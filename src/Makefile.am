@@ -1,4 +1,4 @@
-lib_LTLIBRARIES= libsatsolver.la
+lib_LTLIBRARIES= libsatsolver0.la
 solverincludedir = $(includedir)/satsolver
 
 solverinclude_HEADERS = \
@@ -16,7 +16,9 @@ solverinclude_HEADERS = \
 	util.h		\
 	source_solv.h
 
-libsatsolver_la_SOURCES = \
+EXTRA_DIST = poolid_private.h
+
+libsatsolver0_la_SOURCES = \
         bitmap.c        \
 	evr.c           \
 	poolid.c        \

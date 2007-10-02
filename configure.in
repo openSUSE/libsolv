@@ -134,4 +134,5 @@ AC_OUTPUT([
 	src/Makefile
 	tools/Makefile
 	testsuite/Makefile
+	doc/Makefile
 	])

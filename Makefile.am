@@ -1,4 +1,4 @@
-SUBDIRS = src tools testsuite
+SUBDIRS = src tools testsuite doc
 
 AUTOMAKE_OPTIONS = no-dist-gzip dist-bzip2
 
