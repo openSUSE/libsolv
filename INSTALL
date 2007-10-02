@@ -1,0 +1,26 @@
+Compiling and installing the software
+
+
+** This is a research project, NOT a complete tool. **
+
+
+Requirements
+
+- C compiler
+- automake/autoconf/libtool
+- make
+- expat
+- db-4.3
+
+Steps to compile
+
+1. sh bootstrap
+2. ./configure
+3. make
+
+
+Steps to run the testsuite
+
+1. cd testsuite
+2a. ./runtest.rb --redcarpet data.libredcarpet
+2b. ./runtest.rb data.libzypp

@@ -1,0 +1,26 @@
+SAT-Solver
+
+Using a Satisfyability Solver to compute package dependencies.
+
+See http://idea.opensuse.org/content/ideas/fast-installation-tool
+for the motivation.
+
+
+This code is based on two major, but independent, blocks
+
+1. Using a dictionary approach to store and retrieve package
+   and dependency information.
+   
+2. Using satisfyability, a well known and researched topic, for
+   computing package dependencies.
+
+
+Google for 'sat solver' to get links to the theory behind it.
+http://del.icio.us/kkaempf/solver gives a collection of bookmarks
+related to this topic.
+
+Some research papers are in doc/pdf.
+
+Everything else is below doc.
+
+Please subscribe to zypp-devel@opensuse.org for any questions.

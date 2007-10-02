@@ -1,0 +1,137 @@
+dnl *******************************************
+dnl *** Initialize automake and set version ***
+dnl *******************************************
+
+AC_PREREQ(2.53)
+AC_INIT(satsolver, 0.0.1)
+AC_CONFIG_SRCDIR(src/solver.c)
+AM_INIT_AUTOMAKE(AC_PACKAGE_NAME, AC_PACKAGE_VERSION)
+
+AM_CONFIG_HEADER(config.h)
+AM_MAINTAINER_MODE
+AC_PROG_MAKE_SET
+
+dnl ***************************
+dnl *** Set debugging flags ***
+dnl ***************************
+
+debug_default=minimum
+
+
+# Declare --enable-* args and collect ac_help strings
+AC_ARG_ENABLE(debug, 
+	      [  --enable-debug=[no/minimum/yes] turn on debugging [default=$debug_default]],,
+	      enable_debug=$debug_default)
+
+# Set the debug flags
+if test "x$enable_debug" = "xyes"; then
+    test "$cflags_set" = set || CFLAGS="$CFLAGS -g"
+fi
+
+# check for ssize_t
+AC_CHECK_TYPE(ssize_t, int)
+
+dnl ***************************
+dnl *** Checks for programs ***
+dnl ***************************
+
+
+AC_PROG_CC
+AM_PROG_CC_STDC
+AC_PROG_INSTALL
+
+# Set STDC_HEADERS
+AC_HEADER_STDC
+
+# Initialize libtool
+AM_PROG_LIBTOOL
+
+# This isn't a program, but it doesn't fit anywhere else...
+AC_FUNC_ALLOCA
+
+
+
+dnl ***********************
+dnl *** expat and db43  ***
+dnl ***********************
+
+AC_CHECK_LIB([expat], [XML_ParserCreate], [], [AC_MSG_ERROR(Please install expat)])
+
+AC_CHECK_LIB([db-4.3], [db_create], [], [AC_MSG_ERROR(Please install db43-devel)])
+
+dnl ***********************
+dnl *** Check for Win32 ***
+dnl ***********************
+
+AC_MSG_CHECKING([for Win32])
+case "$host" in
+  *-*-mingw*)
+    os_win32=yes
+    AC_CACHE_VAL(ac_cv_func_getaddrinfo, [ac_cv_func_getaddrinfo=yes])
+    AC_CACHE_VAL(ac_cv_func_getnameinfo, [ac_cv_func_getnameinfo=yes])
+    AC_CACHE_VAL(ac_cv_func_inet_pton, [ac_cv_func_inet_pton=yes])
+    AC_CACHE_VAL(ac_cv_func_inet_ntop, [ac_cv_func_inet_ntop=yes])
+    AC_CACHE_VAL(soup_cv_ipv6, [soup_cv_ipv6=yes])
+    ;;
+  *)
+    os_win32=no
+    ;;
+esac
+AC_MSG_RESULT([$os_win32])
+AM_CONDITIONAL(OS_WIN32, [test $os_win32 = yes])
+
+dnl *******************
+dnl *** Misc checks ***
+dnl *******************
+AC_CHECK_FUNCS(gmtime_r)
+dnl ----------------------------------------------------------------------
+AC_CHECK_HEADERS([inttypes.h stdlib.h])
+
+    AC_CHECK_SIZEOF(short)
+    AC_CHECK_SIZEOF(int)
+    AC_CHECK_SIZEOF(long)
+    AC_CHECK_SIZEOF(long long)
+    SIZEOF_SHORT=$ac_cv_sizeof_short
+    SIZEOF_INT=$ac_cv_sizeof_int
+    SIZEOF_LONG=$ac_cv_sizeof_long
+    SIZEOF_LONG_LONG=$ac_cv_sizeof_long_long
+    AC_SUBST(SIZEOF_SHORT)
+    AC_SUBST(SIZEOF_INT)
+    AC_SUBST(SIZEOF_LONG)
+    AC_SUBST(SIZEOF_LONG_LONG)
+
+if test "$prefix" = "NONE"; then
+    prefix=$ac_default_prefix;
+fi
+
+dnl *************************************
+dnl *** Warnings to show if using GCC ***
+dnl *************************************
+
+AC_ARG_ENABLE(more-warnings,
+	      [  --disable-more-warnings  Inhibit compiler warnings],
+	      set_more_warnings=no)
+
+if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
+	CFLAGS="$CFLAGS \
+		-Wall -Wstrict-prototypes -Wmissing-declarations \
+		-Wmissing-prototypes -Wnested-externs -Wpointer-arith \
+		-Wunused -Werror"
+fi
+
+if test "$os_win32" != yes; then
+	# Use reentrant functions (FIXME!)
+	CFLAGS="$CFLAGS -D_REENTRANT"
+fi
+
+dnl *************************
+dnl *** Output Everything ***
+dnl *************************
+AC_SUBST(SYSCONFDIR)
+
+AC_OUTPUT([
+	Makefile
+	src/Makefile
+	tools/Makefile
+	testsuite/Makefile
+	])
