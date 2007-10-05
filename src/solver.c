@@ -806,6 +806,10 @@ addrulesforsupplements(Solver *solv, Map *m)
       if (MAPTST(m, i))
 	continue;
       s = pool->solvables + i;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	continue;
+      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+	continue;
       sup = 0;
       if ((supp = s->supplements) != 0)
 	{
@@ -1807,6 +1811,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    continue;
 
 		  if (dq.count > 1)
+		    prune_to_recommended(solv, &dq);
+		  if (dq.count > 1)
 		    prune_best_version_arch(pool, &dq);
 #if 0
 		  s = pool->solvables + dq.elements[0];
@@ -1968,6 +1974,10 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  Id *supp, sup;
 		  s = pool->solvables + i;
 		  if (!s->supplements && !s->freshens)
+		    continue;
+		  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+		    continue;
+		  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
 		    continue;
 		  if ((supp = s->supplements) != 0)
 		    {

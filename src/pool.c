@@ -336,10 +336,12 @@ addrelproviders(Pool *pool, Id d)
 	queuepushunique(&plist, p);
       break;
     case REL_NAMESPACE:
+#if 0
       /* unknown namespace, just pass through */
       pp = GET_PROVIDESP(evr, p);
       while ((p = *pp++) != 0)
 	queuepush(&plist, p);
+#endif
       break;
     default:
       break;
