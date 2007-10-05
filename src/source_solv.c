@@ -358,8 +358,8 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
       
       for (i = 0; i < numrel; i++)
 	{
-	  name = read_id(fp, numid);	/* read (source relative) Ids */
-	  evr = read_id(fp, numid);
+	  name = read_id(fp, i + numid);	/* read (source relative) Ids */
+	  evr = read_id(fp, i + numid);
 	  flags = read_u8(fp);
 	  name = idmap[name];		/* map to (pool relative) Ids */
 	  evr = idmap[evr];
@@ -564,7 +564,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 #if 0
 	      printf("%s ->\n", id2str(pool, id));
 	      for (; *ida; ida++)
-	        printf("  %s%s%s\n", id2str(pool, *ida), id2rel(pool, *ida), id2evr(pool, *ida));
+	        printf("  %s\n", dep2str(pool, *ida));
 #endif
 	      break;
 	    }

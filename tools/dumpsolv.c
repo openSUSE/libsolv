@@ -14,7 +14,7 @@ printids(Pool *pool, char *kind, Id *ids)
     return;
   printf("%s:\n", kind);
   while((id = *ids++) != 0)
-    printf("  %s%s%s\n", id2str(pool, id), id2rel(pool, id), id2evr(pool, id));
+    printf("  %s\n", dep2str(pool, id));
 }
 
 int main(int argc, char **argv)

@@ -307,15 +307,50 @@ addrelproviders(Pool *pool, Id d)
   Id evr = rd->evr;
   int flags = rd->flags;
   Id pid, *pidp;
-  Id p, *pp;
+  Id p, *pp, *pp2, *pp3;
 
   d = GETRELID(pool, d);
   queueinit_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
+  switch (flags)
+    {
+    case REL_AND:
+    case REL_WITH:
+      pp = GET_PROVIDESP(name, p);
+      pp2 = GET_PROVIDESP(evr, p);
+      while ((p = *pp++) != 0)
+	{
+	  for (pp3 = pp2; *pp3;)
+	    if (*pp3++ == p)
+	      {
+	        queuepush(&plist, p);
+		break;
+	      }
+	}
+      break;
+    case REL_OR:
+      pp = GET_PROVIDESP(name, p);
+      while ((p = *pp++) != 0)
+	queuepush(&plist, p);
+      pp = GET_PROVIDESP(evr, p);
+      while ((p = *pp++) != 0)
+	queuepushunique(&plist, p);
+      break;
+    case REL_NAMESPACE:
+      /* unknown namespace, just pass through */
+      pp = GET_PROVIDESP(evr, p);
+      while ((p = *pp++) != 0)
+	queuepush(&plist, p);
+      break;
+    default:
+      break;
+    }
+
+  /* convert to whatprovides id */
 #if 0
   if (pool->verbose)
     printf("addrelproviders: what provides %s?\n", id2str(pool, name));
 #endif
-  if (flags)
+  if (flags && flags < 8)
     {
       FOR_PROVIDES(p, pp, name)
 	{

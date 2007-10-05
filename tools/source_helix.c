@@ -583,9 +583,8 @@ endElement(void *userData, const char *name)
                         pd->release ? pd->evrspace + pd->release : 0);
       /* ensure self-provides */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        {
-          pd->deps[pd->pack].provides = source_addid_dep(pd->source, pd->deps[pd->pack].provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-        }
+        pd->deps[pd->pack].provides = source_addid_dep(pd->source, pd->deps[pd->pack].provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      pd->deps[pd->pack].supplements = source_fix_legacy(pd->source, pd->deps[pd->pack].provides, pd->deps[pd->pack].supplements);
       pd->pack++;		       /* inc pack count */
       break;
     case STATE_NAME:

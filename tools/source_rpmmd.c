@@ -385,6 +385,7 @@ endElement(void *userData, const char *name)
         s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         pd->deps[pd->pack].provides = source_addid_dep(pd->source, pd->deps[pd->pack].provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      pd->deps[pd->pack].supplements = source_fix_legacy(pd->source, pd->deps[pd->pack].provides, pd->deps[pd->pack].supplements);
       pd->pack++;
       break;
     case STATE_NAME:

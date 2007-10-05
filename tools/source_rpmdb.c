@@ -506,6 +506,7 @@ rpm2solv(Pool *pool, Source *source, Solvable *s, struct deps *deps, RpmHead *rp
   deps->supplements = makedeps(pool, source, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 2);
   deps->enhances  = makedeps(pool, source, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 1);
   deps->freshens = 0;
+  deps->supplements = source_fix_legacy(source, deps->provides, deps->supplements);
   return 1;
 }
 

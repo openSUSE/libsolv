@@ -21,6 +21,7 @@ typedef struct _Reldep {
 extern Id str2id(Pool *pool, const char *, int);
 extern Id rel2id(Pool *pool, Id, Id, int, int);
 extern const char *id2str(Pool *pool, Id);
+extern const char *dep2str(Pool *pool, Id);
 extern const char *id2rel(Pool *pool, Id);
 extern const char *id2evr(Pool *pool, Id);
 

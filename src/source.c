@@ -280,4 +280,151 @@ pool_freesource(Pool *pool, Source *source)
   xfree(source);
 }
 
+unsigned int
+source_fix_legacy(Source *source, unsigned int provides, unsigned int supplements)
+{
+  Pool *pool = source->pool;
+  const char *p, *dep;
+  Id id, idp, idl, idns;
+  char buf[1024];
+  int i;
+
+  if (provides)
+    {
+      for (i = provides; source->idarraydata[i]; i++)
+	{
+	  id = source->idarraydata[i];
+	  if (ISRELDEP(id))
+	    continue;
+	  dep = id2str(pool, id);
+	  if (!strncmp(dep, "locale(", 7) && strlen(dep) < sizeof(buf))
+	    {
+	      dep += 7;
+	      idp = 0;
+	      if ((p = strchr(dep, ':')) != 0 && p != dep)
+		{
+		  strncpy(buf, dep, p - dep);
+		  buf[p - dep] = 0;
+		  idp = str2id(pool, buf, 1);
+		  dep = p + 1;
+		}
+	      id = 0;
+	      while ((p = strchr(dep, ';')) != 0)
+		{
+		  if (p == dep)
+		    {
+		      dep = p + 1;
+		      continue;
+		    }
+		  strcpy(buf, "Locale(");
+		  strncpy(buf + 7, dep, p - dep);
+		  buf[p - dep + 7] = ')';
+		  buf[p - dep + 8] = 0;
+		  idl = str2id(pool, buf, 1);
+		  if (id)
+		    id = rel2id(pool, id, idl, REL_OR, 1);
+		  else
+		    id = idl;
+		  dep = p + 1;
+		}
+	      if (dep[0] && dep[1])
+		{
+		  strcpy(buf, "Locale(");
+		  strcpy(buf + 7, dep);
+		  idl = str2id(pool, buf, 1);
+		  if (id)
+		    id = rel2id(pool, id, idl, REL_OR, 1);
+		  else
+		    id = idl;
+		}
+	      if (idp)
+		id = rel2id(pool, idp, id, REL_AND, 1);
+	      if (id)
+		supplements = source_addid_dep(source, supplements, id, 0);
+	    }
+	  else if ((p = strchr(dep, ':')) != 0 && p != dep && p[1] == '/' && strlen(dep) < sizeof(buf))
+	    {
+	      strncpy(buf, dep, p - dep);
+	      buf[p - dep] = 0;
+	      idp = str2id(pool, buf, 1);
+	      idns = str2id(pool, "namespace:installed", 1);
+	      id = str2id(pool, p + 1, 1);
+	      id = rel2id(pool, idns, id, REL_NAMESPACE, 1);
+	      id = rel2id(pool, idp, id, REL_AND, 1);
+	      supplements = source_addid_dep(source, supplements, id, 0);
+	    }
+	}
+    }
+  if (!supplements)
+    return 0;
+  for (i = supplements; source->idarraydata[i]; i++)
+    {
+      id = source->idarraydata[i];
+      if (ISRELDEP(id))
+	continue;
+      dep = id2str(pool, id);
+      if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10] && strlen(dep) < sizeof(buf))
+	{
+	  p = strchr(dep + 9, ':');
+	  idns = str2id(pool, "namespace:modalias", 1);
+	  if (p && p != dep + 9 && strchr(p + 1, ':'))
+	    {
+	      dep += 9;
+	      strncpy(buf, dep, p - dep);
+	      buf[p - dep] = 0;
+	      idp = str2id(pool, buf, 1);
+	      strcpy(buf, p + 1);
+	      buf[strlen(buf) - 1] = 0;
+	      id = str2id(pool, buf, 1);
+	      id = rel2id(pool, idns, id, REL_NAMESPACE, 1);
+	      id = rel2id(pool, idp, id, REL_AND, 1);
+	    }
+	  else
+	    {
+	      dep += 9;
+	      strcpy(buf, dep);
+	      buf[strlen(buf) - 1] = 0;
+	      id = str2id(pool, buf, 1);
+	      id = rel2id(pool, idns, id, REL_NAMESPACE, 1);
+	    }
+	  if (id)
+	    source->idarraydata[i] = id;
+	}
+      else if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
+	{
+	  id = 0;
+	  dep += 11;
+	  while ((p = strchr(dep, ':')) != 0)
+	    {
+	      if (p == dep)
+		{
+		  dep = p + 1;
+		  continue;
+		}
+	      strncpy(buf, dep, p - dep);
+	      buf[p - dep] = 0;
+	      idp = str2id(pool, buf, 1);
+	      if (id)
+		id = rel2id(pool, id, idp, REL_AND, 1);
+	      else
+		id = idp;
+	      dep = p + 1;
+	    }
+	  if (dep[0] && dep[1])
+	    {
+	      strcpy(buf, dep);
+	      buf[strlen(buf) - 1] = 0;
+	      idp = str2id(pool, buf, 1);
+	      if (id)
+		id = rel2id(pool, id, idp, REL_AND, 1);
+	      else
+		id = idp;
+	    }
+	  if (id)
+	    source->idarraydata[i] = id;
+	}
+    }
+  return supplements;
+}
+
 // EOF

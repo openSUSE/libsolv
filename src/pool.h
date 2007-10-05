@@ -109,9 +109,14 @@ struct _Pool {
 #define GETRELID(pool, id) ((pool)->nstrings + ((id) ^ 0x80000000))     /* returns Id  */
 #define GETRELDEP(pool, id) ((pool)->rels + ((id) ^ 0x80000000))	/* returns Reldep* */
 
-#define REL_GT 1
-#define REL_EQ 2
-#define REL_LT 4
+#define REL_GT		1
+#define REL_EQ		2
+#define REL_LT		4
+
+#define REL_AND		16
+#define REL_OR		17
+#define REL_WITH	18
+#define REL_NAMESPACE	19
 
 extern Pool *pool_create(void);
 extern void pool_free(Pool *pool);

@@ -51,7 +51,15 @@ incneedid(Pool *pool, Id *idarray, NeedId *needid)
 	{
 	  Reldep *rd = GETRELDEP(pool, id);
 	  needid[GETRELID(pool, id)].need++;
-	  needid[rd->evr].need++;
+	  if (ISRELDEP(rd->evr))
+	    {
+	      Id ida[2];
+	      ida[0] = rd->evr;
+	      ida[1] = 0;
+	      incneedid(pool, ida, needid);
+	    }
+	  else
+	    needid[rd->evr].need++;
 	  id = rd->name;
 	}
       needid[id].need++;

@@ -224,6 +224,8 @@ pool_addsource_susetags(Pool *pool, FILE *fp)
 	{
 	  if (dp && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	    dp->provides = source_addid_dep(source, dp->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+	  if (dp)
+	    dp->supplements = source_fix_legacy(source, dp->provides, dp->supplements);
 	  pd.kind = 0;
 	  if (line[3] == 't')
 	    pd.kind = "pattern";
@@ -319,6 +321,8 @@ pool_addsource_susetags(Pool *pool, FILE *fp)
     }
   if (dp && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     dp->provides = source_addid_dep(source, dp->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  if (dp)
+    dp->supplements = source_fix_legacy(source, dp->provides, dp->supplements);
     
   pool->nsolvables += pack;
   source->nsolvables = pack;
