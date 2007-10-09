@@ -51,6 +51,8 @@ static char *initpool_data[] = {
   "rpm:dbid",			       /* direct key into rpmdb */
   "solvable:prereqmarker",
   "solvable:filemarker",
+  "namespace:installed",
+  "namespace:modalias",
   "src",
   "nosrc",
   "noarch"

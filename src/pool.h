@@ -20,24 +20,26 @@ typedef int bool;
 /* well known ids */
 #define ID_NULL			0
 #define ID_EMPTY		1
-#define SOLVABLE_NAME           2
-#define SOLVABLE_ARCH           3
-#define SOLVABLE_EVR            4
-#define SOLVABLE_PROVIDES       5
-#define SOLVABLE_OBSOLETES      6
-#define SOLVABLE_CONFLICTS      7
-#define SOLVABLE_REQUIRES       8
-#define SOLVABLE_RECOMMENDS     9
-#define SOLVABLE_SUGGESTS       10
-#define SOLVABLE_SUPPLEMENTS    11
-#define SOLVABLE_ENHANCES       12
-#define SOLVABLE_FRESHENS       13
-#define RPM_RPMDBID             14
-#define SOLVABLE_PREREQMARKER   15		// normal requires before this, prereqs after this
-#define SOLVABLE_FILEMARKER     16		// normal provides before this, generated file provides after this
-#define ARCH_SRC                17
-#define ARCH_NOSRC              18
-#define ARCH_NOARCH             19
+#define SOLVABLE_NAME		2
+#define SOLVABLE_ARCH		3
+#define SOLVABLE_EVR		4
+#define SOLVABLE_PROVIDES	5
+#define SOLVABLE_OBSOLETES	6
+#define SOLVABLE_CONFLICTS	7
+#define SOLVABLE_REQUIRES	8
+#define SOLVABLE_RECOMMENDS	9
+#define SOLVABLE_SUGGESTS	10
+#define SOLVABLE_SUPPLEMENTS	11
+#define SOLVABLE_ENHANCES	12
+#define SOLVABLE_FRESHENS	13
+#define RPM_RPMDBID		14
+#define SOLVABLE_PREREQMARKER	15		// normal requires before this, prereqs after this
+#define SOLVABLE_FILEMARKER	16		// normal provides before this, generated file provides after this
+#define NAMESPACE_INSTALLED	17
+#define NAMESPACE_MODALIAS	18
+#define ARCH_SRC		19
+#define ARCH_NOSRC		20
+#define ARCH_NOARCH		21
 
 //-----------------------------------------------
 

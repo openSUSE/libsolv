@@ -55,8 +55,8 @@ replaces_system(Solver *solv, Id id)
 }
 #endif
 
-static inline int
-dep_is_installed(Solver *solv, Id dep)
+static int
+dep_installed(Solver *solv, Id dep)
 {
   Pool *pool = solv->pool;
   Id p, *pp;
@@ -66,10 +66,38 @@ dep_is_installed(Solver *solv, Id dep)
       Reldep *rd = GETRELDEP(pool, dep);
       if (rd->flags == REL_AND)
 	{
-	  if (!dep_is_installed(solv, rd->name))
+	  if (!dep_installed(solv, rd->name))
 	    return 0;
-	  return dep_is_installed(solv, rd->evr);
+	  return dep_installed(solv, rd->evr);
 	}
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+	return dep_installed(solv, rd->evr);
+    }
+  FOR_PROVIDES(p, pp, dep)
+    {
+      if (p >= solv->system->start && p < solv->system->start + solv->system->nsolvables)
+	return 1;
+    }
+  return 0;
+}
+
+static inline int
+dep_fulfilled(Solver *solv, Id dep)
+{
+  Pool *pool = solv->pool;
+  Id p, *pp;
+
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags == REL_AND)
+	{
+	  if (!dep_fulfilled(solv, rd->name))
+	    return 0;
+	  return dep_fulfilled(solv, rd->evr);
+	}
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+	return dep_installed(solv, rd->evr);
     }
   FOR_PROVIDES(p, pp, dep)
     {
@@ -99,7 +127,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
       if ((supp = s->supplements) != 0)
 	{
 	  while ((sup = *supp++) != 0)
-	    if (dep_is_installed(solv, sup))
+	    if (dep_fulfilled(solv, sup))
 	      break;
 	  if (!sup)
 	    continue;
@@ -107,7 +135,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
       if ((supp = s->freshens) != 0)
 	{
 	  while ((sup = *supp++) != 0)
-	    if (dep_is_installed(solv, sup))
+	    if (dep_fulfilled(solv, sup))
 	      break;
 	  if (!sup)
 	    continue;
@@ -151,7 +179,7 @@ prune_best_version_arch(Pool *pool, Queue *plist)
 	  if (a > pool->lastarch)
 	    continue;
 	  a = pool->id2arch[a];
-	  if ((a & 0xffff0000) > bestscore)
+	  if (!bestscore || (a & 0xffff0000) < bestscore)
 	    bestscore = a & 0xffff0000;
 	}
       for (i = j = 0; i < plist->count; i++)
@@ -648,7 +676,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id n;
 
   queueinit(&q);
-  queuepush(&q, s - pool->solvables);/* push solvable Id */
+  queuepush(&q, s - pool->solvables);	/* push solvable Id */
 
   while (q.count)
     {
@@ -1982,7 +2010,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if ((supp = s->supplements) != 0)
 		    {
 		      while ((sup = *supp++) != 0)
-			if (dep_is_installed(solv, sup))
+			if (dep_fulfilled(solv, sup))
 			  break;
 		      if (!sup)
 			continue;
@@ -1990,7 +2018,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if ((supp = s->freshens) != 0)
 		    {
 		      while ((sup = *supp++) != 0)
-			if (dep_is_installed(solv, sup))
+			if (dep_fulfilled(solv, sup))
 			  break;
 		      if (!sup)
 			continue;
@@ -2199,24 +2227,12 @@ printdecisions(Solver *solv)
       if (obsoletesmap[i])
 	continue;
       s = pool->solvables + i;
-      if (solv->rc_output)
-	{
-	  printf(">!> ");
-	  if (solv->rc_output == 2)
-	    {
-	      printf("remove ");
-	      printf(" %s-%s%s", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
-	    }
-	  else
-	    {
-	      printf("remove  %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	    }
-	}
+      if (solv->rc_output == 2)
+	printf(">!> remove  %s-%s%s\n", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
+      else if (solv->rc_output)
+	printf(">!> remove  %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
       else
-        {
-          printf("erase   %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-        }
-      printf("\n");
+	printf("erase   %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
       uninstalls++;
     }
 
@@ -2224,6 +2240,7 @@ printdecisions(Solver *solv)
 
   for (i = 0; i < solv->decisionq.count; i++)
     {
+      int j;
       p = solv->decisionq.elements[i];
       if (p < 0)
 	continue;
@@ -2231,46 +2248,62 @@ printdecisions(Solver *solv)
 	continue;
       s = pool->solvables + p;
 
-      if (solv->rc_output)
-	printf(">!> ");
-
       if (!obsoletesmap[p])
         {
+	  if (solv->rc_output)
+	    printf(">!> ");
           printf("install %s-%s%s", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
 	  if (solv->rc_output != 2)
             printf(".%s", id2str(pool, s->arch));
 	  installs++;
         }
-      else
+      else if (!solv->rc_output)
 	{
-	  int j;
-	  Solvable *from = NULL, *to = NULL;
-	  if (solv->rc_output)
-	    to = s;
-	  else
-	    printf("update  %s-%s.%s  (obsoletes", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	  upgrades++;
+	  printf("update  %s-%s.%s  (obsoletes", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	  for (j = solv->system->start; j < solv->system->start + solv->system->nsolvables; j++)
 	    {
-	      if (obsoletesmap[j] == p)
-		{
-		  s = pool->solvables + j;
-		  if (solv->rc_output)
-		    from = s;
-		  else
-		    printf(" %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-		}
+	      if (obsoletesmap[j] != p)
+		continue;
+	      s = pool->solvables + j;
+	      printf(" %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	    }
-	  if (solv->rc_output)
+	  printf(")");
+	  upgrades++;
+	}
+      else
+	{
+	  Solvable *f, *fn = 0;
+	  for (j = solv->system->start; j < solv->system->start + solv->system->nsolvables; j++)
 	    {
-	      if (solv->rc_output == 2)
-		printf("upgrade %s-%s => %s-%s%s", id2str(pool, from->name), id2str(pool, from->evr), id2str(pool, to->name), id2rc(solv, to->evr), id2str(pool, to->evr));
+	      if (obsoletesmap[j] != p)
+		continue;
+	      f = pool->solvables + j;
+	      if (fn || f->name != s->name)
+		{
+		  if (solv->rc_output == 2)
+		    printf(">!> remove  %s-%s%s\n", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
+		  else if (solv->rc_output)
+		    printf(">!> remove  %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		  uninstalls++;
+		}
 	      else
-		printf("upgrade %s-%s.%s => %s-%s.%s", id2str(pool, from->name), id2str(pool, from->evr), id2str(pool, from->arch), id2str(pool, to->name), id2str(pool, to->evr), id2str(pool, to->arch));
-	      s = to;		       /* for final source name */
+		fn = f;
+	    }
+	  if (!fn)
+	    {
+	      printf(">!> install %s-%s%s", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
+	      if (solv->rc_output != 2)
+	        printf(".%s", id2str(pool, s->arch));
+	      installs++;
 	    }
 	  else
-	    printf(")");
+	    {
+	      if (solv->rc_output == 2)
+	        printf(">!> upgrade %s-%s => %s-%s%s", id2str(pool, fn->name), id2str(pool, fn->evr), id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
+	      else
+	        printf(">!> upgrade %s-%s.%s => %s-%s.%s", id2str(pool, fn->name), id2str(pool, fn->evr), id2str(pool, fn->arch), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	      upgrades++;
+	    }
 	}
       if (solv->rc_output)
 	{
