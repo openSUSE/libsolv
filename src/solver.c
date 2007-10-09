@@ -665,6 +665,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Pool *pool = solv->pool;
   Source *system = solv->system;
   Queue q;
+  Id qbuf[64];
   int i;
   int dontfix;
   Id req, *reqp;
@@ -675,7 +676,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id *dp;
   Id n;
 
-  queueinit(&q);
+  queueinit_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
   queuepush(&q, s - pool->solvables);	/* push solvable Id */
 
   while (q.count)
@@ -927,10 +928,10 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 	  while ((obs = *obsp++) != 0)	/* for all obsoletes */
 	    {
 	      FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
-	      {
-		if (p2 == n)		/* match ! */
-		  break;
-	      }
+		{
+		  if (p2 == n)		/* match ! */
+		    break;
+		}
 	      if (p2)			/* match! */
 		break;
 	    }
@@ -960,13 +961,14 @@ addupdaterule(Solver *solv, Solvable *s, Map *m, int allowdowngrade, int allowar
 {
   /* system packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
-  Id d, n;
+  Id p, d;
   Rule *r;
   Queue qs;
+  Id qsbuf[64];
 
-  queueinit(&qs);
+  queueinit_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   findupdatepackages(solv, s, &qs, m, allowdowngrade, allowarchchange);
-  n = s - pool->solvables;
+  p = s - pool->solvables;
   if (dontaddrule)	/* we consider update candidates but dont force them */
     {
       queuefree(&qs);
@@ -978,14 +980,14 @@ addupdaterule(Solver *solv, Solvable *s, Map *m, int allowdowngrade, int allowar
 #if 0
       printf("new update rule: must keep %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 #endif
-      addrule(solv, n, 0);		/* request 'install' of s */
+      addrule(solv, p, 0);		/* request 'install' of s */
       queuefree(&qs);
       return;
     }
 
   d = pool_queuetowhatprovides(pool, &qs);   /* intern computed provider queue */
   queuefree(&qs);
-  r = addrule(solv, n, d);	       /* allow update of s */
+  r = addrule(solv, p, d);	       /* allow update of s */
 #if 0
   printf("new update rule ");
   if (r)
@@ -1637,7 +1639,6 @@ solver_create(Pool *pool, Source *system)
   solv->decisionmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
   solv->rules = (Rule *)xmalloc((solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
   memset(solv->rules, 0, sizeof(Rule));
-
   solv->nrules = 1;
 
   return solv;
