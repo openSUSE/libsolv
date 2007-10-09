@@ -2076,7 +2076,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
     }
   for (;;)
     {
-      revert(solv, 1);
+      revert(solv, 1);		/* XXX move to reset_solver? */
       reset_solver(solv);
       QUEUEEMPTY(&solv->problems);
       run_solver(solv, 0, 0);
@@ -2139,7 +2139,6 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	}
     }
   /* enable refined rules again */
-  reset_solver(solv);
   for (i = 0; i < disabled.count; i++)
     reenablerule(solv, solv->rules + disabled.elements[i]);
   /* disable problem rules again so that we are in the same state as before */
@@ -2614,8 +2613,26 @@ solve(Solver *solv, Queue *job)
 		}
 	      else if (why >= solv->systemrules && why < solv->learntrules)
 		{
+		  Solvable *sd = 0;
 		  s = pool->solvables + solv->system->start + (why - solv->systemrules);
-		  printf("- allow deinstallation/downgrade of %s-%s.%s [%d]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), why);
+		  if (solv->weaksystemrules && solv->weaksystemrules[why - solv->systemrules])
+		    {
+		      Id *dp = pool->whatprovidesdata + solv->weaksystemrules[why - solv->systemrules];
+		      for (; *dp; dp++)
+			if (solv->decisionmap[*dp] > 0)
+			  {
+			    sd = pool->solvables + *dp;
+			    break;
+			  }
+		    }
+		  if (sd)
+		    {
+		      printf("- allow downgrade of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+		    }
+		  else
+		    {
+		      printf("- allow deinstallation of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		    }
 		}
 	      else
 		{
