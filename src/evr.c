@@ -4,6 +4,7 @@
  * version compare
  */
 
+#include <stdio.h>
 #include <string.h>
 #include "evr.h"
 #include "pool.h"
@@ -103,7 +104,7 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id)
     {
       if (!pool->promoteepoch)
 	{
-	  while(*evr1 == '0')
+	  while (*evr1 == '0')
 	    evr1++;
 	  if (*evr1 != ':')
 	    return 1;
@@ -112,11 +113,11 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id)
     }
   else if (s2)
     {
-      while(*evr2 == '0')
+      while (*evr2 == '0')
 	evr2++;
       if (*evr2 != ':')
 	return -1;
-      evr2 = s1 + 1;
+      evr2 = s2 + 1;
     }
   for (s1 = evr1, r1 = 0; *s1; s1++)
     if (*s1 == '-')
