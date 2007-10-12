@@ -6,6 +6,10 @@
 #ifndef POOL_H
 #define POOL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "pooltypes.h"
 #include "poolid.h"
 #include "source.h"
@@ -13,7 +17,9 @@
 #include "queue.h"
 
 // bool
-typedef int bool;
+#ifndef __cplusplus
+typedef _Bool bool;
+#endif
 
 // see initpool_data[] in pool.c
 
@@ -130,5 +136,9 @@ extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
 extern Id *addrelproviders(Pool *pool, Id d);
 
 extern Source *pool_source(Pool *pool, Solvable *s);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* POOL_H */
