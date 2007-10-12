@@ -1,4 +1,4 @@
-Name:           libsatsolver0-0
+Name:           libsatsolver
 Version:        0.0.1
 Release:        1
 License:        BSD
@@ -30,7 +30,7 @@ make
 
 %install
 make DESTDIR=%{buildroot} install
-rm -f %{buildroot}%{_libdir}/libsatsolver0.la
+rm -f %{buildroot}%{_libdir}/libsatsolver.la
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
@@ -40,11 +40,11 @@ rm -rf "$RPM_BUILD_ROOT"
 
 %files
 %defattr(-,root,root)
-%{_libdir}/libsatsolver0.so.*
+%{_libdir}/libsatsolver.so.*
 
 %files devel
 %defattr(-,root,root)
-%{_libdir}/libsatsolver0.so
+%{_libdir}/libsatsolver.so
 %doc doc/README*
 %doc doc/THEORY
 %doc doc/PLANNING
