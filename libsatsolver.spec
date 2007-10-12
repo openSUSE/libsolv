@@ -25,7 +25,7 @@ Group:          Development/Libraries
 %setup -n satsolver-%{version}
 
 %build
-%configure --prefix=/usr --libdir=%{_libdir} --sysconfdir=/etc --disable-static
+%configure --prefix=/usr --libdir=%{_libdir} --sysconfdir=/etc
 make
 
 %install
@@ -40,11 +40,10 @@ rm -rf "$RPM_BUILD_ROOT"
 
 %files
 %defattr(-,root,root)
-%{_libdir}/libsatsolver.so.*
 
 %files devel
 %defattr(-,root,root)
-%{_libdir}/libsatsolver.so
+%{_libdir}/libsatsolver.a
 %doc doc/README*
 %doc doc/THEORY
 %doc doc/PLANNING
