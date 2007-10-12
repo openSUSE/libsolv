@@ -906,6 +906,35 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
   if (m && !MAPTST(m, n))	/* add rule for s if not already done */
     addrulesforsolvable(solv, s, m);
 
+#if defined(GNADENLOS)
+  for (p = 1; p < pool->nsolvables; ++p)
+    {
+       if (p == n)
+	 continue;
+
+       if (s->name == pool->solvables[p].name) 
+         continue;
+
+       if ((obsp = pool->solvables[p].obsoletes) != 0)   /* provides/obsoletes combination ? */
+        {
+          while ((obs = *obsp++) != 0)  /* for all obsoletes */
+            {
+              FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
+                {
+                  if (p2 == n)          /* match ! */
+                    break;
+                }
+              if (p2)                   /* match! */
+                break;
+            }
+          if (!obs)                     /* continue if no match */
+            continue;
+     
+         queuepush(qs, p); 
+       }
+    }
+#endif
+
   /*
    * look for updates for s
    */
@@ -923,6 +952,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 	  if (!allowarchchange && archchanges(pool, s, pool->solvables + p))
 	    continue;
 	}
+#if !defined(GNADENLOS)
       else if ((obsp = pool->solvables[p].obsoletes) != 0)   /* provides/obsoletes combination ? */
 	{
 	  while ((obs = *obsp++) != 0)	/* for all obsoletes */
@@ -941,6 +971,9 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 	   * thus flagging p as a valid update candidate for s
 	   */
 	}
+#endif
+      else
+        continue;
       queuepush(qs, p);
 
       if (m && !MAPTST(m, p))		/* mark p for install if not already done */
