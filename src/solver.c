@@ -2281,9 +2281,9 @@ printdecisions(Solver *solv)
 	      if (fn || f->name != s->name)
 		{
 		  if (solv->rc_output == 2)
-		    printf(">!> remove  %s-%s%s\n", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
+		    printf(">!> remove  %s-%s%s\n", id2str(pool, f->name), id2rc(solv, f->evr), id2str(pool, f->evr));
 		  else if (solv->rc_output)
-		    printf(">!> remove  %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		    printf(">!> remove  %s-%s.%s\n", id2str(pool, f->name), id2str(pool, f->evr), id2str(pool, f->arch));
 		  uninstalls++;
 		}
 	      else
@@ -2308,7 +2308,7 @@ printdecisions(Solver *solv)
       if (solv->rc_output)
 	{
 	  Source *source = pool_source(pool, s);
-	  if (source)
+	  if (source && strcmp(source_name(source), "locales"))
 	    printf("[%s]", source_name(source));
         }
       printf("\n");
