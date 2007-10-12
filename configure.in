@@ -43,6 +43,9 @@ AC_PROG_INSTALL
 # Set STDC_HEADERS
 AC_HEADER_STDC
 
+# Turn off the shared solver library until we have a stable API
+AC_DISABLE_SHARED
+
 # Initialize libtool
 AM_PROG_LIBTOOL
 

@@ -18,8 +18,9 @@ solverinclude_HEADERS = \
 
 EXTRA_DIST = poolid_private.h
 
-libsatsolver_la_LDFLAGS = -version-info 0:0:0
-
+# As long as we build libsatsolver.la statically only we need to
+# force PIC code here, as this lib will be included in libzypp.
+libsatsolver_la_CFLAGS = -fPIC $(AM_CFLAGS)
 libsatsolver_la_SOURCES = \
         bitmap.c        \
 	evr.c           \
