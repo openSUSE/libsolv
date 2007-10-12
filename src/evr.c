@@ -9,7 +9,7 @@
 #include "pool.h"
 
 int
-vercmp( const char *s1, const char *q1, const char *s2, const char *q2 )
+vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
   int r = 0;
   const char *e1, *e2;
@@ -66,9 +66,9 @@ vercmp( const char *s1, const char *q1, const char *s2, const char *q2 )
 }
 
 
-// edition (e:v.r) compare
+// edition (e:v-r) compare
 int
-evrcmp( Pool *pool, Id evr1id, Id evr2id )
+evrcmp(Pool *pool, Id evr1id, Id evr2id)
 {
   int r;
   const char *evr1, *evr2;
@@ -77,8 +77,8 @@ evrcmp( Pool *pool, Id evr1id, Id evr2id )
 
   if (evr1id == evr2id)
     return 0;
-  evr1 = id2str( pool, evr1id );
-  evr2 = id2str( pool, evr2id );
+  evr1 = id2str(pool, evr1id);
+  evr2 = id2str(pool, evr2id);
 
 #if 0
   printf("evrcmp %s %s\n", evr1, evr2);
@@ -93,7 +93,7 @@ evrcmp( Pool *pool, Id evr1id, Id evr2id )
     s2 = 0;
   if (s1 && s2)
     {
-      r = vercmp( evr1, s1, evr2, s2 );
+      r = vercmp(evr1, s1, evr2, s2);
       if (r)
 	return r;
       evr1 = s1 + 1;
