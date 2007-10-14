@@ -55,6 +55,7 @@ enum state {
   STATE_PATTERN,
   STATE_ATOM,
   STATE_PATCH,
+  STATE_PRODUCT,
 
   STATE_PEPOCH,
   STATE_PVERSION,
@@ -81,6 +82,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUBCHANNEL,  "pattern",         STATE_PACKAGE, 0 },
   { STATE_SUBCHANNEL,  "atom",            STATE_PACKAGE, 0 },
   { STATE_SUBCHANNEL,  "patch",           STATE_PACKAGE, 0 },
+  { STATE_SUBCHANNEL,  "product",         STATE_PACKAGE, 0 },
   { STATE_PACKAGE,     "name",            STATE_NAME, 1 },
   { STATE_PACKAGE,     "epoch",           STATE_PEPOCH, 1 },
   { STATE_PACKAGE,     "version",         STATE_PVERSION, 1 },
@@ -440,6 +442,7 @@ startElement(void *userData, const char *name, const char **atts)
       pd->pack = 0;
       break;
 
+
     case STATE_PACKAGE:		       /* solvable name */
 
       if ((pd->pack & PACK_BLOCK) == 0)  /* alloc new block ? */
@@ -460,6 +463,8 @@ startElement(void *userData, const char *name, const char **atts)
         pd->kind = "pattern";
       else if (!strcmp(name, "atom"))
         pd->kind = "atom";
+      else if (!strcmp(name, "product"))
+        pd->kind = "product";
       else if (!strcmp(name, "patch"))
         pd->kind = "patch";
       else
