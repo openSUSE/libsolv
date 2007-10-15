@@ -1,9 +1,9 @@
-noinst_PROGRAMS = rpmdb2solv rpmmd2solv helix2solv susetags2solv patchxml2solv dumpsolv
+noinst_PROGRAMS = rpmdb2solv rpmmd2solv helix2solv susetags2solv patchxml2solv dumpsolv mergesolv
 
 INCLUDES =  \
 	-I$(top_srcdir)/src
 
-LIBS = \
+LDADD = \
 	$(top_builddir)/src/libsatsolver.la
 
 noinst_HEADERS = source_write.h
@@ -49,3 +49,6 @@ patchxml2solv_LDADD = -lexpat
 dumpsolv_SOURCES = \
 	dumpsolv.c
 
+mergesolv_SOURCES = \
+	mergesolv.c \
+	source_write.c
