@@ -117,11 +117,34 @@ prune_to_recommended(Solver *solv, Queue *plist)
   Pool *pool = solv->pool;
   int i, j;
   Solvable *s;
-  Id sup, *supp;
+  Id p, *pp, sup, *supp, rec, *recp;
 
+  if (solv->recommends_index < 0)
+    {
+      MAPZERO(&solv->recommends);
+      solv->recommends_index = 0;
+    }
+  while (solv->recommends_index < solv->decisionq.count)
+    {
+      p = solv->decisionq.elements[solv->recommends_index++];
+      if (p < 0)
+	continue;
+      s = pool->solvables + p;
+      if (!(recp = s->recommends))
+	continue;
+      while ((rec = *recp++) != 0)
+	FOR_PROVIDES(p, pp, rec)
+	  MAPSET(&solv->recommends, p);
+    }
   for (i = j = 0; i < plist->count; i++)
     {
-      s = pool->solvables + plist->elements[i];
+      p = plist->elements[i];
+      if (MAPTST(&solv->recommends, p))
+	{
+	  plist->elements[j++] = p;
+	  continue;
+	}
+      s = pool->solvables + p;
       if (!s->supplements && !s->freshens)
 	continue;
       if ((supp = s->supplements) != 0)
@@ -621,10 +644,8 @@ addrule(Solver *solv, Id p, Id d)
 	    return r;
 	  /* direct conflict! */
 	  for (i = 0; i < solv->decisionq.count; i++)
-	  {
 	    if (solv->decisionq.elements[i] == -p)
 	      break;
-	  }
 	  if (i == solv->decisionq.count)
 	    abort();
 	  if (solv->decisionq_why.elements[i] == 0)
@@ -1362,6 +1383,7 @@ reset_solver(Solver *solv)
 
   solv->decisionq_why.count = i;
   solv->decisionq.count = i;
+  solv->recommends_index = -1;
   if (i < solv->propagate_index)
     solv->propagate_index = i;
   /* make direct decisions from enabled unary rules */
@@ -1542,6 +1564,7 @@ revert(Solver *solv, int level)
       solv->decisionq_why.count--;
       solv->propagate_index = solv->decisionq.count;
     }
+  solv->recommends_index = -1;
 }
 
 
@@ -1669,6 +1692,9 @@ solver_create(Pool *pool, Source *system)
   queueinit(&solv->learnt_why);
   queueinit(&solv->learnt_pool);
 
+  mapinit(&solv->recommends, pool->nsolvables);
+  solv->recommends_index = 0;
+
   solv->decisionmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
   solv->rules = (Rule *)xmalloc((solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
   memset(solv->rules, 0, sizeof(Rule));
@@ -1689,6 +1715,7 @@ solver_free(Solver *solv)
   queuefree(&solv->decisionq_why);
   queuefree(&solv->learnt_why);
   queuefree(&solv->learnt_pool);
+  mapfree(&solv->recommends);
   xfree(solv->decisionmap);
   xfree(solv->rules);
   xfree(solv->watches);

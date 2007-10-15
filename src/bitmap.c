@@ -7,20 +7,20 @@
 #include <string.h>
 
 #include "bitmap.h"
+#include "util.h"
 
 void
 mapinit(Map *m, int n)
 {
   m->size = (n + 7) >> 3;
-  m->map = calloc(m->size, 1);
+  m->map = xcalloc(m->size, 1);
 }
 
 // free space allocated
 void
 mapfree(Map *m)
 {
-  free(m->map);
-  m->map = 0;
+  m->map = xfree(m->map);
   m->size = 0;
 }
 
@@ -29,7 +29,7 @@ void
 clonemap(Map *t, Map *s)
 {
   t->size = s->size;
-  t->map = malloc(s->size);
+  t->map = xmalloc(s->size);
   memcpy(t->map, s->map, t->size);
 }
 
