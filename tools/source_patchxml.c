@@ -52,6 +52,7 @@ struct stateswitch {
 static struct stateswitch stateswitches[] = {
   { STATE_START,       "patch",           STATE_PATCH, 0 },
   { STATE_START,       "package",         STATE_ATOM, 0 },
+  { STATE_START,       "patches",         STATE_START, 0},
   { STATE_PATCH,       "yum:name",        STATE_NAME, 1 },
   { STATE_PATCH,       "yum:arch",        STATE_ARCH, 1 },
   { STATE_PATCH,       "yum:version",     STATE_VERSION, 0 },
