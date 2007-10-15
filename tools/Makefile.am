@@ -14,7 +14,7 @@ rpmdb2solv_SOURCES = \
 	source_rpmdb.c	\
 	source_write.c
 
-rpmdb2solv_LDADD = -ldb-4.3
+rpmdb2solv_LDADD = -ldb-4.3 $(LDADD)
 
 rpmmd2solv_SOURCES = \
 	rpmmd2solv.c	\
@@ -22,7 +22,7 @@ rpmmd2solv_SOURCES = \
 	source_rpmmd.c	\
 	source_write.c
 
-rpmmd2solv_LDADD = -lexpat
+rpmmd2solv_LDADD = -lexpat $(LDADD)
 
 helix2solv_SOURCES = \
 	helix2solv.c	\
@@ -30,7 +30,7 @@ helix2solv_SOURCES = \
 	source_helix.c	\
 	source_write.c
 
-helix2solv_LDADD = -lexpat
+helix2solv_LDADD = -lexpat $(LDADD)
 
 susetags2solv_SOURCES = \
 	susetags2solv.c		\
@@ -44,7 +44,7 @@ patchxml2solv_SOURCES = \
 	source_patchxml.c	\
 	source_write.c
 
-patchxml2solv_LDADD = -lexpat
+patchxml2solv_LDADD = -lexpat $(LDADD)
 
 dumpsolv_SOURCES = \
 	dumpsolv.c
