@@ -2407,6 +2407,10 @@ create_obsolete_index(Solver *solv)
       s = pool->solvables + i;
       if ((obsp = s->obsoletes) == 0)
 	continue;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+        continue;
+      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+	continue;            
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
@@ -2431,6 +2435,10 @@ create_obsolete_index(Solver *solv)
       s = pool->solvables + i;
       if ((obsp = s->obsoletes) == 0)
 	continue;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+        continue;
+      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+	continue;            
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
