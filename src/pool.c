@@ -154,8 +154,7 @@ pool_prepare(Pool *pool)
   whatprovides = (Offset *)xcalloc(num, sizeof(Offset));
 
   /* count providers for each name */
-
-  for (i = 1; i < pool->nsolvables; i++)   /* loop over all, but first, solvables */
+  for (i = 1; i < pool->nsolvables; i++)
     {
       Id *pp;
       s = pool->solvables + i;

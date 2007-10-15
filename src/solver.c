@@ -956,35 +956,6 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
   if (m && !MAPTST(m, n))	/* add rule for s if not already done */
     addrulesforsolvable(solv, s, m);
 
-#if defined(GNADENLOS)
-  for (p = 1; p < pool->nsolvables; ++p)
-    {
-       if (p == n)
-	 continue;
-
-       if (s->name == pool->solvables[p].name) 
-         continue;
-
-       if ((obsp = pool->solvables[p].obsoletes) != 0)   /* provides/obsoletes combination ? */
-        {
-          while ((obs = *obsp++) != 0)  /* for all obsoletes */
-            {
-              FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
-                {
-                  if (p2 == n)          /* match ! */
-                    break;
-                }
-              if (p2)                   /* match! */
-                break;
-            }
-          if (!obs)                     /* continue if no match */
-            continue;
-     
-         queuepush(qs, p); 
-       }
-    }
-#endif
-
   /*
    * look for updates for s
    */
@@ -1002,8 +973,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 	  if (!allowarchchange && archchanges(pool, s, pool->solvables + p))
 	    continue;
 	}
-#if !defined(GNADENLOS)
-      else if ((obsp = pool->solvables[p].obsoletes) != 0)   /* provides/obsoletes combination ? */
+      else if (!solv->noupdateprovide && (obsp = pool->solvables[p].obsoletes) != 0)   /* provides/obsoletes combination ? */
 	{
 	  while ((obs = *obsp++) != 0)	/* for all obsoletes */
 	    {
@@ -1021,13 +991,21 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 	   * thus flagging p as a valid update candidate for s
 	   */
 	}
-#endif
       else
         continue;
       queuepush(qs, p);
 
       if (m && !MAPTST(m, p))		/* mark p for install if not already done */
 	addrulesforsolvable(solv, pool->solvables + p, m);
+    }
+  if (solv->noupdateprovide && solv->obsoletes && solv->obsoletes[n - solv->system->start])
+    {
+      for (pp = solv->obsoletes_data + solv->obsoletes[n - solv->system->start]; (p = *pp++) != 0;)
+	{
+	  queuepush(qs, p);
+	  if (m && !MAPTST(m, p))		/* mark p for install if not already done */
+	    addrulesforsolvable(solv, pool->solvables + p, m);
+	}
     }
 }
 
@@ -1751,6 +1729,8 @@ solver_free(Solver *solv)
   xfree(solv->rules);
   xfree(solv->watches);
   xfree(solv->weaksystemrules);
+  xfree(solv->obsoletes);
+  xfree(solv->obsoletes_data);
   xfree(solv);
 }
 
@@ -2411,6 +2391,59 @@ printdecisions(Solver *solv)
   xfree(obsoletesmap);
 }
 
+static void
+create_obsolete_index(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Solvable *s;
+  Source *system = solv->system;
+  Id p, *pp, obs, *obsp, *obsoletes, *obsoletes_data;
+  int i, n;
+
+  /* create reverse obsoletes map for system solvables */
+  solv->obsoletes = obsoletes = xcalloc(system->nsolvables, sizeof(Id));
+  for (i = 1; i < pool->nsolvables; i++)
+    {
+      s = pool->solvables + i;
+      if ((obsp = s->obsoletes) == 0)
+	continue;
+      while ((obs = *obsp++) != 0)
+        FOR_PROVIDES(p, pp, obs)
+	  {
+	    if (p < system->start || p >= system->start + system->nsolvables)
+	      continue;
+	    if (pool->solvables[p].name == s->name)
+	      continue;
+	    obsoletes[p - system->start]++;
+	  }
+    }
+  n = 0;
+  for (i = 0; i < system->nsolvables; i++)
+    if (obsoletes[i])
+      {
+        n += obsoletes[i] + 1;
+        obsoletes[i] = n;
+      }
+  solv->obsoletes_data = obsoletes_data = xcalloc(n + 1, sizeof(Id));
+  if (pool->verbose) printf("obsoletes data: %d entries\n", n + 1);
+  for (i = pool->nsolvables - 1; i > 0; i--)
+    {
+      s = pool->solvables + i;
+      if ((obsp = s->obsoletes) == 0)
+	continue;
+      while ((obs = *obsp++) != 0)
+        FOR_PROVIDES(p, pp, obs)
+	  {
+	    if (p < system->start || p >= system->start + system->nsolvables)
+	      continue;
+	    if (pool->solvables[p].name == s->name)
+	      continue;
+	    p -= system->start;
+	    if (obsoletes_data[obsoletes[p]] != i)
+	      obsoletes_data[--obsoletes[p]] = i;
+	  }
+    }
+}
 
 /*-----------------------------------------------------------------*/
 /* main() */
@@ -2459,6 +2492,9 @@ solve(Solver *solv, Queue *job)
    * two passes, as we want to keep the rpm rules distinct from the job rules
    * 
    */
+
+  if (solv->noupdateprovide && solv->system->nsolvables)
+    create_obsolete_index(solv);
 
   /*
    * solvable rules

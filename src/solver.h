@@ -47,6 +47,7 @@ typedef struct solver {
   int allowuninstall;			/* allow removal of system solvables, else keep all installed solvables */
   int updatesystem;			/* distupgrade */
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
+  int noupdateprovide;			/* true: update packages needs not to provide old package */
   
   Rule *rules;				/* all rules */
   Id nrules;				/* rpm rules */
@@ -79,6 +80,9 @@ typedef struct solver {
   Map recommends;			/* recommended packages from decisionmap */
   Map suggests;				/* suggested packages from decisionmap */
   int recommends_index;			/* recommended level */
+
+  Id *obsoletes;			/* obsoletes for each system solvable */
+  Id *obsoletes_data;			/* data area for obsoletes */
 
   int rc_output;			/* output result compatible to redcarpet/zypp testsuite, set == 2 for pure rc (will suppress architecture) */
 } Solver;
