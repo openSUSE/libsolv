@@ -77,6 +77,7 @@ typedef struct solver {
   Queue problems;
 
   Map recommends;			/* recommended packages from decisionmap */
+  Map suggests;				/* suggested packages from decisionmap */
   int recommends_index;			/* recommended level */
 
   int rc_output;			/* output result compatible to redcarpet/zypp testsuite, set == 2 for pure rc (will suppress architecture) */

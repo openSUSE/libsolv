@@ -117,11 +117,12 @@ prune_to_recommended(Solver *solv, Queue *plist)
   Pool *pool = solv->pool;
   int i, j;
   Solvable *s;
-  Id p, *pp, sup, *supp, rec, *recp;
+  Id p, *pp, sup, *supp, rec, *recp, sug, *sugp, enh, *enhp;
 
   if (solv->recommends_index < 0)
     {
       MAPZERO(&solv->recommends);
+      MAPZERO(&solv->suggests);
       solv->recommends_index = 0;
     }
   while (solv->recommends_index < solv->decisionq.count)
@@ -130,12 +131,16 @@ prune_to_recommended(Solver *solv, Queue *plist)
       if (p < 0)
 	continue;
       s = pool->solvables + p;
-      if (!(recp = s->recommends))
-	continue;
-      while ((rec = *recp++) != 0)
-	FOR_PROVIDES(p, pp, rec)
-	  MAPSET(&solv->recommends, p);
+      if ((recp = s->recommends) != 0)
+        while ((rec = *recp++) != 0)
+	  FOR_PROVIDES(p, pp, rec)
+	    MAPSET(&solv->recommends, p);
+      if ((sugp = s->suggests) != 0)
+        while ((sug = *sugp++) != 0)
+	  FOR_PROVIDES(p, pp, sug)
+	    MAPSET(&solv->suggests, p);
     }
+  /* prune to recommended/supplemented */
   for (i = j = 0; i < plist->count; i++)
     {
       p = plist->elements[i];
@@ -163,6 +168,30 @@ prune_to_recommended(Solver *solv, Queue *plist)
 	  if (!sup)
 	    continue;
 	}
+      plist->elements[j++] = s - pool->solvables;
+    }
+  if (j)
+    plist->count = j;
+
+  /* prune to suggested/enhanced*/
+  if (plist->count < 2)
+    return;
+  for (i = j = 0; i < plist->count; i++)
+    {
+      p = plist->elements[i];
+      if (MAPTST(&solv->suggests, p))
+	{
+	  plist->elements[j++] = p;
+	  continue;
+	}
+      s = pool->solvables + p;
+      if (!(enhp = s->enhances))
+	continue;
+      while ((enh = *enhp++) != 0)
+	if (dep_fulfilled(solv, enh))
+	  break;
+      if (!enh)
+	continue;
       plist->elements[j++] = s - pool->solvables;
     }
   if (j)
@@ -1693,6 +1722,7 @@ solver_create(Pool *pool, Source *system)
   queueinit(&solv->learnt_pool);
 
   mapinit(&solv->recommends, pool->nsolvables);
+  mapinit(&solv->suggests, pool->nsolvables);
   solv->recommends_index = 0;
 
   solv->decisionmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
@@ -1716,6 +1746,7 @@ solver_free(Solver *solv)
   queuefree(&solv->learnt_why);
   queuefree(&solv->learnt_pool);
   mapfree(&solv->recommends);
+  mapfree(&solv->suggests);
   xfree(solv->decisionmap);
   xfree(solv->rules);
   xfree(solv->watches);
