@@ -121,8 +121,8 @@ prune_to_recommended(Solver *solv, Queue *plist)
 
   if (solv->recommends_index < 0)
     {
-      MAPZERO(&solv->recommends);
-      MAPZERO(&solv->suggests);
+      MAPZERO(&solv->recommendsmap);
+      MAPZERO(&solv->suggestsmap);
       solv->recommends_index = 0;
     }
   while (solv->recommends_index < solv->decisionq.count)
@@ -134,17 +134,17 @@ prune_to_recommended(Solver *solv, Queue *plist)
       if ((recp = s->recommends) != 0)
         while ((rec = *recp++) != 0)
 	  FOR_PROVIDES(p, pp, rec)
-	    MAPSET(&solv->recommends, p);
+	    MAPSET(&solv->recommendsmap, p);
       if ((sugp = s->suggests) != 0)
         while ((sug = *sugp++) != 0)
 	  FOR_PROVIDES(p, pp, sug)
-	    MAPSET(&solv->suggests, p);
+	    MAPSET(&solv->suggestsmap, p);
     }
   /* prune to recommended/supplemented */
   for (i = j = 0; i < plist->count; i++)
     {
       p = plist->elements[i];
-      if (MAPTST(&solv->recommends, p))
+      if (MAPTST(&solv->recommendsmap, p))
 	{
 	  plist->elements[j++] = p;
 	  continue;
@@ -179,7 +179,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
   for (i = j = 0; i < plist->count; i++)
     {
       p = plist->elements[i];
-      if (MAPTST(&solv->suggests, p))
+      if (MAPTST(&solv->suggestsmap, p))
 	{
 	  plist->elements[j++] = p;
 	  continue;
@@ -918,6 +918,50 @@ addrulesforsupplements(Solver *solv, Map *m)
       n = 0;
     }
   if (pool->verbose) printf("done. (%d)\n", solv->nrules);
+}
+
+static void
+addrulesforenhances(Solver *solv, Map *m)
+{
+  Pool *pool = solv->pool;
+  int i;
+  Solvable *s;
+  Id p, *pp, enh, *enhp, obs, *obsp, con, *conp;
+
+  if (pool->verbose) printf("addrulesforenhances... (%d)\n", solv->nrules);
+  for (i = 1; i < pool->nsolvables; i++)
+    {
+      if (MAPTST(m, i))
+	continue;
+      s = pool->solvables + i;
+      if ((enhp = s->enhances) == 0)
+	continue;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	continue;
+      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+	continue;
+      while ((enh = *enhp++) != ID_NULL)
+	{
+	  FOR_PROVIDES(p, pp, enh)
+	    if (MAPTST(m, p))
+	      break;
+	  if (p)
+	    break;
+	}
+      if (!enh)
+	continue;
+      if ((conp = s->conflicts) != 0)
+	while ((con = *conp++) != 0)
+	  FOR_PROVIDES(p, pp, con)
+	    addrule(solv, -i, -p);
+      if ((obsp = s->obsoletes) != 0)
+        while ((obs = *obsp++) != ID_NULL)
+	  FOR_PROVIDES(p, pp, obs)
+	    addrule(solv, -i, -p);
+      FOR_PROVIDES(p, pp, s->name)
+        if (s->name == pool->solvables[p].name)
+	  addrule(solv, -i, -p);
+    }
 }
 
 
@@ -1696,11 +1740,12 @@ solver_create(Pool *pool, Source *system)
   queueinit(&solv->decisionq);
   queueinit(&solv->decisionq_why);
   queueinit(&solv->problems);
+  queueinit(&solv->suggestions);
   queueinit(&solv->learnt_why);
   queueinit(&solv->learnt_pool);
 
-  mapinit(&solv->recommends, pool->nsolvables);
-  mapinit(&solv->suggests, pool->nsolvables);
+  mapinit(&solv->recommendsmap, pool->nsolvables);
+  mapinit(&solv->suggestsmap, pool->nsolvables);
   solv->recommends_index = 0;
 
   solv->decisionmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
@@ -1723,8 +1768,11 @@ solver_free(Solver *solv)
   queuefree(&solv->decisionq_why);
   queuefree(&solv->learnt_why);
   queuefree(&solv->learnt_pool);
-  mapfree(&solv->recommends);
-  mapfree(&solv->suggests);
+  queuefree(&solv->problems);
+  queuefree(&solv->suggestions);
+
+  mapfree(&solv->recommendsmap);
+  mapfree(&solv->suggestsmap);
   xfree(solv->decisionmap);
   xfree(solv->rules);
   xfree(solv->watches);
@@ -2557,6 +2605,7 @@ solve(Solver *solv, Queue *job)
 #endif
 
   addrulesforsupplements(solv, &addedmap);
+  addrulesforenhances(solv, &addedmap);		/* do this last */
 
   /*
    * first pass done
@@ -2694,6 +2743,56 @@ solve(Solver *solv, Queue *job)
   
   run_solver(solv, 1, 1);
 
+  /* find suggested packages */
+  if (!solv->problems.count)
+    {
+      Id sug, *sugp, enh, *enhp;
+
+      /* create map of all suggests that are still open */
+      solv->recommends_index = -1;
+      MAPZERO(&solv->suggestsmap);
+      for (i = 0; i < solv->decisionq.count; i++)
+	{
+	  p = solv->decisionq.elements[i];
+	  if (p < 0)
+	    continue;
+	  s = pool->solvables + p;
+	  if ((sugp = s->suggests) != 0)
+	    while ((sug = *sugp++) != 0)
+	      {
+	        FOR_PROVIDES(p, pp, sug)
+	          if (solv->decisionmap[p] > 0)
+		    break;
+		if (p)
+		  continue;	/* already fulfilled */
+	        FOR_PROVIDES(p, pp, sug)
+		  MAPSET(&solv->suggestsmap, p);
+	      }
+	}
+      for (i = 1; i < pool->nsolvables; i++)
+	{
+	  if (solv->decisionmap[i] != 0)
+	    continue;
+	  if (!MAPTST(&solv->suggestsmap, i))
+	    {
+	      s = pool->solvables + i;
+	      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+		continue;
+	      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+		continue;
+	      if ((enhp = s->enhances) == 0)
+		continue;
+	      while ((enh = *enhp++) != 0)
+		if (dep_fulfilled(solv, enh))
+		  break;
+	      if (!enh)
+		continue;
+	    }
+	  queuepush(&solv->suggestions, i);
+	}
+      prune_best_version_arch(pool, &solv->suggestions);
+    }
+
   /*
    *
    * print solver result
@@ -2781,6 +2880,15 @@ solve(Solver *solv, Queue *job)
     }
 
   printdecisions(solv);
+  if (solv->suggestions.count)
+    {
+      printf("\nsuggested packages:\n");
+      for (i = 0; i < solv->suggestions.count; i++)
+	{
+	  s = pool->solvables + solv->suggestions.elements[i];
+	  printf("- %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	}
+    }
 }
 
 

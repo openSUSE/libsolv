@@ -76,9 +76,10 @@ typedef struct solver {
   int propagate_index;
 
   Queue problems;
+  Queue suggestions;			/* suggested packages */
 
-  Map recommends;			/* recommended packages from decisionmap */
-  Map suggests;				/* suggested packages from decisionmap */
+  Map recommendsmap;			/* recommended packages from decisionmap */
+  Map suggestsmap;			/* suggested packages from decisionmap */
   int recommends_index;			/* recommended level */
 
   Id *obsoletes;			/* obsoletes for each system solvable */
