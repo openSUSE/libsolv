@@ -110,6 +110,8 @@ dep_fulfilled(Solver *solv, Id dep)
 /*
  * prune_to_recommended
  *
+ * XXX: should we prune to requires/suggests that are already
+ * fulfilled by other packages?
  */
 static void
 prune_to_recommended(Solver *solv, Queue *plist)

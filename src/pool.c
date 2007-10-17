@@ -124,6 +124,113 @@ pool_free(Pool *pool)
 }
 
 
+static Pool *pool_shrink_whatprovides_sortcmp_data;
+
+static int
+pool_shrink_whatprovides_sortcmp(const void *ap, const void *bp)
+{
+  int r;
+  Pool *pool = pool_shrink_whatprovides_sortcmp_data;
+  Id oa, ob, *da, *db;
+  oa = pool->whatprovides[*(Id *)ap];
+  ob = pool->whatprovides[*(Id *)bp];
+  if (oa == ob)
+    return 0;
+  if (!oa)
+    return -1;
+  if (!ob)
+    return 1;
+  da = pool->whatprovidesdata + oa;
+  db = pool->whatprovidesdata + ob;
+  while (*db)
+    if ((r = (*da++ - *db++)) != 0)
+      return r;
+  if (*da)
+    return *da;
+  return oa - ob;
+}
+
+static void
+pool_shrink_whatprovides(Pool *pool)
+{
+  Id i, id;
+  Id *sorted;
+  Id lastid, *last, *dp, *lp;
+  Offset o;
+  int r;
+
+  if (pool->nstrings < 3)
+    return;
+  sorted = xmalloc2(pool->nstrings, sizeof(Id));
+  for (id = 0; id < pool->nstrings; id++)
+    sorted[id] = id;
+  pool_shrink_whatprovides_sortcmp_data = pool;
+  qsort(sorted + 1, pool->nstrings - 1, sizeof(Id), pool_shrink_whatprovides_sortcmp);
+  last = 0;
+  lastid = 0;
+  for (i = 1; i < pool->nstrings; i++)
+    {
+      id = sorted[i];
+      o = pool->whatprovides[id];
+      if (o == 0 || o == 1)
+	continue;
+      dp = pool->whatprovidesdata + o;
+      if (last)
+	{
+	  lp = last;
+	  while (*dp)	
+	    if (*dp++ != *lp++)
+	      {
+		last = 0;
+	        break;
+	      }
+	  if (last && *lp)
+	    last = 0;
+	  if (last)
+	    {
+	      pool->whatprovides[id] = -lastid;
+	      continue;
+	    }
+	}
+      last = pool->whatprovidesdata + o;
+      lastid = id;
+    }
+  xfree(sorted);
+  dp = pool->whatprovidesdata + 2;
+  for (id = 1; id < pool->nstrings; id++)
+    {
+      o = pool->whatprovides[id];
+      if (o == 0 || o == 1)
+	continue;
+      if ((Id)o < 0)
+	{
+	  i = -(Id)o;
+	  if (i >= id)
+	    abort();
+	  pool->whatprovides[id] = pool->whatprovides[i];
+	  continue;
+	}
+      lp = pool->whatprovidesdata + o;
+      if (lp < dp)
+	abort();
+      pool->whatprovides[id] = dp - pool->whatprovidesdata;
+      while ((*dp++ = *lp++) != 0)
+	;
+    }
+  o = dp - pool->whatprovidesdata;
+  if (pool->verbose)
+    printf("shrunk whatprovidesdata from %d to %d\n", pool->whatprovidesdataoff, o);
+  if (pool->whatprovidesdataoff == o)
+    return;
+  r = pool->whatprovidesdataoff - o;
+  pool->whatprovidesdataoff = o;
+  pool->whatprovidesdata = xrealloc(pool->whatprovidesdata, (o + pool->whatprovidesdataleft) * sizeof(Id));
+  if (r > pool->whatprovidesdataleft)
+    r = pool->whatprovidesdataleft;
+  memset(pool->whatprovidesdata + o, 0, r * sizeof(Id));
+}
+
+
 /*
  * pool_prepare()
  * 
@@ -240,11 +347,11 @@ pool_prepare(Pool *pool)
 	  *d = i;		       /* put solvable Id into data */
 	}
     }
-
   pool->whatprovides = whatprovides;
   pool->whatprovidesdata = whatprovidesdata;
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
+  pool_shrink_whatprovides(pool);
 }
 
 /******************************************************************************/
