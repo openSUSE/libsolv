@@ -102,7 +102,7 @@ struct _Pool {
 #define GET_PROVIDESP(d, v) (ISRELDEP(d) ?				\
              (v = GETRELID(pool, d), pool->whatprovides[v] ?		\
                pool->whatprovidesdata + pool->whatprovides[v] :		\
-	       addrelproviders(pool, d)					\
+	       pool_addrelproviders(pool, d)				\
              ) :							\
              (pool->whatprovidesdata + pool->whatprovides[d]))
 
@@ -133,9 +133,18 @@ extern void pool_prepare(Pool *pool);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
 
-extern Id *addrelproviders(Pool *pool, Id d);
+extern Id *pool_addrelproviders(Pool *pool, Id d);
 
 extern Source *pool_source(Pool *pool, Solvable *s);
+
+static inline int pool_installable(Pool *pool, Solvable *s)
+{
+  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+    return 0;
+  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+    return 0;
+  return 1;
+}
 
 #ifdef __cplusplus
 }

@@ -287,8 +287,6 @@ prune_best_version_arch(Pool *pool, Queue *plist)
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	continue;
 
       if (pool->verbose) printf("- %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 
@@ -439,9 +437,10 @@ unifyrules_sortcmp(const void *ap, const void *bp)
   /* compare whatprovidesdata */
   ad = pool->whatprovidesdata + a->d;
   bd = pool->whatprovidesdata + b->d;
-  for (; *ad && *ad == *bd; ad++, bd++)
-    ;
-  return *ad - *bd;
+  while (*bd)
+    if ((x = *ad++ - *bd++) != 0)
+      return x;
+  return *ad;
 }
 
 
@@ -912,9 +911,7 @@ addrulesforsupplements(Solver *solv, Map *m)
       if (MAPTST(m, i))
 	continue;
       s = pool->solvables + i;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	continue;
-      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+      if (!pool_installable(pool, s))
 	continue;
       sup = 0;
       if ((supp = s->supplements) != 0)
@@ -949,18 +946,11 @@ addrulesforenhances(Solver *solv, Map *m)
       s = pool->solvables + i;
       if ((enhp = s->enhances) == 0)
 	continue;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	continue;
-      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+      if (!pool_installable(pool, s))
 	continue;
       while ((enh = *enhp++) != ID_NULL)
-	{
-	  FOR_PROVIDES(p, pp, enh)
-	    if (MAPTST(m, p))
-	      break;
-	  if (p)
-	    break;
-	}
+	if (dep_possible(solv, enh, m))
+	  break;
       if (!enh)
 	continue;
       if ((conp = s->conflicts) != 0)
@@ -2135,9 +2125,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  s = pool->solvables + i;
 		  if (!s->supplements && !s->freshens)
 		    continue;
-		  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-		    continue;
-		  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+		  if (!pool_installable(pool, s))
 		    continue;
 		  if ((supp = s->supplements) != 0)
 		    {
@@ -2467,10 +2455,8 @@ create_obsolete_index(Solver *solv)
       s = pool->solvables + i;
       if ((obsp = s->obsoletes) == 0)
 	continue;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-        continue;
-      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
-	continue;            
+      if (!pool_installable(pool, s))
+	continue;
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
@@ -2495,10 +2481,8 @@ create_obsolete_index(Solver *solv)
       s = pool->solvables + i;
       if ((obsp = s->obsoletes) == 0)
 	continue;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-        continue;
-      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
-	continue;            
+      if (!pool_installable(pool, s))
+	continue;
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
@@ -2618,6 +2602,20 @@ solve(Solver *solv, Queue *job)
 
   addrulesforsupplements(solv, &addedmap);
   addrulesforenhances(solv, &addedmap);		/* do this last */
+#if 1
+  if (pool->verbose)
+    {
+      int possible = 0, installable = 0;
+      for (i = 1; i < pool->nsolvables; i++)
+	{
+	  if (pool_installable(pool, pool->solvables + i))
+	    installable++;
+	  if (MAPTST(&addedmap, i))
+	    possible++;
+	}
+      printf("%d of %d installable solvables used for solving\n", possible, installable);
+    }
+#endif
 
   /*
    * first pass done
@@ -2758,7 +2756,7 @@ solve(Solver *solv, Queue *job)
   /* find suggested packages */
   if (!solv->problems.count)
     {
-      Id sug, *sugp, enh, *enhp;
+      Id sug, *sugp, enh, *enhp, req, *reqp, p, *pp;
 
       /* create map of all suggests that are still open */
       solv->recommends_index = -1;
@@ -2785,19 +2783,35 @@ solve(Solver *solv, Queue *job)
 	{
 	  if (solv->decisionmap[i] != 0)
 	    continue;
+	  s = pool->solvables + i;
 	  if (!MAPTST(&solv->suggestsmap, i))
 	    {
-	      s = pool->solvables + i;
-	      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-		continue;
-	      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
-		continue;
 	      if ((enhp = s->enhances) == 0)
+		continue;
+	      if (!pool_installable(pool, s))
 		continue;
 	      while ((enh = *enhp++) != 0)
 		if (dep_fulfilled(solv, enh))
 		  break;
 	      if (!enh)
+		continue;
+	    }
+	  /* check if installation is possible at all */
+          if ((reqp = s->requires) != 0)
+	    {
+	      while ((req = *reqp++) != 0)
+		{
+		  if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
+		    continue;
+		  FOR_PROVIDES(p, pp, req)
+		    if (solv->decisionmap[p] >= 0)
+		      break;
+		  if (!p && !strncmp(id2str(pool, req), "rpmlib(", 7))
+		    continue;
+		  if (!p)
+		    break;		/* no provider installable! */
+		}
+	      if (req)
 		continue;
 	    }
 	  queuepush(&solv->suggestions, i);

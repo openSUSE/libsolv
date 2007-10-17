@@ -135,7 +135,7 @@ pool_shrink_whatprovides_sortcmp(const void *ap, const void *bp)
   oa = pool->whatprovides[*(Id *)ap];
   ob = pool->whatprovides[*(Id *)bp];
   if (oa == ob)
-    return 0;
+    return *(Id *)ap - *(Id *)bp;
   if (!oa)
     return -1;
   if (!ob)
@@ -147,7 +147,7 @@ pool_shrink_whatprovides_sortcmp(const void *ap, const void *bp)
       return r;
   if (*da)
     return *da;
-  return oa - ob;
+  return *(Id *)ap - *(Id *)bp;
 }
 
 static void
@@ -265,12 +265,10 @@ pool_prepare(Pool *pool)
     {
       Id *pp;
       s = pool->solvables + i;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	continue;		/* sources do not provide anything */
-      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
-	continue;		/* architecture not installable */
       pp = s->provides;
       if (!pp)			/* solvable does not provide anything */
+	continue;
+      if (!pool_installable(pool, s))
 	continue;
       while ((id = *pp++) != ID_NULL)
 	{
@@ -314,12 +312,10 @@ pool_prepare(Pool *pool)
     {
       Id *pp;
       s = pool->solvables + i;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	continue;		/* sources do not provide anything */
-      if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
-	continue;		/* architecture not installable */
       pp = s->provides;
       if (!pp)			       /* solvable does not provide anything */
+	continue;
+      if (!pool_installable(pool, s))
 	continue;
 
       /* for all provides of this solvable */
@@ -405,7 +401,7 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
  */
 
 Id *
-addrelproviders(Pool *pool, Id d)
+pool_addrelproviders(Pool *pool, Id d)
 {
   Reldep *rd = GETRELDEP(pool, d);
   Reldep *prd;
