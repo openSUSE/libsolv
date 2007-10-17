@@ -16,16 +16,6 @@
 
 #define IDARRAY_BLOCK     4095
 
-/*
- * get name of source
- */
-
-const char *
-source_name(const Source *source)
-{
-  return source->name;
-}
-
 
 /*
  * create empty source

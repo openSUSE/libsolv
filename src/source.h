@@ -28,5 +28,9 @@ extern unsigned int source_fix_legacy(Source *source, unsigned int provides, uns
 
 extern Source *pool_addsource_empty(Pool *pool);
 
-extern const char *source_name(const Source *source);
+static inline const char *source_name(const Source *source)
+{
+  return source->name;
+}
+
 #endif /* SOURCE_H */

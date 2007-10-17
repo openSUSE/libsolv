@@ -107,6 +107,32 @@ dep_fulfilled(Solver *solv, Id dep)
   return 0;
 }
 
+static inline int
+dep_possible(Solver *solv, Id dep, Map *m)
+{
+  Pool *pool = solv->pool;
+  Id p, *pp;
+
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags == REL_AND)
+	{
+	  if (!dep_possible(solv, rd->name, m))
+	    return 0;
+	  return dep_possible(solv, rd->evr, m);
+	}
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+	return dep_installed(solv, rd->evr);
+    }
+  FOR_PROVIDES(p, pp, dep)
+    {
+      if (MAPTST(m, p))
+	return 1;
+    }
+  return 0;
+}
+
 /*
  * prune_to_recommended
  *
@@ -876,7 +902,6 @@ addrulesforsupplements(Solver *solv, Map *m)
   Pool *pool = solv->pool;
   Solvable *s;
   Id sup, *supp;
-  Id p, *pp;
   int i, n;
 
   if (pool->verbose) printf("addrulesforsupplements... (%d)\n", solv->nrules);
@@ -893,27 +918,13 @@ addrulesforsupplements(Solver *solv, Map *m)
 	continue;
       sup = 0;
       if ((supp = s->supplements) != 0)
-	{
-	  while ((sup = *supp++) != ID_NULL)
-	    {
-	      FOR_PROVIDES(p, pp, sup)
-		if (MAPTST(m, p))
-		  break;
-	      if (p)
-		break;
-	    }
-	}
+	while ((sup = *supp++) != ID_NULL)
+	  if (dep_possible(solv, sup, m))
+	    break;
       if (!sup && (supp = s->freshens) != 0)
-	{
-	  while ((sup = *supp++) != ID_NULL)
-	    {
-	      FOR_PROVIDES(p, pp, sup)
-		if (MAPTST(m, p))
-		  break;
-	      if (p)
-		break;
-	    }
-	}
+	while ((sup = *supp++) != ID_NULL)
+	  if (dep_possible(solv, sup, m))
+	    break;
       if (!sup)
 	continue;
       addrulesforsolvable(solv, s, m);
@@ -2078,8 +2089,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	    }
 	  if (level < systemlevel)
 	    break;
-	  if (level <= olevel)
-	    n = 0;
+	  n = 0;
 	} /* for(), decide */
 
       if (n != solv->nrules)	/* continue if level < systemlevel */
