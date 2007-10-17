@@ -2182,6 +2182,9 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
   QUEUEEMPTY(refined);
   queuepush(refined, sug);
 
+  revert(solv, 1);
+  reset_solver(solv);
+
   /* re-enable all rules but rule "sug" of the problem */
   for (i = 0; problem[i]; i++)
     {
@@ -2196,8 +2199,6 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
     }
   for (;;)
     {
-      revert(solv, 1);		/* XXX move to reset_solver? */
-      reset_solver(solv);
       QUEUEEMPTY(&solv->problems);
       run_solver(solv, 0, 0);
       if (!solv->problems.count)
@@ -2224,8 +2225,6 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	{
 	  /* no solution found, this was an invalid suggestion! */
 	  printf("no solution found!\n");
-	  for (i = 0; i < refined->count; i++)
-	    reenablerule(solv, solv->rules + refined->elements[i]);
 	  refined->count = 0;
 	  break;
 	}
@@ -2257,6 +2256,8 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	  printrule(solv, r);
 #endif
 	}
+      revert(solv, 1);		/* XXX move to reset_solver? */
+      reset_solver(solv);
     }
   /* enable refined rules again */
   for (i = 0; i < disabled.count; i++)
