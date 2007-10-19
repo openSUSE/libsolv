@@ -601,17 +601,16 @@ addrule(Solver *solv, Id p, Id d)
       if (!solv->jobrules)
 	{
 	  /* this is a rpm rule assertion, we do not have to allocate it */
-          /* we can identify it by looking at the decision level, it will be 1 */
-	  if (p > 0)		           /*  */
+          /* it can be identified by a level of 1 and a zero reason */
+	  if (p > 0)
 	    abort();
-	  if (solv->decisionmap[-p] > 0)   /*  */
+	  if (solv->decisionmap[-p] > 0 || solv->decisionmap[-p] < -1)
 	    abort();
-	  if (solv->decisionmap[-p])       /*  */
+	  if (solv->decisionmap[-p])
 	    return NULL;
 	  queuepush(&solv->decisionq, p);
 	  queuepush(&solv->decisionq_why, 0);
 	  solv->decisionmap[-p] = -1;
-
 	  return NULL;
 	}
     }
@@ -682,52 +681,76 @@ addrule(Solver *solv, Id p, Id d)
     }
   r->n1 = 0;
   r->n2 = 0;
+  return r;
+}
 
-  /* we don't add the decision for learnt rules, as the code does that
-   * right after calling addrule anyway */
-  if (n == 0
-      && p
-      && !solv->learntrules)
+
+/* go through system and job rules and add direct assertions
+ * to the decisionqueue. If we find a conflict, disable rules and
+ * add them to problem queue.
+ */
+static void
+makeruledecisions(Solver *solv)
+{
+  int i, ri;
+  Rule *r, *rr;
+  Id v, vv;
+  for (ri = solv->jobrules, r = solv->rules + ri; ri < solv->nrules; ri++, r++)
     {
-      /* must be system or job rule, as there are only negative unary rpm rules */
-      Id vv = p > 0 ? p : -p;
-      if (solv->decisionmap[vv])
+      if (!r->w1 || r->w2)
+        continue;
+      v = r->p;
+      vv = v > 0 ? v : -v;
+      if (solv->decisionmap[vv] == 0)
 	{
-	  int i;
-	  if (solv->decisionmap[vv] > 0 && p > 0)
-	    return r;
-	  if (solv->decisionmap[vv] < 0 && p < 0)
-	    return r;
-	  /* direct conflict! */
-	  for (i = 0; i < solv->decisionq.count; i++)
-	    if (solv->decisionq.elements[i] == -p)
-	      break;
-	  if (i == solv->decisionq.count)
-	    abort();
-	  if (solv->decisionq_why.elements[i] == 0)
-	    {
-	      /* conflict with rpm rule */
-	      queuepush(&solv->problems, r - solv->rules);
-	      queuepush(&solv->problems, 0);
-	      r->w1 = 0;	/* disable */
-	      return r;
-	    }
-	  /* conflict with other job or system rule */
-	  queuepush(&solv->problems, solv->decisionq_why.elements[i]);
+	  queuepush(&solv->decisionq, v);
+	  queuepush(&solv->decisionq_why, r - solv->rules);
+	  solv->decisionmap[vv] = v > 0 ? 1 : -1;
+	  continue;
+	}
+      if (v > 0 && solv->decisionmap[vv] > 0)
+        continue;
+      if (v < 0 && solv->decisionmap[vv] < 0)
+        continue;
+      /* found a conflict! */
+      for (i = 0; i < solv->decisionq.count; i++)
+	if (solv->decisionq.elements[i] == -v)
+	  break;
+      if (i == solv->decisionq.count)
+	abort();
+      if (solv->decisionq_why.elements[i] == 0)
+	{
+	  /* conflict with rpm rule, need only disable our rule */
+	  printf("conflict with rpm rule, disabling rule #%d\n", ri);
 	  queuepush(&solv->problems, r - solv->rules);
 	  queuepush(&solv->problems, 0);
 	  r->w1 = 0;	/* disable */
-          /* also disable conflicting rule */
-	  solv->rules[solv->decisionq_why.elements[i]].w1 = 0;
-	  /* XXX: remove from decisionq! */
-printf("XXX remove from decisionq\n");
-	  return r;
+	  continue;
 	}
-      queuepush(&solv->decisionq, p);
-      queuepush(&solv->decisionq_why, r - solv->rules);
-      solv->decisionmap[p > 0 ? p : -p] = p > 0 ? 1 : -1;
+      /* conflict with another job or system rule */
+      /* remove old decision */
+      printf("conflicting system/job rules over literal %d\n", vv);
+      solv->decisionmap[vv] = 0;
+      for (; i + 1 < solv->decisionq.count; i++)
+	{
+	  solv->decisionq.elements[i] = solv->decisionq.elements[i + 1];
+	  solv->decisionq_why.elements[i] = solv->decisionq_why.elements[i + 1];
+	}
+      solv->decisionq.count--;
+      solv->decisionq_why.count--;
+      /* push all of our rules asserting this literal on the problem stack */
+      for (i = solv->jobrules, rr = solv->rules + i; i < solv->nrules; i++, rr++)
+	{
+	  if (!rr->w1 || rr->w2)
+	    continue;
+	  if (rr->p != v && rr->p != -v)
+	    continue;
+	  printf(" - disabling rule #%d\n", i);
+	  queuepush(&solv->problems, i);
+	  rr->w1 = 0;	/* disable */
+	}
+      queuepush(&solv->problems, 0);
     }
-  return r;
 }
 
 
@@ -1415,8 +1438,7 @@ static void
 reset_solver(Solver *solv)
 {
   int i;
-  Id v, vv;
-  Rule *r;
+  Id v;
 
   /* delete all learnt rules */
   solv->nrules = solv->learntrules;
@@ -1448,28 +1470,8 @@ reset_solver(Solver *solv)
   solv->recommends_index = -1;
   solv->propagate_index = 0;
 
-  /* make direct decisions from enabled unary rules */
-  for (i = solv->jobrules, r = solv->rules + solv->jobrules; i < solv->nrules; i++, r++)
-    {
-      if (!r->w1 || r->w2)
-	continue;
-#if 0
-      printrule(solv, r);
-#endif
-      v = r->p;
-      vv = v > 0 ? v : -v;
-      if (solv->decisionmap[vv])
-	{
-	  /* do not create conflicts */
-	  if (solv->decisionmap[vv] > 0 && v < 0)
-	    abort();
-	  if (solv->decisionmap[vv] < 0 && v > 0)
-	    abort();
-	}
-      queuepush(&solv->decisionq, v);
-      queuepush(&solv->decisionq_why, r - solv->rules);
-      solv->decisionmap[v > 0 ? v : -v] = v > 0 ? 1 : -1;
-    }
+  /* redo all job/system decisions */
+  makeruledecisions(solv);
   if (solv->pool->verbose)
     printf("decisions after adding job and system rules: %d\n", solv->decisionq.count);
   /* recreate watches */
@@ -2187,10 +2189,11 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
       else
 	r->w1 = solv->pool->whatprovidesdata[r->d];
     }
-  reset_solver(solv);
   for (;;)
     {
       QUEUEEMPTY(&solv->problems);
+      revert(solv, 1);		/* XXX move to reset_solver? */
+      reset_solver(solv);
       run_solver(solv, 0, 0);
       if (!solv->problems.count)
 	{
@@ -2249,8 +2252,6 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	  printrule(solv, r);
 #endif
 	}
-      revert(solv, 1);		/* XXX move to reset_solver? */
-      reset_solver(solv);
     }
   /* enable refined rules again */
   for (i = 0; i < disabled.count; i += 2)
@@ -2748,6 +2749,7 @@ solve(Solver *solv, Queue *job)
    * 
    */
   
+  makeruledecisions(solv);
   run_solver(solv, 1, 1);
 
   /* find suggested packages */
