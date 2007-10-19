@@ -594,6 +594,17 @@ static const char* findKernelFlavor(Parsedata *pd)
   return 0;
 }
 
+static int
+countDeps( Id *idarray)
+{
+  Id id;
+  int count = 0;
+
+  while ((id = *idarray++) != ID_NULL)
+    count++;
+  return count;
+}
+
 /*
  * XML callback
  * </name>
@@ -649,7 +660,8 @@ endElement(void *userData, const char *name)
 	  Id pid, *pidp;
 
 	  /* this is either a kernel package or a kmp */
-	  fprintf(stderr, "flavor %s\n", flavor);
+	  int c = countDeps(pd->source->idarraydata + pd->deps[pd->pack].provides);
+	  source_reserve_ids(pd->source, 0, c);
 
 	  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].provides; pidp && (pid = *pidp++) != 0; )
 	    {
@@ -666,6 +678,8 @@ endElement(void *userData, const char *name)
 		  depname = id2str(pool, pid);
 		}
 
+	      Id newid = pid;
+
 	      if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
 		{
 		  char newdep[100];
@@ -673,52 +687,55 @@ endElement(void *userData, const char *name)
 		  strncat(newdep, cflavor, sizeof(newdep));
 		  strncat(newdep, ":", sizeof(newdep));
 		  strncat(newdep, depname + strlen("kernel("), 100);
-		  // fprintf(stderr, "dep %s %s\n", depname, newdep);
-		  Id newid = str2id(pool, newdep, 1);
+		  newid = str2id(pool, newdep, 1);
 		  if (prd)
 		    newid = rel2id(pool, newid, prd->evr, prd->flags, 1);
-		  npr = source_addid_dep(pd->source, npr, newid, 0);
 		}
+
+	      npr = source_addid_dep(pd->source, npr, newid, 0);
 	    }
 	  pd->deps[pd->pack].provides = npr;
+#if 1
 
 	  npr = 0;
-	  fprintf(stderr, "dd %d\n", pd->deps[pd->pack].requires);
-	  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].requires; pidp && (pid = *pidp++) != 0; )
+	  if (pd->deps[pd->pack].requires)
 	    {
-	      const char *depname = 0;
-	      Reldep *prd = 0;
+	      c = countDeps(pd->source->idarraydata + pd->deps[pd->pack].requires);
+	      source_reserve_ids(pd->source, 0, c);
 
-	      if (ISRELDEP(pid))
+	      for (pidp = pd->source->idarraydata + pd->deps[pd->pack].requires; pidp && (pid = *pidp++) != 0; )
 		{
-		  prd = GETRELDEP(pool, pid);
-		  depname = id2str(pool, prd->name);
-		}
-	      else
-		{
-		  depname = id2str(pool, pid);
-		}
+		  const char *depname = 0;
+		  Reldep *prd = 0;
 
-	      if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
-		{
-		  char newdep[100];
-		  strcpy(newdep, "kernel(");
-		  strncat(newdep, cflavor, sizeof(newdep));
-		  strncat(newdep, ":", sizeof(newdep));
-		  strncat(newdep, depname + strlen("kernel("), 100);
-		  fprintf(stderr, "dep %s %s\n", depname, newdep);
-		  source_reserve_ids(pd->source, 0, 1);
-		  Id newid = str2id(pool, newdep, 1);
-		  if (prd)
-		    newid = rel2id(pool, newid, prd->evr, prd->flags, 1);
+		  if (ISRELDEP(pid))
+		    {
+		      prd = GETRELDEP(pool, pid);
+		      depname = id2str(pool, prd->name);
+		    }
+		  else
+		    {
+		      depname = id2str(pool, pid);
+		    }
+
+		  Id newid = pid;
+
+		  if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
+		    {
+		      char newdep[100];
+		      strcpy(newdep, "kernel(");
+		      strncat(newdep, cflavor, sizeof(newdep));
+		      strncat(newdep, ":", sizeof(newdep));
+		      strncat(newdep, depname + strlen("kernel("), 100);
+		      newid = str2id(pool, newdep, 1);
+		      if (prd)
+			newid = rel2id(pool, newid, prd->evr, prd->flags, 1);
+		    }
 		  npr = source_addid_dep(pd->source, npr, newid, 0);
 		}
-	      else
-		{
-		  npr = source_addid_dep(pd->source, npr, pid, 0);
-		}
-	      pd->deps[pd->pack].requires = npr;
 	    }
+	  pd->deps[pd->pack].requires = npr;
+#endif
 	  free(cflavor);
 	}
 
