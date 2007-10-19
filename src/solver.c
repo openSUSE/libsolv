@@ -764,16 +764,16 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        */
       
       n = queueshift(&q);
-      if (MAPTST(m, n))		       /* continue if already set in map */
+      if (MAPTST(m, n))		       /* continue if already done */
 	continue;
 
       MAPSET(m, n);
       s = pool->solvables + n;	       /* s = Solvable in question */
 
       dontfix = 0;
-      if (system		       /* have rpm */
+      if (system
 	  && !solv->fixsystem
-	  && n >= system->start	       /* its an rpm rule */
+	  && n >= system->start	       /* is it installed? */
 	  && n < system->start + system->nsolvables)
       {
 	dontfix = 1;		       /* dont care about broken rpm deps */
@@ -798,14 +798,18 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  continue;
 		}
 
-	      if (dontfix)	       /* rpm rule, dont care about breakage */
+	      if (dontfix)	       /* dont care about breakage */
 		{
-		  for (i = 0; dp[i]; i++)/* for all providers */
+		  /* the strategy here is to not insist on dependencies
+                   * that are already broken. so if we find one provider
+                   * that was already installed, we know that the
+                   * dependency was not broken before so we enforce it */
+		  for (i = 0; dp[i]; i++)	/* for all providers */
 		    {
 		      if (dp[i] >= system->start && dp[i] < system->start + system->nsolvables)
 			break;	       /* provider is installed */
 		    }
-		  if (!dp[i])	       /* no provider found */
+		  if (!dp[i])	       /* previously broken dependency */
 		    {
 		      if (pool->verbose) printf("ignoring broken requires %s of system package %s-%s.%s\n", dep2str(pool, req), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 		      continue;
@@ -816,7 +820,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		{
 		  /* nothing provides req! */
   #if 1
-		  if (pool->verbose) printf("package %s-%s.%s is not installable (%s)\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req));
+		  if (pool->verbose) printf("package %s-%s.%s [%d] is not installable (%s)\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), s - pool->solvables, dep2str(pool, req));
   #endif
 		  addrule(solv, -n, 0); /* mark requestor as uninstallable */
 		  if (solv->rc_output)
@@ -829,10 +833,11 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		printf("  %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
   #endif
 	      /* add 'requires' dependency */
-	      addrule(solv, -n, dp - pool->whatprovidesdata);   /* rule: (-requestor|provider1|provider2|...|providerN) */
+              /* rule: (-requestor|provider1|provider2|...|providerN) */
+	      addrule(solv, -n, dp - pool->whatprovidesdata);
 
 	      /* descend the dependency tree */
-	      for (; *dp != ID_NULL; dp++)   /* loop through all providers */
+	      for (; *dp; dp++)   /* loop through all providers */
 		{
 		  if (!MAPTST(m, *dp))
 		    queuepush(&q, *dp);
@@ -847,16 +852,17 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        * check conflicts of s
        */
       
-      if ((conp = s->conflicts) != ID_NULL)
+      if ((conp = s->conflicts) != 0)
 	{
-	  while ((con = *conp++) != ID_NULL)
+	  while ((con = *conp++) != 0)
 	    {
-	      FOR_PROVIDES(p, pp, con)   /* loop through all providers of this conflict */
+	      FOR_PROVIDES(p, pp, con)
 		{
-					   /* dontfix: dont care about conflicts with already installed packs */
+		   /* dontfix: dont care about conflicts with already installed packs */
 		  if (dontfix && p >= system->start && p < system->start + system->nsolvables)
 		    continue;
-		  addrule(solv, -n, -p);   /* rule: -n|-p: either solvable _or_ provider of conflict */
+                 /* rule: -n|-p: either solvable _or_ provider of conflict */
+		  addrule(solv, -n, -p);
 		}
 	    }
 	}
@@ -866,9 +872,9 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        */
       if (!system || n < system->start || n >= (system->start + system->nsolvables))
 	{			       /* not installed */
-	  if ((obsp = s->obsoletes) != ID_NULL)
+	  if ((obsp = s->obsoletes) != 0)
 	    {
-	      while ((obs = *obsp++) != ID_NULL)
+	      while ((obs = *obsp++) != 0)
 		{
 		  FOR_PROVIDES(p, pp, obs)
 		    addrule(solv, -n, -p);
@@ -884,8 +890,8 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       /*-----------------------------------------
        * add recommends to the rule list
        */
-      if ((recp = s->recommends) != ID_NULL)
-	while ((rec = *recp++) != ID_NULL)
+      if ((recp = s->recommends) != 0)
+	while ((rec = *recp++) != 0)
 	  {
 	    FOR_PROVIDES(p, pp, rec)
 	      if (!MAPTST(m, p))
@@ -1409,7 +1415,7 @@ static void
 reset_solver(Solver *solv)
 {
   int i;
-  Id v;
+  Id v, vv;
   Rule *r;
 
   /* delete all learnt rules */
@@ -1417,7 +1423,9 @@ reset_solver(Solver *solv)
   QUEUEEMPTY(&solv->learnt_why);
   QUEUEEMPTY(&solv->learnt_pool);
 
-  /* redo all direct decision without the disabled rules */
+  /* redo all direct rpm rule decisions */
+  /* we break at the first decision with a why attached, this is
+   * either a job/system rule decision of a propagated decision */
   for (i = 0; i < solv->decisionq.count; i++)
     {
       v = solv->decisionq.elements[i];
@@ -1438,8 +1446,8 @@ reset_solver(Solver *solv)
   solv->decisionq_why.count = i;
   solv->decisionq.count = i;
   solv->recommends_index = -1;
-  if (i < solv->propagate_index)
-    solv->propagate_index = i;
+  solv->propagate_index = 0;
+
   /* make direct decisions from enabled unary rules */
   for (i = solv->jobrules, r = solv->rules + solv->jobrules; i < solv->nrules; i++, r++)
     {
@@ -1449,6 +1457,15 @@ reset_solver(Solver *solv)
       printrule(solv, r);
 #endif
       v = r->p;
+      vv = v > 0 ? v : -v;
+      if (solv->decisionmap[vv])
+	{
+	  /* do not create conflicts */
+	  if (solv->decisionmap[vv] > 0 && v < 0)
+	    abort();
+	  if (solv->decisionmap[vv] < 0 && v > 0)
+	    abort();
+	}
       queuepush(&solv->decisionq, v);
       queuepush(&solv->decisionq_why, r - solv->rules);
       solv->decisionmap[v > 0 ? v : -v] = v > 0 ? 1 : -1;
@@ -1623,7 +1640,7 @@ revert(Solver *solv, int level)
 
 
 /*
- * watch2onhighest
+ * watch2onhighest - put watch2 on literal with highest level
  */
 
 static void
@@ -1789,14 +1806,18 @@ solver_free(Solver *solv)
 /*
  * reenablerule
  * 
- * r->w1 was set to 0, now find proper value for w1
+ * r->w1 was set to 0, now find proper value for w1.
+ * solver must be in level 1 for this.
+ * returns 1 if rule cound be enabled, 0 if current decison
+ * forbids it.
+ *
  */
   
 static void
 reenablerule(Solver *solv, Rule *r)
 {
   int i;
-  Id v, l, good;
+  Id v, l;
 
   if (!r->w2)			       /* not a rule, but an assertion */
     {
@@ -1805,14 +1826,10 @@ reenablerule(Solver *solv, Rule *r)
     }
   if (!r->d)
     {
-      if (r->w2 != r->p)
-	r->w1 = r->p;
-      else
-	r->w2 = r->d;		       /* mls: shouldn't this be r->w1 ? */
+      r->w1 = r->p;
       return;
     }
-  good = 0;
-				       /* put it on the first not-false literal */
+  /* put watch on the first not-false literal */
   for (i = -1; ; i++)
     {
       if (i == -1)
@@ -2182,10 +2199,9 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
   QUEUEEMPTY(refined);
   queuepush(refined, sug);
 
+  /* re-enable all rules but rule "sug" of the problem */
   revert(solv, 1);
   reset_solver(solv);
-
-  /* re-enable all rules but rule "sug" of the problem */
   for (i = 0; problem[i]; i++)
     {
       if (problem[i] == sug)
@@ -2195,8 +2211,28 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
       printf("enable ");
       printrule(solv, r);
 #endif
+      if (r->w2 == 0)
+	{
+	  /* direct assertion */
+	  v = r->p > 0 ? r->p : -r->p;
+	  if (solv->decisionmap[v])
+	    {
+	      if ((solv->decisionmap[v] > 0 && r->p < 0) ||
+		  (solv->decisionmap[v] < 0 && r->p > 0))
+		{
+		  printf("direct assertion failure, no solution found!\n");
+		  for (; i >= 0; i--)
+		    {
+		      r = solv->rules + problem[i];
+		      r->w1 = 0;
+		    }
+		  return;
+		}
+	    }
+	}
       reenablerule(solv, r);
     }
+  reset_solver(solv);
   for (;;)
     {
       QUEUEEMPTY(&solv->problems);
@@ -2220,6 +2256,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	  if (problem[j])
 	    continue;
 	  queuepush(&disabled, v);
+	  queuepush(&disabled, 0);	/* room for watch */
 	}
       if (disabled.count == disabledcnt)
 	{
@@ -2228,7 +2265,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	  refined->count = 0;
 	  break;
 	}
-      if (disabled.count == disabledcnt + 1)
+      if (disabled.count == disabledcnt + 2)
 	{
 	  /* just one solution, add it to refined list */
 	  queuepush(refined, disabled.elements[disabledcnt]);
@@ -2246,10 +2283,11 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	  /* more than one solution */
 	  /* for now return */
 	}
-      for (i = disabledcnt; i < disabled.count; i++)
+      for (i = disabledcnt; i < disabled.count; i += 2)
 	{
-	  r = solv->rules + disabled.elements[i];;
 	  /* disable it */
+	  r = solv->rules + disabled.elements[i];
+	  disabled.elements[i + 1] = r->w1;
 	  r->w1 = 0;
 #if 0
 	  printf("disable ");
@@ -2260,8 +2298,11 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
       reset_solver(solv);
     }
   /* enable refined rules again */
-  for (i = 0; i < disabled.count; i++)
-    reenablerule(solv, solv->rules + disabled.elements[i]);
+  for (i = 0; i < disabled.count; i += 2)
+    {
+      r = solv->rules + disabled.elements[i];
+      r->w1 = disabled.elements[i + 1];
+    }
   /* disable problem rules again so that we are in the same state as before */
   for (i = 0; problem[i]; i++)
     {
@@ -2881,11 +2922,15 @@ solve(Solver *solv, Queue *job)
 		    {
 		      Id *dp = pool->whatprovidesdata + solv->weaksystemrules[why - solv->systemrules];
 		      for (; *dp; dp++)
-			if (solv->decisionmap[*dp] > 0)
-			  {
-			    sd = pool->solvables + *dp;
-			    break;
-			  }
+			{
+			  if (*dp >= solv->system->start && *dp < solv->system->start + solv->system->nsolvables)
+			    continue;
+			  if (solv->decisionmap[*dp] > 0)
+			    {
+			      sd = pool->solvables + *dp;
+			      break;
+			    }
+			}
 		    }
 		  if (sd)
 		    {
@@ -2893,7 +2938,7 @@ solve(Solver *solv, Queue *job)
 		    }
 		  else
 		    {
-		      printf("- allow deinstallation of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      printf("- allow deinstallation of %s-%s.%s [%d]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), s - pool->solvables);
 		    }
 		}
 	      else
