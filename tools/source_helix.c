@@ -1,3 +1,4 @@
+/*  -*- mode: C; c-file-style: "gnu"; fill-column: 78 -*- */
 /*
  * source_helix.c
  * 
@@ -343,8 +344,9 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, int i
       sprintf(pd->content, "%s:%s", k, n);
       name = str2id(pool, pd->content, 1);
     }
-  else
-    name = str2id(pool, n, 1);       /* package: just intern <name> */
+  else {
+      name = str2id(pool, n, 1);       /* package: just intern <name> */
+  }
 
   if (f)			       /* operator ? */
     {
@@ -544,6 +546,53 @@ startElement(void *userData, const char *name, const char **atts)
     }
 }
 
+static const char* findKernelFlavor(Parsedata *pd)
+{
+  Pool *pool = pd->pool;
+
+  Id pid, *pidp = 0;
+  
+  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].provides; pidp && (pid = *pidp++) != 0; )
+    {
+      Reldep *prd;
+      
+      if (!ISRELDEP(pid))
+	continue;               /* wrong provides name */
+      prd = GETRELDEP(pool, pid);
+      const char *depname = id2str(pool, prd->name);
+      if (!strncmp(depname, "kernel-", strlen("kernel-")))
+	{
+	  return depname + strlen("kernel-");
+	}
+    }
+
+  //fprintf(stderr, "pack %d\n", pd->pack);
+  //fprintf(stderr, "source %d\n", pd->deps[pd->pack].requires);
+
+  if (! pd->deps[pd->pack].requires )
+    return 0;
+
+  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].requires ; pidp && (pid = *pidp++) != 0; )
+    {
+      const char *depname = 0;
+
+      if (!ISRELDEP(pid))
+	{
+	  depname = id2str(pool, pid);
+	} 
+      else 
+	{
+	  Reldep *prd = GETRELDEP(pool, pid);
+	  depname = id2str(pool, prd->name);
+	}
+      if (!strncmp(depname, "kernel-", strlen("kernel-")))
+	{
+	  return depname + strlen("kernel-");
+	}
+    }
+
+  return 0;
+}
 
 /*
  * XML callback
@@ -590,7 +639,91 @@ endElement(void *userData, const char *name)
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         pd->deps[pd->pack].provides = source_addid_dep(pd->source, pd->deps[pd->pack].provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->deps[pd->pack].supplements = source_fix_legacy(pd->source, pd->deps[pd->pack].provides, pd->deps[pd->pack].supplements);
+
+      const char *flavor = findKernelFlavor(pd);
+      if (flavor) 
+	{
+	  char *cflavor = strdup(flavor);
+
+	  Id npr = 0;
+	  Id pid, *pidp;
+
+	  /* this is either a kernel package or a kmp */
+	  fprintf(stderr, "flavor %s\n", flavor);
+
+	  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].provides; pidp && (pid = *pidp++) != 0; )
+	    {
+	      const char *depname = 0;
+	      Reldep *prd = 0;
+
+	      if (ISRELDEP(pid))
+		{
+		  prd = GETRELDEP(pool, pid);
+		  depname = id2str(pool, prd->name);
+		}
+	      else
+		{
+		  depname = id2str(pool, pid);
+		}
+
+	      if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
+		{
+		  char newdep[100];
+		  strcpy(newdep, "kernel(");
+		  strncat(newdep, cflavor, sizeof(newdep));
+		  strncat(newdep, ":", sizeof(newdep));
+		  strncat(newdep, depname + strlen("kernel("), 100);
+		  // fprintf(stderr, "dep %s %s\n", depname, newdep);
+		  Id newid = str2id(pool, newdep, 1);
+		  if (prd)
+		    newid = rel2id(pool, newid, prd->evr, prd->flags, 1);
+		  npr = source_addid_dep(pd->source, npr, newid, 0);
+		}
+	    }
+	  pd->deps[pd->pack].provides = npr;
+
+	  npr = 0;
+	  fprintf(stderr, "dd %d\n", pd->deps[pd->pack].requires);
+	  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].requires; pidp && (pid = *pidp++) != 0; )
+	    {
+	      const char *depname = 0;
+	      Reldep *prd = 0;
+
+	      if (ISRELDEP(pid))
+		{
+		  prd = GETRELDEP(pool, pid);
+		  depname = id2str(pool, prd->name);
+		}
+	      else
+		{
+		  depname = id2str(pool, pid);
+		}
+
+	      if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
+		{
+		  char newdep[100];
+		  strcpy(newdep, "kernel(");
+		  strncat(newdep, cflavor, sizeof(newdep));
+		  strncat(newdep, ":", sizeof(newdep));
+		  strncat(newdep, depname + strlen("kernel("), 100);
+		  fprintf(stderr, "dep %s %s\n", depname, newdep);
+		  source_reserve_ids(pd->source, 0, 1);
+		  Id newid = str2id(pool, newdep, 1);
+		  if (prd)
+		    newid = rel2id(pool, newid, prd->evr, prd->flags, 1);
+		  npr = source_addid_dep(pd->source, npr, newid, 0);
+		}
+	      else
+		{
+		  npr = source_addid_dep(pd->source, npr, pid, 0);
+		}
+	      pd->deps[pd->pack].requires = npr;
+	    }
+	  free(cflavor);
+	}
+
       pd->pack++;		       /* inc pack count */
+
       break;
     case STATE_NAME:
       s->name = str2id(pool, pd->content, 1);
