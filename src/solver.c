@@ -1803,54 +1803,6 @@ solver_free(Solver *solv)
 }
 
 
-/*
- * reenablerule
- * 
- * r->w1 was set to 0, now find proper value for w1.
- * solver must be in level 1 for this.
- * returns 1 if rule cound be enabled, 0 if current decison
- * forbids it.
- *
- */
-  
-static void
-reenablerule(Solver *solv, Rule *r)
-{
-  int i;
-  Id v, l;
-
-  if (!r->w2)			       /* not a rule, but an assertion */
-    {
-      r->w1 = r->p;
-      return;
-    }
-  if (!r->d)
-    {
-      r->w1 = r->p;
-      return;
-    }
-  /* put watch on the first not-false literal */
-  for (i = -1; ; i++)
-    {
-      if (i == -1)
-	v = r->p;
-      else
-        v = solv->pool->whatprovidesdata[r->d + i];
-      if (!v)
-	{
-	  printrule(solv, r);
-	  abort();
-	}
-      if (v == r->w2)
-	continue;
-      l = solv->decisionmap[v > 0 ? v : -v];
-      if (!l || (v < 0 && l < 0) || (v > 0 && l > 0))
-	break;
-    }
-  r->w1 = v;
-}
-
-
 /*-------------------------------------------------------*/
 
 /*
@@ -2221,7 +2173,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 		  (solv->decisionmap[v] < 0 && r->p > 0))
 		{
 		  printf("direct assertion failure, no solution found!\n");
-		  for (; i >= 0; i--)
+		  while (--i >= 0)
 		    {
 		      r = solv->rules + problem[i];
 		      r->w1 = 0;
@@ -2230,7 +2182,10 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 		}
 	    }
 	}
-      reenablerule(solv, r);
+      if (r->d == 0 || r->w2 != r->p)
+	r->w1 = r->p;
+      else
+	r->w1 = solv->pool->whatprovidesdata[r->d];
     }
   reset_solver(solv);
   for (;;)
