@@ -53,8 +53,11 @@ if test -d repodata; then
     cat $patchfile
   fi
   rm -f $primfile $patchfile
-elif test -d suse/setup/descr; then
+elif test -d suse/setup/descr && test -s content; then
+  olddir=`pwd`
   cd suse/setup/descr || exit 2
+  filepack=`mktemp` || exit 3
+  filecont=`mktemp` || exit 3
   (
     # First packages
     if test -s packages.gz; then
@@ -79,5 +82,9 @@ elif test -d suse/setup/descr; then
 	esac
       done
     fi
-  ) | susetags2solv
+  ) | susetags2solv > $filepack
+  cd "$olddir"
+  content2solv < content > $filecont
+  mergesolv $filecont $filepack
+  rm -f $filepack $filecont
 fi
