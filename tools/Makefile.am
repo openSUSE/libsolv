@@ -1,4 +1,4 @@
-noinst_PROGRAMS = rpmdb2solv rpmmd2solv helix2solv susetags2solv patchxml2solv dumpsolv mergesolv
+noinst_PROGRAMS = rpmdb2solv rpmmd2solv helix2solv susetags2solv patchxml2solv dumpsolv mergesolv content2solv
 
 INCLUDES =  \
 	-I$(top_srcdir)/src
@@ -45,6 +45,12 @@ patchxml2solv_SOURCES = \
 	source_write.c
 
 patchxml2solv_LDADD = -lexpat $(LDADD)
+
+content2solv_SOURCES = \
+	content2solv.c		\
+	source_content.h	\
+	source_content.c	\
+	source_write.c
 
 dumpsolv_SOURCES = \
 	dumpsolv.c
