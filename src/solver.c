@@ -623,10 +623,13 @@ addrule(Solver *solv, Id p, Id d)
       n = 1;			       /* re-set n, was used as temp var */
     }
 
+  /* check if the last added rule is exactly the same as what we're looking for.
+   * Differ between binary rules and non-binary rules with one literal (e.g. two kernels) */
   if (r
       && n == 1
       && r->p == p
-      && r->w2 == d)
+      && ( ( !r->d && r->w2 == d )
+	   || r->d == d))
   {
     return r;
   }
