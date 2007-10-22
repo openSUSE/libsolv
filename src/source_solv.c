@@ -107,7 +107,7 @@ read_id(FILE *fp, Id max)
  */
 
 static Id *
-read_idarray(FILE *fp, Id max, Id *map, Id *store)
+read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end)
 {
   unsigned int x = 0;
   int c;
@@ -122,9 +122,24 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store)
       if ((c & 128) == 0)
 	{
 	  x = (x << 6) | (c & 63);
+          if (x >= max)
+	    {
+	      fprintf(stderr, "read_idarray: id too large (%u/%u)\n", x, max);
+	      exit(1);
+	    }
+	  if (store == end)
+	    {
+	      fprintf(stderr, "read_idarray: array overflow\n");
+	      exit(1);
+	    }
 	  *store++ = map[x];
 	  if ((c & 64) == 0)
 	    {
+	      if (store == end)
+		{
+		  fprintf(stderr, "read_idarray: array overflow\n");
+		  exit(1);
+		}
 	      *store++ = 0;
 	      return store;
 	    }
@@ -173,7 +188,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
   SolvData *solvdata;
   unsigned int size, size_str, size_idarray;
   Source *source;
-  Id *idarraydatap, *ida;
+  Id *idarraydatap, *idarraydataend, *ida;
   unsigned int databits;
   Solvable *s;
 
@@ -466,6 +481,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
     source->idarraydata = (Id *)xmalloc(sizeof(Id) * size_idarray);
   source->idarraysize = size_idarray;
   idarraydatap = source->idarraydata;
+  idarraydataend = source->idarraydata + size_idarray;
 
   /* alloc solvables */
   pool->solvables = (Solvable *)xrealloc(pool->solvables, (pool->nsolvables + numsolv) * sizeof(Solvable));
@@ -544,7 +560,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 		  break;
 		}
 	      ida = idarraydatap;
-	      idarraydatap = read_idarray(fp, numid + numrel, idmap, ida);
+	      idarraydatap = read_idarray(fp, numid + numrel, idmap, ida, idarraydataend);
 	      if (id == SOLVABLE_PROVIDES)
 		s->provides = ida;
 	      else if (id == SOLVABLE_OBSOLETES)

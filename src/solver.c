@@ -2789,6 +2789,8 @@ solve(Solver *solv, Queue *job)
       solv->weaksystemrules = xcalloc(solv->system->nsolvables, sizeof(Id));
       for (i = 0; i < solv->system->nsolvables; i++)
 	{
+	  if (MAPTST(&noupdaterule, solv->system->start + i))
+	    continue;
 	  findupdatepackages(solv, pool->solvables + solv->system->start + i, &q, (Map *)0, 1, 1);
 	  if (q.count)
 	    solv->weaksystemrules[i] = pool_queuetowhatprovides(pool, &q);
