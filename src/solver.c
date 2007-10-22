@@ -560,8 +560,8 @@ hashrule(Solver *solv, Id p, Id d, int n)
 static Rule *
 addrule(Solver *solv, Id p, Id d)
 {
-  Rule *r = NULL;
-  Id *dp = NULL;
+  Rule *r = 0;
+  Id *dp = 0;
 
   int n = 0;			       /* number of literals in rule - 1
 					  0 = direct assertion (single literal)
@@ -582,7 +582,7 @@ addrule(Solver *solv, Id p, Id d)
   if (d < 0)
     {
       if (p == d)
-	return NULL;		       /* ignore self conflict */
+	return 0;		       /* ignore self conflict */
       n = 1;
     }
   else if (d == 0)		       /* user requested */
@@ -591,7 +591,7 @@ addrule(Solver *solv, Id p, Id d)
     {
       for (dp = solv->pool->whatprovidesdata + d; *dp; dp++, n++)
 	if (*dp == -p)
-	  return NULL;	/* rule is self-fulfilling */
+	  return 0;			/* rule is self-fulfilling */
       if (n == 1)
 	d = dp[-1];
     }
@@ -611,7 +611,7 @@ addrule(Solver *solv, Id p, Id d)
 	  queuepush(&solv->decisionq, p);
 	  queuepush(&solv->decisionq_why, 0);
 	  solv->decisionmap[-p] = -1;
-	  return NULL;
+	  return 0;
 	}
     }
   else if (n == 1 && p > d)
@@ -623,28 +623,19 @@ addrule(Solver *solv, Id p, Id d)
       n = 1;			       /* re-set n, was used as temp var */
     }
 
-  /* check if the last added rule is exactly the same as what we're looking for.
-   * Differ between binary rules and non-binary rules with one literal (e.g. two kernels) */
-  if (r
-      && n == 1
-      && r->p == p
-      && ( ( !r->d && r->w2 == d )
-	   || r->d == d))
-  {
+  /* check if the last added rule is exactly the same as what we're looking for. */
+  if (r && n == 1 && !r->d && r->p == p && r->w2 == d)
     return r;
-  }
 
-  if (r
-      && r->d
-      && n > 1
-      && r->p == p)
+  if (r && n > 1 && r->d && r->p == p)
     {
-      Id *dp2 = solv->pool->whatprovidesdata + r->d;
+      Id *dp2;
+      if (d == r->d)
+	return r;
+      dp2 = solv->pool->whatprovidesdata + r->d;
       for (dp = solv->pool->whatprovidesdata + d; *dp; dp++, dp2++)
-      {
 	if (*dp != *dp2)
 	  break;
-      }
       if (*dp == *dp2)
 	return r;
    }
