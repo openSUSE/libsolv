@@ -484,6 +484,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 #endif
   for (i = 0, s = pool->solvables + source->start; i < numsolv; i++, s++)
     {
+      s->source = source;
       databits = 0;
       if (numsolvdatabits)
 	{

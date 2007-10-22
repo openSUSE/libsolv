@@ -135,8 +135,6 @@ extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
 
 extern Id *pool_addrelproviders(Pool *pool, Id d);
 
-extern Source *pool_source(Pool *pool, Solvable *s);
-
 static inline int pool_installable(Pool *pool, Solvable *s)
 {
   if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)

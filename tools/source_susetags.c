@@ -240,6 +240,7 @@ pool_addsource_susetags(Pool *pool, FILE *fp)
 	      memset(deps + pack, 0, (PACK_BLOCK + 1) * sizeof(struct deps));
 	    }
 	  s = pool->solvables + source->start + pack;
+	  s->source = source;
 	  dp = deps + pack;
 	  pack++;
           if (split(line + 5, sp, 5) != 4)

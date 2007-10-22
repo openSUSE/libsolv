@@ -854,7 +854,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   #endif
 		  addrule(solv, -n, 0); /* mark requestor as uninstallable */
 		  if (solv->rc_output)
-		    printf(">!> !unflag %s-%s.%s[%s]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), source_name(pool_source(pool, s)));
+		    printf(">!> !unflag %s-%s.%s[%s]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), source_name(s->source));
 		  continue;
 		}
   #if 0
@@ -2480,7 +2480,7 @@ printdecisions(Solver *solv)
 	}
       if (solv->rc_output)
 	{
-	  Source *source = pool_source(pool, s);
+	  Source *source = s->source;
 	  if (source && strcmp(source_name(source), "locales"))
 	    printf("[%s]", source_name(source));
         }
@@ -2701,7 +2701,7 @@ solve(Solver *solv, Queue *job)
 	case SOLVER_INSTALL_SOLVABLE:                     /* install specific solvable */
 	  if (solv->rc_output) {
 	    Solvable *s = pool->solvables + what;
-	    printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), source_name(pool_source(pool, s)));
+	    printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), source_name(s->source));
 	  }
           addrule(solv, what, 0);                         /* install by Id */
 	  break;

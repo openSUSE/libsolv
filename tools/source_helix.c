@@ -637,6 +637,7 @@ endElement(void *userData, const char *name)
     {
 
     case STATE_PACKAGE:		       /* package complete */
+      s->source = pd->source;
 
       if (!s->arch)                    /* default to "noarch" */
 	s->arch = ARCH_NOARCH;

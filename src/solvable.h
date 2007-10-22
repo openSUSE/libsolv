@@ -8,14 +8,17 @@
 #define SOLVABLE_H
 
 #include "pooltypes.h"
+#include "source.h"
 
 typedef struct _Solvable {
   Id name;
   Id arch;
-  Id evr;
+  Id evr;			/* epoch:version-release */
 
-  // dependencies are pointers into idarray of source the solvable originates from
-  Id *provides;			// terminated with Id 0
+  Source *source;		/* source we belong to */
+
+  /* dependencies are pointers into idarray of source */
+  Id *provides;			/* terminated with Id 0 */
   Id *obsoletes;
   Id *conflicts;
 

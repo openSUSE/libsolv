@@ -177,7 +177,7 @@ pool_addsource_content(Pool *pool, FILE *fp)
 
   source = pool_addsource_empty(pool);
   memset(&pd, 0, sizeof(pd));
-  line = malloc(1024);
+  line = xmalloc(1024);
   aline = 1024;
 
   pd.source = source;
@@ -233,6 +233,7 @@ pool_addsource_content(Pool *pool, FILE *fp)
 		  memset(deps + pack, 0, (PACK_BLOCK + 1) * sizeof(struct deps));
 		}
 	      s = pool->solvables + source->start + pack;
+	      s->source = source;
 	      dp = deps + pack;
 	      pack++;
 	    }

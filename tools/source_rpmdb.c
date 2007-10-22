@@ -586,6 +586,7 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	      memset(deps + asolv, 0, 256 * sizeof(*deps));
 	      asolv += 256;
 	    }
+	  pool->solvables[source->start + i].source = source;
           if (key.size != 4)
 	    {
 	      fprintf(stderr, "corrupt Packages database (key size)\n");
@@ -716,6 +717,7 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
       s = pool->solvables + source->start;
       for (i = 0; i < nrpmids; i++, rp++, s++)
 	{
+	  s->source = source;
 	  dbid = rp->dbid;
 	  source->rpmdbid[i] = dbid;
 	  if (refhash)

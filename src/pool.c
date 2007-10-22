@@ -513,29 +513,4 @@ pool_addrelproviders(Pool *pool, Id d)
   return pool->whatprovidesdata + pool->whatprovides[d];
 }
 
-
-/*
- * return source of solvable
- * or NULL
- */
-
-Source *
-pool_source(Pool *pool, Solvable *s)
-{
-  int i;
-  Source *source;
-  int off = s - pool->solvables;
-
-  for (i = 0; i < pool->nsources; i++)
-    {
-      source = pool->sources[i];
-      if (off >= source->start
-	  && off < source->start+source->nsolvables)
-      {
-	return source;
-      }
-    }
-  return NULL;
-}
-
 // EOF

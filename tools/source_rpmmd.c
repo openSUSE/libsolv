@@ -374,13 +374,7 @@ endElement(void *userData, const char *name)
   switch (pd->state)
     {
     case STATE_PACKAGE:
-#if 0
-	{
-	  const char *arch = id2str(pool, s->arch);
-	  if (strcmp(arch, "noarch") && strcmp(arch, "i586") && strcmp(arch, "i686"))
-	    break;
-	}
-#endif
+      s->source = pd->source;
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
