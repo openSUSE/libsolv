@@ -54,6 +54,7 @@ typedef struct solver {
 
   Id jobrules;				/* user rules */
   Id systemrules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
+  Id weakrules;				/* rules that can be autodisabled */
   Id learntrules;			/* learnt rules */
 
   Id *weaksystemrules;			/* please try to install (r->d) */

@@ -689,6 +689,11 @@ makeruledecisions(Solver *solv)
   int i, ri;
   Rule *r, *rr;
   Id v, vv;
+
+  /* no learnt rules for now */
+  if (solv->learntrules && solv->learntrules != solv->nrules)
+    abort();
+
   for (ri = solv->jobrules, r = solv->rules + ri; ri < solv->nrules; ri++, r++)
     {
       if (!r->w1 || r->w2)
@@ -707,6 +712,14 @@ makeruledecisions(Solver *solv)
       if (v < 0 && solv->decisionmap[vv] < 0)
         continue;
       /* found a conflict! */
+      /* if we are weak, just disable ourself */
+      if (ri >= solv->weakrules)
+	{
+	  printf("conflict, but I am weak, disabling ");
+	  printrule(solv, r);
+	  r->w1 = 0;
+	  continue;
+	}
       for (i = 0; i < solv->decisionq.count; i++)
 	if (solv->decisionq.elements[i] == -v)
 	  break;
@@ -1478,73 +1491,74 @@ reset_solver(Solver *solv)
  */
 
 static void
-analyze_unsolvable_rule(Solver *solv, Rule *c, int disablerules)
+analyze_unsolvable_rule(Solver *solv, Rule *r)
 {
-  Id why;
   int i;
-
-  why = c - solv->rules;
+  Id why = r - solv->rules;
 #if 0
   if (why >= solv->jobrules && why < solv->systemrules)
     printf("JOB ");
-  if (why >= solv->systemrules && why < solv->learntrules)
+  if (why >= solv->systemrules && why < solv->weakrules)
     printf("SYSTEM %d ", why - solv->systemrules);
+  if (why >= solv->weakrules && why < solv->learntrules)
+    printf("WEAK ");
   if (solv->learntrules && why >= solv->learntrules)
     printf("LEARNED ");
-  printrule(solv, c);
+  printrule(solv, r);
 #endif
   if (solv->learntrules && why >= solv->learntrules)
     {
       for (i = solv->learnt_why.elements[why - solv->learntrules]; solv->learnt_pool.elements[i]; i++)
-	analyze_unsolvable_rule(solv, solv->rules + solv->learnt_pool.elements[i], disablerules);
+	analyze_unsolvable_rule(solv, solv->rules + solv->learnt_pool.elements[i]);
       return;
     }
-  if (why >= solv->jobrules && why < solv->learntrules)
+  /* do not add rpm rules to problem */
+  if (why < solv->jobrules)
+    return;
+  /* return if problem already countains the rule */
+  if (solv->problems.count)
     {
-      if (disablerules)
-	{
-	  /* turn off rule for further analysis */
-	  c->w1 = 0;
-	}
-      /* unify problem */
-      if (solv->problems.count)
-	{
-	  for (i = solv->problems.count - 1; i >= 0; i--)
-	    if (solv->problems.elements[i] == 0)
-	      break;
-	    else if (solv->problems.elements[i] == why)
-	      return;
-	}
-      queuepush(&solv->problems, why);
+      for (i = solv->problems.count - 1; i >= 0; i--)
+	if (solv->problems.elements[i] == 0)
+	  break;
+	else if (solv->problems.elements[i] == why)
+	  return;
     }
+  queuepush(&solv->problems, why);
 }
 
 
 /*
  * analyze_unsolvable
+ *
+ * return: 1 - disabled some rules, try again
+ *         0 - hopeless
  */
 
-static void
-analyze_unsolvable(Solver *solv, Rule *c, int disablerules)
+static int
+analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
 {
   Pool *pool = solv->pool;
   Map seen;		/* global? */
   Id v, vv, *dp, why;
   int l, i, idx;
   Id *decisionmap = solv->decisionmap;
+  int oldproblemcount;
+  int lastweak;
 
 #if 0
   printf("ANALYZE UNSOLVABLE ----------------------\n");
 #endif
+  oldproblemcount = solv->problems.count;
   mapinit(&seen, pool->nsolvables);
-  analyze_unsolvable_rule(solv, c, disablerules);
-  dp = c->d ? pool->whatprovidesdata + c->d : 0;
+  analyze_unsolvable_rule(solv, r);
+  dp = r->d ? pool->whatprovidesdata + r->d : 0;
   for (i = -1; ; i++)
     {
       if (i == -1)
-	v = c->p;
-      else if (c->d == 0)
-	v = i ? 0 : c->w2;
+	v = r->p;
+      else if (r->d == 0)
+	v = i ? 0 : r->w2;
       else
 	v = *dp++;
       if (v == 0)
@@ -1573,15 +1587,15 @@ analyze_unsolvable(Solver *solv, Rule *c, int disablerules)
 #endif
 	  continue;
 	}
-      c = solv->rules + why;
-      analyze_unsolvable_rule(solv, c, disablerules);
-      dp = c->d ? pool->whatprovidesdata + c->d : 0;
+      r = solv->rules + why;
+      analyze_unsolvable_rule(solv, r);
+      dp = r->d ? pool->whatprovidesdata + r->d : 0;
       for (i = -1; ; i++)
 	{
 	  if (i == -1)
-	    v = c->p;
-	  else if (c->d == 0)
-	    v = i ? 0 : c->w2;
+	    v = r->p;
+	  else if (r->d == 0)
+	    v = i ? 0 : r->w2;
 	  else
 	    v = *dp++;
 	  if (v == 0)
@@ -1597,11 +1611,41 @@ analyze_unsolvable(Solver *solv, Rule *c, int disablerules)
     }
   mapfree(&seen);
   queuepush(&solv->problems, 0);	/* mark end of this problem */
-  if (disablerules)
-    reset_solver(solv);
-#if 0
-  printf("analyze_unsolvables done\n");
-#endif
+
+  lastweak = 0;
+  if (solv->weakrules != solv->learntrules)
+    {
+      for (i = oldproblemcount; i < solv->problems.count - 1; i++)
+	{
+	  why = solv->problems.elements[i];
+	  if (why < solv->weakrules || why >= solv->learntrules)
+	    continue;
+	  if (!lastweak || lastweak < why)
+	    lastweak = why;
+	}
+    }
+  if (lastweak)
+    {
+      /* disable last weak rule */
+      solv->problems.count = oldproblemcount;
+      r = solv->rules + lastweak;
+      printf("disabling weak ");
+      printrule(solv, r);
+      r->w1 = 0;
+      reset_solver(solv);
+      return 1;
+    }
+  else if (disablerules)
+    {
+      for (i = oldproblemcount; i < solv->problems.count - 1; i++)
+	{
+	  r = solv->rules + solv->problems.elements[i];
+	  r->w1 = 0;
+	}
+      reset_solver(solv);
+      return 1;
+    }
+  return 0;
 }
 
 
@@ -1689,12 +1733,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
       if (!r)
 	break;
       if (level == 1)
-	{
-	  analyze_unsolvable(solv, r, disablerules);
-	  if (disablerules)
-	    return 1;
-	  return 0;
-	}
+	return analyze_unsolvable(solv, r, disablerules);
       printf("conflict with rule #%d\n", (int)(r - solv->rules));
       l = analyze(solv, level, r, &p, &d, &why);
       if (l >= level || l <= 0)
@@ -1855,8 +1894,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (pool->verbose) printf("propagating (%d %d)...\n", solv->propagate_index, solv->decisionq.count);
 	  if ((r = propagate(solv, level)) != 0)
 	    {
-	      analyze_unsolvable(solv, r, disablerules);
-	      if (disablerules)
+	      if (analyze_unsolvable(solv, r, disablerules))
 		continue;
 	      printf("UNSOLVABLE\n");
 	      queuefree(&dq);
@@ -2137,8 +2175,8 @@ static void
 refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 {
   Rule *r;
-  int i, j;
-  Id v;
+  int i, j, sugseen;
+  Id v, sugassert;
   Queue disabled;
   int disabledcnt;
 
@@ -2150,10 +2188,20 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
   /* re-enable all rules but rule "sug" of the problem */
   revert(solv, 1);
   reset_solver(solv);
+
+  sugassert = 0;
+  sugseen = 0;
+  r = solv->rules + sug;
+  if (r->w2 == 0)
+    sugassert = r->p;
+
   for (i = 0; problem[i]; i++)
     {
       if (problem[i] == sug)
-	continue;
+	{
+	  continue;
+	  sugseen = 1;
+	}
       r = solv->rules + problem[i];
 #if 0
       printf("enable ");
@@ -2162,6 +2210,11 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
       if (r->w2 == 0)
 	{
 	  /* direct assertion */
+	  if (r->p == sugassert && sugseen)
+	    {
+	      /* also leave this assertion disabled */
+	      continue;
+	    }
 	  v = r->p > 0 ? r->p : -r->p;
 	  if (solv->decisionmap[v])
 	    {
@@ -2185,6 +2238,18 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
     }
   for (;;)
     {
+      /* re-enable as many weak rules as possible */
+      for (i = solv->weakrules; i < solv->learntrules; i++)
+	{
+	  r = solv->rules + i;
+	  if (r->w1)
+	    continue;
+	  if (r->d == 0 || r->w2 != r->p)
+	    r->w1 = r->p;
+	  else
+	    r->w1 = solv->pool->whatprovidesdata[r->d];
+	}
+
       QUEUEEMPTY(&solv->problems);
       revert(solv, 1);		/* XXX move to reset_solver? */
       reset_solver(solv);
@@ -2219,7 +2284,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	}
       if (disabled.count == disabledcnt + 2)
 	{
-	  /* just one solution, add it to refined list */
+	  /* just one suggestion, add it to refined list */
 	  queuepush(refined, disabled.elements[disabledcnt]);
 	}
       else
@@ -2227,17 +2292,14 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	  printf("##############################################   more than one solution found.\n");
 #if 1
 	  for (i = 0; i < solv->problems.elements[i]; i++)
-	    {
-	      printrule(solv, solv->rules + solv->problems.elements[i]);
-	    }
+	    printrule(solv, solv->rules + solv->problems.elements[i]);
 	  printf("##############################################\n");
 #endif
-	  /* more than one solution */
-	  /* for now return */
+	  /* more than one solution, keep all disabled */
 	}
       for (i = disabledcnt; i < disabled.count; i += 2)
 	{
-	  /* disable it */
+	  /* disable em */
 	  r = solv->rules + disabled.elements[i];
 	  disabled.elements[i + 1] = r->w1;
 	  r->w1 = 0;
@@ -2738,6 +2800,18 @@ solve(Solver *solv, Queue *job)
   mapfree(&noupdaterule);
   queuefree(&q);
 
+  solv->weakrules = solv->nrules;
+
+  /* try real hard to keep packages installed */
+  if (0)
+    {
+      for (i = 0; i < solv->system->nsolvables; i++)
+	{
+	  d = solv->weaksystemrules[i];
+	  addrule(solv, solv->system->start + i, d);
+	}
+    }
+
   /*
    * solve !
    * 
@@ -2865,7 +2939,7 @@ solve(Solver *solv, Queue *job)
 		      printf("- do not erase %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 		    }
 		}
-	      else if (why >= solv->systemrules && why < solv->learntrules)
+	      else if (why >= solv->systemrules && why < solv->weakrules)
 		{
 		  Solvable *sd = 0;
 		  s = pool->solvables + solv->system->start + (why - solv->systemrules);
