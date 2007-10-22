@@ -850,7 +850,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		{
 		  /* nothing provides req! */
   #if 1
-		  if (pool->verbose) printf("package %s-%s.%s [%d] is not installable (%s)\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), s - pool->solvables, dep2str(pool, req));
+		  if (pool->verbose) printf("package %s-%s.%s [%ld] is not installable (%s)\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (long int)(s - pool->solvables), dep2str(pool, req));
   #endif
 		  addrule(solv, -n, 0); /* mark requestor as uninstallable */
 		  if (solv->rc_output)
@@ -2963,7 +2963,7 @@ solve(Solver *solv, Queue *job)
 		    }
 		  else
 		    {
-		      printf("- allow deinstallation of %s-%s.%s [%d]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), s - pool->solvables);
+		      printf("- allow deinstallation of %s-%s.%s [%ld]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (long int)(s - pool->solvables));
 		    }
 		}
 	      else
