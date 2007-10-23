@@ -267,7 +267,7 @@ pool_addsource_content(Pool *pool, FILE *fp)
 	    dp->supplements = adddep(pool, &pd, dp->supplements, value, 0);
 	  else if (istag ("ENHANCES"))
 	    dp->enhances = adddep(pool, &pd, dp->enhances, value, 0);
-	  /* There doesn't seem to exist FRESHENS.  */
+	  /* FRESHENS doesn't seem to exist.  */
 	  /* XXX do something about LINGUAS and ARCH? */
 #undef istag
 	}
@@ -285,24 +285,15 @@ pool_addsource_content(Pool *pool, FILE *fp)
   s = pool->solvables + source->start;
   for (i = 0; i < pack; i++, s++)
     {
-      if (deps[i].provides)
-        s->provides = deps[i].provides;
-      if (deps[i].requires)
-        s->requires = deps[i].requires;
-      if (deps[i].conflicts)
-        s->conflicts = deps[i].conflicts;
-      if (deps[i].obsoletes)
-        s->obsoletes = deps[i].obsoletes;
-      if (deps[i].recommends)
-        s->recommends = deps[i].recommends;
-      if (deps[i].supplements)
-        s->supplements = deps[i].supplements;
-      if (deps[i].suggests)
-        s->suggests = deps[i].suggests;
-      if (deps[i].enhances)
-        s->enhances = deps[i].enhances;
-      if (deps[i].freshens)
-        s->freshens = deps[i].freshens;
+      s->provides = deps[i].provides;
+      s->requires = deps[i].requires;
+      s->conflicts = deps[i].conflicts;
+      s->obsoletes = deps[i].obsoletes;
+      s->recommends = deps[i].recommends;
+      s->supplements = deps[i].supplements;
+      s->suggests = deps[i].suggests;
+      s->enhances = deps[i].enhances;
+      s->freshens = deps[i].freshens;
     }
 
   free(deps);
