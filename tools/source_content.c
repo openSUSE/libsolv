@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #include "pool.h"
+#include "util.h"
 #include "source_content.h"
 
 #define PACK_BLOCK 16
