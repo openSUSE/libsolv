@@ -275,7 +275,7 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
 {
   Pool *pool = source->pool;
   Id id, idp, idl, idns;
-  char buf[1024], oc, *p, *dep;
+  char buf[1024], *p, *dep;
   int i;
 
   if (provides)
@@ -286,11 +286,11 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
 	  if (ISRELDEP(id))
 	    continue;
 	  dep = (char *)id2str(pool, id);
-	  if (!strncmp(dep, "locale(", 7) && strlen(dep) < sizeof(buf))
+	  if (!strncmp(dep, "locale(", 7) && strlen(dep) < sizeof(buf) - 2)
 	    {
 	      idp = 0;
-	      strcpy(buf, dep);
-	      dep = buf + 7;
+	      strcpy(buf + 2, dep);
+	      dep = buf + 2 + 7;
 	      if ((p = strchr(dep, ':')) != 0 && p != dep)
 		{
 		  *p++ = 0;
@@ -305,12 +305,9 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
 		      dep = p + 1;
 		      continue;
 		    }
-		  strncpy(dep - 7, "Locale(", 7);
-		  *p++ = ')';
-		  oc = *p;
-		  *p = 0;
-		  idl = str2id(pool, dep - 7, 1);
-		  *p = oc;
+		  strncpy(dep - 9, "language:", 9);
+		  *p++ = 0;
+		  idl = str2id(pool, dep - 9, 1);
 		  if (id)
 		    id = rel2id(pool, id, idl, REL_OR, 1);
 		  else
@@ -319,8 +316,11 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
 		}
 	      if (dep[0] && dep[1])
 		{
-		  strncpy(dep - 7, "Locale(", 7);
-		  idl = str2id(pool, dep - 7, 1);
+	 	  for (p = dep; *p && *p != ')'; p++)
+		    ;
+		  *p = 0;
+		  strncpy(dep - 9, "language:", 9);
+		  idl = str2id(pool, dep - 9, 1);
 		  if (id)
 		    id = rel2id(pool, id, idl, REL_OR, 1);
 		  else
@@ -353,6 +353,8 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
       if (ISRELDEP(id))
 	continue;
       dep = (char *)id2str(pool, id);
+      if (!strncmp(dep, "system:modalias(", 16))
+	dep += 7;
       if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10] && strlen(dep) < sizeof(buf))
 	{
 	  strcpy(buf, dep);
