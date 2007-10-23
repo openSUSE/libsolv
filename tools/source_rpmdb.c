@@ -307,21 +307,23 @@ makedeps(Pool *pool, Source *source, RpmHead *rpmhead, int tagn, int tagv, int t
   return olddeps;
 }
 
-static unsigned int
-copydeps(Pool *pool, Source *source, Id *from, Pool *frompool)
+static Offset
+copydeps(Pool *pool, Source *source, Offset fromoff, Source *fromsource)
 {
   int cc;
-  Id id, *ida;
-  unsigned int olddeps;
+  Id id, *ida, *from;
+  Offset ido;
+  Pool *frompool = fromsource->pool;
 
-  if (!from)
+  if (!fromoff)
     return 0;
+  from = fromsource->idarraydata + fromoff;
   for (ida = from, cc = 0; *ida; ida++, cc++)
     ;
   if (cc == 0)
     return 0;
-  olddeps = source_reserve_ids(source, 0, cc);
-  ida = source->idarraydata + olddeps;
+  ido = source_reserve_ids(source, 0, cc);
+  ida = source->idarraydata + ido;
   if (frompool && pool != frompool)
     {
       while (*from)
@@ -343,7 +345,7 @@ copydeps(Pool *pool, Source *source, Id *from, Pool *frompool)
   else
     memcpy(ida, from, (cc + 1) * sizeof(Id));
   source->idarraysize += cc + 1;
-  return olddeps;
+  return ido;
 }
 
 
@@ -747,15 +749,15 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 		      if (r->arch)
 			s->arch = str2id(pool, id2str(ref->pool, r->arch), 1);
 		    }
-		  deps[i].provides = copydeps(pool, source, r->provides, ref->pool);
-		  deps[i].requires = copydeps(pool, source, r->requires, ref->pool);
-		  deps[i].conflicts = copydeps(pool, source, r->conflicts, ref->pool);
-		  deps[i].obsoletes = copydeps(pool, source, r->obsoletes, ref->pool);
-		  deps[i].recommends = copydeps(pool, source, r->recommends, ref->pool);
-		  deps[i].suggests = copydeps(pool, source, r->suggests, ref->pool);
-		  deps[i].supplements = copydeps(pool, source, r->supplements, ref->pool);
-		  deps[i].enhances  = copydeps(pool, source, r->enhances, ref->pool);
-		  deps[i].freshens = copydeps(pool, source, r->freshens, ref->pool);
+		  deps[i].provides = copydeps(pool, source, r->provides, ref);
+		  deps[i].requires = copydeps(pool, source, r->requires, ref);
+		  deps[i].conflicts = copydeps(pool, source, r->conflicts, ref);
+		  deps[i].obsoletes = copydeps(pool, source, r->obsoletes, ref);
+		  deps[i].recommends = copydeps(pool, source, r->recommends, ref);
+		  deps[i].suggests = copydeps(pool, source, r->suggests, ref);
+		  deps[i].supplements = copydeps(pool, source, r->supplements, ref);
+		  deps[i].enhances  = copydeps(pool, source, r->enhances, ref);
+		  deps[i].freshens = copydeps(pool, source, r->freshens, ref);
 		  continue;
 		}
 	    }
@@ -837,24 +839,15 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
   s = pool->solvables + source->start;
   for (i = 0; i < nrpmids; i++, s++)
     {
-      if (deps[i].provides)
-	s->provides = source->idarraydata + deps[i].provides;
-      if (deps[i].requires)
-	s->requires = source->idarraydata + deps[i].requires;
-      if (deps[i].conflicts)
-	s->conflicts = source->idarraydata + deps[i].conflicts;
-      if (deps[i].obsoletes)
-	s->obsoletes = source->idarraydata + deps[i].obsoletes;
-      if (deps[i].recommends)
-	s->recommends = source->idarraydata + deps[i].recommends;
-      if (deps[i].supplements)
-	s->supplements = source->idarraydata + deps[i].supplements;
-      if (deps[i].suggests)
-	s->suggests = source->idarraydata + deps[i].suggests;
-      if (deps[i].enhances)
-	s->enhances = source->idarraydata + deps[i].enhances;
-      if (deps[i].freshens)
-	s->freshens = source->idarraydata + deps[i].freshens;
+      s->provides = deps[i].provides;
+      s->requires = deps[i].requires;
+      s->conflicts = deps[i].conflicts;
+      s->obsoletes = deps[i].obsoletes;
+      s->recommends = deps[i].recommends;
+      s->supplements = deps[i].supplements;
+      s->suggests = deps[i].suggests;
+      s->enhances = deps[i].enhances;
+      s->freshens = deps[i].freshens;
     }
   free(deps);
   if (db)

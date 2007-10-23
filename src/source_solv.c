@@ -188,7 +188,8 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
   SolvData *solvdata;
   unsigned int size, size_str, size_idarray;
   Source *source;
-  Id *idarraydatap, *idarraydataend, *ida;
+  Id *idarraydatap, *idarraydataend;
+  Offset ido;
   unsigned int databits;
   Solvable *s;
 
@@ -478,10 +479,20 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
       exit(1);
     }
   if (size_idarray)
-    source->idarraydata = (Id *)xmalloc(sizeof(Id) * size_idarray);
-  source->idarraysize = size_idarray;
-  idarraydatap = source->idarraydata;
-  idarraydataend = source->idarraydata + size_idarray;
+    {
+      size_idarray++;	/* first entry is not used */
+      source->idarraydata = (Id *)xmalloc(sizeof(Id) * size_idarray);
+      source->idarraysize = size_idarray;
+      idarraydatap = source->idarraydata + 1;
+      idarraydataend = source->idarraydata + size_idarray;
+    }
+  else
+    {
+      source->idarraydata = 0;
+      source->idarraysize = 0;
+      idarraydatap = 0;
+      idarraydataend = 0;
+    }
 
   /* alloc solvables */
   pool->solvables = (Solvable *)xrealloc(pool->solvables, (pool->nsolvables + numsolv) * sizeof(Solvable));
@@ -559,40 +570,34 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 		    ;
 		  break;
 		}
-	      ida = idarraydatap;
-	      idarraydatap = read_idarray(fp, numid + numrel, idmap, ida, idarraydataend);
+	      ido = idarraydatap - source->idarraydata;
+	      idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend);
 	      if (id == SOLVABLE_PROVIDES)
-		s->provides = ida;
+		s->provides = ido;
 	      else if (id == SOLVABLE_OBSOLETES)
-		s->obsoletes = ida;
+		s->obsoletes = ido;
 	      else if (id == SOLVABLE_CONFLICTS)
-		s->conflicts = ida;
+		s->conflicts = ido;
 	      else if (id == SOLVABLE_REQUIRES)
-		s->requires = ida;
+		s->requires = ido;
 	      else if (id == SOLVABLE_RECOMMENDS)
-		s->recommends= ida;
+		s->recommends= ido;
 	      else if (id == SOLVABLE_SUPPLEMENTS)
-		s->supplements = ida;
+		s->supplements = ido;
 	      else if (id == SOLVABLE_SUGGESTS)
-		s->suggests = ida;
+		s->suggests = ido;
 	      else if (id == SOLVABLE_ENHANCES)
-		s->enhances = ida;
+		s->enhances = ido;
 	      else if (id == SOLVABLE_FRESHENS)
-		s->freshens = ida;
+		s->freshens = ido;
 #if 0
 	      printf("%s ->\n", id2str(pool, id));
-	      for (; *ida; ida++)
-	        printf("  %s\n", dep2str(pool, *ida));
+	      for (; source->idarraydata[ido]; ido++)
+	        printf("  %s\n", dep2str(pool, source->idarraydata[ido]));
 #endif
 	      break;
 	    }
 	}
-    }
-
-  if (idarraydatap > source->idarraydata + size_idarray)
-    {
-      fprintf(stderr, "idarray overflow\n");
-      exit(1);
     }
 
   xfree(idmap);

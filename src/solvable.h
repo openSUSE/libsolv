@@ -17,19 +17,19 @@ typedef struct _Solvable {
 
   Source *source;		/* source we belong to */
 
-  /* dependencies are pointers into idarray of source */
-  Id *provides;			/* terminated with Id 0 */
-  Id *obsoletes;
-  Id *conflicts;
+  /* dependencies are offsets into idarray of source */
+  Offset provides;			/* terminated with Id 0 */
+  Offset obsoletes;
+  Offset conflicts;
 
-  Id *requires;
-  Id *recommends;
-  Id *suggests;
+  Offset requires;
+  Offset recommends;
+  Offset suggests;
 
-  Id *supplements;
-  Id *enhances;
+  Offset supplements;
+  Offset enhances;
 
-  Id *freshens;
+  Offset freshens;
 } Solvable;
 
 #endif /* SOLVABLE_H */

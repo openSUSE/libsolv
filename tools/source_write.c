@@ -44,7 +44,7 @@ incneedid(Pool *pool, Id *idarray, NeedId *needid)
   Id id;
   int n = 0;
 
-  while ((id = *idarray++) != ID_NULL)
+  while ((id = *idarray++) != 0)
     {
       n++;
       while (ISRELDEP(id))
@@ -190,6 +190,7 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
   int nstrings, nrels;
   unsigned int sizeid;
   Reldep *ran;
+  Id *idarraydata;
 
   int idsizes[RPM_RPMDBID + 1];
   int bits, bitmaps;
@@ -197,6 +198,7 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
 
   nsolvables = source->nsolvables;
   sstart = pool->solvables + source->start;
+  idarraydata = source->idarraydata;
 
   needid = (NeedId *)calloc(pool->nstrings + pool->nrels, sizeof(*needid));
 
@@ -208,15 +210,24 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
       needid[s->name].need++;
       needid[s->arch].need++;
       needid[s->evr].need++;
-      idsizes[SOLVABLE_PROVIDES]    += incneedid(pool, s->provides, needid);
-      idsizes[SOLVABLE_REQUIRES]    += incneedid(pool, s->requires, needid);
-      idsizes[SOLVABLE_CONFLICTS]   += incneedid(pool, s->conflicts, needid);
-      idsizes[SOLVABLE_OBSOLETES]   += incneedid(pool, s->obsoletes, needid);
-      idsizes[SOLVABLE_RECOMMENDS]  += incneedid(pool, s->recommends, needid);
-      idsizes[SOLVABLE_SUGGESTS]    += incneedid(pool, s->suggests, needid);
-      idsizes[SOLVABLE_SUPPLEMENTS] += incneedid(pool, s->supplements, needid);
-      idsizes[SOLVABLE_ENHANCES]    += incneedid(pool, s->enhances, needid);
-      idsizes[SOLVABLE_FRESHENS]    += incneedid(pool, s->freshens, needid);
+      if (s->provides)
+        idsizes[SOLVABLE_PROVIDES]    += incneedid(pool, idarraydata + s->provides, needid);
+      if (s->requires)
+        idsizes[SOLVABLE_REQUIRES]    += incneedid(pool, idarraydata + s->requires, needid);
+      if (s->conflicts)
+        idsizes[SOLVABLE_CONFLICTS]   += incneedid(pool, idarraydata + s->conflicts, needid);
+      if (s->obsoletes)
+        idsizes[SOLVABLE_OBSOLETES]   += incneedid(pool, idarraydata + s->obsoletes, needid);
+      if (s->recommends)
+        idsizes[SOLVABLE_RECOMMENDS]  += incneedid(pool, idarraydata + s->recommends, needid);
+      if (s->suggests)
+        idsizes[SOLVABLE_SUGGESTS]    += incneedid(pool, idarraydata + s->suggests, needid);
+      if (s->supplements)
+        idsizes[SOLVABLE_SUPPLEMENTS] += incneedid(pool, idarraydata + s->supplements, needid);
+      if (s->enhances)
+        idsizes[SOLVABLE_ENHANCES]    += incneedid(pool, idarraydata + s->enhances, needid);
+      if (s->freshens)
+        idsizes[SOLVABLE_FRESHENS]    += incneedid(pool, idarraydata + s->freshens, needid);
     }
 
   idsizes[SOLVABLE_NAME] = 1;
@@ -234,9 +245,7 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
   needid[0].need = 0;
   needid[pool->nstrings].need = 0;
   for (i = 0; i < pool->nstrings + pool->nrels; i++)
-    {
-      needid[i].map = i;
-    }
+    needid[i].map = i;
 
   qsort(needid + 1, pool->nstrings - 1, sizeof(*needid), needid_cmp_need);
   qsort(needid + pool->nstrings, pool->nrels, sizeof(*needid), needid_cmp_need);
@@ -252,9 +261,7 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
 
   nstrings = i;
   for (i = 0; i < nstrings; i++)
-    {
-      needid[needid[i].map].need = i;
-    }
+    needid[needid[i].map].need = i;
 
   for (i = 0; i < pool->nrels; i++)
     {
@@ -381,23 +388,23 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
       write_id(fp, needid[s->evr].need);
 
       if (s->provides)
-        write_idarray(fp, pool, needid, s->provides);
+        write_idarray(fp, pool, needid, idarraydata + s->provides);
       if (s->obsoletes)
-        write_idarray(fp, pool, needid, s->obsoletes);
+        write_idarray(fp, pool, needid, idarraydata + s->obsoletes);
       if (s->conflicts)
-        write_idarray(fp, pool, needid, s->conflicts);
+        write_idarray(fp, pool, needid, idarraydata + s->conflicts);
       if (s->requires)
-        write_idarray(fp, pool, needid, s->requires);
+        write_idarray(fp, pool, needid, idarraydata + s->requires);
       if (s->recommends)
-        write_idarray(fp, pool, needid, s->recommends);
+        write_idarray(fp, pool, needid, idarraydata + s->recommends);
       if (s->suggests)
-        write_idarray(fp, pool, needid, s->suggests);
+        write_idarray(fp, pool, needid, idarraydata + s->suggests);
       if (s->supplements)
-        write_idarray(fp, pool, needid, s->supplements);
+        write_idarray(fp, pool, needid, idarraydata + s->supplements);
       if (s->enhances)
-        write_idarray(fp, pool, needid, s->enhances);
+        write_idarray(fp, pool, needid, idarraydata + s->enhances);
       if (s->freshens)
-        write_idarray(fp, pool, needid, s->freshens);
+        write_idarray(fp, pool, needid, idarraydata + s->freshens);
       if (source->rpmdbid)
         write_u32(fp, source->rpmdbid[i]);
     }

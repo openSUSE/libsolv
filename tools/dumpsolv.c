@@ -7,12 +7,14 @@
 #include "source_solv.h"
 
 static void
-printids(Pool *pool, char *kind, Id *ids)
+printids(Source *source, char *kind, Offset ido)
 {
-  Id id;
-  if (!ids)
+  Pool *pool = source->pool;
+  Id id, *ids;
+  if (!ido)
     return;
   printf("%s:\n", kind);
+  ids = source->idarraydata + ido;
   while((id = *ids++) != 0)
     printf("  %s\n", dep2str(pool, id));
 }
@@ -41,15 +43,15 @@ int main(int argc, char **argv)
       printf("\n");
       printf("solvable %d:\n", i);
       printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-      printids(pool, "provides", s->provides);
-      printids(pool, "obsoletes", s->obsoletes);
-      printids(pool, "conflicts", s->conflicts);
-      printids(pool, "requires", s->requires);
-      printids(pool, "recommends", s->recommends);
-      printids(pool, "suggests", s->suggests);
-      printids(pool, "supplements", s->supplements);
-      printids(pool, "enhances", s->enhances);
-      printids(pool, "freshens", s->freshens);
+      printids(source, "provides", s->provides);
+      printids(source, "obsoletes", s->obsoletes);
+      printids(source, "conflicts", s->conflicts);
+      printids(source, "requires", s->requires);
+      printids(source, "recommends", s->recommends);
+      printids(source, "suggests", s->suggests);
+      printids(source, "supplements", s->supplements);
+      printids(source, "enhances", s->enhances);
+      printids(source, "freshens", s->freshens);
     }
   exit(0);
 }

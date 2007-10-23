@@ -15,16 +15,6 @@
 #include "source_solv.h"
 #include "source_write.h"
 
-static void
-adjust (Id **val, Id * new_id, Source *source)
-{
-  if (!*val)
-    return;
-  assert (source->idarraydata <= *val);
-  assert (*val < source->idarraydata + source->idarraysize);
-  *val = new_id + (*val - source->idarraydata);
-}
-
 int
 main(int argc, char **argv)
 {
@@ -62,15 +52,24 @@ main(int argc, char **argv)
       for (si = source->start; si < source->start + source->nsolvables; si++)
         {
 	  Solvable *s = pool->solvables + si;
-	  adjust (&s->provides, new_id + new_id_size, source);
-	  adjust (&s->obsoletes, new_id + new_id_size, source);
-	  adjust (&s->conflicts, new_id + new_id_size, source);
-	  adjust (&s->requires, new_id + new_id_size, source);
-	  adjust (&s->recommends, new_id + new_id_size, source);
-	  adjust (&s->suggests, new_id + new_id_size, source);
-	  adjust (&s->supplements, new_id + new_id_size, source);
-	  adjust (&s->enhances, new_id + new_id_size, source);
-	  adjust (&s->freshens, new_id + new_id_size, source);
+	  if (s->provides)
+	    s->provides += new_id_size;
+	  if (s->obsoletes)
+	    s->obsoletes += new_id_size;
+	  if (s->conflicts)
+	    s->conflicts += new_id_size;
+	  if (s->requires)
+	    s->requires += new_id_size;
+	  if (s->recommends)
+	    s->recommends += new_id_size;
+	  if (s->suggests)
+	    s->suggests+= new_id_size;
+	  if (s->supplements)
+	    s->supplements += new_id_size;
+	  if (s->enhances)
+	    s->enhances += new_id_size;
+	  if (s->freshens)
+	    s->freshens += new_id_size;
 	}
       new_id_size += source->idarraysize;
       if (i > 0)

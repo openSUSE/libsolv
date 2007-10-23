@@ -265,11 +265,11 @@ pool_prepare(Pool *pool)
     {
       Id *pp;
       s = pool->solvables + i;
-      pp = s->provides;
-      if (!pp)			/* solvable does not provide anything */
+      if (!s->provides)
 	continue;
       if (!pool_installable(pool, s))
 	continue;
+      pp = s->source->idarraydata + s->provides;
       while ((id = *pp++) != ID_NULL)
 	{
 	  if (ISRELDEP(id))
@@ -312,13 +312,13 @@ pool_prepare(Pool *pool)
     {
       Id *pp;
       s = pool->solvables + i;
-      pp = s->provides;
-      if (!pp)			       /* solvable does not provide anything */
+      if (!s->provides)
 	continue;
       if (!pool_installable(pool, s))
 	continue;
 
       /* for all provides of this solvable */
+      pp = s->source->idarraydata + s->provides;
       while ((id = *pp++) != 0)
 	{
 	  if (ISRELDEP(id))
@@ -465,7 +465,8 @@ pool_addrelproviders(Pool *pool, Id d)
 	    printf("addrelproviders: checking package %s\n", id2str(pool, pool->p[p].name));
 #endif
 	  /* solvable p provides name in some rels */
-	  for (pidp = pool->solvables[p].provides; (pid = *pidp++) != 0; )
+	  pidp = pool->solvables[p].source->idarraydata + pool->solvables[p].provides;
+	  while ((pid = *pidp++) != 0)
 	    {
 	      int pflags;
 	      Id pevr;

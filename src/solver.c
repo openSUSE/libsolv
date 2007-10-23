@@ -159,14 +159,20 @@ prune_to_recommended(Solver *solv, Queue *plist)
       if (p < 0)
 	continue;
       s = pool->solvables + p;
-      if ((recp = s->recommends) != 0)
-        while ((rec = *recp++) != 0)
-	  FOR_PROVIDES(p, pp, rec)
-	    MAPSET(&solv->recommendsmap, p);
-      if ((sugp = s->suggests) != 0)
-        while ((sug = *sugp++) != 0)
-	  FOR_PROVIDES(p, pp, sug)
-	    MAPSET(&solv->suggestsmap, p);
+      if (s->recommends)
+	{
+	  recp = s->source->idarraydata + s->recommends;
+          while ((rec = *recp++) != 0)
+	    FOR_PROVIDES(p, pp, rec)
+	      MAPSET(&solv->recommendsmap, p);
+	}
+      if (s->suggests)
+	{
+	  sugp = s->source->idarraydata + s->suggests;
+          while ((sug = *sugp++) != 0)
+	    FOR_PROVIDES(p, pp, sug)
+	      MAPSET(&solv->suggestsmap, p);
+	}
     }
   /* prune to recommended/supplemented */
   for (i = j = 0; i < plist->count; i++)
@@ -180,16 +186,18 @@ prune_to_recommended(Solver *solv, Queue *plist)
       s = pool->solvables + p;
       if (!s->supplements && !s->freshens)
 	continue;
-      if ((supp = s->supplements) != 0)
+      if (s->supplements)
 	{
+	  supp = s->source->idarraydata + s->supplements;
 	  while ((sup = *supp++) != 0)
 	    if (dep_fulfilled(solv, sup))
 	      break;
 	  if (!sup)
 	    continue;
 	}
-      if ((supp = s->freshens) != 0)
+      if (s->freshens)
 	{
+	  supp = s->source->idarraydata + s->freshens;
 	  while ((sup = *supp++) != 0)
 	    if (dep_fulfilled(solv, sup))
 	      break;
@@ -213,8 +221,9 @@ prune_to_recommended(Solver *solv, Queue *plist)
 	  continue;
 	}
       s = pool->solvables + p;
-      if (!(enhp = s->enhances))
+      if (!s->enhances)
 	continue;
+      enhp = s->source->idarraydata + s->enhances;
       while ((enh = *enhp++) != 0)
 	if (dep_fulfilled(solv, enh))
 	  break;
@@ -813,9 +822,10 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        * check requires of s
        */
       
-      if ((reqp = s->requires) != ID_NULL)
+      if (s->requires)
 	{
-	  while ((req = *reqp++) != ID_NULL)
+	  reqp = s->source->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
 		continue;
@@ -882,8 +892,9 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        * check conflicts of s
        */
       
-      if ((conp = s->conflicts) != 0)
+      if (s->conflicts)
 	{
+	  conp = s->source->idarraydata + s->conflicts;
 	  while ((con = *conp++) != 0)
 	    {
 	      FOR_PROVIDES(p, pp, con)
@@ -902,8 +913,9 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        */
       if (!system || n < system->start || n >= (system->start + system->nsolvables))
 	{			       /* not installed */
-	  if ((obsp = s->obsoletes) != 0)
+	  if (s->obsoletes)
 	    {
+	      obsp = s->source->idarraydata + s->obsoletes;
 	      while ((obs = *obsp++) != 0)
 		{
 		  FOR_PROVIDES(p, pp, obs)
@@ -920,13 +932,16 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       /*-----------------------------------------
        * add recommends to the rule list
        */
-      if ((recp = s->recommends) != 0)
-	while ((rec = *recp++) != 0)
-	  {
-	    FOR_PROVIDES(p, pp, rec)
-	      if (!MAPTST(m, p))
-	        queuepush(&q, p);
-	  }
+      if (s->recommends)
+	{
+	  recp = s->source->idarraydata + s->recommends;
+	  while ((rec = *recp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, rec)
+		if (!MAPTST(m, p))
+		  queuepush(&q, p);
+	    }
+	}
     }
   queuefree(&q);
 }
@@ -950,14 +965,20 @@ addrulesforsupplements(Solver *solv, Map *m)
       if (!pool_installable(pool, s))
 	continue;
       sup = 0;
-      if ((supp = s->supplements) != 0)
-	while ((sup = *supp++) != ID_NULL)
-	  if (dep_possible(solv, sup, m))
-	    break;
-      if (!sup && (supp = s->freshens) != 0)
-	while ((sup = *supp++) != ID_NULL)
-	  if (dep_possible(solv, sup, m))
-	    break;
+      if (s->supplements)
+	{
+	  supp = s->source->idarraydata + s->supplements;
+	  while ((sup = *supp++) != ID_NULL)
+	    if (dep_possible(solv, sup, m))
+	      break;
+	}
+      if (!sup && s->freshens)
+	{
+	  supp = s->source->idarraydata + s->freshens;
+	  while ((sup = *supp++) != ID_NULL)
+	    if (dep_possible(solv, sup, m))
+	      break;
+	}
       if (!sup)
 	continue;
       addrulesforsolvable(solv, s, m);
@@ -980,23 +1001,30 @@ addrulesforenhances(Solver *solv, Map *m)
       if (MAPTST(m, i))
 	continue;
       s = pool->solvables + i;
-      if ((enhp = s->enhances) == 0)
+      if (!s->enhances)
 	continue;
       if (!pool_installable(pool, s))
 	continue;
+      enhp = s->source->idarraydata + s->enhances;
       while ((enh = *enhp++) != ID_NULL)
 	if (dep_possible(solv, enh, m))
 	  break;
       if (!enh)
 	continue;
-      if ((conp = s->conflicts) != 0)
-	while ((con = *conp++) != 0)
-	  FOR_PROVIDES(p, pp, con)
-	    addrule(solv, -i, -p);
-      if ((obsp = s->obsoletes) != 0)
-        while ((obs = *obsp++) != ID_NULL)
-	  FOR_PROVIDES(p, pp, obs)
-	    addrule(solv, -i, -p);
+      if (s->conflicts)
+	{
+	  conp = s->source->idarraydata + s->conflicts;
+	  while ((con = *conp++) != 0)
+	    FOR_PROVIDES(p, pp, con)
+	      addrule(solv, -i, -p);
+	}
+      if (s->obsoletes)
+	{
+	  obsp = s->source->idarraydata + s->obsoletes;
+	  while ((obs = *obsp++) != ID_NULL)
+	    FOR_PROVIDES(p, pp, obs)
+	      addrule(solv, -i, -p);
+	}
       FOR_PROVIDES(p, pp, s->name)
         if (s->name == pool->solvables[p].name)
 	  addrule(solv, -i, -p);
@@ -1029,6 +1057,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
   Pool *pool = solv->pool;
   Id p, *pp, n, p2, *pp2;
   Id obs, *obsp;
+  Solvable *ps;
 
   QUEUEEMPTY(qs);
   /*
@@ -1047,17 +1076,19 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
       if (p == n)		/* skip itself */
 	continue;
 
-      if (s->name == pool->solvables[p].name)	/* name match */
+      ps = pool->solvables + p;
+      if (s->name == ps->name)	/* name match */
 	{
 	  if (!allowdowngrade			/* consider downgrades ? */
-	      && evrcmp(pool, s->evr, pool->solvables[p].evr) > 0)
+	      && evrcmp(pool, s->evr, ps->evr) > 0)
 	    continue;
 	  /* XXX */
-	  if (!allowarchchange && archchanges(pool, s, pool->solvables + p))
+	  if (!allowarchchange && archchanges(pool, s, ps))
 	    continue;
 	}
-      else if (!solv->noupdateprovide && (obsp = pool->solvables[p].obsoletes) != 0)   /* provides/obsoletes combination ? */
+      else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
 	{
+	  obsp = ps->source->idarraydata + ps->obsoletes;
 	  while ((obs = *obsp++) != 0)	/* for all obsoletes */
 	    {
 	      FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
@@ -2104,8 +2135,9 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  s = pool->solvables + i;
 		  /* installed, check for recommends */
 		  /* XXX need to special case AND ? */
-		  if ((recp = s->recommends) != 0)
+		  if (s->recommends)
 		    {
+		      recp = s->source->idarraydata + s->recommends;
 		      while ((rec = *recp++) != 0)
 			{
 			  qcount = dq.count;
@@ -2130,16 +2162,18 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (!pool_installable(pool, s))
 		    continue;
-		  if ((supp = s->supplements) != 0)
+		  if (s->supplements)
 		    {
+		      supp = s->source->idarraydata + s->supplements;
 		      while ((sup = *supp++) != 0)
 			if (dep_fulfilled(solv, sup))
 			  break;
 		      if (!sup)
 			continue;
 		    }
-		  if ((supp = s->freshens) != 0)
+		  if (s->freshens)
 		    {
+		      supp = s->source->idarraydata + s->freshens;
 		      while ((sup = *supp++) != 0)
 			if (dep_fulfilled(solv, sup))
 			  break;
@@ -2365,16 +2399,19 @@ printdecisions(Solver *solv)
       if (n >= solv->system->start && n < solv->system->start + solv->system->nsolvables)
 	continue;
       s = pool->solvables + n;
-      if ((obsp = s->obsoletes) != 0)
-	while ((obs = *obsp++) != 0)
-	  FOR_PROVIDES(p, pp, obs)
-	    {
-	      if (p >= solv->system->start && p < solv->system->start + solv->system->nsolvables)
-		{
-	          obsoletesmap[p] = n;
-		  obsoletesmap[n]++;
-		}
-	    }
+      if (s->obsoletes)
+	{
+	  obsp = s->source->idarraydata + s->obsoletes;
+	  while ((obs = *obsp++) != 0)
+	    FOR_PROVIDES(p, pp, obs)
+	      {
+		if (p >= solv->system->start && p < solv->system->start + solv->system->nsolvables)
+		  {
+		    obsoletesmap[p] = n;
+		    obsoletesmap[n]++;
+		  }
+	      }
+	}
       FOR_PROVIDES(p, pp, s->name)
 	if (s->name == pool->solvables[p].name)
 	  {
@@ -2507,10 +2544,11 @@ create_obsolete_index(Solver *solv)
   for (i = 1; i < pool->nsolvables; i++)
     {
       s = pool->solvables + i;
-      if ((obsp = s->obsoletes) == 0)
+      if (!s->obsoletes)
 	continue;
       if (!pool_installable(pool, s))
 	continue;
+      obsp = s->source->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
@@ -2533,10 +2571,11 @@ create_obsolete_index(Solver *solv)
   for (i = pool->nsolvables - 1; i > 0; i--)
     {
       s = pool->solvables + i;
-      if ((obsp = s->obsoletes) == 0)
+      if (!s->obsoletes)
 	continue;
       if (!pool_installable(pool, s))
 	continue;
+      obsp = s->source->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
@@ -2836,17 +2875,20 @@ solve(Solver *solv, Queue *job)
 	  if (p < 0)
 	    continue;
 	  s = pool->solvables + p;
-	  if ((sugp = s->suggests) != 0)
-	    while ((sug = *sugp++) != 0)
-	      {
-	        FOR_PROVIDES(p, pp, sug)
-	          if (solv->decisionmap[p] > 0)
-		    break;
-		if (p)
-		  continue;	/* already fulfilled */
-	        FOR_PROVIDES(p, pp, sug)
-		  MAPSET(&solv->suggestsmap, p);
-	      }
+	  if (s->suggests)
+	    {
+	      sugp = s->source->idarraydata + s->suggests;
+	      while ((sug = *sugp++) != 0)
+		{
+		  FOR_PROVIDES(p, pp, sug)
+		    if (solv->decisionmap[p] > 0)
+		      break;
+		  if (p)
+		    continue;	/* already fulfilled */
+		  FOR_PROVIDES(p, pp, sug)
+		    MAPSET(&solv->suggestsmap, p);
+		}
+	    }
 	}
       for (i = 1; i < pool->nsolvables; i++)
 	{
@@ -2855,10 +2897,11 @@ solve(Solver *solv, Queue *job)
 	  s = pool->solvables + i;
 	  if (!MAPTST(&solv->suggestsmap, i))
 	    {
-	      if ((enhp = s->enhances) == 0)
+	      if (!s->enhances)
 		continue;
 	      if (!pool_installable(pool, s))
 		continue;
+	      enhp = s->source->idarraydata + s->enhances;
 	      while ((enh = *enhp++) != 0)
 		if (dep_fulfilled(solv, enh))
 		  break;
@@ -2866,8 +2909,9 @@ solve(Solver *solv, Queue *job)
 		continue;
 	    }
 	  /* check if installation is possible at all */
-          if ((reqp = s->requires) != 0)
+          if (s->requires)
 	    {
+	      reqp = s->source->idarraydata + s->requires;
 	      while ((req = *reqp++) != 0)
 		{
 		  if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */

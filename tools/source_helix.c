@@ -899,24 +899,15 @@ pool_addsource_helix(Pool *pool, FILE *fp)
   solvable = pool->solvables + source->start;
   for (i = 0; i < pd.pack; i++, solvable++)
     {
-      if (deps[i].provides)
-        solvable->provides = source->idarraydata + deps[i].provides;
-      if (deps[i].requires)
-        solvable->requires = source->idarraydata + deps[i].requires;
-      if (deps[i].conflicts)
-        solvable->conflicts = source->idarraydata + deps[i].conflicts;
-      if (deps[i].obsoletes)
-        solvable->obsoletes = source->idarraydata + deps[i].obsoletes;
-      if (deps[i].recommends)
-        solvable->recommends = source->idarraydata + deps[i].recommends;
-      if (deps[i].supplements)
-        solvable->supplements = source->idarraydata + deps[i].supplements;
-      if (deps[i].suggests)
-        solvable->suggests = source->idarraydata + deps[i].suggests;
-      if (deps[i].enhances)
-        solvable->enhances = source->idarraydata + deps[i].enhances;
-      if (deps[i].freshens)
-        solvable->freshens = source->idarraydata + deps[i].freshens;
+      solvable->provides = deps[i].provides;
+      solvable->requires = deps[i].requires;
+      solvable->conflicts = deps[i].conflicts;
+      solvable->obsoletes = deps[i].obsoletes;
+      solvable->recommends = deps[i].recommends;
+      solvable->supplements = deps[i].supplements;
+      solvable->suggests = deps[i].suggests;
+      solvable->enhances = deps[i].enhances;
+      solvable->freshens = deps[i].freshens;
     }
 
   free(deps);
