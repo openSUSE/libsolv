@@ -286,23 +286,23 @@ pool_addsource_content(Pool *pool, FILE *fp)
   for (i = 0; i < pack; i++, s++)
     {
       if (deps[i].provides)
-        s->provides = source->idarraydata + deps[i].provides;
+        s->provides = deps[i].provides;
       if (deps[i].requires)
-        s->requires = source->idarraydata + deps[i].requires;
+        s->requires = deps[i].requires;
       if (deps[i].conflicts)
-        s->conflicts = source->idarraydata + deps[i].conflicts;
+        s->conflicts = deps[i].conflicts;
       if (deps[i].obsoletes)
-        s->obsoletes = source->idarraydata + deps[i].obsoletes;
+        s->obsoletes = deps[i].obsoletes;
       if (deps[i].recommends)
-        s->recommends = source->idarraydata + deps[i].recommends;
+        s->recommends = deps[i].recommends;
       if (deps[i].supplements)
-        s->supplements = source->idarraydata + deps[i].supplements;
+        s->supplements = deps[i].supplements;
       if (deps[i].suggests)
-        s->suggests = source->idarraydata + deps[i].suggests;
+        s->suggests = deps[i].suggests;
       if (deps[i].enhances)
-        s->enhances = source->idarraydata + deps[i].enhances;
+        s->enhances = deps[i].enhances;
       if (deps[i].freshens)
-        s->freshens = source->idarraydata + deps[i].freshens;
+        s->freshens = deps[i].freshens;
     }
 
   free(deps);
