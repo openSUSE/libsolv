@@ -133,6 +133,29 @@ dep_possible(Solver *solv, Id dep, Map *m)
   return 0;
 }
 
+static void
+prune_to_highest_prio(Pool *pool, Queue *plist)
+{
+  int i, j;
+  Solvable *s;
+  int bestprio = 0;
+
+  /* prune to highest priority */
+  for (i = 0; i < plist->count; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+      if (i == 0 || s->source->priority > bestprio)
+	bestprio = s->source->priority;
+    }
+  for (i = j = 0; i < plist->count; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+      if (s->source->priority == bestprio)
+	plist->elements[j++] = plist->elements[i];
+    }
+  plist->count = j;
+}
+
 /*
  * prune_to_recommended
  *
@@ -265,11 +288,9 @@ prune_best_version_arch(Pool *pool, Queue *plist)
 	{
 	  s = pool->solvables + plist->elements[i];
 	  a = s->arch;
-	  if (a > pool->lastarch)
-	    continue;
-	  a = pool->id2arch[a];
-	  if (!bestscore || (a & 0xffff0000) < bestscore)
-	    bestscore = a & 0xffff0000;
+	  a = a <= pool->lastarch ? pool->id2arch[a] : 0;
+	  if (a && a != 1 && (!bestscore || a < bestscore))
+	    bestscore = a;
 	}
       for (i = j = 0; i < plist->count; i++)
 	{
@@ -279,13 +300,12 @@ prune_best_version_arch(Pool *pool, Queue *plist)
 	    continue;
 	  a = pool->id2arch[a];
 	  /* a == 1 -> noarch */
-	  if (a != 1 && (a & 0xffff0000) != bestscore)
+	  if (a != 1 && ((a ^ bestscore) & 0xffff0000) != 0)
 	    continue;
 	  plist->elements[j++] = plist->elements[i];
 	}
-      plist->count = j;
-      if (j == 0)
-	return;
+      if (j)
+        plist->count = j;
     }
 
   prune_best_version_arch_sortcmp_data = pool;
@@ -293,6 +313,7 @@ prune_best_version_arch(Pool *pool, Queue *plist)
   qsort(plist->elements, plist->count, sizeof(Id), prune_best_version_arch_sortcmp);
 
   /* now find best 'per name' */
+  /* FIXME: also check obsoletes! */
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
@@ -308,7 +329,6 @@ prune_best_version_arch(Pool *pool, Queue *plist)
       /* name switch: re-init */
       if (pool->solvables[best].name != s->name)   /* new name */
         {
-          if (pool->verbose) printf("BEST: %s-%s.%s\n", id2str(pool, pool->solvables[best].name), id2str(pool, pool->solvables[best].evr), id2str(pool, pool->solvables[best].arch));
           plist->elements[j++] = best; /* move old best to front */
           best = plist->elements[i];   /* take current as new best */
           continue;
@@ -323,9 +343,6 @@ prune_best_version_arch(Pool *pool, Queue *plist)
 
   if (best == ID_NULL)
     best = plist->elements[0];
-
-  /* XXX also check obsoletes! */
-  if (pool->verbose) printf("BEST: %s-%s.%s\n", id2str(pool, pool->solvables[best].name), id2str(pool, pool->solvables[best].evr), id2str(pool, pool->solvables[best].arch));
 
   plist->elements[j++] = best;
   plist->count = j;
@@ -1823,6 +1840,7 @@ solver_create(Pool *pool, Source *system)
   solv->system = system;
   pool->verbose = 1;
 
+  queueinit(&solv->ruletojob);
   queueinit(&solv->decisionq);
   queueinit(&solv->decisionq_why);
   queueinit(&solv->problems);
@@ -1850,6 +1868,7 @@ solver_create(Pool *pool, Source *system)
 void
 solver_free(Solver *solv)
 {
+  queuefree(&solv->ruletojob);
   queuefree(&solv->decisionq);
   queuefree(&solv->decisionq_why);
   queuefree(&solv->learnt_why);
@@ -1996,6 +2015,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    continue;
 
 		  if (dq.count > 1)
+		    prune_to_highest_prio(pool, &dq);
+		  if (dq.count > 1)
 		    prune_to_recommended(solv, &dq);
 		  if (dq.count > 1)
 		    prune_best_version_arch(pool, &dq);
@@ -2095,7 +2116,9 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      printrule(solv, r);
 	      abort();
 	    }
-	  prune_to_recommended(solv, &dq);
+	  prune_to_highest_prio(pool, &dq);
+	  if (dq.count > 1)
+	    prune_to_recommended(solv, &dq);
 	  if (dq.count > 1)
 	    prune_best_version_arch(pool, &dq);
 	  p = dq.elements[dq.count - 1];
@@ -2185,7 +2208,10 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	    }
 	  if (dq.count)
 	    {
-	      prune_best_version_arch(pool, &dq);
+	      if (dq.count > 1)
+	        prune_to_highest_prio(pool, &dq);
+	      if (dq.count > 1)
+	        prune_best_version_arch(pool, &dq);
 	      p = dq.elements[dq.count - 1];
 	      s = pool->solvables + p;
 #if 1
@@ -2209,12 +2235,16 @@ static void
 refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 {
   Rule *r;
-  int i, j, sugseen;
+  int i, j, sugseen, sugjob = -1;
   Id v, sugassert;
   Queue disabled;
   int disabledcnt;
 
   printf("refine_suggestion start\n");
+
+  if (sug >= solv->jobrules && sug < solv->systemrules)
+    sugjob = solv->ruletojob.elements[sug - solv->jobrules];
+
   queueinit(&disabled);
   QUEUEEMPTY(refined);
   queuepush(refined, sug);
@@ -2235,6 +2265,11 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	{
 	  continue;
 	  sugseen = 1;
+	}
+      if (sugjob >= 0 && problem[i] >= solv->jobrules && problem[i] < solv->systemrules && sugjob == solv->ruletojob.elements[problem[i] - solv->jobrules])
+	{
+	  /* rule belongs to same job */
+	  continue;
 	}
       r = solv->rules + problem[i];
 #if 0
@@ -2737,15 +2772,17 @@ solve(Solver *solv, Queue *job)
       what = job->elements[i + 1];
       switch(how)
 	{
-	case SOLVER_INSTALL_SOLVABLE:                     /* install specific solvable */
+	case SOLVER_INSTALL_SOLVABLE:			/* install specific solvable */
 	  if (solv->rc_output) {
 	    Solvable *s = pool->solvables + what;
 	    printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), source_name(s->source));
 	  }
-          addrule(solv, what, 0);                         /* install by Id */
+          addrule(solv, what, 0);			/* install by Id */
+	  queuepush(&solv->ruletojob, i);
 	  break;
 	case SOLVER_ERASE_SOLVABLE:
           addrule(solv, -what, 0);                        /* remove by Id */
+	  queuepush(&solv->ruletojob, i);
 	  MAPSET(&noupdaterule, what);
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:                /* install by capability */
@@ -2771,6 +2808,7 @@ solve(Solver *solv, Queue *job)
 	  else
 	    d = pool_queuetowhatprovides(pool, &q);   /* get all providers */
 	  addrule(solv, p, d);	       /* add 'requires' rule */
+	  queuepush(&solv->ruletojob, i);
 	  break;
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
@@ -2781,14 +2819,19 @@ solve(Solver *solv, Queue *job)
 	        continue;
 
 	      addrule(solv, -p, 0);  /* add 'remove' rule */
+	      queuepush(&solv->ruletojob, i);
 	      MAPSET(&noupdaterule, p);
 	    }
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_UPDATE:              /* find update for solvable */
 	  addupdaterule(solv, pool->solvables + what, &addedmap, 0, 0, 0);
+	  queuepush(&solv->ruletojob, i);
 	  break;
 	}
     }
+
+  if (solv->ruletojob.count != solv->nrules - solv->jobrules)
+    abort();
 
   if (pool->verbose) printf("problems so far: %d\n", solv->problems.count);
   
@@ -2945,8 +2988,8 @@ solve(Solver *solv, Queue *job)
       Queue problems;
       Queue solution;
       Id *problem;
-      Id why;
-      int j;
+      Id why, what;
+      int j, ji;
 
       if (!pool->verbose)
 	return;
@@ -2963,6 +3006,17 @@ solve(Solver *solv, Queue *job)
 	      problem = problems.elements + i + 1;
 	      continue;
 	    }
+	  if (v >= solv->jobrules && v < solv->systemrules)
+	    {
+	      ji = solv->ruletojob.elements[v - solv->jobrules];
+	      for (j = 0; ; j++)
+		{
+		  if (problem[j] >= solv->jobrules && problem[j] < solv->systemrules && ji == solv->ruletojob.elements[problem[j] - solv->jobrules])
+		    break;
+		}
+	      if (problem + j < problems.elements + i)
+		continue;
+	    }
 	  refine_suggestion(solv, problem, v, &solution);
 	  for (j = 0; j < solution.count; j++)
 	    {
@@ -2973,16 +3027,37 @@ solve(Solver *solv, Queue *job)
 #endif
 	      if (why >= solv->jobrules && why < solv->systemrules)
 		{
-		  /* do a sloppy job of analyzing the job rule */
-		  if (r->p > 0)
+		  ji = solv->ruletojob.elements[why - solv->jobrules];
+		  what = job->elements[ji + 1];
+		  switch (job->elements[ji])
 		    {
-		      s = pool->solvables + r->p;
+		    case SOLVER_INSTALL_SOLVABLE:
+		      s = pool->solvables + what;
 		      printf("- do not install %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-		    }
-		  else
-		    {
-		      s = pool->solvables - r->p;
-		      printf("- do not erase %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      break;
+		    case SOLVER_ERASE_SOLVABLE:
+		      s = pool->solvables + what;
+		      printf("- do not deinstall %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      break;
+		    case SOLVER_INSTALL_SOLVABLE_NAME:
+		      printf("- do not install %s\n", id2str(pool, what));
+		      break;
+		    case SOLVER_ERASE_SOLVABLE_NAME:
+		      printf("- do not deinstall %s\n", id2str(pool, what));
+		      break;
+		    case SOLVER_INSTALL_SOLVABLE_PROVIDES:
+		      printf("- do not install a solvable providing %s\n", dep2str(pool, what));
+		      break;
+		    case SOLVER_ERASE_SOLVABLE_PROVIDES:
+		      printf("- do not deinstall all solvables providing %s\n", dep2str(pool, what));
+		      break;
+		    case SOLVER_INSTALL_SOLVABLE_UPDATE:
+		      s = pool->solvables + what;
+		      printf("- do not install most recent version of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      break;
+		    default:
+		      printf("- do something different\n");
+		      break;
 		    }
 		}
 	      else if (why >= solv->systemrules && why < solv->weakrules)
@@ -3005,7 +3080,19 @@ solve(Solver *solv, Queue *job)
 		    }
 		  if (sd)
 		    {
-		      printf("- allow downgrade of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+		      int gotone = 0;
+		      if (evrcmp(pool, sd->evr, s->evr) < 0)
+			{
+		          printf("- allow downgrade of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  gotone = 1;
+			}
+		      if (!solv->allowarchchange && archchanges(pool, sd, s))
+			{
+		          printf("- allow architecture change of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  gotone = 1;
+			}
+		      if (!gotone)
+		        printf("- allow replacement of %s-%s.%s with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
 		    }
 		  else
 		    {

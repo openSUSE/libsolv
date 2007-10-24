@@ -10,11 +10,13 @@
 
 typedef struct _Source {
   const char *name;
-  struct _Pool *pool;		       /* pool containing source data */
-  int start;			       /* start of this source solvables within pool->solvables */
-  int nsolvables;		       /* number of solvables source is contributing to pool */
+  struct _Pool *pool;		/* pool containing source data */
+  int start;			/* start of this source solvables within pool->solvables */
+  int nsolvables;		/* number of solvables source is contributing to pool */
 
-  Id *idarraydata;		       /* array of metadata Ids, solvable dependencies are offsets into this array */
+  int priority;			/* priority of this source */
+
+  Id *idarraydata;		/* array of metadata Ids, solvable dependencies are offsets into this array */
   int idarraysize;
   Offset lastoff;
 

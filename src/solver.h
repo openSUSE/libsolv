@@ -65,6 +65,8 @@ typedef struct solver {
 					 * middle+solvable : decision to install: offset point to linked-list of rules
 					 */
 
+  Queue ruletojob;
+
   /* our decisions: */
   Queue decisionq;
   Queue decisionq_why;			/* index of rule, Offset into rules */
