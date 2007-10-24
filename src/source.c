@@ -40,7 +40,7 @@ pool_addsource_empty(Pool *pool)
 
 /*
  * add Id to source
- * olddeps = offset into idarraydata
+ * olddeps = old array to extend
  * 
  */
 
@@ -54,22 +54,23 @@ source_addid(Source *source, Offset olddeps, Id id)
   idarray = source->idarraydata;
   idarraysize = source->idarraysize;
 
-  if (!idarray)			       /* check idarray size */
+  if (!idarray)			       /* alloc idarray if not done yet */
     {
       idarray = (Id *)xmalloc((1 + IDARRAY_BLOCK) * sizeof(Id));
+      idarray[0] = 0;
       idarraysize = 1;
       source->lastoff = 0;
     }
 
-  if (!olddeps)			       /* no deps yet */
+  if (!olddeps)				/* no deps yet */
     {   
       olddeps = idarraysize;
       if ((idarraysize & IDARRAY_BLOCK) == 0)
         idarray = (Id *)xrealloc(idarray, (idarraysize + 1 + IDARRAY_BLOCK) * sizeof(Id));
     }   
-  else if (olddeps == source->lastoff) /* append at end */
+  else if (olddeps == source->lastoff)	/* extend at end */
     idarraysize--;
-  else				       /* check space */
+  else					/* can't extend, copy old */
     {
       i = olddeps;
       olddeps = idarraysize;
@@ -83,12 +84,12 @@ source_addid(Source *source, Offset olddeps, Id id)
         idarray = (Id *)xrealloc(idarray, (idarraysize + 1 + IDARRAY_BLOCK) * sizeof(Id));
     }
   
-  idarray[idarraysize++] = id;	       /* insert Id into array */
+  idarray[idarraysize++] = id;		/* insert Id into array */
 
   if ((idarraysize & IDARRAY_BLOCK) == 0)   /* realloc if at block boundary */
     idarray = (Id *)xrealloc(idarray, (idarraysize + 1 + IDARRAY_BLOCK) * sizeof(Id));
 
-  idarray[idarraysize++] = ID_NULL;    /* ensure NULL termination */
+  idarray[idarraysize++] = 0;		/* ensure NULL termination */
 
   source->idarraydata = idarray;
   source->idarraysize = idarraysize;
@@ -183,6 +184,7 @@ source_reserve_ids(Source *source, unsigned int olddeps, int num)
     {
       source->idarraysize = 1;
       source->idarraydata = (Id *)xmalloc(((1 + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
+      source->idarraydata[0] = 0;
       source->lastoff = 1;
       return 1;
     }

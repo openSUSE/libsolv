@@ -480,10 +480,11 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
     }
   if (size_idarray)
     {
-      size_idarray++;	/* first entry is not used */
+      size_idarray++;	/* first entry is always zero */
       source->idarraydata = (Id *)xmalloc(sizeof(Id) * size_idarray);
       source->idarraysize = size_idarray;
-      idarraydatap = source->idarraydata + 1;
+      idarraydatap = source->idarraydata;
+      *idarraydatap++ = 0;
       idarraydataend = source->idarraydata + size_idarray;
     }
   else
