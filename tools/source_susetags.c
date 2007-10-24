@@ -30,18 +30,6 @@ split(char *l, char **sp, int m)
   return i;
 }
 
-struct deps {
-  unsigned int provides;
-  unsigned int requires;
-  unsigned int obsoletes;
-  unsigned int conflicts;
-  unsigned int recommends;
-  unsigned int supplements;
-  unsigned int enhances;
-  unsigned int suggests;
-  unsigned int freshens;
-};
-
 struct parsedata {
   char *kind;
   Source *source;
@@ -145,12 +133,10 @@ pool_addsource_susetags(Pool *pool, FILE *fp)
   int aline;
   Source *source;
   Solvable *s;
-  struct deps *deps = 0, *dp = 0;
   int intag = 0;
   int cummulate = 0;
   int pack;
   char *sp[5];
-  int i;
   struct parsedata pd;
 
   source = pool_addsource_empty(pool);
@@ -222,10 +208,10 @@ pool_addsource_susetags(Pool *pool, FILE *fp)
 	continue;
       if (!strncmp(line, "=Pkg:", 5) || !strncmp(line, "=Pat:", 5))
 	{
-	  if (dp && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	    dp->provides = source_addid_dep(source, dp->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-	  if (dp)
-	    dp->supplements = source_fix_legacy(source, dp->provides, dp->supplements);
+	  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+	    s->provides = source_addid_dep(source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+	  if (s)
+	    s->supplements = source_fix_legacy(source, s->provides, s->supplements);
 	  pd.kind = 0;
 	  if (line[3] == 't')
 	    pd.kind = "pattern";
@@ -233,15 +219,9 @@ pool_addsource_susetags(Pool *pool, FILE *fp)
 	    {
 	      pool->solvables = realloc(pool->solvables, (pool->nsolvables + pack + PACK_BLOCK + 1) * sizeof(Solvable));
 	      memset(pool->solvables + source->start + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
-	      if (!deps)
-		deps = malloc((pack + PACK_BLOCK + 1) * sizeof(struct deps));
-	      else
-		deps = realloc(deps, (pack + PACK_BLOCK + 1) * sizeof(struct deps));
-	      memset(deps + pack, 0, (PACK_BLOCK + 1) * sizeof(struct deps));
 	    }
 	  s = pool->solvables + source->start + pack;
 	  s->source = source;
-	  dp = deps + pack;
 	  pack++;
           if (split(line + 5, sp, 5) != 4)
 	    {
@@ -258,89 +238,75 @@ pool_addsource_susetags(Pool *pool, FILE *fp)
 	}
       if (!strncmp(line, "=Prv:", 5))
 	{
-	  dp->provides = adddep(pool, &pd, dp->provides, line, 0, pd.kind);
+	  s->provides = adddep(pool, &pd, s->provides, line, 0, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Req:", 5))
 	{
-	  dp->requires = adddep(pool, &pd, dp->requires, line, 1, pd.kind);
+	  s->requires = adddep(pool, &pd, s->requires, line, 1, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Prq:", 5))
 	{
 	  if (pd.kind)
-	    dp->requires = adddep(pool, &pd, dp->requires, line, 0, 0);
+	    s->requires = adddep(pool, &pd, s->requires, line, 0, 0);
 	  else
-	    dp->requires = adddep(pool, &pd, dp->requires, line, 2, 0);
+	    s->requires = adddep(pool, &pd, s->requires, line, 2, 0);
 	  continue;
 	}
       if (!strncmp(line, "=Obs:", 5))
 	{
-	  dp->obsoletes = adddep(pool, &pd, dp->obsoletes, line, 0, pd.kind);
+	  s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Con:", 5))
 	{
-	  dp->conflicts = adddep(pool, &pd, dp->conflicts, line, 0, pd.kind);
+	  s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Rec:", 5))
 	{
-	  dp->recommends = adddep(pool, &pd, dp->recommends, line, 0, pd.kind);
+	  s->recommends = adddep(pool, &pd, s->recommends, line, 0, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Sup:", 5))
 	{
-	  dp->supplements = adddep(pool, &pd, dp->supplements, line, 0, pd.kind);
+	  s->supplements = adddep(pool, &pd, s->supplements, line, 0, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Enh:", 5))
 	{
-	  dp->enhances = adddep(pool, &pd, dp->enhances, line, 0, pd.kind);
+	  s->enhances = adddep(pool, &pd, s->enhances, line, 0, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Sug:", 5))
 	{
-	  dp->suggests = adddep(pool, &pd, dp->suggests, line, 0, pd.kind);
+	  s->suggests = adddep(pool, &pd, s->suggests, line, 0, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Fre:", 5))
 	{
-	  dp->freshens = adddep(pool, &pd, dp->freshens, line, 0, pd.kind);
+	  s->freshens = adddep(pool, &pd, s->freshens, line, 0, pd.kind);
 	  continue;
 	}
       if (!strncmp(line, "=Prc:", 5))
 	{
-	  dp->recommends = adddep(pool, &pd, dp->recommends, line, 0, 0);
+	  s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
 	  continue;
 	}
       if (!strncmp(line, "=Psg:", 5))
 	{
-	  dp->suggests = adddep(pool, &pd, dp->suggests, line, 0, 0);
+	  s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
 	  continue;
 	}
     }
-  if (dp && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-    dp->provides = source_addid_dep(source, dp->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  if (dp)
-    dp->supplements = source_fix_legacy(source, dp->provides, dp->supplements);
+  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+    s->provides = source_addid_dep(source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  if (s)
+    s->supplements = source_fix_legacy(source, s->provides, s->supplements);
     
   pool->nsolvables += pack;
   source->nsolvables = pack;
-  s = pool->solvables + source->start;
-  for (i = 0; i < pack; i++, s++)
-    {
-      s->provides = deps[i].provides;
-      s->requires = deps[i].requires;
-      s->conflicts = deps[i].conflicts;
-      s->obsoletes = deps[i].obsoletes;
-      s->recommends = deps[i].recommends;
-      s->supplements = deps[i].supplements;
-      s->suggests = deps[i].suggests;
-      s->enhances = deps[i].enhances;
-      s->freshens = deps[i].freshens;
-    }
-  free(deps);
   if (pd.tmp)
     free(pd.tmp);
   free(line);

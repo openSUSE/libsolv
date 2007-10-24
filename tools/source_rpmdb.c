@@ -459,20 +459,8 @@ addfileprovides(Pool *pool, Source *source, RpmHead *rpmhead, unsigned int oldde
   return olddeps;
 }
 
-struct deps {
-  unsigned int provides;
-  unsigned int requires;
-  unsigned int obsoletes;
-  unsigned int conflicts;
-  unsigned int recommends;
-  unsigned int supplements;
-  unsigned int enhances;
-  unsigned int suggests;
-  unsigned int freshens;
-};
-
 static int
-rpm2solv(Pool *pool, Source *source, Solvable *s, struct deps *deps, RpmHead *rpmhead)
+rpm2solv(Pool *pool, Source *source, Solvable *s, RpmHead *rpmhead)
 {
   char *name;
   char *evr;
@@ -496,19 +484,19 @@ rpm2solv(Pool *pool, Source *source, Solvable *s, struct deps *deps, RpmHead *rp
   s->evr = str2id(pool, evr, 1);
   free(evr);
 
-  deps->provides = makedeps(pool, source, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
-  deps->provides = addfileprovides(pool, source, rpmhead, deps->provides);
-  deps->provides = source_addid_dep(source, deps->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  deps->requires = makedeps(pool, source, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, 0);
-  deps->conflicts = makedeps(pool, source, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0);
-  deps->obsoletes = makedeps(pool, source, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0);
+  s->provides = makedeps(pool, source, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
+  s->provides = addfileprovides(pool, source, rpmhead, s->provides);
+  s->provides = source_addid_dep(source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  s->requires = makedeps(pool, source, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, 0);
+  s->conflicts = makedeps(pool, source, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0);
+  s->obsoletes = makedeps(pool, source, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0);
 
-  deps->recommends = makedeps(pool, source, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 2);
-  deps->suggests = makedeps(pool, source, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 1);
-  deps->supplements = makedeps(pool, source, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 2);
-  deps->enhances  = makedeps(pool, source, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 1);
-  deps->freshens = 0;
-  deps->supplements = source_fix_legacy(source, deps->provides, deps->supplements);
+  s->recommends = makedeps(pool, source, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 2);
+  s->suggests = makedeps(pool, source, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 1);
+  s->supplements = makedeps(pool, source, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 2);
+  s->enhances  = makedeps(pool, source, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 1);
+  s->freshens = 0;
+  s->supplements = source_fix_legacy(source, s->provides, s->supplements);
   return 1;
 }
 
@@ -534,7 +522,6 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
   RpmHead *rpmhead;
   Source *source;
   Solvable *s;
-  struct deps *deps;
   Id id, *refhash;
   unsigned int refmask, h;
   int asolv;
@@ -571,7 +558,6 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
       pool->solvables = realloc(pool->solvables, (pool->nsolvables + 256) * sizeof(Solvable));
       memset(pool->solvables + source->start, 0, 256 * sizeof(Solvable));
       source->rpmdbid = calloc(256, sizeof(unsigned int));
-      deps = calloc(256, sizeof(*deps));
       asolv = 256;
       rpmheadsize = 0;
       rpmhead = 0;
@@ -584,8 +570,6 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	      memset(pool->solvables + source->start + asolv, 0, 256 * sizeof(Solvable));
 	      source->rpmdbid = realloc(source->rpmdbid, (asolv + 256) * sizeof(unsigned int));
 	      memset(source->rpmdbid + asolv, 0, 256 * sizeof(unsigned int));
-	      deps = realloc(deps, (asolv + 256) * sizeof(*deps));
-	      memset(deps + asolv, 0, 256 * sizeof(*deps));
 	      asolv += 256;
 	    }
 	  pool->solvables[source->start + i].source = source;
@@ -626,7 +610,7 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	  memcpy(rpmhead->data, (unsigned char *)data.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 	  source->rpmdbid[i] = dbid;
-	  if (rpm2solv(pool, source, pool->solvables + source->start + i, deps + i, rpmhead))
+	  if (rpm2solv(pool, source, pool->solvables + source->start + i, rpmhead))
 	    i++;
 	}
       nrpmids = i;
@@ -700,7 +684,6 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
       pool->solvables = realloc(pool->solvables, (pool->nsolvables + nrpmids) * sizeof(Solvable));
       memset(pool->solvables + source->start, 0, nrpmids * sizeof(Solvable));
       source->rpmdbid = calloc(nrpmids, sizeof(unsigned int));
-      deps = calloc(nrpmids, sizeof(*deps));
 
       refhash = 0;
       refmask = 0;
@@ -749,15 +732,15 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 		      if (r->arch)
 			s->arch = str2id(pool, id2str(ref->pool, r->arch), 1);
 		    }
-		  deps[i].provides = copydeps(pool, source, r->provides, ref);
-		  deps[i].requires = copydeps(pool, source, r->requires, ref);
-		  deps[i].conflicts = copydeps(pool, source, r->conflicts, ref);
-		  deps[i].obsoletes = copydeps(pool, source, r->obsoletes, ref);
-		  deps[i].recommends = copydeps(pool, source, r->recommends, ref);
-		  deps[i].suggests = copydeps(pool, source, r->suggests, ref);
-		  deps[i].supplements = copydeps(pool, source, r->supplements, ref);
-		  deps[i].enhances  = copydeps(pool, source, r->enhances, ref);
-		  deps[i].freshens = copydeps(pool, source, r->freshens, ref);
+		  s->provides = copydeps(pool, source, r->provides, ref);
+		  s->requires = copydeps(pool, source, r->requires, ref);
+		  s->conflicts = copydeps(pool, source, r->conflicts, ref);
+		  s->obsoletes = copydeps(pool, source, r->obsoletes, ref);
+		  s->recommends = copydeps(pool, source, r->recommends, ref);
+		  s->suggests = copydeps(pool, source, r->suggests, ref);
+		  s->supplements = copydeps(pool, source, r->supplements, ref);
+		  s->enhances  = copydeps(pool, source, r->enhances, ref);
+		  s->freshens = copydeps(pool, source, r->freshens, ref);
 		  continue;
 		}
 	    }
@@ -818,7 +801,7 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	  memcpy(rpmhead->data, (unsigned char *)data.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 
-	  rpm2solv(pool, source, s, deps + i, rpmhead);
+	  rpm2solv(pool, source, s, rpmhead);
 	}
 
       if (refhash)
@@ -835,21 +818,6 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
   pool->nsolvables += nrpmids;
   source->nsolvables = nrpmids;
 
-  // copy solvable data to pool
-  s = pool->solvables + source->start;
-  for (i = 0; i < nrpmids; i++, s++)
-    {
-      s->provides = deps[i].provides;
-      s->requires = deps[i].requires;
-      s->conflicts = deps[i].conflicts;
-      s->obsoletes = deps[i].obsoletes;
-      s->recommends = deps[i].recommends;
-      s->supplements = deps[i].supplements;
-      s->suggests = deps[i].suggests;
-      s->enhances = deps[i].enhances;
-      s->freshens = deps[i].freshens;
-    }
-  free(deps);
   if (db)
     db->close(db, 0);
   return source;

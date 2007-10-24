@@ -77,18 +77,6 @@ static struct stateswitch stateswitches[] = {
   { NUMSTATES}
 };
 
-struct deps {
-  unsigned int provides;
-  unsigned int requires;
-  unsigned int obsoletes;
-  unsigned int conflicts;
-  unsigned int recommends;
-  unsigned int supplements;
-  unsigned int enhances;
-  unsigned int suggests;
-  unsigned int freshens;
-};
-
 struct parsedata {
   int depth;
   enum state state;
@@ -102,7 +90,6 @@ struct parsedata {
   Pool *pool;
   Source *source;
   Solvable *start;
-  struct deps *deps;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
 };
@@ -279,7 +266,6 @@ startElement(void *userData, const char *name, const char **atts)
 	      pool->solvables = realloc(pool->solvables, (pool->nsolvables + pd->numpacks) * sizeof(Solvable));
 	      pd->start = pool->solvables + pd->source->start;
 	      memset(pd->start, 0, pd->numpacks * sizeof(Solvable));
-	      pd->deps = calloc(pd->numpacks, sizeof(struct deps));
 	    }
 	}
       break;
@@ -297,58 +283,58 @@ startElement(void *userData, const char *name, const char **atts)
       s->evr = makeevr_atts(pool, pd, atts);
       break;
     case STATE_PROVIDES:
-      pd->deps[pd->pack].provides = 0;
+      s->provides = 0;
       break;
     case STATE_PROVIDESENTRY:
-      pd->deps[pd->pack].provides = adddep(pool, pd, pd->deps[pd->pack].provides, atts, 0);
+      s->provides = adddep(pool, pd, s->provides, atts, 0);
       break;
     case STATE_REQUIRES:
-      pd->deps[pd->pack].requires = 0;
+      s->requires = 0;
       break;
     case STATE_REQUIRESENTRY:
-      pd->deps[pd->pack].requires = adddep(pool, pd, pd->deps[pd->pack].requires, atts, 1);
+      s->requires = adddep(pool, pd, s->requires, atts, 1);
       break;
     case STATE_OBSOLETES:
-      pd->deps[pd->pack].obsoletes = 0;
+      s->obsoletes = 0;
       break;
     case STATE_OBSOLETESENTRY:
-      pd->deps[pd->pack].obsoletes = adddep(pool, pd, pd->deps[pd->pack].obsoletes, atts, 0);
+      s->obsoletes = adddep(pool, pd, s->obsoletes, atts, 0);
       break;
     case STATE_CONFLICTS:
-      pd->deps[pd->pack].conflicts = 0;
+      s->conflicts = 0;
       break;
     case STATE_CONFLICTSENTRY:
-      pd->deps[pd->pack].conflicts = adddep(pool, pd, pd->deps[pd->pack].conflicts, atts, 0);
+      s->conflicts = adddep(pool, pd, s->conflicts, atts, 0);
       break;
     case STATE_RECOMMENDS:
-      pd->deps[pd->pack].recommends = 0;
+      s->recommends = 0;
       break;
     case STATE_RECOMMENDSENTRY:
-      pd->deps[pd->pack].recommends = adddep(pool, pd, pd->deps[pd->pack].recommends, atts, 0);
+      s->recommends = adddep(pool, pd, s->recommends, atts, 0);
       break;
     case STATE_SUPPLEMENTS:
-      pd->deps[pd->pack].supplements= 0;
+      s->supplements= 0;
       break;
     case STATE_SUPPLEMENTSENTRY:
-      pd->deps[pd->pack].supplements = adddep(pool, pd, pd->deps[pd->pack].supplements, atts, 0);
+      s->supplements = adddep(pool, pd, s->supplements, atts, 0);
       break;
     case STATE_SUGGESTS:
-      pd->deps[pd->pack].suggests = 0;
+      s->suggests = 0;
       break;
     case STATE_SUGGESTSENTRY:
-      pd->deps[pd->pack].suggests = adddep(pool, pd, pd->deps[pd->pack].suggests, atts, 0);
+      s->suggests = adddep(pool, pd, s->suggests, atts, 0);
       break;
     case STATE_ENHANCES:
-      pd->deps[pd->pack].enhances = 0;
+      s->enhances = 0;
       break;
     case STATE_ENHANCESENTRY:
-      pd->deps[pd->pack].enhances = adddep(pool, pd, pd->deps[pd->pack].enhances, atts, 0);
+      s->enhances = adddep(pool, pd, s->enhances, atts, 0);
       break;
     case STATE_FRESHENS:
-      pd->deps[pd->pack].freshens = 0;
+      s->freshens = 0;
       break;
     case STATE_FRESHENSENTRY:
-      pd->deps[pd->pack].freshens = adddep(pool, pd, pd->deps[pd->pack].freshens, atts, 0);
+      s->freshens = adddep(pool, pd, s->freshens, atts, 0);
       break;
     default:
       break;
@@ -378,8 +364,8 @@ endElement(void *userData, const char *name)
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        pd->deps[pd->pack].provides = source_addid_dep(pd->source, pd->deps[pd->pack].provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      pd->deps[pd->pack].supplements = source_fix_legacy(pd->source, pd->deps[pd->pack].provides, pd->deps[pd->pack].supplements);
+        s->provides = source_addid_dep(pd->source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      s->supplements = source_fix_legacy(pd->source, s->provides, s->supplements);
       pd->pack++;
       break;
     case STATE_NAME:
@@ -390,7 +376,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_FILE:
       id = str2id(pool, pd->content, 1);
-      pd->deps[pd->pack].provides = source_addid(pd->source, pd->deps[pd->pack].provides, id);
+      s->provides = source_addid(pd->source, s->provides, id);
       break;
     default:
       break;
@@ -432,8 +418,6 @@ pool_addsource_rpmmd(Pool *pool, FILE *fp)
   char buf[BUFF_SIZE];
   int i, l;
   Source *source;
-  Solvable *s;
-  struct deps *deps;
   struct stateswitch *sw;
 
   source = pool_addsource_empty(pool);
@@ -469,21 +453,6 @@ pool_addsource_rpmmd(Pool *pool, FILE *fp)
   pool->nsolvables += pd.pack;
   source->nsolvables = pd.pack;
 
-  deps = pd.deps;
-  s = pool->solvables + source->start;
-  for (i = 0; i < pd.pack; i++, s++)
-    {
-      s->provides = deps[i].provides;
-      s->requires = deps[i].requires;
-      s->conflicts = deps[i].conflicts;
-      s->obsoletes = deps[i].obsoletes;
-      s->recommends = deps[i].recommends;
-      s->supplements = deps[i].supplements;
-      s->suggests = deps[i].suggests;
-      s->enhances = deps[i].enhances;
-      s->freshens = deps[i].freshens;
-    }
-  free(deps);
   free(pd.content);
   return source;
 }

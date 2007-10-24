@@ -119,19 +119,6 @@ static struct stateswitch stateswitches[] = {
 
 };
 
-// Deps are stored as offsets into source->idarraydata
-typedef struct _deps {
-  Offset provides;
-  Offset requires;
-  Offset obsoletes;
-  Offset conflicts;
-  Offset recommends;
-  Offset supplements;
-  Offset enhances;
-  Offset suggests;
-  Offset freshens;
-} Deps;
-
 /*
  * parser data
  */
@@ -152,9 +139,6 @@ typedef struct _parsedata {
   Pool *pool;		// current pool
   Source *source;	// current source
   Solvable *start;      // collected solvables
-
-  // all dependencies
-  Deps *deps;           // dependencies array, indexed by pack#
 
   // package data
   int  epoch;		// epoch (as offset into evrspace)
@@ -387,6 +371,7 @@ startElement(void *userData, const char *name, const char **atts)
   Parsedata *pd = (Parsedata *)userData;
   struct stateswitch *sw;
   Pool *pool = pd->pool;
+  Solvable *s = pd->start ? pd->start + pd->pack : 0;
 
   if (pd->depth != pd->statedepth)
     {
@@ -452,11 +437,6 @@ startElement(void *userData, const char *name, const char **atts)
 	  pool->solvables = (Solvable *)realloc(pool->solvables, (pool->nsolvables + pd->pack + PACK_BLOCK + 1) * sizeof(Solvable));
 	  pd->start = pool->solvables + pd->source->start;
           memset(pd->start + pd->pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
-	  if (!pd->deps)
-	    pd->deps = (Deps *)malloc((pd->pack + PACK_BLOCK + 1) * sizeof(Deps));
-	  else
-	    pd->deps = (Deps *)realloc(pd->deps, (pd->pack + PACK_BLOCK + 1) * sizeof(Deps));
-          memset(pd->deps + pd->pack, 0, (PACK_BLOCK + 1) * sizeof(Deps));
 	}
 
       if (!strcmp(name, "selection"))
@@ -488,91 +468,95 @@ startElement(void *userData, const char *name, const char **atts)
       break;
 
     case STATE_PROVIDES:	       /* start of provides */
-      pd->deps[pd->pack].provides = 0;
+      s->provides = 0;
       break;
     case STATE_PROVIDESENTRY:	       /* entry within provides */
-      pd->deps[pd->pack].provides = adddep(pool, pd, pd->deps[pd->pack].provides, atts, 0);
+      s->provides = adddep(pool, pd, s->provides, atts, 0);
       break;
     case STATE_REQUIRES:
-      pd->deps[pd->pack].requires = 0;
+      s->requires = 0;
       break;
     case STATE_REQUIRESENTRY:
-      pd->deps[pd->pack].requires = adddep(pool, pd, pd->deps[pd->pack].requires, atts, 1);
+      s->requires = adddep(pool, pd, s->requires, atts, 1);
       break;
     case STATE_OBSOLETES:
-      pd->deps[pd->pack].obsoletes = 0;
+      s->obsoletes = 0;
       break;
     case STATE_OBSOLETESENTRY:
-      pd->deps[pd->pack].obsoletes = adddep(pool, pd, pd->deps[pd->pack].obsoletes, atts, 0);
+      s->obsoletes = adddep(pool, pd, s->obsoletes, atts, 0);
       break;
     case STATE_CONFLICTS:
-      pd->deps[pd->pack].conflicts = 0;
+      s->conflicts = 0;
       break;
     case STATE_CONFLICTSENTRY:
-      pd->deps[pd->pack].conflicts = adddep(pool, pd, pd->deps[pd->pack].conflicts, atts, 0);
+      s->conflicts = adddep(pool, pd, s->conflicts, atts, 0);
       break;
     case STATE_RECOMMENDS:
-      pd->deps[pd->pack].recommends = 0;
+      s->recommends = 0;
       break;
     case STATE_RECOMMENDSENTRY:
-      pd->deps[pd->pack].recommends = adddep(pool, pd, pd->deps[pd->pack].recommends, atts, 0);
+      s->recommends = adddep(pool, pd, s->recommends, atts, 0);
       break;
     case STATE_SUPPLEMENTS:
-      pd->deps[pd->pack].supplements= 0;
+      s->supplements= 0;
       break;
     case STATE_SUPPLEMENTSENTRY:
-      pd->deps[pd->pack].supplements = adddep(pool, pd, pd->deps[pd->pack].supplements, atts, 0);
+      s->supplements = adddep(pool, pd, s->supplements, atts, 0);
       break;
     case STATE_SUGGESTS:
-      pd->deps[pd->pack].suggests = 0;
+      s->suggests = 0;
       break;
     case STATE_SUGGESTSENTRY:
-      pd->deps[pd->pack].suggests = adddep(pool, pd, pd->deps[pd->pack].suggests, atts, 0);
+      s->suggests = adddep(pool, pd, s->suggests, atts, 0);
       break;
     case STATE_ENHANCES:
-      pd->deps[pd->pack].enhances = 0;
+      s->enhances = 0;
       break;
     case STATE_ENHANCESENTRY:
-      pd->deps[pd->pack].enhances = adddep(pool, pd, pd->deps[pd->pack].enhances, atts, 0);
+      s->enhances = adddep(pool, pd, s->enhances, atts, 0);
       break;
     case STATE_FRESHENS:
-      pd->deps[pd->pack].freshens = 0;
+      s->freshens = 0;
       break;
     case STATE_FRESHENSENTRY:
-      pd->deps[pd->pack].freshens = adddep(pool, pd, pd->deps[pd->pack].freshens, atts, 0);
+      s->freshens = adddep(pool, pd, s->freshens, atts, 0);
       break;
     default:
       break;
     }
 }
 
-static const char* findKernelFlavor(Parsedata *pd)
+static const char* findKernelFlavor(Parsedata *pd, Solvable *s)
 {
   Pool *pool = pd->pool;
 
   Id pid, *pidp = 0;
   
-  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].provides; pidp && (pid = *pidp++) != 0; )
+  if (s->provides)
     {
-      Reldep *prd;
-      
-      if (!ISRELDEP(pid))
-	continue;               /* wrong provides name */
-      prd = GETRELDEP(pool, pid);
-      const char *depname = id2str(pool, prd->name);
-      if (!strncmp(depname, "kernel-", strlen("kernel-")))
+      for (pidp = pd->source->idarraydata + s->provides; pidp && (pid = *pidp++) != 0; )
 	{
-	  return depname + strlen("kernel-");
+	  Reldep *prd;
+	  const char *depname;
+	  
+	  if (!ISRELDEP(pid))
+	    continue;               /* wrong provides name */
+	  prd = GETRELDEP(pool, pid);
+	  depname = id2str(pool, prd->name);
+	  if (!strncmp(depname, "kernel-", strlen("kernel-")))
+	    {
+	      return depname + strlen("kernel-");
+	    }
 	}
     }
 
   //fprintf(stderr, "pack %d\n", pd->pack);
-  //fprintf(stderr, "source %d\n", pd->deps[pd->pack].requires);
+  //fprintf(stderr, "source %d\n", s->requires);
 
-  if (! pd->deps[pd->pack].requires )
+  if (!s->requires)
     return 0;
 
-  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].requires ; pidp && (pid = *pidp++) != 0; )
+  for (pidp = pd->source->idarraydata + s->requires ; pidp && (pid = *pidp++) != 0; )
     {
       const char *depname = 0;
 
@@ -594,16 +578,6 @@ static const char* findKernelFlavor(Parsedata *pd)
   return 0;
 }
 
-static int
-countDeps( Id *idarray)
-{
-  Id id;
-  int count = 0;
-
-  while ((id = *idarray++) != ID_NULL)
-    count++;
-  return count;
-}
 
 /*
  * XML callback
@@ -649,62 +623,22 @@ endElement(void *userData, const char *name)
                         pd->release ? pd->evrspace + pd->release : 0);
       /* ensure self-provides */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        pd->deps[pd->pack].provides = source_addid_dep(pd->source, pd->deps[pd->pack].provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      pd->deps[pd->pack].supplements = source_fix_legacy(pd->source, pd->deps[pd->pack].provides, pd->deps[pd->pack].supplements);
+        s->provides = source_addid_dep(pd->source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      s->supplements = source_fix_legacy(pd->source, s->provides, s->supplements);
 
-      const char *flavor = findKernelFlavor(pd);
+      const char *flavor = findKernelFlavor(pd, s);
       if (flavor) 
 	{
-	  char *cflavor = strdup(flavor);
+	  char *cflavor = strdup(flavor);	/* make pointer safe */
 
-	  Id npr = 0;
+	  Id npr;
 	  Id pid, *pidp;
 
 	  /* this is either a kernel package or a kmp */
-	  int c = countDeps(pd->source->idarraydata + pd->deps[pd->pack].provides);
-	  source_reserve_ids(pd->source, 0, c);
-
-	  for (pidp = pd->source->idarraydata + pd->deps[pd->pack].provides; pidp && (pid = *pidp++) != 0; )
+	  if (s->provides)
 	    {
-	      const char *depname = 0;
-	      Reldep *prd = 0;
-
-	      if (ISRELDEP(pid))
-		{
-		  prd = GETRELDEP(pool, pid);
-		  depname = id2str(pool, prd->name);
-		}
-	      else
-		{
-		  depname = id2str(pool, pid);
-		}
-
-	      Id newid = pid;
-
-	      if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
-		{
-		  char newdep[100];
-		  strcpy(newdep, "kernel(");
-		  strncat(newdep, cflavor, sizeof(newdep));
-		  strncat(newdep, ":", sizeof(newdep));
-		  strncat(newdep, depname + strlen("kernel("), 100);
-		  newid = str2id(pool, newdep, 1);
-		  if (prd)
-		    newid = rel2id(pool, newid, prd->evr, prd->flags, 1);
-		}
-
-	      npr = source_addid_dep(pd->source, npr, newid, 0);
-	    }
-	  pd->deps[pd->pack].provides = npr;
-#if 1
-
-	  npr = 0;
-	  if (pd->deps[pd->pack].requires)
-	    {
-	      c = countDeps(pd->source->idarraydata + pd->deps[pd->pack].requires);
-	      source_reserve_ids(pd->source, 0, c);
-
-	      for (pidp = pd->source->idarraydata + pd->deps[pd->pack].requires; pidp && (pid = *pidp++) != 0; )
+	      npr = 0;
+	      for (pidp = pd->source->idarraydata + s->provides; (pid = *pidp++) != 0; )
 		{
 		  const char *depname = 0;
 		  Reldep *prd = 0;
@@ -719,7 +653,6 @@ endElement(void *userData, const char *name)
 		      depname = id2str(pool, pid);
 		    }
 
-		  Id newid = pid;
 
 		  if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
 		    {
@@ -728,14 +661,50 @@ endElement(void *userData, const char *name)
 		      strncat(newdep, cflavor, sizeof(newdep));
 		      strncat(newdep, ":", sizeof(newdep));
 		      strncat(newdep, depname + strlen("kernel("), 100);
-		      newid = str2id(pool, newdep, 1);
+		      pid = str2id(pool, newdep, 1);
 		      if (prd)
-			newid = rel2id(pool, newid, prd->evr, prd->flags, 1);
+			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
 		    }
-		  npr = source_addid_dep(pd->source, npr, newid, 0);
+
+		  npr = source_addid_dep(pd->source, npr, pid, 0);
 		}
+	      s->provides = npr;
 	    }
-	  pd->deps[pd->pack].requires = npr;
+#if 1
+
+	  if (s->requires)
+	    {
+	      npr = 0;
+	      for (pidp = pd->source->idarraydata + s->requires; (pid = *pidp++) != 0; )
+		{
+		  const char *depname = 0;
+		  Reldep *prd = 0;
+
+		  if (ISRELDEP(pid))
+		    {
+		      prd = GETRELDEP(pool, pid);
+		      depname = id2str(pool, prd->name);
+		    }
+		  else
+		    {
+		      depname = id2str(pool, pid);
+		    }
+
+		  if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
+		    {
+		      char newdep[100];
+		      strcpy(newdep, "kernel(");
+		      strncat(newdep, cflavor, sizeof(newdep));
+		      strncat(newdep, ":", sizeof(newdep));
+		      strncat(newdep, depname + strlen("kernel("), 100);
+		      pid = str2id(pool, newdep, 1);
+		      if (prd)
+			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
+		    }
+		  npr = source_addid_dep(pd->source, npr, pid, 0);
+		}
+	      s->requires = npr;
+	    }
 #endif
 	  free(cflavor);
 	}
@@ -842,8 +811,6 @@ pool_addsource_helix(Pool *pool, FILE *fp)
   char buf[BUFF_SIZE];
   int i, l;
   Source *source;
-  Solvable *solvable;
-  Deps *deps;
   struct stateswitch *sw;
 
   // create empty source
@@ -894,23 +861,6 @@ pool_addsource_helix(Pool *pool, FILE *fp)
   pool->nsolvables += pd.pack;
   source->nsolvables = pd.pack;
 
-  // now set dependency pointers for each solvable
-  deps = pd.deps;
-  solvable = pool->solvables + source->start;
-  for (i = 0; i < pd.pack; i++, solvable++)
-    {
-      solvable->provides = deps[i].provides;
-      solvable->requires = deps[i].requires;
-      solvable->conflicts = deps[i].conflicts;
-      solvable->obsoletes = deps[i].obsoletes;
-      solvable->recommends = deps[i].recommends;
-      solvable->supplements = deps[i].supplements;
-      solvable->suggests = deps[i].suggests;
-      solvable->enhances = deps[i].enhances;
-      solvable->freshens = deps[i].freshens;
-    }
-
-  free(deps);
   free(pd.content);
   free(pd.evrspace);
 

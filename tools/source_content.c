@@ -34,18 +34,6 @@ split(char *l, char **sp, int m)
   return i;
 }
 
-struct deps {
-  unsigned int provides;
-  unsigned int requires;
-  unsigned int obsoletes;
-  unsigned int conflicts;
-  unsigned int recommends;
-  unsigned int supplements;
-  unsigned int enhances;
-  unsigned int suggests;
-  unsigned int freshens;
-};
-
 struct parsedata {
   char *kind;
   Source *source;
@@ -172,8 +160,7 @@ pool_addsource_content(Pool *pool, FILE *fp)
   int aline;
   Source *source;
   Solvable *s;
-  struct deps *deps = 0, *dp = 0;
-  int pack, i;
+  int pack;
   struct parsedata pd;
 
   source = pool_addsource_empty(pool);
@@ -220,22 +207,19 @@ pool_addsource_content(Pool *pool, FILE *fp)
 #define istag(x) !strcmp (key, x)
 	  if (istag ("PRODUCT"))
 	    {
+	      if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+		s->provides = source_addid_dep(source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+	      if (s)
+		s->supplements = source_fix_legacy(source, s->provides, s->supplements);
 	      /* Only support one product.  */
-	      assert (!dp);
 	      pd.kind = "product";
 	      if ((pack & PACK_BLOCK) == 0)
 		{
 		  pool->solvables = realloc(pool->solvables, (pool->nsolvables + pack + PACK_BLOCK + 1) * sizeof(Solvable));
 		  memset(pool->solvables + source->start + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
-		  if (!deps)
-		    deps = malloc((pack + PACK_BLOCK + 1) * sizeof(struct deps));
-		  else
-		    deps = realloc(deps, (pack + PACK_BLOCK + 1) * sizeof(struct deps));
-		  memset(deps + pack, 0, (PACK_BLOCK + 1) * sizeof(struct deps));
 		}
 	      s = pool->solvables + source->start + pack;
 	      s->source = source;
-	      dp = deps + pack;
 	      pack++;
 	    }
 	  else if (istag ("VERSION"))
@@ -250,23 +234,23 @@ pool_addsource_content(Pool *pool, FILE *fp)
 	       arch.  We don't know the latter here, though.  */
 	    s->arch = str2id (pool, "noarch" , 1);
 	  else if (istag ("PREREQUIRES"))
-	    dp->requires = adddep(pool, &pd, dp->requires, value, 2);
+	    s->requires = adddep(pool, &pd, s->requires, value, 2);
 	  else if (istag ("REQUIRES"))
-	    dp->requires = adddep(pool, &pd, dp->requires, value, 1);
+	    s->requires = adddep(pool, &pd, s->requires, value, 1);
 	  else if (istag ("PROVIDES"))
-	    dp->provides = adddep(pool, &pd, dp->provides, value, 0);
+	    s->provides = adddep(pool, &pd, s->provides, value, 0);
 	  else if (istag ("CONFLICTS"))
-	    dp->conflicts = adddep(pool, &pd, dp->conflicts, value, 0);
+	    s->conflicts = adddep(pool, &pd, s->conflicts, value, 0);
 	  else if (istag ("OBSOLETES"))
-	    dp->obsoletes = adddep(pool, &pd, dp->obsoletes, value, 0);
+	    s->obsoletes = adddep(pool, &pd, s->obsoletes, value, 0);
 	  else if (istag ("RECOMMENDS"))
-	    dp->recommends = adddep(pool, &pd, dp->recommends, value, 0);
+	    s->recommends = adddep(pool, &pd, s->recommends, value, 0);
 	  else if (istag ("SUGGESTS"))
-	    dp->suggests = adddep(pool, &pd, dp->suggests, value, 0);
+	    s->suggests = adddep(pool, &pd, s->suggests, value, 0);
 	  else if (istag ("SUPPLEMENTS"))
-	    dp->supplements = adddep(pool, &pd, dp->supplements, value, 0);
+	    s->supplements = adddep(pool, &pd, s->supplements, value, 0);
 	  else if (istag ("ENHANCES"))
-	    dp->enhances = adddep(pool, &pd, dp->enhances, value, 0);
+	    s->enhances = adddep(pool, &pd, s->enhances, value, 0);
 	  /* FRESHENS doesn't seem to exist.  */
 	  /* XXX do something about LINGUAS and ARCH? */
 #undef istag
@@ -275,28 +259,13 @@ pool_addsource_content(Pool *pool, FILE *fp)
 	fprintf (stderr, "malformed line: %s\n", line);
     }
 
-  if (dp && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-    dp->provides = source_addid_dep(source, dp->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  if (dp)
-    dp->supplements = source_fix_legacy(source, dp->provides, dp->supplements);
+  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+    s->provides = source_addid_dep(source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  if (s)
+    s->supplements = source_fix_legacy(source, s->provides, s->supplements);
     
   pool->nsolvables += pack;
   source->nsolvables = pack;
-  s = pool->solvables + source->start;
-  for (i = 0; i < pack; i++, s++)
-    {
-      s->provides = deps[i].provides;
-      s->requires = deps[i].requires;
-      s->conflicts = deps[i].conflicts;
-      s->obsoletes = deps[i].obsoletes;
-      s->recommends = deps[i].recommends;
-      s->supplements = deps[i].supplements;
-      s->suggests = deps[i].suggests;
-      s->enhances = deps[i].enhances;
-      s->freshens = deps[i].freshens;
-    }
-
-  free(deps);
   if (pd.tmp)
     free(pd.tmp);
   free(line);
