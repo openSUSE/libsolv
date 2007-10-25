@@ -401,9 +401,9 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 /******************************************************************************/
 
 /*
- * addrangedep
+ * addrelproviders
  * 
- * add RangeDep to whatprovides
+ * add packages fulfilling the relation to whatprovides array
  * no exact providers, do range match
  * 
  */

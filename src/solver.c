@@ -879,6 +879,9 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		    printf(">!> !unflag %s-%s.%s[%s]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), source_name(s->source));
 		  continue;
 		}
+
+	      if (*dp == SYSTEMSOLVABLE)		/* always installed */
+		continue;
   #if 0
 	      printf("addrule %s-%s.%s %s %d %d\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, dp - pool->whatprovidesdata);
 	      for (i = 0; dp[i]; i++)
