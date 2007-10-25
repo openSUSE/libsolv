@@ -805,6 +805,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id con, *conp;
   Id obs, *obsp;
   Id rec, *recp;
+  Id sug, *sugp;
   Id p, *pp;
   Id *dp;
   Id n;
@@ -959,19 +960,29 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  queuepush(&q, p);
 	    }
 	}
+      if (s->suggests)
+	{
+	  sugp = s->source->idarraydata + s->suggests;
+	  while ((sug = *sugp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, sug)
+		if (!MAPTST(m, p))
+		  queuepush(&q, p);
+	    }
+	}
     }
   queuefree(&q);
 }
 
 static void
-addrulesforsupplements(Solver *solv, Map *m)
+addrulesforweak(Solver *solv, Map *m)
 {
   Pool *pool = solv->pool;
   Solvable *s;
   Id sup, *supp;
   int i, n;
 
-  if (pool->verbose) printf("addrulesforsupplements... (%d)\n", solv->nrules);
+  if (pool->verbose) printf("addrulesforweak... (%d)\n", solv->nrules);
   for (i = n = 1; n < pool->nsolvables; i++, n++)
     {
       if (i == pool->nsolvables)
@@ -996,6 +1007,13 @@ addrulesforsupplements(Solver *solv, Map *m)
 	    if (dep_possible(solv, sup, m))
 	      break;
 	}
+      if (!sup && s->enhances)
+	{
+	  supp = s->source->idarraydata + s->enhances;
+	  while ((sup = *supp++) != ID_NULL)
+	    if (dep_possible(solv, sup, m))
+	      break;
+	}
       if (!sup)
 	continue;
       addrulesforsolvable(solv, s, m);
@@ -1003,51 +1021,6 @@ addrulesforsupplements(Solver *solv, Map *m)
     }
   if (pool->verbose) printf("done. (%d)\n", solv->nrules);
 }
-
-static void
-addrulesforenhances(Solver *solv, Map *m)
-{
-  Pool *pool = solv->pool;
-  int i;
-  Solvable *s;
-  Id p, *pp, enh, *enhp, obs, *obsp, con, *conp;
-
-  if (pool->verbose) printf("addrulesforenhances... (%d)\n", solv->nrules);
-  for (i = 1; i < pool->nsolvables; i++)
-    {
-      if (MAPTST(m, i))
-	continue;
-      s = pool->solvables + i;
-      if (!s->enhances)
-	continue;
-      if (!pool_installable(pool, s))
-	continue;
-      enhp = s->source->idarraydata + s->enhances;
-      while ((enh = *enhp++) != ID_NULL)
-	if (dep_possible(solv, enh, m))
-	  break;
-      if (!enh)
-	continue;
-      if (s->conflicts)
-	{
-	  conp = s->source->idarraydata + s->conflicts;
-	  while ((con = *conp++) != 0)
-	    FOR_PROVIDES(p, pp, con)
-	      addrule(solv, -i, -p);
-	}
-      if (s->obsoletes)
-	{
-	  obsp = s->source->idarraydata + s->obsoletes;
-	  while ((obs = *obsp++) != ID_NULL)
-	    FOR_PROVIDES(p, pp, obs)
-	      addrule(solv, -i, -p);
-	}
-      FOR_PROVIDES(p, pp, s->name)
-        if (s->name == pool->solvables[p].name)
-	  addrule(solv, -i, -p);
-    }
-}
-
 
 static inline int
 archchanges(Pool *pool, Solvable *s1, Solvable *s2)
@@ -2728,8 +2701,7 @@ solve(Solver *solv, Queue *job)
     addupdaterule(solv, pool->solvables + i, &addedmap, 1, 1, 1);
 #endif
 
-  addrulesforsupplements(solv, &addedmap);
-  addrulesforenhances(solv, &addedmap);		/* do this last */
+  addrulesforweak(solv, &addedmap);
 #if 1
   if (pool->verbose)
     {
@@ -2907,7 +2879,7 @@ solve(Solver *solv, Queue *job)
   /* find suggested packages */
   if (!solv->problems.count)
     {
-      Id sug, *sugp, enh, *enhp, req, *reqp, p, *pp;
+      Id sug, *sugp, enh, *enhp, p, *pp;
 
       /* create map of all suggests that are still open */
       solv->recommends_index = -1;
@@ -2949,25 +2921,6 @@ solve(Solver *solv, Queue *job)
 		if (dep_fulfilled(solv, enh))
 		  break;
 	      if (!enh)
-		continue;
-	    }
-	  /* check if installation is possible at all */
-          if (s->requires)
-	    {
-	      reqp = s->source->idarraydata + s->requires;
-	      while ((req = *reqp++) != 0)
-		{
-		  if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
-		    continue;
-		  FOR_PROVIDES(p, pp, req)
-		    if (solv->decisionmap[p] >= 0)
-		      break;
-		  if (!p && !strncmp(id2str(pool, req), "rpmlib(", 7))
-		    continue;
-		  if (!p)
-		    break;		/* no provider installable! */
-		}
-	      if (req)
 		continue;
 	    }
 	  queuepush(&solv->suggestions, i);
