@@ -43,9 +43,13 @@ typedef _Bool bool;
 #define SOLVABLE_FILEMARKER	16		// normal provides before this, generated file provides after this
 #define NAMESPACE_INSTALLED	17
 #define NAMESPACE_MODALIAS	18
-#define ARCH_SRC		19
-#define ARCH_NOSRC		20
-#define ARCH_NOARCH		21
+#define SYSTEM_SYSTEM		19
+#define ARCH_SRC		20
+#define ARCH_NOSRC		21
+#define ARCH_NOARCH		22
+
+/* well known solvable */
+#define SYSTEMSOLVABLE		1
 
 //-----------------------------------------------
 
@@ -84,6 +88,9 @@ struct _Pool {
   Id *whatprovidesdata;		/* Ids of solvable providing Id */
   Offset whatprovidesdataoff;	/* next free slot within whatprovidesdata */
   int whatprovidesdataleft;	/* number of 'free slots' within whatprovidesdata */
+
+  Id (*nscallback)(struct _Pool *, void *data, Id name, Id evr);
+  void *nscallbackdata;
 };
 
 #define TYPE_ID			1

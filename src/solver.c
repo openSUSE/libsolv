@@ -850,12 +850,6 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 	      dp = GET_PROVIDESP(req, p);      /* get providers of req */
 
-	      if (!*dp		             /* dont care if noone provides rpmlib() */
-		  && !strncmp(id2str(pool, req), "rpmlib(", 7))
-		{
-		  continue;
-		}
-
 	      if (dontfix)	       /* dont care about breakage */
 		{
 		  /* the strategy here is to not insist on dependencies
@@ -2404,6 +2398,8 @@ printdecisions(Solver *solv)
       n = solv->decisionq.elements[i];
       if (n < 0)
 	continue;
+      if (n == SYSTEMSOLVABLE)
+	continue;
       if (n >= solv->system->start && n < solv->system->start + solv->system->nsolvables)
 	continue;
       s = pool->solvables + n;
@@ -2461,6 +2457,8 @@ printdecisions(Solver *solv)
       int j;
       p = solv->decisionq.elements[i];
       if (p < 0)
+	continue;
+      if (p == SYSTEMSOLVABLE)
 	continue;
       if (p >= solv->system->start && p < solv->system->start + solv->system->nsolvables)
 	continue;
@@ -2629,6 +2627,14 @@ solve(Solver *solv, Queue *job)
   mapinit(&noupdaterule, pool->nsolvables);
 
   queueinit(&q);
+
+  /*
+   * always install our system solvable
+   */
+  MAPSET(&addedmap, SYSTEMSOLVABLE);
+  queuepush(&solv->decisionq, SYSTEMSOLVABLE);
+  queuepush(&solv->decisionq_why, 0);
+  solv->decisionmap[SYSTEMSOLVABLE] = 1;
 
   /*
    * create rules for installed solvables -> keep them installed

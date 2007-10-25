@@ -53,6 +53,7 @@ static char *initpool_data[] = {
   "solvable:filemarker",
   "namespace:installed",
   "namespace:modalias",
+  "system:system",
   "src",
   "nosrc",
   "noarch"
@@ -65,6 +66,7 @@ pool_create(void)
 {
   int count, totalsize = 0;
   Pool *pool;
+  Solvable *s;
 
   pool = (Pool *)xcalloc(1, sizeof(*pool));
 
@@ -91,9 +93,12 @@ pool_create(void)
   pool->nrels = 1;
 
   // pre-alloc space for a Solvable
-  pool->solvables = (Solvable *)xcalloc(1, sizeof(Solvable));
-  pool->nsolvables = 1;
-
+  pool->solvables = (Solvable *)xcalloc(2, sizeof(Solvable));
+  pool->nsolvables = 2;
+  s = pool->solvables + SYSTEMSOLVABLE;
+  s->name = SYSTEM_SYSTEM;
+  s->arch = ARCH_NOARCH;
+  s->evr = ID_EMPTY;
   return pool;
 }
 
@@ -350,6 +355,7 @@ pool_prepare(Pool *pool)
   pool_shrink_whatprovides(pool);
 }
 
+
 /******************************************************************************/
 
 /*
@@ -391,6 +397,8 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
   return (Id)off;
 }
 
+
+/******************************************************************************/
 
 /*
  * addrangedep
@@ -440,12 +448,18 @@ pool_addrelproviders(Pool *pool, Id d)
 	queuepushunique(&plist, p);
       break;
     case REL_NAMESPACE:
-#if 0
-      /* unknown namespace, just pass through */
-      pp = GET_PROVIDESP(evr, p);
-      while ((p = *pp++) != 0)
-	queuepush(&plist, p);
-#endif
+      if (pool->nscallback)
+	{
+	  p = pool->nscallback(pool, pool->nscallbackdata, name, evr);
+	  if (p > 1)
+	    {
+	      queuefree(&plist);
+	      pool->whatprovides[d] = p;
+	      return pool->whatprovidesdata + p;
+	    }
+	  if (p == 1)
+	    queuepush(&plist, SYSTEMSOLVABLE);
+	}
       break;
     default:
       break;
@@ -503,6 +517,9 @@ pool_addrelproviders(Pool *pool, Id d)
 	    continue;	/* no rel match */
 	  queuepush(&plist, p);
 	}
+      /* make our system solvable provide all unknown rpmlib() stuff */
+      if (plist.count == 0 && !strncmp(id2str(pool, name), "rpmlib(", 7))
+	queuepush(&plist, SYSTEMSOLVABLE);
     }
   /* add providers to whatprovides */
 #if 0
