@@ -16,12 +16,6 @@ extern "C" {
 #include "solvable.h"
 #include "queue.h"
 
-// bool
-#ifndef __cplusplus
-#ifndef SWIG
- typedef _Bool bool;
-#endif
-#endif
 // see initpool_data[] in pool.c
 
 /* well known ids */
@@ -81,7 +75,7 @@ struct _Pool {
   Solvable *solvables;
   int nsolvables;
 
-  bool promoteepoch;
+  int promoteepoch;
 
   Id *id2arch;			/* map arch ids to scores */
   Id lastarch;			/* last valid entry in id2arch */
@@ -152,10 +146,6 @@ extern Pool *pool_create(void);
  * Delete a pool
  */
 extern void pool_free(Pool *pool);
-/**
- * ????
- */
-extern void pool_freerepo(Pool *pool, Repo *repo);
 /**
  * Prepares a pool for solving
  */
