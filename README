@@ -24,3 +24,19 @@ Some research papers are in doc/pdf.
 Everything else is below doc.
 
 Please subscribe to zypp-devel@opensuse.org for any questions.
+
+* How to build
+
+Requires: cmake 2.4.x
+
+mkdir build
+cd build
+cmake ..
+make
+
+To install ruby bindings:
+make install
+
+To createe a package
+make srcpackage
+see package/

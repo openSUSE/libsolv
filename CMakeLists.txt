@@ -18,11 +18,13 @@ MESSAGE(STATUS "Libraries will be installed in ${LIB_INSTALL_DIR}" )
 # where to look first for cmake modules, before ${CMAKE_ROOT}/Modules/ is checked
 SET( CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules )
 
+INCLUDE( ${CMAKE_SOURCE_DIR}/VERSION.cmake )
+
 FIND_PACKAGE(Db43 REQUIRED)
 FIND_PACKAGE(EXPAT REQUIRED)
 
 SET( PACKAGE "satsolver" )
-SET( VERSION "${LIBZYPP_MAJOR}.${LIBZYPP_MINOR}.${LIBZYPP_PATCH}" )
+SET( VERSION "${LIBSATSOLVER_MAJOR}.${LIBSATSOLVER_MINOR}.${LIBSATSOLVER_PATCH}" )
 
 SET( CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -g -O3 -Wall" )
 ADD_DEFINITIONS( -D_FILE_OFFSET_BITS=64 )
@@ -30,9 +32,9 @@ ADD_DEFINITIONS( -DVERSION=\\\"${VERSION}\\\" )
 
 SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "mls solver")
 SET(CPACK_PACKAGE_VENDOR "Novell Inc.")
-SET(CPACK_PACKAGE_VERSION_MAJOR ${LIBZYPP_MAJOR})
-SET(CPACK_PACKAGE_VERSION_MINOR ${LIBZYPP_MINOR})
-SET(CPACK_PACKAGE_VERSION_PATCH ${LIBZYPP_PATCH})
+SET(CPACK_PACKAGE_VERSION_MAJOR ${LIBSATSOLVER_MAJOR})
+SET(CPACK_PACKAGE_VERSION_MINOR ${LIBSATSOLVER_MINOR})
+SET(CPACK_PACKAGE_VERSION_PATCH ${LIBSATSOLVER_PATCH})
 SET( CPACK_GENERATOR "TBZ2")
 SET( CPACK_SOURCE_GENERATOR "TBZ2")
 SET( CPACK_SOURCE_PACKAGE_FILE_NAME "${PACKAGE}-${VERSION}" )
@@ -67,6 +69,8 @@ SET (CPACK_SOURCE_IGNORE_FILES
 "\\\\.lo$"
 "\\\\.la$"
 "Makefile\\\\.in$"
+"testsuite/data.libzypp/kernel-tests/kernel-hardware"
+"testsuite/data.libzypp/yast-tests/kernel3-hardware"
 )
 
 INCLUDE(CPack)
@@ -113,7 +117,7 @@ MESSAGE(STATUS "version: ${VERSION}")
 
 MACRO(SPECFILE)
   MESSAGE(STATUS "Writing spec file...")
-  CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/libsatsolver.spec.in ${CMAKE_BINARY_DIR}/package/libsatsolver.spec.in @ONLY)
+  CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/package/libsatsolver.spec.in ${CMAKE_BINARY_DIR}/package/libsatsolver.spec @ONLY)
   #MESSAGE(STATUS "I hate you rpm-lint...!!!")
   #CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/package/libsatsolver-rpmlint.cmake ${CMAKE_BINARY_DIR}/package/libsatsolver-rpmlintrc @ONLY)
 ENDMACRO(SPECFILE)
@@ -129,7 +133,7 @@ SET( AUTOBUILD_COMMAND
   COMMAND ${CMAKE_MAKE_PROGRAM} package_source
   COMMAND ${CMAKE_COMMAND} -E copy ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2 ${CMAKE_BINARY_DIR}/package
   COMMAND ${CMAKE_COMMAND} -E remove ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
-  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/package/${PACKAGE}.changes" "${CMAKE_BINARY_DIR}/package/${PACKAGE}.changes"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/package/libsatsolver.changes" "${CMAKE_BINARY_DIR}/package/libsatsolver.changes"
 )
 
 ADD_CUSTOM_TARGET( srcpackage_local

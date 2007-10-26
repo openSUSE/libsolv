@@ -7,6 +7,7 @@ Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          System/Libraries
 BuildRequires:  libexpat-devel db43-devel
+BuildRequires:  ruby-devel swig
 Requires:       expat db43
 Summary:        A new approach to package dependency solving
 
@@ -21,16 +22,33 @@ Group:          Development/Libraries
 %description devel
 -
 
+%package ruby
+Summary:        Ruby bindings for sat solver
+Group:          Development/Languages/Ruby
+
+%description ruby
+-
+
 %prep
 %setup -n satsolver-%{version}
 
 %build
-%configure --prefix=/usr --libdir=%{_libdir} --sysconfdir=/etc
-make
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=%{prefix} \
+      -DLIB=%{_lib} \
+      -DCMAKE_VERBOSE_MAKEFILE=TRUE \
+      -DCMAKE_C_FLAGS_RELEASE:STRING="%{optflags}" \
+      -DCMAKE_CXX_FLAGS_RELEASE:STRING="%{optflags}" \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_SKIP_RPATH=1 \
+      ..
+make %{?jobs:-j %jobs}
 
 %install
-make DESTDIR=%{buildroot} install
-rm -f %{buildroot}%{_libdir}/libsatsolver.la
+cd build
+make install DESTDIR=$RPM_BUILD_ROOT
+#rm -f %{buildroot}%{_libdir}/libsatsolver.la
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
@@ -47,7 +65,12 @@ rm -rf "$RPM_BUILD_ROOT"
 %doc doc/README*
 %doc doc/THEORY
 %doc doc/PLANNING
-%dir /usr/include/satsolver
-/usr/include/satsolver/*
+%dir %{_includedir}/satsolver
+#%{_includedir}/satsolver/*
+
+%files ruby
+%defattr(-,root,root,-)
+%{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolverx.so
+%{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver.rb
 
 %changelog
