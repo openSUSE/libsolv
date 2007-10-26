@@ -17,8 +17,8 @@ extern "C" {
 #include "queue.h"
 
 // bool
-#ifndef SWIG
 #ifndef __cplusplus
+#ifndef SWIG
  typedef _Bool bool;
 #endif
 #endif
@@ -76,11 +76,8 @@ struct _Pool {
   Solvable *solvables;
   int nsolvables;
 
-#ifdef SWIG
-  _Bool promoteepoch;
-#else
   bool promoteepoch;
-#endif
+
   Id *id2arch;			/* map arch ids to scores */
   Id lastarch;			/* last valid entry in id2arch */
 
