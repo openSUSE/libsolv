@@ -508,31 +508,28 @@ unifyrules(Solver *solv)
   solv->rules = (Rule *)xrealloc(solv->rules, ((solv->nrules + RULES_BLOCK) & ~RULES_BLOCK) * sizeof(Rule));
   solv->nrules = j;
 #if 1
-  {
-    int binr = 0;
-    int dc = 0;
-    Id *dp;
-    Rule *r;
+  if (solv->pool->verbose)
+    {
+      int binr = 0;
+      int lits = 0;
+      Id *dp;
+      Rule *r;
 
-    for (i = 1; i < solv->nrules; i++)
-      {
-	r = solv->rules + i;
-	if (r->d == 0)		       /* assertion */
-	  {
+      for (i = 1; i < solv->nrules; i++)
+	{
+	  r = solv->rules + i;
+	  if (r->d == 0)
 	    binr++;
-	    continue;
-	  }
-        dp = solv->pool->whatprovidesdata + r->d;
-	while (*dp++)
-	  dc++;
-      }
-    if (solv->pool->verbose)
-      {
-        printf("  binary: %d\n", binr);
-        printf("  normal: %d\n", solv->nrules - 1 - binr);
-        printf("  normal lits: %d\n", dc);
-      }
-  }
+	  else
+	    {
+	      dp = solv->pool->whatprovidesdata + r->d;
+	      while (*dp++)
+		lits++;
+	    }
+	}
+      printf("  binary: %d\n", binr);
+      printf("  normal: %d, %d literals\n", solv->nrules - 1 - binr, lits);
+    }
 #endif
 }
 
@@ -627,7 +624,8 @@ addrule(Solver *solv, Id p, Id d)
       if (!solv->jobrules)
 	{
 	  /* this is a rpm rule assertion, we do not have to allocate it */
-          /* it can be identified by a level of 1 and a zero reason */
+	  /* it can be identified by a level of 1 and a zero reason */
+	  /* we must not drop those rules from the decisionq when rewinding! */
 	  if (p > 0)
 	    abort();
 	  if (solv->decisionmap[-p] > 0 || solv->decisionmap[-p] < -1)
@@ -848,9 +846,12 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
 		continue;
 
-	      dp = GET_PROVIDESP(req, p);      /* get providers of req */
+	      dp = GET_PROVIDESP(req, p);	/* get providers of req */
 
-	      if (dontfix)	       /* dont care about breakage */
+	      if (*dp == SYSTEMSOLVABLE)	/* always installed */
+		continue;
+
+	      if (dontfix)
 		{
 		  /* the strategy here is to not insist on dependencies
                    * that are already broken. so if we find one provider
@@ -859,9 +860,9 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  for (i = 0; dp[i]; i++)	/* for all providers */
 		    {
 		      if (dp[i] >= system->start && dp[i] < system->start + system->nsolvables)
-			break;	       /* provider is installed */
+			break;		/* provider was installed */
 		    }
-		  if (!dp[i])	       /* previously broken dependency */
+		  if (!dp[i])		/* previously broken dependency */
 		    {
 		      if (pool->verbose) printf("ignoring broken requires %s of system package %s-%s.%s\n", dep2str(pool, req), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 		      continue;
@@ -880,8 +881,6 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  continue;
 		}
 
-	      if (*dp == SYSTEMSOLVABLE)		/* always installed */
-		continue;
   #if 0
 	      printf("addrule %s-%s.%s %s %d %d\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, dp - pool->whatprovidesdata);
 	      for (i = 0; dp[i]; i++)

@@ -241,24 +241,20 @@ dep2str(Pool *pool, Id id)
   char *s1, *s2;
   int n, l, ls1, ls2, lsr;
 
-  static char *dep2strbuf[DEP2STRBUF];
-  static int   dep2strlen[DEP2STRBUF];
-  static int   dep2strn;
-
   if (!ISRELDEP(id))
     return pool->stringspace + pool->strings[id];
   rd = GETRELDEP(pool, id);
-  n = dep2strn;
+  n = pool->dep2strn;
 
   sr = id2rel(pool, id);
   lsr = strlen(sr);
 
   s2 = (char *)dep2str(pool, rd->evr);
-  dep2strn = n;
+  pool->dep2strn = n;
   ls2 = strlen(s2);
 
   s1 = (char *)dep2str(pool, rd->name);
-  dep2strn = n;
+  pool->dep2strn = n;
   ls1 = strlen(s1);
 
   if (rd->flags == REL_NAMESPACE)
@@ -269,34 +265,34 @@ dep2str(Pool *pool, Id id)
     }
 
   l = ls1 + ls2 + lsr;
-  if (l + 1 > dep2strlen[n])
+  if (l + 1 > pool->dep2strlen[n])
     {
-      if (s1 != dep2strbuf[n])
-        dep2strbuf[n] = xrealloc(dep2strbuf[n], l + 32);
+      if (s1 != pool->dep2strbuf[n])
+        pool->dep2strbuf[n] = xrealloc(pool->dep2strbuf[n], l + 32);
       else
 	{
-          dep2strbuf[n] = xrealloc(dep2strbuf[n], l + 32);
-          s1 = dep2strbuf[n];
+          pool->dep2strbuf[n] = xrealloc(pool->dep2strbuf[n], l + 32);
+          s1 = pool->dep2strbuf[n];
 	}
-      dep2strlen[n] = l + 32;
+      pool->dep2strlen[n] = l + 32;
     }
-  if (s1 != dep2strbuf[n])
+  if (s1 != pool->dep2strbuf[n])
     {
-      strcpy(dep2strbuf[n], s1);
-      s1 = dep2strbuf[n];
+      strcpy(pool->dep2strbuf[n], s1);
+      s1 = pool->dep2strbuf[n];
     }
   strcpy(s1 + ls1, sr);
-  dep2strbuf[n] = s1 + ls1 + lsr;
+  pool->dep2strbuf[n] = s1 + ls1 + lsr;
   s2 = (char *)dep2str(pool, rd->evr);
-  if (s2 != dep2strbuf[n])
-    strcpy(dep2strbuf[n], s2);
-  dep2strbuf[n] = s1;
+  if (s2 != pool->dep2strbuf[n])
+    strcpy(pool->dep2strbuf[n], s2);
+  pool->dep2strbuf[n] = s1;
   if (rd->flags == REL_NAMESPACE)
     {
       s1[ls1 + ls2 + lsr - 1] = ')';
       s1[ls1 + ls2 + lsr] = 0;
     }
-  dep2strn = (n + 1) % DEP2STRBUF;
+  pool->dep2strn = (n + 1) % DEP2STRBUF;
   return s1;
 }
 

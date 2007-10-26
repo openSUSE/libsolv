@@ -52,6 +52,11 @@ extern "C" {
 /* well known solvable */
 #define SYSTEMSOLVABLE		1
 
+
+/* how many strings to maintain (round robin) */
+#define DEP2STRBUF 16
+
+
 //-----------------------------------------------
 
 struct _Pool {
@@ -92,6 +97,11 @@ struct _Pool {
 
   Id (*nscallback)(struct _Pool *, void *data, Id name, Id evr);
   void *nscallbackdata;
+
+  /* our dep2str string space */
+  char *dep2strbuf[DEP2STRBUF];
+  int   dep2strlen[DEP2STRBUF];
+  int   dep2strn;
 };
 
 #define TYPE_ID			1

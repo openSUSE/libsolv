@@ -126,6 +126,8 @@ pool_free(Pool *pool)
   xfree(pool->stringspace);
   xfree(pool->strings);
   xfree(pool->rels);
+  for (i = 0; i < DEP2STRBUF; i++)
+    xfree(pool->dep2strbuf[i]);
   xfree(pool);
 }
 

@@ -50,14 +50,14 @@ cd build
 make install DESTDIR=$RPM_BUILD_ROOT
 #rm -f %{buildroot}%{_libdir}/libsatsolver.la
 
-%post -p /sbin/ldconfig
-%postun -p /sbin/ldconfig
+#%post -p /sbin/ldconfig
+#%postun -p /sbin/ldconfig
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
 
-%files
-%defattr(-,root,root)
+#%files
+#%defattr(-,root,root)
 
 %files devel
 %defattr(-,root,root)
