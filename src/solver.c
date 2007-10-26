@@ -2762,26 +2762,25 @@ solve(Solver *solv, Queue *job)
 	  queuepush(&solv->ruletojob, i);
 	  break;
 	case SOLVER_ERASE_SOLVABLE:
-          addrule(solv, -what, 0);                        /* remove by Id */
+          addrule(solv, -what, 0);			/* remove by Id */
 	  queuepush(&solv->ruletojob, i);
 	  MAPSET(&noupdaterule, what);
 	  break;
-	case SOLVER_INSTALL_SOLVABLE_NAME:                /* install by capability */
+	case SOLVER_INSTALL_SOLVABLE_NAME:		/* install by capability */
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
 	  QUEUEEMPTY(&q);
-	  FOR_PROVIDES(p, pp, what)    /* check all providers */
+	  FOR_PROVIDES(p, pp, what)
 	    {
-				       /* if by name, ensure that the name matches */
+              /* if by name, ensure that the name matches */
 	      if (how == SOLVER_INSTALL_SOLVABLE_NAME && pool->solvables[p].name != what)
 		continue;
 	      queuepush(&q, p);
 	    }
-	  if (!q.count)	{	       /* no provider found -> abort */
-	    fprintf(stderr, "Nothing provides '%s'\n", id2str(pool, what));
-	    /* XXX make this a problem! */
-	    return;
-	    abort();
-	  }
+	  if (!q.count)	
+	    {
+	      /* no provider, make this an impossible rule */
+	      queuepush(&q, -SYSTEMSOLVABLE);
+	    }
 
 	  p = queueshift(&q);	       /* get first provider */
 	  if (!q.count)
