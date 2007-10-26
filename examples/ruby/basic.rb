@@ -5,15 +5,15 @@ include Satsolver
 pool = Pool.new
 #puts pool.methods.sort
 
-#s = pool.add_empty_source
+#s = pool.add_empty_repo
 
 f = File.open('../../testsuite/data.libzypp/basic-exercises/exercise-20-packages.solv', 'r')
-s = pool.add_source_solv(f, 'foo')
+s = pool.add_repo_solv(f, 'foo')
 
 f = File.open('../../testsuite/data.libzypp/basic-exercises/exercise-20-system.solv', 'r')
-installed = pool.add_source_solv(f, 'system')
+installed = pool.add_repo_solv(f, 'system')
 
-pool.each_source do |repo|
+pool.each_repo do |repo|
   puts repo.name
 end
 
@@ -34,7 +34,7 @@ q.push(r)
 pool.prepare
 pool.promoteepoch = true
 
-# no packages installed so use add_empty_source
+# no packages installed so use add_empty_repo
 solv = Solver.new(pool, installed)
 
 solv.fixsystem = 0
