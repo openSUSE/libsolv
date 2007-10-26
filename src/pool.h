@@ -134,9 +134,21 @@ struct _Pool {
 #define REL_WITH	18
 #define REL_NAMESPACE	19
 
+/**
+ * Creates a new pool
+ */
 extern Pool *pool_create(void);
+/**
+ * Delete a pool
+ */
 extern void pool_free(Pool *pool);
+/**
+ * ????
+ */
 extern void pool_freesource(Pool *pool, Source *source);
+/**
+ * Prepares a pool for solving
+ */
 extern void pool_prepare(Pool *pool);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);

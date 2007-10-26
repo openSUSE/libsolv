@@ -18,14 +18,14 @@ pool.each_source do |repo|
 end
 
 s.each_solvable do |r|
-  puts "#{r.name}"
+  puts r
 end
 
 q = Queue.new
 puts q.empty?
 
-r = pool.select_solvable(s, 'gnome-desktop')
-puts r.name
+r = pool.select_solvable(s, 'G')
+puts r
 
 # push one command and one resolvable to the queue
 q.push(SOLVER_INSTALL_SOLVABLE)
@@ -46,4 +46,12 @@ solv.noupdateprovide = 0
 # solve the queue
 solv.solve(q)
 
-solv.print_decisions
+#solv.print_decisions
+
+solv.each_to_install do |i|
+  puts "to install #{i}"
+end
+
+solv.each_to_remove do |i|
+  puts "to remove #{i}"
+end
