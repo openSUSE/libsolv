@@ -64,7 +64,6 @@ static char *initpool_data[] = {
 Pool *
 pool_create(void)
 {
-  printf("POOL CREATE");
   int count, totalsize = 0;
   Pool *pool;
   Solvable *s;
