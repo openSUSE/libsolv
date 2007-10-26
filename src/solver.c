@@ -3066,6 +3066,8 @@ solve(Solver *solv, Queue *job)
 		}
 	    }
 	  printf("------------------------------------\n");
+	  queuefree(&problems);
+	  queuefree(&solution);
 	}
       return;
     }

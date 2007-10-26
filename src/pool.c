@@ -120,6 +120,7 @@ pool_free(Pool *pool)
       xfree(source->rpmdbid);
       xfree(source);
     }
+  xfree(pool->id2arch);
   xfree(pool->solvables);
   xfree(pool->sources);
   xfree(pool->stringspace);
