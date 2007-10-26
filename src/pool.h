@@ -17,10 +17,11 @@ extern "C" {
 #include "queue.h"
 
 // bool
+#ifndef SWIG
 #ifndef __cplusplus
-typedef _Bool bool;
+ typedef _Bool bool;
 #endif
-
+#endif
 // see initpool_data[] in pool.c
 
 /* well known ids */
@@ -75,8 +76,11 @@ struct _Pool {
   Solvable *solvables;
   int nsolvables;
 
+#ifdef SWIG
+  _Bool promoteepoch;
+#else
   bool promoteepoch;
-
+#endif
   Id *id2arch;			/* map arch ids to scores */
   Id lastarch;			/* last valid entry in id2arch */
 

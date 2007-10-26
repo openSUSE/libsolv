@@ -1,5 +1,5 @@
 Name:           libsatsolver
-Version:        0.0.1
+Version:        @VERSION@
 Release:        1
 License:        BSD
 Url:            http://svn.opensuse.org/svn/zypp/trunk/sat-solver

@@ -51,6 +51,11 @@ AM_PROG_LIBTOOL
 # This isn't a program, but it doesn't fit anywhere else...
 AC_FUNC_ALLOCA
 
+dnl ***********************
+dnl *** swig            ***
+dnl ***********************
+
+AC_PROG_SWIG(1.3.0)
 
 
 dnl ***********************
