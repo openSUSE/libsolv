@@ -8,7 +8,7 @@
 
 #include "pooltypes.h"
 #include "pool.h"
-#include "source.h"
+#include "repo.h"
 #include "queue.h"
 #include "bitmap.h"
 
@@ -39,7 +39,7 @@ typedef struct rule {
 
 typedef struct solver {
   Pool *pool;
-  Source *system;
+  Repo *system;
 
   int fixsystem;			/* repair errors in rpm dependency graph */
   int allowdowngrade;			/* allow to downgrade installed solvable */
@@ -106,7 +106,7 @@ enum solvcmds {
   SOLVER_INSTALL_SOLVABLE_UPDATE
 } SolverCmd;
 
-extern Solver *solver_create(Pool *pool, Source *system);
+extern Solver *solver_create(Pool *pool, Repo *system);
 extern void solver_free(Solver *solv);
 extern void solve(Solver *solv, Queue *job);
 

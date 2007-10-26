@@ -41,7 +41,7 @@ static Id
 replaces_system(Solver *solv, Id id)
 {
   Pool *pool = solv->pool;
-  Source *system = solv->system;
+  Repo *system = solv->system;
   Id *name = pool->solvables[id].name;
 
   FOR_PROVIDES(p, pp, id)
@@ -144,13 +144,13 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
   for (i = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
-      if (i == 0 || s->source->priority > bestprio)
-	bestprio = s->source->priority;
+      if (i == 0 || s->repo->priority > bestprio)
+	bestprio = s->repo->priority;
     }
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
-      if (s->source->priority == bestprio)
+      if (s->repo->priority == bestprio)
 	plist->elements[j++] = plist->elements[i];
     }
   plist->count = j;
@@ -184,14 +184,14 @@ prune_to_recommended(Solver *solv, Queue *plist)
       s = pool->solvables + p;
       if (s->recommends)
 	{
-	  recp = s->source->idarraydata + s->recommends;
+	  recp = s->repo->idarraydata + s->recommends;
           while ((rec = *recp++) != 0)
 	    FOR_PROVIDES(p, pp, rec)
 	      MAPSET(&solv->recommendsmap, p);
 	}
       if (s->suggests)
 	{
-	  sugp = s->source->idarraydata + s->suggests;
+	  sugp = s->repo->idarraydata + s->suggests;
           while ((sug = *sugp++) != 0)
 	    FOR_PROVIDES(p, pp, sug)
 	      MAPSET(&solv->suggestsmap, p);
@@ -211,7 +211,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
 	continue;
       if (s->supplements)
 	{
-	  supp = s->source->idarraydata + s->supplements;
+	  supp = s->repo->idarraydata + s->supplements;
 	  while ((sup = *supp++) != 0)
 	    if (dep_fulfilled(solv, sup))
 	      break;
@@ -220,7 +220,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
 	}
       if (s->freshens)
 	{
-	  supp = s->source->idarraydata + s->freshens;
+	  supp = s->repo->idarraydata + s->freshens;
 	  while ((sup = *supp++) != 0)
 	    if (dep_fulfilled(solv, sup))
 	      break;
@@ -246,7 +246,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
       s = pool->solvables + p;
       if (!s->enhances)
 	continue;
-      enhp = s->source->idarraydata + s->enhances;
+      enhp = s->repo->idarraydata + s->enhances;
       while ((enh = *enhp++) != 0)
 	if (dep_fulfilled(solv, enh))
 	  break;
@@ -796,7 +796,7 @@ static void
 addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 {
   Pool *pool = solv->pool;
-  Source *system = solv->system;
+  Repo *system = solv->system;
   Queue q;
   Id qbuf[64];
   int i;
@@ -842,7 +842,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       
       if (s->requires)
 	{
-	  reqp = s->source->idarraydata + s->requires;
+	  reqp = s->repo->idarraydata + s->requires;
 	  while ((req = *reqp++) != 0)
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
@@ -876,7 +876,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   #endif
 		  addrule(solv, -n, 0); /* mark requestor as uninstallable */
 		  if (solv->rc_output)
-		    printf(">!> !unflag %s-%s.%s[%s]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), source_name(s->source));
+		    printf(">!> !unflag %s-%s.%s[%s]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), repo_name(s->repo));
 		  continue;
 		}
 
@@ -909,7 +909,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       
       if (s->conflicts)
 	{
-	  conp = s->source->idarraydata + s->conflicts;
+	  conp = s->repo->idarraydata + s->conflicts;
 	  while ((con = *conp++) != 0)
 	    {
 	      FOR_PROVIDES(p, pp, con)
@@ -930,7 +930,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	{			       /* not installed */
 	  if (s->obsoletes)
 	    {
-	      obsp = s->source->idarraydata + s->obsoletes;
+	      obsp = s->repo->idarraydata + s->obsoletes;
 	      while ((obs = *obsp++) != 0)
 		{
 		  FOR_PROVIDES(p, pp, obs)
@@ -949,7 +949,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        */
       if (s->recommends)
 	{
-	  recp = s->source->idarraydata + s->recommends;
+	  recp = s->repo->idarraydata + s->recommends;
 	  while ((rec = *recp++) != 0)
 	    {
 	      FOR_PROVIDES(p, pp, rec)
@@ -959,7 +959,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	}
       if (s->suggests)
 	{
-	  sugp = s->source->idarraydata + s->suggests;
+	  sugp = s->repo->idarraydata + s->suggests;
 	  while ((sug = *sugp++) != 0)
 	    {
 	      FOR_PROVIDES(p, pp, sug)
@@ -992,21 +992,21 @@ addrulesforweak(Solver *solv, Map *m)
       sup = 0;
       if (s->supplements)
 	{
-	  supp = s->source->idarraydata + s->supplements;
+	  supp = s->repo->idarraydata + s->supplements;
 	  while ((sup = *supp++) != ID_NULL)
 	    if (dep_possible(solv, sup, m))
 	      break;
 	}
       if (!sup && s->freshens)
 	{
-	  supp = s->source->idarraydata + s->freshens;
+	  supp = s->repo->idarraydata + s->freshens;
 	  while ((sup = *supp++) != ID_NULL)
 	    if (dep_possible(solv, sup, m))
 	      break;
 	}
       if (!sup && s->enhances)
 	{
-	  supp = s->source->idarraydata + s->enhances;
+	  supp = s->repo->idarraydata + s->enhances;
 	  while ((sup = *supp++) != ID_NULL)
 	    if (dep_possible(solv, sup, m))
 	      break;
@@ -1075,7 +1075,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 	}
       else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
 	{
-	  obsp = ps->source->idarraydata + ps->obsoletes;
+	  obsp = ps->repo->idarraydata + ps->obsoletes;
 	  while ((obs = *obsp++) != 0)	/* for all obsoletes */
 	    {
 	      FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
@@ -1798,11 +1798,11 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
  *
  *
  * Upon solving, rules are created to flag the Solvables
- * of the 'system' Source as installed.
+ * of the 'system' Repo as installed.
  */
 
 Solver *
-solver_create(Pool *pool, Source *system)
+solver_create(Pool *pool, Repo *system)
 {
   Solver *solv;
   solv = (Solver *)xcalloc(1, sizeof(Solver));
@@ -2130,7 +2130,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  /* XXX need to special case AND ? */
 		  if (s->recommends)
 		    {
-		      recp = s->source->idarraydata + s->recommends;
+		      recp = s->repo->idarraydata + s->recommends;
 		      while ((rec = *recp++) != 0)
 			{
 			  qcount = dq.count;
@@ -2157,7 +2157,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (s->supplements)
 		    {
-		      supp = s->source->idarraydata + s->supplements;
+		      supp = s->repo->idarraydata + s->supplements;
 		      while ((sup = *supp++) != 0)
 			if (dep_fulfilled(solv, sup))
 			  break;
@@ -2166,7 +2166,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    }
 		  if (s->freshens)
 		    {
-		      supp = s->source->idarraydata + s->freshens;
+		      supp = s->repo->idarraydata + s->freshens;
 		      while ((sup = *supp++) != 0)
 			if (dep_fulfilled(solv, sup))
 			  break;
@@ -2408,7 +2408,7 @@ printdecisions(Solver *solv)
       s = pool->solvables + n;
       if (s->obsoletes)
 	{
-	  obsp = s->source->idarraydata + s->obsoletes;
+	  obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
 	    FOR_PROVIDES(p, pp, obs)
 	      {
@@ -2526,9 +2526,9 @@ printdecisions(Solver *solv)
 	}
       if (solv->rc_output)
 	{
-	  Source *source = s->source;
-	  if (source && strcmp(source_name(source), "locales"))
-	    printf("[%s]", source_name(source));
+	  Repo *repo = s->repo;
+	  if (repo && strcmp(repo_name(repo), "locales"))
+	    printf("[%s]", repo_name(repo));
         }
       printf("\n");
     }
@@ -2544,7 +2544,7 @@ create_obsolete_index(Solver *solv)
 {
   Pool *pool = solv->pool;
   Solvable *s;
-  Source *system = solv->system;
+  Repo *system = solv->system;
   Id p, *pp, obs, *obsp, *obsoletes, *obsoletes_data;
   int i, n;
 
@@ -2557,7 +2557,7 @@ create_obsolete_index(Solver *solv)
 	continue;
       if (!pool_installable(pool, s))
 	continue;
-      obsp = s->source->idarraydata + s->obsoletes;
+      obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
@@ -2584,7 +2584,7 @@ create_obsolete_index(Solver *solv)
 	continue;
       if (!pool_installable(pool, s))
 	continue;
-      obsp = s->source->idarraydata + s->obsoletes;
+      obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
@@ -2756,7 +2756,7 @@ solve(Solver *solv, Queue *job)
 	case SOLVER_INSTALL_SOLVABLE:			/* install specific solvable */
 	  if (solv->rc_output) {
 	    Solvable *s = pool->solvables + what;
-	    printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), source_name(s->source));
+	    printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), repo_name(s->repo));
 	  }
           addrule(solv, what, 0);			/* install by Id */
 	  queuepush(&solv->ruletojob, i);
@@ -2900,7 +2900,7 @@ solve(Solver *solv, Queue *job)
 	  s = pool->solvables + p;
 	  if (s->suggests)
 	    {
-	      sugp = s->source->idarraydata + s->suggests;
+	      sugp = s->repo->idarraydata + s->suggests;
 	      while ((sug = *sugp++) != 0)
 		{
 		  FOR_PROVIDES(p, pp, sug)
@@ -2924,7 +2924,7 @@ solve(Solver *solv, Queue *job)
 		continue;
 	      if (!pool_installable(pool, s))
 		continue;
-	      enhp = s->source->idarraydata + s->enhances;
+	      enhp = s->repo->idarraydata + s->enhances;
 	      while ((enh = *enhp++) != 0)
 		if (dep_fulfilled(solv, enh))
 		  break;

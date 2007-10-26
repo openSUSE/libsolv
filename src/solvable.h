@@ -8,16 +8,16 @@
 #define SOLVABLE_H
 
 #include "pooltypes.h"
-#include "source.h"
+#include "repo.h"
 
 typedef struct _Solvable {
   Id name;
   Id arch;
   Id evr;			/* epoch:version-release */
 
-  Source *source;		/* source we belong to */
+  Repo *repo;		/* repo we belong to */
 
-  /* dependencies are offsets into idarray of source */
+  /* dependencies are offsets into idarray of repo */
   Offset provides;			/* terminated with Id 0 */
   Offset obsoletes;
   Offset conflicts;

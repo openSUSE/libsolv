@@ -1,7 +1,7 @@
 /*
- * source_write.c
+ * repo_write.c
  * 
- * Write Source data out to binary file
+ * Write Repo data out to binary file
  * 
  * See doc/README.format for a description 
  * of the binary file format
@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include "pool.h"
-#include "source_write.h"
+#include "repo_write.h"
 
 /*------------------------------------------------------------------*/
 /* Id map optimizations */
@@ -178,11 +178,11 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
 
 
 /*
- * Source
+ * Repo
  */
 
 void
-pool_writesource(Pool *pool, Source *source, FILE *fp)
+pool_writerepo(Pool *pool, Repo *repo, FILE *fp)
 {
   int i, numsolvdata;
   Solvable *s, *sstart;
@@ -196,9 +196,9 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
   int bits, bitmaps;
   int nsolvables;
 
-  nsolvables = source->nsolvables;
-  sstart = pool->solvables + source->start;
-  idarraydata = source->idarraydata;
+  nsolvables = repo->nsolvables;
+  sstart = pool->solvables + repo->start;
+  idarraydata = repo->idarraydata;
 
   needid = (NeedId *)calloc(pool->nstrings + pool->nrels, sizeof(*needid));
 
@@ -233,7 +233,7 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
   idsizes[SOLVABLE_NAME] = 1;
   idsizes[SOLVABLE_ARCH] = 1;
   idsizes[SOLVABLE_EVR] = 1;
-  if (source->rpmdbid)
+  if (repo->rpmdbid)
     idsizes[RPM_RPMDBID] = 1;
 
   for (i = SOLVABLE_NAME; i <= RPM_RPMDBID; i++)
@@ -311,7 +311,7 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
       write_u8( fp, ran->flags);
     }
 
-  write_u32(fp, 0);	/* no source data */
+  write_u32(fp, 0);	/* no repo data */
 
   /*
    * write Solvables
@@ -344,7 +344,7 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
 	write_u32(fp, 0);
     }
 
-  if (source->rpmdbid)
+  if (repo->rpmdbid)
     {
       write_u8(fp, TYPE_U32);
       write_id(fp, needid[RPM_RPMDBID].need);
@@ -405,8 +405,8 @@ pool_writesource(Pool *pool, Source *source, FILE *fp)
         write_idarray(fp, pool, needid, idarraydata + s->enhances);
       if (s->freshens)
         write_idarray(fp, pool, needid, idarraydata + s->freshens);
-      if (source->rpmdbid)
-        write_u32(fp, source->rpmdbid[i]);
+      if (repo->rpmdbid)
+        write_u32(fp, repo->rpmdbid[i]);
     }
 
   free(needid);

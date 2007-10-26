@@ -109,20 +109,20 @@ void
 pool_free(Pool *pool)
 {
   int i;
-  Source *source;
+  Repo *repo;
 
   pool_freewhatprovides(pool);
   pool_freeidhashes(pool);
-  for (i = 0; i < pool->nsources; i++)
+  for (i = 0; i < pool->nrepos; i++)
     {
-      source = pool->sources[i];
-      xfree(source->idarraydata);
-      xfree(source->rpmdbid);
-      xfree(source);
+      repo = pool->repos[i];
+      xfree(repo->idarraydata);
+      xfree(repo->rpmdbid);
+      xfree(repo);
     }
   xfree(pool->id2arch);
   xfree(pool->solvables);
-  xfree(pool->sources);
+  xfree(pool->repos);
   xfree(pool->stringspace);
   xfree(pool->strings);
   xfree(pool->rels);
@@ -275,7 +275,7 @@ pool_prepare(Pool *pool)
 	continue;
       if (!pool_installable(pool, s))
 	continue;
-      pp = s->source->idarraydata + s->provides;
+      pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != ID_NULL)
 	{
 	  if (ISRELDEP(id))
@@ -324,7 +324,7 @@ pool_prepare(Pool *pool)
 	continue;
 
       /* for all provides of this solvable */
-      pp = s->source->idarraydata + s->provides;
+      pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != 0)
 	{
 	  if (ISRELDEP(id))
@@ -480,7 +480,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	    printf("addrelproviders: checking package %s\n", id2str(pool, pool->p[p].name));
 #endif
 	  /* solvable p provides name in some rels */
-	  pidp = pool->solvables[p].source->idarraydata + pool->solvables[p].provides;
+	  pidp = pool->solvables[p].repo->idarraydata + pool->solvables[p].provides;
 	  while ((pid = *pidp++) != 0)
 	    {
 	      int pflags;

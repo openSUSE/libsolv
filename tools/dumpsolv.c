@@ -4,24 +4,24 @@
 #include <string.h>
 
 #include "pool.h"
-#include "source_solv.h"
+#include "repo_solv.h"
 
 static void
-printids(Source *source, char *kind, Offset ido)
+printids(Repo *repo, char *kind, Offset ido)
 {
-  Pool *pool = source->pool;
+  Pool *pool = repo->pool;
   Id id, *ids;
   if (!ido)
     return;
   printf("%s:\n", kind);
-  ids = source->idarraydata + ido;
+  ids = repo->idarraydata + ido;
   while((id = *ids++) != 0)
     printf("  %s\n", dep2str(pool, id));
 }
 
 int main(int argc, char **argv)
 {
-  Source *source;
+  Repo *repo;
   Pool *pool;
   int i;
   Solvable *s;
@@ -35,23 +35,23 @@ int main(int argc, char **argv)
 	}
     }
   pool = pool_create();
-  source = pool_addsource_solv(pool, stdin, "");
-  printf("source contains %d solvables\n", source->nsolvables);
-  for (i = source->start; i < source->start + source->nsolvables; i++)
+  repo = pool_addrepo_solv(pool, stdin, "");
+  printf("repo contains %d solvables\n", repo->nsolvables);
+  for (i = repo->start; i < repo->start + repo->nsolvables; i++)
     {
       s = pool->solvables + i;
       printf("\n");
       printf("solvable %d:\n", i);
       printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-      printids(source, "provides", s->provides);
-      printids(source, "obsoletes", s->obsoletes);
-      printids(source, "conflicts", s->conflicts);
-      printids(source, "requires", s->requires);
-      printids(source, "recommends", s->recommends);
-      printids(source, "suggests", s->suggests);
-      printids(source, "supplements", s->supplements);
-      printids(source, "enhances", s->enhances);
-      printids(source, "freshens", s->freshens);
+      printids(repo, "provides", s->provides);
+      printids(repo, "obsoletes", s->obsoletes);
+      printids(repo, "conflicts", s->conflicts);
+      printids(repo, "requires", s->requires);
+      printids(repo, "recommends", s->recommends);
+      printids(repo, "suggests", s->suggests);
+      printids(repo, "supplements", s->supplements);
+      printids(repo, "enhances", s->enhances);
+      printids(repo, "freshens", s->freshens);
     }
   exit(0);
 }

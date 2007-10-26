@@ -11,15 +11,15 @@
 #include <string.h>
 
 #include "pool.h"
-#include "source_rpmdb.h"
-#include "source_solv.h"
-#include "source_write.h"
+#include "repo_rpmdb.h"
+#include "repo_solv.h"
+#include "repo_write.h"
 
 int
 main(int argc, char **argv)
 {
   Pool *pool = pool_create();
-  Source *ref = NULL;
+  Repo *ref = NULL;
   FILE *fp;
 
   if (argc != 1)
@@ -30,21 +30,21 @@ main(int argc, char **argv)
 	  perror(argv[1]);
 	  exit(0);
 	}
-      ref = pool_addsource_solv(refpool, fp, "rpmdb");
+      ref = pool_addrepo_solv(refpool, fp, "rpmdb");
       fclose(fp);
     }
 
-  Source *source = pool_addsource_rpmdb(pool, ref);
+  Repo *repo = pool_addrepo_rpmdb(pool, ref);
   if (ref)
     {
       if (ref->pool != pool)
 	pool_free(ref->pool);
       else
-	pool_freesource(pool, ref);
+	pool_freerepo(pool, ref);
       ref = NULL;
     }
 
-  pool_writesource(pool, source, stdout);
+  pool_writerepo(pool, repo, stdout);
   pool_free(pool);
 
   exit(0);

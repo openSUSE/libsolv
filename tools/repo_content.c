@@ -8,7 +8,7 @@
 
 #include "pool.h"
 #include "util.h"
-#include "source_content.h"
+#include "repo_content.h"
 
 #define PACK_BLOCK 16
 
@@ -36,7 +36,7 @@ split(char *l, char **sp, int m)
 
 struct parsedata {
   char *kind;
-  Source *source;
+  Repo *repo;
   char *tmp;
   int tmpl;
 };
@@ -146,29 +146,29 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
 	  if (words == 3)
 	    line = sp[2], words = 2;
 	}
-      olddeps = source_addid_dep(pd->source, olddeps, id, isreq);
+      olddeps = repo_addid_dep(pd->repo, olddeps, id, isreq);
       if (!line)
         break;
     }
   return olddeps;
 }
 
-Source *
-pool_addsource_content(Pool *pool, FILE *fp)
+Repo *
+pool_addrepo_content(Pool *pool, FILE *fp)
 {
   char *line, *linep;
   int aline;
-  Source *source;
+  Repo *repo;
   Solvable *s;
   int pack;
   struct parsedata pd;
 
-  source = pool_addsource_empty(pool);
+  repo = pool_addrepo_empty(pool);
   memset(&pd, 0, sizeof(pd));
   line = xmalloc(1024);
   aline = 1024;
 
-  pd.source = source;
+  pd.repo = repo;
   linep = line;
   pack = 0;
   s = 0;
@@ -208,18 +208,18 @@ pool_addsource_content(Pool *pool, FILE *fp)
 	  if (istag ("PRODUCT"))
 	    {
 	      if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-		s->provides = source_addid_dep(source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+		s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 	      if (s)
-		s->supplements = source_fix_legacy(source, s->provides, s->supplements);
+		s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
 	      /* Only support one product.  */
 	      pd.kind = "product";
 	      if ((pack & PACK_BLOCK) == 0)
 		{
 		  pool->solvables = realloc(pool->solvables, (pool->nsolvables + pack + PACK_BLOCK + 1) * sizeof(Solvable));
-		  memset(pool->solvables + source->start + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
+		  memset(pool->solvables + repo->start + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
 		}
-	      s = pool->solvables + source->start + pack;
-	      s->source = source;
+	      s = pool->solvables + repo->start + pack;
+	      s->repo = repo;
 	      pack++;
 	    }
 	  else if (istag ("VERSION"))
@@ -260,15 +260,15 @@ pool_addsource_content(Pool *pool, FILE *fp)
     }
 
   if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-    s->provides = source_addid_dep(source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   if (s)
-    s->supplements = source_fix_legacy(source, s->provides, s->supplements);
+    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
     
   pool->nsolvables += pack;
-  source->nsolvables = pack;
+  repo->nsolvables = pack;
   if (pd.tmp)
     free(pd.tmp);
   free(line);
 
-  return source;
+  return repo;
 }

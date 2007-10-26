@@ -12,8 +12,8 @@
 #include <assert.h>
 
 #include "pool.h"
-#include "source_solv.h"
-#include "source_write.h"
+#include "repo_solv.h"
+#include "repo_write.h"
 
 int
 main(int argc, char **argv)
@@ -32,24 +32,24 @@ main(int argc, char **argv)
 	  perror(argv[1]);
 	  exit(0);
 	}
-      pool_addsource_solv(pool, fp, "");
+      pool_addrepo_solv(pool, fp, "");
       fclose(fp);
     }
-  if (!pool->nsources)
+  if (!pool->nrepos)
     return 0;
 
   new_id_size = 0;
-  for (i = 0; i < pool->nsources; i++)
-    new_id_size += pool->sources[i]->idarraysize;
+  for (i = 0; i < pool->nrepos; i++)
+    new_id_size += pool->repos[i]->idarraysize;
   new_id = (Id*) malloc (sizeof (Id) * new_id_size);
   new_id_size = 0;
-  for (i = 0; i < pool->nsources; i++)
+  for (i = 0; i < pool->nrepos; i++)
     {
-      Source *source = pool->sources[i];
+      Repo *repo = pool->repos[i];
       int si;
-      memcpy (new_id + new_id_size, source->idarraydata,
-      	      source->idarraysize * sizeof (new_id[0]));
-      for (si = source->start; si < source->start + source->nsolvables; si++)
+      memcpy (new_id + new_id_size, repo->idarraydata,
+      	      repo->idarraysize * sizeof (new_id[0]));
+      for (si = repo->start; si < repo->start + repo->nsolvables; si++)
         {
 	  Solvable *s = pool->solvables + si;
 	  if (s->provides)
@@ -71,25 +71,25 @@ main(int argc, char **argv)
 	  if (s->freshens)
 	    s->freshens += new_id_size;
 	}
-      new_id_size += source->idarraysize;
+      new_id_size += repo->idarraysize;
       if (i > 0)
         {
-	  pool->sources[0]->nsolvables += source->nsolvables;
-	  source->nsolvables = 0;
-	  source->start = pool->nsolvables;
-	  free (source->idarraydata);
-	  source->idarraydata = 0;
+	  pool->repos[0]->nsolvables += repo->nsolvables;
+	  repo->nsolvables = 0;
+	  repo->start = pool->nsolvables;
+	  free (repo->idarraydata);
+	  repo->idarraydata = 0;
 	}
     }
-  while (pool->nsources > 1)
+  while (pool->nrepos > 1)
     {
-      pool_freesource (pool, pool->sources[1]);
+      pool_freerepo (pool, pool->repos[1]);
     }
-  free (pool->sources[0]->idarraydata);
-  pool->sources[0]->idarraydata = new_id;
-  pool->sources[0]->idarraysize = new_id_size;
+  free (pool->repos[0]->idarraydata);
+  pool->repos[0]->idarraydata = new_id;
+  pool->repos[0]->idarraysize = new_id_size;
 
-  pool_writesource(pool, pool->sources[0], stdout);
+  pool_writerepo(pool, pool->repos[0], stdout);
   pool_free(pool);
 
   return 0;

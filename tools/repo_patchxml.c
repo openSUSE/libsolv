@@ -7,21 +7,21 @@
 #include <expat.h>
 
 #include "pool.h"
-#include "source_rpmmd.h"
+#include "repo_patchxml.h"
+#include "repo_rpmmd.h"
 
 
 enum state {
   STATE_START,
-  STATE_METADATA,
-  STATE_PACKAGE,
+  STATE_PATCH,
+  STATE_ATOM,
   STATE_NAME,
   STATE_ARCH,
   STATE_VERSION,
-  STATE_FORMAT,
-  STATE_PROVIDES,
-  STATE_PROVIDESENTRY,
   STATE_REQUIRES,
   STATE_REQUIRESENTRY,
+  STATE_PROVIDES,
+  STATE_PROVIDESENTRY,
   STATE_OBSOLETES,
   STATE_OBSOLETESENTRY,
   STATE_CONFLICTS,
@@ -36,9 +36,10 @@ enum state {
   STATE_ENHANCESENTRY,
   STATE_FRESHENS,
   STATE_FRESHENSENTRY,
-  STATE_FILE,
   NUMSTATES
 };
+
+#define PACK_BLOCK 255
 
 
 struct stateswitch {
@@ -49,22 +50,27 @@ struct stateswitch {
 };
 
 static struct stateswitch stateswitches[] = {
-  { STATE_START,       "metadata",        STATE_METADATA, 0 },
-  { STATE_METADATA,    "package",         STATE_PACKAGE, 0 },
-  { STATE_PACKAGE,     "name",            STATE_NAME, 1 },
-  { STATE_PACKAGE,     "arch",            STATE_ARCH, 1 },
-  { STATE_PACKAGE,     "version",         STATE_VERSION, 0 },
-  { STATE_PACKAGE,     "format",          STATE_FORMAT, 0 },
-  { STATE_FORMAT,      "rpm:provides",    STATE_PROVIDES, 0 },
-  { STATE_FORMAT,      "rpm:requires",    STATE_REQUIRES, 0 },
-  { STATE_FORMAT,      "rpm:obsoletes",   STATE_OBSOLETES , 0 },
-  { STATE_FORMAT,      "rpm:conflicts",   STATE_CONFLICTS , 0 },
-  { STATE_FORMAT,      "rpm:recommends" , STATE_RECOMMENDS , 0 },
-  { STATE_FORMAT,      "rpm:supplements", STATE_SUPPLEMENTS, 0 },
-  { STATE_FORMAT,      "rpm:suggests",    STATE_SUGGESTS, 0 },
-  { STATE_FORMAT,      "rpm:enhances",    STATE_ENHANCES, 0 },
-  { STATE_FORMAT,      "rpm:freshens",    STATE_FRESHENS, 0 },
-  { STATE_FORMAT,      "file",            STATE_FILE, 1 },
+  { STATE_START,       "patch",           STATE_PATCH, 0 },
+  { STATE_START,       "package",         STATE_ATOM, 0 },
+  { STATE_START,       "patches",         STATE_START, 0},
+  { STATE_PATCH,       "yum:name",        STATE_NAME, 1 },
+  { STATE_PATCH,       "yum:arch",        STATE_ARCH, 1 },
+  { STATE_PATCH,       "yum:version",     STATE_VERSION, 0 },
+  { STATE_PATCH,       "name",            STATE_NAME, 1 },
+  { STATE_PATCH,       "arch",            STATE_ARCH, 1 },
+  { STATE_PATCH,       "version",         STATE_VERSION, 0 },
+  { STATE_PATCH,       "rpm:requires",    STATE_REQUIRES, 0 },
+  { STATE_PATCH,       "rpm:provides",    STATE_PROVIDES, 0 },
+  { STATE_PATCH,       "rpm:requires",    STATE_REQUIRES, 0 },
+  { STATE_PATCH,       "rpm:obsoletes",   STATE_OBSOLETES , 0 },
+  { STATE_PATCH,       "rpm:conflicts",   STATE_CONFLICTS , 0 },
+  { STATE_PATCH,       "rpm:recommends" , STATE_RECOMMENDS , 0 },
+  { STATE_PATCH,       "rpm:supplements", STATE_SUPPLEMENTS, 0 },
+  { STATE_PATCH,       "rpm:suggests",    STATE_SUGGESTS, 0 },
+  { STATE_PATCH,       "rpm:enhances",    STATE_ENHANCES, 0 },
+  { STATE_PATCH,       "rpm:freshens",    STATE_FRESHENS, 0 },
+  { STATE_PATCH,       "suse:freshens",   STATE_FRESHENS, 0 },
+  { STATE_PATCH,       "atoms", 	  STATE_START, 0 },
   { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
   { STATE_OBSOLETES,   "rpm:entry",       STATE_OBSOLETESENTRY, 0 },
@@ -74,6 +80,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUGGESTS,    "rpm:entry",       STATE_SUGGESTSENTRY, 0 },
   { STATE_ENHANCES,    "rpm:entry",       STATE_ENHANCESENTRY, 0 },
   { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
+  { STATE_FRESHENS,    "suse:entry",      STATE_FRESHENSENTRY, 0 },
   { NUMSTATES}
 };
 
@@ -85,11 +92,12 @@ struct parsedata {
   int lcontent;
   int acontent;
   int docontent;
-  int numpacks;
   int pack;
   Pool *pool;
-  Source *source;
+  Repo *repo;
   Solvable *start;
+  char *kind;
+
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
 };
@@ -219,7 +227,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 #if 0
   fprintf(stderr, "new dep %s%s%s\n", id2str(pool, d), id2rel(pool, d), id2evr(pool, d));
 #endif
-  return source_addid_dep(pd->source, olddeps, id, isreq);
+  return repo_addid_dep(pd->repo, olddeps, id, isreq);
 }
 
 
@@ -236,6 +244,10 @@ startElement(void *userData, const char *name, const char **atts)
       pd->depth++;
       return;
     }
+
+  if (pd->state == STATE_PATCH && !strcmp(name, "format"))
+    return;
+
   pd->depth++;
   for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)
     if (!strcmp(sw->ename, name))
@@ -254,27 +266,39 @@ startElement(void *userData, const char *name, const char **atts)
   *pd->content = 0;
   switch(pd->state)
     {
-    case STATE_METADATA:
-      for (; *atts; atts += 2)
-	{
-	  if (!strcmp(*atts, "packages"))
-	    {
-	      pd->numpacks = atoi(atts[1]);
-#if 0
-	      fprintf(stderr, "numpacks: %d\n", pd->numpacks);
-#endif
-	      pool->solvables = realloc(pool->solvables, (pool->nsolvables + pd->numpacks) * sizeof(Solvable));
-	      pd->start = pool->solvables + pd->source->start;
-	      memset(pd->start, 0, pd->numpacks * sizeof(Solvable));
-	    }
-	}
+    case STATE_NAME:
+      if (pd->kind)
+        {
+          strcpy(pd->content, pd->kind);
+          pd->lcontent = strlen(pd->content);
+          pd->content[pd->lcontent++] = ':';
+          pd->content[pd->lcontent] = 0;
+        }
       break;
-    case STATE_PACKAGE:
-      if (pd->pack >= pd->numpacks)
+    case STATE_PATCH:
+    case STATE_ATOM:
+      if (pd->state == STATE_ATOM)
 	{
-	  fprintf(stderr, "repomd lied about the package number\n");
-	  exit(1);
+	  /* HACK: close patch */
+	  if (pd->kind && !strcmp(pd->kind, "patch"))
+	    {
+	      s->repo = pd->repo;
+	      if (!s->arch)
+		s->arch = ARCH_NOARCH;
+	      s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+	      pd->pack++;
+	    }
+	  pd->kind = "atom";
+	  pd->state = STATE_PATCH;
 	}
+      else
+        pd->kind = "patch";
+      if ((pd->pack & PACK_BLOCK) == 0)
+        {
+          pool->solvables = realloc(pool->solvables, (pool->nsolvables + pd->pack + PACK_BLOCK + 1) * sizeof(Solvable));
+          pd->start = pool->solvables + pd->repo->start;
+          memset(pd->start + pd->pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
+        }
 #if 0
       fprintf(stderr, "package #%d\n", pd->pack);
 #endif
@@ -347,7 +371,6 @@ endElement(void *userData, const char *name)
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
   Solvable *s = pd->start ? pd->start + pd->pack : 0;
-  Id id;
 
   if (pd->depth != pd->statedepth)
     {
@@ -355,17 +378,23 @@ endElement(void *userData, const char *name)
       // printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
       return;
     }
+
+  if (pd->state == STATE_PATCH && !strcmp(name, "format"))
+    return;
+
   pd->depth--;
   pd->statedepth--;
   switch (pd->state)
     {
-    case STATE_PACKAGE:
-      s->source = pd->source;
+    case STATE_PATCH:
+      if (!strcmp(name, "patch") && strcmp(pd->kind, "patch"))
+	break;	/* already closed */
+      s->repo = pd->repo;
       if (!s->arch)
-        s->arch = ARCH_NOARCH;
+	s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        s->provides = source_addid_dep(pd->source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = source_fix_legacy(pd->source, s->provides, s->supplements);
+        s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
       pd->pack++;
       break;
     case STATE_NAME:
@@ -373,10 +402,6 @@ endElement(void *userData, const char *name)
       break;
     case STATE_ARCH:
       s->arch = str2id(pool, pd->content, 1);
-      break;
-    case STATE_FILE:
-      id = str2id(pool, pd->content, 1);
-      s->provides = source_addid(pd->source, s->provides, id);
       break;
     default:
       break;
@@ -411,16 +436,16 @@ characterData(void *userData, const XML_Char *s, int len)
 
 #define BUFF_SIZE 8192
 
-Source *
-pool_addsource_rpmmd(Pool *pool, FILE *fp)
+Repo *
+pool_addrepo_patchxml(Pool *pool, FILE *fp)
 {
   struct parsedata pd;
   char buf[BUFF_SIZE];
   int i, l;
-  Source *source;
+  Repo *repo;
   struct stateswitch *sw;
 
-  source = pool_addsource_empty(pool);
+  repo = pool_addrepo_empty(pool);
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
     {
@@ -429,7 +454,7 @@ pool_addsource_rpmmd(Pool *pool, FILE *fp)
       pd.sbtab[sw->to] = sw->from;
     }
   pd.pool = pool;
-  pd.source = source;
+  pd.repo = repo;
   pd.content = malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
@@ -451,8 +476,8 @@ pool_addsource_rpmmd(Pool *pool, FILE *fp)
   XML_ParserFree(parser);
 
   pool->nsolvables += pd.pack;
-  source->nsolvables = pd.pack;
+  repo->nsolvables = pd.pack;
 
   free(pd.content);
-  return source;
+  return repo;
 }

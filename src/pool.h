@@ -12,7 +12,7 @@ extern "C" {
 
 #include "pooltypes.h"
 #include "poolid.h"
-#include "source.h"
+#include "repo.h"
 #include "solvable.h"
 #include "queue.h"
 
@@ -70,8 +70,8 @@ struct _Pool {
   Hashtable relhashtbl;       // hash table: (name,evr,op ->) Hash -> Id
   Hashmask relhashmask;
 
-  Source **sources;
-  int nsources;
+  Repo **repos;
+  int nrepos;
 
   Solvable *solvables;
   int nsolvables;
@@ -145,7 +145,7 @@ extern void pool_free(Pool *pool);
 /**
  * ????
  */
-extern void pool_freesource(Pool *pool, Source *source);
+extern void pool_freerepo(Pool *pool, Repo *repo);
 /**
  * Prepares a pool for solving
  */

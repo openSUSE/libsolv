@@ -1,5 +1,5 @@
 /*
- * source.c
+ * repo.c
  *
  * Manage metadata coming from one repository
  * 
@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "source.h"
+#include "repo.h"
 #include "pool.h"
 #include "poolid_private.h"
 #include "util.h"
@@ -18,48 +18,48 @@
 
 
 /*
- * create empty source
+ * create empty repo
  * and add to pool
  */
 
-Source *
-pool_addsource_empty(Pool *pool)
+Repo *
+pool_addrepo_empty(Pool *pool)
 {
-  Source *source;
+  Repo *repo;
 
   pool_freewhatprovides(pool);
-  source = (Source *)xcalloc(1, sizeof(*source));
-  pool->sources = (Source **)xrealloc(pool->sources, (pool->nsources + 1) * sizeof(Source *));
-  pool->sources[pool->nsources++] = source;
-  source->name = "empty";
-  source->pool = pool;
-  source->start = pool->nsolvables;
-  source->nsolvables = 0;
-  return source;
+  repo = (Repo *)xcalloc(1, sizeof(*repo));
+  pool->repos = (Repo **)xrealloc(pool->repos, (pool->nrepos + 1) * sizeof(Repo *));
+  pool->repos[pool->nrepos++] = repo;
+  repo->name = "empty";
+  repo->pool = pool;
+  repo->start = pool->nsolvables;
+  repo->nsolvables = 0;
+  return repo;
 }
 
 /*
- * add Id to source
+ * add Id to repo
  * olddeps = old array to extend
  * 
  */
 
 unsigned int
-source_addid(Source *source, Offset olddeps, Id id)
+repo_addid(Repo *repo, Offset olddeps, Id id)
 {
   Id *idarray;
   int idarraysize;
   int i;
   
-  idarray = source->idarraydata;
-  idarraysize = source->idarraysize;
+  idarray = repo->idarraydata;
+  idarraysize = repo->idarraysize;
 
   if (!idarray)			       /* alloc idarray if not done yet */
     {
       idarray = (Id *)xmalloc((1 + IDARRAY_BLOCK) * sizeof(Id));
       idarray[0] = 0;
       idarraysize = 1;
-      source->lastoff = 0;
+      repo->lastoff = 0;
     }
 
   if (!olddeps)				/* no deps yet */
@@ -68,7 +68,7 @@ source_addid(Source *source, Offset olddeps, Id id)
       if ((idarraysize & IDARRAY_BLOCK) == 0)
         idarray = (Id *)xrealloc(idarray, (idarraysize + 1 + IDARRAY_BLOCK) * sizeof(Id));
     }   
-  else if (olddeps == source->lastoff)	/* extend at end */
+  else if (olddeps == repo->lastoff)	/* extend at end */
     idarraysize--;
   else					/* can't extend, copy old */
     {
@@ -91,16 +91,16 @@ source_addid(Source *source, Offset olddeps, Id id)
 
   idarray[idarraysize++] = 0;		/* ensure NULL termination */
 
-  source->idarraydata = idarray;
-  source->idarraysize = idarraysize;
-  source->lastoff = olddeps;
+  repo->idarraydata = idarray;
+  repo->idarraysize = idarraysize;
+  repo->lastoff = olddeps;
 
   return olddeps;
 }
 
 
 /*
- * add dependency (as Id) to source
+ * add dependency (as Id) to repo
  * olddeps = offset into idarraydata
  * isreq = 0 for normal dep
  * isreq = 1 for requires
@@ -109,24 +109,24 @@ source_addid(Source *source, Offset olddeps, Id id)
  */
 
 unsigned int
-source_addid_dep(Source *source, Offset olddeps, Id id, int isreq)
+repo_addid_dep(Repo *repo, Offset olddeps, Id id, int isreq)
 {
   Id oid, *oidp, *marker = 0;
 
   if (!olddeps)
-    return source_addid(source, olddeps, id);
+    return repo_addid(repo, olddeps, id);
 
   if (!isreq)
     {
-      for (oidp = source->idarraydata + olddeps; (oid = *oidp) != ID_NULL; oidp++)
+      for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != ID_NULL; oidp++)
 	{
 	  if (oid == id)
 	    return olddeps;
 	}
-      return source_addid(source, olddeps, id);
+      return repo_addid(repo, olddeps, id);
     }
 
-  for (oidp = source->idarraydata + olddeps; (oid = *oidp) != ID_NULL; oidp++)
+  for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != ID_NULL; oidp++)
     {
       if (oid == SOLVABLE_PREREQMARKER)
 	marker = oidp;
@@ -148,7 +148,7 @@ source_addid_dep(Source *source, Offset olddeps, Id id, int isreq)
           if (marker < oidp)
             memmove(marker, marker + 1, (oidp - marker) * sizeof(Id));
           *oidp = SOLVABLE_PREREQMARKER;
-          return source_addid(source, olddeps, id);
+          return repo_addid(repo, olddeps, id);
         }
       while (oidp[1])
         oidp++;
@@ -157,7 +157,7 @@ source_addid_dep(Source *source, Offset olddeps, Id id, int isreq)
       return olddeps;
     }
   if (isreq == 2 && !marker)
-    olddeps = source_addid(source, olddeps, SOLVABLE_PREREQMARKER);
+    olddeps = repo_addid(repo, olddeps, SOLVABLE_PREREQMARKER);
   else if (isreq == 1 && marker)
     {
       *marker++ = id;
@@ -166,7 +166,7 @@ source_addid_dep(Source *source, Offset olddeps, Id id, int isreq)
         memmove(marker + 1, marker, (oidp - marker) * sizeof(Id));
       *marker = SOLVABLE_PREREQMARKER;
     }
-  return source_addid(source, olddeps, id);
+  return repo_addid(repo, olddeps, id);
 }
 
 
@@ -176,20 +176,20 @@ source_addid_dep(Source *source, Offset olddeps, Id id, int isreq)
  */
 
 unsigned int
-source_reserve_ids(Source *source, unsigned int olddeps, int num)
+repo_reserve_ids(Repo *repo, unsigned int olddeps, int num)
 {
   num++;	/* room for trailing ID_NULL */
 
-  if (!source->idarraysize)	       /* ensure buffer space */
+  if (!repo->idarraysize)	       /* ensure buffer space */
     {
-      source->idarraysize = 1;
-      source->idarraydata = (Id *)xmalloc(((1 + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
-      source->idarraydata[0] = 0;
-      source->lastoff = 1;
+      repo->idarraysize = 1;
+      repo->idarraydata = (Id *)xmalloc(((1 + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
+      repo->idarraydata[0] = 0;
+      repo->lastoff = 1;
       return 1;
     }
 
-  if (olddeps && olddeps != source->lastoff)   /* if not appending */
+  if (olddeps && olddeps != repo->lastoff)   /* if not appending */
     {
       /* can't insert into idarray, this would invalidate all 'larger' offsets
        * so create new space at end and move existing deps there.
@@ -199,92 +199,92 @@ source_reserve_ids(Source *source, unsigned int olddeps, int num)
       Id *idstart, *idend;
       int count;
 
-      for (idstart = idend = source->idarraydata + olddeps; *idend++; )   /* find end */
+      for (idstart = idend = repo->idarraydata + olddeps; *idend++; )   /* find end */
 	;
       count = idend - idstart - 1 + num;	       /* new size */
 
       /* realloc if crossing block boundary */
-      if (((source->idarraysize - 1) | IDARRAY_BLOCK) != ((source->idarraysize + count - 1) | IDARRAY_BLOCK))
-	source->idarraydata = (Id *)xrealloc(source->idarraydata, ((source->idarraysize + count + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
+      if (((repo->idarraysize - 1) | IDARRAY_BLOCK) != ((repo->idarraysize + count - 1) | IDARRAY_BLOCK))
+	repo->idarraydata = (Id *)xrealloc(repo->idarraydata, ((repo->idarraysize + count + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
 
       /* move old deps to end */
-      olddeps = source->lastoff = source->idarraysize;
-      memcpy(source->idarraydata + olddeps, idstart, count - num);
-      source->idarraysize = olddeps + count - num;
+      olddeps = repo->lastoff = repo->idarraysize;
+      memcpy(repo->idarraydata + olddeps, idstart, count - num);
+      repo->idarraysize = olddeps + count - num;
 
       return olddeps;
     }
 
   if (olddeps)			       /* appending */
-    source->idarraysize--;
+    repo->idarraysize--;
 
   /* realloc if crossing block boundary */
-  if (((source->idarraysize - 1) | IDARRAY_BLOCK) != ((source->idarraysize + num - 1) | IDARRAY_BLOCK))
-    source->idarraydata = (Id *)xrealloc(source->idarraydata, ((source->idarraysize + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
+  if (((repo->idarraysize - 1) | IDARRAY_BLOCK) != ((repo->idarraysize + num - 1) | IDARRAY_BLOCK))
+    repo->idarraydata = (Id *)xrealloc(repo->idarraydata, ((repo->idarraysize + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
 
   /* appending or new */
-  source->lastoff = olddeps ? olddeps : source->idarraysize;
+  repo->lastoff = olddeps ? olddeps : repo->idarraysize;
 
-  return source->lastoff;
+  return repo->lastoff;
 }
 
 
 /*
- * remove source from pool
+ * remove repo from pool
  * 
  */
 
 void
-pool_freesource(Pool *pool, Source *source)
+pool_freerepo(Pool *pool, Repo *repo)
 {
   int i, nsolvables;
 
   pool_freewhatprovides(pool);
 
-  for (i = 0; i < pool->nsources; i++)	/* find source in pool */
+  for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
     {
-      if (pool->sources[i] == source)
+      if (pool->repos[i] == repo)
 	break;
     }
-  if (i == pool->nsources)	       /* source not in pool, return */
+  if (i == pool->nrepos)	       /* repo not in pool, return */
     return;
 
   /* close gap
-   * all sources point into pool->solvables _relatively_ to source->start
-   * so closing the gap only needs adaption of source->start for all
-   * other sources.
+   * all repos point into pool->solvables _relatively_ to repo->start
+   * so closing the gap only needs adaption of repo->start for all
+   * other repos.
    */
   
-  nsolvables = source->nsolvables;
-  if (pool->nsolvables > source->start + nsolvables)
-    memmove(pool->solvables + source->start, pool->solvables + source->start + nsolvables, (pool->nsolvables - source->start - nsolvables) * sizeof(Solvable));
+  nsolvables = repo->nsolvables;
+  if (pool->nsolvables > repo->start + nsolvables)
+    memmove(pool->solvables + repo->start, pool->solvables + repo->start + nsolvables, (pool->nsolvables - repo->start - nsolvables) * sizeof(Solvable));
   pool->nsolvables -= nsolvables;
 
-  for (; i < pool->nsources - 1; i++)
+  for (; i < pool->nrepos - 1; i++)
     {
-      pool->sources[i] = pool->sources[i + 1];   /* remove source */
-      pool->sources[i]->start -= nsolvables;     /* adapt start offset of remaining sources */
+      pool->repos[i] = pool->repos[i + 1];   /* remove repo */
+      pool->repos[i]->start -= nsolvables;     /* adapt start offset of remaining repos */
     }
-  pool->nsources = i;
+  pool->nrepos = i;
 
-  xfree(source->idarraydata);
-  xfree(source->rpmdbid);
-  xfree(source);
+  xfree(repo->idarraydata);
+  xfree(repo->rpmdbid);
+  xfree(repo);
 }
 
 unsigned int
-source_fix_legacy(Source *source, unsigned int provides, unsigned int supplements)
+repo_fix_legacy(Repo *repo, unsigned int provides, unsigned int supplements)
 {
-  Pool *pool = source->pool;
+  Pool *pool = repo->pool;
   Id id, idp, idl, idns;
   char buf[1024], *p, *dep;
   int i;
 
   if (provides)
     {
-      for (i = provides; source->idarraydata[i]; i++)
+      for (i = provides; repo->idarraydata[i]; i++)
 	{
-	  id = source->idarraydata[i];
+	  id = repo->idarraydata[i];
 	  if (ISRELDEP(id))
 	    continue;
 	  dep = (char *)id2str(pool, id);
@@ -331,7 +331,7 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
 	      if (idp)
 		id = rel2id(pool, idp, id, REL_AND, 1);
 	      if (id)
-		supplements = source_addid_dep(source, supplements, id, 0);
+		supplements = repo_addid_dep(repo, supplements, id, 0);
 	    }
 	  else if ((p = strchr(dep, ':')) != 0 && p != dep && p[1] == '/' && strlen(dep) < sizeof(buf))
 	    {
@@ -343,15 +343,15 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
 	      id = str2id(pool, p, 1);
 	      id = rel2id(pool, idns, id, REL_NAMESPACE, 1);
 	      id = rel2id(pool, idp, id, REL_AND, 1);
-	      supplements = source_addid_dep(source, supplements, id, 0);
+	      supplements = repo_addid_dep(repo, supplements, id, 0);
 	    }
 	}
     }
   if (!supplements)
     return 0;
-  for (i = supplements; source->idarraydata[i]; i++)
+  for (i = supplements; repo->idarraydata[i]; i++)
     {
-      id = source->idarraydata[i];
+      id = repo->idarraydata[i];
       if (ISRELDEP(id))
 	continue;
       dep = (char *)id2str(pool, id);
@@ -379,7 +379,7 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
 	      id = rel2id(pool, idns, id, REL_NAMESPACE, 1);
 	    }
 	  if (id)
-	    source->idarraydata[i] = id;
+	    repo->idarraydata[i] = id;
 	}
       else if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
 	{
@@ -411,7 +411,7 @@ source_fix_legacy(Source *source, unsigned int provides, unsigned int supplement
 		id = idp;
 	    }
 	  if (id)
-	    source->idarraydata[i] = id;
+	    repo->idarraydata[i] = id;
 	}
     }
   return supplements;

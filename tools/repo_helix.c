@@ -1,9 +1,9 @@
 /*  -*- mode: C; c-file-style: "gnu"; fill-column: 78 -*- */
 /*
- * source_helix.c
+ * repo_helix.c
  * 
  * Parse 'helix' XML representation
- * and create 'source'
+ * and create 'repo'
  * 
  */
 
@@ -15,7 +15,7 @@
 #include <string.h>
 #include <expat.h>
 
-#include "source_helix.h"
+#include "repo_helix.h"
 #include "evr.h"
 
 
@@ -133,11 +133,11 @@ typedef struct _parsedata {
   int acontent;		// actual buffer size
   int docontent;	// handle content
 
-  // source data
+  // repo data
   int pack;             // number of solvables
 
   Pool *pool;		// current pool
-  Source *source;	// current source
+  Repo *repo;	// current repo
   Solvable *start;      // collected solvables
 
   // package data
@@ -352,8 +352,8 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, int i
   else
     id = name;			       /* no operator */
 
-  /* add new dependency to source */
-  return source_addid_dep(pd->source, olddeps, id, isreq);
+  /* add new dependency to repo */
+  return repo_addid_dep(pd->repo, olddeps, id, isreq);
 }
 
 
@@ -435,7 +435,7 @@ startElement(void *userData, const char *name, const char **atts)
       if ((pd->pack & PACK_BLOCK) == 0)  /* alloc new block ? */
 	{
 	  pool->solvables = (Solvable *)realloc(pool->solvables, (pool->nsolvables + pd->pack + PACK_BLOCK + 1) * sizeof(Solvable));
-	  pd->start = pool->solvables + pd->source->start;
+	  pd->start = pool->solvables + pd->repo->start;
           memset(pd->start + pd->pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
 	}
 
@@ -534,7 +534,7 @@ static const char* findKernelFlavor(Parsedata *pd, Solvable *s)
   
   if (s->provides)
     {
-      for (pidp = pd->source->idarraydata + s->provides; pidp && (pid = *pidp++) != 0; )
+      for (pidp = pd->repo->idarraydata + s->provides; pidp && (pid = *pidp++) != 0; )
 	{
 	  Reldep *prd;
 	  const char *depname;
@@ -551,12 +551,12 @@ static const char* findKernelFlavor(Parsedata *pd, Solvable *s)
     }
 
   //fprintf(stderr, "pack %d\n", pd->pack);
-  //fprintf(stderr, "source %d\n", s->requires);
+  //fprintf(stderr, "repo %d\n", s->requires);
 
   if (!s->requires)
     return 0;
 
-  for (pidp = pd->source->idarraydata + s->requires ; pidp && (pid = *pidp++) != 0; )
+  for (pidp = pd->repo->idarraydata + s->requires ; pidp && (pid = *pidp++) != 0; )
     {
       const char *depname = 0;
 
@@ -611,7 +611,7 @@ endElement(void *userData, const char *name)
     {
 
     case STATE_PACKAGE:		       /* package complete */
-      s->source = pd->source;
+      s->repo = pd->repo;
 
       if (!s->arch)                    /* default to "noarch" */
 	s->arch = ARCH_NOARCH;
@@ -623,8 +623,8 @@ endElement(void *userData, const char *name)
                         pd->release ? pd->evrspace + pd->release : 0);
       /* ensure self-provides */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        s->provides = source_addid_dep(pd->source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = source_fix_legacy(pd->source, s->provides, s->supplements);
+        s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
 
       const char *flavor = findKernelFlavor(pd, s);
       if (flavor) 
@@ -638,7 +638,7 @@ endElement(void *userData, const char *name)
 	  if (s->provides)
 	    {
 	      npr = 0;
-	      for (pidp = pd->source->idarraydata + s->provides; (pid = *pidp++) != 0; )
+	      for (pidp = pd->repo->idarraydata + s->provides; (pid = *pidp++) != 0; )
 		{
 		  const char *depname = 0;
 		  Reldep *prd = 0;
@@ -666,7 +666,7 @@ endElement(void *userData, const char *name)
 			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
 		    }
 
-		  npr = source_addid_dep(pd->source, npr, pid, 0);
+		  npr = repo_addid_dep(pd->repo, npr, pid, 0);
 		}
 	      s->provides = npr;
 	    }
@@ -675,7 +675,7 @@ endElement(void *userData, const char *name)
 	  if (s->requires)
 	    {
 	      npr = 0;
-	      for (pidp = pd->source->idarraydata + s->requires; (pid = *pidp++) != 0; )
+	      for (pidp = pd->repo->idarraydata + s->requires; (pid = *pidp++) != 0; )
 		{
 		  const char *depname = 0;
 		  Reldep *prd = 0;
@@ -701,7 +701,7 @@ endElement(void *userData, const char *name)
 		      if (prd)
 			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
 		    }
-		  npr = source_addid_dep(pd->source, npr, pid, 0);
+		  npr = repo_addid_dep(pd->repo, npr, pid, 0);
 		}
 	      s->requires = npr;
 	    }
@@ -800,21 +800,21 @@ characterData(void *userData, const XML_Char *s, int len)
 
 /*
  * read 'helix' type xml from fp
- * add packages to pool/source
+ * add packages to pool/repo
  * 
  */
 
-Source *
-pool_addsource_helix(Pool *pool, FILE *fp)
+Repo *
+pool_addrepo_helix(Pool *pool, FILE *fp)
 {
   Parsedata pd;
   char buf[BUFF_SIZE];
   int i, l;
-  Source *source;
+  Repo *repo;
   struct stateswitch *sw;
 
-  // create empty source
-  source = pool_addsource_empty(pool);
+  // create empty repo
+  repo = pool_addrepo_empty(pool);
 
   // prepare parsedata
   memset(&pd, 0, sizeof(pd));
@@ -826,7 +826,7 @@ pool_addsource_helix(Pool *pool, FILE *fp)
     }
 
   pd.pool = pool;
-  pd.source = source;
+  pd.repo = repo;
 
   pd.content = (char *)malloc(256);	/* must hold all solvable kinds! */
   pd.acontent = 256;
@@ -859,10 +859,10 @@ pool_addsource_helix(Pool *pool, FILE *fp)
 
   // adapt package count
   pool->nsolvables += pd.pack;
-  source->nsolvables = pd.pack;
+  repo->nsolvables = pd.pack;
 
   free(pd.content);
   free(pd.evrspace);
 
-  return source;
+  return repo;
 }

@@ -15,15 +15,15 @@
 #include <string.h>
 
 #include "pool.h"
-#include "source_helix.h"
-#include "source_write.h"
+#include "repo_helix.h"
+#include "repo_write.h"
 
 int
 main(int argc, char **argv)
 {
   Pool *pool = pool_create();
-  Source *source = pool_addsource_helix(pool, stdin);
-  pool_writesource(pool, source, stdout);
+  Repo *repo = pool_addrepo_helix(pool, stdin);
+  pool_writerepo(pool, repo, stdout);
   pool_free(pool);
   exit(0);
 }

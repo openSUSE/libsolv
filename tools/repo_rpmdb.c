@@ -1,7 +1,7 @@
 /*
- * source_rpmdb
+ * repo_rpmdb
  * 
- * convert rpm db to source
+ * convert rpm db to repo
  * 
  */
 
@@ -16,7 +16,7 @@
 
 #include "pool.h"
 #include "hash.h"
-#include "source_rpmdb.h"
+#include "repo_rpmdb.h"
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
@@ -199,7 +199,7 @@ static char *headtoevr(RpmHead *h)
 }
 
 static unsigned int
-makedeps(Pool *pool, Source *source, RpmHead *rpmhead, int tagn, int tagv, int tagf, int strong)
+makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int strong)
 {
   char **n, **v;
   unsigned int *f;
@@ -261,8 +261,8 @@ makedeps(Pool *pool, Source *source, RpmHead *rpmhead, int tagn, int tagv, int t
       return 0;
     }
   cc += haspre;
-  olddeps = source_reserve_ids(source, 0, cc);
-  ida = source->idarraydata + olddeps;
+  olddeps = repo_reserve_ids(repo, 0, cc);
+  ida = repo->idarraydata + olddeps;
   for (i = 0; ; i++)
     {
       if (i == nc)
@@ -300,7 +300,7 @@ makedeps(Pool *pool, Source *source, RpmHead *rpmhead, int tagn, int tagv, int t
         *ida++ = str2id(pool, n[i], 1);
     }
   *ida++ = 0;
-  source->idarraysize += cc + 1;
+  repo->idarraysize += cc + 1;
   free(n);
   free(v);
   free(f);
@@ -308,22 +308,22 @@ makedeps(Pool *pool, Source *source, RpmHead *rpmhead, int tagn, int tagv, int t
 }
 
 static Offset
-copydeps(Pool *pool, Source *source, Offset fromoff, Source *fromsource)
+copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
 {
   int cc;
   Id id, *ida, *from;
   Offset ido;
-  Pool *frompool = fromsource->pool;
+  Pool *frompool = fromrepo->pool;
 
   if (!fromoff)
     return 0;
-  from = fromsource->idarraydata + fromoff;
+  from = fromrepo->idarraydata + fromoff;
   for (ida = from, cc = 0; *ida; ida++, cc++)
     ;
   if (cc == 0)
     return 0;
-  ido = source_reserve_ids(source, 0, cc);
-  ida = source->idarraydata + ido;
+  ido = repo_reserve_ids(repo, 0, cc);
+  ida = repo->idarraydata + ido;
   if (frompool && pool != frompool)
     {
       while (*from)
@@ -344,7 +344,7 @@ copydeps(Pool *pool, Source *source, Offset fromoff, Source *fromsource)
     }
   else
     memcpy(ida, from, (cc + 1) * sizeof(Id));
-  source->idarraysize += cc + 1;
+  repo->idarraysize += cc + 1;
   return ido;
 }
 
@@ -373,7 +373,7 @@ static struct filefilter filefilters[] = {
 
 /* assumes last processed array is provides! */
 static unsigned int
-addfileprovides(Pool *pool, Source *source, RpmHead *rpmhead, unsigned int olddeps)
+addfileprovides(Pool *pool, Repo *repo, RpmHead *rpmhead, unsigned int olddeps)
 {
   char **bn;
   char **dn;
@@ -449,7 +449,7 @@ addfileprovides(Pool *pool, Source *source, RpmHead *rpmhead, unsigned int oldde
 	}
       strcpy(fn, dn[di[i]]);
       strcat(fn, bn[i]);
-      olddeps = source_addid(source, olddeps, str2id(pool, fn, 1));
+      olddeps = repo_addid(repo, olddeps, str2id(pool, fn, 1));
     }
   if (fn)
     free(fn);
@@ -460,7 +460,7 @@ addfileprovides(Pool *pool, Source *source, RpmHead *rpmhead, unsigned int oldde
 }
 
 static int
-rpm2solv(Pool *pool, Source *source, Solvable *s, RpmHead *rpmhead)
+rpm2solv(Pool *pool, Repo *repo, Solvable *s, RpmHead *rpmhead)
 {
   char *name;
   char *evr;
@@ -484,30 +484,30 @@ rpm2solv(Pool *pool, Source *source, Solvable *s, RpmHead *rpmhead)
   s->evr = str2id(pool, evr, 1);
   free(evr);
 
-  s->provides = makedeps(pool, source, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
-  s->provides = addfileprovides(pool, source, rpmhead, s->provides);
-  s->provides = source_addid_dep(source, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  s->requires = makedeps(pool, source, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, 0);
-  s->conflicts = makedeps(pool, source, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0);
-  s->obsoletes = makedeps(pool, source, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0);
+  s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
+  s->provides = addfileprovides(pool, repo, rpmhead, s->provides);
+  s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, 0);
+  s->conflicts = makedeps(pool, repo, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0);
+  s->obsoletes = makedeps(pool, repo, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0);
 
-  s->recommends = makedeps(pool, source, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 2);
-  s->suggests = makedeps(pool, source, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 1);
-  s->supplements = makedeps(pool, source, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 2);
-  s->enhances  = makedeps(pool, source, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 1);
+  s->recommends = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 2);
+  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 1);
+  s->supplements = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 2);
+  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 1);
   s->freshens = 0;
-  s->supplements = source_fix_legacy(source, s->provides, s->supplements);
+  s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
   return 1;
 }
 
 
 /*
- * read rpm db as source
+ * read rpm db as repo
  * 
  */
 
-Source *
-pool_addsource_rpmdb(Pool *pool, Source *ref)
+Repo *
+pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 {
   unsigned char buf[16];
   DB *db = 0;
@@ -520,13 +520,13 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
   int i;
   int rpmheadsize;
   RpmHead *rpmhead;
-  Source *source;
+  Repo *repo;
   Solvable *s;
   Id id, *refhash;
   unsigned int refmask, h;
   int asolv;
 
-  source = pool_addsource_empty(pool);
+  repo = pool_addrepo_empty(pool);
 
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
@@ -556,8 +556,8 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	}
       dbidp = (unsigned char *)&dbid;
       pool->solvables = realloc(pool->solvables, (pool->nsolvables + 256) * sizeof(Solvable));
-      memset(pool->solvables + source->start, 0, 256 * sizeof(Solvable));
-      source->rpmdbid = calloc(256, sizeof(unsigned int));
+      memset(pool->solvables + repo->start, 0, 256 * sizeof(Solvable));
+      repo->rpmdbid = calloc(256, sizeof(unsigned int));
       asolv = 256;
       rpmheadsize = 0;
       rpmhead = 0;
@@ -567,12 +567,12 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	  if (i >= asolv)
 	    {
 	      pool->solvables = realloc(pool->solvables, (pool->nsolvables + asolv + 256) * sizeof(Solvable));
-	      memset(pool->solvables + source->start + asolv, 0, 256 * sizeof(Solvable));
-	      source->rpmdbid = realloc(source->rpmdbid, (asolv + 256) * sizeof(unsigned int));
-	      memset(source->rpmdbid + asolv, 0, 256 * sizeof(unsigned int));
+	      memset(pool->solvables + repo->start + asolv, 0, 256 * sizeof(Solvable));
+	      repo->rpmdbid = realloc(repo->rpmdbid, (asolv + 256) * sizeof(unsigned int));
+	      memset(repo->rpmdbid + asolv, 0, 256 * sizeof(unsigned int));
 	      asolv += 256;
 	    }
-	  pool->solvables[source->start + i].source = source;
+	  pool->solvables[repo->start + i].repo = repo;
           if (key.size != 4)
 	    {
 	      fprintf(stderr, "corrupt Packages database (key size)\n");
@@ -609,8 +609,8 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	    }
 	  memcpy(rpmhead->data, (unsigned char *)data.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-	  source->rpmdbid[i] = dbid;
-	  if (rpm2solv(pool, source, pool->solvables + source->start + i, rpmhead))
+	  repo->rpmdbid[i] = dbid;
+	  if (rpm2solv(pool, repo, pool->solvables + repo->start + i, rpmhead))
 	    i++;
 	}
       nrpmids = i;
@@ -682,8 +682,8 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
       rpmhead = 0;
 
       pool->solvables = realloc(pool->solvables, (pool->nsolvables + nrpmids) * sizeof(Solvable));
-      memset(pool->solvables + source->start, 0, nrpmids * sizeof(Solvable));
-      source->rpmdbid = calloc(nrpmids, sizeof(unsigned int));
+      memset(pool->solvables + repo->start, 0, nrpmids * sizeof(Solvable));
+      repo->rpmdbid = calloc(nrpmids, sizeof(unsigned int));
 
       refhash = 0;
       refmask = 0;
@@ -699,12 +699,12 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	      refhash[h] = i + 1;	/* make it non-zero */
 	    }
 	}
-      s = pool->solvables + source->start;
+      s = pool->solvables + repo->start;
       for (i = 0; i < nrpmids; i++, rp++, s++)
 	{
-	  s->source = source;
+	  s->repo = repo;
 	  dbid = rp->dbid;
-	  source->rpmdbid[i] = dbid;
+	  repo->rpmdbid[i] = dbid;
 	  if (refhash)
 	    {
 	      h = dbid & refmask;
@@ -732,15 +732,15 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 		      if (r->arch)
 			s->arch = str2id(pool, id2str(ref->pool, r->arch), 1);
 		    }
-		  s->provides = copydeps(pool, source, r->provides, ref);
-		  s->requires = copydeps(pool, source, r->requires, ref);
-		  s->conflicts = copydeps(pool, source, r->conflicts, ref);
-		  s->obsoletes = copydeps(pool, source, r->obsoletes, ref);
-		  s->recommends = copydeps(pool, source, r->recommends, ref);
-		  s->suggests = copydeps(pool, source, r->suggests, ref);
-		  s->supplements = copydeps(pool, source, r->supplements, ref);
-		  s->enhances  = copydeps(pool, source, r->enhances, ref);
-		  s->freshens = copydeps(pool, source, r->freshens, ref);
+		  s->provides = copydeps(pool, repo, r->provides, ref);
+		  s->requires = copydeps(pool, repo, r->requires, ref);
+		  s->conflicts = copydeps(pool, repo, r->conflicts, ref);
+		  s->obsoletes = copydeps(pool, repo, r->obsoletes, ref);
+		  s->recommends = copydeps(pool, repo, r->recommends, ref);
+		  s->suggests = copydeps(pool, repo, r->suggests, ref);
+		  s->supplements = copydeps(pool, repo, r->supplements, ref);
+		  s->enhances  = copydeps(pool, repo, r->enhances, ref);
+		  s->freshens = copydeps(pool, repo, r->freshens, ref);
 		  continue;
 		}
 	    }
@@ -801,7 +801,7 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
 	  memcpy(rpmhead->data, (unsigned char *)data.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 
-	  rpm2solv(pool, source, s, rpmhead);
+	  rpm2solv(pool, repo, s, rpmhead);
 	}
 
       if (refhash)
@@ -816,9 +816,9 @@ pool_addsource_rpmdb(Pool *pool, Source *ref)
   if (rpmhead)
     free(rpmhead);
   pool->nsolvables += nrpmids;
-  source->nsolvables = nrpmids;
+  repo->nsolvables = nrpmids;
 
   if (db)
     db->close(db, 0);
-  return source;
+  return repo;
 }

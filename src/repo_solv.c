@@ -1,10 +1,10 @@
 /*
- * source_solv.c
+ * repo_solv.c
  * 
- * Read the binary dump of a Source and create a Source * from it
+ * Read the binary dump of a Repo and create a Repo * from it
  * 
  *  See
- *   Source *pool_addsource_solv(Pool *pool, FILE *fp)
+ *   Repo *pool_addrepo_solv(Pool *pool, FILE *fp)
  * below
  * 
  */
@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#include "source_solv.h"
+#include "repo_solv.h"
 #include "util.h"
 
 #define INTERESTED_START	2
@@ -163,21 +163,21 @@ typedef struct solvdata {
 // ----------------------------------------------
 
 /*
- * read source from .solv file
+ * read repo from .solv file
  *  and add it to pool
  */
 
-Source *
-pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
+Repo *
+pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
 {
   int i, j, l;
   unsigned int numid, numrel, numsolv, numsrcdata, numsolvdata;
   int numsolvdatabits, type;
   Offset sizeid;
   Offset *str;			       /* map Id -> Offset into string space */
-  char *strsp;			       /* source string space */
+  char *strsp;			       /* repo string space */
   char *sp;			       /* pointer into string space */
-  Id *idmap;			       /* map of source Ids to pool Ids */
+  Id *idmap;			       /* map of repo Ids to pool Ids */
   Id id;
   unsigned int hashmask, h;
   int hh;
@@ -187,7 +187,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
   Reldep *ran;
   SolvData *solvdata;
   unsigned int size, size_str, size_idarray;
-  Source *source;
+  Repo *repo;
   Id *idarraydatap, *idarraydataend;
   Offset ido;
   unsigned int databits;
@@ -204,11 +204,11 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
       exit(1);
     }
 
-				       /* create empty Source */
-  source = pool_addsource_empty(pool);
+				       /* create empty Repo */
+  repo = pool_addrepo_empty(pool);
   pool_freeidhashes(pool);
 
-  source->name = sourcename;
+  repo->name = reponame;
   
   numid = read_u32(fp);
   numrel = read_u32(fp);
@@ -240,7 +240,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
   idmap = (Id *)xcalloc(numid + numrel, sizeof(Id));
 
   /*
-   * read new source at end of pool
+   * read new repo at end of pool
    */
   
   if (fread(strsp, sizeid, 1, fp) != 1)
@@ -326,7 +326,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 	    memmove(pool->stringspace + pool->sstrings, sp, l);   /* append to pool buffer */
           pool->sstrings += l;
 	}
-      idmap[i] = id;		       /* source relative -> pool relative */
+      idmap[i] = id;		       /* repo relative -> pool relative */
       sp += l;			       /* next string */
     }
   xfree(hashtbl);
@@ -369,12 +369,12 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 	}
 
       /*
-       * read RelDeps from source
+       * read RelDeps from repo
        */
       
       for (i = 0; i < numrel; i++)
 	{
-	  name = read_id(fp, i + numid);	/* read (source relative) Ids */
+	  name = read_id(fp, i + numid);	/* read (repo relative) Ids */
 	  evr = read_id(fp, i + numid);
 	  flags = read_u8(fp);
 	  name = idmap[name];		/* map to (pool relative) Ids */
@@ -405,11 +405,11 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
     }
 
   /*
-   * read (but dont store) source data
+   * read (but dont store) repo data
    */
 
 #if 0
-  printf("read source data\n");
+  printf("read repo data\n");
 #endif
   numsrcdata = read_u32(fp);
   for (i = 0; i < numsrcdata; i++)
@@ -481,16 +481,16 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
   if (size_idarray)
     {
       size_idarray++;	/* first entry is always zero */
-      source->idarraydata = (Id *)xmalloc(sizeof(Id) * size_idarray);
-      source->idarraysize = size_idarray;
-      idarraydatap = source->idarraydata;
+      repo->idarraydata = (Id *)xmalloc(sizeof(Id) * size_idarray);
+      repo->idarraysize = size_idarray;
+      idarraydatap = repo->idarraydata;
       *idarraydatap++ = 0;
-      idarraydataend = source->idarraydata + size_idarray;
+      idarraydataend = repo->idarraydata + size_idarray;
     }
   else
     {
-      source->idarraydata = 0;
-      source->idarraysize = 0;
+      repo->idarraydata = 0;
+      repo->idarraysize = 0;
       idarraydatap = 0;
       idarraydataend = 0;
     }
@@ -500,8 +500,8 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 
   if (numsolv)			       /* clear newly allocated area */
     memset(pool->solvables + pool->nsolvables, 0, numsolv * sizeof(Solvable));
-  source->start = pool->nsolvables;
-  source->nsolvables = numsolv;
+  repo->start = pool->nsolvables;
+  repo->nsolvables = numsolv;
 
   /*
    * read solvables
@@ -510,9 +510,9 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 #if 0
   printf("read solvables\n");
 #endif
-  for (i = 0, s = pool->solvables + source->start; i < numsolv; i++, s++)
+  for (i = 0, s = pool->solvables + repo->start; i < numsolv; i++, s++)
     {
-      s->source = source;
+      s->repo = repo;
       databits = 0;
       if (numsolvdatabits)
 	{
@@ -554,9 +554,9 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 #endif
 	      if (id == RPM_RPMDBID)
 		{
-		  if (!source->rpmdbid)
-		    source->rpmdbid = (Id *)xcalloc(numsolv, sizeof(Id));
-		  source->rpmdbid[i] = h;
+		  if (!repo->rpmdbid)
+		    repo->rpmdbid = (Id *)xcalloc(numsolv, sizeof(Id));
+		  repo->rpmdbid[i] = h;
 		}
 	      break;
 	    case TYPE_STR:
@@ -571,7 +571,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 		    ;
 		  break;
 		}
-	      ido = idarraydatap - source->idarraydata;
+	      ido = idarraydatap - repo->idarraydata;
 	      idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend);
 	      if (id == SOLVABLE_PROVIDES)
 		s->provides = ido;
@@ -593,8 +593,8 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 		s->freshens = ido;
 #if 0
 	      printf("%s ->\n", id2str(pool, id));
-	      for (; source->idarraydata[ido]; ido++)
-	        printf("  %s\n", dep2str(pool, source->idarraydata[ido]));
+	      for (; repo->idarraydata[ido]; ido++)
+	        printf("  %s\n", dep2str(pool, repo->idarraydata[ido]));
 #endif
 	      break;
 	    }
@@ -606,7 +606,7 @@ pool_addsource_solv(Pool *pool, FILE *fp, const char *sourcename)
 
   pool->nsolvables += numsolv;
 
-  return source;
+  return repo;
 }
 
 // EOF
