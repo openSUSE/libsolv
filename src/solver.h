@@ -104,7 +104,7 @@ enum solvcmds {
   SOLVER_INSTALL_SOLVABLE_PROVIDES,
   SOLVER_ERASE_SOLVABLE_PROVIDES,
   SOLVER_INSTALL_SOLVABLE_UPDATE
-};
+} SolverCmd;
 
 extern Solver *solver_create(Pool *pool, Source *system);
 extern void solver_free(Solver *solv);
