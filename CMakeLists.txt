@@ -98,6 +98,8 @@ FIND_PROGRAM(SWIG_EXECUTABLE
   PATHS ${SWIG_DIR} ${SWIG_DIR}/.. ${SWIG_DIR}/../../bin /usr/bin /usr/local/bin ${CMAKE_INSTALL_PREFIX}/bin
 )
 
+set ( CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} -Werror" )
+
 ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(tools)
 ADD_SUBDIRECTORY(testsuite)
