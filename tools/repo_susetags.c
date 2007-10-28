@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "pool.h"
+#include "attr_store.h"
 #include "repo_susetags.h"
 
 #define PACK_BLOCK 255
@@ -126,8 +127,11 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
   return repo_addid_dep(pd->repo, olddeps, id, isreq);
 }
 
+/* #define AUTHOR_STR */
+Attrstore *attr;
+
 Repo *
-pool_addrepo_susetags(Pool *pool, FILE *fp)
+pool_addrepo_susetags(Pool *pool, FILE *fp, int with_attr)
 {
   char *line, *linep;
   int aline;
@@ -140,6 +144,7 @@ pool_addrepo_susetags(Pool *pool, FILE *fp)
   struct parsedata pd;
 
   repo = pool_addrepo_empty(pool);
+  attr = new_store (pool);
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
   aline = 1024;
@@ -176,6 +181,8 @@ pool_addrepo_susetags(Pool *pool, FILE *fp)
 	  if (cummulate && isend)
 	    {
 	      linep[-intag - 2] = 0;
+	      if (linep[-intag - 3] == '\n')
+	        linep[-intag - 3] = 0;
 	      linep = line;
 	      intag = 0;
 	    }
@@ -199,6 +206,12 @@ pool_addrepo_susetags(Pool *pool, FILE *fp)
 	      exit(1);
 	    }
 	  intag = tagend - (line + 1);
+#ifdef AUTHOR_STR
+	  if (!strncmp (line, "+Aut:", 5))
+	    cummulate = 1;
+	  else
+	    cummulate = 0;
+#endif
 	  line[0] = '=';
 	  line[intag + 2] = ' ';
 	  linep = line + intag + 3;
@@ -297,6 +310,36 @@ pool_addrepo_susetags(Pool *pool, FILE *fp)
       if (!strncmp(line, "=Psg:", 5))
 	{
 	  s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
+	  continue;
+	}
+      if (!with_attr)
+        continue;
+      if (!strncmp(line, "=Grp:", 5))
+        {
+	  ensure_entry (attr, pack);
+	  add_attr_localids_id (attr, pack, str2nameid (attr, "group"), str2localid (attr, line + 6, 1));
+	  continue;
+	}
+      if (!strncmp(line, "=Lic:", 5))
+        {
+	  ensure_entry (attr, pack);
+	  add_attr_localids_id (attr, pack, str2nameid (attr, "license"), str2localid (attr, line + 6, 1));
+	  continue;
+	}
+      if (!strncmp(line, "=Kwd:", 5))
+        {
+	  ensure_entry (attr, pack);
+	  add_attr_localids_id (attr, pack, str2nameid (attr, "keywords"), str2localid (attr, line + 6, 1));
+	  continue;
+	}
+      if (!strncmp(line, "=Aut:", 5))
+        {
+	  ensure_entry (attr, pack);
+#ifdef AUTHOR_STR
+	  add_attr_string (attr, pack, str2nameid (attr, "authors"), line + 6);
+#else
+	  add_attr_localids_id (attr, pack, str2nameid (attr, "authors"), str2localid (attr, line + 6, 1));
+#endif
 	  continue;
 	}
     }
