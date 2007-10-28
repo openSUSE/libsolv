@@ -637,9 +637,15 @@ endElement(void *userData, const char *name)
 	  /* this is either a kernel package or a kmp */
 	  if (s->provides)
 	    {
+	      int prov;
 	      npr = 0;
-	      for (pidp = pd->repo->idarraydata + s->provides; (pid = *pidp++) != 0; )
+	      for ( prov = s->provides; ( pidp = pd->repo->idarraydata + prov) != 0; ++prov)
 		{
+		  if (!*pidp)
+		    break;
+
+		  pid = *pidp;
+
 		  const char *depname = 0;
 		  Reldep *prd = 0;
 
@@ -674,9 +680,16 @@ endElement(void *userData, const char *name)
 
 	  if (s->requires)
 	    {
+	      int reqs;
 	      npr = 0;
-	      for (pidp = pd->repo->idarraydata + s->requires; (pid = *pidp++) != 0; )
+
+	      for ( reqs = s->requires; ( pidp = pd->repo->idarraydata + reqs) != 0; ++reqs)
 		{
+		  if (!*pidp)
+		    break;
+
+		  pid = *pidp;
+
 		  const char *depname = 0;
 		  Reldep *prd = 0;
 
