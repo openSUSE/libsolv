@@ -75,7 +75,7 @@ struct _Pool {
   Solvable *solvables;
   int nsolvables;
 
-  int promoteepoch;
+  int promoteepoch;             /* 0/1  */
 
   Id *id2arch;			/* map arch ids to scores */
   Id lastarch;			/* last valid entry in id2arch */
