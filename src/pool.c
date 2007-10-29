@@ -425,7 +425,7 @@ pool_addrelproviders(Pool *pool, Id d)
   Id p, *pp, *pp2, *pp3;
 
   d = GETRELID(pool, d);
-  queueinit_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
+  queue_init_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
   switch (flags)
     {
     case REL_AND:
@@ -437,7 +437,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	  for (pp3 = pp2; *pp3;)
 	    if (*pp3++ == p)
 	      {
-	        queuepush(&plist, p);
+	        queue_push(&plist, p);
 		break;
 	      }
 	}
@@ -445,10 +445,10 @@ pool_addrelproviders(Pool *pool, Id d)
     case REL_OR:
       pp = GET_PROVIDESP(name, p);
       while ((p = *pp++) != 0)
-	queuepush(&plist, p);
+	queue_push(&plist, p);
       pp = GET_PROVIDESP(evr, p);
       while ((p = *pp++) != 0)
-	queuepushunique(&plist, p);
+	queue_pushunique(&plist, p);
       break;
     case REL_NAMESPACE:
       if (pool->nscallback)
@@ -456,12 +456,12 @@ pool_addrelproviders(Pool *pool, Id d)
 	  p = pool->nscallback(pool, pool->nscallbackdata, name, evr);
 	  if (p > 1)
 	    {
-	      queuefree(&plist);
+	      queue_free(&plist);
 	      pool->whatprovides[d] = p;
 	      return pool->whatprovidesdata + p;
 	    }
 	  if (p == 1)
-	    queuepush(&plist, SYSTEMSOLVABLE);
+	    queue_push(&plist, SYSTEMSOLVABLE);
 	}
       break;
     default:
@@ -518,18 +518,18 @@ pool_addrelproviders(Pool *pool, Id d)
 	    }
 	  if (!pid)
 	    continue;	/* no rel match */
-	  queuepush(&plist, p);
+	  queue_push(&plist, p);
 	}
       /* make our system solvable provide all unknown rpmlib() stuff */
       if (plist.count == 0 && !strncmp(id2str(pool, name), "rpmlib(", 7))
-	queuepush(&plist, SYSTEMSOLVABLE);
+	queue_push(&plist, SYSTEMSOLVABLE);
     }
   /* add providers to whatprovides */
 #if 0
   if (pool->verbose) printf("addrelproviders: adding %d packages to %d\n", plist.count, d);
 #endif
   pool->whatprovides[d] = pool_queuetowhatprovides(pool, &plist);
-  queuefree(&plist);
+  queue_free(&plist);
 
   return pool->whatprovidesdata + pool->whatprovides[d];
 }

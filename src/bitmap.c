@@ -10,7 +10,7 @@
 #include "util.h"
 
 void
-mapinit(Map *m, int n)
+map_init(Map *m, int n)
 {
   m->size = (n + 7) >> 3;
   m->map = xcalloc(m->size, 1);
@@ -18,7 +18,7 @@ mapinit(Map *m, int n)
 
 // free space allocated
 void
-mapfree(Map *m)
+map_free(Map *m)
 {
   m->map = xfree(m->map);
   m->size = 0;
@@ -26,7 +26,7 @@ mapfree(Map *m)
 
 // copy t <- s
 void
-clonemap(Map *t, Map *s)
+map_clone(Map *t, Map *s)
 {
   t->size = s->size;
   t->map = xmalloc(s->size);

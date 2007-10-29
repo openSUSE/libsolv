@@ -7,11 +7,12 @@
 #include <string.h>
 
 #include "queue.h"
+#include "util.h"
 
 void
-clonequeue(Queue *t, Queue *s)
+queue_clone(Queue *t, Queue *s)
 {
-  t->alloc = t->elements = malloc((s->count + 8) * sizeof(Id));
+  t->alloc = t->elements = xmalloc((s->count + 8) * sizeof(Id));
   if (s->count)
     memcpy(t->alloc, s->elements, s->count * sizeof(Id));
   t->count = s->count;
@@ -19,14 +20,14 @@ clonequeue(Queue *t, Queue *s)
 }
 
 void
-queueinit(Queue *q)
+queue_init(Queue *q)
 {
   q->alloc = q->elements = 0;
   q->count = q->left = 0;
 }
 
 void
-queueinit_buffer(Queue *q, Id *buf, int size)
+queue_init_buffer(Queue *q, Id *buf, int size)
 {
   q->alloc = 0;
   q->elements = buf;
@@ -35,7 +36,7 @@ queueinit_buffer(Queue *q, Id *buf, int size)
 }
 
 void
-queuefree(Queue *q)
+queue_free(Queue *q)
 {
   if (q->alloc)
     free(q->alloc);
@@ -43,52 +44,27 @@ queuefree(Queue *q)
   q->count = q->left = 0;
 }
 
-Id
-queueshift(Queue *q)
-{
-  if (!q->count)
-    return 0;
-  q->count--;
-  return *q->elements++;
-}
-
 void
-queuepush(Queue *q, Id id)
+queue_alloc_one(Queue *q)
 {
-  if (!q->left)
+  if (q->alloc && q->alloc != q->elements)
     {
-      if (q->alloc && q->alloc != q->elements)
-	{
-	  memmove(q->alloc, q->elements, q->count * sizeof(Id));
-	  q->left += q->elements - q->alloc;
-	  q->elements = q->alloc;
-	}
-      else if (q->alloc)
-	{
-	  q->elements = q->alloc = realloc(q->alloc, (q->count + 8) * sizeof(Id));
-	  q->left += 8;
-	}
-      else
-	{
-	  q->alloc = malloc((q->count + 8) * sizeof(Id));
-	  if (q->count)
-	    memcpy(q->alloc, q->elements, q->count * sizeof(Id));
-	  q->elements = q->alloc;
-	  q->left += 8;
-	}
+      memmove(q->alloc, q->elements, q->count * sizeof(Id));
+      q->left += q->elements - q->alloc;
+      q->elements = q->alloc;
     }
-  q->elements[q->count++] = id;
-  q->left--;
+  else if (q->alloc)
+    {
+      q->elements = q->alloc = realloc(q->alloc, (q->count + 8) * sizeof(Id));
+      q->left += 8;
+    }
+  else
+    {
+      q->alloc = xmalloc((q->count + 8) * sizeof(Id));
+      if (q->count)
+	memcpy(q->alloc, q->elements, q->count * sizeof(Id));
+      q->elements = q->alloc;
+      q->left += 8;
+    }
 }
-
-void
-queuepushunique(Queue *q, Id id)
-{
-  int i;
-  for (i = q->count; i > 0; )
-    if (q->elements[--i] == id)
-      return;
-  queuepush(q, id);
-}
-
 

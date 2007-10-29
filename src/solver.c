@@ -632,8 +632,8 @@ addrule(Solver *solv, Id p, Id d)
 	    abort();
 	  if (solv->decisionmap[-p])
 	    return NULL;
-	  queuepush(&solv->decisionq, p);
-	  queuepush(&solv->decisionq_why, 0);
+	  queue_push(&solv->decisionq, p);
+	  queue_push(&solv->decisionq_why, 0);
 	  solv->decisionmap[-p] = -1;
 	  return 0;
 	}
@@ -726,8 +726,8 @@ makeruledecisions(Solver *solv)
       vv = v > 0 ? v : -v;
       if (solv->decisionmap[vv] == 0)
 	{
-	  queuepush(&solv->decisionq, v);
-	  queuepush(&solv->decisionq_why, r - solv->rules);
+	  queue_push(&solv->decisionq, v);
+	  queue_push(&solv->decisionq_why, r - solv->rules);
 	  solv->decisionmap[vv] = v > 0 ? 1 : -1;
 	  continue;
 	}
@@ -753,8 +753,8 @@ makeruledecisions(Solver *solv)
 	{
 	  /* conflict with rpm rule, need only disable our rule */
 	  printf("conflict with rpm rule, disabling rule #%d\n", ri);
-	  queuepush(&solv->problems, r - solv->rules);
-	  queuepush(&solv->problems, 0);
+	  queue_push(&solv->problems, r - solv->rules);
+	  queue_push(&solv->problems, 0);
 	  r->w1 = 0;	/* disable */
 	  continue;
 	}
@@ -777,10 +777,10 @@ makeruledecisions(Solver *solv)
 	  if (rr->p != v && rr->p != -v)
 	    continue;
 	  printf(" - disabling rule #%d\n", i);
-	  queuepush(&solv->problems, i);
+	  queue_push(&solv->problems, i);
 	  rr->w1 = 0;	/* disable */
 	}
-      queuepush(&solv->problems, 0);
+      queue_push(&solv->problems, 0);
     }
 }
 
@@ -808,8 +808,8 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id *dp;
   Id n;
 
-  queueinit_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
-  queuepush(&q, s - pool->solvables);	/* push solvable Id */
+  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  queue_push(&q, s - pool->solvables);	/* push solvable Id */
 
   while (q.count)
     {
@@ -818,7 +818,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        * s: Pointer to solvable
        */
       
-      n = queueshift(&q);
+      n = queue_shift(&q);
       if (MAPTST(m, n))		       /* continue if already done */
 	continue;
 
@@ -894,7 +894,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      for (; *dp; dp++)   /* loop through all providers */
 		{
 		  if (!MAPTST(m, *dp))
-		    queuepush(&q, *dp);
+		    queue_push(&q, *dp);
 		}
 
 	    } /* while, requirements of n */
@@ -953,7 +953,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	    {
 	      FOR_PROVIDES(p, pp, rec)
 		if (!MAPTST(m, p))
-		  queuepush(&q, p);
+		  queue_push(&q, p);
 	    }
 	}
       if (s->suggests)
@@ -963,11 +963,11 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	    {
 	      FOR_PROVIDES(p, pp, sug)
 		if (!MAPTST(m, p))
-		  queuepush(&q, p);
+		  queue_push(&q, p);
 	    }
 	}
     }
-  queuefree(&q);
+  queue_free(&q);
 }
 
 static void
@@ -1045,7 +1045,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
   Id obs, *obsp;
   Solvable *ps;
 
-  QUEUEEMPTY(qs);
+  queue_empty(qs);
   /*
    * s = solvable ptr
    * n = solvable Id
@@ -1093,7 +1093,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 	}
       else
         continue;
-      queuepush(qs, p);
+      queue_push(qs, p);
 
       if (m && !MAPTST(m, p))		/* mark p for install if not already done */
 	addrulesforsolvable(solv, pool->solvables + p, m);
@@ -1102,7 +1102,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
     {
       for (pp = solv->obsoletes_data + solv->obsoletes[n - solv->system->start]; (p = *pp++) != 0;)
 	{
-	  queuepush(qs, p);
+	  queue_push(qs, p);
 	  if (m && !MAPTST(m, p))		/* mark p for install if not already done */
 	    addrulesforsolvable(solv, pool->solvables + p, m);
 	}
@@ -1127,12 +1127,12 @@ addupdaterule(Solver *solv, Solvable *s, Map *m, int allowdowngrade, int allowar
   Queue qs;
   Id qsbuf[64];
 
-  queueinit_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
+  queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   findupdatepackages(solv, s, &qs, m, allowdowngrade, allowarchchange);
   p = s - pool->solvables;
   if (dontaddrule)	/* we consider update candidates but dont force them */
     {
-      queuefree(&qs);
+      queue_free(&qs);
       return;
     }
 
@@ -1142,12 +1142,12 @@ addupdaterule(Solver *solv, Solvable *s, Map *m, int allowdowngrade, int allowar
       printf("new update rule: must keep %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 #endif
       addrule(solv, p, 0);		/* request 'install' of s */
-      queuefree(&qs);
+      queue_free(&qs);
       return;
     }
 
   d = pool_queuetowhatprovides(pool, &qs);   /* intern computed provider queue */
-  queuefree(&qs);
+  queue_free(&qs);
   r = addrule(solv, p, d);	       /* allow update of s */
 #if 0
   printf("new update rule ");
@@ -1311,8 +1311,8 @@ propagate(Solver *solv, int level)
             decisionmap[ow] = level;
 	  else
             decisionmap[-ow] = -level;
-	  queuepush(&solv->decisionq, ow);
-	  queuepush(&solv->decisionq_why, r - solv->rules);
+	  queue_push(&solv->decisionq, ow);
+	  queue_push(&solv->decisionq_why, r - solv->rules);
 #if 0
 	    {
 	      Solvable *s = pool->solvables + (ow > 0 ? ow : -ow);
@@ -1349,15 +1349,15 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
   int learnt_why = solv->learnt_pool.count;
   Id *decisionmap = solv->decisionmap;
  
-  queueinit(&r);
+  queue_init(&r);
 
   if (pool->verbose) printf("ANALYZE at %d ----------------------\n", level);
-  mapinit(&seen, pool->nsolvables);
+  map_init(&seen, pool->nsolvables);
   idx = solv->decisionq.count;
   for (;;)
     {
       printrule(solv, c);
-      queuepush(&solv->learnt_pool, c - solv->rules);
+      queue_push(&solv->learnt_pool, c - solv->rules);
       dp = c->d ? pool->whatprovidesdata + c->d : 0;
       for (i = -1; ; i++)
 	{
@@ -1386,7 +1386,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 		  break;
 	      if (j == solv->decisionq.count)
 		abort();
-	      queuepush(&rulq, -(j + 1));
+	      queue_push(&rulq, -(j + 1));
 #endif
 	      continue;			/* initial setting */
 	    }
@@ -1395,7 +1395,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 	    num++;			/* need to do this one as well */
 	  else
 	    {
-	      queuepush(&r, v);
+	      queue_push(&r, v);
 #if 0
   printf("PUSH %d ", v);
   printruleelement(solv, 0, v);
@@ -1438,8 +1438,8 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
           printruleelement(solv, 0, v);
         }
     }
-  mapfree(&seen);
-  queuepush(&solv->learnt_pool, 0);
+  map_free(&seen);
+  queue_push(&solv->learnt_pool, 0);
 #if 0
   for (i = learnt_why; solv->learnt_pool.elements[i]; i++)
     {
@@ -1466,8 +1466,8 @@ reset_solver(Solver *solv)
 
   /* delete all learnt rules */
   solv->nrules = solv->learntrules;
-  QUEUEEMPTY(&solv->learnt_why);
-  QUEUEEMPTY(&solv->learnt_pool);
+  queue_empty(&solv->learnt_why);
+  queue_empty(&solv->learnt_pool);
 
   /* redo all direct rpm rule decisions */
   /* we break at the first decision with a why attached, this is
@@ -1541,7 +1541,7 @@ analyze_unsolvable_rule(Solver *solv, Rule *r)
 	else if (solv->problems.elements[i] == why)
 	  return;
     }
-  queuepush(&solv->problems, why);
+  queue_push(&solv->problems, why);
 }
 
 
@@ -1567,7 +1567,7 @@ analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
   printf("ANALYZE UNSOLVABLE ----------------------\n");
 #endif
   oldproblemcount = solv->problems.count;
-  mapinit(&seen, pool->nsolvables);
+  map_init(&seen, pool->nsolvables);
   analyze_unsolvable_rule(solv, r);
   dp = r->d ? pool->whatprovidesdata + r->d : 0;
   for (i = -1; ; i++)
@@ -1626,8 +1626,8 @@ analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
 	  MAPSET(&seen, vv);
 	}
     }
-  mapfree(&seen);
-  queuepush(&solv->problems, 0);	/* mark end of this problem */
+  map_free(&seen);
+  queue_push(&solv->problems, 0);	/* mark end of this problem */
 
   lastweak = 0;
   if (solv->weakrules != solv->learntrules)
@@ -1741,8 +1741,8 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
         solv->decisionmap[decision] = level;
       else
         solv->decisionmap[-decision] = -level;
-      queuepush(&solv->decisionq, decision);
-      queuepush(&solv->decisionq_why, 0);
+      queue_push(&solv->decisionq, decision);
+      queue_push(&solv->decisionq_why, 0);
     }
   for (;;)
     {
@@ -1766,7 +1766,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
 	  printf("%d %d\n", solv->learnt_why.count, (int)(r - solv->rules) - solv->learntrules);
 	  abort();
 	}
-      queuepush(&solv->learnt_why, why);
+      queue_push(&solv->learnt_why, why);
       if (d)
 	{
 	  /* at least 2 literals, needs watches */
@@ -1774,8 +1774,8 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
 	  addwatches(solv, r);
 	}
       solv->decisionmap[p > 0 ? p : -p] = p > 0 ? level : -level;
-      queuepush(&solv->decisionq, p);
-      queuepush(&solv->decisionq_why, r - solv->rules);
+      queue_push(&solv->decisionq, p);
+      queue_push(&solv->decisionq_why, r - solv->rules);
       printf("decision: ");
       printruleelement(solv, 0, p);
       printf("new rule: ");
@@ -1809,16 +1809,16 @@ solver_create(Pool *pool, Repo *system)
   solv->system = system;
   pool->verbose = 1;
 
-  queueinit(&solv->ruletojob);
-  queueinit(&solv->decisionq);
-  queueinit(&solv->decisionq_why);
-  queueinit(&solv->problems);
-  queueinit(&solv->suggestions);
-  queueinit(&solv->learnt_why);
-  queueinit(&solv->learnt_pool);
+  queue_init(&solv->ruletojob);
+  queue_init(&solv->decisionq);
+  queue_init(&solv->decisionq_why);
+  queue_init(&solv->problems);
+  queue_init(&solv->suggestions);
+  queue_init(&solv->learnt_why);
+  queue_init(&solv->learnt_pool);
 
-  mapinit(&solv->recommendsmap, pool->nsolvables);
-  mapinit(&solv->suggestsmap, pool->nsolvables);
+  map_init(&solv->recommendsmap, pool->nsolvables);
+  map_init(&solv->suggestsmap, pool->nsolvables);
   solv->recommends_index = 0;
 
   solv->decisionmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
@@ -1837,16 +1837,16 @@ solver_create(Pool *pool, Repo *system)
 void
 solver_free(Solver *solv)
 {
-  queuefree(&solv->ruletojob);
-  queuefree(&solv->decisionq);
-  queuefree(&solv->decisionq_why);
-  queuefree(&solv->learnt_why);
-  queuefree(&solv->learnt_pool);
-  queuefree(&solv->problems);
-  queuefree(&solv->suggestions);
+  queue_free(&solv->ruletojob);
+  queue_free(&solv->decisionq);
+  queue_free(&solv->decisionq_why);
+  queue_free(&solv->learnt_why);
+  queue_free(&solv->learnt_pool);
+  queue_free(&solv->problems);
+  queue_free(&solv->suggestions);
 
-  mapfree(&solv->recommendsmap);
-  mapfree(&solv->suggestsmap);
+  map_free(&solv->recommendsmap);
+  map_free(&solv->suggestsmap);
   xfree(solv->decisionmap);
   xfree(solv->rules);
   xfree(solv->watches);
@@ -1901,7 +1901,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
   systemlevel = level + 1;
   if (pool->verbose) printf("solving...\n");
 
-  queueinit(&dq);
+  queue_init(&dq);
   for (;;)
     {
       /*
@@ -1916,7 +1916,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (analyze_unsolvable(solv, r, disablerules))
 		continue;
 	      printf("UNSOLVABLE\n");
-	      queuefree(&dq);
+	      queue_free(&dq);
 	      return;
 	    }
 	}
@@ -1948,7 +1948,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (level == 0)
 		    {
 		      printf("UNSOLVABLE\n");
-		      queuefree(&dq);
+		      queue_free(&dq);
 		      return;
 		    }
 		  if (level <= olevel)
@@ -1964,9 +1964,9 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    break;
 		  if (solv->decisionmap[i] > 0 || (solv->decisionmap[i] < 0 && solv->weaksystemrules[i - solv->system->start] == 0))
 		    continue;
-		  QUEUEEMPTY(&dq);
+		  queue_empty(&dq);
 		  if (solv->decisionmap[i] == 0)
-		    queuepush(&dq, i);
+		    queue_push(&dq, i);
 		  if (solv->weaksystemrules[i - solv->system->start])
 		    {
 		      dp = pool->whatprovidesdata + solv->weaksystemrules[i - solv->system->start];
@@ -1975,7 +1975,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 			  if (solv->decisionmap[p] > 0)
 			    break;
 			  if (solv->decisionmap[p] == 0)
-			    queuepush(&dq, p);
+			    queue_push(&dq, p);
 			}
 		      if (p)
 			continue;	/* rule is already true */
@@ -1998,7 +1998,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (level == 0)
 		    {
 		      printf("UNSOLVABLE\n");
-		      queuefree(&dq);
+		      queue_free(&dq);
 		      return;
 		    }
 		  if (level <= olevel)
@@ -2027,7 +2027,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  r = solv->rules + i;
 	  if (!r->w1)
 	    continue;
-	  QUEUEEMPTY(&dq);
+	  queue_empty(&dq);
 	  if (r->d == 0)
 	    {
 	      /* binary or unary rule */
@@ -2036,8 +2036,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		continue;
 	      if (solv->decisionmap[r->p] || solv->decisionmap[r->w2])
 		continue;
-	      queuepush(&dq, r->p);
-	      queuepush(&dq, r->w2);
+	      queue_push(&dq, r->p);
+	      queue_push(&dq, r->w2);
 	    }
 	  else
 	    {
@@ -2057,7 +2057,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (solv->decisionmap[r->p] > 0)
 		    continue;
 		  if (solv->decisionmap[r->p] == 0)
-		    queuepush(&dq, r->p);
+		    queue_push(&dq, r->p);
 		}
 	      dp = pool->whatprovidesdata + r->d;
 	      while ((p = *dp++) != 0)
@@ -2072,7 +2072,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		      if (solv->decisionmap[p] > 0)
 			break;
 		      if (solv->decisionmap[p] == 0)
-			queuepush(&dq, p);
+			queue_push(&dq, p);
 		    }
 		}
 	      if (p)
@@ -2100,7 +2100,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (level == 0)
 	    {
 	      printf("UNSOLVABLE\n");
-	      queuefree(&dq);
+	      queue_free(&dq);
 	      return;
 	    }
 	  if (level < systemlevel)
@@ -2116,7 +2116,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  int qcount;
 
 	  if (pool->verbose) printf("installing recommended packages\n");
-	  QUEUEEMPTY(&dq);
+	  queue_empty(&dq);
 	  for (i = 1; i < pool->nsolvables; i++)
 	    {
 	      if (solv->decisionmap[i] < 0)
@@ -2141,7 +2141,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 				  break;
 				}
 			      else if (solv->decisionmap[p] == 0)
-				queuepushunique(&dq, p);
+				queue_pushunique(&dq, p);
 			    }
 			}
 		    }
@@ -2172,7 +2172,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		      if (!sup)
 			continue;
 		    }
-		  queuepushunique(&dq, i);
+		  queue_pushunique(&dq, i);
 		}
 	    }
 	  if (dq.count)
@@ -2192,7 +2192,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	}
       break;
     }
-  queuefree(&dq);
+  queue_free(&dq);
 }
 
   
@@ -2214,9 +2214,9 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
   if (sug >= solv->jobrules && sug < solv->systemrules)
     sugjob = solv->ruletojob.elements[sug - solv->jobrules];
 
-  queueinit(&disabled);
-  QUEUEEMPTY(refined);
-  queuepush(refined, sug);
+  queue_init(&disabled);
+  queue_empty(refined);
+  queue_push(refined, sug);
 
   /* re-enable all rules but rule "sug" of the problem */
   revert(solv, 1);
@@ -2288,7 +2288,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	    r->w1 = solv->pool->whatprovidesdata[r->d];
 	}
 
-      QUEUEEMPTY(&solv->problems);
+      queue_empty(&solv->problems);
       revert(solv, 1);		/* XXX move to reset_solver? */
       reset_solver(solv);
       run_solver(solv, 0, 0);
@@ -2310,8 +2310,8 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	      break;
 	  if (problem[j])
 	    continue;
-	  queuepush(&disabled, v);
-	  queuepush(&disabled, 0);	/* room for watch */
+	  queue_push(&disabled, v);
+	  queue_push(&disabled, 0);	/* room for watch */
 	}
       if (disabled.count == disabledcnt)
 	{
@@ -2323,7 +2323,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
       if (disabled.count == disabledcnt + 2)
 	{
 	  /* just one suggestion, add it to refined list */
-	  queuepush(refined, disabled.elements[disabledcnt]);
+	  queue_push(refined, disabled.elements[disabledcnt]);
 	}
       else
 	{
@@ -2625,17 +2625,17 @@ solve(Solver *solv, Queue *job)
    * 
    */
 
-  mapinit(&addedmap, pool->nsolvables);
-  mapinit(&noupdaterule, pool->nsolvables);
+  map_init(&addedmap, pool->nsolvables);
+  map_init(&noupdaterule, pool->nsolvables);
 
-  queueinit(&q);
+  queue_init(&q);
 
   /*
    * always install our system solvable
    */
   MAPSET(&addedmap, SYSTEMSOLVABLE);
-  queuepush(&solv->decisionq, SYSTEMSOLVABLE);
-  queuepush(&solv->decisionq_why, 0);
+  queue_push(&solv->decisionq, SYSTEMSOLVABLE);
+  queue_push(&solv->decisionq_why, 0);
   solv->decisionmap[SYSTEMSOLVABLE] = 1;
 
   /*
@@ -2674,7 +2674,7 @@ solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
-	  QUEUEEMPTY(&q);
+	  queue_empty(&q);
 	  FOR_PROVIDES(p, pp, what)
 	    {
 				       /* if by name, ensure that the name matches */
@@ -2758,36 +2758,36 @@ solve(Solver *solv, Queue *job)
 	    printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), repo_name(s->repo));
 	  }
           addrule(solv, what, 0);			/* install by Id */
-	  queuepush(&solv->ruletojob, i);
+	  queue_push(&solv->ruletojob, i);
 	  break;
 	case SOLVER_ERASE_SOLVABLE:
           addrule(solv, -what, 0);			/* remove by Id */
-	  queuepush(&solv->ruletojob, i);
+	  queue_push(&solv->ruletojob, i);
 	  MAPSET(&noupdaterule, what);
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:		/* install by capability */
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
-	  QUEUEEMPTY(&q);
+	  queue_empty(&q);
 	  FOR_PROVIDES(p, pp, what)
 	    {
               /* if by name, ensure that the name matches */
 	      if (how == SOLVER_INSTALL_SOLVABLE_NAME && pool->solvables[p].name != what)
 		continue;
-	      queuepush(&q, p);
+	      queue_push(&q, p);
 	    }
 	  if (!q.count)	
 	    {
 	      /* no provider, make this an impossible rule */
-	      queuepush(&q, -SYSTEMSOLVABLE);
+	      queue_push(&q, -SYSTEMSOLVABLE);
 	    }
 
-	  p = queueshift(&q);	       /* get first provider */
+	  p = queue_shift(&q);	       /* get first provider */
 	  if (!q.count)
 	    d = 0;		       /* single provider ? -> make assertion */
 	  else
 	    d = pool_queuetowhatprovides(pool, &q);   /* get all providers */
 	  addrule(solv, p, d);	       /* add 'requires' rule */
-	  queuepush(&solv->ruletojob, i);
+	  queue_push(&solv->ruletojob, i);
 	  break;
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
@@ -2798,13 +2798,13 @@ solve(Solver *solv, Queue *job)
 	        continue;
 
 	      addrule(solv, -p, 0);  /* add 'remove' rule */
-	      queuepush(&solv->ruletojob, i);
+	      queue_push(&solv->ruletojob, i);
 	      MAPSET(&noupdaterule, p);
 	    }
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_UPDATE:              /* find update for solvable */
 	  addupdaterule(solv, pool->solvables + what, &addedmap, 0, 0, 0);
-	  queuepush(&solv->ruletojob, i);
+	  queue_push(&solv->ruletojob, i);
 	  break;
 	}
     }
@@ -2859,9 +2859,9 @@ solve(Solver *solv, Queue *job)
     }
 
   /* free unneeded memory */
-  mapfree(&addedmap);
-  mapfree(&noupdaterule);
-  queuefree(&q);
+  map_free(&addedmap);
+  map_free(&noupdaterule);
+  queue_free(&q);
 
   solv->weakrules = solv->nrules;
 
@@ -2930,7 +2930,7 @@ solve(Solver *solv, Queue *job)
 	      if (!enh)
 		continue;
 	    }
-	  queuepush(&solv->suggestions, i);
+	  queue_push(&solv->suggestions, i);
 	}
       prune_best_version_arch(pool, &solv->suggestions);
     }
@@ -2953,8 +2953,8 @@ solve(Solver *solv, Queue *job)
 
       if (!pool->verbose)
 	return;
-      clonequeue(&problems, &solv->problems);
-      queueinit(&solution);
+      queue_clone(&problems, &solv->problems);
+      queue_init(&solution);
       printf("Encountered problems! Here are the solutions:\n");
       problem = problems.elements;
       for (i = 0; i < problems.count; i++)
@@ -3065,8 +3065,8 @@ solve(Solver *solv, Queue *job)
 		}
 	    }
 	  printf("------------------------------------\n");
-	  queuefree(&problems);
-	  queuefree(&solution);
+	  queue_free(&problems);
+	  queue_free(&solution);
 	}
       return;
     }
