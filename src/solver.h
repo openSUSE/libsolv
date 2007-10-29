@@ -39,12 +39,12 @@ typedef struct rule {
 
 typedef struct solver {
   Pool *pool;
-  Repo *system;
+  Repo *installed;
 
   int fixsystem;			/* repair errors in rpm dependency graph */
   int allowdowngrade;			/* allow to downgrade installed solvable */
   int allowarchchange;			/* allow to change architecture of installed solvables */
-  int allowuninstall;			/* allow removal of system solvables, else keep all installed solvables */
+  int allowuninstall;			/* allow removal of installed solvables */
   int updatesystem;			/* distupgrade */
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
@@ -85,7 +85,7 @@ typedef struct solver {
   Map suggestsmap;			/* suggested packages from decisionmap */
   int recommends_index;			/* recommended level */
 
-  Id *obsoletes;			/* obsoletes for each system solvable */
+  Id *obsoletes;			/* obsoletes for each installed solvable */
   Id *obsoletes_data;			/* data area for obsoletes */
 
   int rc_output;			/* output result compatible to redcarpet/zypp testsuite, set == 2 for pure rc (will suppress architecture) */
@@ -106,7 +106,7 @@ enum solvcmds {
   SOLVER_INSTALL_SOLVABLE_UPDATE
 } SolverCmd;
 
-extern Solver *solver_create(Pool *pool, Repo *system);
+extern Solver *solver_create(Pool *pool, Repo *installed);
 extern void solver_free(Solver *solv);
 extern void solve(Solver *solv, Queue *job);
 

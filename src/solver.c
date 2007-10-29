@@ -38,10 +38,10 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
 
 #if 0
 static Id
-replaces_system(Solver *solv, Id id)
+replaces_installed(Solver *solv, Id id)
 {
   Pool *pool = solv->pool;
-  Repo *system = solv->system;
+  Repo *installed = solv->installed;
   Id *name = pool->solvables[id].name;
 
   FOR_PROVIDES(p, pp, id)
@@ -49,7 +49,7 @@ replaces_system(Solver *solv, Id id)
       s = pool->solvables + p;
       if (s->name != name)
 	continue;
-      if (p >= system->start && p < system->start + system->nsolvables)
+      if (p >= installed->start && p < installed->start + installed->nsolvables)
 	return p;
     }
 }
@@ -75,7 +75,7 @@ dep_installed(Solver *solv, Id dep)
     }
   FOR_PROVIDES(p, pp, dep)
     {
-      if (p >= solv->system->start && p < solv->system->start + solv->system->nsolvables)
+      if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables)
 	return 1;
     }
   return 0;
@@ -794,7 +794,7 @@ static void
 addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 {
   Pool *pool = solv->pool;
-  Repo *system = solv->system;
+  Repo *installed = solv->installed;
   Queue q;
   Id qbuf[64];
   int i;
@@ -826,10 +826,10 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       s = pool->solvables + n;	       /* s = Solvable in question */
 
       dontfix = 0;
-      if (system
+      if (installed
 	  && !solv->fixsystem
-	  && n >= system->start	       /* is it installed? */
-	  && n < system->start + system->nsolvables)
+	  && n >= installed->start	       /* is it installed? */
+	  && n < installed->start + installed->nsolvables)
       {
 	dontfix = 1;		       /* dont care about broken rpm deps */
       }
@@ -859,12 +859,12 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
                    * dependency was not broken before so we enforce it */
 		  for (i = 0; dp[i]; i++)	/* for all providers */
 		    {
-		      if (dp[i] >= system->start && dp[i] < system->start + system->nsolvables)
+		      if (dp[i] >= installed->start && dp[i] < installed->start + installed->nsolvables)
 			break;		/* provider was installed */
 		    }
 		  if (!dp[i])		/* previously broken dependency */
 		    {
-		      if (pool->verbose) printf("ignoring broken requires %s of system package %s-%s.%s\n", dep2str(pool, req), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      if (pool->verbose) printf("ignoring broken requires %s of installed package %s-%s.%s\n", dep2str(pool, req), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 		      continue;
 		    }
 		}
@@ -914,7 +914,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      FOR_PROVIDES(p, pp, con)
 		{
 		   /* dontfix: dont care about conflicts with already installed packs */
-		  if (dontfix && p >= system->start && p < system->start + system->nsolvables)
+		  if (dontfix && p >= installed->start && p < installed->start + installed->nsolvables)
 		    continue;
                  /* rule: -n|-p: either solvable _or_ provider of conflict */
 		  addrule(solv, -n, -p);
@@ -925,7 +925,7 @@ addrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       /*-----------------------------------------
        * check obsoletes if not installed
        */
-      if (!system || n < system->start || n >= (system->start + system->nsolvables))
+      if (!installed || n < installed->start || n >= (installed->start + installed->nsolvables))
 	{			       /* not installed */
 	  if (s->obsoletes)
 	    {
@@ -1039,7 +1039,7 @@ archchanges(Pool *pool, Solvable *s1, Solvable *s2)
 static void
 findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngrade, int allowarchchange)
 {
-  /* system packages get a special upgrade allowed rule */
+  /* installed packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
   Id p, *pp, n, p2, *pp2;
   Id obs, *obsp;
@@ -1098,9 +1098,9 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
       if (m && !MAPTST(m, p))		/* mark p for install if not already done */
 	addrulesforsolvable(solv, pool->solvables + p, m);
     }
-  if (solv->noupdateprovide && solv->obsoletes && solv->obsoletes[n - solv->system->start])
+  if (solv->noupdateprovide && solv->obsoletes && solv->obsoletes[n - solv->installed->start])
     {
-      for (pp = solv->obsoletes_data + solv->obsoletes[n - solv->system->start]; (p = *pp++) != 0;)
+      for (pp = solv->obsoletes_data + solv->obsoletes[n - solv->installed->start]; (p = *pp++) != 0;)
 	{
 	  queue_push(qs, p);
 	  if (m && !MAPTST(m, p))		/* mark p for install if not already done */
@@ -1120,7 +1120,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 static void
 addupdaterule(Solver *solv, Solvable *s, Map *m, int allowdowngrade, int allowarchchange, int dontaddrule)
 {
-  /* system packages get a special upgrade allowed rule */
+  /* installed packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
   Id p, d;
   Rule *r;
@@ -1793,20 +1793,20 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
  * create solver structure
  *
  * pool: all available solvables
- * system: installed Solvables
+ * installed: installed Solvables
  *
  *
  * Upon solving, rules are created to flag the Solvables
- * of the 'system' Repo as installed.
+ * of the 'installed' Repo as installed.
  */
 
 Solver *
-solver_create(Pool *pool, Repo *system)
+solver_create(Pool *pool, Repo *installed)
 {
   Solver *solv;
   solv = (Solver *)xcalloc(1, sizeof(Solver));
   solv->pool = pool;
-  solv->system = system;
+  solv->installed = installed;
   pool->verbose = 1;
 
   queue_init(&solv->ruletojob);
@@ -1922,26 +1922,26 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	}
 
       /*
-       * system packages
+       * installed packages
        */
       
-      if (level < systemlevel && solv->system->nsolvables)
+      if (level < systemlevel && solv->installed->nsolvables)
 	{
 	  if (!solv->updatesystem)
 	    {
 	      /* try to keep as many packages as possible */
 	      if (pool->verbose) printf("installing system packages\n");
-	      for (i = solv->system->start, n = 0; ; i++, n++)
+	      for (i = solv->installed->start, n = 0; ; i++, n++)
 		{
-		  if (n == solv->system->nsolvables)
+		  if (n == solv->installed->nsolvables)
 		    break;
-		  if (i == solv->system->start + solv->system->nsolvables)
-		    i = solv->system->start;
+		  if (i == solv->installed->start + solv->installed->nsolvables)
+		    i = solv->installed->start;
 		  s = pool->solvables + i;
 		  if (solv->decisionmap[i] != 0)
 		    continue;
 #if 0
-		  printf("system installing %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		  printf("keeping %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 #endif
 		  olevel = level;
 		  level = setpropagatelearn(solv, level, i, disablerules);
@@ -1958,18 +1958,18 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (solv->weaksystemrules)
 	    {
 	      if (pool->verbose) printf("installing weak system packages\n");
-	      for (i = solv->system->start, n = 0; ; i++, n++)
+	      for (i = solv->installed->start, n = 0; ; i++, n++)
 		{
-		  if (n == solv->system->nsolvables)
+		  if (n == solv->installed->nsolvables)
 		    break;
-		  if (solv->decisionmap[i] > 0 || (solv->decisionmap[i] < 0 && solv->weaksystemrules[i - solv->system->start] == 0))
+		  if (solv->decisionmap[i] > 0 || (solv->decisionmap[i] < 0 && solv->weaksystemrules[i - solv->installed->start] == 0))
 		    continue;
 		  queue_empty(&dq);
 		  if (solv->decisionmap[i] == 0)
 		    queue_push(&dq, i);
-		  if (solv->weaksystemrules[i - solv->system->start])
+		  if (solv->weaksystemrules[i - solv->installed->start])
 		    {
-		      dp = pool->whatprovidesdata + solv->weaksystemrules[i - solv->system->start];
+		      dp = pool->whatprovidesdata + solv->weaksystemrules[i - solv->installed->start];
 		      while ((p = *dp++) != 0)
 			{
 			  if (solv->decisionmap[p] > 0)
@@ -2007,7 +2007,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		      break;
 		    }
 		}
-	      if (n != solv->system->nsolvables)
+	      if (n != solv->installed->nsolvables)
 		continue;
 	    }
 	  systemlevel = level;
@@ -2402,7 +2402,7 @@ printdecisions(Solver *solv)
 	continue;
       if (n == SYSTEMSOLVABLE)
 	continue;
-      if (n >= solv->system->start && n < solv->system->start + solv->system->nsolvables)
+      if (n >= solv->installed->start && n < solv->installed->start + solv->installed->nsolvables)
 	continue;
       s = pool->solvables + n;
       if (s->obsoletes)
@@ -2411,7 +2411,7 @@ printdecisions(Solver *solv)
 	  while ((obs = *obsp++) != 0)
 	    FOR_PROVIDES(p, pp, obs)
 	      {
-		if (p >= solv->system->start && p < solv->system->start + solv->system->nsolvables)
+		if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables)
 		  {
 		    obsoletesmap[p] = n;
 		    obsoletesmap[n]++;
@@ -2421,7 +2421,7 @@ printdecisions(Solver *solv)
       FOR_PROVIDES(p, pp, s->name)
 	if (s->name == pool->solvables[p].name)
 	  {
-	    if (p >= solv->system->start && p < solv->system->start + solv->system->nsolvables)
+	    if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables)
 	      {
 	        obsoletesmap[p] = n;
 	        obsoletesmap[n]++;
@@ -2436,7 +2436,7 @@ printdecisions(Solver *solv)
   
   /* print solvables to be erased */
 
-  for (i = solv->system->start; i < solv->system->start + solv->system->nsolvables; i++)
+  for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
     {
       if (solv->decisionmap[i] > 0)
 	continue;
@@ -2462,7 +2462,7 @@ printdecisions(Solver *solv)
 	continue;
       if (p == SYSTEMSOLVABLE)
 	continue;
-      if (p >= solv->system->start && p < solv->system->start + solv->system->nsolvables)
+      if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables)
 	continue;
       s = pool->solvables + p;
 
@@ -2478,7 +2478,7 @@ printdecisions(Solver *solv)
       else if (!solv->rc_output)
 	{
 	  printf("update  %s-%s.%s  (obsoletes", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	  for (j = solv->system->start; j < solv->system->start + solv->system->nsolvables; j++)
+	  for (j = solv->installed->start; j < solv->installed->start + solv->installed->nsolvables; j++)
 	    {
 	      if (obsoletesmap[j] != p)
 		continue;
@@ -2491,7 +2491,7 @@ printdecisions(Solver *solv)
       else
 	{
 	  Solvable *f, *fn = 0;
-	  for (j = solv->system->start; j < solv->system->start + solv->system->nsolvables; j++)
+	  for (j = solv->installed->start; j < solv->installed->start + solv->installed->nsolvables; j++)
 	    {
 	      if (obsoletesmap[j] != p)
 		continue;
@@ -2543,12 +2543,12 @@ create_obsolete_index(Solver *solv)
 {
   Pool *pool = solv->pool;
   Solvable *s;
-  Repo *system = solv->system;
+  Repo *installed = solv->installed;
   Id p, *pp, obs, *obsp, *obsoletes, *obsoletes_data;
   int i, n;
 
-  /* create reverse obsoletes map for system solvables */
-  solv->obsoletes = obsoletes = xcalloc(system->nsolvables, sizeof(Id));
+  /* create reverse obsoletes map for installed solvables */
+  solv->obsoletes = obsoletes = xcalloc(installed->nsolvables, sizeof(Id));
   for (i = 1; i < pool->nsolvables; i++)
     {
       s = pool->solvables + i;
@@ -2560,15 +2560,15 @@ create_obsolete_index(Solver *solv)
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
-	    if (p < system->start || p >= system->start + system->nsolvables)
+	    if (p < installed->start || p >= installed->start + installed->nsolvables)
 	      continue;
 	    if (pool->solvables[p].name == s->name)
 	      continue;
-	    obsoletes[p - system->start]++;
+	    obsoletes[p - installed->start]++;
 	  }
     }
   n = 0;
-  for (i = 0; i < system->nsolvables; i++)
+  for (i = 0; i < installed->nsolvables; i++)
     if (obsoletes[i])
       {
         n += obsoletes[i] + 1;
@@ -2587,11 +2587,11 @@ create_obsolete_index(Solver *solv)
       while ((obs = *obsp++) != 0)
         FOR_PROVIDES(p, pp, obs)
 	  {
-	    if (p < system->start || p >= system->start + system->nsolvables)
+	    if (p < installed->start || p >= installed->start + installed->nsolvables)
 	      continue;
 	    if (pool->solvables[p].name == s->name)
 	      continue;
-	    p -= system->start;
+	    p -= installed->start;
 	    if (obsoletes_data[obsoletes[p]] != i)
 	      obsoletes_data[--obsoletes[p]] = i;
 	  }
@@ -2644,7 +2644,7 @@ solve(Solver *solv, Queue *job)
    * 
    */
 
-  for (i = solv->system->start; i < solv->system->start + solv->system->nsolvables; i++)
+  for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
     addrulesforsolvable(solv, pool->solvables + i, &addedmap);
 
   /*
@@ -2654,7 +2654,7 @@ solve(Solver *solv, Queue *job)
    * 
    */
 
-  if (solv->noupdateprovide && solv->system->nsolvables)
+  if (solv->noupdateprovide && solv->installed->nsolvables)
     create_obsolete_index(solv);
 
   /*
@@ -2701,11 +2701,11 @@ solve(Solver *solv, Queue *job)
   if (!solv->allowuninstall)
     {
       /* add update rule for every installed package */
-      for (i = solv->system->start; i < solv->system->start + solv->system->nsolvables; i++)
+      for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
         addupdaterule(solv, pool->solvables + i, &addedmap, solv->allowdowngrade, solv->allowarchchange, 1);
     }
 #else  /* this is just to add the needed rpm rules to our set */
-  for (i = solv->system->start; i < solv->system->start + solv->system->nsolvables; i++)
+  for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
     addupdaterule(solv, pool->solvables + i, &addedmap, 1, 1, 1);
 #endif
 
@@ -2830,7 +2830,7 @@ solve(Solver *solv, Queue *job)
   
   if (!solv->allowuninstall)
     {				       /* loop over all installed solvables */
-      for (i = solv->system->start; i < solv->system->start + solv->system->nsolvables; i++)
+      for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
       {
 	if (!MAPTST(&noupdaterule, i)) /* if not marked as 'noupdate' */
 	  addupdaterule(solv, pool->solvables + i, &addedmap, solv->allowdowngrade, solv->allowarchchange, 0);
@@ -2838,21 +2838,21 @@ solve(Solver *solv, Queue *job)
 	  addrule(solv, 0, 0);		/* place holder */
       }
       /* consistency check: we added a rule for _every_ system solvable */
-      if (solv->nrules - solv->systemrules != solv->system->nsolvables)
+      if (solv->nrules - solv->systemrules != solv->installed->nsolvables)
 	abort();
     }
 
   if (pool->verbose) printf("problems so far: %d\n", solv->problems.count);
 
   /* create special weak system rules */
-  if (solv->system->nsolvables)
+  if (solv->installed->nsolvables)
     {
-      solv->weaksystemrules = xcalloc(solv->system->nsolvables, sizeof(Id));
-      for (i = 0; i < solv->system->nsolvables; i++)
+      solv->weaksystemrules = xcalloc(solv->installed->nsolvables, sizeof(Id));
+      for (i = 0; i < solv->installed->nsolvables; i++)
 	{
-	  if (MAPTST(&noupdaterule, solv->system->start + i))
+	  if (MAPTST(&noupdaterule, solv->installed->start + i))
 	    continue;
-	  findupdatepackages(solv, pool->solvables + solv->system->start + i, &q, (Map *)0, 1, 1);
+	  findupdatepackages(solv, pool->solvables + solv->installed->start + i, &q, (Map *)0, 1, 1);
 	  if (q.count)
 	    solv->weaksystemrules[i] = pool_queuetowhatprovides(pool, &q);
 	}
@@ -2868,10 +2868,10 @@ solve(Solver *solv, Queue *job)
   /* try real hard to keep packages installed */
   if (0)
     {
-      for (i = 0; i < solv->system->nsolvables; i++)
+      for (i = 0; i < solv->installed->nsolvables; i++)
 	{
 	  d = solv->weaksystemrules[i];
-	  addrule(solv, solv->system->start + i, d);
+	  addrule(solv, solv->installed->start + i, d);
 	}
     }
 
@@ -3023,13 +3023,13 @@ solve(Solver *solv, Queue *job)
 	      else if (why >= solv->systemrules && why < solv->weakrules)
 		{
 		  Solvable *sd = 0;
-		  s = pool->solvables + solv->system->start + (why - solv->systemrules);
+		  s = pool->solvables + solv->installed->start + (why - solv->systemrules);
 		  if (solv->weaksystemrules && solv->weaksystemrules[why - solv->systemrules])
 		    {
 		      Id *dp = pool->whatprovidesdata + solv->weaksystemrules[why - solv->systemrules];
 		      for (; *dp; dp++)
 			{
-			  if (*dp >= solv->system->start && *dp < solv->system->start + solv->system->nsolvables)
+			  if (*dp >= solv->installed->start && *dp < solv->installed->start + solv->installed->nsolvables)
 			    continue;
 			  if (solv->decisionmap[*dp] > 0)
 			    {
