@@ -632,20 +632,15 @@ endElement(void *userData, const char *name)
 	  char *cflavor = strdup(flavor);	/* make pointer safe */
 
 	  Id npr;
-	  Id pid, *pidp;
+	  Id pid;
 
 	  /* this is either a kernel package or a kmp */
 	  if (s->provides)
 	    {
-	      int prov;
+	      Offset prov = s->provides;
 	      npr = 0;
-	      for ( prov = s->provides; ( pidp = pd->repo->idarraydata + prov) != 0; ++prov)
+	      while ((pid = pd->repo->idarraydata[prov++]) != 0)
 		{
-		  if (!*pidp)
-		    break;
-
-		  pid = *pidp;
-
 		  const char *depname = 0;
 		  Reldep *prd = 0;
 
@@ -680,16 +675,10 @@ endElement(void *userData, const char *name)
 
 	  if (s->requires)
 	    {
-	      int reqs;
+	      Offset reqs = s->requires;
 	      npr = 0;
-
-	      for ( reqs = s->requires; ( pidp = pd->repo->idarraydata + reqs) != 0; ++reqs)
+	      while ((pid = pd->repo->idarraydata[reqs++]) != 0)
 		{
-		  if (!*pidp)
-		    break;
-
-		  pid = *pidp;
-
 		  const char *depname = 0;
 		  Reldep *prd = 0;
 
