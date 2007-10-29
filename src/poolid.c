@@ -231,8 +231,6 @@ id2evr(Pool *pool, Id id)
   return pool->stringspace + pool->strings[rd->evr];
 }
 
-#define DEP2STRBUF 16
-
 const char *
 dep2str(Pool *pool, Id id)
 {

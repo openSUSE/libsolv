@@ -250,11 +250,10 @@ void
 pool_prepare(Pool *pool)
 {
   int i, num, np, extra;
-  unsigned int n;
   Offset off;
   Solvable *s;
   Id id;
-  Offset *idp;
+  Offset *idp, n;
   Offset *whatprovides;
   Id *whatprovidesdata, *d;
 

@@ -44,7 +44,7 @@ pool_addrepo_empty(Pool *pool)
  * 
  */
 
-unsigned int
+Offset
 repo_addid(Repo *repo, Offset olddeps, Id id)
 {
   Id *idarray;
@@ -108,7 +108,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
  * 
  */
 
-unsigned int
+Offset
 repo_addid_dep(Repo *repo, Offset olddeps, Id id, int isreq)
 {
   Id oid, *oidp, *marker = 0;
@@ -175,8 +175,8 @@ repo_addid_dep(Repo *repo, Offset olddeps, Id id, int isreq)
  * make space for 'num' more dependencies
  */
 
-unsigned int
-repo_reserve_ids(Repo *repo, unsigned int olddeps, int num)
+Offset
+repo_reserve_ids(Repo *repo, Offset olddeps, int num)
 {
   num++;	/* room for trailing ID_NULL */
 
@@ -272,8 +272,8 @@ pool_freerepo(Pool *pool, Repo *repo)
   xfree(repo);
 }
 
-unsigned int
-repo_fix_legacy(Repo *repo, unsigned int provides, unsigned int supplements)
+Offset
+repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 {
   Pool *pool = repo->pool;
   Id id, idp, idl, idns;
