@@ -30,9 +30,13 @@ static int
 prune_best_version_arch_sortcmp(const void *ap, const void *bp)
 {
   Pool *pool = prune_best_version_arch_sortcmp_data;
+  int r;
   Id a = *(Id *)ap;
   Id b = *(Id *)bp;
-  return pool->solvables[a].name - pool->solvables[b].name;
+  r = pool->solvables[a].name - pool->solvables[b].name;
+  if (r)
+    return r;
+  return a - b;
 }
 
 
@@ -58,6 +62,9 @@ replaces_installed(Solver *solv, Id id)
 static int
 dep_installed(Solver *solv, Id dep)
 {
+  /* disable for now, splitprovides don't work anyway and it breaks
+     a testcase */
+#if 0
   Pool *pool = solv->pool;
   Id p, *pp;
 
@@ -78,6 +85,7 @@ dep_installed(Solver *solv, Id dep)
       if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables)
 	return 1;
     }
+#endif
   return 0;
 }
 
@@ -267,6 +275,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
  */
 
 /* FIXME: must also look at update packages */
+/* FIXME: should prefer installed if identical version */
 
 void
 prune_best_version_arch(Pool *pool, Queue *plist)
@@ -312,8 +321,36 @@ prune_best_version_arch(Pool *pool, Queue *plist)
   /* sort by name first */
   qsort(plist->elements, plist->count, sizeof(Id), prune_best_version_arch_sortcmp);
 
+  /* delete obsoleted. hmm, looks expensive! */
+  for (i = 0; i < plist->count; i++)
+    {
+      Id p, *pp, obs, *obsp;
+      s = pool->solvables + plist->elements[i];
+      if (!s->obsoletes)
+	continue;
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(p, pp, obs)
+	    {
+	      if (pool->solvables[p].name == s->name)
+		continue;
+	      for (j = 0; j < plist->count; j++)
+		{
+		  if (i == j)
+		    continue;
+		  if (plist->elements[j] == p)
+		    plist->elements[j] = 0;
+		}
+	    }
+	}
+    }
+  for (i = j = 0; i < plist->count; i++)
+    if (plist->elements[i])
+      plist->elements[j++] = plist->elements[i];
+  plist->count = j;
+
   /* now find best 'per name' */
-  /* FIXME: also check obsoletes! */
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
@@ -1965,8 +2002,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (solv->decisionmap[i] > 0 || (solv->decisionmap[i] < 0 && solv->weaksystemrules[i - solv->installed->start] == 0))
 		    continue;
 		  queue_empty(&dq);
-		  if (solv->decisionmap[i] == 0)
-		    queue_push(&dq, i);
 		  if (solv->weaksystemrules[i - solv->installed->start])
 		    {
 		      dp = pool->whatprovidesdata + solv->weaksystemrules[i - solv->installed->start];
@@ -1980,13 +2015,17 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		      if (p)
 			continue;	/* rule is already true */
 		    }
-		  if (!dq.count)
+		  if (!dq.count && solv->decisionmap[i] != 0)
 		    continue;
 
 		  if (dq.count > 1)
 		    prune_to_highest_prio(pool, &dq);
 		  if (dq.count > 1)
 		    prune_to_recommended(solv, &dq);
+		  /* FIXME we push it that late so that it doesn't get
+                   * pruned. should do things a bit different instead! */
+		  if (solv->decisionmap[i] == 0)
+		    queue_push(&dq, i);
 		  if (dq.count > 1)
 		    prune_best_version_arch(pool, &dq);
 #if 0
@@ -2394,6 +2433,28 @@ printdecisions(Solver *solv)
   obsoletesmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
   for (i = 0; i < solv->decisionq.count; i++)
     {
+      Id *pp, n;
+
+      n = solv->decisionq.elements[i];
+      if (n < 0)
+	continue;
+      if (n == SYSTEMSOLVABLE)
+	continue;
+      if (n >= solv->installed->start && n < solv->installed->start + solv->installed->nsolvables)
+	continue;
+      s = pool->solvables + n;
+      FOR_PROVIDES(p, pp, s->name)
+	if (s->name == pool->solvables[p].name)
+	  {
+	    if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables && !obsoletesmap[p])
+	      {
+	        obsoletesmap[p] = n;
+	        obsoletesmap[n]++;
+	      }
+	  }
+    }
+  for (i = 0; i < solv->decisionq.count; i++)
+    {
       Id obs, *obsp;
       Id *pp, n;
 
@@ -2405,26 +2466,16 @@ printdecisions(Solver *solv)
       if (n >= solv->installed->start && n < solv->installed->start + solv->installed->nsolvables)
 	continue;
       s = pool->solvables + n;
-      if (s->obsoletes)
-	{
-	  obsp = s->repo->idarraydata + s->obsoletes;
-	  while ((obs = *obsp++) != 0)
-	    FOR_PROVIDES(p, pp, obs)
-	      {
-		if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables)
-		  {
-		    obsoletesmap[p] = n;
-		    obsoletesmap[n]++;
-		  }
-	      }
-	}
-      FOR_PROVIDES(p, pp, s->name)
-	if (s->name == pool->solvables[p].name)
+      if (!s->obsoletes)
+	continue;
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	FOR_PROVIDES(p, pp, obs)
 	  {
-	    if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables)
+	    if (p >= solv->installed->start && p < solv->installed->start + solv->installed->nsolvables && !obsoletesmap[p])
 	      {
-	        obsoletesmap[p] = n;
-	        obsoletesmap[n]++;
+		obsoletesmap[p] = n;
+		obsoletesmap[n]++;
 	      }
 	  }
     }
