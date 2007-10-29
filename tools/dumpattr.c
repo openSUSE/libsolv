@@ -67,6 +67,9 @@ main (void)
   unsigned int i;
   Pool *pool = pool_create ();
   Attrstore *s = attr_store_read (stdin, pool);
+  /* For now test the packing code.  */
+  attr_store_pack (s);
+  attr_store_unpack (s);
   fprintf (stdout, "attribute store contains %d entities\n", s->entries);
   for (i = 0; i < s->entries; i++)
     {

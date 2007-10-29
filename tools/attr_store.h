@@ -15,6 +15,8 @@ unsigned int new_entry (Attrstore *s);
 Attrstore * attr_store_read (FILE *fp, struct _Pool *pool);
 void ensure_entry (Attrstore *s, unsigned int entry);
 void write_attr_store (FILE *fp, Attrstore *s);
+void attr_store_pack (Attrstore *s);
+void attr_store_unpack (Attrstore *s);
 
 NameId  str2nameid (Attrstore *s, const char *str);
 LocalId str2localid (Attrstore *s, const char *str, int create);

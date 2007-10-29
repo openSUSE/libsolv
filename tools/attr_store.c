@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "attr_store.h"
 #include "pool.h"
@@ -341,6 +342,279 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id)
       mynv.v.localids[1] = 0;
       add_attr (s, entry, mynv);
     }
+}
+
+#define FLAT_ATTR_BLOCK 127
+#define ABBR_BLOCK 127
+#define FLAT_ABBR_BLOCK 127
+#define add_elem(buf,ofs,val,block) do { \
+  if (((ofs) & (block)) == 0) \
+    buf = xrealloc (buf, ((ofs) + (block) + 1) * sizeof((buf)[0])); \
+  (buf)[(ofs)++] = val; \
+} while (0)
+#define add_u16(buf,ofs,val,block) do {\
+  typedef int __wrong_buf__[(1-sizeof((buf)[0])) * (sizeof((buf)[0])-1)];\
+  add_elem(buf,ofs,(val) & 0xFF,block); \
+  add_elem(buf,ofs,((val) >> 8) & 0xFF,block); \
+} while (0)
+#define add_num(buf,ofs,val,block) do {\
+  typedef int __wrong_buf__[(1-sizeof((buf)[0])) * (sizeof((buf)[0])-1)];\
+  if ((val) >= (1 << 14)) \
+    { \
+      if ((val) >= (1 << 28)) \
+	add_elem (buf,ofs,((val) >> 28) | 128, block); \
+      if ((val) >= (1 << 21)) \
+	add_elem (buf,ofs,((val) >> 21) | 128, block); \
+      add_elem (buf,ofs,((val) >> 14) | 128, block); \
+    } \
+  if ((val) >= (1 << 7)) \
+    add_elem (buf,ofs,((val) >> 7) | 128, block); \
+  add_elem (buf,ofs,(val) & 127, block); \
+} while (0)
+
+static int
+longnv_cmp (const void *pa, const void *pb)
+{
+  const LongNV *a = (const LongNV *)pa;
+  const LongNV *b = (const LongNV *)pb;
+  int r = a->name - b->name;
+  if (r)
+    return r;
+  r = a->type - b->type;
+  return r;
+}
+
+void
+attr_store_pack (Attrstore *s)
+{
+  unsigned i;
+  unsigned int old_mem = 0;
+  if (s->packed)
+    return;
+  s->ent2attr = xcalloc (s->entries, sizeof (s->ent2attr[0]));
+  s->flat_attrs = 0;
+  s->attr_next_free = 0;
+  s->abbr = 0;
+  s->abbr_next_free = 0;
+  s->flat_abbr = 0;
+  s->flat_abbr_next_free = 0;
+
+  add_num (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
+  add_elem (s->abbr, s->abbr_next_free, 0, ABBR_BLOCK);
+  add_elem (s->flat_abbr, s->flat_abbr_next_free, 0, FLAT_ABBR_BLOCK);
+
+  for (i = 0; i < s->entries; i++)
+    {
+      unsigned int num_attrs = 0, ofs;
+      LongNV *nv = s->attrs[i];
+      if (nv)
+        while (nv->name)
+	  nv++, num_attrs++;
+      if (nv)
+        old_mem += (num_attrs + 1) * sizeof (LongNV);
+      if (!num_attrs)
+        continue;
+      qsort (s->attrs[i], num_attrs, sizeof (LongNV), longnv_cmp);
+      unsigned int this_abbr;
+      nv = s->attrs[i];
+      for (this_abbr = 0; this_abbr < s->abbr_next_free; this_abbr++)
+        {
+	  for (ofs = 0; ofs < num_attrs; ofs++)
+	    {
+	      unsigned short name_type = (nv[ofs].name << 4) | nv[ofs].type;
+	      assert (s->abbr[this_abbr] + ofs < s->flat_abbr_next_free);
+	      if (name_type != s->flat_abbr[s->abbr[this_abbr]+ofs])
+		break;
+	    }
+	  if (ofs == num_attrs && !s->flat_abbr[s->abbr[this_abbr]+ofs])
+	    break;
+	}
+      if (this_abbr == s->abbr_next_free)
+        {
+	  /* This schema not found --> insert it.  */
+	  add_elem (s->abbr, s->abbr_next_free, s->flat_abbr_next_free, ABBR_BLOCK);
+	  for (ofs = 0; ofs < num_attrs; ofs++)
+	    {
+	      unsigned short name_type = (nv[ofs].name << 4) | nv[ofs].type;
+	      add_elem (s->flat_abbr, s->flat_abbr_next_free, name_type, FLAT_ABBR_BLOCK);
+	    }
+	  add_elem (s->flat_abbr, s->flat_abbr_next_free, 0, FLAT_ABBR_BLOCK);
+	}
+      s->ent2attr[i] = s->attr_next_free;
+      add_num (s->flat_attrs, s->attr_next_free, this_abbr, FLAT_ATTR_BLOCK);
+      for (ofs = 0; ofs < num_attrs; ofs++)
+	switch (nv[ofs].type)
+	  {
+	    case ATTR_INT:
+	    case ATTR_ID:
+	      {
+	        unsigned int i = nv[ofs].v.i[0];
+		add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
+	        break;
+	      }
+	    case ATTR_CHUNK:
+	      {
+	        unsigned int i = nv[ofs].v.i[0];
+		add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
+		i = nv[ofs].v.i[1];
+		add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
+	        break;
+	      }
+	    case ATTR_STRING:
+	      {
+	        const char *str = nv[ofs].v.str;
+		for (; *str; str++)
+		  add_elem (s->flat_attrs, s->attr_next_free, *str, FLAT_ATTR_BLOCK);
+		add_elem (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
+		old_mem += strlen ((const char*)nv[ofs].v.str) + 1;
+		xfree ((void*)nv[ofs].v.str);
+		break;
+	      }
+	    case ATTR_INTLIST:
+	      {
+		const int *il = nv[ofs].v.intlist;
+		int i;
+		for (; (i = *il) != 0; il++, old_mem += 4)
+		  add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
+		add_num (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
+		old_mem+=4;
+		xfree (nv[ofs].v.intlist);
+	        break;
+	      }
+	    case ATTR_LOCALIDS:
+	      {
+		const Id *il = nv[ofs].v.localids;
+		Id i;
+		for (; (i = *il) != 0; il++, old_mem += 4)
+		  add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
+		add_num (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
+		old_mem += 4;
+		xfree (nv[ofs].v.localids);
+	        break;
+	      }
+	    default:
+	      break;
+	  }
+      xfree (nv);
+    }
+  old_mem += s->entries * sizeof (s->attrs[0]);
+  free (s->attrs);
+  s->attrs = 0;
+
+  fprintf (stderr, "%d\n", old_mem);
+  fprintf (stderr, "%d\n", s->entries * sizeof(s->ent2attr[0]));
+  fprintf (stderr, "%d\n", s->attr_next_free);
+  fprintf (stderr, "%d\n", s->abbr_next_free * sizeof(s->abbr[0]));
+  fprintf (stderr, "%d\n", s->flat_abbr_next_free * sizeof(s->flat_abbr[0]));
+  s->packed = 1;
+}
+
+#define get_num(ptr,val) do { \
+  typedef int __wrong_buf__[(1-sizeof((ptr)[0])) * (sizeof((ptr)[0])-1)];\
+  val = 0; \
+  while (1) { \
+    unsigned char __c = *((ptr)++); \
+    (val) = ((val) << 7) | (__c & 0x7F); \
+    if ((__c & 0x80) == 0) \
+      break; \
+  } \
+} while (0)
+
+void
+attr_store_unpack (Attrstore *s)
+{
+  unsigned int i;
+  if (!s->packed)
+    return;
+
+  /* Make the store writable right away, so we can use our adder functions.  */
+  s->packed = 0;
+  s->attrs = xcalloc (s->entries, sizeof (s->attrs[0]));
+
+  for (i = 0; i < s->entries; i++)
+    {
+      unsigned char *attrs;
+      unsigned int this_abbr;
+      if (!s->ent2attr[i])
+        continue;
+      attrs = s->flat_attrs + s->ent2attr[i];
+      get_num (attrs, this_abbr);
+      unsigned short *abbr = s->flat_abbr + s->abbr[this_abbr];
+      while (*abbr)
+        {
+	  NameId name = (*abbr) >> 4;
+	  switch ((*abbr) & 15)
+	    {
+	    case ATTR_INT:
+	      {
+	        int val;
+		get_num (attrs, val);
+		add_attr_int (s, i, name, val); 
+	        break;
+	      }
+	    case ATTR_ID:
+	      {
+	        Id val;
+		get_num (attrs, val);
+		add_attr_id (s, i, name, val); 
+	        break;
+	      }
+	    case ATTR_CHUNK:
+	      {
+	        unsigned int val1, val2;
+		get_num (attrs, val1);
+		get_num (attrs, val2);
+		add_attr_chunk (s, i, name, val1, val2);
+	        break;
+	      }
+	    case ATTR_STRING:
+	      {
+		add_attr_string (s, i, name, (const char*)attrs);
+		attrs += strlen ((const char*)attrs) + 1;
+		break;
+	      }
+	    case ATTR_INTLIST:
+	      {
+		while (1)
+		  {
+		    int val;
+		    get_num (attrs, val);
+		    if (!val)
+		      break;
+		    add_attr_intlist_int (s, i, name, val);
+		  }
+	        break;
+	      }
+	    case ATTR_LOCALIDS:
+	      {
+		while (1)
+		  {
+		    Id val;
+		    get_num (attrs, val);
+		    if (!val)
+		      break;
+		    add_attr_localids_id (s, i, name, val);
+		  }
+	        break;
+	      }
+	    default:
+	      break;
+	    }
+	  abbr++;
+	}
+    }
+
+  xfree (s->ent2attr);
+  s->ent2attr = 0;
+  xfree (s->flat_attrs);
+  s->flat_attrs = 0;
+  s->attr_next_free = 0;
+  xfree (s->abbr);
+  s->abbr = 0;
+  s->abbr_next_free = 0;
+  xfree (s->flat_abbr);
+  s->flat_abbr = 0;
+  s->flat_abbr_next_free = 0;
 }
 
 static void
