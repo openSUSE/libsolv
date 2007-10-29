@@ -501,6 +501,13 @@ attr_store_pack (Attrstore *s)
   free (s->attrs);
   s->attrs = 0;
 
+  /* Remove the hashtable too, it will be build on demand in str2localid
+     the next time we call it, which should not happen while in packed mode.  */
+  old_mem += (s->stringhashmask + 1) * sizeof (s->stringhashtbl[0]);
+  free (s->stringhashtbl);
+  s->stringhashtbl = 0;
+  s->stringhashmask = 0;
+
   fprintf (stderr, "%d\n", old_mem);
   fprintf (stderr, "%d\n", s->entries * sizeof(s->ent2attr[0]));
   fprintf (stderr, "%d\n", s->attr_next_free);
@@ -631,16 +638,6 @@ write_u32(FILE *fp, unsigned int x)
 }
 
 static void
-write_u8(FILE *fp, unsigned int x)
-{
-  if (putc(x, fp) == EOF)
-    {
-      perror("write error");
-      exit(1);
-    }
-}
-
-static void
 write_id(FILE *fp, Id x)
 {
   if (x >= (1 << 14))
@@ -660,84 +657,14 @@ write_id(FILE *fp, Id x)
     }
 }
 
-static void
-write_idarray(FILE *fp, Id *ids)
-{
-  Id id;
-  if (!ids)
-    return;
-  if (!*ids)
-    {
-      write_u8(fp, 0);
-      return;
-    }
-  for (;;)
-    {
-      id = *ids++;
-      if (id >= 64)
-	id = (id & 63) | ((id & ~63) << 1);
-      if (!*ids)
-	{
-	  write_id(fp, id);
-	  return;
-	}
-      write_id(fp, id | 64);
-    }
-}
-
-static void
-write_attrs (FILE *fp, LongNV *nv)
-{
-  if (!nv)
-    {
-      write_id (fp, 0);
-      return;
-    }
-  while (nv->name)
-    {
-      write_id (fp, nv->name);
-      write_u8 (fp, nv->type);
-      switch (nv->type)
-	{
-	  case ATTR_INT:
-	  case ATTR_ID:
-	    write_id (fp, nv->v.i[0]);
-	    break;
-	  case ATTR_CHUNK:
-	    write_id (fp, nv->v.i[0]);
-	    write_id (fp, nv->v.i[1]);
-	    break;
-	  case ATTR_STRING:
-	    if (fputs (nv->v.str, fp) == EOF
-	        || putc (0, fp) == EOF)
-	      {
-	        perror ("write error");
-	        exit (1);
-	      }
-	    break;
-	  case ATTR_INTLIST:
-	    {
-	      write_idarray (fp, nv->v.intlist);
-	      break;
-	    }
-	  case ATTR_LOCALIDS:
-	    {
-	      write_idarray (fp, nv->v.localids);
-	      break;
-	    }
-	  default:
-	    break;
-	}
-      nv++;
-    }
-  write_id (fp, 0);
-}
-
 void
 write_attr_store (FILE *fp, Attrstore *s)
 {
   unsigned i;
   unsigned local_ssize;
+
+  attr_store_pack (s);
+
   write_u32 (fp, s->entries);
   write_u32 (fp, s->num_nameids);
   write_u32 (fp, s->nstrings);
@@ -765,8 +692,30 @@ write_attr_store (FILE *fp, Attrstore *s)
 	}
     }
 
+  int last = 0;
   for (i = 0; i < s->entries; i++)
-    write_attrs (fp, s->attrs[i]);
+    if (i == 0 || s->ent2attr[i] == 0)
+      write_id (fp, s->ent2attr[i]);
+    else
+      {
+        write_id (fp, s->ent2attr[i] - last);
+	assert (last < s->ent2attr[i]);
+	last = s->ent2attr[i];
+      }
+
+  write_u32 (fp, s->attr_next_free);
+  if (fwrite (s->flat_attrs, s->attr_next_free, 1, fp) != 1)
+    {
+      perror ("write error");
+      exit (1);
+    }
+
+  write_u32 (fp, s->flat_abbr_next_free);
+  if (fwrite (s->flat_abbr, s->flat_abbr_next_free * sizeof (s->flat_abbr[0]), 1, fp) != 1)
+    {
+      perror ("write error");
+      exit (1);
+    }
 }
 
 static unsigned int
@@ -801,35 +750,6 @@ read_u8(FILE *fp)
   return c;
 }
 
-static const char *
-read_string (FILE *fp)
-{
-  char *buf;
-  size_t buflen;
-  buflen = 128;
-  buf = malloc (buflen);
-  size_t p = 0;
-  while (1)
-    {
-      int c = getc (fp);
-      if (c == EOF)
-	{
-	  perror ("error reading string");
-	  exit (1);
-	}
-      if (p == buflen)
-	{
-	  buflen += 128;
-	  buf = realloc (buf, buflen);
-	}
-      buf[p++] = c;
-      if (!c)
-	break;
-    }
-  buf = realloc (buf, p);
-  return buf;
-}
-
 static Id
 read_id(FILE *fp, Id max)
 {
@@ -860,105 +780,6 @@ read_id(FILE *fp, Id max)
   exit(1);
 }
 
-static Id *
-read_idarray (FILE *fp, Id max)
-{
-  Id *ret, id;
-  unsigned int len, num_elem;
-
-  id = read_id (fp, 0);
-  if (!id)
-    {
-      ret = malloc (sizeof (ret[0]));
-      ret[0] = 0;
-      return ret;
-    }
-
-  num_elem = 0;
-  len = 8;
-  ret = malloc (len * sizeof (ret[0]));
-  for (;;)
-    {
-      Id real = (id & 63) | ((id >> 1) & ~63);
-      if (max && real >= max)
-	{
-	  fprintf(stderr, "read_id: id too large (%u/%u)\n", real, max);
-	  exit(1);
-	}
-      ret[num_elem++] = real;
-      if (num_elem == len)
-        {
-	  len += 8;
-	  ret = realloc (ret, len * sizeof (ret[0]));
-	}
-      if ((id & 64) == 0)
-        {
-          ret[num_elem++] = 0;
-	  break;
-	}
-      id = read_id (fp, 0);
-    }
-  ret = realloc (ret, num_elem * sizeof (ret[0]));
-  return ret;
-}
-
-static LongNV *
-read_attrs (FILE *fp, Attrstore *s)
-{
-  LongNV *ret, *nv;
-  unsigned int len, num_elem;
-  Id id = read_id (fp, s->num_nameids);
-  if (!id)
-    return 0;
-  len = 16;
-  num_elem = 0;
-  ret = malloc (len * sizeof (ret[0]));
-  nv = ret;
-  while (id)
-    {
-      nv->name = id;
-      nv->type = read_u8 (fp);
-      switch (nv->type)
-	{
-	  case ATTR_INT:
-	  case ATTR_ID:
-	    nv->v.i[0] = read_id (fp, 0);
-	    break;
-	  case ATTR_CHUNK:
-	    nv->v.i[0] = read_id (fp, 0);
-	    nv->v.i[1] = read_id (fp, 0);
-	    break;
-	  case ATTR_STRING:
-	    nv->v.str = read_string (fp);
-	    break;
-	  case ATTR_INTLIST:
-	    {
-	      nv->v.intlist = read_idarray (fp, 0);
-	      break;
-	    }
-	  case ATTR_LOCALIDS:
-	    {
-	      nv->v.localids = read_idarray (fp, s->nstrings);
-	      break;
-	    }
-	  default:
-	    break;
-	}
-      num_elem++;
-      if (num_elem == len)
-        {
-	  len += 16;
-	  ret = realloc (ret, len * sizeof (ret[0]));
-	}
-      nv = ret + num_elem;
-      id = read_id (fp, s->num_nameids);
-    }
-  nv->name = 0;
-  num_elem++;
-  ret = realloc (ret, num_elem * sizeof (ret[0]));
-  return ret;
-}
-
 Attrstore *
 attr_store_read (FILE *fp, Pool *pool)
 {
@@ -974,8 +795,6 @@ attr_store_read (FILE *fp, Pool *pool)
   s->num_nameids = read_u32 (fp);
   nstrings = read_u32 (fp);
 
-  ensure_entry (s, nentries);
-
   buflen = 128;
   buf = malloc (buflen);
 
@@ -985,12 +804,7 @@ attr_store_read (FILE *fp, Pool *pool)
       size_t p = 0;
       while (1)
         {
-	  int c = getc (fp);
-	  if (c == EOF)
-	    {
-	      perror ("error reading namestrings");
-	      exit (1);
-	    }
+	  int c = read_u8 (fp);
 	  if (p == buflen)
 	    {
 	      buflen += 128;
@@ -1018,30 +832,66 @@ attr_store_read (FILE *fp, Pool *pool)
     }
   strsp[local_ssize] = 0;
 
-  s->stringhashmask = mkmask(nstrings);
-  xfree (s->stringhashtbl);
-  s->stringhashtbl = (Hashtable)xcalloc(s->stringhashmask + 1, sizeof(Id));
+  /* Don't build hashtable here, it will be built on demand by str2localid
+     should we call that.  */
 
   strsp = s->stringspace;
   s->nstrings = nstrings;
   for (i = 0; i < nstrings; i++)
     {
       str[i] = strsp - s->stringspace;
-      Hashval h = strhash(strsp) & s->stringhashmask;
-      unsigned int hh = HASHCHAIN_START;
-      while (s->stringhashtbl[h] != 0)
-	h = HASHCHAIN_NEXT(h, hh, s->stringhashmask);
-      s->stringhashtbl[h] = i;
       strsp += strlen (strsp) + 1;
     }
   s->sstrings = strsp - s->stringspace;
 
-  for (i = 0; i < nentries; i++)
-    s->attrs[i] = read_attrs (fp, s);
-
   s->entries = nentries;
 
+  s->ent2attr = xmalloc (s->entries * sizeof (s->ent2attr[0]));
+  int last = 0;
+  for (i = 0; i < s->entries; i++)
+    {
+      int d = read_id (fp, 0);
+      if (i == 0 || d == 0)
+        s->ent2attr[i] = d;
+      else
+        {
+	  last += d;
+	  s->ent2attr[i] = last;
+	}
+    }
+
+  s->attr_next_free = read_u32 (fp);
+  s->flat_attrs = xmalloc (((s->attr_next_free + FLAT_ATTR_BLOCK) & ~(FLAT_ATTR_BLOCK + 1)) * sizeof (s->flat_attrs[0]));
+  if (fread (s->flat_attrs, s->attr_next_free, 1, fp) != 1)
+    {
+      perror ("read error");
+      exit (1);
+    }
+
+  s->flat_abbr_next_free = read_u32 (fp);
+  s->flat_abbr = xmalloc (((s->flat_abbr_next_free + FLAT_ABBR_BLOCK) & ~(FLAT_ABBR_BLOCK + 1)) * sizeof (s->flat_abbr[0]));
+  if (fread (s->flat_abbr, s->flat_abbr_next_free * sizeof (s->flat_abbr[0]), 1, fp) != 1)
+    {
+      perror ("read error");
+      exit (1);
+    }
+
+  assert (s->flat_abbr[0] == 0);
+  s->abbr_next_free = 0;
+  s->abbr = 0;
+  add_elem (s->abbr, s->abbr_next_free, 0, ABBR_BLOCK);
+
+  unsigned int abbi;
+  for (abbi = 0; abbi < s->flat_abbr_next_free - 1; abbi++)
+    if (s->flat_abbr[abbi] == 0)
+      add_elem (s->abbr, s->abbr_next_free, abbi + 1, ABBR_BLOCK);
+  assert (s->flat_abbr[abbi] == 0);
+
+  s->packed = 1;
+
   free (buf);
+
+  attr_store_unpack (s);
 
   return s;
 }
