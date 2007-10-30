@@ -16,20 +16,8 @@
 
 #define NAME_WIDTH 12
 #define TYPE_WIDTH (16-NAME_WIDTH)
-typedef union
-{
-  struct {
-    unsigned short name : NAME_WIDTH;
-    unsigned short type : TYPE_WIDTH;
-  } nt;
-  unsigned short as_short;
-} NameType;
 
-typedef struct
-{
-  NameType n;
-  char val[0];
-} __attribute__((packed)) NameVal;
+#define BLOB_BLOCK 65535
 
 #define STRINGSPACE_BLOCK 1023
 #define STRING_BLOCK 127
@@ -261,7 +249,7 @@ add_attr_int (Attrstore *s, unsigned int entry, NameId name, unsigned int val)
   add_attr (s, entry, nv);
 }
 
-void
+static void
 add_attr_chunk (Attrstore *s, unsigned int entry, NameId name, unsigned int ofs, unsigned int len)
 {
   LongNV nv;
@@ -270,6 +258,17 @@ add_attr_chunk (Attrstore *s, unsigned int entry, NameId name, unsigned int ofs,
   nv.v.i[0] = ofs;
   nv.v.i[1] = len;
   add_attr (s, entry, nv);
+}
+
+void
+add_attr_blob (Attrstore *s, unsigned int entry, NameId name, const void *ptr, unsigned int len)
+{
+  if (((s->blob_next_free + BLOB_BLOCK) & ~BLOB_BLOCK)
+      != ((s->blob_next_free + len + BLOB_BLOCK) & ~BLOB_BLOCK))
+    s->blob_store = xrealloc (s->blob_store, (s->blob_next_free + len + BLOB_BLOCK) & ~BLOB_BLOCK);
+  memcpy (s->blob_store + s->blob_next_free, ptr, len);
+  add_attr_chunk (s, entry, name, s->blob_next_free, len);
+  s->blob_next_free += len;
 }
 
 void
@@ -342,6 +341,14 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id)
       mynv.v.localids[1] = 0;
       add_attr (s, entry, mynv);
     }
+}
+
+const void *
+attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int len)
+{
+  if (!s->blob_store)
+    return 0;
+  return s->blob_store + ofs;
 }
 
 #define FLAT_ATTR_BLOCK 127
@@ -827,7 +834,7 @@ attr_store_read (FILE *fp, Pool *pool)
     }
 
   s->attr_next_free = read_u32 (fp);
-  s->flat_attrs = xmalloc (((s->attr_next_free + FLAT_ATTR_BLOCK) & ~(FLAT_ATTR_BLOCK + 1)) * sizeof (s->flat_attrs[0]));
+  s->flat_attrs = xmalloc (((s->attr_next_free + FLAT_ATTR_BLOCK) & ~FLAT_ATTR_BLOCK) * sizeof (s->flat_attrs[0]));
   if (fread (s->flat_attrs, s->attr_next_free, 1, fp) != 1)
     {
       perror ("read error");
@@ -835,7 +842,7 @@ attr_store_read (FILE *fp, Pool *pool)
     }
 
   s->flat_abbr_next_free = read_u32 (fp);
-  s->flat_abbr = xmalloc (((s->flat_abbr_next_free + FLAT_ABBR_BLOCK) & ~(FLAT_ABBR_BLOCK + 1)) * sizeof (s->flat_abbr[0]));
+  s->flat_abbr = xmalloc (((s->flat_abbr_next_free + FLAT_ABBR_BLOCK) & ~FLAT_ABBR_BLOCK) * sizeof (s->flat_abbr[0]));
   if (fread (s->flat_abbr, s->flat_abbr_next_free * sizeof (s->flat_abbr[0]), 1, fp) != 1)
     {
       perror ("read error");

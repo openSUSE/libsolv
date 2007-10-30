@@ -30,7 +30,8 @@ struct _Attrstore
   LongNV **attrs;
   unsigned int num_nameids;
   Id *nameids;
-  char *big_store;
+  char *blob_store;
+  unsigned int blob_next_free;
 
   Offset *strings;
   int nstrings;
