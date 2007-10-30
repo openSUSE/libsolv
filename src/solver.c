@@ -14,6 +14,7 @@
 #include "pool.h"
 #include "util.h"
 #include "evr.h"
+#include "poolvendor.h"
 
 #define RULES_BLOCK 63
 
@@ -1073,15 +1074,15 @@ archchanges(Pool *pool, Solvable *s1, Solvable *s2)
   return 0;
 }
 
-
 static void
-findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngrade, int allowarchchange)
+findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngrade, int allowarchchange, int allowvendorchange)
 {
   /* installed packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
   Id p, *pp, n, p2, *pp2;
   Id obs, *obsp;
   Solvable *ps;
+  Id vendormask;
 
   queue_empty(qs);
   /*
@@ -1089,6 +1090,8 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
    * n = solvable Id
    */
   n = s - pool->solvables;
+  vendormask = pool_vendor2mask(pool, s->vendor);
+
   if (m && !MAPTST(m, n))	/* add rule for s if not already done */
     addrulesforsolvable(solv, s, m);
 
@@ -1108,6 +1111,8 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
 	    continue;
 	  /* XXX */
 	  if (!allowarchchange && archchanges(pool, s, ps))
+	    continue;
+	  if (!allowvendorchange && s->vendor != ps->vendor && vendormask && (vendormask & pool_vendor2mask(pool, ps->vendor)) == 0)
 	    continue;
 	}
       else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
@@ -1156,7 +1161,7 @@ findupdatepackages(Solver *solv, Solvable *s, Queue *qs, Map *m, int allowdowngr
  */
 
 static void
-addupdaterule(Solver *solv, Solvable *s, Map *m, int allowdowngrade, int allowarchchange, int dontaddrule)
+addupdaterule(Solver *solv, Solvable *s, Map *m, int allowdowngrade, int allowarchchange, int allowvendorchange, int dontaddrule)
 {
   /* installed packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
@@ -1166,7 +1171,7 @@ addupdaterule(Solver *solv, Solvable *s, Map *m, int allowdowngrade, int allowar
   Id qsbuf[64];
 
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
-  findupdatepackages(solv, s, &qs, m, allowdowngrade, allowarchchange);
+  findupdatepackages(solv, s, &qs, m, allowdowngrade, allowarchchange, allowvendorchange);
   p = s - pool->solvables;
   if (dontaddrule)	/* we consider update candidates but dont force them */
     {
@@ -2737,7 +2742,7 @@ solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_UPDATE:
 	  /* dont allow downgrade */
-	  addupdaterule(solv, pool->solvables + what, &addedmap, 0, 0, 1);
+	  addupdaterule(solv, pool->solvables + what, &addedmap, 0, 0, 0, 1);
 	  break;
 	}
     }
@@ -2754,11 +2759,11 @@ solve(Solver *solv, Queue *job)
     {
       /* add update rule for every installed package */
       for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
-        addupdaterule(solv, pool->solvables + i, &addedmap, solv->allowdowngrade, solv->allowarchchange, 1);
+        addupdaterule(solv, pool->solvables + i, &addedmap, solv->allowdowngrade, solv->allowarchchange, solv->allowvendorchange, 1);
     }
 #else  /* this is just to add the needed rpm rules to our set */
   for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
-    addupdaterule(solv, pool->solvables + i, &addedmap, 1, 1, 1);
+    addupdaterule(solv, pool->solvables + i, &addedmap, 1, 1, 1, 1);
 #endif
 
   addrulesforweak(solv, &addedmap);
@@ -2855,7 +2860,7 @@ solve(Solver *solv, Queue *job)
 	    }
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_UPDATE:              /* find update for solvable */
-	  addupdaterule(solv, pool->solvables + what, &addedmap, 0, 0, 0);
+	  addupdaterule(solv, pool->solvables + what, &addedmap, 0, 0, 0, 0);
 	  queue_push(&solv->ruletojob, i);
 	  break;
 	}
@@ -2885,7 +2890,7 @@ solve(Solver *solv, Queue *job)
       for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
       {
 	if (!MAPTST(&noupdaterule, i)) /* if not marked as 'noupdate' */
-	  addupdaterule(solv, pool->solvables + i, &addedmap, solv->allowdowngrade, solv->allowarchchange, 0);
+	  addupdaterule(solv, pool->solvables + i, &addedmap, solv->allowdowngrade, solv->allowarchchange, solv->allowvendorchange, 0);
         else
 	  addrule(solv, 0, 0);		/* place holder */
       }
@@ -2904,7 +2909,7 @@ solve(Solver *solv, Queue *job)
 	{
 	  if (MAPTST(&noupdaterule, solv->installed->start + i))
 	    continue;
-	  findupdatepackages(solv, pool->solvables + solv->installed->start + i, &q, (Map *)0, 1, 1);
+	  findupdatepackages(solv, pool->solvables + solv->installed->start + i, &q, (Map *)0, 1, 1, 1);
 	  if (q.count)
 	    solv->weaksystemrules[i] = pool_queuetowhatprovides(pool, &q);
 	}
@@ -3098,9 +3103,17 @@ solve(Solver *solv, Queue *job)
 		          printf("- allow downgrade of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
 			  gotone = 1;
 			}
-		      if (!solv->allowarchchange && archchanges(pool, sd, s))
+		      if (!solv->allowarchchange && s->name == sd->name && archchanges(pool, sd, s))
 			{
 		          printf("- allow architecture change of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  gotone = 1;
+			}
+		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && pool_vendor2mask(pool, s->vendor) && (pool_vendor2mask(pool, s->vendor) & pool_vendor2mask(pool, sd->vendor)) == 0)
+			{
+			  if (sd->vendor)
+		            printf("- allow vendor change from '%s' (%s-%s.%s) to '%s' (%s-%s.%s)\n", id2str(pool, s->vendor), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->vendor), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  else
+		            printf("- allow vendor change from '%s' (%s-%s.%s) to no vendor (%s-%s.%s)\n", id2str(pool, s->vendor), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
 			  gotone = 1;
 			}
 		      if (!gotone)
@@ -3117,9 +3130,9 @@ solve(Solver *solv, Queue *job)
 		}
 	    }
 	  printf("------------------------------------\n");
-	  queue_free(&problems);
-	  queue_free(&solution);
 	}
+      queue_free(&solution);
+      queue_free(&problems);
       return;
     }
 

@@ -44,6 +44,7 @@ typedef struct solver {
   int fixsystem;			/* repair errors in rpm dependency graph */
   int allowdowngrade;			/* allow to downgrade installed solvable */
   int allowarchchange;			/* allow to change architecture of installed solvables */
+  int allowvendorchange;		/* allow to change vendor of installed solvables */
   int allowuninstall;			/* allow removal of installed solvables */
   int updatesystem;			/* distupgrade */
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */

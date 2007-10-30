@@ -80,6 +80,7 @@ struct _Pool {
 
   Id *id2arch;			/* map arch ids to scores */
   Id lastarch;			/* last valid entry in id2arch */
+  Queue vendormap;		/* map vendor to vendorclasses mask */
 
   /* providers data, as two-step indirect list
    * whatprovides[Id] -> Offset into whatprovidesdata for name

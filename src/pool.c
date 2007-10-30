@@ -96,6 +96,7 @@ pool_create(void)
   // pre-alloc space for a Solvable
   pool->solvables = (Solvable *)xcalloc(2, sizeof(Solvable));
   pool->nsolvables = 2;
+  queue_init(&pool->vendormap);
   s = pool->solvables + SYSTEMSOLVABLE;
   s->name = SYSTEM_SYSTEM;
   s->arch = ARCH_NOARCH;
@@ -127,6 +128,7 @@ pool_free(Pool *pool)
   xfree(pool->stringspace);
   xfree(pool->strings);
   xfree(pool->rels);
+  queue_free(&pool->vendormap);
   for (i = 0; i < DEP2STRBUF; i++)
     xfree(pool->dep2strbuf[i]);
   xfree(pool);
