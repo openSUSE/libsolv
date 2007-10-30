@@ -210,6 +210,11 @@ pool_writerepo(Pool *pool, Repo *repo, FILE *fp)
       needid[s->name].need++;
       needid[s->arch].need++;
       needid[s->evr].need++;
+      if (s->vendor)
+	{
+          needid[s->vendor].need++;
+          idsizes[SOLVABLE_VENDOR] = 1;
+	}
       if (s->provides)
         idsizes[SOLVABLE_PROVIDES]    += incneedid(pool, idarraydata + s->provides, needid);
       if (s->requires)
@@ -386,6 +391,8 @@ pool_writerepo(Pool *pool, Repo *repo, FILE *fp)
       write_id(fp, needid[s->name].need);
       write_id(fp, needid[s->arch].need);
       write_id(fp, needid[s->evr].need);
+      if (idsizes[SOLVABLE_VENDOR])
+        write_id(fp, needid[s->vendor].need);
 
       if (s->provides)
         write_idarray(fp, pool, needid, idarraydata + s->provides);

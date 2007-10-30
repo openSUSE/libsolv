@@ -274,7 +274,6 @@ prune_to_recommended(Solver *solv, Queue *plist)
  * 
  */
 
-/* FIXME: must also look at update packages */
 /* FIXME: should prefer installed if identical version */
 
 void
@@ -322,6 +321,8 @@ prune_best_version_arch(Pool *pool, Queue *plist)
   qsort(plist->elements, plist->count, sizeof(Id), prune_best_version_arch_sortcmp);
 
   /* delete obsoleted. hmm, looks expensive! */
+  /* FIXME maybe also check provides depending on noupdateprovide? */
+  /* FIXME do not prune cycles */
   for (i = 0; i < plist->count; i++)
     {
       Id p, *pp, obs, *obsp;

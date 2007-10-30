@@ -18,6 +18,7 @@ enum state {
   STATE_ARCH,
   STATE_VERSION,
   STATE_FORMAT,
+  STATE_VENDOR,
   STATE_PROVIDES,
   STATE_PROVIDESENTRY,
   STATE_REQUIRES,
@@ -55,6 +56,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PACKAGE,     "arch",            STATE_ARCH, 1 },
   { STATE_PACKAGE,     "version",         STATE_VERSION, 0 },
   { STATE_PACKAGE,     "format",          STATE_FORMAT, 0 },
+  { STATE_FORMAT,      "rpm:vendor",      STATE_VENDOR, 1 },
   { STATE_FORMAT,      "rpm:provides",    STATE_PROVIDES, 0 },
   { STATE_FORMAT,      "rpm:requires",    STATE_REQUIRES, 0 },
   { STATE_FORMAT,      "rpm:obsoletes",   STATE_OBSOLETES , 0 },
@@ -373,6 +375,9 @@ endElement(void *userData, const char *name)
       break;
     case STATE_ARCH:
       s->arch = str2id(pool, pd->content, 1);
+      break;
+    case STATE_VENDOR:
+      s->vendor = str2id(pool, pd->content, 1);
       break;
     case STATE_FILE:
       id = str2id(pool, pd->content, 1);

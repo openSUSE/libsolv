@@ -131,7 +131,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
 Attrstore *attr;
 
 Repo *
-pool_addrepo_susetags(Pool *pool, FILE *fp, int with_attr)
+pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
 {
   char *line, *linep;
   int aline;
@@ -247,6 +247,7 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, int with_attr)
 	    s->name = str2id(pool, sp[0], 1);
 	  s->evr = makeevr(pool, join(&pd, sp[1], "-", sp[2]));
 	  s->arch = str2id(pool, sp[3], 1);
+	  s->vendor = vendor;
 	  continue;
 	}
       if (!strncmp(line, "=Prv:", 5))

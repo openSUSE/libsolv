@@ -43,6 +43,8 @@ int main(int argc, char **argv)
       printf("\n");
       printf("solvable %d:\n", i);
       printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+      if (s->vendor)
+        printf("vendor: %s\n", id2str(pool, s->vendor));
       printids(repo, "provides", s->provides);
       printids(repo, "obsoletes", s->obsoletes);
       printids(repo, "conflicts", s->conflicts);

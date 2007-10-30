@@ -39,6 +39,7 @@ static char *initpool_data[] = {
   "solvable:name",
   "solvable:arch",
   "solvable:evr",
+  "solvable:vendor",
   "solvable:provides",
   "solvable:obsoletes",
   "solvable:conflicts",

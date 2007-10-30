@@ -27,6 +27,7 @@ enum state {
   STATE_SUBCHANNEL,
   STATE_PACKAGE,
   STATE_NAME,
+  STATE_VENDOR,
   STATE_HISTORY,
   STATE_UPDATE,
   STATE_EPOCH,
@@ -85,6 +86,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUBCHANNEL,  "patch",           STATE_PACKAGE, 0 },
   { STATE_SUBCHANNEL,  "product",         STATE_PACKAGE, 0 },
   { STATE_PACKAGE,     "name",            STATE_NAME, 1 },
+  { STATE_PACKAGE,     "vendor",          STATE_VENDOR, 1 },
   { STATE_PACKAGE,     "epoch",           STATE_PEPOCH, 1 },
   { STATE_PACKAGE,     "version",         STATE_PVERSION, 1 },
   { STATE_PACKAGE,     "release",         STATE_PRELEASE, 1 },
@@ -716,6 +718,9 @@ endElement(void *userData, const char *name)
       break;
     case STATE_NAME:
       s->name = str2id(pool, pd->content, 1);
+      break;
+    case STATE_VENDOR:
+      s->vendor = str2id(pool, pd->content, 1);
       break;
     case STATE_UPDATE:		       /* new version, keeping all other metadata */
       evr = evr2id(pool, pd,

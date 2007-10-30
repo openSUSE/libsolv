@@ -228,11 +228,13 @@ pool_addrepo_content(Pool *pool, FILE *fp)
 	    s->name = str2id(pool, join(&pd, pd.kind, ":", value), 1);
 	  else if (istag ("DISTVERSION"))
 	    s->evr = makeevr(pool, value);
+	  else if (istag ("VENDOR"))
+	    s->vendor = str2id(pool, value, 1);
 	  else if (istag ("ARCH"))
 	    /* Theoretically we want to have the best arch of the given
 	       modifiers which still is compatible with the system
 	       arch.  We don't know the latter here, though.  */
-	    s->arch = str2id (pool, "noarch" , 1);
+	    s->arch = ARCH_NOARCH;
 	  else if (istag ("PREREQUIRES"))
 	    s->requires = adddep(pool, &pd, s->requires, value, 2);
 	  else if (istag ("REQUIRES"))

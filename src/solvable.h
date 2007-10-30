@@ -14,6 +14,7 @@ typedef struct _Solvable {
   Id name;
   Id arch;
   Id evr;			/* epoch:version-release */
+  Id vendor;
 
   Repo *repo;		/* repo we belong to */
 

@@ -24,24 +24,25 @@ extern "C" {
 #define SOLVABLE_NAME		2
 #define SOLVABLE_ARCH		3
 #define SOLVABLE_EVR		4
-#define SOLVABLE_PROVIDES	5
-#define SOLVABLE_OBSOLETES	6
-#define SOLVABLE_CONFLICTS	7
-#define SOLVABLE_REQUIRES	8
-#define SOLVABLE_RECOMMENDS	9
-#define SOLVABLE_SUGGESTS	10
-#define SOLVABLE_SUPPLEMENTS	11
-#define SOLVABLE_ENHANCES	12
-#define SOLVABLE_FRESHENS	13
-#define RPM_RPMDBID		14
-#define SOLVABLE_PREREQMARKER	15		// normal requires before this, prereqs after this
-#define SOLVABLE_FILEMARKER	16		// normal provides before this, generated file provides after this
-#define NAMESPACE_INSTALLED	17
-#define NAMESPACE_MODALIAS	18
-#define SYSTEM_SYSTEM		19
-#define ARCH_SRC		20
-#define ARCH_NOSRC		21
-#define ARCH_NOARCH		22
+#define SOLVABLE_VENDOR		5
+#define SOLVABLE_PROVIDES	6
+#define SOLVABLE_OBSOLETES	7
+#define SOLVABLE_CONFLICTS	8
+#define SOLVABLE_REQUIRES	9
+#define SOLVABLE_RECOMMENDS	10
+#define SOLVABLE_SUGGESTS	11
+#define SOLVABLE_SUPPLEMENTS	12
+#define SOLVABLE_ENHANCES	13
+#define SOLVABLE_FRESHENS	14
+#define RPM_RPMDBID		15
+#define SOLVABLE_PREREQMARKER	16		// normal requires before this, prereqs after this
+#define SOLVABLE_FILEMARKER	17		// normal provides before this, generated file provides after this
+#define NAMESPACE_INSTALLED	18
+#define NAMESPACE_MODALIAS	19
+#define SYSTEM_SYSTEM		20
+#define ARCH_SRC		21
+#define ARCH_NOSRC		22
+#define ARCH_NOARCH		23
 
 /* well known solvable */
 #define SYSTEMSOLVABLE		1

@@ -19,8 +19,8 @@
 #include "repo_solv.h"
 #include "util.h"
 
-#define INTERESTED_START	2
-#define INTERESTED_END		13
+#define INTERESTED_START	SOLVABLE_NAME
+#define INTERESTED_END		SOLVABLE_FRESHENS
 
 /*-----------------------------------------------------------------*/
 /* .solv read functions */
@@ -542,7 +542,9 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
 	      else if (id == SOLVABLE_ARCH)
 		s->arch = did;
 	      else if (id == SOLVABLE_EVR)
-		s->evr= did;
+		s->evr = did;
+	      else if (id == SOLVABLE_VENDOR)
+		s->vendor = did;
 #if 0
 	      printf("%s -> %s\n", id2str(pool, id), id2str(pool, did));
 #endif

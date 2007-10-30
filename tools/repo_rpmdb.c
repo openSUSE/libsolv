@@ -16,6 +16,7 @@
 
 #include "pool.h"
 #include "hash.h"
+#include "util.h"
 #include "repo_rpmdb.h"
 
 #define TAG_NAME		1000
@@ -94,7 +95,7 @@ headint32(RpmHead *h, int tag, int *cnt)
   if (o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = calloc(i ? i : 1, sizeof(unsigned int));
+  r = xcalloc(i ? i : 1, sizeof(unsigned int));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 4)
@@ -144,7 +145,7 @@ headstringarray(RpmHead *h, int tag, int *cnt)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  r = calloc(i ? i : 1, sizeof(char *));
+  r = xcalloc(i ? i : 1, sizeof(char *));
   if (cnt)
     *cnt = i;
   d = h->dp + o;
@@ -185,12 +186,12 @@ static char *headtoevr(RpmHead *h)
     {
       char epochbuf[11];        /* 32bit decimal will fit in */
       sprintf(epochbuf, "%u", epoch);
-      evr = malloc(strlen(epochbuf) + 1 + strlen(version) + 1 + strlen(release) + 1);
+      evr = xmalloc(strlen(epochbuf) + 1 + strlen(version) + 1 + strlen(release) + 1);
       sprintf(evr, "%s:%s-%s", epochbuf, version, release);
     }
   else
     {
-      evr = malloc(strlen(version) + 1 + strlen(release) + 1);
+      evr = xmalloc(strlen(version) + 1 + strlen(release) + 1);
       sprintf(evr, "%s-%s", version, release);
     }
   if (epochp)
@@ -441,11 +442,8 @@ addfileprovides(Pool *pool, Repo *repo, RpmHead *rpmhead, unsigned int olddeps)
       j = strlen(bn[i]) + strlen(dn[di[i]]) + 1;
       if (j > fna)
 	{
-	  if (fn)
-	    fn = realloc(fn, j + 256);
-	  else
-	    fn = malloc(j + 256);
 	  fna = j + 256;
+	  fn = xrealloc(fn, fna);
 	}
       strcpy(fn, dn[di[i]]);
       strcat(fn, bn[i]);
@@ -476,13 +474,11 @@ rpm2solv(Pool *pool, Repo *repo, Solvable *s, RpmHead *rpmhead)
     }
   s->arch = str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
   if (!s->arch)
-    {
-      fprintf(stderr, "package %s has no arch\n", id2str(pool, s->name));
-      exit(1);
-    }
+    s->arch = ARCH_NOARCH;
   evr = headtoevr(rpmhead);
   s->evr = str2id(pool, evr, 1);
   free(evr);
+  s->vendor = str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
   s->provides = addfileprovides(pool, repo, rpmhead, s->provides);
@@ -555,9 +551,9 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 	  exit(1);
 	}
       dbidp = (unsigned char *)&dbid;
-      pool->solvables = realloc(pool->solvables, (pool->nsolvables + 256) * sizeof(Solvable));
+      pool->solvables = xrealloc(pool->solvables, (pool->nsolvables + 256) * sizeof(Solvable));
       memset(pool->solvables + repo->start, 0, 256 * sizeof(Solvable));
-      repo->rpmdbid = calloc(256, sizeof(unsigned int));
+      repo->rpmdbid = xcalloc(256, sizeof(unsigned int));
       asolv = 256;
       rpmheadsize = 0;
       rpmhead = 0;
@@ -566,9 +562,9 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 	{
 	  if (i >= asolv)
 	    {
-	      pool->solvables = realloc(pool->solvables, (pool->nsolvables + asolv + 256) * sizeof(Solvable));
+	      pool->solvables = xrealloc(pool->solvables, (pool->nsolvables + asolv + 256) * sizeof(Solvable));
 	      memset(pool->solvables + repo->start + asolv, 0, 256 * sizeof(Solvable));
-	      repo->rpmdbid = realloc(repo->rpmdbid, (asolv + 256) * sizeof(unsigned int));
+	      repo->rpmdbid = xrealloc(repo->rpmdbid, (asolv + 256) * sizeof(unsigned int));
 	      memset(repo->rpmdbid + asolv, 0, 256 * sizeof(unsigned int));
 	      asolv += 256;
 	    }
@@ -595,10 +591,8 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 	      fprintf(stderr, "corrupt rpm database (size %u)\n", data.size);
 	      exit(1);
 	    }
-	  if (!rpmhead)
-	    rpmhead = malloc(sizeof(*rpmhead) + data.size);
-	  else if (data.size > rpmheadsize)
-	    rpmhead = realloc(rpmhead, sizeof(*rpmhead) + data.size);
+	  if (data.size > rpmheadsize)
+	    rpmhead = xrealloc(rpmhead, sizeof(*rpmhead) + data.size);
 	  memcpy(buf, data.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
@@ -656,12 +650,7 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 	      else
 		memcpy(dbidp, dp, 4);
 	      if ((nrpmids & 255) == 0)
-		{
-		  if (rpmids)
-		    rpmids = realloc(rpmids, sizeof(*rpmids) * (nrpmids + 256));
-		  else
-		    rpmids = malloc(sizeof(*rpmids) * 256);
-		}
+		rpmids = xrealloc(rpmids, sizeof(*rpmids) * (nrpmids + 256));
 	      rpmids[nrpmids].dbid = dbid;
 	      rpmids[nrpmids].name = malloc((int)key.size + 1);
 	      memcpy(rpmids[nrpmids].name, key.data, (int)key.size);
@@ -670,7 +659,6 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 	      dp += 8;
 	      dl -= 8;
 	    }
-	  
 	}
       dbc->c_close(dbc);
       db->close(db, 0);
@@ -681,7 +669,7 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
       rpmheadsize = 0;
       rpmhead = 0;
 
-      pool->solvables = realloc(pool->solvables, (pool->nsolvables + nrpmids) * sizeof(Solvable));
+      pool->solvables = xrealloc(pool->solvables, (pool->nsolvables + nrpmids) * sizeof(Solvable));
       memset(pool->solvables + repo->start, 0, nrpmids * sizeof(Solvable));
       repo->rpmdbid = calloc(nrpmids, sizeof(unsigned int));
 
@@ -690,7 +678,7 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
       if (ref)
 	{
 	  refmask = mkmask(ref->nsolvables);
-	  refhash = calloc(refmask + 1, sizeof(Id));
+	  refhash = xcalloc(refmask + 1, sizeof(Id));
 	  for (i = 0; i < ref->nsolvables; i++)
 	    {
 	      h = ref->rpmdbid[i] & refmask;
@@ -722,6 +710,7 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 		      s->name = r->name;
 		      s->evr = r->evr;
 		      s->arch = r->arch;
+		      s->vendor = r->vendor;
 		    }
 		  else
 		    {
@@ -731,6 +720,8 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 			s->evr = str2id(pool, id2str(ref->pool, r->evr), 1);
 		      if (r->arch)
 			s->arch = str2id(pool, id2str(ref->pool, r->arch), 1);
+		      if (r->vendor)
+			s->vendor = str2id(pool, id2str(ref->pool, r->vendor), 1);
 		    }
 		  s->provides = copydeps(pool, repo, r->provides, ref);
 		  s->requires = copydeps(pool, repo, r->requires, ref);
@@ -786,10 +777,8 @@ pool_addrepo_rpmdb(Pool *pool, Repo *ref)
 	      fprintf(stderr, "corrupt rpm database (size)\n");
 	      exit(1);
 	    }
-	  if (!rpmhead)
-	    rpmhead = malloc(sizeof(*rpmhead) + data.size);
-	  else if (data.size > rpmheadsize)
-	    rpmhead = realloc(rpmhead, sizeof(*rpmhead) + data.size);
+	  if (data.size > rpmheadsize)
+	    rpmhead = xrealloc(rpmhead, sizeof(*rpmhead) + data.size);
 	  memcpy(buf, data.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];

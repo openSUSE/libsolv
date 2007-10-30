@@ -31,7 +31,7 @@ main(int argc, char **argv)
       argv++;
     }
   Pool *pool = pool_create();
-  Repo *repo = pool_addrepo_susetags(pool, stdin, with_attr);
+  Repo *repo = pool_addrepo_susetags(pool, stdin, 0, with_attr);
   pool_writerepo(pool, repo, stdout);
   if (with_attr && attr)
     {
