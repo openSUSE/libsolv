@@ -127,7 +127,6 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
   return repo_addid_dep(pd->repo, olddeps, id, isreq);
 }
 
-/* #define AUTHOR_STR */
 Attrstore *attr;
 
 Repo *
@@ -139,6 +138,8 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
   Solvable *s;
   int intag = 0;
   int cummulate = 0;
+  int indesc = 0;
+  int last_found_pack = 0;
   int pack;
   char *sp[5];
   struct parsedata pd;
@@ -206,12 +207,12 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
 	      exit(1);
 	    }
 	  intag = tagend - (line + 1);
-#ifdef AUTHOR_STR
-	  if (!strncmp (line, "+Aut:", 5))
+	  if (!strncmp (line, "+Des:", 5))
+	    cummulate = 1;
+	  else if (!strncmp (line, "+Aut:", 5))
 	    cummulate = 1;
 	  else
 	    cummulate = 0;
-#endif
 	  line[0] = '=';
 	  line[intag + 2] = ' ';
 	  linep = line + intag + 3;
@@ -219,7 +220,8 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
 	}
       if (*line == '#' || !*line)
 	continue;
-      if (!strncmp(line, "=Pkg:", 5) || !strncmp(line, "=Pat:", 5))
+      if (indesc < 2
+          && (!strncmp(line, "=Pkg:", 5) || !strncmp(line, "=Pat:", 5)))
 	{
 	  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
@@ -235,6 +237,7 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
 	    }
 	  s = pool->solvables + repo->start + pack;
 	  s->repo = repo;
+	  last_found_pack = pack;
 	  pack++;
           if (split(line + 5, sp, 5) != 4)
 	    {
@@ -249,6 +252,57 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
 	  s->arch = str2id(pool, sp[3], 1);
 	  s->vendor = vendor;
 	  continue;
+	}
+      if (indesc == 2
+          && (!strncmp(line, "=Pkg:", 5) || !strncmp(line, "=Pat:", 5)))
+	{
+	  Id name, evr, arch;
+	  int n, nn;
+	  pd.kind = 0;
+	  if (line[3] == 't')
+	    pd.kind = "pattern";
+          if (split(line + 5, sp, 5) != 4)
+	    {
+	      fprintf(stderr, "Bad line: %s\n", line);
+	      exit(1);
+	    }
+	  s = 0;
+	  if (pd.kind)
+	    name = str2id(pool, join(&pd, pd.kind, ":", sp[0]), 0);
+	  else
+	    name = str2id(pool, sp[0], 0);
+	  evr = makeevr(pool, join(&pd, sp[1], "-", sp[2]));
+	  arch = str2id(pool, sp[3], 0);
+	  /* If we found neither the name of the arch at all in this repo
+	     there's no chance of finding the exact solvable either.  */
+	  if (!name || !arch)
+	    continue;
+	  /* Now look for a solvable with the given name,evr,arch.
+	     Our input is structured so, that the second set of =Pkg
+	     lines comes in roughly the same order as the first set, so we 
+	     have a hint at where to start our search, namely were we found
+	     the last entry.  */
+	  for (n = 0, nn = last_found_pack; n < pack; n++, nn++)
+	    {
+	      if (nn >= pack)
+	        nn = 0;
+	      s = pool->solvables + repo->start + nn;
+	      if (s->name == name && s->evr == evr && s->arch == arch)
+	        break;
+	    }
+	  if (n == pack)
+	    s = 0;
+	  else
+	    last_found_pack = nn;
+	  continue;
+	}
+      /* If we have no current solvable to add to, ignore all further lines
+         for it.  Probably invalid input data in the second set of
+	 solvables.  */
+      if (indesc >= 2 && !s)
+        {
+	  fprintf (stderr, "Huh?\n");
+          continue;
 	}
       if (!strncmp(line, "=Prv:", 5))
 	{
@@ -317,30 +371,44 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
         continue;
       if (!strncmp(line, "=Grp:", 5))
         {
-	  ensure_entry (attr, pack);
-	  add_attr_localids_id (attr, pack, str2nameid (attr, "group"), str2localid (attr, line + 6, 1));
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_localids_id (attr, last_found_pack, str2nameid (attr, "group"), str2localid (attr, line + 6, 1));
 	  continue;
 	}
       if (!strncmp(line, "=Lic:", 5))
         {
-	  ensure_entry (attr, pack);
-	  add_attr_localids_id (attr, pack, str2nameid (attr, "license"), str2localid (attr, line + 6, 1));
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_localids_id (attr, last_found_pack, str2nameid (attr, "license"), str2localid (attr, line + 6, 1));
 	  continue;
 	}
       if (!strncmp(line, "=Kwd:", 5))
         {
-	  ensure_entry (attr, pack);
-	  add_attr_localids_id (attr, pack, str2nameid (attr, "keywords"), str2localid (attr, line + 6, 1));
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_localids_id (attr, last_found_pack, str2nameid (attr, "keywords"), str2localid (attr, line + 6, 1));
 	  continue;
 	}
       if (!strncmp(line, "=Aut:", 5))
         {
-	  ensure_entry (attr, pack);
-#ifdef AUTHOR_STR
-	  add_attr_string (attr, pack, str2nameid (attr, "authors"), line + 6);
-#else
-	  add_attr_localids_id (attr, pack, str2nameid (attr, "authors"), str2localid (attr, line + 6, 1));
-#endif
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_blob (attr, last_found_pack, str2nameid (attr, "authors"), line + 6, strlen (line + 6) + 1);
+	  continue;
+	}
+      if (!strncmp(line, "=Sum:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_string (attr, last_found_pack, str2nameid (attr, "summary"), line + 6);
+	  continue;
+	}
+      if (!strncmp(line, "=Des:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_blob (attr, last_found_pack, str2nameid (attr, "description"), line + 6, strlen (line + 6) + 1);
+	  continue;
+	}
+      if (!strncmp(line, "=Ver:", 5))
+	{
+	  last_found_pack = 0;
+	  indesc++;
 	  continue;
 	}
     }
