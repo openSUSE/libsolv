@@ -1,0 +1,64 @@
+
+Solver algorithms:
+------------------
+
+- the solver allows arch changes from/to noarch without complaining.
+  good or bad?
+
+- vendow changes are allowed from unknown to known. libzypp doesn't
+  allow that. Feature?
+
+- arch changes are only considered if the name stays the same, so
+  a rename can install a different architecture.
+
+- same with vendor.
+
+- should prune_best_version_arch consider the arch or the vendor this
+  is about an installed package?
+
+- we disable conflicting rules when searching for a suggestion, should
+  we first extend them with arch changes/vendor changes/downgrades?
+  In what order?
+
+- distupdate sets 'allowuninstall'. Should it only allow uninstall
+  for packages that do not have an update in the repositories?
+
+- splitprovides don't work at all.
+
+- repo priorities should influence the order in which package rules
+  are fulfilled.
+
+- weak systemrules should be created for all installed packages, so
+  that they are available when the erase rule is disabled if a
+  suggestion is calculated.
+
+- should we implement weak systemrules as weak rules?
+
+- prune_best_version_arch has a n^2 loop when looking at obsoletes.
+  Should we create an obsoletes index to speed that up?
+
+
+
+Code cleanup:
+-------------
+
+- move whatprovides/whatprovidesdata from pool to solver?
+  good: can implement installed(), though I don't know if we need
+        it.
+  bad: need to allocate solver if we just want to look up a provides.
+       can't re-use whatprovides for multiple solver runs with different
+       solvers.
+
+- implement unified idarray in pool, so that repos don't have to
+  come with their own idarrays? Would need memory for hash, but
+  unification would be a nice thing. Would also fix solver memory
+  leak with learned rules. Needs some hard numbers abour memory usage.
+
+- make bitmap macros inline functions?
+
+- rename ID Macros to ID_, e.g. ARCH_NOARCH to ID_ARCH_NOARCH?
+
+- support different streams than FILE in repo_ functions? Is it
+  enough that glibc supports FILE overloading, see the undocumented
+  fopencookie()?
+
