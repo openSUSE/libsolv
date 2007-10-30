@@ -516,16 +516,6 @@ attr_store_pack (Attrstore *s)
   s->packed = 1;
 }
 
-#define get_num(ptr,val) do { \
-  typedef int __wrong_buf__[(1-sizeof((ptr)[0])) * (sizeof((ptr)[0])-1)];\
-  val = 0; \
-  while (1) { \
-    unsigned char __c = *((ptr)++); \
-    (val) = ((val) << 7) | (__c & 0x7F); \
-    if ((__c & 0x80) == 0) \
-      break; \
-  } \
-} while (0)
 
 void
 attr_store_unpack (Attrstore *s)
@@ -540,55 +530,32 @@ attr_store_unpack (Attrstore *s)
 
   for (i = 0; i < s->entries; i++)
     {
-      unsigned char *attrs;
-      unsigned int this_abbr;
-      if (!s->ent2attr[i])
-        continue;
-      attrs = s->flat_attrs + s->ent2attr[i];
-      get_num (attrs, this_abbr);
-      unsigned short *abbr = s->flat_abbr + s->abbr[this_abbr];
-      while (*abbr)
+      attr_iterator ai;
+      FOR_ATTRS (s, i, &ai)
         {
-	  NameId name = (*abbr) >> 4;
-	  switch ((*abbr) & 15)
+	  switch (ai.type)
 	    {
 	    case ATTR_INT:
-	      {
-	        int val;
-		get_num (attrs, val);
-		add_attr_int (s, i, name, val); 
-	        break;
-	      }
+	      add_attr_int (s, i, ai.name, ai.as_int); 
+	      break;
 	    case ATTR_ID:
-	      {
-	        Id val;
-		get_num (attrs, val);
-		add_attr_id (s, i, name, val); 
-	        break;
-	      }
+	      add_attr_id (s, i, ai.name, ai.as_id); 
+	      break;
 	    case ATTR_CHUNK:
-	      {
-	        unsigned int val1, val2;
-		get_num (attrs, val1);
-		get_num (attrs, val2);
-		add_attr_chunk (s, i, name, val1, val2);
-	        break;
-	      }
+	      add_attr_chunk (s, i, ai.name, ai.as_chunk[0], ai.as_chunk[1]);
+	      break;
 	    case ATTR_STRING:
-	      {
-		add_attr_string (s, i, name, (const char*)attrs);
-		attrs += strlen ((const char*)attrs) + 1;
-		break;
-	      }
+	      add_attr_string (s, i, ai.name, ai.as_string);
+	      break;
 	    case ATTR_INTLIST:
 	      {
 		while (1)
 		  {
 		    int val;
-		    get_num (attrs, val);
+		    get_num (ai.as_numlist, val);
 		    if (!val)
 		      break;
-		    add_attr_intlist_int (s, i, name, val);
+		    add_attr_intlist_int (s, i, ai.name, val);
 		  }
 	        break;
 	      }
@@ -597,17 +564,16 @@ attr_store_unpack (Attrstore *s)
 		while (1)
 		  {
 		    Id val;
-		    get_num (attrs, val);
+		    get_num (ai.as_numlist, val);
 		    if (!val)
 		      break;
-		    add_attr_localids_id (s, i, name, val);
+		    add_attr_localids_id (s, i, ai.name, val);
 		  }
 	        break;
 	      }
 	    default:
 	      break;
 	    }
-	  abbr++;
 	}
     }
 
@@ -890,8 +856,6 @@ attr_store_read (FILE *fp, Pool *pool)
   s->packed = 1;
 
   free (buf);
-
-  attr_store_unpack (s);
 
   return s;
 }

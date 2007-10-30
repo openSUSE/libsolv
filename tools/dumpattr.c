@@ -13,50 +13,54 @@
 static void
 dump_attrs (Attrstore *s, unsigned int entry)
 {
-  LongNV *nv = s->attrs[entry];
-  if (nv)
+  attr_iterator ai;
+  FOR_ATTRS (s, entry, &ai)
     {
-      while (nv->name)
-        {
-	  fprintf (stdout, "%s:", id2str (s->pool, s->nameids[nv->name]));
-	  switch (nv->type)
-	    {
-	      case ATTR_INT:
-	        fprintf (stdout, "int  %u\n", nv->v.i[0]);
-		break;
-	      case ATTR_CHUNK:
-	        fprintf (stdout, "blob %u+%u\n", nv->v.i[0], nv->v.i[1]);
-		break;
-	      case ATTR_STRING:
-	        fprintf (stdout, "str  %s\n", nv->v.str);
-		break;
-	      case ATTR_ID:
-	        fprintf (stdout, "id   %u\n", nv->v.i[0]);
-		break;
-	      case ATTR_INTLIST:
-	        {
-		  unsigned i = 0;
-		  int val;
-	          fprintf (stdout, "lint\n ");
-		  while ((val = nv->v.intlist[i++]))
-		    fprintf (stdout, " %d", val);
-		  fprintf (stdout, "\n");
+      fprintf (stdout, "%s:", id2str (s->pool, s->nameids[ai.name]));
+      switch (ai.type)
+	{
+	case ATTR_INT:
+	  fprintf (stdout, "int  %u\n", ai.as_int);
+	  break;
+	case ATTR_ID:
+	  fprintf (stdout, "id   %u\n", ai.as_id);
+	  break;
+	case ATTR_CHUNK:
+	  fprintf (stdout, "blob %u+%u\n", ai.as_chunk[0], ai.as_chunk[1]);
+	  break;
+	case ATTR_STRING:
+	  fprintf (stdout, "str  %s\n", ai.as_string);
+	  break;
+	case ATTR_INTLIST:
+	  {
+	    fprintf (stdout, "lint\n ");
+	    while (1)
+	      {
+		int val;
+		get_num (ai.as_numlist, val);
+		if (!val)
 		  break;
-		}
-	      case ATTR_LOCALIDS:
-	        {
-		  unsigned i = 0;
-		  LocalId id;
-	          fprintf (stdout, "lids");
-		  while ((id = nv->v.localids[i++]))
-		    fprintf (stdout, "\n  %s(%d)", localid2str (s, id), id);
-		  fprintf (stdout, "\n");
+		fprintf (stdout, " %d", val);
+	      }
+	    fprintf (stdout, "\n");
+	    break;
+	  }
+	case ATTR_LOCALIDS:
+	  {
+	    fprintf (stdout, "lids");
+	    while (1)
+	      {
+		Id val;
+		get_num (ai.as_numlist, val);
+		if (!val)
 		  break;
-		}
-	      default:
-	        break;
-	    }
-	  nv++;
+		fprintf (stdout, "\n  %s(%d)", localid2str (s, val), val);
+	      }
+	    fprintf (stdout, "\n");
+	    break;
+	  }
+	default:
+	  break;
 	}
     }
 }
@@ -68,8 +72,8 @@ main (void)
   Pool *pool = pool_create ();
   Attrstore *s = attr_store_read (stdin, pool);
   /* For now test the packing code.  */
-  attr_store_pack (s);
   attr_store_unpack (s);
+  attr_store_pack (s);
   fprintf (stdout, "attribute store contains %d entities\n", s->entries);
   for (i = 0; i < s->entries; i++)
     {

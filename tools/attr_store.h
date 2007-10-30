@@ -1,3 +1,6 @@
+#ifndef ATTR_STORE_H
+#define ATTR_STORE_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,4 +34,6 @@ void add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalI
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
