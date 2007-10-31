@@ -23,6 +23,20 @@ typedef struct
   } v;
 } LongNV;
 
+#define BLOB_PAGEBITS 15
+#define BLOB_PAGESIZE (1 << BLOB_PAGEBITS)
+
+typedef struct _Attrblobpage
+{
+  /* mapped_at == -1  --> not loaded, otherwise offset into
+     store->blob_store.  The size of the mapping is BLOB_PAGESIZE
+     except for the last page.  */
+  unsigned int mapped_at;
+  long file_offset;
+  /* file_size == 0 means the page is not backed by some file storage.  */
+  long file_size;
+} Attrblobpage;
+
 struct _Attrstore
 {
   Pool *pool;
@@ -32,6 +46,13 @@ struct _Attrstore
   Id *nameids;
   char *blob_store;
   unsigned int blob_next_free;
+  Attrblobpage *pages;
+  unsigned int num_pages;
+  FILE *file;
+  /* mapped[i] is zero if nothing is mapped at logical page I,
+     otherwise it contains the pagenumber plus one (of the mapped page).  */
+  unsigned int *mapped;
+  unsigned int nmapped, ncanmap;
 
   Offset *strings;
   int nstrings;

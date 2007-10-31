@@ -26,7 +26,13 @@ dump_attrs (Attrstore *s, unsigned int entry)
 	  fprintf (stdout, "id   %u\n", ai.as_id);
 	  break;
 	case ATTR_CHUNK:
-	  fprintf (stdout, "blob %u+%u\n", ai.as_chunk[0], ai.as_chunk[1]);
+	  {
+	    const char *str = attr_retrieve_blob (s, ai.as_chunk[0], ai.as_chunk[1]);
+	    if (str)
+	      fprintf (stdout, "blob %s\n", str);
+	    else
+	      fprintf (stdout, "blob %u+%u\n", ai.as_chunk[0], ai.as_chunk[1]);
+	  }
 	  break;
 	case ATTR_STRING:
 	  fprintf (stdout, "str  %s\n", ai.as_string);

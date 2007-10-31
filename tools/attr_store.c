@@ -265,10 +265,27 @@ add_attr_blob (Attrstore *s, unsigned int entry, NameId name, const void *ptr, u
 {
   if (((s->blob_next_free + BLOB_BLOCK) & ~BLOB_BLOCK)
       != ((s->blob_next_free + len + BLOB_BLOCK) & ~BLOB_BLOCK))
-    s->blob_store = xrealloc (s->blob_store, (s->blob_next_free + len + BLOB_BLOCK) & ~BLOB_BLOCK);
+    {
+      unsigned int blobsz = (s->blob_next_free + len + BLOB_BLOCK) &~BLOB_BLOCK;
+      s->blob_store = xrealloc (s->blob_store, blobsz);
+    }
   memcpy (s->blob_store + s->blob_next_free, ptr, len);
   add_attr_chunk (s, entry, name, s->blob_next_free, len);
   s->blob_next_free += len;
+
+  unsigned int npages = (s->blob_next_free + BLOB_PAGESIZE - 1) / BLOB_PAGESIZE;
+  if (npages != s->num_pages)
+    {
+      Attrblobpage *p;
+      s->pages = xrealloc (s->pages, npages * sizeof (s->pages[0]));
+      for (p = s->pages + s->num_pages; s->num_pages < npages;
+	   p++, s->num_pages++)
+	{
+	  p->mapped_at = s->num_pages * BLOB_PAGESIZE;
+	  p->file_offset = 0;
+	  p->file_size = 0;
+	}
+    }
 }
 
 void
@@ -343,10 +360,147 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id)
     }
 }
 
+/* Make sure all pages from PSTART to PEND (inclusive) are loaded,
+   and are consecutive.  Return a pointer to the mapping of PSTART.  */
+static const void *
+load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
+{
+  unsigned int i;
+
+  /* Quick check in case all pages are there already and consecutive.  */
+  for (i = pstart; i <= pend; i++)
+    if (s->pages[i].mapped_at == -1
+        || (i > pstart
+	    && s->pages[i].mapped_at
+	       != s->pages[i-1].mapped_at + BLOB_PAGESIZE))
+      break;
+  if (i > pend)
+    return s->blob_store + s->pages[pstart].mapped_at;
+
+  /* Ensure that we can map the numbers of pages we need at all.  */
+  if (pend - pstart + 1 > s->ncanmap)
+    {
+      unsigned int oldcan = s->ncanmap;
+      s->ncanmap = pend - pstart + 1;
+      if (s->ncanmap < 4)
+        s->ncanmap = 4;
+      s->mapped = xrealloc (s->mapped, s->ncanmap * sizeof (s->mapped[0]));
+      memset (s->mapped + oldcan, 0, (s->ncanmap - oldcan) * sizeof (s->mapped[0]));
+      s->blob_store = xrealloc (s->blob_store, s->ncanmap * BLOB_PAGESIZE);
+      fprintf (stderr, "PAGE: can map %d pages\n", s->ncanmap);
+    }
+
+  /* Now search for "cheap" space in our store.  Space is cheap if it's either
+     free (very cheap) or contains pages we search for anyway.  */
+
+  /* Setup cost array.  */
+  unsigned int cost[s->ncanmap];
+  for (i = 0; i < s->ncanmap; i++)
+    {
+      unsigned int pnum = s->mapped[i];
+      if (pnum == 0)
+        cost[i] = 0;
+      else
+        {
+	  pnum--;
+	  Attrblobpage *p = s->pages + pnum;
+	  assert (p->mapped_at != -1);
+	  if (pnum >= pstart && pnum <= pend)
+	    cost[i] = 1;
+	  else
+	    cost[i] = 3;
+	}
+    }
+
+  /* And search for cheapest space.  */
+  unsigned int best_cost = -1;
+  unsigned int best = 0;
+  for (i = 0; i + pend - pstart < s->ncanmap; i++)
+    {
+      unsigned int c = cost[i];
+      unsigned int j;
+      for (j = 0; j < pend - pstart + 1; j++)
+        c += cost[i+j];
+      if (c < best_cost)
+        best_cost = c, best = i;
+      /* A null cost won't become better.  */
+      if (c == 0)
+        break;
+    }
+
+  /* So we want to map our pages from [best] to [best+pend-pstart].
+     Use a very simple strategy, which doesn't make the best use of
+     our resources, but works.  Throw away all pages in that range
+     (even ours) then copy around ours (in case they were outside the 
+     range) or read them in.  */
+  for (i = best; i < best + pend - pstart + 1; i++)
+    {
+      unsigned int pnum = s->mapped[i];
+      if (pnum--
+          /* If this page is exactly at the right place already,
+	     no need to evict it.  */
+          && pnum != pstart + i - best)
+	{
+	  /* Evict this page.  */
+	  fprintf (stderr, "PAGE: evict page %d from %d\n", pnum, i);
+	  cost[i] = 0;
+	  s->mapped[i] = 0;
+	  s->pages[pnum].mapped_at = -1;
+	}
+    }
+
+  /* Everything is free now.  Read in the pages we want.  */
+  for (i = pstart; i <= pend; i++)
+    {
+      Attrblobpage *p = s->pages + i;
+      unsigned int pnum = i - pstart + best;
+      void *dest = s->blob_store + pnum * BLOB_PAGESIZE;
+      if (p->mapped_at != -1)
+        {
+	  if (p->mapped_at != pnum * BLOB_PAGESIZE)
+	    {
+	      fprintf (stderr, "PAGECOPY: %d to %d\n", i, pnum);
+	      /* Still mapped somewhere else, so just copy it from there.  */
+	      memcpy (dest, s->blob_store + p->mapped_at, BLOB_PAGESIZE);
+	      s->mapped[p->mapped_at / BLOB_PAGESIZE] = 0;
+	    }
+	}
+      else
+        {
+	  fprintf (stderr, "PAGEIN: %d to %d\n", i, pnum);
+	  /* Not mapped, so read in this page.  */
+	  if (fseek (s->file, p->file_offset, SEEK_SET) < 0)
+	    {
+	      perror ("mapping fseek");
+	      exit (1);
+	    }
+	  if (fread (dest, p->file_size, 1, s->file) != 1)
+	    {
+	      perror ("mapping fread");
+	      exit (1);
+	    }
+	}
+      p->mapped_at = pnum * BLOB_PAGESIZE;
+      s->mapped[pnum] = i + 1;
+    }
+
+  return s->blob_store + best * BLOB_PAGESIZE;
+}
+
 const void *
 attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int len)
 {
+  if (s->file)
+    {
+      /* Paging!  Yeah!  */
+      unsigned int pstart = ofs / BLOB_PAGESIZE;
+      unsigned int pend = (ofs + len - 1) / BLOB_PAGESIZE;
+      const void *m = load_page_range (s, pstart, pend);
+      return m + (ofs & (BLOB_PAGESIZE - 1));
+    }
   if (!s->blob_store)
+    return 0;
+  if (ofs >= s->blob_next_free)
     return 0;
   return s->blob_store + ofs;
 }
@@ -520,9 +674,20 @@ attr_store_pack (Attrstore *s)
   fprintf (stderr, "%d\n", s->attr_next_free);
   fprintf (stderr, "%d\n", s->abbr_next_free * sizeof(s->abbr[0]));
   fprintf (stderr, "%d\n", s->flat_abbr_next_free * sizeof(s->flat_abbr[0]));
+  fprintf (stderr, "pages %d\n", s->num_pages);
   s->packed = 1;
 }
 
+/* Pages in all blob pages, and deactivates paging.  */
+static void
+pagein_all (Attrstore *s)
+{
+  /* If we have no backing file everything is there already.  */
+  if (!s->file)
+    return;
+  /*fprintf (stderr, "Aieee!\n");
+  exit (1);*/
+}
 
 void
 attr_store_unpack (Attrstore *s)
@@ -530,6 +695,8 @@ attr_store_unpack (Attrstore *s)
   unsigned int i;
   if (!s->packed)
     return;
+
+  pagein_all (s);
 
   /* Make the store writable right away, so we can use our adder functions.  */
   s->packed = 0;
@@ -630,6 +797,79 @@ write_id(FILE *fp, Id x)
     }
 }
 
+static void
+write_pages (FILE *fp, Attrstore *s)
+{
+  unsigned int i;
+  unsigned char *buf[BLOB_PAGESIZE];
+
+  /* The compressed pages in the file have different sizes, so we need
+     to store these sizes somewhere, either in front of all page data,
+     interleaved with the page data (in front of each page), or after
+     the page data.  At this point we don't yet know the final compressed
+     sizes.  These are the pros and cons:
+     * in front of all page data
+       + when reading back we only have to read this header, and know
+         where every page data is placed
+       - we have to compress all pages first before starting to write them.
+         Our output stream might be unseekable, so we can't simply
+	 reserve space for the header, write all pages and then update the
+	 header.  This needs memory for all compressed pages at once.
+     * interleaved with page data
+       + we can compress and write per page, low memory overhead
+       - when reading back we have to read at least those numbers,
+         thereby either having to read all page data, or at least seek
+	 over it.
+     * after all page data
+       + we can do streamed writing, remembering the sizes per page,
+         and emitting the header (which is a footer then) at the end
+       - reading back is hardest: before the page data we don't know
+         how long it is overall, so we have to put that information
+	 also at the end, but it needs a determinate position, so can
+	 only be at a known offset from the end.  But that means that
+	 we must be able to seek when reading back.  We have this
+	 wish anyway in case we want to use on-demand paging then, but
+	 it's optional.
+
+     Of all these it seems the best good/bad ratio is with the interleaved
+     storage.  No memory overhead at writing and no unreasonable limitations
+     for read back.  */
+  write_u32 (fp, s->blob_next_free);
+  write_u32 (fp, BLOB_PAGESIZE);
+  assert (((s->blob_next_free + BLOB_PAGESIZE - 1) / BLOB_PAGESIZE) == s->num_pages);
+  for (i = 0; i < s->num_pages; i++)
+    {
+      unsigned int in_len;
+      unsigned int out_len;
+      const void *in;
+      if (i == s->num_pages - 1)
+        in_len = s->blob_next_free & (BLOB_PAGESIZE - 1);
+      else
+        in_len = BLOB_PAGESIZE;
+      if (in_len)
+        {
+          in = attr_retrieve_blob (s, i * BLOB_PAGESIZE, in_len);
+          //out_len = lzf_compress (in, in_len, buf, in_len - 1);
+          out_len = 0;
+          if (!out_len)
+            {
+              memcpy (buf, in, in_len);
+              out_len = in_len;
+	    }
+	}
+      else
+        out_len = 0;
+      fprintf (stderr, "page %d: %d -> %d\n", i, in_len, out_len);
+      write_u32 (fp, out_len);
+      if (out_len
+          && fwrite (buf, out_len, 1, fp) != 1)
+        {
+	  perror("write error");
+	  exit(1);
+	}
+    }
+}
+
 void
 write_attr_store (FILE *fp, Attrstore *s)
 {
@@ -689,6 +929,8 @@ write_attr_store (FILE *fp, Attrstore *s)
       perror ("write error");
       exit (1);
     }
+
+  write_pages (fp, s);
 }
 
 static unsigned int
@@ -751,6 +993,105 @@ read_id(FILE *fp, Id max)
     }
   fprintf(stderr, "read_id: id too long\n");
   exit(1);
+}
+
+/* Try to either setup on-demand paging (using FP as backing
+   file), or in case that doesn't work (FP not seekable) slurps in
+   all pages and deactivates paging.  */
+static void
+read_or_setup_pages (FILE *fp, Attrstore *s)
+{
+  unsigned int blobsz;
+  unsigned int pagesz;
+  unsigned int npages;
+  unsigned int i;
+  unsigned int can_seek;
+  long cur_file_ofs;
+  //unsigned char buf[BLOB_PAGESIZE];
+  blobsz = read_u32 (fp);
+  pagesz = read_u32 (fp);
+  if (pagesz != BLOB_PAGESIZE)
+    {
+      /* We could handle this by slurping in everything.  */
+      fprintf (stderr, "non matching page size\n");
+      exit (1);
+    }
+  can_seek = 1;
+  if ((cur_file_ofs = ftell (fp)) < 0)
+    can_seek = 0;
+  clearerr (fp);
+  fprintf (stderr, "can %sseek\n", can_seek ? "" : "NOT ");
+  npages = (blobsz + BLOB_PAGESIZE - 1) / BLOB_PAGESIZE;
+
+  s->num_pages = npages;
+  s->pages = xmalloc (npages * sizeof (s->pages[0]));
+
+  /* If we can't seek on our input we have to slurp in everything.  */
+  if (!can_seek)
+    {
+      s->blob_next_free = blobsz;
+      s->blob_store = xrealloc (s->blob_store, (s->blob_next_free + BLOB_BLOCK) &~BLOB_BLOCK);
+    }
+  for (i = 0; i < npages; i++)
+    {
+      unsigned int in_len = read_u32 (fp);
+      Attrblobpage *p = s->pages + i;
+      fprintf (stderr, "page %d: len %d\n", i, in_len);
+      if (can_seek)
+        {
+          cur_file_ofs += 4;
+	  p->mapped_at = -1;
+	  p->file_offset = cur_file_ofs;
+	  p->file_size = in_len;
+	  if (fseek (fp, in_len, SEEK_CUR) < 0)
+	    {
+	      perror ("fseek");
+	      fprintf (stderr, "can't seek after we thought we can\n");
+	      /* We can't fall back to non-seeking behaviour as we already
+	         read over some data pages without storing them away.  */
+	      exit (1);
+	    }
+	  cur_file_ofs += in_len;
+	}
+      else
+        {
+          p->mapped_at = i * BLOB_PAGESIZE;
+	  p->file_offset = 0;
+	  p->file_size = 0;
+	  /* We can't seek, so suck everything in.  */
+	  if (fread (s->blob_store + i * BLOB_PAGESIZE, in_len, 1, fp) != 1)
+	    {
+	      perror ("fread");
+	      exit (1);
+	    }
+	}
+    }
+
+  if (can_seek)
+    {
+      /* If we are here we were able to seek to all page
+         positions, so activate paging by copying FP into our structure.
+	 We dup() the file, so that our callers can fclose() it and we
+	 still have it open.  But this means that we share file positions
+	 with the input filedesc.  So in case our caller reads it after us,
+	 and calls back into us we might change the file position unexpectedly
+	 to him.  */
+      int fd = dup (fileno (fp));
+      if (fd < 0)
+        {
+	  /* Jeez!  What a bloody system, we can't dup() anymore.  */
+	  perror ("dup");
+	  exit (1);
+	}
+      /* XXX we don't close this yet anywhere.  */
+      s->file = fdopen (fd, "r");
+      if (!s->file)
+        {
+	  /* My God!  What happened now?  */
+	  perror ("fdopen");
+	  exit (1);
+	}
+    }
 }
 
 Attrstore *
@@ -859,6 +1200,8 @@ attr_store_read (FILE *fp, Pool *pool)
     if (s->flat_abbr[abbi] == 0)
       add_elem (s->abbr, s->abbr_next_free, abbi + 1, ABBR_BLOCK);
   assert (s->flat_abbr[abbi] == 0);
+
+  read_or_setup_pages (fp, s);
 
   s->packed = 1;
 
