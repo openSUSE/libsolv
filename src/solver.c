@@ -2810,14 +2810,14 @@ solve(Solver *solv, Queue *job)
       switch(how)
 	{
 	case SOLVER_INSTALL_SOLVABLE:			/* install specific solvable */
+	  s = pool->solvables + what;
 	  if (solv->rc_output) {
-	    Solvable *s = pool->solvables + what;
 	    printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), repo_name(s->repo));
 	  }
           addrule(solv, what, 0);			/* install by Id */
 	  queue_push(&solv->ruletojob, i);
-	  FOR_PROVIDES(p, pp, what)
-	    if (pool->solvables[what].name == pool->solvables[p].name)
+	  FOR_PROVIDES(p, pp, s->name)
+	    if (pool->solvables[p].name == s->name)
 	      MAPSET(&noupdaterule, p);
 	  break;
 	case SOLVER_ERASE_SOLVABLE:
@@ -3053,11 +3053,17 @@ solve(Solver *solv, Queue *job)
 		    {
 		    case SOLVER_INSTALL_SOLVABLE:
 		      s = pool->solvables + what;
-		      printf("- do not install %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      if (what >= solv->installed->start && what < solv->installed->start + solv->installed->nsolvables)
+		        printf("- do not keep %s-%s.%s installed\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      else
+		        printf("- do not install %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 		      break;
 		    case SOLVER_ERASE_SOLVABLE:
 		      s = pool->solvables + what;
-		      printf("- do not deinstall %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      if (what >= solv->installed->start && what < solv->installed->start + solv->installed->nsolvables)
+		        printf("- do not deinstall %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      else
+		        printf("- do not forbid installation of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 		      break;
 		    case SOLVER_INSTALL_SOLVABLE_NAME:
 		      printf("- do not install %s\n", id2str(pool, what));
