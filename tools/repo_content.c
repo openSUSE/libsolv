@@ -224,11 +224,11 @@ pool_addrepo_content(Pool *pool, FILE *fp)
 	      pack++;
 	    }
 	  else if (istag ("VERSION"))
-	    ;
+	    s->evr = makeevr(pool, value);
 	  else if (istag ("DISTPRODUCT"))
 	    ; // DISTPRODUCT is only for Yast, not for the package manager
 	  else if (istag ("DISTVERSION"))
-	    s->evr = makeevr(pool, value);
+	    ; // DISTVERSION is only for Yast
 	  else if (istag ("VENDOR"))
 	    s->vendor = str2id(pool, value, 1);
 	  else if (istag ("ARCH"))
