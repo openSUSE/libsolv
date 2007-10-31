@@ -220,12 +220,13 @@ pool_addrepo_content(Pool *pool, FILE *fp)
 		}
 	      s = pool->solvables + repo->start + pack;
 	      s->repo = repo;
+	      s->name = str2id(pool, join(&pd, pd.kind, ":", value), 1);
 	      pack++;
 	    }
 	  else if (istag ("VERSION"))
 	    ;
 	  else if (istag ("DISTPRODUCT"))
-	    s->name = str2id(pool, join(&pd, pd.kind, ":", value), 1);
+	    ; // DISTPRODUCT is only for Yast, not for the package manager
 	  else if (istag ("DISTVERSION"))
 	    s->evr = makeevr(pool, value);
 	  else if (istag ("VENDOR"))
