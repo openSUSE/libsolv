@@ -287,7 +287,7 @@ prune_best_version_arch(Pool *pool, Queue *plist)
 
   if (plist->count < 2)		/* no need to prune for a single entry */
     return;
-  if (pool->verbose) printf("prune_best_version_arch %d\n", plist->count);
+  if (pool->verbose > 1) printf("prune_best_version_arch %d\n", plist->count);
 
   /* prune to best architecture */
   if (pool->id2arch)
@@ -357,7 +357,7 @@ prune_best_version_arch(Pool *pool, Queue *plist)
     {
       s = pool->solvables + plist->elements[i];
 
-      if (pool->verbose) printf("- %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+      if (pool->verbose > 1) printf("- %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 
       if (!best)		       /* if no best yet, the current is best */
         {
@@ -1394,12 +1394,12 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
  
   queue_init(&r);
 
-  if (pool->verbose) printf("ANALYZE at %d ----------------------\n", level);
+  if (pool->verbose > 1) printf("ANALYZE at %d ----------------------\n", level);
   map_init(&seen, pool->nsolvables);
   idx = solv->decisionq.count;
   for (;;)
     {
-      printrule(solv, c);
+      if (pool->verbose > 1) printrule(solv, c);
       queue_push(&solv->learnt_pool, c - solv->rules);
       dp = c->d ? pool->whatprovidesdata + c->d : 0;
       for (i = -1; ; i++)
@@ -1471,7 +1471,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
     *dr = r.elements[0];
   else
     *dr = pool_queuetowhatprovides(pool, &r);
-  if (pool->verbose)
+  if (pool->verbose > 1)
     {
       printf("learned rule for level %d (am %d)\n", rlevel, level);
       printruleelement(solv, 0, -v);
@@ -1529,7 +1529,7 @@ reset_solver(Solver *solv)
         solv->decisionmap[v > 0 ? v : -v] = v > 0 ? 1 : -1;
       }
 
-  if (solv->pool->verbose)
+  if (solv->pool->verbose > 1)
     printf("decisions done reduced from %d to %d\n", solv->decisionq.count, i);
 
   solv->decisionq_why.count = i;
@@ -1539,7 +1539,7 @@ reset_solver(Solver *solv)
 
   /* redo all job/system decisions */
   makeruledecisions(solv);
-  if (solv->pool->verbose)
+  if (solv->pool->verbose > 1)
     printf("decisions after adding job and system rules: %d\n", solv->decisionq.count);
   /* recreate watches */
   makewatches(solv);
@@ -1819,10 +1819,13 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
       solv->decisionmap[p > 0 ? p : -p] = p > 0 ? level : -level;
       queue_push(&solv->decisionq, p);
       queue_push(&solv->decisionq_why, r - solv->rules);
-      printf("decision: ");
-      printruleelement(solv, 0, p);
-      printf("new rule: ");
-      printrule(solv, r);
+      if (solv->pool->verbose > 1)
+	{
+	  printf("decision: ");
+	  printruleelement(solv, 0, p);
+	  printf("new rule: ");
+	  printrule(solv, r);
+	}
     }
   return level;
 }
@@ -2372,8 +2375,8 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 	}
       else
 	{
+#if 0
 	  printf("##############################################   more than one solution found.\n");
-#if 1
 	  for (i = 0; i < solv->problems.elements[i]; i++)
 	    printrule(solv, solv->rules + solv->problems.elements[i]);
 	  printf("##############################################\n");
@@ -3009,7 +3012,7 @@ solve(Solver *solv, Queue *job)
       Queue solution;
       Id *problem;
       Id why, what;
-      int j, ji;
+      int j, ji, pcnt;
 
       if (!pool->verbose)
 	return;
@@ -3017,11 +3020,19 @@ solve(Solver *solv, Queue *job)
       queue_init(&solution);
       printf("Encountered problems! Here are the solutions:\n");
       problem = problems.elements;
+      pcnt = 1;
+      printf("\n");
+      printf("Problem %d:\n", pcnt);
+      printf("====================================\n");
       for (i = 0; i < problems.count; i++)
 	{
 	  Id v = problems.elements[i];
 	  if (v == 0)
 	    {
+	      printf("\n");
+	      if (i + 1 == problems.count)
+		break;
+	      printf("Problem %d:\n", ++pcnt);
 	      printf("====================================\n");
 	      problem = problems.elements + i + 1;
 	      continue;
