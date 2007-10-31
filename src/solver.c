@@ -2816,6 +2816,9 @@ solve(Solver *solv, Queue *job)
 	  }
           addrule(solv, what, 0);			/* install by Id */
 	  queue_push(&solv->ruletojob, i);
+	  FOR_PROVIDES(p, pp, what)
+	    if (pool->solvables[what].name == pool->solvables[p].name)
+	      MAPSET(&noupdaterule, p);
 	  break;
 	case SOLVER_ERASE_SOLVABLE:
           addrule(solv, -what, 0);			/* remove by Id */
