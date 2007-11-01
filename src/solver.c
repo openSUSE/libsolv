@@ -16,6 +16,8 @@
 #include "evr.h"
 #include "poolvendor.h"
 
+#include "policy.h"
+
 #define RULES_BLOCK 63
 
 static Pool *prune_best_version_arch_sortcmp_data;
@@ -1872,6 +1874,8 @@ solver_create(Pool *pool, Repo *installed)
   memset(solv->rules, 0, sizeof(Rule));
   solv->nrules = 1;
 
+  policy_init( pool );
+
   return solv;
 }
 
@@ -1883,6 +1887,8 @@ solver_create(Pool *pool, Repo *installed)
 void
 solver_free(Solver *solv)
 {
+  policy_exit();
+
   queue_free(&solv->ruletojob);
   queue_free(&solv->decisionq);
   queue_free(&solv->decisionq_why);
@@ -1924,16 +1930,15 @@ run_solver(Solver *solv, int disablerules, int doweak)
   Pool *pool = solv->pool;
   Id p, *dp;
 
-#if 0
-  printf("number of rules: %d\n", solv->nrules);
+if (policy_printrules())
 {
+  printf("number of rules: %d\n", solv->nrules);
   int i;
   for (i = 0; i < solv->nrules; i++)
     {
       printrule(solv, solv->rules + i);
     }
 }
-#endif
 
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
@@ -2973,8 +2978,7 @@ solve(Solver *solv, Queue *job)
 		  FOR_PROVIDES(p, pp, sug)
 		    MAPSET(&solv->suggestsmap, p);
 		}
-	    }
-	}
+	    }	}
       for (i = 1; i < pool->nsolvables; i++)
 	{
 	  if (solv->decisionmap[i] != 0)
