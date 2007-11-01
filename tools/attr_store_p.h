@@ -33,7 +33,9 @@ typedef struct _Attrblobpage
      except for the last page.  */
   unsigned int mapped_at;
   long file_offset;
-  /* file_size == 0 means the page is not backed by some file storage.  */
+  /* file_size == 0 means the page is not backed by some file storage.
+     Otherwise it is L*2+(compressed ? 1 : 0), with L being the data
+     length.  */
   long file_size;
 } Attrblobpage;
 

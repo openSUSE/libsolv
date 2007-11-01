@@ -14,6 +14,8 @@
 
 #include "attr_store_p.h"
 
+#include "fastlz.c"
+
 #define NAME_WIDTH 12
 #define TYPE_WIDTH (16-NAME_WIDTH)
 
@@ -365,6 +367,7 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id)
 static const void *
 load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
 {
+  unsigned char buf[BLOB_PAGESIZE];
   unsigned int i;
 
   /* Quick check in case all pages are there already and consecutive.  */
@@ -467,18 +470,35 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
 	}
       else
         {
-	  fprintf (stderr, "PAGEIN: %d to %d\n", i, pnum);
+	  unsigned int in_len = p->file_size;
+	  unsigned int compressed = in_len & 1;
+	  in_len >>= 1;
+	  fprintf (stderr, "PAGEIN: %d to %d", i, pnum);
 	  /* Not mapped, so read in this page.  */
 	  if (fseek (s->file, p->file_offset, SEEK_SET) < 0)
 	    {
 	      perror ("mapping fseek");
 	      exit (1);
 	    }
-	  if (fread (dest, p->file_size, 1, s->file) != 1)
+	  if (fread (compressed ? buf : dest, in_len, 1, s->file) != 1)
 	    {
 	      perror ("mapping fread");
 	      exit (1);
 	    }
+	  if (compressed)
+	    {
+	      unsigned int out_len;
+	      out_len = unchecked_decompress_buf (buf, in_len,
+						  dest, BLOB_PAGESIZE);
+	      if (out_len != BLOB_PAGESIZE
+	          && i < s->num_pages - 1)
+	        {
+	          fprintf (stderr, "can't decompress\n");
+	          exit (1);
+		}
+	      fprintf (stderr, " (expand %d to %d)", in_len, out_len);
+	    }
+	  fprintf (stderr, "\n");
 	}
       p->mapped_at = pnum * BLOB_PAGESIZE;
       s->mapped[pnum] = i + 1;
@@ -801,7 +821,7 @@ static void
 write_pages (FILE *fp, Attrstore *s)
 {
   unsigned int i;
-  unsigned char *buf[BLOB_PAGESIZE];
+  unsigned char buf[BLOB_PAGESIZE];
 
   /* The compressed pages in the file have different sizes, so we need
      to store these sizes somewhere, either in front of all page data,
@@ -849,8 +869,7 @@ write_pages (FILE *fp, Attrstore *s)
       if (in_len)
         {
           in = attr_retrieve_blob (s, i * BLOB_PAGESIZE, in_len);
-          //out_len = lzf_compress (in, in_len, buf, in_len - 1);
-          out_len = 0;
+          out_len = compress_buf (in, in_len, buf, in_len - 1);
           if (!out_len)
             {
               memcpy (buf, in, in_len);
@@ -860,7 +879,7 @@ write_pages (FILE *fp, Attrstore *s)
       else
         out_len = 0;
       fprintf (stderr, "page %d: %d -> %d\n", i, in_len, out_len);
-      write_u32 (fp, out_len);
+      write_u32 (fp, out_len * 2 + (out_len != in_len));
       if (out_len
           && fwrite (buf, out_len, 1, fp) != 1)
         {
@@ -1007,7 +1026,7 @@ read_or_setup_pages (FILE *fp, Attrstore *s)
   unsigned int i;
   unsigned int can_seek;
   long cur_file_ofs;
-  //unsigned char buf[BLOB_PAGESIZE];
+  unsigned char buf[BLOB_PAGESIZE];
   blobsz = read_u32 (fp);
   pagesz = read_u32 (fp);
   if (pagesz != BLOB_PAGESIZE)
@@ -1035,14 +1054,17 @@ read_or_setup_pages (FILE *fp, Attrstore *s)
   for (i = 0; i < npages; i++)
     {
       unsigned int in_len = read_u32 (fp);
+      unsigned int compressed = in_len & 1;
       Attrblobpage *p = s->pages + i;
-      fprintf (stderr, "page %d: len %d\n", i, in_len);
+      in_len >>= 1;
+      fprintf (stderr, "page %d: len %d (%scompressed)\n",
+      	       i, in_len, compressed ? "" : "not ");
       if (can_seek)
         {
           cur_file_ofs += 4;
 	  p->mapped_at = -1;
 	  p->file_offset = cur_file_ofs;
-	  p->file_size = in_len;
+	  p->file_size = in_len * 2 + compressed;
 	  if (fseek (fp, in_len, SEEK_CUR) < 0)
 	    {
 	      perror ("fseek");
@@ -1055,14 +1077,27 @@ read_or_setup_pages (FILE *fp, Attrstore *s)
 	}
       else
         {
+	  unsigned int out_len;
+	  void *dest = s->blob_store + i * BLOB_PAGESIZE;
           p->mapped_at = i * BLOB_PAGESIZE;
 	  p->file_offset = 0;
 	  p->file_size = 0;
 	  /* We can't seek, so suck everything in.  */
-	  if (fread (s->blob_store + i * BLOB_PAGESIZE, in_len, 1, fp) != 1)
+	  if (fread (compressed ? buf : dest, in_len, 1, fp) != 1)
 	    {
 	      perror ("fread");
 	      exit (1);
+	    }
+	  if (compressed)
+	    {
+	      out_len = unchecked_decompress_buf (buf, in_len,
+					          dest, BLOB_PAGESIZE);
+	      if (out_len != BLOB_PAGESIZE
+	          && i < npages - 1)
+	        {
+	          fprintf (stderr, "can't decompress\n");
+	          exit (1);
+	        }
 	    }
 	}
     }
