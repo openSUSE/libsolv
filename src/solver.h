@@ -76,6 +76,7 @@ typedef struct solver {
   /* learnt rule history */
   Queue learnt_why;
   Queue learnt_pool;
+  Queue minimize;
 
   int propagate_index;
 

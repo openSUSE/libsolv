@@ -38,7 +38,35 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
   Id b = *(Id *)bp;
   r = pool->solvables[a].name - pool->solvables[b].name;
   if (r)
-    return r;
+    {
+      const char *na, *nb;
+      /* different names. We use real strcmp here so that the result
+       * is not depending on some random solvable order */
+      na = id2str(pool, pool->solvables[a].name);
+      nb = id2str(pool, pool->solvables[b].name);
+      /* bring selections and patterns to the front */
+      if (!strncmp(na, "pattern:", 8))
+	{
+          if (strncmp(nb, "pattern:", 8))
+	    return -1;
+	}
+      else if (!strncmp(nb, "pattern:", 8))
+	{
+          if (strncmp(na, "pattern:", 8))
+	    return 1;
+	}
+      if (!strncmp(na, "selection:", 10))
+	{
+          if (strncmp(nb, "selection:", 10))
+	    return -1;
+	}
+      else if (!strncmp(nb, "selection:", 10))
+	{
+          if (strncmp(na, "selection:", 10))
+	    return 1;
+	}
+      return strcmp(na, nb);
+    }
   return a - b;
 }
 
@@ -1348,10 +1376,11 @@ propagate(Solver *solv, int level)
           /* unit clause found, set other watch to TRUE */
 	  if (DECISIONMAP_TRUE(-ow))
 	    return r;		/* eek, a conflict! */
-#if 0
- 	  printf("unit ");
- 	  printrule(solv, r);
-#endif
+	  if (pool->verbose > 2)
+	    {
+	      printf("unit ");
+	      printrule(solv, r);
+	    }
 	  if (ow > 0)
             decisionmap[ow] = level;
 	  else
@@ -1737,6 +1766,12 @@ revert(Solver *solv, int level)
       solv->decisionq_why.count--;
       solv->propagate_index = solv->decisionq.count;
     }
+  while (solv->minimize.count && solv->minimize.elements[solv->minimize.count - 1] < -level)
+    {
+      solv->minimize.count--;
+      while (solv->minimize.count && solv->minimize.elements[solv->minimize.count - 1] >= 0)
+	solv->minimize.count--;
+    }
   solv->recommends_index = -1;
 }
 
@@ -1864,6 +1899,7 @@ solver_create(Pool *pool, Repo *installed)
   queue_init(&solv->suggestions);
   queue_init(&solv->learnt_why);
   queue_init(&solv->learnt_pool);
+  queue_init(&solv->minimize);
 
   map_init(&solv->recommendsmap, pool->nsolvables);
   map_init(&solv->suggestsmap, pool->nsolvables);
@@ -1873,8 +1909,6 @@ solver_create(Pool *pool, Repo *installed)
   solv->rules = (Rule *)xmalloc((solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
   memset(solv->rules, 0, sizeof(Rule));
   solv->nrules = 1;
-
-  policy_init( pool );
 
   return solv;
 }
@@ -1887,8 +1921,6 @@ solver_create(Pool *pool, Repo *installed)
 void
 solver_free(Solver *solv)
 {
-  policy_exit();
-
   queue_free(&solv->ruletojob);
   queue_free(&solv->decisionq);
   queue_free(&solv->decisionq_why);
@@ -1896,6 +1928,7 @@ solver_free(Solver *solv)
   queue_free(&solv->learnt_pool);
   queue_free(&solv->problems);
   queue_free(&solv->suggestions);
+  queue_free(&solv->minimize);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -1914,7 +1947,7 @@ solver_free(Solver *solv)
 /*
  * run_solver
  * 
- * all rules have been set up, not actually run the solver
+ * all rules have been set up, now actually run the solver
  *
  */
 
@@ -1930,15 +1963,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
   Pool *pool = solv->pool;
   Id p, *dp;
 
-if (policy_printrules())
-{
+#if 0
   printf("number of rules: %d\n", solv->nrules);
-  int i;
   for (i = 0; i < solv->nrules; i++)
-    {
-      printrule(solv, solv->rules + i);
-    }
-}
+    printrule(solv, solv->rules + i);
+#endif
 
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
@@ -2138,12 +2167,21 @@ if (policy_printrules())
 	      printrule(solv, r);
 	      abort();
 	    }
+	  if (pool->verbose > 2)
+	    printrule(solv, r);
 	  prune_to_highest_prio(pool, &dq);
 	  if (dq.count > 1)
 	    prune_to_recommended(solv, &dq);
 	  if (dq.count > 1)
 	    prune_best_version_arch(pool, &dq);
-	  p = dq.elements[dq.count - 1];
+          if (dq.count > 1)
+	    {
+	      int j;
+	      for (j = 1; j < dq.count; j++)
+		queue_push(&solv->minimize, dq.elements[j]);
+	      queue_push(&solv->minimize, -level);
+	    }
+	  p = dq.elements[0];
 	  s = pool->solvables + p;
 #if 0
 	  printf("installing %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
@@ -2194,7 +2232,9 @@ if (policy_printrules())
 				  break;
 				}
 			      else if (solv->decisionmap[p] == 0)
-				queue_pushunique(&dq, p);
+				{
+				  queue_pushunique(&dq, p);
+				}
 			    }
 			}
 		    }
@@ -2234,12 +2274,50 @@ if (policy_printrules())
 	        prune_to_highest_prio(pool, &dq);
 	      if (dq.count > 1)
 	        prune_best_version_arch(pool, &dq);
-	      p = dq.elements[dq.count - 1];
+	      p = dq.elements[0];
 	      s = pool->solvables + p;
 #if 1
 	      printf("installing recommended %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 #endif
 	      level = setpropagatelearn(solv, level, p, 0);
+	      continue;
+	    }
+	}
+      /* minimization step */
+     if (solv->minimize.count)
+	{
+	  int l = 0, lasti = -1, lastl = -1;
+	  p = 0;
+	  for (i = solv->minimize.count - 1; i >= 0; i--)
+	    {
+	      p = solv->minimize.elements[i];
+	      if (p < 0)
+		l = -p;
+	      else if (p > 0 && solv->decisionmap[p] > l + 1)
+		{
+		  lasti = i;
+		  lastl = l;
+		}
+	    }
+	  if (lasti >= 0)
+	    {
+	      /* kill old solvable so that we do not loop */
+	      p = solv->minimize.elements[lasti];
+	      solv->minimize.elements[lasti] = 0;
+	      s = pool->solvables + p;
+#if 1
+	      printf("minimizing %d -> %d with %s-%s.%s\n", solv->decisionmap[p], l, id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+#endif
+	      level = lastl;
+	      revert(solv, level);
+	      olevel = level;
+	      level = setpropagatelearn(solv, level, p, disablerules);
+	      if (level == 0)
+		{
+		  printf("UNSOLVABLE\n");
+		  queue_free(&dq);
+		  return;
+		}
 	      continue;
 	    }
 	}
@@ -2819,9 +2897,12 @@ solve(Solver *solv, Queue *job)
 	{
 	case SOLVER_INSTALL_SOLVABLE:			/* install specific solvable */
 	  s = pool->solvables + what;
-	  if (solv->rc_output) {
-	    printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), repo_name(s->repo));
-	  }
+	  if (solv->rc_output)
+            {
+	      printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), repo_name(s->repo));
+	    }
+	  if (pool->verbose)
+	    printf("job: install solvable %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
           addrule(solv, what, 0);			/* install by Id */
 	  queue_push(&solv->ruletojob, i);
 	  FOR_PROVIDES(p, pp, s->name)
@@ -2829,12 +2910,19 @@ solve(Solver *solv, Queue *job)
 	      MAPSET(&noupdaterule, p);
 	  break;
 	case SOLVER_ERASE_SOLVABLE:
+	  s = pool->solvables + what;
+	  if (pool->verbose)
+	    printf("job: erase solvable %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
           addrule(solv, -what, 0);			/* remove by Id */
 	  queue_push(&solv->ruletojob, i);
 	  MAPSET(&noupdaterule, what);
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:		/* install by capability */
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
+	  if (pool->verbose && how == SOLVER_INSTALL_SOLVABLE_NAME)
+	    printf("job: install name %s\n", id2str(pool, what));
+	  if (pool->verbose && how == SOLVER_INSTALL_SOLVABLE_PROVIDES)
+	    printf("job: install provides %s\n", dep2str(pool, what));
 	  queue_empty(&q);
 	  FOR_PROVIDES(p, pp, what)
 	    {
@@ -2859,6 +2947,10 @@ solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
+	  if (pool->verbose && how == SOLVER_ERASE_SOLVABLE_NAME)
+	    printf("job: erase name %s\n", id2str(pool, what));
+	  if (pool->verbose && how == SOLVER_ERASE_SOLVABLE_PROVIDES)
+	    printf("job: erase provides %s\n", dep2str(pool, what));
 	  FOR_PROVIDES(p, pp, what)
 	    {
 				       /* if by name, ensure that the name matches */
@@ -2871,7 +2963,11 @@ solve(Solver *solv, Queue *job)
 	    }
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_UPDATE:              /* find update for solvable */
-	  addupdaterule(solv, pool->solvables + what, &addedmap, 0, 0, 0, 0);
+	  s = pool->solvables + what;
+	  MAPSET(&noupdaterule, what);
+	  if (pool->verbose)
+	    printf("job: update %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	  addupdaterule(solv, s, &addedmap, 0, 0, 0, 0);
 	  queue_push(&solv->ruletojob, i);
 	  break;
 	}
@@ -2978,7 +3074,8 @@ solve(Solver *solv, Queue *job)
 		  FOR_PROVIDES(p, pp, sug)
 		    MAPSET(&solv->suggestsmap, p);
 		}
-	    }	}
+	    }
+	}
       for (i = 1; i < pool->nsolvables; i++)
 	{
 	  if (solv->decisionmap[i] != 0)
