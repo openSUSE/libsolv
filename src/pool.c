@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2007, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
+/*
  * pool.c
  * 
  * The pool contains information about solvables

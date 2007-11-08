@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2007, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
+/*
  * helix2solv.c
  * 
  * parse 'helix' type xml and write out .solv file

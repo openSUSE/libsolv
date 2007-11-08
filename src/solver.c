@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2007, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
+/*
  * solver.c
  *
  * SAT based dependency solver
@@ -172,6 +179,33 @@ dep_possible(Solver *solv, Id dep, Map *m)
   return 0;
 }
 
+static inline int
+is_supplemented(Solver *solv, Solvable *s)
+{
+  Id sup, *supp;
+  if (!s->supplements && !s->freshens)
+    return 0;
+  if (s->supplements)
+    {
+      supp = s->repo->idarraydata + s->supplements;
+      while ((sup = *supp++) != 0)
+	if (dep_fulfilled(solv, sup))
+	  break;
+      if (!sup)
+	return 0;
+    }
+  if (s->freshens)
+    {
+      supp = s->repo->idarraydata + s->freshens;
+      while ((sup = *supp++) != 0)
+	if (dep_fulfilled(solv, sup))
+	  break;
+      if (!sup)
+	return 0;
+    }
+  return 1;
+}
+
 static void
 prune_to_highest_prio(Pool *pool, Queue *plist)
 {
@@ -207,7 +241,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
   Pool *pool = solv->pool;
   int i, j;
   Solvable *s;
-  Id p, *pp, sup, *supp, rec, *recp, sug, *sugp, enh, *enhp;
+  Id p, *pp, rec, *recp, sug, *sugp, enh, *enhp;
 
   if (solv->recommends_index < 0)
     {
@@ -245,28 +279,8 @@ prune_to_recommended(Solver *solv, Queue *plist)
 	  plist->elements[j++] = p;
 	  continue;
 	}
-      s = pool->solvables + p;
-      if (!s->supplements && !s->freshens)
-	continue;
-      if (s->supplements)
-	{
-	  supp = s->repo->idarraydata + s->supplements;
-	  while ((sup = *supp++) != 0)
-	    if (dep_fulfilled(solv, sup))
-	      break;
-	  if (!sup)
-	    continue;
-	}
-      if (s->freshens)
-	{
-	  supp = s->repo->idarraydata + s->freshens;
-	  while ((sup = *supp++) != 0)
-	    if (dep_fulfilled(solv, sup))
-	      break;
-	  if (!sup)
-	    continue;
-	}
-      plist->elements[j++] = s - pool->solvables;
+      if (is_supplemented(solv, pool->solvables + p))
+        plist->elements[j++] = p;
     }
   if (j)
     plist->count = j;
@@ -1766,7 +1780,7 @@ revert(Solver *solv, int level)
       solv->decisionq_why.count--;
       solv->propagate_index = solv->decisionq.count;
     }
-  while (solv->minimize.count && solv->minimize.elements[solv->minimize.count - 1] < -level)
+  while (solv->minimize.count && solv->minimize.elements[solv->minimize.count - 1] <= -level)
     {
       solv->minimize.count--;
       while (solv->minimize.count && solv->minimize.elements[solv->minimize.count - 1] >= 0)
@@ -1958,7 +1972,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
   int systemlevel;
   int level, olevel;
   Rule *r;
-  int i, n;
+  int i, j, n;
   Solvable *s;
   Pool *pool = solv->pool;
   Id p, *dp;
@@ -2174,14 +2188,22 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	    prune_to_recommended(solv, &dq);
 	  if (dq.count > 1)
 	    prune_best_version_arch(pool, &dq);
+	  j = 0;
           if (dq.count > 1)
 	    {
-	      int j;
-	      for (j = 1; j < dq.count; j++)
-		queue_push(&solv->minimize, dq.elements[j]);
-	      queue_push(&solv->minimize, -level);
+	      /* choose the supplemented one */
+	      for (j = 0; j < dq.count; j++)
+		if (is_supplemented(solv, pool->solvables + dq.elements[j]))
+		  break;
+	      if (j == dq.count)
+		{
+		  for (j = 1; j < dq.count; j++)
+		    queue_push(&solv->minimize, dq.elements[j]);
+		  queue_push(&solv->minimize, -level);
+		  j = 0;
+		}
 	    }
-	  p = dq.elements[0];
+	  p = dq.elements[j];
 	  s = pool->solvables + p;
 #if 0
 	  printf("installing %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
@@ -2241,31 +2263,13 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		}
 	      else
 		{
-		  Id *supp, sup;
 		  s = pool->solvables + i;
 		  if (!s->supplements && !s->freshens)
 		    continue;
 		  if (!pool_installable(pool, s))
 		    continue;
-		  if (s->supplements)
-		    {
-		      supp = s->repo->idarraydata + s->supplements;
-		      while ((sup = *supp++) != 0)
-			if (dep_fulfilled(solv, sup))
-			  break;
-		      if (!sup)
-			continue;
-		    }
-		  if (s->freshens)
-		    {
-		      supp = s->repo->idarraydata + s->freshens;
-		      while ((sup = *supp++) != 0)
-			if (dep_fulfilled(solv, sup))
-			  break;
-		      if (!sup)
-			continue;
-		    }
-		  queue_pushunique(&dq, i);
+		  if (is_supplemented(solv, s))
+		    queue_pushunique(&dq, i);
 		}
 	    }
 	  if (dq.count)
