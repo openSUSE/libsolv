@@ -46,3 +46,16 @@ TARGET_LINK_LIBRARIES( mergesolv satsolver)
 SET(dumpattr_REPOS dumpattr.c attr_store.c)
 ADD_EXECUTABLE( dumpattr ${dumpattr_REPOS} )
 TARGET_LINK_LIBRARIES( dumpattr satsolver)
+
+install(TARGETS dumpattr 
+                mergesolv 
+                dumpsolv 
+                patchxml2solv 
+                susetags2solv
+                helix2solv 
+                rpmmd2solv 
+                rpmdb2solv
+   DESTINATION ${BIN_INSTALL_DIR} )
+
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/repo2solv.sh 
+        DESTINATION ${BIN_INSTALL_DIR} )

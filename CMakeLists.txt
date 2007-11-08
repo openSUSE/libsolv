@@ -10,6 +10,7 @@ ELSE ( DEFINED  LIB )
   SET ( LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" )
 ENDIF ( DEFINED  LIB )
 MESSAGE(STATUS "Libraries will be installed in ${LIB_INSTALL_DIR}" )
+SET( BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin" )
 
 ####################################################################
 # CONFIGURATION                                                    #
