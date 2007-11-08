@@ -1780,11 +1780,11 @@ revert(Solver *solv, int level)
       solv->decisionq_why.count--;
       solv->propagate_index = solv->decisionq.count;
     }
-  while (solv->minimize.count && solv->minimize.elements[solv->minimize.count - 1] <= -level)
+  while (solv->branches.count && solv->branches.elements[solv->branches.count - 1] <= -level)
     {
-      solv->minimize.count--;
-      while (solv->minimize.count && solv->minimize.elements[solv->minimize.count - 1] >= 0)
-	solv->minimize.count--;
+      solv->branches.count--;
+      while (solv->branches.count && solv->branches.elements[solv->branches.count - 1] >= 0)
+	solv->branches.count--;
     }
   solv->recommends_index = -1;
 }
@@ -1904,7 +1904,6 @@ solver_create(Pool *pool, Repo *installed)
   solv = (Solver *)xcalloc(1, sizeof(Solver));
   solv->pool = pool;
   solv->installed = installed;
-  pool->verbose = 1;
 
   queue_init(&solv->ruletojob);
   queue_init(&solv->decisionq);
@@ -1913,7 +1912,7 @@ solver_create(Pool *pool, Repo *installed)
   queue_init(&solv->suggestions);
   queue_init(&solv->learnt_why);
   queue_init(&solv->learnt_pool);
-  queue_init(&solv->minimize);
+  queue_init(&solv->branches);
 
   map_init(&solv->recommendsmap, pool->nsolvables);
   map_init(&solv->suggestsmap, pool->nsolvables);
@@ -1942,7 +1941,7 @@ solver_free(Solver *solv)
   queue_free(&solv->learnt_pool);
   queue_free(&solv->problems);
   queue_free(&solv->suggestions);
-  queue_free(&solv->minimize);
+  queue_free(&solv->branches);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -2198,8 +2197,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (j == dq.count)
 		{
 		  for (j = 1; j < dq.count; j++)
-		    queue_push(&solv->minimize, dq.elements[j]);
-		  queue_push(&solv->minimize, -level);
+		    queue_push(&solv->branches, dq.elements[j]);
+		  queue_push(&solv->branches, -level);
 		  j = 0;
 		}
 	    }
@@ -2287,14 +2286,53 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      continue;
 	    }
 	}
+
+     if (solv->solution_callback)
+	{
+	  solv->solution_callback(solv, solv->solution_callback_data);
+	  if (solv->branches.count)
+	    {
+	      int i = solv->branches.count - 1;
+	      int l = -solv->branches.elements[i];
+	      for (; i > 0; i--)
+		if (solv->branches.elements[i - 1] < 0)
+		  break;
+	      p = solv->branches.elements[i];
+#if 1
+	      s = pool->solvables + p;
+	      printf("branching with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+#endif
+	      queue_empty(&dq);
+	      for (j = i + 1; j < solv->branches.count; j++)
+		queue_push(&dq, solv->branches.elements[j]);
+	      solv->branches.count = i;
+	      level = l;
+	      revert(solv, level);
+	      if (dq.count > 1)
+	        for (j = 0; j < dq.count; j++)
+		  queue_push(&solv->branches, dq.elements[j]);
+	      olevel = level;
+	      level = setpropagatelearn(solv, level, p, disablerules);
+	      if (level == 0)
+		{
+		  printf("UNSOLVABLE\n");
+		  queue_free(&dq);
+		  return;
+		}
+	      continue;
+	    }
+	  /* all branches done, we're finally finished */
+	  break;
+	}
+
       /* minimization step */
-     if (solv->minimize.count)
+     if (solv->branches.count)
 	{
 	  int l = 0, lasti = -1, lastl = -1;
 	  p = 0;
-	  for (i = solv->minimize.count - 1; i >= 0; i--)
+	  for (i = solv->branches.count - 1; i >= 0; i--)
 	    {
-	      p = solv->minimize.elements[i];
+	      p = solv->branches.elements[i];
 	      if (p < 0)
 		l = -p;
 	      else if (p > 0 && solv->decisionmap[p] > l + 1)
@@ -2306,8 +2344,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (lasti >= 0)
 	    {
 	      /* kill old solvable so that we do not loop */
-	      p = solv->minimize.elements[lasti];
-	      solv->minimize.elements[lasti] = 0;
+	      p = solv->branches.elements[lasti];
+	      solv->branches.elements[lasti] = 0;
 	      s = pool->solvables + p;
 #if 1
 	      printf("minimizing %d -> %d with %s-%s.%s\n", solv->decisionmap[p], l, id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));

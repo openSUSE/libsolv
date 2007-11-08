@@ -44,6 +44,8 @@ typedef struct rule {
   Id n1, n2;		/* next rules in linked list, corresponding to w1,w2 */
 } Rule;
 
+struct solver;
+
 typedef struct solver {
   Pool *pool;
   Repo *installed;
@@ -83,7 +85,10 @@ typedef struct solver {
   /* learnt rule history */
   Queue learnt_why;
   Queue learnt_pool;
-  Queue minimize;
+
+  Queue branches;
+  int (*solution_callback)(struct solver *solv, void *data);
+  void *solution_callback_data;
 
   int propagate_index;
 
