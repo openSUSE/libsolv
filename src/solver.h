@@ -128,5 +128,7 @@ extern void prune_best_version_arch(Pool *pool, Queue *plist);
 
 void printdecisions(Solver *solv);
 
+void refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined);
+int archchanges(Pool *pool, Solvable *s1, Solvable *s2);
 
 #endif /* SOLVER_H */

@@ -1101,7 +1101,7 @@ addrulesforweak(Solver *solv, Map *m)
   if (pool->verbose) printf("done. (%d)\n", solv->nrules);
 }
 
-static inline int
+int
 archchanges(Pool *pool, Solvable *s1, Solvable *s2)
 {
   Id a1 = s1->arch, a2 = s2->arch;
@@ -2373,7 +2373,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
  * refine_suggestion
  */
   
-static void
+void
 refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined)
 {
   Rule *r;
