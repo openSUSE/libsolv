@@ -57,5 +57,4 @@ install(TARGETS dumpattr
                 rpmdb2solv
    DESTINATION ${BIN_INSTALL_DIR} )
 
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/repo2solv.sh 
-        DESTINATION ${BIN_INSTALL_DIR} )
+install(PROGRAMS repo2solv.sh DESTINATION ${BIN_INSTALL_DIR} )
