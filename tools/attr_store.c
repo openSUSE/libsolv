@@ -697,10 +697,10 @@ attr_store_pack (Attrstore *s)
   s->stringhashmask = 0;
 
   fprintf (stderr, "%d\n", old_mem);
-  fprintf (stderr, "%d\n", s->entries * sizeof(s->ent2attr[0]));
+  fprintf (stderr, "%ld\n", s->entries * sizeof(s->ent2attr[0]));
   fprintf (stderr, "%d\n", s->attr_next_free);
-  fprintf (stderr, "%d\n", s->abbr_next_free * sizeof(s->abbr[0]));
-  fprintf (stderr, "%d\n", s->flat_abbr_next_free * sizeof(s->flat_abbr[0]));
+  fprintf (stderr, "%ld\n", s->abbr_next_free * sizeof(s->abbr[0]));
+  fprintf (stderr, "%ld\n", s->flat_abbr_next_free * sizeof(s->flat_abbr[0]));
   fprintf (stderr, "pages %d\n", s->num_pages);
   s->packed = 1;
 }
