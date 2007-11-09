@@ -1819,6 +1819,12 @@ watch2onhighest(Solver *solv, Rule *r)
 
 /*
  * setpropagatelearn
+ *
+ * add free decision to decision q, increase level
+ * propagate decision, return if no conflict
+ * in conflict case, analyze conflict rule, add resulting
+ * rule to learnt rule set, make decision from learnt
+ * rule (always unit) and re-propagate
  */
 
 static int
@@ -1846,7 +1852,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
       if (level == 1)
 	return analyze_unsolvable(solv, r, disablerules);
       printf("conflict with rule #%d\n", (int)(r - solv->rules));
-      l = analyze(solv, level, r, &p, &d, &why);
+      l = analyze(solv, level, r, &p, &d, &why);	/* learnt rule in p and d */
       if (l >= level || l <= 0)
 	abort();
       printf("reverting decisions (level %d -> %d)\n", level, l);
@@ -2069,7 +2075,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 			    queue_push(&dq, p);
 			}
 		      if (p)
-			continue;	/* rule is already true */
+			continue;	/* update package already installed */
 		    }
 		  if (!dq.count && solv->decisionmap[i] != 0)
 		    continue;
