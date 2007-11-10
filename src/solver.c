@@ -1723,7 +1723,7 @@ selectandinstall(Solver *solv, int level, Queue *dq, Id inst, int disablerules)
   Id p;
   int i;
 
-  if (dq->count > 1)
+  if (dq->count > 1 || inst)
     policy_filter_unwanted(solv, dq, inst, POLICY_MODE_CHOOSE);
 
   i = 0;
