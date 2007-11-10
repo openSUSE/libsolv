@@ -68,6 +68,8 @@ typedef struct solver {
   Id learntrules;			/* learnt rules */
 
   Id *weaksystemrules;			/* please try to install (r->d) */
+  Map noupdate;				/* don't try to update these
+                                           installed solvables */
 
   Id *watches;				/* Array of rule offsets
 					 * watches has nsolvables*2 entries and is addressed from the middle
@@ -123,12 +125,77 @@ enum solvcmds {
 extern Solver *solver_create(Pool *pool, Repo *installed);
 extern void solver_free(Solver *solv);
 extern void solve(Solver *solv, Queue *job);
-
-extern void prune_best_version_arch(Pool *pool, Queue *plist);
+extern int solver_dep_installed(Solver *solv, Id dep);
 
 void printdecisions(Solver *solv);
 
-void refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined);
+void refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined);
 int archchanges(Pool *pool, Solvable *s1, Solvable *s2);
+
+static inline int
+solver_dep_fulfilled(Solver *solv, Id dep)
+{
+  Pool *pool = solv->pool;
+  Id p, *pp;
+
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags == REL_AND)
+        {
+          if (!solver_dep_fulfilled(solv, rd->name))
+            return 0;
+          return solver_dep_fulfilled(solv, rd->evr);
+        }
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+        return solver_dep_installed(solv, rd->evr);
+    }
+  FOR_PROVIDES(p, pp, dep)
+    {
+      if (solv->decisionmap[p] > 0)
+        return 1;
+    }
+  return 0;
+}
+
+static inline int
+solver_is_supplementing(Solver *solv, Solvable *s)
+{
+  Id sup, *supp;
+  if (!s->supplements && !s->freshens)
+    return 0;
+  if (s->supplements)
+    {
+      supp = s->repo->idarraydata + s->supplements;
+      while ((sup = *supp++) != 0)
+        if (solver_dep_fulfilled(solv, sup))
+          break;
+      if (!sup)
+        return 0;
+    }
+  if (s->freshens)
+    {
+      supp = s->repo->idarraydata + s->freshens;
+      while ((sup = *supp++) != 0)
+        if (solver_dep_fulfilled(solv, sup))
+          break;
+      if (!sup)
+        return 0;
+    }
+  return 1;
+}
+
+static inline int
+solver_is_enhancing(Solver *solv, Solvable *s)
+{
+  Id enh, *enhp;
+  if (!s->enhances)
+    return 0;
+  enhp = s->repo->idarraydata + s->enhances;
+  while ((enh = *enhp++) != 0)
+    if (solver_dep_fulfilled(solv, enh))
+      return 1;
+  return 0;
+}
 
 #endif /* SOLVER_H */
