@@ -321,7 +321,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode)
   if (plist->count > 1)
     prune_to_best_arch(pool, plist);
   if (plist->count > 1)
-    prune_to_best_arch(pool, plist);
+    prune_to_best_version(pool, plist);
 }
 
 
