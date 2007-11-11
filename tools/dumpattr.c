@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "attr_store.h"
 #include "pool.h"
@@ -78,8 +79,15 @@ dump_attrs (Attrstore *s, unsigned int entry)
     }
 }
 
+static int
+callback (Attrstore *s, unsigned entry, Id name, const char *str)
+{
+  fprintf (stdout, "%d:%s:%s\n", entry, id2str (s->pool, name), str);
+  return 1;
+}
+
 int
-main (void)
+main (int argc, char *argv[])
 {
   unsigned int i;
   Pool *pool = pool_create ();
@@ -88,10 +96,37 @@ main (void)
   attr_store_unpack (s);
   attr_store_pack (s);
   fprintf (stdout, "attribute store contains %d entities\n", s->entries);
-  for (i = 0; i < s->entries; i++)
+  if (argc == 1)
+    for (i = 0; i < s->entries; i++)
+      {
+        fprintf (stdout, "\nentity %u:\n", i);
+        dump_attrs (s, i);
+      }
+  else
     {
-      fprintf (stdout, "\nentity %u:\n", i);
-      dump_attrs (s, i);
+      int g;
+      unsigned flags;
+      unsigned search_type;
+      NameId name;
+      name = 0;
+      flags = SEARCH_IDS;
+      search_type = SEARCH_SUBSTRING;
+      while ((g = getopt (argc, argv, "-n:bgeri")) >= 0)
+        switch (g)
+	{
+	  case 'n': name = str2nameid (s, optarg); break;
+	  case 'b': flags |= SEARCH_BLOBS; break;
+	  case 'g': search_type = SEARCH_GLOB; break;
+	  case 'e': search_type = SEARCH_STRING; break;
+	  case 'r': search_type = SEARCH_REGEX; break;
+	  case 'i': flags |= SEARCH_NOCASE; break;
+	  case 1:
+	    attr_store_search_s (s, optarg, search_type | flags, name, callback);
+	    flags = SEARCH_IDS;
+	    name = 0;
+	    search_type = SEARCH_SUBSTRING;
+	    break;
+	}
     }
   return 0;
 }

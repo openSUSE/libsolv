@@ -40,6 +40,16 @@ void add_attr_intlist_int (Attrstore *s, unsigned int entry, NameId name, int va
 void add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id);
 
 const void * attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int len);
+
+#define SEARCH_SUBSTRING 1
+#define SEARCH_STRING 2
+#define SEARCH_GLOB 3
+#define SEARCH_REGEX 4
+#define SEARCH_NOCASE 8
+#define SEARCH_BLOBS 16
+#define SEARCH_IDS 32
+typedef int (*cb_attr_search_s) (Attrstore *s, unsigned entry, Id name, const char *str);
+void attr_store_search_s (Attrstore *s, const char *pattern, int flags, NameId name, cb_attr_search_s cb);
 #ifdef __cplusplus
 }
 #endif

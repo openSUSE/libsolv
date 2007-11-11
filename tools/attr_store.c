@@ -5,6 +5,11 @@
  * for further information
  */
 
+/* We need FNM_CASEFOLD and strcasestr.  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -13,6 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <fnmatch.h>
+#include <regex.h>
 
 #include "attr_store.h"
 #include "pool.h"
@@ -22,6 +29,8 @@
 #include "attr_store_p.h"
 
 #include "fastlz.c"
+
+/*#define DEBUG_PAGING*/
 
 #define NAME_WIDTH 12
 #define TYPE_WIDTH (16-NAME_WIDTH)
@@ -397,7 +406,9 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
       s->mapped = xrealloc (s->mapped, s->ncanmap * sizeof (s->mapped[0]));
       memset (s->mapped + oldcan, 0, (s->ncanmap - oldcan) * sizeof (s->mapped[0]));
       s->blob_store = xrealloc (s->blob_store, s->ncanmap * BLOB_PAGESIZE);
+#ifdef DEBUG_PAGING
       fprintf (stderr, "PAGE: can map %d pages\n", s->ncanmap);
+#endif
     }
 
   /* Now search for "cheap" space in our store.  Space is cheap if it's either
@@ -452,7 +463,9 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
           && pnum != pstart + i - best)
 	{
 	  /* Evict this page.  */
+#ifdef DEBUG_PAGING
 	  fprintf (stderr, "PAGE: evict page %d from %d\n", pnum, i);
+#endif
 	  cost[i] = 0;
 	  s->mapped[i] = 0;
 	  s->pages[pnum].mapped_at = -1;
@@ -469,7 +482,9 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
         {
 	  if (p->mapped_at != pnum * BLOB_PAGESIZE)
 	    {
+#ifdef DEBUG_PAGING
 	      fprintf (stderr, "PAGECOPY: %d to %d\n", i, pnum);
+#endif
 	      /* Still mapped somewhere else, so just copy it from there.  */
 	      memcpy (dest, s->blob_store + p->mapped_at, BLOB_PAGESIZE);
 	      s->mapped[p->mapped_at / BLOB_PAGESIZE] = 0;
@@ -480,7 +495,9 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
 	  unsigned int in_len = p->file_size;
 	  unsigned int compressed = in_len & 1;
 	  in_len >>= 1;
+#ifdef DEBUG_PAGING
 	  fprintf (stderr, "PAGEIN: %d to %d", i, pnum);
+#endif
 	  /* Not mapped, so read in this page.  */
 	  if (fseek (s->file, p->file_offset, SEEK_SET) < 0)
 	    {
@@ -503,9 +520,13 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
 	          fprintf (stderr, "can't decompress\n");
 	          exit (1);
 		}
+#ifdef DEBUG_PAGING
 	      fprintf (stderr, " (expand %d to %d)", in_len, out_len);
+#endif
 	    }
+#ifdef DEBUG_PAGING
 	  fprintf (stderr, "\n");
+#endif
 	}
       p->mapped_at = pnum * BLOB_PAGESIZE;
       s->mapped[pnum] = i + 1;
@@ -885,7 +906,9 @@ write_pages (FILE *fp, Attrstore *s)
 	}
       else
         out_len = 0;
+#ifdef DEBUG_PAGING
       fprintf (stderr, "page %d: %d -> %d\n", i, in_len, out_len);
+#endif
       write_u32 (fp, out_len * 2 + (out_len != in_len));
       if (out_len
           && fwrite (buf, out_len, 1, fp) != 1)
@@ -1064,8 +1087,10 @@ read_or_setup_pages (FILE *fp, Attrstore *s)
       unsigned int compressed = in_len & 1;
       Attrblobpage *p = s->pages + i;
       in_len >>= 1;
+#ifdef DEBUG_PAGING
       fprintf (stderr, "page %d: len %d (%scompressed)\n",
       	       i, in_len, compressed ? "" : "not ");
+#endif
       if (can_seek)
         {
           cur_file_ofs += 4;
@@ -1250,6 +1275,104 @@ attr_store_read (FILE *fp, Pool *pool)
   free (buf);
 
   return s;
+}
+
+void
+attr_store_search_s (Attrstore *s, const char *pattern, int flags, NameId name, cb_attr_search_s cb)
+{
+  unsigned int i;
+  attr_iterator ai;
+  regex_t regex;
+  /* If we search for a glob, but we don't have a wildcard pattern, make this
+     an exact string search.  */
+  if ((flags & 7) == SEARCH_GLOB
+      && !strpbrk (pattern, "?*["))
+    flags = SEARCH_STRING | (flags & ~7);
+  if ((flags & 7) == SEARCH_REGEX)
+    {
+      /* We feed multiple lines eventually (e.g. authors or descriptions),
+         so set REG_NEWLINE.  */
+      if (regcomp (&regex, pattern,
+      		   REG_EXTENDED | REG_NOSUB | REG_NEWLINE
+		   | ((flags & SEARCH_NOCASE) ? REG_ICASE : 0)) != 0)
+	return;
+    }
+  for (i = 0; i < s->entries; i++)
+    FOR_ATTRS (s, i, &ai)
+      {
+        const char *str;
+        if (name && name != ai.name)
+	  continue;
+	str = 0;
+	switch (ai.type)
+	  {
+	  case ATTR_INT:
+	  case ATTR_INTLIST:
+	    continue;
+	  case ATTR_ID:
+	    if (!(flags & SEARCH_IDS))
+	      continue;
+	    str = id2str (s->pool, ai.as_id);
+	    break;
+	  case ATTR_CHUNK:
+	    if (!(flags & SEARCH_BLOBS))
+	      continue;
+	    str = attr_retrieve_blob (s, ai.as_chunk[0], ai.as_chunk[1]);
+	    break;
+	  case ATTR_STRING:
+	    str = ai.as_string;
+	    break;
+	  case ATTR_LOCALIDS:
+	    {
+	      Id val;
+	      get_num (ai.as_numlist, val);
+	      if (val)
+		str = localid2str (s, val);
+	      break;
+	    }
+	  default:
+	    break;
+	  }
+	while (str)
+	  {
+	    unsigned int match = 0;
+	    switch (flags & 7)
+	    {
+	      case SEARCH_SUBSTRING:
+	        if (flags & SEARCH_NOCASE)
+		  match = !! strcasestr (str, pattern);
+		else
+		  match = !! strstr (str, pattern);
+		break;
+	      case SEARCH_STRING:
+	        if (flags & SEARCH_NOCASE)
+		  match = ! strcasecmp (str, pattern);
+		else
+		  match = ! strcmp (str, pattern);
+	        break;
+	      case SEARCH_GLOB:
+	        match = ! fnmatch (pattern, str,
+				   (flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0);
+		break;
+	      case SEARCH_REGEX:
+	        match = ! regexec (&regex, str, 0, NULL, 0);
+	        break;
+	      default:
+	        break;
+	    }
+	    if (match)
+	      cb (s, i, s->nameids[ai.name], str);
+	    if (ai.type != ATTR_LOCALIDS)
+	      break;
+	    Id val;
+	    get_num (ai.as_numlist, val);
+	    if (!val)
+	      break;
+	    str = localid2str (s, val);
+	  }
+      }
+  if ((flags & 7) == SEARCH_REGEX)
+    regfree (&regex);
 }
 
 #ifdef MAIN
