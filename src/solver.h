@@ -130,9 +130,6 @@ extern int solver_dep_installed(Solver *solv, Id dep);
 void printdecisions(Solver *solv);
 void printsolutions(Solver *solv, Queue *job);
 
-void refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined);
-int archchanges(Pool *pool, Solvable *s1, Solvable *s2);
-
 static inline int
 solver_dep_fulfilled(Solver *solv, Id dep)
 {

@@ -2210,7 +2210,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
   
 /* FIXME: think about conflicting assertions */
 
-void
+static void
 refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 {
   Pool *pool = solv->pool;
@@ -2321,6 +2321,86 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
   if (pool->verbose)
     printf("refine_suggestion end\n");
 }
+
+static void
+problems_to_solutions(Solver *solv, Queue *job)
+{
+  Pool *pool = solv->pool;
+  Queue problems;
+  Queue solution;
+  Queue solutions;
+  Id *problem;
+  Id why;
+  int i, j;
+
+  queue_clone(&problems, &solv->problems);
+  queue_init(&solution);
+  queue_init(&solutions);
+  problem = problems.elements;
+  for (i = 0; i < problems.count; i++)
+    {
+      Id v = problems.elements[i];
+      if (v == 0)
+	{
+	  /* mark end of this problem */
+	  queue_push(&solutions, 0);
+	  queue_push(&solutions, 0);
+	  if (i + 1 == problems.count)
+	    break;
+	  problem = problems.elements + i + 1;
+	  continue;
+	}
+      refine_suggestion(solv, job, problem, v, &solution);
+      if (!solution.count)
+	continue;	/* this solution didn't work out */
+
+      for (j = 0; j < solution.count; j++)
+	{
+	  why = solution.elements[j];
+#if 0
+	  printproblem(solv, why);
+#endif
+	  if (why < 0)
+	    {
+	      queue_push(&solutions, 0);
+	      queue_push(&solutions, -why);
+	    }
+	  else if (why >= solv->systemrules && why < solv->weakrules)
+	    {
+	      Id p, rp = 0;
+	      p = solv->installed->start + (why - solv->systemrules);
+	      if (solv->weaksystemrules && solv->weaksystemrules[why - solv->systemrules])
+		{
+		  Id *dp = pool->whatprovidesdata + solv->weaksystemrules[why - solv->systemrules];
+		  for (; *dp; dp++)
+		    {
+		      if (*dp >= solv->installed->start && *dp < solv->installed->start + solv->installed->nsolvables)
+			continue;
+		      if (solv->decisionmap[*dp] > 0)
+			{
+			  rp = *dp;
+			  break;
+			}
+		    }
+		}
+	      queue_push(&solutions, p);
+	      queue_push(&solutions, rp);
+	    }
+	  else
+	    abort();
+	}
+      /* mark end of this solution */
+      queue_push(&solutions, 0);
+      queue_push(&solutions, 0);
+    }
+  queue_free(&solution);
+  queue_free(&problems);
+  /* copy queue over to solutions */
+  queue_free(&solv->problems);
+  queue_clone(&solv->problems, &solutions);
+  queue_free(&solutions);
+}
+
 
   
 /*
@@ -2702,85 +2782,6 @@ create_obsolete_index(Solver *solv)
     }
 }
 
-static void
-problems_to_solutions(Solver *solv, Queue *job)
-{
-  Pool *pool = solv->pool;
-  Queue problems;
-  Queue solution;
-  Queue solutions;
-  Id *problem;
-  Id why;
-  int i, j;
-
-  queue_clone(&problems, &solv->problems);
-  queue_init(&solution);
-  queue_init(&solutions);
-  problem = problems.elements;
-  for (i = 0; i < problems.count; i++)
-    {
-      Id v = problems.elements[i];
-      if (v == 0)
-	{
-	  /* mark end of this problem */
-	  queue_push(&solutions, 0);
-	  queue_push(&solutions, 0);
-	  if (i + 1 == problems.count)
-	    break;
-	  problem = problems.elements + i + 1;
-	  continue;
-	}
-      refine_suggestion(solv, job, problem, v, &solution);
-      if (!solution.count)
-	continue;	/* this solution didn't work out */
-
-      for (j = 0; j < solution.count; j++)
-	{
-	  why = solution.elements[j];
-#if 0
-	  printproblem(solv, why);
-#endif
-	  if (why < 0)
-	    {
-	      queue_push(&solutions, 0);
-	      queue_push(&solutions, -why);
-	    }
-	  else if (why >= solv->systemrules && why < solv->weakrules)
-	    {
-	      Id p, rp = 0;
-	      p = solv->installed->start + (why - solv->systemrules);
-	      if (solv->weaksystemrules && solv->weaksystemrules[why - solv->systemrules])
-		{
-		  Id *dp = pool->whatprovidesdata + solv->weaksystemrules[why - solv->systemrules];
-		  for (; *dp; dp++)
-		    {
-		      if (*dp >= solv->installed->start && *dp < solv->installed->start + solv->installed->nsolvables)
-			continue;
-		      if (solv->decisionmap[*dp] > 0)
-			{
-			  rp = *dp;
-			  break;
-			}
-		    }
-		}
-	      queue_push(&solutions, p);
-	      queue_push(&solutions, rp);
-	    }
-	  else
-	    abort();
-	}
-      /* mark end of this solution */
-      queue_push(&solutions, 0);
-      queue_push(&solutions, 0);
-    }
-  queue_free(&solution);
-  queue_free(&problems);
-  /* copy queue over to solutions */
-  queue_free(&solv->problems);
-  queue_clone(&solv->problems, &solutions);
-  queue_free(&solutions);
-}
-
 
 /*-----------------------------------------------------------------*/
 /* main() */
@@ -2801,14 +2802,17 @@ solve(Solver *solv, Queue *job)
   Queue q;
   Solvable *s;
 
+  /* create obsolete index if needed */
+  if (solv->noupdateprovide && solv->installed->nsolvables)
+    create_obsolete_index(solv);
+
   /*
    * create basic rule set of all involved packages
-   * as bitmaps
+   * use addedmap bitmap to make sure we don't create rules twice
    * 
    */
 
   map_init(&addedmap, pool->nsolvables);
-
   queue_init(&q);
 
   /*
@@ -2835,9 +2839,6 @@ solve(Solver *solv, Queue *job)
    * 
    */
 
-  if (solv->noupdateprovide && solv->installed->nsolvables)
-    create_obsolete_index(solv);
-
   /*
    * solvable rules
    *  process job rules for solvables
@@ -2855,10 +2856,9 @@ solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
-	  queue_empty(&q);
 	  FOR_PROVIDES(p, pp, what)
 	    {
-				       /* if by name, ensure that the name matches */
+	      /* if by name, ensure that the name matches */
 	      if (how == SOLVER_INSTALL_SOLVABLE_NAME && pool->solvables[p].name != what)
 		continue;
 	      addrpmrulesforsolvable(solv, pool->solvables + p, &addedmap);
@@ -2901,7 +2901,7 @@ solve(Solver *solv, Queue *job)
   
   unifyrules(solv);	/* remove duplicate rpm rules */
 
-  if (pool->verbose) printf("decisions based on rpms: %d\n", solv->decisionq.count);
+  if (pool->verbose) printf("decisions based on rpm rules: %d\n", solv->decisionq.count);
 
   /*
    * now add all job rules
@@ -3016,6 +3016,8 @@ solve(Solver *solv, Queue *job)
   if (pool->verbose) printf("problems so far: %d\n", solv->problems.count);
 
   /* create special weak system rules */
+  /* those are used later on to keep a version of the installed packages in
+     best effort mode */
   if (solv->installed->nsolvables)
     {
       solv->weaksystemrules = xcalloc(solv->installed->nsolvables, sizeof(Id));
