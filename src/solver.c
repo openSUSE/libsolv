@@ -1574,6 +1574,8 @@ analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
       reset_solver(solv);
       return 1;
     }
+  if (pool->verbose)
+    printf("UNSOLVABLE\n");
   return 0;
 }
 
@@ -1879,7 +1881,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	    {
 	      if (analyze_unsolvable(solv, r, disablerules))
 		continue;
-	      printf("UNSOLVABLE\n");
 	      queue_free(&dq);
 	      return;
 	    }
@@ -1911,7 +1912,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  level = setpropagatelearn(solv, level, i, disablerules);
 		  if (level == 0)
 		    {
-		      printf("UNSOLVABLE\n");
 		      queue_free(&dq);
 		      return;
 		    }
@@ -1954,7 +1954,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  level = selectandinstall(solv, level, &dq, (solv->decisionmap[i] ? 0 : i), disablerules);
 		  if (level == 0)
 		    {
-		      printf("UNSOLVABLE\n");
 		      queue_free(&dq);
 		      return;
 		    }
@@ -2049,7 +2048,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  level = selectandinstall(solv, level, &dq, 0, disablerules);
 	  if (level == 0)
 	    {
-	      printf("UNSOLVABLE\n");
 	      queue_free(&dq);
 	      return;
 	    }
@@ -2151,7 +2149,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      level = setpropagatelearn(solv, level, p, disablerules);
 	      if (level == 0)
 		{
-		  printf("UNSOLVABLE\n");
 		  queue_free(&dq);
 		  return;
 		}
@@ -2192,7 +2189,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      level = setpropagatelearn(solv, level, p, disablerules);
 	      if (level == 0)
 		{
-		  printf("UNSOLVABLE\n");
 		  queue_free(&dq);
 		  return;
 		}
@@ -2217,14 +2213,23 @@ run_solver(Solver *solv, int disablerules, int doweak)
 void
 refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 {
+  Pool *pool = solv->pool;
   Rule *r;
   int i, j;
   Id v;
   Queue disabled;
   int disabledcnt;
 
-  printf("refine_suggestion start\n");
-
+  if (pool->verbose)
+    {
+      printf("refine_suggestion start\n");
+      for (i = 0; problem[i]; i++)
+	{
+	  if (problem[i] == sug)
+	    printf("=> ");
+	  printproblem(solv, problem[i]);
+	}
+    }
   queue_init(&disabled);
   queue_empty(refined);
   queue_push(refined, sug);
@@ -2246,12 +2251,8 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
       for (i = solv->weakrules; i < solv->learntrules; i++)
 	{
 	  r = solv->rules + i;
-	  if (r->w1)
-	    continue;
-	  if (r->d == 0 || r->w2 != r->p)
-	    r->w1 = r->p;
-	  else
-	    r->w1 = solv->pool->whatprovidesdata[r->d];
+	  if (!r->w1)
+	    enablerule(solv, r);
 	}
 
       queue_empty(&solv->problems);
@@ -2260,7 +2261,8 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
       run_solver(solv, 0, 0);
       if (!solv->problems.count)
 	{
-	  printf("no more problems!\n");
+	  if (pool->verbose)
+	    printf("no more problems!\n");
 #if 0
 	  printdecisions(solv);
 #endif
@@ -2281,7 +2283,8 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
       if (disabled.count == disabledcnt)
 	{
 	  /* no solution found, this was an invalid suggestion! */
-	  printf("no solution found!\n");
+	  if (pool->verbose)
+	    printf("no solution found!\n");
 	  refined->count = 0;
 	  break;
 	}
@@ -2298,7 +2301,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	{
 	  /* more than one solution, disable all */
 	  /* do not push anything on refine list */
-	  if (solv->pool->verbose > 1)
+	  if (pool->verbose > 1)
 	    {
 	      printf("more than one solution found:\n");
 	      for (i = disabledcnt; i < disabled.count; i++)
@@ -2315,7 +2318,8 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
   /* disable problem rules again */
   for (i = 0; problem[i]; i++)
     disableproblem(solv, problem[i]);
-  printf("refine_suggestion end\n");
+  if (pool->verbose)
+    printf("refine_suggestion end\n");
 }
 
   
@@ -2504,8 +2508,133 @@ printdecisions(Solver *solv)
     printf(">!> installs=%d, upgrades=%d, uninstalls=%d\n", installs, upgrades, uninstalls);
   
   xfree(obsoletesmap);
+
+  if (solv->suggestions.count)
+    {
+      printf("\nsuggested packages:\n");
+      for (i = 0; i < solv->suggestions.count; i++)
+	{
+	  s = pool->solvables + solv->suggestions.elements[i];
+	  printf("- %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	}
+    }
 }
 
+void
+printsolutions(Solver *solv, Queue *job)
+{
+  Pool *pool = solv->pool;
+  int pcnt;
+  int i;
+  Id p, rp, what;
+  Solvable *s, *sd;
+
+  printf("Encountered problems! Here are the solutions:\n\n");
+  pcnt = 1;
+  for (i = 0; i < solv->problems.count; )
+    {
+      printf("Problem %d:\n", pcnt++);
+      printf("====================================\n");
+      for (;;)
+        {
+	  if (solv->problems.elements[i] == 0 && solv->problems.elements[i + 1] == 0)
+	    {
+	      /* end of solutions for this problems reached */
+	      i += 2;
+	      break;
+	    }
+	  for (;;)
+	    {
+	      p = solv->problems.elements[i];
+	      rp = solv->problems.elements[i + 1];
+	      i += 2;
+	      if (p == 0 && rp == 0)
+		{
+		  /* end of this solution reached */
+		  printf("\n");
+		  break;
+		}
+	      if (p == 0)
+		{
+		  /* job, p is index into job queue */
+		  what = job->elements[rp];
+		  switch (job->elements[rp - 1])
+		    {
+		    case SOLVER_INSTALL_SOLVABLE:
+		      s = pool->solvables + what;
+		      if (what >= solv->installed->start && what < solv->installed->start + solv->installed->nsolvables)
+			printf("- do not keep %s-%s.%s installed\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      else
+			printf("- do not install %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      break;
+		    case SOLVER_ERASE_SOLVABLE:
+		      s = pool->solvables + what;
+		      if (what >= solv->installed->start && what < solv->installed->start + solv->installed->nsolvables)
+			printf("- do not deinstall %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      else
+			printf("- do not forbid installation of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		      break;
+		    case SOLVER_INSTALL_SOLVABLE_NAME:
+		      printf("- do not install %s\n", id2str(pool, what));
+		      break;
+		    case SOLVER_ERASE_SOLVABLE_NAME:
+		      printf("- do not deinstall %s\n", id2str(pool, what));
+		      break;
+		    case SOLVER_INSTALL_SOLVABLE_PROVIDES:
+		      printf("- do not install a solvable providing %s\n", dep2str(pool, what));
+		      break;
+		    case SOLVER_ERASE_SOLVABLE_PROVIDES:
+		      printf("- do not deinstall all solvables providing %s\n", dep2str(pool, what));
+		      break;
+		    case SOLVER_INSTALL_SOLVABLE_UPDATE:
+		      s = pool->solvables + what;
+		      printf("- do not install most recent version of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool
+    , s->arch));
+		      break;
+		    default:
+		      printf("- do something different\n");
+		      break;
+		    }
+		}
+	      else
+		{
+		  /* policy, replace p with rp */
+		  s = pool->solvables + p;
+		  sd = rp ? pool->solvables + rp : 0;
+		  if (sd)
+		    {
+		      int gotone = 0;
+		      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr) > 0)
+			{
+			  printf("- allow downgrade of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  gotone = 1;
+			}
+		      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(pool, s, sd))
+			{
+			  printf("- allow architecture change of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  gotone = 1;
+			}
+		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(pool, s, sd))
+			{
+			  if (sd->vendor)
+			    printf("- allow vendor change from '%s' (%s-%s.%s) to '%s' (%s-%s.%s)\n", id2str(pool, s->vendor), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->vendor), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  else
+			    printf("- allow vendor change from '%s' (%s-%s.%s) to no vendor (%s-%s.%s)\n", id2str(pool, s->vendor), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  gotone = 1;
+			}
+		      if (!gotone)
+			printf("- allow replacement of %s-%s.%s with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+		    }
+		  else
+		    {
+		      printf("- allow deinstallation of %s-%s.%s [%ld]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (long int)(s - pool->solvables));
+		    }
+
+		}
+	    }
+        }
+    }
+}
 
 
 /* for each installed solvable find which packages with *different* names
@@ -2571,6 +2700,85 @@ create_obsolete_index(Solver *solv)
 	      obsoletes_data[--obsoletes[p]] = i;
 	  }
     }
+}
+
+static void
+problems_to_solutions(Solver *solv, Queue *job)
+{
+  Pool *pool = solv->pool;
+  Queue problems;
+  Queue solution;
+  Queue solutions;
+  Id *problem;
+  Id why;
+  int i, j;
+
+  queue_clone(&problems, &solv->problems);
+  queue_init(&solution);
+  queue_init(&solutions);
+  problem = problems.elements;
+  for (i = 0; i < problems.count; i++)
+    {
+      Id v = problems.elements[i];
+      if (v == 0)
+	{
+	  /* mark end of this problem */
+	  queue_push(&solutions, 0);
+	  queue_push(&solutions, 0);
+	  if (i + 1 == problems.count)
+	    break;
+	  problem = problems.elements + i + 1;
+	  continue;
+	}
+      refine_suggestion(solv, job, problem, v, &solution);
+      if (!solution.count)
+	continue;	/* this solution didn't work out */
+
+      for (j = 0; j < solution.count; j++)
+	{
+	  why = solution.elements[j];
+#if 0
+	  printproblem(solv, why);
+#endif
+	  if (why < 0)
+	    {
+	      queue_push(&solutions, 0);
+	      queue_push(&solutions, -why);
+	    }
+	  else if (why >= solv->systemrules && why < solv->weakrules)
+	    {
+	      Id p, rp = 0;
+	      p = solv->installed->start + (why - solv->systemrules);
+	      if (solv->weaksystemrules && solv->weaksystemrules[why - solv->systemrules])
+		{
+		  Id *dp = pool->whatprovidesdata + solv->weaksystemrules[why - solv->systemrules];
+		  for (; *dp; dp++)
+		    {
+		      if (*dp >= solv->installed->start && *dp < solv->installed->start + solv->installed->nsolvables)
+			continue;
+		      if (solv->decisionmap[*dp] > 0)
+			{
+			  rp = *dp;
+			  break;
+			}
+		    }
+		}
+	      queue_push(&solutions, p);
+	      queue_push(&solutions, rp);
+	    }
+	  else
+	    abort();
+	}
+      /* mark end of this solution */
+      queue_push(&solutions, 0);
+      queue_push(&solutions, 0);
+    }
+  queue_free(&solution);
+  queue_free(&problems);
+  /* copy queue over to solutions */
+  queue_free(&solv->problems);
+  queue_clone(&solv->problems, &solutions);
+  queue_free(&solutions);
 }
 
 
@@ -2896,161 +3104,7 @@ solve(Solver *solv, Queue *job)
       policy_filter_unwanted(solv, &solv->suggestions, 0, POLICY_MODE_SUGGEST);
     }
 
-  /*
-   *
-   * print solver result
-   * 
-   */
-
-  if (pool->verbose) printf("-------------------------------------------------------------\n");
-
   if (solv->problems.count)
-    {
-      Queue problems;
-      Queue solution;
-      Id *problem;
-      Id why, what;
-      int j, ji, pcnt;
-
-      if (!pool->verbose)
-	return;
-      queue_clone(&problems, &solv->problems);
-      queue_init(&solution);
-      printf("Encountered problems! Here are the solutions:\n");
-      problem = problems.elements;
-      pcnt = 1;
-      printf("\n");
-      printf("Problem %d:\n", pcnt);
-      printf("====================================\n");
-      for (i = 0; i < problems.count; i++)
-	{
-	  Id v = problems.elements[i];
-	  if (v == 0)
-	    {
-	      printf("\n");
-	      if (i + 1 == problems.count)
-		break;
-	      printf("Problem %d:\n", ++pcnt);
-	      printf("====================================\n");
-	      problem = problems.elements + i + 1;
-	      continue;
-	    }
-	  refine_suggestion(solv, job, problem, v, &solution);
-	  for (j = 0; j < solution.count; j++)
-	    {
-	      why = solution.elements[j];
-#if 0
-	      printproblem(solv, why);
-#endif
-	      if (why < 0)
-		{
-		  ji = -(why + 1);
-		  what = job->elements[ji + 1];
-		  switch (job->elements[ji])
-		    {
-		    case SOLVER_INSTALL_SOLVABLE:
-		      s = pool->solvables + what;
-		      if (what >= solv->installed->start && what < solv->installed->start + solv->installed->nsolvables)
-		        printf("- do not keep %s-%s.%s installed\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-		      else
-		        printf("- do not install %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-		      break;
-		    case SOLVER_ERASE_SOLVABLE:
-		      s = pool->solvables + what;
-		      if (what >= solv->installed->start && what < solv->installed->start + solv->installed->nsolvables)
-		        printf("- do not deinstall %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-		      else
-		        printf("- do not forbid installation of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-		      break;
-		    case SOLVER_INSTALL_SOLVABLE_NAME:
-		      printf("- do not install %s\n", id2str(pool, what));
-		      break;
-		    case SOLVER_ERASE_SOLVABLE_NAME:
-		      printf("- do not deinstall %s\n", id2str(pool, what));
-		      break;
-		    case SOLVER_INSTALL_SOLVABLE_PROVIDES:
-		      printf("- do not install a solvable providing %s\n", dep2str(pool, what));
-		      break;
-		    case SOLVER_ERASE_SOLVABLE_PROVIDES:
-		      printf("- do not deinstall all solvables providing %s\n", dep2str(pool, what));
-		      break;
-		    case SOLVER_INSTALL_SOLVABLE_UPDATE:
-		      s = pool->solvables + what;
-		      printf("- do not install most recent version of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-		      break;
-		    default:
-		      printf("- do something different\n");
-		      break;
-		    }
-		}
-	      else if (why >= solv->systemrules && why < solv->weakrules)
-		{
-		  Solvable *sd = 0;
-		  s = pool->solvables + solv->installed->start + (why - solv->systemrules);
-		  if (solv->weaksystemrules && solv->weaksystemrules[why - solv->systemrules])
-		    {
-		      Id *dp = pool->whatprovidesdata + solv->weaksystemrules[why - solv->systemrules];
-		      for (; *dp; dp++)
-			{
-			  if (*dp >= solv->installed->start && *dp < solv->installed->start + solv->installed->nsolvables)
-			    continue;
-			  if (solv->decisionmap[*dp] > 0)
-			    {
-			      sd = pool->solvables + *dp;
-			      break;
-			    }
-			}
-		    }
-		  if (sd)
-		    {
-		      int gotone = 0;
-		      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr) > 0)
-			{
-		          printf("- allow downgrade of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
-			  gotone = 1;
-			}
-		      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(pool, s, sd))
-			{
-		          printf("- allow architecture change of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
-			  gotone = 1;
-			}
-		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(pool, s, sd))
-			{
-			  if (sd->vendor)
-		            printf("- allow vendor change from '%s' (%s-%s.%s) to '%s' (%s-%s.%s)\n", id2str(pool, s->vendor), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->vendor), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
-			  else
-		            printf("- allow vendor change from '%s' (%s-%s.%s) to no vendor (%s-%s.%s)\n", id2str(pool, s->vendor), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
-			  gotone = 1;
-			}
-		      if (!gotone)
-		        printf("- allow replacement of %s-%s.%s with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
-		    }
-		  else
-		    {
-		      printf("- allow deinstallation of %s-%s.%s [%ld]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (long int)(s - pool->solvables));
-		    }
-		}
-	      else
-		{
-		  abort();
-		}
-	    }
-	  printf("------------------------------------\n");
-	}
-      queue_free(&solution);
-      queue_free(&problems);
-      return;
-    }
-
-  printdecisions(solv);
-  if (solv->suggestions.count)
-    {
-      printf("\nsuggested packages:\n");
-      for (i = 0; i < solv->suggestions.count; i++)
-	{
-	  s = pool->solvables + solv->suggestions.elements[i];
-	  printf("- %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	}
-    }
+    problems_to_solutions(solv, job);
 }
 

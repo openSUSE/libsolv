@@ -9,7 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define _GNU_SOURCE 1
+/* we need FNM_CASEFOLD */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <fnmatch.h>
 
 #include "pool.h"
