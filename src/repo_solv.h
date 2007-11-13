@@ -7,7 +7,7 @@
 
 /*
  * repo_solv.h
- * 
+ *
  */
 
 #ifndef REPO_SOLVE_H
@@ -16,6 +16,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <stdio.h>
 
 #include "pool.h"
 #include "repo.h"
