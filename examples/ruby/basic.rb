@@ -34,7 +34,7 @@ q.push(SOLVER_INSTALL_SOLVABLE)
 q.push(r)
 
 pool.prepare
-pool.promoteepoch = true
+pool.promoteepoch = 1
 
 # no packages installed so use add_empty_repo
 solv = Solver.new(pool, installed)
