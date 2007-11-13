@@ -436,6 +436,12 @@ addrule(Solver *solv, Id p, Id d)
     }
   r->n1 = 0;
   r->n2 = 0;
+
+  if (solv->pool->verbose > 3) {
+      printf ("  Add rule: ");
+      printrule (solv, r);
+  }
+  
   return r;
 }
 
@@ -791,7 +797,8 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 
 /*
  * add (install) rules for solvable
- * 
+ * for unfulfilled requirements, conflicts, obsoletes,....
+ * "unflag" a resolvable if it is not installable via "addrule(solv, -n, 0)"
  */
 
 static void
@@ -812,6 +819,10 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id *dp;
   Id n;
 
+  if (solv->pool->verbose > 3) {
+      printf ("----- addrpmrulesforsolvable -----\n");
+  }
+  
   queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
   queue_push(&q, s - pool->solvables);	/* push solvable Id */
 
@@ -830,9 +841,9 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       s = pool->solvables + n;	       /* s = Solvable in question */
 
       dontfix = 0;
-      if (installed
-	  && !solv->fixsystem
-	  && n >= installed->start	       /* is it installed? */
+      if (installed			/* Installed system available */
+	  && !solv->fixsystem		/* NOT repair errors in rpm dependency graph */
+	  && n >= installed->start	/* is it installed? */
 	  && n < installed->start + installed->nsolvables)
       {
 	dontfix = 1;		       /* dont care about broken rpm deps */
@@ -845,12 +856,12 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       if (s->requires)
 	{
 	  reqp = s->repo->idarraydata + s->requires;
-	  while ((req = *reqp++) != 0)
+	  while ((req = *reqp++) != 0) /* go throw all requires */
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
 		continue;
 
-	      dp = GET_PROVIDESP(req, p);	/* get providers of req */
+	      dp = GET_PROVIDESP(req, p);	/* get providers of req; p is a dummy only */ 
 
 	      if (*dp == SYSTEMSOLVABLE)	/* always installed */
 		continue;
@@ -984,7 +995,7 @@ addrpmrulesforweak(Solver *solv, Map *m)
   Id sup, *supp;
   int i, n;
 
-  if (pool->verbose) printf("addrpmrulesforweak... (%d)\n", solv->nrules);
+  if (pool->verbose) printf("----- addrpmrulesforweak ----- (nrules %d)\n", solv->nrules);
   for (i = n = 1; n < pool->nsolvables; i++, n++)
     {
       if (i == pool->nsolvables)
@@ -1032,6 +1043,10 @@ addrpmrulesforupdaters(Solver *solv, Solvable *s, Map *m, int allowall)
   Queue qs;
   Id qsbuf[64];
 
+  if (solv->pool->verbose > 3) {
+      printf ("----- addrpmrulesforupdaters -----\n");
+  }
+
   if (!MAPTST(m, s - pool->solvables))	/* add rule for s if not already done */
     addrpmrulesforsolvable(solv, s, m); 
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
@@ -1057,6 +1072,10 @@ addupdaterule(Solver *solv, Solvable *s, int allowall)
   Id d;
   Queue qs;
   Id qsbuf[64];
+
+  if (solv->pool->verbose > 3) {
+      printf ("-----  addupdaterule -----\n");
+  }
 
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   policy_findupdatepackages(solv, s, &qs, allowall);
@@ -2850,7 +2869,9 @@ solve(Solver *solv, Queue *job)
    * so called: rpm rules
    * 
    */
-
+  if (solv->pool->verbose > 3) {
+      printf ("*** create rules for installed solvables -> keep them installed ***\n");
+  }
   for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
     addrpmrulesforsolvable(solv, pool->solvables + i, &addedmap);
 
@@ -2865,6 +2886,9 @@ solve(Solver *solv, Queue *job)
    * solvable rules
    *  process job rules for solvables
    */
+  if (solv->pool->verbose > 3) {
+      printf ("*** create install rules ***\n");
+  }
   
   for (i = 0; i < job->count; i += 2)
     {

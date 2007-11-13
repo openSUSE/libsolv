@@ -19,9 +19,9 @@ typedef struct _Map {
 } Map;
 
 #define MAPZERO(m) (memset((m)->map, 0, (m)->size))
-#define MAPSET(m, n) ((m)->map[(n) >> 3] |= 1 << ((n) & 7))
-#define MAPCLR(m, n) ((m)->map[(n) >> 3] &= ~(1 << ((n) & 7)))
-#define MAPTST(m, n) ((m)->map[(n) >> 3] & (1 << ((n) & 7)))
+#define MAPSET(m, n) ((m)->map[(n) >> 3] |= 1 << ((n) & 7)) // Set Bit
+#define MAPCLR(m, n) ((m)->map[(n) >> 3] &= ~(1 << ((n) & 7))) // Reset Bit
+#define MAPTST(m, n) ((m)->map[(n) >> 3] & (1 << ((n) & 7))) // Test Bit
 
 extern void map_init(Map *m, int n);
 extern void map_free(Map *m);
