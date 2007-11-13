@@ -7,16 +7,15 @@ Compiling and installing the software
 Requirements
 
 - C compiler
-- automake/autoconf/libtool
+- cmake
 - make
 - expat
 - db-4.3
 
 Steps to compile
 
-1. sh bootstrap
-2. ./configure
-3. make
+1. cmake .
+2. make
 
 
 Steps to run the testsuite
