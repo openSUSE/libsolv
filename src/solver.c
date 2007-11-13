@@ -885,11 +885,13 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  continue;
 		}
 
-#if 0
-	      printf("addrule %s-%s.%s %s %d %d\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, dp - pool->whatprovidesdata);
-	      for (i = 0; dp[i]; i++)
-		printf("  %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
-#endif
+	      if (pool->verbose > 2)
+	      {
+		  printf("addrule %s-%s.%s %s %d %d\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, dp - pool->whatprovidesdata);
+		  for (i = 0; dp[i]; i++)
+		      printf("  %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
+	      }
+
 	      /* add 'requires' dependency */
               /* rule: (-requestor|provider1|provider2|...|providerN) */
 	      addrule(solv, -n, dp - pool->whatprovidesdata);
@@ -1151,17 +1153,22 @@ propagate(Solver *solv, int level)
     {
       /* negate because our watches trigger if literal goes FALSE */
       pkg = -solv->decisionq.elements[solv->propagate_index++];
-#if 0
-  printf("popagate for decision %d level %d\n", -pkg, level);
-  printruleelement(solv, 0, -pkg);
-#endif
+      if (pool->verbose > 3)
+      {
+	  printf("popagate for decision %d level %d\n", -pkg, level);
+	  printruleelement(solv, 0, -pkg);
+      }
+
       for (rp = watches + pkg; *rp; rp = nrp)
 	{
 	  r = solv->rules + *rp;
-#if 0
-  printf("  watch triggered ");
-  printrule(solv, r);
-#endif
+	  
+	  if (pool->verbose > 3)
+	  {
+	      printf("  watch triggered ");
+	      printrule(solv, r);
+	  }
+	  
 	  if (pkg == r->w1)
 	    {
 	      ow = r->w2;
@@ -1188,12 +1195,13 @@ propagate(Solver *solv, int level)
 	      if (p)
 		{
 		  /* p is free to watch, move watch to p */
-#if 0
-		  if (p > 0)
-		    printf("    -> move w%d to %s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[p].name), id2str(pool, pool->solvables[p].evr), id2str(pool, pool->solvables[p].arch));
-		  else
-		    printf("    -> move w%d to !%s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[-p].name), id2str(pool, pool->solvables[-p].evr), id2str(pool, pool->solvables[-p].arch));
-#endif
+		  if (pool->verbose > 3)
+		  {
+		      if (p > 0)
+			  printf("    -> move w%d to %s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[p].name), id2str(pool, pool->solvables[p].evr), id2str(pool, pool->solvables[p].arch));
+		      else
+			  printf("    -> move w%d to !%s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[-p].name), id2str(pool, pool->solvables[-p].evr), id2str(pool, pool->solvables[-p].arch));
+		  }
 		  *rp = *nrp;
 		  nrp = rp;
 		  if (pkg == r->w1)
@@ -1224,7 +1232,8 @@ propagate(Solver *solv, int level)
             decisionmap[-ow] = -level;
 	  queue_push(&solv->decisionq, ow);
 	  queue_push(&solv->decisionq_why, r - solv->rules);
-#if 0
+	  if (pool->verbose > 3)
+	  {
 	    {
 	      Solvable *s = pool->solvables + (ow > 0 ? ow : -ow);
 	      if (ow > 0)
@@ -1232,7 +1241,7 @@ propagate(Solver *solv, int level)
 	      else
 		printf("  -> decided to conflict %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	    }
-#endif
+	  }
 	}
     }
   return 0;	/* all is well */
@@ -1307,17 +1316,19 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 	  else
 	    {
 	      queue_push(&r, v);
-#if 0
-  printf("PUSH %d ", v);
-  printruleelement(solv, 0, v);
-#endif
+	      if (pool->verbose > 3)
+	      {
+		  printf("PUSH %d ", v);
+		  printruleelement(solv, 0, v);
+	      }
 	      if (l > rlevel)
 		rlevel = l;
 	    }
 	}
-#if 0
-      printf("num = %d\n", num);
-#endif
+      if (pool->verbose > 3)
+      {
+	  printf("num = %d\n", num);
+      }
       if (num <= 0)
 	abort();
       for (;;)
@@ -1351,16 +1362,17 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
     }
   map_free(&seen);
   queue_push(&solv->learnt_pool, 0);
-#if 0
-  for (i = learnt_why; solv->learnt_pool.elements[i]; i++)
-    {
-      printf("learnt_why ");
-      printrule(solv, solv->rules + solv->learnt_pool.elements[i]);
-    }
-#endif
-  if (why)
-    *why = learnt_why;
-  return rlevel;
+  if (pool->verbose > 3)
+  {
+      for (i = learnt_why; solv->learnt_pool.elements[i]; i++)
+      {
+	  printf("learnt_why ");
+	  printrule(solv, solv->rules + solv->learnt_pool.elements[i]);
+      }
+  }
+      if (why)
+	  *why = learnt_why;
+      return rlevel;
 }
 
 
@@ -1513,10 +1525,11 @@ analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
       why = solv->decisionq_why.elements[idx];
       if (!why)
 	{
-#if 0
-	  printf("RPM ");
-	  printruleelement(solv, 0, v);
-#endif
+	  if (pool->verbose > 3)
+	  {
+	      printf("RPM ");
+	      printruleelement(solv, 0, v);
+	  }
 	  continue;
 	}
       r = solv->rules + why;
@@ -1598,9 +1611,10 @@ revert(Solver *solv, int level)
       vv = v > 0 ? v : -v;
       if (solv->decisionmap[vv] <= level && solv->decisionmap[vv] >= -level)
         break;
-#if 0
-      printf("reverting decision %d at %d\n", v, solv->decisionmap[vv]);
-#endif
+      if (solv->pool->verbose > 3)
+      {
+	  printf("reverting decision %d at %d\n", v, solv->decisionmap[vv]);
+      }
       solv->decisionmap[vv] = 0;
       solv->decisionq.count--;
       solv->decisionq_why.count--;
@@ -1744,10 +1758,13 @@ selectandinstall(Solver *solv, int level, Queue *dq, Id inst, int disablerules)
 	}
     }
   p = dq->elements[i];
-#if 0
-  Solvable *s = pool->solvables + p;
-  printf("installing %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-#endif
+
+  if (pool->verbose > 3)
+  {
+      Solvable *s = pool->solvables + p;
+      printf("installing %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+  }
+
   return setpropagatelearn(solv, level, p, disablerules);
 }
 
@@ -1849,11 +1866,12 @@ run_solver(Solver *solv, int disablerules, int doweak)
   Pool *pool = solv->pool;
   Id p, *dp;
 
-#if 0
-  printf("number of rules: %d\n", solv->nrules);
-  for (i = 0; i < solv->nrules; i++)
-    printrule(solv, solv->rules + i);
-#endif
+  if (pool->verbose > 3)
+  {
+      printf("number of rules: %d\n", solv->nrules);
+      for (i = 0; i < solv->nrules; i++)
+	  printrule(solv, solv->rules + i);
+  }
 
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
@@ -1905,9 +1923,10 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  s = pool->solvables + i;
 		  if (solv->decisionmap[i] != 0)
 		    continue;
-#if 0
-		  printf("keeping %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-#endif
+		  if (pool->verbose > 3)
+		  {
+		      printf("keeping %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		  }
 		  olevel = level;
 		  level = setpropagatelearn(solv, level, i, disablerules);
 		  if (level == 0)
@@ -2113,9 +2132,10 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	        policy_filter_unwanted(solv, &dq, 0, POLICY_MODE_RECOMMEND);
 	      p = dq.elements[0];
 	      s = pool->solvables + p;
-#if 1
-	      printf("installing recommended %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-#endif
+	      if (pool->verbose > 0)
+	      {
+		  printf("installing recommended %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	      }
 	      level = setpropagatelearn(solv, level, p, 0);
 	      continue;
 	    }
@@ -2132,10 +2152,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		if (solv->branches.elements[i - 1] < 0)
 		  break;
 	      p = solv->branches.elements[i];
-#if 1
-	      s = pool->solvables + p;
-	      printf("branching with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-#endif
+	      if (pool->verbose > 0)
+	      {
+		  s = pool->solvables + p;
+		  printf("branching with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	      }
 	      queue_empty(&dq);
 	      for (j = i + 1; j < solv->branches.count; j++)
 		queue_push(&dq, solv->branches.elements[j]);
@@ -2180,9 +2201,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      p = solv->branches.elements[lasti];
 	      solv->branches.elements[lasti] = 0;
 	      s = pool->solvables + p;
-#if 1
-	      printf("minimizing %d -> %d with %s-%s.%s\n", solv->decisionmap[p], l, id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-#endif
+	      if (pool->verbose > 0)
+	      {
+		  printf("minimizing %d -> %d with %s-%s.%s\n", solv->decisionmap[p], l, id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	      }
+
 	      level = lastl;
 	      revert(solv, level);
 	      olevel = level;
@@ -2263,9 +2286,8 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	{
 	  if (pool->verbose)
 	    printf("no more problems!\n");
-#if 0
-	  printdecisions(solv);
-#endif
+	  if (pool->verbose > 3)
+	    printdecisions(solv);
 	  break;		/* great, no more problems */
 	}
       disabledcnt = disabled.count;
