@@ -160,17 +160,16 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
   return olddeps;
 }
 
-Repo *
-pool_addrepo_content(Pool *pool, FILE *fp)
+void
+repo_add_content(Repo *repo, FILE *fp)
 {
+  Pool *pool = repo->pool;
   char *line, *linep;
   int aline;
-  Repo *repo;
   Solvable *s;
   int pack;
   struct parsedata pd;
 
-  repo = pool_addrepo_empty(pool);
   memset(&pd, 0, sizeof(pd));
   line = xmalloc(1024);
   aline = 1024;
@@ -223,9 +222,9 @@ pool_addrepo_content(Pool *pool, FILE *fp)
 	      if ((pack & PACK_BLOCK) == 0)
 		{
 		  pool->solvables = realloc(pool->solvables, (pool->nsolvables + pack + PACK_BLOCK + 1) * sizeof(Solvable));
-		  memset(pool->solvables + repo->start + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
+		  memset(pool->solvables + pool->nsolvables + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
 		}
-	      s = pool->solvables + repo->start + pack;
+	      s = pool->solvables + pool->nsolvables + pack;
 	      s->repo = repo;
 	      s->name = str2id(pool, join(&pd, pd.kind, ":", value), 1);
 	      pack++;
@@ -276,10 +275,8 @@ pool_addrepo_content(Pool *pool, FILE *fp)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
     
   pool->nsolvables += pack;
-  repo->nsolvables = pack;
+  repo->nsolvables += pack;
   if (pd.tmp)
     free(pd.tmp);
   free(line);
-
-  return repo;
 }

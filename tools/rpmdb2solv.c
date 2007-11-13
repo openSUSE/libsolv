@@ -26,7 +26,7 @@ int
 main(int argc, char **argv)
 {
   Pool *pool = pool_create();
-  Repo *ref = NULL;
+  Repo *repo, *ref = 0;
   FILE *fp;
 
   if (argc != 1)
@@ -37,21 +37,23 @@ main(int argc, char **argv)
 	  perror(argv[1]);
 	  exit(0);
 	}
-      ref = pool_addrepo_solv(refpool, fp, "rpmdb");
+      ref = repo_create(refpool, "ref");
+      repo_add_solv(ref, fp);
       fclose(fp);
     }
 
-  Repo *repo = pool_addrepo_rpmdb(pool, ref);
+  repo = repo_create(pool, "installed");
+  repo_add_rpmdb(repo, ref);
   if (ref)
     {
       if (ref->pool != pool)
 	pool_free(ref->pool);
       else
-	pool_freerepo(pool, ref);
-      ref = NULL;
+	repo_free(ref);
+      ref = 0;
     }
 
-  pool_writerepo(pool, repo, stdout);
+  repo_write(repo, stdout);
   pool_free(pool);
 
   exit(0);

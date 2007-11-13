@@ -174,9 +174,10 @@ typedef struct solvdata {
  *  and add it to pool
  */
 
-Repo *
-pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
+void
+repo_add_solv(Repo *repo, FILE *fp)
 {
+  Pool *pool = repo->pool;
   int i, j, l;
   unsigned int numid, numrel, numsolv, numsrcdata, numsolvdata;
   int numsolvdatabits, type;
@@ -194,7 +195,6 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
   Reldep *ran;
   SolvData *solvdata;
   unsigned int size, size_str, size_idarray;
-  Repo *repo;
   Id *idarraydatap, *idarraydataend;
   Offset ido;
   unsigned int databits;
@@ -211,12 +211,8 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
       exit(1);
     }
 
-				       /* create empty Repo */
-  repo = pool_addrepo_empty(pool);
   pool_freeidhashes(pool);
 
-  repo->name = reponame;
-  
   numid = read_u32(fp);
   numrel = read_u32(fp);
   numsolv= read_u32(fp);
@@ -232,9 +228,10 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
   /*
    * alloc buffers
    */
-  				       /* alloc string buffer */
+
+  /* alloc string buffer */
   strsp = (char *)xrealloc(pool->stringspace, pool->sstrings + sizeid + 1);
-				       /* alloc string offsets (Id -> Offset into string space) */
+  /* alloc string offsets (Id -> Offset into string space) */
   str = (Offset *)xrealloc(pool->strings, (pool->nstrings + numid) * sizeof(Offset));
 
   pool->stringspace = strsp;
@@ -243,7 +240,8 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
   /* point to _BEHIND_ already allocated string/Id space */
   strsp += pool->sstrings;
 
-  				       /* alloc id map for name and rel Ids */
+  /* alloc id map for name and rel Ids. this maps ids in the solv files
+   * to the ids in our pool */
   idmap = (Id *)xcalloc(numid + numrel, sizeof(Id));
 
   /*
@@ -412,7 +410,7 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
     }
 
   /*
-   * read (but dont store) repo data
+   * read (but dont store yet) repo data
    */
 
 #if 0
@@ -485,30 +483,32 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
       fprintf(stderr, "too many data map bits\n");
       exit(1);
     }
+
+  /* make room for our idarrays */
   if (size_idarray)
     {
-      size_idarray++;	/* first entry is always zero */
-      repo->idarraydata = (Id *)xmalloc(sizeof(Id) * size_idarray);
-      repo->idarraysize = size_idarray;
-      idarraydatap = repo->idarraydata;
-      *idarraydatap++ = 0;
-      idarraydataend = repo->idarraydata + size_idarray;
+      repo_reserve_ids(repo, 0, size_idarray);
+      idarraydatap = repo->idarraydata + repo->idarraysize;
+      repo->idarraysize += size_idarray;
+      idarraydataend = repo->idarraydata + repo->idarraysize;
+      repo->lastoff = 0;
     }
   else
     {
-      repo->idarraydata = 0;
-      repo->idarraysize = 0;
       idarraydatap = 0;
       idarraydataend = 0;
     }
 
-  /* alloc solvables */
+  if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
+    abort();
+  if (!repo->start)
+    repo->start = pool->nsolvables;
+
+  /* alloc space for our solvables */
   pool->solvables = (Solvable *)xrealloc(pool->solvables, (pool->nsolvables + numsolv) * sizeof(Solvable));
 
   if (numsolv)			       /* clear newly allocated area */
     memset(pool->solvables + pool->nsolvables, 0, numsolv * sizeof(Solvable));
-  repo->start = pool->nsolvables;
-  repo->nsolvables = numsolv;
 
   /*
    * read solvables
@@ -517,7 +517,7 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
 #if 0
   printf("read solvables\n");
 #endif
-  for (i = 0, s = pool->solvables + repo->start; i < numsolv; i++, s++)
+  for (i = 0, s = pool->solvables + repo->start + repo->nsolvables; i < numsolv; i++, s++)
     {
       s->repo = repo;
       databits = 0;
@@ -613,9 +613,8 @@ pool_addrepo_solv(Pool *pool, FILE *fp, const char *reponame)
   xfree(idmap);
   xfree(solvdata);
 
+  repo->nsolvables += numsolv;
   pool->nsolvables += numsolv;
-
-  return repo;
 }
 
 // EOF

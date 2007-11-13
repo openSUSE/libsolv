@@ -20,7 +20,7 @@ extern "C" {
 #include "pool.h"
 #include "repo.h"
 
-extern Repo *pool_addrepo_solv(Pool *pool, FILE *fp, const char *name);
+extern void repo_add_solv(Repo *repo, FILE *fp);
 
 #ifdef __cplusplus
 }

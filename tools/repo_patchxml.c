@@ -303,7 +303,7 @@ startElement(void *userData, const char *name, const char **atts)
       if ((pd->pack & PACK_BLOCK) == 0)
         {
           pool->solvables = realloc(pool->solvables, (pool->nsolvables + pd->pack + PACK_BLOCK + 1) * sizeof(Solvable));
-          pd->start = pool->solvables + pd->repo->start;
+          pd->start = pool->solvables + pool->nsolvables;
           memset(pd->start + pd->pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
         }
 #if 0
@@ -443,16 +443,20 @@ characterData(void *userData, const XML_Char *s, int len)
 
 #define BUFF_SIZE 8192
 
-Repo *
-pool_addrepo_patchxml(Pool *pool, FILE *fp)
+void
+repo_add_patchxml(Repo *repo, FILE *fp)
 {
+  Pool *pool = repo->pool;
   struct parsedata pd;
   char buf[BUFF_SIZE];
   int i, l;
-  Repo *repo;
   struct stateswitch *sw;
 
-  repo = pool_addrepo_empty(pool);
+  if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
+    abort();
+  if (!repo->start)
+    repo->start = pool->nsolvables;
+
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
     {
@@ -483,8 +487,7 @@ pool_addrepo_patchxml(Pool *pool, FILE *fp)
   XML_ParserFree(parser);
 
   pool->nsolvables += pd.pack;
-  repo->nsolvables = pd.pack;
+  repo->nsolvables += pd.pack;
 
   free(pd.content);
-  return repo;
 }

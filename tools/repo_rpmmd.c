@@ -14,6 +14,7 @@
 #include <expat.h>
 
 #include "pool.h"
+#include "util.h"
 #include "repo_rpmmd.h"
 
 
@@ -138,7 +139,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(r) + 1;
   if (l > pd->acontent)
     {
-      pd->content = realloc(pd->content, l + 256);
+      pd->content = xrealloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content;
@@ -205,7 +206,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
       int l = strlen(k) + 1 + strlen(n) + 1;
       if (l > pd->acontent)
 	{
-	  pd->content = realloc(pd->content, l + 256);
+	  pd->content = xrealloc(pd->content, l + 256);
 	  pd->acontent = l + 256;
 	}
       sprintf(pd->content, "%s:%s", k, n); 
@@ -272,8 +273,8 @@ startElement(void *userData, const char *name, const char **atts)
 #if 0
 	      fprintf(stderr, "numpacks: %d\n", pd->numpacks);
 #endif
-	      pool->solvables = realloc(pool->solvables, (pool->nsolvables + pd->numpacks) * sizeof(Solvable));
-	      pd->start = pool->solvables + pd->repo->start;
+	      pool->solvables = xrealloc2(pool->solvables, (pool->nsolvables + pd->numpacks), sizeof(Solvable));
+	      pd->start = pool->solvables + pool->nsolvables;
 	      memset(pd->start, 0, pd->numpacks * sizeof(Solvable));
 	    }
 	}
@@ -410,7 +411,7 @@ characterData(void *userData, const XML_Char *s, int len)
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
-      pd->content = realloc(pd->content, l + 256);
+      pd->content = xrealloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content + pd->lcontent;
@@ -423,16 +424,20 @@ characterData(void *userData, const XML_Char *s, int len)
 
 #define BUFF_SIZE 8192
 
-Repo *
-pool_addrepo_rpmmd(Pool *pool, FILE *fp)
+void
+repo_add_rpmmd(Repo *repo, FILE *fp)
 {
+  Pool *pool = repo->pool;
   struct parsedata pd;
   char buf[BUFF_SIZE];
   int i, l;
-  Repo *repo;
   struct stateswitch *sw;
 
-  repo = pool_addrepo_empty(pool);
+  if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
+    abort();
+  if (!repo->start)
+    repo->start = pool->nsolvables;
+
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
     {
@@ -463,8 +468,7 @@ pool_addrepo_rpmmd(Pool *pool, FILE *fp)
   XML_ParserFree(parser);
 
   pool->nsolvables += pd.pack;
-  repo->nsolvables = pd.pack;
+  repo->nsolvables += pd.pack;
 
   free(pd.content);
-  return repo;
 }

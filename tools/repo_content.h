@@ -5,4 +5,4 @@
  * for further information
  */
 
-Repo * pool_addrepo_content(Pool *pool, FILE *fp);
+void repo_add_content(Repo *repo, FILE *fp);

@@ -29,8 +29,9 @@ int
 main(int argc, char **argv)
 {
   Pool *pool = pool_create();
-  Repo *repo = pool_addrepo_helix(pool, stdin);
-  pool_writerepo(pool, repo, stdout);
+  Repo *repo = repo_create(pool, "<stdin>");
+  repo_add_helix(repo, stdin);
+  repo_write(repo, stdout);
   pool_free(pool);
   exit(0);
 }

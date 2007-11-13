@@ -5,4 +5,4 @@
  * for further information
  */
 
-extern Repo *pool_addrepo_patchxml(Pool *pool, FILE *fp);
+extern void repo_add_patchxml(Repo *repo, FILE *fp);

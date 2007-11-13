@@ -30,7 +30,7 @@
  */
 
 Repo *
-pool_addrepo_empty(Pool *pool)
+repo_create(Pool *pool, const char *name)
 {
   Repo *repo;
 
@@ -38,11 +38,20 @@ pool_addrepo_empty(Pool *pool)
   repo = (Repo *)xcalloc(1, sizeof(*repo));
   pool->repos = (Repo **)xrealloc(pool->repos, (pool->nrepos + 1) * sizeof(Repo *));
   pool->repos[pool->nrepos++] = repo;
-  repo->name = "empty";
+  repo->name = name ? strdup(name) : 0;
   repo->pool = pool;
   repo->start = pool->nsolvables;
   repo->nsolvables = 0;
   return repo;
+}
+
+static void
+repo_freedata(Repo *repo)
+{
+  xfree(repo->idarraydata);
+  xfree(repo->rpmdbid);
+  xfree((char *)repo->name);
+  xfree(repo);
 }
 
 /*
@@ -242,8 +251,9 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
  */
 
 void
-pool_freerepo(Pool *pool, Repo *repo)
+repo_free(Repo *repo)
 {
+  Pool *pool = repo->pool;
   int i, nsolvables;
 
   pool_freewhatprovides(pool);
@@ -273,10 +283,17 @@ pool_freerepo(Pool *pool, Repo *repo)
       pool->repos[i]->start -= nsolvables;     /* adapt start offset of remaining repos */
     }
   pool->nrepos = i;
+  repo_freedata(repo);
+}
 
-  xfree(repo->idarraydata);
-  xfree(repo->rpmdbid);
-  xfree(repo);
+void
+pool_freeallrepos(Pool *pool)
+{
+  int i;
+  for (i = 0; i < pool->nrepos; i++)
+    repo_freedata(pool->repos[i]);
+  pool->repos = xfree(pool->repos);
+  pool->nrepos = 0;
 }
 
 Offset

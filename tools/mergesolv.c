@@ -39,7 +39,7 @@ main(int argc, char **argv)
 	  perror(argv[1]);
 	  exit(0);
 	}
-      pool_addrepo_solv(pool, fp, "");
+      repo_add_solv(repo_create(pool, ""), fp);
       fclose(fp);
     }
   if (!pool->nrepos)
@@ -90,13 +90,13 @@ main(int argc, char **argv)
     }
   while (pool->nrepos > 1)
     {
-      pool_freerepo (pool, pool->repos[1]);
+      repo_free(pool->repos[1]);
     }
   free (pool->repos[0]->idarraydata);
   pool->repos[0]->idarraydata = new_id;
   pool->repos[0]->idarraysize = new_id_size;
 
-  pool_writerepo(pool, pool->repos[0], stdout);
+  repo_write(pool->repos[0], stdout);
   pool_free(pool);
 
   return 0;

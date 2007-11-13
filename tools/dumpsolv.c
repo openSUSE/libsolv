@@ -42,7 +42,8 @@ int main(int argc, char **argv)
 	}
     }
   pool = pool_create();
-  repo = pool_addrepo_solv(pool, stdin, "");
+  repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
+  repo_add_solv(repo, stdin);
   printf("repo contains %d solvables\n", repo->nsolvables);
   for (i = repo->start; i < repo->start + repo->nsolvables; i++)
     {

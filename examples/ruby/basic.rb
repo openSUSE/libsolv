@@ -8,10 +8,12 @@ pool = Pool.new
 #s = pool.add_empty_repo
 
 f = File.open('../../testsuite/data.libzypp/basic-exercises/exercise-20-packages.solv', 'r')
-s = pool.add_repo_solv(f, 'foo')
+s = pool.create_repo('foo');
+s.add_solv(f);
 
 f = File.open('../../testsuite/data.libzypp/basic-exercises/exercise-20-system.solv', 'r')
-installed = pool.add_repo_solv(f, 'system')
+installed = pool.create_repo('system');
+installed.add_solv(f);
 
 pool.each_repo do |repo|
   puts repo.name

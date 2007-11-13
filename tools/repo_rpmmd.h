@@ -5,4 +5,4 @@
  * for further information
  */
 
-extern Repo *pool_addrepo_rpmmd(Pool *pool, FILE *fp);
+extern void repo_add_rpmmd(Repo *repo, FILE *fp);

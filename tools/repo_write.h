@@ -18,6 +18,6 @@
 #include "pool.h"
 #include "repo.h"
 
-extern void pool_writerepo(Pool *pool, Repo *repo, FILE *fp);
+extern void repo_write(Repo *repo, FILE *fp);
 
 #endif

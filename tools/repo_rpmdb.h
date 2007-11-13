@@ -5,4 +5,4 @@
  * for further information
  */
 
-extern Repo *pool_addrepo_rpmdb(Pool *pool, Repo *ref);
+extern void repo_add_rpmdb(Repo *repo, Repo *ref);

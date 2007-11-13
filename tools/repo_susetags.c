@@ -136,12 +136,12 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
 
 Attrstore *attr;
 
-Repo *
-pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
+void
+repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 {
+  Pool *pool = repo->pool;
   char *line, *linep;
   int aline;
-  Repo *repo;
   Solvable *s;
   int intag = 0;
   int cummulate = 0;
@@ -151,7 +151,11 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
   char *sp[5];
   struct parsedata pd;
 
-  repo = pool_addrepo_empty(pool);
+  if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
+    abort();
+  if (!repo->start)
+    repo->start = pool->nsolvables;
+
   attr = new_store (pool);
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
@@ -240,9 +244,9 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
 	  if ((pack & PACK_BLOCK) == 0)
 	    {
 	      pool->solvables = realloc(pool->solvables, (pool->nsolvables + pack + PACK_BLOCK + 1) * sizeof(Solvable));
-	      memset(pool->solvables + repo->start + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
+	      memset(pool->solvables + pool->nsolvables + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
 	    }
-	  s = pool->solvables + repo->start + pack;
+	  s = pool->solvables + pool->nsolvables + pack;
 	  s->repo = repo;
 	  last_found_pack = pack;
 	  pack++;
@@ -293,7 +297,7 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
 	    {
 	      if (nn >= pack)
 	        nn = 0;
-	      s = pool->solvables + repo->start + nn;
+	      s = pool->solvables + pool->nsolvables + nn;
 	      if (s->name == name && s->evr == evr && s->arch == arch)
 	        break;
 	    }
@@ -425,9 +429,8 @@ pool_addrepo_susetags(Pool *pool, FILE *fp, Id vendor, int with_attr)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
     
   pool->nsolvables += pack;
-  repo->nsolvables = pack;
+  repo->nsolvables += pack;
   if (pd.tmp)
     free(pd.tmp);
   free(line);
-  return repo;
 }

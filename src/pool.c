@@ -118,20 +118,12 @@ void
 pool_free(Pool *pool)
 {
   int i;
-  Repo *repo;
 
   pool_freewhatprovides(pool);
   pool_freeidhashes(pool);
-  for (i = 0; i < pool->nrepos; i++)
-    {
-      repo = pool->repos[i];
-      xfree(repo->idarraydata);
-      xfree(repo->rpmdbid);
-      xfree(repo);
-    }
+  pool_freeallrepos(pool);
   xfree(pool->id2arch);
   xfree(pool->solvables);
-  xfree(pool->repos);
   xfree(pool->stringspace);
   xfree(pool->strings);
   xfree(pool->rels);

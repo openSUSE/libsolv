@@ -38,8 +38,9 @@ main(int argc, char **argv)
       argv++;
     }
   Pool *pool = pool_create();
-  Repo *repo = pool_addrepo_susetags(pool, stdin, 0, with_attr);
-  pool_writerepo(pool, repo, stdout);
+  Repo *repo = repo_create(pool, "<stdin>");
+  repo_add_susetags(repo, stdin, 0, with_attr);
+  repo_write(repo, stdout);
   if (with_attr && attr)
     {
       FILE *fp = fopen ("test.attr", "w");

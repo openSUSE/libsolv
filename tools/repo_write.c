@@ -189,8 +189,9 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
  */
 
 void
-pool_writerepo(Pool *pool, Repo *repo, FILE *fp)
+repo_write(Repo *repo, FILE *fp)
 {
+  Pool *pool = repo->pool;
   int i, numsolvdata;
   Solvable *s, *sstart;
   NeedId *needid;

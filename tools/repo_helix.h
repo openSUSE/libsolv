@@ -17,6 +17,6 @@
 #include "pool.h"
 #include "repo.h"
 
-extern Repo *pool_addrepo_helix(Pool *pool, FILE *fp);
+extern void repo_add_helix(Repo *repo, FILE *fp);
 
 #endif /* REPO_HELIX_H */
