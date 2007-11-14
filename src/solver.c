@@ -3227,8 +3227,6 @@ solve(Solver *solv, Queue *job)
   if (solv->ruletojob.count != solv->nrules - solv->jobrules)
     abort();
 
-  if (pool->verbose) printf("problems so far: %d\n", solv->problems.count);
-  
   /*
    * now add policy rules
    * 
@@ -3250,8 +3248,6 @@ solve(Solver *solv, Queue *job)
       if (solv->nrules - solv->systemrules != solv->installed->nsolvables)
 	abort();
     }
-
-  if (pool->verbose) printf("problems so far: %d\n", solv->problems.count);
 
   /* create special weak system rules */
   /* those are used later on to keep a version of the installed packages in
@@ -3294,6 +3290,9 @@ solve(Solver *solv, Queue *job)
   
   disableupdaterules(solv, job, -1);
   makeruledecisions(solv);
+
+  if (pool->verbose) printf("problems so far: %d\n", solv->problems.count);
+
   run_solver(solv, 1, 1);
 
   /* find suggested packages */
