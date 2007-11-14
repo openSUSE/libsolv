@@ -121,7 +121,7 @@ pool_free(Pool *pool)
 
   pool_freewhatprovides(pool);
   pool_freeidhashes(pool);
-  pool_freeallrepos(pool);
+  pool_freeallrepos(pool, 1);
   xfree(pool->id2arch);
   xfree(pool->solvables);
   xfree(pool->stringspace);

@@ -179,6 +179,10 @@ repo_add_content(Repo *repo, FILE *fp)
   pack = 0;
   s = 0;
 
+  if (!repo->start || repo->start == repo->end)
+    repo->start = pool->nsolvables;
+  repo->end = pool->nsolvables;
+
   for (;;)
     {
       char *fields[2];
@@ -276,6 +280,7 @@ repo_add_content(Repo *repo, FILE *fp)
     
   pool->nsolvables += pack;
   repo->nsolvables += pack;
+  repo->end += pack;
   if (pd.tmp)
     free(pd.tmp);
   free(line);

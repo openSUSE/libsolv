@@ -828,8 +828,9 @@ repo_add_helix(Repo *repo, FILE *fp)
 
   if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
     abort();
-  if (!repo->start)
+  if (!repo->start || repo->start == repo->end)
     repo->start = pool->nsolvables;
+  repo->end = pool->nsolvables;
 
   /* prepare parsedata */
   memset(&pd, 0, sizeof(pd));
@@ -875,6 +876,7 @@ repo_add_helix(Repo *repo, FILE *fp)
   // adapt package count
   pool->nsolvables += pd.pack;
   repo->nsolvables += pd.pack;
+  repo->end += pd.pack;
 
   free(pd.content);
   free(pd.evrspace);

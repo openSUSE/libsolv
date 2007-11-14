@@ -166,7 +166,7 @@ extern Id *pool_addrelproviders(Pool *pool, Id d);
 
 static inline int pool_installable(Pool *pool, Solvable *s)
 {
-  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+  if (!s->arch || s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
     return 0;
   if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
     return 0;

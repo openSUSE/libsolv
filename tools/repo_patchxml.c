@@ -454,8 +454,9 @@ repo_add_patchxml(Repo *repo, FILE *fp)
 
   if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
     abort();
-  if (!repo->start)
+  if (!repo->start || repo->start == repo->end)
     repo->start = pool->nsolvables;
+  repo->end = pool->nsolvables;
 
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
@@ -488,6 +489,7 @@ repo_add_patchxml(Repo *repo, FILE *fp)
 
   pool->nsolvables += pd.pack;
   repo->nsolvables += pd.pack;
+  repo->end += pd.pack;
 
   free(pd.content);
 }

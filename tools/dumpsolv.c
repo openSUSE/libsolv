@@ -45,9 +45,11 @@ int main(int argc, char **argv)
   repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
   repo_add_solv(repo, stdin);
   printf("repo contains %d solvables\n", repo->nsolvables);
-  for (i = repo->start; i < repo->start + repo->nsolvables; i++)
+  for (i = repo->start; i < repo->end; i++)
     {
       s = pool->solvables + i;
+      if (s->repo != repo)
+	continue;
       printf("\n");
       printf("solvable %d:\n", i);
       printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));

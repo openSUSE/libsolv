@@ -19,6 +19,7 @@ typedef struct _Repo {
   const char *name;
   struct _Pool *pool;		/* pool containing repo data */
   int start;			/* start of this repo solvables within pool->solvables */
+  int end;			/* last solvable + 1 of this repo */
   int nsolvables;		/* number of solvables repo is contributing to pool */
 
   int priority;			/* priority of this repo */
@@ -31,14 +32,14 @@ typedef struct _Repo {
 } Repo;
 
 extern Repo *repo_create(Pool *pool, const char *name);
-extern void repo_free(Repo *repo);
+extern void repo_free(Repo *repo, int reuseids);
 
 extern Offset repo_addid(Repo *repo, Offset olddeps, Id id);
 extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, int isreq);
 extern Offset repo_reserve_ids(Repo *repo, Offset olddeps, int num);
 extern Offset repo_fix_legacy(Repo *repo, Offset provides, Offset supplements);
 
-extern void pool_freeallrepos(Pool *pool);
+extern void pool_freeallrepos(Pool *pool, int reuseids);
 
 static inline const char *repo_name(const Repo *repo)
 {

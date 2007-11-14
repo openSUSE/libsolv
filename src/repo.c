@@ -41,6 +41,7 @@ repo_create(Pool *pool, const char *name)
   repo->name = name ? strdup(name) : 0;
   repo->pool = pool;
   repo->start = pool->nsolvables;
+  repo->end = pool->nsolvables;
   repo->nsolvables = 0;
   return repo;
 }
@@ -246,54 +247,59 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
 
 
 /*
- * remove repo from pool
+ * remove repo from pool, zero out solvables 
  * 
  */
 
 void
-repo_free(Repo *repo)
+repo_free(Repo *repo, int reuseids)
 {
   Pool *pool = repo->pool;
-  int i, nsolvables;
+  Solvable *s;
+  int i;
 
   pool_freewhatprovides(pool);
 
-  for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
+  if (reuseids && repo->end == pool->nsolvables)
     {
-      if (pool->repos[i] == repo)
-	break;
+      /* it's ok to reuse the ids. As this is the last repo, we can
+         just shrink the solvable array */
+      for (i = repo->end - 1, s = pool->solvables + i; i >= repo->start; i--, s--)
+	if (s->repo != repo)
+	  break;
+      repo->end = i + 1;
+      pool->nsolvables = i + 1;
     }
+  /* zero out solvables belonging to this repo */
+  for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
+    if (s->repo == repo)
+      memset(s, 0, sizeof(*s));
+  for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
+    if (pool->repos[i] == repo)
+      break;
   if (i == pool->nrepos)	       /* repo not in pool, return */
     return;
-
-  /* close gap
-   * all repos point into pool->solvables _relatively_ to repo->start
-   * so closing the gap only needs adaption of repo->start for all
-   * other repos.
-   */
-  
-  nsolvables = repo->nsolvables;
-  if (pool->nsolvables > repo->start + nsolvables)
-    memmove(pool->solvables + repo->start, pool->solvables + repo->start + nsolvables, (pool->nsolvables - repo->start - nsolvables) * sizeof(Solvable));
-  pool->nsolvables -= nsolvables;
-
-  for (; i < pool->nrepos - 1; i++)
-    {
-      pool->repos[i] = pool->repos[i + 1];   /* remove repo */
-      pool->repos[i]->start -= nsolvables;     /* adapt start offset of remaining repos */
-    }
-  pool->nrepos = i;
+  if (i < pool->nrepos - 1)
+    memmove(pool->repos + i, pool->repos + i + 1, (pool->nrepos - 1 - i) * sizeof(Repo *));
+  pool->nrepos--;
   repo_freedata(repo);
 }
 
 void
-pool_freeallrepos(Pool *pool)
+pool_freeallrepos(Pool *pool, int reuseids)
 {
   int i;
+
+  pool_freewhatprovides(pool);
   for (i = 0; i < pool->nrepos; i++)
     repo_freedata(pool->repos[i]);
+  /* the first two solvables don't belong to a repo */
+  if (pool->nsolvables > 2 && !reuseids)
+    memset(pool->solvables + 2, 0, (pool->nsolvables - 2) * sizeof(Solvable));
   pool->repos = xfree(pool->repos);
   pool->nrepos = 0;
+  if (reuseids)
+    pool->nsolvables = 2;
 }
 
 Offset

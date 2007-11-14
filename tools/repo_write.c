@@ -193,7 +193,7 @@ repo_write(Repo *repo, FILE *fp)
 {
   Pool *pool = repo->pool;
   int i, numsolvdata;
-  Solvable *s, *sstart;
+  Solvable *s;
   NeedId *needid;
   int nstrings, nrels;
   unsigned int sizeid;
@@ -204,17 +204,18 @@ repo_write(Repo *repo, FILE *fp)
   int bits, bitmaps;
   int nsolvables;
 
-  nsolvables = repo->nsolvables;
-  sstart = pool->solvables + repo->start;
+  nsolvables = 0;
   idarraydata = repo->idarraydata;
 
   needid = (NeedId *)calloc(pool->nstrings + pool->nrels, sizeof(*needid));
 
   memset(idsizes, 0, sizeof(idsizes));
 
-  for (i = 0; i < nsolvables; i++)
+  for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
     {
-      s = sstart + i;
+      if (s->repo != repo)
+	continue;
+      nsolvables++;
       needid[s->name].need++;
       needid[s->arch].need++;
       needid[s->evr].need++;
@@ -242,6 +243,8 @@ repo_write(Repo *repo, FILE *fp)
       if (s->freshens)
         idsizes[SOLVABLE_FRESHENS]    += incneedid(pool, idarraydata + s->freshens, needid);
     }
+  if (nsolvables != repo->nsolvables)
+    abort();
 
   idsizes[SOLVABLE_NAME] = 1;
   idsizes[SOLVABLE_ARCH] = 1;
@@ -364,9 +367,10 @@ repo_write(Repo *repo, FILE *fp)
       write_u32(fp, 0);
     }
 
-  for (i = 0; i < nsolvables; ++i)
+  for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
     {
-      s = sstart + i;
+      if (s->repo != repo)
+	continue;
       bits = 0;
       if (idsizes[SOLVABLE_FRESHENS])
 	bits = (bits << 1) | (s->freshens ? 1 : 0);

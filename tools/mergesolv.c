@@ -90,7 +90,7 @@ main(int argc, char **argv)
     }
   while (pool->nrepos > 1)
     {
-      repo_free(pool->repos[1]);
+      repo_free(pool->repos[pool->nrepos - 1], 1);
     }
   free (pool->repos[0]->idarraydata);
   pool->repos[0]->idarraydata = new_id;

@@ -531,8 +531,11 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
 
   if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
     abort();
-  if (!repo->start)
+  if (!repo->start || repo->start == repo->end)
     repo->start = pool->nsolvables;
+  repo->end = pool->nsolvables;
+  if (repo->start != repo->end)
+    abort();		/* FIXME: rpmdbid */
 
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
@@ -816,6 +819,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
     free(rpmhead);
   pool->nsolvables += nrpmids;
   repo->nsolvables += nrpmids;
+  repo->end += nrpmids;
 
   if (db)
     db->close(db, 0);

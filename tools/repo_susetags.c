@@ -151,10 +151,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   char *sp[5];
   struct parsedata pd;
 
-  if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
-    abort();
-  if (!repo->start)
+  if (!repo->start || repo->start == repo->end)
     repo->start = pool->nsolvables;
+  repo->end = pool->nsolvables;
 
   attr = new_store (pool);
   memset(&pd, 0, sizeof(pd));
@@ -430,6 +429,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
     
   pool->nsolvables += pack;
   repo->nsolvables += pack;
+  repo->end += pack;
   if (pd.tmp)
     free(pd.tmp);
   free(line);

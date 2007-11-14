@@ -49,7 +49,7 @@ main(int argc, char **argv)
       if (ref->pool != pool)
 	pool_free(ref->pool);
       else
-	repo_free(ref);
+	repo_free(ref, 1);
       ref = 0;
     }
 
