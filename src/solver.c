@@ -113,9 +113,9 @@ printruleelement(Solver *solv, Rule *r, Id v)
 	printf(" (w2)");
     }
   if (solv->decisionmap[s - pool->solvables] > 0)
-    printf(" I.%d", solv->decisionmap[s - pool->solvables]);
+    printf(" Install.level%d", solv->decisionmap[s - pool->solvables]);
   if (solv->decisionmap[s - pool->solvables] < 0)
-    printf(" C.%d", -solv->decisionmap[s - pool->solvables]);
+    printf(" Conflict.level%d", -solv->decisionmap[s - pool->solvables]);
   if (r && r->w1 == 0)
     printf(" (disabled)");
   printf("\n");
@@ -220,6 +220,9 @@ unifyrules(Solver *solv)
   if (solv->nrules <= 1)	       /* nothing to unify */
     return;
 
+  if (solv->pool->verbose > 3) 
+      printf ("----- unifyrules -----\n");
+
   /* sort rules first */
   unifyrules_sortcmp_data = solv->pool;
   qsort(solv->rules + 1, solv->nrules - 1, sizeof(Rule), unifyrules_sortcmp);
@@ -268,6 +271,8 @@ unifyrules(Solver *solv)
       printf("  normal: %d, %d literals\n", solv->nrules - 1 - binr, lits);
     }
 #endif
+  if (solv->pool->verbose > 3) 
+      printf ("----- unifyrules end -----\n");  
 }
 
 #if 0
@@ -907,9 +912,9 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 	      if (pool->verbose > 2)
 	        {
-		  printf("addrule %s-%s.%s %s %d %u\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, (Offset)(dp - pool->whatprovidesdata));
+		  printf("  %s-%s.%s requires %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req));
 		  for (i = 0; dp[i]; i++)
-		    printf("  %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
+		    printf("   provided by %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
 	        }
 
 	      /* add 'requires' dependency */
@@ -1041,7 +1046,7 @@ addrpmrulesforweak(Solver *solv, Map *m)
       addrpmrulesforsolvable(solv, s, m);
       n = 0;
     }
-  if (pool->verbose) printf("done. (%d)\n", solv->nrules);
+  if (pool->verbose) printf("----- addrpmrulesforweak ----- done. (nrules%d)\n", solv->nrules);
 }
 
 static void
@@ -3112,6 +3117,10 @@ solve(Solver *solv, Queue *job)
   for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
     addrpmrulesforupdaters(solv, pool->solvables + i, &addedmap, 1);
 
+  if (solv->pool->verbose > 3)
+      printf ("*** Add rules for week dependencies ***\n");
+
+
   addrpmrulesforweak(solv, &addedmap);
 
 #if 1
@@ -3139,11 +3148,14 @@ solve(Solver *solv, Queue *job)
   
   unifyrules(solv);	/* remove duplicate rpm rules */
 
-  if (pool->verbose) printf("decisions based on rpm rules: %d\n", solv->decisionq.count);
+  if (pool->verbose) printf("Decisions based on %d rpm rules.\n", solv->decisionq.count);
 
   /*
    * now add all job rules
    */
+
+  if (solv->pool->verbose > 3)
+      printf ("*** Add JOB rules ***\n");  
   
   solv->jobrules = solv->nrules;
 
@@ -3228,9 +3240,13 @@ solve(Solver *solv, Queue *job)
     abort();
 
   /*
-   * now add policy rules
+   * now add system rules
    * 
    */
+
+ if (solv->pool->verbose > 3)
+     printf ("*** Add system rules ***\n");
+  
   
   solv->systemrules = solv->nrules;
 
