@@ -898,7 +898,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 	      if (pool->verbose > 2)
 	      {
-		  printf("addrule %s-%s.%s %s %d %ld\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, dp - pool->whatprovidesdata);
+		  printf("addrule %s-%s.%s %s %d %d\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, dp - pool->whatprovidesdata);
 		  for (i = 0; dp[i]; i++)
 		      printf("  %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
 	      }
