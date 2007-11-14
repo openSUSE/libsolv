@@ -299,17 +299,18 @@ hashrule(Solver *solv, Id p, Id d, int n)
 
 /*
  * add rule
- *  p = direct literal; > 0 for learnt, < 0 for installed pkg (rpm)
+ *  p = direct literal; always < 0 for installed rpm rules
  *  d, if < 0 direct literal, if > 0 offset into whatprovides, if == 0 rule is assertion (look at p only)
  *
  *
  * A requires b, b provided by B1,B2,B3 => (-A|B1|B2|B3)
  * 
- * p < 0 : rule from rpm (installed pkg)
- * d > 0 : Offset in whatprovidesdata (list of providers)
+ * p < 0 : pkg id of A
+ * d > 0 : Offset in whatprovidesdata (list of providers of b)
  * 
  * A conflicts b, b provided by B1,B2,B3 => (-A|-B1), (-A|-B2), (-A|-B3)
- *  d < 0: Id of solvable (e.g. B1)
+ * p < 0 : pkg id of A
+ * d < 0 : Id of solvable (e.g. B1)
  * 
  * d == 0: unary rule, assertion => (A) or (-A)
  * 
@@ -320,6 +321,8 @@ hashrule(Solver *solv, Id p, Id d, int n)
  *   Conflicts:  p < 0, d < 0   (-A|-B)         either p (conflict issuer) or d (conflict provider)
  *   ?           p > 0, d < 0   (A|-B)
  *   No-op ?:    p = 0, d = 0   (null)          (used as policy rule placeholder)
+ *
+ * always returns a rule for non-rpm rules
  */
 
 static Rule *
@@ -346,13 +349,12 @@ addrule(Solver *solv, Id p, Id d)
 
   if (d < 0)
     {
+      /* always a binary rule */
       if (p == d)
 	return 0;		       /* ignore self conflict */
       n = 1;
     }
-  else if (d == 0)		       /* user requested */
-    n = 0;
-  else
+  else if (d > 0)
     {
       for (dp = solv->pool->whatprovidesdata + d; *dp; dp++, n++)
 	if (*dp == -p)
@@ -361,26 +363,23 @@ addrule(Solver *solv, Id p, Id d)
 	d = dp[-1];
     }
 
-  if (n == 0)			       /* direct assertion */
+  if (n == 0 && !solv->jobrules)
     {
-      if (!solv->jobrules)
-	{
-	  /* this is a rpm rule assertion, we do not have to allocate it */
-	  /* it can be identified by a level of 1 and a zero reason */
-	  /* we must not drop those rules from the decisionq when rewinding! */
-	  if (p > 0)
-	    abort();
-	  if (solv->decisionmap[-p] > 0 || solv->decisionmap[-p] < -1)
-	    abort();
-	  if (solv->decisionmap[-p])
-	    return NULL;
-	  queue_push(&solv->decisionq, p);
-	  queue_push(&solv->decisionq_why, 0);
-	  solv->decisionmap[-p] = -1;
-	  return 0;
-	}
+      /* this is a rpm rule assertion, we do not have to allocate it */
+      /* it can be identified by a level of 1 and a zero reason */
+      /* we must not drop those rules from the decisionq when rewinding! */
+      if (p >= 0)
+	abort();
+      if (solv->decisionmap[-p] > 0 || solv->decisionmap[-p] < -1)
+	abort();
+      if (solv->decisionmap[-p])
+	return 0;	/* already got that one */
+      queue_push(&solv->decisionq, p);
+      queue_push(&solv->decisionq_why, 0);
+      solv->decisionmap[-p] = -1;
+      return 0;
     }
-  else if (n == 1 && p > d)
+  if (n == 1 && p > d)
     {
       /* smallest literal first so we can find dups */
       n = p;
@@ -1001,7 +1000,8 @@ addrpmrulesforweak(Solver *solv, Map *m)
   Id sup, *supp;
   int i, n;
 
-  if (pool->verbose) printf("----- addrpmrulesforweak ----- (nrules %d)\n", solv->nrules);
+  if (solv->pool->verbose > 3)
+    printf ("----- addrpmrulesforweak -----\n");
   for (i = n = 1; n < pool->nsolvables; i++, n++)
     {
       if (i == pool->nsolvables)
@@ -1038,7 +1038,6 @@ addrpmrulesforweak(Solver *solv, Map *m)
       addrpmrulesforsolvable(solv, s, m);
       n = 0;
     }
-  if (pool->verbose) printf("----- addrpmrulesforweak ----- done. (nrules%d)\n", solv->nrules);
 }
 
 static void
@@ -3043,6 +3042,7 @@ solve(Solver *solv, Queue *job)
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
   int i;
+  int oldnrules;
   Map addedmap;			       /* '1' == have rule for solvable */
   Id how, what, p, *pp, d;
   Queue q;
@@ -3076,20 +3076,27 @@ solve(Solver *solv, Queue *job)
    */
   if (installed)
     {
+      oldnrules = solv->nrules;
       if (pool->verbose > 3)
-	printf ("*** create rules for installed solvables ***\n");
+	printf ("*** create rpm rules for installed solvables ***\n");
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
 	if (s->repo == installed)
 	  addrpmrulesforsolvable(solv, s, &addedmap);
+      if (pool->verbose)
+	printf("added %d rpm rules for installed solvables\n", solv->nrules - oldnrules);
       if (pool->verbose > 3)
-	printf ("*** create rules for updaters of installed solvables ***\n");
+	printf ("*** create rpm rules for updaters of installed solvables ***\n");
+      oldnrules = solv->nrules;
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
 	if (s->repo == installed)
 	  addrpmrulesforupdaters(solv, s, &addedmap, 1);
+      if (pool->verbose)
+	printf("added %d rpm rules for updaters of installed solvables\n", solv->nrules - oldnrules);
     }
 
   if (solv->pool->verbose > 3)
     printf ("*** create rpm rules for packages involved with a job ***\n");
+  oldnrules = solv->nrules;
   for (i = 0; i < job->count; i += 2)
     {
       how = job->elements[i];
@@ -3116,14 +3123,16 @@ solve(Solver *solv, Queue *job)
 	  break;
 	}
     }
+  if (pool->verbose)
+    printf("added %d rpm rules for packages involved in a job\n", solv->nrules - oldnrules);
 
   if (solv->pool->verbose > 3)
     printf ("*** create rpm rules for recommended/suggested packages ***\n");
-  if (solv->pool->verbose > 3)
-      printf ("*** Add rules for week dependencies ***\n");
 
-
+  oldnrules = solv->nrules;
   addrpmrulesforweak(solv, &addedmap);
+  if (pool->verbose)
+    printf("added %d rpm rules because of weak dependencies\n", solv->nrules - oldnrules);
 
 #if 1
   if (pool->verbose)
@@ -3150,7 +3159,7 @@ solve(Solver *solv, Queue *job)
   
   unifyrules(solv);	/* remove duplicate rpm rules */
 
-  if (pool->verbose) printf("Decisions based on %d rpm rules.\n", solv->decisionq.count);
+  if (pool->verbose) printf("decisions so far: %d\n", solv->decisionq.count);
 
   /*
    * now add all job rules
