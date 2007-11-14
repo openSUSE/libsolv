@@ -437,10 +437,11 @@ addrule(Solver *solv, Id p, Id d)
   r->n1 = 0;
   r->n2 = 0;
 
-  if (solv->pool->verbose > 3) {
+  if (solv->pool->verbose > 3)
+    {
       printf ("  Add rule: ");
       printrule (solv, r);
-  }
+    }
   
   return r;
 }
@@ -587,6 +588,13 @@ makeruledecisions(Solver *solv)
 	{
 	  /* conflict with rpm rule, need only disable our rule */
 	  printf("conflict with rpm rule, disabling rule #%d\n", ri);
+	  if (v < 0 && v != -SYSTEMSOLVABLE)
+	    abort();
+	  queue_push(&solv->problems, 0);
+          if (v == -SYSTEMSOLVABLE)
+	    queue_push(&solv->problems, 0);	/* sigh, we don't have a rule for that */
+	  else
+	    queue_push(&solv->problems, -v);	/* sigh, we don't have a rule for that */
 	  v = ri;
 	  if (ri < solv->systemrules)
 	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
@@ -598,6 +606,8 @@ makeruledecisions(Solver *solv)
       /* conflict with another job or system rule */
       /* remove old decision */
       printf("conflicting system/job rules over literal %d\n", vv);
+      queue_push(&solv->problems, 0);
+      queue_push(&solv->problems, solv->decisionq_why.elements[i]);
       /* push all of our rules asserting this literal on the problem stack */
       for (i = solv->jobrules, rr = solv->rules + i; i < solv->nrules; i++, rr++)
 	{
@@ -819,9 +829,8 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id *dp;
   Id n;
 
-  if (solv->pool->verbose > 3) {
-      printf ("----- addrpmrulesforsolvable -----\n");
-  }
+  if (solv->pool->verbose > 3)
+    printf ("----- addrpmrulesforsolvable -----\n");
   
   queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
   queue_push(&q, s - pool->solvables);	/* push solvable Id */
@@ -889,7 +898,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		{
 		  /* nothing provides req! */
 		  if (pool->verbose)
-		     printf("package %s-%s.%s [%ld] is not installable (%s)\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (long int)(s - pool->solvables), dep2str(pool, req));
+		     printf("package %s-%s.%s [%d] is not installable (%s)\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (Id)(s - pool->solvables), dep2str(pool, req));
 		  addrule(solv, -n, 0); /* mark requestor as uninstallable */
 		  if (solv->rc_output)
 		    printf(">!> !unflag %s-%s.%s[%s]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), repo_name(s->repo));
@@ -897,11 +906,11 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		}
 
 	      if (pool->verbose > 2)
-	      {
-		  printf("addrule %s-%s.%s %s %d %zd\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, dp - pool->whatprovidesdata);
+	        {
+		  printf("addrule %s-%s.%s %s %d %u\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req), -n, (Offset)(dp - pool->whatprovidesdata));
 		  for (i = 0; dp[i]; i++)
-		      printf("  %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
-	      }
+		    printf("  %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
+	        }
 
 	      /* add 'requires' dependency */
               /* rule: (-requestor|provider1|provider2|...|providerN) */
@@ -1043,14 +1052,13 @@ addrpmrulesforupdaters(Solver *solv, Solvable *s, Map *m, int allowall)
   Queue qs;
   Id qsbuf[64];
 
-  if (solv->pool->verbose > 3) {
-      printf ("----- addrpmrulesforupdaters -----\n");
-  }
+  if (solv->pool->verbose > 3)
+    printf ("----- addrpmrulesforupdaters -----\n");
 
-  if (!MAPTST(m, s - pool->solvables))	/* add rule for s if not already done */
-    addrpmrulesforsolvable(solv, s, m); 
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   policy_findupdatepackages(solv, s, &qs, allowall);
+  if (!MAPTST(m, s - pool->solvables))	/* add rule for s if not already done */
+    addrpmrulesforsolvable(solv, s, m); 
   for (i = 0; i < qs.count; i++)
     if (!MAPTST(m, qs.elements[i]))
       addrpmrulesforsolvable(solv, pool->solvables + qs.elements[i], m);
@@ -1073,9 +1081,8 @@ addupdaterule(Solver *solv, Solvable *s, int allowall)
   Queue qs;
   Id qsbuf[64];
 
-  if (solv->pool->verbose > 3) {
-      printf ("-----  addupdaterule -----\n");
-  }
+  if (solv->pool->verbose > 3)
+    printf ("-----  addupdaterule -----\n");
 
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   policy_findupdatepackages(solv, s, &qs, allowall);
@@ -1173,20 +1180,20 @@ propagate(Solver *solv, int level)
       /* negate because our watches trigger if literal goes FALSE */
       pkg = -solv->decisionq.elements[solv->propagate_index++];
       if (pool->verbose > 3)
-      {
+        {
 	  printf("popagate for decision %d level %d\n", -pkg, level);
 	  printruleelement(solv, 0, -pkg);
-      }
+        }
 
       for (rp = watches + pkg; *rp; rp = nrp)
 	{
 	  r = solv->rules + *rp;
 	  
 	  if (pool->verbose > 3)
-	  {
+	    {
 	      printf("  watch triggered ");
 	      printrule(solv, r);
-	  }
+	    }
 	  
 	  if (pkg == r->w1)
 	    {
@@ -1215,12 +1222,12 @@ propagate(Solver *solv, int level)
 		{
 		  /* p is free to watch, move watch to p */
 		  if (pool->verbose > 3)
-		  {
+		    {
 		      if (p > 0)
-			  printf("    -> move w%d to %s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[p].name), id2str(pool, pool->solvables[p].evr), id2str(pool, pool->solvables[p].arch));
+			printf("    -> move w%d to %s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[p].name), id2str(pool, pool->solvables[p].evr), id2str(pool, pool->solvables[p].arch));
 		      else
-			  printf("    -> move w%d to !%s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[-p].name), id2str(pool, pool->solvables[-p].evr), id2str(pool, pool->solvables[-p].arch));
-		  }
+			printf("    -> move w%d to !%s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[-p].name), id2str(pool, pool->solvables[-p].evr), id2str(pool, pool->solvables[-p].arch));
+		    }
 		  *rp = *nrp;
 		  nrp = rp;
 		  if (pkg == r->w1)
@@ -1252,7 +1259,6 @@ propagate(Solver *solv, int level)
 	  queue_push(&solv->decisionq, ow);
 	  queue_push(&solv->decisionq_why, r - solv->rules);
 	  if (pool->verbose > 3)
-	  {
 	    {
 	      Solvable *s = pool->solvables + (ow > 0 ? ow : -ow);
 	      if (ow > 0)
@@ -1260,7 +1266,6 @@ propagate(Solver *solv, int level)
 	      else
 		printf("  -> decided to conflict %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	    }
-	  }
 	}
     }
   return 0;	/* all is well */
@@ -1336,18 +1341,16 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 	    {
 	      queue_push(&r, v);
 	      if (pool->verbose > 3)
-	      {
+	        {
 		  printf("PUSH %d ", v);
 		  printruleelement(solv, 0, v);
-	      }
+	        }
 	      if (l > rlevel)
 		rlevel = l;
 	    }
 	}
       if (pool->verbose > 3)
-      {
-	  printf("num = %d\n", num);
-      }
+	printf("num = %d\n", num);
       if (num <= 0)
 	abort();
       for (;;)
@@ -1382,16 +1385,16 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
   map_free(&seen);
   queue_push(&solv->learnt_pool, 0);
   if (pool->verbose > 3)
-  {
+    {
       for (i = learnt_why; solv->learnt_pool.elements[i]; i++)
-      {
+        {
 	  printf("learnt_why ");
 	  printrule(solv, solv->rules + solv->learnt_pool.elements[i]);
-      }
-  }
-      if (why)
-	  *why = learnt_why;
-      return rlevel;
+        }
+    }
+  if (why)
+    *why = learnt_why;
+  return rlevel;
 }
 
 
@@ -1483,7 +1486,7 @@ analyze_unsolvable_rule(Solver *solv, Rule *r)
   if (solv->problems.count)
     {
       for (i = solv->problems.count - 1; i >= 0; i--)
-	if (solv->problems.elements[i] == 0)
+	if (solv->problems.elements[i] == 0)	/* end of last problem reached? */
 	  break;
 	else if (solv->problems.elements[i] == why)
 	  return;
@@ -1500,10 +1503,11 @@ analyze_unsolvable_rule(Solver *solv, Rule *r)
  */
 
 static int
-analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
+analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 {
   Pool *pool = solv->pool;
-  Map seen;		/* global? */
+  Rule *r;
+  Map seen;		/* global to speed things up? */
   Id v, vv, *dp, why;
   int l, i, idx;
   Id *decisionmap = solv->decisionmap;
@@ -1513,6 +1517,12 @@ analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
   if (pool->verbose > 1)
     printf("ANALYZE UNSOLVABLE ----------------------\n");
   oldproblemcount = solv->problems.count;
+
+  /* make room for conflicting rule */
+  queue_push(&solv->problems, 0);
+  queue_push(&solv->problems, 0);
+
+  r = cr;
   map_init(&seen, pool->nsolvables);
   analyze_unsolvable_rule(solv, r);
   dp = r->d ? pool->whatprovidesdata + r->d : 0;
@@ -1545,10 +1555,10 @@ analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
       if (!why)
 	{
 	  if (pool->verbose > 3)
-	  {
+	    {
 	      printf("RPM ");
 	      printruleelement(solv, 0, v);
-	  }
+	    }
 	  continue;
 	}
       r = solv->rules + why;
@@ -1579,7 +1589,7 @@ analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
   lastweak = 0;
   if (solv->weakrules != solv->learntrules)
     {
-      for (i = oldproblemcount; i < solv->problems.count - 1; i++)
+      for (i = oldproblemcount + 2; i < solv->problems.count - 1; i++)
 	{
 	  why = solv->problems.elements[i];
 	  if (why < solv->weakrules || why >= solv->learntrules)
@@ -1599,9 +1609,21 @@ analyze_unsolvable(Solver *solv, Rule *r, int disablerules)
       reset_solver(solv);
       return 1;
     }
-  else if (disablerules)
+
+  /* patch conflicting rule data */
+  if (cr - solv->rules >= solv->learntrules)
     {
-      for (i = oldproblemcount; i < solv->problems.count - 1; i++)
+      /* we have to store the rule internals for learnt rules
+       * as they get freed for every solver run */
+      solv->problems.elements[oldproblemcount] = cr->p;
+      solv->problems.elements[oldproblemcount + 1] = cr->d;
+    }
+  else
+    solv->problems.elements[oldproblemcount + 1] = cr - solv->rules;
+
+  if (disablerules)
+    {
+      for (i = oldproblemcount + 2; i < solv->problems.count - 1; i++)
         disableproblem(solv, solv->problems.elements[i]);
       reset_solver(solv);
       return 1;
@@ -1631,9 +1653,7 @@ revert(Solver *solv, int level)
       if (solv->decisionmap[vv] <= level && solv->decisionmap[vv] >= -level)
         break;
       if (solv->pool->verbose > 3)
-      {
-	  printf("reverting decision %d at %d\n", v, solv->decisionmap[vv]);
-      }
+	printf("reverting decision %d at %d\n", v, solv->decisionmap[vv]);
       solv->decisionmap[vv] = 0;
       solv->decisionq.count--;
       solv->decisionq_why.count--;
@@ -1779,10 +1799,10 @@ selectandinstall(Solver *solv, int level, Queue *dq, Id inst, int disablerules)
   p = dq->elements[i];
 
   if (pool->verbose > 3)
-  {
+    {
       Solvable *s = pool->solvables + p;
       printf("installing %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-  }
+    }
 
   return setpropagatelearn(solv, level, p, disablerules);
 }
@@ -1886,11 +1906,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
   Id p, *dp;
 
   if (pool->verbose > 3)
-  {
+    {
       printf("number of rules: %d\n", solv->nrules);
       for (i = 0; i < solv->nrules; i++)
-	  printrule(solv, solv->rules + i);
-  }
+	printrule(solv, solv->rules + i);
+    }
 
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
@@ -1943,9 +1963,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (solv->decisionmap[i] != 0)
 		    continue;
 		  if (pool->verbose > 3)
-		  {
-		      printf("keeping %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-		  }
+		    printf("keeping %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 		  olevel = level;
 		  level = setpropagatelearn(solv, level, i, disablerules);
 		  if (level == 0)
@@ -2152,9 +2170,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      p = dq.elements[0];
 	      s = pool->solvables + p;
 	      if (pool->verbose > 0)
-	      {
-		  printf("installing recommended %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	      }
+		printf("installing recommended %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	      level = setpropagatelearn(solv, level, p, 0);
 	      continue;
 	    }
@@ -2172,10 +2188,10 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  break;
 	      p = solv->branches.elements[i];
 	      if (pool->verbose > 0)
-	      {
+	        {
 		  s = pool->solvables + p;
 		  printf("branching with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	      }
+	        }
 	      queue_empty(&dq);
 	      for (j = i + 1; j < solv->branches.count; j++)
 		queue_push(&dq, solv->branches.elements[j]);
@@ -2221,9 +2237,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      solv->branches.elements[lasti] = 0;
 	      s = pool->solvables + p;
 	      if (pool->verbose > 0)
-	      {
-		  printf("minimizing %d -> %d with %s-%s.%s\n", solv->decisionmap[p], l, id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	      }
+	        printf("minimizing %d -> %d with %s-%s.%s\n", solv->decisionmap[p], l, id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 
 	      level = lastl;
 	      revert(solv, level);
@@ -2310,7 +2324,8 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	  break;		/* great, no more problems */
 	}
       disabledcnt = disabled.count;
-      for (i = 0; i < solv->problems.count - 1; i++)
+      /* skip over problem rule */
+      for (i = 2; i < solv->problems.count - 1; i++)
 	{
 	  /* ignore solutions in refined */
           v = solv->problems.elements[i];
@@ -2374,11 +2389,16 @@ problems_to_solutions(Solver *solv, Queue *job)
   Id why;
   int i, j;
 
+  if (!solv->problems.count)
+    return;
   queue_clone(&problems, &solv->problems);
   queue_init(&solution);
   queue_init(&solutions);
-  problem = problems.elements;
-  for (i = 0; i < problems.count; i++)
+  /* copy over problem rule */
+  queue_push(&solutions, problems.elements[0]);
+  queue_push(&solutions, problems.elements[1]);
+  problem = problems.elements + 2;
+  for (i = 2; i < problems.count; i++)
     {
       Id v = problems.elements[i];
       if (v == 0)
@@ -2388,6 +2408,10 @@ problems_to_solutions(Solver *solv, Queue *job)
 	  queue_push(&solutions, 0);
 	  if (i + 1 == problems.count)
 	    break;
+	  /* copy over problem rule of next problem */
+          queue_push(&solutions, problems.elements[i + 1]);
+          queue_push(&solutions, problems.elements[i + 2]);
+	  i += 2;
 	  problem = problems.elements + i + 1;
 	  continue;
 	}
@@ -2641,13 +2665,179 @@ printdecisions(Solver *solv)
     }
 }
 
+int
+printconflicts(Solver *solv, Solvable *s, Id pc)
+{
+  Pool *pool = solv->pool;
+  Solvable *sc = pool->solvables + pc;
+  Id p, *pp, con, *conp, obs, *obsp;
+  int numc = 0;
+
+  if (s->conflicts)
+    {
+      conp = s->repo->idarraydata + s->conflicts;
+      while ((con = *conp++) != 0)
+	{
+	  FOR_PROVIDES(p, pp, con)
+	    {
+	      if (p != pc)
+		continue;
+	      printf("packags %s-%s.%s conflicts with %s, which is provided by %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, con), id2str(pool, sc->name), id2str(pool, sc->evr), id2str(pool, sc->arch));
+	      numc++;
+	    }
+	}
+    }
+  if (s->obsoletes && (!solv->installed || s - pool->solvables < solv->installed->start || s - pool->solvables >= solv->installed->start + solv->installed->nsolvables))
+    {
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(p, pp, obs)
+	    {
+	      if (p != pc)
+		continue;
+	      printf("packags %s-%s.%s obsolets %s, which is provided by %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, obs), id2str(pool, sc->name), id2str(pool, sc->evr), id2str(pool, sc->arch));
+	      numc++;
+	    }
+	}
+    }
+  return numc;
+}
+
+void
+printprobleminfo(Solver *solv, Id p, Id d, Queue *job, Id firstp, Id firstrp)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  Solvable *s;
+  Id what;
+
+  if (p != 0)
+    {
+      /* learnt rule, ignore for now */
+      printf("some learnt rule...\n");
+      return;
+    }
+  if (d == 0)
+    {
+      /* conflict with system solvable, i.e. could not create rule */
+      if (firstp)
+	{
+	  printf("got firstp\n");
+	  abort();
+	}
+      what = job->elements[firstrp];
+      switch (job->elements[firstrp - 1])
+	{
+	case SOLVER_INSTALL_SOLVABLE_NAME:
+	  printf("no solvable exists with name %s\n", dep2str(pool, what));
+	  break;
+	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
+	  printf("no solvable provides %s\n", dep2str(pool, what));
+	  break;
+	default:
+	  printf("unknown  job\n");
+	  abort();
+	}
+      return;
+    }
+  else if (d < 0)
+    {
+      Id req, *reqp, *dp;
+      int count = 0;
+      /* conflict with rpm rule, package -d is not installable */
+      s = pool->solvables + (-d);
+      if (s->requires)
+	{
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    {
+	      if (req == SOLVABLE_PREREQMARKER)
+		continue;
+	      dp = GET_PROVIDESP(req, p);
+	      if (*dp)
+		continue;
+	      printf("package %s-%s.%s requires %s, but no package provides it\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req));
+	      count++;
+	    }
+	}
+      if (!count)
+        printf("package %s-%s.%s is not installable\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+      return;
+    }
+  if (d >= solv->jobrules)
+    {
+      r = solv->rules + d;
+      p = r->p;
+      d = r->d;
+      if (p < 0 && d < 0)
+	{
+	  Solvable *sp, *sd;
+	  sp = pool->solvables + (-p);
+	  sd = pool->solvables + (-d);
+	  printf("package %s-%s.%s cannot be installed with package %s-%s.%s\n", id2str(pool, sp->name), id2str(pool, sp->evr), id2str(pool, sp->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+	  return;
+	}
+      printf("some job rule...\n");
+      printrule(solv, r);
+      return;
+    }
+  r = solv->rules + d;
+  p = r->p;
+  if (p >= 0)
+    abort();
+  d = r->d;
+  if (d == 0 && r->w2 < 0)
+    {
+      Solvable *sp, *sd;
+      d = r->w2;
+      sp = pool->solvables + (-p);
+      sd = pool->solvables + (-d);
+      if (sp->name == sd->name)
+	{
+	  printf("cannot install both %s-%s.%s and %s-%s.%s\n", id2str(pool, sp->name), id2str(pool, sp->evr), id2str(pool, sp->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+	}
+      else
+	{
+	  printconflicts(solv, pool->solvables + (-p), -d);
+	  printconflicts(solv, pool->solvables + (-d), -p);
+	}
+    }
+  else
+    {
+      /* find requires of p that corresponds with our rule */
+      Id req, *reqp, *dp;
+      s = pool->solvables + (-p);
+      reqp = s->repo->idarraydata + s->requires;
+      while ((req = *reqp++) != 0)
+	{
+	  if (req == SOLVABLE_PREREQMARKER)
+	    continue;
+	  dp = GET_PROVIDESP(req, p);
+          if (d == 0)
+	    {
+	      if (*dp == r->w2 && dp[1] == 0)
+		break;
+	    }
+	  else if (dp - pool->whatprovidesdata == d)
+	    break;
+	}
+      if (!req)
+	{
+	  printf("req not found\n");
+	  abort();
+	}
+      printf("package %s-%s.%s requires %s, but none of its providers can be installed\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req));
+    }
+}
+
 void
 printsolutions(Solver *solv, Queue *job)
 {
   Pool *pool = solv->pool;
   int pcnt;
   int i;
-  Id p, rp, what;
+  Id p, d, rp, what;
   Solvable *s, *sd;
 
   printf("Encountered problems! Here are the solutions:\n\n");
@@ -2656,6 +2846,10 @@ printsolutions(Solver *solv, Queue *job)
     {
       printf("Problem %d:\n", pcnt++);
       printf("====================================\n");
+      p = solv->problems.elements[i++];
+      d = solv->problems.elements[i++];
+      printprobleminfo(solv, p, d, job, solv->problems.elements[i], solv->problems.elements[i + 1]);
+      printf("\n");
       for (;;)
         {
 	  if (solv->problems.elements[i] == 0 && solv->problems.elements[i + 1] == 0)
@@ -2748,7 +2942,7 @@ printsolutions(Solver *solv, Queue *job)
 		    }
 		  else
 		    {
-		      printf("- allow deinstallation of %s-%s.%s [%ld]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (long int)(s - pool->solvables));
+		      printf("- allow deinstallation of %s-%s.%s [%d]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (Id)(s - pool->solvables));
 		    }
 
 		}
@@ -2869,9 +3063,8 @@ solve(Solver *solv, Queue *job)
    * so called: rpm rules
    * 
    */
-  if (solv->pool->verbose > 3) {
-      printf ("*** create rules for installed solvables -> keep them installed ***\n");
-  }
+  if (solv->pool->verbose > 3)
+    printf ("*** create rules for installed solvables -> keep them installed ***\n");
   for (i = solv->installed->start; i < solv->installed->start + solv->installed->nsolvables; i++)
     addrpmrulesforsolvable(solv, pool->solvables + i, &addedmap);
 
@@ -2886,9 +3079,8 @@ solve(Solver *solv, Queue *job)
    * solvable rules
    *  process job rules for solvables
    */
-  if (solv->pool->verbose > 3) {
-      printf ("*** create install rules ***\n");
-  }
+  if (solv->pool->verbose > 3)
+    printf ("*** create install rules ***\n");
   
   for (i = 0; i < job->count; i += 2)
     {
