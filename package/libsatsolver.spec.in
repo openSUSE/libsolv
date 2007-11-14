@@ -6,7 +6,7 @@ Url:            http://svn.opensuse.org/svn/zypp/trunk/sat-solver
 Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          System/Libraries
-BuildRequires:  libexpat-devel db43-devel
+BuildRequires:  libexpat-devel db43-devel cmake
 BuildRequires:  ruby-devel swig
 Requires:       expat db43
 Summary:        A new approach to package dependency solving
