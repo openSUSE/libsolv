@@ -1,7 +1,19 @@
 -------------------------------------------------------------------
 Wed Nov 14 16:10:21 CET 2007 - schubi@suse.de
 
-- further develpment. bugfix, logging, docu,... 
+- further develpment. bugfix, logging, docu,...
+
+-------------------------------------------------------------------
+Mon Nov 12 13:44:52 CET 2007 - coolo@suse.de
+
+- update to the latest version from SVN
+  - compilation fixes
+  - policy engine
+
+-------------------------------------------------------------------
+Thu Nov  8 13:14:20 CET 2007 - coolo@suse.de
+
+- update to the latest version from SVN
 
 -------------------------------------------------------------------
 Tue Oct  2 15:26:36 CEST 2007 - kkaempf@suse.de
