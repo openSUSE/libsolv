@@ -550,15 +550,12 @@ makeruledecisions(Solver *solv)
   Id v, vv;
   int decisionstart;
 
-  /* no learnt rules for now */
-  if (solv->learntrules && solv->learntrules != solv->nrules)
-    abort();
-
   decisionstart = solv->decisionq.count;
-  /* the loop is over jobrules, system rules and weak rules */
+  /* rpm rules don't have assertions, so we can start with the job
+   * rules */
   for (ri = solv->jobrules, r = solv->rules + ri; ri < solv->nrules; ri++, r++)
     {
-      if (!r->w1 || r->w2)
+      if (!r->w1 || r->w2)	/* disabled or no assertion */
 	continue;
       v = r->p;
       vv = v > 0 ? v : -v;
@@ -574,12 +571,19 @@ makeruledecisions(Solver *solv)
       if (v < 0 && solv->decisionmap[vv] < 0)
 	continue;
       /* found a conflict! */
+      if (solv->learntrules && ri >= solv->learntrules)
+        {
+	  /* cannot happen, as this would mean that the problem
+           * was not solvable, so we wouldn't have created the
+           * learnt rule at all */
+	  abort();
+        }
       /* if we are weak, just disable ourself */
       if (ri >= solv->weakrules)
 	{
 	  printf("conflict, but I am weak, disabling ");
 	  printrule(solv, r);
-	  r->w1 = 0;
+	  disablerule(solv, r);
 	  continue;
 	}
       /* only job and system rules left */
@@ -638,6 +642,53 @@ makeruledecisions(Solver *solv)
 	}
       ri = solv->jobrules - 1;
       r = solv->rules + ri;
+    }
+}
+
+/*
+ * we have enabled or disabled some of our rules. We now reenable all
+ * of our learnt rules but the ones that were learnt from rules that
+ * are now disabled.
+ */
+static void
+enabledisablelearntrules(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  Id why, *whyp;
+  int i;
+
+  if (pool->verbose)
+    printf("enabledisablelearntrules called\n");
+  for (i = solv->learntrules, r = solv->rules + i; i < solv->nrules; i++, r++)
+    {
+      whyp = solv->learnt_pool.elements + solv->learnt_why.elements[i - solv->learntrules];
+      while ((why = *whyp++) != 0)
+	{
+	  if (why < 0 || why >= i)
+	    abort();		/* cannot reference newer learnt rules */
+	  if (!solv->rules[why].w1)
+	    break;
+	}
+      /* why != 0: we found a disabled rule, disable the learnt rule */
+      if (why && r->w1)
+	{
+	  if (pool->verbose)
+	    {
+	      printf("disabling learnt ");
+	      printrule(solv, r);
+	    }
+          disablerule(solv, r);
+	}
+      else if (!why && !r->w1)
+	{
+	  if (pool->verbose)
+	    {
+	      printf("re-enabling learnt ");
+	      printrule(solv, r);
+	    }
+          enablerule(solv, r);
+	}
     }
 }
 
@@ -797,7 +848,7 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
     {
       r = solv->rules + solv->systemrules + i;
       if (r->w1 && MAPTST(&solv->noupdate, i))
-	r->w1 = 0;		/* was enabled, need to disable */
+        disablerule(solv, r);	/* was enabled, need to disable */
     }
 }
 
@@ -1307,7 +1358,18 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
   idx = solv->decisionq.count;
   for (;;)
     {
-      if (pool->verbose > 1) printrule(solv, c);
+      if (pool->verbose > 1)
+	{
+	  if (c - solv->rules >= solv->learntrules)
+	    printf("LEARNT ");
+	  else if (c - solv->rules >= solv->weakrules)
+	    printf("WEAK ");
+	  else if (c - solv->rules >= solv->systemrules)
+	    printf("SYSTEM ");
+	  else if (c - solv->rules >= solv->jobrules)
+	    printf("JOB ");
+	  printrule(solv, c);
+	}
       queue_push(&solv->learnt_pool, c - solv->rules);
       dp = c->d ? pool->whatprovidesdata + c->d : 0;
       for (i = -1; ; i++)
@@ -1417,10 +1479,14 @@ reset_solver(Solver *solv)
   int i;
   Id v;
 
+#if 0
   /* delete all learnt rules */
   solv->nrules = solv->learntrules;
   queue_empty(&solv->learnt_why);
   queue_empty(&solv->learnt_pool);
+#else
+  enabledisablelearntrules(solv);
+#endif
 
   /* redo all direct rpm rule decisions */
   /* we break at the first decision with a why attached, this is
@@ -1450,8 +1516,8 @@ reset_solver(Solver *solv)
   /* redo all job/system decisions */
   makeruledecisions(solv);
   if (solv->pool->verbose > 1)
-    printf("decisions after adding job and system rules: %d\n", solv->decisionq.count);
-  /* recreate watches */
+    printf("decisions so far: %d\n", solv->decisionq.count);
+  /* recreate watch chains */
   makewatches(solv);
 }
 
@@ -1612,7 +1678,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       r = solv->rules + lastweak;
       printf("disabling weak ");
       printrule(solv, r);
-      r->w1 = 0;
+      disablerule(solv, r);
       reset_solver(solv);
       return 1;
     }
@@ -1919,9 +1985,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	printrule(solv, solv->rules + i);
     }
 
-  /* all new rules are learnt after this point */
-  solv->learntrules = solv->nrules;
-  /* crate watches lists */
+  /* create watches chains */
   makewatches(solv);
 
   if (pool->verbose) printf("initial decisions: %d\n", solv->decisionq.count);
@@ -3325,6 +3389,9 @@ solve(Solver *solv, Queue *job)
 	    addrule(solv, i, d);
 	  }
     }
+
+  /* all new rules are learnt after this point */
+  solv->learntrules = solv->nrules;
 
   /*
    * solve !
