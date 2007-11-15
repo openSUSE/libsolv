@@ -990,6 +990,9 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	}
     }
   queue_free(&q);
+  if (solv->pool->verbose > 3)
+    printf ("----- addrpmrulesforsolvable end -----\n");
+  
 }
 
 static void
@@ -1038,6 +1041,8 @@ addrpmrulesforweak(Solver *solv, Map *m)
       addrpmrulesforsolvable(solv, s, m);
       n = 0;
     }
+  if (solv->pool->verbose > 3)
+    printf ("----- addrpmrulesforweak end -----\n");  
 }
 
 static void
@@ -1059,6 +1064,10 @@ addrpmrulesforupdaters(Solver *solv, Solvable *s, Map *m, int allowall)
     if (!MAPTST(m, qs.elements[i]))
       addrpmrulesforsolvable(solv, pool->solvables + qs.elements[i], m);
   queue_free(&qs);
+  
+  if (solv->pool->verbose > 3)
+    printf ("----- addrpmrulesforupdaters -----\n");
+  
 }
 
 /*
@@ -1088,6 +1097,8 @@ addupdaterule(Solver *solv, Solvable *s, int allowall)
     d = pool_queuetowhatprovides(pool, &qs);	/* intern computed queue */
   queue_free(&qs);
   addrule(solv, s - pool->solvables, d);	/* allow update of s */
+  if (solv->pool->verbose > 3)
+    printf ("-----  addupdaterule end -----\n");  
 }
 
 
@@ -3271,9 +3282,9 @@ solve(Solver *solv, Queue *job)
       /* we create all update rules, but disable some later on depending on the job */
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
 	if (s->repo == installed)
-	  addupdaterule(solv, s, 0);
+	  addupdaterule(solv, s, 0); /* allowall = 0 */
 	else
-	  addupdaterule(solv, 0, 0);	/* create dummy rule */
+	  addupdaterule(solv, 0, 0);	/* create dummy rule;  allowall = 0  */
       /* consistency check: we added a rule for _every_ system solvable */
       if (solv->nrules - solv->systemrules != installed->end - installed->start)
 	abort();

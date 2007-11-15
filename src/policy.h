@@ -23,4 +23,7 @@ extern void policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode
 
 extern int  policy_illegal_archchange(Pool *pool, Solvable *s1, Solvable *s2);
 extern int  policy_illegal_vendorchange(Pool *pool, Solvable *s1, Solvable *s2);
-extern void policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall);
+extern void policy_findupdatepackages(Solver *solv,
+				      Solvable *s,
+				      Queue *qs,
+				      int allowall); /* do not regard policies for vendor,architecuture,... change */
