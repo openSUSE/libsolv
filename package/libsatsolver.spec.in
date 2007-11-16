@@ -34,13 +34,9 @@ Authors:
 %package ruby
 Summary:        Ruby bindings for sat solver
 Group:          Development/Languages/Ruby
-Authors:
---------
-    Michael Schroeder <mls@suse.de>
-    Klaus Kaempf <kkaempf@suse.de>
 
 %description ruby
--
+.
 
 %prep
 %setup -n satsolver-%{version}

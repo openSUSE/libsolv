@@ -667,9 +667,9 @@ endElement(void *userData, const char *name)
 		    {
 		      char newdep[100];
 		      strcpy(newdep, "kernel(");
-		      strncat(newdep, cflavor, sizeof(newdep));
-		      strncat(newdep, ":", sizeof(newdep));
-		      strncat(newdep, depname + strlen("kernel("), 100);
+		      strncat(newdep, cflavor, sizeof(newdep) - 1);
+		      strncat(newdep, ":", sizeof(newdep) - 1);
+		      strncat(newdep, depname + strlen("kernel("), sizeof(newdep) - 1);
 		      pid = str2id(pool, newdep, 1);
 		      if (prd)
 			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
@@ -704,9 +704,9 @@ endElement(void *userData, const char *name)
 		    {
 		      char newdep[100];
 		      strcpy(newdep, "kernel(");
-		      strncat(newdep, cflavor, sizeof(newdep));
-		      strncat(newdep, ":", sizeof(newdep));
-		      strncat(newdep, depname + strlen("kernel("), 100);
+		      strncat(newdep, cflavor, sizeof(newdep) - 1);
+		      strncat(newdep, ":", sizeof(newdep) - 1);
+		      strncat(newdep, depname + strlen("kernel("), sizeof(newdep) - 1);
 		      pid = str2id(pool, newdep, 1);
 		      if (prd)
 			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
