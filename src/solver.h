@@ -104,7 +104,6 @@ typedef struct solver {
   Id *obsoletes;			/* obsoletes for each installed solvable */
   Id *obsoletes_data;			/* data area for obsoletes */
 
-  int rc_output;			/* output result compatible to redcarpet/zypp testsuite, set == 2 for pure rc (will suppress architecture) */
 } Solver;
 
 /*

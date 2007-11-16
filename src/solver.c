@@ -543,24 +543,8 @@ printproblem(Solver *solv, Id v)
 }
 
 
-static const char *
-id2rc(Solver *solv, Id id)
-{
-  const char *evr;
-  if (solv->rc_output != 2)
-    return "";
-  evr = id2str(solv->pool, id);
-  if (*evr < '0' || *evr > '9')
-    return "0:";
-  while (*evr >= '0' && *evr <= '9')
-    evr++;
-  if (*evr != ':')
-    return "0:";
-  return "";
-}
 
-
-/**********************************************************************************/
+/************************************************************************/
 
 /* go through system and job rules and add direct assertions
  * to the decisionqueue. If we find a conflict, disable rules and
@@ -594,11 +578,11 @@ makeruledecisions(Solver *solv)
 	  solv->decisionmap[vv] = v > 0 ? 1 : -1;
 	  if (solv->pool->verbose > 3)
 	    {
-		Solvable *s = solv->pool->solvables + vv;
-		if (v < 0)
-		    printf("removing  %s-%s%s\n", id2str(solv->pool, s->name), id2rc(solv, s->evr), id2str(solv->pool, s->evr));
-		else
-		    printf("installing  %s-%s%s\n", id2str(solv->pool, s->name), id2rc(solv, s->evr), id2str(solv->pool, s->evr));		    
+	      Solvable *s = solv->pool->solvables + vv;
+	      if (v < 0)
+		printf("removing  %s-%s.%s\n", id2str(solv->pool, s->name), id2str(solv->pool, s->evr), id2str(solv->pool, s->arch));
+	      else
+		printf("installing  %s-%s.%s\n", id2str(solv->pool, s->name), id2str(solv->pool, s->evr), id2str(solv->pool, s->arch));
 	    }
 	  continue;
 	}
@@ -637,7 +621,7 @@ makeruledecisions(Solver *solv)
       if (solv->decisionq_why.elements[i] == 0)
 	{
 	  /* conflict with rpm rule, need only disable our rule */
-	  printf("conflict with rpm rule [%d], disabling rule #%d\n", v, ri);
+	  printf("conflict with rpm rule, disabling rule #%d\n", ri);
 	  if (ri < solv->systemrules)
 	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
 	  queue_push(&solv->problems, v);
@@ -890,7 +874,7 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 /*
  * add (install) rules for solvable
  * for unfulfilled requirements, conflicts, obsoletes,....
- * "unflag" a resolvable if it is not installable via "addrule(solv, -n, 0)"
+ * add a negative assertion for solvables that are not installable
  */
 
 static void
@@ -939,6 +923,13 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	dontfix = 1;		       /* dont care about broken rpm deps */
       }
 
+      if (!dontfix && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC && !pool_installable(pool, s))
+	{
+	  if (pool->verbose)
+	    printf("package %s-%s.%s [%d] is not installable\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (Id)(s - pool->solvables));
+	  addrule(solv, -n, 0);		/* uninstallable */
+	}
+
       /*-----------------------------------------
        * check requires of s
        */
@@ -981,8 +972,6 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  if (pool->verbose)
 		     printf("package %s-%s.%s [%d] is not installable (%s)\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (Id)(s - pool->solvables), dep2str(pool, req));
 		  addrule(solv, -n, 0); /* mark requestor as uninstallable */
-		  if (solv->rc_output)
-		    printf(">!> !unflag %s-%s.%s[%s]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), repo_name(s->repo));
 		  continue;
 		}
 
@@ -1008,6 +997,9 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 	} /* if, requirements */
 
+      /* that's all we check for src packages */
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	continue;
       
       /*-----------------------------------------
        * check conflicts of s
@@ -2020,7 +2012,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 
   if (pool->verbose) printf("initial decisions: %d\n", solv->decisionq.count);
   if (pool->verbose > 3)
-      printdecisions (solv);
+      printdecisions(solv);
 
   /* start SAT algorithm */
   level = 1;
@@ -2639,11 +2631,6 @@ printdecisions(Solver *solv)
 	}
     }
 
-  if (solv->rc_output)
-    printf(">!> Solution #1:\n");
-
-  int installs = 0, uninstalls = 0, upgrades = 0;
-  
   /* print solvables to be erased */
 
   if (installed)
@@ -2657,13 +2644,7 @@ printdecisions(Solver *solv)
 	    continue;
 	  if (obsoletesmap[i])
 	    continue;
-	  if (solv->rc_output == 2)
-	    printf(">!> remove  %s-%s%s\n", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
-	  else if (solv->rc_output)
-	    printf(">!> remove  %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	  else
-	    printf("erase   %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	  uninstalls++;
+	  printf("erase   %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	}
     }
 
@@ -2683,14 +2664,9 @@ printdecisions(Solver *solv)
 
       if (!obsoletesmap[p])
         {
-	  if (solv->rc_output)
-	    printf(">!> ");
-          printf("install %s-%s%s", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
-	  if (solv->rc_output != 2)
-            printf(".%s", id2str(pool, s->arch));
-	  installs++;
+          printf("install %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
         }
-      else if (!solv->rc_output)
+      else
 	{
 	  printf("update  %s-%s.%s  (obsoletes", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	  for (j = installed->start; j < installed->end; j++)
@@ -2701,55 +2677,10 @@ printdecisions(Solver *solv)
 	      printf(" %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	    }
 	  printf(")");
-	  upgrades++;
 	}
-      else
-	{
-	  Solvable *f, *fn = 0;
-	  for (j = installed->start; j < installed->end; j++)
-	    {
-	      if (obsoletesmap[j] != p)
-		continue;
-	      f = pool->solvables + j;
-	      if (fn || f->name != s->name)
-		{
-		  if (solv->rc_output == 2)
-		    printf(">!> remove  %s-%s%s\n", id2str(pool, f->name), id2rc(solv, f->evr), id2str(pool, f->evr));
-		  else if (solv->rc_output)
-		    printf(">!> remove  %s-%s.%s\n", id2str(pool, f->name), id2str(pool, f->evr), id2str(pool, f->arch));
-		  uninstalls++;
-		}
-	      else
-		fn = f;
-	    }
-	  if (!fn)
-	    {
-	      printf(">!> install %s-%s%s", id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
-	      if (solv->rc_output != 2)
-	        printf(".%s", id2str(pool, s->arch));
-	      installs++;
-	    }
-	  else
-	    {
-	      if (solv->rc_output == 2)
-	        printf(">!> upgrade %s-%s => %s-%s%s", id2str(pool, fn->name), id2str(pool, fn->evr), id2str(pool, s->name), id2rc(solv, s->evr), id2str(pool, s->evr));
-	      else
-	        printf(">!> upgrade %s-%s.%s => %s-%s.%s", id2str(pool, fn->name), id2str(pool, fn->evr), id2str(pool, fn->arch), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	      upgrades++;
-	    }
-	}
-      if (solv->rc_output)
-	{
-	  Repo *repo = s->repo;
-	  if (repo && strcmp(repo_name(repo), "locales"))
-	    printf("[%s]", repo_name(repo));
-        }
       printf("\n");
     }
 
-  if (solv->rc_output)
-    printf(">!> installs=%d, upgrades=%d, uninstalls=%d\n", installs, upgrades, uninstalls);
-  
   xfree(obsoletesmap);
 
   if (solv->suggestions.count)
@@ -3118,6 +3049,8 @@ create_obsolete_index(Solver *solv)
   for (i = pool->nsolvables - 1; i > 0; i--)
     {
       s = pool->solvables + i;
+      if (s->repo == installed)
+	continue;
       if (!s->obsoletes)
 	continue;
       if (!pool_installable(pool, s))
@@ -3291,10 +3224,6 @@ solve(Solver *solv, Queue *job)
 	{
 	case SOLVER_INSTALL_SOLVABLE:			/* install specific solvable */
 	  s = pool->solvables + what;
-	  if (solv->rc_output)
-            {
-	      printf(">!> Installing %s from channel %s\n", id2str(pool, s->name), repo_name(s->repo));
-	    }
 	  if (pool->verbose)
 	    printf("job: install solvable %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
           addrule(solv, what, 0);			/* install by Id */
