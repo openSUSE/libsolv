@@ -22,12 +22,13 @@ extern "C" {
 #include "repo.h"
 #include "solvable.h"
 #include "queue.h"
+#include "strpool.h"
 
 // see initpool_data[] in pool.c
 
 /* well known ids */
-#define ID_NULL			0
-#define ID_EMPTY		1
+#define ID_NULL			STRID_NULL
+#define ID_EMPTY		STRID_EMPTY
 #define SOLVABLE_NAME		2
 #define SOLVABLE_ARCH		3
 #define SOLVABLE_EVR		4
@@ -58,19 +59,12 @@ extern "C" {
 /* how many strings to maintain (round robin) */
 #define DEP2STRBUF 16
 
-
 //-----------------------------------------------
 
 struct _Pool {
   int verbose;		// pool is used everywhere, so put the verbose flag here
 
-  Offset *strings;            // table of offsets into stringspace, indexed by Id: Id -> Offset
-  int nstrings;               // number of unique strings in stringspace
-  char *stringspace;          // space for all unique strings: stringspace + Offset = string
-  Offset sstrings;            // next free pos in stringspace
-
-  Hashtable stringhashtbl;    // hash table: (string ->) Hash -> Id
-  Hashmask stringhashmask;    // modulo value for hash table (size of table - 1)
+  struct _Stringpool ss;
 
   Reldep *rels;               // table of rels: Id -> Reldep
   int nrels;                  // number of unique rels
@@ -135,7 +129,7 @@ struct _Pool {
 
 #define MAKERELDEP(id) ((id) | 0x80000000)
 #define ISRELDEP(id) (((id) & 0x80000000) != 0)
-#define GETRELID(pool, id) ((pool)->nstrings + ((id) ^ 0x80000000))     /* returns Id  */
+#define GETRELID(pool, id) ((pool)->ss.nstrings + ((id) ^ 0x80000000))     /* returns Id  */
 #define GETRELDEP(pool, id) ((pool)->rels + ((id) ^ 0x80000000))	/* returns Reldep* */
 
 #define REL_GT		1

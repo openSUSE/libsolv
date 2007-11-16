@@ -207,7 +207,7 @@ repo_write(Repo *repo, FILE *fp)
   nsolvables = 0;
   idarraydata = repo->idarraydata;
 
-  needid = (NeedId *)calloc(pool->nstrings + pool->nrels, sizeof(*needid));
+  needid = (NeedId *)calloc(pool->ss.nstrings + pool->nrels, sizeof(*needid));
 
   memset(idsizes, 0, sizeof(idsizes));
 
@@ -259,20 +259,20 @@ repo_write(Repo *repo, FILE *fp)
     }
 
   needid[0].need = 0;
-  needid[pool->nstrings].need = 0;
-  for (i = 0; i < pool->nstrings + pool->nrels; i++)
+  needid[pool->ss.nstrings].need = 0;
+  for (i = 0; i < pool->ss.nstrings + pool->nrels; i++)
     needid[i].map = i;
 
-  qsort(needid + 1, pool->nstrings - 1, sizeof(*needid), needid_cmp_need);
-  qsort(needid + pool->nstrings, pool->nrels, sizeof(*needid), needid_cmp_need);
+  qsort(needid + 1, pool->ss.nstrings - 1, sizeof(*needid), needid_cmp_need);
+  qsort(needid + pool->ss.nstrings, pool->nrels, sizeof(*needid), needid_cmp_need);
 
   sizeid = 0;
-  for (i = 1; i < pool->nstrings; i++)
+  for (i = 1; i < pool->ss.nstrings; i++)
     {
       if (!needid[i].need)
         break;
       needid[i].need = 0;
-      sizeid += strlen(pool->stringspace + pool->strings[needid[i].map]) + 1;
+      sizeid += strlen(pool->ss.stringspace + pool->ss.strings[needid[i].map]) + 1;
     }
 
   nstrings = i;
@@ -281,16 +281,16 @@ repo_write(Repo *repo, FILE *fp)
 
   for (i = 0; i < pool->nrels; i++)
     {
-      if (!needid[pool->nstrings + i].need)
+      if (!needid[pool->ss.nstrings + i].need)
         break;
       else
-        needid[pool->nstrings + i].need = 0;
+        needid[pool->ss.nstrings + i].need = 0;
     }
 
   nrels = i;
   for (i = 0; i < nrels; i++)
     {
-      needid[needid[pool->nstrings + i].map].need = nstrings + i;
+      needid[needid[pool->ss.nstrings + i].map].need = nstrings + i;
     }
 
   /* write file header */
@@ -308,7 +308,7 @@ repo_write(Repo *repo, FILE *fp)
    */
   for (i = 1; i < nstrings; i++)
     {
-      char *str = pool->stringspace + pool->strings[needid[i].map];
+      char *str = pool->ss.stringspace + pool->ss.strings[needid[i].map];
       if (fwrite(str, strlen(str) + 1, 1, fp) != 1)
 	{
 	  perror("write error");
@@ -321,7 +321,7 @@ repo_write(Repo *repo, FILE *fp)
    */
   for (i = 0; i < nrels; i++)
     {
-      ran = pool->rels + (needid[pool->nstrings + i].map - pool->nstrings);
+      ran = pool->rels + (needid[pool->ss.nstrings + i].map - pool->ss.nstrings);
       write_id(fp, needid[ISRELDEP(ran->name) ? GETRELID(pool, ran->name) : ran->name].need);
       write_id(fp, needid[ISRELDEP(ran->evr) ? GETRELID(pool, ran->evr) : ran->evr].need);
       write_u8( fp, ran->flags);

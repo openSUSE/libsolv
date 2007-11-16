@@ -16,6 +16,9 @@
 /* version number for .solv files */
 #define SOLV_VERSION 0
 
+struct _Stringpool;
+typedef struct _Stringpool Stringpool;
+
 struct _Pool;
 typedef struct _Pool Pool;
 

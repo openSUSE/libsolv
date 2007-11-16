@@ -230,15 +230,15 @@ repo_add_solv(Repo *repo, FILE *fp)
    */
 
   /* alloc string buffer */
-  strsp = (char *)xrealloc(pool->stringspace, pool->sstrings + sizeid + 1);
+  strsp = (char *)xrealloc(pool->ss.stringspace, pool->ss.sstrings + sizeid + 1);
   /* alloc string offsets (Id -> Offset into string space) */
-  str = (Offset *)xrealloc(pool->strings, (pool->nstrings + numid) * sizeof(Offset));
+  str = (Offset *)xrealloc(pool->ss.strings, (pool->ss.nstrings + numid) * sizeof(Offset));
 
-  pool->stringspace = strsp;
-  pool->strings = str;		       /* array of offsets into strsp, indexed by Id */
+  pool->ss.stringspace = strsp;
+  pool->ss.strings = str;		       /* array of offsets into strsp, indexed by Id */
 
   /* point to _BEHIND_ already allocated string/Id space */
-  strsp += pool->sstrings;
+  strsp += pool->ss.sstrings;
 
   /* alloc id map for name and rel Ids. this maps ids in the solv files
    * to the ids in our pool */
@@ -261,7 +261,7 @@ repo_add_solv(Repo *repo, FILE *fp)
    * 
    */
   
-  hashmask = mkmask(pool->nstrings + numid);
+  hashmask = mkmask(pool->ss.nstrings + numid);
 
 #if 0
   printf("read %d strings\n", numid);
@@ -278,9 +278,9 @@ repo_add_solv(Repo *repo, FILE *fp)
    * fill hashtable with strings already in pool
    */
   
-  for (i = 1; i < pool->nstrings; i++)  /* leave out our dummy zero id */
+  for (i = 1; i < pool->ss.nstrings; i++)  /* leave out our dummy zero id */
     {
-      h = strhash(pool->stringspace + pool->strings[i]) & hashmask;
+      h = strhash(pool->ss.stringspace + pool->ss.strings[i]) & hashmask;
       hh = HASHCHAIN_START;
       while (hashtbl[h])
         h = HASHCHAIN_NEXT(h, hh, hashmask);
@@ -315,7 +315,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	  id = hashtbl[h];
 	  if (id == 0)
 	    break;
-	  if (!strcmp(pool->stringspace + pool->strings[id], sp))
+	  if (!strcmp(pool->ss.stringspace + pool->ss.strings[id], sp))
 	    break;		       /* existing string */
 	  h = HASHCHAIN_NEXT(h, hh, hashmask);
 	}
@@ -324,12 +324,12 @@ repo_add_solv(Repo *repo, FILE *fp)
       l = strlen(sp) + 1;
       if (id == ID_NULL)	       /* end of hash chain -> new string */
 	{
-	  id = pool->nstrings++;
+	  id = pool->ss.nstrings++;
 	  hashtbl[h] = id;
-	  str[id] = pool->sstrings;    /* save Offset */
-	  if (sp != pool->stringspace + pool->sstrings)   /* not at end-of-buffer */
-	    memmove(pool->stringspace + pool->sstrings, sp, l);   /* append to pool buffer */
-          pool->sstrings += l;
+	  str[id] = pool->ss.sstrings;    /* save Offset */
+	  if (sp != pool->ss.stringspace + pool->ss.sstrings)   /* not at end-of-buffer */
+	    memmove(pool->ss.stringspace + pool->ss.sstrings, sp, l);   /* append to pool buffer */
+          pool->ss.sstrings += l;
 	}
       idmap[i] = id;		       /* repo relative -> pool relative */
       sp += l;			       /* next string */

@@ -40,7 +40,7 @@ pool_freewhatprovides(Pool *pool)
 // list of string constants, so we can do pointer/Id instead of string comparison
 // index into array matches ID_xxx constants in pool.h
 
-static char *initpool_data[] = {
+static const char *initpool_data[] = {
   "<NULL>",                   // ID_NULL
   "",                         // ID_EMPTY
   "solvable:name",
@@ -64,7 +64,8 @@ static char *initpool_data[] = {
   "system:system",
   "src",
   "nosrc",
-  "noarch"
+  "noarch",
+  0
 };
 
 // create pool
@@ -72,29 +73,12 @@ static char *initpool_data[] = {
 Pool *
 pool_create(void)
 {
-  int count, totalsize = 0;
   Pool *pool;
   Solvable *s;
 
   pool = (Pool *)xcalloc(1, sizeof(*pool));
 
-  // count number and total size of predefined strings
-  for (count = 0; count < sizeof(initpool_data)/sizeof(*initpool_data); count++)
-    totalsize += strlen(initpool_data[count]) + 1;
-
-  // alloc appropriate space
-  pool->stringspace = (char *)xmalloc((totalsize + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  pool->strings = (Offset *)xmalloc(((count + STRING_BLOCK) & ~STRING_BLOCK) * sizeof(Offset));
-
-  // now copy predefined strings into allocated space
-  pool->sstrings = 0;
-  for (count = 0; count < sizeof(initpool_data)/sizeof(*initpool_data); count++)
-    {
-      strcpy(pool->stringspace + pool->sstrings, initpool_data[count]);
-      pool->strings[count] = pool->sstrings;
-      pool->sstrings += strlen(initpool_data[count]) + 1;
-    }
-  pool->nstrings = count;
+  stringpool_init (&pool->ss, initpool_data);
 
   // pre-alloc space for a RelDep
   pool->rels = (Reldep *)xcalloc(1 + REL_BLOCK, sizeof(Reldep));
@@ -124,8 +108,8 @@ pool_free(Pool *pool)
   pool_freeallrepos(pool, 1);
   xfree(pool->id2arch);
   xfree(pool->solvables);
-  xfree(pool->stringspace);
-  xfree(pool->strings);
+  xfree(pool->ss.stringspace);
+  xfree(pool->ss.strings);
   xfree(pool->rels);
   queue_free(&pool->vendormap);
   for (i = 0; i < DEP2STRBUF; i++)
@@ -169,16 +153,16 @@ pool_shrink_whatprovides(Pool *pool)
   Offset o;
   int r;
 
-  if (pool->nstrings < 3)
+  if (pool->ss.nstrings < 3)
     return;
-  sorted = xmalloc2(pool->nstrings, sizeof(Id));
-  for (id = 0; id < pool->nstrings; id++)
+  sorted = xmalloc2(pool->ss.nstrings, sizeof(Id));
+  for (id = 0; id < pool->ss.nstrings; id++)
     sorted[id] = id;
   pool_shrink_whatprovides_sortcmp_data = pool;
-  qsort(sorted + 1, pool->nstrings - 1, sizeof(Id), pool_shrink_whatprovides_sortcmp);
+  qsort(sorted + 1, pool->ss.nstrings - 1, sizeof(Id), pool_shrink_whatprovides_sortcmp);
   last = 0;
   lastid = 0;
-  for (i = 1; i < pool->nstrings; i++)
+  for (i = 1; i < pool->ss.nstrings; i++)
     {
       id = sorted[i];
       o = pool->whatprovides[id];
@@ -207,7 +191,7 @@ pool_shrink_whatprovides(Pool *pool)
     }
   xfree(sorted);
   dp = pool->whatprovidesdata + 2;
-  for (id = 1; id < pool->nstrings; id++)
+  for (id = 1; id < pool->ss.nstrings; id++)
     {
       o = pool->whatprovides[id];
       if (o == 0 || o == 1)
@@ -262,11 +246,11 @@ pool_prepare(Pool *pool)
   if (pool->verbose)
     printf("number of solvables: %d\n", pool->nsolvables);
   if (pool->verbose)
-    printf("number of ids: %d + %d\n", pool->nstrings, pool->nrels);
+    printf("number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
 
   pool_freeidhashes(pool);
   pool_freewhatprovides(pool);
-  num = pool->nstrings + pool->nrels;
+  num = pool->ss.nstrings + pool->nrels;
   whatprovides = (Offset *)xcalloc(num, sizeof(Offset));
 
   /* count providers for each name */

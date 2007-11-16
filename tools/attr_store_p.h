@@ -63,13 +63,7 @@ struct _Attrstore
   unsigned int *mapped;
   unsigned int nmapped, ncanmap;
 
-  Offset *strings;
-  int nstrings;
-  char *stringspace;
-  Offset sstrings;
-  Hashtable stringhashtbl;
-  Hashmask stringhashmask;
-
+  Stringpool ss;
 
   /* A space efficient in memory representation.  It's read-only.  */
   /* flat_attrs[ent2attr[i]] are the attrs for entity i.  */

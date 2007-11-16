@@ -27,83 +27,14 @@
 Id
 str2id(Pool *pool, const char *str, int create)
 {
-  Hashval h;
-  unsigned int hh;
-  Hashmask hashmask;
-  int i, space_needed;
-  Id id;
-  Hashtable hashtbl;
-
-  // check string
-  if (!str)
-    return ID_NULL;
-  if (!*str)
-    return ID_EMPTY;
-
-  hashmask = pool->stringhashmask;
-  hashtbl = pool->stringhashtbl;
-
-  // expand hashtable if needed
-  // 
-  // 
-  if (pool->nstrings * 2 > hashmask)
-    {
-      xfree(hashtbl);
-
-      // realloc hash table
-      pool->stringhashmask = hashmask = mkmask(pool->nstrings + STRING_BLOCK);
-      pool->stringhashtbl = hashtbl = (Hashtable)xcalloc(hashmask + 1, sizeof(Id));
-
-      // rehash all strings into new hashtable
-      for (i = 1; i < pool->nstrings; i++)
-	{
-	  h = strhash(pool->stringspace + pool->strings[i]) & hashmask;
-	  hh = HASHCHAIN_START;
-	  while (hashtbl[h] != ID_NULL)  // follow overflow chain
-	    h = HASHCHAIN_NEXT(h, hh, hashmask);
-	  hashtbl[h] = i;
-	}
-    }
-
-  // compute hash and check for match
-
-  h = strhash(str) & hashmask;
-  hh = HASHCHAIN_START;
-  while ((id = hashtbl[h]) != ID_NULL)  // follow hash overflow chain
-    {
-      // break if string already hashed
-      if(!strcmp(pool->stringspace + pool->strings[id], str))
-	break;
-      h = HASHCHAIN_NEXT(h, hh, hashmask);
-    }
-  if (id || !create)    // exit here if string found
-    return id;
-
-  pool_freewhatprovides(pool);
-
-  // generate next id and save in table
-  id = pool->nstrings++;
-  hashtbl[h] = id;
-
-  // 
-  if ((id & STRING_BLOCK) == 0)
-    pool->strings = xrealloc(pool->strings, ((pool->nstrings + STRING_BLOCK) & ~STRING_BLOCK) * sizeof(Hashval));
-  // 'pointer' into stringspace is Offset of next free pos: sstrings
-  pool->strings[id] = pool->sstrings;
-
-  space_needed = strlen(str) + 1;
-
-  // resize string buffer if needed
-  if (((pool->sstrings + space_needed - 1) | STRINGSPACE_BLOCK) != ((pool->sstrings - 1) | STRINGSPACE_BLOCK))
-    pool->stringspace = xrealloc(pool->stringspace, (pool->sstrings + space_needed + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  // copy new string into buffer
-  memcpy(pool->stringspace + pool->sstrings, str, space_needed);
-  // next free pos is behind new string
-  pool->sstrings += space_needed;
-
+  int old_nstrings = pool->ss.nstrings;
+  Id id = stringpool_str2id (&pool->ss, str, create);
+  /* If we changed the ID->string relations we need to get rid of an
+     eventually existing provides lookup cache.  */
+  if (old_nstrings != pool->ss.nstrings)
+    pool_freewhatprovides(pool);
   return id;
 }
-
 
 Id
 rel2id(Pool *pool, Id name, Id evr, int flags, int create)
@@ -124,7 +55,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   if (pool->nrels * 2 > hashmask)
     {
       xfree(pool->relhashtbl);
-      pool->relhashmask = hashmask = mkmask(pool->nstrings + REL_BLOCK);
+      pool->relhashmask = hashmask = mkmask(pool->ss.nstrings + REL_BLOCK);
       pool->relhashtbl = hashtbl = xcalloc(hashmask + 1, sizeof(Id));
       // rehash all rels into new hashtable
       for (i = 1; i < pool->nrels; i++)
@@ -179,9 +110,9 @@ id2str(Pool *pool, Id id)
       Reldep *rd = GETRELDEP(pool, id);
       if (ISRELDEP(rd->name))
 	return "REL";
-      return pool->stringspace + pool->strings[rd->name];
+      return pool->ss.stringspace + pool->ss.strings[rd->name];
     }
-  return pool->stringspace + pool->strings[id];
+  return pool->ss.stringspace + pool->ss.strings[id];
 }
 
 static const char *rels[] = {
@@ -235,7 +166,7 @@ id2evr(Pool *pool, Id id)
   rd = GETRELDEP(pool, id);
   if (ISRELDEP(rd->evr))
     return "REL";
-  return pool->stringspace + pool->strings[rd->evr];
+  return pool->ss.stringspace + pool->ss.strings[rd->evr];
 }
 
 const char *
@@ -247,7 +178,7 @@ dep2str(Pool *pool, Id id)
   int n, l, ls1, ls2, lsr;
 
   if (!ISRELDEP(id))
-    return pool->stringspace + pool->strings[id];
+    return pool->ss.stringspace + pool->ss.strings[id];
   rd = GETRELDEP(pool, id);
   n = pool->dep2strn;
 
@@ -305,8 +236,7 @@ dep2str(Pool *pool, Id id)
 void
 pool_shrink_strings(Pool *pool)
 {
-  pool->stringspace = (char *)xrealloc(pool->stringspace, (pool->sstrings + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  pool->strings = (Offset *)xrealloc(pool->strings, ((pool->nstrings + STRING_BLOCK) & ~STRING_BLOCK) * sizeof(Offset));
+  stringpool_shrink (&pool->ss);
 }
 
 void
@@ -320,9 +250,9 @@ pool_shrink_rels(Pool *pool)
 void
 pool_freeidhashes(Pool *pool)
 {
-  pool->stringhashtbl = xfree(pool->stringhashtbl);
+  pool->ss.stringhashtbl = xfree(pool->ss.stringhashtbl);
+  pool->ss.stringhashmask = 0;
   pool->relhashtbl = xfree(pool->relhashtbl);
-  pool->stringhashmask = 0;
   pool->relhashmask = 0;
 }
 

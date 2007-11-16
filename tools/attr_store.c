@@ -45,6 +45,11 @@
 Attrstore *
 new_store (Pool *pool)
 {
+  static const char *predef_strings[] = {
+    "<NULL>",
+    "",
+    0
+  };
   Attrstore *s = calloc (1, sizeof (Attrstore));
   s->pool = pool;
   s->nameids = calloc (128, sizeof (s->nameids[0]));
@@ -52,23 +57,7 @@ new_store (Pool *pool)
   s->nameids[0] = 0;
   s->nameids[1] = 1;
 
-  int totalsize = strlen ("<NULL>") + 1 + 1;
-  int count = 2;
-
-  // alloc appropriate space
-  s->stringspace = (char *)xmalloc((totalsize + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  s->strings = (Offset *)xmalloc(((count + STRING_BLOCK) & ~STRING_BLOCK) * sizeof(Offset));
-
-  // now copy predefined strings into allocated space
-  s->sstrings = 0;
-  strcpy (s->stringspace + s->sstrings, "<NULL>");
-  s->strings[0] = s->sstrings;
-  s->sstrings += strlen (s->stringspace + s->strings[0]) + 1;
-  strcpy (s->stringspace + s->sstrings, "");
-  s->strings[1] = s->sstrings;
-  s->sstrings += strlen (s->stringspace + s->strings[1]) + 1;
-
-  s->nstrings = 2;
+  stringpool_init (&s->ss, predef_strings);
 
   return s;
 }
@@ -76,82 +65,13 @@ new_store (Pool *pool)
 LocalId
 str2localid (Attrstore *s, const char *str, int create)
 {
-  Hashval h;
-  unsigned int hh;
-  Hashmask hashmask;
-  int i, space_needed;
-  LocalId id;
-  Hashtable hashtbl;
-
-  // check string
-  if (!str)
-    return LOCALID_NULL;
-  if (!*str)
-    return LOCALID_EMPTY;
-
-  hashmask = s->stringhashmask;
-  hashtbl = s->stringhashtbl;
-
-  // expand hashtable if needed
-  if (s->nstrings * 2 > hashmask)
-    {
-      xfree(hashtbl);
-
-      // realloc hash table
-      s->stringhashmask = hashmask = mkmask(s->nstrings + STRING_BLOCK);
-      s->stringhashtbl = hashtbl = (Hashtable)xcalloc(hashmask + 1, sizeof(Id));
-
-      // rehash all strings into new hashtable
-      for (i = 1; i < s->nstrings; i++)
-	{
-	  h = strhash(s->stringspace + s->strings[i]) & hashmask;
-	  hh = HASHCHAIN_START;
-	  while (hashtbl[h] != 0)
-	    h = HASHCHAIN_NEXT(h, hh, hashmask);
-	  hashtbl[h] = i;
-	}
-    }
-
-  // compute hash and check for match
-
-  h = strhash(str) & hashmask;
-  hh = HASHCHAIN_START;
-  while ((id = hashtbl[h]) != 0)
-    {
-      // break if string already hashed
-      if(!strcmp(s->stringspace + s->strings[id], str))
-	break;
-      h = HASHCHAIN_NEXT(h, hh, hashmask);
-    }
-  if (id || !create)    // exit here if string found
-    return id;
-
-  // generate next id and save in table
-  id = s->nstrings++;
-  hashtbl[h] = id;
-
-  if ((id & STRING_BLOCK) == 0)
-    s->strings = xrealloc(s->strings, ((s->nstrings + STRING_BLOCK) & ~STRING_BLOCK) * sizeof(Hashval));
-  // 'pointer' into stringspace is Offset of next free pos: sstrings
-  s->strings[id] = s->sstrings;
-
-  space_needed = strlen(str) + 1;
-
-  // resize string buffer if needed
-  if (((s->sstrings + space_needed - 1) | STRINGSPACE_BLOCK) != ((s->sstrings - 1) | STRINGSPACE_BLOCK))
-    s->stringspace = xrealloc(s->stringspace, (s->sstrings + space_needed + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  // copy new string into buffer
-  memcpy(s->stringspace + s->sstrings, str, space_needed);
-  // next free pos is behind new string
-  s->sstrings += space_needed;
-
-  return id;
+  return stringpool_str2id (&s->ss, str, create);
 }
 
 const char *
 localid2str(Attrstore *s, LocalId id)
 {
-  return s->stringspace + s->strings[id];
+  return s->ss.stringspace + s->ss.strings[id];
 }
 
 static NameId
@@ -712,10 +632,10 @@ attr_store_pack (Attrstore *s)
 
   /* Remove the hashtable too, it will be build on demand in str2localid
      the next time we call it, which should not happen while in packed mode.  */
-  old_mem += (s->stringhashmask + 1) * sizeof (s->stringhashtbl[0]);
-  free (s->stringhashtbl);
-  s->stringhashtbl = 0;
-  s->stringhashmask = 0;
+  old_mem += (s->ss.stringhashmask + 1) * sizeof (s->ss.stringhashtbl[0]);
+  free (s->ss.stringhashtbl);
+  s->ss.stringhashtbl = 0;
+  s->ss.stringhashmask = 0;
 
   fprintf (stderr, "%d\n", old_mem);
   fprintf (stderr, "%zd\n", s->entries * sizeof(s->ent2attr[0]));
@@ -929,7 +849,7 @@ write_attr_store (FILE *fp, Attrstore *s)
 
   write_u32 (fp, s->entries);
   write_u32 (fp, s->num_nameids);
-  write_u32 (fp, s->nstrings);
+  write_u32 (fp, s->ss.nstrings);
   for (i = 2; i < s->num_nameids; i++)
     {
       const char *str = id2str (s->pool, s->nameids[i]);
@@ -940,11 +860,11 @@ write_attr_store (FILE *fp, Attrstore *s)
 	}
     }
 
-  for (i = 2, local_ssize = 0; i < (unsigned)s->nstrings; i++)
+  for (i = 2, local_ssize = 0; i < (unsigned)s->ss.nstrings; i++)
     local_ssize += strlen (localid2str (s, i)) + 1;
 
   write_u32 (fp, local_ssize);
-  for (i = 2; i < (unsigned)s->nstrings; i++)
+  for (i = 2; i < (unsigned)s->ss.nstrings; i++)
     {
       const char *str = localid2str (s, i);
       if (fwrite(str, strlen(str) + 1, 1, fp) != 1)
@@ -1199,12 +1119,12 @@ attr_store_read (FILE *fp, Pool *pool)
     }
 
   local_ssize = read_u32 (fp);
-  char *strsp = (char *)xrealloc(s->stringspace, s->sstrings + local_ssize + 1);
-  Offset *str = (Offset *)xrealloc(s->strings, (nstrings) * sizeof(Offset));
+  char *strsp = (char *)xrealloc(s->ss.stringspace, s->ss.sstrings + local_ssize + 1);
+  Offset *str = (Offset *)xrealloc(s->ss.strings, (nstrings) * sizeof(Offset));
 
-  s->stringspace = strsp;
-  s->strings = str;
-  strsp += s->sstrings;
+  s->ss.stringspace = strsp;
+  s->ss.strings = str;
+  strsp += s->ss.sstrings;
 
   if (fread(strsp, local_ssize, 1, fp) != 1)
     {
@@ -1216,14 +1136,14 @@ attr_store_read (FILE *fp, Pool *pool)
   /* Don't build hashtable here, it will be built on demand by str2localid
      should we call that.  */
 
-  strsp = s->stringspace;
-  s->nstrings = nstrings;
+  strsp = s->ss.stringspace;
+  s->ss.nstrings = nstrings;
   for (i = 0; i < nstrings; i++)
     {
-      str[i] = strsp - s->stringspace;
+      str[i] = strsp - s->ss.stringspace;
       strsp += strlen (strsp) + 1;
     }
-  s->sstrings = strsp - s->stringspace;
+  s->ss.sstrings = strsp - s->ss.stringspace;
 
   s->entries = nentries;
 
