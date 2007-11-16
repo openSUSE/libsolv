@@ -1233,6 +1233,9 @@ propagate(Solver *solv, int level)
   Id *decisionmap = solv->decisionmap;
   Id *watches = solv->watches + pool->nsolvables;
 
+  if (solv->pool->verbose > 3)
+    printf ("----- propagate -----\n");
+
   while (solv->propagate_index < solv->decisionq.count)
     {
       /* negate because our watches trigger if literal goes FALSE */
@@ -1326,6 +1329,9 @@ propagate(Solver *solv, int level)
 	    }
 	}
     }
+  if (solv->pool->verbose > 3)
+    printf ("----- propagate end-----\n");
+  
   return 0;	/* all is well */
 }
 
@@ -1989,6 +1995,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
   makewatches(solv);
 
   if (pool->verbose) printf("initial decisions: %d\n", solv->decisionq.count);
+  if (pool->verbose > 3)
+      printdecisions (solv);
 
   /* start SAT algorithm */
   level = 1;
@@ -2004,7 +2012,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
       
       if (level == 1)
 	{
-	  if (pool->verbose) printf("propagating (%d %d)...\n", solv->propagate_index, solv->decisionq.count);
+	  if (pool->verbose) printf("propagating (propagate_index: %d;  size decisionq: %d)...\n", solv->propagate_index, solv->decisionq.count);
 	  if ((r = propagate(solv, level)) != 0)
 	    {
 	      if (analyze_unsolvable(solv, r, disablerules))
