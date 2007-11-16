@@ -1,72 +1,68 @@
+
 Name:           libsatsolver
 Version:        @VERSION@
 Release:        1
-License:        BSD
+License:        BSD 3-Clause
 Url:            http://svn.opensuse.org/svn/zypp/trunk/sat-solver
 Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
-Group:          System/Libraries
-BuildRequires:  libexpat-devel db43-devel cmake
-BuildRequires:  ruby-devel swig
-Requires:       expat db43
+Group:          Development/Libraries/C and C++
+BuildRequires:  cmake db43-devel gcc-c++ libexpat-devel ruby-devel swig
 Summary:        A new approach to package dependency solving
 
-
 %description
--
+A new approach to package dependency solving
+
+Authors:
+--------
+    Michael Schroeder <mls@suse.de>
+    Klaus Kaempf <kkaempf@suse.de>
 
 %package devel
 Summary:        A new approach to package dependency solving
-Group:          Development/Libraries
+Group:          Development/Libraries/C and C++
+Requires:       libsatsolver = %version
 
 %description devel
--
+A new approach to package dependency solving
 
-%package ruby
-Summary:        Ruby bindings for sat solver
-Group:          Development/Languages/Ruby
-
-%description ruby
--
+Authors:
+--------
+    Michael Schroeder <mls@suse.de>
+    Klaus Kaempf <kkaempf@suse.de>
 
 %prep
 %setup -n satsolver-%{version}
 
 %build
-mkdir build
-cd build
 cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
       -DLIB=%{_lib} \
       -DCMAKE_VERBOSE_MAKEFILE=TRUE \
       -DCMAKE_C_FLAGS_RELEASE:STRING="%{optflags}" \
       -DCMAKE_CXX_FLAGS_RELEASE:STRING="%{optflags}" \
       -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_SKIP_RPATH=1 \
-      ..
+      -DCMAKE_SKIP_RPATH=1 
 make %{?jobs:-j %jobs}
 
 %install
-cd build
-make install DESTDIR=$RPM_BUILD_ROOT
-#rm -f %{buildroot}%{_libdir}/libsatsolver.la
-
-#%post -p /sbin/ldconfig
-#%postun -p /sbin/ldconfig
+make DESTDIR=$RPM_BUILD_ROOT install
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
 
-#%files
-#%defattr(-,root,root)
+%files
+%defattr(-,root,root)
+%doc LICENSE*
+/usr/bin/*
 
 %files devel
 %defattr(-,root,root)
-%{_libdir}/libsatsolver.a
+%_libdir/libsatsolver.a
 %doc doc/README*
 %doc doc/THEORY
 %doc doc/PLANNING
-%dir %{_includedir}/satsolver
-%{_includedir}/satsolver/*
+%dir /usr/include/satsolver
+/usr/include/satsolver/*
 
 %files ruby
 %defattr(-,root,root,-)
