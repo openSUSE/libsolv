@@ -221,7 +221,7 @@ unifyrules(Solver *solv)
     return;
 
   if (solv->pool->verbose > 3) 
-      printf ("----- unifyrules -----\n");
+    printf ("----- unifyrules -----\n");
 
   /* sort rules first */
   unifyrules_sortcmp_data = solv->pool;
@@ -245,8 +245,8 @@ unifyrules(Solver *solv)
   if (solv->pool->verbose) printf("pruned rules from %d to %d\n", solv->nrules, j);
 
   /* adapt rule buffer */
-  solv->rules = (Rule *)xrealloc(solv->rules, ((solv->nrules + RULES_BLOCK) & ~RULES_BLOCK) * sizeof(Rule));
   solv->nrules = j;
+  solv->rules = (Rule *)xrealloc(solv->rules, ((solv->nrules + RULES_BLOCK) & ~RULES_BLOCK) * sizeof(Rule));
 #if 1
   if (solv->pool->verbose)
     {
@@ -272,7 +272,7 @@ unifyrules(Solver *solv)
     }
 #endif
   if (solv->pool->verbose > 3) 
-      printf ("----- unifyrules end -----\n");  
+    printf ("----- unifyrules end -----\n");  
 }
 
 #if 0
@@ -560,7 +560,7 @@ makeruledecisions(Solver *solv)
   int decisionstart;
 
   if (solv->pool->verbose > 3)
-      printf ("----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
+    printf ("----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
   
   decisionstart = solv->decisionq.count;
   /* rpm rules don't have assertions, so we can start with the job
@@ -660,7 +660,7 @@ makeruledecisions(Solver *solv)
     }
   
   if (solv->pool->verbose > 3) 
-      printf ("----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
+    printf ("----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
 }
 
 /*
@@ -2012,7 +2012,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 
   if (pool->verbose) printf("initial decisions: %d\n", solv->decisionq.count);
   if (pool->verbose > 3)
-      printdecisions(solv);
+    printdecisions(solv);
 
   /* start SAT algorithm */
   level = 1;
@@ -3205,14 +3205,14 @@ solve(Solver *solv, Queue *job)
 
   if (pool->verbose) printf("decisions so far: %d\n", solv->decisionq.count);
   if (pool->verbose > 3)
-      printdecisions (solv);
+    printdecisions (solv);
 
   /*
    * now add all job rules
    */
 
   if (solv->pool->verbose > 3)
-      printf ("*** Add JOB rules ***\n");  
+    printf ("*** Add JOB rules ***\n");  
   
   solv->jobrules = solv->nrules;
 
@@ -3298,7 +3298,7 @@ solve(Solver *solv, Queue *job)
    */
 
  if (solv->pool->verbose > 3)
-     printf ("*** Add system rules ***\n");
+   printf ("*** Add system rules ***\n");
   
   
   solv->systemrules = solv->nrules;
