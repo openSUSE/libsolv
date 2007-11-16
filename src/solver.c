@@ -565,6 +565,7 @@ id2rc(Solver *solv, Id id)
 /* go through system and job rules and add direct assertions
  * to the decisionqueue. If we find a conflict, disable rules and
  * add them to problem queue.
+ * (disablerules is always true for the cases when we get called)
  */
 static void
 makeruledecisions(Solver *solv)
@@ -606,7 +607,7 @@ makeruledecisions(Solver *solv)
       if (v < 0 && solv->decisionmap[vv] < 0)
 	continue;
       /* found a conflict! */
-      if (solv->learntrules && ri >= solv->learntrules)
+      if (ri >= solv->learntrules)
         {
 	  /* cannot happen, as this would mean that the problem
            * was not solvable, so we wouldn't have created the
@@ -621,6 +622,12 @@ makeruledecisions(Solver *solv)
 	  disablerule(solv, r);
 	  continue;
 	}
+
+      /* record proof */
+      queue_push(&solv->problems, solv->learnt_pool.count);
+      queue_push(&solv->learnt_pool, ri);
+      queue_push(&solv->learnt_pool, 0);
+
       /* only job and system rules left */
       for (i = 0; i < solv->decisionq.count; i++)
 	if (solv->decisionq.elements[i] == -v)
@@ -630,15 +637,7 @@ makeruledecisions(Solver *solv)
       if (solv->decisionq_why.elements[i] == 0)
 	{
 	  /* conflict with rpm rule, need only disable our rule */
-	  printf("conflict with rpm rule, disabling rule #%d\n", ri);
-	  if (v < 0 && v != -SYSTEMSOLVABLE)
-	    abort();
-	  queue_push(&solv->problems, 0);
-          if (v == -SYSTEMSOLVABLE)
-	    queue_push(&solv->problems, 0);	/* sigh, we don't have a rule for that */
-	  else
-	    queue_push(&solv->problems, -v);	/* sigh, we don't have a rule for that */
-	  v = ri;
+	  printf("conflict with rpm rule [%d], disabling rule #%d\n", v, ri);
 	  if (ri < solv->systemrules)
 	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
 	  queue_push(&solv->problems, v);
@@ -647,10 +646,7 @@ makeruledecisions(Solver *solv)
 	  continue;
 	}
       /* conflict with another job or system rule */
-      /* remove old decision */
       printf("conflicting system/job rules over literal %d\n", vv);
-      queue_push(&solv->problems, 0);
-      queue_push(&solv->problems, solv->decisionq_why.elements[i]);
       /* push all of our rules asserting this literal on the problem stack */
       for (i = solv->jobrules, rr = solv->rules + i; i < solv->nrules; i++, rr++)
 	{
@@ -1311,6 +1307,8 @@ propagate(Solver *solv, int level)
           if (r->d)
 	    {
 	      /* not a binary clause, check if we need to move our watch */
+	      /* search for a literal that is not ow and not false */
+	      /* (true is also ok, in that case the rule is fulfilled) */
 	      if (r->p && r->p != ow && !DECISIONMAP_TRUE(-r->p))
 		p = r->p;
 	      else
@@ -1523,14 +1521,7 @@ reset_solver(Solver *solv)
   int i;
   Id v;
 
-#if 0
-  /* delete all learnt rules */
-  solv->nrules = solv->learntrules;
-  queue_empty(&solv->learnt_why);
-  queue_empty(&solv->learnt_pool);
-#else
   enabledisablelearntrules(solv);
-#endif
 
   /* redo all direct rpm rule decisions */
   /* we break at the first decision with a why attached, this is
@@ -1635,8 +1626,9 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
     printf("ANALYZE UNSOLVABLE ----------------------\n");
   oldproblemcount = solv->problems.count;
 
-  /* make room for conflicting rule */
-  queue_push(&solv->problems, 0);
+  /* make room for proof index */
+  /* must update it later, as analyze_unsolvable_rule would confuse
+   * it with a rule index if we put the real value in already */
   queue_push(&solv->problems, 0);
 
   r = cr;
@@ -1706,7 +1698,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   lastweak = 0;
   if (solv->weakrules != solv->learntrules)
     {
-      for (i = oldproblemcount + 2; i < solv->problems.count - 1; i++)
+      for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
 	{
 	  why = solv->problems.elements[i];
 	  if (why < solv->weakrules || why >= solv->learntrules)
@@ -1727,20 +1719,14 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       return 1;
     }
 
-  /* patch conflicting rule data */
-  if (cr - solv->rules >= solv->learntrules)
-    {
-      /* we have to store the rule internals for learnt rules
-       * as they get freed for every solver run */
-      solv->problems.elements[oldproblemcount] = cr->p;
-      solv->problems.elements[oldproblemcount + 1] = cr->d;
-    }
-  else
-    solv->problems.elements[oldproblemcount + 1] = cr - solv->rules;
+  /* record proof */
+  solv->problems.elements[oldproblemcount] = solv->learnt_pool.count;
+  queue_push(&solv->learnt_pool, cr - solv->rules);
+  queue_push(&solv->learnt_pool, 0);
 
   if (disablerules)
     {
-      for (i = oldproblemcount + 2; i < solv->problems.count - 1; i++)
+      for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
         disableproblem(solv, solv->problems.elements[i]);
       reset_solver(solv);
       return 1;
@@ -2431,6 +2417,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
       queue_empty(&solv->problems);
       revert(solv, 1);		/* XXX move to reset_solver? */
       reset_solver(solv);
+
       run_solver(solv, 0, 0);
       if (!solv->problems.count)
 	{
@@ -2441,11 +2428,13 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	  break;		/* great, no more problems */
 	}
       disabledcnt = disabled.count;
-      /* skip over problem rule */
-      for (i = 2; i < solv->problems.count - 1; i++)
+      /* skip over proof index */
+      for (i = 1; i < solv->problems.count - 1; i++)
 	{
 	  /* ignore solutions in refined */
           v = solv->problems.elements[i];
+	  if (v == 0)
+	    break;	/* end of problem reached */
 	  for (j = 0; problem[j]; j++)
 	    if (problem[j] != sug && problem[j] == v)
 	      break;
@@ -2511,11 +2500,10 @@ problems_to_solutions(Solver *solv, Queue *job)
   queue_clone(&problems, &solv->problems);
   queue_init(&solution);
   queue_init(&solutions);
-  /* copy over problem rule */
+  /* copy over proof index */
   queue_push(&solutions, problems.elements[0]);
-  queue_push(&solutions, problems.elements[1]);
-  problem = problems.elements + 2;
-  for (i = 2; i < problems.count; i++)
+  problem = problems.elements + 1;
+  for (i = 1; i < problems.count; i++)
     {
       Id v = problems.elements[i];
       if (v == 0)
@@ -2525,10 +2513,9 @@ problems_to_solutions(Solver *solv, Queue *job)
 	  queue_push(&solutions, 0);
 	  if (i + 1 == problems.count)
 	    break;
-	  /* copy over problem rule of next problem */
+	  /* copy over proof of next problem */
           queue_push(&solutions, problems.elements[i + 1]);
-          queue_push(&solutions, problems.elements[i + 2]);
-	  i += 2;
+	  i++;
 	  problem = problems.elements + i + 1;
 	  continue;
 	}
@@ -2816,48 +2803,63 @@ printconflicts(Solver *solv, Solvable *s, Id pc)
 }
 
 void
-printprobleminfo(Solver *solv, Id p, Id d, Queue *job, Id firstp, Id firstrp)
+printprobleminfo(Solver *solv, Queue *job, Id idx)
 {
   Pool *pool = solv->pool;
   Rule *r;
   Solvable *s;
-  Id what;
+  Id p, d, rn;
 
-  if (p != 0)
+  rn = solv->learnt_pool.elements[idx];
+  if (rn < 0)
     {
-      /* learnt rule, ignore for now */
-      printf("some learnt rule...\n");
-      return;
+      p = rn;		/* fake a negative assertion rule */
+      r = 0;
     }
-  if (d == 0)
+  else
     {
-      /* conflict with system solvable, i.e. could not create rule */
-      if (firstp)
-	{
-	  printf("got firstp\n");
-	  abort();
-	}
-      what = job->elements[firstrp];
-      switch (job->elements[firstrp - 1])
-	{
-	case SOLVER_INSTALL_SOLVABLE_NAME:
-	  printf("no solvable exists with name %s\n", dep2str(pool, what));
-	  break;
-	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
-	  printf("no solvable provides %s\n", dep2str(pool, what));
-	  break;
-	default:
-	  printf("unknown  job\n");
-	  abort();
-	}
-      return;
+      r = solv->rules + rn;
+      p = r->p;
     }
-  else if (d < 0)
+
+  if (!r || r->w2 == 0)
     {
       Id req, *reqp, *dp;
       int count = 0;
-      /* conflict with rpm rule, package -d is not installable */
-      s = pool->solvables + (-d);
+
+      /* assertions */
+      if (p == -SYSTEMSOLVABLE)
+	{
+          Id ji, what;
+
+	  /* we tried to deinstall the system solvable. must be a job. */
+	  if (rn < solv->jobrules || rn >= solv->systemrules)
+	    abort();
+	  ji = solv->ruletojob.elements[rn - solv->jobrules];
+	  what = job->elements[ji + 1];
+	  switch (job->elements[ji])
+	    {
+	    case SOLVER_INSTALL_SOLVABLE_NAME:
+	      printf("no solvable exists with name %s\n", dep2str(pool, what));
+	      break;
+	    case SOLVER_INSTALL_SOLVABLE_PROVIDES:
+	      printf("no solvable provides %s\n", dep2str(pool, what));
+	      break;
+	    default:
+	      printf("unknown  job\n");
+	      abort();
+	    }
+	  return;
+	}
+      if (rn >= solv->jobrules)
+	{
+	  printrule(solv, r);
+	  return;
+	}
+      if (p >= 0)
+	abort();
+      /* negative assertion, i.e. package is not installable */
+      s = pool->solvables + (-p);
       if (s->requires)
 	{
 	  reqp = s->repo->idarraydata + s->requires;
@@ -2876,28 +2878,33 @@ printprobleminfo(Solver *solv, Id p, Id d, Queue *job, Id firstp, Id firstrp)
         printf("package %s-%s.%s is not installable\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
       return;
     }
-  if (d >= solv->jobrules)
+
+  if (rn >= solv->learntrules)
     {
-      r = solv->rules + d;
-      p = r->p;
-      d = r->d;
-      if (p < 0 && d < 0)
-	{
-	  Solvable *sp, *sd;
-	  sp = pool->solvables + (-p);
-	  sd = pool->solvables + (-d);
-	  printf("package %s-%s.%s cannot be installed with package %s-%s.%s\n", id2str(pool, sp->name), id2str(pool, sp->evr), id2str(pool, sp->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
-	  return;
-	}
+      /* learnt rule, ignore for now */
+      printf("some learnt rule...\n");
+      printrule(solv, r);
+      return;
+    }
+  if (rn >= solv->systemrules)
+    {
+      /* system rule, ignore for now */
+      printf("some system rule...\n");
+      printrule(solv, r);
+      return;
+    }
+  if (rn >= solv->jobrules)
+    {
+      /* job rule, ignore for now */
       printf("some job rule...\n");
       printrule(solv, r);
       return;
     }
-  r = solv->rules + d;
+  /* only rpm rules left... */
   p = r->p;
+  d = r->d;
   if (p >= 0)
     abort();
-  d = r->d;
   if (d == 0 && r->w2 < 0)
     {
       Solvable *sp, *sd;
@@ -2948,7 +2955,7 @@ printsolutions(Solver *solv, Queue *job)
   Pool *pool = solv->pool;
   int pcnt;
   int i;
-  Id p, d, rp, what;
+  Id p, rp, what;
   Solvable *s, *sd;
 
   printf("Encountered problems! Here are the solutions:\n\n");
@@ -2957,9 +2964,7 @@ printsolutions(Solver *solv, Queue *job)
     {
       printf("Problem %d:\n", pcnt++);
       printf("====================================\n");
-      p = solv->problems.elements[i++];
-      d = solv->problems.elements[i++];
-      printprobleminfo(solv, p, d, job, solv->problems.elements[i], solv->problems.elements[i + 1]);
+      printprobleminfo(solv, job, solv->problems.elements[i++]);
       printf("\n");
       for (;;)
         {
