@@ -17,8 +17,6 @@
 #include "util.h"
 #include "repo_content.h"
 
-#define PACK_BLOCK 16
-
 static int
 split(char *l, char **sp, int m)
 {
@@ -167,7 +165,7 @@ repo_add_content(Repo *repo, FILE *fp)
   char *line, *linep;
   int aline;
   Solvable *s;
-  int pack;
+  Id id;
   struct parsedata pd;
 
   memset(&pd, 0, sizeof(pd));
@@ -176,12 +174,7 @@ repo_add_content(Repo *repo, FILE *fp)
 
   pd.repo = repo;
   linep = line;
-  pack = 0;
   s = 0;
-
-  if (!repo->start || repo->start == repo->end)
-    repo->start = pool->nsolvables;
-  repo->end = pool->nsolvables;
 
   for (;;)
     {
@@ -217,21 +210,18 @@ repo_add_content(Repo *repo, FILE *fp)
 #define istag(x) !strcmp (key, x)
 	  if (istag ("PRODUCT"))
 	    {
+	      /* finish old solvable */
 	      if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 		s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 	      if (s)
 		s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
 	      /* Only support one product.  */
 	      pd.kind = "product";
-	      if ((pack & PACK_BLOCK) == 0)
-		{
-		  pool->solvables = realloc(pool->solvables, (pool->nsolvables + pack + PACK_BLOCK + 1) * sizeof(Solvable));
-		  memset(pool->solvables + pool->nsolvables + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
-		}
-	      s = pool->solvables + pool->nsolvables + pack;
+	      id = repo_add_solvable(repo);
+	      s = pool->solvables + id;
 	      s->repo = repo;
+	      repo->nsolvables++;
 	      s->name = str2id(pool, join(&pd, pd.kind, ":", value), 1);
-	      pack++;
 	    }
 	  else if (istag ("VERSION"))
 	    /* without a release? but that's like zypp implements it */
@@ -278,9 +268,6 @@ repo_add_content(Repo *repo, FILE *fp)
   if (s)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
     
-  pool->nsolvables += pack;
-  repo->nsolvables += pack;
-  repo->end += pack;
   if (pd.tmp)
     free(pd.tmp);
   free(line);

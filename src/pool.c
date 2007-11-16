@@ -24,6 +24,7 @@
 #include "util.h"
 #include "evr.h"
 
+#define SOLVABLE_BLOCK	255
 
 // reset all whatprovides
 // 
@@ -85,7 +86,7 @@ pool_create(void)
   pool->nrels = 1;
 
   // pre-alloc space for a Solvable
-  pool->solvables = (Solvable *)xcalloc(2, sizeof(Solvable));
+  pool->solvables = (Solvable *)xcalloc(SOLVABLE_BLOCK + 1, sizeof(Solvable));
   pool->nsolvables = 2;
   queue_init(&pool->vendormap);
   s = pool->solvables + SYSTEMSOLVABLE;
@@ -117,6 +118,41 @@ pool_free(Pool *pool)
   xfree(pool);
 }
 
+Id
+pool_add_solvable(Pool *pool)
+{
+  if ((pool->nsolvables & SOLVABLE_BLOCK) == 0)
+    pool->solvables = xrealloc2(pool->solvables, pool->nsolvables + (SOLVABLE_BLOCK + 1), sizeof(Solvable));
+  memset(pool->solvables + pool->nsolvables, 0, sizeof(Solvable));
+  return pool->nsolvables++;
+}
+
+Id
+pool_add_solvable_block(Pool *pool, int count)
+{
+  Id nsolvables = pool->nsolvables;
+  if (!count)
+    return nsolvables;
+  if (((nsolvables - 1) | SOLVABLE_BLOCK) != ((nsolvables + count - 1) | SOLVABLE_BLOCK))
+    pool->solvables = xrealloc2(pool->solvables, (nsolvables + count + SOLVABLE_BLOCK) & ~SOLVABLE_BLOCK, sizeof(Solvable));
+  memset(pool->solvables + nsolvables, 0, sizeof(Solvable) * count);
+  pool->nsolvables += count;
+  return nsolvables;
+}
+
+void
+pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids)
+{
+  if (!count)
+    return;
+  if (reuseids && start + count == pool->nsolvables)
+    {
+      /* might want to shrink solvable array */
+      pool->nsolvables = start;
+      return;
+    }
+  memset(pool->solvables + start, 0, sizeof(Solvable) * count);
+}
 
 static Pool *pool_shrink_whatprovides_sortcmp_data;
 

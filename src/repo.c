@@ -293,13 +293,10 @@ pool_freeallrepos(Pool *pool, int reuseids)
   pool_freewhatprovides(pool);
   for (i = 0; i < pool->nrepos; i++)
     repo_freedata(pool->repos[i]);
-  /* the first two solvables don't belong to a repo */
-  if (pool->nsolvables > 2 && !reuseids)
-    memset(pool->solvables + 2, 0, (pool->nsolvables - 2) * sizeof(Solvable));
   pool->repos = xfree(pool->repos);
   pool->nrepos = 0;
-  if (reuseids)
-    pool->nsolvables = 2;
+  /* the first two solvables don't belong to a repo */
+  pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
 }
 
 Offset

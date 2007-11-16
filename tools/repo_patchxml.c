@@ -46,8 +46,6 @@ enum state {
   NUMSTATES
 };
 
-#define PACK_BLOCK 255
-
 
 struct stateswitch {
   enum state from;
@@ -99,10 +97,9 @@ struct parsedata {
   int lcontent;
   int acontent;
   int docontent;
-  int pack;
   Pool *pool;
   Repo *repo;
-  Solvable *start;
+  Solvable *solvable;
   char *kind;
 
   struct stateswitch *swtab[NUMSTATES];
@@ -243,8 +240,9 @@ startElement(void *userData, const char *name, const char **atts)
 {
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
-  Solvable *s = pd->start ? pd->start + pd->pack : 0;
+  Solvable *s = pd->solvable;
   struct stateswitch *sw;
+  Id id;
 
   if (pd->depth != pd->statedepth)
     {
@@ -290,24 +288,20 @@ startElement(void *userData, const char *name, const char **atts)
 	  if (pd->kind && !strcmp(pd->kind, "patch"))
 	    {
 	      s->repo = pd->repo;
+	      pd->repo->nsolvables++;
 	      if (!s->arch)
 		s->arch = ARCH_NOARCH;
 	      s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-	      pd->pack++;
 	    }
 	  pd->kind = "atom";
 	  pd->state = STATE_PATCH;
 	}
       else
         pd->kind = "patch";
-      if ((pd->pack & PACK_BLOCK) == 0)
-        {
-          pool->solvables = realloc(pool->solvables, (pool->nsolvables + pd->pack + PACK_BLOCK + 1) * sizeof(Solvable));
-          pd->start = pool->solvables + pool->nsolvables;
-          memset(pd->start + pd->pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
-        }
+      id = repo_add_solvable(pd->repo);
+      pd->solvable = pool->solvables + id;
 #if 0
-      fprintf(stderr, "package #%d\n", pd->pack);
+      fprintf(stderr, "package #%d\n", id);
 #endif
       break;
     case STATE_VERSION:
@@ -377,7 +371,7 @@ endElement(void *userData, const char *name)
 {
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
-  Solvable *s = pd->start ? pd->start + pd->pack : 0;
+  Solvable *s = pd->solvable;
 
   if (pd->depth != pd->statedepth)
     {
@@ -397,12 +391,12 @@ endElement(void *userData, const char *name)
       if (!strcmp(name, "patch") && strcmp(pd->kind, "patch"))
 	break;	/* already closed */
       s->repo = pd->repo;
+      pd->repo->nsolvables++;
       if (!s->arch)
 	s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
-      pd->pack++;
       break;
     case STATE_NAME:
       s->name = str2id(pool, pd->content, 1);
@@ -452,12 +446,6 @@ repo_add_patchxml(Repo *repo, FILE *fp)
   int i, l;
   struct stateswitch *sw;
 
-  if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
-    abort();
-  if (!repo->start || repo->start == repo->end)
-    repo->start = pool->nsolvables;
-  repo->end = pool->nsolvables;
-
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
     {
@@ -486,10 +474,6 @@ repo_add_patchxml(Repo *repo, FILE *fp)
 	break;
     }
   XML_ParserFree(parser);
-
-  pool->nsolvables += pd.pack;
-  repo->nsolvables += pd.pack;
-  repo->end += pd.pack;
 
   free(pd.content);
 }

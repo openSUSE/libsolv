@@ -16,8 +16,6 @@
 #include "attr_store.h"
 #include "repo_susetags.h"
 
-#define PACK_BLOCK 255
-
 static int
 split(char *l, char **sp, int m)
 {
@@ -150,12 +148,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   int pack;
   char *sp[5];
   struct parsedata pd;
+  Id id;
 
-  if (!repo->start || repo->start == repo->end)
-    repo->start = pool->nsolvables;
-  repo->end = pool->nsolvables;
-
-  attr = new_store (pool);
+  if (with_attr)
+    attr = new_store(pool);
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
   aline = 1024;
@@ -240,13 +236,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  pd.kind = 0;
 	  if (line[3] == 't')
 	    pd.kind = "pattern";
-	  if ((pack & PACK_BLOCK) == 0)
-	    {
-	      pool->solvables = realloc(pool->solvables, (pool->nsolvables + pack + PACK_BLOCK + 1) * sizeof(Solvable));
-	      memset(pool->solvables + pool->nsolvables + pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
-	    }
-	  s = pool->solvables + pool->nsolvables + pack;
+	  id = repo_add_solvable(repo);
+	  s = pool->solvables + id;
 	  s->repo = repo;
+	  repo->nsolvables++;
 	  last_found_pack = pack;
 	  pack++;
           if (split(line + 5, sp, 5) != 4)
@@ -427,9 +420,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   if (s)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
     
-  pool->nsolvables += pack;
-  repo->nsolvables += pack;
-  repo->end += pack;
   if (pd.tmp)
     free(pd.tmp);
   free(line);

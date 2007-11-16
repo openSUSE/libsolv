@@ -73,8 +73,6 @@ enum state {
   NUMSTATES
 };
 
-#define PACK_BLOCK 255
-
 struct stateswitch {
   enum state from;
   char *ename;
@@ -142,11 +140,9 @@ typedef struct _parsedata {
   int docontent;	// handle content
 
   // repo data
-  int pack;             // number of solvables
-
   Pool *pool;		// current pool
-  Repo *repo;	// current repo
-  Solvable *start;      // collected solvables
+  Repo *repo;		// current repo
+  Solvable *solvable;	// current solvable
 
   // package data
   int  epoch;		// epoch (as offset into evrspace)
@@ -379,7 +375,8 @@ startElement(void *userData, const char *name, const char **atts)
   Parsedata *pd = (Parsedata *)userData;
   struct stateswitch *sw;
   Pool *pool = pd->pool;
-  Solvable *s = pd->start ? pd->start + pd->pack : 0;
+  Solvable *s = pd->solvable;
+  Id id;
 
   if (pd->depth != pd->statedepth)
     {
@@ -433,20 +430,9 @@ startElement(void *userData, const char *name, const char **atts)
 	}
       break;
 
-    case STATE_SUBCHANNEL:
-      pd->pack = 0;
-      break;
-
-
     case STATE_PACKAGE:		       /* solvable name */
-
-      if ((pd->pack & PACK_BLOCK) == 0)  /* alloc new block ? */
-	{
-	  pool->solvables = (Solvable *)realloc(pool->solvables, (pool->nsolvables + pd->pack + PACK_BLOCK + 1) * sizeof(Solvable));
-	  pd->start = pool->solvables + pool->nsolvables;
-          memset(pd->start + pd->pack, 0, (PACK_BLOCK + 1) * sizeof(Solvable));
-	}
-
+      id = repo_add_solvable(pd->repo);
+      pd->solvable = pool->solvables + id;
       if (!strcmp(name, "selection"))
         pd->kind = "selection";
       else if (!strcmp(name, "pattern"))
@@ -464,7 +450,7 @@ startElement(void *userData, const char *name, const char **atts)
       pd->version = 0;
       pd->release = 0;
 #if 0
-      fprintf(stderr, "package #%d\n", pd->pack);
+      fprintf(stderr, "package #%d\n", id);
 #endif
       break;
 
@@ -558,9 +544,6 @@ static const char* findKernelFlavor(Parsedata *pd, Solvable *s)
 	}
     }
 
-  //fprintf(stderr, "pack %d\n", pd->pack);
-  //fprintf(stderr, "repo %d\n", s->requires);
-
   if (!s->requires)
     return 0;
 
@@ -599,7 +582,7 @@ endElement(void *userData, const char *name)
 {
   Parsedata *pd = (Parsedata *)userData;
   Pool *pool = pd->pool;
-  Solvable *s = pd->start ? pd->start + pd->pack : NULL;
+  Solvable *s = pd->solvable;
   Id evr;
 
   if (pd->depth != pd->statedepth)
@@ -620,6 +603,7 @@ endElement(void *userData, const char *name)
 
     case STATE_PACKAGE:		       /* package complete */
       s->repo = pd->repo;
+      pd->repo->nsolvables++;
 
       if (!s->arch)                    /* default to "noarch" */
 	s->arch = ARCH_NOARCH;
@@ -718,9 +702,6 @@ endElement(void *userData, const char *name)
 #endif
 	  free(cflavor);
 	}
-
-      pd->pack++;		       /* inc pack count */
-
       break;
     case STATE_NAME:
       s->name = str2id(pool, pd->content, 1);
@@ -826,12 +807,6 @@ repo_add_helix(Repo *repo, FILE *fp)
   int i, l;
   struct stateswitch *sw;
 
-  if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
-    abort();
-  if (!repo->start || repo->start == repo->end)
-    repo->start = pool->nsolvables;
-  repo->end = pool->nsolvables;
-
   /* prepare parsedata */
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
@@ -872,11 +847,6 @@ repo_add_helix(Repo *repo, FILE *fp)
 	break;
     }
   XML_ParserFree(parser);
-
-  // adapt package count
-  pool->nsolvables += pd.pack;
-  repo->nsolvables += pd.pack;
-  repo->end += pd.pack;
 
   free(pd.content);
   free(pd.evrspace);

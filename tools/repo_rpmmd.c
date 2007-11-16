@@ -96,10 +96,9 @@ struct parsedata {
   int acontent;
   int docontent;
   int numpacks;
-  int pack;
   Pool *pool;
   Repo *repo;
-  Solvable *start;
+  Solvable *solvable;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
 };
@@ -238,8 +237,9 @@ startElement(void *userData, const char *name, const char **atts)
 {
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
-  Solvable *s = pd->start ? pd->start + pd->pack : 0;
+  Solvable *s = pd->solvable;
   struct stateswitch *sw;
+  Id id;
 
   if (pd->depth != pd->statedepth)
     {
@@ -270,23 +270,26 @@ startElement(void *userData, const char *name, const char **atts)
 	  if (!strcmp(*atts, "packages"))
 	    {
 	      pd->numpacks = atoi(atts[1]);
+	      if (pd->numpacks < 0)
+		pd->numpacks = 0;
 #if 0
 	      fprintf(stderr, "numpacks: %d\n", pd->numpacks);
 #endif
-	      pool->solvables = xrealloc2(pool->solvables, (pool->nsolvables + pd->numpacks), sizeof(Solvable));
-	      pd->start = pool->solvables + pool->nsolvables;
-	      memset(pd->start, 0, pd->numpacks * sizeof(Solvable));
+	      id = repo_add_solvable_block(pd->repo, pd->numpacks);
+	      pd->solvable = pool->solvables + id;
 	    }
 	}
       break;
     case STATE_PACKAGE:
-      if (pd->pack >= pd->numpacks)
+      if (pd->numpacks > 0)
+	pd->numpacks--;
+      else
 	{
-	  fprintf(stderr, "repomd lied about the package number\n");
-	  exit(1);
+	  id = repo_add_solvable(pd->repo);
+	  pd->solvable = pool->solvables + id;
 	}
 #if 0
-      fprintf(stderr, "package #%d\n", pd->pack);
+      fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
       break;
     case STATE_VERSION:
@@ -356,7 +359,7 @@ endElement(void *userData, const char *name)
 {
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
-  Solvable *s = pd->start ? pd->start + pd->pack : 0;
+  Solvable *s = pd->solvable;
   Id id;
 
   if (pd->depth != pd->statedepth)
@@ -371,12 +374,13 @@ endElement(void *userData, const char *name)
     {
     case STATE_PACKAGE:
       s->repo = pd->repo;
+      pd->repo->nsolvables++;
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
-      pd->pack++;
+      pd->solvable++;
       break;
     case STATE_NAME:
       s->name = str2id(pool, pd->content, 1);
@@ -433,10 +437,6 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
   int i, l;
   struct stateswitch *sw;
 
-  if (!repo->start || repo->start == repo->end)
-    repo->start = pool->nsolvables;
-  repo->end = pool->nsolvables;
-
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
     {
@@ -465,10 +465,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
 	break;
     }
   XML_ParserFree(parser);
-
-  pool->nsolvables += pd.pack;
-  repo->nsolvables += pd.pack;
-  repo->end += pd.pack;
-
+  if (pd.numpacks)
+    repo_free_solvable_block(repo, pd.solvable - pool->solvables, pd.numpacks, 1);
   free(pd.content);
 }

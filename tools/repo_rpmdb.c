@@ -529,11 +529,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
   unsigned int refmask, h;
   int asolv;
 
-  if (repo->start && repo->start + repo->nsolvables != pool->nsolvables)
-    abort();
-  if (!repo->start || repo->start == repo->end)
-    repo->start = pool->nsolvables;
-  repo->end = pool->nsolvables;
   if (repo->start != repo->end)
     abort();		/* FIXME: rpmdbid */
 
@@ -564,24 +559,25 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
 	  exit(1);
 	}
       dbidp = (unsigned char *)&dbid;
-      pool->solvables = xrealloc(pool->solvables, (pool->nsolvables + 256) * sizeof(Solvable));
-      memset(pool->solvables + pool->nsolvables, 0, 256 * sizeof(Solvable));
       repo->rpmdbid = xcalloc(256, sizeof(unsigned int));
       asolv = 256;
       rpmheadsize = 0;
       rpmhead = 0;
       i = 0;
+      s = 0;
       while (dbc->c_get(dbc, &key, &data, DB_NEXT) == 0)
 	{
+	  if (!s)
+	    {
+	      id = repo_add_solvable(repo);
+	      s = pool->solvables + id;
+	    }
 	  if (i >= asolv)
 	    {
-	      pool->solvables = xrealloc(pool->solvables, (pool->nsolvables + asolv + 256) * sizeof(Solvable));
-	      memset(pool->solvables + pool->nsolvables + asolv, 0, 256 * sizeof(Solvable));
 	      repo->rpmdbid = xrealloc(repo->rpmdbid, (asolv + 256) * sizeof(unsigned int));
 	      memset(repo->rpmdbid + asolv, 0, 256 * sizeof(unsigned int));
 	      asolv += 256;
 	    }
-	  pool->solvables[pool->nsolvables + i].repo = repo;
           if (key.size != 4)
 	    {
 	      fprintf(stderr, "corrupt Packages database (key size)\n");
@@ -617,10 +613,24 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
 	  memcpy(rpmhead->data, (unsigned char *)data.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 	  repo->rpmdbid[i] = dbid;
-	  if (rpm2solv(pool, repo, pool->solvables + pool->nsolvables + i, rpmhead))
-	    i++;
+	  if (rpm2solv(pool, repo, s, rpmhead))
+	    {
+	      s->repo = repo;
+	      repo->nsolvables++;
+	      i++;
+	      s = 0;
+	    }
+	  else
+	    {
+	      memset(s, 0, sizeof(*s));		/* oops, reuse that one */
+	    }
 	}
-      nrpmids = i;
+      if (s)
+	{
+	  /* oops, could not reuse. free it instead */
+          repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+	  s = 0;
+	}
       dbc->c_close(dbc);
       db->close(db, 0);
       db = 0;
@@ -682,10 +692,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
       rpmheadsize = 0;
       rpmhead = 0;
 
-      pool->solvables = xrealloc2(pool->solvables, (pool->nsolvables + nrpmids), sizeof(Solvable));
-      memset(pool->solvables + pool->nsolvables, 0, nrpmids * sizeof(Solvable));
-      repo->rpmdbid = calloc(nrpmids, sizeof(unsigned int));
-
       refhash = 0;
       refmask = 0;
       if (ref)
@@ -700,10 +706,15 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
 	      refhash[h] = i + 1;	/* make it non-zero */
 	    }
 	}
-      s = pool->solvables + pool->nsolvables;
+
+      repo->rpmdbid = xcalloc(nrpmids, sizeof(unsigned int));
+      id = repo_add_solvable_block(repo, nrpmids);
+      s = pool->solvables + id;
+
       for (i = 0; i < nrpmids; i++, rp++, s++)
 	{
 	  s->repo = repo;
+	  repo->nsolvables++;
 	  dbid = rp->dbid;
 	  repo->rpmdbid[i] = dbid;
 	  if (refhash)
@@ -817,10 +828,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
     }
   if (rpmhead)
     free(rpmhead);
-  pool->nsolvables += nrpmids;
-  repo->nsolvables += nrpmids;
-  repo->end += nrpmids;
-
   if (db)
     db->close(db, 0);
 }

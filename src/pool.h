@@ -149,6 +149,12 @@ extern Pool *pool_create(void);
  * Delete a pool
  */
 extern void pool_free(Pool *pool);
+
+extern Id pool_add_solvable(Pool *pool);
+extern Id pool_add_solvable_block(Pool *pool, int count);
+
+extern void pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids);
+
 /**
  * Prepares a pool for solving
  */

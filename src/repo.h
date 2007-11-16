@@ -46,4 +46,50 @@ static inline const char *repo_name(const Repo *repo)
   return repo->name;
 }
 
+static inline Id repo_add_solvable(Repo *repo)
+{
+  extern Id pool_add_solvable(Pool *pool);
+  Id p = pool_add_solvable(repo->pool);
+  if (!repo->start || repo->start == repo->end)
+    {
+      repo->start = p;
+      repo->end = p + 1;
+      return p;
+    }
+  if (p < repo->start)
+    repo->start = p;
+  if (p + 1 > repo->end)
+    repo->end = p + 1;
+  return p;
+}
+
+static inline Id repo_add_solvable_block(Repo *repo, int count)
+{
+  extern Id pool_add_solvable_block(Pool *pool, int count);
+  Id p;
+  if (!count)
+    return 0;
+  p = pool_add_solvable_block(repo->pool, count);
+  if (!repo->start || repo->start == repo->end)
+    {
+      repo->start = p;
+      repo->end = p + count;
+      return p;
+    }
+  if (p < repo->start)
+    repo->start = p;
+  if (p + count > repo->end)
+    repo->end = p + count;
+  return p;
+}
+
+/* does not modify repo->nsolvables! */
+static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
+{
+  extern void pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids);
+  if (start + count == repo->end)
+    repo->end -= count;
+  pool_free_solvable_block(repo->pool, start, count, reuseids);
+}
+
 #endif /* REPO_H */

@@ -425,7 +425,7 @@ repo_write(Repo *repo, FILE *fp)
       if (s->freshens)
         write_idarray(fp, pool, needid, idarraydata + s->freshens);
       if (repo->rpmdbid)
-        write_u32(fp, repo->rpmdbid[i]);
+        write_u32(fp, repo->rpmdbid[i - repo->start]);
     }
 
   free(needid);

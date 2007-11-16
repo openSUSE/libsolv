@@ -499,18 +499,6 @@ repo_add_solv(Repo *repo, FILE *fp)
       idarraydataend = 0;
     }
 
-
-  /* alloc space for our solvables */
-  if (numsolv)			       /* clear newly allocated area */
-    {
-      pool->solvables = (Solvable *)xrealloc(pool->solvables, (pool->nsolvables + numsolv) * sizeof(Solvable));
-
-      memset(pool->solvables + pool->nsolvables, 0, numsolv * sizeof(Solvable));
-      if (!repo->start || repo->start == repo->end)
-	repo->start = pool->nsolvables;
-      repo->end = pool->nsolvables;
-    }
-
   /*
    * read solvables
    */
@@ -518,7 +506,9 @@ repo_add_solv(Repo *repo, FILE *fp)
 #if 0
   printf("read solvables\n");
 #endif
-  for (i = 0, s = pool->solvables + pool->nsolvables; i < numsolv; i++, s++)
+  id = repo_add_solvable_block(repo, numsolv);
+  s = pool->solvables + id;
+  for (i = 0; i < numsolv; i++, s++)
     {
       s->repo = repo;
       databits = 0;
@@ -610,13 +600,10 @@ repo_add_solv(Repo *repo, FILE *fp)
 	    }
 	}
     }
+  repo->nsolvables += numsolv;
 
   xfree(idmap);
   xfree(solvdata);
-
-  repo->end += numsolv;
-  repo->nsolvables += numsolv;
-  pool->nsolvables += numsolv;
 }
 
 // EOF
