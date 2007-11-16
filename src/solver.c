@@ -607,11 +607,6 @@ makeruledecisions(Solver *solv)
 	  continue;
 	}
 
-      /* record proof */
-      queue_push(&solv->problems, solv->learnt_pool.count);
-      queue_push(&solv->learnt_pool, ri);
-      queue_push(&solv->learnt_pool, 0);
-
       /* only job and system rules left */
       for (i = 0; i < solv->decisionq.count; i++)
 	if (solv->decisionq.elements[i] == -v)
@@ -621,6 +616,13 @@ makeruledecisions(Solver *solv)
       if (solv->decisionq_why.elements[i] == 0)
 	{
 	  /* conflict with rpm rule, need only disable our rule */
+	  if (v < 0 && v != -SYSTEMSOLVABLE)
+	    abort();
+	  /* record proof */
+	  queue_push(&solv->problems, solv->learnt_pool.count);
+	  queue_push(&solv->learnt_pool, ri);
+	  queue_push(&solv->learnt_pool, v != -SYSTEMSOLVABLE ? -v : v);
+	  queue_push(&solv->learnt_pool, 0);
 	  printf("conflict with rpm rule, disabling rule #%d\n", ri);
 	  if (ri < solv->systemrules)
 	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
@@ -629,6 +631,12 @@ makeruledecisions(Solver *solv)
 	  queue_push(&solv->problems, 0);
 	  continue;
 	}
+      /* record proof */
+      queue_push(&solv->problems, solv->learnt_pool.count);
+      queue_push(&solv->learnt_pool, ri);
+      queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
+      queue_push(&solv->learnt_pool, 0);
+
       /* conflict with another job or system rule */
       printf("conflicting system/job rules over literal %d\n", vv);
       /* push all of our rules asserting this literal on the problem stack */
@@ -1612,11 +1620,13 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   int l, i, idx;
   Id *decisionmap = solv->decisionmap;
   int oldproblemcount;
+  int oldlearntpoolcount;
   int lastweak;
 
   if (pool->verbose > 1)
     printf("ANALYZE UNSOLVABLE ----------------------\n");
   oldproblemcount = solv->problems.count;
+  oldlearntpoolcount = solv->learnt_pool.count;
 
   /* make room for proof index */
   /* must update it later, as analyze_unsolvable_rule would confuse
@@ -1625,6 +1635,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 
   r = cr;
   map_init(&seen, pool->nsolvables);
+  queue_push(&solv->learnt_pool, r - solv->rules);
   analyze_unsolvable_rule(solv, r);
   dp = r->d ? pool->whatprovidesdata + r->d : 0;
   for (i = -1; ; i++)
@@ -1655,14 +1666,22 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       why = solv->decisionq_why.elements[idx];
       if (!why)
 	{
+	  /* level 1 and no why, must be an rpm assertion */
 	  if (pool->verbose > 3)
 	    {
 	      printf("RPM ");
 	      printruleelement(solv, 0, v);
 	    }
+	  /* this is the only positive rpm assertion */
+	  if (v == SYSTEMSOLVABLE)
+	    v = -v;
+	  if (v >= 0)
+	    abort();
+	  queue_push(&solv->learnt_pool, v);
 	  continue;
 	}
       r = solv->rules + why;
+      queue_push(&solv->learnt_pool, why);
       analyze_unsolvable_rule(solv, r);
       dp = r->d ? pool->whatprovidesdata + r->d : 0;
       for (i = -1; ; i++)
@@ -1703,6 +1722,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
     {
       /* disable last weak rule */
       solv->problems.count = oldproblemcount;
+      solv->learnt_pool.count = oldlearntpoolcount;
       r = solv->rules + lastweak;
       printf("disabling weak ");
       printrule(solv, r);
@@ -1711,10 +1731,9 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       return 1;
     }
 
-  /* record proof */
-  solv->problems.elements[oldproblemcount] = solv->learnt_pool.count;
-  queue_push(&solv->learnt_pool, cr - solv->rules);
+  /* finish proof */
   queue_push(&solv->learnt_pool, 0);
+  solv->problems.elements[oldproblemcount] = oldlearntpoolcount;
 
   if (disablerules)
     {
@@ -2782,8 +2801,16 @@ printprobleminfo(Solver *solv, Queue *job, Id idx)
 	    }
 	  return;
 	}
+      if (p > 0 && solv->learnt_pool.elements[idx + 1] == -p)
+	{
+	  /* we conflicted with a direct rpm assertion */
+	  /* print other rule */
+	  p = -p;
+	  rn = 0;
+	}
       if (rn >= solv->jobrules)
 	{
+	  printf("some job/system/learnt rule\n");
 	  printrule(solv, r);
 	  return;
 	}
