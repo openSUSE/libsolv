@@ -318,11 +318,18 @@ hashrule(Solver *solv, Id p, Id d, int n)
  *   Remove:     p < 0, d = 0   (-A)            user requested remove
  *   Requires:   p < 0, d > 0   (-A|B1|B2|...)  d: <list of providers for requirement of p>
  *   Updates:    p > 0, d > 0   (A|B1|B2|...)   d: <list of updates for solvable p>
- *   Conflicts:  p < 0, d < 0   (-A|-B)         either p (conflict issuer) or d (conflict provider)
+ *   Conflicts:  p < 0, d < 0   (-A|-B)         either p (conflict issuer) or d (conflict provider) (binary rule)
  *   ?           p > 0, d < 0   (A|-B)
  *   No-op ?:    p = 0, d = 0   (null)          (used as policy rule placeholder)
  *
- * always returns a rule for non-rpm rules
+ *   resulting watches:
+ *   ------------------
+ *   Direct assertion (no watch needed)( if d <0 ) --> d = 0, w1 = p, w2 = 0
+ *   Binary rule: p = first literal, d = 0, w2 = second literal, w1 = p
+ *   every other : w1 = p, w2 = whatprovidesdata[d];
+ *   Disabled rule: w1 = 0
+ *
+ *   always returns a rule for non-rpm rules
  */
 
 static Rule *
