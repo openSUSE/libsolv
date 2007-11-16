@@ -536,6 +536,23 @@ printproblem(Solver *solv, Id v)
 }
 
 
+static const char *
+id2rc(Solver *solv, Id id)
+{
+  const char *evr;
+  if (solv->rc_output != 2)
+    return "";
+  evr = id2str(solv->pool, id);
+  if (*evr < '0' || *evr > '9')
+    return "0:";
+  while (*evr >= '0' && *evr <= '9')
+    evr++;
+  if (*evr != ':')
+    return "0:";
+  return "";
+}
+
+
 /**********************************************************************************/
 
 /* go through system and job rules and add direct assertions
@@ -550,6 +567,9 @@ makeruledecisions(Solver *solv)
   Id v, vv;
   int decisionstart;
 
+  if (solv->pool->verbose > 3)
+      printf ("----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
+  
   decisionstart = solv->decisionq.count;
   /* rpm rules don't have assertions, so we can start with the job
    * rules */
@@ -564,6 +584,14 @@ makeruledecisions(Solver *solv)
 	  queue_push(&solv->decisionq, v);
 	  queue_push(&solv->decisionq_why, r - solv->rules);
 	  solv->decisionmap[vv] = v > 0 ? 1 : -1;
+	  if (solv->pool->verbose > 3)
+	    {
+		Solvable *s = solv->pool->solvables + vv;
+		if (v < 0)
+		    printf("removing  %s-%s%s\n", id2str(solv->pool, s->name), id2rc(solv, s->evr), id2str(solv->pool, s->evr));
+		else
+		    printf("installing  %s-%s%s\n", id2str(solv->pool, s->name), id2rc(solv, s->evr), id2str(solv->pool, s->evr));		    
+	    }
 	  continue;
 	}
       if (v > 0 && solv->decisionmap[vv] > 0)
@@ -643,6 +671,9 @@ makeruledecisions(Solver *solv)
       ri = solv->jobrules - 1;
       r = solv->rules + ri;
     }
+  
+  if (solv->pool->verbose > 3) 
+      printf ("----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
 }
 
 /*
@@ -2551,21 +2582,6 @@ problems_to_solutions(Solver *solv, Queue *job)
  * printdecisions
  */
   
-static const char *
-id2rc(Solver *solv, Id id)
-{
-  const char *evr;
-  if (solv->rc_output != 2)
-    return "";
-  evr = id2str(solv->pool, id);
-  if (*evr < '0' || *evr > '9')
-    return "0:";
-  while (*evr >= '0' && *evr <= '9')
-    evr++;
-  if (*evr != ':')
-    return "0:";
-  return "";
-}
 
 void
 printdecisions(Solver *solv)
@@ -2643,7 +2659,7 @@ printdecisions(Solver *solv)
 	  s = pool->solvables + i;
 	  if (s->repo != installed)
 	    continue;
-	  if (solv->decisionmap[i] > 0)
+	  if (solv->decisionmap[i] >= 0)
 	    continue;
 	  if (obsoletesmap[i])
 	    continue;
@@ -3143,7 +3159,7 @@ solve(Solver *solv, Queue *job)
 
   map_init(&addedmap, pool->nsolvables);
   queue_init(&q);
-
+  
   /*
    * always install our system solvable
    */
@@ -3243,6 +3259,8 @@ solve(Solver *solv, Queue *job)
   unifyrules(solv);	/* remove duplicate rpm rules */
 
   if (pool->verbose) printf("decisions so far: %d\n", solv->decisionq.count);
+  if (pool->verbose > 3)
+      printdecisions (solv);
 
   /*
    * now add all job rules
