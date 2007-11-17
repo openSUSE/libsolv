@@ -111,20 +111,6 @@ struct _Pool {
 
 //-----------------------------------------------
 
-// whatprovides
-//  "foo" -> Id -> lookup in table, returns offset into whatprovidesdata where array of Ids providing 'foo' are located, 0-terminated
-
-
-#define GET_PROVIDESP(d, v) (ISRELDEP(d) ?				\
-             (v = GETRELID(pool, d), pool->whatprovides[v] ?		\
-               pool->whatprovidesdata + pool->whatprovides[v] :		\
-	       pool_addrelproviders(pool, d)				\
-             ) :							\
-             (pool->whatprovidesdata + pool->whatprovides[d]))
-
-/* loop over all providers of d */
-#define FOR_PROVIDES(v, vp, d) 						\
-  for (vp = GET_PROVIDESP(d, v) ; (v = *vp++) != ID_NULL; )
 
 /* mark dependencies with relation by setting bit31 */
 
@@ -167,11 +153,9 @@ static inline Solvable *pool_id2solvable(Pool *pool, Id p)
 /**
  * Prepares a pool for solving
  */
-extern void pool_prepare(Pool *pool);
+extern void pool_createwhatprovides(Pool *pool);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
-
-extern Id *pool_addrelproviders(Pool *pool, Id d);
 
 static inline int pool_installable(Pool *pool, Solvable *s)
 {
@@ -181,6 +165,24 @@ static inline int pool_installable(Pool *pool, Solvable *s)
     return 0;
   return 1;
 }
+
+extern Id *pool_addrelproviders(Pool *pool, Id d);
+
+static inline Id *pool_whatprovides(Pool *pool, Id d)
+{
+  Id v;
+  if (!ISRELDEP(d))
+    return pool->whatprovidesdata + pool->whatprovides[d];
+  v = GETRELID(pool, d);
+  if (pool->whatprovides[v])
+    return pool->whatprovidesdata + pool->whatprovides[v];
+  return pool_addrelproviders(pool, d);
+}
+
+/* loop over all providers of d */
+#define FOR_PROVIDES(v, vp, d) 						\
+  for (vp = pool_whatprovides(pool, d) ; (v = *vp++) != 0; )
+
 
 #ifdef __cplusplus
 }

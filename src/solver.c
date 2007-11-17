@@ -953,7 +953,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
 		continue;
 
-	      dp = GET_PROVIDESP(req, p);	/* get providers of req; p is a dummy only */ 
+	      dp = pool_whatprovides(pool, req);
 
 	      if (*dp == SYSTEMSOLVABLE)	/* always installed */
 		continue;
@@ -2886,7 +2886,7 @@ printprobleminfo(Solver *solv, Queue *job, Id problem)
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)
 		continue;
-	      dp = GET_PROVIDESP(req, p);
+	      dp = pool_whatprovides(pool, req);
 	      if (*dp)
 		continue;
 	      printf("package %s-%s.%s requires %s, but no package provides it\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req));
@@ -2950,7 +2950,7 @@ printprobleminfo(Solver *solv, Queue *job, Id problem)
 	{
 	  if (req == SOLVABLE_PREREQMARKER)
 	    continue;
-	  dp = GET_PROVIDESP(req, p);
+	  dp = pool_whatprovides(pool, req);
           if (d == 0)
 	    {
 	      if (*dp == r->w2 && dp[1] == 0)

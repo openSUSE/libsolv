@@ -286,7 +286,7 @@ repo_free(Repo *repo, int reuseids)
 }
 
 void
-pool_freeallrepos(Pool *pool, int reuseids)
+repo_freeallrepos(Pool *pool, int reuseids)
 {
   int i;
 

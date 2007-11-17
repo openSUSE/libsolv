@@ -107,7 +107,7 @@ pool_free(Pool *pool)
 
   pool_freewhatprovides(pool);
   pool_freeidhashes(pool);
-  pool_freeallrepos(pool, 1);
+  repo_freeallrepos(pool, 1);
   xfree(pool->id2arch);
   xfree(pool->solvables);
   xfree(pool->ss.stringspace);
@@ -263,14 +263,14 @@ pool_shrink_whatprovides(Pool *pool)
 
 
 /*
- * pool_prepare()
+ * pool_createwhatprovides()
  * 
  * create hashes over complete pool to ease lookups
  * 
  */
 
 void
-pool_prepare(Pool *pool)
+pool_createwhatprovides(Pool *pool)
 {
   int i, num, np, extra;
   Offset off;
@@ -452,8 +452,8 @@ pool_addrelproviders(Pool *pool, Id d)
     {
     case REL_AND:
     case REL_WITH:
-      pp = GET_PROVIDESP(name, p);
-      pp2 = GET_PROVIDESP(evr, p);
+      pp = pool_whatprovides(pool, name);
+      pp2 = pool_whatprovides(pool, evr);
       while ((p = *pp++) != 0)
 	{
 	  for (pp3 = pp2; *pp3;)
@@ -465,10 +465,10 @@ pool_addrelproviders(Pool *pool, Id d)
 	}
       break;
     case REL_OR:
-      pp = GET_PROVIDESP(name, p);
+      pp = pool_whatprovides(pool, name);
       while ((p = *pp++) != 0)
 	queue_push(&plist, p);
-      pp = GET_PROVIDESP(evr, p);
+      pp = pool_whatprovides(pool, evr);
       while ((p = *pp++) != 0)
 	queue_pushunique(&plist, p);
       break;
