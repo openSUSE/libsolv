@@ -376,7 +376,6 @@ startElement(void *userData, const char *name, const char **atts)
   struct stateswitch *sw;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
-  Id id;
 
   if (pd->depth != pd->statedepth)
     {
@@ -431,8 +430,7 @@ startElement(void *userData, const char *name, const char **atts)
       break;
 
     case STATE_PACKAGE:		       /* solvable name */
-      id = repo_add_solvable(pd->repo);
-      pd->solvable = pool->solvables + id;
+      pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
       if (!strcmp(name, "selection"))
         pd->kind = "selection";
       else if (!strcmp(name, "pattern"))
@@ -450,7 +448,7 @@ startElement(void *userData, const char *name, const char **atts)
       pd->version = 0;
       pd->release = 0;
 #if 0
-      fprintf(stderr, "package #%d\n", id);
+      fprintf(stderr, "package #%d\n", s - pool->solvables);
 #endif
       break;
 
@@ -602,9 +600,6 @@ endElement(void *userData, const char *name)
     {
 
     case STATE_PACKAGE:		       /* package complete */
-      s->repo = pd->repo;
-      pd->repo->nsolvables++;
-
       if (!s->arch)                    /* default to "noarch" */
 	s->arch = ARCH_NOARCH;
 

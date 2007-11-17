@@ -506,11 +506,9 @@ repo_add_solv(Repo *repo, FILE *fp)
 #if 0
   printf("read solvables\n");
 #endif
-  id = repo_add_solvable_block(repo, numsolv);
-  s = pool->solvables + id;
+  s = pool_id2solvable(pool, repo_add_solvable_block(repo, numsolv));
   for (i = 0; i < numsolv; i++, s++)
     {
-      s->repo = repo;
       databits = 0;
       if (numsolvdatabits)
 	{
@@ -600,8 +598,6 @@ repo_add_solv(Repo *repo, FILE *fp)
 	    }
 	}
     }
-  repo->nsolvables += numsolv;
-
   xfree(idmap);
   xfree(solvdata);
 }

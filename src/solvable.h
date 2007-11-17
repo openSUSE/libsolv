@@ -15,7 +15,8 @@
 #define SOLVABLE_H
 
 #include "pooltypes.h"
-#include "repo.h"
+
+struct _Repo;
 
 typedef struct _Solvable {
   Id name;
@@ -23,7 +24,7 @@ typedef struct _Solvable {
   Id evr;			/* epoch:version-release */
   Id vendor;
 
-  Repo *repo;		/* repo we belong to */
+  struct _Repo *repo;		/* repo we belong to */
 
   /* dependencies are offsets into idarray of repo */
   Offset provides;			/* terminated with Id 0 */

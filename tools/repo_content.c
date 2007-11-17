@@ -14,6 +14,7 @@
 #include <assert.h>
 
 #include "pool.h"
+#include "repo.h"
 #include "util.h"
 #include "repo_content.h"
 
@@ -165,7 +166,6 @@ repo_add_content(Repo *repo, FILE *fp)
   char *line, *linep;
   int aline;
   Solvable *s;
-  Id id;
   struct parsedata pd;
 
   memset(&pd, 0, sizeof(pd));
@@ -217,10 +217,7 @@ repo_add_content(Repo *repo, FILE *fp)
 		s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
 	      /* Only support one product.  */
 	      pd.kind = "product";
-	      id = repo_add_solvable(repo);
-	      s = pool->solvables + id;
-	      s->repo = repo;
-	      repo->nsolvables++;
+	      s = pool_id2solvable(pool, repo_add_solvable(repo));
 	      s->name = str2id(pool, join(&pd, pd.kind, ":", value), 1);
 	    }
 	  else if (istag ("VERSION"))

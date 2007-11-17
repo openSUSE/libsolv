@@ -22,6 +22,7 @@
 #include <db43/db.h>
 
 #include "pool.h"
+#include "repo.h"
 #include "hash.h"
 #include "util.h"
 #include "repo_rpmdb.h"
@@ -568,10 +569,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
       while (dbc->c_get(dbc, &key, &data, DB_NEXT) == 0)
 	{
 	  if (!s)
-	    {
-	      id = repo_add_solvable(repo);
-	      s = pool->solvables + id;
-	    }
+	    s = pool_id2solvable(pool, repo_add_solvable(repo));
 	  if (i >= asolv)
 	    {
 	      repo->rpmdbid = xrealloc(repo->rpmdbid, (asolv + 256) * sizeof(unsigned int));
@@ -615,8 +613,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
 	  repo->rpmdbid[i] = dbid;
 	  if (rpm2solv(pool, repo, s, rpmhead))
 	    {
-	      s->repo = repo;
-	      repo->nsolvables++;
 	      i++;
 	      s = 0;
 	    }
@@ -708,13 +704,11 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
 	}
 
       repo->rpmdbid = xcalloc(nrpmids, sizeof(unsigned int));
-      id = repo_add_solvable_block(repo, nrpmids);
-      s = pool->solvables + id;
+
+      s = pool_id2solvable(pool, repo_add_solvable_block(repo, nrpmids));
 
       for (i = 0; i < nrpmids; i++, rp++, s++)
 	{
-	  s->repo = repo;
-	  repo->nsolvables++;
 	  dbid = rp->dbid;
 	  repo->rpmdbid[i] = dbid;
 	  if (refhash)

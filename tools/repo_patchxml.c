@@ -14,6 +14,7 @@
 #include <expat.h>
 
 #include "pool.h"
+#include "repo.h"
 #include "repo_patchxml.h"
 #include "repo_rpmmd.h"
 
@@ -242,7 +243,6 @@ startElement(void *userData, const char *name, const char **atts)
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
-  Id id;
 
   if (pd->depth != pd->statedepth)
     {
@@ -287,8 +287,6 @@ startElement(void *userData, const char *name, const char **atts)
 	  /* HACK: close patch */
 	  if (pd->kind && !strcmp(pd->kind, "patch"))
 	    {
-	      s->repo = pd->repo;
-	      pd->repo->nsolvables++;
 	      if (!s->arch)
 		s->arch = ARCH_NOARCH;
 	      s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
@@ -298,10 +296,10 @@ startElement(void *userData, const char *name, const char **atts)
 	}
       else
         pd->kind = "patch";
-      id = repo_add_solvable(pd->repo);
-      pd->solvable = pool->solvables + id;
+      
+      pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 #if 0
-      fprintf(stderr, "package #%d\n", id);
+      fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
       break;
     case STATE_VERSION:
@@ -390,8 +388,6 @@ endElement(void *userData, const char *name)
     case STATE_PATCH:
       if (!strcmp(name, "patch") && strcmp(pd->kind, "patch"))
 	break;	/* already closed */
-      s->repo = pd->repo;
-      pd->repo->nsolvables++;
       if (!s->arch)
 	s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)

@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "pool.h"
+#include "repo.h"
 #include "attr_store.h"
 #include "repo_susetags.h"
 
@@ -148,7 +149,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   int pack;
   char *sp[5];
   struct parsedata pd;
-  Id id;
 
   if (with_attr)
     attr = new_store(pool);
@@ -236,12 +236,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  pd.kind = 0;
 	  if (line[3] == 't')
 	    pd.kind = "pattern";
-	  id = repo_add_solvable(repo);
-	  s = pool->solvables + id;
-	  s->repo = repo;
-	  repo->nsolvables++;
-	  last_found_pack = pack;
-	  pack++;
+	  s = pool_id2solvable(pool, repo_add_solvable(repo));
+	  last_found_pack = (s - pool->solvables) - repo->start;
           if (split(line + 5, sp, 5) != 4)
 	    {
 	      fprintf(stderr, "Bad line: %s\n", line);
@@ -285,18 +281,18 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	     lines comes in roughly the same order as the first set, so we 
 	     have a hint at where to start our search, namely were we found
 	     the last entry.  */
-	  for (n = 0, nn = last_found_pack; n < pack; n++, nn++)
+	  for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
 	    {
-	      if (nn >= pack)
-	        nn = 0;
-	      s = pool->solvables + pool->nsolvables + nn;
-	      if (s->name == name && s->evr == evr && s->arch == arch)
+	      if (nn >= repo->end)
+	        nn = repo->start;
+	      s = pool->solvables + nn;
+	      if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
 	        break;
 	    }
 	  if (n == pack)
 	    s = 0;
 	  else
-	    last_found_pack = nn;
+	    last_found_pack = nn - repo->start;
 	  continue;
 	}
       /* If we have no current solvable to add to, ignore all further lines

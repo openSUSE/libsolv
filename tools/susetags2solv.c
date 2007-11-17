@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "pool.h"
+#include "repo.h"
 #include "repo_susetags.h"
 #include "repo_write.h"
 #include "attr_store.h"

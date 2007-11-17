@@ -14,6 +14,7 @@
 #define REPO_H
 
 #include "pooltypes.h"
+#include "pool.h"
 
 typedef struct _Repo {
   const char *name;
@@ -54,12 +55,16 @@ static inline Id repo_add_solvable(Repo *repo)
     {
       repo->start = p;
       repo->end = p + 1;
-      return p;
     }
-  if (p < repo->start)
-    repo->start = p;
-  if (p + 1 > repo->end)
-    repo->end = p + 1;
+  else
+    {
+      if (p < repo->start)
+	repo->start = p;
+      if (p + 1 > repo->end)
+	repo->end = p + 1;
+    }
+  repo->nsolvables++;
+  repo->pool->solvables[p].repo = repo;
   return p;
 }
 
@@ -67,6 +72,7 @@ static inline Id repo_add_solvable_block(Repo *repo, int count)
 {
   extern Id pool_add_solvable_block(Pool *pool, int count);
   Id p;
+  Solvable *s;
   if (!count)
     return 0;
   p = pool_add_solvable_block(repo->pool, count);
@@ -74,21 +80,30 @@ static inline Id repo_add_solvable_block(Repo *repo, int count)
     {
       repo->start = p;
       repo->end = p + count;
-      return p;
     }
-  if (p < repo->start)
-    repo->start = p;
-  if (p + count > repo->end)
-    repo->end = p + count;
+  else
+    {
+      if (p < repo->start)
+	repo->start = p;
+      if (p + count > repo->end)
+	repo->end = p + count;
+    }
+  repo->nsolvables += count;
+  for (s = repo->pool->solvables + p; count--; s++)
+    s->repo = repo;
   return p;
 }
 
-/* does not modify repo->nsolvables! */
 static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
 {
   extern void pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids);
+  Solvable *s;
+  int i;
   if (start + count == repo->end)
     repo->end -= count;
+  repo->nsolvables -= count;
+  for (s = repo->pool->solvables + start, i = count; i--; s++)
+    s->repo = 0;
   pool_free_solvable_block(repo->pool, start, count, reuseids);
 }
 

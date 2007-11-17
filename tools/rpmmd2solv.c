@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "pool.h"
+#include "repo.h"
 #include "repo_rpmmd.h"
 #include "repo_write.h"
 

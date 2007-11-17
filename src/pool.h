@@ -19,7 +19,6 @@ extern "C" {
 
 #include "pooltypes.h"
 #include "poolid.h"
-#include "repo.h"
 #include "solvable.h"
 #include "queue.h"
 #include "strpool.h"
@@ -61,6 +60,8 @@ extern "C" {
 
 //-----------------------------------------------
 
+struct _Repo;
+
 struct _Pool {
   int verbose;		// pool is used everywhere, so put the verbose flag here
 
@@ -71,7 +72,7 @@ struct _Pool {
   Hashtable relhashtbl;       // hash table: (name,evr,op ->) Hash -> Id
   Hashmask relhashmask;
 
-  Repo **repos;
+  struct _Repo **repos;
   int nrepos;
 
   Solvable *solvables;
@@ -150,10 +151,18 @@ extern Pool *pool_create(void);
  */
 extern void pool_free(Pool *pool);
 
+/**
+ * Solvable management
+ */
 extern Id pool_add_solvable(Pool *pool);
 extern Id pool_add_solvable_block(Pool *pool, int count);
 
 extern void pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids);
+static inline Solvable *pool_id2solvable(Pool *pool, Id p)
+{
+  return pool->solvables + p;
+}
+
 
 /**
  * Prepares a pool for solving

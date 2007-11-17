@@ -14,6 +14,7 @@
 #include <expat.h>
 
 #include "pool.h"
+#include "repo.h"
 #include "util.h"
 #include "repo_rpmmd.h"
 
@@ -239,7 +240,6 @@ startElement(void *userData, const char *name, const char **atts)
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
-  Id id;
 
   if (pd->depth != pd->statedepth)
     {
@@ -275,19 +275,18 @@ startElement(void *userData, const char *name, const char **atts)
 #if 0
 	      fprintf(stderr, "numpacks: %d\n", pd->numpacks);
 #endif
-	      id = repo_add_solvable_block(pd->repo, pd->numpacks);
-	      pd->solvable = pool->solvables + id;
+	      pd->solvable = pool_id2solvable(pool, repo_add_solvable_block(pd->repo, pd->numpacks));
 	    }
 	}
       break;
     case STATE_PACKAGE:
       if (pd->numpacks > 0)
-	pd->numpacks--;
-      else
 	{
-	  id = repo_add_solvable(pd->repo);
-	  pd->solvable = pool->solvables + id;
+	  pd->numpacks--;
+	  pd->solvable++;
 	}
+      else
+	pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -373,14 +372,11 @@ endElement(void *userData, const char *name)
   switch (pd->state)
     {
     case STATE_PACKAGE:
-      s->repo = pd->repo;
-      pd->repo->nsolvables++;
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
-      pd->solvable++;
       break;
     case STATE_NAME:
       s->name = str2id(pool, pd->content, 1);

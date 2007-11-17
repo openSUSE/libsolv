@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "pool.h"
+#include "repo.h"
 #include "repo_rpmdb.h"
 #include "repo_solv.h"
 #include "repo_write.h"
