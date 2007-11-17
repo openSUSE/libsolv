@@ -126,6 +126,10 @@ extern void solver_free(Solver *solv);
 extern void solve(Solver *solv, Queue *job);
 extern int solver_dep_installed(Solver *solv, Id dep);
 
+extern Id solver_next_problem(Solver *solv, Id problem);
+extern Id solver_next_solution(Solver *solv, Id problem, Id solution);
+extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
+
 void printdecisions(Solver *solv);
 void printsolutions(Solver *solv, Queue *job);
 

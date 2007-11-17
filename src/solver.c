@@ -2588,6 +2588,59 @@ problems_to_solutions(Solver *solv, Queue *job)
   reset_solver(solv);
 }
 
+Id
+solver_next_problem(Solver *solv, Id problem)
+{
+  Id *pp;
+  if (problem == 0)
+    return solv->problems.count ? 1 : 0;
+  pp = solv->problems.elements + problem;
+  while (pp[0] || pp[1])
+    {
+      /* solution */
+      pp += 2;
+      while (pp[0] || pp[1])
+        pp += 2;
+      pp += 2;
+    }
+  pp += 2;
+  problem = pp - solv->problems.elements;
+  if (problem >= solv->problems.count)
+    return 0;
+  return problem + 1;
+}
+
+Id
+solver_next_solution(Solver *solv, Id problem, Id solution)
+{
+  Id *pp;
+  if (solution == 0)
+    {
+      solution = problem;
+      pp = solv->problems.elements + solution;
+      return pp[0] || pp[1] ? solution : 0;
+    }
+  pp = solv->problems.elements + solution;
+  while (pp[0] || pp[1])
+    pp += 2;
+  pp += 2;
+  solution = pp - solv->problems.elements;
+  return pp[0] || pp[1] ? solution : 0;
+}
+
+Id
+solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp)
+{
+  Id *pp;
+  element = element ? element + 2 : solution;
+  pp = solv->problems.elements + element;
+  if (!(pp[0] || pp[1]))
+    return 0;
+  *p = pp[0];
+  *rp = pp[1];
+  return element;
+}
+
 
   
 /*
@@ -2760,12 +2813,13 @@ printconflicts(Solver *solv, Solvable *s, Id pc)
 }
 
 void
-printprobleminfo(Solver *solv, Queue *job, Id idx)
+printprobleminfo(Solver *solv, Queue *job, Id problem)
 {
   Pool *pool = solv->pool;
   Rule *r;
   Solvable *s;
   Id p, d, rn;
+  Id idx = solv->problems.elements[problem - 1];
 
   rn = solv->learnt_pool.elements[idx];
   if (rn < 0)
@@ -2919,40 +2973,28 @@ printsolutions(Solver *solv, Queue *job)
 {
   Pool *pool = solv->pool;
   int pcnt;
-  int i;
   Id p, rp, what;
+  Id problem, solution, element;
   Solvable *s, *sd;
 
   printf("Encountered problems! Here are the solutions:\n\n");
   pcnt = 1;
-  for (i = 0; i < solv->problems.count; )
+  problem = 0;
+  while ((problem = solver_next_problem(solv, problem)) != 0)
     {
       printf("Problem %d:\n", pcnt++);
       printf("====================================\n");
-      printprobleminfo(solv, job, solv->problems.elements[i++]);
+      printprobleminfo(solv, job, problem);
       printf("\n");
-      for (;;)
+      solution = 0;
+      while ((solution = solver_next_solution(solv, problem, solution)) != 0)
         {
-	  if (solv->problems.elements[i] == 0 && solv->problems.elements[i + 1] == 0)
+	  element = 0;
+	  while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
 	    {
-	      /* end of solutions for this problems reached */
-	      i += 2;
-	      break;
-	    }
-	  for (;;)
-	    {
-	      p = solv->problems.elements[i];
-	      rp = solv->problems.elements[i + 1];
-	      i += 2;
-	      if (p == 0 && rp == 0)
-		{
-		  /* end of this solution reached */
-		  printf("\n");
-		  break;
-		}
 	      if (p == 0)
 		{
-		  /* job, p is index into job queue */
+		  /* job, rp is index into job queue */
 		  what = job->elements[rp];
 		  switch (job->elements[rp - 1])
 		    {
@@ -3028,6 +3070,7 @@ printsolutions(Solver *solv, Queue *job)
 
 		}
 	    }
+	  printf("\n");
         }
     }
 }
