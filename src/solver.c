@@ -116,8 +116,6 @@ printruleelement(Solver *solv, Rule *r, Id v)
     printf(" Install.level%d", solv->decisionmap[s - pool->solvables]);
   if (solv->decisionmap[s - pool->solvables] < 0)
     printf(" Conflict.level%d", -solv->decisionmap[s - pool->solvables]);
-  if (r && r->w1 == 0)
-    printf(" (disabled)");
   printf("\n");
 }
 
@@ -133,9 +131,12 @@ printrule(Solver *solv, Rule *r)
   Id v;
 
   if (r >= solv->rules && r < solv->rules + solv->nrules)   /* r is a solver rule */
-    printf("Rule #%d:\n", (int)(r - solv->rules));
+    printf("Rule #%d:", (int)(r - solv->rules));
   else
-    printf("Rule:\n");		       /* r is any rule */
+    printf("Rule:");		       /* r is any rule */
+  if (r && r->w1 == 0)
+    printf(" (disabled)");
+  printf("\n");
   for (i = 0; ; i++)
     {
       if (i == 0)
@@ -626,6 +627,8 @@ makeruledecisions(Solver *solv)
 	  printf("conflict with rpm rule, disabling rule #%d\n", ri);
 	  if (ri < solv->systemrules)
 	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	  else
+	    v = ri;
 	  queue_push(&solv->problems, v);
 	  disableproblem(solv, v);
 	  queue_push(&solv->problems, 0);
@@ -2579,6 +2582,10 @@ problems_to_solutions(Solver *solv, Queue *job)
   queue_free(&solv->problems);
   queue_clone(&solv->problems, &solutions);
   queue_free(&solutions);
+
+  /* bring solver back into problem state */
+  revert(solv, 1);		/* XXX move to reset_solver? */
+  reset_solver(solv);
 }
 
 
