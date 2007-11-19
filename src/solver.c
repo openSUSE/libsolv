@@ -2714,14 +2714,11 @@ printdecisions(Solver *solv)
 
   if (installed)
     {
-      for (i = installed->start; i < installed->end; i++)
+      FOR_REPO_SOLVABLES(installed, p, s)
 	{
-	  s = pool->solvables + i;
-	  if (s->repo != installed)
+	  if (solv->decisionmap[p] >= 0)
 	    continue;
-	  if (solv->decisionmap[i] >= 0)
-	    continue;
-	  if (obsoletesmap[i])
+	  if (obsoletesmap[p])
 	    continue;
 	  printf("erase   %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	}
@@ -2747,7 +2744,8 @@ printdecisions(Solver *solv)
         }
       else
 	{
-	  printf("update  %s-%s.%s  (obsoletes", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	  printf("update  %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+          printf("  (obsoletes");
 	  for (j = installed->start; j < installed->end; j++)
 	    {
 	      if (obsoletesmap[j] != p)
@@ -3200,17 +3198,15 @@ solve(Solver *solv, Queue *job)
       oldnrules = solv->nrules;
       if (pool->verbose > 3)
 	printf ("*** create rpm rules for installed solvables ***\n");
-      for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
-	if (s->repo == installed)
-	  addrpmrulesforsolvable(solv, s, &addedmap);
+      FOR_REPO_SOLVABLES(installed, p, s)
+	addrpmrulesforsolvable(solv, s, &addedmap);
       if (pool->verbose)
 	printf("added %d rpm rules for installed solvables\n", solv->nrules - oldnrules);
       if (pool->verbose > 3)
 	printf ("*** create rpm rules for updaters of installed solvables ***\n");
       oldnrules = solv->nrules;
-      for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
-	if (s->repo == installed)
-	  addrpmrulesforupdaters(solv, s, &addedmap, 1);
+      FOR_REPO_SOLVABLES(installed, p, s)
+	addrpmrulesforupdaters(solv, s, &addedmap, 1);
       if (pool->verbose)
 	printf("added %d rpm rules for updaters of installed solvables\n", solv->nrules - oldnrules);
     }
@@ -3404,13 +3400,12 @@ solve(Solver *solv, Queue *job)
   if (installed && installed->nsolvables)
     {
       solv->weaksystemrules = xcalloc(installed->end - installed->start, sizeof(Id));
-      for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
-	if (s->repo == installed)
-	  {
-	    policy_findupdatepackages(solv, s, &q, 1);
-	    if (q.count)
-	      solv->weaksystemrules[i - installed->start] = pool_queuetowhatprovides(pool, &q);
-	  }
+      FOR_REPO_SOLVABLES(installed, p, s)
+	{
+	  policy_findupdatepackages(solv, s, &q, 1);
+	  if (q.count)
+	    solv->weaksystemrules[p - installed->start] = pool_queuetowhatprovides(pool, &q);
+	}
     }
 
   /* free unneeded memory */
@@ -3422,16 +3417,15 @@ solve(Solver *solv, Queue *job)
   /* try real hard to keep packages installed */
   if (0)
     {
-      for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
-	if (s->repo == installed)
-	  {
-	    /* FIXME: can't work with refine_suggestion! */
-            /* need to always add the rule but disable it */
-	    if (MAPTST(&solv->noupdate, i - installed->start))
-	      continue;
-	    d = solv->weaksystemrules[i - installed->start];
-	    addrule(solv, i, d);
-	  }
+      FOR_REPO_SOLVABLES(installed, p, s)
+        {
+	  /* FIXME: can't work with refine_suggestion! */
+	  /* need to always add the rule but disable it */
+	  if (MAPTST(&solv->noupdate, p - installed->start))
+ 	    continue;
+	  d = solv->weaksystemrules[p - installed->start];
+	  addrule(solv, p, d);
+	}
     }
 
   /* all new rules are learnt after this point */
