@@ -155,6 +155,26 @@ pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids)
   memset(pool->solvables + start, 0, sizeof(Solvable) * count);
 }
 
+
+const char *
+solvable2str(Pool *pool, Solvable *s)
+{
+  int l, nn = pool->dep2strn;
+  const char *n, *e, *a;
+  n = id2str(pool, s->name);
+  e = id2str(pool, s->evr);
+  a = id2str(pool, s->arch);
+  l = strlen(n) + strlen(e) + strlen(a) + 3;
+  if (l > pool->dep2strlen[nn])
+    {
+      pool->dep2strbuf[nn] = xrealloc(pool->dep2strbuf[nn], l + 32);
+      pool->dep2strlen[nn] = l + 32;
+    }
+  sprintf(pool->dep2strbuf[nn], "%s-%s.%s", n, e, a);
+  pool->dep2strn = (nn + 1) % DEP2STRBUF;
+  return pool->dep2strbuf[nn];
+}
+
 static Pool *pool_shrink_whatprovides_sortcmp_data;
 
 static int

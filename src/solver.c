@@ -98,12 +98,12 @@ printruleelement(Solver *solv, Rule *r, Id v)
   if (v < 0)
     {
       s = pool->solvables + -v;
-      printf("    !%s-%s.%s [%d]", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), -v);
+      printf("    !%s [%d]", solvable2str(pool, s), -v);
     }
   else
     {
       s = pool->solvables + v;
-      printf("    %s-%s.%s [%d]", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), v);
+      printf("    %s [%d]", solvable2str(pool, s), v);
     }
   if (r)
     {
@@ -581,9 +581,9 @@ makeruledecisions(Solver *solv)
 	    {
 	      Solvable *s = solv->pool->solvables + vv;
 	      if (v < 0)
-		printf("removing  %s-%s.%s\n", id2str(solv->pool, s->name), id2str(solv->pool, s->evr), id2str(solv->pool, s->arch));
+		printf("removing  %s\n", solvable2str(solv->pool, s));
 	      else
-		printf("installing  %s-%s.%s\n", id2str(solv->pool, s->name), id2str(solv->pool, s->evr), id2str(solv->pool, s->arch));
+		printf("installing  %s\n", solvable2str(solv->pool, s));
 	    }
 	  continue;
 	}
@@ -937,7 +937,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       if (!dontfix && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC && !pool_installable(pool, s))
 	{
 	  if (pool->verbose)
-	    printf("package %s-%s.%s [%d] is not installable\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (Id)(s - pool->solvables));
+	    printf("package %s [%d] is not installable\n", solvable2str(pool, s), (Id)(s - pool->solvables));
 	  addrule(solv, -n, 0);		/* uninstallable */
 	}
 
@@ -972,7 +972,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  if (!p)		/* previously broken dependency */
 		    {
 		      if (pool->verbose)
-			printf("ignoring broken requires %s of installed package %s-%s.%s\n", dep2str(pool, req), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+			printf("ignoring broken requires %s of installed package %s\n", dep2str(pool, req), solvable2str(pool, s));
 		      continue;
 		    }
 		}
@@ -981,16 +981,16 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		{
 		  /* nothing provides req! */
 		  if (pool->verbose)
-		     printf("package %s-%s.%s [%d] is not installable (%s)\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (Id)(s - pool->solvables), dep2str(pool, req));
+		     printf("package %s [%d] is not installable (%s)\n", solvable2str(pool, s), (Id)(s - pool->solvables), dep2str(pool, req));
 		  addrule(solv, -n, 0); /* mark requestor as uninstallable */
 		  continue;
 		}
 
 	      if (pool->verbose > 2)
 	        {
-		  printf("  %s-%s.%s requires %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req));
+		  printf("  %s requires %s\n", solvable2str(pool, s), dep2str(pool, req));
 		  for (i = 0; dp[i]; i++)
-		    printf("   provided by %s-%s.%s\n", id2str(pool, pool->solvables[dp[i]].name), id2str(pool, pool->solvables[dp[i]].evr), id2str(pool, pool->solvables[dp[i]].arch));
+		    printf("   provided by %s\n", solvable2str(pool, pool->solvables + dp[i]));
 	        }
 
 	      /* add 'requires' dependency */
@@ -1324,9 +1324,9 @@ propagate(Solver *solv, int level)
 		  if (pool->verbose > 3)
 		    {
 		      if (p > 0)
-			printf("    -> move w%d to %s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[p].name), id2str(pool, pool->solvables[p].evr), id2str(pool, pool->solvables[p].arch));
+			printf("    -> move w%d to %s\n", (pkg == r->w1 ? 1 : 2), solvable2str(pool, pool->solvables + p));
 		      else
-			printf("    -> move w%d to !%s-%s.%s\n", (pkg == r->w1 ? 1 : 2), id2str(pool, pool->solvables[-p].name), id2str(pool, pool->solvables[-p].evr), id2str(pool, pool->solvables[-p].arch));
+			printf("    -> move w%d to !%s\n", (pkg == r->w1 ? 1 : 2), solvable2str(pool, pool->solvables - p));
 		    }
 		  *rp = *nrp;
 		  nrp = rp;
@@ -1362,9 +1362,9 @@ propagate(Solver *solv, int level)
 	    {
 	      Solvable *s = pool->solvables + (ow > 0 ? ow : -ow);
 	      if (ow > 0)
-		printf("  -> decided to install %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		printf("  -> decided to install %s\n", solvable2str(pool, s));
 	      else
-		printf("  -> decided to conflict %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		printf("  -> decided to conflict %s\n", solvable2str(pool, s));
 	    }
 	}
     }
@@ -1916,10 +1916,7 @@ selectandinstall(Solver *solv, int level, Queue *dq, Id inst, int disablerules)
   p = dq->elements[i];
 
   if (pool->verbose > 3)
-    {
-      Solvable *s = pool->solvables + p;
-      printf("installing %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-    }
+    printf("installing %s\n", solvable2str(pool, pool->solvables + p));
 
   return setpropagatelearn(solv, level, p, disablerules);
 }
@@ -2083,7 +2080,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (solv->decisionmap[i] != 0)
 		    continue;
 		  if (pool->verbose > 3)
-		    printf("keeping %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		    printf("keeping %s\n", solvable2str(pool, s));
 		  olevel = level;
 		  level = setpropagatelearn(solv, level, i, disablerules);
 		  if (level == 0)
@@ -2285,9 +2282,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (dq.count > 1)
 	        policy_filter_unwanted(solv, &dq, 0, POLICY_MODE_RECOMMEND);
 	      p = dq.elements[0];
-	      s = pool->solvables + p;
 	      if (pool->verbose > 0)
-		printf("installing recommended %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+		printf("installing recommended %s\n", solvable2str(pool, pool->solvables + p));
 	      level = setpropagatelearn(solv, level, p, 0);
 	      continue;
 	    }
@@ -2305,10 +2301,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  break;
 	      p = solv->branches.elements[i];
 	      if (pool->verbose > 0)
-	        {
-		  s = pool->solvables + p;
-		  printf("branching with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	        }
+		printf("branching with %s\n", solvable2str(pool, pool->solvables + p));
 	      queue_empty(&dq);
 	      for (j = i + 1; j < solv->branches.count; j++)
 		queue_push(&dq, solv->branches.elements[j]);
@@ -2352,9 +2345,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      /* kill old solvable so that we do not loop */
 	      p = solv->branches.elements[lasti];
 	      solv->branches.elements[lasti] = 0;
-	      s = pool->solvables + p;
 	      if (pool->verbose > 0)
-	        printf("minimizing %d -> %d with %s-%s.%s\n", solv->decisionmap[p], l, id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	        printf("minimizing %d -> %d with %s\n", solv->decisionmap[p], l, solvable2str(pool, pool->solvables + p));
 
 	      level = lastl;
 	      revert(solv, level);
@@ -2720,7 +2712,7 @@ printdecisions(Solver *solv)
 	    continue;
 	  if (obsoletesmap[p])
 	    continue;
-	  printf("erase   %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	  printf("erase   %s\n", solvable2str(pool, s));
 	}
     }
 
@@ -2740,19 +2732,15 @@ printdecisions(Solver *solv)
 
       if (!obsoletesmap[p])
         {
-          printf("install %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+          printf("install %s", solvable2str(pool, s));
         }
       else
 	{
-	  printf("update  %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	  printf("update  %s", solvable2str(pool, s));
           printf("  (obsoletes");
 	  for (j = installed->start; j < installed->end; j++)
-	    {
-	      if (obsoletesmap[j] != p)
-		continue;
-	      s = pool->solvables + j;
-	      printf(" %s-%s.%s", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-	    }
+	    if (obsoletesmap[j] == p)
+	      printf(" %s", solvable2str(pool, pool->solvables + j));
 	  printf(")");
 	}
       printf("\n");
@@ -2766,7 +2754,7 @@ printdecisions(Solver *solv)
       for (i = 0; i < solv->suggestions.count; i++)
 	{
 	  s = pool->solvables + solv->suggestions.elements[i];
-	  printf("- %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	  printf("- %s\n", solvable2str(pool, s));
 	}
     }
 }
@@ -2788,7 +2776,7 @@ printconflicts(Solver *solv, Solvable *s, Id pc)
 	    {
 	      if (p != pc)
 		continue;
-	      printf("packags %s-%s.%s conflicts with %s, which is provided by %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, con), id2str(pool, sc->name), id2str(pool, sc->evr), id2str(pool, sc->arch));
+	      printf("packags %s conflicts with %s, which is provided by %s\n", solvable2str(pool, s), dep2str(pool, con), solvable2str(pool, sc));
 	      numc++;
 	    }
 	}
@@ -2802,7 +2790,7 @@ printconflicts(Solver *solv, Solvable *s, Id pc)
 	    {
 	      if (p != pc)
 		continue;
-	      printf("packags %s-%s.%s obsolets %s, which is provided by %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, obs), id2str(pool, sc->name), id2str(pool, sc->evr), id2str(pool, sc->arch));
+	      printf("packags %s obsolets %s, which is provided by %s\n", solvable2str(pool, s), dep2str(pool, obs), solvable2str(pool, sc));
 	      numc++;
 	    }
 	}
@@ -2887,12 +2875,12 @@ printprobleminfo(Solver *solv, Queue *job, Id problem)
 	      dp = pool_whatprovides(pool, req);
 	      if (*dp)
 		continue;
-	      printf("package %s-%s.%s requires %s, but no package provides it\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req));
+	      printf("package %s requires %s, but no package provides it\n", solvable2str(pool, s), dep2str(pool, req));
 	      count++;
 	    }
 	}
       if (!count)
-        printf("package %s-%s.%s is not installable\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+        printf("package %s is not installable\n", solvable2str(pool, s));
       return;
     }
 
@@ -2930,7 +2918,7 @@ printprobleminfo(Solver *solv, Queue *job, Id problem)
       sd = pool->solvables + (-d);
       if (sp->name == sd->name)
 	{
-	  printf("cannot install both %s-%s.%s and %s-%s.%s\n", id2str(pool, sp->name), id2str(pool, sp->evr), id2str(pool, sp->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+	  printf("cannot install both %s and %s\n", solvable2str(pool, sp), solvable2str(pool, sd));
 	}
       else
 	{
@@ -2962,7 +2950,7 @@ printprobleminfo(Solver *solv, Queue *job, Id problem)
 	  printf("req not found\n");
 	  abort();
 	}
-      printf("package %s-%s.%s requires %s, but none of its providers can be installed\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), dep2str(pool, req));
+      printf("package %s requires %s, but none of its providers can be installed\n", solvable2str(pool, s), dep2str(pool, req));
     }
 }
 
@@ -2999,16 +2987,16 @@ printsolutions(Solver *solv, Queue *job)
 		    case SOLVER_INSTALL_SOLVABLE:
 		      s = pool->solvables + what;
 		      if (solv->installed && s->repo == solv->installed)
-			printf("- do not keep %s-%s.%s installed\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+			printf("- do not keep %s installed\n", solvable2str(pool, s));
 		      else
-			printf("- do not install %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+			printf("- do not install %s\n", solvable2str(pool, s));
 		      break;
 		    case SOLVER_ERASE_SOLVABLE:
 		      s = pool->solvables + what;
 		      if (solv->installed && s->repo == solv->installed)
-			printf("- do not deinstall %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+			printf("- do not deinstall %s\n", solvable2str(pool, s));
 		      else
-			printf("- do not forbid installation of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+			printf("- do not forbid installation of %s\n", solvable2str(pool, s));
 		      break;
 		    case SOLVER_INSTALL_SOLVABLE_NAME:
 		      printf("- do not install %s\n", id2str(pool, what));
@@ -3024,8 +3012,7 @@ printsolutions(Solver *solv, Queue *job)
 		      break;
 		    case SOLVER_INSTALL_SOLVABLE_UPDATE:
 		      s = pool->solvables + what;
-		      printf("- do not install most recent version of %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool
-    , s->arch));
+		      printf("- do not install most recent version of %s\n", solvable2str(pool, s));
 		      break;
 		    default:
 		      printf("- do something different\n");
@@ -3042,28 +3029,28 @@ printsolutions(Solver *solv, Queue *job)
 		      int gotone = 0;
 		      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr) > 0)
 			{
-			  printf("- allow downgrade of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  printf("- allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 			  gotone = 1;
 			}
 		      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(pool, s, sd))
 			{
-			  printf("- allow architecture change of %s-%s.%s to %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			  printf("- allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 			  gotone = 1;
 			}
 		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(pool, s, sd))
 			{
 			  if (sd->vendor)
-			    printf("- allow vendor change from '%s' (%s-%s.%s) to '%s' (%s-%s.%s)\n", id2str(pool, s->vendor), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->vendor), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			    printf("- allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));
 			  else
-			    printf("- allow vendor change from '%s' (%s-%s.%s) to no vendor (%s-%s.%s)\n", id2str(pool, s->vendor), id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			    printf("- allow vendor change from '%s' (%s) to no vendor (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), solvable2str(pool, sd));
 			  gotone = 1;
 			}
 		      if (!gotone)
-			printf("- allow replacement of %s-%s.%s with %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), id2str(pool, sd->name), id2str(pool, sd->evr), id2str(pool, sd->arch));
+			printf("- allow replacement of %s with %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 		    }
 		  else
 		    {
-		      printf("- allow deinstallation of %s-%s.%s [%d]\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch), (Id)(s - pool->solvables));
+		      printf("- allow deinstallation of %s\n", solvable2str(pool, s));
 		    }
 
 		}
@@ -3156,7 +3143,7 @@ create_obsolete_index(Solver *solv)
  */
 
 void
-solve(Solver *solv, Queue *job)
+solver_solve(Solver *solv, Queue *job)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
@@ -3298,14 +3285,14 @@ solve(Solver *solv, Queue *job)
 	case SOLVER_INSTALL_SOLVABLE:			/* install specific solvable */
 	  s = pool->solvables + what;
 	  if (pool->verbose)
-	    printf("job: install solvable %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	    printf("job: install solvable %s\n", solvable2str(pool, s));
           addrule(solv, what, 0);			/* install by Id */
 	  queue_push(&solv->ruletojob, i);
 	  break;
 	case SOLVER_ERASE_SOLVABLE:
 	  s = pool->solvables + what;
 	  if (pool->verbose)
-	    printf("job: erase solvable %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	    printf("job: erase solvable %s\n", solvable2str(pool, s));
           addrule(solv, -what, 0);			/* remove by Id */
 	  queue_push(&solv->ruletojob, i);
 	  break;
@@ -3355,7 +3342,7 @@ solve(Solver *solv, Queue *job)
 	case SOLVER_INSTALL_SOLVABLE_UPDATE:              /* find update for solvable */
 	  s = pool->solvables + what;
 	  if (pool->verbose)
-	    printf("job: update %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	    printf("job: update %s\n", solvable2str(pool, s));
 	  addupdaterule(solv, s, 0);
 	  queue_push(&solv->ruletojob, i);
 	  break;

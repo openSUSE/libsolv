@@ -123,15 +123,17 @@ enum solvcmds {
 
 extern Solver *solver_create(Pool *pool, Repo *installed);
 extern void solver_free(Solver *solv);
-extern void solve(Solver *solv, Queue *job);
+extern void solver_solve(Solver *solv, Queue *job);
 extern int solver_dep_installed(Solver *solv, Id dep);
 
 extern Id solver_next_problem(Solver *solv, Id problem);
 extern Id solver_next_solution(Solver *solv, Id problem, Id solution);
 extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
 
+/* debug functions, do not use */
 void printdecisions(Solver *solv);
 void printsolutions(Solver *solv, Queue *job);
+
 
 static inline int
 solver_dep_fulfilled(Solver *solv, Id dep)

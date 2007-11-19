@@ -267,7 +267,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
     {
       s = pool->solvables + plist->elements[i];
 
-      if (pool->verbose > 1) printf("- %s-%s.%s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+      if (pool->verbose > 1) printf("- %s\n", solvable2str(pool, s));
 
       if (!best)		       /* if no best yet, the current is best */
         {
