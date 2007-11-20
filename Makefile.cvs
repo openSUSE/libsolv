@@ -1,0 +1,30 @@
+# Generic Makefile.cvs for CMake-based projects:
+#
+# Create a subdirecory build/ and call cmake from there with /usr prefix.
+#
+# Intentionally using /usr rather than the default /usr/local since this is for
+# internal use, and we are the distribution makers: /usr/local is off limits
+# for us.
+#
+# Author: Stefan Hundhammer <sh@suse.de>
+
+BUILD_SUBDIR		= build
+HERE_FROM_BUILD_SUBDIR	= ..
+PREFIX			= /usr
+CMAKE			= /usr/bin/cmake
+
+all:	cmake
+
+
+cmake: create-build-subdir create-toplevel-makefile
+	( cd $(BUILD_SUBDIR) && $(CMAKE) -DCMAKE_INSTALL_PREFIX=$(PREFIX) $(HERE_FROM_BUILD_SUBDIR) )
+
+
+create-build-subdir:
+	test -d $(BUILD_SUBDIR) || mkdir $(BUILD_SUBDIR)
+
+
+create-toplevel-makefile:
+	echo 'all:'						 >Makefile
+	echo -e '\t$$(MAKE) $$(MAKEFLAGS) -C $(BUILD_SUBDIR)'	>>Makefile
+
