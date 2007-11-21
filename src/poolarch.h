@@ -5,11 +5,11 @@
  * for further information
  */
 
-#ifndef POOLARCH_H
-#define POOLARCH_H
+#ifndef SATSOLVER_POOLARCH_H
+#define SATSOLVER_POOLARCH_H
 
 #include "pool.h"
 
 extern void pool_setarch(Pool *, const char *);
 
-#endif /* POOLARCH_H */
+#endif /* SATSOLVER_POOLARCH_H */

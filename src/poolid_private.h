@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef POOLID_PRIVATE_H
-#define POOLID_PRIVATE_H
+#ifndef SATSOLVER_POOLID_PRIVATE_H
+#define SATSOLVER_POOLID_PRIVATE_H
 
 // the size of all buffers is incremented in blocks
 // these are the block values (increment values) for the
@@ -19,4 +19,4 @@
 // 
 #define REL_BLOCK         1023          // hashtable for relations
 
-#endif /* POOLID_PRIVATE_H */
+#endif /* SATSOLVER_POOLID_PRIVATE_H */

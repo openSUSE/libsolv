@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef REPO_SOLVE_H
-#define REPO_SOLVE_H
+#ifndef SATSOLVER_REPO_SOLVE_H
+#define SATSOLVER_REPO_SOLVE_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,4 +28,4 @@ extern void repo_add_solv(Repo *repo, FILE *fp);
 }
 #endif
 
-#endif /* REPO_SOLVE_H */
+#endif /* SATSOLVER_REPO_SOLVE_H */

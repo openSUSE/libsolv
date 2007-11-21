@@ -10,8 +10,8 @@
  * generic hash functions
  */
 
-#ifndef HASH_H
-#define HASH_H
+#ifndef SATSOLVER_HASH_H
+#define SATSOLVER_HASH_H
 
 #include "pooltypes.h"
 
@@ -65,4 +65,4 @@ mkmask(unsigned int num)
   return num * 2 - 1;
 }
 
-#endif /* HASH_H */
+#endif /* SATSOLVER_HASH_H */

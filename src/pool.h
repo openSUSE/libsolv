@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef POOL_H
-#define POOL_H
+#ifndef SATSOLVER_POOL_H
+#define SATSOLVER_POOL_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -189,4 +189,4 @@ static inline Id *pool_whatprovides(Pool *pool, Id d)
 }
 #endif
 
-#endif /* POOL_H */
+#endif /* SATSOLVER_POOL_H */

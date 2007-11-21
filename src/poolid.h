@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef POOLID_H
-#define POOLID_H
+#ifndef SATSOLVER_POOLID_H
+#define SATSOLVER_POOLID_H
 
 #include "pooltypes.h"
 #include "hash.h"
@@ -36,4 +36,4 @@ extern void pool_shrink_strings(Pool *pool);
 extern void pool_shrink_rels(Pool *pool);
 extern void pool_freeidhashes(Pool *pool);
 
-#endif /* POOLID_H */
+#endif /* SATSOLVER_POOLID_H */

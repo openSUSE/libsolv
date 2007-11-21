@@ -4,8 +4,8 @@
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
  */
-#ifndef STRINGPOOL_H
-#define STRINGPOOL_H
+#ifndef SATSOLVER_STRINGPOOL_H
+#define SATSOLVER_STRINGPOOL_H
 
 #include "pooltypes.h"
 #include "hash.h"

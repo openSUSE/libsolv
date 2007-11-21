@@ -5,11 +5,11 @@
  * for further information
  */
 
-#ifndef POOLVENDOR_H
-#define POOLVENDOR_H
+#ifndef SATSOLVER_POOLVENDOR_H
+#define SATSOLVER_POOLVENDOR_H
 
 #include "pool.h"
 
 Id pool_vendor2mask(Pool *pool, Id vendor);
 
-#endif /* POOLVENDOR_H */
+#endif /* SATSOLVER_POOLVENDOR_H */

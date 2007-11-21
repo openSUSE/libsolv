@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef QUEUE_H
-#define QUEUE_H
+#ifndef SATSOLVER_QUEUE_H
+#define SATSOLVER_QUEUE_H
 
 #include "pooltypes.h"
 
@@ -72,4 +72,4 @@ extern void queue_init(Queue *q);
 extern void queue_init_buffer(Queue *q, Id *buf, int size);
 extern void queue_free(Queue *q);
 
-#endif /* QUEUE_H */
+#endif /* SATSOLVER_QUEUE_H */

@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef EVR_H
-#define EVR_H
+#ifndef SATSOLVER_EVR_H
+#define SATSOLVER_EVR_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,4 +26,4 @@ extern int evrcmp( Pool *pool, Id evr1id, Id evr2id );
 }
 #endif
 
-#endif /* EVR_H */
+#endif /* SATSOLVER_EVR_H */

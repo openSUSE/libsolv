@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef SOLVER_H
-#define SOLVER_H
+#ifndef SATSOLVER_SOLVER_H
+#define SATSOLVER_SOLVER_H
 
 #include "pooltypes.h"
 #include "pool.h"
@@ -201,4 +201,4 @@ solver_is_enhancing(Solver *solv, Solvable *s)
   return 0;
 }
 
-#endif /* SOLVER_H */
+#endif /* SATSOLVER_SOLVER_H */

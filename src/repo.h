@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef REPO_H
-#define REPO_H
+#ifndef SATSOLVER_REPO_H
+#define SATSOLVER_REPO_H
 
 #include "pooltypes.h"
 #include "pool.h"
@@ -110,4 +110,4 @@ static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int
   for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s++)	\
     if (s->repo == (r))
 
-#endif /* REPO_H */
+#endif /* SATSOLVER_REPO_H */

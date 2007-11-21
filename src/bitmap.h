@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef BITMAP_H
-#define BITMAP_H
+#ifndef SATSOLVER_BITMAP_H
+#define SATSOLVER_BITMAP_H
 
 typedef struct _Map {
   unsigned char *map;
@@ -27,4 +27,4 @@ extern void map_init(Map *m, int n);
 extern void map_free(Map *m);
 extern void map_clone(Map *t, Map *s);
 
-#endif /* BITMAP_H */
+#endif /* SATSOLVER_BITMAP_H */

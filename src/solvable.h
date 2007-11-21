@@ -11,8 +11,8 @@
  * A solvable represents an object with name-epoch:version-release.arch and dependencies
  */
 
-#ifndef SOLVABLE_H
-#define SOLVABLE_H
+#ifndef SATSOLVER_SOLVABLE_H
+#define SATSOLVER_SOLVABLE_H
 
 #include "pooltypes.h"
 
@@ -41,4 +41,4 @@ typedef struct _Solvable {
   Offset freshens;
 } Solvable;
 
-#endif /* SOLVABLE_H */
+#endif /* SATSOLVER_SOLVABLE_H */
