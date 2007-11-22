@@ -156,6 +156,20 @@ printrule(Solver *solv, Rule *r)
   printf("    next: %d %d\n", r->n1, r->n2);
 }
 
+static void
+printruleclass(Solver *solv, Rule *r)
+{
+  if (r - solv->rules >= solv->learntrules)
+    printf("LEARNT ");
+  else if (r - solv->rules >= solv->weakrules)
+    printf("WEAK ");
+  else if (r - solv->rules >= solv->systemrules)
+    printf("SYSTEM ");
+  else if (r - solv->rules >= solv->jobrules)
+    printf("JOB ");
+  printrule(solv, r);
+}
+
 
 /*-----------------------------------------------------------------*/
 
@@ -647,7 +661,7 @@ makeruledecisions(Solver *solv)
 	{
 	  if (!rr->w1 || rr->w2)
 	    continue;
-	  if (rr->p != v && rr->p != -v)
+	  if (rr->p != vv && rr->p != -vv)
 	    continue;
 	  printf(" - disabling rule #%d\n", i);
 	  v = i;
@@ -1404,17 +1418,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
   for (;;)
     {
       if (pool->verbose > 1)
-	{
-	  if (c - solv->rules >= solv->learntrules)
-	    printf("LEARNT ");
-	  else if (c - solv->rules >= solv->weakrules)
-	    printf("WEAK ");
-	  else if (c - solv->rules >= solv->systemrules)
-	    printf("SYSTEM ");
-	  else if (c - solv->rules >= solv->jobrules)
-	    printf("JOB ");
-	  printrule(solv, c);
-	}
+	printruleclass(solv, c);
       queue_push(&solv->learnt_pool, c - solv->rules);
       dp = c->d ? pool->whatprovidesdata + c->d : 0;
       for (i = -1; ; i++)
@@ -1570,17 +1574,7 @@ analyze_unsolvable_rule(Solver *solv, Rule *r)
   int i;
   Id why = r - solv->rules;
   if (solv->pool->verbose > 1)
-    {
-      if (why >= solv->jobrules && why < solv->systemrules)
-	printf("JOB ");
-      if (why >= solv->systemrules && why < solv->weakrules)
-	printf("SYSTEM %d ", why - solv->systemrules);
-      if (why >= solv->weakrules && why < solv->learntrules)
-	printf("WEAK ");
-      if (solv->learntrules && why >= solv->learntrules)
-	printf("LEARNED ");
-      printrule(solv, r);
-    }
+     printruleclass(solv, r);
   if (solv->learntrules && why >= solv->learntrules)
     {
       for (i = solv->learnt_why.elements[why - solv->learntrules]; solv->learnt_pool.elements[i]; i++)
@@ -2234,6 +2228,15 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  int qcount;
 
 	  if (pool->verbose) printf("installing recommended packages\n");
+	  if (0)
+	    {
+	      for (i = 0; i < solv->decisionq.count; i++)
+		{
+		  p = solv->decisionq.elements[i];
+		  if (p > 0 && pool->solvables[p].repo == solv->installed)
+		    solv->decisionmap[p] = -solv->decisionmap[p];
+		}
+	    }
 	  queue_empty(&dq);
 	  for (i = 1; i < pool->nsolvables; i++)
 	    {
@@ -2275,6 +2278,15 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (solver_is_supplementing(solv, s))
 		    queue_pushunique(&dq, i);
+		}
+	    }
+	  if (0)
+	    {
+	      for (i = 0; i < solv->decisionq.count; i++)
+		{
+		  p = solv->decisionq.elements[i];
+		  if (p > 0 && pool->solvables[p].repo == solv->installed)
+		    solv->decisionmap[p] = -solv->decisionmap[p];
 		}
 	    }
 	  if (dq.count)
@@ -2486,6 +2498,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
   /* disable problem rules again */
   for (i = 0; problem[i]; i++)
     disableproblem(solv, problem[i]);
+  disableupdaterules(solv, job, -1);
   if (pool->verbose)
     printf("refine_suggestion end\n");
 }
@@ -2573,11 +2586,14 @@ problems_to_solutions(Solver *solv, Queue *job)
   /* copy queue over to solutions */
   queue_free(&solv->problems);
   queue_clone(&solv->problems, &solutions);
-  queue_free(&solutions);
 
   /* bring solver back into problem state */
   revert(solv, 1);		/* XXX move to reset_solver? */
   reset_solver(solv);
+
+  if (solv->problems.count != solutions.count)
+    abort();
+  queue_free(&solutions);
 }
 
 Id
