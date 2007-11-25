@@ -280,12 +280,7 @@ startElement(void *userData, const char *name, const char **atts)
 	}
       break;
     case STATE_PACKAGE:
-      if (pd->numpacks > 0)
-	{
-	  pd->numpacks--;
-	  pd->solvable++;
-	}
-      else
+      if (pd->numpacks == 0)
 	pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
@@ -377,6 +372,11 @@ endElement(void *userData, const char *name)
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
+      if (pd->numpacks > 0)
+	{
+	  pd->numpacks--;
+	  pd->solvable++;
+	}
       break;
     case STATE_NAME:
       s->name = str2id(pool, pd->content, 1);
