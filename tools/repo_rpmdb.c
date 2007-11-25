@@ -618,7 +618,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref)
 	    }
 	  else
 	    {
-	      memset(s, 0, sizeof(*s));		/* oops, reuse that one */
+	      /* We can reuse this solvable, but make sure it's still
+		 associated with this repo.  */
+	      memset(s, 0, sizeof(*s));
+	      s->repo = repo;
 	    }
 	}
       if (s)
