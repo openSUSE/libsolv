@@ -54,11 +54,11 @@ main(int argc, char **argv)
     {
       Repo *repo = pool->repos[i];
       int si;
+      Solvable *s;
       memcpy (new_id + new_id_size, repo->idarraydata,
       	      repo->idarraysize * sizeof (new_id[0]));
-      for (si = repo->start; si < repo->start + repo->nsolvables; si++)
+      FOR_REPO_SOLVABLES (repo, si, s)
         {
-	  Solvable *s = pool->solvables + si;
 	  if (s->provides)
 	    s->provides += new_id_size;
 	  if (s->obsoletes)
@@ -77,13 +77,20 @@ main(int argc, char **argv)
 	    s->enhances += new_id_size;
 	  if (s->freshens)
 	    s->freshens += new_id_size;
+	  if (i > 0)
+	    s->repo = pool->repos[0];
 	}
       new_id_size += repo->idarraysize;
       if (i > 0)
         {
 	  pool->repos[0]->nsolvables += repo->nsolvables;
+	  if (pool->repos[0]->start > repo->start)
+	    pool->repos[0]->start = repo->start;
+	  if (pool->repos[0]->end < repo->end)
+	    pool->repos[0]->end = repo->end;
 	  repo->nsolvables = 0;
 	  repo->start = pool->nsolvables;
+	  repo->end = repo->start;
 	  free (repo->idarraydata);
 	  repo->idarraydata = 0;
 	}
