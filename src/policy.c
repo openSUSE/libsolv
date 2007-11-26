@@ -20,6 +20,7 @@
 #include "policy.h"
 #include "poolvendor.h"
 #include "poolarch.h"
+#include "sat_debug.h"
 
 
 static Pool *prune_best_version_arch_sortcmp_data;
@@ -222,7 +223,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
 
   if (plist->count < 2)		/* no need to prune for a single entry */
     return;
-  if (pool->verbose > 1) printf("prune_to_best_version %d\n", plist->count);
+  sat_debug (DEBUG_2, "prune_to_best_version %d\n", plist->count);
 
   /* prune to best architecture */
   if (pool->id2arch)
@@ -267,7 +268,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
     {
       s = pool->solvables + plist->elements[i];
 
-      if (pool->verbose > 1) printf("- %s\n", solvable2str(pool, s));
+      sat_debug (DEBUG_2, "- %s\n", solvable2str(pool, s));
 
       if (!best)		       /* if no best yet, the current is best */
         {

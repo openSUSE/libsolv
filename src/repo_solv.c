@@ -25,6 +25,7 @@
 
 #include "repo_solv.h"
 #include "util.h"
+#include "sat_debug.h"
 
 #define INTERESTED_START	SOLVABLE_NAME
 #define INTERESTED_END		SOLVABLE_FRESHENS
@@ -47,7 +48,7 @@ read_u32(FILE *fp)
       c = getc(fp);
       if (c == EOF)
 	{
-	  fprintf(stderr, "unexpected EOF\n");
+	  sat_debug (ERROR, "unexpected EOF\n");
 	  exit(1);
 	}
       x = (x << 8) | c;
@@ -67,7 +68,7 @@ read_u8(FILE *fp)
   c = getc(fp);
   if (c == EOF)
     {
-      fprintf(stderr, "unexpected EOF\n");
+      sat_debug (ERROR, "unexpected EOF\n");
       exit(1);
     }
   return c;
@@ -89,7 +90,7 @@ read_id(FILE *fp, Id max)
       c = getc(fp);
       if (c == EOF)
 	{
-	  fprintf(stderr, "unexpected EOF\n");
+	  sat_debug (ERROR, "unexpected EOF\n");
 	  exit(1);
 	}
       if (!(c & 128))
@@ -97,14 +98,14 @@ read_id(FILE *fp, Id max)
 	  x = (x << 7) | c;
 	  if (x >= max)
 	    {
-	      fprintf(stderr, "read_id: id too large (%u/%u)\n", x, max);
+	      sat_debug (ERROR, "read_id: id too large (%u/%u)\n", x, max);
 	      exit(1);
 	    }
 	  return x;
 	}
       x = (x << 7) ^ c ^ 128;
     }
-  fprintf(stderr, "read_id: id too long\n");
+  sat_debug (ERROR, "read_id: id too long\n");
   exit(1);
 }
 
@@ -123,7 +124,7 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end)
       c = getc(fp);
       if (c == EOF)
 	{
-	  fprintf(stderr, "unexpected EOF\n");
+	  sat_debug (ERROR, "unexpected EOF\n");
 	  exit(1);
 	}
       if ((c & 128) == 0)
@@ -131,12 +132,12 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end)
 	  x = (x << 6) | (c & 63);
           if (x >= max)
 	    {
-	      fprintf(stderr, "read_idarray: id too large (%u/%u)\n", x, max);
+	      sat_debug (ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
 	      exit(1);
 	    }
 	  if (store == end)
 	    {
-	      fprintf(stderr, "read_idarray: array overflow\n");
+	      sat_debug (ERROR, "read_idarray: array overflow\n");
 	      exit(1);
 	    }
 	  *store++ = map[x];
@@ -144,7 +145,7 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end)
 	    {
 	      if (store == end)
 		{
-		  fprintf(stderr, "read_idarray: array overflow\n");
+		  sat_debug (ERROR, "read_idarray: array overflow\n");
 		  exit(1);
 		}
 	      *store++ = 0;
@@ -202,12 +203,12 @@ repo_add_solv(Repo *repo, FILE *fp)
 
   if (read_u32(fp) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
     {
-      fprintf(stderr, "not a SOLV file\n");
+      sat_debug (ERROR, "not a SOLV file\n");
       exit(1);
     }
   if (read_u32(fp) != SOLV_VERSION)
     {
-      fprintf(stderr, "unsupported SOLV version\n");
+      sat_debug (ERROR, "unsupported SOLV version\n");
       exit(1);
     }
 
@@ -250,7 +251,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   
   if (fread(strsp, sizeid, 1, fp) != 1)
     {
-      fprintf(stderr, "read error while reading strings\n");
+      sat_debug (ERROR, "read error while reading strings\n");
       exit(1);
     }
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
@@ -264,8 +265,8 @@ repo_add_solv(Repo *repo, FILE *fp)
   hashmask = mkmask(pool->ss.nstrings + numid);
 
 #if 0
-  printf("read %d strings\n", numid);
-  printf("string hash buckets: %d\n", hashmask + 1);
+  sat_debug (ALWAYS, "read %d strings\n", numid);
+  sat_debug (ALWAYS, "string hash buckets: %d\n", hashmask + 1);
 #endif
 
   /*
@@ -297,7 +298,7 @@ repo_add_solv(Repo *repo, FILE *fp)
     {
       if (sp >= strsp + sizeid)
 	{
-	  fprintf(stderr, "not enough strings\n");
+	  sat_debug (ERROR, "not enough strings\n");
 	  exit(1);
 	}
       if (!*sp)			       /* empty string */
@@ -349,15 +350,15 @@ repo_add_solv(Repo *repo, FILE *fp)
       ran = (Reldep *)xrealloc(pool->rels, (pool->nrels + numrel) * sizeof(Reldep));
       if (!ran)
 	{
-	  fprintf(stderr, "no mem for rel space\n");
+	  sat_debug (ERROR, "no mem for rel space\n");
 	  exit(1);
 	}
       pool->rels = ran;	       /* extended rel space */
 
       hashmask = mkmask(pool->nrels + numrel);
 #if 0
-      printf("read %d rels\n", numrel);
-      printf("rel hash buckets: %d\n", hashmask + 1);
+      sat_debug (ALWAYS, "read %d rels\n", numrel);
+      sat_debug (ALWAYS, "rel hash buckets: %d\n", hashmask + 1);
 #endif
       /*
        * prep hash table with already existing RelDeps
@@ -414,7 +415,7 @@ repo_add_solv(Repo *repo, FILE *fp)
    */
 
 #if 0
-  printf("read repo data\n");
+  sat_debug (ALWAYS, "read repo data\n");
 #endif
   numsrcdata = read_u32(fp);
   for (i = 0; i < numsrcdata; i++)
@@ -434,7 +435,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	    ;
 	  break;
 	default:
-          fprintf(stderr, "unknown type\n");
+          sat_debug (ERROR, "unknown type\n");
 	  exit(0);
 	}
     }
@@ -445,7 +446,7 @@ repo_add_solv(Repo *repo, FILE *fp)
    */
   
 #if 0
-  printf("read solvable data info\n");
+  sat_debug (ALWAYS, "read solvable data info\n");
 #endif
   numsolvdata = read_u32(fp);
   numsolvdatabits = 0;
@@ -464,7 +465,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	}
       id = idmap[read_id(fp, numid)];
 #if 0
-      printf("#%d: %s\n", i, id2str(pool, id));
+      sat_debug (ALWAYS, "#%d: %s\n", i, id2str(pool, id));
 #endif
       solvdata[i].id = id;
       size = read_u32(fp);
@@ -480,7 +481,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 
   if (numsolvdatabits >= 32)
     {
-      fprintf(stderr, "too many data map bits\n");
+      sat_debug (ERROR, "too many data map bits\n");
       exit(1);
     }
 
@@ -504,7 +505,7 @@ repo_add_solv(Repo *repo, FILE *fp)
    */
   
 #if 0
-  printf("read solvables\n");
+  sat_debug (ALWAYS, "read solvables\n");
 #endif
   s = pool_id2solvable(pool, repo_add_solvable_block(repo, numsolv));
   for (i = 0; i < numsolv; i++, s++)
@@ -542,13 +543,13 @@ repo_add_solv(Repo *repo, FILE *fp)
 	      else if (id == SOLVABLE_VENDOR)
 		s->vendor = did;
 #if 0
-	      printf("%s -> %s\n", id2str(pool, id), id2str(pool, did));
+	      sat_debug (ALWAYS, "%s -> %s\n", id2str(pool, id), id2str(pool, did));
 #endif
 	      break;
 	    case TYPE_U32:
 	      h = read_u32(fp);
 #if 0
-	      printf("%s -> %u\n", id2str(pool, id), h);
+	      sat_debug (ALWAYS, "%s -> %u\n", id2str(pool, id), h);
 #endif
 	      if (id == RPM_RPMDBID)
 		{
@@ -590,9 +591,9 @@ repo_add_solv(Repo *repo, FILE *fp)
 	      else if (id == SOLVABLE_FRESHENS)
 		s->freshens = ido;
 #if 0
-	      printf("%s ->\n", id2str(pool, id));
+	      sat_debug (ALWAYS, "%s ->\n", id2str(pool, id));
 	      for (; repo->idarraydata[ido]; ido++)
-	        printf("  %s\n", dep2str(pool, repo->idarraydata[ido]));
+	        sat_debug (ALWAYS,"  %s\n", dep2str(pool, repo->idarraydata[ido]));
 #endif
 	      break;
 	    }
