@@ -26,12 +26,15 @@ typedef enum {
     DEBUG_5  = 5
 } DebugLevel;
 
+// Callback for logging
+typedef void (*SatDebugFn) (char *logString);
+void sat_set_debugCallback (SatDebugFn callback);
+
 // debug level
 void sat_set_debug (DebugLevel level, int log_line_nr);
 DebugLevel sat_debug_level ();
 
+// logging a line
 void sat_debug (DebugLevel  level, const char *format, ...);
-
-
 
 #endif /* _SAT_DEBUG_H */

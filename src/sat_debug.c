@@ -21,7 +21,14 @@
 static DebugLevel debug_level = ERROR;
 // log file,function,line too
 static int sat_log_lineNr = 0;
+// Callback for logging
+SatDebugFn debugCallback = NULL;
 
+void
+sat_set_debugCallback (SatDebugFn callback)
+{
+    debugCallback = callback;
+}
 
 void
 sat_set_debug (DebugLevel level, int log_line_nr)
@@ -48,9 +55,15 @@ sat_debug (DebugLevel level, const char *format, ...)
     if (sat_debug_level() >= level) {
 	if (sat_log_lineNr) {
 	    char pre[MAX_OUTPUT_LEN];
-	    snprintf (pre, MAX_OUTPUT_LEN, "(%s, %s:%d) ", __FUNCTION__, __FILE__, __LINE__);
-	    printf("%s", pre);
+	    snprintf (pre, MAX_OUTPUT_LEN, "(%s, %s:%d) ", __FUNCTION__, __FILE__, __LINE__);	    
+	    if (debugCallback == NULL) 
+		printf("%s", pre);
+	    else 
+		debugCallback (pre);
 	}
-	printf ("%s", str);
+	if (debugCallback == NULL)     
+	    printf ("%s", str);
+	else 
+	    debugCallback (str);	
     }
 }
