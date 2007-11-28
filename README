@@ -11,7 +11,7 @@ This code is based on two major, but independent, blocks
 1. Using a dictionary approach to store and retrieve package
    and dependency information.
    
-2. Using satisfyability, a well known and researched topic, for
+2. Using satisfiability, a well known and researched topic, for
    computing package dependencies.
 
 
