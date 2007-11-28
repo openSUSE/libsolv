@@ -63,8 +63,6 @@ extern "C" {
 struct _Repo;
 
 struct _Pool {
-  int verbose;		// pool is used everywhere, so put the verbose flag here
-
   struct _Stringpool ss;
 
   Reldep *rels;               // table of rels: Id -> Reldep
@@ -100,7 +98,26 @@ struct _Pool {
   char *dep2strbuf[DEP2STRBUF];
   int   dep2strlen[DEP2STRBUF];
   int   dep2strn;
+
+  /* debug mask and callback */
+  int  debugmask;
+  void (*debugcallback)(struct _Pool *, void *data, int type, const char *str);
+  void *debugcallbackdata;
 };
+
+#define SAT_FATAL			(1<<0)
+#define SAT_ERROR			(1<<1)
+#define SAT_WARN			(1<<2)
+#define SAT_DEBUG_STATS			(1<<3)
+#define SAT_DEBUG_RULE_CREATION		(1<<4)
+#define SAT_DEBUG_PROPAGATE		(1<<5)
+#define SAT_DEBUG_ANALYZE		(1<<6)
+#define SAT_DEBUG_UNSOLVABLE		(1<<7)
+#define SAT_DEBUG_SOLUTIONS		(1<<8)
+#define SAT_DEBUG_POLICY		(1<<9)
+#define SAT_DEBUG_RESULT		(1<<10)
+#define SAT_DEBUG_JOB			(1<<11)
+#define SAT_DEBUG_SCHUBI		(1<<12)
 
 #define TYPE_ID			1
 #define TYPE_IDARRAY		2
@@ -136,6 +153,8 @@ extern Pool *pool_create(void);
  * Delete a pool
  */
 extern void pool_free(Pool *pool);
+
+extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 /**
  * Solvable management
@@ -180,13 +199,29 @@ static inline Id *pool_whatprovides(Pool *pool, Id d)
   return pool_addrelproviders(pool, d);
 }
 
+extern void pool_setdebuglevel(Pool *pool, int level);
+
+static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
+{
+  pool->debugcallback = debugcallback;
+  pool->debugcallbackdata = debugcallbackdata;
+}
+
+static inline void pool_setdebugmask(Pool *pool, int mask)
+{
+  pool->debugmask = mask;
+}
+
 /* loop over all providers of d */
 #define FOR_PROVIDES(v, vp, d) 						\
   for (vp = pool_whatprovides(pool, d) ; (v = *vp++) != 0; )
 
+#define POOL_DEBUG(type, ...) do {if ((pool->debugmask & (type)) != 0) pool_debug(pool, (type), __VA_ARGS__);} while (0)
+#define IF_POOLDEBUG(type) if ((pool->debugmask & (type)) != 0)
 
 #ifdef __cplusplus
 }
 #endif
+
 
 #endif /* SATSOLVER_POOL_H */

@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -24,7 +25,6 @@
 #include "poolarch.h"
 #include "util.h"
 #include "evr.h"
-#include "sat_debug.h"
 
 #define SOLVABLE_BLOCK	255
 
@@ -95,6 +95,8 @@ pool_create(void)
   s->name = SYSTEM_SYSTEM;
   s->arch = ARCH_NOARCH;
   s->evr = ID_EMPTY;
+
+  pool->debugmask = SAT_DEBUG_RESULT;	/* FIXME */
   return pool;
 }
 
@@ -270,7 +272,7 @@ pool_shrink_whatprovides(Pool *pool)
 	;
     }
   o = dp - pool->whatprovidesdata;
-  sat_debug (DEBUG_1, "shrunk whatprovidesdata from %d to %d\n", pool->whatprovidesdataoff, o);
+  POOL_DEBUG(SAT_DEBUG_STATS, "shrunk whatprovidesdata from %d to %d\n", pool->whatprovidesdataoff, o);
   if (pool->whatprovidesdataoff == o)
     return;
   r = pool->whatprovidesdataoff - o;
@@ -300,8 +302,8 @@ pool_createwhatprovides(Pool *pool)
   Offset *whatprovides;
   Id *whatprovidesdata, *d;
 
-  sat_debug (DEBUG_1,"number of solvables: %d\n", pool->nsolvables);
-  sat_debug (DEBUG_1,"number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
+  POOL_DEBUG(SAT_DEBUG_STATS, "number of solvables: %d\n", pool->nsolvables);
+  POOL_DEBUG(SAT_DEBUG_STATS, "number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
 
   pool_freeidhashes(pool);
   pool_freewhatprovides(pool);
@@ -342,13 +344,13 @@ pool_createwhatprovides(Pool *pool)
       np++;			       /* inc # of provider 'slots' */
     }
 
-  sat_debug (DEBUG_1, "provide ids: %d\n", np);
+  POOL_DEBUG(SAT_DEBUG_STATS, "provide ids: %d\n", np);
   extra = 2 * pool->nrels;
 
   if (extra < 256)
     extra = 256;
 
-  sat_debug (DEBUG_1, "provide space needed: %d + %d\n", off, extra);
+  POOL_DEBUG(SAT_DEBUG_STATS, "provide space needed: %d + %d\n", off, extra);
 
   /* alloc space for all providers + extra */
   whatprovidesdata = (Id *)xcalloc(off + extra, sizeof(Id));
@@ -379,12 +381,7 @@ pool_createwhatprovides(Pool *pool)
 	      while (*d)	       /* find free slot */
 		d++;
 	      if (d[-1] == i)
-		{
-#if 0
-		  sat_debug (DEBUG_4, "duplicate entry for %s in package %s.%s\n", id2str(pool, id), id2str(pool, s->name), id2str(pool, s->arch));
-#endif
-		  continue;
-		}
+		continue;
 	    }
 	  *d = i;		       /* put solvable Id into data */
 	}
@@ -420,7 +417,7 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
   /* extend whatprovidesdata if needed, +1 for ID_NULL-termination */
   if (pool->whatprovidesdataleft < count + 1)
     {
-      sat_debug (DEBUG_1, "growing provides hash data...\n");
+      POOL_DEBUG(SAT_DEBUG_STATS, "growing provides hash data...\n");
       pool->whatprovidesdata = (Id *)xrealloc(pool->whatprovidesdata, (pool->whatprovidesdataoff + count + 4096) * sizeof(Id));
       pool->whatprovidesdataleft = count + 4096;
     }
@@ -438,7 +435,7 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 }
 
 
-/******************************************************************************/
+/*************************************************************************/
 
 /*
  * addrelproviders
@@ -507,14 +504,14 @@ pool_addrelproviders(Pool *pool, Id d)
 
   /* convert to whatprovides id */
 #if 0
-  sat_debug (DEBUG_1, "addrelproviders: what provides %s?\n", id2str(pool, name));
+  POOL_DEBUG(DEBUG_1, "addrelproviders: what provides %s?\n", id2str(pool, name));
 #endif
   if (flags && flags < 8)
     {
       FOR_PROVIDES(p, pp, name)
 	{
 #if 0
-	  sat_debug (DEBUG_1, "addrelproviders: checking package %s\n", id2str(pool, pool->p[p].name));
+	  POOL_DEBUG(DEBUG_1, "addrelproviders: checking package %s\n", id2str(pool, pool->p[p].name));
 #endif
 	  /* solvable p provides name in some rels */
 	  pidp = pool->solvables[p].repo->idarraydata + pool->solvables[p].provides;
@@ -561,12 +558,56 @@ pool_addrelproviders(Pool *pool, Id d)
     }
   /* add providers to whatprovides */
 #if 0
-  sat_debug (DEBUG_1, "addrelproviders: adding %d packages to %d\n", plist.count, d);
+  POOL_DEBUG(DEBUG_1, "addrelproviders: adding %d packages to %d\n", plist.count, d);
 #endif
   pool->whatprovides[d] = pool_queuetowhatprovides(pool, &plist);
   queue_free(&plist);
 
   return pool->whatprovidesdata + pool->whatprovides[d];
 }
+
+/*************************************************************************/
+
+void
+pool_debug(Pool *pool, int type, const char *format, ...)
+{
+  va_list args;
+  char buf[1024];
+
+  if ((type & SAT_FATAL) == 0)
+    {
+      if ((pool->debugmask & type) == 0)
+	return;
+    }
+  va_start(args, format);
+  if (!pool->debugcallback)
+    {
+      if ((type & (SAT_FATAL|SAT_ERROR)) == 0)
+        vprintf(format, args);
+      else
+        vfprintf(stderr, format, args);
+      return;
+    }
+  vsnprintf(buf, sizeof(buf), format, args);
+  pool->debugcallback(pool, pool->debugcallbackdata, type, buf);
+}
+
+void
+pool_setdebuglevel(Pool *pool, int level)
+{
+  int mask = SAT_DEBUG_RESULT;
+  if (level > 0)
+    mask |= SAT_DEBUG_STATS|SAT_DEBUG_ANALYZE|SAT_DEBUG_UNSOLVABLE;
+  if (level > 1)
+    mask |= SAT_DEBUG_JOB|SAT_DEBUG_SOLUTIONS|SAT_DEBUG_POLICY;
+  if (level > 2)
+    mask |= SAT_DEBUG_PROPAGATE;
+  if (level > 3)
+    mask |= SAT_DEBUG_RULE_CREATION;
+  if (level > 4)
+    mask |= SAT_DEBUG_SCHUBI;
+  pool->debugmask = mask;
+}
+
 
 // EOF

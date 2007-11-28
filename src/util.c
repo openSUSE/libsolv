@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "util.h"
-#include "sat_debug.h"
 
 void *
 xmalloc(size_t len)
@@ -19,7 +18,7 @@ xmalloc(size_t len)
   void *r = malloc(len ? len : 1);
   if (r)
     return r;
-  sat_debug (ERROR, "Out of memory allocating %zu bytes!\n", len);
+  fprintf(stderr, "Out of memory allocating %zu bytes!\n", len);
   exit(1);
 }
 
@@ -28,7 +27,7 @@ xmalloc2(size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
     {
-       sat_debug (ERROR, "Out of memory allocating %zu*%zu bytes!\n", num, len);
+      fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
       exit(1);
     }
   return xmalloc(num * len);
@@ -43,7 +42,7 @@ xrealloc(void *old, size_t len)
     old = realloc(old, len ? len : 1);
   if (old)
     return old;
-  sat_debug (ERROR, "Out of memory reallocating %zu bytes!\n", len);
+  fprintf(stderr, "Out of memory reallocating %zu bytes!\n", len);
   exit(1);
 }
 
@@ -52,7 +51,7 @@ xrealloc2(void *old, size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
     {
-       sat_debug (ERROR, "Out of memory allocating %zu*%zu bytes!\n", num, len);
+      fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
       exit(1);
     }
   return xrealloc(old, num * len);
@@ -68,7 +67,7 @@ xcalloc(size_t num, size_t len)
     r = calloc(num, len);
   if (r)
     return r;
-  sat_debug (ERROR, "Out of memory allocating %zu bytes!\n", num * len);
+  fprintf(stderr, "Out of memory allocating %zu bytes!\n", num * len);
   exit(1);
 }
 

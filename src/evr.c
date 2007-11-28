@@ -15,7 +15,6 @@
 #include <string.h>
 #include "evr.h"
 #include "pool.h"
-#include "sat_debug.h"
 
 int
 vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
@@ -90,7 +89,7 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id)
   evr2 = id2str(pool, evr2id);
 
 #if 0
-  sat_debug (DEBUG_5,"evrcmp %s %s\n", evr1, evr2);
+  POOL_DEBUG(DEBUG_EVRCMP, "evrcmp %s %s\n", evr1, evr2);
 #endif
   for (s1 = evr1; *s1 >= '0' && *s1 <= '9'; s1++)
     ;
