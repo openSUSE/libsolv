@@ -110,7 +110,7 @@ typedef struct solver {
  * queue commands
  */
 
-enum solvcmds {
+typedef enum {
   SOLVCMD_NULL=0,
   SOLVER_INSTALL_SOLVABLE,
   SOLVER_ERASE_SOLVABLE,

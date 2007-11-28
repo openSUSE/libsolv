@@ -30,7 +30,7 @@ str2id(Pool *pool, const char *str, int create)
   int old_nstrings = pool->ss.nstrings;
   Id id = stringpool_str2id (&pool->ss, str, create);
   /* If we changed the ID->string relations we need to get rid of an
-     eventually existing provides lookup cache.  */
+     existing provides lookup cache.  */
   if (old_nstrings != pool->ss.nstrings)
     pool_freewhatprovides(pool);
   return id;
