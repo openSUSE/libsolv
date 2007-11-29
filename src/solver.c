@@ -2992,7 +2992,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 }
 
 Id
-findproblemrule(Solver *solv, Id problem)
+solver_findproblemrule(Solver *solv, Id problem)
 {
   Id reqr, conr, sysr, jobr;
   Id idx = solv->problems.elements[problem - 1];
@@ -3017,7 +3017,7 @@ printprobleminfo(Solver *solv, Queue *job, Id problem)
   Id dep, source, target;
   Solvable *s, *s2;
 
-  probr = findproblemrule(solv, problem);
+  probr = solver_findproblemrule(solv, problem);
   switch (solver_problemruleinfo(solv, job, probr, &dep, &source, &target))
     {
     case SOLVER_PROBLEM_UPDATE_RULE:
