@@ -224,9 +224,6 @@ prune_to_best_version(Pool *pool, Queue *plist)
     return;
   POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
 
-  /* prune to best architecture */
-  if (pool->id2arch)
-
   prune_best_version_arch_sortcmp_data = pool;
   /* sort by name first */
   qsort(plist->elements, plist->count, sizeof(Id), prune_best_version_arch_sortcmp);
