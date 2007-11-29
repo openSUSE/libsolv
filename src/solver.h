@@ -121,6 +121,19 @@ typedef enum {
   SOLVER_INSTALL_SOLVABLE_UPDATE
 } SolverCmd;
 
+typedef enum {
+  SOLVER_PROBLEM_UPDATE_RULE,
+  SOLVER_PROBLEM_JOB_RULE,
+  SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP,
+  SOLVER_PROBLEM_NOT_INSTALLABLE,
+  SOLVER_PROBLEM_NOTHING_PROVIDES_DEP,
+  SOLVER_PROBLEM_SAME_NAME,
+  SOLVER_PROBLEM_PACKAGE_CONFLICT,
+  SOLVER_PROBLEM_PACKAGE_OBSOLETES,
+  SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE
+} SolverProbleminfo;
+
+
 extern Solver *solver_create(Pool *pool, Repo *installed);
 extern void solver_free(Solver *solv);
 extern void solver_solve(Solver *solv, Queue *job);
@@ -129,6 +142,8 @@ extern int solver_dep_installed(Solver *solv, Id dep);
 extern Id solver_next_problem(Solver *solv, Id problem);
 extern Id solver_next_solution(Solver *solv, Id problem, Id solution);
 extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
+extern SolverProbleminfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
+extern Id findproblemrule(Solver *solv, Id problem);
 
 /* debug functions, do not use */
 void printdecisions(Solver *solv);

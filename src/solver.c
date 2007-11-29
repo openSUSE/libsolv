@@ -2742,198 +2742,321 @@ printdecisions(Solver *solv)
     }
 }
 
-int
-printconflicts(Solver *solv, Solvable *s, Id pc)
+/* this is basically the reverse of addrpmrulesforsolvable */
+SolverProbleminfo
+solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp)
 {
   Pool *pool = solv->pool;
-  Solvable *sc = pool->solvables + pc;
-  Id p, *pp, con, *conp, obs, *obsp;
-  int numc = 0;
-
-  if (s->conflicts)
-    {
-      conp = s->repo->idarraydata + s->conflicts;
-      while ((con = *conp++) != 0)
-	{
-	  FOR_PROVIDES(p, pp, con)
-	    {
-	      if (p != pc)
-		continue;
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "packags %s conflicts with %s, which is provided by %s\n", solvable2str(pool, s), dep2str(pool, con), solvable2str(pool, sc));
-	      numc++;
-	    }
-	}
-    }
-  if (s->obsoletes && (!solv->installed || s->repo != solv->installed))
-    {
-      obsp = s->repo->idarraydata + s->obsoletes;
-      while ((obs = *obsp++) != 0)
-	{
-	  FOR_PROVIDES(p, pp, obs)
-	    {
-	      if (p != pc)
-		continue;
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "packags %s obsolets %s, which is provided by %s\n", solvable2str(pool, s), dep2str(pool, obs), solvable2str(pool, sc));
-	      numc++;
-	    }
-	}
-    }
-  return numc;
-}
-
-void
-printprobleminfo(Solver *solv, Queue *job, Id problem)
-{
-  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
   Rule *r;
   Solvable *s;
-  Id p, d, rn;
-  Id idx = solv->problems.elements[problem - 1];
-
-  rn = solv->learnt_pool.elements[idx];
-  if (rn < 0)
-    {
-      p = rn;		/* fake a negative assertion rule */
-      r = 0;
-    }
-  else
-    {
-      r = solv->rules + rn;
-      p = r->p;
-    }
-
-  if (!r || r->w2 == 0)
-    {
-      Id req, *reqp, *dp;
-      int count = 0;
-
-      /* assertions */
-      if (p == -SYSTEMSOLVABLE)
-	{
-          Id ji, what;
-
-	  /* we tried to deinstall the system solvable. must be a job. */
-	  if (rn < solv->jobrules || rn >= solv->systemrules)
-	    abort();
-	  ji = solv->ruletojob.elements[rn - solv->jobrules];
-	  what = job->elements[ji + 1];
-	  switch (job->elements[ji])
-	    {
-	    case SOLVER_INSTALL_SOLVABLE_NAME:
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "no solvable exists with name %s\n", dep2str(pool, what));
-	      break;
-	    case SOLVER_INSTALL_SOLVABLE_PROVIDES:
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "no solvable provides %s\n", dep2str(pool, what));
-	      break;
-	    default:
-	      pool_debug(pool, SAT_FATAL, "unknown  job\n");
-	      abort();
-	    }
-	  return;
-	}
-      if (p > 0 && solv->learnt_pool.elements[idx + 1] == -p)
-	{
-	  /* we conflicted with a direct rpm assertion */
-	  /* print other rule */
-	  p = -p;
-	  rn = 0;
-	}
-      if (rn >= solv->jobrules)
-	{
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "some job/system/learnt rule\n");
-	  printrule(solv, SAT_DEBUG_RESULT, r);
-	  return;
-	}
-      if (p >= 0)
-	abort();
-      /* negative assertion, i.e. package is not installable */
-      s = pool->solvables + (-p);
-      if (s->requires)
-	{
-	  reqp = s->repo->idarraydata + s->requires;
-	  while ((req = *reqp++) != 0)
-	    {
-	      if (req == SOLVABLE_PREREQMARKER)
-		continue;
-	      dp = pool_whatprovides(pool, req);
-	      if (*dp)
-		continue;
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but no package provides it\n", solvable2str(pool, s), dep2str(pool, req));
-	      count++;
-	    }
-	}
-      if (!count)
-        POOL_DEBUG(SAT_DEBUG_RESULT, "package %s is not installable\n", solvable2str(pool, s));
-      return;
-    }
-
-  if (rn >= solv->learntrules)
-    {
-      /* learnt rule, ignore for now */
-      POOL_DEBUG(SAT_DEBUG_RESULT, "some learnt rule...\n");
-      printrule(solv, SAT_DEBUG_RESULT, r);
-      return;
-    }
-  if (rn >= solv->systemrules)
-    {
-      /* system rule, ignore for now */
-      POOL_DEBUG(SAT_DEBUG_RESULT, "some system rule...\n");
-      printrule(solv, SAT_DEBUG_RESULT, r);
-      return;
-    }
-  if (rn >= solv->jobrules)
-    {
-      /* job rule, ignore for now */
-      POOL_DEBUG(SAT_DEBUG_RESULT, "some job rule...\n");
-      printrule(solv, SAT_DEBUG_RESULT, r);
-      return;
-    }
-  /* only rpm rules left... */
-  p = r->p;
-  d = r->d;
-  if (p >= 0)
+  int dontfix = 0;
+  Id p, *pp, req, *reqp, con, *conp, obs, *obsp, *dp;
+  
+  if (rid >= solv->weakrules)
     abort();
-  if (d == 0 && r->w2 < 0)
+  if (rid >= solv->systemrules)
     {
-      Solvable *sp, *sd;
-      d = r->w2;
-      sp = pool->solvables + (-p);
-      sd = pool->solvables + (-d);
-      if (sp->name == sd->name)
-	{
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "cannot install both %s and %s\n", solvable2str(pool, sp), solvable2str(pool, sd));
-	}
-      else
-	{
-	  printconflicts(solv, pool->solvables + (-p), -d);
-	  printconflicts(solv, pool->solvables + (-d), -p);
-	}
+      *depp = 0;
+      *sourcep = solv->installed->start + (rid - solv->systemrules);
+      *targetp = 0;
+      return SOLVER_PROBLEM_UPDATE_RULE;
     }
-  else
+  if (rid >= solv->jobrules)
     {
-      /* find requires of p that corresponds with our rule */
-      Id req, *reqp, *dp;
-      s = pool->solvables + (-p);
+     
+      r = solv->rules + rid;
+      p = solv->ruletojob.elements[rid - solv->jobrules];
+      *depp = job->elements[p + 1];
+      *sourcep = p;
+      *targetp = job->elements[p];
+      if (r->d == 0 && r->w2 == 0 && r->p == -SYSTEMSOLVABLE)
+	return SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP;
+      return SOLVER_PROBLEM_JOB_RULE;
+    }
+  if (rid < 0)
+    {
+      /* a rpm rule assertion */
+      if (rid == -SYSTEMSOLVABLE)
+	abort();	/* can happen only for job rules */
+      s = pool->solvables - rid;
+      if (installed && !solv->fixsystem && s->repo == installed)
+	dontfix = 1;
+      if (dontfix)	/* dontfix packages never have a neg assertion */
+	abort();
+      /* see why the package is not installable */
+      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC && !pool_installable(pool, s))
+	return SOLVER_PROBLEM_NOT_INSTALLABLE;
+      /* check requires */
+      if (!s->requires)
+	abort();
       reqp = s->repo->idarraydata + s->requires;
       while ((req = *reqp++) != 0)
 	{
 	  if (req == SOLVABLE_PREREQMARKER)
 	    continue;
 	  dp = pool_whatprovides(pool, req);
-          if (d == 0)
+	  if (*dp == 0)
 	    {
-	      if (*dp == r->w2 && dp[1] == 0)
-		break;
+	      *depp = req;
+	      *sourcep = -rid;
+	      *targetp = 0;
+	      return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
 	    }
-	  else if (dp - pool->whatprovidesdata == d)
+	}
+      abort();
+    }
+  r = solv->rules + rid;
+  if (r->p >= 0)
+    abort();	/* not a rpm rule */
+  if (r->d == 0 && r->w2 == 0)
+    {
+      /* an assertion. we don't store them as rpm rules, so
+       * can't happen */
+      abort();
+    }
+  s = pool->solvables - r->p;
+  if (installed && !solv->fixsystem && s->repo == installed)
+    dontfix = 1;
+  if (r->d == 0 && r->w2 < 0)
+    {
+      /* a package conflict */
+      Solvable *s2 = pool->solvables - r->w2;
+      int dontfix2 = 0;
+
+      if (installed && !solv->fixsystem && s2->repo == installed)
+	dontfix2 = 1;
+
+      /* if both packages have the same name and at least one of them
+       * is not installed, they conflict */
+      if (s->name == s2->name && (!installed || (s->repo != installed || s2->repo != installed)))
+	{
+	  *depp = 0;
+	  *sourcep = -r->p;
+	  *targetp = -r->w2;
+	  return SOLVER_PROBLEM_SAME_NAME;
+	}
+
+      /* check conflicts in both directions */
+      if (s->conflicts)
+	{
+	  conp = s->repo->idarraydata + s->conflicts;
+	  while ((con = *conp++) != 0)
+            {
+              FOR_PROVIDES(p, pp, con) 
+		{
+		  if (dontfix && pool->solvables[p].repo == installed)
+		    continue;
+		  if (p != -r->w2)
+		    continue;
+		  *depp = con;
+		  *sourcep = -r->p;
+		  *targetp = p;
+		  return SOLVER_PROBLEM_PACKAGE_CONFLICT;
+		}
+	    }
+	}
+      if (s2->conflicts)
+	{
+	  conp = s2->repo->idarraydata + s2->conflicts;
+	  while ((con = *conp++) != 0)
+            {
+              FOR_PROVIDES(p, pp, con) 
+		{
+		  if (dontfix2 && pool->solvables[p].repo == installed)
+		    continue;
+		  if (p != -r->p)
+		    continue;
+		  *depp = con;
+		  *sourcep = -r->w2;
+		  *targetp = p;
+		  return SOLVER_PROBLEM_PACKAGE_CONFLICT;
+		}
+	    }
+	}
+      /* check obsoletes in both directions */
+      if ((!installed || s->repo != installed) && s->obsoletes)
+	{
+	  obsp = s->repo->idarraydata + s->obsoletes;
+	  while ((obs = *obsp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, obs)
+		{
+		  if (p != -r->w2)
+		    continue;
+		  *depp = obs;
+		  *sourcep = -r->p;
+		  *targetp = p;
+		  return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
+		}
+	    }
+	}
+      if ((!installed || s2->repo != installed) && s2->obsoletes)
+	{
+	  obsp = s2->repo->idarraydata + s2->obsoletes;
+	  while ((obs = *obsp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, obs)
+		{
+		  if (p != -r->p)
+		    continue;
+		  *depp = obs;
+		  *sourcep = -r->w2;
+		  *targetp = p;
+		  return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
+		}
+	    }
+	}
+      /* all cases checked, can't happen */
+      abort();
+    }
+  /* simple requires */
+  if (!s->requires)
+    abort();
+  reqp = s->repo->idarraydata + s->requires;
+  while ((req = *reqp++) != 0)
+    {
+      if (req == SOLVABLE_PREREQMARKER)
+	continue;
+      dp = pool_whatprovides(pool, req);
+      if (r->d == 0)
+	{
+	  if (*dp == r->w2 && dp[1] == 0)
 	    break;
 	}
-      if (!req)
+      else if (dp - pool->whatprovidesdata == r->d)
+	break;
+    }
+  if (!req)
+    abort();
+  *depp = req;
+  *sourcep = -r->p;
+  *targetp = 0;
+  return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
+}
+
+static void
+findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, Id *jobrp)
+{
+  Id rid;
+  Id lreqr, lconr, lsysr, ljobr;
+  Rule *r;
+
+  lreqr = lconr = lsysr = ljobr = 0;
+  while ((rid = solv->learnt_pool.elements[idx++]) != 0)
+    {
+      if (rid >= solv->learntrules)
+	findproblemrule_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], &lreqr, &lconr, &lsysr, &ljobr);
+      else if (rid >= solv->systemrules)
 	{
-	  pool_debug(pool, SAT_FATAL, "req not found\n");
-	  abort();
+	  if (!*sysrp)
+	    *sysrp = rid;
 	}
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but none of its providers can be installed\n", solvable2str(pool, s), dep2str(pool, req));
+      else if (rid >= solv->jobrules)
+	{
+	  if (!*jobrp)
+	    *jobrp = rid;
+	}
+      else if (rid >= 0)
+	{
+	  r = solv->rules + rid;
+	  if (!r->d && r->w2 < 0)
+	    {
+	      if (!*conrp)
+		*conrp = rid;
+	    }
+	  else
+	    {
+	      if (!*reqrp)
+		*reqrp = rid;
+	    }
+	}
+      else
+	{
+	  /* assertion, counts as require rule */
+	  /* system solvable doesn't count, as this is useful information */
+	  if (rid == -SYSTEMSOLVABLE)
+	    continue;
+	  if (!*reqrp)
+	    *reqrp = rid;
+	}
+    }
+  if (!*reqrp && lreqr)
+    *reqrp = lreqr;
+  if (!*conrp && lconr)
+    *conrp = lconr;
+  if (!*jobrp && ljobr)
+    *jobrp = ljobr;
+  if (!*sysrp && lsysr)
+    *sysrp = lsysr;
+}
+
+Id
+findproblemrule(Solver *solv, Id problem)
+{
+  Id reqr, conr, sysr, jobr;
+  Id idx = solv->problems.elements[problem - 1];
+  reqr = conr = sysr = jobr = 0;
+  findproblemrule_internal(solv, idx, &reqr, &conr, &sysr, &jobr);
+  if (reqr)
+    return reqr;
+  if (conr)
+    return conr;
+  if (sysr)
+    return sysr;
+  if (jobr)
+    return jobr;
+  abort();
+}
+
+void
+printprobleminfo(Solver *solv, Queue *job, Id problem)
+{
+  Pool *pool = solv->pool;
+  Id probr;
+  Id dep, source, target;
+  Solvable *s, *s2;
+
+  probr = findproblemrule(solv, problem);
+  switch (solver_problemruleinfo(solv, job, probr, &dep, &source, &target))
+    {
+    case SOLVER_PROBLEM_UPDATE_RULE:
+      s = pool_id2solvable(pool, source);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "problem with installed package %s\n", solvable2str(pool, s));
+      return;
+    case SOLVER_PROBLEM_JOB_RULE:
+      POOL_DEBUG(SAT_DEBUG_RESULT, "conflicting requests\n");
+      return;
+    case SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP:
+      POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides requested %s\n", dep2str(pool, dep));
+      return;
+    case SOLVER_PROBLEM_NOT_INSTALLABLE:
+      s = pool_id2solvable(pool, source);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s is not installable\n", solvable2str(pool, s));
+      return;
+    case SOLVER_PROBLEM_NOTHING_PROVIDES_DEP:
+      s = pool_id2solvable(pool, source);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides %s needed by %s\n", dep2str(pool, dep), solvable2str(pool, s));
+      return;
+    case SOLVER_PROBLEM_SAME_NAME:
+      s = pool_id2solvable(pool, source);
+      s2 = pool_id2solvable(pool, target);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "cannot install both %s and %s\n", solvable2str(pool, s), solvable2str(pool, s2));
+      return;
+    case SOLVER_PROBLEM_PACKAGE_CONFLICT:
+      s = pool_id2solvable(pool, source);
+      s2 = pool_id2solvable(pool, target);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
+      return;
+    case SOLVER_PROBLEM_PACKAGE_OBSOLETES:
+      s = pool_id2solvable(pool, source);
+      s2 = pool_id2solvable(pool, target);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s obsoletes %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
+      return;
+    case SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE:
+      s = pool_id2solvable(pool, source);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but none of the providers can be installed\n", solvable2str(pool, s), dep2str(pool, dep));
+      return;
     }
 }
 

@@ -297,6 +297,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
   plist->count = j;
 }
 
+/* legacy, do not use anymore! */
 void
 prune_best_version_arch(Pool *pool, Queue *plist)
 {
