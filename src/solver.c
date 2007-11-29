@@ -2941,6 +2941,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
   Id rid;
   Id lreqr, lconr, lsysr, ljobr;
   Rule *r;
+  int reqassert = 0;
 
   lreqr = lconr = lsysr = ljobr = 0;
   while ((rid = solv->learnt_pool.elements[idx++]) != 0)
@@ -2974,11 +2975,14 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
       else
 	{
 	  /* assertion, counts as require rule */
-	  /* system solvable doesn't count, as this is useful information */
+	  /* ignore system solvable as we need useful info */
 	  if (rid == -SYSTEMSOLVABLE)
 	    continue;
-	  if (!*reqrp)
-	    *reqrp = rid;
+	  if (!*reqrp || !reqassert)
+	    {
+	      *reqrp = rid;
+	      reqassert = 1;
+	    }
 	}
     }
   if (!*reqrp && lreqr)
