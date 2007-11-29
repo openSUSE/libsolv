@@ -24,6 +24,7 @@
 #include "policy.h"
 
 #define RULES_BLOCK 63
+#define REGARD_RECOMMENDS_OF_INSTALLED_ITEMS 0
 
 
 int
@@ -2201,7 +2202,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  int qcount;
 
 	  POOL_DEBUG(SAT_DEBUG_STATS, "installing recommended packages\n");
-	  if (0)
+	  if (!REGARD_RECOMMENDS_OF_INSTALLED_ITEMS)
 	    {
 	      for (i = 0; i < solv->decisionq.count; i++)
 		{
@@ -2253,7 +2254,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    queue_pushunique(&dq, i);
 		}
 	    }
-	  if (0)
+	  if (!REGARD_RECOMMENDS_OF_INSTALLED_ITEMS)
 	    {
 	      for (i = 0; i < solv->decisionq.count; i++)
 		{
