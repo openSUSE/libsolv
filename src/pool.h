@@ -154,7 +154,11 @@ extern Pool *pool_create(void);
  */
 extern void pool_free(Pool *pool);
 
-extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
+extern void pool_debug(Pool *pool, int type, const char *format, ...)
+#ifdef __GNUC__
+ __attribute__((format(printf, 3, 4)))
+#endif
+;
 
 /**
  * Solvable management
