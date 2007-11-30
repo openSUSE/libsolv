@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Nov 30 16:01:39 CET 2007 - schubi@suse.de
+
+- update for libzypp integration 
+
+-------------------------------------------------------------------
 Fri Nov 16 12:17:13 CET 2007 - coolo@suse.de
 
 - update to SVN again to make libzypp compilable again
