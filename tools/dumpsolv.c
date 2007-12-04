@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 {
   Repo *repo;
   Pool *pool;
-  int i;
+  int i, n;
   Solvable *s;
 
   if (argc != 1)
@@ -45,13 +45,13 @@ int main(int argc, char **argv)
   repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
   repo_add_solv(repo, stdin);
   printf("repo contains %d solvables\n", repo->nsolvables);
-  for (i = repo->start; i < repo->end; i++)
+  for (i = repo->start, n = 1; i < repo->end; i++)
     {
       s = pool->solvables + i;
       if (s->repo != repo)
 	continue;
       printf("\n");
-      printf("solvable %d:\n", i);
+      printf("solvable %d:\n", n++);
       printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
       if (s->vendor)
         printf("vendor: %s\n", id2str(pool, s->vendor));
@@ -65,5 +65,6 @@ int main(int argc, char **argv)
       printids(repo, "enhances", s->enhances);
       printids(repo, "freshens", s->freshens);
     }
+  pool_free(pool);
   exit(0);
 }

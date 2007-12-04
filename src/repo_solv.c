@@ -97,7 +97,7 @@ read_id(FILE *fp, Id max)
       if (!(c & 128))
 	{
 	  x = (x << 7) | c;
-	  if (x >= max)
+	  if (max && x >= max)
 	    {
               pool_debug(mypool, SAT_FATAL, "read_id: id too large (%u/%u)\n", x, max);
 	      exit(1);
@@ -141,7 +141,9 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end)
 	      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
 	      exit(1);
 	    }
-	  *store++ = map[x];
+	  if (map)
+	    x = map[x];
+	  *store++ = x;
 	  if ((c & 64) == 0)
 	    {
 	      if (store == end)
@@ -162,11 +164,11 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end)
 
 /*-----------------------------------------------------------------*/
 
-typedef struct solvdata {
-  int type;
-  Id id;
-  unsigned int size;
-} SolvData;
+struct key {
+  Id name;
+  Id type;
+  Id size;
+};
 
 
 // ----------------------------------------------
@@ -180,9 +182,11 @@ void
 repo_add_solv(Repo *repo, FILE *fp)
 {
   Pool *pool = repo->pool;
-  int i, j, l;
-  unsigned int numid, numrel, numsolv, numsrcdata, numsolvdata;
-  int numsolvdatabits, type;
+  int i, l;
+  unsigned int numid, numrel, numsolv;
+  unsigned int numkeys, numschemata, numinfo;
+
+  int type;
   Offset sizeid;
   Offset *str;			       /* map Id -> Offset into string space */
   char *strsp;			       /* repo string space */
@@ -195,12 +199,14 @@ repo_add_solv(Repo *repo, FILE *fp)
   Id name, evr, did;
   int flags;
   Reldep *ran;
-  SolvData *solvdata;
-  unsigned int size, size_str, size_idarray;
+  unsigned int size_idarray;
   Id *idarraydatap, *idarraydataend;
   Offset ido;
-  unsigned int databits;
   Solvable *s;
+  unsigned int solvflags;
+  struct key *keys;
+  Id *schemadata, *schemadatap, *schemadataend;
+  Id *schemata, key;
 
   mypool = pool;
 
@@ -209,7 +215,7 @@ repo_add_solv(Repo *repo, FILE *fp)
       pool_debug(pool, SAT_FATAL, "not a SOLV file\n");
       exit(1);
     }
-  if (read_u32(fp) != SOLV_VERSION)
+  if (read_u32(fp) != SOLV_VERSION_1)
     {
       pool_debug(pool, SAT_FATAL, "unsupported SOLV version\n");
       exit(1);
@@ -219,7 +225,13 @@ repo_add_solv(Repo *repo, FILE *fp)
 
   numid = read_u32(fp);
   numrel = read_u32(fp);
-  numsolv= read_u32(fp);
+  numsolv = read_u32(fp);
+  numkeys = read_u32(fp);
+  numschemata = read_u32(fp);
+  numinfo = read_u32(fp);
+  solvflags = read_u32(fp);
+
+  /*******  Part 1: string IDs  *****************************************/
 
   sizeid = read_u32(fp);	       /* size of string+Id space */
 
@@ -342,6 +354,8 @@ repo_add_solv(Repo *repo, FILE *fp)
   pool_shrink_strings(pool);	       /* vacuum */
 
   
+  /*******  Part 2: Relation IDs  ***************************************/
+
   /*
    * read RelDeps
    * 
@@ -413,82 +427,81 @@ repo_add_solv(Repo *repo, FILE *fp)
       pool_shrink_rels(pool);		/* vacuum */
     }
 
-  /*
-   * read (but dont store yet) repo data
-   */
 
-#if 0
-  POOL_DEBUG(SAT_DEBUG_STATS, "read repo data\n");
-#endif
-  numsrcdata = read_u32(fp);
-  for (i = 0; i < numsrcdata; i++)
+  /*******  Part 3: Keys  ***********************************************/
+
+  keys = xcalloc(numkeys, sizeof(*keys));
+  /* keys start at 1 */
+  for (i = 1; i < numkeys; i++)
     {
-      type = read_u8(fp);
-      id = idmap[read_id(fp, numid)];
-      switch(type)
-	{
-	case TYPE_ID:
-          read_id(fp, numid + numrel);   /* just check Id */
-	  break;
-	case TYPE_U32:
-          read_u32(fp);
-	  break;
-	case TYPE_STR:
-	  while(read_u8(fp) != 0)
-	    ;
-	  break;
-	default:
-          pool_debug(pool, SAT_FATAL, "unknown type %d\n", type);
-	  exit(0);
-	}
+      keys[i].name = idmap[read_id(fp, numid)];
+      keys[i].type = read_id(fp, 0);
+      keys[i].size = read_id(fp, 0);
     }
 
-
-  /*
-   * read solvables
-   */
+  /*******  Part 4: Schemata ********************************************/
   
-#if 0
-  POOL_DEBUG(SAT_DEBUG_STATS, "read solvable data info\n");
-#endif
-  numsolvdata = read_u32(fp);
-  numsolvdatabits = 0;
-  solvdata = (SolvData *)xmalloc(numsolvdata * sizeof(SolvData));
+  id = read_id(fp, 0);
+  schemadata = xcalloc(id, sizeof(Id));
+  schemadatap = schemadata;
+  schemadataend = schemadata + id;
+  schemata = xcalloc(numschemata, sizeof(Id));
+  for (i = 0; i < numschemata; i++)
+    {
+      schemata[i] = schemadatap - schemadata;
+      schemadatap = read_idarray(fp, numid, 0, schemadatap, schemadataend);
+    }
+
+  /*******  Part 5: Info  ***********************************************/
+  /* we skip the info for now... */
+  for (i = 0; i < numinfo; i++)
+    {
+      Id *schema = schemadata + schemata[read_id(fp, numschemata)];
+      while ((key = *schema++) != 0)
+	{
+	  type = keys[key].type;
+	  switch (type)
+	    {
+	      case TYPE_ID:
+	        read_id(fp, numid + numrel);   /* just check Id */
+	        break;
+	      case TYPE_U32:
+	        read_u32(fp);
+	        break;
+	      case TYPE_STR:
+	        while(read_u8(fp) != 0)
+		  ;
+	        break;
+	      case TYPE_IDARRAY:
+		while ((read_u8(fp) & 0xc0) != 0)
+		  ;
+		break;
+	      default:
+	        pool_debug(pool, SAT_FATAL, "unknown type %d\n", type);
+	        exit(0);
+	    }
+	}
+    }
+
+  /*******  Part 6: packed sizes (optional)  ****************************/
+  if ((solvflags & SOLV_FLAG_PACKEDSIZES) != 0)
+    {
+      for (i = 0; i < numsolv; i++)
+	read_id(fp, 0);
+    }
+
+  /*******  Part 7: item data *******************************************/
+
+  /* calculate idarray size */
   size_idarray = 0;
-  size_str = 0;
-
-  for (i = 0; i < numsolvdata; i++)
+  for (i = 1; i < numkeys; i++)
     {
-      type = read_u8(fp);
-      solvdata[i].type = type;
-      if ((type & TYPE_BITMAP) != 0)
-	{
-	  type ^= TYPE_BITMAP;
-	  numsolvdatabits++;
-	}
-      id = idmap[read_id(fp, numid)];
-#if 0
-      POOL_DEBUG(SAT_DEBUG_STATS, "#%d: %s\n", i, id2str(pool, id));
-#endif
-      solvdata[i].id = id;
-      size = read_u32(fp);
-      solvdata[i].size = size;
-      if (id >= INTERESTED_START && id <= INTERESTED_END)
-	{
-	  if (type == TYPE_STR)
-	    size_str += size;
-	  if (type == TYPE_IDARRAY)
-	    size_idarray += size;
-	}
+      id = keys[i].name;
+      if (keys[i].type == TYPE_IDARRAY && id >= INTERESTED_START && id <= INTERESTED_END)
+	size_idarray += keys[i].size;
     }
 
-  if (numsolvdatabits >= 32)
-    {
-      pool_debug(pool, SAT_FATAL, "too many data map bits\n");
-      exit(1);
-    }
-
-  /* make room for our idarrays */
+  /* allocate needed space in repo */
   if (size_idarray)
     {
       repo_reserve_ids(repo, 0, size_idarray);
@@ -503,37 +516,111 @@ repo_add_solv(Repo *repo, FILE *fp)
       idarraydataend = 0;
     }
 
-  /*
-   * read solvables
-   */
-  
-#if 0
-  POOL_DEBUG(SAT_DEBUG_STATS, "read solvables\n");
-#endif
+  /* read solvables */
   s = pool_id2solvable(pool, repo_add_solvable_block(repo, numsolv));
+
+  if ((solvflags & SOLV_FLAG_VERTICAL) != 0)
+    {
+      Id *solvschema = xcalloc(numsolv, sizeof(Id));
+      unsigned char *used = xmalloc(numschemata);
+      Solvable *sstart = s;
+      Id type;
+
+      for (i = 0; i < numsolv; i++)
+	solvschema[i] = read_id(fp, numschemata);
+      for (key = 1; key < numkeys; key++)
+	{
+	  id = keys[key].name;
+	  type = keys[key].type;
+	  memset(used, 0, numschemata);
+	  for (i = 0; i < numschemata; i++)
+	    {
+	      Id *keyp = schemadata + schemata[i];
+	      while (*keyp)
+		if (*keyp++ == key)
+		  {
+		    used[i] = 1;
+		    break;
+		  }
+	    }
+	  for (i = 0, s = sstart; i < numsolv; i++, s++)
+	     {
+	      if (!used[solvschema[i]])
+		continue;
+	      switch (type)
+		{
+		case TYPE_ID:
+		  did = idmap[read_id(fp, numid + numrel)];
+		  if (id == SOLVABLE_NAME)
+		    s->name = did;
+		  else if (id == SOLVABLE_ARCH)
+		    s->arch = did;
+		  else if (id == SOLVABLE_EVR)
+		    s->evr = did;
+		  else if (id == SOLVABLE_VENDOR)
+		    s->vendor = did;
+		  break;
+		case TYPE_U32:
+		  h = read_u32(fp);
+		  if (id == RPM_RPMDBID)
+		    {
+		      if (!repo->rpmdbid)
+			repo->rpmdbid = (Id *)xcalloc(numsolv, sizeof(Id));
+		      repo->rpmdbid[i] = h;
+		    }
+		  break;
+		case TYPE_STR:
+		  while(read_u8(fp) != 0)
+		    ;
+		  break;
+		case TYPE_IDARRAY:
+		  if (id < INTERESTED_START || id > INTERESTED_END)
+		    {
+		      /* not interested in array */
+		      while ((read_u8(fp) & 0xc0) != 0)
+			;
+		      break;
+		    }
+		  ido = idarraydatap - repo->idarraydata;
+		  idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend);
+		  if (id == SOLVABLE_PROVIDES)
+		    s->provides = ido;
+		  else if (id == SOLVABLE_OBSOLETES)
+		    s->obsoletes = ido;
+		  else if (id == SOLVABLE_CONFLICTS)
+		    s->conflicts = ido;
+		  else if (id == SOLVABLE_REQUIRES)
+		    s->requires = ido;
+		  else if (id == SOLVABLE_RECOMMENDS)
+		    s->recommends= ido;
+		  else if (id == SOLVABLE_SUPPLEMENTS)
+		    s->supplements = ido;
+		  else if (id == SOLVABLE_SUGGESTS)
+		    s->suggests = ido;
+		  else if (id == SOLVABLE_ENHANCES)
+		    s->enhances = ido;
+		  else if (id == SOLVABLE_FRESHENS)
+		    s->freshens = ido;
+		  break;
+		}
+	    }
+	}
+      xfree(used);
+      xfree(solvschema);
+      xfree(idmap);
+      xfree(schemata);
+      xfree(schemadata);
+      xfree(keys);
+      mypool = 0;
+      return;
+    }
   for (i = 0; i < numsolv; i++, s++)
     {
-      databits = 0;
-      if (numsolvdatabits)
+      Id *keyp = schemadata + schemata[read_id(fp, numschemata)];
+      while ((key = *keyp++) != 0)
 	{
-	  for (j = 0; j < (numsolvdatabits + 7) >> 3; j++)
-	    databits = (databits << 8) | read_u8(fp);
-	}
-      for (j = 0; j < numsolvdata; j++)
-	{
-	  type = solvdata[j].type;
-	  if ((type & TYPE_BITMAP) != 0)
-	    {
-	      if (!(databits & 1))
-		{
-		  databits >>= 1;
-		  continue;
-		}
-	      databits >>= 1;
-	      type ^= TYPE_BITMAP;
-	    }
-	  id = solvdata[j].id;
-	  switch (type)
+	  id = keys[key].name;
+	  switch (keys[key].type)
 	    {
 	    case TYPE_ID:
 	      did = idmap[read_id(fp, numid + numrel)];
@@ -603,7 +690,9 @@ repo_add_solv(Repo *repo, FILE *fp)
 	}
     }
   xfree(idmap);
-  xfree(solvdata);
+  xfree(schemata);
+  xfree(schemadata);
+  xfree(keys);
   mypool = 0;
 }
 

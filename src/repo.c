@@ -444,4 +444,103 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
   return supplements;
 }
 
+#if 0
+void
+repodata_search(Repodata *data, Id key)
+{
+}
+
+const char *
+repodata_lookup_id(Repodata *data, Id num, Id key)
+{
+  Id id, k, *kp, *keyp;
+
+  fseek(data->fp, data->itemoffsets[num] , SEEK_SET);
+  Id *keyp = data->schemadata + data->schemata[read_id(data->fp, data->numschemata)];
+  /* make sure our schema contains the key */
+  for (kp = keyp; (k = *kp++) != 0)
+    if (k == key)
+      break;
+  if (k == 0)
+    return 0;
+  /* get it */
+  while ((k = *keyp++) != 0)
+    {
+      if (k == key)
+	break;
+      switch (keys[key].type)
+	{
+	case TYPE_ID:
+	  while ((read_u8(data->fp) & 0x80) != 0)
+	    ;
+	  break;
+	case TYPE_U32:
+	  read_u32(data->fp);
+	  break;
+	case TYPE_STR:
+	  while(read_u8(data->fp) != 0)
+	    ;
+	  break;
+	case TYPE_IDARRAY:
+	  while ((read_u8(data->fp) & 0xc0) != 0)
+	    ;
+	  break;
+	}
+    }
+  id = read_id(data->fp, 0);
+  return data->ss.stringspace + data->ss.strings[id];
+}
+
+Id
+repo_lookup_id(Solvable *s, Id key)
+{
+  Solvable *rs;
+  Repo *repo = s->repo;
+  Repodata *data;
+  int i, j, n;
+
+  switch(key)
+    {
+    case SOLVABLE_NAME:
+      return s->name;
+    case SOLVABLE_ARCH:
+      return s->arch;
+    case SOLVABLE_EVR:
+      return s->evr;
+    case SOLVABLE_VENDOR:
+      return s->vendor;
+    }
+  /* convert solvable id into repo item count */
+  if (repo->end - repo->start + 1 == repo->nsolvables)
+    {
+      n = (s - pool->solvables);
+      if (n < repo->start || n > repo->end)
+	return 0;
+      n -= repo->start;
+    }
+  else
+    {
+      for (i = repo->start, rs = pool->solvables + i, n = 0; i < repo->end; i++, rs++)
+	{
+	  if (rs->repo != repo)
+	    continue;
+	  if (rs == s)
+	    break;
+	  n++;
+	}
+      if (i == repo->end)
+	return 0;
+    }
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      for (j = 0; j < data->nkeys; j++)
+	{
+	  if (data->keys[j].name == key && data->keys[j].type == TYPE_ID)
+	    return repodata_lookup_id(data, n, j);
+	}
+    }
+  return 0;
+}
+#endif
+
 // EOF

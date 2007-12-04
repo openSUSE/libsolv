@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "pool.h"
+#include "util.h"
 #include "repo_write.h"
 
 /*------------------------------------------------------------------*/
@@ -32,6 +33,9 @@ typedef struct needid {
   Id need;
   Id map;
 } NeedId;
+
+
+#define RELOFF(id) (pool->ss.nstrings + GETRELID(id))
 
 /*
  * increment need Id
@@ -57,7 +61,7 @@ incneedid(Pool *pool, Id *idarray, NeedId *needid)
       while (ISRELDEP(id))
 	{
 	  Reldep *rd = GETRELDEP(pool, id);
-	  needid[GETRELID(pool, id)].need++;
+	  needid[RELOFF(id)].need++;
 	  if (ISRELDEP(rd->evr))
 	    {
 	      Id ida[2];
@@ -165,13 +169,14 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
     return;
   if (!*ids)
     {
-      write_u8(fp, ID_NULL);
+      write_u8(fp, 0);
       return;
     }
   for (;;)
     {
       id = *ids++;
-      id = needid[ISRELDEP(id) ? GETRELID(pool, id) : id].need;
+      if (needid)
+        id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
       if (id >= 64)
 	id = (id & 63) | ((id & ~63) << 1);
       if (!*ids)
@@ -192,22 +197,29 @@ void
 repo_write(Repo *repo, FILE *fp)
 {
   Pool *pool = repo->pool;
-  int i, numsolvdata;
+  int i, n;
   Solvable *s;
   NeedId *needid;
-  int nstrings, nrels;
+  int nstrings, nrels, nkeys, nschemata;
   unsigned int sizeid;
   Reldep *ran;
   Id *idarraydata;
 
   int idsizes[RPM_RPMDBID + 1];
-  int bits, bitmaps;
+  int id2key[RPM_RPMDBID + 1];
   int nsolvables;
+
+  Id *schemadata, *schemadatap, *schema, *sp;
+  Id schemaid;
+  int schemadatalen;
+  Id *solvschema;	/* schema of our solvables */
+  Id lastschema[256];
+  Id lastschemakey[256];
 
   nsolvables = 0;
   idarraydata = repo->idarraydata;
 
-  needid = (NeedId *)calloc(pool->ss.nstrings + pool->nrels, sizeof(*needid));
+  needid = (NeedId *)xcalloc(pool->ss.nstrings + pool->nrels, sizeof(*needid));
 
   memset(idsizes, 0, sizeof(idsizes));
 
@@ -293,19 +305,120 @@ repo_write(Repo *repo, FILE *fp)
       needid[needid[pool->ss.nstrings + i].map].need = nstrings + i;
     }
 
+  /* find the keys we need */
+  nkeys = 1;
+  memset(id2key, 0, sizeof(id2key));
+  for (i = SOLVABLE_NAME; i <= RPM_RPMDBID; i++)
+    if (idsizes[i])
+      id2key[i] = nkeys++;
+
+  /* find the schemata we need */
+  solvschema = xcalloc(repo->nsolvables, sizeof(Id));
+
+  memset(lastschema, 0, sizeof(lastschema));
+  memset(lastschemakey, 0, sizeof(lastschemakey));
+  schemadata = xmalloc(256 * sizeof(Id));
+  schemadatalen = 256;
+  schemadatap = schemadata;
+  *schemadatap++ = 0;
+  schemadatalen--;
+  nschemata = 0;
+  for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
+    {
+      unsigned int h;
+      Id *sp;
+
+      if (s->repo != repo)
+	continue;
+      if (schemadatalen < 32)
+	{
+	  int l = schemadatap - schemadata;
+          fprintf(stderr, "growing schemadata\n");
+	  schemadata = xrealloc(schemadata, (schemadatap - schemadata + 256) * sizeof(Id));
+	  schemadatalen = 256;
+	  schemadatap = schemadata + l;
+	}
+      schema = schemadatap;
+      *schema++ = SOLVABLE_NAME;
+      *schema++ = SOLVABLE_ARCH;
+      *schema++ = SOLVABLE_EVR;
+      if (s->vendor)
+        *schema++ = SOLVABLE_VENDOR;
+      if (s->provides)
+        *schema++ = SOLVABLE_PROVIDES;
+      if (s->obsoletes)
+        *schema++ = SOLVABLE_OBSOLETES;
+      if (s->conflicts)
+        *schema++ = SOLVABLE_CONFLICTS;
+      if (s->requires)
+        *schema++ = SOLVABLE_REQUIRES;
+      if (s->recommends)
+        *schema++ = SOLVABLE_RECOMMENDS;
+      if (s->suggests)
+        *schema++ = SOLVABLE_SUGGESTS;
+      if (s->supplements)
+        *schema++ = SOLVABLE_SUPPLEMENTS;
+      if (s->enhances)
+        *schema++ = SOLVABLE_ENHANCES;
+      if (s->freshens)
+        *schema++ = SOLVABLE_FRESHENS;
+      if (repo->rpmdbid)
+        *schema++ = RPM_RPMDBID;
+      *schema++ = 0;
+      for (sp = schemadatap, h = 0; *sp; )
+	h = h * 7 + *sp++;
+      h &= 255;
+      if (lastschema[h] && !memcmp(schemadata + lastschema[h], schemadatap, (schema - schemadatap) * sizeof(Id)))
+	{
+	  solvschema[n++] = lastschemakey[h];
+	  continue;
+	}
+      schemaid = 0;
+      for (sp = schemadata + 1; sp < schemadatap; )
+	{
+	  if (!memcmp(sp, schemadatap, (schema - schemadatap) * sizeof(Id)))
+	    break;
+	  while (*sp++)
+	    ;
+	  schemaid++;
+	}
+      if (sp >= schemadatap)
+	{
+	  if (schemaid != nschemata)
+	    abort();
+	  lastschema[h] = schemadatap - schemadata;
+	  lastschemakey[h] = schemaid;
+	  schemadatalen -= schema - schemadatap;
+	  schemadatap = schema;
+	  nschemata++;
+	}
+      solvschema[n++] = schemaid;
+    }
+  /* convert all schemas to keys */
+  for (sp = schemadata; sp < schemadatap; sp++)
+    *sp = id2key[*sp];
+
   /* write file header */
   write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
-  write_u32(fp, SOLV_VERSION);
+  write_u32(fp, SOLV_VERSION_1);
 
   /* write counts */
   write_u32(fp, nstrings);
   write_u32(fp, nrels);
   write_u32(fp, nsolvables);
-  write_u32(fp, sizeid);
+  write_u32(fp, nkeys);
+  write_u32(fp, nschemata);
+  write_u32(fp, 0);	/* no info block */
+#if 0
+  write_u32(fp, SOLV_FLAG_VERTICAL);	/* no flags */
+#else
+  write_u32(fp, 0);	/* no flags */
+#endif
 
   /*
    * write strings
    */
+  write_u32(fp, sizeid);
   for (i = 1; i < nstrings; i++)
     {
       char *str = pool->ss.stringspace + pool->ss.strings[needid[i].map];
@@ -322,90 +435,134 @@ repo_write(Repo *repo, FILE *fp)
   for (i = 0; i < nrels; i++)
     {
       ran = pool->rels + (needid[pool->ss.nstrings + i].map - pool->ss.nstrings);
-      write_id(fp, needid[ISRELDEP(ran->name) ? GETRELID(pool, ran->name) : ran->name].need);
-      write_id(fp, needid[ISRELDEP(ran->evr) ? GETRELID(pool, ran->evr) : ran->evr].need);
+      write_id(fp, needid[ISRELDEP(ran->name) ? RELOFF(ran->name) : ran->name].need);
+      write_id(fp, needid[ISRELDEP(ran->evr) ? RELOFF(ran->evr) : ran->evr].need);
       write_u8( fp, ran->flags);
     }
 
-  write_u32(fp, 0);	/* no repo data */
+  /*
+   * write keys
+   */
+  for (i = SOLVABLE_NAME; i <= RPM_RPMDBID; i++)
+    {
+      if (!idsizes[i])
+	continue;
+      write_id(fp, needid[i].need);
+      if (i >= SOLVABLE_PROVIDES && i <= SOLVABLE_FRESHENS)
+	write_id(fp, TYPE_IDARRAY);
+      else if (i == RPM_RPMDBID)
+        write_id(fp, TYPE_U32);
+      else
+        write_id(fp, TYPE_ID);
+      write_id(fp, idsizes[i]);
+    }
+
+  /*
+   * write schemata
+   */
+  write_id(fp, schemadatap - schemadata - 1);
+  for (sp = schemadata + 1; sp < schemadatap; )
+    {
+      write_idarray(fp, pool, 0, sp);
+      while (*sp++)
+	;
+    }
+  
+#if 0
+  if (1)
+    {
+      Id id, key;
+
+      for (i = 0; i < nsolvables; i++)
+	write_id(fp, solvschema[i]);
+      unsigned char *used = xmalloc(nschemata);
+      for (id = SOLVABLE_NAME; id <= RPM_RPMDBID; id++)
+	{
+	  key = id2key[id];
+	  memset(used, 0, nschemata);
+	  for (sp = schemadata + 1, i = 0; sp < schemadatap; sp++)
+	    {
+	      if (*sp == 0)
+		i++;
+	      else if (*sp == key)
+		used[i] = 1;
+	    }
+	  for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
+	    {
+	      if (s->repo != repo)
+		continue;
+	      if (!used[solvschema[n++]])
+		continue;
+	      switch(id)
+		{
+		case SOLVABLE_NAME:
+		  write_id(fp, needid[s->name].need);
+		  break;
+		case SOLVABLE_ARCH:
+		  write_id(fp, needid[s->arch].need);
+		  break;
+		case SOLVABLE_EVR:
+		  write_id(fp, needid[s->evr].need);
+		  break;
+		case SOLVABLE_VENDOR:
+		  write_id(fp, needid[s->vendor].need);
+		  break;
+		case RPM_RPMDBID:
+		  write_u32(fp, repo->rpmdbid[i - repo->start]);
+		  break;
+		case SOLVABLE_PROVIDES:
+		  write_idarray(fp, pool, needid, idarraydata + s->provides);
+		  break;
+		case SOLVABLE_OBSOLETES:
+		  write_idarray(fp, pool, needid, idarraydata + s->obsoletes);
+		  break;
+		case SOLVABLE_CONFLICTS:
+		  write_idarray(fp, pool, needid, idarraydata + s->conflicts);
+		  break;
+		case SOLVABLE_REQUIRES:
+		  write_idarray(fp, pool, needid, idarraydata + s->requires);
+		  break;
+		case SOLVABLE_RECOMMENDS:
+		  write_idarray(fp, pool, needid, idarraydata + s->recommends);
+		  break;
+		case SOLVABLE_SUPPLEMENTS:
+		  write_idarray(fp, pool, needid, idarraydata + s->supplements);
+		  break;
+		case SOLVABLE_SUGGESTS:
+		  write_idarray(fp, pool, needid, idarraydata + s->suggests);
+		  break;
+		case SOLVABLE_ENHANCES:
+		  write_idarray(fp, pool, needid, idarraydata + s->enhances);
+		  break;
+		case SOLVABLE_FRESHENS:
+		  write_idarray(fp, pool, needid, idarraydata + s->freshens);
+		  break;
+		}
+	    }
+	}
+      xfree(used);
+      xfree(needid);
+      xfree(solvschema);
+      xfree(schemadata);
+      return;
+    }
+  
+#endif
 
   /*
    * write Solvables
    */
-  
-  numsolvdata = 0;
-  for (i = SOLVABLE_NAME; i <= RPM_RPMDBID; i++)
-    {
-      if (idsizes[i])
-        numsolvdata++;
-    }
-  write_u32(fp, (unsigned int)numsolvdata);
-
-  bitmaps = 0;
-  for (i = SOLVABLE_NAME; i <= SOLVABLE_FRESHENS; i++)
-    {
-      if (!idsizes[i])
-	continue;
-      if (i >= SOLVABLE_PROVIDES && i <= SOLVABLE_FRESHENS)
-	{
-	  write_u8(fp, TYPE_IDARRAY|TYPE_BITMAP);
-	  bitmaps++;
-	}
-      else
-	write_u8(fp, TYPE_ID);
-      write_id(fp, needid[i].need);
-      if (i >= SOLVABLE_PROVIDES && i <= SOLVABLE_FRESHENS)
-	write_u32(fp, idsizes[i]);
-      else
-	write_u32(fp, 0);
-    }
-
-  if (repo->rpmdbid)
-    {
-      write_u8(fp, TYPE_U32);
-      write_id(fp, needid[RPM_RPMDBID].need);
-      write_u32(fp, 0);
-    }
-
-  for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
+  for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
     {
       if (s->repo != repo)
 	continue;
-      bits = 0;
-      if (idsizes[SOLVABLE_FRESHENS])
-	bits = (bits << 1) | (s->freshens ? 1 : 0);
-      if (idsizes[SOLVABLE_ENHANCES])
-	bits = (bits << 1) | (s->enhances ? 1 : 0);
-      if (idsizes[SOLVABLE_SUPPLEMENTS])
-	bits = (bits << 1) | (s->supplements ? 1 : 0);
-      if (idsizes[SOLVABLE_SUGGESTS])
-	bits = (bits << 1) | (s->suggests ? 1 : 0);
-      if (idsizes[SOLVABLE_RECOMMENDS])
-	bits = (bits << 1) | (s->recommends ? 1 : 0);
-      if (idsizes[SOLVABLE_REQUIRES])
-	bits = (bits << 1) | (s->requires ? 1 : 0);
-      if (idsizes[SOLVABLE_CONFLICTS])
-	bits = (bits << 1) | (s->conflicts ? 1 : 0);
-      if (idsizes[SOLVABLE_OBSOLETES])
-	bits = (bits << 1) | (s->obsoletes ? 1 : 0);
-      if (idsizes[SOLVABLE_PROVIDES])
-	bits = (bits << 1) | (s->provides ? 1 : 0);
-
-      if (bitmaps > 24)
-	write_u8(fp, bits >> 24);
-      if (bitmaps > 16)
-	write_u8(fp, bits >> 16);
-      if (bitmaps > 8)
-	write_u8(fp, bits >> 8);
-      if (bitmaps)
-	write_u8(fp, bits);
-
+      /* keep in sync with schema generation! */
+      write_id(fp, solvschema[n++]);
       write_id(fp, needid[s->name].need);
       write_id(fp, needid[s->arch].need);
       write_id(fp, needid[s->evr].need);
-      if (idsizes[SOLVABLE_VENDOR])
+      if (s->vendor)
         write_id(fp, needid[s->vendor].need);
-
       if (s->provides)
         write_idarray(fp, pool, needid, idarraydata + s->provides);
       if (s->obsoletes)
@@ -428,7 +585,9 @@ repo_write(Repo *repo, FILE *fp)
         write_u32(fp, repo->rpmdbid[i - repo->start]);
     }
 
-  free(needid);
+  xfree(needid);
+  xfree(solvschema);
+  xfree(schemadata);
 }
 
 // EOF

@@ -87,6 +87,8 @@ struct _Pool {
    * whatprovidesdata[Offset] -> ID_NULL-terminated list of solvables providing Id
    */
   Offset *whatprovides;		/* Offset to providers of a specific name, Id -> Offset  */
+  Offset *whatprovides_rel;	/* Offset to providers of a specific relation, Id -> Offset  */
+
   Id *whatprovidesdata;		/* Ids of solvable providing Id */
   Offset whatprovidesdataoff;	/* next free slot within whatprovidesdata */
   int whatprovidesdataleft;	/* number of 'free slots' within whatprovidesdata */
@@ -133,7 +135,7 @@ struct _Pool {
 
 #define MAKERELDEP(id) ((id) | 0x80000000)
 #define ISRELDEP(id) (((id) & 0x80000000) != 0)
-#define GETRELID(pool, id) ((pool)->ss.nstrings + ((id) ^ 0x80000000))     /* returns Id  */
+#define GETRELID(id) ((id) ^ 0x80000000)				/* returns Id */
 #define GETRELDEP(pool, id) ((pool)->rels + ((id) ^ 0x80000000))	/* returns Reldep* */
 
 #define REL_GT		1
@@ -145,6 +147,10 @@ struct _Pool {
 #define REL_WITH	18
 #define REL_NAMESPACE	19
 
+#if !defined(__GNUC__) && !defined(__attribute__)
+# define __attribute__(x)
+#endif
+
 /**
  * Creates a new pool
  */
@@ -154,11 +160,7 @@ extern Pool *pool_create(void);
  */
 extern void pool_free(Pool *pool);
 
-extern void pool_debug(Pool *pool, int type, const char *format, ...)
-#ifdef __GNUC__
- __attribute__((format(printf, 3, 4)))
-#endif
-;
+extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 /**
  * Solvable management
@@ -197,9 +199,9 @@ static inline Id *pool_whatprovides(Pool *pool, Id d)
   Id v;
   if (!ISRELDEP(d))
     return pool->whatprovidesdata + pool->whatprovides[d];
-  v = GETRELID(pool, d);
-  if (pool->whatprovides[v])
-    return pool->whatprovidesdata + pool->whatprovides[v];
+  v = GETRELID(d);
+  if (pool->whatprovides_rel[v])
+    return pool->whatprovidesdata + pool->whatprovides_rel[v];
   return pool_addrelproviders(pool, d);
 }
 

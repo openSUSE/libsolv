@@ -28,17 +28,6 @@
 
 #define SOLVABLE_BLOCK	255
 
-// reset all whatprovides
-// 
-void
-pool_freewhatprovides(Pool *pool)
-{
-  pool->whatprovides = xfree(pool->whatprovides);
-  pool->whatprovidesdata = xfree(pool->whatprovidesdata);
-  pool->whatprovidesdataoff = 0;
-  pool->whatprovidesdataleft = 0;
-}
-
 
 // list of string constants, so we can do pointer/Id instead of string comparison
 // index into array matches ID_xxx constants in pool.h
@@ -71,8 +60,7 @@ static const char *initpool_data[] = {
   0
 };
 
-// create pool
-// 
+/* create pool */
 Pool *
 pool_create(void)
 {
@@ -101,8 +89,7 @@ pool_create(void)
 }
 
 
-// empty the pool
-// 
+/* free all the resources of our pool */
 void
 pool_free(Pool *pool)
 {
@@ -204,6 +191,12 @@ pool_shrink_whatprovides_sortcmp(const void *ap, const void *bp)
   return *(Id *)ap - *(Id *)bp;
 }
 
+/*
+ * pool_shrink_whatprovides  - unify whatprovides data
+ *
+ * whatprovides_rel must be empty for this to work!
+ *
+ */
 static void
 pool_shrink_whatprovides(Pool *pool)
 {
@@ -287,10 +280,9 @@ pool_shrink_whatprovides(Pool *pool)
 /*
  * pool_createwhatprovides()
  * 
- * create hashes over complete pool to ease lookups
+ * create hashes over pool of solvables to ease provide lookups
  * 
  */
-
 void
 pool_createwhatprovides(Pool *pool)
 {
@@ -305,10 +297,11 @@ pool_createwhatprovides(Pool *pool)
   POOL_DEBUG(SAT_DEBUG_STATS, "number of solvables: %d\n", pool->nsolvables);
   POOL_DEBUG(SAT_DEBUG_STATS, "number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
 
-  pool_freeidhashes(pool);
+  pool_freeidhashes(pool);	/* XXX: should not be here! */
   pool_freewhatprovides(pool);
-  num = pool->ss.nstrings + pool->nrels;
-  whatprovides = (Offset *)xcalloc(num, sizeof(Offset));
+  num = pool->ss.nstrings;
+  pool->whatprovides = whatprovides = (Offset *)xcalloc((num + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK, sizeof(Offset));
+  pool->whatprovides_rel = (Offset *)xcalloc((pool->nrels + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK, sizeof(Offset));
 
   /* count providers for each name */
   for (i = 1; i < pool->nsolvables; i++)
@@ -322,7 +315,7 @@ pool_createwhatprovides(Pool *pool)
       pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != ID_NULL)
 	{
-	  if (ISRELDEP(id))
+	  while (ISRELDEP(id))
 	    {
 	      Reldep *rd = GETRELDEP(pool, id);
 	      id = rd->name;
@@ -345,8 +338,9 @@ pool_createwhatprovides(Pool *pool)
     }
 
   POOL_DEBUG(SAT_DEBUG_STATS, "provide ids: %d\n", np);
-  extra = 2 * pool->nrels;
 
+  /* reserve some space for relation data */
+  extra = 2 * pool->nrels;
   if (extra < 256)
     extra = 256;
 
@@ -369,7 +363,7 @@ pool_createwhatprovides(Pool *pool)
       pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != 0)
 	{
-	  if (ISRELDEP(id))
+	  while (ISRELDEP(id))
 	    {
 	      Reldep *rd = GETRELDEP(pool, id);
 	      id = rd->name;
@@ -386,25 +380,38 @@ pool_createwhatprovides(Pool *pool)
 	  *d = i;		       /* put solvable Id into data */
 	}
     }
-  pool->whatprovides = whatprovides;
   pool->whatprovidesdata = whatprovidesdata;
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
   pool_shrink_whatprovides(pool);
 }
 
+/*
+ * free all of our whatprovides data
+ * be careful, everything internalized with pool_queuetowhatprovides is gone, too
+ */
+void
+pool_freewhatprovides(Pool *pool)
+{
+  pool->whatprovides = xfree(pool->whatprovides);
+  pool->whatprovides_rel = xfree(pool->whatprovides_rel);
+  pool->whatprovidesdata = xfree(pool->whatprovidesdata);
+  pool->whatprovidesdataoff = 0;
+  pool->whatprovidesdataleft = 0;
+}
+
 
 /******************************************************************************/
 
 /*
- * pool_queuetowhatprovides
+ * pool_queuetowhatprovides  - add queue contents to whatprovidesdata
  * 
  * on-demand filling of provider information
  * move queue data into whatprovidesdata
  * q: queue of Ids
  * returns: Offset into whatprovides
+ *
  */
-
 Id
 pool_queuetowhatprovides(Pool *pool, Queue *q)
 {
@@ -458,7 +465,7 @@ pool_addrelproviders(Pool *pool, Id d)
   Id pid, *pidp;
   Id p, *pp, *pp2, *pp3;
 
-  d = GETRELID(pool, d);
+  d = GETRELID(d);
   queue_init_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
   switch (flags)
     {
@@ -491,7 +498,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	  if (p > 1)
 	    {
 	      queue_free(&plist);
-	      pool->whatprovides[d] = p;
+	      pool->whatprovides_rel[d] = p;
 	      return pool->whatprovidesdata + p;
 	    }
 	  if (p == 1)
@@ -560,10 +567,10 @@ pool_addrelproviders(Pool *pool, Id d)
 #if 0
   POOL_DEBUG(DEBUG_1, "addrelproviders: adding %d packages to %d\n", plist.count, d);
 #endif
-  pool->whatprovides[d] = pool_queuetowhatprovides(pool, &plist);
+  pool->whatprovides_rel[d] = pool_queuetowhatprovides(pool, &plist);
   queue_free(&plist);
 
-  return pool->whatprovidesdata + pool->whatprovides[d];
+  return pool->whatprovidesdata + pool->whatprovides_rel[d];
 }
 
 /*************************************************************************/

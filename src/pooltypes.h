@@ -14,7 +14,10 @@
 #define SATSOLVER_POOLTYPES_H
 
 /* version number for .solv files */
-#define SOLV_VERSION 0
+#define SOLV_VERSION_0 0
+#define SOLV_VERSION_1 1
+#define SOLV_FLAG_PACKEDSIZES 1
+#define SOLV_FLAG_VERTICAL    2
 
 struct _Stringpool;
 typedef struct _Stringpool Stringpool;

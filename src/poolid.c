@@ -21,18 +21,19 @@
 #include "util.h"
 
 
-// intern string into pool
-// return Id
+/* intern string into pool, return id */
 
 Id
 str2id(Pool *pool, const char *str, int create)
 {
-  int old_nstrings = pool->ss.nstrings;
+  int oldnstrings = pool->ss.nstrings;
   Id id = stringpool_str2id (&pool->ss, str, create);
-  /* If we changed the ID->string relations we need to get rid of an
-     existing provides lookup cache.  */
-  if (old_nstrings != pool->ss.nstrings)
-    pool_freewhatprovides(pool);
+  if (create && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
+    {
+      /* grow whatprovides array */
+      pool->whatprovides = xrealloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      memset(pool->whatprovides + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
+    }
   return id;
 }
 
@@ -51,7 +52,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   hashtbl = pool->relhashtbl;
   ran = pool->rels;
   
-  // extend hashtable if needed
+  /* extend hashtable if needed */
   if (pool->nrels * 2 > hashmask)
     {
       xfree(pool->relhashtbl);
@@ -68,8 +69,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 	}
     }
   
-  // compute hash and check for match
-
+  /* compute hash and check for match */
   h = relhash(name, evr, flags) & hashmask;
   hh = HASHCHAIN_START;
   while ((id = hashtbl[h]) != 0)
@@ -84,10 +84,8 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   if (!create)
     return ID_NULL;
 
-  pool_freewhatprovides(pool);
-
   id = pool->nrels++;
-  // extend rel space if needed
+  /* extend rel space if needed */
   if ((id & REL_BLOCK) == 0)
     pool->rels = xrealloc(pool->rels, ((pool->nrels + REL_BLOCK) & ~REL_BLOCK) * sizeof(Reldep));
   hashtbl[h] = id;
@@ -95,6 +93,13 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   ran->name = name;
   ran->evr = evr;
   ran->flags = flags;
+
+  /* extend whatprovides_rel if needed */
+  if (pool->whatprovides_rel && (id & WHATPROVIDES_BLOCK) == 0)
+    {
+      pool->whatprovides_rel = xrealloc(pool->whatprovides_rel, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      memset(pool->whatprovides_rel + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
+    }
   return MAKERELDEP(id);
 }
 
@@ -236,7 +241,7 @@ dep2str(Pool *pool, Id id)
 void
 pool_shrink_strings(Pool *pool)
 {
-  stringpool_shrink (&pool->ss);
+  stringpool_shrink(&pool->ss);
 }
 
 void

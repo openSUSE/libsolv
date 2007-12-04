@@ -3260,10 +3260,14 @@ solver_solve(Solver *solv, Queue *job)
   Repo *installed = solv->installed;
   int i;
   int oldnrules;
-  Map addedmap;			       /* '1' == have rule for solvable */
+  Map addedmap;		       /* '1' == have rpm-rules for solvable */
   Id how, what, p, *pp, d;
   Queue q;
   Solvable *s;
+
+  /* create whatprovides if not already there */
+  if (pool->whatprovides)
+    pool_createwhatprovides(pool);
 
   /* create obsolete index if needed */
   if (solv->noupdateprovide)
