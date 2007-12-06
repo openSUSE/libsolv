@@ -29,7 +29,7 @@
 #define INTERESTED_START	SOLVABLE_NAME
 #define INTERESTED_END		SOLVABLE_FRESHENS
 
-Pool *mypool;		/* for pool_debug... */
+static Pool *mypool;		/* for pool_debug... */
 
 /*-----------------------------------------------------------------*/
 /* .solv read functions */
@@ -116,10 +116,11 @@ read_id(FILE *fp, Id max)
  */
 
 static Id *
-read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end)
+read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 {
   unsigned int x = 0;
   int c;
+  Id old = 0;
   for (;;)
     {
       c = getc(fp);
@@ -131,18 +132,31 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end)
       if ((c & 128) == 0)
 	{
 	  x = (x << 6) | (c & 63);
-          if (x >= max)
+	  if (!relative || x != 1)
 	    {
-	      pool_debug(mypool, SAT_FATAL, "read_idarray: id too large (%u/%u)\n", x, max);
-	      exit(1);
+	      if (relative)
+	        {
+		  x--;
+	          x += old;
+	          old = x;
+	        }
+	      if (x >= max)
+		{
+		  pool_debug(mypool, SAT_FATAL, "read_idarray: id too large (%u/%u)\n", x, max);
+		  exit(1);
+		}
+	      if (map)
+		x = map[x];
 	    }
+	  else
+	    /* (relative && x==1) :
+	       Ugly PREREQ handling.  See repo_write.c.  */
+	    x = SOLVABLE_PREREQMARKER, old = 1;
 	  if (store == end)
 	    {
 	      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
 	      exit(1);
 	    }
-	  if (map)
-	    x = map[x];
 	  *store++ = x;
 	  if ((c & 64) == 0)
 	    {
@@ -204,6 +218,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   Offset ido;
   Solvable *s;
   unsigned int solvflags;
+  unsigned int solvversion;
   struct key *keys;
   Id *schemadata, *schemadatap, *schemadataend;
   Id *schemata, key;
@@ -215,10 +230,15 @@ repo_add_solv(Repo *repo, FILE *fp)
       pool_debug(pool, SAT_FATAL, "not a SOLV file\n");
       exit(1);
     }
-  if (read_u32(fp) != SOLV_VERSION_1)
+  solvversion = read_u32(fp);
+  switch (solvversion)
     {
-      pool_debug(pool, SAT_FATAL, "unsupported SOLV version\n");
-      exit(1);
+      case SOLV_VERSION_1:
+      case SOLV_VERSION_2:
+        break;
+      default:
+        pool_debug(pool, SAT_FATAL, "unsupported SOLV version\n");
+        exit(1);
     }
 
   pool_freeidhashes(pool);
@@ -264,10 +284,38 @@ repo_add_solv(Repo *repo, FILE *fp)
    * read new repo at end of pool
    */
   
-  if (fread(strsp, sizeid, 1, fp) != 1)
+  if ((solvflags & SOLV_FLAG_PREFIX_POOL) == 0)
     {
-      pool_debug(pool, SAT_FATAL, "read error while reading strings\n");
-      exit(1);
+      if (fread(strsp, sizeid, 1, fp) != 1)
+	{
+	  pool_debug(pool, SAT_FATAL, "read error while reading strings\n");
+	  exit(1);
+	}
+    }
+  else
+    {
+      unsigned int pfsize = read_u32 (fp);
+      char *prefix = xmalloc (pfsize);
+      char *pp = prefix;
+      char *old_str = "";
+      char *dest = strsp;
+      if (fread (prefix, pfsize, 1, fp) != 1)
+        {
+	  pool_debug(pool, SAT_FATAL, "read error while reading strings\n");
+	  exit(1);
+	}
+      for (i = 1; i < numid; i++)
+        {
+	  int same = (unsigned char)*pp++;
+	  size_t len = strlen (pp) + 1;
+	  if (same)
+	    memcpy (dest, old_str, same);
+	  memcpy (dest + same, pp, len);
+	  pp += len;
+	  old_str = dest;
+	  dest += same + len;
+	}
+      xfree (prefix);
     }
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
@@ -449,7 +497,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   for (i = 0; i < numschemata; i++)
     {
       schemata[i] = schemadatap - schemadata;
-      schemadatap = read_idarray(fp, numid, 0, schemadatap, schemadataend);
+      schemadatap = read_idarray(fp, numid, 0, schemadatap, schemadataend, 0);
     }
 
   /*******  Part 5: Info  ***********************************************/
@@ -473,6 +521,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 		  ;
 	        break;
 	      case TYPE_IDARRAY:
+	      case TYPE_REL_IDARRAY:
 		while ((read_u8(fp) & 0xc0) != 0)
 		  ;
 		break;
@@ -497,7 +546,8 @@ repo_add_solv(Repo *repo, FILE *fp)
   for (i = 1; i < numkeys; i++)
     {
       id = keys[i].name;
-      if (keys[i].type == TYPE_IDARRAY && id >= INTERESTED_START && id <= INTERESTED_END)
+      if ((keys[i].type == TYPE_IDARRAY || keys[i].type == TYPE_REL_IDARRAY)
+          && id >= INTERESTED_START && id <= INTERESTED_END)
 	size_idarray += keys[i].size;
     }
 
@@ -574,6 +624,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 		    ;
 		  break;
 		case TYPE_IDARRAY:
+		case TYPE_REL_IDARRAY:
 		  if (id < INTERESTED_START || id > INTERESTED_END)
 		    {
 		      /* not interested in array */
@@ -582,7 +633,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 		      break;
 		    }
 		  ido = idarraydatap - repo->idarraydata;
-		  idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend);
+		  idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend, type == TYPE_REL_IDARRAY);
 		  if (id == SOLVABLE_PROVIDES)
 		    s->provides = ido;
 		  else if (id == SOLVABLE_OBSOLETES)
@@ -653,6 +704,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 		;
 	      break;
 	    case TYPE_IDARRAY:
+	    case TYPE_REL_IDARRAY:
 	      if (id < INTERESTED_START || id > INTERESTED_END)
 		{
 		  /* not interested in array */
@@ -661,7 +713,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 		  break;
 		}
 	      ido = idarraydatap - repo->idarraydata;
-	      idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend);
+	      idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend, keys[key].type == TYPE_REL_IDARRAY);
 	      if (id == SOLVABLE_PROVIDES)
 		s->provides = ido;
 	      else if (id == SOLVABLE_OBSOLETES)

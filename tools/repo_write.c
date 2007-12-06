@@ -21,10 +21,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "pool.h"
 #include "util.h"
 #include "repo_write.h"
+
+/* #define IGNORE_NEED_FREQUENCY */
 
 /*------------------------------------------------------------------*/
 /* Id map optimizations */
@@ -93,6 +96,32 @@ needid_cmp_need(const void *ap, const void *bp)
   if (r)
     return r;
   return a->map - b->map;
+}
+
+static Pool *cmp_pool;
+static int
+needid_cmp_need_s(const void *ap, const void *bp)
+{
+  const NeedId *a = ap;
+  const NeedId *b = bp;
+  if (a == b)
+    return 0;
+#ifdef IGNORE_NEED_FREQUENCY
+  if (a->need == 0)
+    return 1;
+  else if (b->need == 0)
+    return -1;
+#else
+  int r;
+  r = b->need - a->need;
+  if (r)
+    return r;
+#endif
+  char *as = cmp_pool->ss.stringspace + cmp_pool->ss.strings[a->map];
+  char *bs = cmp_pool->ss.stringspace + cmp_pool->ss.strings[b->map];
+  size_t alen = strlen (as);
+  size_t blen = strlen (bs);
+  return memcmp (as, bs, alen < blen ? alen + 1 : blen + 1);
 }
 
 
@@ -188,6 +217,82 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
     }
 }
 
+static int
+cmp_ids (const void *pa, const void *pb)
+{
+  Id a = *(Id *)pa;
+  Id b = *(Id *)pb;
+  return a - b;
+}
+
+static void
+write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
+{
+  int len, i;
+  if (!ids)
+    return;
+  if (!*ids)
+    {
+      write_u8 (fp, 0);
+      return;
+    }
+  /* If we ever share idarrays we can't do this in-place.  */
+  for (len = 0; ids[len]; len++)
+    {
+      Id id = ids[len];
+      if (needid)
+        ids[len] = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
+    }
+
+  /* That bloody solvable:prereqmarker needs to stay in position :-(  */
+  Id prereq = SOLVABLE_PREREQMARKER;
+  if (needid)
+    prereq = needid[prereq].need;
+  for (i = 0; i < len; i++)
+    if (ids[i] == prereq)
+      break;
+  if (i > 1)
+    qsort (ids, i, sizeof (Id), cmp_ids);
+  if ((len - i) > 2)
+    qsort (ids + i + 1, len - i - 1, sizeof (Id), cmp_ids);
+
+  Id old = 0;
+  for (i = 0; i < len; i++)
+    /* Ugly PREREQ handling.  A "difference" of 1 is the prereq marker,
+       hence all real differences are offsetted by 1.  Otherwise we would
+       have to handle negative differences, which would cost code space for
+       the encoding of the sign.  We loose the exact mapping of prereq here,
+       but we know the result, so we can recover from that in the reader.  */
+    if (ids[i] == prereq)
+      old = ids[i] = 1;
+    else
+      {
+        ids[i] -= old;
+	old = ids[i] + old;
+        /* difference is zero --> we have multiple equal elements in the list */
+        assert (ids[i] > 0);
+	ids[i]++;
+      }
+
+  /* The differencing above produces many runs of ones and twos.  I tried
+     fairly elaborate schemes to RLE those, but they give only very mediocre
+     improvements in compression, as coding the escapes costs quite some
+     space.  Even if they are coded only as bits in IDs.  The best improvement
+     was about 2.7% for the whole .solv file.  It's probably better to
+     invest some complexity into sharing idarrays, than RLEing.  */
+  for (;;)
+    {
+      Id id = *ids++;
+      if (id >= 64)
+	id = (id & 63) | ((id & ~63) << 1);
+      if (!*ids)
+	{
+	  write_id(fp, id);
+	  return;
+	}
+      write_id(fp, id | 64);
+    }
+}
 
 /*
  * Repo
@@ -202,6 +307,7 @@ repo_write(Repo *repo, FILE *fp)
   NeedId *needid;
   int nstrings, nrels, nkeys, nschemata;
   unsigned int sizeid;
+  unsigned int solv_flags;
   Reldep *ran;
   Id *idarraydata;
 
@@ -275,7 +381,8 @@ repo_write(Repo *repo, FILE *fp)
   for (i = 0; i < pool->ss.nstrings + pool->nrels; i++)
     needid[i].map = i;
 
-  qsort(needid + 1, pool->ss.nstrings - 1, sizeof(*needid), needid_cmp_need);
+  cmp_pool = pool;
+  qsort(needid + 1, pool->ss.nstrings - 1, sizeof(*needid), needid_cmp_need_s);
   qsort(needid + pool->ss.nstrings, pool->nrels, sizeof(*needid), needid_cmp_need);
 
   sizeid = 0;
@@ -400,7 +507,7 @@ repo_write(Repo *repo, FILE *fp)
 
   /* write file header */
   write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
-  write_u32(fp, SOLV_VERSION_1);
+  write_u32(fp, SOLV_VERSION_2);
 
   /* write counts */
   write_u32(fp, nstrings);
@@ -409,25 +516,48 @@ repo_write(Repo *repo, FILE *fp)
   write_u32(fp, nkeys);
   write_u32(fp, nschemata);
   write_u32(fp, 0);	/* no info block */
+  solv_flags = 0;
+  solv_flags |= SOLV_FLAG_PREFIX_POOL;
 #if 0
-  write_u32(fp, SOLV_FLAG_VERTICAL);	/* no flags */
-#else
-  write_u32(fp, 0);	/* no flags */
+  solv_flags |= SOLV_FLAG_VERTICAL;
 #endif
+  write_u32(fp, solv_flags);
+
+  /* Build the prefix-encoding of the string pool.  We need to know
+     the size of that before writing it to the file, so we have to
+     build a separate buffer for that.  As it's temporarily possible
+     that this actually is an expansion we can't easily reuse the 
+     stringspace for this.  The max expansion per string is 1 byte,
+     so it will fit into sizeid+nstrings bytes.  */
+  char *prefix = xmalloc (sizeid + nstrings);
+  char *pp = prefix;
+  char *old_str = "";
+  for (i = 1; i < nstrings; i++)
+    {
+      char *str = pool->ss.stringspace + pool->ss.strings[needid[i].map];
+      int same;
+      size_t len;
+      for (same = 0; same < 255; same++)
+	if (old_str[same] != str[same])
+	  break;
+      *pp++ = same;
+      len = strlen (str + same) + 1;
+      memcpy (pp, str + same, len);
+      pp += len;
+      old_str = str;
+    }
 
   /*
    * write strings
    */
   write_u32(fp, sizeid);
-  for (i = 1; i < nstrings; i++)
+  write_u32(fp, pp - prefix);
+  if (fwrite(prefix, pp - prefix, 1, fp) != 1)
     {
-      char *str = pool->ss.stringspace + pool->ss.strings[needid[i].map];
-      if (fwrite(str, strlen(str) + 1, 1, fp) != 1)
-	{
-	  perror("write error");
-	  exit(1);
-	}
+      perror("write error");
+      exit(1);
     }
+  xfree (prefix);
 
   /*
    * write RelDeps
@@ -449,7 +579,7 @@ repo_write(Repo *repo, FILE *fp)
 	continue;
       write_id(fp, needid[i].need);
       if (i >= SOLVABLE_PROVIDES && i <= SOLVABLE_FRESHENS)
-	write_id(fp, TYPE_IDARRAY);
+	write_id(fp, TYPE_REL_IDARRAY);
       else if (i == RPM_RPMDBID)
         write_id(fp, TYPE_U32);
       else
@@ -564,23 +694,23 @@ repo_write(Repo *repo, FILE *fp)
       if (s->vendor)
         write_id(fp, needid[s->vendor].need);
       if (s->provides)
-        write_idarray(fp, pool, needid, idarraydata + s->provides);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->provides);
       if (s->obsoletes)
-        write_idarray(fp, pool, needid, idarraydata + s->obsoletes);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->obsoletes);
       if (s->conflicts)
-        write_idarray(fp, pool, needid, idarraydata + s->conflicts);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->conflicts);
       if (s->requires)
-        write_idarray(fp, pool, needid, idarraydata + s->requires);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->requires);
       if (s->recommends)
-        write_idarray(fp, pool, needid, idarraydata + s->recommends);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->recommends);
       if (s->suggests)
-        write_idarray(fp, pool, needid, idarraydata + s->suggests);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->suggests);
       if (s->supplements)
-        write_idarray(fp, pool, needid, idarraydata + s->supplements);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->supplements);
       if (s->enhances)
-        write_idarray(fp, pool, needid, idarraydata + s->enhances);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->enhances);
       if (s->freshens)
-        write_idarray(fp, pool, needid, idarraydata + s->freshens);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->freshens);
       if (repo->rpmdbid)
         write_u32(fp, repo->rpmdbid[i - repo->start]);
     }

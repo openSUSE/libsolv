@@ -125,7 +125,7 @@ struct _Pool {
 #define TYPE_IDARRAY		2
 #define TYPE_STR		3
 #define TYPE_U32		4
-#define TYPE_BITMAP		128
+#define TYPE_REL_IDARRAY	5
 
 
 //-----------------------------------------------

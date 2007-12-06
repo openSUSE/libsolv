@@ -16,8 +16,10 @@
 /* version number for .solv files */
 #define SOLV_VERSION_0 0
 #define SOLV_VERSION_1 1
+#define SOLV_VERSION_2 2
 #define SOLV_FLAG_PACKEDSIZES 1
 #define SOLV_FLAG_VERTICAL    2
+#define SOLV_FLAG_PREFIX_POOL 4
 
 struct _Stringpool;
 typedef struct _Stringpool Stringpool;
