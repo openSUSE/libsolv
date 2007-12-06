@@ -132,26 +132,31 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
       if ((c & 128) == 0)
 	{
 	  x = (x << 6) | (c & 63);
-	  if (!relative || x != 0)
+	  if (relative)
 	    {
-	      if (relative)
-	        {
-		  x--;
-	          x += old;
-	          old = x;
-	        }
-	      if (x >= max)
+	      if (x == 0 && c == 0x40)
 		{
-		  pool_debug(mypool, SAT_FATAL, "read_idarray: id too large (%u/%u)\n", x, max);
-		  exit(1);
+		  /* prereq hack */
+		  if (store == end)
+		    {
+		      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
+		      exit(1);
+		    }
+		  *store++ = SOLVABLE_PREREQMARKER;
+		  old = 0;
+		  x = 0;
+		  continue;
 		}
-	      if (map)
-		x = map[x];
+	      x = (x - 1) + old;
+	      old = x;
 	    }
-	  else
-	    /* (relative && x==0) :
-	       Ugly PREREQ handling.  See repo_write.c.  */
-	    x = SOLVABLE_PREREQMARKER, old = 0;
+	  if (x >= max)
+	    {
+	      pool_debug(mypool, SAT_FATAL, "read_idarray: id too large (%u/%u)\n", x, max);
+	      exit(1);
+	    }
+	  if (map)
+	    x = map[x];
 	  if (store == end)
 	    {
 	      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
@@ -160,6 +165,8 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 	  *store++ = x;
 	  if ((c & 64) == 0)
 	    {
+	      if (x == 0)	/* already have trailing zero? */
+		return store;
 	      if (store == end)
 		{
 		  pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");

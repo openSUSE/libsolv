@@ -198,8 +198,6 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
     return;
   if (!*ids)
     {
-      /* XXX I think this is broken.  A lone '0' will be interpreted as
-	 zero plus end-of-array, which stores another zero.  */
       write_u8(fp, 0);
       return;
     }
@@ -235,8 +233,6 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
     return;
   if (!*ids)
     {
-      /* XXX I think this is broken.  A lone '0' will be interpreted as
-	 zero plus end-of-array, which stores another zero.  */
       write_u8 (fp, 0);
       return;
     }
