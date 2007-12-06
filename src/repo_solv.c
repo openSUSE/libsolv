@@ -132,7 +132,7 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
       if ((c & 128) == 0)
 	{
 	  x = (x << 6) | (c & 63);
-	  if (!relative || x != 1)
+	  if (!relative || x != 0)
 	    {
 	      if (relative)
 	        {
@@ -149,9 +149,9 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 		x = map[x];
 	    }
 	  else
-	    /* (relative && x==1) :
+	    /* (relative && x==0) :
 	       Ugly PREREQ handling.  See repo_write.c.  */
-	    x = SOLVABLE_PREREQMARKER, old = 1;
+	    x = SOLVABLE_PREREQMARKER, old = 0;
 	  if (store == end)
 	    {
 	      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");

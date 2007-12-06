@@ -198,6 +198,8 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
     return;
   if (!*ids)
     {
+      /* XXX I think this is broken.  A lone '0' will be interpreted as
+	 zero plus end-of-array, which stores another zero.  */
       write_u8(fp, 0);
       return;
     }
@@ -233,6 +235,8 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
     return;
   if (!*ids)
     {
+      /* XXX I think this is broken.  A lone '0' will be interpreted as
+	 zero plus end-of-array, which stores another zero.  */
       write_u8 (fp, 0);
       return;
     }
@@ -258,19 +262,19 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
 
   Id old = 0;
   for (i = 0; i < len; i++)
-    /* Ugly PREREQ handling.  A "difference" of 1 is the prereq marker,
+    /* Ugly PREREQ handling.  A "difference" of 0 is the prereq marker,
        hence all real differences are offsetted by 1.  Otherwise we would
        have to handle negative differences, which would cost code space for
        the encoding of the sign.  We loose the exact mapping of prereq here,
        but we know the result, so we can recover from that in the reader.  */
     if (ids[i] == prereq)
-      old = ids[i] = 1;
+      old = ids[i] = 0;
     else
       {
         ids[i] -= old;
 	old = ids[i] + old;
-        /* difference is zero --> we have multiple equal elements in the list */
-        assert (ids[i] > 0);
+	/* XXX If difference is zero we have multiple equal elements,
+	   we might want to skip writing them out.  */
 	ids[i]++;
       }
 
@@ -280,18 +284,17 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
      space.  Even if they are coded only as bits in IDs.  The best improvement
      was about 2.7% for the whole .solv file.  It's probably better to
      invest some complexity into sharing idarrays, than RLEing.  */
-  for (;;)
+  for (i = 0; i < len - 1; i++)
     {
-      Id id = *ids++;
+      Id id = ids[i];
       if (id >= 64)
 	id = (id & 63) | ((id & ~63) << 1);
-      if (!*ids)
-	{
-	  write_id(fp, id);
-	  return;
-	}
       write_id(fp, id | 64);
     }
+  old = ids[i];
+  if (old >= 64)
+    old = (old & 63) | ((old & ~63) << 1);
+  write_id(fp, old);
 }
 
 /*
