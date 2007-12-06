@@ -528,7 +528,14 @@ pool_addrelproviders(Pool *pool, Id d)
 	      Id pevr;
 
 	      if (pid == name)
-		break;		/* yes, provides all versions */
+		{
+#ifdef DEBIAN_SEMANTICS
+		  continue;		/* unversioned provides can
+				 	 * never match versioned deps */
+#else
+		  break;		/* yes, provides all versions */
+#endif
+		}
 	      if (!ISRELDEP(pid))
 		continue;		/* wrong provides name */
 	      prd = GETRELDEP(pool, pid);

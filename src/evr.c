@@ -135,6 +135,12 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id)
   r = vercmp(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2);
   if (r)
     return r;
+#ifdef DEBIAN_SEMANTICS
+  if (!r1 && r2)
+    return -1;
+  if (r1 && !r2)
+    return 1;
+#endif
   if (r1 && r2)
     {
       if (s1 != ++r1 && s2 != ++r2)
