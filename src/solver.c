@@ -142,14 +142,17 @@ printrule(Solver *solv, int type, Rule *r)
   for (i = 0; ; i++)
     {
       if (i == 0)
+	  /* print direct literal */ 
 	v = r->p;
       else if (r->d == ID_NULL)
 	{
 	  if (i == 2)
 	    break;
+	  /* binary rule --> print w2 as second literal */
 	  v = r->w2;
 	}
       else
+	  /* every other which is in d */
 	v = solv->pool->whatprovidesdata[r->d + i - 1];
       if (v == ID_NULL)
 	break;
@@ -383,7 +386,7 @@ addrule(Solver *solv, Id p, Id d)
 	if (*dp == -p)
 	  return 0;			/* rule is self-fulfilling */
       if (n == 1)
-	d = dp[-1];
+	d = dp[-1];                     /* take single literal */
     }
 
   if (n == 0 && !solv->jobrules)
@@ -413,10 +416,11 @@ addrule(Solver *solv, Id p, Id d)
 
   /* check if the last added rule is exactly the same as what we're looking for. */
   if (r && n == 1 && !r->d && r->p == p && r->w2 == d)
-    return r;
+    return r;  /* binary rule */
 
   if (r && n > 1 && r->d && r->p == p)
     {
+      /* Rule where d is an offset in whatprovidesdata */
       Id *dp2;
       if (d == r->d)
 	return r;
@@ -2633,6 +2637,8 @@ printdecisions(Solver *solv)
   int i;
   Solvable *s;
 
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions -----\n");  
+  
   obsoletesmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
   if (installed)
     {
@@ -2707,9 +2713,19 @@ printdecisions(Solver *solv)
       int j;
       p = solv->decisionq.elements[i];
       if (p < 0)
-	continue;
+        {
+	    IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
+	    {	
+	      s = pool->solvables + p;	    
+	      POOL_DEBUG(SAT_DEBUG_SCHUBI, "level of %s is %d\n", solvable2str(pool, s), p);
+	    }
+	    continue;
+	}
       if (p == SYSTEMSOLVABLE)
-	continue;
+        {
+	    POOL_DEBUG(SAT_DEBUG_SCHUBI, "SYSTEMSOLVABLE\n");
+	    continue;
+	}	  
       s = pool->solvables + p;
       if (installed && s->repo == installed)
 	continue;
@@ -2741,6 +2757,7 @@ printdecisions(Solver *solv)
 	  POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
 	}
     }
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions end -----\n");    
 }
 
 /* this is basically the reverse of addrpmrulesforsolvable */
@@ -3369,7 +3386,7 @@ solver_solve(Solver *solv, Queue *job)
   unifyrules(solv);	/* remove duplicate rpm rules */
 
   POOL_DEBUG(SAT_DEBUG_STATS, "decisions so far: %d\n", solv->decisionq.count);
-  IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
+  IF_POOLDEBUG (SAT_DEBUG_SCHUBI) 
     printdecisions (solv);
 
   /*
