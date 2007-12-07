@@ -153,7 +153,7 @@ void
 add_attr_int (Attrstore *s, unsigned int entry, Id name, unsigned int val)
 {
   LongNV nv;
-  nv.key = add_key (s, name, ATTR_INT, 0);
+  nv.key = add_key (s, name, TYPE_ATTR_INT, 0);
   nv.v.i[0] = val;
   add_attr (s, entry, nv);
 }
@@ -162,7 +162,7 @@ static void
 add_attr_chunk (Attrstore *s, unsigned int entry, Id name, unsigned int ofs, unsigned int len)
 {
   LongNV nv;
-  nv.key = add_key (s, name, ATTR_CHUNK, 0);
+  nv.key = add_key (s, name, TYPE_ATTR_CHUNK, 0);
   nv.v.i[0] = ofs;
   nv.v.i[1] = len;
   add_attr (s, entry, nv);
@@ -200,7 +200,7 @@ void
 add_attr_string (Attrstore *s, unsigned int entry, Id name, const char *val)
 {
   LongNV nv;
-  nv.key = add_key (s, name, ATTR_STRING, 0);
+  nv.key = add_key (s, name, TYPE_ATTR_STRING, 0);
   nv.v.str = strdup (val);
   add_attr (s, entry, nv);
 }
@@ -223,7 +223,7 @@ add_attr_intlist_int (Attrstore *s, unsigned int entry, Id name, int val)
   else
     {
       LongNV mynv;
-      mynv.key = add_key (s, name, ATTR_INTLIST, 0);
+      mynv.key = add_key (s, name, TYPE_ATTR_INTLIST, 0);
       mynv.v.intlist = malloc (2 * sizeof (mynv.v.intlist[0]));
       mynv.v.intlist[0] = val;
       mynv.v.intlist[1] = 0;
@@ -247,7 +247,7 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id)
   else
     {
       LongNV mynv;
-      mynv.key = add_key (s, name, ATTR_LOCALIDS, 0);
+      mynv.key = add_key (s, name, TYPE_ATTR_LOCALIDS, 0);
       mynv.v.localids = malloc (2 * sizeof (mynv.v.localids[0]));
       mynv.v.localids[0] = id;
       mynv.v.localids[1] = 0;
@@ -548,13 +548,13 @@ attr_store_pack (Attrstore *s)
       for (ofs = 0; ofs < num_attrs; ofs++)
 	switch (s->keys[nv[ofs].key].type)
 	  {
-	    case ATTR_INT:
+	    case TYPE_ATTR_INT:
 	      {
 	        unsigned int i = nv[ofs].v.i[0];
 		add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
 	        break;
 	      }
-	    case ATTR_CHUNK:
+	    case TYPE_ATTR_CHUNK:
 	      {
 	        unsigned int i = nv[ofs].v.i[0];
 		add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
@@ -562,7 +562,7 @@ attr_store_pack (Attrstore *s)
 		add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
 	        break;
 	      }
-	    case ATTR_STRING:
+	    case TYPE_ATTR_STRING:
 	      {
 	        const char *str = nv[ofs].v.str;
 		for (; *str; str++)
@@ -572,7 +572,7 @@ attr_store_pack (Attrstore *s)
 		xfree ((void*)nv[ofs].v.str);
 		break;
 	      }
-	    case ATTR_INTLIST:
+	    case TYPE_ATTR_INTLIST:
 	      {
 		const int *il = nv[ofs].v.intlist;
 		int i;
@@ -583,7 +583,7 @@ attr_store_pack (Attrstore *s)
 		xfree (nv[ofs].v.intlist);
 	        break;
 	      }
-	    case ATTR_LOCALIDS:
+	    case TYPE_ATTR_LOCALIDS:
 	      {
 		const Id *il = nv[ofs].v.localids;
 		Id i;
@@ -650,16 +650,16 @@ attr_store_unpack (Attrstore *s)
         {
 	  switch (ai.type)
 	    {
-	    case ATTR_INT:
+	    case TYPE_ATTR_INT:
 	      add_attr_int (s, i, ai.name, ai.as_int); 
 	      break;
-	    case ATTR_CHUNK:
+	    case TYPE_ATTR_CHUNK:
 	      add_attr_chunk (s, i, ai.name, ai.as_chunk[0], ai.as_chunk[1]);
 	      break;
-	    case ATTR_STRING:
+	    case TYPE_ATTR_STRING:
 	      add_attr_string (s, i, ai.name, ai.as_string);
 	      break;
-	    case ATTR_INTLIST:
+	    case TYPE_ATTR_INTLIST:
 	      {
 		while (1)
 		  {
@@ -671,7 +671,7 @@ attr_store_unpack (Attrstore *s)
 		  }
 	        break;
 	      }
-	    case ATTR_LOCALIDS:
+	    case TYPE_ATTR_LOCALIDS:
 	      {
 		while (1)
 		  {
@@ -1245,7 +1245,7 @@ attr_store_read (FILE *fp, Pool *pool)
   for (i = 1; i < s->nkeys; i++)
     {
       s->keys[i].name = read_id (fp, nstrings);
-      s->keys[i].type = read_id (fp, ATTR_TYPE_MAX + 1);
+      s->keys[i].type = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
       s->keys[i].size = read_id (fp, 0);
 
       /* Globalize the attribute names (they are local IDs right now).  */
@@ -1324,18 +1324,18 @@ attr_store_search_s (Attrstore *s, const char *pattern, int flags, Id name, cb_a
 	str = 0;
 	switch (ai.type)
 	  {
-	  case ATTR_INT:
-	  case ATTR_INTLIST:
+	  case TYPE_ATTR_INT:
+	  case TYPE_ATTR_INTLIST:
 	    continue;
-	  case ATTR_CHUNK:
+	  case TYPE_ATTR_CHUNK:
 	    if (!(flags & SEARCH_BLOBS))
 	      continue;
 	    str = attr_retrieve_blob (s, ai.as_chunk[0], ai.as_chunk[1]);
 	    break;
-	  case ATTR_STRING:
+	  case TYPE_ATTR_STRING:
 	    str = ai.as_string;
 	    break;
-	  case ATTR_LOCALIDS:
+	  case TYPE_ATTR_LOCALIDS:
 	    {
 	      Id val;
 	      get_num (ai.as_numlist, val);
@@ -1375,7 +1375,7 @@ attr_store_search_s (Attrstore *s, const char *pattern, int flags, Id name, cb_a
 	    }
 	    if (match)
 	      cb (s, i, ai.name, str);
-	    if (ai.type != ATTR_LOCALIDS)
+	    if (ai.type != TYPE_ATTR_LOCALIDS)
 	      break;
 	    Id val;
 	    get_num (ai.as_numlist, val);

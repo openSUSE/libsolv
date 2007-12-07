@@ -127,6 +127,12 @@ struct _Pool {
 #define TYPE_U32		4
 #define TYPE_REL_IDARRAY	5
 
+#define TYPE_ATTR_INT		6
+#define TYPE_ATTR_CHUNK		7
+#define TYPE_ATTR_STRING	8
+#define TYPE_ATTR_INTLIST	9
+#define TYPE_ATTR_LOCALIDS	10
+#define TYPE_ATTR_TYPE_MAX	10
 
 //-----------------------------------------------
 

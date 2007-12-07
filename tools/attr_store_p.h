@@ -15,12 +15,6 @@ extern "C" {
 typedef struct
 {
   Id key;
-#define ATTR_INT      0
-#define ATTR_CHUNK    1
-#define ATTR_STRING   2
-#define ATTR_INTLIST  3
-#define ATTR_LOCALIDS 4
-#define ATTR_TYPE_MAX 4
   union {
     unsigned int i[2];
     const char *str;
@@ -138,14 +132,14 @@ ai_step (Attrstore *s, attr_iterator *ai)
   ai->attrs_next = ai->attrs;
   switch (ai->type)
     {
-    case ATTR_INT:
+    case TYPE_ATTR_INT:
       {
 	int val;
 	get_num (ai->attrs_next, val);
 	ai->as_int = val;
 	break;
       }
-    case ATTR_CHUNK:
+    case TYPE_ATTR_CHUNK:
       {
 	unsigned int val1, val2;
 	get_num (ai->attrs_next, val1);
@@ -154,13 +148,13 @@ ai_step (Attrstore *s, attr_iterator *ai)
 	ai->as_chunk[1] = val2;
 	break;
       }
-    case ATTR_STRING:
+    case TYPE_ATTR_STRING:
       {
 	ai->as_string = (const char *) ai->attrs_next;
 	ai->attrs_next += strlen ((const char*)ai->attrs_next) + 1;
 	break;
       }
-    case ATTR_INTLIST:
+    case TYPE_ATTR_INTLIST:
       {
         ai->as_numlist = ai->attrs_next;
 	while (1)
@@ -172,7 +166,7 @@ ai_step (Attrstore *s, attr_iterator *ai)
 	  }
 	break;
       }
-    case ATTR_LOCALIDS:
+    case TYPE_ATTR_LOCALIDS:
       {
         ai->as_numlist = ai->attrs_next;
 	while (1)

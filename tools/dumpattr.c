@@ -27,10 +27,10 @@ dump_attrs (Attrstore *s, unsigned int entry)
       fprintf (stdout, "%s:", id2str (s->pool, ai.name));
       switch (ai.type)
 	{
-	case ATTR_INT:
+	case TYPE_ATTR_INT:
 	  fprintf (stdout, "int  %u\n", ai.as_int);
 	  break;
-	case ATTR_CHUNK:
+	case TYPE_ATTR_CHUNK:
 	  {
 	    const char *str = attr_retrieve_blob (s, ai.as_chunk[0], ai.as_chunk[1]);
 	    if (str)
@@ -39,10 +39,10 @@ dump_attrs (Attrstore *s, unsigned int entry)
 	      fprintf (stdout, "blob %u+%u\n", ai.as_chunk[0], ai.as_chunk[1]);
 	  }
 	  break;
-	case ATTR_STRING:
+	case TYPE_ATTR_STRING:
 	  fprintf (stdout, "str  %s\n", ai.as_string);
 	  break;
-	case ATTR_INTLIST:
+	case TYPE_ATTR_INTLIST:
 	  {
 	    fprintf (stdout, "lint\n ");
 	    while (1)
@@ -56,7 +56,7 @@ dump_attrs (Attrstore *s, unsigned int entry)
 	    fprintf (stdout, "\n");
 	    break;
 	  }
-	case ATTR_LOCALIDS:
+	case TYPE_ATTR_LOCALIDS:
 	  {
 	    fprintf (stdout, "lids");
 	    while (1)
