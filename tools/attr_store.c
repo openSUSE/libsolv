@@ -897,9 +897,9 @@ write_attr_store (FILE *fp, Attrstore *s)
       s->keys[i].name = str2id (s->pool, localid2str (s, s->keys[i].name), 0);
     }
 
-  write_id (fp, s->szschemata - 1);
-  Id *ids = s->schemata + 1;
-  for (i = 1; i < s->nschemata; i++)
+  write_id (fp, s->szschemata);
+  Id *ids = s->schemata + 0;
+  for (i = 0; i < s->nschemata; i++)
     ids = write_idarray (fp, ids);
   assert (ids == s->schemata + s->szschemata);
 
