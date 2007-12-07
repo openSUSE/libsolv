@@ -3283,11 +3283,11 @@ solver_solve(Solver *solv, Queue *job)
   Solvable *s;
 
   /* create whatprovides if not already there */
-  if (pool->whatprovides)
+  if (!pool->whatprovides)
     pool_createwhatprovides(pool);
 
   /* create obsolete index if needed */
-  if (solv->noupdateprovide)
+  if (!solv->noupdateprovide)
     create_obsolete_index(solv);
 
   /*
