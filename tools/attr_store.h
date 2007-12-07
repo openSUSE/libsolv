@@ -17,7 +17,6 @@ extern "C" {
 struct _Pool;
 struct _Attrstore;
 typedef struct _Attrstore Attrstore;
-typedef unsigned short NameId;
 typedef Id LocalId;
 
 Attrstore * new_store (struct _Pool *pool);
@@ -28,15 +27,14 @@ void write_attr_store (FILE *fp, Attrstore *s);
 void attr_store_pack (Attrstore *s);
 void attr_store_unpack (Attrstore *s);
 
-NameId  str2nameid (Attrstore *s, const char *str);
 LocalId str2localid (Attrstore *s, const char *str, int create);
 const char * localid2str(Attrstore *s, LocalId id);
 
-void add_attr_int (Attrstore *s, unsigned int entry, NameId name, unsigned int val);
-void add_attr_blob (Attrstore *s, unsigned int entry, NameId name, const void *ptr, unsigned int len);
-void add_attr_string (Attrstore *s, unsigned int entry, NameId name, const char *val);
-void add_attr_intlist_int (Attrstore *s, unsigned int entry, NameId name, int val);
-void add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id);
+void add_attr_int (Attrstore *s, unsigned int entry, Id name, unsigned int val);
+void add_attr_blob (Attrstore *s, unsigned int entry, Id name, const void *ptr, unsigned int len);
+void add_attr_string (Attrstore *s, unsigned int entry, Id name, const char *val);
+void add_attr_intlist_int (Attrstore *s, unsigned int entry, Id name, int val);
+void add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id);
 
 const void * attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int len);
 
@@ -48,7 +46,7 @@ const void * attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int le
 #define SEARCH_BLOBS 16
 #define SEARCH_IDS 32
 typedef int (*cb_attr_search_s) (Attrstore *s, unsigned entry, Id name, const char *str);
-void attr_store_search_s (Attrstore *s, const char *pattern, int flags, NameId name, cb_attr_search_s cb);
+void attr_store_search_s (Attrstore *s, const char *pattern, int flags, Id name, cb_attr_search_s cb);
 #ifdef __cplusplus
 }
 #endif

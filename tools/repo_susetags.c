@@ -371,37 +371,37 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
       if (!strncmp(line, "=Grp:", 5))
         {
 	  ensure_entry (attr, last_found_pack);
-	  add_attr_localids_id (attr, last_found_pack, str2nameid (attr, "group"), str2localid (attr, line + 6, 1));
+	  add_attr_localids_id (attr, last_found_pack, str2id (pool, "group", 1), str2localid (attr, line + 6, 1));
 	  continue;
 	}
       if (!strncmp(line, "=Lic:", 5))
         {
 	  ensure_entry (attr, last_found_pack);
-	  add_attr_localids_id (attr, last_found_pack, str2nameid (attr, "license"), str2localid (attr, line + 6, 1));
+	  add_attr_localids_id (attr, last_found_pack, str2id (pool, "license", 1), str2localid (attr, line + 6, 1));
 	  continue;
 	}
       if (!strncmp(line, "=Kwd:", 5))
         {
 	  ensure_entry (attr, last_found_pack);
-	  add_attr_localids_id (attr, last_found_pack, str2nameid (attr, "keywords"), str2localid (attr, line + 6, 1));
+	  add_attr_localids_id (attr, last_found_pack, str2id (pool, "keywords", 1), str2localid (attr, line + 6, 1));
 	  continue;
 	}
       if (!strncmp(line, "=Aut:", 5))
         {
 	  ensure_entry (attr, last_found_pack);
-	  add_attr_blob (attr, last_found_pack, str2nameid (attr, "authors"), line + 6, strlen (line + 6) + 1);
+	  add_attr_blob (attr, last_found_pack, str2id (pool, "authors", 1), line + 6, strlen (line + 6) + 1);
 	  continue;
 	}
       if (!strncmp(line, "=Sum:", 5))
         {
 	  ensure_entry (attr, last_found_pack);
-	  add_attr_string (attr, last_found_pack, str2nameid (attr, "summary"), line + 6);
+	  add_attr_string (attr, last_found_pack, str2id (pool, "summary", 1), line + 6);
 	  continue;
 	}
       if (!strncmp(line, "=Des:", 5))
         {
 	  ensure_entry (attr, last_found_pack);
-	  add_attr_blob (attr, last_found_pack, str2nameid (attr, "description"), line + 6, strlen (line + 6) + 1);
+	  add_attr_blob (attr, last_found_pack, str2id (pool, "description", 1), line + 6, strlen (line + 6) + 1);
 	  continue;
 	}
       if (!strncmp(line, "=Ver:", 5))

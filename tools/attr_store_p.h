@@ -50,8 +50,6 @@ struct _Attrstore
   Pool *pool;
   unsigned int entries;
   LongNV **attrs;
-  unsigned int num_nameids;
-  Id *nameids;
   char *blob_store;
   unsigned int blob_next_free;
   Attrblobpage *pages;
@@ -71,7 +69,7 @@ struct _Attrstore
   unsigned int attr_next_free;
 
   struct {
-    NameId name;
+    Id name;
     unsigned type;
     unsigned size;
   } *keys;
@@ -98,7 +96,7 @@ typedef struct {
   unsigned char *attrs;
   Id *schema;
   unsigned char *attrs_next;
-  NameId name;
+  Id name;
   unsigned type;
 
   /* The following fields could be a union, but if we do that GCC

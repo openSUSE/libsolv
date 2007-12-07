@@ -42,7 +42,7 @@
 #define LOCALID_NULL  0
 #define LOCALID_EMPTY 1
 
-static Id add_key (Attrstore *s, NameId name, unsigned type, unsigned size);
+static Id add_key (Attrstore *s, Id name, unsigned type, unsigned size);
 
 Attrstore *
 new_store (Pool *pool)
@@ -54,11 +54,6 @@ new_store (Pool *pool)
   };
   Attrstore *s = calloc (1, sizeof (Attrstore));
   s->pool = pool;
-  s->nameids = calloc (128, sizeof (s->nameids[0]));
-  s->num_nameids = 2;
-  s->nameids[0] = 0;
-  s->nameids[1] = 1;
-
   stringpool_init (&s->ss, predef_strings);
   add_key (s, 0, 0, 0);
 
@@ -75,30 +70,6 @@ const char *
 localid2str(Attrstore *s, LocalId id)
 {
   return s->ss.stringspace + s->ss.strings[id];
-}
-
-static NameId
-id2nameid (Attrstore *s, Id id)
-{
-  unsigned int i;
-  for (i = 0; i < s->num_nameids; i++)
-    if (s->nameids[i] == id)
-      return i;
-  if (s->num_nameids >= (1 << NAME_WIDTH))
-    {
-      fprintf (stderr, "Too many attribute names\n");
-      exit (1);
-    }
-  if ((s->num_nameids & 127) == 0)
-    s->nameids = realloc (s->nameids, ((s->num_nameids+128) * sizeof (s->nameids[0])));
-  s->nameids[s->num_nameids++] = id;
-  return s->num_nameids - 1;
-}
-
-NameId
-str2nameid (Attrstore *s, const char *str)
-{
-  return id2nameid (s, str2id (s->pool, str, 1));
 }
 
 void
@@ -133,12 +104,10 @@ new_entry (Attrstore *s)
 }
 
 static LongNV *
-find_attr (Attrstore *s, unsigned int entry, NameId name)
+find_attr (Attrstore *s, unsigned int entry, Id name)
 {
   LongNV *nv;
   if (entry >= s->entries)
-    return 0;
-  if (name >= s->num_nameids)
     return 0;
   nv = s->attrs[entry];
   if (nv)
@@ -181,7 +150,7 @@ add_attr (Attrstore *s, unsigned int entry, LongNV attr)
 }
 
 void
-add_attr_int (Attrstore *s, unsigned int entry, NameId name, unsigned int val)
+add_attr_int (Attrstore *s, unsigned int entry, Id name, unsigned int val)
 {
   LongNV nv;
   nv.key = add_key (s, name, ATTR_INT, 0);
@@ -190,7 +159,7 @@ add_attr_int (Attrstore *s, unsigned int entry, NameId name, unsigned int val)
 }
 
 static void
-add_attr_chunk (Attrstore *s, unsigned int entry, NameId name, unsigned int ofs, unsigned int len)
+add_attr_chunk (Attrstore *s, unsigned int entry, Id name, unsigned int ofs, unsigned int len)
 {
   LongNV nv;
   nv.key = add_key (s, name, ATTR_CHUNK, 0);
@@ -200,7 +169,7 @@ add_attr_chunk (Attrstore *s, unsigned int entry, NameId name, unsigned int ofs,
 }
 
 void
-add_attr_blob (Attrstore *s, unsigned int entry, NameId name, const void *ptr, unsigned int len)
+add_attr_blob (Attrstore *s, unsigned int entry, Id name, const void *ptr, unsigned int len)
 {
   if (((s->blob_next_free + BLOB_BLOCK) & ~BLOB_BLOCK)
       != ((s->blob_next_free + len + BLOB_BLOCK) & ~BLOB_BLOCK))
@@ -228,7 +197,7 @@ add_attr_blob (Attrstore *s, unsigned int entry, NameId name, const void *ptr, u
 }
 
 void
-add_attr_string (Attrstore *s, unsigned int entry, NameId name, const char *val)
+add_attr_string (Attrstore *s, unsigned int entry, Id name, const char *val)
 {
   LongNV nv;
   nv.key = add_key (s, name, ATTR_STRING, 0);
@@ -237,7 +206,7 @@ add_attr_string (Attrstore *s, unsigned int entry, NameId name, const char *val)
 }
 
 void
-add_attr_intlist_int (Attrstore *s, unsigned int entry, NameId name, int val)
+add_attr_intlist_int (Attrstore *s, unsigned int entry, Id name, int val)
 {
   LongNV *nv = find_attr (s, entry, name);
   if (val == 0)
@@ -263,7 +232,7 @@ add_attr_intlist_int (Attrstore *s, unsigned int entry, NameId name, int val)
 }
 
 void
-add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id)
+add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id)
 {
   LongNV *nv = find_attr (s, entry, name);
   if (nv)
@@ -499,7 +468,7 @@ longnv_cmp (const void *pa, const void *pb)
 }
 
 static Id
-add_key (Attrstore *s, NameId name, unsigned type, unsigned size)
+add_key (Attrstore *s, Id name, unsigned type, unsigned size)
 {
   unsigned i;
   for (i = 0; i < s->nkeys; i++)
@@ -883,6 +852,10 @@ write_attr_store (FILE *fp, Attrstore *s)
 
   attr_store_pack (s);
 
+  /* Transform our attribute names (pool string IDs) into local IDs.  */
+  for (i = 1; i < s->nkeys; i++)
+    s->keys[i].name = str2localid (s, id2str (s->pool, s->keys[i].name), 1);
+
   /* write file header */
   write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
   write_u32(fp, SOLV_VERSION_2);
@@ -918,6 +891,10 @@ write_attr_store (FILE *fp, Attrstore *s)
       write_id (fp, s->keys[i].name);
       write_id (fp, s->keys[i].type);
       write_id (fp, s->keys[i].size);
+
+      /* Also transform back the names (now local IDs) into pool IDs,
+	 so we can use the pool also after writing.  */
+      s->keys[i].name = str2id (s->pool, localid2str (s, s->keys[i].name), 0);
     }
 
   write_id (fp, s->szschemata - 1);
@@ -954,17 +931,6 @@ write_attr_store (FILE *fp, Attrstore *s)
       exit (1);
     }
 
-  write_u32 (fp, s->num_nameids);
-  for (i = 2; i < s->num_nameids; i++)
-    {
-      const char *str = id2str (s->pool, s->nameids[i]);
-      if (fwrite(str, strlen(str) + 1, 1, fp) != 1)
-	{
-	  perror("write error");
-	  exit(1);
-	}
-    }
-
   write_pages (fp, s);
 }
 
@@ -985,19 +951,6 @@ read_u32(FILE *fp)
       x = (x << 8) | c;
     }
   return x;
-}
-
-static unsigned int
-read_u8(FILE *fp)
-{
-  int c;
-  c = getc(fp);
-  if (c == EOF)
-    {
-      fprintf(stderr, "unexpected EOF\n");
-      exit(1);
-    }
-  return c;
 }
 
 static Id
@@ -1223,8 +1176,6 @@ attr_store_read (FILE *fp, Pool *pool)
   unsigned i;
   unsigned local_ssize;
   unsigned nstrings, nschemata;
-  char *buf;
-  size_t buflen;
   Attrstore *s = new_store (pool);
 
   if (read_u32(fp) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
@@ -1286,9 +1237,12 @@ attr_store_read (FILE *fp, Pool *pool)
   /* s->keys[0] is initialized in new_store.  */
   for (i = 1; i < s->nkeys; i++)
     {
-      s->keys[i].name = read_id (fp, 0 /*s->num_nameids*/);
+      s->keys[i].name = read_id (fp, nstrings);
       s->keys[i].type = read_id (fp, ATTR_TYPE_MAX + 1);
       s->keys[i].size = read_id (fp, 0);
+
+      /* Globalize the attribute names (they are local IDs right now).  */
+      s->keys[i].name = str2id (s->pool, localid2str (s, s->keys[i].name), 1);
     }
 
   s->szschemata = 1 + read_id (fp, 0);
@@ -1327,41 +1281,15 @@ attr_store_read (FILE *fp, Pool *pool)
       exit (1);
     }
 
-  s->num_nameids = read_u32 (fp);
-
-  buflen = 128;
-  buf = malloc (buflen);
-
-  s->nameids = realloc (s->nameids, (((s->num_nameids+127) & ~127) * sizeof (s->nameids[0])));
-  for (i = 2; i < s->num_nameids; i++)
-    {
-      size_t p = 0;
-      while (1)
-        {
-	  int c = read_u8 (fp);
-	  if (p == buflen)
-	    {
-	      buflen += 128;
-	      buf = realloc (buf, buflen);
-	    }
-	  buf[p++] = c;
-	  if (!c)
-	    break;
-	}
-      s->nameids[i] = str2id (s->pool, buf, 1);
-    }
-
   read_or_setup_pages (fp, s);
 
   s->packed = 1;
-
-  free (buf);
 
   return s;
 }
 
 void
-attr_store_search_s (Attrstore *s, const char *pattern, int flags, NameId name, cb_attr_search_s cb)
+attr_store_search_s (Attrstore *s, const char *pattern, int flags, Id name, cb_attr_search_s cb)
 {
   unsigned int i;
   attr_iterator ai;
@@ -1439,7 +1367,7 @@ attr_store_search_s (Attrstore *s, const char *pattern, int flags, NameId name, 
 	        break;
 	    }
 	    if (match)
-	      cb (s, i, s->nameids[ai.name], str);
+	      cb (s, i, ai.name, str);
 	    if (ai.type != ATTR_LOCALIDS)
 	      break;
 	    Id val;
@@ -1463,20 +1391,20 @@ main (void)
   unsigned int id2 = new_entry (s);
   unsigned int id3 = new_entry (s);
   unsigned int id4 = new_entry (s);
-  add_attr_int (s, id1, str2nameid (s, "name1"), 42);
-  add_attr_chunk (s, id1, str2nameid (s, "name2"), 9876, 1024);
-  add_attr_string (s, id1, str2nameid (s, "name3"), "hallo");
-  add_attr_int (s, id1, str2nameid (s, "name1"), 43);
-  add_attr_intlist_int (s, id1, str2nameid (s, "intlist1"), 3);
-  add_attr_intlist_int (s, id1, str2nameid (s, "intlist1"), 14);
-  add_attr_intlist_int (s, id1, str2nameid (s, "intlist1"), 1);
-  add_attr_intlist_int (s, id1, str2nameid (s, "intlist1"), 59);
-  add_attr_localids_id (s, id1, str2nameid (s, "l_ids1"), str2localid (s, "one", 1));
-  add_attr_localids_id (s, id1, str2nameid (s, "l_ids1"), str2localid (s, "two", 1));
-  add_attr_localids_id (s, id1, str2nameid (s, "l_ids1"), str2localid (s, "three", 1));
-  add_attr_localids_id (s, id1, str2nameid (s, "l_ids2"), str2localid (s, "three", 1));
-  add_attr_localids_id (s, id1, str2nameid (s, "l_ids2"), str2localid (s, "two", 1));
-  add_attr_localids_id (s, id1, str2nameid (s, "l_ids2"), str2localid (s, "one", 1));
+  add_attr_int (s, id1, str2id (s, "name1", 1), 42);
+  add_attr_chunk (s, id1, str2id (s->pool, "name2", 1), 9876, 1024);
+  add_attr_string (s, id1, str2id (s->pool, "name3", 1), "hallo");
+  add_attr_int (s, id1, str2id (s->pool, "name1", 1), 43);
+  add_attr_intlist_int (s, id1, str2id (s->pool, "intlist1", 1), 3);
+  add_attr_intlist_int (s, id1, str2id (s->pool, "intlist1", 1), 14);
+  add_attr_intlist_int (s, id1, str2id (s->pool, "intlist1", 1), 1);
+  add_attr_intlist_int (s, id1, str2id (s->pool, "intlist1", 1), 59);
+  add_attr_localids_id (s, id1, str2id (s->pool, "l_ids1", 1), str2localid (s, "one", 1));
+  add_attr_localids_id (s, id1, str2id (s->pool, "l_ids1", 1), str2localid (s, "two", 1));
+  add_attr_localids_id (s, id1, str2id (s->pool, "l_ids1", 1), str2localid (s, "three", 1));
+  add_attr_localids_id (s, id1, str2id (s->pool, "l_ids2", 1), str2localid (s, "three", 1));
+  add_attr_localids_id (s, id1, str2id (s->pool, "l_ids2", 1), str2localid (s, "two", 1));
+  add_attr_localids_id (s, id1, str2id (s->pool, "l_ids2", 1), str2localid (s, "one", 1));
   write_attr_store (stdout, s);
   return 0;
 }

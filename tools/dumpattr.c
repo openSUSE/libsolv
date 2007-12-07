@@ -24,7 +24,7 @@ dump_attrs (Attrstore *s, unsigned int entry)
   attr_iterator ai;
   FOR_ATTRS (s, entry, &ai)
     {
-      fprintf (stdout, "%s:", id2str (s->pool, s->nameids[ai.name]));
+      fprintf (stdout, "%s:", id2str (s->pool, ai.name));
       switch (ai.type)
 	{
 	case ATTR_INT:
@@ -104,14 +104,14 @@ main (int argc, char *argv[])
       int g;
       unsigned flags;
       unsigned search_type;
-      NameId name;
+      Id name;
       name = 0;
       flags = SEARCH_IDS;
       search_type = SEARCH_SUBSTRING;
       while ((g = getopt (argc, argv, "-n:bgeri")) >= 0)
         switch (g)
 	{
-	  case 'n': name = str2nameid (s, optarg); break;
+	  case 'n': name = str2id (s->pool, optarg, 1); break;
 	  case 'b': flags |= SEARCH_BLOBS; break;
 	  case 'g': search_type = SEARCH_GLOB; break;
 	  case 'e': search_type = SEARCH_STRING; break;
