@@ -30,9 +30,6 @@ dump_attrs (Attrstore *s, unsigned int entry)
 	case ATTR_INT:
 	  fprintf (stdout, "int  %u\n", ai.as_int);
 	  break;
-	case ATTR_ID:
-	  fprintf (stdout, "id   %u\n", ai.as_id);
-	  break;
 	case ATTR_CHUNK:
 	  {
 	    const char *str = attr_retrieve_blob (s, ai.as_chunk[0], ai.as_chunk[1]);

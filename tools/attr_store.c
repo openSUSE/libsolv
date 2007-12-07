@@ -42,6 +42,8 @@
 #define LOCALID_NULL  0
 #define LOCALID_EMPTY 1
 
+static Id add_key (Attrstore *s, NameId name, unsigned type, unsigned size);
+
 Attrstore *
 new_store (Pool *pool)
 {
@@ -58,6 +60,7 @@ new_store (Pool *pool)
   s->nameids[1] = 1;
 
   stringpool_init (&s->ss, predef_strings);
+  add_key (s, 0, 0, 0);
 
   return s;
 }
@@ -140,9 +143,9 @@ find_attr (Attrstore *s, unsigned int entry, NameId name)
   nv = s->attrs[entry];
   if (nv)
     {
-      while (nv->name && nv->name != name)
+      while (nv->key && s->keys[nv->key].name != name)
 	nv++;
-      if (nv->name)
+      if (nv->key)
         return nv;
     }
   return 0;
@@ -155,15 +158,15 @@ add_attr (Attrstore *s, unsigned int entry, LongNV attr)
   unsigned int len;
   if (entry >= s->entries)
     return;
-  if (attr.name >= s->num_nameids)
+  if (attr.key >= s->nkeys)
     return;
   nv = s->attrs[entry];
   len = 0;
   if (nv)
     {
-      while (nv->name && nv->name != attr.name)
+      while (nv->key && nv->key != attr.key)
 	nv++;
-      if (nv->name)
+      if (nv->key)
         return;
       len = nv - s->attrs[entry];
     }
@@ -174,15 +177,14 @@ add_attr (Attrstore *s, unsigned int entry, LongNV attr)
     s->attrs[entry] = malloc (len * sizeof (LongNV));
   nv = s->attrs[entry] + len - 2;
   *nv++ = attr;
-  nv->name = 0;
+  nv->key = 0;
 }
 
 void
 add_attr_int (Attrstore *s, unsigned int entry, NameId name, unsigned int val)
 {
   LongNV nv;
-  nv.name = name;
-  nv.type = ATTR_INT;
+  nv.key = add_key (s, name, ATTR_INT, 0);
   nv.v.i[0] = val;
   add_attr (s, entry, nv);
 }
@@ -191,8 +193,7 @@ static void
 add_attr_chunk (Attrstore *s, unsigned int entry, NameId name, unsigned int ofs, unsigned int len)
 {
   LongNV nv;
-  nv.name = name;
-  nv.type = ATTR_CHUNK;
+  nv.key = add_key (s, name, ATTR_CHUNK, 0);
   nv.v.i[0] = ofs;
   nv.v.i[1] = len;
   add_attr (s, entry, nv);
@@ -230,19 +231,8 @@ void
 add_attr_string (Attrstore *s, unsigned int entry, NameId name, const char *val)
 {
   LongNV nv;
-  nv.name = name;
-  nv.type = ATTR_STRING;
+  nv.key = add_key (s, name, ATTR_STRING, 0);
   nv.v.str = strdup (val);
-  add_attr (s, entry, nv);
-}
-
-void
-add_attr_id (Attrstore *s, unsigned int entry, NameId name, Id val)
-{
-  LongNV nv;
-  nv.name = name;
-  nv.type = ATTR_ID;
-  nv.v.i[0] = val;
   add_attr (s, entry, nv);
 }
 
@@ -264,8 +254,7 @@ add_attr_intlist_int (Attrstore *s, unsigned int entry, NameId name, int val)
   else
     {
       LongNV mynv;
-      mynv.name = name;
-      mynv.type = ATTR_INTLIST;
+      mynv.key = add_key (s, name, ATTR_INTLIST, 0);
       mynv.v.intlist = malloc (2 * sizeof (mynv.v.intlist[0]));
       mynv.v.intlist[0] = val;
       mynv.v.intlist[1] = 0;
@@ -289,8 +278,7 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id)
   else
     {
       LongNV mynv;
-      mynv.name = name;
-      mynv.type = ATTR_LOCALIDS;
+      mynv.key = add_key (s, name, ATTR_LOCALIDS, 0);
       mynv.v.localids = malloc (2 * sizeof (mynv.v.localids[0]));
       mynv.v.localids[0] = id;
       mynv.v.localids[1] = 0;
@@ -474,8 +462,9 @@ attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int len)
 }
 
 #define FLAT_ATTR_BLOCK 127
-#define ABBR_BLOCK 127
-#define FLAT_ABBR_BLOCK 127
+#define KEY_BLOCK 127
+#define SCHEMA_BLOCK 127
+
 #define add_elem(buf,ofs,val,block) do { \
   if (((ofs) & (block)) == 0) \
     buf = xrealloc (buf, ((ofs) + (block) + 1) * sizeof((buf)[0])); \
@@ -506,11 +495,27 @@ longnv_cmp (const void *pa, const void *pb)
 {
   const LongNV *a = (const LongNV *)pa;
   const LongNV *b = (const LongNV *)pb;
-  int r = a->name - b->name;
-  if (r)
-    return r;
-  r = a->type - b->type;
-  return r;
+  return a->key - b->key;
+}
+
+static Id
+add_key (Attrstore *s, NameId name, unsigned type, unsigned size)
+{
+  unsigned i;
+  for (i = 0; i < s->nkeys; i++)
+    if (s->keys[i].name == name && s->keys[i].type == type)
+      break;
+  if (i < s->nkeys)
+    {
+      s->keys[i].size += size;
+      return i;
+    }
+  if ((s->nkeys & KEY_BLOCK) == 0)
+    s->keys = xrealloc (s->keys, (s->nkeys + KEY_BLOCK + 1) * sizeof (s->keys[0]));
+  s->keys[i].name = name;
+  s->keys[i].type = type;
+  s->keys[i].size = size;
+  return s->nkeys++;
 }
 
 void
@@ -523,59 +528,58 @@ attr_store_pack (Attrstore *s)
   s->ent2attr = xcalloc (s->entries, sizeof (s->ent2attr[0]));
   s->flat_attrs = 0;
   s->attr_next_free = 0;
-  s->abbr = 0;
-  s->abbr_next_free = 0;
-  s->flat_abbr = 0;
-  s->flat_abbr_next_free = 0;
+  s->nschemata = 0;
+  s->szschemata = 0;
+  s->schemata = 0;
+  s->schemaofs = 0;
 
   add_num (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
-  add_elem (s->abbr, s->abbr_next_free, 0, ABBR_BLOCK);
-  add_elem (s->flat_abbr, s->flat_abbr_next_free, 0, FLAT_ABBR_BLOCK);
+  add_elem (s->schemata, s->szschemata, 0, SCHEMA_BLOCK);
+  add_elem (s->schemaofs, s->nschemata, 0, SCHEMA_BLOCK);
 
   for (i = 0; i < s->entries; i++)
     {
       unsigned int num_attrs = 0, ofs;
       LongNV *nv = s->attrs[i];
       if (nv)
-        while (nv->name)
+        while (nv->key)
 	  nv++, num_attrs++;
       if (nv)
         old_mem += (num_attrs + 1) * sizeof (LongNV);
       if (!num_attrs)
         continue;
-      qsort (s->attrs[i], num_attrs, sizeof (LongNV), longnv_cmp);
-      unsigned int this_abbr;
       nv = s->attrs[i];
-      for (this_abbr = 0; this_abbr < s->abbr_next_free; this_abbr++)
+      qsort (s->attrs[i], num_attrs, sizeof (LongNV), longnv_cmp);
+      unsigned int this_schema;
+      for (this_schema = 0; this_schema < s->nschemata; this_schema++)
         {
 	  for (ofs = 0; ofs < num_attrs; ofs++)
 	    {
-	      unsigned short name_type = (nv[ofs].name << 4) | nv[ofs].type;
-	      assert (s->abbr[this_abbr] + ofs < s->flat_abbr_next_free);
-	      if (name_type != s->flat_abbr[s->abbr[this_abbr]+ofs])
+	      Id key = nv[ofs].key;
+	      assert (s->schemaofs[this_schema] + ofs < s->szschemata);
+	      if (key != s->schemata[s->schemaofs[this_schema]+ofs])
 		break;
 	    }
-	  if (ofs == num_attrs && !s->flat_abbr[s->abbr[this_abbr]+ofs])
+	  if (ofs == num_attrs && !s->schemata[s->schemaofs[this_schema]+ofs])
 	    break;
 	}
-      if (this_abbr == s->abbr_next_free)
+      if (this_schema == s->nschemata)
         {
 	  /* This schema not found --> insert it.  */
-	  add_elem (s->abbr, s->abbr_next_free, s->flat_abbr_next_free, ABBR_BLOCK);
+	  add_elem (s->schemaofs, s->nschemata, s->szschemata, SCHEMA_BLOCK);
 	  for (ofs = 0; ofs < num_attrs; ofs++)
 	    {
-	      unsigned short name_type = (nv[ofs].name << 4) | nv[ofs].type;
-	      add_elem (s->flat_abbr, s->flat_abbr_next_free, name_type, FLAT_ABBR_BLOCK);
+	      Id key = nv[ofs].key;
+	      add_elem (s->schemata, s->szschemata, key, SCHEMA_BLOCK);
 	    }
-	  add_elem (s->flat_abbr, s->flat_abbr_next_free, 0, FLAT_ABBR_BLOCK);
+	  add_elem (s->schemata, s->szschemata, 0, SCHEMA_BLOCK);
 	}
       s->ent2attr[i] = s->attr_next_free;
-      add_num (s->flat_attrs, s->attr_next_free, this_abbr, FLAT_ATTR_BLOCK);
+      add_num (s->flat_attrs, s->attr_next_free, this_schema, FLAT_ATTR_BLOCK);
       for (ofs = 0; ofs < num_attrs; ofs++)
-	switch (nv[ofs].type)
+	switch (s->keys[nv[ofs].key].type)
 	  {
 	    case ATTR_INT:
-	    case ATTR_ID:
 	      {
 	        unsigned int i = nv[ofs].v.i[0];
 		add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
@@ -640,8 +644,8 @@ attr_store_pack (Attrstore *s)
   fprintf (stderr, "%d\n", old_mem);
   fprintf (stderr, "%zd\n", s->entries * sizeof(s->ent2attr[0]));
   fprintf (stderr, "%d\n", s->attr_next_free);
-  fprintf (stderr, "%zd\n", s->abbr_next_free * sizeof(s->abbr[0]));
-  fprintf (stderr, "%zd\n", s->flat_abbr_next_free * sizeof(s->flat_abbr[0]));
+  fprintf (stderr, "%zd\n", s->nschemata * sizeof(s->schemaofs[0]));
+  fprintf (stderr, "%zd\n", s->szschemata * sizeof(s->schemata[0]));
   fprintf (stderr, "pages %d\n", s->num_pages);
   s->packed = 1;
 }
@@ -679,9 +683,6 @@ attr_store_unpack (Attrstore *s)
 	    {
 	    case ATTR_INT:
 	      add_attr_int (s, i, ai.name, ai.as_int); 
-	      break;
-	    case ATTR_ID:
-	      add_attr_id (s, i, ai.name, ai.as_id); 
 	      break;
 	    case ATTR_CHUNK:
 	      add_attr_chunk (s, i, ai.name, ai.as_chunk[0], ai.as_chunk[1]);
@@ -724,12 +725,22 @@ attr_store_unpack (Attrstore *s)
   xfree (s->flat_attrs);
   s->flat_attrs = 0;
   s->attr_next_free = 0;
-  xfree (s->abbr);
-  s->abbr = 0;
-  s->abbr_next_free = 0;
-  xfree (s->flat_abbr);
-  s->flat_abbr = 0;
-  s->flat_abbr_next_free = 0;
+  xfree (s->schemaofs);
+  s->schemaofs = 0;
+  s->nschemata = 0;
+  xfree (s->schemata);
+  s->schemata = 0;
+  s->szschemata = 0;
+}
+
+static void
+write_u8(FILE *fp, unsigned int x)
+{
+  if (putc(x, fp) == EOF)
+    {
+      perror("write error");
+      exit(1);
+    }
 }
 
 static void
@@ -762,6 +773,31 @@ write_id(FILE *fp, Id x)
     {
       perror("write error");
       exit(1);
+    }
+}
+
+static Id *
+write_idarray(FILE *fp, Id *ids)
+{
+  Id id;
+  if (!ids)
+    return ids;
+  if (!*ids)
+    {
+      write_u8(fp, 0);
+      return ids + 1;
+    }
+  for (;;)
+    {
+      id = *ids++;
+      if (id >= 64)
+	id = (id & 63) | ((id & ~63) << 1);
+      if (!*ids)
+	{
+	  write_id(fp, id);
+	  return ids + 1;
+	}
+      write_id(fp, id | 64);
     }
 }
 
@@ -847,18 +883,21 @@ write_attr_store (FILE *fp, Attrstore *s)
 
   attr_store_pack (s);
 
-  write_u32 (fp, s->entries);
-  write_u32 (fp, s->num_nameids);
-  write_u32 (fp, s->ss.nstrings);
-  for (i = 2; i < s->num_nameids; i++)
-    {
-      const char *str = id2str (s->pool, s->nameids[i]);
-      if (fwrite(str, strlen(str) + 1, 1, fp) != 1)
-	{
-	  perror("write error");
-	  exit(1);
-	}
-    }
+  /* write file header */
+  write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
+  write_u32(fp, SOLV_VERSION_2);
+
+  /* write counts */
+  write_u32(fp, s->ss.nstrings - 1);  // nstrings
+  write_u32(fp, 0);		      // nrels
+  write_u32(fp, s->entries);	      // nsolvables
+  write_u32(fp, s->nkeys);
+  write_u32(fp, s->nschemata);
+  write_u32(fp, 0);	/* no info block */
+  unsigned solv_flags = 0;
+  solv_flags |= SOLV_FLAG_PACKEDSIZES;
+  //solv_flags |= SOLV_FLAG_PREFIX_POOL;
+  write_u32(fp, solv_flags);
 
   for (i = 2, local_ssize = 0; i < (unsigned)s->ss.nstrings; i++)
     local_ssize += strlen (localid2str (s, i)) + 1;
@@ -874,29 +913,56 @@ write_attr_store (FILE *fp, Attrstore *s)
 	}
     }
 
-  int last = 0;
-  for (i = 0; i < s->entries; i++)
-    if (i == 0 || s->ent2attr[i] == 0)
-      write_id (fp, s->ent2attr[i]);
-    else
-      {
-        write_id (fp, s->ent2attr[i] - last);
-	assert (last < s->ent2attr[i]);
-	last = s->ent2attr[i];
-      }
+  for (i = 1; i < s->nkeys; i++)
+    {
+      write_id (fp, s->keys[i].name);
+      write_id (fp, s->keys[i].type);
+      write_id (fp, s->keys[i].size);
+    }
 
-  write_u32 (fp, s->attr_next_free);
+  write_id (fp, s->szschemata - 1);
+  Id *ids = s->schemata + 1;
+  for (i = 1; i < s->nschemata; i++)
+    ids = write_idarray (fp, ids);
+  assert (ids == s->schemata + s->szschemata);
+
+  /* Convert our offsets into sizes.  */
+  unsigned end = s->attr_next_free;
+  for (i = s->entries; i > 0;)
+    {
+      i--;
+      if (s->ent2attr[i])
+        {
+          s->ent2attr[i] = end - s->ent2attr[i];
+	  end = end - s->ent2attr[i];
+	}
+    }
+  /* The first zero should not have been consumed, but everything else.  */
+  assert (end == 1);
+  /* Write the sizes and convert back to offsets.  */
+  unsigned start = 1;
+  for (i = 0; i < s->entries; i++)
+    {
+      write_id (fp, s->ent2attr[i]);
+      if (s->ent2attr[i])
+        s->ent2attr[i] += start, start = s->ent2attr[i];
+    }
+
   if (fwrite (s->flat_attrs, s->attr_next_free, 1, fp) != 1)
     {
       perror ("write error");
       exit (1);
     }
 
-  write_u32 (fp, s->flat_abbr_next_free);
-  if (fwrite (s->flat_abbr, s->flat_abbr_next_free * sizeof (s->flat_abbr[0]), 1, fp) != 1)
+  write_u32 (fp, s->num_nameids);
+  for (i = 2; i < s->num_nameids; i++)
     {
-      perror ("write error");
-      exit (1);
+      const char *str = id2str (s->pool, s->nameids[i]);
+      if (fwrite(str, strlen(str) + 1, 1, fp) != 1)
+	{
+	  perror("write error");
+	  exit(1);
+	}
     }
 
   write_pages (fp, s);
@@ -962,6 +1028,75 @@ read_id(FILE *fp, Id max)
     }
   fprintf(stderr, "read_id: id too long\n");
   exit(1);
+}
+
+#define pool_debug(a,b,...) fprintf (stderr, __VA_ARGS__)
+
+static Id *
+read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
+{
+  unsigned int x = 0;
+  int c;
+  Id old = 0;
+  for (;;)
+    {
+      c = getc(fp);
+      if (c == EOF)
+	{
+	  pool_debug(mypool, SAT_FATAL, "unexpected EOF\n");
+	  exit(1);
+	}
+      if ((c & 128) == 0)
+	{
+	  x = (x << 6) | (c & 63);
+	  if (relative)
+	    {
+	      if (x == 0 && c == 0x40)
+		{
+		  /* prereq hack */
+		  if (store == end)
+		    {
+		      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
+		      exit(1);
+		    }
+		  *store++ = SOLVABLE_PREREQMARKER;
+		  old = 0;
+		  x = 0;
+		  continue;
+		}
+	      x = (x - 1) + old;
+	      old = x;
+	    }
+	  if (x >= max)
+	    {
+	      pool_debug(mypool, SAT_FATAL, "read_idarray: id too large (%u/%u)\n", x, max);
+	      exit(1);
+	    }
+	  if (map)
+	    x = map[x];
+	  if (store == end)
+	    {
+	      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
+	      exit(1);
+	    }
+	  *store++ = x;
+	  if ((c & 64) == 0)
+	    {
+	      if (x == 0)	/* already have trailing zero? */
+		return store;
+	      if (store == end)
+		{
+		  pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
+		  exit(1);
+		}
+	      *store++ = 0;
+	      return store;
+	    }
+	  x = 0;
+	  continue;
+	}
+      x = (x << 7) ^ c ^ 128;
+    }
 }
 
 /* Try to either setup on-demand paging (using FP as backing
@@ -1087,35 +1222,37 @@ attr_store_read (FILE *fp, Pool *pool)
   unsigned nentries;
   unsigned i;
   unsigned local_ssize;
-  unsigned nstrings;
+  unsigned nstrings, nschemata;
   char *buf;
   size_t buflen;
   Attrstore *s = new_store (pool);
 
-  nentries = read_u32 (fp);
-  s->num_nameids = read_u32 (fp);
-  nstrings = read_u32 (fp);
-
-  buflen = 128;
-  buf = malloc (buflen);
-
-  s->nameids = realloc (s->nameids, (((s->num_nameids+127) & ~127) * sizeof (s->nameids[0])));
-  for (i = 2; i < s->num_nameids; i++)
+  if (read_u32(fp) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
     {
-      size_t p = 0;
-      while (1)
-        {
-	  int c = read_u8 (fp);
-	  if (p == buflen)
-	    {
-	      buflen += 128;
-	      buf = realloc (buf, buflen);
-	    }
-	  buf[p++] = c;
-	  if (!c)
-	    break;
-	}
-      s->nameids[i] = str2id (s->pool, buf, 1);
+      pool_debug(pool, SAT_FATAL, "not a SOLV file\n");
+      exit(1);
+    }
+  unsigned solvversion = read_u32(fp);
+  switch (solvversion)
+    {
+      case SOLV_VERSION_2:
+        break;
+      default:
+        pool_debug(pool, SAT_FATAL, "unsupported SOLV version\n");
+        exit(1);
+    }
+
+  nstrings = 1 + read_u32(fp);
+  read_u32(fp); //nrels
+  nentries = read_u32(fp);
+  s->nkeys = read_u32(fp);
+  nschemata = read_u32(fp);
+  read_u32(fp); //ninfo
+  unsigned solvflags = read_u32(fp);
+  if (!(solvflags & SOLV_FLAG_PACKEDSIZES))
+    {
+      pool_debug(pool, SAT_FATAL, "invalid attribute store\n");
+      exit (1);
     }
 
   local_ssize = read_u32 (fp);
@@ -1145,23 +1282,44 @@ attr_store_read (FILE *fp, Pool *pool)
     }
   s->ss.sstrings = strsp - s->ss.stringspace;
 
+  s->keys = xrealloc (s->keys, ((s->nkeys + KEY_BLOCK) & ~KEY_BLOCK) * sizeof (s->keys[0]));
+  /* s->keys[0] is initialized in new_store.  */
+  for (i = 1; i < s->nkeys; i++)
+    {
+      s->keys[i].name = read_id (fp, 0 /*s->num_nameids*/);
+      s->keys[i].type = read_id (fp, ATTR_TYPE_MAX + 1);
+      s->keys[i].size = read_id (fp, 0);
+    }
+
+  s->szschemata = 1 + read_id (fp, 0);
+  s->nschemata = 0;
+  s->schemata = xmalloc (((s->szschemata + SCHEMA_BLOCK) & ~SCHEMA_BLOCK) * sizeof (s->schemata[0]));
+  s->schemaofs = 0;
+  Id *ids = s->schemata;
+  add_elem (s->schemaofs, s->nschemata, 0, SCHEMA_BLOCK);
+  *ids++ = 0;
+  while (ids < s->schemata + s->szschemata)
+    {
+      add_elem (s->schemaofs, s->nschemata, ids - s->schemata, SCHEMA_BLOCK);
+      ids = read_idarray (fp, s->nkeys, 0, ids, s->schemata + s->szschemata, 0);
+    }
+  assert (ids == s->schemata + s->szschemata);
+  assert (nschemata == s->nschemata);
+
   s->entries = nentries;
 
   s->ent2attr = xmalloc (s->entries * sizeof (s->ent2attr[0]));
-  int last = 0;
+  int start = 1;
   for (i = 0; i < s->entries; i++)
     {
       int d = read_id (fp, 0);
-      if (i == 0 || d == 0)
-        s->ent2attr[i] = d;
+      if (d)
+        s->ent2attr[i] = start, start += d;
       else
-        {
-	  last += d;
-	  s->ent2attr[i] = last;
-	}
+        s->ent2attr[i] = 0;
     }
 
-  s->attr_next_free = read_u32 (fp);
+  s->attr_next_free = start;
   s->flat_attrs = xmalloc (((s->attr_next_free + FLAT_ATTR_BLOCK) & ~FLAT_ATTR_BLOCK) * sizeof (s->flat_attrs[0]));
   if (fread (s->flat_attrs, s->attr_next_free, 1, fp) != 1)
     {
@@ -1169,24 +1327,29 @@ attr_store_read (FILE *fp, Pool *pool)
       exit (1);
     }
 
-  s->flat_abbr_next_free = read_u32 (fp);
-  s->flat_abbr = xmalloc (((s->flat_abbr_next_free + FLAT_ABBR_BLOCK) & ~FLAT_ABBR_BLOCK) * sizeof (s->flat_abbr[0]));
-  if (fread (s->flat_abbr, s->flat_abbr_next_free * sizeof (s->flat_abbr[0]), 1, fp) != 1)
+  s->num_nameids = read_u32 (fp);
+
+  buflen = 128;
+  buf = malloc (buflen);
+
+  s->nameids = realloc (s->nameids, (((s->num_nameids+127) & ~127) * sizeof (s->nameids[0])));
+  for (i = 2; i < s->num_nameids; i++)
     {
-      perror ("read error");
-      exit (1);
+      size_t p = 0;
+      while (1)
+        {
+	  int c = read_u8 (fp);
+	  if (p == buflen)
+	    {
+	      buflen += 128;
+	      buf = realloc (buf, buflen);
+	    }
+	  buf[p++] = c;
+	  if (!c)
+	    break;
+	}
+      s->nameids[i] = str2id (s->pool, buf, 1);
     }
-
-  assert (s->flat_abbr[0] == 0);
-  s->abbr_next_free = 0;
-  s->abbr = 0;
-  add_elem (s->abbr, s->abbr_next_free, 0, ABBR_BLOCK);
-
-  unsigned int abbi;
-  for (abbi = 0; abbi < s->flat_abbr_next_free - 1; abbi++)
-    if (s->flat_abbr[abbi] == 0)
-      add_elem (s->abbr, s->abbr_next_free, abbi + 1, ABBR_BLOCK);
-  assert (s->flat_abbr[abbi] == 0);
 
   read_or_setup_pages (fp, s);
 
@@ -1229,11 +1392,6 @@ attr_store_search_s (Attrstore *s, const char *pattern, int flags, NameId name, 
 	  case ATTR_INT:
 	  case ATTR_INTLIST:
 	    continue;
-	  case ATTR_ID:
-	    if (!(flags & SEARCH_IDS))
-	      continue;
-	    str = id2str (s->pool, ai.as_id);
-	    break;
 	  case ATTR_CHUNK:
 	    if (!(flags & SEARCH_BLOBS))
 	      continue;
@@ -1309,7 +1467,6 @@ main (void)
   add_attr_chunk (s, id1, str2nameid (s, "name2"), 9876, 1024);
   add_attr_string (s, id1, str2nameid (s, "name3"), "hallo");
   add_attr_int (s, id1, str2nameid (s, "name1"), 43);
-  add_attr_id (s, id1, str2nameid (s, "id1"), 100);
   add_attr_intlist_int (s, id1, str2nameid (s, "intlist1"), 3);
   add_attr_intlist_int (s, id1, str2nameid (s, "intlist1"), 14);
   add_attr_intlist_int (s, id1, str2nameid (s, "intlist1"), 1);

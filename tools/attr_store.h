@@ -35,7 +35,6 @@ const char * localid2str(Attrstore *s, LocalId id);
 void add_attr_int (Attrstore *s, unsigned int entry, NameId name, unsigned int val);
 void add_attr_blob (Attrstore *s, unsigned int entry, NameId name, const void *ptr, unsigned int len);
 void add_attr_string (Attrstore *s, unsigned int entry, NameId name, const char *val);
-void add_attr_id (Attrstore *s, unsigned int entry, NameId name, Id val);
 void add_attr_intlist_int (Attrstore *s, unsigned int entry, NameId name, int val);
 void add_attr_localids_id (Attrstore *s, unsigned int entry, NameId name, LocalId id);
 

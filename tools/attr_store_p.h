@@ -14,14 +14,13 @@ extern "C" {
 
 typedef struct
 {
-  NameId name;
-  unsigned type;
+  Id key;
 #define ATTR_INT      0
 #define ATTR_CHUNK    1
 #define ATTR_STRING   2
-#define ATTR_ID       3
-#define ATTR_INTLIST  4
-#define ATTR_LOCALIDS 5
+#define ATTR_INTLIST  3
+#define ATTR_LOCALIDS 4
+#define ATTR_TYPE_MAX 4
   union {
     unsigned int i[2];
     const char *str;
@@ -71,11 +70,15 @@ struct _Attrstore
   unsigned char *flat_attrs;
   unsigned int attr_next_free;
 
-  /* flat_abbr[abbr[i]] is the schema for abbreviation i.  */
-  unsigned int *abbr;
-  unsigned int abbr_next_free;
-  unsigned short *flat_abbr;
-  unsigned int flat_abbr_next_free;
+  struct {
+    NameId name;
+    unsigned type;
+    unsigned size;
+  } *keys;
+  unsigned nkeys;
+  Id *schemata;
+  unsigned *schemaofs;
+  unsigned nschemata, szschemata;
 
   unsigned int packed:1;
 };
@@ -93,10 +96,10 @@ struct _Attrstore
 
 typedef struct {
   unsigned char *attrs;
-  unsigned short *abbrp;
+  Id *schema;
   unsigned char *attrs_next;
   NameId name;
-  unsigned short type;
+  unsigned type;
 
   /* The following fields could be a union, but if we do that GCC
      doesn't scalarize these fields anymore, hence real memory accesses
@@ -112,9 +115,9 @@ static inline void
 ai_init (Attrstore *s, unsigned int i, attr_iterator *ai)
 {
   ai->attrs = s->flat_attrs + s->ent2attr[i];
-  unsigned int this_abbr;
-  get_num (ai->attrs, this_abbr);
-  ai->abbrp = s->flat_abbr + s->abbr[this_abbr];
+  unsigned int this_schema;
+  get_num (ai->attrs, this_schema);
+  ai->schema = s->schemata + s->schemaofs[this_schema];
 
   /* Initialize all fields so we get no uninit warnings later.
      Don't use memset() to initialize this structure, it would make
@@ -129,11 +132,11 @@ ai_init (Attrstore *s, unsigned int i, attr_iterator *ai)
 static inline int
 ai_step (Attrstore *s, attr_iterator *ai)
 {
-  unsigned short nt = *(ai->abbrp);
-  if (!nt)
+  Id key = *(ai->schema);
+  if (!key)
     return 0;
-  ai->name = nt >> 4;
-  ai->type = nt & 0xF;
+  ai->name = s->keys[key].name;
+  ai->type = s->keys[key].type;
   ai->attrs_next = ai->attrs;
   switch (ai->type)
     {
@@ -142,13 +145,6 @@ ai_step (Attrstore *s, attr_iterator *ai)
 	int val;
 	get_num (ai->attrs_next, val);
 	ai->as_int = val;
-	break;
-      }
-    case ATTR_ID:
-      {
-	Id val;
-	get_num (ai->attrs_next, val);
-	ai->as_id = val;
 	break;
       }
     case ATTR_CHUNK:
@@ -197,7 +193,7 @@ ai_step (Attrstore *s, attr_iterator *ai)
 }
 
 #define FOR_ATTRS(s,i,ai) \
-  for (ai_init (s, i, ai); ai_step (s, ai); (ai)->abbrp++,(ai)->attrs = (ai)->attrs_next)
+  for (ai_init (s, i, ai); ai_step (s, ai); (ai)->schema++,(ai)->attrs = (ai)->attrs_next)
 
 #ifdef __cplusplus
 }
