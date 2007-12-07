@@ -1252,13 +1252,13 @@ attr_store_read (FILE *fp, Pool *pool)
       s->keys[i].name = str2id (s->pool, localid2str (s, s->keys[i].name), 1);
     }
 
-  s->szschemata = 1 + read_id (fp, 0);
+  s->szschemata = read_id (fp, 0);
   s->nschemata = 0;
   s->schemata = xmalloc (((s->szschemata + SCHEMA_BLOCK) & ~SCHEMA_BLOCK) * sizeof (s->schemata[0]));
   s->schemaofs = 0;
   Id *ids = s->schemata;
-  add_elem (s->schemaofs, s->nschemata, 0, SCHEMA_BLOCK);
-  *ids++ = 0;
+  //add_elem (s->schemaofs, s->nschemata, 0, SCHEMA_BLOCK);
+  //*ids++ = 0;
   while (ids < s->schemata + s->szschemata)
     {
       add_elem (s->schemaofs, s->nschemata, ids - s->schemata, SCHEMA_BLOCK);
