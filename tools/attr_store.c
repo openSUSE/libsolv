@@ -861,7 +861,7 @@ write_attr_store (FILE *fp, Attrstore *s)
   write_u32(fp, SOLV_VERSION_2);
 
   /* write counts */
-  write_u32(fp, s->ss.nstrings - 1);  // nstrings
+  write_u32(fp, s->ss.nstrings);      // nstrings
   write_u32(fp, 0);		      // nrels
   write_u32(fp, s->entries);	      // nsolvables
   write_u32(fp, s->nkeys);
@@ -872,11 +872,11 @@ write_attr_store (FILE *fp, Attrstore *s)
   //solv_flags |= SOLV_FLAG_PREFIX_POOL;
   write_u32(fp, solv_flags);
 
-  for (i = 2, local_ssize = 0; i < (unsigned)s->ss.nstrings; i++)
+  for (i = 1, local_ssize = 0; i < (unsigned)s->ss.nstrings; i++)
     local_ssize += strlen (localid2str (s, i)) + 1;
 
   write_u32 (fp, local_ssize);
-  for (i = 2; i < (unsigned)s->ss.nstrings; i++)
+  for (i = 1; i < (unsigned)s->ss.nstrings; i++)
     {
       const char *str = localid2str (s, i);
       if (fwrite(str, strlen(str) + 1, 1, fp) != 1)
@@ -1193,7 +1193,7 @@ attr_store_read (FILE *fp, Pool *pool)
         exit(1);
     }
 
-  nstrings = 1 + read_u32(fp);
+  nstrings = read_u32(fp);
   read_u32(fp); //nrels
   nentries = read_u32(fp);
   s->nkeys = read_u32(fp);
@@ -1206,7 +1206,11 @@ attr_store_read (FILE *fp, Pool *pool)
       exit (1);
     }
 
-  local_ssize = read_u32 (fp);
+  /* Slightly hacky.  Our local string pool already contains "<NULL>" and
+     "".  We write out the "" too, so we have to read over it.  We write it
+     out to be compatible with the SOLV file and to not have to introduce
+     merging and mapping the string IDs.  */
+  local_ssize = read_u32 (fp) - 1;
   char *strsp = (char *)xrealloc(s->ss.stringspace, s->ss.sstrings + local_ssize + 1);
   Offset *str = (Offset *)xrealloc(s->ss.strings, (nstrings) * sizeof(Offset));
 
@@ -1214,7 +1218,10 @@ attr_store_read (FILE *fp, Pool *pool)
   s->ss.strings = str;
   strsp += s->ss.sstrings;
 
-  if (fread(strsp, local_ssize, 1, fp) != 1)
+  unsigned char ignore_char = 1;
+  if (fread(&ignore_char, 1, 1, fp) != 1
+      || fread(strsp, local_ssize, 1, fp) != 1
+      || ignore_char != 0)
     {
       perror ("read error while reading strings");
       exit(1);
