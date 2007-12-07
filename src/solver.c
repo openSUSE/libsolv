@@ -3287,7 +3287,7 @@ solver_solve(Solver *solv, Queue *job)
     pool_createwhatprovides(pool);
 
   /* create obsolete index if needed */
-  if (!solv->noupdateprovide)
+  if (solv->noupdateprovide)
     create_obsolete_index(solv);
 
   /*
