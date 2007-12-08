@@ -17,7 +17,7 @@ SET(helix2solv_REPOS helix2solv.c repo_helix.h repo_helix.c repo_write.c )
 ADD_EXECUTABLE( helix2solv ${helix2solv_REPOS} )
 TARGET_LINK_LIBRARIES( helix2solv satsolver ${EXPAT_LIBRARY})
 
-SET(susetags2solv_REPOS susetags2solv.c repo_susetags.h repo_susetags.c repo_write.c attr_store.c)
+SET(susetags2solv_REPOS susetags2solv.c repo_susetags.h repo_susetags.c repo_write.c)
 ADD_EXECUTABLE( susetags2solv ${susetags2solv_REPOS} )
 TARGET_LINK_LIBRARIES( susetags2solv satsolver)
 
@@ -43,7 +43,7 @@ SET(mergesolv_REPOS mergesolv.c repo_write.c)
 ADD_EXECUTABLE( mergesolv ${mergesolv_REPOS} )
 TARGET_LINK_LIBRARIES( mergesolv satsolver)
 
-SET(dumpattr_REPOS dumpattr.c attr_store.c)
+SET(dumpattr_REPOS dumpattr.c)
 ADD_EXECUTABLE( dumpattr ${dumpattr_REPOS} )
 TARGET_LINK_LIBRARIES( dumpattr satsolver)
 

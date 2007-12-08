@@ -75,6 +75,8 @@ struct _Attrstore
   unsigned int packed:1;
 };
 
+void add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, FILE *fp);
+
 #define get_num(ptr,val) do { \
   typedef int __wrong_buf__[(1-sizeof((ptr)[0])) * (sizeof((ptr)[0])-1)];\
   val = 0; \
