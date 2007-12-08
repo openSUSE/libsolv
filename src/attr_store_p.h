@@ -76,6 +76,7 @@ struct _Attrstore
 };
 
 void add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, unsigned maxid, FILE *fp);
+void read_or_setup_pages (FILE *fp, Attrstore *s);
 
 #define get_num(ptr,val) do { \
   typedef int __wrong_buf__[(1-sizeof((ptr)[0])) * (sizeof((ptr)[0])-1)];\

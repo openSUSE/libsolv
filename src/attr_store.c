@@ -1137,7 +1137,7 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 /* Try to either setup on-demand paging (using FP as backing
    file), or in case that doesn't work (FP not seekable) slurps in
    all pages and deactivates paging.  */
-static void
+void
 read_or_setup_pages (FILE *fp, Attrstore *s)
 {
   unsigned int blobsz;

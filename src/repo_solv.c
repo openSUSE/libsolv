@@ -521,12 +521,6 @@ repo_add_solv(Repo *repo, FILE *fp)
 	      case TYPE_ID:
 	        read_id(fp, numid + numrel);   /* just check Id */
 	        break;
-	      case TYPE_ATTR_CHUNK:
-	        read_id(fp, 0);
-		/* Fallthrough.  */
-	      case TYPE_ATTR_INT:
-		read_id(fp, 0);
-		break;
 	      case TYPE_U32:
 	        read_u32(fp);
 	        break;
@@ -539,6 +533,12 @@ repo_add_solv(Repo *repo, FILE *fp)
 	      case TYPE_REL_IDARRAY:
 		while ((read_u8(fp) & 0xc0) != 0)
 		  ;
+		break;
+	      case TYPE_ATTR_CHUNK:
+	        read_id(fp, 0);
+		/* Fallthrough.  */
+	      case TYPE_ATTR_INT:
+		read_id(fp, 0);
 		break;
 	      case TYPE_ATTR_INTLIST:
 	      case TYPE_ATTR_LOCALIDS:
@@ -787,6 +787,8 @@ repo_add_solv(Repo *repo, FILE *fp)
   if (embedded_store)
     {
       attr_store_pack (embedded_store);
+      /* If we have any attributes we also have pages.  */
+      read_or_setup_pages (fp, embedded_store);
       repo_add_attrstore (repo, embedded_store);
     }
   xfree(idmap);
