@@ -132,7 +132,9 @@ struct _Pool {
 #define TYPE_ATTR_STRING	8
 #define TYPE_ATTR_INTLIST	9
 #define TYPE_ATTR_LOCALIDS	10
-#define TYPE_ATTR_TYPE_MAX	10
+
+#define TYPE_COUNT_NAMED	11
+#define TYPE_ATTR_TYPE_MAX	11
 
 //-----------------------------------------------
 

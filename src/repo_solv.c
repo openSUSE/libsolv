@@ -184,6 +184,55 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 }
 
 
+static void
+skip_item (FILE *fp, unsigned type, Id *idmap, unsigned numid, unsigned numrel)
+{
+  switch (type)
+    {
+      case TYPE_ID:
+	read_id(fp, numid + numrel);   /* just check Id */
+	break;
+      case TYPE_U32:
+	read_u32(fp);
+	break;
+      case TYPE_ATTR_STRING:
+      case TYPE_STR:
+	while(read_u8(fp) != 0)
+	  ;
+	break;
+      case TYPE_IDARRAY:
+      case TYPE_REL_IDARRAY:
+	while ((read_u8(fp) & 0xc0) != 0)
+	  ;
+	break;
+      case TYPE_COUNT_NAMED:
+	{
+	  unsigned count = read_id (fp, 0);
+	  while (count--)
+	    {
+	      read_id (fp, numid);    /* Name */
+	      unsigned t = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
+	      skip_item (fp, t, idmap, numid, numrel);
+	    }
+	}
+	break;
+      case TYPE_ATTR_CHUNK:
+	read_id(fp, 0);
+	/* Fallthrough.  */
+      case TYPE_ATTR_INT:
+	read_id(fp, 0);
+	break;
+      case TYPE_ATTR_INTLIST:
+      case TYPE_ATTR_LOCALIDS:
+	while (read_id(fp, 0) != 0)
+	  ;
+	break;
+      default:
+	pool_debug(mypool, SAT_FATAL, "unknown type %d\n", type);
+	exit(1);
+    }
+}
+
 /*-----------------------------------------------------------------*/
 
 struct key {
@@ -208,7 +257,6 @@ repo_add_solv(Repo *repo, FILE *fp)
   unsigned int numkeys, numschemata, numinfo;
   Attrstore *embedded_store = 0;
 
-  int type;
   Offset sizeid;
   Offset *str;			       /* map Id -> Offset into string space */
   char *strsp;			       /* repo string space */
@@ -243,6 +291,7 @@ repo_add_solv(Repo *repo, FILE *fp)
     {
       case SOLV_VERSION_1:
       case SOLV_VERSION_2:
+      case SOLV_VERSION_3:
         break;
       default:
         pool_debug(pool, SAT_FATAL, "unsupported SOLV version\n");
@@ -258,6 +307,13 @@ repo_add_solv(Repo *repo, FILE *fp)
   numschemata = read_u32(fp);
   numinfo = read_u32(fp);
   solvflags = read_u32(fp);
+
+  if (solvversion < SOLV_VERSION_3
+      && numinfo)
+    {
+      pool_debug(pool, SAT_FATAL, "unsupported SOLV format (has info)\n");
+      exit(1);
+    }
 
   /*******  Part 1: string IDs  *****************************************/
 
@@ -512,44 +568,13 @@ repo_add_solv(Repo *repo, FILE *fp)
   /* we skip the info for now... */
   for (i = 0; i < numinfo; i++)
     {
-      Id *schema = schemadata + schemata[read_id(fp, numschemata)];
-      while ((key = *schema++) != 0)
-	{
-	  type = keys[key].type;
-	  switch (type)
-	    {
-	      case TYPE_ID:
-	        read_id(fp, numid + numrel);   /* just check Id */
-	        break;
-	      case TYPE_U32:
-	        read_u32(fp);
-	        break;
-	      case TYPE_ATTR_STRING:
-	      case TYPE_STR:
-	        while(read_u8(fp) != 0)
-		  ;
-	        break;
-	      case TYPE_IDARRAY:
-	      case TYPE_REL_IDARRAY:
-		while ((read_u8(fp) & 0xc0) != 0)
-		  ;
-		break;
-	      case TYPE_ATTR_CHUNK:
-	        read_id(fp, 0);
-		/* Fallthrough.  */
-	      case TYPE_ATTR_INT:
-		read_id(fp, 0);
-		break;
-	      case TYPE_ATTR_INTLIST:
-	      case TYPE_ATTR_LOCALIDS:
-	        while (read_id(fp, 0) != 0)
-		  ;
-		break;
-	      default:
-	        pool_debug(pool, SAT_FATAL, "unknown type %d\n", type);
-	        exit(0);
-	    }
-	}
+      unsigned name = idmap[read_id (fp, numid)];
+      unsigned type = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
+      if (type == TYPE_COUNT_NAMED
+          && !strcmp (id2str (pool, name), "repodata"))
+	skip_item (fp, type, idmap, numid, numrel);
+      else
+        skip_item (fp, type, idmap, numid, numrel);
     }
 
   /*******  Part 6: packed sizes (optional)  ****************************/
