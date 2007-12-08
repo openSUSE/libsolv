@@ -15,6 +15,29 @@
 
 #include "pooltypes.h"
 #include "pool.h"
+#include "attr_store.h"
+
+typedef struct _Repodata {
+  /* Keys provided by this attribute store, sorted by name value.
+     The same keys may be provided by multiple attribute stores, but
+     then only for different solvables.  I.e. the relation
+       (solvable,name) -> store
+     has to be injective.  */
+  struct {
+    Id name;
+    unsigned type;
+  } *keys;
+  /* Length of names.  */
+  unsigned nkeys;
+  /* The attribute store itself.  */
+  Attrstore *s;
+  /* A filename where to find this attribute store, or where to store
+     it.  May be NULL, in which case we can't load it on demand or store
+     into it.  */
+  const char *name;
+  /* The SHA1 checksum of the file.  */
+  unsigned char checksum[20];
+} Repodata;
 
 typedef struct _Repo {
   const char *name;
@@ -30,6 +53,11 @@ typedef struct _Repo {
   Offset lastoff;
 
   Id *rpmdbid;
+
+  /* The attribute stores we know about.  */
+  Repodata *repodata;
+  /* Number of attribute stores..  */
+  unsigned nrepodata;
 } Repo;
 
 extern Repo *repo_create(Pool *pool, const char *name);
@@ -40,6 +68,8 @@ extern Offset repo_addid(Repo *repo, Offset olddeps, Id id);
 extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, int isreq);
 extern Offset repo_reserve_ids(Repo *repo, Offset olddeps, int num);
 extern Offset repo_fix_legacy(Repo *repo, Offset provides, Offset supplements);
+
+extern void repo_add_attrstore (Repo *repo, Attrstore *s);
 
 static inline const char *repo_name(const Repo *repo)
 {

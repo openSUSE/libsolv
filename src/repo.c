@@ -20,6 +20,7 @@
 #include "pool.h"
 #include "poolid_private.h"
 #include "util.h"
+#include "attr_store_p.h"
 
 #define IDARRAY_BLOCK     4095
 
@@ -542,5 +543,37 @@ repo_lookup_id(Solvable *s, Id key)
   return 0;
 }
 #endif
+
+static int
+key_cmp (const void *pa, const void *pb)
+{
+  struct key { Id name; unsigned type; };
+  struct key *a = (struct key*)pa;
+  struct key *b = (struct key*)pb;
+  return a->name - b->name;
+}
+
+void
+repo_add_attrstore (Repo *repo, Attrstore *s)
+{
+  unsigned i;
+  Repodata *data;
+  repo->nrepodata++;
+  repo->repodata = xrealloc (repo->repodata, repo->nrepodata * sizeof (*data));
+  data = repo->repodata + repo->nrepodata - 1;
+  memset (data, 0, sizeof (*data));
+  data->s = s;
+  data->nkeys = s->nkeys;
+  if (s->nkeys)
+    {
+      data->keys = xmalloc (data->nkeys * sizeof (data->keys[0]));
+      for (i = 0; i < data->nkeys; i++)
+        {
+          data->keys[i].name = s->keys[i].name;
+	  data->keys[i].type = s->keys[i].type;
+	}
+      qsort (data->keys, data->nkeys, sizeof (data->keys[0]), key_cmp);
+    }
+}
 
 // EOF

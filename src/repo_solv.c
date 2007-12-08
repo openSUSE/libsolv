@@ -25,6 +25,7 @@
 
 #include "repo_solv.h"
 #include "util.h"
+#include "attr_store_p.h"
 
 #define INTERESTED_START	SOLVABLE_NAME
 #define INTERESTED_END		SOLVABLE_FRESHENS
@@ -191,7 +192,6 @@ struct key {
   Id size;
 };
 
-
 // ----------------------------------------------
 
 /*
@@ -206,6 +206,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   int i, l;
   unsigned int numid, numrel, numsolv;
   unsigned int numkeys, numschemata, numinfo;
+  Attrstore *embedded_store = 0;
 
   int type;
   Offset sizeid;
@@ -520,9 +521,16 @@ repo_add_solv(Repo *repo, FILE *fp)
 	      case TYPE_ID:
 	        read_id(fp, numid + numrel);   /* just check Id */
 	        break;
+	      case TYPE_ATTR_CHUNK:
+	        read_id(fp, 0);
+		/* Fallthrough.  */
+	      case TYPE_ATTR_INT:
+		read_id(fp, 0);
+		break;
 	      case TYPE_U32:
 	        read_u32(fp);
 	        break;
+	      case TYPE_ATTR_STRING:
 	      case TYPE_STR:
 	        while(read_u8(fp) != 0)
 		  ;
@@ -530,6 +538,11 @@ repo_add_solv(Repo *repo, FILE *fp)
 	      case TYPE_IDARRAY:
 	      case TYPE_REL_IDARRAY:
 		while ((read_u8(fp) & 0xc0) != 0)
+		  ;
+		break;
+	      case TYPE_ATTR_INTLIST:
+	      case TYPE_ATTR_LOCALIDS:
+	        while (read_id(fp, 0) != 0)
 		  ;
 		break;
 	      default:
@@ -540,10 +553,12 @@ repo_add_solv(Repo *repo, FILE *fp)
     }
 
   /*******  Part 6: packed sizes (optional)  ****************************/
+  char *exists = 0;
   if ((solvflags & SOLV_FLAG_PACKEDSIZES) != 0)
     {
+      exists = xmalloc (numsolv);
       for (i = 0; i < numsolv; i++)
-	read_id(fp, 0);
+	exists[i] = read_id(fp, 0) != 0;
     }
 
   /*******  Part 7: item data *******************************************/
@@ -660,6 +675,15 @@ repo_add_solv(Repo *repo, FILE *fp)
 		  else if (id == SOLVABLE_FRESHENS)
 		    s->freshens = ido;
 		  break;
+		case TYPE_ATTR_INT:
+		case TYPE_ATTR_CHUNK:
+		case TYPE_ATTR_STRING:
+		case TYPE_ATTR_INTLIST:
+		case TYPE_ATTR_LOCALIDS:
+		  if (!embedded_store)
+		    embedded_store = new_store (pool);
+		  add_attr_from_file (embedded_store, i, id, type, idmap, numid, fp);
+		  break;
 		}
 	    }
 	}
@@ -674,6 +698,8 @@ repo_add_solv(Repo *repo, FILE *fp)
     }
   for (i = 0; i < numsolv; i++, s++)
     {
+      if (exists && !exists[i])
+        continue;
       Id *keyp = schemadata + schemata[read_id(fp, numschemata)];
       while ((key = *keyp++) != 0)
 	{
@@ -745,8 +771,23 @@ repo_add_solv(Repo *repo, FILE *fp)
 	        POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", dep2str(pool, repo->idarraydata[ido]));
 #endif
 	      break;
+	    case TYPE_ATTR_INT:
+	    case TYPE_ATTR_CHUNK:
+	    case TYPE_ATTR_STRING:
+	    case TYPE_ATTR_INTLIST:
+	    case TYPE_ATTR_LOCALIDS:
+	      if (!embedded_store)
+		embedded_store = new_store (pool);
+	      add_attr_from_file (embedded_store, i, id, keys[key].type, idmap, numid, fp);
+	      break;
 	    }
 	}
+    }
+  xfree(exists);
+  if (embedded_store)
+    {
+      attr_store_pack (embedded_store);
+      repo_add_attrstore (repo, embedded_store);
     }
   xfree(idmap);
   xfree(schemata);

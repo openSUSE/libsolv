@@ -125,8 +125,7 @@ add_attr (Attrstore *s, unsigned int entry, LongNV attr)
 {
   LongNV *nv;
   unsigned int len;
-  if (entry >= s->entries)
-    return;
+  ensure_entry (s, entry);
   if (attr.key >= s->nkeys)
     return;
   nv = s->attrs[entry];
@@ -262,9 +261,9 @@ static Id read_id (FILE *fp, Id max);
 /* This routine is used only when attributes are embedded into the
    normal repo SOLV file.  */
 void
-add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, FILE *fp)
+add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, unsigned maxid, FILE *fp)
 {
-  //Pool *pool = s->pool;
+  Pool *pool = s->pool;
   //fprintf (stderr, "%s: attribute in a repo SOLV?\n", id2str (pool, name));
   switch (type)
     {
@@ -325,8 +324,13 @@ add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, FILE *fp)
       case TYPE_ATTR_LOCALIDS:
         {
 	  Id i;
-	  while ((i = read_id(fp, 0)) != 0)
-	    add_attr_localids_id (s, entry, name, i);
+	  /* The read ID will be pool-based.  */
+	  while ((i = read_id(fp, maxid)) != 0)
+	    {
+	      if (idmap)
+	        i = idmap[i];
+	      add_attr_localids_id (s, entry, name, str2localid (s, id2str (pool, i), 1));
+	    }
 	}
 	break;
       default:
@@ -1005,7 +1009,7 @@ write_attr_store (FILE *fp, Attrstore *s)
         s->ent2attr[i] += start, start = s->ent2attr[i];
     }
 
-  if (fwrite (s->flat_attrs, s->attr_next_free, 1, fp) != 1)
+  if (fwrite (s->flat_attrs + 1, s->attr_next_free - 1, 1, fp) != 1)
     {
       perror ("write error");
       exit (1);
@@ -1360,7 +1364,8 @@ attr_store_read (FILE *fp, Pool *pool)
 
   s->attr_next_free = start;
   s->flat_attrs = xmalloc (((s->attr_next_free + FLAT_ATTR_BLOCK) & ~FLAT_ATTR_BLOCK) * sizeof (s->flat_attrs[0]));
-  if (fread (s->flat_attrs, s->attr_next_free, 1, fp) != 1)
+  s->flat_attrs[0] = 0;
+  if (fread (s->flat_attrs + 1, s->attr_next_free - 1, 1, fp) != 1)
     {
       perror ("read error");
       exit (1);
