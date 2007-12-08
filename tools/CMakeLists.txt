@@ -47,6 +47,9 @@ SET(dumpattr_REPOS dumpattr.c)
 ADD_EXECUTABLE( dumpattr ${dumpattr_REPOS} )
 TARGET_LINK_LIBRARIES( dumpattr satsolver)
 
+ADD_EXECUTABLE( addstore addstore.c repo_write.c )
+TARGET_LINK_LIBRARIES( addstore satsolver )
+
 install(TARGETS dumpattr 
                 mergesolv 
                 dumpsolv 
@@ -55,6 +58,7 @@ install(TARGETS dumpattr
                 helix2solv 
                 rpmmd2solv 
                 rpmdb2solv
+		addstore
    DESTINATION ${BIN_INSTALL_DIR} )
 
 install(PROGRAMS repo2solv.sh DESTINATION ${BIN_INSTALL_DIR} )

@@ -554,26 +554,43 @@ key_cmp (const void *pa, const void *pb)
 }
 
 void
-repo_add_attrstore (Repo *repo, Attrstore *s)
+repo_add_attrstore (Repo *repo, Attrstore *s, const char *name)
 {
   unsigned i;
   Repodata *data;
+  /* If this is meant to be the embedded attributes, make sure we don't
+     have them already.  */
+  if (!name)
+    {
+      for (i = 0; i < repo->nrepodata; i++)
+        if (repo->repodata[i].name == 0)
+	  break;
+      if (i != repo->nrepodata)
+        {
+	  pool_debug (repo->pool, SAT_FATAL, "embedded attribs added twice\n");
+	  exit (1);
+	}
+    }
   repo->nrepodata++;
   repo->repodata = xrealloc (repo->repodata, repo->nrepodata * sizeof (*data));
   data = repo->repodata + repo->nrepodata - 1;
   memset (data, 0, sizeof (*data));
   data->s = s;
   data->nkeys = s->nkeys;
-  if (s->nkeys)
+  /* Don't store the first key, it's {0,0,0}.  */
+  data->nkeys--;
+  if (data->nkeys)
     {
       data->keys = xmalloc (data->nkeys * sizeof (data->keys[0]));
       for (i = 0; i < data->nkeys; i++)
         {
-          data->keys[i].name = s->keys[i].name;
-	  data->keys[i].type = s->keys[i].type;
+          data->keys[i].name = s->keys[i + 1].name;
+	  data->keys[i].type = s->keys[i + 1].type;
 	}
       qsort (data->keys, data->nkeys, sizeof (data->keys[0]), key_cmp);
     }
+  if (name)
+    data->name = strdup (name);
 }
 
 // EOF

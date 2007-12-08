@@ -185,6 +185,16 @@ write_id(FILE *fp, Id x)
     }
 }
 
+static void
+write_str(FILE *fp, const char *str)
+{
+  if (fputs (str, fp) == EOF
+      || putc (0, fp) == EOF)
+    {
+      perror("write error");
+      exit(1);
+    }
+}
 
 /*
  * Array of Ids
@@ -321,10 +331,25 @@ repo_write(Repo *repo, FILE *fp)
   Id lastschema[256];
   Id lastschemakey[256];
 
+  /* For the info block.  */
+  Id repodata_id, hello_id;
+
+  repodata_id = str2id (pool, "repodata", 1);
+  hello_id = str2id (pool, "hello", 1);
+
   nsolvables = 0;
   idarraydata = repo->idarraydata;
 
   needid = (NeedId *)xcalloc(pool->ss.nstrings + pool->nrels, sizeof(*needid));
+
+  needid[repodata_id].need++;
+  needid[hello_id].need++;
+  for (i = 0; i < repo->nrepodata; i++)
+    {
+      int j;
+      for (j = 0; j < repo->repodata[i].nkeys; j++)
+        needid[repo->repodata[i].keys[j].name].need++;
+    }
 
   memset(idsizes, 0, sizeof(idsizes));
 
@@ -506,7 +531,7 @@ repo_write(Repo *repo, FILE *fp)
 
   /* write file header */
   write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
-  write_u32(fp, SOLV_VERSION_2);
+  write_u32(fp, SOLV_VERSION_3);
 
   /* write counts */
   write_u32(fp, nstrings);
@@ -514,7 +539,7 @@ repo_write(Repo *repo, FILE *fp)
   write_u32(fp, nsolvables);
   write_u32(fp, nkeys);
   write_u32(fp, nschemata);
-  write_u32(fp, 0);	/* no info block */
+  write_u32(fp, 2);  /* Info block.  */
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
 #if 0
@@ -596,7 +621,49 @@ repo_write(Repo *repo, FILE *fp)
       while (*sp++)
 	;
     }
-  
+
+  /*
+   * write info block
+   */
+  write_id (fp, needid[hello_id].need);
+  write_id (fp, TYPE_COUNT_NAMED);
+  write_id (fp, 1);
+    write_id (fp, 0); //name
+      write_id (fp, TYPE_STR);
+      write_str (fp, "doll");
+
+  write_id (fp, needid[repodata_id].need);
+  write_id (fp, TYPE_COUNT_NAMED);
+  write_id (fp, repo->nrepodata);
+  for (i = 0; i < repo->nrepodata; i++)
+    {
+      int j;
+      write_id (fp, 0);		/* no name, isn't important here */
+      write_id (fp, TYPE_COUNT_NAMED);
+      /* Don't emit the embedded attributes.  */
+      if (repo->repodata[i].name == 0)
+        {
+          write_id (fp, 0);	/* count */
+	  continue;
+	}
+      write_id (fp, 2);		/* 2 items, the filename and the keys */
+	/* 1 filename */
+        write_id (fp, 0);	/* no name */
+	write_id (fp, TYPE_STR);
+	write_str (fp, repo->repodata[i].name);
+
+	/* 2 keys */
+	write_id (fp, 0);	/* no name */
+	write_id (fp, TYPE_COUNTED);
+	write_id (fp, repo->repodata[i].nkeys * 2);
+	write_id (fp, TYPE_ID);
+        for (j = 0; j < repo->repodata[i].nkeys; j++)
+	  {
+	    write_id (fp, needid[repo->repodata[i].keys[j].name].need);
+	    write_id (fp, repo->repodata[i].keys[j].type);
+	  }
+    }
+
 #if 0
   if (1)
     {

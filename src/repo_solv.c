@@ -183,6 +183,42 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
     }
 }
 
+static void
+read_str (FILE *fp, char **inbuf, unsigned *len)
+{
+  unsigned char *buf = (unsigned char*)*inbuf;
+  if (!buf)
+    {
+      buf = xmalloc (1024);
+      *len = 1024;
+    }
+  int c;
+  unsigned ofs = 0;
+  while((c = getc (fp)) != 0)
+    {
+      if (c == EOF)
+        {
+	  pool_debug (mypool, SAT_FATAL, "unexpected EOF\n");
+	  exit (1);
+        }
+      /* Plus 1 as we also want to add the 0.  */
+      if (ofs + 1 >= *len)
+        {
+	  *len += 256;
+	  /* Don't realloc on the inbuf, it might be on the stack.  */
+	  if (buf == (unsigned char*)*inbuf)
+	    {
+	      buf = xmalloc (*len);
+	      memcpy (buf, *inbuf, *len - 256);
+	    }
+	  else
+	    buf = xrealloc (buf, *len);
+        }
+      buf[ofs++] = c;
+    }
+  buf[ofs++] = 0;
+  *inbuf = (char*)buf;
+}
 
 static void
 skip_item (FILE *fp, unsigned type, Id *idmap, unsigned numid, unsigned numrel)
@@ -216,6 +252,14 @@ skip_item (FILE *fp, unsigned type, Id *idmap, unsigned numid, unsigned numrel)
 	    }
 	}
 	break;
+      case TYPE_COUNTED:
+        {
+	  unsigned count = read_id (fp, 0);
+	  unsigned t = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
+	  while (count--)
+	    skip_item (fp, t, idmap, numid, numrel);
+	}
+        break;
       case TYPE_ATTR_CHUNK:
 	read_id(fp, 0);
 	/* Fallthrough.  */
@@ -230,6 +274,89 @@ skip_item (FILE *fp, unsigned type, Id *idmap, unsigned numid, unsigned numrel)
       default:
 	pool_debug(mypool, SAT_FATAL, "unknown type %d\n", type);
 	exit(1);
+    }
+}
+
+static int
+key_cmp (const void *pa, const void *pb)
+{
+  struct key { Id name; unsigned type; };
+  struct key *a = (struct key*)pa;
+  struct key *b = (struct key*)pb;
+  return a->name - b->name;
+}
+
+static void
+parse_repodata (FILE *fp, Id *idmap, unsigned numid, unsigned numrel, Repo *repo)
+{
+  unsigned count = read_id (fp, 0);
+
+  while (count--)
+    {
+      Repodata *data;
+      read_id (fp, numid);  /* no name */
+      unsigned type = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
+      if (type != TYPE_COUNT_NAMED)
+        {
+          skip_item (fp, type, idmap, numid, numrel);
+	  continue;
+	}
+      unsigned c = read_id (fp, 0);
+      if (c == 0)
+        continue;
+      if (c != 2)
+        {
+	  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
+	  exit (1);
+	}
+      read_id (fp, numid);  /* no name */
+      if (read_id (fp, TYPE_ATTR_TYPE_MAX + 1) != TYPE_STR)
+        {
+	  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
+	  exit (1);
+	}
+      char buf[1024];
+      unsigned len = sizeof (buf);
+      char *filename = buf;
+      read_str (fp, &filename, &len);
+
+      read_id (fp, numid);  /* no name */
+      if (read_id (fp, TYPE_ATTR_TYPE_MAX + 1) != TYPE_COUNTED)
+        {
+	  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
+	  exit (1);
+	}
+
+      unsigned nkeys = read_id (fp, 0);
+      if ((nkeys & 1) != 0
+          || read_id (fp, TYPE_ATTR_TYPE_MAX + 1) != TYPE_ID)
+        {
+	  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
+	  exit (1);
+	}
+      nkeys >>= 1;
+
+      repo->nrepodata++;
+      data = xrealloc (repo->repodata, repo->nrepodata * sizeof (*data));
+      repo->repodata = data;
+      data += repo->nrepodata - 1;
+      memset (data, 0, sizeof (*data));
+      data->nkeys = nkeys;
+      if (data->nkeys)
+        {
+	  unsigned i;
+	  data->keys = xmalloc (data->nkeys * sizeof (data->keys[0]));
+	  for (i = 0; i < data->nkeys; i++)
+	  {
+	      data->keys[i].name = idmap[read_id (fp, numid)];
+	      data->keys[i].type = read_id (fp, 0);
+	  }
+	  qsort (data->keys, data->nkeys, sizeof (data->keys[0]), key_cmp);
+        }
+      data->name = strdup (filename);
+
+      if (filename != buf)
+        xfree (filename);
     }
 }
 
@@ -572,7 +699,7 @@ repo_add_solv(Repo *repo, FILE *fp)
       unsigned type = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
       if (type == TYPE_COUNT_NAMED
           && !strcmp (id2str (pool, name), "repodata"))
-	skip_item (fp, type, idmap, numid, numrel);
+	parse_repodata (fp, idmap, numid, numrel, repo);
       else
         skip_item (fp, type, idmap, numid, numrel);
     }
@@ -814,7 +941,8 @@ repo_add_solv(Repo *repo, FILE *fp)
       attr_store_pack (embedded_store);
       /* If we have any attributes we also have pages.  */
       read_or_setup_pages (fp, embedded_store);
-      repo_add_attrstore (repo, embedded_store);
+      /* The NULL name here means embedded attributes.  */
+      repo_add_attrstore (repo, embedded_store, NULL);
     }
   xfree(idmap);
   xfree(schemata);

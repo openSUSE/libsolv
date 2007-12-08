@@ -32,8 +32,9 @@ typedef struct _Repodata {
   /* The attribute store itself.  */
   Attrstore *s;
   /* A filename where to find this attribute store, or where to store
-     it.  May be NULL, in which case we can't load it on demand or store
-     into it.  */
+     it.  May be "", in which case we can't load it on demand or store
+     into it.  It may also be NULL for at most one of the repodata per
+     repo, in which case these are the embedded attributes.  */
   const char *name;
   /* The SHA1 checksum of the file.  */
   unsigned char checksum[20];
@@ -69,7 +70,7 @@ extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, int isreq);
 extern Offset repo_reserve_ids(Repo *repo, Offset olddeps, int num);
 extern Offset repo_fix_legacy(Repo *repo, Offset provides, Offset supplements);
 
-extern void repo_add_attrstore (Repo *repo, Attrstore *s);
+extern void repo_add_attrstore (Repo *repo, Attrstore *s, const char *name);
 
 static inline const char *repo_name(const Repo *repo)
 {
