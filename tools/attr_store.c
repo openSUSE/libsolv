@@ -255,6 +255,79 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id)
     }
 }
 
+#define pool_debug(a,b,...) fprintf (stderr, __VA_ARGS__)
+
+/* This routine is used only when attributes are embedded into the
+   normal repo SOLV file.  */
+void
+add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, FILE *fp)
+{
+  Pool *pool = s->pool;
+  //fprintf (stderr, "%s: attribute in a repo SOLV?\n", id2str (pool, name));
+  switch (type)
+    {
+      case TYPE_ATTR_CHUNK:
+	{
+	  unsigned ofs = read_id (fp, 0);
+	  unsigned len = read_id (fp, 0);
+	  add_attr_chunk (s, entry, name, ofs, len);
+	}
+	break;
+      case TYPE_ATTR_INT:
+	{
+	  unsigned i = read_id(fp, 0);
+	  add_attr_int (s, entry, name, i);
+	}
+	break;
+      case TYPE_ATTR_STRING:
+        {
+	  char localbuf[1024];
+	  char c;
+	  char *buf = localbuf;
+	  unsigned len = sizeof (localbuf);
+	  unsigned ofs = 0;
+	  while((c = read_u8(fp)) != 0)
+	    {
+	      /* Plus 1 as we also want to add the 0.  */
+	      if (ofs + 1 >= len)
+	        {
+		  len += 256;
+		  if (buf == localbuf)
+		    {
+		      buf = xmalloc (len);
+		      memcpy (buf, localbuf, len - 256);
+		    }
+		  else
+		    buf = xrealloc (buf, len);
+		}
+	      buf[ofs++] = c;
+	    }
+	  buf[ofs++] = 0;
+	  add_attr_string (s, entry, name, buf);
+	  if (buf != localbuf)
+	    xfree (buf);
+	}
+	break;
+      case TYPE_ATTR_INTLIST:
+        {
+	  unsigned i;
+	  while ((i = read_id(fp, 0)) != 0)
+	    add_attr_intlist_int (s, entry, name, i);
+	}
+	break;
+      case TYPE_ATTR_LOCALIDS:
+        {
+	  Id i;
+	  while ((i = read_id(fp, 0)) != 0)
+	    add_attr_localids_id (s, entry, name, i);
+	}
+	break;
+      default:
+	pool_debug(pool, SAT_FATAL, "unknown type %d\n", type);
+	exit(0);
+    }
+}
+
 /* Make sure all pages from PSTART to PEND (inclusive) are loaded,
    and are consecutive.  Return a pointer to the mapping of PSTART.  */
 static const void *
@@ -982,8 +1055,6 @@ read_id(FILE *fp, Id max)
   fprintf(stderr, "read_id: id too long\n");
   exit(1);
 }
-
-#define pool_debug(a,b,...) fprintf (stderr, __VA_ARGS__)
 
 static Id *
 read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
