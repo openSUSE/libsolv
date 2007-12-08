@@ -257,12 +257,14 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id)
 
 #define pool_debug(a,b,...) fprintf (stderr, __VA_ARGS__)
 
+static Id read_id (FILE *fp, Id max);
+
 /* This routine is used only when attributes are embedded into the
    normal repo SOLV file.  */
 void
 add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, FILE *fp)
 {
-  Pool *pool = s->pool;
+  //Pool *pool = s->pool;
   //fprintf (stderr, "%s: attribute in a repo SOLV?\n", id2str (pool, name));
   switch (type)
     {
@@ -281,13 +283,18 @@ add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, FILE *fp)
 	break;
       case TYPE_ATTR_STRING:
         {
-	  char localbuf[1024];
-	  char c;
-	  char *buf = localbuf;
+	  unsigned char localbuf[1024];
+	  int c;
+	  unsigned char *buf = localbuf;
 	  unsigned len = sizeof (localbuf);
 	  unsigned ofs = 0;
-	  while((c = read_u8(fp)) != 0)
+	  while((c = getc (fp)) != 0)
 	    {
+	      if (c == EOF)
+		{
+		  pool_debug (mypool, SAT_FATAL, "unexpected EOF\n");
+		  exit (1);
+		}
 	      /* Plus 1 as we also want to add the 0.  */
 	      if (ofs + 1 >= len)
 	        {
@@ -303,7 +310,7 @@ add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, FILE *fp)
 	      buf[ofs++] = c;
 	    }
 	  buf[ofs++] = 0;
-	  add_attr_string (s, entry, name, buf);
+	  add_attr_string (s, entry, name, (char*) buf);
 	  if (buf != localbuf)
 	    xfree (buf);
 	}
