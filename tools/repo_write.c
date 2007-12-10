@@ -320,38 +320,41 @@ repo_write(Repo *repo, FILE *fp)
   Reldep *ran;
   Id *idarraydata;
 
-  int idsizes[RPM_RPMDBID + 1];
-  int id2key[RPM_RPMDBID + 1];
+  int idsizes[ID_NUM_INTERNAL];
+  int id2key[ID_NUM_INTERNAL];
   int nsolvables;
 
   Id *schemadata, *schemadatap, *schema, *sp;
   Id schemaid;
   int schemadatalen;
   Id *solvschema;	/* schema of our solvables */
+  Id repodataschema, repodataschema_internal;
   Id lastschema[256];
   Id lastschemakey[256];
-
-  /* For the info block.  */
-  Id repodata_id, hello_id;
-
-  repodata_id = str2id (pool, "repodata", 1);
-  hello_id = str2id (pool, "hello", 1);
 
   nsolvables = 0;
   idarraydata = repo->idarraydata;
 
   needid = (NeedId *)xcalloc(pool->ss.nstrings + pool->nrels, sizeof(*needid));
+  memset(idsizes, 0, sizeof(idsizes));
 
-  needid[repodata_id].need++;
-  needid[hello_id].need++;
+  repodataschema = repodataschema_internal = 0;
   for (i = 0; i < repo->nrepodata; i++)
     {
       int j;
+      idsizes[REPODATA_EXTERNAL] = 1;
+      idsizes[REPODATA_KEYS]++;
+      if (repo->repodata[i].location)
+	{
+	  repodataschema = 1;		/* mark that we need it */
+          idsizes[REPODATA_LOCATION] = 1;
+	}
+      else
+	repodataschema_internal = 1;	/* mark that we need it */
       for (j = 0; j < repo->repodata[i].nkeys; j++)
         needid[repo->repodata[i].keys[j].name].need++;
+      idsizes[REPODATA_KEYS] += 2 * repo->repodata[i].nkeys;
     }
-
-  memset(idsizes, 0, sizeof(idsizes));
 
   for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
     {
@@ -394,7 +397,7 @@ repo_write(Repo *repo, FILE *fp)
   if (repo->rpmdbid)
     idsizes[RPM_RPMDBID] = 1;
 
-  for (i = SOLVABLE_NAME; i <= RPM_RPMDBID; i++)
+  for (i = SOLVABLE_NAME; i < ID_NUM_INTERNAL; i++)
     {
       if (idsizes[i])
         needid[i].need++;
@@ -439,7 +442,7 @@ repo_write(Repo *repo, FILE *fp)
   /* find the keys we need */
   nkeys = 1;
   memset(id2key, 0, sizeof(id2key));
-  for (i = SOLVABLE_NAME; i <= RPM_RPMDBID; i++)
+  for (i = SOLVABLE_NAME; i < ID_NUM_INTERNAL; i++)
     if (idsizes[i])
       id2key[i] = nkeys++;
 
@@ -525,7 +528,26 @@ repo_write(Repo *repo, FILE *fp)
 	}
       solvschema[n++] = schemaid;
     }
-  /* convert all schemas to keys */
+
+  if (repodataschema)
+    {
+      /* add us a schema for our repodata */
+      repodataschema = nschemata++;
+      *schemadatap++ = REPODATA_EXTERNAL;
+      *schemadatap++ = REPODATA_KEYS;
+      *schemadatap++ = REPODATA_LOCATION;
+      *schemadatap++ = 0;
+    }
+  if (repodataschema_internal)
+    {
+      /* add us a schema for our repodata */
+      repodataschema = nschemata++;
+      *schemadatap++ = REPODATA_EXTERNAL;
+      *schemadatap++ = REPODATA_KEYS;
+      *schemadatap++ = 0;
+    }
+
+  /* convert all schemas to local keys */
   for (sp = schemadata; sp < schemadatap; sp++)
     *sp = id2key[*sp];
 
@@ -539,7 +561,7 @@ repo_write(Repo *repo, FILE *fp)
   write_u32(fp, nsolvables);
   write_u32(fp, nkeys);
   write_u32(fp, nschemata);
-  write_u32(fp, 2);  /* Info block.  */
+  write_u32(fp, repo->nrepodata);  /* info blocks.  */
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
 #if 0
@@ -591,13 +613,13 @@ repo_write(Repo *repo, FILE *fp)
       ran = pool->rels + (needid[pool->ss.nstrings + i].map - pool->ss.nstrings);
       write_id(fp, needid[ISRELDEP(ran->name) ? RELOFF(ran->name) : ran->name].need);
       write_id(fp, needid[ISRELDEP(ran->evr) ? RELOFF(ran->evr) : ran->evr].need);
-      write_u8( fp, ran->flags);
+      write_u8(fp, ran->flags);
     }
 
   /*
    * write keys
    */
-  for (i = SOLVABLE_NAME; i <= RPM_RPMDBID; i++)
+  for (i = SOLVABLE_NAME; i < ID_NUM_INTERNAL; i++)
     {
       if (!idsizes[i])
 	continue;
@@ -606,6 +628,12 @@ repo_write(Repo *repo, FILE *fp)
 	write_id(fp, TYPE_REL_IDARRAY);
       else if (i == RPM_RPMDBID)
         write_id(fp, TYPE_U32);
+      else if (i == REPODATA_EXTERNAL)
+        write_id(fp, TYPE_VOID);
+      else if (i == REPODATA_KEYS)
+        write_id(fp, TYPE_IDVALUEARRAY);
+      else if (i == REPODATA_LOCATION)
+        write_id(fp, TYPE_STR);
       else
         write_id(fp, TYPE_ID);
       write_id(fp, idsizes[i]);
@@ -625,43 +653,29 @@ repo_write(Repo *repo, FILE *fp)
   /*
    * write info block
    */
-  write_id (fp, needid[hello_id].need);
-  write_id (fp, TYPE_COUNT_NAMED);
-  write_id (fp, 1);
-    write_id (fp, 0); //name
-      write_id (fp, TYPE_STR);
-      write_str (fp, "doll");
-
-  write_id (fp, needid[repodata_id].need);
-  write_id (fp, TYPE_COUNT_NAMED);
-  write_id (fp, repo->nrepodata);
   for (i = 0; i < repo->nrepodata; i++)
     {
       int j;
-      write_id (fp, 0);		/* no name, isn't important here */
-      write_id (fp, TYPE_COUNT_NAMED);
-      /* Don't emit the embedded attributes.  */
-      if (repo->repodata[i].name == 0)
-        {
-          write_id (fp, 0);	/* count */
-	  continue;
-	}
-      write_id (fp, 2);		/* 2 items, the filename and the keys */
-	/* 1 filename */
-        write_id (fp, 0);	/* no name */
-	write_id (fp, TYPE_STR);
-	write_str (fp, repo->repodata[i].name);
 
-	/* 2 keys */
-	write_id (fp, 0);	/* no name */
-	write_id (fp, TYPE_COUNTED);
-	write_id (fp, repo->repodata[i].nkeys * 2);
-	write_id (fp, TYPE_ID);
-        for (j = 0; j < repo->repodata[i].nkeys; j++)
-	  {
-	    write_id (fp, needid[repo->repodata[i].keys[j].name].need);
-	    write_id (fp, repo->repodata[i].keys[j].type);
-	  }
+      if (repo->repodata[i].location)
+        write_id(fp, repodataschema);
+      else
+        write_id(fp, repodataschema_internal);
+      /* keys + location, write idarray */
+      for (j = 0; j < repo->repodata[i].nkeys; j++)
+        {
+	  /* this looks horrible, we need some function */
+	  Id id = needid[repo->repodata[i].keys[j].name].need;
+	  if (id >= 64)
+	    id = (id & 63) | ((id & ~63) << 1);
+	  write_id(fp, id | 0x40);
+	  id = repo->repodata[i].keys[j].type;
+	  if (id >= 64)
+	    id = (id & 63) | ((id & ~63) << 1);
+	  write_id(fp, id | (j < repo->repodata[i].nkeys - 1 ? 0x40: 0));
+        }
+      if (repo->repodata[i].location)
+        write_str(fp, repo->repodata[i].location);
     }
 
 #if 0

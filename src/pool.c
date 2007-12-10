@@ -57,6 +57,9 @@ static const char *initpool_data[] = {
   "src",
   "nosrc",
   "noarch",
+  "repodata:external",
+  "repodata:keys",
+  "repodata:location",
   0
 };
 

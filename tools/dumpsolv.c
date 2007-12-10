@@ -89,19 +89,19 @@ static void
 dump_repodata (Repo *repo)
 {
   unsigned i;
-  Repodata *d;
+  Repodata *data;
   if (repo->nrepodata == 0)
     return;
-  printf ("repo refers to %d attribute stores:\n", repo->nrepodata);
-  for (i = 0, d = repo->repodata; i < repo->nrepodata; i++, d++)
+  printf("repo refers to %d attribute stores:\n", repo->nrepodata);
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      unsigned j;
-      printf ("%s has %d keys", d->name ? d->name : "**EMBED**", d->nkeys);
-      for (j = 0; j < d->nkeys; j++)
-        printf ("\n  %s", id2str (repo->pool, d->keys[j].name));
-      printf ("\n");
+      unsigned int j;
+      printf("%s has %d keys", data->location ? data->location : "**EMBED**", data->nkeys);
+      for (j = 0; j < data->nkeys; j++)
+        printf("\n  %s", id2str(repo->pool, data->keys[j].name));
+      printf("\n");
     }
-  printf ("\n");
+  printf("\n");
 }
 
 static void

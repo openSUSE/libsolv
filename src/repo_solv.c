@@ -151,7 +151,7 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 	      x = (x - 1) + old;
 	      old = x;
 	    }
-	  if (x >= max)
+	  if (max && x >= max)
 	    {
 	      pool_debug(mypool, SAT_FATAL, "read_idarray: id too large (%u/%u)\n", x, max);
 	      exit(1);
@@ -221,10 +221,12 @@ read_str (FILE *fp, char **inbuf, unsigned *len)
 }
 
 static void
-skip_item (FILE *fp, unsigned type, Id *idmap, unsigned numid, unsigned numrel)
+skip_item (FILE *fp, unsigned type, unsigned numid, unsigned numrel)
 {
   switch (type)
     {
+      case TYPE_VOID:
+	break;
       case TYPE_ID:
 	read_id(fp, numid + numrel);   /* just check Id */
 	break;
@@ -237,6 +239,8 @@ skip_item (FILE *fp, unsigned type, Id *idmap, unsigned numid, unsigned numrel)
 	  ;
 	break;
       case TYPE_IDARRAY:
+      case TYPE_IDVALUEARRAY:
+      case TYPE_IDVALUEVALUEARRAY:
       case TYPE_REL_IDARRAY:
 	while ((read_u8(fp) & 0xc0) != 0)
 	  ;
@@ -248,7 +252,7 @@ skip_item (FILE *fp, unsigned type, Id *idmap, unsigned numid, unsigned numrel)
 	    {
 	      read_id (fp, numid);    /* Name */
 	      unsigned t = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
-	      skip_item (fp, t, idmap, numid, numrel);
+	      skip_item (fp, t, numid, numrel);
 	    }
 	}
 	break;
@@ -257,7 +261,7 @@ skip_item (FILE *fp, unsigned type, Id *idmap, unsigned numid, unsigned numrel)
 	  unsigned count = read_id (fp, 0);
 	  unsigned t = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
 	  while (count--)
-	    skip_item (fp, t, idmap, numid, numrel);
+	    skip_item (fp, t, numid, numrel);
 	}
         break;
       case TYPE_ATTR_CHUNK:
@@ -286,87 +290,89 @@ key_cmp (const void *pa, const void *pb)
   return a->name - b->name;
 }
 
-static void
-parse_repodata (FILE *fp, Id *idmap, unsigned numid, unsigned numrel, Repo *repo)
-{
-  unsigned count = read_id (fp, 0);
-
-  while (count--)
-    {
-      Repodata *data;
-      read_id (fp, numid);  /* no name */
-      unsigned type = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
-      if (type != TYPE_COUNT_NAMED)
-        {
-          skip_item (fp, type, idmap, numid, numrel);
-	  continue;
-	}
-      unsigned c = read_id (fp, 0);
-      if (c == 0)
-        continue;
-      if (c != 2)
-        {
-	  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
-	  exit (1);
-	}
-      read_id (fp, numid);  /* no name */
-      if (read_id (fp, TYPE_ATTR_TYPE_MAX + 1) != TYPE_STR)
-        {
-	  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
-	  exit (1);
-	}
-      char buf[1024];
-      unsigned len = sizeof (buf);
-      char *filename = buf;
-      read_str (fp, &filename, &len);
-
-      read_id (fp, numid);  /* no name */
-      if (read_id (fp, TYPE_ATTR_TYPE_MAX + 1) != TYPE_COUNTED)
-        {
-	  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
-	  exit (1);
-	}
-
-      unsigned nkeys = read_id (fp, 0);
-      if ((nkeys & 1) != 0
-          || read_id (fp, TYPE_ATTR_TYPE_MAX + 1) != TYPE_ID)
-        {
-	  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
-	  exit (1);
-	}
-      nkeys >>= 1;
-
-      repo->nrepodata++;
-      data = xrealloc (repo->repodata, repo->nrepodata * sizeof (*data));
-      repo->repodata = data;
-      data += repo->nrepodata - 1;
-      memset (data, 0, sizeof (*data));
-      data->nkeys = nkeys;
-      if (data->nkeys)
-        {
-	  unsigned i;
-	  data->keys = xmalloc (data->nkeys * sizeof (data->keys[0]));
-	  for (i = 0; i < data->nkeys; i++)
-	  {
-	      data->keys[i].name = idmap[read_id (fp, numid)];
-	      data->keys[i].type = read_id (fp, 0);
-	  }
-	  qsort (data->keys, data->nkeys, sizeof (data->keys[0]), key_cmp);
-        }
-      data->name = strdup (filename);
-
-      if (filename != buf)
-        xfree (filename);
-    }
-}
-
-/*-----------------------------------------------------------------*/
-
 struct key {
   Id name;
   Id type;
   Id size;
 };
+
+static void
+parse_repodata (FILE *fp, Id *keyp, struct key *keys, Id *idmap, unsigned numid, unsigned numrel, Repo *repo)
+{
+  Id key, id;
+  Id *ida, *ide;
+  Repodata *data;
+  int i, n;
+
+  repo->repodata = xrealloc(repo->repodata, (repo->nrepodata + 1) * sizeof (*data));
+  data = repo->repodata + repo->nrepodata++;
+  memset(data, 0, sizeof(*data));
+
+  while ((key = *keyp++) != 0)
+    {
+      id = keys[key].name;
+      switch (keys[key].type)
+	{
+	case TYPE_IDVALUEARRAY:
+	  if (id != REPODATA_KEYS)
+	    {
+	      skip_item(fp, TYPE_IDVALUEARRAY, numid, numrel);
+	      break;
+	    }
+	  ida = xcalloc(keys[key].size, sizeof(Id));
+	  ide = read_idarray(fp, 0, 0, ida, ida + keys[key].size, 0);
+	  n = ide - ida - 1;
+	  if (n & 1)
+	    {
+	      pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
+	      exit (1);
+	    }
+	  data->nkeys = n >> 1;
+	  data->keys = xmalloc2(data->nkeys, sizeof(data->keys[0]));
+	  for (i = 0, ide = ida; i < data->nkeys; i++)
+	    {
+	      if (*ide >= numid)
+		{
+		  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
+		  exit (1);
+		}
+	      data->keys[i].name = idmap[*ide++];
+	      data->keys[i].type = *ide++;
+	    }
+	  xfree(ida);
+	  qsort(data->keys, data->nkeys, sizeof(data->keys[0]), key_cmp);
+	  break;
+	case TYPE_STR:
+	  if (id != REPODATA_LOCATION)
+	    skip_item(fp, TYPE_STR, numid, numrel);
+	  else
+	    {
+	      char buf[1024];
+	      unsigned len = sizeof (buf);
+	      char *filename = buf;
+	      read_str(fp, &filename, &len);
+	      data->location = strdup(filename);
+	      if (filename != buf)
+		free(filename);
+	    }
+	  break;
+	default:
+	  skip_item(fp, keys[key].type, numid, numrel);
+	  break;
+	}
+    }
+}
+
+/*-----------------------------------------------------------------*/
+
+
+void
+skip_schema(FILE *fp, Id *keyp, struct key *keys, unsigned int numid, unsigned int numrel)
+{
+  Id key;
+  while ((key = *keyp++) != 0)
+    skip_item(fp, keys[key].type, numid, numrel);
+}
 
 // ----------------------------------------------
 
@@ -692,16 +698,20 @@ repo_add_solv(Repo *repo, FILE *fp)
     }
 
   /*******  Part 5: Info  ***********************************************/
-  /* we skip the info for now... */
   for (i = 0; i < numinfo; i++)
     {
-      unsigned name = idmap[read_id (fp, numid)];
-      unsigned type = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
-      if (type == TYPE_COUNT_NAMED
-          && !strcmp (id2str (pool, name), "repodata"))
-	parse_repodata (fp, idmap, numid, numrel, repo);
+      /* for now we're just interested in data that starts with
+       * the repodata_external id
+       */
+      Id *keyp = schemadata + schemata[read_id(fp, numschemata)];
+      key = *keyp;
+      if (keys[key].name == REPODATA_EXTERNAL && keys[key].type == TYPE_VOID)
+	{
+	  /* external data for some ids */
+	  parse_repodata(fp, keyp, keys, idmap, numid, numrel, repo);
+	}
       else
-        skip_item (fp, type, idmap, numid, numrel);
+	skip_schema(fp, keyp, keys, numid, numrel);
     }
 
   /*******  Part 6: packed sizes (optional)  ****************************/
@@ -932,6 +942,8 @@ repo_add_solv(Repo *repo, FILE *fp)
 		embedded_store = new_store (pool);
 	      add_attr_from_file (embedded_store, i, id, keys[key].type, idmap, numid, fp);
 	      break;
+	    default:
+	      skip_item(fp, keys[key].type, numid, numrel);
 	    }
 	}
     }

@@ -50,6 +50,12 @@ extern "C" {
 #define ARCH_SRC		21
 #define ARCH_NOSRC		22
 #define ARCH_NOARCH		23
+#define REPODATA_EXTERNAL	24
+#define REPODATA_KEYS		25
+#define REPODATA_LOCATION	26
+
+#define ID_NUM_INTERNAL		27
+
 
 /* well known solvable */
 #define SYSTEMSOLVABLE		1
@@ -121,6 +127,7 @@ struct _Pool {
 #define SAT_DEBUG_JOB			(1<<11)
 #define SAT_DEBUG_SCHUBI		(1<<12)
 
+#define TYPE_VOID               0
 #define TYPE_ID			1
 #define TYPE_IDARRAY		2
 #define TYPE_STR		3
@@ -136,6 +143,9 @@ struct _Pool {
 #define TYPE_COUNT_NAMED	11
 #define TYPE_COUNTED		12
 #define TYPE_ATTR_TYPE_MAX	12
+
+#define TYPE_IDVALUEARRAY	13
+#define TYPE_IDVALUEVALUEARRAY	14
 
 //-----------------------------------------------
 

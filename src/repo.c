@@ -554,16 +554,16 @@ key_cmp (const void *pa, const void *pb)
 }
 
 void
-repo_add_attrstore (Repo *repo, Attrstore *s, const char *name)
+repo_add_attrstore (Repo *repo, Attrstore *s, const char *location)
 {
   unsigned i;
   Repodata *data;
   /* If this is meant to be the embedded attributes, make sure we don't
      have them already.  */
-  if (!name)
+  if (!location)
     {
       for (i = 0; i < repo->nrepodata; i++)
-        if (repo->repodata[i].name == 0)
+        if (repo->repodata[i].location == 0)
 	  break;
       if (i != repo->nrepodata)
         {
@@ -589,8 +589,8 @@ repo_add_attrstore (Repo *repo, Attrstore *s, const char *name)
 	}
       qsort (data->keys, data->nkeys, sizeof (data->keys[0]), key_cmp);
     }
-  if (name)
-    data->name = strdup (name);
+  if (location)
+    data->location = strdup(location);
 }
 
 // EOF
