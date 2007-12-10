@@ -12,6 +12,8 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
+
 #include "poolid.h"
 
 struct _Pool;
