@@ -73,10 +73,13 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
   return s1 < q1 ? 1 : s2 < q2 ? -1 : 0;
 }
 
+#define EVRCMP_COMPARE			0
+#define EVRCMP_MATCH_RELEASE		1
+#define EVRCMP_MATCH			2
 
 // edition (e:v-r) compare
 int
-evrcmp(Pool *pool, Id evr1id, Id evr2id)
+evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode)
 {
   int r;
   const char *evr1, *evr2;
@@ -89,7 +92,7 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id)
   evr2 = id2str(pool, evr2id);
 
 #if 0
-  POOL_DEBUG(DEBUG_EVRCMP, "evrcmp %s %s\n", evr1, evr2);
+  POOL_DEBUG(DEBUG_EVRCMP, "evrcmp %s %s mode=%d\n", evr1, evr2, mode);
 #endif
   for (s1 = evr1; *s1 >= '0' && *s1 <= '9'; s1++)
     ;
@@ -132,15 +135,20 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id)
   for (s2 = evr2, r2 = 0; *s2; s2++)
     if (*s2 == '-')
       r2 = s2;
-  r = vercmp(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2);
+
+  r = 0;
+  if (mode != EVRCMP_MATCH || (evr1 != (r1 ? r1 : s1) && evr2 != (r2 ? r2 : s2)))
+    r = vercmp(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2);
   if (r)
     return r;
-#ifdef DEBIAN_SEMANTICS
-  if (!r1 && r2)
-    return -1;
-  if (r1 && !r2)
-    return 1;
-#endif
+
+  if (mode == EVRCMP_COMPARE)
+    {
+      if (!r1 && r2)
+	return -1;
+      if (r1 && !r2)
+	return 1;
+    }
   if (r1 && r2)
     {
       if (s1 != ++r1 && s2 != ++r2)

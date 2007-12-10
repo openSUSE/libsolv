@@ -558,7 +558,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	      else
 		{
 		  int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr)))) != 0)
+		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_MATCH_RELEASE)))) != 0)
 		    break;
 		}
 	    }

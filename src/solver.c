@@ -3155,7 +3155,7 @@ printsolutions(Solver *solv, Queue *job)
 		  if (sd)
 		    {
 		      int gotone = 0;
-		      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr) > 0)
+		      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr, EVRCMP_MATCH_RELEASE) > 0)
 			{
 			  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 			  gotone = 1;

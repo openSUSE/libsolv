@@ -19,8 +19,12 @@ extern "C" {
 
 #include "pooltypes.h"
 
-extern int vercmp( const char *s1, const char *q1, const char *s2, const char *q2 );
-extern int evrcmp( Pool *pool, Id evr1id, Id evr2id );
+#define EVRCMP_COMPARE                  0
+#define EVRCMP_MATCH_RELEASE            1
+#define EVRCMP_MATCH                    2
+
+extern int vercmp(const char *s1, const char *q1, const char *s2, const char *q2);
+extern int evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode);
 
 #ifdef __cplusplus
 }

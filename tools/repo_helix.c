@@ -714,7 +714,7 @@ endElement(void *userData, const char *name)
       pd->version = 0;
       pd->release = 0;
       /* use highest evr */
-      if (!s->evr || evrcmp(pool, s->evr, evr) <= 0)
+      if (!s->evr || evrcmp(pool, s->evr, evr, EVRCMP_MATCH_RELEASE) <= 0)
 	s->evr = evr;
       break;
     case STATE_EPOCH:

@@ -282,7 +282,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
 
       if (pool->solvables[best].evr != s->evr)   /* compare evr */
         {
-          if (evrcmp(pool, pool->solvables[best].evr, s->evr) < 0)
+          if (evrcmp(pool, pool->solvables[best].evr, s->evr, EVRCMP_MATCH_RELEASE) < 0)
             best = plist->elements[i];
         }
     }
@@ -386,7 +386,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
 	{
 	  if (!allowall)
 	    {
-	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr) > 0)
+	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_MATCH_RELEASE) > 0)
 	        continue;
 	      if (!solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(pool, s, ps))
 		continue;
