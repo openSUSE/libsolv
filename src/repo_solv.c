@@ -837,6 +837,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 		  else if (id == SOLVABLE_FRESHENS)
 		    s->freshens = ido;
 		  break;
+		case TYPE_VOID:
 		case TYPE_ATTR_INT:
 		case TYPE_ATTR_CHUNK:
 		case TYPE_ATTR_STRING:
@@ -933,6 +934,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	        POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", dep2str(pool, repo->idarraydata[ido]));
 #endif
 	      break;
+	    case TYPE_VOID:
 	    case TYPE_ATTR_INT:
 	    case TYPE_ATTR_CHUNK:
 	    case TYPE_ATTR_STRING:

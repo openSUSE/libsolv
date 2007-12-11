@@ -42,6 +42,9 @@ struct parsedata {
   Repo *repo;
   char *tmp;
   int tmpl;
+  char **sources;
+  int nsources;
+  int last_found_source;
 };
 
 static Id
@@ -135,6 +138,143 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
 
 Attrstore *attr;
 
+static void
+add_location (char *line, Solvable *s, unsigned entry)
+{
+  Pool *pool = s->repo->pool;
+  char *sp[3];
+  int i;
+
+  i = split(line, sp, 3);
+  if (i != 2 && i != 3)
+    {
+      fprintf(stderr, "Bad location line: %s\n", line);
+      exit(1);
+    }
+  /* If we have a dirname, let's see if it's the same as arch.  In that
+     case don't store it.  */
+  if (i == 3 && !strcmp (sp[2], id2str (pool, s->arch)))
+    sp[2] = 0, i = 2;
+  if (i == 3 && sp[2])
+    {
+      /* medianr filename dir
+         don't optimize this one */
+      add_attr_int (attr, entry, str2id (pool, "medianr", 1), atoi (sp[0]));
+      add_attr_localids_id (attr, entry, str2id (pool, "mediadir", 1), str2localid (attr, sp[2], 1));
+      add_attr_string (attr, entry, str2id (pool, "mediafile", 1), sp[1]);
+      return;
+    }
+  else
+    {
+      /* Let's see if we can optimize this a bit.  If the media file name
+         can be formed by the base rpm information we don't store it, but
+	 only a flag that we've seen it.  */
+      unsigned int medianr = atoi (sp[0]);
+      const char *n1 = sp[1];
+      const char *n2 = id2str (pool, s->name);
+      for (n2 = id2str (pool, s->name); *n2; n1++, n2++)
+        if (*n1 != *n2)
+	  break;
+      if (*n2 || *n1 != '-')
+        goto nontrivial;
+
+      n1++;
+      for (n2 = id2str (pool, s->evr); *n2; n1++, n2++)
+	if (*n1 != *n2)
+	  break;
+      if (*n2 || *n1 != '.')
+        goto nontrivial;
+      n1++;
+      for (n2 = id2str (pool, s->arch); *n2; n1++, n2++)
+	if (*n1 != *n2)
+	  break;
+      if (*n2 || strcmp (n1, ".rpm"))
+        goto nontrivial;
+      add_attr_int (attr, entry, str2id (pool, "medianr", 1), medianr);
+      add_attr_void (attr, entry, str2id (pool, "mediafile", 1));
+      return;
+
+nontrivial:
+      add_attr_int (attr, entry, str2id (pool, "medianr", 1), medianr);
+      add_attr_string (attr, entry, str2id (pool, "mediafile", 1), sp[1]);
+      return;
+    }
+}
+
+static void
+add_source (char *line, struct parsedata *pd, Solvable *s, unsigned entry, int first)
+{
+  Repo *repo = s->repo;
+  Pool *pool = repo->pool;
+  char *sp[5];
+
+  if (split(line, sp, 5) != 4)
+    {
+      fprintf(stderr, "Bad source line: %s\n", line);
+      exit(1);
+    }
+
+  Id name = str2id(pool, sp[0], 1);
+  Id evr = makeevr(pool, join(pd, sp[1], "-", sp[2]));
+  Id arch = str2id(pool, sp[3], 1);
+
+  /* Now, if the source of a package only differs in architecture
+     (src or nosrc), code only that fact.  */
+  if (s->name == name && s->evr == evr
+      && (arch == ARCH_SRC || arch == ARCH_NOSRC))
+    add_attr_void (attr, entry,
+                   str2id (pool, arch == ARCH_SRC ? "source" : "nosource", 1));
+  else if (first)
+    {
+      if (entry >= pd->nsources)
+        {
+	  if (pd->nsources)
+	    {
+	      pd->sources = realloc (pd->sources, (entry + 256) * sizeof (*pd->sources));
+	      memset (pd->sources + pd->nsources, 0, (entry + 256 - pd->nsources) * sizeof (*pd->sources));
+	    }
+	  else
+	    pd->sources = calloc (entry + 256, sizeof (*pd->sources));
+	  pd->nsources = entry + 256;
+	}
+      /* Uarrr.  Unsplit.  */
+      sp[0][strlen (sp[0])] = ' ';
+      sp[1][strlen (sp[1])] = ' ';
+      sp[2][strlen (sp[2])] = ' ';
+      pd->sources[entry] = strdup (sp[0]);
+    }
+  else
+    {
+      unsigned n, nn;
+      Solvable *found = 0;
+      /* Otherwise we may find a solvable with exactly matching name, evr, arch
+         in the repository already.  In that case encode its ID.  */
+      for (n = repo->start, nn = repo->start + pd->last_found_source;
+           n < repo->end; n++, nn++)
+        {
+	  if (nn >= repo->end)
+	    nn = repo->start;
+	  found = pool->solvables + nn;
+	  if (found->repo == repo
+	      && found->name == name
+	      && found->evr == evr
+	      && found->arch == arch)
+	    {
+	      pd->last_found_source = nn - repo->start;
+	      break;
+	    }
+        }
+      if (n != repo->end)
+        add_attr_intlist_int (attr, entry, str2id (pool, "sourceid", 1), nn - repo->start);
+      else
+        {
+          add_attr_localids_id (attr, entry, str2id (pool, "source", 1), str2localid (attr, sp[0], 1));
+          add_attr_localids_id (attr, entry, str2id (pool, "source", 1), str2localid (attr, join (pd, sp[1], "-", sp[2]), 1));
+          add_attr_localids_id (attr, entry, str2id (pool, "source", 1), str2localid (attr, sp[3], 1));
+	}
+    }
+}
+
 void
 repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 {
@@ -146,7 +286,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   int cummulate = 0;
   int indesc = 0;
   int last_found_pack = 0;
-  int pack;
   char *sp[5];
   struct parsedata pd;
 
@@ -159,7 +298,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   pd.repo = repo;
 
   linep = line;
-  pack = 0;
   s = 0;
 
   for (;;)
@@ -213,9 +351,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      exit(1);
 	    }
 	  intag = tagend - (line + 1);
-	  if (!strncmp (line, "+Des:", 5))
-	    cummulate = 1;
-	  else if (!strncmp (line, "+Aut:", 5))
+	  if (!strncmp (line, "+Des:", 5)
+	      || !strncmp (line, "+Eul:", 5)
+	      || !strncmp (line, "+Ins:", 5)
+	      || !strncmp (line, "+Del:", 5)
+	      || !strncmp (line, "+Aut:", 5))
 	    cummulate = 1;
 	  else
 	    cummulate = 0;
@@ -272,7 +412,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    name = str2id(pool, sp[0], 0);
 	  evr = makeevr(pool, join(&pd, sp[1], "-", sp[2]));
 	  arch = str2id(pool, sp[3], 0);
-	  /* If we found neither the name of the arch at all in this repo
+	  /* If we found neither the name or the arch at all in this repo
 	     there's no chance of finding the exact solvable either.  */
 	  if (!name || !arch)
 	    continue;
@@ -289,7 +429,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
 	        break;
 	    }
-	  if (n == pack)
+	  if (n == repo->end)
 	    s = 0;
 	  else
 	    last_found_pack = nn - repo->start;
@@ -380,6 +520,36 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  add_attr_localids_id (attr, last_found_pack, str2id (pool, "license", 1), str2localid (attr, line + 6, 1));
 	  continue;
 	}
+      if (!strncmp(line, "=Loc:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  add_location (line + 6, s, last_found_pack);
+	  continue;
+	}
+      if (!strncmp(line, "=Src:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  add_source (line + 6, &pd, s, last_found_pack, 1);
+	  continue;
+	}
+      if (!strncmp(line, "=Siz:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  if (split (line + 6, sp, 3) == 2)
+	    {
+	      add_attr_int (attr, last_found_pack, str2id (pool, "downloadsize", 1), (atoi (sp[0]) + 1023) / 1024);
+	      add_attr_int (attr, last_found_pack, str2id (pool, "installsize", 1), (atoi (sp[1]) + 1023) / 1024);
+	    }
+	  continue;
+	}
+      if (!strncmp(line, "=Tim:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  unsigned int t = atoi (line + 6);
+	  if (t)
+	    add_attr_int (attr, last_found_pack, str2id (pool, "time", 1), t);
+	  continue;
+	}
       if (!strncmp(line, "=Kwd:", 5))
         {
 	  ensure_entry (attr, last_found_pack);
@@ -404,6 +574,31 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  add_attr_blob (attr, last_found_pack, str2id (pool, "description", 1), line + 6, strlen (line + 6) + 1);
 	  continue;
 	}
+      if (!strncmp(line, "=Eul:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_blob (attr, last_found_pack, str2id (pool, "eula", 1), line + 6, strlen (line + 6) + 1);
+	  continue;
+	}
+      if (!strncmp(line, "=Ins:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_blob (attr, last_found_pack, str2id (pool, "messageins", 1), line + 6, strlen (line + 6) + 1);
+	  continue;
+	}
+      if (!strncmp(line, "=Del:", 5))
+        {
+	  ensure_entry (attr, last_found_pack);
+	  add_attr_blob (attr, last_found_pack, str2id (pool, "messagedel", 1), line + 6, strlen (line + 6) + 1);
+	  continue;
+	}
+      if (!strncmp(line, "=Shr:", 5))
+        {
+	  /* XXX Not yet handled.  Two possibilities: either include all
+	     referenced data verbatim here, or write out the sharing
+	     information.  */
+	  continue;
+	}
       if (!strncmp(line, "=Ver:", 5))
 	{
 	  last_found_pack = 0;
@@ -416,6 +611,17 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   if (s)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
     
+  if (pd.sources)
+    {
+      int i;
+      for (i = 0; i < pd.nsources; i++)
+        if (pd.sources[i])
+	  {
+	    add_source (pd.sources[i], &pd, pool->solvables + repo->start + i, i, 0);
+	    free (pd.sources[i]);
+	  }
+      free (pd.sources);
+    }
   if (pd.tmp)
     free(pd.tmp);
   free(line);

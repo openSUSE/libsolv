@@ -135,6 +135,9 @@ ai_step (Attrstore *s, attr_iterator *ai)
   ai->attrs_next = ai->attrs;
   switch (ai->type)
     {
+    case TYPE_VOID:
+      /* No data.  */
+      break;
     case TYPE_ATTR_INT:
       {
 	int val;

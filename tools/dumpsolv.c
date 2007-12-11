@@ -68,6 +68,7 @@ dump_attrs_1 (Attrstore *s, unsigned int entry)
 	    break;
 	  }
 	default:
+	  fprintf (stdout, "\n");
 	  break;
 	}
     }

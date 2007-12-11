@@ -32,9 +32,6 @@
 
 /*#define DEBUG_PAGING*/
 
-#define NAME_WIDTH 12
-#define TYPE_WIDTH (16-NAME_WIDTH)
-
 #define BLOB_BLOCK 65535
 
 #define STRINGSPACE_BLOCK 1023
@@ -254,6 +251,14 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id)
     }
 }
 
+void
+add_attr_void (Attrstore *s, unsigned int entry, Id name)
+{
+  LongNV nv;
+  nv.key = add_key (s, name, TYPE_VOID, 0);
+  add_attr (s, entry, nv);
+}
+
 #define pool_debug(a,b,...) fprintf (stderr, __VA_ARGS__)
 
 static Id read_id (FILE *fp, Id max);
@@ -267,6 +272,9 @@ add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, 
   //fprintf (stderr, "%s: attribute in a repo SOLV?\n", id2str (pool, name));
   switch (type)
     {
+      case TYPE_VOID:
+        add_attr_void (s, entry, name);
+	break;
       case TYPE_ATTR_CHUNK:
 	{
 	  unsigned ofs = read_id (fp, 0);
@@ -632,6 +640,8 @@ attr_store_pack (Attrstore *s)
       for (ofs = 0; ofs < num_attrs; ofs++)
 	switch (s->keys[nv[ofs].key].type)
 	  {
+	    case TYPE_VOID:
+	      break;
 	    case TYPE_ATTR_INT:
 	      {
 	        unsigned int i = nv[ofs].v.i[0];
@@ -734,6 +744,9 @@ attr_store_unpack (Attrstore *s)
         {
 	  switch (ai.type)
 	    {
+	    case TYPE_VOID:
+	      add_attr_void (s, i, ai.name);
+	      break;
 	    case TYPE_ATTR_INT:
 	      add_attr_int (s, i, ai.name, ai.as_int); 
 	      break;

@@ -37,6 +37,7 @@ void add_attr_blob (Attrstore *s, unsigned int entry, Id name, const void *ptr, 
 void add_attr_string (Attrstore *s, unsigned int entry, Id name, const char *val);
 void add_attr_intlist_int (Attrstore *s, unsigned int entry, Id name, int val);
 void add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id);
+void add_attr_void (Attrstore *s, unsigned int entry, Id name);
 
 const void * attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int len);
 
