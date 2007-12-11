@@ -303,6 +303,74 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
   write_id(fp, old);
 }
 
+static inline void
+write_id_value(FILE *fp, Id id, Id value, int eof)
+{
+  if (id >= 64)
+    id = (id & 63) | ((id & ~63) << 1);
+  write_id(fp, id | 64);
+  if (value >= 64)
+    value = (value & 63) | ((value & ~63) << 1);
+  write_id(fp, value | (eof ? 0 : 64));
+}
+
+struct schemata {
+  int nschemata;
+  Id *schemadata, *schemadatap;
+  int schemadatafree;
+
+  Id lastschema[256];
+  Id lastschemakey[256];
+};
+
+static Id
+addschema(struct schemata *schemata, Id *schema)
+{
+  int h, len;
+  Id *sp, schemaid;
+
+  for (sp = schema, len = 0, h = 0; *sp; len++)
+    h = h * 7 + *sp++;
+  h &= 255;
+  len++;
+  if (schemata->lastschema[h] && !memcmp(schemata->schemadata + schemata->lastschema[h], schema, len * sizeof(Id)))
+    return schemata->lastschemakey[h];
+
+  schemaid = 0;
+  for (sp = schemata->schemadata + 1; sp < schemata->schemadatap; )
+    {
+      if (!memcmp(sp, schemata->schemadatap, len * sizeof(Id)))
+	return schemaid;
+      while (*sp++)
+	;
+      schemaid++;
+    }
+
+  /* a new one */
+  if (len > schemata->schemadatafree)
+    {
+      int l = schemata->schemadatap - schemata->schemadata;
+      schemata->schemadata = xrealloc(schemata->schemadata, (schemata->schemadatap - schemata->schemadata + len + 256) * sizeof(Id));
+      schemata->schemadatafree = len + 256;
+      schemata->schemadatap = schemata->schemadata + l;
+      if (l == 0)
+	{
+	  /* leave first one free so that our lastschema test works */
+	  *schemata->schemadatap++ = 0;
+	  schemata->schemadatafree--;
+	}
+    }
+  if (schemaid != schemata->nschemata)
+    abort();
+  schemata->lastschema[h] = schemata->schemadatap - schemata->schemadata;
+  schemata->lastschemakey[h] = schemaid;
+  memcpy(schemata->schemadatap, schema, len * sizeof(Id));
+  schemata->schemadatafree -= len;
+  schemata->schemadatap += len;
+  schemata->nschemata++;
+  return schemaid;
+}
+
 /*
  * Repo
  */
@@ -314,7 +382,7 @@ repo_write(Repo *repo, FILE *fp)
   int i, n;
   Solvable *s;
   NeedId *needid;
-  int nstrings, nrels, nkeys, nschemata;
+  int nstrings, nrels, nkeys;
   unsigned int sizeid;
   unsigned int solv_flags;
   Reldep *ran;
@@ -324,13 +392,10 @@ repo_write(Repo *repo, FILE *fp)
   int id2key[ID_NUM_INTERNAL];
   int nsolvables;
 
-  Id *schemadata, *schemadatap, *schema, *sp;
-  Id schemaid;
-  int schemadatalen;
+  Id schema[ID_NUM_INTERNAL], *sp;
+  struct schemata schemata;
   Id *solvschema;	/* schema of our solvables */
   Id repodataschema, repodataschema_internal;
-  Id lastschema[256];
-  Id lastschemakey[256];
 
   nsolvables = 0;
   idarraydata = repo->idarraydata;
@@ -447,109 +512,66 @@ repo_write(Repo *repo, FILE *fp)
       id2key[i] = nkeys++;
 
   /* find the schemata we need */
+  memset(&schemata, 0, sizeof(schemata));
   solvschema = xcalloc(repo->nsolvables, sizeof(Id));
 
-  memset(lastschema, 0, sizeof(lastschema));
-  memset(lastschemakey, 0, sizeof(lastschemakey));
-  schemadata = xmalloc(256 * sizeof(Id));
-  schemadatalen = 256;
-  schemadatap = schemadata;
-  *schemadatap++ = 0;
-  schemadatalen--;
-  nschemata = 0;
   for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
     {
-      unsigned int h;
-      Id *sp;
-
       if (s->repo != repo)
 	continue;
-      if (schemadatalen < 32)
-	{
-	  int l = schemadatap - schemadata;
-          fprintf(stderr, "growing schemadata\n");
-	  schemadata = xrealloc(schemadata, (schemadatap - schemadata + 256) * sizeof(Id));
-	  schemadatalen = 256;
-	  schemadatap = schemadata + l;
-	}
-      schema = schemadatap;
-      *schema++ = SOLVABLE_NAME;
-      *schema++ = SOLVABLE_ARCH;
-      *schema++ = SOLVABLE_EVR;
+      sp = schema;
+      *sp++ = SOLVABLE_NAME;
+      *sp++ = SOLVABLE_ARCH;
+      *sp++ = SOLVABLE_EVR;
       if (s->vendor)
-        *schema++ = SOLVABLE_VENDOR;
+        *sp++ = SOLVABLE_VENDOR;
       if (s->provides)
-        *schema++ = SOLVABLE_PROVIDES;
+        *sp++ = SOLVABLE_PROVIDES;
       if (s->obsoletes)
-        *schema++ = SOLVABLE_OBSOLETES;
+        *sp++ = SOLVABLE_OBSOLETES;
       if (s->conflicts)
-        *schema++ = SOLVABLE_CONFLICTS;
+        *sp++ = SOLVABLE_CONFLICTS;
       if (s->requires)
-        *schema++ = SOLVABLE_REQUIRES;
+        *sp++ = SOLVABLE_REQUIRES;
       if (s->recommends)
-        *schema++ = SOLVABLE_RECOMMENDS;
+        *sp++ = SOLVABLE_RECOMMENDS;
       if (s->suggests)
-        *schema++ = SOLVABLE_SUGGESTS;
+        *sp++ = SOLVABLE_SUGGESTS;
       if (s->supplements)
-        *schema++ = SOLVABLE_SUPPLEMENTS;
+        *sp++ = SOLVABLE_SUPPLEMENTS;
       if (s->enhances)
-        *schema++ = SOLVABLE_ENHANCES;
+        *sp++ = SOLVABLE_ENHANCES;
       if (s->freshens)
-        *schema++ = SOLVABLE_FRESHENS;
+        *sp++ = SOLVABLE_FRESHENS;
       if (repo->rpmdbid)
-        *schema++ = RPM_RPMDBID;
-      *schema++ = 0;
-      for (sp = schemadatap, h = 0; *sp; )
-	h = h * 7 + *sp++;
-      h &= 255;
-      if (lastschema[h] && !memcmp(schemadata + lastschema[h], schemadatap, (schema - schemadatap) * sizeof(Id)))
-	{
-	  solvschema[n++] = lastschemakey[h];
-	  continue;
-	}
-      schemaid = 0;
-      for (sp = schemadata + 1; sp < schemadatap; )
-	{
-	  if (!memcmp(sp, schemadatap, (schema - schemadatap) * sizeof(Id)))
-	    break;
-	  while (*sp++)
-	    ;
-	  schemaid++;
-	}
-      if (sp >= schemadatap)
-	{
-	  if (schemaid != nschemata)
-	    abort();
-	  lastschema[h] = schemadatap - schemadata;
-	  lastschemakey[h] = schemaid;
-	  schemadatalen -= schema - schemadatap;
-	  schemadatap = schema;
-	  nschemata++;
-	}
-      solvschema[n++] = schemaid;
+        *sp++ = RPM_RPMDBID;
+      *sp = 0;
+      solvschema[n++] = addschema(&schemata, schema);
     }
 
   if (repodataschema)
     {
       /* add us a schema for our repodata */
-      repodataschema = nschemata++;
-      *schemadatap++ = REPODATA_EXTERNAL;
-      *schemadatap++ = REPODATA_KEYS;
-      *schemadatap++ = REPODATA_LOCATION;
-      *schemadatap++ = 0;
+      sp = schema;
+      *sp++ = REPODATA_EXTERNAL;
+      *sp++ = REPODATA_KEYS;
+      *sp++ = REPODATA_LOCATION;
+      *sp = 0;
+      repodataschema = addschema(&schemata, schema);
     }
   if (repodataschema_internal)
     {
-      /* add us a schema for our repodata */
-      repodataschema = nschemata++;
-      *schemadatap++ = REPODATA_EXTERNAL;
-      *schemadatap++ = REPODATA_KEYS;
-      *schemadatap++ = 0;
+      sp = schema;
+      *sp++ = REPODATA_EXTERNAL;
+      *sp++ = REPODATA_KEYS;
+      *sp = 0;
+      repodataschema_internal = addschema(&schemata, schema);
     }
 
   /* convert all schemas to local keys */
-  for (sp = schemadata; sp < schemadatap; sp++)
-    *sp = id2key[*sp];
+  if (schemata.nschemata)
+    for (sp = schemata.schemadata; sp < schemata.schemadatap; sp++)
+      *sp = id2key[*sp];
 
   /* write file header */
   write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
@@ -560,7 +582,7 @@ repo_write(Repo *repo, FILE *fp)
   write_u32(fp, nrels);
   write_u32(fp, nsolvables);
   write_u32(fp, nkeys);
-  write_u32(fp, nschemata);
+  write_u32(fp, schemata.nschemata);
   write_u32(fp, repo->nrepodata);  /* info blocks.  */
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
@@ -642,13 +664,18 @@ repo_write(Repo *repo, FILE *fp)
   /*
    * write schemata
    */
-  write_id(fp, schemadatap - schemadata - 1);
-  for (sp = schemadata + 1; sp < schemadatap; )
+  if (schemata.nschemata)
     {
-      write_idarray(fp, pool, 0, sp);
-      while (*sp++)
-	;
+      write_id(fp, schemata.schemadatap - schemata.schemadata - 1);
+      for (sp = schemata.schemadata + 1; sp < schemata.schemadatap; )
+	{
+	  write_idarray(fp, pool, 0, sp);
+	  while (*sp++)
+	    ;
+	}
     }
+  else
+    write_id(fp, 0);
 
   /*
    * write info block
@@ -664,15 +691,8 @@ repo_write(Repo *repo, FILE *fp)
       /* keys + location, write idarray */
       for (j = 0; j < repo->repodata[i].nkeys; j++)
         {
-	  /* this looks horrible, we need some function */
 	  Id id = needid[repo->repodata[i].keys[j].name].need;
-	  if (id >= 64)
-	    id = (id & 63) | ((id & ~63) << 1);
-	  write_id(fp, id | 0x40);
-	  id = repo->repodata[i].keys[j].type;
-	  if (id >= 64)
-	    id = (id & 63) | ((id & ~63) << 1);
-	  write_id(fp, id | (j < repo->repodata[i].nkeys - 1 ? 0x40: 0));
+	  write_id_value(fp, id, repo->repodata[i].keys[j].type, j == repo->repodata[i].nkeys - 1);
         }
       if (repo->repodata[i].location)
         write_str(fp, repo->repodata[i].location);
@@ -685,12 +705,12 @@ repo_write(Repo *repo, FILE *fp)
 
       for (i = 0; i < nsolvables; i++)
 	write_id(fp, solvschema[i]);
-      unsigned char *used = xmalloc(nschemata);
+      unsigned char *used = xmalloc(schemata.nschemata);
       for (id = SOLVABLE_NAME; id <= RPM_RPMDBID; id++)
 	{
 	  key = id2key[id];
 	  memset(used, 0, nschemata);
-	  for (sp = schemadata + 1, i = 0; sp < schemadatap; sp++)
+	  for (sp = schemata.schemadata + 1, i = 0; sp < schemata.schemadatap; sp++)
 	    {
 	      if (*sp == 0)
 		i++;
@@ -753,7 +773,7 @@ repo_write(Repo *repo, FILE *fp)
       xfree(used);
       xfree(needid);
       xfree(solvschema);
-      xfree(schemadata);
+      xfree(schemata.schemadata);
       return;
     }
   
@@ -797,7 +817,7 @@ repo_write(Repo *repo, FILE *fp)
 
   xfree(needid);
   xfree(solvschema);
-  xfree(schemadata);
+  xfree(schemata.schemadata);
 }
 
 // EOF
