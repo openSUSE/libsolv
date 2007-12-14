@@ -865,6 +865,10 @@ repo_add_solv(Repo *repo, FILE *fp)
   /* read solvables */
   s = pool_id2solvable(pool, repo_add_solvable_block(repo, numsolv));
 
+  /* store start and end of our id block */
+  data.start = s - pool->solvables;
+  data.end = data.start + numsolv;
+
   if ((solvflags & SOLV_FLAG_VERTICAL) != 0)
     {
       Id *solvschema = xcalloc(numsolv, sizeof(Id));
