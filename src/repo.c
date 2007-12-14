@@ -445,111 +445,175 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
   return supplements;
 }
 
-#if 0
 void
 repodata_search(Repodata *data, Id key)
 {
 }
 
-const char *
-repodata_lookup_id(Repodata *data, Id num, Id key)
+unsigned char *
+data_read_id(unsigned char *dp, Id *idp)
 {
-  Id id, k, *kp, *keyp;
+  Id x = 0;
+  unsigned char c;
+  for (;;)
+    {
+      c = *dp++;
+      if (!(c & 0x80))
+	{
+	  *idp = (x << 7) ^ c;
+          return dp;
+	}
+      x = (x << 7) ^ c ^ 128;
+    }
+}
 
-  fseek(data->fp, data->itemoffsets[num] , SEEK_SET);
-  Id *keyp = data->schemadata + data->schemata[read_id(data->fp, data->numschemata)];
-  /* make sure our schema contains the key */
-  for (kp = keyp; (k = *kp++) != 0)
+unsigned char *
+data_skip(unsigned char *dp, int type)
+{
+  switch (type)
+    {
+    case TYPE_VOID:
+      return dp;
+    case TYPE_ID:
+      while ((*dp & 0x80) != 0)
+	dp++;
+      return dp;
+    case TYPE_IDARRAY:
+    case TYPE_REL_IDARRAY:
+    case TYPE_IDVALUEARRAY:
+    case TYPE_IDVALUEVALUEARRAY:
+      while ((*dp & 0xc0) != 0)
+	dp++;
+      return dp;
+    default:
+      fprintf(stderr, "unknown type in data_skip\n");
+      exit(1);
+    }
+}
+
+const char *
+repodata_lookup_str(Repodata *data, Id entry, Id key)
+{
+  Id schema;
+  Id id, k, *kp, *keyp;
+  unsigned char *dp;
+
+  if (data->entryschemau8)
+    schema = data->entryschemau8[entry];
+  else
+    schema = data->entryschema[entry];
+  keyp = data->schemadata + schema;
+  /* make sure the schema of this solvable contains the key */
+  for (kp = keyp; (k = *kp++) != 0; )
     if (k == key)
       break;
   if (k == 0)
     return 0;
-  /* get it */
-  while ((k = *keyp++) != 0)
+  switch (data->keys[key].storage)
     {
-      if (k == key)
-	break;
-      switch (keys[key].type)
+    case KEY_STORAGE_VERTICAL_OFFSET:
+    case KEY_STORAGE_INCORE:
+      dp = data->incoredata + data->incoreoffset[entry];
+      while ((k = *keyp++) != 0)
 	{
-	case TYPE_ID:
-	  while ((read_u8(data->fp) & 0x80) != 0)
-	    ;
-	  break;
-	case TYPE_U32:
-	  read_u32(data->fp);
-	  break;
-	case TYPE_STR:
-	  while(read_u8(data->fp) != 0)
-	    ;
-	  break;
-	case TYPE_IDARRAY:
-	  while ((read_u8(data->fp) & 0xc0) != 0)
-	    ;
-	  break;
+	  if (k == key)
+	    break;
+	  if (data->keys[k].storage == KEY_STORAGE_VERTICAL_OFFSET)
+	    {
+	      /* skip that offset */
+	      dp = data_skip(dp, TYPE_ID);
+	      continue;
+	    }
+	  if (data->keys[k].storage != KEY_STORAGE_INCORE)
+	    continue;
+	  dp = data_skip(dp, data->keys[k].type);
 	}
+      if (data->keys[key].storage == KEY_STORAGE_VERTICAL_OFFSET)
+	{
+	  int i, oi, max;
+	  if (!data->fp)
+	    return 0;
+	  dp = data_read_id(dp, &id);
+	  max = data->keys[key].size - id;
+	  if (max <= 0)
+	    return 0;
+          /* we now have the offset, go into vertical */
+	  for (i = 1; i < key; i++)
+	    if (data->keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
+	      id += data->keys[i].size;
+	  if (fseek(data->fp, data->verticaloffset + id, SEEK_SET))
+	    return 0;
+	  i = max > 256 ? 256 : max;
+	  for (oi = 0;; oi = i, i += 256)
+	    {
+	      if (i > max)
+		i = max;
+	      if (i == oi)
+		return 0;
+	      if (i > data->strbuflen)
+		{
+		  data->strbuf = xrealloc(data->strbuf, i);
+		  data->strbuflen = i;
+		}
+	      if (fread(data->strbuf + oi, i - oi, 1, data->fp) != 1)
+		return 0;
+	      if (memchr(data->strbuf + oi, 0, i - oi))
+		return data->strbuf;
+	    }
+	}
+      if (data->keys[key].type == TYPE_STR)
+	return (const char *)dp;
+      /* id type, must either use global or local string strore*/
+      dp = data_read_id(dp, &id);
+#if 0
+      /* not yet working */
+      return data->ss.stringspace + data->ss.strings[id];
+#else
+      return id2str(data->repo->pool, id);
+#endif
     }
-  id = read_id(data->fp, 0);
-  return data->ss.stringspace + data->ss.strings[id];
+  return 0;
 }
 
-Id
-repo_lookup_id(Solvable *s, Id key)
+const char *
+repo_lookup_str(Solvable *s, Id key)
 {
-  Solvable *rs;
   Repo *repo = s->repo;
+  Pool *pool = repo->pool;
   Repodata *data;
   int i, j, n;
 
   switch(key)
     {
     case SOLVABLE_NAME:
-      return s->name;
+      return id2str(pool, s->name);
     case SOLVABLE_ARCH:
-      return s->arch;
+      return id2str(pool, s->arch);
     case SOLVABLE_EVR:
-      return s->evr;
+      return id2str(pool, s->evr);
     case SOLVABLE_VENDOR:
-      return s->vendor;
+      return id2str(pool, s->vendor);
     }
-  /* convert solvable id into repo item count */
-  if (repo->end - repo->start + 1 == repo->nsolvables)
-    {
-      n = (s - pool->solvables);
-      if (n < repo->start || n > repo->end)
-	return 0;
-      n -= repo->start;
-    }
-  else
-    {
-      for (i = repo->start, rs = pool->solvables + i, n = 0; i < repo->end; i++, rs++)
-	{
-	  if (rs->repo != repo)
-	    continue;
-	  if (rs == s)
-	    break;
-	  n++;
-	}
-      if (i == repo->end)
-	return 0;
-    }
+  n = s - pool->solvables;
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      for (j = 0; j < data->nkeys; j++)
+      if (n < data->start || n >= data->end)
+	continue;
+      for (j = 1; j < data->nkeys; j++)
 	{
-	  if (data->keys[j].name == key && data->keys[j].type == TYPE_ID)
-	    return repodata_lookup_id(data, n, j);
+	  if (data->keys[j].name == key && (data->keys[j].type == TYPE_ID || data->keys[j].type == TYPE_STR))
+	    return repodata_lookup_str(data, n - data->start, j);
 	}
     }
   return 0;
 }
-#endif
+
 
 static int
 key_cmp (const void *pa, const void *pb)
 {
-  struct key { Id name; unsigned type; };
-  struct key *a = (struct key*)pa;
-  struct key *b = (struct key*)pb;
+  Repokey *a = (Repokey *)pa;
+  Repokey *b = (Repokey *)pb;
   return a->name - b->name;
 }
 
@@ -577,17 +641,16 @@ repo_add_attrstore (Repo *repo, Attrstore *s, const char *location)
   memset (data, 0, sizeof (*data));
   data->s = s;
   data->nkeys = s->nkeys;
-  /* Don't store the first key, it's {0,0,0}.  */
-  data->nkeys--;
   if (data->nkeys)
     {
-      data->keys = xmalloc (data->nkeys * sizeof (data->keys[0]));
-      for (i = 0; i < data->nkeys; i++)
+      data->keys = xmalloc(data->nkeys * sizeof(data->keys[0]));
+      for (i = 1; i < data->nkeys; i++)
         {
-          data->keys[i].name = s->keys[i + 1].name;
-	  data->keys[i].type = s->keys[i + 1].type;
+          data->keys[i].name = s->keys[i].name;
+	  data->keys[i].type = s->keys[i].type;
 	}
-      qsort (data->keys, data->nkeys, sizeof (data->keys[0]), key_cmp);
+      if (data->nkeys > 2)
+        qsort(data->keys + 1, data->nkeys - 1, sizeof(data->keys[0]), key_cmp);
     }
   if (location)
     data->location = strdup(location);

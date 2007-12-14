@@ -17,18 +17,55 @@
 #include "pool.h"
 #include "attr_store.h"
 
+typedef struct _Repokey {
+  Id name;
+  Id type;
+  Id size;
+  Id storage;
+} Repokey;
+
+#define KEY_STORAGE_DROPPED             0
+#define KEY_STORAGE_SOLVABLE		1
+#define KEY_STORAGE_INCORE		2
+#define KEY_STORAGE_VERTICAL_OFFSET	3
+
+struct _Repo;
+
 typedef struct _Repodata {
+  struct _Repo *repo;		/* back pointer to repo */
+
+  int start;			/* start of solvables this repodata is valid for */
+  int end;			/* last solvable + 1 of this repodata */
+
   /* Keys provided by this attribute store, sorted by name value.
      The same keys may be provided by multiple attribute stores, but
      then only for different solvables.  I.e. the relation
        (solvable,name) -> store
      has to be injective.  */
-  struct {
-    Id name;
-    unsigned type;
-  } *keys;
-  /* Length of keys array */
-  unsigned nkeys;
+
+  Repokey *keys;		/* keys, first entry is always zero */
+  unsigned int nkeys;		/* length of keys array */
+
+  Id *schemata;			/* schema -> offset into schemadata */
+  unsigned int nschemata;	/* number of schemata */
+
+  Id *schemadata;		/* schema storage */
+
+  unsigned char *entryschemau8;	/* schema for entry */
+  Id *entryschema;		/* schema for entry */
+
+  unsigned char *incoredata;	/* in-core data */
+  unsigned int incoredatalen;	/* data len */
+  unsigned int incoredatafree;	/* data len */
+
+  Id *incoreoffset;		/* offset for all entries */
+
+  FILE *fp;			/* for paged access */
+  Id verticaloffset;		/* offset of verticals */
+
+  char *strbuf;
+  int strbuflen;
+
 
   /* The attribute store itself.  */
   Attrstore *s;
@@ -42,9 +79,11 @@ typedef struct _Repodata {
   unsigned char checksum[20];
 } Repodata;
 
+
 typedef struct _Repo {
   const char *name;
   struct _Pool *pool;		/* pool containing repo data */
+
   int start;			/* start of this repo solvables within pool->solvables */
   int end;			/* last solvable + 1 of this repo */
   int nsolvables;		/* number of solvables repo is contributing to pool */

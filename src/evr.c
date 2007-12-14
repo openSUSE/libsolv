@@ -98,6 +98,16 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode)
     ;
   for (s2 = evr2; *s2 >= '0' && *s2 <= '9'; s2++)
     ;
+  if (mode == EVRCMP_MATCH && (*evr1 == ':' || *evr2 == ':'))
+    {
+      /* empty epoch, skip epoch check */
+      if (*s1 == ':')
+	evr1 = s1 + 1;
+      if (*s2 == ':')
+	evr2 = s2 + 1;
+      s1 = evr1;
+      s2 = evr2;
+    }
   if (s1 == evr1 || *s1 != ':')
     s1 = 0;
   if (s2 == evr2 || *s2 != ':')
