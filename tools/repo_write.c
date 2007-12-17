@@ -371,6 +371,7 @@ addschema(struct schemata *schemata, Id *schema)
   return schemaid;
 }
 
+
 /*
  * Repo
  */
@@ -421,6 +422,11 @@ repo_write(Repo *repo, FILE *fp)
       idsizes[REPODATA_KEYS] += 2 * repo->repodata[i].nkeys;
     }
 
+  idsizes[SOLVABLE_NAME] = 1;
+  idsizes[SOLVABLE_ARCH] = 1;
+  idsizes[SOLVABLE_EVR] = 1;
+  if (repo->rpmdbid)
+    idsizes[RPM_RPMDBID] = 1;
   for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
     {
       if (s->repo != repo)
@@ -455,12 +461,6 @@ repo_write(Repo *repo, FILE *fp)
     }
   if (nsolvables != repo->nsolvables)
     abort();
-
-  idsizes[SOLVABLE_NAME] = 1;
-  idsizes[SOLVABLE_ARCH] = 1;
-  idsizes[SOLVABLE_EVR] = 1;
-  if (repo->rpmdbid)
-    idsizes[RPM_RPMDBID] = 1;
 
   for (i = SOLVABLE_NAME; i < ID_NUM_INTERNAL; i++)
     {
@@ -697,87 +697,6 @@ repo_write(Repo *repo, FILE *fp)
       if (repo->repodata[i].location)
         write_str(fp, repo->repodata[i].location);
     }
-
-#if 0
-  if (1)
-    {
-      Id id, key;
-
-      for (i = 0; i < nsolvables; i++)
-	write_id(fp, solvschema[i]);
-      unsigned char *used = xmalloc(schemata.nschemata);
-      for (id = SOLVABLE_NAME; id <= RPM_RPMDBID; id++)
-	{
-	  key = id2key[id];
-	  memset(used, 0, nschemata);
-	  for (sp = schemata.schemadata + 1, i = 0; sp < schemata.schemadatap; sp++)
-	    {
-	      if (*sp == 0)
-		i++;
-	      else if (*sp == key)
-		used[i] = 1;
-	    }
-	  for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
-	    {
-	      if (s->repo != repo)
-		continue;
-	      if (!used[solvschema[n++]])
-		continue;
-	      switch(id)
-		{
-		case SOLVABLE_NAME:
-		  write_id(fp, needid[s->name].need);
-		  break;
-		case SOLVABLE_ARCH:
-		  write_id(fp, needid[s->arch].need);
-		  break;
-		case SOLVABLE_EVR:
-		  write_id(fp, needid[s->evr].need);
-		  break;
-		case SOLVABLE_VENDOR:
-		  write_id(fp, needid[s->vendor].need);
-		  break;
-		case RPM_RPMDBID:
-		  write_u32(fp, repo->rpmdbid[i - repo->start]);
-		  break;
-		case SOLVABLE_PROVIDES:
-		  write_idarray(fp, pool, needid, idarraydata + s->provides);
-		  break;
-		case SOLVABLE_OBSOLETES:
-		  write_idarray(fp, pool, needid, idarraydata + s->obsoletes);
-		  break;
-		case SOLVABLE_CONFLICTS:
-		  write_idarray(fp, pool, needid, idarraydata + s->conflicts);
-		  break;
-		case SOLVABLE_REQUIRES:
-		  write_idarray(fp, pool, needid, idarraydata + s->requires);
-		  break;
-		case SOLVABLE_RECOMMENDS:
-		  write_idarray(fp, pool, needid, idarraydata + s->recommends);
-		  break;
-		case SOLVABLE_SUPPLEMENTS:
-		  write_idarray(fp, pool, needid, idarraydata + s->supplements);
-		  break;
-		case SOLVABLE_SUGGESTS:
-		  write_idarray(fp, pool, needid, idarraydata + s->suggests);
-		  break;
-		case SOLVABLE_ENHANCES:
-		  write_idarray(fp, pool, needid, idarraydata + s->enhances);
-		  break;
-		case SOLVABLE_FRESHENS:
-		  write_idarray(fp, pool, needid, idarraydata + s->freshens);
-		  break;
-		}
-	    }
-	}
-      xfree(used);
-      xfree(needid);
-      xfree(solvschema);
-      xfree(schemata.schemadata);
-      return;
-    }
-  
-#endif
 
   /*
    * write Solvables

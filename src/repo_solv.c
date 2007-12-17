@@ -184,7 +184,7 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 }
 
 static void
-read_str (FILE *fp, char **inbuf, unsigned *len)
+read_str(FILE *fp, char **inbuf, unsigned *len)
 {
   unsigned char *buf = (unsigned char*)*inbuf;
   if (!buf)
@@ -331,7 +331,7 @@ parse_repodata (FILE *fp, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, un
 		  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
 		  exit (1);
 		}
-	      data->keys[i].name = idmap[*ide++];
+	      data->keys[i].name = idmap ? idmap[*ide++] : *ide++;
 	      data->keys[i].type = *ide++;
 	      data->keys[i].size = 0;
 	      data->keys[i].storage = 0;
@@ -749,7 +749,10 @@ repo_add_solv(Repo *repo, FILE *fp)
   /* keys start at 1 */
   for (i = 1; i < numkeys; i++)
     {
-      keys[i].name = id = idmap[read_id(fp, numid)];
+      id = read_id(fp, numid);
+      if (idmap)
+	id = idmap[id];
+      keys[i].name = id;
       keys[i].type = read_id(fp, 0);
       keys[i].size = read_id(fp, 0);
       keys[i].storage = KEY_STORAGE_DROPPED;
@@ -869,126 +872,6 @@ repo_add_solv(Repo *repo, FILE *fp)
   data.start = s - pool->solvables;
   data.end = data.start + numsolv;
 
-  if ((solvflags & SOLV_FLAG_VERTICAL) != 0)
-    {
-      Id *solvschema = xcalloc(numsolv, sizeof(Id));
-      unsigned char *used = xmalloc(numschemata);
-      Solvable *sstart = s;
-      Id type;
-
-/* XXX BROKEN CODE */
-
-      for (i = 0; i < numsolv; i++)
-	solvschema[i] = read_id(fp, numschemata);
-      for (key = 1; key < numkeys; key++)
-	{
-	  id = keys[key].name;
-	  type = keys[key].type;
-	  memset(used, 0, numschemata);
-	  for (i = 0; i < numschemata; i++)
-	    {
-	      Id *keyp = schemadata + schemata[i];
-	      while (*keyp)
-		if (*keyp++ == key)
-		  {
-		    used[i] = 1;
-		    break;
-		  }
-	    }
-	  for (i = 0, s = sstart; i < numsolv; i++, s++)
-	     {
-	      if (!used[solvschema[i]])
-		continue;
-	      switch (type)
-		{
-		case TYPE_ID:
-		  did = idmap[read_id(fp, numid + numrel)];
-		  if (id == SOLVABLE_NAME)
-		    s->name = did;
-		  else if (id == SOLVABLE_ARCH)
-		    s->arch = did;
-		  else if (id == SOLVABLE_EVR)
-		    s->evr = did;
-		  else if (id == SOLVABLE_VENDOR)
-		    s->vendor = did;
-		  else
-		    incore_add_id(&data, did);
-		  break;
-		case TYPE_U32:
-		  h = read_u32(fp);
-		  if (id == RPM_RPMDBID)
-		    {
-		      if (!repo->rpmdbid)
-			repo->rpmdbid = (Id *)xcalloc(numsolv, sizeof(Id));
-		      repo->rpmdbid[i] = h;
-		    }
-		  else
-		    {
-		      incore_add_u32(&data, h);
-		    }
-		  break;
-		case TYPE_STR:
-		  while(read_u8(fp) != 0)
-		    ;
-		  break;
-		case TYPE_IDARRAY:
-		case TYPE_REL_IDARRAY:
-		  if (id < INTERESTED_START || id > INTERESTED_END)
-		    {
-		      /* not interested in array */
-		      while ((read_u8(fp) & 0xc0) != 0)
-			;
-		      break;
-		    }
-		  ido = idarraydatap - repo->idarraydata;
-		  idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend, type == TYPE_REL_IDARRAY);
-		  if (id == SOLVABLE_PROVIDES)
-		    s->provides = ido;
-		  else if (id == SOLVABLE_OBSOLETES)
-		    s->obsoletes = ido;
-		  else if (id == SOLVABLE_CONFLICTS)
-		    s->conflicts = ido;
-		  else if (id == SOLVABLE_REQUIRES)
-		    s->requires = ido;
-		  else if (id == SOLVABLE_RECOMMENDS)
-		    s->recommends= ido;
-		  else if (id == SOLVABLE_SUPPLEMENTS)
-		    s->supplements = ido;
-		  else if (id == SOLVABLE_SUGGESTS)
-		    s->suggests = ido;
-		  else if (id == SOLVABLE_ENHANCES)
-		    s->enhances = ido;
-		  else if (id == SOLVABLE_FRESHENS)
-		    s->freshens = ido;
-		  break;
-		case TYPE_VOID:
-		  break;
-#if 0
-		case TYPE_ATTR_INT:
-		case TYPE_ATTR_CHUNK:
-		case TYPE_ATTR_STRING:
-		case TYPE_ATTR_INTLIST:
-		case TYPE_ATTR_LOCALIDS:
-		  if (!embedded_store)
-		    embedded_store = new_store (pool);
-		  add_attr_from_file (embedded_store, i, id, type, idmap, numid, fp);
-		  break;
-#endif
-		default:
-		  abort();
-		}
-	    }
-	}
-      xfree(used);
-      xfree(solvschema);
-      xfree(idmap);
-      xfree(schemata);
-      xfree(schemadata);
-      xfree(keys);
-      mypool = 0;
-      return;
-    }
-
   for (i = 0; i < numsolv; i++, s++)
     {
       if (exists && !exists[i])
@@ -1000,7 +883,9 @@ repo_add_solv(Repo *repo, FILE *fp)
 	  switch (keys[key].type)
 	    {
 	    case TYPE_ID:
-	      did = idmap[read_id(fp, numid + numrel)];
+	      did = read_id(fp, numid + numrel);
+	      if (idmap)
+		did = idmap[did];
 	      if (id == SOLVABLE_NAME)
 		s->name = did;
 	      else if (id == SOLVABLE_ARCH)
@@ -1048,32 +933,41 @@ repo_add_solv(Repo *repo, FILE *fp)
 		{
 		  if (keys[key].storage == KEY_STORAGE_INCORE)
 		    {
-		      Id old = 0, rel = keys[key].type == TYPE_REL_IDARRAY ? SOLVABLE_PREREQMARKER : 0;
-		      do
+		      if (idmap)
 			{
-			  did = read_id(fp, 0);
-			  h = did & 0x40;
-			  did = (did & 0x3f) | ((did >> 1) & ~0x3f);
-			  if (rel)
+			  Id old = 0, rel = keys[key].type == TYPE_REL_IDARRAY ? SOLVABLE_PREREQMARKER : 0;
+			  do
 			    {
-			      if (did == 0)
+			      did = read_id(fp, 0);
+			      h = did & 0x40;
+			      did = (did & 0x3f) | ((did >> 1) & ~0x3f);
+			      if (rel)
 				{
-				  did = rel;
-				  old = 0;
+				  if (did == 0)
+				    {
+				      did = rel;
+				      old = 0;
+				    }
+				  else
+				    {
+				      did += old;
+				      old = did;
+				    }
 				}
-			      else
-				{
-				  did += old;
-				  old = did;
-				}
+			      if (did >= numid + numrel)
+				abort();
+			      did = idmap[did];
+			      did = ((did & ~0x3f) << 1) | h;
+			      incore_add_id(&data, did);
 			    }
-			  if (did >= numid + numrel)
-			    abort();
-			  did = idmap[did];
-			  did = ((did & ~0x3f) << 1) | h;
-			  incore_add_id(&data, did);
+			  while (h);
 			}
-		      while (h);
+		      else
+			{
+			  while (((h = read_u8(fp)) & 0xc0) != 0)
+			    incore_add_u8(&data, h);
+			  break;
+			}
 		    }
 		  else
 		    {
@@ -1081,6 +975,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 			;
 		      break;
 		    }
+		  break;
 		}
 	      ido = idarraydatap - repo->idarraydata;
 	      idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend, keys[key].type == TYPE_REL_IDARRAY);

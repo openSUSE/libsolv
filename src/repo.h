@@ -54,11 +54,11 @@ typedef struct _Repodata {
   unsigned char *entryschemau8;	/* schema for entry */
   Id *entryschema;		/* schema for entry */
 
-  unsigned char *incoredata;	/* in-core data */
-  unsigned int incoredatalen;	/* data len */
-  unsigned int incoredatafree;	/* data len */
+  unsigned char *incoredata;	/* in-core data (flat_attrs) */
+  unsigned int incoredatalen;	/* data len (attr_next_free) */
+  unsigned int incoredatafree;	/* free data len */
 
-  Id *incoreoffset;		/* offset for all entries */
+  Id *incoreoffset;		/* offset for all entries (ent2attr) */
 
   FILE *fp;			/* for paged access */
   Id verticaloffset;		/* offset of verticals */
