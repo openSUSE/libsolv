@@ -30,6 +30,13 @@
 #define INTERESTED_START	SOLVABLE_NAME
 #define INTERESTED_END		SOLVABLE_FRESHENS
 
+#define SOLV_ERROR_NOT_SOLV	1
+#define SOLV_ERROR_UNSUPPORTED	2
+#define SOLV_ERROR_EOF		3
+#define SOLV_ERROR_ID_RANGE	4
+#define SOLV_ERROR_OVERFLOW	5
+#define SOLV_ERROR_CORRUPT	6
+
 static Pool *mypool;		/* for pool_debug... */
 
 /*-----------------------------------------------------------------*/
@@ -40,18 +47,21 @@ static Pool *mypool;		/* for pool_debug... */
  */
 
 static unsigned int
-read_u32(FILE *fp)
+read_u32(Repodata *data)
 {
   int c, i;
   unsigned int x = 0;
 
+  if (data->error)
+    return 0;
   for (i = 0; i < 4; i++)
     {
-      c = getc(fp);
+      c = getc(data->fp);
       if (c == EOF)
 	{
-	  pool_debug(mypool, SAT_FATAL, "unexpected EOF\n");
-	  exit(1);
+	  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+	  data->error = SOLV_ERROR_EOF;
+	  return 0;
 	}
       x = (x << 8) | c;
     }
@@ -64,14 +74,18 @@ read_u32(FILE *fp)
  */
 
 static unsigned int
-read_u8(FILE *fp)
+read_u8(Repodata *data)
 {
   int c;
-  c = getc(fp);
+
+  if (data->error)
+    return 0;
+  c = getc(data->fp);
   if (c == EOF)
     {
-      pool_debug(mypool, SAT_FATAL, "unexpected EOF\n");
-      exit(1);
+      pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+      data->error = SOLV_ERROR_EOF;
+      return 0;
     }
   return c;
 }
@@ -82,33 +96,38 @@ read_u8(FILE *fp)
  */
 
 static Id
-read_id(FILE *fp, Id max)
+read_id(Repodata *data, Id max)
 {
   unsigned int x = 0;
   int c, i;
 
+  if (data->error)
+    return 0;
   for (i = 0; i < 5; i++)
     {
-      c = getc(fp);
+      c = getc(data->fp);
       if (c == EOF)
 	{
-          pool_debug(mypool, SAT_FATAL, "unexpected EOF\n");
-	  exit(1);
+          pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+	  data->error = SOLV_ERROR_EOF;
+	  return 0;
 	}
       if (!(c & 128))
 	{
 	  x = (x << 7) | c;
 	  if (max && x >= max)
 	    {
-              pool_debug(mypool, SAT_FATAL, "read_id: id too large (%u/%u)\n", x, max);
-	      exit(1);
+              pool_debug(mypool, SAT_ERROR, "read_id: id too large (%u/%u)\n", x, max);
+	      data->error = SOLV_ERROR_ID_RANGE;
+	      return 0;
 	    }
 	  return x;
 	}
       x = (x << 7) ^ c ^ 128;
     }
-  pool_debug(mypool, SAT_FATAL, "read_id: id too long\n");
-  exit(1);
+  pool_debug(mypool, SAT_ERROR, "read_id: id too long\n");
+  data->error = SOLV_ERROR_CORRUPT;
+  return 0;
 }
 
 
@@ -117,18 +136,22 @@ read_id(FILE *fp, Id max)
  */
 
 static Id *
-read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
+read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end, int relative)
 {
   unsigned int x = 0;
   int c;
   Id old = 0;
+
+  if (data->error)
+    return 0;
   for (;;)
     {
-      c = getc(fp);
+      c = getc(data->fp);
       if (c == EOF)
 	{
-	  pool_debug(mypool, SAT_FATAL, "unexpected EOF\n");
-	  exit(1);
+	  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+	  data->error = SOLV_ERROR_EOF;
+	  return 0;
 	}
       if ((c & 128) == 0)
 	{
@@ -140,8 +163,9 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 		  /* prereq hack */
 		  if (store == end)
 		    {
-		      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
-		      exit(1);
+		      pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
+		      data->error = SOLV_ERROR_OVERFLOW;
+		      return 0;
 		    }
 		  *store++ = SOLVABLE_PREREQMARKER;
 		  old = 0;
@@ -153,15 +177,16 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 	    }
 	  if (max && x >= max)
 	    {
-	      pool_debug(mypool, SAT_FATAL, "read_idarray: id too large (%u/%u)\n", x, max);
-	      exit(1);
+	      pool_debug(mypool, SAT_ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
+	      data->error = SOLV_ERROR_ID_RANGE;
+	      return 0;
 	    }
 	  if (map)
 	    x = map[x];
 	  if (store == end)
 	    {
-	      pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
-	      exit(1);
+	      pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
+	      return 0;
 	    }
 	  *store++ = x;
 	  if ((c & 64) == 0)
@@ -170,8 +195,9 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 		return store;
 	      if (store == end)
 		{
-		  pool_debug(mypool, SAT_FATAL, "read_idarray: array overflow\n");
-		  exit(1);
+		  pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
+		  data->error = SOLV_ERROR_OVERFLOW;
+		  return 0;
 		}
 	      *store++ = 0;
 	      return store;
@@ -184,7 +210,7 @@ read_idarray(FILE *fp, Id max, Id *map, Id *store, Id *end, int relative)
 }
 
 static void
-read_str(FILE *fp, char **inbuf, unsigned *len)
+read_str(Repodata *data, char **inbuf, unsigned *len)
 {
   unsigned char *buf = (unsigned char*)*inbuf;
   if (!buf)
@@ -194,12 +220,13 @@ read_str(FILE *fp, char **inbuf, unsigned *len)
     }
   int c;
   unsigned ofs = 0;
-  while((c = getc (fp)) != 0)
+  while((c = getc(data->fp)) != 0)
     {
       if (c == EOF)
         {
-	  pool_debug (mypool, SAT_FATAL, "unexpected EOF\n");
-	  exit (1);
+	  pool_debug (mypool, SAT_ERROR, "unexpected EOF\n");
+	  data->error = SOLV_ERROR_EOF;
+	  return;
         }
       /* Plus 1 as we also want to add the 0.  */
       if (ofs + 1 >= *len)
@@ -208,11 +235,11 @@ read_str(FILE *fp, char **inbuf, unsigned *len)
 	  /* Don't realloc on the inbuf, it might be on the stack.  */
 	  if (buf == (unsigned char*)*inbuf)
 	    {
-	      buf = xmalloc (*len);
-	      memcpy (buf, *inbuf, *len - 256);
+	      buf = xmalloc(*len);
+	      memcpy(buf, *inbuf, *len - 256);
 	    }
 	  else
-	    buf = xrealloc (buf, *len);
+	    buf = xrealloc(buf, *len);
         }
       buf[ofs++] = c;
     }
@@ -221,63 +248,64 @@ read_str(FILE *fp, char **inbuf, unsigned *len)
 }
 
 static void
-skip_item (FILE *fp, unsigned type, unsigned numid, unsigned numrel)
+skip_item (Repodata *data, unsigned type, unsigned numid, unsigned numrel)
 {
   switch (type)
     {
       case TYPE_VOID:
 	break;
       case TYPE_ID:
-	read_id(fp, numid + numrel);   /* just check Id */
+	read_id(data, numid + numrel);   /* just check Id */
 	break;
       case TYPE_U32:
-	read_u32(fp);
+	read_u32(data);
 	break;
       case TYPE_ATTR_STRING:
       case TYPE_STR:
-	while(read_u8(fp) != 0)
+	while(read_u8(data) != 0)
 	  ;
 	break;
       case TYPE_IDARRAY:
       case TYPE_IDVALUEARRAY:
       case TYPE_IDVALUEVALUEARRAY:
       case TYPE_REL_IDARRAY:
-	while ((read_u8(fp) & 0xc0) != 0)
+	while ((read_u8(data) & 0xc0) != 0)
 	  ;
 	break;
       case TYPE_COUNT_NAMED:
 	{
-	  unsigned count = read_id (fp, 0);
+	  unsigned count = read_id(data, 0);
 	  while (count--)
 	    {
-	      read_id (fp, numid);    /* Name */
-	      unsigned t = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
-	      skip_item (fp, t, numid, numrel);
+	      read_id(data, numid);    /* Name */
+	      unsigned t = read_id(data, TYPE_ATTR_TYPE_MAX + 1);
+	      skip_item(data, t, numid, numrel);
 	    }
 	}
 	break;
       case TYPE_COUNTED:
         {
-	  unsigned count = read_id (fp, 0);
-	  unsigned t = read_id (fp, TYPE_ATTR_TYPE_MAX + 1);
+	  unsigned count = read_id(data, 0);
+	  unsigned t = read_id(data, TYPE_ATTR_TYPE_MAX + 1);
 	  while (count--)
-	    skip_item (fp, t, numid, numrel);
+	    skip_item(data, t, numid, numrel);
 	}
         break;
       case TYPE_ATTR_CHUNK:
-	read_id(fp, 0);
+	read_id(data, 0);
 	/* Fallthrough.  */
       case TYPE_ATTR_INT:
-	read_id(fp, 0);
+	read_id(data, 0);
 	break;
       case TYPE_ATTR_INTLIST:
       case TYPE_ATTR_LOCALIDS:
-	while (read_id(fp, 0) != 0)
+	while (read_id(data, 0) != 0)
 	  ;
 	break;
       default:
-	pool_debug(mypool, SAT_FATAL, "unknown type %d\n", type);
-	exit(1);
+	pool_debug(mypool, SAT_ERROR, "unknown type %d\n", type);
+        data->error = SOLV_ERROR_CORRUPT;
+	break;
     }
 }
 
@@ -290,7 +318,7 @@ key_cmp (const void *pa, const void *pb)
 }
 
 static void
-parse_repodata (FILE *fp, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, unsigned numrel, Repo *repo)
+parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, unsigned numrel, Repo *repo)
 {
   Id key, id;
   Id *ida, *ide;
@@ -310,16 +338,16 @@ parse_repodata (FILE *fp, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, un
 	case TYPE_IDVALUEARRAY:
 	  if (id != REPODATA_KEYS)
 	    {
-	      skip_item(fp, TYPE_IDVALUEARRAY, numid, numrel);
+	      skip_item(maindata, TYPE_IDVALUEARRAY, numid, numrel);
 	      break;
 	    }
 	  ida = xcalloc(keys[key].size, sizeof(Id));
-	  ide = read_idarray(fp, 0, 0, ida, ida + keys[key].size, 0);
+	  ide = read_idarray(maindata, 0, 0, ida, ida + keys[key].size, 0);
 	  n = ide - ida - 1;
 	  if (n & 1)
 	    {
-	      pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
-	      exit (1);
+	      data->error = SOLV_ERROR_CORRUPT;
+	      return;
 	    }
 	  data->nkeys = 1 + (n >> 1);
 	  data->keys = xmalloc2(data->nkeys, sizeof(data->keys[0]));
@@ -328,8 +356,9 @@ parse_repodata (FILE *fp, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, un
 	    {
 	      if (*ide >= numid)
 		{
-		  pool_debug (mypool, SAT_FATAL, "invalid attribute data\n");
-		  exit (1);
+		  data->error = SOLV_ERROR_CORRUPT;
+		  pool_debug (mypool, SAT_ERROR, "invalid attribute data\n");
+		  return;
 		}
 	      data->keys[i].name = idmap ? idmap[*ide++] : *ide++;
 	      data->keys[i].type = *ide++;
@@ -342,20 +371,20 @@ parse_repodata (FILE *fp, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, un
 	  break;
 	case TYPE_STR:
 	  if (id != REPODATA_LOCATION)
-	    skip_item(fp, TYPE_STR, numid, numrel);
+	    skip_item(maindata, TYPE_STR, numid, numrel);
 	  else
 	    {
 	      char buf[1024];
 	      unsigned len = sizeof (buf);
 	      char *filename = buf;
-	      read_str(fp, &filename, &len);
+	      read_str(maindata, &filename, &len);
 	      data->location = strdup(filename);
 	      if (filename != buf)
 		free(filename);
 	    }
 	  break;
 	default:
-	  skip_item(fp, keys[key].type, numid, numrel);
+	  skip_item(maindata, keys[key].type, numid, numrel);
 	  break;
 	}
     }
@@ -365,11 +394,11 @@ parse_repodata (FILE *fp, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, un
 
 
 static void
-skip_schema(FILE *fp, Id *keyp, Repokey *keys, unsigned int numid, unsigned int numrel)
+skip_schema(Repodata *data, Id *keyp, Repokey *keys, unsigned int numid, unsigned int numrel)
 {
   Id key;
   while ((key = *keyp++) != 0)
-    skip_item(fp, keys[key].type, numid, numrel);
+    skip_item(data, keys[key].type, numid, numrel);
 }
 
 /*-----------------------------------------------------------------*/
@@ -444,7 +473,7 @@ incore_add_u8(Repodata *data, unsigned int x)
  *  and add it to pool
  */
 
-void
+int
 repo_add_solv(Repo *repo, FILE *fp)
 {
   Pool *pool = repo->pool;
@@ -479,14 +508,18 @@ repo_add_solv(Repo *repo, FILE *fp)
 
   Repodata data;
 
+  memset(&data, 0, sizeof(data));
+  data.repo = repo;
+  data.fp = fp;
+
   mypool = pool;
 
-  if (read_u32(fp) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
+  if (read_u32(&data) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
     {
-      pool_debug(pool, SAT_FATAL, "not a SOLV file\n");
-      exit(1);
+      pool_debug(pool, SAT_ERROR, "not a SOLV file\n");
+      return SOLV_ERROR_NOT_SOLV;
     }
-  solvversion = read_u32(fp);
+  solvversion = read_u32(&data);
   switch (solvversion)
     {
       case SOLV_VERSION_1:
@@ -494,33 +527,30 @@ repo_add_solv(Repo *repo, FILE *fp)
       case SOLV_VERSION_3:
         break;
       default:
-        pool_debug(pool, SAT_FATAL, "unsupported SOLV version\n");
-        exit(1);
+        pool_debug(pool, SAT_ERROR, "unsupported SOLV version\n");
+        return SOLV_ERROR_UNSUPPORTED;
     }
 
   pool_freeidhashes(pool);
 
-  numid = read_u32(fp);
-  numrel = read_u32(fp);
-  numsolv = read_u32(fp);
-  numkeys = read_u32(fp);
-  numschemata = read_u32(fp);
-  numinfo = read_u32(fp);
-  solvflags = read_u32(fp);
-
-  memset(&data, 0, sizeof(data));
-  data.repo = repo;
+  numid = read_u32(&data);
+  numrel = read_u32(&data);
+  numsolv = read_u32(&data);
+  numkeys = read_u32(&data);
+  numschemata = read_u32(&data);
+  numinfo = read_u32(&data);
+  solvflags = read_u32(&data);
 
   if (solvversion < SOLV_VERSION_3
       && numinfo)
     {
-      pool_debug(pool, SAT_FATAL, "unsupported SOLV format (has info)\n");
-      exit(1);
+      pool_debug(pool, SAT_ERROR, "unsupported SOLV format (has info)\n");
+      return SOLV_ERROR_UNSUPPORTED;
     }
 
   /*******  Part 1: string IDs  *****************************************/
 
-  sizeid = read_u32(fp);	       /* size of string+Id space */
+  sizeid = read_u32(&data);	       /* size of string+Id space */
 
   /*
    * read strings and Ids
@@ -533,19 +563,16 @@ repo_add_solv(Repo *repo, FILE *fp)
    */
 
   /* alloc string buffer */
-  strsp = (char *)xrealloc(pool->ss.stringspace, pool->ss.sstrings + sizeid + 1);
+  pool->ss.stringspace = xrealloc(pool->ss.stringspace, pool->ss.sstrings + sizeid + 1);
   /* alloc string offsets (Id -> Offset into string space) */
-  str = (Offset *)xrealloc(pool->ss.strings, (pool->ss.nstrings + numid) * sizeof(Offset));
+  pool->ss.strings = xrealloc2(pool->ss.strings, pool->ss.nstrings + numid, sizeof(Offset));
 
-  pool->ss.stringspace = strsp;
-  pool->ss.strings = str;		       /* array of offsets into strsp, indexed by Id */
+  strsp = pool->ss.stringspace;
+  str = pool->ss.strings;		       /* array of offsets into strsp, indexed by Id */
 
   /* point to _BEHIND_ already allocated string/Id space */
   strsp += pool->ss.sstrings;
 
-  /* alloc id map for name and rel Ids. this maps ids in the solv files
-   * to the ids in our pool */
-  idmap = (Id *)xcalloc(numid + numrel, sizeof(Id));
 
   /*
    * read new repo at end of pool
@@ -555,37 +582,43 @@ repo_add_solv(Repo *repo, FILE *fp)
     {
       if (fread(strsp, sizeid, 1, fp) != 1)
 	{
-	  pool_debug(pool, SAT_FATAL, "read error while reading strings\n");
-	  exit(1);
+	  pool_debug(pool, SAT_ERROR, "read error while reading strings\n");
+	  return SOLV_ERROR_EOF;
 	}
     }
   else
     {
-      unsigned int pfsize = read_u32 (fp);
-      char *prefix = xmalloc (pfsize);
+      unsigned int pfsize = read_u32(&data);
+      char *prefix = xmalloc(pfsize);
       char *pp = prefix;
       char *old_str = "";
       char *dest = strsp;
-      if (fread (prefix, pfsize, 1, fp) != 1)
+      if (fread(prefix, pfsize, 1, fp) != 1)
         {
-	  pool_debug(pool, SAT_FATAL, "read error while reading strings\n");
-	  exit(1);
+	  pool_debug(pool, SAT_ERROR, "read error while reading strings\n");
+	  xfree(prefix);
+	  return SOLV_ERROR_EOF;
 	}
       for (i = 1; i < numid; i++)
         {
 	  int same = (unsigned char)*pp++;
 	  size_t len = strlen (pp) + 1;
 	  if (same)
-	    memcpy (dest, old_str, same);
-	  memcpy (dest + same, pp, len);
+	    memcpy(dest, old_str, same);
+	  memcpy(dest + same, pp, len);
 	  pp += len;
 	  old_str = dest;
 	  dest += same + len;
 	}
-      xfree (prefix);
+      xfree(prefix);
     }
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
+
+
+  /* alloc id map for name and rel Ids. this maps ids in the solv files
+   * to the ids in our pool */
+  idmap = (Id *)xcalloc(numid + numrel, sizeof(Id));
 
   /*
    * build hashes for all read strings
@@ -600,15 +633,10 @@ repo_add_solv(Repo *repo, FILE *fp)
 #endif
 
   /*
-   * ensure sufficient hash size
+   * create hashtable with strings already in pool
    */
-  
-  hashtbl = (Id *)xcalloc(hashmask + 1, sizeof(Id));
 
-  /*
-   * fill hashtable with strings already in pool
-   */
-  
+  hashtbl = (Id *)xcalloc(hashmask + 1, sizeof(Id));
   for (i = 1; i < pool->ss.nstrings; i++)  /* leave out our dummy zero id */
     {
       h = strhash(pool->ss.stringspace + pool->ss.strings[i]) & hashmask;
@@ -628,8 +656,10 @@ repo_add_solv(Repo *repo, FILE *fp)
     {
       if (sp >= strsp + sizeid)
 	{
-	  pool_debug(pool, SAT_FATAL, "not enough strings\n");
-	  exit(1);
+	  xfree(hashtbl);
+	  xfree(idmap);
+	  pool_debug(pool, SAT_ERROR, "not enough strings\n");
+	  return SOLV_ERROR_OVERFLOW;
 	}
       if (!*sp)			       /* empty string */
 	{
@@ -679,13 +709,8 @@ repo_add_solv(Repo *repo, FILE *fp)
   if (numrel)
     {
       /* extend rels */
-      ran = (Reldep *)xrealloc(pool->rels, (pool->nrels + numrel) * sizeof(Reldep));
-      if (!ran)
-	{
-	  pool_debug(pool, SAT_FATAL, "no mem for rel space\n");
-	  exit(1);
-	}
-      pool->rels = ran;	       /* extended rel space */
+      pool->rels = xrealloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
+      ran = pool->rels;
 
       hashmask = mkmask(pool->nrels + numrel);
 #if 0
@@ -696,7 +721,7 @@ repo_add_solv(Repo *repo, FILE *fp)
        * prep hash table with already existing RelDeps
        */
       
-      hashtbl = (Id *)xcalloc(hashmask + 1, sizeof(Id));
+      hashtbl = xcalloc(hashmask + 1, sizeof(Id));
       for (i = 1; i < pool->nrels; i++)
 	{
 	  h = relhash(ran[i].name, ran[i].evr, ran[i].flags) & hashmask;
@@ -712,9 +737,9 @@ repo_add_solv(Repo *repo, FILE *fp)
       
       for (i = 0; i < numrel; i++)
 	{
-	  name = read_id(fp, i + numid);	/* read (repo relative) Ids */
-	  evr = read_id(fp, i + numid);
-	  flags = read_u8(fp);
+	  name = read_id(&data, i + numid);	/* read (repo relative) Ids */
+	  evr = read_id(&data, i + numid);
+	  flags = read_u8(&data);
 	  name = idmap[name];		/* map to (pool relative) Ids */
 	  evr = idmap[evr];
 	  h = relhash(name, evr, flags) & hashmask;
@@ -749,12 +774,12 @@ repo_add_solv(Repo *repo, FILE *fp)
   /* keys start at 1 */
   for (i = 1; i < numkeys; i++)
     {
-      id = read_id(fp, numid);
+      id = read_id(&data, numid);
       if (idmap)
 	id = idmap[id];
       keys[i].name = id;
-      keys[i].type = read_id(fp, 0);
-      keys[i].size = read_id(fp, 0);
+      keys[i].type = read_id(&data, 0);
+      keys[i].size = read_id(&data, 0);
       keys[i].storage = KEY_STORAGE_DROPPED;
       switch (keys[i].type)
 	{
@@ -798,7 +823,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 
   /*******  Part 4: Schemata ********************************************/
   
-  id = read_id(fp, 0);
+  id = read_id(&data, 0);
   schemadata = xcalloc(id, sizeof(Id));
   schemadatap = schemadata;
   schemadataend = schemadata + id;
@@ -806,7 +831,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   for (i = 0; i < numschemata; i++)
     {
       schemata[i] = schemadatap - schemadata;
-      schemadatap = read_idarray(fp, numid, 0, schemadatap, schemadataend, 0);
+      schemadatap = read_idarray(&data, numid, 0, schemadatap, schemadataend, 0);
     }
   data.schemata = schemata;
   data.nschemata = numschemata;
@@ -818,15 +843,15 @@ repo_add_solv(Repo *repo, FILE *fp)
       /* for now we're just interested in data that starts with
        * the repodata_external id
        */
-      Id *keyp = schemadata + schemata[read_id(fp, numschemata)];
+      Id *keyp = schemadata + schemata[read_id(&data, numschemata)];
       key = *keyp;
       if (keys[key].name == REPODATA_EXTERNAL && keys[key].type == TYPE_VOID)
 	{
 	  /* external data for some ids */
-	  parse_repodata(fp, keyp, keys, idmap, numid, numrel, repo);
+	  parse_repodata(&data, keyp, keys, idmap, numid, numrel, repo);
 	}
       else
-	skip_schema(fp, keyp, keys, numid, numrel);
+	skip_schema(&data, keyp, keys, numid, numrel);
     }
 
   /*******  Part 6: packed sizes (optional)  ****************************/
@@ -835,7 +860,7 @@ repo_add_solv(Repo *repo, FILE *fp)
     {
       exists = xmalloc (numsolv);
       for (i = 0; i < numsolv; i++)
-	exists[i] = read_id(fp, 0) != 0;
+	exists[i] = read_id(&data, 0) != 0;
     }
 
   /*******  Part 7: item data *******************************************/
@@ -856,7 +881,7 @@ repo_add_solv(Repo *repo, FILE *fp)
       repo_reserve_ids(repo, 0, size_idarray);
       idarraydatap = repo->idarraydata + repo->idarraysize;
       repo->idarraysize += size_idarray;
-      idarraydataend = repo->idarraydata + repo->idarraysize;
+      idarraydataend = idarraydatap + size_idarray;
       repo->lastoff = 0;
     }
   else
@@ -874,16 +899,18 @@ repo_add_solv(Repo *repo, FILE *fp)
 
   for (i = 0; i < numsolv; i++, s++)
     {
+      if (data.error)
+	break;
       if (exists && !exists[i])
         continue;
-      Id *keyp = schemadata + schemata[read_id(fp, numschemata)];
+      Id *keyp = schemadata + schemata[read_id(&data, numschemata)];
       while ((key = *keyp++) != 0)
 	{
 	  id = keys[key].name;
 	  switch (keys[key].type)
 	    {
 	    case TYPE_ID:
-	      did = read_id(fp, numid + numrel);
+	      did = read_id(&data, numid + numrel);
 	      if (idmap)
 		did = idmap[did];
 	      if (id == SOLVABLE_NAME)
@@ -901,7 +928,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 #endif
 	      break;
 	    case TYPE_U32:
-	      h = read_u32(fp);
+	      h = read_u32(&data);
 #if 0
 	      POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %u\n", id2str(pool, id), h);
 #endif
@@ -917,13 +944,13 @@ repo_add_solv(Repo *repo, FILE *fp)
 	    case TYPE_STR:
               if (keys[key].storage == KEY_STORAGE_INCORE)
 		{
-		  while ((h = read_u8(fp)) != 0)
+		  while ((h = read_u8(&data)) != 0)
 		    incore_add_u8(&data, h);
 		  incore_add_u8(&data, 0);
 		}
 	      else
 		{
-		  while (read_u8(fp) != 0)
+		  while (read_u8(&data) != 0)
 		    ;
 		}
 	      break;
@@ -938,7 +965,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 			  Id old = 0, rel = keys[key].type == TYPE_REL_IDARRAY ? SOLVABLE_PREREQMARKER : 0;
 			  do
 			    {
-			      did = read_id(fp, 0);
+			      did = read_id(&data, 0);
 			      h = did & 0x40;
 			      did = (did & 0x3f) | ((did >> 1) & ~0x3f);
 			      if (rel)
@@ -964,21 +991,21 @@ repo_add_solv(Repo *repo, FILE *fp)
 			}
 		      else
 			{
-			  while (((h = read_u8(fp)) & 0xc0) != 0)
+			  while (((h = read_u8(&data)) & 0xc0) != 0)
 			    incore_add_u8(&data, h);
 			  break;
 			}
 		    }
 		  else
 		    {
-		      while ((read_u8(fp) & 0xc0) != 0)
+		      while ((read_u8(&data) & 0xc0) != 0)
 			;
 		      break;
 		    }
 		  break;
 		}
 	      ido = idarraydatap - repo->idarraydata;
-	      idarraydatap = read_idarray(fp, numid + numrel, idmap, idarraydatap, idarraydataend, keys[key].type == TYPE_REL_IDARRAY);
+	      idarraydatap = read_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend, keys[key].type == TYPE_REL_IDARRAY);
 	      if (id == SOLVABLE_PROVIDES)
 		s->provides = ido;
 	      else if (id == SOLVABLE_OBSOLETES)
@@ -1013,13 +1040,24 @@ repo_add_solv(Repo *repo, FILE *fp)
 	    case TYPE_ATTR_LOCALIDS:
 	      if (!embedded_store)
 		embedded_store = new_store (pool);
-	      add_attr_from_file (embedded_store, i, id, keys[key].type, idmap, numid, fp);
+	      add_attr_from_file (embedded_store, i, id, keys[key].type, idmap, numid, &data);
 	      break;
 #endif
 	    default:
-	      skip_item(fp, keys[key].type, numid, numrel);
+	      skip_item(&data, keys[key].type, numid, numrel);
 	    }
 	}
+    }
+
+  if (data.error)
+    {
+      /* free solvables */
+      repo_free_solvable_block(repo, data.start, data.end - data.start, 1);
+      /* free id array */
+      repo->idarraysize -= size_idarray;
+      /* free incore data */
+      data.incoredata = xfree(data.incoredata);
+      data.incoredatalen = data.incoredatafree = 0;
     }
 
   if (data.incoredatafree)
@@ -1032,11 +1070,15 @@ repo_add_solv(Repo *repo, FILE *fp)
   for (i = 1; i < numkeys; i++)
     if (keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
       break;
-  if (i < numkeys)
+  if (i < numkeys && !data.error)
     {
       /* we have vertical data, make it available */
-      data.fp = fp;
       data.verticaloffset = ftell(fp);
+    }
+  else
+    {
+      /* no longer needed */
+      data.fp = 0;
     }
 
   if (data.incoredatalen || data.fp)
@@ -1065,6 +1107,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 #endif
   xfree(idmap);
   mypool = 0;
+  return data.error;
 }
 
 // EOF

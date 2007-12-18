@@ -37,6 +37,9 @@ typedef struct _Repodata {
   int start;			/* start of solvables this repodata is valid for */
   int end;			/* last solvable + 1 of this repodata */
 
+  FILE *fp;			/* file pointer of solv file */
+  int error;			/* corrupt solv file */
+
   /* Keys provided by this attribute store, sorted by name value.
      The same keys may be provided by multiple attribute stores, but
      then only for different solvables.  I.e. the relation
@@ -60,11 +63,9 @@ typedef struct _Repodata {
 
   Id *incoreoffset;		/* offset for all entries (ent2attr) */
 
-  FILE *fp;			/* for paged access */
-  Id verticaloffset;		/* offset of verticals */
-
-  char *strbuf;
-  int strbuflen;
+  Id verticaloffset;		/* file offset of verticals */
+  char *strbuf;			/* just for testing */
+  int strbuflen;		/* just for testing */
 
 
   /* The attribute store itself.  */
