@@ -159,7 +159,7 @@ add_location (char *line, Solvable *s, unsigned entry)
     {
       /* medianr filename dir
          don't optimize this one */
-      add_attr_int (attr, entry, str2id (pool, "medianr", 1), atoi (sp[0]));
+      add_attr_special_int (attr, entry, str2id (pool, "medianr", 1), atoi (sp[0]));
       add_attr_localids_id (attr, entry, str2id (pool, "mediadir", 1), str2localid (attr, sp[2], 1));
       add_attr_string (attr, entry, str2id (pool, "mediafile", 1), sp[1]);
       return;
@@ -190,12 +190,12 @@ add_location (char *line, Solvable *s, unsigned entry)
 	  break;
       if (*n2 || strcmp (n1, ".rpm"))
         goto nontrivial;
-      add_attr_int (attr, entry, str2id (pool, "medianr", 1), medianr);
+      add_attr_special_int (attr, entry, str2id (pool, "medianr", 1), medianr);
       add_attr_void (attr, entry, str2id (pool, "mediafile", 1));
       return;
 
 nontrivial:
-      add_attr_int (attr, entry, str2id (pool, "medianr", 1), medianr);
+      add_attr_special_int (attr, entry, str2id (pool, "medianr", 1), medianr);
       add_attr_string (attr, entry, str2id (pool, "mediafile", 1), sp[1]);
       return;
     }

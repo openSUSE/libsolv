@@ -185,6 +185,7 @@ ai_step (Attrstore *s, attr_iterator *ai)
 	break;
       }
     default:
+      /* ??? Convert TYPE_ATTR_SPECIAL_* to _INT type with the right value? */
       break;
     }
   return 1;

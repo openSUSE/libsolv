@@ -71,6 +71,9 @@ dump_attrs (Attrstore *s, unsigned int entry)
 	    break;
 	  }
 	default:
+	  if (ai.type >= TYPE_ATTR_SPECIAL_START
+	      && ai.type <= TYPE_ATTR_SPECIAL_END)
+	    fprintf (stdout, "spec %d", ai.type - TYPE_ATTR_SPECIAL_START);
 	  fprintf (stdout, "\n");
 	  break;
 	}

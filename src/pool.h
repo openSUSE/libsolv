@@ -142,10 +142,18 @@ struct _Pool {
 
 #define TYPE_COUNT_NAMED	11
 #define TYPE_COUNTED		12
-#define TYPE_ATTR_TYPE_MAX	12
 
 #define TYPE_IDVALUEARRAY	13
 #define TYPE_IDVALUEVALUEARRAY	14
+
+/* The special types are usable to encode one-valued attributes, they have
+   no associated data.  This is useful to encode values which many solvables
+   have in common, and whose overall set is relatively limited.  A prime
+   example would be the media number.  Be warned: careless use of this
+   leads to combinatoric explosion of number of schemas.  */
+#define TYPE_ATTR_SPECIAL_START	15
+#define TYPE_ATTR_SPECIAL_END	(TYPE_ATTR_SPECIAL_START + 31)
+#define TYPE_ATTR_TYPE_MAX	TYPE_ATTR_SPECIAL_END
 
 //-----------------------------------------------
 

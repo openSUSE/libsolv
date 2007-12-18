@@ -154,6 +154,19 @@ add_attr_int (Attrstore *s, unsigned int entry, Id name, unsigned int val)
   add_attr (s, entry, nv);
 }
 
+void
+add_attr_special_int (Attrstore *s, unsigned int entry, Id name, unsigned int val)
+{
+  if (val > (TYPE_ATTR_SPECIAL_END - TYPE_ATTR_SPECIAL_START))
+    add_attr_int (s, entry, name, val);
+  else
+    {
+      LongNV nv;
+      nv.key = add_key (s, name, TYPE_ATTR_SPECIAL_START + val, 0);
+      add_attr (s, entry, nv);
+    }
+}
+
 static void
 add_attr_chunk (Attrstore *s, unsigned int entry, Id name, unsigned int ofs, unsigned int len)
 {
@@ -342,6 +355,11 @@ add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, 
 	}
 	break;
       default:
+        if (type >= TYPE_ATTR_SPECIAL_START && type <= TYPE_ATTR_SPECIAL_END)
+	  {
+	    add_attr_special_int (s, entry, name, type - TYPE_ATTR_SPECIAL_START);
+	    break;
+	  }
 	pool_debug(pool, SAT_FATAL, "unknown type %d\n", type);
 	exit(0);
     }
@@ -781,6 +799,9 @@ attr_store_unpack (Attrstore *s)
 	        break;
 	      }
 	    default:
+	      if (ai.type >= TYPE_ATTR_SPECIAL_START
+	          && ai.type <= TYPE_ATTR_SPECIAL_END)
+		add_attr_special_int (s, i, ai.name, ai.type - TYPE_ATTR_SPECIAL_START);
 	      break;
 	    }
 	}
