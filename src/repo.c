@@ -527,7 +527,10 @@ get_data(Repodata *data, Repokey *key, unsigned char **dpp)
   if (!dp)
     return 0;
   if (key->storage == KEY_STORAGE_INCORE)
-    return dp;
+    {
+      *dpp = data_skip(dp, key->type);
+      return dp;
+    }
   if (key->storage != KEY_STORAGE_VERTICAL_OFFSET)
     return 0;
   if (!data->fp)
@@ -616,6 +619,10 @@ repodata_lookup_str(Repodata *data, Id entry, Id key)
 #endif
 }
 
+#define SEARCH_NEXT_KEY		1
+#define SEARCH_NEXT_SOLVABLE	2
+#define SEACH_STOP		3
+
 struct matchdata
 {
   Pool *pool;
@@ -633,7 +640,7 @@ static void
 domatch(Id p, Id key, struct matchdata *md, const char *str)
 {
   /* fill match code here */
-  md->callback(md->callback_data, md->pool->solvables + p, key, str);
+  md->stop = md->callback(md->callback_data, md->pool->solvables + p, key, str);
 }
 
 static void
@@ -664,6 +671,7 @@ repodata_search(Repodata *data, Id entry, Id key, struct matchdata *md)
       keyp = kp - 1;
       onekey = 1;
     }
+  md->stop = 0;
   while ((key = *keyp++) != 0)
     {
       ddp = get_data(data, data->keys + key, &dp);
@@ -686,14 +694,23 @@ repodata_search(Repodata *data, Id entry, Id key, struct matchdata *md)
 		ddp = 0;
 	      id = (id & 0x3f) | ((id >> 1) & ~0x3f);
 	      /* domatch */
+	      while (md->stop == SEARCH_NEXT_KEY && ddp)
+		ddp = data_read_id(ddp, &id);
 	      break;
 	    default:
 	      ddp = 0;
 	    }
 	}
-      if (onekey || md->stop)
+      if (onekey || md->stop > SEARCH_NEXT_KEY)
 	return;
     }
+}
+
+static void
+domatch_idarray(Id p, Id key, struct matchdata *md, Id *ida)
+{
+  for (; *ida && !md->stop; ida++)
+    domatch(p, key, md, id2str(md->pool, *ida));
 }
 
 static void
@@ -704,27 +721,98 @@ repo_search_md(Repo *repo, Id p, Id key, struct matchdata *md)
   Solvable *s;
   int i;
 
+  md->stop = 0;
   if (!p)
     {
       for (p = repo->start, s = repo->pool->solvables + p; p < repo->end; p++, s++)
-	if (s->repo == repo)
-          repo_search_md(repo, p, key, md);
+	{
+	  if (s->repo == repo)
+            repo_search_md(repo, p, key, md);
+	  if (md->stop > SEARCH_NEXT_SOLVABLE)
+	    break;
+	}
       return;
     }
   s = pool->solvables + p;
-  if ((!key || key == SOLVABLE_NAME) && s->name)
-    domatch(p, SOLVABLE_NAME, md, id2str(pool, s->name));
-  if ((!key || key == SOLVABLE_ARCH) && s->arch)
-    domatch(p, SOLVABLE_ARCH, md, id2str(pool, s->arch));
-  if ((!key || key == SOLVABLE_EVR) && s->evr)
-    domatch(p, SOLVABLE_EVR, md, id2str(pool, s->evr));
-  if ((!key || key == SOLVABLE_VENDOR) && s->vendor)
-    domatch(p, SOLVABLE_VENDOR, md, id2str(pool, s->vendor));
+  switch(key)
+    {
+      case 0:
+      case SOLVABLE_NAME:
+	if (s->name)
+	  domatch(p, SOLVABLE_NAME, md, id2str(pool, s->name));
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_ARCH:
+	if (s->arch)
+	  domatch(p, SOLVABLE_ARCH, md, id2str(pool, s->arch));
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_EVR:
+	if (s->evr)
+	  domatch(p, SOLVABLE_EVR, md, id2str(pool, s->evr));
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_VENDOR:
+	if (s->vendor)
+	  domatch(p, SOLVABLE_VENDOR, md, id2str(pool, s->vendor));
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_PROVIDES:
+        if (s->provides)
+	  domatch_idarray(p, SOLVABLE_PROVIDES, md, repo->idarraydata + s->provides);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_OBSOLETES:
+        if (s->obsoletes)
+	  domatch_idarray(p, SOLVABLE_OBSOLETES, md, repo->idarraydata + s->obsoletes);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_CONFLICTS:
+        if (s->obsoletes)
+	  domatch_idarray(p, SOLVABLE_CONFLICTS, md, repo->idarraydata + s->conflicts);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_REQUIRES:
+        if (s->requires)
+	  domatch_idarray(p, SOLVABLE_REQUIRES, md, repo->idarraydata + s->requires);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_RECOMMENDS:
+        if (s->recommends)
+	  domatch_idarray(p, SOLVABLE_RECOMMENDS, md, repo->idarraydata + s->recommends);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_SUPPLEMENTS:
+        if (s->supplements)
+	  domatch_idarray(p, SOLVABLE_SUPPLEMENTS, md, repo->idarraydata + s->supplements);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_SUGGESTS:
+        if (s->suggests)
+	  domatch_idarray(p, SOLVABLE_SUGGESTS, md, repo->idarraydata + s->suggests);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_ENHANCES:
+        if (s->enhances)
+	  domatch_idarray(p, SOLVABLE_ENHANCES, md, repo->idarraydata + s->enhances);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      case SOLVABLE_FRESHENS:
+        if (s->freshens)
+	  domatch_idarray(p, SOLVABLE_FRESHENS, md, repo->idarraydata + s->freshens);
+	if (key || md->stop > SEARCH_NEXT_KEY)
+	  return;
+      default:
+	break;
+    }
+
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
       if (p < data->start || p >= data->end)
 	continue;
       repodata_search(data, p - data->start, key, md);
+      if (md->stop > SEARCH_NEXT_KEY)
+	break;
     }
 }
 
