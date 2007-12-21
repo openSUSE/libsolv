@@ -106,7 +106,7 @@ join(struct parsedata *pd, char *s1, char *s2, char *s3)
 }
 
 static unsigned int
-adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int isreq, char *kind)
+adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker, char *kind)
 {
   int i, flags;
   Id id, evrid;
@@ -135,7 +135,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
 	}
       id = rel2id(pool, id, evrid, flags + 1, 1);
     }
-  return repo_addid_dep(pd->repo, olddeps, id, isreq);
+  return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
 
 Attrstore *attr;
@@ -512,13 +512,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    s->provides = adddep(pool, &pd, s->provides, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'R', 'e', 'q'):
-	    s->requires = adddep(pool, &pd, s->requires, line, 1, pd.kind);
+	    s->requires = adddep(pool, &pd, s->requires, line, -SOLVABLE_PREREQMARKER, pd.kind);
 	    continue;
           case CTAG('=', 'P', 'r', 'q'):
 	    if (pd.kind)
 	      s->requires = adddep(pool, &pd, s->requires, line, 0, 0);
 	    else
-	      s->requires = adddep(pool, &pd, s->requires, line, 2, 0);
+	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0);
 	    continue;
 	  case CTAG('=', 'O', 'b', 's'):
 	    s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, pd.kind);

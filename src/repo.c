@@ -118,23 +118,27 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
 
 
 /*
- * add dependency (as Id) to repo
+ * add dependency (as Id) to repo, also unifies dependencies
  * olddeps = offset into idarraydata
- * isreq = 0 for normal dep
- * isreq = 1 for requires
- * isreq = 2 for pre-requires
+ * marker= 0 for normal dep
+ * marker > 0 add dep after marker
+ * marker < 0 add dep after -marker
  * 
  */
-
 Offset
-repo_addid_dep(Repo *repo, Offset olddeps, Id id, int isreq)
+repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker)
 {
-  Id oid, *oidp, *marker = 0;
+  Id oid, *oidp, *markerp;
+  int before;
 
   if (!olddeps)
-    return repo_addid(repo, olddeps, id);
+    {
+      if (marker > 0)
+	olddeps = repo_addid(repo, olddeps, marker);
+      return repo_addid(repo, olddeps, id);
+    }
 
-  if (!isreq)
+  if (!marker)
     {
       for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != ID_NULL; oidp++)
 	{
@@ -144,45 +148,55 @@ repo_addid_dep(Repo *repo, Offset olddeps, Id id, int isreq)
       return repo_addid(repo, olddeps, id);
     }
 
+  before = 0;
+  markerp = 0;
+  if (marker < 0)
+    {
+      before = 1;
+      marker = -marker;
+    }
   for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != ID_NULL; oidp++)
     {
-      if (oid == SOLVABLE_PREREQMARKER)
-	marker = oidp;
+      if (oid == marker)
+	markerp = oidp;
       else if (oid == id)
 	break;
     }
 
   if (oid)
     {
-      if (marker || isreq == 1)
+      if (markerp || before)
         return olddeps;
-      marker = oidp++;
+      /* we found it, but in the wrong half */
+      markerp = oidp++;
       for (; (oid = *oidp) != ID_NULL; oidp++)
-        if (oid == SOLVABLE_PREREQMARKER)
+        if (oid == marker)
           break;
       if (!oid)
         {
+	  /* no marker in array yet */
           oidp--;
-          if (marker < oidp)
-            memmove(marker, marker + 1, (oidp - marker) * sizeof(Id));
-          *oidp = SOLVABLE_PREREQMARKER;
+          if (markerp < oidp)
+            memmove(markerp, markerp + 1, (oidp - markerp) * sizeof(Id));
+          *oidp = marker;
           return repo_addid(repo, olddeps, id);
         }
       while (oidp[1])
         oidp++;
-      memmove(marker, marker + 1, (oidp - marker) * sizeof(Id));
+      memmove(markerp, markerp + 1, (oidp - markerp) * sizeof(Id));
       *oidp = id;
       return olddeps;
     }
-  if (isreq == 2 && !marker)
-    olddeps = repo_addid(repo, olddeps, SOLVABLE_PREREQMARKER);
-  else if (isreq == 1 && marker)
+  /* id not yet in array */
+  if (!before && !markerp)
+    olddeps = repo_addid(repo, olddeps, marker);
+  else if (before && markerp)
     {
-      *marker++ = id;
+      *markerp++ = id;
       id = *--oidp;
-      if (marker < oidp)
-        memmove(marker + 1, marker, (oidp - marker) * sizeof(Id));
-      *marker = SOLVABLE_PREREQMARKER;
+      if (markerp < oidp)
+        memmove(markerp + 1, markerp, (oidp - markerp) * sizeof(Id));
+      *markerp = marker;
     }
   return repo_addid(repo, olddeps, id);
 }

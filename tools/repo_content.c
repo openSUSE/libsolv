@@ -104,7 +104,7 @@ join(struct parsedata *pd, char *s1, char *s2, char *s3)
 }
 
 static unsigned int
-adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int isreq)
+adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker)
 {
   int flags, words;
   Id id, evrid;
@@ -152,7 +152,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
 	  if (words == 3)
 	    line = sp[2], words = 2;
 	}
-      olddeps = repo_addid_dep(pd->repo, olddeps, id, isreq);
+      olddeps = repo_addid_dep(pd->repo, olddeps, id, marker);
       if (!line)
         break;
     }
@@ -235,9 +235,9 @@ repo_add_content(Repo *repo, FILE *fp)
 	       arch.  We don't know the latter here, though.  */
 	    s->arch = ARCH_NOARCH;
 	  else if (istag ("PREREQUIRES"))
-	    s->requires = adddep(pool, &pd, s->requires, value, 2);
+	    s->requires = adddep(pool, &pd, s->requires, value, SOLVABLE_PREREQMARKER);
 	  else if (istag ("REQUIRES"))
-	    s->requires = adddep(pool, &pd, s->requires, value, 1);
+	    s->requires = adddep(pool, &pd, s->requires, value, -SOLVABLE_PREREQMARKER);
 	  else if (istag ("PROVIDES"))
 	    s->provides = adddep(pool, &pd, s->provides, value, 0);
 	  else if (istag ("CONFLICTS"))

@@ -184,11 +184,12 @@ static char *flagtab[] = {
 static unsigned int
 adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts, int isreq)
 {
-  Id id, name;
+  Id id, name, marker;
   const char *n, *f, *k;
   const char **a;
 
   n = f = k = 0;
+  marker = isreq ? -SOLVABLE_PREREQMARKER : 0;
   for (a = atts; *a; a += 2)
     {
       if (!strcmp(*a, "name"))
@@ -198,7 +199,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
       else if (!strcmp(*a, "kind"))
 	k = a[1];
       else if (isreq && !strcmp(*a, "pre") && a[1][0] == '1')
-	isreq = 2;
+	marker = SOLVABLE_PREREQMARKER;
     }
   if (!n)
     return olddeps;
@@ -232,7 +233,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 #if 0
   fprintf(stderr, "new dep %s%s%s\n", id2str(pool, d), id2rel(pool, d), id2evr(pool, d));
 #endif
-  return repo_addid_dep(pd->repo, olddeps, id, isreq);
+  return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
 
 

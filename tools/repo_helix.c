@@ -296,11 +296,12 @@ static struct flagtab flagtab[] = {
 static unsigned int
 adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, int isreq)
 {
-  Id id, name;
+  Id id, name, marker;
   const char *n, *f, *k;
   const char **a;
 
   n = f = k = NULL;
+  marker = isreq ? -SOLVABLE_PREREQMARKER : 0;
 
   /* loop over name,value pairs */
   for (a = atts; *a; a += 2)
@@ -312,7 +313,7 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, int i
       else if (!strcmp(*a, "op"))
 	f = a[1];
       else if (isreq && !strcmp(*a, "pre") && a[1][0] == '1')
-        isreq = 2;
+        marker = SOLVABLE_PREREQMARKER;
     }
   if (!n)			       /* quit if no name found */
     return olddeps;
@@ -332,9 +333,10 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, int i
       sprintf(pd->content, "%s:%s", k, n);
       name = str2id(pool, pd->content, 1);
     }
-  else {
+  else
+    {
       name = str2id(pool, n, 1);       /* package: just intern <name> */
-  }
+    }
 
   if (f)			       /* operator ? */
     {
@@ -357,7 +359,7 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, int i
     id = name;			       /* no operator */
 
   /* add new dependency to repo */
-  return repo_addid_dep(pd->repo, olddeps, id, isreq);
+  return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
 
 
