@@ -45,6 +45,8 @@ struct parsedata {
   char **sources;
   int nsources;
   int last_found_source;
+  char **share_with;
+  int nshare;
 };
 
 static Id
@@ -598,9 +600,18 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    add_attr_blob (attr, last_found_pack, id_messagedel, line + 6, strlen (line + 6) + 1);
 	    continue;
           case CTAG('=', 'S', 'h', 'r'):
-	    /* XXX Not yet handled.  Two possibilities: either include all
-	       referenced data verbatim here, or write out the sharing
-	       information.  */
+	    if (last_found_pack >= pd.nshare)
+	      {
+	        if (pd.share_with)
+		  {
+		    pd.share_with = realloc (pd.share_with, (last_found_pack + 256) * sizeof (*pd.share_with));
+		    memset (pd.share_with + pd.nshare, 0, (last_found_pack + 256 - pd.nshare) * sizeof (*pd.share_with));
+		  }
+		else
+		  pd.share_with = calloc (last_found_pack + 256, sizeof (*pd.share_with));
+		pd.nshare = last_found_pack + 256;
+	      }
+	    pd.share_with[last_found_pack] = strdup (line + 6);
 	    continue;
           case CTAG('=', 'V', 'e', 'r'):
 	    last_found_pack = 0;
@@ -615,7 +626,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
     
   if (pd.sources)
     {
-      int i;
+      int i, last_found;
       for (i = 0; i < pd.nsources; i++)
         if (pd.sources[i])
 	  {
@@ -623,6 +634,41 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    free (pd.sources[i]);
 	  }
       free (pd.sources);
+
+      last_found = 0;
+      for (i = 0; i < pd.nshare; i++)
+        if (pd.share_with[i])
+	  {
+	    if (split(pd.share_with[i], sp, 5) != 4)
+	      {
+	        fprintf(stderr, "Bad =Shr line: %s\n", pd.share_with[i]);
+	        exit(1);
+	      }
+
+	    Id name = str2id(pool, sp[0], 1);
+	    Id evr = makeevr(pool, join(&pd, sp[1], "-", sp[2]));
+	    Id arch = str2id(pool, sp[3], 1);
+	    unsigned n, nn;
+	    Solvable *found = 0;
+	    for (n = repo->start, nn = repo->start + last_found;
+		 n < repo->end; n++, nn++)
+	      {
+		if (nn >= repo->end)
+		  nn = repo->start;
+		found = pool->solvables + nn;
+		if (found->repo == repo
+		    && found->name == name
+		    && found->evr == evr
+		    && found->arch == arch)
+		  {
+		    last_found = nn - repo->start;
+		    break;
+		  }
+	      }
+	    if (n != repo->end)
+	      merge_attrs (attr, i, last_found);
+	  }
+      free (pd.share_with);
     }
   if (pd.tmp)
     free(pd.tmp);

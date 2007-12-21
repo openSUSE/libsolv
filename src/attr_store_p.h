@@ -53,6 +53,7 @@ struct _Attrstore
      otherwise it contains the pagenumber plus one (of the mapped page).  */
   unsigned int *mapped;
   unsigned int nmapped, ncanmap;
+  unsigned int rr_counter;
 
   Stringpool ss;
 

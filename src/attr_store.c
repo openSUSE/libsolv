@@ -30,7 +30,7 @@
 
 #include "fastlz.c"
 
-/*#define DEBUG_PAGING*/
+/* #define DEBUG_PAGING */
 
 #define BLOB_BLOCK 65535
 
@@ -272,6 +272,42 @@ add_attr_void (Attrstore *s, unsigned int entry, Id name)
   add_attr (s, entry, nv);
 }
 
+void
+merge_attrs (Attrstore *s, unsigned dest, unsigned src)
+{
+  LongNV *nv;
+  ensure_entry (s, dest);
+  nv = s->attrs[src];
+  if (nv)
+    {
+      for (; nv->key; nv++)
+        if (!find_attr (s, dest, s->keys[nv->key].name))
+	  switch (s->keys[nv->key].type)
+	    {
+	      case TYPE_ATTR_INTLIST:
+	        {
+		  unsigned len = 0;
+		  while (nv->v.intlist[len])
+		    add_attr_intlist_int (s, dest, s->keys[nv->key].name, nv->v.intlist[len++]);
+		}
+		break;
+	      case TYPE_ATTR_LOCALIDS:
+	        {
+		  unsigned len = 0;
+		  while (nv->v.localids[len])
+		    add_attr_localids_id (s, dest, s->keys[nv->key].name, nv->v.localids[len++]);
+		}
+		break;
+	      case TYPE_ATTR_STRING:
+	        add_attr_string (s, dest, s->keys[nv->key].name, nv->v.str);
+		break;
+	      default:
+		add_attr (s, dest, *nv);
+		break;
+	    }
+    }
+}
+
 #define pool_debug(a,b,...) fprintf (stderr, __VA_ARGS__)
 
 static Id read_id (FILE *fp, Id max);
@@ -423,6 +459,7 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
   /* And search for cheapest space.  */
   unsigned int best_cost = -1;
   unsigned int best = 0;
+  unsigned int same_cost = 0;
   for (i = 0; i + pend - pstart < s->ncanmap; i++)
     {
       unsigned int c = cost[i];
@@ -431,10 +468,16 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
         c += cost[i+j];
       if (c < best_cost)
         best_cost = c, best = i;
+      else if (c == best_cost)
+        same_cost++;
       /* A null cost won't become better.  */
       if (c == 0)
         break;
     }
+  /* If all places have the same cost we would thrash on slot 0.  Avoid
+     this by doing a round-robin strategy in this case.  */
+  if (same_cost == s->ncanmap - pend + pstart - 1)
+    best = s->rr_counter++ % (s->ncanmap - pend + pstart);
 
   /* So we want to map our pages from [best] to [best+pend-pstart].
      Use a very simple strategy, which doesn't make the best use of
