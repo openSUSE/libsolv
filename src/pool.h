@@ -207,6 +207,7 @@ extern const char *solvable2str(Pool *pool, Solvable *s);
  * Prepares a pool for solving
  */
 extern void pool_createwhatprovides(Pool *pool);
+extern void pool_addfileprovides(Pool *pool);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
 

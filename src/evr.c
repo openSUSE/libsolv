@@ -167,4 +167,52 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode)
   return r;
 }
 
+int
+evrmatch(Pool *pool, Id evrid, const char *epoch, const char *version, const char *release)
+{
+  const char *evr1;
+  const char *s1;
+  const char *r1;
+  int r;
+
+  evr1 = id2str(pool, evrid);
+  for (s1 = evr1; *s1 >= '0' && *s1 <= '9'; s1++)
+    ;
+  if (s1 != evr1 && *s1 == ':')
+    {
+      if (epoch)
+	{
+	  r = vercmp(evr1, s1, epoch, epoch + strlen(epoch));
+	  if (r)
+	    return r;
+	}
+      evr1 = s1 + 1;
+    }
+  else if (epoch)
+    {
+      while (*epoch == '0')
+	epoch++;
+      if (*epoch)
+	return -1;
+    }
+  for (s1 = evr1, r1 = 0; *s1; s1++)
+    if (*s1 == '-')
+      r1 = s1;
+  if (version)
+    {
+      r = vercmp(evr1, r1 ? r1 : s1, version, version + strlen(version));
+      if (r)
+	return r;
+    }
+  if (release)
+    {
+      if (!r1)
+	return -1;
+      r = vercmp(r1 + 1, s1, release, release + strlen(release));
+      if (r)
+	return r;
+    }
+  return 0;
+}
+
 // EOF

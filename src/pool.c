@@ -24,6 +24,7 @@
 #include "poolid_private.h"
 #include "poolarch.h"
 #include "util.h"
+#include "bitmap.h"
 #include "evr.h"
 
 #define SOLVABLE_BLOCK	255
@@ -626,5 +627,132 @@ pool_setdebuglevel(Pool *pool, int level)
   pool->debugmask = mask;
 }
 
+/*************************************************************************/
+
+struct searchfiles {
+  const char **files;
+  int nfiles;
+};
+
+#define SEARCHFILES_BLOCK 127
+
+static void
+pool_addfileprovides_dep(Pool *pool, Id *ida, Map *seen, struct searchfiles *sf)
+{
+  Id dep, sid;
+  const char *s;
+
+  while ((dep = *ida++) != 0)
+    {
+      while (ISRELDEP(dep))
+	{
+	  Reldep *rd;
+	  sid = pool->ss.nstrings + GETRELID(dep);
+	  if (MAPTST(seen, sid))
+	    {
+	      dep = 0;
+	      break;
+	    }
+	  MAPSET(seen, sid);
+	  rd = GETRELDEP(pool, dep);
+	  if (rd->flags < 8)
+	    dep = rd->name;
+	  else if (rd->flags == REL_NAMESPACE)
+	    {
+	      if (rd->name == NAMESPACE_INSTALLED)
+		{
+		  dep = 0;	/* for now */
+		  break;
+		}
+	      dep = rd->evr;
+	    }
+	  else
+	    {
+	      Id ids[2];
+	      ids[0] = rd->name;
+	      ids[1] = 0;
+	      pool_addfileprovides_dep(pool, ids, seen, sf);
+	      dep = rd->evr;
+	    }
+	}
+      if (!dep)
+	continue;
+      if (MAPTST(seen, dep))
+	continue;
+      MAPSET(seen, dep);
+      s = id2str(pool, dep);
+      if (*s != '/')
+	continue;
+      if ((sf->nfiles & SEARCHFILES_BLOCK) == 0)
+	sf->files = xrealloc2(sf->files, sf->nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+      sf->files[sf->nfiles++] = strdup(s);
+    }
+}
+
+#if 0
+static int
+addfileprovides_cb(void *data, Solvable *s, Id key, const char *str)
+{
+  Pool *pool = s->repo->pool;
+  Id id;
+  id = str2id(pool, str, 0);
+  if (!id)
+    return 0;	/* can't happen */
+  s->provides = repo_addid_dep(s->repo, s->provides, id, SOLVABLE_FILEMARKER);
+  return 0;
+}
+#endif
+
+void
+pool_addfileprovides(Pool *pool)
+{
+  Solvable *s;
+  Repo *repo;
+  Map seen;
+  struct searchfiles sf;
+  int i;
+
+  map_init(&seen, pool->ss.nstrings + pool->nrels);
+  memset(&sf, 0, sizeof(sf));
+
+  for (i = 1, s = pool->solvables + i; i < pool->nsolvables; i++, s++)
+    {
+      repo = s->repo;
+      if (!repo)
+	continue;
+      if (s->obsoletes)
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->obsoletes, &seen, &sf);
+      if (s->conflicts)
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->conflicts, &seen, &sf);
+      if (s->requires)
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->requires, &seen, &sf);
+      if (s->recommends)
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->recommends, &seen, &sf);
+      if (s->suggests)
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->suggests, &seen, &sf);
+      if (s->supplements)
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->supplements, &seen, &sf);
+      if (s->enhances)
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->enhances, &seen, &sf);
+      if (s->freshens)
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->freshens, &seen, &sf);
+    }
+  map_free(&seen);
+  POOL_DEBUG(SAT_DEBUG_STATS, "found %d file dependencies\n", sf.nfiles);
+  if (!sf.nfiles)
+    return;
+#if 0
+  for (i = 0; i < sf.nfiles; i++)
+    POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", sf.files[i]);
+#endif
+  if ((sf.nfiles & SEARCHFILES_BLOCK) == 0)
+    sf.files = xrealloc2(sf.files, sf.nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+  sf.files[sf.nfiles++] = 0;
+#if 0
+  pool_search(0, SOLVABLE_FILELIST, (const char *)sf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);
+#endif
+  xfree(sf.files);
+  pool_freewhatprovides(pool);	/* as we have added provides */
+}
 
 // EOF
