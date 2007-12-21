@@ -137,6 +137,24 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, int i
 }
 
 Attrstore *attr;
+static Id id_authors;
+static Id id_description;
+static Id id_downloadsize;
+static Id id_eula;
+static Id id_group;
+static Id id_installsize;
+static Id id_keywords;
+static Id id_license;
+static Id id_messagedel;
+static Id id_messageins;
+static Id id_mediadir;
+static Id id_mediafile;
+static Id id_medianr;
+static Id id_nosource;
+static Id id_source;
+static Id id_sourceid;
+static Id id_summary;
+static Id id_time;
 
 static void
 add_location (char *line, Solvable *s, unsigned entry)
@@ -159,9 +177,9 @@ add_location (char *line, Solvable *s, unsigned entry)
     {
       /* medianr filename dir
          don't optimize this one */
-      add_attr_special_int (attr, entry, str2id (pool, "medianr", 1), atoi (sp[0]));
-      add_attr_localids_id (attr, entry, str2id (pool, "mediadir", 1), str2localid (attr, sp[2], 1));
-      add_attr_string (attr, entry, str2id (pool, "mediafile", 1), sp[1]);
+      add_attr_special_int (attr, entry, id_medianr, atoi (sp[0]));
+      add_attr_localids_id (attr, entry, id_mediadir, str2localid (attr, sp[2], 1));
+      add_attr_string (attr, entry, id_mediafile, sp[1]);
       return;
     }
   else
@@ -190,13 +208,13 @@ add_location (char *line, Solvable *s, unsigned entry)
 	  break;
       if (*n2 || strcmp (n1, ".rpm"))
         goto nontrivial;
-      add_attr_special_int (attr, entry, str2id (pool, "medianr", 1), medianr);
-      add_attr_void (attr, entry, str2id (pool, "mediafile", 1));
+      add_attr_special_int (attr, entry, id_medianr, medianr);
+      add_attr_void (attr, entry, id_mediafile);
       return;
 
 nontrivial:
-      add_attr_special_int (attr, entry, str2id (pool, "medianr", 1), medianr);
-      add_attr_string (attr, entry, str2id (pool, "mediafile", 1), sp[1]);
+      add_attr_special_int (attr, entry, id_medianr, medianr);
+      add_attr_string (attr, entry, id_mediafile, sp[1]);
       return;
     }
 }
@@ -222,8 +240,7 @@ add_source (char *line, struct parsedata *pd, Solvable *s, unsigned entry, int f
      (src or nosrc), code only that fact.  */
   if (s->name == name && s->evr == evr
       && (arch == ARCH_SRC || arch == ARCH_NOSRC))
-    add_attr_void (attr, entry,
-                   str2id (pool, arch == ARCH_SRC ? "source" : "nosource", 1));
+    add_attr_void (attr, entry, arch == ARCH_SRC ? id_source : id_nosource);
   else if (first)
     {
       if (entry >= pd->nsources)
@@ -265,14 +282,28 @@ add_source (char *line, struct parsedata *pd, Solvable *s, unsigned entry, int f
 	    }
         }
       if (n != repo->end)
-        add_attr_intlist_int (attr, entry, str2id (pool, "sourceid", 1), nn - repo->start);
+        add_attr_intlist_int (attr, entry, id_sourceid, nn - repo->start);
       else
         {
-          add_attr_localids_id (attr, entry, str2id (pool, "source", 1), str2localid (attr, sp[0], 1));
-          add_attr_localids_id (attr, entry, str2id (pool, "source", 1), str2localid (attr, join (pd, sp[1], "-", sp[2]), 1));
-          add_attr_localids_id (attr, entry, str2id (pool, "source", 1), str2localid (attr, sp[3], 1));
+          add_attr_localids_id (attr, entry, id_source, str2localid (attr, sp[0], 1));
+          add_attr_localids_id (attr, entry, id_source, str2localid (attr, join (pd, sp[1], "-", sp[2]), 1));
+          add_attr_localids_id (attr, entry, id_source, str2localid (attr, sp[3], 1));
 	}
     }
+}
+
+/* Unfortunately "a"[0] is no constant expression in the C languages,
+   so we need to pass the four characters individually :-/  */
+#define CTAG(a,b,c,d) ((unsigned)(((unsigned char)a) << 24) \
+ | ((unsigned char)b << 16) \
+ | ((unsigned char)c << 8) \
+ | ((unsigned char)d))
+
+static inline unsigned
+tag_from_string (char *cs)
+{
+  unsigned char *s = (unsigned char*) cs;
+  return ((s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3]);
 }
 
 void
@@ -290,7 +321,28 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   struct parsedata pd;
 
   if (with_attr)
-    attr = new_store(pool);
+    {
+      attr = new_store(pool);
+      id_authors = str2id (pool, "authors", 1);
+      id_description = str2id (pool, "description", 1);
+      id_downloadsize = str2id (pool, "downloadsize", 1);
+      id_eula = str2id (pool, "eula", 1);
+      id_group = str2id (pool, "group", 1);
+      id_installsize = str2id (pool, "installsize", 1);
+      id_keywords = str2id (pool, "keywords", 1);
+      id_license = str2id (pool, "license", 1);
+      id_messagedel = str2id (pool, "messagedel", 1);
+      id_messageins = str2id (pool, "messageins", 1);
+      id_mediadir = str2id (pool, "mediadir", 1);
+      id_mediafile = str2id (pool, "mediafile", 1);
+      id_medianr = str2id (pool, "medianr", 1);
+      id_nosource = str2id (pool, "nosource", 1);
+      id_source = str2id (pool, "source", 1);
+      id_sourceid = str2id (pool, "sourceid", 1);
+      id_summary = str2id (pool, "summary", 1);
+      id_time = str2id (pool, "time", 1);
+    }
+
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
   aline = 1024;
@@ -302,6 +354,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 
   for (;;)
     {
+      unsigned tag;
       if (linep - line + 16 > aline)
 	{
 	  aline = linep - line;
@@ -351,14 +404,17 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      exit(1);
 	    }
 	  intag = tagend - (line + 1);
-	  if (!strncmp (line, "+Des:", 5)
-	      || !strncmp (line, "+Eul:", 5)
-	      || !strncmp (line, "+Ins:", 5)
-	      || !strncmp (line, "+Del:", 5)
-	      || !strncmp (line, "+Aut:", 5))
-	    cummulate = 1;
-	  else
-	    cummulate = 0;
+	  cummulate = 0;
+	  switch (tag_from_string (line))
+	    {
+	      case CTAG('+', 'D', 'e', 's'):
+	      case CTAG('+', 'E', 'u', 'l'):
+	      case CTAG('+', 'I', 'n', 's'):
+	      case CTAG('+', 'D', 'e', 'l'):
+	      case CTAG('+', 'A', 'u', 't'):
+	        if (line[4] == ':')
+	          cummulate = 1;
+	    }
 	  line[0] = '=';
 	  line[intag + 2] = ' ';
 	  linep = line + intag + 3;
@@ -366,8 +422,12 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	}
       if (*line == '#' || !*line)
 	continue;
+      if (! (line[0] && line[1] && line[2] && line[3] && line[4] == ':'))
+        continue;
+      tag = tag_from_string (line);
       if (indesc < 2
-          && (!strncmp(line, "=Pkg:", 5) || !strncmp(line, "=Pat:", 5)))
+          && (tag == CTAG('=', 'P', 'k', 'g')
+	      || tag == CTAG('=', 'P', 'a', 't')))
 	{
 	  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
@@ -393,7 +453,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  continue;
 	}
       if (indesc == 2
-          && (!strncmp(line, "=Pkg:", 5) || !strncmp(line, "=Pat:", 5)))
+          && (tag == CTAG('=', 'P', 'k', 'g')
+	      || tag == CTAG('=', 'P', 'a', 't')))
 	{
 	  Id name, evr, arch;
 	  int n, nn;
@@ -412,7 +473,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    name = str2id(pool, sp[0], 0);
 	  evr = makeevr(pool, join(&pd, sp[1], "-", sp[2]));
 	  arch = str2id(pool, sp[3], 0);
-	  /* If we found neither the name or the arch at all in this repo
+	  /* If we found neither the name nor the arch at all in this repo
 	     there's no chance of finding the exact solvable either.  */
 	  if (!name || !arch)
 	    continue;
@@ -443,167 +504,108 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  fprintf (stderr, "Huh?\n");
           continue;
 	}
-      if (!strncmp(line, "=Prv:", 5))
-	{
-	  s->provides = adddep(pool, &pd, s->provides, line, 0, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Req:", 5))
-	{
-	  s->requires = adddep(pool, &pd, s->requires, line, 1, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Prq:", 5))
-	{
-	  if (pd.kind)
-	    s->requires = adddep(pool, &pd, s->requires, line, 0, 0);
-	  else
-	    s->requires = adddep(pool, &pd, s->requires, line, 2, 0);
-	  continue;
-	}
-      if (!strncmp(line, "=Obs:", 5))
-	{
-	  s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Con:", 5))
-	{
-	  s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Rec:", 5))
-	{
-	  s->recommends = adddep(pool, &pd, s->recommends, line, 0, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Sup:", 5))
-	{
-	  s->supplements = adddep(pool, &pd, s->supplements, line, 0, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Enh:", 5))
-	{
-	  s->enhances = adddep(pool, &pd, s->enhances, line, 0, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Sug:", 5))
-	{
-	  s->suggests = adddep(pool, &pd, s->suggests, line, 0, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Fre:", 5))
-	{
-	  s->freshens = adddep(pool, &pd, s->freshens, line, 0, pd.kind);
-	  continue;
-	}
-      if (!strncmp(line, "=Prc:", 5))
-	{
-	  s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
-	  continue;
-	}
-      if (!strncmp(line, "=Psg:", 5))
-	{
-	  s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
-	  continue;
+      switch (tag)
+        {
+	  case CTAG('=', 'P', 'r', 'v'):
+	    s->provides = adddep(pool, &pd, s->provides, line, 0, pd.kind);
+	    continue;
+          case CTAG('=', 'R', 'e', 'q'):
+	    s->requires = adddep(pool, &pd, s->requires, line, 1, pd.kind);
+	    continue;
+          case CTAG('=', 'P', 'r', 'q'):
+	    if (pd.kind)
+	      s->requires = adddep(pool, &pd, s->requires, line, 0, 0);
+	    else
+	      s->requires = adddep(pool, &pd, s->requires, line, 2, 0);
+	    continue;
+	  case CTAG('=', 'O', 'b', 's'):
+	    s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, pd.kind);
+	    continue;
+          case CTAG('=', 'C', 'o', 'n'):
+	    s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, pd.kind);
+	    continue;
+          case CTAG('=', 'R', 'e', 'c'):
+	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, pd.kind);
+	    continue;
+          case CTAG('=', 'S', 'u', 'p'):
+	    s->supplements = adddep(pool, &pd, s->supplements, line, 0, pd.kind);
+	    continue;
+          case CTAG('=', 'E', 'n', 'h'):
+	    s->enhances = adddep(pool, &pd, s->enhances, line, 0, pd.kind);
+	    continue;
+          case CTAG('=', 'S', 'u', 'g'):
+	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, pd.kind);
+	    continue;
+          case CTAG('=', 'F', 'r', 'e'):
+	    s->freshens = adddep(pool, &pd, s->freshens, line, 0, pd.kind);
+	    continue;
+          case CTAG('=', 'P', 'r', 'c'):
+	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
+	    continue;
+          case CTAG('=', 'P', 's', 'g'):
+	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
+	    continue;
 	}
       if (!with_attr)
         continue;
-      if (!strncmp(line, "=Grp:", 5))
+      switch (tag)
         {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_localids_id (attr, last_found_pack, str2id (pool, "group", 1), str2localid (attr, line + 6, 1));
-	  continue;
-	}
-      if (!strncmp(line, "=Lic:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_localids_id (attr, last_found_pack, str2id (pool, "license", 1), str2localid (attr, line + 6, 1));
-	  continue;
-	}
-      if (!strncmp(line, "=Loc:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_location (line + 6, s, last_found_pack);
-	  continue;
-	}
-      if (!strncmp(line, "=Src:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_source (line + 6, &pd, s, last_found_pack, 1);
-	  continue;
-	}
-      if (!strncmp(line, "=Siz:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  if (split (line + 6, sp, 3) == 2)
+          case CTAG('=', 'G', 'r', 'p'):
+	    add_attr_localids_id (attr, last_found_pack, id_group, str2localid (attr, line + 6, 1));
+	    continue;
+          case CTAG('=', 'L', 'i', 'c'):
+	    add_attr_localids_id (attr, last_found_pack, id_license, str2localid (attr, line + 6, 1));
+	    continue;
+          case CTAG('=', 'L', 'o', 'c'):
+	    add_location (line + 6, s, last_found_pack);
+	    continue;
+          case CTAG('=', 'S', 'r', 'c'):
+	    add_source (line + 6, &pd, s, last_found_pack, 1);
+	    continue;
+          case CTAG('=', 'S', 'i', 'z'):
+	    if (split (line + 6, sp, 3) == 2)
+	      {
+	        add_attr_int (attr, last_found_pack, id_downloadsize, (atoi (sp[0]) + 1023) / 1024);
+	        add_attr_int (attr, last_found_pack, id_installsize, (atoi (sp[1]) + 1023) / 1024);
+	      }
+	    continue;
+          case CTAG('=', 'T', 'i', 'm'):
 	    {
-	      add_attr_int (attr, last_found_pack, str2id (pool, "downloadsize", 1), (atoi (sp[0]) + 1023) / 1024);
-	      add_attr_int (attr, last_found_pack, str2id (pool, "installsize", 1), (atoi (sp[1]) + 1023) / 1024);
+	      unsigned int t = atoi (line + 6);
+	      if (t)
+	        add_attr_int (attr, last_found_pack, id_time, t);
 	    }
-	  continue;
-	}
-      if (!strncmp(line, "=Tim:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  unsigned int t = atoi (line + 6);
-	  if (t)
-	    add_attr_int (attr, last_found_pack, str2id (pool, "time", 1), t);
-	  continue;
-	}
-      if (!strncmp(line, "=Kwd:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_localids_id (attr, last_found_pack, str2id (pool, "keywords", 1), str2localid (attr, line + 6, 1));
-	  continue;
-	}
-      if (!strncmp(line, "=Aut:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_blob (attr, last_found_pack, str2id (pool, "authors", 1), line + 6, strlen (line + 6) + 1);
-	  continue;
-	}
-      if (!strncmp(line, "=Sum:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_string (attr, last_found_pack, str2id (pool, "summary", 1), line + 6);
-	  continue;
-	}
-      if (!strncmp(line, "=Des:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_blob (attr, last_found_pack, str2id (pool, "description", 1), line + 6, strlen (line + 6) + 1);
-	  continue;
-	}
-      if (!strncmp(line, "=Eul:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_blob (attr, last_found_pack, str2id (pool, "eula", 1), line + 6, strlen (line + 6) + 1);
-	  continue;
-	}
-      if (!strncmp(line, "=Ins:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_blob (attr, last_found_pack, str2id (pool, "messageins", 1), line + 6, strlen (line + 6) + 1);
-	  continue;
-	}
-      if (!strncmp(line, "=Del:", 5))
-        {
-	  ensure_entry (attr, last_found_pack);
-	  add_attr_blob (attr, last_found_pack, str2id (pool, "messagedel", 1), line + 6, strlen (line + 6) + 1);
-	  continue;
-	}
-      if (!strncmp(line, "=Shr:", 5))
-        {
-	  /* XXX Not yet handled.  Two possibilities: either include all
-	     referenced data verbatim here, or write out the sharing
-	     information.  */
-	  continue;
-	}
-      if (!strncmp(line, "=Ver:", 5))
-	{
-	  last_found_pack = 0;
-	  indesc++;
-	  continue;
+	    continue;
+          case CTAG('=', 'K', 'w', 'd'):
+	    add_attr_localids_id (attr, last_found_pack, id_keywords, str2localid (attr, line + 6, 1));
+	    continue;
+          case CTAG('=', 'A', 'u', 't'):
+	    add_attr_blob (attr, last_found_pack, id_authors, line + 6, strlen (line + 6) + 1);
+	    continue;
+          case CTAG('=', 'S', 'u', 'm'):
+	    add_attr_string (attr, last_found_pack, id_summary, line + 6);
+	    continue;
+          case CTAG('=', 'D', 'e', 's'):
+	    add_attr_blob (attr, last_found_pack, id_description, line + 6, strlen (line + 6) + 1);
+	    continue;
+          case CTAG('=', 'E', 'u', 'l'):
+	    add_attr_blob (attr, last_found_pack, id_eula, line + 6, strlen (line + 6) + 1);
+	    continue;
+          case CTAG('=', 'I', 'n', 's'):
+	    add_attr_blob (attr, last_found_pack, id_messageins, line + 6, strlen (line + 6) + 1);
+	    continue;
+          case CTAG('=', 'D', 'e', 'l'):
+	    add_attr_blob (attr, last_found_pack, id_messagedel, line + 6, strlen (line + 6) + 1);
+	    continue;
+          case CTAG('=', 'S', 'h', 'r'):
+	    /* XXX Not yet handled.  Two possibilities: either include all
+	       referenced data verbatim here, or write out the sharing
+	       information.  */
+	    continue;
+          case CTAG('=', 'V', 'e', 'r'):
+	    last_found_pack = 0;
+	    indesc++;
+	    continue;
 	}
     }
   if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
