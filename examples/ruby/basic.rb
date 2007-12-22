@@ -1,6 +1,6 @@
 require 'satsolver'
 
-include Satsolver
+include SatSolver
 
 pool = Pool.new
 #puts pool.methods.sort
