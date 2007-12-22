@@ -44,7 +44,7 @@ main(int argc, char **argv)
     }
 
   repo = repo_create(pool, "installed");
-  repo_add_rpmdb(repo, ref);
+  repo_add_rpmdb(repo, ref, "/");
   if (ref)
     {
       if (ref->pool != pool)

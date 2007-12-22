@@ -511,7 +511,7 @@ rpm2solv(Pool *pool, Repo *repo, Solvable *s, RpmHead *rpmhead)
  */
 
 void
-repo_add_rpmdb(Repo *repo, Repo *ref)
+repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 {
   Pool *pool = repo->pool;
   unsigned char buf[16];

@@ -5,4 +5,4 @@
  * for further information
  */
 
-extern void repo_add_rpmdb(Repo *repo, Repo *ref);
+extern void repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir);
