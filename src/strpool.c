@@ -37,7 +37,7 @@ stringpool_init (Stringpool *ss, const char *strs[])
 }
 
 Id
-stringpool_str2id (Stringpool *ss, const char *str, int create)
+stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
 {
   Hashval h;
   unsigned int hh;
@@ -79,12 +79,13 @@ stringpool_str2id (Stringpool *ss, const char *str, int create)
 
   // compute hash and check for match
 
-  h = strhash(str) & hashmask;
+  h = strnhash(str, len) & hashmask;
   hh = HASHCHAIN_START;
   while ((id = hashtbl[h]) != 0)  // follow hash overflow chain
     {
       // break if string already hashed
-      if(!strcmp(ss->stringspace + ss->strings[id], str))
+      if(!memcmp(ss->stringspace + ss->strings[id], str, len)
+         && ss->stringspace[ss->strings[id] + len] == 0)
 	break;
       h = HASHCHAIN_NEXT(h, hh, hashmask);
     }
@@ -101,17 +102,27 @@ stringpool_str2id (Stringpool *ss, const char *str, int create)
   // 'pointer' into stringspace is Offset of next free pos: sstrings
   ss->strings[id] = ss->sstrings;
 
-  space_needed = strlen(str) + 1;
+  space_needed = len + 1;
 
   // resize string buffer if needed
   if (((ss->sstrings + space_needed - 1) | STRINGSPACE_BLOCK) != ((ss->sstrings - 1) | STRINGSPACE_BLOCK))
     ss->stringspace = xrealloc(ss->stringspace, (ss->sstrings + space_needed + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
   // copy new string into buffer
-  memcpy(ss->stringspace + ss->sstrings, str, space_needed);
+  memcpy(ss->stringspace + ss->sstrings, str, space_needed - 1);
+  // add the sentinel, we can't rely on it being in the source string (in
+  // case the LEN is not really strlen(str))
+  ss->stringspace[ss->sstrings + space_needed - 1] = 0;
   // next free pos is behind new string
   ss->sstrings += space_needed;
 
   return id;
+}
+
+Id
+stringpool_str2id (Stringpool *ss, const char *str, int create)
+{
+  unsigned len = strlen (str);
+  return stringpool_strn2id (ss, str, len, create);
 }
 
 void

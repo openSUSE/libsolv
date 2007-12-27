@@ -26,6 +26,13 @@ struct _Stringpool
 
 void stringpool_init (Stringpool *ss, const char *strs[]);
 Id stringpool_str2id (Stringpool *ss, const char *str, int create);
+Id stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create);
 void stringpool_shrink (Stringpool *ss);
+
+static inline const char *
+stringpool_id2str (Stringpool *ss, Id id)
+{
+  return ss->stringspace + ss->strings[id];
+}
 
 #endif
