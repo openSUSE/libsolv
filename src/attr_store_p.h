@@ -39,6 +39,14 @@ typedef struct _Attrblobpage
   long file_size;
 } Attrblobpage;
 
+typedef struct _Dir
+{
+  unsigned parent;
+  unsigned child;
+  unsigned sibling;
+  Id name;
+} Dir;
+
 struct _Attrstore
 {
   Pool *pool;
@@ -56,6 +64,14 @@ struct _Attrstore
   unsigned int rr_counter;
 
   Stringpool ss;
+
+  struct Dirtree {
+    Dir *dirs;
+    unsigned ndirs;
+    Stringpool ss;
+    unsigned *dirstack;
+    unsigned ndirstack, dirstack_size;
+  } dirtree;
 
   /* A space efficient in memory representation.  It's read-only.  */
   /* flat_attrs[ent2attr[i]] are the attrs for entity i.  */

@@ -41,6 +41,10 @@ void add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id
 void add_attr_void (Attrstore *s, unsigned int entry, Id name);
 void merge_attrs (Attrstore *s, unsigned dest, unsigned src);
 
+unsigned dir_lookup (Attrstore *s, const char *name, unsigned insert);
+unsigned dir_parent (Attrstore *s, unsigned dir);
+void dir2str (Attrstore *s, unsigned dir, char **str, unsigned *len);
+
 const void * attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int len);
 
 #define SEARCH_SUBSTRING 1

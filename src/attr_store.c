@@ -69,6 +69,157 @@ localid2str(Attrstore *s, LocalId id)
   return s->ss.stringspace + s->ss.strings[id];
 }
 
+static void
+setup_dirs (Attrstore *s)
+{
+  static const char *ss_init_strs[] =
+  {
+    "<NULL>",
+    "",
+    0
+  };
+
+  s->dirtree.dirs = calloc (1024, sizeof (s->dirtree.dirs[0]));
+  s->dirtree.ndirs = 2;
+  s->dirtree.dirs[0].child = 0;
+  s->dirtree.dirs[0].sibling = 0;
+  s->dirtree.dirs[0].name = 0;
+  s->dirtree.dirs[1].child = 0;
+  s->dirtree.dirs[1].sibling = 0;
+  s->dirtree.dirs[1].name = STRID_EMPTY;
+
+  s->dirtree.dirstack_size = 16;
+  s->dirtree.dirstack = malloc (s->dirtree.dirstack_size * sizeof (s->dirtree.dirstack[0]));
+  s->dirtree.ndirstack = 0;
+  s->dirtree.dirstack[s->dirtree.ndirstack++] = 1; //dir-id of /
+
+  stringpool_init (&s->dirtree.ss, ss_init_strs);
+}
+
+static unsigned
+dir_lookup_1 (Attrstore *s, unsigned dir, const char *name, unsigned insert)
+{
+  Id nameid;
+  while (*name == '/')
+    name++;
+  if (!*name)
+    return dir;
+  const char *end = strchrnul (name, '/');
+  nameid = stringpool_strn2id (&s->dirtree.ss, name, end - name, 1);
+  unsigned c, num = 0;
+  Dir *dirs = s->dirtree.dirs;
+  for (c = dirs[dir].child; c; c = dirs[c].sibling, num++)
+    if (nameid == dirs[c].name)
+      break;
+  if (!c && !insert)
+    return 0;
+  if (!c)
+    {
+      c = s->dirtree.ndirs++;
+      if (!(c & 1023))
+	dirs = realloc (dirs, (c + 1024) * sizeof (dirs[0]));
+      dirs[c].child = 0;
+      dirs[c].sibling = dirs[dir].child;
+      dirs[c].name = nameid;
+      dirs[c].parent = dir;
+      dirs[dir].child = c;
+      s->dirtree.dirs = dirs;
+    }
+  if (!(s->dirtree.ndirstack & 15))
+    {
+      s->dirtree.dirstack_size += 16;
+      s->dirtree.dirstack = realloc (s->dirtree.dirstack, s->dirtree.dirstack_size * sizeof (s->dirtree.dirstack[0]));
+    }
+  s->dirtree.dirstack[s->dirtree.ndirstack++] = c;
+  if (!*end)
+    return c;
+  unsigned ret = dir_lookup_1 (s, c, end + 1, insert);
+  return ret;
+}
+
+unsigned
+dir_lookup (Attrstore *s, const char *name, unsigned insert)
+{
+  if (!s->dirtree.ndirs)
+    setup_dirs (s);
+
+  /* Detect number of common path components.  Accept multiple // .  */
+  const char *new_start;
+  unsigned components;
+  for (components = 1, new_start = name; components < s->dirtree.ndirstack; )
+    {
+      int ofs;
+      const char *dirname;
+      while (*new_start == '/')
+	new_start++;
+      dirname = stringpool_id2str (&s->dirtree.ss, s->dirtree.dirs[s->dirtree.dirstack[components]].name);
+      for (ofs = 0;; ofs++)
+	{
+	  char n = new_start[ofs];
+	  char d = dirname[ofs];
+	  if (d == 0 && (n == 0 || n == '/'))
+	    {
+	      new_start += ofs;
+	      components++;
+	      if (n == 0)
+		goto endmatch2;
+	      break;
+	    }
+	  if (n != d)
+	    goto endmatch;
+	}
+    }
+endmatch:
+  while (*new_start == '/')
+    new_start++;
+endmatch2:
+
+  /* We have always / on the stack.  */
+  //assert (ndirstack);
+  //assert (ndirstack >= components);
+  s->dirtree.ndirstack = components;
+  unsigned ret = s->dirtree.dirstack[s->dirtree.ndirstack - 1];
+  if (*new_start)
+    ret = dir_lookup_1 (s, ret, new_start, insert);
+  //assert (ret == dirstack[ndirstack - 1]);
+  return ret;
+}
+
+unsigned
+dir_parent (Attrstore *s, unsigned dir)
+{
+  return s->dirtree.dirs[dir].parent;
+}
+
+void
+dir2str (Attrstore *s, unsigned dir, char **str, unsigned *len)
+{
+  unsigned l = 0;
+  Id ids[s->dirtree.dirstack_size + 1];
+  unsigned i, ii;
+  for (i = 0; dir > 1; dir = dir_parent (s, dir), i++)
+    ids[i] = s->dirtree.dirs[dir].name;
+  ii = i;
+  l = 1;
+  for (i = 0; i < ii; i++)
+    l += 1 + strlen (stringpool_id2str (&s->dirtree.ss, ids[i]));
+  l++;
+  if (l > *len)
+    {
+      *str = malloc (l);
+      *len = l;
+    }
+  char *dest = *str;
+  *dest++ = '/';
+  for (i = ii; i--;)
+    {
+      const char *name = stringpool_id2str (&s->dirtree.ss, ids[i]);
+      dest = mempcpy (dest, name, strlen (name));
+      *dest++ = '/';
+    }
+  *dest = 0;
+}
+
 void
 ensure_entry (Attrstore *s, unsigned int entry)
 {
@@ -1086,7 +1237,8 @@ write_attr_store (FILE *fp, Attrstore *s)
         s->ent2attr[i] += start, start = s->ent2attr[i];
     }
 
-  if (fwrite (s->flat_attrs + 1, s->attr_next_free - 1, 1, fp) != 1)
+  if (s->entries
+      && fwrite (s->flat_attrs + 1, s->attr_next_free - 1, 1, fp) != 1)
     {
       perror ("write error");
       exit (1);
@@ -1379,7 +1531,7 @@ attr_store_read (FILE *fp, Pool *pool)
 
   unsigned char ignore_char = 1;
   if (fread(&ignore_char, 1, 1, fp) != 1
-      || fread(strsp, local_ssize, 1, fp) != 1
+      || (local_ssize && fread(strsp, local_ssize, 1, fp) != 1)
       || ignore_char != 0)
     {
       perror ("read error while reading strings");
@@ -1442,7 +1594,7 @@ attr_store_read (FILE *fp, Pool *pool)
   s->attr_next_free = start;
   s->flat_attrs = xmalloc (((s->attr_next_free + FLAT_ATTR_BLOCK) & ~FLAT_ATTR_BLOCK) * sizeof (s->flat_attrs[0]));
   s->flat_attrs[0] = 0;
-  if (fread (s->flat_attrs + 1, s->attr_next_free - 1, 1, fp) != 1)
+  if (s->entries && fread (s->flat_attrs + 1, s->attr_next_free - 1, 1, fp) != 1)
     {
       perror ("read error");
       exit (1);
