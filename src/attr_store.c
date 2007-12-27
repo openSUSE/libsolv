@@ -369,24 +369,19 @@ void
 add_attr_intlist_int (Attrstore *s, unsigned int entry, Id name, int val)
 {
   LongNV *nv = find_attr (s, entry, name);
-  if (val == 0)
-    return;
   if (nv)
     {
-      unsigned len = 0;
-      while (nv->v.intlist[len])
-        len++;
+      unsigned len = nv->v.intlist[0]++;
       nv->v.intlist = realloc (nv->v.intlist, (len + 2) * sizeof (nv->v.intlist[0]));
-      nv->v.intlist[len] = val;
-      nv->v.intlist[len+1] = 0;
+      nv->v.intlist[len+1] = val;
     }
   else
     {
       LongNV mynv;
       mynv.key = add_key (s, name, TYPE_ATTR_INTLIST, 0);
       mynv.v.intlist = malloc (2 * sizeof (mynv.v.intlist[0]));
-      mynv.v.intlist[0] = val;
-      mynv.v.intlist[1] = 0;
+      mynv.v.intlist[0] = 1;
+      mynv.v.intlist[1] = val;
       add_attr (s, entry, mynv);
     }
 }
@@ -437,9 +432,9 @@ merge_attrs (Attrstore *s, unsigned dest, unsigned src)
 	    {
 	      case TYPE_ATTR_INTLIST:
 	        {
-		  unsigned len = 0;
-		  while (nv->v.intlist[len])
-		    add_attr_intlist_int (s, dest, s->keys[nv->key].name, nv->v.intlist[len++]);
+		  unsigned i, len = nv->v.intlist[0];
+		  for (i = 0; i < len; i++)
+		    add_attr_intlist_int (s, dest, s->keys[nv->key].name, nv->v.intlist[i + 1]);
 		}
 		break;
 	      case TYPE_ATTR_LOCALIDS:
@@ -523,10 +518,11 @@ add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, 
 	}
 	break;
       case TYPE_ATTR_INTLIST:
-        {
-	  unsigned i;
-	  while ((i = read_id(fp, 0)) != 0)
-	    add_attr_intlist_int (s, entry, name, i);
+	{
+	  int i;
+	  while ((i = read_id(fp, 0)) & 64)
+	    add_attr_intlist_int (s, entry, name, (i & 63) | ((i >> 1) & ~63));
+	  add_attr_intlist_int (s, entry, name, (i & 63) | ((i >> 1) & ~63));
 	}
 	break;
       case TYPE_ATTR_LOCALIDS:
@@ -881,11 +877,18 @@ attr_store_pack (Attrstore *s)
 	    case TYPE_ATTR_INTLIST:
 	      {
 		const int *il = nv[ofs].v.intlist;
-		int i;
-		for (; (i = *il) != 0; il++, old_mem += 4)
-		  add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
-		add_num (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
-		old_mem+=4;
+		int len = *il++;
+		//add_num (s->flat_attrs, s->attr_next_free, len, FLAT_ATTR_BLOCK);
+		old_mem += 4 * (len + 1);
+		while (len--)
+		  {
+		    int i = *il++;
+		    if (i >= 64)
+		      i = (i & 63) | ((i & ~63) << 1);
+		    if (len)
+		      i |= 64;
+		    add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
+		  }
 		xfree (nv[ofs].v.intlist);
 	        break;
 	      }
@@ -974,9 +977,9 @@ attr_store_unpack (Attrstore *s)
 		  {
 		    int val;
 		    get_num (ai.as_numlist, val);
-		    if (!val)
+		    add_attr_intlist_int (s, i, ai.name, (val & 63) | ((val >> 1) & ~63));
+		    if (!(val & 64))
 		      break;
-		    add_attr_intlist_int (s, i, ai.name, val);
 		  }
 	        break;
 	      }

@@ -179,12 +179,12 @@ ai_step (Attrstore *s, attr_iterator *ai)
       }
     case TYPE_ATTR_INTLIST:
       {
-        ai->as_numlist = ai->attrs_next;
+	ai->as_numlist = ai->attrs_next;
 	while (1)
 	  {
 	    int val;
 	    get_num (ai->attrs_next, val);
-	    if (!val)
+	    if (!(val & 64))
 	      break;
 	  }
 	break;

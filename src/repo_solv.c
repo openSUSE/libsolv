@@ -269,6 +269,7 @@ skip_item (Repodata *data, unsigned type, unsigned numid, unsigned numrel)
       case TYPE_IDVALUEARRAY:
       case TYPE_IDVALUEVALUEARRAY:
       case TYPE_REL_IDARRAY:
+      case TYPE_ATTR_INTLIST:
 	while ((read_u8(data) & 0xc0) != 0)
 	  ;
 	break;
@@ -297,7 +298,6 @@ skip_item (Repodata *data, unsigned type, unsigned numid, unsigned numrel)
       case TYPE_ATTR_INT:
 	read_id(data, 0);
 	break;
-      case TYPE_ATTR_INTLIST:
       case TYPE_ATTR_LOCALIDS:
 	while (read_id(data, 0) != 0)
 	  ;

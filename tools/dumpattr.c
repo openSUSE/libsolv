@@ -49,9 +49,9 @@ dump_attrs (Attrstore *s, unsigned int entry)
 	      {
 		int val;
 		get_num (ai.as_numlist, val);
-		if (!val)
+		fprintf (stdout, " %d", (val & 63) | ((val >> 1) & ~63));
+		if (!(val & 64))
 		  break;
-		fprintf (stdout, " %d", val);
 	      }
 	    fprintf (stdout, "\n");
 	    break;
