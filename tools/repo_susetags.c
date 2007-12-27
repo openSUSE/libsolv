@@ -287,7 +287,7 @@ add_source (char *line, struct parsedata *pd, Solvable *s, unsigned entry, int f
 	    }
         }
       if (n != repo->end)
-        add_attr_intlist_int (attr, entry, id_sourceid, nn - repo->start);
+        add_attr_int (attr, entry, id_sourceid, nn - repo->start);
       else
         {
           add_attr_localids_id (attr, entry, id_source, str2localid (attr, sp[0], 1));
