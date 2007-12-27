@@ -47,6 +47,8 @@ struct parsedata {
   int last_found_source;
   char **share_with;
   int nshare;
+  Id (*dirs)[3]; // dirid, size, nfiles
+  int ndirs;
 };
 
 static Id
@@ -141,6 +143,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 Attrstore *attr;
 static Id id_authors;
 static Id id_description;
+static Id id_diskusage;
 static Id id_downloadsize;
 static Id id_eula;
 static Id id_group;
@@ -294,6 +297,98 @@ add_source (char *line, struct parsedata *pd, Solvable *s, unsigned entry, int f
     }
 }
 
+static void
+add_dirline (struct parsedata *pd, char *line)
+{
+  char *sp[6];
+  if (split (line, sp, 6) != 5)
+    return;
+  if (!(pd->ndirs & 31))
+    {
+      if (pd->dirs)
+        pd->dirs = realloc (pd->dirs, (pd->ndirs + 32) * sizeof (pd->dirs[0]));
+      else
+        pd->dirs = malloc ((pd->ndirs + 32) * sizeof (pd->dirs[0]));
+    }
+  long filesz = strtol (sp[1], 0, 0);
+  filesz += strtol (sp[2], 0, 0);
+  long filenum = strtol (sp[3], 0, 0);
+  filenum += strtol (sp[4], 0, 0);
+  unsigned dirid = dir_lookup (attr, sp[0], 1);
+  pd->dirs[pd->ndirs][0] = dirid;
+  pd->dirs[pd->ndirs][1] = filesz;
+  pd->dirs[pd->ndirs][2] = filenum;
+  pd->ndirs++;
+}
+
+static int
+id3_cmp (const void *v1, const void *v2)
+{
+  Id *i1 = (Id*)v1;
+  Id *i2 = (Id*)v2;
+  return i1[0] - i2[0];
+}
+
+static void
+commit_diskusage (struct parsedata *pd, unsigned entry)
+{
+  unsigned i;
+  /* Now sort in dirid order.  This ensures that parents come before
+     their children.  */
+  if (pd->ndirs > 1)
+    qsort (pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp);
+  /* Substract leaf numbers from all parents to make the numbers
+     non-cumulative.  This must be done post-order (i.e. all leafs
+     adjusted before parents).  We ensure this by starting at the end of
+     the array moving to the start, hence seeing leafs before parents.  */
+  for (i = pd->ndirs; i--;)
+    {
+      unsigned p = dir_parent (attr, pd->dirs[i][0]);
+      unsigned j = i;
+      for (; p; p = dir_parent (attr, p))
+        {
+          for (; j--;)
+	    if (pd->dirs[j][0] == p)
+	      break;
+	  if (j < pd->ndirs)
+	    {
+	      if (pd->dirs[j][1] < pd->dirs[i][1])
+	        pd->dirs[j][1] = 0;
+	      else
+	        pd->dirs[j][1] -= pd->dirs[i][1];
+	      if (pd->dirs[j][2] < pd->dirs[i][2])
+	        pd->dirs[j][2] = 0;
+	      else
+	        pd->dirs[j][2] -= pd->dirs[i][2];
+	    }
+	  else
+	    /* Haven't found this parent in the list, look further if
+	       we maybe find the parents parent.  */
+	    j = i;
+	}
+    }
+#if 0
+  char sbuf[1024];
+  char *buf = sbuf;
+  unsigned slen = sizeof (sbuf);
+  for (i = 0; i < pd->ndirs; i++)
+    {
+      dir2str (attr, pd->dirs[i][0], &buf, &slen);
+      fprintf (stderr, "have dir %d %d %d %s\n", pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2], buf);
+    }
+  if (buf != sbuf)
+    free (buf);
+#endif
+  for (i = 0; i < pd->ndirs; i++)
+    if (pd->dirs[i][1] || pd->dirs[i][2])
+      {
+        add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][0]);
+        add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][1]);
+        add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][2]);
+      }
+  pd->ndirs = 0;
+}
+
 /* Unfortunately "a"[0] is no constant expression in the C languages,
    so we need to pass the four characters individually :-/  */
 #define CTAG(a,b,c,d) ((unsigned)(((unsigned char)a) << 24) \
@@ -327,6 +422,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
       attr = new_store(pool);
       id_authors = str2id (pool, "authors", 1);
       id_description = str2id (pool, "description", 1);
+      id_diskusage = str2id (pool, "diskusage", 1);
       id_downloadsize = str2id (pool, "downloadsize", 1);
       id_eula = str2id (pool, "eula", 1);
       id_group = str2id (pool, "group", 1);
@@ -435,6 +531,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 	  if (s)
 	    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
+	  if (s && pd.ndirs)
+	    commit_diskusage (&pd, last_found_pack);
 	  pd.kind = 0;
 	  if (line[3] == 't')
 	    pd.kind = "pattern";
@@ -454,10 +552,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  s->vendor = vendor;
 	  continue;
 	}
-      if (indesc == 2
+      if (indesc >= 2
           && (tag == CTAG('=', 'P', 'k', 'g')
 	      || tag == CTAG('=', 'P', 'a', 't')))
 	{
+	  if (s && pd.ndirs)
+	    commit_diskusage (&pd, last_found_pack);
+
 	  Id name, evr, arch;
 	  int n, nn;
 	  pd.kind = 0;
@@ -613,6 +714,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      }
 	    pd.share_with[last_found_pack] = strdup (line + 6);
 	    continue;
+	  case CTAG('=', 'D', 'i', 'r'):
+	    add_dirline (&pd, line + 6);
+	    continue;
           case CTAG('=', 'V', 'e', 'r'):
 	    last_found_pack = 0;
 	    indesc++;
@@ -623,6 +727,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   if (s)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
+  if (s && pd.ndirs)
+    commit_diskusage (&pd, last_found_pack);
     
   if (pd.sources)
     {
