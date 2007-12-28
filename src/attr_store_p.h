@@ -47,6 +47,18 @@ typedef struct _Dir
   Id name;
 } Dir;
 
+typedef struct _Dirtree {
+  Dir *dirs;
+  unsigned ndirs;
+  Stringpool ss;
+  unsigned *dirstack;
+  unsigned ndirstack, dirstack_size;
+  unsigned *flatdirs;
+  unsigned nflatdirs;
+  unsigned *flatsons;
+  unsigned *dirmap;
+} Dirtree;
+
 struct _Attrstore
 {
   Pool *pool;
@@ -65,13 +77,7 @@ struct _Attrstore
 
   Stringpool ss;
 
-  struct Dirtree {
-    Dir *dirs;
-    unsigned ndirs;
-    Stringpool ss;
-    unsigned *dirstack;
-    unsigned ndirstack, dirstack_size;
-  } dirtree;
+  Dirtree dirtree;
 
   /* A space efficient in memory representation.  It's read-only.  */
   /* flat_attrs[ent2attr[i]] are the attrs for entity i.  */

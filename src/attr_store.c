@@ -96,6 +96,37 @@ setup_dirs (Attrstore *s)
   stringpool_init (&s->dirtree.ss, ss_init_strs);
 }
 
+#if 0
+static void
+dir_setup_flatsons (Dirtree *d)
+{
+  if (d->flatsons)
+    return;
+  if (!d->nflatdirs)
+    return;
+  d->flatsons = xcalloc (d->nflatdirs, sizeof (d->flatsons[0]));
+  unsigned firstson = -1;
+  unsigned i;
+  for (i = 0; i < d->nflatdirs; i++)
+    if (d->flatdirs[i] & 1)
+      /* A node, i.e. potential son.  */
+      {
+        if (firstson == -1)
+	  firstson = i;
+      }
+    else if (d->flatdirs[i] & 2)
+      /* An intermediate parent pointer.  */
+      ;
+    else
+      /* The final parent pointer.  Remember the first son.  */
+      {
+        assert (firstson != -1);
+	d->flatsons[d->flatdirs[i] >> 2] = firstson;
+	firstson = -1;
+      }
+}
+#endif
+
 static unsigned
 dir_lookup_1 (Attrstore *s, unsigned dir, const char *name, unsigned insert)
 {
@@ -188,17 +219,30 @@ endmatch2:
 unsigned
 dir_parent (Attrstore *s, unsigned dir)
 {
-  return s->dirtree.dirs[dir].parent;
+  if (s->dirtree.dirs)
+    return s->dirtree.dirs[dir].parent;
+  /* We have the packed representation.  */
+  unsigned p;
+  while ((p = s->dirtree.flatdirs[dir]) & 1)
+    dir++;
+  return p >> 2;
 }
 
 void
 dir2str (Attrstore *s, unsigned dir, char **str, unsigned *len)
 {
   unsigned l = 0;
-  Id ids[s->dirtree.dirstack_size + 1];
+  Id ids[256];
   unsigned i, ii;
-  for (i = 0; dir > 1; dir = dir_parent (s, dir), i++)
-    ids[i] = s->dirtree.dirs[dir].name;
+  if (s->dirtree.dirs)
+    for (i = 0; i < 256 && dir > 1; dir = dir_parent (s, dir), i++)
+      ids[i] = s->dirtree.dirs[dir].name;
+  else
+    for (i = 0; i < 256 && dir > 1; dir = dir_parent (s, dir), i++)
+      {
+        assert (s->dirtree.flatdirs[dir] & 1);
+        ids[i] = s->dirtree.flatdirs[dir] >> 1;
+      }
   ii = i;
   l = 1;
   for (i = 0; i < ii; i++)
@@ -787,6 +831,47 @@ add_key (Attrstore *s, Id name, unsigned type, unsigned size)
   return s->nkeys++;
 }
 
+#define DIR_BLOCK 1023
+#define CACHE_LINE 32
+#define CACHE_LINE_ELEMS (CACHE_LINE / sizeof(unsigned))
+
+static void
+finalize_dirs_rec (Dirtree *d, unsigned dir)
+{
+  unsigned c, parent;
+  if (!d->dirs[dir].child)
+    return;
+  parent = d->dirmap[dir];
+  assert(parent);
+  parent--;
+  for (c = d->dirs[dir].child; c; c = d->dirs[c].sibling)
+    {
+      unsigned id = d->dirs[c].name;
+      if ((d->nflatdirs & (CACHE_LINE_ELEMS - 1)) == CACHE_LINE_ELEMS - 1)
+	add_elem (d->flatdirs, d->nflatdirs, parent * 4 + 2, DIR_BLOCK);
+      d->dirmap[c] = d->nflatdirs + 1;
+      add_elem (d->flatdirs, d->nflatdirs, id * 2 + 1, DIR_BLOCK);
+    }
+  add_elem (d->flatdirs, d->nflatdirs, parent * 4, DIR_BLOCK);
+  for (c = d->dirs[dir].child; c; c = d->dirs[c].sibling)
+    finalize_dirs_rec (d, c);
+}
+
+static void
+finalize_dirtree (Dirtree *d)
+{
+  if (d->nflatdirs || !d->ndirs)
+    return;
+  d->dirmap = calloc (d->ndirs, sizeof (d->dirmap[0]));
+  d->nflatdirs = 0;
+  d->flatdirs = 0;
+  d->flatsons = 0;
+  d->dirmap[1] = d->nflatdirs + 1;
+  finalize_dirs_rec (d, 1);
+  xfree (d->dirs);
+  d->dirs = 0;
+}
+
 void
 attr_store_pack (Attrstore *s)
 {
@@ -794,6 +879,8 @@ attr_store_pack (Attrstore *s)
   unsigned int old_mem = 0;
   if (s->packed)
     return;
+  finalize_dirtree (&s->dirtree);
+
   s->ent2attr = xcalloc (s->entries, sizeof (s->ent2attr[0]));
   s->flat_attrs = 0;
   s->attr_next_free = 0;
@@ -801,6 +888,8 @@ attr_store_pack (Attrstore *s)
   s->szschemata = 0;
   s->schemata = 0;
   s->schemaofs = 0;
+
+  Id id_diskusage = str2id (s->pool, "diskusage", 0);
 
   add_num (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
   add_elem (s->schemata, s->szschemata, 0, SCHEMA_BLOCK);
@@ -878,7 +967,14 @@ attr_store_pack (Attrstore *s)
 	      {
 		const int *il = nv[ofs].v.intlist;
 		int len = *il++;
-		//add_num (s->flat_attrs, s->attr_next_free, len, FLAT_ATTR_BLOCK);
+	        if (s->dirtree.dirmap
+		    && s->keys[nv[ofs].key].name == id_diskusage)
+		  {
+		    unsigned i;
+		    assert (!(len % 3));
+		    for (i = 1; i <= len; i += 3)
+		      nv[ofs].v.intlist[i] = s->dirtree.dirmap[nv[ofs].v.intlist[i]] - 1;
+		  }
 		old_mem += 4 * (len + 1);
 		while (len--)
 		  {
@@ -911,6 +1007,8 @@ attr_store_pack (Attrstore *s)
   old_mem += s->entries * sizeof (s->attrs[0]);
   free (s->attrs);
   s->attrs = 0;
+  xfree (s->dirtree.dirmap);
+  s->dirtree.dirmap = 0;
 
   /* Remove the hashtable too, it will be build on demand in str2localid
      the next time we call it, which should not happen while in packed mode.  */
@@ -1015,6 +1113,7 @@ attr_store_unpack (Attrstore *s)
   xfree (s->schemata);
   s->schemata = 0;
   s->szschemata = 0;
+  /* XXX unpack the dirtree */
 }
 
 static void
@@ -1247,6 +1346,28 @@ write_attr_store (FILE *fp, Attrstore *s)
       exit (1);
     }
 
+  /* XXX write the dirtree as info block.  */
+  write_id (fp, s->dirtree.ndirs);
+  if (s->dirtree.ndirs)
+    {
+      for (i = 1, local_ssize = 0; i < (unsigned)s->dirtree.ss.nstrings; i++)
+        local_ssize += 1 + strlen (s->dirtree.ss.stringspace + s->dirtree.ss.strings[i]);
+
+      write_u32 (fp, s->dirtree.ss.nstrings);
+      write_u32 (fp, local_ssize);
+      for (i = 1; i < (unsigned)s->dirtree.ss.nstrings; i++)
+	{
+	  const char *str = s->dirtree.ss.stringspace + s->dirtree.ss.strings[i];
+	  if (fwrite(str, strlen(str) + 1, 1, fp) != 1)
+	    {
+	      perror("write error");
+	      exit(1);
+	    }
+	}
+      write_id (fp, s->dirtree.nflatdirs);
+      for (i = 0; i < s->dirtree.nflatdirs; i++)
+        write_id (fp, s->dirtree.flatdirs[i]);
+    }
   write_pages (fp, s);
 }
 
@@ -1483,12 +1604,51 @@ read_or_setup_pages (FILE *fp, Attrstore *s)
     }
 }
 
+static void
+read_stringpool (FILE *fp, Stringpool *ss, unsigned nstrings)
+{
+  unsigned i;
+  unsigned local_ssize;
+  /* Slightly hacky.  Our local string pool already contains "<NULL>" and
+     "".  We write out the "" too, so we have to read over it.  We write it
+     out to be compatible with the SOLV file and to not have to introduce
+     merging and mapping the string IDs.  */
+  local_ssize = read_u32 (fp) - 1;
+  char *strsp = (char *)xrealloc(ss->stringspace, ss->sstrings + local_ssize + 1);
+  Offset *str = (Offset *)xrealloc(ss->strings, nstrings * sizeof(Offset));
+
+  ss->stringspace = strsp;
+  ss->strings = str;
+  strsp += ss->sstrings;
+
+  unsigned char ignore_char = 1;
+  if (fread(&ignore_char, 1, 1, fp) != 1
+      || (local_ssize && fread(strsp, local_ssize, 1, fp) != 1)
+      || ignore_char != 0)
+    {
+      perror ("read error while reading strings");
+      exit(1);
+    }
+  strsp[local_ssize] = 0;
+
+  /* Don't build hashtable here, it will be built on demand by str2localid
+     should we call that.  */
+
+  strsp = ss->stringspace;
+  ss->nstrings = nstrings;
+  for (i = 0; i < nstrings; i++)
+    {
+      str[i] = strsp - ss->stringspace;
+      strsp += strlen (strsp) + 1;
+    }
+  ss->sstrings = strsp - ss->stringspace;
+}
+
 Attrstore *
 attr_store_read (FILE *fp, Pool *pool)
 {
   unsigned nentries;
   unsigned i;
-  unsigned local_ssize;
   unsigned nstrings, nschemata;
   Attrstore *s = new_store (pool);
 
@@ -1520,39 +1680,7 @@ attr_store_read (FILE *fp, Pool *pool)
       exit (1);
     }
 
-  /* Slightly hacky.  Our local string pool already contains "<NULL>" and
-     "".  We write out the "" too, so we have to read over it.  We write it
-     out to be compatible with the SOLV file and to not have to introduce
-     merging and mapping the string IDs.  */
-  local_ssize = read_u32 (fp) - 1;
-  char *strsp = (char *)xrealloc(s->ss.stringspace, s->ss.sstrings + local_ssize + 1);
-  Offset *str = (Offset *)xrealloc(s->ss.strings, (nstrings) * sizeof(Offset));
-
-  s->ss.stringspace = strsp;
-  s->ss.strings = str;
-  strsp += s->ss.sstrings;
-
-  unsigned char ignore_char = 1;
-  if (fread(&ignore_char, 1, 1, fp) != 1
-      || (local_ssize && fread(strsp, local_ssize, 1, fp) != 1)
-      || ignore_char != 0)
-    {
-      perror ("read error while reading strings");
-      exit(1);
-    }
-  strsp[local_ssize] = 0;
-
-  /* Don't build hashtable here, it will be built on demand by str2localid
-     should we call that.  */
-
-  strsp = s->ss.stringspace;
-  s->ss.nstrings = nstrings;
-  for (i = 0; i < nstrings; i++)
-    {
-      str[i] = strsp - s->ss.stringspace;
-      strsp += strlen (strsp) + 1;
-    }
-  s->ss.sstrings = strsp - s->ss.stringspace;
+  read_stringpool (fp, &s->ss, nstrings);
 
   s->keys = xrealloc (s->keys, ((s->nkeys + KEY_BLOCK) & ~KEY_BLOCK) * sizeof (s->keys[0]));
   /* s->keys[0] is initialized in new_store.  */
@@ -1603,6 +1731,22 @@ attr_store_read (FILE *fp, Pool *pool)
       exit (1);
     }
 
+  s->dirtree.ndirs = read_id (fp, 0);
+  if (s->dirtree.ndirs)
+    {
+      unsigned ndirs = s->dirtree.ndirs;
+      setup_dirs (s);
+      xfree (s->dirtree.dirs);
+      s->dirtree.dirs = 0;
+      s->dirtree.ndirs = ndirs;
+
+      nstrings = read_u32 (fp);
+      read_stringpool (fp, &s->dirtree.ss, nstrings);
+      s->dirtree.nflatdirs = read_id (fp, 0);
+      s->dirtree.flatdirs = xmalloc (s->dirtree.nflatdirs * sizeof (s->dirtree.flatdirs[0]));
+      for (i = 0; i < s->dirtree.nflatdirs; i++)
+        s->dirtree.flatdirs[i] = read_id (fp, 0);
+    }
   read_or_setup_pages (fp, s);
 
   s->packed = 1;

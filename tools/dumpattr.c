@@ -18,6 +18,38 @@
 #include "pool.h"
 #include "attr_store_p.h"
 
+static Id id_diskusage;
+
+static void
+dump_diskusage (Attrstore *s, const unsigned char *numlist)
+{
+  char sbuf[1024];
+  char *buf = sbuf;
+  unsigned slen = sizeof (sbuf);
+  fprintf (stdout, "DU\n");
+  while (1)
+    {
+      unsigned dirid, filesz, filenum;
+      int val;
+      get_num (numlist, val);
+      dirid = (val & 63) | ((val >> 1) & ~63);
+      if (!(val & 64))
+	break;
+      get_num (numlist, val);
+      filesz = (val & 63) | ((val >> 1) & ~63);
+      if (!(val & 64))
+	break;
+      get_num (numlist, val);
+      filenum = (val & 63) | ((val >> 1) & ~63);
+      dir2str (s, dirid, &buf, &slen);
+      fprintf (stdout, "  %s %d %d %d\n", buf, dirid, filesz, filenum);
+      if (!(val & 64))
+	break;
+    }
+  if (buf != sbuf)
+    free (buf);
+}
+
 static void
 dump_attrs (Attrstore *s, unsigned int entry)
 {
@@ -43,19 +75,22 @@ dump_attrs (Attrstore *s, unsigned int entry)
 	  fprintf (stdout, "str  %s\n", ai.as_string);
 	  break;
 	case TYPE_ATTR_INTLIST:
-	  {
-	    fprintf (stdout, "lint\n ");
-	    while (1)
-	      {
-		int val;
-		get_num (ai.as_numlist, val);
-		fprintf (stdout, " %d", (val & 63) | ((val >> 1) & ~63));
-		if (!(val & 64))
-		  break;
-	      }
-	    fprintf (stdout, "\n");
-	    break;
-	  }
+	  if (ai.name == id_diskusage)
+	    dump_diskusage (s, ai.as_numlist);
+	  else
+	    {
+	      fprintf (stdout, "lint\n ");
+	      while (1)
+	        {
+		  int val;
+		  get_num (ai.as_numlist, val);
+		  fprintf (stdout, " %d", (val & 63) | ((val >> 1) & ~63));
+		  if (!(val & 64))
+		    break;
+	        }
+	      fprintf (stdout, "\n");
+	    }
+	  break;
 	case TYPE_ATTR_LOCALIDS:
 	  {
 	    fprintf (stdout, "lids");
@@ -93,6 +128,7 @@ main (int argc, char *argv[])
   unsigned int i;
   Pool *pool = pool_create ();
   Attrstore *s = attr_store_read (stdin, pool);
+  id_diskusage = str2id (pool, "diskusage", 0);
   /* For now test the packing code.  */
   attr_store_unpack (s);
   attr_store_pack (s);
