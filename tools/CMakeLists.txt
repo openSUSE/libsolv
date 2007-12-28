@@ -59,6 +59,7 @@ install(TARGETS dumpattr
                 rpmmd2solv 
                 rpmdb2solv
 		addstore
+		content2solv
    DESTINATION ${BIN_INSTALL_DIR} )
 
 install(PROGRAMS repo2solv.sh DESTINATION ${BIN_INSTALL_DIR} )
