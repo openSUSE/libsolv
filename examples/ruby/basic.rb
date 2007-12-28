@@ -1,5 +1,5 @@
+$: << "../../build/bindings/ruby"
 require 'satsolver'
-
 include SatSolver
 
 pool = Pool.new
@@ -7,46 +7,39 @@ pool = Pool.new
 
 #s = pool.add_empty_repo
 
-f = File.open('../../testsuite/data.libzypp/basic-exercises/exercise-20-packages.solv', 'r')
 s = pool.create_repo('foo');
-s.add_solv(f);
+s.add_solv('../../testsuite/data.libzypp/basic-exercises/exercise-20-packages.solv');
 
-f = File.open('../../testsuite/data.libzypp/basic-exercises/exercise-20-system.solv', 'r')
 installed = pool.create_repo('system');
-installed.add_solv(f);
+installed.add_solv('../../testsuite/data.libzypp/basic-exercises/exercise-20-system.solv');
 
 pool.each_repo do |repo|
   puts repo.name
 end
 
-s.each_solvable do |r|
+s.each do |r|
   puts r
 end
 
-q = Queue.new
-puts q.empty?
-
-r = pool.select_solvable(s, 'G')
+r = pool.find('G', s)
 puts r
 
-# push one command and one resolvable to the queue
-q.push(SOLVER_INSTALL_SOLVABLE)
-q.push(r)
+t = pool.create_transaction
+t.install( r )
 
 pool.prepare
 pool.promoteepoch = 1
 
-# no packages installed so use add_empty_repo
 solv = Solver.new(pool, installed)
 
-solv.fixsystem = 0
-solv.updatesystem = 0
-solv.allowdowngrade = 0
-solv.allowuninstall = 0
-solv.noupdateprovide = 0
+solv.fix_system = 0
+solv.update_system = 0
+solv.allow_downgrade = 0
+solv.allow_uninstall = 0
+solv.no_update_provide = 0
 
 # solve the queue
-solv.solve(q)
+solv.solve(t)
 
 #solv.print_decisions
 
