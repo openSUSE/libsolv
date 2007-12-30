@@ -2731,6 +2731,7 @@ printdecisions(Solver *solv)
         {
 	    IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
 	    {	
+	      p = -p;
 	      s = pool->solvables + p;	    
 	      POOL_DEBUG(SAT_DEBUG_SCHUBI, "level of %s is %d\n", solvable2str(pool, s), p);
 	    }
@@ -2740,7 +2741,7 @@ printdecisions(Solver *solv)
         {
 	    POOL_DEBUG(SAT_DEBUG_SCHUBI, "SYSTEMSOLVABLE\n");
 	    continue;
-	}	  
+	}
       s = pool->solvables + p;
       if (installed && s->repo == installed)
 	continue;
