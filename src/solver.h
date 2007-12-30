@@ -145,6 +145,8 @@ extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id 
 extern Id solver_findproblemrule(Solver *solv, Id problem);
 extern SolverProbleminfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
 
+Id *create_obsoletesmap(Solver *solv);
+
 /* debug functions, do not use */
 void printdecisions(Solver *solv);
 void printsolutions(Solver *solv, Queue *job);

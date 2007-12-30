@@ -2622,23 +2622,20 @@ solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, I
 }
 
 
-  
 /*
- * printdecisions
+ * create obsoletesmap from solver decisions
+ * required for decision handling
  */
-  
 
-void
-printdecisions(Solver *solv)
+Id *
+create_obsoletesmap(Solver *solv)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
-  Id p, *obsoletesmap;
+  Id p, *obsoletesmap = NULL;
   int i;
   Solvable *s;
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions -----\n");  
-  
   obsoletesmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
   if (installed)
     {
@@ -2691,6 +2688,24 @@ printdecisions(Solver *solv)
 	      }
 	}
     }
+  return obsoletesmap;
+}
+
+/*
+ * printdecisions
+ */
+  
+
+void
+printdecisions(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Id p, *obsoletesmap = create_obsoletesmap( solv );
+  int i;
+  Solvable *s;
+
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions -----\n");  
 
   /* print solvables to be erased */
 
