@@ -158,7 +158,7 @@ printrule(Solver *solv, int type, Rule *r)
 	break;
       printruleelement(solv, type, r, v);
     }
-  POOL_DEBUG(type, "    next: %d %d\n", r->n1, r->n2);
+  POOL_DEBUG(type, "    next rules: %d %d\n", r->n1, r->n2);
 }
 
 static void
@@ -629,7 +629,7 @@ makeruledecisions(Solver *solv)
 	}
 
       /* only job and system rules left in the decisionq*/
-      /* find the decision which is the "oposite" of the jobrule */
+      /* find the decision which is the "opposite" of the jobrule */
       for (i = 0; i < solv->decisionq.count; i++)
 	if (solv->decisionq.elements[i] == -v)
 	  break;
@@ -1199,6 +1199,24 @@ addupdaterule(Solver *solv, Solvable *s, int allowall)
 /*-----------------------------------------------------------------*/
 /* watches */
 
+/*
+ * print watches
+ *
+ */
+
+static void
+printWatches(Solver *solv, int type)
+{
+  Pool *pool = solv->pool;
+  int counter;
+    
+  POOL_DEBUG(type, "Watches: \n");
+
+  for (counter = -(pool->nsolvables); counter <= pool->nsolvables; counter ++)
+     {
+	 POOL_DEBUG(type, "    solvable [%d] -- rule [%d]\n", counter, solv->watches[counter+pool->nsolvables]);
+     }
+}
 
 /*
  * makewatches
@@ -1286,6 +1304,7 @@ propagate(Solver *solv, int level)
         {
 	  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "popagate for decision %d level %d\n", -pkg, level);
 	  printruleelement(solv, SAT_DEBUG_PROPAGATE, 0, -pkg);
+	  printWatches(solv, SAT_DEBUG_SCHUBI);
         }
 
       for (rp = watches + pkg; *rp; rp = nrp)
@@ -1300,12 +1319,12 @@ propagate(Solver *solv, int level)
 	  
 	  if (pkg == r->w1)
 	    {
-	      ow = r->w2;
+	      ow = r->w2; /* regard the second watchpoint to come to a solution */
 	      nrp = &r->n1;
 	    }
 	  else
 	    {
-	      ow = r->w1;
+	      ow = r->w1; /* regard the first watchpoint to come to a solution */
 	      nrp = &r->n2;
 	    }
 	  /* if clause is TRUE, nothing to do */
@@ -1354,7 +1373,7 @@ propagate(Solver *solv, int level)
 	    return r;		/* eek, a conflict! */
 	  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
 	    {
-	      POOL_DEBUG(SAT_DEBUG_PROPAGATE, "unit ");
+	      POOL_DEBUG(SAT_DEBUG_PROPAGATE, "   unit ");
 	      printrule(solv, SAT_DEBUG_PROPAGATE, r);
 	    }
 	  if (ow > 0)
@@ -1367,9 +1386,9 @@ propagate(Solver *solv, int level)
 	    {
 	      Solvable *s = pool->solvables + (ow > 0 ? ow : -ow);
 	      if (ow > 0)
-		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "  -> decided to install %s\n", solvable2str(pool, s));
+		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "    -> decided to install %s\n", solvable2str(pool, s));
 	      else
-		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "  -> decided to conflict %s\n", solvable2str(pool, s));
+		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "    -> decided to conflict %s\n", solvable2str(pool, s));
 	    }
 	}
     }

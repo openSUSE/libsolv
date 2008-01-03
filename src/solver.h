@@ -60,7 +60,7 @@ typedef struct solver {
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   
   Rule *rules;				/* all rules */
-  Id nrules;				/* rpm rules */
+  Id nrules;				/* index of the last rule */
 
   Id jobrules;				/* user rules */
   Id systemrules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
