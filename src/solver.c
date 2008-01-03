@@ -1281,6 +1281,8 @@ addwatches(Solver *solv, Rule *r)
  * propagate
  * 
  * propagate decision to all rules
+ * return : 0 = everything is OK
+ *          watched rule = there is a conflict
  */
 
 static Rule *
