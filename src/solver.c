@@ -628,7 +628,8 @@ makeruledecisions(Solver *solv)
 	  continue;
 	}
 
-      /* only job and system rules left */
+      /* only job and system rules left in the decisionq*/
+      /* find the decision which is the "oposite" of the jobrule */
       for (i = 0; i < solv->decisionq.count; i++)
 	if (solv->decisionq.elements[i] == -v)
 	  break;
@@ -3388,7 +3389,7 @@ solver_solve(Solver *solv, Queue *job)
 	  if (MAPTST(&addedmap, i))
 	    possible++;
 	}
-      POOL_DEBUG(SAT_DEBUG_STATS, "%d of %d installable solvables considered for solving\n", possible, installable);
+      POOL_DEBUG(SAT_DEBUG_STATS, "%d of %d installable solvables considered for solving (rules has been generated for)\n", possible, installable);
     }
 
   /*
@@ -3415,7 +3416,7 @@ solver_solve(Solver *solv, Queue *job)
 
   for (i = 0; i < job->count; i += 2)
     {
-      int oldnrules = solv->nrules;
+      oldnrules = solv->nrules;
 
       how = job->elements[i];
       what = job->elements[i + 1];
