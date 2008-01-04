@@ -1,40 +1,40 @@
 #!/usr/bin/perl
 
-use lib './blib/arch/auto/SaT';
+use lib '../../build/bindings/perl';
 
-use SaT;
+use satsolverx;
 
 # Open Solvable file
-open(F, "gzip -cd tmp/primary.gz |") || die;
+# open(F, "gzip -cd tmp/primary.gz |") || die;
 
 # Create Pool and Repository 
-my $pool = new SaT::_Pool;
-my $repo = $pool -> createRepo('repo');
+my $pool = new satsolverx::Pool;
+my $repo = $pool -> create_repo('repo');
 
 # Add Solvable to Repository
-$repo -> addSolvable (F);
-close(F) || die;
+$repo -> add_solv ("tmp/primary");
+# close(F) || die;
 
 # Create Solver
-my $solver = new SaT::Solver ($pool);
+my $solver = $pool -> create_solver();
 
 # Create dependencies to provides table
-$pool -> createWhatProvides();
+$pool -> prepare();
 
-# Create Queue
-my $job = new SaT::Queue;
+# Create Transactions
+my $job = $pool -> create_transaction();
 
 # Push jobs on Queue
-$job -> queuePush ( $SaT::SOLVER_INSTALL_SOLVABLE );
-if (! $job -> queuePush ( $pool -> selectSolvable ($repo,"pattern:default"))) {
-	die "failed to push job";
-}
+my $pat = $pool -> find( "pattern:default" ) || die;
+$job -> install( $pat );
+
+# $job -> install( "pattern:default" );
 
 # Solve the jobs
 $solver -> solve ($job);
 
 # Print packages to install
-$a = $solver -> getInstallList($pool);
+$a = $solver -> getInstallList();
 foreach my $c (@{$a}) {
 	print "$c\n";
 }
