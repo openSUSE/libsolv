@@ -1417,7 +1417,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
   Map seen;		/* global? */
   Id v, vv, *dp;
   int l, i, idx;
-  int num = 0;
+  int num = 0, l1num = 0;
   int learnt_why = solv->learnt_pool.count;
   Id *decisionmap = solv->decisionmap;
  
@@ -1432,6 +1432,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 	printruleclass(solv, SAT_DEBUG_ANALYZE, c);
       queue_push(&solv->learnt_pool, c - solv->rules);
       dp = c->d ? pool->whatprovidesdata + c->d : 0;
+      /* go through all literals of the rule */
       for (i = -1; ; i++)
 	{
 	  if (i == -1)
@@ -1442,8 +1443,9 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 	    v = *dp++;
 	  if (v == 0)
 	    break;
+
 	  if (DECISIONMAP_TRUE(v))	/* the one true literal */
-	      continue;
+	    continue;
 	  vv = v > 0 ? v : -v;
 	  if (MAPTST(&seen, vv))
 	    continue;
@@ -1452,6 +1454,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 	    l = -l;
 	  if (l == 1)
 	    {
+	      /* a level 1 literal, mark it for later */
 #if 0
 	      int j;
 	      for (j = 0; j < solv->decisionq.count; j++)
@@ -1461,7 +1464,9 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 		abort();
 	      queue_push(&rulq, -(j + 1));
 #endif
-	      continue;			/* initial setting */
+	      MAPSET(&seen, vv);	/* mark for scanning in level 1 phase */
+	      l1num++;
+	      continue;
 	    }
 	  MAPSET(&seen, vv);
 	  if (l == level)
@@ -1487,7 +1492,46 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
       if (--num == 0)
 	break;
     }
-  *pr = -v;
+  *pr = -v;	/* so that v doesn't get lost */
+
+  /* add involved level 1 rules */
+  if (l1num)
+    {
+      POOL_DEBUG(SAT_DEBUG_ANALYZE, "got %d involved level 1 decisions\n", l1num);
+      idx++;
+      while (idx)
+	{
+	  v = solv->decisionq.elements[--idx];
+	  vv = v > 0 ? v : -v;
+	  if (!MAPTST(&seen, vv))
+	    continue;
+	  if (!solv->decisionq_why.elements[idx])
+	    continue;
+	  c = solv->rules + solv->decisionq_why.elements[idx];
+	  IF_POOLDEBUG (SAT_DEBUG_ANALYZE)
+	    printruleclass(solv, SAT_DEBUG_ANALYZE, c);
+	  queue_push(&solv->learnt_pool, c - solv->rules);
+	  for (i = -1; ; i++)
+	    {
+	      if (i == -1)
+		v = c->p;
+	      else if (c->d == 0)
+		v = i ? 0 : c->w2;
+	      else
+		v = *dp++;
+	      if (v == 0)
+		break;
+	      if (DECISIONMAP_TRUE(v))	/* the one true literal */
+		continue;
+	      vv = v > 0 ? v : -v;
+	      l = solv->decisionmap[vv];
+	      if (l != 1 && l != -1)
+		continue;
+	      MAPSET(&seen, vv);
+	    }
+	}
+    }
+
   if (r.count == 0)
     *dr = 0;
   else if (r.count == 1 && r.elements[0] < 0)
@@ -1497,7 +1541,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
   IF_POOLDEBUG (SAT_DEBUG_ANALYZE)
     {
       POOL_DEBUG(SAT_DEBUG_ANALYZE, "learned rule for level %d (am %d)\n", rlevel, level);
-      printruleelement(solv, SAT_DEBUG_ANALYZE, 0, -v);
+      printruleelement(solv, SAT_DEBUG_ANALYZE, 0, *pr);
       for (i = 0; i < r.count; i++)
         printruleelement(solv, SAT_DEBUG_ANALYZE, 0, r.elements[i]);
     }
