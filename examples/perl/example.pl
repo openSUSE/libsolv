@@ -9,6 +9,7 @@ use satsolverx;
 
 # Create Pool and Repository 
 my $pool = new satsolverx::Pool;
+$pool -> set_arch( 'i686' );
 my $repo = $pool -> create_repo('repo');
 
 # Add Solvable to Repository
