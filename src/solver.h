@@ -82,6 +82,8 @@ typedef struct solver {
   /* our decisions: */
   Queue decisionq;
   Queue decisionq_why;			/* index of rule, Offset into rules */
+  int directdecisions;			/* number of decisions with no rule */
+
   Id *decisionmap;			/* map for all available solvables, > 0: level of decision when installed, < 0 level of decision when conflict */
 
   /* learnt rule history */
