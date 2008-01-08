@@ -394,10 +394,14 @@ addrule(Solver *solv, Id p, Id d)
       /* this is a rpm rule assertion, we do not have to allocate it */
       /* it can be identified by a level of 1 and a zero reason */
       /* we must not drop those rules from the decisionq when rewinding! */
-      if (p >= 0)
+      if (p >= 0) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
-      if (solv->decisionmap[-p] > 0 || solv->decisionmap[-p] < -1)
+      }
+      if (solv->decisionmap[-p] > 0 || solv->decisionmap[-p] < -1) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
+      }
       if (solv->decisionmap[-p])
 	return 0;	/* already got that one */
       queue_push(&solv->decisionq, p);
@@ -617,6 +621,7 @@ makeruledecisions(Solver *solv)
 	  /* cannot happen, as this would mean that the problem
            * was not solvable, so we wouldn't have created the
            * learnt rule at all */
+	  fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	  abort();
         }
       /* if we are weak, just disable ourself */
@@ -633,13 +638,17 @@ makeruledecisions(Solver *solv)
       for (i = 0; i < solv->decisionq.count; i++)
 	if (solv->decisionq.elements[i] == -v)
 	  break;
-      if (i == solv->decisionq.count)
+      if (i == solv->decisionq.count) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
+      }
       if (solv->decisionq_why.elements[i] == 0)
 	{
 	  /* conflict with rpm rule, need only disable our rule */
-	  if (v < 0 && v != -SYSTEMSOLVABLE)
+	  if (v < 0 && v != -SYSTEMSOLVABLE) {
+	    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	    abort();
+	  }
 	  /* record proof */
 	  queue_push(&solv->problems, solv->learnt_pool.count);
 	  queue_push(&solv->learnt_pool, ri);
@@ -713,8 +722,10 @@ enabledisablelearntrules(Solver *solv)
       whyp = solv->learnt_pool.elements + solv->learnt_why.elements[i - solv->learntrules];
       while ((why = *whyp++) != 0)
 	{
-	  if (why < 0 || why >= i)
+	  if (why < 0 || why >= i) {
+	    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	    abort();		/* cannot reference newer learnt rules */
+	  }
 	  if (!solv->rules[why].w1)
 	    break;
 	}
@@ -1478,8 +1489,10 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *why)
 		rlevel = l;
 	    }
 	}
-      if (num <= 0)
+      if (num <= 0) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
+      }
       for (;;)
 	{
 	  v = solv->decisionq.elements[--idx];
@@ -1717,8 +1730,10 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 	  /* this is the only positive rpm assertion */
 	  if (v == SYSTEMSOLVABLE)
 	    v = -v;
-	  if (v >= 0)
+	  if (v >= 0) {
+	    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	    abort();
+	  }
 	  queue_push(&solv->learnt_pool, v);
 	  continue;
 	}
@@ -1888,16 +1903,22 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
 	return analyze_unsolvable(solv, r, disablerules);
       POOL_DEBUG(SAT_DEBUG_ANALYZE, "conflict with rule #%d\n", (int)(r - solv->rules));
       l = analyze(solv, level, r, &p, &d, &why);	/* learnt rule in p and d */
-      if (l >= level || l <= 0)
+      if (l >= level || l <= 0) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
+      }
       POOL_DEBUG(SAT_DEBUG_ANALYZE, "reverting decisions (level %d -> %d)\n", level, l);
       level = l;
       revert(solv, level);
       r = addrule(solv, p, d);       /* p requires d */
-      if (!r)
+      if (!r) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
-      if (solv->learnt_why.count != (r - solv->rules) - solv->learntrules)
+      }
+      if (solv->learnt_why.count != (r - solv->rules) - solv->learntrules) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
+      }
       queue_push(&solv->learnt_why, why);
       if (d)
 	{
@@ -2244,6 +2265,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      /* cannot happen as this means that
                * the rule is unit */
 	      printrule(solv, SAT_FATAL, r);
+	      fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	      abort();
 	    }
 	  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
@@ -2612,8 +2634,10 @@ problems_to_solutions(Solver *solv, Queue *job)
 	      queue_push(&solutions, p);
 	      queue_push(&solutions, rp);
 	    }
-	  else
+	  else {
+	    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	    abort();
+	  }
 	}
       /* mark end of this solution */
       queue_push(&solutions, 0);
@@ -2629,8 +2653,10 @@ problems_to_solutions(Solver *solv, Queue *job)
   revert(solv, 1);		/* XXX move to reset_solver? */
   reset_solver(solv);
 
-  if (solv->problems.count != solutions.count)
+  if (solv->problems.count != solutions.count) {
+    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
     abort();
+  }
   queue_free(&solutions);
 }
 
@@ -2853,8 +2879,10 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
   int dontfix = 0;
   Id p, *pp, req, *reqp, con, *conp, obs, *obsp, *dp;
   
-  if (rid >= solv->weakrules)
+  if (rid >= solv->weakrules) {
+    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
     abort();
+  }
   if (rid >= solv->systemrules)
     {
       *depp = 0;
@@ -2877,19 +2905,25 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
   if (rid < 0)
     {
       /* a rpm rule assertion */
-      if (rid == -SYSTEMSOLVABLE)
+      if (rid == -SYSTEMSOLVABLE) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();	/* can happen only for job rules */
+      }
       s = pool->solvables - rid;
       if (installed && !solv->fixsystem && s->repo == installed)
 	dontfix = 1;
-      if (dontfix)	/* dontfix packages never have a neg assertion */
+      if (dontfix) {	/* dontfix packages never have a neg assertion */
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
+      }
       /* see why the package is not installable */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC && !pool_installable(pool, s))
 	return SOLVER_PROBLEM_NOT_INSTALLABLE;
       /* check requires */
-      if (!s->requires)
+      if (!s->requires) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
+      }
       reqp = s->repo->idarraydata + s->requires;
       while ((req = *reqp++) != 0)
 	{
@@ -2904,15 +2938,19 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	      return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
 	    }
 	}
+      fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
       abort();
     }
   r = solv->rules + rid;
-  if (r->p >= 0)
+  if (r->p >= 0) {
+    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
     abort();	/* not a rpm rule */
+  }
   if (r->d == 0 && r->w2 == 0)
     {
       /* an assertion. we don't store them as rpm rules, so
        * can't happen */
+      fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
       abort();
     }
   s = pool->solvables - r->p;
@@ -3008,11 +3046,14 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	    }
 	}
       /* all cases checked, can't happen */
+      fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
       abort();
     }
   /* simple requires */
-  if (!s->requires)
+  if (!s->requires) {
+    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
     abort();
+  }
   reqp = s->repo->idarraydata + s->requires;
   while ((req = *reqp++) != 0)
     {
@@ -3027,8 +3068,10 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
       else if (dp - pool->whatprovidesdata == r->d)
 	break;
     }
-  if (!req)
+  if (!req) {
+    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
     abort();
+  }
   *depp = req;
   *sourcep = -r->p;
   *targetp = 0;
@@ -3110,6 +3153,7 @@ solver_findproblemrule(Solver *solv, Id problem)
     return sysr;
   if (jobr)
     return jobr;
+  fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
   abort();
 }
 
@@ -3562,9 +3606,11 @@ solver_solve(Solver *solv, Queue *job)
 	}
     }
 
-  if (solv->ruletojob.count != solv->nrules - solv->jobrules)
+  if (solv->ruletojob.count != solv->nrules - solv->jobrules) {
+    fprintf( stderr, "ruletojob.count %d != nrules %d - jobrules %d\n", solv->ruletojob.count, solv->nrules, solv->jobrules );
+    fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
     abort();
-
+  }
   /*
    * now add system rules
    * 
@@ -3589,8 +3635,10 @@ solver_solve(Solver *solv, Queue *job)
 	else
 	  addupdaterule(solv, 0, 0);	/* create dummy rule;  allowall = 0  */
       /* consistency check: we added a rule for _every_ system solvable */
-      if (solv->nrules - solv->systemrules != installed->end - installed->start)
+      if (solv->nrules - solv->systemrules != installed->end - installed->start) {
+	fprintf( stderr, "abort at solver.c:%d\n", __LINE__ );
 	abort();
+      }
     }
 
   /* create special weak system rules */
