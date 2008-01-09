@@ -569,7 +569,6 @@ printproblem(Solver *solv, Id v)
 /* go through system and job rules and add direct assertions
  * to the decisionqueue. If we find a conflict, disable rules and
  * add them to problem queue.
- * (disablerules is always true for the cases when we get called)
  */
 static void
 makeruledecisions(Solver *solv)
@@ -645,17 +644,18 @@ makeruledecisions(Solver *solv)
 	  else
 	    v = ri;
 	  queue_push(&solv->problems, v);
-	  disableproblem(solv, v);
 	  queue_push(&solv->problems, 0);
+	  disableproblem(solv, v);
 	  continue;
 	}
+
+      /* conflict with another job or system rule */
       /* record proof */
       queue_push(&solv->problems, solv->learnt_pool.count);
       queue_push(&solv->learnt_pool, ri);
       queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
       queue_push(&solv->learnt_pool, 0);
 
-      /* conflict with another job or system rule */
       POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflicting system/job assertions over literal %d\n", vv);
       /* push all of our rules asserting this literal on the problem stack */
       for (i = solv->jobrules, rr = solv->rules + i; i < solv->nrules; i++, rr++)
@@ -1228,7 +1228,7 @@ makewatches(Solver *solv)
 
   sat_free(solv->watches);
 				       /* lower half for removals, upper half for installs */
-  solv->watches = (Id *)sat_calloc(2 * nsolvables, sizeof(Id));
+  solv->watches = sat_calloc(2 * nsolvables, sizeof(Id));
 #if 1
   /* do it reverse so rpm rules get triggered first */
   for (i = 1, r = solv->rules + solv->nrules - 1; i < solv->nrules; i++, r--)
@@ -1561,11 +1561,7 @@ reset_solver(Solver *solv)
   int i;
   Id v;
 
-  enabledisablelearntrules(solv);
-
-  /* redo all direct rpm rule decisions */
-  /* we break at the first decision with a why attached, this is
-   * either a job/system rule assertion or a propagated decision */
+  /* rewind decisions to direct rpm rule assertions */
   for (i = solv->decisionq.count - 1; i >= solv->directdecisions; i--)
     {
       v = solv->decisionq.elements[i];
@@ -1579,9 +1575,13 @@ reset_solver(Solver *solv)
   solv->recommends_index = -1;
   solv->propagate_index = 0;
 
+  /* adapt learnt rule status to new set of enabled/disabled rules */
+  enabledisablelearntrules(solv);
+
   /* redo all job/system decisions */
   makeruledecisions(solv);
   POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "decisions so far: %d\n", solv->decisionq.count);
+
   /* recreate watch chains */
   makewatches(solv);
 }
@@ -1998,6 +1998,7 @@ solver_free(Solver *solv)
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
   map_free(&solv->noupdate);
+
   sat_free(solv->decisionmap);
   sat_free(solv->rules);
   sat_free(solv->watches);
@@ -2035,9 +2036,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
       for (i = 0; i < solv->nrules; i++)
 	printrule(solv, SAT_DEBUG_RULE_CREATION, solv->rules + i);
     }
-
-  /* create watches chains */
-  makewatches(solv);
 
   POOL_DEBUG(SAT_DEBUG_STATS, "initial decisions: %d\n", solv->decisionq.count);
   
@@ -2448,7 +2446,9 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
       revert(solv, 1);		/* XXX move to reset_solver? */
       reset_solver(solv);
 
-      run_solver(solv, 0, 0);
+      if (!solv->problems.count)
+        run_solver(solv, 0, 0);
+
       if (!solv->problems.count)
 	{
 	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "no more problems!\n");
@@ -2457,7 +2457,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	  break;		/* great, no more problems */
 	}
       disabledcnt = disabled.count;
-      /* skip over proof index */
+      /* start with 1 to skip over proof index */
       for (i = 1; i < solv->problems.count - 1; i++)
 	{
 	  /* ignore solutions in refined */
@@ -3592,16 +3592,18 @@ solver_solve(Solver *solv, Queue *job)
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
 
-  /*
-   * solve !
-   * 
-   */
-  
+  /* disable system rules that conflict with our job */
   disableupdaterules(solv, job, -1);
+
+  /* make decisions based on job/system assertions */
   makeruledecisions(solv);
+
+  /* create watches chains */
+  makewatches(solv);
 
   POOL_DEBUG(SAT_DEBUG_STATS, "problems so far: %d\n", solv->problems.count);
 
+  /* solve! */
   run_solver(solv, 1, 1);
 
   /* find suggested packages */
