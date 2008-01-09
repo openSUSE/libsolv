@@ -1832,13 +1832,13 @@ watch2onhighest(Solver *solv, Rule *r)
 /*
  * setpropagatelearn
  *
- * add free decision to decision q, increase level
+ * add free decision to decisionq, increase level and
  * propagate decision, return if no conflict.
  * in conflict case, analyze conflict rule, add resulting
  * rule to learnt rule set, make decision from learnt
  * rule (always unit) and re-propagate.
  *
- * returns the current solver level
+ * returns the new solver level or 0 if unsolvable
  *
  */
 
@@ -1902,7 +1902,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
  * install best package from the queue. We add an extra package, inst, if
  * provided. See comment in weak install section.
  *
- * returns the current solver level
+ * returns the new solver level or 0 if unsolvable
  *
  */
 static int
@@ -2165,7 +2165,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (i == solv->nrules)
 	    i = 1;
 	  r = solv->rules + i;
-	  if (!r->w1) // disabled rule
+	  if (!r->w1)	/* ignore disabled rules */
 	    continue;
 	  queue_empty(&dq);
 	  if (r->d == 0)
