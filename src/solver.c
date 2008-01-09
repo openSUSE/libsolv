@@ -1837,6 +1837,9 @@ watch2onhighest(Solver *solv, Rule *r)
  * in conflict case, analyze conflict rule, add resulting
  * rule to learnt rule set, make decision from learnt
  * rule (always unit) and re-propagate.
+ *
+ * returns the current solver level
+ *
  */
 
 static int
@@ -1898,6 +1901,9 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
 /*
  * install best package from the queue. We add an extra package, inst, if
  * provided. See comment in weak install section.
+ *
+ * returns the current solver level
+ *
  */
 static int
 selectandinstall(Solver *solv, int level, Queue *dq, Id inst, int disablerules)
@@ -2159,7 +2165,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (i == solv->nrules)
 	    i = 1;
 	  r = solv->rules + i;
-	  if (!r->w1)
+	  if (!r->w1) // disabled rule
 	    continue;
 	  queue_empty(&dq);
 	  if (r->d == 0)
