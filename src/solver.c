@@ -268,7 +268,7 @@ unifyrules(Solver *solv)
 
   /* adapt rule buffer */
   solv->nrules = j;
-  solv->rules = (Rule *)xrealloc(solv->rules, ((solv->nrules + RULES_BLOCK) & ~RULES_BLOCK) * sizeof(Rule));
+  solv->rules = (Rule *)sat_realloc(solv->rules, ((solv->nrules + RULES_BLOCK) & ~RULES_BLOCK) * sizeof(Rule));
   IF_POOLDEBUG (SAT_DEBUG_STATS)
     {
       int binr = 0;
@@ -438,7 +438,7 @@ addrule(Solver *solv, Id p, Id d)
   /* check and extend rule buffer */
   if ((solv->nrules & RULES_BLOCK) == 0)
     {
-      solv->rules = (Rule *)xrealloc(solv->rules, (solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
+      solv->rules = (Rule *)sat_realloc(solv->rules, (solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
     }
 
   r = solv->rules + solv->nrules++;    /* point to rule space */
@@ -1226,9 +1226,9 @@ makewatches(Solver *solv)
   int i;
   int nsolvables = solv->pool->nsolvables;
 
-  xfree(solv->watches);
+  sat_free(solv->watches);
 				       /* lower half for removals, upper half for installs */
-  solv->watches = (Id *)xcalloc(2 * nsolvables, sizeof(Id));
+  solv->watches = (Id *)sat_calloc(2 * nsolvables, sizeof(Id));
 #if 1
   /* do it reverse so rpm rules get triggered first */
   for (i = 1, r = solv->rules + solv->nrules - 1; i < solv->nrules; i++, r--)
@@ -1952,7 +1952,7 @@ Solver *
 solver_create(Pool *pool, Repo *installed)
 {
   Solver *solv;
-  solv = (Solver *)xcalloc(1, sizeof(Solver));
+  solv = (Solver *)sat_calloc(1, sizeof(Solver));
   solv->pool = pool;
   solv->installed = installed;
 
@@ -1970,8 +1970,8 @@ solver_create(Pool *pool, Repo *installed)
   map_init(&solv->noupdate, installed ? installed->end - installed->start : 0);
   solv->recommends_index = 0;
 
-  solv->decisionmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
-  solv->rules = (Rule *)xmalloc((solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
+  solv->decisionmap = (Id *)sat_calloc(pool->nsolvables, sizeof(Id));
+  solv->rules = (Rule *)sat_malloc((solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
   memset(solv->rules, 0, sizeof(Rule));
   solv->nrules = 1;
 
@@ -1998,13 +1998,13 @@ solver_free(Solver *solv)
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
   map_free(&solv->noupdate);
-  xfree(solv->decisionmap);
-  xfree(solv->rules);
-  xfree(solv->watches);
-  xfree(solv->weaksystemrules);
-  xfree(solv->obsoletes);
-  xfree(solv->obsoletes_data);
-  xfree(solv);
+  sat_free(solv->decisionmap);
+  sat_free(solv->rules);
+  sat_free(solv->watches);
+  sat_free(solv->weaksystemrules);
+  sat_free(solv->obsoletes);
+  sat_free(solv->obsoletes_data);
+  sat_free(solv);
 }
 
 
@@ -2674,7 +2674,7 @@ create_obsoletesmap(Solver *solv)
   int i;
   Solvable *s;
 
-  obsoletesmap = (Id *)xcalloc(pool->nsolvables, sizeof(Id));
+  obsoletesmap = (Id *)sat_calloc(pool->nsolvables, sizeof(Id));
   if (installed)
     {
       for (i = 0; i < solv->decisionq.count; i++)
@@ -2800,7 +2800,7 @@ printdecisions(Solver *solv)
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
 
-  xfree(obsoletesmap);
+  sat_free(obsoletesmap);
 
   if (solv->suggestions.count)
     {
@@ -3252,7 +3252,7 @@ create_obsolete_index(Solver *solv)
   if (!installed || !installed->nsolvables)
     return;
   /* create reverse obsoletes map for installed solvables */
-  solv->obsoletes = obsoletes = xcalloc(installed->end - installed->start, sizeof(Id));
+  solv->obsoletes = obsoletes = sat_calloc(installed->end - installed->start, sizeof(Id));
   for (i = 1; i < pool->nsolvables; i++)
     {
       s = pool->solvables + i;
@@ -3280,7 +3280,7 @@ create_obsolete_index(Solver *solv)
         n += obsoletes[i] + 1;
         obsoletes[i] = n;
       }
-  solv->obsoletes_data = obsoletes_data = xcalloc(n + 1, sizeof(Id));
+  solv->obsoletes_data = obsoletes_data = sat_calloc(n + 1, sizeof(Id));
   POOL_DEBUG(SAT_DEBUG_STATS, "obsoletes data: %d entries\n", n + 1);
   for (i = pool->nsolvables - 1; i > 0; i--)
     {
@@ -3560,7 +3560,7 @@ solver_solve(Solver *solv, Queue *job)
      best effort mode */
   if (installed && installed->nsolvables)
     {
-      solv->weaksystemrules = xcalloc(installed->end - installed->start, sizeof(Id));
+      solv->weaksystemrules = sat_calloc(installed->end - installed->start, sizeof(Id));
       FOR_REPO_SOLVABLES(installed, p, s)
 	{
 	  policy_findupdatepackages(solv, s, &q, 1);

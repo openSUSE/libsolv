@@ -13,7 +13,7 @@
 #include "util.h"
 
 void *
-xmalloc(size_t len)
+sat_malloc(size_t len)
 {
   void *r = malloc(len ? len : 1);
   if (r)
@@ -23,18 +23,18 @@ xmalloc(size_t len)
 }
 
 void *
-xmalloc2(size_t num, size_t len)
+sat_malloc2(size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
     {
       fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
       exit(1);
     }
-  return xmalloc(num * len);
+  return sat_malloc(num * len);
 }
 
 void *
-xrealloc(void *old, size_t len)
+sat_realloc(void *old, size_t len)
 {
   if (old == 0)
     old = malloc(len ? len : 1);
@@ -47,18 +47,18 @@ xrealloc(void *old, size_t len)
 }
 
 void *
-xrealloc2(void *old, size_t num, size_t len)
+sat_realloc2(void *old, size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
     {
       fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
       exit(1);
     }
-  return xrealloc(old, num * len);
+  return sat_realloc(old, num * len);
 }
 
 void *
-xcalloc(size_t num, size_t len)
+sat_calloc(size_t num, size_t len)
 {
   void *r;
   if (num == 0 || len == 0)
@@ -72,7 +72,7 @@ xcalloc(size_t num, size_t len)
 }
 
 void *
-xfree(void *mem)
+sat_free(void *mem)
 {
   if (mem)
     free(mem);

@@ -36,8 +36,8 @@ repo_create(Pool *pool, const char *name)
   Repo *repo;
 
   pool_freewhatprovides(pool);
-  repo = (Repo *)xcalloc(1, sizeof(*repo));
-  pool->repos = (Repo **)xrealloc(pool->repos, (pool->nrepos + 1) * sizeof(Repo *));
+  repo = (Repo *)sat_calloc(1, sizeof(*repo));
+  pool->repos = (Repo **)sat_realloc2(pool->repos, pool->nrepos + 1, sizeof(Repo *));
   pool->repos[pool->nrepos++] = repo;
   repo->name = name ? strdup(name) : 0;
   repo->pool = pool;
@@ -50,10 +50,10 @@ repo_create(Pool *pool, const char *name)
 static void
 repo_freedata(Repo *repo)
 {
-  xfree(repo->idarraydata);
-  xfree(repo->rpmdbid);
-  xfree((char *)repo->name);
-  xfree(repo);
+  sat_free(repo->idarraydata);
+  sat_free(repo->rpmdbid);
+  sat_free((char *)repo->name);
+  sat_free(repo);
 }
 
 /*
@@ -74,7 +74,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
 
   if (!idarray)			       /* alloc idarray if not done yet */
     {
-      idarray = (Id *)xmalloc((1 + IDARRAY_BLOCK) * sizeof(Id));
+      idarray = sat_malloc2(1 + IDARRAY_BLOCK, sizeof(Id));
       idarray[0] = 0;
       idarraysize = 1;
       repo->lastoff = 0;
@@ -84,7 +84,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
     {   
       olddeps = idarraysize;
       if ((idarraysize & IDARRAY_BLOCK) == 0)
-        idarray = (Id *)xrealloc(idarray, (idarraysize + 1 + IDARRAY_BLOCK) * sizeof(Id));
+        idarray = sat_realloc2(idarray, idarraysize + 1 + IDARRAY_BLOCK, sizeof(Id));
     }   
   else if (olddeps == repo->lastoff)	/* extend at end */
     idarraysize--;
@@ -95,17 +95,17 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
       for (; idarray[i]; i++)
         {
           if ((idarraysize & IDARRAY_BLOCK) == 0)
-            idarray = (Id *)xrealloc(idarray, (idarraysize + 1 + IDARRAY_BLOCK) * sizeof(Id));
+            idarray = sat_realloc2(idarray, idarraysize + 1 + IDARRAY_BLOCK, sizeof(Id));
           idarray[idarraysize++] = idarray[i];
         }
       if ((idarraysize & IDARRAY_BLOCK) == 0)
-        idarray = (Id *)xrealloc(idarray, (idarraysize + 1 + IDARRAY_BLOCK) * sizeof(Id));
+        idarray = sat_realloc2(idarray, idarraysize + 1 + IDARRAY_BLOCK, sizeof(Id));
     }
   
   idarray[idarraysize++] = id;		/* insert Id into array */
 
   if ((idarraysize & IDARRAY_BLOCK) == 0)   /* realloc if at block boundary */
-    idarray = (Id *)xrealloc(idarray, (idarraysize + 1 + IDARRAY_BLOCK) * sizeof(Id));
+    idarray = sat_realloc2(idarray, idarraysize + 1 + IDARRAY_BLOCK, sizeof(Id));
 
   idarray[idarraysize++] = 0;		/* ensure NULL termination */
 
@@ -215,7 +215,7 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
   if (!repo->idarraysize)	       /* ensure buffer space */
     {
       repo->idarraysize = 1;
-      repo->idarraydata = (Id *)xmalloc(((1 + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
+      repo->idarraydata = sat_malloc2((1 + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK, sizeof(Id));
       repo->idarraydata[0] = 0;
       repo->lastoff = 1;
       return 1;
@@ -237,7 +237,7 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
 
       /* realloc if crossing block boundary */
       if (((repo->idarraysize - 1) | IDARRAY_BLOCK) != ((repo->idarraysize + count - 1) | IDARRAY_BLOCK))
-	repo->idarraydata = (Id *)xrealloc(repo->idarraydata, ((repo->idarraysize + count + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
+	repo->idarraydata = sat_realloc2(repo->idarraydata, (repo->idarraysize + count + IDARRAY_BLOCK) & ~IDARRAY_BLOCK, sizeof(Id));
 
       /* move old deps to end */
       olddeps = repo->lastoff = repo->idarraysize;
@@ -252,7 +252,7 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
 
   /* realloc if crossing block boundary */
   if (((repo->idarraysize - 1) | IDARRAY_BLOCK) != ((repo->idarraysize + num - 1) | IDARRAY_BLOCK))
-    repo->idarraydata = (Id *)xrealloc(repo->idarraydata, ((repo->idarraysize + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK) * sizeof(Id));
+    repo->idarraydata = sat_realloc2(repo->idarraydata, (repo->idarraysize + num + IDARRAY_BLOCK) & ~IDARRAY_BLOCK, sizeof(Id));
 
   /* appending or new */
   repo->lastoff = olddeps ? olddeps : repo->idarraysize;
@@ -308,7 +308,7 @@ repo_freeallrepos(Pool *pool, int reuseids)
   pool_freewhatprovides(pool);
   for (i = 0; i < pool->nrepos; i++)
     repo_freedata(pool->repos[i]);
-  pool->repos = xfree(pool->repos);
+  pool->repos = sat_free(pool->repos);
   pool->nrepos = 0;
   /* the first two solvables don't belong to a repo */
   pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
@@ -906,14 +906,14 @@ repo_add_attrstore (Repo *repo, Attrstore *s, const char *location)
 	}
     }
   repo->nrepodata++;
-  repo->repodata = xrealloc (repo->repodata, repo->nrepodata * sizeof (*data));
+  repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
   data = repo->repodata + repo->nrepodata - 1;
   memset (data, 0, sizeof (*data));
   data->s = s;
   data->nkeys = s->nkeys;
   if (data->nkeys)
     {
-      data->keys = xmalloc(data->nkeys * sizeof(data->keys[0]));
+      data->keys = sat_malloc2(data->nkeys, sizeof(data->keys[0]));
       for (i = 1; i < data->nkeys; i++)
         {
           data->keys[i].name = s->keys[i].name;

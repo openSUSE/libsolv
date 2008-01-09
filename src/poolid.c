@@ -31,7 +31,7 @@ str2id(Pool *pool, const char *str, int create)
   if (create && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
     {
       /* grow whatprovides array */
-      pool->whatprovides = xrealloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      pool->whatprovides = sat_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
       memset(pool->whatprovides + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
     }
   return id;
@@ -55,9 +55,9 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   /* extend hashtable if needed */
   if (pool->nrels * 2 > hashmask)
     {
-      xfree(pool->relhashtbl);
+      sat_free(pool->relhashtbl);
       pool->relhashmask = hashmask = mkmask(pool->ss.nstrings + REL_BLOCK);
-      pool->relhashtbl = hashtbl = xcalloc(hashmask + 1, sizeof(Id));
+      pool->relhashtbl = hashtbl = sat_calloc(hashmask + 1, sizeof(Id));
       // rehash all rels into new hashtable
       for (i = 1; i < pool->nrels; i++)
 	{
@@ -87,7 +87,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   id = pool->nrels++;
   /* extend rel space if needed */
   if ((id & REL_BLOCK) == 0)
-    pool->rels = xrealloc(pool->rels, ((pool->nrels + REL_BLOCK) & ~REL_BLOCK) * sizeof(Reldep));
+    pool->rels = sat_realloc(pool->rels, ((pool->nrels + REL_BLOCK) & ~REL_BLOCK) * sizeof(Reldep));
   hashtbl[h] = id;
   ran = pool->rels + id;
   ran->name = name;
@@ -97,7 +97,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   /* extend whatprovides_rel if needed */
   if (pool->whatprovides_rel && (id & WHATPROVIDES_BLOCK) == 0)
     {
-      pool->whatprovides_rel = xrealloc(pool->whatprovides_rel, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      pool->whatprovides_rel = sat_realloc(pool->whatprovides_rel, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
       memset(pool->whatprovides_rel + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
     }
   return MAKERELDEP(id);
@@ -209,10 +209,10 @@ dep2str(Pool *pool, Id id)
   if (l + 1 > pool->dep2strlen[n])
     {
       if (s1 != pool->dep2strbuf[n])
-        pool->dep2strbuf[n] = xrealloc(pool->dep2strbuf[n], l + 32);
+        pool->dep2strbuf[n] = sat_realloc(pool->dep2strbuf[n], l + 32);
       else
 	{
-          pool->dep2strbuf[n] = xrealloc(pool->dep2strbuf[n], l + 32);
+          pool->dep2strbuf[n] = sat_realloc(pool->dep2strbuf[n], l + 32);
           s1 = pool->dep2strbuf[n];
 	}
       pool->dep2strlen[n] = l + 32;
@@ -247,7 +247,7 @@ pool_shrink_strings(Pool *pool)
 void
 pool_shrink_rels(Pool *pool)
 {
-  pool->rels = (Reldep *)xrealloc(pool->rels, ((pool->nrels + REL_BLOCK) & ~REL_BLOCK) * sizeof(Reldep));
+  pool->rels = (Reldep *)sat_realloc(pool->rels, ((pool->nrels + REL_BLOCK) & ~REL_BLOCK) * sizeof(Reldep));
 }
 
 // reset all hash tables
@@ -255,9 +255,9 @@ pool_shrink_rels(Pool *pool)
 void
 pool_freeidhashes(Pool *pool)
 {
-  pool->ss.stringhashtbl = xfree(pool->ss.stringhashtbl);
+  pool->ss.stringhashtbl = sat_free(pool->ss.stringhashtbl);
   pool->ss.stringhashmask = 0;
-  pool->relhashtbl = xfree(pool->relhashtbl);
+  pool->relhashtbl = sat_free(pool->relhashtbl);
   pool->relhashmask = 0;
 }
 

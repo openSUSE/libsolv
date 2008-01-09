@@ -103,7 +103,7 @@ headint32(RpmHead *h, int tag, int *cnt)
   if (o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = xcalloc(i ? i : 1, sizeof(unsigned int));
+  r = sat_calloc(i ? i : 1, sizeof(unsigned int));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 4)
@@ -153,7 +153,7 @@ headstringarray(RpmHead *h, int tag, int *cnt)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  r = xcalloc(i ? i : 1, sizeof(char *));
+  r = sat_calloc(i ? i : 1, sizeof(char *));
   if (cnt)
     *cnt = i;
   d = h->dp + o;
@@ -164,7 +164,7 @@ headstringarray(RpmHead *h, int tag, int *cnt)
         d += strlen((char *)d) + 1;
       if (d >= h->dp + h->dcnt)
         {
-          free(r);
+          sat_free(r);
           return 0;
         }
     }
@@ -194,16 +194,16 @@ static char *headtoevr(RpmHead *h)
     {
       char epochbuf[11];        /* 32bit decimal will fit in */
       sprintf(epochbuf, "%u", epoch);
-      evr = xmalloc(strlen(epochbuf) + 1 + strlen(version) + 1 + strlen(release) + 1);
+      evr = sat_malloc(strlen(epochbuf) + 1 + strlen(version) + 1 + strlen(release) + 1);
       sprintf(evr, "%s:%s-%s", epochbuf, version, release);
     }
   else
     {
-      evr = xmalloc(strlen(version) + 1 + strlen(release) + 1);
+      evr = sat_malloc(strlen(version) + 1 + strlen(release) + 1);
       sprintf(evr, "%s-%s", version, release);
     }
   if (epochp)
-    free(epochp);
+    sat_free(epochp);
   return evr;
 }
 
@@ -223,13 +223,13 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   v = headstringarray(rpmhead, tagv, &vc);
   if (!v)
     {
-      free(n);
+      sat_free(n);
       return 0;
     }
   f = headint32(rpmhead, tagf, &fc);
   if (!f)
     {
-      free(n);
+      sat_free(n);
       free(v);
       return 0;
     }
@@ -264,9 +264,9 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
      haspre = 0;
   if (cc == 0)
     {
-      free(n);
-      free(v);
-      free(f);
+      sat_free(n);
+      sat_free(v);
+      sat_free(f);
       return 0;
     }
   cc += haspre;
@@ -310,9 +310,9 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
     }
   *ida++ = 0;
   repo->idarraysize += cc + 1;
-  free(n);
-  free(v);
-  free(f);
+  sat_free(n);
+  sat_free(v);
+  sat_free(f);
   return olddeps;
 }
 
@@ -399,14 +399,14 @@ addfileprovides(Pool *pool, Repo *repo, RpmHead *rpmhead, unsigned int olddeps)
   dn = headstringarray(rpmhead, TAG_DIRNAMES, &dnc);
   if (!dn)
     {
-      free(bn);
+      sat_free(bn);
       return olddeps;
     }
   di = headint32(rpmhead, TAG_DIRINDEXES, &dic);
   if (!di)
     {
-      free(bn);
-      free(dn);
+      sat_free(bn);
+      sat_free(dn);
       return olddeps;
     }
   if (bnc != dic)
@@ -451,17 +451,17 @@ addfileprovides(Pool *pool, Repo *repo, RpmHead *rpmhead, unsigned int olddeps)
       if (j > fna)
 	{
 	  fna = j + 256;
-	  fn = xrealloc(fn, fna);
+	  fn = sat_realloc(fn, fna);
 	}
       strcpy(fn, dn[di[i]]);
       strcat(fn, bn[i]);
       olddeps = repo_addid(repo, olddeps, str2id(pool, fn, 1));
     }
   if (fn)
-    free(fn);
-  free(bn);
-  free(dn);
-  free(di);
+    sat_free(fn);
+  sat_free(bn);
+  sat_free(dn);
+  sat_free(di);
   return olddeps;
 }
 
@@ -485,7 +485,7 @@ rpm2solv(Pool *pool, Repo *repo, Solvable *s, RpmHead *rpmhead)
     s->arch = ARCH_NOARCH;
   evr = headtoevr(rpmhead);
   s->evr = str2id(pool, evr, 1);
-  free(evr);
+  sat_free(evr);
   s->vendor = str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
@@ -560,7 +560,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	  exit(1);
 	}
       dbidp = (unsigned char *)&dbid;
-      repo->rpmdbid = xcalloc(256, sizeof(unsigned int));
+      repo->rpmdbid = sat_calloc(256, sizeof(unsigned int));
       asolv = 256;
       rpmheadsize = 0;
       rpmhead = 0;
@@ -572,7 +572,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	    s = pool_id2solvable(pool, repo_add_solvable(repo));
 	  if (i >= asolv)
 	    {
-	      repo->rpmdbid = xrealloc(repo->rpmdbid, (asolv + 256) * sizeof(unsigned int));
+	      repo->rpmdbid = sat_realloc(repo->rpmdbid, (asolv + 256) * sizeof(unsigned int));
 	      memset(repo->rpmdbid + asolv, 0, 256 * sizeof(unsigned int));
 	      asolv += 256;
 	    }
@@ -599,7 +599,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	      exit(1);
 	    }
 	  if (data.size > rpmheadsize)
-	    rpmhead = xrealloc(rpmhead, sizeof(*rpmhead) + data.size);
+	    rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + data.size);
 	  memcpy(buf, data.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
@@ -672,9 +672,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	      else
 		memcpy(dbidp, dp, 4);
 	      if ((nrpmids & 255) == 0)
-		rpmids = xrealloc(rpmids, sizeof(*rpmids) * (nrpmids + 256));
+		rpmids = sat_realloc(rpmids, sizeof(*rpmids) * (nrpmids + 256));
 	      rpmids[nrpmids].dbid = dbid;
-	      rpmids[nrpmids].name = malloc((int)key.size + 1);
+	      rpmids[nrpmids].name = sat_malloc((int)key.size + 1);
 	      memcpy(rpmids[nrpmids].name, key.data, (int)key.size);
 	      rpmids[nrpmids].name[(int)key.size] = 0;
 	      nrpmids++;
@@ -696,7 +696,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
       if (ref)
 	{
 	  refmask = mkmask(ref->nsolvables);
-	  refhash = xcalloc(refmask + 1, sizeof(Id));
+	  refhash = sat_calloc(refmask + 1, sizeof(Id));
 	  for (i = 0; i < ref->nsolvables; i++)
 	    {
 	      h = ref->rpmdbid[i] & refmask;
@@ -706,7 +706,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	    }
 	}
 
-      repo->rpmdbid = xcalloc(nrpmids, sizeof(unsigned int));
+      repo->rpmdbid = sat_calloc(nrpmids, sizeof(unsigned int));
 
       s = pool_id2solvable(pool, repo_add_solvable_block(repo, nrpmids));
 
@@ -799,7 +799,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	      exit(1);
 	    }
 	  if (data.size > rpmheadsize)
-	    rpmhead = xrealloc(rpmhead, sizeof(*rpmhead) + data.size);
+	    rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + data.size);
 	  memcpy(buf, data.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
@@ -815,16 +815,16 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	}
 
       if (refhash)
-	free(refhash);
+	sat_free(refhash);
       if (rpmids)
 	{
 	  for (i = 0; i < nrpmids; i++)
-	    free(rpmids[i].name);
-	  free(rpmids);
+	    sat_free(rpmids[i].name);
+	  sat_free(rpmids);
 	}
     }
   if (rpmhead)
-    free(rpmhead);
+    sat_free(rpmhead);
   if (db)
     db->close(db, 0);
 }

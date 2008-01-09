@@ -49,7 +49,7 @@ new_store (Pool *pool)
     "",
     0
   };
-  Attrstore *s = calloc (1, sizeof (Attrstore));
+  Attrstore *s = sat_calloc (1, sizeof (Attrstore));
   s->pool = pool;
   stringpool_init (&s->ss, predef_strings);
   add_key (s, 0, 0, 0);
@@ -79,7 +79,7 @@ setup_dirs (Attrstore *s)
     0
   };
 
-  s->dirtree.dirs = calloc (1024, sizeof (s->dirtree.dirs[0]));
+  s->dirtree.dirs = sat_calloc (1024, sizeof (s->dirtree.dirs[0]));
   s->dirtree.ndirs = 2;
   s->dirtree.dirs[0].child = 0;
   s->dirtree.dirs[0].sibling = 0;
@@ -89,7 +89,7 @@ setup_dirs (Attrstore *s)
   s->dirtree.dirs[1].name = STRID_EMPTY;
 
   s->dirtree.dirstack_size = 16;
-  s->dirtree.dirstack = malloc (s->dirtree.dirstack_size * sizeof (s->dirtree.dirstack[0]));
+  s->dirtree.dirstack = sat_malloc (s->dirtree.dirstack_size * sizeof (s->dirtree.dirstack[0]));
   s->dirtree.ndirstack = 0;
   s->dirtree.dirstack[s->dirtree.ndirstack++] = 1; //dir-id of /
 
@@ -104,7 +104,7 @@ dir_setup_flatsons (Dirtree *d)
     return;
   if (!d->nflatdirs)
     return;
-  d->flatsons = xcalloc (d->nflatdirs, sizeof (d->flatsons[0]));
+  d->flatsons = sat_calloc (d->nflatdirs, sizeof (d->flatsons[0]));
   unsigned firstson = -1;
   unsigned i;
   for (i = 0; i < d->nflatdirs; i++)
@@ -148,7 +148,7 @@ dir_lookup_1 (Attrstore *s, unsigned dir, const char *name, unsigned insert)
     {
       c = s->dirtree.ndirs++;
       if (!(c & 1023))
-	dirs = realloc (dirs, (c + 1024) * sizeof (dirs[0]));
+	dirs = sat_realloc (dirs, (c + 1024) * sizeof (dirs[0]));
       dirs[c].child = 0;
       dirs[c].sibling = dirs[dir].child;
       dirs[c].name = nameid;
@@ -159,7 +159,7 @@ dir_lookup_1 (Attrstore *s, unsigned dir, const char *name, unsigned insert)
   if (!(s->dirtree.ndirstack & 15))
     {
       s->dirtree.dirstack_size += 16;
-      s->dirtree.dirstack = realloc (s->dirtree.dirstack, s->dirtree.dirstack_size * sizeof (s->dirtree.dirstack[0]));
+      s->dirtree.dirstack = sat_realloc (s->dirtree.dirstack, s->dirtree.dirstack_size * sizeof (s->dirtree.dirstack[0]));
     }
   s->dirtree.dirstack[s->dirtree.ndirstack++] = c;
   if (!*end)
@@ -250,7 +250,7 @@ dir2str (Attrstore *s, unsigned dir, char **str, unsigned *len)
   l++;
   if (l > *len)
     {
-      *str = malloc (l);
+      *str = sat_malloc (l);
       *len = l;
     }
   char *dest = *str;
@@ -274,9 +274,9 @@ ensure_entry (Attrstore *s, unsigned int entry)
   if (((old_num + 127) & ~127) != ((s->entries + 127) & ~127))
     {
       if (s->attrs)
-        s->attrs = realloc (s->attrs, (((s->entries+127) & ~127) * sizeof (s->attrs[0])));
+        s->attrs = sat_realloc (s->attrs, (((s->entries+127) & ~127) * sizeof (s->attrs[0])));
       else
-        s->attrs = malloc (((s->entries+127) & ~127) * sizeof (s->attrs[0]));
+        s->attrs = sat_malloc (((s->entries+127) & ~127) * sizeof (s->attrs[0]));
     }
   memset (s->attrs + old_num, 0, (s->entries - old_num) * sizeof (s->attrs[0]));
 }
@@ -287,9 +287,9 @@ new_entry (Attrstore *s)
   if ((s->entries & 127) == 0)
     {
       if (s->attrs)
-        s->attrs = realloc (s->attrs, ((s->entries+128) * sizeof (s->attrs[0])));
+        s->attrs = sat_realloc (s->attrs, ((s->entries+128) * sizeof (s->attrs[0])));
       else
-        s->attrs = malloc ((s->entries+128) * sizeof (s->attrs[0]));
+        s->attrs = sat_malloc ((s->entries+128) * sizeof (s->attrs[0]));
     }
   s->attrs[s->entries++] = 0;
   return s->entries - 1;
@@ -332,9 +332,9 @@ add_attr (Attrstore *s, unsigned int entry, LongNV attr)
     }
   len += 2;
   if (s->attrs[entry])
-    s->attrs[entry] = realloc (s->attrs[entry], len * sizeof (LongNV));
+    s->attrs[entry] = sat_realloc (s->attrs[entry], len * sizeof (LongNV));
   else
-    s->attrs[entry] = malloc (len * sizeof (LongNV));
+    s->attrs[entry] = sat_malloc (len * sizeof (LongNV));
   nv = s->attrs[entry] + len - 2;
   *nv++ = attr;
   nv->key = 0;
@@ -379,7 +379,7 @@ add_attr_blob (Attrstore *s, unsigned int entry, Id name, const void *ptr, unsig
       != ((s->blob_next_free + len + BLOB_BLOCK) & ~BLOB_BLOCK))
     {
       unsigned int blobsz = (s->blob_next_free + len + BLOB_BLOCK) &~BLOB_BLOCK;
-      s->blob_store = xrealloc (s->blob_store, blobsz);
+      s->blob_store = sat_realloc (s->blob_store, blobsz);
     }
   memcpy (s->blob_store + s->blob_next_free, ptr, len);
   add_attr_chunk (s, entry, name, s->blob_next_free, len);
@@ -389,7 +389,7 @@ add_attr_blob (Attrstore *s, unsigned int entry, Id name, const void *ptr, unsig
   if (npages != s->num_pages)
     {
       Attrblobpage *p;
-      s->pages = xrealloc (s->pages, npages * sizeof (s->pages[0]));
+      s->pages = sat_realloc (s->pages, npages * sizeof (s->pages[0]));
       for (p = s->pages + s->num_pages; s->num_pages < npages;
 	   p++, s->num_pages++)
 	{
@@ -416,14 +416,14 @@ add_attr_intlist_int (Attrstore *s, unsigned int entry, Id name, int val)
   if (nv)
     {
       unsigned len = nv->v.intlist[0]++;
-      nv->v.intlist = realloc (nv->v.intlist, (len + 2) * sizeof (nv->v.intlist[0]));
+      nv->v.intlist = sat_realloc (nv->v.intlist, (len + 2) * sizeof (nv->v.intlist[0]));
       nv->v.intlist[len+1] = val;
     }
   else
     {
       LongNV mynv;
       mynv.key = add_key (s, name, TYPE_ATTR_INTLIST, 0);
-      mynv.v.intlist = malloc (2 * sizeof (mynv.v.intlist[0]));
+      mynv.v.intlist = sat_malloc (2 * sizeof (mynv.v.intlist[0]));
       mynv.v.intlist[0] = 1;
       mynv.v.intlist[1] = val;
       add_attr (s, entry, mynv);
@@ -439,7 +439,7 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id)
       unsigned len = 0;
       while (nv->v.localids[len])
         len++;
-      nv->v.localids = realloc (nv->v.localids, (len + 2) * sizeof (nv->v.localids[0]));
+      nv->v.localids = sat_realloc (nv->v.localids, (len + 2) * sizeof (nv->v.localids[0]));
       nv->v.localids[len] = id;
       nv->v.localids[len+1] = 0;
     }
@@ -447,7 +447,7 @@ add_attr_localids_id (Attrstore *s, unsigned int entry, Id name, LocalId id)
     {
       LongNV mynv;
       mynv.key = add_key (s, name, TYPE_ATTR_LOCALIDS, 0);
-      mynv.v.localids = malloc (2 * sizeof (mynv.v.localids[0]));
+      mynv.v.localids = sat_malloc (2 * sizeof (mynv.v.localids[0]));
       mynv.v.localids[0] = id;
       mynv.v.localids[1] = 0;
       add_attr (s, entry, mynv);
@@ -547,18 +547,18 @@ add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, 
 		  len += 256;
 		  if (buf == localbuf)
 		    {
-		      buf = xmalloc (len);
+		      buf = sat_malloc (len);
 		      memcpy (buf, localbuf, len - 256);
 		    }
 		  else
-		    buf = xrealloc (buf, len);
+		    buf = sat_realloc (buf, len);
 		}
 	      buf[ofs++] = c;
 	    }
 	  buf[ofs++] = 0;
 	  add_attr_string (s, entry, name, (char*) buf);
 	  if (buf != localbuf)
-	    xfree (buf);
+	    sat_free (buf);
 	}
 	break;
       case TYPE_ATTR_INTLIST:
@@ -617,9 +617,9 @@ load_page_range (Attrstore *s, unsigned int pstart, unsigned int pend)
       s->ncanmap = pend - pstart + 1;
       if (s->ncanmap < 4)
         s->ncanmap = 4;
-      s->mapped = xrealloc (s->mapped, s->ncanmap * sizeof (s->mapped[0]));
+      s->mapped = sat_realloc (s->mapped, s->ncanmap * sizeof (s->mapped[0]));
       memset (s->mapped + oldcan, 0, (s->ncanmap - oldcan) * sizeof (s->mapped[0]));
-      s->blob_store = xrealloc (s->blob_store, s->ncanmap * BLOB_PAGESIZE);
+      s->blob_store = sat_realloc (s->blob_store, s->ncanmap * BLOB_PAGESIZE);
 #ifdef DEBUG_PAGING
       fprintf (stderr, "PAGE: can map %d pages\n", s->ncanmap);
 #endif
@@ -780,7 +780,7 @@ attr_retrieve_blob (Attrstore *s, unsigned int ofs, unsigned int len)
 
 #define add_elem(buf,ofs,val,block) do { \
   if (((ofs) & (block)) == 0) \
-    buf = xrealloc (buf, ((ofs) + (block) + 1) * sizeof((buf)[0])); \
+    buf = sat_realloc (buf, ((ofs) + (block) + 1) * sizeof((buf)[0])); \
   (buf)[(ofs)++] = val; \
 } while (0)
 #define add_u16(buf,ofs,val,block) do {\
@@ -824,7 +824,7 @@ add_key (Attrstore *s, Id name, unsigned type, unsigned size)
       return i;
     }
   if ((s->nkeys & KEY_BLOCK) == 0)
-    s->keys = xrealloc (s->keys, (s->nkeys + KEY_BLOCK + 1) * sizeof (s->keys[0]));
+    s->keys = sat_realloc (s->keys, (s->nkeys + KEY_BLOCK + 1) * sizeof (s->keys[0]));
   s->keys[i].name = name;
   s->keys[i].type = type;
   s->keys[i].size = size;
@@ -862,13 +862,13 @@ finalize_dirtree (Dirtree *d)
 {
   if (d->nflatdirs || !d->ndirs)
     return;
-  d->dirmap = calloc (d->ndirs, sizeof (d->dirmap[0]));
+  d->dirmap = sat_calloc (d->ndirs, sizeof (d->dirmap[0]));
   d->nflatdirs = 0;
   d->flatdirs = 0;
   d->flatsons = 0;
   d->dirmap[1] = d->nflatdirs + 1;
   finalize_dirs_rec (d, 1);
-  xfree (d->dirs);
+  sat_free (d->dirs);
   d->dirs = 0;
 }
 
@@ -881,7 +881,7 @@ attr_store_pack (Attrstore *s)
     return;
   finalize_dirtree (&s->dirtree);
 
-  s->ent2attr = xcalloc (s->entries, sizeof (s->ent2attr[0]));
+  s->ent2attr = sat_calloc (s->entries, sizeof (s->ent2attr[0]));
   s->flat_attrs = 0;
   s->attr_next_free = 0;
   s->nschemata = 0;
@@ -960,7 +960,7 @@ attr_store_pack (Attrstore *s)
 		  add_elem (s->flat_attrs, s->attr_next_free, *str, FLAT_ATTR_BLOCK);
 		add_elem (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
 		old_mem += strlen ((const char*)nv[ofs].v.str) + 1;
-		xfree ((void*)nv[ofs].v.str);
+		sat_free ((void*)nv[ofs].v.str);
 		break;
 	      }
 	    case TYPE_ATTR_INTLIST:
@@ -985,7 +985,7 @@ attr_store_pack (Attrstore *s)
 		      i |= 64;
 		    add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
 		  }
-		xfree (nv[ofs].v.intlist);
+		sat_free (nv[ofs].v.intlist);
 	        break;
 	      }
 	    case TYPE_ATTR_LOCALIDS:
@@ -996,18 +996,18 @@ attr_store_pack (Attrstore *s)
 		  add_num (s->flat_attrs, s->attr_next_free, i, FLAT_ATTR_BLOCK);
 		add_num (s->flat_attrs, s->attr_next_free, 0, FLAT_ATTR_BLOCK);
 		old_mem += 4;
-		xfree (nv[ofs].v.localids);
+		sat_free (nv[ofs].v.localids);
 	        break;
 	      }
 	    default:
 	      break;
 	  }
-      xfree (nv);
+      sat_free (nv);
     }
   old_mem += s->entries * sizeof (s->attrs[0]);
   free (s->attrs);
   s->attrs = 0;
-  xfree (s->dirtree.dirmap);
+  sat_free (s->dirtree.dirmap);
   s->dirtree.dirmap = 0;
 
   /* Remove the hashtable too, it will be build on demand in str2localid
@@ -1048,7 +1048,7 @@ attr_store_unpack (Attrstore *s)
 
   /* Make the store writable right away, so we can use our adder functions.  */
   s->packed = 0;
-  s->attrs = xcalloc (s->entries, sizeof (s->attrs[0]));
+  s->attrs = sat_calloc (s->entries, sizeof (s->attrs[0]));
 
   for (i = 0; i < s->entries; i++)
     {
@@ -1102,15 +1102,15 @@ attr_store_unpack (Attrstore *s)
 	}
     }
 
-  xfree (s->ent2attr);
+  sat_free (s->ent2attr);
   s->ent2attr = 0;
-  xfree (s->flat_attrs);
+  sat_free (s->flat_attrs);
   s->flat_attrs = 0;
   s->attr_next_free = 0;
-  xfree (s->schemaofs);
+  sat_free (s->schemaofs);
   s->schemaofs = 0;
   s->nschemata = 0;
-  xfree (s->schemata);
+  sat_free (s->schemata);
   s->schemata = 0;
   s->szschemata = 0;
   /* XXX unpack the dirtree */
@@ -1516,13 +1516,13 @@ read_or_setup_pages (FILE *fp, Attrstore *s)
   npages = (blobsz + BLOB_PAGESIZE - 1) / BLOB_PAGESIZE;
 
   s->num_pages = npages;
-  s->pages = xmalloc (npages * sizeof (s->pages[0]));
+  s->pages = sat_malloc (npages * sizeof (s->pages[0]));
 
   /* If we can't seek on our input we have to slurp in everything.  */
   if (!can_seek)
     {
       s->blob_next_free = blobsz;
-      s->blob_store = xrealloc (s->blob_store, (s->blob_next_free + BLOB_BLOCK) &~BLOB_BLOCK);
+      s->blob_store = sat_realloc (s->blob_store, (s->blob_next_free + BLOB_BLOCK) &~BLOB_BLOCK);
     }
   for (i = 0; i < npages; i++)
     {
@@ -1614,8 +1614,8 @@ read_stringpool (FILE *fp, Stringpool *ss, unsigned nstrings)
      out to be compatible with the SOLV file and to not have to introduce
      merging and mapping the string IDs.  */
   local_ssize = read_u32 (fp) - 1;
-  char *strsp = (char *)xrealloc(ss->stringspace, ss->sstrings + local_ssize + 1);
-  Offset *str = (Offset *)xrealloc(ss->strings, nstrings * sizeof(Offset));
+  char *strsp = (char *)sat_realloc(ss->stringspace, ss->sstrings + local_ssize + 1);
+  Offset *str = (Offset *)sat_realloc(ss->strings, nstrings * sizeof(Offset));
 
   ss->stringspace = strsp;
   ss->strings = str;
@@ -1682,7 +1682,7 @@ attr_store_read (FILE *fp, Pool *pool)
 
   read_stringpool (fp, &s->ss, nstrings);
 
-  s->keys = xrealloc (s->keys, ((s->nkeys + KEY_BLOCK) & ~KEY_BLOCK) * sizeof (s->keys[0]));
+  s->keys = sat_realloc (s->keys, ((s->nkeys + KEY_BLOCK) & ~KEY_BLOCK) * sizeof (s->keys[0]));
   /* s->keys[0] is initialized in new_store.  */
   for (i = 1; i < s->nkeys; i++)
     {
@@ -1696,7 +1696,7 @@ attr_store_read (FILE *fp, Pool *pool)
 
   s->szschemata = read_id (fp, 0);
   s->nschemata = 0;
-  s->schemata = xmalloc (((s->szschemata + SCHEMA_BLOCK) & ~SCHEMA_BLOCK) * sizeof (s->schemata[0]));
+  s->schemata = sat_malloc (((s->szschemata + SCHEMA_BLOCK) & ~SCHEMA_BLOCK) * sizeof (s->schemata[0]));
   s->schemaofs = 0;
   Id *ids = s->schemata;
   //add_elem (s->schemaofs, s->nschemata, 0, SCHEMA_BLOCK);
@@ -1711,7 +1711,7 @@ attr_store_read (FILE *fp, Pool *pool)
 
   s->entries = nentries;
 
-  s->ent2attr = xmalloc (s->entries * sizeof (s->ent2attr[0]));
+  s->ent2attr = sat_malloc (s->entries * sizeof (s->ent2attr[0]));
   int start = 1;
   for (i = 0; i < s->entries; i++)
     {
@@ -1723,7 +1723,7 @@ attr_store_read (FILE *fp, Pool *pool)
     }
 
   s->attr_next_free = start;
-  s->flat_attrs = xmalloc (((s->attr_next_free + FLAT_ATTR_BLOCK) & ~FLAT_ATTR_BLOCK) * sizeof (s->flat_attrs[0]));
+  s->flat_attrs = sat_malloc (((s->attr_next_free + FLAT_ATTR_BLOCK) & ~FLAT_ATTR_BLOCK) * sizeof (s->flat_attrs[0]));
   s->flat_attrs[0] = 0;
   if (s->entries && fread (s->flat_attrs + 1, s->attr_next_free - 1, 1, fp) != 1)
     {
@@ -1736,14 +1736,14 @@ attr_store_read (FILE *fp, Pool *pool)
     {
       unsigned ndirs = s->dirtree.ndirs;
       setup_dirs (s);
-      xfree (s->dirtree.dirs);
+      sat_free (s->dirtree.dirs);
       s->dirtree.dirs = 0;
       s->dirtree.ndirs = ndirs;
 
       nstrings = read_u32 (fp);
       read_stringpool (fp, &s->dirtree.ss, nstrings);
       s->dirtree.nflatdirs = read_id (fp, 0);
-      s->dirtree.flatdirs = xmalloc (s->dirtree.nflatdirs * sizeof (s->dirtree.flatdirs[0]));
+      s->dirtree.flatdirs = sat_malloc (s->dirtree.nflatdirs * sizeof (s->dirtree.flatdirs[0]));
       for (i = 0; i < s->dirtree.nflatdirs; i++)
         s->dirtree.flatdirs[i] = read_id (fp, 0);
     }

@@ -79,10 +79,7 @@ join(struct parsedata *pd, char *s1, char *s2, char *s3)
   if (l > pd->tmpl)
     {
       pd->tmpl = l + 256;
-      if (!pd->tmp)
-	pd->tmp = malloc(pd->tmpl);
-      else
-	pd->tmp = realloc(pd->tmp, pd->tmpl);
+      pd->tmp = sat_realloc(pd->tmp, pd->tmpl);
     }
   p = pd->tmp;
   if (s1)
@@ -169,7 +166,7 @@ repo_add_content(Repo *repo, FILE *fp)
   struct parsedata pd;
 
   memset(&pd, 0, sizeof(pd));
-  line = xmalloc(1024);
+  line = sat_malloc(1024);
   aline = 1024;
 
   pd.repo = repo;
@@ -182,7 +179,7 @@ repo_add_content(Repo *repo, FILE *fp)
       if (linep - line + 16 > aline)
 	{
 	  aline = linep - line;
-	  line = realloc(line, aline + 512);
+	  line = sat_realloc(line, aline + 512);
 	  linep = line + aline;
 	  aline += 512;
 	}
@@ -266,6 +263,6 @@ repo_add_content(Repo *repo, FILE *fp)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
     
   if (pd.tmp)
-    free(pd.tmp);
-  free(line);
+    sat_free(pd.tmp);
+  sat_free(line);
 }

@@ -46,7 +46,7 @@ pool_setarch(Pool *pool, const char *arch)
   Id *id2arch;
   Id id, lastarch;
   
-  pool->id2arch = xfree(pool->id2arch);
+  pool->id2arch = sat_free(pool->id2arch);
   if (!arch)
     {
       pool->lastarch = 0;
@@ -54,7 +54,7 @@ pool_setarch(Pool *pool, const char *arch)
     }
   id = ARCH_NOARCH;
   lastarch = id + 255;
-  id2arch = xcalloc(lastarch + 1, sizeof(Id));
+  id2arch = sat_calloc(lastarch + 1, sizeof(Id));
   id2arch[id] = 1;
 
   a = "";
@@ -74,7 +74,7 @@ pool_setarch(Pool *pool, const char *arch)
 	  id = str2id(pool, buf, 1);
 	  if (id > lastarch)
 	    {
-	      id2arch = xrealloc(id2arch, (id + 255 + 1) * sizeof(Id));
+	      id2arch = sat_realloc(id2arch, (id + 255 + 1) * sizeof(Id));
 	      memset(id2arch + lastarch + 1, 0, (id + 255 - lastarch) * sizeof(Id));
 	      lastarch = id + 255;
 	    }

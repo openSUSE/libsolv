@@ -22,8 +22,8 @@ stringpool_init (Stringpool *ss, const char *strs[])
     totalsize += strlen(strs[count]) + 1;
 
   // alloc appropriate space
-  ss->stringspace = (char *)xmalloc((totalsize + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  ss->strings = (Offset *)xmalloc(((count + STRING_BLOCK) & ~STRING_BLOCK) * sizeof(Offset));
+  ss->stringspace = sat_malloc((totalsize + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
+  ss->strings = sat_malloc2((count + STRING_BLOCK) & ~STRING_BLOCK, sizeof(Offset));
 
   // now copy predefined strings into allocated space
   ss->sstrings = 0;
@@ -60,11 +60,11 @@ stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
   // 
   if (ss->nstrings * 2 > hashmask)
     {
-      xfree(hashtbl);
+      sat_free(hashtbl);
 
       // realloc hash table
       ss->stringhashmask = hashmask = mkmask(ss->nstrings + STRING_BLOCK);
-      ss->stringhashtbl = hashtbl = (Hashtable)xcalloc(hashmask + 1, sizeof(Id));
+      ss->stringhashtbl = hashtbl = (Hashtable)sat_calloc(hashmask + 1, sizeof(Id));
 
       // rehash all strings into new hashtable
       for (i = 1; i < ss->nstrings; i++)
@@ -98,7 +98,7 @@ stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
 
   // 
   if ((id & STRING_BLOCK) == 0)
-    ss->strings = xrealloc(ss->strings, ((ss->nstrings + STRING_BLOCK) & ~STRING_BLOCK) * sizeof(Hashval));
+    ss->strings = sat_realloc2(ss->strings, (ss->nstrings + STRING_BLOCK) & ~STRING_BLOCK, sizeof(Hashval));
   // 'pointer' into stringspace is Offset of next free pos: sstrings
   ss->strings[id] = ss->sstrings;
 
@@ -106,7 +106,7 @@ stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
 
   // resize string buffer if needed
   if (((ss->sstrings + space_needed - 1) | STRINGSPACE_BLOCK) != ((ss->sstrings - 1) | STRINGSPACE_BLOCK))
-    ss->stringspace = xrealloc(ss->stringspace, (ss->sstrings + space_needed + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
+    ss->stringspace = sat_realloc(ss->stringspace, (ss->sstrings + space_needed + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
   // copy new string into buffer
   memcpy(ss->stringspace + ss->sstrings, str, space_needed - 1);
   // add the sentinel, we can't rely on it being in the source string (in
@@ -128,6 +128,6 @@ stringpool_str2id (Stringpool *ss, const char *str, int create)
 void
 stringpool_shrink (Stringpool *ss)
 {
-  ss->stringspace = (char *)xrealloc(ss->stringspace, (ss->sstrings + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  ss->strings = (Offset *)xrealloc(ss->strings, ((ss->nstrings + STRING_BLOCK) & ~STRING_BLOCK) * sizeof(Offset));
+  ss->stringspace = (char *)sat_realloc(ss->stringspace, (ss->sstrings + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
+  ss->strings = (Offset *)sat_realloc2(ss->strings, (ss->nstrings + STRING_BLOCK) & ~STRING_BLOCK, sizeof(Offset));
 }

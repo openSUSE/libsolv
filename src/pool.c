@@ -71,16 +71,16 @@ pool_create(void)
   Pool *pool;
   Solvable *s;
 
-  pool = (Pool *)xcalloc(1, sizeof(*pool));
+  pool = (Pool *)sat_calloc(1, sizeof(*pool));
 
   stringpool_init (&pool->ss, initpool_data);
 
   // pre-alloc space for a RelDep
-  pool->rels = (Reldep *)xcalloc(1 + REL_BLOCK, sizeof(Reldep));
+  pool->rels = (Reldep *)sat_calloc(1 + REL_BLOCK, sizeof(Reldep));
   pool->nrels = 1;
 
   // pre-alloc space for a Solvable
-  pool->solvables = (Solvable *)xcalloc(SOLVABLE_BLOCK + 1, sizeof(Solvable));
+  pool->solvables = (Solvable *)sat_calloc(SOLVABLE_BLOCK + 1, sizeof(Solvable));
   pool->nsolvables = 2;
   queue_init(&pool->vendormap);
   s = pool->solvables + SYSTEMSOLVABLE;
@@ -102,22 +102,22 @@ pool_free(Pool *pool)
   pool_freewhatprovides(pool);
   pool_freeidhashes(pool);
   repo_freeallrepos(pool, 1);
-  xfree(pool->id2arch);
-  xfree(pool->solvables);
-  xfree(pool->ss.stringspace);
-  xfree(pool->ss.strings);
-  xfree(pool->rels);
+  sat_free(pool->id2arch);
+  sat_free(pool->solvables);
+  sat_free(pool->ss.stringspace);
+  sat_free(pool->ss.strings);
+  sat_free(pool->rels);
   queue_free(&pool->vendormap);
   for (i = 0; i < DEP2STRBUF; i++)
-    xfree(pool->dep2strbuf[i]);
-  xfree(pool);
+    sat_free(pool->dep2strbuf[i]);
+  sat_free(pool);
 }
 
 Id
 pool_add_solvable(Pool *pool)
 {
   if ((pool->nsolvables & SOLVABLE_BLOCK) == 0)
-    pool->solvables = xrealloc2(pool->solvables, pool->nsolvables + (SOLVABLE_BLOCK + 1), sizeof(Solvable));
+    pool->solvables = sat_realloc2(pool->solvables, pool->nsolvables + (SOLVABLE_BLOCK + 1), sizeof(Solvable));
   memset(pool->solvables + pool->nsolvables, 0, sizeof(Solvable));
   return pool->nsolvables++;
 }
@@ -129,7 +129,7 @@ pool_add_solvable_block(Pool *pool, int count)
   if (!count)
     return nsolvables;
   if (((nsolvables - 1) | SOLVABLE_BLOCK) != ((nsolvables + count - 1) | SOLVABLE_BLOCK))
-    pool->solvables = xrealloc2(pool->solvables, (nsolvables + count + SOLVABLE_BLOCK) & ~SOLVABLE_BLOCK, sizeof(Solvable));
+    pool->solvables = sat_realloc2(pool->solvables, (nsolvables + count + SOLVABLE_BLOCK) & ~SOLVABLE_BLOCK, sizeof(Solvable));
   memset(pool->solvables + nsolvables, 0, sizeof(Solvable) * count);
   pool->nsolvables += count;
   return nsolvables;
@@ -161,7 +161,7 @@ solvable2str(Pool *pool, Solvable *s)
   l = strlen(n) + strlen(e) + strlen(a) + 3;
   if (l > pool->dep2strlen[nn])
     {
-      pool->dep2strbuf[nn] = xrealloc(pool->dep2strbuf[nn], l + 32);
+      pool->dep2strbuf[nn] = sat_realloc(pool->dep2strbuf[nn], l + 32);
       pool->dep2strlen[nn] = l + 32;
     }
   sprintf(pool->dep2strbuf[nn], "%s-%s.%s", n, e, a);
@@ -212,7 +212,7 @@ pool_shrink_whatprovides(Pool *pool)
 
   if (pool->ss.nstrings < 3)
     return;
-  sorted = xmalloc2(pool->ss.nstrings, sizeof(Id));
+  sorted = sat_malloc2(pool->ss.nstrings, sizeof(Id));
   for (id = 0; id < pool->ss.nstrings; id++)
     sorted[id] = id;
   pool_shrink_whatprovides_sortcmp_data = pool;
@@ -246,7 +246,7 @@ pool_shrink_whatprovides(Pool *pool)
       last = pool->whatprovidesdata + o;
       lastid = id;
     }
-  xfree(sorted);
+  sat_free(sorted);
   dp = pool->whatprovidesdata + 2;
   for (id = 1; id < pool->ss.nstrings; id++)
     {
@@ -274,7 +274,7 @@ pool_shrink_whatprovides(Pool *pool)
     return;
   r = pool->whatprovidesdataoff - o;
   pool->whatprovidesdataoff = o;
-  pool->whatprovidesdata = xrealloc(pool->whatprovidesdata, (o + pool->whatprovidesdataleft) * sizeof(Id));
+  pool->whatprovidesdata = sat_realloc(pool->whatprovidesdata, (o + pool->whatprovidesdataleft) * sizeof(Id));
   if (r > pool->whatprovidesdataleft)
     r = pool->whatprovidesdataleft;
   memset(pool->whatprovidesdata + o, 0, r * sizeof(Id));
@@ -304,8 +304,8 @@ pool_createwhatprovides(Pool *pool)
   pool_freeidhashes(pool);	/* XXX: should not be here! */
   pool_freewhatprovides(pool);
   num = pool->ss.nstrings;
-  pool->whatprovides = whatprovides = (Offset *)xcalloc((num + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK, sizeof(Offset));
-  pool->whatprovides_rel = (Offset *)xcalloc((pool->nrels + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK, sizeof(Offset));
+  pool->whatprovides = whatprovides = sat_calloc((num + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK, sizeof(Offset));
+  pool->whatprovides_rel = sat_calloc((pool->nrels + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK, sizeof(Offset));
 
   /* count providers for each name */
   for (i = 1; i < pool->nsolvables; i++)
@@ -351,7 +351,7 @@ pool_createwhatprovides(Pool *pool)
   POOL_DEBUG(SAT_DEBUG_STATS, "provide space needed: %d + %d\n", off, extra);
 
   /* alloc space for all providers + extra */
-  whatprovidesdata = (Id *)xcalloc(off + extra, sizeof(Id));
+  whatprovidesdata = sat_calloc(off + extra, sizeof(Id));
 
   /* now fill data for all provides */
   for (i = 1; i < pool->nsolvables; i++)
@@ -397,9 +397,9 @@ pool_createwhatprovides(Pool *pool)
 void
 pool_freewhatprovides(Pool *pool)
 {
-  pool->whatprovides = xfree(pool->whatprovides);
-  pool->whatprovides_rel = xfree(pool->whatprovides_rel);
-  pool->whatprovidesdata = xfree(pool->whatprovidesdata);
+  pool->whatprovides = sat_free(pool->whatprovides);
+  pool->whatprovides_rel = sat_free(pool->whatprovides_rel);
+  pool->whatprovidesdata = sat_free(pool->whatprovidesdata);
   pool->whatprovidesdataoff = 0;
   pool->whatprovidesdataleft = 0;
 }
@@ -429,7 +429,7 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
   if (pool->whatprovidesdataleft < count + 1)
     {
       POOL_DEBUG(SAT_DEBUG_STATS, "growing provides hash data...\n");
-      pool->whatprovidesdata = (Id *)xrealloc(pool->whatprovidesdata, (pool->whatprovidesdataoff + count + 4096) * sizeof(Id));
+      pool->whatprovidesdata = sat_realloc(pool->whatprovidesdata, (pool->whatprovidesdataoff + count + 4096) * sizeof(Id));
       pool->whatprovidesdataleft = count + 4096;
     }
 
@@ -684,7 +684,7 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, Map *seen, struct searchfiles *sf)
       if (*s != '/')
 	continue;
       if ((sf->nfiles & SEARCHFILES_BLOCK) == 0)
-	sf->files = xrealloc2(sf->files, sf->nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+	sf->files = sat_realloc2(sf->files, sf->nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
       sf->files[sf->nfiles++] = strdup(s);
     }
 }
@@ -746,12 +746,12 @@ pool_addfileprovides(Pool *pool)
     POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", sf.files[i]);
 #endif
   if ((sf.nfiles & SEARCHFILES_BLOCK) == 0)
-    sf.files = xrealloc2(sf.files, sf.nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+    sf.files = sat_realloc2(sf.files, sf.nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
   sf.files[sf.nfiles++] = 0;
 #if 0
   pool_search(0, SOLVABLE_FILELIST, (const char *)sf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);
 #endif
-  xfree(sf.files);
+  sat_free(sf.files);
   pool_freewhatprovides(pool);	/* as we have added provides */
 }
 

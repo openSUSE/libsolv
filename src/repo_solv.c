@@ -215,7 +215,7 @@ read_str(Repodata *data, char **inbuf, unsigned *len)
   unsigned char *buf = (unsigned char*)*inbuf;
   if (!buf)
     {
-      buf = xmalloc (1024);
+      buf = sat_malloc(1024);
       *len = 1024;
     }
   int c;
@@ -235,11 +235,11 @@ read_str(Repodata *data, char **inbuf, unsigned *len)
 	  /* Don't realloc on the inbuf, it might be on the stack.  */
 	  if (buf == (unsigned char*)*inbuf)
 	    {
-	      buf = xmalloc(*len);
+	      buf = sat_malloc(*len);
 	      memcpy(buf, *inbuf, *len - 256);
 	    }
 	  else
-	    buf = xrealloc(buf, *len);
+	    buf = sat_realloc(buf, *len);
         }
       buf[ofs++] = c;
     }
@@ -325,7 +325,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
   Repodata *data;
   int i, n;
 
-  repo->repodata = xrealloc(repo->repodata, (repo->nrepodata + 1) * sizeof (*data));
+  repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata + 1, sizeof (*data));
   data = repo->repodata + repo->nrepodata++;
   data->repo = repo;
   memset(data, 0, sizeof(*data));
@@ -341,7 +341,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	      skip_item(maindata, TYPE_IDVALUEARRAY, numid, numrel);
 	      break;
 	    }
-	  ida = xcalloc(keys[key].size, sizeof(Id));
+	  ida = sat_calloc(keys[key].size, sizeof(Id));
 	  ide = read_idarray(maindata, 0, 0, ida, ida + keys[key].size, 0);
 	  n = ide - ida - 1;
 	  if (n & 1)
@@ -350,7 +350,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	      return;
 	    }
 	  data->nkeys = 1 + (n >> 1);
-	  data->keys = xmalloc2(data->nkeys, sizeof(data->keys[0]));
+	  data->keys = sat_malloc2(data->nkeys, sizeof(data->keys[0]));
 	  memset(data->keys, 0, sizeof(Repokey));
 	  for (i = 1, ide = ida; i < data->nkeys; i++)
 	    {
@@ -365,7 +365,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	      data->keys[i].size = 0;
 	      data->keys[i].storage = 0;
 	    }
-	  xfree(ida);
+	  sat_free(ida);
 	  if (data->nkeys > 2)
 	    qsort(data->keys + 1, data->nkeys - 1, sizeof(data->keys[0]), key_cmp);
 	  break;
@@ -410,7 +410,7 @@ incore_add_id(Repodata *data, Id x)
   /* make sure we have at least 5 bytes free */
   if (data->incoredatafree < 5)
     {
-      data->incoredata = xrealloc(data->incoredata, data->incoredatalen + 1024);
+      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + 1024);
       data->incoredatafree = 1024;
     }
   dp = data->incoredata + data->incoredatalen;
@@ -438,7 +438,7 @@ incore_add_u32(Repodata *data, unsigned int x)
   /* make sure we have at least 4 bytes free */
   if (data->incoredatafree < 4)
     {
-      data->incoredata = xrealloc(data->incoredata, data->incoredatalen + 1024);
+      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + 1024);
       data->incoredatafree = 1024;
     }
   dp = data->incoredata + data->incoredatalen;
@@ -457,7 +457,7 @@ incore_add_u8(Repodata *data, unsigned int x)
   /* make sure we have at least 1 byte free */
   if (data->incoredatafree < 1)
     {
-      data->incoredata = xrealloc(data->incoredata, data->incoredatalen + 1024);
+      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + 1024);
       data->incoredatafree = 1024;
     }
   dp = data->incoredata + data->incoredatalen;
@@ -563,9 +563,9 @@ repo_add_solv(Repo *repo, FILE *fp)
    */
 
   /* alloc string buffer */
-  pool->ss.stringspace = xrealloc(pool->ss.stringspace, pool->ss.sstrings + sizeid + 1);
+  pool->ss.stringspace = sat_realloc(pool->ss.stringspace, pool->ss.sstrings + sizeid + 1);
   /* alloc string offsets (Id -> Offset into string space) */
-  pool->ss.strings = xrealloc2(pool->ss.strings, pool->ss.nstrings + numid, sizeof(Offset));
+  pool->ss.strings = sat_realloc2(pool->ss.strings, pool->ss.nstrings + numid, sizeof(Offset));
 
   strsp = pool->ss.stringspace;
   str = pool->ss.strings;		       /* array of offsets into strsp, indexed by Id */
@@ -589,14 +589,14 @@ repo_add_solv(Repo *repo, FILE *fp)
   else
     {
       unsigned int pfsize = read_u32(&data);
-      char *prefix = xmalloc(pfsize);
+      char *prefix = sat_malloc(pfsize);
       char *pp = prefix;
       char *old_str = "";
       char *dest = strsp;
       if (fread(prefix, pfsize, 1, fp) != 1)
         {
 	  pool_debug(pool, SAT_ERROR, "read error while reading strings\n");
-	  xfree(prefix);
+	  sat_free(prefix);
 	  return SOLV_ERROR_EOF;
 	}
       for (i = 1; i < numid; i++)
@@ -610,7 +610,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	  old_str = dest;
 	  dest += same + len;
 	}
-      xfree(prefix);
+      sat_free(prefix);
     }
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
@@ -618,7 +618,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 
   /* alloc id map for name and rel Ids. this maps ids in the solv files
    * to the ids in our pool */
-  idmap = (Id *)xcalloc(numid + numrel, sizeof(Id));
+  idmap = sat_calloc(numid + numrel, sizeof(Id));
 
   /*
    * build hashes for all read strings
@@ -636,7 +636,7 @@ repo_add_solv(Repo *repo, FILE *fp)
    * create hashtable with strings already in pool
    */
 
-  hashtbl = (Id *)xcalloc(hashmask + 1, sizeof(Id));
+  hashtbl = sat_calloc(hashmask + 1, sizeof(Id));
   for (i = 1; i < pool->ss.nstrings; i++)  /* leave out our dummy zero id */
     {
       h = strhash(pool->ss.stringspace + pool->ss.strings[i]) & hashmask;
@@ -656,8 +656,8 @@ repo_add_solv(Repo *repo, FILE *fp)
     {
       if (sp >= strsp + sizeid)
 	{
-	  xfree(hashtbl);
-	  xfree(idmap);
+	  sat_free(hashtbl);
+	  sat_free(idmap);
 	  pool_debug(pool, SAT_ERROR, "not enough strings\n");
 	  return SOLV_ERROR_OVERFLOW;
 	}
@@ -695,7 +695,7 @@ repo_add_solv(Repo *repo, FILE *fp)
       idmap[i] = id;		       /* repo relative -> pool relative */
       sp += l;			       /* next string */
     }
-  xfree(hashtbl);
+  sat_free(hashtbl);
   pool_shrink_strings(pool);	       /* vacuum */
 
   
@@ -709,7 +709,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   if (numrel)
     {
       /* extend rels */
-      pool->rels = xrealloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
+      pool->rels = sat_realloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
       ran = pool->rels;
 
       hashmask = mkmask(pool->nrels + numrel);
@@ -721,7 +721,7 @@ repo_add_solv(Repo *repo, FILE *fp)
        * prep hash table with already existing RelDeps
        */
       
-      hashtbl = xcalloc(hashmask + 1, sizeof(Id));
+      hashtbl = sat_calloc(hashmask + 1, sizeof(Id));
       for (i = 1; i < pool->nrels; i++)
 	{
 	  h = relhash(ran[i].name, ran[i].evr, ran[i].flags) & hashmask;
@@ -763,14 +763,14 @@ repo_add_solv(Repo *repo, FILE *fp)
 	    }
 	  idmap[i + numid] = MAKERELDEP(id);   /* fill Id map */
 	}
-      xfree(hashtbl);
+      sat_free(hashtbl);
       pool_shrink_rels(pool);		/* vacuum */
     }
 
 
   /*******  Part 3: Keys  ***********************************************/
 
-  keys = xcalloc(numkeys, sizeof(*keys));
+  keys = sat_calloc(numkeys, sizeof(*keys));
   /* keys start at 1 */
   for (i = 1; i < numkeys; i++)
     {
@@ -824,10 +824,10 @@ repo_add_solv(Repo *repo, FILE *fp)
   /*******  Part 4: Schemata ********************************************/
   
   id = read_id(&data, 0);
-  schemadata = xcalloc(id, sizeof(Id));
+  schemadata = sat_calloc(id, sizeof(Id));
   schemadatap = schemadata;
   schemadataend = schemadata + id;
-  schemata = xcalloc(numschemata, sizeof(Id));
+  schemata = sat_calloc(numschemata, sizeof(Id));
   for (i = 0; i < numschemata; i++)
     {
       schemata[i] = schemadatap - schemadata;
@@ -858,7 +858,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   char *exists = 0;
   if ((solvflags & SOLV_FLAG_PACKEDSIZES) != 0)
     {
-      exists = xmalloc (numsolv);
+      exists = sat_malloc (numsolv);
       for (i = 0; i < numsolv; i++)
 	exists[i] = read_id(&data, 0) != 0;
     }
@@ -935,7 +935,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	      if (id == RPM_RPMDBID)
 		{
 		  if (!repo->rpmdbid)
-		    repo->rpmdbid = (Id *)xcalloc(numsolv, sizeof(Id));
+		    repo->rpmdbid = sat_calloc(numsolv, sizeof(Id));
 		  repo->rpmdbid[i] = h;
 		}
 	      else if (keys[key].storage == KEY_STORAGE_INCORE)
@@ -1056,14 +1056,14 @@ repo_add_solv(Repo *repo, FILE *fp)
       /* free id array */
       repo->idarraysize -= size_idarray;
       /* free incore data */
-      data.incoredata = xfree(data.incoredata);
+      data.incoredata = sat_free(data.incoredata);
       data.incoredatalen = data.incoredatafree = 0;
     }
 
   if (data.incoredatafree)
     {
       /* shrink excess size */
-      data.incoredata = xrealloc(data.incoredata, data.incoredatalen);
+      data.incoredata = sat_realloc(data.incoredata, data.incoredatalen);
       data.incoredatafree = 0;
     }
 
@@ -1084,17 +1084,17 @@ repo_add_solv(Repo *repo, FILE *fp)
   if (data.incoredatalen || data.fp)
     {
       /* we got some data, make it available */
-      repo->repodata = xrealloc(repo->repodata, (repo->nrepodata + 1) * sizeof(data));
+      repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata + 1, sizeof(data));
       repo->repodata[repo->nrepodata++] = data;
     }
   else
     {
-      xfree(schemata);
-      xfree(schemadata);
-      xfree(keys);
+      sat_free(schemata);
+      sat_free(schemadata);
+      sat_free(keys);
     }
 
-  xfree(exists);
+  sat_free(exists);
 #if 0
   if (embedded_store)
     {
@@ -1105,7 +1105,7 @@ repo_add_solv(Repo *repo, FILE *fp)
       repo_add_attrstore (repo, embedded_store, NULL);
     }
 #endif
-  xfree(idmap);
+  sat_free(idmap);
   mypool = 0;
   return data.error;
 }

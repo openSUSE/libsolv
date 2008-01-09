@@ -350,7 +350,7 @@ addschema(struct schemata *schemata, Id *schema)
   if (len > schemata->schemadatafree)
     {
       int l = schemata->schemadatap - schemata->schemadata;
-      schemata->schemadata = xrealloc(schemata->schemadata, (schemata->schemadatap - schemata->schemadata + len + 256) * sizeof(Id));
+      schemata->schemadata = sat_realloc(schemata->schemadata, (schemata->schemadatap - schemata->schemadata + len + 256) * sizeof(Id));
       schemata->schemadatafree = len + 256;
       schemata->schemadatap = schemata->schemadata + l;
       if (l == 0)
@@ -401,7 +401,7 @@ repo_write(Repo *repo, FILE *fp)
   nsolvables = 0;
   idarraydata = repo->idarraydata;
 
-  needid = (NeedId *)xcalloc(pool->ss.nstrings + pool->nrels, sizeof(*needid));
+  needid = sat_calloc(pool->ss.nstrings + pool->nrels, sizeof(*needid));
   memset(idsizes, 0, sizeof(idsizes));
 
   repodataschema = repodataschema_internal = 0;
@@ -513,7 +513,7 @@ repo_write(Repo *repo, FILE *fp)
 
   /* find the schemata we need */
   memset(&schemata, 0, sizeof(schemata));
-  solvschema = xcalloc(repo->nsolvables, sizeof(Id));
+  solvschema = sat_calloc(repo->nsolvables, sizeof(Id));
 
   for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
     {
@@ -597,7 +597,7 @@ repo_write(Repo *repo, FILE *fp)
      that this actually is an expansion we can't easily reuse the 
      stringspace for this.  The max expansion per string is 1 byte,
      so it will fit into sizeid+nstrings bytes.  */
-  char *prefix = xmalloc (sizeid + nstrings);
+  char *prefix = sat_malloc (sizeid + nstrings);
   char *pp = prefix;
   char *old_str = "";
   for (i = 1; i < nstrings; i++)
@@ -625,7 +625,7 @@ repo_write(Repo *repo, FILE *fp)
       perror("write error");
       exit(1);
     }
-  xfree (prefix);
+  sat_free (prefix);
 
   /*
    * write RelDeps
@@ -734,9 +734,9 @@ repo_write(Repo *repo, FILE *fp)
         write_u32(fp, repo->rpmdbid[i - repo->start]);
     }
 
-  xfree(needid);
-  xfree(solvschema);
-  xfree(schemata.schemadata);
+  sat_free(needid);
+  sat_free(solvschema);
+  sat_free(schemata.schemadata);
 }
 
 // EOF

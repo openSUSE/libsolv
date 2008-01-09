@@ -139,7 +139,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(r) + 1;
   if (l > pd->acontent)
     {
-      pd->content = xrealloc(pd->content, l + 256);
+      pd->content = sat_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content;
@@ -207,7 +207,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
       int l = strlen(k) + 1 + strlen(n) + 1;
       if (l > pd->acontent)
 	{
-	  pd->content = xrealloc(pd->content, l + 256);
+	  pd->content = sat_realloc(pd->content, l + 256);
 	  pd->acontent = l + 256;
 	}
       sprintf(pd->content, "%s:%s", k, n); 
@@ -412,7 +412,7 @@ characterData(void *userData, const XML_Char *s, int len)
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
-      pd->content = xrealloc(pd->content, l + 256);
+      pd->content = sat_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content + pd->lcontent;
@@ -443,7 +443,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
     }
   pd.pool = pool;
   pd.repo = repo;
-  pd.content = malloc(256);
+  pd.content = sat_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
@@ -464,5 +464,5 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
   XML_ParserFree(parser);
   if (pd.numpacks)
     repo_free_solvable_block(repo, pd.solvable - pool->solvables, pd.numpacks, 1);
-  free(pd.content);
+  sat_free(pd.content);
 }

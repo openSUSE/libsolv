@@ -13,11 +13,11 @@
 #ifndef SATSOLVER_UTIL_H
 #define SATSOLVER_UTIL_H
 
-extern void *xmalloc(size_t);
-extern void *xmalloc2(size_t, size_t);
-extern void *xcalloc(size_t, size_t);
-extern void *xrealloc(void *, size_t);
-extern void *xrealloc2(void *, size_t, size_t);
-extern void *xfree(void *);
+extern void *sat_malloc(size_t);
+extern void *sat_malloc2(size_t, size_t);
+extern void *sat_calloc(size_t, size_t);
+extern void *sat_realloc(void *, size_t);
+extern void *sat_realloc2(void *, size_t, size_t);
+extern void *sat_free(void *);
 
 #endif /* SATSOLVER_UTIL_H */

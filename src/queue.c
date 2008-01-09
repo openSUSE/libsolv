@@ -19,7 +19,7 @@
 void
 queue_clone(Queue *t, Queue *s)
 {
-  t->alloc = t->elements = xmalloc((s->count + 8) * sizeof(Id));
+  t->alloc = t->elements = sat_malloc2(s->count + 8, sizeof(Id));
   if (s->count)
     memcpy(t->alloc, s->elements, s->count * sizeof(Id));
   t->count = s->count;
@@ -46,7 +46,7 @@ void
 queue_free(Queue *q)
 {
   if (q->alloc)
-    free(q->alloc);
+    sat_free(q->alloc);
   q->alloc = q->elements = 0;
   q->count = q->left = 0;
 }
@@ -62,12 +62,12 @@ queue_alloc_one(Queue *q)
     }
   else if (q->alloc)
     {
-      q->elements = q->alloc = realloc(q->alloc, (q->count + 8) * sizeof(Id));
+      q->elements = q->alloc = sat_realloc2(q->alloc, q->count + 8, sizeof(Id));
       q->left += 8;
     }
   else
     {
-      q->alloc = xmalloc((q->count + 8) * sizeof(Id));
+      q->alloc = sat_malloc2(q->count + 8, sizeof(Id));
       if (q->count)
 	memcpy(q->alloc, q->elements, q->count * sizeof(Id));
       q->elements = q->alloc;
