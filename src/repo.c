@@ -318,7 +318,7 @@ Offset
 repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 {
   Pool *pool = repo->pool;
-  Id id, idp, idl, idns;
+  Id id, idp, idl;
   char buf[1024], *p, *dep;
   int i;
 
@@ -381,10 +381,9 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 	      p = buf + (p - dep);
 	      *p++ = 0;
 	      idp = str2id(pool, buf, 1);
-	      idns = str2id(pool, "namespace:installed", 1);
 	      id = str2id(pool, p, 1);
-	      id = rel2id(pool, idns, id, REL_NAMESPACE, 1);
-	      id = rel2id(pool, idp, id, REL_AND, 1);
+	      id = rel2id(pool, idp, id, REL_WITH, 1);
+	      id = rel2id(pool, NAMESPACE_SPLITPROVIDES, id, REL_NAMESPACE, 1);
 	      supplements = repo_addid_dep(repo, supplements, id, 0);
 	    }
 	}
@@ -403,14 +402,13 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 	{
 	  strcpy(buf, dep);
 	  p = strchr(buf + 9, ':');
-	  idns = str2id(pool, "namespace:modalias", 1);
 	  if (p && p != buf + 9 && strchr(p + 1, ':'))
 	    {
 	      *p++ = 0;
 	      idp = str2id(pool, buf + 9, 1);
 	      p[strlen(p) - 1] = 0;
 	      id = str2id(pool, p, 1);
-	      id = rel2id(pool, idns, id, REL_NAMESPACE, 1);
+	      id = rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
 	      id = rel2id(pool, idp, id, REL_AND, 1);
 	    }
 	  else
@@ -418,7 +416,7 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 	      p = buf + 9;
 	      p[strlen(p) - 1] = 0;
 	      id = str2id(pool, p, 1);
-	      id = rel2id(pool, idns, id, REL_NAMESPACE, 1);
+	      id = rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
 	    }
 	  if (id)
 	    repo->idarraydata[i] = id;
@@ -738,6 +736,30 @@ repo_search_md(Repo *repo, Id p, Id key, struct matchdata *md)
   md->stop = 0;
   if (!p)
     {
+#if 0
+      switch(key)
+	{
+        case 0:
+        case SOLVABLE_NAME:
+        case SOLVABLE_ARCH:
+        case SOLVABLE_EVR:
+        case SOLVABLE_VENDOR:
+        case SOLVABLE_PROVIDES:
+        case SOLVABLE_OBSOLETES:
+        case SOLVABLE_CONFLICTS:
+        case SOLVABLE_REQUIRES:
+        case SOLVABLE_RECOMMENDS:
+        case SOLVABLE_SUPPLEMENTS:
+        case SOLVABLE_SUGGESTS:
+        case SOLVABLE_ENHANCES:
+        case SOLVABLE_FRESHENS:
+	  break;
+	default:
+	  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+	    repodata_search(data, -1, key, md);
+	  return;
+	}
+#endif
       for (p = repo->start, s = repo->pool->solvables + p; p < repo->end; p++, s++)
 	{
 	  if (s->repo == repo)

@@ -58,6 +58,7 @@ typedef struct solver {
   int updatesystem;			/* distupgrade */
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
+  int dosplitprovides;			/* true: consider legacy split provides */
   
   Rule *rules;				/* all rules */
   Id nrules;				/* index of the last rule */
@@ -140,6 +141,7 @@ extern Solver *solver_create(Pool *pool, Repo *installed);
 extern void solver_free(Solver *solv);
 extern void solver_solve(Solver *solv, Queue *job);
 extern int solver_dep_installed(Solver *solv, Id dep);
+extern int solver_splitprovides(Solver *solv, Id dep);
 
 extern Id solver_next_problem(Solver *solv, Id problem);
 extern Id solver_next_solution(Solver *solv, Id problem, Id solution);
@@ -169,6 +171,8 @@ solver_dep_fulfilled(Solver *solv, Id dep)
             return 0;
           return solver_dep_fulfilled(solv, rd->evr);
         }
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+        return solver_splitprovides(solv, rd->evr);
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
         return solver_dep_installed(solv, rd->evr);
     }

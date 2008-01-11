@@ -29,10 +29,32 @@
 
 
 int
+solver_splitprovides(Solver *solv, Id dep)
+{
+  Pool *pool = solv->pool;
+  Id p, *pp;
+  Reldep *rd;
+  Solvable *s;
+
+  if (!solv->dosplitprovides || !solv->installed)
+    return 0;
+  if (!ISRELDEP(dep))
+    return 0;
+  rd = GETRELDEP(pool, dep);
+  if (rd->flags != REL_WITH)
+    return 0;
+  FOR_PROVIDES(p, pp, dep)
+    {
+      s = pool->solvables + p;
+      if (s->repo == solv->installed && s->name == rd->name)
+	return 1;
+    }
+  return 0;
+}
+
+int
 solver_dep_installed(Solver *solv, Id dep)
 {
-  /* disable for now, splitprovides don't work anyway and it breaks
-     a testcase */
 #if 0
   Pool *pool = solv->pool;
   Id p, *pp;
@@ -75,6 +97,8 @@ dep_possible(Solver *solv, Id dep, Map *m)
 	    return 0;
 	  return dep_possible(solv, rd->evr, m);
 	}
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+	return solver_splitprovides(solv, rd->evr);
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
 	return solver_dep_installed(solv, rd->evr);
     }

@@ -54,6 +54,7 @@ static const char *initpool_data[] = {
   "solvable:filemarker",
   "namespace:installed",
   "namespace:modalias",
+  "namespace:splitprovides",
   "system:system",
   "src",
   "nosrc",
@@ -632,12 +633,13 @@ pool_setdebuglevel(Pool *pool, int level)
 struct searchfiles {
   const char **files;
   int nfiles;
+  Map seen;
 };
 
 #define SEARCHFILES_BLOCK 127
 
 static void
-pool_addfileprovides_dep(Pool *pool, Id *ida, Map *seen, struct searchfiles *sf)
+pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct searchfiles *isf)
 {
   Id dep, sid;
   const char *s;
@@ -648,21 +650,27 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, Map *seen, struct searchfiles *sf)
 	{
 	  Reldep *rd;
 	  sid = pool->ss.nstrings + GETRELID(dep);
-	  if (MAPTST(seen, sid))
+	  if (MAPTST(&sf->seen, sid))
 	    {
 	      dep = 0;
 	      break;
 	    }
-	  MAPSET(seen, sid);
+	  MAPSET(&sf->seen, sid);
 	  rd = GETRELDEP(pool, dep);
 	  if (rd->flags < 8)
 	    dep = rd->name;
 	  else if (rd->flags == REL_NAMESPACE)
 	    {
-	      if (rd->name == NAMESPACE_INSTALLED)
+	      if (isf && (rd->name == NAMESPACE_INSTALLED || rd->name == NAMESPACE_SPLITPROVIDES))
 		{
-		  dep = 0;	/* for now */
-		  break;
+		  sf = isf;
+		  isf = 0;
+		  if (MAPTST(&sf->seen, sid))
+		    {
+		      dep = 0;
+		      break;
+		    }
+		  MAPSET(&sf->seen, sid);
 		}
 	      dep = rd->evr;
 	    }
@@ -671,15 +679,15 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, Map *seen, struct searchfiles *sf)
 	      Id ids[2];
 	      ids[0] = rd->name;
 	      ids[1] = 0;
-	      pool_addfileprovides_dep(pool, ids, seen, sf);
+	      pool_addfileprovides_dep(pool, ids, sf, isf);
 	      dep = rd->evr;
 	    }
 	}
       if (!dep)
 	continue;
-      if (MAPTST(seen, dep))
+      if (MAPTST(&sf->seen, dep))
 	continue;
-      MAPSET(seen, dep);
+      MAPSET(&sf->seen, dep);
       s = id2str(pool, dep);
       if (*s != '/')
 	continue;
@@ -704,16 +712,17 @@ addfileprovides_cb(void *data, Solvable *s, Id key, const char *str)
 #endif
 
 void
-pool_addfileprovides(Pool *pool)
+pool_addfileprovides(Pool *pool, Repo *installed)
 {
   Solvable *s;
   Repo *repo;
-  Map seen;
-  struct searchfiles sf;
+  struct searchfiles sf, isf;
   int i;
 
-  map_init(&seen, pool->ss.nstrings + pool->nrels);
   memset(&sf, 0, sizeof(sf));
+  map_init(&sf.seen, pool->ss.nstrings + pool->nrels);
+  memset(&isf, 0, sizeof(isf));
+  map_init(&isf.seen, pool->ss.nstrings + pool->nrels);
 
   for (i = 1, s = pool->solvables + i; i < pool->nsolvables; i++, s++)
     {
@@ -721,38 +730,271 @@ pool_addfileprovides(Pool *pool)
       if (!repo)
 	continue;
       if (s->obsoletes)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->obsoletes, &seen, &sf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->obsoletes, &sf, &isf);
       if (s->conflicts)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->conflicts, &seen, &sf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->conflicts, &sf, &isf);
       if (s->requires)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->requires, &seen, &sf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->requires, &sf, &isf);
       if (s->recommends)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->recommends, &seen, &sf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->recommends, &sf, &isf);
       if (s->suggests)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->suggests, &seen, &sf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->suggests, &sf, &isf);
       if (s->supplements)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->supplements, &seen, &sf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->supplements, &sf, &isf);
       if (s->enhances)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->enhances, &seen, &sf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->enhances, &sf, &isf);
       if (s->freshens)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->freshens, &seen, &sf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->freshens, &sf, &isf);
     }
-  map_free(&seen);
+  map_free(&sf.seen);
+  map_free(&isf.seen);
   POOL_DEBUG(SAT_DEBUG_STATS, "found %d file dependencies\n", sf.nfiles);
-  if (!sf.nfiles)
-    return;
+  POOL_DEBUG(SAT_DEBUG_STATS, "found %d installed file dependencies\n", isf.nfiles);
+  if (sf.nfiles)
+    {
 #if 0
-  for (i = 0; i < sf.nfiles; i++)
-    POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", sf.files[i]);
+      for (i = 0; i < sf.nfiles; i++)
+	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", sf.files[i]);
 #endif
-  if ((sf.nfiles & SEARCHFILES_BLOCK) == 0)
-    sf.files = sat_realloc2(sf.files, sf.nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
-  sf.files[sf.nfiles++] = 0;
+      if ((sf.nfiles & SEARCHFILES_BLOCK) == 0)
+	sf.files = sat_realloc2(sf.files, sf.nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+      sf.files[sf.nfiles++] = 0;
 #if 0
-  pool_search(0, SOLVABLE_FILELIST, (const char *)sf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);
+      pool_search(0, SOLVABLE_FILELIST, (const char *)sf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);
 #endif
-  sat_free(sf.files);
+      sat_free(sf.files);
+    }
+  if (isf.nfiles && installed)
+    {
+#if 0
+      for (i = 0; i < isf.nfiles; i++)
+	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", isf.files[i]);
+#endif
+      if ((isf.nfiles & SEARCHFILES_BLOCK) == 0)
+	isf.files = sat_realloc2(isf.files, isf.nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+      isf.files[isf.nfiles++] = 0;
+#if 0
+      repo_search(installed, 0, SOLVABLE_FILELIST, (const char *)isf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);
+#endif
+      sat_free(isf.files);
+    }
   pool_freewhatprovides(pool);	/* as we have added provides */
 }
+
+#if 0
+
+struct mountpoint {
+  const char *path;
+  int kbytes;
+  int files;
+};
+
+struct mptree {
+  Id sibling;
+  Id child;
+  const char *comp;
+  int compl;
+  Id mountpoint;
+};
+
+struct cbdata {
+  struct mountpoint *mps;
+  Id *dirmap;
+  int nmap;
+};
+
+static int
+pool_fill_DU_add_cb(void *data, Solvable *s, Id key, const char *str)
+{
+  struct cbdata *cbdata = data;
+  Id mp, dirnum, kbytes, files;
+
+  dp = data_read_id(dp, &dirnum);
+  dp = data_read_id(dp, &kbytes);
+  data_read_id(dp, &files);
+  if (dirnum < 0 || dirnum > cbdata->nmap)
+    return 0;
+  mp = cbdata->dirmap[dirnum];
+  if (mp >= 0)
+    {
+      cbdata->mps[mp].kbytes += kbytes;
+      cbdata->mps[mp].files += files;
+    }
+  return 0;
+}
+
+static int
+pool_fill_DU_sub_cb(void *data, Solvable *s, Id key, const char *str)
+{
+  struct cbdata *cbdata = data;
+  Id mp, dirnum, kbytes, files;
+
+  dp = data_read_id(dp, &dirnum);
+  dp = data_read_id(dp, &kbytes);
+  data_read_id(dp, &files);
+  if (dirnum < 0 || dirnum > cbdata->nmap)
+    return 0;
+  mp = cbdata->dirmap[dirnum];
+  if (mp >= 0)
+    {
+      cbdata->mps[mp].kbytes -= kbytes;
+      cbdata->mps[mp].files -= files;
+    }
+  return 0;
+}
+
+static void
+propagate_mountpoints(struct mptree *mptree, int pos, Id mountpoint)
+{
+  int i;
+  if (mptree[pos].mountpoint == -1)
+    mptree[pos].mountpoint = mountpoint;
+  else
+    mountpoint = mptree[pos].mountpoint;
+  for (i = mptree[pos].child; i; i = mptree[i].sibling)
+    propagate_mountpoints(mptree, i, mountpoint);
+}
+
+void
+pool_fill_DU(Pool *pool, struct mountpoint *mps, int nmps)
+{
+  char *path, *p;
+  Id *dirmap;
+  struct mptree *mptree;
+  int nmptree;
+  int pos;
+  int mp;
+
+  struct matchdata md;
+  struct cbdata cbdata;
+
+  memset(&md, 0, sizeof(md));
+  md.pool = 0;
+  md.matchstr = 0;
+  md.flags = 0;
+  md.callback = 0;
+  md.callback_data = &cbdata
+
+  cbdata.mps = mps;
+  cbdata.dirmap = 0;
+  cbdata.nmap = 0;
+
+  mptree = sat_malloc2(16, sizeof(mptree));
+
+  /* our root node */
+  mptree[0].sibling = 0;
+  mptree[0].child = 0;
+  mptree[0].comp = 0;
+  mptree[0].compl = 0;
+  mptree[0].mountpoint = -1;
+  nmptree = 1;
+  
+  /* create component tree */
+  for (mp = 0; mp < nmps; mp++)
+    {
+      pos = 0;
+      path = mps[mp].path;
+      while(*path == '/')
+	path++;
+      while (*path)
+	{
+	  if ((p = strchr('/', path)) == 0)
+	    {
+	      comp = path;
+	      compl = strlen(comp);
+	      path += compl;
+	    }
+	  else
+	    {
+	      comp = path;
+	      compl = p - path;
+	      path = p + 1;
+	      while(*path == '/')
+		path++;
+	    }
+          for (i = mptree[pos].child; i; i = mptree[i].sibling)
+	    if (mptree[i].compl == compl && !strncmp(mptree[i].comp, comp, compl))
+	      break;
+	  if (!i)
+	    {
+	      /* create new node */
+	      if ((nmptree & 15) == 0)
+		mptree = sat_realloc2(mptree, nmptree + 16, sizeof(mptree));
+	      i = nmptree++;
+	      mptree[i].sibling = mptree[pos].child;
+	      mptree[i].child = 0;
+	      mptree[i].comp = comp;
+	      mptree[i].compl = compl;
+	      mptree[i].mountpoint = -1;
+	      mptree[pos].child = i;
+	    }
+	  pos = i;
+	}
+      mptree[pos].mountpoint = mp;
+    }
+  propagate_mountpoints(mptree, 0, mptree[0].mountpoint);
+
+  for_all_repos
+    {
+      for_all_repodatas_containing_DU
+	{
+	  dirmap = xcalloc2(data->ndirs, sizeof(Id));
+	  dirnum = 0;
+	  for (;;)
+	    {
+	      parent = readid();
+	      mp = parent ? dirmap[parent] : 0;
+	      while (id = readid())
+		{
+		  if (mp < 0)
+		    {
+		      /* unconnected */
+		      dirmap[dirnum++] = mp;
+		      continue;
+		    }
+		  if (!mptree[mp].child)
+		    {
+		      dirmap[dirnum++] = -mp;
+		      continue;
+		    }
+		  comp = id2str(pool, id);
+		  compl = strlen(comp);
+		  for (i = mptree[mp].child; i; i = mptree[i].sibling)
+		    if (mptree[i].compl == compl && !strncmp(mptree[i].comp, comp, compl))
+		      break;
+		  dirmap[dirnum++] = i ? i : -mp;
+		}
+	    }
+	  for (i = 0; i < dirnum; i++)
+	    {
+	      mp = dirmap[i];
+	      dirmap[i] = mptree[mp > 0 ? mp : -mp].mountpoint;
+	    }
+	  cbdata.nmap = dirnum;
+	  cbdata.dirmap = dirmap;
+
+	  md.callback = pool_fill_DU_add_cb;
+	  for_solvables_to_be_installed()
+	    {
+	      if (p < data->start || p >= data->end)
+		continue;
+	      repodata_search(data, p - data->start, SOLVABLE_DUDATA, &md);
+	    }
+	  md.callback = pool_fill_DU_sub_cb;
+	  for_solvables_to_be_erased()
+	    {
+	      if (p < data->start || p >= data->end)
+		continue;
+	      repodata_search(data, p - data->start, SOLVABLE_DUDATA, &md);
+	    }
+
+	  cbdata.dirmap = 0;
+	  cbdata.nmap = 0;
+	  sat_free(dirmap);
+	}
+    }
+}
+
+#endif
 
 // EOF

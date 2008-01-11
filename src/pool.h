@@ -46,15 +46,16 @@ extern "C" {
 #define SOLVABLE_FILEMARKER	17		// normal provides before this, generated file provides after this
 #define NAMESPACE_INSTALLED	18
 #define NAMESPACE_MODALIAS	19
-#define SYSTEM_SYSTEM		20
-#define ARCH_SRC		21
-#define ARCH_NOSRC		22
-#define ARCH_NOARCH		23
-#define REPODATA_EXTERNAL	24
-#define REPODATA_KEYS		25
-#define REPODATA_LOCATION	26
+#define NAMESPACE_SPLITPROVIDES 20
+#define SYSTEM_SYSTEM		21
+#define ARCH_SRC		22
+#define ARCH_NOSRC		23
+#define ARCH_NOARCH		24
+#define REPODATA_EXTERNAL	25
+#define REPODATA_KEYS		26
+#define REPODATA_LOCATION	27
 
-#define ID_NUM_INTERNAL		27
+#define ID_NUM_INTERNAL		28
 
 
 /* well known solvable */
@@ -207,7 +208,7 @@ extern const char *solvable2str(Pool *pool, Solvable *s);
  * Prepares a pool for solving
  */
 extern void pool_createwhatprovides(Pool *pool);
-extern void pool_addfileprovides(Pool *pool);
+extern void pool_addfileprovides(Pool *pool, struct _Repo *installed);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
 
