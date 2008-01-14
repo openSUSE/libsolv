@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Jan 14 17:14:03 CET 2008 - coolo@suse.de
+
+- update from SVN:
+  - various fixes
+  - less logging
+
+-------------------------------------------------------------------
 Tue Jan  8 16:02:26 CET 2008 - coolo@suse.de
 
 - update to SVN again and don't strip
