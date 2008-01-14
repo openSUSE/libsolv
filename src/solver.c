@@ -1325,7 +1325,8 @@ propagate(Solver *solv, int level)
         {
 	  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "popagate for decision %d level %d\n", -pkg, level);
 	  printruleelement(solv, SAT_DEBUG_PROPAGATE, 0, -pkg);
-	  printWatches(solv, SAT_DEBUG_SCHUBI);
+	  if (0)
+	      printWatches(solv, SAT_DEBUG_SCHUBI);
         }
 
       for (rp = watches + pkg; *rp; rp = nrp)
