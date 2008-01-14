@@ -73,23 +73,16 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
   return s1 < q1 ? 1 : s2 < q2 ? -1 : 0;
 }
 
-#define EVRCMP_COMPARE			0
-#define EVRCMP_MATCH_RELEASE		1
-#define EVRCMP_MATCH			2
-
-// edition (e:v-r) compare
+/* edition (e:v-r) compare */
 int
-evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode)
+evrcmp_str(Pool *pool, const char *evr1, const char *evr2, int mode)
 {
   int r;
-  const char *evr1, *evr2;
   const char *s1, *s2;
   const char *r1, *r2;
 
-  if (evr1id == evr2id)
+  if (evr1 == evr2)
     return 0;
-  evr1 = id2str(pool, evr1id);
-  evr2 = id2str(pool, evr2id);
 
 #if 0
   POOL_DEBUG(DEBUG_EVRCMP, "evrcmp %s %s mode=%d\n", evr1, evr2, mode);
@@ -165,6 +158,17 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode)
         r = vercmp(r1, s1, r2, s2);
     }
   return r;
+}
+
+int
+evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode)
+{
+  const char *evr1, *evr2;
+  if (evr1id == evr2id)
+    return 0;
+  evr1 = id2str(pool, evr1id);
+  evr2 = id2str(pool, evr2id);
+  return evrcmp_str(pool, evr1, evr2, mode);
 }
 
 int

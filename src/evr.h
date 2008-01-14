@@ -24,6 +24,7 @@ extern "C" {
 #define EVRCMP_MATCH                    2
 
 extern int vercmp(const char *s1, const char *q1, const char *s2, const char *q2);
+extern int evrcmp_str(Pool *pool, const char *evr1, const char *evr2, int mode);
 extern int evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode);
 extern int evrmatch(Pool *pool, Id evrid, const char *epoch, const char *version, const char *release);
 
