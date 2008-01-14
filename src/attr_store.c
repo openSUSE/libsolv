@@ -352,14 +352,9 @@ add_attr_int (Attrstore *s, unsigned int entry, Id name, unsigned int val)
 void
 add_attr_special_int (Attrstore *s, unsigned int entry, Id name, unsigned int val)
 {
-  if (val > (TYPE_ATTR_SPECIAL_END - TYPE_ATTR_SPECIAL_START))
-    add_attr_int (s, entry, name, val);
-  else
-    {
-      LongNV nv;
-      nv.key = add_key (s, name, TYPE_ATTR_SPECIAL_START + val, 0);
-      add_attr (s, entry, nv);
-    }
+  LongNV nv;
+  nv.key = add_key (s, name, TYPE_VOID, val);
+  add_attr (s, entry, nv);
 }
 
 static void
@@ -505,14 +500,17 @@ static Id read_id (FILE *fp, Id max);
 /* This routine is used only when attributes are embedded into the
    normal repo SOLV file.  */
 void
-add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, unsigned maxid, FILE *fp)
+add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, unsigned maxid, FILE *fp, unsigned size)
 {
   Pool *pool = s->pool;
   //fprintf (stderr, "%s: attribute in a repo SOLV?\n", id2str (pool, name));
   switch (type)
     {
       case TYPE_VOID:
-        add_attr_void (s, entry, name);
+      	if (size)
+	  add_attr_special_int (s, entry, name, size);
+	else
+          add_attr_void (s, entry, name);
 	break;
       case TYPE_ATTR_CHUNK:
 	{
@@ -582,11 +580,6 @@ add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, 
 	}
 	break;
       default:
-        if (type >= TYPE_ATTR_SPECIAL_START && type <= TYPE_ATTR_SPECIAL_END)
-	  {
-	    add_attr_special_int (s, entry, name, type - TYPE_ATTR_SPECIAL_START);
-	    break;
-	  }
 	pool_debug(pool, SAT_FATAL, "unknown type %d\n", type);
 	exit(0);
     }
@@ -816,11 +809,13 @@ add_key (Attrstore *s, Id name, unsigned type, unsigned size)
 {
   unsigned i;
   for (i = 0; i < s->nkeys; i++)
-    if (s->keys[i].name == name && s->keys[i].type == type)
+    if (s->keys[i].name == name && s->keys[i].type == type
+	&& (type != TYPE_VOID || s->keys[i].size == size))
       break;
   if (i < s->nkeys)
     {
-      s->keys[i].size += size;
+      if (type != TYPE_VOID)
+        s->keys[i].size += size;
       return i;
     }
   if ((s->nkeys & KEY_BLOCK) == 0)
@@ -1058,7 +1053,10 @@ attr_store_unpack (Attrstore *s)
 	  switch (ai.type)
 	    {
 	    case TYPE_VOID:
-	      add_attr_void (s, i, ai.name);
+	      if (ai.as_int)
+	        add_attr_special_int (s, i, ai.name, ai.as_int);
+	      else
+	        add_attr_void (s, i, ai.name);
 	      break;
 	    case TYPE_ATTR_INT:
 	      add_attr_int (s, i, ai.name, ai.as_int); 
@@ -1094,9 +1092,6 @@ attr_store_unpack (Attrstore *s)
 	        break;
 	      }
 	    default:
-	      if (ai.type >= TYPE_ATTR_SPECIAL_START
-	          && ai.type <= TYPE_ATTR_SPECIAL_END)
-		add_attr_special_int (s, i, ai.name, ai.type - TYPE_ATTR_SPECIAL_START);
 	      break;
 	    }
 	}

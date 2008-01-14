@@ -59,6 +59,9 @@ dump_attrs (Attrstore *s, unsigned int entry)
       fprintf (stdout, "%s:", id2str (s->pool, ai.name));
       switch (ai.type)
 	{
+	case TYPE_VOID:
+	  fprintf (stdout, "spec %d\n", ai.as_int);
+	  break;
 	case TYPE_ATTR_INT:
 	  fprintf (stdout, "int  %u\n", ai.as_int);
 	  break;
@@ -106,10 +109,6 @@ dump_attrs (Attrstore *s, unsigned int entry)
 	    break;
 	  }
 	default:
-	  if (ai.type >= TYPE_ATTR_SPECIAL_START
-	      && ai.type <= TYPE_ATTR_SPECIAL_END)
-	    fprintf (stdout, "spec %d", ai.type - TYPE_ATTR_SPECIAL_START);
-	  fprintf (stdout, "\n");
 	  break;
 	}
     }

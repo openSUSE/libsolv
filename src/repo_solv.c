@@ -1040,7 +1040,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	    case TYPE_ATTR_LOCALIDS:
 	      if (!embedded_store)
 		embedded_store = new_store (pool);
-	      add_attr_from_file (embedded_store, i, id, keys[key].type, idmap, numid, &data);
+	      add_attr_from_file (embedded_store, i, id, keys[key].type, idmap, numid, &data, keys[key].size);
 	      break;
 #endif
 	    default:

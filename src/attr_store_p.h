@@ -98,7 +98,7 @@ struct _Attrstore
   unsigned int packed:1;
 };
 
-void add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, unsigned maxid, FILE *fp);
+void add_attr_from_file (Attrstore *s, unsigned entry, Id name, int type, Id *idmap, unsigned maxid, FILE *fp, unsigned size);
 void read_or_setup_pages (FILE *fp, Attrstore *s);
 
 #define get_num(ptr,val) do { \
@@ -159,7 +159,8 @@ ai_step (Attrstore *s, attr_iterator *ai)
   switch (ai->type)
     {
     case TYPE_VOID:
-      /* No data.  */
+      /* No data, except perhaps a constant value.  */
+      ai->as_int = s->keys[key].size;
       break;
     case TYPE_ATTR_INT:
       {
@@ -208,7 +209,6 @@ ai_step (Attrstore *s, attr_iterator *ai)
 	break;
       }
     default:
-      /* ??? Convert TYPE_ATTR_SPECIAL_* to _INT type with the right value? */
       break;
     }
   return 1;

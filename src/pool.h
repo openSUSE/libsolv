@@ -128,6 +128,12 @@ struct _Pool {
 #define SAT_DEBUG_JOB			(1<<11)
 #define SAT_DEBUG_SCHUBI		(1<<12)
 
+/* The void type is usable to encode one-valued attributes, they have
+   no associated data.  This is useful to encode values which many solvables
+   have in common, and whose overall set is relatively limited.  A prime
+   example would be the media number.  The actual value is encoded in the
+   SIZE member of the key structure.  Be warned: careless use of this
+   leads to combinatoric explosion of number of schemas.  */
 #define TYPE_VOID               0
 #define TYPE_ID			1
 #define TYPE_IDARRAY		2
@@ -147,14 +153,7 @@ struct _Pool {
 #define TYPE_IDVALUEARRAY	13
 #define TYPE_IDVALUEVALUEARRAY	14
 
-/* The special types are usable to encode one-valued attributes, they have
-   no associated data.  This is useful to encode values which many solvables
-   have in common, and whose overall set is relatively limited.  A prime
-   example would be the media number.  Be warned: careless use of this
-   leads to combinatoric explosion of number of schemas.  */
-#define TYPE_ATTR_SPECIAL_START	15
-#define TYPE_ATTR_SPECIAL_END	(TYPE_ATTR_SPECIAL_START + 31)
-#define TYPE_ATTR_TYPE_MAX	TYPE_ATTR_SPECIAL_END
+#define TYPE_ATTR_TYPE_MAX	TYPE_IDVALUEVALUEARRAY
 
 //-----------------------------------------------
 
