@@ -151,9 +151,11 @@ struct _Pool {
 #define TYPE_COUNTED		12
 
 #define TYPE_IDVALUEARRAY	13
-#define TYPE_IDVALUEVALUEARRAY	14
 
-#define TYPE_ATTR_TYPE_MAX	TYPE_IDVALUEVALUEARRAY
+#define TYPE_DIR		14
+#define TYPE_DIRVALUEVALUEARRAY	15
+
+#define TYPE_ATTR_TYPE_MAX	TYPE_DIRVALUEVALUEARRAY
 
 //-----------------------------------------------
 

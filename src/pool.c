@@ -938,39 +938,43 @@ pool_fill_DU(Pool *pool, struct mountpoint *mps, int nmps)
     {
       for_all_repodatas_containing_DU
 	{
-	  dirmap = xcalloc2(data->ndirs, sizeof(Id));
-	  dirnum = 0;
-	  for (;;)
+	  /* create map from dir to mptree */
+	  dirmap = xcalloc2(pool->ndirs, sizeof(Id));
+	  mp = 0;
+	  for (dn = 2, dirs = pool->dirs + dn; dn < pool->ndirs; dn++)
 	    {
-	      parent = readid();
-	      mp = parent ? dirmap[parent] : 0;
-	      while (id = readid())
+	      id = *dirs++;
+	      if (id <= 0)
 		{
-		  if (mp < 0)
-		    {
-		      /* unconnected */
-		      dirmap[dirnum++] = mp;
-		      continue;
-		    }
-		  if (!mptree[mp].child)
-		    {
-		      dirmap[dirnum++] = -mp;
-		      continue;
-		    }
-		  comp = id2str(pool, id);
-		  compl = strlen(comp);
-		  for (i = mptree[mp].child; i; i = mptree[i].sibling)
-		    if (mptree[i].compl == compl && !strncmp(mptree[i].comp, comp, compl))
-		      break;
-		  dirmap[dirnum++] = i ? i : -mp;
+		  mp = dirmap[-id];
+		  continue;
 		}
+	      if (mp < 0)
+		{
+		  /* unconnected */
+		  dirmap[dn] = mp;
+		  continue;
+		}
+	      if (!mptree[mp].child)
+		{
+		  dirmap[dn] = -mp;
+		  continue;
+		}
+	      comp = id2str(pool, id);
+	      compl = strlen(comp);
+	      for (i = mptree[mp].child; i; i = mptree[i].sibling)
+		if (mptree[i].compl == compl && !strncmp(mptree[i].comp, comp, compl))
+		  break;
+	      dirmap[dn] = i ? i : -mp;
 	    }
-	  for (i = 0; i < dirnum; i++)
+	  /* change dirmap to point to mountpoint instead of mptree */
+	  for (dn = 0; dn < pool->ndirs; dn++)
 	    {
 	      mp = dirmap[i];
 	      dirmap[i] = mptree[mp > 0 ? mp : -mp].mountpoint;
 	    }
-	  cbdata.nmap = dirnum;
+
+	  cbdata.nmap = pool->ndirs;
 	  cbdata.dirmap = dirmap;
 
 	  md.callback = pool_fill_DU_add_cb;

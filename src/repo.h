@@ -64,9 +64,9 @@ typedef struct _Repodata {
   Id *incoreoffset;		/* offset for all entries (ent2attr) */
 
   Id verticaloffset;		/* file offset of verticals */
-  char *strbuf;			/* just for testing */
-  int strbuflen;		/* just for testing */
 
+  Id *dirs;			/* directory list */
+  int ndirs;			/* its size */
 
   /* The attribute store itself.  */
   Attrstore *s;

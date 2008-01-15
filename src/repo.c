@@ -482,13 +482,14 @@ data_skip(unsigned char *dp, int type)
     case TYPE_VOID:
       return dp;
     case TYPE_ID:
+    case TYPE_DIR:
       while ((*dp & 0x80) != 0)
 	dp++;
       return dp;
     case TYPE_IDARRAY:
     case TYPE_REL_IDARRAY:
     case TYPE_IDVALUEARRAY:
-    case TYPE_IDVALUEVALUEARRAY:
+    case TYPE_DIRVALUEVALUEARRAY:
       while ((*dp & 0xc0) != 0)
 	dp++;
       return dp;
@@ -583,7 +584,7 @@ get_data(Repodata *data, Repokey *key, unsigned char **dpp)
 	case TYPE_IDARRAY:
 	case TYPE_REL_IDARRAY:
 	case TYPE_IDVALUEARRAY:
-	case TYPE_IDVALUEVALUEARRAY:
+	case TYPE_DIRVALUEVALUEARRAY:
 	  for (i = 0; i < plen; i++)
 	    if ((dp[i] & 0xc0) == 0)
 	      return dp;

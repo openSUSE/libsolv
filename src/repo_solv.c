@@ -255,7 +255,10 @@ skip_item (Repodata *data, unsigned type, unsigned numid, unsigned numrel)
       case TYPE_VOID:
 	break;
       case TYPE_ID:
-	read_id(data, numid + numrel);   /* just check Id */
+	read_id(data, numid + numrel);		/* just check Id */
+	break;
+      case TYPE_DIR:
+	read_id(data, numid + data->ndirs);	/* just check Id */
 	break;
       case TYPE_U32:
 	read_u32(data);
@@ -267,7 +270,7 @@ skip_item (Repodata *data, unsigned type, unsigned numid, unsigned numrel)
 	break;
       case TYPE_IDARRAY:
       case TYPE_IDVALUEARRAY:
-      case TYPE_IDVALUEVALUEARRAY:
+      case TYPE_DIRVALUEVALUEARRAY:
       case TYPE_REL_IDARRAY:
       case TYPE_ATTR_INTLIST:
 	while ((read_u8(data) & 0xc0) != 0)
@@ -478,7 +481,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 {
   Pool *pool = repo->pool;
   int i, l;
-  unsigned int numid, numrel, numsolv;
+  unsigned int numid, numrel, numdir, numsolv;
   unsigned int numkeys, numschemata, numinfo;
 #if 0
   Attrstore *embedded_store = 0;
@@ -525,6 +528,7 @@ repo_add_solv(Repo *repo, FILE *fp)
       case SOLV_VERSION_1:
       case SOLV_VERSION_2:
       case SOLV_VERSION_3:
+      case SOLV_VERSION_4:
         break;
       default:
         pool_debug(pool, SAT_ERROR, "unsupported SOLV version\n");
@@ -535,14 +539,22 @@ repo_add_solv(Repo *repo, FILE *fp)
 
   numid = read_u32(&data);
   numrel = read_u32(&data);
+  if (solvversion >= SOLV_VERSION_4)
+    numdir = read_u32(&data);
+  else
+    numdir = 0;
   numsolv = read_u32(&data);
   numkeys = read_u32(&data);
   numschemata = read_u32(&data);
   numinfo = read_u32(&data);
   solvflags = read_u32(&data);
 
-  if (solvversion < SOLV_VERSION_3
-      && numinfo)
+  if (numdir && numdir < 2)
+    {
+      pool_debug(pool, SAT_ERROR, "bad number of dirs\n");
+      return SOLV_ERROR_CORRUPT;
+    }
+  if (numinfo && solvversion < SOLV_VERSION_3)
     {
       pool_debug(pool, SAT_ERROR, "unsupported SOLV format (has info)\n");
       return SOLV_ERROR_UNSUPPORTED;
@@ -768,7 +780,25 @@ repo_add_solv(Repo *repo, FILE *fp)
     }
 
 
-  /*******  Part 3: Keys  ***********************************************/
+  /*******  Part 3: Dirs  ***********************************************/
+  if (numdir)
+    {
+      data.dirs = sat_calloc(numdir, sizeof(Id));
+      data.ndirs = numdir;
+      /* dir 0: no directory
+       * dir 1: /
+       */
+      for (i = 2; i < numdir; i++)
+	{
+	  id = read_id(&data, i + numid);
+	  if (i > numid)
+	    data.dirs[i] = -(id - numid);
+	  else
+	    data.dirs[i] = idmap[id];
+	}
+    }
+
+  /*******  Part 4: Keys  ***********************************************/
 
   keys = sat_calloc(numkeys, sizeof(*keys));
   /* keys start at 1 */
@@ -821,7 +851,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   data.keys = keys;
   data.nkeys = numkeys;
 
-  /*******  Part 4: Schemata ********************************************/
+  /*******  Part 5: Schemata ********************************************/
   
   id = read_id(&data, 0);
   schemadata = sat_calloc(id, sizeof(Id));
@@ -837,7 +867,7 @@ repo_add_solv(Repo *repo, FILE *fp)
   data.nschemata = numschemata;
   data.schemadata = schemadata;
 
-  /*******  Part 5: Info  ***********************************************/
+  /*******  Part 6: Info  ***********************************************/
   for (i = 0; i < numinfo; i++)
     {
       /* for now we're just interested in data that starts with
@@ -854,7 +884,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	skip_schema(&data, keyp, keys, numid, numrel);
     }
 
-  /*******  Part 6: packed sizes (optional)  ****************************/
+  /*******  Part 7: packed sizes (optional)  ****************************/
   char *exists = 0;
   if ((solvflags & SOLV_FLAG_PACKEDSIZES) != 0)
     {
@@ -863,7 +893,7 @@ repo_add_solv(Repo *repo, FILE *fp)
 	exists[i] = read_id(&data, 0) != 0;
     }
 
-  /*******  Part 7: item data *******************************************/
+  /*******  Part 8: item data *******************************************/
 
   /* calculate idarray size */
   size_idarray = 0;
@@ -1089,6 +1119,8 @@ repo_add_solv(Repo *repo, FILE *fp)
     }
   else
     {
+      /* discard data */
+      sat_free(data.dirs);
       sat_free(schemata);
       sat_free(schemadata);
       sat_free(keys);
