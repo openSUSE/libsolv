@@ -332,7 +332,7 @@ unchecked_decompress_buf (const unsigned char *in, unsigned int in_len,
          better optimizable.  */
       do
 	{
-	  *out = out[-o];
+	  *out = *(out - o);
 	  out++;
 	}
       while (--first);
