@@ -1995,6 +1995,7 @@ solver_create(Pool *pool, Repo *installed)
   queue_init(&solv->learnt_why);
   queue_init(&solv->learnt_pool);
   queue_init(&solv->branches);
+  queue_init(&solv->covenantq);
 
   map_init(&solv->recommendsmap, pool->nsolvables);
   map_init(&solv->suggestsmap, pool->nsolvables);
@@ -2025,6 +2026,7 @@ solver_free(Solver *solv)
   queue_free(&solv->problems);
   queue_free(&solv->suggestions);
   queue_free(&solv->branches);
+  queue_free(&solv->covenantq);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);

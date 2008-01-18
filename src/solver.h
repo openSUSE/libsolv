@@ -107,6 +107,8 @@ typedef struct solver {
   Id *obsoletes;			/* obsoletes for each installed solvable */
   Id *obsoletes_data;			/* data area for obsoletes */
 
+  Queue covenantq;                      /* Covenants honored by this solver (generic locks) */
+  
 } Solver;
 
 /*
