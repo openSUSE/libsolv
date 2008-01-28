@@ -296,8 +296,13 @@ prune_to_best_version(Pool *pool, Queue *plist)
 
 /* legacy, do not use anymore! */
 void
-prune_best_version_arch(Pool *pool, Queue *plist)
+prune_best_version_arch(Solver *solv, Pool *pool, Queue *plist)
 {
+  if (solv && solv->bestSolvableCb)
+     {   /* The application is responsible for */
+	 return solv->bestSolvableCb (plist);
+     }
+    
   if (plist->count > 1)
     prune_to_best_arch(pool, plist);
   if (plist->count > 1)
@@ -316,17 +321,20 @@ policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode)
   /* FIXME: do this different! */
   if (inst)
     queue_push(plist, inst);
-  if (plist->count > 1)
-    prune_to_best_arch(pool, plist);
-  if (plist->count > 1)
-    prune_to_best_version(pool, plist);
+  
+  prune_best_version_arch (solv, pool, plist);
 }
 
 
 int
-policy_illegal_archchange(Pool *pool, Solvable *s1, Solvable *s2)
+policy_illegal_archchange(Solver *solv, Pool *pool, Solvable *s1, Solvable *s2)
 {
   Id a1 = s1->arch, a2 = s2->arch;
+
+  if (solv && solv->archCheckCb)
+     {   /* The application is responsible for */
+	 return solv->archCheckCb (s1, s2);
+     }
 
   /* we allow changes to/from noarch */
   if (a1 == a2 || a1 == ARCH_NOARCH || a2 == ARCH_NOARCH)
@@ -341,9 +349,15 @@ policy_illegal_archchange(Pool *pool, Solvable *s1, Solvable *s2)
 }
 
 int
-policy_illegal_vendorchange(Pool *pool, Solvable *s1, Solvable *s2)
+policy_illegal_vendorchange(Solver *solv, Pool *pool, Solvable *s1, Solvable *s2)
 {
   Id vendormask1, vendormask2;
+
+  if (solv && solv->vendorCheckCb)
+     {   /* The application is responsible for */
+	 return solv->vendorCheckCb (s1, s2);
+     }
+  
   if (s1->vendor == s2->vendor)
     return 0;
   vendormask1 = pool_vendor2mask(pool, s1->vendor);
@@ -366,6 +380,12 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
   Id vendormask;
 
   queue_empty(qs);
+
+  if (solv && solv->updateCandidateCb)
+     {   /* The application is responsible for */
+	 return solv->updateCandidateCb (s, qs);
+     }
+  
   /*
    * s = solvable ptr
    * n = solvable Id
@@ -388,9 +408,9 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
 	    {
 	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_MATCH_RELEASE) > 0)
 	        continue;
-	      if (!solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(pool, s, ps))
+	      if (!solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, pool, s, ps))
 		continue;
-	      if (!solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(pool, s, ps))
+	      if (!solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, pool, s, ps))
 		continue;
 	    }
 	}

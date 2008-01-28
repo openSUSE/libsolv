@@ -24,6 +24,8 @@
 #include "evr.h"
 #include "policy.h"
 
+
+
 #define RULES_BLOCK 63
 #define REGARD_RECOMMENDS_OF_INSTALLED_ITEMS 0
 
@@ -3239,12 +3241,12 @@ printsolutions(Solver *solv, Queue *job)
 			  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 			  gotone = 1;
 			}
-		      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(pool, s, sd))
+		      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(solv, pool, s, sd))
 			{
 			  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 			  gotone = 1;
 			}
-		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(pool, s, sd))
+		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(solv,pool, s, sd))
 			{
 			  if (sd->vendor)
 			    POOL_DEBUG(SAT_DEBUG_RESULT, "- allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));

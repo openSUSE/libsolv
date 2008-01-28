@@ -18,6 +18,15 @@
 #include "repo.h"
 #include "queue.h"
 #include "bitmap.h"
+/*
+ * Callback definitions in order to "overwrite" the policies by an external application.
+ */
+ 
+typedef void  (*BestSolvableCb) (Queue *canditates);
+typedef int  (*ArchCheckCb) (Solvable *solvable1, Solvable *solvable2);
+typedef int  (*VendorCheckCb) (Solvable *solvable1, Solvable *solvable2);
+typedef void (*UpdateCandidateCb) (Solvable *solvable, Queue *canditates);
+
 
 /* ----------------------------------------------
  * Rule
@@ -49,16 +58,6 @@ struct solver;
 typedef struct solver {
   Pool *pool;
   Repo *installed;
-
-  int fixsystem;			/* repair errors in rpm dependency graph */
-  int allowdowngrade;			/* allow to downgrade installed solvable */
-  int allowarchchange;			/* allow to change architecture of installed solvables */
-  int allowvendorchange;		/* allow to change vendor of installed solvables */
-  int allowuninstall;			/* allow removal of installed solvables */
-  int updatesystem;			/* distupgrade */
-  int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
-  int noupdateprovide;			/* true: update packages needs not to provide old package */
-  int dosplitprovides;			/* true: consider legacy split provides */
   
   Rule *rules;				/* all rules */
   Id nrules;				/* index of the last rule */
@@ -108,6 +107,60 @@ typedef struct solver {
   Id *obsoletes_data;			/* data area for obsoletes */
 
   Queue covenantq;                      /* Covenants honored by this solver (generic locks) */
+
+  /*-------------------------------------------------------------------------------------------------------------
+   * Solver configuration
+   *-------------------------------------------------------------------------------------------------------------*/
+
+  int fixsystem;			/* repair errors in rpm dependency graph */
+  int allowdowngrade;			/* allow to downgrade installed solvable */
+  int allowarchchange;			/* allow to change architecture of installed solvables */
+  int allowvendorchange;		/* allow to change vendor of installed solvables */
+  int allowuninstall;			/* allow removal of installed solvables */
+  int updatesystem;			/* distupgrade */
+  int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
+  int noupdateprovide;			/* true: update packages needs not to provide old package */
+  int dosplitprovides;			/* true: consider legacy split provides */
+
+  /* Callbacks for defining the bahaviour of the SAT solver */
+
+  /* Finding best candidate
+   *
+   * Callback definition:
+   * void  bestSolvable (Queue *canditates)
+   *     candidates       : List of canditates which has to be sorted by the function call
+   *     return candidates: Sorted list of the candidates(first is the best).
+   */
+   BestSolvableCb bestSolvableCb;
+
+  /* Checking if two solvables has compatible architectures
+   *
+   * Callback definition:
+   *     int  archCheck (Solvable *solvable1, Solvable *solvable2);
+   *     
+   *     return 0 it the two solvables has compatible architectures
+   */
+   ArchCheckCb archCheckCb;
+
+  /* Checking if two solvables has compatible vendors
+   *
+   * Callback definition:
+   *     int  vendorCheck (Solvable *solvable1, Solvable *solvable2);
+   *     
+   *     return 0 it the two solvables has compatible architectures
+   */
+   VendorCheckCb vendorCheckCb;
+    
+  /* Evaluate update candidate
+   *
+   * Callback definition:
+   * void pdateCandidateCb (Solvable *solvable, Queue *canditates)
+   *     solvable   : for which updates should be search
+   *     candidates : List of candidates (This list depends on other
+   *                  restrictions like architecture and vendor policies too)
+   */
+   UpdateCandidateCb   updateCandidateCb;
+    
   
 } Solver;
 
