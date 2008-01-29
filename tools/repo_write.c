@@ -977,7 +977,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
       if (cbdata.keymap[SOLVABLE_EVR])
 	{
           *sp++ = SOLVABLE_EVR;
-	  needid[s->arch].need++;
+	  needid[s->evr].need++;
 	}
       if (s->vendor && cbdata.keymap[SOLVABLE_VENDOR])
 	{
