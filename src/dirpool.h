@@ -58,7 +58,8 @@ dirpool_child(Dirpool *dp, Id did)
 static inline void
 dirpool_free_dirtraverse(Dirpool *dp)
 {
-  dp->dirtraverse = sat_free(dp->dirtraverse);
+  sat_free(dp->dirtraverse);
+  dp->dirtraverse = 0;
 }
 
 static inline Id
