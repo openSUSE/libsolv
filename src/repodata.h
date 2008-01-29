@@ -13,6 +13,8 @@
 #ifndef SATSOLVER_REPODATA_H
 #define SATSOLVER_REPODATA_H
 
+#include <stdio.h> 
+
 #include "pooltypes.h"
 #include "pool.h"
 #include "dirpool.h"
