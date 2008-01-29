@@ -917,7 +917,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	      if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
 		{
 		  ndp = data_skip(dp, TYPE_ID);
-		  ndp = data_skip(dp, TYPE_ID);
+		  ndp = data_skip(ndp, TYPE_ID);
 		}
 	      else if (key->storage == KEY_STORAGE_INCORE)
 		ndp = data_skip(dp, key->type);
@@ -955,7 +955,6 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 		  data_addid(xd, id);
 		  break;
 		case TYPE_DIRNUMNUMARRAY:
-		  ida = data->attriddata + id;
 		  for (ida = data->attriddata + id; *ida; ida += 3)
 		    {
 		      data_addid(xd, ida[0]);
