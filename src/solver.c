@@ -294,7 +294,7 @@ unifyrules(Solver *solv)
 
   /* adapt rule buffer */
   solv->nrules = j;
-  solv->rules = (Rule *)sat_realloc(solv->rules, ((solv->nrules + RULES_BLOCK) & ~RULES_BLOCK) * sizeof(Rule));
+  solv->rules = sat_extend_resize(solv->rules, solv->nrules, sizeof(Rule), RULES_BLOCK);
   IF_POOLDEBUG (SAT_DEBUG_STATS)
     {
       int binr = 0;
@@ -461,12 +461,8 @@ addrule(Solver *solv, Id p, Id d)
    * allocate new rule
    */
 
-  /* check and extend rule buffer */
-  if ((solv->nrules & RULES_BLOCK) == 0)
-    {
-      solv->rules = (Rule *)sat_realloc(solv->rules, (solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
-    }
-
+  /* extend rule buffer */
+  solv->rules = sat_extend(solv->rules, solv->nrules, 1, sizeof(Rule), RULES_BLOCK);
   r = solv->rules + solv->nrules++;    /* point to rule space */
 
   r->p = p;
@@ -921,6 +917,46 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
     }
 }
 
+#if 0
+static void
+addpatchatomrequires(Solver *solv, Solvable *s, Id *dp, Queue *q, Map *m)
+{
+  Pool *pool = solv->pool;
+  Id fre, *frep, p, *pp, ndp;
+  Solvable *ps;
+  Queue fq;
+  Id qbuf[64];
+  int i, used = 0;
+
+  queue_init_buffer(&fq, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  queue_push(&fq, -(s - pool->solvables));
+  for (; *dp; dp++)
+    queue_push(&fq, *dp);
+  ndp = pool_queuetowhatprovides(pool, &fq);
+  frep = s->repo->idarraydata + s->freshens;
+  while ((fre = *frep++) != 0)
+    {
+      FOR_PROVIDES(p, pp, fre)
+	{
+	  ps = pool->solvables + p;
+	  addrule(solv, -p, ndp);
+	  used = 1;
+	  if (!MAPTST(m, p))
+	    queue_push(q, p);
+	}
+    }
+  if (used)
+    {
+      for (i = 1; i < fq.count; i++)
+	{
+	  p = fq.elements[i];
+	  if (!MAPTST(m, p))
+	    queue_push(q, p);
+	}
+    }
+  queue_free(&fq);
+}
+#endif
 
 /*
  * add (install) rules for solvable
@@ -937,6 +973,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id qbuf[64];
   int i;
   int dontfix;
+  int patchatom;
   Id req, *reqp;
   Id con, *conp;
   Id obs, *obsp;
@@ -979,6 +1016,14 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  addrule(solv, -n, 0);		/* uninstallable */
 	}
 
+      patchatom = 0;
+      if (s->freshens && !s->supplements)
+	{
+	  const char *name = id2str(pool, s->name);
+	  if (name[0] == 'a' && !strncmp(name, "atom:", 5))
+	    patchatom = 1;
+	}
+
       /*-----------------------------------------
        * check requires of s
        */
@@ -996,6 +1041,13 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (*dp == SYSTEMSOLVABLE)	/* always installed */
 		continue;
 
+#if 0
+	      if (patchatom)
+		{
+		  addpatchatomrequires(solv, s, dp, &q, m);
+		  continue;
+		}
+#endif
 	      if (dontfix)
 		{
 		  /* the strategy here is to not insist on dependencies
@@ -2005,9 +2057,9 @@ solver_create(Pool *pool, Repo *installed)
   solv->recommends_index = 0;
 
   solv->decisionmap = (Id *)sat_calloc(pool->nsolvables, sizeof(Id));
-  solv->rules = (Rule *)sat_malloc((solv->nrules + (RULES_BLOCK + 1)) * sizeof(Rule));
-  memset(solv->rules, 0, sizeof(Rule));
   solv->nrules = 1;
+  solv->rules = sat_extend_resize(solv->rules, solv->nrules, sizeof(Rule), RULES_BLOCK);
+  memset(solv->rules, 0, sizeof(Rule));
 
   return solv;
 }
@@ -2701,7 +2753,7 @@ solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, I
  */
 
 Id *
-create_obsoletesmap(Solver *solv)
+create_decisions_obsoletesmap(Solver *solv)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
@@ -2774,7 +2826,7 @@ printdecisions(Solver *solv)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
-  Id p, *obsoletesmap = create_obsoletesmap( solv );
+  Id p, *obsoletesmap = create_decisions_obsoletesmap( solv );
   int i;
   Solvable *s;
 
@@ -3270,7 +3322,9 @@ printsolutions(Solver *solv, Queue *job)
 }
 
 
-/* for each installed solvable find which packages with *different* names
+/* create reverse obsoletes map for installed solvables
+ *
+ * for each installed solvable find which packages with *different* names
  * obsolete the solvable.
  * this index is used in policy_findupdatepackages if noupdateprovide is set.
  */
@@ -3286,7 +3340,6 @@ create_obsolete_index(Solver *solv)
 
   if (!installed || !installed->nsolvables)
     return;
-  /* create reverse obsoletes map for installed solvables */
   solv->obsoletes = obsoletes = sat_calloc(installed->end - installed->start, sizeof(Id));
   for (i = 1; i < pool->nsolvables; i++)
     {
@@ -3582,10 +3635,22 @@ solver_solve(Solver *solv, Queue *job)
     {				       /* loop over all installed solvables */
       /* we create all update rules, but disable some later on depending on the job */
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
-	if (s->repo == installed)
-	  addupdaterule(solv, s, 0); /* allowall = 0 */
-	else
-	  addupdaterule(solv, 0, 0);	/* create dummy rule;  allowall = 0  */
+	{
+	  /* no system rules for patch atoms */
+	  if (s->freshens && !s->supplements)
+	    {
+	      const char *name = id2str(pool, s->name);
+	      if (name[0] == 'a' && !strncmp(name, "atom:", 5))
+		{
+		  addrule(solv, 0, 0);
+		  continue;
+		}
+	    }
+	  if (s->repo == installed)
+	    addupdaterule(solv, s, 0);	/* allowall = 0 */
+	  else
+	    addrule(solv, 0, 0);	/* create dummy rule */
+	}
       /* consistency check: we added a rule for _every_ system solvable */
       assert(solv->nrules - solv->systemrules == installed->end - installed->start);
     }

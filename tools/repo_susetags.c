@@ -14,7 +14,9 @@
 
 #include "pool.h"
 #include "repo.h"
+#if 0
 #include "attr_store.h"
+#endif
 #include "repo_susetags.h"
 
 static int
@@ -40,6 +42,7 @@ split(char *l, char **sp, int m)
 struct parsedata {
   char *kind;
   Repo *repo;
+  Repodata *data;
   char *tmp;
   int tmpl;
   char **sources;
@@ -140,7 +143,9 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
 
+#if 0
 Attrstore *attr;
+#endif
 static Id id_authors;
 static Id id_description;
 static Id id_diskusage;
@@ -162,7 +167,7 @@ static Id id_summary;
 static Id id_time;
 
 static void
-add_location (char *line, Solvable *s, unsigned entry)
+add_location(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
 {
   Pool *pool = s->repo->pool;
   char *sp[3];
@@ -182,9 +187,15 @@ add_location (char *line, Solvable *s, unsigned entry)
     {
       /* medianr filename dir
          don't optimize this one */
+#if 0
       add_attr_special_int (attr, entry, id_medianr, atoi (sp[0]));
       add_attr_localids_id (attr, entry, id_mediadir, str2localid (attr, sp[2], 1));
       add_attr_string (attr, entry, id_mediafile, sp[1]);
+#else
+      repodata_set_constant(pd->data, entry, id_medianr, atoi(sp[0]));
+      repodata_set_poolstr(pd->data, entry, id_mediadir, sp[2]);
+      repodata_set_str(pd->data, entry, id_mediafile, sp[1]);
+#endif
       return;
     }
   else
@@ -213,19 +224,30 @@ add_location (char *line, Solvable *s, unsigned entry)
 	  break;
       if (*n2 || strcmp (n1, ".rpm"))
         goto nontrivial;
+#if 0
       add_attr_special_int (attr, entry, id_medianr, medianr);
       add_attr_void (attr, entry, id_mediafile);
+#else
+      repodata_set_constant(pd->data, entry, id_medianr, medianr);
+      repodata_set_void(pd->data, entry, id_mediafile);
+#endif
       return;
 
 nontrivial:
+#if 0
       add_attr_special_int (attr, entry, id_medianr, medianr);
       add_attr_string (attr, entry, id_mediafile, sp[1]);
+#else
+      repodata_set_constant(pd->data, entry, id_medianr, medianr);
+      repodata_set_str(pd->data, entry, id_mediafile, sp[1]);
+#endif
       return;
     }
 }
 
+#if 0
 static void
-add_source (char *line, struct parsedata *pd, Solvable *s, unsigned entry, int first)
+add_source(struct parsedata *pd, char *line, Solvable *s, unsigned entry, int first)
 {
   Repo *repo = s->repo;
   Pool *pool = repo->pool;
@@ -245,7 +267,9 @@ add_source (char *line, struct parsedata *pd, Solvable *s, unsigned entry, int f
      (src or nosrc), code only that fact.  */
   if (s->name == name && s->evr == evr
       && (arch == ARCH_SRC || arch == ARCH_NOSRC))
-    add_attr_void (attr, entry, arch == ARCH_SRC ? id_source : id_nosource);
+    {
+      add_attr_void (attr, entry, arch == ARCH_SRC ? id_source : id_nosource);
+    }
   else if (first)
     {
       if (entry >= pd->nsources)
@@ -296,6 +320,7 @@ add_source (char *line, struct parsedata *pd, Solvable *s, unsigned entry, int f
 	}
     }
 }
+#endif
 
 static void
 add_dirline (struct parsedata *pd, char *line)
@@ -303,18 +328,18 @@ add_dirline (struct parsedata *pd, char *line)
   char *sp[6];
   if (split (line, sp, 6) != 5)
     return;
-  if (!(pd->ndirs & 31))
-    {
-      if (pd->dirs)
-        pd->dirs = realloc (pd->dirs, (pd->ndirs + 32) * sizeof (pd->dirs[0]));
-      else
-        pd->dirs = malloc ((pd->ndirs + 32) * sizeof (pd->dirs[0]));
-    }
+  pd->dirs = sat_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
   long filesz = strtol (sp[1], 0, 0);
   filesz += strtol (sp[2], 0, 0);
   long filenum = strtol (sp[3], 0, 0);
   filenum += strtol (sp[4], 0, 0);
-  unsigned dirid = dir_lookup (attr, sp[0], 1);
+  /* hack: we know that there's room for a / */
+  if (*sp[0] != '/')
+    *--sp[0] = '/';
+  unsigned dirid = repodata_str2dir(pd->data, sp[0], 1);
+#if 0
+fprintf(stderr, "%s -> %d\n", sp[0], dirid);
+#endif
   pd->dirs[pd->ndirs][0] = dirid;
   pd->dirs[pd->ndirs][1] = filesz;
   pd->dirs[pd->ndirs][2] = filenum;
@@ -333,6 +358,7 @@ static void
 commit_diskusage (struct parsedata *pd, unsigned entry)
 {
   unsigned i;
+  Dirpool *dp = &pd->data->dirpool;
   /* Now sort in dirid order.  This ensures that parents come before
      their children.  */
   if (pd->ndirs > 1)
@@ -343,9 +369,9 @@ commit_diskusage (struct parsedata *pd, unsigned entry)
      the array moving to the start, hence seeing leafs before parents.  */
   for (i = pd->ndirs; i--;)
     {
-      unsigned p = dir_parent (attr, pd->dirs[i][0]);
+      unsigned p = dirpool_parent(dp, pd->dirs[i][0]);
       unsigned j = i;
-      for (; p; p = dir_parent (attr, p))
+      for (; p; p = dirpool_parent(dp, p))
         {
           for (; j--;)
 	    if (pd->dirs[j][0] == p)
@@ -382,12 +408,16 @@ commit_diskusage (struct parsedata *pd, unsigned entry)
   for (i = 0; i < pd->ndirs; i++)
     if (pd->dirs[i][1] || pd->dirs[i][2])
       {
+	repodata_add_dirnumnum(pd->data, entry, id_diskusage, pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2]);
+#if 0
         add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][0]);
         add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][1]);
         add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][2]);
+#endif
       }
   pd->ndirs = 0;
 }
+
 
 /* Unfortunately "a"[0] is no constant expression in the C languages,
    so we need to pass the four characters individually :-/  */
@@ -416,10 +446,15 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   int last_found_pack = 0;
   char *sp[5];
   struct parsedata pd;
+  Repodata *data = 0;
 
+#if 1
   if (with_attr)
     {
+#if 0
       attr = new_store(pool);
+#endif
+      data = repo_add_repodata(repo);
       id_authors = str2id (pool, "authors", 1);
       id_description = str2id (pool, "description", 1);
       id_diskusage = str2id (pool, "diskusage", 1);
@@ -440,12 +475,14 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
       id_summary = str2id (pool, "summary", 1);
       id_time = str2id (pool, "time", 1);
     }
+#endif
 
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
   aline = 1024;
 
   pd.repo = repo;
+  pd.data = data;
 
   linep = line;
   s = 0;
@@ -538,6 +575,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    pd.kind = "pattern";
 	  s = pool_id2solvable(pool, repo_add_solvable(repo));
 	  last_found_pack = (s - pool->solvables) - repo->start;
+	  if (data)
+            repodata_extend(data, s - pool->solvables);
           if (split(line + 5, sp, 5) != 4)
 	    {
 	      fprintf(stderr, "Bad line: %s\n", line);
@@ -558,7 +597,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	{
 	  if (s && pd.ndirs)
 	    commit_diskusage (&pd, last_found_pack);
-
 	  Id name, evr, arch;
 	  int n, nn;
 	  pd.kind = 0;
@@ -654,52 +692,99 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
       switch (tag)
         {
           case CTAG('=', 'G', 'r', 'p'):
+	    repodata_set_poolstr(data, last_found_pack, id_group, line + 6);
+#if 0
 	    add_attr_localids_id (attr, last_found_pack, id_group, str2localid (attr, line + 6, 1));
+#endif
 	    continue;
           case CTAG('=', 'L', 'i', 'c'):
+	    repodata_set_poolstr(data, last_found_pack, id_license, line + 6);
+#if 0
 	    add_attr_localids_id (attr, last_found_pack, id_license, str2localid (attr, line + 6, 1));
+#endif
 	    continue;
           case CTAG('=', 'L', 'o', 'c'):
-	    add_location (line + 6, s, last_found_pack);
+	    add_location(&pd, line + 6, s, last_found_pack);
 	    continue;
+#if 0
           case CTAG('=', 'S', 'r', 'c'):
-	    add_source (line + 6, &pd, s, last_found_pack, 1);
+	    add_source(&pd, line + 6, s, last_found_pack, 1);
 	    continue;
+#endif
           case CTAG('=', 'S', 'i', 'z'):
 	    if (split (line + 6, sp, 3) == 2)
 	      {
+		repodata_set_num(data, last_found_pack, id_downloadsize, (atoi(sp[0]) + 1023) / 1024);
+		repodata_set_num(data, last_found_pack, id_installsize, (atoi(sp[1]) + 1023) / 1024);
+#if 0
 	        add_attr_int (attr, last_found_pack, id_downloadsize, (atoi (sp[0]) + 1023) / 1024);
 	        add_attr_int (attr, last_found_pack, id_installsize, (atoi (sp[1]) + 1023) / 1024);
+#endif
 	      }
 	    continue;
           case CTAG('=', 'T', 'i', 'm'):
 	    {
 	      unsigned int t = atoi (line + 6);
 	      if (t)
-	        add_attr_int (attr, last_found_pack, id_time, t);
+		{
+#if 0
+	          add_attr_int (attr, last_found_pack, id_time, t);
+#else
+		  repodata_set_num(data, last_found_pack, id_time, t);
+#endif
+		}
 	    }
 	    continue;
           case CTAG('=', 'K', 'w', 'd'):
+#if 0
 	    add_attr_localids_id (attr, last_found_pack, id_keywords, str2localid (attr, line + 6, 1));
+#else
+	    repodata_set_poolstr(data, last_found_pack, id_keywords, line + 6);
+#endif
 	    continue;
           case CTAG('=', 'A', 'u', 't'):
+#if 0
 	    add_attr_blob (attr, last_found_pack, id_authors, line + 6, strlen (line + 6) + 1);
+#else
+	    repodata_set_str(data, last_found_pack, id_authors, line + 6);
+#endif
 	    continue;
           case CTAG('=', 'S', 'u', 'm'):
+#if 0
 	    add_attr_string (attr, last_found_pack, id_summary, line + 6);
+#else
+	    repodata_set_str(data, last_found_pack, id_summary, line + 6);
+#endif
 	    continue;
           case CTAG('=', 'D', 'e', 's'):
+#if 0
 	    add_attr_blob (attr, last_found_pack, id_description, line + 6, strlen (line + 6) + 1);
+#else
+	    repodata_set_str(data, last_found_pack, id_description, line + 6);
+#endif
 	    continue;
           case CTAG('=', 'E', 'u', 'l'):
+#if 0
 	    add_attr_blob (attr, last_found_pack, id_eula, line + 6, strlen (line + 6) + 1);
+#else
+	    repodata_set_str(data, last_found_pack, id_eula, line + 6);
+#endif
 	    continue;
           case CTAG('=', 'I', 'n', 's'):
+#if 0
 	    add_attr_blob (attr, last_found_pack, id_messageins, line + 6, strlen (line + 6) + 1);
+#else
+	    repodata_set_str(data, last_found_pack, id_messageins, line + 6);
+#endif
 	    continue;
           case CTAG('=', 'D', 'e', 'l'):
+#if 0
 	    add_attr_blob (attr, last_found_pack, id_messagedel, line + 6, strlen (line + 6) + 1);
+#else
+	    repodata_set_str(data, last_found_pack, id_messagedel, line + 6);
+#endif
 	    continue;
+#if 0
           case CTAG('=', 'S', 'h', 'r'):
 	    if (last_found_pack >= pd.nshare)
 	      {
@@ -714,6 +799,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      }
 	    pd.share_with[last_found_pack] = strdup (line + 6);
 	    continue;
+#endif
 	  case CTAG('=', 'D', 'i', 'r'):
 	    add_dirline (&pd, line + 6);
 	    continue;
@@ -727,16 +813,18 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   if (s)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
+
   if (s && pd.ndirs)
-    commit_diskusage (&pd, last_found_pack);
+    commit_diskusage(&pd, last_found_pack);
     
+#if 0
   if (pd.sources)
     {
       int i, last_found;
       for (i = 0; i < pd.nsources; i++)
         if (pd.sources[i])
 	  {
-	    add_source (pd.sources[i], &pd, pool->solvables + repo->start + i, i, 0);
+	    add_source(&pd, pd.sources[i], pool->solvables + repo->start + i, i, 0);
 	    free (pd.sources[i]);
 	  }
       free (pd.sources);
@@ -776,6 +864,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  }
       free (pd.share_with);
     }
+#endif
+
+  if (data)
+    repodata_internalize(data);
+
   if (pd.tmp)
     free(pd.tmp);
   free(line);

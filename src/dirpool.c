@@ -31,8 +31,9 @@ dirpool_make_dirtraverse(Dirpool *dp)
   Id parent, i, *dirtraverse;
   if (!dp->ndirs)
     return;
-  dp->dirs = sat_realloc2(dp->dirs, (dp->ndirs + DIR_BLOCK) &~ DIR_BLOCK, sizeof(Id));
-  dirtraverse = sat_calloc((dp->ndirs + DIR_BLOCK) &~ DIR_BLOCK, sizeof(Id));
+  dp->dirs = sat_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
+  dirtraverse = sat_extend_resize(0, dp->ndirs, sizeof(Id), DIR_BLOCK);
+  memset(dirtraverse, 0, dp->ndirs * sizeof(Id));
   for (parent = 0, i = 0; i < dp->ndirs; i++)
     {
       if (dp->dirs[i] > 0)
@@ -45,14 +46,14 @@ dirpool_make_dirtraverse(Dirpool *dp)
 }
 
 Id
-dirpool_add_dir(Dirpool *dp, Id parent, Id comp)
+dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 {
   Id did, d, ds, *dirtraverse;
 
   if (!dp->ndirs)
     {
-      dp->dirs = sat_malloc2(DIR_BLOCK, sizeof(Id));
       dp->ndirs = 2;
+      dp->dirs = sat_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
       dp->dirs[0] = 0;
       dp->dirs[1] = 1;	/* "" */
     }
@@ -76,27 +77,25 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp)
       if (ds)
         ds = dp->dirtraverse[ds];
     }
+  if (!create)
+    return 0;
   /* a new one, find last parent */
   for (did = dp->ndirs - 1; did > 0; did--)
     if (dp->dirs[did] <= 0)
       break;
   if (dp->dirs[did] != -parent)
     {
-      if ((dp->ndirs & DIR_BLOCK) == 0)
-	{
-	  dp->dirs = sat_realloc2(dp->dirs, dp->ndirs + DIR_BLOCK, sizeof(Id));
-	  dp->dirtraverse = sat_realloc2(dp->dirtraverse, dp->ndirs + DIR_BLOCK, sizeof(Id));
-	}
+      /* make room for parent entry */
+      dp->dirs = sat_extend(dp->dirs, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
+      dp->dirtraverse = sat_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
       /* new parent block, link in */
       dp->dirs[dp->ndirs] = -parent;
       dp->dirtraverse[dp->ndirs] = dp->dirtraverse[parent];
       dp->dirtraverse[parent] = ++dp->ndirs;
     }
-  if ((dp->ndirs & DIR_BLOCK) == 0)
-    {
-      dp->dirs = sat_realloc2(dp->dirs, dp->ndirs + DIR_BLOCK, sizeof(Id));
-      dp->dirtraverse = sat_realloc2(dp->dirtraverse, dp->ndirs + DIR_BLOCK, sizeof(Id));
-    }
+  /* make room for new entry */
+  dp->dirs = sat_extend(dp->dirs, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
+  dp->dirtraverse = sat_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
   dp->dirs[dp->ndirs] = comp;
   dp->dirtraverse[dp->ndirs] = 0;
   return dp->ndirs++;

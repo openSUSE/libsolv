@@ -23,7 +23,7 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
   repo_add_rpmmd(repo, stdin);
-  repo_write(repo, stdout);
+  repo_write(repo, stdout, 0, 0);
   pool_free(pool);
   exit(0);
 }

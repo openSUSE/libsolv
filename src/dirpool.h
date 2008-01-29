@@ -21,7 +21,7 @@ typedef struct _Dirpool {
 
 void dirpool_create(Dirpool *dp);
 void dirpool_make_dirtraverse(Dirpool *dp);
-Id dirpool_add_dir(Dirpool *dp, Id parent, Id comp);
+Id dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create);
 
 static inline Id dirpool_parent(Dirpool *dp, Id did)
 {

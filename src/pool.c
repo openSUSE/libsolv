@@ -76,18 +76,21 @@ pool_create(void)
 
   stringpool_init (&pool->ss, initpool_data);
 
-  // pre-alloc space for a RelDep
-  pool->rels = (Reldep *)sat_calloc(1 + REL_BLOCK, sizeof(Reldep));
+  /* alloc space for ReDep 0 */
+  pool->rels = sat_extend_resize(0, 1, sizeof(Reldep), REL_BLOCK);
   pool->nrels = 1;
+  memset(pool->rels, 0, sizeof(Reldep));
 
-  // pre-alloc space for a Solvable
-  pool->solvables = (Solvable *)sat_calloc(SOLVABLE_BLOCK + 1, sizeof(Solvable));
+  /* alloc space for Solvable 0 and system solvable */
+  pool->solvables = sat_extend_resize(0, 2, sizeof(Solvable), SOLVABLE_BLOCK);
   pool->nsolvables = 2;
-  queue_init(&pool->vendormap);
+  memset(pool->solvables, 0, 2 * sizeof(Solvable));
   s = pool->solvables + SYSTEMSOLVABLE;
   s->name = SYSTEM_SYSTEM;
   s->arch = ARCH_NOARCH;
   s->evr = ID_EMPTY;
+
+  queue_init(&pool->vendormap);
 
   pool->debugmask = SAT_DEBUG_RESULT;	/* FIXME */
   return pool;
@@ -117,8 +120,7 @@ pool_free(Pool *pool)
 Id
 pool_add_solvable(Pool *pool)
 {
-  if ((pool->nsolvables & SOLVABLE_BLOCK) == 0)
-    pool->solvables = sat_realloc2(pool->solvables, pool->nsolvables + (SOLVABLE_BLOCK + 1), sizeof(Solvable));
+  pool->solvables = sat_extend(pool->solvables, pool->nsolvables, 1, sizeof(Solvable), SOLVABLE_BLOCK);
   memset(pool->solvables + pool->nsolvables, 0, sizeof(Solvable));
   return pool->nsolvables++;
 }
@@ -129,8 +131,7 @@ pool_add_solvable_block(Pool *pool, int count)
   Id nsolvables = pool->nsolvables;
   if (!count)
     return nsolvables;
-  if (((nsolvables - 1) | SOLVABLE_BLOCK) != ((nsolvables + count - 1) | SOLVABLE_BLOCK))
-    pool->solvables = sat_realloc2(pool->solvables, (nsolvables + count + SOLVABLE_BLOCK) & ~SOLVABLE_BLOCK, sizeof(Solvable));
+  pool->solvables = sat_extend(pool->solvables, pool->nsolvables, count, sizeof(Solvable), SOLVABLE_BLOCK);
   memset(pool->solvables + nsolvables, 0, sizeof(Solvable) * count);
   pool->nsolvables += count;
   return nsolvables;
@@ -305,8 +306,10 @@ pool_createwhatprovides(Pool *pool)
   pool_freeidhashes(pool);	/* XXX: should not be here! */
   pool_freewhatprovides(pool);
   num = pool->ss.nstrings;
-  pool->whatprovides = whatprovides = sat_calloc((num + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK, sizeof(Offset));
-  pool->whatprovides_rel = sat_calloc((pool->nrels + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK, sizeof(Offset));
+  pool->whatprovides = whatprovides = sat_extend_resize(0, num, sizeof(Offset), WHATPROVIDES_BLOCK);
+  memset(whatprovides, 0, num * sizeof(Offset));
+  pool->whatprovides_rel = sat_extend_resize(0, pool->nrels, sizeof(Offset), WHATPROVIDES_BLOCK);
+  memset(pool->whatprovides_rel, 0, pool->nrels * sizeof(Offset));
 
   /* count providers for each name */
   for (i = 1; i < pool->nsolvables; i++)
@@ -593,7 +596,7 @@ pool_debug(Pool *pool, int type, const char *format, ...)
   va_list args;
   char buf[1024];
 
-  if ((type & SAT_FATAL) == 0)
+  if ((type & (SAT_FATAL|SAT_ERROR)) == 0)
     {
       if ((pool->debugmask & type) == 0)
 	return;
@@ -691,8 +694,7 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       s = id2str(pool, dep);
       if (*s != '/')
 	continue;
-      if ((sf->nfiles & SEARCHFILES_BLOCK) == 0)
-	sf->files = sat_realloc2(sf->files, sf->nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+      sf->files = sat_extend(sf->files, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
       sf->files[sf->nfiles++] = strdup(s);
     }
 }
@@ -756,8 +758,7 @@ pool_addfileprovides(Pool *pool, Repo *installed)
       for (i = 0; i < sf.nfiles; i++)
 	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", sf.files[i]);
 #endif
-      if ((sf.nfiles & SEARCHFILES_BLOCK) == 0)
-	sf.files = sat_realloc2(sf.files, sf.nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+      sf.files = sat_extend(sf.files, sf.nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
       sf.files[sf.nfiles++] = 0;
 #if 0
       pool_search(0, SOLVABLE_FILELIST, (const char *)sf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);
@@ -770,8 +771,7 @@ pool_addfileprovides(Pool *pool, Repo *installed)
       for (i = 0; i < isf.nfiles; i++)
 	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", isf.files[i]);
 #endif
-      if ((isf.nfiles & SEARCHFILES_BLOCK) == 0)
-	isf.files = sat_realloc2(isf.files, isf.nfiles + (SEARCHFILES_BLOCK + 1), sizeof(const char *));
+      isf.files = sat_extend(isf.files, isf.nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
       isf.files[isf.nfiles++] = 0;
 #if 0
       repo_search(installed, 0, SOLVABLE_FILELIST, (const char *)isf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);

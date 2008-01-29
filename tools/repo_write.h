@@ -18,6 +18,6 @@
 #include "pool.h"
 #include "repo.h"
 
-extern void repo_write(Repo *repo, FILE *fp);
+void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata);
 
 #endif

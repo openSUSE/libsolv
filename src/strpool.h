@@ -24,10 +24,14 @@ struct _Stringpool
   Hashmask stringhashmask;    // modulo value for hash table (size of table - 1)
 };
 
-void stringpool_init (Stringpool *ss, const char *strs[]);
+void stringpool_init(Stringpool *ss, const char *strs[]);
+void stringpool_init_empty(Stringpool *ss);
+void stringpool_clone(Stringpool *ss, Stringpool *from);
+
 Id stringpool_str2id (Stringpool *ss, const char *str, int create);
-Id stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create);
+Id stringpool_strn2id (Stringpool *ss, const char *str, unsigned int len, int create);
 void stringpool_shrink (Stringpool *ss);
+
 
 static inline const char *
 stringpool_id2str (Stringpool *ss, Id id)

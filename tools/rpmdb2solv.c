@@ -54,7 +54,7 @@ main(int argc, char **argv)
       ref = 0;
     }
 
-  repo_write(repo, stdout);
+  repo_write(repo, stdout, 0, 0);
   pool_free(pool);
 
   exit(0);

@@ -15,7 +15,10 @@
 
 #include "pooltypes.h"
 #include "pool.h"
+#if 0
 #include "attr_store.h"
+#endif
+#include "repodata.h"
 
 typedef struct _Repokey {
   Id name;
@@ -28,57 +31,6 @@ typedef struct _Repokey {
 #define KEY_STORAGE_SOLVABLE		1
 #define KEY_STORAGE_INCORE		2
 #define KEY_STORAGE_VERTICAL_OFFSET	3
-
-struct _Repo;
-
-typedef struct _Repodata {
-  struct _Repo *repo;		/* back pointer to repo */
-
-  int start;			/* start of solvables this repodata is valid for */
-  int end;			/* last solvable + 1 of this repodata */
-
-  FILE *fp;			/* file pointer of solv file */
-  int error;			/* corrupt solv file */
-
-  /* Keys provided by this attribute store, sorted by name value.
-     The same keys may be provided by multiple attribute stores, but
-     then only for different solvables.  I.e. the relation
-       (solvable,name) -> store
-     has to be injective.  */
-
-  Repokey *keys;		/* keys, first entry is always zero */
-  unsigned int nkeys;		/* length of keys array */
-
-  Id *schemata;			/* schema -> offset into schemadata */
-  unsigned int nschemata;	/* number of schemata */
-
-  Id *schemadata;		/* schema storage */
-
-  unsigned char *entryschemau8;	/* schema for entry */
-  Id *entryschema;		/* schema for entry */
-
-  unsigned char *incoredata;	/* in-core data (flat_attrs) */
-  unsigned int incoredatalen;	/* data len (attr_next_free) */
-  unsigned int incoredatafree;	/* free data len */
-
-  Id *incoreoffset;		/* offset for all entries (ent2attr) */
-
-  Id verticaloffset;		/* file offset of verticals */
-
-  Id *dirs;			/* directory list */
-  int ndirs;			/* its size */
-
-  /* The attribute store itself.  */
-  Attrstore *s;
-  /* A filename where to find this attribute store, or where to store
-     it.  May be "", in which case we can't load it on demand or store
-     into it.  It may also be NULL for at most one of the repodata per
-     repo, in which case these are the embedded attributes.  */
-
-  const char *location;
-  /* The SHA1 checksum of the file.  */
-  unsigned char checksum[20];
-} Repodata;
 
 
 typedef struct _Repo {
@@ -95,12 +47,10 @@ typedef struct _Repo {
   int idarraysize;
   Offset lastoff;
 
-  Id *rpmdbid;
+  Id *rpmdbid;			/* hmm, go to repodata? */
 
-  /* The attribute stores we know about.  */
-  Repodata *repodata;
-  /* Number of attribute stores..  */
-  unsigned nrepodata;
+  Repodata *repodata;		/* our stores for non-solvable related data */
+  unsigned nrepodata;		/* number of our stores..  */
 } Repo;
 
 extern Repo *repo_create(Pool *pool, const char *name);
@@ -112,7 +62,9 @@ extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker);
 extern Offset repo_reserve_ids(Repo *repo, Offset olddeps, int num);
 extern Offset repo_fix_legacy(Repo *repo, Offset provides, Offset supplements);
 
+#if 0
 extern void repo_add_attrstore (Repo *repo, Attrstore *s, const char *location);
+#endif
 
 static inline const char *repo_name(const Repo *repo)
 {
@@ -182,5 +134,39 @@ static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int
 #define FOR_REPO_SOLVABLES(r, p, s)						\
   for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s++)	\
     if (s->repo == (r))
+
+
+/* search callback values */
+
+#define SEARCH_NEXT_KEY         1
+#define SEARCH_NEXT_SOLVABLE    2
+#define SEACH_STOP              3
+
+typedef struct _KeyValue {
+  Id id;
+  const char *str;
+  int num;
+  int num2;
+  int eof;
+} KeyValue;
+
+/* search flags */
+#define SEARCH_STRINGMASK	15
+#define SEARCH_STRING		1
+#define SEARCH_SUBSTRING	2
+#define SEARCH_GLOB 		3
+#define SEARCH_REGEX 		4
+
+#define	SEARCH_NOCASE			(1<<8)
+#define	SEARCH_NO_STORAGE_SOLVABLE	(1<<9)
+
+Repodata *repo_add_repodata(Repo *repo);
+void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
+
+void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
+void repo_set_num(Repo *repo, Id p, Id keyname, Id num);
+void repo_set_str(Repo *repo, Id p, Id keyname, const char *str);
+void repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str);
+void repo_internalize(Repo *repo);
 
 #endif /* SATSOLVER_REPO_H */

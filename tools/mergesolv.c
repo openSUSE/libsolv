@@ -103,7 +103,7 @@ main(int argc, char **argv)
   pool->repos[0]->idarraydata = new_id;
   pool->repos[0]->idarraysize = new_id_size;
 
-  repo_write(pool->repos[0], stdout);
+  repo_write(pool->repos[0], stdout, 0, 0);
   pool_free(pool);
 
   return 0;

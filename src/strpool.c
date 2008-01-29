@@ -13,17 +13,19 @@
 #define STRINGSPACE_BLOCK 65535
 
 void
-stringpool_init (Stringpool *ss, const char *strs[])
+stringpool_init(Stringpool *ss, const char *strs[])
 {
   unsigned totalsize = 0;
   unsigned count;
+
+  memset(ss, 0, sizeof(*ss));
   // count number and total size of predefined strings
   for (count = 0; strs[count]; count++)
     totalsize += strlen(strs[count]) + 1;
 
   // alloc appropriate space
-  ss->stringspace = sat_malloc((totalsize + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  ss->strings = sat_malloc2((count + STRING_BLOCK) & ~STRING_BLOCK, sizeof(Offset));
+  ss->stringspace = sat_extend_resize(0, totalsize, 1, STRINGSPACE_BLOCK);
+  ss->strings = sat_extend_resize(0, count, sizeof(Offset), STRING_BLOCK);
 
   // now copy predefined strings into allocated space
   ss->sstrings = 0;
@@ -34,6 +36,29 @@ stringpool_init (Stringpool *ss, const char *strs[])
       ss->sstrings += strlen(strs[count]) + 1;
     }
   ss->nstrings = count;
+}
+
+void
+stringpool_init_empty(Stringpool *ss)
+{
+  const char *emptystrs[] = {
+    "<NULL>", 
+    "",
+    0,
+  };
+  stringpool_init(ss, emptystrs);
+}
+
+void
+stringpool_clone(Stringpool *ss, Stringpool *from)
+{
+  memset(ss, 0, sizeof(*ss));
+  ss->strings = sat_extend_resize(0, from->nstrings, sizeof(Offset), STRING_BLOCK);
+  memcpy(ss->strings, from->strings, from->nstrings * sizeof(Offset));
+  ss->stringspace = sat_extend_resize(0, from->sstrings, 1, STRINGSPACE_BLOCK);
+  memcpy(ss->stringspace, from->stringspace, from->sstrings);
+  ss->nstrings = from->nstrings;
+  ss->sstrings = from->sstrings;
 }
 
 Id
@@ -96,17 +121,13 @@ stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
   id = ss->nstrings++;
   hashtbl[h] = id;
 
-  // 
-  if ((id & STRING_BLOCK) == 0)
-    ss->strings = sat_realloc2(ss->strings, (ss->nstrings + STRING_BLOCK) & ~STRING_BLOCK, sizeof(Hashval));
+  ss->strings = sat_extend(ss->strings, id, 1, sizeof(Offset), STRING_BLOCK);
   // 'pointer' into stringspace is Offset of next free pos: sstrings
   ss->strings[id] = ss->sstrings;
 
   space_needed = len + 1;
-
-  // resize string buffer if needed
-  if (((ss->sstrings + space_needed - 1) | STRINGSPACE_BLOCK) != ((ss->sstrings - 1) | STRINGSPACE_BLOCK))
-    ss->stringspace = sat_realloc(ss->stringspace, (ss->sstrings + space_needed + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
+  // make room in string buffer
+  ss->stringspace = sat_extend(ss->stringspace, ss->sstrings, space_needed, 1, STRINGSPACE_BLOCK);
   // copy new string into buffer
   memcpy(ss->stringspace + ss->sstrings, str, space_needed - 1);
   // add the sentinel, we can't rely on it being in the source string (in
@@ -128,6 +149,6 @@ stringpool_str2id (Stringpool *ss, const char *str, int create)
 void
 stringpool_shrink (Stringpool *ss)
 {
-  ss->stringspace = (char *)sat_realloc(ss->stringspace, (ss->sstrings + STRINGSPACE_BLOCK) & ~STRINGSPACE_BLOCK);
-  ss->strings = (Offset *)sat_realloc2(ss->strings, (ss->nstrings + STRING_BLOCK) & ~STRING_BLOCK, sizeof(Offset));
+  ss->stringspace = sat_extend_resize(ss->stringspace, ss->sstrings, 1, STRINGSPACE_BLOCK);
+  ss->strings = sat_extend_resize(ss->strings, ss->nstrings, sizeof(Offset), STRING_BLOCK);
 }

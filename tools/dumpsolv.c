@@ -12,6 +12,7 @@
 
 #include "pool.h"
 #include "repo_solv.h"
+#if 0
 #include "attr_store.h"
 #include "attr_store_p.h"
 
@@ -104,6 +105,7 @@ dump_repodata (Repo *repo)
     }
   printf("\n");
 }
+#endif
 
 static void
 printids(Repo *repo, char *kind, Offset ido)
@@ -116,6 +118,75 @@ printids(Repo *repo, char *kind, Offset ido)
   ids = repo->idarraydata + ido;
   while((id = *ids++) != 0)
     printf("  %s\n", dep2str(pool, id));
+}
+
+static void
+printdir(Repodata *data, Id dir)
+{
+  Id comp;
+  Id parent = dirpool_parent(&data->dirpool, dir);
+  if (parent)
+    {
+      printdir(data, parent);
+      putchar('/');
+    }
+  comp = dirpool_compid(&data->dirpool, dir);
+  if (data->localpool)
+    printf("%s", stringpool_id2str(&data->spool, comp));
+  else
+    printf("%s", id2str(data->repo->pool, comp));
+}
+
+int
+dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
+{
+  const char *keyname;
+
+  keyname = id2str(data->repo->pool, key->name);
+  switch(key->type)
+    {
+    case TYPE_ID:
+      if (data->localpool)
+	kv->str = stringpool_id2str(&data->spool, kv->id);
+      else
+        kv->str = id2str(data->repo->pool, kv->id);
+      printf("%s: %s\n", keyname, kv->str);
+      break;
+    case TYPE_STR:
+      printf("%s: %s\n", keyname, kv->str);
+      break;
+    case TYPE_VOID:
+      printf("%s\n", keyname);
+      break;
+    case TYPE_NUM:
+    case TYPE_CONSTANT:
+      printf("%s: %d\n", keyname, kv->num);
+      break;
+    case TYPE_DIRNUMNUMARRAY:
+      printf("%s: ", keyname);
+      printdir(data, kv->id);
+      printf(" %d %d\n", kv->num, kv->num2);
+      break;
+    default:
+      printf("%s: ?\n", keyname);
+      break;
+    }
+  return 0;
+}
+
+void
+dump_repoattrs(Repo *repo, Id p)
+{
+  int i;
+  Repodata *data;
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      if (data->state == REPODATA_STUB || data->state == REPODATA_ERROR)
+        continue;
+      if (p < data->start || p >= data->end)
+	continue;
+      repodata_search(data, p - data->start, 0, dump_repoattrs_cb, 0);
+    }
 }
 
 int main(int argc, char **argv)
@@ -134,9 +205,14 @@ int main(int argc, char **argv)
 	}
     }
   pool = pool_create();
+  pool_setdebuglevel(pool, 1);
+
   repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
-  repo_add_solv(repo, stdin);
+  if (repo_add_solv(repo, stdin))
+    printf("could not read repository\n");
+#if 0
   dump_repodata (repo);
+#endif
   printf("repo contains %d solvables\n", repo->nsolvables);
   for (i = repo->start, n = 1; i < repo->end; i++)
     {
@@ -158,7 +234,10 @@ int main(int argc, char **argv)
       printids(repo, "supplements", s->supplements);
       printids(repo, "enhances", s->enhances);
       printids(repo, "freshens", s->freshens);
+#if 0
       dump_attrs (repo, n - 1);
+#endif
+      dump_repoattrs(repo, i);
       n++;
     }
   pool_free(pool);

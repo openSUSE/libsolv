@@ -38,6 +38,20 @@ str2id(Pool *pool, const char *str, int create)
 }
 
 Id
+strn2id(Pool *pool, const char *str, unsigned int len, int create)
+{
+  int oldnstrings = pool->ss.nstrings;
+  Id id = stringpool_strn2id (&pool->ss, str, len, create);
+  if (create && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
+    {
+      /* grow whatprovides array */
+      pool->whatprovides = sat_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      memset(pool->whatprovides + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
+    }
+  return id;
+}
+
+Id
 rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 {
   Hashval h;
@@ -86,8 +100,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 
   id = pool->nrels++;
   /* extend rel space if needed */
-  if ((id & REL_BLOCK) == 0)
-    pool->rels = sat_realloc(pool->rels, ((pool->nrels + REL_BLOCK) & ~REL_BLOCK) * sizeof(Reldep));
+  pool->rels = sat_extend(pool->rels, id, 1, sizeof(Reldep), REL_BLOCK);
   hashtbl[h] = id;
   ran = pool->rels + id;
   ran->name = name;
@@ -247,7 +260,7 @@ pool_shrink_strings(Pool *pool)
 void
 pool_shrink_rels(Pool *pool)
 {
-  pool->rels = (Reldep *)sat_realloc(pool->rels, ((pool->nrels + REL_BLOCK) & ~REL_BLOCK) * sizeof(Reldep));
+  pool->rels = sat_extend_resize(pool->rels, pool->nrels, sizeof(Reldep), REL_BLOCK);
 }
 
 // reset all hash tables
