@@ -7,7 +7,7 @@
 
 /*
  * Generic policy interface for SAT solver
- * 
+ *
  */
 
 #include <stdio.h>
@@ -205,10 +205,10 @@ prune_to_best_arch(Pool *pool, Queue *plist)
 
 /*
  * prune_best_version_arch
- * 
+ *
  * sort list of packages (given through plist) by name and evr
  * return result through plist
- * 
+ *
  */
 
 /* FIXME: should prefer installed if identical version */
@@ -302,7 +302,7 @@ prune_best_version_arch(Solver *solv, Pool *pool, Queue *plist)
      {   /* The application is responsible for */
 	 return solv->bestSolvableCb (plist);
      }
-    
+
   if (plist->count > 1)
     prune_to_best_arch(pool, plist);
   if (plist->count > 1)
@@ -321,14 +321,15 @@ policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode)
   /* FIXME: do this different! */
   if (inst)
     queue_push(plist, inst);
-  
+
   prune_best_version_arch (solv, pool, plist);
 }
 
 
 int
-policy_illegal_archchange(Solver *solv, Pool *pool, Solvable *s1, Solvable *s2)
+policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2)
 {
+  Pool *pool = solv->pool;
   Id a1 = s1->arch, a2 = s2->arch;
 
   if (solv && solv->archCheckCb)
@@ -349,15 +350,16 @@ policy_illegal_archchange(Solver *solv, Pool *pool, Solvable *s1, Solvable *s2)
 }
 
 int
-policy_illegal_vendorchange(Solver *solv, Pool *pool, Solvable *s1, Solvable *s2)
+policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
 {
+  Pool *pool = solv->pool;
   Id vendormask1, vendormask2;
 
   if (solv && solv->vendorCheckCb)
      {   /* The application is responsible for */
 	 return solv->vendorCheckCb (s1, s2);
      }
-  
+
   if (s1->vendor == s2->vendor)
     return 0;
   vendormask1 = pool_vendor2mask(pool, s1->vendor);
@@ -385,7 +387,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
      {   /* The application is responsible for */
 	 return solv->updateCandidateCb (s, qs);
      }
-  
+
   /*
    * s = solvable ptr
    * n = solvable Id
@@ -408,9 +410,9 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
 	    {
 	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_MATCH_RELEASE) > 0)
 	        continue;
-	      if (!solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, pool, s, ps))
+	      if (!solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
 		continue;
-	      if (!solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, pool, s, ps))
+	      if (!solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
 		continue;
 	    }
 	}

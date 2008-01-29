@@ -169,7 +169,7 @@ printrule(Solver *solv, int type, Rule *r)
   for (i = 0; ; i++)
     {
       if (i == 0)
-	  /* print direct literal */ 
+	  /* print direct literal */
 	v = r->p;
       else if (r->d == ID_NULL)
 	{
@@ -224,7 +224,7 @@ unifyrules_sortcmp(const void *ap, const void *bp)
   Rule *b = (Rule *)bp;
   Id *ad, *bd;
   int x;
-  
+
   x = a->p - b->p;
   if (x)
     return x;			       /* p differs */
@@ -317,7 +317,7 @@ unifyrules(Solver *solv)
       POOL_DEBUG(SAT_DEBUG_STATS, "  binary: %d\n", binr);
       POOL_DEBUG(SAT_DEBUG_STATS, "  normal: %d, %d literals\n", solv->nrules - 1 - binr, lits);
     }
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- unifyrules end -----\n");  
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- unifyrules end -----\n");
 }
 
 #if 0
@@ -333,7 +333,7 @@ hashrule(Solver *solv, Id p, Id d, int n)
   int *dp;
 
   if (n <= 1)
-    return (x * 37) ^ (unsigned int)d; 
+    return (x * 37) ^ (unsigned int)d;
   dp = solv->pool->whatprovidesdata + d;
   while (*dp)
     x = (x * 37) ^ (unsigned int)*dp++;
@@ -349,16 +349,16 @@ hashrule(Solver *solv, Id p, Id d, int n)
  *
  *
  * A requires b, b provided by B1,B2,B3 => (-A|B1|B2|B3)
- * 
+ *
  * p < 0 : pkg id of A
  * d > 0 : Offset in whatprovidesdata (list of providers of b)
- * 
+ *
  * A conflicts b, b provided by B1,B2,B3 => (-A|-B1), (-A|-B2), (-A|-B3)
  * p < 0 : pkg id of A
  * d < 0 : Id of solvable (e.g. B1)
- * 
+ *
  * d == 0: unary rule, assertion => (A) or (-A)
- * 
+ *
  *   Install:    p > 0, d = 0   (A)             user requested install
  *   Remove:     p < 0, d = 0   (-A)            user requested remove
  *   Requires:   p < 0, d > 0   (-A|B1|B2|...)  d: <list of providers for requirement of p>
@@ -456,7 +456,7 @@ addrule(Solver *solv, Id p, Id d)
       if (*dp == *dp2)
 	return r;
    }
-  
+
   /*
    * allocate new rule
    */
@@ -494,7 +494,7 @@ addrule(Solver *solv, Id p, Id d)
       POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "  Add rule: ");
       printrule(solv, SAT_DEBUG_RULE_CREATION, r);
     }
-  
+
   return r;
 }
 
@@ -521,7 +521,7 @@ enablerule(Solver *solv, Rule *r)
  * consisting of multiple job rules.
  */
 
-static void 
+static void
 disableproblem(Solver *solv, Id v)
 {
   Rule *r;
@@ -540,7 +540,7 @@ disableproblem(Solver *solv, Id v)
       disablerule(solv, r);
 }
 
-static void 
+static void
 enableproblem(Solver *solv, Id v)
 {
   Rule *r;
@@ -602,7 +602,7 @@ makeruledecisions(Solver *solv)
   int decisionstart;
 
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
-  
+
   decisionstart = solv->decisionq.count;
   /* rpm rules don't have assertions, so we can start with the job
    * rules */
@@ -706,7 +706,7 @@ makeruledecisions(Solver *solv)
       ri = solv->jobrules - 1;
       r = solv->rules + ri;
     }
-  
+
     POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
 }
 
@@ -984,7 +984,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id n;
 
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforsolvable -----\n");
-  
+
   queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
   queue_push(&q, s - pool->solvables);	/* push solvable Id */
 
@@ -994,7 +994,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        * n: Id of solvable
        * s: Pointer to solvable
        */
-      
+
       n = queue_shift(&q);
       if (MAPTST(m, n))		       /* continue if already done */
 	continue;
@@ -1027,7 +1027,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       /*-----------------------------------------
        * check requires of s
        */
-      
+
       if (s->requires)
 	{
 	  reqp = s->repo->idarraydata + s->requires;
@@ -1099,11 +1099,11 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       /* that's all we check for src packages */
       if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	continue;
-      
+
       /*-----------------------------------------
        * check conflicts of s
        */
-      
+
       if (s->conflicts)
 	{
 	  conp = s->repo->idarraydata + s->conflicts;
@@ -1214,7 +1214,7 @@ addrpmrulesforweak(Solver *solv, Map *m)
       addrpmrulesforsolvable(solv, s, m);
       n = 0;
     }
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforweak end -----\n");  
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforweak end -----\n");
 }
 
 static void
@@ -1230,19 +1230,19 @@ addrpmrulesforupdaters(Solver *solv, Solvable *s, Map *m, int allowall)
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   policy_findupdatepackages(solv, s, &qs, allowall);
   if (!MAPTST(m, s - pool->solvables))	/* add rule for s if not already done */
-    addrpmrulesforsolvable(solv, s, m); 
+    addrpmrulesforsolvable(solv, s, m);
   for (i = 0; i < qs.count; i++)
     if (!MAPTST(m, qs.elements[i]))
       addrpmrulesforsolvable(solv, pool->solvables + qs.elements[i], m);
   queue_free(&qs);
-  
+
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforupdaters -----\n");
 }
 
 /*
  * add rule for update
  *   (A|A1|A2|A3...)  An = update candidates for A
- * 
+ *
  * s = (installed) solvable
  */
 
@@ -1265,7 +1265,7 @@ addupdaterule(Solver *solv, Solvable *s, int allowall)
     d = pool_queuetowhatprovides(pool, &qs);	/* intern computed queue */
   queue_free(&qs);
   addrule(solv, s - pool->solvables, d);	/* allow update of s */
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "-----  addupdaterule end -----\n");  
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "-----  addupdaterule end -----\n");
 }
 
 
@@ -1282,7 +1282,7 @@ printWatches(Solver *solv, int type)
 {
   Pool *pool = solv->pool;
   int counter;
-    
+
   POOL_DEBUG(type, "Watches: \n");
 
   for (counter = -(pool->nsolvables); counter <= pool->nsolvables; counter ++)
@@ -1293,7 +1293,7 @@ printWatches(Solver *solv, int type)
 
 /*
  * makewatches
- * 
+ *
  * initial setup for all watches
  */
 
@@ -1352,7 +1352,7 @@ addwatches(Solver *solv, Rule *r)
 
 /*
  * propagate
- * 
+ *
  * propagate decision to all rules
  * return : 0 = everything is OK
  *          watched rule = there is a conflict
@@ -1386,13 +1386,13 @@ propagate(Solver *solv, int level)
       for (rp = watches + pkg; *rp; rp = nrp)
 	{
 	  r = solv->rules + *rp;
-	  
+
 	  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_PROPAGATE,"  watch triggered ");
 	      printrule(solv, SAT_DEBUG_PROPAGATE, r);
 	    }
-	  
+
 	  if (pkg == r->w1)
 	    {
 	      ow = r->w2; /* regard the second watchpoint to come to a solution */
@@ -1469,7 +1469,7 @@ propagate(Solver *solv, int level)
 	}
     }
   POOL_DEBUG(SAT_DEBUG_PROPAGATE, "----- propagate end-----\n");
-  
+
   return 0;	/* all is well */
 }
 
@@ -1494,7 +1494,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
   int num = 0, l1num = 0;
   int learnt_why = solv->learnt_pool.count;
   Id *decisionmap = solv->decisionmap;
- 
+
   queue_init(&r);
 
   POOL_DEBUG(SAT_DEBUG_ANALYZE, "ANALYZE at %d ----------------------\n", level);
@@ -1572,7 +1572,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
 	  why = solv->decisionq_why.elements[idx];
 	  if (!why)
 	    {
-	      queue_push(&solv->learnt_pool, -vv); 
+	      queue_push(&solv->learnt_pool, -vv);
 	      IF_POOLDEBUG (SAT_DEBUG_ANALYZE)
 		{
 		  POOL_DEBUG(SAT_DEBUG_ANALYZE, "RPM ASSERT Rule:\n");
@@ -2100,7 +2100,7 @@ solver_free(Solver *solv)
 
 /*
  * run_solver
- * 
+ *
  * all rules have been set up, now actually run the solver
  *
  */
@@ -2125,7 +2125,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
     }
 
   POOL_DEBUG(SAT_DEBUG_STATS, "initial decisions: %d\n", solv->decisionq.count);
-  
+
   IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
     printdecisions(solv);
 
@@ -2140,7 +2140,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
       /*
        * propagate
        */
-      
+
       if (level == 1)
 	{
 	  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "propagating (propagate_index: %d;  size decisionq: %d)...\n", solv->propagate_index, solv->decisionq.count);
@@ -2156,7 +2156,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
       /*
        * installed packages
        */
-      
+
       if (level < systemlevel && solv->installed && solv->installed->nsolvables)
 	{
 	  if (!solv->updatesystem)
@@ -2237,7 +2237,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
       /*
        * decide
        */
-      
+
       POOL_DEBUG(SAT_DEBUG_STATS, "deciding unresolved rules\n");
       for (i = 1, n = 1; ; i++, n++)
 	{
@@ -2322,7 +2322,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 
       if (n != solv->nrules)	/* continue if level < systemlevel */
 	continue;
-      
+
       if (doweak && !solv->problems.count)
 	{
 	  int qcount;
@@ -2474,14 +2474,14 @@ run_solver(Solver *solv, int disablerules, int doweak)
   queue_free(&dq);
 }
 
-  
+
 /*
  * refine_suggestion
  * at this point, all rules that led to conflicts are disabled.
  * we re-enable all rules of a problem set but rule "sug", then
  * continue to disable more rules until there as again a solution.
  */
-  
+
 /* FIXME: think about conflicting assertions */
 
 static void
@@ -2819,7 +2819,7 @@ create_decisions_obsoletesmap(Solver *solv)
 /*
  * printdecisions
  */
-  
+
 
 void
 printdecisions(Solver *solv)
@@ -2830,7 +2830,7 @@ printdecisions(Solver *solv)
   int i;
   Solvable *s;
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions -----\n");  
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions -----\n");
 
   /* print solvables to be erased */
 
@@ -2855,9 +2855,9 @@ printdecisions(Solver *solv)
       if (p < 0)
         {
 	    IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
-	    {	
+	    {
 	      p = -p;
-	      s = pool->solvables + p;	    
+	      s = pool->solvables + p;
 	      POOL_DEBUG(SAT_DEBUG_SCHUBI, "level of %s is %d\n", solvable2str(pool, s), p);
 	    }
 	    continue;
@@ -2898,7 +2898,7 @@ printdecisions(Solver *solv)
 	  POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
 	}
     }
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions end -----\n");    
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions end -----\n");
 }
 
 /* this is basically the reverse of addrpmrulesforsolvable */
@@ -2911,7 +2911,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
   Solvable *s;
   int dontfix = 0;
   Id p, *pp, req, *reqp, con, *conp, obs, *obsp, *dp;
-  
+
   assert(rid < solv->weakrules);
   if (rid >= solv->systemrules)
     {
@@ -2922,7 +2922,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
     }
   if (rid >= solv->jobrules)
     {
-     
+
       r = solv->rules + rid;
       p = solv->ruletojob.elements[rid - solv->jobrules];
       *depp = job->elements[p + 1];
@@ -2996,7 +2996,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  conp = s->repo->idarraydata + s->conflicts;
 	  while ((con = *conp++) != 0)
             {
-              FOR_PROVIDES(p, pp, con) 
+              FOR_PROVIDES(p, pp, con)
 		{
 		  if (dontfix && pool->solvables[p].repo == installed)
 		    continue;
@@ -3014,7 +3014,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  conp = s2->repo->idarraydata + s2->conflicts;
 	  while ((con = *conp++) != 0)
             {
-              FOR_PROVIDES(p, pp, con) 
+              FOR_PROVIDES(p, pp, con)
 		{
 		  if (dontfix2 && pool->solvables[p].repo == installed)
 		    continue;
@@ -3293,12 +3293,12 @@ printsolutions(Solver *solv, Queue *job)
 			  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 			  gotone = 1;
 			}
-		      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(solv, pool, s, sd))
+		      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(solv, s, sd))
 			{
 			  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 			  gotone = 1;
 			}
-		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(solv,pool, s, sd))
+		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(solv, s, sd))
 			{
 			  if (sd->vendor)
 			    POOL_DEBUG(SAT_DEBUG_RESULT, "- allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));
@@ -3427,12 +3427,12 @@ solver_solve(Solver *solv, Queue *job)
   /*
    * create basic rule set of all involved packages
    * use addedmap bitmap to make sure we don't create rules twice
-   * 
+   *
    */
 
   map_init(&addedmap, pool->nsolvables);
   queue_init(&q);
-  
+
   /*
    * always install our system solvable
    */
@@ -3444,7 +3444,7 @@ solver_solve(Solver *solv, Queue *job)
   /*
    * create rules for all package that could be involved with the solving
    * so called: rpm rules
-   * 
+   *
    */
   if (installed)
     {
@@ -3516,20 +3516,20 @@ solver_solve(Solver *solv, Queue *job)
    * at this point the system is always solvable,
    * as an empty system (remove all packages) is a valid solution
    */
-  
+
   unifyrules(solv);	/* remove duplicate rpm rules */
   solv->directdecisions = solv->decisionq.count;
 
   POOL_DEBUG(SAT_DEBUG_STATS, "decisions so far: %d\n", solv->decisionq.count);
-  IF_POOLDEBUG (SAT_DEBUG_SCHUBI) 
+  IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
     printdecisions (solv);
 
   /*
    * now add all job rules
    */
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add JOB rules ***\n");  
-  
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add JOB rules ***\n");
+
   solv->jobrules = solv->nrules;
 
   for (i = 0; i < job->count; i += 2)
@@ -3566,7 +3566,7 @@ solver_solve(Solver *solv, Queue *job)
 		continue;
 	      queue_push(&q, p);
 	    }
-	  if (!q.count)	
+	  if (!q.count)
 	    {
 	      /* no provider, make this an impossible rule */
 	      queue_push(&q, -SYSTEMSOLVABLE);
@@ -3618,19 +3618,19 @@ solver_solve(Solver *solv, Queue *job)
 
   /*
    * now add system rules
-   * 
+   *
    */
 
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add system rules ***\n");
-  
-  
+
+
   solv->systemrules = solv->nrules;
 
   /*
    * create rules for updating installed solvables
-   * 
+   *
    */
-  
+
   if (installed && !solv->allowuninstall)
     {				       /* loop over all installed solvables */
       /* we create all update rules, but disable some later on depending on the job */

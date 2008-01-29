@@ -7,11 +7,13 @@
 
 /*
  * util.h
- * 
+ *
  */
 
 #ifndef SATSOLVER_UTIL_H
 #define SATSOLVER_UTIL_H
+
+#include <stdio.h>
 
 extern void *sat_malloc(size_t);
 extern void *sat_malloc2(size_t, size_t);
