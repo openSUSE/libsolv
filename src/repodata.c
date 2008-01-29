@@ -127,9 +127,9 @@ data_skip(unsigned char *dp, int type)
 static unsigned char *
 data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
 {
+  kv->eof = 1;
   if (!dp)
     return 0;
-  kv->eof = 1;
   switch (key->type)
     {
     case TYPE_VOID:
@@ -471,8 +471,9 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
       do
 	{
 	  ddp = data_fetch(ddp, &kv, key);
-	  if (ddp)
-	    stop = callback(cbdata, data->repo->pool->solvables + data->start + entry, data, key, &kv);
+	  if (!ddp)
+	    break;
+	  stop = callback(cbdata, data->repo->pool->solvables + data->start + entry, data, key, &kv);
 	}
       while (!kv.eof && !stop);
       if (onekey || stop > SEARCH_NEXT_KEY)
