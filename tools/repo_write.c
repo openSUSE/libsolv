@@ -1358,11 +1358,11 @@ if (cbdata.dirused)
   fprintf(stderr, "\n");
 }
 #endif
-      if (cbdata.keymap[SOLVABLE_NAME]);
+      if (cbdata.keymap[SOLVABLE_NAME])
         write_id(fp, needid[s->name].need);
-      if (cbdata.keymap[SOLVABLE_ARCH]);
+      if (cbdata.keymap[SOLVABLE_ARCH])
         write_id(fp, needid[s->arch].need);
-      if (cbdata.keymap[SOLVABLE_EVR]);
+      if (cbdata.keymap[SOLVABLE_EVR])
         write_id(fp, needid[s->evr].need);
       if (s->vendor && cbdata.keymap[SOLVABLE_VENDOR])
         write_id(fp, needid[s->vendor].need);
