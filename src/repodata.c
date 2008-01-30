@@ -846,6 +846,8 @@ repodata_internalize(Repodata *data)
   schema = sat_malloc2(data->nkeys, sizeof(Id));
   seen = sat_malloc2(data->nkeys, sizeof(Id));
 
+  /* Merge the data already existing (in data->schemata, ->incoredata and
+     friends) with the new attributes in data->attrs[].  */
   nentry = data->end - data->start;
   addschema_prepare(data, schematacache);
   memset(&newincore, 0, sizeof(newincore));
@@ -869,8 +871,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	{
 	  if (seen[*keyp])
 	    {
-	      newschema = 1;
-	      continue;
+	      fprintf(stderr, "Inconsistent old data (key occured twice).\n");
+	      exit(1);
 	    }
 	  seen[*keyp] = -1;
 	  *sp++ = *keyp;
@@ -888,6 +890,11 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
       *sp++ = 0;
       if (newschema)
 	{
+          /* Ideally we'd like to sort the new schema here, to ensure
+	     schema equality independend of the ordering.  We can't do that
+	     yet.  For once see below (old ids need to come before new ids).
+	     An additional difficulty is that we also need to move
+	     the values with the keys.  */
 	  schemaid = addschema(data, schema, schematacache);
 	  if (schemaid > 255 && data->entryschemau8)
 	    {
@@ -905,7 +912,13 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	schemaid = oldschema;
 
 
-      /* now create data blob */
+      /* Now create data blob.  We walk through the (possibly new) schema
+	 and either copy over old data, or insert the new.  */
+      /* XXX Here we rely on the fact that the (new) schema has the form
+	 o1 o2 o3 o4 ... | n1 n2 n3 ...
+	 (oX being the old keyids (possibly overwritten), and nX being
+	  the new keyids).  This rules out sorting the keyids in order
+	 to ensure a small schema count.  */
       dp = data->incoredata + data->incoreoffset[entry];
       data->incoreoffset[entry] = newincore.len;
       for (keyp = data->schemadata + data->schemata[schemaid]; *keyp; keyp++)
@@ -914,6 +927,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	  ndp = dp;
 	  if (oldcount)
 	    {
+	      /* Skip the data associated with this old key.  */
 	      if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
 		{
 		  ndp = data_skip(dp, TYPE_ID);
@@ -925,12 +939,17 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	  if (seen[*keyp] == -1)
 	    {
+	      /* If this key was an old one _and_ was not overwritten with
+		 a different value copy over the old value (we skipped it
+		 above).  */
 	      if (dp != ndp)
 		data_addblob(&newincore, dp, ndp - dp);
 	      seen[*keyp] = 0;
 	    }
 	  else if (seen[*keyp])
 	    {
+	      /* Otherwise we have a new value.  Parse it into the internal
+		 form.  */
 	      struct extdata *xd;
 	      unsigned int oldvincorelen = 0;
 
@@ -1025,10 +1044,6 @@ repodata_compress_page(unsigned char *page, unsigned int len, unsigned char *cpa
   return compress_buf(page, len, cpage, max);
 }
 
-/* Try to either setup on-demand paging (using FP as backing
-   file), or in case that doesn't work (FP not seekable) slurps in
-   all pages and deactivates paging.  */
-
 #define SOLV_ERROR_EOF              3
 
 static inline unsigned int
@@ -1046,6 +1061,10 @@ read_u32(FILE *fp)
     }    
   return x;
 }
+
+/* Try to either setup on-demand paging (using FP as backing
+   file), or in case that doesn't work (FP not seekable) slurps in
+   all pages and deactivates paging.  */
 
 void
 repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz)
