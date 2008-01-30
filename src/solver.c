@@ -2328,9 +2328,9 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  int qcount;
 
 	  POOL_DEBUG(SAT_DEBUG_STATS, "installing recommended packages\n");
-	  if (!REGARD_RECOMMENDS_OF_INSTALLED_ITEMS)
+	  if (!solv->dosplitprovides && !REGARD_RECOMMENDS_OF_INSTALLED_ITEMS)
 	    {
-	      for (i = 0; i < solv->decisionq.count; i++)
+	      for (i = 1; i < solv->decisionq.count; i++)
 		{
 		  p = solv->decisionq.elements[i];
 		  if (p > 0 && pool->solvables[p].repo == solv->installed)
@@ -2380,9 +2380,9 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    queue_pushunique(&dq, i);
 		}
 	    }
-	  if (!REGARD_RECOMMENDS_OF_INSTALLED_ITEMS)
+	  if (!solv->dosplitprovides && !REGARD_RECOMMENDS_OF_INSTALLED_ITEMS)
 	    {
-	      for (i = 0; i < solv->decisionq.count; i++)
+	      for (i = 1; i < solv->decisionq.count; i++)
 		{
 		  p = solv->decisionq.elements[i];
 		  if (p > 0 && pool->solvables[p].repo == solv->installed)

@@ -346,9 +346,14 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 		      dep = p + 1;
 		      continue;
 		    }
-		  strncpy(dep - 9, "language:", 9);
 		  *p++ = 0;
+#if 0
+		  strncpy(dep - 9, "language:", 9);
 		  idl = str2id(pool, dep - 9, 1);
+#else
+		  idl = str2id(pool, dep, 1);
+		  idl = rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
+#endif
 		  if (id)
 		    id = rel2id(pool, id, idl, REL_OR, 1);
 		  else
@@ -360,8 +365,13 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 	 	  for (p = dep; *p && *p != ')'; p++)
 		    ;
 		  *p = 0;
+#if 0
 		  strncpy(dep - 9, "language:", 9);
 		  idl = str2id(pool, dep - 9, 1);
+#else
+		  idl = str2id(pool, dep, 1);
+		  idl = rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
+#endif
 		  if (id)
 		    id = rel2id(pool, id, idl, REL_OR, 1);
 		  else
