@@ -408,15 +408,13 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
   Id id, *keyp;
   unsigned char *dp;
 
-  if (data->entryschemau8)
-    schema = data->entryschemau8[entry];
-  else
-    schema = data->entryschema[entry];
+  dp = data->incoredata + data->incoreoffset[entry];
+  dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
     if (!*keyp)
       return 0;
-  dp = forward_to_key(data, keyid, schema, data->incoredata + data->incoreoffset[entry]);
+  dp = forward_to_key(data, keyid, schema, dp);
   key = data->keys + keyid;
   dp = get_data(data, key, &dp);
   if (!dp)
@@ -443,12 +441,9 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
   int stop;
   KeyValue kv;
 
-  if (data->entryschemau8)
-    schema = data->entryschemau8[entry];
-  else
-    schema = data->entryschema[entry];
-  keyp = data->schemadata + data->schemata[schema];
   dp = data->incoredata + data->incoreoffset[entry];
+  dp = data_read_id(dp, &schema);
+  keyp = data->schemadata + data->schemata[schema];
   if (keyname)
     {
       /* search in a specific key */
@@ -492,16 +487,6 @@ repodata_extend(Repodata *data, Id p)
     {
       int old = data->end - data->start;
       int new = p - data->end + 1;
-      if (data->entryschemau8)
-	{
-	  data->entryschemau8 = sat_realloc(data->entryschemau8, old + new);
-	  memset(data->entryschemau8 + old, 0, new);
-	}
-      if (data->entryschema)
-	{
-	  data->entryschema = sat_realloc2(data->entryschema, old + new, sizeof(Id));
-	  memset(data->entryschema + old, 0, new * sizeof(Id));
-	}
       if (data->attrs)
 	{
 	  data->attrs = sat_realloc2(data->attrs, old + new, sizeof(Id *));
@@ -515,18 +500,6 @@ repodata_extend(Repodata *data, Id p)
     {
       int old = data->end - data->start;
       int new = data->start - p;
-      if (data->entryschemau8)
-	{
-	  data->entryschemau8 = sat_realloc(data->entryschemau8, old + new);
-	  memmove(data->entryschemau8 + new, data->entryschemau8, old);
-	  memset(data->entryschemau8, 0, new);
-	}
-      if (data->entryschema)
-	{
-	  data->entryschema = sat_realloc2(data->entryschema, old + new, sizeof(Id));
-	  memmove(data->entryschema + new, data->entryschema, old * sizeof(Id));
-	  memset(data->entryschema, 0, new * sizeof(Id));
-	}
       if (data->attrs)
 	{
 	  data->attrs = sat_realloc2(data->attrs, old + new, sizeof(Id *));
@@ -827,7 +800,6 @@ fprintf(stderr, "addschema: new schema\n");
 void
 repodata_internalize(Repodata *data)
 {
-  int i;
   Repokey *key;
   Id id, entry, nentry, *ida;
   Id schematacache[256];
@@ -855,10 +827,11 @@ repodata_internalize(Repodata *data)
     {
       memset(seen, 0, data->nkeys * sizeof(Id));
       sp = schema;
-      if (data->entryschemau8)
-	oldschema = data->entryschemau8[entry];
+      dp = data->incoredata + data->incoreoffset[entry];
+      if (data->incoredata)
+        dp = data_read_id(dp, &oldschema);
       else
-	oldschema = data->entryschema[entry];
+	oldschema = 0;
 #if 0
 fprintf(stderr, "oldschema %d\n", oldschema);
 fprintf(stderr, "schemata %d\n", data->schemata[oldschema]);
@@ -889,25 +862,12 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	}
       *sp++ = 0;
       if (newschema)
-	{
-          /* Ideally we'd like to sort the new schema here, to ensure
-	     schema equality independend of the ordering.  We can't do that
-	     yet.  For once see below (old ids need to come before new ids).
-	     An additional difficulty is that we also need to move
-	     the values with the keys.  */
-	  schemaid = addschema(data, schema, schematacache);
-	  if (schemaid > 255 && data->entryschemau8)
-	    {
-	      data->entryschema = sat_malloc2(nentry, sizeof(Id));
-	      for (i = 0; i < nentry; i++)
-		data->entryschema[i] = data->entryschemau8[i];
-	      data->entryschemau8 = sat_free(data->entryschemau8);
-	    }
-	  if (data->entryschemau8)
-	    data->entryschemau8[entry] = schemaid;
-	  else
-	    data->entryschema[entry] = schemaid;
-	}
+        /* Ideally we'd like to sort the new schema here, to ensure
+	   schema equality independend of the ordering.  We can't do that
+	   yet.  For once see below (old ids need to come before new ids).
+	   An additional difficulty is that we also need to move
+	   the values with the keys.  */
+	schemaid = addschema(data, schema, schematacache);
       else
 	schemaid = oldschema;
 
@@ -919,8 +879,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	 (oX being the old keyids (possibly overwritten), and nX being
 	  the new keyids).  This rules out sorting the keyids in order
 	 to ensure a small schema count.  */
-      dp = data->incoredata + data->incoreoffset[entry];
       data->incoreoffset[entry] = newincore.len;
+      data_addid(&newincore, schemaid);
       for (keyp = data->schemadata + data->schemata[schemaid]; *keyp; keyp++)
 	{
 	  key = data->keys + *keyp;

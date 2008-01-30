@@ -775,7 +775,6 @@ repo_add_repodata(Repo *repo)
   data->schemadata = sat_calloc(1, sizeof(Id));
   data->nschemata = 1;
   data->schemadatalen = 1;
-  data->entryschemau8 = sat_calloc(data->end - data->start, 1);
   data->incoreoffset = sat_calloc(data->end - data->start, sizeof(Id));
   return data;
 }

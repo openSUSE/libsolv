@@ -1056,13 +1056,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     s = 0;
 
   if (have_xdata)
-    {
-      if (numschemata < 255)
-	data.entryschemau8 = sat_calloc(numsolv, 1);
-      else
-	data.entryschema = sat_calloc(numsolv, sizeof(Id));
-      data.incoreoffset = sat_calloc(numsolv, sizeof(Id));
-    }
+    data.incoreoffset = sat_calloc(numsolv, sizeof(Id));
   for (i = 0; i < numsolv; i++, s++)
     {
       Id *keyp;
@@ -1075,11 +1069,8 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	id++;
       if (have_xdata)
 	{
-	  if (data.entryschemau8)
-	    data.entryschemau8[i] = id;
-	  else
-	    data.entryschema[i] = id;
 	  data.incoreoffset[i] = data.incoredatalen;
+	  incore_add_id(&data, id);
 	}
       keyp = schemadata + schemata[id];
       while ((key = *keyp++) != 0)
@@ -1333,8 +1324,6 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
     {
       /* discard data */
       sat_free(data.dirpool.dirs);
-      sat_free(data.entryschemau8);
-      sat_free(data.entryschema);
       sat_free(data.incoreoffset);
       sat_free(schemata);
       sat_free(schemadata);
@@ -1389,6 +1378,3 @@ repodata_load_solv(Repodata *data)
   else
     data->state = REPODATA_AVAILABLE;
 }
-
-
-// EOF

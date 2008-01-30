@@ -58,9 +58,6 @@ typedef struct _Repodata {
   Id *schemadata;		/* schema storage */
   unsigned int schemadatalen;   /* schema storage size */
 
-  unsigned char *entryschemau8;	/* schema for entry */
-  Id *entryschema;		/* schema for entry */
-
   Stringpool spool;		/* local string pool */
   int localpool;		/* is local string pool used */
 
