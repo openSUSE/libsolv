@@ -513,11 +513,38 @@ repodata_extend(Repodata *data, Id p)
     }
 }
 
+static void
+repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
+{
+  Id *pp;
+  int i;
+  if (!data->attrs)
+    data->attrs = sat_calloc(data->end - data->start + 1, sizeof(Id *));
+  i = 0;
+  if (data->attrs[entry])
+    {
+      for (pp = data->attrs[entry]; *pp; pp += 2)
+        if (*pp == keyid)
+          break;
+      if (*pp)
+        {
+	  if (overwrite)
+            pp[1] = val;
+          return;
+        }
+      i = pp - data->attrs[entry];
+    }
+  data->attrs[entry] = sat_realloc2(data->attrs[entry], i + 3, sizeof(Id));
+  pp = data->attrs[entry] + i;
+  *pp++ = keyid;
+  *pp++ = val;
+  *pp = 0;
+}
+
 void
 repodata_set(Repodata *data, Id entry, Repokey *key, Id val)
 {
-  Id keyid, *pp;
-  int i;
+  Id keyid;
 
   /* find key in keys */
   for (keyid = 1; keyid < data->nkeys; keyid++)
@@ -538,27 +565,7 @@ repodata_set(Repodata *data, Id entry, Repokey *key, Id val)
 	  data->verticaloffset[data->nkeys - 1] = 0;
 	}
     }
-  key = data->keys + keyid;
-  if (!data->attrs)
-    data->attrs = sat_calloc(data->end - data->start + 1, sizeof(Id *));
-  i = 0;
-  if (data->attrs[entry])
-    {
-      for (pp = data->attrs[entry]; *pp; pp += 2)
-        if (*pp == keyid)
-          break;
-      if (*pp)
-        {
-          pp[1] = val;
-          return;
-        }
-      i = pp - data->attrs[entry];
-    }
-  data->attrs[entry] = sat_realloc2(data->attrs[entry], i + 3, sizeof(Id));
-  pp = data->attrs[entry] + i;
-  *pp++ = keyid;
-  *pp++ = val;
-  *pp = 0;
+  repodata_insert_keyid(data, entry, keyid, val, 1);
 }
 
 void
@@ -647,7 +654,7 @@ repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id 
 #if 0
 fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, num2, data->attriddatalen);
 #endif
-  if (data->attrs[entry])
+  if (data->attrs && data->attrs[entry])
     {
       for (pp = data->attrs[entry]; *pp; pp += 2)
         if (data->keys[*pp].name == keyname && data->keys[*pp].type == TYPE_DIRNUMNUMARRAY)
@@ -688,6 +695,14 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, nu
   data->attriddata[data->attriddatalen++] = num;
   data->attriddata[data->attriddatalen++] = num2;
   data->attriddata[data->attriddatalen++] = 0;
+}
+
+void
+repodata_merge_attrs (Repodata *data, Id dest, Id src)
+{
+  Id *keyp;
+  for (keyp = data->attrs[src]; *keyp; keyp += 2)
+    repodata_insert_keyid(data, dest, keyp[0], keyp[1], 0);
 }
 
 /*********************************/
@@ -851,15 +866,16 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	  *sp++ = *keyp;
 	  oldcount++;
 	}
-      for (keyp = data->attrs[entry]; *keyp; keyp += 2)
-	{
-	  if (!seen[*keyp])
-	    {
-	      newschema = 1;
-	      *sp++ = *keyp;
-	    }
-	  seen[*keyp] = keyp[1] + 1;
-	}
+      if (data->attrs[entry])
+        for (keyp = data->attrs[entry]; *keyp; keyp += 2)
+	  {
+	    if (!seen[*keyp])
+	      {
+	        newschema = 1;
+	        *sp++ = *keyp;
+	      }
+	    seen[*keyp] = keyp[1] + 1;
+	  }
       *sp++ = 0;
       if (newschema)
         /* Ideally we'd like to sort the new schema here, to ensure
