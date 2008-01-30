@@ -644,6 +644,7 @@ repo_write_cb_sizes(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, Ke
     }
   if (cbdata->mykeys[rm].storage == KEY_STORAGE_VERTICAL_OFFSET && kv->eof)
     {
+      /* we can re-use old data in the blob here! */
       data_addid(cbdata->extdata + 0, cbdata->vstart);			/* add offset into incore data */
       data_addid(cbdata->extdata + 0, xd->len - cbdata->vstart);	/* add length into incore data */
       cbdata->vstart = 0;
