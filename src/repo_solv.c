@@ -662,7 +662,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   
   if ((solvflags & SOLV_FLAG_PREFIX_POOL) == 0)
     {
-      if (fread(strsp, sizeid, 1, fp) != 1)
+      if (sizeid && fread(strsp, sizeid, 1, fp) != 1)
 	{
 	  pool_debug(pool, SAT_ERROR, "read error while reading strings\n");
 	  return SOLV_ERROR_EOF;
@@ -675,7 +675,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       char *pp = prefix;
       char *old_str = 0;
       char *dest = strsp;
-      if (fread(prefix, pfsize, 1, fp) != 1)
+      if (pfsize && fread(prefix, pfsize, 1, fp) != 1)
         {
 	  pool_debug(pool, SAT_ERROR, "read error while reading strings\n");
 	  sat_free(prefix);
