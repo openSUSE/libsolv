@@ -35,7 +35,7 @@ static inline Id dirpool_parent(Dirpool *dp, Id did)
 static inline Id
 dirpool_sibling(Dirpool *dp, Id did)
 {
-  if (did + 1 <= dp->ndirs && dp->dirs[did + 1] > 0)
+  if (did + 1 < dp->ndirs && dp->dirs[did + 1] > 0)
     return did + 1;
   while (dp->dirs[--did] > 0)
     ;
