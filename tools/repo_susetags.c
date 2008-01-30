@@ -784,7 +784,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    repodata_set_str(data, last_found_pack, id_messagedel, line + 6);
 #endif
 	    continue;
-#if 0
+#if 1
           case CTAG('=', 'S', 'h', 'r'):
 	    if (last_found_pack >= pd.nshare)
 	      {
@@ -828,7 +828,12 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    free (pd.sources[i]);
 	  }
       free (pd.sources);
+    }
+#endif
 
+  if (pd.nshare)
+    {
+      int i, last_found;
       last_found = 0;
       for (i = 0; i < pd.nshare; i++)
         if (pd.share_with[i])
@@ -860,11 +865,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 		  }
 	      }
 	    if (n != repo->end)
-	      merge_attrs (attr, i, last_found);
+	      repodata_merge_attrs (data, i, last_found);
 	  }
       free (pd.share_with);
     }
-#endif
 
   if (data)
     repodata_internalize(data);
