@@ -138,7 +138,7 @@ write_u32(FILE *fp, unsigned int x)
       putc(x >> 8, fp) == EOF ||
       putc(x, fp) == EOF)
     {
-      perror("write error");
+      perror("write error u32");
       exit(1);
     }
 }
@@ -153,7 +153,7 @@ write_u8(FILE *fp, unsigned int x)
 {
   if (putc(x, fp) == EOF)
     {
-      perror("write error");
+      perror("write error u8");
       exit(1);
     }
 }
@@ -167,7 +167,7 @@ write_blob(FILE *fp, void *data, int len)
 {
   if (fwrite(data, len, 1, fp) != 1)
     {
-      perror("write error");
+      perror("write error blob");
       exit(1);
     }
 }
@@ -191,7 +191,7 @@ write_id(FILE *fp, Id x)
     putc((x >> 7) | 128, fp);
   if (putc(x & 127, fp) == EOF)
     {
-      perror("write error");
+      perror("write error id");
       exit(1);
     }
 }
@@ -1258,10 +1258,13 @@ if (cbdata.dirused)
    */
   write_u32(fp, sizeid);
   write_u32(fp, pp - prefix);
-  if (fwrite(prefix, pp - prefix, 1, fp) != 1)
+  if (pp != prefix)
     {
-      perror("write error");
-      exit(1);
+      if (fwrite(prefix, pp - prefix, 1, fp) != 1)
+	{
+	  perror("write error prefix");
+	  exit(1);
+	}
     }
   sat_free(prefix);
 
