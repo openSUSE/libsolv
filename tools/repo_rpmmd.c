@@ -15,14 +15,14 @@
 
 #include "pool.h"
 #include "repo.h"
-#include "util.h"
+#include "repo_utils.h"
 #include "repo_rpmmd.h"
 
 
 enum state {
   STATE_START,
   STATE_METADATA,
-  STATE_PACKAGE,
+  STATE_SOLVABLE,
   STATE_PRODUCT,
   STATE_PATTERN,
   STATE_PATCH,
@@ -33,23 +33,34 @@ enum state {
   STATE_VENDOR,
   STATE_PROVIDES,
   STATE_PROVIDESENTRY,
+  STATE_PROVIDESCAP,
   STATE_REQUIRES,
   STATE_REQUIRESENTRY,
+  STATE_REQUIRESCAP,
   STATE_OBSOLETES,
   STATE_OBSOLETESENTRY,
+  STATE_OBSOLETESCAP,
   STATE_CONFLICTS,
   STATE_CONFLICTSENTRY,
+  STATE_CONFLICTSCAP,
   STATE_RECOMMENDS,
   STATE_RECOMMENDSENTRY,
+  STATE_RECOMMENDSCAP,
   STATE_SUPPLEMENTS,
   STATE_SUPPLEMENTSENTRY,
+  STATE_SUPPLEMENTSCAP,
   STATE_SUGGESTS,
   STATE_SUGGESTSENTRY,
+  STATE_SUGGESTSCAP,
   STATE_ENHANCES,
   STATE_ENHANCESENTRY,
+  STATE_ENHANCESCAP,
   STATE_FRESHENS,
   STATE_FRESHENSENTRY,
+  STATE_FRESHENSCAP,
   STATE_FILE,
+  STATE_SUMMARY,
+  STATE_DESCRIPTION,
   NUMSTATES
 };
 
@@ -62,35 +73,57 @@ struct stateswitch {
 };
 
 static struct stateswitch stateswitches[] = {
+
+  { STATE_START,       "product",         STATE_SOLVABLE, 0 },
+  { STATE_START,       "pattern",         STATE_SOLVABLE, 0 },
+  { STATE_START,       "patch",           STATE_SOLVABLE, 0 },
+
   { STATE_START,       "metadata",        STATE_METADATA, 0 },
-  { STATE_METADATA,    "package",         STATE_PACKAGE, 0 },
-  { STATE_METADATA,    "product",         STATE_PRODUCT, 0 },
-  { STATE_METADATA,    "pattern",         STATE_PATTERN, 0 },
-  { STATE_METADATA,    "patch",           STATE_PATCH, 0 },
-  { STATE_PACKAGE,     "name",            STATE_NAME, 1 },
-  { STATE_PACKAGE,     "arch",            STATE_ARCH, 1 },
-  { STATE_PACKAGE,     "version",         STATE_VERSION, 0 },
-  { STATE_PACKAGE,     "format",          STATE_FORMAT, 0 },
+  { STATE_METADATA,    "package",         STATE_SOLVABLE, 0 },
+  
+  { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
+  { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
+  { STATE_SOLVABLE,    "version",         STATE_VERSION, 0 },
+  { STATE_SOLVABLE,    "vendor",          STATE_VENDOR, 1 },
+
+  { STATE_SOLVABLE,    "format",          STATE_FORMAT, 0 },
+
+  /* those are used in libzypp xml store */
+  { STATE_SOLVABLE,    "provides",        STATE_PROVIDES, 0 },
+  { STATE_SOLVABLE,    "requires",        STATE_REQUIRES, 0 },
+  { STATE_SOLVABLE,    "obsoletes",       STATE_OBSOLETES , 0 },
+  { STATE_SOLVABLE,    "conflicts",       STATE_CONFLICTS , 0 },
+  { STATE_SOLVABLE,    "recommends",      STATE_RECOMMENDS , 0 },
+  { STATE_SOLVABLE,    "supplements",     STATE_SUPPLEMENTS, 0 },
+  { STATE_SOLVABLE,    "suggests",        STATE_SUGGESTS, 0 },
+  { STATE_SOLVABLE,    "enhances",        STATE_ENHANCES, 0 },
+  { STATE_SOLVABLE,    "freshens",        STATE_FRESHENS, 0 },
+
+  { STATE_PROVIDES,    "capability",      STATE_PROVIDESCAP, 1 },
+  { STATE_REQUIRES,    "capability",      STATE_REQUIRESCAP, 1 },
+  { STATE_OBSOLETES,   "capability",      STATE_OBSOLETESCAP, 1 },
+  { STATE_CONFLICTS,   "capability",      STATE_CONFLICTSCAP, 1 },
+  { STATE_RECOMMENDS,  "capability",      STATE_RECOMMENDSCAP, 1 },
+  { STATE_SUPPLEMENTS, "capability",      STATE_SUPPLEMENTSCAP, 1 },
+  { STATE_SUGGESTS,    "capability",      STATE_SUGGESTSCAP, 1 },
+  { STATE_ENHANCES,    "capability",      STATE_ENHANCESCAP, 1 },
+  { STATE_FRESHENS,    "capability",      STATE_FRESHENSCAP, 1 },
+  
+  { STATE_SOLVABLE,    "summary",         STATE_SUMMARY, 1 },
+  { STATE_SOLVABLE,    "description",     STATE_DESCRIPTION, 1 },
+
   { STATE_FORMAT,      "rpm:vendor",      STATE_VENDOR, 1 },
-  { STATE_FORMAT,      "vendor",          STATE_VENDOR, 1 },
+
+  /* rpm-md dependencies */ 
   { STATE_FORMAT,      "rpm:provides",    STATE_PROVIDES, 0 },
-  { STATE_FORMAT,      "provides",        STATE_PROVIDES, 0 },
   { STATE_FORMAT,      "rpm:requires",    STATE_REQUIRES, 0 },
-  { STATE_FORMAT,      "requires",        STATE_REQUIRES, 0 },
   { STATE_FORMAT,      "rpm:obsoletes",   STATE_OBSOLETES , 0 },
-  { STATE_FORMAT,      "obsoletes",       STATE_OBSOLETES , 0 },
   { STATE_FORMAT,      "rpm:conflicts",   STATE_CONFLICTS , 0 },
-  { STATE_FORMAT,      "conflicts",       STATE_CONFLICTS , 0 },
   { STATE_FORMAT,      "rpm:recommends",  STATE_RECOMMENDS , 0 },
-  { STATE_FORMAT,      "recommends",      STATE_RECOMMENDS , 0 },
   { STATE_FORMAT,      "rpm:supplements", STATE_SUPPLEMENTS, 0 },
-  { STATE_FORMAT,      "supplements",     STATE_SUPPLEMENTS, 0 },
   { STATE_FORMAT,      "rpm:suggests",    STATE_SUGGESTS, 0 },
-  { STATE_FORMAT,      "suggests",        STATE_SUGGESTS, 0 },
   { STATE_FORMAT,      "rpm:enhances",    STATE_ENHANCES, 0 },
-  { STATE_FORMAT,      "enhances",        STATE_ENHANCES, 0 },
   { STATE_FORMAT,      "rpm:freshens",    STATE_FRESHENS, 0 },
-  { STATE_FORMAT,      "freshens",        STATE_FRESHENS, 0 },
   { STATE_FORMAT,      "file",            STATE_FILE, 1 },
   { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
@@ -105,9 +138,8 @@ static struct stateswitch stateswitches[] = {
 };
 
 struct parsedata {
+  struct parsedata_common common;
   char *kind;
-  char *tmp;
-  int tmpl;
   int depth;
   enum state state;
   int statedepth;
@@ -116,52 +148,59 @@ struct parsedata {
   int acontent;
   int docontent;
   int numpacks;
-  Pool *pool;
-  Repo *repo;
   Solvable *solvable;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
+  const char *lang;
+  const char *capkind;
 };
 
-static char *
-join(struct parsedata *pd, char *s1, char *s2, char *s3)
+static char *flagtabnum[] = {
+  ">",
+  "=",
+  ">=",
+  "<",
+  "!=",
+  "<=",
+  "=="
+};
+
+/**
+ * adds plain dependencies, that is strings like "foo > 2.0"
+ * which are used in libzypp xml store, not in rpm-md.
+ */
+static unsigned int
+adddepplain(Pool *pool, struct parsedata_common *pd, unsigned int olddeps, char *line, Id marker, char *kind)
 {
-  int l = 1;
-  char *p;
+  int i, flags;
+  Id id, evrid;
+  char *sp[4];
 
-  if (s1)
-    l += strlen(s1);
-  if (s2)
-    l += strlen(s2);
-  if (s3)
-    l += strlen(s3);
-  if (l > pd->tmpl)
+  i = split(line + 5, sp, 4);
+  if (i != 1 && i != 3)
     {
-      pd->tmpl = l + 256;
-      if (!pd->tmp)
-        pd->tmp = malloc(pd->tmpl);
-      else
-        pd->tmp = realloc(pd->tmp, pd->tmpl);
+      fprintf(stderr, "Bad dependency line: %s\n", line);
+      exit(1);
     }
-  p = pd->tmp;
-  if (s1)
+  if (kind)
+    id = str2id(pool, join(pd, kind, ":", sp[0]), 1);
+  else
+    id = str2id(pool, sp[0], 1);
+  if (i == 3)
     {
-      strcpy(p, s1);
-      p += strlen(s1);
+      evrid = makeevr(pool, sp[2]);
+      for (flags = 0; flags < 6; flags++)
+        if (!strcmp(sp[1], flagtabnum[flags]))
+          break;
+      if (flags == 7)
+        {
+          fprintf(stderr, "Unknown relation '%s'\n", sp[1]);
+          exit(1);
+        }
+      id = rel2id(pool, id, evrid, flags + 1, 1);
     }
-  if (s2)
-    {
-      strcpy(p, s2);
-      p += strlen(s2);
-    }
-  if (s3)
-    {
-      strcpy(p, s3);
-      p += strlen(s3);
-    }
-  return pd->tmp;
+  return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
-
 
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
@@ -228,6 +267,19 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return str2id(pool, pd->content, 1);
 }
 
+static const char *
+find_attr(const char *txt, const char **atts)
+{
+  char *k;
+  k = 0;
+  for (; *atts; atts += 2)
+    {
+      if (!strcmp(*atts, txt))
+        return atts[1];
+    }
+  return k;
+}
+
 static char *flagtab[] = {
   "GT",
   "EQ",
@@ -289,15 +341,16 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 #if 0
   fprintf(stderr, "new dep %s%s%s\n", id2str(pool, d), id2rel(pool, d), id2evr(pool, d));
 #endif
-  return repo_addid_dep(pd->repo, olddeps, id, marker);
+  return repo_addid_dep(pd->common.repo, olddeps, id, marker);
 }
 
 
 static void XMLCALL
 startElement(void *userData, const char *name, const char **atts)
 {
+  fprintf(stderr,"+tag: %s\n", name);
   struct parsedata *pd = userData;
-  Pool *pool = pd->pool;
+  Pool *pool = pd->common.pool;
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
 
@@ -312,9 +365,9 @@ startElement(void *userData, const char *name, const char **atts)
       break;
   if (sw->from != pd->state)
     {
-#if 0
+//#if 0
       fprintf(stderr, "into unknown: %s\n", name);
-#endif
+//#endif
       return;
     }
   pd->state = sw->to;
@@ -335,13 +388,21 @@ startElement(void *userData, const char *name, const char **atts)
 #if 0
 	      fprintf(stderr, "numpacks: %d\n", pd->numpacks);
 #endif
-	      pd->solvable = pool_id2solvable(pool, repo_add_solvable_block(pd->repo, pd->numpacks));
+	      pd->solvable = pool_id2solvable(pool, repo_add_solvable_block(pd->common.repo, pd->numpacks));
 	    }
 	}
       break;
-    case STATE_PACKAGE:
+    case STATE_SOLVABLE:
+      pd->kind = 0;
+      if ( name[2] == 't' && name[3] == 't' )
+        pd->kind = "pattern";
+      else if ( name[1] == 'r' )
+        pd->kind = "product";
+      else if ( name[2] == 't' && name[3] == 'c' )
+        pd->kind = "patch";
+      
       if (pd->numpacks == 0)
-	pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+	pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -403,6 +464,24 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_FRESHENSENTRY:
       s->freshens = adddep(pool, pd, s->freshens, atts, 0);
       break;
+    case STATE_PROVIDESCAP:
+    case STATE_REQUIRESCAP:
+    case STATE_OBSOLETESCAP:
+    case STATE_CONFLICTSCAP:
+    case STATE_RECOMMENDSCAP:
+    case STATE_SUPPLEMENTSCAP:
+    case STATE_SUGGESTSCAP:
+    case STATE_ENHANCESCAP:
+    case STATE_FRESHENSCAP:
+      pd->capkind = find_attr("kind", atts);
+      //fprintf(stderr,"capkind es: %s\n", pd->capkind);
+      break;
+    case STATE_SUMMARY:
+      pd->lang = find_attr("lang", atts);
+      break;
+    case STATE_DESCRIPTION:
+      pd->lang = find_attr("lang", atts);
+      break;
     default:
       break;
     }
@@ -411,9 +490,11 @@ startElement(void *userData, const char *name, const char **atts)
 static void XMLCALL
 endElement(void *userData, const char *name)
 {
+  fprintf(stderr,"-tag: %s\n", name);
   struct parsedata *pd = userData;
-  Pool *pool = pd->pool;
+  Pool *pool = pd->common.pool;
   Solvable *s = pd->solvable;
+  Repo *repo = pd->common.repo;
   Id id;
 
   if (pd->depth != pd->statedepth)
@@ -428,33 +509,24 @@ endElement(void *userData, const char *name)
     {
     case STATE_PATTERN:
     case STATE_PRODUCT:
-      if ( pd->state == STATE_PATTERN )
-        pd->kind = "pattern";
-      if ( pd->state == STATE_PRODUCT )
-        pd->kind = "product";
-    case STATE_PACKAGE:
+    case STATE_SOLVABLE:
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
+        s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
       if (pd->numpacks > 0)
 	{
 	  pd->numpacks--;
 	  pd->solvable++;
 	}
+      pd->kind = 0;
       break;
     case STATE_NAME:
       if ( pd->kind )
-        {
-          s->name = str2id(pool, pd->content, 1);
-          s->name = str2id(pool, join(pd, pd->kind, ":", pd->content), 1);
-        }
+          s->name = str2id(pool, join(&pd->common, pd->kind, ":", pd->content), 1);
       else
-        {
           s->name = str2id(pool, pd->content, 1);
-        }
-        pd->kind = 0;
       break;
     case STATE_ARCH:
       s->arch = str2id(pool, pd->content, 1);
@@ -464,14 +536,47 @@ endElement(void *userData, const char *name)
       break;
     case STATE_FILE:
       id = str2id(pool, pd->content, 1);
-      s->provides = repo_addid(pd->repo, s->provides, id);
+      s->provides = repo_addid(repo, s->provides, id);
+      break;
+    case STATE_PROVIDESCAP:
+      s->provides = adddepplain(pool, &pd->common, s->provides, pd->content, 0, 0);
+      break;
+    case STATE_REQUIRESCAP:
+      s->requires = adddepplain(pool, &pd->common, s->requires, pd->content, 0, 0);
+      break;
+    case STATE_OBSOLETESCAP:
+      s->obsoletes = adddepplain(pool, &pd->common, s->obsoletes, pd->content, 0, 0);
+      break;
+    case STATE_CONFLICTSCAP:
+      s->conflicts = adddepplain(pool, &pd->common, s->conflicts, pd->content, 0, 0);
+      break;
+    case STATE_RECOMMENDSCAP:
+      s->recommends = adddepplain(pool, &pd->common, s->recommends, pd->content, 0, 0);
+      break;
+    case STATE_SUPPLEMENTSCAP:
+      s->supplements = adddepplain(pool, &pd->common, s->supplements, pd->content, 0, 0);
+      break;
+    case STATE_SUGGESTSCAP:
+      s->suggests = adddepplain(pool, &pd->common, s->suggests, pd->content, 0, 0);
+      break;
+    case STATE_ENHANCESCAP:
+      s->enhances = adddepplain(pool, &pd->common, s->enhances, pd->content, 0, 0);
+      break;
+    case STATE_FRESHENSCAP:
+      s->freshens = adddepplain(pool, &pd->common, s->freshens, pd->content, 0, 0);
+      break;
+    case STATE_SUMMARY:
+      pd->lang = 0;
+      break;
+    case STATE_DESCRIPTION:
+      pd->lang = 0;
       break;
     default:
       break;
     }
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
-  // printf("back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+  fprintf(stderr, "back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth);
 }
 
 static void XMLCALL
@@ -515,13 +620,13 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
         pd.swtab[sw->from] = sw;
       pd.sbtab[sw->to] = sw->from;
     }
-  pd.pool = pool;
-  pd.repo = repo;
+  pd.common.pool = pool;
+  pd.common.repo = repo;
   pd.content = sat_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
-  pd.tmp = 0;
-  pd.tmpl = 0;
+  pd.common.tmp = 0;
+  pd.common.tmpl = 0;
   pd.kind = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
