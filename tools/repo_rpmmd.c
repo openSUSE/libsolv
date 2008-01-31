@@ -23,6 +23,9 @@ enum state {
   STATE_START,
   STATE_METADATA,
   STATE_PACKAGE,
+  STATE_PRODUCT,
+  STATE_PATTERN,
+  STATE_PATCH,
   STATE_NAME,
   STATE_ARCH,
   STATE_VERSION,
@@ -61,20 +64,33 @@ struct stateswitch {
 static struct stateswitch stateswitches[] = {
   { STATE_START,       "metadata",        STATE_METADATA, 0 },
   { STATE_METADATA,    "package",         STATE_PACKAGE, 0 },
+  { STATE_METADATA,    "product",         STATE_PRODUCT, 0 },
+  { STATE_METADATA,    "pattern",         STATE_PATTERN, 0 },
+  { STATE_METADATA,    "patch",           STATE_PATCH, 0 },
   { STATE_PACKAGE,     "name",            STATE_NAME, 1 },
   { STATE_PACKAGE,     "arch",            STATE_ARCH, 1 },
   { STATE_PACKAGE,     "version",         STATE_VERSION, 0 },
   { STATE_PACKAGE,     "format",          STATE_FORMAT, 0 },
   { STATE_FORMAT,      "rpm:vendor",      STATE_VENDOR, 1 },
+  { STATE_FORMAT,      "vendor",          STATE_VENDOR, 1 },
   { STATE_FORMAT,      "rpm:provides",    STATE_PROVIDES, 0 },
+  { STATE_FORMAT,      "provides",        STATE_PROVIDES, 0 },
   { STATE_FORMAT,      "rpm:requires",    STATE_REQUIRES, 0 },
+  { STATE_FORMAT,      "requires",        STATE_REQUIRES, 0 },
   { STATE_FORMAT,      "rpm:obsoletes",   STATE_OBSOLETES , 0 },
+  { STATE_FORMAT,      "obsoletes",       STATE_OBSOLETES , 0 },
   { STATE_FORMAT,      "rpm:conflicts",   STATE_CONFLICTS , 0 },
-  { STATE_FORMAT,      "rpm:recommends" , STATE_RECOMMENDS , 0 },
+  { STATE_FORMAT,      "conflicts",       STATE_CONFLICTS , 0 },
+  { STATE_FORMAT,      "rpm:recommends",  STATE_RECOMMENDS , 0 },
+  { STATE_FORMAT,      "recommends",      STATE_RECOMMENDS , 0 },
   { STATE_FORMAT,      "rpm:supplements", STATE_SUPPLEMENTS, 0 },
+  { STATE_FORMAT,      "supplements",     STATE_SUPPLEMENTS, 0 },
   { STATE_FORMAT,      "rpm:suggests",    STATE_SUGGESTS, 0 },
+  { STATE_FORMAT,      "suggests",        STATE_SUGGESTS, 0 },
   { STATE_FORMAT,      "rpm:enhances",    STATE_ENHANCES, 0 },
+  { STATE_FORMAT,      "enhances",        STATE_ENHANCES, 0 },
   { STATE_FORMAT,      "rpm:freshens",    STATE_FRESHENS, 0 },
+  { STATE_FORMAT,      "freshens",        STATE_FRESHENS, 0 },
   { STATE_FORMAT,      "file",            STATE_FILE, 1 },
   { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
@@ -89,6 +105,9 @@ static struct stateswitch stateswitches[] = {
 };
 
 struct parsedata {
+  char *kind;
+  char *tmp;
+  int tmpl;
   int depth;
   enum state state;
   int statedepth;
@@ -103,6 +122,46 @@ struct parsedata {
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
 };
+
+static char *
+join(struct parsedata *pd, char *s1, char *s2, char *s3)
+{
+  int l = 1;
+  char *p;
+
+  if (s1)
+    l += strlen(s1);
+  if (s2)
+    l += strlen(s2);
+  if (s3)
+    l += strlen(s3);
+  if (l > pd->tmpl)
+    {
+      pd->tmpl = l + 256;
+      if (!pd->tmp)
+        pd->tmp = malloc(pd->tmpl);
+      else
+        pd->tmp = realloc(pd->tmp, pd->tmpl);
+    }
+  p = pd->tmp;
+  if (s1)
+    {
+      strcpy(p, s1);
+      p += strlen(s1);
+    }
+  if (s2)
+    {
+      strcpy(p, s2);
+      p += strlen(s2);
+    }
+  if (s3)
+    {
+      strcpy(p, s3);
+      p += strlen(s3);
+    }
+  return pd->tmp;
+}
+
 
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
@@ -367,6 +426,12 @@ endElement(void *userData, const char *name)
   pd->statedepth--;
   switch (pd->state)
     {
+    case STATE_PATTERN:
+    case STATE_PRODUCT:
+      if ( pd->state == STATE_PATTERN )
+        pd->kind = "pattern";
+      if ( pd->state == STATE_PRODUCT )
+        pd->kind = "product";
     case STATE_PACKAGE:
       if (!s->arch)
         s->arch = ARCH_NOARCH;
@@ -380,7 +445,16 @@ endElement(void *userData, const char *name)
 	}
       break;
     case STATE_NAME:
-      s->name = str2id(pool, pd->content, 1);
+      if ( pd->kind )
+        {
+          s->name = str2id(pool, pd->content, 1);
+          s->name = str2id(pool, join(pd, pd->kind, ":", pd->content), 1);
+        }
+      else
+        {
+          s->name = str2id(pool, pd->content, 1);
+        }
+        pd->kind = 0;
       break;
     case STATE_ARCH:
       s->arch = str2id(pool, pd->content, 1);
@@ -446,6 +520,9 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
   pd.content = sat_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
+  pd.tmp = 0;
+  pd.tmpl = 0;
+  pd.kind = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   XML_SetElementHandler(parser, startElement, endElement);
