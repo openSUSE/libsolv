@@ -53,7 +53,7 @@ split(char *l, char **sp, int m)
 }
 
 static char *
-join(struct parsedata_common *pd, char *s1, char *s2, char *s3)
+join(struct parsedata_common *pd, const char *s1, const char *s2, const char *s3)
 {
   int l = 1;
   char *p;
