@@ -35,6 +35,9 @@ enum state {
 
   STATE_FORMAT,
   STATE_VENDOR,
+
+  /* rpm-md dependencies inside the
+     format tag */
   STATE_PROVIDES,
   STATE_REQUIRES,
   STATE_OBSOLETES,
@@ -186,6 +189,7 @@ struct parsedata {
   enum state sbtab[NUMSTATES];
   const char *lang;
   const char *capkind;
+  Repodata *data;
 };
 
 static char *flagtabnum[] = {

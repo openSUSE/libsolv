@@ -17,34 +17,14 @@
 #if 0
 #include "attr_store.h"
 #endif
+#include "tools_util.h"
 #include "repo_susetags.h"
-
-static int
-split(char *l, char **sp, int m)
-{
-  int i;
-  for (i = 0; i < m;)
-    {
-      while (*l == ' ')
-	l++;
-      if (!*l)
-	break;
-      sp[i++] = l;
-      while (*l && *l != ' ')
-	l++;
-      if (!*l)
-	break;
-      *l++ = 0;
-    }
-  return i;
-}
 
 struct parsedata {
   char *kind;
   Repo *repo;
   Repodata *data;
-  char *tmp;
-  int tmpl;
+  struct parsedata_common common;
   char **sources;
   int nsources;
   int last_found_source;
@@ -53,14 +33,6 @@ struct parsedata {
   Id (*dirs)[3]; // dirid, size, nfiles
   int ndirs;
 };
-
-static Id
-makeevr(Pool *pool, char *s)
-{
-  if (!strncmp(s, "0:", 2) && s[2])
-    s += 2;
-  return str2id(pool, s, 1);
-}
 
 static char *flagtab[] = {
   ">",
@@ -71,47 +43,8 @@ static char *flagtab[] = {
   "<="
 };
 
-static char *
-join(struct parsedata *pd, char *s1, char *s2, char *s3)
-{
-  int l = 1;
-  char *p;
-
-  if (s1)
-    l += strlen(s1);
-  if (s2)
-    l += strlen(s2);
-  if (s3)
-    l += strlen(s3);
-  if (l > pd->tmpl)
-    {
-      pd->tmpl = l + 256;
-      if (!pd->tmp)
-	pd->tmp = malloc(pd->tmpl);
-      else
-	pd->tmp = realloc(pd->tmp, pd->tmpl);
-    }
-  p = pd->tmp;
-  if (s1)
-    {
-      strcpy(p, s1);
-      p += strlen(s1);
-    }
-  if (s2)
-    {
-      strcpy(p, s2);
-      p += strlen(s2);
-    }
-  if (s3)
-    {
-      strcpy(p, s3);
-      p += strlen(s3);
-    }
-  return pd->tmp;
-}
-
 static unsigned int
-adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker, char *kind)
+adddep(Pool *pool, struct parsedata_common *pd, unsigned int olddeps, char *line, Id marker, char *kind)
 {
   int i, flags;
   Id id, evrid;
@@ -583,10 +516,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      exit(1);
 	    }
 	  if (pd.kind)
-	    s->name = str2id(pool, join(&pd, pd.kind, ":", sp[0]), 1);
+	    s->name = str2id(pool, join(&pd.common, pd.kind, ":", sp[0]), 1);
 	  else
 	    s->name = str2id(pool, sp[0], 1);
-	  s->evr = makeevr(pool, join(&pd, sp[1], "-", sp[2]));
+	  s->evr = makeevr(pool, join(&pd.common, sp[1], "-", sp[2]));
 	  s->arch = str2id(pool, sp[3], 1);
 	  s->vendor = vendor;
 	  continue;
@@ -609,10 +542,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    }
 	  s = 0;
 	  if (pd.kind)
-	    name = str2id(pool, join(&pd, pd.kind, ":", sp[0]), 0);
+	    name = str2id(pool, join(&pd.common, pd.kind, ":", sp[0]), 0);
 	  else
 	    name = str2id(pool, sp[0], 0);
-	  evr = makeevr(pool, join(&pd, sp[1], "-", sp[2]));
+	  evr = makeevr(pool, join(&pd.common, sp[1], "-", sp[2]));
 	  arch = str2id(pool, sp[3], 0);
 	  /* If we found neither the name nor the arch at all in this repo
 	     there's no chance of finding the exact solvable either.  */
@@ -648,43 +581,43 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
       switch (tag)
         {
 	  case CTAG('=', 'P', 'r', 'v'):
-	    s->provides = adddep(pool, &pd, s->provides, line, 0, pd.kind);
+	    s->provides = adddep(pool, &pd.common, s->provides, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'R', 'e', 'q'):
-	    s->requires = adddep(pool, &pd, s->requires, line, -SOLVABLE_PREREQMARKER, pd.kind);
+	    s->requires = adddep(pool, &pd.common, s->requires, line, -SOLVABLE_PREREQMARKER, pd.kind);
 	    continue;
           case CTAG('=', 'P', 'r', 'q'):
 	    if (pd.kind)
-	      s->requires = adddep(pool, &pd, s->requires, line, 0, 0);
+	      s->requires = adddep(pool, &pd.common, s->requires, line, 0, 0);
 	    else
-	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0);
+	      s->requires = adddep(pool, &pd.common, s->requires, line, SOLVABLE_PREREQMARKER, 0);
 	    continue;
 	  case CTAG('=', 'O', 'b', 's'):
-	    s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, pd.kind);
+	    s->obsoletes = adddep(pool, &pd.common, s->obsoletes, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'C', 'o', 'n'):
-	    s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, pd.kind);
+	    s->conflicts = adddep(pool, &pd.common, s->conflicts, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'R', 'e', 'c'):
-	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, pd.kind);
+	    s->recommends = adddep(pool, &pd.common, s->recommends, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'S', 'u', 'p'):
-	    s->supplements = adddep(pool, &pd, s->supplements, line, 0, pd.kind);
+	    s->supplements = adddep(pool, &pd.common, s->supplements, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'E', 'n', 'h'):
-	    s->enhances = adddep(pool, &pd, s->enhances, line, 0, pd.kind);
+	    s->enhances = adddep(pool, &pd.common, s->enhances, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'S', 'u', 'g'):
-	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, pd.kind);
+	    s->suggests = adddep(pool, &pd.common, s->suggests, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'F', 'r', 'e'):
-	    s->freshens = adddep(pool, &pd, s->freshens, line, 0, pd.kind);
+	    s->freshens = adddep(pool, &pd.common, s->freshens, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'P', 'r', 'c'):
-	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
+	    s->recommends = adddep(pool, &pd.common, s->recommends, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 's', 'g'):
-	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
+	    s->suggests = adddep(pool, &pd.common, s->suggests, line, 0, 0);
 	    continue;
 	}
       if (!with_attr)
@@ -845,7 +778,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      }
 
 	    Id name = str2id(pool, sp[0], 1);
-	    Id evr = makeevr(pool, join(&pd, sp[1], "-", sp[2]));
+	    Id evr = makeevr(pool, join(&pd.common, sp[1], "-", sp[2]));
 	    Id arch = str2id(pool, sp[3], 1);
 	    unsigned n, nn;
 	    Solvable *found = 0;
@@ -873,7 +806,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   if (data)
     repodata_internalize(data);
 
-  if (pd.tmp)
-    free(pd.tmp);
+  if (pd.common.tmp)
+    free(pd.common.tmp);
   free(line);
 }
