@@ -30,12 +30,40 @@ enum state {
   STATE_ARCH,
   STATE_VERSION,
 
+  /* resobject attributes */
   STATE_SUMMARY,
   STATE_DESCRIPTION,
+  STATE_INSNOTIFY,
+  STATE_DELNOTIFY,
+  STATE_VENDOR,
+  STATE_SIZE,
+  STATE_DOWNLOADSIZE,
+  STATE_INSTALLTIME,
+  STATE_INSTALLONLY,
+  
+  /* patch */
+  STATE_ID,
+  STATE_TIMESTAMP,
+  STATE_AFFECTSPKG,
+  STATE_REBOOTNEEDED,
+
+   // xml store pattern attributes
+  STATE_CATEGORY, /* pattern and patches */
+  STATE_SCRIPT,
+  STATE_ICON,
+  STATE_USERVISIBLE,
+  STATE_DEFAULT,
+  STATE_INSTALL_TIME,
+
+  /* product */
+  STATE_SHORTNAME,
+  STATE_DISTNAME,
+  STATE_DISTEDITION,
+  STATE_SOURCE,
+  STATE_RELNOTESURL,
 
   STATE_FORMAT,
-  STATE_VENDOR,
-
+  
   /* rpm-md dependencies inside the
      format tag */
   STATE_PROVIDES,
@@ -81,17 +109,10 @@ enum state {
   STATE_CAP_ENHANCES,
 
   STATE_FILE,
-  // xml store pattern attributes
-  STATE_SCRIPT,
-  STATE_ICON,
-  STATE_USERVISIBLE,
-  STATE_CATEGORY,
-  STATE_DEFAULT,
-  STATE_INSTALL_TIME,
 
+  // general
   NUMSTATES
 };
-
 
 struct stateswitch {
   enum state from;
@@ -112,11 +133,19 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
   { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
   { STATE_SOLVABLE,    "version",         STATE_VERSION, 0 },
-  { STATE_SOLVABLE,    "vendor",          STATE_VENDOR, 1 },
+  
+  /* resobject attributes */
 
   { STATE_SOLVABLE,    "summary",         STATE_SUMMARY, 1 },
   { STATE_SOLVABLE,    "description",     STATE_DESCRIPTION, 1 },
-  
+  //{ STATE_SOLVABLE,    "???",         STATE_INSNOTIFY, 1 },
+  //{ STATE_SOLVABLE,    "??",     STATE_DELNOTIFY, 1 },
+  { STATE_SOLVABLE,    "vendor",          STATE_VENDOR, 1 },
+  { STATE_SOLVABLE,    "size",            STATE_SIZE, 1 },
+  { STATE_SOLVABLE,    "archive-size",    STATE_DOWNLOADSIZE, 1 },
+  { STATE_SOLVABLE,    "install-time",    STATE_INSTALLTIME, 1 },
+  { STATE_SOLVABLE,    "install-only",    STATE_INSTALLONLY, 1 },
+
   // xml store pattern attributes
   { STATE_SOLVABLE,    "script",          STATE_SCRIPT, 1 },
   { STATE_SOLVABLE,    "icon",            STATE_ICON, 1 },
@@ -531,6 +560,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_SUMMARY:
     case STATE_DESCRIPTION:
       pd->lang = find_attr("lang", atts);
+      //repodata_set_tstr( pd->data, pd-
       break;
     default:
       break;
@@ -673,6 +703,10 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
     }
   pd.common.pool = pool;
   pd.common.repo = repo;
+
+  pd.data = repo_add_repodata(repo);
+  init_attr_ids(pool);
+
   pd.content = sat_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;

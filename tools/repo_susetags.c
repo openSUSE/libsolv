@@ -79,25 +79,6 @@ adddep(Pool *pool, struct parsedata_common *pd, unsigned int olddeps, char *line
 #if 0
 Attrstore *attr;
 #endif
-static Id id_authors;
-static Id id_description;
-static Id id_diskusage;
-static Id id_downloadsize;
-static Id id_eula;
-static Id id_group;
-static Id id_installsize;
-static Id id_keywords;
-static Id id_license;
-static Id id_messagedel;
-static Id id_messageins;
-static Id id_mediadir;
-static Id id_mediafile;
-static Id id_medianr;
-static Id id_nosource;
-static Id id_source;
-static Id id_sourceid;
-static Id id_summary;
-static Id id_time;
 
 static void
 add_location(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
@@ -388,25 +369,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
       attr = new_store(pool);
 #endif
       data = repo_add_repodata(repo);
-      id_authors = str2id (pool, "authors", 1);
-      id_description = str2id (pool, "description", 1);
-      id_diskusage = str2id (pool, "diskusage", 1);
-      id_downloadsize = str2id (pool, "downloadsize", 1);
-      id_eula = str2id (pool, "eula", 1);
-      id_group = str2id (pool, "group", 1);
-      id_installsize = str2id (pool, "installsize", 1);
-      id_keywords = str2id (pool, "keywords", 1);
-      id_license = str2id (pool, "license", 1);
-      id_messagedel = str2id (pool, "messagedel", 1);
-      id_messageins = str2id (pool, "messageins", 1);
-      id_mediadir = str2id (pool, "mediadir", 1);
-      id_mediafile = str2id (pool, "mediafile", 1);
-      id_medianr = str2id (pool, "medianr", 1);
-      id_nosource = str2id (pool, "nosource", 1);
-      id_source = str2id (pool, "source", 1);
-      id_sourceid = str2id (pool, "sourceid", 1);
-      id_summary = str2id (pool, "summary", 1);
-      id_time = str2id (pool, "time", 1);
+      init_attr_ids(pool);
     }
 #endif
 
