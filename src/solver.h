@@ -22,10 +22,10 @@
  * Callback definitions in order to "overwrite" the policies by an external application.
  */
  
-typedef void  (*BestSolvableCb) (Queue *canditates);
-typedef int  (*ArchCheckCb) (Solvable *solvable1, Solvable *solvable2);
-typedef int  (*VendorCheckCb) (Solvable *solvable1, Solvable *solvable2);
-typedef void (*UpdateCandidateCb) (Solvable *solvable, Queue *canditates);
+typedef void  (*BestSolvableCb) (Pool *pool, Queue *canditates);
+typedef int  (*ArchCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
+typedef int  (*VendorCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
+typedef void (*UpdateCandidateCb) (Pool *pool, Solvable *solvable, Queue *canditates);
 
 
 /* ----------------------------------------------
@@ -127,7 +127,7 @@ typedef struct solver {
   /* Finding best candidate
    *
    * Callback definition:
-   * void  bestSolvable (Queue *canditates)
+   * void  bestSolvable (Pool *pool, Queue *canditates)
    *     candidates       : List of canditates which has to be sorted by the function call
    *     return candidates: Sorted list of the candidates(first is the best).
    */
@@ -136,7 +136,7 @@ typedef struct solver {
   /* Checking if two solvables has compatible architectures
    *
    * Callback definition:
-   *     int  archCheck (Solvable *solvable1, Solvable *solvable2);
+   *     int  archCheck (Pool *pool, Solvable *solvable1, Solvable *solvable2);
    *     
    *     return 0 it the two solvables has compatible architectures
    */
@@ -145,7 +145,7 @@ typedef struct solver {
   /* Checking if two solvables has compatible vendors
    *
    * Callback definition:
-   *     int  vendorCheck (Solvable *solvable1, Solvable *solvable2);
+   *     int  vendorCheck (Pool *pool, Solvable *solvable1, Solvable *solvable2);
    *     
    *     return 0 it the two solvables has compatible architectures
    */
@@ -154,7 +154,7 @@ typedef struct solver {
   /* Evaluate update candidate
    *
    * Callback definition:
-   * void pdateCandidateCb (Solvable *solvable, Queue *canditates)
+   * void pdateCandidateCb (Pool *pool, Solvable *solvable, Queue *canditates)
    *     solvable   : for which updates should be search
    *     candidates : List of candidates (This list depends on other
    *                  restrictions like architecture and vendor policies too)

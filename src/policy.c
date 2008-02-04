@@ -300,7 +300,7 @@ prune_best_version_arch(Solver *solv, Pool *pool, Queue *plist)
 {
   if (solv && solv->bestSolvableCb)
      {   /* The application is responsible for */
-	 return solv->bestSolvableCb (plist);
+	 return solv->bestSolvableCb (solv->pool, plist);
      }
 
   if (plist->count > 1)
@@ -334,7 +334,7 @@ policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2)
 
   if (solv && solv->archCheckCb)
      {   /* The application is responsible for */
-	 return solv->archCheckCb (s1, s2);
+	 return solv->archCheckCb (solv->pool, s1, s2);
      }
 
   /* we allow changes to/from noarch */
@@ -357,7 +357,7 @@ policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
 
   if (solv && solv->vendorCheckCb)
      {   /* The application is responsible for */
-	 return solv->vendorCheckCb (s1, s2);
+	 return solv->vendorCheckCb (solv->pool, s1, s2);
      }
 
   if (s1->vendor == s2->vendor)
@@ -385,7 +385,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
 
   if (solv && solv->updateCandidateCb)
      {   /* The application is responsible for */
-	 return solv->updateCandidateCb (s, qs);
+	 return solv->updateCandidateCb (solv->pool, s, qs);
      }
 
   /*
