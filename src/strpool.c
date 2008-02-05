@@ -42,7 +42,7 @@ void
 stringpool_init_empty(Stringpool *ss)
 {
   const char *emptystrs[] = {
-    "<NULL>", 
+    "<NULL>",
     "",
     0,
   };
@@ -81,8 +81,8 @@ stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
   hashtbl = ss->stringhashtbl;
 
   // expand hashtable if needed
-  // 
-  // 
+  //
+  //
   if (ss->nstrings * 2 > hashmask)
     {
       sat_free(hashtbl);
@@ -142,6 +142,10 @@ stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
 Id
 stringpool_str2id (Stringpool *ss, const char *str, int create)
 {
+  if ( !str )
+    return STRID_NULL;
+  if ( !*str )
+    return STRID_EMPTY;
   unsigned len = strlen (str);
   return stringpool_strn2id (ss, str, len, create);
 }
