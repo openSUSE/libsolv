@@ -1245,7 +1245,7 @@ if (cbdata.dirused)
       int same;
       size_t len;
       for (same = 0; same < 255; same++)
-	if (old_str[same] != str[same])
+	if (!old_str[same] || !str[same] || old_str[same] != str[same])
 	  break;
       *pp++ = same;
       len = strlen (str + same) + 1;
