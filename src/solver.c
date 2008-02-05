@@ -1582,6 +1582,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
 	    }
 	  queue_push(&solv->learnt_pool, why);
 	  c = solv->rules + why;
+	  dp = c->d ? pool->whatprovidesdata + c->d : 0;
 	  IF_POOLDEBUG (SAT_DEBUG_ANALYZE)
 	    printruleclass(solv, SAT_DEBUG_ANALYZE, c);
 	  for (i = -1; ; i++)
