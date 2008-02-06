@@ -248,7 +248,7 @@ adddepplain(Pool *pool, struct parsedata_common *pd, unsigned int olddeps, char 
       exit(1);
     }
   if (kind)
-    id = str2id(pool, join(pd, kind, ":", sp[0]), 1);
+    id = str2id(pool, join2(kind, ":", sp[0]), 1);
   else
     id = str2id(pool, sp[0], 1);
   if (i == 3)
@@ -604,7 +604,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_NAME:
       if ( pd->kind )
-          s->name = str2id(pool, join(&pd->common, pd->kind, ":", pd->content), 1);
+          s->name = str2id(pool, join2( pd->kind, ":", pd->content), 1);
       else
           s->name = str2id(pool, pd->content, 1);
       break;

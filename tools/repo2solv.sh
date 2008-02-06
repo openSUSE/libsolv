@@ -68,6 +68,15 @@ elif test -d suse/setup/descr && test -s content; then
       cat packages
     fi
 
+    # First packages
+    if test -s packages.en.gz; then
+      gzip -dc packages.en.gz
+    elif test -s packages.en.bz2; then
+      bzip2 -dc packages.en.bz2
+    elif test -s packages.en; then
+      cat packages.en
+    fi
+
     # XXX need to do something with packages.DU and packages.{lang}
 
     # Now patterns.  Not simply those files matching *.pat{,.gz,bz2},
@@ -82,7 +91,7 @@ elif test -d suse/setup/descr && test -s content; then
 	esac
       done
     fi
-  ) | susetags2solv > $filepack
+  ) | susetags2solv -a > $filepack
   cd "$olddir"
   content2solv < content > $filecont
   mergesolv $filecont $filepack

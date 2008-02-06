@@ -95,44 +95,44 @@ join2(const char *s1, const char *s2, const char *s3)
   return _join_tmp;
 }
 
-static char *
-join(struct parsedata_common *pd, const char *s1, const char *s2, const char *s3)
-{
-  int l = 1;
-  char *p;
-
-  if (s1)
-    l += strlen(s1);
-  if (s2)
-    l += strlen(s2);
-  if (s3)
-    l += strlen(s3);
-  if (l > pd->tmpl)
-    {
-      pd->tmpl = l + 256;
-      if (!pd->tmp)
-        pd->tmp = malloc(pd->tmpl);
-      else
-        pd->tmp = realloc(pd->tmp, pd->tmpl);
-    }
-  p = pd->tmp;
-  if (s1)
-    {
-      strcpy(p, s1);
-      p += strlen(s1);
-    }
-  if (s2)
-    {
-      strcpy(p, s2);
-      p += strlen(s2);
-    }
-  if (s3)
-    {
-      strcpy(p, s3);
-      p += strlen(s3);
-    }
-  return pd->tmp;
-}
+// static char *
+// join(struct parsedata_common *pd, const char *s1, const char *s2, const char *s3)
+// {
+//   int l = 1;
+//   char *p;
+// 
+//   if (s1)
+//     l += strlen(s1);
+//   if (s2)
+//     l += strlen(s2);
+//   if (s3)
+//     l += strlen(s3);
+//   if (l > pd->tmpl)
+//     {
+//       pd->tmpl = l + 256;
+//       if (!pd->tmp)
+//         pd->tmp = malloc(pd->tmpl);
+//       else
+//         pd->tmp = realloc(pd->tmp, pd->tmpl);
+//     }
+//   p = pd->tmp;
+//   if (s1)
+//     {
+//       strcpy(p, s1);
+//       p += strlen(s1);
+//     }
+//   if (s2)
+//     {
+//       strcpy(p, s2);
+//       p += strlen(s2);
+//     }
+//   if (s3)
+//     {
+//       strcpy(p, s3);
+//       p += strlen(s3);
+//     }
+//   return pd->tmp;
+// }
 
 // packages
 static Id id_authors;

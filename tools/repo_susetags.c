@@ -44,7 +44,7 @@ static char *flagtab[] = {
 };
 
 static unsigned int
-adddep(Pool *pool, struct parsedata_common *pd, unsigned int olddeps, char *line, Id marker, char *kind)
+adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker, char *kind)
 {
   int i, flags;
   Id id, evrid;
@@ -57,7 +57,7 @@ adddep(Pool *pool, struct parsedata_common *pd, unsigned int olddeps, char *line
       exit(1);
     }
   if (kind)
-    id = str2id(pool, join(pd, kind, ":", sp[0]), 1);
+    id = str2id(pool, join2(kind, ":", sp[0]), 1);
   else
     id = str2id(pool, sp[0], 1);
   if (i == 3)
@@ -479,10 +479,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      exit(1);
 	    }
 	  if (pd.kind)
-	    s->name = str2id(pool, join(&pd.common, pd.kind, ":", sp[0]), 1);
+	    s->name = str2id(pool, join2(pd.kind, ":", sp[0]), 1);
 	  else
 	    s->name = str2id(pool, sp[0], 1);
-	  s->evr = makeevr(pool, join(&pd.common, sp[1], "-", sp[2]));
+	  s->evr = makeevr(pool, join2(sp[1], "-", sp[2]));
 	  s->arch = str2id(pool, sp[3], 1);
 	  s->vendor = vendor;
 	  continue;
@@ -505,10 +505,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    }
 	  s = 0;
 	  if (pd.kind)
-	    name = str2id(pool, join(&pd.common, pd.kind, ":", sp[0]), 0);
+	    name = str2id(pool, join2(pd.kind, ":", sp[0]), 0);
 	  else
 	    name = str2id(pool, sp[0], 0);
-	  evr = makeevr(pool, join(&pd.common, sp[1], "-", sp[2]));
+	  evr = makeevr(pool, join2(sp[1], "-", sp[2]));
 	  arch = str2id(pool, sp[3], 0);
 	  /* If we found neither the name nor the arch at all in this repo
 	     there's no chance of finding the exact solvable either.  */
@@ -544,43 +544,43 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
       switch (tag)
         {
 	  case CTAG('=', 'P', 'r', 'v'):
-	    s->provides = adddep(pool, &pd.common, s->provides, line, 0, pd.kind);
+	    s->provides = adddep(pool, &pd, s->provides, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'R', 'e', 'q'):
-	    s->requires = adddep(pool, &pd.common, s->requires, line, -SOLVABLE_PREREQMARKER, pd.kind);
+	    s->requires = adddep(pool, &pd, s->requires, line, -SOLVABLE_PREREQMARKER, pd.kind);
 	    continue;
           case CTAG('=', 'P', 'r', 'q'):
 	    if (pd.kind)
-	      s->requires = adddep(pool, &pd.common, s->requires, line, 0, 0);
+	      s->requires = adddep(pool, &pd, s->requires, line, 0, 0);
 	    else
-	      s->requires = adddep(pool, &pd.common, s->requires, line, SOLVABLE_PREREQMARKER, 0);
+	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0);
 	    continue;
 	  case CTAG('=', 'O', 'b', 's'):
-	    s->obsoletes = adddep(pool, &pd.common, s->obsoletes, line, 0, pd.kind);
+	    s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'C', 'o', 'n'):
-	    s->conflicts = adddep(pool, &pd.common, s->conflicts, line, 0, pd.kind);
+	    s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'R', 'e', 'c'):
-	    s->recommends = adddep(pool, &pd.common, s->recommends, line, 0, pd.kind);
+	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'S', 'u', 'p'):
-	    s->supplements = adddep(pool, &pd.common, s->supplements, line, 0, pd.kind);
+	    s->supplements = adddep(pool, &pd, s->supplements, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'E', 'n', 'h'):
-	    s->enhances = adddep(pool, &pd.common, s->enhances, line, 0, pd.kind);
+	    s->enhances = adddep(pool, &pd, s->enhances, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'S', 'u', 'g'):
-	    s->suggests = adddep(pool, &pd.common, s->suggests, line, 0, pd.kind);
+	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'F', 'r', 'e'):
-	    s->freshens = adddep(pool, &pd.common, s->freshens, line, 0, pd.kind);
+	    s->freshens = adddep(pool, &pd, s->freshens, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'P', 'r', 'c'):
-	    s->recommends = adddep(pool, &pd.common, s->recommends, line, 0, 0);
+	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 's', 'g'):
-	    s->suggests = adddep(pool, &pd.common, s->suggests, line, 0, 0);
+	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
 	    continue;
 	}
       if (!with_attr)
@@ -589,15 +589,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
         {
           case CTAG('=', 'G', 'r', 'p'):
 	    repodata_set_poolstr(data, last_found_pack, id_group, line + 6);
-#if 0
-	    add_attr_localids_id (attr, last_found_pack, id_group, str2localid (attr, line + 6, 1));
-#endif
 	    continue;
           case CTAG('=', 'L', 'i', 'c'):
 	    repodata_set_poolstr(data, last_found_pack, id_license, line + 6);
-#if 0
-	    add_attr_localids_id (attr, last_found_pack, id_license, str2localid (attr, line + 6, 1));
-#endif
 	    continue;
           case CTAG('=', 'L', 'o', 'c'):
 	    add_location(&pd, line + 6, s, last_found_pack);
@@ -612,10 +606,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      {
 		repodata_set_num(data, last_found_pack, id_downloadsize, (atoi(sp[0]) + 1023) / 1024);
 		repodata_set_num(data, last_found_pack, id_installsize, (atoi(sp[1]) + 1023) / 1024);
-#if 0
-	        add_attr_int (attr, last_found_pack, id_downloadsize, (atoi (sp[0]) + 1023) / 1024);
-	        add_attr_int (attr, last_found_pack, id_installsize, (atoi (sp[1]) + 1023) / 1024);
-#endif
 	      }
 	    continue;
           case CTAG('=', 'T', 'i', 'm'):
@@ -623,62 +613,30 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      unsigned int t = atoi (line + 6);
 	      if (t)
 		{
-#if 0
-	          add_attr_int (attr, last_found_pack, id_time, t);
-#else
 		  repodata_set_num(data, last_found_pack, id_time, t);
-#endif
 		}
 	    }
 	    continue;
           case CTAG('=', 'K', 'w', 'd'):
-#if 0
-	    add_attr_localids_id (attr, last_found_pack, id_keywords, str2localid (attr, line + 6, 1));
-#else
 	    repodata_set_poolstr(data, last_found_pack, id_keywords, line + 6);
-#endif
 	    continue;
           case CTAG('=', 'A', 'u', 't'):
-#if 0
-	    add_attr_blob (attr, last_found_pack, id_authors, line + 6, strlen (line + 6) + 1);
-#else
 	    repodata_set_str(data, last_found_pack, id_authors, line + 6);
-#endif
 	    continue;
           case CTAG('=', 'S', 'u', 'm'):
-#if 0
-	    add_attr_string (attr, last_found_pack, id_summary, line + 6);
-#else
-	    repodata_set_str(data, last_found_pack, id_summary, line + 6);
-#endif
+      repodata_set_str(data, last_found_pack, id_summary, line + 6);
 	    continue;
           case CTAG('=', 'D', 'e', 's'):
-#if 0
-	    add_attr_blob (attr, last_found_pack, id_description, line + 6, strlen (line + 6) + 1);
-#else
 	    repodata_set_str(data, last_found_pack, id_description, line + 6);
-#endif
 	    continue;
           case CTAG('=', 'E', 'u', 'l'):
-#if 0
-	    add_attr_blob (attr, last_found_pack, id_eula, line + 6, strlen (line + 6) + 1);
-#else
 	    repodata_set_str(data, last_found_pack, id_eula, line + 6);
-#endif
 	    continue;
           case CTAG('=', 'I', 'n', 's'):
-#if 0
-	    add_attr_blob (attr, last_found_pack, id_messageins, line + 6, strlen (line + 6) + 1);
-#else
 	    repodata_set_str(data, last_found_pack, id_messageins, line + 6);
-#endif
 	    continue;
           case CTAG('=', 'D', 'e', 'l'):
-#if 0
-	    add_attr_blob (attr, last_found_pack, id_messagedel, line + 6, strlen (line + 6) + 1);
-#else
 	    repodata_set_str(data, last_found_pack, id_messagedel, line + 6);
-#endif
 	    continue;
 #if 1
           case CTAG('=', 'S', 'h', 'r'):
@@ -741,7 +699,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      }
 
 	    Id name = str2id(pool, sp[0], 1);
-	    Id evr = makeevr(pool, join(&pd.common, sp[1], "-", sp[2]));
+	    Id evr = makeevr(pool, join2(sp[1], "-", sp[2]));
 	    Id arch = str2id(pool, sp[3], 1);
 	    unsigned n, nn;
 	    Solvable *found = 0;
