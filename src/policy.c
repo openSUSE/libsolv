@@ -22,7 +22,7 @@
 #include "poolarch.h"
 
 
-static Pool *prune_best_version_arch_sortcmp_data;
+static Solver *prune_best_version_arch_sortcmp_data;
 
 /*-----------------------------------------------------------------*/
 
@@ -34,7 +34,8 @@ static Pool *prune_best_version_arch_sortcmp_data;
 static int
 prune_best_version_arch_sortcmp(const void *ap, const void *bp)
 {
-  Pool *pool = prune_best_version_arch_sortcmp_data;
+  Solver *solv = prune_best_version_arch_sortcmp_data;
+  Pool *pool = solv->pool;
   int r;
   Id a = *(Id *)ap;
   Id b = *(Id *)bp;
@@ -46,7 +47,7 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
        * is not depending on some random solvable order */
       na = id2str(pool, pool->solvables[a].name);
       nb = id2str(pool, pool->solvables[b].name);
-      /* bring selections and patterns to the front */
+      /* bring patterns to the front */
       if (!strncmp(na, "pattern:", 8))
 	{
           if (strncmp(nb, "pattern:", 8))
@@ -57,17 +58,17 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
           if (strncmp(na, "pattern:", 8))
 	    return 1;
 	}
-      if (!strncmp(na, "selection:", 10))
-	{
-          if (strncmp(nb, "selection:", 10))
-	    return -1;
-	}
-      else if (!strncmp(nb, "selection:", 10))
-	{
-          if (strncmp(na, "selection:", 10))
-	    return 1;
-	}
       return strcmp(na, nb);
+    } else {
+	/* the same name */
+	if ( pool->solvables[a].evr == pool->solvables[b].evr)
+	{
+	    /* prefer installed solvables first */
+	    if (solv->installed && pool->solvables[a].repo == solv->installed)
+		return -1;
+	    if (solv->installed && pool->solvables[b].repo == solv->installed)
+		return 1;	
+	}
     }
   return a - b;
 }
@@ -211,11 +212,10 @@ prune_to_best_arch(Pool *pool, Queue *plist)
  *
  */
 
-/* FIXME: should prefer installed if identical version */
-
 static void
-prune_to_best_version(Pool *pool, Queue *plist)
+prune_to_best_version(Solver *solv, Queue *plist)
 {
+  Pool *pool = solv->pool;
   Id best = ID_NULL;
   int i, j;
   Solvable *s;
@@ -224,8 +224,8 @@ prune_to_best_version(Pool *pool, Queue *plist)
     return;
   POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
 
-  prune_best_version_arch_sortcmp_data = pool;
-  /* sort by name first */
+  prune_best_version_arch_sortcmp_data = solv;
+  /* sort by name first, prefer installed */
   qsort(plist->elements, plist->count, sizeof(Id), prune_best_version_arch_sortcmp);
 
   /* delete obsoleted. hmm, looks expensive! */
@@ -264,7 +264,9 @@ prune_to_best_version(Pool *pool, Queue *plist)
     {
       s = pool->solvables + plist->elements[i];
 
-      POOL_DEBUG(SAT_DEBUG_POLICY, "- %s\n", solvable2str(pool, s));
+      POOL_DEBUG(SAT_DEBUG_POLICY, "- %s[%s]\n",
+		 solvable2str(pool, s),
+		 (solv->installed && s->repo == solv->installed) ? "installed" : "not installed");
 
       if (!best)		       /* if no best yet, the current is best */
         {
@@ -306,7 +308,7 @@ prune_best_version_arch(Solver *solv, Pool *pool, Queue *plist)
   if (plist->count > 1)
     prune_to_best_arch(pool, plist);
   if (plist->count > 1)
-    prune_to_best_version(pool, plist);
+    prune_to_best_version(solv, plist);
 }
 
 
