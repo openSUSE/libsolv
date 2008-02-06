@@ -556,12 +556,17 @@ repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
   if (data->attrs[entry])
     {
       for (pp = data->attrs[entry]; *pp; pp += 2)
-        if (*pp == keyid)
+	/* Determine equality based on the name only, allows us to change
+	   type (when overwrite is set), and makes TYPE_CONSTANT work.  */
+        if (data->keys[*pp].name == data->keys[keyid].name)
           break;
       if (*pp)
         {
 	  if (overwrite)
-            pp[1] = val;
+	    {
+	      pp[0] = keyid;
+              pp[1] = val;
+	    }
           return;
         }
       i = pp - data->attrs[entry];
