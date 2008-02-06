@@ -101,6 +101,7 @@ typedef struct _Repodata {
 
 void repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
 const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);
+int repodata_lookup_num(Repodata *data, Id entry, Id keyid);
 
 void repodata_extend(Repodata *data, Id p);
 

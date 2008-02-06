@@ -430,6 +430,34 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
   return id2str(data->repo->pool, id);
 }
 
+int
+repodata_lookup_num(Repodata *data, Id entry, Id keyid)
+{
+  Id schema;
+  Repokey *key;
+  Id *keyp;
+  KeyValue kv;
+  unsigned char *dp;
+
+  dp = data->incoredata + data->incoreoffset[entry];
+  dp = data_read_id(dp, &schema);
+  /* make sure the schema of this solvable contains the key */
+  for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
+    if (!*keyp)
+      return 0;
+  dp = forward_to_key(data, keyid, schema, dp);
+  key = data->keys + keyid;
+  dp = get_data(data, key, &dp);
+  if (!dp)
+    return 0;
+  if (key->type == TYPE_NUM || key->type == TYPE_U32)
+  {
+    dp = data_fetch(dp, &kv, key);
+    return kv.num;
+  }
+  return 0;
+}
+
 void
 repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
 {

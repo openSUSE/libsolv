@@ -766,6 +766,28 @@ repo_lookup_str(Solvable *s, Id key)
   return 0;
 }
 
+int
+repo_lookup_num(Solvable *s, Id key)
+{
+  Repo *repo = s->repo;
+  Pool *pool = repo->pool;
+  Repodata *data;
+  int i, j, n;
+
+  n = s - pool->solvables;
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      if (n < data->start || n >= data->end)
+	continue;
+      for (j = 1; j < data->nkeys; j++)
+	{
+	  if (data->keys[j].name == key && (data->keys[j].type == TYPE_U32 || data->keys[j].type == TYPE_NUM))
+	    return repodata_lookup_num(data, n - data->start, j);
+	}
+    }
+  return 0;
+}
+
 Repodata *
 repo_add_repodata(Repo *repo)
 {

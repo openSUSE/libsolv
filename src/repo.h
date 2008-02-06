@@ -163,6 +163,11 @@ typedef struct _KeyValue {
 Repodata *repo_add_repodata(Repo *repo);
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
+/* returns the string value of the attribute, or NULL if not found */
+const char * repo_lookup_str(Solvable *s, Id key);
+/* returns the string value of the attribute, or 0 if not found */
+int repo_lookup_num(Solvable *s, Id key);
+
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
 void repo_set_num(Repo *repo, Id p, Id keyname, Id num);
 void repo_set_str(Repo *repo, Id p, Id keyname, const char *str);
