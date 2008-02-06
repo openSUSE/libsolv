@@ -781,8 +781,15 @@ repo_lookup_num(Solvable *s, Id key)
 	continue;
       for (j = 1; j < data->nkeys; j++)
 	{
-	  if (data->keys[j].name == key && (data->keys[j].type == TYPE_U32 || data->keys[j].type == TYPE_NUM))
-	    return repodata_lookup_num(data, n - data->start, j);
+	  if (data->keys[j].name == key
+	      && (data->keys[j].type == TYPE_U32
+	          || data->keys[j].type == TYPE_NUM
+		  || data->keys[j].type == TYPE_CONSTANT))
+	    {
+	      unsigned value;
+	      if (repodata_lookup_num(data, n - data->start, j, &value))
+	        return value;
+	    }
 	}
     }
   return 0;

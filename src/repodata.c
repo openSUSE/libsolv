@@ -423,7 +423,7 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
     return (const char *)dp;
   if (key->type != TYPE_ID)
     return 0;
-  /* id type, must either use global or local string strore*/
+  /* id type, must either use global or local string store*/
   dp = data_read_id(dp, &id);
   if (data->localpool)
     return data->spool.stringspace + data->spool.strings[id];
@@ -431,7 +431,7 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
 }
 
 int
-repodata_lookup_num(Repodata *data, Id entry, Id keyid)
+repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value)
 {
   Id schema;
   Repokey *key;
@@ -439,6 +439,7 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyid)
   KeyValue kv;
   unsigned char *dp;
 
+  *value = 0;
   dp = data->incoredata + data->incoreoffset[entry];
   dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
@@ -450,11 +451,14 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyid)
   dp = get_data(data, key, &dp);
   if (!dp)
     return 0;
-  if (key->type == TYPE_NUM || key->type == TYPE_U32)
-  {
-    dp = data_fetch(dp, &kv, key);
-    return kv.num;
-  }
+  if (key->type == TYPE_NUM
+      || key->type == TYPE_U32
+      || key->type == TYPE_CONSTANT)
+    {
+      dp = data_fetch(dp, &kv, key);
+      *value = kv.num;
+      return 1;
+    }
   return 0;
 }
 
