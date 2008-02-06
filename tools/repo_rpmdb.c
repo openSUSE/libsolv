@@ -486,7 +486,7 @@ rpm2solv(Pool *pool, Repo *repo, Solvable *s, RpmHead *rpmhead)
   evr = headtoevr(rpmhead);
   s->evr = str2id(pool, evr, 1);
   sat_free(evr);
-  //s->vendor = str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
+  s->vendor = str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
   s->provides = addfileprovides(pool, repo, rpmhead, s->provides);
