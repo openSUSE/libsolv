@@ -1213,7 +1213,7 @@ if (cbdata.dirused)
 
   /* write file header */
   write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
-  write_u32(fp, SOLV_VERSION_5);
+  write_u32(fp, SOLV_VERSION_6);
 
   /* write counts */
   write_u32(fp, nstrings);

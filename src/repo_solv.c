@@ -566,6 +566,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       case SOLV_VERSION_3:
       case SOLV_VERSION_4:
       case SOLV_VERSION_5:
+      case SOLV_VERSION_6:
         break;
       default:
         pool_debug(pool, SAT_ERROR, "unsupported SOLV version\n");
@@ -1097,8 +1098,16 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 	      did = read_id(&data, numid + numrel);
 	      if (idmap)
 		did = idmap[did];
-	      if (id == SOLVABLE_NAME)
+	      if (id == SOLVABLE_NAME) {
 		s->name = did;
+		if (s->name) {
+		  /* Yeah, thats ugly. Better store kind as u8 in .solv files */
+		  const char *name = id2str(pool, s->name);
+		  const char *colon = strchr(name, ':');
+		  if (colon)
+		    s->kind = colon - name + 1;
+		}
+	      }
 	      else if (id == SOLVABLE_ARCH)
 		s->arch = did;
 	      else if (id == SOLVABLE_EVR)

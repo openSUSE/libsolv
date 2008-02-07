@@ -21,7 +21,7 @@
 #include "repo_susetags.h"
 
 struct parsedata {
-  char *kind;
+  solvable_kind kind;
   Repo *repo;
   Repodata *data;
   struct parsedata_common common;
@@ -43,21 +43,27 @@ static char *flagtab[] = {
   "<="
 };
 
+
+/*
+ * adddep
+ * create and add dependency
+ */
+
 static unsigned int
-adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker, char *kind)
+adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker, solvable_kind kind)
 {
   int i, flags;
   Id id, evrid;
   char *sp[4];
 
-  i = split(line + 5, sp, 4);
-  if (i != 1 && i != 3)
+  i = split(line + 5, sp, 4); /* name, ?, evr, ? */
+  if (i != 1 && i != 3) /* expect either 'name' or 'name' '-' 'evr' */
     {
       fprintf(stderr, "Bad dependency line: %s\n", line);
       exit(1);
     }
   if (kind)
-    id = str2id(pool, join2(kind, ":", sp[0]), 1);
+    id = str2id(pool, join2(kind_prefix(kind), sp[0], 0), 1);
   else
     id = str2id(pool, sp[0], 1);
   if (i == 3)
@@ -79,6 +85,11 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 #if 0
 Attrstore *attr;
 #endif
+
+/*
+ * add_location
+ * 
+ */
 
 static void
 add_location(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
@@ -160,6 +171,12 @@ nontrivial:
 }
 
 #if 0
+
+/*
+ * add_source
+ * 
+ */
+
 static void
 add_source(struct parsedata *pd, char *line, Solvable *s, unsigned entry, int first)
 {
@@ -236,6 +253,12 @@ add_source(struct parsedata *pd, char *line, Solvable *s, unsigned entry, int fi
 }
 #endif
 
+/*
+ * add_dirline
+ * add a line with directory information
+ * 
+ */
+
 static void
 add_dirline (struct parsedata *pd, char *line)
 {
@@ -260,6 +283,13 @@ fprintf(stderr, "%s -> %d\n", sp[0], dirid);
   pd->ndirs++;
 }
 
+
+/*
+ * id3_cmp
+ * compare 
+ * 
+ */
+
 static int
 id3_cmp (const void *v1, const void *v2)
 {
@@ -267,6 +297,12 @@ id3_cmp (const void *v1, const void *v2)
   Id *i2 = (Id*)v2;
   return i1[0] - i2[0];
 }
+
+
+/*
+ * commit_diskusage
+ * 
+ */
 
 static void
 commit_diskusage (struct parsedata *pd, unsigned entry)
@@ -340,12 +376,24 @@ commit_diskusage (struct parsedata *pd, unsigned entry)
  | ((unsigned char)c << 8) \
  | ((unsigned char)d))
 
+/*
+ * tag_from_string
+ * 
+ */
+
 static inline unsigned
 tag_from_string (char *cs)
 {
   unsigned char *s = (unsigned char*) cs;
   return ((s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3]);
 }
+
+
+/*
+ * repo_add_susetags
+ * Parse susetags file passed in fp, fill solvables into repo
+ * 
+ */
 
 void
 repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
@@ -377,8 +425,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   line = malloc(1024);
   aline = 1024;
 
-  pd.repo = repo;
+  pd.repo = pd.common.repo = repo;
   pd.data = data;
+  pd.common.pool = pool;
 
   linep = line;
   s = 0;
@@ -456,6 +505,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
       if (! (line[0] && line[1] && line[2] && line[3] && line[4] == ':'))
         continue;
       tag = tag_from_string (line);
+
+      /* first appearance of solvable data,
+       * create the solvable
+       */
+      
       if (indesc < 2
           && (tag == CTAG('=', 'P', 'k', 'g')
 	      || tag == CTAG('=', 'P', 'a', 't')))
@@ -466,9 +520,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
 	  if (s && pd.ndirs)
 	    commit_diskusage (&pd, last_found_pack);
-	  pd.kind = 0;
+	  pd.kind = KIND_PACKAGE;
 	  if (line[3] == 't')
-	    pd.kind = "pattern";
+	    pd.kind = KIND_PATTERN;
 	  s = pool_id2solvable(pool, repo_add_solvable(repo));
 	  last_found_pack = (s - pool->solvables) - repo->start;
 	  if (data)
@@ -478,8 +532,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      fprintf(stderr, "Bad line: %s\n", line);
 	      exit(1);
 	    }
+	  s->kind = pd.kind;
 	  if (pd.kind)
-	    s->name = str2id(pool, join2(pd.kind, ":", sp[0]), 1);
+	    s->name = str2id(pool, join2(kind_prefix(pd.kind), sp[0], 0), 1);
 	  else
 	    s->name = str2id(pool, sp[0], 1);
 	  s->evr = makeevr(pool, join2(sp[1], "-", sp[2]));
@@ -487,6 +542,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	  s->vendor = vendor;
 	  continue;
 	}
+      
+      /* Shared or Dirinfo appearance of solvable
+       */
       if (indesc >= 2
           && (tag == CTAG('=', 'P', 'k', 'g')
 	      || tag == CTAG('=', 'P', 'a', 't')))
@@ -495,9 +553,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    commit_diskusage (&pd, last_found_pack);
 	  Id name, evr, arch;
 	  int n, nn;
-	  pd.kind = 0;
+	  pd.kind = KIND_PACKAGE;
 	  if (line[3] == 't')
-	    pd.kind = "pattern";
+	    pd.kind = KIND_PATTERN;
           if (split(line + 5, sp, 5) != 4)
 	    {
 	      fprintf(stderr, "Bad line: %s\n", line);
@@ -505,7 +563,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    }
 	  s = 0;
 	  if (pd.kind)
-	    name = str2id(pool, join2(pd.kind, ":", sp[0]), 0);
+	    name = str2id(pool, join2(kind_prefix(pd.kind), sp[0], 0), 0);
 	  else
 	    name = str2id(pool, sp[0], 0);
 	  evr = makeevr(pool, join2(sp[1], "-", sp[2]));
@@ -551,7 +609,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    continue;
           case CTAG('=', 'P', 'r', 'q'):
 	    if (pd.kind)
-	      s->requires = adddep(pool, &pd, s->requires, line, 0, 0);
+	      s->requires = adddep(pool, &pd, s->requires, line, 0, 0); /* Huh? No PreReq for non-packages ? */
 	    else
 	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0);
 	    continue;
