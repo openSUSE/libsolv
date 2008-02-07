@@ -1,8 +1,11 @@
+rm *.tar.bz2
 svn export http://svn.opensuse.org/svn/zypp/trunk/sat-solver
 rm -rf sat-solver/testsuite
 cd sat-solver
-cmake .
+mkdir build
+cd build
+cmake ..
 make srcpackage_local
-cp package/*es package/*ec package/*tar.bz2 ..
-cd ..
+cp package/*es package/*ec package/*tar.bz2 ../..
+cd ../..
 rm -rf sat-solver
