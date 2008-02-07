@@ -170,7 +170,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
     plist->count = j;
 }
 
-static void
+void
 prune_to_best_arch(Pool *pool, Queue *plist)
 {
   Id a, bestscore;
@@ -212,7 +212,7 @@ prune_to_best_arch(Pool *pool, Queue *plist)
  *
  */
 
-static void
+void
 prune_to_best_version(Solver *solv, Queue *plist)
 {
   Pool *pool = solv->pool;
@@ -296,9 +296,8 @@ prune_to_best_version(Solver *solv, Queue *plist)
   plist->count = j;
 }
 
-/* legacy, do not use anymore! */
 void
-prune_best_version_arch(Solver *solv, Pool *pool, Queue *plist)
+prune_best_arch_name_version(Solver *solv, Pool *pool, Queue *plist)
 {
   if (solv && solv->bestSolvableCb)
      {   /* The application is responsible for */
@@ -324,7 +323,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode)
   if (inst)
     queue_push(plist, inst);
 
-  prune_best_version_arch (solv, pool, plist);
+  prune_best_arch_name_version (solv, pool, plist);
 }
 
 
