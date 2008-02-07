@@ -121,7 +121,8 @@ typedef struct solver {
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
-
+  solvable_kind limittokind;
+  
   /* Callbacks for defining the bahaviour of the SAT solver */
 
   /* Finding best candidate

@@ -2116,6 +2116,16 @@ solver_create(Pool *pool, Repo *installed)
   solv->rules = sat_extend_resize(solv->rules, solv->nrules, sizeof(Rule), RULES_BLOCK);
   memset(solv->rules, 0, sizeof(Rule));
 
+  /* cannot be zero by default since zero corresponds to KIND_PACKAGE
+   * so we initialize it with _KIND_MAX to denote 'all kinds'
+   * if the application sets this to a specific KIND_, the value is
+   * incremented by 1 at solver start to make 'if (limittokind)' checks easy
+   *
+   * A sure candidate for a more clever implementation
+   */
+  
+  solv->limittokind = _KIND_MAX;
+
   return solv;
 }
 
@@ -2563,7 +2573,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
   queue_empty(refined);
   queue_push(refined, sug);
 
-  /* re-enable all problem rules with the exception of "sug" */
+  /* re-enable all problem rules with the exception of "sug"(gests) */
   revert(solv, 1);
   reset_solver(solv);
 
@@ -3471,6 +3481,11 @@ solver_solve(Solver *solv, Queue *job)
   Queue q;
   Solvable *s;
 
+  if (solv->limittokind != _KIND_MAX)  /* if application wants to limit, make it non-zero */
+    solv->limittokind += 1;
+  else
+    solv->limittokind = 0;
+  
   /* create whatprovides if not already there */
   if (!pool->whatprovides)
     pool_createwhatprovides(pool);
