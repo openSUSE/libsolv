@@ -9,6 +9,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
 BuildRequires:  cmake db43-devel gcc-c++ libexpat-devel ruby-devel swig
 Summary:        A new approach to package dependency solving
+Requires:       satsolver-tools
 
 %description
 A new approach to package dependency solving
@@ -21,7 +22,7 @@ Authors:
 %package devel
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
-Requires:       libsatsolver = %version
+Requires:       satsolver-tools = %version
 
 %description devel
 A new approach to package dependency solving
@@ -37,6 +38,13 @@ Group:          Development/Languages/Ruby
 
 %description ruby
 .
+
+%package -n satsolver-tools
+Summary:        A new approach to package dependency solving
+Group:          Development/Libraries/C and C++
+
+%description -n satsolver-tools
+. 
 
 %prep
 %setup -n satsolver-%{version}
@@ -62,7 +70,7 @@ rm -rf $RPM_BUILD_ROOT/usr/lib/perl5
 %clean
 rm -rf "$RPM_BUILD_ROOT"
 
-%files
+%files -n satsolver-tools
 %defattr(-,root,root)
 %doc LICENSE*
 /usr/bin/*
