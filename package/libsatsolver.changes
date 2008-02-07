@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Feb  7 18:41:05 CET 2008 - coolo@suse.de
+
+- rename libsatsolver in satsolver-tools
+- several updates and fixes
+
+-------------------------------------------------------------------
 Mon Jan 14 17:14:03 CET 2008 - coolo@suse.de
 
 - update from SVN:
