@@ -73,6 +73,34 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
   return a - b;
 }
 
+
+/*
+ * prune queue, only keep solvables of kind
+ * 
+ */
+
+static void
+prune_to_kind(Pool *pool, Queue *plist, solvable_kind kind)
+{
+  int i, j;
+  Solvable *s;
+
+  /* prune to highest priority */
+  for (i = j = 0; i < plist->count; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+      if (s->kind == kind)
+	plist->elements[j++] = plist->elements[i];
+    }
+  plist->count = j;
+}
+
+
+/*
+ * prune to repository with highest priority
+ * 
+ */
+
 static void
 prune_to_highest_prio(Pool *pool, Queue *plist)
 {
@@ -81,13 +109,13 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
   int bestprio = 0;
 
   /* prune to highest priority */
-  for (i = 0; i < plist->count; i++)
+  for (i = 0; i < plist->count; i++)  /* find highest prio in queue */
     {
       s = pool->solvables + plist->elements[i];
       if (i == 0 || s->repo->priority > bestprio)
 	bestprio = s->repo->priority;
     }
-  for (i = j = 0; i < plist->count; i++)
+  for (i = j = 0; i < plist->count; i++) /* remove all with lower prio */
     {
       s = pool->solvables + plist->elements[i];
       if (s->repo->priority == bestprio)
@@ -96,12 +124,14 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
   plist->count = j;
 }
 
+
 /*
  * prune_to_recommended
  *
  * XXX: should we prune to requires/suggests that are already
  * fulfilled by other packages?
  */
+
 static void
 prune_to_recommended(Solver *solv, Queue *plist)
 {
@@ -296,6 +326,11 @@ prune_to_best_version(Solver *solv, Queue *plist)
   plist->count = j;
 }
 
+
+/* legacy, do not use anymore!
+ * (rates arch higher than version, but thats a policy)
+ */
+
 void
 prune_best_arch_name_version(Solver *solv, Pool *pool, Queue *plist)
 {
@@ -315,6 +350,8 @@ void
 policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode)
 {
   Pool *pool = solv->pool;
+  if (plist->count > 1 && solv->limittokind)
+    prune_to_kind(pool, plist, solv->limittokind-1);
   if (plist->count > 1 && mode != POLICY_MODE_SUGGEST)
     prune_to_highest_prio(pool, plist);
   if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)
