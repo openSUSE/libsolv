@@ -1,0 +1,8 @@
+svn export http://svn.opensuse.org/svn/zypp/trunk/sat-solver
+rm -rf sat-solver/testsuite
+cd sat-solver
+cmake .
+make srcpackage_local
+cp package/*es package/*ec package/*tar.bz2 ..
+cd ..
+rm -rf sat-solver
