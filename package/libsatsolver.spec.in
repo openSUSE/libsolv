@@ -54,7 +54,7 @@ make %{?jobs:-j %jobs}
 %install
 make DESTDIR=$RPM_BUILD_ROOT install
 # we want to leave the .a file untouched
-export NO_BRP_STRIP_DEBUG=yes
+export NO_BRP_STRIP_DEBUG=true
 
 # remove the perl bindings for now
 rm -rf $RPM_BUILD_ROOT/usr/lib/perl5
