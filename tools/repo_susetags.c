@@ -506,53 +506,28 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
         continue;
       tag = tag_from_string (line);
 
-      /* first appearance of solvable data,
-       * create the solvable
-       */
-      
-      if (indesc < 2
-          && (tag == CTAG('=', 'P', 'k', 'g')
-	      || tag == CTAG('=', 'P', 'a', 't')))
+
+      if ((tag == CTAG('=', 'P', 'k', 'g')
+	   || tag == CTAG('=', 'P', 'a', 't')))
 	{
-	  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-	  if (s)
-	    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
-	  if (s && pd.ndirs)
-	    commit_diskusage (&pd, last_found_pack);
-	  pd.kind = KIND_PACKAGE;
-	  if (line[3] == 't')
-	    pd.kind = KIND_PATTERN;
-	  s = pool_id2solvable(pool, repo_add_solvable(repo));
-	  last_found_pack = (s - pool->solvables) - repo->start;
-	  if (data)
-            repodata_extend(data, s - pool->solvables);
-          if (split(line + 5, sp, 5) != 4)
-	    {
-	      fprintf(stderr, "Bad line: %s\n", line);
-	      exit(1);
-	    }
-	  s->kind = pd.kind;
-	  if (pd.kind)
-	    s->name = str2id(pool, join2(kind_prefix(pd.kind), sp[0], 0), 1);
-	  else
-	    s->name = str2id(pool, sp[0], 1);
-	  s->evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-	  s->arch = str2id(pool, sp[3], 1);
-	  s->vendor = vendor;
-	  continue;
-	}
-      
-      /* Shared or Dirinfo appearance of solvable
-       */
-      if (indesc >= 2
-          && (tag == CTAG('=', 'P', 'k', 'g')
-	      || tag == CTAG('=', 'P', 'a', 't')))
-	{
-	  if (s && pd.ndirs)
-	    commit_diskusage (&pd, last_found_pack);
 	  Id name, evr, arch;
-	  int n, nn;
+	  /* If we have an old solvable, complete it by filling in some
+	     default stuff.  */
+	  if (s)
+	    {
+	      /* A self provide, except for source packages.  This is harmless
+	         to do twice (in case we see the same package twice).  */
+	      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+	        s->provides = repo_addid_dep(repo, s->provides,
+					     rel2id(pool, s->name, s->evr,
+						    REL_EQ, 1), 0);
+	      /* XXX This uses repo_addid_dep internally, so should also be
+	         harmless to do twice.  */
+	      s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
+	      if (pd.ndirs)
+		commit_diskusage (&pd, last_found_pack);
+	    }
+
 	  pd.kind = KIND_PACKAGE;
 	  if (line[3] == 't')
 	    pd.kind = KIND_PATTERN;
@@ -561,36 +536,64 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      fprintf(stderr, "Bad line: %s\n", line);
 	      exit(1);
 	    }
-	  s = 0;
+	  /* Lookup (but don't construct) the name and arch.  */
 	  if (pd.kind)
 	    name = str2id(pool, join2(kind_prefix(pd.kind), sp[0], 0), 0);
 	  else
 	    name = str2id(pool, sp[0], 0);
-	  evr = makeevr(pool, join2(sp[1], "-", sp[2]));
 	  arch = str2id(pool, sp[3], 0);
-	  /* If we found neither the name nor the arch at all in this repo
+	  evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+
+	  s = 0;
+
+	  /* Now see if we know this solvable already.  If we found neither
+	     the name nor the arch at all in this repo
 	     there's no chance of finding the exact solvable either.  */
-	  if (!name || !arch)
-	    continue;
-	  /* Now look for a solvable with the given name,evr,arch.
-	     Our input is structured so, that the second set of =Pkg
-	     lines comes in roughly the same order as the first set, so we 
-	     have a hint at where to start our search, namely were we found
-	     the last entry.  */
-	  for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
+	  if (indesc >= 2 && name && arch)
 	    {
-	      if (nn >= repo->end)
-	        nn = repo->start;
-	      s = pool->solvables + nn;
-	      if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
-	        break;
+	      int n, nn;
+	      /* Now look for a solvable with the given name,evr,arch.
+	         Our input is structured so, that the second set of =Pkg
+		 lines comes in roughly the same order as the first set, so we 
+		 have a hint at where to start our search, namely were we found
+		 the last entry.  */
+	      for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
+	        {
+	          if (nn >= repo->end)
+	            nn = repo->start;
+	          s = pool->solvables + nn;
+	          if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
+	            break;
+	        }
+	      if (n == repo->end)
+	        s = 0;
+	      else
+	        last_found_pack = nn - repo->start;
 	    }
-	  if (n == repo->end)
-	    s = 0;
-	  else
-	    last_found_pack = nn - repo->start;
-	  continue;
+
+	  /* And if we still don't have a solvable, create a new one.  */
+	  if (!s)
+	    {
+	      s = pool_id2solvable(pool, repo_add_solvable(repo));
+	      last_found_pack = (s - pool->solvables) - repo->start;
+	      if (data)
+		repodata_extend(data, s - pool->solvables);
+	      s->kind = pd.kind;
+	      if (name)
+	        s->name = name;
+	      else if (pd.kind)
+		s->name = str2id(pool, join2(kind_prefix(pd.kind), sp[0], 0), 1);
+	      else
+		s->name = str2id(pool, sp[0], 1);
+	      s->evr = evr;
+	      if (arch)
+	        s->arch = arch;
+	      else
+	        s->arch = str2id(pool, sp[3], 1);
+	      s->vendor = vendor;
+	    }
 	}
+
       /* If we have no current solvable to add to, ignore all further lines
          for it.  Probably invalid input data in the second set of
 	 solvables.  */
@@ -682,7 +685,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    repodata_set_str(data, last_found_pack, id_authors, line + 6);
 	    continue;
           case CTAG('=', 'S', 'u', 'm'):
-      repodata_set_str(data, last_found_pack, id_summary, line + 6);
+	    repodata_set_str(data, last_found_pack, id_summary, line + 6);
 	    continue;
           case CTAG('=', 'D', 'e', 's'):
 	    repodata_set_str(data, last_found_pack, id_description, line + 6);
@@ -696,7 +699,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
           case CTAG('=', 'D', 'e', 'l'):
 	    repodata_set_str(data, last_found_pack, id_messagedel, line + 6);
 	    continue;
-#if 1
           case CTAG('=', 'S', 'h', 'r'):
 	    if (last_found_pack >= pd.nshare)
 	      {
@@ -711,7 +713,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	      }
 	    pd.share_with[last_found_pack] = strdup (line + 6);
 	    continue;
-#endif
 	  case CTAG('=', 'D', 'i', 'r'):
 	    add_dirline (&pd, line + 6);
 	    continue;
