@@ -140,7 +140,7 @@ static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int
 
 #define SEARCH_NEXT_KEY         1
 #define SEARCH_NEXT_SOLVABLE    2
-#define SEACH_STOP              3
+#define SEARCH_STOP             3
 
 typedef struct _KeyValue {
   Id id;
