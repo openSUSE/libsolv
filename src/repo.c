@@ -489,10 +489,10 @@ repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValu
 	{
 	case TYPE_ID:
 	case TYPE_IDARRAY:
-	  if (data->localpool)
+	  if (data && data->localpool)
 	    kv->str = stringpool_id2str(&data->spool, kv->id);
 	  else
-	    kv->str = id2str(data->repo->pool, kv->id);
+	    kv->str = id2str(s->repo->pool, kv->id);
 	  break;
 	case TYPE_STR:
 	  break;
