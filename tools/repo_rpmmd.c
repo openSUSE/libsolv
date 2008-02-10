@@ -30,6 +30,10 @@ enum state {
   STATE_ARCH,
   STATE_VERSION,
 
+  // package rpm-md
+  STATE_LOCATION,
+  STATE_CHECKSUM,
+
   /* resobject attributes */
   STATE_SUMMARY,
   STATE_DESCRIPTION,
@@ -133,6 +137,10 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
   { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
   { STATE_SOLVABLE,    "version",         STATE_VERSION, 0 },
+
+  // package attributes rpm-md
+  { STATE_SOLVABLE,    "location",            STATE_LOCATION, 0 },
+  { STATE_SOLVABLE,    "checksum",         STATE_CHECKSUM, 1 },
   
   /* resobject attributes */
 
@@ -214,10 +222,14 @@ struct parsedata {
   int docontent;
   int numpacks;
   Solvable *solvable;
+  Id lastsolvableid;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
   const char *lang;
   const char *capkind;
+  // used to store tmp attributes
+  // while the tag ends
+  const char *tmpattr;
   Repodata *data;
 };
 
@@ -451,18 +463,18 @@ startElement(void *userData, const char *name, const char **atts)
     {
     case STATE_METADATA:
       for (; *atts; atts += 2)
-	{
-	  if (!strcmp(*atts, "packages"))
-	    {
-	      pd->numpacks = atoi(atts[1]);
-	      if (pd->numpacks < 0)
-		pd->numpacks = 0;
+      {
+        if (!strcmp(*atts, "packages"))
+        {
+          pd->numpacks = atoi(atts[1]);
+          if (pd->numpacks < 0)
+            pd->numpacks = 0;
 #if 0
 	      fprintf(stderr, "numpacks: %d\n", pd->numpacks);
 #endif
-	      pd->solvable = pool_id2solvable(pool, repo_add_solvable_block(pd->common.repo, pd->numpacks));
-	    }
-	}
+            pd->solvable = pool_id2solvable(pool, repo_add_solvable_block(pd->common.repo, pd->numpacks));
+        }
+      }
       break;
     case STATE_SOLVABLE:
       pd->kind = 0;
@@ -474,7 +486,10 @@ startElement(void *userData, const char *name, const char **atts)
         pd->kind = "patch";
       
       if (pd->numpacks == 0)
-	pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
+      {
+        pd->lastsolvableid = repo_add_solvable(pd->common.repo);
+        pd->solvable = pool_id2solvable(pool, pd->lastsolvableid);
+      }
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -562,6 +577,12 @@ startElement(void *userData, const char *name, const char **atts)
       pd->lang = find_attr("lang", atts);
       //repodata_set_tstr( pd->data, pd-
       break;
+    case STATE_LOCATION:
+      pd->tmpattr = find_attr("href", atts);
+      break;
+    case STATE_CHECKSUM:
+      pd->tmpattr = find_attr("type", atts);
+      break;
     default:
       break;
     }
@@ -596,10 +617,10 @@ endElement(void *userData, const char *name)
         s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
       if (pd->numpacks > 0)
-	{
-	  pd->numpacks--;
-	  pd->solvable++;
-	}
+      {
+        pd->numpacks--;
+        pd->solvable++;
+      }
       pd->kind = 0;
       break;
     case STATE_NAME:
@@ -651,6 +672,11 @@ endElement(void *userData, const char *name)
       break;
     case STATE_DESCRIPTION:
       pd->lang = 0;
+      break;
+    case STATE_LOCATION:
+      repodata_set_str(pd->data, pd->lastsolvableid, id_mediafile, pd->tmpattr);
+      break;
+    case STATE_CHECKSUM:
       break;
     default:
       break;
@@ -713,6 +739,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
   pd.common.tmp = 0;
   pd.common.tmpl = 0;
   pd.kind = 0;
+  pd.lastsolvableid = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   XML_SetElementHandler(parser, startElement, endElement);
@@ -729,6 +756,10 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
 	break;
     }
   XML_ParserFree(parser);
+
+  if (pd.data)
+    repodata_internalize(pd.data);
+
   if (pd.numpacks)
     repo_free_solvable_block(repo, pd.solvable - pool->solvables, pd.numpacks, 1);
   sat_free(pd.content);
