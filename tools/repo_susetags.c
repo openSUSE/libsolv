@@ -112,15 +112,9 @@ add_location(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
     {
       /* medianr filename dir
          don't optimize this one */
-#if 0
-      add_attr_special_int (attr, entry, id_medianr, atoi (sp[0]));
-      add_attr_localids_id (attr, entry, id_mediadir, str2localid (attr, sp[2], 1));
-      add_attr_string (attr, entry, id_mediafile, sp[1]);
-#else
       repodata_set_constant(pd->data, entry, id_medianr, atoi(sp[0]));
       repodata_set_poolstr(pd->data, entry, id_mediadir, sp[2]);
       repodata_set_str(pd->data, entry, id_mediafile, sp[1]);
-#endif
       return;
     }
   else
@@ -149,23 +143,14 @@ add_location(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
 	  break;
       if (*n2 || strcmp (n1, ".rpm"))
         goto nontrivial;
-#if 0
-      add_attr_special_int (attr, entry, id_medianr, medianr);
-      add_attr_void (attr, entry, id_mediafile);
-#else
+
       repodata_set_constant(pd->data, entry, id_medianr, medianr);
       repodata_set_void(pd->data, entry, id_mediafile);
-#endif
       return;
 
 nontrivial:
-#if 0
-      add_attr_special_int (attr, entry, id_medianr, medianr);
-      add_attr_string (attr, entry, id_mediafile, sp[1]);
-#else
       repodata_set_constant(pd->data, entry, id_medianr, medianr);
       repodata_set_str(pd->data, entry, id_mediafile, sp[1]);
-#endif
       return;
     }
 }
