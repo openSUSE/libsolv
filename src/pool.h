@@ -17,6 +17,8 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
+
 #include "pooltypes.h"
 #include "poolid.h"
 #include "solvable.h"
@@ -68,7 +70,6 @@ extern "C" {
 
 //-----------------------------------------------
 
-struct FILE;
 struct _Repo;
 struct _Repodata;
 
