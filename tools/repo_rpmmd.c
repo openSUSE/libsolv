@@ -222,7 +222,6 @@ struct parsedata {
   int docontent;
   int numpacks;
   Solvable *solvable;
-  Id lastsolvableid;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
   const char *lang;
@@ -463,33 +462,30 @@ startElement(void *userData, const char *name, const char **atts)
     {
     case STATE_METADATA:
       for (; *atts; atts += 2)
-      {
-        if (!strcmp(*atts, "packages"))
-        {
-          pd->numpacks = atoi(atts[1]);
-          if (pd->numpacks < 0)
-            pd->numpacks = 0;
+	{
+	  if (!strcmp(*atts, "packages"))
+	    {
+	      pd->numpacks = atoi(atts[1]);
+	      if (pd->numpacks < 0)
+		pd->numpacks = 0;
 #if 0
 	      fprintf(stderr, "numpacks: %d\n", pd->numpacks);
 #endif
-            pd->solvable = pool_id2solvable(pool, repo_add_solvable_block(pd->common.repo, pd->numpacks));
-        }
-      }
+	      pd->solvable = pool_id2solvable(pool, repo_add_solvable_block(pd->common.repo, pd->numpacks));
+	    }
+	}
       break;
     case STATE_SOLVABLE:
       pd->kind = 0;
-      if ( name[2] == 't' && name[3] == 't' )
+      if (name[2] == 't' && name[3] == 't')
         pd->kind = "pattern";
-      else if ( name[1] == 'r' )
+      else if (name[1] == 'r')
         pd->kind = "product";
-      else if ( name[2] == 't' && name[3] == 'c' )
+      else if (name[2] == 't' && name[3] == 'c')
         pd->kind = "patch";
       
       if (pd->numpacks == 0)
-      {
-        pd->lastsolvableid = repo_add_solvable(pd->common.repo);
-        pd->solvable = pool_id2solvable(pool, pd->lastsolvableid);
-      }
+	pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -617,10 +613,10 @@ endElement(void *userData, const char *name)
         s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
       if (pd->numpacks > 0)
-      {
-        pd->numpacks--;
-        pd->solvable++;
-      }
+	{
+	  pd->numpacks--;
+	  pd->solvable++;
+	}
       pd->kind = 0;
       break;
     case STATE_NAME:
@@ -674,7 +670,7 @@ endElement(void *userData, const char *name)
       pd->lang = 0;
       break;
     case STATE_LOCATION:
-      repodata_set_str(pd->data, pd->lastsolvableid, id_mediafile, pd->tmpattr);
+      repo_set_str(repo, s - pool->solvables, id_mediafile, pd->tmpattr);
       break;
     case STATE_CHECKSUM:
       break;
@@ -739,7 +735,6 @@ repo_add_rpmmd(Repo *repo, FILE *fp)
   pd.common.tmp = 0;
   pd.common.tmpl = 0;
   pd.kind = 0;
-  pd.lastsolvableid = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   XML_SetElementHandler(parser, startElement, endElement);
