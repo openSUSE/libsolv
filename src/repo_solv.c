@@ -371,8 +371,9 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	      skip_item(maindata, TYPE_IDVALUEARRAY, numid, numrel);
 	      break;
 	    }
-	  ida = sat_calloc(keys[key].size, sizeof(Id));
-	  ide = read_idarray(maindata, 0, 0, ida, ida + keys[key].size, 0);
+	  /* read_idarray writes a terminating 0, that's why the + 1 */
+	  ida = sat_calloc(keys[key].size + 1, sizeof(Id));
+	  ide = read_idarray(maindata, 0, 0, ida, ida + keys[key].size + 1, 0);
 	  n = ide - ida - 1;
 	  if (n & 1)
 	    {
@@ -409,9 +410,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	      unsigned len = sizeof (buf);
 	      char *filename = buf;
 	      read_str(maindata, &filename, &len);
-#if 0
 	      data->location = strdup(filename);
-#endif
 	      if (filename != buf)
 		free(filename);
 	    }
@@ -608,9 +607,9 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	  pool_debug(pool, SAT_ERROR, "relations are forbidden in a store\n");
 	  return SOLV_ERROR_CORRUPT;
 	}
-      if (numsolv)
+      if (parent->end - parent->start != numsolv)
 	{
-	  pool_debug(pool, SAT_ERROR, "solvables are forbidden in a store\n");
+	  pool_debug(pool, SAT_ERROR, "unequal number of solvables in a store\n");
 	  return SOLV_ERROR_CORRUPT;
 	}
       if (numinfo)
@@ -638,6 +637,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     spool = &pool->ss;
   else
     {
+      data.localpool = 1;
       spool = &data.spool;
       spool->stringspace = sat_malloc(7);
       strcpy(spool->stringspace, "<NULL>");
@@ -703,12 +703,12 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     {
       /* no shared pool, thus no idmap and no unification */
       idmap = 0;
-      sp += 7;
-      if (*sp)
+      if (0 && *sp)
 	{
 	  pool_debug(pool, SAT_ERROR, "store strings don't start with ''\n");
 	  return SOLV_ERROR_CORRUPT;
 	}
+      spool->nstrings = numid;
       str[0] = 0;
       for (i = 1; i < spool->nstrings; i++)
 	{
@@ -717,9 +717,10 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	      pool_debug(pool, SAT_ERROR, "not enough strings\n");
 	      return SOLV_ERROR_OVERFLOW;
 	    }
-	  str[i] = sp - strsp;
+	  str[i] = sp - spool->stringspace;
 	  sp += strlen(sp) + 1;
 	}
+      spool->sstrings = sp - spool->stringspace;
     }
   else
     {
@@ -905,9 +906,15 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       id = read_id(&data, numid);
       if (idmap)
 	id = idmap[id];
+      else if (parent)
+        id = str2id(pool, stringpool_id2str(spool, id), 1);
       keys[i].name = id;
       keys[i].type = read_id(&data, 0);
       keys[i].size = read_id(&data, 0);
+#if 0
+      fprintf (stderr, "key %d %s %d %d\n", i, id2str(pool,id), keys[i].type,
+               keys[i].size);
+#endif
       if (solvversion >= SOLV_VERSION_5)
 	{
 	  keys[i].storage = read_id(&data, 0);
@@ -979,6 +986,13 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     {
       schemata[i] = schemadatap - schemadata;
       schemadatap = read_idarray(&data, numid, 0, schemadatap, schemadataend, 0);
+#if 0
+      Id *sp = schemadata + schemata[i];
+      fprintf (stderr, "schema %d:", i);
+      for (; *sp; sp++)
+        fprintf (stderr, " %d", *sp);
+      fprintf (stderr, "\n");
+#endif
     }
   data.schemata = schemata;
   data.nschemata = numschemata;
@@ -1046,12 +1060,25 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     }
 
   /* read solvables */
-  if (numsolv)
+  if (parent)
+    {
+      data.start = parent->start;
+      data.end = parent->end;
+      s = pool_id2solvable(pool, data.start);
+    }
+  else if (numsolv)
     {
       s = pool_id2solvable(pool, repo_add_solvable_block(repo, numsolv));
       /* store start and end of our id block */
       data.start = s - pool->solvables;
       data.end = data.start + numsolv;
+      /* In case we have subfiles, make them refer to our part of the 
+	 repository now.  */
+      for (i = 0; i < repo->nrepodata; i++)
+        {
+	  repo->repodata[i].start = data.start;
+	  repo->repodata[i].end = data.end;
+	}
     }
   else
     s = 0;
@@ -1365,14 +1392,14 @@ static void
 repodata_load_solv(Repodata *data)
 {
   FILE *fp;
-#if 0
+#if 1
   Pool *pool = data->repo->pool;
   if (!pool->loadcallback)
     {   
       data->state = REPODATA_ERROR;
       return;
     }   
-  fp = pool->loadcallback(pool->loadcallback_data, pool, data);
+  fp = pool->loadcallback(pool, data, pool->loadcallbackdata);
 #else
   fp = 0;
 #endif

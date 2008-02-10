@@ -18,6 +18,19 @@
 #include "pool.h"
 #include "repo.h"
 
-void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata);
+/* Describes a repodata file */
+typedef struct _Repodatafile
+{
+  /* These have the same meaning as the equally named fields in
+     Repodata.  */
+  char *location;
+  char *checksum;
+  unsigned nchecksum;
+  unsigned checksumtype;
+  struct _Repokey *keys;
+  unsigned int nkeys;
+} Repodatafile;
+
+void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Repodatafile *fileinfo, int nsubfiles);
 
 #endif

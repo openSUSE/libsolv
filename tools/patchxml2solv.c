@@ -23,7 +23,7 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
   repo_add_patchxml(repo, stdin);
-  repo_write(repo, stdout, 0, 0);
+  repo_write(repo, stdout, 0, 0, 0, 0);
   pool_free(pool);
   exit(0);
 }

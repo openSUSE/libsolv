@@ -53,9 +53,23 @@ create_filter(Pool *pool)
     }
 }
 
+static int test_separate = 0;
+
 static int
-keyfilter(Repo *data, Repokey *key, void *kfdata)
+keyfilter_solv(Repo *data, Repokey *key, void *kfdata)
 {
+  if (test_separate && key->storage != KEY_STORAGE_SOLVABLE)
+    return KEY_STORAGE_DROPPED;
+  if (key->name < nfilter && filter[key->name])
+    return KEY_STORAGE_VERTICAL_OFFSET;
+  return KEY_STORAGE_INCORE;
+}
+
+static int
+keyfilter_attr(Repo *data, Repokey *key, void *kfdata)
+{
+  if (key->storage == KEY_STORAGE_SOLVABLE)
+    return KEY_STORAGE_DROPPED;
   if (key->name < nfilter && filter[key->name])
     return KEY_STORAGE_VERTICAL_OFFSET;
   return KEY_STORAGE_INCORE;
@@ -64,6 +78,9 @@ keyfilter(Repo *data, Repokey *key, void *kfdata)
 int
 main(int argc, char **argv)
 {
+  Repodatafile fileinfoa[1];
+  Repodatafile *fileinfo = 0;
+  int nsubfiles = 0;
   int with_attr = 0;
   argv++;
   argc--;
@@ -75,6 +92,7 @@ main(int argc, char **argv)
           switch (*s++)
 	    {
 	      case 'a': with_attr = 1; break;
+	      case 's': test_separate = 1; break;
 	      default : break;
 	    }
       argv++;
@@ -83,7 +101,20 @@ main(int argc, char **argv)
   Repo *repo = repo_create(pool, "<stdin>");
   repo_add_susetags(repo, stdin, 0, with_attr);
   create_filter(pool);
-  repo_write(repo, stdout, keyfilter, 0);
+  memset (fileinfoa, 0, sizeof fileinfoa);
+  if (with_attr && test_separate)
+    {
+      fileinfo = fileinfoa;
+      FILE *fp = fopen ("test.attr", "w");
+      repo_write(repo, fp, keyfilter_attr, 0, fileinfo, 0);
+      fclose (fp);
+      fileinfo->location = strdup ("test.attr");
+      fileinfo++;
+
+      nsubfiles = fileinfo - fileinfoa;
+      fileinfo = fileinfoa;
+    }
+  repo_write(repo, stdout, keyfilter_solv, 0, fileinfo, nsubfiles);
 #if 0
   if (with_attr && attr)
     {

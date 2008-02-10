@@ -39,9 +39,17 @@ typedef struct _Attrblobpage
 typedef struct _Repodata {
   struct _Repo *repo;		/* back pointer to repo */
 
+#define REPODATA_AVAILABLE	0
+#define REPODATA_STUB		1
+#define REPODATA_ERROR		2
+#define REPODATA_STORE		3
   int state;			/* available, stub or error */
 
   void (*loadcallback)(struct _Repodata *);
+  char *location;		/* E.g. filename or the like */
+  char *checksum;		/* Checksum of the file */
+  unsigned nchecksum;		/* Length of the checksum */
+  unsigned checksumtype;	/* Type of checksum */
 
   int start;			/* start of solvables this repodata is valid for */
   int end;			/* last solvable + 1 of this repodata */
@@ -94,10 +102,6 @@ typedef struct _Repodata {
 
 } Repodata;
 
-#define REPODATA_AVAILABLE	0
-#define REPODATA_STUB		1
-#define REPODATA_ERROR		2
-#define REPODATA_STORE		3
 
 void repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
 const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);

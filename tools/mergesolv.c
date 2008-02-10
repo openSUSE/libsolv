@@ -82,7 +82,7 @@ main(int argc, char **argv)
     }
 
   create_filter(pool);
-  repo_write(repo, stdout, keyfilter, 0);
+  repo_write(repo, stdout, keyfilter, 0, 0, 0);
   pool_free(pool);
 
   return 0;

@@ -69,6 +69,7 @@ extern "C" {
 //-----------------------------------------------
 
 struct _Repo;
+struct _Repodata;
 
 struct _Pool {
   struct _Stringpool ss;
@@ -113,6 +114,10 @@ struct _Pool {
   int  debugmask;
   void (*debugcallback)(struct _Pool *, void *data, int type, const char *str);
   void *debugcallbackdata;
+
+  /* load callback */
+  FILE * (*loadcallback)(struct _Pool *, struct _Repodata *, void *);
+  void *loadcallbackdata;
 };
 
 #define SAT_FATAL			(1<<0)
@@ -251,6 +256,12 @@ static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struc
 static inline void pool_setdebugmask(Pool *pool, int mask)
 {
   pool->debugmask = mask;
+}
+
+static inline void pool_setloadcallback(Pool *pool, FILE *(*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata)
+{
+  pool->loadcallback = cb;
+  pool->loadcallbackdata = loadcbdata;
 }
 
 /* loop over all providers of d */

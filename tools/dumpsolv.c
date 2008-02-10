@@ -86,6 +86,7 @@ dump_attrs (Repo *repo, unsigned int entry)
         dump_attrs_1 (s, entry);
     }
 }
+#endif
 
 static void
 dump_repodata (Repo *repo)
@@ -94,18 +95,17 @@ dump_repodata (Repo *repo)
   Repodata *data;
   if (repo->nrepodata == 0)
     return;
-  printf("repo refers to %d attribute stores:\n", repo->nrepodata);
+  printf("repo refers to %d subfiles:\n", repo->nrepodata);
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
       unsigned int j;
       printf("%s has %d keys", data->location ? data->location : "**EMBED**", data->nkeys);
-      for (j = 0; j < data->nkeys; j++)
+      for (j = 1; j < data->nkeys; j++)
         printf("\n  %s", id2str(repo->pool, data->keys[j].name));
       printf("\n");
     }
   printf("\n");
 }
-#endif
 
 static void
 printids(Repo *repo, char *kind, Offset ido)
@@ -189,6 +189,34 @@ dump_repoattrs(Repo *repo, Id p)
     }
 }
 
+void
+dump_some_attrs(Repo *repo, Solvable *s)
+{
+  Id name = str2id (repo->pool, "summary", 0);
+  const char *summary = 0;
+  unsigned int medianr = -1, downloadsize = -1;
+  unsigned int time = -1;
+  if (name)
+    summary = repo_lookup_str (s, name);
+  if ((name = str2id (repo->pool, "medianr", 0)))
+    medianr = repo_lookup_num (s, name);
+  if ((name = str2id (repo->pool, "downloadsize", 0)))
+    downloadsize = repo_lookup_num (s, name);
+  if ((name = str2id (repo->pool, "time", 0)))
+    time = repo_lookup_num (s, name);
+
+  printf ("  XXX %d %d %u %s\n", medianr, downloadsize, time, summary);
+}
+
+static FILE *
+loadcallback (Pool *pool, Repodata *data, void *vdata)
+{
+  FILE *fp;
+  fprintf (stderr, "Loading SOLV file %s\n", data->location);
+  fp = fopen ("test.attr", "r");
+  return fp;
+}
+
 int main(int argc, char **argv)
 {
   Repo *repo;
@@ -206,13 +234,12 @@ int main(int argc, char **argv)
     }
   pool = pool_create();
   pool_setdebuglevel(pool, 1);
+  pool_setloadcallback(pool, loadcallback, 0);
 
   repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
   if (repo_add_solv(repo, stdin))
     printf("could not read repository\n");
-#if 0
   dump_repodata (repo);
-#endif
   printf("repo contains %d solvables\n", repo->nsolvables);
   for (i = repo->start, n = 1; i < repo->end; i++)
     {
@@ -238,6 +265,9 @@ int main(int argc, char **argv)
       dump_attrs (repo, n - 1);
 #endif
       dump_repoattrs(repo, i);
+#if 1
+      dump_some_attrs(repo, s);
+#endif
       n++;
     }
   pool_free(pool);

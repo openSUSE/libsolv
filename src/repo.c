@@ -818,7 +818,8 @@ repo_add_repodata(Repo *repo)
   return data;
 }
 
-static Repodata *findrepodata(Repo *repo, Id p, Id keyname)
+static Repodata *
+findrepodata(Repo *repo, Id p, Id keyname)
 {
   int i;
   Repodata *data;

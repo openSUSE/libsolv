@@ -643,6 +643,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
           case CTAG('=', 'P', 's', 'g'):
 	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
 	    continue;
+          case CTAG('=', 'V', 'e', 'r'):
+	    last_found_pack = 0;
+	    indesc++;
+	    continue;
 	}
       if (!with_attr)
         continue;
@@ -715,10 +719,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    continue;
 	  case CTAG('=', 'D', 'i', 'r'):
 	    add_dirline (&pd, line + 6);
-	    continue;
-          case CTAG('=', 'V', 'e', 'r'):
-	    last_found_pack = 0;
-	    indesc++;
 	    continue;
 	}
     }

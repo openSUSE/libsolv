@@ -399,6 +399,21 @@ get_data(Repodata *data, Repokey *key, unsigned char **dpp)
   return 0;
 }
 
+static inline int
+maybe_load_repodata(Repodata *data)
+{
+  if (data->state == REPODATA_STUB)
+    {
+      if (data->loadcallback)
+	data->loadcallback(data);
+      else
+	data->state = REPODATA_ERROR;
+    }
+  if (data->state == REPODATA_AVAILABLE)
+    return 1;
+  data->state = REPODATA_ERROR;
+  return 0;
+}
 
 const char *
 repodata_lookup_str(Repodata *data, Id entry, Id keyid)
@@ -407,6 +422,9 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
   Repokey *key;
   Id id, *keyp;
   unsigned char *dp;
+
+  if (!maybe_load_repodata (data))
+    return 0;
 
   dp = data->incoredata + data->incoreoffset[entry];
   dp = data_read_id(dp, &schema);
@@ -440,6 +458,10 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value)
   unsigned char *dp;
 
   *value = 0;
+
+  if (!maybe_load_repodata (data))
+    return 0;
+
   dp = data->incoredata + data->incoreoffset[entry];
   dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
@@ -472,6 +494,9 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
   int onekey = 0;
   int stop;
   KeyValue kv;
+
+  if (!maybe_load_repodata (data))
+    return;
 
   dp = data->incoredata + data->incoreoffset[entry];
   dp = data_read_id(dp, &schema);

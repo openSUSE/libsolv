@@ -172,6 +172,8 @@ write_blob(FILE *fp, void *data, int len)
     }
 }
 
+static unsigned id_bytes;
+
 /*
  * Id
  */
@@ -196,7 +198,7 @@ write_id(FILE *fp, Id x)
     }
 }
 
-#if 0
+#if 1
 static void
 write_str(FILE *fp, const char *str)
 {
@@ -668,6 +670,7 @@ traverse_dirs(Dirpool *dp, Id *dirmap, Id n, Id dir, Id *used)
 	continue;
       if (sib == 1 && parent == 1)
 	continue;	/* already did that one above */
+assert (sib < dp->ndirs);
       dirmap[n++] = sib;
     }
   lastn = n;
@@ -713,7 +716,7 @@ write_compressed_page(FILE *fp, unsigned char *page, int len)
  */
 
 void
-repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata)
+repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Repodatafile *fileinfo, int nsubfiles)
 {
   Pool *pool = repo->pool;
   int i, j, k, n;
@@ -743,6 +746,15 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   Repodata *data;
   Stringpool ownspool, *spool;
   Dirpool owndirpool, *dirpool;
+
+  int setfileinfo = 0;
+  Id repodataschema = 0;
+  Id repodataschema_internal = 0;
+
+  /* If we're given a fileinfo structure, but have no subfiles, then we're
+     writing a subfile and our callers wants info about it.  */
+  if (fileinfo && nsubfiles == 0)
+    setfileinfo = 1;
 
   memset(&cbdata, 0, sizeof(cbdata));
 
@@ -790,6 +802,34 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       cbdata.keymap[i] = i;
     }
   cbdata.nmykeys = i;
+
+  /* If we store subfile info, generate the three necessary keys.  */
+  if (nsubfiles)
+    {
+      key = cbdata.mykeys + cbdata.nmykeys;
+      key->name = REPODATA_EXTERNAL;
+      key->type = TYPE_VOID;
+      key->size = 0;
+      key->storage = KEY_STORAGE_SOLVABLE;
+      cbdata.keymap[key->name] = key - cbdata.mykeys;
+      key++;
+
+      key->name = REPODATA_KEYS;
+      key->type = TYPE_IDVALUEARRAY;
+      key->size = 0;
+      key->storage = KEY_STORAGE_SOLVABLE;
+      cbdata.keymap[key->name] = key - cbdata.mykeys;
+      key++;
+
+      key->name = REPODATA_LOCATION;
+      key->type = TYPE_STR;
+      key->size = 0;
+      key->storage = KEY_STORAGE_SOLVABLE;
+      cbdata.keymap[key->name] = key - cbdata.mykeys;
+      key++;
+
+      cbdata.nmykeys = key - cbdata.mykeys;
+    }
 
   dirpoolusage = 0;
 
@@ -1053,6 +1093,46 @@ for (i = 1; i < cbdata.nmykeys; i++)
 
   reloff = needid[0].map;
 
+  /* If we have fileinfos to write, setup schemas and increment needid[]
+     of the right strings.  */
+  for (i = 0; i < nsubfiles; i++)
+    {
+      int j;
+
+      if (fileinfo[i].location && !repodataschema)
+        {
+	  Id schema[4];
+	  schema[0] = cbdata.keymap[REPODATA_EXTERNAL];
+	  schema[1] = cbdata.keymap[REPODATA_KEYS];
+	  schema[2] = cbdata.keymap[REPODATA_LOCATION];
+	  schema[3] = 0;
+	  repodataschema = addschema(&cbdata, schema);
+	}
+      else if (!repodataschema_internal)
+        {
+	  Id schema[3];
+	  schema[0] = cbdata.keymap[REPODATA_EXTERNAL];
+	  schema[1] = cbdata.keymap[REPODATA_KEYS];
+	  schema[2] = 0;
+	  repodataschema_internal = addschema(&cbdata, schema);
+	}
+      if (2 * fileinfo[i].nkeys > cbdata.mykeys[cbdata.keymap[REPODATA_KEYS]].size)
+	cbdata.mykeys[cbdata.keymap[REPODATA_KEYS]].size = 2 * fileinfo[i].nkeys;
+      for (j = 1; j < fileinfo[i].nkeys; j++)
+	needid[fileinfo[i].keys[j].name].need++;
+#if 0
+      fprintf (stderr, " %d nkeys: %d:", i, fileinfo[i].nkeys);
+      for (j = 1; j < fileinfo[i].nkeys; j++)
+        {
+	  needid[fileinfo[i].keys[j].name].need++;
+	  fprintf (stderr, " %s(%d,%d)", id2str(pool, fileinfo[i].keys[j].name),
+	           fileinfo[i].keys[j].name, fileinfo[i].keys[j].type);
+	}
+      fprintf (stderr, "\n");
+#endif
+    }
+  if (nsubfiles)
+    cbdata.mykeys[cbdata.keymap[REPODATA_KEYS]].size -= 2;
 
 /********************************************************************/
 
@@ -1222,7 +1302,7 @@ if (cbdata.dirused)
   write_u32(fp, repo->nsolvables);
   write_u32(fp, cbdata.nmykeys);
   write_u32(fp, cbdata.nmyschemata);
-  write_u32(fp, 0);	/* info blocks.  */
+  write_u32(fp, nsubfiles);	/* info blocks.  */
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
 #if 0
@@ -1294,6 +1374,11 @@ if (cbdata.dirused)
   /*
    * write keys
    */
+  if (setfileinfo)
+    {
+      fileinfo->nkeys = cbdata.nmykeys;
+      fileinfo->keys = sat_calloc (fileinfo->nkeys, sizeof (*fileinfo->keys));
+    }
   for (i = 1; i < cbdata.nmykeys; i++)
     {
       write_id(fp, needid[cbdata.mykeys[i].name].need);
@@ -1303,6 +1388,8 @@ if (cbdata.dirused)
       else
         write_id(fp, cbdata.extdata[i].len);
       write_id(fp, cbdata.mykeys[i].storage);
+      if (setfileinfo)
+        fileinfo->keys[i] = cbdata.mykeys[i];
     }
 
   /*
@@ -1315,28 +1402,32 @@ if (cbdata.dirused)
 	write_idarray(fp, pool, 0, cbdata.myschemadata + cbdata.myschemata[i]);
     }
 
-#if 0
   /*
    * write info block
    */
-  for (i = 0; i < repo->nrepodata; i++)
+  for (i = 0; i < nsubfiles; i++)
     {
       int j;
 
-      if (repo->repodata[i].location)
+      if (fileinfo[i].location)
         write_id(fp, repodataschema);
       else
         write_id(fp, repodataschema_internal);
       /* keys + location, write idarray */
-      for (j = 0; j < repo->repodata[i].nkeys; j++)
+      for (j = 1; j < fileinfo[i].nkeys; j++)
         {
-	  Id id = needid[repo->repodata[i].keys[j].name].need;
-	  write_id_value(fp, id, repo->repodata[i].keys[j].type, j == repo->repodata[i].nkeys - 1);
-        }
-      if (repo->repodata[i].location)
-        write_str(fp, repo->repodata[i].location);
-    }
+	  	   
+	  Id id = needid[fileinfo[i].keys[j].name].need;
+#if 0
+	  fprintf (stderr, "writing %d(%s) %d\n", id,
+	           id2str(pool, needid[id].map),
+		   fileinfo[i].keys[j].type);
 #endif
+	  write_id_value(fp, id, fileinfo[i].keys[j].type, j == fileinfo[i].nkeys - 1);
+        }
+      if (fileinfo[i].location)
+        write_str(fp, fileinfo[i].location);
+    }
 
 
 /********************************************************************/
@@ -1350,6 +1441,7 @@ if (cbdata.dirused)
     {
       if (s->repo != repo)
 	continue;
+      id_bytes = 0;
       /* keep in sync with schema generation! */
       write_id(fp, cbdata.solvschemata[n]);
 #if 0
@@ -1389,11 +1481,12 @@ if (cbdata.dirused)
       if (s->freshens && cbdata.keymap[SOLVABLE_FRESHENS])
         write_idarray_sort(fp, pool, needid, idarraydata + s->freshens);
       if (repo->rpmdbid && cbdata.keymap[RPM_RPMDBID])
-        write_u32(fp, repo->rpmdbid[i - repo->start]);
+        write_u32(fp, repo->rpmdbid[i - repo->start]),id_bytes+=4;
       if (cbdata.incorelen[n])
 	{
 	  write_blob(fp, incoredata, cbdata.incorelen[n]);
 	  incoredata += cbdata.incorelen[n];
+	  id_bytes += cbdata.incorelen[n];
 	}
       n++;
     }
@@ -1443,6 +1536,15 @@ if (cbdata.dirused)
       write_blob(fp, cbdata.extdata[i].buf, cbdata.extdata[i].len);
 #endif
 
+  /* Fill fileinfo for our caller.  */
+  if (setfileinfo)
+    {
+      fileinfo->checksum = 0;
+      fileinfo->nchecksum = 0;
+      fileinfo->checksumtype = 0;
+      fileinfo->location = 0;
+    }
+
   for (i = 1; i < cbdata.nmykeys; i++)
     sat_free(cbdata.extdata[i].buf);
 
@@ -1451,5 +1553,3 @@ if (cbdata.dirused)
   sat_free(cbdata.myschemadata);
   sat_free(cbdata.myschemata);
 }
-
-// EOF
