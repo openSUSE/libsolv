@@ -68,6 +68,7 @@ extern "C" {
 
 //-----------------------------------------------
 
+struct FILE;
 struct _Repo;
 struct _Repodata;
 
