@@ -14,9 +14,6 @@
 
 #include "pool.h"
 #include "repo.h"
-#if 0
-#include "attr_store.h"
-#endif
 #include "tools_util.h"
 #include "repo_susetags.h"
 
@@ -81,10 +78,6 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
     }
   return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
-
-#if 0
-Attrstore *attr;
-#endif
 
 /*
  * add_location
@@ -344,11 +337,6 @@ commit_diskusage (struct parsedata *pd, unsigned entry)
     if (pd->dirs[i][1] || pd->dirs[i][2])
       {
 	repodata_add_dirnumnum(pd->data, entry, id_diskusage, pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2]);
-#if 0
-        add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][0]);
-        add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][1]);
-        add_attr_intlist_int (attr, entry, id_diskusage, pd->dirs[i][2]);
-#endif
       }
   pd->ndirs = 0;
 }
@@ -395,16 +383,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   struct parsedata pd;
   Repodata *data = 0;
 
-#if 1
   if (with_attr)
     {
-#if 0
-      attr = new_store(pool);
-#endif
       data = repo_add_repodata(repo);
       init_attr_ids(pool);
     }
-#endif
 
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);

@@ -56,8 +56,6 @@ if test -d repodata; then
 elif test -d suse/setup/descr && test -s content; then
   olddir=`pwd`
   cd suse/setup/descr || exit 2
-  filepack=`mktemp` || exit 3
-  filecont=`mktemp` || exit 3
   (
     # First packages
     if test -s packages.gz; then
@@ -91,9 +89,6 @@ elif test -d suse/setup/descr && test -s content; then
 	esac
       done
     fi
-  ) | susetags2solv -a > $filepack
+  ) | susetags2solv -a -c "${olddir}/content"
   cd "$olddir"
-  content2solv < content > $filecont
-  mergesolv $filecont $filepack
-  rm -f $filepack $filecont
 fi

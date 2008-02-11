@@ -15,6 +15,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "repo_susetags.h"
+#include "repo_content.h"
 #include "common_write.h"
 
 int
@@ -22,6 +23,8 @@ main(int argc, char **argv)
 {
   int with_attr = 0;
   int test_separate = 0;
+  const char *contentfile = 0;
+  Id vendor = 0;
   argv++;
   argc--;
   while (argc--)
@@ -33,13 +36,34 @@ main(int argc, char **argv)
 	    {
 	      case 'a': with_attr = 1; break;
 	      case 's': test_separate = 1; break;
+	      case 'c':
+	        if (argc)
+		  {
+		    contentfile = argv[1];
+		    argv++;
+		    argc--;
+		  }
+		break;
 	      default : break;
 	    }
       argv++;
     }
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
-  repo_add_susetags(repo, stdin, 0, with_attr);
+  if (contentfile)
+    {
+      FILE *fp = fopen (contentfile, "r");
+      if (!fp)
+        {
+	  perror("opening content file");
+	  exit (1);
+	}
+      repo_add_content(repo, fp);
+      if (!strncmp (id2str(pool, pool->solvables[repo->start].name), "product:", 8))
+        vendor = pool->solvables[repo->start].vendor;
+      fclose (fp);
+    }
+  repo_add_susetags(repo, stdin, vendor, with_attr);
   tool_write(repo, 0, with_attr && test_separate);
   pool_free(pool);
   exit(0);
