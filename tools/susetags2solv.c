@@ -15,73 +15,13 @@
 #include "pool.h"
 #include "repo.h"
 #include "repo_susetags.h"
-#include "repo_write.h"
-#if 0
-#include "attr_store.h"
-
-extern Attrstore *attr;
-#endif
-
-static char *verticals[] = {
-  "authors",
-  "description",
-  "messagedel",
-  "messageins",
-  "eula",
-  "diskusage",
-  0
-};
-
-static unsigned char *filter;
-static int nfilter;
-
-static void
-create_filter(Pool *pool)
-{
-  char **s;
-  Id id;
-  for (s = verticals; *s; s++)
-    {
-      id = str2id(pool, *s, 1);
-      if (id >= nfilter)
-	{
-	  filter = sat_realloc(filter, id + 16);
-	  memset(filter + nfilter, 0, id + 16 - nfilter);
-	  nfilter = id + 16;
-	}
-      filter[id] = 1;
-    }
-}
-
-static int test_separate = 0;
-
-static int
-keyfilter_solv(Repo *data, Repokey *key, void *kfdata)
-{
-  if (test_separate && key->storage != KEY_STORAGE_SOLVABLE)
-    return KEY_STORAGE_DROPPED;
-  if (key->name < nfilter && filter[key->name])
-    return KEY_STORAGE_VERTICAL_OFFSET;
-  return KEY_STORAGE_INCORE;
-}
-
-static int
-keyfilter_attr(Repo *data, Repokey *key, void *kfdata)
-{
-  if (key->storage == KEY_STORAGE_SOLVABLE)
-    return KEY_STORAGE_DROPPED;
-  if (key->name < nfilter && filter[key->name])
-    return KEY_STORAGE_VERTICAL_OFFSET;
-  return KEY_STORAGE_INCORE;
-}
+#include "common_write.h"
 
 int
 main(int argc, char **argv)
 {
-  Repodatafile fileinfoa[1];
-  Repodatafile *fileinfo = 0;
-  int nsubfiles = 0;
   int with_attr = 0;
+  int test_separate = 0;
   argv++;
   argc--;
   while (argc--)
@@ -100,29 +40,7 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
   repo_add_susetags(repo, stdin, 0, with_attr);
-  create_filter(pool);
-  memset (fileinfoa, 0, sizeof fileinfoa);
-  if (with_attr && test_separate)
-    {
-      fileinfo = fileinfoa;
-      FILE *fp = fopen ("test.attr", "w");
-      repo_write(repo, fp, keyfilter_attr, 0, fileinfo, 0);
-      fclose (fp);
-      fileinfo->location = strdup ("test.attr");
-      fileinfo++;
-
-      nsubfiles = fileinfo - fileinfoa;
-      fileinfo = fileinfoa;
-    }
-  repo_write(repo, stdout, keyfilter_solv, 0, fileinfo, nsubfiles);
-#if 0
-  if (with_attr && attr)
-    {
-      FILE *fp = fopen ("test.attr", "w");
-      write_attr_store (fp, attr);
-      fclose (fp);
-    }
-#endif
+  tool_write(repo, 0, with_attr && test_separate);
   pool_free(pool);
   exit(0);
 }

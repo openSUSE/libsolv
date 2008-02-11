@@ -20,46 +20,7 @@
 
 #include "pool.h"
 #include "repo_solv.h"
-#include "repo_write.h"
-
-static char *verticals[] = {
-  "authors",
-  "description",
-  "messagedel",
-  "messageins",
-  "eula",
-  "diskusage",
-  0
-};
-
-static unsigned char *filter;
-static int nfilter;
-
-static void
-create_filter(Pool *pool)
-{
-  char **s;
-  Id id;
-  for (s = verticals; *s; s++)
-    {
-      id = str2id(pool, *s, 1);
-      if (id >= nfilter)
-	{
-	  filter = sat_realloc(filter, id + 16);
-	  memset(filter + nfilter, 0, id + 16 - nfilter);
-	  nfilter = id + 16;
-	}
-      filter[id] = 1;
-    }
-}
-
-static int
-keyfilter(Repo *data, Repokey *key, void *kfdata)
-{
-  if (key->name < nfilter && filter[key->name])
-    return KEY_STORAGE_VERTICAL_OFFSET;
-  return KEY_STORAGE_INCORE;
-}
+#include "common_write.h"
 
 int
 main(int argc, char **argv)
@@ -81,8 +42,7 @@ main(int argc, char **argv)
       fclose(fp);
     }
 
-  create_filter(pool);
-  repo_write(repo, stdout, keyfilter, 0, 0, 0);
+  tool_write(repo, 0, 0);
   pool_free(pool);
 
   return 0;

@@ -15,7 +15,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "repo_patchxml.h"
-#include "repo_write.h"
+#include "common_write.h"
 
 int
 main(int argc, char **argv)
@@ -23,7 +23,7 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
   repo_add_patchxml(repo, stdin);
-  repo_write(repo, stdout, 0, 0, 0, 0);
+  tool_write(repo, 0, 0);
   pool_free(pool);
   exit(0);
 }

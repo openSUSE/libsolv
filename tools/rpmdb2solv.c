@@ -21,7 +21,7 @@
 #include "repo.h"
 #include "repo_rpmdb.h"
 #include "repo_solv.h"
-#include "repo_write.h"
+#include "common_write.h"
 
 int
 main(int argc, char **argv)
@@ -54,7 +54,7 @@ main(int argc, char **argv)
       ref = 0;
     }
 
-  repo_write(repo, stdout, 0, 0, 0, 0);
+  tool_write(repo, 0, 0);
   pool_free(pool);
 
   exit(0);
