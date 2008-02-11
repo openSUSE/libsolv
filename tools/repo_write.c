@@ -537,9 +537,9 @@ repo_write_cb_needed(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, K
   int rm;
 
 #if 0
-  fprintf(stderr, "solvable %d (%s): key %d %d\n", s ? s - s->repo->pool->solvables : 0, s ? id2str(s->repo->pool, s->name) : "", key->name, key->type);
+  fprintf(stderr, "solvable %d (%s): key (%d)%s %d\n", s ? s - s->repo->pool->solvables : 0, s ? id2str(s->repo->pool, s->name) : "", key->name, id2str(repo->pool, key->name), key->type);
 #endif
-  rm = cbdata->keymap[cbdata->keymapstart[data->repo->repodata - data] + (key - data->keys)];
+  rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];
   if (!rm)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
   if (cbdata->sp == cbdata->schema || cbdata->sp[-1] != rm)
@@ -577,7 +577,7 @@ repo_write_cb_sizes(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, Ke
   unsigned char v[4];
   struct extdata *xd;
 
-  rm = cbdata->keymap[cbdata->keymapstart[data->repo->repodata - data] + (key - data->keys)];
+  rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];
   if (!rm)
     return 0;	/* we do not want this one */
   
@@ -858,7 +858,8 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	    }
 	  if (k < cbdata.nmykeys)
 	    {
-	      cbdata.keymap[n++] = 0;
+	      repodataused[i] = 1;
+	      cbdata.keymap[n++] = k;
 	      continue;
 	    }
 	  cbdata.mykeys[cbdata.nmykeys] = *key;

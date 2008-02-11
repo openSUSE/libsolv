@@ -541,6 +541,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   Id *schemadata, *schemadatap, *schemadataend;
   Id *schemata, key;
   int have_xdata;
+  unsigned oldnrepodata;
 
   struct _Stringpool *spool;
 
@@ -1001,6 +1002,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 
 
   /*******  Part 6: Info  ***********************************************/
+  oldnrepodata = repo->nrepodata;
   for (i = 0; i < numinfo; i++)
     {
       /* for now we're just interested in data that starts with
@@ -1074,7 +1076,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       data.end = data.start + numsolv;
       /* In case we have subfiles, make them refer to our part of the 
 	 repository now.  */
-      for (i = 0; i < repo->nrepodata; i++)
+      for (i = oldnrepodata; i < repo->nrepodata; i++)
         {
 	  repo->repodata[i].start = data.start;
 	  repo->repodata[i].end = data.end;
