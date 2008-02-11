@@ -6,7 +6,7 @@ ADD_LIBRARY(satsolver STATIC ${libsatsolver_SRCS})
 
 SET(libsatsolver_HEADERS bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h poolid.h pooltypes.h queue.h solvable.h solver.h repo.h repodata.h repo_solv.h util.h strpool.h dirpool.h)
 
-SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O3 -Wall -fPIC" )
+SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC" )
 
 INSTALL(  FILES ${libsatsolver_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/satsolver" )
 INSTALL(TARGETS satsolver LIBRARY DESTINATION ${LIB_INSTALL_DIR} ARCHIVE DESTINATION ${LIB_INSTALL_DIR})
