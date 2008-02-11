@@ -702,11 +702,11 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       pd->lang = 0;
-      repo_set_poolstr(repo, s - pool->solvables, id_summary, pd->content);
+      repo_set_str(repo, s - pool->solvables, id_summary, pd->content);
       break;
     case STATE_DESCRIPTION:
       pd->lang = 0;
-      repo_set_poolstr(repo, s - pool->solvables, id_description, pd->content);
+      repo_set_str(repo, s - pool->solvables, id_description, pd->content);
       break;
     default:
       break;
