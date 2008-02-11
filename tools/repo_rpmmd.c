@@ -33,6 +33,8 @@ enum state {
   // package rpm-md
   STATE_LOCATION,
   STATE_CHECKSUM,
+  STATE_RPM_GROUP,
+  STATE_RPM_LICENSE,
 
   /* resobject attributes */
   STATE_SUMMARY,
@@ -41,6 +43,7 @@ enum state {
   STATE_DELNOTIFY,
   STATE_VENDOR,
   STATE_SIZE,
+  STATE_TIME,
   STATE_DOWNLOADSIZE,
   STATE_INSTALLTIME,
   STATE_INSTALLONLY,
@@ -139,8 +142,8 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "version",         STATE_VERSION, 0 },
 
   // package attributes rpm-md
-  { STATE_SOLVABLE,    "location",            STATE_LOCATION, 0 },
-  { STATE_SOLVABLE,    "checksum",         STATE_CHECKSUM, 1 },
+  { STATE_SOLVABLE,    "location",        STATE_LOCATION, 0 },
+  { STATE_SOLVABLE,    "checksum",        STATE_CHECKSUM, 1 },
   
   /* resobject attributes */
 
@@ -149,10 +152,11 @@ static struct stateswitch stateswitches[] = {
   //{ STATE_SOLVABLE,    "???",         STATE_INSNOTIFY, 1 },
   //{ STATE_SOLVABLE,    "??",     STATE_DELNOTIFY, 1 },
   { STATE_SOLVABLE,    "vendor",          STATE_VENDOR, 1 },
-  { STATE_SOLVABLE,    "size",            STATE_SIZE, 1 },
+  { STATE_SOLVABLE,    "size",            STATE_SIZE, 0 },
   { STATE_SOLVABLE,    "archive-size",    STATE_DOWNLOADSIZE, 1 },
   { STATE_SOLVABLE,    "install-time",    STATE_INSTALLTIME, 1 },
   { STATE_SOLVABLE,    "install-only",    STATE_INSTALLONLY, 1 },
+  { STATE_SOLVABLE,    "time",            STATE_TIME, 0 },
 
   // xml store pattern attributes
   { STATE_SOLVABLE,    "script",          STATE_SCRIPT, 1 },
@@ -186,6 +190,8 @@ static struct stateswitch stateswitches[] = {
   { STATE_CAPS_FRESHENS,    "capability",      STATE_CAP_FRESHENS, 1 },
   
   { STATE_FORMAT,      "rpm:vendor",      STATE_VENDOR, 1 },
+  { STATE_FORMAT,      "rpm:group",       STATE_RPM_GROUP, 1 },
+  { STATE_FORMAT,      "rpm:license",     STATE_RPM_LICENSE, 1 },
 
   /* rpm-md dependencies */ 
   { STATE_FORMAT,      "rpm:provides",    STATE_PROVIDES, 0 },
@@ -353,14 +359,12 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 static const char *
 find_attr(const char *txt, const char **atts)
 {
-  char *k;
-  k = 0;
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, txt))
         return atts[1];
     }
-  return k;
+  return 0;
 }
 
 static char *flagtab[] = {
@@ -434,8 +438,11 @@ startElement(void *userData, const char *name, const char **atts)
   //fprintf(stderr,"+tag: %s\n", name);
   struct parsedata *pd = userData;
   Pool *pool = pd->common.pool;
+  Repo *repo = pd->common.repo;
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
+  const char *str;
+  Id solvid = s - pool->solvables;
 
   if (pd->depth != pd->statedepth)
     {
@@ -571,14 +578,38 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_SUMMARY:
     case STATE_DESCRIPTION:
       pd->lang = find_attr("lang", atts);
-      //repodata_set_tstr( pd->data, pd-
       break;
     case STATE_LOCATION:
-      pd->tmpattr = find_attr("href", atts);
+      str = find_attr("href", atts);
+      if (str)
+        repo_set_str(repo, solvid, id_mediafile, str);
       break;
     case STATE_CHECKSUM:
       pd->tmpattr = find_attr("type", atts);
       break;
+    case STATE_TIME:
+      {
+        unsigned t;
+        str = find_attr("build", atts);
+        if (str && (t = atoi(str)) != 0)
+          repo_set_num(repo, solvid, id_time, t);
+	break;
+      }
+    case STATE_SIZE:
+      {
+        unsigned k;
+        str = find_attr("installed", atts);
+	if (str && (k = atoi(str)) != 0)
+	  repo_set_num(repo, solvid, id_installsize, (k + 1023) / 1024);
+	/* XXX the "package" attribute gives the size of the rpm file,
+	   i.e. the download size.  Except on packman, there it seems to be
+	   something else entirely, it has a value near to the other two
+	   values, as if the rpm is uncompressed.  */
+        str = find_attr("package", atts);
+	if (str && (k = atoi(str)) != 0)
+	  repo_set_num(repo, solvid, id_downloadsize, (k + 1023) / 1024);
+        break;
+      }
     default:
       break;
     }
@@ -631,6 +662,12 @@ endElement(void *userData, const char *name)
     case STATE_VENDOR:
       s->vendor = str2id(pool, pd->content, 1);
       break;
+    case STATE_RPM_GROUP:
+      repo_set_poolstr(repo, s - pool->solvables, id_group, pd->content);
+      break;
+    case STATE_RPM_LICENSE:
+      repo_set_poolstr(repo, s - pool->solvables, id_license, pd->content);
+      break;
     case STATE_FILE:
       id = str2id(pool, pd->content, 1);
       s->provides = repo_addid(repo, s->provides, id);
@@ -665,14 +702,11 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       pd->lang = 0;
+      repo_set_poolstr(repo, s - pool->solvables, id_summary, pd->content);
       break;
     case STATE_DESCRIPTION:
       pd->lang = 0;
-      break;
-    case STATE_LOCATION:
-      repo_set_str(repo, s - pool->solvables, id_mediafile, pd->tmpattr);
-      break;
-    case STATE_CHECKSUM:
+      repo_set_poolstr(repo, s - pool->solvables, id_description, pd->content);
       break;
     default:
       break;
