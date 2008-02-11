@@ -3007,7 +3007,12 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
       assert(!dontfix);	/* dontfix packages never have a neg assertion */
       /* see why the package is not installable */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC && !pool_installable(pool, s))
-	return SOLVER_PROBLEM_NOT_INSTALLABLE;
+	{
+	  *depp = 0;
+	  *sourcep = -rid;
+	  *targetp = 0;
+	  return SOLVER_PROBLEM_NOT_INSTALLABLE;
+	}
       /* check requires */
       assert(s->requires);
       reqp = s->repo->idarraydata + s->requires;
