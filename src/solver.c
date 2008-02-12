@@ -3832,4 +3832,3 @@ solver_solve(Solver *solv, Queue *job)
   if (solv->problems.count)
     problems_to_solutions(solv, job);
 }
-

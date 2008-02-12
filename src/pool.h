@@ -22,6 +22,7 @@ extern "C" {
 #include "pooltypes.h"
 #include "poolid.h"
 #include "solvable.h"
+#include "bitmap.h"
 #include "queue.h"
 #include "strpool.h"
 
@@ -103,6 +104,10 @@ struct _Pool {
   Id *whatprovidesdata;		/* Ids of solvable providing Id */
   Offset whatprovidesdataoff;	/* next free slot within whatprovidesdata */
   int whatprovidesdataleft;	/* number of 'free slots' within whatprovidesdata */
+
+  /* If nonzero, then consider only the solvables with Ids set in this
+     bitmap for solving.  If zero, consider all solvables.  */
+  Map *considered;
 
   Id (*nscallback)(struct _Pool *, void *data, Id name, Id evr);
   void *nscallbackdata;
@@ -231,6 +236,12 @@ static inline int pool_installable(Pool *pool, Solvable *s)
     return 0;
   if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
     return 0;
+  if (pool->considered)
+    { 
+      Id id = s - pool->solvables;
+      if (!MAPTST(pool->considered, id))
+	return 0;
+    }
   return 1;
 }
 
