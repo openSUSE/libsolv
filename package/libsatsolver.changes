@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Feb 12 18:29:43 CET 2008 - kkaempf@suse.de
+
+- add libappsatsolver, an application layer to ease coding
+  against sat-solver.
+
+-------------------------------------------------------------------
 Tue Feb 12 17:14:04 CET 2008 - coolo@suse.de
 
 - let susetags parse vendors
