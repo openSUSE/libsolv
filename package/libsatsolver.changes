@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Feb 12 17:14:04 CET 2008 - coolo@suse.de
+
+- let susetags parse vendors
+
+-------------------------------------------------------------------
 Thu Feb  7 18:41:05 CET 2008 - coolo@suse.de
 
 - rename libsatsolver in satsolver-tools
