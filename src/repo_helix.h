@@ -10,8 +10,12 @@
  * 
  */
 
-#ifndef REPO_HELIX_H
-#define REPO_HELIX_H
+#ifndef SATSOLVER_REPO_HELIX_H
+#define SATSOLVER_REPO_HELIX_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdio.h>
 #include "pool.h"
@@ -19,4 +23,9 @@
 
 extern void repo_add_helix(Repo *repo, FILE *fp);
 
-#endif /* REPO_HELIX_H */
+#ifdef __cplusplus
+}
+#endif
+    
+
+#endif /* SATSOLVER_REPO_HELIX_H */
