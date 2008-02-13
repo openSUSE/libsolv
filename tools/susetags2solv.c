@@ -18,6 +18,19 @@
 #include "repo_content.h"
 #include "common_write.h"
 
+static void
+usage(void)
+{
+  fprintf(stderr, "Usage:\n"
+          "susetags2solv [-a][-s][-c <content>][-h]\n"
+	  "  reads a 'susetags' repository from <stdin> and writes a .solv file to <stdout>\n"
+	  "  -a : with attributes\n"
+	  "  -c : parse given contentfile (for product information)\n"
+	  "  -h : print help & exit\n"
+	  "  -s : test separate\n"
+	 );
+}
+
 int
 main(int argc, char **argv)
 {
@@ -34,6 +47,7 @@ main(int argc, char **argv)
         while (*s)
           switch (*s++)
 	    {
+	      case 'h': usage(); exit(0);
 	      case 'a': with_attr = 1; break;
 	      case 's': test_separate = 1; break;
 	      case 'c':
