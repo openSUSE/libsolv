@@ -78,6 +78,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %files devel
 %defattr(-,root,root)
 %_libdir/libsatsolver.a
+%_libdir/libappsatsolver.a
 %doc doc/README*
 %doc doc/THEORY
 %doc doc/PLANNING
