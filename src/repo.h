@@ -22,9 +22,9 @@
 
 typedef struct _Repokey {
   Id name;
-  Id type;
-  Id size;
-  Id storage;
+  unsigned int type; /* TYPE_xxx */
+  unsigned int size;
+  unsigned int storage; /* KEY_STORAGE_xxx */
 } Repokey;
 
 #define KEY_STORAGE_DROPPED             0
