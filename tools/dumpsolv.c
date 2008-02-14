@@ -176,16 +176,23 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   return 0;
 }
 
+/*
+ * dump all attributes for Id <p>
+ */
+
 void
 dump_repoattrs(Repo *repo, Id p)
 {
   int i;
   Repodata *data;
+  /*
+   * look through all repodata(s) to find the one covering the right range of Ids
+   */
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      if (data->state == REPODATA_STUB || data->state == REPODATA_ERROR)
+      if (data->state == REPODATA_STUB || data->state == REPODATA_ERROR) /* skip repodata of wrong state */
         continue;
-      if (p < data->start || p >= data->end)
+      if (p < data->start || p >= data->end) /* skip repodata of wrong range */
 	continue;
       repodata_search(data, p - data->start, 0, dump_repoattrs_cb, 0);
     }
