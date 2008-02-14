@@ -147,6 +147,8 @@ struct _Pool {
    example would be the media number.  The actual value is encoded in the
    SIZE member of the key structure.  Be warned: careless use of this
    leads to combinatoric explosion of number of schemas.  */
+
+/* FIXME: Should be 'enum' */
 #define TYPE_VOID               0
 #define TYPE_ID			1
 #define TYPE_IDARRAY		2
