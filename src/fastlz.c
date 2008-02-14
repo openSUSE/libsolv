@@ -53,7 +53,7 @@
 */
 
 
-static unsigned int
+unsigned int
 compress_buf (const unsigned char *in, unsigned int in_len,
 	      unsigned char *out, unsigned int out_len)
 {
@@ -267,7 +267,7 @@ compress_buf (const unsigned char *in, unsigned int in_len,
   return oo;
 }
 
-static unsigned int
+unsigned int
 unchecked_decompress_buf (const unsigned char *in, unsigned int in_len,
 			  unsigned char *out,
 			  unsigned int out_len __attribute__((unused)))

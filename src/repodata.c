@@ -25,9 +25,14 @@
 #include "poolid_private.h"
 #include "util.h"
 
-#include "fastlz.c"
+extern unsigned int compress_buf (const unsigned char *in, unsigned int in_len,
+				  unsigned char *out, unsigned int out_len);
+extern unsigned int unchecked_decompress_buf (const unsigned char *in,
+					      unsigned int in_len,
+					      unsigned char *out,
+					      unsigned int out_len);
 
-unsigned char *
+static unsigned char *
 data_read_id(unsigned char *dp, Id *idp)
 {
   Id x = 0;

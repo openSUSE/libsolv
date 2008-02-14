@@ -1,6 +1,6 @@
 
 SET(libsatsolver_SRCS bitmap.c  poolarch.c  poolvendor.c  poolid.c strpool.c dirpool.c
-solver.c repo_solv.c repo_helix.c evr.c pool.c queue.c   repo.c  repodata.c util.c policy.c)
+solver.c repo_solv.c repo_helix.c evr.c pool.c queue.c   repo.c  repodata.c util.c policy.c fastlz.c)
 
 ADD_LIBRARY(satsolver STATIC ${libsatsolver_SRCS})
 

@@ -25,9 +25,6 @@
 
 #include "repo_solv.h"
 #include "util.h"
-#if 0
-#include "attr_store_p.h"
-#endif
 
 #define INTERESTED_START	SOLVABLE_NAME
 #define INTERESTED_END		SOLVABLE_FRESHENS
@@ -515,9 +512,6 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   int i, l;
   unsigned int numid, numrel, numdir, numsolv;
   unsigned int numkeys, numschemata, numinfo;
-#if 0
-  Attrstore *embedded_store = 0;
-#endif
 
   Offset sizeid;
   Offset *str;			       /* map Id -> Offset into string space */
@@ -699,16 +693,10 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
 
-  /* make sure first entry is "" for a store */
   if (parent)
     {
       /* no shared pool, thus no idmap and no unification */
       idmap = 0;
-      if (0 && *sp)
-	{
-	  pool_debug(pool, SAT_ERROR, "store strings don't start with ''\n");
-	  return SOLV_ERROR_CORRUPT;
-	}
       spool->nstrings = numid;
       str[0] = 0;
       for (i = 1; i < spool->nstrings; i++)
@@ -1260,19 +1248,6 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 	        POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", dep2str(pool, repo->idarraydata[ido]));
 #endif
 	      break;
-#if 0
-	    case TYPE_VOID:
-
-	    case TYPE_ATTR_INT:
-	    case TYPE_ATTR_CHUNK:
-	    case TYPE_ATTR_STRING:
-	    case TYPE_ATTR_INTLIST:
-	    case TYPE_ATTR_LOCALIDS:
-	      if (!embedded_store)
-		embedded_store = new_store (pool);
-	      add_attr_from_file (embedded_store, i, id, keys[key].type, idmap, numid, &data, keys[key].size);
-	      break;
-#endif
 	    case TYPE_DIRNUMNUMARRAY:
 	      for (;;)
 		{
@@ -1369,16 +1344,6 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
     }
 
   sat_free(exists);
-#if 0
-  if (embedded_store)
-    {
-      attr_store_pack (embedded_store);
-      /* If we have any attributes we also have pages.  */
-      read_or_setup_pages (fp, embedded_store);
-      /* The NULL name here means embedded attributes.  */
-      repo_add_attrstore (repo, embedded_store, NULL);
-    }
-#endif
   sat_free(idmap);
   mypool = 0;
   return data.error;
@@ -1394,7 +1359,6 @@ static void
 repodata_load_solv(Repodata *data)
 {
   FILE *fp;
-#if 1
   Pool *pool = data->repo->pool;
   if (!pool->loadcallback)
     {   
@@ -1402,9 +1366,6 @@ repodata_load_solv(Repodata *data)
       return;
     }   
   fp = pool->loadcallback(pool, data, pool->loadcallbackdata);
-#else
-  fp = 0;
-#endif
 
   if (!fp)
     {   
