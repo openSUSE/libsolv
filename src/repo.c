@@ -795,6 +795,33 @@ repo_lookup_num(Solvable *s, Id key)
   return 0;
 }
 
+
+/*
+ * generic attribute lookup
+ * returns non-zero if found
+ * zero if not found
+ */
+
+int
+repo_lookup(Solvable *s, Id key, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+{
+  Repo *repo = s->repo;
+  Pool *pool = repo->pool;
+  Repodata *data;
+  int i, s_id;
+
+  s_id = s - pool->solvables;
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      if (s_id < data->start || s_id >= data->end)
+	continue;
+      repodata_search (data, s_id - data->start, key, callback, cbdata);
+      return 1;
+    }
+  return 0;
+}
+
+
 Repodata *
 repo_add_repodata(Repo *repo)
 {
