@@ -102,9 +102,20 @@ typedef struct _Repodata {
 
 } Repodata;
 
-
+/* Search key <keyname> (all keys, if keyname == 0) for Id <entry>
+ * <entry> is _relative_ Id for <data>
+ * Call <callback> for each match
+ */
 void repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
+
+/*
+ * lookup string type attribute
+ */
 const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);
+
+/*
+ * lookup integer type attribute
+ */
 int repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value);
 
 void repodata_extend(Repodata *data, Id p);
