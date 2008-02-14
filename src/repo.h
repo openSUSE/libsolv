@@ -165,7 +165,7 @@ void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*c
 
 /* returns the string value of the attribute, or NULL if not found */
 const char * repo_lookup_str(Solvable *s, Id key);
-/* returns the string value of the attribute, or 0 if not found */
+/* returns the integer value of the attribute, or 0 if not found */
 int repo_lookup_num(Solvable *s, Id key);
 
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
