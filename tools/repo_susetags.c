@@ -369,7 +369,7 @@ tag_from_string (char *cs)
  */
 
 void
-repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
+repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *attrname)
 {
   Pool *pool = repo->pool;
   char *line, *linep;
@@ -383,7 +383,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
   struct parsedata pd;
   Repodata *data = 0;
 
-  if (with_attr)
+  if (attrname)
     {
       data = repo_add_repodata(repo);
       init_attr_ids(pool);
@@ -616,7 +616,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int with_attr)
 	    indesc++;
 	    continue;
 	}
-      if (!with_attr)
+      if (!attrname)
         continue;
       switch (tag)
         {

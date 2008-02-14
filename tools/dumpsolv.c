@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <string.h>
 
+static char *attrname = 0;
+
 #include "pool.h"
 #include "repo_solv.h"
 #if 0
@@ -211,11 +213,36 @@ dump_some_attrs(Repo *repo, Solvable *s)
 static FILE *
 loadcallback (Pool *pool, Repodata *data, void *vdata)
 {
-  FILE *fp;
+  FILE *fp = 0;
   fprintf (stderr, "Loading SOLV file %s\n", data->location);
-  fp = fopen ("test.attr", "r");
+  if (attrname)
+    {
+      fp = fopen (attrname, "r");
+      if (!fp)
+	perror(attrname);
+    }
   return fp;
 }
+
+
+static void
+usage( const char *err )
+{
+  if (err)
+    fprintf (stderr, "\n** Error:\n  %s\n", err);
+  fprintf( stderr, "\nUsage:\n"
+	   "dumpsolv [-a] [-n <attrname>] [<solvfile>]\n"
+	   "  -a            read attributes.\n"
+	   "                If no attribute name (-n) is given,\n"
+	   "                  it is deduced from the .solv name\n"
+	   "                  by replacing '.solv' with '.attr'\n"
+	   "                If neither an attribute name nor a solvfile are given,\n"
+	   "                  the attribute name defaults to 'test.attr'\n"
+	   "  -n <attrname> use <attrname> (evtl. suffixed by '.attr') for attributes\n"
+	   );
+  exit(0);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -223,15 +250,74 @@ int main(int argc, char **argv)
   Pool *pool;
   int i, n;
   Solvable *s;
-
-  if (argc != 1)
+  const char *solvname = 0;
+  
+  argv++;
+  argc--;
+  while (argc--)
     {
-      if (freopen(argv[1], "r", stdin) == 0)
+      const char *s = argv[0];
+      if (*s++ == '-')
+        while (*s)
+          switch (*s++)
+	    {
+	      case 'h': usage(NULL); break;
+	      case 'a':
+	        if (!attrname)
+		  attrname = "";
+	        break;
+	      case 'n':
+	        if (argc)
+		  {
+		    attrname = argv[1];
+		    argv++;
+		    argc--;
+		  }
+	        else
+		  usage("argument required for '-n'");
+		break;
+	      default : break;
+	    }
+      else
 	{
-	  perror(argv[1]);
-	  exit(1);
+	  solvname = argv[0];
+	  if (freopen (solvname, "r", stdin) == 0)
+	    {
+	      perror(solvname);
+	      exit(1);
+	    }
+	  break;
 	}
+      argv++;
     }
+
+  if (attrname) /* attributes wanted */
+    {
+      if (*attrname == 0) /* no attrname given */
+      {
+	if (solvname) /* solvname given -> deduce attrname from it */
+	{
+	  attrname = strdup (solvname);
+	  char *dot = strrchr(attrname, '.');
+          if (dot && !strcmp(dot, ".solv")) /* if it ends in .solv, just keep the dot */
+	    dot[1] = 0;
+	}
+	else
+	  attrname = "test.attr"; /* default to "test.attr" */
+      }
+      
+      /* ensure '.attr' suffix */
+      const char *dot = strrchr(attrname, '.');
+      if (!dot || strcmp(dot, ".attr"))
+      {
+	int len = strlen (attrname);
+	char *newname = (char *)malloc (len + 6); /* alloc for <attrname>+'.attr'+'\0' */
+	strcpy (newname, attrname);
+	strcpy (newname+len, ".attr");
+	attrname = newname;
+      }
+    }
+
   pool = pool_create();
   pool_setdebuglevel(pool, 1);
   pool_setloadcallback(pool, loadcallback, 0);

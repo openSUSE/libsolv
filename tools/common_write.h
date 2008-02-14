@@ -10,6 +10,6 @@
 
 #include "repo.h"
 
-int tool_write(Repo *repo, const char *basename, int separate);
+int tool_write(Repo *repo, const char *basename, const char *attrname);
 
 #endif

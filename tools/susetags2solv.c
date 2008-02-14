@@ -19,24 +19,26 @@
 #include "common_write.h"
 
 static void
-usage(void)
+usage(const char *err)
 {
-  fprintf(stderr, "Usage:\n"
+  if (err)
+    fprintf(stderr, "\n** Error:\n  %s\n", err);
+  fprintf(stderr, "\nUsage:\n"
           "susetags2solv [-a][-s][-c <content>][-h]\n"
 	  "  reads a 'susetags' repository from <stdin> and writes a .solv file to <stdout>\n"
 	  "  -a : with attributes\n"
-	  "  -c : parse given contentfile (for product information)\n"
+	  "  -c <contenfile> : parse given contentfile (for product information)\n"
 	  "  -h : print help & exit\n"
-	  "  -s : test separate\n"
+	  "  -n <name>: save attributes as <name>.attr\n"
 	 );
+   exit(0);
 }
 
 int
 main(int argc, char **argv)
 {
-  int with_attr = 0;
-  int test_separate = 0;
   const char *contentfile = 0;
+  const char *attrname = 0;
   Id vendor = 0;
   argv++;
   argc--;
@@ -47,9 +49,21 @@ main(int argc, char **argv)
         while (*s)
           switch (*s++)
 	    {
-	      case 'h': usage(); exit(0);
-	      case 'a': with_attr = 1; break;
-	      case 's': test_separate = 1; break;
+	      case 'h': usage(NULL); break;
+	      case 'a':
+	        if (attrname == NULL)
+		  attrname = "test.attr";
+	      break;
+	      case 'n':
+	        if (argc)
+		  {
+		    attrname = argv[1];
+		    argv++;
+		    argc--;
+		  }
+	        else
+		  usage("argument required for '-n'");
+		break;
 	      case 'c':
 	        if (argc)
 		  {
@@ -57,6 +71,8 @@ main(int argc, char **argv)
 		    argv++;
 		    argc--;
 		  }
+	        else
+		  usage("argument required for '-c'");
 		break;
 	      default : break;
 	    }
@@ -77,8 +93,21 @@ main(int argc, char **argv)
         vendor = pool->solvables[repo->start].vendor;
       fclose (fp);
     }
-  repo_add_susetags(repo, stdin, vendor, with_attr);
-  tool_write(repo, 0, with_attr && test_separate);
+  if (attrname)
+    {
+      /* ensure '.attr' suffix */
+      const char *dot = strrchr(attrname, '.');
+      if (!dot || strcmp(dot, ".attr"))
+      {
+	int len = strlen (attrname);
+	char *newname = (char *)malloc (len + 6); /* alloc for <attrname>+'.attr'+'\0' */
+	strcpy (newname, attrname);
+	strcpy (newname+len, ".attr");
+	attrname = newname;
+      }
+    }
+  repo_add_susetags(repo, stdin, vendor, attrname);
+  tool_write(repo, 0, attrname);
   pool_free(pool);
   exit(0);
 }

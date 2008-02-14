@@ -70,8 +70,13 @@ keyfilter_attr(Repo *data, Repokey *key, void *kfdata)
   return KEY_STORAGE_INCORE;
 }
 
+/*
+ * Write <repo> to stdout
+ * If <attrname> is given, write attributes to <attrname>
+ */
+
 int
-tool_write(Repo *repo, const char *basename, int separate)
+tool_write(Repo *repo, const char *basename, const char *attrname)
 {
   Pool *pool = repo->pool;
   Repodatafile fileinfoa[1];
@@ -80,14 +85,14 @@ tool_write(Repo *repo, const char *basename, int separate)
 
   create_filter(pool);
   memset (fileinfoa, 0, sizeof fileinfoa);
-  if (separate)
+  if (attrname)
     {
       test_separate = 1;
       fileinfo = fileinfoa;
-      FILE *fp = fopen ("test.attr", "w");
+      FILE *fp = fopen (attrname, "w");
       repo_write(repo, fp, keyfilter_attr, 0, fileinfo, 0);
       fclose (fp);
-      fileinfo->location = strdup ("test.attr");
+      fileinfo->location = strdup (attrname);
       fileinfo++;
 
       nsubfiles = fileinfo - fileinfoa;
