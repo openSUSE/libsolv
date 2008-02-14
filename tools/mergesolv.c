@@ -22,6 +22,17 @@
 #include "repo_solv.h"
 #include "common_write.h"
 
+static void
+usage()
+{
+  fprintf(stderr, "\nUsage:\n"
+	  "mergesolv [file] [file] [...]\n"
+	  "  merges multiple solv files into one and writes it to stdout\n"
+	  );
+  exit(0);
+}
+
+
 int
 main(int argc, char **argv)
 {
@@ -33,6 +44,8 @@ main(int argc, char **argv)
     {
       FILE *fp;
       argv++;
+      if (!strcmp(*argv,"-h"))
+	usage();
       if ((fp = fopen(*argv, "r")) == NULL)
 	{
 	  perror(argv[1]);
