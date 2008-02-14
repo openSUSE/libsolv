@@ -18,6 +18,7 @@
 #include "repo_patchxml.h"
 #include "repo_rpmmd.h"
 
+//#define TESTMM
 
 enum state {
   STATE_START,
@@ -26,6 +27,13 @@ enum state {
   STATE_NAME,
   STATE_ARCH,
   STATE_VERSION,
+  STATE_PKGFILES,
+  STATE_DELTARPM,
+  STATE_DLOCATION,
+  STATE_DCHECKSUM,
+  STATE_DTIME,
+  STATE_DSIZE,
+  STATE_DBASEVERSION,
   STATE_REQUIRES,
   STATE_REQUIRESENTRY,
   STATE_PROVIDES,
@@ -77,6 +85,14 @@ static struct stateswitch stateswitches[] = {
   { STATE_PATCH,       "rpm:freshens",    STATE_FRESHENS, 0 },
   { STATE_PATCH,       "suse:freshens",   STATE_FRESHENS, 0 },
   { STATE_PATCH,       "atoms", 	  STATE_START, 0 },
+  { STATE_PATCH,       "pkgfiles",        STATE_PKGFILES, 0 },
+  { STATE_PKGFILES,    "deltarpm",        STATE_DELTARPM, 0 },
+  { STATE_PKGFILES,    "patchrpm",        STATE_DELTARPM, 0 },
+  { STATE_DELTARPM,    "location",        STATE_DLOCATION, 0 },
+  { STATE_DELTARPM,    "checksum",        STATE_DCHECKSUM, 0 },
+  { STATE_DELTARPM,    "time",            STATE_DTIME, 0 },
+  { STATE_DELTARPM,    "size",            STATE_DSIZE, 0 },
+  { STATE_DELTARPM,    "base-version",    STATE_DBASEVERSION, 0 },
   { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
   { STATE_OBSOLETES,   "rpm:entry",       STATE_OBSOLETESENTRY, 0 },
@@ -105,7 +121,25 @@ struct parsedata {
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
+  char *tempstr;
+  int ltemp;
+  int atemp;
 };
+
+static void
+append_str(struct parsedata *pd, const char *s)
+{
+  if (!s)
+    return;
+  int l = pd->ltemp + strlen(s) + 1;
+  if (l > pd->atemp)
+    {
+      pd->tempstr = realloc(pd->tempstr, l + 256);
+      pd->atemp = l + 256;
+    }
+  strcpy(pd->tempstr + pd->ltemp, s);
+  pd->ltemp += strlen(s);
+}
 
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
@@ -170,6 +204,17 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   fprintf(stderr, "evr: %s\n", pd->content);
 #endif
   return str2id(pool, pd->content, 1);
+}
+
+static const char *
+find_attr(const char *txt, const char **atts)
+{
+  for (; *atts; atts += 2)
+    {
+      if (!strcmp(*atts, txt))
+        return atts[1];
+    }
+  return 0;
 }
 
 static char *flagtab[] = {
@@ -303,6 +348,26 @@ startElement(void *userData, const char *name, const char **atts)
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
       break;
+    case STATE_DELTARPM:
+      *pd->tempstr = 0;
+      pd->ltemp = 0;
+      break;
+    case STATE_DLOCATION:
+      append_str (pd, "loc:");
+      append_str (pd, find_attr("href", atts));
+      break;
+    case STATE_DCHECKSUM:
+      append_str (pd, "chk:");
+      break;
+    case STATE_DTIME:
+      append_str (pd, "tim:");
+      break;
+    case STATE_DSIZE:
+      append_str (pd, "siz:");
+      break;
+    case STATE_DBASEVERSION:
+      append_str (pd, "bve:");
+      break;
     case STATE_VERSION:
       s->evr = makeevr_atts(pool, pd, atts);
       break;
@@ -401,6 +466,11 @@ endElement(void *userData, const char *name)
     case STATE_ARCH:
       s->arch = str2id(pool, pd->content, 1);
       break;
+    case STATE_DELTARPM:
+#ifdef TESTMM
+      fprintf (stderr, "found deltarpm for %s: %s\n", id2str(pool, s->name), pd->tempstr);
+#endif
+      break;
     default:
       break;
     }
@@ -455,6 +525,9 @@ repo_add_patchxml(Repo *repo, FILE *fp)
   pd.content = malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
+  pd.tempstr = malloc(256);
+  pd.atemp = 256;
+  pd.ltemp = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   XML_SetElementHandler(parser, startElement, endElement);
