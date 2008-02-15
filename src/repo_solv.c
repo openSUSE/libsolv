@@ -1262,7 +1262,26 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 		    break;
 		}
 	      break;
-	
+	    case TYPE_DIRSTRARRAY:
+	      for (;;)
+		{
+		  did = read_id(&data, 0);
+		  if (keys[key].storage == KEY_STORAGE_INCORE)
+		    {
+		      incore_add_id(&data, did);
+		      while ((h = read_u8(&data)) != 0)
+			incore_add_u8(&data, h);
+		      incore_add_u8(&data, 0);
+		    }
+		  else
+		    {
+		      while (read_u8(&data) != 0)
+			;
+		    }
+		  if (!(did & 0x40))
+		    break;
+		}
+	      break;
 	    default:
 	      skip_item(&data, keys[key].type, numid, numrel);
 	    }

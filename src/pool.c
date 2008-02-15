@@ -636,7 +636,9 @@ pool_setdebuglevel(Pool *pool, int level)
 /*************************************************************************/
 
 struct searchfiles {
-  const char **files;
+  Id *ids;
+  char **dirs;
+  char **names;
   int nfiles;
   Map seen;
 };
@@ -647,7 +649,7 @@ static void
 pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct searchfiles *isf)
 {
   Id dep, sid;
-  const char *s;
+  const char *s, *sr;
 
   while ((dep = *ida++) != 0)
     {
@@ -696,24 +698,66 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       s = id2str(pool, dep);
       if (*s != '/')
 	continue;
-      sf->files = sat_extend(sf->files, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
-      sf->files[sf->nfiles++] = strdup(s);
+      sf->ids = sat_extend(sf->ids, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
+      sf->dirs = sat_extend(sf->dirs, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
+      sf->names = sat_extend(sf->names, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
+      sf->ids[sf->nfiles] = dep;
+      sr = strrchr(s, '/');
+      sf->names[sf->nfiles] = strdup(sr + 1);
+      sf->dirs[sf->nfiles] = sat_malloc(sr - s + 1);
+      if (sr != s)
+        strncpy(sf->dirs[sf->nfiles], s, sr - s);
+      sf->dirs[sf->nfiles][sr - s] = 0;
+      sf->nfiles++;
     }
 }
 
-#if 0
+struct addfileprovides_cbdata {
+  int nfiles;
+  Id *ids;
+  char **dirs;
+  char **names;
+
+  Repodata *olddata;
+  Id *dids;
+  Map useddirs;
+};
+
 static int
-addfileprovides_cb(void *data, Solvable *s, Id key, const char *str)
+addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *value)
 {
+  struct addfileprovides_cbdata *cbd = cbdata;
   Pool *pool = s->repo->pool;
+  int i;
   Id id;
-  id = str2id(pool, str, 0);
-  if (!id)
-    return 0;	/* can't happen */
-  s->provides = repo_addid_dep(s->repo, s->provides, id, SOLVABLE_FILEMARKER);
+
+  if (data != cbd->olddata)
+    {
+      map_free(&cbd->useddirs);
+      map_init(&cbd->useddirs, data->dirpool.ndirs);
+      for (i = 0; i < cbd->nfiles; i++)
+	{
+	  Id did = repodata_str2dir(data, cbd->dirs[i], 0);
+          cbd->dids[i] = did;
+	  if (did)
+	    MAPSET(&cbd->useddirs, did);
+	}
+      cbd->olddata = data;
+    }
+  if (!MAPTST(&cbd->useddirs, value->id))
+    return 0;
+  for (i = 0; i < cbd->nfiles; i++)
+    {
+      if (cbd->dids[i] != value->id)
+	continue;
+      if (!strcmp(cbd->names[i], value->str))
+	break;
+    }
+  if (i == cbd->nfiles)
+    return 0;
+  s->provides = repo_addid_dep(s->repo, s->provides, cbd->ids[i], SOLVABLE_FILEMARKER);
   return 0;
 }
-#endif
 
 void
 pool_addfileprovides(Pool *pool, Repo *installed)
@@ -721,7 +765,11 @@ pool_addfileprovides(Pool *pool, Repo *installed)
   Solvable *s;
   Repo *repo;
   struct searchfiles sf, isf;
+  struct addfileprovides_cbdata cbd;
   int i;
+  Id id_filelist;
+
+  id_filelist = str2id(pool, "filelist", 1);
 
   memset(&sf, 0, sizeof(sf));
   map_init(&sf.seen, pool->ss.nstrings + pool->nrels);
@@ -754,32 +802,54 @@ pool_addfileprovides(Pool *pool, Repo *installed)
   map_free(&isf.seen);
   POOL_DEBUG(SAT_DEBUG_STATS, "found %d file dependencies\n", sf.nfiles);
   POOL_DEBUG(SAT_DEBUG_STATS, "found %d installed file dependencies\n", isf.nfiles);
+  cbd.dids = 0;
+  map_init(&cbd.useddirs, 1);
   if (sf.nfiles)
     {
 #if 0
       for (i = 0; i < sf.nfiles; i++)
-	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", sf.files[i]);
+	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", id2str(pool, sf.ids[i]));
 #endif
-      sf.files = sat_extend(sf.files, sf.nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
-      sf.files[sf.nfiles++] = 0;
-#if 0
-      pool_search(0, SOLVABLE_FILELIST, (const char *)sf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);
-#endif
-      sat_free(sf.files);
+      cbd.nfiles = sf.nfiles;
+      cbd.ids = sf.ids;
+      cbd.dirs = sf.dirs;
+      cbd.names = sf.names;
+      cbd.olddata = 0;
+      cbd.dids = sat_realloc2(cbd.dids, sf.nfiles, sizeof(Id));
+      pool_search(pool, 0, id_filelist, 0, 0, addfileprovides_cb, &cbd);
+      sat_free(sf.ids);
+      for (i = 0; i < sf.nfiles; i++)
+	{
+	  sat_free(sf.dirs[i]);
+	  sat_free(sf.names[i]);
+	}
+      sat_free(sf.dirs);
+      sat_free(sf.names);
     }
   if (isf.nfiles && installed)
     {
 #if 0
       for (i = 0; i < isf.nfiles; i++)
-	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", isf.files[i]);
+	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", id2str(pool, isf.ids[i]));
 #endif
-      isf.files = sat_extend(isf.files, isf.nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
-      isf.files[isf.nfiles++] = 0;
-#if 0
-      repo_search(installed, 0, SOLVABLE_FILELIST, (const char *)isf.files, SEARCH_STRING|SEARCH_MULTIPLE, addfileprovides_cb, 0);
-#endif
-      sat_free(isf.files);
+      cbd.nfiles = isf.nfiles;
+      cbd.ids = isf.ids;
+      cbd.dirs = isf.dirs;
+      cbd.names = isf.names;
+      cbd.olddata = 0;
+      cbd.dids = sat_realloc2(cbd.dids, isf.nfiles, sizeof(Id));
+      repo_search(installed, 0, id_filelist, 0, 0, addfileprovides_cb, &cbd);
+      sat_free(isf.ids);
+      for (i = 0; i < isf.nfiles; i++)
+	{
+	  sat_free(isf.dirs[i]);
+	  sat_free(isf.names[i]);
+	}
+      sat_free(isf.dirs);
+      sat_free(isf.names);
     }
+  map_free(&cbd.useddirs);
+  sat_free(cbd.dids);
   pool_freewhatprovides(pool);	/* as we have added provides */
 }
 

@@ -127,6 +127,7 @@ void repodata_set_constant(Repodata *data, Id entry, Id keyname, Id constant);
 void repodata_set_void(Repodata *data, Id entry, Id keyname);
 void repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str);
 void repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2);
+void repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *str);
 void repodata_merge_attrs (Repodata *data, Id dest, Id src);
 
 void repodata_internalize(Repodata *data);

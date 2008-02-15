@@ -765,6 +765,63 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, nu
 }
 
 void
+repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *str)
+{
+  Id *ida, *pp, stroff;
+  Repokey key;
+  int l;
+
+  l = strlen(str) + 1;
+  data->attrdata = sat_realloc(data->attrdata, data->attrdatalen + l);
+  memcpy(data->attrdata + data->attrdatalen, str, l);
+  stroff = data->attrdatalen;
+  data->attrdatalen += l;
+
+#if 0
+fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->attriddatalen);
+#endif
+  if (data->attrs && data->attrs[entry])
+    {
+      for (pp = data->attrs[entry]; *pp; pp += 2)
+        if (data->keys[*pp].name == keyname && data->keys[*pp].type == TYPE_DIRSTRARRAY)
+	  break;
+      if (*pp)
+	{
+	  int oldsize = 0;
+	  for (ida = data->attriddata + pp[1]; *ida; ida += 2)
+	    oldsize += 2;
+	  if (ida + 1 == data->attriddata + data->attriddatalen)
+	    {
+	      /* this was the last entry, just append it */
+	      data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + 2, sizeof(Id));
+	      data->attriddatalen--;	/* overwrite terminating 0  */
+	    }
+	  else
+	    {
+	      /* too bad. move to back. */
+	      data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + oldsize + 3, sizeof(Id));
+	      memcpy(data->attriddata + data->attriddatalen, data->attriddata + pp[1], oldsize * sizeof(Id));
+	      pp[1] = data->attriddatalen;
+	      data->attriddatalen += oldsize;
+	    }
+	  data->attriddata[data->attriddatalen++] = dir;
+	  data->attriddata[data->attriddatalen++] = stroff;
+	  data->attriddata[data->attriddatalen++] = 0;
+	  return;
+	}
+    }
+  key.name = keyname;
+  key.type = TYPE_DIRSTRARRAY;
+  key.size = 0;
+  key.storage = KEY_STORAGE_INCORE;
+  data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + 3, sizeof(Id));
+  repodata_set(data, entry, &key, data->attriddatalen);
+  data->attriddata[data->attriddatalen++] = dir;
+  data->attriddata[data->attriddatalen++] = stroff;
+  data->attriddata[data->attriddatalen++] = 0;
+}
+
+void
 repodata_merge_attrs (Repodata *data, Id dest, Id src)
 {
   Id *keyp;
@@ -1022,6 +1079,13 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 		      data_addid(xd, ida[0]);
 		      data_addid(xd, ida[1]);
 		      data_addideof(xd, ida[2], ida[3] ? 0 : 1);
+		    }
+		  break;
+		case TYPE_DIRSTRARRAY:
+		  for (ida = data->attriddata + id; *ida; ida += 2)
+		    {
+		      data_addideof(xd, ida[0], ida[2] ? 0 : 1);
+		      data_addblob(xd, data->attrdata + ida[1], strlen((char *)(data->attrdata + ida[1])) + 1);
 		    }
 		  break;
 		default:

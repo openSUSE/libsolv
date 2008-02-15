@@ -110,7 +110,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   /* extend whatprovides_rel if needed */
   if (pool->whatprovides_rel && (id & WHATPROVIDES_BLOCK) == 0)
     {
-      pool->whatprovides_rel = sat_realloc(pool->whatprovides_rel, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      pool->whatprovides_rel = sat_realloc2(pool->whatprovides_rel, id + (WHATPROVIDES_BLOCK + 1), sizeof(Offset));
       memset(pool->whatprovides_rel + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
     }
   return MAKERELDEP(id);
