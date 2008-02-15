@@ -119,7 +119,9 @@ struct deltarpm {
   Id *bevr;
   unsigned nbevr;
   /* If deltarpm, then this is filled.  */
-  char *sequence_info;
+  Id seqname;
+  Id seqevr;
+  char *seqnum;
 };
 
 struct parsedata {
@@ -442,7 +444,29 @@ startElement(void *userData, const char *name, const char **atts)
       break;
     case STATE_DBASEVERSION:
       if ((str = find_attr("sequence_info", atts)))
-        pd->delta.sequence_info = strdup(str);
+	{
+	  const char *s1, *s2;
+	  s1 = strrchr(str, '-');
+	  if (s1)
+	    {
+	      for (s2 = s1 - 1; s2 > str; s2--)
+	        if (*s2 == '-')
+		  break;
+	      if (*s2 == '-')
+	        {
+		  for (s2 = s2 - 1; s2 > str; s2--)
+		    if (*s2 == '-')
+		      break;
+		  if (*s2 == '-')
+		    {
+		      pd->delta.seqevr = strn2id(pool, s2 + 1, s1 - s2 - 1, 1);
+		      pd->delta.seqname = strn2id(pool, str, s2 - str, 1);
+		      str = s1 + 1;
+		    }
+		}
+	    }
+	  pd->delta.seqnum = strdup(str);
+	}
       pd->delta.nbevr++;
       pd->delta.bevr = sat_realloc (pd->delta.bevr, pd->delta.nbevr * sizeof(Id));
       pd->delta.bevr[pd->delta.nbevr - 1] = makeevr_atts(pool, pd, atts);
@@ -558,10 +582,17 @@ endElement(void *userData, const char *name)
 	fprintf (stderr, "  size: %d down, %d archive\n", d->downloadsize,
 		 d->archivesize);
 	fprintf (stderr, "  chek: %s\n", d->filechecksum);
-	if (d->sequence_info)
+	if (d->seqnum)
 	  {
-	    fprintf (stderr, "  base: %s, seq: %s\n", id2str(pool, d->bevr[0]),
-	    	     d->sequence_info);
+	    fprintf (stderr, "  base: %s, seq: %s %s %s\n",
+		     id2str(pool, d->bevr[0]), id2str(pool, d->seqname),
+		     id2str(pool, d->seqevr), d->seqnum);
+	    if (d->seqevr != d->bevr[0])
+	      fprintf (stderr, "XXXXX evr\n");
+	    /* Name of package ("atom:xxxx") should match the sequence info
+	       name.  */
+	    if (strcmp(id2str(pool, d->seqname), id2str(pool, s->name) + 5))
+	      fprintf (stderr, "XXXXX name\n");
 	  }
 	else
 	  {
@@ -574,7 +605,7 @@ endElement(void *userData, const char *name)
 #endif
       free(pd->delta.filechecksum);
       free(pd->delta.bevr);
-      free(pd->delta.sequence_info);
+      free(pd->delta.seqnum);
       break;
     case STATE_DCHECKSUM:
       pd->delta.filechecksum = strdup(pd->content);
