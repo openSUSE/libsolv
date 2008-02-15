@@ -89,7 +89,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PKGFILES,    "deltarpm",        STATE_DELTARPM, 0 },
   { STATE_PKGFILES,    "patchrpm",        STATE_DELTARPM, 0 },
   { STATE_DELTARPM,    "location",        STATE_DLOCATION, 0 },
-  { STATE_DELTARPM,    "checksum",        STATE_DCHECKSUM, 0 },
+  { STATE_DELTARPM,    "checksum",        STATE_DCHECKSUM, 1 },
   { STATE_DELTARPM,    "time",            STATE_DTIME, 0 },
   { STATE_DELTARPM,    "size",            STATE_DSIZE, 0 },
   { STATE_DELTARPM,    "base-version",    STATE_DBASEVERSION, 0 },
@@ -104,6 +104,22 @@ static struct stateswitch stateswitches[] = {
   { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
   { STATE_FRESHENS,    "suse:entry",      STATE_FRESHENSENTRY, 0 },
   { NUMSTATES}
+};
+
+/* Cumulated info about the current deltarpm or patchrpm */
+struct deltarpm {
+  Id locdir;
+  Id locname;
+  Id locevr;
+  Id locsuffix;
+  unsigned buildtime;
+  unsigned downloadsize, archivesize;
+  char *filechecksum;
+  /* Baseversions.  deltarpm only has one, patchrpm may have more.  */
+  Id *bevr;
+  unsigned nbevr;
+  /* If deltarpm, then this is filled.  */
+  char *sequence_info;
 };
 
 struct parsedata {
@@ -124,6 +140,7 @@ struct parsedata {
   char *tempstr;
   int ltemp;
   int atemp;
+  struct deltarpm delta;
 };
 
 static void
@@ -289,6 +306,7 @@ startElement(void *userData, const char *name, const char **atts)
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
+  const char *str;
 
   if (pd->depth != pd->statedepth)
     {
@@ -349,24 +367,85 @@ startElement(void *userData, const char *name, const char **atts)
 #endif
       break;
     case STATE_DELTARPM:
+      memset(&pd->delta, 0, sizeof (pd->delta));
       *pd->tempstr = 0;
       pd->ltemp = 0;
       break;
     case STATE_DLOCATION:
-      append_str (pd, "loc:");
-      append_str (pd, find_attr("href", atts));
-      break;
-    case STATE_DCHECKSUM:
-      append_str (pd, "chk:");
+      if ((str = find_attr("href", atts)))
+        {
+	  /* Separate the filename into its different parts.
+	     rpm/x86_64/alsa-1.0.14-31_31.2.x86_64.delta.rpm
+	     --> dir = rpm/x86_64
+	         name = alsa
+		 evr = 1.0.14-31_31.2
+		 suffix = x86_64.delta.rpm.  */
+          char *real_str = strdup(str);
+	  char *s = real_str;
+          char *s1, *s2;
+	  s1 = strrchr (s, '/');
+	  if (s1)
+	    {
+	      pd->delta.locdir = strn2id(pool, s, s1 - s, 1);
+	      s = s1 + 1;
+	    }
+	  /* Guess suffix.  */
+	  s1 = strrchr (s, '.');
+	  if (s1)
+	    {
+	      for (s2 = s1 - 1; s2 > s; s2--)
+	        if (*s2 == '.')
+		  break;
+	      if (!strcmp (s2, ".delta.rpm") || !strcmp (s2, ".patch.rpm"))
+		{
+	          s1 = s2;
+		  /* We accept one more item as suffix.  */
+		  for (s2 = s1 - 1; s2 > s; s2--)
+		    if (*s2 == '.')
+		      break;
+		  s1 = s2;
+		}
+	      if (*s1 == '.')
+	        *s1++ = 0;
+	      pd->delta.locsuffix = str2id(pool, s1, 1); 
+	    }
+	  /* Last '-'.  */
+	  s1 = strrchr (s, '-');
+	  if (s1)
+	    {
+	      /* Second to last '-'.  */
+	      for (s2 = s1 - 1; s2 > s; s2--)
+	        if (*s2 == '-')
+	          break;
+	    }
+	  else
+	    s2 = 0;
+	  if (s2 > s && *s2 == '-')
+	    {
+	      *s2++ = 0;
+	      pd->delta.locevr = str2id(pool, s2, 1);
+	    }
+	  pd->delta.locname = str2id(pool, s, 1);
+	  free(real_str);
+        }
       break;
     case STATE_DTIME:
-      append_str (pd, "tim:");
+      str = find_attr("build", atts);
+      if (str)
+	pd->delta.buildtime = atoi(str);
       break;
     case STATE_DSIZE:
-      append_str (pd, "siz:");
+      if ((str = find_attr("package", atts)))
+	pd->delta.downloadsize = atoi(str);
+      if ((str = find_attr("archive", atts)))
+	pd->delta.archivesize = atoi(str);
       break;
     case STATE_DBASEVERSION:
-      append_str (pd, "bve:");
+      if ((str = find_attr("sequence_info", atts)))
+        pd->delta.sequence_info = strdup(str);
+      pd->delta.nbevr++;
+      pd->delta.bevr = sat_realloc (pd->delta.bevr, pd->delta.nbevr * sizeof(Id));
+      pd->delta.bevr[pd->delta.nbevr - 1] = makeevr_atts(pool, pd, atts);
       break;
     case STATE_VERSION:
       s->evr = makeevr_atts(pool, pd, atts);
@@ -468,8 +547,37 @@ endElement(void *userData, const char *name)
       break;
     case STATE_DELTARPM:
 #ifdef TESTMM
-      fprintf (stderr, "found deltarpm for %s: %s\n", id2str(pool, s->name), pd->tempstr);
+      {
+	int i;
+        struct deltarpm *d = &pd->delta;
+	fprintf (stderr, "found deltarpm for %s:\n", id2str(pool, s->name));
+	fprintf (stderr, "   loc: %s %s %s %s\n", id2str(pool, d->locdir),
+	         id2str(pool, d->locname), id2str(pool, d->locevr),
+		 id2str(pool, d->locsuffix));
+	fprintf (stderr, "  time: %u\n", d->buildtime);
+	fprintf (stderr, "  size: %d down, %d archive\n", d->downloadsize,
+		 d->archivesize);
+	fprintf (stderr, "  chek: %s\n", d->filechecksum);
+	if (d->sequence_info)
+	  {
+	    fprintf (stderr, "  base: %s, seq: %s\n", id2str(pool, d->bevr[0]),
+	    	     d->sequence_info);
+	  }
+	else
+	  {
+	    fprintf (stderr, "  base:");
+	    for (i = 0; i < d->nbevr; i++)
+	      fprintf (stderr, " %s", id2str(pool, d->bevr[i]));
+	    fprintf (stderr, "\n");
+	  }
+      }
 #endif
+      free(pd->delta.filechecksum);
+      free(pd->delta.bevr);
+      free(pd->delta.sequence_info);
+      break;
+    case STATE_DCHECKSUM:
+      pd->delta.filechecksum = strdup(pd->content);
       break;
     default:
       break;
