@@ -560,6 +560,9 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       case SOLV_VERSION_3:
       case SOLV_VERSION_4:
       case SOLV_VERSION_5:
+      /* Version 6 existed only intermittantly.  It's equivalent to
+	 version 5.  */
+      case 6:
         break;
       default:
         pool_debug(pool, SAT_ERROR, "unsupported SOLV version\n");
