@@ -398,7 +398,7 @@ struct cbdata {
 #define SCHEMATADATA_BLOCK 255
 #define EXTDATA_BLOCK 1023
 
-void
+static void
 data_addid(struct extdata *xd, Id x)
 {
   unsigned char *dp;
@@ -419,7 +419,7 @@ data_addid(struct extdata *xd, Id x)
   xd->len = dp - xd->buf;
 }
 
-void
+static void
 data_addideof(struct extdata *xd, Id x, int eof)
 {
   if (x >= 64)
@@ -427,7 +427,7 @@ data_addideof(struct extdata *xd, Id x, int eof)
   data_addid(xd, (eof ? x: x | 64));
 }
 
-void
+static void
 data_addblob(struct extdata *xd, unsigned char *blob, int len)
 {
   xd->buf = sat_extend(xd->buf, xd->len, len, 1, EXTDATA_BLOCK);
@@ -494,7 +494,7 @@ putinownpool(struct cbdata *cbdata, Stringpool *ss, Id id)
   return id;
 }
 
-Id
+static Id
 putinowndirpool(struct cbdata *cbdata, Repodata *data, Dirpool *dp, Id dir)
 {
   Id compid, parent;
@@ -528,7 +528,7 @@ setdirused(struct cbdata *cbdata, Dirpool *dp, Id dir)
   cbdata->dirused[0] = 2;
 }
 
-int
+static int
 repo_write_cb_needed(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
   struct cbdata *cbdata = vcbdata;
@@ -555,6 +555,7 @@ repo_write_cb_needed(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, K
 	break;
       case TYPE_DIR:
       case TYPE_DIRNUMNUMARRAY:
+      case TYPE_DIRSTRARRAY:
 	id = kv->id;
 	if (cbdata->owndirpool)
 	  putinowndirpool(cbdata, data, &data->dirpool, id);
@@ -567,7 +568,7 @@ repo_write_cb_needed(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, K
   return 0;
 }
 
-int
+static int
 repo_write_cb_sizes(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
   struct cbdata *cbdata = vcbdata;
@@ -901,7 +902,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	  repodataused[i] = 1;
 	  if (key->type != TYPE_STR && key->type != TYPE_U32)
 	    idused = 1;
-	  if (key->type == TYPE_DIR || key->type == TYPE_DIRNUMNUMARRAY)
+	  if (key->type == TYPE_DIR || key->type == TYPE_DIRNUMNUMARRAY || key->type == TYPE_DIRSTRARRAY)
 	    dirused = 1;
 	}
       if (idused)

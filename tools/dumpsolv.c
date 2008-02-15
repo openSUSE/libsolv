@@ -169,6 +169,11 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
       printdir(data, kv->id);
       printf(" %d %d\n", kv->num, kv->num2);
       break;
+    case TYPE_DIRSTRARRAY:
+      printf("%s: ", keyname);
+      printdir(data, kv->id);
+      printf("/%s\n", kv->str);
+      break;
     default:
       printf("%s: ?\n", keyname);
       break;

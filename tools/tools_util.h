@@ -154,6 +154,7 @@ static Id id_nosource;
 static Id id_source;
 static Id id_sourceid;
 static Id id_time;
+static Id id_filelist;
 
 /* resobject */
 static Id id_summary;
@@ -200,6 +201,7 @@ static void init_attr_ids(Pool *pool)
   id_source = str2id(pool, "source", 1);
   id_sourceid = str2id(pool, "sourceid", 1);
   id_time = str2id(pool, "time", 1);
+  id_filelist = str2id(pool, "filelist", 1);
 
   id_isvisible = str2id(pool, "isvisible", 1);
 
