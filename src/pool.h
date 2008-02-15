@@ -73,6 +73,8 @@ extern "C" {
 
 struct _Repo;
 struct _Repodata;
+struct _Repokey;
+struct _KeyValue;
 
 struct _Pool {
   struct _Stringpool ss;
@@ -278,6 +280,13 @@ static inline void pool_setloadcallback(Pool *pool, FILE *(*cb)(struct _Pool *, 
   pool->loadcallback = cb;
   pool->loadcallbackdata = loadcbdata;
 }
+
+/* search the pool. the following filters are available:
+ *   p     - search just this solvable
+ *   key   - search only this key
+ *   match - key must match this string
+ */
+void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, struct _Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
 
 /* loop over all providers of d */
 #define FOR_PROVIDES(v, vp, d) 						\

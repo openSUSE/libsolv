@@ -1003,4 +1003,18 @@ pool_fill_DU(Pool *pool, struct mountpoint *mps, int nmps)
 
 #endif
 
+void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, struct _Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata)
+{
+  if (p)
+    {
+      if (pool->solvables[p].repo)
+        repo_search(pool->solvables[p].repo, p, key, match, flags, callback, cbdata);
+      return;
+    }
+  /* FIXME: obey callback return value! */
+  for (p = 1; p < pool->nsolvables; p++)
+    if (pool->solvables[p].repo)
+      repo_search(pool->solvables[p].repo, p, key, match, flags, callback, cbdata);
+}
+
 // EOF
