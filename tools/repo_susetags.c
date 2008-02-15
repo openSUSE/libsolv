@@ -663,6 +663,15 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
           case CTAG('=', 'D', 'e', 'l'):
 	    repodata_set_str(data, last_found_pack, id_messagedel, line + 6);
 	    continue;
+          case CTAG('=', 'V', 'i', 's'):
+	    {
+	      /* Accept numbers and textual bools.  */
+	      unsigned k;
+	      k = atoi (line + 6);
+	      if (k || !strcasecmp (line + 6, "true"))
+	        repodata_set_constant(data, last_found_pack, id_isvisible, 1);
+	    }
+	    continue;
           case CTAG('=', 'S', 'h', 'r'):
 	    if (last_found_pack >= pd.nshare)
 	      {

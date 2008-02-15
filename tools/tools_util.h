@@ -163,6 +163,8 @@ static Id id_downloadsize;
 static Id id_installtime;
 static Id id_installonly;
 
+static Id id_isvisible;
+
 static void init_attr_ids(Pool *pool)
 {
   id_size = str2id(pool, "size", 1);;
@@ -191,6 +193,8 @@ static void init_attr_ids(Pool *pool)
   id_source = str2id(pool, "source", 1);
   id_sourceid = str2id(pool, "sourceid", 1);
   id_time = str2id(pool, "time", 1);
+
+  id_isvisible = str2id(pool, "isvisible", 1);
 }
 
 /* util function to set a translated string */
