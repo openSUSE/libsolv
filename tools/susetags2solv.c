@@ -27,8 +27,9 @@ usage(const char *err)
           "susetags2solv [-a][-s][-c <content>][-h]\n"
 	  "  reads a 'susetags' repository from <stdin> and writes a .solv file to <stdout>\n"
 	  "  -a : with attributes\n"
-	  "  -c <contenfile> : parse given contentfile (for product information)\n"
+	  "  -c <contentfile> : parse given contentfile (for product information)\n"
 	  "  -h : print help & exit\n"
+	  "  -k : don't mix kinds (experimental!)\n"
 	  "  -n <name>: save attributes as <name>.attr\n"
 	 );
    exit(0);
@@ -40,6 +41,7 @@ main(int argc, char **argv)
   const char *contentfile = 0;
   const char *attrname = 0;
   Id vendor = 0;
+  int flags = 0;
   argv++;
   argc--;
   while (argc--)
@@ -70,6 +72,9 @@ main(int argc, char **argv)
 	        else
 		  usage("argument required for '-c'");
 		break;
+	      case 'k':
+	        flags |= SUSETAGS_KINDS_SEPARATELY;
+	      break;
 	      default : break;
 	    }
       argv++;
@@ -102,7 +107,7 @@ main(int argc, char **argv)
 	attrname = newname;
       }
     }
-  repo_add_susetags(repo, stdin, vendor);
+  repo_add_susetags(repo, stdin, vendor, flags);
   tool_write(repo, 0, attrname);
   pool_free(pool);
   exit(0);

@@ -9,4 +9,6 @@
  * if <attrname> given, write attributes as '<attrname>.attr'
  */
 
-extern void repo_add_susetags(Repo *repo, FILE *fp, Id vendor);
+#define SUSETAGS_KINDS_SEPARATELY 1
+
+extern void repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags);

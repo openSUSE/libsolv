@@ -134,7 +134,9 @@ join2(const char *s1, const char *s2, const char *s3)
 //   return pd->tmp;
 // }
 
-// packages
+/* key Ids */
+
+/* packages */
 static Id id_authors;
 static Id id_description;
 static Id id_diskusage;
@@ -164,6 +166,11 @@ static Id id_installtime;
 static Id id_installonly;
 
 static Id id_isvisible;
+
+/* experimental */
+static Id id_must;
+static Id id_should;
+static Id id_may;
 
 static void init_attr_ids(Pool *pool)
 {
@@ -195,6 +202,11 @@ static void init_attr_ids(Pool *pool)
   id_time = str2id(pool, "time", 1);
 
   id_isvisible = str2id(pool, "isvisible", 1);
+
+  id_must = str2id(pool, "must", 1);
+  id_should = str2id(pool, "should", 1);
+  id_may = str2id(pool, "may", 1);
+
 }
 
 /* util function to set a translated string */
@@ -205,5 +217,4 @@ void repodata_set_tstr(Repodata *data, Id rid, const char *attrname, const char 
   repodata_set_str(data, rid, attrid, str);
 }
 
-#endif
-
+#endif /* SATSOLVER_TOOLS_UTIL_H */

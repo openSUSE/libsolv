@@ -52,8 +52,8 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   Id id, evrid;
   char *sp[4];
 
-  i = split(line + 5, sp, 4); /* name, ?, evr, ? */
-  if (i != 1 && i != 3) /* expect either 'name' or 'name' '-' 'evr' */
+  i = split(line + 5, sp, 4); /* name, <op>, evr, ? */
+  if (i != 1 && i != 3) /* expect either 'name' or 'name' <op> 'evr' */
     {
       fprintf(stderr, "Bad dependency line: %s\n", line);
       exit(1);
@@ -77,6 +77,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
     }
   return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
+
 
 /*
  * add_location
@@ -365,10 +366,27 @@ tag_from_string (char *cs)
  * repo_add_susetags
  * Parse susetags file passed in fp, fill solvables into repo
  * 
+ * susetags is key,value based
+ *  for short values
+ *    =key: value
+ *  is used
+ *  for long (multi-line) values,
+ *    +key:
+ *    value
+ *    value
+ *    -key:
+ *  is used
+ *
+ * See http://en.opensuse.org/Standards/YaST2_Repository_Metadata
+ * and http://en.opensuse.org/Standards/YaST2_Repository_Metadata/packages
+ * and http://en.opensuse.org/Standards/YaST2_Repository_Metadata/pattern
+ * 
+ * Assumptions:
+ *   All keys have 3 characters and end in ':'
  */
 
 void
-repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
+repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
 {
   Pool *pool = repo->pool;
   char *line, *linep;
@@ -396,31 +414,44 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
   linep = line;
   s = 0;
 
+  /*
+   * read complete file
+   * 
+   * collect values in 'struct parsedata pd'
+   * then build .solv (and .attr) file
+   */
+  
   for (;;)
     {
       unsigned tag;
-      if (linep - line + 16 > aline)
+      if (linep - line + 16 > aline)              /* (re-)alloc buffer */
 	{
 	  aline = linep - line;
 	  line = realloc(line, aline + 512);
 	  linep = line + aline;
 	  aline += 512;
 	}
-      if (!fgets(linep, aline - (linep - line), fp))
+      if (!fgets(linep, aline - (linep - line), fp)) /* read line */
 	break;
       linep += strlen(linep);
       if (linep == line || linep[-1] != '\n')
         continue;
       *--linep = 0;
+      
       if (intag)
 	{
-	  int isend = linep[-intag - 2] == '-' && linep[-1] == ':' && !strncmp(linep - 1 - intag, line + 1, intag) && (linep == line + 1 + intag + 1 + 1 + 1 + intag + 1 || linep[-intag - 3] == '\n');
-	  if (cummulate && !isend)
+	  /* check for multi-line value tags (+Key:/-Key:) */
+	  
+	  int is_end = (linep[-intag - 2] == '-')
+	              && (linep[-1] == ':')
+	              && !strncmp(linep - 1 - intag, line + 1, intag)
+		      && (linep == line + 1 + intag + 1 + 1 + 1 + intag + 1 || linep[-intag - 3] == '\n');
+	  if (cummulate && !is_end)
 	    {
 	      *linep++ = '\n';
 	      continue;
 	    }
-	  if (cummulate && isend)
+	  if (cummulate && is_end)
 	    {
 	      linep[-intag - 2] = 0;
 	      if (linep[-intag - 3] == '\n')
@@ -428,18 +459,19 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 	      linep = line;
 	      intag = 0;
 	    }
-	  if (!cummulate && isend)
+	  if (!cummulate && is_end)
 	    {
 	      intag = 0;
 	      linep = line;
 	      continue;
 	    }
-	  if (!cummulate && !isend)
+	  if (!cummulate && !is_end)
 	    linep = line + intag + 3;
 	}
       else
 	linep = line;
-      if (!intag && line[0] == '+' && line[1] && line[1] != ':')
+
+      if (!intag && line[0] == '+' && line[1] && line[1] != ':') /* start of +Key:/-Key: tag */
 	{
 	  char *tagend = strchr(line, ':');
 	  if (!tagend)
@@ -449,8 +481,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 	    }
 	  intag = tagend - (line + 1);
 	  cummulate = 0;
-	  switch (tag_from_string (line))
+	  switch (tag_from_string (line))       /* check if accumulation is needed */
 	    {
+	      case CTAG('+', 'P', 'r', 'q'):
+	      case CTAG('+', 'P', 'r', 'c'):
+	      case CTAG('+', 'P', 's', 'g'):
+	        if (!pd.kind || !(flags & SUSETAGS_KINDS_SEPARATELY))
+		  break;
 	      case CTAG('+', 'D', 'e', 's'):
 	      case CTAG('+', 'E', 'u', 'l'):
 	      case CTAG('+', 'I', 'n', 's'):
@@ -459,7 +496,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 	        if (line[4] == ':')
 	          cummulate = 1;
 	    }
-	  line[0] = '=';
+	  line[0] = '=';                       /* handle lines between +Key:/-Key: as =Key: */
 	  line[intag + 2] = ' ';
 	  linep = line + intag + 3;
 	  continue;
@@ -471,6 +508,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
       tag = tag_from_string (line);
 
 
+      /*
+       * start of (next) package or pattern
+       *
+       * =Pkg: <name> <version> <release> <architecture>
+       * (=Pat: ...)
+       */
+      
       if ((tag == CTAG('=', 'P', 'k', 'g')
 	   || tag == CTAG('=', 'P', 'a', 't')))
 	{
@@ -492,9 +536,18 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 		commit_diskusage (&pd, last_found_pack);
 	    }
 
+	  /*
+	   * define kind
+	   */
+	  
 	  pd.kind = 0;
 	  if (line[3] == 't')
 	    pd.kind = "pattern";
+
+	  /*
+	   * parse nevra
+	   */
+	  
           if (split(line + 5, sp, 5) != 4)
 	    {
 	      fprintf(stderr, "Bad line: %s\n", line);
@@ -567,46 +620,86 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 	}
       switch (tag)
         {
-	  case CTAG('=', 'P', 'r', 'v'):
+	  case CTAG('=', 'P', 'r', 'v'):                                        /* provides */
 	    s->provides = adddep(pool, &pd, s->provides, line, 0, pd.kind);
 	    continue;
-          case CTAG('=', 'R', 'e', 'q'):
+	  case CTAG('=', 'R', 'e', 'q'):                                        /* requires */
 	    s->requires = adddep(pool, &pd, s->requires, line, -SOLVABLE_PREREQMARKER, pd.kind);
 	    continue;
-          case CTAG('=', 'P', 'r', 'q'):
-	    if (pd.kind)
-	      s->requires = adddep(pool, &pd, s->requires, line, 0, 0); /* Huh? No PreReq for non-packages ? */
+          case CTAG('=', 'P', 'r', 'q'):                                        /* pre-requires / packages required */
+	    if (pd.kind) {
+	      if (flags & SUSETAGS_KINDS_SEPARATELY)
+	        repodata_set_poolstr(data, last_found_pack, id_must, line + 6);
+	      else
+	        s->requires = adddep(pool, &pd, s->requires, line, 0, 0);           /* patterns: a required package */
+	    }
 	    else
-	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0);
+	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0); /* package: pre-requires */
 	    continue;
-	  case CTAG('=', 'O', 'b', 's'):
+	  case CTAG('=', 'O', 'b', 's'):                                        /* obsoletes */
 	    s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, pd.kind);
 	    continue;
-          case CTAG('=', 'C', 'o', 'n'):
+          case CTAG('=', 'C', 'o', 'n'):                                        /* conflicts */
 	    s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, pd.kind);
 	    continue;
-          case CTAG('=', 'R', 'e', 'c'):
+          case CTAG('=', 'R', 'e', 'c'):                                        /* recommends */
 	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, pd.kind);
 	    continue;
-          case CTAG('=', 'S', 'u', 'p'):
+          case CTAG('=', 'S', 'u', 'p'):                                        /* supplements */
 	    s->supplements = adddep(pool, &pd, s->supplements, line, 0, pd.kind);
 	    continue;
-          case CTAG('=', 'E', 'n', 'h'):
+          case CTAG('=', 'E', 'n', 'h'):                                        /* enhances */
 	    s->enhances = adddep(pool, &pd, s->enhances, line, 0, pd.kind);
 	    continue;
-          case CTAG('=', 'S', 'u', 'g'):
+          case CTAG('=', 'S', 'u', 'g'):                                        /* suggests */
 	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, pd.kind);
 	    continue;
-          case CTAG('=', 'F', 'r', 'e'):
+          case CTAG('=', 'F', 'r', 'e'):                                        /* freshens */
 	    s->freshens = adddep(pool, &pd, s->freshens, line, 0, pd.kind);
 	    continue;
-          case CTAG('=', 'P', 'r', 'c'):
-	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
+          case CTAG('=', 'P', 'r', 'c'):                                        /* packages recommended */
+	    if (flags & SUSETAGS_KINDS_SEPARATELY)
+	      repodata_set_poolstr(data, last_found_pack, id_should, line + 6);
+	    else
+	      s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
 	    continue;
-          case CTAG('=', 'P', 's', 'g'):
-	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
+          case CTAG('=', 'P', 's', 'g'):                                        /* packages suggested */
+	    if (flags & SUSETAGS_KINDS_SEPARATELY)
+	      repodata_set_poolstr(data, last_found_pack, id_may, line + 6);
+	    else
+	      s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
 	    continue;
-          case CTAG('=', 'V', 'e', 'r'):
+          case CTAG('=', 'P', 'c', 'n'):                                        /* pattern: package conflicts */
+	    if (flags & SUSETAGS_KINDS_SEPARATELY)
+	      fprintf (stderr, "Unsupported: pattern -> package conflicts\n");
+	    else
+	      s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, 0);
+	    continue;
+	  case CTAG('=', 'P', 'o', 'b'):                                        /* pattern: package obsoletes */
+	    if (flags & SUSETAGS_KINDS_SEPARATELY)
+	      fprintf (stderr, "Unsupported: pattern -> package obsoletes\n");
+	    else
+	      s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, 0);
+	    continue;
+          case CTAG('=', 'P', 'f', 'r'):                                        /* pattern: package freshens */
+	    if (flags & SUSETAGS_KINDS_SEPARATELY)
+	      fprintf (stderr, "Unsupported: pattern -> package freshens\n");
+	    else
+	      s->freshens = adddep(pool, &pd, s->freshens, line, 0, 0);
+	    continue;
+          case CTAG('=', 'P', 's', 'p'):                                        /* pattern: package supplements */
+	    if (flags & SUSETAGS_KINDS_SEPARATELY)
+	      fprintf (stderr, "Unsupported: pattern -> package supplements\n");
+	    else
+	      s->supplements = adddep(pool, &pd, s->supplements, line, 0, 0);
+	    continue;
+          case CTAG('=', 'P', 'e', 'n'):                                        /* pattern: package enhances */
+	    if (flags & SUSETAGS_KINDS_SEPARATELY)
+	      fprintf (stderr, "Unsupported: pattern -> package enhances\n");
+	    else
+	      s->enhances = adddep(pool, &pd, s->enhances, line, 0, 0);
+	    continue;
+          case CTAG('=', 'V', 'e', 'r'):                                        /* - version - */
 	    last_found_pack = 0;
 	    indesc++;
 	    continue;
@@ -689,10 +782,17 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 	  case CTAG('=', 'D', 'i', 'r'):
 	    add_dirline (&pd, line + 6);
 	    continue;
+
+	  default:
+	    break;
 	}
-    }
+
+    } /* for(;;) */
+
+  /* add versioned 'self-provides' */
   if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+
   if (s)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
 
@@ -713,6 +813,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
     }
 #endif
 
+  /* Shared attributes
+   *  (e.g. multiple binaries built from same source)
+   */
   if (pd.nshare)
     {
       int i, last_found;
