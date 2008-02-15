@@ -613,7 +613,7 @@ characterData(void *userData, const XML_Char *s, int len)
 #define BUFF_SIZE 8192
 
 void
-repo_add_patchxml(Repo *repo, FILE *fp)
+repo_add_patchxml(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   struct parsedata pd;

@@ -5,4 +5,6 @@
  * for further information
  */
 
-extern void repo_add_patchxml(Repo *repo, FILE *fp);
+#define PATCHXML_KINDS_SEPARATELY 1
+
+extern void repo_add_patchxml(Repo *repo, FILE *fp, int flags);

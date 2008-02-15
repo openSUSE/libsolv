@@ -5,4 +5,6 @@
  * for further information
  */
 
-extern void repo_add_rpmmd(Repo *repo, FILE *fp);
+#define RPMMD_KINDS_SEPARATELY 1
+
+extern void repo_add_rpmmd(Repo *repo, FILE *fp, int flags);
