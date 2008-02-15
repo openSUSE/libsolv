@@ -20,7 +20,6 @@
 #define SOLV_VERSION_3 3
 #define SOLV_VERSION_4 4
 #define SOLV_VERSION_5 5
-#define SOLV_VERSION_6 6 /* solvable.kind added */
 
 #define SOLV_FLAG_PACKEDSIZES 1
 #define SOLV_FLAG_VERTICAL    2

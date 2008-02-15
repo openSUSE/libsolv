@@ -18,20 +18,7 @@
 
 struct _Repo;
 
-typedef enum {
-  KIND_PACKAGE = 0,
-  KIND_PRODUCT = 5,         /* strlen("prod:") */
-  KIND_PATCH = 6,           /* strlen("patch:") */
-  KIND_SOURCE = 7,          /* strlen("source:") */
-  KIND_PATTERN = 8,         /* strlen("pattern:") */
-  KIND_NOSOURCE = 9,        /* strlen("nosource:") */
-  _KIND_MAX
-} solvable_kind;
-
-extern const char *kind_prefix( solvable_kind kind );
-
 typedef struct _Solvable {
-  unsigned int kind;           /* one of KIND_xxx */
   Id name;
   Id arch;
   Id evr;			/* epoch:version-release */

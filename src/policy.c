@@ -75,28 +75,6 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
 
 
 /*
- * prune queue, only keep solvables of kind
- * 
- */
-
-static void
-prune_to_kind(Pool *pool, Queue *plist, solvable_kind kind)
-{
-  int i, j;
-  Solvable *s;
-
-  /* prune to highest priority */
-  for (i = j = 0; i < plist->count; i++)
-    {
-      s = pool->solvables + plist->elements[i];
-      if (s->kind == kind)
-	plist->elements[j++] = plist->elements[i];
-    }
-  plist->count = j;
-}
-
-
-/*
  * prune to repository with highest priority
  * 
  */
@@ -350,8 +328,6 @@ void
 policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode)
 {
   Pool *pool = solv->pool;
-  if (plist->count > 1 && solv->limittokind)
-    prune_to_kind(pool, plist, solv->limittokind-1);
   if (plist->count > 1 && mode != POLICY_MODE_SUGGEST)
     prune_to_highest_prio(pool, plist);
   if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)

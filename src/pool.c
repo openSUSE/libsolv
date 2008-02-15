@@ -30,29 +30,6 @@
 #define SOLVABLE_BLOCK	255
 
 /*
- * solvable_kind -> string prefix
- *
- */
-
-static const char *kindprefix_data[] = {
-  NULL, NULL, NULL, NULL, NULL, 
-  "prod:", 
-  "patch:",
-  "source:",
-  "pattern:",
-  "nosource"
-};
-
-const char *
-kind_prefix( solvable_kind kind )
-{
-  if (kind >= _KIND_MAX)
-    return NULL;
-  return kindprefix_data[kind];
-}
-
-
-/*
  * list of string constants, so we can do pointer/Id instead of string comparison
  * index into array matches ID_xxx constants in pool.h
  */
