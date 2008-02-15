@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Feb 15 11:04:09 CET 2008 - coolo@suse.de
+
+- several fixes for the solv files
+
+-------------------------------------------------------------------
 Tue Feb 12 18:29:43 CET 2008 - kkaempf@suse.de
 
 - add libappsatsolver, an application layer to ease coding
