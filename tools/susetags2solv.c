@@ -26,7 +26,6 @@ usage(const char *err)
   fprintf(stderr, "\nUsage:\n"
           "susetags2solv [-a][-s][-c <content>][-h]\n"
 	  "  reads a 'susetags' repository from <stdin> and writes a .solv file to <stdout>\n"
-	  "  -a : with attributes\n"
 	  "  -c <contentfile> : parse given contentfile (for product information)\n"
 	  "  -h : print help & exit\n"
 	  "  -k : don't mix kinds (experimental!)\n"
