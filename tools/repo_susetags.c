@@ -18,7 +18,7 @@
 #include "repo_susetags.h"
 
 struct parsedata {
-  solvable_kind kind;
+  char *kind;
   Repo *repo;
   Repodata *data;
   struct parsedata_common common;
@@ -40,14 +40,13 @@ static char *flagtab[] = {
   "<="
 };
 
-
 /*
  * adddep
  * create and add dependency
  */
 
 static unsigned int
-adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker, solvable_kind kind)
+adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker, char *kind)
 {
   int i, flags;
   Id id, evrid;
@@ -60,7 +59,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
       exit(1);
     }
   if (kind)
-    id = str2id(pool, join2(kind_prefix(kind), sp[0], 0), 1);
+    id = str2id(pool, join2(kind, ":", sp[0]), 1);
   else
     id = str2id(pool, sp[0], 1);
   if (i == 3)
@@ -493,9 +492,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 		commit_diskusage (&pd, last_found_pack);
 	    }
 
-	  pd.kind = KIND_PACKAGE;
+	  pd.kind = 0;
 	  if (line[3] == 't')
-	    pd.kind = KIND_PATTERN;
+	    pd.kind = "pattern";
           if (split(line + 5, sp, 5) != 4)
 	    {
 	      fprintf(stderr, "Bad line: %s\n", line);
@@ -503,7 +502,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 	    }
 	  /* Lookup (but don't construct) the name and arch.  */
 	  if (pd.kind)
-	    name = str2id(pool, join2(kind_prefix(pd.kind), sp[0], 0), 0);
+	    name = str2id(pool, join2(pd.kind, ":", sp[0]), 0);
 	  else
 	    name = str2id(pool, sp[0], 0);
 	  arch = str2id(pool, sp[3], 0);
@@ -543,11 +542,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 	      last_found_pack = (s - pool->solvables) - repo->start;
 	      if (data)
 		repodata_extend(data, s - pool->solvables);
-	      s->kind = pd.kind;
 	      if (name)
 	        s->name = name;
 	      else if (pd.kind)
-		s->name = str2id(pool, join2(kind_prefix(pd.kind), sp[0], 0), 1);
+		s->name = str2id(pool, join2(pd.kind, ":", sp[0]), 1);
 	      else
 		s->name = str2id(pool, sp[0], 1);
 	      s->evr = evr;
