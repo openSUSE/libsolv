@@ -50,10 +50,6 @@ main(int argc, char **argv)
           switch (*s++)
 	    {
 	      case 'h': usage(NULL); break;
-	      case 'a':
-	        if (attrname == NULL)
-		  attrname = "test.attr";
-	      break;
 	      case 'n':
 	        if (argc)
 		  {
@@ -106,7 +102,7 @@ main(int argc, char **argv)
 	attrname = newname;
       }
     }
-  repo_add_susetags(repo, stdin, vendor, attrname);
+  repo_add_susetags(repo, stdin, vendor);
   tool_write(repo, 0, attrname);
   pool_free(pool);
   exit(0);

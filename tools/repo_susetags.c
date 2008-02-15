@@ -369,7 +369,7 @@ tag_from_string (char *cs)
  */
 
 void
-repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *attrname)
+repo_add_susetags(Repo *repo, FILE *fp, Id vendor)
 {
   Pool *pool = repo->pool;
   char *line, *linep;
@@ -383,11 +383,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *attrname)
   struct parsedata pd;
   Repodata *data = 0;
 
-  if (attrname)
-    {
-      data = repo_add_repodata(repo);
-      init_attr_ids(pool);
-    }
+  data = repo_add_repodata(repo);
+  init_attr_ids(pool);
 
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
@@ -615,11 +612,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *attrname)
 	    last_found_pack = 0;
 	    indesc++;
 	    continue;
-	}
-      if (!attrname)
-        continue;
-      switch (tag)
-        {
+
+        /* From here it's the attribute tags.  */
           case CTAG('=', 'G', 'r', 'p'):
 	    repodata_set_poolstr(data, last_found_pack, id_group, line + 6);
 	    continue;

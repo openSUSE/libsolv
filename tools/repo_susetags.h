@@ -9,4 +9,4 @@
  * if <attrname> given, write attributes as '<attrname>.attr'
  */
 
-extern void repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *attrname);
+extern void repo_add_susetags(Repo *repo, FILE *fp, Id vendor);

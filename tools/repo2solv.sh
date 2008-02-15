@@ -89,6 +89,6 @@ elif test -d suse/setup/descr && test -s content; then
 	esac
       done
     fi
-  ) | susetags2solv -a -c "${olddir}/content"
+  ) | susetags2solv -c "${olddir}/content"
   cd "$olddir"
 fi
