@@ -727,9 +727,7 @@ static int
 addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *value)
 {
   struct addfileprovides_cbdata *cbd = cbdata;
-  Pool *pool = s->repo->pool;
   int i;
-  Id id;
 
   if (data != cbd->olddata)
     {

@@ -145,6 +145,7 @@ struct parsedata {
   struct deltarpm delta;
 };
 
+#if 0
 static void
 append_str(struct parsedata *pd, const char *s)
 {
@@ -159,6 +160,7 @@ append_str(struct parsedata *pd, const char *s)
   strcpy(pd->tempstr + pd->ltemp, s);
   pd->ltemp += strlen(s);
 }
+#endif
 
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
