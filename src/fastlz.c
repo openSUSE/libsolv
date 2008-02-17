@@ -5,13 +5,19 @@
  * for further information
  */
 
+#include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <time.h>
 
-#define BLOCK_SIZE 65536
+#define BLOCK_SIZE (65536*1)
+#if BLOCK_SIZE <= 65536
+typedef __uint16_t Ref;
+#else
+typedef __uint32_t Ref;
+#endif
 
 /*
    The format is tailored for fast decompression (i.e. only byte based),
@@ -60,8 +66,8 @@ compress_buf (const unsigned char *in, unsigned int in_len,
   unsigned int oo = 0;		//out-offset
   unsigned int io = 0;		//in-offset
 #define HS (65536)
-  unsigned short htab[HS];
-  unsigned short hnext[BLOCK_SIZE];
+  unsigned int htab[HS];
+  unsigned int hnext[BLOCK_SIZE];
   memset (htab, 0, sizeof (htab));
   memset (hnext, 0, sizeof (hnext));
   unsigned int litofs = 0;
@@ -78,30 +84,96 @@ compress_buf (const unsigned char *in, unsigned int in_len,
       htab[hval] = io;
       mlen = 0;
       mofs = 0;
+
       for (tries = 0; tries < 4; tries++)
-	{
-	  unsigned int this_len, this_ofs;
-	  this_len = 0;
-	  this_ofs = 0;
-	  if (try < io)
+        {
+	  if (try < io
+	      && in[try] == in[io] && in[try + 1] == in[io + 1])
 	    {
+	      mlen = 2;
+	      mofs = (io - try) - 1;
+	      break;
+	    }
+	  try = hnext[try];
+	}
+      for (; tries < 4; tries++)
+	{
+	  //assert (mlen >= 2);
+	  //assert (io + mlen < in_len);
+	  /* Try a match starting from [io] with the strings at [try].
+	     That's only sensible if TRY actually is before IO (can happen
+	     with uninit hash table).  If we have a previous match already
+	     we're only going to take the new one if it's longer, hence
+	     check the potentially last character.  */
+	  if (try < io && in[try + mlen] == in[io + mlen])
+	    {
+	      unsigned int this_len, this_ofs;
+	      if (memcmp (in + try, in + io, mlen))
+		goto no_match;
+	      this_len = mlen + 1;
+	      /* Now try extending the match by more characters.  */
 	      for (;
 		   io + this_len < in_len
 		   && in[try + this_len] == in[io + this_len]; this_len++)
 		;
+#if 0
+	      unsigned int testi;
+	      for (testi = 0; testi < this_len; testi++)
+		assert (in[try + testi] == in[io + testi]);
+#endif
 	      this_ofs = (io - try) - 1;
-	      if (this_len < 2)
-		this_len = 0;
-	      else if (this_len == 2 && (litofs || ((io - try) - 1) >= 1024))
-		this_len = 0;
-	      else if (this_len >= 4096 + 18)
-		this_len = 4095 + 18;
-	      else if (this_ofs >= 65536)
-		this_len = 0;
-	      if (this_len > mlen || (this_len == mlen && this_ofs < mofs))
-		mlen = this_len, mofs = this_ofs;
+	      /*if (this_ofs > 65535)
+		 goto no_match; */
+#if 0
+	      assert (this_len >= 2);
+	      assert (this_len >= mlen);
+	      assert (this_len > mlen || (this_len == mlen && this_ofs > mofs));
+#endif
+	      mlen = this_len, mofs = this_ofs;
+	      /* If our match extends up to the end of input, no next
+		 match can become better.  This is not just an
+		 optimization, it establishes a loop invariant
+		 (io + mlen < in_len).  */
+	      if (io + mlen >= in_len)
+		goto match_done;
 	    }
+	no_match:
 	  try = hnext[try];
+	  if (io - try - 1 >= 65536)
+	    break;
+	}
+
+match_done:
+      if (mlen)
+	{
+	  if (mlen == 2 && (0 || litofs || mofs >= 1024))
+	    mlen = 0;
+	  else if (mofs >= 65536)
+	    mlen = 0;
+	  else if (mlen >= 4096 + 18)
+	    mlen = 4095 + 18;
+	  if (mlen && io + 3 < in_len)
+	    {
+	      unsigned int hval =
+		in[io + 1] | in[io + 2] << 8 | in[io + 3] << 16;
+	      unsigned int try;
+	      hval = (hval ^ (hval << 5) ^ (hval >> 5)) - hval * 5;
+	      hval = hval & (HS - 1);
+	      try = htab[hval];
+	      if (try < io + 1
+		  && in[try] == in[io + 1] && in[try + 1] == in[io + 2])
+		{
+		  unsigned int this_len;
+		  this_len = 2;
+		  for (;
+		       io + 1 + this_len < in_len
+		       && in[try + this_len] == in[io + 1 + this_len];
+		       this_len++)
+		    ;
+		  if (this_len >= mlen)
+		    mlen = 0;
+		}
+	    }
 	}
       if (!mlen)
 	{
@@ -118,23 +190,27 @@ compress_buf (const unsigned char *in, unsigned int in_len,
 	      //fprintf (stderr, "lit: %d\n", litlen);
 	      while (litlen)
 		{
-		  if (litlen == 1 && in[litofs] < 0x80)
+		  unsigned int easy_sz;
+		  /* Emit everything we can as self-describers.  As soon as
+		     we hit a byte we can't emit as such we're going to emit
+		     a length descriptor anyway, so we can as well include
+		     bytes < 0x80 which might follow afterwards in that run.  */
+		  for (easy_sz = 0;
+		       easy_sz < litlen && in[litofs + easy_sz] < 0x80;
+		       easy_sz++)
+		    ;
+		  if (easy_sz)
 		    {
-		      if (oo + 1 >= out_len)
+		      if (oo + easy_sz >= out_len)
 			return 0;
-		      out[oo++] = in[litofs++];
-		      break;
+		      memcpy (out + oo, in + litofs, easy_sz);
+		      litofs += easy_sz;
+		      oo += easy_sz;
+		      litlen -= easy_sz;
+		      if (!litlen)
+			break;
 		    }
-		  else if (litlen == 2 && in[litofs] < 0x80
-			   && in[litofs + 1] < 0x80)
-		    {
-		      if (oo + 2 >= out_len)
-			return 0;
-		      out[oo++] = in[litofs++];
-		      out[oo++] = in[litofs++];
-		      break;
-		    }
-		  else if (litlen <= 32)
+		  if (litlen <= 32)
 		    {
 		      if (oo + 1 + litlen >= out_len)
 			return 0;
@@ -226,22 +302,26 @@ compress_buf (const unsigned char *in, unsigned int in_len,
       //fprintf (stderr, "lit: %d\n", litlen);
       while (litlen)
 	{
-	  if (litlen == 1 && in[litofs] < 0x80)
+	  unsigned int easy_sz;
+	  /* Emit everything we can as self-describers.  As soon as we hit a
+	     byte we can't emit as such we're going to emit a length
+	     descriptor anyway, so we can as well include bytes < 0x80 which
+	     might follow afterwards in that run.  */
+	  for (easy_sz = 0; easy_sz < litlen && in[litofs + easy_sz] < 0x80;
+	       easy_sz++)
+	    ;
+	  if (easy_sz)
 	    {
-	      if (oo + 1 >= out_len)
+	      if (oo + easy_sz >= out_len)
 		return 0;
-	      out[oo++] = in[litofs++];
-	      break;
+	      memcpy (out + oo, in + litofs, easy_sz);
+	      litofs += easy_sz;
+	      oo += easy_sz;
+	      litlen -= easy_sz;
+	      if (!litlen)
+		break;
 	    }
-	  else if (litlen == 2 && in[litofs] < 0x80 && in[litofs + 1] < 0x80)
-	    {
-	      if (oo + 2 >= out_len)
-		return 0;
-	      out[oo++] = in[litofs++];
-	      out[oo++] = in[litofs++];
-	      break;
-	    }
-	  else if (litlen <= 32)
+	  if (litlen <= 32)
 	    {
 	      if (oo + 1 + litlen >= out_len)
 		return 0;
