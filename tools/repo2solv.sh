@@ -27,7 +27,7 @@ if test -d repodata; then
   if test -n "$cmd"; then
     # we have some primary.xml*
     primfile=`mktemp` || exit 3
-    $cmd $i | rpmmd2solv $parser_options > $primfile
+    $cmd $i | rpmmd2solv $parser_options > $primfile || exit 4
   fi
 
   patchfile="/nonexist"
@@ -43,7 +43,7 @@ if test -d repodata; then
        esac
      done
      echo '</patches>'
-    ) | grep -v '\?xml' | patchxml2solv $parser_options > $patchfile
+    ) | grep -v '\?xml' | patchxml2solv $parser_options > $patchfile || exit 4
   fi
 
   # Now merge primary and patches
@@ -91,7 +91,7 @@ elif test -d suse/setup/descr && test -s content; then
 	esac
       done
     fi
-  ) | susetags2solv -c "${olddir}/content" $parser_options
+  ) | susetags2solv -c "${olddir}/content" $parser_options || exit 4
   cd "$olddir"
 else
   exit 1
