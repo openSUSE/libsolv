@@ -188,19 +188,7 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 void
 dump_repoattrs(Repo *repo, Id p)
 {
-  int i;
-  Repodata *data;
-  /*
-   * look through all repodata(s) to find the one covering the right range of Ids
-   */
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    {
-      if (data->state == REPODATA_STUB || data->state == REPODATA_ERROR) /* skip repodata of wrong state */
-        continue;
-      if (p < data->start || p >= data->end) /* skip repodata of wrong range */
-	continue;
-      repodata_search(data, p - data->start, 0, dump_repoattrs_cb, 0);
-    }
+  repo_search(repo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE, dump_repoattrs_cb, 0);
 }
 
 void
@@ -312,6 +300,8 @@ int main(int argc, char **argv)
       printids(repo, "supplements", s->supplements);
       printids(repo, "enhances", s->enhances);
       printids(repo, "freshens", s->freshens);
+      if (repo->rpmdbid)
+	printf("rpmdbid: %u\n", repo->rpmdbid[i - repo->start]);
 #if 0
       dump_attrs (repo, n - 1);
 #endif
