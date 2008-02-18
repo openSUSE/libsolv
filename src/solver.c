@@ -818,7 +818,7 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 {
   Pool *pool = solv->pool;
   int i, j;
-  Id how, what, p, *pp;
+  Id name, how, what, p, *pp;
   Solvable *s;
   Repo *installed;
   Rule *r;
@@ -874,9 +874,15 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	  break;
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
+	  name = (how == SOLVER_ERASE_SOLVABLE_NAME) ? what : 0;
+	  while (ISRELDEP(name))
+	    {
+	      Reldep *rd = GETRELDEP(pool, name);
+	      name = rd->name;
+	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
-	      if (how == SOLVER_ERASE_SOLVABLE_NAME && pool->solvables[p].name != what)
+	      if (name && pool->solvables[p].name != name)
 	        continue;
 	      if (pool->solvables[p].repo == installed)
 	        MAPSET(&solv->noupdate, p - installed->start);
@@ -938,9 +944,15 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	  break;
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
+	  name = (how == SOLVER_ERASE_SOLVABLE_NAME) ? what : 0;
+	  while (ISRELDEP(name))
+	    {
+	      Reldep *rd = GETRELDEP(pool, name);
+	      name = rd->name;
+	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
-	      if (how == SOLVER_ERASE_SOLVABLE_NAME && pool->solvables[p].name != what)
+	      if (name && pool->solvables[p].name != name)
 	        continue;
 	      if (pool->solvables[p].repo != installed)
 		continue;
@@ -3320,10 +3332,10 @@ printsolutions(Solver *solv, Queue *job)
 			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not forbid installation of %s\n", solvable2str(pool, s));
 		      break;
 		    case SOLVER_INSTALL_SOLVABLE_NAME:
-		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install %s\n", id2str(pool, what));
+		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install %s\n", dep2str(pool, what));
 		      break;
 		    case SOLVER_ERASE_SOLVABLE_NAME:
-		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall %s\n", id2str(pool, what));
+		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall %s\n", dep2str(pool, what));
 		      break;
 		    case SOLVER_INSTALL_SOLVABLE_PROVIDES:
 		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install a solvable providing %s\n", dep2str(pool, what));
@@ -3472,7 +3484,7 @@ solver_solve(Solver *solv, Queue *job)
   int i;
   int oldnrules;
   Map addedmap;		       /* '1' == have rpm-rules for solvable */
-  Id how, what, p, *pp, d;
+  Id how, what, name, p, *pp, d;
   Queue q;
   Solvable *s;
 
@@ -3534,10 +3546,16 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
+	  name = (how == SOLVER_INSTALL_SOLVABLE_NAME) ? what : 0;
+	  while (ISRELDEP(name))
+	    {
+	      Reldep *rd = GETRELDEP(pool, name);
+	      name = rd->name;
+	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
 	      /* if by name, ensure that the name matches */
-	      if (how == SOLVER_INSTALL_SOLVABLE_NAME && pool->solvables[p].name != what)
+	      if (name && pool->solvables[p].name != name)
 		continue;
 	      addrpmrulesforsolvable(solv, pool->solvables + p, &addedmap);
 	    }
@@ -3615,14 +3633,20 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_INSTALL_SOLVABLE_NAME:		/* install by capability */
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
 	  if (how == SOLVER_INSTALL_SOLVABLE_NAME)
-	    POOL_DEBUG(SAT_DEBUG_JOB, "job: install name %s\n", id2str(pool, what));
+	    POOL_DEBUG(SAT_DEBUG_JOB, "job: install name %s\n", dep2str(pool, what));
 	  if (how == SOLVER_INSTALL_SOLVABLE_PROVIDES)
 	    POOL_DEBUG(SAT_DEBUG_JOB, "job: install provides %s\n", dep2str(pool, what));
 	  queue_empty(&q);
+	  name = (how == SOLVER_INSTALL_SOLVABLE_NAME) ? what : 0;
+	  while (ISRELDEP(name))
+	    {
+	      Reldep *rd = GETRELDEP(pool, name);
+	      name = rd->name;
+	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
               /* if by name, ensure that the name matches */
-	      if (how == SOLVER_INSTALL_SOLVABLE_NAME && pool->solvables[p].name != what)
+	      if (name && pool->solvables[p].name != name)
 		continue;
 	      queue_push(&q, p);
 	    }
@@ -3646,10 +3670,16 @@ solver_solve(Solver *solv, Queue *job)
 	    POOL_DEBUG(SAT_DEBUG_JOB, "job: erase name %s\n", id2str(pool, what));
 	  if (how == SOLVER_ERASE_SOLVABLE_PROVIDES)
 	    POOL_DEBUG(SAT_DEBUG_JOB, "job: erase provides %s\n", dep2str(pool, what));
+	  name = (how == SOLVER_ERASE_SOLVABLE_NAME) ? what : 0;
+	  while (ISRELDEP(name))
+	    {
+	      Reldep *rd = GETRELDEP(pool, name);
+	      name = rd->name;
+	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
 	      /* if by name, ensure that the name matches */
-	      if (how == SOLVER_ERASE_SOLVABLE_NAME && pool->solvables[p].name != what)
+	      if (name && pool->solvables[p].name != name)
 	        continue;
 	      addrule(solv, -p, 0);  /* add 'remove' rule */
 	      queue_push(&solv->ruletojob, i);
