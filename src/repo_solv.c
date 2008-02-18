@@ -135,7 +135,7 @@ read_id(Repodata *data, Id max)
  */
 
 static Id *
-read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end, int relative)
+read_rel_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end, Id marker)
 {
   unsigned int x = 0;
   int c;
@@ -152,59 +152,110 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end, int relative)
 	  data->error = SOLV_ERROR_EOF;
 	  return 0;
 	}
-      if ((c & 128) == 0)
+      if ((c & 128) != 0)
 	{
-	  x = (x << 6) | (c & 63);
-	  if (relative)
-	    {
-	      if (x == 0 && c == 0x40)
-		{
-		  /* prereq hack */
-		  if (store == end)
-		    {
-		      pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
-		      data->error = SOLV_ERROR_OVERFLOW;
-		      return 0;
-		    }
-		  *store++ = SOLVABLE_PREREQMARKER;
-		  old = 0;
-		  x = 0;
-		  continue;
-		}
-	      x = (x - 1) + old;
-	      old = x;
-	    }
-	  if (max && x >= max)
-	    {
-	      pool_debug(mypool, SAT_ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
-	      data->error = SOLV_ERROR_ID_RANGE;
-	      return 0;
-	    }
-	  if (map)
-	    x = map[x];
+	  x = (x << 7) ^ c ^ 128;
+	  continue;
+	}
+      x = (x << 6) | (c & 63);
+      if (x == 0 && c == 0x40)
+	{
+	  /* marker hack */
 	  if (store == end)
 	    {
-	      pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
+	      pool_debug(mypool, SAT_ERROR, "read_rel_idarray: array overflow\n");
+	      data->error = SOLV_ERROR_OVERFLOW;
 	      return 0;
 	    }
-	  *store++ = x;
-	  if ((c & 64) == 0)
-	    {
-	      if (x == 0)	/* already have trailing zero? */
-		return store;
-	      if (store == end)
-		{
-		  pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
-		  data->error = SOLV_ERROR_OVERFLOW;
-		  return 0;
-		}
-	      *store++ = 0;
-	      return store;
-	    }
+	  *store++ = marker;	/* do not map! */
+	  old = 0;
 	  x = 0;
 	  continue;
 	}
-      x = (x << 7) ^ c ^ 128;
+      x = (x - 1) + old;
+      old = x;
+      if (max && x >= max)
+	{
+	  pool_debug(mypool, SAT_ERROR, "read_rel_idarray: id too large (%u/%u)\n", x, max);
+	  data->error = SOLV_ERROR_ID_RANGE;
+	  return 0;
+	}
+      if (map)
+	x = map[x];
+      if (store == end)
+	{
+	  pool_debug(mypool, SAT_ERROR, "read_rel_idarray: array overflow\n");
+	  return 0;
+	}
+      *store++ = x;
+      if ((c & 64) == 0)
+	{
+	  if (x == 0)	/* already have trailing zero? */
+	    return store;
+	  if (store == end)
+	    {
+	      pool_debug(mypool, SAT_ERROR, "read_rel_idarray: array overflow\n");
+	      data->error = SOLV_ERROR_OVERFLOW;
+	      return 0;
+	    }
+	  *store++ = 0;
+	  return store;
+	}
+      x = 0;
+    }
+}
+
+static Id *
+read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
+{
+  unsigned int x = 0;
+  int c;
+
+  if (data->error)
+    return 0;
+  for (;;)
+    {
+      c = getc(data->fp);
+      if (c == EOF)
+	{
+	  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+	  data->error = SOLV_ERROR_EOF;
+	  return 0;
+	}
+      if ((c & 128) != 0)
+	{
+	  x = (x << 7) ^ c ^ 128;
+	  continue;
+	}
+      x = (x << 6) | (c & 63);
+      if (max && x >= max)
+	{
+	  pool_debug(mypool, SAT_ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
+	  data->error = SOLV_ERROR_ID_RANGE;
+	  return 0;
+	}
+      if (map)
+	x = map[x];
+      if (store == end)
+	{
+	  pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
+	  return 0;
+	}
+      *store++ = x;
+      if ((c & 64) == 0)
+	{
+	  if (x == 0)	/* already have trailing zero? */
+	    return store;
+	  if (store == end)
+	    {
+	      pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
+	      data->error = SOLV_ERROR_OVERFLOW;
+	      return 0;
+	    }
+	  *store++ = 0;
+	  return store;
+	}
+      x = 0;
     }
 }
 
@@ -370,7 +421,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	    }
 	  /* read_idarray writes a terminating 0, that's why the + 1 */
 	  ida = sat_calloc(keys[key].size + 1, sizeof(Id));
-	  ide = read_idarray(maindata, 0, 0, ida, ida + keys[key].size + 1, 0);
+	  ide = read_idarray(maindata, 0, 0, ida, ida + keys[key].size + 1);
 	  n = ide - ida - 1;
 	  if (n & 1)
 	    {
@@ -976,7 +1027,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   for (i = 1; i < numschemata; i++)
     {
       schemata[i] = schemadatap - schemadata;
-      schemadatap = read_idarray(&data, numid, 0, schemadatap, schemadataend, 0);
+      schemadatap = read_idarray(&data, numid, 0, schemadatap, schemadataend);
 #if 0
       Id *sp = schemadata + schemata[i];
       fprintf (stderr, "schema %d:", i);
@@ -1174,32 +1225,7 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 		    {
 		      if (idmap)
 			{
-			  Id old = 0, rel = keys[key].type == TYPE_REL_IDARRAY ? SOLVABLE_PREREQMARKER : 0;
-			  do
-			    {
-			      did = read_id(&data, 0);
-			      h = did & 0x40;
-			      did = (did & 0x3f) | ((did >> 1) & ~0x3f);
-			      if (rel)
-				{
-				  if (did == 0)
-				    {
-				      did = rel;
-				      old = 0;
-				    }
-				  else
-				    {
-				      did += old;
-				      old = did;
-				    }
-				}
-			      if (did >= numid + numrel)
-				abort();
-			      did = idmap[did];
-			      did = ((did & ~0x3f) << 1) | h;
-			      incore_add_id(&data, did);
-			    }
-			  while (h);
+			  abort();	/* implement me! */
 			}
 		      else
 			{
@@ -1217,7 +1243,14 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 		  break;
 		}
 	      ido = idarraydatap - repo->idarraydata;
-	      idarraydatap = read_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend, keys[key].type == TYPE_REL_IDARRAY);
+	      if (keys[key].type == TYPE_IDARRAY)
+	        idarraydatap = read_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend);
+	      else if (id == SOLVABLE_REQUIRES)
+	        idarraydatap = read_rel_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend, SOLVABLE_PREREQMARKER);
+	      else if (id == SOLVABLE_PROVIDES)
+	        idarraydatap = read_rel_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend, SOLVABLE_FILEMARKER);
+	      else
+	        idarraydatap = read_rel_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend, 0);
 	      if (id == SOLVABLE_PROVIDES)
 		s->provides = ido;
 	      else if (id == SOLVABLE_OBSOLETES)
