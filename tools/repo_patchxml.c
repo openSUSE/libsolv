@@ -162,6 +162,10 @@ append_str(struct parsedata *pd, const char *s)
 }
 #endif
 
+/*
+ * create evr (as Id) from 'epoch', 'ver' and 'rel' attributes
+ */
+
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 {
@@ -227,6 +231,11 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return str2id(pool, pd->content, 1);
 }
 
+
+/*
+ * find attribute
+ */
+
 static const char *
 find_attr(const char *txt, const char **atts)
 {
@@ -238,6 +247,11 @@ find_attr(const char *txt, const char **atts)
   return 0;
 }
 
+
+/*
+ * relation comparision operators
+ */
+
 static char *flagtab[] = {
   "GT",
   "EQ",
@@ -246,6 +260,11 @@ static char *flagtab[] = {
   "NE",
   "LE"
 };
+
+
+/*
+ * add dependency
+ */
 
 static unsigned int
 adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts, int isreq)
@@ -269,7 +288,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
     }
   if (!n)
     return olddeps;
-  if (k && !strcmp(k, "package"))
+  if (k && !strcmp(k, "package"))            /* kind 'package' -> ignore */
     k = 0;
   if (k)
     {
@@ -279,12 +298,12 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 	  pd->content = realloc(pd->content, l + 256);
 	  pd->acontent = l + 256;
 	}
-      sprintf(pd->content, "%s:%s", k, n); 
+      sprintf(pd->content, "%s:%s", k, n);   /* prepend kind to name */
       name = str2id(pool, pd->content, 1); 
     }
   else
     name = str2id(pool, (char *)n, 1);
-  if (f)
+  if (f)                                     /* flags means name,operator,relation */
     {
       Id evr = makeevr_atts(pool, pd, atts);
       int flags;
@@ -322,9 +341,10 @@ startElement(void *userData, const char *name, const char **atts)
     return;
 
   pd->depth++;
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)
+  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
     if (!strcmp(sw->ename, name))
       break;
+  
   if (sw->from != pd->state)
     {
 #if 0
