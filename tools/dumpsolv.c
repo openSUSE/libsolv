@@ -103,7 +103,7 @@ dump_repodata (Repo *repo)
       unsigned int j;
       printf("%s has %d keys", data->location ? data->location : "**EMBED**", data->nkeys);
       for (j = 1; j < data->nkeys; j++)
-        printf("\n  %s", id2str(repo->pool, data->keys[j].name));
+        printf("\n  %s (type %d size %d storage %d)", id2str(repo->pool, data->keys[j].name), data->keys[j].type, data->keys[j].size, data->keys[j].storage);
       printf("\n");
     }
   printf("\n");

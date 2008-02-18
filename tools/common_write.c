@@ -24,6 +24,7 @@ static char *verticals[] = {
   "messageins",
   "eula",
   "diskusage",
+  "filelist",
   0
 };
 
