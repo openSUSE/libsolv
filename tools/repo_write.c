@@ -250,7 +250,7 @@ cmp_ids (const void *pa, const void *pb)
 }
 
 static void
-write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
+write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
 {
   int len, i;
   Id lids[64], *sids;
@@ -287,11 +287,10 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
     sids = lids;
 
   /* That bloody solvable:prereqmarker needs to stay in position :-(  */
-  Id prereq = SOLVABLE_PREREQMARKER;
   if (needid)
-    prereq = needid[prereq].need;
+    marker = needid[marker].need;
   for (i = 0; i < len; i++)
-    if (sids[i] == prereq)
+    if (sids[i] == marker)
       break;
   if (i > 1)
     qsort(sids, i, sizeof (Id), cmp_ids);
@@ -314,7 +313,7 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
        have to handle negative differences, which would cost code space for
        the encoding of the sign.  We loose the exact mapping of prereq here,
        but we know the result, so we can recover from that in the reader.  */
-      if (id == prereq)
+      if (id == marker)
 	id = old = 0;
       else
 	{
@@ -328,7 +327,7 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
       write_id(fp, id | 64);
     }
   id = sids[i];
-  if (id == prereq)
+  if (id == marker)
     id = 0;
   else
     id = id - old + 1;
@@ -1465,23 +1464,23 @@ if (cbdata.dirused)
       if (s->vendor && cbdata.keymap[SOLVABLE_VENDOR])
         write_id(fp, needid[s->vendor].need);
       if (s->provides && cbdata.keymap[SOLVABLE_PROVIDES])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->provides);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->provides, SOLVABLE_FILEMARKER);
       if (s->obsoletes && cbdata.keymap[SOLVABLE_OBSOLETES])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->obsoletes);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->obsoletes, 0);
       if (s->conflicts && cbdata.keymap[SOLVABLE_CONFLICTS])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->conflicts);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->conflicts, 0);
       if (s->requires && cbdata.keymap[SOLVABLE_REQUIRES])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->requires);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->requires, SOLVABLE_PREREQMARKER);
       if (s->recommends && cbdata.keymap[SOLVABLE_RECOMMENDS])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->recommends);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->recommends, 0);
       if (s->suggests && cbdata.keymap[SOLVABLE_SUGGESTS])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->suggests);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->suggests, 0);
       if (s->supplements && cbdata.keymap[SOLVABLE_SUPPLEMENTS])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->supplements);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->supplements, 0);
       if (s->enhances && cbdata.keymap[SOLVABLE_ENHANCES])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->enhances);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->enhances, 0);
       if (s->freshens && cbdata.keymap[SOLVABLE_FRESHENS])
-        write_idarray_sort(fp, pool, needid, idarraydata + s->freshens);
+        write_idarray_sort(fp, pool, needid, idarraydata + s->freshens, 0);
       if (repo->rpmdbid && cbdata.keymap[RPM_RPMDBID])
         write_u32(fp, repo->rpmdbid[i - repo->start]),id_bytes+=4;
       if (cbdata.incorelen[n])
