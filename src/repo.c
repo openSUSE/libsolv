@@ -57,6 +57,10 @@ repo_create(Pool *pool, const char *name)
 static void
 repo_freedata(Repo *repo)
 {
+  int i;
+  for (i = 0; i < repo->nrepodata; i++)
+    repodata_free(repo->repodata + i);
+  sat_free(repo->repodata);
   sat_free(repo->idarraydata);
   sat_free(repo->rpmdbid);
   sat_free((char *)repo->name);

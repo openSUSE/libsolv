@@ -32,6 +32,39 @@ extern unsigned int unchecked_decompress_buf (const unsigned char *in,
 					      unsigned char *out,
 					      unsigned int out_len);
 
+
+void
+repodata_free(Repodata *data)
+{
+  sat_free(data->keys);
+  sat_free(data->schemata);
+  sat_free(data->schemadata);
+
+  sat_free(data->spool.strings);
+  sat_free(data->spool.stringspace);
+  sat_free(data->spool.stringhashtbl);
+
+  sat_free(data->dirpool.dirs);
+  sat_free(data->dirpool.dirtraverse);
+
+  sat_free(data->incoredata);
+  sat_free(data->incoreoffset);
+  sat_free(data->verticaloffset);
+
+  sat_free(data->blob_store);
+  sat_free(data->pages);
+  sat_free(data->mapped);
+
+  sat_free(data->vincore);
+
+  sat_free(data->attrs);
+  sat_free(data->attrdata);
+  sat_free(data->attriddata);
+  
+  if (data->fp)
+    fclose(data->fp);
+}
+
 static unsigned char *
 data_read_id(unsigned char *dp, Id *idp)
 {
