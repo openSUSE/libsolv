@@ -3847,3 +3847,247 @@ solver_solve(Solver *solv, Queue *job)
   if (solv->problems.count)
     problems_to_solutions(solv, job);
 }
+
+/***********************************************************************/
+
+struct mptree {
+  Id sibling;
+  Id child;
+  const char *comp;
+  int compl;
+  Id mountpoint;
+};
+
+struct ducbdata {
+  DUChanges *mps;
+  struct mptree *mptree;
+  int addsub;
+
+  Id *dirmap;
+  int nmap;
+  Repodata *olddata;
+};
+
+
+static int
+solver_fill_DU_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *value)
+{
+  struct ducbdata *cbd = cbdata;
+  Id mp;
+
+  if (data != cbd->olddata)
+    {
+      Id dn, mp, comp, *dirmap, *dirs;
+      int i, compl;
+      const char *compstr;
+      struct mptree *mptree;
+
+      /* create map from dir to mptree */
+      cbd->dirmap = sat_free(cbd->dirmap);
+      cbd->nmap = 0;
+      dirmap = sat_calloc(data->dirpool.ndirs, sizeof(Id));
+      mptree = cbd->mptree;
+      mp = 0;
+      for (dn = 2, dirs = data->dirpool.dirs + dn; dn < data->dirpool.ndirs; dn++)
+	{
+	  comp = *dirs++;
+	  if (comp <= 0)
+	    {
+	      mp = dirmap[-comp];
+	      continue;
+	    }
+	  if (mp < 0)
+	    {
+	      /* unconnected */
+	      dirmap[dn] = mp;
+	      continue;
+	    }
+	  if (!mptree[mp].child)
+	    {
+	      dirmap[dn] = -mp;
+	      continue;
+	    }
+	  if (data->localpool)
+	    compstr = stringpool_id2str(&data->spool, comp);
+	  else
+	    compstr = id2str(data->repo->pool, comp);
+	  compl = strlen(compstr);
+	  for (i = mptree[mp].child; i; i = mptree[i].sibling)
+	    if (mptree[i].compl == compl && !strncmp(mptree[i].comp, compstr, compl))
+	      break;
+	  dirmap[dn] = i ? i : -mp;
+	}
+      /* change dirmap to point to mountpoint instead of mptree */
+      for (dn = 0; dn < data->dirpool.ndirs; dn++)
+	{
+	  mp = dirmap[dn];
+	  dirmap[dn] = mptree[mp > 0 ? mp : -mp].mountpoint;
+	}
+      cbd->dirmap = dirmap;
+      cbd->nmap = data->dirpool.ndirs;
+      cbd->olddata = data;
+    }
+  if (value->id < 0 || value->id >= cbd->nmap)
+    return 0;
+  mp = cbd->dirmap[value->id];
+  if (mp < 0)
+    return 0;
+  if (cbd->addsub > 0)
+    {
+      cbd->mps[mp].kbytes += value->num;
+      cbd->mps[mp].files += value->num2;
+    }
+  else
+    {
+      cbd->mps[mp].kbytes -= value->num;
+      cbd->mps[mp].files -= value->num2;
+    }
+  return 0;
+}
+
+static void
+propagate_mountpoints(struct mptree *mptree, int pos, Id mountpoint)
+{
+  int i;
+  if (mptree[pos].mountpoint == -1)
+    mptree[pos].mountpoint = mountpoint;
+  else
+    mountpoint = mptree[pos].mountpoint;
+  for (i = mptree[pos].child; i; i = mptree[i].sibling)
+    propagate_mountpoints(mptree, i, mountpoint);
+}
+
+#define MPTREE_BLOCK 15
+
+void
+solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps)
+{
+  Pool *pool = solv->pool;
+  Solvable *s;
+  Id id_diskusage;
+  char *p;
+  const char *path, *compstr;
+  struct mptree *mptree;
+  int i, nmptree;
+  int pos, compl;
+  int mp;
+  Map installmap;
+  struct ducbdata cbd;
+
+  id_diskusage = str2id(pool, "diskusage", 1);
+
+  cbd.mps = mps;
+  cbd.addsub = 0;
+  cbd.dirmap = 0;
+  cbd.nmap = 0;
+  cbd.olddata = 0;
+
+  mptree = sat_extend_resize(0, 1, sizeof(struct mptree), MPTREE_BLOCK);
+
+  /* our root node */
+  mptree[0].sibling = 0;
+  mptree[0].child = 0;
+  mptree[0].comp = 0;
+  mptree[0].compl = 0;
+  mptree[0].mountpoint = -1;
+  nmptree = 1;
+  
+  /* create component tree */
+  for (mp = 0; mp < nmps; mp++)
+    {
+      mps[mp].kbytes = 0;
+      mps[mp].files = 0;
+      pos = 0;
+      path = mps[mp].path;
+      while(*path == '/')
+	path++;
+      while (*path)
+	{
+	  if ((p = strchr(path, '/')) == 0)
+	    {
+	      compstr = path;
+	      compl = strlen(compstr);
+	      path += compl;
+	    }
+	  else
+	    {
+	      compstr = path;
+	      compl = p - path;
+	      path = p + 1;
+	      while(*path == '/')
+		path++;
+	    }
+          for (i = mptree[pos].child; i; i = mptree[i].sibling)
+	    if (mptree[i].compl == compl && !strncmp(mptree[i].comp, compstr, compl))
+	      break;
+	  if (!i)
+	    {
+	      /* create new node */
+	      mptree = sat_extend(mptree, nmptree, 1, sizeof(struct mptree), MPTREE_BLOCK);
+	      i = nmptree++;
+	      mptree[i].sibling = mptree[pos].child;
+	      mptree[i].child = 0;
+	      mptree[i].comp = compstr;
+	      mptree[i].compl = compl;
+	      mptree[i].mountpoint = -1;
+	      mptree[pos].child = i;
+	    }
+	  pos = i;
+	}
+      mptree[pos].mountpoint = mp;
+    }
+
+  propagate_mountpoints(mptree, 0, mptree[0].mountpoint);
+
+#if 0
+  for (i = 0; i < nmptree; i++)
+    {
+      printf("#%d sibling: %d\n", i, mptree[i].sibling);
+      printf("#%d child: %d\n", i, mptree[i].child);
+      printf("#%d comp: %s\n", i, mptree[i].comp);
+      printf("#%d compl: %d\n", i, mptree[i].compl);
+      printf("#%d mountpont: %d\n", i, mptree[i].mountpoint);
+    }
+#endif
+
+  cbd.mptree = mptree;
+
+  /* create list of solvables that have to be installed */
+  /* (this is actually just a simple sort) */
+  map_init(&installmap, pool->nsolvables);
+  for (i = 1; i < solv->decisionq.count; i++)
+    {
+      Id sp = solv->decisionq.elements[i];
+      if (sp < 0)
+	continue;
+      s = pool->solvables + sp;
+      if (!s->repo)
+	continue;
+      if (solv->installed && s->repo == solv->installed)
+	continue;
+      MAPSET(&installmap, sp);
+    }
+  /* run through install solvable dudata */
+  cbd.addsub = 1;
+  for (i = 1; i < pool->nsolvables; i++)
+    {
+      if (!MAPTST(&installmap, i))
+	continue;
+      s = pool->solvables + i;
+      repo_search(s->repo, i, id_diskusage, 0, 0, solver_fill_DU_cb, &cbd);
+    }
+  map_free(&installmap);
+  /* run through erase solvable dudata */
+  if (solv->installed)
+    {
+      cbd.addsub = -1;
+      for (i = solv->installed->start; i < solv->installed->end; i++)
+	{
+	  if (solv->decisionmap[i] >= 0)
+	    continue;
+	  repo_search(solv->installed, i, id_diskusage, 0, 0, solver_fill_DU_cb, &cbd);
+	}
+    }
+  sat_free(cbd.dirmap);
+  sat_free(mptree);
+}

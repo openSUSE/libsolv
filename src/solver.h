@@ -279,4 +279,13 @@ solver_is_enhancing(Solver *solv, Solvable *s)
   return 0;
 }
 
+typedef struct _duchanges {
+  const char *path;
+  int kbytes;
+  int files;
+} DUChanges;
+
+void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
+
+
 #endif /* SATSOLVER_SOLVER_H */
