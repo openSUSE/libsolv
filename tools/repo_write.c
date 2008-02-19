@@ -387,7 +387,6 @@ struct cbdata {
   struct extdata *extdata;
 
   Id *dirused;
-  Id *dirmap;
 
   Id vstart;
 };
@@ -1165,8 +1164,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
   if (cbdata.dirused && !cbdata.dirused[0])
     {
       /* no dirs used at all */
-fprintf(stderr, "no dirs used!\n");
-      sat_free(cbdata.dirused);
+      cbdata.dirused = sat_free(cbdata.dirused);
       dirpool = 0;
     }
   if (dirpool)
@@ -1243,7 +1241,6 @@ if (cbdata.dirused)
       if (cbdata.dirused && !cbdata.dirused[1])
 	cbdata.dirused[1] = 1;	/* always want / entry */
       dirmap = sat_calloc(dirpool->ndirs, sizeof(Id));
-      dirpool_make_dirtraverse(dirpool);
       dirmap[0] = 0;
       ndirmap = traverse_dirs(dirpool, dirmap, 1, dirpool_child(dirpool, 0), cbdata.dirused);
       if (!cbdata.dirused)
@@ -1371,6 +1368,7 @@ if (cbdata.dirused)
       else
         write_id(fp, nstrings - dirmap[i]);
     }
+  sat_free(dirmap);
 
   /*
    * write keys
@@ -1378,7 +1376,7 @@ if (cbdata.dirused)
   if (setfileinfo)
     {
       fileinfo->nkeys = cbdata.nmykeys;
-      fileinfo->keys = sat_calloc (fileinfo->nkeys, sizeof (*fileinfo->keys));
+      fileinfo->keys = sat_calloc(fileinfo->nkeys, sizeof (*fileinfo->keys));
     }
   for (i = 1; i < cbdata.nmykeys; i++)
     {
@@ -1548,9 +1546,18 @@ if (cbdata.dirused)
 
   for (i = 1; i < cbdata.nmykeys; i++)
     sat_free(cbdata.extdata[i].buf);
+  sat_free(cbdata.extdata);
 
   sat_free(needid);
   sat_free(cbdata.solvschemata);
   sat_free(cbdata.myschemadata);
   sat_free(cbdata.myschemata);
+  sat_free(cbdata.schema);
+
+  sat_free(cbdata.mykeys);
+  sat_free(cbdata.keymap);
+  sat_free(cbdata.keymapstart);
+  sat_free(cbdata.dirused);
+  sat_free(cbdata.incorelen);
+  sat_free(repodataused);
 }

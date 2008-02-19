@@ -100,5 +100,6 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       fileinfo = fileinfoa;
     }
   repo_write(repo, stdout, keyfilter_solv, 0, fileinfo, nsubfiles);
+  sat_free(filter);
   return 0;
 }
