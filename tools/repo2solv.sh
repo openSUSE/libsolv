@@ -4,6 +4,9 @@
 # give it a directory of a local mirror of a repo and this
 # tries to detect the repo type and generate one SOLV file on stdout
 
+# this should signal an error if there is a problem
+set -e 
+
 LANG=C
 parser_options=${PARSER_OPTIONS:-}
 
