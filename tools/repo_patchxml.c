@@ -27,6 +27,9 @@ enum state {
   STATE_NAME,
   STATE_ARCH,
   STATE_VERSION,
+  STATE_SUMMARY,
+  STATE_DESCRIPTION,
+  STATE_CATEGORY,
   STATE_PKGFILES,
   STATE_DELTARPM,
   STATE_DLOCATION,
@@ -73,6 +76,9 @@ static struct stateswitch stateswitches[] = {
   { STATE_PATCH,       "name",            STATE_NAME, 1 },
   { STATE_PATCH,       "arch",            STATE_ARCH, 1 },
   { STATE_PATCH,       "version",         STATE_VERSION, 0 },
+  { STATE_PATCH,       "summary",         STATE_SUMMARY, 1 },
+  { STATE_PATCH,       "description",     STATE_DESCRIPTION, 1 },
+  { STATE_PATCH,       "category",        STATE_CATEGORY, 1 },
   { STATE_PATCH,       "rpm:requires",    STATE_REQUIRES, 0 },
   { STATE_PATCH,       "rpm:provides",    STATE_PROVIDES, 0 },
   { STATE_PATCH,       "rpm:requires",    STATE_REQUIRES, 0 },
@@ -135,6 +141,7 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
+  unsigned int datanum;
   Solvable *solvable;
   char *kind;
   unsigned int timestamp;
@@ -147,7 +154,11 @@ struct parsedata {
   struct deltarpm delta;
 };
 
+/* repo data attribute ids */
 static Id id_timestamp;
+static Id id_summary;
+static Id id_description;
+static Id id_category;
 
 #if 0
 static void
@@ -401,10 +412,9 @@ startElement(void *userData, const char *name, const char **atts)
 
       if (!strcmp(pd->kind, "patch"))
         {
-          int solvnum = (pd->solvable - pool->solvables) - pd->repo->start;
-	  if (pd->data)
-	    repodata_extend(pd->data, pd->solvable - pool->solvables);
-          repodata_set_num(pd->data, solvnum, id_timestamp, pd->timestamp);
+          pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
+	  repodata_extend(pd->data, pd->solvable - pool->solvables);
+          repodata_set_num(pd->data, pd->datanum, id_timestamp, pd->timestamp);
 	}
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
@@ -611,6 +621,15 @@ endElement(void *userData, const char *name)
     case STATE_ARCH:
       s->arch = str2id(pool, pd->content, 1);
       break;
+    case STATE_SUMMARY:
+      repodata_set_str(pd->data, pd->datanum, id_summary, pd->content);
+      break;
+    case STATE_DESCRIPTION:
+      repodata_set_str(pd->data, pd->datanum, id_description, pd->content);
+      break;
+    case STATE_CATEGORY:  
+      repodata_set_str(pd->data, pd->datanum, id_category, pd->content);
+      break;
     case STATE_DELTARPM:
 #ifdef TESTMM
       {
@@ -704,7 +723,11 @@ repo_add_patchxml(Repo *repo, FILE *fp, int flags)
   pd.pool = pool;
   pd.repo = repo;
   pd.data = repo_add_repodata(pd.repo);
+
   id_timestamp = str2id(pool, "patch:timestamp", 1);
+  id_summary = str2id(pool, "summary", 1);
+  id_description = str2id(pool, "description", 1);
+  id_category = str2id(pool, "patch:category", 1);
   
   pd.content = malloc(256);
   pd.acontent = 256;
