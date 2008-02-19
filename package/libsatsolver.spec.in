@@ -9,7 +9,6 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
 BuildRequires:  cmake db43-devel gcc-c++ libexpat-devel ruby-devel swig
 Summary:        A new approach to package dependency solving
-Requires:       satsolver-tools libexpat-devel
 
 %description
 A new approach to package dependency solving
@@ -42,6 +41,7 @@ Group:          Development/Languages/Ruby
 %package -n satsolver-tools
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
+Obsoletes:      libsatsolver < 0.0.15
 
 %description -n satsolver-tools
 . 
