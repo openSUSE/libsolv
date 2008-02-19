@@ -41,7 +41,8 @@ Group:          Development/Languages/Ruby
 %package -n satsolver-tools
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
-Obsoletes:      libsatsolver < 0.0.15
+Obsoletes:      libsatsolver <= 0.0.15
+Provides:       libsatsolver = 0.0.15
 
 %description -n satsolver-tools
 . 
