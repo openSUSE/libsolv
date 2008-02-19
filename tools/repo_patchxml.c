@@ -134,9 +134,11 @@ struct parsedata {
   int docontent;
   Pool *pool;
   Repo *repo;
+  Repodata *data;
   Solvable *solvable;
   char *kind;
-
+  unsigned int timestamp;
+  
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
   char *tempstr;
@@ -144,6 +146,8 @@ struct parsedata {
   int atemp;
   struct deltarpm delta;
 };
+
+static Id id_timestamp;
 
 #if 0
 static void
@@ -369,6 +373,15 @@ startElement(void *userData, const char *name, const char **atts)
         }
       break;
     case STATE_PATCH:
+      if (sw->from == STATE_START)
+        {
+	  if ((str = find_attr("timestamp", atts)))
+	    {
+	      pd->timestamp = strtoul(str, NULL, 10);
+	      fprintf(stderr, "timestamp %s [%d]\n", str, pd->timestamp);
+	    }
+        }
+      /*FALLTHRU*/
     case STATE_ATOM:
       if (pd->state == STATE_ATOM)
 	{
@@ -386,6 +399,14 @@ startElement(void *userData, const char *name, const char **atts)
         pd->kind = "patch";
       
       pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+
+      if (!strcmp(pd->kind, "patch"))
+        {
+          int solvnum = (pd->solvable - pool->solvables) - pd->repo->start;
+	  if (pd->data)
+	    repodata_extend(pd->data, pd->solvable - pool->solvables);
+          repodata_set_num(pd->data, solvnum, id_timestamp, pd->timestamp);
+	}
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -683,6 +704,9 @@ repo_add_patchxml(Repo *repo, FILE *fp, int flags)
     }
   pd.pool = pool;
   pd.repo = repo;
+  pd.data = repo_add_repodata(pd.repo);
+  id_timestamp = str2id(pool, "patch:timestamp", 1);
+  
   pd.content = malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
@@ -705,6 +729,9 @@ repo_add_patchxml(Repo *repo, FILE *fp, int flags)
 	break;
     }
   XML_ParserFree(parser);
+
+  if (pd.data)
+    repodata_internalize(pd.data);
 
   free(pd.content);
 }
