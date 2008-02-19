@@ -1202,7 +1202,13 @@ if (cbdata.dirused)
     needid[i].map = i;
 
   cmp_pool = pool;
+#if 0
   qsort(needid + 1, reloff - 1, sizeof(*needid), needid_cmp_need_s);
+#else
+  /* make first entry '' */
+  needid[1].need = 1;
+  qsort(needid + 2, reloff - 2, sizeof(*needid), needid_cmp_need_s);
+#endif
   qsort(needid + reloff, pool->nrels, sizeof(*needid), needid_cmp_need);
 
   sizeid = 0;
