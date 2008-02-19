@@ -378,7 +378,6 @@ startElement(void *userData, const char *name, const char **atts)
 	  if ((str = find_attr("timestamp", atts)))
 	    {
 	      pd->timestamp = strtoul(str, NULL, 10);
-	      fprintf(stderr, "timestamp %s [%d]\n", str, pd->timestamp);
 	    }
         }
       /*FALLTHRU*/
