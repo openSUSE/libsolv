@@ -226,7 +226,6 @@ struct parsedata {
   int lcontent;
   int acontent;
   int docontent;
-  int numpacks;
   Solvable *solvable;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
@@ -431,6 +430,49 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
   return repo_addid_dep(pd->common.repo, olddeps, id, marker);
 }
 
+static void
+set_desciption_author(Repodata *data, Id entry, char *str)
+{
+  char *aut, *p;
+
+  if (!str || !*str)
+    return;
+  for (aut = str; (aut = strchr(aut, '\n')) != 0; aut++)
+    if (!strncmp(aut, "\nAuthors:\n--------\n", 19)) 
+      break;
+  if (aut)
+    {
+      /* oh my, found SUSE special author section */
+      int l = aut - str; 
+      str[l] = 0; 
+      while (l > 0 && str[l - 1] == '\n')
+	str[--l] = 0; 
+      if (l)
+	repodata_set_str(data, entry, id_description, str);
+      p = aut + 19;
+      aut = str;        /* copy over */
+      while (*p == ' ' || *p == '\n')
+	p++;
+      while (*p) 
+	{
+	  if (*p == '\n')
+	    {
+	      *aut++ = *p++;
+	      while (*p == ' ') 
+		p++;
+	      continue;
+	    }
+	  *aut++ = *p++;
+	}
+      while (aut != str && aut[-1] == '\n')
+	aut--;
+      *aut = 0; 
+      if (*str)
+	repodata_set_str(data, entry, id_authors, str);
+    }
+  else if (*str)
+    repodata_set_str(data, entry, id_description, str);
+}
 
 static void XMLCALL
 startElement(void *userData, const char *name, const char **atts)
@@ -438,11 +480,10 @@ startElement(void *userData, const char *name, const char **atts)
   //fprintf(stderr,"+tag: %s\n", name);
   struct parsedata *pd = userData;
   Pool *pool = pd->common.pool;
-  Repo *repo = pd->common.repo;
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
   const char *str;
-  Id solvid = s - pool->solvables;
+  Id entry = s ? (s - pool->solvables) - pd->data->start : 0;
 
   if (pd->depth != pd->statedepth)
     {
@@ -467,21 +508,6 @@ startElement(void *userData, const char *name, const char **atts)
   *pd->content = 0;
   switch(pd->state)
     {
-    case STATE_METADATA:
-      for (; *atts; atts += 2)
-	{
-	  if (!strcmp(*atts, "packages"))
-	    {
-	      pd->numpacks = atoi(atts[1]);
-	      if (pd->numpacks < 0)
-		pd->numpacks = 0;
-#if 0
-	      fprintf(stderr, "numpacks: %d\n", pd->numpacks);
-#endif
-	      pd->solvable = pool_id2solvable(pool, repo_add_solvable_block(pd->common.repo, pd->numpacks));
-	    }
-	}
-      break;
     case STATE_SOLVABLE:
       pd->kind = 0;
       if (name[2] == 't' && name[3] == 't')
@@ -491,8 +517,8 @@ startElement(void *userData, const char *name, const char **atts)
       else if (name[2] == 't' && name[3] == 'c')
         pd->kind = "patch";
       
-      if (pd->numpacks == 0)
-	pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
+      pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
+      repodata_extend(pd->data, pd->solvable - pool->solvables);
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -582,7 +608,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_LOCATION:
       str = find_attr("href", atts);
       if (str)
-        repo_set_str(repo, solvid, id_mediafile, str);
+        repodata_set_str(pd->data, entry, id_mediafile, str);
       break;
     case STATE_CHECKSUM:
       pd->tmpattr = find_attr("type", atts);
@@ -592,7 +618,7 @@ startElement(void *userData, const char *name, const char **atts)
         unsigned t;
         str = find_attr("build", atts);
         if (str && (t = atoi(str)) != 0)
-          repo_set_num(repo, solvid, id_time, t);
+          repodata_set_num(pd->data, entry, id_time, t);
 	break;
       }
     case STATE_SIZE:
@@ -600,14 +626,14 @@ startElement(void *userData, const char *name, const char **atts)
         unsigned k;
         str = find_attr("installed", atts);
 	if (str && (k = atoi(str)) != 0)
-	  repo_set_num(repo, solvid, id_installsize, (k + 1023) / 1024);
+	  repodata_set_num(pd->data, entry, id_installsize, (k + 1023) / 1024);
 	/* XXX the "package" attribute gives the size of the rpm file,
 	   i.e. the download size.  Except on packman, there it seems to be
 	   something else entirely, it has a value near to the other two
 	   values, as if the rpm is uncompressed.  */
         str = find_attr("package", atts);
 	if (str && (k = atoi(str)) != 0)
-	  repo_set_num(repo, solvid, id_downloadsize, (k + 1023) / 1024);
+	  repodata_set_num(pd->data, entry, id_downloadsize, (k + 1023) / 1024);
         break;
       }
     default:
@@ -623,7 +649,9 @@ endElement(void *userData, const char *name)
   Pool *pool = pd->common.pool;
   Solvable *s = pd->solvable;
   Repo *repo = pd->common.repo;
+  Id entry = s ? (s - pool->solvables) - pd->data->start : 0;
   Id id;
+  char *p;
 
   if (pd->depth != pd->statedepth)
     {
@@ -643,11 +671,6 @@ endElement(void *userData, const char *name)
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
-      if (pd->numpacks > 0)
-	{
-	  pd->numpacks--;
-	  pd->solvable++;
-	}
       pd->kind = 0;
       break;
     case STATE_NAME:
@@ -663,14 +686,24 @@ endElement(void *userData, const char *name)
       s->vendor = str2id(pool, pd->content, 1);
       break;
     case STATE_RPM_GROUP:
-      repo_set_poolstr(repo, s - pool->solvables, id_group, pd->content);
+      repodata_set_poolstr(pd->data, entry, id_group, pd->content);
       break;
     case STATE_RPM_LICENSE:
-      repo_set_poolstr(repo, s - pool->solvables, id_license, pd->content);
+      repodata_set_poolstr(pd->data, entry, id_license, pd->content);
       break;
     case STATE_FILE:
+#if 0
       id = str2id(pool, pd->content, 1);
-      s->provides = repo_addid(repo, s->provides, id);
+      s->provides = repo_addid_dep(repo, s->provides, id, SOLVABLE_FILEMARKER);
+#endif
+      if ((p = strrchr(pd->content, '/')) != 0) {
+	*p++ = 0;
+	id = repodata_str2dir(pd->data, pd->content, 1);
+      } else {
+	id = 1;
+	p = pd->content;
+      }
+      repodata_add_dirstr(pd->data, entry, id_filelist, id, p);
       break;
     // xml store capabilities
     case STATE_CAP_PROVIDES:
@@ -702,11 +735,11 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       pd->lang = 0;
-      repo_set_str(repo, s - pool->solvables, id_summary, pd->content);
+      repodata_set_str(pd->data, entry, id_summary, pd->content);
       break;
     case STATE_DESCRIPTION:
       pd->lang = 0;
-      repo_set_str(repo, s - pool->solvables, id_description, pd->content);
+      set_desciption_author(pd->data, entry, pd->content);
       break;
     default:
       break;
@@ -788,8 +821,5 @@ repo_add_rpmmd(Repo *repo, FILE *fp, int flags)
 
   if (pd.data)
     repodata_internalize(pd.data);
-
-  if (pd.numpacks)
-    repo_free_solvable_block(repo, pd.solvable - pool->solvables, pd.numpacks, 1);
   sat_free(pd.content);
 }
