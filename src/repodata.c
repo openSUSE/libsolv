@@ -32,6 +32,7 @@ extern unsigned int unchecked_decompress_buf (const unsigned char *in,
 					      unsigned char *out,
 					      unsigned int out_len);
 
+#define REPODATA_BLOCK 255
 
 void
 repodata_free(Repodata *data)
@@ -571,6 +572,24 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
     }
 }
 
+void
+repodata_init(Repodata *data, Repo *repo, int localpool)
+{
+  memset(data, 0, sizeof (*data));
+  data->repo = repo;
+  data->localpool = localpool;
+  if (localpool)
+    stringpool_init_empty(&data->spool);
+  data->keys = sat_calloc(1, sizeof(Repokey));
+  data->nkeys = 1;
+  data->schemata = sat_calloc(1, sizeof(Id));
+  data->schemadata = sat_calloc(1, sizeof(Id));
+  data->nschemata = 1;
+  data->schemadatalen = 1;
+  data->start = repo->start;
+  data->end = repo->end;
+  data->incoreoffset = sat_extend_resize(0, data->end - data->start, sizeof(Id), REPODATA_BLOCK);
+}
 
 /* extend repodata so that it includes solvables p */
 void
@@ -584,10 +603,10 @@ repodata_extend(Repodata *data, Id p)
       int new = p - data->end + 1;
       if (data->attrs)
 	{
-	  data->attrs = sat_realloc2(data->attrs, old + new, sizeof(Id *));
+	  data->attrs = sat_extend(data->attrs, old, new, sizeof(Id *), REPODATA_BLOCK);
 	  memset(data->attrs + old, 0, new * sizeof(Id *));
 	}
-      data->incoreoffset = sat_realloc2(data->incoreoffset, old + new, sizeof(Id));
+      data->incoreoffset = sat_extend(data->incoreoffset, old, new, sizeof(Id), REPODATA_BLOCK);
       memset(data->incoreoffset + old, 0, new * sizeof(Id));
       data->end = p + 1;
     }
@@ -597,16 +616,38 @@ repodata_extend(Repodata *data, Id p)
       int new = data->start - p;
       if (data->attrs)
 	{
-	  data->attrs = sat_realloc2(data->attrs, old + new, sizeof(Id *));
+	  data->attrs = sat_extend_resize(data->attrs, old + new, sizeof(Id *), REPODATA_BLOCK);
 	  memmove(data->attrs + new, data->attrs, old * sizeof(Id *));
 	  memset(data->attrs, 0, new * sizeof(Id *));
 	}
-      data->incoreoffset = sat_realloc2(data->incoreoffset, old + new, sizeof(Id));
+      data->incoreoffset = sat_extend_resize(data->incoreoffset, old + new, sizeof(Id), REPODATA_BLOCK);
       memmove(data->incoreoffset + new, data->incoreoffset, old * sizeof(Id));
       memset(data->incoreoffset, 0, new * sizeof(Id));
       data->start = p;
     }
 }
+
+void
+repodata_extend_block(Repodata *data, Id start, Id num)
+{
+  if (!num)
+    return;
+  if (!data->incoreoffset)
+    {
+      data->incoreoffset = sat_extend_resize(data->incoreoffset, num, sizeof(Id), REPODATA_BLOCK);
+      memset(data->incoreoffset, 0, num * sizeof(Id));
+      data->start = start;
+      data->end = start + num;
+      return;
+    }
+  repodata_extend(data, start);
+  if (num > 1)
+    repodata_extend(data, start + num - 1);
+}
+
+#define REPODATA_ATTRS_BLOCK 63
+#define REPODATA_ATTRDATA_BLOCK 1023
+#define REPODATA_ATTRIDDATA_BLOCK 63
 
 static void
 repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
@@ -614,7 +655,10 @@ repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
   Id *pp;
   int i;
   if (!data->attrs)
-    data->attrs = sat_calloc(data->end - data->start + 1, sizeof(Id *));
+    {
+      data->attrs = sat_extend_resize(0, data->end - data->start, sizeof(Id *), REPODATA_BLOCK);
+      memset(data->attrs, 0, (data->end - data->start) * sizeof(Id *));
+    }
   i = 0;
   if (data->attrs[entry])
     {
@@ -634,7 +678,7 @@ repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
         }
       i = pp - data->attrs[entry];
     }
-  data->attrs[entry] = sat_realloc2(data->attrs[entry], i + 3, sizeof(Id));
+  data->attrs[entry] = sat_extend(data->attrs[entry], i, 3, sizeof(Id), REPODATA_ATTRS_BLOCK);
   pp = data->attrs[entry] + i;
   *pp++ = keyid;
   *pp++ = val;
@@ -739,7 +783,7 @@ repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str)
   key.type = TYPE_STR;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  data->attrdata = sat_realloc(data->attrdata, data->attrdatalen + l);
+  data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
   repodata_set(data, entry, &key, data->attrdatalen);
   data->attrdatalen += l;
@@ -767,13 +811,13 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, nu
 	  if (ida + 1 == data->attriddata + data->attriddatalen)
 	    {
 	      /* this was the last entry, just append it */
-	      data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + 3, sizeof(Id));
+	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 3, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
 	      data->attriddatalen--;	/* overwrite terminating 0  */
 	    }
 	  else
 	    {
 	      /* too bad. move to back. */
-	      data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + oldsize + 4, sizeof(Id));
+	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen,  oldsize + 4, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
 	      memcpy(data->attriddata + data->attriddatalen, data->attriddata + pp[1], oldsize * sizeof(Id));
 	      pp[1] = data->attriddatalen;
 	      data->attriddatalen += oldsize;
@@ -789,7 +833,7 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, nu
   key.type = TYPE_DIRNUMNUMARRAY;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + 4, sizeof(Id));
+  data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 4, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
   repodata_set(data, entry, &key, data->attriddatalen);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = num;
@@ -805,7 +849,7 @@ repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *st
   int l;
 
   l = strlen(str) + 1;
-  data->attrdata = sat_realloc(data->attrdata, data->attrdatalen + l);
+  data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
   stroff = data->attrdatalen;
   data->attrdatalen += l;
@@ -826,13 +870,13 @@ fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->a
 	  if (ida + 1 == data->attriddata + data->attriddatalen)
 	    {
 	      /* this was the last entry, just append it */
-	      data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + 2, sizeof(Id));
+	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 2, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
 	      data->attriddatalen--;	/* overwrite terminating 0  */
 	    }
 	  else
 	    {
 	      /* too bad. move to back. */
-	      data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + oldsize + 3, sizeof(Id));
+	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, oldsize + 3, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
 	      memcpy(data->attriddata + data->attriddatalen, data->attriddata + pp[1], oldsize * sizeof(Id));
 	      pp[1] = data->attriddatalen;
 	      data->attriddatalen += oldsize;
@@ -847,7 +891,7 @@ fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->a
   key.type = TYPE_DIRSTRARRAY;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  data->attriddata = sat_realloc2(data->attriddata, data->attriddatalen + 3, sizeof(Id));
+  data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 3, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
   repodata_set(data, entry, &key, data->attriddatalen);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = stroff;
@@ -1135,17 +1179,26 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	  dp = ndp;
 	}
+      if (data->attrs[entry])
+        sat_free(data->attrs[entry]);
     }
+  sat_free(schema);
+  sat_free(seen);
+
+  sat_free(data->incoredata);
   data->incoredata = newincore.buf;
   data->incoredatalen = newincore.len;
   data->incoredatafree = 0;
   
+  sat_free(data->vincore);
   data->vincore = newvincore.buf;
   data->vincorelen = newvincore.len;
 
   data->attrs = sat_free(data->attrs);
   data->attrdata = sat_free(data->attrdata);
+  data->attriddata = sat_free(data->attriddata);
   data->attrdatalen = 0;
+  data->attriddatalen = 0;
 }
 
 Id

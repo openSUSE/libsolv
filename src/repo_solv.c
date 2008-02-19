@@ -752,6 +752,12 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       idmap = 0;
       spool->nstrings = numid;
       str[0] = 0;
+      if (*sp)
+	{
+	  /* we need the '' for directories */
+	  pool_debug(pool, SAT_ERROR, "store strings don't start with ''\n");
+	  return SOLV_ERROR_CORRUPT;
+	}
       for (i = 1; i < spool->nstrings; i++)
 	{
 	  if (sp >= strsp + sizeid)
@@ -1103,19 +1109,16 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     }
 
   /* read solvables */
-  if (parent)
+  if (numsolv)
     {
-      data.start = parent->start;
-      data.end = parent->end;
-      s = pool_id2solvable(pool, data.start);
-    }
-  else if (numsolv)
-    {
-      s = pool_id2solvable(pool, repo_add_solvable_block(repo, numsolv));
+      if (parent)
+	s = pool_id2solvable(pool, parent->start);
+      else
+        s = pool_id2solvable(pool, repo_add_solvable_block(repo, numsolv));
       /* store start and end of our id block */
       data.start = s - pool->solvables;
       data.end = data.start + numsolv;
-      /* In case we have subfiles, make them refer to our part of the 
+      /* In case we have info blocks, make them refer to our part of the 
 	 repository now.  */
       for (i = oldnrepodata; i < repo->nrepodata; i++)
         {
@@ -1127,7 +1130,8 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     s = 0;
 
   if (have_xdata)
-    data.incoreoffset = sat_calloc(numsolv, sizeof(Id));
+    repodata_extend_block(&data, data.start, numsolv);
+
   for (i = 0; i < numsolv; i++, s++)
     {
       Id *keyp;

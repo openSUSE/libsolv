@@ -118,7 +118,9 @@ const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);
  */
 int repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value);
 
+void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
 void repodata_extend(Repodata *data, Id p);
+void repodata_extend_block(Repodata *data, Id p, int num);
 void repodata_free(Repodata *data);
 
 void repodata_set_id(Repodata *data, Id entry, Id keyname, Id id);

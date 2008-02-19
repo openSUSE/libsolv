@@ -838,18 +838,7 @@ repo_add_repodata(Repo *repo)
   repo->nrepodata++;
   repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
   data = repo->repodata + repo->nrepodata - 1;
-  memset(data, 0, sizeof (*data));
-  data->repo = repo;
-  data->start = repo->start;
-  data->end = repo->end;
-  data->localpool = 0;
-  data->keys = sat_calloc(1, sizeof(Repokey));
-  data->nkeys = 1;
-  data->schemata = sat_calloc(1, sizeof(Id));
-  data->schemadata = sat_calloc(1, sizeof(Id));
-  data->nschemata = 1;
-  data->schemadatalen = 1;
-  data->incoreoffset = sat_calloc(data->end - data->start, sizeof(Id));
+  repodata_init(data, repo, 0);
   return data;
 }
 
