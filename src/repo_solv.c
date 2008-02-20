@@ -1417,7 +1417,6 @@ repodata_load_solv(Repodata *data)
       return;
     }   
   fp = pool->loadcallback(pool, data, pool->loadcallbackdata);
-
   if (!fp)
     {   
       data->state = REPODATA_ERROR;
@@ -1427,4 +1426,5 @@ repodata_load_solv(Repodata *data)
     data->state = REPODATA_ERROR;
   else
     data->state = REPODATA_AVAILABLE;
+  fclose(fp);
 }
