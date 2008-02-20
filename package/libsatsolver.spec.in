@@ -7,7 +7,7 @@ Url:            http://svn.opensuse.org/svn/zypp/trunk/sat-solver
 Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
-BuildRequires:  cmake db43-devel gcc-c++ libexpat-devel ruby-devel swig
+BuildRequires:  cmake rpm-devel gcc-c++ libexpat-devel ruby-devel swig
 Summary:        A new approach to package dependency solving
 
 %description

@@ -8,7 +8,7 @@ SET(rpmdb2solv_REPOS
 )
 
 ADD_EXECUTABLE( rpmdb2solv ${rpmdb2solv_REPOS} )
-TARGET_LINK_LIBRARIES( rpmdb2solv satsolver ${DB43_LIBRARY})
+TARGET_LINK_LIBRARIES( rpmdb2solv satsolver ${RPMDB_LIBRARY})
 
 SET(rpmmd2solv_REPOS rpmmd2solv.c repo_rpmmd.h repo_rpmmd.c repo_write.c common_write.c )
 ADD_EXECUTABLE( rpmmd2solv ${rpmmd2solv_REPOS} )

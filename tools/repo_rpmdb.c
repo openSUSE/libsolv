@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <db43/db.h>
+#include <rpm/db.h>
 
 #include "pool.h"
 #include "repo.h"
