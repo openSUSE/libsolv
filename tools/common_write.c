@@ -92,14 +92,19 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       fileinfo = fileinfoa;
       FILE *fp = fopen (attrname, "w");
       repo_write(repo, fp, keyfilter_attr, 0, fileinfo, 0);
-      fclose (fp);
-      fileinfo->location = strdup (attrname);
+      fclose(fp);
+      fileinfo->location = strdup(attrname);
       fileinfo++;
 
       nsubfiles = fileinfo - fileinfoa;
       fileinfo = fileinfoa;
     }
   repo_write(repo, stdout, keyfilter_solv, 0, fileinfo, nsubfiles);
+  if (fileinfo)
+    {
+      free(fileinfo->location);
+      free(fileinfo->keys);
+    }
   sat_free(filter);
   return 0;
 }

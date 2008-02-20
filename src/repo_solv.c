@@ -1375,6 +1375,7 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
       sat_free(parent->schemata);
       sat_free(parent->schemadata);
       sat_free(parent->keys);
+      sat_free(parent->location);
       *parent = data;
     }
   else if (data.incoredatalen || data.fp)
