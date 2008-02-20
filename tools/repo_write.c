@@ -482,7 +482,6 @@ putinownpool(struct cbdata *cbdata, Stringpool *ss, Id id)
       int oldoff = cbdata->needid[0].map;
       int newoff = (id + 1 + NEEDED_BLOCK) & ~NEEDED_BLOCK;
       int nrels = cbdata->repo->pool->nrels;
-      fprintf(stderr, "growing needid...\n");
       cbdata->needid = sat_realloc2(cbdata->needid, newoff + nrels, sizeof(NeedId));
       if (nrels)
 	memmove(cbdata->needid + newoff, cbdata->needid + oldoff, nrels * sizeof(NeedId));
@@ -618,16 +617,20 @@ repo_write_cb_sizes(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, Ke
 	v[3] = u32;
 	data_addblob(xd, v, 4);
 	break;
-      case TYPE_DIR:
-	id = kv->id;
-	id = cbdata->dirused[id];
-	data_addid(xd, id);
-	break;
       case TYPE_NUM:
 	data_addid(xd, kv->num);
 	break;
+      case TYPE_DIR:
+	id = kv->id;
+	if (cbdata->owndirpool)
+	  id = putinowndirpool(cbdata, data, &data->dirpool, id);
+	id = cbdata->dirused[id];
+	data_addid(xd, id);
+	break;
       case TYPE_DIRNUMNUMARRAY:
 	id = kv->id;
+	if (cbdata->owndirpool)
+	  id = putinowndirpool(cbdata, data, &data->dirpool, id);
 	id = cbdata->dirused[id];
 	data_addid(xd, id);
 	data_addid(xd, kv->num);
@@ -635,6 +638,8 @@ repo_write_cb_sizes(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, Ke
 	break;
       case TYPE_DIRSTRARRAY:
 	id = kv->id;
+	if (cbdata->owndirpool)
+	  id = putinowndirpool(cbdata, data, &data->dirpool, id);
 	id = cbdata->dirused[id];
 	data_addideof(xd, id, kv->eof);
 	data_addblob(xd, (unsigned char *)kv->str, strlen(kv->str) + 1);
@@ -756,6 +761,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
     setfileinfo = 1;
 
   memset(&cbdata, 0, sizeof(cbdata));
+  cbdata.repo = repo;
 
   /* go through all repodata and find the keys we need */
   /* also unify keys */
@@ -842,7 +848,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       cbdata.keymap[n++] = 0;	/* key 0 */
       idused = 0;
       dirused = 0;
-      for (j = 1; j < data->nkeys; j++)
+      for (j = 1; j < data->nkeys; j++, n++)
 	{
 	  key = data->keys + j;
 	  /* see if we already had this one, should use hash for fast miss */
@@ -858,22 +864,25 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	  if (k < cbdata.nmykeys)
 	    {
 	      repodataused[i] = 1;
-	      cbdata.keymap[n++] = k;
-	      continue;
+	      cbdata.keymap[n] = k;
 	    }
-	  cbdata.mykeys[cbdata.nmykeys] = *key;
-	  key = cbdata.mykeys + cbdata.nmykeys;
-	  key->storage = KEY_STORAGE_INCORE;
-	  if (key->type != TYPE_CONSTANT)
-	    key->size = 0;
-	  if (keyfilter)
+          else
 	    {
-	      key->storage = keyfilter(repo, key, kfdata);
-	      if (key->storage == KEY_STORAGE_DROPPED)
+	      cbdata.mykeys[cbdata.nmykeys] = *key;
+	      key = cbdata.mykeys + cbdata.nmykeys;
+	      key->storage = KEY_STORAGE_INCORE;
+	      if (key->type != TYPE_CONSTANT)
+		key->size = 0;
+	      if (keyfilter)
 		{
-		  cbdata.keymap[n++] = 0;
-		  continue;
+		  key->storage = keyfilter(repo, key, kfdata);
+		  if (key->storage == KEY_STORAGE_DROPPED)
+		    {
+		      cbdata.keymap[n] = 0;
+		      continue;
+		    }
 		}
+	      cbdata.keymap[n] = cbdata.nmykeys++;
 	    }
 	  /* load repodata if not already loaded */
 	  if (data->state == REPODATA_STUB)
@@ -886,17 +895,17 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 		{
 		  /* redo this repodata! */
 		  j = 0;
-		  n = cbdata.keymapstart[i] + 1;
+		  n = cbdata.keymapstart[i];
 		  continue;
 		}
 	    }
 	  if (data->state == REPODATA_ERROR)
 	    {
 	      /* too bad! */
-	      cbdata.keymap[n++] = 0;
+	      cbdata.keymap[n] = 0;
 	      continue;
 	    }
-	  cbdata.keymap[n++] = cbdata.nmykeys++;
+
 	  repodataused[i] = 1;
 	  if (key->type != TYPE_STR && key->type != TYPE_U32)
 	    idused = 1;
@@ -958,6 +967,17 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       spool = &repo->pool->ss;
     }
 
+  if (poolusage > 1)
+    {
+      /* convert global keys to new pool names */
+      for (i = 0; i < cbdata.nmykeys; i++)
+	{
+	  if (cbdata.mykeys[i].storage == KEY_STORAGE_DROPPED)
+	    continue;
+	  cbdata.mykeys[i].name = stringpool_str2id(spool, id2str(repo->pool, cbdata.mykeys[i].name), 1);
+	}
+    }
+
   if (dirpoolusage == 3)
     {
       dirpool = &owndirpool;
@@ -974,7 +994,7 @@ fprintf(stderr, "poolusage: %d\n", poolusage);
 fprintf(stderr, "dirpoolusage: %d\n", dirpoolusage);
 fprintf(stderr, "nmykeys: %d\n", cbdata.nmykeys);
 for (i = 1; i < cbdata.nmykeys; i++)
-  fprintf(stderr, "  %2d: %d %d\n", i, cbdata.mykeys[i].name, cbdata.mykeys[i].type);
+  fprintf(stderr, "  %2d: %d %d %d\n", i, cbdata.mykeys[i].name, cbdata.mykeys[i].type, cbdata.mykeys[i].storage);
 #endif
 
 /********************************************************************/
@@ -1172,8 +1192,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
       for (i = 1; i < dirpool->ndirs; i++)
 	{
 #if 0
-if (cbdata.dirused)
-  fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused[i]);
+fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 #endif
 	  id = dirpool->dirs[i];
 	  if (id <= 0)
@@ -1554,6 +1573,17 @@ if (cbdata.dirused)
     sat_free(cbdata.extdata[i].buf);
   sat_free(cbdata.extdata);
 
+  if (cbdata.ownspool)
+    {
+      sat_free(cbdata.ownspool->strings);
+      sat_free(cbdata.ownspool->stringspace);
+      sat_free(cbdata.ownspool->stringhashtbl);
+    }
+  if (cbdata.owndirpool)
+    {
+      sat_free(cbdata.owndirpool->dirs);
+      sat_free(cbdata.owndirpool->dirtraverse);
+    }
   sat_free(needid);
   sat_free(cbdata.solvschemata);
   sat_free(cbdata.myschemadata);
