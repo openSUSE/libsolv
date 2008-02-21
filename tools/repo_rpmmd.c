@@ -608,7 +608,19 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_LOCATION:
       str = find_attr("href", atts);
       if (str)
-        repodata_set_str(pd->data, entry, id_mediafile, str);
+	{
+	  const char *str2 = strrchr(str, '/');
+	  if (str2)
+	    {
+	      char *str3 = strdup (str);
+	      str3[str2 - str] = 0;
+	      repodata_set_poolstr(pd->data, entry, id_mediadir, str3);
+	      free(str3);
+              repodata_set_str(pd->data, entry, id_mediafile, str2 + 1);
+	    }
+	  else
+            repodata_set_str(pd->data, entry, id_mediafile, str);
+	}
       break;
     case STATE_CHECKSUM:
       pd->tmpattr = find_attr("type", atts);
