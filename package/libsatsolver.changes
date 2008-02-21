@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu Feb 21 18:14:41 CET 2008 - coolo@suse.de
+
+- fix susetags parser for so called full trees
+
+-------------------------------------------------------------------
 Wed Feb 20 13:23:31 CET 2008 - coolo@suse.de
 
 - no longer link against db43 but against rpmlib
