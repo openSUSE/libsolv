@@ -132,7 +132,7 @@ static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int
 }
 
 #define FOR_REPO_SOLVABLES(r, p, s)						\
-  for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s++)	\
+  for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\
     if (s->repo == (r))
 
 
