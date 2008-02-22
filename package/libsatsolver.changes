@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Feb 22 11:09:05 CET 2008 - coolo@suse.de
+
+- support rpmdb2solv -r for chroots
+
+-------------------------------------------------------------------
 Thu Feb 21 18:14:41 CET 2008 - coolo@suse.de
 
 - fix susetags parser for so called full trees
