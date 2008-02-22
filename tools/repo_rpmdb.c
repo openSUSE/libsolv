@@ -718,6 +718,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
   unsigned int refmask, h;
   int asolv;
   Repodata *repodata;
+  char dbpath[PATH_MAX];
 
   if (repo->start != repo->end)
     abort();		/* FIXME: rpmdbid */
@@ -736,9 +737,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 
   if (!ref)
     {
-      if (db->open(db, 0, "/var/lib/rpm/Packages", 0, DB_HASH, DB_RDONLY, 0664))
+      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
+      if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
 	{
-	  perror("db->open /var/lib/rpm/Packages");
+	  perror("db->open var/lib/rpm/Packages");
 	  exit(1);
 	}
       if (db->get_byteswapped(db, &byteswapped))
@@ -828,9 +830,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
     }
   else
     {
-      if (db->open(db, 0, "/var/lib/rpm/Name", 0, DB_HASH, DB_RDONLY, 0664))
+      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", rootdir);
+      if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
 	{
-	  perror("db->open /var/lib/rpm/Name");
+	  perror("db->open var/lib/rpm/Name");
 	  exit(1);
 	}
       if (db->get_byteswapped(db, &byteswapped))
@@ -955,9 +958,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 		  perror("db_create");
 		  exit(1);
 		}
-	      if (db->open(db, 0, "/var/lib/rpm/Packages", 0, DB_HASH, DB_RDONLY, 0664))
+	      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
+	      if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
 		{
-		  perror("db->open /var/lib/rpm/Packages");
+		  perror("db->open var/lib/rpm/Packages");
 		  exit(1);
 		}
 	      if (db->get_byteswapped(db, &byteswapped))

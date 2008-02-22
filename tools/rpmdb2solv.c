@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -29,22 +30,28 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo, *ref = 0;
   FILE *fp;
+  Pool *refpool;
+  int g;
+  const char *root = "/";
 
-  if (argc != 1)
-    {
-      Pool *refpool = pool;
-      if ((fp = fopen(argv[1], "r")) == NULL)
-	{
-	  perror(argv[1]);
-	  exit(0);
-	}
-      ref = repo_create(refpool, "ref");
-      repo_add_solv(ref, fp);
-      fclose(fp);
-    }
-
+  while ((g = getopt (argc, argv, "-r:")) >= 0)
+    switch (g)
+      {
+      case 'r': root = optarg; break;
+      case 1:
+        refpool = pool;
+        if ((fp = fopen(argv[1], "r")) == NULL)
+          {
+            perror(argv[1]);
+            exit(0);
+          }
+        ref = repo_create(refpool, "ref");
+        repo_add_solv(ref, fp);
+        fclose(fp);
+      }
+  
   repo = repo_create(pool, "installed");
-  repo_add_rpmdb(repo, ref, "/");
+  repo_add_rpmdb(repo, ref, root);
   if (ref)
     {
       if (ref->pool != pool)
