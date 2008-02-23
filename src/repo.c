@@ -728,7 +728,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 }
 
 void
-repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+repo_search(Repo *repo, Id p, Id keyname, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
 {
   struct matchdata md;
 
@@ -738,7 +738,7 @@ repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callba
   md.flags = flags;
   md.callback = callback;
   md.callback_data = cbdata;
-  repo_search_md(repo, p, key, &md);
+  repo_search_md(repo, p, keyname, &md);
 }
 
 const char *
@@ -954,3 +954,6 @@ repo_add_attrstore (Repo *repo, Attrstore *s, const char *location)
 #endif
 
 // EOF
+/*
+vim:cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-0.5s:tw=78:cindent:sw=4:
+*/

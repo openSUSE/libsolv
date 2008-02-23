@@ -14,6 +14,7 @@
 
 #define _GNU_SOURCE
 #include <string.h>
+#include <fnmatch.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -570,6 +571,207 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
       if (onekey || stop > SEARCH_NEXT_KEY)
 	return;
     }
+}
+
+static void
+dataiterator_newdata(Dataiterator *di)
+{
+  Id keyname = di->keyname;
+  Repodata *data = di->data;
+  di->nextkeydp = 0;
+
+  if (data->state == REPODATA_STUB)
+    {
+      if (keyname)
+	{
+	  int j;
+	  for (j = 1; j < data->nkeys; j++)
+	    if (keyname == data->keys[j].name)
+	      break;
+	  if (j == data->nkeys)
+	    return;
+	}
+      /* load it */
+      if (data->loadcallback)
+	data->loadcallback(data);
+      else
+	data->state = REPODATA_ERROR;
+    }
+  if (data->state == REPODATA_ERROR)
+    return;
+
+  Id schema;
+  unsigned char *dp = data->incoredata + data->incoreoffset[di->solvid - data->start];
+  dp = data_read_id(dp, &schema);
+  Id *keyp = data->schemadata + data->schemata[schema];
+  if (keyname)
+    {
+      Id k, *kp;
+      /* search in a specific key */
+      for (kp = keyp; (k = *kp++) != 0; )
+	if (data->keys[k].name == keyname)
+	  break;
+      if (k == 0)
+	return;
+      dp = forward_to_key(data, k, schema, dp);
+      if (!dp)
+	return;
+      keyp = kp - 1;
+    }
+  Id keyid = *keyp++;
+  if (!keyid)
+    return;
+
+  di->data = data;
+  di->key = di->data->keys + keyid;
+  di->keyp = keyp;
+  di->dp = 0;
+
+  di->nextkeydp = dp;
+  di->dp = get_data(di->data, di->key, &di->nextkeydp);
+  di->kv.eof = 0;
+}
+
+void
+dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
+		  const char *match, int flags)
+{
+  di->flags = flags;
+  if (p)
+    {
+      di->solvid = p;
+      di->flags |= __SEARCH_ONESOLVABLE;
+      di->data = repo->repodata - 1;
+    }
+  else
+    {
+      di->solvid = repo->start - 1;
+      di->data = repo->repodata + repo->nrepodata - 1;
+    }
+  di->match = match;
+  di->keyname = keyname;
+  static Id zeroid = 0;
+  di->keyp = &zeroid;
+  di->kv.eof = 1;
+  di->repo = repo;
+}
+
+/* FIXME factor and merge with repo_matchvalue */
+static int
+dataiterator_match(Dataiterator *di, KeyValue *kv)
+{
+  int flags = di->flags;
+
+  if ((flags & SEARCH_STRINGMASK) != 0)
+    {
+      switch (di->key->type)
+	{
+	case TYPE_ID:
+	case TYPE_IDARRAY:
+	  if (di->data && di->data->localpool)
+	    kv->str = stringpool_id2str(&di->data->spool, kv->id);
+	  else
+	    kv->str = id2str(di->repo->pool, kv->id);
+	  break;
+	case TYPE_STR:
+	  break;
+	default:
+	  return 0;
+	}
+      switch ((flags & SEARCH_STRINGMASK))
+	{
+	  case SEARCH_SUBSTRING:
+	    if (flags & SEARCH_NOCASE)
+	      {
+	        if (!strcasestr(kv->str, di->match))
+		  return 0;
+	      }
+	    else
+	      {
+	        if (!strstr(kv->str, di->match))
+		  return 0;
+	      }
+	    break;
+	  case SEARCH_STRING:
+	    if (flags & SEARCH_NOCASE)
+	      {
+	        if (strcasecmp(di->match, kv->str))
+		  return 0;
+	      }
+	    else
+	      {
+	        if (strcmp(di->match, kv->str))
+		  return 0;
+	      }
+	    break;
+	  case SEARCH_GLOB:
+	    if (fnmatch(di->match, kv->str, (flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
+	      return 0;
+	    break;
+#if 0
+	  case SEARCH_REGEX:
+	    if (regexec(&di->regexp, kv->str, 0, NULL, 0))
+	      return 0;
+#endif
+	  default:
+	    return 0;
+	}
+    }
+  return 1;
+}
+
+int
+dataiterator_step(Dataiterator *di)
+{
+  /* FIXME add solvable data */
+  while (1)
+    {
+      if (di->kv.eof)
+	di->dp = 0;
+      else
+	di->dp = data_fetch(di->dp, &di->kv, di->key);
+
+      while (!di->dp)
+	{
+	  Id keyid;
+	  if (di->keyname || !(keyid = *di->keyp++))
+	    {
+	      while (1)
+		{
+		  Repo *repo = di->repo;
+		  Repodata *data = ++di->data;
+		  if (data >= repo->repodata + repo->nrepodata)
+		    {
+		      if (di->flags & __SEARCH_ONESOLVABLE)
+			return 0;
+		      while (++di->solvid < repo->end)
+			if (repo->pool->solvables[di->solvid].repo == repo)
+			  break;
+		      if (di->solvid >= repo->end)
+			return 0;
+		      di->data = repo->repodata - 1;
+		      continue;
+		    }
+		  if (di->solvid >= data->start && di->solvid < data->end)
+		    {
+		      dataiterator_newdata(di);
+		      if (di->nextkeydp)
+			break;
+		    }
+		}
+	    }
+	  else
+	    {
+	      di->key = di->data->keys + keyid;
+	      di->dp = get_data(di->data, di->key, &di->nextkeydp);
+	    }
+	  di->dp = data_fetch(di->dp, &di->kv, di->key);
+	}
+      if (!di->match
+	  || dataiterator_match(di, &di->kv))
+	break;
+    }
+  return 1;
 }
 
 void
@@ -1367,3 +1569,6 @@ repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int b
 	}
     }
 }
+/*
+vim:cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-0.5s:tw=78:cindent:sw=4:
+*/

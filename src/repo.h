@@ -160,6 +160,9 @@ typedef struct _KeyValue {
 #define	SEARCH_NOCASE			(1<<8)
 #define	SEARCH_NO_STORAGE_SOLVABLE	(1<<9)
 
+/* Internal */
+#define __SEARCH_ONESOLVABLE		(1 << 31)
+
 Repodata *repo_add_repodata(Repo *repo);
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
@@ -170,6 +173,29 @@ int repo_lookup_num(Solvable *s, Id key);
 /* generic attribute lookup */
 int repo_lookup(Solvable *s, Id key, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
+typedef struct _Dataiterator
+{
+  Repodata *data;
+  Id *keyp;
+  unsigned char *nextkeydp;
+  unsigned char *dp;
+  Repokey *key;
+  Repo *repo;
+  const char *match;
+  Id solvid;
+  Id keyname;
+  unsigned flags;
+  KeyValue kv;
+} Dataiterator;
+
+/* Use these like:
+     Dataiterator di;
+     dataiterator_init(&di, repo, 0, 0, "bla", SEARCH_SUBSTRING);
+     while (dataiterator_step(&di))
+       dosomething(di.solvid, di.key, di.kv);  */
+void dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
+		       const char *match, int flags);
+int dataiterator_step(Dataiterator *di);
 
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
 void repo_set_num(Repo *repo, Id p, Id keyname, Id num);

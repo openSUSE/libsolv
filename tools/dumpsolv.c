@@ -14,81 +14,6 @@ static int with_attr = 0;
 
 #include "pool.h"
 #include "repo_solv.h"
-#if 0
-#include "attr_store.h"
-#include "attr_store_p.h"
-
-static void
-dump_attrs_1 (Attrstore *s, unsigned int entry)
-{
-  attr_iterator ai;
-  FOR_ATTRS (s, entry, &ai)
-    {
-      fprintf (stdout, "%s:", id2str (s->pool, ai.name));
-      switch (ai.type)
-	{
-	case TYPE_ATTR_INT:
-	  fprintf (stdout, "int  %u\n", ai.as_int);
-	  break;
-	case TYPE_ATTR_CHUNK:
-	  {
-	    const char *str = attr_retrieve_blob (s, ai.as_chunk[0], ai.as_chunk[1]);
-	    if (str)
-	      fprintf (stdout, "blob %s\n", str);
-	    else
-	      fprintf (stdout, "blob %u+%u\n", ai.as_chunk[0], ai.as_chunk[1]);
-	  }
-	  break;
-	case TYPE_ATTR_STRING:
-	  fprintf (stdout, "str  %s\n", ai.as_string);
-	  break;
-	case TYPE_ATTR_INTLIST:
-	  {
-	    fprintf (stdout, "lint\n ");
-	    while (1)
-	      {
-		int val;
-		get_num (ai.as_numlist, val);
-		fprintf (stdout, " %d", (val & 63) | ((val >> 1) & ~63));
-		if (!(val & 64))
-		  break;
-	      }
-	    fprintf (stdout, "\n");
-	    break;
-	  }
-	case TYPE_ATTR_LOCALIDS:
-	  {
-	    fprintf (stdout, "lids");
-	    while (1)
-	      {
-		Id val;
-		get_num (ai.as_numlist, val);
-		if (!val)
-		  break;
-		fprintf (stdout, "\n  %s(%d)", localid2str (s, val), val);
-	      }
-	    fprintf (stdout, "\n");
-	    break;
-	  }
-	default:
-	  fprintf (stdout, "\n");
-	  break;
-	}
-    }
-}
-
-static void
-dump_attrs (Repo *repo, unsigned int entry)
-{
-  unsigned i;
-  for (i = 0; i < repo->nrepodata; i++)
-    {
-      Attrstore *s = repo->repodata[i].s;
-      if (s && entry < s->entries)
-        dump_attrs_1 (s, entry);
-    }
-}
-#endif
 
 static void
 dump_repodata (Repo *repo)
@@ -188,9 +113,18 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 void
 dump_repoattrs(Repo *repo, Id p)
 {
+#if 1
   repo_search(repo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE, dump_repoattrs_cb, 0);
+#else
+  Dataiterator di;
+  dataiterator_init(&di, repo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE);
+  while (dataiterator_step(&di))
+    dump_repoattrs_cb(0, repo->pool->solvables + di.solvid, di.data, di.key,
+		      &di.kv);
+#endif
 }
 
+#if 0
 void
 dump_some_attrs(Repo *repo, Solvable *s)
 {
@@ -209,6 +143,7 @@ dump_some_attrs(Repo *repo, Solvable *s)
 
   printf ("  XXX %d %d %u %s\n", medianr, downloadsize, time, summary);
 }
+#endif
 
 
 static FILE *
@@ -238,6 +173,37 @@ usage( const char *err )
   exit(0);
 }
 
+#if 0
+static void
+tryme (Repo *repo, Id p, Id keyname, const char *match, int flags)
+{
+  Dataiterator di;
+  dataiterator_init(&di, repo, p, keyname, match, flags);
+  while (dataiterator_step(&di))
+    {
+      switch (di.key->type)
+	{
+	  case TYPE_ID:
+	  case TYPE_IDARRAY:
+	      if (di.data && di.data->localpool)
+		di.kv.str = stringpool_id2str(&di.data->spool, di.kv.id);
+	      else
+		di.kv.str = id2str(repo->pool, di.kv.id);
+	      break;
+	  case TYPE_STR:
+	  case TYPE_DIRSTRARRAY:
+	      break;
+	  default:
+	      di.kv.str = 0;
+	}
+      fprintf (stdout, "found: %d:%s %d %s %d %d %d\n",
+	       di.solvid,
+	       id2str(repo->pool, di.key->name),
+	       di.kv.id,
+	       di.kv.str, di.kv.num, di.kv.num2, di.kv.eof);
+    }
+}
+#endif
 
 int main(int argc, char **argv)
 {
@@ -306,11 +272,18 @@ int main(int argc, char **argv)
       dump_attrs (repo, n - 1);
 #endif
       dump_repoattrs(repo, i);
-#if 1
+#if 0
       dump_some_attrs(repo, s);
 #endif
       n++;
     }
+#if 0
+  tryme(repo, 0, str2id (repo->pool, "medianr", 0), 0, 0);
+  printf("\n");
+  tryme(repo, 0, 0, 0, 0);
+  printf("\n");
+  tryme(repo, 0, 0, "*y*e*", SEARCH_GLOB);
+#endif
   pool_free(pool);
   exit(0);
 }
