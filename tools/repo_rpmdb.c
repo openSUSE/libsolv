@@ -38,6 +38,7 @@
 #define TAG_SUMMARY		1004
 #define TAG_DESCRIPTION		1005
 #define TAG_BUILDTIME		1006
+#define TAG_SIZE                1009
 #define TAG_VENDOR		1011
 #define TAG_GROUP		1016
 #define TAG_ARCH		1022
@@ -688,6 +689,10 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
         repodata_set_num(repodata, entry, id_time, u32);
+      u32 = headint32(rpmhead, TAG_SIZE);
+      if (u32)
+        repodata_set_num(repodata, entry, id_installsize, u32);
+
     }
   return 1;
 }
