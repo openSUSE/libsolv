@@ -69,15 +69,18 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 {
   const char *keyname;
 
-  keyname = id2str(data->repo->pool, key->name);
+  keyname = id2str(s->repo->pool, key->name);
   switch(key->type)
     {
     case TYPE_ID:
-      if (data->localpool)
+      if (data && data->localpool)
 	kv->str = stringpool_id2str(&data->spool, kv->id);
       else
-        kv->str = id2str(data->repo->pool, kv->id);
+        kv->str = id2str(s->repo->pool, kv->id);
       printf("%s: %s\n", keyname, kv->str);
+      break;
+    case TYPE_IDARRAY:
+      printf("%s: %s\n", keyname, dep2str(s->repo->pool, kv->id));
       break;
     case TYPE_STR:
       printf("%s: %s\n", keyname, kv->str);
@@ -85,6 +88,7 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
     case TYPE_VOID:
       printf("%s\n", keyname);
       break;
+    case TYPE_U32:
     case TYPE_NUM:
     case TYPE_CONSTANT:
       printf("%s: %d\n", keyname, kv->num);
