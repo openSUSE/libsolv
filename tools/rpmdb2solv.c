@@ -34,22 +34,27 @@ main(int argc, char **argv)
   int g;
   const char *root = "/";
 
-  while ((g = getopt (argc, argv, "-r:")) >= 0)
+  while ((g = getopt (argc, argv, "r:")) >= 0)
     switch (g)
       {
       case 'r': root = optarg; break;
-      case 1:
-        refpool = pool;
-        if ((fp = fopen(argv[1], "r")) == NULL)
-          {
-            perror(argv[1]);
-            exit(0);
-          }
-        ref = repo_create(refpool, "ref");
-        repo_add_solv(ref, fp);
-        fclose(fp);
+      default:
+	exit(1);
       }
   
+  if (optind < argc)
+    {
+      refpool = pool;
+      if ((fp = fopen(argv[optind], "r")) == NULL)
+        {
+          perror(argv[optind]);
+          exit(1);
+        }
+      ref = repo_create(refpool, "ref");
+      repo_add_solv(ref, fp);
+      fclose(fp);
+    }
+
   repo = repo_create(pool, "installed");
   repo_add_rpmdb(repo, ref, root);
   if (ref)
