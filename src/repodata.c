@@ -642,11 +642,16 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
       di->solvid = p;
       di->flags |= __SEARCH_ONESOLVABLE;
       di->data = repo->repodata - 1;
+      if (flags & SEARCH_NO_STORAGE_SOLVABLE)
+	di->state = 0;
+      else
+	di->state = 1;
     }
   else
     {
       di->solvid = repo->start - 1;
       di->data = repo->repodata + repo->nrepodata - 1;
+      di->state = 0;
     }
   di->match = match;
   di->keyname = keyname;
@@ -654,6 +659,7 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
   di->keyp = &zeroid;
   di->kv.eof = 1;
   di->repo = repo;
+  di->idp = 0;
 }
 
 /* FIXME factor and merge with repo_matchvalue */
@@ -720,53 +726,177 @@ dataiterator_match(Dataiterator *di, KeyValue *kv)
   return 1;
 }
 
+static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
+  { SOLVABLE_NAME,        TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_ARCH,        TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_EVR,         TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_VENDOR,      TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_PROVIDES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_OBSOLETES,   TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_CONFLICTS,   TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_REQUIRES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_RECOMMENDS,  TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_SUGGESTS,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_SUPPLEMENTS, TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_ENHANCES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_FRESHENS,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { RPM_RPMDBID,          TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
+};
+
 int
 dataiterator_step(Dataiterator *di)
 {
-  /* FIXME add solvable data */
+restart:
   while (1)
     {
-      if (di->kv.eof)
-	di->dp = 0;
-      else
-	di->dp = data_fetch(di->dp, &di->kv, di->key);
-
-      while (!di->dp)
+      if (di->state)
 	{
-	  Id keyid;
-	  if (di->keyname || !(keyid = *di->keyp++))
+	  if (di->idp)
 	    {
-	      while (1)
+	      Id *idp = di->idp;
+	      if (*idp)
 		{
-		  Repo *repo = di->repo;
-		  Repodata *data = ++di->data;
-		  if (data >= repo->repodata + repo->nrepodata)
+		  di->kv.id = *idp;
+		  di->idp++;
+		  di->kv.eof = idp[1] ? 0 : 1;
+		  goto weg2;
+		}
+	      else
+		di->idp = 0;
+	    }
+	  Solvable *s = di->repo->pool->solvables + di->solvid;
+	  int state = di->state;
+	  di->key = solvablekeys + state - 1;
+	  if (di->keyname)
+	    di->state = RPM_RPMDBID;
+	  else
+	    di->state++;
+	  if (state == 1)
+	    {
+	      di->data = 0;
+	      if (di->keyname)
+		state = di->keyname - 1;
+	    }
+	  switch (state + 1)
+	    {
+	      case SOLVABLE_NAME:
+		if (!s->name)
+		  continue;
+		di->kv.id = s->name;
+		break;
+	      case SOLVABLE_ARCH:
+		if (!s->arch)
+		  continue;
+		di->kv.id = s->arch;
+		break;
+	      case SOLVABLE_EVR:
+		if (!s->evr)
+		  continue;
+		di->kv.id = s->evr;
+		break;
+	      case SOLVABLE_VENDOR:
+		if (!s->vendor)
+		  continue;
+		di->kv.id = s->vendor;
+		break;
+	      case SOLVABLE_PROVIDES:
+		di->idp = s->provides
+		    ? di->repo->idarraydata + s->provides : 0;
+		continue;
+	      case SOLVABLE_OBSOLETES:
+		di->idp = s->obsoletes
+		    ? di->repo->idarraydata + s->obsoletes : 0;
+		continue;
+	      case SOLVABLE_CONFLICTS:
+		di->idp = s->conflicts
+		    ? di->repo->idarraydata + s->conflicts : 0;
+		continue;
+	      case SOLVABLE_REQUIRES:
+		di->idp = s->requires
+		    ? di->repo->idarraydata + s->requires : 0;
+		continue;
+	      case SOLVABLE_RECOMMENDS:
+		di->idp = s->recommends
+		    ? di->repo->idarraydata + s->recommends : 0;
+		continue;
+	      case SOLVABLE_SUPPLEMENTS:
+		di->idp = s->supplements
+		    ? di->repo->idarraydata + s->supplements : 0;
+		continue;
+	      case SOLVABLE_SUGGESTS:
+		di->idp = s->suggests
+		    ? di->repo->idarraydata + s->suggests : 0;
+		continue;
+	      case SOLVABLE_ENHANCES:
+		di->idp = s->enhances
+		    ? di->repo->idarraydata + s->enhances : 0;
+		continue;
+	      case SOLVABLE_FRESHENS:
+		di->idp = s->freshens
+		    ? di->repo->idarraydata + s->freshens : 0;
+		continue;
+	      case RPM_RPMDBID:
+		if (!di->repo->rpmdbid)
+		  continue;
+		di->kv.num = di->repo->rpmdbid[di->solvid - di->repo->start];
+		break;
+	      default:
+		di->data = di->repo->repodata - 1;
+		di->kv.eof = 1;
+		di->state = 0;
+		continue;
+	    }
+	}
+      else
+	{
+	  if (di->kv.eof)
+	    di->dp = 0;
+	  else
+	    di->dp = data_fetch(di->dp, &di->kv, di->key);
+
+	  while (!di->dp)
+	    {
+	      Id keyid;
+	      if (di->keyname || !(keyid = *di->keyp++))
+		{
+		  while (1)
 		    {
-		      if (di->flags & __SEARCH_ONESOLVABLE)
-			return 0;
-		      while (++di->solvid < repo->end)
-			if (repo->pool->solvables[di->solvid].repo == repo)
-			  break;
-		      if (di->solvid >= repo->end)
-			return 0;
-		      di->data = repo->repodata - 1;
-		      continue;
-		    }
-		  if (di->solvid >= data->start && di->solvid < data->end)
-		    {
-		      dataiterator_newdata(di);
-		      if (di->nextkeydp)
-			break;
+		      Repo *repo = di->repo;
+		      Repodata *data = ++di->data;
+		      if (data >= repo->repodata + repo->nrepodata)
+			{
+			  if (di->flags & __SEARCH_ONESOLVABLE)
+			    return 0;
+			  while (++di->solvid < repo->end)
+			    if (repo->pool->solvables[di->solvid].repo == repo)
+			      break;
+			  if (di->solvid >= repo->end)
+			    return 0;
+			  di->data = repo->repodata - 1;
+			  if (di->flags & SEARCH_NO_STORAGE_SOLVABLE)
+			    continue;
+			  static Id zeroid = 0;
+			  di->keyp = &zeroid;
+			  di->state = 1;
+			  goto restart;
+			}
+		      if (di->solvid >= data->start && di->solvid < data->end)
+			{
+			  dataiterator_newdata(di);
+			  if (di->nextkeydp)
+			    break;
+			}
 		    }
 		}
+	      else
+		{
+		  di->key = di->data->keys + keyid;
+		  di->dp = get_data(di->data, di->key, &di->nextkeydp);
+		}
+	      di->dp = data_fetch(di->dp, &di->kv, di->key);
 	    }
-	  else
-	    {
-	      di->key = di->data->keys + keyid;
-	      di->dp = get_data(di->data, di->key, &di->nextkeydp);
-	    }
-	  di->dp = data_fetch(di->dp, &di->kv, di->key);
 	}
+weg2:
       if (!di->match
 	  || dataiterator_match(di, &di->kv))
 	break;

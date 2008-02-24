@@ -181,10 +181,12 @@ typedef struct _Dataiterator
   unsigned char *dp;
   Repokey *key;
   Repo *repo;
+  Id *idp;
   const char *match;
   Id solvid;
   Id keyname;
   unsigned flags;
+  unsigned state;
   KeyValue kv;
 } Dataiterator;
 
