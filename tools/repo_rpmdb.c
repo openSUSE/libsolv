@@ -691,7 +691,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
         repodata_set_num(repodata, entry, id_time, u32);
       u32 = headint32(rpmhead, TAG_SIZE);
       if (u32)
-        repodata_set_num(repodata, entry, id_installsize, u32);
+        repodata_set_num(repodata, entry, id_installsize, (u32 + 1023) / 1024);
 
     }
   return 1;
