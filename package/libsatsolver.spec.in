@@ -7,7 +7,18 @@ Url:            http://svn.opensuse.org/svn/zypp/trunk/sat-solver
 Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
-BuildRequires:  cmake rpm-devel gcc-c++ libexpat-devel ruby-devel swig
+
+%if 0%{?mandriva_version}
+# force this version on mandriva
+BuildRequires: libneon0.26-devel
+%endif
+
+%if 0%{?suse_version}
+BuildRequires: libexpat-devel
+%else
+BuildRequires: expat-devel
+%endif
+BuildRequires:  cmake rpm-devel gcc-c++ ruby-devel swig
 Summary:        A new approach to package dependency solving
 
 %description
@@ -88,7 +99,16 @@ rm -rf "$RPM_BUILD_ROOT"
 
 %files ruby
 %defattr(-,root,root,-)
+
+%if 0%{?suse_version}
 %{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolverx.so
 %{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver.rb
+%else
+%{!?ruby_sitelib: %define ruby_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"]')}
+%{!?ruby_sitearch: %define ruby_sitearch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"]')}
+%{ruby_sitearch}/satsolverx.so
+%{ruby_sitelib}/satsolver.rb
+%endif
+
 
 %changelog
