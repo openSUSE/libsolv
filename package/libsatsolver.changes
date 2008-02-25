@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Feb 25 12:59:00 CET 2008 - coolo@suse.de
+
+- fixing rpmdb2solv argument handling
+
+-------------------------------------------------------------------
 Fri Feb 22 11:09:05 CET 2008 - coolo@suse.de
 
 - support rpmdb2solv -r for chroots
