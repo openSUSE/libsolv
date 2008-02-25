@@ -80,7 +80,10 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
       printf("%s: %s\n", keyname, kv->str);
       break;
     case TYPE_IDARRAY:
-      printf("%s: %s\n", keyname, dep2str(s->repo->pool, kv->id));
+      if (data && data->localpool)
+        printf("%s: %s\n", keyname, stringpool_id2str(&data->spool, kv->id));
+      else
+        printf("%s: %s\n", keyname, dep2str(s->repo->pool, kv->id));
       break;
     case TYPE_STR:
       printf("%s: %s\n", keyname, kv->str);
