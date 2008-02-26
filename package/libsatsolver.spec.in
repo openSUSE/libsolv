@@ -104,10 +104,8 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolverx.so
 %{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver.rb
 %else
-%{!?ruby_sitelib: %define ruby_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"]')}
-%{!?ruby_sitearch: %define ruby_sitearch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"]')}
-%{ruby_sitearch}/satsolverx.so
-%{ruby_sitelib}/satsolver.rb
+%{ruby_sitearchdir}/satsolverx.so
+%{ruby_sitelibdir}/satsolver.rb
 %endif
 
 
