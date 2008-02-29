@@ -495,14 +495,14 @@ repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValu
     {
       switch (key->type)
 	{
-	case TYPE_ID:
-	case TYPE_IDARRAY:
+	case REPOKEY_TYPE_ID:
+	case REPOKEY_TYPE_IDARRAY:
 	  if (data && data->localpool)
 	    kv->str = stringpool_id2str(&data->spool, kv->id);
 	  else
 	    kv->str = id2str(s->repo->pool, kv->id);
 	  break;
-	case TYPE_STR:
+	case REPOKEY_TYPE_STR:
 	  break;
 	default:
 	  return 0;
@@ -552,20 +552,20 @@ repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValu
 
 
 static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
-  { SOLVABLE_NAME,        TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_ARCH,        TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_EVR,         TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_VENDOR,      TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_PROVIDES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_OBSOLETES,   TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_CONFLICTS,   TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_REQUIRES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_RECOMMENDS,  TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_SUGGESTS,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_SUPPLEMENTS, TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_ENHANCES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_FRESHENS,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { RPM_RPMDBID,          TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_NAME,        REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_ARCH,        REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_EVR,         REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_VENDOR,      REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_PROVIDES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_OBSOLETES,   REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_CONFLICTS,   REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_REQUIRES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_RECOMMENDS,  REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_SUGGESTS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_SUPPLEMENTS, REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_ENHANCES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_FRESHENS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { RPM_RPMDBID,          REPOKEY_TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
 };
 
 static void
@@ -767,7 +767,7 @@ repo_lookup_str(Solvable *s, Id key)
 	continue;
       for (j = 1; j < data->nkeys; j++)
 	{
-	  if (data->keys[j].name == key && (data->keys[j].type == TYPE_ID || data->keys[j].type == TYPE_STR))
+	  if (data->keys[j].name == key && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID || data->keys[j].type == REPOKEY_TYPE_STR))
 	    return repodata_lookup_str(data, n - data->start, j);
 	}
     }
@@ -782,6 +782,12 @@ repo_lookup_num(Solvable *s, Id key)
   Repodata *data;
   int i, j, n;
 
+  if (key == RPM_RPMDBID)
+    {
+      if (repo->rpmdbid)
+	return repo->rpmdbid[(s - pool->solvables) - repo->start];
+      return 0;
+    }
   n = s - pool->solvables;
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
@@ -790,9 +796,9 @@ repo_lookup_num(Solvable *s, Id key)
       for (j = 1; j < data->nkeys; j++)
 	{
 	  if (data->keys[j].name == key
-	      && (data->keys[j].type == TYPE_U32
-	          || data->keys[j].type == TYPE_NUM
-		  || data->keys[j].type == TYPE_CONSTANT))
+	      && (data->keys[j].type == REPOKEY_TYPE_U32
+	          || data->keys[j].type == REPOKEY_TYPE_NUM
+		  || data->keys[j].type == REPOKEY_TYPE_CONSTANT))
 	    {
 	      unsigned value;
 	      if (repodata_lookup_num(data, n - data->start, j, &value))

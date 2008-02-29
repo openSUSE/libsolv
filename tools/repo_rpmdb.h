@@ -6,3 +6,4 @@
  */
 
 extern void repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir);
+extern void repo_add_rpms(Repo *repo, const char **rpms, int nrpms);

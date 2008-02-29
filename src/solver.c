@@ -3964,7 +3964,6 @@ solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps)
 {
   Pool *pool = solv->pool;
   Solvable *s;
-  Id id_diskusage;
   char *p;
   const char *path, *compstr;
   struct mptree *mptree;
@@ -3973,8 +3972,6 @@ solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps)
   int mp;
   Map installmap;
   struct ducbdata cbd;
-
-  id_diskusage = str2id(pool, "diskusage", 1);
 
   cbd.mps = mps;
   cbd.addsub = 0;
@@ -4074,20 +4071,50 @@ solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps)
       if (!MAPTST(&installmap, i))
 	continue;
       s = pool->solvables + i;
-      repo_search(s->repo, i, id_diskusage, 0, 0, solver_fill_DU_cb, &cbd);
+      repo_search(s->repo, i, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
     }
   map_free(&installmap);
   /* run through erase solvable dudata */
   if (solv->installed)
     {
       cbd.addsub = -1;
-      for (i = solv->installed->start; i < solv->installed->end; i++)
+      FOR_REPO_SOLVABLES(solv->installed, i, s)
 	{
 	  if (solv->decisionmap[i] >= 0)
 	    continue;
-	  repo_search(solv->installed, i, id_diskusage, 0, 0, solver_fill_DU_cb, &cbd);
+	  repo_search(solv->installed, i, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
 	}
     }
   sat_free(cbd.dirmap);
   sat_free(mptree);
+}
+
+int
+solver_calc_installsizechange(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  int i, change;
+  Id p;
+  Solvable *s;
+
+  change = 0;
+  for (i = 1; i < solv->decisionq.count; i++)
+    {
+      Id p = solv->decisionq.elements[i];
+      if (p < 0)
+	continue;
+      s = pool->solvables + p;
+      if (!s->repo)
+	continue;
+      if (solv->installed && s->repo == solv->installed)
+	continue;
+      change += repo_lookup_num(s, SOLVABLE_INSTALLSIZE);
+    }
+  if (solv->installed)
+    {
+      FOR_REPO_SOLVABLES(solv->installed, p, s)
+	if (solv->decisionmap[p] < 0)
+	  change -= repo_lookup_num(s, SOLVABLE_INSTALLSIZE);
+    }
+  return change;
 }

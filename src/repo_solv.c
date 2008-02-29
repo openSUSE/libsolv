@@ -26,6 +26,8 @@
 #include "repo_solv.h"
 #include "util.h"
 
+#include "repopack.h"
+
 #define INTERESTED_START	SOLVABLE_NAME
 #define INTERESTED_END		SOLVABLE_FRESHENS
 
@@ -134,6 +136,7 @@ read_id(Repodata *data, Id max)
  * read array of Ids
  */
 
+#if 0
 static Id *
 read_rel_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end, Id marker)
 {
@@ -158,7 +161,7 @@ read_rel_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end, Id marker)
 	  continue;
 	}
       x = (x << 6) | (c & 63);
-      if (x == 0 && c == 0x40)
+      if (x == 0)
 	{
 	  /* marker hack */
 	  if (store == end)
@@ -166,6 +169,11 @@ read_rel_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end, Id marker)
 	      pool_debug(mypool, SAT_ERROR, "read_rel_idarray: array overflow\n");
 	      data->error = SOLV_ERROR_OVERFLOW;
 	      return 0;
+	    }
+	  if (c != 0x40)
+	    {
+	      *store++ = 0;
+	      return store;
 	    }
 	  *store++ = marker;	/* do not map! */
 	  old = 0;
@@ -204,6 +212,99 @@ read_rel_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end, Id marker)
       x = 0;
     }
 }
+#endif
+
+static inline unsigned char *
+data_read_id_max(unsigned char *dp, Id *ret, Id *map, int max, int *error)
+{
+  Id x;
+  dp = data_read_id(dp, &x);
+  if (max && x >= max)
+    {
+      pool_debug(mypool, SAT_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
+      *error = SOLV_ERROR_ID_RANGE;
+      x = 0;
+    }
+  *ret = map ? map[x] : x;
+  return dp;
+}
+
+unsigned char *
+data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error)
+{
+  Id *store = *storep;
+  unsigned int x = 0;
+  int c;
+
+  for (;;)
+    {
+      c = *dp++;
+      if ((c & 128) != 0)
+	{
+	  x = (x << 7) ^ c ^ 128;
+	  continue;
+	}
+      x = (x << 6) | (c & 63);
+      if (max && x >= max)
+	{
+	  pool_debug(mypool, SAT_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
+	  *error = SOLV_ERROR_ID_RANGE;
+	  break;
+	}
+      *store++ = x;
+      if ((c & 64) == 0)
+        break;
+      x = 0;
+    }
+  *store++ = 0;
+  *storep = store;
+  return dp;
+}
+
+unsigned char *
+data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error, Id marker)
+{
+  Id *store = *storep;
+  Id old = 0;
+  unsigned int x = 0;
+  int c;
+
+  for (;;)
+    {
+      c = *dp++;
+      if ((c & 128) != 0)
+	{
+	  x = (x << 7) ^ c ^ 128;
+	  continue;
+	}
+      x = (x << 6) | (c & 63);
+      if (x == 0)
+	{
+	  if (!(c & 64))
+	    break;
+          if (marker)
+	    *store++ = marker;
+	  old = 0;
+	  continue;
+	}
+      x = old + (x - 1);
+      old = x;
+      if (max && x >= max)
+	{
+	  pool_debug(mypool, SAT_ERROR, "data_read_rel_idarray: id too large (%u/%u)\n", x, max);
+	  *error = SOLV_ERROR_ID_RANGE;
+	  break;
+	}
+      *store++ = map ? map[x] : x;
+      if (!(c & 64))
+        break;
+      x = 0;
+    }
+  *store++ = 0;
+  *storep = store;
+  return dp;
+}
+
 
 static Id *
 read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
@@ -298,37 +399,36 @@ read_str(Repodata *data, char **inbuf, unsigned *len)
 }
 
 static void
-skip_item (Repodata *data, unsigned type, unsigned numid, unsigned numrel)
+skip_item(Repodata *data, unsigned type, unsigned numid, unsigned numrel)
 {
   switch (type)
     {
-      case TYPE_VOID:
-      case TYPE_CONSTANT:
+      case REPOKEY_TYPE_VOID:
+      case REPOKEY_TYPE_CONSTANT:
+      case REPOKEY_TYPE_CONSTANTID:
 	break;
-      case TYPE_ID:
+      case REPOKEY_TYPE_ID:
 	read_id(data, numid + numrel);		/* just check Id */
 	break;
-      case TYPE_DIR:
+      case REPOKEY_TYPE_DIR:
 	read_id(data, numid + data->dirpool.ndirs);	/* just check Id */
 	break;
-      case TYPE_NUM:
+      case REPOKEY_TYPE_NUM:
 	read_id(data, 0);
 	break;
-      case TYPE_U32:
+      case REPOKEY_TYPE_U32:
 	read_u32(data);
 	break;
-      case TYPE_ATTR_STRING:
-      case TYPE_STR:
+      case REPOKEY_TYPE_STR:
 	while (read_u8(data) != 0)
 	  ;
 	break;
-      case TYPE_IDARRAY:
-      case TYPE_REL_IDARRAY:
-      case TYPE_ATTR_INTLIST:
+      case REPOKEY_TYPE_IDARRAY:
+      case REPOKEY_TYPE_REL_IDARRAY:
 	while ((read_u8(data) & 0xc0) != 0)
 	  ;
 	break;
-      case TYPE_DIRNUMNUMARRAY:
+      case REPOKEY_TYPE_DIRNUMNUMARRAY:
 	for (;;)
 	  {
 	    read_id(data, numid + data->dirpool.ndirs);	/* just check Id */
@@ -337,7 +437,7 @@ skip_item (Repodata *data, unsigned type, unsigned numid, unsigned numrel)
 	      break;
 	  }
 	break;
-      case TYPE_DIRSTRARRAY:
+      case REPOKEY_TYPE_DIRSTRARRAY:
 	for (;;)
 	  {
 	    Id id = read_id(data, 0);
@@ -346,35 +446,6 @@ skip_item (Repodata *data, unsigned type, unsigned numid, unsigned numrel)
 	    if (!(id & 0x40))
 	      break;
 	  }
-	break;
-      case TYPE_COUNT_NAMED:
-	{
-	  unsigned count = read_id(data, 0);
-	  while (count--)
-	    {
-	      read_id(data, numid);    /* Name */
-	      unsigned t = read_id(data, TYPE_ATTR_TYPE_MAX + 1);
-	      skip_item(data, t, numid, numrel);
-	    }
-	}
-	break;
-      case TYPE_COUNTED:
-        {
-	  unsigned count = read_id(data, 0);
-	  unsigned t = read_id(data, TYPE_ATTR_TYPE_MAX + 1);
-	  while (count--)
-	    skip_item(data, t, numid, numrel);
-	}
-        break;
-      case TYPE_ATTR_CHUNK:
-	read_id(data, 0);
-	/* Fallthrough.  */
-      case TYPE_ATTR_INT:
-	read_id(data, 0);
-	break;
-      case TYPE_ATTR_LOCALIDS:
-	while (read_id(data, 0) != 0)
-	  ;
 	break;
       default:
 	pool_debug(mypool, SAT_ERROR, "unknown type %d\n", type);
@@ -413,10 +484,10 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
       id = keys[key].name;
       switch (keys[key].type)
 	{
-	case TYPE_IDVALUEARRAY:
+	case REPOKEY_TYPE_IDARRAY:
 	  if (id != REPODATA_KEYS)
 	    {
-	      skip_item(maindata, TYPE_IDVALUEARRAY, numid, numrel);
+	      skip_item(maindata, REPOKEY_TYPE_IDARRAY, numid, numrel);
 	      break;
 	    }
 	  /* read_idarray writes a terminating 0, that's why the + 1 */
@@ -441,7 +512,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 		  return;
 		}
 	      data->keys[i].name = idmap ? idmap[*ide++] : *ide++;
-	      data->keys[i].type = *ide++;
+	      data->keys[i].type = idmap ? idmap[*ide++] : *ide++;
 	      data->keys[i].size = 0;
 	      data->keys[i].storage = 0;
 	    }
@@ -449,9 +520,9 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	  if (data->nkeys > 2)
 	    qsort(data->keys + 1, data->nkeys - 1, sizeof(data->keys[0]), key_cmp);
 	  break;
-	case TYPE_STR:
+	case REPOKEY_TYPE_STR:
 	  if (id != REPODATA_LOCATION)
-	    skip_item(maindata, TYPE_STR, numid, numrel);
+	    skip_item(maindata, REPOKEY_TYPE_STR, numid, numrel);
 	  else
 	    {
 	      char buf[1024];
@@ -512,6 +583,19 @@ incore_add_id(Repodata *data, Id x)
 }
 
 static void
+incore_add_blob(Repodata *data, unsigned char *buf, int len)
+{
+  if (data->incoredatafree < len)
+    {
+      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + 1024 + len);
+      data->incoredatafree = 1024 + len;
+    }
+  memcpy(data->incoredata + data->incoredatalen, buf, len);
+  data->incoredatafree -= len;
+  data->incoredatalen += len;
+}
+
+static void
 incore_add_u32(Repodata *data, unsigned int x)
 {
   unsigned char *dp;
@@ -530,6 +614,7 @@ incore_add_u32(Repodata *data, unsigned int x)
   data->incoredatalen += 4;
 }
 
+#if 0
 static void
 incore_add_u8(Repodata *data, unsigned int x)
 {
@@ -545,6 +630,7 @@ incore_add_u8(Repodata *data, unsigned int x)
   data->incoredatafree--;
   data->incoredatalen++;
 }
+#endif
 
 
 
@@ -569,7 +655,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   char *strsp;			       /* repo string space */
   char *sp;			       /* pointer into string space */
   Id *idmap;			       /* map of repo Ids to pool Ids */
-  Id id;
+  Id id, type;
   unsigned int hashmask, h;
   int hh;
   Id *hashtbl;
@@ -587,6 +673,9 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   Id *schemata, key;
   int have_xdata;
   unsigned oldnrepodata;
+  int maxsize, allsize;
+  unsigned char *buf, *dp, *dps;
+  int left;
 
   struct _Stringpool *spool;
 
@@ -595,6 +684,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   memset(&data, 0, sizeof(data));
   data.repo = repo;
   data.fp = fp;
+  data.pagefd = -1;
 
   mypool = pool;
 
@@ -606,14 +696,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   solvversion = read_u32(&data);
   switch (solvversion)
     {
-      case SOLV_VERSION_1:
-      case SOLV_VERSION_2:
-      case SOLV_VERSION_3:
-      case SOLV_VERSION_4:
-      case SOLV_VERSION_5:
-      /* Version 6 existed only intermittantly.  It's equivalent to
-	 version 5.  */
-      case 6:
+      case SOLV_VERSION_6:
         break;
       default:
         pool_debug(pool, SAT_ERROR, "unsupported SOLV version\n");
@@ -624,28 +707,17 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 
   numid = read_u32(&data);
   numrel = read_u32(&data);
-  if (solvversion >= SOLV_VERSION_4)
-    numdir = read_u32(&data);
-  else
-    numdir = 0;
+  numdir = read_u32(&data);
   numsolv = read_u32(&data);
   numkeys = read_u32(&data);
   numschemata = read_u32(&data);
   numinfo = read_u32(&data);
   solvflags = read_u32(&data);
 
-  if (solvversion < SOLV_VERSION_5)
-    numschemata++;
-
   if (numdir && numdir < 2)
     {
       pool_debug(pool, SAT_ERROR, "bad number of dirs\n");
       return SOLV_ERROR_CORRUPT;
-    }
-  if (numinfo && solvversion < SOLV_VERSION_3)
-    {
-      pool_debug(pool, SAT_ERROR, "unsupported SOLV format (has info)\n");
-      return SOLV_ERROR_UNSUPPORTED;
     }
 
   if (parent)
@@ -956,63 +1028,36 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	id = idmap[id];
       else if (parent)
         id = str2id(pool, stringpool_id2str(spool, id), 1);
+      type = read_id(&data, numid);
+      if (idmap)
+	type = idmap[type];
+      else if (parent)
+        type = str2id(pool, stringpool_id2str(spool, type), 1);
+      if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_DIRNUMNUMARRAY)
+	{
+	  pool_debug(pool, SAT_ERROR, "unsupported data type '%s'\n", id2str(pool, type));
+	  data.error = SOLV_ERROR_UNSUPPORTED;
+	  type = REPOKEY_TYPE_VOID;
+	}
       keys[i].name = id;
-      keys[i].type = read_id(&data, 0);
-      keys[i].size = read_id(&data, 0);
+      keys[i].type = type;
+      keys[i].size = read_id(&data, keys[i].type == REPOKEY_TYPE_CONSTANTID ? numid + numrel : 0);
+      keys[i].storage = read_id(&data, 0);
+      if (id >= SOLVABLE_NAME && id <= RPM_RPMDBID)
+	keys[i].storage = KEY_STORAGE_SOLVABLE;
+      else if (keys[i].storage == KEY_STORAGE_SOLVABLE)
+	keys[i].storage = KEY_STORAGE_INCORE;
+      if (keys[i].type == REPOKEY_TYPE_CONSTANTID)
+	{
+	  if (idmap)
+	    keys[i].size = idmap[keys[i].size];
+	  else if (parent)
+	    keys[i].size = str2id(pool, stringpool_id2str(spool, keys[i].size), 1);
+	}
 #if 0
-      fprintf (stderr, "key %d %s %d %d\n", i, id2str(pool,id), keys[i].type,
-               keys[i].size);
+      fprintf(stderr, "key %d %s %s %d %d\n", i, id2str(pool,id), id2str(pool, keys[i].type),
+               keys[i].size, keys[i].storage);
 #endif
-      if (solvversion >= SOLV_VERSION_5)
-	{
-	  keys[i].storage = read_id(&data, 0);
-	  continue;
-	}
-      keys[i].storage = KEY_STORAGE_DROPPED;
-      if (parent)
-	{
-	  keys[i].storage = KEY_STORAGE_INCORE;
-	  continue;
-	}
-      switch (keys[i].type)
-	{
-	case TYPE_VOID:
-	case TYPE_CONSTANT:
-	case TYPE_STR:
-	case TYPE_NUM:
-	case TYPE_DIRNUMNUMARRAY:
-	  keys[i].storage = KEY_STORAGE_INCORE;
-	  break;
-	case TYPE_ID:
-	  switch(id)
-	    {
-	    case SOLVABLE_NAME:
-	    case SOLVABLE_ARCH:
-	    case SOLVABLE_EVR:
-	    case SOLVABLE_VENDOR:
-	      keys[i].storage = KEY_STORAGE_SOLVABLE;
-	      break;
-	    default:
-	      keys[i].storage = KEY_STORAGE_INCORE;
-	      break;
-	    }
-	  break;
-	case TYPE_IDARRAY:
-	case TYPE_REL_IDARRAY:
-          if (id >= INTERESTED_START && id <= INTERESTED_END)
-	    keys[i].storage = KEY_STORAGE_SOLVABLE;
-	  else
-	    keys[i].storage = KEY_STORAGE_INCORE;
-	  break;
-	case TYPE_U32:
-	  if (id == RPM_RPMDBID)
-	    keys[i].storage = KEY_STORAGE_SOLVABLE;
-	  else
-	    keys[i].storage = KEY_STORAGE_INCORE;
-	  break;
-	default:
-	  break;
-	}
     }
 
   have_xdata = parent ? 1 : 0;
@@ -1050,6 +1095,11 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 
   /*******  Part 6: Info  ***********************************************/
   oldnrepodata = repo->nrepodata;
+  if (numinfo)
+    {
+      id = read_id(&data, 0);
+      id = read_id(&data, 0);
+    }
   for (i = 0; i < numinfo; i++)
     {
       /* for now we're just interested in data that starts with
@@ -1057,11 +1107,9 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
        */
       Id *keyp;
       id = read_id(&data, numschemata);
-      if (solvversion < SOLV_VERSION_5)
-	id++;
       keyp = schemadata + schemata[id];
       key = *keyp;
-      if (keys[key].name == REPODATA_EXTERNAL && keys[key].type == TYPE_VOID)
+      if (keys[key].name == REPODATA_EXTERNAL && keys[key].type == REPOKEY_TYPE_VOID)
 	{
 	  /* external data for some ids */
 	  parse_repodata(&data, keyp, keys, idmap, numid, numrel, repo);
@@ -1071,42 +1119,38 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     }
 
 
-  /*******  Part 7: packed sizes (optional)  ****************************/
-  char *exists = 0;
-  if ((solvflags & SOLV_FLAG_PACKEDSIZES) != 0)
-    {
-      exists = sat_malloc (numsolv);
-      for (i = 0; i < numsolv; i++)
-	exists[i] = read_id(&data, 0) != 0;
-    }
-
-
-  /*******  Part 8: item data *******************************************/
+  /*******  Part 7: item data *******************************************/
 
   /* calculate idarray size */
   size_idarray = 0;
   for (i = 1; i < numkeys; i++)
     {
       id = keys[i].name;
-      if ((keys[i].type == TYPE_IDARRAY || keys[i].type == TYPE_REL_IDARRAY)
+      if ((keys[i].type == REPOKEY_TYPE_IDARRAY || keys[i].type == REPOKEY_TYPE_REL_IDARRAY)
           && id >= INTERESTED_START && id <= INTERESTED_END)
 	size_idarray += keys[i].size;
     }
 
-  /* allocate needed space in repo */
-  if (size_idarray)
+  if (numsolv)
     {
-      repo_reserve_ids(repo, 0, size_idarray);
-      idarraydatap = repo->idarraydata + repo->idarraysize;
-      repo->idarraysize += size_idarray;
-      idarraydataend = idarraydatap + size_idarray;
-      repo->lastoff = 0;
+      maxsize = read_id(&data, 0);
+      allsize = read_id(&data, 0);
+      if (maxsize > allsize)
+	{
+	  pool_debug(pool, SAT_ERROR, "maxsize %d is greater then allsize %d\n", maxsize, allsize);
+	  data.error = SOLV_ERROR_CORRUPT;
+	}
     }
   else
-    {
-      idarraydatap = 0;
-      idarraydataend = 0;
-    }
+    maxsize = allsize = 0;
+
+  /* allocate needed space in repo */
+  /* we add maxsize because it is an upper limit for all idarrays */
+  repo_reserve_ids(repo, 0, size_idarray + maxsize + 1);
+  idarraydatap = repo->idarraydata + repo->idarraysize;
+  repo->idarraysize += size_idarray;
+  idarraydataend = idarraydatap + size_idarray;
+  repo->lastoff = 0;
 
   /* read solvables */
   if (numsolv)
@@ -1132,16 +1176,38 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   if (have_xdata)
     repodata_extend_block(&data, data.start, numsolv);
 
+  left = 0;
+  buf = sat_calloc(maxsize + 4, 1);
+  dp = buf;
   for (i = 0; i < numsolv; i++, s++)
     {
       Id *keyp;
       if (data.error)
 	break;
-      if (exists && !exists[i])
-        continue;
-      id = read_id(&data, numschemata);
-      if (solvversion < SOLV_VERSION_5)
-	id++;
+
+      left -= (dp - buf);
+      if (left < 0)
+        {
+	  pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
+	  data.error = SOLV_ERROR_EOF;
+	  break;
+        }
+      if (left)
+        memmove(buf, dp, left);
+      l = maxsize - left;
+      if (l > allsize)
+        l = allsize;
+      if (l && fread(buf + left, l, 1, data.fp) != 1)
+        {
+	  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+	  data.error = SOLV_ERROR_EOF;
+	  break;
+        }
+      allsize -= l;
+      left += l;
+      dp = buf;
+
+      dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
       if (have_xdata)
 	{
 	  data.incoreoffset[i] = data.incoredatalen;
@@ -1150,6 +1216,9 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       keyp = schemadata + schemata[id];
       while ((key = *keyp++) != 0)
 	{
+	  if (data.error)
+	    break;
+
 	  id = keys[key].name;
 #if 0
 fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, keys[key].storage);
@@ -1157,21 +1226,16 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 	  if (keys[key].storage == KEY_STORAGE_VERTICAL_OFFSET)
 	    {
 	      /* copy offset/length into incore */
-	      did = read_id(&data, 0);
-	      incore_add_id(&data, did);
-	      did = read_id(&data, 0);
-	      incore_add_id(&data, did);
+	      dps = dp;
+	      dp = data_skip(dp, REPOKEY_TYPE_ID);
+	      dp = data_skip(dp, REPOKEY_TYPE_ID);
+	      incore_add_blob(&data, dps, dp - dps);
 	      continue;
 	    }
 	  switch (keys[key].type)
 	    {
-	    case TYPE_VOID:
-	    case TYPE_CONSTANT:
-	      break;
-	    case TYPE_ID:
-	      did = read_id(&data, numid + numrel);
-	      if (idmap)
-		did = idmap[did];
+	    case REPOKEY_TYPE_ID:
+	      dp = data_read_id_max(dp, &did, idmap, numid + numrel, &data.error);
 	      if (id == SOLVABLE_NAME)
 		s->name = did;
 	      else if (id == SOLVABLE_ARCH)
@@ -1186,16 +1250,8 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 	      POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %s\n", id2str(pool, id), id2str(pool, did));
 #endif
 	      break;
-	    case TYPE_NUM:
-	      did = read_id(&data, 0);
-	      if (keys[key].storage == KEY_STORAGE_INCORE)
-	        incore_add_id(&data, did);
-#if 0
-	      POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %d\n", id2str(pool, id), did);
-#endif
-	      break;
-	    case TYPE_U32:
-	      h = read_u32(&data);
+	    case REPOKEY_TYPE_U32:
+	      dp = data_read_u32(dp, &h);
 #if 0
 	      POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %u\n", id2str(pool, id), h);
 #endif
@@ -1208,53 +1264,33 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 	      else if (keys[key].storage == KEY_STORAGE_INCORE)
 		incore_add_u32(&data, h);
 	      break;
-	    case TYPE_STR:
-              if (keys[key].storage == KEY_STORAGE_INCORE)
-		{
-		  while ((h = read_u8(&data)) != 0)
-		    incore_add_u8(&data, h);
-		  incore_add_u8(&data, 0);
-		}
-	      else
-		{
-		  while (read_u8(&data) != 0)
-		    ;
-		}
-	      break;
-	    case TYPE_IDARRAY:
-	    case TYPE_REL_IDARRAY:
+	    case REPOKEY_TYPE_IDARRAY:
+	    case REPOKEY_TYPE_REL_IDARRAY:
 	      if (id < INTERESTED_START || id > INTERESTED_END)
 		{
+		  dps = dp;
+		  dp = data_skip(dp, REPOKEY_TYPE_IDARRAY);
+		  if (keys[key].storage == KEY_STORAGE_INCORE && idmap)
+		    abort();
 		  if (keys[key].storage == KEY_STORAGE_INCORE)
-		    {
-		      if (idmap)
-			{
-			  abort();	/* implement me! */
-			}
-		      else
-			{
-			  while (((h = read_u8(&data)) & 0xc0) != 0)
-			    incore_add_u8(&data, h);
-			  break;
-			}
-		    }
-		  else
-		    {
-		      while ((read_u8(&data) & 0xc0) != 0)
-			;
-		      break;
-		    }
+		    incore_add_blob(&data, dps, dp - dps);
 		  break;
 		}
 	      ido = idarraydatap - repo->idarraydata;
-	      if (keys[key].type == TYPE_IDARRAY)
-	        idarraydatap = read_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend);
+	      if (keys[key].type == REPOKEY_TYPE_IDARRAY)
+	        dp = data_read_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error);
 	      else if (id == SOLVABLE_REQUIRES)
-	        idarraydatap = read_rel_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend, SOLVABLE_PREREQMARKER);
+	        dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error, SOLVABLE_PREREQMARKER);
 	      else if (id == SOLVABLE_PROVIDES)
-	        idarraydatap = read_rel_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend, SOLVABLE_FILEMARKER);
+	        dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error, SOLVABLE_FILEMARKER);
 	      else
-	        idarraydatap = read_rel_idarray(&data, numid + numrel, idmap, idarraydatap, idarraydataend, 0);
+	        dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error, 0);
+	      if (idarraydatap > idarraydataend)
+		{
+		  pool_debug(pool, SAT_ERROR, "idarray overflow\n");
+		  data.error = SOLV_ERROR_OVERFLOW;
+		  break;
+		}
 	      if (id == SOLVABLE_PROVIDES)
 		s->provides = ido;
 	      else if (id == SOLVABLE_OBSOLETES)
@@ -1279,51 +1315,28 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 	        POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", dep2str(pool, repo->idarraydata[ido]));
 #endif
 	      break;
-	    case TYPE_DIRNUMNUMARRAY:
-	      for (;;)
-		{
-		  Id num, num2;
-		  did = read_id(&data, numdir);
-		  num = read_id(&data, 0);
-		  num2 = read_id(&data, 0);
-		  if (keys[key].storage == KEY_STORAGE_INCORE)
-		    {
-#if 0
-	              POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %d %d %d\n", id2str(pool, id), did, num, num2);
-#endif
-		      incore_add_id(&data, did);
-		      incore_add_id(&data, num);
-		      incore_add_id(&data, num2);
-		    }
-		  if (!(num2 & 0x40))
-		    break;
-		}
-	      break;
-	    case TYPE_DIRSTRARRAY:
-	      for (;;)
-		{
-		  did = read_id(&data, 0);
-		  if (keys[key].storage == KEY_STORAGE_INCORE)
-		    {
-		      incore_add_id(&data, did);
-		      while ((h = read_u8(&data)) != 0)
-			incore_add_u8(&data, h);
-		      incore_add_u8(&data, 0);
-		    }
-		  else
-		    {
-		      while (read_u8(&data) != 0)
-			;
-		    }
-		  if (!(did & 0x40))
-		    break;
-		}
-	      break;
 	    default:
-	      skip_item(&data, keys[key].type, numid, numrel);
+	      dps = dp;
+	      dp = data_skip(dp, keys[key].type);
+	      if (keys[key].storage == KEY_STORAGE_INCORE)
+	        incore_add_blob(&data, dps, dp - dps);
+	      break;
 	    }
 	}
     }
+
+  /* should shrink idarraydata again */
+
+  if (!data.error)
+    {
+      left -= (dp - buf);
+      if (left < 0)
+        {
+	  pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
+	  data.error = SOLV_ERROR_EOF;
+        }
+    }
+  sat_free(buf);
 
   if (data.error)
     {
@@ -1369,7 +1382,7 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
       data.fp = 0;
     }
 
-  if (parent)
+  if (parent && !data.error)
     {
       /* we're a store */
       sat_free(parent->schemata);
@@ -1378,7 +1391,7 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
       sat_free(parent->location);
       *parent = data;
     }
-  else if (data.incoredatalen || data.fp)
+  else if ((data.incoredatalen || data.fp) && !data.error)
     {
       /* we got some data, make it available */
       repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata + 1, sizeof(data));
@@ -1394,7 +1407,6 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
       sat_free(keys);
     }
 
-  sat_free(exists);
   sat_free(idmap);
   mypool = 0;
   return data.error;

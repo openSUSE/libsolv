@@ -286,6 +286,7 @@ typedef struct _duchanges {
 } DUChanges;
 
 void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
+int solver_calc_installsizechange(Solver *solv);
 
 
 #endif /* SATSOLVER_SOLVER_H */

@@ -57,6 +57,7 @@ typedef struct _Repodata {
   FILE *fp;			/* file pointer of solv file */
   int error;			/* corrupt solv file */
 
+
   struct _Repokey *keys;	/* keys, first entry is always zero */
   unsigned int nkeys;		/* length of keys array */
 
@@ -80,8 +81,8 @@ typedef struct _Repodata {
   Id *verticaloffset;		/* offset for all verticals, nkeys elements */
   Id lastverticaloffset;	/* end of verticals */
 
+  int pagefd;			/* file descriptor of page file */
   unsigned char *blob_store;
-
   Attrblobpage *pages;
   unsigned int num_pages;
 
@@ -127,6 +128,7 @@ void repodata_set_id(Repodata *data, Id entry, Id keyname, Id id);
 void repodata_set_num(Repodata *data, Id entry, Id keyname, Id num);
 void repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str);
 void repodata_set_constant(Repodata *data, Id entry, Id keyname, Id constant);
+void repodata_set_constantid(Repodata *data, Id entry, Id keyname, Id id);
 void repodata_set_void(Repodata *data, Id entry, Id keyname);
 void repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str);
 void repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2);

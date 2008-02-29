@@ -59,7 +59,51 @@ extern "C" {
 #define REPODATA_KEYS		27
 #define REPODATA_LOCATION	28
 
-#define ID_NUM_INTERNAL		29
+/* The void type is usable to encode one-valued attributes, they have
+   no associated data.  This is useful to encode values which many solvables
+   have in common, and whose overall set is relatively limited.  A prime
+   example would be the media number.  The actual value is encoded in the
+   SIZE member of the key structure.  Be warned: careless use of this
+   leads to combinatoric explosion of number of schemas.  */
+#define REPOKEY_TYPE_VOID	29
+#define REPOKEY_TYPE_CONSTANT	30
+#define REPOKEY_TYPE_CONSTANTID	31
+#define REPOKEY_TYPE_ID		32
+#define REPOKEY_TYPE_NUM	33
+#define REPOKEY_TYPE_U32	34
+#define REPOKEY_TYPE_DIR	35
+#define REPOKEY_TYPE_STR	36
+#define REPOKEY_TYPE_IDARRAY	37
+#define REPOKEY_TYPE_REL_IDARRAY	38
+#define REPOKEY_TYPE_DIRSTRARRAY	39
+#define REPOKEY_TYPE_DIRNUMNUMARRAY	40
+
+#define SOLVABLE_SUMMARY	41
+#define SOLVABLE_DESCRIPTION	42
+#define SOLVABLE_AUTHORS	43
+#define SOLVABLE_GROUP		44
+#define SOLVABLE_KEYWORDS	45
+#define SOLVABLE_LICENSE	46
+#define SOLVABLE_BUILDTIME	47
+#define SOLVABLE_EULA		48
+#define SOLVABLE_MESSAGEINS	49
+#define SOLVABLE_MESSAGEDEL	50
+#define SOLVABLE_INSTALLSIZE	51
+#define SOLVABLE_DISKUSAGE	52
+#define SOLVABLE_FILELIST	53
+#define SOLVABLE_INSTALLTIME	54
+#define SOLVABLE_MEDIADIR	55
+#define SOLVABLE_MEDIAFILE	56
+#define SOLVABLE_MEDIANR	57
+#define SOLVABLE_DOWNLOADSIZE	58
+#define SOLVABLE_SOURCEARCH	59
+#define SOLVABLE_SOURCENAME	60
+#define SOLVABLE_SOURCEEVR	61
+#define SOLVABLE_ISVISIBLE	62
+
+#define SOLVABLE_PATCHCATEGORY	63
+
+#define ID_NUM_INTERNAL		64
 
 
 /* well known solvable */
@@ -142,41 +186,6 @@ struct _Pool {
 #define SAT_DEBUG_RESULT		(1<<10)
 #define SAT_DEBUG_JOB			(1<<11)
 #define SAT_DEBUG_SCHUBI		(1<<12)
-
-/* The void type is usable to encode one-valued attributes, they have
-   no associated data.  This is useful to encode values which many solvables
-   have in common, and whose overall set is relatively limited.  A prime
-   example would be the media number.  The actual value is encoded in the
-   SIZE member of the key structure.  Be warned: careless use of this
-   leads to combinatoric explosion of number of schemas.  */
-
-/* FIXME: Should be 'enum' */
-#define TYPE_VOID               0
-#define TYPE_ID			1
-#define TYPE_IDARRAY		2
-#define TYPE_STR		3
-#define TYPE_U32		4
-#define TYPE_REL_IDARRAY	5
-
-#define TYPE_ATTR_INT		6
-#define TYPE_ATTR_CHUNK		7
-#define TYPE_ATTR_STRING	8
-#define TYPE_ATTR_INTLIST	9
-#define TYPE_ATTR_LOCALIDS	10
-
-#define TYPE_COUNT_NAMED	11
-#define TYPE_COUNTED		12
-
-#define TYPE_IDVALUEARRAY	13
-
-#define TYPE_DIR		14
-#define TYPE_DIRNUMNUMARRAY	15
-#define TYPE_DIRSTRARRAY	16
-
-#define TYPE_CONSTANT		17
-#define TYPE_NUM		18
-
-#define TYPE_ATTR_TYPE_MAX	18
 
 //-----------------------------------------------
 

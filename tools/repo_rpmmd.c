@@ -448,7 +448,7 @@ set_desciption_author(Repodata *data, Id entry, char *str)
       while (l > 0 && str[l - 1] == '\n')
 	str[--l] = 0; 
       if (l)
-	repodata_set_str(data, entry, id_description, str);
+	repodata_set_str(data, entry, SOLVABLE_DESCRIPTION, str);
       p = aut + 19;
       aut = str;        /* copy over */
       while (*p == ' ' || *p == '\n')
@@ -468,10 +468,10 @@ set_desciption_author(Repodata *data, Id entry, char *str)
 	aut--;
       *aut = 0; 
       if (*str)
-	repodata_set_str(data, entry, id_authors, str);
+	repodata_set_str(data, entry, SOLVABLE_AUTHORS, str);
     }
   else if (*str)
-    repodata_set_str(data, entry, id_description, str);
+    repodata_set_str(data, entry, SOLVABLE_DESCRIPTION, str);
 }
 
 static void XMLCALL
@@ -612,14 +612,14 @@ startElement(void *userData, const char *name, const char **atts)
 	  const char *str2 = strrchr(str, '/');
 	  if (str2)
 	    {
-	      char *str3 = strdup (str);
+	      char *str3 = strdup(str);
 	      str3[str2 - str] = 0;
-	      repodata_set_poolstr(pd->data, entry, id_mediadir, str3);
+	      repodata_set_poolstr(pd->data, entry, SOLVABLE_MEDIADIR, str3);
 	      free(str3);
-              repodata_set_str(pd->data, entry, id_mediafile, str2 + 1);
+              repodata_set_str(pd->data, entry, SOLVABLE_MEDIAFILE, str2 + 1);
 	    }
 	  else
-            repodata_set_str(pd->data, entry, id_mediafile, str);
+            repodata_set_str(pd->data, entry, SOLVABLE_MEDIAFILE, str);
 	}
       break;
     case STATE_CHECKSUM:
@@ -630,7 +630,7 @@ startElement(void *userData, const char *name, const char **atts)
         unsigned t;
         str = find_attr("build", atts);
         if (str && (t = atoi(str)) != 0)
-          repodata_set_num(pd->data, entry, id_time, t);
+          repodata_set_num(pd->data, entry, SOLVABLE_BUILDTIME, t);
 	break;
       }
     case STATE_SIZE:
@@ -638,14 +638,14 @@ startElement(void *userData, const char *name, const char **atts)
         unsigned k;
         str = find_attr("installed", atts);
 	if (str && (k = atoi(str)) != 0)
-	  repodata_set_num(pd->data, entry, id_installsize, (k + 1023) / 1024);
+	  repodata_set_num(pd->data, entry, SOLVABLE_INSTALLSIZE, (k + 1023) / 1024);
 	/* XXX the "package" attribute gives the size of the rpm file,
 	   i.e. the download size.  Except on packman, there it seems to be
 	   something else entirely, it has a value near to the other two
 	   values, as if the rpm is uncompressed.  */
         str = find_attr("package", atts);
 	if (str && (k = atoi(str)) != 0)
-	  repodata_set_num(pd->data, entry, id_downloadsize, (k + 1023) / 1024);
+	  repodata_set_num(pd->data, entry, SOLVABLE_DOWNLOADSIZE, (k + 1023) / 1024);
         break;
       }
     default:
@@ -698,10 +698,10 @@ endElement(void *userData, const char *name)
       s->vendor = str2id(pool, pd->content, 1);
       break;
     case STATE_RPM_GROUP:
-      repodata_set_poolstr(pd->data, entry, id_group, pd->content);
+      repodata_set_poolstr(pd->data, entry, SOLVABLE_GROUP, pd->content);
       break;
     case STATE_RPM_LICENSE:
-      repodata_set_poolstr(pd->data, entry, id_license, pd->content);
+      repodata_set_poolstr(pd->data, entry, SOLVABLE_LICENSE, pd->content);
       break;
     case STATE_FILE:
 #if 0
@@ -715,7 +715,7 @@ endElement(void *userData, const char *name)
 	id = 1;
 	p = pd->content;
       }
-      repodata_add_dirstr(pd->data, entry, id_filelist, id, p);
+      repodata_add_dirstr(pd->data, entry, SOLVABLE_FILELIST, id, p);
       break;
     // xml store capabilities
     case STATE_CAP_PROVIDES:
@@ -747,7 +747,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       pd->lang = 0;
-      repodata_set_str(pd->data, entry, id_summary, pd->content);
+      repodata_set_str(pd->data, entry, SOLVABLE_SUMMARY, pd->content);
       break;
     case STATE_DESCRIPTION:
       pd->lang = 0;
@@ -806,7 +806,6 @@ repo_add_rpmmd(Repo *repo, FILE *fp, int flags)
   pd.common.repo = repo;
 
   pd.data = repo_add_repodata(repo);
-  init_attr_ids(pool);
 
   pd.content = sat_malloc(256);
   pd.acontent = 256;

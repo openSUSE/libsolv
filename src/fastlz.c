@@ -32,9 +32,13 @@ typedef __uint32_t Ref;
    d 110lllll <8o>
         - back ref of length l+2+8, at offset -(o+1) (o < 1 << 8)
    e 1110llll <8o> <8o>
-        - back ref of length l+2, at offset -(o+1) (o < 1 << 16)
-   f 1111llll <8o> <8o> <8l>
-        - back ref, length l+18 (l < 1<<12), offset -(o+1) (o < 1<<16)
+        - back ref of length l+3, at offset -(o+1) (o < 1 << 16)
+  f1 1111llll <8l> <8o> <8o>
+        - back ref, length l+19 (l < 1<<12), offset -(o+1) (o < 1<<16)
+  f2 11110lll <8l> <8o> <8o>
+        - back ref, length l+19 (l < 1<<11), offset -(o+1) (o < 1<<16)
+   g 11111lll <8l> <8o> <8o> <8o>
+        - back ref, length l+5 (l < 1<<11), offset -(o+1) (o < 1<<24)
 
    Generally for a literal of length L we need L+1 bytes, hence it is
    better to encode also very short backrefs (2 chars) as backrefs if
@@ -50,8 +54,9 @@ typedef __uint32_t Ref;
    L >= 2, L <= 9, O < 1024                            : encode as c
    L >= 10, L <= 41, O < 256                           : encode as d
    else we have either O >= 1024, or L >= 42:
-   L >= 2, L <= 17, O < 65536                          : encode as e
-   L >= 18, L <= 4095+18, O < 65536                    : encode as f
+   L < 3 : encode as 1-literal
+   L >= 3, L <= 18, O < 65536                          : encode as e
+   L >= 19, L <= 4095+18, O < 65536                    : encode as f
    else we have either L >= 4096+18 or O >= 65536.
    O >= 65536: encode as 1-literal, too bad
      (with the current block size this can't happen)
@@ -66,10 +71,10 @@ compress_buf (const unsigned char *in, unsigned int in_len,
   unsigned int oo = 0;		//out-offset
   unsigned int io = 0;		//in-offset
 #define HS (65536)
-  unsigned int htab[HS];
-  unsigned int hnext[BLOCK_SIZE];
-  memset (htab, 0, sizeof (htab));
-  memset (hnext, 0, sizeof (hnext));
+  Ref htab[HS];
+  Ref hnext[BLOCK_SIZE];
+  memset (htab, -1, sizeof (htab));
+  memset (hnext, -1, sizeof (hnext));
   unsigned int litofs = 0;
   while (io + 2 < in_len)
     {
@@ -85,7 +90,7 @@ compress_buf (const unsigned char *in, unsigned int in_len,
       mlen = 0;
       mofs = 0;
 
-      for (tries = 0; tries < 4; tries++)
+      for (tries = 0; try != -1 && tries < 12; tries++)
         {
 	  if (try < io
 	      && in[try] == in[io] && in[try + 1] == in[io + 1])
@@ -96,7 +101,7 @@ compress_buf (const unsigned char *in, unsigned int in_len,
 	    }
 	  try = hnext[try];
 	}
-      for (; tries < 4; tries++)
+      for (; try != -1 && tries < 12; tries++)
 	{
 	  //assert (mlen >= 2);
 	  //assert (io + mlen < in_len);
@@ -139,20 +144,36 @@ compress_buf (const unsigned char *in, unsigned int in_len,
 	    }
 	no_match:
 	  try = hnext[try];
-	  if (io - try - 1 >= 65536)
-	    break;
+	  /*if (io - try - 1 >= 65536)
+	    break;*/
 	}
 
 match_done:
       if (mlen)
 	{
-	  if (mlen == 2 && (0 || litofs || mofs >= 1024))
+	  //fprintf (stderr, "%d %d\n", mlen, mofs);
+	  if (mlen == 2 && (litofs || mofs >= 1024))
 	    mlen = 0;
+	  /*else if (mofs >= 65536)
+	    mlen = 0;*/
 	  else if (mofs >= 65536)
+	    {
+	      if (mlen >= 2048 + 5)
+	        mlen = 2047 + 5;
+	      else if (mlen < 5)
+	        mlen = 0;
+	    }
+	  else if (mlen < 3)
 	    mlen = 0;
-	  else if (mlen >= 4096 + 18)
-	    mlen = 4095 + 18;
-	  if (mlen && io + 3 < in_len)
+	  /*else if (mlen >= 4096 + 19)
+	    mlen = 4095 + 19;*/
+	  else if (mlen >= 2048 + 19)
+	    mlen = 2047 + 19;
+	  /* Skip this match if the next character would deliver a better one,
+	     but only do this if we have the chance to really extend the
+	     length (i.e. our current length isn't yet the (conservative)
+	     maximum).  */
+	  if (mlen && mlen < (2048 + 5) && io + 3 < in_len)
 	    {
 	      unsigned int hval =
 		in[io + 1] | in[io + 2] << 8 | in[io + 3] << 16;
@@ -250,24 +271,35 @@ match_done:
 	      out[oo++] = 0xc0 | (mlen - 10);
 	      out[oo++] = mofs;
 	    }
-	  else if (mlen >= 2 && mlen <= 17)
+	  else if (mofs >= 65536)
+	    {
+	      assert (mlen >= 5 && mlen < 2048 + 5);
+	      if (oo + 5 >= out_len)
+	        return 0;
+	      out[oo++] = 0xf8 | ((mlen - 5) >> 8);
+	      out[oo++] = (mlen - 5) & 0xff;
+	      out[oo++] = mofs & 0xff;
+	      out[oo++] = (mofs >> 8) & 0xff;
+	      out[oo++] = mofs >> 16;
+	    }
+	  else if (mlen >= 3 && mlen <= 18)
 	    {
 	      assert (mofs < 65536);
 	      if (oo + 3 >= out_len)
 		return 0;
-	      out[oo++] = 0xe0 | (mlen - 2);
-	      out[oo++] = mofs >> 8;
+	      out[oo++] = 0xe0 | (mlen - 3);
 	      out[oo++] = mofs & 0xff;
+	      out[oo++] = mofs >> 8;
 	    }
 	  else
 	    {
-	      assert (mlen >= 18 && mlen <= 4095 + 18 && mofs < 65536);
+	      assert (mlen >= 19 && mlen <= 4095 + 19 && mofs < 65536);
 	      if (oo + 4 >= out_len)
 		return 0;
-	      out[oo++] = 0xf0 | ((mlen - 18) >> 8);
-	      out[oo++] = mofs >> 8;
+	      out[oo++] = 0xf0 | ((mlen - 19) >> 8);
+	      out[oo++] = (mlen - 19) & 0xff;
 	      out[oo++] = mofs & 0xff;
-	      out[oo++] = (mlen - 18) & 0xff;
+	      out[oo++] = mofs >> 8;
 	    }
 	  /* Insert the hashes for the compressed run [io..io+mlen-1].
 	     For [io] we have it already done at the start of the loop.
@@ -357,27 +389,34 @@ unchecked_decompress_buf (const unsigned char *in, unsigned int in_len,
   while (in < in_end)
     {
       unsigned int first = *in++;
-      unsigned int o = o;
-      switch (first >> 5)
+      unsigned int o;
+      switch (first >> 4)
 	{
-	case 0:
-	case 1:
-	case 2:
-	case 3:
+	default:
+	  /* This default case can't happen, but GCCs VRP is not strong
+	     enough to see this, so make this explicitely not fall to
+	     the end of the switch, so that we don't have to initialize
+	     o above.  */
+	  continue;
+	case 0: case 1:
+	case 2: case 3:
+	case 4: case 5:
+	case 6: case 7:
 	  //a 0LLLLLLL
 	  //fprintf (stderr, "lit: 1\n");
 	  *out++ = first;
 	  continue;
-	case 4:
+	case 8: case 9:
 	  //b 100lllll <l+1 bytes>
 	  {
-	    unsigned int l = (first & 31) + 1;
+	    unsigned int l = first & 31;
 	    //fprintf (stderr, "lit: %d\n", l);
-	    while (l--)
+	    do
 	      *out++ = *in++;
+	    while (l--);
 	    continue;
 	  }
-	case 5:
+	case 10: case 11:
 	  //c 101oolll <8o>
 	  {
 	    o = first & (3 << 3);
@@ -385,29 +424,47 @@ unchecked_decompress_buf (const unsigned char *in, unsigned int in_len,
 	    first = (first & 7) + 2;
 	    break;
 	  }
-	case 6:
+	case 12: case 13:
 	  //d 110lllll <8o>
 	  {
 	    o = *in++;
 	    first = (first & 31) + 10;
 	    break;
 	  }
-	case 7:
-	  //e 1110llll <8o> <8o>
-	  //f 1111llll <8o> <8o> <8l>
+	case 14:
+	  // e 1110llll <8o> <8o>
 	  {
-	    o = *in++ << 8;
-	    o |= *in++;
+	    o = in[0] | (in[1] << 8);
+	    in += 2;
 	    first = first & 31;
-	    if (first >= 16)
-	      first = (((first - 16) << 8) | *in++) + 18;
+	    first += 3;
+	    break;
+	  }
+	case 15:
+	  //f1 1111llll <8o> <8o> <8l>
+	  //f2 11110lll <8o> <8o> <8l>
+	  // g 11111lll <8o> <8o> <8o> <8l>
+	  {
+	    first = first & 15;
+	    if (first >= 8)
+	      {
+		first = (((first - 8) << 8) | in[0]) + 5;
+		o = in[1] | (in[2] << 8) | (in[3] << 16);
+		in += 4;
+	      }
 	    else
-	      first += 2;
+	      {
+	        first = ((first << 8) | in[0]) + 19;
+		o = in[1] | (in[2] << 8);
+		in += 3;
+	      }
 	    break;
 	  }
 	}
       //fprintf (stderr, "ref: %d @ %d\n", first, o);
       o++;
+      o = -o;
+#if 0
       /* We know that first will not be zero, and this loop structure is
          better optimizable.  */
       do
@@ -416,6 +473,56 @@ unchecked_decompress_buf (const unsigned char *in, unsigned int in_len,
 	  out++;
 	}
       while (--first);
+#else
+      switch (first)
+        {
+	  case 18: *out = *(out + o); out++;
+	  case 17: *out = *(out + o); out++;
+	  case 16: *out = *(out + o); out++;
+	  case 15: *out = *(out + o); out++;
+	  case 14: *out = *(out + o); out++;
+	  case 13: *out = *(out + o); out++;
+	  case 12: *out = *(out + o); out++;
+	  case 11: *out = *(out + o); out++;
+	  case 10: *out = *(out + o); out++;
+	  case  9: *out = *(out + o); out++;
+	  case  8: *out = *(out + o); out++;
+	  case  7: *out = *(out + o); out++;
+	  case  6: *out = *(out + o); out++;
+	  case  5: *out = *(out + o); out++;
+	  case  4: *out = *(out + o); out++;
+	  case  3: *out = *(out + o); out++;
+	  case  2: *out = *(out + o); out++;
+	  case  1: *out = *(out + o); out++;
+	  case  0: break;
+	  default:
+	    /* Duff duff :-) */
+	    switch (first & 15)
+	      {
+		do
+		  {
+		    case  0: *out = *(out + o); out++;
+		    case 15: *out = *(out + o); out++;
+		    case 14: *out = *(out + o); out++;
+		    case 13: *out = *(out + o); out++;
+		    case 12: *out = *(out + o); out++;
+		    case 11: *out = *(out + o); out++;
+		    case 10: *out = *(out + o); out++;
+		    case  9: *out = *(out + o); out++;
+		    case  8: *out = *(out + o); out++;
+		    case  7: *out = *(out + o); out++;
+		    case  6: *out = *(out + o); out++;
+		    case  5: *out = *(out + o); out++;
+		    case  4: *out = *(out + o); out++;
+		    case  3: *out = *(out + o); out++;
+		    case  2: *out = *(out + o); out++;
+		    case  1: *out = *(out + o); out++;
+		  }
+		while ((int)(first -= 16) > 0);
+	      }
+	    break;
+	}
+#endif
     }
   return out - orig_out;
 }
@@ -503,7 +610,9 @@ benchmark (FILE * from)
   unsigned int per_loop;
   unsigned int i, j;
   clock_t start, end;
+  float seconds;
 
+#if 0
   calib_loop = 1;
   per_loop = 0;
   start = clock ();
@@ -523,9 +632,10 @@ benchmark (FILE * from)
     for (j = 0; j < per_loop; j++)
       dumb_memcpy (outb, inb, in_len);
   end = clock ();
-  float seconds = (end - start) / (float) CLOCKS_PER_SEC;
+  seconds = (end - start) / (float) CLOCKS_PER_SEC;
   fprintf (stderr, "%.2f seconds == %.2f MB/s\n", seconds,
 	   ((long long) in_len * per_loop * 10) / (1024 * 1024 * seconds));
+#endif
 
   calib_loop = 1;
   per_loop = 0;

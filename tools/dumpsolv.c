@@ -26,9 +26,9 @@ dump_repodata (Repo *repo)
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
       unsigned int j;
-      printf("%s has %d keys", data->location ? data->location : "**EMBED**", data->nkeys);
+      printf("%s has %d keys, %d schemata", data->location ? data->location : "**EMBED**", data->nkeys, data->nschemata);
       for (j = 1; j < data->nkeys; j++)
-        printf("\n  %s (type %d size %d storage %d)", id2str(repo->pool, data->keys[j].name), data->keys[j].type, data->keys[j].size, data->keys[j].storage);
+        printf("\n  %s (type %s size %d storage %d)", id2str(repo->pool, data->keys[j].name), id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
       printf("\n");
     }
   printf("\n");
@@ -72,36 +72,39 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   keyname = id2str(s->repo->pool, key->name);
   switch(key->type)
     {
-    case TYPE_ID:
+    case REPOKEY_TYPE_ID:
       if (data && data->localpool)
 	kv->str = stringpool_id2str(&data->spool, kv->id);
       else
         kv->str = id2str(s->repo->pool, kv->id);
       printf("%s: %s\n", keyname, kv->str);
       break;
-    case TYPE_IDARRAY:
+    case REPOKEY_TYPE_CONSTANTID:
+      printf("%s: %s\n", keyname, dep2str(s->repo->pool, kv->id));
+      break;
+    case REPOKEY_TYPE_IDARRAY:
       if (data && data->localpool)
         printf("%s: %s\n", keyname, stringpool_id2str(&data->spool, kv->id));
       else
         printf("%s: %s\n", keyname, dep2str(s->repo->pool, kv->id));
       break;
-    case TYPE_STR:
+    case REPOKEY_TYPE_STR:
       printf("%s: %s\n", keyname, kv->str);
       break;
-    case TYPE_VOID:
-      printf("%s\n", keyname);
+    case REPOKEY_TYPE_VOID:
+      printf("%s: (void)\n", keyname);
       break;
-    case TYPE_U32:
-    case TYPE_NUM:
-    case TYPE_CONSTANT:
+    case REPOKEY_TYPE_U32:
+    case REPOKEY_TYPE_NUM:
+    case REPOKEY_TYPE_CONSTANT:
       printf("%s: %d\n", keyname, kv->num);
       break;
-    case TYPE_DIRNUMNUMARRAY:
+    case REPOKEY_TYPE_DIRNUMNUMARRAY:
       printf("%s: ", keyname);
       printdir(data, kv->id);
       printf(" %d %d\n", kv->num, kv->num2);
       break;
-    case TYPE_DIRSTRARRAY:
+    case REPOKEY_TYPE_DIRSTRARRAY:
       printf("%s: ", keyname);
       printdir(data, kv->id);
       printf("/%s\n", kv->str);
@@ -135,19 +138,13 @@ dump_repoattrs(Repo *repo, Id p)
 void
 dump_some_attrs(Repo *repo, Solvable *s)
 {
-  Id name = str2id (repo->pool, "summary", 0);
   const char *summary = 0;
   unsigned int medianr = -1, downloadsize = -1;
   unsigned int time = -1;
-  if (name)
-    summary = repo_lookup_str (s, name);
-  if ((name = str2id (repo->pool, "medianr", 0)))
-    medianr = repo_lookup_num (s, name);
-  if ((name = str2id (repo->pool, "downloadsize", 0)))
-    downloadsize = repo_lookup_num (s, name);
-  if ((name = str2id (repo->pool, "time", 0)))
-    time = repo_lookup_num (s, name);
-
+  summary = repo_lookup_str(s, SOLVABLE_SUMMARY);
+  medianr = repo_lookup_num(s, SOLVABLE_MEDIANR);
+  downloadsize = repo_lookup_num (s, SOLVABLE_DOWNLOADSIZE);
+  time = repo_lookup_num(s, SOLVABLE_BUILDTIME);
   printf ("  XXX %d %d %u %s\n", medianr, downloadsize, time, summary);
 }
 #endif
@@ -190,15 +187,15 @@ tryme (Repo *repo, Id p, Id keyname, const char *match, int flags)
     {
       switch (di.key->type)
 	{
-	  case TYPE_ID:
-	  case TYPE_IDARRAY:
+	  case REPOKEY_TYPE_ID:
+	  case REPOKEY_TYPE_IDARRAY:
 	      if (di.data && di.data->localpool)
 		di.kv.str = stringpool_id2str(&di.data->spool, di.kv.id);
 	      else
 		di.kv.str = id2str(repo->pool, di.kv.id);
 	      break;
-	  case TYPE_STR:
-	  case TYPE_DIRSTRARRAY:
+	  case REPOKEY_TYPE_STR:
+	  case REPOKEY_TYPE_DIRSTRARRAY:
 	      break;
 	  default:
 	      di.kv.str = 0;
@@ -285,7 +282,7 @@ int main(int argc, char **argv)
       n++;
     }
 #if 0
-  tryme(repo, 0, str2id (repo->pool, "medianr", 0), 0, 0);
+  tryme(repo, 0, SOLVABLE_MEDIANR, 0, 0);
   printf("\n");
   tryme(repo, 0, 0, 0, 0);
   printf("\n");

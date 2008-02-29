@@ -26,6 +26,8 @@
 #include "poolid_private.h"
 #include "util.h"
 
+#include "repopack.h"
+
 extern unsigned int compress_buf (const unsigned char *in, unsigned int in_len,
 				  unsigned char *out, unsigned int out_len);
 extern unsigned int unchecked_decompress_buf (const unsigned char *in,
@@ -63,142 +65,8 @@ repodata_free(Repodata *data)
   sat_free(data->attrdata);
   sat_free(data->attriddata);
   
-  if (data->fp)
-    fclose(data->fp);
-}
-
-static unsigned char *
-data_read_id(unsigned char *dp, Id *idp)
-{
-  Id x = 0;
-  unsigned char c;
-  for (;;)
-    {
-      c = *dp++;
-      if (!(c & 0x80))
-	{
-	  *idp = (x << 7) ^ c;
-          return dp;
-	}
-      x = (x << 7) ^ c ^ 128;
-    }
-}
-
-static unsigned char *
-data_read_ideof(unsigned char *dp, Id *idp, int *eof)
-{
-  Id x = 0;
-  unsigned char c;
-  for (;;)
-    {
-      c = *dp++;
-      if (!(c & 0x80))
-	{
-	  if (c & 0x40)
-	    {
-	      c ^= 0x40;
-	      *eof = 0;
-	    }
-	  else
-	    *eof = 1;
-	  *idp = (x << 6) ^ c;
-          return dp;
-	}
-      x = (x << 7) ^ c ^ 128;
-    }
-}
-
-static unsigned char *
-data_skip(unsigned char *dp, int type)
-{
-  unsigned char x;
-  switch (type)
-    {
-    case TYPE_VOID:
-    case TYPE_CONSTANT:
-      return dp;
-    case TYPE_ID:
-    case TYPE_NUM:
-    case TYPE_DIR:
-      while ((*dp & 0x80) != 0)
-	dp++;
-      return dp + 1;
-    case TYPE_IDARRAY:
-      while ((*dp & 0xc0) != 0)
-	dp++;
-      return dp + 1;
-    case TYPE_STR:
-      while ((*dp) != 0)
-	dp++;
-      return dp + 1;
-    case TYPE_DIRSTRARRAY:
-      for (;;)
-	{
-          while ((*dp & 0x80) != 0)
-	    dp++;
-	  x = *dp++;
-          while ((*dp) != 0)
-	    dp++;
-	  dp++;
-	  if (!(x & 0x40))
-	    return dp;
-	}
-    case TYPE_DIRNUMNUMARRAY:
-      for (;;)
-	{
-	  while ((*dp & 0x80) != 0)
-	    dp++;
-	  dp++;
-	  while ((*dp & 0x80) != 0)
-	    dp++;
-	  dp++;
-	  while ((*dp & 0x80) != 0)
-	    dp++;
-	  if (!(*dp & 0x40))
-	    return dp + 1;
-	  dp++;
-	}
-    default:
-      fprintf(stderr, "unknown type in data_skip\n");
-      exit(1);
-    }
-}
-
-static unsigned char *
-data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
-{
-  kv->eof = 1;
-  if (!dp)
-    return 0;
-  switch (key->type)
-    {
-    case TYPE_VOID:
-      return dp;
-    case TYPE_CONSTANT:
-      kv->num = key->size;
-      return dp;
-    case TYPE_STR:
-      kv->str = (const char *)dp;
-      return dp + strlen(kv->str) + 1;
-    case TYPE_ID:
-      return data_read_id(dp, &kv->id);
-    case TYPE_NUM:
-      return data_read_id(dp, &kv->num);
-    case TYPE_IDARRAY:
-      return data_read_ideof(dp, &kv->id, &kv->eof);
-    case TYPE_DIR:
-      return data_read_id(dp, &kv->id);
-    case TYPE_DIRSTRARRAY:
-      dp = data_read_ideof(dp, &kv->id, &kv->eof);
-      kv->str = (const char *)dp;
-      return dp + strlen(kv->str) + 1;
-    case TYPE_DIRNUMNUMARRAY:
-      dp = data_read_id(dp, &kv->id);
-      dp = data_read_id(dp, &kv->num);
-      return data_read_ideof(dp, &kv->num2, &kv->eof);
-    default:
-      return 0;
-    }
+  if (data->pagefd != -1)
+    close(data->pagefd);
 }
 
 static unsigned char *
@@ -213,8 +81,8 @@ forward_to_key(Repodata *data, Id key, Id schemaid, unsigned char *dp)
 	return dp;
       if (data->keys[k].storage == KEY_STORAGE_VERTICAL_OFFSET)
 	{
-	  dp = data_skip(dp, TYPE_ID);	/* skip that offset */
-	  dp = data_skip(dp, TYPE_ID);	/* skip that length */
+	  dp = data_skip(dp, REPOKEY_TYPE_ID);	/* skip that offset */
+	  dp = data_skip(dp, REPOKEY_TYPE_ID);	/* skip that length */
 	  continue;
 	}
       if (data->keys[k].storage != KEY_STORAGE_INCORE)
@@ -354,27 +222,20 @@ load_page_range(Repodata *data, unsigned int pstart, unsigned int pend)
 #ifdef DEBUG_PAGING
 	  fprintf (stderr, "PAGEIN: %d to %d", i, pnum);
 #endif
-	  /* Not mapped, so read in this page.  */
-	  if (fseek(data->fp, p->file_offset, SEEK_SET) < 0)
+          if (pread(data->pagefd, compressed ? buf : dest, in_len, p->file_offset) != in_len)
 	    {
-	      perror ("mapping fseek");
-	      exit (1);
-	    }
-	  if (fread(compressed ? buf : dest, in_len, 1, data->fp) != 1)
-	    {
-	      perror ("mapping fread");
-	      exit (1);
+	      perror ("mapping pread");
+	      return 0;
 	    }
 	  if (compressed)
 	    {
 	      unsigned int out_len;
 	      out_len = unchecked_decompress_buf(buf, in_len,
 						  dest, BLOB_PAGESIZE);
-	      if (out_len != BLOB_PAGESIZE
-	          && i < data->num_pages - 1)
+	      if (out_len != BLOB_PAGESIZE && i < data->num_pages - 1)
 	        {
-	          fprintf (stderr, "can't decompress\n");
-	          exit (1);
+	          fprintf(stderr, "can't decompress\n");
+		  return 0;
 		}
 #ifdef DEBUG_PAGING
 	      fprintf (stderr, " (expand %d to %d)", in_len, out_len);
@@ -394,7 +255,7 @@ static unsigned char *
 make_vertical_available(Repodata *data, Repokey *key, Id off, Id len)
 {
   unsigned char *dp;
-  if (key->type == TYPE_VOID)
+  if (key->type == REPOKEY_TYPE_VOID)
     return 0;
   if (off >= data->lastverticaloffset)
     {
@@ -403,7 +264,7 @@ make_vertical_available(Repodata *data, Repokey *key, Id off, Id len)
 	return 0;
       return data->vincore + off;
     }
-  if (!data->fp)
+  if (data->pagefd == -1)
     return 0;
   if (off + len > key->size)
     return 0;
@@ -477,12 +338,14 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
   dp = get_data(data, key, &dp);
   if (!dp)
     return 0;
-  if (key->type == TYPE_STR)
+  if (key->type == REPOKEY_TYPE_STR)
     return (const char *)dp;
-  if (key->type != TYPE_ID)
+  if (key->type == REPOKEY_TYPE_CONSTANTID)
+    return id2str(data->repo->pool, key->size);
+  if (key->type == REPOKEY_TYPE_ID)
+    dp = data_read_id(dp, &id);
+  else
     return 0;
-  /* id type, must either use global or local string store*/
-  dp = data_read_id(dp, &id);
   if (data->localpool)
     return data->spool.stringspace + data->spool.strings[id];
   return id2str(data->repo->pool, id);
@@ -513,9 +376,9 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value)
   dp = get_data(data, key, &dp);
   if (!dp)
     return 0;
-  if (key->type == TYPE_NUM
-      || key->type == TYPE_U32
-      || key->type == TYPE_CONSTANT)
+  if (key->type == REPOKEY_TYPE_NUM
+      || key->type == REPOKEY_TYPE_U32
+      || key->type == REPOKEY_TYPE_CONSTANT)
     {
       dp = data_fetch(dp, &kv, key);
       *value = kv.num;
@@ -672,14 +535,14 @@ dataiterator_match(Dataiterator *di, KeyValue *kv)
     {
       switch (di->key->type)
 	{
-	case TYPE_ID:
-	case TYPE_IDARRAY:
+	case REPOKEY_TYPE_ID:
+	case REPOKEY_TYPE_IDARRAY:
 	  if (di->data && di->data->localpool)
 	    kv->str = stringpool_id2str(&di->data->spool, kv->id);
 	  else
 	    kv->str = id2str(di->repo->pool, kv->id);
 	  break;
-	case TYPE_STR:
+	case REPOKEY_TYPE_STR:
 	  break;
 	default:
 	  return 0;
@@ -727,20 +590,20 @@ dataiterator_match(Dataiterator *di, KeyValue *kv)
 }
 
 static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
-  { SOLVABLE_NAME,        TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_ARCH,        TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_EVR,         TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_VENDOR,      TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_PROVIDES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_OBSOLETES,   TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_CONFLICTS,   TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_REQUIRES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_RECOMMENDS,  TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_SUGGESTS,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_SUPPLEMENTS, TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_ENHANCES,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_FRESHENS,    TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { RPM_RPMDBID,          TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_NAME,        REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_ARCH,        REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_EVR,         REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_VENDOR,      REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_PROVIDES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_OBSOLETES,   REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_CONFLICTS,   REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_REQUIRES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_RECOMMENDS,  REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_SUGGESTS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_SUPPLEMENTS, REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_ENHANCES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { SOLVABLE_FRESHENS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
+  { RPM_RPMDBID,          REPOKEY_TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
 };
 
 int
@@ -921,6 +784,7 @@ repodata_init(Repodata *data, Repo *repo, int localpool)
   data->start = repo->start;
   data->end = repo->end;
   data->incoreoffset = sat_extend_resize(0, data->end - data->start, sizeof(Id), REPODATA_BLOCK);
+  data->pagefd = -1;
 }
 
 /* extend repodata so that it includes solvables p */
@@ -1026,7 +890,7 @@ repodata_set(Repodata *data, Id entry, Repokey *key, Id val)
   for (keyid = 1; keyid < data->nkeys; keyid++)
     if (data->keys[keyid].name == key->name && data->keys[keyid].type == key->type)
       {
-        if (key->type == TYPE_CONSTANT && key->size != data->keys[keyid].size)
+        if ((key->type == REPOKEY_TYPE_CONSTANT || key->type == REPOKEY_TYPE_CONSTANTID) && key->size != data->keys[keyid].size)
           continue;
         break;
       }
@@ -1049,7 +913,7 @@ repodata_set_id(Repodata *data, Id entry, Id keyname, Id id)
 {
   Repokey key;
   key.name = keyname;
-  key.type = TYPE_ID;
+  key.type = REPOKEY_TYPE_ID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   repodata_set(data, entry, &key, id);
@@ -1060,7 +924,7 @@ repodata_set_num(Repodata *data, Id entry, Id keyname, Id num)
 {
   Repokey key;
   key.name = keyname;
-  key.type = TYPE_NUM;
+  key.type = REPOKEY_TYPE_NUM;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   repodata_set(data, entry, &key, num);
@@ -1076,7 +940,7 @@ repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str)
   else
     id = str2id(data->repo->pool, str, 1);
   key.name = keyname;
-  key.type = TYPE_ID;
+  key.type = REPOKEY_TYPE_ID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   repodata_set(data, entry, &key, id);
@@ -1087,8 +951,19 @@ repodata_set_constant(Repodata *data, Id entry, Id keyname, Id constant)
 {
   Repokey key;
   key.name = keyname;
-  key.type = TYPE_CONSTANT;
+  key.type = REPOKEY_TYPE_CONSTANT;
   key.size = constant;
+  key.storage = KEY_STORAGE_INCORE;
+  repodata_set(data, entry, &key, 0);
+}
+
+void
+repodata_set_constantid(Repodata *data, Id entry, Id keyname, Id id)
+{
+  Repokey key;
+  key.name = keyname;
+  key.type = REPOKEY_TYPE_CONSTANTID;
+  key.size = id;
   key.storage = KEY_STORAGE_INCORE;
   repodata_set(data, entry, &key, 0);
 }
@@ -1098,7 +973,7 @@ repodata_set_void(Repodata *data, Id entry, Id keyname)
 {
   Repokey key;
   key.name = keyname;
-  key.type = TYPE_VOID;
+  key.type = REPOKEY_TYPE_VOID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   repodata_set(data, entry, &key, 0);
@@ -1112,7 +987,7 @@ repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str)
 
   l = strlen(str) + 1;
   key.name = keyname;
-  key.type = TYPE_STR;
+  key.type = REPOKEY_TYPE_STR;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
@@ -1133,7 +1008,7 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, nu
   if (data->attrs && data->attrs[entry])
     {
       for (pp = data->attrs[entry]; *pp; pp += 2)
-        if (data->keys[*pp].name == keyname && data->keys[*pp].type == TYPE_DIRNUMNUMARRAY)
+        if (data->keys[*pp].name == keyname && data->keys[*pp].type == REPOKEY_TYPE_DIRNUMNUMARRAY)
 	  break;
       if (*pp)
 	{
@@ -1162,7 +1037,7 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, nu
 	}
     }
   key.name = keyname;
-  key.type = TYPE_DIRNUMNUMARRAY;
+  key.type = REPOKEY_TYPE_DIRNUMNUMARRAY;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 4, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
@@ -1192,7 +1067,7 @@ fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->a
   if (data->attrs && data->attrs[entry])
     {
       for (pp = data->attrs[entry]; *pp; pp += 2)
-        if (data->keys[*pp].name == keyname && data->keys[*pp].type == TYPE_DIRSTRARRAY)
+        if (data->keys[*pp].name == keyname && data->keys[*pp].type == REPOKEY_TYPE_DIRSTRARRAY)
 	  break;
       if (*pp)
 	{
@@ -1220,7 +1095,7 @@ fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->a
 	}
     }
   key.name = keyname;
-  key.type = TYPE_DIRSTRARRAY;
+  key.type = REPOKEY_TYPE_DIRSTRARRAY;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 3, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
@@ -1439,8 +1314,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	      /* Skip the data associated with this old key.  */
 	      if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
 		{
-		  ndp = data_skip(dp, TYPE_ID);
-		  ndp = data_skip(ndp, TYPE_ID);
+		  ndp = data_skip(dp, REPOKEY_TYPE_ID);
+		  ndp = data_skip(ndp, REPOKEY_TYPE_ID);
 		}
 	      else if (key->storage == KEY_STORAGE_INCORE)
 		ndp = data_skip(dp, key->type);
@@ -1471,18 +1346,19 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	      id = seen[*keyp] - 1;
 	      switch (key->type)
 		{
-		case TYPE_VOID:
-		case TYPE_CONSTANT:
+		case REPOKEY_TYPE_VOID:
+		case REPOKEY_TYPE_CONSTANT:
+		case REPOKEY_TYPE_CONSTANTID:
 		  break;
-		case TYPE_STR:
+		case REPOKEY_TYPE_STR:
 		  data_addblob(xd, data->attrdata + id, strlen((char *)(data->attrdata + id)) + 1);
 		  break;
-		case TYPE_ID:
-		case TYPE_NUM:
-		case TYPE_DIR:
+		case REPOKEY_TYPE_ID:
+		case REPOKEY_TYPE_NUM:
+		case REPOKEY_TYPE_DIR:
 		  data_addid(xd, id);
 		  break;
-		case TYPE_DIRNUMNUMARRAY:
+		case REPOKEY_TYPE_DIRNUMNUMARRAY:
 		  for (ida = data->attriddata + id; *ida; ida += 3)
 		    {
 		      data_addid(xd, ida[0]);
@@ -1490,7 +1366,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 		      data_addideof(xd, ida[2], ida[3] ? 0 : 1);
 		    }
 		  break;
-		case TYPE_DIRSTRARRAY:
+		case REPOKEY_TYPE_DIRSTRARRAY:
 		  for (ida = data->attriddata + id; *ida; ida += 2)
 		    {
 		      data_addideof(xd, ida[0], ida[2] ? 0 : 1);
@@ -1587,10 +1463,12 @@ read_u32(FILE *fp)
   return x;
 }
 
+#define SOLV_ERROR_EOF		3
+#define SOLV_ERROR_CORRUPT	6
+
 /* Try to either setup on-demand paging (using FP as backing
    file), or in case that doesn't work (FP not seekable) slurps in
    all pages and deactivates paging.  */
-
 void
 repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz)
 {
@@ -1600,16 +1478,22 @@ repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int b
   unsigned int can_seek;
   long cur_file_ofs;
   unsigned char buf[BLOB_PAGESIZE];
+
   if (pagesz != BLOB_PAGESIZE)
     {
       /* We could handle this by slurping in everything.  */
-      fprintf (stderr, "non matching page size\n");
-      exit (1);
+      data->error = SOLV_ERROR_CORRUPT;
+      return;
     }
   can_seek = 1;
   if ((cur_file_ofs = ftell(fp)) < 0)
     can_seek = 0;
-  clearerr (fp);
+  clearerr(fp);
+  if (can_seek)
+    data->pagefd = dup(fileno(fp));
+  if (data->pagefd == -1)
+    can_seek = 0;
+
 #ifdef DEBUG_PAGING
   fprintf (stderr, "can %sseek\n", can_seek ? "" : "NOT ");
 #endif
@@ -1643,7 +1527,10 @@ repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int b
 	      fprintf (stderr, "can't seek after we thought we can\n");
 	      /* We can't fall back to non-seeking behaviour as we already
 	         read over some data pages without storing them away.  */
-	      exit (1);
+	      data->error = SOLV_ERROR_EOF;
+	      close(data->pagefd);
+	      data->pagefd = -1;
+	      return;
 	    }
 	  cur_file_ofs += in_len;
 	}
@@ -1657,48 +1544,23 @@ repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int b
 	  /* We can't seek, so suck everything in.  */
 	  if (fread(compressed ? buf : dest, in_len, 1, fp) != 1)
 	    {
-	      perror ("fread");
-	      exit (1);
+	      perror("fread");
+	      data->error = SOLV_ERROR_EOF;
+	      return;
 	    }
 	  if (compressed)
 	    {
 	      out_len = unchecked_decompress_buf(buf, in_len, dest, BLOB_PAGESIZE);
-	      if (out_len != BLOB_PAGESIZE
-	          && i < npages - 1)
+	      if (out_len != BLOB_PAGESIZE && i < npages - 1)
 	        {
-	          fprintf (stderr, "can't decompress\n");
-	          exit (1);
+		  data->error = SOLV_ERROR_CORRUPT;
+		  return;
 	        }
 	    }
 	}
     }
-
-  if (can_seek)
-    {
-      /* If we are here we were able to seek to all page
-         positions, so activate paging by copying FP into our structure.
-	 We dup() the file, so that our callers can fclose() it and we
-	 still have it open.  But this means that we share file positions
-	 with the input filedesc.  So in case our caller reads it after us,
-	 and calls back into us we might change the file position unexpectedly
-	 to him.  */
-      int fd = dup (fileno (fp));
-      if (fd < 0)
-        {
-	  /* Jeez!  What a bloody system, we can't dup() anymore.  */
-	  perror ("dup");
-	  exit (1);
-	}
-      /* XXX we don't close this yet anywhere.  */
-      data->fp = fdopen (fd, "r");
-      if (!data->fp)
-        {
-	  /* My God!  What happened now?  */
-	  perror ("fdopen");
-	  exit (1);
-	}
-    }
 }
+
 /*
 vim:cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-0.5s:tw=78:cindent:sw=4:
 */

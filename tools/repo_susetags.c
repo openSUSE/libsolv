@@ -22,8 +22,6 @@ struct parsedata {
   Repo *repo;
   Repodata *data;
   struct parsedata_common common;
-  char **sources;
-  int nsources;
   int last_found_source;
   char **share_with;
   int nshare;
@@ -105,9 +103,9 @@ add_location(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
     {
       /* medianr filename dir
          don't optimize this one */
-      repodata_set_constant(pd->data, entry, id_medianr, atoi(sp[0]));
-      repodata_set_poolstr(pd->data, entry, id_mediadir, sp[2]);
-      repodata_set_str(pd->data, entry, id_mediafile, sp[1]);
+      repodata_set_constant(pd->data, entry, SOLVABLE_MEDIANR, atoi(sp[0]));
+      repodata_set_poolstr(pd->data, entry, SOLVABLE_MEDIADIR, sp[2]);
+      repodata_set_str(pd->data, entry, SOLVABLE_MEDIAFILE, sp[1]);
       return;
     }
   else
@@ -137,18 +135,16 @@ add_location(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
       if (*n2 || strcmp (n1, ".rpm"))
         goto nontrivial;
 
-      repodata_set_constant(pd->data, entry, id_medianr, medianr);
-      repodata_set_void(pd->data, entry, id_mediafile);
+      repodata_set_constant(pd->data, entry, SOLVABLE_MEDIANR, medianr);
+      repodata_set_void(pd->data, entry, SOLVABLE_MEDIAFILE);
       return;
 
 nontrivial:
-      repodata_set_constant(pd->data, entry, id_medianr, medianr);
-      repodata_set_str(pd->data, entry, id_mediafile, sp[1]);
+      repodata_set_constant(pd->data, entry, SOLVABLE_MEDIANR, medianr);
+      repodata_set_str(pd->data, entry, SOLVABLE_MEDIAFILE, sp[1]);
       return;
     }
 }
-
-#if 0
 
 /*
  * add_source
@@ -156,7 +152,7 @@ nontrivial:
  */
 
 static void
-add_source(struct parsedata *pd, char *line, Solvable *s, unsigned entry, int first)
+add_source(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
 {
   Repo *repo = s->repo;
   Pool *pool = repo->pool;
@@ -169,68 +165,20 @@ add_source(struct parsedata *pd, char *line, Solvable *s, unsigned entry, int fi
     }
 
   Id name = str2id(pool, sp[0], 1);
-  Id evr = makeevr(pool, join(pd, sp[1], "-", sp[2]));
+  Id evr = makeevr(pool, join2(sp[1], "-", sp[2]));
   Id arch = str2id(pool, sp[3], 1);
-
-  /* Now, if the source of a package only differs in architecture
-     (src or nosrc), code only that fact.  */
-  if (s->name == name && s->evr == evr
-      && (arch == ARCH_SRC || arch == ARCH_NOSRC))
-    {
-      add_attr_void (attr, entry, arch == ARCH_SRC ? id_source : id_nosource);
-    }
-  else if (first)
-    {
-      if (entry >= pd->nsources)
-        {
-	  if (pd->nsources)
-	    {
-	      pd->sources = realloc (pd->sources, (entry + 256) * sizeof (*pd->sources));
-	      memset (pd->sources + pd->nsources, 0, (entry + 256 - pd->nsources) * sizeof (*pd->sources));
-	    }
-	  else
-	    pd->sources = calloc (entry + 256, sizeof (*pd->sources));
-	  pd->nsources = entry + 256;
-	}
-      /* Uarrr.  Unsplit.  */
-      sp[0][strlen (sp[0])] = ' ';
-      sp[1][strlen (sp[1])] = ' ';
-      sp[2][strlen (sp[2])] = ' ';
-      pd->sources[entry] = strdup (sp[0]);
-    }
+  /* XXX: could record a dep here, depends on where we want to store the data */
+  if (name == s->name)
+    repodata_set_void(pd->data, entry, SOLVABLE_SOURCENAME);
   else
-    {
-      unsigned n, nn;
-      Solvable *found = 0;
-      /* Otherwise we may find a solvable with exactly matching name, evr, arch
-         in the repository already.  In that case encode its ID.  */
-      for (n = repo->start, nn = repo->start + pd->last_found_source;
-           n < repo->end; n++, nn++)
-        {
-	  if (nn >= repo->end)
-	    nn = repo->start;
-	  found = pool->solvables + nn;
-	  if (found->repo == repo
-	      && found->name == name
-	      && found->evr == evr
-	      && found->arch == arch)
-	    {
-	      pd->last_found_source = nn - repo->start;
-	      break;
-	    }
-        }
-      if (n != repo->end)
-        add_attr_int (attr, entry, id_sourceid, nn - repo->start);
-      else
-        {
-          add_attr_localids_id (attr, entry, id_source, str2localid (attr, sp[0], 1));
-          add_attr_localids_id (attr, entry, id_source, str2localid (attr, join (pd, sp[1], "-", sp[2]), 1));
-          add_attr_localids_id (attr, entry, id_source, str2localid (attr, sp[3], 1));
-	}
-    }
+    repodata_set_id(pd->data, entry, SOLVABLE_SOURCENAME, name);
+  if (evr == s->evr)
+    repodata_set_void(pd->data, entry, SOLVABLE_SOURCEEVR);
+  else
+    repodata_set_id(pd->data, entry, SOLVABLE_SOURCEEVR, evr);
+  repodata_set_constantid(pd->data, entry, SOLVABLE_SOURCEARCH, arch);
 }
-#endif
-
+  
 /*
  * add_dirline
  * add a line with directory information
@@ -336,7 +284,7 @@ commit_diskusage (struct parsedata *pd, unsigned entry)
   for (i = 0; i < pd->ndirs; i++)
     if (pd->dirs[i][1] || pd->dirs[i][2])
       {
-	repodata_add_dirnumnum(pd->data, entry, id_diskusage, pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2]);
+	repodata_add_dirnumnum(pd->data, entry, SOLVABLE_DISKUSAGE, pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2]);
       }
   pd->ndirs = 0;
 }
@@ -401,7 +349,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
   Repodata *data = 0;
 
   data = repo_add_repodata(repo);
-  init_attr_ids(pool);
 
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
@@ -627,12 +574,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
 	    s->requires = adddep(pool, &pd, s->requires, line, -SOLVABLE_PREREQMARKER, pd.kind);
 	    continue;
           case CTAG('=', 'P', 'r', 'q'):                                        /* pre-requires / packages required */
-	    if (pd.kind) {
-	      if (flags & SUSETAGS_KINDS_SEPARATELY)
-	        repodata_set_poolstr(data, last_found_pack, id_must, line + 6);
-	      else
-	        s->requires = adddep(pool, &pd, s->requires, line, 0, 0);           /* patterns: a required package */
-	    }
+	    if (pd.kind)
+	      {
+		if (flags & SUSETAGS_KINDS_SEPARATELY)
+		  repodata_set_poolstr(data, last_found_pack, str2id(pool, "solvable:must", 1), line + 6);
+		else
+		  s->requires = adddep(pool, &pd, s->requires, line, 0, 0);           /* patterns: a required package */
+	      }
 	    else
 	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0); /* package: pre-requires */
 	    continue;
@@ -659,13 +607,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
 	    continue;
           case CTAG('=', 'P', 'r', 'c'):                                        /* packages recommended */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      repodata_set_poolstr(data, last_found_pack, id_should, line + 6);
+	      repodata_set_poolstr(data, last_found_pack, str2id(pool, "solvable:should", 1), line + 6);
 	    else
 	      s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 's', 'g'):                                        /* packages suggested */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      repodata_set_poolstr(data, last_found_pack, id_may, line + 6);
+	      repodata_set_poolstr(data, last_found_pack, str2id(pool, "solvable:may", 1), line + 6);
 	    else
 	      s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
 	    continue;
@@ -706,55 +654,51 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
 
         /* From here it's the attribute tags.  */
           case CTAG('=', 'G', 'r', 'p'):
-	    repodata_set_poolstr(data, last_found_pack, id_group, line + 6);
+	    repodata_set_poolstr(data, last_found_pack, SOLVABLE_GROUP, line + 6);
 	    continue;
           case CTAG('=', 'L', 'i', 'c'):
-	    repodata_set_poolstr(data, last_found_pack, id_license, line + 6);
+	    repodata_set_poolstr(data, last_found_pack, SOLVABLE_LICENSE, line + 6);
 	    continue;
           case CTAG('=', 'L', 'o', 'c'):
 	    add_location(&pd, line + 6, s, last_found_pack);
 	    continue;
-#if 0
           case CTAG('=', 'S', 'r', 'c'):
-	    add_source(&pd, line + 6, s, last_found_pack, 1);
+	    add_source(&pd, line + 6, s, last_found_pack);
 	    continue;
-#endif
           case CTAG('=', 'S', 'i', 'z'):
 	    if (split (line + 6, sp, 3) == 2)
 	      {
-		repodata_set_num(data, last_found_pack, id_downloadsize, (atoi(sp[0]) + 1023) / 1024);
-		repodata_set_num(data, last_found_pack, id_installsize, (atoi(sp[1]) + 1023) / 1024);
+		repodata_set_num(data, last_found_pack, SOLVABLE_DOWNLOADSIZE, (atoi(sp[0]) + 1023) / 1024);
+		repodata_set_num(data, last_found_pack, SOLVABLE_INSTALLSIZE, (atoi(sp[1]) + 1023) / 1024);
 	      }
 	    continue;
           case CTAG('=', 'T', 'i', 'm'):
 	    {
 	      unsigned int t = atoi (line + 6);
 	      if (t)
-		{
-		  repodata_set_num(data, last_found_pack, id_time, t);
-		}
+		repodata_set_num(data, last_found_pack, SOLVABLE_BUILDTIME, t);
 	    }
 	    continue;
           case CTAG('=', 'K', 'w', 'd'):
-	    repodata_set_poolstr(data, last_found_pack, id_keywords, line + 6);
+	    repodata_set_poolstr(data, last_found_pack, SOLVABLE_KEYWORDS, line + 6);
 	    continue;
           case CTAG('=', 'A', 'u', 't'):
-	    repodata_set_str(data, last_found_pack, id_authors, line + 6);
+	    repodata_set_str(data, last_found_pack, SOLVABLE_AUTHORS, line + 6);
 	    continue;
           case CTAG('=', 'S', 'u', 'm'):
-	    repodata_set_str(data, last_found_pack, id_summary, line + 6);
+	    repodata_set_str(data, last_found_pack, SOLVABLE_SUMMARY, line + 6);
 	    continue;
           case CTAG('=', 'D', 'e', 's'):
-	    repodata_set_str(data, last_found_pack, id_description, line + 6);
+	    repodata_set_str(data, last_found_pack, SOLVABLE_DESCRIPTION, line + 6);
 	    continue;
           case CTAG('=', 'E', 'u', 'l'):
-	    repodata_set_str(data, last_found_pack, id_eula, line + 6);
+	    repodata_set_str(data, last_found_pack, SOLVABLE_EULA, line + 6);
 	    continue;
           case CTAG('=', 'I', 'n', 's'):
-	    repodata_set_str(data, last_found_pack, id_messageins, line + 6);
+	    repodata_set_str(data, last_found_pack, SOLVABLE_MESSAGEINS, line + 6);
 	    continue;
           case CTAG('=', 'D', 'e', 'l'):
-	    repodata_set_str(data, last_found_pack, id_messagedel, line + 6);
+	    repodata_set_str(data, last_found_pack, SOLVABLE_MESSAGEDEL, line + 6);
 	    continue;
           case CTAG('=', 'V', 'i', 's'):
 	    {
@@ -762,7 +706,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
 	      unsigned k;
 	      k = atoi (line + 6);
 	      if (k || !strcasecmp (line + 6, "true"))
-	        repodata_set_constant(data, last_found_pack, id_isvisible, 1);
+	        repodata_set_constant(data, last_found_pack, SOLVABLE_ISVISIBLE, 1);
 	    }
 	    continue;
           case CTAG('=', 'S', 'h', 'r'):
@@ -799,20 +743,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
   if (s && pd.ndirs)
     commit_diskusage(&pd, last_found_pack);
     
-#if 0
-  if (pd.sources)
-    {
-      int i, last_found;
-      for (i = 0; i < pd.nsources; i++)
-        if (pd.sources[i])
-	  {
-	    add_source(&pd, pd.sources[i], pool->solvables + repo->start + i, i, 0);
-	    free (pd.sources[i]);
-	  }
-      free (pd.sources);
-    }
-#endif
-
   /* Shared attributes
    *  (e.g. multiple binaries built from same source)
    */

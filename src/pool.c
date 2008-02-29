@@ -64,6 +64,50 @@ static const char *initpool_data[] = {
   "repodata:external",
   "repodata:keys",
   "repodata:location",
+  "repokey:type:void",
+  "repokey:type:constant",
+  "repokey:type:constantid",
+  "repokey:type:id",
+  "repokey:type:num",
+  "repokey:type:num32",
+  "repokey:type:dir",
+  "repokey:type:str",
+  "repokey:type:idarray",
+  "repokey:type:relidarray",
+  "repokey:type:dirstrarray",
+  "repokey:type:dirnumnumarray",
+
+  "solvable:summary",
+  "solvable:description",
+  "solvable:authors",
+  "solvable:group",
+  "solvable:keywords",
+  "solvable:license",
+  "solvable:buildtime",
+
+  "solvable:eula",
+  "solvable:messageins",
+  "solvable:messagedel",
+
+  "solvable:installsize",
+  "solvable:diskusage",
+  "solvable:filelist",
+
+  "solvable:installtime",
+
+  "solvable:mediadir",
+  "solvable:mediafile",
+  "solvable:medianr",
+  "solvable:downloadsize",
+
+  "solvable:sourcearch",
+  "solvable:sourcename",
+  "solvable:sourceevr",
+
+  "solvable:isvisible",			/* from susetags */
+
+  "solvable:patchcategory",
+
   0
 };
 
@@ -521,7 +565,7 @@ pool_addrelproviders(Pool *pool, Id d)
 
   /* convert to whatprovides id */
 #if 0
-  POOL_DEBUG(DEBUG_1, "addrelproviders: what provides %s?\n", id2str(pool, name));
+  POOL_DEBUG(SAT_DEBUG_STATS, "addrelproviders: what provides %s?\n", dep2str(pool, name));
 #endif
   if (flags && flags < 8)
     {
@@ -582,7 +626,7 @@ pool_addrelproviders(Pool *pool, Id d)
     }
   /* add providers to whatprovides */
 #if 0
-  POOL_DEBUG(DEBUG_1, "addrelproviders: adding %d packages to %d\n", plist.count, d);
+  POOL_DEBUG(SAT_DEBUG_STATS, "addrelproviders: adding %d packages to %d\n", plist.count, d);
 #endif
   pool->whatprovides_rel[d] = pool_queuetowhatprovides(pool, &plist);
   queue_free(&plist);
@@ -765,9 +809,6 @@ pool_addfileprovides(Pool *pool, Repo *installed)
   struct searchfiles sf, isf;
   struct addfileprovides_cbdata cbd;
   int i;
-  Id id_filelist;
-
-  id_filelist = str2id(pool, "filelist", 1);
 
   memset(&sf, 0, sizeof(sf));
   map_init(&sf.seen, pool->ss.nstrings + pool->nrels);
@@ -814,7 +855,7 @@ pool_addfileprovides(Pool *pool, Repo *installed)
       cbd.names = sf.names;
       cbd.olddata = 0;
       cbd.dids = sat_realloc2(cbd.dids, sf.nfiles, sizeof(Id));
-      pool_search(pool, 0, id_filelist, 0, 0, addfileprovides_cb, &cbd);
+      pool_search(pool, 0, SOLVABLE_FILELIST, 0, 0, addfileprovides_cb, &cbd);
       sat_free(sf.ids);
       for (i = 0; i < sf.nfiles; i++)
 	{
@@ -836,7 +877,7 @@ pool_addfileprovides(Pool *pool, Repo *installed)
       cbd.names = isf.names;
       cbd.olddata = 0;
       cbd.dids = sat_realloc2(cbd.dids, isf.nfiles, sizeof(Id));
-      repo_search(installed, 0, id_filelist, 0, 0, addfileprovides_cb, &cbd);
+      repo_search(installed, 0, SOLVABLE_FILELIST, 0, 0, addfileprovides_cb, &cbd);
       sat_free(isf.ids);
       for (i = 0; i < isf.nfiles; i++)
 	{

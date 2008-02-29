@@ -154,12 +154,6 @@ struct parsedata {
   struct deltarpm delta;
 };
 
-/* repo data attribute ids */
-static Id id_timestamp;
-static Id id_summary;
-static Id id_description;
-static Id id_category;
-
 #if 0
 static void
 append_str(struct parsedata *pd, const char *s)
@@ -414,7 +408,7 @@ startElement(void *userData, const char *name, const char **atts)
         {
           pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
 	  repodata_extend(pd->data, pd->solvable - pool->solvables);
-          repodata_set_num(pd->data, pd->datanum, id_timestamp, pd->timestamp);
+          repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, pd->timestamp);
 	}
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
@@ -622,13 +616,13 @@ endElement(void *userData, const char *name)
       s->arch = str2id(pool, pd->content, 1);
       break;
     case STATE_SUMMARY:
-      repodata_set_str(pd->data, pd->datanum, id_summary, pd->content);
+      repodata_set_str(pd->data, pd->datanum, SOLVABLE_SUMMARY, pd->content);
       break;
     case STATE_DESCRIPTION:
-      repodata_set_str(pd->data, pd->datanum, id_description, pd->content);
+      repodata_set_str(pd->data, pd->datanum, SOLVABLE_DESCRIPTION, pd->content);
       break;
     case STATE_CATEGORY:  
-      repodata_set_str(pd->data, pd->datanum, id_category, pd->content);
+      repodata_set_str(pd->data, pd->datanum, SOLVABLE_PATCHCATEGORY, pd->content);
       break;
     case STATE_DELTARPM:
 #ifdef TESTMM
@@ -724,11 +718,6 @@ repo_add_patchxml(Repo *repo, FILE *fp, int flags)
   pd.repo = repo;
   pd.data = repo_add_repodata(pd.repo);
 
-  id_timestamp = str2id(pool, "patch:timestamp", 1);
-  id_summary = str2id(pool, "summary", 1);
-  id_description = str2id(pool, "description", 1);
-  id_category = str2id(pool, "patch:category", 1);
-  
   pd.content = malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;

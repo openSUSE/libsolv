@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <rpm/db.h>
 
@@ -27,8 +28,6 @@
 #include "hash.h"
 #include "util.h"
 #include "repo_rpmdb.h"
-
-#include "tools_util.h"
 
 
 #define TAG_NAME		1000
@@ -44,10 +43,13 @@
 #define TAG_ARCH		1022
 #define TAG_FILESIZES		1028
 #define TAG_FILEMODES		1030
+#define TAG_SOURCERPM		1044
 #define TAG_PROVIDENAME		1047
 #define TAG_REQUIREFLAGS	1048
 #define TAG_REQUIRENAME		1049
 #define TAG_REQUIREVERSION	1050
+#define TAG_NOSOURCE		1051
+#define TAG_NOPATCH		1052
 #define TAG_CONFLICTFLAGS	1053
 #define TAG_CONFLICTNAME	1054
 #define TAG_CONFLICTVERSION	1055
@@ -87,6 +89,23 @@ typedef struct rpmhead {
   unsigned char *dp;
   unsigned char data[1];
 } RpmHead;
+
+static int
+headexists(RpmHead *h, int tag)
+{
+  unsigned int i;
+  unsigned char *d, taga[4];
+
+  d = h->dp - 16;
+  taga[0] = tag >> 24;
+  taga[1] = tag >> 16;
+  taga[2] = tag >> 8;
+  taga[3] = tag;
+  for (i = 0; i < h->cnt; i++, d -= 16)
+    if (d[3] == taga[3] && d[2] == taga[2] && d[1] == taga[1] && d[0] == taga[0])
+      return 1;
+  return 0;
+}
 
 static unsigned int *
 headint32array(RpmHead *h, int tag, int *cnt)
@@ -484,8 +503,11 @@ adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmh
     {
       if (!fn[i])
 	continue;
-      did = repodata_str2dir(repodata, dn[i], 1);
-      repodata_add_dirnumnum(repodata, entry, id_diskusage, did, fkb[i], fn[i]);
+      if (!*dn[i] && (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC))
+        did = repodata_str2dir(repodata, "/usr/src", 1);
+      else
+        did = repodata_str2dir(repodata, dn[i], 1);
+      repodata_add_dirnumnum(repodata, entry, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
     }
   sat_free(fn);
   sat_free(fkb);
@@ -581,7 +603,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 	  repodata_extend(repodata, s - pool->solvables);
 	  entry = (s - pool->solvables) - repodata->start;
 	  did = repodata_str2dir(repodata, dn[di[i]], 1);
-	  repodata_add_dirstr(repodata, entry, id_filelist, did, bn[i]);
+	  repodata_add_dirstr(repodata, entry, SOLVABLE_FILELIST, did, bn[i]);
 	}
     }
   if (fn)
@@ -607,7 +629,15 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       fprintf(stderr, "package has no name\n");
       exit(1);
     }
-  s->arch = str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
+  if (headstring(rpmhead, TAG_SOURCERPM))
+    s->arch = str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
+  else
+    {
+      if (headexists(rpmhead, TAG_NOSOURCE) || headexists(rpmhead, TAG_NOPATCH))
+        s->arch = ARCH_NOSRC;
+      else
+        s->arch = ARCH_SRC;
+    }
   if (!s->arch)
     s->arch = ARCH_NOARCH;
   evr = headtoevr(rpmhead);
@@ -639,7 +669,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       entry = (s - pool->solvables) - repodata->start;
       str = headstring(rpmhead, TAG_SUMMARY);
       if (str)
-        repodata_set_str(repodata, entry, id_summary, str);
+        repodata_set_str(repodata, entry, SOLVABLE_SUMMARY, str);
       str = headstring(rpmhead, TAG_DESCRIPTION);
       if (str)
 	{
@@ -657,7 +687,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 	      while (l > 0 && str[l - 1] == '\n')
 	        str[--l] = 0;
 	      if (l)
-                repodata_set_str(repodata, entry, id_description, str);
+                repodata_set_str(repodata, entry, SOLVABLE_DESCRIPTION, str);
 	      p = aut + 19;
 	      aut = str;	/* copy over */
 	      while (*p == ' ' || *p == '\n')
@@ -677,22 +707,21 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 		aut--;
 	      *aut = 0;
 	      if (*str)
-	        repodata_set_str(repodata, entry, id_authors, str);
+	        repodata_set_str(repodata, entry, SOLVABLE_AUTHORS, str);
 	      free(str);
 	    }
 	  else if (*str)
-	    repodata_set_str(repodata, entry, id_description, str);
+	    repodata_set_str(repodata, entry, SOLVABLE_DESCRIPTION, str);
 	}
       str = headstring(rpmhead, TAG_GROUP);
       if (str)
-        repodata_set_poolstr(repodata, entry, id_group, str);
+        repodata_set_poolstr(repodata, entry, SOLVABLE_GROUP, str);
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
-        repodata_set_num(repodata, entry, id_time, u32);
+        repodata_set_num(repodata, entry, SOLVABLE_BUILDTIME, u32);
       u32 = headint32(rpmhead, TAG_SIZE);
       if (u32)
-        repodata_set_num(repodata, entry, id_installsize, (u32 + 1023) / 1024);
-
+        repodata_set_num(repodata, entry, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
     }
   return 1;
 }
@@ -729,7 +758,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
     abort();		/* FIXME: rpmdbid */
 
   repodata = repo_add_repodata(repo);
-  init_attr_ids(repo->pool);
 
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
@@ -1032,9 +1060,173 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
     repodata_internalize(repodata);
 }
 
-/* XXX: delete me! */
-void rpmdb_dummy()
+static inline unsigned int
+getu32(unsigned char *dp)
 {
-  makeevr(0, 0);
-  split(0, 0, 0);
+  return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
+}
+
+static void
+add_location(Repodata *data, Solvable *s, const char *location)
+{
+  Pool *pool = s->repo->pool;
+  const char *name, *n1, *n2;
+  int l;
+  Id entry;
+
+  repodata_extend(data, s - pool->solvables);
+  entry = (s - pool->solvables) - data->start;
+
+  /* skip ./ prefix */
+  if (location[0] == '.' && location[1] == '/' && location[2] != '/')
+    location += 2;
+
+  name = strrchr(location, '/');
+  if (!name)
+    name = location;
+  else
+    {
+      name++;
+      n2 = id2str(pool, s->arch);
+      l = strlen(n2);
+      if (strncmp(location, n2, l) != 0 || location + l + 1 != name)
+	{
+	  /* too bad, need to store directory */
+	  char *dir = strdup(location);
+	  dir[name - location - 1] = 0;
+	  repodata_set_str(data, entry, SOLVABLE_MEDIADIR, dir);
+	  free(dir);
+	}
+      else
+        repodata_set_void(data, entry, SOLVABLE_MEDIADIR);
+    }
+  n1 = name;
+  for (n2 = id2str(pool, s->name); *n2; n1++, n2++)
+    if (*n1 != *n2)
+      break;
+  if (*n2 || *n1 != '-')
+    goto nontrivial;
+  n1++;
+  for (n2 = id2str (pool, s->evr); *n2; n1++, n2++)
+    if (*n1 != *n2)
+      break;
+  if (*n2 || *n1 != '.')
+    goto nontrivial;
+  n1++;
+  for (n2 = id2str (pool, s->arch); *n2; n1++, n2++)
+    if (*n1 != *n2)
+      break;
+  if (*n2 || strcmp (n1, ".rpm"))
+    goto nontrivial;
+  repodata_set_void(data, entry, SOLVABLE_MEDIAFILE);
+  return;
+
+nontrivial:
+  repodata_set_str(data, entry, SOLVABLE_MEDIAFILE, name);
+  return;
+}
+
+
+void
+repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
+{
+  int i, sigdsize, sigcnt, l;
+  Pool *pool = repo->pool;
+  Solvable *s;
+  Repodata *repodata;
+  RpmHead *rpmhead = 0;
+  int rpmheadsize = 0;
+  FILE *fp;
+  unsigned char lead[4096];
+
+  if (nrpms <= 0)
+    return;
+  repodata = repo_add_repodata(repo);
+  for (i = 0; i < nrpms; i++)
+    {
+      if ((fp = fopen(rpms[i], "r")) == 0)
+	{
+	  perror(rpms[i]);
+	  continue;
+	}
+      if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
+	{
+	  fprintf(stderr, "%s: not a rpm\n", rpms[i]);
+	  fclose(fp);
+	  continue;
+	}
+      if (lead[78] != 0 || lead[79] != 5)
+	{
+	  fprintf(stderr, "%s: not a V5 header\n", rpms[i]);
+	  fclose(fp);
+	  continue;
+	}
+      if (getu32(lead + 96) != 0x8eade801)
+	{
+	  fprintf(stderr, "%s: bad signature header\n", rpms[i]);
+	  fclose(fp);
+	  continue;
+	}
+      sigcnt = getu32(lead + 96 + 8);
+      sigdsize = getu32(lead + 96 + 12);
+      if (sigcnt >= 0x4000000 || sigdsize >= 0x40000000)
+	{
+	  fprintf(stderr, "%s: bad signature header\n", rpms[i]);
+	  fclose(fp);
+	  continue;
+	}
+      sigdsize += sigcnt * 16;
+      sigdsize = (sigdsize + 7) & ~7;
+      while (sigdsize)
+	{
+	  l = sigdsize > 4096 ? 4096 : sigdsize;
+	  if (fread(lead, l, 1, fp) != 1)
+	    {
+	      fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
+	      fclose(fp);
+	      continue;
+	    }
+	  sigdsize -= l;
+	}
+      if (fread(lead, 16, 1, fp) != 1)
+	{
+	  fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
+	  fclose(fp);
+	  continue;
+	}
+      if (getu32(lead) != 0x8eade801)
+	{
+	  fprintf(stderr, "%s: bad header\n", rpms[i]);
+	  fclose(fp);
+	  continue;
+	}
+      sigcnt = getu32(lead + 8);
+      sigdsize = getu32(lead + 12);
+      if (sigcnt >= 0x4000000 || sigdsize >= 0x40000000)
+	{
+	  fprintf(stderr, "%s: bad header\n", rpms[i]);
+	  fclose(fp);
+	  continue;
+	}
+      l = sigdsize + sigcnt * 16;
+      if (l > rpmheadsize)
+	rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + l);
+      if (fread(rpmhead->data, l, 1, fp) != 1)
+	{
+	  fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
+	  fclose(fp);
+	  continue;
+	}
+      rpmhead->cnt = sigcnt;
+      rpmhead->dcnt = sigdsize;
+      rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+      fclose(fp);
+      s = pool_id2solvable(pool, repo_add_solvable(repo));
+      rpm2solv(pool, repo, repodata, s, rpmhead);
+      add_location(repodata, s, rpms[i]);
+    }
+  if (rpmhead)
+    sat_free(rpmhead);
+  if (repodata)
+    repodata_internalize(repodata);
 }
