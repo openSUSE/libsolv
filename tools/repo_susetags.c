@@ -27,6 +27,7 @@ struct parsedata {
   int nshare;
   Id (*dirs)[3]; // dirid, size, nfiles
   int ndirs;
+  Id langcache[ID_NUM_INTERNAL];
 };
 
 static char *flagtab[] = {
@@ -37,6 +38,26 @@ static char *flagtab[] = {
   "!=",
   "<="
 };
+
+
+static Id
+langtag(struct parsedata *pd, Id tag, const char *language)
+{
+  char *p;
+  const char *tagname;
+
+  if (!language || tag >= ID_NUM_INTERNAL)
+    return tag;
+  if (!pd->langcache[tag])
+    {
+      tagname = id2str(pd->repo->pool, tag);
+      p = sat_malloc(strlen(tagname) + strlen(language) + 2);
+      sprintf(p, "%s:%s", tagname, language);
+      pd->langcache[tag] = str2id(pd->repo->pool, p, 1);
+      sat_free(p);
+    }
+  return pd->langcache[tag];
+}
 
 /*
  * adddep
@@ -238,7 +259,7 @@ commit_diskusage (struct parsedata *pd, unsigned entry)
   /* Now sort in dirid order.  This ensures that parents come before
      their children.  */
   if (pd->ndirs > 1)
-    qsort (pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp);
+    qsort(pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp);
   /* Substract leaf numbers from all parents to make the numbers
      non-cumulative.  This must be done post-order (i.e. all leafs
      adjusted before parents).  We ensure this by starting at the end of
@@ -334,7 +355,7 @@ tag_from_string (char *cs)
  */
 
 void
-repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
+repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int flags)
 {
   Pool *pool = repo->pool;
   char *line, *linep;
@@ -348,7 +369,14 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
   struct parsedata pd;
   Repodata *data = 0;
 
-  data = repo_add_repodata(repo);
+  if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
+    {
+      /* use last repodata */
+      data = repo->repodata + repo->nrepodata - 1;
+      indesc = 1;
+    }
+  if (!data)
+    data = repo_add_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
@@ -562,7 +590,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
 	 solvables.  */
       if (indesc >= 2 && !s)
         {
-	  fprintf (stderr, "Huh?\n");
+	  fprintf (stderr, "Huh %s?\n", line);
           continue;
 	}
       switch (tag)
@@ -686,19 +714,19 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
 	    repodata_set_str(data, last_found_pack, SOLVABLE_AUTHORS, line + 6);
 	    continue;
           case CTAG('=', 'S', 'u', 'm'):
-	    repodata_set_str(data, last_found_pack, SOLVABLE_SUMMARY, line + 6);
+	    repodata_set_str(data, last_found_pack, langtag(&pd, SOLVABLE_SUMMARY, language), line + 6);
 	    continue;
           case CTAG('=', 'D', 'e', 's'):
-	    repodata_set_str(data, last_found_pack, SOLVABLE_DESCRIPTION, line + 6);
+	    repodata_set_str(data, last_found_pack, langtag(&pd, SOLVABLE_DESCRIPTION, language), line + 6);
 	    continue;
           case CTAG('=', 'E', 'u', 'l'):
-	    repodata_set_str(data, last_found_pack, SOLVABLE_EULA, line + 6);
+	    repodata_set_str(data, last_found_pack, langtag(&pd, SOLVABLE_EULA, language), line + 6);
 	    continue;
           case CTAG('=', 'I', 'n', 's'):
-	    repodata_set_str(data, last_found_pack, SOLVABLE_MESSAGEINS, line + 6);
+	    repodata_set_str(data, last_found_pack, langtag(&pd, SOLVABLE_MESSAGEINS, language), line + 6);
 	    continue;
           case CTAG('=', 'D', 'e', 'l'):
-	    repodata_set_str(data, last_found_pack, SOLVABLE_MESSAGEDEL, line + 6);
+	    repodata_set_str(data, last_found_pack, langtag(&pd, SOLVABLE_MESSAGEDEL, language), line + 6);
 	    continue;
           case CTAG('=', 'V', 'i', 's'):
 	    {
@@ -792,3 +820,4 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, int flags)
     free(pd.common.tmp);
   free(line);
 }
+

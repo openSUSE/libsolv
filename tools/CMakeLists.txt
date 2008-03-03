@@ -24,7 +24,7 @@ TARGET_LINK_LIBRARIES( helix2solv satsolver ${EXPAT_LIBRARY})
 
 SET(susetags2solv_REPOS susetags2solv.c repo_susetags.h repo_susetags.c repo_content.c repo_write.c common_write.c)
 ADD_EXECUTABLE( susetags2solv ${susetags2solv_REPOS} )
-TARGET_LINK_LIBRARIES( susetags2solv satsolver)
+TARGET_LINK_LIBRARIES( susetags2solv satsolver ${ZLIB_LIBRARY})
 
 SET(patchxml2solv_REPOS patchxml2solv.c repo_patchxml.h repo_patchxml.c repo_write.c common_write.c)
 ADD_EXECUTABLE( patchxml2solv ${patchxml2solv_REPOS} )

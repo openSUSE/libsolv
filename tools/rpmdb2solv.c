@@ -31,13 +31,19 @@ main(int argc, char **argv)
   Repo *repo, *ref = 0;
   FILE *fp;
   Pool *refpool;
-  int g;
+  int c;
   const char *root = "/";
+  const char *basefile = 0;
 
-  while ((g = getopt (argc, argv, "r:")) >= 0)
-    switch (g)
+  while ((c = getopt (argc, argv, "b:r:")) >= 0)
+    switch (c)
       {
-      case 'r': root = optarg; break;
+      case 'r':
+        root = optarg;
+        break;
+      case 'b':
+        basefile = optarg;
+        break;
       default:
 	exit(1);
       }
@@ -66,7 +72,7 @@ main(int argc, char **argv)
       ref = 0;
     }
 
-  tool_write(repo, 0, 0);
+  tool_write(repo, basefile, 0);
   pool_free(pool);
 
   exit(0);
