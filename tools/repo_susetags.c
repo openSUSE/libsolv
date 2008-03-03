@@ -157,11 +157,13 @@ add_location(struct parsedata *pd, char *line, Solvable *s, unsigned entry)
         goto nontrivial;
 
       repodata_set_constant(pd->data, entry, SOLVABLE_MEDIANR, medianr);
+      repodata_set_void(pd->data, entry, SOLVABLE_MEDIADIR);
       repodata_set_void(pd->data, entry, SOLVABLE_MEDIAFILE);
       return;
 
 nontrivial:
       repodata_set_constant(pd->data, entry, SOLVABLE_MEDIANR, medianr);
+      repodata_set_void(pd->data, entry, SOLVABLE_MEDIADIR);
       repodata_set_str(pd->data, entry, SOLVABLE_MEDIAFILE, sp[1]);
       return;
     }
@@ -210,7 +212,7 @@ static void
 add_dirline (struct parsedata *pd, char *line)
 {
   char *sp[6];
-  if (split (line, sp, 6) != 5)
+  if (split(line, sp, 6) != 5)
     return;
   pd->dirs = sat_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
   long filesz = strtol (sp[1], 0, 0);
@@ -355,6 +357,66 @@ tag_from_string (char *cs)
  */
 
 void
+finish_solvable(struct parsedata *pd, Solvable *s, int last_found_pack)
+{
+  Pool *pool = pd->repo->pool;
+
+#if 0
+  /* move file provides to filelist */
+  /* relies on the fact that rpm inserts self-provides at the end */
+  if (s->provides)
+    {
+      Id *p, *lastreal, did;
+      const char *str, *sp;
+      lastreal = pd->repo->idarraydata + s->provides;
+      for (p = lastreal; *p; p++)
+	if (ISRELDEP(*p))
+	  lastreal = p + 1;
+      for (p = lastreal; *p; p++)
+	{
+	  str = id2str(pool, *p);
+	  if (*str != '/')
+	    lastreal = p + 1;
+	}
+      if (*lastreal)
+	{
+	  for (p = lastreal; *p; p++)
+	    {
+	      str = id2str(pool, *p);
+	      sp = strrchr(str, '/');
+	      if (sp - str >= 128)
+		{
+		  char *sdup = strdup(str);
+		  sdup[sp - str] = 0;
+		  did = repodata_str2dir(pd->data, sdup, 1);
+		  free(sdup);
+		}
+	      else
+		{
+		  char sdup[128];
+		  strncpy(sdup, str, sp - str);
+		  sdup[sp - str] = 0;
+		  did = repodata_str2dir(pd->data, sdup, 1);
+		}
+	      repodata_add_dirstr(pd->data, last_found_pack, SOLVABLE_FILELIST, did, sp + 1);
+	      *p = 0;
+	    }
+	}
+    }
+#endif
+  /* A self provide, except for source packages.  This is harmless
+     to do twice (in case we see the same package twice).  */
+  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+    s->provides = repo_addid_dep(pd->repo, s->provides,
+		rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  /* XXX This uses repo_addid_dep internally, so should also be
+     harmless to do twice.  */
+  s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
+  if (pd->ndirs)
+    commit_diskusage (pd, last_found_pack);
+}
+
+void
 repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int flags)
 {
   Pool *pool = repo->pool;
@@ -497,19 +559,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	  /* If we have an old solvable, complete it by filling in some
 	     default stuff.  */
 	  if (s)
-	    {
-	      /* A self provide, except for source packages.  This is harmless
-	         to do twice (in case we see the same package twice).  */
-	      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	        s->provides = repo_addid_dep(repo, s->provides,
-					     rel2id(pool, s->name, s->evr,
-						    REL_EQ, 1), 0);
-	      /* XXX This uses repo_addid_dep internally, so should also be
-	         harmless to do twice.  */
-	      s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
-	      if (pd.ndirs)
-		commit_diskusage (&pd, last_found_pack);
-	    }
+	    finish_solvable(&pd, s, last_found_pack);
 
 	  /*
 	   * define kind
@@ -761,15 +811,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 
     } /* for(;;) */
 
-  /* add versioned 'self-provides' */
-  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-
   if (s)
-    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
-
-  if (s && pd.ndirs)
-    commit_diskusage(&pd, last_found_pack);
+    finish_solvable(&pd, s, last_found_pack);
     
   /* Shared attributes
    *  (e.g. multiple binaries built from same source)
