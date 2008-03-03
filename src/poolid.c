@@ -70,7 +70,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   if (pool->nrels * 2 > hashmask)
     {
       sat_free(pool->relhashtbl);
-      pool->relhashmask = hashmask = mkmask(pool->ss.nstrings + REL_BLOCK);
+      pool->relhashmask = hashmask = mkmask(pool->nrels + REL_BLOCK);
       pool->relhashtbl = hashtbl = sat_calloc(hashmask + 1, sizeof(Id));
       // rehash all rels into new hashtable
       for (i = 1; i < pool->nrels; i++)
