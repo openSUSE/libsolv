@@ -814,6 +814,7 @@ repo_lookup_num(Solvable *s, Id key)
  * generic attribute lookup
  * returns non-zero if found
  * zero if not found
+ * (XXX: return value is broken atm!)
  */
 
 int
@@ -829,12 +830,14 @@ repo_lookup(Solvable *s, Id key, int (*callback)(void *cbdata, Solvable *s, Repo
     {
       if (s_id < data->start || s_id >= data->end)
 	continue;
-      repodata_search (data, s_id - data->start, key, callback, cbdata);
+      repodata_search(data, s_id - data->start, key, callback, cbdata);
       return 1;
     }
   return 0;
 }
 
+
+/***********************************************************************/
 
 Repodata *
 repo_add_repodata(Repo *repo)
@@ -907,57 +910,6 @@ repo_internalize(Repo *repo)
     if (data->attrs)
       repodata_internalize(data);
 }
-
-
-#if 0
-
-static int
-key_cmp (const void *pa, const void *pb)
-{
-  Repokey *a = (Repokey *)pa;
-  Repokey *b = (Repokey *)pb;
-  return a->name - b->name;
-}
-
-void
-repo_add_attrstore (Repo *repo, Attrstore *s, const char *location)
-{
-  unsigned i;
-  Repodata *data;
-  /* If this is meant to be the embedded attributes, make sure we don't
-     have them already.  */
-  if (!location)
-    {
-      for (i = 0; i < repo->nrepodata; i++)
-        if (repo->repodata[i].location == 0)
-	  break;
-      if (i != repo->nrepodata)
-        {
-	  pool_debug (repo->pool, SAT_FATAL, "embedded attribs added twice\n");
-	  exit (1);
-	}
-    }
-  repo->nrepodata++;
-  repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
-  data = repo->repodata + repo->nrepodata - 1;
-  memset (data, 0, sizeof (*data));
-  data->s = s;
-  data->nkeys = s->nkeys;
-  if (data->nkeys)
-    {
-      data->keys = sat_malloc2(data->nkeys, sizeof(data->keys[0]));
-      for (i = 1; i < data->nkeys; i++)
-        {
-          data->keys[i].name = s->keys[i].name;
-	  data->keys[i].type = s->keys[i].type;
-	}
-      if (data->nkeys > 2)
-        qsort(data->keys + 1, data->nkeys - 1, sizeof(data->keys[0]), key_cmp);
-    }
-  if (location)
-    data->location = strdup(location);
-}
-#endif
 
 // EOF
 /*

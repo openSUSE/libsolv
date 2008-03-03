@@ -301,12 +301,33 @@ get_data(Repodata *data, Repokey *key, unsigned char **dpp)
 }
 
 static inline int
-maybe_load_repodata(Repodata *data)
+maybe_load_repodata(Repodata *data, Id *keyid)
 {
   if (data->state == REPODATA_STUB)
     {
       if (data->loadcallback)
-	data->loadcallback(data);
+	{
+	  if (keyid)
+	    {
+	      /* key order may change when loading */
+	      int i;
+	      Id name = data->keys[*keyid].name;
+	      Id type = data->keys[*keyid].type;
+	      data->loadcallback(data);
+	      if (data->state == REPODATA_AVAILABLE)
+		{
+		  for (i = 1; i < data->nkeys; i++)
+		    if (data->keys[i].name == name && data->keys[i].type == type)
+		      break;
+		  if (i < data->nkeys)
+		    *keyid = i;
+		  else
+		    return 0;
+		}
+	    }
+	  else
+	    data->loadcallback(data);
+	}
       else
 	data->state = REPODATA_ERROR;
     }
@@ -324,7 +345,7 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
   Id id, *keyp;
   unsigned char *dp;
 
-  if (!maybe_load_repodata (data))
+  if (!maybe_load_repodata(data, &keyid))
     return 0;
 
   dp = data->incoredata + data->incoreoffset[entry];
@@ -362,7 +383,7 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value)
 
   *value = 0;
 
-  if (!maybe_load_repodata (data))
+  if (!maybe_load_repodata(data, &keyid))
     return 0;
 
   dp = data->incoredata + data->incoreoffset[entry];
@@ -398,7 +419,7 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
   int stop;
   KeyValue kv;
 
-  if (!maybe_load_repodata (data))
+  if (!maybe_load_repodata(data, 0))
     return;
 
   dp = data->incoredata + data->incoreoffset[entry];

@@ -22,7 +22,7 @@
 
 typedef struct _Repokey {
   Id name;
-  unsigned int type; /* TYPE_xxx */
+  Id type;		 /* REPOKEY_TYPE_xxx */
   unsigned int size;
   unsigned int storage; /* KEY_STORAGE_xxx */
 } Repokey;
@@ -61,10 +61,6 @@ extern Offset repo_addid(Repo *repo, Offset olddeps, Id id);
 extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker);
 extern Offset repo_reserve_ids(Repo *repo, Offset olddeps, int num);
 extern Offset repo_fix_legacy(Repo *repo, Offset provides, Offset supplements);
-
-#if 0
-extern void repo_add_attrstore (Repo *repo, Attrstore *s, const char *location);
-#endif
 
 static inline const char *repo_name(const Repo *repo)
 {

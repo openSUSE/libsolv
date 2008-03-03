@@ -134,6 +134,11 @@ struct _Pool {
   Solvable *solvables;
   int nsolvables;
 
+  const char **languages;
+  int nlanguages;
+  Id *languagecache;
+  int languagecacheother;
+
   int promoteepoch;             /* 0/1  */
 
   Id *id2arch;			/* map arch ids to scores */
@@ -233,6 +238,9 @@ static inline Solvable *pool_id2solvable(Pool *pool, Id p)
   return pool->solvables + p;
 }
 extern const char *solvable2str(Pool *pool, Solvable *s);
+
+void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
+const char *solvable_lookup_str_lang(Solvable *s, Id keyname);
 
 
 /**
