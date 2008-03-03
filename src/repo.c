@@ -321,7 +321,7 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
   Pool *pool = repo->pool;
   Id id, idp, idl;
   char buf[1024], *p, *dep;
-  int i;
+  int i, l;
 
   if (provides)
     {
@@ -393,9 +393,9 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 	      *p++ = 0;
 	      idp = str2id(pool, buf, 1);
 	      /* strip trailing slashes */
-	      i = strlen(p);
-	      while (i > 1 && p[i - 1] == '/')
-		p[--i] = 0;
+	      l = strlen(p);
+	      while (l > 1 && p[l - 1] == '/')
+		p[--l] = 0;
 	      id = str2id(pool, p, 1);
 	      id = rel2id(pool, idp, id, REL_WITH, 1);
 	      id = rel2id(pool, NAMESPACE_SPLITPROVIDES, id, REL_NAMESPACE, 1);
