@@ -163,6 +163,7 @@ pool_free(Pool *pool)
   for (i = 0; i < pool->nlanguages; i++)
     free((char *)pool->languages[i]);
   sat_free(pool->languages);
+  sat_free(pool->languagecache);
   sat_free(pool);
 }
 
@@ -930,60 +931,6 @@ pool_set_languages(Pool *pool, const char **languages, int nlanguages)
   pool->languages = sat_calloc(nlanguages, sizeof(const char **));
   for (i = 0; i < pool->nlanguages; i++)
     pool->languages[i] = strdup(languages[i]);
-}
-
-const char *
-solvable_lookup_str_lang(Solvable *s, Id keyname)
-{
-  Pool *pool;
-  int i, cols;
-  const char *str;
-  Id *row;
-
-  if (!s->repo)
-    return repo_lookup_str(s, keyname);
-  pool = s->repo->pool;
-  if (!pool->nlanguages)
-    return repo_lookup_str(s, keyname);
-  cols = pool->nlanguages + 1;
-  if (!pool->languagecache)
-    {
-      pool->languagecache = sat_calloc(cols * ID_NUM_INTERNAL, sizeof(Id));
-      pool->languagecacheother = 0;
-    }
-  if (keyname >= ID_NUM_INTERNAL)
-    {
-      row = pool->languagecache + ID_NUM_INTERNAL * cols;
-      for (i = 0; i < pool->languagecacheother; i++, row += cols)
-	if (*row == keyname)
-	  break;
-      if (i >= pool->languagecacheother)
-	{
-	  pool->languagecache = sat_realloc2(pool->languagecache, pool->languagecacheother + 1, cols * sizeof(Id));
-	  pool->languagecacheother++;
-	  row = pool->languagecache + cols * (ID_NUM_INTERNAL + pool->languagecacheother++);
-	}
-    }
-  else
-    row = pool->languagecache + keyname * cols;
-  row++;	/* skip keyname */
-  for (i = 0; i < pool->nlanguages; i++, row++)
-    {
-      if (!*row)
-	{
-	  char *p;
-	  const char *kn;
-
-	  kn = id2str(pool, keyname);
-          p = sat_malloc(strlen(kn) + strlen(pool->languages[i]) + 2);
-	  sprintf(p, "%s:%s", kn, pool->languages[i]);
-	  *row = str2id(pool, p, 1);
-	}
-      str = repo_lookup_str(s, *row);
-      if (str)
-	return str;
-    }
-  return repo_lookup_str(s, keyname);
 }
 
 // EOF

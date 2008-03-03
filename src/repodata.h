@@ -118,6 +118,7 @@ const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);
  * lookup integer type attribute
  */
 int repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value);
+int repodata_lookup_void(Repodata *data, Id entry, Id keyid);
 
 void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
 void repodata_extend(Repodata *data, Id p);

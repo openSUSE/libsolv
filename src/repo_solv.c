@@ -476,6 +476,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
   data = repo->repodata + repo->nrepodata++;
   memset(data, 0, sizeof(*data));
   data->repo = repo;
+  data->pagefd = -1;
   data->state = REPODATA_STUB;
   data->loadcallback = repodata_load_solv;
 
@@ -526,7 +527,7 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	  else
 	    {
 	      char buf[1024];
-	      unsigned len = sizeof (buf);
+	      unsigned len = sizeof(buf);
 	      char *filename = buf;
 	      read_str(maindata, &filename, &len);
 	      data->location = strdup(filename);

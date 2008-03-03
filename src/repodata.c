@@ -65,6 +65,8 @@ repodata_free(Repodata *data)
   sat_free(data->attrdata);
   sat_free(data->attriddata);
   
+  sat_free(data->location);
+
   if (data->pagefd != -1)
     close(data->pagefd);
 }
@@ -373,7 +375,7 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
 }
 
 int
-repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value)
+repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned int *value)
 {
   Id schema;
   Repokey *key;
@@ -406,6 +408,22 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value)
       return 1;
     }
   return 0;
+}
+
+int
+repodata_lookup_void(Repodata *data, Id entry, Id keyid)
+{
+  Id schema;
+  Id *keyp;
+  unsigned char *dp;
+  if (!maybe_load_repodata(data, &keyid))
+    return 0;
+  dp = data->incoredata + data->incoreoffset[entry];
+  dp = data_read_id(dp, &schema);
+  for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
+    if (!*keyp)
+      return 0;
+  return 1;
 }
 
 void
