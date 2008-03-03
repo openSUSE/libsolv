@@ -115,6 +115,9 @@ load_page_range(Repodata *data, unsigned int pstart, unsigned int pend)
   if (i > pend)
     return data->blob_store + data->pages[pstart].mapped_at;
 
+  if (data->pagefd == -1)
+    return 0;
+
   /* Ensure that we can map the numbers of pages we need at all.  */
   if (pend - pstart + 1 > data->ncanmap)
     {
@@ -266,8 +269,6 @@ make_vertical_available(Repodata *data, Repokey *key, Id off, Id len)
 	return 0;
       return data->vincore + off;
     }
-  if (data->pagefd == -1)
-    return 0;
   if (off + len > key->size)
     return 0;
   /* we now have the offset, go into vertical */
