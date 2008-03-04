@@ -57,6 +57,7 @@ static const char *initpool_data[] = {
   "namespace:modalias",
   "namespace:splitprovides",
   "namespace:language",
+  "namespace:filesystem",
   "system:system",
   "src",
   "nosrc",

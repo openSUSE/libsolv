@@ -468,6 +468,15 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 	  if (id)
 	    repo->idarraydata[i] = id;
 	}
+      else if (!strncmp(dep, "filesystem(", 11) && strlen(dep) < sizeof(buf))
+	{
+	  strcpy(buf, dep + 11);
+	  if ((p = strrchr(buf, ')')) != 0)
+	    *p = 0;
+	  id = str2id(pool, buf, 1);
+	  id = rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
+	  repo->idarraydata[i] = id;
+	}
     }
   return supplements;
 }
