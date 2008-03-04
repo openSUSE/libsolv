@@ -1146,10 +1146,12 @@ fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->a
 }
 
 void
-repodata_merge_attrs (Repodata *data, Id dest, Id src)
+repodata_merge_attrs(Repodata *data, Id dest, Id src)
 {
   Id *keyp;
-  for (keyp = data->attrs[src]; *keyp; keyp += 2)
+  if (dest == src || !(keyp = data->attrs[src]))
+    return;
+  for (; *keyp; keyp += 2)
     repodata_insert_keyid(data, dest, keyp[0], keyp[1], 0);
 }
 
