@@ -22,6 +22,19 @@
 #include "util.h"
 
 const char *
+solvable2str(Pool *pool, Solvable *s) 
+{
+  const char *n, *e, *a; 
+  char *p; 
+  n = id2str(pool, s->name);
+  e = id2str(pool, s->evr);
+  a = id2str(pool, s->arch);
+  p = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3); 
+  sprintf(p, "%s-%s.%s", n, e, a); 
+  return p;
+}
+
+const char *
 solvable_lookup_str(Solvable *s, Id keyname)
 {
   Repo *repo = s->repo;
@@ -210,7 +223,7 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
       evr = id2str(pool, s->evr);
       arch = id2str(pool, s->arch);
       /* name-evr.arch.rpm */
-      loc = sat_malloc(l + strlen(name) + strlen(evr) + strlen(arch) + 7);
+      loc = pool_alloctmpspace(pool, l + strlen(name) + strlen(evr) + strlen(arch) + 7);
       if (mediadir)
 	sprintf(loc, "%s/%s-%s.%s.rpm", mediadir, name, evr, arch);
       else
@@ -221,7 +234,7 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
       mediafile = solvable_lookup_str(s, SOLVABLE_MEDIAFILE);
       if (!mediafile)
 	return 0;
-      loc = sat_malloc(l + strlen(mediafile) + 1);
+      loc = pool_alloctmpspace(pool, l + strlen(mediafile) + 1);
       if (mediadir)
 	sprintf(loc, "%s/%s", mediadir, mediafile);
       else

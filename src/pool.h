@@ -111,7 +111,7 @@ extern "C" {
 
 
 /* how many strings to maintain (round robin) */
-#define DEP2STRBUF 16
+#define POOL_TMPSPACEBUF 16
 
 //-----------------------------------------------
 
@@ -163,10 +163,10 @@ struct _Pool {
   Id (*nscallback)(struct _Pool *, void *data, Id name, Id evr);
   void *nscallbackdata;
 
-  /* our dep2str string space */
-  char *dep2strbuf[DEP2STRBUF];
-  int   dep2strlen[DEP2STRBUF];
-  int   dep2strn;
+  /* our tmp space string space */
+  char *tmpspacebuf[POOL_TMPSPACEBUF];
+  int   tmpspacelen[POOL_TMPSPACEBUF];
+  int   tmpspacen;
 
   /* debug mask and callback */
   int  debugmask;
@@ -225,6 +225,8 @@ extern Pool *pool_create(void);
 extern void pool_free(Pool *pool);
 
 extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
+
+extern char *pool_alloctmpspace(Pool *pool, int len);
 
 /**
  * Solvable management

@@ -1458,6 +1458,8 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
   parent = 0;
   while (*dir == '/' && dir[1] == '/')
     dir++;
+  if (*dir == '/' && !dir[1])
+    return 1;
   while (*dir)
     {
       dire = strchrnul(dir, '/');

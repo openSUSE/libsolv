@@ -183,74 +183,57 @@ id2evr(Pool *pool, Id id)
     return "";
   rd = GETRELDEP(pool, id);
   if (ISRELDEP(rd->evr))
-    return "REL";
+    return "(REL)";
   return pool->ss.stringspace + pool->ss.strings[rd->evr];
+}
+
+static int
+dep2strlen(Pool *pool, Id id)
+{
+  int l = 0;
+
+  while (ISRELDEP(id))
+    {
+      Reldep *rd = GETRELDEP(pool, id);
+      l += dep2strlen(pool, rd->name) + strlen(id2rel(pool, id));
+      id = rd->evr;
+    }
+  return l + strlen(pool->ss.stringspace + pool->ss.strings[id]);
+}
+
+static void
+dep2strcpy(Pool *pool, char *p, Id id)
+{
+  while (ISRELDEP(id))
+    {
+      Reldep *rd = GETRELDEP(pool, id);
+      dep2strcpy(pool, p, rd->name);
+      p += strlen(p);
+      if (rd->flags == REL_NAMESPACE)
+	{
+	  *p++ = '(';
+	  dep2strcpy(pool, p, rd->evr);
+	  strcat(p, ")");
+	  return;
+	}
+      strcpy(p, id2rel(pool, id));
+      p += strlen(p);
+      id = rd->evr;
+    }
+  strcpy(p, pool->ss.stringspace + pool->ss.strings[id]);
 }
 
 const char *
 dep2str(Pool *pool, Id id)
 {
-  Reldep *rd;
-  const char *sr;
-  char *s1, *s2;
-  int n, l, ls1, ls2, lsr;
-
+  char *p;
   if (!ISRELDEP(id))
     return pool->ss.stringspace + pool->ss.strings[id];
-  rd = GETRELDEP(pool, id);
-  n = pool->dep2strn;
-
-  sr = id2rel(pool, id);
-  lsr = strlen(sr);
-
-  s2 = (char *)dep2str(pool, rd->evr);
-  pool->dep2strn = n;
-  ls2 = strlen(s2);
-
-  s1 = (char *)dep2str(pool, rd->name);
-  pool->dep2strn = n;
-  ls1 = strlen(s1);
-
-  if (rd->flags == REL_NAMESPACE)
-    {
-      sr = "(";
-      lsr = 1;
-      ls2++;
-    }
-
-  l = ls1 + ls2 + lsr;
-  if (l + 1 > pool->dep2strlen[n])
-    {
-      if (s1 != pool->dep2strbuf[n])
-        pool->dep2strbuf[n] = sat_realloc(pool->dep2strbuf[n], l + 32);
-      else
-	{
-          pool->dep2strbuf[n] = sat_realloc(pool->dep2strbuf[n], l + 32);
-          s1 = pool->dep2strbuf[n];
-	}
-      pool->dep2strlen[n] = l + 32;
-    }
-  if (s1 != pool->dep2strbuf[n])
-    {
-      strcpy(pool->dep2strbuf[n], s1);
-      s1 = pool->dep2strbuf[n];
-    }
-  strcpy(s1 + ls1, sr);
-  pool->dep2strbuf[n] = s1 + ls1 + lsr;
-  s2 = (char *)dep2str(pool, rd->evr);
-  if (s2 != pool->dep2strbuf[n])
-    strcpy(pool->dep2strbuf[n], s2);
-  pool->dep2strbuf[n] = s1;
-  if (rd->flags == REL_NAMESPACE)
-    {
-      s1[ls1 + ls2 + lsr - 1] = ')';
-      s1[ls1 + ls2 + lsr] = 0;
-    }
-  pool->dep2strn = (n + 1) % DEP2STRBUF;
-  return s1;
+  p = pool_alloctmpspace(pool, dep2strlen(pool, id));
+  dep2strcpy(pool, p, id);
+  return p;
 }
-
-
+  
 void
 pool_shrink_strings(Pool *pool)
 {
