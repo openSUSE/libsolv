@@ -708,13 +708,16 @@ endElement(void *userData, const char *name)
       id = str2id(pool, pd->content, 1);
       s->provides = repo_addid_dep(repo, s->provides, id, SOLVABLE_FILEMARKER);
 #endif
-      if ((p = strrchr(pd->content, '/')) != 0) {
-	*p++ = 0;
-	id = repodata_str2dir(pd->data, pd->content, 1);
-      } else {
-	id = 1;
-	p = pd->content;
-      }
+      if ((p = strrchr(pd->content, '/')) != 0)
+	{
+	  *p++ = 0;
+	  id = repodata_str2dir(pd->data, pd->content, 1);
+	}
+      else
+	{
+	  p = pd->content;
+	  id = repodata_str2dir(pd->data, "/", 1);
+	}
       repodata_add_dirstr(pd->data, entry, SOLVABLE_FILELIST, id, p);
       break;
     // xml store capabilities

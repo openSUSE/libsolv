@@ -851,7 +851,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 		  }
 	      }
 	    if (n != repo->end)
-	      repodata_merge_attrs (data, i, last_found);
+	      repodata_merge_attrs(data, i, last_found);
 	  }
       free (pd.share_with);
     }

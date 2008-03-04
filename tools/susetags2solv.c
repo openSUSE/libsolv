@@ -150,6 +150,26 @@ main(int argc, char **argv)
 	  perror(descrdir);
 	  exit(1);
 	}
+
+      /* bring packages to front */
+      for (i = 0; i < ndirs; i++)
+	{
+	  char *fn = files[i]->d_name;
+	  if (!strcmp(fn, "packages") || !strcmp(fn, "packages.gz"))
+	    break;
+        }
+      if (i == ndirs)
+	{
+	  fprintf(stderr, "found no packages file\n");
+	  exit(1);
+	}
+      if (i)
+	{
+	  struct dirent *de = files[i];
+	  memmove(files + 1, files, i * sizeof(de));
+	  files[0] = de;
+	}
+
       fnp = sat_malloc(strlen(descrdir) + 128);
       for (i = 0; i < ndirs; i++)
 	{
@@ -184,11 +204,11 @@ main(int argc, char **argv)
 	      char lang[6];
 	      char *p;
 	      sprintf(fnp, "%s/%s", descrdir, fn);
-	      p = strrchr(fn, '.');
+	      p = strrchr(fnp, '.');
 	      if (p && !strcmp(p, ".gz"))
 		{
 		  *p = 0;
-		  p = strrchr(fn, '.');
+		  p = strrchr(fnp, '.');
 		}
 	      if (!p || !p[1] || strlen(p + 1) > 5)
 		continue;
@@ -204,6 +224,8 @@ main(int argc, char **argv)
 	      fclose(fp);
 	    }
 	}
+      for (i = 0; i < ndirs; i++)
+	free(files[i]);
       free(files);
       free(fnp);
     }
