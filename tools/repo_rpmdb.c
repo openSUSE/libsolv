@@ -619,6 +619,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 {
   char *name;
   char *evr;
+  char *sourcerpm;
 
   name = headstring(rpmhead, TAG_NAME);
   if (!strcmp(name, "gpg-pubkey"))
@@ -629,7 +630,8 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       fprintf(stderr, "package has no name\n");
       exit(1);
     }
-  if (headstring(rpmhead, TAG_SOURCERPM))
+  sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
+  if (sourcerpm)
     s->arch = str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
   else
     {
@@ -642,7 +644,6 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
     s->arch = ARCH_NOARCH;
   evr = headtoevr(rpmhead);
   s->evr = str2id(pool, evr, 1);
-  sat_free(evr);
   s->vendor = str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
@@ -722,7 +723,49 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       u32 = headint32(rpmhead, TAG_SIZE);
       if (u32)
         repodata_set_num(repodata, entry, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
+      if (sourcerpm)
+	{
+	  const char *p, *sevr, *sarch;
+	  p = strrchr(sourcerpm, '.');
+	  if (p && !strcmp(p, ".rpm"))
+	    {
+	      p--;
+	      while (p > sourcerpm && *p != '.')
+		p--;
+	      if (*p == '.' && p > sourcerpm)
+		{
+		  sarch = p-- + 1;
+		  while (p > sourcerpm && *p != '-')
+		    p--;
+		  if (*p == '-' && p > sourcerpm)
+		    {
+		      p--;
+		      while (p > sourcerpm && *p != '-')
+			p--;
+		      if (*p == '-' && p > sourcerpm)
+			{
+			  sevr = p + 1;
+			  if (!strcmp(sarch, "src.rpm"))
+			    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, ARCH_SRC);
+			  else if (!strcmp(sarch, "nosrc.rpm"))
+			    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
+			  else
+			    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
+			  if (!strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
+			    repodata_set_void(repodata, entry, SOLVABLE_SOURCEEVR);
+			  else
+			    repodata_set_id(repodata, entry, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
+			  if (!strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
+			    repodata_set_void(repodata, entry, SOLVABLE_SOURCENAME);
+			  else
+			    repodata_set_id(repodata, entry, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
+			}
+		    }
+		}
+	    }
+	}
     }
+  sat_free(evr);
   return 1;
 }
 
