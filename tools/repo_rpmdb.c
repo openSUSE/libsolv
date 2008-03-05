@@ -614,6 +614,48 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
   return olddeps;
 }
 
+static void
+addsourcerpm(Pool *pool, Repodata *repodata, Solvable *s, char *sourcerpm, char *name, char *evr)
+{
+  Id entry;
+  const char *p, *sevr, *sarch;
+
+  p = strrchr(sourcerpm, '.');
+  if (!p || strcmp(p, ".rpm") != 0)
+    return;
+  p--;
+  while (p > sourcerpm && *p != '.')
+    p--;
+  if (*p != '.' || p == sourcerpm)
+    return;
+  sarch = p-- + 1;
+  while (p > sourcerpm && *p != '-')
+    p--;
+  if (*p != '-' || p == sourcerpm)
+    return;
+  p--;
+  while (p > sourcerpm && *p != '-')
+    p--;
+  if (*p != '-' || p == sourcerpm)
+    return;
+  sevr = p + 1;
+  entry = (s - pool->solvables) - repodata->start;
+  if (!strcmp(sarch, "src.rpm"))
+    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, ARCH_SRC);
+  else if (!strcmp(sarch, "nosrc.rpm"))
+    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
+  else
+    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
+  if (!strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
+    repodata_set_void(repodata, entry, SOLVABLE_SOURCEEVR);
+  else
+    repodata_set_id(repodata, entry, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
+  if (!strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
+    repodata_set_void(repodata, entry, SOLVABLE_SOURCENAME);
+  else
+    repodata_set_id(repodata, entry, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
+}
+
 static int
 rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhead)
 {
@@ -724,46 +766,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       if (u32)
         repodata_set_num(repodata, entry, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
       if (sourcerpm)
-	{
-	  const char *p, *sevr, *sarch;
-	  p = strrchr(sourcerpm, '.');
-	  if (p && !strcmp(p, ".rpm"))
-	    {
-	      p--;
-	      while (p > sourcerpm && *p != '.')
-		p--;
-	      if (*p == '.' && p > sourcerpm)
-		{
-		  sarch = p-- + 1;
-		  while (p > sourcerpm && *p != '-')
-		    p--;
-		  if (*p == '-' && p > sourcerpm)
-		    {
-		      p--;
-		      while (p > sourcerpm && *p != '-')
-			p--;
-		      if (*p == '-' && p > sourcerpm)
-			{
-			  sevr = p + 1;
-			  if (!strcmp(sarch, "src.rpm"))
-			    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, ARCH_SRC);
-			  else if (!strcmp(sarch, "nosrc.rpm"))
-			    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
-			  else
-			    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
-			  if (!strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
-			    repodata_set_void(repodata, entry, SOLVABLE_SOURCEEVR);
-			  else
-			    repodata_set_id(repodata, entry, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
-			  if (!strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
-			    repodata_set_void(repodata, entry, SOLVABLE_SOURCENAME);
-			  else
-			    repodata_set_id(repodata, entry, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
-			}
-		    }
-		}
-	    }
-	}
+	addsourcerpm(pool, repodata, s, sourcerpm, name, evr);
     }
   sat_free(evr);
   return 1;

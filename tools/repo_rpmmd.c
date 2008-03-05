@@ -82,6 +82,8 @@ enum state {
   STATE_SUGGESTS,
   STATE_ENHANCES,
   STATE_FRESHENS,
+  STATE_SOURCERPM,
+  STATE_HEADERRANGE,
 
   STATE_CAPS_FORMAT,
   STATE_CAPS_VENDOR,
@@ -203,6 +205,8 @@ static struct stateswitch stateswitches[] = {
   { STATE_FORMAT,      "rpm:suggests",    STATE_SUGGESTS, 0 },
   { STATE_FORMAT,      "rpm:enhances",    STATE_ENHANCES, 0 },
   { STATE_FORMAT,      "rpm:freshens",    STATE_FRESHENS, 0 },
+  { STATE_FORMAT,      "rpm:sourcerpm",   STATE_SOURCERPM, 1 },
+  { STATE_FORMAT,      "rpm:header-range", STATE_HEADERRANGE, 0 },
   { STATE_FORMAT,      "file",            STATE_FILE, 1 },
   { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
@@ -355,7 +359,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return str2id(pool, pd->content, 1);
 }
 
-static const char *
+static inline const char *
 find_attr(const char *txt, const char **atts)
 {
   for (; *atts; atts += 2)
@@ -472,6 +476,51 @@ set_desciption_author(Repodata *data, Id entry, char *str)
     }
   else if (*str)
     repodata_set_str(data, entry, SOLVABLE_DESCRIPTION, str);
+}
+
+static void
+set_sourcerpm(Repodata *data, Solvable *s, Id entry, char *sourcerpm)
+{
+  const char *p, *sevr, *sarch, *name, *evr;
+  Pool *pool;
+
+    p = strrchr(sourcerpm, '.');
+  if (!p || strcmp(p, ".rpm") != 0)
+    return;
+  p--;
+  while (p > sourcerpm && *p != '.')
+    p--;
+  if (*p != '.' || p == sourcerpm)
+    return;
+  sarch = p-- + 1;
+  while (p > sourcerpm && *p != '-')
+    p--;
+  if (*p != '-' || p == sourcerpm)
+    return;
+  p--;
+  while (p > sourcerpm && *p != '-')
+    p--;
+  if (*p != '-' || p == sourcerpm)
+    return;
+  sevr = p + 1;
+  pool = s->repo->pool;
+  name = id2str(pool, s->name);
+  evr = id2str(pool, s->evr);
+  if (!strcmp(sarch, "src.rpm"))
+    repodata_set_constantid(data, entry, SOLVABLE_SOURCEARCH, ARCH_SRC);
+  else if (!strcmp(sarch, "nosrc.rpm"))
+    repodata_set_constantid(data, entry, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
+  else
+    repodata_set_constantid(data, entry, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
+  if (!strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
+    repodata_set_void(data, entry, SOLVABLE_SOURCEEVR);
+  else
+    repodata_set_id(data, entry, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
+  if (!strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm -
+ 1] == 0)
+    repodata_set_void(data, entry, SOLVABLE_SOURCENAME);
+  else
+    repodata_set_id(data, entry, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
 }
 
 static void XMLCALL
@@ -627,7 +676,7 @@ startElement(void *userData, const char *name, const char **atts)
       break;
     case STATE_TIME:
       {
-        unsigned t;
+        unsigned int t;
         str = find_attr("build", atts);
         if (str && (t = atoi(str)) != 0)
           repodata_set_num(pd->data, entry, SOLVABLE_BUILDTIME, t);
@@ -635,7 +684,7 @@ startElement(void *userData, const char *name, const char **atts)
       }
     case STATE_SIZE:
       {
-        unsigned k;
+        unsigned int k;
         str = find_attr("installed", atts);
 	if (str && (k = atoi(str)) != 0)
 	  repodata_set_num(pd->data, entry, SOLVABLE_INSTALLSIZE, (k + 1023) / 1024);
@@ -647,6 +696,13 @@ startElement(void *userData, const char *name, const char **atts)
 	if (str && (k = atoi(str)) != 0)
 	  repodata_set_num(pd->data, entry, SOLVABLE_DOWNLOADSIZE, (k + 1023) / 1024);
         break;
+      }
+    case STATE_HEADERRANGE:
+      {
+        unsigned int end;
+        str = find_attr("end", atts);
+	if (str && (end = atoi(str)) != 0)
+	  repodata_set_num(pd->data, entry, SOLVABLE_HEADEREND, end);
       }
     default:
       break;
@@ -755,6 +811,9 @@ endElement(void *userData, const char *name)
     case STATE_DESCRIPTION:
       pd->lang = 0;
       set_desciption_author(pd->data, entry, pd->content);
+      break;
+    case STATE_SOURCERPM:
+      set_sourcerpm(pd->data, s, entry, pd->content);
       break;
     default:
       break;

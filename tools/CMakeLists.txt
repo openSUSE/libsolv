@@ -16,7 +16,7 @@ TARGET_LINK_LIBRARIES( rpms2solv satsolver ${RPMDB_LIBRARY})
 
 SET(rpmmd2solv_REPOS rpmmd2solv.c repo_rpmmd.h repo_rpmmd.c repo_write.c common_write.c )
 ADD_EXECUTABLE( rpmmd2solv ${rpmmd2solv_REPOS} )
-TARGET_LINK_LIBRARIES( rpmmd2solv satsolver ${EXPAT_LIBRARY})
+TARGET_LINK_LIBRARIES( rpmmd2solv satsolver ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
 
 SET(helix2solv_REPOS helix2solv.c repo_write.c common_write.c )
 ADD_EXECUTABLE( helix2solv ${helix2solv_REPOS} )
