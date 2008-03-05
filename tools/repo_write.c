@@ -1600,6 +1600,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       write_id(fp, max);
       write_id(fp, xd.len);
       write_blob(fp, xd.buf, xd.len);
+      sat_free(xd.buf);
     }
 
 /********************************************************************/

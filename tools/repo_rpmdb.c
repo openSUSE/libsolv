@@ -54,6 +54,8 @@
 #define TAG_CONFLICTNAME	1054
 #define TAG_CONFLICTVERSION	1055
 #define TAG_OBSOLETENAME	1090
+#define TAG_FILEDEVICES		1095
+#define TAG_FILEINODES		1096
 #define TAG_PROVIDEFLAGS	1112
 #define TAG_PROVIDEVERSION	1113
 #define TAG_OBSOLETEFLAGS	1114
@@ -466,8 +468,11 @@ adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmh
 {
   Id entry, did;
   int i, fszc;
-  unsigned int *fkb, *fn, *fsz, *fm;
+  unsigned int *fkb, *fn, *fsz, *fm, *fino;
+  unsigned int inotest[256], inotestok;
 
+  if (!fc)
+    return;
   fsz = headint32array(rpmhead, TAG_FILESIZES, &fszc);
   if (!fsz || fc != fszc)
     {
@@ -482,6 +487,80 @@ adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmh
       sat_free(fm);
       return;
     }
+  fino = headint32array(rpmhead, TAG_FILEINODES, &fszc);
+  if (!fino || fc != fszc)
+    {
+      sat_free(fsz);
+      sat_free(fm);
+      sat_free(fino);
+      return;
+    }
+  inotestok = 0;
+  if (fc < sizeof(inotest))
+    {
+      memset(inotest, 0, sizeof(inotest));
+      for (i = 0; i < fc; i++)
+	{
+	  int off, bit;
+	  if (fsz[i] == 0 || !S_ISREG(fm[i]))
+	    continue;
+	  off = (fino[i] >> 5) & (sizeof(inotest)/sizeof(*inotest) - 1);
+	  bit = 1 << (fino[i] & 31);
+	  if ((inotest[off] & bit) != 0)
+	    break;
+	  inotest[off] |= bit;
+	}
+      if (i == fc)
+	inotestok = 1;
+    }
+  if (!inotestok)
+    {
+      unsigned int *fdev = headint32array(rpmhead, TAG_FILEDEVICES, &fszc);
+      unsigned int *fx, j;
+      unsigned int mask, hash, hh;
+      if (!fdev || fc != fszc)
+	{
+	  sat_free(fsz);
+	  sat_free(fm);
+	  sat_free(fdev);
+	  sat_free(fino);
+	  return;
+	}
+      mask = fc;
+      while ((mask & (mask - 1)) != 0)
+	mask = mask & (mask - 1);
+      mask <<= 2;
+      if (mask > sizeof(inotest)/sizeof(*inotest))
+        fx = sat_calloc(mask, sizeof(unsigned int));
+      else
+	{
+	  fx = inotest;
+	  memset(fx, 0, mask * sizeof(unsigned int));
+	}
+      mask--;
+      for (i = 0; i < fc; i++)
+	{
+	  if (fsz[i] == 0 || !S_ISREG(fm[i]))
+	    continue;
+	  hash = (fino[i] + fdev[i] * 31) & mask;
+          hh = 7;
+	  while ((j = fx[hash]) != 0)
+	    {
+	      if (fino[j - 1] == fino[i] && fdev[j - 1] == fdev[i])
+		{
+		  fsz[i] = 0;	/* kill entry */
+		  break;
+		}
+	      hash = (hash + hh++) & mask;
+	    }
+	  if (!j)
+	    fx[hash] = i + 1;
+	}
+      if (fx != inotest)
+        sat_free(fx);
+      sat_free(fdev);
+    }
+  sat_free(fino);
   fn = sat_calloc(dic, sizeof(unsigned int));
   fkb = sat_calloc(dic, sizeof(unsigned int));
   for (i = 0; i < fc; i++)
@@ -491,7 +570,6 @@ adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmh
       if (di[i] >= dic)
 	continue;
       fn[di[i]]++;
-      /* does not consider hard links. tough luck. */
       fkb[di[i]] += fsz[i] / 1024 + 1;
     }
   sat_free(fsz);
@@ -523,8 +601,10 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
   int bnc, dnc, dic;
   int i, j;
   struct filefilter *ff;
+#if 0
   char *fn = 0;
   int fna = 0;
+#endif
 
   if (!repodata)
     return olddeps;
@@ -586,6 +666,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 	}
       if (j == sizeof(filefilters)/sizeof(*filefilters))
 	continue;
+#if 0
       j = strlen(bn[i]) + strlen(dn[di[i]]) + 1;
       if (j > fna)
 	{
@@ -594,7 +675,6 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 	}
       strcpy(fn, dn[di[i]]);
       strcat(fn, bn[i]);
-#if 0
       olddeps = repo_addid_dep(repo, olddeps, str2id(pool, fn, 1), SOLVABLE_FILEMARKER);
 #endif
       if (repodata)
@@ -606,8 +686,10 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 	  repodata_add_dirstr(repodata, entry, SOLVABLE_FILELIST, did, bn[i]);
 	}
     }
+#if 0
   if (fn)
     sat_free(fn);
+#endif
   sat_free(bn);
   sat_free(dn);
   sat_free(di);

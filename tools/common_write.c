@@ -248,7 +248,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	  sat_free(fileinfos[i].keys);
 	}
       sat_free(fileinfos);
-      exit(0);
+      return 0;
     }
   if (attrname)
     {

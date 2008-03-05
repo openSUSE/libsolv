@@ -26,9 +26,13 @@ dump_repodata (Repo *repo)
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
       unsigned int j;
-      printf("%s has %d keys, %d schemata", data->location ? data->location : "**EMBED**", data->nkeys, data->nschemata);
+      printf("%s has %d keys, %d schemata\n", data->location ? data->location : "**EMBED**", data->nkeys, data->nschemata);
       for (j = 1; j < data->nkeys; j++)
-        printf("\n  %s (type %s size %d storage %d)", id2str(repo->pool, data->keys[j].name), id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
+        printf("  %s (type %s size %d storage %d)\n", id2str(repo->pool, data->keys[j].name), id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
+      if (data->localpool)
+	printf("  localpool has %d strings, size is %d\n", data->spool.nstrings, data->spool.sstrings);
+      if (data->dirpool.ndirs)
+	printf("  localpool has %d directories\n", data->dirpool.ndirs);
       printf("\n");
     }
   printf("\n");
@@ -248,7 +252,8 @@ int main(int argc, char **argv)
   repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
   if (repo_add_solv(repo, stdin))
     printf("could not read repository\n");
-  dump_repodata (repo);
+  printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);
+  dump_repodata(repo);
   printf("repo contains %d solvables\n", repo->nsolvables);
   for (i = repo->start, n = 1; i < repo->end; i++)
     {
