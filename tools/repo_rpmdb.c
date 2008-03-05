@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include <rpm/db.h>
 
@@ -397,47 +398,6 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   sat_free(v);
   sat_free(f);
   return olddeps;
-}
-
-static Offset
-copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
-{
-  int cc;
-  Id id, *ida, *from;
-  Offset ido;
-  Pool *frompool = fromrepo->pool;
-
-  if (!fromoff)
-    return 0;
-  from = fromrepo->idarraydata + fromoff;
-  for (ida = from, cc = 0; *ida; ida++, cc++)
-    ;
-  if (cc == 0)
-    return 0;
-  ido = repo_reserve_ids(repo, 0, cc);
-  ida = repo->idarraydata + ido;
-  if (frompool && pool != frompool)
-    {
-      while (*from)
-	{
-	  id = *from++;
-	  if (ISRELDEP(id))
-	    {
-	      Reldep *rd = GETRELDEP(frompool, id);
-	      Id name = str2id(pool, id2str(frompool, rd->name), 1);
-	      Id evr = str2id(pool, id2str(frompool, rd->evr), 1);
-	      id = rel2id(pool, name, evr, rd->flags, 1);
-	    }
-	  else
-	    id = str2id(pool, id2str(frompool, id), 1);
-	  *ida++ = id;
-	}
-      *ida = 0;
-    }
-  else
-    memcpy(ida, from, (cc + 1) * sizeof(Id));
-  repo->idarraysize += cc + 1;
-  return ido;
 }
 
 
@@ -854,6 +814,180 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
   return 1;
 }
 
+static Id
+copyreldep(Pool *pool, Pool *frompool, Id id)
+{
+  Reldep *rd = GETRELDEP(frompool, id);
+  Id name = rd->name, evr = rd->evr;
+  if (ISRELDEP(name))
+    name = copyreldep(pool, frompool, name);
+  else
+    name = str2id(pool, id2str(frompool, name), 1);
+  if (ISRELDEP(evr))
+    evr = copyreldep(pool, frompool, evr);
+  else
+    evr = str2id(pool, id2str(frompool, evr), 1);
+  return rel2id(pool, name, evr, rd->flags, 1);
+}
+
+static Offset
+copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
+{
+  int cc;
+  Id id, *ida, *from;
+  Offset ido;
+  Pool *frompool = fromrepo->pool;
+
+  if (!fromoff)
+    return 0;
+  from = fromrepo->idarraydata + fromoff;
+  for (ida = from, cc = 0; *ida; ida++, cc++)
+    ;
+  if (cc == 0)
+    return 0;
+  ido = repo_reserve_ids(repo, 0, cc);
+  ida = repo->idarraydata + ido;
+  if (frompool && pool != frompool)
+    {
+      while (*from)
+	{
+	  id = *from++;
+	  if (ISRELDEP(id))
+	    id = copyreldep(pool, frompool, id);
+	  else
+	    id = str2id(pool, id2str(frompool, id), 1);
+	  *ida++ = id;
+	}
+      *ida = 0;
+    }
+  else
+    memcpy(ida, from, (cc + 1) * sizeof(Id));
+  repo->idarraysize += cc + 1;
+  return ido;
+}
+
+static Id
+copydir(Pool *pool, Repodata *data, Stringpool *fromspool, Repodata *fromdata, Id did)
+{
+  Id parent = dirpool_parent(&fromdata->dirpool, did);
+  Id compid = dirpool_compid(&fromdata->dirpool, did);
+  if (parent)
+    parent = copydir(pool, data, fromspool, fromdata, parent);
+  if (fromspool != &pool->ss)
+    compid = str2id(pool, stringpool_id2str(fromspool, compid), 1);
+  return dirpool_add_dir(&data->dirpool, parent, compid, 1);
+}
+
+struct solvable_copy_cbdata {
+  Repodata *data;
+  Id entry;
+};
+
+static int
+solvable_copy_cb(void *cbdata, Solvable *r, Repodata *fromdata, Repokey *key, KeyValue *kv)
+{
+  Id id, keyname;
+  Repodata *data = ((struct solvable_copy_cbdata *)cbdata)->data;
+  Id entry = ((struct solvable_copy_cbdata *)cbdata)->entry;
+  Pool *pool = data->repo->pool, *frompool = fromdata->repo->pool;
+  Stringpool *fromspool = fromdata->localpool ? &fromdata->spool : &frompool->ss;
+
+  keyname = key->name;
+  if (keyname >= ID_NUM_INTERNAL)
+    keyname = str2id(pool, id2str(frompool, keyname), 1);
+  switch(key->type)
+    {
+    case REPOKEY_TYPE_ID:
+    case REPOKEY_TYPE_CONSTANTID:
+      id = kv->id;
+      assert(!data->localpool);	/* implement me! */
+      if (pool != frompool || fromdata->localpool)
+	{
+	  if (ISRELDEP(id))
+	    id = copyreldep(pool, frompool, id);
+	  else
+	    id = str2id(pool, stringpool_id2str(fromspool, id), 1);
+	}
+      if (key->type == REPOKEY_TYPE_ID)
+        repodata_set_id(data, entry, keyname, id);
+      else
+        repodata_set_constantid(data, entry, keyname, id);
+      break;
+    case REPOKEY_TYPE_STR:
+      repodata_set_str(data, entry, keyname, kv->str);
+      break;
+    case REPOKEY_TYPE_VOID:
+      repodata_set_void(data, entry, keyname);
+      break;
+    case REPOKEY_TYPE_NUM:
+      repodata_set_num(data, entry, keyname, kv->num);
+      break;
+    case REPOKEY_TYPE_CONSTANT:
+      repodata_set_constant(data, entry, keyname, kv->num);
+      break;
+    case REPOKEY_TYPE_DIRNUMNUMARRAY:
+      id = kv->id;
+      assert(!data->localpool);	/* implement me! */
+      id = copydir(pool, data, fromspool, fromdata, id);
+      repodata_add_dirnumnum(data, entry, keyname, id, kv->num, kv->num2);
+      break;
+    case REPOKEY_TYPE_DIRSTRARRAY:
+      id = kv->id;
+      assert(!data->localpool);	/* implement me! */
+      id = copydir(pool, data, fromspool, fromdata, id);
+      repodata_add_dirstr(data, entry, keyname, id, kv->str);
+      break;
+    default:
+      break;
+    }
+  return 0;
+}
+
+static void
+solvable_copy(Solvable *s, Solvable *r, Repodata *data)
+{
+  Repo *repo = s->repo;
+  Repo *fromrepo = r->repo;
+  Pool *pool = repo->pool;
+  struct solvable_copy_cbdata cbdata;
+
+  /* copy solvable data */
+  if (pool == fromrepo->pool)
+    {
+      s->name = r->name;
+      s->evr = r->evr;
+      s->arch = r->arch;
+      s->vendor = r->vendor;
+    }
+  else
+    {
+      if (r->name)
+	s->name = str2id(pool, id2str(fromrepo->pool, r->name), 1);
+      if (r->evr)
+	s->evr = str2id(pool, id2str(fromrepo->pool, r->evr), 1);
+      if (r->arch)
+	s->arch = str2id(pool, id2str(fromrepo->pool, r->arch), 1);
+      if (r->vendor)
+	s->vendor = str2id(pool, id2str(fromrepo->pool, r->vendor), 1);
+    }
+  s->provides = copydeps(pool, repo, r->provides, fromrepo);
+  s->requires = copydeps(pool, repo, r->requires, fromrepo);
+  s->conflicts = copydeps(pool, repo, r->conflicts, fromrepo);
+  s->obsoletes = copydeps(pool, repo, r->obsoletes, fromrepo);
+  s->recommends = copydeps(pool, repo, r->recommends, fromrepo);
+  s->suggests = copydeps(pool, repo, r->suggests, fromrepo);
+  s->supplements = copydeps(pool, repo, r->supplements, fromrepo);
+  s->enhances  = copydeps(pool, repo, r->enhances, fromrepo);
+  s->freshens = copydeps(pool, repo, r->freshens, fromrepo);
+
+  /* copy all attributes */
+  if (!data)
+    return;
+  repodata_extend(data, s - pool->solvables);
+  cbdata.data = data;
+  cbdata.entry = (s - pool->solvables) - data->start;
+  repo_search(fromrepo, (r - fromrepo->pool->solvables), 0, 0, SEARCH_NO_STORAGE_SOLVABLE, solvable_copy_cb, &cbdata);
+}
 
 /*
  * read rpm db as repo
@@ -881,16 +1015,31 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
   int asolv;
   Repodata *repodata;
   char dbpath[PATH_MAX];
+  DB_ENV *dbenv = 0;
 
   if (repo->start != repo->end)
     abort();		/* FIXME: rpmdbid */
+
+  if (!rootdir)
+    rootdir = "";
 
   repodata = repo_add_repodata(repo);
 
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
 
-  if (db_create(&db, 0, 0))
+  if (db_env_create(&dbenv, 0))
+    {
+      perror("db_env_create");
+      exit(1);
+    }
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir);
+  if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
+    {
+      perror("dbenv open");
+      exit(1);
+    }
+  if (db_create(&db, dbenv, 0))
     {
       perror("db_create");
       exit(1);
@@ -1082,33 +1231,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	      if (id)
 		{
 		  Solvable *r = ref->pool->solvables + ref->start + (id - 1);
-		  if (pool == ref->pool)
-		    {
-		      s->name = r->name;
-		      s->evr = r->evr;
-		      s->arch = r->arch;
-		      s->vendor = r->vendor;
-		    }
-		  else
-		    {
-		      if (r->name)
-			s->name = str2id(pool, id2str(ref->pool, r->name), 1);
-		      if (r->evr)
-			s->evr = str2id(pool, id2str(ref->pool, r->evr), 1);
-		      if (r->arch)
-			s->arch = str2id(pool, id2str(ref->pool, r->arch), 1);
-		      if (r->vendor)
-			s->vendor = str2id(pool, id2str(ref->pool, r->vendor), 1);
-		    }
-		  s->provides = copydeps(pool, repo, r->provides, ref);
-		  s->requires = copydeps(pool, repo, r->requires, ref);
-		  s->conflicts = copydeps(pool, repo, r->conflicts, ref);
-		  s->obsoletes = copydeps(pool, repo, r->obsoletes, ref);
-		  s->recommends = copydeps(pool, repo, r->recommends, ref);
-		  s->suggests = copydeps(pool, repo, r->suggests, ref);
-		  s->supplements = copydeps(pool, repo, r->supplements, ref);
-		  s->enhances  = copydeps(pool, repo, r->enhances, ref);
-		  s->freshens = copydeps(pool, repo, r->freshens, ref);
+		  solvable_copy(s, r, repodata);
 		  continue;
 		}
 	    }
@@ -1184,6 +1307,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
     sat_free(rpmhead);
   if (db)
     db->close(db, 0);
+  dbenv->close(dbenv, 0);
   if (repodata)
     repodata_internalize(repodata);
 }

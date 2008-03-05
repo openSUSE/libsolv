@@ -32,10 +32,11 @@ main(int argc, char **argv)
   FILE *fp;
   Pool *refpool;
   int c;
-  const char *root = "/";
+  int extrapool = 0;
+  const char *root = 0;
   const char *basefile = 0;
 
-  while ((c = getopt (argc, argv, "b:r:")) >= 0)
+  while ((c = getopt (argc, argv, "xb:r:")) >= 0)
     switch (c)
       {
       case 'r':
@@ -44,13 +45,19 @@ main(int argc, char **argv)
       case 'b':
         basefile = optarg;
         break;
+      case 'x':
+        extrapool = 1;
+        break;
       default:
 	exit(1);
       }
   
   if (optind < argc)
     {
-      refpool = pool;
+      if (extrapool)
+	refpool = pool_create();
+      else
+        refpool = pool;
       if ((fp = fopen(argv[optind], "r")) == NULL)
         {
           perror(argv[optind]);
