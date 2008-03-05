@@ -1184,6 +1184,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
   int rpmheadsize = 0;
   FILE *fp;
   unsigned char lead[4096];
+  int headerstart, headerend;
 
   if (nrpms <= 0)
     return;
@@ -1223,6 +1224,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
 	}
       sigdsize += sigcnt * 16;
       sigdsize = (sigdsize + 7) & ~7;
+      headerstart = 96 + 16 + sigdsize;
       while (sigdsize)
 	{
 	  l = sigdsize > 4096 ? 4096 : sigdsize;
@@ -1255,6 +1257,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
 	  continue;
 	}
       l = sigdsize + sigcnt * 16;
+      headerend = headerstart + 16 + l;
       if (l > rpmheadsize)
 	rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + l);
       if (fread(rpmhead->data, l, 1, fp) != 1)
@@ -1270,6 +1273,8 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       rpm2solv(pool, repo, repodata, s, rpmhead);
       add_location(repodata, s, rpms[i]);
+      if (repodata)
+	repodata_set_num(repodata, (s - pool->solvables) - repodata->start, SOLVABLE_HEADEREND, headerend);
     }
   if (rpmhead)
     sat_free(rpmhead);

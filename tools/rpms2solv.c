@@ -33,11 +33,15 @@ main(int argc, char **argv)
   Repo *repo;
   FILE *fp;
   char buf[4096], *p;
+  const char *basefile = 0;
 
-  while ((c = getopt(argc, argv, "m:")) >= 0)
+  while ((c = getopt(argc, argv, "b:m:")) >= 0)
     {
       switch(c)
 	{
+	case 'b':
+	  basefile = optarg;
+	  break;
 	case 'm':
 	  manifest = optarg;
 	  break;
@@ -68,7 +72,7 @@ main(int argc, char **argv)
     }
   repo = repo_create(pool, "rpms2solv");
   repo_add_rpms(repo, rpms, nrpms);
-  tool_write(repo, 0, 0);
+  tool_write(repo, basefile, 0);
   pool_free(pool);
   for (c = 0; c < nrpms; c++)
     free((char *)rpms[c]);
