@@ -59,16 +59,15 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
 	    return 1;
 	}
       return strcmp(na, nb);
-    } else {
-	/* the same name */
-	if ( pool->solvables[a].evr == pool->solvables[b].evr)
-	{
-	    /* prefer installed solvables first */
-	    if (solv->installed && pool->solvables[a].repo == solv->installed)
-		return -1;
-	    if (solv->installed && pool->solvables[b].repo == solv->installed)
-		return 1;	
-	}
+    }
+  /* the same name */
+  if (pool->solvables[a].evr == pool->solvables[b].evr && solv->installed)
+    {
+	/* prefer installed solvables */
+      if (pool->solvables[a].repo == solv->installed)
+	return -1;
+      if (pool->solvables[b].repo == solv->installed)
+	return 1;	
     }
   return a - b;
 }

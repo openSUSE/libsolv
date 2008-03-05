@@ -108,6 +108,7 @@ static const char *initpool_data[] = {
   "solvable:isvisible",			/* from susetags */
 
   "solvable:patchcategory",
+  "solvable:headerend",
 
   0
 };

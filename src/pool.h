@@ -103,8 +103,9 @@ extern "C" {
 #define SOLVABLE_ISVISIBLE	63
 
 #define SOLVABLE_PATCHCATEGORY	64
+#define SOLVABLE_HEADEREND      65
 
-#define ID_NUM_INTERNAL		65
+#define ID_NUM_INTERNAL		66
 
 
 /* well known solvable */

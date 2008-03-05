@@ -44,11 +44,4 @@ static inline void *sat_extend_resize(void *buf, size_t len, size_t size, size_t
   return buf;
 }
 
-static inline void *sat_extend_cleanup(void *buf, size_t len, size_t size)
-{
-  if (len)
-    buf = sat_realloc2(buf, len, size);
-  return buf;
-}
-
 #endif /* SATSOLVER_UTIL_H */
