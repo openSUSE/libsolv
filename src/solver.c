@@ -3696,7 +3696,7 @@ solver_solve(Solver *solv, Queue *job)
 	{
 	  int j;
 	  if (solv->nrules == oldnrules)
-	    POOL_DEBUG(SAT_DEBUG_JOB, " - no rule created");
+	    POOL_DEBUG(SAT_DEBUG_JOB, " - no rule created\n");
 	  for (j = oldnrules; j < solv->nrules; j++)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_JOB, " - job ");
