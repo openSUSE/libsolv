@@ -389,7 +389,7 @@ unchecked_decompress_buf (const unsigned char *in, unsigned int in_len,
   while (in < in_end)
     {
       unsigned int first = *in++;
-      unsigned int o;
+      int o;
       switch (first >> 4)
 	{
 	default:
