@@ -3667,7 +3667,7 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
 	  if (how == SOLVER_ERASE_SOLVABLE_NAME)
-	    POOL_DEBUG(SAT_DEBUG_JOB, "job: erase name %s\n", id2str(pool, what));
+	    POOL_DEBUG(SAT_DEBUG_JOB, "job: erase name %s\n", dep2str(pool, what));
 	  if (how == SOLVER_ERASE_SOLVABLE_PROVIDES)
 	    POOL_DEBUG(SAT_DEBUG_JOB, "job: erase provides %s\n", dep2str(pool, what));
 	  name = (how == SOLVER_ERASE_SOLVABLE_NAME) ? what : 0;
