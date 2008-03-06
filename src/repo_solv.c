@@ -797,6 +797,8 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       char *pp = prefix;
       char *old_str = 0;
       char *dest = strsp;
+      int freesp = sizeid;
+
       if (pfsize && fread(prefix, pfsize, 1, fp) != 1)
         {
 	  pool_debug(pool, SAT_ERROR, "read error while reading strings\n");
@@ -806,7 +808,14 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       for (i = 1; i < numid; i++)
         {
 	  int same = (unsigned char)*pp++;
-	  size_t len = strlen (pp) + 1;
+	  size_t len = strlen(pp) + 1;
+	  freesp -= same + len;
+	  if (freesp < 0)
+	    {
+	      pool_debug(pool, SAT_ERROR, "overflow while expanding strings\n");
+	      sat_free(prefix);
+	      return SOLV_ERROR_OVERFLOW;
+	    }
 	  if (same)
 	    memcpy(dest, old_str, same);
 	  memcpy(dest + same, pp, len);
@@ -815,6 +824,11 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	  dest += same + len;
 	}
       sat_free(prefix);
+      if (freesp != 0)
+	{
+	  pool_debug(pool, SAT_ERROR, "expanding strings size mismatch\n");
+	  return SOLV_ERROR_CORRUPT;
+	}
     }
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
@@ -888,7 +902,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	    {
 	      sat_free(hashtbl);
 	      sat_free(idmap);
-	      pool_debug(pool, SAT_ERROR, "not enough strings\n");
+	      pool_debug(pool, SAT_ERROR, "not enough strings %d %d\n", i, numid);
 	      return SOLV_ERROR_OVERFLOW;
 	    }
 	  if (!*sp)			       /* empty string */

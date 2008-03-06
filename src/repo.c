@@ -849,19 +849,19 @@ repo_lookup(Solvable *s, Id key, int (*callback)(void *cbdata, Solvable *s, Repo
 /***********************************************************************/
 
 Repodata *
-repo_add_repodata(Repo *repo)
+repo_add_repodata(Repo *repo, int localpool)
 {
   Repodata *data;
 
   repo->nrepodata++;
   repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
   data = repo->repodata + repo->nrepodata - 1;
-  repodata_init(data, repo, 0);
+  repodata_init(data, repo, localpool);
   return data;
 }
 
 static Repodata *
-findrepodata(Repo *repo, Id p, Id keyname)
+repo_findrepodata(Repo *repo, Id p, Id keyname)
 {
   int i;
   Repodata *data;
@@ -878,34 +878,34 @@ findrepodata(Repo *repo, Id p, Id keyname)
       repodata_extend(data, p);
       return data;
     }
-  return repo_add_repodata(repo);
+  return repo_add_repodata(repo, 0);
 }
 
 void
 repo_set_id(Repo *repo, Id p, Id keyname, Id id)
 {
-  Repodata *data = findrepodata(repo, p, keyname);
+  Repodata *data = repo_findrepodata(repo, p, keyname);
   repodata_set_id(data, p - data->start, keyname, id);
 }
 
 void
 repo_set_num(Repo *repo, Id p, Id keyname, Id num)
 {
-  Repodata *data = findrepodata(repo, p, keyname);
+  Repodata *data = repo_findrepodata(repo, p, keyname);
   repodata_set_num(data, p - data->start, keyname, num);
 }
 
 void
 repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
 {
-  Repodata *data = findrepodata(repo, p, keyname);
+  Repodata *data = repo_findrepodata(repo, p, keyname);
   repodata_set_str(data, p - data->start, keyname, str);
 }
 
 void
 repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str)
 {
-  Repodata *data = findrepodata(repo, p, keyname);
+  Repodata *data = repo_findrepodata(repo, p, keyname);
   repodata_set_poolstr(data, p - data->start, keyname, str);
 }
 

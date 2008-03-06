@@ -37,6 +37,27 @@ extern unsigned int unchecked_decompress_buf (const unsigned char *in,
 
 #define REPODATA_BLOCK 255
 
+
+void
+repodata_init(Repodata *data, Repo *repo, int localpool)
+{
+  memset(data, 0, sizeof (*data));
+  data->repo = repo;
+  data->localpool = localpool;
+  if (localpool)
+    stringpool_init_empty(&data->spool);
+  data->keys = sat_calloc(1, sizeof(Repokey));
+  data->nkeys = 1;
+  data->schemata = sat_calloc(1, sizeof(Id));
+  data->schemadata = sat_calloc(1, sizeof(Id));
+  data->nschemata = 1;
+  data->schemadatalen = 1;
+  data->start = repo->start;
+  data->end = repo->end;
+  data->incoreoffset = sat_extend_resize(0, data->end - data->start, sizeof(Id), REPODATA_BLOCK);
+  data->pagefd = -1;
+}
+
 void
 repodata_free(Repodata *data)
 {
@@ -72,14 +93,14 @@ repodata_free(Repodata *data)
 }
 
 static unsigned char *
-forward_to_key(Repodata *data, Id key, Id schemaid, unsigned char *dp)
+forward_to_key(Repodata *data, Id keyid, Id schemaid, unsigned char *dp)
 {
   Id k, *keyp;
 
   keyp = data->schemadata + data->schemata[schemaid];
   while ((k = *keyp++) != 0)
     {
-      if (k == key)
+      if (k == keyid)
 	return dp;
       if (data->keys[k].storage == KEY_STORAGE_VERTICAL_OFFSET)
 	{
@@ -260,7 +281,7 @@ static unsigned char *
 make_vertical_available(Repodata *data, Repokey *key, Id off, Id len)
 {
   unsigned char *dp;
-  if (key->type == REPOKEY_TYPE_VOID)
+  if (!len)
     return 0;
   if (off >= data->lastverticaloffset)
     {
@@ -273,6 +294,7 @@ make_vertical_available(Repodata *data, Repokey *key, Id off, Id len)
     return 0;
   /* we now have the offset, go into vertical */
   off += data->verticaloffset[key - data->keys];
+  /* fprintf(stderr, "key %d page %d\n", key->name, off / BLOB_PAGESIZE); */
   dp = load_page_range(data, off / BLOB_PAGESIZE, (off + len - 1) / BLOB_PAGESIZE);
   if (dp)
     dp += off % BLOB_PAGESIZE;
@@ -807,26 +829,6 @@ weg2:
   return 1;
 }
 
-void
-repodata_init(Repodata *data, Repo *repo, int localpool)
-{
-  memset(data, 0, sizeof (*data));
-  data->repo = repo;
-  data->localpool = localpool;
-  if (localpool)
-    stringpool_init_empty(&data->spool);
-  data->keys = sat_calloc(1, sizeof(Repokey));
-  data->nkeys = 1;
-  data->schemata = sat_calloc(1, sizeof(Id));
-  data->schemadata = sat_calloc(1, sizeof(Id));
-  data->nschemata = 1;
-  data->schemadatalen = 1;
-  data->start = repo->start;
-  data->end = repo->end;
-  data->incoreoffset = sat_extend_resize(0, data->end - data->start, sizeof(Id), REPODATA_BLOCK);
-  data->pagefd = -1;
-}
-
 /* extend repodata so that it includes solvables p */
 void
 repodata_extend(Repodata *data, Id p)
@@ -880,6 +882,8 @@ repodata_extend_block(Repodata *data, Id start, Id num)
   if (num > 1)
     repodata_extend(data, start + num - 1);
 }
+
+/**********************************************************************/
 
 #define REPODATA_ATTRS_BLOCK 63
 #define REPODATA_ATTRDATA_BLOCK 1023

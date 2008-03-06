@@ -159,7 +159,8 @@ typedef struct _KeyValue {
 /* Internal */
 #define __SEARCH_ONESOLVABLE		(1 << 31)
 
-Repodata *repo_add_repodata(Repo *repo);
+Repodata *repo_add_repodata(Repo *repo, int localpool);
+
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
 /* returns the string value of the attribute, or NULL if not found */
