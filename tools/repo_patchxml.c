@@ -716,7 +716,7 @@ repo_add_patchxml(Repo *repo, FILE *fp, int flags)
     }
   pd.pool = pool;
   pd.repo = repo;
-  pd.data = repo_add_repodata(pd.repo);
+  pd.data = repo_add_repodata(pd.repo, 0);
 
   pd.content = malloc(256);
   pd.acontent = 256;

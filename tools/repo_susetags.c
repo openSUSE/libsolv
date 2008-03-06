@@ -438,7 +438,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
       indesc = 1;
     }
   if (!data)
-    data = repo_add_repodata(repo);
+    data = repo_add_repodata(repo, 0);
 
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);

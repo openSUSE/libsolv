@@ -1023,7 +1023,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
   if (!rootdir)
     rootdir = "";
 
-  repodata = repo_add_repodata(repo);
+  repodata = repo_add_repodata(repo, 0);
 
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
@@ -1394,7 +1394,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
 
   if (nrpms <= 0)
     return;
-  repodata = repo_add_repodata(repo);
+  repodata = repo_add_repodata(repo, 0);
   for (i = 0; i < nrpms; i++)
     {
       if ((fp = fopen(rpms[i], "r")) == 0)

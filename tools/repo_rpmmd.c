@@ -867,7 +867,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, int flags)
   pd.common.pool = pool;
   pd.common.repo = repo;
 
-  pd.data = repo_add_repodata(repo);
+  pd.data = repo_add_repodata(repo, 0);
 
   pd.content = sat_malloc(256);
   pd.acontent = 256;

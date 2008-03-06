@@ -106,7 +106,7 @@ needid_cmp_need(const void *ap, const void *bp)
   return a->map - b->map;
 }
 
-static Pool *cmp_pool;
+static Stringpool *cmp_spool;
 
 static int
 needid_cmp_need_s(const void *ap, const void *bp)
@@ -117,8 +117,8 @@ needid_cmp_need_s(const void *ap, const void *bp)
   r = b->need - a->need;
   if (r)
     return r;
-  const char *as = cmp_pool->ss.stringspace + cmp_pool->ss.strings[a->map];
-  const char *bs = cmp_pool->ss.stringspace + cmp_pool->ss.strings[b->map];
+  const char *as = cmp_spool->stringspace + cmp_spool->strings[a->map];
+  const char *bs = cmp_spool->stringspace + cmp_spool->strings[b->map];
   return strcmp(as, bs);
 }
 
@@ -1014,6 +1014,14 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	    idused = 1;
 	  if (key->type == REPOKEY_TYPE_DIR || key->type == REPOKEY_TYPE_DIRNUMNUMARRAY || key->type == REPOKEY_TYPE_DIRSTRARRAY)
 	    dirused = 1;
+	  /* make sure we know that key */
+	  if (data->localpool)
+	    {
+	      stringpool_str2id(&data->spool, id2str(pool, key->name), 1);
+	      stringpool_str2id(&data->spool, id2str(pool, key->type), 1);
+	      if (key->type == REPOKEY_TYPE_CONSTANTID)
+	        stringpool_str2id(&data->spool, id2str(pool, key->size), 1);
+	    }
 	}
       if (idused)
 	{
@@ -1063,6 +1071,8 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       else
 	stringpool_init_empty(spool);
       cbdata.ownspool = spool;
+      if (dirpoolusage)
+        dirpoolusage = 3;	/* hmm, maybe not needed */
     }
   else if (poolusage == 0 || poolusage == 1)
     {
@@ -1331,13 +1341,13 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   for (i = 1; i < reloff + pool->nrels; i++)
     needid[i].map = i;
 
-  cmp_pool = pool;
+  cmp_spool = spool;
 #if 0
-  qsort(needid + 1, reloff - 1, sizeof(*needid), needid_cmp_need_s);
+  qsort(needid + 1, spool->nstrings - 1, sizeof(*needid), needid_cmp_need_s);
 #else
   /* make first entry '' */
   needid[1].need = 1;
-  qsort(needid + 2, reloff - 2, sizeof(*needid), needid_cmp_need_s);
+  qsort(needid + 2, spool->nstrings - 2, sizeof(*needid), needid_cmp_need_s);
 #endif
   qsort(needid + reloff, pool->nrels, sizeof(*needid), needid_cmp_need);
 
@@ -1347,7 +1357,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       if (!needid[i].need)
         break;
       needid[i].need = 0;
-      sizeid += strlen(pool->ss.stringspace + pool->ss.strings[needid[i].map]) + 1;
+      sizeid += strlen(spool->stringspace + spool->strings[needid[i].map]) + 1;
     }
 
   nstrings = i;
@@ -1485,7 +1495,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	if (!old_str[same] || !str[same] || old_str[same] != str[same])
 	  break;
       *pp++ = same;
-      len = strlen (str + same) + 1;
+      len = strlen(str + same) + 1;
       memcpy (pp, str + same, len);
       pp += len;
       old_str = str;
@@ -1511,7 +1521,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
    */
   for (i = 0; i < nrels; i++)
     {
-      ran = pool->rels + (needid[reloff + i].map - pool->ss.nstrings);
+      ran = pool->rels + (needid[reloff + i].map - reloff);
       write_id(fp, needid[ISRELDEP(ran->name) ? RELOFF(ran->name) : ran->name].need);
       write_id(fp, needid[ISRELDEP(ran->evr) ? RELOFF(ran->evr) : ran->evr].need);
       write_u8(fp, ran->flags);
