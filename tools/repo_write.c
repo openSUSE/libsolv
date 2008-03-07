@@ -845,7 +845,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   int poolusage, dirpoolusage, idused, dirused;
   int reloff;
 
-  Repodata *data;
+  Repodata *data, *dirpooldata = 0;
   Stringpool ownspool, *spool;
   Dirpool owndirpool, *dirpool;
 
@@ -1051,6 +1051,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	    {
 	      dirpoolusage = 2;
 	      dirpool = &data->dirpool;
+	      dirpooldata = data;
 	    }
 	}
     }
@@ -1071,8 +1072,6 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       else
 	stringpool_init_empty(spool);
       cbdata.ownspool = spool;
-      if (dirpoolusage)
-        dirpoolusage = 3;	/* hmm, maybe not needed */
     }
   else if (poolusage == 0 || poolusage == 1)
     {
@@ -1082,6 +1081,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   if (dirpoolusage == 3)
     {
       dirpool = &owndirpool;
+      dirpooldata = 0;
       dirpool_create(dirpool);
       cbdata.owndirpool = dirpool;
     }
@@ -1215,8 +1215,6 @@ for (i = 1; i < cbdata.nmykeys; i++)
       n++;
     }
 
-  reloff = needid[0].map;
-
   /* If we have fileinfos to write, setup schemas and increment needid[]
      of the right strings.  */
   for (i = 0; i < nsubfiles; i++)
@@ -1320,9 +1318,17 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	    continue;
 	  if (cbdata.dirused && !cbdata.dirused[i])
 	    continue;
+	  if (cbdata.ownspool && dirpooldata && id > 1)
+	    {
+	      id = putinownpool(&cbdata, dirpooldata->localpool ? &dirpooldata->spool : &pool->ss, id);
+	      needid = cbdata.needid;
+	    }
 	  needid[id].need++;
 	}
     }
+
+  reloff = needid[0].map;
+
 
 /********************************************************************/
 
@@ -1397,7 +1403,10 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  if (dirmap[i] <= 0)
 	    continue;
 	  cbdata.dirused[dirmap[i]] = i;
-	  dirmap[i] = needid[dirpool->dirs[dirmap[i]]].need;
+	  id = dirpool->dirs[dirmap[i]];
+	  if (cbdata.ownspool && dirpooldata && id > 1)
+	    id = putinownpool(&cbdata, dirpooldata->localpool ? &dirpooldata->spool : &pool->ss, id);
+	  dirmap[i] = needid[id].need;
 	}
     }
 
