@@ -69,8 +69,6 @@ enum state {
   STATE_SOURCE,
   STATE_RELNOTESURL,
 
-  STATE_FORMAT,
-  
   /* rpm-md dependencies inside the
      format tag */
   STATE_PROVIDES,
@@ -135,9 +133,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_START,       "product",         STATE_SOLVABLE, 0 },
   { STATE_START,       "pattern",         STATE_SOLVABLE, 0 },
   { STATE_START,       "patch",           STATE_SOLVABLE, 0 },
-
-  { STATE_START,       "metadata",        STATE_METADATA, 0 },
-  { STATE_METADATA,    "package",         STATE_SOLVABLE, 0 },
+  { STATE_START,       "package",         STATE_SOLVABLE, 0 },
   
   { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
   { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
@@ -168,8 +164,6 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "default",         STATE_DEFAULT, 1 },
   { STATE_SOLVABLE,    "install-time",    STATE_INSTALL_TIME, 1 },
 
-  { STATE_SOLVABLE,    "format",          STATE_FORMAT, 0 },
-
   /* those are used in libzypp xml store */
   { STATE_SOLVABLE,    "obsoletes",       STATE_CAPS_OBSOLETES , 0 },
   { STATE_SOLVABLE,    "conflicts",       STATE_CAPS_CONFLICTS , 0 },
@@ -181,6 +175,24 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "provides",        STATE_CAPS_PROVIDES, 0 },
   { STATE_SOLVABLE,    "requires",        STATE_CAPS_REQUIRES, 0 },
 
+  { STATE_SOLVABLE,      "rpm:vendor",      STATE_VENDOR, 1 },
+  { STATE_SOLVABLE,      "rpm:group",       STATE_RPM_GROUP, 1 },
+  { STATE_SOLVABLE,      "rpm:license",     STATE_RPM_LICENSE, 1 },
+
+  /* rpm-md dependencies */ 
+  { STATE_SOLVABLE,      "rpm:provides",    STATE_PROVIDES, 0 },
+  { STATE_SOLVABLE,      "rpm:requires",    STATE_REQUIRES, 0 },
+  { STATE_SOLVABLE,      "rpm:obsoletes",   STATE_OBSOLETES , 0 },
+  { STATE_SOLVABLE,      "rpm:conflicts",   STATE_CONFLICTS , 0 },
+  { STATE_SOLVABLE,      "rpm:recommends",  STATE_RECOMMENDS , 0 },
+  { STATE_SOLVABLE,      "rpm:supplements", STATE_SUPPLEMENTS, 0 },
+  { STATE_SOLVABLE,      "rpm:suggests",    STATE_SUGGESTS, 0 },
+  { STATE_SOLVABLE,      "rpm:enhances",    STATE_ENHANCES, 0 },
+  { STATE_SOLVABLE,      "rpm:freshens",    STATE_FRESHENS, 0 },
+  { STATE_SOLVABLE,      "rpm:sourcerpm",   STATE_SOURCERPM, 1 },
+  { STATE_SOLVABLE,      "rpm:header-range", STATE_HEADERRANGE, 0 },
+  { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
+
   { STATE_CAPS_PROVIDES,    "capability",      STATE_CAP_PROVIDES, 1 },
   { STATE_CAPS_REQUIRES,    "capability",      STATE_CAP_REQUIRES, 1 },
   { STATE_CAPS_OBSOLETES,   "capability",      STATE_CAP_OBSOLETES, 1 },
@@ -191,23 +203,6 @@ static struct stateswitch stateswitches[] = {
   { STATE_CAPS_ENHANCES,    "capability",      STATE_CAP_ENHANCES, 1 },
   { STATE_CAPS_FRESHENS,    "capability",      STATE_CAP_FRESHENS, 1 },
   
-  { STATE_FORMAT,      "rpm:vendor",      STATE_VENDOR, 1 },
-  { STATE_FORMAT,      "rpm:group",       STATE_RPM_GROUP, 1 },
-  { STATE_FORMAT,      "rpm:license",     STATE_RPM_LICENSE, 1 },
-
-  /* rpm-md dependencies */ 
-  { STATE_FORMAT,      "rpm:provides",    STATE_PROVIDES, 0 },
-  { STATE_FORMAT,      "rpm:requires",    STATE_REQUIRES, 0 },
-  { STATE_FORMAT,      "rpm:obsoletes",   STATE_OBSOLETES , 0 },
-  { STATE_FORMAT,      "rpm:conflicts",   STATE_CONFLICTS , 0 },
-  { STATE_FORMAT,      "rpm:recommends",  STATE_RECOMMENDS , 0 },
-  { STATE_FORMAT,      "rpm:supplements", STATE_SUPPLEMENTS, 0 },
-  { STATE_FORMAT,      "rpm:suggests",    STATE_SUGGESTS, 0 },
-  { STATE_FORMAT,      "rpm:enhances",    STATE_ENHANCES, 0 },
-  { STATE_FORMAT,      "rpm:freshens",    STATE_FRESHENS, 0 },
-  { STATE_FORMAT,      "rpm:sourcerpm",   STATE_SOURCERPM, 1 },
-  { STATE_FORMAT,      "rpm:header-range", STATE_HEADERRANGE, 0 },
-  { STATE_FORMAT,      "file",            STATE_FILE, 1 },
   { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
   { STATE_OBSOLETES,   "rpm:entry",       STATE_OBSOLETESENTRY, 0 },
@@ -217,6 +212,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUGGESTS,    "rpm:entry",       STATE_SUGGESTSENTRY, 0 },
   { STATE_ENHANCES,    "rpm:entry",       STATE_ENHANCESENTRY, 0 },
   { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
+
   { NUMSTATES}
 };
 
@@ -534,11 +530,21 @@ startElement(void *userData, const char *name, const char **atts)
   const char *str;
   Id entry = s ? (s - pool->solvables) - pd->data->start : 0;
 
+  // fprintf(stderr, "into %s, from %d, depth %d, statedepth %d\n", name, pd->state, pd->depth, pd->statedepth);
+
   if (pd->depth != pd->statedepth)
     {
       pd->depth++;
       return;
     }
+
+  if (pd->state == STATE_START && !strcmp(name, "patterns"))
+    return;
+  if (pd->state == STATE_START && !strcmp(name, "metadata"))
+    return;
+  if (pd->state == STATE_SOLVABLE && !strcmp(name, "format"))
+    return;
+
   pd->depth++;
   for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)
     if (!strcmp(sw->ename, name))
@@ -727,6 +733,15 @@ endElement(void *userData, const char *name)
       // printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
       return;
     }
+
+  /* ignore patterns & metadata */
+  if (pd->state == STATE_START && !strcmp(name, "patterns"))
+    return;
+  if (pd->state == STATE_START && !strcmp(name, "metadata"))
+    return;
+  if (pd->state == STATE_SOLVABLE && !strcmp(name, "format"))
+    return;
+
   pd->depth--;
   pd->statedepth--;
   switch (pd->state)
@@ -736,6 +751,8 @@ endElement(void *userData, const char *name)
     case STATE_SOLVABLE:
       if (!s->arch)
         s->arch = ARCH_NOARCH;
+      if (!s->evr)
+        s->evr = ID_EMPTY;	/* some patterns have this */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
@@ -820,7 +837,7 @@ endElement(void *userData, const char *name)
     }
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
-  //fprintf(stderr, "back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+  // fprintf(stderr, "back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth);
 }
 
 static void XMLCALL
