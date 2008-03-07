@@ -920,6 +920,15 @@ repo_internalize(Repo *repo)
       repodata_internalize(data);
 }
 
+void
+repo_disable_paging(Repo *repo)
+{
+  int i;
+  Repodata *data;
+
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    repodata_disable_paging(data);
+}
 // EOF
 /*
 vim:cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-0.5s:tw=78:cindent:sw=4:

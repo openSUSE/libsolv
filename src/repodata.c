@@ -1609,6 +1609,13 @@ repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int b
     }
 }
 
+void
+repodata_disable_paging(Repodata *data)
+{
+  if (maybe_load_repodata(data, 0)
+      && data->num_pages)
+    load_page_range (data, 0, data->num_pages - 1);
+}
 /*
 vim:cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-0.5s:tw=78:cindent:sw=4:
 */

@@ -65,6 +65,7 @@ main(int argc, char **argv)
         }
       ref = repo_create(refpool, "ref");
       repo_add_solv(ref, fp);
+      repo_disable_paging(ref);
       fclose(fp);
     }
 

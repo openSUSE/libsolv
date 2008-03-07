@@ -137,6 +137,7 @@ void repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const cha
 void repodata_merge_attrs (Repodata *data, Id dest, Id src);
 
 void repodata_internalize(Repodata *data);
+void repodata_disable_paging(Repodata *data);
 
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 
