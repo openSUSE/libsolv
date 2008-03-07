@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Mar  7 10:51:09 CET 2008 - coolo@suse.de
+
+- several fixes in whatprovides (possibly root cause of bnc#367210)
+
+-------------------------------------------------------------------
 Mon Feb 25 12:59:00 CET 2008 - coolo@suse.de
 
 - fixing rpmdb2solv argument handling
