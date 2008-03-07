@@ -1933,6 +1933,8 @@ revert(Solver *solv, int level)
       if (solv->decisionmap[vv] <= level && solv->decisionmap[vv] >= -level)
         break;
       POOL_DEBUG(SAT_DEBUG_PROPAGATE, "reverting decision %d at %d\n", v, solv->decisionmap[vv]);
+      if (v > 0 && solv->recommendations.count && v == solv->recommendations.elements[solv->recommendations.count - 1])
+	solv->recommendations.count--;
       solv->decisionmap[vv] = 0;
       solv->decisionq.count--;
       solv->decisionq_why.count--;
@@ -2113,6 +2115,7 @@ solver_create(Pool *pool, Repo *installed)
   queue_init(&solv->decisionq_why);
   queue_init(&solv->problems);
   queue_init(&solv->suggestions);
+  queue_init(&solv->recommendations);
   queue_init(&solv->learnt_why);
   queue_init(&solv->learnt_pool);
   queue_init(&solv->branches);
@@ -2146,6 +2149,7 @@ solver_free(Solver *solv)
   queue_free(&solv->learnt_pool);
   queue_free(&solv->problems);
   queue_free(&solv->suggestions);
+  queue_free(&solv->recommendations);
   queue_free(&solv->branches);
   queue_free(&solv->covenantq);
 
@@ -2366,14 +2370,14 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (p)
 		continue;
 	    }
-	  /* dq.count < 2 cannot happen as this means that
-	   * the rule is unit */
-	  assert(dq.count > 1);
 	  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_PROPAGATE, "unfulfilled ");
 	      printrule(solv, SAT_DEBUG_PROPAGATE, r);
 	    }
+	  /* dq.count < 2 cannot happen as this means that
+	   * the rule is unit */
+	  assert(dq.count > 1);
 
 	  olevel = level;
 	  level = selectandinstall(solv, level, &dq, 0, disablerules);
@@ -2462,6 +2466,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	        policy_filter_unwanted(solv, &dq, 0, POLICY_MODE_RECOMMEND);
 	      p = dq.elements[0];
 	      POOL_DEBUG(SAT_DEBUG_STATS, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
+	      queue_push(&solv->recommendations, p);
 	      level = setpropagatelearn(solv, level, p, 0);
 	      continue;
 	    }
@@ -2538,6 +2543,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	}
       break;
     }
+  POOL_DEBUG(SAT_DEBUG_STATS, "done solving.\n\n");
   queue_free(&dq);
 }
 
@@ -2956,6 +2962,16 @@ printdecisions(Solver *solv)
 
   sat_free(obsoletesmap);
 
+  if (solv->recommendations.count)
+    {
+      POOL_DEBUG(SAT_DEBUG_RESULT, "\nrecommended packages:\n");
+      for (i = 0; i < solv->recommendations.count; i++)
+	{
+	  s = pool->solvables + solv->recommendations.elements[i];
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
+	}
+    }
+
   if (solv->suggestions.count)
     {
       POOL_DEBUG(SAT_DEBUG_RESULT, "\nsuggested packages:\n");
@@ -3193,6 +3209,13 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	    {
 	      if (!*reqrp)
 		*reqrp = rid;
+	      else if (solv->installed && r->p < 0 && solv->pool->solvables[-r->p].repo == solv->installed)
+		{
+		  /* prefer rules of installed packages */
+		  Id op = *reqrp >= 0 ? solv->rules[*reqrp].p : -*reqrp;
+		  if (op <= 0 || solv->pool->solvables[op].repo != solv->installed)
+		    *reqrp = rid;
+		}
 	    }
 	}
       else
@@ -3205,6 +3228,13 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	    {
 	      *reqrp = rid;
 	      reqassert = 1;
+	    }
+	  else if (solv->installed && solv->pool->solvables[-rid].repo == solv->installed)
+	    {
+	      /* prefer rules of installed packages */
+	      Id op = *reqrp >= 0 ? solv->rules[*reqrp].p : -*reqrp;
+	      if (op <= 0 || solv->pool->solvables[op].repo != solv->installed)
+		*reqrp = rid;
 	    }
 	}
     }
@@ -3794,7 +3824,56 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SAT_DEBUG_STATS, "problems so far: %d\n", solv->problems.count);
 
   /* solve! */
-  run_solver(solv, 1, 1);
+  run_solver(solv, solv->dontinstallrecommended ? 0 : 1, 1);
+
+  /* find recommended packages */
+  if (!solv->problems.count && solv->dontinstallrecommended)
+    {
+      Id rec, *recp, p, *pp;
+
+      /* create map of all suggests that are still open */
+      solv->recommends_index = -1;
+      MAPZERO(&solv->recommendsmap);
+      for (i = 0; i < solv->decisionq.count; i++)
+	{
+	  p = solv->decisionq.elements[i];
+	  if (p < 0)
+	    continue;
+	  s = pool->solvables + p;
+	  if (s->recommends)
+	    {
+	      recp = s->repo->idarraydata + s->recommends;
+	      while ((rec = *recp++) != 0)
+		{
+		  FOR_PROVIDES(p, pp, rec)
+		    if (solv->decisionmap[p] > 0)
+		      break;
+		  if (p)
+		    continue;	/* already fulfilled */
+		  FOR_PROVIDES(p, pp, rec)
+		    MAPSET(&solv->recommendsmap, p);
+		}
+	    }
+	}
+      for (i = 1; i < pool->nsolvables; i++)
+	{
+	  if (solv->decisionmap[i] != 0)
+	    continue;
+	  s = pool->solvables + i;
+	  if (!MAPTST(&solv->recommendsmap, i))
+	    {
+	      if (!s->supplements)
+		continue;
+	      if (!pool_installable(pool, s))
+		continue;
+	      if (!solver_is_supplementing(solv, s))
+		continue;
+	    }
+	  queue_push(&solv->recommendations, i);
+	}
+      /* we use MODE_SUGGEST here so that repo prio is ignored */
+      policy_filter_unwanted(solv, &solv->recommendations, 0, POLICY_MODE_SUGGEST);
+    }
 
   /* find suggested packages */
   if (!solv->problems.count)

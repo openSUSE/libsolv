@@ -97,11 +97,13 @@ typedef struct solver {
   int propagate_index;
 
   Queue problems;
+  Queue recommendations;		/* recommended packages */
   Queue suggestions;			/* suggested packages */
+
 
   Map recommendsmap;			/* recommended packages from decisionmap */
   Map suggestsmap;			/* suggested packages from decisionmap */
-  int recommends_index;			/* recommended level */
+  int recommends_index;			/* recommendsmap/suggestsmap is created up to this level */
 
   Id *obsoletes;			/* obsoletes for each installed solvable */
   Id *obsoletes_data;			/* data area for obsoletes */
@@ -121,6 +123,7 @@ typedef struct solver {
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
+  int dontinstallrecommended;		/* true: do not install recommended packages */
   
   /* Callbacks for defining the bahaviour of the SAT solver */
 
