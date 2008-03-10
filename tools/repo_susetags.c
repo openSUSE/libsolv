@@ -432,12 +432,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
   Repodata *data = 0;
 
   if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
-    {
-      /* use last repodata */
-      data = repo->repodata + repo->nrepodata - 1;
-      indesc = 1;
-    }
-  if (!data)
+    indesc = 1;
+  if (repo->nrepodata)
+    /* use last repodata */
+    data = repo->repodata + repo->nrepodata - 1;
+  else
     data = repo_add_repodata(repo, 0);
 
   memset(&pd, 0, sizeof(pd));

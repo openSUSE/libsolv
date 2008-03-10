@@ -249,6 +249,8 @@ repo_add_content(Repo *repo, FILE *fp)
 	    s->supplements = adddep(pool, &pd, s->supplements, value, 0);
 	  else if (istag ("ENHANCES"))
 	    s->enhances = adddep(pool, &pd, s->enhances, value, 0);
+	  else if (istag ("DATADIR"))
+	    repo_set_str(repo, s - pool->solvables, str2id(pool, "susetags:datadir", 1), value);
 	  /* FRESHENS doesn't seem to exist.  */
 	  /* XXX do something about LINGUAS and ARCH? */
 #undef istag
