@@ -604,56 +604,6 @@ makeruledecisions(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
 
   decisionstart = solv->decisionq.count;
-#if 1
-  /* FIXME: For the time being we first need to assert what we can get
-     from learned rules.  Currently it can happen that we learn a unit
-     rule (i.e. assertion) in direct conflict with e.g. a job unit rule.  The 
-     input problem was unsolvable, but we can't deal with this situation
-     of two conflicting assertions (see also FIXME at refine_suggestion).
-
-     What normally would happen (without this loop), we would first see the
-     job rule (and let's say decide to install A), and later see the learned
-     rule (which says don't install A), have a conflict, and assert, because
-     we don't ever expect to see conflicts with learned rules.
-
-     So we gather assertions from learned rules first.  This then leads
-     to a conflict with a job rule, which is dealt with (mostly).  We note
-     that job rule as a problem (and don't remember the learned rule as a
-     problem like we would normally do, as even other code doesn't expect to
-     see learned rules in problem descriptions.
-
-     We need to deal with this situation in a better way, preferably by
-     never learning unit rules in conflicts with any other unit rule.  */
-
-  for (ri = solv->learntrules, r = solv->rules + ri; ri < solv->nrules; ri++, r++)
-    {
-      if (!r->w1 || r->w2)	/* disabled or no assertion */
-	continue;
-      v = r->p;
-      vv = v > 0 ? v : -v;
-      if (solv->decisionmap[vv] == 0)
-	{
-	  queue_push(&solv->decisionq, v);
-	  queue_push(&solv->decisionq_why, r - solv->rules);
-	  solv->decisionmap[vv] = v > 0 ? 1 : -1;
-	  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
-	    {
-	      Solvable *s = solv->pool->solvables + vv;
-	      if (v < 0)
-		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "conflicting %s (assertion)\n", solvable2str(solv->pool, s));
-	      else
-		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "installing  %s (assertion)\n", solvable2str(solv->pool, s));
-	    }
-	  continue;
-	}
-      if (v > 0 && solv->decisionmap[vv] > 0)
-	continue;
-      if (v < 0 && solv->decisionmap[vv] < 0)
-	continue;
-      /* found a conflict, which can't happen with learned rules.  */
-      assert(0);
-    }
-#endif
   /* rpm rules don't have assertions, so we can start with the job
    * rules */
   for (ri = solv->jobrules, r = solv->rules + ri; ri < solv->nrules; ri++, r++)
@@ -682,10 +632,17 @@ makeruledecisions(Solver *solv)
       if (v < 0 && solv->decisionmap[vv] < 0)
 	continue;
       /* found a conflict! */
-      /* ri >= learntrules cannot happen, as this would mean that the
-       * problem was not solvable, so we wouldn't have created the
-       * learnt rule at all */
-      assert(ri < solv->learntrules);
+      if (ri >= solv->learntrules)
+	{
+	  /* conflict with a learnt rule */
+	  /* can happen when packages cannot be installed for
+           * multiple reasons. */
+          /* we disable the learnt rule for now as an easy workaround */
+          /* (this may cause that a learnt rule gets added multiple
+           * times, which should not harm) */
+	  disablerule(solv, r);
+	  continue;
+	}
       /* if we are weak, just disable ourself */
       if (ri >= solv->weakrules)
 	{
