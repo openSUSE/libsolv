@@ -229,7 +229,7 @@ dep2str(Pool *pool, Id id)
   char *p;
   if (!ISRELDEP(id))
     return pool->ss.stringspace + pool->ss.strings[id];
-  p = pool_alloctmpspace(pool, dep2strlen(pool, id));
+  p = pool_alloctmpspace(pool, dep2strlen(pool, id) + 1);
   dep2strcpy(pool, p, id);
   return p;
 }
