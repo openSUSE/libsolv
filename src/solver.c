@@ -637,9 +637,7 @@ makeruledecisions(Solver *solv)
 	  /* conflict with a learnt rule */
 	  /* can happen when packages cannot be installed for
            * multiple reasons. */
-          /* we disable the learnt rule for now as an easy workaround */
-          /* (this may cause that a learnt rule gets added multiple
-           * times, which should not harm) */
+          /* we disable the learnt rule in this case */
 	  disablerule(solv, r);
 	  continue;
 	}
