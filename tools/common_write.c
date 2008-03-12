@@ -122,6 +122,7 @@ keyfilter_other(Repo *repo, Repokey *key, void *kfdata)
 
   if (key->name == SOLVABLE_FILELIST || key->name == SOLVABLE_DISKUSAGE)
     return KEY_STORAGE_DROPPED;
+
   name = id2str(repo->pool, key->name);
   p = strrchr(name, ':');
   if (p)
