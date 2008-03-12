@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Wed Mar 12 11:45:21 CET 2008 - coolo@suse.de
+
+- store datadir for susetags
+- fixing assertion in rules learning
+
+-------------------------------------------------------------------
 Fri Mar  7 10:51:09 CET 2008 - coolo@suse.de
 
 - several fixes in whatprovides (possibly root cause of bnc#367210)
