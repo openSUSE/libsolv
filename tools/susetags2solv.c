@@ -15,6 +15,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <zlib.h>
+#include <getopt.h>
 
 #include "pool.h"
 #include "repo.h"
