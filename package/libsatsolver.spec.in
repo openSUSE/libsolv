@@ -12,7 +12,9 @@ Group:          Development/Libraries/C and C++
 # force this version on mandriva
 BuildRequires: libneon0.26-devel
 %endif
-
+%if 0%{?fedora_version}
+BuildRequires: perl-devel
+%endif
 %if 0%{?suse_version}
 BuildRequires: libexpat-devel
 %else
