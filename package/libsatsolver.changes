@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Mar 14 08:37:47 CET 2008 - coolo@suse.de
+
+- fix build on other distris
+- fix requires of tools
+
+-------------------------------------------------------------------
 Wed Mar 12 11:45:21 CET 2008 - coolo@suse.de
 
 - store datadir for susetags
