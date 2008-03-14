@@ -315,6 +315,15 @@ static inline void pool_setloadcallback(Pool *pool, FILE *(*cb)(struct _Pool *, 
  */
 void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, struct _Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
 
+typedef struct _duchanges {
+  const char *path;
+  int kbytes;
+  int files;
+} DUChanges;
+
+void pool_calc_duchanges(Pool *pool, Queue *pkgs, DUChanges *mps, int nmps);
+int pool_calc_installsizechange(Pool *pool, Queue *pkgs);
+
 /* loop over all providers of d */
 #define FOR_PROVIDES(v, vp, d) 						\
   for (vp = pool_whatprovides(pool, d) ; (v = *vp++) != 0; )
