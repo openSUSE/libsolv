@@ -681,7 +681,7 @@ repo_write_cb_adddata(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, 
   if (cbdata->mykeys[rm].storage == KEY_STORAGE_VERTICAL_OFFSET)
     {
       xd = cbdata->extdata + rm;	/* vertical buffer */
-      if (!cbdata->vstart)
+      if (cbdata->vstart == -1)
         cbdata->vstart = xd->len;
     }
   else
@@ -753,7 +753,7 @@ repo_write_cb_adddata(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, 
       /* we can re-use old data in the blob here! */
       data_addid(cbdata->extdata + 0, cbdata->vstart);			/* add offset into incore data */
       data_addid(cbdata->extdata + 0, xd->len - cbdata->vstart);	/* add length into incore data */
-      cbdata->vstart = 0;
+      cbdata->vstart = -1;
     }
   return 0;
 }
@@ -1451,6 +1451,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
         data_addu32(xd, repo->rpmdbid[i - repo->start]);
       if (anyrepodataused)
 	{
+	  cbdata.vstart = -1;
 	  for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
 	    {
 	      if (!repodataused[j])

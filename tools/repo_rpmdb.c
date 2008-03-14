@@ -64,6 +64,8 @@
 #define TAG_DIRINDEXES		1116
 #define TAG_BASENAMES		1117
 #define TAG_DIRNAMES		1118
+#define TAG_PAYLOADFORMAT	1124
+#define TAG_PATCHESNAME         1133
 #define TAG_SUGGESTSNAME	1156
 #define TAG_SUGGESTSVERSION	1157
 #define TAG_SUGGESTSFLAGS	1158
@@ -77,9 +79,6 @@
 #define DEP_STRONG		(1 << 27)
 #define DEP_PRE			((1 << 6) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12))
 
-
-static DBT key;
-static DBT data;
 
 struct rpmid {
   unsigned int dbid;
@@ -989,6 +988,58 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data)
   repo_search(fromrepo, (r - fromrepo->pool->solvables), 0, 0, SEARCH_NO_STORAGE_SOLVABLE, solvable_copy_cb, &cbdata);
 }
 
+/* used to sort entries returned in some database order */
+static int
+rpmids_sort_cmp(const void *va, const void *vb)
+{
+  struct rpmid const *a = va, *b = vb;
+  int r;
+  r = strcmp(a->name, b->name);
+  if (r)
+    return r;
+  return a->dbid - b->dbid;
+}
+
+static Repo *pkgids_sort_cmp_data;
+
+static int
+pkgids_sort_cmp(const void *va, const void *vb)
+{
+  Pool *pool = pkgids_sort_cmp_data->pool;
+  Solvable *a = pool->solvables + *(Id *)va;
+  Solvable *b = pool->solvables + *(Id *)vb;
+  Id *rpmdbid;
+
+  if (a->name != b->name)
+    return strcmp(id2str(pool, a->name), id2str(pool, b->name));
+  rpmdbid = pkgids_sort_cmp_data->rpmdbid;
+  return rpmdbid[(a - pool->solvables) - pkgids_sort_cmp_data->start] - rpmdbid[(b - pool->solvables) - pkgids_sort_cmp_data->start];
+}
+
+static void
+swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
+{
+  Pool *pool = repo->pool;
+  Solvable tmp;
+
+  tmp = pool->solvables[pa];
+  pool->solvables[pa] = pool->solvables[pb];
+  pool->solvables[pb] = tmp;
+  if (repo->rpmdbid)
+    {
+      Id tmpid = repo->rpmdbid[pa - repo->start];
+      repo->rpmdbid[pa - repo->start] = repo->rpmdbid[pb - repo->start];
+      repo->rpmdbid[pb - repo->start] = tmpid;
+    }
+  /* only works if nothing is already internalized! */
+  if (data && data->attrs)
+    {
+      Id *tmpattrs = data->attrs[pa - data->start];
+      data->attrs[pa - data->start] = data->attrs[pb - data->start];
+      data->attrs[pb - data->start] = tmpattrs;
+    }
+}
+
 /*
  * read rpm db as repo
  * 
@@ -1016,6 +1067,11 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
   Repodata *repodata;
   char dbpath[PATH_MAX];
   DB_ENV *dbenv = 0;
+  DBT dbkey;
+  DBT dbdata;
+
+  memset(&dbkey, 0, sizeof(dbkey));
+  memset(&dbdata, 0, sizeof(dbdata));
 
   if (repo->start != repo->end)
     abort();		/* FIXME: rpmdbid */
@@ -1047,6 +1103,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 
   if (!ref)
     {
+      Id *pkgids;
       snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
       if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
 	{
@@ -1064,28 +1121,28 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	  exit(1);
 	}
       dbidp = (unsigned char *)&dbid;
-      repo->rpmdbid = sat_calloc(256, sizeof(unsigned int));
+      repo->rpmdbid = sat_calloc(256, sizeof(Id));
       asolv = 256;
       rpmheadsize = 0;
       rpmhead = 0;
       i = 0;
       s = 0;
-      while (dbc->c_get(dbc, &key, &data, DB_NEXT) == 0)
+      while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
 	{
 	  if (!s)
 	    s = pool_id2solvable(pool, repo_add_solvable(repo));
 	  if (i >= asolv)
 	    {
-	      repo->rpmdbid = sat_realloc(repo->rpmdbid, (asolv + 256) * sizeof(unsigned int));
+	      repo->rpmdbid = sat_realloc(repo->rpmdbid, (asolv + 256) * sizeof(Id));
 	      memset(repo->rpmdbid + asolv, 0, 256 * sizeof(unsigned int));
 	      asolv += 256;
 	    }
-          if (key.size != 4)
+          if (dbkey.size != 4)
 	    {
 	      fprintf(stderr, "corrupt Packages database (key size)\n");
 	      exit(1);
 	    }
-	  dp = key.data;
+	  dp = dbkey.data;
 	  if (byteswapped)
 	    {
 	      dbidp[0] = dp[3];
@@ -1097,22 +1154,22 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	    memcpy(dbidp, dp, 4);
 	  if (dbid == 0)		/* the join key */
 	    continue;
-	  if (data.size < 8)
+	  if (dbdata.size < 8)
 	    {
-	      fprintf(stderr, "corrupt rpm database (size %u)\n", data.size);
+	      fprintf(stderr, "corrupt rpm database (size %u)\n", dbdata.size);
 	      exit(1);
 	    }
-	  if (data.size > rpmheadsize)
-	    rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + data.size);
-	  memcpy(buf, data.data, 8);
+	  if (dbdata.size > rpmheadsize)
+	    rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + dbdata.size);
+	  memcpy(buf, dbdata.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-	  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > data.size)
+	  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
 	    {
 	      fprintf(stderr, "corrupt rpm database (data size)\n");
 	      exit(1);
 	    }
-	  memcpy(rpmhead->data, (unsigned char *)data.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
+	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 	  repo->rpmdbid[i] = dbid;
 	  if (rpm2solv(pool, repo, repodata, s, rpmhead))
@@ -1137,6 +1194,25 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
       dbc->c_close(dbc);
       db->close(db, 0);
       db = 0;
+      /* now sort all solvables */
+      if (repo->end - repo->start > 1)
+	{
+	  pkgids = sat_malloc2(repo->end - repo->start, sizeof(Id));
+	  for (i = repo->start; i < repo->end; i++)
+	    pkgids[i - repo->start] = i;
+	  pkgids_sort_cmp_data = repo;
+	  qsort(pkgids, repo->end - repo->start, sizeof(Id), pkgids_sort_cmp);
+	  /* adapt order */
+	  for (i = repo->start; i < repo->end; i++)
+	    {
+	      int j = pkgids[i - repo->start];
+	      while (j < i)
+		j = pkgids[i - repo->start] = pkgids[j - repo->start];
+	      if (j != i)
+	        swap_solvables(repo, repodata, i, j);
+	    }
+	  sat_free(pkgids);
+	}
     }
   else
     {
@@ -1159,12 +1235,12 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
       dbidp = (unsigned char *)&dbid;
       nrpmids = 0;
       rpmids = 0;
-      while (dbc->c_get(dbc, &key, &data, DB_NEXT) == 0)
+      while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
 	{
-	  if (key.size == 10 && !memcmp(key.data, "gpg-pubkey", 10))
+	  if (dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
 	    continue;
-	  dl = data.size;
-	  dp = data.data;
+	  dl = dbdata.size;
+	  dp = dbdata.data;
 	  while(dl >= 8)
 	    {
 	      if (byteswapped)
@@ -1176,12 +1252,11 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 		}
 	      else
 		memcpy(dbidp, dp, 4);
-	      if ((nrpmids & 255) == 0)
-		rpmids = sat_realloc(rpmids, sizeof(*rpmids) * (nrpmids + 256));
+	      rpmids = sat_extend(rpmids, nrpmids, 1, sizeof(*rpmids), 255);
 	      rpmids[nrpmids].dbid = dbid;
-	      rpmids[nrpmids].name = sat_malloc((int)key.size + 1);
-	      memcpy(rpmids[nrpmids].name, key.data, (int)key.size);
-	      rpmids[nrpmids].name[(int)key.size] = 0;
+	      rpmids[nrpmids].name = sat_malloc((int)dbkey.size + 1);
+	      memcpy(rpmids[nrpmids].name, dbkey.data, (int)dbkey.size);
+	      rpmids[nrpmids].name[(int)dbkey.size] = 0;
 	      nrpmids++;
 	      dp += 8;
 	      dl -= 8;
@@ -1191,28 +1266,26 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
       db->close(db, 0);
       db = 0;
 
+      /* sort rpmids */
+      qsort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp);
+
       rp = rpmids;
       dbidp = (unsigned char *)&dbid;
       rpmheadsize = 0;
       rpmhead = 0;
 
-      refhash = 0;
-      refmask = 0;
-      if (ref)
+      /* create hash from dbid to ref */
+      refmask = mkmask(ref->nsolvables);
+      refhash = sat_calloc(refmask + 1, sizeof(Id));
+      for (i = 0; i < ref->nsolvables; i++)
 	{
-	  refmask = mkmask(ref->nsolvables);
-	  refhash = sat_calloc(refmask + 1, sizeof(Id));
-	  for (i = 0; i < ref->nsolvables; i++)
-	    {
-	      h = ref->rpmdbid[i] & refmask;
-	      while (refhash[h])
-		h = (h + 317) & refmask;
-	      refhash[h] = i + 1;	/* make it non-zero */
-	    }
+	  h = ref->rpmdbid[i] & refmask;
+	  while (refhash[h])
+	    h = (h + 317) & refmask;
+	  refhash[h] = i + 1;	/* make it non-zero */
 	}
 
       repo->rpmdbid = sat_calloc(nrpmids, sizeof(unsigned int));
-
       s = pool_id2solvable(pool, repo_add_solvable_block(repo, nrpmids));
 
       for (i = 0; i < nrpmids; i++, rp++, s++)
@@ -1263,32 +1336,32 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 	    }
 	  else
 	    memcpy(buf, dbidp, 4);
-	  key.data = buf;
-	  key.size = 4;
-	  data.data = 0;
-	  data.size = 0;
-	  if (db->get(db, NULL, &key, &data, 0))
+	  dbkey.data = buf;
+	  dbkey.size = 4;
+	  dbdata.data = 0;
+	  dbdata.size = 0;
+	  if (db->get(db, NULL, &dbkey, &dbdata, 0))
 	    {
 	      perror("db->get");
 	      fprintf(stderr, "corrupt rpm database\n");
 	      exit(1);
 	    }
-	  if (data.size < 8)
+	  if (dbdata.size < 8)
 	    {
 	      fprintf(stderr, "corrupt rpm database (size)\n");
 	      exit(1);
 	    }
-	  if (data.size > rpmheadsize)
-	    rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + data.size);
-	  memcpy(buf, data.data, 8);
+	  if (dbdata.size > rpmheadsize)
+	    rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + dbdata.size);
+	  memcpy(buf, dbdata.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-	  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > data.size)
+	  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
 	    {
 	      fprintf(stderr, "corrupt rpm database (data size)\n");
 	      exit(1);
 	    }
-	  memcpy(rpmhead->data, (unsigned char *)data.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
+	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 
 	  rpm2solv(pool, repo, repodata, s, rpmhead);
@@ -1378,7 +1451,6 @@ nontrivial:
   return;
 }
 
-
 void
 repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
 {
@@ -1388,6 +1460,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
   Repodata *repodata;
   RpmHead *rpmhead = 0;
   int rpmheadsize = 0;
+  char *payloadformat;
   FILE *fp;
   unsigned char lead[4096];
   int headerstart, headerend;
@@ -1475,6 +1548,19 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
       rpmhead->cnt = sigcnt;
       rpmhead->dcnt = sigdsize;
       rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+      if (headexists(rpmhead, TAG_PATCHESNAME))
+	{
+	  /* this is a patch rpm, ignore */
+	  fclose(fp);
+	  continue;
+	}
+      payloadformat = headstring(rpmhead, TAG_PAYLOADFORMAT);
+      if (payloadformat && !strcmp(payloadformat, "drpm"))
+	{
+	  /* this is a delta rpm */
+	  fclose(fp);
+	  continue;
+	}
       fclose(fp);
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       rpm2solv(pool, repo, repodata, s, rpmhead);
