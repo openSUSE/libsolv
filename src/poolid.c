@@ -233,7 +233,7 @@ dep2str(Pool *pool, Id id)
   dep2strcpy(pool, p, id);
   return p;
 }
-  
+
 void
 pool_shrink_strings(Pool *pool)
 {

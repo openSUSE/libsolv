@@ -140,6 +140,7 @@ void repodata_internalize(Repodata *data);
 void repodata_disable_paging(Repodata *data);
 
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
+const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
 
 unsigned int repodata_compress_page(unsigned char *, unsigned int, unsigned char *, unsigned int);
 void repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz);
