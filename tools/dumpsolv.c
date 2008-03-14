@@ -51,23 +51,6 @@ printids(Repo *repo, char *kind, Offset ido)
     printf("  %s\n", dep2str(pool, id));
 }
 
-static void
-printdir(Repodata *data, Id dir)
-{
-  Id comp;
-  Id parent = dirpool_parent(&data->dirpool, dir);
-  if (parent)
-    {
-      printdir(data, parent);
-      putchar('/');
-    }
-  comp = dirpool_compid(&data->dirpool, dir);
-  if (data->localpool)
-    printf("%s", stringpool_id2str(&data->spool, comp));
-  else
-    printf("%s", id2str(data->repo->pool, comp));
-}
-
 int
 dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
