@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Mar 17 16:10:22 CET 2008 - matz@suse.de
+
+- Initialize all allocated array members for blocky arrays (when it
+  matters, e.g. when extending also in blocks - bnc#371137)
+
+-------------------------------------------------------------------
 Fri Mar 14 08:37:47 CET 2008 - coolo@suse.de
 
 - fix build on other distris
