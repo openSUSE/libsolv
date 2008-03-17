@@ -32,8 +32,7 @@ dirpool_make_dirtraverse(Dirpool *dp)
   if (!dp->ndirs)
     return;
   dp->dirs = sat_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
-  dirtraverse = sat_extend_resize(0, dp->ndirs, sizeof(Id), DIR_BLOCK);
-  memset(dirtraverse, 0, dp->ndirs * sizeof(Id));
+  dirtraverse = sat_calloc_block(dp->ndirs, sizeof(Id), DIR_BLOCK);
   for (parent = 0, i = 0; i < dp->ndirs; i++)
     {
       if (dp->dirs[i] > 0)
@@ -100,4 +99,3 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
   dp->dirtraverse[dp->ndirs] = 0;
   return dp->ndirs++;
 }
-

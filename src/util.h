@@ -14,6 +14,7 @@
 #define SATSOLVER_UTIL_H
 
 #include <stddef.h>
+#include <string.h>
 
 extern void *sat_malloc(size_t);
 extern void *sat_malloc2(size_t, size_t);
@@ -44,4 +45,13 @@ static inline void *sat_extend_resize(void *buf, size_t len, size_t size, size_t
   return buf;
 }
 
+static inline void *sat_calloc_block(size_t len, size_t size, size_t block)
+{
+  void *buf;
+  if (!len)
+    return 0;
+  buf = sat_malloc2((len + block) & ~block, size);
+  memset(buf, 0, ((len + block) & ~block) * size);
+  return buf;
+}
 #endif /* SATSOLVER_UTIL_H */

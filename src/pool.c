@@ -124,7 +124,7 @@ pool_create(void)
 
   stringpool_init (&pool->ss, initpool_data);
 
-  /* alloc space for ReDep 0 */
+  /* alloc space for RelDep 0 */
   pool->rels = sat_extend_resize(0, 1, sizeof(Reldep), REL_BLOCK);
   pool->nrels = 1;
   memset(pool->rels, 0, sizeof(Reldep));
@@ -339,10 +339,8 @@ pool_createwhatprovides(Pool *pool)
   pool_freeidhashes(pool);	/* XXX: should not be here! */
   pool_freewhatprovides(pool);
   num = pool->ss.nstrings;
-  pool->whatprovides = whatprovides = sat_extend_resize(0, num, sizeof(Offset), WHATPROVIDES_BLOCK);
-  memset(whatprovides, 0, num * sizeof(Offset));
-  pool->whatprovides_rel = sat_extend_resize(0, pool->nrels, sizeof(Offset), WHATPROVIDES_BLOCK);
-  memset(pool->whatprovides_rel, 0, pool->nrels * sizeof(Offset));
+  pool->whatprovides = whatprovides = sat_calloc_block(num, sizeof(Offset), WHATPROVIDES_BLOCK);
+  pool->whatprovides_rel = sat_calloc_block(pool->nrels, sizeof(Offset), WHATPROVIDES_BLOCK);
 
   /* count providers for each name */
   for (i = 1; i < pool->nsolvables; i++)

@@ -872,8 +872,7 @@ repodata_extend_block(Repodata *data, Id start, Id num)
     return;
   if (!data->incoreoffset)
     {
-      data->incoreoffset = sat_extend_resize(data->incoreoffset, num, sizeof(Id), REPODATA_BLOCK);
-      memset(data->incoreoffset, 0, num * sizeof(Id));
+      data->incoreoffset = sat_calloc_block(num, sizeof(Id), REPODATA_BLOCK);
       data->start = start;
       data->end = start + num;
       return;
@@ -896,8 +895,8 @@ repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
   int i;
   if (!data->attrs)
     {
-      data->attrs = sat_extend_resize(0, data->end - data->start, sizeof(Id *), REPODATA_BLOCK);
-      memset(data->attrs, 0, (data->end - data->start) * sizeof(Id *));
+      data->attrs = sat_calloc_block(data->end - data->start, sizeof(Id *),
+				     REPODATA_BLOCK);
     }
   i = 0;
   if (data->attrs[entry])
