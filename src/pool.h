@@ -26,87 +26,8 @@ extern "C" {
 #include "queue.h"
 #include "strpool.h"
 
-// see initpool_data[] in pool.c
-
 /* well known ids */
-#define ID_NULL			STRID_NULL
-#define ID_EMPTY		STRID_EMPTY
-#define SOLVABLE_NAME		2
-#define SOLVABLE_ARCH		3
-#define SOLVABLE_EVR		4
-#define SOLVABLE_VENDOR		5
-#define SOLVABLE_PROVIDES	6
-#define SOLVABLE_OBSOLETES	7
-#define SOLVABLE_CONFLICTS	8
-#define SOLVABLE_REQUIRES	9
-#define SOLVABLE_RECOMMENDS	10
-#define SOLVABLE_SUGGESTS	11
-#define SOLVABLE_SUPPLEMENTS	12
-#define SOLVABLE_ENHANCES	13
-#define SOLVABLE_FRESHENS	14
-#define RPM_RPMDBID		15
-#define SOLVABLE_PREREQMARKER	16		// normal requires before this, prereqs after this
-#define SOLVABLE_FILEMARKER	17		// normal provides before this, generated file provides after this
-#define NAMESPACE_INSTALLED	18
-#define NAMESPACE_MODALIAS	19
-#define NAMESPACE_SPLITPROVIDES 20
-#define NAMESPACE_LANGUAGE	21
-#define NAMESPACE_FILESYSTEM	22
-#define SYSTEM_SYSTEM		23
-#define ARCH_SRC		24
-#define ARCH_NOSRC		25
-#define ARCH_NOARCH		26
-#define REPODATA_EXTERNAL	27
-#define REPODATA_KEYS		28
-#define REPODATA_LOCATION	29
-
-/* The void type is usable to encode one-valued attributes, they have
-   no associated data.  This is useful to encode values which many solvables
-   have in common, and whose overall set is relatively limited.  A prime
-   example would be the media number.  The actual value is encoded in the
-   SIZE member of the key structure.  Be warned: careless use of this
-   leads to combinatoric explosion of number of schemas.  */
-#define REPOKEY_TYPE_VOID	30
-#define REPOKEY_TYPE_CONSTANT	31
-#define REPOKEY_TYPE_CONSTANTID	32
-#define REPOKEY_TYPE_ID		33
-#define REPOKEY_TYPE_NUM	34
-#define REPOKEY_TYPE_U32	35
-#define REPOKEY_TYPE_DIR	36
-#define REPOKEY_TYPE_STR	37
-#define REPOKEY_TYPE_IDARRAY	38
-#define REPOKEY_TYPE_REL_IDARRAY	39
-#define REPOKEY_TYPE_DIRSTRARRAY	40
-#define REPOKEY_TYPE_DIRNUMNUMARRAY	41
-
-#define SOLVABLE_SUMMARY	42
-#define SOLVABLE_DESCRIPTION	43
-#define SOLVABLE_AUTHORS	44
-#define SOLVABLE_GROUP		45
-#define SOLVABLE_KEYWORDS	46
-#define SOLVABLE_LICENSE	47
-#define SOLVABLE_BUILDTIME	48
-#define SOLVABLE_EULA		49
-#define SOLVABLE_MESSAGEINS	50
-#define SOLVABLE_MESSAGEDEL	51
-#define SOLVABLE_INSTALLSIZE	52
-#define SOLVABLE_DISKUSAGE	53
-#define SOLVABLE_FILELIST	54
-#define SOLVABLE_INSTALLTIME	55
-#define SOLVABLE_MEDIADIR	56
-#define SOLVABLE_MEDIAFILE	57
-#define SOLVABLE_MEDIANR	58
-#define SOLVABLE_DOWNLOADSIZE	59
-#define SOLVABLE_SOURCEARCH	60
-#define SOLVABLE_SOURCENAME	61
-#define SOLVABLE_SOURCEEVR	62
-#define SOLVABLE_ISVISIBLE	63
-
-#define SOLVABLE_PATCHCATEGORY	64
-#define SOLVABLE_HEADEREND      65
-
-#define ID_NUM_INTERNAL		66
-
+#include "knownid.h"
 
 /* well known solvable */
 #define SYSTEMSOLVABLE		1

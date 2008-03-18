@@ -29,89 +29,9 @@
 
 #define SOLVABLE_BLOCK	255
 
-/*
- * list of string constants, so we can do pointer/Id instead of string comparison
- * index into array matches ID_xxx constants in pool.h
- */
-  
-static const char *initpool_data[] = {
-  "<NULL>",                   // ID_NULL
-  "",                         // ID_EMPTY
-  "solvable:name",
-  "solvable:arch",
-  "solvable:evr",
-  "solvable:vendor",
-  "solvable:provides",
-  "solvable:obsoletes",
-  "solvable:conflicts",
-  "solvable:requires",
-  "solvable:recommends",
-  "solvable:suggests",
-  "solvable:supplements",
-  "solvable:enhances",
-  "solvable:freshens",
-  "rpm:dbid",			       /* direct key into rpmdb */
-  "solvable:prereqmarker",
-  "solvable:filemarker",
-  "namespace:installed",
-  "namespace:modalias",
-  "namespace:splitprovides",
-  "namespace:language",
-  "namespace:filesystem",
-  "system:system",
-  "src",
-  "nosrc",
-  "noarch",
-  "repodata:external",
-  "repodata:keys",
-  "repodata:location",
-  "repokey:type:void",
-  "repokey:type:constant",
-  "repokey:type:constantid",
-  "repokey:type:id",
-  "repokey:type:num",
-  "repokey:type:num32",
-  "repokey:type:dir",
-  "repokey:type:str",
-  "repokey:type:idarray",
-  "repokey:type:relidarray",
-  "repokey:type:dirstrarray",
-  "repokey:type:dirnumnumarray",
-
-  "solvable:summary",
-  "solvable:description",
-  "solvable:authors",
-  "solvable:group",
-  "solvable:keywords",
-  "solvable:license",
-  "solvable:buildtime",
-
-  "solvable:eula",
-  "solvable:messageins",
-  "solvable:messagedel",
-
-  "solvable:installsize",
-  "solvable:diskusage",
-  "solvable:filelist",
-
-  "solvable:installtime",
-
-  "solvable:mediadir",
-  "solvable:mediafile",
-  "solvable:medianr",
-  "solvable:downloadsize",
-
-  "solvable:sourcearch",
-  "solvable:sourcename",
-  "solvable:sourceevr",
-
-  "solvable:isvisible",			/* from susetags */
-
-  "solvable:patchcategory",
-  "solvable:headerend",
-
-  0
-};
+#define KNOWNID_INITIALIZE
+#include "knownid.h"
+#undef KNOWNID_INITIALIZE
 
 /* create pool */
 Pool *
