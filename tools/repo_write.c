@@ -1241,7 +1241,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
 	  *sp++ = cbdata.keymap[REPODATA_INFO];
 	  *sp++ = cbdata.keymap[REPODATA_ADDEDFILEPROVIDES];
 	  for (j = 0; fileinfo[i].addedfileprovides[j]; j++)
-	    j++;
+	    ;
 	  cbdata.mykeys[cbdata.keymap[REPODATA_ADDEDFILEPROVIDES]].size += j + 1;
 	}
       else

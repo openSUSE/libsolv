@@ -248,7 +248,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	}
       kd.languages = languages;
       kd.nlanguages = nlanguages;
-      repo_write(repo, fp, keyfilter_other, &kd, fileinfos, nfileinfos);
+      repo_write(repo, fp, keyfilter_other, &kd, nfileinfos ? fileinfos : 0, nfileinfos);
       fclose(fp);
       for (i = 0; i < nlanguages; i++)
 	free(languages[i]);
@@ -272,7 +272,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       fclose(fp);
       nfileinfos++;
     }
-  repo_write(repo, stdout, keyfilter_solv, 0, fileinfos, nfileinfos);
+  repo_write(repo, stdout, keyfilter_solv, 0, nfileinfos ? fileinfos : 0, nfileinfos);
   for (i = 0; i < nfileinfos; i++)
     {
       sat_free(fileinfos[i].addedfileprovides);
