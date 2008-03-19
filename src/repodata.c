@@ -1083,6 +1083,97 @@ repoadata_add_array(Repodata *data, Id entry, Id keyname, Id keytype, int entrys
 }
 
 void
+repodata_set_bin_checksum(Repodata *data, Id entry, Id keyname, Id type,
+		      const unsigned char *str)
+{
+  Repokey key;
+  int l;
+  switch (type)
+    {
+      case REPOKEY_TYPE_MD5: l = SIZEOF_MD5; break;
+      case REPOKEY_TYPE_SHA1: l = SIZEOF_SHA1; break;
+      default: return;
+    }
+  key.name = keyname;
+  key.type = type;
+  key.size = 0;
+  key.storage = KEY_STORAGE_INCORE;
+  data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
+  memcpy(data->attrdata + data->attrdatalen, str, l);
+  repodata_set(data, entry, &key, data->attrdatalen);
+  data->attrdatalen += l;
+}
+
+static int
+hexstr2bytes(unsigned char *buf, const char *str, int buflen)
+{
+  int i;
+  for (i = 0; i < buflen; i++)
+    {
+#define c2h(c) (((c)>='0' && (c)<='9') ? ((c)-'0')	\
+		: ((c)>='a' && (c)<='f') ? ((c)-'a'+10)	\
+		: ((c)>='A' && (c)<='F') ? ((c)-'A'+10)	\
+		: -1)
+      int v = c2h(*str);
+      str++;
+      if (v < 0)
+	return 0;
+      buf[i] = v;
+      v = c2h(*str);
+      str++;
+      if (v < 0)
+	return 0;
+      buf[i] = (buf[i] << 4) | v;
+#undef c2h
+    }
+  return buflen;
+}
+
+void
+repodata_set_checksum(Repodata *data, Id entry, Id keyname, Id type,
+		      const char *str)
+{
+  int l;
+  switch (type)
+    {
+      case REPOKEY_TYPE_MD5: l = SIZEOF_MD5; break;
+      case REPOKEY_TYPE_SHA1: l = SIZEOF_SHA1; break;
+      default: return;
+    }
+  unsigned char buf[l];
+  if (hexstr2bytes(buf, str, l) != l)
+    {
+      fprintf(stderr, "Invalid hex character in %s\n", str);
+      return;
+    }
+  repodata_set_bin_checksum(data, entry, keyname, type, buf);
+}
+
+const char *
+repodata_chk2str(Repodata *data, Id type, const char *buf)
+{
+  int i, l;
+  char *str, *s;
+  switch (type)
+    {
+      case REPOKEY_TYPE_MD5: l = SIZEOF_MD5; break;
+      case REPOKEY_TYPE_SHA1: l = SIZEOF_SHA1; break;
+      default: return id2str(data->repo->pool, ID_EMPTY);
+    }
+  s = str = pool_alloctmpspace(data->repo->pool, 2*l + 1);
+  for (i = 0; i < l; i++, s+=2)
+    {
+      unsigned char v = buf[i];
+      unsigned char w = v >> 4;
+      s[0] = w >= 10 ? (w-10)+'a' : w + '0';
+      w = v & 15;
+      s[1] = w >= 10 ? (w-10)+'a' : w + '0';
+    }
+  *s = 0;
+  return str;
+}
+
+void
 repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2)
 {
 
@@ -1390,6 +1481,12 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 		  break;
 		case REPOKEY_TYPE_STR:
 		  data_addblob(xd, data->attrdata + id, strlen((char *)(data->attrdata + id)) + 1);
+		  break;
+		case REPOKEY_TYPE_MD5:
+		  data_addblob(xd, data->attrdata + id, SIZEOF_MD5);
+		  break;
+		case REPOKEY_TYPE_SHA1:
+		  data_addblob(xd, data->attrdata + id, SIZEOF_SHA1);
 		  break;
 		case REPOKEY_TYPE_ID:
 		case REPOKEY_TYPE_NUM:

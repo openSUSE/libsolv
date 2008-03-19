@@ -423,6 +423,20 @@ skip_item(Repodata *data, unsigned type, unsigned numid, unsigned numrel)
 	while (read_u8(data) != 0)
 	  ;
 	break;
+      case REPOKEY_TYPE_MD5:
+        {
+	  int i;
+	  for (i = 0; i < SIZEOF_MD5; i++)
+	    read_u8(data);
+	  break;
+	}
+      case REPOKEY_TYPE_SHA1:
+        {
+	  int i;
+	  for (i = 0; i < SIZEOF_SHA1; i++)
+	    read_u8(data);
+	  break;
+	}
       case REPOKEY_TYPE_IDARRAY:
       case REPOKEY_TYPE_REL_IDARRAY:
 	while ((read_u8(data) & 0xc0) != 0)
@@ -1100,7 +1114,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	type = idmap[type];
       else if (parent)
         type = str2id(pool, stringpool_id2str(spool, type), 1);
-      if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_DIRNUMNUMARRAY)
+      if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_SHA1)
 	{
 	  pool_debug(pool, SAT_ERROR, "unsupported data type '%s'\n", id2str(pool, type));
 	  data.error = SOLV_ERROR_UNSUPPORTED;

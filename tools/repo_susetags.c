@@ -232,6 +232,33 @@ fprintf(stderr, "%s -> %d\n", sp[0], dirid);
   pd->ndirs++;
 }
 
+static void
+set_checksum(Repodata *data, int last_found_pack, Id keyname, char *line)
+{
+  char *sp[3];
+  int l;
+  Id type;
+  if (split(line, sp, 3) != 2)
+    {
+      fprintf(stderr, "Bad source line: %s\n", line);
+      exit(1);
+    }
+  if (!strcasecmp (sp[0], "sha1"))
+    l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
+  else if (!strcasecmp (sp[0], "md5"))
+    l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
+  else
+    {
+      fprintf(stderr, "Unknown checksum type: %s\n", sp[0]);
+      exit(1);
+    }
+  if (strlen(sp[1]) != l)
+    {
+      fprintf(stderr, "Invalid checksum length for %s: %s\n", sp[0], sp[1]);
+      exit(1);
+    }
+  repodata_set_checksum(data, last_found_pack, keyname, type, sp[1]);
+}
 
 /*
  * id3_cmp
@@ -819,6 +846,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    break;
 	  case CTAG('=', 'I', 'n', 'c'):
 	    repodata_add_poolstr_array(data, last_found_pack, SOLVABLE_INCLUDES, line + 6);
+	    break;
+	  case CTAG('=', 'C', 'k', 's'):
+	    set_checksum(data, last_found_pack, SOLVABLE_CHECKSUM, line + 6);
 	    break;
 
 	  case CTAG('=', 'P', 'a', 't'):

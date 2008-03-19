@@ -19,6 +19,9 @@
 #include "pool.h"
 #include "dirpool.h"
 
+#define SIZEOF_MD5 16
+#define SIZEOF_SHA1 20
+
 struct _Repo;
 struct _Repokey;
 struct _KeyValue;
@@ -133,6 +136,10 @@ void repodata_set_constant(Repodata *data, Id entry, Id keyname, Id constant);
 void repodata_set_constantid(Repodata *data, Id entry, Id keyname, Id id);
 void repodata_set_void(Repodata *data, Id entry, Id keyname);
 void repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str);
+void repodata_set_bin_checksum(Repodata *data, Id entry, Id keyname, Id type,
+			       const unsigned char *buf);
+void repodata_set_checksum(Repodata *data, Id entry, Id keyname, Id type,
+			   const char *str);
 void repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2);
 void repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *str);
 void repodata_add_idarray(Repodata *data, Id entry, Id keyname, Id id);
@@ -145,6 +152,7 @@ void repodata_disable_paging(Repodata *data);
 
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
+const char *repodata_chk2str(Repodata *data, Id type, const char *buf);
 
 unsigned int repodata_compress_page(unsigned char *, unsigned int, unsigned char *, unsigned int);
 void repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz);

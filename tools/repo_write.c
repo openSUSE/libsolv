@@ -709,6 +709,12 @@ repo_write_cb_adddata(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, 
       case REPOKEY_TYPE_STR:
 	data_addblob(xd, (unsigned char *)kv->str, strlen(kv->str) + 1);
 	break;
+      case REPOKEY_TYPE_MD5:
+	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_MD5);
+	break;
+      case REPOKEY_TYPE_SHA1:
+	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA1);
+	break;
       case REPOKEY_TYPE_U32:
 	u32 = kv->num;
 	v[0] = u32 >> 24;
@@ -1022,7 +1028,10 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 
 	  repodataused[i] = 1;
 	  anyrepodataused = 1;
-	  if (key->type != REPOKEY_TYPE_STR && key->type != REPOKEY_TYPE_U32)
+	  if (key->type != REPOKEY_TYPE_STR
+	      && key->type != REPOKEY_TYPE_U32
+	      && key->type != REPOKEY_TYPE_MD5
+	      && key->type != REPOKEY_TYPE_SHA1)
 	    idused = 1;
 	  if (key->type == REPOKEY_TYPE_DIR || key->type == REPOKEY_TYPE_DIRNUMNUMARRAY || key->type == REPOKEY_TYPE_DIRSTRARRAY)
 	    dirused = 1;
