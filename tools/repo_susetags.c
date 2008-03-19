@@ -757,7 +757,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    }
 	    continue;
           case CTAG('=', 'K', 'w', 'd'):
-	    repodata_set_poolstr(data, last_found_pack, SOLVABLE_KEYWORDS, line + 6);
+	    repodata_add_poolstr_array(data, last_found_pack, SOLVABLE_KEYWORDS, line + 6);
 	    continue;
           case CTAG('=', 'A', 'u', 't'):
 	    repodata_set_str(data, last_found_pack, SOLVABLE_AUTHORS, line + 6);
@@ -803,6 +803,27 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	  case CTAG('=', 'D', 'i', 'r'):
 	    add_dirline (&pd, line + 6);
 	    continue;
+	  case CTAG('=', 'C', 'a', 't'):
+	    repodata_set_poolstr(data, last_found_pack, SOLVABLE_CATEGORY, line + 6);
+	    break;
+	  case CTAG('=', 'O', 'r', 'd'):
+	    /* Order is a string not a number, so we can retroactively insert
+	       new patterns in the middle, i.e. 1 < 15 < 2.  */
+	    repodata_set_str(data, last_found_pack, SOLVABLE_ORDER, line + 6);
+	    break;
+	  case CTAG('=', 'I', 'c', 'o'):
+	    repodata_set_str(data, last_found_pack, SOLVABLE_ICON, line + 6);
+	    break;
+	  case CTAG('=', 'E', 'x', 't'):
+	    repodata_add_poolstr_array(data, last_found_pack, SOLVABLE_EXTENDS, line + 6);
+	    break;
+	  case CTAG('=', 'I', 'n', 'c'):
+	    repodata_add_poolstr_array(data, last_found_pack, SOLVABLE_INCLUDES, line + 6);
+	    break;
+
+	  case CTAG('=', 'P', 'a', 't'):
+	  case CTAG('=', 'P', 'k', 'g'):
+	    break;
 
 	  default:
 	    break;

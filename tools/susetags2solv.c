@@ -33,7 +33,7 @@ usage(int status)
           "  -d <descrdir> : do not read from stdin, but use data in descrdir\n"
 	  "  -h : print help & exit\n"
 	  "  -k : don't mix kinds (experimental!)\n"
-	  "  -b <base>: save fas multiple files starting with <base>\n"
+	  "  -b <base>: save as multiple files starting with <base>\n"
 	  "  -n <name>: save attributes as <name>.attr\n"
 	 );
    exit(status);
