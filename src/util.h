@@ -38,6 +38,13 @@ static inline void *sat_extend(void *buf, size_t len, size_t nmemb, size_t size,
   return buf;
 }
 
+static inline void *sat_zextend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
+{
+  buf = sat_extend(buf, len, nmemb, size, block);
+  memset(buf + len * size, 0, nmemb * size);
+  return buf;
+}
+
 static inline void *sat_extend_resize(void *buf, size_t len, size_t size, size_t block)
 {
   if (len)

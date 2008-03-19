@@ -87,6 +87,7 @@ repodata_free(Repodata *data)
   sat_free(data->attriddata);
   
   sat_free(data->location);
+  sat_free(data->addedfileprovides);
 
   if (data->pagefd != -1)
     close(data->pagefd);
@@ -1291,6 +1292,7 @@ repodata_internalize(Repodata *data)
   nentry = data->end - data->start;
   addschema_prepare(data, schematacache);
   memset(&newincore, 0, sizeof(newincore));
+  data_addid(&newincore, 0);
   for (entry = 0; entry < nentry; entry++)
     {
       memset(seen, 0, data->nkeys * sizeof(Id));

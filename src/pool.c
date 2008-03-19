@@ -647,7 +647,7 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       s = id2str(pool, dep);
       if (*s != '/')
 	continue;
-      sf->ids = sat_extend(sf->ids, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
+      sf->ids = sat_extend(sf->ids, sf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
       sf->dirs = sat_extend(sf->dirs, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
       sf->names = sat_extend(sf->names, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
       sf->ids[sf->nfiles] = dep;
@@ -706,8 +706,80 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   return 0;
 }
 
+
+static void
+pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, struct searchfiles *sf, Repo *repoonly)
+{
+  Id p, start, end, *idp;
+  Solvable *s;
+  Repodata *data = 0, *nextdata;
+  Repo *oldrepo = 0;
+  int dataincludes = 0;
+  int i;
+  Map providedids;
+
+  cbd->nfiles = sf->nfiles;
+  cbd->ids = sf->ids;
+  cbd->dirs = sf->dirs;
+  cbd->names = sf->names;
+  cbd->olddata = 0;
+  cbd->dids = sat_realloc2(cbd->dids, sf->nfiles, sizeof(Id));
+  if (repoonly)
+    {
+      start = repoonly->start;
+      end = repoonly->end;
+    }
+  else
+    {
+      start = 2;	/* skip system solvable */
+      end = pool->nsolvables;
+    }
+  for (p = start, s = pool->solvables + p; p < end; p++, s++)
+    {
+      if (!s->repo || (repoonly && s->repo != repoonly))
+	continue;
+      if (s->repo != oldrepo || (data && p >= data->end))
+	{
+	  data = 0;
+	  oldrepo = 0;
+	}
+      if (oldrepo == 0)
+	{
+	  nextdata = 0;
+	  for (i = 0, data = s->repo->repodata; i < s->repo->nrepodata; i++, data++)
+	    {
+	      if (!data->addedfileprovides || p >= data->end)
+		continue;
+	      if (!nextdata || nextdata->start > data->start)
+		nextdata = data;
+	      if (p >= data->start)
+		break;
+	    }
+	  if (i == s->repo->nrepodata)
+	    data = nextdata;
+	  if (data)
+	    {
+	      map_init(&providedids, pool->ss.nstrings);
+	      for (idp = data->addedfileprovides; *idp; idp++)
+		MAPSET(&providedids, *idp);
+	      for (i = 0; i < cbd->nfiles; i++)
+		if (!MAPTST(&providedids, cbd->ids[i]))
+		  {
+		    break;
+		  }
+	      map_free(&providedids);
+	      dataincludes = i == cbd->nfiles;
+	    }
+	  oldrepo = s->repo;
+	}
+      if (data && p >= data->start && dataincludes)
+	continue;
+      repo_search(s->repo, p, SOLVABLE_FILELIST, 0, 0, addfileprovides_cb, cbd);
+    }
+}
+
 void
-pool_addfileprovides(Pool *pool, Repo *installed)
+pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
 {
   Solvable *s;
   Repo *repo;
@@ -748,19 +820,22 @@ pool_addfileprovides(Pool *pool, Repo *installed)
   POOL_DEBUG(SAT_DEBUG_STATS, "found %d installed file dependencies\n", isf.nfiles);
   cbd.dids = 0;
   map_init(&cbd.useddirs, 1);
+  if (idp)
+    *idp = 0;
   if (sf.nfiles)
     {
 #if 0
       for (i = 0; i < sf.nfiles; i++)
 	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", id2str(pool, sf.ids[i]));
 #endif
-      cbd.nfiles = sf.nfiles;
-      cbd.ids = sf.ids;
-      cbd.dirs = sf.dirs;
-      cbd.names = sf.names;
-      cbd.olddata = 0;
-      cbd.dids = sat_realloc2(cbd.dids, sf.nfiles, sizeof(Id));
-      pool_search(pool, 0, SOLVABLE_FILELIST, 0, 0, addfileprovides_cb, &cbd);
+      pool_addfileprovides_search(pool, &cbd, &sf, 0);
+      if (idp)
+	{
+	  sf.ids = sat_extend(sf.ids, sf.nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
+	  sf.ids[sf.nfiles] = 0;
+	  *idp = sf.ids;
+	  sf.ids = 0;
+	}
       sat_free(sf.ids);
       for (i = 0; i < sf.nfiles; i++)
 	{
@@ -776,13 +851,7 @@ pool_addfileprovides(Pool *pool, Repo *installed)
       for (i = 0; i < isf.nfiles; i++)
 	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", id2str(pool, isf.ids[i]));
 #endif
-      cbd.nfiles = isf.nfiles;
-      cbd.ids = isf.ids;
-      cbd.dirs = isf.dirs;
-      cbd.names = isf.names;
-      cbd.olddata = 0;
-      cbd.dids = sat_realloc2(cbd.dids, isf.nfiles, sizeof(Id));
-      repo_search(installed, 0, SOLVABLE_FILELIST, 0, 0, addfileprovides_cb, &cbd);
+      pool_addfileprovides_search(pool, &cbd, &isf, installed);
       sat_free(isf.ids);
       for (i = 0; i < isf.nfiles; i++)
 	{
@@ -795,6 +864,12 @@ pool_addfileprovides(Pool *pool, Repo *installed)
   map_free(&cbd.useddirs);
   sat_free(cbd.dids);
   pool_freewhatprovides(pool);	/* as we have added provides */
+}
+
+void
+pool_addfileprovides(Pool *pool, Repo *installed)
+{
+  pool_addfileprovides_ids(pool, installed, 0);
 }
 
 void
@@ -1060,6 +1135,7 @@ pool_calc_duchanges(Pool *pool, Queue *pkgs, DUChanges *mps, int nmps)
       if (sp < 0)
         repo_search(pool->solvables[-sp].repo, -sp, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
     }
+  sat_free(cbd.dirmap);
   sat_free(mptree);
 }
 

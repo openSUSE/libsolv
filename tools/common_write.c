@@ -143,6 +143,8 @@ keyfilter_other(Repo *repo, Repokey *key, void *kfdata)
  * If <basename> is given, split attributes
  */
 
+#define REPODATAFILE_BLOCK 15
+
 int
 tool_write(Repo *repo, const char *basename, const char *attrname)
 {
@@ -153,6 +155,10 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
   char **languages = 0;
   int nlanguages = 0;
   int i, j, k, l;
+
+  fileinfos = sat_zextend(fileinfos, nfileinfos, 1, sizeof(Repodatafile), REPODATAFILE_BLOCK);
+  pool_addfileprovides_ids(repo->pool, 0, &fileinfos[nfileinfos].addedfileprovides);
+  nfileinfos++;
 
   if (basename)
     {
@@ -189,7 +195,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	      languages[nlanguages++] = strdup(keyname + l);
 	    }
 	}
-      fileinfos = sat_calloc(nlanguages + 2, sizeof(Repodatafile));
+      fileinfos = sat_zextend(fileinfos, nfileinfos, nlanguages + 2, sizeof(Repodatafile), REPODATAFILE_BLOCK);
       /* write language subfiles */
       for (i = 0; i < nlanguages; i++)
         {
@@ -200,8 +206,9 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	      exit(1);
 	    }
           repo_write(repo, fp, keyfilter_language, languages[i], fileinfos + nfileinfos, 0);
-	  fileinfos[nfileinfos++].location = strdup(fn);
+	  fileinfos[nfileinfos].location = strdup(fn);
 	  fclose(fp);
+	  nfileinfos++;
         }
       /* write DU subfile */
       if (has_DU)
@@ -213,8 +220,9 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	      exit(1);
 	    }
 	  repo_write(repo, fp, keyfilter_DU, 0, fileinfos + nfileinfos, 0);
-	  fileinfos[nfileinfos++].location = strdup(fn);
+	  fileinfos[nfileinfos].location = strdup(fn);
 	  fclose(fp);
+	  nfileinfos++;
 	}
       /* write filelist */
       if (has_FL)
@@ -226,8 +234,9 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	      exit(1);
 	    }
 	  repo_write(repo, fp, keyfilter_FL, 0, fileinfos + nfileinfos, 0);
-	  fileinfos[nfileinfos++].location = strdup(fn);
+	  fileinfos[nfileinfos].location = strdup(fn);
 	  fclose(fp);
+	  nfileinfos++;
 	}
       /* write everything else */
       sprintf(fn, "%s.solv", basename);
@@ -245,6 +254,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       sat_free(languages);
       for (i = 0; i < nfileinfos; i++)
 	{
+	  sat_free(fileinfos[i].addedfileprovides);
 	  sat_free(fileinfos[i].location);
 	  sat_free(fileinfos[i].keys);
 	}
@@ -253,19 +263,21 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
     }
   if (attrname)
     {
-      fileinfos = sat_calloc(1, sizeof(Repodatafile));
+      fileinfos = sat_zextend(fileinfos, nfileinfos, 1, sizeof(Repodatafile), REPODATAFILE_BLOCK);
       test_separate = 1;
       FILE *fp = fopen (attrname, "w");
-      repo_write(repo, fp, keyfilter_attr, 0, fileinfos + nfileinfos++, 0);
-      fileinfos[nfileinfos - 1].location = strdup(attrname);
+      repo_write(repo, fp, keyfilter_attr, 0, fileinfos + nfileinfos, 0);
+      fileinfos[nfileinfos].location = strdup(attrname);
       fclose(fp);
+      nfileinfos++;
     }
   repo_write(repo, stdout, keyfilter_solv, 0, fileinfos, nfileinfos);
-  if (fileinfos)
+  for (i = 0; i < nfileinfos; i++)
     {
-      free(fileinfos[0].location);
-      free(fileinfos[0].keys);
-      free(fileinfos);
+      sat_free(fileinfos[i].addedfileprovides);
+      sat_free(fileinfos[i].location);
+      sat_free(fileinfos[i].keys);
     }
+  sat_free(fileinfos);
   return 0;
 }

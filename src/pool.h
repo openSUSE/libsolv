@@ -179,6 +179,7 @@ char * solvable_get_location(Solvable *s, unsigned int *medianrp);
  */
 extern void pool_createwhatprovides(Pool *pool);
 extern void pool_addfileprovides(Pool *pool, struct _Repo *installed);
+extern void pool_addfileprovides_ids(Pool *pool, struct _Repo *installed, Id **idp);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
 

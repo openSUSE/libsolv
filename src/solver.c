@@ -3911,6 +3911,7 @@ solver_calc_changed_pkgs(Solver *solv, Queue *pkgs)
   for (p = 1; p < pool->nsolvables; p++)
     if (MAPTST(&installmap, p))
       queue_push(pkgs, p);
+  map_free(&installmap);
   /* run through erase solvable dudata */
   if (solv->installed)
     {

@@ -850,8 +850,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   Dirpool owndirpool, *dirpool;
 
   int setfileinfo = 0;
-  Id repodataschema = 0;
-  Id repodataschema_internal = 0;
+  Id *repodataschemata = 0;
 
   struct extdata *xd;
 
@@ -863,6 +862,8 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
      writing a subfile and our callers wants info about it.  */
   if (fileinfo && nsubfiles == 0)
     setfileinfo = 1;
+  if (nsubfiles)
+    repodataschemata = sat_calloc(nsubfiles, sizeof(Id));
 
   memset(&cbdata, 0, sizeof(cbdata));
   cbdata.repo = repo;
@@ -912,32 +913,43 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
     }
   cbdata.nmykeys = i;
 
-  /* If we store subfile info, generate the three necessary keys.  */
+  /* If we store subfile info, generate the necessary keys.  */
   if (nsubfiles)
     {
+      key = cbdata.mykeys + cbdata.nmykeys;
+      key->name = REPODATA_INFO;
+      key->type = REPOKEY_TYPE_VOID;
+      key->size = 0;
+      key->storage = KEY_STORAGE_SOLVABLE;
+      cbdata.keymap[key->name] = cbdata.nmykeys++;
+
       key = cbdata.mykeys + cbdata.nmykeys;
       key->name = REPODATA_EXTERNAL;
       key->type = REPOKEY_TYPE_VOID;
       key->size = 0;
       key->storage = KEY_STORAGE_SOLVABLE;
-      cbdata.keymap[key->name] = key - cbdata.mykeys;
-      key++;
+      cbdata.keymap[key->name] = cbdata.nmykeys++;
 
+      key = cbdata.mykeys + cbdata.nmykeys;
       key->name = REPODATA_KEYS;
       key->type = REPOKEY_TYPE_IDARRAY;
       key->size = 0;
       key->storage = KEY_STORAGE_SOLVABLE;
-      cbdata.keymap[key->name] = key - cbdata.mykeys;
-      key++;
+      cbdata.keymap[key->name] = cbdata.nmykeys++;
 
+      key = cbdata.mykeys + cbdata.nmykeys;
       key->name = REPODATA_LOCATION;
       key->type = REPOKEY_TYPE_STR;
       key->size = 0;
       key->storage = KEY_STORAGE_SOLVABLE;
-      cbdata.keymap[key->name] = key - cbdata.mykeys;
-      key++;
+      cbdata.keymap[key->name] = cbdata.nmykeys++;
 
-      cbdata.nmykeys = key - cbdata.mykeys;
+      key = cbdata.mykeys + cbdata.nmykeys;
+      key->name = REPODATA_ADDEDFILEPROVIDES;
+      key->type = REPOKEY_TYPE_IDARRAY;
+      key->size = 0;
+      key->storage = KEY_STORAGE_SOLVABLE;
+      cbdata.keymap[key->name] = cbdata.nmykeys++;
     }
 
   dirpoolusage = 0;
@@ -1095,7 +1107,7 @@ fprintf(stderr, "poolusage: %d\n", poolusage);
 fprintf(stderr, "dirpoolusage: %d\n", dirpoolusage);
 fprintf(stderr, "nmykeys: %d\n", cbdata.nmykeys);
 for (i = 1; i < cbdata.nmykeys; i++)
-  fprintf(stderr, "  %2d: %d %d %d %d\n", i, cbdata.mykeys[i].name, cbdata.mykeys[i].type, cbdata.mykeys[i].size, cbdata.mykeys[i].storage);
+  fprintf(stderr, "  %2d: %s[%d] %d %d %d\n", i, id2str(pool, cbdata.mykeys[i].name), cbdata.mykeys[i].name, cbdata.mykeys[i].type, cbdata.mykeys[i].size, cbdata.mykeys[i].storage);
 #endif
 
 /********************************************************************/
@@ -1220,44 +1232,34 @@ for (i = 1; i < cbdata.nmykeys; i++)
   for (i = 0; i < nsubfiles; i++)
     {
       int j;
+      Id schema[4], *sp;
 
-      if (fileinfo[i].location && !repodataschema)
-        {
-	  Id schema[4];
-	  schema[0] = cbdata.keymap[REPODATA_EXTERNAL];
-	  schema[1] = cbdata.keymap[REPODATA_KEYS];
-	  schema[2] = cbdata.keymap[REPODATA_LOCATION];
-	  schema[3] = 0;
-	  repodataschema = addschema(&cbdata, schema);
+      sp = schema;
+      if (fileinfo[i].addedfileprovides)
+	{
+	  /* extra info about this file */
+	  *sp++ = cbdata.keymap[REPODATA_INFO];
+	  *sp++ = cbdata.keymap[REPODATA_ADDEDFILEPROVIDES];
+	  for (j = 0; fileinfo[i].addedfileprovides[j]; j++)
+	    j++;
+	  cbdata.mykeys[cbdata.keymap[REPODATA_ADDEDFILEPROVIDES]].size += j + 1;
 	}
-      else if (!repodataschema_internal)
-        {
-	  Id schema[3];
-	  schema[0] = cbdata.keymap[REPODATA_EXTERNAL];
-	  schema[1] = cbdata.keymap[REPODATA_KEYS];
-	  schema[2] = 0;
-	  repodataschema_internal = addschema(&cbdata, schema);
+      else
+	{
+	  *sp++ = cbdata.keymap[REPODATA_EXTERNAL];
+	  *sp++ = cbdata.keymap[REPODATA_KEYS];
+	  if (fileinfo[i].location)
+	    *sp++ = cbdata.keymap[REPODATA_LOCATION];
 	}
-      if (2 * fileinfo[i].nkeys > cbdata.mykeys[cbdata.keymap[REPODATA_KEYS]].size)
-	cbdata.mykeys[cbdata.keymap[REPODATA_KEYS]].size = 2 * fileinfo[i].nkeys;
+      *sp = 0;
+      repodataschemata[i] = addschema(&cbdata, schema);
+      cbdata.mykeys[cbdata.keymap[REPODATA_KEYS]].size += 2 * fileinfo[i].nkeys + 1;
       for (j = 1; j < fileinfo[i].nkeys; j++)
 	{
 	  needid[fileinfo[i].keys[j].type].need++;
 	  needid[fileinfo[i].keys[j].name].need++;
 	}
-#if 0
-      fprintf (stderr, " %d nkeys: %d:", i, fileinfo[i].nkeys);
-      for (j = 1; j < fileinfo[i].nkeys; j++)
-        {
-	  needid[fileinfo[i].keys[j].name].need++;
-	  fprintf (stderr, " %s(%d,%d)", id2str(pool, fileinfo[i].keys[j].name),
-	           fileinfo[i].keys[j].name, fileinfo[i].keys[j].type);
-	}
-      fprintf (stderr, "\n");
-#endif
     }
-  if (nsubfiles)
-    cbdata.mykeys[cbdata.keymap[REPODATA_KEYS]].size -= 2;
 
 /********************************************************************/
 
@@ -1601,18 +1603,23 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  int j;
 
 	  cur = xd.len;
-	  if (fileinfo[i].location)
-	    data_addid(&xd, repodataschema);
-	  else
-	    data_addid(&xd, repodataschema_internal);
-	  /* key,type array + location, write idarray */
-	  for (j = 1; j < fileinfo[i].nkeys; j++)
+	  data_addid(&xd, repodataschemata[i]);
+	  if (fileinfo[i].addedfileprovides)
 	    {
-	      data_addideof(&xd, needid[fileinfo[i].keys[j].name].need, 0);
-	      data_addideof(&xd, needid[fileinfo[i].keys[j].type].need, j == fileinfo[i].nkeys - 1);
+	      for (j = 0; fileinfo[i].addedfileprovides[j]; j++)
+		data_addideof(&xd, needid[fileinfo[i].addedfileprovides[j]].need, fileinfo[i].addedfileprovides[j + 1] ? 0 : 1);
 	    }
-	  if (fileinfo[i].location)
-	    data_addblob(&xd, (unsigned char *)fileinfo[i].location, strlen(fileinfo[i].location) + 1);
+	  else
+	    {
+	      /* key,type array + location, write idarray */
+	      for (j = 1; j < fileinfo[i].nkeys; j++)
+		{
+		  data_addideof(&xd, needid[fileinfo[i].keys[j].name].need, 0);
+		  data_addideof(&xd, needid[fileinfo[i].keys[j].type].need, j == fileinfo[i].nkeys - 1);
+		}
+	      if (fileinfo[i].location)
+		data_addblob(&xd, (unsigned char *)fileinfo[i].location, strlen(fileinfo[i].location) + 1);
+	    }
 	  cur = xd.len - cur;
 	  if (cur > max)
 	    max = cur;
@@ -1716,4 +1723,5 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   sat_free(cbdata.keymapstart);
   sat_free(cbdata.dirused);
   sat_free(repodataused);
+  sat_free(repodataschemata);
 }

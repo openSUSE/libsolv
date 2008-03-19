@@ -465,8 +465,9 @@ key_cmp (const void *pa, const void *pb)
 static void repodata_load_solv(Repodata *data);
 
 static void
-parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, unsigned numrel, Repo *repo)
+parse_external_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, unsigned numrel)
 {
+  Repo *repo = maindata->repo;
   Id key, id;
   Id *ida, *ide;
   Repodata *data;
@@ -493,12 +494,12 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	    }
 	  /* read_idarray writes a terminating 0, that's why the + 1 */
 	  ida = sat_calloc(keys[key].size + 1, sizeof(Id));
-	  ide = read_idarray(maindata, 0, 0, ida, ida + keys[key].size + 1);
+	  ide = read_idarray(maindata, numid, idmap, ida, ida + keys[key].size + 1);
 	  n = ide - ida - 1;
 	  if (n & 1)
 	    {
 	      pool_debug (mypool, SAT_ERROR, "invalid attribute data\n");
-	      data->error = SOLV_ERROR_CORRUPT;
+	      maindata->error = SOLV_ERROR_CORRUPT;
 	      return;
 	    }
 	  data->nkeys = 1 + (n >> 1);
@@ -506,14 +507,8 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	  memset(data->keys, 0, sizeof(Repokey));
 	  for (i = 1, ide = ida; i < data->nkeys; i++)
 	    {
-	      if (*ide >= numid)
-		{
-		  pool_debug (mypool, SAT_ERROR, "invalid attribute data\n");
-		  data->error = SOLV_ERROR_CORRUPT;
-		  return;
-		}
-	      data->keys[i].name = idmap ? idmap[*ide++] : *ide++;
-	      data->keys[i].type = idmap ? idmap[*ide++] : *ide++;
+	      data->keys[i].name = *ide++;
+	      data->keys[i].type = *ide++;
 	      data->keys[i].size = 0;
 	      data->keys[i].storage = 0;
 	    }
@@ -539,6 +534,26 @@ parse_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned 
 	  skip_item(maindata, keys[key].type, numid, numrel);
 	  break;
 	}
+    }
+}
+
+static void
+parse_info_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsigned numid, unsigned numrel)
+{
+  Id key, id;
+  Id *ida;
+  while ((key = *keyp++) != 0)
+    {
+      id = keys[key].name;
+      if (id == REPODATA_ADDEDFILEPROVIDES && keys[key].type == REPOKEY_TYPE_IDARRAY)
+	{
+	  /* + 1 just in case */
+	  ida = sat_calloc(keys[key].size + 1, sizeof(Id));
+	  read_idarray(maindata, numid, idmap, ida, ida + keys[key].size + 1);
+	  maindata->addedfileprovides = ida;
+	  continue;
+	}
+      skip_item(maindata, keys[key].type, numid, numrel);
     }
 }
 
@@ -1127,10 +1142,16 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       if (keys[key].name == REPODATA_EXTERNAL && keys[key].type == REPOKEY_TYPE_VOID)
 	{
 	  /* external data for some ids */
-	  parse_repodata(&data, keyp, keys, idmap, numid, numrel, repo);
+	  parse_external_repodata(&data, keyp, keys, idmap, numid, numrel);
+	}
+      else if (keys[key].name == REPODATA_INFO)
+	{
+	  parse_info_repodata(&data, keyp, keys, idmap, numid, numrel);
 	}
       else
-	skip_schema(&data, keyp, keys, numid, numrel);
+	{
+	  skip_schema(&data, keyp, keys, numid, numrel);
+	}
     }
 
 
@@ -1189,7 +1210,11 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     s = 0;
 
   if (have_xdata)
-    repodata_extend_block(&data, data.start, numsolv);
+    {
+      /* reserve one byte so that all offsets are not zero */
+      incore_add_id(&data, 0);
+      repodata_extend_block(&data, data.start, numsolv);
+    }
 
   left = 0;
   buf = sat_calloc(maxsize + 4, 1);

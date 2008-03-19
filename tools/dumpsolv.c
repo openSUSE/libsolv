@@ -33,6 +33,12 @@ dump_repodata (Repo *repo)
 	printf("  localpool has %d strings, size is %d\n", data->spool.nstrings, data->spool.sstrings);
       if (data->dirpool.ndirs)
 	printf("  localpool has %d directories\n", data->dirpool.ndirs);
+      if (data->addedfileprovides)
+	{
+	  printf("  added file provides:\n");
+	  for (j = 0; data->addedfileprovides[j]; j++)
+	    printf("    %s\n", id2str(repo->pool, data->addedfileprovides[j]));
+	}
       printf("\n");
     }
   printf("\n");

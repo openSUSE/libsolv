@@ -48,9 +48,11 @@ KNOWNID(SYSTEM_SYSTEM,			"system:system"),
 KNOWNID(ARCH_SRC,			"src"),
 KNOWNID(ARCH_NOSRC,			"nosrc"),
 KNOWNID(ARCH_NOARCH,			"noarch"),
+KNOWNID(REPODATA_INFO,			"repodata:info"),
 KNOWNID(REPODATA_EXTERNAL,		"repodata:external"),
 KNOWNID(REPODATA_KEYS,			"repodata:keys"),
 KNOWNID(REPODATA_LOCATION,		"repodata:location"),
+KNOWNID(REPODATA_ADDEDFILEPROVIDES,	"repodata:addedfileprovides"),
 
 /* The void type is usable to encode one-valued attributes, they have
    no associated data.  This is useful to encode values which many solvables

@@ -29,6 +29,7 @@ typedef struct _Repodatafile
   unsigned checksumtype;
   struct _Repokey *keys;
   unsigned int nkeys;
+  Id *addedfileprovides;
 } Repodatafile;
 
 void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Repodatafile *fileinfo, int nsubfiles);

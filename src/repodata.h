@@ -101,6 +101,7 @@ typedef struct _Repodata {
   Id *attriddata;		/* their id space */
   unsigned int attriddatalen;
 
+  Id *addedfileprovides;
 } Repodata;
 
 /* Search key <keyname> (all keys, if keyname == 0) for Id <entry>
