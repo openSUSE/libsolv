@@ -1347,9 +1347,11 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 		{
 		  dps = dp;
 		  dp = data_skip(dp, REPOKEY_TYPE_IDARRAY);
-		  if (keys[key].storage == KEY_STORAGE_INCORE && idmap)
+		  if (keys[key].storage != KEY_STORAGE_INCORE)
+		    break;
+		  if (idmap)
 		    incore_map_idarray(&data, dps, idmap, numid);
-		  else if (keys[key].storage == KEY_STORAGE_INCORE)
+		  else
 		    incore_add_blob(&data, dps, dp - dps);
 		  break;
 		}

@@ -599,34 +599,35 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
 {
   Id dep, sid;
   const char *s, *sr;
+  struct searchfiles *csf;
 
   while ((dep = *ida++) != 0)
     {
+      csf = sf;
       while (ISRELDEP(dep))
 	{
 	  Reldep *rd;
 	  sid = pool->ss.nstrings + GETRELID(dep);
-	  if (MAPTST(&sf->seen, sid))
+	  if (MAPTST(&csf->seen, sid))
 	    {
 	      dep = 0;
 	      break;
 	    }
-	  MAPSET(&sf->seen, sid);
+	  MAPSET(&csf->seen, sid);
 	  rd = GETRELDEP(pool, dep);
 	  if (rd->flags < 8)
 	    dep = rd->name;
 	  else if (rd->flags == REL_NAMESPACE)
 	    {
-	      if (isf && (rd->name == NAMESPACE_INSTALLED || rd->name == NAMESPACE_SPLITPROVIDES))
+	      if (rd->name == NAMESPACE_INSTALLED || rd->name == NAMESPACE_SPLITPROVIDES)
 		{
-		  sf = isf;
-		  isf = 0;
-		  if (MAPTST(&sf->seen, sid))
+		  csf = isf;
+		  if (!csf || MAPTST(&csf->seen, sid))
 		    {
 		      dep = 0;
 		      break;
 		    }
-		  MAPSET(&sf->seen, sid);
+		  MAPSET(&csf->seen, sid);
 		}
 	      dep = rd->evr;
 	    }
@@ -635,29 +636,29 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
 	      Id ids[2];
 	      ids[0] = rd->name;
 	      ids[1] = 0;
-	      pool_addfileprovides_dep(pool, ids, sf, isf);
+	      pool_addfileprovides_dep(pool, ids, csf, isf);
 	      dep = rd->evr;
 	    }
 	}
       if (!dep)
 	continue;
-      if (MAPTST(&sf->seen, dep))
+      if (MAPTST(&csf->seen, dep))
 	continue;
-      MAPSET(&sf->seen, dep);
+      MAPSET(&csf->seen, dep);
       s = id2str(pool, dep);
       if (*s != '/')
 	continue;
-      sf->ids = sat_extend(sf->ids, sf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
-      sf->dirs = sat_extend(sf->dirs, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
-      sf->names = sat_extend(sf->names, sf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
-      sf->ids[sf->nfiles] = dep;
+      csf->ids = sat_extend(csf->ids, csf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
+      csf->dirs = sat_extend(csf->dirs, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
+      csf->names = sat_extend(csf->names, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
+      csf->ids[csf->nfiles] = dep;
       sr = strrchr(s, '/');
-      sf->names[sf->nfiles] = strdup(sr + 1);
-      sf->dirs[sf->nfiles] = sat_malloc(sr - s + 1);
+      csf->names[csf->nfiles] = strdup(sr + 1);
+      csf->dirs[csf->nfiles] = sat_malloc(sr - s + 1);
       if (sr != s)
-        strncpy(sf->dirs[sf->nfiles], s, sr - s);
-      sf->dirs[sf->nfiles][sr - s] = 0;
-      sf->nfiles++;
+        strncpy(csf->dirs[csf->nfiles], s, sr - s);
+      csf->dirs[csf->nfiles][sr - s] = 0;
+      csf->nfiles++;
     }
 }
 
@@ -783,7 +784,7 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
 {
   Solvable *s;
   Repo *repo;
-  struct searchfiles sf, isf;
+  struct searchfiles sf, isf, *isfp;
   struct addfileprovides_cbdata cbd;
   int i;
 
@@ -792,27 +793,28 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
   memset(&isf, 0, sizeof(isf));
   map_init(&isf.seen, pool->ss.nstrings + pool->nrels);
 
+  isfp = installed ? &isf : 0;
   for (i = 1, s = pool->solvables + i; i < pool->nsolvables; i++, s++)
     {
       repo = s->repo;
       if (!repo)
 	continue;
       if (s->obsoletes)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->obsoletes, &sf, &isf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->obsoletes, &sf, isfp);
       if (s->conflicts)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->conflicts, &sf, &isf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->conflicts, &sf, isfp);
       if (s->requires)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->requires, &sf, &isf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->requires, &sf, isfp);
       if (s->recommends)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->recommends, &sf, &isf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->recommends, &sf, isfp);
       if (s->suggests)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->suggests, &sf, &isf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->suggests, &sf, isfp);
       if (s->supplements)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->supplements, &sf, &isf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->supplements, &sf, isfp);
       if (s->enhances)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->enhances, &sf, &isf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->enhances, &sf, isfp);
       if (s->freshens)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->freshens, &sf, &isf);
+        pool_addfileprovides_dep(pool, repo->idarraydata + s->freshens, &sf, isfp);
     }
   map_free(&sf.seen);
   map_free(&isf.seen);
@@ -845,13 +847,14 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
       sat_free(sf.dirs);
       sat_free(sf.names);
     }
-  if (isf.nfiles && installed)
+  if (isf.nfiles)
     {
 #if 0
       for (i = 0; i < isf.nfiles; i++)
 	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", id2str(pool, isf.ids[i]));
 #endif
-      pool_addfileprovides_search(pool, &cbd, &isf, installed);
+      if (installed)
+        pool_addfileprovides_search(pool, &cbd, &isf, installed);
       sat_free(isf.ids);
       for (i = 0; i < isf.nfiles; i++)
 	{

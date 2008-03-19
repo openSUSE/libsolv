@@ -1040,52 +1040,56 @@ repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str)
   data->attrdatalen += l;
 }
 
+static void
+repoadata_add_array(Repodata *data, Id entry, Id keyname, Id keytype, int entrysize)
+{
+  int oldsize;
+  Id *ida, *pp;
+
+  pp = 0;
+  if (data->attrs && data->attrs[entry])
+    for (pp = data->attrs[entry]; *pp; pp += 2)
+      if (data->keys[*pp].name == keyname && data->keys[*pp].type == keytype)
+        break;
+  if (!pp || !*pp)
+    {
+      /* not found. allocate new key */
+      Repokey key;
+      key.name = keyname;
+      key.type = keytype;
+      key.size = 0;
+      key.storage = KEY_STORAGE_INCORE;
+      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+      repodata_set(data, entry, &key, data->attriddatalen);
+      return;
+    }
+  oldsize = 0;
+  for (ida = data->attriddata + pp[1]; *ida; ida += entrysize)
+    oldsize += entrysize;
+  if (ida + 1 == data->attriddata + data->attriddatalen)
+    {
+      /* this was the last entry, just append it */
+      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+      data->attriddatalen--;	/* overwrite terminating 0  */
+    }
+  else
+    {
+      /* too bad. move to back. */
+      data->attriddata = sat_extend(data->attriddata, data->attriddatalen,  oldsize + entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+      memcpy(data->attriddata + data->attriddatalen, data->attriddata + pp[1], oldsize * sizeof(Id));
+      pp[1] = data->attriddatalen;
+      data->attriddatalen += oldsize;
+    }
+}
+
 void
 repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2)
 {
-  Id *ida, *pp;
-  Repokey key;
 
 #if 0
 fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, num2, data->attriddatalen);
 #endif
-  if (data->attrs && data->attrs[entry])
-    {
-      for (pp = data->attrs[entry]; *pp; pp += 2)
-        if (data->keys[*pp].name == keyname && data->keys[*pp].type == REPOKEY_TYPE_DIRNUMNUMARRAY)
-	  break;
-      if (*pp)
-	{
-	  int oldsize = 0;
-	  for (ida = data->attriddata + pp[1]; *ida; ida += 3)
-	    oldsize += 3;
-	  if (ida + 1 == data->attriddata + data->attriddatalen)
-	    {
-	      /* this was the last entry, just append it */
-	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 3, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-	      data->attriddatalen--;	/* overwrite terminating 0  */
-	    }
-	  else
-	    {
-	      /* too bad. move to back. */
-	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen,  oldsize + 4, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-	      memcpy(data->attriddata + data->attriddatalen, data->attriddata + pp[1], oldsize * sizeof(Id));
-	      pp[1] = data->attriddatalen;
-	      data->attriddatalen += oldsize;
-	    }
-	  data->attriddata[data->attriddatalen++] = dir;
-	  data->attriddata[data->attriddatalen++] = num;
-	  data->attriddata[data->attriddatalen++] = num2;
-	  data->attriddata[data->attriddatalen++] = 0;
-	  return;
-	}
-    }
-  key.name = keyname;
-  key.type = REPOKEY_TYPE_DIRNUMNUMARRAY;
-  key.size = 0;
-  key.storage = KEY_STORAGE_INCORE;
-  data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 4, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-  repodata_set(data, entry, &key, data->attriddatalen);
+  repoadata_add_array(data, entry, keyname, REPOKEY_TYPE_DIRNUMNUMARRAY, 3);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = num;
   data->attriddata[data->attriddatalen++] = num2;
@@ -1095,8 +1099,7 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, nu
 void
 repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *str)
 {
-  Id *ida, *pp, stroff;
-  Repokey key;
+  Id stroff;
   int l;
 
   l = strlen(str) + 1;
@@ -1108,42 +1111,7 @@ repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *st
 #if 0
 fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->attriddatalen);
 #endif
-  if (data->attrs && data->attrs[entry])
-    {
-      for (pp = data->attrs[entry]; *pp; pp += 2)
-        if (data->keys[*pp].name == keyname && data->keys[*pp].type == REPOKEY_TYPE_DIRSTRARRAY)
-	  break;
-      if (*pp)
-	{
-	  int oldsize = 0;
-	  for (ida = data->attriddata + pp[1]; *ida; ida += 2)
-	    oldsize += 2;
-	  if (ida + 1 == data->attriddata + data->attriddatalen)
-	    {
-	      /* this was the last entry, just append it */
-	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 2, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-	      data->attriddatalen--;	/* overwrite terminating 0  */
-	    }
-	  else
-	    {
-	      /* too bad. move to back. */
-	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, oldsize + 3, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-	      memcpy(data->attriddata + data->attriddatalen, data->attriddata + pp[1], oldsize * sizeof(Id));
-	      pp[1] = data->attriddatalen;
-	      data->attriddatalen += oldsize;
-	    }
-	  data->attriddata[data->attriddatalen++] = dir;
-	  data->attriddata[data->attriddatalen++] = stroff;
-	  data->attriddata[data->attriddatalen++] = 0;
-	  return;
-	}
-    }
-  key.name = keyname;
-  key.type = REPOKEY_TYPE_DIRSTRARRAY;
-  key.size = 0;
-  key.storage = KEY_STORAGE_INCORE;
-  data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 3, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-  repodata_set(data, entry, &key, data->attriddatalen);
+  repoadata_add_array(data, entry, keyname, REPOKEY_TYPE_DIRSTRARRAY, 2);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = stroff;
   data->attriddata[data->attriddatalen++] = 0;
@@ -1152,48 +1120,10 @@ fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->a
 void
 repodata_add_idarray(Repodata *data, Id entry, Id keyname, Id id)
 {
-  Id *ida, *pp;
-  Repokey key;
-
 #if 0
 fprintf(stderr, "repodata_add_idarray %d %d (%d)\n", entry, id, data->attriddatalen);
 #endif
-  if (data->attrs && data->attrs[entry])
-    {
-      for (pp = data->attrs[entry]; *pp; pp += 2)
-        if (data->keys[*pp].name == keyname
-	    && data->keys[*pp].type == REPOKEY_TYPE_IDARRAY)
-	  break;
-      if (*pp)
-	{
-	  int oldsize = 0;
-	  for (ida = data->attriddata + pp[1]; *ida; ida++)
-	    oldsize++;
-	  if (ida + 1 == data->attriddata + data->attriddatalen)
-	    {
-	      /* this was the last entry, just append it */
-	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-	      data->attriddatalen--;	/* overwrite terminating 0  */
-	    }
-	  else
-	    {
-	      /* too bad. move to back. */
-	      data->attriddata = sat_extend(data->attriddata, data->attriddatalen,  oldsize + 2, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-	      memcpy(data->attriddata + data->attriddatalen, data->attriddata + pp[1], oldsize * sizeof(Id));
-	      pp[1] = data->attriddatalen;
-	      data->attriddatalen += oldsize;
-	    }
-	  data->attriddata[data->attriddatalen++] = id;
-	  data->attriddata[data->attriddatalen++] = 0;
-	  return;
-	}
-    }
-  key.name = keyname;
-  key.type = REPOKEY_TYPE_IDARRAY;
-  key.size = 0;
-  key.storage = KEY_STORAGE_INCORE;
-  data->attriddata = sat_extend(data->attriddata, data->attriddatalen, 2, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-  repodata_set(data, entry, &key, data->attriddatalen);
+  repoadata_add_array(data, entry, keyname, REPOKEY_TYPE_IDARRAY, 1);
   data->attriddata[data->attriddatalen++] = id;
   data->attriddata[data->attriddatalen++] = 0;
 }
