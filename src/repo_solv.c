@@ -623,6 +623,32 @@ incore_add_blob(Repodata *data, unsigned char *buf, int len)
 }
 
 static void
+incore_map_idarray(Repodata *data, unsigned char *dp, Id *map, Id max)
+{
+  /* We have to map the IDs, which might also change
+     the necessary number of bytes, so we can't just copy
+     over the blob and adjust it.  */
+  for (;;)
+    {
+      Id id;
+      int eof;
+      dp = data_read_ideof(dp, &id, &eof);
+      if (max && id >= max)
+	{
+	  pool_debug(mypool, SAT_ERROR, "incore_map_idarray: id too large (%u/%u)\n", id, max);
+	  data->error = SOLV_ERROR_ID_RANGE;
+	  break;
+	}
+      id = map[id];
+      if (id >= 64)
+	id = (id & 63) | ((id & ~63) << 1);
+      incore_add_id(data, eof ? id : id | 64);
+      if (eof)
+	break;
+    }
+}
+
+static void
 incore_add_u32(Repodata *data, unsigned int x)
 {
   unsigned char *dp;
@@ -1322,8 +1348,8 @@ fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, key
 		  dps = dp;
 		  dp = data_skip(dp, REPOKEY_TYPE_IDARRAY);
 		  if (keys[key].storage == KEY_STORAGE_INCORE && idmap)
-		    abort();
-		  if (keys[key].storage == KEY_STORAGE_INCORE)
+		    incore_map_idarray(&data, dps, idmap, numid);
+		  else if (keys[key].storage == KEY_STORAGE_INCORE)
 		    incore_add_blob(&data, dps, dp - dps);
 		  break;
 		}
