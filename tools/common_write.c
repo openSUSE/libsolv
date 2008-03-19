@@ -158,7 +158,8 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 
   fileinfos = sat_zextend(fileinfos, nfileinfos, 1, sizeof(Repodatafile), REPODATAFILE_BLOCK);
   pool_addfileprovides_ids(repo->pool, 0, &fileinfos[nfileinfos].addedfileprovides);
-  nfileinfos++;
+  if (fileinfos[nfileinfos].addedfileprovides)
+    nfileinfos++;
 
   if (basename)
     {
