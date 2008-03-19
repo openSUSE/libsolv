@@ -946,7 +946,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 
       key = cbdata.mykeys + cbdata.nmykeys;
       key->name = REPODATA_ADDEDFILEPROVIDES;
-      key->type = REPOKEY_TYPE_IDARRAY;
+      key->type = REPOKEY_TYPE_REL_IDARRAY;
       key->size = 0;
       key->storage = KEY_STORAGE_SOLVABLE;
       cbdata.keymap[key->name] = cbdata.nmykeys++;
@@ -1606,8 +1606,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  data_addid(&xd, repodataschemata[i]);
 	  if (fileinfo[i].addedfileprovides)
 	    {
-	      for (j = 0; fileinfo[i].addedfileprovides[j]; j++)
-		data_addideof(&xd, needid[fileinfo[i].addedfileprovides[j]].need, fileinfo[i].addedfileprovides[j + 1] ? 0 : 1);
+	      data_addidarray_sort(&xd, pool, needid, fileinfo[i].addedfileprovides, 0);
 	    }
 	  else
 	    {

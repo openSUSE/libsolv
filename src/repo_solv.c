@@ -545,12 +545,23 @@ parse_info_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsi
   while ((key = *keyp++) != 0)
     {
       id = keys[key].name;
-      if (id == REPODATA_ADDEDFILEPROVIDES && keys[key].type == REPOKEY_TYPE_IDARRAY)
+      if (id == REPODATA_ADDEDFILEPROVIDES && keys[key].type == REPOKEY_TYPE_REL_IDARRAY)
 	{
+	  Id old = 0;
 	  /* + 1 just in case */
 	  ida = sat_calloc(keys[key].size + 1, sizeof(Id));
-	  read_idarray(maindata, numid, idmap, ida, ida + keys[key].size + 1);
+	  read_idarray(maindata, 0, 0, ida, ida + keys[key].size + 1);
 	  maindata->addedfileprovides = ida;
+	  for (; *ida; ida++)
+	    {
+	      old += *ida - 1;
+	      if (old >= numid)
+		{
+		  *ida = 0;
+		  break;
+		}
+	      *ida = idmap ? idmap[old] : old;
+	    }
 	  continue;
 	}
       skip_item(maindata, keys[key].type, numid, numrel);
