@@ -7,7 +7,7 @@
 
 /*
  * knownid.h
- * 
+ *
  */
 
 #undef KNOWNID
@@ -96,6 +96,12 @@ KNOWNID(SOLVABLE_ISVISIBLE,		"solvable:isvisible"),
 
 KNOWNID(SOLVABLE_PATCHCATEGORY,		"solvable:patchcategory"),
 KNOWNID(SOLVABLE_HEADEREND,		"solvable:headerend"),
+
+KNOWNID(SOLVABLE_CATEGORY,		"solvable:category"),
+KNOWNID(SOLVABLE_INCLUDES,		"solvable:includes"),
+KNOWNID(SOLVABLE_EXTENDS,		"solvable:extends"),
+KNOWNID(SOLVABLE_ICON,			"solvable:icon"),
+KNOWNID(SOLVABLE_ORDER,			"solvable:order"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
