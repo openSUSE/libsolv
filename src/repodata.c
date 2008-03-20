@@ -1202,6 +1202,13 @@ repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
   return str;
 }
 
+Id repodata_globalize_id(Repodata *data, Id id)
+{ 
+  if (!data || !data->localpool)
+    return id;
+  return str2id(data->repo->pool, stringpool_id2str(&data->spool, id), 1);
+}
+
 void
 repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2)
 {

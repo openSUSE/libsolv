@@ -159,4 +159,6 @@ const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
 unsigned int repodata_compress_page(unsigned char *, unsigned int, unsigned char *, unsigned int);
 void repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz);
 
+Id repodata_globalize_id(Repodata *data, Id id);
+
 #endif /* SATSOLVER_REPODATA_H */
