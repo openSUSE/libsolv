@@ -74,6 +74,7 @@ KNOWNID(REPOKEY_TYPE_DIRSTRARRAY,	"repokey:type:dirstrarray"),
 KNOWNID(REPOKEY_TYPE_DIRNUMNUMARRAY,	"repokey:type:dirnumnumarray"),
 KNOWNID(REPOKEY_TYPE_MD5,		"repokey:type:md5"),
 KNOWNID(REPOKEY_TYPE_SHA1,		"repokey:type:sha1"),
+KNOWNID(REPOKEY_TYPE_SHA256,		"repokey:type:sha256"),
 
 KNOWNID(SOLVABLE_SUMMARY,		"solvable:summary"),
 KNOWNID(SOLVABLE_DESCRIPTION,		"solvable:description"),

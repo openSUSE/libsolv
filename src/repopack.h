@@ -90,6 +90,9 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
     case REPOKEY_TYPE_SHA1:
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA1;
+    case REPOKEY_TYPE_SHA256:
+      kv->str = (const char *)dp;
+      return dp + SIZEOF_SHA256;
     case REPOKEY_TYPE_IDARRAY:
       return data_read_ideof(dp, &kv->id, &kv->eof);
     case REPOKEY_TYPE_DIRSTRARRAY:
@@ -127,6 +130,8 @@ data_skip(unsigned char *dp, int type)
       return dp + SIZEOF_MD5;
     case REPOKEY_TYPE_SHA1:
       return dp + SIZEOF_SHA1;
+    case REPOKEY_TYPE_SHA256:
+      return dp + SIZEOF_SHA256;
     case REPOKEY_TYPE_IDARRAY:
     case REPOKEY_TYPE_REL_IDARRAY:
       while ((*dp & 0xc0) != 0)
@@ -190,6 +195,8 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
       return dp + SIZEOF_MD5;
     case REPOKEY_TYPE_SHA1:
       return dp + SIZEOF_SHA1;
+    case REPOKEY_TYPE_SHA256:
+      return dp + SIZEOF_SHA256;
     case REPOKEY_TYPE_ID:
       dp = data_read_id(dp, &id);
       if (id >= maxid)

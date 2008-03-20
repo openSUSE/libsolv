@@ -1082,18 +1082,31 @@ repoadata_add_array(Repodata *data, Id entry, Id keyname, Id keytype, int entrys
     }
 }
 
+static inline int
+checksumtype2len(Id type)
+{
+  switch (type)
+    {
+    case REPOKEY_TYPE_MD5:
+      return SIZEOF_MD5;
+    case REPOKEY_TYPE_SHA1:
+      return SIZEOF_SHA1;
+    case REPOKEY_TYPE_SHA256:
+      return SIZEOF_SHA256;
+    default:
+      return 0;
+    }
+}
+
 void
 repodata_set_bin_checksum(Repodata *data, Id entry, Id keyname, Id type,
 		      const unsigned char *str)
 {
   Repokey key;
-  int l;
-  switch (type)
-    {
-      case REPOKEY_TYPE_MD5: l = SIZEOF_MD5; break;
-      case REPOKEY_TYPE_SHA1: l = SIZEOF_SHA1; break;
-      default: return;
-    }
+  int l = checksumtype2len(type);
+
+  if (!l)
+    return;
   key.name = keyname;
   key.type = type;
   key.size = 0;
@@ -1133,17 +1146,14 @@ void
 repodata_set_checksum(Repodata *data, Id entry, Id keyname, Id type,
 		      const char *str)
 {
-  int l;
-  switch (type)
-    {
-      case REPOKEY_TYPE_MD5: l = SIZEOF_MD5; break;
-      case REPOKEY_TYPE_SHA1: l = SIZEOF_SHA1; break;
-      default: return;
-    }
-  unsigned char buf[l];
+  unsigned char buf[64];
+  int l = checksumtype2len(type);
+
+  if (!l)
+    return;
   if (hexstr2bytes(buf, str, l) != l)
     {
-      fprintf(stderr, "Invalid hex character in %s\n", str);
+      fprintf(stderr, "Invalid hex character in '%s'\n", str);
       return;
     }
   repodata_set_bin_checksum(data, entry, keyname, type, buf);
@@ -1154,20 +1164,18 @@ repodata_chk2str(Repodata *data, Id type, const char *buf)
 {
   int i, l;
   char *str, *s;
-  switch (type)
-    {
-      case REPOKEY_TYPE_MD5: l = SIZEOF_MD5; break;
-      case REPOKEY_TYPE_SHA1: l = SIZEOF_SHA1; break;
-      default: return id2str(data->repo->pool, ID_EMPTY);
-    }
-  s = str = pool_alloctmpspace(data->repo->pool, 2*l + 1);
-  for (i = 0; i < l; i++, s+=2)
+
+  l = checksumtype2len(type);
+  if (!l)
+    return "";
+  s = str = pool_alloctmpspace(data->repo->pool, 2 * l + 1);
+  for (i = 0; i < l; i++)
     {
       unsigned char v = buf[i];
       unsigned char w = v >> 4;
-      s[0] = w >= 10 ? (w-10)+'a' : w + '0';
+      *s++ = w >= 10 ? w + ('a' - 10) : w + '0';
       w = v & 15;
-      s[1] = w >= 10 ? (w-10)+'a' : w + '0';
+      *s++ = w >= 10 ? w + ('a' - 10) : w + '0';
     }
   *s = 0;
   return str;
