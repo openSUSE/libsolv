@@ -205,6 +205,7 @@ solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep)
   Repodata *data;
   int i, j, n;
 
+  *typep = 0;
   if (!repo)
     return 0;
   pool = repo->pool;
