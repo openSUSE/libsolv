@@ -124,6 +124,7 @@ const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);
  */
 int repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value);
 int repodata_lookup_void(Repodata *data, Id entry, Id keyid);
+const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyid, Id *typep);
 
 void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
 void repodata_extend(Repodata *data, Id p);
@@ -153,7 +154,7 @@ void repodata_disable_paging(Repodata *data);
 
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
-const char *repodata_chk2str(Repodata *data, Id type, const char *buf);
+const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
 
 unsigned int repodata_compress_page(unsigned char *, unsigned int, unsigned char *, unsigned int);
 void repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz);

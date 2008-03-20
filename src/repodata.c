@@ -450,6 +450,27 @@ repodata_lookup_void(Repodata *data, Id entry, Id keyid)
   return 1;
 }
 
+const unsigned char *
+repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyid, Id *typep)
+{
+  Id schema;
+  Id *keyp;
+  Repokey *key;
+  unsigned char *dp;
+
+  if (!maybe_load_repodata(data, &keyid))
+    return 0;
+  dp = data->incoredata + data->incoreoffset[entry];
+  dp = data_read_id(dp, &schema);
+  for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
+    if (!*keyp)
+      return 0;
+  dp = forward_to_key(data, keyid, schema, dp);
+  key = data->keys + keyid;
+  *typep = key->type;
+  return get_data(data, key, &dp);
+}
+
 void
 repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
 {
@@ -1160,7 +1181,7 @@ repodata_set_checksum(Repodata *data, Id entry, Id keyname, Id type,
 }
 
 const char *
-repodata_chk2str(Repodata *data, Id type, const char *buf)
+repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
 {
   int i, l;
   char *str, *s;

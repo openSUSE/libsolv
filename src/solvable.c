@@ -197,6 +197,46 @@ solvable_lookup_void(Solvable *s, Id keyname)
   return 0;
 }
 
+const unsigned char *
+solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep)
+{
+  Repo *repo = s->repo;
+  Pool *pool;
+  Repodata *data;
+  int i, j, n;
+
+  if (!repo)
+    return 0;
+  pool = repo->pool;
+  n = s - pool->solvables;
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      if (n < data->start || n >= data->end)
+        continue;
+      for (j = 1; j < data->nkeys; j++)
+        {
+          if (data->keys[j].name == keyname
+              && (data->keys[j].type == REPOKEY_TYPE_MD5
+		  || data->keys[j].type == REPOKEY_TYPE_SHA1
+		  || data->keys[j].type == REPOKEY_TYPE_SHA256))
+	    {
+	      const unsigned char *chk = repodata_lookup_bin_checksum(data, n - data->start, j, typep);
+	      if (chk)
+		return chk;
+	    }
+	}
+    }
+  return 0;
+}
+
+const char *
+solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep)
+{
+  const unsigned char *chk = solvable_lookup_bin_checksum(s, keyname, typep);
+  /* we need the repodata just as a reference for a pool */
+  return chk ? repodata_chk2str(s->repo->repodata, *typep, chk) : 0;
+}
+
 char *
 solvable_get_location(Solvable *s, unsigned int *medianrp)
 {

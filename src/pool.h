@@ -171,6 +171,9 @@ const char *solvable_lookup_str(Solvable *s, Id keyname);
 const char *solvable_lookup_str_lang(Solvable *s, Id keyname);
 int solvable_lookup_bool(Solvable *s, Id keyname);
 char * solvable_get_location(Solvable *s, unsigned int *medianrp);
+const unsigned char *solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep);
+const char *solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep);
+
 
 
 
