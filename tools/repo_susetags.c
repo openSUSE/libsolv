@@ -842,10 +842,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    repodata_set_str(data, last_found_pack, SOLVABLE_ICON, line + 6);
 	    break;
 	  case CTAG('=', 'E', 'x', 't'):
-	    repodata_add_poolstr_array(data, last_found_pack, SOLVABLE_EXTENDS, line + 6);
+	    repodata_add_poolstr_array(data, last_found_pack, SOLVABLE_EXTENDS, join2("pattern", ":", line + 6));
 	    break;
 	  case CTAG('=', 'I', 'n', 'c'):
-	    repodata_add_poolstr_array(data, last_found_pack, SOLVABLE_INCLUDES, line + 6);
+	    repodata_add_poolstr_array(data, last_found_pack, SOLVABLE_INCLUDES, join2("pattern", ":", line + 6));
 	    break;
 	  case CTAG('=', 'C', 'k', 's'):
 	    set_checksum(data, last_found_pack, SOLVABLE_CHECKSUM, line + 6);
