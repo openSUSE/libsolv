@@ -166,6 +166,7 @@ extern const char *solvable2str(Pool *pool, Solvable *s);
 
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
 
+Id solvable_lookup_id(Solvable *s, Id keyname);
 unsigned int solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound);
 const char *solvable_lookup_str(Solvable *s, Id keyname);
 const char *solvable_lookup_str_poollang(Solvable *s, Id keyname);

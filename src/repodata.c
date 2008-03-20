@@ -363,6 +363,35 @@ maybe_load_repodata(Repodata *data, Id *keyid)
   return 0;
 }
 
+Id
+repodata_lookup_id(Repodata *data, Id entry, Id keyid)
+{
+  Id schema;
+  Repokey *key;
+  Id id, *keyp;
+  unsigned char *dp;
+
+  if (!maybe_load_repodata(data, &keyid))
+    return 0;
+  dp = data->incoredata + data->incoreoffset[entry];
+  dp = data_read_id(dp, &schema);
+  /* make sure the schema of this solvable contains the key */
+  for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
+    if (!*keyp)
+      return 0;
+  dp = forward_to_key(data, keyid, schema, dp);
+  key = data->keys + keyid;
+  dp = get_data(data, key, &dp);
+  if (!dp)
+    return 0;
+  if (key->type == REPOKEY_TYPE_CONSTANTID)
+    return key->size;
+  if (key->type != REPOKEY_TYPE_ID)
+    return 0;
+  dp = data_read_id(dp, &id);
+  return id;
+}
+
 const char *
 repodata_lookup_str(Repodata *data, Id entry, Id keyid)
 {

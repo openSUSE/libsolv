@@ -34,6 +34,50 @@ solvable2str(Pool *pool, Solvable *s)
   return p;
 }
 
+Id
+solvable_lookup_id(Solvable *s, Id keyname)
+{
+  Repo *repo = s->repo;
+  Pool *pool;
+  Repodata *data;
+  int i, j, n;
+
+  if (!repo)
+    return 0;
+  pool = repo->pool;
+  switch(keyname)
+    {   
+    case SOLVABLE_NAME:
+      return s->name;
+    case SOLVABLE_ARCH:
+      return s->arch;
+    case SOLVABLE_EVR:
+      return s->evr;
+    case SOLVABLE_VENDOR:
+      return s->vendor;
+    }   
+  n = s - pool->solvables;
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {   
+      if (n < data->start || n >= data->end)
+        continue;
+      for (j = 1; j < data->nkeys; j++)
+        {
+          if (data->keys[j].name == keyname && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID))
+	    {
+              Id id = repodata_lookup_id(data, n - data->start, j); 
+	      if (id)
+		{
+		  if (data->localpool)
+		    id = repodata_globalize_id(data, id);
+		  return id;
+		}
+	    }
+        }
+    }
+  return 0;
+}
+
 const char *
 solvable_lookup_str(Solvable *s, Id keyname)
 {

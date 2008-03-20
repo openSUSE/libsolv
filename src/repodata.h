@@ -108,29 +108,26 @@ typedef struct _Repodata {
   Id *addedfileprovides;
 } Repodata;
 
+/* management functions */
+void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
+void repodata_extend(Repodata *data, Id p);
+void repodata_extend_block(Repodata *data, Id p, int num);
+void repodata_free(Repodata *data);
+
 /* Search key <keyname> (all keys, if keyname == 0) for Id <entry>
  * <entry> is _relative_ Id for <data>
  * Call <callback> for each match
  */
 void repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
 
-/*
- * lookup string type attribute
- */
+/* lookup functions */
+Id repodata_lookup_id(Repodata *data, Id entry, Id keyid);
 const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);
-
-/*
- * lookup integer type attribute
- */
 int repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value);
 int repodata_lookup_void(Repodata *data, Id entry, Id keyid);
 const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyid, Id *typep);
 
-void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
-void repodata_extend(Repodata *data, Id p);
-void repodata_extend_block(Repodata *data, Id p, int num);
-void repodata_free(Repodata *data);
-
+/* data assignment */
 void repodata_set_id(Repodata *data, Id entry, Id keyname, Id id);
 void repodata_set_num(Repodata *data, Id entry, Id keyname, Id num);
 void repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str);
@@ -152,13 +149,15 @@ void repodata_merge_attrs (Repodata *data, Id dest, Id src);
 void repodata_internalize(Repodata *data);
 void repodata_disable_paging(Repodata *data);
 
+/* helper functions */
+Id repodata_globalize_id(Repodata *data, Id id);
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
 const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
 
+/* internal */
 unsigned int repodata_compress_page(unsigned char *, unsigned int, unsigned char *, unsigned int);
 void repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz);
 
-Id repodata_globalize_id(Repodata *data, Id id);
 
 #endif /* SATSOLVER_REPODATA_H */
