@@ -99,6 +99,12 @@ KNOWNID(SOLVABLE_SOURCENAME,		"solvable:sourcename"),
 KNOWNID(SOLVABLE_SOURCEEVR,		"solvable:sourceevr"),
 KNOWNID(SOLVABLE_ISVISIBLE,		"solvable:isvisible"),
 KNOWNID(SOLVABLE_CHECKSUM,		"solvable:checksum"),
+/* pkgid: md5sum over header + payload */
+KNOWNID(SOLVABLE_PKGID,			"solvable:pkgid"),
+/* hdrid: sha1sum over header only */
+KNOWNID(SOLVABLE_HDRID,			"solvable:hdrid"),
+/* leadsigid: md5sum over lead + sigheader */
+KNOWNID(SOLVABLE_LEADSIGID,		"solvable:leadsigid"),
 
 KNOWNID(SOLVABLE_PATCHCATEGORY,		"solvable:patchcategory"),
 KNOWNID(SOLVABLE_HEADEREND,		"solvable:headerend"),
