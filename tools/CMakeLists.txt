@@ -1,4 +1,3 @@
-
 SET(rpmdb2solv_REPOS
   rpmdb2solv.c
   repo_rpmdb.h
