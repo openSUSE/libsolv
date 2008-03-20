@@ -38,13 +38,6 @@ SET(mergesolv_REPOS mergesolv.c repo_write.c common_write.c)
 ADD_EXECUTABLE( mergesolv ${mergesolv_REPOS} )
 TARGET_LINK_LIBRARIES( mergesolv satsolver)
 
-#SET(dumpattr_REPOS dumpattr.c)
-#ADD_EXECUTABLE( dumpattr ${dumpattr_REPOS} )
-#TARGET_LINK_LIBRARIES( dumpattr satsolver)
-
-#ADD_EXECUTABLE( addstore addstore.c repo_write.c )
-#TARGET_LINK_LIBRARIES( addstore satsolver )
-
 install(TARGETS
                 mergesolv 
                 dumpsolv 
