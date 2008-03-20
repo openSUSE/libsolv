@@ -86,7 +86,8 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
       break;
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
-      printf("%s: %s\n", keyname, repodata_chk2str(data, key->type, kv->str));
+    case REPOKEY_TYPE_SHA256:
+      printf("%s: %s\n", keyname, repodata_chk2str(data, key->type, (unsigned char *)kv->str));
       break;
     case REPOKEY_TYPE_VOID:
       printf("%s: (void)\n", keyname);
