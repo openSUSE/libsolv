@@ -12,24 +12,30 @@
 
 #include "util.h"
 
+void
+sat_oom(size_t num, size_t len)
+{
+  if (num)
+    fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
+  else
+    fprintf(stderr, "Out of memory allocating %zu bytes!\n", num);
+  exit(1);
+}
+
 void *
 sat_malloc(size_t len)
 {
   void *r = malloc(len ? len : 1);
-  if (r)
-    return r;
-  fprintf(stderr, "Out of memory allocating %zu bytes!\n", len);
-  exit(1);
+  if (!r)
+    sat_oom(0, len);
+  return r;
 }
 
 void *
 sat_malloc2(size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
-    {
-      fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
-      exit(1);
-    }
+    sat_oom(num, len);
   return sat_malloc(num * len);
 }
 
@@ -40,20 +46,16 @@ sat_realloc(void *old, size_t len)
     old = malloc(len ? len : 1);
   else
     old = realloc(old, len ? len : 1);
-  if (old)
-    return old;
-  fprintf(stderr, "Out of memory reallocating %zu bytes!\n", len);
-  exit(1);
+  if (!old)
+    sat_oom(0, len);
+  return old;
 }
 
 void *
 sat_realloc2(void *old, size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
-    {
-      fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
-      exit(1);
-    }
+   sat_oom(num, len);
   return sat_realloc(old, num * len);
 }
 
@@ -65,10 +67,9 @@ sat_calloc(size_t num, size_t len)
     r = malloc(1);
   else
     r = calloc(num, len);
-  if (r)
-    return r;
-  fprintf(stderr, "Out of memory allocating %zu bytes!\n", num * len);
-  exit(1);
+  if (!r)
+    sat_oom(num, len);
+  return r;
 }
 
 void *

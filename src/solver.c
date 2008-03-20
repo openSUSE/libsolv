@@ -3569,7 +3569,7 @@ solver_solve(Solver *solv, Queue *job)
 	  if (MAPTST(&addedmap, i))
 	    possible++;
 	}
-      POOL_DEBUG(SAT_DEBUG_STATS, "%d of %d installable solvables considered for solving (rules has been generated for)\n", possible, installable);
+      POOL_DEBUG(SAT_DEBUG_STATS, "%d of %d installable solvables considered for solving\n", possible, installable);
     }
 
   /*
