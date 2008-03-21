@@ -38,8 +38,10 @@
 #define TAG_SUMMARY		1004
 #define TAG_DESCRIPTION		1005
 #define TAG_BUILDTIME		1006
+#define TAG_INSTALLTIME		1008
 #define TAG_SIZE                1009
 #define TAG_VENDOR		1011
+#define TAG_LICENSE		1014
 #define TAG_GROUP		1016
 #define TAG_ARCH		1022
 #define TAG_FILESIZES		1028
@@ -800,9 +802,15 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       str = headstring(rpmhead, TAG_GROUP);
       if (str)
         repodata_set_poolstr(repodata, entry, SOLVABLE_GROUP, str);
+      str = headstring(rpmhead, TAG_LICENSE);
+      if (str)
+        repodata_set_poolstr(repodata, entry, SOLVABLE_LICENSE, str);
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
         repodata_set_num(repodata, entry, SOLVABLE_BUILDTIME, u32);
+      u32 = headint32(rpmhead, TAG_INSTALLTIME);
+      if (u32)
+        repodata_set_num(repodata, entry, SOLVABLE_INSTALLTIME, u32);
       u32 = headint32(rpmhead, TAG_SIZE);
       if (u32)
         repodata_set_num(repodata, entry, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
@@ -1464,6 +1472,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
   FILE *fp;
   unsigned char lead[4096];
   int headerstart, headerend;
+  struct stat stb;
 
   if (nrpms <= 0)
     return;
@@ -1473,6 +1482,11 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
       if ((fp = fopen(rpms[i], "r")) == 0)
 	{
 	  perror(rpms[i]);
+	  continue;
+	}
+      if (fstat(fileno(fp), &stb))
+	{
+	  perror("stat");
 	  continue;
 	}
       if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
@@ -1566,7 +1580,11 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
       rpm2solv(pool, repo, repodata, s, rpmhead);
       add_location(repodata, s, rpms[i]);
       if (repodata)
-	repodata_set_num(repodata, (s - pool->solvables) - repodata->start, SOLVABLE_HEADEREND, headerend);
+	{
+	  Id entry = (s - pool->solvables) - repodata->start;
+	  repodata_set_num(repodata, entry, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
+	  repodata_set_num(repodata, entry, SOLVABLE_HEADEREND, headerend);
+	}
     }
   if (rpmhead)
     sat_free(rpmhead);
