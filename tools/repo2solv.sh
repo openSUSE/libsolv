@@ -97,5 +97,10 @@ elif test -d suse/setup/descr && test -s content; then
   ) | susetags2solv -c "${olddir}/content" $parser_options || exit 4
   cd "$olddir"
 else
-  exit 1
+  rpms=`ls -1 *.rpm`
+  if test -n "$rpms"; then
+      rpms2solv $rpms
+  else
+      exit 1
+  fi
 fi
