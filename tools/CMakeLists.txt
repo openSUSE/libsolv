@@ -46,6 +46,7 @@ install(TARGETS
                 helix2solv 
                 rpmmd2solv 
                 rpmdb2solv
+                rpms2solv
    DESTINATION ${BIN_INSTALL_DIR} )
 
 install(PROGRAMS repo2solv.sh DESTINATION ${BIN_INSTALL_DIR} )
