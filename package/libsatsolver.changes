@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Mar 24 15:31:18 CET 2008 - coolo@suse.de
+
+- install rpms2solv
+
+-------------------------------------------------------------------
 Mon Mar 17 16:10:22 CET 2008 - matz@suse.de
 
 - Initialize all allocated array members for blocky arrays (when it
