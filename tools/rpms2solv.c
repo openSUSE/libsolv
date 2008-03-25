@@ -51,7 +51,9 @@ main(int argc, char **argv)
     }
   if (manifest)
     {
-      if ((fp = fopen(manifest, "r")) == 0)
+      if (!strcmp(manifest, "-"))
+        fp = stdin;
+      else if ((fp = fopen(manifest, "r")) == 0)
 	{
 	  perror(manifest);
 	  exit(1);
@@ -63,7 +65,8 @@ main(int argc, char **argv)
           rpms = sat_extend(rpms, nrpms, 1, sizeof(char *), 15);
 	  rpms[nrpms++] = strdup(buf);
 	}
-      fclose(fp);
+      if (fp != stdin)
+        fclose(fp);
     }
   while (optind < argc)
     {
