@@ -312,9 +312,9 @@ void
 prune_best_arch_name_version(Solver *solv, Pool *pool, Queue *plist)
 {
   if (solv && solv->bestSolvableCb)
-     {   /* The application is responsible for */
-	 return solv->bestSolvableCb (solv->pool, plist);
-     }
+    { /* The application is responsible for */
+      return solv->bestSolvableCb(solv->pool, plist);
+    }
 
   if (plist->count > 1)
     prune_to_best_arch(pool, plist);
@@ -335,7 +335,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode)
   if (inst)
     queue_push(plist, inst);
 
-  prune_best_arch_name_version (solv, pool, plist);
+  prune_best_arch_name_version(solv, pool, plist);
 }
 
 
@@ -346,9 +346,9 @@ policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2)
   Id a1 = s1->arch, a2 = s2->arch;
 
   if (solv && solv->archCheckCb)
-     {   /* The application is responsible for */
-	 return solv->archCheckCb (solv->pool, s1, s2);
-     }
+    { /* The application is responsible for */
+      return solv->archCheckCb(solv->pool, s1, s2);
+    }
 
   /* we allow changes to/from noarch */
   if (a1 == a2 || a1 == ARCH_NOARCH || a2 == ARCH_NOARCH)
@@ -369,9 +369,9 @@ policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
   Id vendormask1, vendormask2;
 
   if (solv && solv->vendorCheckCb)
-     {   /* The application is responsible for */
-	 return solv->vendorCheckCb (solv->pool, s1, s2);
-     }
+   {   /* The application is responsible for */
+     return solv->vendorCheckCb(solv->pool, s1, s2);
+   }
 
   if (s1->vendor == s2->vendor)
     return 0;
@@ -397,9 +397,9 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
   queue_empty(qs);
 
   if (solv && solv->updateCandidateCb)
-     {   /* The application is responsible for */
-	 return solv->updateCandidateCb (solv->pool, s, qs);
-     }
+    { /* The application is responsible for */
+      return solv->updateCandidateCb(solv->pool, s, qs);
+    }
 
   /*
    * s = solvable ptr

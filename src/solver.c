@@ -1398,7 +1398,7 @@ propagate(Solver *solv, int level)
       pkg = -solv->decisionq.elements[solv->propagate_index++];
       IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
         {
-	  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "popagate for decision %d level %d\n", -pkg, level);
+	  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "propagate for decision %d level %d\n", -pkg, level);
 	  printruleelement(solv, SAT_DEBUG_PROPAGATE, 0, -pkg);
 	  if (0)
 	      printWatches(solv, SAT_DEBUG_SCHUBI);
@@ -2189,16 +2189,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	    {
 	      /* try to keep as many packages as possible */
 	      POOL_DEBUG(SAT_DEBUG_STATS, "installing system packages\n");
-	      for (i = solv->installed->start, n = 0; ; i++)
+	      for (i = solv->installed->start; i < solv->installed->end; i++)
 		{
-		  if (n == solv->installed->nsolvables)
-		    break;
-		  if (i == solv->installed->end)
-		    i = solv->installed->start;
 		  s = pool->solvables + i;
 		  if (s->repo != solv->installed)
 		    continue;
-		  n++;
 		  if (solv->decisionmap[i] != 0)
 		    continue;
 		  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "keeping %s\n", solvable2str(pool, s));
@@ -2210,15 +2205,18 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		      return;
 		    }
 		  if (level <= olevel)
-		    n = 0;
+		    break;
 		}
+	      if (i < solv->installed->end)
+		continue;
 	    }
 	  if (solv->weaksystemrules)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_STATS, "installing weak system packages\n");
 	      for (i = solv->installed->start; i < solv->installed->end; i++)
 		{
-		  if (pool->solvables[i].repo != solv->installed)
+		  s = pool->solvables + i;
+		  if (s->repo != solv->installed)
 		    continue;
 		  if (solv->decisionmap[i] > 0 || (solv->decisionmap[i] < 0 && solv->weaksystemrules[i - solv->installed->start] == 0))
 		    continue;
