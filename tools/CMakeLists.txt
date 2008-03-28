@@ -29,6 +29,9 @@ SET(patchxml2solv_REPOS patchxml2solv.c repo_patchxml.h repo_patchxml.c repo_wri
 ADD_EXECUTABLE( patchxml2solv ${patchxml2solv_REPOS} )
 TARGET_LINK_LIBRARIES( patchxml2solv satsolver ${EXPAT_LIBRARY})
 
+SET(updateinfoxml2solv_REPOS updateinfoxml2solv.c repo_updateinfoxml.h repo_updateinfoxml.c repo_write.c common_write.c)
+ADD_EXECUTABLE( updateinfoxml2solv ${updateinfoxml2solv_REPOS} )
+TARGET_LINK_LIBRARIES( updateinfoxml2solv satsolver ${EXPAT_LIBRARY})
 
 SET(dumpsolv_REPOS dumpsolv.c)
 ADD_EXECUTABLE( dumpsolv ${dumpsolv_REPOS} )
