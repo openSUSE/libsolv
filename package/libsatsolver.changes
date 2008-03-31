@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Mar 31 16:25:03 CEST 2008 - coolo@suse.de
+
+- truly restart when analyze_unsolvable is hit (fixes #368209)
+- make it work with really large directories
+
+-------------------------------------------------------------------
 Mon Mar 24 15:31:18 CET 2008 - coolo@suse.de
 
 - install rpms2solv
