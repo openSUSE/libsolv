@@ -7,7 +7,7 @@
 
 /*
  * solvable.c
- * 
+ *
  * set/retrieve data from solvables
  */
 
@@ -22,15 +22,15 @@
 #include "util.h"
 
 const char *
-solvable2str(Pool *pool, Solvable *s) 
+solvable2str(Pool *pool, Solvable *s)
 {
-  const char *n, *e, *a; 
-  char *p; 
+  const char *n, *e, *a;
+  char *p;
   n = id2str(pool, s->name);
   e = id2str(pool, s->evr);
   a = id2str(pool, s->arch);
-  p = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3); 
-  sprintf(p, "%s-%s.%s", n, e, a); 
+  p = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3);
+  sprintf(p, "%s-%s.%s", n, e, a);
   return p;
 }
 
@@ -46,7 +46,7 @@ solvable_lookup_id(Solvable *s, Id keyname)
     return 0;
   pool = repo->pool;
   switch(keyname)
-    {   
+    {
     case SOLVABLE_NAME:
       return s->name;
     case SOLVABLE_ARCH:
@@ -55,17 +55,17 @@ solvable_lookup_id(Solvable *s, Id keyname)
       return s->evr;
     case SOLVABLE_VENDOR:
       return s->vendor;
-    }   
+    }
   n = s - pool->solvables;
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    {   
+    {
       if (n < data->start || n >= data->end)
         continue;
       for (j = 1; j < data->nkeys; j++)
         {
           if (data->keys[j].name == keyname && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID))
 	    {
-              Id id = repodata_lookup_id(data, n - data->start, j); 
+              Id id = repodata_lookup_id(data, n - data->start, j);
 	      if (id)
 		{
 		  if (data->localpool)
@@ -91,7 +91,7 @@ solvable_lookup_str(Solvable *s, Id keyname)
     return 0;
   pool = repo->pool;
   switch(keyname)
-    {   
+    {
     case SOLVABLE_NAME:
       return id2str(pool, s->name);
     case SOLVABLE_ARCH:
@@ -100,17 +100,17 @@ solvable_lookup_str(Solvable *s, Id keyname)
       return id2str(pool, s->evr);
     case SOLVABLE_VENDOR:
       return id2str(pool, s->vendor);
-    }   
+    }
   n = s - pool->solvables;
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    {   
+    {
       if (n < data->start || n >= data->end)
         continue;
       for (j = 1; j < data->nkeys; j++)
         {
           if (data->keys[j].name == keyname && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID || data->keys[j].type == REPOKEY_TYPE_STR))
 	    {
-              str = repodata_lookup_str(data, n - data->start, j); 
+              str = repodata_lookup_str(data, n - data->start, j);
 	      if (str)
 		return str;
 	    }
@@ -234,6 +234,12 @@ solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound)
         }
     }
   return notfound;
+}
+
+int
+solvable_lookup_bool(Solvable *s, Id keyname)
+{
+  return solvable_lookup_num(s, keyname, 0) ? 1 : 0;
 }
 
 int
