@@ -1,7 +1,7 @@
 -------------------------------------------------------------------
 Mon Mar 31 16:25:03 CEST 2008 - coolo@suse.de
 
-- truly restart when analyze_unsolvable is hit (fixes #368209)
+- truly restart when analyze_unsolvable is hit (fixes bnc#368209)
 - make it work with really large directories
 
 -------------------------------------------------------------------
