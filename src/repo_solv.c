@@ -722,7 +722,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   Pool *pool = repo->pool;
   int i, l;
   unsigned int numid, numrel, numdir, numsolv;
-  unsigned int numkeys, numschemata, numinfo;
+  unsigned int numkeys, numschemata, numinfo, numextra;
 
   Offset sizeid;
   Offset *str;			       /* map Id -> Offset into string space */
@@ -772,6 +772,8 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     {
       case SOLV_VERSION_6:
         break;
+      case SOLV_VERSION_7:
+	break;
       default:
         pool_debug(pool, SAT_ERROR, "unsupported SOLV version\n");
         return SOLV_ERROR_UNSUPPORTED;
@@ -786,6 +788,10 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   numkeys = read_u32(&data);
   numschemata = read_u32(&data);
   numinfo = read_u32(&data);
+  if (solvversion > SOLV_VERSION_6)
+    numextra = read_u32(&data);
+  else
+    numextra = 0;
   solvflags = read_u32(&data);
 
   if (numdir && numdir < 2)
@@ -804,6 +810,11 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       if (parent->end - parent->start != numsolv)
 	{
 	  pool_debug(pool, SAT_ERROR, "unequal number of solvables in a store\n");
+	  return SOLV_ERROR_CORRUPT;
+	}
+      if (parent->nextra != numextra)
+	{
+	  pool_debug(pool, SAT_ERROR, "unequal number of non-solvables in a store\n");
 	  return SOLV_ERROR_CORRUPT;
 	}
       if (numinfo)
@@ -1225,7 +1236,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	size_idarray += keys[i].size;
     }
 
-  if (numsolv)
+  if (numsolv || numextra)
     {
       maxsize = read_id(&data, 0);
       allsize = read_id(&data, 0);
@@ -1267,6 +1278,18 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   else
     s = 0;
 
+  if (numextra)
+    {
+      data.extrastart = repo->nextra;
+      repodata_extend_extra(&data, numextra);
+      repo->nextra += numextra;
+      for (i = oldnrepodata; i < repo->nrepodata; i++)
+        {
+	  repo->repodata[i].extrastart = data.extrastart;
+	  repo->repodata[i].nextra = data.nextra;
+	}
+    }
+
   if (have_xdata)
     {
       /* reserve one byte so that all offsets are not zero */
@@ -1277,7 +1300,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   left = 0;
   buf = sat_calloc(maxsize + 4, 1);
   dp = buf;
-  for (i = 0; i < numsolv; i++, s++)
+  for (i = 0; i < numsolv + numextra; i++, s++)
     {
       Id *keyp;
       if (data.error)
@@ -1308,9 +1331,20 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
       if (have_xdata)
 	{
-	  data.incoreoffset[i] = data.incoredatalen;
+	  if (i < numsolv)
+	    data.incoreoffset[i] = data.incoredatalen;
+	  else
+	    data.extraoffset[i - numsolv] = data.incoredatalen;
 	  incore_add_id(&data, id);
 	}
+      if (i >= numsolv)
+	s = 0;
+#if 0
+      if (i < numsolv)
+	fprintf(stderr, "solv %d: schema %d\n", i, id);
+      else
+	fprintf(stderr, "extra %d: schema %d\n", i - numsolv, id);
+#endif
       keyp = schemadata + schemata[id];
       while ((key = *keyp++) != 0)
 	{
@@ -1319,7 +1353,10 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 
 	  id = keys[key].name;
 #if 0
-fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, keys[key].storage);
+	  if (i < numsolv)
+	    fprintf(stderr, "solv %d name %d type %d class %d\n", i, id, keys[key].type, keys[key].storage);
+	  else
+	    fprintf(stderr, "extra %d name %d type %d class %d\n", i - numsolv, id, keys[key].type, keys[key].storage);
 #endif
 	  if (keys[key].storage == KEY_STORAGE_VERTICAL_OFFSET)
 	    {

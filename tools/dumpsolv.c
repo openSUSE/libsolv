@@ -58,28 +58,28 @@ printids(Repo *repo, char *kind, Offset ido)
 }
 
 int
-dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
+dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
 {
   const char *keyname;
 
-  keyname = id2str(s->repo->pool, key->name);
+  keyname = id2str(repo->pool, key->name);
   switch(key->type)
     {
     case REPOKEY_TYPE_ID:
       if (data && data->localpool)
 	kv->str = stringpool_id2str(&data->spool, kv->id);
       else
-        kv->str = id2str(s->repo->pool, kv->id);
+        kv->str = id2str(repo->pool, kv->id);
       printf("%s: %s\n", keyname, kv->str);
       break;
     case REPOKEY_TYPE_CONSTANTID:
-      printf("%s: %s\n", keyname, dep2str(s->repo->pool, kv->id));
+      printf("%s: %s\n", keyname, dep2str(repo->pool, kv->id));
       break;
     case REPOKEY_TYPE_IDARRAY:
       if (data && data->localpool)
         printf("%s: %s\n", keyname, stringpool_id2str(&data->spool, kv->id));
       else
-        printf("%s: %s\n", keyname, dep2str(s->repo->pool, kv->id));
+        printf("%s: %s\n", keyname, dep2str(repo->pool, kv->id));
       break;
     case REPOKEY_TYPE_STR:
       printf("%s: %s\n", keyname, kv->str);
@@ -110,6 +110,12 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   return 0;
 }
 
+static int
+dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
+{
+  return dump_attr(s->repo, data, key, kv);
+}
+
 /*
  * dump all attributes for Id <p>
  */
@@ -123,8 +129,7 @@ dump_repoattrs(Repo *repo, Id p)
   Dataiterator di;
   dataiterator_init(&di, repo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE);
   while (dataiterator_step(&di))
-    dump_repoattrs_cb(0, repo->pool->solvables + di.solvid, di.data, di.key,
-		      &di.kv);
+    dump_attr(repo, di.data, di.key, &di.kv);
 #endif
 }
 
@@ -244,7 +249,7 @@ int main(int argc, char **argv)
     printf("could not read repository\n");
   printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);
   dump_repodata(repo);
-  printf("repo contains %d solvables\n", repo->nsolvables);
+  printf("repo contains %d solvables %d non-solvables\n", repo->nsolvables, repo->nextra);
   for (i = repo->start, n = 1; i < repo->end; i++)
     {
       s = pool->solvables + i;
@@ -275,6 +280,14 @@ int main(int argc, char **argv)
       dump_some_attrs(repo, s);
 #endif
       n++;
+    }
+  for (i = 0; i < repo->nextra; i++)
+    {
+      printf("\nextra %d:\n", i);
+      Dataiterator di;
+      dataiterator_init(&di, repo, -1 - i, 0, 0, SEARCH_EXTRA | SEARCH_NO_STORAGE_SOLVABLE);
+      while (dataiterator_step(&di))
+	dump_attr(repo, di.data, di.key, &di.kv);
     }
 #if 0
   tryme(repo, 0, SOLVABLE_MEDIANR, 0, 0);

@@ -457,6 +457,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
   char *sp[5];
   struct parsedata pd;
   Repodata *data = 0;
+  Id blanr = -1;
 
   if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
     indesc = 1;
@@ -477,6 +478,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
   linep = line;
   s = 0;
 
+  /* XXX deactivate test code */
+  blanr = 0;
   /*
    * read complete file
    * 
@@ -800,6 +803,12 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    continue;
           case CTAG('=', 'I', 'n', 's'):
 	    repodata_set_str(data, last_found_pack, langtag(&pd, SOLVABLE_MESSAGEINS, language), line + 6);
+	    if (blanr)
+	      {
+		/* XXX testcode */
+		repo_set_str(repo, blanr, SOLVABLE_MESSAGEINS, line + 6);
+		blanr--;
+	      }
 	    continue;
           case CTAG('=', 'D', 'e', 'l'):
 	    repodata_set_str(data, last_found_pack, langtag(&pd, SOLVABLE_MESSAGEDEL, language), line + 6);
@@ -849,6 +858,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    break;
 	  case CTAG('=', 'C', 'k', 's'):
 	    set_checksum(data, last_found_pack, SOLVABLE_CHECKSUM, line + 6);
+	    break;
+	  case CTAG('=', 'L', 'a', 'n'):
+	    language = strdup(line + 6);
 	    break;
 
 	  case CTAG('=', 'P', 'a', 't'):

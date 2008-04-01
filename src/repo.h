@@ -40,6 +40,7 @@ typedef struct _Repo {
   int start;			/* start of this repo solvables within pool->solvables */
   int end;			/* last solvable + 1 of this repo */
   int nsolvables;		/* number of solvables repo is contributing to pool */
+  int nextra;			/* number of extra objects (non-solvables) */
 
   int priority;			/* priority of this repo */
 
@@ -155,6 +156,7 @@ typedef struct _KeyValue {
 
 #define	SEARCH_NOCASE			(1<<8)
 #define	SEARCH_NO_STORAGE_SOLVABLE	(1<<9)
+#define SEARCH_EXTRA			(1<<10)
 
 /* Internal */
 #define __SEARCH_ONESOLVABLE		(1 << 31)

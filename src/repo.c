@@ -595,8 +595,8 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
   KeyValue kv;
   Pool *pool = repo->pool;
   Repodata *data;
-  Solvable *s;
   int i, j, flags;
+  Solvable *s;
 
   md->stop = 0;
   if (!p)
@@ -610,10 +610,14 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	}
       return;
     }
-  s = pool->solvables + p;
+  else if (p < 0)
+    /* The callback only supports solvables, so we can't iterate over the
+       extra things.  */
+    return;
   flags = md->flags;
   if (!(flags & SEARCH_NO_STORAGE_SOLVABLE))
     {
+      s = pool->solvables + p;
       switch(keyname)
 	{
 	  case 0:
@@ -868,8 +872,26 @@ repo_findrepodata(Repo *repo, Id p, Id keyname)
 
   /* FIXME: enter nice code here */
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    if (p >= data->start && p < data->end)
+    if ((p < 0 && (-1 - p) >= data->extrastart && (-1 - p) < (data->extrastart + data->nextra))
+	|| (p >= 0 && p >= data->start && p < data->end))
       return data;
+  if (p < 0)
+    {
+      data = repo->repodata;
+      if (data)
+	{
+	  for (i = 1; i < repo->nrepodata; i++)
+	    if (data->extrastart + data->nextra
+		> repo->repodata[i].extrastart + repo->repodata[i].nextra)
+	      data = repo->repodata + i;
+	}
+      else
+	data = repo_add_repodata(repo, 0);
+      repodata_extend_extra(data, (-1 - p) - data->extrastart + 1);
+      if (-p > repo->nextra)
+	repo->nextra = -p;
+      return data;
+    }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     if (p == data->end)
       break;
@@ -885,28 +907,45 @@ void
 repo_set_id(Repo *repo, Id p, Id keyname, Id id)
 {
   Repodata *data = repo_findrepodata(repo, p, keyname);
-  repodata_set_id(data, p - data->start, keyname, id);
+  if (p < 0)
+    /* This is -1 - ((-1 - p) - data->extrastart).  */
+    p = p + data->extrastart;
+  else
+    p = p - data->start;
+  repodata_set_id(data, p, keyname, id);
 }
 
 void
 repo_set_num(Repo *repo, Id p, Id keyname, Id num)
 {
   Repodata *data = repo_findrepodata(repo, p, keyname);
-  repodata_set_num(data, p - data->start, keyname, num);
+  if (p < 0)
+    p = p + data->extrastart;
+  else
+    p = p - data->start;
+  repodata_set_num(data, p, keyname, num);
 }
 
 void
 repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
 {
   Repodata *data = repo_findrepodata(repo, p, keyname);
-  repodata_set_str(data, p - data->start, keyname, str);
+  if (p < 0)
+    p = p + data->extrastart;
+  else
+    p = p - data->start;
+  repodata_set_str(data, p, keyname, str);
 }
 
 void
 repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str)
 {
   Repodata *data = repo_findrepodata(repo, p, keyname);
-  repodata_set_poolstr(data, p - data->start, keyname, str);
+  if (p < 0)
+    p = p + data->extrastart;
+  else
+    p = p - data->start;
+  repodata_set_poolstr(data, p, keyname, str);
 }
 
 void
@@ -916,7 +955,7 @@ repo_internalize(Repo *repo)
   Repodata *data;
 
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    if (data->attrs)
+    if (data->attrs || data->extraattrs)
       repodata_internalize(data);
 }
 

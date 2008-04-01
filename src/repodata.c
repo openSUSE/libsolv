@@ -54,7 +54,10 @@ repodata_init(Repodata *data, Repo *repo, int localpool)
   data->schemadatalen = 1;
   data->start = repo->start;
   data->end = repo->end;
+  data->nextra = repo->nextra;
+  data->extrastart = 0;
   data->incoreoffset = sat_extend_resize(0, data->end - data->start, sizeof(Id), REPODATA_BLOCK);
+  data->extraoffset = sat_extend_resize(0, repo->nextra, sizeof(Id), REPODATA_BLOCK);
   data->pagefd = -1;
 }
 
@@ -74,6 +77,7 @@ repodata_free(Repodata *data)
 
   sat_free(data->incoredata);
   sat_free(data->incoreoffset);
+  sat_free(data->extraoffset);
   sat_free(data->verticaloffset);
 
   sat_free(data->blob_store);
@@ -83,6 +87,7 @@ repodata_free(Repodata *data)
   sat_free(data->vincore);
 
   sat_free(data->attrs);
+  sat_free(data->extraattrs);
   sat_free(data->attrdata);
   sat_free(data->attriddata);
   
@@ -363,6 +368,15 @@ maybe_load_repodata(Repodata *data, Id *keyid)
   return 0;
 }
 
+static inline unsigned char*
+entry2data(Repodata *data, Id entry)
+{
+  if (entry < 0)
+    return data->incoredata + data->extraoffset[-1 - entry];
+  else
+    return data->incoredata + data->incoreoffset[entry];
+}
+
 Id
 repodata_lookup_id(Repodata *data, Id entry, Id keyid)
 {
@@ -373,7 +387,7 @@ repodata_lookup_id(Repodata *data, Id entry, Id keyid)
 
   if (!maybe_load_repodata(data, &keyid))
     return 0;
-  dp = data->incoredata + data->incoreoffset[entry];
+  dp = entry2data(data, entry);
   dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
@@ -403,7 +417,7 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
   if (!maybe_load_repodata(data, &keyid))
     return 0;
 
-  dp = data->incoredata + data->incoreoffset[entry];
+  dp = entry2data(data, entry);
   dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
@@ -441,7 +455,7 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned int *value)
   if (!maybe_load_repodata(data, &keyid))
     return 0;
 
-  dp = data->incoredata + data->incoreoffset[entry];
+  dp = entry2data(data, entry);
   dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
@@ -471,7 +485,7 @@ repodata_lookup_void(Repodata *data, Id entry, Id keyid)
   unsigned char *dp;
   if (!maybe_load_repodata(data, &keyid))
     return 0;
-  dp = data->incoredata + data->incoreoffset[entry];
+  dp = entry2data(data, entry);
   dp = data_read_id(dp, &schema);
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
     if (!*keyp)
@@ -489,7 +503,7 @@ repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyid, Id *typep)
 
   if (!maybe_load_repodata(data, &keyid))
     return 0;
-  dp = data->incoredata + data->incoreoffset[entry];
+  dp = entry2data(data, entry);
   dp = data_read_id(dp, &schema);
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
     if (!*keyp)
@@ -511,10 +525,11 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
   int stop;
   KeyValue kv;
 
-  if (!maybe_load_repodata(data, 0))
+  if (entry < 0
+      || !maybe_load_repodata(data, 0))
     return;
 
-  dp = data->incoredata + data->incoreoffset[entry];
+  dp = entry2data(data, entry);
   dp = data_read_id(dp, &schema);
   keyp = data->schemadata + data->schemata[schema];
   if (keyname)
@@ -577,7 +592,11 @@ dataiterator_newdata(Dataiterator *di)
     return;
 
   Id schema;
-  unsigned char *dp = data->incoredata + data->incoreoffset[di->solvid - data->start];
+  unsigned char *dp = data->incoredata;
+  if (di->solvid >= 0)
+    dp += data->incoreoffset[di->solvid - data->start];
+  else
+    dp += data->extraoffset[-1 - di->solvid - data->extrastart];
   dp = data_read_id(dp, &schema);
   Id *keyp = data->schemadata + data->schemata[schema];
   if (keyname)
@@ -626,6 +645,11 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
   else
     {
       di->solvid = repo->start - 1;
+      if (di->solvid < 0)
+	{
+	  fprintf(stderr, "A repo contains the NULL solvable!\n");
+	  exit(1);
+	}
       di->data = repo->repodata + repo->nrepodata - 1;
       di->state = 0;
     }
@@ -843,20 +867,37 @@ restart:
 			{
 			  if (di->flags & __SEARCH_ONESOLVABLE)
 			    return 0;
-			  while (++di->solvid < repo->end)
-			    if (repo->pool->solvables[di->solvid].repo == repo)
-			      break;
-			  if (di->solvid >= repo->end)
-			    return 0;
+			  if (di->solvid >= 0)
+			    {
+			      while (++di->solvid < repo->end)
+				if (repo->pool->solvables[di->solvid].repo == repo)
+				  break;
+			      if (di->solvid >= repo->end)
+				{
+				  if (!(di->flags & SEARCH_EXTRA))
+				    return 0;
+				  di->solvid = -1;
+				  if (di->solvid < -repo->nextra)
+				    return 0;
+				}
+			    }
+			  else
+			    {
+			      --di->solvid;
+			      if (di->solvid < -repo->nextra)
+				return 0;
+			    }
 			  di->data = repo->repodata - 1;
-			  if (di->flags & SEARCH_NO_STORAGE_SOLVABLE)
+			  if (di->solvid < 0
+			      || (di->flags & SEARCH_NO_STORAGE_SOLVABLE))
 			    continue;
 			  static Id zeroid = 0;
 			  di->keyp = &zeroid;
 			  di->state = 1;
 			  goto restart;
 			}
-		      if (di->solvid >= data->start && di->solvid < data->end)
+		      if ((di->solvid < 0 && (-1 - di->solvid) >= data->extrastart && (-1 - di->solvid) < (data->extrastart + data->nextra))
+			  || (di->solvid >= 0 && di->solvid >= data->start && di->solvid < data->end))
 			{
 			  dataiterator_newdata(di);
 			  if (di->nextkeydp)
@@ -917,6 +958,21 @@ repodata_extend(Repodata *data, Id p)
 }
 
 void
+repodata_extend_extra(Repodata *data, int nextra)
+{
+  if (nextra <= data->nextra)
+    return;
+  if (data->extraattrs)
+    {
+      data->extraattrs = sat_extend(data->extraattrs, data->nextra, nextra - data->nextra, sizeof(Id *), REPODATA_BLOCK);
+      memset(data->extraattrs + data->nextra, 0, (nextra - data->nextra) * sizeof (Id *));
+    }
+  data->extraoffset = sat_extend(data->extraoffset, data->nextra, nextra - data->nextra, sizeof(Id), REPODATA_BLOCK);
+  memset(data->extraoffset + data->nextra, 0, (nextra - data->nextra) * sizeof(Id));
+  data->nextra = nextra;
+}
+
+void
 repodata_extend_block(Repodata *data, Id start, Id num)
 {
   if (!num)
@@ -943,16 +999,23 @@ static void
 repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
 {
   Id *pp;
+  Id *ap;
   int i;
-  if (!data->attrs)
+  if (!data->attrs && entry >= 0)
     {
       data->attrs = sat_calloc_block(data->end - data->start, sizeof(Id *),
 				     REPODATA_BLOCK);
     }
+  else if (!data->extraattrs && entry < 0)
+    data->extraattrs = sat_calloc_block(data->nextra, sizeof(Id *), REPODATA_BLOCK);
+  if (entry < 0)
+    ap = data->extraattrs[-1 - entry];
+  else
+    ap = data->attrs[entry];
   i = 0;
-  if (data->attrs[entry])
+  if (ap)
     {
-      for (pp = data->attrs[entry]; *pp; pp += 2)
+      for (pp = ap; *pp; pp += 2)
 	/* Determine equality based on the name only, allows us to change
 	   type (when overwrite is set), and makes TYPE_CONSTANT work.  */
         if (data->keys[*pp].name == data->keys[keyid].name)
@@ -966,10 +1029,14 @@ repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
 	    }
           return;
         }
-      i = pp - data->attrs[entry];
+      i = pp - ap;
     }
-  data->attrs[entry] = sat_extend(data->attrs[entry], i, 3, sizeof(Id), REPODATA_ATTRS_BLOCK);
-  pp = data->attrs[entry] + i;
+  ap = sat_extend(ap, i, 3, sizeof(Id), REPODATA_ATTRS_BLOCK);
+  if (entry < 0)
+    data->extraattrs[-1 - entry] = ap;
+  else
+    data->attrs[entry] = ap;
+  pp = ap + i;
   *pp++ = keyid;
   *pp++ = val;
   *pp = 0;
@@ -1096,9 +1163,12 @@ repoadata_add_array(Repodata *data, Id entry, Id keyname, Id keytype, int entrys
   int oldsize;
   Id *ida, *pp;
 
-  pp = 0;
-  if (data->attrs && data->attrs[entry])
-    for (pp = data->attrs[entry]; *pp; pp += 2)
+  if (entry < 0)
+    pp = data->extraattrs ? data->extraattrs[-1 - entry] : 0;
+  else
+    pp = data->attrs ? data->attrs[entry] : 0;
+  if (pp)
+    for (; *pp; pp += 2)
       if (data->keys[*pp].name == keyname && data->keys[*pp].type == keytype)
         break;
   if (!pp || !*pp)
@@ -1231,7 +1301,8 @@ repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
   return str;
 }
 
-Id repodata_globalize_id(Repodata *data, Id id)
+Id
+repodata_globalize_id(Repodata *data, Id id)
 { 
   if (!data || !data->localpool)
     return id;
@@ -1300,7 +1371,8 @@ void
 repodata_merge_attrs(Repodata *data, Id dest, Id src)
 {
   Id *keyp;
-  if (dest == src || !(keyp = data->attrs[src]))
+  if (dest == src
+      || !(keyp = src < 0 ? data->extraattrs[-1 - src] : data->attrs[src]))
     return;
   for (; *keyp; keyp += 2)
     repodata_insert_keyid(data, dest, keyp[0], keyp[1], 0);
@@ -1425,7 +1497,7 @@ repodata_internalize(Repodata *data)
   struct extdata newincore;
   struct extdata newvincore;
 
-  if (!data->attrs)
+  if (!data->attrs && !data->extraattrs)
     return;
 
   newvincore.buf = data->vincore;
@@ -1440,11 +1512,13 @@ repodata_internalize(Repodata *data)
   addschema_prepare(data, schematacache);
   memset(&newincore, 0, sizeof(newincore));
   data_addid(&newincore, 0);
-  for (entry = 0; entry < nentry; entry++)
+  if (!data->attrs)
+    nentry = 0;
+  for (entry = data->extraattrs ? -data->nextra : 0; entry < nentry; entry++)
     {
       memset(seen, 0, data->nkeys * sizeof(Id));
       sp = schema;
-      dp = data->incoredata + data->incoreoffset[entry];
+      dp = entry2data(data, entry);
       if (data->incoredata)
         dp = data_read_id(dp, &oldschema);
       else
@@ -1468,8 +1542,9 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	  *sp++ = *keyp;
 	  oldcount++;
 	}
-      if (data->attrs[entry])
-        for (keyp = data->attrs[entry]; *keyp; keyp += 2)
+      keyp = entry < 0 ? data->extraattrs[-1 - entry] : data->attrs[entry];
+      if (keyp)
+        for (; *keyp; keyp += 2)
 	  {
 	    if (!seen[*keyp])
 	      {
@@ -1497,7 +1572,10 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	 (oX being the old keyids (possibly overwritten), and nX being
 	  the new keyids).  This rules out sorting the keyids in order
 	 to ensure a small schema count.  */
-      data->incoreoffset[entry] = newincore.len;
+      if (entry < 0)
+	data->extraoffset[-1 - entry] = newincore.len;
+      else
+	data->incoreoffset[entry] = newincore.len;
       data_addid(&newincore, schemaid);
       for (keyp = data->schemadata + data->schemata[schemaid]; *keyp; keyp++)
 	{
@@ -1591,7 +1669,9 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	  dp = ndp;
 	}
-      if (data->attrs[entry])
+      if (entry < 0 && data->extraattrs[-1 - entry])
+	sat_free(data->extraattrs[-1 - entry]);
+      else if (entry >= 0 && data->attrs[entry])
         sat_free(data->attrs[entry]);
     }
   sat_free(schema);
@@ -1607,6 +1687,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
   data->vincorelen = newvincore.len;
 
   data->attrs = sat_free(data->attrs);
+  data->extraattrs = sat_free(data->extraattrs);
   data->attrdata = sat_free(data->attrdata);
   data->attriddata = sat_free(data->attriddata);
   data->attrdatalen = 0;

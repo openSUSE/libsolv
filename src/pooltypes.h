@@ -21,6 +21,7 @@
 #define SOLV_VERSION_4 4
 #define SOLV_VERSION_5 5
 #define SOLV_VERSION_6 6
+#define SOLV_VERSION_7 7
 
 #define SOLV_FLAG_PREFIX_POOL 4
 

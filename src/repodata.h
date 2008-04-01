@@ -57,6 +57,8 @@ typedef struct _Repodata {
 
   int start;			/* start of solvables this repodata is valid for */
   int end;			/* last solvable + 1 of this repodata */
+  int extrastart;
+  int nextra;
 
   FILE *fp;			/* file pointer of solv file */
   int error;			/* corrupt solv file */
@@ -81,6 +83,7 @@ typedef struct _Repodata {
   unsigned int incoredatafree;	/* free data len */
 
   Id *incoreoffset;		/* offset for all entries (ent2attr) */
+  Id *extraoffset;		/* offset for all extra entries */
 
   Id *verticaloffset;		/* offset for all verticals, nkeys elements */
   Id lastverticaloffset;	/* end of verticals */
@@ -100,6 +103,7 @@ typedef struct _Repodata {
   unsigned int vincorelen;
 
   Id **attrs;			/* un-internalized attributes */
+  Id **extraattrs;		/* Same, but for extra objects.  */
   unsigned char *attrdata;	/* their string data space */
   unsigned int attrdatalen;
   Id *attriddata;		/* their id space */
@@ -111,6 +115,7 @@ typedef struct _Repodata {
 /* management functions */
 void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
 void repodata_extend(Repodata *data, Id p);
+void repodata_extend_extra(Repodata *data, int nextra);
 void repodata_extend_block(Repodata *data, Id p, int num);
 void repodata_free(Repodata *data);
 
