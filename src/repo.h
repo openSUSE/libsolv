@@ -157,6 +157,7 @@ typedef struct _KeyValue {
 #define	SEARCH_NOCASE			(1<<8)
 #define	SEARCH_NO_STORAGE_SOLVABLE	(1<<9)
 #define SEARCH_EXTRA			(1<<10)
+#define SEARCH_ALL_REPOS		(1<<11)
 
 /* Internal */
 #define __SEARCH_ONESOLVABLE		(1 << 31)
@@ -197,6 +198,11 @@ typedef struct _Dataiterator
 void dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
 		       const char *match, int flags);
 int dataiterator_step(Dataiterator *di);
+void dataiterator_skip_attribute(Dataiterator *di);
+void dataiterator_skip_solvable(Dataiterator *di);
+void dataiterator_skip_repo(Dataiterator *di);
+void dataiterator_jump_to_solvable(Dataiterator *di, Solvable *s);
+void dataiterator_jump_to_repo(Dataiterator *di, Repo *repo);
 
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
 void repo_set_num(Repo *repo, Id p, Id keyname, Id num);

@@ -797,21 +797,25 @@ restart:
 		if (!s->name)
 		  continue;
 		di->kv.id = s->name;
+		di->kv.eof = 1;
 		break;
 	      case SOLVABLE_ARCH:
 		if (!s->arch)
 		  continue;
 		di->kv.id = s->arch;
+		di->kv.eof = 1;
 		break;
 	      case SOLVABLE_EVR:
 		if (!s->evr)
 		  continue;
 		di->kv.id = s->evr;
+		di->kv.eof = 1;
 		break;
 	      case SOLVABLE_VENDOR:
 		if (!s->vendor)
 		  continue;
 		di->kv.id = s->vendor;
+		di->kv.eof = 1;
 		break;
 	      case SOLVABLE_PROVIDES:
 		di->idp = s->provides
@@ -853,6 +857,7 @@ restart:
 		if (!di->repo->rpmdbid)
 		  continue;
 		di->kv.num = di->repo->rpmdbid[di->solvid - di->repo->start];
+		di->kv.eof = 1;
 		break;
 	      default:
 		di->data = di->repo->repodata - 1;
@@ -889,17 +894,30 @@ restart:
 			      if (di->solvid >= repo->end)
 				{
 				  if (!(di->flags & SEARCH_EXTRA))
-				    return 0;
+				    goto skiprepo;
 				  di->solvid = -1;
 				  if (di->solvid < -repo->nextra)
-				    return 0;
+				    goto skiprepo;
 				}
 			    }
 			  else
 			    {
 			      --di->solvid;
 			      if (di->solvid < -repo->nextra)
-				return 0;
+				{
+skiprepo:;
+				  Pool *pool = di->repo->pool;
+				  if (!(di->flags & SEARCH_ALL_REPOS)
+				      || di->repo == pool->repos[pool->nrepos - 1])
+				    return 0;
+				  int i;
+				  for (i = 0; i < pool->nrepos; i++)
+				    if (di->repo == pool->repos[i])
+				      break;
+				  di->repo = pool->repos[i + 1];
+				  dataiterator_init(di, di->repo, 0, di->keyname, di->match, di->flags);
+				  continue;
+				}
 			    }
 			  di->data = repo->repodata - 1;
 			  if (di->solvid < 0
@@ -933,6 +951,56 @@ weg2:
 	break;
     }
   return 1;
+}
+
+void
+dataiterator_skip_attribute(Dataiterator *di)
+{
+  if (di->state)
+    di->idp = 0;
+  /* This will make the next _step call to retrieve the next field.  */
+  di->kv.eof = 1;
+}
+
+void
+dataiterator_skip_solvable(Dataiterator *di)
+{
+  /* We're done with this field.  */
+  di->kv.eof = 1;
+  /* And with solvable data.  */
+  di->state = 0;
+  /* And with all keys for this repodata and thing. */
+  static Id zeroid = 0;
+  di->keyp = &zeroid;
+  /* And with all repodatas for this thing.  */
+  di->data = di->repo->repodata + di->repo->nrepodata - 1;
+  /* Hence the next call to _step will retrieve the next thing.  */
+}
+
+void
+dataiterator_skip_repo(Dataiterator *di)
+{
+  dataiterator_skip_solvable(di);
+  /* We're done with all solvables and all extra things for this repo.  */
+  di->solvid = -1 - di->repo->nextra;
+}
+
+void
+dataiterator_jump_to_solvable(Dataiterator *di, Solvable *s)
+{
+  di->repo = s->repo;
+  /* Simulate us being done with the solvable before the requested one.  */
+  dataiterator_skip_solvable(di);
+  di->solvid = s - s->repo->pool->solvables;
+  di->solvid--;
+}
+
+void
+dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
+{
+  di->repo = repo;
+  dataiterator_skip_solvable(di);
+  di->solvid = repo->start - 1;
 }
 
 /* extend repodata so that it includes solvables p */
