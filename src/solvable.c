@@ -189,6 +189,7 @@ solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang)
   p = sat_malloc(strlen(kn) + strlen(lang) + 2);
   sprintf(p, "%s:%s", kn, lang);
   id = str2id(pool, p, 0);
+  free(p);
   if (id)
     {
       str = repo_lookup_str(s, id);

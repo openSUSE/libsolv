@@ -64,12 +64,13 @@ typedef struct solver {
 
   Id jobrules;				/* user rules */
   Id systemrules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
-  Id weakrules;				/* rules that can be autodisabled */
   Id learntrules;			/* learnt rules */
 
   Id *weaksystemrules;			/* please try to install (r->d) */
   Map noupdate;				/* don't try to update these
                                            installed solvables */
+  Queue weakruleq;
+  Map weakrulemap;
 
   Id *watches;				/* Array of rule offsets
 					 * watches has nsolvables*2 entries and is addressed from the middle
@@ -179,7 +180,8 @@ typedef enum {
   SOLVER_ERASE_SOLVABLE_NAME,
   SOLVER_INSTALL_SOLVABLE_PROVIDES,
   SOLVER_ERASE_SOLVABLE_PROVIDES,
-  SOLVER_INSTALL_SOLVABLE_UPDATE
+  SOLVER_INSTALL_SOLVABLE_UPDATE,
+  SOLVER_WEAK = 0x100,
 } SolverCmd;
 
 typedef enum {
