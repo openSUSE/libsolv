@@ -212,9 +212,13 @@ int main(int argc, char **argv)
 {
   Repo *repo;
   Pool *pool;
-  int i, n;
+  int i, j, n;
   Solvable *s;
   
+  pool = pool_create();
+  pool_setdebuglevel(pool, 1);
+  pool_setloadcallback(pool, loadcallback, 0);
+
   argv++;
   argc--;
   while (argc--)
@@ -235,66 +239,87 @@ int main(int argc, char **argv)
 	      perror(argv[0]);
 	      exit(1);
 	    }
-	  break;
+	  repo = repo_create(pool, argv[0]);
+	  if (repo_add_solv(repo, stdin))
+	    printf("could not read repository\n");
 	}
       argv++;
     }
 
-  pool = pool_create();
-  pool_setdebuglevel(pool, 1);
-  pool_setloadcallback(pool, loadcallback, 0);
-
-  repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
-  if (repo_add_solv(repo, stdin))
-    printf("could not read repository\n");
+  if (!pool->nrepos)
+    {
+      repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
+      if (repo_add_solv(repo, stdin))
+	printf("could not read repository\n");
+    }
   printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);
-  dump_repodata(repo);
-  printf("repo contains %d solvables %d non-solvables\n", repo->nsolvables, repo->nextra);
-  for (i = repo->start, n = 1; i < repo->end; i++)
+  for (j = 0; 1 && j < pool->nrepos; j++)
     {
-      s = pool->solvables + i;
-      if (s->repo != repo)
-	continue;
+      repo = pool->repos[j];
+      dump_repodata(repo);
+      printf("repo %d contains %d solvables %d non-solvables\n", j, repo->nsolvables, repo->nextra);
+      for (i = repo->start, n = 1; i < repo->end; i++)
+	{
+	  s = pool->solvables + i;
+	  if (s->repo != repo)
+	    continue;
+	  printf("\n");
+	  printf("solvable %d:\n", n);
+	  if (s->name || s->evr || s->arch)
+	    printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	  if (s->vendor)
+	    printf("vendor: %s\n", id2str(pool, s->vendor));
+	  printids(repo, "provides", s->provides);
+	  printids(repo, "obsoletes", s->obsoletes);
+	  printids(repo, "conflicts", s->conflicts);
+	  printids(repo, "requires", s->requires);
+	  printids(repo, "recommends", s->recommends);
+	  printids(repo, "suggests", s->suggests);
+	  printids(repo, "supplements", s->supplements);
+	  printids(repo, "enhances", s->enhances);
+	  printids(repo, "freshens", s->freshens);
+	  if (repo->rpmdbid)
+	    printf("rpmdbid: %u\n", repo->rpmdbid[i - repo->start]);
+#if 0
+	  dump_attrs (repo, n - 1);
+#endif
+	  dump_repoattrs(repo, i);
+#if 0
+	  dump_some_attrs(repo, s);
+#endif
+	  n++;
+	}
+      for (i = 0; i < repo->nextra; i++)
+	{
+	  printf("\nextra %d:\n", i);
+	  Dataiterator di;
+	  dataiterator_init(&di, repo, -1 - i, 0, 0, SEARCH_EXTRA | SEARCH_NO_STORAGE_SOLVABLE);
+	  while (dataiterator_step(&di))
+	    dump_attr(repo, di.data, di.key, &di.kv);
+	}
+#if 0
+      tryme(repo, 0, SOLVABLE_MEDIANR, 0, 0);
       printf("\n");
-      printf("solvable %d:\n", n);
-      if (s->name || s->evr || s->arch)
-        printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
-      if (s->vendor)
-        printf("vendor: %s\n", id2str(pool, s->vendor));
-      printids(repo, "provides", s->provides);
-      printids(repo, "obsoletes", s->obsoletes);
-      printids(repo, "conflicts", s->conflicts);
-      printids(repo, "requires", s->requires);
-      printids(repo, "recommends", s->recommends);
-      printids(repo, "suggests", s->suggests);
-      printids(repo, "supplements", s->supplements);
-      printids(repo, "enhances", s->enhances);
-      printids(repo, "freshens", s->freshens);
-      if (repo->rpmdbid)
-	printf("rpmdbid: %u\n", repo->rpmdbid[i - repo->start]);
-#if 0
-      dump_attrs (repo, n - 1);
+      tryme(repo, 0, 0, 0, 0);
+      printf("\n");
+      tryme(repo, 0, 0, "*y*e*", SEARCH_GLOB);
 #endif
-      dump_repoattrs(repo, i);
-#if 0
-      dump_some_attrs(repo, s);
-#endif
-      n++;
     }
-  for (i = 0; i < repo->nextra; i++)
+#if 0
+  printf ("\nSearchresults:\n");
+  Dataiterator di;
+  dataiterator_init(&di, pool->repos[0], 0, 0, "3", SEARCH_EXTRA | SEARCH_SUBSTRING | SEARCH_ALL_REPOS);
+  //int count = 0;
+  while (dataiterator_step(&di))
     {
-      printf("\nextra %d:\n", i);
-      Dataiterator di;
-      dataiterator_init(&di, repo, -1 - i, 0, 0, SEARCH_EXTRA | SEARCH_NO_STORAGE_SOLVABLE);
-      while (dataiterator_step(&di))
-	dump_attr(repo, di.data, di.key, &di.kv);
+      printf("%d:", di.solvid);
+      dump_attr(repo, di.data, di.key, &di.kv);
+      /*if (di.solvid == 4 && count++ == 0)
+	dataiterator_jump_to_solvable(&di, pool->solvables + 3);*/
+      //dataiterator_skip_attribute(&di);
+      //dataiterator_skip_solvable(&di);
+      //dataiterator_skip_repo(&di);
     }
-#if 0
-  tryme(repo, 0, SOLVABLE_MEDIANR, 0, 0);
-  printf("\n");
-  tryme(repo, 0, 0, 0, 0);
-  printf("\n");
-  tryme(repo, 0, 0, "*y*e*", SEARCH_GLOB);
 #endif
   pool_free(pool);
   exit(0);
