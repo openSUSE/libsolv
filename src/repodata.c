@@ -388,6 +388,8 @@ repodata_lookup_id(Repodata *data, Id entry, Id keyid)
   if (!maybe_load_repodata(data, &keyid))
     return 0;
   dp = entry2data(data, entry);
+  if (!dp)
+    return 0;
   dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
@@ -418,6 +420,8 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyid)
     return 0;
 
   dp = entry2data(data, entry);
+  if (!dp)
+    return 0;
   dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
@@ -456,6 +460,8 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned int *value)
     return 0;
 
   dp = entry2data(data, entry);
+  if (!dp)
+    return 0;
   dp = data_read_id(dp, &schema);
   /* make sure the schema of this solvable contains the key */
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
@@ -486,6 +492,8 @@ repodata_lookup_void(Repodata *data, Id entry, Id keyid)
   if (!maybe_load_repodata(data, &keyid))
     return 0;
   dp = entry2data(data, entry);
+  if (!dp)
+    return 0;
   dp = data_read_id(dp, &schema);
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
     if (!*keyp)
@@ -504,6 +512,8 @@ repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyid, Id *typep)
   if (!maybe_load_repodata(data, &keyid))
     return 0;
   dp = entry2data(data, entry);
+  if (!dp)
+    return 0;
   dp = data_read_id(dp, &schema);
   for (keyp = data->schemadata + data->schemata[schema]; *keyp != keyid; keyp++)
     if (!*keyp)
@@ -530,6 +540,8 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
     return;
 
   dp = entry2data(data, entry);
+  if (!dp)
+    return;
   dp = data_read_id(dp, &schema);
   keyp = data->schemadata + data->schemata[schema];
   if (keyname)
@@ -593,6 +605,8 @@ dataiterator_newdata(Dataiterator *di)
 
   Id schema;
   unsigned char *dp = data->incoredata;
+  if (!dp)
+    return;
   if (di->solvid >= 0)
     dp += data->incoreoffset[di->solvid - data->start];
   else
