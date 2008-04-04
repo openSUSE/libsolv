@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Apr  4 15:45:44 CEST 2008 - coolo@suse.de
+
+- package deptestomatic in -devel
+
+-------------------------------------------------------------------
 Mon Mar 31 16:25:03 CEST 2008 - coolo@suse.de
 
 - truly restart when analyze_unsolvable is hit (fixes bnc#368209)
