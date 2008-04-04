@@ -34,6 +34,7 @@ enum state {
   STATE_PACKAGE,
   STATE_NAME,
   STATE_VENDOR,
+  STATE_BUILDTIME,  
   STATE_HISTORY,
   STATE_UPDATE,
   STATE_EPOCH,
@@ -91,6 +92,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUBCHANNEL,  "product",         STATE_PACKAGE, 0 },
   { STATE_PACKAGE,     "name",            STATE_NAME, 1 },
   { STATE_PACKAGE,     "vendor",          STATE_VENDOR, 1 },
+  { STATE_PACKAGE,     "buildtime",       STATE_BUILDTIME, 1 },
   { STATE_PACKAGE,     "epoch",           STATE_PEPOCH, 1 },
   { STATE_PACKAGE,     "version",         STATE_PVERSION, 1 },
   { STATE_PACKAGE,     "release",         STATE_PRELEASE, 1 },
@@ -142,6 +144,7 @@ typedef struct _parsedata {
   // repo data
   Pool *pool;		// current pool
   Repo *repo;		// current repo
+  Repodata *data;       // current repo data
   Solvable *solvable;	// current solvable
 
   // package data
@@ -433,6 +436,9 @@ startElement(void *userData, const char *name, const char **atts)
 
     case STATE_PACKAGE:		       /* solvable name */
       pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+      if (pd->data)
+	repodata_extend(pd->data, pd->solvable - pool->solvables);
+      
       if (!strcmp(name, "selection"))
         pd->kind = "selection";
       else if (!strcmp(name, "pattern"))
@@ -584,6 +590,7 @@ endElement(void *userData, const char *name)
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   Id evr;
+  unsigned int t=0;
 
   if (pd->depth != pd->statedepth)
     {
@@ -706,6 +713,11 @@ endElement(void *userData, const char *name)
     case STATE_VENDOR:
       s->vendor = str2id(pool, pd->content, 1);
       break;
+    case STATE_BUILDTIME:
+	t = atoi (pd->content);
+	if (t)
+	  repodata_set_num(pd->data, (s - pool->solvables) - pd->repo->start, SOLVABLE_BUILDTIME, t);
+      break;	
     case STATE_UPDATE:		       /* new version, keeping all other metadata */
       evr = evr2id(pool, pd,
                    pd->epoch   ? pd->evrspace + pd->epoch   : 0,
@@ -800,10 +812,17 @@ repo_add_helix(Repo *repo, FILE *fp)
 {
   Pool *pool = repo->pool;
   Parsedata pd;
+  Repodata *data = 0;
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
 
+  if (repo->nrepodata)
+    /* use last repodata */
+    data = repo->repodata + repo->nrepodata - 1;
+  else
+    data = repo_add_repodata(repo, 0);
+  
   /* prepare parsedata */
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
@@ -823,6 +842,7 @@ repo_add_helix(Repo *repo, FILE *fp)
   pd.evrspace = (char *)malloc(256);
   pd.aevrspace= 256;
   pd.levrspace = 1;
+  pd.data = data;
 
   // set up XML parser
 
@@ -844,6 +864,9 @@ repo_add_helix(Repo *repo, FILE *fp)
 	break;
     }
   XML_ParserFree(parser);
+
+  if (pd.data)
+    repodata_internalize(pd.data);  
 
   free(pd.content);
   free(pd.evrspace);
