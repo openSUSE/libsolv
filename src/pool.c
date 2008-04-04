@@ -423,7 +423,6 @@ pool_addrelproviders(Pool *pool, Id d)
   int flags = rd->flags;
   Id pid, *pidp;
   Id p, *pp, *pp2, *pp3;
-  int i;
 
   d = GETRELID(d);
   queue_init_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
@@ -471,18 +470,17 @@ pool_addrelproviders(Pool *pool, Id d)
 	}
       break;
     case REL_ARCH:
-      pp = pool_whatprovides(pool, name);
-      i = 0;
+      pp = pp2 = pool_whatprovides(pool, name);
       while ((p = *pp++) != 0)
 	{
 	  Solvable *s = pool->solvables + p;
 	  if (s->arch == evr)
 	    queue_push(&plist, p);
 	  else
-	    i = 1;
+	    pp2 = 0;
 	}
-      if (i == 0)
-	return pp;
+      if (pp2)
+	return pp2;
       break;
     default:
       break;
