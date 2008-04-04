@@ -283,7 +283,7 @@ unifyrules(Solver *solv)
    * j = pruned
    */
   jr = 0;
-  for (i = j = 1, ir = solv->rules + 1; i < solv->nrules; i++, ir++)
+  for (i = j = 1, ir = solv->rules + i; i < solv->nrules; i++, ir++)
     {
       if (jr && !unifyrules_sortcmp(ir, jr))
 	continue;		       /* prune! */
@@ -1445,6 +1445,7 @@ addwatches(Solver *solv, Rule *r)
 /* rule propagation */
 
 #define DECISIONMAP_TRUE(p) ((p) > 0 ? (decisionmap[p] > 0) : (decisionmap[-p] < 0))
+#define DECISIONMAP_FALSE(p) ((p) > 0 ? (decisionmap[p] < 0) : (decisionmap[-p] > 0))
 
 /*
  * propagate
@@ -3581,6 +3582,101 @@ create_obsolete_index(Solver *solv)
     }
 }
 
+static void
+removedisabledconflicts(Solver *solv, Queue *removed)
+{
+  Pool *pool = solv->pool;
+  int i, n;
+  Id p, why, *dp;
+  Id new;
+  Rule *r;
+  Id *decisionmap = solv->decisionmap;
+
+  POOL_DEBUG(SAT_DEBUG_STATS, "removedisabledconflicts\n");
+  queue_empty(removed);
+  for (i = 0; i < solv->decisionq.count; i++)
+    {
+      p = solv->decisionq.elements[i];
+      if (p > 0)
+	continue;
+      /* a conflict. we never do conflicts on free decisions, so there
+       * must have been an unit rule */
+      why = solv->decisionq_why.elements[i];
+      assert(why > 0);
+      r = solv->rules + why;
+      if (!r->w1 && decisionmap[-p])
+	{
+	  /* rule is now disabled, remove from decisionmap */
+	  POOL_DEBUG(SAT_DEBUG_STATS, "removing conflict for package %s[%d]\n", solvable2str(pool, pool->solvables - p), -p);
+	  queue_push(removed, -p);
+	  queue_push(removed, decisionmap[-p]);
+	  decisionmap[-p] = 0;
+	}
+    }
+  if (!removed->count)
+    return;
+  /* we removed some confliced packages. some of them might still
+   * be in conflict, so search for unit rules and re-conflict */
+  new = 0;
+  for (i = n = 1, r = solv->rules + i; n < solv->nrules; i++, r++, n++)
+    {
+      if (i == solv->nrules)
+	{
+	  i = 1;
+	  r = solv->rules + i;
+	}
+      if (!r->w1)
+	continue;
+      if (!r->w2)
+	{
+	  if (r->p < 0 && !decisionmap[-r->p])
+	    new = r->p;
+	}
+      else if (!r->d)
+	{
+	  /* binary rule */
+	  if (r->p < 0 && decisionmap[-r->p] == 0 && DECISIONMAP_FALSE(r->w2))
+	    new = r->p;
+	  else if (r->w2 < 0 && decisionmap[-r->w2] == 0 && DECISIONMAP_FALSE(r->p))
+	    new = r->w2;
+	}
+      else
+	{
+	  if (r->p < 0 && decisionmap[-r->p] == 0)
+	    new = r->p;
+	  if (new || DECISIONMAP_FALSE(r->p))
+	    {
+	      dp = pool->whatprovidesdata + r->d;
+	      while ((p = *dp++) != 0)
+		{
+		  if (new && p == new)
+		    continue;
+		  if (p < 0 && decisionmap[-p] == 0)
+		    {
+		      if (new)
+			{
+			  new = 0;
+			  break;
+			}
+		      new = p;
+		    }
+		  else if (!DECISIONMAP_FALSE(p))
+		    {
+		      new = 0;
+		      break;
+		    }
+		}
+	    }
+	}
+      if (new)
+	{
+	  POOL_DEBUG(SAT_DEBUG_STATS, "re-conflicting package %s[%d]\n", solvable2str(pool, pool->solvables - new), -new);
+	  decisionmap[-new] = -1;
+	  n = 0;	/* redo all rules */
+	}
+    }
+}
+
 
 /*-----------------------------------------------------------------*/
 /* main() */
@@ -3600,7 +3696,7 @@ solver_solve(Solver *solv, Queue *job)
   int oldnrules;
   Map addedmap;		       /* '1' == have rpm-rules for solvable */
   Id how, what, weak, name, p, *pp, d;
-  Queue q;
+  Queue q, redoq;
   Solvable *s;
 
   /* create whatprovides if not already there */
@@ -3914,15 +4010,13 @@ solver_solve(Solver *solv, Queue *job)
   /* solve! */
   run_solver(solv, 1, solv->dontinstallrecommended ? 0 : 1);
 
-  /* find recommended packages */
+  queue_init(&redoq);
   if (!solv->problems.count)
     {
-      Id rec, *recp, p, *pp;
       int gotweak = 0;
-      Queue olddecisions;
       Rule *r;
 
-      /* disable all weak erase rules */
+      /* disable all weak erase rules for recommened/suggestes search */
       for (i = 1, r = solv->rules + i; i < solv->learntrules; i++, r++)
 	{
           if (!MAPTST(&solv->weakrulemap, i))
@@ -3934,80 +4028,63 @@ solver_solve(Solver *solv, Queue *job)
 	}
       if (gotweak)
 	{
-	  queue_clone(&olddecisions, &solv->decisionq);
-	  reset_solver(solv);
-	  r = propagate(solv, 1);
-	  assert(!r);
-	  for (i = 0; i < olddecisions.count; i++)
-	    {
-	      p = olddecisions.elements[i];
-	      if (p < 0)
-		continue;
-	      if (solv->decisionmap[p] > 0)
-		continue;
-	      assert(solv->decisionmap[p] == 0);
-	      solv->decisionmap[p] = 1;
-	      queue_push(&solv->decisionq, p);
-	      queue_push(&solv->decisionq_why, 0);
-	      r = propagate(solv, 1);
-	      assert(!r);
-	    }
+	  enabledisablelearntrules(solv);
+	  removedisabledconflicts(solv, &redoq);
 	}
+    }
 
-      if (gotweak || solv->dontinstallrecommended)
+  /* find recommended packages */
+  /* if q.count == 0 we already found all recommended in the
+   * solver run */
+  if (!solv->problems.count && (redoq.count || solv->dontinstallrecommended))
+    {
+      Id rec, *recp, p, *pp;
+
+      /* create map of all suggests that are still open */
+      solv->recommends_index = -1;
+      MAPZERO(&solv->recommendsmap);
+      for (i = 0; i < solv->decisionq.count; i++)
 	{
-	  /* create map of all suggests that are still open */
-	  solv->recommends_index = -1;
-	  MAPZERO(&solv->recommendsmap);
-	  for (i = 0; i < solv->decisionq.count; i++)
+	  p = solv->decisionq.elements[i];
+	  if (p < 0)
+	    continue;
+	  s = pool->solvables + p;
+	  if (s->recommends)
 	    {
-	      p = solv->decisionq.elements[i];
-	      if (p < 0)
-		continue;
-	      s = pool->solvables + p;
-	      if (s->recommends)
+	      recp = s->repo->idarraydata + s->recommends;
+	      while ((rec = *recp++) != 0)
 		{
-		  recp = s->repo->idarraydata + s->recommends;
-		  while ((rec = *recp++) != 0)
-		    {
-		      FOR_PROVIDES(p, pp, rec)
-			if (solv->decisionmap[p] > 0)
-			  break;
-		      if (p)
-			continue;	/* already fulfilled */
-		      FOR_PROVIDES(p, pp, rec)
-			MAPSET(&solv->recommendsmap, p);
-		    }
+		  FOR_PROVIDES(p, pp, rec)
+		    if (solv->decisionmap[p] > 0)
+		      break;
+		  if (p)
+		    continue;	/* p != 0: already fulfilled */
+		  FOR_PROVIDES(p, pp, rec)
+		    MAPSET(&solv->recommendsmap, p);
 		}
 	    }
-	  for (i = 1; i < pool->nsolvables; i++)
-	    {
-	      if (solv->decisionmap[i] != 0)
-		continue;
-	      s = pool->solvables + i;
-	      if (!MAPTST(&solv->recommendsmap, i))
-		{
-		  if (!s->supplements)
-		    continue;
-		  if (!pool_installable(pool, s))
-		    continue;
-		  if (!solver_is_supplementing(solv, s))
-		    continue;
-		}
-	      if (solv->dontinstallrecommended)
-		queue_push(&solv->recommendations, i);
-	      else
-		queue_pushunique(&solv->recommendations, i);
-	    }
-	  /* we use MODE_SUGGEST here so that repo prio is ignored */
-	  policy_filter_unwanted(solv, &solv->recommendations, 0, POLICY_MODE_SUGGEST);
 	}
-      if (gotweak)
+      for (i = 1; i < pool->nsolvables; i++)
 	{
-	  queue_clone(&solv->decisionq, &olddecisions);
-	  queue_free(&olddecisions);
-	  /* XXX restore everything */
+	  if (solv->decisionmap[i] != 0)
+	    continue;
+	  s = pool->solvables + i;
+	  if (!MAPTST(&solv->recommendsmap, i))
+	    {
+	      if (!s->supplements)
+		continue;
+	      if (!pool_installable(pool, s))
+		continue;
+	      if (!solver_is_supplementing(solv, s))
+		continue;
+	    }
+	  if (solv->dontinstallrecommended)
+	    queue_push(&solv->recommendations, i);
+	  else
+	    queue_pushunique(&solv->recommendations, i);
 	}
+      /* we use MODE_SUGGEST here so that repo prio is ignored */
+      policy_filter_unwanted(solv, &solv->recommendations, 0, POLICY_MODE_SUGGEST);
     }
 
   /* find suggested packages */
@@ -4058,6 +4135,14 @@ solver_solve(Solver *solv, Queue *job)
       policy_filter_unwanted(solv, &solv->suggestions, 0, POLICY_MODE_SUGGEST);
     }
 
+  if (redoq.count)
+    {
+      /* restore decisionmap */
+      for (i = 0; i < redoq.count; i += 2)
+	solv->decisionmap[redoq.elements[i]] = redoq.elements[i + 1];
+    }
+
+  queue_free(&redoq);
   if (solv->problems.count)
     problems_to_solutions(solv, job);
 }
