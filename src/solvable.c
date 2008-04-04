@@ -358,3 +358,111 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
     }
   return loc;
 }
+
+
+static inline Id dep2name(Pool *pool, Id dep)
+{
+  while (ISRELDEP(dep))
+    {
+      Reldep *rd = rd = GETRELDEP(pool, dep);
+      dep = rd->name;
+    }
+  return dep;
+}
+
+static inline int providedbyinstalled(Pool *pool, Repo *installed, Id dep)
+{
+  Id p, *pp;
+  Solvable *s;
+  FOR_PROVIDES(p, pp, dep)
+    {
+      if (p == SYSTEMSOLVABLE)
+	return -1;
+      s = pool->solvables + p;
+      if (s->repo && s->repo == installed)
+	return 1;
+    }
+  return 0;
+}
+
+/*
+ * returns:
+ * 1:  solvable is installable without any other package changes
+ * 0:  solvable is not installable
+ * -1: solvable is installable, but doesn't constrain any installed packages
+ */
+int
+solvable_trivial_installable(Solvable *s, Repo *installed)
+{
+  Pool *pool = s->repo->pool;
+  Solvable *s2;
+  Id p, *pp, *dp;
+  Id *reqp, req;
+  Id *conp, con;
+  Id *obsp, obs;
+  int r, interesting = 0;
+
+  if (s->requires)
+    {
+      reqp = s->repo->idarraydata + s->requires;
+      while ((req = *reqp++) != 0)
+	{
+	  if (req == SOLVABLE_PREREQMARKER)
+	    continue;
+          r = providedbyinstalled(pool, installed, req);
+	  if (!r)
+	    return 0;
+	  if (r > 0)
+	    interesting = 1;
+	}
+    }
+  if (!installed)
+    return 1;
+  if (s->conflicts)
+    {
+      conp = s->repo->idarraydata + s->conflicts;
+      while ((con = *conp++) != 0)
+	{
+	  if (providedbyinstalled(pool, installed, con))
+	    return 0;
+	  if (!interesting && ISRELDEP(con))
+	    {
+              con = dep2name(pool, con);
+	      if (providedbyinstalled(pool, installed, con))
+		interesting = 1;
+	    }
+	}
+    }
+  if (s->obsoletes && s->repo != installed)
+    {
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *conp++) != 0)
+	{
+	  if (providedbyinstalled(pool, installed, obs))
+	    return 0;
+	}
+    }
+  if (s->repo != installed)
+    {
+      FOR_PROVIDES(p, pp, s->name)
+	{
+	  s2 = pool->solvables + p;
+	  if (s2->repo == installed && s2->name == s->name)
+	    return 0;
+	}
+    }
+  FOR_REPO_SOLVABLES(installed, p, s2)
+    {
+      if (!s2->conflicts)
+	continue;
+      conp = s->repo->idarraydata + s->conflicts;
+      while ((con = *conp++) != 0)
+	{
+	  dp = pool_whatprovides(pool, con);
+	  for (; *dp; dp++)
+	    if (*dp == s - pool->solvables)
+	      return 0;
+	}
+    }
+  return interesting ? 1 : -1;
+}

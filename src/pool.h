@@ -177,6 +177,7 @@ char * solvable_get_location(Solvable *s, unsigned int *medianrp);
 const unsigned char *solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep);
 const char *solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep);
 
+int solvable_trivial_installable(Solvable *s, struct _Repo *installed);
 
 
 
