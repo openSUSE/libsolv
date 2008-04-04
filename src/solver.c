@@ -658,6 +658,23 @@ makeruledecisions(Solver *solv)
 	if (solv->decisionq.elements[i] == -v)
 	  break;
       assert(i < solv->decisionq.count);
+      if (v == -SYSTEMSOLVABLE) {
+	/* conflict with system solvable */
+	queue_push(&solv->problems, solv->learnt_pool.count);
+        queue_push(&solv->learnt_pool, ri);
+	queue_push(&solv->learnt_pool, 0);
+	POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
+	if (ri < solv->systemrules)
+	  v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	else
+	  v = ri;
+	queue_push(&solv->problems, v);
+	queue_push(&solv->problems, 0);
+	disableproblem(solv, v);
+	continue;
+      }
+      assert(solv->decisionq_why.elements[i]);
+#if 0
 /*OBSOLETE*/
       if (solv->decisionq_why.elements[i] == 0)
 	{
@@ -678,6 +695,7 @@ makeruledecisions(Solver *solv)
 	  disableproblem(solv, v);
 	  continue;
 	}
+#endif
       if (solv->decisionq_why.elements[i] < solv->jobrules)
 	{
 	  /* conflict with rpm rule assertion */
