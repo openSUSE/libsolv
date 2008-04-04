@@ -42,20 +42,20 @@
 
 enum state {
   STATE_START,
-  STATE_UPDATES,
-  STATE_UPDATE,
-  STATE_ID,
-  STATE_TITLE,
-  STATE_RELEASE,
-  STATE_ISSUED,
-  STATE_REFERENCES,
-  STATE_REFERENCE,
-  STATE_DESCRIPTION,
-  STATE_PKGLIST,
-  STATE_COLLECTION,
-  STATE_NAME,
-  STATE_PACKAGE,
-  STATE_FILENAME,
+  STATE_UPDATES,      /* 1 */
+  STATE_UPDATE,       /* 2 */
+  STATE_ID,           /* 3 */
+  STATE_TITLE,        /* 4 */
+  STATE_RELEASE,      /* 5 */
+  STATE_ISSUED,       /* 6 */
+  STATE_REFERENCES,   /* 7 */
+  STATE_REFERENCE,    /* 8 */
+  STATE_DESCRIPTION,  /* 9 */
+  STATE_PKGLIST,     /* 10 */
+  STATE_COLLECTION,  /* 11 */
+  STATE_NAME,        /* 12 */
+  STATE_PACKAGE,     /* 13 */
+  STATE_FILENAME,    /* 14 */
   NUMSTATES
 };
 
@@ -66,23 +66,25 @@ struct stateswitch {
   int docontent;
 };
 
+
+/* !! must be sorted by first column !! */
 static struct stateswitch stateswitches[] = {
-  { STATE_START,       "updates",         STATE_UPDATES, 0 },
-  { STATE_START,       "update",          STATE_UPDATE, 0 },
-  { STATE_UPDATES,     "update",          STATE_UPDATE, 0},
-  { STATE_UPDATE,      "id",              STATE_ID, 1},
-  { STATE_UPDATE,      "title",           STATE_TITLE, 1},
-  { STATE_UPDATE,      "release",         STATE_RELEASE, 1},
-  { STATE_UPDATE,      "issued",          STATE_ISSUED, 1},
-  { STATE_UPDATE,      "references",      STATE_REFERENCES, 0},
-  { STATE_UPDATE,      "description",     STATE_DESCRIPTION, 0},
-  { STATE_REFERENCES,  "reference",       STATE_REFERENCE, 0},
-  { STATE_UPDATE,      "pkglist",         STATE_PKGLIST, 0},
-  { STATE_PKGLIST,     "collection",      STATE_COLLECTION, 0},
-  { STATE_COLLECTION,  "name",            STATE_NAME, 1},
-  { STATE_COLLECTION,  "package",         STATE_PACKAGE, 0},
-  { STATE_COLLECTION,  "filename",        STATE_FILENAME, 1},
-  { NUMSTATES}
+  { STATE_START,       "updates",         STATE_UPDATES,     0 },
+  { STATE_START,       "update",          STATE_UPDATE,      0 },
+  { STATE_UPDATES,     "update",          STATE_UPDATE,      0 },
+  { STATE_UPDATE,      "id",              STATE_ID,          1 },
+  { STATE_UPDATE,      "title",           STATE_TITLE,       1 },
+  { STATE_UPDATE,      "release",         STATE_RELEASE,     1 },
+  { STATE_UPDATE,      "issued",          STATE_ISSUED,      1 },
+  { STATE_UPDATE,      "description",     STATE_DESCRIPTION, 1 },
+  { STATE_UPDATE,      "references",      STATE_REFERENCES,  0 },
+  { STATE_UPDATE,      "pkglist",         STATE_PKGLIST,     0 },
+  { STATE_REFERENCES,  "reference",       STATE_REFERENCE,   0 },
+  { STATE_PKGLIST,     "collection",      STATE_COLLECTION,  0 },
+  { STATE_COLLECTION,  "name",            STATE_NAME,        1 },
+  { STATE_COLLECTION,  "package",         STATE_PACKAGE,     0 },
+  { STATE_PACKAGE,     "filename",        STATE_FILENAME,    1 },
+  { NUMSTATES }
 };
 
 struct parsedata {
@@ -129,11 +131,14 @@ static void XMLCALL
 startElement(void *userData, const char *name, const char **atts)
 {
   struct parsedata *pd = userData;
-  /*Pool *pool = pd->pool;*/
+  Pool *pool = pd->pool;
   /*Solvable *s = pd->solvable;*/
   struct stateswitch *sw;
   /*const char *str; */
 
+#if 1
+      fprintf(stderr, "start: [%d]%s\n", pd->state, name);
+#endif
   if (pd->depth != pd->statedepth)
     {
       pd->depth++;
@@ -147,8 +152,8 @@ startElement(void *userData, const char *name, const char **atts)
   
   if (sw->from != pd->state)
     {
-#if 0
-      fprintf(stderr, "into unknown: %s\n", name);
+#if 1
+      fprintf(stderr, "into unknown: [%d]%s (from: %d)\n", sw->to, name, sw->from);
 #endif
       return;
     }
@@ -158,12 +163,49 @@ startElement(void *userData, const char *name, const char **atts)
   pd->lcontent = 0;
   *pd->content = 0;
 
+#if 1
+      fprintf(stderr, "state: %d\n", pd->state);
+#endif
   switch(pd->state)
     {
+     case STATE_START:
+      break;
+     case STATE_UPDATES:
+      break;
+     case STATE_UPDATE:
+      pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+      pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
+      repodata_extend(pd->data, pd->solvable - pool->solvables);      
+      break;
+     case STATE_ID:
+      break;
+     case STATE_TITLE:
+      break;
+     case STATE_RELEASE:
+      break;
+     case STATE_ISSUED:
+      break;
+     case STATE_REFERENCES:
+      break;
+     case STATE_REFERENCE:
+      break;
+     case STATE_DESCRIPTION:
+      break;
+     case STATE_PKGLIST:
+      break;
+     case STATE_COLLECTION:
+      break;
+     case STATE_NAME:
+      break;
+     case STATE_PACKAGE:
+      break;
+     case STATE_FILENAME:
+      break;
      default:
       break;
     }
 }
+
 
 static void XMLCALL
 endElement(void *userData, const char *name)
@@ -172,10 +214,15 @@ endElement(void *userData, const char *name)
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
 
+#if 1
+      fprintf(stderr, "end: %s\n", name);
+#endif
   if (pd->depth != pd->statedepth)
     {
       pd->depth--;
-      // printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+#if 1
+      fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+#endif
       return;
     }
 
@@ -183,29 +230,52 @@ endElement(void *userData, const char *name)
   pd->statedepth--;
   switch (pd->state)
     {
-        case STATE_ID:
-            s->name = str2id(pool, pd->content, 1);
-            break;
-        case STATE_TITLE:
-            repodata_set_str(pd->data, pd->datanum, SOLVABLE_SUMMARY, pd->content);
-            break;
+      case STATE_START:
+      break;
+      case STATE_UPDATES:
+      break;
+      case STATE_UPDATE:
+      break;
+      case STATE_ID:
+      {
+        if (pd->content) {
+	  s->name = str2id(pool, pd->content, 1);
+	}
+      }
+      break;
+      case STATE_TITLE:
+      {
+	repodata_set_str(pd->data, pd->datanum, SOLVABLE_SUMMARY, pd->content);
+      }
+      break;
         case STATE_RELEASE:
         case STATE_ISSUED:
             s->name = str2id(pool, pd->content, 1);
+     case STATE_REFERENCES:
+      break;
         case STATE_REFERENCE:
         case STATE_DESCRIPTION:
             repodata_set_str(pd->data, pd->datanum, SOLVABLE_DESCRIPTION, pd->content);
-            break;
-        case STATE_NAME:
-      
+            break;   
+     case STATE_PKGLIST:
+      break;
+     case STATE_COLLECTION:
+      break;
+     case STATE_NAME:
+      break;
+     case STATE_PACKAGE:
+      break;
+     case STATE_FILENAME:
+      break;
 
         default:
             break;
     }
 
-
-
+  pd->state = pd->sbtab[pd->state];
+  pd->docontent = 0;
 }
+
 
 static void XMLCALL
 characterData(void *userData, const XML_Char *s, int len)
@@ -213,7 +283,9 @@ characterData(void *userData, const XML_Char *s, int len)
   struct parsedata *pd = userData;
   int l;
   char *c;
-
+#if 0
+  fprintf(stderr, "Content: [%d]'%s'\n", len, s );
+#endif
   if (!pd->docontent)
     return;
   l = pd->lcontent + len + 1;
@@ -280,3 +352,5 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
 
   free(pd.content);
 }
+
+/* EOF */
