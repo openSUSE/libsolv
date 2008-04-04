@@ -166,6 +166,8 @@ id2rel(Pool *pool, Id id)
       return " WITH ";
     case REL_NAMESPACE:
       return " NAMESPACE ";
+    case REL_ARCH:
+      return ".";
     default:
       break;
     }

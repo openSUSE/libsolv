@@ -423,6 +423,7 @@ pool_addrelproviders(Pool *pool, Id d)
   int flags = rd->flags;
   Id pid, *pidp;
   Id p, *pp, *pp2, *pp3;
+  int i;
 
   d = GETRELID(d);
   queue_init_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
@@ -453,6 +454,11 @@ pool_addrelproviders(Pool *pool, Id d)
     case REL_NAMESPACE:
       if (pool->nscallback)
 	{
+	  /* ask callback which packages provide the dependency
+           * 0:  none
+           * 1:  the system (aka SYSTEMSOLVABLE)
+           * >1: a set of packages, stored as offset on whatprovidesdata
+           */
 	  p = pool->nscallback(pool, pool->nscallbackdata, name, evr);
 	  if (p > 1)
 	    {
@@ -464,6 +470,20 @@ pool_addrelproviders(Pool *pool, Id d)
 	    queue_push(&plist, SYSTEMSOLVABLE);
 	}
       break;
+    case REL_ARCH:
+      pp = pool_whatprovides(pool, name);
+      i = 0;
+      while ((p = *pp++) != 0)
+	{
+	  Solvable *s = pool->solvables + p;
+	  if (s->arch == evr)
+	    queue_push(&plist, p);
+	  else
+	    i = 1;
+	}
+      if (i == 0)
+	return pp;
+      break;
     default:
       break;
     }
@@ -474,7 +494,13 @@ pool_addrelproviders(Pool *pool, Id d)
 #endif
   if (flags && flags < 8)
     {
-      FOR_PROVIDES(p, pp, name)
+      pp = pool_whatprovides(pool, name);
+      while (ISRELDEP(name))
+	{
+          rd = GETRELDEP(pool, name);
+	  name = rd->name;
+	}
+      while ((p = *pp++) != 0)
 	{
 #if 0
 	  POOL_DEBUG(DEBUG_1, "addrelproviders: checking package %s\n", id2str(pool, pool->p[p].name));

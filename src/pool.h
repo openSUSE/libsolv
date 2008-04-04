@@ -133,6 +133,7 @@ struct _Pool {
 #define REL_OR		17
 #define REL_WITH	18
 #define REL_NAMESPACE	19
+#define REL_ARCH	20
 
 #if !defined(__GNUC__) && !defined(__attribute__)
 # define __attribute__(x)
