@@ -1,6 +1,6 @@
 rm *.tar.bz2
 svn export http://svn.opensuse.org/svn/zypp/trunk/sat-solver
-rm -rf sat-solver/testsuite
+rm -rf sat-solver/testsuite/data.libzypp
 cd sat-solver
 mkdir build
 cd build
