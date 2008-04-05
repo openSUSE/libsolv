@@ -258,7 +258,7 @@ startElement(void *userData, const char *name, const char **atts)
        */
       case STATE_UPDATE:
       {
-	const char *from, *status, *type, *version;
+	const char *from = 0, *status = 0, *type = 0, *version = 0;
 	for (; *atts; atts += 2)
 	{
 	  if (!strcmp(*atts, "from"))
@@ -275,8 +275,8 @@ startElement(void *userData, const char *name, const char **atts)
 	pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
 	repodata_extend(pd->data, pd->solvable - pool->solvables);      
 	
-	solvable->vendor = str2id(pool, (char *)from, 1);
-	solvable->evr = str2id(pool, (char *)version, 1);
+	solvable->vendor = str2id(pool, from, 1);
+	solvable->evr = str2id(pool, version, 1);
 	repodata_set_str(pd->data, pd->datanum, UPDATE_SEVERITY, type);
       }
       break;
