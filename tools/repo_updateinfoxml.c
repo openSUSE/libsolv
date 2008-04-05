@@ -293,7 +293,7 @@ startElement(void *userData, const char *name, const char **atts)
       */
       case STATE_ISSUED:
       {
-	const char *date;
+	const char *date = 0;
 	for (; *atts; atts += 2)
 	{
 	  if (!strcmp(*atts, "date"))
@@ -330,7 +330,7 @@ startElement(void *userData, const char *name, const char **atts)
        */
       case STATE_PACKAGE:
       {
-	const char *arch, *name, *src;
+	const char *arch = 0, *name = 0, *src = 0;
 	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
 	Id n;
 	Id rel_id;
