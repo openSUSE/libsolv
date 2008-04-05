@@ -436,7 +436,7 @@ solvable_trivial_installable(Solvable *s, Repo *installed)
   if (s->obsoletes && s->repo != installed)
     {
       obsp = s->repo->idarraydata + s->obsoletes;
-      while ((obs = *conp++) != 0)
+      while ((obs = *obsp++) != 0)
 	{
 	  if (providedbyinstalled(pool, installed, obs))
 	    return 0;
