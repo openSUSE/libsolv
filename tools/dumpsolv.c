@@ -258,13 +258,14 @@ int main(int argc, char **argv)
       repo = pool->repos[j];
       dump_repodata(repo);
       printf("repo %d contains %d solvables %d non-solvables\n", j, repo->nsolvables, repo->nextra);
+      printf("repo start: %d end: %d\n", repo->start, repo->end);
       for (i = repo->start, n = 1; i < repo->end; i++)
 	{
 	  s = pool->solvables + i;
 	  if (s->repo != repo)
 	    continue;
 	  printf("\n");
-	  printf("solvable %d:\n", n);
+	  printf("solvable %d (%d):\n", n, i);
 	  if (s->name || s->evr || s->arch)
 	    printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	  if (s->vendor)
