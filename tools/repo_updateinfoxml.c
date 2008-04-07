@@ -17,8 +17,7 @@
 
 #include "pool.h"
 #include "repo.h"
-#include "repo_patchxml.h"
-#include "repo_rpmmd.h"
+#include "repo_updateinfoxml.h"
 #include "tools_util.h"
 
 //#define TESTMM
