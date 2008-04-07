@@ -115,10 +115,8 @@ KNOWNID(SOLVABLE_EXTENDS,		"solvable:extends"),
 KNOWNID(SOLVABLE_ICON,			"solvable:icon"),
 KNOWNID(SOLVABLE_ORDER,			"solvable:order"),
 
-KNOWNID(UPDATE_SEVERITY,		"update:severity"), /* update severity (security, recommended, optional, ...) */
 KNOWNID(UPDATE_REBOOT,		        "update:reboot"),   /* reboot suggested (kernel update) */
 KNOWNID(UPDATE_RESTART,		        "update:restart"),  /* restart suggested (update stack update) */
-KNOWNID(UPDATE_TIMESTAMP,	        "update:timestamp"),/* release date */
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
