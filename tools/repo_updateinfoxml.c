@@ -278,6 +278,7 @@ startElement(void *userData, const char *name, const char **atts)
 	
 	solvable->vendor = str2id(pool, from, 1);
 	solvable->evr = str2id(pool, version, 1);
+	solvable->arch = ARCH_NOARCH;
 	repodata_set_str(pd->data, pd->datanum, UPDATE_SEVERITY, type);
       }
       break;
