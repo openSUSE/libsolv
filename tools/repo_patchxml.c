@@ -55,6 +55,7 @@ enum state {
   STATE_ENHANCESENTRY,
   STATE_FRESHENS,
   STATE_FRESHENSENTRY,
+  STATE_REBOOT,
   NUMSTATES
 };
 
@@ -79,6 +80,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PATCH,       "summary",         STATE_SUMMARY, 1 },
   { STATE_PATCH,       "description",     STATE_DESCRIPTION, 1 },
   { STATE_PATCH,       "category",        STATE_CATEGORY, 1 },
+  { STATE_PATCH,       "reboot-needed",   STATE_REBOOT, 0 },
   { STATE_PATCH,       "rpm:requires",    STATE_REQUIRES, 0 },
   { STATE_PATCH,       "rpm:provides",    STATE_PROVIDES, 0 },
   { STATE_PATCH,       "rpm:requires",    STATE_REQUIRES, 0 },
@@ -574,6 +576,9 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_FRESHENSENTRY:
       s->freshens = adddep(pool, pd, s->freshens, atts, 0);
       break;
+    case STATE_REBOOT:
+      repodata_set_str(pd->data, pd->datanum, UPDATE_REBOOT, pd->content);
+      break;  
     default:
       break;
     }
