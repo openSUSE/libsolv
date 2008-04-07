@@ -334,7 +334,7 @@ startElement(void *userData, const char *name, const char **atts)
       {
 	const char *arch = 0, *name = 0, *src = 0;
 	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
-	Id n;
+	Id n, a, na;
 	Id rel_id;
 	for (; *atts; atts += 2)
 	{
@@ -345,8 +345,13 @@ startElement(void *userData, const char *name, const char **atts)
 	  else if (!strcmp(*atts, "src"))
 	    src = atts[1];
 	}
+	/* generated Ids for name and arch */
 	n = str2id(pool, name, 1);
-	rel_id = rel2id(pool, n, evr, REL_LT, 1);
+	a = str2id(pool, arch, 1);
+	/*  now combine both to a single Id */
+	na = rel2id(pool, n, a, REL_ARCH, 1);
+	
+	rel_id = rel2id(pool, na, evr, REL_LT, 1);
 
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
       }
