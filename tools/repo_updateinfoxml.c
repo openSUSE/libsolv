@@ -63,6 +63,7 @@ enum state {
   STATE_PACKAGE,     /* 13 */
   STATE_FILENAME,    /* 14 */
   STATE_REBOOT,      /* 15 */
+  STATE_RESTART,     /* 16 */
   NUMSTATES
 };
 
@@ -92,6 +93,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_COLLECTION,  "package",         STATE_PACKAGE,     0 },
   { STATE_PACKAGE,     "filename",        STATE_FILENAME,    1 },
   { STATE_PACKAGE,     "reboot_suggested",STATE_REBOOT,      1 },
+  { STATE_PACKAGE,     "restart_suggested",STATE_RESTART,    1 },
   { NUMSTATES }
 };
 
@@ -354,6 +356,9 @@ startElement(void *userData, const char *name, const char **atts)
       /* <reboot_suggested>True</reboot_suggested> */
       case STATE_REBOOT:
       break;
+      /* <restart_suggested>True</restart_suggested> */
+      case STATE_RESTART:
+      break;
       case NUMSTATES+1:
         split(NULL, NULL, 0); /* just to keep gcc happy about tools_util.h: static ... split() {...}  Urgs!*/
       break;
@@ -446,6 +451,12 @@ endElement(void *userData, const char *name)
       case STATE_REBOOT:
       {
 	repodata_set_str(pd->data, pd->datanum, UPDATE_REBOOT, pd->content);
+      }
+      break;
+      /* <restart_suggested>True</restart_suggested> */
+      case STATE_RESTART:
+      {
+	repodata_set_str(pd->data, pd->datanum, UPDATE_RESTART, pd->content);
       }
       break;
       default:
