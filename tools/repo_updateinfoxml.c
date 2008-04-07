@@ -279,7 +279,7 @@ startElement(void *userData, const char *name, const char **atts)
 	solvable->vendor = str2id(pool, from, 1);
 	solvable->evr = str2id(pool, version, 1);
 	solvable->arch = ARCH_NOARCH;
-	repodata_set_str(pd->data, pd->datanum, UPDATE_SEVERITY, type);
+	repodata_set_str(pd->data, pd->datanum, SOLVABLE_PATCHCATEGORY, type);
       }
       break;
       /* <id>FEDORA-2007-4594</id> */
@@ -301,7 +301,7 @@ startElement(void *userData, const char *name, const char **atts)
 	  if (!strcmp(*atts, "date"))
 	    date = atts[1];
 	}
-	repodata_set_str(pd->data, pd->datanum, UPDATE_TIMESTAMP, date);
+	repodata_set_str(pd->data, pd->datanum, SOLVABLE_BUILDTIME, date);
       }
       break;
       case STATE_REFERENCES:
@@ -451,13 +451,13 @@ endElement(void *userData, const char *name)
       /* <reboot_suggested>True</reboot_suggested> */
       case STATE_REBOOT:
       {
-	repodata_set_str(pd->data, pd->datanum, UPDATE_REBOOT, pd->content);
+	repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
       }
       break;
       /* <restart_suggested>True</restart_suggested> */
       case STATE_RESTART:
       {
-	repodata_set_str(pd->data, pd->datanum, UPDATE_RESTART, pd->content);
+	repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
       }
       break;
       default:

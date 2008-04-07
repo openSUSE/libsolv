@@ -579,10 +579,10 @@ startElement(void *userData, const char *name, const char **atts)
       s->freshens = adddep(pool, pd, s->freshens, atts, 0);
       break;
     case STATE_REBOOT:
-      repodata_set_str(pd->data, pd->datanum, UPDATE_REBOOT, pd->content);
+      repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
       break;  
     case STATE_RESTART:
-      repodata_set_str(pd->data, pd->datanum, UPDATE_RESTART, pd->content);
+      repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
       break;  
     default:
       break;
