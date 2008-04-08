@@ -158,7 +158,11 @@ void repodata_set_id(Repodata *data, Id entry, Id keyname, Id id);
 /*  */
 
 void repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str);
+
+/* set numeric constant */
 void repodata_set_constant(Repodata *data, Id entry, Id keyname, unsigned int constant);
+
+/* set Id constant */
 void repodata_set_constantid(Repodata *data, Id entry, Id keyname, Id id);
 
 /* checksum */
@@ -196,6 +200,5 @@ const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
 /* internal */
 unsigned int repodata_compress_page(unsigned char *, unsigned int, unsigned char *, unsigned int);
 void repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz);
-
 
 #endif /* SATSOLVER_REPODATA_H */
