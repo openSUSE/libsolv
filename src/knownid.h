@@ -117,6 +117,7 @@ KNOWNID(SOLVABLE_ORDER,			"solvable:order"),
 
 KNOWNID(UPDATE_REBOOT,		        "update:reboot"),   /* reboot suggested (kernel update) */
 KNOWNID(UPDATE_RESTART,		        "update:restart"),  /* restart suggested (update stack update) */
+KNOWNID(UPDATE_COLLECTION,	        "update:collection"),  /* collection (of packages) */
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
