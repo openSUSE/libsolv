@@ -1163,14 +1163,14 @@ repodata_set_id(Repodata *data, Id entry, Id keyname, Id id)
 }
 
 void
-repodata_set_num(Repodata *data, Id entry, Id keyname, Id num)
+repodata_set_num(Repodata *data, Id entry, Id keyname, unsigned int num)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_NUM;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, entry, &key, num);
+  repodata_set(data, entry, &key, (Id)num);
 }
 
 void

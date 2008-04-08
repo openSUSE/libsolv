@@ -112,12 +112,23 @@ typedef struct _Repodata {
   Id *addedfileprovides;
 } Repodata;
 
-/* management functions */
+
+/*-----
+ * management functions
+ */
 void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
 void repodata_extend(Repodata *data, Id p);
 void repodata_extend_extra(Repodata *data, int nextra);
 void repodata_extend_block(Repodata *data, Id p, int num);
 void repodata_free(Repodata *data);
+
+/* internalize repodata into .solv, required before writing out a .solv file */
+void repodata_internalize(Repodata *data);
+
+
+/*----
+ * access functions
+ */
 
 /* Search key <keyname> (all keys, if keyname == 0) for Id <entry>
  * <entry> is _relative_ Id for <data>
@@ -128,30 +139,52 @@ void repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void 
 /* lookup functions */
 Id repodata_lookup_id(Repodata *data, Id entry, Id keyid);
 const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);
-int repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned *value);
+int repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned int *value);
 int repodata_lookup_void(Repodata *data, Id entry, Id keyid);
 const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyid, Id *typep);
 
-/* data assignment */
+
+/*-----
+ * data assignment functions
+ */
+
+/* basic types: void, num, string, Id */
+
+void repodata_set_void(Repodata *data, Id entry, Id keyname);
+void repodata_set_num(Repodata *data, Id entry, Id keyname, unsigned int num);
+void repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str);
 void repodata_set_id(Repodata *data, Id entry, Id keyname, Id id);
-void repodata_set_num(Repodata *data, Id entry, Id keyname, Id num);
+
+/*  */
+
 void repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str);
 void repodata_set_constant(Repodata *data, Id entry, Id keyname, Id constant);
 void repodata_set_constantid(Repodata *data, Id entry, Id keyname, Id id);
-void repodata_set_void(Repodata *data, Id entry, Id keyname);
-void repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str);
+
+/* checksum */
 void repodata_set_bin_checksum(Repodata *data, Id entry, Id keyname, Id type,
 			       const unsigned char *buf);
 void repodata_set_checksum(Repodata *data, Id entry, Id keyname, Id type,
 			   const char *str);
+
+/* directory (for package file list) */
 void repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2);
 void repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *str);
+
+
+/* Arrays */
 void repodata_add_idarray(Repodata *data, Id entry, Id keyname, Id id);
 void repodata_add_poolstr_array(Repodata *data, Id entry, Id keyname,
 				const char *str);
+
+/*-----
+ * data management
+ */
+
+/* merge attributes */
 void repodata_merge_attrs (Repodata *data, Id dest, Id src);
 
-void repodata_internalize(Repodata *data);
+/* */
 void repodata_disable_paging(Repodata *data);
 
 /* helper functions */
