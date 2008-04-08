@@ -347,13 +347,28 @@ startElement(void *userData, const char *name, const char **atts)
 	}
 	/* generated Ids for name and arch */
 	n = str2id(pool, name, 1);
-	a = str2id(pool, arch, 1);
+	if (arch)
+	  a = str2id(pool, arch, 1);
+	else
+	  a = ARCH_NOARCH;
 	/*  now combine both to a single Id */
 	na = rel2id(pool, n, a, REL_ARCH, 1);
 	
 	rel_id = rel2id(pool, na, evr, REL_LT, 1);
 
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
+	
+	if (1) {
+	  const char *evrstr = id2str(pool, evr);
+	  int buflen = strlen(name) + 1 + strlen(evrstr) + 1 + strlen(arch?arch:"") + 1;
+	  char *buf;
+	  if (!arch) arch = "";
+	  buf = (char *)malloc(buflen);
+	  if (!buf) exit(1);
+	  sprintf(buf, "%s %s %s", name, evrstr, arch);
+	  repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION, buf);
+	  free(buf);
+	}
       }
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
