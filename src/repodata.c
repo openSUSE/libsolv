@@ -1190,7 +1190,7 @@ repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str)
 }
 
 void
-repodata_set_constant(Repodata *data, Id entry, Id keyname, Id constant)
+repodata_set_constant(Repodata *data, Id entry, Id keyname, unsigned int constant)
 {
   Repokey key;
   key.name = keyname;

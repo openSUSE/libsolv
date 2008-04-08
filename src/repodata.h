@@ -158,7 +158,7 @@ void repodata_set_id(Repodata *data, Id entry, Id keyname, Id id);
 /*  */
 
 void repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str);
-void repodata_set_constant(Repodata *data, Id entry, Id keyname, Id constant);
+void repodata_set_constant(Repodata *data, Id entry, Id keyname, unsigned int constant);
 void repodata_set_constantid(Repodata *data, Id entry, Id keyname, Id id);
 
 /* checksum */
