@@ -333,8 +333,8 @@ pool_createwhatprovides(Pool *pool)
 	      d++;
 	      while (*d)	       /* find free slot */
 		d++;
-	      if (d[-1] == i)
-		continue;
+	      if (d[-1] == i)          /* solvable already tacked at end ? */
+		continue;              /* Y: skip, on to next provides */
 	    }
 	  *d = i;		       /* put solvable Id into data */
 	}
