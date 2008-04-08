@@ -787,7 +787,8 @@ repo_lookup_str(Solvable *s, Id key)
   return 0;
 }
 
-int
+
+unsigned int
 repo_lookup_num(Solvable *s, Id key)
 {
   Repo *repo = s->repo;

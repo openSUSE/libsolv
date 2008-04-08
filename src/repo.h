@@ -169,7 +169,7 @@ void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*c
 /* returns the string value of the attribute, or NULL if not found */
 const char * repo_lookup_str(Solvable *s, Id key);
 /* returns the integer value of the attribute, or 0 if not found */
-int repo_lookup_num(Solvable *s, Id key);
+unsigned int repo_lookup_num(Solvable *s, Id key);
 /* generic attribute lookup */
 int repo_lookup(Solvable *s, Id key, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
