@@ -678,10 +678,10 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
 
 /* FIXME factor and merge with repo_matchvalue */
 static int
-dataiterator_match(Dataiterator *di, KeyValue *kv)
+dataiterator_match_int_real(Dataiterator *di, int flags, const void *vmatch)
 {
-  int flags = di->flags;
-
+  KeyValue *kv = &di->kv;
+  const char *match = vmatch;
   if ((flags & SEARCH_STRINGMASK) != 0)
     {
       switch (di->key->type)
@@ -703,34 +703,34 @@ dataiterator_match(Dataiterator *di, KeyValue *kv)
 	  case SEARCH_SUBSTRING:
 	    if (flags & SEARCH_NOCASE)
 	      {
-	        if (!strcasestr(kv->str, di->match))
+	        if (!strcasestr(kv->str, match))
 		  return 0;
 	      }
 	    else
 	      {
-	        if (!strstr(kv->str, di->match))
+	        if (!strstr(kv->str, match))
 		  return 0;
 	      }
 	    break;
 	  case SEARCH_STRING:
 	    if (flags & SEARCH_NOCASE)
 	      {
-	        if (strcasecmp(di->match, kv->str))
+	        if (strcasecmp(match, kv->str))
 		  return 0;
 	      }
 	    else
 	      {
-	        if (strcmp(di->match, kv->str))
+	        if (strcmp(match, kv->str))
 		  return 0;
 	      }
 	    break;
 	  case SEARCH_GLOB:
-	    if (fnmatch(di->match, kv->str, (flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
+	    if (fnmatch(match, kv->str, (flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
 	      return 0;
 	    break;
 #if 0
 	  case SEARCH_REGEX:
-	    if (regexec(&di->regexp, kv->str, 0, NULL, 0))
+	    if (regexec((const regex_t *)vmatch, kv->str, 0, NULL, 0))
 	      return 0;
 #endif
 	  default:
@@ -738,6 +738,18 @@ dataiterator_match(Dataiterator *di, KeyValue *kv)
 	}
     }
   return 1;
+}
+
+static int
+dataiterator_match_int(Dataiterator *di)
+{
+  return dataiterator_match_int_real(di, di->flags, di->match);
+}
+
+int
+dataiterator_match(Dataiterator *di, int flags, const void *vmatch)
+{
+  return dataiterator_match_int_real(di, flags, vmatch);
 }
 
 static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
@@ -947,7 +959,7 @@ skiprepo:;
 	}
 weg2:
       if (!di->match
-	  || dataiterator_match(di, &di->kv))
+	  || dataiterator_match_int(di))
 	break;
     }
   return 1;
