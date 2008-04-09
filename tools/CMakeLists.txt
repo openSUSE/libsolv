@@ -50,6 +50,7 @@ install(TARGETS
                 rpmmd2solv 
                 rpmdb2solv
                 rpms2solv
+                updateinfoxml2solv
    DESTINATION ${BIN_INSTALL_DIR} )
 
 install(PROGRAMS repo2solv.sh DESTINATION ${BIN_INSTALL_DIR} )

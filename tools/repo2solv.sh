@@ -33,6 +33,25 @@ if test -d repodata; then
     $cmd $i | rpmmd2solv $parser_options > $primfile || exit 4
   fi
 
+  # This contains a updateinfo.xml* and maybe patches
+  if test -f updateinfo.xml || test -f updateinfo.xml.gz || test -f updateinfo.xml.bz2 ; then
+      for i in updateinfo.xml*; do
+          case $i in
+              *.gz) cmd="gzip -dc" ;;
+              *.bz2) cmd="bzip2 -dc" ;;
+              *) cmd="cat" ;;
+          esac
+          # only check the first updateinfo.xml*, in case there are more
+          break
+      done
+      updateinfofile="/nonexist"
+      if test -n "$cmd"; then
+      # we have some updateinfo.xml*
+          updateinfofile=`mktemp` || exit 3
+          $cmd $i | updateinfoxml2solv $parser_options > $updateinfofile || exit 4
+      fi
+  fi
+
   patchfile="/nonexist"
   if test -f patches.xml; then
     patchfile=`mktemp` || exit 3
@@ -49,15 +68,19 @@ if test -d repodata; then
     ) | grep -v '\?xml' | patchxml2solv $parser_options > $patchfile || exit 4
   fi
 
-  # Now merge primary and patches
-  if test -s $primfile && test -s $patchfile; then
+  # Now merge primary and patches and updateinfo
+  if test -s $primfile && test -s $patchfile && test -s $updateinfofile; then
+      mergesolv $primfile $patchfile $updateinfofile
+  elif test -s $primfile && test -s $updateinfofile; then
+      mergesolv $primfile $updateinfofile
+  elif test -s $primfile && test -s $patchfile; then
     mergesolv $primfile $patchfile
   elif test -s $primfile; then
     cat $primfile
   elif test -s $patchfile; then
     cat $patchfile
   fi
-  rm -f $primfile $patchfile
+  rm -f $primfile $patchfile $updateinfofile
 elif test -d suse/setup/descr && test -s content; then
   olddir=`pwd`
   cd suse/setup/descr || exit 2
