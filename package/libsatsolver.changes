@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Wed Apr  9 16:09:36 CEST 2008 - jkupec@suse.cz
+
+- enable regex matching in Dataiterator
+
+-------------------------------------------------------------------
 Fri Apr  4 15:45:44 CEST 2008 - coolo@suse.de
 
 - package deptestomatic in -devel
