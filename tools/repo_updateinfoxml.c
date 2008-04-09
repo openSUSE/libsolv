@@ -1,10 +1,11 @@
-
 /*
  * Copyright (c) 2007, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
  */
+
+#define DO_ARRAY 1
 
 #define _GNU_SOURCE
 #include <sys/types.h>
@@ -118,6 +119,18 @@ struct parsedata {
   int ltemp;
   int atemp;
 };
+
+/*
+ * if we have seen a <filename>...
+ * inside of <package>...
+ * 
+ * If not, we must insert an empty filename to UPDATE_COLLECTION_FILENAME
+ * at </package> in order to keep all UPDATE_COLLECTION_* arrays in sync
+ */
+
+static int package_filename_seen = 0;
+static int package_flags = 0; /* same for reboot/restart flags, to be written at </package> */
+
 
 /*
  * find attribute
@@ -312,6 +325,26 @@ startElement(void *userData, const char *name, const char **atts)
        *             type="bugzilla"/>
        */
       case STATE_REFERENCE:
+      {
+        const char *url = 0, *id = 0, *title = 0, *type = 0;
+	for (; *atts; atts += 2)
+	{
+	  if (!strcmp(*atts, "href"))
+	    url = atts[1];
+	  else if (!strcmp(*atts, "id"))
+	    id = atts[1];
+	  else if (!strcmp(*atts, "title"))
+	    title = atts[1];
+	  else if (!strcmp(*atts, "type"))
+	    type = atts[1];
+	}
+#if DO_ARRAY
+        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_URL, url);
+        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_ID, id);
+        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_TITLE, title);
+        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_TYPE, type);
+#endif
+      }
       break;
       /* <description>This update ...</description> */
       case STATE_DESCRIPTION:
@@ -336,6 +369,11 @@ startElement(void *userData, const char *name, const char **atts)
 	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
 	Id n, a, na;
 	Id rel_id;
+	
+	/* reset package_* markers, to be evaluated at </package> */
+	package_filename_seen = 0;
+	package_flags = 0;
+	
 	for (; *atts; atts += 2)
 	{
 	  if (!strcmp(*atts, "arch"))
@@ -357,8 +395,13 @@ startElement(void *userData, const char *name, const char **atts)
 	rel_id = rel2id(pool, na, evr, REL_LT, 1);
 
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
-	
-	if (1) {
+#if DO_ARRAY
+	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_NAME, n);
+	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_EVR, a);
+	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_ARCH, evr);
+#else
+	/* _FILENAME and _FLAGS are written at </package> */
+        if (1) {
 	  const char *evrstr = id2str(pool, evr);
 	  int buflen = strlen(name) + 1 + strlen(evrstr) + 1 + strlen(arch?arch:"") + 1;
 	  char *buf;
@@ -369,6 +412,7 @@ startElement(void *userData, const char *name, const char **atts)
 	  repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION, buf);
 	  free(buf);
 	}
+#endif
       }
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
@@ -464,20 +508,52 @@ endElement(void *userData, const char *name)
       case STATE_NAME:
       break;
       case STATE_PACKAGE:
+      {
+#if DO_ARRAY
+	/* write _FILENAME and _FLAGS at </package>
+	 * to ensure all UPDATE_COLLECTION_* arrays are filled in parallel
+	 */
+	if (!package_filename_seen)
+	{
+	  repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION_FILENAME, "");
+	}
+	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_FLAGS, package_flags+1);
+#endif
+      }
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
       case STATE_FILENAME:
+      {
+#if DO_ARRAY
+	repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION_FILENAME, pd->content);
+        package_filename_seen = 1;
+#endif
+      }
       break;
       /* <reboot_suggested>True</reboot_suggested> */
       case STATE_REBOOT:
       {
-	repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
+	if (pd->content
+	    && (pd->content[0] == 'T'
+		|| pd->content[0] == 't'))
+	{
+	  /* FIXME: this is per-package, the global flag should be computed at runtime */
+	  repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
+	  package_flags = 1;
+	}
       }
       break;
       /* <restart_suggested>True</restart_suggested> */
       case STATE_RESTART:
       {
-	repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
+	if (pd->content
+	    && (pd->content[0] == 'T'
+		|| pd->content[0] == 't'))
+	{
+	  /* FIXME: this is per-package, the global flag should be computed at runtime */
+	  repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
+	  package_flags = 2;
+	}
       }
       break;
       default:
