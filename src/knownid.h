@@ -128,7 +128,7 @@ KNOWNID(UPDATE_COLLECTION_FLAGS,        "update:collection:flags"),    /*   rebo
 
                                                                    /* external references for the update */
 KNOWNID(UPDATE_REFERENCE_TYPE,	        "update:reference:type"),  /*  type, e.g. 'bugzilla' or 'cve' */
-KNOWNID(UPDATE_REFERENCE_URL,	        "update:reference:url"),   /*  url, e.g. 'http://bugzilla...' */
+KNOWNID(UPDATE_REFERENCE_HREF,	        "update:reference:href"),  /*  href, e.g. 'http://bugzilla...' */
 KNOWNID(UPDATE_REFERENCE_ID,	        "update:reference:id"),    /*  id, e.g. bug number */
 KNOWNID(UPDATE_REFERENCE_TITLE,	        "update:reference:title"), /*  title, e.g. "the bla forz scribs on fuggle" */
 

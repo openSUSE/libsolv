@@ -326,11 +326,11 @@ startElement(void *userData, const char *name, const char **atts)
        */
       case STATE_REFERENCE:
       {
-        const char *url = 0, *id = 0, *title = 0, *type = 0;
+        const char *href = 0, *id = 0, *title = 0, *type = 0;
 	for (; *atts; atts += 2)
 	{
 	  if (!strcmp(*atts, "href"))
-	    url = atts[1];
+	    href = atts[1];
 	  else if (!strcmp(*atts, "id"))
 	    id = atts[1];
 	  else if (!strcmp(*atts, "title"))
@@ -339,7 +339,7 @@ startElement(void *userData, const char *name, const char **atts)
 	    type = atts[1];
 	}
 #if DO_ARRAY
-        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_URL, url);
+        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_HREF, href);
         repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_ID, id);
         repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_TITLE, title);
         repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_TYPE, type);
