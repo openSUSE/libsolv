@@ -117,7 +117,20 @@ KNOWNID(SOLVABLE_ORDER,			"solvable:order"),
 
 KNOWNID(UPDATE_REBOOT,		        "update:reboot"),   /* reboot suggested (kernel update) */
 KNOWNID(UPDATE_RESTART,		        "update:restart"),  /* restart suggested (update stack update) */
-KNOWNID(UPDATE_COLLECTION,	        "update:collection"),  /* collection (of packages) */
+
+                                                                       /* 'content' of patch, usually list of packages */
+KNOWNID(UPDATE_COLLECTION,	        "update:collection"),          /*  "name evr arch" */
+KNOWNID(UPDATE_COLLECTION_NAME,	        "update:collection:name"),     /*   name */
+KNOWNID(UPDATE_COLLECTION_EVR,	        "update:collection:evr"),      /*   epoch:version-release */
+KNOWNID(UPDATE_COLLECTION_ARCH,	        "update:collection:arch"),     /*   architecture */
+KNOWNID(UPDATE_COLLECTION_FILENAME,     "update:collection:filename"), /*   filename (of rpm) */
+KNOWNID(UPDATE_COLLECTION_FLAGS,        "update:collection:flags"),    /*   reboot(1)/restart(2) suggested if this rpm gets updated */
+
+                                                                   /* external references for the update */
+KNOWNID(UPDATE_REFERENCE_TYPE,	        "update:reference:type"),  /*  type, e.g. 'bugzilla' or 'cve' */
+KNOWNID(UPDATE_REFERENCE_URL,	        "update:reference:url"),   /*  url, e.g. 'http://bugzilla...' */
+KNOWNID(UPDATE_REFERENCE_ID,	        "update:reference:id"),    /*  id, e.g. bug number */
+KNOWNID(UPDATE_REFERENCE_TITLE,	        "update:reference:title"), /*  title, e.g. "the bla forz scribs on fuggle" */
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
