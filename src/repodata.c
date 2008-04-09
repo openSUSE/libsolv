@@ -667,7 +667,35 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
       di->data = repo->repodata + repo->nrepodata - 1;
       di->state = 0;
     }
+
   di->match = match;
+  if ((di->flags & SEARCH_STRINGMASK) == SEARCH_REGEX)
+    {
+      if (di->match)
+        {
+          /* We feed multiple lines eventually (e.g. authors or descriptions),
+             so set REG_NEWLINE. */
+          di->regex_err =
+            regcomp(&di->regex, di->match,
+              REG_EXTENDED | REG_NOSUB | REG_NEWLINE
+              | ((di->flags & SEARCH_NOCASE) ? REG_ICASE : 0));
+#if 0
+          if (di->regex_err != 0)
+            {
+              fprintf(stderr, "Given regex failed to compile: %s\n", di->match);
+              fprintf(stderr, "regcomp error code: %d\n", di->regex_err);
+              exit(1);
+            }
+#else
+        }
+      else
+        {
+          di->flags |= (di->flags & SEARCH_STRINGMASK) | SEARCH_STRING;
+          di->regex_err = 0;
+#endif
+        }
+    }
+
   di->keyname = keyname;
   static Id zeroid = 0;
   di->keyp = &zeroid;
@@ -728,11 +756,10 @@ dataiterator_match_int_real(Dataiterator *di, int flags, const void *vmatch)
 	    if (fnmatch(match, kv->str, (flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
 	      return 0;
 	    break;
-#if 0
 	  case SEARCH_REGEX:
 	    if (regexec((const regex_t *)vmatch, kv->str, 0, NULL, 0))
 	      return 0;
-#endif
+	    break;
 	  default:
 	    return 0;
 	}
@@ -743,7 +770,10 @@ dataiterator_match_int_real(Dataiterator *di, int flags, const void *vmatch)
 static int
 dataiterator_match_int(Dataiterator *di)
 {
-  return dataiterator_match_int_real(di, di->flags, di->match);
+  if ((di->flags & SEARCH_STRINGMASK) == SEARCH_REGEX)
+    return dataiterator_match_int_real(di, di->flags, &di->regex);
+  else
+    return dataiterator_match_int_real(di, di->flags, di->match);
 }
 
 int

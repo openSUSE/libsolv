@@ -13,6 +13,8 @@
 #ifndef SATSOLVER_REPO_H
 #define SATSOLVER_REPO_H
 
+#include <regex.h>
+
 #include "pooltypes.h"
 #include "pool.h"
 #if 0
@@ -188,6 +190,8 @@ typedef struct _Dataiterator
   unsigned flags;
   unsigned state;
   KeyValue kv;
+  regex_t regex;
+  int regex_err;
 } Dataiterator;
 
 /* Use these like:
