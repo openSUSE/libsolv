@@ -370,16 +370,14 @@ static inline Id dep2name(Pool *pool, Id dep)
   return dep;
 }
 
-static inline int providedbyinstalled(Pool *pool, Repo *installed, Id dep)
+static inline int providedbyinstalled(Pool *pool, Map *installed, Id dep)
 {
   Id p, *pp;
-  Solvable *s;
   FOR_PROVIDES(p, pp, dep)
     {
       if (p == SYSTEMSOLVABLE)
 	return -1;
-      s = pool->solvables + p;
-      if (s->repo && s->repo == installed)
+      if (MAPTST(installed, p))
 	return 1;
     }
   return 0;
@@ -392,7 +390,7 @@ static inline int providedbyinstalled(Pool *pool, Repo *installed, Id dep)
  * -1: solvable is installable, but doesn't constrain any installed packages
  */
 int
-solvable_trivial_installable(Solvable *s, Repo *installed)
+solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap)
 {
   Pool *pool = s->repo->pool;
   Solvable *s2;
@@ -402,6 +400,8 @@ solvable_trivial_installable(Solvable *s, Repo *installed)
   Id *obsp, obs;
   int r, interesting = 0;
 
+  if (conflictsmap && MAPTST(conflictsmap, s - pool->solvables))
+    return 0;
   if (s->requires)
     {
       reqp = s->repo->idarraydata + s->requires;
@@ -409,60 +409,139 @@ solvable_trivial_installable(Solvable *s, Repo *installed)
 	{
 	  if (req == SOLVABLE_PREREQMARKER)
 	    continue;
-          r = providedbyinstalled(pool, installed, req);
+          r = providedbyinstalled(pool, installedmap, req);
 	  if (!r)
 	    return 0;
 	  if (r > 0)
 	    interesting = 1;
 	}
     }
-  if (!installed)
-    return 1;
   if (s->conflicts)
     {
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
 	{
-	  if (providedbyinstalled(pool, installed, con))
+	  if (providedbyinstalled(pool, installedmap, con))
 	    return 0;
 	  if (!interesting && ISRELDEP(con))
 	    {
               con = dep2name(pool, con);
-	      if (providedbyinstalled(pool, installed, con))
+	      if (providedbyinstalled(pool, installedmap, con))
 		interesting = 1;
 	    }
 	}
     }
-  if (s->obsoletes && s->repo != installed)
+  if (0)
     {
-      obsp = s->repo->idarraydata + s->obsoletes;
-      while ((obs = *obsp++) != 0)
+      Repo *installed = 0;
+      if (s->obsoletes && s->repo != installed)
 	{
-	  if (providedbyinstalled(pool, installed, obs))
-	    return 0;
+	  obsp = s->repo->idarraydata + s->obsoletes;
+	  while ((obs = *obsp++) != 0)
+	    {
+	      if (providedbyinstalled(pool, installedmap, obs))
+		return 0;
+	    }
+	}
+      if (s->repo != installed)
+	{
+	  FOR_PROVIDES(p, pp, s->name)
+	    {
+	      s2 = pool->solvables + p;
+	      if (s2->repo == installed && s2->name == s->name)
+		return 0;
+	    }
 	}
     }
-  if (s->repo != installed)
+  if (!conflictsmap)
     {
-      FOR_PROVIDES(p, pp, s->name)
+      int i;
+
+      p = s - pool->solvables;
+      for (i = 1; i < pool->nsolvables; i++)
 	{
-	  s2 = pool->solvables + p;
-	  if (s2->repo == installed && s2->name == s->name)
-	    return 0;
+	  if (!MAPTST(installedmap, i))
+	    continue;
+	  s2 = pool->solvables + i;
+	  if (!s2->conflicts)
+	    continue;
+	  conp = s2->repo->idarraydata + s2->conflicts;
+	  while ((con = *conp++) != 0)
+	    {
+	      dp = pool_whatprovides(pool, con);
+	      for (; *dp; dp++)
+		if (*dp == p)
+		  return 0;
+	    }
 	}
+     }
+  return interesting ? 1 : -1;
+}
+
+int
+solvable_trivial_installable_queue(Solvable *s, Queue *installed)
+{
+  Pool *pool = s->repo->pool;
+  int i;
+  Id p;
+  Map installedmap;
+  int r;
+
+  map_init(&installedmap, pool->nsolvables);
+  for (i = 0; i < installed->count; i++)
+    {
+      p = installed->elements[i];
+      if (p > 0)		/* makes it work with decisionq */
+	MAPSET(&installedmap, p);
     }
+  r = solvable_trivial_installable_map(s, &installedmap, 0);
+  map_free(&installedmap);
+  return r;
+}
+
+int
+solvable_trivial_installable_repo(Solvable *s, Repo *installed)
+{
+  Pool *pool = s->repo->pool;
+  Id p;
+  Solvable *s2;
+  Map installedmap;
+  int r;
+
+  map_init(&installedmap, pool->nsolvables);
   FOR_REPO_SOLVABLES(installed, p, s2)
+    MAPSET(&installedmap, p);
+  r = solvable_trivial_installable_map(s, &installedmap, 0);
+  map_free(&installedmap);
+  return r;
+}
+
+void
+create_trivial_installable_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap)
+{
+  int i;
+  Solvable *s;
+  Id p, *dp;
+  Id *conp, con;
+
+  map_init(installedmap, pool->nsolvables);
+  map_init(conflictsmap, pool->nsolvables);
+  for (i = 0; i < installed->count; i++)
     {
-      if (!s2->conflicts)
+      p = installed->elements[i];
+      if (p <= 0)	/* makes it work with decisionq */
+	continue;
+      MAPSET(installedmap, p);
+      s = pool->solvables + p;
+      if (!s->conflicts)
 	continue;
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
 	{
 	  dp = pool_whatprovides(pool, con);
 	  for (; *dp; dp++)
-	    if (*dp == s - pool->solvables)
-	      return 0;
+	    MAPSET(conflictsmap, *dp);
 	}
     }
-  return interesting ? 1 : -1;
 }
+

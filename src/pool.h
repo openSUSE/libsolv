@@ -177,7 +177,10 @@ char * solvable_get_location(Solvable *s, unsigned int *medianrp);
 const unsigned char *solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep);
 const char *solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep);
 
-int solvable_trivial_installable(Solvable *s, struct _Repo *installed);
+int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap);
+int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed);
+int solvable_trivial_installable_queue(Solvable *s, Queue *installed);
+void create_trivial_installable_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
 
 
 
