@@ -397,8 +397,8 @@ startElement(void *userData, const char *name, const char **atts)
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
 #if DO_ARRAY
 	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_NAME, n);
-	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_EVR, a);
-	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_ARCH, evr);
+	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_EVR, evr);
+	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_ARCH, a);
 #else
 	/* _FILENAME and _FLAGS are written at </package> */
         if (1) {
