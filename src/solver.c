@@ -674,28 +674,6 @@ makeruledecisions(Solver *solv)
 	continue;
       }
       assert(solv->decisionq_why.elements[i]);
-#if 0
-/*OBSOLETE*/
-      if (solv->decisionq_why.elements[i] == 0)
-	{
-	  /* conflict with rpm rule, need only disable our rule */
-	  assert(v > 0 || v == -SYSTEMSOLVABLE);
-	  /* record proof */
-	  queue_push(&solv->problems, solv->learnt_pool.count);
-	  queue_push(&solv->learnt_pool, ri);
-	  queue_push(&solv->learnt_pool, v != -SYSTEMSOLVABLE ? -v : v);
-	  queue_push(&solv->learnt_pool, 0);
-	  POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflict with rpm rule, disabling rule #%d\n", ri);
-	  if (ri < solv->systemrules)
-	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
-	  else
-	    v = ri;
-	  queue_push(&solv->problems, v);
-	  queue_push(&solv->problems, 0);
-	  disableproblem(solv, v);
-	  continue;
-	}
-#endif
       if (solv->decisionq_why.elements[i] < solv->jobrules)
 	{
 	  /* conflict with rpm rule assertion */
@@ -843,6 +821,8 @@ enabledisablelearntrules(Solver *solv)
 
 
 /* FIXME: bad code ahead, replace as soon as possible */
+/* FIXME: should probably look at SOLVER_INSTALL_SOLVABLE_ONE_OF */
+
 static void
 disableupdaterules(Solver *solv, Queue *job, int jobidx)
 {
@@ -1053,6 +1033,7 @@ addpatchatomrequires(Solver *solv, Solvable *s, Id *dp, Queue *q, Map *m)
   queue_free(&fq);
 }
 #endif
+
 
 /*
  * add (install) rules for solvable
@@ -1380,11 +1361,8 @@ printWatches(Solver *solv, int type)
   int counter;
 
   POOL_DEBUG(type, "Watches: \n");
-
-  for (counter = -(pool->nsolvables); counter <= pool->nsolvables; counter ++)
-     {
-	 POOL_DEBUG(type, "    solvable [%d] -- rule [%d]\n", counter, solv->watches[counter+pool->nsolvables]);
-     }
+  for (counter = -(pool->nsolvables - 1); counter < pool->nsolvables; counter++)
+    POOL_DEBUG(type, "    solvable [%d] -- rule [%d]\n", counter, solv->watches[counter + pool->nsolvables]);
 }
 
 /*
@@ -1404,7 +1382,7 @@ makewatches(Solver *solv)
 				       /* lower half for removals, upper half for installs */
   solv->watches = sat_calloc(2 * nsolvables, sizeof(Id));
 #if 1
-  /* do it reverse so rpm rules get triggered first */
+  /* do it reverse so rpm rules get triggered first (XXX: obsolete?) */
   for (i = 1, r = solv->rules + solv->nrules - 1; i < solv->nrules; i++, r--)
 #else
   for (i = 1, r = solv->rules + 1; i < solv->nrules; i++, r++)
@@ -1867,24 +1845,6 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       if (!MAPTST(&seen, vv))
 	continue;
       why = solv->decisionq_why.elements[idx];
-#if 0
-      /* OBSOLETE */
-      if (!why)
-	{
-	  /* level 1 and no why, must be an rpm assertion */
-	  IF_POOLDEBUG (SAT_DEBUG_UNSOLVABLE)
-	    {
-	      POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "RPM ");
-	      printruleelement(solv, SAT_DEBUG_UNSOLVABLE, 0, v);
-	    }
-	  /* this is the only positive rpm assertion */
-	  if (v == SYSTEMSOLVABLE)
-	    v = -v;
-	  assert(v < 0);
-	  queue_push(&solv->learnt_pool, v);
-	  continue;
-	}
-#endif
       queue_push(&solv->learnt_pool, why);
       r = solv->rules + why;
       analyze_unsolvable_rule(solv, r, &lastweak);
@@ -2804,12 +2764,10 @@ problems_to_solutions(Solver *solv, Queue *job)
   queue_free(&solv->problems);
   queue_clone(&solv->problems, &solutions);
 
-printf("bring it back!\n");
   /* bring solver back into problem state */
   revert(solv, 1);		/* XXX move to reset_solver? */
   reset_solver(solv);
 
-printf("problems %d solutions %d\n", solv->problems.count, solutions.count);
   assert(solv->problems.count == solutions.count);
   queue_free(&solutions);
 }
@@ -2941,7 +2899,6 @@ create_decisions_obsoletesmap(Solver *solv)
  * printdecisions
  */
 
-
 void
 printdecisions(Solver *solv)
 {
@@ -3032,6 +2989,7 @@ printdecisions(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions end -----\n");
 }
 
+
 /* this is basically the reverse of addrpmrulesforsolvable */
 SolverProbleminfo
 solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp)
@@ -3059,46 +3017,10 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
       *depp = job->elements[p + 1];
       *sourcep = p;
       *targetp = job->elements[p];
-      if (r->d == 0 && r->w2 == 0 && r->p == -SYSTEMSOLVABLE)
+      if (r->d == 0 && r->w2 == 0 && r->p == -SYSTEMSOLVABLE && job->elements[p] != SOLVER_INSTALL_SOLVABLE_ONE_OF)
 	return SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP;
       return SOLVER_PROBLEM_JOB_RULE;
     }
-#if 0
-  if (rid < 0)
-    {
-/*XXX OBSOLETE CODE */
-      /* a rpm rule assertion */
-      assert(rid != -SYSTEMSOLVABLE);
-      s = pool->solvables - rid;
-      if (installed && !solv->fixsystem && s->repo == installed)
-	dontfix = 1;
-      assert(!dontfix);	/* dontfix packages never have a neg assertion */
-      /* see why the package is not installable */
-      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC && !pool_installable(pool, s))
-	{
-	  *depp = 0;
-	  *sourcep = -rid;
-	  *targetp = 0;
-	  return SOLVER_PROBLEM_NOT_INSTALLABLE;
-	}
-      /* check requires */
-      assert(s->requires);
-      reqp = s->repo->idarraydata + s->requires;
-      while ((req = *reqp++) != 0)
-	{
-	  if (req == SOLVABLE_PREREQMARKER)
-	    continue;
-	  dp = pool_whatprovides(pool, req);
-	  if (*dp == 0)
-	    break;
-	}
-      assert(req);
-      *depp = req;
-      *sourcep = -rid;
-      *targetp = 0;
-      return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
-    }
-#endif
   r = solv->rules + rid;
   assert(r->p < 0);
   if (r->d == 0 && r->w2 == 0)
@@ -3300,28 +3222,6 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 		}
 	    }
 	}
-#if 0
-      else
-	{
-	  /* XXX OBSOLETE */
-	  /* assertion, counts as require rule */
-	  /* ignore system solvable as we need useful info */
-	  if (rid == -SYSTEMSOLVABLE)
-	    continue;
-	  if (!*reqrp || !reqassert)
-	    {
-	      *reqrp = rid;
-	      reqassert = 1;
-	    }
-	  else if (solv->installed && solv->pool->solvables[-rid].repo == solv->installed)
-	    {
-	      /* prefer rules of installed packages */
-	      Id op = *reqrp >= 0 ? solv->rules[*reqrp].p : -*reqrp;
-	      if (op <= 0 || solv->pool->solvables[op].repo != solv->installed)
-		*reqrp = rid;
-	    }
-	}
-#endif
     }
   if (!*reqrp && lreqr)
     *reqrp = lreqr;
@@ -3333,6 +3233,11 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
     *sysrp = lsysr;
 }
 
+/*
+ * search for a rule that describes the problem to the
+ * user. A pretty hopeless task, actually. We currently
+ * prefer simple requires.
+ */
 Id
 solver_findproblemrule(Solver *solv, Id problem)
 {
@@ -3775,6 +3680,11 @@ solver_solve(Solver *solv, Queue *job)
 	  /* dont allow downgrade */
 	  addrpmrulesforupdaters(solv, pool->solvables + what, &addedmap, 0);
 	  break;
+	case SOLVER_INSTALL_SOLVABLE_ONE_OF:
+	  pp = pool->whatprovidesdata + what;
+	  while ((p = *pp++) != 0)
+	    addrpmrulesforsolvable(solv, pool->solvables + p, &addedmap);
+	  break;
 	}
     }
   POOL_DEBUG(SAT_DEBUG_STATS, "added %d rpm rules for packages involved in a job\n", solv->nrules - oldnrules);
@@ -3909,6 +3819,15 @@ solver_solve(Solver *solv, Queue *job)
 	  s = pool->solvables + what;
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: update %s\n", solvable2str(pool, s));
 	  addupdaterule(solv, s, 0);
+	  queue_push(&solv->ruletojob, i);
+	  if (weak)
+	    queue_push(&solv->weakruleq, solv->nrules - 1);
+	  break;
+	case SOLVER_INSTALL_SOLVABLE_ONE_OF:
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: one of\n");
+	  for (pp = pool->whatprovidesdata + what; *pp; pp++)
+	    POOL_DEBUG(SAT_DEBUG_JOB, "  %s\n", solvable2str(pool, pool->solvables + *pp));
+	  addrule(solv, -SYSTEMSOLVABLE, what);
 	  queue_push(&solv->ruletojob, i);
 	  if (weak)
 	    queue_push(&solv->weakruleq, solv->nrules - 1);
