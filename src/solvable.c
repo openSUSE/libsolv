@@ -525,13 +525,16 @@ create_trivial_installable_maps(Pool *pool, Queue *installed, Map *installedmap,
   Id *conp, con;
 
   map_init(installedmap, pool->nsolvables);
-  map_init(conflictsmap, pool->nsolvables);
+  if (!conflictsmap)
+    map_init(conflictsmap, pool->nsolvables);
   for (i = 0; i < installed->count; i++)
     {
       p = installed->elements[i];
       if (p <= 0)	/* makes it work with decisionq */
 	continue;
       MAPSET(installedmap, p);
+      if (!conflictsmap)
+	continue;
       s = pool->solvables + p;
       if (!s->conflicts)
 	continue;
