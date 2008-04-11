@@ -209,6 +209,7 @@ extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id 
 extern Id solver_findproblemrule(Solver *solv, Id problem);
 extern SolverProbleminfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
 
+/* XXX: why is this not static? */
 Id *create_decisions_obsoletesmap(Solver *solv);
 
 /* debug functions, do not use */
@@ -287,5 +288,10 @@ solver_is_enhancing(Solver *solv, Solvable *s)
 void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
 int solver_calc_installsizechange(Solver *solv);
 
+static inline void
+solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
+{
+  pool_create_state_maps(solv->pool, &solv->decisionq, installedmap, conflictsmap);
+}
 
 #endif /* SATSOLVER_SOLVER_H */

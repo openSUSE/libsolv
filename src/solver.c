@@ -4152,31 +4152,20 @@ solver_solve(Solver *solv, Queue *job)
 void
 solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps)
 {
-  Pool *pool = solv->pool;
   Map installedmap;
-  Id p;
-  int i;
 
-  map_init(&installedmap, pool->nsolvables);
-  for (i = 1; i < solv->decisionq.count; i++)
-    if ((p = solv->decisionq.elements[i]) > 0)
-      MAPSET(&installedmap, p);
-  pool_calc_duchanges(pool, solv->installed, &installedmap, mps, nmps);
+  solver_create_state_maps(solv, &installedmap, 0);
+  pool_calc_duchanges(solv->pool, solv->installed, &installedmap, mps, nmps);
   map_free(&installedmap);
 }
 
 int
 solver_calc_installsizechange(Solver *solv)
 {
-  Pool *pool = solv->pool;
   Map installedmap;
-  Id p;
-  int i, change;
+  int change;
 
-  map_init(&installedmap, pool->nsolvables);
-  for (i = 1; i < solv->decisionq.count; i++)
-    if ((p = solv->decisionq.elements[i]) > 0)
-      MAPSET(&installedmap, p);
+  solver_create_state_maps(solv, &installedmap, 0);
   change = pool_calc_installsizechange(solv->pool, solv->installed, &installedmap);
   map_free(&installedmap);
   return change;

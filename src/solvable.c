@@ -359,6 +359,7 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
   return loc;
 }
 
+/*****************************************************************************/
 
 static inline Id dep2name(Pool *pool, Id dep)
 {
@@ -384,6 +385,16 @@ static inline int providedbyinstalled(Pool *pool, Map *installed, Id dep)
 }
 
 /*
+ * solvable_trivial_installable_map - anwers is a solvable is installable
+ * without any other installs/deinstalls.
+ * The packages considered to be installed are provided via the
+ * installedmap bitmap. A additional "conflictsmap" bitmap providing
+ * information about the conflicts of the installed packages can be
+ * used for extra speed up. Provide a NULL pointer if you do not
+ * have this information.
+ * Both maps can be created with pool_create_state_maps() or
+ * solver_create_state_maps().
+ *
  * returns:
  * 1:  solvable is installable without any other package changes
  * 0:  solvable is not installable
@@ -431,7 +442,7 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
 	    }
 	}
     }
-  if (0)
+  if (s->repo)
     {
       Repo *installed = 0;
       if (s->obsoletes && s->repo != installed)
@@ -478,6 +489,11 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
   return interesting ? 1 : -1;
 }
 
+/*
+ * different interface for solvable_trivial_installable_map, where
+ * the information about the installed packages is provided
+ * by a queue.
+ */
 int
 solvable_trivial_installable_queue(Solvable *s, Queue *installed)
 {
@@ -499,6 +515,11 @@ solvable_trivial_installable_queue(Solvable *s, Queue *installed)
   return r;
 }
 
+/*
+ * different interface for solvable_trivial_installable_map, where
+ * the information about the installed packages is provided
+ * by a repo containing the installed solvables.
+ */
 int
 solvable_trivial_installable_repo(Solvable *s, Repo *installed)
 {
@@ -516,8 +537,19 @@ solvable_trivial_installable_repo(Solvable *s, Repo *installed)
   return r;
 }
 
+
+/*****************************************************************************/
+
+/*
+ * Create maps containing the state of each solvable. Input is a "installed" queue,
+ * it contains all solvable ids that are considered to be installed.
+ * 
+ * The created maps can be used for solvable_trivial_installable_map(),
+ * pool_calc_duchanges(), pool_calc_installsizechange().
+ *
+ */
 void
-create_trivial_installable_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap)
+pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap)
 {
   int i;
   Solvable *s;
