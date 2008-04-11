@@ -2829,6 +2829,12 @@ solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, I
 /*
  * create obsoletesmap from solver decisions
  * required for decision handling
+ *
+ * for solvables in installed repo:
+ *   0 - not obsoleted
+ *   p - one of the packages that obsolete us
+ * for all others:
+ *   n - number of packages this package obsoletes
  */
 
 Id *
@@ -2908,7 +2914,16 @@ printdecisions(Solver *solv)
   int i;
   Solvable *s;
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions -----\n");
+  IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
+    {
+      POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions -----\n");
+      for (i = 0; i < solv->decisionq.count; i++)
+	{
+	  p = solv->decisionq.elements[i];
+	  printruleelement(solv, SAT_DEBUG_SCHUBI, 0, p);
+	}
+      POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions end -----\n");
+    }
 
   /* print solvables to be erased */
 
@@ -2931,20 +2946,9 @@ printdecisions(Solver *solv)
       int j;
       p = solv->decisionq.elements[i];
       if (p < 0)
-        {
-	    IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
-	    {
-	      p = -p;
-	      s = pool->solvables + p;
-	      POOL_DEBUG(SAT_DEBUG_SCHUBI, "level of %s is %d\n", solvable2str(pool, s), p);
-	    }
-	    continue;
-	}
+	continue;
       if (p == SYSTEMSOLVABLE)
-        {
-	    POOL_DEBUG(SAT_DEBUG_SCHUBI, "SYSTEMSOLVABLE\n");
-	    continue;
-	}
+	continue;
       s = pool->solvables + p;
       if (installed && s->repo == installed)
 	continue;
@@ -2986,7 +2990,6 @@ printdecisions(Solver *solv)
 	  POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
 	}
     }
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions end -----\n");
 }
 
 
