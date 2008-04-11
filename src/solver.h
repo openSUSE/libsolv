@@ -284,7 +284,6 @@ solver_is_enhancing(Solver *solv, Solvable *s)
   return 0;
 }
 
-void solver_calc_changed_pkgs(Solver *solv, Queue *pkgs);
 void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
 int solver_calc_installsizechange(Solver *solv);
 

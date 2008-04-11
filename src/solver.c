@@ -4150,63 +4150,35 @@ solver_solve(Solver *solv, Queue *job)
 /***********************************************************************/
 
 void
-solver_calc_changed_pkgs(Solver *solv, Queue *pkgs)
-{
-  Pool *pool = solv->pool;
-  Map installmap;
-  Solvable *s;
-  int i;
-  Id p;
-
-  /* create list of solvables that have to be installed */
-  /* (this is actually just a simple sort) */
-  map_init(&installmap, pool->nsolvables);
-  for (i = 1; i < solv->decisionq.count; i++)
-    {
-      Id p = solv->decisionq.elements[i];
-      if (p < 0)
-	continue;
-      s = pool->solvables + p;
-      if (!s->repo)
-	continue;
-      if (solv->installed && s->repo == solv->installed)
-	continue;
-      MAPSET(&installmap, p);
-    }
-  for (p = 1; p < pool->nsolvables; p++)
-    if (MAPTST(&installmap, p))
-      queue_push(pkgs, p);
-  map_free(&installmap);
-  /* run through erase solvable dudata */
-  if (solv->installed)
-    {
-      FOR_REPO_SOLVABLES(solv->installed, p, s)
-	{
-	  if (solv->decisionmap[p] < 0)
-	    queue_push(pkgs, -p);
-	}
-    }
-}
-
-void
 solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps)
 {
-  Queue pkgs;
-  queue_init(&pkgs);
-  solver_calc_changed_pkgs(solv, &pkgs);
-  pool_calc_duchanges(solv->pool, &pkgs, mps, nmps);
-  queue_free(&pkgs);
+  Pool *pool = solv->pool;
+  Map installedmap;
+  Id p;
+  int i;
+
+  map_init(&installedmap, pool->nsolvables);
+  for (i = 1; i < solv->decisionq.count; i++)
+    if ((p = solv->decisionq.elements[i]) > 0)
+      MAPSET(&installedmap, p);
+  pool_calc_duchanges(pool, solv->installed, &installedmap, mps, nmps);
+  map_free(&installedmap);
 }
 
 int
 solver_calc_installsizechange(Solver *solv)
 {
-  int change;
-  Queue pkgs;
-  queue_init(&pkgs);
-  solver_calc_changed_pkgs(solv, &pkgs);
-  change = pool_calc_installsizechange(solv->pool, &pkgs);
-  queue_free(&pkgs);
+  Pool *pool = solv->pool;
+  Map installedmap;
+  Id p;
+  int i, change;
+
+  map_init(&installedmap, pool->nsolvables);
+  for (i = 1; i < solv->decisionq.count; i++)
+    if ((p = solv->decisionq.elements[i]) > 0)
+      MAPSET(&installedmap, p);
+  change = pool_calc_installsizechange(solv->pool, solv->installed, &installedmap);
+  map_free(&installedmap);
   return change;
 }
 

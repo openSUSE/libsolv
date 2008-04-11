@@ -965,6 +965,7 @@ struct ducbdata {
   DUChanges *mps;
   struct mptree *mptree;
   int addsub;
+  int hasdu;
 
   Id *dirmap;
   int nmap;
@@ -1030,6 +1031,7 @@ solver_fill_DU_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyVa
       cbd->nmap = data->dirpool.ndirs;
       cbd->olddata = data;
     }
+  cbd->hasdu = 1;
   if (value->id < 0 || value->id >= cbd->nmap)
     return 0;
   mp = cbd->dirmap[value->id];
@@ -1063,7 +1065,7 @@ propagate_mountpoints(struct mptree *mptree, int pos, Id mountpoint)
 #define MPTREE_BLOCK 15
 
 void
-pool_calc_duchanges(Pool *pool, Queue *pkgs, DUChanges *mps, int nmps)
+pool_calc_duchanges(Pool *pool, Repo *oldinstalled, Map *installedmap, DUChanges *mps, int nmps)
 {
   char *p;
   const char *path, *compstr;
@@ -1072,7 +1074,11 @@ pool_calc_duchanges(Pool *pool, Queue *pkgs, DUChanges *mps, int nmps)
   int pos, compl;
   int mp;
   struct ducbdata cbd;
+  Solvable *s;
+  Id sp;
+  Map ignoredu;
 
+  memset(&ignoredu, 0, sizeof(ignoredu));
   cbd.mps = mps;
   cbd.addsub = 0;
   cbd.dirmap = 0;
@@ -1149,36 +1155,76 @@ pool_calc_duchanges(Pool *pool, Queue *pkgs, DUChanges *mps, int nmps)
 
   cbd.mptree = mptree;
   cbd.addsub = 1;
-  for (i = 0; i < pkgs->count; i++)
+  for (sp = 1, s = pool->solvables + sp; sp < pool->nsolvables; sp++, s++)
     {
-      Id sp = pkgs->elements[i];
-      if (sp > 0)
-        repo_search(pool->solvables[sp].repo, sp, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
+      if (!s->repo || (oldinstalled && s->repo == oldinstalled))
+	continue;
+      if (!MAPTST(installedmap, sp))
+	continue;
+      cbd.hasdu = 0;
+      repo_search(s->repo, sp, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
+      if (!cbd.hasdu && oldinstalled)
+	{
+	  Id op, *opp;
+	  /* no du data available, ignore data of all installed solvables we obsolete */
+	  if (!ignoredu.map)
+	    map_init(&ignoredu, oldinstalled->end - oldinstalled->start);
+	  if (s->obsoletes)
+	    {
+	      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+	      while ((obs = *obsp++) != 0)
+		FOR_PROVIDES(op, opp, obs)
+		  if (op >= oldinstalled->start && op < oldinstalled->end)
+		    MAPSET(&ignoredu, op - oldinstalled->start);
+	    }
+	  FOR_PROVIDES(op, opp, s->name)
+	    if (pool->solvables[op].name == s->name)
+	      if (op >= oldinstalled->start && op < oldinstalled->end)
+		MAPSET(&ignoredu, op - oldinstalled->start);
+	}
     }
   cbd.addsub = -1;
-  for (i = 0; i < pkgs->count; i++)
+  if (oldinstalled)
     {
-      Id sp = pkgs->elements[i];
-      if (sp < 0)
-        repo_search(pool->solvables[-sp].repo, -sp, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
+      /* assumes we allways have du data for installed solvables */
+      FOR_REPO_SOLVABLES(oldinstalled, sp, s)
+	{
+	  if (MAPTST(installedmap, sp))
+	    continue;
+	  if (ignoredu.map && MAPTST(&ignoredu, sp - oldinstalled->start))
+	    continue;
+	  repo_search(oldinstalled, sp, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
+	}
     }
+  if (ignoredu.map)
+    map_free(&ignoredu);
   sat_free(cbd.dirmap);
   sat_free(mptree);
 }
 
 int
-pool_calc_installsizechange(Pool *pool, Queue *pkgs)
+pool_calc_installsizechange(Pool *pool, Repo *oldinstalled, Map *installedmap)
 {
-  int i, change;
+  Id sp;
+  Solvable *s;
+  int change = 0;
 
-  change = 0;
-  for (i = 0; i < pkgs->count; i++)
+  for (sp = 1, s = pool->solvables + sp; sp < pool->nsolvables; sp++, s++)
     {
-      Id sp = pkgs->elements[i];
-      if (sp > 0)
-        change += repo_lookup_num(pool->solvables + sp, SOLVABLE_INSTALLSIZE);
-      else if (sp < 0)
-        change -= repo_lookup_num(pool->solvables - sp, SOLVABLE_INSTALLSIZE);
+      if (!s->repo || (oldinstalled && s->repo == oldinstalled))
+	continue;
+      if (!MAPTST(installedmap, sp))
+	continue;
+      change += repo_lookup_num(s, SOLVABLE_INSTALLSIZE);
+    }
+  if (oldinstalled)
+    {
+      FOR_REPO_SOLVABLES(oldinstalled, sp, s)
+	{
+	  if (MAPTST(installedmap, sp))
+	    continue;
+	  change -= repo_lookup_num(s, SOLVABLE_INSTALLSIZE);
+	}
     }
   return change;
 }
