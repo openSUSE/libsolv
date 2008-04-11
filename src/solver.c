@@ -27,7 +27,6 @@
 
 
 #define RULES_BLOCK 63
-#define REGARD_RECOMMENDS_OF_INSTALLED_ITEMS 1
 
 
 int
@@ -2394,22 +2393,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
       if (n != solv->nrules)	/* continue if level < systemlevel */
 	continue;
 
-      if (doweak && !solv->problems.count)
+      if (doweak)
 	{
 	  int qcount;
 
 	  POOL_DEBUG(SAT_DEBUG_STATS, "installing recommended packages\n");
-#if 0
-	  if (!solv->dosplitprovides && !REGARD_RECOMMENDS_OF_INSTALLED_ITEMS)
-	    {
-	      for (i = 1; i < solv->decisionq.count; i++)
-		{
-		  p = solv->decisionq.elements[i];
-		  if (p > 0 && pool->solvables[p].repo == solv->installed)
-		    solv->decisionmap[p] = -solv->decisionmap[p];
-		}
-	    }
-#endif
 	  queue_empty(&dq);
 	  for (i = 1; i < pool->nsolvables; i++)
 	    {
@@ -2453,17 +2441,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    queue_pushunique(&dq, i);
 		}
 	    }
-#if 0
-	  if (!solv->dosplitprovides && !REGARD_RECOMMENDS_OF_INSTALLED_ITEMS)
-	    {
-	      for (i = 1; i < solv->decisionq.count; i++)
-		{
-		  p = solv->decisionq.elements[i];
-		  if (p > 0 && pool->solvables[p].repo == solv->installed)
-		    solv->decisionmap[p] = -solv->decisionmap[p];
-		}
-	    }
-#endif
 	  if (dq.count)
 	    {
 	      if (dq.count > 1)
@@ -3621,6 +3598,8 @@ solver_solve(Solver *solv, Queue *job)
   Id how, what, weak, name, p, *pp, d;
   Queue q, redoq;
   Solvable *s;
+  int gotweak;
+  Rule *r;
 
   /* create whatprovides if not already there */
   if (!pool->whatprovides)
@@ -3953,32 +3932,27 @@ solver_solve(Solver *solv, Queue *job)
   run_solver(solv, 1, solv->dontinstallrecommended ? 0 : 1);
 
   queue_init(&redoq);
-  if (!solv->problems.count)
+  gotweak = 0;
+  /* disable all weak erase rules for recommened/suggestes search */
+  for (i = 1, r = solv->rules + i; i < solv->learntrules; i++, r++)
     {
-      int gotweak = 0;
-      Rule *r;
-
-      /* disable all weak erase rules for recommened/suggestes search */
-      for (i = 1, r = solv->rules + i; i < solv->learntrules; i++, r++)
-	{
-          if (!MAPTST(&solv->weakrulemap, i))
-	    continue;
-	  if (!r->w1)
-	    continue;
-	  disablerule(solv, r);
-	  gotweak++;
-	}
-      if (gotweak)
-	{
-	  enabledisablelearntrules(solv);
-	  removedisabledconflicts(solv, &redoq);
-	}
+      if (!MAPTST(&solv->weakrulemap, i))
+	continue;
+      if (!r->w1)
+	continue;
+      disablerule(solv, r);
+      gotweak++;
+    }
+  if (gotweak)
+    {
+      enabledisablelearntrules(solv);
+      removedisabledconflicts(solv, &redoq);
     }
 
   /* find recommended packages */
   /* if q.count == 0 we already found all recommended in the
    * solver run */
-  if (!solv->problems.count && (redoq.count || solv->dontinstallrecommended))
+  if (redoq.count || solv->dontinstallrecommended)
     {
       Id rec, *recp, p, *pp;
 
@@ -4030,7 +4004,7 @@ solver_solve(Solver *solv, Queue *job)
     }
 
   /* find suggested packages */
-  if (!solv->problems.count)
+  if (1)
     {
       Id sug, *sugp, p, *pp;
 
@@ -4084,9 +4058,33 @@ solver_solve(Solver *solv, Queue *job)
 	solv->decisionmap[redoq.elements[i]] = redoq.elements[i + 1];
     }
 
-  queue_free(&redoq);
+
   if (solv->problems.count)
-    problems_to_solutions(solv, job);
+    {
+      int recocount = solv->recommendations.count;
+      solv->recommendations.count = 0;	/* so that revert() doesn't mess with it */
+      queue_empty(&redoq);
+      for (i = 0; i < solv->decisionq.count; i++)
+	{
+	  Id p = solv->decisionq.elements[i];
+	  queue_push(&redoq, p);
+	  queue_push(&redoq, solv->decisionq_why.elements[i]);
+	  queue_push(&redoq, solv->decisionmap[p > 0 ? p : -p]);
+	}
+      problems_to_solutions(solv, job);
+      memset(solv->decisionmap, 0, pool->nsolvables * sizeof(Id));
+      queue_empty(&solv->decisionq);
+      queue_empty(&solv->decisionq_why);
+      for (i = 0; i < redoq.count; i += 3)
+	{
+	  Id p = redoq.elements[i];
+	  queue_push(&solv->decisionq, p);
+	  queue_push(&solv->decisionq_why, redoq.elements[i + 1]);
+	  solv->decisionmap[p > 0 ? p : -p] = redoq.elements[i + 2];
+	}
+      solv->recommendations.count = recocount;
+    }
+  queue_free(&redoq);
 }
 
 /***********************************************************************/
