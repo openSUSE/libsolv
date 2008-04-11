@@ -557,7 +557,7 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
   Id *conp, con;
 
   map_init(installedmap, pool->nsolvables);
-  if (!conflictsmap)
+  if (conflictsmap)
     map_init(conflictsmap, pool->nsolvables);
   for (i = 0; i < installed->count; i++)
     {
