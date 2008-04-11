@@ -3582,6 +3582,21 @@ removedisabledconflicts(Solver *solv, Queue *removed)
     }
 }
 
+static void
+weaken_solvable_deps(Solver *solv, Id p)
+{
+  int i;
+  Rule *r;
+
+  for (i = 1, r = solv->rules + i; i < solv->jobrules; i++, r++)
+    {
+      if (r->p != -p)
+	continue;
+      if (r->d == 0 && r->w2 < 0)
+	continue;	/* conflict */
+      queue_push(&solv->weakruleq, i);
+    }
+}
 
 /*-----------------------------------------------------------------*/
 /* main() */
@@ -3742,7 +3757,7 @@ solver_solve(Solver *solv, Queue *job)
 	{
 	case SOLVER_INSTALL_SOLVABLE:			/* install specific solvable */
 	  s = pool->solvables + what;
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: install solvable %s\n", solvable2str(pool, s));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sinstall solvable %s\n", weak ? "weak " : "", solvable2str(pool, s));
           addrule(solv, what, 0);			/* install by Id */
 	  queue_push(&solv->ruletojob, i);
 	  if (weak)
@@ -3750,7 +3765,7 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_ERASE_SOLVABLE:
 	  s = pool->solvables + what;
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: erase solvable %s\n", solvable2str(pool, s));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %serase solvable %s\n", weak ? "weak " : "", solvable2str(pool, s));
           addrule(solv, -what, 0);			/* remove by Id */
 	  queue_push(&solv->ruletojob, i);
 	  if (weak)
@@ -3759,9 +3774,9 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_INSTALL_SOLVABLE_NAME:		/* install by capability */
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
 	  if (how == SOLVER_INSTALL_SOLVABLE_NAME)
-	    POOL_DEBUG(SAT_DEBUG_JOB, "job: install name %s\n", dep2str(pool, what));
+	    POOL_DEBUG(SAT_DEBUG_JOB, "job: %sinstall name %s\n", weak ? "weak " : "", dep2str(pool, what));
 	  if (how == SOLVER_INSTALL_SOLVABLE_PROVIDES)
-	    POOL_DEBUG(SAT_DEBUG_JOB, "job: install provides %s\n", dep2str(pool, what));
+	    POOL_DEBUG(SAT_DEBUG_JOB, "job: %sinstall provides %s\n", weak ? "weak " : "", dep2str(pool, what));
 	  queue_empty(&q);
 	  name = (how == SOLVER_INSTALL_SOLVABLE_NAME) ? what : 0;
 	  while (ISRELDEP(name))
@@ -3795,9 +3810,9 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
 	  if (how == SOLVER_ERASE_SOLVABLE_NAME)
-	    POOL_DEBUG(SAT_DEBUG_JOB, "job: erase name %s\n", dep2str(pool, what));
+	    POOL_DEBUG(SAT_DEBUG_JOB, "job: %serase name %s\n", weak ? "weak " : "", dep2str(pool, what));
 	  if (how == SOLVER_ERASE_SOLVABLE_PROVIDES)
-	    POOL_DEBUG(SAT_DEBUG_JOB, "job: erase provides %s\n", dep2str(pool, what));
+	    POOL_DEBUG(SAT_DEBUG_JOB, "job: %serase provides %s\n", weak ? "weak " : "", dep2str(pool, what));
 	  name = (how == SOLVER_ERASE_SOLVABLE_NAME) ? what : 0;
 	  while (ISRELDEP(name))
 	    {
@@ -3817,20 +3832,25 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_UPDATE:              /* find update for solvable */
 	  s = pool->solvables + what;
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: update %s\n", solvable2str(pool, s));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %supdate %s\n", weak ? "weak " : "", solvable2str(pool, s));
 	  addupdaterule(solv, s, 0);
 	  queue_push(&solv->ruletojob, i);
 	  if (weak)
 	    queue_push(&solv->weakruleq, solv->nrules - 1);
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_ONE_OF:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: one of\n");
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sone of\n", weak ? "weak " : "");
 	  for (pp = pool->whatprovidesdata + what; *pp; pp++)
 	    POOL_DEBUG(SAT_DEBUG_JOB, "  %s\n", solvable2str(pool, pool->solvables + *pp));
 	  addrule(solv, -SYSTEMSOLVABLE, what);
 	  queue_push(&solv->ruletojob, i);
 	  if (weak)
 	    queue_push(&solv->weakruleq, solv->nrules - 1);
+	  break;
+	case SOLVER_WEAKEN_SOLVABLE_DEPS:
+	  s = pool->solvables + what;
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: weaken deps %s\n", solvable2str(pool, s));
+	  weaken_solvable_deps(solv, what);
 	  break;
 	}
       IF_POOLDEBUG (SAT_DEBUG_JOB)
