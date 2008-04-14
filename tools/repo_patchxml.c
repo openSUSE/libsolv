@@ -412,6 +412,7 @@ startElement(void *userData, const char *name, const char **atts)
         {
           pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
 	  repodata_extend(pd->data, pd->solvable - pool->solvables);
+	  pd->datanum = repodata_get_handle(pd->data, pd->datanum);
           repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, pd->timestamp);
 	}
 #if 0

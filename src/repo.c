@@ -913,7 +913,7 @@ repo_set_id(Repo *repo, Id p, Id keyname, Id id)
     p = p + data->extrastart;
   else
     p = p - data->start;
-  repodata_set_id(data, p, keyname, id);
+  repodata_set_id(data, repodata_get_handle(data, p), keyname, id);
 }
 
 void
@@ -924,7 +924,7 @@ repo_set_num(Repo *repo, Id p, Id keyname, Id num)
     p = p + data->extrastart;
   else
     p = p - data->start;
-  repodata_set_num(data, p, keyname, num);
+  repodata_set_num(data, repodata_get_handle(data, p), keyname, num);
 }
 
 void
@@ -935,7 +935,7 @@ repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
     p = p + data->extrastart;
   else
     p = p - data->start;
-  repodata_set_str(data, p, keyname, str);
+  repodata_set_str(data, repodata_get_handle(data, p), keyname, str);
 }
 
 void
@@ -946,7 +946,7 @@ repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str)
     p = p + data->extrastart;
   else
     p = p - data->start;
-  repodata_set_poolstr(data, p, keyname, str);
+  repodata_set_poolstr(data, repodata_get_handle(data, p), keyname, str);
 }
 
 void

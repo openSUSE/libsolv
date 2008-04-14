@@ -21,8 +21,6 @@
 #include "repo_updateinfoxml.h"
 #include "tools_util.h"
 
-//#define TESTMM
-
 /*
  * <updates>
  *   <update from="rel-eng@fedoraproject.org" status="stable" type="security" version="1.4">
@@ -288,6 +286,7 @@ startElement(void *userData, const char *name, const char **atts)
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 	pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
 	repodata_extend(pd->data, pd->solvable - pool->solvables);      
+	pd->datanum = repodata_get_handle(pd->data, pd->datanum);
 	
 	solvable->vendor = str2id(pool, from, 1);
 	solvable->evr = str2id(pool, version, 1);

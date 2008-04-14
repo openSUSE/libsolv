@@ -427,7 +427,7 @@ static struct filefilter filefilters[] = {
 static void
 adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dic)
 {
-  Id entry, did;
+  Id handle, did;
   int i, fszc;
   unsigned int *fkb, *fn, *fsz, *fm, *fino;
   unsigned int inotest[256], inotestok;
@@ -537,7 +537,8 @@ adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmh
   sat_free(fm);
   /* commit */
   repodata_extend(repodata, s - pool->solvables);
-  entry = (s - pool->solvables) - repodata->start;
+  handle = (s - pool->solvables) - repodata->start;
+  handle = repodata_get_handle(repodata, handle);
   for (i = 0; i < fc; i++)
     {
       if (!fn[i])
@@ -546,7 +547,7 @@ adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmh
         did = repodata_str2dir(repodata, "/usr/src", 1);
       else
         did = repodata_str2dir(repodata, dn[i], 1);
-      repodata_add_dirnumnum(repodata, entry, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
+      repodata_add_dirnumnum(repodata, handle, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
     }
   sat_free(fn);
   sat_free(fkb);
@@ -640,11 +641,12 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 #endif
       if (repodata)
 	{
-	  Id entry, did;
+	  Id handle, did;
 	  repodata_extend(repodata, s - pool->solvables);
-	  entry = (s - pool->solvables) - repodata->start;
+	  handle = (s - pool->solvables) - repodata->start;
+	  handle = repodata_get_handle(repodata, handle);
 	  did = repodata_str2dir(repodata, dn[di[i]], 1);
-	  repodata_add_dirstr(repodata, entry, SOLVABLE_FILELIST, did, bn[i]);
+	  repodata_add_dirstr(repodata, handle, SOLVABLE_FILELIST, did, bn[i]);
 	}
     }
 #if 0
@@ -658,9 +660,8 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 }
 
 static void
-addsourcerpm(Pool *pool, Repodata *repodata, Solvable *s, char *sourcerpm, char *name, char *evr)
+addsourcerpm(Pool *pool, Repodata *repodata, Id handle, char *sourcerpm, char *name, char *evr)
 {
-  Id entry;
   const char *p, *sevr, *sarch;
 
   p = strrchr(sourcerpm, '.');
@@ -682,21 +683,20 @@ addsourcerpm(Pool *pool, Repodata *repodata, Solvable *s, char *sourcerpm, char 
   if (*p != '-' || p == sourcerpm)
     return;
   sevr = p + 1;
-  entry = (s - pool->solvables) - repodata->start;
   if (!strcmp(sarch, "src.rpm"))
-    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, ARCH_SRC);
+    repodata_set_constantid(repodata, handle, SOLVABLE_SOURCEARCH, ARCH_SRC);
   else if (!strcmp(sarch, "nosrc.rpm"))
-    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
+    repodata_set_constantid(repodata, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
   else
-    repodata_set_constantid(repodata, entry, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
+    repodata_set_constantid(repodata, handle, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
   if (!strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
-    repodata_set_void(repodata, entry, SOLVABLE_SOURCEEVR);
+    repodata_set_void(repodata, handle, SOLVABLE_SOURCEEVR);
   else
-    repodata_set_id(repodata, entry, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
+    repodata_set_id(repodata, handle, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
   if (!strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
-    repodata_set_void(repodata, entry, SOLVABLE_SOURCENAME);
+    repodata_set_void(repodata, handle, SOLVABLE_SOURCENAME);
   else
-    repodata_set_id(repodata, entry, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
+    repodata_set_id(repodata, handle, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
 }
 
 static int
@@ -747,15 +747,15 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 
   if (repodata)
     {
-      Id entry;
+      Id handle;
       char *str;
       unsigned int u32;
 
       repodata_extend(repodata, s - pool->solvables);
-      entry = (s - pool->solvables) - repodata->start;
+      handle = repodata_get_handle(repodata, (s - pool->solvables) - repodata->start);
       str = headstring(rpmhead, TAG_SUMMARY);
       if (str)
-        repodata_set_str(repodata, entry, SOLVABLE_SUMMARY, str);
+        repodata_set_str(repodata, handle, SOLVABLE_SUMMARY, str);
       str = headstring(rpmhead, TAG_DESCRIPTION);
       if (str)
 	{
@@ -773,7 +773,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 	      while (l > 0 && str[l - 1] == '\n')
 	        str[--l] = 0;
 	      if (l)
-                repodata_set_str(repodata, entry, SOLVABLE_DESCRIPTION, str);
+                repodata_set_str(repodata, handle, SOLVABLE_DESCRIPTION, str);
 	      p = aut + 19;
 	      aut = str;	/* copy over */
 	      while (*p == ' ' || *p == '\n')
@@ -793,29 +793,29 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 		aut--;
 	      *aut = 0;
 	      if (*str)
-	        repodata_set_str(repodata, entry, SOLVABLE_AUTHORS, str);
+	        repodata_set_str(repodata, handle, SOLVABLE_AUTHORS, str);
 	      free(str);
 	    }
 	  else if (*str)
-	    repodata_set_str(repodata, entry, SOLVABLE_DESCRIPTION, str);
+	    repodata_set_str(repodata, handle, SOLVABLE_DESCRIPTION, str);
 	}
       str = headstring(rpmhead, TAG_GROUP);
       if (str)
-        repodata_set_poolstr(repodata, entry, SOLVABLE_GROUP, str);
+        repodata_set_poolstr(repodata, handle, SOLVABLE_GROUP, str);
       str = headstring(rpmhead, TAG_LICENSE);
       if (str)
-        repodata_set_poolstr(repodata, entry, SOLVABLE_LICENSE, str);
+        repodata_set_poolstr(repodata, handle, SOLVABLE_LICENSE, str);
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
-        repodata_set_num(repodata, entry, SOLVABLE_BUILDTIME, u32);
+        repodata_set_num(repodata, handle, SOLVABLE_BUILDTIME, u32);
       u32 = headint32(rpmhead, TAG_INSTALLTIME);
       if (u32)
-        repodata_set_num(repodata, entry, SOLVABLE_INSTALLTIME, u32);
+        repodata_set_num(repodata, handle, SOLVABLE_INSTALLTIME, u32);
       u32 = headint32(rpmhead, TAG_SIZE);
       if (u32)
-        repodata_set_num(repodata, entry, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
+        repodata_set_num(repodata, handle, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
       if (sourcerpm)
-	addsourcerpm(pool, repodata, s, sourcerpm, name, evr);
+	addsourcerpm(pool, repodata, handle, sourcerpm, name, evr);
     }
   sat_free(evr);
   return 1;
@@ -887,7 +887,7 @@ copydir(Pool *pool, Repodata *data, Stringpool *fromspool, Repodata *fromdata, I
 
 struct solvable_copy_cbdata {
   Repodata *data;
-  Id entry;
+  Id handle;
 };
 
 static int
@@ -895,7 +895,7 @@ solvable_copy_cb(void *cbdata, Solvable *r, Repodata *fromdata, Repokey *key, Ke
 {
   Id id, keyname;
   Repodata *data = ((struct solvable_copy_cbdata *)cbdata)->data;
-  Id entry = ((struct solvable_copy_cbdata *)cbdata)->entry;
+  Id handle = ((struct solvable_copy_cbdata *)cbdata)->handle;
   Pool *pool = data->repo->pool, *frompool = fromdata->repo->pool;
   Stringpool *fromspool = fromdata->localpool ? &fromdata->spool : &frompool->ss;
 
@@ -916,33 +916,33 @@ solvable_copy_cb(void *cbdata, Solvable *r, Repodata *fromdata, Repokey *key, Ke
 	    id = str2id(pool, stringpool_id2str(fromspool, id), 1);
 	}
       if (key->type == REPOKEY_TYPE_ID)
-        repodata_set_id(data, entry, keyname, id);
+        repodata_set_id(data, handle, keyname, id);
       else
-        repodata_set_constantid(data, entry, keyname, id);
+        repodata_set_constantid(data, handle, keyname, id);
       break;
     case REPOKEY_TYPE_STR:
-      repodata_set_str(data, entry, keyname, kv->str);
+      repodata_set_str(data, handle, keyname, kv->str);
       break;
     case REPOKEY_TYPE_VOID:
-      repodata_set_void(data, entry, keyname);
+      repodata_set_void(data, handle, keyname);
       break;
     case REPOKEY_TYPE_NUM:
-      repodata_set_num(data, entry, keyname, kv->num);
+      repodata_set_num(data, handle, keyname, kv->num);
       break;
     case REPOKEY_TYPE_CONSTANT:
-      repodata_set_constant(data, entry, keyname, kv->num);
+      repodata_set_constant(data, handle, keyname, kv->num);
       break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       id = kv->id;
       assert(!data->localpool);	/* implement me! */
       id = copydir(pool, data, fromspool, fromdata, id);
-      repodata_add_dirnumnum(data, entry, keyname, id, kv->num, kv->num2);
+      repodata_add_dirnumnum(data, handle, keyname, id, kv->num, kv->num2);
       break;
     case REPOKEY_TYPE_DIRSTRARRAY:
       id = kv->id;
       assert(!data->localpool);	/* implement me! */
       id = copydir(pool, data, fromspool, fromdata, id);
-      repodata_add_dirstr(data, entry, keyname, id, kv->str);
+      repodata_add_dirstr(data, handle, keyname, id, kv->str);
       break;
     default:
       break;
@@ -992,7 +992,7 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data)
     return;
   repodata_extend(data, s - pool->solvables);
   cbdata.data = data;
-  cbdata.entry = (s - pool->solvables) - data->start;
+  cbdata.handle = repodata_get_handle(data, (s - pool->solvables) - data->start);
   repo_search(fromrepo, (r - fromrepo->pool->solvables), 0, 0, SEARCH_NO_STORAGE_SOLVABLE, solvable_copy_cb, &cbdata);
 }
 
@@ -1042,7 +1042,7 @@ swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
   /* only works if nothing is already internalized! */
   if (data && data->attrs)
     {
-      Id *tmpattrs = data->attrs[pa - data->start];
+      Id tmpattrs = data->attrs[pa - data->start];
       data->attrs[pa - data->start] = data->attrs[pb - data->start];
       data->attrs[pb - data->start] = tmpattrs;
     }
@@ -1400,15 +1400,13 @@ getu32(unsigned char *dp)
 }
 
 static void
-add_location(Repodata *data, Solvable *s, const char *location)
+add_location(Repodata *data, Solvable *s, Id handle, const char *location)
 {
   Pool *pool = s->repo->pool;
   const char *name, *n1, *n2;
   int l;
-  Id entry;
 
   repodata_extend(data, s - pool->solvables);
-  entry = (s - pool->solvables) - data->start;
 
   /* skip ./ prefix */
   if (location[0] == '.' && location[1] == '/' && location[2] != '/')
@@ -1427,11 +1425,11 @@ add_location(Repodata *data, Solvable *s, const char *location)
 	  /* too bad, need to store directory */
 	  char *dir = strdup(location);
 	  dir[name - location - 1] = 0;
-	  repodata_set_str(data, entry, SOLVABLE_MEDIADIR, dir);
+	  repodata_set_str(data, handle, SOLVABLE_MEDIADIR, dir);
 	  free(dir);
 	}
       else
-        repodata_set_void(data, entry, SOLVABLE_MEDIADIR);
+        repodata_set_void(data, handle, SOLVABLE_MEDIADIR);
     }
   n1 = name;
   for (n2 = id2str(pool, s->name); *n2; n1++, n2++)
@@ -1451,11 +1449,11 @@ add_location(Repodata *data, Solvable *s, const char *location)
       break;
   if (*n2 || strcmp (n1, ".rpm"))
     goto nontrivial;
-  repodata_set_void(data, entry, SOLVABLE_MEDIAFILE);
+  repodata_set_void(data, handle, SOLVABLE_MEDIAFILE);
   return;
 
 nontrivial:
-  repodata_set_str(data, entry, SOLVABLE_MEDIAFILE, name);
+  repodata_set_str(data, handle, SOLVABLE_MEDIAFILE, name);
   return;
 }
 
@@ -1578,12 +1576,13 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
       fclose(fp);
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       rpm2solv(pool, repo, repodata, s, rpmhead);
-      add_location(repodata, s, rpms[i]);
       if (repodata)
 	{
-	  Id entry = (s - pool->solvables) - repodata->start;
-	  repodata_set_num(repodata, entry, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
-	  repodata_set_num(repodata, entry, SOLVABLE_HEADEREND, headerend);
+	  Id handle = (s - pool->solvables) - repodata->start;
+	  handle = repodata_get_handle(repodata, handle);
+	  add_location(repodata, s, handle, rpms[i]);
+	  repodata_set_num(repodata, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
+	  repodata_set_num(repodata, handle, SOLVABLE_HEADEREND, headerend);
 	}
     }
   if (rpmhead)

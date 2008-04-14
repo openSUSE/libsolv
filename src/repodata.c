@@ -1057,8 +1057,8 @@ repodata_extend(Repodata *data, Id p)
       int new = p - data->end + 1;
       if (data->attrs)
 	{
-	  data->attrs = sat_extend(data->attrs, old, new, sizeof(Id *), REPODATA_BLOCK);
-	  memset(data->attrs + old, 0, new * sizeof(Id *));
+	  data->attrs = sat_extend(data->attrs, old, new, sizeof(Id), REPODATA_BLOCK);
+	  memset(data->attrs + old, 0, new * sizeof(Id));
 	}
       data->incoreoffset = sat_extend(data->incoreoffset, old, new, sizeof(Id), REPODATA_BLOCK);
       memset(data->incoreoffset + old, 0, new * sizeof(Id));
@@ -1070,9 +1070,9 @@ repodata_extend(Repodata *data, Id p)
       int new = data->start - p;
       if (data->attrs)
 	{
-	  data->attrs = sat_extend_resize(data->attrs, old + new, sizeof(Id *), REPODATA_BLOCK);
-	  memmove(data->attrs + new, data->attrs, old * sizeof(Id *));
-	  memset(data->attrs, 0, new * sizeof(Id *));
+	  data->attrs = sat_extend_resize(data->attrs, old + new, sizeof(Id), REPODATA_BLOCK);
+	  memmove(data->attrs + new, data->attrs, old * sizeof(Id));
+	  memset(data->attrs, 0, new * sizeof(Id));
 	}
       data->incoreoffset = sat_extend_resize(data->incoreoffset, old + new, sizeof(Id), REPODATA_BLOCK);
       memmove(data->incoreoffset + new, data->incoreoffset, old * sizeof(Id));
@@ -1088,8 +1088,8 @@ repodata_extend_extra(Repodata *data, int nextra)
     return;
   if (data->extraattrs)
     {
-      data->extraattrs = sat_extend(data->extraattrs, data->nextra, nextra - data->nextra, sizeof(Id *), REPODATA_BLOCK);
-      memset(data->extraattrs + data->nextra, 0, (nextra - data->nextra) * sizeof (Id *));
+      data->extraattrs = sat_extend(data->extraattrs, data->nextra, nextra - data->nextra, sizeof(Id), REPODATA_BLOCK);
+      memset(data->extraattrs + data->nextra, 0, (nextra - data->nextra) * sizeof (Id));
     }
   data->extraoffset = sat_extend(data->extraoffset, data->nextra, nextra - data->nextra, sizeof(Id), REPODATA_BLOCK);
   memset(data->extraoffset + data->nextra, 0, (nextra - data->nextra) * sizeof(Id));
@@ -1119,23 +1119,59 @@ repodata_extend_block(Repodata *data, Id start, Id num)
 #define REPODATA_ATTRDATA_BLOCK 1023
 #define REPODATA_ATTRIDDATA_BLOCK 63
 
-static void
-repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
+static inline Id
+get_new_struct(Repodata *data)
 {
-  Id *pp;
+  /* Make sure to never give out struct id 0. */
+  if (!data->structs)
+    {
+      data->structs = sat_extend(0, 0, 2, sizeof(Id *), REPODATA_BLOCK);
+      data->structs[0] = 0;
+      data->structs[1] = 0;
+      data->nstructs = 2;
+      return 1;
+    }
+  data->structs = sat_extend(data->structs, data->nstructs, 1, sizeof(Id *), REPODATA_BLOCK);
+  data->structs[data->nstructs] = 0;
+  return data->nstructs++;
+}
+
+static Id
+repodata_get_handle_int(Repodata *data, Id entry)
+{
   Id *ap;
-  int i;
   if (!data->attrs && entry >= 0)
     {
-      data->attrs = sat_calloc_block(data->end - data->start, sizeof(Id *),
+      data->attrs = sat_calloc_block(data->end - data->start, sizeof(Id),
 				     REPODATA_BLOCK);
     }
   else if (!data->extraattrs && entry < 0)
-    data->extraattrs = sat_calloc_block(data->nextra, sizeof(Id *), REPODATA_BLOCK);
+    data->extraattrs = sat_calloc_block(data->nextra, sizeof(Id), REPODATA_BLOCK);
   if (entry < 0)
-    ap = data->extraattrs[-1 - entry];
+    ap = &data->extraattrs[-1 - entry];
   else
-    ap = data->attrs[entry];
+    ap = &data->attrs[entry];
+  if (!*ap)
+    *ap = get_new_struct(data);
+  return *ap;
+}
+
+Id
+repodata_get_handle(Repodata *data, Id entry)
+{
+  return repodata_get_handle_int(data, entry);
+}
+
+static void
+repodata_insert_keyid(Repodata *data, Id handle, Id keyid, Id val, int overwrite)
+{
+  Id *pp;
+  Id *ap;
+  Id sid;
+  int i;
+  //sid = repodata_get_handle(data, handle);
+  sid = handle;
+  ap = data->structs[sid];
   i = 0;
   if (ap)
     {
@@ -1156,10 +1192,7 @@ repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
       i = pp - ap;
     }
   ap = sat_extend(ap, i, 3, sizeof(Id), REPODATA_ATTRS_BLOCK);
-  if (entry < 0)
-    data->extraattrs[-1 - entry] = ap;
-  else
-    data->attrs[entry] = ap;
+  data->structs[sid] = ap;
   pp = ap + i;
   *pp++ = keyid;
   *pp++ = val;
@@ -1167,7 +1200,7 @@ repodata_insert_keyid(Repodata *data, Id entry, Id keyid, Id val, int overwrite)
 }
 
 void
-repodata_set(Repodata *data, Id entry, Repokey *key, Id val)
+repodata_set(Repodata *data, Id handle, Repokey *key, Id val)
 {
   Id keyid;
 
@@ -1190,33 +1223,33 @@ repodata_set(Repodata *data, Id entry, Repokey *key, Id val)
 	  data->verticaloffset[data->nkeys - 1] = 0;
 	}
     }
-  repodata_insert_keyid(data, entry, keyid, val, 1);
+  repodata_insert_keyid(data, handle, keyid, val, 1);
 }
 
 void
-repodata_set_id(Repodata *data, Id entry, Id keyname, Id id)
+repodata_set_id(Repodata *data, Id handle, Id keyname, Id id)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_ID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, entry, &key, id);
+  repodata_set(data, handle, &key, id);
 }
 
 void
-repodata_set_num(Repodata *data, Id entry, Id keyname, unsigned int num)
+repodata_set_num(Repodata *data, Id handle, Id keyname, unsigned int num)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_NUM;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, entry, &key, (Id)num);
+  repodata_set(data, handle, &key, (Id)num);
 }
 
 void
-repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str)
+repodata_set_poolstr(Repodata *data, Id handle, Id keyname, const char *str)
 {
   Repokey key;
   Id id;
@@ -1228,44 +1261,44 @@ repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str)
   key.type = REPOKEY_TYPE_ID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, entry, &key, id);
+  repodata_set(data, handle, &key, id);
 }
 
 void
-repodata_set_constant(Repodata *data, Id entry, Id keyname, unsigned int constant)
+repodata_set_constant(Repodata *data, Id handle, Id keyname, unsigned int constant)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_CONSTANT;
   key.size = constant;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, entry, &key, 0);
+  repodata_set(data, handle, &key, 0);
 }
 
 void
-repodata_set_constantid(Repodata *data, Id entry, Id keyname, Id id)
+repodata_set_constantid(Repodata *data, Id handle, Id keyname, Id id)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_CONSTANTID;
   key.size = id;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, entry, &key, 0);
+  repodata_set(data, handle, &key, 0);
 }
 
 void
-repodata_set_void(Repodata *data, Id entry, Id keyname)
+repodata_set_void(Repodata *data, Id handle, Id keyname)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_VOID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, entry, &key, 0);
+  repodata_set(data, handle, &key, 0);
 }
 
 void
-repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str)
+repodata_set_str(Repodata *data, Id handle, Id keyname, const char *str)
 {
   Repokey key;
   int l;
@@ -1277,20 +1310,17 @@ repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str)
   key.storage = KEY_STORAGE_INCORE;
   data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
-  repodata_set(data, entry, &key, data->attrdatalen);
+  repodata_set(data, handle, &key, data->attrdatalen);
   data->attrdatalen += l;
 }
 
 static void
-repoadata_add_array(Repodata *data, Id entry, Id keyname, Id keytype, int entrysize)
+repoadata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrysize)
 {
   int oldsize;
   Id *ida, *pp;
 
-  if (entry < 0)
-    pp = data->extraattrs ? data->extraattrs[-1 - entry] : 0;
-  else
-    pp = data->attrs ? data->attrs[entry] : 0;
+  pp = data->structs[handle];
   if (pp)
     for (; *pp; pp += 2)
       if (data->keys[*pp].name == keyname && data->keys[*pp].type == keytype)
@@ -1304,7 +1334,7 @@ repoadata_add_array(Repodata *data, Id entry, Id keyname, Id keytype, int entrys
       key.size = 0;
       key.storage = KEY_STORAGE_INCORE;
       data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-      repodata_set(data, entry, &key, data->attriddatalen);
+      repodata_set(data, handle, &key, data->attriddatalen);
       return;
     }
   oldsize = 0;
@@ -1343,7 +1373,7 @@ checksumtype2len(Id type)
 }
 
 void
-repodata_set_bin_checksum(Repodata *data, Id entry, Id keyname, Id type,
+repodata_set_bin_checksum(Repodata *data, Id handle, Id keyname, Id type,
 		      const unsigned char *str)
 {
   Repokey key;
@@ -1357,7 +1387,7 @@ repodata_set_bin_checksum(Repodata *data, Id entry, Id keyname, Id type,
   key.storage = KEY_STORAGE_INCORE;
   data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
-  repodata_set(data, entry, &key, data->attrdatalen);
+  repodata_set(data, handle, &key, data->attrdatalen);
   data->attrdatalen += l;
 }
 
@@ -1387,7 +1417,7 @@ hexstr2bytes(unsigned char *buf, const char *str, int buflen)
 }
 
 void
-repodata_set_checksum(Repodata *data, Id entry, Id keyname, Id type,
+repodata_set_checksum(Repodata *data, Id handle, Id keyname, Id type,
 		      const char *str)
 {
   unsigned char buf[64];
@@ -1400,7 +1430,7 @@ repodata_set_checksum(Repodata *data, Id entry, Id keyname, Id type,
       fprintf(stderr, "Invalid hex character in '%s'\n", str);
       return;
     }
-  repodata_set_bin_checksum(data, entry, keyname, type, buf);
+  repodata_set_bin_checksum(data, handle, keyname, type, buf);
 }
 
 const char *
@@ -1434,13 +1464,13 @@ repodata_globalize_id(Repodata *data, Id id)
 }
 
 void
-repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2)
+repodata_add_dirnumnum(Repodata *data, Id handle, Id keyname, Id dir, Id num, Id num2)
 {
 
 #if 0
-fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, num2, data->attriddatalen);
+fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", handle, dir, num, num2, data->attriddatalen);
 #endif
-  repoadata_add_array(data, entry, keyname, REPOKEY_TYPE_DIRNUMNUMARRAY, 3);
+  repoadata_add_array(data, handle, keyname, REPOKEY_TYPE_DIRNUMNUMARRAY, 3);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = num;
   data->attriddata[data->attriddatalen++] = num2;
@@ -1448,7 +1478,7 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", entry, dir, num, nu
 }
 
 void
-repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *str)
+repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const char *str)
 {
   Id stroff;
   int l;
@@ -1460,27 +1490,27 @@ repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *st
   data->attrdatalen += l;
 
 #if 0
-fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", entry, dir, str,  data->attriddatalen);
+fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", handle, dir, str,  data->attriddatalen);
 #endif
-  repoadata_add_array(data, entry, keyname, REPOKEY_TYPE_DIRSTRARRAY, 2);
+  repoadata_add_array(data, handle, keyname, REPOKEY_TYPE_DIRSTRARRAY, 2);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = stroff;
   data->attriddata[data->attriddatalen++] = 0;
 }
 
 void
-repodata_add_idarray(Repodata *data, Id entry, Id keyname, Id id)
+repodata_add_idarray(Repodata *data, Id handle, Id keyname, Id id)
 {
 #if 0
-fprintf(stderr, "repodata_add_idarray %d %d (%d)\n", entry, id, data->attriddatalen);
+fprintf(stderr, "repodata_add_idarray %d %d (%d)\n", handle, id, data->attriddatalen);
 #endif
-  repoadata_add_array(data, entry, keyname, REPOKEY_TYPE_IDARRAY, 1);
+  repoadata_add_array(data, handle, keyname, REPOKEY_TYPE_IDARRAY, 1);
   data->attriddata[data->attriddatalen++] = id;
   data->attriddata[data->attriddatalen++] = 0;
 }
 
 void
-repodata_add_poolstr_array(Repodata *data, Id entry, Id keyname,
+repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname,
 			   const char *str)
 {
   Id id;
@@ -1488,16 +1518,31 @@ repodata_add_poolstr_array(Repodata *data, Id entry, Id keyname,
     id = stringpool_str2id(&data->spool, str, 1);
   else
     id = str2id(data->repo->pool, str, 1);
-  repodata_add_idarray(data, entry, keyname, id);
+  repodata_add_idarray(data, handle, keyname, id);
 }
+
+#if 0
+void
+repodata_open_struct(Repodata *data, Id handle, Id keyname)
+{
+}
+
+void
+repodata_close_struct(Repodata *data, Id entry, Id keyname)
+{
+}
+#endif
 
 void
 repodata_merge_attrs(Repodata *data, Id dest, Id src)
 {
   Id *keyp;
   if (dest == src
-      || !(keyp = src < 0 ? data->extraattrs[-1 - src] : data->attrs[src]))
+      || !(keyp = data->structs[src < 0
+	   			? data->extraattrs[-1 - src]
+				: data->attrs[src]]))
     return;
+  dest = repodata_get_handle_int(data, dest);
   for (; *keyp; keyp += 2)
     repodata_insert_keyid(data, dest, keyp[0], keyp[1], 0);
 }
@@ -1640,6 +1685,7 @@ repodata_internalize(Repodata *data)
     nentry = 0;
   for (entry = data->extraattrs ? -data->nextra : 0; entry < nentry; entry++)
     {
+      Id sid;
       memset(seen, 0, data->nkeys * sizeof(Id));
       sp = schema;
       dp = entry2data(data, entry);
@@ -1666,7 +1712,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	  *sp++ = *keyp;
 	  oldcount++;
 	}
-      keyp = entry < 0 ? data->extraattrs[-1 - entry] : data->attrs[entry];
+      sid = entry < 0 ? data->extraattrs[-1 - entry] : data->attrs[entry];
+      keyp = data->structs[sid];
       if (keyp)
         for (; *keyp; keyp += 2)
 	  {
@@ -1793,11 +1840,13 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	  dp = ndp;
 	}
-      if (entry < 0 && data->extraattrs[-1 - entry])
-	sat_free(data->extraattrs[-1 - entry]);
-      else if (entry >= 0 && data->attrs[entry])
-        sat_free(data->attrs[entry]);
+      if (data->structs[sid])
+	data->structs[sid] = sat_free(data->structs[sid]);
     }
+  for (entry = 0; entry < data->nstructs; entry++)
+    if (data->structs[entry])
+      sat_free(data->structs[entry]);
+  data->structs = sat_free(data->structs);
   sat_free(schema);
   sat_free(seen);
 

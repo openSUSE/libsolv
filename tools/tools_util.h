@@ -136,11 +136,11 @@ join2(const char *s1, const char *s2, const char *s3)
 
 
 /* util function to set a translated string */
-static inline void repodata_set_tstr(Repodata *data, Id rid, const char *attrname, const char *lang, const char *str)
+static inline void repodata_set_tstr(Repodata *data, Id handle, const char *attrname, const char *lang, const char *str)
 {
   Id attrid;
   attrid = str2id(data->repo->pool, join2(attrname, ":", lang), 1);
-  repodata_set_str(data, rid, attrid, str);
+  repodata_set_str(data, handle, attrid, str);
 }
 
 #endif /* SATSOLVER_TOOLS_UTIL_H */

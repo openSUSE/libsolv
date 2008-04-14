@@ -102,12 +102,14 @@ typedef struct _Repodata {
   unsigned char *vincore;	
   unsigned int vincorelen;
 
-  Id **attrs;			/* un-internalized attributes */
-  Id **extraattrs;		/* Same, but for extra objects.  */
+  Id *attrs;			/* un-internalized attributes */
+  Id *extraattrs;		/* Same, but for extra objects.  */
   unsigned char *attrdata;	/* their string data space */
   unsigned int attrdatalen;
   Id *attriddata;		/* their id space */
   unsigned int attriddatalen;
+  Id **structs;			/* key-value lists */
+  unsigned int nstructs;
 
   Id *addedfileprovides;
 } Repodata;
@@ -148,37 +150,43 @@ const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id entry, Id k
  * data assignment functions
  */
 
+/* Returns a handle for the attributes of ENTRY.  ENTRY >= 0
+   corresponds to data associated with a solvable, ENTRY < 0 is
+   extra data.  The returned handle is used in the various repodata_set_*
+   functions to add attributes to it.  */
+Id repodata_get_handle(Repodata *data, Id entry);
+
 /* basic types: void, num, string, Id */
 
-void repodata_set_void(Repodata *data, Id entry, Id keyname);
-void repodata_set_num(Repodata *data, Id entry, Id keyname, unsigned int num);
-void repodata_set_str(Repodata *data, Id entry, Id keyname, const char *str);
-void repodata_set_id(Repodata *data, Id entry, Id keyname, Id id);
+void repodata_set_void(Repodata *data, Id handle, Id keyname);
+void repodata_set_num(Repodata *data, Id handle, Id keyname, unsigned int num);
+void repodata_set_str(Repodata *data, Id handle, Id keyname, const char *str);
+void repodata_set_id(Repodata *data, Id handle, Id keyname, Id id);
 
 /*  */
 
-void repodata_set_poolstr(Repodata *data, Id entry, Id keyname, const char *str);
+void repodata_set_poolstr(Repodata *data, Id handle, Id keyname, const char *str);
 
 /* set numeric constant */
-void repodata_set_constant(Repodata *data, Id entry, Id keyname, unsigned int constant);
+void repodata_set_constant(Repodata *data, Id handle, Id keyname, unsigned int constant);
 
 /* set Id constant */
-void repodata_set_constantid(Repodata *data, Id entry, Id keyname, Id id);
+void repodata_set_constantid(Repodata *data, Id handle, Id keyname, Id id);
 
 /* checksum */
-void repodata_set_bin_checksum(Repodata *data, Id entry, Id keyname, Id type,
+void repodata_set_bin_checksum(Repodata *data, Id handle, Id keyname, Id type,
 			       const unsigned char *buf);
-void repodata_set_checksum(Repodata *data, Id entry, Id keyname, Id type,
+void repodata_set_checksum(Repodata *data, Id handle, Id keyname, Id type,
 			   const char *str);
 
 /* directory (for package file list) */
-void repodata_add_dirnumnum(Repodata *data, Id entry, Id keyname, Id dir, Id num, Id num2);
-void repodata_add_dirstr(Repodata *data, Id entry, Id keyname, Id dir, const char *str);
+void repodata_add_dirnumnum(Repodata *data, Id handle, Id keyname, Id dir, Id num, Id num2);
+void repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const char *str);
 
 
 /* Arrays */
-void repodata_add_idarray(Repodata *data, Id entry, Id keyname, Id id);
-void repodata_add_poolstr_array(Repodata *data, Id entry, Id keyname,
+void repodata_add_idarray(Repodata *data, Id handle, Id keyname, Id id);
+void repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname,
 				const char *str);
 
 /*-----

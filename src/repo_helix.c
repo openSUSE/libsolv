@@ -34,7 +34,7 @@ enum state {
   STATE_PACKAGE,
   STATE_NAME,
   STATE_VENDOR,
-  STATE_BUILDTIME,  
+  STATE_BUILDTIME,
   STATE_HISTORY,
   STATE_UPDATE,
   STATE_EPOCH,
@@ -714,9 +714,9 @@ endElement(void *userData, const char *name)
       s->vendor = str2id(pool, pd->content, 1);
       break;
     case STATE_BUILDTIME:
-	t = atoi (pd->content);
-	if (t)
-	  repodata_set_num(pd->data, (s - pool->solvables) - pd->repo->start, SOLVABLE_BUILDTIME, t);
+      t = atoi (pd->content);
+      if (t)
+	repodata_set_num(pd->data, repodata_get_handle(pd->data, (s - pool->solvables) - pd->repo->start), SOLVABLE_BUILDTIME, t);
       break;	
     case STATE_UPDATE:		       /* new version, keeping all other metadata */
       evr = evr2id(pool, pd,
@@ -866,7 +866,7 @@ repo_add_helix(Repo *repo, FILE *fp)
   XML_ParserFree(parser);
 
   if (pd.data)
-    repodata_internalize(pd.data);  
+    repodata_internalize(pd.data);
 
   free(pd.content);
   free(pd.evrspace);

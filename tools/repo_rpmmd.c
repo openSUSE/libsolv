@@ -235,6 +235,7 @@ struct parsedata {
   // while the tag ends
   const char *tmpattr;
   Repodata *data;
+  Id handle;
 };
 
 static char *flagtabnum[] = {
@@ -431,7 +432,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 }
 
 static void
-set_desciption_author(Repodata *data, Id entry, char *str)
+set_desciption_author(Repodata *data, Id handle, char *str)
 {
   char *aut, *p;
 
@@ -448,7 +449,7 @@ set_desciption_author(Repodata *data, Id entry, char *str)
       while (l > 0 && str[l - 1] == '\n')
 	str[--l] = 0; 
       if (l)
-	repodata_set_str(data, entry, SOLVABLE_DESCRIPTION, str);
+	repodata_set_str(data, handle, SOLVABLE_DESCRIPTION, str);
       p = aut + 19;
       aut = str;        /* copy over */
       while (*p == ' ' || *p == '\n')
@@ -468,19 +469,19 @@ set_desciption_author(Repodata *data, Id entry, char *str)
 	aut--;
       *aut = 0; 
       if (*str)
-	repodata_set_str(data, entry, SOLVABLE_AUTHORS, str);
+	repodata_set_str(data, handle, SOLVABLE_AUTHORS, str);
     }
   else if (*str)
-    repodata_set_str(data, entry, SOLVABLE_DESCRIPTION, str);
+    repodata_set_str(data, handle, SOLVABLE_DESCRIPTION, str);
 }
 
 static void
-set_sourcerpm(Repodata *data, Solvable *s, Id entry, char *sourcerpm)
+set_sourcerpm(Repodata *data, Solvable *s, Id handle, char *sourcerpm)
 {
   const char *p, *sevr, *sarch, *name, *evr;
   Pool *pool;
 
-    p = strrchr(sourcerpm, '.');
+  p = strrchr(sourcerpm, '.');
   if (!p || strcmp(p, ".rpm") != 0)
     return;
   p--;
@@ -503,20 +504,20 @@ set_sourcerpm(Repodata *data, Solvable *s, Id entry, char *sourcerpm)
   name = id2str(pool, s->name);
   evr = id2str(pool, s->evr);
   if (!strcmp(sarch, "src.rpm"))
-    repodata_set_constantid(data, entry, SOLVABLE_SOURCEARCH, ARCH_SRC);
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_SRC);
   else if (!strcmp(sarch, "nosrc.rpm"))
-    repodata_set_constantid(data, entry, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
   else
-    repodata_set_constantid(data, entry, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
   if (!strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
-    repodata_set_void(data, entry, SOLVABLE_SOURCEEVR);
+    repodata_set_void(data, handle, SOLVABLE_SOURCEEVR);
   else
-    repodata_set_id(data, entry, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
+    repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
   if (!strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm -
  1] == 0)
-    repodata_set_void(data, entry, SOLVABLE_SOURCENAME);
+    repodata_set_void(data, handle, SOLVABLE_SOURCENAME);
   else
-    repodata_set_id(data, entry, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
+    repodata_set_id(data, handle, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
 }
 
 static void XMLCALL
@@ -528,7 +529,7 @@ startElement(void *userData, const char *name, const char **atts)
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
   const char *str;
-  Id entry = s ? (s - pool->solvables) - pd->data->start : 0;
+  Id handle = pd->handle;
 
   // fprintf(stderr, "into %s, from %d, depth %d, statedepth %d\n", name, pd->state, pd->depth, pd->statedepth);
 
@@ -574,6 +575,7 @@ startElement(void *userData, const char *name, const char **atts)
       
       pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
       repodata_extend(pd->data, pd->solvable - pool->solvables);
+      pd->handle = repodata_get_handle(pd->data, (pd->solvable - pool->solvables) - pd->data->start);
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -669,12 +671,12 @@ startElement(void *userData, const char *name, const char **atts)
 	    {
 	      char *str3 = strdup(str);
 	      str3[str2 - str] = 0;
-	      repodata_set_poolstr(pd->data, entry, SOLVABLE_MEDIADIR, str3);
+	      repodata_set_poolstr(pd->data, handle, SOLVABLE_MEDIADIR, str3);
 	      free(str3);
-              repodata_set_str(pd->data, entry, SOLVABLE_MEDIAFILE, str2 + 1);
+              repodata_set_str(pd->data, handle, SOLVABLE_MEDIAFILE, str2 + 1);
 	    }
 	  else
-            repodata_set_str(pd->data, entry, SOLVABLE_MEDIAFILE, str);
+            repodata_set_str(pd->data, handle, SOLVABLE_MEDIAFILE, str);
 	}
       break;
     case STATE_CHECKSUM:
@@ -685,7 +687,7 @@ startElement(void *userData, const char *name, const char **atts)
         unsigned int t;
         str = find_attr("build", atts);
         if (str && (t = atoi(str)) != 0)
-          repodata_set_num(pd->data, entry, SOLVABLE_BUILDTIME, t);
+          repodata_set_num(pd->data, handle, SOLVABLE_BUILDTIME, t);
 	break;
       }
     case STATE_SIZE:
@@ -693,14 +695,14 @@ startElement(void *userData, const char *name, const char **atts)
         unsigned int k;
         str = find_attr("installed", atts);
 	if (str && (k = atoi(str)) != 0)
-	  repodata_set_num(pd->data, entry, SOLVABLE_INSTALLSIZE, (k + 1023) / 1024);
+	  repodata_set_num(pd->data, handle, SOLVABLE_INSTALLSIZE, (k + 1023) / 1024);
 	/* XXX the "package" attribute gives the size of the rpm file,
 	   i.e. the download size.  Except on packman, there it seems to be
 	   something else entirely, it has a value near to the other two
 	   values, as if the rpm is uncompressed.  */
         str = find_attr("package", atts);
 	if (str && (k = atoi(str)) != 0)
-	  repodata_set_num(pd->data, entry, SOLVABLE_DOWNLOADSIZE, (k + 1023) / 1024);
+	  repodata_set_num(pd->data, handle, SOLVABLE_DOWNLOADSIZE, (k + 1023) / 1024);
         break;
       }
     case STATE_HEADERRANGE:
@@ -708,7 +710,7 @@ startElement(void *userData, const char *name, const char **atts)
         unsigned int end;
         str = find_attr("end", atts);
 	if (str && (end = atoi(str)) != 0)
-	  repodata_set_num(pd->data, entry, SOLVABLE_HEADEREND, end);
+	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
       }
     default:
       break;
@@ -723,7 +725,7 @@ endElement(void *userData, const char *name)
   Pool *pool = pd->common.pool;
   Solvable *s = pd->solvable;
   Repo *repo = pd->common.repo;
-  Id entry = s ? (s - pool->solvables) - pd->data->start : 0;
+  Id handle = pd->handle;
   Id id;
   char *p;
 
@@ -771,10 +773,10 @@ endElement(void *userData, const char *name)
       s->vendor = str2id(pool, pd->content, 1);
       break;
     case STATE_RPM_GROUP:
-      repodata_set_poolstr(pd->data, entry, SOLVABLE_GROUP, pd->content);
+      repodata_set_poolstr(pd->data, handle, SOLVABLE_GROUP, pd->content);
       break;
     case STATE_RPM_LICENSE:
-      repodata_set_poolstr(pd->data, entry, SOLVABLE_LICENSE, pd->content);
+      repodata_set_poolstr(pd->data, handle, SOLVABLE_LICENSE, pd->content);
       break;
     case STATE_FILE:
 #if 0
@@ -791,7 +793,7 @@ endElement(void *userData, const char *name)
 	  p = pd->content;
 	  id = repodata_str2dir(pd->data, "/", 1);
 	}
-      repodata_add_dirstr(pd->data, entry, SOLVABLE_FILELIST, id, p);
+      repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, id, p);
       break;
     // xml store capabilities
     case STATE_CAP_PROVIDES:
@@ -823,14 +825,14 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       pd->lang = 0;
-      repodata_set_str(pd->data, entry, SOLVABLE_SUMMARY, pd->content);
+      repodata_set_str(pd->data, handle, SOLVABLE_SUMMARY, pd->content);
       break;
     case STATE_DESCRIPTION:
       pd->lang = 0;
-      set_desciption_author(pd->data, entry, pd->content);
+      set_desciption_author(pd->data, handle, pd->content);
       break;
     case STATE_SOURCERPM:
-      set_sourcerpm(pd->data, s, entry, pd->content);
+      set_sourcerpm(pd->data, s, handle, pd->content);
       break;
     default:
       break;
