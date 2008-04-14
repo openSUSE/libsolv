@@ -33,6 +33,7 @@ static char *languagetags[] = {
   "solvable:description:",
   "solvable:messageins:",
   "solvable:messagedel:",
+  "solvable:eula:",
   0
 };
 
@@ -42,10 +43,15 @@ static int
 keyfilter_solv(Repo *data, Repokey *key, void *kfdata)
 {
   int i;
+  const char *keyname;
   if (test_separate && key->storage != KEY_STORAGE_SOLVABLE)
     return KEY_STORAGE_DROPPED;
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
+      return KEY_STORAGE_VERTICAL_OFFSET;
+  keyname = id2str(data->pool, key->name);
+  for (i = 0; languagetags[i] != 0; i++)
+    if (!strncmp(keyname, languagetags[i], strlen(languagetags[i])))
       return KEY_STORAGE_VERTICAL_OFFSET;
   return KEY_STORAGE_INCORE;
 }
@@ -54,10 +60,15 @@ static int
 keyfilter_attr(Repo *data, Repokey *key, void *kfdata)
 {
   int i;
+  const char *keyname;
   if (key->storage == KEY_STORAGE_SOLVABLE)
     return KEY_STORAGE_DROPPED;
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
+      return KEY_STORAGE_VERTICAL_OFFSET;
+  keyname = id2str(data->pool, key->name);
+  for (i = 0; languagetags[i] != 0; i++)
+    if (!strncmp(keyname, languagetags[i], strlen(languagetags[i])))
       return KEY_STORAGE_VERTICAL_OFFSET;
   return KEY_STORAGE_INCORE;
 }
