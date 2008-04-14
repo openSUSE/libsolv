@@ -1167,11 +1167,8 @@ repodata_insert_keyid(Repodata *data, Id handle, Id keyid, Id val, int overwrite
 {
   Id *pp;
   Id *ap;
-  Id sid;
   int i;
-  //sid = repodata_get_handle(data, handle);
-  sid = handle;
-  ap = data->structs[sid];
+  ap = data->structs[handle];
   i = 0;
   if (ap)
     {
@@ -1192,7 +1189,7 @@ repodata_insert_keyid(Repodata *data, Id handle, Id keyid, Id val, int overwrite
       i = pp - ap;
     }
   ap = sat_extend(ap, i, 3, sizeof(Id), REPODATA_ATTRS_BLOCK);
-  data->structs[sid] = ap;
+  data->structs[handle] = ap;
   pp = ap + i;
   *pp++ = keyid;
   *pp++ = val;
@@ -1315,7 +1312,7 @@ repodata_set_str(Repodata *data, Id handle, Id keyname, const char *str)
 }
 
 static void
-repoadata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrysize)
+repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrysize)
 {
   int oldsize;
   Id *ida, *pp;
@@ -1470,7 +1467,7 @@ repodata_add_dirnumnum(Repodata *data, Id handle, Id keyname, Id dir, Id num, Id
 #if 0
 fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", handle, dir, num, num2, data->attriddatalen);
 #endif
-  repoadata_add_array(data, handle, keyname, REPOKEY_TYPE_DIRNUMNUMARRAY, 3);
+  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_DIRNUMNUMARRAY, 3);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = num;
   data->attriddata[data->attriddatalen++] = num2;
@@ -1492,7 +1489,7 @@ repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const char *s
 #if 0
 fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", handle, dir, str,  data->attriddatalen);
 #endif
-  repoadata_add_array(data, handle, keyname, REPOKEY_TYPE_DIRSTRARRAY, 2);
+  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_DIRSTRARRAY, 2);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = stroff;
   data->attriddata[data->attriddatalen++] = 0;
@@ -1504,7 +1501,7 @@ repodata_add_idarray(Repodata *data, Id handle, Id keyname, Id id)
 #if 0
 fprintf(stderr, "repodata_add_idarray %d %d (%d)\n", handle, id, data->attriddatalen);
 #endif
-  repoadata_add_array(data, handle, keyname, REPOKEY_TYPE_IDARRAY, 1);
+  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_IDARRAY, 1);
   data->attriddata[data->attriddatalen++] = id;
   data->attriddata[data->attriddatalen++] = 0;
 }
@@ -1521,17 +1518,13 @@ repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname,
   repodata_add_idarray(data, handle, keyname, id);
 }
 
-#if 0
-void
-repodata_open_struct(Repodata *data, Id handle, Id keyname)
+Id
+repodata_create_struct(Repodata *data, Id handle, Id keyname)
 {
+  Id newhandle = get_new_struct(data);
+  repodata_add_idarray(data, handle, keyname, newhandle);
+  return newhandle;
 }
-
-void
-repodata_close_struct(Repodata *data, Id entry, Id keyname)
-{
-}
-#endif
 
 void
 repodata_merge_attrs(Repodata *data, Id dest, Id src)
@@ -1685,7 +1678,7 @@ repodata_internalize(Repodata *data)
     nentry = 0;
   for (entry = data->extraattrs ? -data->nextra : 0; entry < nentry; entry++)
     {
-      Id sid;
+      Id handle;
       memset(seen, 0, data->nkeys * sizeof(Id));
       sp = schema;
       dp = entry2data(data, entry);
@@ -1712,8 +1705,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	  *sp++ = *keyp;
 	  oldcount++;
 	}
-      sid = entry < 0 ? data->extraattrs[-1 - entry] : data->attrs[entry];
-      keyp = data->structs[sid];
+      handle = entry < 0 ? data->extraattrs[-1 - entry] : data->attrs[entry];
+      keyp = data->structs[handle];
       if (keyp)
         for (; *keyp; keyp += 2)
 	  {
@@ -1840,8 +1833,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	  dp = ndp;
 	}
-      if (data->structs[sid])
-	data->structs[sid] = sat_free(data->structs[sid]);
+      if (data->structs[handle])
+	data->structs[handle] = sat_free(data->structs[handle]);
     }
   for (entry = 0; entry < data->nstructs; entry++)
     if (data->structs[entry])

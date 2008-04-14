@@ -188,6 +188,9 @@ void repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const ch
 void repodata_add_idarray(Repodata *data, Id handle, Id keyname, Id id);
 void repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname,
 				const char *str);
+/* Creates a new substructure.  Returns a handle for it (usable with the
+   other repodata_{set,add}_* functions.  */
+Id repodata_create_struct(Repodata *data, Id handle, Id keyname);
 
 /*-----
  * data management

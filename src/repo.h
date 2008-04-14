@@ -17,9 +17,6 @@
 
 #include "pooltypes.h"
 #include "pool.h"
-#if 0
-#include "attr_store.h"
-#endif
 #include "repodata.h"
 
 typedef struct _Repokey {

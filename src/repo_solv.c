@@ -722,7 +722,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   Pool *pool = repo->pool;
   int i, l;
   unsigned int numid, numrel, numdir, numsolv;
-  unsigned int numkeys, numschemata, numinfo, numextra;
+  unsigned int numkeys, numschemata, numinfo, numextra, contentver;
 
   Offset sizeid;
   Offset *str;			       /* map Id -> Offset into string space */
@@ -789,9 +789,12 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   numschemata = read_u32(&data);
   numinfo = read_u32(&data);
   if (solvversion > SOLV_VERSION_6)
-    numextra = read_u32(&data);
+    {
+      numextra = read_u32(&data);
+      contentver = read_u32(&data);
+    }
   else
-    numextra = 0;
+    numextra = 0, contentver = 1;
   solvflags = read_u32(&data);
 
   if (numdir && numdir < 2)

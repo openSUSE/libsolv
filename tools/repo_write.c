@@ -1536,7 +1536,10 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   write_u32(fp, cbdata.nmyschemata);
   write_u32(fp, nsubfiles);	/* info blocks.  */
   if (repo->nextra)
-    write_u32(fp, repo->nextra);
+    {
+      write_u32(fp, repo->nextra);
+      write_u32(fp, SOLV_CONTENT_VERSION);
+    }
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
   write_u32(fp, solv_flags);
