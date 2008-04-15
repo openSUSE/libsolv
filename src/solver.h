@@ -122,6 +122,7 @@ typedef struct solver {
   int allowuninstall;			/* allow removal of installed solvables */
   int updatesystem;			/* distupgrade */
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
+  int allowselfconflicts;		/* true: packages wich conflict with itself are installable */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
@@ -195,7 +196,8 @@ typedef enum {
   SOLVER_PROBLEM_SAME_NAME,
   SOLVER_PROBLEM_PACKAGE_CONFLICT,
   SOLVER_PROBLEM_PACKAGE_OBSOLETES,
-  SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE
+  SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE,
+  SOLVER_PROBLEM_SELF_CONFLICT
 } SolverProbleminfo;
 
 

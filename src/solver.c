@@ -1190,6 +1190,8 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		   /* dontfix: dont care about conflicts with already installed packs */
 		  if (dontfix && pool->solvables[p].repo == installed)
 		    continue;
+		 if (p == n && !solv->allowselfconflicts)
+		   p = 0;	/* make it a negative assertion */
                  /* rule: -n|-p: either solvable _or_ provider of conflict */
 		  addrule(solv, -n, -p);
 		}
@@ -3029,9 +3031,22 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  if (*dp == 0)
 	    break;
 	}
-      assert(req);
-      *depp = req;
-      return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
+      if (req)
+	{
+	  *depp = req;
+	  return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
+	}
+      assert(!solv->allowselfconflicts);
+      assert(s->conflicts);
+      conp = s->repo->idarraydata + s->conflicts;
+      while ((con = *conp++) != 0)
+	FOR_PROVIDES(p, pp, con)
+	  if (p == -r->p)
+	    {
+	      *depp = con;
+	      return SOLVER_PROBLEM_SELF_CONFLICT;
+	    }
+      assert(0);
     }
   s = pool->solvables - r->p;
   if (installed && !solv->fixsystem && s->repo == installed)
@@ -3283,6 +3298,10 @@ printprobleminfo(Solver *solv, Queue *job, Id problem)
     case SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but none of the providers can be installed\n", solvable2str(pool, s), dep2str(pool, dep));
+      return;
+    case SOLVER_PROBLEM_SELF_CONFLICT:
+      s = pool_id2solvable(pool, source);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by itself\n", solvable2str(pool, s), dep2str(pool, dep));
       return;
     }
 }
