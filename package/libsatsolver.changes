@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Apr 15 09:06:36 CEST 2008 - coolo@suse.de
+
+- some fixes around updateinfo parsing
+
+-------------------------------------------------------------------
 Wed Apr  9 16:09:36 CEST 2008 - jkupec@suse.cz
 
 - enable regex matching in Dataiterator
