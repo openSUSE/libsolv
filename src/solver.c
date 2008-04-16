@@ -3011,20 +3011,22 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  return SOLVER_PROBLEM_NOT_INSTALLABLE;
 	}
       /* check requires */
-      assert(s->requires);
-      reqp = s->repo->idarraydata + s->requires;
-      while ((req = *reqp++) != 0)
+      if (s->requires)
 	{
-	  if (req == SOLVABLE_PREREQMARKER)
-	    continue;
-	  dp = pool_whatprovides(pool, req);
-	  if (*dp == 0)
-	    break;
-	}
-      if (req)
-	{
-	  *depp = req;
-	  return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    {
+	      if (req == SOLVABLE_PREREQMARKER)
+		continue;
+	      dp = pool_whatprovides(pool, req);
+	      if (*dp == 0)
+		break;
+	    }
+	  if (req)
+	    {
+	      *depp = req;
+	      return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
+	    }
 	}
       assert(!solv->allowselfconflicts);
       assert(s->conflicts);
