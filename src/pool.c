@@ -1229,4 +1229,182 @@ pool_calc_installsizechange(Pool *pool, Repo *oldinstalled, Map *installedmap)
   return change;
 }
 
+/* map:
+ *  1: installed
+ *  2: conflicts with installed
+ *  8: interesting (only true if installed)
+ * 16: undecided
+ */
+ 
+static inline Id dep2name(Pool *pool, Id dep)
+{
+  while (ISRELDEP(dep))
+    {
+      Reldep *rd = rd = GETRELDEP(pool, dep);
+      dep = rd->name;
+    }
+  return dep;
+}
+
+static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep)
+{
+  Id p, *pp;
+  int r = 0;
+  FOR_PROVIDES(p, pp, dep)
+    {
+      if (p == SYSTEMSOLVABLE)
+        return 1;	/* always boring, as never constraining */
+      if ((map[p] & 9) == 9)
+	return 9;
+      r |= map[p] & 17;
+    }
+  return r;
+}
+
+/*
+ * pool_trivial_installable - calculate if a set of solvables is
+ * trivial installable without any other installs/deinstalls of
+ * packages not belonging to the set.
+ *
+ * the state is returned in the result queue:
+ * 1:  solvable is installable without any other package changes
+ * 0:  solvable is not installable
+ * -1: solvable is installable, but doesn't constrain any installed packages
+ */
+
+void
+pool_trivial_installable(Pool *pool, Repo *oldinstalled, Map *installedmap, Queue *pkgs, Queue *res)
+{
+  int i, r, m, did;
+  Id p, *dp, con, *conp, req, *reqp, obs, *obsp, *pp;
+  unsigned char *map;
+  Solvable *s;
+
+  map = sat_calloc(pool->nsolvables, 1);
+  for (p = 0; p < pool->nsolvables; p++)
+    {
+      if (!MAPTST(installedmap, p))
+	continue;
+      map[p] |= 9;
+      s = pool->solvables + p;
+      if (!s->conflicts)
+	continue;
+      conp = s->repo->idarraydata + s->conflicts;
+      while ((con = *conp++) != 0)
+	{
+	  dp = pool_whatprovides(pool, con);
+	  for (; *dp; dp++)
+	    map[p] |= 2;	/* XXX: self conflict ? */
+	}
+    }
+  for (i = 0; i < pkgs->count; i++)
+    map[pkgs->elements[i]] = 16;
+
+  for (i = 0, did = 0; did < pkgs->count; i++, did++)
+    {
+      if (i == pkgs->count)
+	i = 0;
+      p = pkgs->elements[i];
+      if ((map[p] & 16) == 0)
+	continue;
+      if ((map[p] & 2) != 0)
+	{
+	  map[p] = 2;
+	  continue;
+	}
+      s = pool->solvables + p;
+      m = 1;
+      if (s->requires)
+	{
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    {
+	      if (req == SOLVABLE_PREREQMARKER)
+		continue;
+	      r = providedbyinstalled(pool, map, req);
+	      if (!r)
+		{
+		  /* decided and miss */
+		  map[p] = 2;
+		  break;
+		}
+	      m |= r;	/* 1 | 9 | 16 | 17 */
+	    }
+	  if (req)
+	    continue;
+	  if ((m & 9) == 9)
+	    m = 9;
+	}
+      if (s->conflicts)
+	{
+	  conp = s->repo->idarraydata + s->conflicts;
+	  while ((con = *conp++) != 0)
+	    {
+	      if ((providedbyinstalled(pool, map, con) & 1) != 0)
+		{
+		  map[p] = 2;
+		  break;
+		}
+	      if ((m == 1 || m == 17) && ISRELDEP(con))
+		{
+		  con = dep2name(pool, con);
+		  if ((providedbyinstalled(pool, map, con) & 1) != 0)
+		    m = 9;
+		}
+	    }
+	  if (con)
+	    continue;	/* found a conflict */
+	}
+      if (s->repo && s->repo != oldinstalled)
+	{
+	  Id p2;
+	  Solvable *s2;
+	  if (s->obsoletes)
+	    {
+	      obsp = s->repo->idarraydata + s->obsoletes;
+	      while ((obs = *obsp++) != 0)
+		{
+		  if ((providedbyinstalled(pool, map, obs) & 1) != 0)
+		    {
+		      map[p] = 2;
+		      break;
+		    }
+		}
+	      if (obs)
+		continue;
+	    }
+	  FOR_PROVIDES(p2, pp, s->name)
+	    {
+	      s2 = pool->solvables + p2;
+	      if (s2->name == s->name && (map[p2] & 1) != 0)
+		{
+		  map[p] = 2;
+		  break;
+		}
+	    }
+	  if (p2)
+	    continue;
+	}
+      if (m != map[p])
+	{
+          map[p] = m;
+	  did = 0;
+	}
+    }
+  queue_free(res);
+  queue_clone(res, pkgs);
+  for (i = 0; i < pkgs->count; i++)
+    {
+      m = map[pkgs->elements[i]];
+      if ((m & 9) == 9)
+	r = 1;
+      else if (m & 1)
+	r = -1;
+      else
+	r = 0;
+      res->elements[i] = r;
+    }
+  free(map);
+}
+
 // EOF

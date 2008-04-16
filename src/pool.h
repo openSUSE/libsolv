@@ -256,6 +256,8 @@ typedef struct _duchanges {
 
 void pool_calc_duchanges(Pool *pool, struct _Repo *oldinstalled, Map *installedmap, DUChanges *mps, int nmps);
 int pool_calc_installsizechange(Pool *pool, struct _Repo *oldinstalled, Map *installedmap);
+void pool_trivial_installable(Pool *pool, struct _Repo *oldinstalled, Map *installedmap, Queue *pkgs, Queue *res);
+
 
 /* loop over all providers of d */
 #define FOR_PROVIDES(v, vp, d) 						\
