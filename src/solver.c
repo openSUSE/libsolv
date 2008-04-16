@@ -788,11 +788,7 @@ enabledisablelearntrules(Solver *solv)
       whyp = solv->learnt_pool.elements + solv->learnt_why.elements[i - solv->learntrules];
       while ((why = *whyp++) != 0)
 	{
-#if 0
-	  if (why < 0)
-	    continue;		/* rpm assertion */
-#endif
-	  assert(why < i);
+	  assert(why > 0 && why < i);
 	  if (!solv->rules[why].w1)
 	    break;
 	}
@@ -1645,17 +1641,11 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
 	  vv = v > 0 ? v : -v;
 	  if (!MAPTST(&seen, vv))
 	    continue;
+	  l = solv->decisionmap[vv];
+	  if (l != 1 && l != -1)
+	    continue;
 	  why = solv->decisionq_why.elements[idx];
-	  if (!why)
-	    {
-	      queue_push(&solv->learnt_pool, -vv);
-	      IF_POOLDEBUG (SAT_DEBUG_ANALYZE)
-		{
-		  POOL_DEBUG(SAT_DEBUG_ANALYZE, "RPM ASSERT Rule:\n");
-		  printruleelement(solv, SAT_DEBUG_ANALYZE, 0, v);
-		}
-	      continue;
-	    }
+	  assert(why);
 	  queue_push(&solv->learnt_pool, why);
 	  c = solv->rules + why;
 	  dp = c->d ? pool->whatprovidesdata + c->d : 0;
