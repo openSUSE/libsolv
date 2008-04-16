@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Wed Apr 16 17:44:20 CEST 2008 - coolo@suse.de
+
+- fix (rare) case of crashing solver
+
+-------------------------------------------------------------------
 Tue Apr 15 09:06:36 CEST 2008 - coolo@suse.de
 
 - some fixes around updateinfo parsing
