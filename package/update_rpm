@@ -1,6 +1,0 @@
-rm -rf testsuite/data.libzypp
-mkdir build
-cd build
-cmake ..
-make srcpackage_local
-cp package/*es package/*ec package/*tar.bz2 ../..
