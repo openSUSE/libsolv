@@ -110,13 +110,8 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   words = 0;
   while (1)
     {
-      /* Name [relop evr [rest]] --> 1, 3 or 4 fields.  */
+      /* Name [relop evr] [rest] --> 1, 2, 3 or 4 fields.  */
       words += split(line, sp + words, 4 - words);
-      if (words == 2)
-	{
-	  fprintf(stderr, "Bad dependency line: %s\n", line);
-	  exit(1);
-	}
       line = 0;
       /* Hack, as the content file adds 'package:' for package
          dependencies sometimes.  */
