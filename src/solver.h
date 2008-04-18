@@ -67,10 +67,10 @@ typedef struct solver {
   Id nrules;				/* index of the last rule */
 
   Id jobrules;				/* user rules */
-  Id systemrules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
+  Id updaterules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
+  Id featurerules;			/* feature rules */
   Id learntrules;			/* learnt rules */
 
-  Id *weaksystemrules;			/* please try to install (r->d) */
   Map noupdate;				/* don't try to update these
                                            installed solvables */
   Queue weakruleq;
