@@ -13,6 +13,10 @@
 #ifndef SATSOLVER_SOLVER_H
 #define SATSOLVER_SOLVER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "pooltypes.h"
 #include "pool.h"
 #include "repo.h"
@@ -297,5 +301,9 @@ solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
 {
   pool_create_state_maps(solv->pool, &solv->decisionq, installedmap, conflictsmap);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* SATSOLVER_SOLVER_H */
