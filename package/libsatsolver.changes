@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Sat Apr 19 08:10:51 CEST 2008 - coolo@suse.de
+
+- fix probleminfo if solvable conflicts with itself and has no requires
+- Fix parsing dep lines of content files (bnc #380396).
+- C++-guard also solver.h
+- add support for feature rules
+- fix a couple of small bugs
+- use new interface
+
+-------------------------------------------------------------------
 Wed Apr 16 17:44:20 CEST 2008 - coolo@suse.de
 
 - fix (rare) case of crashing solver
