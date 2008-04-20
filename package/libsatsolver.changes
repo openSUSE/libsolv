@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Sun Apr 20 18:25:14 CEST 2008 - coolo@suse.de
+
+- fix build
+
+-------------------------------------------------------------------
 Sat Apr 19 08:10:51 CEST 2008 - coolo@suse.de
 
 - fix probleminfo if solvable conflicts with itself and has no requires
