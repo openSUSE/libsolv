@@ -1976,7 +1976,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
 {
   Pool *pool = solv->pool;
   Rule *r;
-  Id p, d;
+  Id p = 0, d = 0;
   int l, why;
 
   if (decision)
