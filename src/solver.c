@@ -3636,6 +3636,7 @@ removedisabledconflicts(Solver *solv, Queue *removed)
 	{
 	  POOL_DEBUG(SAT_DEBUG_STATS, "re-conflicting package %s[%d]\n", solvable2str(pool, pool->solvables - new), -new);
 	  decisionmap[-new] = -1;
+	  new = 0;
 	  n = 0;	/* redo all rules */
 	}
     }
