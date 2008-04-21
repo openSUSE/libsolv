@@ -491,6 +491,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
   for (;;)
     {
       unsigned tag;
+      char *olinep; /* old line pointer */
       if (linep - line + 16 > aline)              /* (re-)alloc buffer */
 	{
 	  aline = linep - line;
@@ -500,11 +501,14 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	}
       if (!fgets(linep, aline - (linep - line), fp)) /* read line */
 	break;
+      olinep = linep;
       linep += strlen(linep);
       if (linep == line || linep[-1] != '\n')
         continue;
       *--linep = 0;
-      
+      if (linep == olinep)
+	continue;
+
       if (intag)
 	{
 	  /* check for multi-line value tags (+Key:/-Key:) */
