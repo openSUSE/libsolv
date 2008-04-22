@@ -220,11 +220,6 @@ extern SolverProbleminfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid
 /* XXX: why is this not static? */
 Id *create_decisions_obsoletesmap(Solver *solv);
 
-/* debug functions, do not use */
-void printdecisions(Solver *solv);
-void printsolutions(Solver *solv, Queue *job);
-
-
 static inline int
 solver_dep_fulfilled(Solver *solv, Id dep)
 {
