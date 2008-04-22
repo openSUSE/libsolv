@@ -1531,7 +1531,10 @@ l1retry:
 	    break;
 	  POOL_DEBUG(SAT_DEBUG_ANALYZE, "got %d involved level 1 decisions\n", l1num);
 	  for (i = 0; i < r.count; i++)
-	    MAPCLR(&seen, r.elements[i]);
+	    {
+	      v = r.elements[i];
+	      MAPCLR(&seen, v > 0 ? v : -v);
+	    }
 	  /* only level 1 marks left */
 	  l1num++;
 	  goto l1retry;
