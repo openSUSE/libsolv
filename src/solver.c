@@ -3592,7 +3592,7 @@ solver_solve(Solver *solv, Queue *job)
   /* find recommended packages */
   /* if redoq.count == 0 we already found all recommended in the
    * solver run */
-  if (redoq.count || solv->dontinstallrecommended || solv->showinstalledrecommended)
+  if (redoq.count || solv->dontinstallrecommended || !solv->dontshowinstalledrecommended)
     {
       Id rec, *recp, p, *pp;
 
@@ -3615,7 +3615,7 @@ solver_solve(Solver *solv, Queue *job)
 		      break;
 		  if (p)
 		    {
-		      if (solv->showinstalledrecommended)
+		      if (!solv->dontshowinstalledrecommended)
 			{
 			  FOR_PROVIDES(p, pp, rec)
 			    if (solv->decisionmap[p] > 0)
@@ -3632,7 +3632,7 @@ solver_solve(Solver *solv, Queue *job)
 	{
 	  if (solv->decisionmap[i] < 0)
 	    continue;
-	  if (solv->decisionmap[i] > 0 && !solv->showinstalledrecommended)
+	  if (solv->decisionmap[i] > 0 && solv->dontshowinstalledrecommended)
 	    continue;
 	  s = pool->solvables + i;
 	  if (!MAPTST(&solv->recommendsmap, i))
@@ -3677,7 +3677,7 @@ solver_solve(Solver *solv, Queue *job)
 		      break;
 		  if (p)
 		    {
-		      if (solv->showinstalledrecommended)
+		      if (!solv->dontshowinstalledrecommended)
 			{
 			  FOR_PROVIDES(p, pp, sug)
 			    if (solv->decisionmap[p] > 0)
@@ -3694,7 +3694,7 @@ solver_solve(Solver *solv, Queue *job)
 	{
 	  if (solv->decisionmap[i] < 0)
 	    continue;
-	  if (solv->decisionmap[i] > 0 && !solv->showinstalledrecommended)
+	  if (solv->decisionmap[i] > 0 && solv->dontshowinstalledrecommended)
 	    continue;
 	  s = pool->solvables + i;
 	  if (!MAPTST(&solv->suggestsmap, i))
