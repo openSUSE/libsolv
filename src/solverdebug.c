@@ -314,7 +314,15 @@ solver_printdecisions(Solver *solv)
       for (i = 0; i < solv->recommendations.count; i++)
 	{
 	  s = pool->solvables + solv->recommendations.elements[i];
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "- %s%s\n", solvable2str(pool, s), solv->decisionmap[solv->recommendations.elements[i]] > 0 ? " (selected)" : "");
+          if (solv->decisionmap[solv->recommendations.elements[i]] > 0)
+	    {
+	      if (installed && s->repo == installed)
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "- %s (installed)\n", solvable2str(pool, s));
+	      else
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "- %s (selected)\n", solvable2str(pool, s));
+	    }
+          else
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
 	}
     }
 
@@ -324,7 +332,15 @@ solver_printdecisions(Solver *solv)
       for (i = 0; i < solv->suggestions.count; i++)
 	{
 	  s = pool->solvables + solv->suggestions.elements[i];
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
+          if (solv->decisionmap[solv->suggestions.elements[i]] > 0)
+	    {
+	      if (installed && s->repo == installed)
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "- %s (installed)\n", solvable2str(pool, s));
+	      else
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "- %s (selected)\n", solvable2str(pool, s));
+	    }
+	  else
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
 	}
     }
 }

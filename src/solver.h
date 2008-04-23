@@ -113,8 +113,6 @@ typedef struct solver {
   Id *obsoletes;			/* obsoletes for each installed solvable */
   Id *obsoletes_data;			/* data area for obsoletes */
 
-  Queue covenantq;                      /* Covenants honored by this solver (generic locks) */
-
   /*-------------------------------------------------------------------------------------------------------------
    * Solver configuration
    *-------------------------------------------------------------------------------------------------------------*/
@@ -130,6 +128,7 @@ typedef struct solver {
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
+  int showinstalledrecommended;		/* true: add recommened packages that are already installed to the lists */
   
   /* Callbacks for defining the bahaviour of the SAT solver */
 
@@ -170,6 +169,11 @@ typedef struct solver {
    */
    UpdateCandidateCb   updateCandidateCb;
     
+
+  /* some strange queue that doesn't belong here */
+
+  Queue covenantq;                      /* Covenants honored by this solver (generic locks) */
+
   
 } Solver;
 

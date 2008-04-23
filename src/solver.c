@@ -3592,11 +3592,11 @@ solver_solve(Solver *solv, Queue *job)
   /* find recommended packages */
   /* if redoq.count == 0 we already found all recommended in the
    * solver run */
-  if (redoq.count || solv->dontinstallrecommended)
+  if (redoq.count || solv->dontinstallrecommended || solv->showinstalledrecommended)
     {
       Id rec, *recp, p, *pp;
 
-      /* create map of all suggests that are still open */
+      /* create map of all recommened packages */
       solv->recommends_index = -1;
       MAPZERO(&solv->recommendsmap);
       for (i = 0; i < solv->decisionq.count; i++)
@@ -3614,7 +3614,15 @@ solver_solve(Solver *solv, Queue *job)
 		    if (solv->decisionmap[p] > 0)
 		      break;
 		  if (p)
-		    continue;	/* p != 0: already fulfilled */
+		    {
+		      if (solv->showinstalledrecommended)
+			{
+			  FOR_PROVIDES(p, pp, rec)
+			    if (solv->decisionmap[p] > 0)
+			      MAPSET(&solv->recommendsmap, p);
+			}
+		      continue;	/* p != 0: already fulfilled */
+		    }
 		  FOR_PROVIDES(p, pp, rec)
 		    MAPSET(&solv->recommendsmap, p);
 		}
@@ -3622,7 +3630,9 @@ solver_solve(Solver *solv, Queue *job)
 	}
       for (i = 1; i < pool->nsolvables; i++)
 	{
-	  if (solv->decisionmap[i] != 0)
+	  if (solv->decisionmap[i] < 0)
+	    continue;
+	  if (solv->decisionmap[i] > 0 && !solv->showinstalledrecommended)
 	    continue;
 	  s = pool->solvables + i;
 	  if (!MAPTST(&solv->recommendsmap, i))
@@ -3666,7 +3676,15 @@ solver_solve(Solver *solv, Queue *job)
 		    if (solv->decisionmap[p] > 0)
 		      break;
 		  if (p)
-		    continue;	/* already fulfilled */
+		    {
+		      if (solv->showinstalledrecommended)
+			{
+			  FOR_PROVIDES(p, pp, sug)
+			    if (solv->decisionmap[p] > 0)
+			      MAPSET(&solv->suggestsmap, p);
+			}
+		      continue;	/* already fulfilled */
+		    }
 		  FOR_PROVIDES(p, pp, sug)
 		    MAPSET(&solv->suggestsmap, p);
 		}
@@ -3674,7 +3692,9 @@ solver_solve(Solver *solv, Queue *job)
 	}
       for (i = 1; i < pool->nsolvables; i++)
 	{
-	  if (solv->decisionmap[i] != 0)
+	  if (solv->decisionmap[i] < 0)
+	    continue;
+	  if (solv->decisionmap[i] > 0 && !solv->showinstalledrecommended)
 	    continue;
 	  s = pool->solvables + i;
 	  if (!MAPTST(&solv->suggestsmap, i))
