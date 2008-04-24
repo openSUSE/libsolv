@@ -41,7 +41,6 @@ split(char *l, char **sp, int m)
 }
 
 struct parsedata {
-  char *kind;
   Repo *repo;
   char *tmp;
   int tmpl;
@@ -157,7 +156,7 @@ repo_add_content(Repo *repo, FILE *fp)
   Pool *pool = repo->pool;
   char *line, *linep;
   int aline;
-  Solvable *s;
+  Solvable *s, *firsts;
   struct parsedata pd;
 
   memset(&pd, 0, sizeof(pd));
@@ -202,17 +201,27 @@ repo_add_content(Repo *repo, FILE *fp)
 #define istag(x) !strcmp (key, x)
 	  if (istag ("PRODUCT"))
 	    {
-	      /* finish old solvable */
-	      if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-		s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-	      if (s)
-		s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
-	      /* Only support one product.  */
-	      pd.kind = "product";
-	      s = pool_id2solvable(pool, repo_add_solvable(repo));
-	      s->name = str2id(pool, join(&pd, pd.kind, ":", value), 1);
+	      /* Finish old solvable, but only if it wasn't created
+	         on demand without seeing a PRODUCT entry.  */
+	      if (!firsts)
+		{
+		  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+		    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+		  if (s)
+		    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
+		  /* Only support one product.  */
+		  s = pool_id2solvable(pool, repo_add_solvable(repo));
+		}
+	      firsts = 0;
+	      s->name = str2id(pool, join(&pd, "product", ":", value), 1);
+	      continue;
 	    }
-	  else if (istag ("VERSION"))
+
+	  /* Sometimes PRODUCT is not the first entry, but we need a solvable
+	     from here on.  */
+	  if (!s)
+	    firsts = s = pool_id2solvable(pool, repo_add_solvable(repo));
+	  if (istag ("VERSION"))
 	    /* without a release? but that's like zypp implements it */
 	    s->evr = makeevr(pool, value);
 	  else if (istag ("DISTPRODUCT"))
