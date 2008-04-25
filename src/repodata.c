@@ -1463,7 +1463,7 @@ repodata_globalize_id(Repodata *data, Id id)
 void
 repodata_add_dirnumnum(Repodata *data, Id handle, Id keyname, Id dir, Id num, Id num2)
 {
-
+  assert(dir);
 #if 0
 fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", handle, dir, num, num2, data->attriddatalen);
 #endif
@@ -1480,6 +1480,7 @@ repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const char *s
   Id stroff;
   int l;
 
+  assert(dir);
   l = strlen(str) + 1;
   data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
