@@ -105,6 +105,8 @@ typedef struct solver {
   Queue recommendations;		/* recommended packages */
   Queue suggestions;			/* suggested packages */
 
+  int stats_learned;			/* statistic */
+  int stats_unsolvable;			/* statistic */
 
   Map recommendsmap;			/* recommended packages from decisionmap */
   Map suggestsmap;			/* suggested packages from decisionmap */

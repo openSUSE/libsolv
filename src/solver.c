@@ -1291,7 +1291,7 @@ makewatches(Solver *solv)
 	  || !r->w2)		       /* rule is assertion */
 	continue;
 
-      /* see addwatches(solv, r) */
+      /* see addwatches_rule(solv, r) */
       r->n1 = solv->watches[nsolvables + r->w1];
       solv->watches[nsolvables + r->w1] = r - solv->rules;
 
@@ -1305,8 +1305,8 @@ makewatches(Solver *solv)
  * add watches (for rule)
  */
 
-static void
-addwatches(Solver *solv, Rule *r)
+static inline void
+addwatches_rule(Solver *solv, Rule *r)
 {
   int nsolvables = solv->pool->nsolvables;
 
@@ -1353,8 +1353,6 @@ propagate(Solver *solv, int level)
         {
 	  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "propagate for decision %d level %d\n", -pkg, level);
 	  solver_printruleelement(solv, SAT_DEBUG_PROPAGATE, 0, -pkg);
-	  if (0)
-	    solver_printwatches(solv, SAT_DEBUG_SCHUBI);
         }
 
       for (rp = watches + pkg; *rp; rp = nrp)
@@ -1563,6 +1561,7 @@ l1retry:
   queue_push(&solv->learnt_pool, 0);
   if (whyp)
     *whyp = learnt_why;
+  solv->stats_learned++;
   return rlevel;
 }
 
@@ -1669,6 +1668,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   Id lastweak;
 
   POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "ANALYZE UNSOLVABLE ----------------------\n");
+  solv->stats_unsolvable++;
   oldproblemcount = solv->problems.count;
   oldlearntpoolcount = solv->learnt_pool.count;
 
@@ -1881,7 +1881,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
 	{
 	  /* at least 2 literals, needs watches */
 	  watch2onhighest(solv, r);
-	  addwatches(solv, r);
+	  addwatches_rule(solv, r);
 	}
       solv->decisionmap[p > 0 ? p : -p] = p > 0 ? level : -level;
       queue_push(&solv->decisionq, p);
@@ -2402,6 +2402,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	}
       break;
     }
+  POOL_DEBUG(SAT_DEBUG_STATS, "solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
+
   POOL_DEBUG(SAT_DEBUG_STATS, "done solving.\n\n");
   queue_free(&dq);
 }
@@ -3572,7 +3574,7 @@ solver_solve(Solver *solv, Queue *job)
 
   queue_init(&redoq);
   goterase = 0;
-  /* disable all erase jobs (continuing weak "keep uninstalled" rules) */
+  /* disable all erase jobs (including weak "keep uninstalled" rules) */
   for (i = solv->jobrules, r = solv->rules + i; i < solv->updaterules; i++, r++)
     {
       if (!r->w1)
@@ -3744,6 +3746,8 @@ solver_solve(Solver *solv, Queue *job)
 	}
       solv->recommendations.count = recocount;
     }
+
+  POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
   queue_free(&redoq);
 }
 

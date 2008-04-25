@@ -622,6 +622,7 @@ endElement(void *userData, const char *name)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
 
+      /* see bugzilla bnc#190163 */
       const char *flavor = findKernelFlavor(pd, s);
       if (flavor) 
 	{
