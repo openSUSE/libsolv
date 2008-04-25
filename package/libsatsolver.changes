@@ -1,4 +1,23 @@
 -------------------------------------------------------------------
+Fri Apr 25 19:23:51 CEST 2008 - coolo@suse.de
+
+- detect and skip empty lines (bnc#381828)
+- fix endless loop
+- move debug functions to solverdebug.c
+- do not delete negative bitfield entries [bnc#381908]
+- add "showinstalledrecommended" option to make the solver
+  put installed packages on the suggestions/recommendations
+  queues
+- Fix content parsing if PRODUCT isn't the first entry.
+- add more statistics
+- add two assertions
+- add support for susetags filelist
+- plug mem join2 leak
+- fix anchoring of filelist data
+- susetags move files added to provides back into filelist
+- ignore packages.FL for now
+ 
+-------------------------------------------------------------------
 Sun Apr 20 18:25:14 CEST 2008 - coolo@suse.de
 
 - fix build
