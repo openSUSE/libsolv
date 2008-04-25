@@ -95,6 +95,15 @@ join2(const char *s1, const char *s2, const char *s3)
   return _join_tmp;
 }
 
+static inline void
+join_freemem(void)
+{
+  if (_join_tmp)
+    free(_join_tmp);
+  _join_tmp = 0;
+  _join_tmpl = 0;
+}
+
 // static char *
 // join(struct parsedata_common *pd, const char *s1, const char *s2, const char *s3)
 // {

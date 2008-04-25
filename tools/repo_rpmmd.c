@@ -914,4 +914,5 @@ repo_add_rpmmd(Repo *repo, FILE *fp, int flags)
   if (pd.data)
     repodata_internalize(pd.data);
   sat_free(pd.content);
+  join_freemem();
 }

@@ -200,6 +200,18 @@ main(int argc, char **argv)
 	      repo_add_susetags(repo, fp, vendor, 0, flags | SUSETAGS_EXTEND);
 	      fclose(fp);
  	    }
+	  else if (!strcmp(fn, "packages.FL") || !strcmp(fn, "packages.FL.gz"))
+	    {
+	      sprintf(fnp, "%s/%s", descrdir, fn);
+	      FILE *fp = myfopen(fnp);
+	      if (!fp)
+		{
+		  perror(fn);
+		  exit(1);
+		}
+	      repo_add_susetags(repo, fp, vendor, 0, flags | SUSETAGS_EXTEND);
+	      fclose(fp);
+ 	    }
 	  else if (!strncmp(fn, "packages.", 9))
 	    {
 	      char lang[6];

@@ -643,6 +643,7 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
     repodata_internalize(pd.data);
 
   free(pd.content);
+  join_freemem();
 }
 
 /* EOF */

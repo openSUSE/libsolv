@@ -875,6 +875,31 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    language = strdup(line + 6);
 	    break;
 
+	  case CTAG('=', 'F', 'l', 's'):
+	    {
+	      if (line[6] != '/')
+		continue;	/* no relative files, please */
+	      char *p = strrchr(line + 6, '/');
+	      Id did;
+	      if (p && p != line + 6 && !p[1])
+		{
+		  *p = 0;
+		  p = strrchr(line + 6, '/');
+		}
+	      if (p)
+		{
+		  *p++ = 0;
+		  did = repodata_str2dir(data, line + 6, 1);
+		}
+	      else
+		{
+		  p = line + 6;
+		  did = repodata_str2dir(data, "/", 1);
+		}
+	      repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, p);
+	      continue;
+	    }
+
 	  case CTAG('=', 'P', 'a', 't'):
 	  case CTAG('=', 'P', 'k', 'g'):
 	    break;
@@ -936,4 +961,5 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
   if (pd.common.tmp)
     free(pd.common.tmp);
   free(line);
+  join_freemem();
 }
