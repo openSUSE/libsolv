@@ -156,7 +156,7 @@ repo_add_content(Repo *repo, FILE *fp)
   Pool *pool = repo->pool;
   char *line, *linep;
   int aline;
-  Solvable *s, *firsts;
+  Solvable *s, *firsts = 0;
   struct parsedata pd;
 
   memset(&pd, 0, sizeof(pd));
