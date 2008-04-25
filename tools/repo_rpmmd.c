@@ -791,8 +791,10 @@ endElement(void *userData, const char *name)
       else
 	{
 	  p = pd->content;
-	  id = repodata_str2dir(pd->data, "/", 1);
+	  id = 0;
 	}
+      if (!id)
+	id = repodata_str2dir(pd->data, "/", 1);
       repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, id, p);
       break;
     // xml store capabilities

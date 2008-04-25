@@ -646,6 +646,8 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 	  handle = (s - pool->solvables) - repodata->start;
 	  handle = repodata_get_handle(repodata, handle);
 	  did = repodata_str2dir(repodata, dn[di[i]], 1);
+	  if (!did)
+	    did = repodata_str2dir(repodata, "/", 1);
 	  repodata_add_dirstr(repodata, handle, SOLVABLE_FILELIST, did, bn[i]);
 	}
     }

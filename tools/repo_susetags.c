@@ -388,7 +388,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, int handle)
 {
   Pool *pool = pd->repo->pool;
 
-#if 0
+#if 1
   /* move file provides to filelist */
   /* relies on the fact that rpm inserts self-provides at the end */
   if (s->provides)
@@ -425,6 +425,8 @@ finish_solvable(struct parsedata *pd, Solvable *s, int handle)
 		  sdup[sp - str] = 0;
 		  did = repodata_str2dir(pd->data, sdup, 1);
 		}
+	      if (!did)
+		did = repodata_str2dir(pd->data, "/", 1);
 	      repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, did, sp + 1);
 	      *p = 0;
 	    }
@@ -877,8 +879,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 
 	  case CTAG('=', 'F', 'l', 's'):
 	    {
-	      if (line[6] != '/')
-		continue;	/* no relative files, please */
 	      char *p = strrchr(line + 6, '/');
 	      Id did;
 	      if (p && p != line + 6 && !p[1])
@@ -894,8 +894,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	      else
 		{
 		  p = line + 6;
-		  did = repodata_str2dir(data, "/", 1);
+		  did = 0;
 		}
+	      if (!did)
+	        did = repodata_str2dir(data, "/", 1);
 	      repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, p);
 	      continue;
 	    }
