@@ -98,6 +98,24 @@ repodata_free(Repodata *data)
     close(data->pagefd);
 }
 
+unsigned char *
+data_skip_recursive(Repodata *data, unsigned char *dp, Repokey *key)
+{
+  KeyValue kv;
+  if (key->type != REPOKEY_TYPE_COUNTED)
+    return data_skip(dp, key->type);
+  dp = data_fetch(dp, &kv, key);
+  int num = kv.num;
+  int schema = kv.id;
+  while (num--)
+    {
+      Id *keyp = data->schemadata + data->schemata[schema];
+      for (; *keyp; keyp++)
+	dp = data_skip_recursive(data, dp, data->keys + *keyp);
+    }
+  return dp;
+}
+
 static unsigned char *
 forward_to_key(Repodata *data, Id keyid, Id schemaid, unsigned char *dp)
 {
@@ -116,7 +134,7 @@ forward_to_key(Repodata *data, Id keyid, Id schemaid, unsigned char *dp)
 	}
       if (data->keys[k].storage != KEY_STORAGE_INCORE)
 	continue;
-      dp = data_skip(dp, data->keys[k].type);
+      dp = data_skip_recursive(data, dp, data->keys + k);
     }
   return 0;
 }
@@ -317,7 +335,7 @@ get_data(Repodata *data, Repokey *key, unsigned char **dpp)
   if (key->storage == KEY_STORAGE_INCORE)
     {
       /* hmm, this is a bit expensive */
-      *dpp = data_skip(dp, key->type);
+      *dpp = data_skip_recursive(data, dp, key);
       return dp;
     }
   else if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
@@ -568,7 +586,32 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
 	  ddp = data_fetch(ddp, &kv, key);
 	  if (!ddp)
 	    break;
-	  stop = callback(cbdata, data->repo->pool->solvables + data->start + entry, data, key, &kv);
+	  if (key->type == REPOKEY_TYPE_COUNTED)
+	    {
+	      int num = kv.num;
+	      int subschema = kv.id;
+	      Repokey *countkey = key;
+	      kv.eof = 0;
+	      callback(cbdata, data->repo->pool->solvables + data->start + entry, data, countkey, &kv);
+	      while (num--)
+		{
+		  Id *kp = data->schemadata + data->schemata[subschema];
+		  for (; *kp; kp++)
+		    {
+		      key = data->keys + *kp;
+		      ddp = data_fetch(ddp, &kv, key);
+		      if (!ddp)
+			exit(1);
+		      callback(cbdata, data->repo->pool->solvables + data->start + entry, data, key, &kv);
+		    }
+		  kv.eof = 1;
+		  callback(cbdata, data->repo->pool->solvables + data->start + entry, data, countkey, &kv);
+		}
+	      kv.eof = 2;
+	      stop = callback(cbdata, data->repo->pool->solvables + data->start + entry, data, countkey, &kv);
+	    }
+	  else
+	    stop = callback(cbdata, data->repo->pool->solvables + data->start + entry, data, key, &kv);
 	}
       while (!kv.eof && !stop);
       if (onekey || stop > SEARCH_NEXT_KEY)
@@ -702,6 +745,7 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
   di->kv.eof = 1;
   di->repo = repo;
   di->idp = 0;
+  di->subkeyp = 0;
 }
 
 /* FIXME factor and merge with repo_matchvalue */
@@ -908,6 +952,34 @@ restart:
 		continue;
 	    }
 	}
+      else if (di->subkeyp)
+	{
+	  Id keyid;
+	  if (!di->subnum)
+	    {
+	      /* Send end-of-substruct.  We are here only when we saw a
+	         _COUNTED key one level up.  Since then we didn't increment
+		 ->keyp, so it still can be found at keyp[-1].  */
+	      di->kv.eof = 2;
+	      di->key = di->data->keys + di->keyp[-1];
+	      di->subkeyp = 0;
+	    }
+	  else if (!(keyid = *di->subkeyp++))
+	    {
+	      /* Send end-of-element.  See above for keyp[-1].  */
+	      di->kv.eof = 1;
+	      di->key = di->data->keys + di->keyp[-1];
+	      di->subkeyp = di->data->schemadata + di->data->schemata[di->subschema];
+	      di->subnum--;
+	    }
+	  else
+	    {
+	      di->key = di->data->keys + keyid;
+	      di->dp = data_fetch(di->dp, &di->kv, di->key);
+	      if (!di->dp)
+		exit(1);
+	    }
+	}
       else
 	{
 	  if (di->kv.eof)
@@ -985,6 +1057,13 @@ skiprepo:;
 		  di->dp = get_data(di->data, di->key, &di->nextkeydp);
 		}
 	      di->dp = data_fetch(di->dp, &di->kv, di->key);
+	    }
+	  if (di->key->type == REPOKEY_TYPE_COUNTED)
+	    {
+	      di->subnum = di->kv.num;
+	      di->subschema = di->kv.id;
+	      di->kv.eof = 0;
+	      di->subkeyp = di->data->schemadata + di->data->schemata[di->subschema];
 	    }
 	}
 weg2:
@@ -1523,7 +1602,9 @@ Id
 repodata_create_struct(Repodata *data, Id handle, Id keyname)
 {
   Id newhandle = get_new_struct(data);
-  repodata_add_idarray(data, handle, keyname, newhandle);
+  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_COUNTED, 1);
+  data->attriddata[data->attriddatalen++] = newhandle;
+  data->attriddata[data->attriddatalen++] = 0;
   return newhandle;
 }
 
@@ -1647,12 +1728,133 @@ fprintf(stderr, "addschema: new schema\n");
   return data->nschemata++; 
 }
 
+static void
+repodata_serialize_key(Repodata *data, struct extdata *newincore,
+		       struct extdata *newvincore,
+		       Id *schema, Id *schematacache,
+		       Repokey *key, Id val)
+{
+  /* Otherwise we have a new value.  Parse it into the internal
+     form.  */
+  Id *ida;
+  struct extdata *xd;
+  unsigned int oldvincorelen = 0;
+  Id schemaid, *sp;
+
+  xd = newincore;
+  if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
+    {
+      xd = newvincore;
+      oldvincorelen = xd->len;
+    }
+  switch (key->type)
+    {
+      case REPOKEY_TYPE_VOID:
+      case REPOKEY_TYPE_CONSTANT:
+      case REPOKEY_TYPE_CONSTANTID:
+	break;
+      case REPOKEY_TYPE_STR:
+	data_addblob(xd, data->attrdata + val, strlen((char *)(data->attrdata + val)) + 1);
+	break;
+      case REPOKEY_TYPE_MD5:
+	data_addblob(xd, data->attrdata + val, SIZEOF_MD5);
+	break;
+      case REPOKEY_TYPE_SHA1:
+	data_addblob(xd, data->attrdata + val, SIZEOF_SHA1);
+	break;
+      case REPOKEY_TYPE_ID:
+      case REPOKEY_TYPE_NUM:
+      case REPOKEY_TYPE_DIR:
+	data_addid(xd, val);
+	break;
+      case REPOKEY_TYPE_IDARRAY:
+	for (ida = data->attriddata + val; *ida; ida++)
+	  data_addideof(xd, ida[0], ida[1] ? 0 : 1);
+	break;
+      case REPOKEY_TYPE_DIRNUMNUMARRAY:
+	for (ida = data->attriddata + val; *ida; ida += 3)
+	  {
+	    data_addid(xd, ida[0]);
+	    data_addid(xd, ida[1]);
+	    data_addideof(xd, ida[2], ida[3] ? 0 : 1);
+	  }
+	break;
+      case REPOKEY_TYPE_DIRSTRARRAY:
+	for (ida = data->attriddata + val; *ida; ida += 2)
+	  {
+	    data_addideof(xd, ida[0], ida[2] ? 0 : 1);
+	    data_addblob(xd, data->attrdata + ida[1], strlen((char *)(data->attrdata + ida[1])) + 1);
+	  }
+	break;
+      case REPOKEY_TYPE_COUNTED:
+	{
+	  int num = 0;
+	  schemaid = 0;
+	  for (ida = data->attriddata + val; *ida; ida++)
+	    {
+#if 0
+	      fprintf(stderr, "serialize struct %d\n", *ida);
+#endif
+	      sp = schema;
+	      Id *kp = data->structs[*ida];
+	      if (!kp)
+		continue;
+	      num++;
+	      for (;*kp; kp += 2)
+		{
+#if 0
+		  fprintf(stderr, "  %s:%d\n", id2str(data->repo->pool, data->keys[*kp].name), kp[1]);
+#endif
+		  *sp++ = *kp;
+		}
+	      *sp = 0;
+	      if (!schemaid)
+		schemaid = addschema(data, schema, schematacache);
+	      else if (schemaid != addschema(data, schema, schematacache))
+		{
+		  fprintf(stderr, "  not yet implemented: substructs with different schemas\n");
+		  exit(1);
+		}
+#if 0
+	      fprintf(stderr, "  schema %d\n", schemaid);
+#endif
+	    }
+	  if (!num)
+	    break;
+	  data_addid(xd, num);
+	  data_addid(xd, schemaid);
+	  for (ida = data->attriddata + val; *ida; ida++)
+	    {
+	      Id *kp = data->structs[*ida];
+	      if (!kp)
+		continue;
+	      for (;*kp; kp += 2)
+		{
+		  repodata_serialize_key(data, newincore, newvincore,
+					 schema, schematacache,
+					 data->keys + *kp, kp[1]);
+		}
+	    }
+	  break;
+	}
+      default:
+	fprintf(stderr, "don't know how to handle type %d\n", key->type);
+	exit(1);
+    }
+  if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
+    {
+      /* put offset/len in incore */
+      data_addid(newincore, data->lastverticaloffset + oldvincorelen);
+      oldvincorelen = xd->len - oldvincorelen;
+      data_addid(newincore, oldvincorelen);
+    }
+}
 
 void
 repodata_internalize(Repodata *data)
 {
   Repokey *key;
-  Id id, entry, nentry, *ida;
+  Id entry, nentry;
   Id schematacache[256];
   Id schemaid, *schema, *sp, oldschema, *keyp, *seen;
   unsigned char *dp, *ndp;
@@ -1745,6 +1947,9 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
       for (keyp = data->schemadata + data->schemata[schemaid]; *keyp; keyp++)
 	{
 	  key = data->keys + *keyp;
+#if 0
+	  fprintf(stderr, "internalize %d:%s:%s\n", entry, id2str(data->repo->pool, key->name), id2str(data->repo->pool, key->type));
+#endif
 	  ndp = dp;
 	  if (oldcount)
 	    {
@@ -1755,7 +1960,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 		  ndp = data_skip(ndp, REPOKEY_TYPE_ID);
 		}
 	      else if (key->storage == KEY_STORAGE_INCORE)
-		ndp = data_skip(dp, key->type);
+		ndp = data_skip_recursive(data, dp, key);
 	      oldcount--;
 	    }
 	  if (seen[*keyp] == -1)
@@ -1771,66 +1976,9 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    {
 	      /* Otherwise we have a new value.  Parse it into the internal
 		 form.  */
-	      struct extdata *xd;
-	      unsigned int oldvincorelen = 0;
-
-	      xd = &newincore;
-	      if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
-		{
-		  xd = &newvincore;
-		  oldvincorelen = xd->len;
-		}
-	      id = seen[*keyp] - 1;
-	      switch (key->type)
-		{
-		case REPOKEY_TYPE_VOID:
-		case REPOKEY_TYPE_CONSTANT:
-		case REPOKEY_TYPE_CONSTANTID:
-		  break;
-		case REPOKEY_TYPE_STR:
-		  data_addblob(xd, data->attrdata + id, strlen((char *)(data->attrdata + id)) + 1);
-		  break;
-		case REPOKEY_TYPE_MD5:
-		  data_addblob(xd, data->attrdata + id, SIZEOF_MD5);
-		  break;
-		case REPOKEY_TYPE_SHA1:
-		  data_addblob(xd, data->attrdata + id, SIZEOF_SHA1);
-		  break;
-		case REPOKEY_TYPE_ID:
-		case REPOKEY_TYPE_NUM:
-		case REPOKEY_TYPE_DIR:
-		  data_addid(xd, id);
-		  break;
-		case REPOKEY_TYPE_IDARRAY:
-		  for (ida = data->attriddata + id; *ida; ida++)
-		    data_addideof(xd, ida[0], ida[1] ? 0 : 1);
-		  break;
-		case REPOKEY_TYPE_DIRNUMNUMARRAY:
-		  for (ida = data->attriddata + id; *ida; ida += 3)
-		    {
-		      data_addid(xd, ida[0]);
-		      data_addid(xd, ida[1]);
-		      data_addideof(xd, ida[2], ida[3] ? 0 : 1);
-		    }
-		  break;
-		case REPOKEY_TYPE_DIRSTRARRAY:
-		  for (ida = data->attriddata + id; *ida; ida += 2)
-		    {
-		      data_addideof(xd, ida[0], ida[2] ? 0 : 1);
-		      data_addblob(xd, data->attrdata + ida[1], strlen((char *)(data->attrdata + ida[1])) + 1);
-		    }
-		  break;
-		default:
-		  fprintf(stderr, "don't know how to handle type %d\n", key->type);
-		  exit(1);
-		}
-	      if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
-		{
-		  /* put offset/len in incore */
-		  data_addid(&newincore, data->lastverticaloffset + oldvincorelen);
-		  oldvincorelen = xd->len - oldvincorelen;
-		  data_addid(&newincore, oldvincorelen);
-		}
+	      repodata_serialize_key(data, &newincore, &newvincore,
+				     schema, schematacache,
+				     key, seen[*keyp] - 1);
 	    }
 	  dp = ndp;
 	}

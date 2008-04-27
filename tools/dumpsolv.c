@@ -103,6 +103,9 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
     case REPOKEY_TYPE_DIRSTRARRAY:
       printf("%s: %s\n", keyname, repodata_dir2str(data, kv->id, kv->str));
       break;
+    case REPOKEY_TYPE_COUNTED:
+      printf("%s: %s\n", keyname, kv->eof == 0 ? "open" : kv->eof == 1 ? "next" : "close");
+      break;
     default:
       printf("%s: ?\n", keyname);
       break;
@@ -110,11 +113,11 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
   return 0;
 }
 
-static int
+/*static int
 dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
   return dump_attr(s->repo, data, key, kv);
-}
+}*/
 
 /*
  * dump all attributes for Id <p>
@@ -123,7 +126,7 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 void
 dump_repoattrs(Repo *repo, Id p)
 {
-#if 1
+#if 0
   repo_search(repo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE, dump_repoattrs_cb, 0);
 #else
   Dataiterator di;

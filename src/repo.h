@@ -189,6 +189,9 @@ typedef struct _Dataiterator
   KeyValue kv;
   regex_t regex;
   int regex_err;
+  Id *subkeyp;
+  int subnum;
+  Id subschema;
 } Dataiterator;
 
 /* Use these like:

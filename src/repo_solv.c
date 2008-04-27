@@ -710,7 +710,6 @@ incore_add_u8(Repodata *data, unsigned int x)
 
 // ----------------------------------------------
 
-
 /*
  * read repo from .solv file
  *  and add it to pool
@@ -1135,7 +1134,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	type = idmap[type];
       else if (parent)
         type = str2id(pool, stringpool_id2str(spool, type), 1);
-      if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_SHA256)
+      if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_COUNTED)
 	{
 	  pool_debug(pool, SAT_ERROR, "unsupported data type '%s'\n", id2str(pool, type));
 	  data.error = SOLV_ERROR_UNSUPPORTED;
@@ -1455,9 +1454,40 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	        POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", dep2str(pool, repo->idarraydata[ido]));
 #endif
 	      break;
+	    case REPOKEY_TYPE_COUNTED:
+		{
+		  Id num, did;
+		  dp = data_read_id(dp, &num);
+		  incore_add_id(&data, num);
+		  dp = data_read_id_max(dp, &did, 0, numschemata, &data.error);
+		  incore_add_id(&data, did);
+		  while (num--)
+		    {
+		      Id *kp = schemadata + schemata[did];
+		      for (; *kp; kp++)
+			{
+			  Id tid;
+			  switch (keys[*kp].type)
+			    {
+			      case REPOKEY_TYPE_ID:
+				dp = data_read_id_max(dp, &tid, idmap, numid + numrel, &data.error);
+				incore_add_id(&data, tid);
+				break;
+			      default:
+				dps = dp;
+				//dp = data_skip(dp, keys[*kp].type);
+				dp = data_skip_recursive(&data, dp, keys + *kp);
+				incore_add_blob(&data, dps, dp - dps);
+				break;
+			    }
+			}
+		    }
+		}
+	      break;
 	    default:
 	      dps = dp;
-	      dp = data_skip(dp, keys[key].type);
+	      //dp = data_skip(dp, keys[key].type);
+	      dp = data_skip_recursive(&data, dp, keys + key);
 	      if (keys[key].storage == KEY_STORAGE_INCORE)
 	        incore_add_blob(&data, dps, dp - dps);
 	      break;

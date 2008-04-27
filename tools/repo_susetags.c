@@ -872,6 +872,15 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    break;
 	  case CTAG('=', 'C', 'k', 's'):
 	    set_checksum(data, handle, SOLVABLE_CHECKSUM, line + 6);
+	    if (0)
+	      {
+		Id sub = repodata_create_struct(data, handle, str2id(pool, "solvable:komisch", 1));
+		repodata_set_poolstr(data, sub, str2id(pool, "sub:key1", 1), line + 6);
+		repodata_set_num(data, sub, str2id(pool, "sub:key2", 1), last_found_pack);
+		sub = repodata_create_struct(data, handle, str2id(pool, "solvable:komisch", 1));
+		repodata_set_poolstr(data, sub, str2id(pool, "sub:key1", 1), line + 7);
+		repodata_set_num(data, sub, str2id(pool, "sub:key2", 1), last_found_pack+1);
+	      }
 	    break;
 	  case CTAG('=', 'L', 'a', 'n'):
 	    language = strdup(line + 6);

@@ -371,6 +371,7 @@ struct cbdata {
 
   Id *schema;		/* schema construction space */
   Id *sp;		/* pointer in above */
+  Id *oldschema, *oldsp;
 
   Id *myschemata;
   int nmyschemata;
@@ -382,6 +383,9 @@ struct cbdata {
 
   Id *solvschemata;
   Id *extraschemata;
+  Id *subschemata;
+  int nsubschemata;
+  int current_sub;
 
   struct extdata *extdata;
 
@@ -634,7 +638,8 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
   if (!rm)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
   /* record key in schema */
-  if (cbdata->sp == cbdata->schema || cbdata->sp[-1] != rm)
+  if ((key->type != REPOKEY_TYPE_COUNTED || kv->eof == 0)
+      && (cbdata->sp == cbdata->schema || cbdata->sp[-1] != rm))
     *cbdata->sp++ = rm;
   switch(key->type)
     {
@@ -653,6 +658,38 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
 	  putinowndirpool(cbdata, data, &data->dirpool, id);
 	else
 	  setdirused(cbdata, &data->dirpool, id);
+	break;
+      case REPOKEY_TYPE_COUNTED:
+	if (kv->eof == 0)
+	  {
+	    if (cbdata->oldschema)
+	      {
+		fprintf(stderr, "nested structs not yet implemented\n");
+		exit(1);
+	      }
+	    cbdata->oldschema = cbdata->schema;
+	    cbdata->oldsp = cbdata->sp;
+	    cbdata->schema = sat_calloc(cbdata->nmykeys, sizeof(Id));
+	    cbdata->sp = cbdata->schema;
+	  }
+	else if (kv->eof == 1)
+	  {
+	    cbdata->current_sub++;
+	    *cbdata->sp = 0;
+	    cbdata->subschemata = sat_extend(cbdata->subschemata, cbdata->nsubschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
+	    cbdata->subschemata[cbdata->nsubschemata++] = addschema(cbdata, cbdata->schema);
+#if 0
+	    fprintf(stderr, "Have schema %d\n", cbdata->subschemata[cbdata->nsubschemata-1]);
+#endif
+	    cbdata->sp = cbdata->schema;
+	  }
+	else
+	  {
+	    sat_free(cbdata->schema);
+	    cbdata->schema = cbdata->oldschema;
+	    cbdata->sp = cbdata->oldsp;
+	    cbdata->oldsp = cbdata->oldschema = 0;
+	  }
 	break;
       default:
 	break;
@@ -755,6 +792,26 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	id = cbdata->dirused[id];
 	data_addideof(xd, id, kv->eof);
 	data_addblob(xd, (unsigned char *)kv->str, strlen(kv->str) + 1);
+	break;
+      case REPOKEY_TYPE_COUNTED:
+	if (kv->eof == 0)
+	  {
+	    if (kv->num)
+	      {
+		data_addid(xd, kv->num);
+		data_addid(xd, cbdata->subschemata[cbdata->current_sub]);
+#if 0
+		fprintf(stderr, "writing %d %d\n", kv->num, cbdata->subschemata[cbdata->current_sub]);
+#endif
+	      }
+	  }
+	else if (kv->eof == 1)
+	  {
+	    cbdata->current_sub++;
+	  }
+	else
+	  {
+	  }
 	break;
       default:
 	fprintf(stderr, "unknown type for %d: %d\n", key->name, key->type);
@@ -1449,6 +1506,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 /********************************************************************/
   cbdata.extdata = sat_calloc(cbdata.nmykeys, sizeof(struct extdata));
   
+  cbdata.current_sub = 0;
   xd = cbdata.extdata;
   maxentrysize = 0;
   for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
