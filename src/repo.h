@@ -157,6 +157,7 @@ typedef struct _KeyValue {
 #define	SEARCH_NO_STORAGE_SOLVABLE	(1<<9)
 #define SEARCH_EXTRA			(1<<10)
 #define SEARCH_ALL_REPOS		(1<<11)
+#define SEARCH_SKIP_KIND		(1<<12)
 
 /* Internal */
 #define __SEARCH_ONESOLVABLE		(1 << 31)

@@ -770,6 +770,15 @@ dataiterator_match_int_real(Dataiterator *di, int flags, const void *vmatch)
 	default:
 	  return 0;
 	}
+      /* Maybe skip the kind specifier.  Do this only for SOLVABLE attributes,
+         for the others we can't know if a colon separates a kind or not.  */
+      if ((flags & SEARCH_SKIP_KIND)
+	  && di->key->storage == KEY_STORAGE_SOLVABLE)
+	{
+	  const char *s = strchr(kv->str, ':');
+	  if (s)
+	    kv->str = s + 1;
+	}
       switch ((flags & SEARCH_STRINGMASK))
 	{
 	  case SEARCH_SUBSTRING:
