@@ -467,7 +467,7 @@ enableproblem(Solver *solv, Id v)
     {
       if (v >= solv->featurerules && v < solv->learntrules)
 	{
-	  /* do not enable feature rule is update rule is enabled */
+	  /* do not enable feature rule if update rule is enabled */
 	  r = solv->rules + v - (solv->installed->end - solv->installed->start);
 	  if (r->w1)
 	    return;
@@ -2134,14 +2134,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (MAPTST(&solv->noupdate, i - solv->installed->start))
 		continue;
 	      queue_empty(&dq);
-	      if (!solv->allowuninstall)
-		{
-		  rr = r;
-		  if (!rr->w1)
-		    rr += solv->installed->end - solv->installed->start;
-		}
-	      else
-		rr = solv->rules + solv->featurerules + (i - solv->installed->start);
+	      rr = r;
+	      if (!rr->w1)
+		rr += solv->installed->end - solv->installed->start;
+	      if (!rr->p)	/* identical to update rule? */
+		rr = r;
 	      if (rr->d == 0)
 		{
 		  if (!rr->w2 || solv->decisionmap[rr->w2] > 0)
@@ -3476,7 +3473,7 @@ solver_solve(Solver *solv, Queue *job)
    */
 
   solv->updaterules = solv->nrules;
-  if (installed && !solv->allowuninstall)
+  if (installed)
     { /* loop over all installed solvables */
       /* we create all update rules, but disable some later on depending on the job */
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
@@ -3491,10 +3488,14 @@ solver_solve(Solver *solv, Queue *job)
 		  continue;
 		}
 	    }
-	  if (s->repo == installed)
-	    addupdaterule(solv, s, 0);	/* allowall = 0 */
-	  else
-	    addrule(solv, 0, 0);	/* create dummy rule */
+	  if (s->repo != installed)
+	    {
+	      addrule(solv, 0, 0);	/* create dummy rule */
+	      continue;
+	    }
+	  addupdaterule(solv, s, 0);	/* allowall = 0 */
+	  if (solv->allowuninstall)
+	    queue_push(&solv->weakruleq, solv->nrules - 1);
 	}
       /* consistency check: we added a rule for _every_ installed solvable */
       assert(solv->nrules - solv->updaterules == installed->end - installed->start);
@@ -3508,6 +3509,7 @@ solver_solve(Solver *solv, Queue *job)
     {
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
 	{
+	  Rule *sr;
 	  if (s->freshens && !s->supplements)
 	    {
 	      const char *name = id2str(pool, s->name);
@@ -3517,27 +3519,22 @@ solver_solve(Solver *solv, Queue *job)
 		  continue;
 		}
 	    }
-	  if (s->repo == installed)
+	  if (s->repo != installed)
 	    {
-	      Rule *sr;
-	      addupdaterule(solv, s, 1);	/* allowall = 0 */
-	      if (solv->allowuninstall)
-		{
-		  queue_push(&solv->weakruleq, solv->nrules - 1);
-		  continue;
-		}
-	      r = solv->rules + solv->nrules - 1;
-	      sr = r - (installed->end - installed->start);
-	      if (sr->p)
-	        disablerule(solv, r);
-	      if (sr->p && !unifyrules_sortcmp(r, sr))
-		{
-		  /* identical rule, kill feature rule */
-		  memset(r, 0, sizeof(*r));
-		}
+	      addrule(solv, 0, 0);	/* create dummy rule */
+	      continue;
 	    }
-	  else
-	    addrule(solv, 0, 0);	/* create dummy rule */
+	  addupdaterule(solv, s, 1);
+	  r = solv->rules + solv->nrules - 1;
+	  sr = r - (installed->end - installed->start);
+	  disablerule(solv, r);
+	  if (!unifyrules_sortcmp(r, sr))
+	    {
+	      /* identical rule, kill feature rule */
+	      memset(r, 0, sizeof(*r));
+	    }
+	  if (r->p && solv->allowuninstall)
+	    queue_push(&solv->weakruleq, solv->nrules - 1);
 	}
       assert(solv->nrules - solv->featurerules == installed->end - installed->start);
     }
