@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Mon Apr 28 19:36:54 CEST 2008 - coolo@suse.de
+
+- (De-)Serialize structured types.  Dataiterator and repo_search support
+  them too, but not yet nested, so that is unsupported for now.
+- skipping kinds in matcher when a flag is specified.
+- make --force behave a bit more like --noforce
+
+-------------------------------------------------------------------
 Fri Apr 25 19:23:51 CEST 2008 - coolo@suse.de
 
 - detect and skip empty lines (bnc#381828)
