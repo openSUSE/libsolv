@@ -51,8 +51,8 @@ typedef struct rule {
   Id p;			/* first literal in rule */
   Id d;			/* Id offset into 'list of providers terminated by 0' as used by whatprovides; pool->whatprovides + d */
 			/* in case of binary rules, d == 0, w1 == p, w2 == other literal */
+			/* in case of disabled rules: ~d, aka -d - 1 */
   Id w1, w2;		/* watches, literals not-yet-decided */
-  				       /* if !w1, disabled */
   				       /* if !w2, assertion, not rule */
   Id n1, n2;		/* next rules in linked list, corresponding to w1,w2 */
 } Rule;
@@ -127,6 +127,8 @@ typedef struct solver {
   int updatesystem;			/* distupgrade */
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
   int allowselfconflicts;		/* true: packages wich conflict with itself are installable */
+  int obsoleteusesprovides;		/* true: obsoletes are matched against provides, not names */
+  int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
@@ -302,6 +304,11 @@ solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
 {
   pool_create_state_maps(solv->pool, &solv->decisionq, installedmap, conflictsmap);
 }
+
+#define FOR_RULELITERALS(l, dp, r)				\
+    for (l = r->d < 0 ? -r->d - 1 : r->d,			\
+         dp = !l ? &r->w2 : pool->whatprovidesdata + l,		\
+         l = r->p; l; l = (dp != &r->w2 + 1 ? *dp++ : 0))
 
 #ifdef __cplusplus
 }

@@ -61,14 +61,15 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	  if (s->repo == installed)		/* obsoletes don't count for already installed packages */
 	    continue;
 	  FOR_PROVIDES(p, pp, s->name)
-	    if (s->name == pool->solvables[p].name)
-	      {
-		if (pool->solvables[p].repo == installed && !obsoletesmap[p])
-		  {
-		    obsoletesmap[p] = n;
-		    obsoletesmap[n]++;
-		  }
-	      }
+	    {
+	      if (!solv->implicitobsoleteusesprovides && s->name != pool->solvables[p].name)
+		continue;
+	      if (pool->solvables[p].repo == installed && !obsoletesmap[p])
+		{
+		  obsoletesmap[p] = n;
+		  obsoletesmap[n]++;
+		}
+	    }
 	}
       for (i = 0; i < solv->decisionq.count; i++)
 	{
@@ -89,6 +90,8 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	  while ((obs = *obsp++) != 0)
 	    FOR_PROVIDES(p, pp, obs)
 	      {
+		if (!solv->obsoleteusesprovides && s->name != pool->solvables[p].name)
+		  continue;
 		if (pool->solvables[p].repo == installed && !obsoletesmap[p])
 		  {
 		    obsoletesmap[p] = n;
@@ -139,21 +142,22 @@ solver_printrule(Solver *solv, int type, Rule *r)
 {
   Pool *pool = solv->pool;
   int i;
-  Id v;
+  Id d, v;
 
   if (r >= solv->rules && r < solv->rules + solv->nrules)   /* r is a solver rule */
     POOL_DEBUG(type, "Rule #%d:", (int)(r - solv->rules));
   else
     POOL_DEBUG(type, "Rule:");		       /* r is any rule */
-  if (r && r->w1 == 0)
+  if (r && r->d < 0)
     POOL_DEBUG(type, " (disabled)");
   POOL_DEBUG(type, "\n");
+  d = r->d < 0 ? -r->d - 1 : r->d;
   for (i = 0; ; i++)
     {
       if (i == 0)
 	  /* print direct literal */
 	v = r->p;
-      else if (r->d == ID_NULL)
+      else if (!d)
 	{
 	  if (i == 2)
 	    break;
@@ -162,7 +166,7 @@ solver_printrule(Solver *solv, int type, Rule *r)
 	}
       else
 	  /* every other which is in d */
-	v = solv->pool->whatprovidesdata[r->d + i - 1];
+	v = solv->pool->whatprovidesdata[d + i - 1];
       if (v == ID_NULL)
 	break;
       solver_printruleelement(solv, type, r, v);
