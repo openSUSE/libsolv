@@ -36,6 +36,16 @@
  *
  */
 
+static inline Id dep2name(Pool *pool, Id dep) 
+{
+  while (ISRELDEP(dep))
+    {    
+      Reldep *rd = rd = GETRELDEP(pool, dep);
+      dep = rd->name;
+    }    
+  return dep; 
+}
+
 Id *
 solver_create_decisions_obsoletesmap(Solver *solv)
 {
@@ -88,16 +98,19 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	    continue;
 	  obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
-	    FOR_PROVIDES(p, pp, obs)
-	      {
-		if (!solv->obsoleteusesprovides && s->name != pool->solvables[p].name)
-		  continue;
-		if (pool->solvables[p].repo == installed && !obsoletesmap[p])
-		  {
-		    obsoletesmap[p] = n;
-		    obsoletesmap[n]++;
-		  }
-	      }
+	    {
+	      Id obsname = dep2name(pool, obs);
+	      FOR_PROVIDES(p, pp, obs)
+		{
+		  if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
+		    continue;
+		  if (pool->solvables[p].repo == installed && !obsoletesmap[p])
+		    {
+		      obsoletesmap[p] = n;
+		      obsoletesmap[n]++;
+		    }
+		}
+	    }
 	}
     }
   return obsoletesmap;

@@ -35,6 +35,16 @@
  *
  */
 
+static inline Id dep2name(Pool *pool, Id dep) 
+{
+  while (ISRELDEP(dep))
+    {    
+      Reldep *rd = rd = GETRELDEP(pool, dep);
+      dep = rd->name;
+    }    
+  return dep; 
+}
+
 int
 solver_splitprovides(Solver *solv, Id dep)
 {
@@ -1117,9 +1127,10 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      obsp = s->repo->idarraydata + s->obsoletes;
 	      while ((obs = *obsp++) != 0)
 		{
+		  Id obsname = dep2name(pool, obs);
 		  FOR_PROVIDES(p, pp, obs)
 		    {
-		      if (!solv->obsoleteusesprovides && s->name != pool->solvables[p].name)
+		      if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
 			continue;
 		      addrule(solv, -n, -p);
 		    }
@@ -2878,11 +2889,12 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
 	    {
+	      Id obsname = dep2name(pool, obs);
 	      FOR_PROVIDES(p, pp, obs)
 		{
 		  if (p != -r->w2)
 		    continue;
-		  if (!solv->obsoleteusesprovides && s->name != pool->solvables[p].name)
+		  if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
 		    continue;
 		  *depp = obs;
 		  *sourcep = -r->p;
@@ -2896,11 +2908,12 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  obsp = s2->repo->idarraydata + s2->obsoletes;
 	  while ((obs = *obsp++) != 0)
 	    {
+	      Id obsname = dep2name(pool, obs);
 	      FOR_PROVIDES(p, pp, obs)
 		{
 		  if (p != -r->p)
 		    continue;
-		  if (!solv->obsoleteusesprovides && s2->name != pool->solvables[p].name)
+		  if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
 		    continue;
 		  *depp = obs;
 		  *sourcep = -r->w2;
@@ -3566,6 +3579,7 @@ solver_solve(Solver *solv, Queue *job)
 	  addupdaterule(solv, s, 1);
 	  r = solv->rules + solv->nrules - 1;
 	  sr = r - (installed->end - installed->start);
+	  unifyrules_sortcmp_data = pool;
 	  if (!unifyrules_sortcmp(r, sr))
 	    {
 	      /* identical rule, kill feature rule */
