@@ -66,6 +66,8 @@ typedef struct solver {
   Rule *rules;				/* all rules */
   Id nrules;				/* index of the last rule */
 
+  Queue ruleassertions;			/* index of all assertion rules */
+
   Id jobrules;				/* user rules */
   Id updaterules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
   Id featurerules;			/* feature rules */

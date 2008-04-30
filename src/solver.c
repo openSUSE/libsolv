@@ -508,7 +508,7 @@ static void
 makeruledecisions(Solver *solv)
 {
   Pool *pool = solv->pool;
-  int i, ri;
+  int i, ri, ii;
   Rule *r, *rr;
   Id v, vv;
   int decisionstart;
@@ -516,12 +516,10 @@ makeruledecisions(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
 
   decisionstart = solv->decisionq.count;
-  /* rpm rules don't have assertions, so we can start with the job
-   * rules (rpm assertions are not resulting in a rule, but cause a
-   * immediate decision) */
-  /* nowadays they can be weak, so start with rule 1 */
-  for (ri = 1, r = solv->rules + ri; ri < solv->nrules; ri++, r++)
+  for (ii = 0; ii < solv->ruleassertions.count; ii++)
     {
+      ri = solv->ruleassertions.elements[ii];
+      r = solv->rules + ri;
       if (r->d < 0 || !r->p || r->w2)	/* disabled, dummy or no assertion */
 	continue;
       /* do weak rules in phase 2 */
@@ -636,13 +634,14 @@ makeruledecisions(Solver *solv)
 	  vv = v > 0 ? v : -v;
 	  solv->decisionmap[vv] = 0;
 	}
-      ri = solv->jobrules - 1;
-      r = solv->rules + ri;
+      ii = -1;
     }
 
   /* phase 2: now do the weak assertions */
-  for (ri = 1, r = solv->rules + ri; ri < solv->learntrules; ri++, r++)
+  for (ii = 0; ii < solv->ruleassertions.count; ii++)
     {
+      ri = solv->ruleassertions.elements[ii];
+      r = solv->rules + ri;
       if (r->d < 0 || r->w2)	/* disabled or no assertion */
 	continue;
       if (!MAPTST(&solv->weakrulemap, ri))
@@ -1904,6 +1903,11 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
 	  watch2onhighest(solv, r);
 	  addwatches_rule(solv, r);
 	}
+      else
+	{
+	  /* learnt rule is an assertion */
+          queue_push(&solv->ruleassertions, r - solv->rules);
+	}
       solv->decisionmap[p > 0 ? p : -p] = p > 0 ? level : -level;
       queue_push(&solv->decisionq, p);
       queue_push(&solv->decisionq_why, r - solv->rules);
@@ -1994,6 +1998,7 @@ solver_create(Pool *pool, Repo *installed)
   queue_init(&solv->branches);
   queue_init(&solv->covenantq);
   queue_init(&solv->weakruleq);
+  queue_init(&solv->ruleassertions);
 
   map_init(&solv->recommendsmap, pool->nsolvables);
   map_init(&solv->suggestsmap, pool->nsolvables);
@@ -2027,6 +2032,7 @@ solver_free(Solver *solv)
   queue_free(&solv->branches);
   queue_free(&solv->covenantq);
   queue_free(&solv->weakruleq);
+  queue_free(&solv->ruleassertions);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -3607,6 +3613,12 @@ solver_solve(Solver *solv, Queue *job)
 
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
+
+  /* create assertion index. it is only used to speed up
+   * makeruledecsions() a bit */
+  for (i = 1, r = solv->rules + i; i < solv->nrules; i++, r++)
+    if (r->p && !r->w2 && (r->d == 0 || r->d == -1))
+      queue_push(&solv->ruleassertions, i);
 
   /* disable update rules that conflict with our job */
   disableupdaterules(solv, job, -1);
