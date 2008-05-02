@@ -150,6 +150,22 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   return olddeps;
 }
 
+static void
+add_multiple_strings(Repodata *data, Id handle, Id name, char *value)
+{
+  char *sp[2];
+  while (value)
+    {
+      int words = split(value, sp, 2);
+      if (!words)
+	break;
+      repodata_add_poolstr_array(data, handle, name, sp[0]);
+      if (words == 1)
+	break;
+      value = sp[1];
+    }
+}
+
 void
 repo_add_content(Repo *repo, FILE *fp)
 {
@@ -158,10 +174,18 @@ repo_add_content(Repo *repo, FILE *fp)
   int aline;
   Solvable *s, *firsts = 0;
   struct parsedata pd;
+  Repodata *data;
+  Id handle = 0;
 
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
   aline = 1024;
+
+  if (repo->nrepodata)
+    /* use last repodata */
+    data = repo->repodata + repo->nrepodata - 1;
+  else
+    data = repo_add_repodata(repo, 0);
 
   pd.repo = repo;
   linep = line;
@@ -211,6 +235,8 @@ repo_add_content(Repo *repo, FILE *fp)
 		    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
 		  /* Only support one product.  */
 		  s = pool_id2solvable(pool, repo_add_solvable(repo));
+		  repodata_extend(data, s - pool->solvables);
+		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
 		}
 	      firsts = 0;
 	      s->name = str2id(pool, join(&pd, "product", ":", value), 1);
@@ -220,14 +246,20 @@ repo_add_content(Repo *repo, FILE *fp)
 	  /* Sometimes PRODUCT is not the first entry, but we need a solvable
 	     from here on.  */
 	  if (!s)
-	    firsts = s = pool_id2solvable(pool, repo_add_solvable(repo));
+	    {
+	      firsts = s = pool_id2solvable(pool, repo_add_solvable(repo));
+	      repodata_extend(data, s - pool->solvables);
+	      handle = repodata_get_handle(data, s - pool->solvables - repo->start);
+	    }
 	  if (istag ("VERSION"))
 	    /* without a release? but that's like zypp implements it */
 	    s->evr = makeevr(pool, value);
 	  else if (istag ("DISTPRODUCT"))
-	    ; /* DISTPRODUCT is only for Yast, not the package manager */
+	    /* DISTPRODUCT is for registration and Yast, not for the solver. */
+	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:distproduct", 1), value);
 	  else if (istag ("DISTVERSION"))
-	    ; /* DISTVERSION is only for Yast, not the package manager */
+	    /* DISTVERSION is for registration and Yast, not for the solver. */
+	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:distversion", 1), value);
 	  else if (istag ("VENDOR"))
 	    s->vendor = str2id(pool, value, 1);
 	  else if (istag ("ARCH"))
@@ -256,6 +288,25 @@ repo_add_content(Repo *repo, FILE *fp)
 	  else if (istag ("DATADIR"))
 	    repo_set_str(repo, s - pool->solvables, str2id(pool, "susetags:datadir", 1), value);
 	  /* FRESHENS doesn't seem to exist.  */
+	  else if (istag ("TYPE"))
+	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:type", 1), value);
+	  else if (istag ("RELNOTESURL"))
+	    repodata_add_poolstr_array(data, handle, str2id(pool, "product:relnotesurl", 1), value);
+	  else if (istag ("UPDATEURLS"))
+	    add_multiple_strings(data, handle, str2id(pool, "product:updateurls", 1), value);
+	  else if (istag ("EXTRAURLS"))
+	    add_multiple_strings(data, handle, str2id(pool, "product:extraurls", 1), value);
+	  else if (istag ("OPTIONALURLS"))
+	    add_multiple_strings(data, handle, str2id(pool, "product:optionalurls", 1), value);
+	  else if (istag ("SHORTLABEL"))
+	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:shortlabel", 1), value);
+	  else if (istag ("LABEL"))
+	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:label", 1), value);
+	  else if (!strncmp (key, "LABEL.", 6))
+	    repo_set_str(repo, s - pool->solvables, str2id(pool, join(&pd, "product:label:", key + 6, 0), 1), value);
+	  else if (istag ("FLAGS"))
+	    add_multiple_strings(data, handle, str2id(pool, "product:flags", 1), value);
+
 	  /* XXX do something about LINGUAS and ARCH? */
 #undef istag
 	}
