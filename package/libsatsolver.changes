@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Mon May  5 16:24:14 CEST 2008 - coolo@suse.de
+
+- add obsoleteusesprovides and implicitobsoleteusesprovides solver
+  flags
+- speed up solving by not recreating the watch chains every time
+  some rule is enabled/disabled. To do this, the "disabled" flag
+  had to be moved from w1 to d.
+- fix bug that broke rule disabling when "forceResolve" was true
+- fix bug in update rule calculation
+- speed up solver a bit by creating a queue holding all assertion
+  rules, so we do not have to scan all rules for assertions
+- parse also DISTPRODUCT and DISTVERSION (for registration), and the other
+  (often unused) attributes of products.
+
+-------------------------------------------------------------------
 Mon Apr 28 19:36:54 CEST 2008 - coolo@suse.de
 
 - (De-)Serialize structured types.  Dataiterator and repo_search support
