@@ -68,9 +68,13 @@ typedef struct solver {
 
   Queue ruleassertions;			/* index of all assertion rules */
 
-  Id jobrules;				/* user rules */
-  Id updaterules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
+  Id rpmrules_end;
   Id featurerules;			/* feature rules */
+  Id featurerules_end;
+  Id updaterules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
+  Id updaterules_end;
+  Id jobrules;				/* user rules */
+  Id jobrules_end;
   Id learntrules;			/* learnt rules */
 
   Map noupdate;				/* don't try to update these

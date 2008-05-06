@@ -316,7 +316,7 @@ addrule(Solver *solv, Id p, Id d)
    * multiple times, so we prune those duplicates right away to make
    * the work for unifyrules a bit easier */
 
-  if (solv->nrules && !solv->jobrules)
+  if (solv->nrules && !solv->rpmrules_end)
     {
       r = solv->rules + solv->nrules - 1;   /* get the last added rule */
       if (r->p == p && r->d == d && d != 0)   /* identical and not user requested */
@@ -340,7 +340,7 @@ addrule(Solver *solv, Id p, Id d)
     }
 
 #if 0
-  if (n == 0 && !solv->jobrules)
+  if (n == 0 && !solv->rpmrules_end)
     {
       /* this is a rpm rule assertion, we do not have to allocate it */
       /* it can be identified by a level of 1 and a zero reason */
@@ -460,7 +460,7 @@ disableproblem(Solver *solv, Id v)
     }
   v = -(v + 1);
   jp = solv->ruletojob.elements;
-  for (i = solv->jobrules, r = solv->rules + i; i < solv->updaterules; i++, r++, jp++)
+  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++, jp++)
     if (*jp == v)
       disablerule(solv, r);
 }
@@ -474,17 +474,18 @@ enableproblem(Solver *solv, Id v)
 
   if (v > 0)
     {
-      if (v >= solv->featurerules && v < solv->learntrules)
+      if (v >= solv->featurerules && v < solv->featurerules_end)
 	{
 	  /* do not enable feature rule if update rule is enabled */
-	  r = solv->rules + v - (solv->installed->end - solv->installed->start);
+	  r = solv->rules + (v - solv->featurerules + solv->updaterules);
 	  if (r->d >= 0)
 	    return;
 	}
       enablerule(solv, solv->rules + v);
-      if (v >= solv->updaterules && v < solv->featurerules)
+      if (v >= solv->updaterules && v < solv->updaterules_end)
 	{
-	  r = solv->rules + v + (solv->installed->end - solv->installed->start);
+	  /* disable feature rule when enabling update rule */
+	  r = solv->rules + (v - solv->updaterules + solv->featurerules);
 	  if (r->p)
 	    disablerule(solv, r);
 	}
@@ -492,7 +493,7 @@ enableproblem(Solver *solv, Id v)
     }
   v = -(v + 1);
   jp = solv->ruletojob.elements;
-  for (i = solv->jobrules, r = solv->rules + i; i < solv->updaterules; i++, r++, jp++)
+  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++, jp++)
     if (*jp == v)
       enablerule(solv, r);
 }
@@ -556,8 +557,7 @@ makeruledecisions(Solver *solv)
 	  disablerule(solv, r);
 	  continue;
 	}
-      /* only job and update rules left in the decisionq */
-      /* find the decision which is the "opposite" of the jobrule */
+      /* find the decision which is the "opposite" of the rule */
       for (i = 0; i < solv->decisionq.count; i++)
 	if (solv->decisionq.elements[i] == -v)
 	  break;
@@ -568,7 +568,7 @@ makeruledecisions(Solver *solv)
         queue_push(&solv->learnt_pool, ri);
 	queue_push(&solv->learnt_pool, 0);
 	POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
-	if (ri < solv->updaterules)
+	if  (ri >= solv->jobrules && ri < solv->jobrules_end)
 	  v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
 	else
 	  v = ri;
@@ -578,7 +578,7 @@ makeruledecisions(Solver *solv)
 	continue;
       }
       assert(solv->decisionq_why.elements[i]);
-      if (solv->decisionq_why.elements[i] < solv->jobrules)
+      if (solv->decisionq_why.elements[i] < solv->rpmrules_end)
 	{
 	  /* conflict with rpm rule assertion */
 	  queue_push(&solv->problems, solv->learnt_pool.count);
@@ -587,7 +587,7 @@ makeruledecisions(Solver *solv)
 	  queue_push(&solv->learnt_pool, 0);
 	  assert(v > 0 || v == -SYSTEMSOLVABLE);
 	  POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflict with rpm rule, disabling rule #%d\n", ri);
-	  if (ri < solv->updaterules)
+	  if (ri >= solv->jobrules && ri < solv->jobrules_end)
 	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
 	  else
 	    v = ri;
@@ -597,7 +597,7 @@ makeruledecisions(Solver *solv)
 	  continue;
 	}
 
-      /* conflict with another job or update rule */
+      /* conflict with another job or update/feature rule */
       /* record proof */
       queue_push(&solv->problems, solv->learnt_pool.count);
       queue_push(&solv->learnt_pool, ri);
@@ -607,19 +607,18 @@ makeruledecisions(Solver *solv)
       POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflicting update/job assertions over literal %d\n", vv);
 
       /* push all of our rules asserting this literal on the problem stack */
-      for (i = solv->jobrules, rr = solv->rules + i; i < solv->nrules; i++, rr++)
+      for (i = solv->featurerules, rr = solv->rules + i; i < solv->learntrules; i++, rr++)
 	{
 	  if (rr->d < 0 || rr->w2)
 	    continue;
 	  if (rr->p != vv && rr->p != -vv)
 	    continue;
-	  if (i >= solv->learntrules)
-	    continue;
 	  if (MAPTST(&solv->weakrulemap, i))
 	    continue;
 	  POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
+solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, solv->rules + i);
 	  v = i;
-	  if (i < solv->updaterules)
+	  if (i >= solv->jobrules && i < solv->jobrules_end)
 	    v = -(solv->ruletojob.elements[i - solv->jobrules] + 1);
 	  queue_push(&solv->problems, v);
 	  disableproblem(solv, v);
@@ -726,7 +725,7 @@ enableweakrules(Solver *solv)
   int i;
   Rule *r;
 
-  for (i = solv->jobrules, r = solv->rules + i; i < solv->learntrules; i++, r++)
+  for (i = 1, r = solv->rules + i; i < solv->learntrules; i++, r++)
     {
       if (r->d >= 0)
 	continue;
@@ -771,7 +770,7 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
     }
   /* go through all enabled job rules */
   MAPZERO(&solv->noupdate);
-  for (i = solv->jobrules; i < solv->updaterules; i++)
+  for (i = solv->jobrules; i < solv->jobrules_end; i++)
     {
       r = solv->rules + i;
       if (r->d < 0)	/* disabled? */
@@ -1646,10 +1645,10 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp)
     if (!*lastweakp || why > *lastweakp)
       *lastweakp = why;
   /* do not add rpm rules to problem */
-  if (why < solv->jobrules)
+  if (why < solv->rpmrules_end)
     return;
   /* turn rule into problem */
-  if (why >= solv->jobrules && why < solv->updaterules)
+  if (why >= solv->jobrules && why < solv->jobrules_end)
     why = -(solv->ruletojob.elements[why - solv->jobrules] + 1);
   /* return if problem already countains our rule */
   if (solv->problems.count)
@@ -2163,8 +2162,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		continue;
 	      queue_empty(&dq);
 	      rr = r;
-	      if (rr->d < 0)	/* disabled ? */
-		rr += solv->installed->end - solv->installed->start;
+	      if (rr->d < 0)	/* disabled -> look at feature rule ? */
+		rr -= solv->installed->end - solv->installed->start;
 	      if (!rr->p)	/* identical to update rule? */
 		rr = r;
 	      d = rr->d < 0 ? -rr->d - 1 : rr->d;
@@ -2477,12 +2476,20 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 
   if (sug < 0)
     disableupdaterules(solv, job, -(sug + 1));
+  else if (sug >= solv->updaterules && sug < solv->updaterules_end)
+    {
+      /* enable feature rule */
+      Rule *r = solv->rules + solv->featurerules + (sug - solv->updaterules);
+      if (r->p)
+	enablerule(solv, r);
+    }
+
+  enableweakrules(solv);
 
   for (;;)
     {
       int njob, nfeature, nupdate;
       queue_empty(&solv->problems);
-      enableweakrules(solv);
       revert(solv, 1);		/* XXX no longer needed? */
       reset_solver(solv);
 
@@ -2510,7 +2517,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	      break;
 	  if (problem[j])
 	    continue;
-	  if (v >= solv->featurerules && v < solv->learntrules)
+	  if (v >= solv->featurerules && v < solv->featurerules_end)
 	    nfeature++;
 	  else if (v > 0)
 	    nupdate++;
@@ -2532,7 +2539,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	  for (i = j = disabledcnt; i < disabled.count; i++)
 	    {
 	      v = disabled.elements[i];
-	      if (v < solv->featurerules || v >= solv->learntrules)
+	      if (v < solv->featurerules || v >= solv->featurerules_end)
 	        disabled.elements[j++] = v;
 	    }
 	  disabled.count = j;
@@ -2545,9 +2552,9 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	  if (!nfeature)
 	    queue_push(refined, v);	/* do not record feature rules */
 	  disableproblem(solv, v);
-	  if (v >= solv->updaterules && v < solv->featurerules)
+	  if (v >= solv->updaterules && v < solv->updaterules_end)
 	    {
-	      Rule *r = solv->rules + v + (solv->installed->end - solv->installed->start);
+	      Rule *r = solv->rules + (v - solv->updaterules + solv->featurerules);
 	      if (r->p)
 		enablerule(solv, r);	/* enable corresponding feature rule */
 	    }
@@ -2570,9 +2577,9 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	    {
 	      v = disabled.elements[i];
 	      disableproblem(solv, v);
-	      if (v >= solv->updaterules && v < solv->featurerules)
+	      if (v >= solv->updaterules && v < solv->updaterules_end)
 		{
-		  Rule *r = solv->rules + v + (solv->installed->end - solv->installed->start);
+		  Rule *r = solv->rules + (v - solv->updaterules + solv->featurerules);
 		  if (r->p)
 		    enablerule(solv, r);
 		}
@@ -2584,10 +2591,46 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
   for (i = 0; i < disabled.count; i++)
     enableproblem(solv, disabled.elements[i]);
   /* disable problem rules again */
+
+  /* FIXME! */
+  for (i = 0; problem[i]; i++)
+    enableproblem(solv, problem[i]);
+  disableupdaterules(solv, job, -1);
+
+  /* disable problem rules again */
   for (i = 0; problem[i]; i++)
     disableproblem(solv, problem[i]);
-  disableupdaterules(solv, job, -1);
   POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "refine_suggestion end\n");
+}
+
+static int
+problems_sortcmp(const void *ap, const void *bp)
+{
+  Id a = *(Id *)ap, b = *(Id *)bp;
+  if (a < 0 && b > 0)
+    return 1;
+  if (a > 0 && b < 0)
+    return -1;
+  return a - b;
+}
+
+static void
+problems_sort(Solver *solv)
+{
+  int i, j;
+  if (!solv->problems.count)
+    return;
+  for (i = j = 1; i < solv->problems.count; i++)
+    {
+      if (!solv->problems.elements[i])
+	{
+	  if (i > j + 1)
+	    qsort(solv->problems.elements + j, i - j, sizeof(Id), problems_sortcmp);
+	  if (++i == solv->problems.count)
+	    break;
+	  j = i + 1;
+	}
+    }
 }
 
 static void
@@ -2599,10 +2642,11 @@ problems_to_solutions(Solver *solv, Queue *job)
   Queue solutions;
   Id *problem;
   Id why;
-  int i, j;
+  int i, j, nsol;
 
   if (!solv->problems.count)
     return;
+  problems_sort(solv);
   queue_clone(&problems, &solv->problems);
   queue_init(&solution);
   queue_init(&solutions);
@@ -2629,11 +2673,12 @@ problems_to_solutions(Solver *solv, Queue *job)
       if (!solution.count)
 	continue;	/* this solution didn't work out */
 
+      nsol = 0;
       for (j = 0; j < solution.count; j++)
 	{
 	  why = solution.elements[j];
 	  /* must be either job descriptor or update rule */
-	  assert(why < 0 || (why >= solv->updaterules && why < solv->featurerules));
+	  assert(why < 0 || (why >= solv->updaterules && why < solv->updaterules_end));
 #if 0
 	  solver_printproblem(solv, why);
 #endif
@@ -2677,10 +2722,18 @@ problems_to_solutions(Solver *solv, Queue *job)
 	      queue_push(&solutions, p);
 	      queue_push(&solutions, rp);
 	    }
+	  nsol++;
 	}
       /* mark end of this solution */
-      queue_push(&solutions, 0);
-      queue_push(&solutions, 0);
+      if (nsol)
+	{
+	  queue_push(&solutions, 0);
+	  queue_push(&solutions, 0);
+	}
+      else
+	{
+	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "Oops, everything was fine?\n");
+	}
     }
   queue_free(&solution);
   queue_free(&problems);
@@ -2762,14 +2815,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
   Id p, d, *pp, req, *reqp, con, *conp, obs, *obsp, *dp;
 
   assert(rid > 0);
-  if (rid >= solv->updaterules)
-    {
-      *depp = 0;
-      *sourcep = solv->installed->start + (rid - solv->updaterules);
-      *targetp = 0;
-      return SOLVER_PROBLEM_UPDATE_RULE;
-    }
-  if (rid >= solv->jobrules)
+  if (rid >= solv->jobrules && rid < solv->jobrules_end)
     {
 
       r = solv->rules + rid;
@@ -2782,6 +2828,14 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	return SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP;
       return SOLVER_PROBLEM_JOB_RULE;
     }
+  if (rid >= solv->updaterules && rid < solv->updaterules_end)
+    {
+      *depp = 0;
+      *sourcep = solv->installed->start + (rid - solv->updaterules);
+      *targetp = 0;
+      return SOLVER_PROBLEM_UPDATE_RULE;
+    }
+  assert(rid < solv->rpmrules_end);
   r = solv->rules + rid;
   assert(r->p < 0);
   d = r->d < 0 ? -r->d - 1 : r->d;
@@ -2992,18 +3046,19 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
       assert(rid > 0);
       if (rid >= solv->learntrules)
 	findproblemrule_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], &lreqr, &lconr, &lsysr, &ljobr);
-      else if (rid >= solv->updaterules)
-	{
-	  if (!*sysrp)
-	    *sysrp = rid;
-	}
-      else if (rid >= solv->jobrules)
+      else if (rid >= solv->jobrules && rid < solv->jobrules_end)
 	{
 	  if (!*jobrp)
 	    *jobrp = rid;
 	}
+      else if (rid >= solv->updaterules && rid < solv->updaterules_end)
+	{
+	  if (!*sysrp)
+	    *sysrp = rid;
+	}
       else
 	{
+	  assert(rid < solv->rpmrules_end);
 	  r = solv->rules + rid;
 	  d = r->d < 0 ? -r->d - 1 : r->d;
 	  if (!d && r->w2 < 0)
@@ -3093,14 +3148,19 @@ create_obsolete_index(Solver *solv)
 	continue;
       obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
-        FOR_PROVIDES(p, pp, obs)
-	  {
-	    if (pool->solvables[p].repo != installed)
-	      continue;
-	    if (pool->solvables[p].name == s->name)
-	      continue;
-	    obsoletes[p - installed->start]++;
-	  }
+	{
+	  Id obsname = dep2name(pool, obs);
+	  FOR_PROVIDES(p, pp, obs)
+	    {
+	      if (pool->solvables[p].repo != installed)
+		continue;
+	      if (pool->solvables[p].name == s->name)
+		continue;
+	      if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
+		continue;
+	      obsoletes[p - installed->start]++;
+	    }
+	}
     }
   n = 0;
   for (i = 0; i < installed->nsolvables; i++)
@@ -3120,16 +3180,21 @@ create_obsolete_index(Solver *solv)
 	continue;
       obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
-        FOR_PROVIDES(p, pp, obs)
-	  {
-	    if (pool->solvables[p].repo != installed)
-	      continue;
-	    if (pool->solvables[p].name == s->name)
-	      continue;
-	    p -= installed->start;
-	    if (obsoletes_data[obsoletes[p]] != i)
-	      obsoletes_data[--obsoletes[p]] = i;
-	  }
+	{
+	  Id obsname = dep2name(pool, obs);
+	  FOR_PROVIDES(p, pp, obs)
+	    {
+	      if (pool->solvables[p].repo != installed)
+		continue;
+	      if (pool->solvables[p].name == s->name)
+		continue;
+	      if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
+		continue;
+	      p -= installed->start;
+	      if (obsoletes_data[obsoletes[p]] != i)
+		obsoletes_data[--obsoletes[p]] = i;
+	    }
+	}
     }
 }
 
@@ -3235,7 +3300,7 @@ weaken_solvable_deps(Solver *solv, Id p)
   int i;
   Rule *r;
 
-  for (i = 1, r = solv->rules + i; i < solv->jobrules; i++, r++)
+  for (i = 1, r = solv->rules + i; i < solv->featurerules; i++, r++)
     {
       if (r->p != -p)
 	continue;
@@ -3381,11 +3446,98 @@ solver_solve(Solver *solv, Queue *job)
    */
 
   unifyrules(solv);	/* remove duplicate rpm rules */
-  solv->directdecisions = solv->decisionq.count;
+  solv->rpmrules_end = solv->nrules;
 
+  solv->directdecisions = solv->decisionq.count;
   POOL_DEBUG(SAT_DEBUG_STATS, "decisions so far: %d\n", solv->decisionq.count);
-  IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
-    solver_printdecisions (solv);
+
+
+  /* create feature rules */
+  /* those are used later on to keep a version of the installed packages in
+     best effort mode */
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add feature rules ***\n");
+  solv->featurerules = solv->nrules;
+  if (installed)
+    {
+      for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
+	{
+	  if (s->freshens && !s->supplements)
+	    {
+	      const char *name = id2str(pool, s->name);
+	      if (name[0] == 'a' && !strncmp(name, "atom:", 5))
+		{
+		  addrule(solv, 0, 0);
+		  continue;
+		}
+	    }
+	  if (s->repo != installed)
+	    {
+	      addrule(solv, 0, 0);	/* create dummy rule */
+	      continue;
+	    }
+	  addupdaterule(solv, s, 1);
+	}
+      assert(solv->nrules - solv->featurerules == installed->end - installed->start);
+    }
+  solv->featurerules_end = solv->nrules;
+
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add update rules ***\n");
+  solv->updaterules = solv->nrules;
+  if (installed)
+    { /* loop over all installed solvables */
+      /* we create all update rules, but disable some later on depending on the job */
+      for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
+	{
+	  Rule *sr;
+	  /* no update rules for patch atoms */
+	  if (s->freshens && !s->supplements)
+	    {
+	      const char *name = id2str(pool, s->name);
+	      if (name[0] == 'a' && !strncmp(name, "atom:", 5))
+		{
+		  addrule(solv, 0, 0);
+		  continue;
+		}
+	    }
+	  if (s->repo != installed)
+	    {
+	      addrule(solv, 0, 0);	/* create dummy rule */
+	      continue;
+	    }
+	  addupdaterule(solv, s, 0);	/* allowall = 0 */
+	  r = solv->rules + solv->nrules - 1;
+	  sr = r - (installed->end - installed->start);
+	  unifyrules_sortcmp_data = pool;
+	  if (!unifyrules_sortcmp(r, sr))
+	    {
+	      /* identical rule, kill unneeded rule */
+	      if (solv->allowuninstall)
+		{
+		  /* keep feature rule */
+		  memset(r, 0, sizeof(*r));
+		  queue_push(&solv->weakruleq, sr - solv->rules);
+		}
+	      else
+		{
+		  /* keep update rule */
+		  memset(sr, 0, sizeof(*sr));
+		}
+	    }
+	  else if (solv->allowuninstall)
+	    {
+	      /* make both feature and update rule weak */
+	      queue_push(&solv->weakruleq, r - solv->rules);
+	      queue_push(&solv->weakruleq, sr - solv->rules);
+	    }
+	  else
+	    disablerule(solv, sr);
+	}
+      /* consistency check: we added a rule for _every_ installed solvable */
+      assert(solv->nrules - solv->updaterules == installed->end - installed->start);
+    }
+  solv->updaterules_end = solv->nrules;
+
+
 
   /*
    * now add all job rules
@@ -3394,7 +3546,6 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add JOB rules ***\n");
 
   solv->jobrules = solv->nrules;
-
   for (i = 0; i < job->count; i += 2)
     {
       oldnrules = solv->nrules;
@@ -3515,89 +3666,7 @@ solver_solve(Solver *solv, Queue *job)
 	}
     }
   assert(solv->ruletojob.count == solv->nrules - solv->jobrules);
-
-  /*
-   * now add update rules
-   *
-   */
-
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add update rules ***\n");
-
-
-
-  /*
-   * create rules for updating installed solvables
-   *
-   */
-
-  solv->updaterules = solv->nrules;
-  if (installed)
-    { /* loop over all installed solvables */
-      /* we create all update rules, but disable some later on depending on the job */
-      for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
-	{
-	  /* no update rules for patch atoms */
-	  if (s->freshens && !s->supplements)
-	    {
-	      const char *name = id2str(pool, s->name);
-	      if (name[0] == 'a' && !strncmp(name, "atom:", 5))
-		{
-		  addrule(solv, 0, 0);
-		  continue;
-		}
-	    }
-	  if (s->repo != installed)
-	    {
-	      addrule(solv, 0, 0);	/* create dummy rule */
-	      continue;
-	    }
-	  addupdaterule(solv, s, 0);	/* allowall = 0 */
-	  if (solv->allowuninstall)
-	    queue_push(&solv->weakruleq, solv->nrules - 1);
-	}
-      /* consistency check: we added a rule for _every_ installed solvable */
-      assert(solv->nrules - solv->updaterules == installed->end - installed->start);
-    }
-
-  /* create feature rules */
-  /* those are used later on to keep a version of the installed packages in
-     best effort mode */
-  solv->featurerules = solv->nrules;
-  if (installed)
-    {
-      for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
-	{
-	  Rule *sr;
-	  if (s->freshens && !s->supplements)
-	    {
-	      const char *name = id2str(pool, s->name);
-	      if (name[0] == 'a' && !strncmp(name, "atom:", 5))
-		{
-		  addrule(solv, 0, 0);
-		  continue;
-		}
-	    }
-	  if (s->repo != installed)
-	    {
-	      addrule(solv, 0, 0);	/* create dummy rule */
-	      continue;
-	    }
-	  addupdaterule(solv, s, 1);
-	  r = solv->rules + solv->nrules - 1;
-	  sr = r - (installed->end - installed->start);
-	  unifyrules_sortcmp_data = pool;
-	  if (!unifyrules_sortcmp(r, sr))
-	    {
-	      /* identical rule, kill feature rule */
-	      memset(r, 0, sizeof(*r));
-	    }
-	  if (r->p)
-	    disablerule(solv, r);
-	  if (r->p && solv->allowuninstall)
-	    queue_push(&solv->weakruleq, solv->nrules - 1);
-	}
-      assert(solv->nrules - solv->featurerules == installed->end - installed->start);
-    }
+  solv->jobrules_end = solv->nrules;
 
   /* free unneeded memory */
   map_free(&addedmap);
@@ -3638,7 +3707,7 @@ solver_solve(Solver *solv, Queue *job)
   queue_init(&redoq);
   goterase = 0;
   /* disable all erase jobs (including weak "keep uninstalled" rules) */
-  for (i = solv->jobrules, r = solv->rules + i; i < solv->updaterules; i++, r++)
+  for (i = solv->jobrules, r = solv->rules + i; i < solv->learntrules; i++, r++)
     {
       if (r->d < 0)	/* disabled ? */
 	continue;

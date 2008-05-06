@@ -198,12 +198,12 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
       POOL_DEBUG(type, "WEAK ");
   if (p >= solv->learntrules)
     POOL_DEBUG(type, "LEARNT ");
-  else if (p >= solv->featurerules)
-    POOL_DEBUG(type, "FEATURE ");
-  else if (p >= solv->updaterules)
-    POOL_DEBUG(type, "UPDATE ");
-  else if (p >= solv->jobrules)
+  else if (p >= solv->jobrules && p < solv->jobrules_end)
     POOL_DEBUG(type, "JOB ");
+  else if (p >= solv->updaterules && p < solv->updaterules_end)
+    POOL_DEBUG(type, "UPDATE ");
+  else if (p >= solv->featurerules && p < solv->featurerules_end)
+    POOL_DEBUG(type, "FEATURE ");
   solver_printrule(solv, type, r);
 }
 
@@ -222,7 +222,7 @@ solver_printproblem(Solver *solv, Id v)
       v = -(v + 1);
       POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "JOB %d\n", v);
       jp = solv->ruletojob.elements;
-      for (i = solv->jobrules, r = solv->rules + i; i < solv->updaterules; i++, r++, jp++)
+      for (i = solv->jobrules, r = solv->rules + i; i < solv->learntrules; i++, r++, jp++)
 	if (*jp == v)
 	  {
 	    POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "- ");

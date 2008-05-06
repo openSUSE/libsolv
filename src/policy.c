@@ -22,6 +22,16 @@
 #include "poolarch.h"
 
 
+static inline Id dep2name(Pool *pool, Id dep) 
+{
+  while (ISRELDEP(dep))
+    {    
+      Reldep *rd = rd = GETRELDEP(pool, dep);
+      dep = rd->name;
+    }    
+  return dep; 
+}
+
 static Solver *prune_best_version_arch_sortcmp_data;
 
 /*-----------------------------------------------------------------*/
@@ -48,6 +58,7 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
       na = id2str(pool, pool->solvables[a].name);
       nb = id2str(pool, pool->solvables[b].name);
       /* bring patterns to the front */
+      /* XXX: no longer needed? */
       if (!strncmp(na, "pattern:", 8))
 	{
           if (strncmp(nb, "pattern:", 8))
@@ -247,9 +258,12 @@ prune_to_best_version(Solver *solv, Queue *plist)
       obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
 	{
+	  Id obsname = dep2name(pool, obs);
 	  FOR_PROVIDES(p, pp, obs)
 	    {
 	      if (pool->solvables[p].name == s->name)
+		continue;
+	      if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
 		continue;
 	      for (j = 0; j < plist->count; j++)
 		{
@@ -434,8 +448,11 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
 	  obsp = ps->repo->idarraydata + ps->obsoletes;
 	  while ((obs = *obsp++) != 0)	/* for all obsoletes */
 	    {
+	      Id obsname = dep2name(pool, obs);
 	      FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
 		{
+		  if (!solv->obsoleteusesprovides && obsname != pool->solvables[p2].name)
+		    continue;
 		  if (p2 == n)		/* match ! */
 		    break;
 		}
