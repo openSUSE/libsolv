@@ -35,16 +35,6 @@
  *
  */
 
-static inline Id dep2name(Pool *pool, Id dep) 
-{
-  while (ISRELDEP(dep))
-    {    
-      Reldep *rd = rd = GETRELDEP(pool, dep);
-      dep = rd->name;
-    }    
-  return dep; 
-}
-
 int
 solver_splitprovides(Solver *solv, Id dep)
 {
@@ -744,7 +734,7 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 {
   Pool *pool = solv->pool;
   int i, j;
-  Id name, how, what, p, *pp;
+  Id how, what, p, *pp;
   Solvable *s;
   Repo *installed;
   Rule *r;
@@ -800,15 +790,9 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	  break;
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
-	  name = (how == SOLVER_ERASE_SOLVABLE_NAME) ? what : 0;
-	  while (ISRELDEP(name))
-	    {
-	      Reldep *rd = GETRELDEP(pool, name);
-	      name = rd->name;
-	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
-	      if (name && pool->solvables[p].name != name)
+	      if (how == SOLVER_ERASE_SOLVABLE_NAME && !pool_match_nevr(pool, pool->solvables + p, what))
 	        continue;
 	      if (pool->solvables[p].repo == installed)
 	        MAPSET(&solv->noupdate, p - installed->start);
@@ -867,16 +851,10 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	  break;
 	case SOLVER_ERASE_SOLVABLE_NAME:                  /* remove by capability */
 	case SOLVER_ERASE_SOLVABLE_PROVIDES:
-	  name = (how == SOLVER_ERASE_SOLVABLE_NAME) ? what : 0;
-	  while (ISRELDEP(name))
-	    {
-	      Reldep *rd = GETRELDEP(pool, name);
-	      name = rd->name;
-	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
-	      if (name && pool->solvables[p].name != name)
-	        continue;
+	      if (how == SOLVER_ERASE_SOLVABLE_NAME && !pool_match_nevr(pool, pool->solvables + p, what))
+		continue;
 	      if (pool->solvables[p].repo != installed)
 		continue;
 	      if (MAPTST(&solv->noupdate, p - installed->start))
@@ -1125,10 +1103,9 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      obsp = s->repo->idarraydata + s->obsoletes;
 	      while ((obs = *obsp++) != 0)
 		{
-		  Id obsname = dep2name(pool, obs);
 		  FOR_PROVIDES(p, pp, obs)
 		    {
-		      if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
+		      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 			continue;
 		      addrule(solv, -n, -p);
 		    }
@@ -2949,12 +2926,11 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
 	    {
-	      Id obsname = dep2name(pool, obs);
 	      FOR_PROVIDES(p, pp, obs)
 		{
 		  if (p != -r->w2)
 		    continue;
-		  if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
+		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		    continue;
 		  *depp = obs;
 		  *sourcep = -r->p;
@@ -2968,12 +2944,11 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  obsp = s2->repo->idarraydata + s2->obsoletes;
 	  while ((obs = *obsp++) != 0)
 	    {
-	      Id obsname = dep2name(pool, obs);
 	      FOR_PROVIDES(p, pp, obs)
 		{
 		  if (p != -r->p)
 		    continue;
-		  if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
+		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		    continue;
 		  *depp = obs;
 		  *sourcep = -r->w2;
@@ -3149,14 +3124,13 @@ create_obsolete_index(Solver *solv)
       obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
 	{
-	  Id obsname = dep2name(pool, obs);
 	  FOR_PROVIDES(p, pp, obs)
 	    {
 	      if (pool->solvables[p].repo != installed)
 		continue;
 	      if (pool->solvables[p].name == s->name)
 		continue;
-	      if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
+	      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		continue;
 	      obsoletes[p - installed->start]++;
 	    }
@@ -3181,14 +3155,13 @@ create_obsolete_index(Solver *solv)
       obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
 	{
-	  Id obsname = dep2name(pool, obs);
 	  FOR_PROVIDES(p, pp, obs)
 	    {
 	      if (pool->solvables[p].repo != installed)
 		continue;
 	      if (pool->solvables[p].name == s->name)
 		continue;
-	      if (!solv->obsoleteusesprovides && obsname != pool->solvables[p].name)
+	      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		continue;
 	      p -= installed->start;
 	      if (obsoletes_data[obsoletes[p]] != i)
@@ -3327,7 +3300,7 @@ solver_solve(Solver *solv, Queue *job)
   int i;
   int oldnrules;
   Map addedmap;		       /* '1' == have rpm-rules for solvable */
-  Id how, what, weak, name, p, *pp, d;
+  Id how, what, weak, p, *pp, d;
   Queue q, redoq;
   Solvable *s;
   int goterase;
@@ -3391,16 +3364,10 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
-	  name = (how == SOLVER_INSTALL_SOLVABLE_NAME) ? what : 0;
-	  while (ISRELDEP(name))
-	    {
-	      Reldep *rd = GETRELDEP(pool, name);
-	      name = rd->name;
-	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
 	      /* if by name, ensure that the name matches */
-	      if (name && pool->solvables[p].name != name)
+	      if (how == SOLVER_INSTALL_SOLVABLE_NAME && !pool_match_nevr(pool, pool->solvables + p, what))
 		continue;
 	      addrpmrulesforsolvable(solv, pool->solvables + p, &addedmap);
 	    }
@@ -3578,16 +3545,10 @@ solver_solve(Solver *solv, Queue *job)
 	  if (how == SOLVER_INSTALL_SOLVABLE_PROVIDES)
 	    POOL_DEBUG(SAT_DEBUG_JOB, "job: %sinstall provides %s\n", weak ? "weak " : "", dep2str(pool, what));
 	  queue_empty(&q);
-	  name = (how == SOLVER_INSTALL_SOLVABLE_NAME) ? what : 0;
-	  while (ISRELDEP(name))
-	    {
-	      Reldep *rd = GETRELDEP(pool, name);
-	      name = rd->name;
-	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
               /* if by name, ensure that the name matches */
-	      if (name && pool->solvables[p].name != name)
+	      if (how == SOLVER_INSTALL_SOLVABLE_NAME && !pool_match_nevr(pool, pool->solvables + p, what))
 		continue;
 	      queue_push(&q, p);
 	    }
@@ -3613,16 +3574,10 @@ solver_solve(Solver *solv, Queue *job)
 	    POOL_DEBUG(SAT_DEBUG_JOB, "job: %serase name %s\n", weak ? "weak " : "", dep2str(pool, what));
 	  if (how == SOLVER_ERASE_SOLVABLE_PROVIDES)
 	    POOL_DEBUG(SAT_DEBUG_JOB, "job: %serase provides %s\n", weak ? "weak " : "", dep2str(pool, what));
-	  name = (how == SOLVER_ERASE_SOLVABLE_NAME) ? what : 0;
-	  while (ISRELDEP(name))
-	    {
-	      Reldep *rd = GETRELDEP(pool, name);
-	      name = rd->name;
-	    }
 	  FOR_PROVIDES(p, pp, what)
 	    {
 	      /* if by name, ensure that the name matches */
-	      if (name && pool->solvables[p].name != name)
+	      if (how == SOLVER_ERASE_SOLVABLE_NAME && !pool_match_nevr(pool, pool->solvables + p, what))
 	        continue;
 	      addrule(solv, -p, 0);  /* add 'remove' rule */
 	      queue_push(&solv->ruletojob, i);

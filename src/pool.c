@@ -403,6 +403,52 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 
 /*************************************************************************/
 
+/* check if a package's nevr matches a dependency */
+
+int
+pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
+{
+  Reldep *rd = GETRELDEP(pool, d);
+  Id name = rd->name;
+  Id evr = rd->evr;
+  int flags = rd->flags;
+
+  if (flags > 7)
+    {
+      switch (flags)
+	{
+	case REL_ARCH:
+	  if (s->arch != evr)
+	    return 0;
+	  return pool_match_nevr(pool, s, name);
+	case REL_OR:
+	  if (pool_match_nevr(pool, s, name))
+	    return 1;
+	  return pool_match_nevr(pool, s, evr);
+	case REL_AND:
+	case REL_WITH:
+	  if (!pool_match_nevr(pool, s, name))
+	    return 0;
+	  return pool_match_nevr(pool, s, evr);
+	default:
+	  return 0;
+	}
+    }
+  if (!pool_match_nevr(pool, s, name))
+    return 0;
+  if (evr == s->evr)
+    return flags & 2 ? 1 : 0;
+  if (!flags)
+    return 0;
+  if (flags == 7)
+    return 1;
+  if (flags != 2 && flags != 5)
+    flags ^= 5;
+  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_MATCH_RELEASE)))) != 0)
+    return 1;
+  return 0;
+}
+
 /*
  * addrelproviders
  * 

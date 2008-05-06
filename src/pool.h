@@ -183,6 +183,15 @@ int solvable_trivial_installable_queue(Solvable *s, Queue *installed);
 
 void pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
 
+int pool_match_nevr_rel(Pool *pool, Solvable *s, Id d);
+
+static inline int pool_match_nevr(Pool *pool, Solvable *s, Id d)
+{
+  if (!ISRELDEP(d))
+    return d == s->name;
+  else
+    return pool_match_nevr_rel(pool, s, d);
+}
 
 
 /**
