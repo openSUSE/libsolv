@@ -292,6 +292,84 @@ static char *headtoevr(RpmHead *h)
   return evr;
 }
 
+
+static void
+setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
+{
+  const unsigned char *cp;
+  int state = 0;
+  int c;
+  char *buf = 0, *bp;
+
+  /* check if it's already utf8, code taken from screen ;-) */
+  cp = (const unsigned char *)str;
+  while ((c = *cp++) != 0)
+    {
+      if (state)
+	{
+          if ((c & 0xc0) != 0x80)
+            break; /* encoding error */
+          c = (c & 0x3f) | (state << 6);
+          if (!(state & 0x40000000))
+	    {
+              /* check for overlong sequences */
+              if ((c & 0x820823e0) == 0x80000000)
+                c = 0xfdffffff;
+              else if ((c & 0x020821f0) == 0x02000000)
+                c = 0xfff7ffff;
+              else if ((c & 0x000820f8) == 0x00080000)
+                c = 0xffffd000;
+              else if ((c & 0x0000207c) == 0x00002000)
+                c = 0xffffff70;
+            }
+        }
+      else
+	{
+          /* new sequence */
+          if (c >= 0xfe)
+            c = 0xfffd;
+          else if (c >= 0xfc)
+            c = (c & 0x01) | 0xbffffffc;    /* 5 bytes to follow */
+          else if (c >= 0xf8)
+            c = (c & 0x03) | 0xbfffff00;    /* 4 */
+          else if (c >= 0xf0)
+            c = (c & 0x07) | 0xbfffc000;    /* 3 */
+          else if (c >= 0xe0)
+            c = (c & 0x0f) | 0xbff00000;    /* 2 */
+          else if (c >= 0xc2)
+            c = (c & 0x1f) | 0xfc000000;    /* 1 */
+          else if (c >= 0xc0)
+            c = 0xfdffffff;         /* overlong */
+          else if (c >= 0x80)
+            c = 0xfffd;
+        }
+      state = (c & 0x80000000) ? c : 0;
+    }
+  if (c)
+    {
+      /* not utf8, assume latin1 */
+      buf = sat_malloc(2 * strlen(str) + 1);
+      cp = (const unsigned char *)str;
+      str = buf;
+      bp = buf;
+      while ((c = *cp++) != 0)
+	{
+	  if (c >= 0xc0)
+	    {
+	      *bp++ = 0xc3;
+	      c ^= 0x80;
+	    }
+	  else if (c >= 0x80)
+	    *bp++ = 0xc2;
+	  *bp++ = c;
+	}
+      *bp++ = 0;
+    }
+  repodata_set_str(repodata, handle, tag, str);
+  if (buf)
+    sat_free(buf);
+}
+
 static unsigned int
 makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int strong)
 {
@@ -757,7 +835,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       handle = repodata_get_handle(repodata, (s - pool->solvables) - repodata->start);
       str = headstring(rpmhead, TAG_SUMMARY);
       if (str)
-        repodata_set_str(repodata, handle, SOLVABLE_SUMMARY, str);
+        setutf8string(repodata, handle, SOLVABLE_SUMMARY, str);
       str = headstring(rpmhead, TAG_DESCRIPTION);
       if (str)
 	{
@@ -775,7 +853,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 	      while (l > 0 && str[l - 1] == '\n')
 	        str[--l] = 0;
 	      if (l)
-                repodata_set_str(repodata, handle, SOLVABLE_DESCRIPTION, str);
+                setutf8string(repodata, handle, SOLVABLE_DESCRIPTION, str);
 	      p = aut + 19;
 	      aut = str;	/* copy over */
 	      while (*p == ' ' || *p == '\n')
@@ -795,11 +873,11 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 		aut--;
 	      *aut = 0;
 	      if (*str)
-	        repodata_set_str(repodata, handle, SOLVABLE_AUTHORS, str);
+	        setutf8string(repodata, handle, SOLVABLE_AUTHORS, str);
 	      free(str);
 	    }
 	  else if (*str)
-	    repodata_set_str(repodata, handle, SOLVABLE_DESCRIPTION, str);
+	    setutf8string(repodata, handle, SOLVABLE_DESCRIPTION, str);
 	}
       str = headstring(rpmhead, TAG_GROUP);
       if (str)
