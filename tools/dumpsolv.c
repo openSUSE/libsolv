@@ -22,6 +22,16 @@ dump_repodata (Repo *repo)
   Repodata *data;
   if (repo->nrepodata == 0)
     return;
+  for (i = 0; i < 32; i++)
+    if (repo->rpmdbcookie[i])
+      break;
+  if (i < 32)
+    {
+      printf("rpmdb cookie: ");
+      for (i = 0; i < 32; i++)
+	printf("%02x", repo->rpmdbcookie[i]);
+      printf("\n");
+    }
   printf("repo refers to %d subfiles:\n", repo->nrepodata);
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {

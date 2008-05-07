@@ -53,6 +53,7 @@ KNOWNID(REPODATA_EXTERNAL,		"repodata:external"),
 KNOWNID(REPODATA_KEYS,			"repodata:keys"),
 KNOWNID(REPODATA_LOCATION,		"repodata:location"),
 KNOWNID(REPODATA_ADDEDFILEPROVIDES,	"repodata:addedfileprovides"),
+KNOWNID(REPODATA_RPMDBCOOKIE,		"repodata:rpmdbcookie"),
 
 /* The void type is usable to encode one-valued attributes, they have
    no associated data.  This is useful to encode values which many solvables

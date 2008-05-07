@@ -30,6 +30,7 @@
 #include "util.h"
 #include "repo_rpmdb.h"
 
+#define RPMDB_COOKIE_VERSION 1
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
@@ -1128,6 +1129,15 @@ swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
     }
 }
 
+static void
+mkrpmdbcookie(struct stat *st, unsigned char *cookie)
+{
+  memset(cookie, 0, 32);
+  cookie[3] = RPMDB_COOKIE_VERSION;
+  memcpy(cookie + 16, &st->st_ino, sizeof(st->st_ino));
+  memcpy(cookie + 24, &st->st_dev, sizeof(st->st_dev));
+}
+
 /*
  * read rpm db as repo
  * 
@@ -1157,6 +1167,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
   DB_ENV *dbenv = 0;
   DBT dbkey;
   DBT dbdata;
+  struct stat packagesstat;
 
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
@@ -1189,10 +1200,18 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
       exit(1);
     }
 
-  if (!ref)
+  /* XXX: should get ro lock of Packages database! */
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
+  if (stat(dbpath, &packagesstat))
+    {
+      perror(dbpath);
+      exit(1);
+    }
+  mkrpmdbcookie(&packagesstat, repo->rpmdbcookie);
+
+  if (!ref || memcmp(repo->rpmdbcookie, ref->rpmdbcookie, 32) != 0)
     {
       Id *pkgids;
-      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
       if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
 	{
 	  perror("db->open var/lib/rpm/Packages");

@@ -48,6 +48,7 @@ typedef struct _Repo {
   Offset lastoff;
 
   Id *rpmdbid;			/* hmm, go to repodata? */
+  unsigned char rpmdbcookie[32];
 
   Repodata *repodata;		/* our stores for non-solvable related data */
   unsigned nrepodata;		/* number of our stores..  */

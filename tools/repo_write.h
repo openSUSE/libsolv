@@ -25,11 +25,12 @@ typedef struct _Repodatafile
      Repodata.  */
   char *location;
   char *checksum;
-  unsigned nchecksum;
-  unsigned checksumtype;
+  unsigned int nchecksum;
+  unsigned int checksumtype;
   struct _Repokey *keys;
   unsigned int nkeys;
   Id *addedfileprovides;
+  unsigned char *rpmdbcookie;
 } Repodatafile;
 
 void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Repodatafile *fileinfo, int nsubfiles);

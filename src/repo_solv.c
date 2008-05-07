@@ -585,6 +585,13 @@ parse_info_repodata(Repodata *maindata, Id *keyp, Repokey *keys, Id *idmap, unsi
 	    }
 	  continue;
 	}
+      if (id == REPODATA_RPMDBCOOKIE && keys[key].type == REPOKEY_TYPE_SHA256)
+	{
+	  int i;
+	  for (i = 0; i < 32; i++)
+	    maindata->repo->rpmdbcookie[i] = read_u8(maindata);
+	  continue;
+	}
       skip_item(maindata, keys[key].type, numid, numrel);
     }
 }

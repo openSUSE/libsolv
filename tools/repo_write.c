@@ -890,6 +890,17 @@ write_compressed_page(FILE *fp, unsigned char *page, int len)
     }
 }
 
+
+static Id subfilekeys[] = {
+  REPODATA_INFO, REPOKEY_TYPE_VOID,
+  REPODATA_EXTERNAL, REPOKEY_TYPE_VOID,
+  REPODATA_KEYS, REPOKEY_TYPE_IDARRAY,
+  REPODATA_LOCATION, REPOKEY_TYPE_STR,
+  REPODATA_ADDEDFILEPROVIDES, REPOKEY_TYPE_REL_IDARRAY,
+  REPODATA_RPMDBCOOKIE, REPOKEY_TYPE_SHA256,
+  0,
+};
+
 /*
  * Repo
  */
@@ -992,40 +1003,15 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   /* If we store subfile info, generate the necessary keys.  */
   if (nsubfiles)
     {
-      key = cbdata.mykeys + cbdata.nmykeys;
-      key->name = REPODATA_INFO;
-      key->type = REPOKEY_TYPE_VOID;
-      key->size = 0;
-      key->storage = KEY_STORAGE_SOLVABLE;
-      cbdata.keymap[key->name] = cbdata.nmykeys++;
-
-      key = cbdata.mykeys + cbdata.nmykeys;
-      key->name = REPODATA_EXTERNAL;
-      key->type = REPOKEY_TYPE_VOID;
-      key->size = 0;
-      key->storage = KEY_STORAGE_SOLVABLE;
-      cbdata.keymap[key->name] = cbdata.nmykeys++;
-
-      key = cbdata.mykeys + cbdata.nmykeys;
-      key->name = REPODATA_KEYS;
-      key->type = REPOKEY_TYPE_IDARRAY;
-      key->size = 0;
-      key->storage = KEY_STORAGE_SOLVABLE;
-      cbdata.keymap[key->name] = cbdata.nmykeys++;
-
-      key = cbdata.mykeys + cbdata.nmykeys;
-      key->name = REPODATA_LOCATION;
-      key->type = REPOKEY_TYPE_STR;
-      key->size = 0;
-      key->storage = KEY_STORAGE_SOLVABLE;
-      cbdata.keymap[key->name] = cbdata.nmykeys++;
-
-      key = cbdata.mykeys + cbdata.nmykeys;
-      key->name = REPODATA_ADDEDFILEPROVIDES;
-      key->type = REPOKEY_TYPE_REL_IDARRAY;
-      key->size = 0;
-      key->storage = KEY_STORAGE_SOLVABLE;
-      cbdata.keymap[key->name] = cbdata.nmykeys++;
+      for (i = 0; subfilekeys[i]; i += 2)
+	{
+	  key = cbdata.mykeys + cbdata.nmykeys;
+	  key->name = subfilekeys[i];
+	  key->type = subfilekeys[i + 1];
+	  key->size = 0;
+	  key->storage = KEY_STORAGE_SOLVABLE;
+	  cbdata.keymap[key->name] = cbdata.nmykeys++;
+	}
     }
 
   dirpoolusage = 0;
@@ -1326,14 +1312,19 @@ for (i = 1; i < cbdata.nmykeys; i++)
       Id schema[4], *sp;
 
       sp = schema;
-      if (fileinfo[i].addedfileprovides)
+      if (fileinfo[i].addedfileprovides || fileinfo[i].rpmdbcookie)
 	{
 	  /* extra info about this file */
 	  *sp++ = cbdata.keymap[REPODATA_INFO];
-	  *sp++ = cbdata.keymap[REPODATA_ADDEDFILEPROVIDES];
-	  for (j = 0; fileinfo[i].addedfileprovides[j]; j++)
-	    ;
-	  cbdata.mykeys[cbdata.keymap[REPODATA_ADDEDFILEPROVIDES]].size += j + 1;
+	  if (fileinfo[i].addedfileprovides)
+	    {
+	      *sp++ = cbdata.keymap[REPODATA_ADDEDFILEPROVIDES];
+	      for (j = 0; fileinfo[i].addedfileprovides[j]; j++)
+	        ;
+	      cbdata.mykeys[cbdata.keymap[REPODATA_ADDEDFILEPROVIDES]].size += j + 1;
+	    }
+	  if (fileinfo[i].rpmdbcookie)
+	    *sp++ = cbdata.keymap[REPODATA_RPMDBCOOKIE];
 	}
       else
 	{
@@ -1717,9 +1708,12 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 
 	  cur = xd.len;
 	  data_addid(&xd, repodataschemata[i]);
-	  if (fileinfo[i].addedfileprovides)
+	  if (fileinfo[i].addedfileprovides || fileinfo[i].rpmdbcookie)
 	    {
-	      data_addidarray_sort(&xd, pool, needid, fileinfo[i].addedfileprovides, 0);
+	      if (fileinfo[i].addedfileprovides)
+	        data_addidarray_sort(&xd, pool, needid, fileinfo[i].addedfileprovides, 0);
+	      if (fileinfo[i].rpmdbcookie)
+	        data_addblob(&xd, fileinfo[i].rpmdbcookie, 32);
 	    }
 	  else
 	    {
