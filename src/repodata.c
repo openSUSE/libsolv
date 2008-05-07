@@ -1405,6 +1405,14 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
   int oldsize;
   Id *ida, *pp;
 
+  if (handle == data->lasthandle && data->keys[data->lastkey].name == keyname && data->keys[data->lastkey].type == keytype && data->attriddatalen == data->lastdatalen)
+    {
+      /* great! just append the new data */
+      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+      data->attriddatalen--;	/* overwrite terminating 0  */
+      data->lastdatalen += entrysize;
+      return;
+    }
   pp = data->structs[handle];
   if (pp)
     for (; *pp; pp += 2)
@@ -1420,6 +1428,7 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
       key.storage = KEY_STORAGE_INCORE;
       data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
       repodata_set(data, handle, &key, data->attriddatalen);
+      data->lasthandle = 0;	/* next time... */
       return;
     }
   oldsize = 0;
@@ -1439,6 +1448,9 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
       pp[1] = data->attriddatalen;
       data->attriddatalen += oldsize;
     }
+  data->lasthandle = handle;
+  data->lastkey = *pp;
+  data->lastdatalen = data->attriddatalen + entrysize + 1;
 }
 
 static inline int
@@ -1998,6 +2010,9 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
     if (data->structs[entry])
       sat_free(data->structs[entry]);
   data->structs = sat_free(data->structs);
+  data->lasthandle = 0;
+  data->lastkey = 0;
+  data->lastdatalen = 0;
   sat_free(schema);
   sat_free(seen);
 

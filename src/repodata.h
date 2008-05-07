@@ -111,6 +111,11 @@ typedef struct _Repodata {
   Id **structs;			/* key-value lists */
   unsigned int nstructs;
 
+  /* array cache */
+  Id lasthandle;
+  Id lastkey;
+  Id lastdatalen;
+
   Id *addedfileprovides;
 } Repodata;
 
