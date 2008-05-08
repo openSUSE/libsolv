@@ -481,6 +481,8 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 }
 
 
+#ifdef USE_FILEFILTER
+
 #define FILEFILTER_EXACT    0
 #define FILEFILTER_STARTS   1
 #define FILEFILTER_CONTAINS 2
@@ -502,6 +504,8 @@ static struct filefilter filefilters[] = {
   { FILEFILTER_STARTS, "/usr/share/", "magic.mime"},
   { FILEFILTER_STARTS, "/opt/gnome/games/", 0},
 };
+
+#endif
 
 static void
 adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dic)
@@ -640,8 +644,11 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
   char **dn;
   unsigned int *di;
   int bnc, dnc, dic;
-  int i, j;
+  int i;
+#ifdef USE_FILEFILTER
+  int j;
   struct filefilter *ff;
+#endif
 #if 0
   char *fn = 0;
   int fna = 0;
@@ -676,6 +683,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 
   for (i = 0; i < bnc; i++)
     {
+#ifdef USE_FILEFILTER
       ff = filefilters;
       for (j = 0; j < sizeof(filefilters)/sizeof(*filefilters); j++, ff++)
 	{
@@ -707,6 +715,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 	}
       if (j == sizeof(filefilters)/sizeof(*filefilters))
 	continue;
+#endif
 #if 0
       j = strlen(bn[i]) + strlen(dn[di[i]]) + 1;
       if (j > fna)
