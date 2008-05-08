@@ -33,6 +33,10 @@ SET(updateinfoxml2solv_REPOS updateinfoxml2solv.c repo_updateinfoxml.h repo_upda
 ADD_EXECUTABLE( updateinfoxml2solv ${updateinfoxml2solv_REPOS} )
 TARGET_LINK_LIBRARIES( updateinfoxml2solv satsolver ${EXPAT_LIBRARY})
 
+SET(deltainfoxml2solv_REPOS deltainfoxml2solv.c repo_deltainfoxml.h repo_deltainfoxml.c repo_write.c common_write.c)
+ADD_EXECUTABLE( deltainfoxml2solv ${deltainfoxml2solv_REPOS} )
+TARGET_LINK_LIBRARIES( deltainfoxml2solv satsolver ${EXPAT_LIBRARY})
+
 SET(dumpsolv_REPOS dumpsolv.c)
 ADD_EXECUTABLE( dumpsolv ${dumpsolv_REPOS} )
 TARGET_LINK_LIBRARIES( dumpsolv satsolver)
@@ -51,6 +55,7 @@ install(TARGETS
                 rpmdb2solv
                 rpms2solv
                 updateinfoxml2solv
+                deltainfoxml2solv
    DESTINATION ${BIN_INSTALL_DIR} )
 
 install(PROGRAMS repo2solv.sh DESTINATION ${BIN_INSTALL_DIR} )
