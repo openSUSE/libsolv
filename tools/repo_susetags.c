@@ -28,6 +28,7 @@ struct parsedata {
   Id (*dirs)[3]; // dirid, size, nfiles
   int ndirs;
   Id langcache[ID_NUM_INTERNAL];
+  int lineno;
 };
 
 static char *flagtab[] = {
@@ -65,7 +66,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   i = split(line + 5, sp, 4); /* name, <op>, evr, ? */
   if (i != 1 && i != 3) /* expect either 'name' or 'name' <op> 'evr' */
     {
-      fprintf(stderr, "Bad dependency line: %s\n", line);
+      fprintf(stderr, "Bad dependency line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
   if (kind)
@@ -80,7 +81,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
           break;
       if (flags == 6)
 	{
-	  fprintf(stderr, "Unknown relation '%s'\n", sp[1]);
+	  fprintf(stderr, "Unknown relation %d: '%s'\n", pd->lineno, sp[1]);
 	  exit(1);
 	}
       id = rel2id(pool, id, evrid, flags + 1, 1);
@@ -104,7 +105,7 @@ add_location(struct parsedata *pd, char *line, Solvable *s, unsigned handle)
   i = split(line, sp, 3);
   if (i != 2 && i != 3)
     {
-      fprintf(stderr, "Bad location line: %s\n", line);
+      fprintf(stderr, "Bad location line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
   /* If we have a dirname, let's see if it's the same as arch.  In that
@@ -174,7 +175,7 @@ add_source(struct parsedata *pd, char *line, Solvable *s, unsigned handle)
 
   if (split(line, sp, 5) != 4)
     {
-      fprintf(stderr, "Bad source line: %s\n", line);
+      fprintf(stderr, "Bad source line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
 
@@ -224,14 +225,14 @@ fprintf(stderr, "%s -> %d\n", sp[0], dirid);
 }
 
 static void
-set_checksum(Repodata *data, int handle, Id keyname, char *line)
+set_checksum(struct parsedata *pd, Repodata *data, int handle, Id keyname, char *line)
 {
   char *sp[3];
   int l;
   Id type;
   if (split(line, sp, 3) != 2)
     {
-      fprintf(stderr, "Bad source line: %s\n", line);
+      fprintf(stderr, "Bad source line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
   if (!strcasecmp (sp[0], "sha1"))
@@ -240,12 +241,12 @@ set_checksum(Repodata *data, int handle, Id keyname, char *line)
     l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
   else
     {
-      fprintf(stderr, "Unknown checksum type: %s\n", sp[0]);
+      fprintf(stderr, "Unknown checksum type: %d: %s\n", pd->lineno, sp[0]);
       exit(1);
     }
   if (strlen(sp[1]) != l)
     {
-      fprintf(stderr, "Invalid checksum length for %s: %s\n", sp[0], sp[1]);
+      fprintf(stderr, "Invalid checksum length: %d: for %s: %s\n", pd->lineno, sp[0], sp[1]);
       exit(1);
     }
   repodata_set_checksum(data, handle, keyname, type, sp[1]);
@@ -498,6 +499,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
       linep += strlen(linep);
       if (linep == line || linep[-1] != '\n')
         continue;
+      pd.lineno++;
       *--linep = 0;
       if (linep == olinep)
 	continue;
@@ -508,8 +510,12 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	  
 	  int is_end = (linep[-intag - 2] == '-')
 	              && (linep[-1] == ':')
-	              && !strncmp(linep - 1 - intag, line + 1, intag)
 		      && (linep == line + 1 + intag + 1 + 1 + 1 + intag + 1 || linep[-intag - 3] == '\n');
+	  if (is_end
+	      && strncmp(linep - 1 - intag, line + 1, intag))
+	    {
+	      fprintf(stderr, "Nonmatching multi-line tags: %d: %s\n", pd.lineno, linep - 1 - intag);
+	    }
 	  if (cummulate && !is_end)
 	    {
 	      *linep++ = '\n';
@@ -540,7 +546,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	  char *tagend = strchr(line, ':');
 	  if (!tagend)
 	    {
-	      fprintf(stderr, "bad line: %s\n", line);
+	      fprintf(stderr, "bad line: %d: %s\n", pd.lineno, line);
 	      exit(1);
 	    }
 	  intag = tagend - (line + 1);
@@ -602,7 +608,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	  
           if (split(line + 5, sp, 5) != 4)
 	    {
-	      fprintf(stderr, "Bad line: %s\n", line);
+	      fprintf(stderr, "Bad line: %d: %s\n", pd.lineno, line);
 	      exit(1);
 	    }
 	  /* Lookup (but don't construct) the name and arch.  */
@@ -673,7 +679,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	 solvables.  */
       if (indesc >= 2 && !s)
         {
-	  fprintf (stderr, "Huh %s?\n", line);
+	  fprintf (stderr, "Huh %d: %s?\n", pd.lineno, line);
           continue;
 	}
       switch (tag)
@@ -862,7 +868,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    repodata_add_poolstr_array(data, handle, SOLVABLE_INCLUDES, join2("pattern", ":", line + 6));
 	    break;
 	  case CTAG('=', 'C', 'k', 's'):
-	    set_checksum(data, handle, SOLVABLE_CHECKSUM, line + 6);
+	    set_checksum(&pd, data, handle, SOLVABLE_CHECKSUM, line + 6);
 	    if (0)
 	      {
 		Id sub = repodata_create_struct(data, handle, str2id(pool, "solvable:komisch", 1));
