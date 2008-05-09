@@ -177,24 +177,12 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
 const char *
 solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang)
 {
-  Pool *pool;
-  Id id;
-  char *p;
-  const char *kn, *str;
-
-  if (!s->repo)
-    return repo_lookup_str(s, keyname);
-  pool = s->repo->pool;
-  kn = id2str(pool, keyname);
-  p = sat_malloc(strlen(kn) + strlen(lang) + 2);
-  sprintf(p, "%s:%s", kn, lang);
-  id = str2id(pool, p, 0);
-  free(p);
-  if (id)
+  if (s->repo)
     {
-      str = repo_lookup_str(s, id);
-      if (str)
-	return str;
+      const char *str;
+      Id id = pool_id2langid(s->repo->pool, keyname, lang, 0);
+      if (id && (str = repo_lookup_str(s, id)) != 0)
+        return str;
     }
   return repo_lookup_str(s, keyname);
 }

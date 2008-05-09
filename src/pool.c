@@ -982,6 +982,28 @@ pool_set_languages(Pool *pool, const char **languages, int nlanguages)
     pool->languages[i] = strdup(languages[i]);
 }
 
+Id
+pool_id2langid(Pool *pool, Id id, const char *lang, int create)
+{
+  const char *n;
+  char buf[256], *p;
+  int l;
+
+  if (!lang)
+    return id;
+  n = id2str(pool, id);
+  l = strlen(n) + strlen(lang) + 2;
+  if (l > sizeof(buf))
+    p = sat_malloc(strlen(n) + strlen(lang) + 2);
+  else
+    p = buf;
+  sprintf(p, "%s:%s", n, lang);
+  id = str2id(pool, p, create);
+  if (p != buf)
+    free(p);
+  return id;
+}
+
 char *
 pool_alloctmpspace(Pool *pool, int len)
 {
