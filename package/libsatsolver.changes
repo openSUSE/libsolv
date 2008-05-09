@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri May  9 16:04:42 CEST 2008 - kkaempf@suse.de
+
+- move 'helix2solv' from satsolver-tools to satsolver-devel package
+  (bnc#388595)
+
+-------------------------------------------------------------------
 Mon May  5 16:24:14 CEST 2008 - coolo@suse.de
 
 - add obsoleteusesprovides and implicitobsoleteusesprovides solver

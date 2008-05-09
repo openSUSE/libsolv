@@ -93,6 +93,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root)
 %doc LICENSE*
 %exclude /usr/bin/deptestomatic
+%exclude /usr/bin/helix2solv
 /usr/bin/*
 
 %files devel
@@ -105,6 +106,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %dir /usr/include/satsolver
 /usr/include/satsolver/*
 /usr/bin/deptestomatic
+/usr/bin/helix2solv
 
 %files ruby
 %defattr(-,root,root,-)
