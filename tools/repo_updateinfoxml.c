@@ -534,7 +534,7 @@ endElement(void *userData, const char *name)
       {
 	if (pd->content
 	    && (pd->content[0] == 'T'
-		|| pd->content[0] == 't'))
+		|| pd->content[0] == 't'|| pd->content[0] == '1'))
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
 	  repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
@@ -547,7 +547,7 @@ endElement(void *userData, const char *name)
       {
 	if (pd->content
 	    && (pd->content[0] == 'T'
-		|| pd->content[0] == 't'))
+		|| pd->content[0] == 't' || pd->content[0] == '1'))
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
 	  repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);

@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri May  9 20:26:52 CEST 2008 - dmacvicar@suse.de
+
+- recognize 1 as true for reboot suggested and
+  restart suggested (bnc#388818)
+
+-------------------------------------------------------------------
 Fri May  9 16:04:42 CEST 2008 - kkaempf@suse.de
 
 - move 'helix2solv' from satsolver-tools to satsolver-devel package
