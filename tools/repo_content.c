@@ -212,14 +212,8 @@ repo_add_content(Repo *repo, FILE *fp)
         {
 	  char *key = fields[0];
 	  char *value = fields[1];
-	  char *modifier = strchr (key, '.');
-	  if (modifier)
-	    *modifier++ = 0;
 #if 0
-	  if (modifier)
-	    fprintf (stderr, "key %s, mod %s, value %s\n", key, modifier, fields[1]);
-	  else
-	    fprintf (stderr, "key %s, value %s\n", key, fields[1]);
+	  fprintf (stderr, "key %s, value %s\n", key, fields[1]);
 #endif
 
 #define istag(x) !strcmp (key, x)
@@ -303,7 +297,7 @@ repo_add_content(Repo *repo, FILE *fp)
 	  else if (istag ("LABEL"))
 	    repo_set_str(repo, s - pool->solvables, PRODUCT_LABEL, value);
 	  else if (!strncmp (key, "LABEL.", 6))
-	    repo_set_str(repo, s - pool->solvables, str2id(pool, join(&pd, "product:label:", key + 6, 0), 1), value);
+	    repo_set_str(repo, s - pool->solvables, pool_id2langid(pool, PRODUCT_LABEL, key + 6, 1), value);
 	  else if (istag ("FLAGS"))
 	    add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
 
@@ -314,6 +308,8 @@ repo_add_content(Repo *repo, FILE *fp)
 	fprintf (stderr, "malformed line: %s\n", line);
     }
 
+  if (!s->arch)
+    s->arch = ARCH_NOARCH;
   if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   if (s)

@@ -43,19 +43,10 @@ static char *flagtab[] = {
 static Id
 langtag(struct parsedata *pd, Id tag, const char *language)
 {
-  char *p;
-  const char *tagname;
-
   if (!language || tag >= ID_NUM_INTERNAL)
-    return tag;
+    return pool_id2langid(pd->repo->pool, tag, language, 1);
   if (!pd->langcache[tag])
-    {
-      tagname = id2str(pd->repo->pool, tag);
-      p = sat_malloc(strlen(tagname) + strlen(language) + 2);
-      sprintf(p, "%s:%s", tagname, language);
-      pd->langcache[tag] = str2id(pd->repo->pool, p, 1);
-      sat_free(p);
-    }
+    pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, language, 1);
   return pd->langcache[tag];
 }
 
