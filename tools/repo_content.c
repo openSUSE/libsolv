@@ -256,10 +256,10 @@ repo_add_content(Repo *repo, FILE *fp)
 	    s->evr = makeevr(pool, value);
 	  else if (istag ("DISTPRODUCT"))
 	    /* DISTPRODUCT is for registration and Yast, not for the solver. */
-	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:distproduct", 1), value);
+	    repo_set_str(repo, s - pool->solvables, PRODUCT_DISTPRODUCT, value);
 	  else if (istag ("DISTVERSION"))
 	    /* DISTVERSION is for registration and Yast, not for the solver. */
-	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:distversion", 1), value);
+	    repo_set_str(repo, s - pool->solvables, PRODUCT_DISTVERSION, value);
 	  else if (istag ("VENDOR"))
 	    s->vendor = str2id(pool, value, 1);
 	  else if (istag ("ARCH"))
@@ -286,26 +286,26 @@ repo_add_content(Repo *repo, FILE *fp)
 	  else if (istag ("ENHANCES"))
 	    s->enhances = adddep(pool, &pd, s->enhances, value, 0);
 	  else if (istag ("DATADIR"))
-	    repo_set_str(repo, s - pool->solvables, str2id(pool, "susetags:datadir", 1), value);
+	    repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, value);
 	  /* FRESHENS doesn't seem to exist.  */
 	  else if (istag ("TYPE"))
-	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:type", 1), value);
+	    repo_set_str(repo, s - pool->solvables, PRODUCT_TYPE, value);
 	  else if (istag ("RELNOTESURL"))
-	    repodata_add_poolstr_array(data, handle, str2id(pool, "product:relnotesurl", 1), value);
+	    repodata_add_poolstr_array(data, handle, PRODUCT_RELNOTESURL, value);
 	  else if (istag ("UPDATEURLS"))
-	    add_multiple_strings(data, handle, str2id(pool, "product:updateurls", 1), value);
+	    add_multiple_strings(data, handle, PRODUCT_UPDATEURLS, value);
 	  else if (istag ("EXTRAURLS"))
-	    add_multiple_strings(data, handle, str2id(pool, "product:extraurls", 1), value);
+	    add_multiple_strings(data, handle, PRODUCT_EXTRAURLS, value);
 	  else if (istag ("OPTIONALURLS"))
-	    add_multiple_strings(data, handle, str2id(pool, "product:optionalurls", 1), value);
+	    add_multiple_strings(data, handle, PRODUCT_OPTIONALURLS, value);
 	  else if (istag ("SHORTLABEL"))
-	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:shortlabel", 1), value);
+	    repo_set_str(repo, s - pool->solvables, PRODUCT_SHORTLABEL, value);
 	  else if (istag ("LABEL"))
-	    repo_set_str(repo, s - pool->solvables, str2id(pool, "product:label", 1), value);
+	    repo_set_str(repo, s - pool->solvables, PRODUCT_LABEL, value);
 	  else if (!strncmp (key, "LABEL.", 6))
 	    repo_set_str(repo, s - pool->solvables, str2id(pool, join(&pd, "product:label:", key + 6, 0), 1), value);
 	  else if (istag ("FLAGS"))
-	    add_multiple_strings(data, handle, str2id(pool, "product:flags", 1), value);
+	    add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
 
 	  /* XXX do something about LINGUAS and ARCH? */
 #undef istag

@@ -134,6 +134,22 @@ KNOWNID(UPDATE_REFERENCE_HREF,	        "update:reference:href"),  /*  href, e.g.
 KNOWNID(UPDATE_REFERENCE_ID,	        "update:reference:id"),    /*  id, e.g. bug number */
 KNOWNID(UPDATE_REFERENCE_TITLE,	        "update:reference:title"), /*  title, e.g. "the bla forz scribs on fuggle" */
 
+/* name */
+KNOWNID(PRODUCT_SHORTLABEL,		"product:shortlabel"),
+/* summary */
+KNOWNID(PRODUCT_LABEL,			"product:label"),
+KNOWNID(PRODUCT_DISTPRODUCT,		"product:distproduct"),
+KNOWNID(PRODUCT_DISTVERSION,		"product:distversion"),
+KNOWNID(PRODUCT_TYPE,			"product:type"),
+KNOWNID(PRODUCT_RELNOTESURL,		"product:relnotesurl"),
+KNOWNID(PRODUCT_UPDATEURLS,		"product:updateurls"),
+KNOWNID(PRODUCT_EXTRAURLS,		"product:extraurls"),
+KNOWNID(PRODUCT_OPTIONALURLS,		"product:optionalurls"),
+KNOWNID(PRODUCT_FLAGS,			"product:flags"),
+
+/* argh */
+KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
