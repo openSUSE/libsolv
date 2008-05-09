@@ -136,8 +136,6 @@ KNOWNID(UPDATE_REFERENCE_TITLE,	        "update:reference:title"), /*  title, e.
 
 /* name */
 KNOWNID(PRODUCT_SHORTLABEL,		"product:shortlabel"),
-/* summary */
-KNOWNID(PRODUCT_LABEL,			"product:label"),
 KNOWNID(PRODUCT_DISTPRODUCT,		"product:distproduct"),
 KNOWNID(PRODUCT_DISTVERSION,		"product:distversion"),
 KNOWNID(PRODUCT_TYPE,			"product:type"),

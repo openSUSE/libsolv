@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri May  9 21:56:43 CEST 2008 - ma@suse.de
+
+- Parse the products LABEL in content file to SUMMARY. 
+
+-------------------------------------------------------------------
 Fri May  9 20:26:52 CEST 2008 - dmacvicar@suse.de
 
 - recognize 1 as true for reboot suggested and

@@ -294,14 +294,16 @@ repo_add_content(Repo *repo, FILE *fp)
 	    add_multiple_strings(data, handle, PRODUCT_OPTIONALURLS, value);
 	  else if (istag ("SHORTLABEL"))
 	    repo_set_str(repo, s - pool->solvables, PRODUCT_SHORTLABEL, value);
-	  else if (istag ("LABEL"))
-	    repo_set_str(repo, s - pool->solvables, PRODUCT_LABEL, value);
+	  else if (istag ("LABEL")) /* LABEL is the products SUMMARY. */
+	    repo_set_str(repo, s - pool->solvables, SOLVABLE_SUMMARY, value);
 	  else if (!strncmp (key, "LABEL.", 6))
-	    repo_set_str(repo, s - pool->solvables, pool_id2langid(pool, PRODUCT_LABEL, key + 6, 1), value);
+	    repo_set_str(repo, s - pool->solvables, pool_id2langid(pool, SOLVABLE_SUMMARY, key + 6, 1), value);
 	  else if (istag ("FLAGS"))
 	    add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
 
-	  /* XXX do something about LINGUAS and ARCH? */
+	  /* XXX do something about LINGUAS and ARCH?
+          * <ma>: Don't think so. zypp does not use or propagate them.
+          */
 #undef istag
 	}
       else
@@ -314,7 +316,7 @@ repo_add_content(Repo *repo, FILE *fp)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   if (s)
     s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
-    
+
   if (pd.tmp)
     sat_free(pd.tmp);
   sat_free(line);
