@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Sat May 10 15:33:15 CEST 2008 - coolo@suse.de
+
+- resubmit clean tar
+
+-------------------------------------------------------------------
 Fri May  9 21:56:43 CEST 2008 - ma@suse.de
 
 - Parse the products LABEL in content file to SUMMARY. 
