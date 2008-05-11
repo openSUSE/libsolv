@@ -20,6 +20,9 @@
 #include "repo.h"
 #include "repo_updateinfoxml.h"
 #include "tools_util.h"
+
+//#define DUMPOUT 0
+
 /*
  * <deltainfo>
  *   <newpackage name="libtool" epoch="0" version="1.5.24" release="6.fc9" arch="i386">
@@ -41,14 +44,13 @@
 
 enum state {
   STATE_START,
-  STATE_DELTAINFO,      /* 1 */
-  STATE_NEWPACKAGE,     /* 2 */
-  STATE_DELTA,          /* 3 */
-  STATE_FILENAME,       /* 4 */
-  STATE_SEQUENCE,       /* 5 */
-  STATE_SIZE,           /* 6 */
-  STATE_CHECKSUM,       /* 7 */
-  STATE_LOCATION,       /* 8 */
+  STATE_NEWPACKAGE,     /* 1 */
+  STATE_DELTA,          /* 2 */
+  STATE_FILENAME,       /* 3 */
+  STATE_SEQUENCE,       /* 4 */
+  STATE_SIZE,           /* 5 */
+  STATE_CHECKSUM,       /* 6 */
+  STATE_LOCATION,       /* 7 */
   NUMSTATES
 };
 
@@ -61,12 +63,10 @@ struct stateswitch {
 
 /* !! must be sorted by first column !! */
 static struct stateswitch stateswitches[] = {
-  { STATE_START,       "deltainfo",       STATE_DELTAINFO,   0 },
   /* compatibility with old yum-presto */
-  { STATE_START,       "prestodelta",     STATE_DELTAINFO,   0 },
-  /* allow starting from newpackage directly */
+  { STATE_START,       "prestodelta",     STATE_START, 0 },
+  { STATE_START,       "deltainfo",       STATE_START, 0 },
   { STATE_START,       "newpackage",      STATE_NEWPACKAGE,  0 },
-  { STATE_DELTAINFO,   "newpackage",      STATE_NEWPACKAGE,  0 },
   { STATE_NEWPACKAGE,  "delta",           STATE_DELTA,       0 },
   /* compatibility with yum-presto */
   { STATE_DELTA,       "filename",        STATE_FILENAME,    1 },
@@ -106,7 +106,7 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
-  unsigned int datanum;
+  int datanum;
   
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
@@ -325,6 +325,7 @@ startElement(void *userData, const char *name, const char **atts)
           pd->delta.nbevr++;
           pd->delta.bevr = sat_realloc (pd->delta.bevr, pd->delta.nbevr * sizeof(Id));
           pd->delta.bevr[pd->delta.nbevr - 1] = makeevr_atts(pool, pd, atts);
+          --(pd->datanum);
           break;
       case STATE_FILENAME:
           break;
@@ -375,17 +376,36 @@ endElement(void *userData, const char *name)
           break;
       case STATE_DELTA:
       {
-#if DUMPOUT
+#ifdef DUMPOUT
           int i;
+#endif
           struct deltarpm *d = &pd->delta;
+
+#ifdef DUMPOUT
+
           fprintf (stderr, "found deltarpm for %s:\n", id2str(pool, pd->newpkgname));
+#endif
+          repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_NAME, pd->newpkgname);
+          repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_NAME, d->locname);
+          repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_DIR, d->locdir);
+          repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_EVR, d->locevr);
+          repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_SUFFIX, d->locsuffix);
+
+#ifdef DUMPOUT
           fprintf (stderr, "   loc: %s %s %s %s\n", id2str(pool, d->locdir),
                    id2str(pool, d->locname), id2str(pool, d->locevr),
                    id2str(pool, d->locsuffix));
           fprintf (stderr, "  size: %d down\n", d->downloadsize);
           fprintf (stderr, "  chek: %s\n", d->filechecksum);
+#endif
+
+          repo_set_num(pd->repo, pd->datanum, DELTA_DOWNLOADSIZE, d->downloadsize);
+          repo_set_str(pd->repo, pd->datanum, DELTA_CHECKSUM, d->filechecksum);
+
+
           if (d->seqnum)
 	  {
+#ifdef DUMPOUT
               fprintf (stderr, "  base: %s\n",
                        id2str(pool, d->bevr[0]));
               fprintf (stderr, "            seq: %s\n",
@@ -394,24 +414,36 @@ endElement(void *userData, const char *name)
                        id2str(pool, d->seqevr));
               fprintf (stderr, "                 %s\n",
                        d->seqnum);
+#endif
+              repo_set_id(pd->repo, pd->datanum, DELTA_BASE_EVR, d->bevr[0]);
+              repo_set_id(pd->repo, pd->datanum, DELTA_SEQ_NAME, d->seqname);
+              repo_set_id(pd->repo, pd->datanum, DELTA_SEQ_EVR, d->seqevr);
+              repo_set_str(pd->repo, pd->datanum, DELTA_SEQ_NUM, d->seqnum);
 
+#ifdef DUMPOUT
               fprintf(stderr, "OK\n");
-              
+#endif
+
+#ifdef DUMPOUT              
               if (d->seqevr != d->bevr[0])
                   fprintf (stderr, "XXXXX evr\n");
               /* Name of package ("atom:xxxx") should match the sequence info
                  name.  */
               if (strcmp(id2str(pool, d->seqname), id2str(pool, pd->newpkgname) + 5))
                   fprintf (stderr, "XXXXX name\n");
+#endif
 	  }
           else
 	  {
+
+#ifdef DUMPOUT                          
               fprintf (stderr, "  base:");
               for (i = 0; i < d->nbevr; i++)
                   fprintf (stderr, " %s", id2str(pool, d->bevr[i]));
               fprintf (stderr, "\n");
-	  }
 #endif
+	  }
+
       }
       free(pd->delta.filechecksum);
       free(pd->delta.bevr);
@@ -517,6 +549,7 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
   pd.tempstr = malloc(256);
   pd.atemp = 256;
   pd.ltemp = 0;
+  pd.datanum = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   XML_SetElementHandler(parser, startElement, endElement);

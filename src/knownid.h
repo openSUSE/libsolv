@@ -148,6 +148,18 @@ KNOWNID(PRODUCT_FLAGS,			"product:flags"),
 /* argh */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
 
+KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
+KNOWNID(DELTA_LOCATION_DIR,		"delta:locdir"),
+KNOWNID(DELTA_LOCATION_NAME,		"delta:locname"),
+KNOWNID(DELTA_LOCATION_EVR,		"delta:locevr"),
+KNOWNID(DELTA_LOCATION_SUFFIX,		"delta:locsuffix"),
+KNOWNID(DELTA_DOWNLOADSIZE,		"delta:downloadsize"),
+KNOWNID(DELTA_CHECKSUM,		        "delta:checksum"),
+KNOWNID(DELTA_BASE_EVR,		        "delta:baseevr"),
+KNOWNID(DELTA_SEQ_NAME,		        "delta:seqname"),
+KNOWNID(DELTA_SEQ_EVR,		        "delta:seqevr"),
+KNOWNID(DELTA_SEQ_NUM,		        "delta:seqnum"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
