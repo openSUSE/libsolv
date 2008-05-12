@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon May 12 10:16:20 CEST 2008 - coolo@suse.de
+
+- provide libsatsolver to fix requires of debuginfo
+
+-------------------------------------------------------------------
 Sat May 10 15:33:15 CEST 2008 - coolo@suse.de
 
 - resubmit clean tar

@@ -55,7 +55,7 @@ Group:          Development/Languages/Ruby
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
 Obsoletes:      libsatsolver <= 0.0.15
-Provides:       libsatsolver = 0.0.15
+Provides:       libsatsolver = %{version}-%{release}
 Requires:       gzip bzip2 coreutils
 
 %description -n satsolver-tools
