@@ -94,7 +94,16 @@ elif test -d suse/setup/descr && test -s content; then
       cat packages
     fi
 
-    # First packages
+    # DU
+    if test -s packages.DU.gz; then
+      gzip -dc packages.DU.gz
+    elif test -s packages.DU.bz2; then
+      bzip2 -dc packages.DU.bz2
+    elif test -s packages.DU; then
+      cat packages.DU
+    fi
+
+    # Now default language
     if test -s packages.en.gz; then
       gzip -dc packages.en.gz
     elif test -s packages.en.bz2; then
@@ -102,8 +111,6 @@ elif test -d suse/setup/descr && test -s content; then
     elif test -s packages.en; then
       cat packages.en
     fi
-
-    # XXX need to do something with packages.DU and packages.{lang}
 
     # Now patterns.  Not simply those files matching *.pat{,.gz,bz2},
     # but only those mentioned in the file 'patterns'
@@ -117,6 +124,25 @@ elif test -d suse/setup/descr && test -s content; then
 	esac
       done
     fi
+
+    # Now all other packages.{lang}.  Needs to come last as it switches
+    # languages for all following susetags files
+    for i in packages.*; do
+      case $i in
+	*.gz) name="${i%.gz}" ; prog="gzip -dc" ;;
+	*.bz2) name="${i%.bz2}" ; prog="bzip2 -dc" ;;
+	*) name="$i"; prog=cat ;;
+      esac
+      case $name in
+	# ignore files we handled already
+	*.DU | *.en | *.FL | packages ) continue ;;
+	*) 
+	  suff=${name#packages.}
+	  echo "=Lan: $suff"
+	  eval "$prog '$i'" ;;
+      esac
+    done
+
   ) | susetags2solv -c "${olddir}/content" $parser_options || exit 4
   cd "$olddir"
 else
