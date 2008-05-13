@@ -1651,6 +1651,7 @@ propagate(Solver *solv, int level)
 	      else                                    /* go find a 'd' to make 'true' */
 		{
 		  /* foreach 'd' */
+		  /* FIXME: should be a policy */
 		  for (dp = pool->whatprovidesdata + r->d; (p = *dp++) != 0;)
 		    if (p != other_watch              /* which is not what we just checked */
 		        && !DECISIONMAP_TRUE(-p))     /* and its not already decided 'negative' */
