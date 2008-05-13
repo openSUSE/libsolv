@@ -2412,12 +2412,12 @@ run_solver(Solver *solv, int disablerules, int doweak)
 
       if (level < systemlevel && solv->installed && solv->installed->nsolvables)
 	{
-	    /*
-	     * Normal run (non-updating)
-	     * Keep as many packages as possible
-	     */
 	  if (!solv->updatesystem)
 	    {
+	      /*
+	       * Normal run (non-updating)
+	       * Keep as many packages installed as possible
+	       */
 	      POOL_DEBUG(SAT_DEBUG_STATS, "installing old packages\n");
 		
 	      for (i = solv->installed->start; i < solv->installed->end; i++)
