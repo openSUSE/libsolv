@@ -4,6 +4,19 @@
 # give it a directory of a local mirror of a repo and this
 # tries to detect the repo type and generate one SOLV file on stdout
 
+test_susetags() {
+  if test -s content; then
+    DESCR=`grep DESCRDIR content | cut -d ' ' -f 2`
+    if test -z $DESCR; then
+      DESCR=suse/setup/descr
+    fi
+    test -d $DESCR
+    return $?
+  else
+    return 1
+  fi
+}
+
 # this should signal an error if there is a problem
 set -e 
 
@@ -103,9 +116,13 @@ if test -d repodata; then
   mergesolv $m_primfile $m_patchfile $m_updateinfofile $m_deltainfofile
   rm -f $primfile $patchfile $updateinfofile $deltainfofile
 
-elif test -d suse/setup/descr && test -s content; then
+elif test_susetags; then
   olddir=`pwd`
-  cd suse/setup/descr || exit 2
+  DESCR=`grep DESCRDIR content | cut -d ' ' -f 2`
+  if test -z $DESCR; then
+    DESCR=suse/setup/descr
+  fi
+  cd ${DESCR} || exit 2
   (
     # First packages
     if test -s packages.gz; then
