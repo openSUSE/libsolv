@@ -1554,13 +1554,10 @@ addwatches_rule(Solver *solv, Rule *r)
  * make decision and propagate to all rules
  * 
  * Evaluate each term affected by the decision (linked through watches)
- * 
- * If the decision was positive (true), we're done since the whole term is true
- * If the decision was negative (false), we must force the other literal of
- *  the conjunctive normal form (CNF) to true.
+ * If we find unit rules we make new decisions based on them
  * 
  * return : 0 = everything is OK
- *          watched rule = there is a conflict
+ *          rule = conflict found in this rule
  */
 
 static Rule *
@@ -1577,14 +1574,12 @@ propagate(Solver *solv, int level)
 
   POOL_DEBUG(SAT_DEBUG_PROPAGATE, "----- propagate -----\n");
 
-    /* foreach non-propagated decision */
+  /* foreach non-propagated decision */
   while (solv->propagate_index < solv->decisionq.count)
     {
 	/*
 	 * 'pkg' was just decided
-	 * 
 	 * negate because our watches trigger if literal goes FALSE
-	 * If a literal goes TRUE in a CNF (terms of (x|y)), we're done for this term
 	 */
       pkg = -solv->decisionq.elements[solv->propagate_index++];
 	
@@ -1594,7 +1589,7 @@ propagate(Solver *solv, int level)
 	  solver_printruleelement(solv, SAT_DEBUG_PROPAGATE, 0, -pkg);
         }
 
-	/* foreach rule involving 'pkg' */
+      /* foreach rule where 'pkg' is now FALSE */
       for (rp = watches + pkg; *rp; rp = next_rp)
 	{
 	  r = solv->rules + *rp;
@@ -1631,12 +1626,13 @@ propagate(Solver *solv, int level)
 	    
 	    /* 
 	     * This term is already true (through the other literal)
+	     * so we have nothing to do
 	     */
 	  if (DECISIONMAP_TRUE(other_watch))
 	    continue;
 
 	    /*
-	     * The other literal is false, try to get a 'true'
+	     * The other literal is false or undecided
 	     */
 	    
           if (r->d)
@@ -1696,10 +1692,10 @@ propagate(Solver *solv, int level)
 	    } /* not binary */
 	    
             /*
-	     * unit clause found, force other watch to TRUE
+	     * unit clause found, set literal other_watch to TRUE
 	     */
 
-	  if (DECISIONMAP_TRUE(-other_watch))	           /* decided before to 'negative' */
+	  if (DECISIONMAP_TRUE(-other_watch))	   /* check if literal is FALSE */
 	    return r;  		                   /* eek, a conflict! */
 	    
 	  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
@@ -1708,9 +1704,6 @@ propagate(Solver *solv, int level)
 	      solver_printrule(solv, SAT_DEBUG_PROPAGATE, r);
 	    }
 
-	    /*
-	     * decide: 'other_watch' to 'true'
-	     */
 	  if (other_watch > 0)
             decisionmap[other_watch] = level;    /* install! */
 	  else
