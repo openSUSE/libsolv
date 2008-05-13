@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue May 13 14:11:30 CEST 2008 - jreidinger@suse.cz
+
+- read description dir path from content file (bnc #389414) 
+
+-------------------------------------------------------------------
 Tue May 13 12:20:58 CEST 2008 - dmacvicar@suse.de
 
 - a boolean is not a num attribute set to 1, but just a existing void
