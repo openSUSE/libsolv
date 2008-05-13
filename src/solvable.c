@@ -226,12 +226,6 @@ solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound)
 }
 
 int
-solvable_lookup_bool(Solvable *s, Id keyname)
-{
-  return solvable_lookup_num(s, keyname, 0) ? 1 : 0;
-}
-
-int
 solvable_lookup_void(Solvable *s, Id keyname)
 {
   Repo *repo = s->repo;
@@ -258,6 +252,12 @@ solvable_lookup_void(Solvable *s, Id keyname)
         }
     }
   return 0;
+}
+
+int
+solvable_lookup_bool(Solvable *s, Id keyname)
+{
+  return solvable_lookup_void(s, keyname);
 }
 
 const unsigned char *
