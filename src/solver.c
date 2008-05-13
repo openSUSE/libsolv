@@ -1651,6 +1651,7 @@ propagate(Solver *solv, int level)
 	      else                                    /* go find a 'd' to make 'true' */
 		{
 		  /* foreach 'd' */
+		  /* FIXME: should be a policy */
 		  for (dp = pool->whatprovidesdata + r->d; (p = *dp++) != 0;)
 		    if (p != other_watch              /* which is not what we just checked */
 		        && !DECISIONMAP_TRUE(-p))     /* and its not already decided 'negative' */
@@ -2493,7 +2494,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (!dq.count && solv->decisionmap[i] != 0)
 		continue;
 	      olevel = level;
-	      /* FIXME: i is handled a bit different because we do not want
+	      /* FIXME: it is handled a bit different because we do not want
 	       * to have it pruned just because it is not recommened.
 	       * we should not prune installed packages instead
 	       */
