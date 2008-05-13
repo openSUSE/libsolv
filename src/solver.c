@@ -2437,7 +2437,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  olevel = level;
 		  level = setpropagatelearn(solv, level, i, disablerules);
 
-		  if (level == 0)                /* done */
+		  if (level == 0)                /* unsolvable */
 		    {
 		      queue_free(&dq);
 		      return;
