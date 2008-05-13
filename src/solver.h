@@ -109,8 +109,9 @@ typedef struct solver {
   int directdecisions;			/* number of decisions with no rule */
 
   Id *decisionmap;			/* map for all available solvables,
-					   > 0: level of decision when installed,
-					   < 0: level of decision when conflict */
+					 * = 0: undecided
+					 * > 0: level of decision when installed,
+					 * < 0: level of decision when conflict */
 
   /* learnt rule history */
   Queue learnt_why;
