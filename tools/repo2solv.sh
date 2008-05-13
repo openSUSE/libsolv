@@ -68,19 +68,41 @@ if test -d repodata; then
     ) | grep -v '\?xml' | patchxml2solv $parser_options > $patchfile || exit 4
   fi
 
-  # Now merge primary and patches and updateinfo
-  if test -s $primfile && test -s $patchfile && test -s $updateinfofile; then
-      mergesolv $primfile $patchfile $updateinfofile
-  elif test -s $primfile && test -s $updateinfofile; then
-      mergesolv $primfile $updateinfofile
-  elif test -s $primfile && test -s $patchfile; then
-    mergesolv $primfile $patchfile
-  elif test -s $primfile; then
-    cat $primfile
-  elif test -s $patchfile; then
-    cat $patchfile
+  # This contains a deltainfo.xml*
+  if test -f deltainfo.xml || test -f deltainfo.xml.gz || test -f deltainfo.xml.bz2 ; then
+      for i in deltainfo.xml*; do
+          case $i in
+              *.gz) cmd="gzip -dc" ;;
+              *.bz2) cmd="bzip2 -dc" ;;
+              *) cmd="cat" ;;
+          esac
+          # only check the first deltainfo.xml*, in case there are more
+          break
+      done
+      deltainfofile="/nonexist"
+      if test -n "$cmd"; then
+      # we have some deltainfo.xml*
+          deltainfofile=`mktemp` || exit 3
+          $cmd $i | deltainfoxml2solv $parser_options > $deltainfofile || exit 4
+      fi
   fi
-  rm -f $primfile $patchfile $updateinfofile
+
+  # Now merge primary, patches, updateinfo, and deltainfo
+  if test -s $primfile; then
+    m_primfile=$primfile
+  fi
+  if test -s $patchfile; then
+    m_patchfile=$patchfile
+  fi
+  if test -s $updateinfofile; then
+    m_updateinfofile=$updateinfofile
+  fi
+  if test -s $deltainfofile; then
+    m_deltainfofile=$deltainfofile
+  fi
+  mergesolv $m_primfile $m_patchfile $m_updateinfofile $m_deltainfofile
+  rm -f $primfile $patchfile $updateinfofile $deltainfofile
+
 elif test -d suse/setup/descr && test -s content; then
   olddir=`pwd`
   cd suse/setup/descr || exit 2
