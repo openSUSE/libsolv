@@ -169,7 +169,10 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 
   fileinfos = sat_zextend(fileinfos, nfileinfos, 1, sizeof(Repodatafile), REPODATAFILE_BLOCK);
   pool_addfileprovides_ids(repo->pool, 0, &fileinfos[nfileinfos].addedfileprovides);
-  if (repo->rpmdbcookie)
+  for (i = 0; i < 32; i++)
+    if (repo->rpmdbcookie[i])
+      break;
+  if (i < 32)
     fileinfos[nfileinfos].rpmdbcookie = repo->rpmdbcookie;
   if (fileinfos[nfileinfos].addedfileprovides || fileinfos[nfileinfos].rpmdbcookie)
     nfileinfos++;

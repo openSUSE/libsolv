@@ -11,6 +11,7 @@
  */
 
 #include <sys/types.h>
+#include <unistd.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -32,31 +33,64 @@ usage()
   exit(0);
 }
 
+static FILE *
+loadcallback (Pool *pool, Repodata *data, void *vdata)
+{
+  FILE *fp = 0;
+  if (data->location)
+    {
+      fprintf(stderr, "Loading SOLV file %s\n", data->location);
+      fp = fopen (data->location, "r");
+      if (!fp)
+	perror(data->location);
+    }
+  return fp;
+}
 
 int
 main(int argc, char **argv)
 {
-  Pool *pool = pool_create();
+  Pool *pool;
   Repo *repo;
+  const char *basefile = 0;
+  int with_attr = 0;
+  int c;
 
-  repo = repo_create(pool, "");
-  while (argc-- > 1)
+  pool = pool_create();
+  repo = repo_create(pool, "<mergesolv>");
+  
+  while ((c = getopt(argc, argv, "ahb:")) >= 0)
+    {
+      switch (c)
+      {
+	case 'h':
+	  usage();
+	  break;
+	case 'a':
+	  with_attr = 1;
+	  break;
+	case 'b':
+	  basefile = optarg;
+	  break;
+	default:
+	  exit(1);
+      }
+    }
+  if (with_attr)
+    pool_setloadcallback(pool, loadcallback, 0);
+
+  for (; optind < argc; optind++)
     {
       FILE *fp;
-      argv++;
-      if (!strcmp(*argv,"-h"))
-	usage();
-      if ((fp = fopen(*argv, "r")) == NULL)
+      if ((fp = fopen(argv[optind], "r")) == NULL)
 	{
-	  perror(argv[1]);
+	  perror(argv[optind]);
 	  exit(0);
 	}
       repo_add_solv(repo, fp);
       fclose(fp);
     }
-
-  tool_write(repo, 0, 0);
+  tool_write(repo, basefile, 0);
   pool_free(pool);
-
   return 0;
 }
