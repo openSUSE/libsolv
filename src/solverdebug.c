@@ -51,6 +51,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
       for (i = 0; i < solv->decisionq.count; i++)
 	{
 	  Id *pp, n;
+	  int noobs;
 
 	  n = solv->decisionq.elements[i];
 	  if (n < 0)
@@ -60,9 +61,13 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	  s = pool->solvables + n;
 	  if (s->repo == installed)		/* obsoletes don't count for already installed packages */
 	    continue;
+	  noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, n);
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
-	      if (!solv->implicitobsoleteusesprovides && s->name != pool->solvables[p].name)
+	      Solvable *ps = pool->solvables + p;
+	      if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
+		continue;
+	      if (!solv->implicitobsoleteusesprovides && s->name != ps->name)
 		continue;
 	      if (pool->solvables[p].repo == installed && !obsoletesmap[p])
 		{
@@ -85,6 +90,8 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	  if (s->repo == installed)		/* obsoletes don't count for already installed packages */
 	    continue;
 	  if (!s->obsoletes)
+	    continue;
+	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, n))
 	    continue;
 	  obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)

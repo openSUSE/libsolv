@@ -908,6 +908,8 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	{
 	case SOLVER_INSTALL_SOLVABLE:			/* install specific solvable */
 	  s = pool->solvables + what;
+	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
+	    break;
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
 	      if (pool->solvables[p].name != s->name)
@@ -1278,7 +1280,8 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        */
       if (!installed || pool->solvables[n].repo != installed)
 	{			       /* not installed */
-	  if (s->obsoletes)
+	  int noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, n);
+	  if (s->obsoletes && !noobs)
 	    {
 	      obsp = s->repo->idarraydata + s->obsoletes;
 	      /* foreach obsoletes */
@@ -1294,16 +1297,14 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		    }
 		}
 	    }
-/**
- * FIXME
- * This looks wrong, since its outside of the obsoletes loop so it probably prevents multiple installs of the same name
- * 
- */
-	  /* foreach provider of s->name */
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
-	      if (!solv->implicitobsoleteusesprovides /* implicit obsoletes due to same name are not matched against provides, just names */
-		  && s->name != pool->solvables[p].name)
+	      Solvable *ps = pool->solvables + p;
+	      /* we still obsolete packages with same nevra, like rpm does */
+	      /* (actually, rpm mixes those packages. yuck...) */
+	      if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
+		continue;
+	      if (!solv->implicitobsoleteusesprovides && s->name != ps->name)
 		continue;
 	      addrule(solv, -n, -p);
 	    }
@@ -1377,7 +1378,7 @@ addrpmrulesforweak(Solver *solv, Map *m)
 	}
 
 	/* if nothing found, check for freshens
-	 * (patterns use this
+	 * (patterns use this)
 	 */
       if (!sup && s->freshens)
 	{
@@ -2326,6 +2327,7 @@ solver_free(Solver *solv)
   map_free(&solv->suggestsmap);
   map_free(&solv->noupdate);
   map_free(&solv->weakrulemap);
+  map_free(&solv->noobsoletes);
 
   sat_free(solv->decisionmap);
   sat_free(solv->rules);
@@ -3250,12 +3252,18 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 
       /* if both packages have the same name and at least one of them
        * is not installed, they conflict */
-      if (s->name == s2->name && (!installed || (s->repo != installed || s2->repo != installed)))
+      if (s->name == s2->name && !(installed && s->repo == installed && s2->repo == installed))
 	{
-	  *depp = 0;
-	  *sourcep = -r->p;
-	  *targetp = -r->w2;
-	  return SOLVER_PROBLEM_SAME_NAME;
+	  /* also check noobsoletes map */
+	  if ((s->evr == s2->evr && s->arch == s2->arch) || !solv->noobsoletes.size
+		|| ((!installed || s->repo != installed) && !MAPTST(&solv->noobsoletes, -r->p))
+		|| ((!installed || s2->repo != installed) && !MAPTST(&solv->noobsoletes, -r->w2)))
+	    {
+	      *depp = 0;
+	      *sourcep = -r->p;
+	      *targetp = -r->w2;
+	      return SOLVER_PROBLEM_SAME_NAME;
+	    }
 	}
 
       /* check conflicts in both directions */
@@ -3296,7 +3304,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	    }
 	}
       /* check obsoletes in both directions */
-      if ((!installed || s->repo != installed) && s->obsoletes)
+      if ((!installed || s->repo != installed) && s->obsoletes && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -r->p)))
 	{
 	  obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
@@ -3314,7 +3322,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 		}
 	    }
 	}
-      if ((!installed || s2->repo != installed) && s2->obsoletes)
+      if ((!installed || s2->repo != installed) && s2->obsoletes && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -r->w2)))
 	{
 	  obsp = s2->repo->idarraydata + s2->obsoletes;
 	  while ((obs = *obsp++) != 0)
@@ -3332,7 +3340,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 		}
 	    }
 	}
-      if (solv->implicitobsoleteusesprovides && (!installed || s->repo != installed))
+      if (solv->implicitobsoleteusesprovides && (!installed || s->repo != installed) && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -r->p)))
 	{
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
@@ -3344,7 +3352,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	      return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
 	    }
 	}
-      if (solv->implicitobsoleteusesprovides && (!installed || s2->repo != installed))
+      if (solv->implicitobsoleteusesprovides && (!installed || s2->repo != installed) && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -r->w2)))
 	{
 	  FOR_PROVIDES(p, pp, s2->name)
 	    {
@@ -3720,6 +3728,35 @@ solver_solve(Solver *solv, Queue *job)
    *
    */
 
+  /* create noobsolete map if needed */
+  for (i = 0; i < job->count; i += 2)
+    {
+      how = job->elements[i] & ~SOLVER_WEAK;
+      what = job->elements[i + 1];
+      switch(how)
+	{
+	case SOLVER_NOOBSOLETES_SOLVABLE:
+	case SOLVER_NOOBSOLETES_SOLVABLE_NAME:
+	case SOLVER_NOOBSOLETES_SOLVABLE_PROVIDES:
+	  if (!solv->noobsoletes.size)
+	    map_init(&solv->noobsoletes, pool->nsolvables);
+	  if (how == SOLVER_NOOBSOLETES_SOLVABLE)
+	    {
+	      MAPSET(&solv->noobsoletes, what);
+	      break;
+	    }
+	  FOR_PROVIDES(p, pp, what)
+	    {
+	      if (how == SOLVER_NOOBSOLETES_SOLVABLE_NAME && !pool_match_nevr(pool, pool->solvables + p, what))
+		continue;
+	      MAPSET(&solv->noobsoletes, p);
+	    }
+	  break;
+	default:
+	  break;
+	}
+    }
+
   map_init(&addedmap, pool->nsolvables);
   queue_init(&q);
 
@@ -3861,7 +3898,6 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	    }
 
-	    /* FIXME: Huh ? Impossile !, we only loop over installed here */
 	  if (s->repo != installed)
 	    {
 	      addrule(solv, 0, 0);	/* create dummy rule */
@@ -3906,7 +3942,6 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	    }
 #endif
-	    /* FIXME: Huh ? Impossile !, we only loop over installed here */
 	  if (s->repo != installed)
 	    {
 	      addrule(solv, 0, 0);	/* create dummy rule */
@@ -4051,6 +4086,15 @@ solver_solve(Solver *solv, Queue *job)
 	  s = pool->solvables + what;
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: weaken deps %s\n", solvable2str(pool, s));
 	  weaken_solvable_deps(solv, what);
+	  break;
+	case SOLVER_NOOBSOLETES_SOLVABLE:
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: no obsolete %s\n", solvable2str(pool, pool->solvables + what));
+	  break;
+	case SOLVER_NOOBSOLETES_SOLVABLE_NAME:
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: no obsolete name %s\n", dep2str(pool, what));
+	  break;
+	case SOLVER_NOOBSOLETES_SOLVABLE_PROVIDES:
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: no obsolete provides %s\n", dep2str(pool, what));
 	  break;
 	}
 	

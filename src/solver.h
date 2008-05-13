@@ -87,12 +87,13 @@ typedef struct solver {
     
   Id learntrules;			/* learnt rules, (end == nrules) */
 
-  Map noupdate;				/* don't try to update these installed solvables */
-                                        /* aka 'obsoletesmap' */
+  Map noupdate;				/* don't try to update these
+                                           installed solvables */
+  Map noobsoletes;			/* ignore obsoletes for these
+					   (multiinstall) */
 
-  Queue weakruleq;                      /* index into 'rules' for weak ones */
-
-  Map weakrulemap;                      /* map rule# to '1' for weak rules, 1..learntrules */
+  Queue weakruleq;			/* index into 'rules' for weak ones */
+  Map weakrulemap;			/* map rule# to '1' for weak rules, 1..learntrules */
 
   Id *watches;				/* Array of rule offsets
 					 * watches has nsolvables*2 entries and is addressed from the middle
@@ -216,6 +217,11 @@ typedef enum {
   SOLVER_INSTALL_SOLVABLE_UPDATE,
   SOLVER_INSTALL_SOLVABLE_ONE_OF,
   SOLVER_WEAKEN_SOLVABLE_DEPS,
+  SOLVER_NOOBSOLETES_SOLVABLE,
+  SOLVER_NOOBSOLETES_SOLVABLE_NAME,
+  SOLVER_NOOBSOLETES_SOLVABLE_PROVIDES,
+
+  /* flags */
   SOLVER_WEAK = 0x100,
 } SolverCmd;
 
