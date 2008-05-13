@@ -387,8 +387,17 @@ policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
   return 1;
 }
 
+
+/*
+ * find update candidates
+ * 
+ * s: solvable to be updated
+ * qs: [out] queue to hold Ids of candidates
+ * allow_all: 0 = dont allow downgrades, 1 = allow all candidates
+ * 
+ */
 void
-policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
+policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 {
   /* installed packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
@@ -422,7 +431,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allowall)
       ps = pool->solvables + p;
       if (s->name == ps->name)	/* name match */
 	{
-	  if (!allowall)
+	  if (!allow_all)
 	    {
 	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_MATCH_RELEASE) > 0)
 	        continue;
