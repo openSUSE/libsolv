@@ -63,24 +63,36 @@ typedef struct solver {
   Pool *pool;
   Repo *installed;
   
+  /* list of rules, ordered
+   * rpm rules first, then features, updates, jobs, learnt
+   * see start/end offsets below
+   */
   Rule *rules;				/* all rules */
-  Id nrules;				/* index of the last rule */
+  Id nrules;				/* [Offset] index of the last rule */
 
-  Queue ruleassertions;			/* index of all assertion rules */
+  Queue ruleassertions;			/* Queue of all assertion rules */
 
-  Id rpmrules_end;
-  Id featurerules;			/* feature rules */
+  /* start/end offset for rule 'areas' */
+    
+  Id rpmrules_end;                      /* [Offset] rpm rules end */
+    
+  Id featurerules;			/* feature rules start/end */
   Id featurerules_end;
+    
   Id updaterules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
   Id updaterules_end;
+    
   Id jobrules;				/* user rules */
   Id jobrules_end;
-  Id learntrules;			/* learnt rules */
+    
+  Id learntrules;			/* learnt rules, (end == nrules) */
 
-  Map noupdate;				/* don't try to update these
-                                           installed solvables */
-  Queue weakruleq;
-  Map weakrulemap;
+  Map noupdate;				/* don't try to update these installed solvables */
+                                        /* aka 'obsoletesmap' */
+
+  Queue weakruleq;                      /* index into 'rules' for weak ones */
+
+  Map weakrulemap;                      /* map rule# to '1' for weak rules, 1..learntrules */
 
   Id *watches;				/* Array of rule offsets
 					 * watches has nsolvables*2 entries and is addressed from the middle
@@ -88,14 +100,16 @@ typedef struct solver {
 					 * middle+solvable : decision to install: offset point to linked-list of rules
 					 */
 
-  Queue ruletojob;
+  Queue ruletojob;                      /* index into job queue: jobs for which a rule exits */
 
   /* our decisions: */
-  Queue decisionq;
+  Queue decisionq;                      /* >0:install, <0:remove/conflict */
   Queue decisionq_why;			/* index of rule, Offset into rules */
   int directdecisions;			/* number of decisions with no rule */
 
-  Id *decisionmap;			/* map for all available solvables, > 0: level of decision when installed, < 0 level of decision when conflict */
+  Id *decisionmap;			/* map for all available solvables,
+					   > 0: level of decision when installed,
+					   < 0: level of decision when conflict */
 
   /* learnt rule history */
   Queue learnt_why;
@@ -105,9 +119,9 @@ typedef struct solver {
   int (*solution_callback)(struct solver *solv, void *data);
   void *solution_callback_data;
 
-  int propagate_index;
+  int propagate_index;                  /* index into decisionq for non-propagated decisions */
 
-  Queue problems;
+  Queue problems;                       /* index of conflicting rules, < 0 for job rules */
   Queue recommendations;		/* recommended packages */
   Queue suggestions;			/* suggested packages */
 
