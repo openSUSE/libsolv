@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue May 13 17:14:26 CEST 2008 - dmacvicar@suse.de
+
+- use repodata_set_void for pattern visible attr
+
+-------------------------------------------------------------------
 Tue May 13 14:11:30 CEST 2008 - jreidinger@suse.cz
 
 - read description dir path from content file (bnc #389414) 

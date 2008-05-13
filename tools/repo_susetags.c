@@ -830,7 +830,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	      unsigned k;
 	      k = atoi (line + 6);
 	      if (k || !strcasecmp (line + 6, "true"))
-	        repodata_set_constant(data, handle, SOLVABLE_ISVISIBLE, 1);
+	        repodata_set_void(data, handle, SOLVABLE_ISVISIBLE );
 	    }
 	    continue;
           case CTAG('=', 'S', 'h', 'r'):
