@@ -263,6 +263,9 @@ solver_printdecisions(Solver *solv)
       POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions end -----\n");
     }
 
+  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
+  POOL_DEBUG(SAT_DEBUG_RESULT, "transaction:\n");
+
   /* print solvables to be erased */
 
   if (installed)
@@ -273,7 +276,7 @@ solver_printdecisions(Solver *solv)
 	    continue;
 	  if (obsoletesmap[p])
 	    continue;
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "erase   %s\n", solvable2str(pool, s));
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "  erase   %s\n", solvable2str(pool, s));
 	}
     }
 
@@ -293,7 +296,7 @@ solver_printdecisions(Solver *solv)
 
       if (!obsoletesmap[p])
         {
-          POOL_DEBUG(SAT_DEBUG_RESULT, "install   %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  install   %s", solvable2str(pool, s));
         }
       else
 	{
@@ -307,9 +310,9 @@ solver_printdecisions(Solver *solv)
 		break;
 	    }
 	  if (xp)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "downgrade %s", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  downgrade %s", solvable2str(pool, s));
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "upgrade   %s", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  upgrade   %s", solvable2str(pool, s));
           POOL_DEBUG(SAT_DEBUG_RESULT, "  (obsoletes");
 	  for (j = installed->start; j < installed->end; j++)
 	    if (obsoletesmap[j] == p)
@@ -318,43 +321,46 @@ solver_printdecisions(Solver *solv)
 	}
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
+  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
 
   sat_free(obsoletesmap);
 
   if (solv->recommendations.count)
     {
-      POOL_DEBUG(SAT_DEBUG_RESULT, "\nrecommended packages:\n");
+      POOL_DEBUG(SAT_DEBUG_RESULT, "recommended packages:\n");
       for (i = 0; i < solv->recommendations.count; i++)
 	{
 	  s = pool->solvables + solv->recommendations.elements[i];
           if (solv->decisionmap[solv->recommendations.elements[i]] > 0)
 	    {
 	      if (installed && s->repo == installed)
-	        POOL_DEBUG(SAT_DEBUG_RESULT, "- %s (installed)\n", solvable2str(pool, s));
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (installed)\n", solvable2str(pool, s));
 	      else
-	        POOL_DEBUG(SAT_DEBUG_RESULT, "- %s (selected)\n", solvable2str(pool, s));
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (selected)\n", solvable2str(pool, s));
 	    }
           else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s\n", solvable2str(pool, s));
 	}
+      POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
 
   if (solv->suggestions.count)
     {
-      POOL_DEBUG(SAT_DEBUG_RESULT, "\nsuggested packages:\n");
+      POOL_DEBUG(SAT_DEBUG_RESULT, "suggested packages:\n");
       for (i = 0; i < solv->suggestions.count; i++)
 	{
 	  s = pool->solvables + solv->suggestions.elements[i];
           if (solv->decisionmap[solv->suggestions.elements[i]] > 0)
 	    {
 	      if (installed && s->repo == installed)
-	        POOL_DEBUG(SAT_DEBUG_RESULT, "- %s (installed)\n", solvable2str(pool, s));
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (installed)\n", solvable2str(pool, s));
 	      else
-	        POOL_DEBUG(SAT_DEBUG_RESULT, "- %s (selected)\n", solvable2str(pool, s));
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (selected)\n", solvable2str(pool, s));
 	    }
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "- %s\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s\n", solvable2str(pool, s));
 	}
+      POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
 }
 
@@ -375,6 +381,9 @@ solver_printprobleminfo(Solver *solv, Queue *job, Id problem)
       return;
     case SOLVER_PROBLEM_JOB_RULE:
       POOL_DEBUG(SAT_DEBUG_RESULT, "conflicting requests\n");
+      return;
+    case SOLVER_PROBLEM_RPM_RULE:
+      POOL_DEBUG(SAT_DEBUG_RESULT, "some dependency problem\n");
       return;
     case SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP:
       POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides requested %s\n", dep2str(pool, dep));
@@ -520,3 +529,38 @@ solver_printsolutions(Solver *solv, Queue *job)
     }
 }
 
+void
+solver_printtrivial(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Queue in, out;
+  Map installedmap;
+  Id p;
+  const char *n; 
+  Solvable *s; 
+  int i;
+
+  queue_init(&in);
+  for (p = 1, s = pool->solvables + p; p < solv->pool->nsolvables; p++, s++)
+    {   
+      n = id2str(pool, s->name);
+      if (strncmp(n, "patch:", 6) != 0 && strncmp(n, "pattern:", 8) != 0)
+        continue;
+      queue_push(&in, p); 
+    }   
+  if (!in.count)
+    {
+      queue_free(&in);
+      return;
+    }
+  solver_create_state_maps(solv, &installedmap, 0); 
+  queue_init(&out);
+  pool_trivial_installable(pool, solv->installed, &installedmap, &in, &out);
+  POOL_DEBUG(SAT_DEBUG_RESULT, "trivial installable status:\n");
+  for (i = 0; i < in.count; i++)
+    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s: %d\n", solvable2str(pool, pool->solvables + in.elements[i]), out.elements[i]);
+  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
+  map_free(&installedmap);
+  queue_free(&in);
+  queue_free(&out);
+}

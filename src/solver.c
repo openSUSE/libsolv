@@ -1546,6 +1546,7 @@ addwatches_rule(Solver *solv, Rule *r)
  */
 #define DECISIONMAP_TRUE(p) ((p) > 0 ? (decisionmap[p] > 0) : (decisionmap[-p] < 0))
 #define DECISIONMAP_FALSE(p) ((p) > 0 ? (decisionmap[p] < 0) : (decisionmap[-p] > 0))
+#define DECISIONMAP_UNDEF(p) (decisionmap[(p) > 0 ? (p) : -(p)] == 0)
 
 /*-------------------------------------------------------------------
  * 
@@ -1632,37 +1633,36 @@ propagate(Solver *solv, int level)
 	    continue;
 
 	    /*
-	     * The other literal is false or undecided
+	     * The other literal is FALSE or UNDEF
 	     */
 	    
           if (r->d)
 	    {
-	      /* not a binary clause, check if we need to move our watch.
-	       * 
-	       * search for a literal that is not other_watch and not false
-	       * (true is also ok, in that case the rule is fulfilled)
+	      /* not a binary clause, try to move our watch.
+	       * search for a literal that is not other_watch and not FALSE
+	       * (TRUE is also ok, in that case the rule is fulfilled)
 	       */
 	      if (r->p                                /* we have a 'p' */
-		  && r->p != other_watch              /* which is not what we just checked */
-		  && !DECISIONMAP_TRUE(-r->p))        /* and its not already decided 'negative' */
+		  && r->p != other_watch              /* which is watched */
+		  && !DECISIONMAP_FALSE(r->p))        /* and not FALSE */
 		{
-		  p = r->p;                           /* we must get this to 'true' */
+		  p = r->p;
 		}
 	      else                                    /* go find a 'd' to make 'true' */
 		{
 		  /* foreach 'd' */
-		  /* FIXME: should be a policy */
 		  for (dp = pool->whatprovidesdata + r->d; (p = *dp++) != 0;)
-		    if (p != other_watch              /* which is not what we just checked */
-		        && !DECISIONMAP_TRUE(-p))     /* and its not already decided 'negative' */
+		    if (p != other_watch              /* which is not watched */
+		        && !DECISIONMAP_FALSE(p))     /* and not FALSE */
 		      break;
 		}
 
-		/*
-		 * if p is free to watch, move watch to p
-		 */
 	      if (p)
 		{
+		  /*
+		   * if we found some p that is UNDEF or TRUE, move
+		   * watch to it
+		   */
 		  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
 		    {
 		      if (p > 0)
@@ -1687,8 +1687,7 @@ propagate(Solver *solv, int level)
 		  watches[p] = r - solv->rules;
 		  continue;
 		}
-		
-		/* !p */
+	      /* search failed, thus all unwatched literals are FALSE */
 		
 	    } /* not binary */
 	    
@@ -1696,7 +1695,7 @@ propagate(Solver *solv, int level)
 	     * unit clause found, set literal other_watch to TRUE
 	     */
 
-	  if (DECISIONMAP_TRUE(-other_watch))	   /* check if literal is FALSE */
+	  if (DECISIONMAP_FALSE(other_watch))	   /* check if literal is FALSE */
 	    return r;  		                   /* eek, a conflict! */
 	    
 	  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
@@ -3220,17 +3219,20 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	      return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
 	    }
 	}
-      assert(!solv->allowselfconflicts);
-      assert(s->conflicts);
-      conp = s->repo->idarraydata + s->conflicts;
-      while ((con = *conp++) != 0)
-	FOR_PROVIDES(p, pp, con)
-	  if (p == -r->p)
-	    {
-	      *depp = con;
-	      return SOLVER_PROBLEM_SELF_CONFLICT;
-	    }
-      assert(0);
+      if (!solv->allowselfconflicts && s->conflicts)
+	{
+	  conp = s->repo->idarraydata + s->conflicts;
+	  while ((con = *conp++) != 0)
+	    FOR_PROVIDES(p, pp, con)
+	      if (p == -r->p)
+		{
+		  *depp = con;
+		  return SOLVER_PROBLEM_SELF_CONFLICT;
+		}
+	}
+      /* should never happen */
+      *depp = 0;
+      return SOLVER_PROBLEM_RPM_RULE;
     }
   s = pool->solvables - r->p;
   if (installed && !solv->fixsystem && s->repo == installed)
@@ -3359,29 +3361,41 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	    }
 	}
       /* all cases checked, can't happen */
-      assert(0);
+      *depp = 0;
+      *sourcep = -r->p;
+      *targetp = 0;
+      return SOLVER_PROBLEM_RPM_RULE;
     }
   /* simple requires */
-  assert(s->requires);
-  reqp = s->repo->idarraydata + s->requires;
-  while ((req = *reqp++) != 0)
+  if (s->requires)
     {
-      if (req == SOLVABLE_PREREQMARKER)
-	continue;
-      dp = pool_whatprovides(pool, req);
-      if (d == 0)
+      reqp = s->repo->idarraydata + s->requires;
+      while ((req = *reqp++) != 0)
 	{
-	  if (*dp == r->w2 && dp[1] == 0)
+	  if (req == SOLVABLE_PREREQMARKER)
+	    continue;
+	  dp = pool_whatprovides(pool, req);
+	  if (d == 0)
+	    {
+	      if (*dp == r->w2 && dp[1] == 0)
+		break;
+	    }
+	  else if (dp - pool->whatprovidesdata == d)
 	    break;
 	}
-      else if (dp - pool->whatprovidesdata == d)
-	break;
+      if (req)
+	{
+	  *depp = req;
+	  *sourcep = -r->p;
+	  *targetp = 0;
+	  return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
+	}
     }
-  assert(req);
-  *depp = req;
+  /* all cases checked, can't happen */
+  *depp = 0;
   *sourcep = -r->p;
   *targetp = 0;
-  return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
+  return SOLVER_PROBLEM_RPM_RULE;
 }
 
 
