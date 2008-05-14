@@ -1344,12 +1344,12 @@ void
 pool_trivial_installable(Pool *pool, Repo *oldinstalled, Map *installedmap, Queue *pkgs, Queue *res)
 {
   int i, r, m, did;
-  Id p, *dp, con, *conp, req, *reqp, obs, *obsp, *pp;
+  Id p, *dp, con, *conp, req, *reqp;
   unsigned char *map;
   Solvable *s;
 
   map = sat_calloc(pool->nsolvables, 1);
-  for (p = 0; p < pool->nsolvables; p++)
+  for (p = 1; p < pool->nsolvables; p++)
     {
       if (!MAPTST(installedmap, p))
 	continue;
@@ -1423,9 +1423,10 @@ pool_trivial_installable(Pool *pool, Repo *oldinstalled, Map *installedmap, Queu
 	  if (con)
 	    continue;	/* found a conflict */
 	}
+#if 0
       if (s->repo && s->repo != oldinstalled)
 	{
-	  Id p2;
+	  Id p2, obs, *obsp, *pp;
 	  Solvable *s2;
 	  if (s->obsoletes)
 	    {
@@ -1453,6 +1454,7 @@ pool_trivial_installable(Pool *pool, Repo *oldinstalled, Map *installedmap, Queu
 	  if (p2)
 	    continue;
 	}
+#endif
       if (m != map[p])
 	{
           map[p] = m;
