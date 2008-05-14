@@ -1557,6 +1557,9 @@ addwatches_rule(Solver *solv, Rule *r)
  * Evaluate each term affected by the decision (linked through watches)
  * If we find unit rules we make new decisions based on them
  * 
+ * Everything's fixed there, it's just finding rules that are
+ * unit.
+ * 
  * return : 0 = everything is OK
  *          rule = conflict found in this rule
  */
@@ -1610,9 +1613,10 @@ propagate(Solver *solv, int level)
 	      solver_printrule(solv, SAT_DEBUG_PROPAGATE, r);
 	    }
 
-	    /* 'pkg' was just decided
-	     *   now find other literal watch, check clause
-	     *  and advance on linked list
+	    /* 'pkg' was just decided (was set to FALSE)
+	     * 
+	     *  now find other literal watch, check clause
+	     *   and advance on linked list
 	     */
 	  if (pkg == r->w1)
 	    {
@@ -1634,27 +1638,36 @@ propagate(Solver *solv, int level)
 
 	    /*
 	     * The other literal is FALSE or UNDEF
+	     * 
 	     */
 	    
           if (r->d)
 	    {
-	      /* not a binary clause, try to move our watch.
-	       * search for a literal that is not other_watch and not FALSE
+	      /* Not a binary clause, try to move our watch.
+	       * 
+	       * Go over all literals and find one that is
+	       *   not other_watch
+	       *   and not FALSE
+	       * 
 	       * (TRUE is also ok, in that case the rule is fulfilled)
 	       */
 	      if (r->p                                /* we have a 'p' */
-		  && r->p != other_watch              /* which is watched */
+		  && r->p != other_watch              /* which is not watched */
 		  && !DECISIONMAP_FALSE(r->p))        /* and not FALSE */
 		{
 		  p = r->p;
 		}
 	      else                                    /* go find a 'd' to make 'true' */
 		{
-		  /* foreach 'd' */
+		  /* foreach p in 'd'
+		     we just iterate sequentially, doing it in another order just changes the order of decisions, not the decisions itself
+		   */
 		  for (dp = pool->whatprovidesdata + r->d; (p = *dp++) != 0;)
-		    if (p != other_watch              /* which is not watched */
-		        && !DECISIONMAP_FALSE(p))     /* and not FALSE */
-		      break;
+		    {
+		      if (p != other_watch              /* which is not watched */
+		          && !DECISIONMAP_FALSE(p))     /* and not FALSE */
+		        break;
+		    }
 		}
 
 	      if (p)
@@ -3889,13 +3902,15 @@ solver_solve(Solver *solv, Queue *job)
   solv->featurerules = solv->nrules;              /* mark start of feature rules */
   if (installed)
     {
-	/* foreach installed solvable */
+	/* foreach possibly installed solvable */
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
 	{
-	    /*
-	     * patterns use this
-	     */
-
+	  if (s->repo != installed)
+	    {
+	      addrule(solv, 0, 0);	/* create dummy rule */
+	      continue;
+	    }
+#if CODE10
 	  if (s->freshens && !s->supplements)
 	    {
 	      const char *name = id2str(pool, s->name);
@@ -3905,12 +3920,7 @@ solver_solve(Solver *solv, Queue *job)
 		  continue;
 		}
 	    }
-
-	  if (s->repo != installed)
-	    {
-	      addrule(solv, 0, 0);	/* create dummy rule */
-	      continue;
-	    }
+#endif
 	  addupdaterule(solv, s, 1);    /* allow s to be updated */
 	}
 	/*
@@ -3931,12 +3941,19 @@ solver_solve(Solver *solv, Queue *job)
     
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add update rules ***\n");
   solv->updaterules = solv->nrules;
+
   if (installed)
     { /* foreach installed solvables */
       /* we create all update rules, but disable some later on depending on the job */
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
 	{
 	  Rule *sr;
+
+	  if (s->repo != installed)
+	    {
+	      addrule(solv, 0, 0);	/* create dummy rule */
+	      continue;
+	    }
 
 #if CODE10
 	  /* no update rules for patch atoms */
@@ -3950,13 +3967,8 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	    }
 #endif
-	  if (s->repo != installed)
-	    {
-	      addrule(solv, 0, 0);	/* create dummy rule */
-	      continue;
-	    }
 	  addupdaterule(solv, s, 0);	/* allowall = 0: downgrades allowed */
-	    
+
 	    /*
 	     * check for and remove duplicate
 	     */
