@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu May 15 16:05:50 CEST 2008 - coolo@suse.de
+
+- fix susetags parser
+
+-------------------------------------------------------------------
 Tue May 13 17:14:26 CEST 2008 - dmacvicar@suse.de
 
 - use repodata_set_void for pattern visible attr
