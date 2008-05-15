@@ -401,8 +401,20 @@ finish_solvable(struct parsedata *pd, Solvable *s, int handle)
 	{
 	  for (p = lastreal; *p; p++)
 	    {
+	      char fname_buf[128];
+	      const char *fname;
 	      str = id2str(pool, *p);
 	      sp = strrchr(str, '/');
+	      /* Need to copy filename now, before we add string that could
+	         realloc the stringspace (and hence invalidate str).  */
+	      fname = sp + 1;
+	      if (strlen(fname) >= 128)
+		fname = strdup(fname);
+	      else
+		{
+		  memcpy(fname_buf, fname, strlen(fname) + 1);
+		  fname = fname_buf;
+		}
 	      if (sp - str >= 128)
 		{
 		  char *sdup = strdup(str);
@@ -419,7 +431,9 @@ finish_solvable(struct parsedata *pd, Solvable *s, int handle)
 		}
 	      if (!did)
 		did = repodata_str2dir(pd->data, "/", 1);
-	      repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, did, sp + 1);
+	      repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, did, fname);
+	      if (fname != fname_buf)
+		free((char*)fname);
 	      *p = 0;
 	    }
 	}
