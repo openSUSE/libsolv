@@ -112,16 +112,14 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root,-)
 
 %if 0%{?suse_version}
-%{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolverx.so
-%{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver.rb
+%{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolver.so
 %endif
 %if 0%{?mandriva_version}
 %{ruby_sitearchdir}/satsolverx.so
-%{ruby_sitelibdir}/satsolver.rb
 %endif
 
 %files perl
 %defattr(-,root,root,-)
-%{perl_vendorarch}/satsolverx.so
-%{perl_vendorlib}/satsolverx.pm
+%{perl_vendorarch}/satsolver.so
+%{perl_vendorlib}/satsolver.pm
 %changelog
