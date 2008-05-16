@@ -1,5 +1,16 @@
 PROJECT(satsolver)
 
+cmake_minimum_required(VERSION 2.4)
+
+#IF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERISION} GREATER 2.4)
+#ENDIF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERISION} GREATER 2.4)
+
+if(COMMAND cmake_policy)
+  # escape preprocessor, see -DVERSION below
+  cmake_policy(SET CMP0005 OLD)
+endif(COMMAND cmake_policy)	      
+  
+
 # Library
 IF ( DEFINED LIB )
   SET ( LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${LIB}" )
