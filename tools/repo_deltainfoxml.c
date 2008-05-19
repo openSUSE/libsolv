@@ -116,6 +116,7 @@ struct parsedata {
   struct deltarpm delta;
   Id newpkgevr;
   Id newpkgname;
+  Id newpkgarch;
 };
 
 /*
@@ -313,11 +314,16 @@ startElement(void *userData, const char *name, const char **atts)
           break;
       case STATE_NEWPACKAGE:
           if ( (str = find_attr("name", atts)) )
-          {
+            {
               pd->newpkgname = str2id(pool, str, 1);
-          }
+            }
+          pd->newpkgevr = makeevr_atts(pool, pd, atts);
+          if ( (str = find_attr("arch", atts)) )
+            {
+              pd->newpkgarch = str2id(pool, str, 1);
+            }
           break;
-          
+
       case STATE_DELTA:
           memset(&pd->delta, 0, sizeof (pd->delta));
           *pd->tempstr = 0;
@@ -386,6 +392,8 @@ endElement(void *userData, const char *name)
           fprintf (stderr, "found deltarpm for %s:\n", id2str(pool, pd->newpkgname));
 #endif
           repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_NAME, pd->newpkgname);
+          repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_EVR, pd->newpkgevr);
+          repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_ARCH, pd->newpkgarch);
           repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_NAME, d->locname);
           repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_DIR, d->locdir);
           repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_EVR, d->locevr);

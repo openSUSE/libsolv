@@ -149,6 +149,8 @@ KNOWNID(PRODUCT_FLAGS,			"product:flags"),
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
 
 KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
+KNOWNID(DELTA_PACKAGE_EVR,              "delta:pkgevr"),
+KNOWNID(DELTA_PACKAGE_ARCH,             "delta:pkgarch"),
 KNOWNID(DELTA_LOCATION_DIR,		"delta:locdir"),
 KNOWNID(DELTA_LOCATION_NAME,		"delta:locname"),
 KNOWNID(DELTA_LOCATION_EVR,		"delta:locevr"),
