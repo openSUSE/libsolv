@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon May 19 14:53:01 CEST 2008 - dmacvicar@suse.de
+
+- make solvable_look_bool more robust by allowing both
+  the void or the num == 1 strategy.
+
+-------------------------------------------------------------------
 Thu May 15 16:05:50 CEST 2008 - coolo@suse.de
 
 - fix susetags parser

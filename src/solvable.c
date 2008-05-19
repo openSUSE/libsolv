@@ -257,7 +257,43 @@ solvable_lookup_void(Solvable *s, Id keyname)
 int
 solvable_lookup_bool(Solvable *s, Id keyname)
 {
-  return solvable_lookup_void(s, keyname);
+  Repo *repo = s->repo;
+  Pool *pool;
+  Repodata *data;
+  int i, j, n;
+
+  if (!repo)
+    return 0;
+  pool = repo->pool;
+  n = s - pool->solvables;
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      if (n < data->start || n >= data->end)
+        continue;
+      /* there are two ways of storing a bool */
+      for (j = 1; j < data->nkeys; j++)
+        {
+          /* as a num == 1 */
+          if (data->keys[j].name == keyname
+              && (data->keys[j].type == REPOKEY_TYPE_U32
+                  || data->keys[j].type == REPOKEY_TYPE_NUM
+                  || data->keys[j].type == REPOKEY_TYPE_CONSTANT))
+            {
+              unsigned int value;
+              if (repodata_lookup_num(data, n - data->start, j, &value))
+                return value == 1;
+            }
+
+          /* as a void attribute, if it is there, then true */
+          if (data->keys[j].name == keyname
+              && (data->keys[j].type == REPOKEY_TYPE_VOID))
+            {
+              if (repodata_lookup_void(data, n - data->start, j))
+                return 1;
+            }
+        }
+    }
+  return 0;
 }
 
 const unsigned char *
