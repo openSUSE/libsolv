@@ -516,6 +516,22 @@ pool_addrelproviders(Pool *pool, Id d)
 	}
       break;
     case REL_ARCH:
+      /* small hack: make it possible to match <pkg>.src
+       * we have to iterate over the solvables as src packages do not
+       * provide anything, thus they are not indexed in our
+       * whatprovides hash */
+      if (evr == ARCH_SRC)
+	{
+	  Solvable *s;
+	  for (p = 1, s = pool->solvables + p; p < pool->nsolvables; p++, s++)
+	    {
+	      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+		continue;
+	      if (pool_match_nevr(pool, s, name))
+		queue_push(&plist, p);
+	    }
+	  break;
+	}
       pp = pp2 = pool_whatprovides(pool, name);
       while ((p = *pp++) != 0)
 	{
@@ -546,11 +562,19 @@ pool_addrelproviders(Pool *pool, Id d)
 	}
       while ((p = *pp++) != 0)
 	{
+	  Solvable *s = pool->solvables + p;
 #if 0
-	  POOL_DEBUG(DEBUG_1, "addrelproviders: checking package %s\n", id2str(pool, pool->p[p].name));
+	  POOL_DEBUG(DEBUG_1, "addrelproviders: checking package %s\n", id2str(pool, s->name));
 #endif
+	  if (!s->provides)
+	    {
+	      /* no provides - check nevr */
+	      if (pool_match_nevr_rel(pool, s, MAKERELDEP(d)))
+	        queue_push(&plist, p);
+	      continue;
+	    }
 	  /* solvable p provides name in some rels */
-	  pidp = pool->solvables[p].repo->idarraydata + pool->solvables[p].provides;
+	  pidp = s->repo->idarraydata + s->provides;
 	  while ((pid = *pidp++) != 0)
 	    {
 	      int pflags;
