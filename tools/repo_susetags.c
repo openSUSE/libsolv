@@ -44,8 +44,11 @@ static char *flagtab[] = {
 static Id
 langtag(struct parsedata *pd, Id tag, const char *language)
 {
+  if (language && !language[0])
+    language = 0;
   if (!language || tag >= ID_NUM_INTERNAL)
     return pool_id2langid(pd->repo->pool, tag, language, 1);
+  return pool_id2langid(pd->repo->pool, tag, language, 1);
   if (!pd->langcache[tag])
     pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, language, 1);
   return pd->langcache[tag];
@@ -500,6 +503,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
     {
       unsigned tag;
       char *olinep; /* old line pointer */
+      char line_lang[6];
+      int keylen = 3;
       if (linep - line + 16 > aline)              /* (re-)alloc buffer */
 	{
 	  aline = linep - line;
@@ -522,13 +527,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	{
 	  /* check for multi-line value tags (+Key:/-Key:) */
 	  
-	  int is_end = (linep[-intag - 2] == '-')
+	  int is_end = (linep[-intag - keylen + 1] == '-')
 	              && (linep[-1] == ':')
-		      && (linep == line + 1 + intag + 1 + 1 + 1 + intag + 1 || linep[-intag - 3] == '\n');
+		      && (linep == line + 1 + intag + 1 + 1 + 1 + intag + 1 || linep[-intag - keylen] == '\n');
 	  if (is_end
 	      && strncmp(linep - 1 - intag, line + 1, intag))
 	    {
-	      fprintf(stderr, "Nonmatching multi-line tags: %d: %s\n", pd.lineno, linep - 1 - intag);
+	      fprintf(stderr, "Nonmatching multi-line tags: %d: '%s' '%s' %d\n", pd.lineno, linep - 1 - intag, line + 1, intag);
 	    }
 	  if (cummulate && !is_end)
 	    {
@@ -537,9 +542,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    }
 	  if (cummulate && is_end)
 	    {
-	      linep[-intag - 2] = 0;
-	      if (linep[-intag - 3] == '\n')
-	        linep[-intag - 3] = 0;
+	      linep[-intag - keylen + 1] = 0;
+	      if (linep[-intag - keylen] == '\n')
+	        linep[-intag - keylen] = 0;
 	      linep = line;
 	      intag = 0;
 	    }
@@ -550,7 +555,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	      continue;
 	    }
 	  if (!cummulate && !is_end)
-	    linep = line + intag + 3;
+	    linep = line + intag + keylen;
 	}
       else
 	linep = line;
@@ -581,14 +586,27 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	          cummulate = 1;
 	    }
 	  line[0] = '=';                       /* handle lines between +Key:/-Key: as =Key: */
-	  line[intag + 2] = ' ';
-	  linep = line + intag + 3;
+	  line[intag + keylen - 1] = ' ';
+	  linep = line + intag + keylen;
 	  continue;
 	}
       if (*line == '#' || !*line)
 	continue;
-      if (! (line[0] && line[1] && line[2] && line[3] && line[4] == ':'))
+      if (! (line[0] && line[1] && line[2] && line[3] && (line[4] == ':' || line[4] == '.')))
         continue;
+      if ( line[4] == '.')
+        {
+          char *endlang; 
+          endlang = strchr(line + 5, ':');
+          if (endlang)
+            {
+              keylen = endlang - line - 1;
+              strncpy(line_lang, line + 5, 5);
+              line_lang[endlang - line - 5] = 0;
+            }
+        }
+      else
+        line_lang[0] = 0;
       tag = tag_from_string (line);
 
 
@@ -818,10 +836,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    repodata_set_str(data, handle, SOLVABLE_AUTHORS, line + 6);
 	    continue;
           case CTAG('=', 'S', 'u', 'm'):
-	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_SUMMARY, language), line + 6);
-	    continue;
+            repodata_set_str(data, handle, langtag(&pd, SOLVABLE_SUMMARY, language ? language : line_lang), line + 3 + keylen );
+            continue;
           case CTAG('=', 'D', 'e', 's'):
-	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_DESCRIPTION, language), line + 6);
+	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_DESCRIPTION, language ? language : line_lang), line + 3 + keylen );
 	    continue;
           case CTAG('=', 'E', 'u', 'l'):
 	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_EULA, language), line + 6);
@@ -865,7 +883,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    add_dirline (&pd, line + 6);
 	    continue;
 	  case CTAG('=', 'C', 'a', 't'):
-	    repodata_set_poolstr(data, handle, SOLVABLE_CATEGORY, line + 6);
+	    repodata_set_poolstr(data, handle, langtag(&pd, SOLVABLE_CATEGORY, line_lang), line + 3 + keylen);
 	    break;
 	  case CTAG('=', 'O', 'r', 'd'):
 	    /* Order is a string not a number, so we can retroactively insert
@@ -927,6 +945,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    break;
 
 	  default:
+            fprintf(stderr,"unknown line %s\n", line);
 	    break;
 	}
 
