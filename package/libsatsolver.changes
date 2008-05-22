@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu May 22 20:16:22 CEST 2008 - coolo@suse.de
+
+- fixed language support in patterns (bnc#386524)
+
+-------------------------------------------------------------------
 Mon May 19 14:53:01 CEST 2008 - dmacvicar@suse.de
 
 - make solvable_look_bool more robust by allowing both
