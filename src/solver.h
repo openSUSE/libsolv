@@ -154,6 +154,7 @@ typedef struct solver {
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
+  int ignorealreadyrecommended;		/* true: ignore recommended packages that were already recommended by the installed packages */
   int dontshowinstalledrecommended;	/* true: do not show recommended packages that are already installed */
   
   /* Callbacks for defining the bahaviour of the SAT solver */

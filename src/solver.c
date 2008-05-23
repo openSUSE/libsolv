@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2007-2008, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -2355,7 +2355,8 @@ solver_free(Solver *solv)
 static void
 run_solver(Solver *solv, int disablerules, int doweak)
 {
-  Queue dq;         /* local decisionqueue */
+  Queue dq;		/* local decisionqueue */
+  Queue dqs;		/* local decisionqueue for supplements */
   int systemlevel;
   int level, olevel;
   Rule *r;
@@ -2382,6 +2383,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
   POOL_DEBUG(SAT_DEBUG_STATS, "solving...\n");
 
   queue_init(&dq);
+  queue_init(&dqs);
 
   /*
    * here's the main loop:
@@ -2619,15 +2621,18 @@ run_solver(Solver *solv, int disablerules, int doweak)
 
 	  POOL_DEBUG(SAT_DEBUG_STATS, "installing recommended packages\n");
 	  queue_empty(&dq);
+	  queue_empty(&dqs);
 	  for (i = 1; i < pool->nsolvables; i++)
 	    {
 	      if (solv->decisionmap[i] < 0)
 		continue;
 	      if (solv->decisionmap[i] > 0)
 		{
+		  /* installed, check for recommends */
 		  Id *recp, rec, *pp, p;
 		  s = pool->solvables + i;
-		  /* installed, check for recommends */
+		  if (solv->ignorealreadyrecommended && s->repo == solv->installed)
+		    continue;
 		  /* XXX need to special case AND ? */
 		  if (s->recommends)
 		    {
@@ -2657,8 +2662,45 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (!pool_installable(pool, s))
 		    continue;
-		  if (solver_is_supplementing(solv, s))
+		  if (!solver_is_supplementing(solv, s))
+		    continue;
+		  if (solv->ignorealreadyrecommended && solv->installed)
+		    queue_pushunique(&dqs, i);	/* needs filter */
+		  else
 		    queue_pushunique(&dq, i);
+		}
+	    }
+          if (solv->ignorealreadyrecommended && dqs.count)
+	    {
+	      /* turn off all new packages */
+	      for (i = 0; i < solv->decisionq.count; i++)
+		{
+		  p = solv->decisionq.elements[i];
+		  if (p < 0)
+		    continue;
+		  s = pool->solvables + p;
+		  if (s->repo && s->repo != solv->installed)
+		    solv->decisionmap[p] = -solv->decisionmap[p];
+		}
+	      /* filter out old supplements */
+	      for (i = 0; i < dqs.count; i++)
+		{
+		  p = dqs.elements[i];
+		  s = pool->solvables + p;
+		  if (!s->supplements && !s->freshens)
+		    continue;
+		  if (!solver_is_supplementing(solv, s))
+		    queue_pushunique(&dq, p);
+		}
+	      /* undo turning off */
+	      for (i = 0; i < solv->decisionq.count; i++)
+		{
+		  p = solv->decisionq.elements[i];
+		  if (p < 0)
+		    continue;
+		  s = pool->solvables + p;
+		  if (s->repo && s->repo != solv->installed)
+		    solv->decisionmap[p] = -solv->decisionmap[p];
 		}
 	    }
 	  if (dq.count)
@@ -2748,6 +2790,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 
   POOL_DEBUG(SAT_DEBUG_STATS, "done solving.\n\n");
   queue_free(&dq);
+  queue_free(&dqs);
 }
 
 
