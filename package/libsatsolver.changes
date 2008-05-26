@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri May 23 21:07:01 CEST 2008 - mls@suse.de
+
+- add "zypper" flag
+- add "ignorealreadyrecommended" aka "zypper" solver option
+
+-------------------------------------------------------------------
 Thu May 22 20:16:22 CEST 2008 - coolo@suse.de
 
 - fixed language support in patterns (bnc#386524)
