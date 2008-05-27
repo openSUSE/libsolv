@@ -72,11 +72,12 @@ Group:          Development/Languages/Perl
 %setup -n satsolver-%{version}
 
 %build
+export CFLAGS="$RPM_OPT_FLAGS"
+export CXXFLAGS="$CFLAGS"
+
 cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
       -DLIB=%{_lib} \
       -DCMAKE_VERBOSE_MAKEFILE=TRUE \
-      -DCMAKE_C_FLAGS_RELEASE:STRING="%{optflags}" \
-      -DCMAKE_CXX_FLAGS_RELEASE:STRING="%{optflags}" \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SKIP_RPATH=1 
 make %{?jobs:-j %jobs}
