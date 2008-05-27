@@ -1,3 +1,11 @@
+#
+# CMakeLists.txt for sat-solver/tools
+#
+
+ENABLE_TESTING()
+
+ADD_SUBDIRECTORY(tests)
+
 SET(rpmdb2solv_REPOS
   rpmdb2solv.c
   repo_rpmdb.h
