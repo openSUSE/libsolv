@@ -159,13 +159,13 @@ id2rel(Pool *pool, Id id)
     case 4: case 5: case 6: case 7:
       return rels[rd->flags & 7];
     case REL_AND:
-      return " AND ";
+      return " & ";
     case REL_OR:
-      return " OR ";
+      return " | ";
     case REL_WITH:
-      return " WITH ";
+      return " + ";
     case REL_NAMESPACE:
-      return " NAMESPACE ";
+      return " NAMESPACE ";	/* actually not used in dep2str */
     case REL_ARCH:
       return ".";
     default:
@@ -197,30 +197,45 @@ dep2strlen(Pool *pool, Id id)
   while (ISRELDEP(id))
     {
       Reldep *rd = GETRELDEP(pool, id);
-      l += dep2strlen(pool, rd->name) + strlen(id2rel(pool, id));
+      /* add 2 for parens */
+      l += 2 + dep2strlen(pool, rd->name) + strlen(id2rel(pool, id));
       id = rd->evr;
     }
   return l + strlen(pool->ss.stringspace + pool->ss.strings[id]);
 }
 
 static void
-dep2strcpy(Pool *pool, char *p, Id id)
+dep2strcpy(Pool *pool, char *p, Id id, int oldrel)
 {
   while (ISRELDEP(id))
     {
       Reldep *rd = GETRELDEP(pool, id);
-      dep2strcpy(pool, p, rd->name);
+      if (oldrel == REL_AND || oldrel == REL_OR || oldrel == REL_WITH)
+	if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_WITH)
+	  if (oldrel != rd->flags)
+	    {
+	      *p++ = '(';
+	      dep2strcpy(pool, p, rd->name, rd->flags);
+	      p += strlen(p);
+	      strcpy(p, id2rel(pool, id));
+	      p += strlen(p);
+	      dep2strcpy(pool, p, rd->evr, rd->flags);
+	      strcat(p, ")");
+	      return;
+	    }
+      dep2strcpy(pool, p, rd->name, rd->flags);
       p += strlen(p);
       if (rd->flags == REL_NAMESPACE)
 	{
 	  *p++ = '(';
-	  dep2strcpy(pool, p, rd->evr);
+	  dep2strcpy(pool, p, rd->evr, rd->flags);
 	  strcat(p, ")");
 	  return;
 	}
       strcpy(p, id2rel(pool, id));
       p += strlen(p);
       id = rd->evr;
+      oldrel = rd->flags;
     }
   strcpy(p, pool->ss.stringspace + pool->ss.strings[id]);
 }
@@ -232,7 +247,7 @@ dep2str(Pool *pool, Id id)
   if (!ISRELDEP(id))
     return pool->ss.stringspace + pool->ss.strings[id];
   p = pool_alloctmpspace(pool, dep2strlen(pool, id) + 1);
-  dep2strcpy(pool, p, id);
+  dep2strcpy(pool, p, id, 0);
   return p;
 }
 
