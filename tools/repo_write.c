@@ -558,16 +558,19 @@ addschema(struct cbdata *cbdata, Id *schema)
 	  return cid;
     }
   /* a new one. make room. */
-  cbdata->myschemadata = sat_extend(cbdata->myschemadata, cbdata->myschemadatalen, len, sizeof(Id), SCHEMATADATA_BLOCK);
-  cbdata->myschemata = sat_extend(cbdata->myschemata, cbdata->nmyschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
   if (!cbdata->nmyschemata)
     {
+      /* allocate schema 0, it is always empty */
+      cbdata->myschemadata = sat_extend(cbdata->myschemadata, cbdata->myschemadatalen, 1, sizeof(Id), SCHEMATADATA_BLOCK);
+      cbdata->myschemata = sat_extend(cbdata->myschemata, cbdata->nmyschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
       cbdata->myschemata[0] = 0;
       cbdata->myschemadata[0] = 0;
       cbdata->nmyschemata = 1;
       cbdata->myschemadatalen = 1;
     }
   /* add schema */
+  cbdata->myschemadata = sat_extend(cbdata->myschemadata, cbdata->myschemadatalen, len, sizeof(Id), SCHEMATADATA_BLOCK);
+  cbdata->myschemata = sat_extend(cbdata->myschemata, cbdata->nmyschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
   memcpy(cbdata->myschemadata + cbdata->myschemadatalen, schema, len * sizeof(Id));
   cbdata->myschemata[cbdata->nmyschemata] = cbdata->myschemadatalen;
   cbdata->myschemadatalen += len;
