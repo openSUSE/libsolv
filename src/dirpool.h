@@ -11,8 +11,6 @@
 #include "pooltypes.h"
 #include "util.h"
 
-#define DIR_BLOCK 127
-
 typedef struct _Dirpool {
   Id *dirs;
   int ndirs;

@@ -10,14 +10,9 @@
 
 #include "pool.h"
 #include "util.h"
+#include "dirpool.h"
 
 #define DIR_BLOCK 127
-
-typedef struct _Dirpool {
-  Id *dirs;
-  int ndirs;
-  Id *dirtraverse;
-} Dirpool;
 
 void
 dirpool_create(Dirpool *dp)
