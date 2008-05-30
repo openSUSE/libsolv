@@ -838,7 +838,7 @@ enabledisablelearntrules(Solver *solv)
  * 
  */
 
-void
+static void
 enableweakrules(Solver *solv)
 {
   int i;
