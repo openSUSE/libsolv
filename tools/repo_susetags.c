@@ -378,7 +378,7 @@ tag_from_string (char *cs)
  *   All keys have 3 characters and end in ':'
  */
 
-void
+static void
 finish_solvable(struct parsedata *pd, Solvable *s, int handle)
 {
   Pool *pool = pd->repo->pool;
