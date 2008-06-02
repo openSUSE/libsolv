@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Mon Jun  2 11:47:32 CEST 2008 - coolo@suse.de
+
+- calculate recommendation list also if ignorealreadyrecommended is set,
+  as some recommendations would be missing otherwise
+- make dependency output less confusing (bnc#396309)
+- 0.9.0
+
+-------------------------------------------------------------------
 Tue May 27 22:34:05 CEST 2008 - coolo@suse.de
 
 - compile with RPM_OPT_FLAGS
