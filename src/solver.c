@@ -380,7 +380,7 @@ addrule(Solver *solv, Id p, Id d)
     }
 #endif
 
-  if (n == 1 && p > d)
+  if (n == 1 && p > d && !solv->rpmrules_end)
     {
       /* smallest literal first so we can find dups */
       n = p; p = d; d = n;             /* p <-> d */
