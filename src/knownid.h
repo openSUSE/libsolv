@@ -10,6 +10,11 @@
  *
  */
 
+/*
+ * Warning: you're free to append new entries, but insert/delete breaks
+ * the ABI!
+ */
+
 #undef KNOWNID
 #ifdef KNOWNID_INITIALIZE
 # define KNOWNID(a, b) b
@@ -82,6 +87,7 @@ KNOWNID(SOLVABLE_SUMMARY,		"solvable:summary"),
 KNOWNID(SOLVABLE_DESCRIPTION,		"solvable:description"),
 KNOWNID(SOLVABLE_AUTHORS,		"solvable:authors"),
 KNOWNID(SOLVABLE_GROUP,			"solvable:group"),
+KNOWNID(SOLVABLE_URL,			"solvable:url"),
 KNOWNID(SOLVABLE_KEYWORDS,		"solvable:keywords"),
 KNOWNID(SOLVABLE_LICENSE,		"solvable:license"),
 KNOWNID(SOLVABLE_BUILDTIME,		"solvable:buildtime"),

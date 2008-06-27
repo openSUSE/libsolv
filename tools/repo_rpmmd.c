@@ -39,6 +39,7 @@ enum state {
   /* resobject attributes */
   STATE_SUMMARY,
   STATE_DESCRIPTION,
+  STATE_URL,
   STATE_INSNOTIFY,
   STATE_DELNOTIFY,
   STATE_VENDOR,
@@ -147,6 +148,7 @@ static struct stateswitch stateswitches[] = {
 
   { STATE_SOLVABLE,    "summary",         STATE_SUMMARY, 1 },
   { STATE_SOLVABLE,    "description",     STATE_DESCRIPTION, 1 },
+  { STATE_SOLVABLE,    "url",             STATE_URL, 1 },
   //{ STATE_SOLVABLE,    "???",         STATE_INSNOTIFY, 1 },
   //{ STATE_SOLVABLE,    "??",     STATE_DELNOTIFY, 1 },
   { STATE_SOLVABLE,    "vendor",          STATE_VENDOR, 1 },
@@ -832,6 +834,10 @@ endElement(void *userData, const char *name)
     case STATE_DESCRIPTION:
       pd->lang = 0;
       set_desciption_author(pd->data, handle, pd->content);
+      break;
+    case STATE_URL:
+      if (pd->content[0])
+	repodata_set_str(pd->data, handle, SOLVABLE_URL, pd->content);
       break;
     case STATE_SOURCERPM:
       set_sourcerpm(pd->data, s, handle, pd->content);

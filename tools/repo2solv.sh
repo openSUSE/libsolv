@@ -21,6 +21,7 @@ test_susetags() {
 set -e 
 
 LANG=C
+unset CDPATH
 parser_options=${PARSER_OPTIONS:-}
 
 
