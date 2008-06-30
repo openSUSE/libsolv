@@ -126,6 +126,7 @@ KNOWNID(SOLVABLE_ORDER,			"solvable:order"),
 KNOWNID(UPDATE_REBOOT,		        "update:reboot"),   /* reboot suggested (kernel update) */
 KNOWNID(UPDATE_RESTART,		        "update:restart"),  /* restart suggested (update stack update) */
 
+KNOWNID(UPDATE_MESSAGE,		        "update:message"),  /* restart suggested (update stack update) */
                                                                        /* 'content' of patch, usually list of packages */
 KNOWNID(UPDATE_COLLECTION,	        "update:collection"),          /*  "name evr arch" */
 KNOWNID(UPDATE_COLLECTION_NAME,	        "update:collection:name"),     /*   name */

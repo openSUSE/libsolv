@@ -53,16 +53,17 @@ enum state {
   STATE_TITLE,        /* 4 */
   STATE_RELEASE,      /* 5 */
   STATE_ISSUED,       /* 6 */
-  STATE_REFERENCES,   /* 7 */
-  STATE_REFERENCE,    /* 8 */
-  STATE_DESCRIPTION,  /* 9 */
-  STATE_PKGLIST,     /* 10 */
-  STATE_COLLECTION,  /* 11 */
-  STATE_NAME,        /* 12 */
-  STATE_PACKAGE,     /* 13 */
-  STATE_FILENAME,    /* 14 */
-  STATE_REBOOT,      /* 15 */
-  STATE_RESTART,     /* 16 */
+  STATE_MESSAGE,      /* 7 */
+  STATE_REFERENCES,   /* 8 */
+  STATE_REFERENCE,    /* 9 */
+  STATE_DESCRIPTION,  /* 10 */
+  STATE_PKGLIST,     /* 11 */
+  STATE_COLLECTION,  /* 12 */
+  STATE_NAME,        /* 13 */
+  STATE_PACKAGE,     /* 14 */
+  STATE_FILENAME,    /* 15 */
+  STATE_REBOOT,      /* 16 */
+  STATE_RESTART,     /* 17 */
   NUMSTATES
 };
 
@@ -84,6 +85,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_UPDATE,      "release",         STATE_RELEASE,     1 },
   { STATE_UPDATE,      "issued",          STATE_ISSUED,      1 },
   { STATE_UPDATE,      "description",     STATE_DESCRIPTION, 1 },
+  { STATE_UPDATE,      "message",         STATE_MESSAGE    , 1 },
   { STATE_UPDATE,      "references",      STATE_REFERENCES,  0 },
   { STATE_UPDATE,      "pkglist",         STATE_PKGLIST,     0 },
   { STATE_REFERENCES,  "reference",       STATE_REFERENCE,   0 },
@@ -111,6 +113,7 @@ struct parsedata {
   Solvable *solvable;
   unsigned int timestamp;
   
+
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
   char *tempstr;
@@ -122,6 +125,7 @@ struct parsedata {
  * if we have seen a <filename>...
  * inside of <package>...
  * 
+ *
  * If not, we must insert an empty filename to UPDATE_COLLECTION_FILENAME
  * at </package> in order to keep all UPDATE_COLLECTION_* arrays in sync
  */
@@ -242,6 +246,7 @@ startElement(void *userData, const char *name, const char **atts)
     if (!strcmp(sw->ename, name))
       break;
   
+
   if (sw->from != pd->state)
     {
 #if 1
@@ -283,11 +288,14 @@ startElement(void *userData, const char *name, const char **atts)
 	    version = atts[1];
 	}
 	
+
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 	pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
 	repodata_extend(pd->data, pd->solvable - pool->solvables);      
+	repodata_extend(pd->data, pd->solvable - pool->solvables);
 	pd->datanum = repodata_get_handle(pd->data, pd->datanum);
 	
+
 	solvable->vendor = str2id(pool, from, 1);
 	solvable->evr = str2id(pool, version, 1);
 	solvable->arch = ARCH_NOARCH;
@@ -348,6 +356,9 @@ startElement(void *userData, const char *name, const char **atts)
       /* <description>This update ...</description> */
       case STATE_DESCRIPTION:
       break;
+      /* <message type="confirm">This update ...</message> */
+      case STATE_MESSAGE:
+      break;
       case STATE_PKGLIST:
       break;
       /* <collection short="F8"> */
@@ -360,6 +371,7 @@ startElement(void *userData, const char *name, const char **atts)
        *            src="http://download.fedoraproject.org/pub/fedora/linux/updates/8/ppc64/imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm"
        *            version="1.9.15">
        * 
+       *
        * -> patch.conflicts: {name} < {version}.{release}
        */
       case STATE_PACKAGE:
@@ -369,10 +381,12 @@ startElement(void *userData, const char *name, const char **atts)
 	Id n, a, na;
 	Id rel_id;
 	
+
 	/* reset package_* markers, to be evaluated at </package> */
 	package_filename_seen = 0;
 	package_flags = 0;
 	
+
 	for (; *atts; atts += 2)
 	{
 	  if (!strcmp(*atts, "arch"))
@@ -391,6 +405,7 @@ startElement(void *userData, const char *name, const char **atts)
 	/*  now combine both to a single Id */
 	na = rel2id(pool, n, a, REL_ARCH, 1);
 	
+
 	rel_id = rel2id(pool, na, evr, REL_LT, 1);
 
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
@@ -415,6 +430,7 @@ startElement(void *userData, const char *name, const char **atts)
       }
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
+      /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
       case STATE_FILENAME:
       break;
       /* <reboot_suggested>True</reboot_suggested> */
@@ -439,6 +455,7 @@ endElement(void *userData, const char *name)
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
+  Repo *repo = pd->repo;
 
 #if 0
       fprintf(stderr, "end: %s\n", name);
@@ -461,6 +478,7 @@ endElement(void *userData, const char *name)
       case STATE_UPDATES:
       break;
       case STATE_UPDATE:
+      s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       break;
       case STATE_ID:
       {
@@ -500,6 +518,15 @@ endElement(void *userData, const char *name)
 	repodata_set_str(pd->data, pd->datanum, SOLVABLE_DESCRIPTION, pd->content);
       }
       break;   
+      break;
+      /*
+       * <message>Warning! ...</message>
+       */
+      case STATE_MESSAGE:
+      {
+	repodata_set_str(pd->data, pd->datanum, UPDATE_MESSAGE, pd->content);
+      }
+      break;
       case STATE_PKGLIST:
       break;
       case STATE_COLLECTION:
@@ -521,6 +548,7 @@ endElement(void *userData, const char *name)
       }
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
+      /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
       case STATE_FILENAME:
       {
 #if DO_ARRAY
@@ -562,6 +590,7 @@ endElement(void *userData, const char *name)
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
   
+
   return;
 }
 
