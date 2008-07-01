@@ -5,6 +5,8 @@ Mon Jun 30 23:55:20 CEST 2008 - dmacvicar@suse.de
 - add message tag to updateinfo.xml for displaying
   messages in the user interface
 - Fix missing self provides for patches (bnc #397132).
+- do not reorder binary rules if they are not rpm rules [bnc#397456]
+- 0.10.0
 
 -------------------------------------------------------------------
 Mon Jun  2 11:47:32 CEST 2008 - coolo@suse.de
