@@ -20,7 +20,7 @@ BuildRequires: libexpat-devel
 %else
 BuildRequires: expat-devel
 %endif
-BuildRequires:  cmake rpm-devel gcc-c++ ruby-devel swig
+BuildRequires:  cmake rpm-devel gcc-c++ ruby-devel swig perl python-devel
 Summary:        A new approach to package dependency solving
 
 %description
@@ -44,13 +44,6 @@ Authors:
     Michael Schroeder <mls@suse.de>
     Klaus Kaempf <kkaempf@suse.de>
 
-%package ruby
-Summary:        Ruby bindings for sat solver
-Group:          Development/Languages/Ruby
-
-%description ruby
-.
-
 %package -n satsolver-tools
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
@@ -61,11 +54,26 @@ Requires:       gzip bzip2 coreutils
 %description -n satsolver-tools
 . 
 
-%package perl
+%package -n ruby-satsolver
+Summary:        Ruby bindings for sat solver
+Group:          Development/Languages/Ruby
+
+%description -n ruby-satsolver
+.
+
+%package -n python-satsolver
+Summary:        Python bindings for sat solver
+Group:          Development/Languages/Python
+
+%description -n python-satsolver
+.
+
+%package -n perl-satsolver
+Requires:       perl-base = 5.10.0
 Summary:        Perl bindings for sat solver
 Group:          Development/Languages/Perl
 
-%description perl
+%description -n perl-satsolver
 .
 
 %prep
@@ -109,9 +117,8 @@ rm -rf "$RPM_BUILD_ROOT"
 /usr/bin/deptestomatic
 /usr/bin/helix2solv
 
-%files ruby
+%files -n ruby-satsolver
 %defattr(-,root,root,-)
-
 %if 0%{?suse_version}
 %{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolver.so
 %endif
@@ -119,7 +126,13 @@ rm -rf "$RPM_BUILD_ROOT"
 %{ruby_sitearchdir}/satsolverx.so
 %endif
 
-%files perl
+%files -n python-satsolver
+%defattr(-,root,root,-)
+#%doc swig/python/examples/*.py
+%{_libdir}/python2.5/site-packages/_satsolver.so
+%{_libdir}/python2.5/site-packages/satsolver.py
+
+%files -n perl-satsolver
 %defattr(-,root,root,-)
 %{perl_vendorarch}/satsolver.so
 %{perl_vendorlib}/satsolver.pm

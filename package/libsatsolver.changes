@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Jul  1 14:54:38 CEST 2008 - kkaempf@suse.de
+
+- rename language bindings to {perl,python,ruby}-satsolver
+  to follow naming conventions.
+
+-------------------------------------------------------------------
 Mon Jun 30 23:55:20 CEST 2008 - dmacvicar@suse.de
 
 - forward port
