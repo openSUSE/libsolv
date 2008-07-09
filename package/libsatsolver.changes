@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Wed Jul  9 16:25:36 CEST 2008 - ma@suse.de
+
+- Fix repo_content dependency parsing. Parser may lose up to 
+  two trailing dependencies.
+
+-------------------------------------------------------------------
 Tue Jul  1 14:54:38 CEST 2008 - kkaempf@suse.de
 
 - rename language bindings to {perl,python,ruby}-satsolver

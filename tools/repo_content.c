@@ -110,8 +110,11 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   while (1)
     {
       /* Name [relop evr] [rest] --> 1, 2, 3 or 4 fields.  */
-      words += split(line, sp + words, 4 - words);
-      line = 0;
+      if ( line )
+        {
+          words += split(line, sp + words, 4 - words);
+          line = 0;
+        }
       /* Hack, as the content file adds 'package:' for package
          dependencies sometimes.  */
       if (!strncmp (sp[0], "package:", 8))
@@ -131,7 +134,8 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	  id = rel2id(pool, id, evrid, flags + 1, 1);
 	  /* Consume three words, there's nothing to move to front.  */
 	  if (words == 4)
-	    line = sp[3], words = 0;
+	    line = sp[3];
+          words = 0;
 	}
       else
         {
@@ -144,7 +148,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	    line = sp[2], words = 2;
 	}
       olddeps = repo_addid_dep(pd->repo, olddeps, id, marker);
-      if (!line)
+      if (! ( line || words > 0 ) )
         break;
     }
   return olddeps;
