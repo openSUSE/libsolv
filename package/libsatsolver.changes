@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Sat Jul 12 02:32:15 CEST 2008 - dmacvicar@suse.de
+
+- infrastructure to save generated and expiration time
+  stamp in rpm-md repositories (fate #301904)
+- 0.10.1
+
+-------------------------------------------------------------------
 Wed Jul  9 16:25:36 CEST 2008 - ma@suse.de
 
 - Fix repo_content dependency parsing. Parser may lose up to 
