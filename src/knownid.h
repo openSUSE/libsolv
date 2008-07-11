@@ -155,6 +155,12 @@ KNOWNID(PRODUCT_FLAGS,			"product:flags"),
 /* argh */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
 
+/* timestamp then the repository was generated */
+KNOWNID(REPOSITORY_TIMESTAMP,           "repository:timestamp"),
+/* hint when the metadata could be outdated
+   w/respect to generated timestamp */
+KNOWNID(REPOSITORY_EXPIRE,              "repository:expire"),
+
 KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
 KNOWNID(DELTA_PACKAGE_EVR,              "delta:pkgevr"),
 KNOWNID(DELTA_PACKAGE_ARCH,             "delta:pkgarch"),

@@ -45,6 +45,11 @@ SET(deltainfoxml2solv_REPOS deltainfoxml2solv.c repo_deltainfoxml.h repo_deltain
 ADD_EXECUTABLE( deltainfoxml2solv ${deltainfoxml2solv_REPOS} )
 TARGET_LINK_LIBRARIES( deltainfoxml2solv satsolver ${EXPAT_LIBRARY})
 
+SET(repomdxml2solv_REPOS repomdxml2solv.c repo_repomdxml.h repo_repomdxml.c repo_write.c common_write.c)
+ADD_EXECUTABLE( repomdxml2solv ${repomdxml2solv_REPOS} )
+TARGET_LINK_LIBRARIES( repomdxml2solv satsolver ${EXPAT_LIBRARY})
+
+
 SET(dumpsolv_REPOS dumpsolv.c)
 ADD_EXECUTABLE( dumpsolv ${dumpsolv_REPOS} )
 TARGET_LINK_LIBRARIES( dumpsolv satsolver)
