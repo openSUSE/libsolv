@@ -39,10 +39,13 @@
 #define TAG_SUMMARY		1004
 #define TAG_DESCRIPTION		1005
 #define TAG_BUILDTIME		1006
+#define TAG_BUILDHOST		1007
 #define TAG_INSTALLTIME		1008
 #define TAG_SIZE                1009
+#define TAG_DISTRIBUTION	1010
 #define TAG_VENDOR		1011
 #define TAG_LICENSE		1014
+#define TAG_PACKAGER		1015
 #define TAG_GROUP		1016
 #define TAG_URL			1020
 #define TAG_ARCH		1022
@@ -900,6 +903,12 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
       str = headstring(rpmhead, TAG_URL);
       if (str)
 	repodata_set_str(repodata, handle, SOLVABLE_URL, str);
+      str = headstring(rpmhead, TAG_DISTRIBUTION);
+      if (str)
+	repodata_set_poolstr(repodata, handle, SOLVABLE_DISTRIBUTION, str);
+      str = headstring(rpmhead, TAG_PACKAGER);
+      if (str)
+	repodata_set_poolstr(repodata, handle, SOLVABLE_PACKAGER, str);
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
         repodata_set_num(repodata, handle, SOLVABLE_BUILDTIME, u32);
