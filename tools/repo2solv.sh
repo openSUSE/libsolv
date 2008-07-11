@@ -47,6 +47,27 @@ if test -d repodata; then
     $cmd $i | rpmmd2solv $parser_options > $primfile || exit 4
   fi
 
+  # This contains repomd.xml
+  # for now we only read some keys like expiration
+  if test -f repomd.xml || test -f repomd.xml.gz || test -f repomd.xml.bz2 ; then
+      for i in repomd.xml*; do
+          case $i in
+              *.gz) cmd="gzip -dc" ;;
+              *.bz2) cmd="bzip2 -dc" ;;
+              *) cmd="cat" ;;
+          esac
+          # only check the first updateinfo.xml*, in case there are more
+          break
+      done
+
+      repomdfile="/nonexist"
+      if test -n "$cmd"; then
+      # we have some repomd.xml*
+          repomdfile=`mktemp` || exit 3
+          $cmd $i | repomdxml2solv $parser_options > $repomdfile || exit 4
+      fi
+  fi
+
   # This contains a updateinfo.xml* and maybe patches
   if test -f updateinfo.xml || test -f updateinfo.xml.gz || test -f updateinfo.xml.bz2 ; then
       for i in updateinfo.xml*; do
@@ -102,6 +123,9 @@ if test -d repodata; then
   fi
 
   # Now merge primary, patches, updateinfo, and deltainfo
+  if test -s $repomdfile; then
+    m_repomdfile=$repomdfile
+  fi
   if test -s $primfile; then
     m_primfile=$primfile
   fi
@@ -114,8 +138,8 @@ if test -d repodata; then
   if test -s $deltainfofile; then
     m_deltainfofile=$deltainfofile
   fi
-  mergesolv $m_primfile $m_patchfile $m_updateinfofile $m_deltainfofile
-  rm -f $primfile $patchfile $updateinfofile $deltainfofile
+  mergesolv $m_repomdfile $m_primfile $m_patchfile $m_updateinfofile $m_deltainfofile
+  rm -f $repomdfile $primfile $patchfile $updateinfofile $deltainfofile
 
 elif test_susetags; then
   olddir=`pwd`

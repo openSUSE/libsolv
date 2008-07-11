@@ -69,6 +69,7 @@ install(TARGETS
                 rpms2solv
                 updateinfoxml2solv
                 deltainfoxml2solv
+                repomdxml2solv
    DESTINATION ${BIN_INSTALL_DIR} )
 
 install(PROGRAMS repo2solv.sh DESTINATION ${BIN_INSTALL_DIR} )
