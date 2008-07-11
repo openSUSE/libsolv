@@ -404,7 +404,6 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
   Id p, *pp, n, p2, *pp2;
   Id obs, *obsp;
   Solvable *ps;
-  Id vendormask;
 
   queue_empty(qs);
 
@@ -418,7 +417,6 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
    * n = solvable Id
    */
   n = s - pool->solvables;
-  vendormask = pool_vendor2mask(pool, s->vendor);
 
   /*
    * look for updates for s
@@ -431,15 +429,8 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       ps = pool->solvables + p;
       if (s->name == ps->name)	/* name match */
 	{
-	  if (!allow_all)
-	    {
-	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_MATCH_RELEASE) > 0)
-	        continue;
-	      if (!solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
-		continue;
-	      if (!solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
-		continue;
-	    }
+	  if (!allow_all && !solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_MATCH_RELEASE) > 0)
+	    continue;
 	}
       else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
 	{
@@ -464,12 +455,23 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	}
       else
         continue;
+      if (!allow_all && !solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
+	continue;
+      if (!allow_all && !solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
+	continue;
       queue_push(qs, p);
     }
   if (solv->noupdateprovide && solv->obsoletes && solv->obsoletes[n - solv->installed->start])
     {
       for (pp = solv->obsoletes_data + solv->obsoletes[n - solv->installed->start]; (p = *pp++) != 0;)
-	queue_push(qs, p);
+	{
+	  ps = pool->solvables + p;
+	  if (!allow_all && !solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
+	    continue;
+	  if (!allow_all && !solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
+	    continue;
+	  queue_push(qs, p);
+	}
     }
 }
 
