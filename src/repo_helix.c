@@ -146,6 +146,7 @@ typedef struct _parsedata {
   Repo *repo;		// current repo
   Repodata *data;       // current repo data
   Solvable *solvable;	// current solvable
+  Offset freshens;	// current freshens vector
 
   // package data
   int  epoch;		// epoch (as offset into evrspace)
@@ -455,6 +456,7 @@ startElement(void *userData, const char *name, const char **atts)
       pd->epoch = 0;
       pd->version = 0;
       pd->release = 0;
+      pd->freshens = 0;
 #if 0
       fprintf(stderr, "package #%d\n", s - pool->solvables);
 #endif
@@ -516,10 +518,10 @@ startElement(void *userData, const char *name, const char **atts)
       s->enhances = adddep(pool, pd, s->enhances, atts, 0);
       break;
     case STATE_FRESHENS:
-      s->freshens = 0;
+      pd->freshens = 0;
       break;
     case STATE_FRESHENSENTRY:
-      s->freshens = adddep(pool, pd, s->freshens, atts, 0);
+      pd->freshens = adddep(pool, pd, pd->freshens, atts, 0);
       break;
     default:
       break;
@@ -620,7 +622,8 @@ endElement(void *userData, const char *name)
       /* ensure self-provides */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
+      s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements, pd->freshens);
+      pd->freshens = 0;
 
       /* see bugzilla bnc#190163 */
       const char *flavor = findKernelFlavor(pd, s);

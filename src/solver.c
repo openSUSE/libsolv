@@ -1022,50 +1022,6 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
     }
 }
 
-#if CODE10
-/*-------------------------------------------------------------------
- * add patch atom requires
- */
-
-static void
-addpatchatomrequires(Solver *solv, Solvable *s, Id *dp, Queue *q, Map *m)
-{
-  Pool *pool = solv->pool;
-  Id fre, *frep, p, *pp, ndp;
-  Solvable *ps;
-  Queue fq;
-  Id qbuf[64];
-  int i, used = 0;
-
-  queue_init_buffer(&fq, qbuf, sizeof(qbuf)/sizeof(*qbuf));
-  queue_push(&fq, -(s - pool->solvables));
-  for (; *dp; dp++)
-    queue_push(&fq, *dp);
-  ndp = pool_queuetowhatprovides(pool, &fq);
-  frep = s->repo->idarraydata + s->freshens;
-  while ((fre = *frep++) != 0)
-    {
-      FOR_PROVIDES(p, pp, fre)
-	{
-	  ps = pool->solvables + p;
-	  addrule(solv, -p, ndp);
-	  used = 1;
-	  if (!MAPTST(m, p))
-	    queue_push(q, p);
-	}
-    }
-  if (used)
-    {
-      for (i = 1; i < fq.count; i++)
-	{
-	  p = fq.elements[i];
-	  if (!MAPTST(m, p))
-	    queue_push(q, p);
-	}
-    }
-  queue_free(&fq);
-}
-#endif
 
 
 /*-------------------------------------------------------------------
@@ -1158,15 +1114,6 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", solvable2str(pool, s), (Id)(s - pool->solvables));
 	  addrule(solv, -n, 0);		   /* uninstallable */
 	}
-#if CODE10
-      patchatom = 0;
-      if (s->freshens && !s->supplements)
-	{
-	  const char *name = id2str(pool, s->name);
-	  if (name[0] == 'a' && !strncmp(name, "atom:", 5))
-	    patchatom = 1;
-	}
-#endif
 
       /*-----------------------------------------
        * check requires of s
@@ -1377,17 +1324,6 @@ addrpmrulesforweak(Solver *solv, Map *m)
 	      break;
 	}
 
-	/* if nothing found, check for freshens
-	 * (patterns use this)
-	 */
-      if (!sup && s->freshens)
-	{
-	  supp = s->repo->idarraydata + s->freshens;
-	  while ((sup = *supp++) != ID_NULL)
-	    if (dep_possible(solv, sup, m))
-	      break;
-	}
-
 	/* if nothing found, check for enhances */
       if (!sup && s->enhances)
 	{
@@ -1396,7 +1332,7 @@ addrpmrulesforweak(Solver *solv, Map *m)
 	    if (dep_possible(solv, sup, m))
 	      break;
 	}
-	/* if notthing found, goto next solvables */
+	/* if nothing found, goto next solvables */
       if (!sup)
 	continue;
       addrpmrulesforsolvable(solv, s, m);
@@ -2658,7 +2594,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      else
 		{
 		  s = pool->solvables + i;
-		  if (!s->supplements && !s->freshens)
+		  if (!s->supplements)
 		    continue;
 		  if (!pool_installable(pool, s))
 		    continue;
@@ -2687,7 +2623,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		{
 		  p = dqs.elements[i];
 		  s = pool->solvables + p;
-		  if (!s->supplements && !s->freshens)
+		  if (!s->supplements)
 		    continue;
 		  if (!solver_is_supplementing(solv, s))
 		    queue_pushunique(&dq, p);
@@ -3896,7 +3832,7 @@ solver_solve(Solver *solv, Queue *job)
   oldnrules = solv->nrules;
     
     /*
-     * add rules for suggests, [freshens,] enhances
+     * add rules for suggests, enhances
      */
   addrpmrulesforweak(solv, &addedmap);
   POOL_DEBUG(SAT_DEBUG_STATS, "added %d rpm rules because of weak dependencies\n", solv->nrules - oldnrules);
@@ -3953,17 +3889,6 @@ solver_solve(Solver *solv, Queue *job)
 	      addrule(solv, 0, 0);	/* create dummy rule */
 	      continue;
 	    }
-#if CODE10
-	  if (s->freshens && !s->supplements)
-	    {
-	      const char *name = id2str(pool, s->name);
-	      if (name[0] == 'a' && !strncmp(name, "atom:", 5))
-		{
-		  addrule(solv, 0, 0);
-		  continue;
-		}
-	    }
-#endif
 	  addupdaterule(solv, s, 1);    /* allow s to be updated */
 	}
 	/*
@@ -3998,18 +3923,6 @@ solver_solve(Solver *solv, Queue *job)
 	      continue;
 	    }
 
-#if CODE10
-	  /* no update rules for patch atoms */
-	  if (s->freshens && !s->supplements)
-	    {
-	      const char *name = id2str(pool, s->name);
-	      if (name[0] == 'a' && !strncmp(name, "atom:", 5))
-		{
-		  addrule(solv, 0, 0);
-		  continue;
-		}
-	    }
-#endif
 	  addupdaterule(solv, s, 0);	/* allowall = 0: downgrades allowed */
 
 	    /*

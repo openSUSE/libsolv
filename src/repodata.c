@@ -848,7 +848,6 @@ static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
   { SOLVABLE_SUGGESTS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
   { SOLVABLE_SUPPLEMENTS, REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
   { SOLVABLE_ENHANCES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_FRESHENS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
   { RPM_RPMDBID,          REPOKEY_TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
 };
 
@@ -943,10 +942,6 @@ restart:
 	      case SOLVABLE_ENHANCES:
 		di->idp = s->enhances
 		    ? di->repo->idarraydata + s->enhances : 0;
-		continue;
-	      case SOLVABLE_FRESHENS:
-		di->idp = s->freshens
-		    ? di->repo->idarraydata + s->freshens : 0;
 		continue;
 	      case RPM_RPMDBID:
 		if (!di->repo->rpmdbid)

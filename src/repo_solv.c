@@ -29,7 +29,7 @@
 #include "repopack.h"
 
 #define INTERESTED_START	SOLVABLE_NAME
-#define INTERESTED_END		SOLVABLE_FRESHENS
+#define INTERESTED_END		SOLVABLE_ENHANCES
 
 #define SOLV_ERROR_NOT_SOLV	1
 #define SOLV_ERROR_UNSUPPORTED	2
@@ -1453,8 +1453,6 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 		s->suggests = ido;
 	      else if (id == SOLVABLE_ENHANCES)
 		s->enhances = ido;
-	      else if (id == SOLVABLE_FRESHENS)
-		s->freshens = ido;
 #if 0
 	      POOL_DEBUG(SAT_DEBUG_STATS, "%s ->\n", id2str(pool, id));
 	      for (; repo->idarraydata[ido]; ido++)

@@ -291,7 +291,6 @@ int main(int argc, char **argv)
 	  printids(repo, "suggests", s->suggests);
 	  printids(repo, "supplements", s->supplements);
 	  printids(repo, "enhances", s->enhances);
-	  printids(repo, "freshens", s->freshens);
 	  if (repo->rpmdbid)
 	    printf("rpmdbid: %u\n", repo->rpmdbid[i - repo->start]);
 #if 0

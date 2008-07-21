@@ -379,7 +379,7 @@ tag_from_string (char *cs)
  */
 
 static void
-finish_solvable(struct parsedata *pd, Solvable *s, int handle)
+finish_solvable(struct parsedata *pd, Solvable *s, int handle, Offset freshens)
 {
   Pool *pool = pd->repo->pool;
 
@@ -449,7 +449,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, int handle)
 		rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   /* XXX This uses repo_addid_dep internally, so should also be
      harmless to do twice.  */
-  s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
+  s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements, freshens);
   if (pd->ndirs)
     commit_diskusage (pd, handle);
 }
@@ -461,6 +461,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
   char *line, *linep;
   int aline;
   Solvable *s;
+  Offset freshens;
   int intag = 0;
   int cummulate = 0;
   int indesc = 0;
@@ -489,6 +490,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 
   linep = line;
   s = 0;
+  freshens = 0;
 
   /* XXX deactivate test code */
   blanr = 0;
@@ -624,7 +626,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	  /* If we have an old solvable, complete it by filling in some
 	     default stuff.  */
 	  if (s)
-	    finish_solvable(&pd, s, handle);
+	    finish_solvable(&pd, s, handle, freshens);
 
 	  /*
 	   * define kind
@@ -652,6 +654,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	  evr = makeevr(pool, join2(sp[1], "-", sp[2]));
 
 	  s = 0;
+          freshens = 0;
 
 	  /* Now see if we know this solvable already.  If we found neither
 	     the name nor the arch at all in this repo
@@ -752,7 +755,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'F', 'r', 'e'):                                        /* freshens */
-	    s->freshens = adddep(pool, &pd, s->freshens, line, 0, pd.kind);
+	    freshens = adddep(pool, &pd, freshens, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'P', 'r', 'c'):                                        /* packages recommended */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
@@ -782,7 +785,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
 	      fprintf (stderr, "Unsupported: pattern -> package freshens\n");
 	    else
-	      s->freshens = adddep(pool, &pd, s->freshens, line, 0, 0);
+	      freshens = adddep(pool, &pd, freshens, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 's', 'p'):                                        /* pattern: package supplements */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
@@ -952,7 +955,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
     } /* for(;;) */
 
   if (s)
-    finish_solvable(&pd, s, handle);
+    finish_solvable(&pd, s, handle, freshens);
     
   /* Shared attributes
    *  (e.g. multiple binaries built from same source)

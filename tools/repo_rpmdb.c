@@ -837,8 +837,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
   s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 1);
   s->supplements = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 2);
   s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 1);
-  s->freshens = 0;
-  s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
+  s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, 0);
 
   if (repodata)
     {
@@ -1107,7 +1106,6 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
   s->suggests = copydeps(pool, repo, r->suggests, fromrepo);
   s->supplements = copydeps(pool, repo, r->supplements, fromrepo);
   s->enhances  = copydeps(pool, repo, r->enhances, fromrepo);
-  s->freshens = copydeps(pool, repo, r->freshens, fromrepo);
 
   /* copy all attributes */
   if (!data)

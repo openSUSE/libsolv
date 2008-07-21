@@ -38,7 +38,6 @@ KNOWNID(SOLVABLE_RECOMMENDS,		"solvable:recommends"),
 KNOWNID(SOLVABLE_SUGGESTS,		"solvable:suggests"),
 KNOWNID(SOLVABLE_SUPPLEMENTS,		"solvable:supplements"),
 KNOWNID(SOLVABLE_ENHANCES,		"solvable:enhances"),
-KNOWNID(SOLVABLE_FRESHENS,		"solvable:freshens"),
 KNOWNID(RPM_RPMDBID,			"rpm:dbid"),
 /* normal requires before this, prereqs after this */
 KNOWNID(SOLVABLE_PREREQMARKER,		"solvable:prereqmarker"),

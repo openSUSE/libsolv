@@ -148,6 +148,7 @@ struct parsedata {
   unsigned int datanum;
   Solvable *solvable;
   char *kind;
+  Offset freshens;
   unsigned int timestamp;
   
   struct stateswitch *swtab[NUMSTATES];
@@ -407,6 +408,7 @@ startElement(void *userData, const char *name, const char **atts)
         pd->kind = "patch";
       
       pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+      pd->freshens = 0;
 
       if (!strcmp(pd->kind, "patch"))
         {
@@ -574,10 +576,10 @@ startElement(void *userData, const char *name, const char **atts)
       s->enhances = adddep(pool, pd, s->enhances, atts, 0);
       break;
     case STATE_FRESHENS:
-      s->freshens = 0;
+      pd->freshens = 0;
       break;
     case STATE_FRESHENSENTRY:
-      s->freshens = adddep(pool, pd, s->freshens, atts, 0);
+      pd->freshens = adddep(pool, pd, pd->freshens, atts, 0);
       break;
     case STATE_REBOOT:
       repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
@@ -618,7 +620,8 @@ endElement(void *userData, const char *name)
 	s->arch = ARCH_NOARCH;
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements);
+      s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements, pd->freshens);
+      pd->freshens = 0;
       break;
     case STATE_NAME:
       s->name = str2id(pool, pd->content, 1);

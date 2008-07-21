@@ -907,8 +907,6 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
         pool_addfileprovides_dep(pool, repo->idarraydata + s->supplements, &sf, isfp);
       if (s->enhances)
         pool_addfileprovides_dep(pool, repo->idarraydata + s->enhances, &sf, isfp);
-      if (s->freshens)
-        pool_addfileprovides_dep(pool, repo->idarraydata + s->freshens, &sf, isfp);
     }
   map_free(&sf.seen);
   map_free(&isf.seen);

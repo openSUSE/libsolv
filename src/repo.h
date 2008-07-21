@@ -61,7 +61,7 @@ extern void repo_freeallrepos(Pool *pool, int reuseids);
 extern Offset repo_addid(Repo *repo, Offset olddeps, Id id);
 extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker);
 extern Offset repo_reserve_ids(Repo *repo, Offset olddeps, int num);
-extern Offset repo_fix_legacy(Repo *repo, Offset provides, Offset supplements);
+extern Offset repo_fix_legacy(Repo *repo, Offset provides, Offset supplements, Offset freshens);
 
 static inline const char *repo_name(const Repo *repo)
 {

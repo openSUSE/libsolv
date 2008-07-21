@@ -289,27 +289,13 @@ static inline int
 solver_is_supplementing(Solver *solv, Solvable *s)
 {
   Id sup, *supp;
-  if (!s->supplements && !s->freshens)
+  if (!s->supplements)
     return 0;
-  if (s->supplements)
-    {
-      supp = s->repo->idarraydata + s->supplements;
-      while ((sup = *supp++) != 0)
-        if (solver_dep_fulfilled(solv, sup))
-          break;
-      if (!sup)
-        return 0;
-    }
-  if (s->freshens)
-    {
-      supp = s->repo->idarraydata + s->freshens;
-      while ((sup = *supp++) != 0)
-        if (solver_dep_fulfilled(solv, sup))
-          break;
-      if (!sup)
-        return 0;
-    }
-  return 1;
+  supp = s->repo->idarraydata + s->supplements;
+  while ((sup = *supp++) != 0)
+    if (solver_dep_fulfilled(solv, sup))
+      return 1;
+  return 0;
 }
 
 static inline int

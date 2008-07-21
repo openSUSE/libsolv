@@ -38,7 +38,6 @@ typedef struct _Solvable {
   Offset supplements;
   Offset enhances;
 
-  Offset freshens;
 } Solvable;
 
 #endif /* SATSOLVER_SOLVABLE_H */

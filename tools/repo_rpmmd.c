@@ -231,6 +231,7 @@ struct parsedata {
   int acontent;
   int docontent;
   Solvable *solvable;
+  Offset freshens;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
   const char *lang;
@@ -578,6 +579,7 @@ startElement(void *userData, const char *name, const char **atts)
         pd->kind = "patch";
       
       pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
+      pd->freshens = 0;
       repodata_extend(pd->data, pd->solvable - pool->solvables);
       pd->handle = repodata_get_handle(pd->data, (pd->solvable - pool->solvables) - pd->data->start);
 #if 0
@@ -645,10 +647,10 @@ startElement(void *userData, const char *name, const char **atts)
       break;
     case STATE_CAPS_FRESHENS:
     case STATE_FRESHENS:
-      s->freshens = 0;
+      pd->freshens = 0;
       break;
     case STATE_FRESHENSENTRY:
-      s->freshens = adddep(pool, pd, s->freshens, atts, 0);
+      pd->freshens = adddep(pool, pd, pd->freshens, atts, 0);
       break;
     case STATE_CAP_PROVIDES:
     case STATE_CAP_REQUIRES:
@@ -761,7 +763,8 @@ endElement(void *userData, const char *name)
         s->evr = ID_EMPTY;	/* some patterns have this */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = repo_fix_legacy(repo, s->provides, s->supplements);
+      s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, pd->freshens);
+      pd->freshens = 0;
       pd->kind = 0;
       break;
     case STATE_NAME:
@@ -827,7 +830,7 @@ endElement(void *userData, const char *name)
       s->enhances = adddepplain(pool, &pd->common, s->enhances, pd->content, 0, pd->capkind);
       break;
     case STATE_CAP_FRESHENS:
-      s->freshens = adddepplain(pool, &pd->common, s->freshens, pd->content, 0, pd->capkind);
+      pd->freshens = adddepplain(pool, &pd->common, pd->freshens, pd->content, 0, pd->capkind);
       break;
     case STATE_SUMMARY:
       pd->lang = 0;

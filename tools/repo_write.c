@@ -1267,11 +1267,6 @@ for (i = 1; i < cbdata.nmykeys; i++)
           *sp++ = SOLVABLE_ENHANCES;
 	  cbdata.mykeys[SOLVABLE_ENHANCES].size += incneedidarray(pool, idarraydata + s->enhances, needid);
 	}
-      if (s->freshens && cbdata.keymap[SOLVABLE_FRESHENS])
-	{
-          *sp++ = SOLVABLE_FRESHENS;
-	  cbdata.mykeys[SOLVABLE_FRESHENS].size += incneedidarray(pool, idarraydata + s->freshens, needid);
-	}
       if (repo->rpmdbid && cbdata.keymap[RPM_RPMDBID])
 	{
           *sp++ = RPM_RPMDBID;
@@ -1533,8 +1528,6 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
         data_addidarray_sort(xd, pool, needid, idarraydata + s->supplements, 0);
       if (s->enhances && cbdata.keymap[SOLVABLE_ENHANCES])
         data_addidarray_sort(xd, pool, needid, idarraydata + s->enhances, 0);
-      if (s->freshens && cbdata.keymap[SOLVABLE_FRESHENS])
-        data_addidarray_sort(xd, pool, needid, idarraydata + s->freshens, 0);
       if (repo->rpmdbid && cbdata.keymap[RPM_RPMDBID])
         data_addu32(xd, repo->rpmdbid[i - repo->start]);
       if (anyrepodataused)

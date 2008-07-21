@@ -316,7 +316,7 @@ repo_freeallrepos(Pool *pool, int reuseids)
 }
 
 Offset
-repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
+repo_fix_legacy(Repo *repo, Offset provides, Offset supplements, Offset freshens)
 {
   Pool *pool = repo->pool;
   Id id, idp, idl;
@@ -403,80 +403,106 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements)
 	    }
 	}
     }
-  if (!supplements)
-    return 0;
-  for (i = supplements; repo->idarraydata[i]; i++)
+  if (supplements)
     {
-      id = repo->idarraydata[i];
-      if (ISRELDEP(id))
-	continue;
-      dep = (char *)id2str(pool, id);
-      if (!strncmp(dep, "system:modalias(", 16))
-	dep += 7;
-      if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10] && strlen(dep) < sizeof(buf))
+      for (i = supplements; repo->idarraydata[i]; i++)
 	{
-	  strcpy(buf, dep);
-	  p = strchr(buf + 9, ':');
-	  if (p && p != buf + 9 && strchr(p + 1, ':'))
+	  id = repo->idarraydata[i];
+	  if (ISRELDEP(id))
+	    continue;
+	  dep = (char *)id2str(pool, id);
+	  if (!strncmp(dep, "system:modalias(", 16))
+	    dep += 7;
+	  if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10] && strlen(dep) < sizeof(buf))
 	    {
-	      *p++ = 0;
-	      idp = str2id(pool, buf + 9, 1);
-	      p[strlen(p) - 1] = 0;
-	      id = str2id(pool, p, 1);
-	      id = rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
-	      id = rel2id(pool, idp, id, REL_AND, 1);
-	    }
-	  else
-	    {
-	      p = buf + 9;
-	      p[strlen(p) - 1] = 0;
-	      id = str2id(pool, p, 1);
-	      id = rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
-	    }
-	  if (id)
-	    repo->idarraydata[i] = id;
-	}
-      else if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
-	{
-	  strcpy(buf, dep);
-	  id = 0;
-	  dep = buf + 11;
-	  while ((p = strchr(dep, ':')) != 0)
-	    {
-	      if (p == dep)
+	      strcpy(buf, dep);
+	      p = strchr(buf + 9, ':');
+	      if (p && p != buf + 9 && strchr(p + 1, ':'))
 		{
-		  dep = p + 1;
-		  continue;
+		  *p++ = 0;
+		  idp = str2id(pool, buf + 9, 1);
+		  p[strlen(p) - 1] = 0;
+		  id = str2id(pool, p, 1);
+		  id = rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
+		  id = rel2id(pool, idp, id, REL_AND, 1);
 		}
-	      *p++ = 0;
-	      idp = str2id(pool, dep, 1);
-	      if (id)
-		id = rel2id(pool, id, idp, REL_AND, 1);
 	      else
-		id = idp;
-	      dep = p;
+		{
+		  p = buf + 9;
+		  p[strlen(p) - 1] = 0;
+		  id = str2id(pool, p, 1);
+		  id = rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
+		}
+	      if (id)
+		repo->idarraydata[i] = id;
 	    }
-	  if (dep[0] && dep[1])
+	  else if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
 	    {
-	      dep[strlen(dep) - 1] = 0;
-	      idp = str2id(pool, dep, 1);
+	      strcpy(buf, dep);
+	      id = 0;
+	      dep = buf + 11;
+	      while ((p = strchr(dep, ':')) != 0)
+		{
+		  if (p == dep)
+		    {
+		      dep = p + 1;
+		      continue;
+		    }
+		  *p++ = 0;
+		  idp = str2id(pool, dep, 1);
+		  if (id)
+		    id = rel2id(pool, id, idp, REL_AND, 1);
+		  else
+		    id = idp;
+		  dep = p;
+		}
+	      if (dep[0] && dep[1])
+		{
+		  dep[strlen(dep) - 1] = 0;
+		  idp = str2id(pool, dep, 1);
+		  if (id)
+		    id = rel2id(pool, id, idp, REL_AND, 1);
+		  else
+		    id = idp;
+		}
 	      if (id)
-		id = rel2id(pool, id, idp, REL_AND, 1);
-	      else
-		id = idp;
+		repo->idarraydata[i] = id;
 	    }
-	  if (id)
-	    repo->idarraydata[i] = id;
+	  else if (!strncmp(dep, "filesystem(", 11) && strlen(dep) < sizeof(buf))
+	    {
+	      strcpy(buf, dep + 11);
+	      if ((p = strrchr(buf, ')')) != 0)
+		*p = 0;
+	      id = str2id(pool, buf, 1);
+	      id = rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
+	      repo->idarraydata[i] = id;
+	    }
 	}
-      else if (!strncmp(dep, "filesystem(", 11) && strlen(dep) < sizeof(buf))
-	{
-	  strcpy(buf, dep + 11);
-	  if ((p = strrchr(buf, ')')) != 0)
-	    *p = 0;
-	  id = str2id(pool, buf, 1);
-	  id = rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
-	  repo->idarraydata[i] = id;
-	}
+    }
+  if (freshens && repo->idarraydata[freshens])
+    {
+      Id idsupp = 0, idfresh = 0;
+      if (!supplements)
+	return freshens;
+      for (i = supplements; repo->idarraydata[i]; i++)
+        {
+	  if (!idsupp)
+	    idsupp = repo->idarraydata[i];
+	  else
+	    idsupp = rel2id(pool, idsupp, repo->idarraydata[i], REL_OR, 1);
+        }
+      for (i = freshens; repo->idarraydata[i]; i++)
+        {
+	  if (!idfresh)
+	    idfresh = repo->idarraydata[i];
+	  else
+	    idfresh = rel2id(pool, idfresh, repo->idarraydata[i], REL_OR, 1);
+        }
+      if (!idsupp)
+        idsupp = idfresh;
+      else
+	idsupp = rel2id(pool, idsupp, idfresh, REL_AND, 1);
+      supplements = repo_addid_dep(repo, 0, idsupp, 0);
     }
   return supplements;
 }
@@ -573,7 +599,6 @@ static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
   { SOLVABLE_SUGGESTS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
   { SOLVABLE_SUPPLEMENTS, REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
   { SOLVABLE_ENHANCES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { SOLVABLE_FRESHENS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
   { RPM_RPMDBID,          REPOKEY_TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
 };
 
@@ -691,11 +716,6 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	  case SOLVABLE_ENHANCES:
 	    if (s->enhances)
 	      domatch_idarray(s, SOLVABLE_ENHANCES, md, repo->idarraydata + s->enhances);
-	    if (keyname || md->stop > SEARCH_NEXT_KEY)
-	      return;
-	  case SOLVABLE_FRESHENS:
-	    if (s->freshens)
-	      domatch_idarray(s, SOLVABLE_FRESHENS, md, repo->idarraydata + s->freshens);
 	    if (keyname || md->stop > SEARCH_NEXT_KEY)
 	      return;
 	  case RPM_RPMDBID:
