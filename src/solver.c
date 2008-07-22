@@ -2350,6 +2350,60 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	    }
 	}
 
+     if (level < systemlevel)
+	{
+	  POOL_DEBUG(SAT_DEBUG_STATS, "resolving job rules\n");
+	  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++)
+	    {
+	      Id l;
+	      if (r->d < 0)		/* ignore disabled rules */
+		continue;
+	      queue_empty(&dq);
+	      FOR_RULELITERALS(l, dp, r)
+		{
+		  if (l < 0)
+		    {
+		      if (solv->decisionmap[-l] <= 0)
+			break;
+		    }
+		  else
+		    {
+		      if (solv->decisionmap[l] > 0)
+			break;
+		      if (solv->decisionmap[l] == 0)
+			queue_push(&dq, l);
+		    }
+		}
+	      if (l || !dq.count)
+		continue;
+	      if (!solv->updatesystem && solv->installed && dq.count > 1)
+		{
+		  int j, k;
+		  for (j = k = 0; j < dq.count; j++)
+		    {
+		      Solvable *s = pool->solvables + dq.elements[j];
+		      if (s->repo == solv->installed)
+			dq.elements[k++] = dq.elements[j];
+		    }
+		  if (k)
+		    dq.count = k;
+		}
+	      olevel = level;
+	      level = selectandinstall(solv, level, &dq, 0, disablerules);
+	      if (level == 0)
+		{
+		  queue_free(&dq);
+		  return;
+		}
+	      if (level <= olevel)
+		break;
+	    }
+	  systemlevel = level + 1;
+	  if (i < solv->jobrules_end)
+	    continue;
+	}
+
+
       /*
        * installed packages
        */
@@ -2457,10 +2511,13 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (level <= olevel)
 		break;
 	    }
+	  systemlevel = level + 1;
 	  if (i < solv->installed->end)
 	    continue;
-	  systemlevel = level;
 	}
+
+      if (level < systemlevel)
+        systemlevel = level;
 
       /*
        * decide
