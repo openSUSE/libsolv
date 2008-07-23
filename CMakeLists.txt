@@ -83,6 +83,9 @@ SET (CPACK_SOURCE_IGNORE_FILES
 "Makefile\\\\.in$"
 "testsuite/data.libzypp/kernel-tests/kernel-hardware"
 "testsuite/data.libzypp/yast-tests/kernel3-hardware"
+# cmake cache files
+"CMakeCache.txt"
+"CMakeFiles"
 )
 
 INCLUDE(CPack)
