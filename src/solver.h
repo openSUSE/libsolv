@@ -255,7 +255,7 @@ extern Id solver_findproblemrule(Solver *solv, Id problem);
 extern SolverProbleminfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
 
 /* XXX: why is this not static? */
-Id *create_decisions_obsoletesmap(Solver *solv);
+Id *solver_create_decisions_obsoletesmap(Solver *solv);
 
 static inline int
 solver_dep_fulfilled(Solver *solv, Id dep)
