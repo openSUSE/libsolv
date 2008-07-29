@@ -37,6 +37,6 @@ make
 To install ruby bindings:
 make install
 
-To createe a package
+To create a package
 make srcpackage
 see package/

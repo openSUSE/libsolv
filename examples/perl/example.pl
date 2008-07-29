@@ -9,34 +9,34 @@ use satsolverx;
 
 # Create Pool and Repository 
 my $pool = new satsolverx::Pool;
-$pool -> set_arch( 'i686' );
-my $repo = $pool -> create_repo('repo');
+$pool->set_arch( 'i686' );
+my $repo = $pool->create_repo('repo');
 
 # Add Solvable to Repository
-$repo -> add_solv ("tmp/primary");
+$repo->add_solv ("tmp/primary");
 # close(F) || die;
 
 # Create Solver
-my $solver = $pool -> create_solver();
+my $solver = $pool->create_solver();
 
 # Create dependencies to provides table
-$pool -> prepare();
+$pool->prepare();
 
 # Create Transactions
-my $job = $pool -> create_transaction();
+my $job = $pool->create_transaction();
 
 # Push jobs on Queue
-my $pat = $pool -> find( "pattern:default" ) || die;
-$job -> install( $pat );
+my $pat = $pool->find("pattern:default") || die;
+$job->install($pat);
 
-# $job -> install( "pattern:default" );
+# $job -> install("pattern:default");
 
 # Solve the jobs
-$solver -> solve ($job);
+$solver->solve ($job);
 
 # Print packages to install
-$a = $solver -> getInstallList();
-foreach my $c (@{$a}) {
-	print "$c\n";
+$a = $solver->getInstallList();
+for my $c (@$a) {
+    print "$c\n";
 }
 
