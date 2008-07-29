@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Tue Jul 29 10:53:22 CEST 2008 - mls@suse.de
+
+- resolve job rules before installing system packages [#411086]
+- no more freshens. R.I.P.
+- make repo2solv.sh also take repomd.xml in count
+- install repomdxml2solv
+- add Packager, Build Host, Distribution
+- disallow arch/vendor changes even if the package name changes
+
+-------------------------------------------------------------------
 Sat Jul 12 02:32:15 CEST 2008 - dmacvicar@suse.de
 
 - infrastructure to save generated and expiration time
