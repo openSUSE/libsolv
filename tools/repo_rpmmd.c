@@ -15,6 +15,7 @@
 
 #include "pool.h"
 #include "repo.h"
+#define DISABLE_SPLIT
 #include "tools_util.h"
 #include "repo_rpmmd.h"
 
@@ -85,18 +86,6 @@ enum state {
   STATE_SOURCERPM,
   STATE_HEADERRANGE,
 
-  STATE_CAPS_FORMAT,
-  STATE_CAPS_VENDOR,
-  STATE_CAPS_PROVIDES,
-  STATE_CAPS_REQUIRES,
-  STATE_CAPS_OBSOLETES,
-  STATE_CAPS_CONFLICTS,
-  STATE_CAPS_RECOMMENDS,
-  STATE_CAPS_SUPPLEMENTS,
-  STATE_CAPS_SUGGESTS,
-  STATE_CAPS_ENHANCES,
-  STATE_CAPS_FRESHENS,
-
   STATE_PROVIDESENTRY,
   STATE_REQUIRESENTRY,
   STATE_OBSOLETESENTRY,
@@ -106,16 +95,6 @@ enum state {
   STATE_SUGGESTSENTRY,
   STATE_ENHANCESENTRY,
   STATE_FRESHENSENTRY,
-
-  STATE_CAP_FRESHENS,
-  STATE_CAP_PROVIDES,
-  STATE_CAP_REQUIRES,
-  STATE_CAP_OBSOLETES,
-  STATE_CAP_CONFLICTS,
-  STATE_CAP_SUGGESTS,
-  STATE_CAP_RECOMMENDS,
-  STATE_CAP_SUPPLEMENTS,
-  STATE_CAP_ENHANCES,
 
   STATE_FILE,
 
@@ -168,17 +147,6 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "default",         STATE_DEFAULT, 1 },
   { STATE_SOLVABLE,    "install-time",    STATE_INSTALL_TIME, 1 },
 
-  /* those are used in libzypp xml store */
-  { STATE_SOLVABLE,    "obsoletes",       STATE_CAPS_OBSOLETES , 0 },
-  { STATE_SOLVABLE,    "conflicts",       STATE_CAPS_CONFLICTS , 0 },
-  { STATE_SOLVABLE,    "recommends",      STATE_CAPS_RECOMMENDS , 0 },
-  { STATE_SOLVABLE,    "supplements",     STATE_CAPS_SUPPLEMENTS, 0 },
-  { STATE_SOLVABLE,    "suggests",        STATE_CAPS_SUGGESTS, 0 },
-  { STATE_SOLVABLE,    "enhances",        STATE_CAPS_ENHANCES, 0 },
-  { STATE_SOLVABLE,    "freshens",        STATE_CAPS_FRESHENS, 0 },
-  { STATE_SOLVABLE,    "provides",        STATE_CAPS_PROVIDES, 0 },
-  { STATE_SOLVABLE,    "requires",        STATE_CAPS_REQUIRES, 0 },
-
   { STATE_SOLVABLE,      "rpm:vendor",      STATE_VENDOR, 1 },
   { STATE_SOLVABLE,      "rpm:group",       STATE_RPM_GROUP, 1 },
   { STATE_SOLVABLE,      "rpm:license",     STATE_RPM_LICENSE, 1 },
@@ -196,16 +164,6 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,      "rpm:sourcerpm",   STATE_SOURCERPM, 1 },
   { STATE_SOLVABLE,      "rpm:header-range", STATE_HEADERRANGE, 0 },
   { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
-
-  { STATE_CAPS_PROVIDES,    "capability",      STATE_CAP_PROVIDES, 1 },
-  { STATE_CAPS_REQUIRES,    "capability",      STATE_CAP_REQUIRES, 1 },
-  { STATE_CAPS_OBSOLETES,   "capability",      STATE_CAP_OBSOLETES, 1 },
-  { STATE_CAPS_CONFLICTS,   "capability",      STATE_CAP_CONFLICTS, 1 },
-  { STATE_CAPS_RECOMMENDS,  "capability",      STATE_CAP_RECOMMENDS, 1 },
-  { STATE_CAPS_SUPPLEMENTS, "capability",      STATE_CAP_SUPPLEMENTS, 1 },
-  { STATE_CAPS_SUGGESTS,    "capability",      STATE_CAP_SUGGESTS, 1 },
-  { STATE_CAPS_ENHANCES,    "capability",      STATE_CAP_ENHANCES, 1 },
-  { STATE_CAPS_FRESHENS,    "capability",      STATE_CAP_FRESHENS, 1 },
   
   { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
@@ -242,59 +200,6 @@ struct parsedata {
   Repodata *data;
   Id handle;
 };
-
-static char *flagtabnum[] = {
-  ">",
-  "=",
-  ">=",
-  "<",
-  "!=",
-  "<=",
-};
-
-/**
- * adds plain dependencies, that is strings like "foo > 2.0"
- * which are used in libzypp xml store, not in rpm-md.
- */
-static unsigned int
-adddepplain(Pool *pool, struct parsedata_common *pd, unsigned int olddeps, char *line, Id marker, const char *kind)
-{
-  int i, flags;
-  Id id, evrid;
-  char *sp[4];
-
-  i = split(line, sp, 4);
-  if (i != 1 && i != 3)
-    {
-      fprintf(stderr, "Bad dependency line: %s\n", line);
-      exit(1);
-    }
-  if (kind)
-    id = str2id(pool, join2(kind, ":", sp[0]), 1);
-  else
-    id = str2id(pool, sp[0], 1);
-  if (i == 3)
-    {
-      evrid = makeevr(pool, sp[2]);
-      for (flags = 0; flags < 6; flags++)
-        if (!strcmp(sp[1], flagtabnum[flags]))
-          break;
-      if (flags == 6)
-        {
-          if ( !strcmp(sp[1], "=="))
-           {
-            flags = 1;
-           }
-          else
-           {
-            fprintf(stderr, "Unknown relation '%s'\n", sp[1]);
-            exit(1);
-           }
-        }
-      id = rel2id(pool, id, evrid, flags + 1, 1);
-    }
-  return repo_addid_dep(pd->repo, olddeps, id, marker);
-}
 
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
@@ -589,80 +494,59 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_VERSION:
       s->evr = makeevr_atts(pool, pd, atts);
       break;
-    case STATE_CAPS_PROVIDES:
     case STATE_PROVIDES:
       s->provides = 0;
       break;
     case STATE_PROVIDESENTRY:
       s->provides = adddep(pool, pd, s->provides, atts, 0);
       break;
-    case STATE_CAPS_REQUIRES:
     case STATE_REQUIRES:
       s->requires = 0;
       break;
     case STATE_REQUIRESENTRY:
       s->requires = adddep(pool, pd, s->requires, atts, 1);
       break;
-    case STATE_CAPS_OBSOLETES:
     case STATE_OBSOLETES:
       s->obsoletes = 0;
       break;
     case STATE_OBSOLETESENTRY:
       s->obsoletes = adddep(pool, pd, s->obsoletes, atts, 0);
       break;
-    case STATE_CAPS_CONFLICTS:
     case STATE_CONFLICTS:
       s->conflicts = 0;
       break;
     case STATE_CONFLICTSENTRY:
       s->conflicts = adddep(pool, pd, s->conflicts, atts, 0);
       break;
-    case STATE_CAPS_RECOMMENDS:
     case STATE_RECOMMENDS:
       s->recommends = 0;
       break;
     case STATE_RECOMMENDSENTRY:
       s->recommends = adddep(pool, pd, s->recommends, atts, 0);
       break;
-    case STATE_CAPS_SUPPLEMENTS:
     case STATE_SUPPLEMENTS:
       s->supplements= 0;
       break;
     case STATE_SUPPLEMENTSENTRY:
       s->supplements = adddep(pool, pd, s->supplements, atts, 0);
       break;
-    case STATE_CAPS_SUGGESTS:
     case STATE_SUGGESTS:
       s->suggests = 0;
       break;
     case STATE_SUGGESTSENTRY:
       s->suggests = adddep(pool, pd, s->suggests, atts, 0);
       break;
-    case STATE_CAPS_ENHANCES:
     case STATE_ENHANCES:
       s->enhances = 0;
       break;
     case STATE_ENHANCESENTRY:
       s->enhances = adddep(pool, pd, s->enhances, atts, 0);
       break;
-    case STATE_CAPS_FRESHENS:
     case STATE_FRESHENS:
       pd->freshens = 0;
       break;
     case STATE_FRESHENSENTRY:
       pd->freshens = adddep(pool, pd, pd->freshens, atts, 0);
-      break;
-    case STATE_CAP_PROVIDES:
-    case STATE_CAP_REQUIRES:
-    case STATE_CAP_OBSOLETES:
-    case STATE_CAP_CONFLICTS:
-    case STATE_CAP_RECOMMENDS:
-    case STATE_CAP_SUPPLEMENTS:
-    case STATE_CAP_SUGGESTS:
-    case STATE_CAP_ENHANCES:
-    case STATE_CAP_FRESHENS:
-      pd->capkind = find_attr("kind", atts);
-      //fprintf(stderr,"capkind es: %s\n", pd->capkind);
       break;
     case STATE_SUMMARY:
     case STATE_DESCRIPTION:
@@ -803,34 +687,6 @@ endElement(void *userData, const char *name)
       if (!id)
 	id = repodata_str2dir(pd->data, "/", 1);
       repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, id, p);
-      break;
-    // xml store capabilities
-    case STATE_CAP_PROVIDES:
-      s->provides = adddepplain(pool, &pd->common, s->provides, pd->content, 0, pd->capkind);
-      break;
-    case STATE_CAP_REQUIRES:
-      s->requires = adddepplain(pool, &pd->common, s->requires, pd->content, 0, pd->capkind);
-      break;
-    case STATE_CAP_OBSOLETES:
-      s->obsoletes = adddepplain(pool, &pd->common, s->obsoletes, pd->content, 0, pd->capkind);
-      break;
-    case STATE_CAP_CONFLICTS:
-      s->conflicts = adddepplain(pool, &pd->common, s->conflicts, pd->content, 0, pd->capkind);
-      break;
-    case STATE_CAP_RECOMMENDS:
-      s->recommends = adddepplain(pool, &pd->common, s->recommends, pd->content, 0, pd->capkind);
-      break;
-    case STATE_CAP_SUPPLEMENTS:
-      s->supplements = adddepplain(pool, &pd->common, s->supplements, pd->content, 0, pd->capkind);
-      break;
-    case STATE_CAP_SUGGESTS:
-      s->suggests = adddepplain(pool, &pd->common, s->suggests, pd->content, 0, pd->capkind);
-      break;
-    case STATE_CAP_ENHANCES:
-      s->enhances = adddepplain(pool, &pd->common, s->enhances, pd->content, 0, pd->capkind);
-      break;
-    case STATE_CAP_FRESHENS:
-      pd->freshens = adddepplain(pool, &pd->common, pd->freshens, pd->content, 0, pd->capkind);
       break;
     case STATE_SUMMARY:
       pd->lang = 0;
