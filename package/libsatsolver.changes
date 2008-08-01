@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Aug  1 18:59:22 CEST 2008 - dmacvicar@suse.de
+
+- insert the checksum in rpmmd generated solv files                                  
+  (bnc#414002)                                                                       
+- 0.10.3 
+
+-------------------------------------------------------------------
 Tue Jul 29 10:53:22 CEST 2008 - mls@suse.de
 
 - resolve job rules before installing system packages [#411086]

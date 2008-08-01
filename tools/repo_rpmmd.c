@@ -199,6 +199,7 @@ struct parsedata {
   const char *tmpattr;
   Repodata *data;
   Id handle;
+  XML_Parser *parser;
 };
 
 static Id
@@ -483,9 +484,59 @@ startElement(void *userData, const char *name, const char **atts)
       else if (name[2] == 't' && name[3] == 'c')
         pd->kind = "patch";
       
-      pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
-      pd->freshens = 0;
-      repodata_extend(pd->data, pd->solvable - pool->solvables);
+      /**
+       * now we have two cases, one is that we are in the package tag of a new package
+       * and the other is that we are in the tag of an extension file like other.xml or
+       * filelist.xml.
+       * We identify it by looking the attributes
+       *
+       * new package
+       * <package>
+       *     <name>...
+       *     <version...>
+       *
+       * extension package:
+       *
+       * For other.xml
+       *
+       * <package pkgid="b78f8664cd90efe42e09a345e272997ef1b53c18"
+       *          name="zaptel-kmp-default"
+       *          arch="i586">
+       *     <version epoch="0"
+       *              ver="1.2.10_2.6.22_rc4_git6_2"
+       *              rel="70"/>
+       */
+
+      /* first check if there is a pkgid attribute */
+      const char *pkgid = find_attr( "pkgid", atts);
+
+      if ( pkgid == NULL )
+        {
+          /* this is a new package */
+          /*fprintf(stderr, "new package\n");*/
+          pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
+          pd->freshens = 0;
+          repodata_extend(pd->data, pd->solvable - pool->solvables);
+        }
+      else
+        {
+          /* we need to look for the package based on the pkgid */
+          Dataiterator di;
+          dataiterator_init(&di, pd->common.repo, -1, SOLVABLE_CHECKSUM, pkgid, SEARCH_STRING);
+          if (dataiterator_step(&di))
+            {
+              /* we found it */
+              /*fprintf(stderr, "package found '%i'\n", di.solvid);*/
+              pd->solvable = pool_id2solvable(pool, di.solvid);
+            }
+          else
+            {
+              /* this is bad, here we should ignore the whole solvable */
+              fprintf(stderr, "can't find package with checksum '%s'\n", pkgid);
+              //exit(1);
+            }
+        }
+
       pd->handle = repodata_get_handle(pd->data, (pd->solvable - pool->solvables) - pd->data->start);
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
@@ -669,6 +720,27 @@ endElement(void *userData, const char *name)
     case STATE_RPM_LICENSE:
       repodata_set_poolstr(pd->data, handle, SOLVABLE_LICENSE, pd->content);
       break;
+    case STATE_CHECKSUM:
+      { 
+        int l;
+        Id type;
+        if (!strcasecmp (pd->tmpattr, "sha") || !strcasecmp (pd->tmpattr, "sha1"))
+          l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
+        else if (!strcasecmp (pd->tmpattr, "md5"))
+          l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
+        else
+          {
+            fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
+            exit(1);
+          }
+        if (strlen(pd->content) != l)
+          {
+            fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
+            exit(1);
+          }
+        repodata_set_checksum(pd->data, handle, SOLVABLE_CHECKSUM, type, pd->content);
+      }
+      break;
     case STATE_FILE:
 #if 0
       id = str2id(pool, pd->content, 1);
@@ -769,6 +841,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, int flags)
   pd.kind = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
+  pd.parser = &parser;
   XML_SetElementHandler(parser, startElement, endElement);
   XML_SetCharacterDataHandler(parser, characterData);
   for (;;)
