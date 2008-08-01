@@ -454,8 +454,18 @@ finish_solvable(struct parsedata *pd, Solvable *s, int handle, Offset freshens)
     commit_diskusage (pd, handle);
 }
 
+
+/*
+ * parse susetags
+ * 
+ * fp: file to read from
+ * product: solvable representing the product (0 if none)
+ * language: current language (0 if none)
+ * flags: flags
+ */
+
 void
-repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int flags)
+repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int flags)
 {
   Pool *pool = repo->pool;
   char *line, *linep;
@@ -471,7 +481,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
   Repodata *data = 0;
   Id blanr = -1;
   Id handle = 0;
-
+  Id vendor = 0;
+  
   if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
     indesc = 1;
   if (repo->nrepodata)
@@ -480,6 +491,14 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
   else
     data = repo_add_repodata(repo, 0);
 
+  if (product)
+    {
+      if (!strncmp (id2str(pool, pool->solvables[product].name), "product:", 8))
+        vendor = pool->solvables[product].vendor;
+      else
+        vendor = str2id(pool, repo_lookup_str(pool->solvables + product, PRODUCT_VENDOR), 0);
+    }
+  
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
   aline = 1024;
@@ -659,30 +678,43 @@ repo_add_susetags(Repo *repo, FILE *fp, Id vendor, const char *language, int fla
 	  /* Now see if we know this solvable already.  If we found neither
 	     the name nor the arch at all in this repo
 	     there's no chance of finding the exact solvable either.  */
-	  if (indesc >= 2 && name && arch)
+	  if (name && arch)
 	    {
-	      int n, nn;
-	      /* Now look for a solvable with the given name,evr,arch.
-	         Our input is structured so, that the second set of =Pkg
-		 lines comes in roughly the same order as the first set, so we 
-		 have a hint at where to start our search, namely were we found
-		 the last entry.  */
-	      for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
-	        {
-	          if (nn >= repo->end)
-	            nn = repo->start;
-	          s = pool->solvables + nn;
-	          if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
-	            break;
-	        }
-	      if (n == repo->end)
-	        s = 0;
-	      else
+	      if (product && (name == pool->solvables[product].name))
 		{
-		  last_found_pack = nn - repo->start;
-		  handle = repodata_get_handle(data, last_found_pack);
+		  s = pool->solvables + product;
+		  s->vendor = vendor;
+		  s->arch = arch;
+		  s->evr = evr;
+		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
+		  last_found_pack = (s - pool->solvables) - repo->start;
+		}
+	      else if (indesc >= 2)
+		{
+		  int n, nn;
+		  /* Now look for a solvable with the given name,evr,arch.
+		   Our input is structured so, that the second set of =Pkg
+		   lines comes in roughly the same order as the first set, so we 
+		   have a hint at where to start our search, namely were we found
+		   the last entry.  */
+		  for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
+		    {
+		      if (nn >= repo->end)
+			nn = repo->start;
+		      s = pool->solvables + nn;
+		      if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
+			break;
+		    }
+		  if (n == repo->end)
+		    s = 0;
+		  else
+		    {
+		      last_found_pack = nn - repo->start;
+		      handle = repodata_get_handle(data, last_found_pack);
+		    }
 		}
 	    }
+	  
 
 	  /* And if we still don't have a solvable, create a new one.  */
 	  if (!s)

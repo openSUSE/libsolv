@@ -79,7 +79,7 @@ main(int argc, char **argv)
   const char *attrname = 0;
   const char *descrdir = 0;
   const char *basefile = 0;
-  Id vendor = 0;
+  Id product = 0;
   int flags = 0;
   int c;
 
@@ -121,8 +121,8 @@ main(int argc, char **argv)
 	  exit(1);
 	}
       repo_add_content(repo, fp);
-      if (!strncmp (id2str(pool, pool->solvables[repo->start].name), "product:", 8))
-        vendor = pool->solvables[repo->start].vendor;
+      product = repo->start;
+
       fclose (fp);
     }
   if (attrname)
@@ -139,6 +139,10 @@ main(int argc, char **argv)
       }
     }
 
+  /*
+   * descrdir path given, open files and read from there
+   */
+  
   if (descrdir)
     {
       char *fnp;
@@ -185,7 +189,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, vendor, 0, flags);
+	      repo_add_susetags(repo, fp, product, 0, flags);
 	      fclose(fp);
 	    }
 	  else if (!strcmp(fn, "packages.DU") || !strcmp(fn, "packages.DU.gz"))
@@ -197,7 +201,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, vendor, 0, flags | SUSETAGS_EXTEND);
+	      repo_add_susetags(repo, fp, product, 0, flags | SUSETAGS_EXTEND);
 	      fclose(fp);
  	    }
 	  else if (!strcmp(fn, "packages.FL") || !strcmp(fn, "packages.FL.gz"))
@@ -210,7 +214,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, vendor, 0, flags | SUSETAGS_EXTEND);
+	      repo_add_susetags(repo, fp, product, 0, flags | SUSETAGS_EXTEND);
 	      fclose(fp);
 #else
 	      /* ignore for now. reactivate when filters work */
@@ -238,7 +242,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, vendor, lang, flags | SUSETAGS_EXTEND);
+	      repo_add_susetags(repo, fp, product, lang, flags | SUSETAGS_EXTEND);
 	      fclose(fp);
 	    }
 	}
@@ -248,7 +252,8 @@ main(int argc, char **argv)
       free(fnp);
     }
   else
-    repo_add_susetags(repo, stdin, vendor, 0, flags);
+    /* read data from stdin */
+    repo_add_susetags(repo, stdin, product, 0, flags);
 
   tool_write(repo, basefile, attrname);
   pool_free(pool);
