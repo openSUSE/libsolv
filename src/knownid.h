@@ -153,11 +153,8 @@ KNOWNID(PRODUCT_UPDATEURLS,		"product:updateurls"),
 KNOWNID(PRODUCT_EXTRAURLS,		"product:extraurls"),
 KNOWNID(PRODUCT_OPTIONALURLS,		"product:optionalurls"),
 KNOWNID(PRODUCT_FLAGS,			"product:flags"),
-KNOWNID(PRODUCT_NAME,			"product:name"),
-KNOWNID(PRODUCT_VERSION,		"product:version"),
 KNOWNID(PRODUCT_FLAVOR,			"product:flavor"),
-KNOWNID(PRODUCT_DISTRIBUTION,		"product:distribution"),
-KNOWNID(PRODUCT_VENDOR,		        "product:vendor"),
+KNOWNID(PRODUCT_REFERENCES,		"product:references"),
 
 /* argh */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
