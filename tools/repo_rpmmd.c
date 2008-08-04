@@ -178,6 +178,7 @@ static struct stateswitch stateswitches[] = {
   { NUMSTATES}
 };
 
+
 struct parsedata {
   struct parsedata_common common;
   char *kind;
@@ -200,7 +201,11 @@ struct parsedata {
   Repodata *data;
   Id handle;
   XML_Parser *parser;
+  Id (*dirs)[3]; // dirid, size, nfiles
+  int ndirs;
+  Id langcache[ID_NUM_INTERNAL];
 };
+
 
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
