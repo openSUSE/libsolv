@@ -220,8 +220,6 @@ repo_add_content(Repo *repo, FILE *fp)
   Repodata *data;
   Id handle = 0;
   int contentstyle = 0;
-  char *product_name = 0;
-  char *product_version = 0;
   
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
@@ -283,33 +281,12 @@ repo_add_content(Repo *repo, FILE *fp)
 
 	  if (code11 && istag ("REFERENCES"))
 	    {
-	      char *vals[3];
-	      Id nameid;
-	      Id evrid = 0;
-	      
-	      if (split(value, vals, 3) == 3)
-		{
-		  if (!strcmp(vals[1], "=")) 
-		    {
-		      nameid = str2id(pool, vals[0], 1);
-		      evrid = str2id(pool, vals[2], 1);
-		  
-		      s = pool_id2solvable(pool, repo_add_solvable(repo));
-		      repodata_extend(data, s - pool->solvables);
-		      handle = repodata_get_handle(data, s - pool->solvables - repo->start);
-
-		      s->name = nameid;
-		      s->evr = evrid;
-		      s->provides = adddep(pool, &pd, s->provides, "product()", 0);
-
-		      continue;
-		    }
-		}
-	      fprintf(stderr, "REFERENCES must be 'name = evr'\n");
-	      break;
+	      repo_set_id(repo, s - pool->solvables, PRODUCT_REFERENCES, str2id(pool, value, 1));
+	      continue;
 	    }
 	  
-	  if (code10 && istag ("PRODUCT"))
+	  if ((code10 && istag ("PRODUCT"))
+	      || (code11 && istag ("NAME")))
 	    {
 	      /* Finish old solvable, but only if it wasn't created
 	         on demand without seeing a PRODUCT entry.  */
@@ -317,7 +294,7 @@ repo_add_content(Repo *repo, FILE *fp)
 		{
 		  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 		    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-		  if (s)
+		  if (s && code10)
 		    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, 0);
 		  /* Only support one product.  */
 		  s = pool_id2solvable(pool, repo_add_solvable(repo));
@@ -339,22 +316,11 @@ repo_add_content(Repo *repo, FILE *fp)
 	    }
 	  if (istag ("VERSION"))
 	    {
-	      if (code11)
-		{
-		  repo_set_str(repo, s - pool->solvables, PRODUCT_VERSION, value);
-		  product_version = strdup(value);
-		}
-	      else
-		/* without a release? but that's like zypp implements it */
-		s->evr = makeevr(pool, value);
-	    }
-	  else if (code11 && istag ("NAME"))
-	    {
-	      repo_set_str(repo, s - pool->solvables, PRODUCT_NAME, value);
-	      product_name = strdup(value);
+	      /* without a release? but that's like zypp implements it */
+	      s->evr = makeevr(pool, value);
 	    }
 	  else if (code11 && istag ("DISTRIBUTION"))
-	    repo_set_str(repo, s - pool->solvables, PRODUCT_DISTRIBUTION, value);
+	    repo_set_str(repo, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
 	  else if (code11 && istag ("FLAVOR"))
 	    repo_set_str(repo, s - pool->solvables, PRODUCT_FLAVOR, value);
 	  else if (istag ("DATADIR"))
@@ -377,10 +343,7 @@ repo_add_content(Repo *repo, FILE *fp)
 	    repodata_add_poolstr_array(data, handle, PRODUCT_RELNOTESURL, value);
 	  else if (istag ("VENDOR"))
 	    {
-	      if (code11)
-		repo_set_str(repo, s - pool->solvables, PRODUCT_VENDOR, value);
-	      else
-		s->vendor = str2id(pool, value, 1);
+	      s->vendor = str2id(pool, value, 1);
 	    }
 	  
 	  /*
@@ -435,31 +398,14 @@ repo_add_content(Repo *repo, FILE *fp)
       fprintf(stderr, "No product solvable created !\n");
       exit(1);
     }
-  if (code11)
-    {
-      if (!product_name) 
-        {
-	  fprintf(stderr, "Product must have a name !\n");
-	  exit(1);
-	}
-      if (!product_version) 
-        {
-	  fprintf(stderr, "Product must have a version !\n");
-	  exit(1);
-	}
-      const char *product = join(&pd, "product(", product_name, ")");
-      s->provides = adddep(pool, &pd, s->provides, join(&pd, product, " = ", product_version), 0);
-      free(product_version);
-      free(product_name);
-    }
 
-  if (code10)
+  if (!s->arch)
+    s->arch = ARCH_NOARCH;
+  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     {
-      if (!s->arch)
-	s->arch = ARCH_NOARCH;
-      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, 0);
+      s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      if (code10)
+	s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, 0);
     }
   
   if (pd.tmp)

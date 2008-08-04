@@ -495,8 +495,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
     {
       if (!strncmp (id2str(pool, pool->solvables[product].name), "product:", 8))
         vendor = pool->solvables[product].vendor;
-      else
-        vendor = str2id(pool, repo_lookup_str(pool->solvables + product, PRODUCT_VENDOR), 0);
     }
   
   memset(&pd, 0, sizeof(pd));
@@ -678,40 +676,28 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	  /* Now see if we know this solvable already.  If we found neither
 	     the name nor the arch at all in this repo
 	     there's no chance of finding the exact solvable either.  */
-	  if (name && arch)
+	  if (name && arch && (indesc >= 2))
 	    {
-	      if (product && (name == pool->solvables[product].name))
+	      int n, nn;
+	      /* Now look for a solvable with the given name,evr,arch.
+	       Our input is structured so, that the second set of =Pkg
+	       lines comes in roughly the same order as the first set, so we 
+	       have a hint at where to start our search, namely were we found
+	       the last entry.  */
+	      for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
 		{
-		  s = pool->solvables + product;
-		  s->vendor = vendor;
-		  s->arch = arch;
-		  s->evr = evr;
-		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
-		  last_found_pack = (s - pool->solvables) - repo->start;
+		  if (nn >= repo->end)
+		    nn = repo->start;
+		  s = pool->solvables + nn;
+		  if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
+		    break;
 		}
-	      else if (indesc >= 2)
+	      if (n == repo->end)
+		s = 0;
+	      else
 		{
-		  int n, nn;
-		  /* Now look for a solvable with the given name,evr,arch.
-		   Our input is structured so, that the second set of =Pkg
-		   lines comes in roughly the same order as the first set, so we 
-		   have a hint at where to start our search, namely were we found
-		   the last entry.  */
-		  for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
-		    {
-		      if (nn >= repo->end)
-			nn = repo->start;
-		      s = pool->solvables + nn;
-		      if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
-			break;
-		    }
-		  if (n == repo->end)
-		    s = 0;
-		  else
-		    {
-		      last_found_pack = nn - repo->start;
-		      handle = repodata_get_handle(data, last_found_pack);
-		    }
+		  last_found_pack = nn - repo->start;
+		  handle = repodata_get_handle(data, last_found_pack);
 		}
 	    }
 	  
