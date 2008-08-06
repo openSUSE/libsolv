@@ -40,6 +40,7 @@ enum state {
   /* resobject attributes */
   STATE_SUMMARY,
   STATE_DESCRIPTION,
+  STATE_DISTRIBUTION,
   STATE_PACKAGER,
   STATE_URL,
   STATE_INSNOTIFY,
@@ -57,7 +58,7 @@ enum state {
   STATE_AFFECTSPKG,
   STATE_REBOOTNEEDED,
 
-   // xml store pattern attributes
+  // pattern attributes
   STATE_CATEGORY, /* pattern and patches */
   STATE_SCRIPT,
   STATE_ICON,
@@ -67,10 +68,16 @@ enum state {
 
   /* product */
   STATE_SHORTNAME,
-  STATE_DISTNAME,
-  STATE_DISTEDITION,
+  STATE_DISTNAME, // obsolete
+  STATE_DISTEDITION, // obsolete
   STATE_SOURCE,
+  STATE_TYPE,
   STATE_RELNOTESURL,
+  STATE_UPDATEURL,
+  STATE_OPTIONALURL,
+  STATE_FLAG,
+  STATE_FLAVOR,
+  STATE_REFERENCES,
 
   /* rpm-md dependencies inside the
      format tag */
@@ -126,42 +133,52 @@ static struct stateswitch stateswitches[] = {
   
   /* resobject attributes */
 
-  { STATE_SOLVABLE,    "summary",         STATE_SUMMARY, 1 },
-  { STATE_SOLVABLE,    "description",     STATE_DESCRIPTION, 1 },
-  { STATE_SOLVABLE,    "url",             STATE_URL, 1 },
-  { STATE_SOLVABLE,    "packager",        STATE_PACKAGER, 1 },
+  { STATE_SOLVABLE,    "summary",         STATE_SUMMARY,      1 },
+  { STATE_SOLVABLE,    "description",     STATE_DESCRIPTION,  1 },
+  { STATE_SOLVABLE,    "distribution",    STATE_DISTRIBUTION, 1 },
+  { STATE_SOLVABLE,    "url",             STATE_URL,          1 },
+  { STATE_SOLVABLE,    "packager",        STATE_PACKAGER,     1 },
   //{ STATE_SOLVABLE,    "???",         STATE_INSNOTIFY, 1 },
   //{ STATE_SOLVABLE,    "??",     STATE_DELNOTIFY, 1 },
-  { STATE_SOLVABLE,    "vendor",          STATE_VENDOR, 1 },
-  { STATE_SOLVABLE,    "size",            STATE_SIZE, 0 },
+  { STATE_SOLVABLE,    "vendor",          STATE_VENDOR,       1 },
+  { STATE_SOLVABLE,    "size",            STATE_SIZE,         0 },
   { STATE_SOLVABLE,    "archive-size",    STATE_DOWNLOADSIZE, 1 },
-  { STATE_SOLVABLE,    "install-time",    STATE_INSTALLTIME, 1 },
-  { STATE_SOLVABLE,    "install-only",    STATE_INSTALLONLY, 1 },
-  { STATE_SOLVABLE,    "time",            STATE_TIME, 0 },
+  { STATE_SOLVABLE,    "install-time",    STATE_INSTALLTIME,  1 },
+  { STATE_SOLVABLE,    "install-only",    STATE_INSTALLONLY,  1 },
+  { STATE_SOLVABLE,    "time",            STATE_TIME,         0 },
 
-  // xml store pattern attributes
-  { STATE_SOLVABLE,    "script",          STATE_SCRIPT, 1 },
-  { STATE_SOLVABLE,    "icon",            STATE_ICON, 1 },
-  { STATE_SOLVABLE,    "uservisible",     STATE_USERVISIBLE, 1 },
-  { STATE_SOLVABLE,    "category",        STATE_CATEGORY, 1 },
-  { STATE_SOLVABLE,    "default",         STATE_DEFAULT, 1 },
-  { STATE_SOLVABLE,    "install-time",    STATE_INSTALL_TIME, 1 },
+  // pattern attribute
+  { STATE_SOLVABLE,    "script",          STATE_SCRIPT,        1 },
+  { STATE_SOLVABLE,    "icon",            STATE_ICON,          1 },
+  { STATE_SOLVABLE,    "uservisible",     STATE_USERVISIBLE,   1 },
+  { STATE_SOLVABLE,    "category",        STATE_CATEGORY,      1 },
+  { STATE_SOLVABLE,    "default",         STATE_DEFAULT,       1 },
+  { STATE_SOLVABLE,    "install-time",    STATE_INSTALL_TIME,  1 },
 
-  { STATE_SOLVABLE,      "rpm:vendor",      STATE_VENDOR, 1 },
-  { STATE_SOLVABLE,      "rpm:group",       STATE_RPM_GROUP, 1 },
+  /* product attributes */
+  /* note the product type is an attribute */
+  { STATE_SOLVABLE,    "release-notes-url", STATE_RELNOTESURL, 1 },
+  { STATE_SOLVABLE,    "update-url",        STATE_UPDATEURL,   1 },
+  { STATE_SOLVABLE,    "optional-url",      STATE_OPTIONALURL, 1 },
+  { STATE_SOLVABLE,    "flag",              STATE_FLAG,        1 },
+  { STATE_SOLVABLE,    "flavor",            STATE_FLAVOR,      1 },
+  { STATE_SOLVABLE,    "references",        STATE_REFERENCES,  1 },
+
+  { STATE_SOLVABLE,      "rpm:vendor",      STATE_VENDOR,      1 },
+  { STATE_SOLVABLE,      "rpm:group",       STATE_RPM_GROUP,   1 },
   { STATE_SOLVABLE,      "rpm:license",     STATE_RPM_LICENSE, 1 },
 
   /* rpm-md dependencies */ 
-  { STATE_SOLVABLE,      "rpm:provides",    STATE_PROVIDES, 0 },
-  { STATE_SOLVABLE,      "rpm:requires",    STATE_REQUIRES, 0 },
-  { STATE_SOLVABLE,      "rpm:obsoletes",   STATE_OBSOLETES , 0 },
-  { STATE_SOLVABLE,      "rpm:conflicts",   STATE_CONFLICTS , 0 },
-  { STATE_SOLVABLE,      "rpm:recommends",  STATE_RECOMMENDS , 0 },
-  { STATE_SOLVABLE,      "rpm:supplements", STATE_SUPPLEMENTS, 0 },
-  { STATE_SOLVABLE,      "rpm:suggests",    STATE_SUGGESTS, 0 },
-  { STATE_SOLVABLE,      "rpm:enhances",    STATE_ENHANCES, 0 },
-  { STATE_SOLVABLE,      "rpm:freshens",    STATE_FRESHENS, 0 },
-  { STATE_SOLVABLE,      "rpm:sourcerpm",   STATE_SOURCERPM, 1 },
+  { STATE_SOLVABLE,      "rpm:provides",    STATE_PROVIDES,     0 },
+  { STATE_SOLVABLE,      "rpm:requires",    STATE_REQUIRES,     0 },
+  { STATE_SOLVABLE,      "rpm:obsoletes",   STATE_OBSOLETES,    0 },
+  { STATE_SOLVABLE,      "rpm:conflicts",   STATE_CONFLICTS,    0 },
+  { STATE_SOLVABLE,      "rpm:recommends",  STATE_RECOMMENDS ,  0 },
+  { STATE_SOLVABLE,      "rpm:supplements", STATE_SUPPLEMENTS,  0 },
+  { STATE_SOLVABLE,      "rpm:suggests",    STATE_SUGGESTS,     0 },
+  { STATE_SOLVABLE,      "rpm:enhances",    STATE_ENHANCES,     0 },
+  { STATE_SOLVABLE,      "rpm:freshens",    STATE_FRESHENS,     0 },
+  { STATE_SOLVABLE,      "rpm:sourcerpm",   STATE_SOURCERPM,    1 },
   { STATE_SOLVABLE,      "rpm:header-range", STATE_HEADERRANGE, 0 },
   { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
   
@@ -489,59 +506,11 @@ startElement(void *userData, const char *name, const char **atts)
       else if (name[2] == 't' && name[3] == 'c')
         pd->kind = "patch";
       
-      /**
-       * now we have two cases, one is that we are in the package tag of a new package
-       * and the other is that we are in the tag of an extension file like other.xml or
-       * filelist.xml.
-       * We identify it by looking the attributes
-       *
-       * new package
-       * <package>
-       *     <name>...
-       *     <version...>
-       *
-       * extension package:
-       *
-       * For other.xml
-       *
-       * <package pkgid="b78f8664cd90efe42e09a345e272997ef1b53c18"
-       *          name="zaptel-kmp-default"
-       *          arch="i586">
-       *     <version epoch="0"
-       *              ver="1.2.10_2.6.22_rc4_git6_2"
-       *              rel="70"/>
-       */
-
-      /* first check if there is a pkgid attribute */
-      const char *pkgid = find_attr( "pkgid", atts);
-
-      if ( pkgid == NULL )
-        {
-          /* this is a new package */
-          /*fprintf(stderr, "new package\n");*/
-          pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
-          pd->freshens = 0;
-          repodata_extend(pd->data, pd->solvable - pool->solvables);
-        }
-      else
-        {
-          /* we need to look for the package based on the pkgid */
-          Dataiterator di;
-          dataiterator_init(&di, pd->common.repo, -1, SOLVABLE_CHECKSUM, pkgid, SEARCH_STRING);
-          if (dataiterator_step(&di))
-            {
-              /* we found it */
-              /*fprintf(stderr, "package found '%i'\n", di.solvid);*/
-              pd->solvable = pool_id2solvable(pool, di.solvid);
-            }
-          else
-            {
-              /* this is bad, here we should ignore the whole solvable */
-              fprintf(stderr, "can't find package with checksum '%s'\n", pkgid);
-              //exit(1);
-            }
-        }
-
+      /* this is a new package */
+      /*fprintf(stderr, "new package\n");*/
+      pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
+      pd->freshens = 0;
+      repodata_extend(pd->data, pd->solvable - pool->solvables);
       pd->handle = repodata_get_handle(pd->data, (pd->solvable - pool->solvables) - pd->data->start);
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
@@ -773,6 +742,9 @@ endElement(void *userData, const char *name)
       pd->lang = 0;
       set_desciption_author(pd->data, handle, pd->content);
       break;
+    case STATE_DISTRIBUTION:
+        repodata_set_poolstr(pd->data, handle, SOLVABLE_DISTRIBUTION, pd->content);
+        break;
     case STATE_URL:
       if (pd->content[0])
 	repodata_set_str(pd->data, handle, SOLVABLE_URL, pd->content);
@@ -783,6 +755,30 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SOURCERPM:
       set_sourcerpm(pd->data, s, handle, pd->content);
+      break;
+    case STATE_RELNOTESURL:
+      if (pd->content[0])
+          repodata_set_poolstr(pd->data, handle, PRODUCT_RELNOTESURL, pd->content);
+      break;
+    case STATE_UPDATEURL:
+      if (pd->content[0])
+          repodata_set_poolstr(pd->data, handle, PRODUCT_EXTRAURLS, pd->content);
+      break;
+    case STATE_OPTIONALURL:
+      if (pd->content[0])
+          repodata_set_poolstr(pd->data, handle, PRODUCT_OPTIONALURLS, pd->content);
+      break;
+    case STATE_FLAG:
+      if (pd->content[0])
+          repodata_set_poolstr(pd->data, handle, PRODUCT_FLAGS, pd->content);
+      break;
+    case STATE_FLAVOR:
+      if (pd->content[0])
+        repodata_set_str(pd->data, handle, PRODUCT_FLAVOR, pd->content);
+      break;
+    case STATE_REFERENCES:
+      if (pd->content[0])
+        repodata_set_str(pd->data, handle, PRODUCT_REFERENCES, pd->content);
       break;
     default:
       break;

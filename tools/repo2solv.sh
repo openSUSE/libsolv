@@ -47,6 +47,23 @@ if test -d repodata; then
     $cmd $i | rpmmd2solv $parser_options > $primfile || exit 4
   fi
 
+  prodfile="/nonexist"
+  if test -f product.xml; then
+    prodfile=`mktemp` || exit 3
+    (
+     echo '<products>'
+     for i in product*.xml*; do
+       case $i in
+         *.gz) gzip -dc "$i" ;;
+	 *.bz2) bzip2 -dc "$i" ;;
+	 *) cat "$i" ;;
+       esac
+     done
+     echo '</products>'
+    ) | grep -v '\?xml' | rpmmd2solv $parser_options > $prodfile || exit 4
+  fi
+
+
   # This contains repomd.xml
   # for now we only read some keys like expiration
   if test -f repomd.xml || test -f repomd.xml.gz || test -f repomd.xml.bz2 ; then
@@ -56,7 +73,7 @@ if test -d repodata; then
               *.bz2) cmd="bzip2 -dc" ;;
               *) cmd="cat" ;;
           esac
-          # only check the first updateinfo.xml*, in case there are more
+          # only check the first repomd.xml*, in case there are more
           break
       done
 
@@ -129,6 +146,9 @@ if test -d repodata; then
   if test -s $primfile; then
     m_primfile=$primfile
   fi
+  if test -s $prodfile; then
+    m_prodfile=$prodfile
+  fi
   if test -s $patchfile; then
     m_patchfile=$patchfile
   fi
@@ -138,8 +158,8 @@ if test -d repodata; then
   if test -s $deltainfofile; then
     m_deltainfofile=$deltainfofile
   fi
-  mergesolv $m_repomdfile $m_primfile $m_patchfile $m_updateinfofile $m_deltainfofile
-  rm -f $repomdfile $primfile $patchfile $updateinfofile $deltainfofile
+  mergesolv $m_repomdfile $m_primfile $m_prodfile $m_patchfile $m_updateinfofile $m_deltainfofile
+  rm -f $repomdfile $primfile $prodfile $patchfile $updateinfofile $deltainfofile
 
 elif test_susetags; then
   olddir=`pwd`
