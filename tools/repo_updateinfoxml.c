@@ -64,6 +64,7 @@ enum state {
   STATE_FILENAME,    /* 15 */
   STATE_REBOOT,      /* 16 */
   STATE_RESTART,     /* 17 */
+  STATE_RELOGIN,     /* 18 */
   NUMSTATES
 };
 
@@ -95,6 +96,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PACKAGE,     "filename",        STATE_FILENAME,    1 },
   { STATE_PACKAGE,     "reboot_suggested",STATE_REBOOT,      1 },
   { STATE_PACKAGE,     "restart_suggested",STATE_RESTART,    1 },
+  { STATE_PACKAGE,     "relogin_suggested",STATE_RELOGIN,    1 },
   { NUMSTATES }
 };
 
@@ -438,6 +440,9 @@ startElement(void *userData, const char *name, const char **atts)
       break;
       /* <restart_suggested>True</restart_suggested> */
       case STATE_RESTART:
+      break;
+      /* <relogin_suggested>True</relogin_suggested> */
+      case STATE_RELOGIN:
       break;
       case NUMSTATES+1:
         split(NULL, NULL, 0); /* just to keep gcc happy about tools_util.h: static ... split() {...}  Urgs!*/
