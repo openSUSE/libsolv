@@ -66,28 +66,37 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   Id id, evrid;
   char *sp[4];
 
-  i = split(line + 5, sp, 4); /* name, <op>, evr, ? */
-  if (i != 1 && i != 3) /* expect either 'name' or 'name' <op> 'evr' */
+  if (*line=='/')
     {
-      fprintf(stderr, "Bad dependency line: %d: %s\n", pd->lineno, line);
-      exit(1);
+      /* Allow spaces in file dependencies. Autobuild may generate
+         such filedeps into the provides list. */
+      id = str2id(pool, line, 1);
     }
-  if (kind)
-    id = str2id(pool, join2(kind, ":", sp[0]), 1);
   else
-    id = str2id(pool, sp[0], 1);
-  if (i == 3)
     {
-      evrid = makeevr(pool, sp[2]);
-      for (flags = 0; flags < 6; flags++)
-        if (!strcmp(sp[1], flagtab[flags]))
-          break;
-      if (flags == 6)
-	{
-	  fprintf(stderr, "Unknown relation %d: '%s'\n", pd->lineno, sp[1]);
-	  exit(1);
-	}
-      id = rel2id(pool, id, evrid, flags + 1, 1);
+      i = split(line + 5, sp, 4); /* name, <op>, evr, ? */
+      if (i != 1 && i != 3) /* expect either 'name' or 'name' <op> 'evr' */
+        {
+          fprintf(stderr, "Bad dependency line: %d: %s\n", pd->lineno, line);
+          exit(1);
+        }
+      if (kind)
+        id = str2id(pool, join2(kind, ":", sp[0]), 1);
+      else
+        id = str2id(pool, sp[0], 1);
+      if (i == 3)
+        {
+          evrid = makeevr(pool, sp[2]);
+          for (flags = 0; flags < 6; flags++)
+            if (!strcmp(sp[1], flagtab[flags]))
+              break;
+          if (flags == 6)
+            {
+              fprintf(stderr, "Unknown relation %d: '%s'\n", pd->lineno, sp[1]);
+              exit(1);
+            }
+          id = rel2id(pool, id, evrid, flags + 1, 1);
+        }
     }
   return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
@@ -95,7 +104,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 
 /*
  * add_location
- * 
+ *
  */
 
 static void
@@ -166,7 +175,7 @@ nontrivial:
 
 /*
  * add_source
- * 
+ *
  */
 
 static void
@@ -196,11 +205,11 @@ add_source(struct parsedata *pd, char *line, Solvable *s, unsigned handle)
     repodata_set_id(pd->data, handle, SOLVABLE_SOURCEEVR, evr);
   repodata_set_constantid(pd->data, handle, SOLVABLE_SOURCEARCH, arch);
 }
-  
+
 /*
  * add_dirline
  * add a line with directory information
- * 
+ *
  */
 
 static void
@@ -257,8 +266,8 @@ set_checksum(struct parsedata *pd, Repodata *data, int handle, Id keyname, char 
 
 /*
  * id3_cmp
- * compare 
- * 
+ * compare
+ *
  */
 
 static int
@@ -272,7 +281,7 @@ id3_cmp (const void *v1, const void *v2)
 
 /*
  * commit_diskusage
- * 
+ *
  */
 
 static void
@@ -344,7 +353,7 @@ commit_diskusage (struct parsedata *pd, unsigned handle)
 
 /*
  * tag_from_string
- * 
+ *
  */
 
 static inline unsigned
@@ -358,7 +367,7 @@ tag_from_string (char *cs)
 /*
  * repo_add_susetags
  * Parse susetags file passed in fp, fill solvables into repo
- * 
+ *
  * susetags is key,value based
  *  for short values
  *    =key: value
@@ -373,7 +382,7 @@ tag_from_string (char *cs)
  * See http://en.opensuse.org/Standards/YaST2_Repository_Metadata
  * and http://en.opensuse.org/Standards/YaST2_Repository_Metadata/packages
  * and http://en.opensuse.org/Standards/YaST2_Repository_Metadata/pattern
- * 
+ *
  * Assumptions:
  *   All keys have 3 characters and end in ':'
  */
@@ -457,7 +466,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, int handle, Offset freshens)
 
 /*
  * parse susetags
- * 
+ *
  * fp: file to read from
  * product: solvable representing the product (0 if none)
  * language: current language (0 if none)
@@ -482,7 +491,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
   Id blanr = -1;
   Id handle = 0;
   Id vendor = 0;
-  
+
   if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
     indesc = 1;
   if (repo->nrepodata)
@@ -496,7 +505,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
       if (!strncmp (id2str(pool, pool->solvables[product].name), "product:", 8))
         vendor = pool->solvables[product].vendor;
     }
-  
+
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
   aline = 1024;
@@ -513,11 +522,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
   blanr = 0;
   /*
    * read complete file
-   * 
+   *
    * collect values in 'struct parsedata pd'
    * then build .solv (and .attr) file
    */
-  
+
   for (;;)
     {
       unsigned tag;
@@ -545,7 +554,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
       if (intag)
 	{
 	  /* check for multi-line value tags (+Key:/-Key:) */
-	  
+
 	  int is_end = (linep[-intag - keylen + 1] == '-')
 	              && (linep[-1] == ':')
 		      && (linep == line + 1 + intag + 1 + 1 + 1 + intag + 1 || linep[-intag - keylen] == '\n');
@@ -615,7 +624,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
         continue;
       if ( line[4] == '.')
         {
-          char *endlang; 
+          char *endlang;
           endlang = strchr(line + 5, ':');
           if (endlang)
             {
@@ -635,7 +644,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
        * =Pkg: <name> <version> <release> <architecture>
        * (=Pat: ...)
        */
-      
+
       if ((tag == CTAG('=', 'P', 'k', 'g')
 	   || tag == CTAG('=', 'P', 'a', 't')))
 	{
@@ -648,7 +657,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	  /*
 	   * define kind
 	   */
-	  
+
 	  pd.kind = 0;
 	  if (line[3] == 't')
 	    pd.kind = "pattern";
@@ -656,7 +665,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	  /*
 	   * parse nevra
 	   */
-	  
+
           if (split(line + 5, sp, 5) != 4)
 	    {
 	      fprintf(stderr, "Bad line: %d: %s\n", pd.lineno, line);
@@ -681,7 +690,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	      int n, nn;
 	      /* Now look for a solvable with the given name,evr,arch.
 	       Our input is structured so, that the second set of =Pkg
-	       lines comes in roughly the same order as the first set, so we 
+	       lines comes in roughly the same order as the first set, so we
 	       have a hint at where to start our search, namely were we found
 	       the last entry.  */
 	      for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
@@ -700,7 +709,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 		  handle = repodata_get_handle(data, last_found_pack);
 		}
 	    }
-	  
+
 
 	  /* And if we still don't have a solvable, create a new one.  */
 	  if (!s)
@@ -974,7 +983,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 
   if (s)
     finish_solvable(&pd, s, handle, freshens);
-    
+
   /* Shared attributes
    *  (e.g. multiple binaries built from same source)
    */
