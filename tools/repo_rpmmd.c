@@ -105,6 +105,12 @@ enum state {
 
   STATE_FILE,
 
+  STATE_DISKUSAGE,
+  STATE_TRANSLATIONS,
+  STATE_DUINFO,
+  STATE_DIRS,
+  STATE_DIR,
+
   // general
   NUMSTATES
 };
@@ -122,6 +128,8 @@ static struct stateswitch stateswitches[] = {
   { STATE_START,       "pattern",         STATE_SOLVABLE, 0 },
   { STATE_START,       "patch",           STATE_SOLVABLE, 0 },
   { STATE_START,       "package",         STATE_SOLVABLE, 0 },
+  { STATE_START,       "diskusage",       STATE_DISKUSAGE, 0 },
+  { STATE_START,       "translations",    STATE_TRANSLATIONS, 0 },
   
   { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
   { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
@@ -192,6 +200,11 @@ static struct stateswitch stateswitches[] = {
   { STATE_ENHANCES,    "rpm:entry",       STATE_ENHANCESENTRY, 0 },
   { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
 
+  /* diskusage.xml */
+  { STATE_DISKUSAGE,   "duinfo",          STATE_DUINFO, 0 },
+  { STATE_DUINFO,      "dirs",            STATE_DIRS, 0 },
+  { STATE_DIRS,        "dir",             STATE_DIR, 0 },
+  
   { NUMSTATES}
 };
 
@@ -223,6 +236,12 @@ struct parsedata {
   Id langcache[ID_NUM_INTERNAL];
 };
 
+
+/*
+ * makeevr_atts
+ * parse 'epoch', 'ver' and 'rel', return evr Id
+ * 
+ */
 
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
@@ -289,6 +308,16 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return str2id(pool, pd->content, 1);
 }
 
+
+/*
+ * find_attr
+ * find value for xml attribute
+ * I: txt, name of attribute
+ * I: atts, list of key/value attributes
+ * O: pointer to value of matching key, or NULL
+ * 
+ */
+
 static inline const char *
 find_attr(const char *txt, const char **atts)
 {
@@ -300,6 +329,11 @@ find_attr(const char *txt, const char **atts)
   return 0;
 }
 
+
+/*
+ * dependency relations
+ */
+
 static char *flagtab[] = {
   "GT",
   "EQ",
@@ -308,6 +342,13 @@ static char *flagtab[] = {
   "NE",
   "LE"
 };
+
+
+/*
+ * adddep
+ * parse attributes to reldep Id
+ * 
+ */
 
 static unsigned int
 adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts, int isreq)
@@ -364,6 +405,12 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
   return repo_addid_dep(pd->common.repo, olddeps, id, marker);
 }
 
+
+/*
+ * set_desciption_author
+ *
+ */
+
 static void
 set_desciption_author(Repodata *data, Id handle, char *str)
 {
@@ -407,6 +454,12 @@ set_desciption_author(Repodata *data, Id handle, char *str)
   else if (*str)
     repodata_set_str(data, handle, SOLVABLE_DESCRIPTION, str);
 }
+
+
+/*
+ * set_sourcerpm
+ * 
+ */
 
 static void
 set_sourcerpm(Repodata *data, Solvable *s, Id handle, char *sourcerpm)
@@ -452,6 +505,15 @@ set_sourcerpm(Repodata *data, Solvable *s, Id handle, char *sourcerpm)
   else
     repodata_set_id(data, handle, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
 }
+
+/*-----------------------------------------------*/
+/* XML callbacks */
+
+/*
+ * startElement
+ * XML callback
+ * 
+ */
 
 static void XMLCALL
 startElement(void *userData, const char *name, const char **atts)
@@ -627,10 +689,23 @@ startElement(void *userData, const char *name, const char **atts)
 	if (str && (end = atoi(str)) != 0)
 	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
       }
+    case STATE_DISKUSAGE:
+    case STATE_TRANSLATIONS:
+    case STATE_DUINFO:
+    case STATE_DIRS:
+    case STATE_DIR:
+
     default:
       break;
     }
 }
+
+
+/*
+ * endElement
+ * XML callback
+ * 
+ */
 
 static void XMLCALL
 endElement(void *userData, const char *name)
@@ -788,6 +863,13 @@ endElement(void *userData, const char *name)
   // fprintf(stderr, "back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth);
 }
 
+
+/*
+ * characterData
+ * XML callback
+ * 
+ */
+
 static void XMLCALL
 characterData(void *userData, const XML_Char *s, int len)
 {
@@ -811,7 +893,16 @@ characterData(void *userData, const XML_Char *s, int len)
 }
 
 
+/*-----------------------------------------------*/
+/* 'main' */
+
 #define BUFF_SIZE 8192
+
+/*
+ * repo_add_rpmmd
+ * parse rpm-md metadata (primary, others, diskusage, translations)
+ * 
+ */
 
 void
 repo_add_rpmmd(Repo *repo, FILE *fp, int flags)
