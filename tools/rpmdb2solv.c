@@ -93,12 +93,13 @@ main(int argc, char **argv)
    */
 
   repo = repo_create(pool, "installed");
+
+  repo_add_rpmdb(repo, ref, root);
+
   if (proddir)
     {
       repo_add_products(repo, proddir);
     }
-
-  repo_add_rpmdb(repo, ref, root);
   if (ref)
     {
       if (ref->pool != pool)

@@ -1214,7 +1214,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
 
   if (repo->start != repo->end)
     abort();		/* FIXME: rpmdbid */
-
+  
   if (!rootdir)
     rootdir = "";
 

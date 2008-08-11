@@ -32,58 +32,6 @@ struct parsedata {
 };
 
 
-
-#if 0
-/*
- * split l into m parts, store to sp[]
- *  split at whitespace
- */
-
-static int
-split(char *l, char **sp, int m)
-{
-  int i;
-  for (i = 0; i < m;)
-    {
-      while (*l == ' ' || *l == '\t')
-	l++;
-      if (!*l)
-	break;
-      sp[i++] = l;
-      if (i == m)
-        break;
-      while (*l && !(*l == ' ' || *l == '\t'))
-	l++;
-      if (!*l)
-	break;
-      *l++ = 0;
-    }
-  return i;
-}
-
-
-static Id
-makeevr(Pool *pool, char *s)
-{
-  if (!strncmp(s, "0:", 2) && s[2])
-    s += 2;
-  return str2id(pool, s, 1);
-}
-
-/*
- * dependency relations
- */
-
-static char *flagtab[] = {
-  ">",
-  "=",
-  ">=",
-  "<",
-  "!=",
-  "<="
-};
-#endif
-
 /*
  * join up to three strings into one
  */
@@ -125,87 +73,21 @@ join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
 }
 
 
-#if 0
-/*
- * add dependency to pool
- */
-
-static unsigned int
-adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker)
+static Id
+makeevr(Pool *pool, char *s)
 {
-  int flags, words;
-  Id id, evrid;
-  char *sp[4];
-
-  words = 0;
-  while (1)
-    {
-      /* Name [relop evr] [rest] --> 1, 2, 3 or 4 fields.  */
-      if ( line )
-        {
-          words += split(line, sp + words, 4 - words);
-          line = 0;
-        }
-      /* Hack, as the content file adds 'package:' for package
-         dependencies sometimes.  */
-      if (!strncmp (sp[0], "package:", 8))
-        sp[0] += 8;
-      id = str2id(pool, sp[0], 1);
-      if (words >= 3 && strpbrk (sp[1], "<>="))
-	{
-	  evrid = makeevr(pool, sp[2]);
-	  for (flags = 0; flags < 6; flags++)
-	    if (!strcmp(sp[1], flagtab[flags]))
-	      break;
-	  if (flags == 6)
-	    {
-	      fprintf(stderr, "Unknown relation '%s'\n", sp[1]);
-	      exit(1);
-	    }
-	  id = rel2id(pool, id, evrid, flags + 1, 1);
-	  /* Consume three words, there's nothing to move to front.  */
-	  if (words == 4)
-	    line = sp[3];
-          words = 0;
-	}
-      else
-        {
-	  int j;
-	  /* Consume one word.  If we had more move them to front.  */
-	  words--;
-	  for (j = 0; j < words; j++)
-	    sp[j] = sp[j+1];
-	  if (words == 3)
-	    line = sp[2], words = 2;
-	}
-      olddeps = repo_addid_dep(pd->repo, olddeps, id, marker);
-      if (! ( line || words > 0 ) )
-        break;
-    }
-  return olddeps;
+  if (!strncmp(s, "0:", 2) && s[2])
+    s += 2;
+  return str2id(pool, s, 1);
 }
 
 
-/*
- * split value and add to pool
- */
-
-static void
-add_multiple_strings(Repodata *data, Id handle, Id name, char *value)
+enum sections 
 {
-  char *sp[2];
-  while (value)
-    {
-      int words = split(value, sp, 2);
-      if (!words)
-	break;
-      repodata_add_poolstr_array(data, handle, name, sp[0]);
-      if (words == 1)
-	break;
-      value = sp[1];
-    }
-}
-#endif
+  SECTION_UNKNOWN,
+  SECTION_PRODUCT
+};
+
 
 /*
  * add single product to repo
@@ -215,13 +97,22 @@ add_multiple_strings(Repodata *data, Id handle, Id name, char *value)
 static void
 repo_add_product(struct parsedata *pd, FILE *fp)
 {
-#if 0
-  Pool *pool = pd->repo->pool;
+  Repo *repo = pd->repo;
+  Pool *pool = repo->pool;
   char *line, *linep;
   int aline;
-  Solvable *s, *firsts = 0;
+  Solvable *s = 0;
   Id handle = 0;
+  Repodata *data;
+
+  enum sections current_section = SECTION_UNKNOWN;
   
+  if (repo->nrepodata)
+    /* use last repodata */
+    data = repo->repodata + repo->nrepodata - 1;
+  else
+    data = repo_add_repodata(repo, 0);
+
   line = sat_malloc(1024);
   aline = 1024;
 
@@ -229,9 +120,7 @@ repo_add_product(struct parsedata *pd, FILE *fp)
   s = 0;
 
   for (;;)
-    {
-/*      char *fields[2]; */
-      
+    {      
       /* read line into big-enough buffer */
       if (linep - line + 16 > aline)
 	{
@@ -247,11 +136,78 @@ repo_add_product(struct parsedata *pd, FILE *fp)
         continue;
       *--linep = 0;
       linep = line;
-      /* expect "key value" lines */
-      if (split (line, fields, 2) == 2)
-        {
-	  char *key = fields[0];
-	  char *value = fields[1];
+
+      /*
+       * Very trivial .ini parser
+       */
+      
+      /* skip empty and comment lines */
+      if (*linep == '#'
+	  || *linep == 0)
+	{
+	  continue;
+	}
+      
+      /* sections must start at column 0 */
+      if (*linep == '[')
+	{
+	  char *secp = linep+1;
+	  char *endp = linep;
+	  endp = strchr(secp, ']');
+	  if (!endp)
+	    {
+	      fprintf(stderr, "Skipping unclosed section '%s'\n", line);
+	      continue;
+	    }
+	  *endp = 0;
+	  if (!strcmp(secp, "product"))
+	    current_section = SECTION_PRODUCT;
+	  else
+	    {
+	      fprintf(stderr, "Skipping unknown section '%s'\n", secp);
+	      current_section = SECTION_UNKNOWN;
+	    }
+	  continue;
+	}
+      else if (current_section != SECTION_UNKNOWN)
+	{
+	  char *ptr = linep;
+	  char *key, *value;
+
+	  /* split line into '<key> = <value>' */
+	  while (*ptr && (*ptr == ' ' || *ptr == '\t'))
+	    ++ptr;
+	  key = ptr;
+	  while (*ptr && !(*ptr == ' ' || *ptr == '\t' || *ptr == '='))
+	    ++ptr;
+	  if (*ptr != '=')
+	    *ptr++ = 0;
+	  while (*ptr && !(*ptr == '='))
+	    ++ptr;
+	  if (*ptr == '=')
+	    *ptr++ = 0;
+	  while (*ptr && (*ptr == ' ' || *ptr == '\t'))
+	    ++ptr;
+	  value = ptr;
+	  while (*ptr && !(*ptr == ' ' || *ptr == '\t'))
+	    ++ptr;
+	  *ptr++ = 0;
+
+	  if (current_section == SECTION_PRODUCT)
+	    {
+	      if (!s)
+		{
+		  s = pool_id2solvable(pool, repo_add_solvable(repo));
+		  repodata_extend(data, s - pool->solvables);
+		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
+		}
+	      if (!strcmp(key, "name"))
+		  s->name = str2id(pool, join(pd, "product", ":", value), 1);
+	      else if (!strcmp(key, "version"))
+		s->evr = makeevr(pool, value);
+	      else if (!strcmp (key, "flavor"))
+		repo_set_str(repo, s - pool->solvables, PRODUCT_FLAVOR, value);	    
+	    }
 	}
       else
 	fprintf (stderr, "malformed line: %s\n", line);
@@ -271,7 +227,6 @@ repo_add_product(struct parsedata *pd, FILE *fp)
     }
   
   sat_free(line);
-#endif
 }
 
 
@@ -286,15 +241,8 @@ repo_add_products(Repo *repo, const char *proddir)
   DIR *dir = opendir(proddir);
   struct dirent *entry;
   struct parsedata pd;
-  Repodata *data;
   
   memset(&pd, 0, sizeof(pd));
-  if (repo->nrepodata)
-    /* use last repodata */
-    data = repo->repodata + repo->nrepodata - 1;
-  else
-    data = repo_add_repodata(repo, 0);
-
   pd.repo = repo;
 
   if (!dir)
