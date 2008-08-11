@@ -8,6 +8,9 @@
 /*
  * rpmdb2solv
  * 
+ * Reads rpm database (and evtl. more, like product metadata) to build
+ * a .solv file of 'installed' solvables.
+ * 
  */
 
 #include <sys/types.h>
@@ -21,6 +24,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "repo_rpmdb.h"
+#include "repo_products.h"
 #include "repo_solv.h"
 #include "common_write.h"
 
@@ -35,8 +39,13 @@ main(int argc, char **argv)
   int extrapool = 0;
   const char *root = 0;
   const char *basefile = 0;
+  const char *proddir = 0;
 
-  while ((c = getopt (argc, argv, "xb:r:")) >= 0)
+  /*
+   * parse arguments
+   */
+  
+  while ((c = getopt (argc, argv, "xb:r:p:")) >= 0)
     switch (c)
       {
       case 'r':
@@ -45,12 +54,19 @@ main(int argc, char **argv)
       case 'b':
         basefile = optarg;
         break;
+      case 'p':
+	proddir = optarg;
+	break;
       case 'x':
         extrapool = 1;
         break;
       default:
 	exit(1);
       }
+  
+  /*
+   * ???
+   */
   
   if (optind < argc)
     {
@@ -69,7 +85,19 @@ main(int argc, char **argv)
       fclose(fp);
     }
 
+  /*
+   * create 'installed' repository
+   * add products
+   * add rpmdb
+   * write .solv
+   */
+
   repo = repo_create(pool, "installed");
+  if (proddir)
+    {
+      repo_add_products(repo, proddir);
+    }
+
   repo_add_rpmdb(repo, ref, root);
   if (ref)
     {
