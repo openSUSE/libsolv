@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Aug 12 14:22:29 CEST 2008 - kkaempf@suse.de
+
+- Add .prod parsing for 'installed' products to rpmdb2solv.
+
+-------------------------------------------------------------------
 Thu Aug  7 22:00:55 CEST 2008 - dmacvicar@suse.de
 
 - implement relogin suggested support (fate#304889)
