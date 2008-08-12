@@ -1207,7 +1207,8 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
   DBT dbkey;
   DBT dbdata;
   struct stat packagesstat;
-
+  int repodata_self = 0;
+  
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
 
@@ -1217,6 +1218,12 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
   if (!rootdir)
     rootdir = "";
 
+  if (!repodata)
+    {
+      repodata = repo_add_repodata(repo, 0);
+      repodata_self = 1;
+    }
+  
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
 
@@ -1523,6 +1530,8 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	  sat_free(rpmids);
 	}
     }
+  if (repodata && repodata_self)
+    repodata_internalize(repodata);
   if (rpmhead)
     sat_free(rpmhead);
   if (db)
