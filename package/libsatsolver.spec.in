@@ -7,6 +7,7 @@ Url:            http://svn.opensuse.org/svn/zypp/trunk/sat-solver
 Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
+Prefix:         /usr
 
 %if 0%{?mandriva_version}
 # force this version on mandriva
@@ -62,6 +63,7 @@ Group:          Development/Languages/Ruby
 .
 
 %package -n python-satsolver
+%py_requires
 Summary:        Python bindings for sat solver
 Group:          Development/Languages/Python
 
@@ -69,7 +71,7 @@ Group:          Development/Languages/Python
 .
 
 %package -n perl-satsolver
-Requires:       perl-base = 5.10.0
+Requires:       perl = %{perl_version}
 Summary:        Perl bindings for sat solver
 Group:          Development/Languages/Perl
 
@@ -84,6 +86,7 @@ export CFLAGS="$RPM_OPT_FLAGS"
 export CXXFLAGS="$CFLAGS"
 
 cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+      -DPYTHON_SITEDIR=%{py_sitedir} \
       -DLIB=%{_lib} \
       -DCMAKE_VERBOSE_MAKEFILE=TRUE \
       -DCMAKE_BUILD_TYPE=Release \
@@ -129,8 +132,8 @@ rm -rf "$RPM_BUILD_ROOT"
 %files -n python-satsolver
 %defattr(-,root,root,-)
 #%doc swig/python/examples/*.py
-%{_libdir}/python2.5/site-packages/_satsolver.so
-%{_libdir}/python2.5/site-packages/satsolver.py
+%{py_sitedir}/_satsolver.so
+%{py_sitedir}/satsolver.py
 
 %files -n perl-satsolver
 %defattr(-,root,root,-)
