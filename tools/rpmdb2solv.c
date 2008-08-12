@@ -33,10 +33,12 @@ main(int argc, char **argv)
 {
   Pool *pool = pool_create();
   Repo *repo, *ref = 0;
+  Repodata *repodata;
   FILE *fp;
   Pool *refpool;
   int c;
   int extrapool = 0;
+  int nopacks = 0;
   const char *root = 0;
   const char *basefile = 0;
   const char *proddir = 0;
@@ -45,7 +47,7 @@ main(int argc, char **argv)
    * parse arguments
    */
   
-  while ((c = getopt (argc, argv, "xb:r:p:")) >= 0)
+  while ((c = getopt (argc, argv, "nxb:r:p:")) >= 0)
     switch (c)
       {
       case 'r':
@@ -54,6 +56,9 @@ main(int argc, char **argv)
       case 'b':
         basefile = optarg;
         break;
+      case 'n':
+	nopacks = 1;
+	break;
       case 'p':
 	proddir = optarg;
 	break;
@@ -93,13 +98,17 @@ main(int argc, char **argv)
    */
 
   repo = repo_create(pool, "installed");
+  repodata = repo_add_repodata(repo, 0);
 
-  repo_add_rpmdb(repo, ref, root);
+  if (!nopacks)
+    repo_add_rpmdb(repo, repodata, ref, root);
 
   if (proddir)
-    {
-      repo_add_products(repo, proddir);
-    }
+    repo_add_products(repo, repodata, proddir);
+
+  if (repodata)
+    repodata_internalize(repodata);
+
   if (ref)
     {
       if (ref->pool != pool)

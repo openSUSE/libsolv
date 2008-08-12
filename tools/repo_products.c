@@ -29,6 +29,7 @@ struct parsedata {
   Repo *repo;
   char *tmp;
   int tmpl;
+  Id langcache[ID_NUM_INTERNAL];
 };
 
 
@@ -73,6 +74,10 @@ join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
 }
 
 
+/*
+ * create epoch:version-release as Id
+ */
+
 static Id
 makeevr(Pool *pool, char *s)
 {
@@ -82,10 +87,32 @@ makeevr(Pool *pool, char *s)
 }
 
 
+/*
+ * create localized tag
+ */
+
+static Id
+langtag(struct parsedata *pd, Id tag, const char *language)
+{
+    if (language && !language[0])
+        language = 0;
+    if (!language || tag >= ID_NUM_INTERNAL)
+        return pool_id2langid(pd->repo->pool, tag, language, 1);
+    return pool_id2langid(pd->repo->pool, tag, language, 1);
+    if (!pd->langcache[tag])
+        pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, language, 1);
+    return pd->langcache[tag];
+}
+
+
+
+
 enum sections 
 {
   SECTION_UNKNOWN,
-  SECTION_PRODUCT
+  SECTION_PRODUCT,
+  SECTION_TRANSLATED,
+  SECTION_UPDATE
 };
 
 
@@ -95,7 +122,7 @@ enum sections
  */
 
 static void
-repo_add_product(struct parsedata *pd, FILE *fp)
+repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
 {
   Repo *repo = pd->repo;
   Pool *pool = repo->pool;
@@ -103,15 +130,8 @@ repo_add_product(struct parsedata *pd, FILE *fp)
   int aline;
   Solvable *s = 0;
   Id handle = 0;
-  Repodata *data;
 
   enum sections current_section = SECTION_UNKNOWN;
-  
-  if (repo->nrepodata)
-    /* use last repodata */
-    data = repo->repodata + repo->nrepodata - 1;
-  else
-    data = repo_add_repodata(repo, 0);
 
   line = sat_malloc(1024);
   aline = 1024;
@@ -162,6 +182,10 @@ repo_add_product(struct parsedata *pd, FILE *fp)
 	  *endp = 0;
 	  if (!strcmp(secp, "product"))
 	    current_section = SECTION_PRODUCT;
+	  else if (!strcmp(secp, "translated"))
+	    current_section = SECTION_TRANSLATED;
+	  else if (!strcmp(secp, "update"))
+	    current_section = SECTION_UPDATE;
 	  else
 	    {
 	      fprintf(stderr, "Skipping unknown section '%s'\n", secp);
@@ -172,14 +196,24 @@ repo_add_product(struct parsedata *pd, FILE *fp)
       else if (current_section != SECTION_UNKNOWN)
 	{
 	  char *ptr = linep;
-	  char *key, *value;
+	  char *key, *value, *lang;
 
-	  /* split line into '<key> = <value>' */
+	  lang = 0;
+	  
+	  /* split line into '<key>[<lang>] = <value>' */
 	  while (*ptr && (*ptr == ' ' || *ptr == '\t'))
 	    ++ptr;
 	  key = ptr;
-	  while (*ptr && !(*ptr == ' ' || *ptr == '\t' || *ptr == '='))
+	  while (*ptr && !(*ptr == ' ' || *ptr == '\t' || *ptr == '=' || *ptr == '['))
 	    ++ptr;
+	  if (*ptr == '[')
+	    {
+	      *ptr++ = 0;
+	      lang = ptr;
+	      while (*ptr && !(*ptr == ']'))
+		++ptr;
+	      *ptr++ = 0;
+	    }
 	  if (*ptr != '=')
 	    *ptr++ = 0;
 	  while (*ptr && !(*ptr == '='))
@@ -189,10 +223,11 @@ repo_add_product(struct parsedata *pd, FILE *fp)
 	  while (*ptr && (*ptr == ' ' || *ptr == '\t'))
 	    ++ptr;
 	  value = ptr;
-	  while (*ptr && !(*ptr == ' ' || *ptr == '\t'))
-	    ++ptr;
-	  *ptr++ = 0;
 
+	  /*
+	   * [product]
+	   */
+	  
 	  if (current_section == SECTION_PRODUCT)
 	    {
 	      if (!s)
@@ -205,8 +240,30 @@ repo_add_product(struct parsedata *pd, FILE *fp)
 		  s->name = str2id(pool, join(pd, "product", ":", value), 1);
 	      else if (!strcmp(key, "version"))
 		s->evr = makeevr(pool, value);
+	      else if (!strcmp(key, "vendor"))
+		s->vendor = str2id(pool, value, 1);
+	      else if (!strcmp(key, "distribution"))
+		repo_set_str(repo, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
 	      else if (!strcmp (key, "flavor"))
 		repo_set_str(repo, s - pool->solvables, PRODUCT_FLAVOR, value);	    
+	    }
+	    /*
+	     * [translated]
+	     */
+	  else if (current_section == SECTION_TRANSLATED)
+	    {
+	      if (!strcmp(key, "summary"))
+		{
+		  repodata_set_str(data, handle, langtag(pd, SOLVABLE_SUMMARY, lang), value );
+		}
+	      else if (!strcmp(key, "description"))
+		repodata_set_str(data, handle, langtag(pd, SOLVABLE_DESCRIPTION, lang), value );
+	    }
+	    /*
+	     * [update]
+	     */
+	  else if (current_section == SECTION_UPDATE)
+	    {
 	    }
 	}
       else
@@ -236,7 +293,7 @@ repo_add_product(struct parsedata *pd, FILE *fp)
  */
 
 void
-repo_add_products(Repo *repo, const char *proddir)
+repo_add_products(Repo *repo, Repodata *repodata, const char *proddir)
 {
   DIR *dir = opendir(proddir);
   struct dirent *entry;
@@ -264,7 +321,7 @@ repo_add_products(Repo *repo, const char *proddir)
 	      perror(fullpath);
 	      break;
 	    }
-	  repo_add_product(&pd, fp);
+	  repo_add_product(&pd, repodata, fp);
 	  fclose(fp);
 	}
     }

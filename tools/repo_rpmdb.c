@@ -1184,7 +1184,7 @@ mkrpmdbcookie(struct stat *st, unsigned char *cookie)
  */
 
 void
-repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
+repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 {
   Pool *pool = repo->pool;
   unsigned char buf[16];
@@ -1202,7 +1202,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
   Id id, *refhash;
   unsigned int refmask, h;
   int asolv;
-  Repodata *repodata;
   char dbpath[PATH_MAX];
   DB_ENV *dbenv = 0;
   DBT dbkey;
@@ -1217,8 +1216,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
   
   if (!rootdir)
     rootdir = "";
-
-  repodata = repo_add_repodata(repo, 0);
 
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
@@ -1531,15 +1528,15 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir)
   if (db)
     db->close(db, 0);
   dbenv->close(dbenv, 0);
-  if (repodata)
-    repodata_internalize(repodata);
 }
+
 
 static inline unsigned int
 getu32(unsigned char *dp)
 {
   return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
 }
+
 
 static void
 add_location(Repodata *data, Solvable *s, Id handle, const char *location)
@@ -1600,12 +1597,11 @@ nontrivial:
 }
 
 void
-repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
+repo_add_rpms(Repo *repo, Repodata *repodata, const char **rpms, int nrpms)
 {
   int i, sigdsize, sigcnt, l;
   Pool *pool = repo->pool;
   Solvable *s;
-  Repodata *repodata;
   RpmHead *rpmhead = 0;
   int rpmheadsize = 0;
   char *payloadformat;
@@ -1616,7 +1612,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
 
   if (nrpms <= 0)
     return;
-  repodata = repo_add_repodata(repo, 0);
+
   for (i = 0; i < nrpms; i++)
     {
       if ((fp = fopen(rpms[i], "r")) == 0)
@@ -1729,6 +1725,4 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms)
     }
   if (rpmhead)
     sat_free(rpmhead);
-  if (repodata)
-    repodata_internalize(repodata);
 }

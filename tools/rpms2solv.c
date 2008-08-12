@@ -31,6 +31,7 @@ main(int argc, char **argv)
   int c, nrpms = 0;
   Pool *pool = pool_create();
   Repo *repo;
+  Repodata *repodata;
   FILE *fp;
   char buf[4096], *p;
   const char *basefile = 0;
@@ -74,8 +75,11 @@ main(int argc, char **argv)
       rpms[nrpms++] = strdup(argv[optind++]);
     }
   repo = repo_create(pool, "rpms2solv");
-  repo_add_rpms(repo, rpms, nrpms);
+  repodata = repo_add_repodata(repo, 0);
+  repo_add_rpms(repo, repodata, rpms, nrpms);
   tool_write(repo, basefile, 0);
+  if (repodata)
+    repodata_internalize(repodata);
   pool_free(pool);
   for (c = 0; c < nrpms; c++)
     free((char *)rpms[c]);
