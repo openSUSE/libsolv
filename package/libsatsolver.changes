@@ -2,6 +2,7 @@
 Tue Aug 12 14:22:29 CEST 2008 - kkaempf@suse.de
 
 - Add .prod parsing for 'installed' products to rpmdb2solv.
+- Improve python-bindings, add iterators.
 
 -------------------------------------------------------------------
 Thu Aug  7 22:00:55 CEST 2008 - dmacvicar@suse.de
