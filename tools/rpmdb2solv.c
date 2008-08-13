@@ -10,6 +10,15 @@
  * 
  * Reads rpm database (and evtl. more, like product metadata) to build
  * a .solv file of 'installed' solvables.
+ * Writes .solv to stdout
+ * 
+ * Usage:
+ * rpmdb2solv [-n] [-x] [-b <basefile>] [-p <productsdir>] [-r <root>] 
+ * -n : No packages, do not read rpmdb, useful to only parse products
+ * -x : use extrapool
+ * -b <basefile> : Write .solv to <basefile>.solv instead of stdout
+ * -p <productsdir> : Scan <productsdir> for .prod files, representing installed products
+ * -r <root> : Prefix rpmdb path and <productsdir> with <root>
  * 
  */
 
