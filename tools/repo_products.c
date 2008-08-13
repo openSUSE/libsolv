@@ -12,6 +12,8 @@
  */
 
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -232,9 +234,19 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
 	    {
 	      if (!s)
 		{
+		  struct stat st;
+		  
 		  s = pool_id2solvable(pool, repo_add_solvable(repo));
 		  repodata_extend(data, s - pool->solvables);
 		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
+		  if (!fstat(fileno(fp), &st))
+		    {
+		      repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, st.st_ctime);
+		    }
+		  else
+		    {
+		      perror("Can't stat()");
+		    }
 		}
 	      if (!strcmp(key, "name"))
 		  s->name = str2id(pool, join(pd, "product", ":", value), 1);
