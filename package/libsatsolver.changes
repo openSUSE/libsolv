@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Aug 13 15:42:36 CEST 2008 - dmacvicar@suse.de
+
+- include new file search capability commited by matz
+  (SEARCH_FILES)
+- 0.10.4
+
+-------------------------------------------------------------------
 Wed Aug 13 10:31:01 CEST 2008 - kkaempf@suse.de
 
 - Honor rpmdb2solv's '-r <root>' also for the products.d path.
