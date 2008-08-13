@@ -103,9 +103,31 @@ main(int argc, char **argv)
   if (!nopacks)
     repo_add_rpmdb(repo, repodata, ref, root);
 
-  if (proddir)
-    repo_add_products(repo, repodata, proddir);
-
+  if (proddir && *proddir)
+    {
+      /* if <root> given, not '/', and proddir does not start with <root> */
+      if (root && *root)
+	{
+	  int rootlen = strlen(root);
+	  if (strncmp(root, proddir, rootlen))
+	    {
+	      char *buf;
+	      buf = (char *)sat_malloc(rootlen + strlen(proddir) + 2); /* + '/' + \0 */
+	      strcpy(buf, root);
+	      if (root[rootlen-1] != '/'
+		  && *proddir != '/')
+		{
+		  strcpy(buf+rootlen, "/");
+		  ++rootlen;
+		}
+	      strcpy(buf+rootlen, proddir);
+	      proddir = buf;
+	    }
+	}
+      
+      repo_add_products(repo, repodata, proddir);
+    }
+      
   if (repodata)
     repodata_internalize(repodata);
 
