@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Wed Aug 13 10:31:01 CEST 2008 - kkaempf@suse.de
+
+- Honor rpmdb2solv's '-r <root>' also for the products.d path.
+
+-------------------------------------------------------------------
 Tue Aug 12 14:22:29 CEST 2008 - kkaempf@suse.de
 
 - Add .prod parsing for 'installed' products to rpmdb2solv.
