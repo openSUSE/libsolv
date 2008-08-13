@@ -321,7 +321,7 @@ int main(int argc, char **argv)
 #if 0
   printf ("\nSearchresults:\n");
   Dataiterator di;
-  dataiterator_init(&di, pool->repos[0], 0, 0, "3", SEARCH_EXTRA | SEARCH_SUBSTRING | SEARCH_ALL_REPOS);
+  dataiterator_init(&di, pool->repos[0], 0, 0, "3", SEARCH_EXTRA | SEARCH_SUBSTRING | SEARCH_ALL_REPOS | SEARCH_FILES);
   //int count = 0;
   while (dataiterator_step(&di))
     {

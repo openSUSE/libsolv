@@ -160,6 +160,12 @@ typedef struct _KeyValue {
 #define SEARCH_ALL_REPOS		(1<<11)
 #define SEARCH_SKIP_KIND		(1<<12)
 
+/* By default we don't match in attributes representing filelists
+   because the construction of those strings is costly.  Specify this
+   flag if you want this.  In that case kv->str will contain the full
+   filename (if matched of course).  */
+#define SEARCH_FILES			(1<<13)
+
 /* Internal */
 #define __SEARCH_ONESOLVABLE		(1 << 31)
 

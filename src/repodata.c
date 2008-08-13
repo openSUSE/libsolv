@@ -767,6 +767,16 @@ dataiterator_match_int_real(Dataiterator *di, int flags, const void *vmatch)
 	  break;
 	case REPOKEY_TYPE_STR:
 	  break;
+	case REPOKEY_TYPE_DIRSTRARRAY:
+	  if (!(flags & SEARCH_FILES))
+	    return 0;
+	  /* Put the full filename into kv->str.  */
+	  kv->str = repodata_dir2str(di->data, kv->id, kv->str);
+	  /* And to compensate for that put the "empty" directory into
+	     kv->id, so that later calls to repodata_dir2str on this data
+	     come up with the same filename again.  */
+	  kv->id = 0;
+	  break;
 	default:
 	  return 0;
 	}
