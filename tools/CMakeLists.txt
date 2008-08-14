@@ -75,7 +75,7 @@ install(TARGETS
                 rpms2solv
                 updateinfoxml2solv
                 deltainfoxml2solv
-                diskusage2solv
+                diskusagexml2solv
                 repomdxml2solv
    DESTINATION ${BIN_INSTALL_DIR} )
 
