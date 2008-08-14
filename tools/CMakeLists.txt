@@ -48,8 +48,8 @@ ADD_EXECUTABLE( deltainfoxml2solv ${deltainfoxml2solv_REPOS} )
 TARGET_LINK_LIBRARIES( deltainfoxml2solv satsolver ${EXPAT_LIBRARY})
 
 SET(diskusagexml2solv_REPOS diskusagexml2solv.c repo_diskusagexml.h repo_diskusagexml.c repo_write.c common_write.c)
-ADD_EXECUTABLE( diskusage2solv ${diskusagexml2solv_REPOS} )
-TARGET_LINK_LIBRARIES( diskusage2solv satsolver ${EXPAT_LIBRARY})
+ADD_EXECUTABLE( diskusagexml2solv ${diskusagexml2solv_REPOS} )
+TARGET_LINK_LIBRARIES( diskusagexml2solv satsolver ${EXPAT_LIBRARY})
 
 SET(repomdxml2solv_REPOS repomdxml2solv.c repo_repomdxml.h repo_repomdxml.c repo_write.c common_write.c)
 ADD_EXECUTABLE( repomdxml2solv ${repomdxml2solv_REPOS} )
