@@ -54,6 +54,12 @@
 <timestamp>1215708447</timestamp>
 <open-checksum type="sha">24f8252f3dd041e37e7c3feb2d57e02b4422d316</open-checksum>
 </data>
+<data type="diskusage">
+<location href="repodata/diskusage.xml.gz"/>
+<checksum type="sha">4097f7e25c7bb0770ae31b2471a9c8c077ee904b</checksum>
+<timestamp>1215708447</timestamp>
+<open-checksum type="sha">24f8252f3dd041e37e7c3feb2d57e02b4422d316</open-checksum>
+</data>
 </repomd>
 */
 
