@@ -105,12 +105,6 @@ enum state {
 
   STATE_FILE,
 
-  STATE_DISKUSAGE,
-  STATE_TRANSLATIONS,
-  STATE_DUINFO,
-  STATE_DIRS,
-  STATE_DIR,
-
   // general
   NUMSTATES
 };
@@ -128,8 +122,6 @@ static struct stateswitch stateswitches[] = {
   { STATE_START,       "pattern",         STATE_SOLVABLE, 0 },
   { STATE_START,       "patch",           STATE_SOLVABLE, 0 },
   { STATE_START,       "package",         STATE_SOLVABLE, 0 },
-  { STATE_START,       "diskusage",       STATE_DISKUSAGE, 0 },
-  { STATE_START,       "translations",    STATE_TRANSLATIONS, 0 },
   
   { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
   { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
@@ -199,11 +191,6 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUGGESTS,    "rpm:entry",       STATE_SUGGESTSENTRY, 0 },
   { STATE_ENHANCES,    "rpm:entry",       STATE_ENHANCESENTRY, 0 },
   { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
-
-  /* diskusage.xml */
-  { STATE_DISKUSAGE,   "duinfo",          STATE_DUINFO, 0 },
-  { STATE_DUINFO,      "dirs",            STATE_DIRS, 0 },
-  { STATE_DIRS,        "dir",             STATE_DIR, 0 },
   
   { NUMSTATES}
 };
@@ -689,11 +676,6 @@ startElement(void *userData, const char *name, const char **atts)
 	if (str && (end = atoi(str)) != 0)
 	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
       }
-    case STATE_DISKUSAGE:
-    case STATE_TRANSLATIONS:
-    case STATE_DUINFO:
-    case STATE_DIRS:
-    case STATE_DIR:
 
     default:
       break;
@@ -900,7 +882,7 @@ characterData(void *userData, const XML_Char *s, int len)
 
 /*
  * repo_add_rpmmd
- * parse rpm-md metadata (primary, others, diskusage, translations)
+ * parse rpm-md metadata (primary, others)
  * 
  */
 
