@@ -238,7 +238,7 @@ repo_add_content(Repo *repo, FILE *fp)
   for (;;)
     {
       char *fields[2];
-      
+
       /* read line into big-enough buffer */
       if (linep - line + 16 > aline)
 	{
@@ -279,12 +279,6 @@ repo_add_content(Repo *repo, FILE *fp)
 		contentstyle = 10;
 	    }
 
-	  if (code11 && istag ("REFERENCES"))
-	    {
-	      repo_set_id(repo, s - pool->solvables, PRODUCT_REFERENCES, str2id(pool, value, 1));
-	      continue;
-	    }
-	  
 	  if ((code10 && istag ("PRODUCT"))
 	      || (code11 && istag ("NAME")))
 	    {
@@ -306,7 +300,7 @@ repo_add_content(Repo *repo, FILE *fp)
 	      continue;
 	    }
 
-	  /* Sometimes PRODUCT is not the first entry, but we need a solvable
+	  /* Sometimes PRODUCT/NAME is not the first entry, but we need a solvable
 	     from here on.  */
 	  if (!s)
 	    {
@@ -314,11 +308,11 @@ repo_add_content(Repo *repo, FILE *fp)
 	      repodata_extend(data, s - pool->solvables);
 	      handle = repodata_get_handle(data, s - pool->solvables - repo->start);
 	    }
-	  if (istag ("VERSION"))
-	    {
-	      /* without a release? but that's like zypp implements it */
-	      s->evr = makeevr(pool, value);
-	    }
+
+	  if (code11 && istag ("REFERENCES"))
+	    repo_set_id(repo, s - pool->solvables, PRODUCT_REFERENCES, str2id(pool, value, 1));
+	  else if (istag ("VERSION"))
+	    s->evr = makeevr(pool, value);
 	  else if (code11 && istag ("DISTRIBUTION"))
 	    repo_set_str(repo, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
 	  else if (code11 && istag ("FLAVOR"))
@@ -342,9 +336,7 @@ repo_add_content(Repo *repo, FILE *fp)
 	  else if (istag ("RELNOTESURL"))
 	    repodata_add_poolstr_array(data, handle, PRODUCT_RELNOTESURL, value);
 	  else if (istag ("VENDOR"))
-	    {
-	      s->vendor = str2id(pool, value, 1);
-	    }
+	    s->vendor = str2id(pool, value, 1);
 	  
 	  /*
 	   * Every tag below is Code10 only
