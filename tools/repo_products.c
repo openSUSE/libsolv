@@ -25,6 +25,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#include "tools_util.h"
 #include "repo_content.h"
 
 struct parsedata {
@@ -33,60 +34,6 @@ struct parsedata {
   int tmpl;
   Id langcache[ID_NUM_INTERNAL];
 };
-
-
-/*
- * join up to three strings into one
- */
-
-static char *
-join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
-{
-  int l = 1;
-  char *p;
-
-  if (s1)
-    l += strlen(s1);
-  if (s2)
-    l += strlen(s2);
-  if (s3)
-    l += strlen(s3);
-  if (l > pd->tmpl)
-    {
-      pd->tmpl = l + 256;
-      pd->tmp = sat_realloc(pd->tmp, pd->tmpl);
-    }
-  p = pd->tmp;
-  if (s1)
-    {
-      strcpy(p, s1);
-      p += strlen(s1);
-    }
-  if (s2)
-    {
-      strcpy(p, s2);
-      p += strlen(s2);
-    }
-  if (s3)
-    {
-      strcpy(p, s3);
-      p += strlen(s3);
-    }
-  return pd->tmp;
-}
-
-
-/*
- * create epoch:version-release as Id
- */
-
-static Id
-makeevr(Pool *pool, char *s)
-{
-  if (!strncmp(s, "0:", 2) && s[2])
-    s += 2;
-  return str2id(pool, s, 1);
-}
 
 
 /*
@@ -124,7 +71,7 @@ enum sections
  */
 
 static void
-repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
+repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 {
   Repo *repo = pd->repo;
   Pool *pool = repo->pool;
@@ -159,6 +106,42 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
       *--linep = 0;
       linep = line;
 
+      if (!code11)
+	{
+	  /* non-code11, assume /etc/xyz-release
+	   * just parse first line
+	   * as "<name> <version> (<arch>)"
+	   */
+	  char *sp[3];
+
+	  if (split(linep, sp, 3) == 3)
+	    {
+	      if (!s)
+		{
+		  struct stat st;
+		  
+		  s = pool_id2solvable(pool, repo_add_solvable(repo));
+		  repodata_extend(data, s - pool->solvables);
+		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
+		  if (!fstat(fileno(fp), &st))
+		    {
+		      repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, st.st_ctime);
+		    }
+		  else
+		    {
+		      perror("Can't stat()");
+		    }
+		}
+	      s->name = str2id(pool, join2("product", ":", sp[0]), 1);
+	      s->evr = makeevr(pool, sp[1]);
+	    }
+	  else
+	    {
+	      fprintf(stderr, "Can't recognize -release line '%s'\n", linep);
+	    }	  
+	  break; /* just parse single line */
+	}
+      
       /*
        * Very trivial .ini parser
        */
@@ -249,7 +232,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
 		    }
 		}
 	      if (!strcmp(key, "name"))
-		  s->name = str2id(pool, join(pd, "product", ":", value), 1);
+		  s->name = str2id(pool, join2("product", ":", value), 1);
 	      else if (!strcmp(key, "version"))
 		s->evr = makeevr(pool, value);
 	      else if (!strcmp(key, "vendor"))
@@ -300,15 +283,60 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
 
 
 /*
- * read all .prod files from directory
+ * parse dir looking for files ending in suffix
+ */
+
+static void
+parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, int code11)
+{
+  struct dirent *entry;
+  char *suffix = code11 ? ".prod" : "-release";
+  int slen = code11 ? 5 : 8;  /* strlen(".prod") : strlen("-release") */
+  
+  while ((entry = readdir(dir)))
+    {
+      int len;
+      len = strlen(entry->d_name);
+      
+      /* skip /etc/lsb-release, thats not a product per-se */
+      if (!code11
+	  && strcmp(entry->d_name, "lsb-release") == 0)
+	{
+	  continue;
+	}
+      
+      if (len > slen
+	  && strcmp(entry->d_name+len-slen, suffix) == 0)
+	{
+	  char *fullpath = join2(path, "/", entry->d_name);
+	  FILE *fp = fopen(fullpath, "r");
+	  if (!fp)
+	    {
+	      perror(fullpath);
+	      break;
+	    }
+	  repo_add_product(pd, repodata, fp, code11);
+	  fclose(fp);
+	}
+    }
+}
+
+
+/*
+ * read all installed products
+ * 
+ * try proddir (reading all .prod files from this directory) first
+ * if not available, assume non-code11 layout and parse /etc/xyz-release
+ *
  * parse each one as a product
  */
 
 void
-repo_add_products(Repo *repo, Repodata *repodata, const char *proddir)
+repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const char *root)
 {
-  DIR *dir = opendir(proddir);
-  struct dirent *entry;
+  const char *fullpath = proddir;
+  int code11 = 1;
+  DIR *dir = opendir(fullpath);
   struct parsedata pd;
   
   memset(&pd, 0, sizeof(pd));
@@ -316,28 +344,21 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir)
 
   if (!dir)
     {
-      perror(proddir);
-      return;
+      fullpath = root ? join2(root, "", "/etc") : "/etc";
+      dir = opendir(fullpath);
+      code11 = 0;
+    }
+  if (!dir)
+    {
+      perror(fullpath);
+    }
+  else
+    {
+      parse_dir(dir, fullpath, &pd, repodata, code11);
     }
   
-  while ((entry = readdir(dir)))
-    {
-      const char *dot;
-      dot = strrchr( entry->d_name, '.' );
-      if (dot && strcmp(dot, ".prod") == 0)
-	{
-	  char *fullpath = join(&pd, proddir, "/", entry->d_name);
-	  FILE *fp = fopen(fullpath, "r");
-	  if (!fp)
-	    {
-	      perror(fullpath);
-	      break;
-	    }
-	  repo_add_product(&pd, repodata, fp);
-	  fclose(fp);
-	}
-    }
   if (pd.tmp)
     sat_free(pd.tmp);
+  join_freemem();
   closedir(dir);
 }

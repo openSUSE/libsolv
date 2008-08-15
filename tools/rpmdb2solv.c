@@ -12,14 +12,6 @@
  * a .solv file of 'installed' solvables.
  * Writes .solv to stdout
  * 
- * Usage:
- * rpmdb2solv [-n] [-x] [-b <basefile>] [-p <productsdir>] [-r <root>] 
- * -n : No packages, do not read rpmdb, useful to only parse products
- * -x : use extrapool
- * -b <basefile> : Write .solv to <basefile>.solv instead of stdout
- * -p <productsdir> : Scan <productsdir> for .prod files, representing installed products
- * -r <root> : Prefix rpmdb path and <productsdir> with <root>
- * 
  */
 
 #include <sys/types.h>
@@ -36,6 +28,21 @@
 #include "repo_products.h"
 #include "repo_solv.h"
 #include "common_write.h"
+
+static void
+usage(int status)
+{
+  fprintf(stderr, "\nUsage:\n"
+	  "rpmdb2solv [-n] [-x] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
+	  " -n : No packages, do not read rpmdb, useful to only parse products\n"
+	  " -x : use extrapool\n"
+	  " -b <basefile> : Write .solv to <basefile>.solv instead of stdout\n"
+	  " -p <productsdir> : Scan <productsdir> for .prod files, representing installed products\n"
+	  " -r <root> : Prefix rpmdb path and <productsdir> with <root>\n"
+	 );
+  exit(status);
+}
+
 
 int
 main(int argc, char **argv)
@@ -56,9 +63,12 @@ main(int argc, char **argv)
    * parse arguments
    */
   
-  while ((c = getopt (argc, argv, "nxb:r:p:")) >= 0)
+  while ((c = getopt (argc, argv, "hnxb:r:p:")) >= 0)
     switch (c)
       {
+      case 'h':
+	  usage(0);
+	break;
       case 'r':
         root = optarg;
         break;
@@ -75,7 +85,7 @@ main(int argc, char **argv)
         extrapool = 1;
         break;
       default:
-	exit(1);
+	usage(1);
       }
   
   /*
@@ -134,7 +144,7 @@ main(int argc, char **argv)
 	    }
 	}
       
-      repo_add_products(repo, repodata, proddir);
+      repo_add_products(repo, repodata, proddir, root);
     }
       
   if (repodata)
