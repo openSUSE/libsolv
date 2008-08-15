@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Aug 15 16:29:00 CEST 2008 - kkaempf@suse.de
+
+- ensure existance of product solvable in repo_content(bnc#417594)
+
+-------------------------------------------------------------------
 Fri Aug 15 15:00:32 CEST 2008 - kkaempf@suse.de
 
 - follow /etc/products.d/baseproduct and mark product as 'base'
