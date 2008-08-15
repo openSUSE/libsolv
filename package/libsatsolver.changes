@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Aug 15 15:00:32 CEST 2008 - kkaempf@suse.de
+
+- follow /etc/products.d/baseproduct and mark product as 'base'
+
+-------------------------------------------------------------------
 Fri Aug 15 14:26:29 CEST 2008 - kkaempf@suse.de
 
 - Implement pre-code11 fallback for products, parse /etc/*-release

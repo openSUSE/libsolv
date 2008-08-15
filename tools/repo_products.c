@@ -28,6 +28,9 @@
 #include "tools_util.h"
 #include "repo_content.h"
 
+
+static ino_t baseproduct = 0;
+
 struct parsedata {
   Repo *repo;
   char *tmp;
@@ -225,6 +228,9 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 		  if (!fstat(fileno(fp), &st))
 		    {
 		      repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, st.st_ctime);
+		      /* this is where <productsdir>/baseproduct points to */
+		      if (st.st_ino == baseproduct)
+			repodata_set_str(data, handle, PRODUCT_TYPE, "base");
 		    }
 		  else
 		    {
@@ -292,6 +298,14 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, 
   struct dirent *entry;
   char *suffix = code11 ? ".prod" : "-release";
   int slen = code11 ? 5 : 8;  /* strlen(".prod") : strlen("-release") */
+  struct stat st;
+  
+  /* check for <productsdir>/baseproduct on code11 and remember its target inode */
+  if (code11
+      && stat(join2(path, "/", "baseproduct"), &st) == 0) /* follow symlink */
+    {
+      baseproduct = st.st_ino;
+    }
   
   while ((entry = readdir(dir)))
     {
