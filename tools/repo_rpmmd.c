@@ -23,15 +23,8 @@
 enum state {
   STATE_START,
 
-  STATE_METADATA,
-  STATE_OTHERDATA,
-  STATE_DISKUSAGEDATA,
-  STATE_SUSEDATA,
-
   STATE_SOLVABLE,
-  STATE_PRODUCT,
-  STATE_PATTERN,
-  STATE_PATCH,
+
   STATE_NAME,
   STATE_ARCH,
   STATE_VERSION,
@@ -169,8 +162,6 @@ static struct stateswitch stateswitches[] = {
   /* extended Novell/SUSE attributes (suseinfo.xml) */
   { STATE_SOLVABLE,    "eula",            STATE_EULA,         1 },
   { STATE_SOLVABLE,    "diskusage",       STATE_DISKUSAGE,    0 },
-  { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
-  { STATE_DIRS,        "dir",             STATE_DIR,          0 },
 
   // pattern attribute
   { STATE_SOLVABLE,    "script",          STATE_SCRIPT,        1 },
@@ -207,6 +198,10 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,      "rpm:header-range", STATE_HEADERRANGE, 0 },
   { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
   
+   /* extended Novell/SUSE dskusage attributes (suseinfo.xml) */
+  { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
+  { STATE_DIRS,        "dir",             STATE_DIR,          0 },
+
   { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
   { STATE_OBSOLETES,   "rpm:entry",       STATE_OBSOLETESENTRY, 0 },
@@ -642,8 +637,8 @@ startElement(void *userData, const char *name, const char **atts)
 
   if (pd->state == STATE_START && !strcmp(name, "patterns"))
     return;
-  if (pd->state == STATE_START && !strcmp(name, "metadata"))
-    return;
+  //if (pd->state == STATE_START && !strcmp(name, "metadata"))
+  //  return;
   if (pd->state == STATE_SOLVABLE && !strcmp(name, "format"))
     return;
 
@@ -918,8 +913,8 @@ endElement(void *userData, const char *name)
   /* ignore patterns & metadata */
   if (pd->state == STATE_START && !strcmp(name, "patterns"))
     return;
-  if (pd->state == STATE_START && !strcmp(name, "metadata"))
-    return;
+  //if (pd->state == STATE_START && !strcmp(name, "metadata"))
+  //  return;
   if (pd->state == STATE_SOLVABLE && !strcmp(name, "format"))
     return;
 
@@ -927,8 +922,6 @@ endElement(void *userData, const char *name)
   pd->statedepth--;
   switch (pd->state)
     {
-    case STATE_PATTERN:
-    case STATE_PRODUCT:
     case STATE_SOLVABLE:
       if (!s->arch)
         s->arch = ARCH_NOARCH;
@@ -959,7 +952,7 @@ endElement(void *userData, const char *name)
       repodata_set_poolstr(pd->data, handle, SOLVABLE_LICENSE, pd->content);
       break;
     case STATE_CHECKSUM:
-      { 
+      {
         int l;
         Id type;
         if (!strcasecmp (pd->tmpattr, "sha") || !strcasecmp (pd->tmpattr, "sha1"))
@@ -991,9 +984,8 @@ endElement(void *userData, const char *name)
         }
         /* add the checksum to the cache */
         pd->cscache[index-1] = s - pool->solvables;
-
-      }
       break;
+      }
     case STATE_FILE:
 #if 0
       id = str2id(pool, pd->content, 1);
