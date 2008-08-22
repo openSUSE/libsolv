@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Aug 22 18:04:12 CEST 2008 - dmacvicar@suse.de
+
+- add support for extensible metadata over primary +
+  diskusage
+- 0.10.5
+
+-------------------------------------------------------------------
 Fri Aug 15 16:29:00 CEST 2008 - kkaempf@suse.de
 
 - ensure existance of product solvable in repo_content(bnc#417594)
