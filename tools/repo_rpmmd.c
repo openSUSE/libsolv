@@ -22,7 +22,12 @@
 
 enum state {
   STATE_START,
+
   STATE_METADATA,
+  STATE_OTHERDATA,
+  STATE_DISKUSAGEDATA,
+  STATE_SUSEDATA,
+
   STATE_SOLVABLE,
   STATE_PRODUCT,
   STATE_PATTERN,
@@ -52,6 +57,12 @@ enum state {
   STATE_INSTALLTIME,
   STATE_INSTALLONLY,
   
+  /* Novell/SUSE extended attributes */
+  STATE_EULA,
+  STATE_DISKUSAGE,
+  STATE_DIRS,
+  STATE_DIR,
+
   /* patch */
   STATE_ID,
   STATE_TIMESTAMP,
@@ -117,6 +128,14 @@ struct stateswitch {
 };
 
 static struct stateswitch stateswitches[] = {
+  /** fake tag used to enclose 2 different xml files in one **/
+  { STATE_START,       "rpmmd",           STATE_START,    0 },
+
+  /** tags for different package data, we just ignore the tag **/
+  { STATE_START,       "metadata",        STATE_START,    0 },
+  { STATE_START,       "otherdata",       STATE_START,    0 },
+  { STATE_START,       "diskusagedata",   STATE_START,    0 },
+  { STATE_START,       "susedata",        STATE_START,    0 },
 
   { STATE_START,       "product",         STATE_SOLVABLE, 0 },
   { STATE_START,       "pattern",         STATE_SOLVABLE, 0 },
@@ -146,6 +165,12 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "install-time",    STATE_INSTALLTIME,  1 },
   { STATE_SOLVABLE,    "install-only",    STATE_INSTALLONLY,  1 },
   { STATE_SOLVABLE,    "time",            STATE_TIME,         0 },
+
+  /* extended Novell/SUSE attributes (suseinfo.xml) */
+  { STATE_SOLVABLE,    "eula",            STATE_EULA,         1 },
+  { STATE_SOLVABLE,    "diskusage",       STATE_DISKUSAGE,    0 },
+  { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
+  { STATE_DIRS,        "dir",             STATE_DIR,          0 },
 
   // pattern attribute
   { STATE_SOLVABLE,    "script",          STATE_SCRIPT,        1 },
@@ -195,6 +220,10 @@ static struct stateswitch stateswitches[] = {
   { NUMSTATES}
 };
 
+/* maxmum initial size of
+   the checksum cache */
+#define MAX_CSCACHE 32768
+#define CSREALLOC_STEP 1024
 
 struct parsedata {
   struct parsedata_common common;
@@ -210,7 +239,8 @@ struct parsedata {
   Offset freshens;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
-  const char *lang;
+  /* temporal to store attribute tag language */
+  const char *tmplang;
   const char *capkind;
   // used to store tmp attributes
   // while the tag ends
@@ -221,7 +251,96 @@ struct parsedata {
   Id (*dirs)[3]; // dirid, size, nfiles
   int ndirs;
   Id langcache[ID_NUM_INTERNAL];
+  /** system language */
+  const char *language;
+
+  /** Hash to maps checksums to solv */
+  Stringpool cspool;
+  /** Cache of known checksums to solvable id */
+  Id *cscache;
+  /* the current longest index in the table */
+  int ncscache;
 };
+
+static Id
+langtag(struct parsedata *pd, Id tag, const char *language)
+{
+  if (language && !language[0])
+    language = 0;
+  if (!language || tag >= ID_NUM_INTERNAL)
+    return pool_id2langid(pd->common.repo->pool, tag, language, 1);
+  return pool_id2langid(pd->common.repo->pool, tag, language, 1);
+  if (!pd->langcache[tag])
+    pd->langcache[tag] = pool_id2langid(pd->common.repo->pool, tag, language, 1);
+  return pd->langcache[tag];
+}
+
+static int
+id3_cmp (const void *v1, const void *v2)
+{
+  Id *i1 = (Id*)v1;
+  Id *i2 = (Id*)v2;
+  return i1[0] - i2[0];
+}
+
+static void
+commit_diskusage (struct parsedata *pd, unsigned handle)
+{
+  unsigned i;
+  Dirpool *dp = &pd->data->dirpool;
+  /* Now sort in dirid order.  This ensures that parents come before
+     their children.  */
+  if (pd->ndirs > 1)
+    qsort(pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp);
+  /* Substract leaf numbers from all parents to make the numbers
+     non-cumulative.  This must be done post-order (i.e. all leafs
+     adjusted before parents).  We ensure this by starting at the end of
+     the array moving to the start, hence seeing leafs before parents.  */
+  for (i = pd->ndirs; i--;)
+    {
+      unsigned p = dirpool_parent(dp, pd->dirs[i][0]);
+      unsigned j = i;
+      for (; p; p = dirpool_parent(dp, p))
+        {
+          for (; j--;)
+	    if (pd->dirs[j][0] == p)
+	      break;
+	  if (j < pd->ndirs)
+	    {
+	      if (pd->dirs[j][1] < pd->dirs[i][1])
+	        pd->dirs[j][1] = 0;
+	      else
+	        pd->dirs[j][1] -= pd->dirs[i][1];
+	      if (pd->dirs[j][2] < pd->dirs[i][2])
+	        pd->dirs[j][2] = 0;
+	      else
+	        pd->dirs[j][2] -= pd->dirs[i][2];
+	    }
+	  else
+	    /* Haven't found this parent in the list, look further if
+	       we maybe find the parents parent.  */
+	    j = i;
+	}
+    }
+#if 0
+  char sbuf[1024];
+  char *buf = sbuf;
+  unsigned slen = sizeof (sbuf);
+  for (i = 0; i < pd->ndirs; i++)
+    {
+      dir2str (attr, pd->dirs[i][0], &buf, &slen);
+      fprintf (stderr, "have dir %d %d %d %s\n", pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2], buf);
+    }
+  if (buf != sbuf)
+    free (buf);
+#endif
+  for (i = 0; i < pd->ndirs; i++)
+    if (pd->dirs[i][1] || pd->dirs[i][2])
+      {
+	repodata_add_dirnumnum(pd->data, handle, SOLVABLE_DISKUSAGE, pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2]);
+      }
+  pd->ndirs = 0;
+}
 
 
 /*
@@ -555,15 +674,60 @@ startElement(void *userData, const char *name, const char **atts)
       else if (name[2] == 't' && name[3] == 'c')
         pd->kind = "patch";
       
-      /* this is a new package */
-      /*fprintf(stderr, "new package\n");*/
-      pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
-      pd->freshens = 0;
-      repodata_extend(pd->data, pd->solvable - pool->solvables);
+      /* to support extension metadata files like others.xml which
+         have the following structure:
+
+         <otherdata xmlns="http://linux.duke.edu/metadata/other"
+                    packages="101">
+           <package pkgid="b78f8664cd90efe42e09a345e272997ef1b53c18"
+                    name="zaptel-kmp-default"
+                    arch="i586"><version epoch="0"
+                    ver="1.2.10_2.6.22_rc4_git6_2" rel="70"/>
+              ...
+
+         we need to check if the pkgid is there and if it matches
+         an already seen package, that means we don't need to create
+         a new solvable but just append the attributes to the existing
+         one.
+      */
+      const char *pkgid;
+      if ( (pkgid = find_attr("pkgid", atts)) != NULL )
+        {
+          int found = 0;
+          /*const char *name = find_attr("name", atts);*/
+          // look at the checksum cache
+          Id index = stringpool_str2id (&pd->cspool, pkgid, 1 /* create it */);
+          if ( index < pd->ncscache )
+            {
+              Id solvid = pd->cscache[index-1];
+              /* printf */
+              if ( solvid > 0 )
+                {
+                  Solvable *s = pool_id2solvable(pool, solvid);
+                  /* we found the already defined package */
+                  pd->solvable = s;
+                  found = 1;
+                  /*fprintf(stderr, "package found %s-%s.\n", name, find_attr("arch", atts));*/
+                }
+            }
+          if ( ! found )
+            {
+              fprintf(stderr, "error, the repository specifies extra information about package with checksum '%s', which does not exist in the repository.\n", pkgid);
+              exit(1);
+            }
+        }
+       else
+        {
+          /* this is a new package */
+          pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
+          pd->freshens = 0;
+          repodata_extend(pd->data, pd->solvable - pool->solvables);
+        }
       pd->handle = repodata_get_handle(pd->data, (pd->solvable - pool->solvables) - pd->data->start);
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
+
       break;
     case STATE_VERSION:
       s->evr = makeevr_atts(pool, pd, atts);
@@ -624,7 +788,7 @@ startElement(void *userData, const char *name, const char **atts)
       break;
     case STATE_SUMMARY:
     case STATE_DESCRIPTION:
-      pd->lang = find_attr("lang", atts);
+      pd->tmplang = find_attr("lang", atts);
       break;
     case STATE_LOCATION:
       str = find_attr("href", atts);
@@ -676,7 +840,50 @@ startElement(void *userData, const char *name, const char **atts)
 	if (str && (end = atoi(str)) != 0)
 	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
       }
-
+      /*
+        <diskusage>
+          <dirs>
+            <dir name="/" size="56" count="11"/>
+            <dir name="usr/" size="56" count="11"/>
+            <dir name="usr/bin/" size="38" count="10"/>
+            <dir name="usr/share/" size="18" count="1"/>
+            <dir name="usr/share/doc/" size="18" count="1"/>
+          </dirs>
+        </diskusage>
+      */
+    case STATE_DISKUSAGE:
+      {
+        /* Really, do nothing, wat for <dir> tag */
+        break;
+      }
+    case STATE_DIR:  
+      {
+        long filesz = 0, filenum = 0;
+        unsigned dirid;
+        if ( (str = find_attr("name", atts)) )
+          {
+            dirid = repodata_str2dir(pd->data, str, 1);
+          }
+        else
+          {	      
+            fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n", atts, *atts);
+            break;
+          }
+        if ( (str = find_attr("size", atts)) )
+          {
+            filesz = strtol (str, 0, 0);
+          }
+        if ( (str = find_attr("count", atts)) )
+          {
+            filenum = strtol (str, 0, 0);
+          }
+        pd->dirs = sat_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
+        pd->dirs[pd->ndirs][0] = dirid;
+        pd->dirs[pd->ndirs][1] = filesz;
+        pd->dirs[pd->ndirs][2] = filenum;
+        pd->ndirs++;
+        break;
+      }
     default:
       break;
     }
@@ -770,6 +977,21 @@ endElement(void *userData, const char *name)
             exit(1);
           }
         repodata_set_checksum(pd->data, handle, SOLVABLE_CHECKSUM, type, pd->content);
+        /* we save the checksum to solvable id relationship for extended
+           metadata */
+        Id index = stringpool_str2id (&pd->cspool, pd->content, 1 /* create it */);
+        if ( index >= pd->ncscache )
+        {
+          /** realloc for this index plus CSREALLOC_STEP*/
+          pd->cscache = (Id *) sat_zextend(pd->cscache, pd->ncscache, index - pd->ncscache +1, sizeof(Id), 255);
+          /** fill the realloced part with 0s */
+          
+          pd->ncscache = index +1;
+
+        }
+        /* add the checksum to the cache */
+        pd->cscache[index-1] = s - pool->solvables;
+
       }
       break;
     case STATE_FILE:
@@ -792,11 +1014,11 @@ endElement(void *userData, const char *name)
       repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, id, p);
       break;
     case STATE_SUMMARY:
-      pd->lang = 0;
+      pd->tmplang = 0;
       repodata_set_str(pd->data, handle, SOLVABLE_SUMMARY, pd->content);
       break;
     case STATE_DESCRIPTION:
-      pd->lang = 0;
+      pd->tmplang = 0;
       set_desciption_author(pd->data, handle, pd->content);
       break;
     case STATE_DISTRIBUTION:
@@ -837,6 +1059,14 @@ endElement(void *userData, const char *name)
       if (pd->content[0])
         repodata_set_str(pd->data, handle, PRODUCT_REFERENCES, pd->content);
       break;
+    case STATE_EULA:
+      if (pd->content[0])
+        repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->language), pd->content);
+      break;
+    case STATE_DISKUSAGE:
+      if (pd->ndirs)
+        commit_diskusage (pd, pd->handle);
+      break;    
     default:
       break;
     }
@@ -887,7 +1117,7 @@ characterData(void *userData, const XML_Char *s, int len)
  */
 
 void
-repo_add_rpmmd(Repo *repo, FILE *fp, int flags)
+repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
 {
   Pool *pool = repo->pool;
   struct parsedata pd;
@@ -913,6 +1143,15 @@ repo_add_rpmmd(Repo *repo, FILE *fp, int flags)
   pd.common.tmp = 0;
   pd.common.tmpl = 0;
   pd.kind = 0;
+  pd.language = language;
+
+  /* initialize the string pool where we will store
+     the package checksums we know about, to get an Id
+     we can use in a cache */
+  stringpool_init_empty(&pd.cspool);
+  pd.cscache = (Id *) calloc(MAX_CSCACHE, sizeof(Id));
+  pd.ncscache = MAX_CSCACHE;
+
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   pd.parser = &parser;

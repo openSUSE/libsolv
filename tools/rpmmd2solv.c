@@ -121,12 +121,12 @@ main(int argc, char **argv)
 	  perror(fnp);
 	  exit(1);
 	}
-      repo_add_rpmmd(repo, fp, flags);
+      repo_add_rpmmd(repo, fp, 0, flags);
       fclose(fp);
-      snprintf(fnp, l, "%s/diskusage.xml.gz", dir);
+      snprintf(fnp, l, "%s/diskusagedata.xml.gz", dir);
       if ((fp = myfopen(fnp)))
 	{
-	  repo_add_rpmmd(repo, fp, flags);
+	  repo_add_rpmmd(repo, fp, 0, flags);
 	  fclose(fp);
 	}
       if (locale)
@@ -153,13 +153,13 @@ main(int argc, char **argv)
 	      exit(1);
 	    }
 	  fprintf(stderr, "opened %s\n", fnp);
-	  repo_add_rpmmd(repo, fp, flags);
+	  repo_add_rpmmd(repo, fp, 0, flags);
 	  fclose(fp);
 	}
       sat_free(fnp);
     }
   else
-    repo_add_rpmmd(repo, stdin, flags);
+    repo_add_rpmmd(repo, stdin, 0, flags);
   tool_write(repo, basefile, attrname);
   pool_free(pool);
   exit(0);
