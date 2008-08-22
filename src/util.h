@@ -16,6 +16,10 @@
 #include <stddef.h>
 #include <string.h>
 
+/**
+ * malloc
+ * exits with error message on error
+ */
 extern void *sat_malloc(size_t);
 extern void *sat_malloc2(size_t, size_t);
 extern void *sat_calloc(size_t, size_t);
@@ -39,6 +43,14 @@ static inline void *sat_extend(void *buf, size_t len, size_t nmemb, size_t size,
   return buf;
 }
 
+/**
+ * extend an array by reallocation and zero's the new section
+ * buf old pointer
+ * len current size
+ * nmbemb number of elements to add
+ * size size of each element
+ * block block size used to allocate the elements
+ */
 static inline void *sat_zextend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
 {
   buf = sat_extend(buf, len, nmemb, size, block);
