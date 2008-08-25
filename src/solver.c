@@ -3803,7 +3803,8 @@ solver_solve(Solver *solv, Queue *job)
   int i;
   int oldnrules;
   Map addedmap;		       /* '1' == have rpm-rules for solvable */
-  Id how, what, weak, p, *pp, d;
+  Map installcandidatemap;
+  Id how, what, name, weak, p, *pp, d;
   Queue q, redoq;
   Solvable *s;
   int goterase;
@@ -3853,6 +3854,7 @@ solver_solve(Solver *solv, Queue *job)
     }
 
   map_init(&addedmap, pool->nsolvables);
+  map_init(&installcandidatemap, pool->nsolvables);
   queue_init(&q);
 
   /*
@@ -3897,6 +3899,7 @@ solver_solve(Solver *solv, Queue *job)
       switch(how)
 	{
 	case SOLVER_INSTALL_SOLVABLE:
+	  MAPSET(&installcandidatemap, what);
 	  addrpmrulesforsolvable(solv, pool->solvables + what, &addedmap);
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:
@@ -3906,6 +3909,7 @@ solver_solve(Solver *solv, Queue *job)
 	      /* if by name, ensure that the name matches */
 	      if (how == SOLVER_INSTALL_SOLVABLE_NAME && !pool_match_nevr(pool, pool->solvables + p, what))
 		continue;
+	      MAPSET(&installcandidatemap, p);
 	      addrpmrulesforsolvable(solv, pool->solvables + p, &addedmap);
 	    }
 	  break;
@@ -4084,10 +4088,36 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_ERASE_SOLVABLE:
 	  s = pool->solvables + what;
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %serase solvable %s\n", weak ? "weak " : "", solvable2str(pool, s));
-          addrule(solv, -what, 0);			/* remove by Id */
-	  queue_push(&solv->ruletojob, i);
-	  if (weak)
-	    queue_push(&solv->weakruleq, solv->nrules - 1);
+	  name = s->name;
+	  if (solv->installed && s->repo == solv->installed)
+	    {
+	      FOR_PROVIDES(p, pp, s->name)
+		{
+		  s = pool->solvables + p;
+		  if (s->name != name)
+		    continue;
+		  if (p != what)
+		    {
+		      /* keep other versions installed */
+		      if (s->repo == solv->installed)
+			continue;
+		      /* keep installcandidates of other jobs */
+		      if (MAPTST(&installcandidatemap, p))
+			continue;
+		    }
+		  addrule(solv, -p, 0);			/* remove by Id */
+		  queue_push(&solv->ruletojob, i);
+		  if (weak)
+		    queue_push(&solv->weakruleq, solv->nrules - 1);
+		}
+	    }
+	  else
+	    {
+	      addrule(solv, -what, 0);			/* remove by Id */
+	      queue_push(&solv->ruletojob, i);
+	      if (weak)
+		queue_push(&solv->weakruleq, solv->nrules - 1);
+	    }
 	  break;
 	case SOLVER_INSTALL_SOLVABLE_NAME:		/* install by capability */
 	case SOLVER_INSTALL_SOLVABLE_PROVIDES:
@@ -4195,6 +4225,7 @@ solver_solve(Solver *solv, Queue *job)
     
   /* free unneeded memory */
   map_free(&addedmap);
+  map_free(&installcandidatemap);
   queue_free(&q);
 
   /* create weak map */
