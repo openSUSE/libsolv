@@ -965,7 +965,7 @@ endElement(void *userData, const char *name)
             pd->ncscache = index + 1;
           }
         /* add the checksum to the cache */
-        pd->cscache[index-1] = s - pool->solvables;
+        pd->cscache[index] = s - pool->solvables;
         break;
       }
     case STATE_FILE:
