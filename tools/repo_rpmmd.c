@@ -686,30 +686,16 @@ startElement(void *userData, const char *name, const char **atts)
          one.
       */
       const char *pkgid;
-      if ( (pkgid = find_attr("pkgid", atts)) != NULL )
+      if ((pkgid = find_attr("pkgid", atts)) != NULL)
         {
-          int found = 0;
-          /*const char *name = find_attr("name", atts);*/
           // look at the checksum cache
-          Id index = stringpool_str2id (&pd->cspool, pkgid, 1 /* create it */);
-          if ( index < pd->ncscache )
-            {
-              Id solvid = pd->cscache[index-1];
-              /* printf */
-              if ( solvid > 0 )
-                {
-                  Solvable *s = pool_id2solvable(pool, solvid);
-                  /* we found the already defined package */
-                  pd->solvable = s;
-                  found = 1;
-                  /*fprintf(stderr, "package found %s-%s.\n", name, find_attr("arch", atts));*/
-                }
-            }
-          if ( ! found )
-            {
+          Id index = stringpool_str2id(&pd->cspool, pkgid, 0);
+          if (!index || index >= pd->ncscache || !pd->cscache[index])
+	    {
               fprintf(stderr, "error, the repository specifies extra information about package with checksum '%s', which does not exist in the repository.\n", pkgid);
               exit(1);
-            }
+	    }
+	  pd->solvable = pool_id2solvable(pool, pd->cscache[index]);
         }
        else
         {
@@ -954,7 +940,7 @@ endElement(void *userData, const char *name)
     case STATE_CHECKSUM:
       {
         int l;
-        Id type;
+        Id type, index;
         if (!strcasecmp (pd->tmpattr, "sha") || !strcasecmp (pd->tmpattr, "sha1"))
           l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
         else if (!strcasecmp (pd->tmpattr, "md5"))
@@ -972,19 +958,15 @@ endElement(void *userData, const char *name)
         repodata_set_checksum(pd->data, handle, SOLVABLE_CHECKSUM, type, pd->content);
         /* we save the checksum to solvable id relationship for extended
            metadata */
-        Id index = stringpool_str2id (&pd->cspool, pd->content, 1 /* create it */);
-        if ( index >= pd->ncscache )
-        {
-          /** realloc for this index plus CSREALLOC_STEP*/
-          pd->cscache = (Id *) sat_zextend(pd->cscache, pd->ncscache, index - pd->ncscache +1, sizeof(Id), 255);
-          /** fill the realloced part with 0s */
-          
-          pd->ncscache = index +1;
-
-        }
+        index = stringpool_str2id(&pd->cspool, pd->content, 1 /* create it */);
+        if (index >= pd->ncscache)
+          {
+            pd->cscache = sat_zextend(pd->cscache, pd->ncscache, index + 1 - pd->ncscache, sizeof(Id), 255);
+            pd->ncscache = index + 1;
+          }
         /* add the checksum to the cache */
         pd->cscache[index-1] = s - pool->solvables;
-      break;
+        break;
       }
     case STATE_FILE:
 #if 0
@@ -1141,8 +1123,6 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
      the package checksums we know about, to get an Id
      we can use in a cache */
   stringpool_init_empty(&pd.cspool);
-  pd.cscache = (Id *) calloc(MAX_CSCACHE, sizeof(Id));
-  pd.ncscache = MAX_CSCACHE;
 
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
@@ -1166,4 +1146,6 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
     repodata_internalize(pd.data);
   sat_free(pd.content);
   join_freemem();
+  stringpool_free(&pd.cspool);
+  sat_free(pd.cscache);
 }
