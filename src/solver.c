@@ -910,9 +910,23 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	  s = pool->solvables + what;
 	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
 	    break;
+	  if (s->obsoletes)
+	    {
+	      Id obs, *obsp;
+	      obsp = s->repo->idarraydata + s->obsoletes;
+	      while ((obs = *obsp++) != 0)
+		FOR_PROVIDES(p, pp, obs)
+		  {
+		    if (pool->solvables[p].repo != installed)
+		      continue;
+		    if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		      continue;
+	            MAPSET(&solv->noupdate, p - installed->start);
+		  }
+	    }
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
-	      if (pool->solvables[p].name != s->name)
+	      if (!solv->implicitobsoleteusesprovides && pool->solvables[p].name != s->name)
 		continue;
 	      if (pool->solvables[p].repo == installed)
 	        MAPSET(&solv->noupdate, p - installed->start);
@@ -949,9 +963,33 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	{
 	case SOLVER_INSTALL_SOLVABLE:
 	  s = pool->solvables + what;
+	  if (s->obsoletes)
+	    {
+	      Id obs, *obsp;
+	      obsp = s->repo->idarraydata + s->obsoletes;
+	      while ((obs = *obsp++) != 0)
+		FOR_PROVIDES(p, pp, obs)
+		  {
+		    if (pool->solvables[p].repo != installed)
+		      continue;
+		    if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		      continue;
+		    if (MAPTST(&solv->noupdate, p - installed->start))
+		      continue;
+		    r = solv->rules + solv->updaterules + (p - installed->start);
+		    if (r->d >= 0)
+		      continue;
+		    enablerule(solv, r);
+		    IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+		      {
+			POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+			solver_printrule(solv, SAT_DEBUG_SOLUTIONS, r);
+		      }
+		  }
+	    }
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
-	      if (pool->solvables[p].name != s->name)
+	      if (!solv->implicitobsoleteusesprovides && pool->solvables[p].name != s->name)
 		continue;
 	      if (pool->solvables[p].repo != installed)
 		continue;
