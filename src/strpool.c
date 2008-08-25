@@ -39,6 +39,14 @@ stringpool_init(Stringpool *ss, const char *strs[])
 }
 
 void
+stringpool_free(Stringpool *ss)
+{
+  sat_free(ss->strings);
+  sat_free(ss->stringspace);
+  sat_free(ss->stringhashtbl);
+}
+
+void
 stringpool_init_empty(Stringpool *ss)
 {
   const char *emptystrs[] = {

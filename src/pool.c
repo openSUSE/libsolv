@@ -76,8 +76,7 @@ pool_free(Pool *pool)
   repo_freeallrepos(pool, 1);
   sat_free(pool->id2arch);
   sat_free(pool->solvables);
-  sat_free(pool->ss.stringspace);
-  sat_free(pool->ss.strings);
+  stringpool_free(&pool->ss);
   sat_free(pool->rels);
   queue_free(&pool->vendormap);
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
