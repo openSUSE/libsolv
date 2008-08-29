@@ -299,7 +299,7 @@ prune_to_best_version(Solver *solv, Queue *plist)
         }
     }
 
-  if (best == ID_NULL)
+  if (!best)
     best = plist->elements[0];
 
   plist->elements[j++] = best;
@@ -461,7 +461,11 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	continue;
       queue_push(qs, p);
     }
-  if (solv->noupdateprovide && solv->obsoletes && solv->obsoletes[n - solv->installed->start])
+  /* if we have found some valid candidates and noupdateprovide is not set, we're
+     done. otherwise we fallback to all obsoletes */
+  if (!solv->noupdateprovide && qs->count)
+    return;
+  if (solv->obsoletes && solv->obsoletes[n - solv->installed->start])
     {
       for (pp = solv->obsoletes_data + solv->obsoletes[n - solv->installed->start]; (p = *pp++) != 0;)
 	{

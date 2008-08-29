@@ -376,8 +376,8 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
   Offset off;
   int count = q->count;
 
-  if (count == 0)		       /* queue empty -> ID_EMPTY */
-    return ID_EMPTY;
+  if (count == 0)		       /* queue empty -> 1 */
+    return 1;
 
   /* extend whatprovidesdata if needed, +1 for ID_NULL-termination */
   if (pool->whatprovidesdataleft < count + 1)

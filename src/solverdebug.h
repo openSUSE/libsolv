@@ -27,6 +27,8 @@ extern void solver_printdecisions(Solver *solv);
 extern void solver_printprobleminfo(Solver *solv, Queue *job, Id problem);
 extern void solver_printsolutions(Solver *solv, Queue *job);
 extern void solver_printtrivial(Solver *solv);
+extern const char *solver_select2str(Solver *solv, Id select, Id what);
+
 
 #endif /* SATSOLVER_SOLVERDEBUG_H */
 

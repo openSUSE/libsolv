@@ -604,3 +604,39 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
     }
 }
 
+int
+solvable_identical(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  unsigned int bt1, bt2;
+  Id rq1, rq2;
+  Id *reqp;
+
+  if (s1->name != s2->name)
+    return 0;
+  if (s1->arch != s2->arch)
+    return 0;
+  if (s1->evr != s2->evr)
+    return 0;
+  if (s1->vendor != s2->vendor)
+    return 0;
+
+  /* first tests passed, try requires */
+  rq1 = rq2 = 0;
+  if (s1->requires)
+    for (reqp = s1->repo->idarraydata + s1->requires; *reqp; reqp++)
+      rq1 ^= *reqp++;
+  if (s2->requires)
+    for (reqp = s2->repo->idarraydata + s2->requires; *reqp; reqp++)
+      rq2 ^= *reqp++;
+  if (rq1 != rq2)
+     return 0;
+
+  /* looking good, try some fancier stuff */
+  bt1 = solvable_lookup_num(s1, SOLVABLE_BUILDTIME, 0);
+  bt2 = solvable_lookup_num(s2, SOLVABLE_BUILDTIME, 0);
+  if (bt1 && bt2 && bt1 != bt2)
+    return 0;
+
+  /* might also look up the package checksum here */
+  return 1;
+}

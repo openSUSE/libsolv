@@ -126,6 +126,7 @@ typedef struct solver {
   Queue problems;                       /* index of conflicting rules, < 0 for job rules */
   Queue recommendations;		/* recommended packages */
   Queue suggestions;			/* suggested packages */
+  Queue orphaned;			/* orphaned packages */
 
   int stats_learned;			/* statistic */
   int stats_unsolvable;			/* statistic */
@@ -157,6 +158,10 @@ typedef struct solver {
   int ignorealreadyrecommended;		/* true: ignore recommended packages that were already recommended by the installed packages */
   int dontshowinstalledrecommended;	/* true: do not show recommended packages that are already installed */
   
+  /* distupgrade also needs updatesystem and dosplitprovides */
+  int distupgrade;
+  int distupgrade_removeunsupported;
+
   /* Callbacks for defining the bahaviour of the SAT solver */
 
   /* Finding best candidate
@@ -208,24 +213,39 @@ typedef struct solver {
  * queue commands
  */
 
-typedef enum {
-  SOLVCMD_NULL=0,
-  SOLVER_INSTALL_SOLVABLE,
-  SOLVER_ERASE_SOLVABLE,
-  SOLVER_INSTALL_SOLVABLE_NAME,
-  SOLVER_ERASE_SOLVABLE_NAME,
-  SOLVER_INSTALL_SOLVABLE_PROVIDES,
-  SOLVER_ERASE_SOLVABLE_PROVIDES,
-  SOLVER_INSTALL_SOLVABLE_UPDATE,
-  SOLVER_INSTALL_SOLVABLE_ONE_OF,
-  SOLVER_WEAKEN_SOLVABLE_DEPS,
-  SOLVER_NOOBSOLETES_SOLVABLE,
-  SOLVER_NOOBSOLETES_SOLVABLE_NAME,
-  SOLVER_NOOBSOLETES_SOLVABLE_PROVIDES,
+#define SOLVER_SOLVABLE			0x01
+#define SOLVER_SOLVABLE_NAME		0x02
+#define SOLVER_SOLVABLE_PROVIDES	0x03
+#define SOLVER_SOLVABLE_ONE_OF		0x04
 
-  /* flags */
-  SOLVER_WEAK = 0x100,
-} SolverCmd;
+#define SOLVER_SELECTMASK		0xff
+
+#define SOLVER_INSTALL       		0x0100
+#define SOLVER_ERASE         		0x0200
+#define SOLVER_UPDATE			0x0300
+#define SOLVER_WEAKENDEPS      		0x0400
+#define SOLVER_NOOBSOLETES   		0x0500
+#define SOLVER_LOCK			0x0600
+
+#define SOLVER_JOBMASK			0xff00
+
+#define SOLVER_WEAK			0x010000
+
+/* old API compatibility, do not use in new code */
+#if 1
+#define SOLVER_INSTALL_SOLVABLE (SOLVER_INSTALL|SOLVER_SOLVABLE)
+#define SOLVER_ERASE_SOLVABLE (SOLVER_ERASE|SOLVER_SOLVABLE)
+#define SOLVER_INSTALL_SOLVABLE_NAME (SOLVER_INSTALL|SOLVER_SOLVABLE_NAME)
+#define SOLVER_ERASE_SOLVABLE_NAME (SOLVER_ERASE|SOLVER_SOLVABLE_NAME)
+#define SOLVER_INSTALL_SOLVABLE_PROVIDES (SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES)
+#define SOLVER_ERASE_SOLVABLE_PROVIDES (SOLVER_ERASE|SOLVER_SOLVABLE_PROVIDES)
+#define SOLVER_INSTALL_SOLVABLE_UPDATE (SOLVER_UPDATE|SOLVER_SOLVABLE)
+#define SOLVER_INSTALL_SOLVABLE_ONE_OF (SOLVER_INSTALL|SOLVER_SOLVABLE_ONE_OF)
+#define SOLVER_WEAKEN_SOLVABLE_DEPS (SOLVER_WEAKENDEPS|SOLVER_SOLVABLE)
+#define SOLVER_NOOBSOLETES_SOLVABLE (SOLVER_NOOBSOLETES|SOLVER_SOLVABLE)
+#define SOLVER_NOOBSOLETES_SOLVABLE_NAME (SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME)
+#define SOLVER_NOOBSOLETES_SOLVABLE_PROVIDES (SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_PROVIDES)
+#endif
 
 typedef enum {
   SOLVER_PROBLEM_UPDATE_RULE,
@@ -324,6 +344,13 @@ solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
     for (l = r->d < 0 ? -r->d - 1 : r->d,			\
          dp = !l ? &r->w2 : pool->whatprovidesdata + l,		\
          l = r->p; l; l = (dp != &r->w2 + 1 ? *dp++ : 0))
+
+#define FOR_JOB_SELECT(p, pp, select, what) \
+    for (pp = (select == SOLVER_SOLVABLE ? pool->whatprovidesdata :	\
+               select == SOLVER_SOLVABLE_ONE_OF ? pool->whatprovidesdata + what : \
+               pool_whatprovides(pool, what)),				\
+         p = (select == SOLVER_SOLVABLE ? what : *pp++) ; p ; p = *pp++) \
+      if (select != SOLVER_SOLVABLE_NAME || pool_match_nevr(pool, pool->solvables + p, what))
 
 #ifdef __cplusplus
 }
