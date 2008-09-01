@@ -1044,6 +1044,41 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 }
 
 
+/*
+ *  special multiversion patch conflict handling:
+ *  a patch conflict is also satisfied, if some other
+ *  version with the same name/arch that doesn't conflict
+ *  get's installed. The generated rule is thus:
+ *  -patch|-cpack|opack1|opack2|...
+ */
+Id
+makemultiversionconflict(Solver *solv, Id n, Id con)
+{
+  Pool *pool = solv->pool;
+  Solvable *s, *sn;
+  Queue q;
+  Id p, *pp, qbuf[64];
+
+  sn = pool->solvables + n;
+  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  queue_push(&q, -n);
+  FOR_PROVIDES(p, pp, sn->name)
+    {
+      if (s->name != sn->name || s->arch != sn->arch)
+	continue;
+      if (!MAPTST(&solv->noobsoletes, p))
+	continue;
+      if (pool_match_nevr(pool, pool->solvables + p, con))
+	continue;
+      /* here we have a multiversion solvable that doesn't conflict */
+      /* thus we're not in conflict if it is installed */
+      queue_push(&q, p);
+    }
+  if (q.count == 1)
+    return -n;	/* no other package found, generate normal conflict */
+  return pool_queuetowhatprovides(pool, &q);
+}
+
 
 /*-------------------------------------------------------------------
  * 
@@ -1223,6 +1258,14 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
       if (s->conflicts)
 	{
+	  int ispatch = 0;
+
+	  /* we treat conflicts in patches a bit differen:
+	   * - nevr matching
+	   * - multiversion handling
+	   */
+	  if (!strncmp("patch:", id2str(pool, s->name), 6))
+	    ispatch = 1;
 	  conp = s->repo->idarraydata + s->conflicts;
 	  /* foreach conflicts of 's' */
 	  while ((con = *conp++) != 0)
@@ -1230,12 +1273,19 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      /* foreach providers of a conflict of 's' */
 	      FOR_PROVIDES(p, pp, con)
 		{
+		  if (ispatch && !pool_match_nevr(pool, pool->solvables + p, con))
+		    continue;
 		  /* dontfix: dont care about conflicts with already installed packs */
 		  if (dontfix && pool->solvables[p].repo == installed)
 		    continue;
 		  /* p == n: self conflict */
 		  if (p == n && !solv->allowselfconflicts)
 		    p = 0;	/* make it a negative assertion, aka 'uninstallable' */
+		  if (p && ispatch && solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p) && ISRELDEP(con))
+		    {
+		      /* our patch conflicts with a noobsoletes (aka multiversion) package */
+		      p = -makemultiversionconflict(solv, p, con);
+		    }
                  /* rule: -n|-p: either solvable _or_ provider of conflict */
 		  addrule(solv, -n, -p);
 		}
@@ -3292,7 +3342,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
   Rule *r;
   Solvable *s;
   int dontfix = 0;
-  Id p, d, *pp, req, *reqp, con, *conp, obs, *obsp, *dp;
+  Id p, d, w2, *pp, req, *reqp, con, *conp, obs, *obsp, *dp;
 
   assert(rid > 0);
   if (rid >= solv->jobrules && rid < solv->jobrules_end)
@@ -3370,10 +3420,17 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
   s = pool->solvables - r->p;
   if (installed && !solv->fixsystem && s->repo == installed)
     dontfix = 1;
-  if (d == 0 && r->w2 < 0)
+  w2 = r->w2;
+  if (d && pool->whatprovidesdata[d] < 0)
+    {
+      /* rule looks like -p|-c|x|x|x..., we only create this for patches with multiversion */
+      /* reduce it to -p|-c case */
+      w2 = pool->whatprovidesdata[d];
+    }
+  if (d == 0 && w2 < 0)
     {
       /* a package conflict */
-      Solvable *s2 = pool->solvables - r->w2;
+      Solvable *s2 = pool->solvables - w2;
       int dontfix2 = 0;
 
       if (installed && !solv->fixsystem && s2->repo == installed)
@@ -3386,11 +3443,11 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  /* also check noobsoletes map */
 	  if ((s->evr == s2->evr && s->arch == s2->arch) || !solv->noobsoletes.size
 		|| ((!installed || s->repo != installed) && !MAPTST(&solv->noobsoletes, -r->p))
-		|| ((!installed || s2->repo != installed) && !MAPTST(&solv->noobsoletes, -r->w2)))
+		|| ((!installed || s2->repo != installed) && !MAPTST(&solv->noobsoletes, -w2)))
 	    {
 	      *depp = 0;
 	      *sourcep = -r->p;
-	      *targetp = -r->w2;
+	      *targetp = -w2;
 	      return SOLVER_PROBLEM_SAME_NAME;
 	    }
 	}
@@ -3405,7 +3462,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 		{
 		  if (dontfix && pool->solvables[p].repo == installed)
 		    continue;
-		  if (p != -r->w2)
+		  if (p != -w2)
 		    continue;
 		  *depp = con;
 		  *sourcep = -r->p;
@@ -3426,7 +3483,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 		  if (p != -r->p)
 		    continue;
 		  *depp = con;
-		  *sourcep = -r->w2;
+		  *sourcep = -w2;
 		  *targetp = p;
 		  return SOLVER_PROBLEM_PACKAGE_CONFLICT;
 		}
@@ -3440,7 +3497,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	    {
 	      FOR_PROVIDES(p, pp, obs)
 		{
-		  if (p != -r->w2)
+		  if (p != -w2)
 		    continue;
 		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		    continue;
@@ -3451,7 +3508,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 		}
 	    }
 	}
-      if ((!installed || s2->repo != installed) && s2->obsoletes && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -r->w2)))
+      if ((!installed || s2->repo != installed) && s2->obsoletes && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -w2)))
 	{
 	  obsp = s2->repo->idarraydata + s2->obsoletes;
 	  while ((obs = *obsp++) != 0)
@@ -3463,7 +3520,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		    continue;
 		  *depp = obs;
-		  *sourcep = -r->w2;
+		  *sourcep = -w2;
 		  *targetp = p;
 		  return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
 		}
@@ -3473,7 +3530,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	{
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
-	      if (p != -r->w2)
+	      if (p != -w2)
 		continue;
 	      *depp = s->name;
 	      *sourcep = -r->p;
@@ -3481,14 +3538,14 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	      return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
 	    }
 	}
-      if (solv->implicitobsoleteusesprovides && (!installed || s2->repo != installed) && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -r->w2)))
+      if (solv->implicitobsoleteusesprovides && (!installed || s2->repo != installed) && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -w2)))
 	{
 	  FOR_PROVIDES(p, pp, s2->name)
 	    {
 	      if (p != -r->p)
 		continue;
 	      *depp = s2->name;
-	      *sourcep = -r->w2;
+	      *sourcep = -w2;
 	      *targetp = p;
 	      return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
 	    }
