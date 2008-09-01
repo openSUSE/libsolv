@@ -458,7 +458,8 @@ finish_solvable(struct parsedata *pd, Solvable *s, int handle, Offset freshens)
 		rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   /* XXX This uses repo_addid_dep internally, so should also be
      harmless to do twice.  */
-  s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements, freshens);
+  s->supplements = repo_fix_supplements(pd->repo, s->provides, s->supplements, freshens);
+  s->conflicts = repo_fix_conflicts(pd->repo, s->conflicts);
   if (pd->ndirs)
     commit_diskusage (pd, handle);
 }

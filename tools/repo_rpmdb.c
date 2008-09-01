@@ -837,7 +837,8 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
   s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 1);
   s->supplements = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 2);
   s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 1);
-  s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, 0);
+  s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
+  s->conflicts = repo_fix_conflicts(repo, s->conflicts);
 
   if (repodata)
     {

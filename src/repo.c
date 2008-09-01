@@ -316,7 +316,7 @@ repo_freeallrepos(Pool *pool, int reuseids)
 }
 
 Offset
-repo_fix_legacy(Repo *repo, Offset provides, Offset supplements, Offset freshens)
+repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset freshens)
 {
   Pool *pool = repo->pool;
   Id id, idp, idl;
@@ -505,6 +505,35 @@ repo_fix_legacy(Repo *repo, Offset provides, Offset supplements, Offset freshens
       supplements = repo_addid_dep(repo, 0, idsupp, 0);
     }
   return supplements;
+}
+
+Offset
+repo_fix_conflicts(Repo *repo, Offset conflicts)
+{
+  char buf[1024], *p, *dep;
+  Pool *pool = repo->pool;
+  Id id;
+  int i;
+
+  if (!conflicts)
+    return conflicts;
+  for (i = conflicts; repo->idarraydata[i]; i++)
+    {
+      id = repo->idarraydata[i];
+      if (ISRELDEP(id))
+	continue;
+      dep = (char *)id2str(pool, id);
+      if (!strncmp(dep, "otherproviders(", 15) && strlen(dep) < sizeof(buf) - 2)
+	{
+	  strcpy(buf, dep + 15);
+	  if ((p = strchr(buf, ')')) != 0)
+	    *p = 0;
+	  id = str2id(pool, buf, 1);
+	  id = rel2id(pool, NAMESPACE_OTHERPROVIDERS, id, REL_NAMESPACE, 1);
+	  repo->idarraydata[i] = id;
+	}
+    }
+  return conflicts;
 }
 
 struct matchdata

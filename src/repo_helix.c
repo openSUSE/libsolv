@@ -622,7 +622,8 @@ endElement(void *userData, const char *name)
       /* ensure self-provides */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = repo_fix_legacy(pd->repo, s->provides, s->supplements, pd->freshens);
+      s->supplements = repo_fix_supplements(pd->repo, s->provides, s->supplements, pd->freshens);
+      s->conflicts = repo_fix_conflicts(pd->repo, s->conflicts);
       pd->freshens = 0;
 
       /* see bugzilla bnc#190163 */

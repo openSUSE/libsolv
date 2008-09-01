@@ -915,7 +915,8 @@ endElement(void *userData, const char *name)
         s->evr = ID_EMPTY;	/* some patterns have this */
       if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, pd->freshens);
+      s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, pd->freshens);
+      s->conflicts = repo_fix_conflicts(repo, s->conflicts);
       pd->freshens = 0;
       pd->kind = 0;
       break;

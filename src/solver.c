@@ -1280,7 +1280,15 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		    continue;
 		  /* p == n: self conflict */
 		  if (p == n && !solv->allowselfconflicts)
-		    p = 0;	/* make it a negative assertion, aka 'uninstallable' */
+		    {
+		      if (ISRELDEP(con))
+			{
+			  Reldep *rd = GETRELDEP(pool, con);
+			  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_OTHERPROVIDERS)
+			    continue;
+			}
+		      p = 0;	/* make it a negative assertion, aka 'uninstallable' */
+		    }
 		  if (p && ispatch && solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p) && ISRELDEP(con))
 		    {
 		      /* our patch conflicts with a noobsoletes (aka multiversion) package */

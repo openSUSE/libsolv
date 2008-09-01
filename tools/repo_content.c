@@ -289,7 +289,7 @@ repo_add_content(Repo *repo, FILE *fp)
 		  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 		    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 		  if (s && code10)
-		    s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, 0);
+		    s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
 		  /* Only support one product.  */
 		  s = pool_id2solvable(pool, repo_add_solvable(repo));
 		  repodata_extend(data, s - pool->solvables);
@@ -397,7 +397,7 @@ repo_add_content(Repo *repo, FILE *fp)
     {
       s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (code10)
-	s->supplements = repo_fix_legacy(repo, s->provides, s->supplements, 0);
+	s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
     }
   
   if (pd.tmp)

@@ -496,6 +496,12 @@ pool_addrelproviders(Pool *pool, Id d)
 	queue_pushunique(&plist, p);
       break;
     case REL_NAMESPACE:
+      if (name == NAMESPACE_OTHERPROVIDERS)
+	{
+	  pp = pool_whatprovides(pool, evr);
+	  pool->whatprovides_rel[d] = pp - pool->whatprovidesdata;
+	  return pp;
+	}
       if (pool->nscallback)
 	{
 	  /* ask callback which packages provide the dependency
