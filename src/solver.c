@@ -1064,6 +1064,7 @@ makemultiversionconflict(Solver *solv, Id n, Id con)
   queue_push(&q, -n);
   FOR_PROVIDES(p, pp, sn->name)
     {
+      s = pool->solvables + p;
       if (s->name != sn->name || s->arch != sn->arch)
 	continue;
       if (!MAPTST(&solv->noobsoletes, p))

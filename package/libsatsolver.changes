@@ -1,4 +1,17 @@
 -------------------------------------------------------------------
+Tue Sep  2 12:17:03 CEST 2008 - mls@suse.de
+
+- make solver includes use "" instead of <>, fixes bnc#415920
+- implement otherproviders()
+- make patches do nevr matching
+- make patch conflicts work with multiversion
+- new job commands, now combinded from job type and select type
+- support for distupgrade mode
+- make SOLVER_ERASE_SOLVABLE work
+- also check obsoletes when disabling update rules
+- 0.10.6
+
+-------------------------------------------------------------------
 Fri Aug 22 18:04:12 CEST 2008 - dmacvicar@suse.de
 
 - add support for extensible metadata over primary +
