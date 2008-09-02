@@ -608,8 +608,10 @@ int
 solvable_identical(Pool *pool, Solvable *s1, Solvable *s2)
 {
   unsigned int bt1, bt2;
+#if 0
   Id rq1, rq2;
   Id *reqp;
+#endif
 
   if (s1->name != s2->name)
     return 0;
@@ -620,6 +622,9 @@ solvable_identical(Pool *pool, Solvable *s1, Solvable *s2)
   if (s1->vendor != s2->vendor)
     return 0;
 
+  /* disabled for now because some testcases have requires where the
+     duplicates are removed */
+#if 0
   /* first tests passed, try requires */
   rq1 = rq2 = 0;
   if (s1->requires)
@@ -630,6 +635,7 @@ solvable_identical(Pool *pool, Solvable *s1, Solvable *s2)
       rq2 ^= *reqp++;
   if (rq1 != rq2)
      return 0;
+#endif
 
   /* looking good, try some fancier stuff */
   bt1 = solvable_lookup_num(s1, SOLVABLE_BUILDTIME, 0);
