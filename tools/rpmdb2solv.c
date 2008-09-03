@@ -34,6 +34,7 @@ usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
 	  "rpmdb2solv [-n] [-x] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
+	  " -a <attr> : Only print this attribute, no .solv generation. E.g. '-a distribution.target'\n"
 	  " -n : No packages, do not read rpmdb, useful to only parse products\n"
 	  " -x : use extrapool\n"
 	  " -b <basefile> : Write .solv to <basefile>.solv instead of stdout\n"
@@ -58,16 +59,20 @@ main(int argc, char **argv)
   const char *root = 0;
   const char *basefile = 0;
   const char *proddir = 0;
+  const char *attribute = 0;
 
   /*
    * parse arguments
    */
   
-  while ((c = getopt (argc, argv, "hnxb:r:p:")) >= 0)
+  while ((c = getopt (argc, argv, "a:hnxb:r:p:")) >= 0)
     switch (c)
       {
       case 'h':
 	  usage(0);
+	break;
+      case 'a':
+	attribute = optarg;
 	break;
       case 'r':
         root = optarg;
@@ -144,7 +149,7 @@ main(int argc, char **argv)
 	    }
 	}
       
-      repo_add_products(repo, repodata, proddir, root);
+      repo_add_products(repo, repodata, proddir, root, attribute);
     }
       
   if (repodata)
@@ -159,7 +164,9 @@ main(int argc, char **argv)
       ref = 0;
     }
 
-  tool_write(repo, basefile, 0);
+  if (!attribute)
+    tool_write(repo, basefile, 0);
+
   pool_free(pool);
 
   exit(0);

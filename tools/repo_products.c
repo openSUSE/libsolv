@@ -21,22 +21,115 @@
 #include <string.h>
 #include <assert.h>
 #include <dirent.h>
+#include <expat.h>
 
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#define DISABLE_SPLIT
 #include "tools_util.h"
 #include "repo_content.h"
 
 
 static ino_t baseproduct = 0;
 
+//#define DUMPOUT 0
+
+enum state {
+  STATE_START,
+  STATE_PRODUCT,
+  STATE_GENERAL,
+  STATE_VENDOR,
+  STATE_NAME,
+  STATE_VERSION,
+  STATE_RELEASE,
+  STATE_SUMMARY,
+  STATE_DESCRIPTION,
+  STATE_DISTRIBUTION,
+  STATE_FLAVOR,
+  STATE_URLS,
+  STATE_URL,
+  STATE_RUNTIMECONFIG,
+  STATE_LINGUAS,
+  STATE_LANG,
+  NUMSTATES
+};
+
+struct stateswitch {
+  enum state from;
+  char *ename;
+  enum state to;
+  int docontent;
+};
+
+/* !! must be sorted by first column !! */
+static struct stateswitch stateswitches[] = {
+  { STATE_START,     "product",       STATE_PRODUCT,       0 },
+  { STATE_PRODUCT,   "general",       STATE_GENERAL,       0 },
+  { STATE_GENERAL,   "vendor",        STATE_VENDOR,        1 },
+  { STATE_GENERAL,   "name",          STATE_NAME,          1 },
+  { STATE_GENERAL,   "version",       STATE_VERSION,       1 },
+  { STATE_GENERAL,   "release",       STATE_RELEASE,       1 },
+  { STATE_GENERAL,   "summary",       STATE_SUMMARY,       1 },
+  { STATE_GENERAL,   "description",   STATE_DESCRIPTION,   1 },
+  { STATE_GENERAL,   "distribution",  STATE_DISTRIBUTION,  0 },
+  { STATE_GENERAL,   "urls",          STATE_URLS,          0 },
+  { STATE_GENERAL,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
+  { STATE_GENERAL,   "linguas",       STATE_LINGUAS,       0 },
+  { STATE_URLS,      "url",           STATE_URL,           0 },
+  { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
+  { NUMSTATES }
+};
+
 struct parsedata {
+  int depth;
+  enum state state;
+  int statedepth;
+  char *content;
+  int lcontent;
+  int acontent;
+  int docontent;
+  Pool *pool;
   Repo *repo;
-  char *tmp;
-  int tmpl;
+  Repodata *data;
+  int datanum;
+  
+  struct stateswitch *swtab[NUMSTATES];
+  enum state sbtab[NUMSTATES];
+
+  const char *attribute; /* only print this attribute */
+
+  const char *tmplang;
+  const char *tmpvers;
+  const char *tmprel;
+
+  Solvable *s;
+  Id handle;
+
   Id langcache[ID_NUM_INTERNAL];
 };
+
+
+/*
+ * find_attr
+ * find value for xml attribute
+ * I: txt, name of attribute
+ * I: atts, list of key/value attributes
+ * I: dup, strdup it
+ * O: pointer to value of matching key, or NULL
+ * 
+ */
+
+static inline const char *
+find_attr(const char *txt, const char **atts, int dup)
+{
+  for (; *atts; atts += 2)
+    {
+      if (!strcmp(*atts, txt))
+        return dup ? strdup(atts[1]) : atts[1];
+    }
+  return 0;
+}
 
 
 /*
@@ -50,22 +143,191 @@ langtag(struct parsedata *pd, Id tag, const char *language)
         language = 0;
     if (!language || tag >= ID_NUM_INTERNAL)
         return pool_id2langid(pd->repo->pool, tag, language, 1);
-    return pool_id2langid(pd->repo->pool, tag, language, 1);
     if (!pd->langcache[tag])
         pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, language, 1);
     return pd->langcache[tag];
 }
 
 
+/*
+ * XML callback: startElement
+ */
 
-
-enum sections 
+static void XMLCALL
+startElement(void *userData, const char *name, const char **atts)
 {
-  SECTION_UNKNOWN,
-  SECTION_PRODUCT,
-  SECTION_TRANSLATED,
-  SECTION_UPDATE
-};
+  struct parsedata *pd = userData;
+  Pool *pool = pd->pool;
+  struct stateswitch *sw;
+
+#if 0
+      fprintf(stderr, "start: [%d]%s\n", pd->state, name);
+#endif
+  if (pd->depth != pd->statedepth)
+    {
+      pd->depth++;
+      return;
+    }
+
+  pd->depth++;
+  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
+    if (!strcmp(sw->ename, name))
+      break;
+  
+  if (sw->from != pd->state)
+    {
+#if 1
+      fprintf(stderr, "into unknown: [%d]%s (from: %d)\n", sw->to, name, sw->from);
+      exit( 1 );
+#endif
+      return;
+    }
+  pd->state = sw->to;
+  pd->docontent = sw->docontent;
+  pd->statedepth = pd->depth;
+  pd->lcontent = 0;
+  *pd->content = 0;
+
+  switch(pd->state)
+    {
+      case STATE_START:
+          break;
+    case STATE_PRODUCT:
+      if (!pd->s)
+	{
+	  
+	  pd->s = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+	  repodata_extend(pd->data, pd->s - pool->solvables);
+	  pd->handle = repodata_get_handle(pd->data, pd->s - pool->solvables - pd->repo->start);
+	}
+     break;
+
+      /* <summary lang="xy">... */
+    case STATE_SUMMARY:
+      pd->tmplang = find_attr("lang", atts, 1);
+      break;
+    case STATE_DESCRIPTION:
+      pd->tmplang = find_attr("lang", atts, 1);
+      break;
+    case STATE_DISTRIBUTION:
+	{
+	  const char *str;
+	  if ((str = find_attr("flavor", atts, 0)))
+	    repo_set_str(pd->repo, pd->s - pool->solvables, PRODUCT_FLAVOR, str);
+	  if ((str = find_attr("target", atts, 0)))
+	    {
+	      if (pd->attribute && !strcmp(pd->attribute, "distribution.target"))
+		  printf("%s\n", str);
+	      else
+		  repo_set_str(pd->repo, pd->s - pool->solvables, SOLVABLE_DISTRIBUTION, str);
+	    }
+	}
+      break;
+    case STATE_URLS:
+    case STATE_URL:
+    case STATE_RUNTIMECONFIG:
+      default:
+      break;
+    }
+  return;
+}
+
+
+static void XMLCALL
+endElement(void *userData, const char *name)
+{
+  struct parsedata *pd = userData;
+
+#if 0
+      fprintf(stderr, "end: %s\n", name);
+#endif
+  if (pd->depth != pd->statedepth)
+    {
+      pd->depth--;
+#if 1
+      fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+#endif
+      return;
+    }
+
+  pd->depth--;
+  pd->statedepth--;
+
+  switch (pd->state)
+    {
+    case STATE_VENDOR:
+      pd->s->vendor = str2id(pd->pool, pd->content, 1);
+      break;
+    case STATE_NAME:
+      pd->s->name = str2id(pd->pool, join2("product", ":", pd->content), 1);
+      break;
+    case STATE_VERSION:
+      pd->tmpvers = strdup(pd->content);
+      break;
+    case STATE_RELEASE:
+      pd->tmprel = strdup(pd->content);
+      break;
+    case STATE_SUMMARY:
+      repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
+      if (pd->tmplang) 
+      {
+        free( (char *)pd->tmplang );
+	pd->tmplang = 0;
+      }
+      break;
+    case STATE_DESCRIPTION:
+      repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), pd->content );
+      if (pd->tmplang) 
+      {
+        free( (char *)pd->tmplang );
+	pd->tmplang = 0;
+      }
+      break;
+    case STATE_DISTRIBUTION:
+      break;
+    case STATE_URL:
+      break;
+    case STATE_RUNTIMECONFIG:
+      break;
+    default:
+      break;
+    }
+  
+  pd->state = pd->sbtab[pd->state];
+  pd->docontent = 0;
+  
+  return;
+}
+
+
+static void XMLCALL
+characterData(void *userData, const XML_Char *s, int len)
+{
+  struct parsedata *pd = userData;
+  int l;
+  char *c;
+  if (!pd->docontent) {
+#if 0
+    char *dup = strndup( s, len );
+  fprintf(stderr, "Content: [%d]'%s'\n", pd->state, dup );
+  free( dup );
+#endif
+    return;
+  }
+  l = pd->lcontent + len + 1;
+  if (l > pd->acontent)
+    {
+      pd->content = realloc(pd->content, l + 256);
+      pd->acontent = l + 256;
+    }
+  c = pd->content + pd->lcontent;
+  pd->lcontent += len;
+  while (len-- > 0)
+    *c++ = *s++;
+  *c = 0;
+}
+
+#define BUFF_SIZE 8192
 
 
 /*
@@ -76,215 +338,80 @@ enum sections
 static void
 repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 {
-  Repo *repo = pd->repo;
-  Pool *pool = repo->pool;
-  char *line, *linep;
-  int aline;
-  Solvable *s = 0;
-  Id handle = 0;
+  Pool *pool = pd->pool;
+  char buf[BUFF_SIZE];
+  int i, l;
+  struct stateswitch *sw;
 
-  enum sections current_section = SECTION_UNKNOWN;
-
-  line = sat_malloc(1024);
-  aline = 1024;
-
-  linep = line;
-  s = 0;
-
+  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
+    {
+      if (!pd->swtab[sw->from])
+        pd->swtab[sw->from] = sw;
+      pd->sbtab[sw->to] = sw->from;
+    }
+  XML_Parser parser = XML_ParserCreate(NULL);
+  XML_SetUserData(parser, pd);
+  XML_SetElementHandler(parser, startElement, endElement);
+  XML_SetCharacterDataHandler(parser, characterData);
+  
   for (;;)
-    {      
-      /* read line into big-enough buffer */
-      if (linep - line + 16 > aline)
+    {
+      l = fread(buf, 1, sizeof(buf), fp);
+      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  aline = linep - line;
-	  line = sat_realloc(line, aline + 512);
-	  linep = line + aline;
-	  aline += 512;
+	  fprintf(stderr, "repo_diskusagexml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  exit(1);
 	}
-      if (!fgets(linep, aline - (linep - line), fp))
+      if (l == 0)
 	break;
-      linep += strlen(linep);
-      if (linep == line || linep[-1] != '\n')
-        continue;
-      *--linep = 0;
-      linep = line;
-
-      if (!code11)
+    }
+  XML_ParserFree(parser);
+  
+  if (pd->s)
+    {
+      Solvable *s = pd->s;
+      struct stat st;
+      if (!fstat(fileno(fp), &st))
 	{
-	  /* non-code11, assume /etc/xyz-release
-	   * just parse first line
-	   * as "<name> <version> (<arch>)"
-	   */
-	  char *sp[3];
-
-	  if (split(linep, sp, 3) == 3)
-	    {
-	      if (!s)
-		{
-		  struct stat st;
-		  
-		  s = pool_id2solvable(pool, repo_add_solvable(repo));
-		  repodata_extend(data, s - pool->solvables);
-		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
-		  if (!fstat(fileno(fp), &st))
-		    {
-		      repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, st.st_ctime);
-		    }
-		  else
-		    {
-		      perror("Can't stat()");
-		    }
-		}
-	      s->name = str2id(pool, join2("product", ":", sp[0]), 1);
-	      s->evr = makeevr(pool, sp[1]);
-	    }
-	  else
-	    {
-	      fprintf(stderr, "Can't recognize -release line '%s'\n", linep);
-	    }	  
-	  break; /* just parse single line */
-	}
-      
-      /*
-       * Very trivial .ini parser
-       */
-      
-      /* skip empty and comment lines */
-      if (*linep == '#'
-	  || *linep == 0)
-	{
-	  continue;
-	}
-      
-      /* sections must start at column 0 */
-      if (*linep == '[')
-	{
-	  char *secp = linep+1;
-	  char *endp = linep;
-	  endp = strchr(secp, ']');
-	  if (!endp)
-	    {
-	      fprintf(stderr, "Skipping unclosed section '%s'\n", line);
-	      continue;
-	    }
-	  *endp = 0;
-	  if (!strcmp(secp, "product"))
-	    current_section = SECTION_PRODUCT;
-	  else if (!strcmp(secp, "translated"))
-	    current_section = SECTION_TRANSLATED;
-	  else if (!strcmp(secp, "update"))
-	    current_section = SECTION_UPDATE;
-	  else
-	    {
-	      fprintf(stderr, "Skipping unknown section '%s'\n", secp);
-	      current_section = SECTION_UNKNOWN;
-	    }
-	  continue;
-	}
-      else if (current_section != SECTION_UNKNOWN)
-	{
-	  char *ptr = linep;
-	  char *key, *value, *lang;
-
-	  lang = 0;
-	  
-	  /* split line into '<key>[<lang>] = <value>' */
-	  while (*ptr && (*ptr == ' ' || *ptr == '\t'))
-	    ++ptr;
-	  key = ptr;
-	  while (*ptr && !(*ptr == ' ' || *ptr == '\t' || *ptr == '=' || *ptr == '['))
-	    ++ptr;
-	  if (*ptr == '[')
-	    {
-	      *ptr++ = 0;
-	      lang = ptr;
-	      while (*ptr && !(*ptr == ']'))
-		++ptr;
-	      *ptr++ = 0;
-	    }
-	  if (*ptr != '=')
-	    *ptr++ = 0;
-	  while (*ptr && !(*ptr == '='))
-	    ++ptr;
-	  if (*ptr == '=')
-	    *ptr++ = 0;
-	  while (*ptr && (*ptr == ' ' || *ptr == '\t'))
-	    ++ptr;
-	  value = ptr;
-
-	  /*
-	   * [product]
-	   */
-	  
-	  if (current_section == SECTION_PRODUCT)
-	    {
-	      if (!s)
-		{
-		  struct stat st;
-		  
-		  s = pool_id2solvable(pool, repo_add_solvable(repo));
-		  repodata_extend(data, s - pool->solvables);
-		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
-		  if (!fstat(fileno(fp), &st))
-		    {
-		      repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, st.st_ctime);
-		      /* this is where <productsdir>/baseproduct points to */
-		      if (st.st_ino == baseproduct)
-			repodata_set_str(data, handle, PRODUCT_TYPE, "base");
-		    }
-		  else
-		    {
-		      perror("Can't stat()");
-		    }
-		}
-	      if (!strcmp(key, "name"))
-		  s->name = str2id(pool, join2("product", ":", value), 1);
-	      else if (!strcmp(key, "version"))
-		s->evr = makeevr(pool, value);
-	      else if (!strcmp(key, "vendor"))
-		s->vendor = str2id(pool, value, 1);
-	      else if (!strcmp(key, "distribution"))
-		repo_set_str(repo, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
-	      else if (!strcmp (key, "flavor"))
-		repo_set_str(repo, s - pool->solvables, PRODUCT_FLAVOR, value);	    
-	    }
-	    /*
-	     * [translated]
-	     */
-	  else if (current_section == SECTION_TRANSLATED)
-	    {
-	      if (!strcmp(key, "summary"))
-		{
-		  repodata_set_str(data, handle, langtag(pd, SOLVABLE_SUMMARY, lang), value );
-		}
-	      else if (!strcmp(key, "description"))
-		repodata_set_str(data, handle, langtag(pd, SOLVABLE_DESCRIPTION, lang), value );
-	    }
-	    /*
-	     * [update]
-	     */
-	  else if (current_section == SECTION_UPDATE)
-	    {
-	    }
+	  repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, st.st_ctime);
+	  /* this is where <productsdir>/baseproduct points to */
+	  if (st.st_ino == baseproduct)
+	    repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, "base");
 	}
       else
-	fprintf (stderr, "malformed line: %s\n", line);
-    }
-
-  if (!s)
-    {
-      fprintf(stderr, "No product solvable created !\n");
-      exit(1);
-    }
-
-  if (!s->arch)
-    s->arch = ARCH_NOARCH;
-  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-    {
-      s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-    }
-  
-  sat_free(line);
+	{
+	  perror("Can't stat()");
+	}
+      
+      if (pd->tmprel)
+	{
+	  if (pd->tmpvers)
+	    {
+	      s->evr = makeevr(pool, join2(pd->tmpvers, "-", pd->tmprel));
+	      free((char *)pd->tmpvers);
+	      pd->tmpvers = 0;
+	    }
+	  else
+	    {
+	      fprintf(stderr, "Seen <release> but no <version>\n");
+	    }
+	  free((char *)pd->tmprel);
+	  pd->tmprel = 0;
+	}
+      else if (pd->tmpvers)
+	{
+	  s->evr = makeevr(pool, pd->tmpvers); /* just version, no release */
+	  free((char *)pd->tmpvers);
+	  pd->tmpvers = 0;
+	}
+      if (!s->arch)
+	s->arch = ARCH_NOARCH;
+      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+	{
+	  s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+	}
+    } /* if pd->s */
+  return;
 }
 
 
@@ -296,8 +423,8 @@ static void
 parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, int code11)
 {
   struct dirent *entry;
-  char *suffix = code11 ? ".prod" : "-release";
-  int slen = code11 ? 5 : 8;  /* strlen(".prod") : strlen("-release") */
+  char *suffix = code11 ? ".xml" : "-release";
+  int slen = code11 ? 4 : 8;  /* strlen(".xml") : strlen("-release") */
   struct stat st;
   
   /* check for <productsdir>/baseproduct on code11 and remember its target inode */
@@ -311,7 +438,7 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, 
     {
       int len;
       len = strlen(entry->d_name);
-      
+
       /* skip /etc/lsb-release, thats not a product per-se */
       if (!code11
 	  && strcmp(entry->d_name, "lsb-release") == 0)
@@ -339,14 +466,14 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, 
 /*
  * read all installed products
  * 
- * try proddir (reading all .prod files from this directory) first
+ * try proddir (reading all .xml files from this directory) first
  * if not available, assume non-code11 layout and parse /etc/xyz-release
  *
  * parse each one as a product
  */
 
 void
-repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const char *root)
+repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const char *root, const char *attribute)
 {
   const char *fullpath = proddir;
   int code11 = 1;
@@ -355,6 +482,13 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
   
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;
+  pd.pool = repo->pool;
+  pd.data = repo_add_repodata(pd.repo, 0);
+
+  pd.content = malloc(256);
+  pd.acontent = 256;
+
+  pd.attribute = attribute;
 
   if (!dir)
     {
@@ -371,8 +505,12 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
       parse_dir(dir, fullpath, &pd, repodata, code11);
     }
   
-  if (pd.tmp)
-    sat_free(pd.tmp);
+  if (pd.data)
+    repodata_internalize(pd.data);
+
+  free(pd.content);
   join_freemem();
   closedir(dir);
 }
+
+/* EOF */
