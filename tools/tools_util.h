@@ -25,7 +25,7 @@ struct parsedata_common {
 };
 
 static inline Id
-makeevr(Pool *pool, char *s)
+makeevr(Pool *pool, const char *s)
 {
   if (!strncmp(s, "0:", 2) && s[2])
     s += 2;
