@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Thu Sep  4 12:30:06 CEST 2008 - kkaempf@suse.de
+
+- tools/rpmdb2solv: Adapt to xml-based /etc/products.d
+- tools/rpmdb2solv: Add '-a <attribute>' to print
+  distribution.target attribute of baseproduct.
+
+-------------------------------------------------------------------
 Tue Sep  2 12:17:03 CEST 2008 - mls@suse.de
 
 - make solver includes use "" instead of <>, fixes bnc#415920

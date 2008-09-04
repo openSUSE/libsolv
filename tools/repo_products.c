@@ -32,6 +32,7 @@
 
 
 static ino_t baseproduct = 0;
+static ino_t currentproduct = 0;
 
 //#define DUMPOUT 0
 
@@ -97,7 +98,7 @@ struct parsedata {
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
 
-  const char *attribute; /* only print this attribute */
+  const char *attribute; /* only print this attribute, if currentproduct == baseproduct */
 
   const char *tmplang;
   const char *tmpvers;
@@ -216,7 +217,9 @@ startElement(void *userData, const char *name, const char **atts)
 	    repo_set_str(pd->repo, pd->s - pool->solvables, PRODUCT_FLAVOR, str);
 	  if ((str = find_attr("target", atts, 0)))
 	    {
-	      if (pd->attribute && !strcmp(pd->attribute, "distribution.target"))
+	      if (currentproduct == baseproduct
+		  && pd->attribute
+		  && !strcmp(pd->attribute, "distribution.target"))
 		  printf("%s\n", str);
 	      else
 		  repo_set_str(pd->repo, pd->s - pool->solvables, SOLVABLE_DISTRIBUTION, str);
@@ -342,7 +345,17 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
+  struct stat st;
 
+  if (!fstat(fileno(fp), &st))
+    currentproduct = st.st_ino;
+  else 
+    {
+      currentproduct = baseproduct+1; /* make it != baseproduct if stat fails */
+      st.st_ctime = 0;
+      perror("Can't stat()");
+    }
+  
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
     {
       if (!pd->swtab[sw->from])
@@ -370,18 +383,11 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
   if (pd->s)
     {
       Solvable *s = pd->s;
-      struct stat st;
-      if (!fstat(fileno(fp), &st))
-	{
-	  repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, st.st_ctime);
-	  /* this is where <productsdir>/baseproduct points to */
-	  if (st.st_ino == baseproduct)
-	    repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, "base");
-	}
-      else
-	{
-	  perror("Can't stat()");
-	}
+
+      repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, st.st_ctime);
+      /* this is where <productsdir>/baseproduct points to */
+      if (currentproduct == baseproduct)
+	repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, "base");
       
       if (pd->tmprel)
 	{
@@ -433,7 +439,9 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, 
     {
       baseproduct = st.st_ino;
     }
-  
+  else
+    baseproduct = 0;
+
   while ((entry = readdir(dir)))
     {
       int len;
