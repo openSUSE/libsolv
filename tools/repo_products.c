@@ -140,13 +140,13 @@ find_attr(const char *txt, const char **atts, int dup)
 static Id
 langtag(struct parsedata *pd, Id tag, const char *language)
 {
-    if (language && !language[0])
-        language = 0;
-    if (!language || tag >= ID_NUM_INTERNAL)
-        return pool_id2langid(pd->repo->pool, tag, language, 1);
-    if (!pd->langcache[tag])
-        pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, language, 1);
-    return pd->langcache[tag];
+  if (language && !language[0])
+    language = 0;
+  if (!language || tag >= ID_NUM_INTERNAL)
+    return pool_id2langid(pd->repo->pool, tag, language, 1);
+  if (!pd->langcache[tag])
+    pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, language, 1);
+  return pd->langcache[tag];
 }
 
 
@@ -220,9 +220,9 @@ startElement(void *userData, const char *name, const char **atts)
 	      if (currentproduct == baseproduct
 		  && pd->attribute
 		  && !strcmp(pd->attribute, "distribution.target"))
-		  printf("%s\n", str);
+		printf("%s\n", str);
 	      else
-		  repo_set_str(pd->repo, pd->s - pool->solvables, SOLVABLE_DISTRIBUTION, str);
+	        repo_set_str(pd->repo, pd->s - pool->solvables, SOLVABLE_DISTRIBUTION, str);
 	    }
 	}
       break;
@@ -372,7 +372,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  fprintf(stderr, "repo_diskusagexml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  fprintf(stderr, "repo_products: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
 	  exit(1);
 	}
       if (l == 0)
@@ -384,7 +384,8 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
     {
       Solvable *s = pd->s;
 
-      repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, st.st_ctime);
+      if (st.st_ctime)
+        repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, st.st_ctime);
       /* this is where <productsdir>/baseproduct points to */
       if (currentproduct == baseproduct)
 	repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, "base");
