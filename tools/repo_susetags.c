@@ -733,7 +733,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	        s->arch = arch;
 	      else
 	        s->arch = str2id(pool, sp[3], 1);
-	      s->vendor = vendor;
+	      s->vendor = vendor; /* default to product vendor */
 	    }
 	}
 
@@ -832,6 +832,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    handle = 0;
 	    indesc++;
 	    continue;
+          case CTAG('=', 'V', 'n', 'd'):                                        /* vendor */
+            s->vendor = str2id(pool, line + 6, 1);
+            continue;
 
         /* From here it's the attribute tags.  */
           case CTAG('=', 'G', 'r', 'p'):

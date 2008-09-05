@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Sep  5 13:29:47 CEST 2008 - ma@suse.de
+
+- tools/repo_susetags.c: Parse packages vendor (bnc #422493).
+- 0.10.7
+
+-------------------------------------------------------------------
 Thu Sep  4 12:30:06 CEST 2008 - kkaempf@suse.de
 
 - tools/rpmdb2solv: Adapt to xml-based /etc/products.d
