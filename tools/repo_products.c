@@ -37,26 +37,26 @@ static ino_t currentproduct = 0;
 //#define DUMPOUT 0
 
 enum state {
-  STATE_START,
-  STATE_PRODUCT,
-  STATE_GENERAL,
-  STATE_VENDOR,
-  STATE_NAME,
-  STATE_VERSION,
-  STATE_RELEASE,
-  STATE_SUMMARY,
-  STATE_DESCRIPTION,
-  STATE_DISTRIBUTION,
-  STATE_FLAVOR,
-  STATE_URLS,
-  STATE_URL,
-  STATE_UPDATEREPOKEY,
-  STATE_BUILDCONFIG,
-  STATE_INSTALLCONFIG,
-  STATE_RUNTIMECONFIG,
-  STATE_LINGUAS,
-  STATE_LANG,
-  NUMSTATES
+  STATE_START,           // 0
+  STATE_PRODUCT,         // 1
+  STATE_GENERAL,         // 2
+  STATE_VENDOR,          // 3
+  STATE_NAME,            // 4
+  STATE_VERSION,         // 5
+  STATE_RELEASE,         // 6
+  STATE_SUMMARY,         // 7
+  STATE_DESCRIPTION,     // 8
+  STATE_DISTRIBUTION,    // 9
+  STATE_FLAVOR,          // 10
+  STATE_URLS,            // 11
+  STATE_URL,             // 12
+  STATE_UPDATEREPOKEY,   // 13
+  STATE_BUILDCONFIG,     // 14
+  STATE_INSTALLCONFIG,   // 15
+  STATE_RUNTIMECONFIG,   // 16
+  STATE_LINGUAS,         // 17
+  STATE_LANG,            // 18
+  NUMSTATES              // 0
 };
 
 struct stateswitch {
@@ -84,7 +84,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_GENERAL,   "linguas",       STATE_LINGUAS,       0 },
   { STATE_GENERAL,   "update_repo_key", STATE_UPDATEREPOKEY,   0 },
   { STATE_URLS,      "url",           STATE_URL,           0 },
-  { STATE_BUILDCONFIG,"linguas",      STATE_LINGUAS,       0 },
+/*  { STATE_BUILDCONFIG,"linguas",      STATE_LINGUAS,       0 }, */
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
   { NUMSTATES }
 };
@@ -168,7 +168,7 @@ startElement(void *userData, const char *name, const char **atts)
   Pool *pool = pd->pool;
   struct stateswitch *sw;
 
-#if 1
+#if 0
       fprintf(stderr, "start: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
@@ -248,8 +248,8 @@ endElement(void *userData, const char *name)
 {
   struct parsedata *pd = userData;
 
-#if 1
-      fprintf(stderr, "end: %s\n", name);
+#if 0
+      fprintf(stderr, "end: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
     {
@@ -306,6 +306,9 @@ endElement(void *userData, const char *name)
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
   
+#if 0
+      fprintf(stderr, "end: [%s] -> %d\n", name, pd->state);
+#endif
   return;
 }
 
