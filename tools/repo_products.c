@@ -50,6 +50,9 @@ enum state {
   STATE_FLAVOR,
   STATE_URLS,
   STATE_URL,
+  STATE_UPDATEREPOKEY,
+  STATE_BUILDCONFIG,
+  STATE_INSTALLCONFIG,
   STATE_RUNTIMECONFIG,
   STATE_LINGUAS,
   STATE_LANG,
@@ -76,8 +79,12 @@ static struct stateswitch stateswitches[] = {
   { STATE_GENERAL,   "distribution",  STATE_DISTRIBUTION,  0 },
   { STATE_GENERAL,   "urls",          STATE_URLS,          0 },
   { STATE_GENERAL,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
+  { STATE_GENERAL,   "installconfig", STATE_INSTALLCONFIG, 0 },
+  { STATE_GENERAL,   "buildconfig",   STATE_BUILDCONFIG,   0 },
   { STATE_GENERAL,   "linguas",       STATE_LINGUAS,       0 },
+  { STATE_GENERAL,   "update_repo_key", STATE_UPDATEREPOKEY,   0 },
   { STATE_URLS,      "url",           STATE_URL,           0 },
+  { STATE_BUILDCONFIG,"linguas",      STATE_LINGUAS,       0 },
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
   { NUMSTATES }
 };
@@ -161,7 +168,7 @@ startElement(void *userData, const char *name, const char **atts)
   Pool *pool = pd->pool;
   struct stateswitch *sw;
 
-#if 0
+#if 1
       fprintf(stderr, "start: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
@@ -178,7 +185,7 @@ startElement(void *userData, const char *name, const char **atts)
   if (sw->from != pd->state)
     {
 #if 1
-      fprintf(stderr, "into unknown: [%d]%s (from: %d)\n", sw->to, name, sw->from);
+      fprintf(stderr, "into unknown: [%d]%s (from: %d, state %d)\n", sw->to, name, sw->from, pd->state);
       exit( 1 );
 #endif
       return;
@@ -241,7 +248,7 @@ endElement(void *userData, const char *name)
 {
   struct parsedata *pd = userData;
 
-#if 0
+#if 1
       fprintf(stderr, "end: %s\n", name);
 #endif
   if (pd->depth != pd->statedepth)
