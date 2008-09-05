@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Sep  5 18:59:35 CEST 2008 - kkaempf@suse.de
+
+- adapt /etc/product.d parser to generated .prod files. 
+
+-------------------------------------------------------------------
 Fri Sep  5 13:29:47 CEST 2008 - ma@suse.de
 
 - tools/repo_susetags.c: Parse packages vendor (bnc #422493).
