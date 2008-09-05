@@ -502,7 +502,7 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;
   pd.pool = repo->pool;
-  pd.data = repo_add_repodata(pd.repo, 0);
+  pd.data = repodata;
 
   pd.content = malloc(256);
   pd.acontent = 256;
@@ -523,9 +523,6 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
     {
       parse_dir(dir, fullpath, &pd, repodata, code11);
     }
-  
-  if (pd.data)
-    repodata_internalize(pd.data);
 
   free(pd.content);
   join_freemem();
