@@ -430,8 +430,8 @@ static void
 parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, int code11)
 {
   struct dirent *entry;
-  char *suffix = code11 ? ".xml" : "-release";
-  int slen = code11 ? 4 : 8;  /* strlen(".xml") : strlen("-release") */
+  char *suffix = code11 ? ".prod" : "-release";
+  int slen = code11 ? 5 : 8;  /* strlen(".prod") : strlen("-release") */
   struct stat st;
   
   /* check for <productsdir>/baseproduct on code11 and remember its target inode */
