@@ -51,8 +51,10 @@ enum state {
   STATE_URLS,            // 11
   STATE_URL,             // 12
   STATE_UPDATEREPOKEY,   // 13
+#if 0 /* not needed */
   STATE_BUILDCONFIG,     // 14
   STATE_INSTALLCONFIG,   // 15
+#endif
   STATE_RUNTIMECONFIG,   // 16
   STATE_LINGUAS,         // 17
   STATE_LANG,            // 18
@@ -79,8 +81,10 @@ static struct stateswitch stateswitches[] = {
   { STATE_GENERAL,   "distribution",  STATE_DISTRIBUTION,  0 },
   { STATE_GENERAL,   "urls",          STATE_URLS,          0 },
   { STATE_GENERAL,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
+#if 0 /* not needed */
   { STATE_GENERAL,   "installconfig", STATE_INSTALLCONFIG, 0 },
   { STATE_GENERAL,   "buildconfig",   STATE_BUILDCONFIG,   0 },
+#endif
   { STATE_GENERAL,   "linguas",       STATE_LINGUAS,       0 },
   { STATE_GENERAL,   "update_repo_key", STATE_UPDATEREPOKEY,   0 },
   { STATE_URLS,      "url",           STATE_URL,           0 },
@@ -184,7 +188,7 @@ startElement(void *userData, const char *name, const char **atts)
   
   if (sw->from != pd->state)
     {
-#if 1
+#if 0
       fprintf(stderr, "into unknown: [%d]%s (from: %d, state %d)\n", sw->to, name, sw->from, pd->state);
       exit( 1 );
 #endif
@@ -254,7 +258,7 @@ endElement(void *userData, const char *name)
   if (pd->depth != pd->statedepth)
     {
       pd->depth--;
-#if 1
+#if 0
       fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
 #endif
       return;
