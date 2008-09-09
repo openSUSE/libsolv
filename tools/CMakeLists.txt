@@ -16,6 +16,8 @@ SET(rpmdb2solv_REPOS
   common_write.c
 )
 
+SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g" )
+
 ADD_EXECUTABLE( rpmdb2solv ${rpmdb2solv_REPOS} )
 TARGET_LINK_LIBRARIES( rpmdb2solv satsolver ${RPMDB_LIBRARY} ${EXPAT_LIBRARY})
 
