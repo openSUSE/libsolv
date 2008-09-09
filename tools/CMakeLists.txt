@@ -6,8 +6,6 @@ ENABLE_TESTING()
 
 ADD_SUBDIRECTORY(tests)
 
-set ( CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} -Werror -Wall" )
-
 SET(rpmdb2solv_REPOS
   rpmdb2solv.c
   repo_rpmdb.h
@@ -63,12 +61,12 @@ ADD_EXECUTABLE( mergesolv ${mergesolv_REPOS} )
 TARGET_LINK_LIBRARIES( mergesolv satsolver)
 
 install(TARGETS
-                mergesolv 
-                dumpsolv 
-                patchxml2solv 
+                mergesolv
+                dumpsolv
+                patchxml2solv
                 susetags2solv
-                helix2solv 
-                rpmmd2solv 
+                helix2solv
+                rpmmd2solv
                 rpmdb2solv
                 rpms2solv
                 updateinfoxml2solv

@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Sep  9 17:52:30 CEST 2008 - ma@suse.de
+
+- Reenable -Werror and fix bindings.
+- 0.10.8
+
+-------------------------------------------------------------------
 Tue Sep  9 11:50:39 CEST 2008 - dmacvicar@suse.de
 
 - disable -Werror for swig generated stuff 

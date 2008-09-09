@@ -8,8 +8,8 @@ cmake_minimum_required(VERSION 2.4)
 if(COMMAND cmake_policy)
   # escape preprocessor, see -DVERSION below
   cmake_policy(SET CMP0005 OLD)
-endif(COMMAND cmake_policy)	      
-  
+endif(COMMAND cmake_policy)
+
 
 # Library
 IF ( DEFINED LIB )
@@ -113,6 +113,7 @@ FIND_PROGRAM(SWIG_EXECUTABLE
   PATHS ${SWIG_DIR} ${SWIG_DIR}/.. ${SWIG_DIR}/../../bin /usr/bin /usr/local/bin ${CMAKE_INSTALL_PREFIX}/bin
 )
 
+set ( CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} -Werror -Wall" )
 set ( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -g -O3" )
 set ( CMAKE_C_FLAGS_DEBUG     "${CMAKE_C_FLAGS} -g3 -O0" )
 
