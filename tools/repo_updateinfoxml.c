@@ -588,6 +588,19 @@ endElement(void *userData, const char *name)
 	}
       }
       break;
+      /* <relogin_suggested>True</relogin_suggested> */
+      case STATE_RELOGIN:
+      {
+	if (pd->content
+	    && (pd->content[0] == 'T'
+		|| pd->content[0] == 't' || pd->content[0] == '1'))
+	{
+	  /* FIXME: this is per-package, the global flag should be computed at runtime */
+	  repodata_set_void(pd->data, pd->datanum, UPDATE_RELOGIN);
+	  package_flags = 2;
+	}
+      }
+      break;
       default:
       break;
     }
