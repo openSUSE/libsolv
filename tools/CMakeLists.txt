@@ -6,6 +6,8 @@ ENABLE_TESTING()
 
 ADD_SUBDIRECTORY(tests)
 
+set ( CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} -Werror -Wall" )
+
 SET(rpmdb2solv_REPOS
   rpmdb2solv.c
   repo_rpmdb.h
