@@ -39,25 +39,27 @@ static ino_t currentproduct = 0;
 enum state {
   STATE_START,           // 0
   STATE_PRODUCT,         // 1
-  STATE_GENERAL,         // 2
-  STATE_VENDOR,          // 3
-  STATE_NAME,            // 4
-  STATE_VERSION,         // 5
-  STATE_RELEASE,         // 6
+  STATE_VENDOR,          // 2
+  STATE_NAME,            // 3
+  STATE_VERSION,         // 4
+  STATE_RELEASE,         // 5
+  STATE_ARCH,            // 6
   STATE_SUMMARY,         // 7
   STATE_DESCRIPTION,     // 8
-  STATE_DISTRIBUTION,    // 9
-  STATE_FLAVOR,          // 10
-  STATE_URLS,            // 11
-  STATE_URL,             // 12
-  STATE_UPDATEREPOKEY,   // 13
+  STATE_UPDATEREPOKEY,   // 9
+  STATE_URLS,            // 10
+  STATE_URL,             // 11
 #if 0 /* not needed */
-  STATE_BUILDCONFIG,     // 14
-  STATE_INSTALLCONFIG,   // 15
+  STATE_BUILDCONFIG,     // 12
+  STATE_INSTALLCONFIG,   // 13
 #endif
-  STATE_RUNTIMECONFIG,   // 16
-  STATE_LINGUAS,         // 17
-  STATE_LANG,            // 18
+  STATE_RUNTIMECONFIG,   // 14
+  STATE_LINGUAS,         // 15
+  STATE_LANG,            // 16
+  STATE_REGISTER,        // 17
+  STATE_TARGET,          // 18
+  STATE_FLAVOR,          // 19
+  STATE_REGRELEASE,      // 20
   NUMSTATES              // 0
 };
 
@@ -71,25 +73,28 @@ struct stateswitch {
 /* !! must be sorted by first column !! */
 static struct stateswitch stateswitches[] = {
   { STATE_START,     "product",       STATE_PRODUCT,       0 },
-  { STATE_PRODUCT,   "general",       STATE_GENERAL,       0 },
-  { STATE_GENERAL,   "vendor",        STATE_VENDOR,        1 },
-  { STATE_GENERAL,   "name",          STATE_NAME,          1 },
-  { STATE_GENERAL,   "version",       STATE_VERSION,       1 },
-  { STATE_GENERAL,   "release",       STATE_RELEASE,       1 },
-  { STATE_GENERAL,   "summary",       STATE_SUMMARY,       1 },
-  { STATE_GENERAL,   "description",   STATE_DESCRIPTION,   1 },
-  { STATE_GENERAL,   "distribution",  STATE_DISTRIBUTION,  0 },
-  { STATE_GENERAL,   "urls",          STATE_URLS,          0 },
-  { STATE_GENERAL,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
+  { STATE_PRODUCT,   "vendor",        STATE_VENDOR,        1 },
+  { STATE_PRODUCT,   "name",          STATE_NAME,          1 },
+  { STATE_PRODUCT,   "version",       STATE_VERSION,       1 },
+  { STATE_PRODUCT,   "release",       STATE_RELEASE,       1 },
+  { STATE_PRODUCT,   "arch",          STATE_ARCH,          1 },
+  { STATE_PRODUCT,   "summary",       STATE_SUMMARY,       1 },
+  { STATE_PRODUCT,   "description",   STATE_DESCRIPTION,   1 },
+  { STATE_PRODUCT,   "register",      STATE_REGISTER,      0 },
+  { STATE_PRODUCT,   "urls",          STATE_URLS,          0 },
+  { STATE_PRODUCT,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
 #if 0 /* not needed */
-  { STATE_GENERAL,   "installconfig", STATE_INSTALLCONFIG, 0 },
-  { STATE_GENERAL,   "buildconfig",   STATE_BUILDCONFIG,   0 },
+  { STATE_PRODUCT,   "installconfig", STATE_INSTALLCONFIG, 0 },
+  { STATE_PRODUCT,   "buildconfig",   STATE_BUILDCONFIG,   0 },
 #endif
-  { STATE_GENERAL,   "linguas",       STATE_LINGUAS,       0 },
-  { STATE_GENERAL,   "update_repo_key", STATE_UPDATEREPOKEY,   0 },
+  { STATE_PRODUCT,   "linguas",       STATE_LINGUAS,       0 },
+  { STATE_PRODUCT,   "updaterepokey", STATE_UPDATEREPOKEY, 1 },
   { STATE_URLS,      "url",           STATE_URL,           0 },
 /*  { STATE_BUILDCONFIG,"linguas",      STATE_LINGUAS,       0 }, */
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
+  { STATE_REGISTER,  "flavor",        STATE_FLAVOR,        1 },
+  { STATE_REGISTER,  "target",        STATE_TARGET,        1 },
+  { STATE_REGISTER,  "release",       STATE_REGRELEASE,    1 },
   { NUMSTATES }
 };
 
@@ -202,9 +207,8 @@ startElement(void *userData, const char *name, const char **atts)
 
   switch(pd->state)
     {
-      case STATE_START:
-          break;
     case STATE_PRODUCT:
+      /* FIXME: parse 'schemeversion' and store in global variable */
       if (!pd->s)
 	{
 	  
@@ -221,26 +225,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_DESCRIPTION:
       pd->tmplang = find_attr("lang", atts, 1);
       break;
-    case STATE_DISTRIBUTION:
-	{
-	  const char *str;
-	  if ((str = find_attr("flavor", atts, 0)))
-	    repo_set_str(pd->repo, pd->s - pool->solvables, PRODUCT_FLAVOR, str);
-	  if ((str = find_attr("target", atts, 0)))
-	    {
-	      if (currentproduct == baseproduct
-		  && pd->attribute
-		  && !strcmp(pd->attribute, "distribution.target"))
-		printf("%s\n", str);
-	      else
-	        repo_set_str(pd->repo, pd->s - pool->solvables, SOLVABLE_DISTRIBUTION, str);
-	    }
-	}
-      break;
-    case STATE_URLS:
-    case STATE_URL:
-    case STATE_RUNTIMECONFIG:
-      default:
+    default:
       break;
     }
   return;
@@ -281,6 +266,14 @@ endElement(void *userData, const char *name)
     case STATE_RELEASE:
       pd->tmprel = strdup(pd->content);
       break;
+    case STATE_ARCH:
+      pd->s->arch = str2id(pd->pool, pd->content, 1);
+      break;
+    case STATE_UPDATEREPOKEY:
+      /* FIXME: Define PRODUCT_UPDATEREPOKEY in src/knownids.h
+      repodata_set_str(pd->data, pd->handle, langtag(pd, PRODUCT_UPDATEREPOKEY, pd->tmplang), pd->content);
+       */
+      break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
       if (pd->tmplang) 
@@ -297,12 +290,30 @@ endElement(void *userData, const char *name)
 	pd->tmplang = 0;
       }
       break;
-    case STATE_DISTRIBUTION:
-      break;
-    case STATE_URL:
-      break;
-    case STATE_RUNTIMECONFIG:
-      break;
+    case STATE_TARGET:
+      if (currentproduct == baseproduct
+	  && pd->attribute
+	  && !strcmp(pd->attribute, "register.target"))
+	{
+	  printf("%s\n", pd->content);
+	}
+    break;      
+    case STATE_FLAVOR:
+      if (currentproduct == baseproduct
+	  && pd->attribute
+	  && !strcmp(pd->attribute, "register.flavor"))
+	{
+	  printf("%s\n", pd->content);
+	}
+    break;      
+    case STATE_REGRELEASE:
+      if (currentproduct == baseproduct
+	  && pd->attribute
+	  && !strcmp(pd->attribute, "register.release"))
+	{
+	  printf("%s\n", pd->content);
+	}
+    break;      
     default:
       break;
     }
@@ -360,7 +371,9 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
   int i, l;
   struct stateswitch *sw;
   struct stat st;
-
+  
+  pd->s = NULL; /* enforce new solvable when coming here again */
+  
   if (!fstat(fileno(fp), &st))
     currentproduct = st.st_ino;
   else 
@@ -432,6 +445,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 	  s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 	}
     } /* if pd->s */
+
   return;
 }
 
