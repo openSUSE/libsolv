@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Sep  9 11:50:39 CEST 2008 - dmacvicar@suse.de
+
+- disable -Werror for swig generated stuff 
+
+-------------------------------------------------------------------
 Fri Sep  5 18:59:35 CEST 2008 - kkaempf@suse.de
 
 - adapt /etc/product.d parser to generated .prod files. 
