@@ -12,7 +12,7 @@ SET(libsatsolver_HEADERS
     repo.h repodata.h repo_solv.h repo_helix.h util.h
     strpool.h dirpool.h knownid.h)
 
-SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -g" )
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
 INSTALL(FILES ${libsatsolver_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/satsolver")
 INSTALL(TARGETS satsolver LIBRARY DESTINATION ${LIB_INSTALL_DIR} ARCHIVE DESTINATION ${LIB_INSTALL_DIR})
