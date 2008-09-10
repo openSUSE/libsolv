@@ -179,7 +179,7 @@ startElement(void *userData, const char *name, const char **atts)
   Pool *pool = pd->pool;
   struct stateswitch *sw;
 
-#if 1
+#if 0
       fprintf(stderr, "start: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
