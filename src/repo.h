@@ -57,6 +57,8 @@ typedef struct _Repo {
 extern Repo *repo_create(Pool *pool, const char *name);
 extern void repo_free(Repo *repo, int reuseids);
 extern void repo_freeallrepos(Pool *pool, int reuseids);
+extern void *repo_sidedata_create(Repo *repo, size_t size);
+extern void *repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count);
 
 extern Offset repo_addid(Repo *repo, Offset olddeps, Id id);
 extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker);
@@ -80,6 +82,8 @@ static inline Id repo_add_solvable(Repo *repo)
     }
   else
     {
+      if (repo->rpmdbid)
+	repo->rpmdbid = repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, 1);
       if (p < repo->start)
 	repo->start = p;
       if (p + 1 > repo->end)
@@ -105,6 +109,8 @@ static inline Id repo_add_solvable_block(Repo *repo, int count)
     }
   else
     {
+      if (repo->rpmdbid)
+	repo->rpmdbid = repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, count);
       if (p < repo->start)
 	repo->start = p;
       if (p + count > repo->end)

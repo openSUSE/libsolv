@@ -608,10 +608,8 @@ int
 solvable_identical(Pool *pool, Solvable *s1, Solvable *s2)
 {
   unsigned int bt1, bt2;
-#if 0
   Id rq1, rq2;
   Id *reqp;
-#endif
 
   if (s1->name != s2->name)
     return 0;
@@ -622,27 +620,27 @@ solvable_identical(Pool *pool, Solvable *s1, Solvable *s2)
   if (s1->vendor != s2->vendor)
     return 0;
 
-  /* disabled for now because some testcases have requires where the
-     duplicates are removed */
-#if 0
-  /* first tests passed, try requires */
-  rq1 = rq2 = 0;
-  if (s1->requires)
-    for (reqp = s1->repo->idarraydata + s1->requires; *reqp; reqp++)
-      rq1 ^= *reqp++;
-  if (s2->requires)
-    for (reqp = s2->repo->idarraydata + s2->requires; *reqp; reqp++)
-      rq2 ^= *reqp++;
-  if (rq1 != rq2)
-     return 0;
-#endif
-
   /* looking good, try some fancier stuff */
+  /* might also look up the package checksum here */
   bt1 = solvable_lookup_num(s1, SOLVABLE_BUILDTIME, 0);
   bt2 = solvable_lookup_num(s2, SOLVABLE_BUILDTIME, 0);
-  if (bt1 && bt2 && bt1 != bt2)
-    return 0;
-
-  /* might also look up the package checksum here */
+  if (bt1 && bt2)
+    {
+      if (bt1 != bt2)
+        return 0;
+    }
+  else
+    {
+      /* look at requires in a last attempt to find recompiled packages */
+      rq1 = rq2 = 0;
+      if (s1->requires)
+	for (reqp = s1->repo->idarraydata + s1->requires; *reqp; reqp++)
+	  rq1 ^= *reqp++;
+      if (s2->requires)
+	for (reqp = s2->repo->idarraydata + s2->requires; *reqp; reqp++)
+	  rq2 ^= *reqp++;
+      if (rq1 != rq2)
+	 return 0;
+    }
   return 1;
 }

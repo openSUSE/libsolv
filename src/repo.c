@@ -315,6 +315,36 @@ repo_freeallrepos(Pool *pool, int reuseids)
   pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
 }
 
+
+#define REPO_SIDEDATA_BLOCK 63
+
+void *
+repo_sidedata_create(Repo *repo, size_t size)
+{
+  return sat_calloc_block(repo->end - repo->start, size, REPO_SIDEDATA_BLOCK);
+}
+
+void *
+repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count)
+{ 
+  int n = repo->end - repo->start;
+  if (p < repo->start)
+    { 
+      int d = repo->start - p;
+      b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
+      memmove(b + d * size, b, n * size);
+      memset(b, 0, d * size);
+      n += d;
+    }     
+  if (p + count > repo->end)
+    { 
+      int d = p + count - repo->end;
+      b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
+      memset(b + n * size, 0, d * size);
+    }     
+  return b;
+}
+
 Offset
 repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset freshens)
 {

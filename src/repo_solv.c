@@ -1402,7 +1402,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	      if (id == RPM_RPMDBID)
 		{
 		  if (!repo->rpmdbid)
-		    repo->rpmdbid = sat_calloc(numsolv, sizeof(Id));
+		    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 		  repo->rpmdbid[i] = h;
 		}
 	      else if (keys[key].storage == KEY_STORAGE_INCORE)

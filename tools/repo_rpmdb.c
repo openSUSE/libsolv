@@ -1202,7 +1202,6 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
   Solvable *s;
   Id id, *refhash;
   unsigned int refmask, h;
-  int asolv;
   char dbpath[PATH_MAX];
   DB_ENV *dbenv = 0;
   DBT dbkey;
@@ -1213,9 +1212,6 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
 
-  if (repo->start != repo->end)
-    abort();		/* FIXME: rpmdbid */
-  
   if (!rootdir)
     rootdir = "";
 
@@ -1273,8 +1269,6 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	  exit(1);
 	}
       dbidp = (unsigned char *)&dbid;
-      repo->rpmdbid = sat_calloc(256, sizeof(Id));
-      asolv = 256;
       rpmheadsize = 0;
       rpmhead = 0;
       i = 0;
@@ -1283,12 +1277,8 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	{
 	  if (!s)
 	    s = pool_id2solvable(pool, repo_add_solvable(repo));
-	  if (i >= asolv)
-	    {
-	      repo->rpmdbid = sat_realloc(repo->rpmdbid, (asolv + 256) * sizeof(Id));
-	      memset(repo->rpmdbid + asolv, 0, 256 * sizeof(unsigned int));
-	      asolv += 256;
-	    }
+	  if (!repo->rpmdbid)
+	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
           if (dbkey.size != 4)
 	    {
 	      fprintf(stderr, "corrupt Packages database (key size)\n");
@@ -1323,7 +1313,7 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	    }
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-	  repo->rpmdbid[i] = dbid;
+	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
 	  if (rpm2solv(pool, repo, repodata, s, rpmhead))
 	    {
 	      i++;
@@ -1432,21 +1422,24 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
       /* create hash from dbid to ref */
       refmask = mkmask(ref->nsolvables);
       refhash = sat_calloc(refmask + 1, sizeof(Id));
-      for (i = 0; i < ref->nsolvables; i++)
+      for (i = 0; i < ref->end - ref->start; i++)
 	{
+	  if (!ref->rpmdbid[i])
+	    continue;
 	  h = ref->rpmdbid[i] & refmask;
 	  while (refhash[h])
 	    h = (h + 317) & refmask;
 	  refhash[h] = i + 1;	/* make it non-zero */
 	}
 
-      repo->rpmdbid = sat_calloc(nrpmids, sizeof(unsigned int));
       s = pool_id2solvable(pool, repo_add_solvable_block(repo, nrpmids));
+      if (!repo->rpmdbid)
+        repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 
       for (i = 0; i < nrpmids; i++, rp++, s++)
 	{
 	  dbid = rp->dbid;
-	  repo->rpmdbid[i] = dbid;
+	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
 	  if (refhash)
 	    {
 	      h = dbid & refmask;
@@ -1459,8 +1452,11 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	      if (id)
 		{
 		  Solvable *r = ref->pool->solvables + ref->start + (id - 1);
-		  solvable_copy(s, r, repodata, dircache);
-		  continue;
+		  if (r->repo == ref)
+		    {
+		      solvable_copy(s, r, repodata, dircache);
+		      continue;
+		    }
 		}
 	    }
 	  if (!db)
