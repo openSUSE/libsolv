@@ -445,7 +445,7 @@ repo_add_content(Repo *repo, FILE *fp)
   for ( i=0; i < numotherarchs; ++i )
     {
       Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
-      /*repodata_extend(data, p - pool->solvables);*/
+      repodata_extend(data, p - pool->solvables);
       /*handle = repodata_get_handle(data, p - pool->solvables - repo->start);*/
       p->name = s->name;
       p->evr = s->evr;
