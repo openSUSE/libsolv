@@ -201,7 +201,10 @@ Id repodata_create_struct(Repodata *data, Id handle, Id keyname);
  * data management
  */
 
-/* merge attributes */
+/* 
+ merge attributes fro one solvable to another
+ works only if the data is not yet internalized
+*/
 void repodata_merge_attrs (Repodata *data, Id dest, Id src);
 
 /* */

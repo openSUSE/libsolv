@@ -221,6 +221,19 @@ repo_add_content(Repo *repo, FILE *fp)
   Id handle = 0;
   int contentstyle = 0;
 
+  int i = 0;
+
+  /* architectures
+     we use the first architecture in BASEARCHS or noarch
+     for the product. At the end we create (clone) the product
+     for each one of the remaining architectures
+     we allow max 4 archs 
+  */
+  unsigned int numotherarchs = 0;
+  Id otherarchs[4];
+  for ( ; i < 4; ++i )
+    otherarchs[i] = 0;
+
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
   aline = 1024;
@@ -290,7 +303,7 @@ repo_add_content(Repo *repo, FILE *fp)
 		    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 		  if (s && code10)
 		    s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
-		  /* Only support one product.  */
+		  /* first product.  */
 		  s = pool_id2solvable(pool, repo_add_solvable(repo));
 		  repodata_extend(data, s - pool->solvables);
 		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
@@ -337,6 +350,34 @@ repo_add_content(Repo *repo, FILE *fp)
 	    repodata_add_poolstr_array(data, handle, PRODUCT_RELNOTESURL, value);
 	  else if (istag ("VENDOR"))
 	    s->vendor = str2id(pool, value, 1);
+          else if (istag ("BASEARCHS"))
+            {
+              char *sp[2];
+
+              /* get the first architecture and use it
+                   for the product arch */
+              int words = split(value, sp, 2);
+              if ( words > 0 )
+              {
+                /* there is at least one architecture */
+                s->arch = str2id(pool, sp[0], 1);
+                /* ignore the rest for now */
+                value = sp[1];
+
+                while ( value && (numotherarchs < 5) )
+                  {
+                    words = split(value, sp, 2);
+                    if (!words)
+                      break;
+                    /* we have a new extra architecture */
+                    numotherarchs++;
+                    otherarchs[numotherarchs - 1 ] = str2id(pool, sp[0], 1); 
+                    if (words == 1)
+                      break;
+                    value = sp[1];
+                  }
+              }
+            }
 
 	  /*
 	   * Every tag below is Code10 only
@@ -399,6 +440,28 @@ repo_add_content(Repo *repo, FILE *fp)
       if (code10)
 	s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
     }
+  
+  /* now for every other arch, clone the product except the architecture */
+  for ( i=0; i < numotherarchs; ++i )
+    {
+      Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
+      /*repodata_extend(data, p - pool->solvables);*/
+      /*handle = repodata_get_handle(data, p - pool->solvables - repo->start);*/
+      p->name = s->name;
+      p->evr = s->evr;
+      p->vendor = s->vendor;
+      p->arch = otherarchs[i];
+
+      /* self provides */
+      if (p->arch != ARCH_SRC && p->arch != ARCH_NOSRC)
+          p->provides = repo_addid_dep(repo, p->provides, rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
+
+      /* now merge the attributes */
+      repodata_merge_attrs(data, p - pool->solvables - repo->start, s - pool->solvables- repo->start);
+    }
+  
+  if (data)
+    repodata_internalize(data);
 
   if (pd.tmp)
     sat_free(pd.tmp);
