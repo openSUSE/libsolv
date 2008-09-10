@@ -1,11 +1,11 @@
 /*
  * repo_content.c
- * 
+ *
  * Parses 'content' file into .solv
  * See http://en.opensuse.org/Standards/YaST2_Repository_Metadata/content for a description
  * of the syntax
- * 
- * 
+ *
+ *
  * Copyright (c) 2007, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
@@ -220,7 +220,7 @@ repo_add_content(Repo *repo, FILE *fp)
   Repodata *data;
   Id handle = 0;
   int contentstyle = 0;
-  
+
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
   aline = 1024;
@@ -254,7 +254,7 @@ repo_add_content(Repo *repo, FILE *fp)
         continue;
       *--linep = 0;
       linep = line;
-      
+
       /* expect "key value" lines */
       if (split (line, fields, 2) == 2)
         {
@@ -267,8 +267,8 @@ repo_add_content(Repo *repo, FILE *fp)
 #define istag(x) (!strcmp (key, x))
 #define code10 (contentstyle == 10)
 #define code11 (contentstyle == 11)
-	  
-	  if (contentstyle == 0) 
+
+	  if (contentstyle == 0)
 	    {
 	      if (istag ("CONTENTSTYLE"))
 		{
@@ -337,14 +337,12 @@ repo_add_content(Repo *repo, FILE *fp)
 	    repodata_add_poolstr_array(data, handle, PRODUCT_RELNOTESURL, value);
 	  else if (istag ("VENDOR"))
 	    s->vendor = str2id(pool, value, 1);
-          else if (istag ("PATTERNS"))
-	    { /* ignore this tag, but accept it */ }
 
 	  /*
 	   * Every tag below is Code10 only
-	   * 
+	   *
 	   */
-	  
+
 	  else if (code10 && istag ("DISTPRODUCT"))
 	    /* DISTPRODUCT is for registration and Yast, not for the solver. */
 	    repo_set_str(repo, s - pool->solvables, PRODUCT_DISTPRODUCT, value);
@@ -401,7 +399,7 @@ repo_add_content(Repo *repo, FILE *fp)
       if (code10)
 	s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
     }
-  
+
   if (pd.tmp)
     sat_free(pd.tmp);
   sat_free(line);

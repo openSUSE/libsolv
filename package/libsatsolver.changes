@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Sep 10 14:19:26 CEST 2008 - ma@suse.de
+
+- repo_products: Parse schemeversion, propagate product 
+  updaterepokey and flavor. Fix segfault on malformed 
+  xml.
+- 0.10.10
+
+-------------------------------------------------------------------
 Wed Sep 10 11:57:27 CEST 2008 - dmacvicar@suse.de
 
 - accept the PATTERNS tag in content file 
