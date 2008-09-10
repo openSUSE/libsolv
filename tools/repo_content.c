@@ -337,7 +337,9 @@ repo_add_content(Repo *repo, FILE *fp)
 	    repodata_add_poolstr_array(data, handle, PRODUCT_RELNOTESURL, value);
 	  else if (istag ("VENDOR"))
 	    s->vendor = str2id(pool, value, 1);
-	  
+          else if (istag ("PATTERNS"))
+	    { /* ignore this tag, but accept it */ }
+
 	  /*
 	   * Every tag below is Code10 only
 	   * 
