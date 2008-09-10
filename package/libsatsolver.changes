@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Wed Sep 10 18:11:10 CEST 2008 - dmacvicar@suse.de
+
+- create one product per BASEARCHS 
+
+-------------------------------------------------------------------
 Wed Sep 10 14:19:26 CEST 2008 - ma@suse.de
 
 - repo_products: Parse schemeversion, propagate product 
