@@ -167,6 +167,8 @@ KNOWNID(REPOSITORY_TIMESTAMP,           "repository:timestamp"),
 /* hint when the metadata could be outdated
    w/respect to generated timestamp */
 KNOWNID(REPOSITORY_EXPIRE,              "repository:expire"),
+/* which things does this repo provides updates for, if it does */
+KNOWNID(REPOSITORY_UPDATES,              "repository:updates"),
 
 KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
 KNOWNID(DELTA_PACKAGE_EVR,              "delta:pkgevr"),

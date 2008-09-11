@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Thu Sep 11 14:30:16 CEST 2008 - dmacvicar@suse.de
+
+- add REPOSITORY_UPDATES to match product -> repos
+- make updateinfo.xml support id attribute in collection that
+  leads to insert that the repository updates that id.
+  - 0.10.11
+  
+-------------------------------------------------------------------
 Wed Sep 10 18:11:10 CEST 2008 - dmacvicar@suse.de
 
 - create one product per BASEARCHS 
