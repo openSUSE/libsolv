@@ -306,25 +306,9 @@ endElement(void *userData, const char *name)
     case STATE_URL:
       if (pd->tmpurltype)
         {
-          Id type = 0;
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
 
-          if ( pd->tmpurltype[0] == 's' )
-            type = PRODUCT_URL_TYPE_SMOLT;
-          else if ( pd->tmpurltype[0] == 'u' )
-            type = PRODUCT_URL_TYPE_UPDATE;
-          else if ( pd->tmpurltype[0] == 'o' )
-            type = PRODUCT_URL_TYPE_OPTIONAL;
-          else if ( pd->tmpurltype[0] == 'r' )
-            {
-              type = PRODUCT_URL_TYPE_REGISTER;
-              if ( pd->tmpurltype[2] &&  pd->tmpurltype[2] == 'l' )
-                type = PRODUCT_URL_TYPE_RELNOTES;
-            }
-          else
-            type = PRODUCT_URL_TYPE_EXTRA;
-          
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, type);
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pd->pool, pd->tmpurltype, 1));
         }
       break;
     case STATE_TARGET:

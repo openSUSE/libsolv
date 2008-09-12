@@ -1014,21 +1014,21 @@ endElement(void *userData, const char *name)
       if (pd->content[0])
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, PRODUCT_URL_TYPE_RELNOTES);
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pool, "releasenotes", 1));
         }
       break;
     case STATE_UPDATEURL:
       if (pd->content[0])
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, PRODUCT_URL_TYPE_UPDATE);
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pool, "update", 1));
         }
       break;
     case STATE_OPTIONALURL:
       if (pd->content[0])
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, PRODUCT_URL_TYPE_OPTIONAL);
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pool, "optional", 1));
         }
       break;
     case STATE_FLAG:

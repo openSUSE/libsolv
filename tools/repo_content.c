@@ -355,13 +355,13 @@ repo_add_content(Repo *repo, FILE *fp)
 	  else if (istag ("DATADIR"))
 	    repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, value);
 	  else if (istag ("UPDATEURLS"))
-	    add_multiple_urls(data, handle, value, PRODUCT_URL_TYPE_UPDATE);
+	    add_multiple_urls(data, handle, value, str2id(pool, "update", 1));
 	  else if (istag ("EXTRAURLS"))
-	    add_multiple_urls(data, handle, value, PRODUCT_URL_TYPE_EXTRA);
+	    add_multiple_urls(data, handle, value, str2id(pool, "extra", 1));
 	  else if (istag ("OPTIONALURLS"))
-	    add_multiple_urls(data, handle, value, PRODUCT_URL_TYPE_OPTIONAL);
+	    add_multiple_urls(data, handle, value, str2id(pool, "optional", 1));
 	  else if (istag ("RELNOTESURL"))
-	    add_multiple_urls(data, handle, value, PRODUCT_URL_TYPE_RELNOTES);
+	    add_multiple_urls(data, handle, value, str2id(pool, "releasenotes", 1));
 	  else if (istag ("SHORTLABEL"))
 	    repo_set_str(repo, s - pool->solvables, PRODUCT_SHORTLABEL, value);
 	  else if (istag ("LABEL")) /* LABEL is the products SUMMARY. */
