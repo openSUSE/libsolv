@@ -316,7 +316,11 @@ endElement(void *userData, const char *name)
           else if ( pd->tmpurltype[0] == 'o' )
             type = PRODUCT_URL_TYPE_OPTIONAL;
           else if ( pd->tmpurltype[0] == 'r' )
-            type = PRODUCT_URL_TYPE_RELNOTES;
+            {
+              type = PRODUCT_URL_TYPE_REGISTER;
+              if ( pd->tmpurltype[2] &&  pd->tmpurltype[2] == 'l' )
+                type = PRODUCT_URL_TYPE_RELNOTES;
+            }
           else
             type = PRODUCT_URL_TYPE_EXTRA;
           
