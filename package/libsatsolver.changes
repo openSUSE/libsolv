@@ -1,10 +1,16 @@
 -------------------------------------------------------------------
+Fri Sep 12 14:01:11 CEST 2008 - dmacvicar@suse.de
+
+- add repo_add_poolstr_array
+- move updates="key,key.." to repomd.xml
+- 0.10.11
+
+-------------------------------------------------------------------
 Thu Sep 11 14:30:16 CEST 2008 - dmacvicar@suse.de
 
 - add REPOSITORY_UPDATES to match product -> repos
 - make updateinfo.xml support id attribute in collection that
   leads to insert that the repository updates that id.
-- 0.10.11
   
 -------------------------------------------------------------------
 Wed Sep 10 18:11:10 CEST 2008 - dmacvicar@suse.de
