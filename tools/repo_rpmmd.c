@@ -159,7 +159,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "install-only",    STATE_INSTALLONLY,  1 },
   { STATE_SOLVABLE,    "time",            STATE_TIME,         0 },
 
-  /* extended Novell/SUSE attributes (suseinfo.xml) */
+  /* extended Novell/SUSE attributes (susedata.xml) */
   { STATE_SOLVABLE,    "eula",            STATE_EULA,         1 },
   { STATE_SOLVABLE,    "diskusage",       STATE_DISKUSAGE,    0 },
 

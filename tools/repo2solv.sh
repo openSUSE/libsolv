@@ -47,6 +47,25 @@ if test -d repodata; then
     $cmd $i | rpmmd2solv $parser_options > $primfile || exit 4
   fi
 
+  # This contains a susedata.xml* with extended primary data
+ if test -f susedata.xml || test -f susedata.xml.gz || test -f susedata.xml.bz2 ; then
+     for i in susedata.xml*; do
+         case $i in
+             *.gz) cmd="gzip -dc" ;;
+             *.bz2) cmd="bzip2 -dc" ;;
+             *) cmd="cat" ;;
+         esac
+    # only check the first susedata.xml*, in case there are more
+         break
+     done
+     susedatafile="/nonexist"
+     if test -n "$cmd"; then
+    # we have some susedata.xml*
+         susedatafile=`mktemp` || exit 3
+         $cmd $i | rpmmd2solv $parser_options > $susedatafile || exit 4
+     fi
+  fi
+
   prodfile="/nonexist"
   if test -f product.xml; then
     prodfile=`mktemp` || exit 3
@@ -143,6 +162,9 @@ if test -d repodata; then
   if test -s $repomdfile; then
     m_repomdfile=$repomdfile
   fi
+  if test -s $susedatafile; then
+    m_susedata=$susedatafile
+  fi
   if test -s $primfile; then
     m_primfile=$primfile
   fi
@@ -158,7 +180,7 @@ if test -d repodata; then
   if test -s $deltainfofile; then
     m_deltainfofile=$deltainfofile
   fi
-  mergesolv $m_repomdfile $m_primfile $m_prodfile $m_patchfile $m_updateinfofile $m_deltainfofile
+  mergesolv $m_repomdfile $m_primfile $m_susedatafile $m_prodfile $m_patchfile $m_updateinfofile $m_deltainfofile
   rm -f $repomdfile $primfile $prodfile $patchfile $updateinfofile $deltainfofile
 
 elif test_susetags; then
