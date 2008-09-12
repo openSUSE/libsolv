@@ -115,12 +115,12 @@ struct parsedata {
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
-
   const char *attribute; /* only print this attribute, if currentproduct == baseproduct */
 
   const char *tmplang;
   const char *tmpvers;
   const char *tmprel;
+  const char *tmpurltype;
 
   Solvable *s;
   Id handle;
@@ -237,6 +237,9 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_DESCRIPTION:
       pd->tmplang = find_attr("lang", atts, 1);
       break;
+    case STATE_URL:
+      pd->tmpurltype = find_attr("name", atts, 1);
+      break;
     default:
       break;
     }
@@ -299,6 +302,13 @@ endElement(void *userData, const char *name)
         free( (char *)pd->tmplang );
 	pd->tmplang = 0;
       }
+      break;
+    case STATE_URL:
+      if (pd->tmpurltype)
+        {
+          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
+          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL_TYPE, pd->content);
+        }
       break;
     case STATE_TARGET:
       if (currentproduct == baseproduct
