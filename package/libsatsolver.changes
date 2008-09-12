@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Sep 12 17:32:02 CEST 2008 - dmacvicar@suse.de
+
+- support for susedata.xml 
+
+-------------------------------------------------------------------
 Fri Sep 12 14:01:11 CEST 2008 - dmacvicar@suse.de
 
 - add repo_add_poolstr_array
