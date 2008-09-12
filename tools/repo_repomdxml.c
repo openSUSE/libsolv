@@ -92,6 +92,34 @@ static struct stateswitch stateswitches[] = {
   { NUMSTATES }
 };
 
+/*
+ * split l into m parts, store to sp[]
+ *  split at whitespace
+ */
+
+static inline int
+split_comma(char *l, char **sp, int m)
+{
+  int i;
+  for (i = 0; i < m;)
+    {
+      while (*l == ',')
+	l++;
+      if (!*l)
+	break;
+      sp[i++] = l;
+      if (i == m)
+        break;
+      while (*l && !(*l == ','))
+	l++;
+      if (!*l)
+	break;
+      *l++ = 0;
+    }
+  return i;
+}
+
+
 struct parsedata {
   int depth;
   enum state state;
@@ -113,7 +141,7 @@ struct parsedata {
  * find attribute
  */
 
-static const char *
+static inline const char *
 find_attr(const char *txt, const char **atts)
 {
   for (; *atts; atts += 2)
@@ -123,6 +151,7 @@ find_attr(const char *txt, const char **atts)
     }
   return 0;
 }
+
 
 static void XMLCALL
 startElement(void *userData, const char *name, const char **atts)
@@ -165,15 +194,44 @@ startElement(void *userData, const char *name, const char **atts)
     {
     case STATE_START: break;
     case STATE_REPOMD:
-      expirestr = find_attr("expire", atts);
-      if ( expirestr != NULL )
-        expire = atoi(expirestr);
-      if ( expire > 0 )
-        {
-          /* save the timestamp in the non solvable number 1 */
-          repo_set_num(pd->repo, -1, REPOSITORY_EXPIRE, expire);
+      {
+        const char *updstr;
+        char *value;
+        char *fvalue;
+
+        expirestr = (char*) find_attr("expire", atts);
+        if ( expirestr != NULL )
+          expire = atoi(expirestr);
+        if ( expire > 0 )
+          {
+            /* save the timestamp in the non solvable number 1 */
+            repo_set_num(pd->repo, -1, REPOSITORY_EXPIRE, expire);
+          }
+
+        updstr = find_attr("updates", atts);
+        if ( updstr != NULL )
+          {
+            value = strdup(updstr);
+            fvalue = value; /* save the first */
+            if ( value != NULL )
+              {
+                char *sp[2];
+                while (value)
+                  {
+                    int words = split_comma(value, sp, 2);
+                    if (!words)
+                      break;
+                    if (sp[0])
+                      repo_add_poolstr_array(pd->repo, -1, REPOSITORY_UPDATES, sp[0]);
+                    if (words == 1)
+                      break;
+                    value = sp[1];
+                  }
+                free(fvalue);
+              }
+          }
+          break;
         }
-      break;
     case STATE_DATA: break;
     case STATE_LOCATION: break;
     case STATE_CHECKSUM: break;

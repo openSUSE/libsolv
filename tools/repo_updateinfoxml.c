@@ -135,22 +135,6 @@ struct parsedata {
 static int package_filename_seen = 0;
 static int package_flags = 0; /* same for reboot/restart flags, to be written at </package> */
 
-
-/*
- * find attribute
- */
-
-static const char *
-find_attr(const char *txt, const char **atts)
-{
-  for (; *atts; atts += 2)
-    {
-      if (!strcmp(*atts, txt))
-        return atts[1];
-    }
-  return 0;
-}
-
 /*
  * create evr (as Id) from 'epoch', 'version' and 'release' attributes
  */
@@ -360,15 +344,9 @@ startElement(void *userData, const char *name, const char **atts)
       break;
       case STATE_PKGLIST:
       break;
-      /* <collection short="F8" id="PRODUCT0001444"> */
+      /* <collection short="F8" */
       case STATE_COLLECTION:
-        {
-          /* insert a REPOSITORY_UPDATES for every present collection id */
-          const char *cid;
-          if ((cid = find_attr("id", atts)))
-            repodata_add_poolstr_array(pd->data, -1, REPOSITORY_UPDATES, cid);
-          break;
-        }
+      break;
       /* <name>Fedora 8</name> */ 
       case STATE_NAME:
       break;

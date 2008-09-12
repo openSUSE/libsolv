@@ -1029,6 +1029,17 @@ repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str)
 }
 
 void
+repo_add_poolstr_array(Repo *repo, Id p, Id keyname, const char *str)
+{
+  Repodata *data = repo_findrepodata(repo, p, keyname);
+  if (p < 0)
+    p = p + data->extrastart;
+  else
+    p = p - data->start;
+  repodata_add_poolstr_array(data, repodata_get_handle(data, p), keyname, str);
+}
+
+void
 repo_internalize(Repo *repo)
 {
   int i;
