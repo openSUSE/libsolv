@@ -312,6 +312,7 @@ endElement(void *userData, const char *name)
         }
       break;
     case STATE_TARGET:
+      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_TARGET, pd->content );
       if (currentproduct == baseproduct
 	  && pd->attribute
 	  && !strcmp(pd->attribute, "register.target"))
@@ -329,6 +330,7 @@ endElement(void *userData, const char *name)
 	}
     break;
     case STATE_REGRELEASE:
+      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_RELEASE, pd->content );
       if (currentproduct == baseproduct
 	  && pd->attribute
 	  && !strcmp(pd->attribute, "register.release"))
