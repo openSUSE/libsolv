@@ -1012,15 +1012,24 @@ endElement(void *userData, const char *name)
       break;
     case STATE_RELNOTESURL:
       if (pd->content[0])
-          repodata_set_poolstr(pd->data, handle, PRODUCT_RELNOTESURL, pd->content);
+        {
+          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, PRODUCT_URL_TYPE_RELNOTES);
+        }
       break;
     case STATE_UPDATEURL:
       if (pd->content[0])
-          repodata_set_poolstr(pd->data, handle, PRODUCT_EXTRAURLS, pd->content);
+        {
+          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, PRODUCT_URL_TYPE_UPDATE);
+        }
       break;
     case STATE_OPTIONALURL:
       if (pd->content[0])
-          repodata_set_poolstr(pd->data, handle, PRODUCT_OPTIONALURLS, pd->content);
+        {
+          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, PRODUCT_URL_TYPE_OPTIONAL);
+        }
       break;
     case STATE_FLAG:
       if (pd->content[0])

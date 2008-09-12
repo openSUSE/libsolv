@@ -3,6 +3,7 @@ Fri Sep 12 14:01:11 CEST 2008 - dmacvicar@suse.de
 
 - add repo_add_poolstr_array
 - move updates="key,key.." to repomd.xml
+- make product url ids more extensible
 - 0.10.11
 
 -------------------------------------------------------------------

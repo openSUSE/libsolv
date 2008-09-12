@@ -203,6 +203,28 @@ add_multiple_strings(Repodata *data, Id handle, Id name, char *value)
     }
 }
 
+/*
+ * split value and add to pool
+ */
+
+static void
+add_multiple_urls(Repodata *data, Id handle, char *value, Id type)
+{
+  char *sp[2];
+  while (value)
+    {
+      int words = split(value, sp, 2);
+      if (!words)
+	break;
+      repodata_add_poolstr_array(data, handle, PRODUCT_URL, sp[0]);
+      repodata_add_idarray(data, handle, PRODUCT_URL_TYPE, type);
+      if (words == 1)
+	break;
+      value = sp[1];
+    }
+}
+
+
 
 /*
  * add 'content' to repo
@@ -333,11 +355,13 @@ repo_add_content(Repo *repo, FILE *fp)
 	  else if (istag ("DATADIR"))
 	    repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, value);
 	  else if (istag ("UPDATEURLS"))
-	    add_multiple_strings(data, handle, PRODUCT_UPDATEURLS, value);
+	    add_multiple_urls(data, handle, value, PRODUCT_URL_TYPE_UPDATE);
 	  else if (istag ("EXTRAURLS"))
-	    add_multiple_strings(data, handle, PRODUCT_EXTRAURLS, value);
+	    add_multiple_urls(data, handle, value, PRODUCT_URL_TYPE_EXTRA);
 	  else if (istag ("OPTIONALURLS"))
-	    add_multiple_strings(data, handle, PRODUCT_OPTIONALURLS, value);
+	    add_multiple_urls(data, handle, value, PRODUCT_URL_TYPE_OPTIONAL);
+	  else if (istag ("RELNOTESURL"))
+	    add_multiple_urls(data, handle, value, PRODUCT_URL_TYPE_RELNOTES);
 	  else if (istag ("SHORTLABEL"))
 	    repo_set_str(repo, s - pool->solvables, PRODUCT_SHORTLABEL, value);
 	  else if (istag ("LABEL")) /* LABEL is the products SUMMARY. */
@@ -346,8 +370,6 @@ repo_add_content(Repo *repo, FILE *fp)
 	    repo_set_str(repo, s - pool->solvables, pool_id2langid(pool, SOLVABLE_SUMMARY, key + 6, 1), value);
 	  else if (istag ("FLAGS"))
 	    add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
-	  else if (istag ("RELNOTESURL"))
-	    repodata_add_poolstr_array(data, handle, PRODUCT_RELNOTESURL, value);
 	  else if (istag ("VENDOR"))
 	    s->vendor = str2id(pool, value, 1);
           else if (istag ("BASEARCHS"))
