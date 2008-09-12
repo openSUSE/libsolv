@@ -156,6 +156,8 @@ KNOWNID(PRODUCT_FLAGS,			"product:flags"),
 KNOWNID(PRODUCT_FLAVOR,			"product:flavor"),
 KNOWNID(PRODUCT_REFERENCES,		"product:references"),
 KNOWNID(PRODUCT_UPDATEREPOKEY,		"product:updaterepokey"),
+KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),
+KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),
 
 /* argh */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
