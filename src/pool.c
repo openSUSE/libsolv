@@ -456,7 +456,7 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
  * 
  */
 
-Id *
+Id
 pool_addrelproviders(Pool *pool, Id d)
 {
   Reldep *rd = GETRELDEP(pool, d);
@@ -467,7 +467,7 @@ pool_addrelproviders(Pool *pool, Id d)
   Id evr = rd->evr;
   int flags = rd->flags;
   Id pid, *pidp;
-  Id p, *pp, *pp2, *pp3;
+  Id p, wp, *pp, *pp2, *pp3;
 
   d = GETRELID(d);
   queue_init_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
@@ -475,8 +475,8 @@ pool_addrelproviders(Pool *pool, Id d)
     {
     case REL_AND:
     case REL_WITH:
-      pp = pool_whatprovides(pool, name);
-      pp2 = pool_whatprovides(pool, evr);
+      pp = pool->whatprovidesdata + pool_whatprovides(pool, name);
+      pp2 = pool->whatprovidesdata + pool_whatprovides(pool, evr);
       while ((p = *pp++) != 0)
 	{
 	  for (pp3 = pp2; *pp3;)
@@ -488,19 +488,19 @@ pool_addrelproviders(Pool *pool, Id d)
 	}
       break;
     case REL_OR:
-      pp = pool_whatprovides(pool, name);
+      pp = pool->whatprovidesdata + pool_whatprovides(pool, name);
       while ((p = *pp++) != 0)
 	queue_push(&plist, p);
-      pp = pool_whatprovides(pool, evr);
+      pp = pool->whatprovidesdata + pool_whatprovides(pool, evr);
       while ((p = *pp++) != 0)
 	queue_pushunique(&plist, p);
       break;
     case REL_NAMESPACE:
       if (name == NAMESPACE_OTHERPROVIDERS)
 	{
-	  pp = pool_whatprovides(pool, evr);
-	  pool->whatprovides_rel[d] = pp - pool->whatprovidesdata;
-	  return pp;
+	  wp = pool_whatprovides(pool, evr);
+	  pool->whatprovides_rel[d] = wp;
+	  return wp;
 	}
       if (pool->nscallback)
 	{
@@ -514,7 +514,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	    {
 	      queue_free(&plist);
 	      pool->whatprovides_rel[d] = p;
-	      return pool->whatprovidesdata + p;
+	      return p;
 	    }
 	  if (p == 1)
 	    queue_push(&plist, SYSTEMSOLVABLE);
@@ -537,17 +537,21 @@ pool_addrelproviders(Pool *pool, Id d)
 	    }
 	  break;
 	}
-      pp = pp2 = pool_whatprovides(pool, name);
+      wp = pool_whatprovides(pool, name);
+      pp = pool->whatprovidesdata + wp;
       while ((p = *pp++) != 0)
 	{
 	  Solvable *s = pool->solvables + p;
 	  if (s->arch == evr)
 	    queue_push(&plist, p);
 	  else
-	    pp2 = 0;
+	    wp = 0;
 	}
-      if (pp2)
-	return pp2;
+      if (wp)
+	{
+	  pool->whatprovides_rel[d] = wp;
+	  return wp;
+	}
       break;
     default:
       break;
@@ -559,7 +563,7 @@ pool_addrelproviders(Pool *pool, Id d)
 #endif
   if (flags && flags < 8)
     {
-      pp = pool_whatprovides(pool, name);
+      pp = pool->whatprovidesdata + pool_whatprovides(pool, name);
       while (ISRELDEP(name))
 	{
           rd = GETRELDEP(pool, name);
@@ -635,7 +639,7 @@ pool_addrelproviders(Pool *pool, Id d)
   pool->whatprovides_rel[d] = pool_queuetowhatprovides(pool, &plist);
   queue_free(&plist);
 
-  return pool->whatprovidesdata + pool->whatprovides_rel[d];
+  return pool->whatprovides_rel[d];
 }
 
 /*************************************************************************/
@@ -1260,7 +1264,7 @@ pool_calc_duchanges(Pool *pool, Repo *oldinstalled, Map *installedmap, DUChanges
       repo_search(s->repo, sp, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
       if (!cbd.hasdu && oldinstalled)
 	{
-	  Id op, *opp;
+	  Id op, opp;
 	  /* no du data available, ignore data of all installed solvables we obsolete */
 	  if (!ignoredu.map)
 	    map_init(&ignoredu, oldinstalled->end - oldinstalled->start);
@@ -1343,7 +1347,7 @@ static inline Id dep2name(Pool *pool, Id dep)
 
 static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep)
 {
-  Id p, *pp;
+  Id p, pp;
   int r = 0;
   FOR_PROVIDES(p, pp, dep)
     {
@@ -1387,7 +1391,7 @@ pool_trivial_installable(Pool *pool, Repo *oldinstalled, Map *installedmap, Queu
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
 	{
-	  dp = pool_whatprovides(pool, con);
+	  dp = pool->whatprovidesdata + pool_whatprovides(pool, con);
 	  for (; *dp; dp++)
 	    map[p] |= 2;	/* XXX: self conflict ? */
 	}

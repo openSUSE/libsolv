@@ -281,7 +281,7 @@ static inline int
 solver_dep_fulfilled(Solver *solv, Id dep)
 {
   Pool *pool = solv->pool;
-  Id p, *pp;
+  Id p, pp;
 
   if (ISRELDEP(dep))
     {
@@ -334,22 +334,28 @@ solver_is_enhancing(Solver *solv, Solvable *s)
 void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
 int solver_calc_installsizechange(Solver *solv);
 
+void solver_find_involved(Solver *solv, Queue *installedq, Solvable *s, Queue *q);
+
 static inline void
 solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
 {
   pool_create_state_maps(solv->pool, &solv->decisionq, installedmap, conflictsmap);
 }
 
+/* iterate over all literals of a rule */
+/* WARNING: loop body must not relocate whatprovidesdata, e.g. by
+ * looking up the providers of a dependency */
 #define FOR_RULELITERALS(l, dp, r)				\
     for (l = r->d < 0 ? -r->d - 1 : r->d,			\
          dp = !l ? &r->w2 : pool->whatprovidesdata + l,		\
          l = r->p; l; l = (dp != &r->w2 + 1 ? *dp++ : 0))
 
+/* iterate over all packages selected by a job */
 #define FOR_JOB_SELECT(p, pp, select, what) \
-    for (pp = (select == SOLVER_SOLVABLE ? pool->whatprovidesdata :	\
-               select == SOLVER_SOLVABLE_ONE_OF ? pool->whatprovidesdata + what : \
+    for (pp = (select == SOLVER_SOLVABLE ? 0 :	\
+               select == SOLVER_SOLVABLE_ONE_OF ? what : \
                pool_whatprovides(pool, what)),				\
-         p = (select == SOLVER_SOLVABLE ? what : *pp++) ; p ; p = *pp++) \
+         p = (select == SOLVER_SOLVABLE ? what : pool->whatprovidesdata[pp++]) ; p ; p = pool->whatprovidesdata[pp++]) \
       if (select != SOLVER_SOLVABLE_NAME || pool_match_nevr(pool, pool->solvables + p, what))
 
 #ifdef __cplusplus

@@ -116,7 +116,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
   Pool *pool = solv->pool;
   int i, j;
   Solvable *s;
-  Id p, *pp, rec, *recp, sug, *sugp;
+  Id p, pp, rec, *recp, sug, *sugp;
 
   if (solv->recommends_index < 0)
     {
@@ -241,7 +241,7 @@ prune_to_best_version(Solver *solv, Queue *plist)
   /* FIXME do not prune cycles */
   for (i = 0; i < plist->count; i++)
     {
-      Id p, *pp, obs, *obsp;
+      Id p, pp, obs, *obsp;
       s = pool->solvables + plist->elements[i];
       if (!s->obsoletes)
 	continue;
@@ -401,7 +401,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 {
   /* installed packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
-  Id p, *pp, n, p2, *pp2;
+  Id p, pp, n, p2, pp2;
   Id obs, *obsp;
   Solvable *ps;
 
@@ -467,7 +467,8 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
     return;
   if (solv->obsoletes && solv->obsoletes[n - solv->installed->start])
     {
-      for (pp = solv->obsoletes_data + solv->obsoletes[n - solv->installed->start]; (p = *pp++) != 0;)
+      Id *opp;
+      for (opp = solv->obsoletes_data + solv->obsoletes[n - solv->installed->start]; (p = *opp++) != 0;)
 	{
 	  ps = pool->solvables + p;
 	  if (!allow_all && !solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))

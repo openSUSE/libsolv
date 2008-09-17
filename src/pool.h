@@ -221,16 +221,16 @@ static inline int pool_installable(Pool *pool, Solvable *s)
   return 1;
 }
 
-extern Id *pool_addrelproviders(Pool *pool, Id d);
+extern Id pool_addrelproviders(Pool *pool, Id d);
 
-static inline Id *pool_whatprovides(Pool *pool, Id d)
+static inline Id pool_whatprovides(Pool *pool, Id d)
 {
   Id v;
   if (!ISRELDEP(d))
-    return pool->whatprovidesdata + pool->whatprovides[d];
+    return pool->whatprovides[d];
   v = GETRELID(d);
   if (pool->whatprovides_rel[v])
-    return pool->whatprovidesdata + pool->whatprovides_rel[v];
+    return pool->whatprovides_rel[v];
   return pool_addrelproviders(pool, d);
 }
 
@@ -273,7 +273,7 @@ void pool_trivial_installable(Pool *pool, struct _Repo *oldinstalled, Map *insta
 
 /* loop over all providers of d */
 #define FOR_PROVIDES(v, vp, d) 						\
-  for (vp = pool_whatprovides(pool, d) ; (v = *vp++) != 0; )
+  for (vp = pool_whatprovides(pool, d) ; (v = pool->whatprovidesdata[vp++]) != 0; )
 
 #define POOL_DEBUG(type, ...) do {if ((pool->debugmask & (type)) != 0) pool_debug(pool, (type), __VA_ARGS__);} while (0)
 #define IF_POOLDEBUG(type) if ((pool->debugmask & (type)) != 0)

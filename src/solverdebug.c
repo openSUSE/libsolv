@@ -51,7 +51,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
     {
       for (i = 0; i < solv->decisionq.count; i++)
 	{
-	  Id *pp, n;
+	  Id pp, n;
 	  int noobs;
 
 	  n = solv->decisionq.elements[i];
@@ -80,7 +80,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
       for (i = 0; i < solv->decisionq.count; i++)
 	{
 	  Id obs, *obsp;
-	  Id *pp, n;
+	  Id pp, n;
 
 	  n = solv->decisionq.elements[i];
 	  if (n < 0)
@@ -301,7 +301,7 @@ solver_printdecisions(Solver *solv)
         }
       else
 	{
-	  Id xp, *xpp;
+	  Id xp, xpp;
 	  FOR_PROVIDES(xp, xpp, s->name)
 	    {
 	      Solvable *s2 = pool->solvables + xp;

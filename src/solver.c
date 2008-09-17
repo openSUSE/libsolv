@@ -25,8 +25,6 @@
 #include "policy.h"
 #include "solverdebug.h"
 
-#define CODE10 0 /* set to '1' to enable patch atoms */
-
 #define RULES_BLOCK 63
 
 /********************************************************************
@@ -43,7 +41,7 @@ int
 solver_splitprovides(Solver *solv, Id dep)
 {
   Pool *pool = solv->pool;
-  Id p, *pp;
+  Id p, pp;
   Reldep *rd;
   Solvable *s;
 
@@ -73,7 +71,7 @@ solver_dep_installed(Solver *solv, Id dep)
 {
 #if 0
   Pool *pool = solv->pool;
-  Id p, *pp;
+  Id p, pp;
 
   if (ISRELDEP(dep))
     {
@@ -108,7 +106,7 @@ static inline int
 dep_possible(Solver *solv, Id dep, Map *m)
 {
   Pool *pool = solv->pool;
-  Id p, *pp;
+  Id p, pp;
 
   if (ISRELDEP(dep))
     {
@@ -867,7 +865,7 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 {
   Pool *pool = solv->pool;
   int i, j;
-  Id how, select, what, p, *pp;
+  Id how, select, what, p, pp;
   Solvable *s;
   Repo *installed;
   Rule *r;
@@ -1057,7 +1055,7 @@ makemultiversionconflict(Solver *solv, Id n, Id con)
   Pool *pool = solv->pool;
   Solvable *s, *sn;
   Queue q;
-  Id p, *pp, qbuf[64];
+  Id p, pp, qbuf[64];
 
   sn = pool->solvables + n;
   queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
@@ -1117,9 +1115,6 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
      * 0 = yes, 1 = no
      */
   int dontfix;
-#if CODE10
-  int patchatom;
-#endif
     /* Id var and pointer for each dependency
      * (not used in parallel)
      */
@@ -1129,7 +1124,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id rec, *recp;
   Id sug, *sugp;
     /* var and ptr for loops */
-  Id p, *pp;
+  Id p, pp;
     /* ptr to 'whatprovides' */
   Id *dp;
     /* Id for current solvable 's' */
@@ -1185,18 +1180,11 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		continue;
 
 	      /* find list of solvables providing 'req' */
-	      dp = pool_whatprovides(pool, req);
+	      dp = pool->whatprovidesdata + pool_whatprovides(pool, req);
 
 	      if (*dp == SYSTEMSOLVABLE)	  /* always installed */
 		continue;
 
-#if CODE10
-	      if (patchatom)
-		{
-		  addpatchatomrequires(solv, s, dp, &workq, m);
-		  continue;
-		}
-#endif
 	      if (dontfix)
 		{
 		  /* the strategy here is to not insist on dependencies
@@ -1264,6 +1252,8 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  /* we treat conflicts in patches a bit differen:
 	   * - nevr matching
 	   * - multiversion handling
+	   * XXX: we should really handle this different, looking
+	   * at the name is a bad hack
 	   */
 	  if (!strncmp("patch:", id2str(pool, s->name), 6))
 	    ispatch = 1;
@@ -2726,7 +2716,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (solv->decisionmap[i] > 0)
 		{
 		  /* installed, check for recommends */
-		  Id *recp, rec, *pp, p;
+		  Id *recp, rec, pp, p;
 		  s = pool->solvables + i;
 		  if (solv->ignorealreadyrecommended && s->repo == solv->installed)
 		    continue;
@@ -3351,7 +3341,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
   Rule *r;
   Solvable *s;
   int dontfix = 0;
-  Id p, d, w2, *pp, req, *reqp, con, *conp, obs, *obsp, *dp;
+  Id p, d, w2, pp, req, *reqp, con, *conp, obs, *obsp, *dp;
 
   assert(rid > 0);
   if (rid >= solv->jobrules && rid < solv->jobrules_end)
@@ -3401,7 +3391,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)
 		continue;
-	      dp = pool_whatprovides(pool, req);
+	      dp = pool->whatprovidesdata + pool_whatprovides(pool, req);
 	      if (*dp == 0)
 		break;
 	    }
@@ -3573,7 +3563,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	{
 	  if (req == SOLVABLE_PREREQMARKER)
 	    continue;
-	  dp = pool_whatprovides(pool, req);
+	  dp = pool->whatprovidesdata + pool_whatprovides(pool, req);
 	  if (d == 0)
 	    {
 	      if (*dp == r->w2 && dp[1] == 0)
@@ -3711,7 +3701,7 @@ create_obsolete_index(Solver *solv)
   Pool *pool = solv->pool;
   Solvable *s;
   Repo *installed = solv->installed;
-  Id p, *pp, obs, *obsp, *obsoletes, *obsoletes_data;
+  Id p, pp, obs, *obsp, *obsoletes, *obsoletes_data;
   int i, n;
 
   if (!installed || !installed->nsolvables)
@@ -3916,7 +3906,7 @@ solver_solve(Solver *solv, Queue *job)
   int oldnrules;
   Map addedmap;		       /* '1' == have rpm-rules for solvable */
   Map installcandidatemap;
-  Id how, what, select, name, weak, p, *pp, d;
+  Id how, what, select, name, weak, p, pp, d;
   Queue q, redoq;
   Solvable *s;
   int goterase;
@@ -4369,7 +4359,7 @@ solver_solve(Solver *solv, Queue *job)
    * solver run */
   if (redoq.count || solv->dontinstallrecommended || !solv->dontshowinstalledrecommended || solv->ignorealreadyrecommended)
     {
-      Id rec, *recp, p, *pp;
+      Id rec, *recp, p, pp;
 
       /* create map of all recommened packages */
       solv->recommends_index = -1;
@@ -4434,7 +4424,7 @@ solver_solve(Solver *solv, Queue *job)
     
   if (1)
     {
-      Id sug, *sugp, p, *pp;
+      Id sug, *sugp, p, pp;
 
       /* create map of all suggests that are still open */
       solv->recommends_index = -1;
@@ -4564,6 +4554,237 @@ solver_calc_installsizechange(Solver *solv)
   change = pool_calc_installsizechange(solv->pool, solv->installed, &installedmap);
   map_free(&installedmap);
   return change;
+}
+
+#define FIND_INVOLVED_DEBUG 0
+void
+solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)
+{
+  Pool *pool = solv->pool;
+  Map im;
+  Map installedm;
+  Solvable *s;
+  Queue iq;
+  Queue installedq_internal;
+  Id tp, ip, p, pp, req, *reqp, sup, *supp;
+  int i, count;
+
+  tp = ts - pool->solvables;
+  queue_init(&iq);
+  queue_init(&installedq_internal);
+  map_init(&im, pool->nsolvables);
+  map_init(&installedm, pool->nsolvables);
+
+  if (!installedq)
+    {
+      installedq = &installedq_internal;
+      if (solv->installed)
+	{
+	  for (ip = solv->installed->start; ip < solv->installed->end; ip++)
+	    {
+	      s = pool->solvables + ip;
+	      if (s->repo != solv->installed)
+		continue;
+	      queue_push(installedq, ip);
+	    }
+	}
+    }
+  for (i = 0; i < installedq->count; i++)
+    {
+      ip = installedq->elements[i];
+      MAPSET(&installedm, ip);
+      MAPSET(&im, ip);
+    }
+
+  queue_push(&iq, ts - pool->solvables);
+  while (iq.count)
+    {
+      ip = queue_shift(&iq);
+      if (!MAPTST(&im, ip))
+	continue;
+      if (!MAPTST(&installedm, ip))
+	continue;
+      MAPCLR(&im, ip);
+      s = pool->solvables + ip;
+#if FIND_INVOLVED_DEBUG
+      printf("hello %s\n", solvable2str(pool, s));
+#endif
+      if (s->requires)
+	{
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    {
+	      if (req == SOLVABLE_PREREQMARKER)
+		continue;
+	      /* count number of installed packages that match */
+	      count = 0;
+	      FOR_PROVIDES(p, pp, req)
+		if (MAPTST(&installedm, p))
+		  count++;
+	      if (count > 1)
+		continue;
+	      FOR_PROVIDES(p, pp, req)
+		{
+		  if (MAPTST(&im, p))
+		    {
+#if FIND_INVOLVED_DEBUG
+		      printf("%s requires %s\n", solvable2str(pool, pool->solvables + ip), solvable2str(pool, pool->solvables + p));
+#endif
+		      queue_push(&iq, p);
+		    }
+		}
+	    }
+	}
+      if (s->recommends)
+	{
+	  reqp = s->repo->idarraydata + s->recommends;
+	  while ((req = *reqp++) != 0)
+	    {
+	      count = 0;
+	      FOR_PROVIDES(p, pp, req)
+		if (MAPTST(&installedm, p))
+		  count++;
+	      if (count > 1)
+		continue;
+	      FOR_PROVIDES(p, pp, req)
+		{
+		  if (MAPTST(&im, p))
+		    {
+#if FIND_INVOLVED_DEBUG
+		      printf("%s recommends %s\n", solvable2str(pool, pool->solvables + ip), solvable2str(pool, pool->solvables + p));
+#endif
+		      queue_push(&iq, p);
+		    }
+		}
+	    }
+	}
+      if (!iq.count)
+	{
+	  /* supplements pass */
+	  for (i = 0; i < installedq->count; i++)
+	    {
+	      ip = installedq->elements[i];
+	      s = pool->solvables + ip;
+	      if (!s->supplements)
+		continue;
+	      if (!MAPTST(&im, ip))
+		continue;
+	      supp = s->repo->idarraydata + s->supplements;
+	      while ((sup = *supp++) != 0)
+		if (!dep_possible(solv, sup, &im) && dep_possible(solv, sup, &installedm))
+		  break;
+	      /* no longer supplemented, also erase */
+	      if (sup)
+		{
+#if FIND_INVOLVED_DEBUG
+		  printf("%s supplemented\n", solvable2str(pool, pool->solvables + ip));
+#endif
+		  queue_push(&iq, ip);
+		}
+	    }
+	}
+    }
+
+  for (i = 0; i < installedq->count; i++)
+    {
+      ip = installedq->elements[i];
+      if (MAPTST(&im, ip))
+	queue_push(&iq, ip);
+    }
+
+  while (iq.count)
+    {
+      ip = queue_shift(&iq);
+      if (!MAPTST(&installedm, ip))
+	continue;
+      s = pool->solvables + ip;
+#if FIND_INVOLVED_DEBUG
+      printf("bye %s\n", solvable2str(pool, s));
+#endif
+      if (s->requires)
+	{
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, req)
+		{
+		  if (!MAPTST(&im, p))
+		    {
+		      if (p == tp)
+			continue;
+#if FIND_INVOLVED_DEBUG
+		      printf("%s requires %s\n", solvable2str(pool, pool->solvables + ip), solvable2str(pool, pool->solvables + p));
+#endif
+		      MAPSET(&im, p);
+		      queue_push(&iq, p);
+		    }
+		}
+	    }
+	}
+      if (s->recommends)
+	{
+	  reqp = s->repo->idarraydata + s->recommends;
+	  while ((req = *reqp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, req)
+		{
+		  if (!MAPTST(&im, p))
+		    {
+		      if (p == tp)
+			continue;
+#if FIND_INVOLVED_DEBUG
+		      printf("%s recommends %s\n", solvable2str(pool, pool->solvables + ip), solvable2str(pool, pool->solvables + p));
+#endif
+		      MAPSET(&im, p);
+		      queue_push(&iq, p);
+		    }
+		}
+	    }
+	}
+      if (!iq.count)
+	{
+	  /* supplements pass */
+	  for (i = 0; i < installedq->count; i++)
+	    {
+	      ip = installedq->elements[i];
+	      if (ip == tp)
+	        continue;
+	      s = pool->solvables + ip;
+	      if (!s->supplements)
+		continue;
+	      if (MAPTST(&im, ip))
+		continue;
+	      supp = s->repo->idarraydata + s->supplements;
+	      while ((sup = *supp++) != 0)
+		if (dep_possible(solv, sup, &im))
+		  break;
+	      if (sup)
+		{
+#if FIND_INVOLVED_DEBUG
+		  printf("%s supplemented\n", solvable2str(pool, pool->solvables + ip));
+#endif
+		  MAPSET(&im, ip);
+		  queue_push(&iq, ip);
+		}
+	    }
+	}
+    }
+    
+  queue_free(&iq);
+
+  /* convert map into result */
+  for (i = 0; i < installedq->count; i++)
+    {
+      ip = installedq->elements[i];
+      if (MAPTST(&im, ip))
+	continue;
+      if (ip == ts - pool->solvables)
+	continue;
+      queue_push(q, ip);
+    }
+  map_free(&im);
+  map_free(&installedm);
+  queue_free(&installedq_internal);
 }
 
 /* EOF */

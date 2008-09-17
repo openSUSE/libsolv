@@ -397,7 +397,7 @@ static inline Id dep2name(Pool *pool, Id dep)
 
 static inline int providedbyinstalled(Pool *pool, Map *installed, Id dep)
 {
-  Id p, *pp;
+  Id p, pp;
   FOR_PROVIDES(p, pp, dep)
     {
       if (p == SYSTEMSOLVABLE)
@@ -429,7 +429,7 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
 {
   Pool *pool = s->repo->pool;
   Solvable *s2;
-  Id p, *pp, *dp;
+  Id p, pp, *dp;
   Id *reqp, req;
   Id *conp, con;
   Id *obsp, obs;
@@ -503,7 +503,7 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
 	  conp = s2->repo->idarraydata + s2->conflicts;
 	  while ((con = *conp++) != 0)
 	    {
-	      dp = pool_whatprovides(pool, con);
+	      dp = pool->whatprovidesdata + pool_whatprovides(pool, con);
 	      for (; *dp; dp++)
 		if (*dp == p)
 		  return 0;
@@ -597,7 +597,7 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
 	{
-	  dp = pool_whatprovides(pool, con);
+	  dp = pool->whatprovidesdata + pool_whatprovides(pool, con);
 	  for (; *dp; dp++)
 	    MAPSET(conflictsmap, *dp);
 	}
