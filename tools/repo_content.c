@@ -25,6 +25,9 @@
 #include "util.h"
 #include "repo_content.h"
 
+/* maximum number of architectures */
+#define MAX_MULTIARCH 25
+
 /*
  * split l into m parts, store to sp[]
  *  split at whitespace
@@ -252,10 +255,9 @@ repo_add_content(Repo *repo, FILE *fp)
      we allow max 4 archs 
   */
   unsigned int numotherarchs = 0;
-  Id otherarchs[4];
-  for ( ; i < 4; ++i )
-    otherarchs[i] = 0;
-
+  Id otherarchs[MAX_MULTIARCH];
+  memset(otherarchs, 0, MAX_MULTIARCH * sizeof(Id));
+  
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
   aline = 1024;
@@ -375,7 +377,7 @@ repo_add_content(Repo *repo, FILE *fp)
           else if (istag ("BASEARCHS"))
             {
               char *sp[2];
-
+              int i = 0;
               /* get the first architecture and use it
                    for the product arch */
               int words = split(value, sp, 2);
@@ -385,18 +387,27 @@ repo_add_content(Repo *repo, FILE *fp)
                 s->arch = str2id(pool, sp[0], 1);
                 /* ignore the rest for now */
                 value = sp[1];
+                /* fprintf(stderr, "first arch is %s\n", sp[0]); */
 
-                while ( value && (numotherarchs < 5) )
+                /* only if there were more than one arch */
+                if ( words > 1 )
                   {
-                    words = split(value, sp, 2);
-                    if (!words)
-                      break;
-                    /* we have a new extra architecture */
-                    numotherarchs++;
-                    otherarchs[numotherarchs - 1 ] = str2id(pool, sp[0], 1); 
-                    if (words == 1)
-                      break;
-                    value = sp[1];
+                    while ( value && (i < MAX_MULTIARCH) )
+                      {
+                        words = split(value, sp, 2);
+                        if (!words)
+                          break;
+                        /* we have a new extra architecture */
+                        otherarchs[i] = 0;
+                        numotherarchs++;
+                        otherarchs[i] = str2id(pool, sp[0], 1); 
+                        /* fprintf(stderr, "%d arch is %s\n", i, sp[0]); */
+                        
+                        if (words == 1)
+                          break;
+                        value = sp[1];
+                        i++;
+                      }
                   }
               }
             }
