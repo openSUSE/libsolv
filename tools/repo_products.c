@@ -5,7 +5,7 @@
  * See http://en.opensuse.org/Product_Management/Code11
  *
  *
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2008, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -31,11 +31,6 @@
 #include "repo_content.h"
 
 
-static ino_t baseproduct = 0;
-static ino_t currentproduct = 0;
-
-static int productscheme = -1;
-
 //#define DUMPOUT 0
 
 enum state {
@@ -51,17 +46,13 @@ enum state {
   STATE_UPDATEREPOKEY,   // 9
   STATE_URLS,            // 10
   STATE_URL,             // 11
-#if 0 /* not needed */
-  STATE_BUILDCONFIG,     // 12
-  STATE_INSTALLCONFIG,   // 13
-#endif
-  STATE_RUNTIMECONFIG,   // 14
-  STATE_LINGUAS,         // 15
-  STATE_LANG,            // 16
-  STATE_REGISTER,        // 17
-  STATE_TARGET,          // 18
-  STATE_FLAVOR,          // 19
-  STATE_REGRELEASE,      // 20
+  STATE_RUNTIMECONFIG,   // 12
+  STATE_LINGUAS,         // 13
+  STATE_LANG,            // 14
+  STATE_REGISTER,        // 15
+  STATE_TARGET,          // 16
+  STATE_FLAVOR,          // 17
+  STATE_REGRELEASE,      // 18
   NUMSTATES              // 0
 };
 
@@ -85,14 +76,9 @@ static struct stateswitch stateswitches[] = {
   { STATE_PRODUCT,   "register",      STATE_REGISTER,      0 },
   { STATE_PRODUCT,   "urls",          STATE_URLS,          0 },
   { STATE_PRODUCT,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
-#if 0 /* not needed */
-  { STATE_PRODUCT,   "installconfig", STATE_INSTALLCONFIG, 0 },
-  { STATE_PRODUCT,   "buildconfig",   STATE_BUILDCONFIG,   0 },
-#endif
   { STATE_PRODUCT,   "linguas",       STATE_LINGUAS,       0 },
   { STATE_PRODUCT,   "updaterepokey", STATE_UPDATEREPOKEY, 1 },
   { STATE_URLS,      "url",           STATE_URL,           1 },
-/*  { STATE_BUILDCONFIG,"linguas",      STATE_LINGUAS,       0 }, */
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
   { STATE_REGISTER,  "flavor",        STATE_FLAVOR,        1 },
   { STATE_REGISTER,  "target",        STATE_TARGET,        1 },
@@ -118,12 +104,19 @@ struct parsedata {
   const char *attribute; /* only print this attribute, if currentproduct == baseproduct */
 
   const char *tmplang;
+
   const char *tmpvers;
   const char *tmprel;
   const char *tmpurltype;
 
-  Solvable *s;
+  unsigned int ctime;
+
+  Solvable *solvable;
   Id handle;
+
+  ino_t baseproduct;
+  ino_t currentproduct;
+  int productscheme;
 
   Id langcache[ID_NUM_INTERNAL];
 };
@@ -177,6 +170,7 @@ startElement(void *userData, const char *name, const char **atts)
 {
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
+  Solvable *s = pd->solvable;
   struct stateswitch *sw;
 
 #if 0
@@ -189,7 +183,7 @@ startElement(void *userData, const char *name, const char **atts)
     }
 
   pd->depth++;
-  if ( !(sw = pd->swtab[pd->state]) ) /* no statetable -> no substates */
+  if (!(sw = pd->swtab[pd->state])) /* no statetable -> no substates */
     {
 #if 0
       fprintf(stderr, "into unknown: [?]%s (from: ?, state %d)\n", name, pd->state);
@@ -220,15 +214,15 @@ startElement(void *userData, const char *name, const char **atts)
       /* parse 'schemeversion' and store in global variable */
       {
         const char * scheme = find_attr("schemeversion", atts, 0);
-        productscheme = (scheme && *scheme) ? atoi(scheme) : -1;
+        pd->productscheme = (scheme && *scheme) ? atoi(scheme) : -1;
       }
-      if (!pd->s)
+      if (!s)
 	{
-	  pd->s = pool_id2solvable(pool, repo_add_solvable(pd->repo));
-	  repodata_extend(pd->data, pd->s - pool->solvables);
-	  pd->handle = repodata_get_handle(pd->data, pd->s - pool->solvables - pd->repo->start);
+	  s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+	  repodata_extend(pd->data, s - pool->solvables);
+	  pd->handle = repodata_get_handle(pd->data, (s - pool->solvables) - pd->repo->start);
 	}
-     break;
+      break;
 
       /* <summary lang="xy">... */
     case STATE_SUMMARY:
@@ -243,7 +237,6 @@ startElement(void *userData, const char *name, const char **atts)
     default:
       break;
     }
-  return;
 }
 
 
@@ -251,6 +244,7 @@ static void XMLCALL
 endElement(void *userData, const char *name)
 {
   struct parsedata *pd = userData;
+  Solvable *s = pd->solvable;
 
 #if 0
       fprintf(stderr, "end: [%d]%s\n", pd->state, name);
@@ -269,11 +263,39 @@ endElement(void *userData, const char *name)
 
   switch (pd->state)
     {
+    case STATE_PRODUCT:
+      /* product done, finish solvable */
+      if (pd->ctime)
+        repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, pd->ctime);
+
+      /* this is where <productsdir>/baseproduct points to */
+      if (pd->currentproduct == pd->baseproduct)
+	repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, "base");
+
+      if (pd->tmprel)
+	{
+	  if (pd->tmpvers)
+	    s->evr = makeevr(pd->pool, join2(pd->tmpvers, "-", pd->tmprel));
+	  else
+	    {
+	      fprintf(stderr, "Seen <release> but no <version>\n");
+	    }
+	}
+      else if (pd->tmpvers)
+	s->evr = makeevr(pd->pool, pd->tmpvers); /* just version, no release */
+      pd->tmpvers = sat_free((void *)pd->tmpvers);
+      pd->tmprel = sat_free((void *)pd->tmprel);
+      if (!s->arch)
+	s->arch = ARCH_NOARCH;
+      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+	s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
+      pd->solvable = 0;
+      break;
     case STATE_VENDOR:
-      pd->s->vendor = str2id(pd->pool, pd->content, 1);
+      s->vendor = str2id(pd->pool, pd->content, 1);
       break;
     case STATE_NAME:
-      pd->s->name = str2id(pd->pool, join2("product", ":", pd->content), 1);
+      s->name = str2id(pd->pool, join2("product", ":", pd->content), 1);
       break;
     case STATE_VERSION:
       pd->tmpvers = strdup(pd->content);
@@ -282,38 +304,30 @@ endElement(void *userData, const char *name)
       pd->tmprel = strdup(pd->content);
       break;
     case STATE_ARCH:
-      pd->s->arch = str2id(pd->pool, pd->content, 1);
+      s->arch = str2id(pd->pool, pd->content, 1);
       break;
     case STATE_UPDATEREPOKEY:
       repodata_set_str(pd->data, pd->handle, langtag(pd, PRODUCT_UPDATEREPOKEY, pd->tmplang), pd->content);
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
-      if (pd->tmplang)
-      {
-        free( (char *)pd->tmplang );
-	pd->tmplang = 0;
-      }
+      pd->tmplang = sat_free((void *)pd->tmplang);
       break;
     case STATE_DESCRIPTION:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), pd->content );
-      if (pd->tmplang)
-      {
-        free( (char *)pd->tmplang );
-	pd->tmplang = 0;
-      }
+      pd->tmplang = sat_free((void *)pd->tmplang);
       break;
     case STATE_URL:
       if (pd->tmpurltype)
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-
           repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pd->pool, pd->tmpurltype, 1));
         }
+      pd->tmpurltype = sat_free((void *)pd->tmpurltype);
       break;
     case STATE_TARGET:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_TARGET, pd->content );
-      if (currentproduct == baseproduct
+      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_TARGET, pd->content);
+      if (pd->currentproduct == pd->baseproduct
 	  && pd->attribute
 	  && !strcmp(pd->attribute, "register.target"))
 	{
@@ -321,8 +335,8 @@ endElement(void *userData, const char *name)
 	}
     break;
     case STATE_FLAVOR:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_FLAVOR, pd->content );
-      if (currentproduct == baseproduct
+      repodata_set_str(pd->data, pd->handle, PRODUCT_FLAVOR, pd->content);
+      if (pd->currentproduct == pd->baseproduct
 	  && pd->attribute
 	  && !strcmp(pd->attribute, "register.flavor"))
 	{
@@ -330,8 +344,8 @@ endElement(void *userData, const char *name)
 	}
     break;
     case STATE_REGRELEASE:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_RELEASE, pd->content );
-      if (currentproduct == baseproduct
+      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_RELEASE, pd->content);
+      if (pd->currentproduct == pd->baseproduct
 	  && pd->attribute
 	  && !strcmp(pd->attribute, "register.release"))
 	{
@@ -348,7 +362,6 @@ endElement(void *userData, const char *name)
 #if 0
       fprintf(stderr, "end: [%s] -> %d\n", name, pd->state);
 #endif
-  return;
 }
 
 
@@ -390,29 +403,22 @@ characterData(void *userData, const XML_Char *s, int len)
 static void
 repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 {
-  Pool *pool = pd->pool;
   char buf[BUFF_SIZE];
-  int i, l;
-  struct stateswitch *sw;
+  int l;
   struct stat st;
 
-  pd->s = NULL; /* enforce new solvable when coming here again */
-
   if (!fstat(fileno(fp), &st))
-    currentproduct = st.st_ino;
+    {
+      pd->currentproduct = st.st_ino;
+      pd->ctime = (unsigned int)st.st_ctime;
+    }
   else
     {
-      currentproduct = baseproduct+1; /* make it != baseproduct if stat fails */
-      st.st_ctime = 0;
-      perror("Can't stat()");
+      pd->currentproduct = pd->baseproduct + 1; /* make it != baseproduct if stat fails */
+      perror("fstat");
+      pd->ctime = 0;
     }
 
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd->swtab[sw->from])
-        pd->swtab[sw->from] = sw;
-      pd->sbtab[sw->to] = sw->from;
-    }
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, pd);
   XML_SetElementHandler(parser, startElement, endElement);
@@ -430,47 +436,6 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 	break;
     }
   XML_ParserFree(parser);
-
-  if (pd->s)
-    {
-      Solvable *s = pd->s;
-
-      if (st.st_ctime)
-        repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, st.st_ctime);
-      /* this is where <productsdir>/baseproduct points to */
-      if (currentproduct == baseproduct)
-	repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, "base");
-
-      if (pd->tmprel)
-	{
-	  if (pd->tmpvers)
-	    {
-	      s->evr = makeevr(pool, join2(pd->tmpvers, "-", pd->tmprel));
-	      free((char *)pd->tmpvers);
-	      pd->tmpvers = 0;
-	    }
-	  else
-	    {
-	      fprintf(stderr, "Seen <release> but no <version>\n");
-	    }
-	  free((char *)pd->tmprel);
-	  pd->tmprel = 0;
-	}
-      else if (pd->tmpvers)
-	{
-	  s->evr = makeevr(pool, pd->tmpvers); /* just version, no release */
-	  free((char *)pd->tmpvers);
-	  pd->tmpvers = 0;
-	}
-      if (!s->arch)
-	s->arch = ARCH_NOARCH;
-      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	{
-	  s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-	}
-    } /* if pd->s */
-
-  return;
 }
 
 
@@ -490,10 +455,10 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, 
   if (code11
       && stat(join2(path, "/", "baseproduct"), &st) == 0) /* follow symlink */
     {
-      baseproduct = st.st_ino;
+      pd->baseproduct = st.st_ino;
     }
   else
-    baseproduct = 0;
+    pd->baseproduct = 0;
 
   while ((entry = readdir(dir)))
     {
@@ -508,7 +473,7 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, 
 	}
 
       if (len > slen
-	  && strcmp(entry->d_name+len-slen, suffix) == 0)
+	  && strcmp(entry->d_name + len - slen, suffix) == 0)
 	{
 	  char *fullpath = join2(path, "/", entry->d_name);
 	  FILE *fp = fopen(fullpath, "r");
@@ -537,9 +502,11 @@ void
 repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const char *root, const char *attribute)
 {
   const char *fullpath = proddir;
-  int code11 = 1;
-  DIR *dir = opendir(fullpath);
+  int code11;
+  DIR *dir;
+  int i;
   struct parsedata pd;
+  struct stateswitch *sw;
 
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;
@@ -551,6 +518,15 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
 
   pd.attribute = attribute;
 
+  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
+    {
+      if (!pd.swtab[sw->from])
+        pd.swtab[sw->from] = sw;
+      pd.sbtab[sw->to] = sw->from;
+    }
+
+  code11 = 1;
+  dir = opendir(fullpath);
   if (!dir)
     {
       fullpath = root ? join2(root, "", "/etc") : "/etc";
@@ -566,6 +542,7 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
       parse_dir(dir, fullpath, &pd, repodata, code11);
     }
 
+  sat_free((void *)pd.tmplang);
   free(pd.content);
   join_freemem();
   closedir(dir);
