@@ -52,6 +52,8 @@ split(char *l, char **sp, int m)
 	break;
       *l++ = 0;
     }
+  if (i < m)
+    sp[i] = 0;	/* terminate array */
   return i;
 }
 
@@ -133,54 +135,42 @@ join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
 static unsigned int
 adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker)
 {
-  int flags, words;
-  Id id, evrid;
-  char *sp[4];
-
-  words = 0;
-  while (1)
+  char *sp[3], *name;
+  int flags;
+  Id id;
+  
+  while(line)
     {
-      /* Name [relop evr] [rest] --> 1, 2, 3 or 4 fields.  */
-      if ( line )
-        {
-          words += split(line, sp + words, 4 - words);
-          line = 0;
-        }
+      split(line, sp, 2);
+      name = sp[0];
+      if (!name)
+	break;
+      line = sp[1];
       /* Hack, as the content file adds 'package:' for package
          dependencies sometimes.  */
-      if (!strncmp (sp[0], "package:", 8))
-        sp[0] += 8;
-      id = str2id(pool, sp[0], 1);
-      if (words >= 3 && strpbrk (sp[1], "<>="))
+      if (!strncmp (name, "package:", 8))
+        name += 8;
+      id = str2id(pool, name, 1);
+      if (line && strpbrk(line, "<>="))
 	{
-	  evrid = makeevr(pool, sp[2]);
+	  split(line, sp, 3);
+	  if (!sp[0] || !sp[1])
+	    {
+	      fprintf(stderr, "bad relation '%s %s'\n", name, sp[0]);
+	      exit(1);
+	    }
+	  line = sp[2];
 	  for (flags = 0; flags < 6; flags++)
-	    if (!strcmp(sp[1], flagtab[flags]))
+	    if (!strcmp(sp[0], flagtab[flags]))
 	      break;
 	  if (flags == 6)
 	    {
-	      fprintf(stderr, "Unknown relation '%s'\n", sp[1]);
+	      fprintf(stderr, "Unknown relation '%s'\n", sp[0]);
 	      exit(1);
 	    }
-	  id = rel2id(pool, id, evrid, flags + 1, 1);
-	  /* Consume three words, there's nothing to move to front.  */
-	  if (words == 4)
-	    line = sp[3];
-          words = 0;
-	}
-      else
-        {
-	  int j;
-	  /* Consume one word.  If we had more move them to front.  */
-	  words--;
-	  for (j = 0; j < words; j++)
-	    sp[j] = sp[j+1];
-	  if (words == 3)
-	    line = sp[2], words = 2;
+	  id = rel2id(pool, id, str2id(pool, sp[1], 1), flags + 1, 1);
 	}
       olddeps = repo_addid_dep(pd->repo, olddeps, id, marker);
-      if (! ( line || words > 0 ) )
-        break;
     }
   return olddeps;
 }
@@ -194,15 +184,14 @@ static void
 add_multiple_strings(Repodata *data, Id handle, Id name, char *value)
 {
   char *sp[2];
+
   while (value)
     {
-      int words = split(value, sp, 2);
-      if (!words)
-	break;
-      repodata_add_poolstr_array(data, handle, name, sp[0]);
-      if (words == 1)
+      split(value, sp, 2);
+      if (!sp[0])
 	break;
       value = sp[1];
+      repodata_add_poolstr_array(data, handle, name, sp[0]);
     }
 }
 
@@ -216,14 +205,12 @@ add_multiple_urls(Repodata *data, Id handle, char *value, Id type)
   char *sp[2];
   while (value)
     {
-      int words = split(value, sp, 2);
-      if (!words)
-	break;
-      repodata_add_poolstr_array(data, handle, PRODUCT_URL, sp[0]);
-      repodata_add_idarray(data, handle, PRODUCT_URL_TYPE, type);
-      if (words == 1)
+      split(value, sp, 2);
+      if (!sp[0])
 	break;
       value = sp[1];
+      repodata_add_poolstr_array(data, handle, PRODUCT_URL, sp[0]);
+      repodata_add_idarray(data, handle, PRODUCT_URL_TYPE, type);
     }
 }
 
@@ -255,8 +242,7 @@ repo_add_content(Repo *repo, FILE *fp)
      we allow max 4 archs 
   */
   unsigned int numotherarchs = 0;
-  Id otherarchs[MAX_MULTIARCH];
-  memset(otherarchs, 0, MAX_MULTIARCH * sizeof(Id));
+  Id *otherarchs = 0;
   
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
@@ -293,7 +279,7 @@ repo_add_content(Repo *repo, FILE *fp)
       linep = line;
 
       /* expect "key value" lines */
-      if (split (line, fields, 2) == 2)
+      if (split(line, fields, 2) == 2)
         {
 	  char *key = fields[0];
 	  char *value = fields[1];
@@ -377,39 +363,23 @@ repo_add_content(Repo *repo, FILE *fp)
           else if (istag ("BASEARCHS"))
             {
               char *sp[2];
-              int i = 0;
-              /* get the first architecture and use it
-                   for the product arch */
-              int words = split(value, sp, 2);
-              if ( words > 0 )
-              {
-                /* there is at least one architecture */
-                s->arch = str2id(pool, sp[0], 1);
-                /* ignore the rest for now */
-                value = sp[1];
-                /* fprintf(stderr, "first arch is %s\n", sp[0]); */
 
-                /* only if there were more than one arch */
-                if ( words > 1 )
-                  {
-                    while ( value && (i < MAX_MULTIARCH) )
-                      {
-                        words = split(value, sp, 2);
-                        if (!words)
-                          break;
-                        /* we have a new extra architecture */
-                        otherarchs[i] = 0;
-                        numotherarchs++;
-                        otherarchs[i] = str2id(pool, sp[0], 1); 
-                        /* fprintf(stderr, "%d arch is %s\n", i, sp[0]); */
-                        
-                        if (words == 1)
-                          break;
-                        value = sp[1];
-                        i++;
-                      }
-                  }
-              }
+              split(value, sp, 2);
+	      if (sp[0])
+		{
+		  value = sp[1];
+		  s->arch = str2id(pool, sp[0], 1);
+		  while (value)
+		    {
+		      /* got another arch */
+		      split(value, sp, 2);
+		      if (!sp[0])
+			break;
+		       value = sp[1];
+		       otherarchs = sat_extend(otherarchs, numotherarchs, 1, sizeof(Id), 7);
+		       otherarchs[numotherarchs++] = str2id(pool, sp[0], 1);
+		    }
+		}
             }
 
 	  /*
@@ -475,7 +445,7 @@ repo_add_content(Repo *repo, FILE *fp)
     }
   
   /* now for every other arch, clone the product except the architecture */
-  for ( i=0; i < numotherarchs; ++i )
+  for (i = 0; i < numotherarchs; ++i)
     {
       Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
       repodata_extend(data, p - pool->solvables);
@@ -499,4 +469,5 @@ repo_add_content(Repo *repo, FILE *fp)
   if (pd.tmp)
     sat_free(pd.tmp);
   sat_free(line);
+  sat_free(otherarchs);
 }
