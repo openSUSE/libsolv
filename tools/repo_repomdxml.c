@@ -163,7 +163,7 @@ startElement(void *userData, const char *name, const char **atts)
   int expire = 0;
 
 #if 0
-      fprintf(stderr, "start: [%d]%s\n", pd->state, name);
+  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
     {
@@ -172,6 +172,8 @@ startElement(void *userData, const char *name, const char **atts)
     }
 
   pd->depth++;
+  if (!pd->swtab[pd->state])
+    return;
   for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
     if (!strcmp(sw->ename, name))
       break;
@@ -179,7 +181,7 @@ startElement(void *userData, const char *name, const char **atts)
   if (sw->from != pd->state)
     {
 #if 1
-      fprintf(stderr, "into unknown: [%d]%s (from: %d)\n", sw->to, name, sw->from);
+      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
       exit( 1 );
 #endif
       return;

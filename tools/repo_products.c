@@ -183,22 +183,21 @@ startElement(void *userData, const char *name, const char **atts)
     }
 
   pd->depth++;
-  if (!(sw = pd->swtab[pd->state])) /* no statetable -> no substates */
+  if (!pd->swtab[pd->state])	/* no statetable -> no substates */
     {
 #if 0
-      fprintf(stderr, "into unknown: [?]%s (from: ?, state %d)\n", name, pd->state);
+      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
 #endif
       return;
     }
-  for (; sw->from == pd->state; sw++)  /* find name in statetable */
+  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
     if (!strcmp(sw->ename, name))
       break;
 
   if (sw->from != pd->state)
     {
 #if 0
-      fprintf(stderr, "into unknown: [%d]%s (from: %d, state %d)\n", sw->to, name, sw->from, pd->state);
-      exit( 1 );
+      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
 #endif
       return;
     }

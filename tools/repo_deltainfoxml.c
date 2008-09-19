@@ -290,10 +290,11 @@ startElement(void *userData, const char *name, const char **atts)
     }
 
   pd->depth++;
+  if (!pd->swtab[pd->state])
+    return;
   for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
     if (!strcmp(sw->ename, name))
       break;
-  
   if (sw->from != pd->state)
     {
 #if 1
