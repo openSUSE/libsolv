@@ -19,6 +19,8 @@
 #include "pool.h"
 #include "repo.h"
 #include "repo_updateinfoxml.h"
+
+#define DISABLE_SPLIT
 #include "tools_util.h"
 
 //#define DUMPOUT 0
@@ -213,62 +215,62 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 static void parse_delta_location( struct parsedata *pd, 
                                   const char* str )
 {
-    Pool *pool = pd->pool;
-    if (str)
+  Pool *pool = pd->pool;
+  if (str)
     {
-        /* Separate the filename into its different parts.
-           rpm/x86_64/alsa-1.0.14-31_31.2.x86_64.delta.rpm
-           --> dir = rpm/x86_64
-           name = alsa
-           evr = 1.0.14-31_31.2
-           suffix = x86_64.delta.rpm.  */
-        char *real_str = strdup(str);
-        char *s = real_str;
-        char *s1, *s2;
-        s1 = strrchr (s, '/');
-        if (s1)
-        {
-            pd->delta.locdir = strn2id(pool, s, s1 - s, 1);
-            s = s1 + 1;
-        }
-        /* Guess suffix.  */
-        s1 = strrchr (s, '.');
-        if (s1)
-        {
-            for (s2 = s1 - 1; s2 > s; s2--)
-                if (*s2 == '.')
-                    break;
-            if (!strcmp (s2, ".delta.rpm") || !strcmp (s2, ".patch.rpm"))
-            {
-                s1 = s2;
-                /* We accept one more item as suffix.  */
-                for (s2 = s1 - 1; s2 > s; s2--)
-		    if (*s2 == '.')
-                        break;
-                s1 = s2;
-                  }
-            if (*s1 == '.')
-                *s1++ = 0;
-            pd->delta.locsuffix = str2id(pool, s1, 1); 
-        }
-        /* Last '-'.  */
-        s1 = strrchr (s, '-');
-        if (s1)
-        {
-                  /* Second to last '-'.  */
-            for (s2 = s1 - 1; s2 > s; s2--)
-                if (*s2 == '-')
-                    break;
-        }
-        else
-            s2 = 0;
-        if (s2 > s && *s2 == '-')
-        {
-            *s2++ = 0;
-            pd->delta.locevr = str2id(pool, s2, 1);
-        }
-        pd->delta.locname = str2id(pool, s, 1);
-        free(real_str);
+      /* Separate the filename into its different parts.
+	 rpm/x86_64/alsa-1.0.14-31_31.2.x86_64.delta.rpm
+	 --> dir = rpm/x86_64
+	 name = alsa
+	 evr = 1.0.14-31_31.2
+	 suffix = x86_64.delta.rpm.  */
+      char *real_str = strdup(str);
+      char *s = real_str;
+      char *s1, *s2;
+      s1 = strrchr (s, '/');
+      if (s1)
+	{
+	  pd->delta.locdir = strn2id(pool, s, s1 - s, 1);
+	  s = s1 + 1;
+	}
+      /* Guess suffix.  */
+      s1 = strrchr (s, '.');
+      if (s1)
+	{
+	  for (s2 = s1 - 1; s2 > s; s2--)
+	    if (*s2 == '.')
+	      break;
+	  if (!strcmp (s2, ".delta.rpm") || !strcmp (s2, ".patch.rpm"))
+	    {
+	      s1 = s2;
+	      /* We accept one more item as suffix.  */
+	      for (s2 = s1 - 1; s2 > s; s2--)
+		if (*s2 == '.')
+		  break;
+	      s1 = s2;
+	    }
+	  if (*s1 == '.')
+	    *s1++ = 0;
+	  pd->delta.locsuffix = str2id(pool, s1, 1); 
+	}
+      /* Last '-'.  */
+      s1 = strrchr (s, '-');
+      if (s1)
+	{
+	  /* Second to last '-'.  */
+	  for (s2 = s1 - 1; s2 > s; s2--)
+	    if (*s2 == '-')
+	      break;
+	}
+      else
+	s2 = 0;
+      if (s2 > s && *s2 == '-')
+	{
+	  *s2++ = 0;
+	  pd->delta.locevr = str2id(pool, s2, 1);
+	}
+      pd->delta.locname = str2id(pool, s, 1);
+      free(real_str);
     }
 }
                                  
@@ -311,46 +313,41 @@ startElement(void *userData, const char *name, const char **atts)
 
   switch(pd->state)
     {
-      case STATE_START:
-          break;
-      case STATE_NEWPACKAGE:
-          if ( (str = find_attr("name", atts)) )
-            {
-              pd->newpkgname = str2id(pool, str, 1);
-            }
-          pd->newpkgevr = makeevr_atts(pool, pd, atts);
-          if ( (str = find_attr("arch", atts)) )
-            {
-              pd->newpkgarch = str2id(pool, str, 1);
-            }
-          break;
+    case STATE_START:
+      break;
+    case STATE_NEWPACKAGE:
+      if ( (str = find_attr("name", atts)) )
+	{
+	  pd->newpkgname = str2id(pool, str, 1);
+	}
+      pd->newpkgevr = makeevr_atts(pool, pd, atts);
+      if ( (str = find_attr("arch", atts)) )
+	{
+	  pd->newpkgarch = str2id(pool, str, 1);
+	}
+      break;
 
-      case STATE_DELTA:
-          memset(&pd->delta, 0, sizeof (pd->delta));
-          *pd->tempstr = 0;
-          pd->ltemp = 0;
-          pd->delta.nbevr++;
-          pd->delta.bevr = sat_realloc (pd->delta.bevr, pd->delta.nbevr * sizeof(Id));
-          pd->delta.bevr[pd->delta.nbevr - 1] = makeevr_atts(pool, pd, atts);
-          --(pd->datanum);
-          break;
-      case STATE_FILENAME:
-          break;
-      case STATE_LOCATION:
-          parse_delta_location( pd, find_attr("href", atts));
-          break;
+    case STATE_DELTA:
+      memset(&pd->delta, 0, sizeof (pd->delta));
+      *pd->tempstr = 0;
+      pd->ltemp = 0;
+      pd->delta.nbevr++;
+      pd->delta.bevr = sat_realloc (pd->delta.bevr, pd->delta.nbevr * sizeof(Id));
+      pd->delta.bevr[pd->delta.nbevr - 1] = makeevr_atts(pool, pd, atts);
+      --(pd->datanum);
+      break;
+    case STATE_FILENAME:
+      break;
+    case STATE_LOCATION:
+      parse_delta_location(pd, find_attr("href", atts));
+      break;
     case STATE_SIZE:
       break;
     case STATE_SEQUENCE:
       break;
-
-      case NUMSTATES+1:
-        split(NULL, NULL, 0); /* just to keep gcc happy about tools_util.h: static ... split() {...}  Urgs!*/
-      break;
-      default:
+    default:
       break;
     }
-  return;
 }
 
 
@@ -376,80 +373,79 @@ endElement(void *userData, const char *name)
   pd->depth--;
   pd->statedepth--;
   switch (pd->state)
-  {
-      case STATE_START:
-          break;
-      case STATE_NEWPACKAGE:
-          break;
-      case STATE_DELTA:
+    {
+    case STATE_START:
+      break;
+    case STATE_NEWPACKAGE:
+      break;
+    case STATE_DELTA:
       {
 #ifdef DUMPOUT
-          int i;
+	int i;
 #endif
-          struct deltarpm *d = &pd->delta;
+	struct deltarpm *d = &pd->delta;
 
 #ifdef DUMPOUT
 
-          fprintf (stderr, "found deltarpm for %s:\n", id2str(pool, pd->newpkgname));
+	fprintf (stderr, "found deltarpm for %s:\n", id2str(pool, pd->newpkgname));
 #endif
-          repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_NAME, pd->newpkgname);
-          repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_EVR, pd->newpkgevr);
-          repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_ARCH, pd->newpkgarch);
-          repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_NAME, d->locname);
-          repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_DIR, d->locdir);
-          repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_EVR, d->locevr);
-          repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_SUFFIX, d->locsuffix);
+	repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_NAME, pd->newpkgname);
+	repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_EVR, pd->newpkgevr);
+	repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_ARCH, pd->newpkgarch);
+	repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_NAME, d->locname);
+	repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_DIR, d->locdir);
+	repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_EVR, d->locevr);
+	repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_SUFFIX, d->locsuffix);
 
 #ifdef DUMPOUT
-          fprintf (stderr, "   loc: %s %s %s %s\n", id2str(pool, d->locdir),
-                   id2str(pool, d->locname), id2str(pool, d->locevr),
-                   id2str(pool, d->locsuffix));
-          fprintf (stderr, "  size: %d down\n", d->downloadsize);
-          fprintf (stderr, "  chek: %s\n", d->filechecksum);
+	fprintf (stderr, "   loc: %s %s %s %s\n", id2str(pool, d->locdir),
+		 id2str(pool, d->locname), id2str(pool, d->locevr),
+		 id2str(pool, d->locsuffix));
+	fprintf (stderr, "  size: %d down\n", d->downloadsize);
+	fprintf (stderr, "  chek: %s\n", d->filechecksum);
 #endif
 
-          repo_set_num(pd->repo, pd->datanum, DELTA_DOWNLOADSIZE, d->downloadsize);
-          repo_set_str(pd->repo, pd->datanum, DELTA_CHECKSUM, d->filechecksum);
+	repo_set_num(pd->repo, pd->datanum, DELTA_DOWNLOADSIZE, d->downloadsize);
+	repo_set_str(pd->repo, pd->datanum, DELTA_CHECKSUM, d->filechecksum);
 
-
-          if (d->seqnum)
+	if (d->seqnum)
 	  {
 #ifdef DUMPOUT
-              fprintf (stderr, "  base: %s\n",
-                       id2str(pool, d->bevr[0]));
-              fprintf (stderr, "            seq: %s\n",
-                       id2str(pool, d->seqname));
-              fprintf (stderr, "                 %s\n",
-                       id2str(pool, d->seqevr));
-              fprintf (stderr, "                 %s\n",
-                       d->seqnum);
+	    fprintf (stderr, "  base: %s\n",
+		     id2str(pool, d->bevr[0]));
+	    fprintf (stderr, "            seq: %s\n",
+		     id2str(pool, d->seqname));
+	    fprintf (stderr, "                 %s\n",
+		     id2str(pool, d->seqevr));
+	    fprintf (stderr, "                 %s\n",
+		     d->seqnum);
 #endif
-              repo_set_id(pd->repo, pd->datanum, DELTA_BASE_EVR, d->bevr[0]);
-              repo_set_id(pd->repo, pd->datanum, DELTA_SEQ_NAME, d->seqname);
-              repo_set_id(pd->repo, pd->datanum, DELTA_SEQ_EVR, d->seqevr);
-              repo_set_str(pd->repo, pd->datanum, DELTA_SEQ_NUM, d->seqnum);
+	    repo_set_id(pd->repo, pd->datanum, DELTA_BASE_EVR, d->bevr[0]);
+	    repo_set_id(pd->repo, pd->datanum, DELTA_SEQ_NAME, d->seqname);
+	    repo_set_id(pd->repo, pd->datanum, DELTA_SEQ_EVR, d->seqevr);
+	    repo_set_str(pd->repo, pd->datanum, DELTA_SEQ_NUM, d->seqnum);
 
 #ifdef DUMPOUT
-              fprintf(stderr, "OK\n");
+	    fprintf(stderr, "OK\n");
 #endif
 
 #ifdef DUMPOUT              
-              if (d->seqevr != d->bevr[0])
-                  fprintf (stderr, "XXXXX evr\n");
-              /* Name of package ("atom:xxxx") should match the sequence info
-                 name.  */
-              if (strcmp(id2str(pool, d->seqname), id2str(pool, pd->newpkgname) + 5))
-                  fprintf (stderr, "XXXXX name\n");
+	    if (d->seqevr != d->bevr[0])
+	      fprintf (stderr, "XXXXX evr\n");
+	    /* Name of package ("atom:xxxx") should match the sequence info
+	       name.  */
+	    if (strcmp(id2str(pool, d->seqname), id2str(pool, pd->newpkgname) + 5))
+	      fprintf (stderr, "XXXXX name\n");
 #endif
 	  }
-          else
+	else
 	  {
 
 #ifdef DUMPOUT                          
-              fprintf (stderr, "  base:");
-              for (i = 0; i < d->nbevr; i++)
-                  fprintf (stderr, " %s", id2str(pool, d->bevr[i]));
-              fprintf (stderr, "\n");
+	    fprintf (stderr, "  base:");
+	    for (i = 0; i < d->nbevr; i++)
+	      fprintf (stderr, " %s", id2str(pool, d->bevr[i]));
+	    fprintf (stderr, "\n");
 #endif
 	  }
 
@@ -458,48 +454,46 @@ endElement(void *userData, const char *name)
       free(pd->delta.bevr);
       free(pd->delta.seqnum);
       break;
-      case STATE_FILENAME:
-          parse_delta_location(pd, pd->content);
-          break;
-      case STATE_CHECKSUM:
+    case STATE_FILENAME:
+      parse_delta_location(pd, pd->content);
+      break;
+    case STATE_CHECKSUM:
       pd->delta.filechecksum = strdup(pd->content);
       break;
-      case STATE_SIZE:
-          pd->delta.downloadsize = atoi(pd->content);
-          break;
-      case STATE_SEQUENCE:
+    case STATE_SIZE:
+      pd->delta.downloadsize = atoi(pd->content);
+      break;
+    case STATE_SEQUENCE:
       if ((str = pd->content))
-      {
+	{
 	  const char *s1, *s2;
 	  s1 = strrchr(str, '-');
 	  if (s1)
-          {
+	    {
 	      for (s2 = s1 - 1; s2 > str; s2--)
 	        if (*s2 == '-')
-                    break;
+		  break;
 	      if (*s2 == '-')
-              {
+		{
 		  for (s2 = s2 - 1; s2 > str; s2--)
-                      if (*s2 == '-')
-                          break;
+		    if (*s2 == '-')
+		      break;
 		  if (*s2 == '-')
-                  {
+		    {
 		      pd->delta.seqevr = strn2id(pool, s2 + 1, s1 - s2 - 1, 1);
 		      pd->delta.seqname = strn2id(pool, str, s2 - str, 1);
 		      str = s1 + 1;
-                  }
-              }
-          }
+		    }
+		}
+	    }
 	  pd->delta.seqnum = strdup(str);
       }
-      default:
+    default:
       break;
-  }
+    }
 
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
-  
-  return;
 }
 
 
@@ -509,14 +503,8 @@ characterData(void *userData, const XML_Char *s, int len)
   struct parsedata *pd = userData;
   int l;
   char *c;
-  if (!pd->docontent) {
-#if 0
-    char *dup = strndup( s, len );
-  fprintf(stderr, "Content: [%d]'%s'\n", pd->state, dup );
-  free( dup );
-#endif
+  if (!pd->docontent)
     return;
-  }
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {

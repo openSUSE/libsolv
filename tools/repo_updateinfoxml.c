@@ -19,6 +19,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "repo_updateinfoxml.h"
+#define DISABLE_SPLIT
 #include "tools_util.h"
 
 /*
@@ -247,9 +248,9 @@ startElement(void *userData, const char *name, const char **atts)
 
   switch(pd->state)
     {
-      case STATE_START:
+    case STATE_START:
       break;
-      case STATE_UPDATES:
+    case STATE_UPDATES:
       break;
       /*
        * <update from="rel-eng@fedoraproject.org"
@@ -257,7 +258,7 @@ startElement(void *userData, const char *name, const char **atts)
        *         type="bugfix" (enhancement, security)
        *         version="1.4">
        */
-      case STATE_UPDATE:
+    case STATE_UPDATE:
       {
 	const char *from = 0, *status = 0, *type = 0, *version = 0;
 	for (; *atts; atts += 2)
@@ -287,17 +288,17 @@ startElement(void *userData, const char *name, const char **atts)
       }
       break;
       /* <id>FEDORA-2007-4594</id> */
-      case STATE_ID:
+    case STATE_ID:
       break;
       /* <title>imlib-1.9.15-6.fc8</title> */
-      case STATE_TITLE:
+    case STATE_TITLE:
       break;
       /* <release>Fedora 8</release> */
-      case STATE_RELEASE:
+    case STATE_RELEASE:
       break;
       /*  <issued date="2008-03-21 21:36:55"/>
       */
-      case STATE_ISSUED:
+    case STATE_ISSUED:
       {
 	const char *date = 0;
 	for (; *atts; atts += 2)
@@ -308,14 +309,14 @@ startElement(void *userData, const char *name, const char **atts)
 	repodata_set_str(pd->data, pd->datanum, SOLVABLE_BUILDTIME, date);
       }
       break;
-      case STATE_REFERENCES:
+    case STATE_REFERENCES:
       break;
       /*  <reference href="https://bugzilla.redhat.com/show_bug.cgi?id=330471"
        *             id="330471"
        *             title="LDAP schema file missing for dhcpd"
        *             type="bugzilla"/>
        */
-      case STATE_REFERENCE:
+    case STATE_REFERENCE:
       {
         const char *href = 0, *id = 0, *title = 0, *type = 0;
 	for (; *atts; atts += 2)
@@ -338,18 +339,18 @@ startElement(void *userData, const char *name, const char **atts)
       }
       break;
       /* <description>This update ...</description> */
-      case STATE_DESCRIPTION:
+    case STATE_DESCRIPTION:
       break;
       /* <message type="confirm">This update ...</message> */
-      case STATE_MESSAGE:
+    case STATE_MESSAGE:
       break;
-      case STATE_PKGLIST:
+    case STATE_PKGLIST:
       break;
       /* <collection short="F8" */
-      case STATE_COLLECTION:
+    case STATE_COLLECTION:
       break;
       /* <name>Fedora 8</name> */ 
-      case STATE_NAME:
+    case STATE_NAME:
       break;
       /*   <package arch="ppc64" name="imlib-debuginfo" release="6.fc8"
        *            src="http://download.fedoraproject.org/pub/fedora/linux/updates/8/ppc64/imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm"
@@ -358,7 +359,7 @@ startElement(void *userData, const char *name, const char **atts)
        *
        * -> patch.conflicts: {name} < {version}.{release}
        */
-      case STATE_PACKAGE:
+    case STATE_PACKAGE:
       {
 	const char *arch = 0, *name = 0, *src = 0;
 	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
@@ -415,21 +416,18 @@ startElement(void *userData, const char *name, const char **atts)
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
-      case STATE_FILENAME:
+    case STATE_FILENAME:
       break;
       /* <reboot_suggested>True</reboot_suggested> */
-      case STATE_REBOOT:
+    case STATE_REBOOT:
       break;
       /* <restart_suggested>True</restart_suggested> */
-      case STATE_RESTART:
+    case STATE_RESTART:
       break;
       /* <relogin_suggested>True</relogin_suggested> */
-      case STATE_RELOGIN:
+    case STATE_RELOGIN:
       break;
-      case NUMSTATES+1:
-        split(NULL, NULL, 0); /* just to keep gcc happy about tools_util.h: static ... split() {...}  Urgs!*/
-      break;
-      default:
+    default:
       break;
     }
   return;
@@ -460,14 +458,14 @@ endElement(void *userData, const char *name)
   pd->statedepth--;
   switch (pd->state)
     {
-      case STATE_START:
+    case STATE_START:
       break;
-      case STATE_UPDATES:
+    case STATE_UPDATES:
       break;
-      case STATE_UPDATE:
+    case STATE_UPDATE:
       s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       break;
-      case STATE_ID:
+    case STATE_ID:
       {
         if (pd->content)
 	  {
@@ -476,7 +474,7 @@ endElement(void *userData, const char *name)
       }
       break;
       /* <title>imlib-1.9.15-6.fc8</title> */
-      case STATE_TITLE:
+    case STATE_TITLE:
       {
 	while (pd->lcontent > 0
 	       && *(pd->content + pd->lcontent - 1) == '\n')
@@ -490,38 +488,37 @@ endElement(void *userData, const char *name)
       /*
        * <release>Fedora 8</release>
        */
-      case STATE_RELEASE:
+    case STATE_RELEASE:
       break;
-      case STATE_ISSUED:
+    case STATE_ISSUED:
       break;
-      case STATE_REFERENCES:
+    case STATE_REFERENCES:
       break;
-      case STATE_REFERENCE:
+    case STATE_REFERENCE:
       break;
       /*
        * <description>This update ...</description>
        */
-      case STATE_DESCRIPTION:
+    case STATE_DESCRIPTION:
       {
 	repodata_set_str(pd->data, pd->datanum, SOLVABLE_DESCRIPTION, pd->content);
       }
       break;   
-      break;
       /*
        * <message>Warning! ...</message>
        */
-      case STATE_MESSAGE:
+    case STATE_MESSAGE:
       {
 	repodata_set_str(pd->data, pd->datanum, UPDATE_MESSAGE, pd->content);
       }
       break;
-      case STATE_PKGLIST:
+    case STATE_PKGLIST:
       break;
-      case STATE_COLLECTION:
+    case STATE_COLLECTION:
       break;
-      case STATE_NAME:
+    case STATE_NAME:
       break;
-      case STATE_PACKAGE:
+    case STATE_PACKAGE:
       {
 #if DO_ARRAY
 	/* write _FILENAME and _FLAGS at </package>
@@ -537,7 +534,7 @@ endElement(void *userData, const char *name)
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
-      case STATE_FILENAME:
+    case STATE_FILENAME:
       {
 #if DO_ARRAY
 	repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION_FILENAME, pd->content);
@@ -546,7 +543,7 @@ endElement(void *userData, const char *name)
       }
       break;
       /* <reboot_suggested>True</reboot_suggested> */
-      case STATE_REBOOT:
+    case STATE_REBOOT:
       {
 	if (pd->content
 	    && (pd->content[0] == 'T'
@@ -559,7 +556,7 @@ endElement(void *userData, const char *name)
       }
       break;
       /* <restart_suggested>True</restart_suggested> */
-      case STATE_RESTART:
+    case STATE_RESTART:
       {
 	if (pd->content
 	    && (pd->content[0] == 'T'
@@ -572,7 +569,7 @@ endElement(void *userData, const char *name)
       }
       break;
       /* <relogin_suggested>True</relogin_suggested> */
-      case STATE_RELOGIN:
+    case STATE_RELOGIN:
       {
 	if (pd->content
 	    && (pd->content[0] == 'T'
