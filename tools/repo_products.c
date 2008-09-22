@@ -355,7 +355,7 @@ endElement(void *userData, const char *name)
     break;
     case STATE_CPENAME:
       if (pd->content)
-        repodata_set_str(pd->data, pd->handle, PRODUCT_CPE_NAME, pd->content);
+        repodata_set_str(pd->data, pd->handle, SOLVABLE_CPE_NAME, pd->content);
     default:
       break;
     }
