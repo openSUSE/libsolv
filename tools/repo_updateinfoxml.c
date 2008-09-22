@@ -261,16 +261,16 @@ startElement(void *userData, const char *name, const char **atts)
       {
 	const char *from = 0, *status = 0, *type = 0, *version = 0;
 	for (; *atts; atts += 2)
-	{
-	  if (!strcmp(*atts, "from"))
-	    from = atts[1];
-	  else if (!strcmp(*atts, "status"))
-	    status = atts[1];
-	  else if (!strcmp(*atts, "type"))
-	    type = atts[1];
-	  else if (!strcmp(*atts, "version"))
-	    version = atts[1];
-	}
+	  {
+	    if (!strcmp(*atts, "from"))
+	      from = atts[1];
+	    else if (!strcmp(*atts, "status"))
+	      status = atts[1];
+	    else if (!strcmp(*atts, "type"))
+	      type = atts[1];
+	    else if (!strcmp(*atts, "version"))
+	      version = atts[1];
+	  }
 	
 
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
@@ -301,10 +301,10 @@ startElement(void *userData, const char *name, const char **atts)
       {
 	const char *date = 0;
 	for (; *atts; atts += 2)
-	{
-	  if (!strcmp(*atts, "date"))
-	    date = atts[1];
-	}
+	  {
+	    if (!strcmp(*atts, "date"))
+	      date = atts[1];
+	  }
 	repodata_set_str(pd->data, pd->datanum, SOLVABLE_BUILDTIME, date);
       }
       break;
@@ -319,16 +319,16 @@ startElement(void *userData, const char *name, const char **atts)
       {
         const char *href = 0, *id = 0, *title = 0, *type = 0;
 	for (; *atts; atts += 2)
-	{
-	  if (!strcmp(*atts, "href"))
-	    href = atts[1];
-	  else if (!strcmp(*atts, "id"))
-	    id = atts[1];
-	  else if (!strcmp(*atts, "title"))
-	    title = atts[1];
-	  else if (!strcmp(*atts, "type"))
-	    type = atts[1];
-	}
+	  {
+	    if (!strcmp(*atts, "href"))
+	      href = atts[1];
+	    else if (!strcmp(*atts, "id"))
+	      id = atts[1];
+	    else if (!strcmp(*atts, "title"))
+	      title = atts[1];
+	    else if (!strcmp(*atts, "type"))
+	      type = atts[1];
+	  }
 #if DO_ARRAY
         repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_HREF, href);
         repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_ID, id);
@@ -372,14 +372,14 @@ startElement(void *userData, const char *name, const char **atts)
 	
 
 	for (; *atts; atts += 2)
-	{
-	  if (!strcmp(*atts, "arch"))
-	    arch = atts[1];
-	  else if (!strcmp(*atts, "name"))
-	    name = atts[1];
-	  else if (!strcmp(*atts, "src"))
-	    src = atts[1];
-	}
+	  {
+	    if (!strcmp(*atts, "arch"))
+	      arch = atts[1];
+	    else if (!strcmp(*atts, "name"))
+	      name = atts[1];
+	    else if (!strcmp(*atts, "src"))
+	      src = atts[1];
+	  }
 	/* generated Ids for name and arch */
 	n = str2id(pool, name, 1);
 	if (arch)
@@ -469,9 +469,10 @@ endElement(void *userData, const char *name)
       break;
       case STATE_ID:
       {
-        if (pd->content) {
-	  s->name = str2id(pool, join2("patch", ":", pd->content), 1);
-	}
+        if (pd->content)
+	  {
+	    s->name = str2id(pool, join2("patch", ":", pd->content), 1);
+	  }
       }
       break;
       /* <title>imlib-1.9.15-6.fc8</title> */
@@ -479,10 +480,10 @@ endElement(void *userData, const char *name)
       {
 	while (pd->lcontent > 0
 	       && *(pd->content + pd->lcontent - 1) == '\n')
-	{
-	  --pd->lcontent;
-	  *(pd->content + pd->lcontent) = 0;
-	}
+	  {
+	    --pd->lcontent;
+	    *(pd->content + pd->lcontent) = 0;
+	  }
 	repodata_set_str(pd->data, pd->datanum, SOLVABLE_SUMMARY, pd->content);
       }
       break;
@@ -527,9 +528,9 @@ endElement(void *userData, const char *name)
 	 * to ensure all UPDATE_COLLECTION_* arrays are filled in parallel
 	 */
 	if (!package_filename_seen)
-	{
-	  repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION_FILENAME, "");
-	}
+	  {
+	    repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION_FILENAME, "");
+	  }
 	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_FLAGS, package_flags+1);
 #endif
       }
@@ -550,11 +551,11 @@ endElement(void *userData, const char *name)
 	if (pd->content
 	    && (pd->content[0] == 'T'
 		|| pd->content[0] == 't'|| pd->content[0] == '1'))
-	{
-	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
-	  package_flags = 1;
-	}
+	  {
+	    /* FIXME: this is per-package, the global flag should be computed at runtime */
+	    repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
+	    package_flags = 1;
+	  }
       }
       break;
       /* <restart_suggested>True</restart_suggested> */
@@ -563,11 +564,11 @@ endElement(void *userData, const char *name)
 	if (pd->content
 	    && (pd->content[0] == 'T'
 		|| pd->content[0] == 't' || pd->content[0] == '1'))
-	{
-	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
-	  package_flags = 2;
-	}
+	  {
+	    /* FIXME: this is per-package, the global flag should be computed at runtime */
+	    repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
+	    package_flags = 2;
+	  }
       }
       break;
       /* <relogin_suggested>True</relogin_suggested> */
@@ -576,22 +577,19 @@ endElement(void *userData, const char *name)
 	if (pd->content
 	    && (pd->content[0] == 'T'
 		|| pd->content[0] == 't' || pd->content[0] == '1'))
-	{
-	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->datanum, UPDATE_RELOGIN);
-	  package_flags = 2;
-	}
+	  {
+	    /* FIXME: this is per-package, the global flag should be computed at runtime */
+	    repodata_set_void(pd->data, pd->datanum, UPDATE_RELOGIN);
+	    package_flags = 2;
+	  }
       }
       break;
-      default:
+    default:
       break;
     }
 
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
-  
-
-  return;
 }
 
 
@@ -601,14 +599,14 @@ characterData(void *userData, const XML_Char *s, int len)
   struct parsedata *pd = userData;
   int l;
   char *c;
-  if (!pd->docontent) {
+
+  if (!pd->docontent)
+    {
 #if 0
-    char *dup = strndup( s, len );
-  fprintf(stderr, "Content: [%d]'%s'\n", pd->state, dup );
-  free( dup );
+      fprintf(stderr, "Content: [%d]'%.*s'\n", pd->state, len, s);
 #endif
-    return;
-  }
+      return;
+    }
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
