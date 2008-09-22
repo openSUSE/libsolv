@@ -202,7 +202,7 @@ repo_add_content(Repo *repo, FILE *fp)
   Pool *pool = repo->pool;
   char *line, *linep;
   int aline;
-  Solvable *s, *firsts = 0;
+  Solvable *s;
   struct parsedata pd;
   Repodata *data;
   Id handle = 0;
@@ -281,20 +281,27 @@ repo_add_content(Repo *repo, FILE *fp)
 	  if ((code10 && istag ("PRODUCT"))
 	      || (code11 && istag ("NAME")))
 	    {
-	      /* Finish old solvable, but only if it wasn't created
-	         on demand without seeing a PRODUCT entry.  */
-	      if (!firsts)
+	      if (s && !s->name)
 		{
-		  if (s && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-		    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-		  if (s && code10)
-		    s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
-		  /* first product.  */
-		  s = pool_id2solvable(pool, repo_add_solvable(repo));
-		  repodata_extend(data, s - pool->solvables);
-		  handle = repodata_get_handle(data, s - pool->solvables - repo->start);
+		  /* this solvable was created without seeing a
+		     PRODUCT entry, just set the name and continue */
+		  s->name = str2id(pool, join(&pd, "product", ":", value), 1);
+		  continue;
 		}
-	      firsts = 0;
+	      if (s)
+		{
+		  /* finish old solvable */
+		  if (!s->arch)
+		    s->arch = ARCH_NOARCH;
+		  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+		    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+		  if (code10)
+		    s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
+		}
+	      /* create new solvable */
+	      s = pool_id2solvable(pool, repo_add_solvable(repo));
+	      repodata_extend(data, s - pool->solvables);
+	      handle = repodata_get_handle(data, s - pool->solvables - repo->start);
 	      s->name = str2id(pool, join(&pd, "product", ":", value), 1);
 	      continue;
 	    }
@@ -303,7 +310,7 @@ repo_add_content(Repo *repo, FILE *fp)
 	     from here on.  */
 	  if (!s)
 	    {
-	      firsts = s = pool_id2solvable(pool, repo_add_solvable(repo));
+	      s = pool_id2solvable(pool, repo_add_solvable(repo));
 	      repodata_extend(data, s - pool->solvables);
 	      handle = repodata_get_handle(data, s - pool->solvables - repo->start);
 	    }
@@ -398,7 +405,7 @@ repo_add_content(Repo *repo, FILE *fp)
 	fprintf (stderr, "malformed line: %s\n", line);
     }
 
-  if (!s)
+  if (!s || !s->name)
     {
       fprintf(stderr, "No product solvable created !\n");
       exit(1);
