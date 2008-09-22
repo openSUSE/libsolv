@@ -25,38 +25,26 @@
 #include "util.h"
 #include "repo_content.h"
 
-/* maximum number of architectures */
-#define MAX_MULTIARCH 25
 
-/*
- * split l into m parts, store to sp[]
- *  split at whitespace
- */
-
-static int
-split(char *l, char **sp, int m)
+/* split off a word, return null terminated pointer to it.
+ * return NULL if there is no word left. */
+static char *
+splitword(char **lp)
 {
-  int i;
-  for (i = 0; i < m;)
-    {
-      while (*l == ' ' || *l == '\t')
-	l++;
-      if (!*l)
-	break;
-      sp[i++] = l;
-      if (i == m)
-        break;
-      while (*l && !(*l == ' ' || *l == '\t'))
-	l++;
-      if (!*l)
-	break;
-      *l++ = 0;
-    }
-  if (i < m)
-    sp[i] = 0;	/* terminate array */
-  return i;
-}
+  char *w, *l = *lp;
 
+  while (*l == ' ' || *l == '\t')
+    l++;
+  w = *l ? l : 0;
+  while (*l && *l != ' ' && *l != '\t')
+    l++;
+  if (*l)
+    *l++ = 0;		/* terminate word */
+  while (*l == ' ' || *l == '\t')
+    l++; 		/* convenience: advance to next word */
+  *lp = l;
+  return w;
+}
 
 struct parsedata {
   Repo *repo;
@@ -135,40 +123,36 @@ join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
 static unsigned int
 adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id marker)
 {
-  char *sp[3], *name;
-  int flags;
+  char *name;
   Id id;
   
-  while(line)
+  while ((name = splitword(&line)) != 0)
     {
-      split(line, sp, 2);
-      name = sp[0];
-      if (!name)
-	break;
-      line = sp[1];
       /* Hack, as the content file adds 'package:' for package
          dependencies sometimes.  */
       if (!strncmp (name, "package:", 8))
         name += 8;
       id = str2id(pool, name, 1);
-      if (line && strpbrk(line, "<>="))
+      if (strpbrk(line, "<>="))
 	{
-	  split(line, sp, 3);
-	  if (!sp[0] || !sp[1])
+	  char *rel = splitword(&line);
+          char *evr = splitword(&line);
+	  int flags;
+
+	  if (!rel || !evr)
 	    {
-	      fprintf(stderr, "bad relation '%s %s'\n", name, sp[0]);
+	      fprintf(stderr, "bad relation '%s %s'\n", name, rel);
 	      exit(1);
 	    }
-	  line = sp[2];
 	  for (flags = 0; flags < 6; flags++)
-	    if (!strcmp(sp[0], flagtab[flags]))
+	    if (!strcmp(rel, flagtab[flags]))
 	      break;
 	  if (flags == 6)
 	    {
-	      fprintf(stderr, "Unknown relation '%s'\n", sp[0]);
+	      fprintf(stderr, "Unknown relation '%s'\n", rel);
 	      exit(1);
 	    }
-	  id = rel2id(pool, id, str2id(pool, sp[1], 1), flags + 1, 1);
+	  id = rel2id(pool, id, str2id(pool, evr, 1), flags + 1, 1);
 	}
       olddeps = repo_addid_dep(pd->repo, olddeps, id, marker);
     }
@@ -183,16 +167,10 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 static void
 add_multiple_strings(Repodata *data, Id handle, Id name, char *value)
 {
-  char *sp[2];
+  char *str;
 
-  while (value)
-    {
-      split(value, sp, 2);
-      if (!sp[0])
-	break;
-      value = sp[1];
-      repodata_add_poolstr_array(data, handle, name, sp[0]);
-    }
+  while ((str = splitword(&value)) != 0)
+    repodata_add_poolstr_array(data, handle, name, str);
 }
 
 /*
@@ -202,14 +180,11 @@ add_multiple_strings(Repodata *data, Id handle, Id name, char *value)
 static void
 add_multiple_urls(Repodata *data, Id handle, char *value, Id type)
 {
-  char *sp[2];
-  while (value)
+  char *url;
+
+  while ((url = splitword(&value)) != 0)
     {
-      split(value, sp, 2);
-      if (!sp[0])
-	break;
-      value = sp[1];
-      repodata_add_poolstr_array(data, handle, PRODUCT_URL, sp[0]);
+      repodata_add_poolstr_array(data, handle, PRODUCT_URL, url);
       repodata_add_idarray(data, handle, PRODUCT_URL_TYPE, type);
     }
 }
@@ -260,7 +235,7 @@ repo_add_content(Repo *repo, FILE *fp)
 
   for (;;)
     {
-      char *fields[2];
+      char *key, *value;
 
       /* read line into big-enough buffer */
       if (linep - line + 16 > aline)
@@ -279,12 +254,13 @@ repo_add_content(Repo *repo, FILE *fp)
       linep = line;
 
       /* expect "key value" lines */
-      if (split(line, fields, 2) == 2)
+      value = line;
+      key = splitword(&value);
+      
+      if (key)
         {
-	  char *key = fields[0];
-	  char *value = fields[1];
 #if 0
-	  fprintf (stderr, "key %s, value %s\n", key, fields[1]);
+	  fprintf (stderr, "key %s, value %s\n", key, value);
 #endif
 
 #define istag(x) (!strcmp (key, x))
@@ -362,22 +338,15 @@ repo_add_content(Repo *repo, FILE *fp)
 	    s->vendor = str2id(pool, value, 1);
           else if (istag ("BASEARCHS"))
             {
-              char *sp[2];
+              char *arch;
 
-              split(value, sp, 2);
-	      if (sp[0])
+	      if ((arch = splitword(&value)) != 0)
 		{
-		  value = sp[1];
-		  s->arch = str2id(pool, sp[0], 1);
-		  while (value)
+		  s->arch = str2id(pool, arch, 1);
+		  while ((arch = splitword(&value)) != 0)
 		    {
-		      /* got another arch */
-		      split(value, sp, 2);
-		      if (!sp[0])
-			break;
-		       value = sp[1];
 		       otherarchs = sat_extend(otherarchs, numotherarchs, 1, sizeof(Id), 7);
-		       otherarchs[numotherarchs++] = str2id(pool, sp[0], 1);
+		       otherarchs[numotherarchs++] = str2id(pool, arch, 1);
 		    }
 		}
             }
