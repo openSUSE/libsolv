@@ -61,16 +61,36 @@
 <open-checksum type="sha">24f8252f3dd041e37e7c3feb2d57e02b4422d316</open-checksum>
 </data>
 </repomd>
+
+support also extension suseinfo format
+<suseinfo>
+  <expire>timestamp</expire>
+  <products>
+    <id>...</id>
+  </products>
+  <kewwords>
+    <k>...</k>
+  </keywords>
+</suseinfo>
+
 */
 
 enum state {
   STATE_START,
-  STATE_REPOMD,       /* 1 */
-  STATE_DATA,         /* 2 */
-  STATE_LOCATION,     /* 3 */
-  STATE_CHECKSUM,     /* 4 */
-  STATE_TIMESTAMP,    /* 5 */
-  STATE_OPENCHECKSUM, /* 6 */
+  /* extension tags */
+  STATE_SUSEINFO,
+  STATE_EXPIRE,
+  STATE_PRODUCTS,
+  STATE_PRODUCT,
+  STATE_KEYWORDS,
+  STATE_KEYWORD,
+  /* normal repomd.xml */
+  STATE_REPOMD,
+  STATE_DATA,
+  STATE_LOCATION,
+  STATE_CHECKSUM,
+  STATE_TIMESTAMP,
+  STATE_OPENCHECKSUM,
   NUMSTATES
 };
 
@@ -83,7 +103,15 @@ struct stateswitch {
 
 /* !! must be sorted by first column !! */
 static struct stateswitch stateswitches[] = {
+  /* suseinfo tags */
   { STATE_START,       "repomd",          STATE_REPOMD, 0 },
+  { STATE_START,       "suseinfo",        STATE_SUSEINFO, 0 },  
+  { STATE_SUSEINFO,    "expire",          STATE_EXPIRE, 1 },  
+  { STATE_SUSEINFO,    "products",        STATE_PRODUCTS, 0 },  
+  { STATE_SUSEINFO,    "keywords",        STATE_KEYWORDS, 0 },  
+  { STATE_PRODUCTS,    "id",              STATE_PRODUCT, 1 },  
+  { STATE_KEYWORDS,    "k",               STATE_KEYWORD, 1 },  
+  /* standard tags */
   { STATE_REPOMD,      "data",            STATE_DATA,  0 },
   { STATE_DATA,        "location",        STATE_LOCATION, 0 },
   { STATE_DATA,        "checksum",        STATE_CHECKSUM, 1 },  
@@ -159,8 +187,6 @@ startElement(void *userData, const char *name, const char **atts)
   struct parsedata *pd = userData;
   /*Pool *pool = pd->pool;*/
   struct stateswitch *sw;
-  const char *expirestr = 0;
-  int expire = 0;
 
 #if 0
   fprintf(stderr, "start: [%d]%s\n", pd->state, name);
@@ -201,15 +227,7 @@ startElement(void *userData, const char *name, const char **atts)
         char *value;
         char *fvalue;
 
-        expirestr = (char*) find_attr("expire", atts);
-        if ( expirestr != NULL )
-          expire = atoi(expirestr);
-        if ( expire > 0 )
-          {
-            /* save the timestamp in the non solvable number 1 */
-            repo_set_num(pd->repo, -1, REPOSITORY_EXPIRE, expire);
-          }
-
+        /* this should be OBSOLETE soon */
         updstr = find_attr("updates", atts);
         if ( updstr != NULL )
           {
@@ -234,6 +252,12 @@ startElement(void *userData, const char *name, const char **atts)
           }
           break;
         }
+    case STATE_SUSEINFO: break;
+    case STATE_EXPIRE: break;
+    case STATE_PRODUCTS: break;
+    case STATE_PRODUCT: break;
+    case STATE_KEYWORDS: break;
+    case STATE_KEYWORD: break;
     case STATE_DATA: break;
     case STATE_LOCATION: break;
     case STATE_CHECKSUM: break;
@@ -291,6 +315,35 @@ endElement(void *userData, const char *name)
           repo_set_num(pd->repo, -1, REPOSITORY_TIMESTAMP, pd->timestamp);
         }
       break;
+    case STATE_EXPIRE:
+      {
+        int expire = 0;
+        if ( pd->content )
+          {
+            expire = atoi(pd->content);
+            if ( expire > 0 )
+              {
+                /* save the timestamp in the non solvable number 1 */
+                repo_set_num(pd->repo, -1, REPOSITORY_EXPIRE, expire);
+              }
+          }
+        break;
+      }
+    case STATE_PRODUCT:
+      {
+        if ( pd->content )
+          repo_add_poolstr_array(pd->repo, -1, REPOSITORY_PRODUCTS, pd->content);
+        break;
+      }
+    case STATE_KEYWORD:
+      {
+        if ( pd->content )
+          repo_add_poolstr_array(pd->repo, -1, REPOSITORY_KEYWORDS, pd->content);
+        break;
+      }
+    case STATE_SUSEINFO: break;
+    case STATE_PRODUCTS: break;
+    case STATE_KEYWORDS: break;
     case NUMSTATES: break;              
     default:
       break;

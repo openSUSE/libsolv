@@ -30,40 +30,35 @@ cd "$dir" || exit 1
 if test -d repodata; then
   cd repodata || exit 2
 
-  # This contains a primary.xml* and maybe patches
-  for i in primary.xml*; do
-    case $i in
-      *.gz) cmd="gzip -dc" ;;
-      *.bz2) cmd="bzip2 -dc" ;;
-      *) cmd="cat" ;;
-    esac
-    # only check the first primary.xml*, in case there are more
-    break
-  done
   primfile="/nonexist"
-  if test -n "$cmd"; then
-    # we have some primary.xml*
+  if test -f primary.xml || test -f primary.xml.gz || test -f primary.xml.bz2 ; then
     primfile=`mktemp` || exit 3
-    $cmd $i | rpmmd2solv $parser_options > $primfile || exit 4
-  fi
-
-  # This contains a susedata.xml* with extended primary data
- if test -f susedata.xml || test -f susedata.xml.gz || test -f susedata.xml.bz2 ; then
-     for i in susedata.xml*; do
-         case $i in
-             *.gz) cmd="gzip -dc" ;;
-             *.bz2) cmd="bzip2 -dc" ;;
-             *) cmd="cat" ;;
-         esac
-    # only check the first susedata.xml*, in case there are more
-         break
+    (
+     # fake tag to combine primary.xml and extensions
+     # like susedata.xml, other.xml, filelists.xml
+     echo '<rpmmd>'
+     for i in primary.xml* susedata.xml*; do
+       case $i in
+         *.gz) gzip -dc "$i";;
+	 *.bz2) bzip2 -dc "$i";;
+	 *) cat "$i";;
+       esac
+       # add a newline
+       echo
+       # only the first
+       break
      done
-     susedatafile="/nonexist"
-     if test -n "$cmd"; then
-    # we have some susedata.xml*
-         susedatafile=`mktemp` || exit 3
-         $cmd $i | rpmmd2solv $parser_options > $susedatafile || exit 4
-     fi
+     for i in susedata.xml*; do
+       case $i in
+         *.gz) gzip -dc "$i";;
+ 	 *.bz2) bzip2 -dc "$i";;
+         *) cat "$i";;
+       esac
+       # only the first
+       break
+     done
+     echo '</rpmmd>'
+    ) | grep -v '\?xml' |  sed '1i\<?xml version="1.0" encoding="UTF-8"?>' | rpmmd2solv $parser_options > $primfile || exit 4
   fi
 
   prodfile="/nonexist"
@@ -84,7 +79,7 @@ if test -d repodata; then
 
 
   # This contains repomd.xml
-  # for now we only read some keys like expiration
+  # for now we only read some keys like timestamp
   if test -f repomd.xml || test -f repomd.xml.gz || test -f repomd.xml.bz2 ; then
       for i in repomd.xml*; do
           case $i in
@@ -101,6 +96,27 @@ if test -d repodata; then
       # we have some repomd.xml*
           repomdfile=`mktemp` || exit 3
           $cmd $i | repomdxml2solv $parser_options > $repomdfile || exit 4
+      fi
+  fi
+
+  # This contains suseinfo.xml, which is extensions to repomd.xml
+  # for now we only read some keys like expiration and products
+  if test -f suseinfo.xml || test -f suseinfo.xml.gz || test -f suseinfo.xml.bz2 ; then
+      for i in suseinfo.xml*; do
+          case $i in
+              *.gz) cmd="gzip -dc" ;;
+              *.bz2) cmd="bzip2 -dc" ;;
+              *) cmd="cat" ;;
+          esac
+          # only check the first suseinfo.xml*, in case there are more
+          break
+      done
+
+      suseinfofile="/nonexist"
+      if test -n "$cmd"; then
+      # we have some suseinfo.xml*
+          suseinfofile=`mktemp` || exit 3
+          $cmd $i | repomdxml2solv $parser_options > $suseinfofile || exit 4
       fi
   fi
 
@@ -162,8 +178,8 @@ if test -d repodata; then
   if test -s $repomdfile; then
     m_repomdfile=$repomdfile
   fi
-  if test -s $susedatafile; then
-    m_susedata=$susedatafile
+  if test -s $suseinfofile; then
+    m_suseinfofile=$suseinfofile
   fi
   if test -s $primfile; then
     m_primfile=$primfile
@@ -180,8 +196,8 @@ if test -d repodata; then
   if test -s $deltainfofile; then
     m_deltainfofile=$deltainfofile
   fi
-  mergesolv $m_repomdfile $m_primfile $m_susedatafile $m_prodfile $m_patchfile $m_updateinfofile $m_deltainfofile
-  rm -f $repomdfile $primfile $prodfile $patchfile $updateinfofile $deltainfofile
+  mergesolv $m_repomdfile $m_suseinfofile $m_primfile $m_prodfile $m_patchfile $m_updateinfofile $m_deltainfofile
+  rm -f $repomdfile $suseinfofile $primfile $prodfile $patchfile $updateinfofile $deltainfofile
 
 elif test_susetags; then
   olddir=`pwd`

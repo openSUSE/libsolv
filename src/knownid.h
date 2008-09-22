@@ -158,6 +158,7 @@ KNOWNID(PRODUCT_REFERENCES,		"product:references"),
 KNOWNID(PRODUCT_UPDATEREPOKEY,		"product:updaterepokey"),
 KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),
 KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),
+KNOWNID(PRODUCT_CPE_NAME,	        "product:cpename"),
 
 /* argh */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
@@ -169,6 +170,10 @@ KNOWNID(REPOSITORY_TIMESTAMP,           "repository:timestamp"),
 KNOWNID(REPOSITORY_EXPIRE,              "repository:expire"),
 /* which things does this repo provides updates for, if it does */
 KNOWNID(REPOSITORY_UPDATES,              "repository:updates"),
+/* which products this repository is supposed to be for */
+KNOWNID(REPOSITORY_PRODUCTS,             "repository:products"),
+/* keyword (tags) for this repository */
+KNOWNID(REPOSITORY_KEYWORDS,             "repository:keywords"),
 
 KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
 KNOWNID(DELTA_PACKAGE_EVR,              "delta:pkgevr"),
