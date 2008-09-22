@@ -293,28 +293,32 @@ endElement(void *userData, const char *name)
   switch (pd->state)
     {
     case STATE_START: break;
-    case STATE_REPOMD: break;
+    case STATE_REPOMD: 
+      /* save the timestamp in the non solvable number 1 */
+      if ( pd->timestamp > 0 )
+        repo_set_num(pd->repo, -1, REPOSITORY_TIMESTAMP, pd->timestamp);
+      break;
     case STATE_DATA: break;
     case STATE_LOCATION: break;
     case STATE_CHECKSUM: break;
     case STATE_OPENCHECKSUM: break;
     case STATE_TIMESTAMP:
-      /**
-       * we want to look for the newer timestamp
-       * of all resources to save it as the time
-       * the metadata was generated
-       */
-      timestamp = atoi(pd->content);
-      /** if the timestamp is invalid or just 0 ignore it */
-      if ( timestamp == 0 )
+      {
+        /**
+         * we want to look for the newer timestamp
+         * of all resources to save it as the time
+         * the metadata was generated
+         */
+        timestamp = atoi(pd->content);
+        /** if the timestamp is invalid or just 0 ignore it */
+        if ( timestamp == 0 )
+          break;
+        if ( timestamp > pd->timestamp )
+          {
+            pd->timestamp = timestamp;
+          }
         break;
-      if ( timestamp > pd->timestamp )
-        {
-          pd->timestamp = timestamp;
-          /* save the timestamp in the non solvable number 1 */
-          repo_set_num(pd->repo, -1, REPOSITORY_TIMESTAMP, pd->timestamp);
-        }
-      break;
+      }
     case STATE_EXPIRE:
       {
         int expire = 0;
