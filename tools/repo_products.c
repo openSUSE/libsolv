@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -423,24 +424,107 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
       pd->ctime = 0;
     }
 
-  XML_Parser parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, pd);
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
-
-  for (;;)
+  if (code11)
     {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
+      XML_Parser parser = XML_ParserCreate(NULL);
+      XML_SetUserData(parser, pd);
+      XML_SetElementHandler(parser, startElement, endElement);
+      XML_SetCharacterDataHandler(parser, characterData);
+      
+      for (;;)
 	{
-	  fprintf(stderr, "repo_products: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  exit(1);
+	  l = fread(buf, 1, sizeof(buf), fp);
+	  if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
+	    {
+	      fprintf(stderr, "repo_products: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	      exit(1);
+	    }
+	  if (l == 0)
+	    break;
 	}
-      if (l == 0)
-	break;
+      XML_ParserFree(parser);
     }
-  XML_ParserFree(parser);
+  else
+    {
+      Id name = 0;
+      Id arch = 0;
+      Id version = 0;
+      int lnum = 0; /* line number */
+      char *ptr, *ptr1;
+      /* parse /etc/<xyz>-release file */
+      while (fgets(buf, sizeof(buf), fp))
+	{
+	  /* remove trailing \n */
+	  int l = strlen(buf);
+	  if (*(buf + l - 1) == '\n')
+	    {
+	      --l;
+	      *(buf + l) = 0;
+	    }
+	  ++lnum;
+	  
+	  if (lnum == 1)
+	    {
+	      /* 1st line, <name> [(<arch>)] */
+	      ptr = strchr(buf, '(');
+	      if (ptr)
+		{
+		  ptr1 = ptr - 1;
+		  *ptr++ = 0;
+		}
+	      else
+		ptr1 = buf + l - 1;
+	      
+	      /* track back until non-blank, non-digit */
+	      while (ptr1 > buf
+		     && (*ptr1 == ' ' || isdigit(*ptr1) || *ptr1 == '.'))
+		--ptr1;
+	      *(++ptr1) = 0;
+	      name = str2id(pd->pool, join2("product", ":", buf), 1);
+
+	      if (ptr)
+		{
+		  /* have arch */
+		  char *ptr1 = strchr(ptr, ')');
+		  if (ptr1)
+		    {
+		      *ptr1 = 0;
+		      /* downcase arch */
+		      ptr1 = ptr;
+		      while (*ptr1)
+			{
+			  if (isupper(*ptr1)) *ptr1 = tolower(*ptr1);
+			  ++ptr1;
+			}
+		      arch = str2id(pd->pool, ptr, 1);
+		    }
+		}
+	    }
+	  else if (strncmp(buf, "VERSION", 7) == 0) 
+	    {
+	      ptr = strchr(buf+7, '=');
+	      if (ptr)
+		{
+		  while (*++ptr == ' ');
+		  version = makeevr(pd->pool, ptr);
+		}
+	    }
+	}
+      if (name)
+	{
+	  Solvable *s = pd->solvable = pool_id2solvable(pd->pool, repo_add_solvable(pd->repo));
+	  s->name = name;
+	  if (version)
+	    s->evr = version;
+	  if (arch)
+	    s->arch = arch;
+	  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+	    s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
+	}
+    }
+  return;
 }
+
 
 
 /*
