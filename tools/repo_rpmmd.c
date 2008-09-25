@@ -52,6 +52,8 @@ enum state {
   
   /* Novell/SUSE extended attributes */
   STATE_EULA,
+  STATE_KEYWORDS,
+  STATE_KEYWORD,
   STATE_DISKUSAGE,
   STATE_DIRS,
   STATE_DIR,
@@ -161,6 +163,7 @@ static struct stateswitch stateswitches[] = {
 
   /* extended Novell/SUSE attributes (susedata.xml) */
   { STATE_SOLVABLE,    "eula",            STATE_EULA,         1 },
+  { STATE_SOLVABLE,    "keywords",        STATE_KEYWORDS,     0 },
   { STATE_SOLVABLE,    "diskusage",       STATE_DISKUSAGE,    0 },
 
   // pattern attribute
@@ -199,6 +202,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
   
    /* extended Novell/SUSE dskusage attributes (suseinfo.xml) */
+  { STATE_KEYWORDS,    "k",               STATE_KEYWORD,      1 },
   { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
   { STATE_DIRS,        "dir",             STATE_DIR,          0 },
 
@@ -1048,6 +1052,10 @@ endElement(void *userData, const char *name)
     case STATE_EULA:
       if (pd->content[0])
         repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->language), pd->content);
+      break;
+    case STATE_KEYWORD:
+      if (pd->content[0])
+        repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_KEYWORDS, pd->content);
       break;
     case STATE_DISKUSAGE:
       if (pd->ndirs)

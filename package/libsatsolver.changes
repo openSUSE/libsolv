@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu Sep 25 13:53:54 CEST 2008 - dmacvicar@suse.de
+
+- add support for keywords in susedata 
+
+-------------------------------------------------------------------
 Wed Sep 24 10:55:01 CEST 2008 - kkaempf@suse.de
 
 - parse /etc/<xyz>-release if no /etc/products.d present
