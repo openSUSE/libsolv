@@ -52,7 +52,6 @@ enum state {
   
   /* Novell/SUSE extended attributes */
   STATE_EULA,
-  STATE_KEYWORDS,
   STATE_KEYWORD,
   STATE_DISKUSAGE,
   STATE_DIRS,
@@ -163,7 +162,7 @@ static struct stateswitch stateswitches[] = {
 
   /* extended Novell/SUSE attributes (susedata.xml) */
   { STATE_SOLVABLE,    "eula",            STATE_EULA,         1 },
-  { STATE_SOLVABLE,    "keywords",        STATE_KEYWORDS,     0 },
+  { STATE_SOLVABLE,    "keyword",         STATE_KEYWORD,      1 },
   { STATE_SOLVABLE,    "diskusage",       STATE_DISKUSAGE,    0 },
 
   // pattern attribute
@@ -201,8 +200,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,      "rpm:header-range", STATE_HEADERRANGE, 0 },
   { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
   
-   /* extended Novell/SUSE dskusage attributes (suseinfo.xml) */
-  { STATE_KEYWORDS,    "k",               STATE_KEYWORD,      1 },
+   /* extended Novell/SUSE diskusage attributes (susedata.xml) */
   { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
   { STATE_DIRS,        "dir",             STATE_DIR,          0 },
 
