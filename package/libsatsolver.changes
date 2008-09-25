@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Sep 25 17:14:42 CEST 2008 - kkaempf@suse.de
+
+- fully support Dataiterator in Python and Ruby bindings.
+- 0.10.15
+
+-------------------------------------------------------------------
 Thu Sep 25 13:53:54 CEST 2008 - dmacvicar@suse.de
 
 - add support for keywords in susedata 
