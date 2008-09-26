@@ -30,6 +30,7 @@
 #define DISABLE_SPLIT
 #include "tools_util.h"
 #include "repo_content.h"
+#include "repo_zyppdb.h"
 
 
 //#define DUMPOUT 0
@@ -100,7 +101,6 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
-  int datanum;
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
@@ -590,7 +590,6 @@ void
 repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const char *root, const char *attribute)
 {
   const char *fullpath = proddir;
-  int code11;
   DIR *dir;
   int i;
   struct parsedata pd;
@@ -613,27 +612,41 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
       pd.sbtab[sw->to] = sw->from;
     }
 
-  code11 = 1;
   dir = opendir(fullpath);
-  if (!dir)
+  if (dir)
     {
-      fullpath = root ? join2(root, "", "/etc") : "/etc";
-      dir = opendir(fullpath);
-      code11 = 0;
-    }
-  if (!dir)
-    {
-      perror(fullpath);
+      parse_dir(dir, fullpath, &pd, repodata, 1); /* assume 'code11' products */
+      closedir(dir);
     }
   else
     {
-      parse_dir(dir, fullpath, &pd, repodata, code11);
+      fullpath = root ? join2(root, "", "/var/lib/zypp/db/products") : "/var/lib/zypp/db/products";
+      dir = opendir(fullpath);
+      if (dir)
+	{
+	  repo_add_zyppdb_products(repo, repodata, fullpath, dir); /* assume 'code10' zypp-style products */
+	  closedir(dir);
+	}
+      else
+	{
+	  fullpath = root ? join2(root, "", "/etc") : "/etc";
+	  dir = opendir(fullpath);
+	  if (dir)
+	    {
+	      parse_dir(dir, fullpath, &pd, repodata, 0); /* fall back to /etc/<xyz>-release parsing */
+	      closedir(dir);
+	    }
+	  else
+	    {
+	      perror(fullpath);
+	    }
+	}
     }
-
+	      
   sat_free((void *)pd.tmplang);
   free(pd.content);
   join_freemem();
-  closedir(dir);
+  
 }
 
 /* EOF */

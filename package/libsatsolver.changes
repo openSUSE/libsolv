@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Fri Sep 26 11:54:34 CEST 2008 - kkaempf@suse.de
+
+- new fallback strategy for installed products in rpmdb2solv
+  try /etc/products.d (code11 style) first
+  if this fails, try /var/lib/zypp/db/products/*
+  if this fails, fallback to /etc/*-release
+  (bnc#429177)
+- 0.10.16
+
+-------------------------------------------------------------------
 Thu Sep 25 17:14:42 CEST 2008 - kkaempf@suse.de
 
 - fully support Dataiterator in Python and Ruby bindings.

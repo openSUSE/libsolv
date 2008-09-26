@@ -12,6 +12,8 @@ SET(rpmdb2solv_REPOS
   repo_rpmdb.c
   repo_products.c
   repo_products.h
+  repo_zyppdb.c
+  repo_zyppdb.h
   repo_write.c
   common_write.c
 )
