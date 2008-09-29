@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Sep 29 14:53:09 CEST 2008 - ma@suse.de
+
+- rpms2solv failed to write out most solvable data (bnc #422338).
+- revision 11201
+
+-------------------------------------------------------------------
 Fri Sep 26 11:54:34 CEST 2008 - kkaempf@suse.de
 
 - new fallback strategy for installed products in rpmdb2solv

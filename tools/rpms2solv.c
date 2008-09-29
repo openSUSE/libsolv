@@ -77,9 +77,9 @@ main(int argc, char **argv)
   repo = repo_create(pool, "rpms2solv");
   repodata = repo_add_repodata(repo, 0);
   repo_add_rpms(repo, repodata, rpms, nrpms);
-  tool_write(repo, basefile, 0);
   if (repodata)
     repodata_internalize(repodata);
+  tool_write(repo, basefile, 0);
   pool_free(pool);
   for (c = 0; c < nrpms; c++)
     free((char *)rpms[c]);
