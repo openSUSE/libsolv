@@ -118,6 +118,7 @@ join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
 
 /*
  * add dependency to pool
+ * OBSOLETES product:SUSE_LINUX product:openSUSE < 11.0 package:openSUSE < 11.0
  */
 
 static unsigned int
@@ -125,7 +126,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 {
   char *name;
   Id id;
-  
+
   while ((name = splitword(&line)) != 0)
     {
       /* Hack, as the content file adds 'package:' for package
@@ -133,7 +134,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
       if (!strncmp (name, "package:", 8))
         name += 8;
       id = str2id(pool, name, 1);
-      if (strpbrk(line, "<>="))
+      if (strpbrk(line, "<>=") == line) /* next(!) word is rel */
 	{
 	  char *rel = splitword(&line);
           char *evr = splitword(&line);
@@ -214,11 +215,11 @@ repo_add_content(Repo *repo, FILE *fp)
      we use the first architecture in BASEARCHS or noarch
      for the product. At the end we create (clone) the product
      for each one of the remaining architectures
-     we allow max 4 archs 
+     we allow max 4 archs
   */
   unsigned int numotherarchs = 0;
   Id *otherarchs = 0;
-  
+
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
   aline = 1024;
@@ -256,7 +257,7 @@ repo_add_content(Repo *repo, FILE *fp)
       /* expect "key value" lines */
       value = line;
       key = splitword(&value);
-      
+
       if (key)
         {
 #if 0
@@ -419,7 +420,7 @@ repo_add_content(Repo *repo, FILE *fp)
       if (code10)
 	s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
     }
-  
+
   /* now for every other arch, clone the product except the architecture */
   for (i = 0; i < numotherarchs; ++i)
     {
@@ -438,7 +439,7 @@ repo_add_content(Repo *repo, FILE *fp)
       /* now merge the attributes */
       repodata_merge_attrs(data, p - pool->solvables - repo->start, s - pool->solvables- repo->start);
     }
-  
+
   if (data)
     repodata_internalize(data);
 
