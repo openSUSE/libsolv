@@ -38,6 +38,7 @@ if test -d repodata; then
      # like susedata.xml, other.xml, filelists.xml
      echo '<rpmmd>'
      for i in primary.xml* susedata.xml*; do
+       test -s "$i" || continue
        case $i in
          *.gz) gzip -dc "$i";;
 	 *.bz2) bzip2 -dc "$i";;
@@ -49,6 +50,7 @@ if test -d repodata; then
        break
      done
      for i in susedata.xml*; do
+       test -s "$i" || continue
        case $i in
          *.gz) gzip -dc "$i";;
  	 *.bz2) bzip2 -dc "$i";;
@@ -77,6 +79,23 @@ if test -d repodata; then
     ) | grep -v '\?xml' | rpmmd2solv $parser_options > $prodfile || exit 4
   fi
 
+  patternfile="/nonexist"
+  for i in patterns.xml*; do
+    test -s "$i" || continue
+    # got one!
+    patternfile=`mktemp` || exit 3
+    (
+      for i in patterns.xml*; do
+        test -s "$i" || continue
+        case $i in
+          *.gz) gzip -dc "$i" ;;
+	  *.bz2) bzip2 -dc "$i" ;;
+	  *) cat "$i" ;;
+        esac
+      done
+    ) | rpmmd2solv $parser_options > $patternfile || exit 4
+    break
+  done
 
   # This contains repomd.xml
   # for now we only read some keys like timestamp
@@ -184,6 +203,9 @@ if test -d repodata; then
   if test -s $primfile; then
     m_primfile=$primfile
   fi
+  if test -s $patternfile; then
+    m_patternfile=$patternfile
+  fi
   if test -s $prodfile; then
     m_prodfile=$prodfile
   fi
@@ -196,8 +218,8 @@ if test -d repodata; then
   if test -s $deltainfofile; then
     m_deltainfofile=$deltainfofile
   fi
-  mergesolv $m_repomdfile $m_suseinfofile $m_primfile $m_prodfile $m_patchfile $m_updateinfofile $m_deltainfofile
-  rm -f $repomdfile $suseinfofile $primfile $prodfile $patchfile $updateinfofile $deltainfofile
+  mergesolv $m_repomdfile $m_suseinfofile $m_primfile $m_prodfile $m_patternfile $m_patchfile $m_updateinfofile $m_deltainfofile
+  rm -f $repomdfile $suseinfofile $primfile $patternfile $prodfile $patchfile $updateinfofile $deltainfofile
 
 elif test_susetags; then
   olddir=`pwd`
