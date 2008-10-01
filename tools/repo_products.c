@@ -46,7 +46,7 @@ enum state {
   STATE_SUMMARY,         // 7
   STATE_DESCRIPTION,     // 8
   STATE_UPDATEREPOKEY,   // 9 should go away
-  STATE_CPENAME,         // 9
+  STATE_CPEID,         // 9
   STATE_URLS,            // 10
   STATE_URL,             // 11
   STATE_RUNTIMECONFIG,   // 12
@@ -81,7 +81,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PRODUCT,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
   { STATE_PRODUCT,   "linguas",       STATE_LINGUAS,       0 },
   { STATE_PRODUCT,   "updaterepokey", STATE_UPDATEREPOKEY, 1 },
-  { STATE_PRODUCT,   "cpename",       STATE_CPENAME,       1 },
+  { STATE_PRODUCT,   "cpename",       STATE_CPEID,       1 },
   { STATE_URLS,      "url",           STATE_URL,           1 },
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
   { STATE_REGISTER,  "flavor",        STATE_FLAVOR,        1 },
@@ -354,9 +354,9 @@ endElement(void *userData, const char *name)
 	  printf("%s\n", pd->content);
 	}
     break;
-    case STATE_CPENAME:
+    case STATE_CPEID:
       if (pd->content)
-        repodata_set_str(pd->data, pd->handle, SOLVABLE_CPE_NAME, pd->content);
+        repodata_set_str(pd->data, pd->handle, SOLVABLE_CPE_ID, pd->content);
     default:
       break;
     }
