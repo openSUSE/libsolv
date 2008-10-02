@@ -49,7 +49,7 @@ enum state {
   STATE_DOWNLOADSIZE,
   STATE_INSTALLTIME,
   STATE_INSTALLONLY,
-  
+
   /* Novell/SUSE extended attributes */
   STATE_EULA,
   STATE_KEYWORD,
@@ -81,8 +81,6 @@ enum state {
   STATE_UPDATEURL,
   STATE_OPTIONALURL,
   STATE_FLAG,
-  STATE_FLAVOR,
-  STATE_REFERENCES,
 
   /* rpm-md dependencies inside the
      format tag */
@@ -135,7 +133,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_START,       "pattern",         STATE_SOLVABLE, 0 },
   { STATE_START,       "patch",           STATE_SOLVABLE, 0 },
   { STATE_START,       "package",         STATE_SOLVABLE, 0 },
-  
+
   { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
   { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
   { STATE_SOLVABLE,    "version",         STATE_VERSION, 0 },
@@ -143,7 +141,7 @@ static struct stateswitch stateswitches[] = {
   // package attributes rpm-md
   { STATE_SOLVABLE,    "location",        STATE_LOCATION, 0 },
   { STATE_SOLVABLE,    "checksum",        STATE_CHECKSUM, 1 },
-  
+
   /* resobject attributes */
 
   { STATE_SOLVABLE,    "summary",         STATE_SUMMARY,      1 },
@@ -179,14 +177,12 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "update-url",        STATE_UPDATEURL,   1 },
   { STATE_SOLVABLE,    "optional-url",      STATE_OPTIONALURL, 1 },
   { STATE_SOLVABLE,    "flag",              STATE_FLAG,        1 },
-  { STATE_SOLVABLE,    "flavor",            STATE_FLAVOR,      1 },
-  { STATE_SOLVABLE,    "references",        STATE_REFERENCES,  1 },
 
   { STATE_SOLVABLE,      "rpm:vendor",      STATE_VENDOR,      1 },
   { STATE_SOLVABLE,      "rpm:group",       STATE_RPM_GROUP,   1 },
   { STATE_SOLVABLE,      "rpm:license",     STATE_RPM_LICENSE, 1 },
 
-  /* rpm-md dependencies */ 
+  /* rpm-md dependencies */
   { STATE_SOLVABLE,      "rpm:provides",    STATE_PROVIDES,     0 },
   { STATE_SOLVABLE,      "rpm:requires",    STATE_REQUIRES,     0 },
   { STATE_SOLVABLE,      "rpm:obsoletes",   STATE_OBSOLETES,    0 },
@@ -199,7 +195,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,      "rpm:sourcerpm",   STATE_SOURCERPM,    1 },
   { STATE_SOLVABLE,      "rpm:header-range", STATE_HEADERRANGE, 0 },
   { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
-  
+
    /* extended Novell/SUSE diskusage attributes (susedata.xml) */
   { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
   { STATE_DIRS,        "dir",             STATE_DIR,          0 },
@@ -213,7 +209,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUGGESTS,    "rpm:entry",       STATE_SUGGESTSENTRY, 0 },
   { STATE_ENHANCES,    "rpm:entry",       STATE_ENHANCESENTRY, 0 },
   { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
-  
+
   { NUMSTATES}
 };
 
@@ -343,7 +339,7 @@ commit_diskusage (struct parsedata *pd, unsigned handle)
 /*
  * makeevr_atts
  * parse 'epoch', 'ver' and 'rel', return evr Id
- * 
+ *
  */
 
 static Id
@@ -418,7 +414,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
  * I: txt, name of attribute
  * I: atts, list of key/value attributes
  * O: pointer to value of matching key, or NULL
- * 
+ *
  */
 
 static inline const char *
@@ -450,7 +446,7 @@ static char *flagtab[] = {
 /*
  * adddep
  * parse attributes to reldep Id
- * 
+ *
  */
 
 static unsigned int
@@ -485,8 +481,8 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 	  pd->content = sat_realloc(pd->content, l + 256);
 	  pd->acontent = l + 256;
 	}
-      sprintf(pd->content, "%s:%s", k, n); 
-      name = str2id(pool, pd->content, 1); 
+      sprintf(pd->content, "%s:%s", k, n);
+      name = str2id(pool, pd->content, 1);
     }
   else
     name = str2id(pool, (char *)n, 1);
@@ -522,27 +518,27 @@ set_desciption_author(Repodata *data, Id handle, char *str)
   if (!str || !*str)
     return;
   for (aut = str; (aut = strchr(aut, '\n')) != 0; aut++)
-    if (!strncmp(aut, "\nAuthors:\n--------\n", 19)) 
+    if (!strncmp(aut, "\nAuthors:\n--------\n", 19))
       break;
   if (aut)
     {
       /* oh my, found SUSE special author section */
-      int l = aut - str; 
-      str[l] = 0; 
+      int l = aut - str;
+      str[l] = 0;
       while (l > 0 && str[l - 1] == '\n')
-	str[--l] = 0; 
+	str[--l] = 0;
       if (l)
 	repodata_set_str(data, handle, SOLVABLE_DESCRIPTION, str);
       p = aut + 19;
       aut = str;        /* copy over */
       while (*p == ' ' || *p == '\n')
 	p++;
-      while (*p) 
+      while (*p)
 	{
 	  if (*p == '\n')
 	    {
 	      *aut++ = *p++;
-	      while (*p == ' ') 
+	      while (*p == ' ')
 		p++;
 	      continue;
 	    }
@@ -550,7 +546,7 @@ set_desciption_author(Repodata *data, Id handle, char *str)
 	}
       while (aut != str && aut[-1] == '\n')
 	aut--;
-      *aut = 0; 
+      *aut = 0;
       if (*str)
 	repodata_set_str(data, handle, SOLVABLE_AUTHORS, str);
     }
@@ -561,7 +557,7 @@ set_desciption_author(Repodata *data, Id handle, char *str)
 
 /*
  * set_sourcerpm
- * 
+ *
  */
 
 static void
@@ -615,7 +611,7 @@ set_sourcerpm(Repodata *data, Solvable *s, Id handle, char *sourcerpm)
 /*
  * startElement
  * XML callback
- * 
+ *
  */
 
 static void XMLCALL
@@ -672,7 +668,7 @@ startElement(void *userData, const char *name, const char **atts)
         pd->kind = "product";
       else if (name[2] == 't' && name[3] == 'c')
         pd->kind = "patch";
-      
+
       /* to support extension metadata files like others.xml which
          have the following structure:
 
@@ -841,7 +837,7 @@ startElement(void *userData, const char *name, const char **atts)
         /* Really, do nothing, wat for <dir> tag */
         break;
       }
-    case STATE_DIR:  
+    case STATE_DIR:
       {
         long filesz = 0, filenum = 0;
         unsigned dirid;
@@ -850,7 +846,7 @@ startElement(void *userData, const char *name, const char **atts)
             dirid = repodata_str2dir(pd->data, str, 1);
           }
         else
-          {	      
+          {
             fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n", atts, *atts);
             break;
           }
@@ -878,7 +874,7 @@ startElement(void *userData, const char *name, const char **atts)
 /*
  * endElement
  * XML callback
- * 
+ *
  */
 
 static void XMLCALL
@@ -1039,14 +1035,6 @@ endElement(void *userData, const char *name)
       if (pd->content[0])
           repodata_set_poolstr(pd->data, handle, PRODUCT_FLAGS, pd->content);
       break;
-    case STATE_FLAVOR:
-      if (pd->content[0])
-        repodata_set_str(pd->data, handle, PRODUCT_FLAVOR, pd->content);
-      break;
-    case STATE_REFERENCES:
-      if (pd->content[0])
-        repodata_set_str(pd->data, handle, PRODUCT_REFERENCES, pd->content);
-      break;
     case STATE_EULA:
       if (pd->content[0])
         repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->language), pd->content);
@@ -1058,7 +1046,7 @@ endElement(void *userData, const char *name)
     case STATE_DISKUSAGE:
       if (pd->ndirs)
         commit_diskusage (pd, pd->handle);
-      break;    
+      break;
     default:
       break;
     }
@@ -1071,7 +1059,7 @@ endElement(void *userData, const char *name)
 /*
  * characterData
  * XML callback
- * 
+ *
  */
 
 static void XMLCALL
@@ -1105,7 +1093,7 @@ characterData(void *userData, const XML_Char *s, int len)
 /*
  * repo_add_rpmmd
  * parse rpm-md metadata (primary, others)
- * 
+ *
  */
 
 void

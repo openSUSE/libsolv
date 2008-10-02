@@ -54,8 +54,8 @@ enum state {
   STATE_LANG,            // 14
   STATE_REGISTER,        // 15
   STATE_TARGET,          // 16
-  STATE_FLAVOR,          // 17
   STATE_REGRELEASE,      // 18
+  STATE_PRODUCTLINE,     // 19
   NUMSTATES              // 0
 };
 
@@ -74,6 +74,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PRODUCT,   "version",       STATE_VERSION,       1 },
   { STATE_PRODUCT,   "release",       STATE_RELEASE,       1 },
   { STATE_PRODUCT,   "arch",          STATE_ARCH,          1 },
+  { STATE_PRODUCT,   "productline",   STATE_PRODUCTLINE,   1 },
   { STATE_PRODUCT,   "summary",       STATE_SUMMARY,       1 },
   { STATE_PRODUCT,   "description",   STATE_DESCRIPTION,   1 },
   { STATE_PRODUCT,   "register",      STATE_REGISTER,      0 },
@@ -81,10 +82,9 @@ static struct stateswitch stateswitches[] = {
   { STATE_PRODUCT,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
   { STATE_PRODUCT,   "linguas",       STATE_LINGUAS,       0 },
   { STATE_PRODUCT,   "updaterepokey", STATE_UPDATEREPOKEY, 1 },
-  { STATE_PRODUCT,   "cpename",       STATE_CPEID,       1 },
+  { STATE_PRODUCT,   "cpename",       STATE_CPEID,         1 },
   { STATE_URLS,      "url",           STATE_URL,           1 },
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
-  { STATE_REGISTER,  "flavor",        STATE_FLAVOR,        1 },
   { STATE_REGISTER,  "target",        STATE_TARGET,        1 },
   { STATE_REGISTER,  "release",       STATE_REGRELEASE,    1 },
   { NUMSTATES }
@@ -308,6 +308,9 @@ endElement(void *userData, const char *name)
     case STATE_ARCH:
       s->arch = str2id(pd->pool, pd->content, 1);
       break;
+    case STATE_PRODUCTLINE:
+      repodata_set_str(pd->data, pd->handle, PRODUCT_PRODUCTLINE, pd->content);
+    break;
     case STATE_UPDATEREPOKEY:
       repodata_set_str(pd->data, pd->handle, langtag(pd, PRODUCT_UPDATEREPOKEY, pd->tmplang), pd->content);
       break;
@@ -332,15 +335,6 @@ endElement(void *userData, const char *name)
       if (pd->currentproduct == pd->baseproduct
 	  && pd->attribute
 	  && !strcmp(pd->attribute, "register.target"))
-	{
-	  printf("%s\n", pd->content);
-	}
-    break;
-    case STATE_FLAVOR:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_FLAVOR, pd->content);
-      if (pd->currentproduct == pd->baseproduct
-	  && pd->attribute
-	  && !strcmp(pd->attribute, "register.flavor"))
 	{
 	  printf("%s\n", pd->content);
 	}
@@ -430,7 +424,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
       XML_SetUserData(parser, pd);
       XML_SetElementHandler(parser, startElement, endElement);
       XML_SetCharacterDataHandler(parser, characterData);
-      
+
       for (;;)
 	{
 	  l = fread(buf, 1, sizeof(buf), fp);
@@ -462,7 +456,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 	      *(buf + l) = 0;
 	    }
 	  ++lnum;
-	  
+
 	  if (lnum == 1)
 	    {
 	      /* 1st line, <name> [(<arch>)] */
@@ -474,7 +468,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 		}
 	      else
 		ptr1 = buf + l - 1;
-	      
+
 	      /* track back until non-blank, non-digit */
 	      while (ptr1 > buf
 		     && (*ptr1 == ' ' || isdigit(*ptr1) || *ptr1 == '.'))
@@ -500,7 +494,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
 		    }
 		}
 	    }
-	  else if (strncmp(buf, "VERSION", 7) == 0) 
+	  else if (strncmp(buf, "VERSION", 7) == 0)
 	    {
 	      ptr = strchr(buf+7, '=');
 	      if (ptr)
@@ -642,11 +636,11 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
 	    }
 	}
     }
-	      
+
   sat_free((void *)pd.tmplang);
   free(pd.content);
   join_freemem();
-  
+
 }
 
 /* EOF */

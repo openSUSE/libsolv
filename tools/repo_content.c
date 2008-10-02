@@ -316,14 +316,10 @@ repo_add_content(Repo *repo, FILE *fp)
 	      handle = repodata_get_handle(data, s - pool->solvables - repo->start);
 	    }
 
-	  if (code11 && istag ("REFERENCES"))
-	    repo_set_id(repo, s - pool->solvables, PRODUCT_REFERENCES, str2id(pool, value, 1));
-	  else if (istag ("VERSION"))
+	  if (istag ("VERSION"))
 	    s->evr = makeevr(pool, value);
 	  else if (code11 && istag ("DISTRIBUTION"))
 	    repo_set_str(repo, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
-	  else if (code11 && istag ("FLAVOR"))
-	    repo_set_str(repo, s - pool->solvables, PRODUCT_FLAVOR, value);
 	  else if (istag ("DATADIR"))
 	    repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, value);
 	  else if (istag ("UPDATEURLS"))
