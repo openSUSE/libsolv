@@ -72,7 +72,7 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
   int indent = 0;
 
   keyname = id2str(repo->pool, key->name);
-  for (kvp = kv; (kvp = kvp->path) != 0; indent += 2)
+  for (kvp = kv; (kvp = kvp->parent) != 0; indent += 2)
     printf("  ");
   switch(key->type)
     {

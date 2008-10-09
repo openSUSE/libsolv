@@ -862,7 +862,7 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	  data_addid(xd, kv->num);
 	if (!kv->eof)
 	  data_addid(xd, cbdata->subschemata[cbdata->current_sub++]);
-	if (xd == cbdata->extdata + 0 && !kv->path && !cbdata->doingsolvables)
+	if (xd == cbdata->extdata + 0 && !kv->parent && !cbdata->doingsolvables)
 	  {
 	    if (xd->len - cbdata->lastlen > cbdata->maxdata)
 	      cbdata->maxdata = xd->len - cbdata->lastlen;

@@ -361,7 +361,7 @@ startElement(void *userData, const char *name, const char **atts)
       {
 	const char *arch = 0, *name = 0, *src = 0;
 	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
-	Id n, a;
+	Id n, a = 0;
 	Id rel_id;
 
 	for (; *atts; atts += 2)
@@ -375,13 +375,14 @@ startElement(void *userData, const char *name, const char **atts)
 	  }
 	/* generated Id for name */
 	n = str2id(pool, name, 1);
+	rel_id = n;
 	if (arch)
 	  {
 	    /*  generate Id for arch and combine with name */
 	    a = str2id(pool, arch, 1);
-	    n = rel2id(pool, n, a, REL_ARCH, 1);
+	    rel_id = rel2id(pool, n, a, REL_ARCH, 1);
 	  }
-	rel_id = rel2id(pool, n, evr, REL_LT, 1);
+	rel_id = rel2id(pool, rel_id, evr, REL_LT, 1);
 
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
 
