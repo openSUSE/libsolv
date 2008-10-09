@@ -964,6 +964,13 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname, const char *ma
     di->repoid = -1;
   if (match)
     datamatcher_init(&di->matcher, di->pool, match, flags);
+  if (p == REPOENTRY_POS)
+    {
+      di->repo = di->pool->pos.repo;
+      di->data = di->repo->repodata + di->pool->pos.repodataid;
+      di->repoid = -1;
+      di->repodataid = -1;
+    }
   di->state = di_enterrepo;
 }
 
