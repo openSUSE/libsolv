@@ -40,11 +40,6 @@ typedef struct _Attrblobpage
   long file_size;
 } Attrblobpage;
 
-typedef struct _Repopos {
-  Id schema;
-  Id dp;
-} Repopos;
-
 typedef struct _Repodata {
   struct _Repo *repo;		/* back pointer to repo */
 
@@ -117,8 +112,6 @@ typedef struct _Repodata {
   Id lasthandle;
   Id lastkey;
   Id lastdatalen;
-
-  Repopos pos;
 
 } Repodata;
 

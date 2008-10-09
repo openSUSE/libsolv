@@ -43,6 +43,13 @@ struct _Repodata;
 struct _Repokey;
 struct _KeyValue;
 
+typedef struct _Repopos {
+  struct _Repo *repo;
+  Id repodataid;
+  Id schema;
+  Id dp; 
+} Repopos;
+
 struct _Pool {
   struct _Stringpool ss;
 
@@ -99,6 +106,9 @@ struct _Pool {
   /* load callback */
   FILE * (*loadcallback)(struct _Pool *, struct _Repodata *, void *);
   void *loadcallbackdata;
+
+  /* search position */
+  Repopos pos;
 };
 
 #define SAT_FATAL			(1<<0)

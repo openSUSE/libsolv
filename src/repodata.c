@@ -457,8 +457,13 @@ entry2data(Repodata *data, Id entry, Id *schemap)
     dp += 1;
   else if (entry == REPOENTRY_POS)	/* META */
     {
-      *schemap = data->pos.schema;
-      return data->incoredata + data->pos.dp;
+      Pool *pool = data->repo->pool;
+      if (data->repo != pool->pos.repo)
+	return 0;
+      if (data != data->repo->repodata + pool->pos.repodataid)
+	return 0;
+      *schemap = pool->pos.schema;
+      return data->incoredata + pool->pos.dp;
     }
   else
     {
@@ -728,17 +733,22 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
 }
 
 void
-repodata_set_pos_kv(Repodata *data, KeyValue *kv)
+repodata_setpos_kv(Repodata *data, KeyValue *kv)
 {
+  Pool *pool = data->repo->pool;
   if (!kv)
     {
-      data->pos.dp = 0;
-      data->pos.schema = 0;
+      pool->pos.repo = 0;
+      pool->pos.repodataid = 0;
+      pool->pos.dp = 0;
+      pool->pos.schema = 0;
     }
   else
     {
-      data->pos.dp = (unsigned char *)kv->str - data->incoredata;
-      data->pos.schema = kv->id;
+      pool->pos.repo = 0;
+      pool->pos.repodataid = data - data->repo->repodata;
+      pool->pos.dp = (unsigned char *)kv->str - data->incoredata;
+      pool->pos.schema = kv->id;
     }
 }
 
@@ -1190,6 +1200,15 @@ dataiterator_step(Dataiterator *di)
       /* found something! */
       return 1;
     }
+}
+
+void
+dataiterator_setpos(Dataiterator *di)
+{
+  di->pool->pos.repo = di->repo;
+  di->pool->pos.repodataid = di->data - di->repo->repodata;
+  di->pool->pos.schema = di->kv.id;
+  di->pool->pos.dp = (unsigned char *)di->kv.str - di->data->incoredata;
 }
 
 void
