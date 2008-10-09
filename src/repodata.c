@@ -1256,6 +1256,15 @@ dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
   di->state = di_enterrepo;
 }
 
+int
+dataiterator_match(Dataiterator *di, int flags, const void *vmatch)
+{
+  Datamatcher matcher = di->matcher;
+  matcher.flags = flags;
+  matcher.match = (void *)vmatch;
+  return datamatcher_match(&matcher, di->data, di->key, &di->kv);
+}
+
 #else
 
 /************************************************************************
