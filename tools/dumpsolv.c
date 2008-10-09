@@ -300,7 +300,7 @@ int main(int argc, char **argv)
       repo = pool->repos[j];
       dump_repodata(repo);
 
-      printf("repo %d contains %d solvables %d non-solvables\n", j, repo->nsolvables, repo->nextra);
+      printf("repo %d contains %d solvables\n", j, repo->nsolvables);
       printf("repo start: %d end: %d\n", repo->start, repo->end);
       for (i = repo->start, n = 1; i < repo->end; i++)
 	{
@@ -332,6 +332,7 @@ int main(int argc, char **argv)
 #endif
 	  n++;
 	}
+#if 0
       for (i = 0; i < repo->nextra; i++)
 	{
 	  printf("\nextra %d:\n", i);
@@ -340,6 +341,7 @@ int main(int argc, char **argv)
 	  while (dataiterator_step(&di))
 	    dump_attr(repo, di.data, di.key, &di.kv);
 	}
+#endif
 #if 0
       tryme(repo, 0, SOLVABLE_MEDIANR, 0, 0);
       printf("\n");
