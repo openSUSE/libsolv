@@ -355,7 +355,7 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
     }
   pd.pool = pool;
   pd.repo = repo;
-  pd.data = repo_add_repodata(pd.repo, 0);
+  pd.data = data;
 
   pd.content = malloc(256);
   pd.acontent = 256;
