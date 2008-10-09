@@ -2265,8 +2265,19 @@ selectandinstall(Solver *solv, int level, Queue *dq, Id inst, int disablerules)
   Id p;
   int i;
 
-  if (dq->count > 1 || inst)
-    policy_filter_unwanted(solv, dq, inst, POLICY_MODE_CHOOSE);
+  /* FIXME: do we really need that inst handling? */
+  if (solv->distupgrade && inst && dq->count)
+    {
+      policy_filter_unwanted(solv, dq, 0, POLICY_MODE_CHOOSE);
+      for (i = 0; i < dq->count; i++)
+	if (solvable_identical(pool, pool->solvables + inst, pool->solvables + dq->elements[i]))
+	  dq->elements[i] = inst;
+    }
+  else
+    {
+      if (dq->count > 1 || inst)
+	policy_filter_unwanted(solv, dq, inst, POLICY_MODE_CHOOSE);
+    }
 
   i = 0;
   if (dq->count > 1)

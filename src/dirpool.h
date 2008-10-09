@@ -18,6 +18,8 @@ typedef struct _Dirpool {
 } Dirpool;
 
 void dirpool_create(Dirpool *dp);
+void dirpool_free(Dirpool *dp);
+
 void dirpool_make_dirtraverse(Dirpool *dp);
 Id dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create);
 

@@ -40,6 +40,11 @@ typedef struct _Attrblobpage
   long file_size;
 } Attrblobpage;
 
+typedef struct _Repopos {
+  Id schema;
+  Id dp;
+} Repopos;
+
 typedef struct _Repodata {
   struct _Repo *repo;		/* back pointer to repo */
 
@@ -50,15 +55,9 @@ typedef struct _Repodata {
   int state;			/* available, stub or error */
 
   void (*loadcallback)(struct _Repodata *);
-  char *location;		/* E.g. filename or the like */
-  char *checksum;		/* Checksum of the file */
-  unsigned nchecksum;		/* Length of the checksum */
-  unsigned checksumtype;	/* Type of checksum */
 
   int start;			/* start of solvables this repodata is valid for */
   int end;			/* last solvable + 1 of this repodata */
-  int extrastart;
-  int nextra;
 
   FILE *fp;			/* file pointer of solv file */
   int error;			/* corrupt solv file */
@@ -66,24 +65,27 @@ typedef struct _Repodata {
 
   struct _Repokey *keys;	/* keys, first entry is always zero */
   unsigned int nkeys;		/* length of keys array */
+  unsigned char keybits[32];	/* keyname hash */
 
   Id *schemata;			/* schema -> offset into schemadata */
   unsigned int nschemata;	/* number of schemata */
-
   Id *schemadata;		/* schema storage */
   unsigned int schemadatalen;   /* schema storage size */
+  Id *schematahash;		/* unification helper */
 
   Stringpool spool;		/* local string pool */
   int localpool;		/* is local string pool used */
 
   Dirpool dirpool;		/* local dir pool */
 
+  Id mainschema;
+  Id *mainschemaoffsets;
+
   unsigned char *incoredata;	/* in-core data (flat_attrs) */
   unsigned int incoredatalen;	/* data len (attr_next_free) */
   unsigned int incoredatafree;	/* free data len */
 
   Id *incoreoffset;		/* offset for all entries (ent2attr) */
-  Id *extraoffset;		/* offset for all extra entries */
 
   Id *verticaloffset;		/* offset for all verticals, nkeys elements */
   Id lastverticaloffset;	/* end of verticals */
@@ -102,36 +104,48 @@ typedef struct _Repodata {
   unsigned char *vincore;	
   unsigned int vincorelen;
 
-  Id *attrs;			/* un-internalized attributes */
-  Id *extraattrs;		/* Same, but for extra objects.  */
+  Id **attrs;			/* un-internalized attributes */
+  Id **xattrs;			/* anonymous handles */
+  int nxattrs;
+
   unsigned char *attrdata;	/* their string data space */
   unsigned int attrdatalen;
   Id *attriddata;		/* their id space */
   unsigned int attriddatalen;
-  Id **structs;			/* key-value lists */
-  unsigned int nstructs;
 
   /* array cache */
   Id lasthandle;
   Id lastkey;
   Id lastdatalen;
 
-  Id *addedfileprovides;
+  Repopos pos;
+
 } Repodata;
 
+#define REPOENTRY_META		-1
+#define REPOENTRY_POS		-2
+#define REPOENTRY_SUBSCHEMA	-3		/* internal! */
 
 /*-----
  * management functions
  */
 void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
 void repodata_extend(Repodata *data, Id p);
-void repodata_extend_extra(Repodata *data, int nextra);
 void repodata_extend_block(Repodata *data, Id p, int num);
 void repodata_free(Repodata *data);
 
 /* internalize repodata into .solv, required before writing out a .solv file */
 void repodata_internalize(Repodata *data);
 
+Id repodata_key2id(Repodata *data, struct _Repokey *key, int create);
+Id repodata_schema2id(Repodata *data, Id *schema, int create);
+
+static inline int
+repodata_precheck_keyname(Repodata *data, Id keyname)
+{
+  unsigned char x = data->keybits[(keyname >> 3) & (sizeof(data->keybits) - 1)];
+  return x && (x & (1 << (keyname & 7))) ? 1 : 0;
+}
 
 /*----
  * access functions
@@ -144,22 +158,20 @@ void repodata_internalize(Repodata *data);
 void repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
 
 /* lookup functions */
-Id repodata_lookup_id(Repodata *data, Id entry, Id keyid);
-const char *repodata_lookup_str(Repodata *data, Id entry, Id keyid);
-int repodata_lookup_num(Repodata *data, Id entry, Id keyid, unsigned int *value);
-int repodata_lookup_void(Repodata *data, Id entry, Id keyid);
-const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyid, Id *typep);
+Id repodata_lookup_id(Repodata *data, Id entry, Id keyname);
+const char *repodata_lookup_str(Repodata *data, Id entry, Id keyname);
+int repodata_lookup_num(Repodata *data, Id entry, Id keyname, unsigned int *value);
+int repodata_lookup_void(Repodata *data, Id entry, Id keyname);
+const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyname, Id *typep);
 
 
 /*-----
  * data assignment functions
  */
 
-/* Returns a handle for the attributes of ENTRY.  ENTRY >= 0
-   corresponds to data associated with a solvable, ENTRY < 0 is
-   extra data.  The returned handle is used in the various repodata_set_*
-   functions to add attributes to it.  */
-Id repodata_get_handle(Repodata *data, Id entry);
+/* create an anonymous handle. useful for substructures like
+ * fixarray/flexarray  */
+Id repodata_new_handle(Repodata *data);
 
 /* basic types: void, num, string, Id */
 
@@ -191,11 +203,10 @@ void repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const ch
 
 /* Arrays */
 void repodata_add_idarray(Repodata *data, Id handle, Id keyname, Id id);
-void repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname,
-				const char *str);
-/* Creates a new substructure.  Returns a handle for it (usable with the
-   other repodata_{set,add}_* functions.  */
-Id repodata_create_struct(Repodata *data, Id handle, Id keyname);
+void repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname, const char *str);
+void repodata_add_fixarray(Repodata *data, Id handle, Id keyname, Id ghandle);
+void repodata_add_flexarray(Repodata *data, Id handle, Id keyname, Id ghandle);
+
 
 /*-----
  * data management
@@ -215,9 +226,5 @@ Id repodata_globalize_id(Repodata *data, Id id);
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
 const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
-
-/* internal */
-unsigned int repodata_compress_page(unsigned char *, unsigned int, unsigned char *, unsigned int);
-void repodata_read_or_setup_pages(Repodata *data, unsigned int pagesz, unsigned int blobsz);
 
 #endif /* SATSOLVER_REPODATA_H */

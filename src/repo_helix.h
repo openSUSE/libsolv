@@ -21,7 +21,7 @@ extern "C" {
 #include "pool.h"
 #include "repo.h"
 
-extern void repo_add_helix(Repo *repo, FILE *fp);
+extern void repo_add_helix(Repo *repo, FILE *fp, int flags);
 
 #ifdef __cplusplus
 }

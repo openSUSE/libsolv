@@ -182,7 +182,7 @@ startElement(void *userData, const char *name, const char **atts)
 	const char *type = find_attr("type", atts, 0);
 	s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 	repodata_extend(pd->data, s - pool->solvables);
-	pd->handle = repodata_get_handle(pd->data, (s - pool->solvables) - pd->repo->start);
+	pd->handle = s - pool->solvables;
 	if (type)
 	  {
 	    repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, type);

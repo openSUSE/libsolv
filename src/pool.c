@@ -810,16 +810,26 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   return 0;
 }
 
+static int
+addfileprovides_setid_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
+{
+  Map *provideids = cbdata;
+  if (key->type != REPOKEY_TYPE_IDARRAY)
+    return 0;
+  MAPSET(provideids, kv->id);
+  return kv->eof ? SEARCH_NEXT_SOLVABLE : 0;
+}
+
 
 static void
 pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, struct searchfiles *sf, Repo *repoonly)
 {
-  Id p, start, end, *idp;
+  Id p, start, end;
   Solvable *s;
   Repodata *data = 0, *nextdata;
   Repo *oldrepo = 0;
   int dataincludes = 0;
-  int i;
+  int i, j;
   Map providedids;
 
   cbd->nfiles = sf->nfiles;
@@ -842,6 +852,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
     {
       if (!s->repo || (repoonly && s->repo != repoonly))
 	continue;
+      /* check if p is in (oldrepo,data) */
       if (s->repo != oldrepo || (data && p >= data->end))
 	{
 	  data = 0;
@@ -849,28 +860,35 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	}
       if (oldrepo == 0)
 	{
+	  /* nope, find new repo/repodata */
+          /* if we don't find a match, set data to the next repodata */
 	  nextdata = 0;
 	  for (i = 0, data = s->repo->repodata; i < s->repo->nrepodata; i++, data++)
 	    {
-	      if (!data->addedfileprovides || p >= data->end)
+	      if (p >= data->end)
 		continue;
+	      if (data->state != REPODATA_AVAILABLE)
+		continue;
+	      for (j = 1; j < data->nkeys; j++)
+		if (data->keys[j].name == REPOSITORY_ADDEDFILEPROVIDES && data->keys[j].type == REPOKEY_TYPE_IDARRAY)
+		  break;
+	      if (j == data->nkeys)
+		continue;
+	      /* great, this repodata contains addedfileprovides */
 	      if (!nextdata || nextdata->start > data->start)
 		nextdata = data;
 	      if (p >= data->start)
 		break;
 	    }
 	  if (i == s->repo->nrepodata)
-	    data = nextdata;
+	    data = nextdata;	/* no direct hit, use next repodata */
 	  if (data)
 	    {
 	      map_init(&providedids, pool->ss.nstrings);
-	      for (idp = data->addedfileprovides; *idp; idp++)
-		MAPSET(&providedids, *idp);
+	      repodata_search(data, REPOENTRY_META, REPOSITORY_ADDEDFILEPROVIDES, addfileprovides_setid_cb, &providedids);
 	      for (i = 0; i < cbd->nfiles; i++)
 		if (!MAPTST(&providedids, cbd->ids[i]))
-		  {
-		    break;
-		  }
+		  break;
 	      map_free(&providedids);
 	      dataincludes = i == cbd->nfiles;
 	    }
@@ -1314,7 +1332,7 @@ pool_calc_installsizechange(Pool *pool, Repo *oldinstalled, Map *installedmap)
 	continue;
       if (!MAPTST(installedmap, sp))
 	continue;
-      change += repo_lookup_num(s, SOLVABLE_INSTALLSIZE);
+      change += solvable_lookup_num(s, SOLVABLE_INSTALLSIZE, 0);
     }
   if (oldinstalled)
     {
@@ -1322,7 +1340,7 @@ pool_calc_installsizechange(Pool *pool, Repo *oldinstalled, Map *installedmap)
 	{
 	  if (MAPTST(installedmap, sp))
 	    continue;
-	  change -= repo_lookup_num(s, SOLVABLE_INSTALLSIZE);
+	  change -= solvable_lookup_num(s, SOLVABLE_INSTALLSIZE, 0);
 	}
     }
   return change;

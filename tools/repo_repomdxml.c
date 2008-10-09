@@ -120,33 +120,6 @@ static struct stateswitch stateswitches[] = {
   { NUMSTATES }
 };
 
-/*
- * split l into m parts, store to sp[]
- *  split at whitespace
- */
-
-static inline int
-split_comma(char *l, char **sp, int m)
-{
-  int i;
-  for (i = 0; i < m;)
-    {
-      while (*l == ',')
-	l++;
-      if (!*l)
-	break;
-      sp[i++] = l;
-      if (i == m)
-        break;
-      while (*l && !(*l == ','))
-	l++;
-      if (!*l)
-	break;
-      *l++ = 0;
-    }
-  return i;
-}
-
 
 struct parsedata {
   int depth;
@@ -224,31 +197,23 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_REPOMD:
       {
         const char *updstr;
-        char *value;
-        char *fvalue;
 
         /* this should be OBSOLETE soon */
         updstr = find_attr("updates", atts);
-        if ( updstr != NULL )
+        if (updstr)
           {
-            value = strdup(updstr);
-            fvalue = value; /* save the first */
-            if ( value != NULL )
-              {
-                char *sp[2];
-                while (value)
-                  {
-                    int words = split_comma(value, sp, 2);
-                    if (!words)
-                      break;
-                    if (sp[0])
-                      repo_add_poolstr_array(pd->repo, -1, REPOSITORY_UPDATES, sp[0]);
-                    if (words == 1)
-                      break;
-                    value = sp[1];
-                  }
-                free(fvalue);
-              }
+            char *value = strdup(updstr);
+            char *fvalue = value; /* save the first */
+            while (value)
+	      {
+		char *p = strchr(value, ',');
+		if (*p)
+		  *p++ = 0;
+		if (*value)
+		  repo_add_poolstr_array(pd->repo, REPOENTRY_META, REPOSITORY_UPDATES, value);
+		value = p;
+	      }
+	    free(fvalue);
           }
           break;
         }
@@ -274,7 +239,6 @@ endElement(void *userData, const char *name)
 {
   struct parsedata *pd = userData;
   /* Pool *pool = pd->pool; */
-  int timestamp;
 
 #if 0
       fprintf(stderr, "end: %s\n", name);
@@ -294,9 +258,8 @@ endElement(void *userData, const char *name)
     {
     case STATE_START: break;
     case STATE_REPOMD: 
-      /* save the timestamp in the non solvable number 1 */
-      if ( pd->timestamp > 0 )
-        repo_set_num(pd->repo, -1, REPOSITORY_TIMESTAMP, pd->timestamp);
+      if (pd->timestamp > 0)
+        repodata_set_num(pd->data, REPOENTRY_META, REPOSITORY_TIMESTAMP, pd->timestamp);
       break;
     case STATE_DATA: break;
     case STATE_LOCATION: break;
@@ -305,46 +268,30 @@ endElement(void *userData, const char *name)
     case STATE_TIMESTAMP:
       {
         /**
-         * we want to look for the newer timestamp
+         * we want to look for the newest timestamp
          * of all resources to save it as the time
          * the metadata was generated
          */
-        timestamp = atoi(pd->content);
-        /** if the timestamp is invalid or just 0 ignore it */
-        if ( timestamp == 0 )
-          break;
-        if ( timestamp > pd->timestamp )
-          {
-            pd->timestamp = timestamp;
-          }
+        int timestamp = atoi(pd->content);
+        if (timestamp > pd->timestamp)
+          pd->timestamp = timestamp;
         break;
       }
     case STATE_EXPIRE:
       {
-        int expire = 0;
-        if ( pd->content )
-          {
-            expire = atoi(pd->content);
-            if ( expire > 0 )
-              {
-                /* save the timestamp in the non solvable number 1 */
-                repo_set_num(pd->repo, -1, REPOSITORY_EXPIRE, expire);
-              }
-          }
+        int expire = atoi(pd->content);
+	if (expire > 0)
+	  repodata_set_num(pd->data, REPOENTRY_META, REPOSITORY_EXPIRE, expire);
         break;
       }
     case STATE_PRODUCT:
-      {
-        if ( pd->content )
-          repo_add_poolstr_array(pd->repo, -1, REPOSITORY_PRODUCTS, pd->content);
-        break;
-      }
+      if (pd->content)
+	repodata_add_poolstr_array(pd->data, REPOENTRY_META, REPOSITORY_PRODUCTS, pd->content);
+      break;
     case STATE_KEYWORD:
-      {
-        if ( pd->content )
-          repo_add_poolstr_array(pd->repo, -1, REPOSITORY_KEYWORDS, pd->content);
-        break;
-      }
+      if (pd->content)
+	repodata_add_poolstr_array(pd->data, REPOENTRY_META, REPOSITORY_KEYWORDS, pd->content);
+      break;
     case STATE_SUSEINFO: break;
     case STATE_PRODUCTS: break;
     case STATE_KEYWORDS: break;
@@ -366,14 +313,8 @@ characterData(void *userData, const XML_Char *s, int len)
   struct parsedata *pd = userData;
   int l;
   char *c;
-  if (!pd->docontent) {
-#if 0
-    char *dup = strndup( s, len );
-  fprintf(stderr, "Content: [%d]'%s'\n", pd->state, dup );
-  free( dup );
-#endif
+  if (!pd->docontent)
     return;
-  }
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
@@ -394,13 +335,18 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   struct parsedata pd;
-  pd.timestamp = 0;
-
+  Repodata *data;
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
 
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
+
   memset(&pd, 0, sizeof(pd));
+  pd.timestamp = 0;
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
     {
       if (!pd.swtab[sw->from])
@@ -431,8 +377,8 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
     }
   XML_ParserFree(parser);
 
-  if (pd.data)
-    repodata_internalize(pd.data);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 
   free(pd.content);
 }

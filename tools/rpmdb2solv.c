@@ -50,7 +50,7 @@ main(int argc, char **argv)
 {
   Pool *pool = pool_create();
   Repo *repo, *ref = 0;
-  Repodata *repodata;
+  Repodata *data;
   FILE *fp;
   Pool *refpool;
   int c;
@@ -58,7 +58,7 @@ main(int argc, char **argv)
   int nopacks = 0;
   const char *root = 0;
   const char *basefile = 0;
-  const char *proddir = 0;
+  char *proddir = 0;
   const char *attribute = 0;
 
   /*
@@ -122,38 +122,33 @@ main(int argc, char **argv)
    */
 
   repo = repo_create(pool, "installed");
-  repodata = repo_add_repodata(repo, 0);
+  data = repo_add_repodata(repo, 0);
 
   if (!nopacks)
-    repo_add_rpmdb(repo, repodata, ref, root);
+    repo_add_rpmdb(repo, ref, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 
   if (proddir && *proddir)
     {
+      char *buf = proddir;
       /* if <root> given, not '/', and proddir does not start with <root> */
       if (root && *root)
 	{
 	  int rootlen = strlen(root);
 	  if (strncmp(root, proddir, rootlen))
 	    {
-	      char *buf;
 	      buf = (char *)sat_malloc(rootlen + strlen(proddir) + 2); /* + '/' + \0 */
 	      strcpy(buf, root);
-	      if (root[rootlen-1] != '/'
-		  && *proddir != '/')
-		{
-		  strcpy(buf+rootlen, "/");
-		  ++rootlen;
-		}
-	      strcpy(buf+rootlen, proddir);
-	      proddir = buf;
+	      if (root[rootlen - 1] != '/' && *proddir != '/')
+		buf[rootlen++] = '/';
+	      strcpy(buf + rootlen, proddir);
 	    }
 	}
-      
-      repo_add_products(repo, repodata, proddir, root, attribute);
+      repo_add_products(repo, proddir, root, attribute, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+      if (buf != proddir)
+	sat_free(buf);
     }
       
-  if (repodata)
-    repodata_internalize(repodata);
+  repodata_internalize(data);
 
   if (ref)
     {

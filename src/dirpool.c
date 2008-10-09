@@ -21,6 +21,13 @@ dirpool_create(Dirpool *dp)
 }
 
 void
+dirpool_free(Dirpool *dp)
+{
+  sat_free(dp->dirs);
+  sat_free(dp->dirtraverse);
+}
+
+void
 dirpool_make_dirtraverse(Dirpool *dp)
 {
   Id parent, i, *dirtraverse;

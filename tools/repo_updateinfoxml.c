@@ -5,8 +5,6 @@
  * for further information
  */
 
-#define DO_ARRAY 1
-
 #define _GNU_SOURCE
 #include <sys/types.h>
 #include <limits.h>
@@ -114,14 +112,10 @@ struct parsedata {
   Repodata *data;
   unsigned int datanum;
   Solvable *solvable;
-  unsigned int timestamp;
-  
+  Id collhandle;
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
-  char *tempstr;
-  int ltemp;
-  int atemp;
 };
 
 /*
@@ -132,9 +126,6 @@ struct parsedata {
  * If not, we must insert an empty filename to UPDATE_COLLECTION_FILENAME
  * at </package> in order to keep all UPDATE_COLLECTION_* arrays in sync
  */
-
-static int package_filename_seen = 0;
-static int package_flags = 0; /* same for reboot/restart flags, to be written at </package> */
 
 /*
  * create evr (as Id) from 'epoch', 'version' and 'release' attributes
@@ -275,16 +266,13 @@ startElement(void *userData, const char *name, const char **atts)
 	
 
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
-	pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
-	repodata_extend(pd->data, pd->solvable - pool->solvables);      
-	repodata_extend(pd->data, pd->solvable - pool->solvables);
-	pd->datanum = repodata_get_handle(pd->data, pd->datanum);
+	pd->datanum = pd->solvable - pool->solvables;
 	
-
 	solvable->vendor = str2id(pool, from, 1);
 	solvable->evr = str2id(pool, version, 1);
 	solvable->arch = ARCH_NOARCH;
-	repodata_set_str(pd->data, pd->datanum, SOLVABLE_PATCHCATEGORY, type);
+	if (type)
+	  repodata_set_str(pd->data, pd->datanum, SOLVABLE_PATCHCATEGORY, type);
       }
       break;
       /* <id>FEDORA-2007-4594</id> */
@@ -306,7 +294,16 @@ startElement(void *userData, const char *name, const char **atts)
 	    if (!strcmp(*atts, "date"))
 	      date = atts[1];
 	  }
-	repodata_set_str(pd->data, pd->datanum, SOLVABLE_BUILDTIME, date);
+	if (date)
+	  {
+	    if (strlen(date) == strspn(date, "0123456789"))
+	      repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, atoi(date));
+	    else
+	      {
+		/* FIXME: must convert to interger! */
+	        repodata_set_str(pd->data, pd->datanum, SOLVABLE_BUILDTIME, date);
+	      }
+	  }
       }
       break;
     case STATE_REFERENCES:
@@ -319,6 +316,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_REFERENCE:
       {
         const char *href = 0, *id = 0, *title = 0, *type = 0;
+	Id handle;
 	for (; *atts; atts += 2)
 	  {
 	    if (!strcmp(*atts, "href"))
@@ -330,12 +328,12 @@ startElement(void *userData, const char *name, const char **atts)
 	    else if (!strcmp(*atts, "type"))
 	      type = atts[1];
 	  }
-#if DO_ARRAY
-        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_HREF, href);
-        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_ID, id);
-        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_TITLE, title);
-        repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_REFERENCE_TYPE, type);
-#endif
+	handle = repodata_new_handle(pd->data);
+	repodata_set_str(pd->data, handle, UPDATE_REFERENCE_HREF, href);
+	repodata_set_str(pd->data, handle, UPDATE_REFERENCE_ID, id);
+	repodata_set_str(pd->data, handle, UPDATE_REFERENCE_TITLE, title);
+	repodata_set_poolstr(pd->data, handle, UPDATE_REFERENCE_TYPE, type);
+	repodata_add_flexarray(pd->data, pd->datanum, UPDATE_REFERENCE, handle);
       }
       break;
       /* <description>This update ...</description> */
@@ -363,14 +361,8 @@ startElement(void *userData, const char *name, const char **atts)
       {
 	const char *arch = 0, *name = 0, *src = 0;
 	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
-	Id n, a, na;
+	Id n, a;
 	Id rel_id;
-	
-
-	/* reset package_* markers, to be evaluated at </package> */
-	package_filename_seen = 0;
-	package_flags = 0;
-	
 
 	for (; *atts; atts += 2)
 	  {
@@ -381,39 +373,25 @@ startElement(void *userData, const char *name, const char **atts)
 	    else if (!strcmp(*atts, "src"))
 	      src = atts[1];
 	  }
-	/* generated Ids for name and arch */
+	/* generated Id for name */
 	n = str2id(pool, name, 1);
 	if (arch)
-	  a = str2id(pool, arch, 1);
-	else
-	  a = ARCH_NOARCH;
-	/*  now combine both to a single Id */
-	na = rel2id(pool, n, a, REL_ARCH, 1);
-	
-
-	rel_id = rel2id(pool, na, evr, REL_LT, 1);
+	  {
+	    /*  generate Id for arch and combine with name */
+	    a = str2id(pool, arch, 1);
+	    n = rel2id(pool, n, a, REL_ARCH, 1);
+	  }
+	rel_id = rel2id(pool, n, evr, REL_LT, 1);
 
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
-#if DO_ARRAY
-	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_NAME, n);
-	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_EVR, evr);
-	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_ARCH, a);
-#else
-	/* _FILENAME and _FLAGS are written at </package> */
-        if (1) {
-	  const char *evrstr = id2str(pool, evr);
-	  int buflen = strlen(name) + 1 + strlen(evrstr) + 1 + strlen(arch?arch:"") + 1;
-	  char *buf;
-	  if (!arch) arch = "";
-	  buf = (char *)malloc(buflen);
-	  if (!buf) exit(1);
-	  sprintf(buf, "%s %s %s", name, evrstr, arch);
-	  repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION, buf);
-	  free(buf);
-	}
-#endif
+
+        /* who needs the collection anyway? */
+        pd->collhandle = repodata_new_handle(pd->data);
+	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_NAME, n);
+	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_EVR, evr);
+	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
+        break;
       }
-      break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
     case STATE_FILENAME:
@@ -466,24 +444,13 @@ endElement(void *userData, const char *name)
       s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       break;
     case STATE_ID:
-      {
-        if (pd->content)
-	  {
-	    s->name = str2id(pool, join2("patch", ":", pd->content), 1);
-	  }
-      }
+      s->name = str2id(pool, join2("patch", ":", pd->content), 1);
       break;
       /* <title>imlib-1.9.15-6.fc8</title> */
     case STATE_TITLE:
-      {
-	while (pd->lcontent > 0
-	       && *(pd->content + pd->lcontent - 1) == '\n')
-	  {
-	    --pd->lcontent;
-	    *(pd->content + pd->lcontent) = 0;
-	  }
-	repodata_set_str(pd->data, pd->datanum, SOLVABLE_SUMMARY, pd->content);
-      }
+      while (pd->lcontent > 0 && pd->content[pd->lcontent - 1] == '\n')
+        pd->content[--pd->lcontent] = 0;
+      repodata_set_str(pd->data, pd->datanum, SOLVABLE_SUMMARY, pd->content);
       break;
       /*
        * <release>Fedora 8</release>
@@ -500,17 +467,13 @@ endElement(void *userData, const char *name)
        * <description>This update ...</description>
        */
     case STATE_DESCRIPTION:
-      {
-	repodata_set_str(pd->data, pd->datanum, SOLVABLE_DESCRIPTION, pd->content);
-      }
+      repodata_set_str(pd->data, pd->datanum, SOLVABLE_DESCRIPTION, pd->content);
       break;   
       /*
        * <message>Warning! ...</message>
        */
     case STATE_MESSAGE:
-      {
-	repodata_set_str(pd->data, pd->datanum, UPDATE_MESSAGE, pd->content);
-      }
+      repodata_set_str(pd->data, pd->datanum, UPDATE_MESSAGE, pd->content);
       break;
     case STATE_PKGLIST:
       break;
@@ -519,67 +482,40 @@ endElement(void *userData, const char *name)
     case STATE_NAME:
       break;
     case STATE_PACKAGE:
-      {
-#if DO_ARRAY
-	/* write _FILENAME and _FLAGS at </package>
-	 * to ensure all UPDATE_COLLECTION_* arrays are filled in parallel
-	 */
-	if (!package_filename_seen)
-	  {
-	    repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION_FILENAME, "");
-	  }
-	repodata_add_idarray(pd->data, pd->datanum, UPDATE_COLLECTION_FLAGS, package_flags+1);
-#endif
-      }
+      repodata_add_flexarray(pd->data, pd->datanum, UPDATE_COLLECTION, pd->collhandle);
+      pd->collhandle = 0;
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
     case STATE_FILENAME:
-      {
-#if DO_ARRAY
-	repodata_add_poolstr_array(pd->data, pd->datanum, UPDATE_COLLECTION_FILENAME, pd->content);
-        package_filename_seen = 1;
-#endif
-      }
+      repodata_set_str(pd->data, pd->collhandle, UPDATE_COLLECTION_FILENAME, pd->content);
       break;
       /* <reboot_suggested>True</reboot_suggested> */
     case STATE_REBOOT:
-      {
-	if (pd->content
-	    && (pd->content[0] == 'T'
-		|| pd->content[0] == 't'|| pd->content[0] == '1'))
-	  {
-	    /* FIXME: this is per-package, the global flag should be computed at runtime */
-	    repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
-	    package_flags = 1;
-	  }
-      }
+      if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
+	{
+	  /* FIXME: this is per-package, the global flag should be computed at runtime */
+	  repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
+	  repodata_set_void(pd->data, pd->collhandle, UPDATE_REBOOT);
+	}
       break;
       /* <restart_suggested>True</restart_suggested> */
     case STATE_RESTART:
-      {
-	if (pd->content
-	    && (pd->content[0] == 'T'
-		|| pd->content[0] == 't' || pd->content[0] == '1'))
-	  {
-	    /* FIXME: this is per-package, the global flag should be computed at runtime */
-	    repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
-	    package_flags = 2;
-	  }
-      }
+      if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
+	{
+	  /* FIXME: this is per-package, the global flag should be computed at runtime */
+	  repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
+	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RESTART);
+	}
       break;
       /* <relogin_suggested>True</relogin_suggested> */
     case STATE_RELOGIN:
-      {
-	if (pd->content
-	    && (pd->content[0] == 'T'
-		|| pd->content[0] == 't' || pd->content[0] == '1'))
-	  {
-	    /* FIXME: this is per-package, the global flag should be computed at runtime */
-	    repodata_set_void(pd->data, pd->datanum, UPDATE_RELOGIN);
-	    package_flags = 2;
-	  }
-      }
+      if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
+	{
+	  /* FIXME: this is per-package, the global flag should be computed at runtime */
+	  repodata_set_void(pd->data, pd->datanum, UPDATE_RELOGIN);
+	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RELOGIN);
+	}
       break;
     default:
       break;
@@ -628,6 +564,12 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
+  Repodata *data;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
@@ -638,14 +580,11 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
     }
   pd.pool = pool;
   pd.repo = repo;
-  pd.data = repo_add_repodata(pd.repo, 0);
+  pd.data = data;
 
   pd.content = malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
-  pd.tempstr = malloc(256);
-  pd.atemp = 256;
-  pd.ltemp = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   XML_SetElementHandler(parser, startElement, endElement);
@@ -662,12 +601,11 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
 	break;
     }
   XML_ParserFree(parser);
-
-  if (pd.data)
-    repodata_internalize(pd.data);
-
   free(pd.content);
   join_freemem();
+
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }
 
 /* EOF */

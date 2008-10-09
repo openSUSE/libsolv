@@ -151,7 +151,11 @@ typedef struct _KeyValue {
   const char *str;
   int num;
   int num2;
-  int eof;
+
+  int entry;	/* array entry, starts with 0 */
+  int eof;	/* last entry reached */
+
+  struct _KeyValue *parent;
 } KeyValue;
 
 /* search flags */
@@ -160,12 +164,15 @@ typedef struct _KeyValue {
 #define SEARCH_SUBSTRING	2
 #define SEARCH_GLOB 		3
 #define SEARCH_REGEX 		4
+#define SEARCH_ERROR 		5
 
 #define	SEARCH_NOCASE			(1<<8)
 #define	SEARCH_NO_STORAGE_SOLVABLE	(1<<9)
 #define SEARCH_EXTRA			(1<<10)
+#define SEARCH_SUB			(1<<10)
 #define SEARCH_ALL_REPOS		(1<<11)
 #define SEARCH_SKIP_KIND		(1<<12)
+
 
 /* By default we don't match in attributes representing filelists
    because the construction of those strings is costly.  Specify this
@@ -174,19 +181,28 @@ typedef struct _KeyValue {
 #define SEARCH_FILES			(1<<13)
 
 /* Internal */
-#define __SEARCH_ONESOLVABLE		(1 << 31)
+#define SEARCH_THISENTRY		(1<<31)
+
+
+/* standard flags used in the repo_add functions */
+#define REPO_REUSE_REPODATA		(1 << 0)
+#define REPO_NO_INTERNALIZE		(1 << 1)
 
 Repodata *repo_add_repodata(Repo *repo, int localpool);
+Repodata *repo_last_repodata(Repo *repo);
 
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
 /* returns the string value of the attribute, or NULL if not found */
-const char * repo_lookup_str(Solvable *s, Id key);
+const char *repo_lookup_str(Repo *repo, Id entry, Id key);
 /* returns the integer value of the attribute, or 0 if not found */
-unsigned int repo_lookup_num(Solvable *s, Id key);
-/* generic attribute lookup */
-int repo_lookup(Solvable *s, Id key, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
+unsigned int repo_lookup_num(Repo *repo, Id entry, Id key, unsigned int notfound);
+Id repo_lookup_id(Repo *repo, Id entry, Id keyid);
+int repo_lookup_void(Repo *repo, Id entry, Id keyid);
+const unsigned char *repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyid, Id *typep);
 
+
+#if 0
 typedef struct _Dataiterator
 {
   Repodata *data;
@@ -208,6 +224,53 @@ typedef struct _Dataiterator
   int subnum;
   Id subschema;
 } Dataiterator;
+#else
+
+typedef struct _Datamatcher {
+  Pool *pool;
+  int flags;
+  void *match;
+  int error;
+} Datamatcher;
+
+typedef struct _Dataiterator
+{
+  int state;
+  int flags;
+
+  Pool *pool;
+  Repo *repo;
+  Repodata *data;
+
+  /* data pointers */
+  unsigned char *dp;
+  unsigned char *ddp;
+  Id *idp;
+  Id *keyp;
+
+  /* the result */
+  Repokey *key;
+  KeyValue kv;
+
+  /* our matcher */
+  Datamatcher matcher;
+
+  /* iterators/filters */
+  Id keyname;
+  Id repodataid;
+  Id entry;
+  Id repoid;
+
+  /* recursion data */
+  struct di_parent {
+    KeyValue kv;
+    unsigned char *dp;
+    Id *keyp;
+  } parents[3];
+  int nparents;
+} Dataiterator;
+
+#endif
 
 /* Use these like:
      Dataiterator di;

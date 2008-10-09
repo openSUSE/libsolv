@@ -33,6 +33,6 @@ typedef struct _Repodatafile
   unsigned char *rpmdbcookie;
 } Repodatafile;
 
-void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Repodatafile *fileinfo, int nsubfiles);
+void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp);
 
 #endif

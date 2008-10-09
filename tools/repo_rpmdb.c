@@ -512,7 +512,7 @@ static struct filefilter filefilters[] = {
 #endif
 
 static void
-adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dic)
+adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dic)
 {
   Id handle, did;
   int i, fszc;
@@ -623,18 +623,16 @@ adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmh
   sat_free(fsz);
   sat_free(fm);
   /* commit */
-  repodata_extend(repodata, s - pool->solvables);
-  handle = (s - pool->solvables) - repodata->start;
-  handle = repodata_get_handle(repodata, handle);
+  handle = s - pool->solvables;
   for (i = 0; i < fc; i++)
     {
       if (!fn[i])
 	continue;
       if (!*dn[i] && (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC))
-        did = repodata_str2dir(repodata, "/usr/src", 1);
+        did = repodata_str2dir(data, "/usr/src", 1);
       else
-        did = repodata_str2dir(repodata, dn[i], 1);
-      repodata_add_dirnumnum(repodata, handle, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
+        did = repodata_str2dir(data, dn[i], 1);
+      repodata_add_dirnumnum(data, handle, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
     }
   sat_free(fn);
   sat_free(fkb);
@@ -642,7 +640,7 @@ adddudata(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmh
 
 /* assumes last processed array is provides! */
 static unsigned int
-addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhead, unsigned int olddeps)
+addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, unsigned int olddeps)
 {
   char **bn;
   char **dn;
@@ -658,7 +656,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
   int fna = 0;
 #endif
 
-  if (!repodata)
+  if (!data)
     return olddeps;
   bn = headstringarray(rpmhead, TAG_BASENAMES, &bnc);
   if (!bn)
@@ -682,8 +680,8 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
       exit(1);
     }
 
-  if (repodata)
-    adddudata(pool, repo, repodata, s, rpmhead, dn, di, bnc, dic);
+  if (data)
+    adddudata(pool, repo, data, s, rpmhead, dn, di, bnc, dic);
 
   for (i = 0; i < bnc; i++)
     {
@@ -731,16 +729,14 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
       strcat(fn, bn[i]);
       olddeps = repo_addid_dep(repo, olddeps, str2id(pool, fn, 1), SOLVABLE_FILEMARKER);
 #endif
-      if (repodata)
+      if (data)
 	{
 	  Id handle, did;
-	  repodata_extend(repodata, s - pool->solvables);
-	  handle = (s - pool->solvables) - repodata->start;
-	  handle = repodata_get_handle(repodata, handle);
-	  did = repodata_str2dir(repodata, dn[di[i]], 1);
+	  handle = s - pool->solvables;
+	  did = repodata_str2dir(data, dn[di[i]], 1);
 	  if (!did)
-	    did = repodata_str2dir(repodata, "/", 1);
-	  repodata_add_dirstr(repodata, handle, SOLVABLE_FILELIST, did, bn[i]);
+	    did = repodata_str2dir(data, "/", 1);
+	  repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, bn[i]);
 	}
     }
 #if 0
@@ -754,7 +750,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead
 }
 
 static void
-addsourcerpm(Pool *pool, Repodata *repodata, Id handle, char *sourcerpm, char *name, char *evr)
+addsourcerpm(Pool *pool, Repodata *data, Id handle, char *sourcerpm, char *name, char *evr)
 {
   const char *p, *sevr, *sarch;
 
@@ -778,23 +774,23 @@ addsourcerpm(Pool *pool, Repodata *repodata, Id handle, char *sourcerpm, char *n
     return;
   sevr = p + 1;
   if (!strcmp(sarch, "src.rpm"))
-    repodata_set_constantid(repodata, handle, SOLVABLE_SOURCEARCH, ARCH_SRC);
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_SRC);
   else if (!strcmp(sarch, "nosrc.rpm"))
-    repodata_set_constantid(repodata, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
   else
-    repodata_set_constantid(repodata, handle, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
   if (!strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
-    repodata_set_void(repodata, handle, SOLVABLE_SOURCEEVR);
+    repodata_set_void(data, handle, SOLVABLE_SOURCEEVR);
   else
-    repodata_set_id(repodata, handle, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
+    repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
   if (!strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
-    repodata_set_void(repodata, handle, SOLVABLE_SOURCENAME);
+    repodata_set_void(data, handle, SOLVABLE_SOURCENAME);
   else
-    repodata_set_id(repodata, handle, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
+    repodata_set_id(data, handle, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
 }
 
 static int
-rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhead)
+rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead)
 {
   char *name;
   char *evr;
@@ -826,7 +822,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
   s->vendor = str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
-  s->provides = addfileprovides(pool, repo, repodata, s, rpmhead, s->provides);
+  s->provides = addfileprovides(pool, repo, data, s, rpmhead, s->provides);
   if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, 0);
@@ -840,17 +836,16 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
   s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
   s->conflicts = repo_fix_conflicts(repo, s->conflicts);
 
-  if (repodata)
+  if (data)
     {
       Id handle;
       char *str;
       unsigned int u32;
 
-      repodata_extend(repodata, s - pool->solvables);
-      handle = repodata_get_handle(repodata, (s - pool->solvables) - repodata->start);
+      handle = s - pool->solvables;
       str = headstring(rpmhead, TAG_SUMMARY);
       if (str)
-        setutf8string(repodata, handle, SOLVABLE_SUMMARY, str);
+        setutf8string(data, handle, SOLVABLE_SUMMARY, str);
       str = headstring(rpmhead, TAG_DESCRIPTION);
       if (str)
 	{
@@ -868,7 +863,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 	      while (l > 0 && str[l - 1] == '\n')
 	        str[--l] = 0;
 	      if (l)
-                setutf8string(repodata, handle, SOLVABLE_DESCRIPTION, str);
+                setutf8string(data, handle, SOLVABLE_DESCRIPTION, str);
 	      p = aut + 19;
 	      aut = str;	/* copy over */
 	      while (*p == ' ' || *p == '\n')
@@ -888,38 +883,38 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *repodata, Solvable *s, RpmHead *rpmhe
 		aut--;
 	      *aut = 0;
 	      if (*str)
-	        setutf8string(repodata, handle, SOLVABLE_AUTHORS, str);
+	        setutf8string(data, handle, SOLVABLE_AUTHORS, str);
 	      free(str);
 	    }
 	  else if (*str)
-	    setutf8string(repodata, handle, SOLVABLE_DESCRIPTION, str);
+	    setutf8string(data, handle, SOLVABLE_DESCRIPTION, str);
 	}
       str = headstring(rpmhead, TAG_GROUP);
       if (str)
-        repodata_set_poolstr(repodata, handle, SOLVABLE_GROUP, str);
+        repodata_set_poolstr(data, handle, SOLVABLE_GROUP, str);
       str = headstring(rpmhead, TAG_LICENSE);
       if (str)
-        repodata_set_poolstr(repodata, handle, SOLVABLE_LICENSE, str);
+        repodata_set_poolstr(data, handle, SOLVABLE_LICENSE, str);
       str = headstring(rpmhead, TAG_URL);
       if (str)
-	repodata_set_str(repodata, handle, SOLVABLE_URL, str);
+	repodata_set_str(data, handle, SOLVABLE_URL, str);
       str = headstring(rpmhead, TAG_DISTRIBUTION);
       if (str)
-	repodata_set_poolstr(repodata, handle, SOLVABLE_DISTRIBUTION, str);
+	repodata_set_poolstr(data, handle, SOLVABLE_DISTRIBUTION, str);
       str = headstring(rpmhead, TAG_PACKAGER);
       if (str)
-	repodata_set_poolstr(repodata, handle, SOLVABLE_PACKAGER, str);
+	repodata_set_poolstr(data, handle, SOLVABLE_PACKAGER, str);
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
-        repodata_set_num(repodata, handle, SOLVABLE_BUILDTIME, u32);
+        repodata_set_num(data, handle, SOLVABLE_BUILDTIME, u32);
       u32 = headint32(rpmhead, TAG_INSTALLTIME);
       if (u32)
-        repodata_set_num(repodata, handle, SOLVABLE_INSTALLTIME, u32);
+        repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, u32);
       u32 = headint32(rpmhead, TAG_SIZE);
       if (u32)
-        repodata_set_num(repodata, handle, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
+        repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
       if (sourcerpm)
-	addsourcerpm(pool, repodata, handle, sourcerpm, name, evr);
+	addsourcerpm(pool, data, handle, sourcerpm, name, evr);
     }
   sat_free(evr);
   return 1;
@@ -1111,9 +1106,8 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
   /* copy all attributes */
   if (!data)
     return;
-  repodata_extend(data, s - pool->solvables);
   cbdata.data = data;
-  cbdata.handle = repodata_get_handle(data, (s - pool->solvables) - data->start);
+  cbdata.handle = s - pool->solvables;
   cbdata.dircache = dircache;
   repo_search(fromrepo, (r - fromrepo->pool->solvables), 0, 0, SEARCH_NO_STORAGE_SOLVABLE, solvable_copy_cb, &cbdata);
 }
@@ -1164,7 +1158,7 @@ swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
   /* only works if nothing is already internalized! */
   if (data && data->attrs)
     {
-      Id tmpattrs = data->attrs[pa - data->start];
+      Id *tmpattrs = data->attrs[pa - data->start];
       data->attrs[pa - data->start] = data->attrs[pb - data->start];
       data->attrs[pb - data->start] = tmpattrs;
     }
@@ -1185,7 +1179,7 @@ mkrpmdbcookie(struct stat *st, unsigned char *cookie)
  */
 
 void
-repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
+repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 {
   Pool *pool = repo->pool;
   unsigned char buf[16];
@@ -1207,7 +1201,10 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
   DBT dbkey;
   DBT dbdata;
   struct stat packagesstat;
-  int repodata_self = 0;
+  unsigned char newcookie[32];
+  const unsigned char *oldcookie = 0;
+  Id oldcookietype = 0;
+  Repodata *data;
   
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
@@ -1215,11 +1212,11 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
   if (!rootdir)
     rootdir = "";
 
-  if (!repodata)
-    {
-      repodata = repo_add_repodata(repo, 0);
-      repodata_self = 1;
-    }
+  
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
   
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
@@ -1248,9 +1245,12 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
       perror(dbpath);
       exit(1);
     }
-  mkrpmdbcookie(&packagesstat, repo->rpmdbcookie);
+  mkrpmdbcookie(&packagesstat, newcookie);
+  repodata_set_bin_checksum(data, REPOENTRY_META, REPOSITORY_RPMDBCOOKIE, REPOKEY_TYPE_SHA256, newcookie);
 
-  if (!ref || memcmp(repo->rpmdbcookie, ref->rpmdbcookie, 32) != 0)
+  if (ref)
+    oldcookie = repo_lookup_bin_checksum(ref, REPOENTRY_META, REPOSITORY_RPMDBCOOKIE, &oldcookietype);
+  if (!ref || !oldcookie || oldcookietype != REPOKEY_TYPE_SHA256 || memcmp(oldcookie, newcookie, 32) != 0)
     {
       Id *pkgids;
       if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
@@ -1314,7 +1314,7 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
-	  if (rpm2solv(pool, repo, repodata, s, rpmhead))
+	  if (rpm2solv(pool, repo, data, s, rpmhead))
 	    {
 	      i++;
 	      s = 0;
@@ -1351,7 +1351,7 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	      while (j < i)
 		j = pkgids[i - repo->start] = pkgids[j - repo->start];
 	      if (j != i)
-	        swap_solvables(repo, repodata, i, j);
+	        swap_solvables(repo, data, i, j);
 	    }
 	  sat_free(pkgids);
 	}
@@ -1454,7 +1454,7 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 		  Solvable *r = ref->pool->solvables + ref->start + (id - 1);
 		  if (r->repo == ref)
 		    {
-		      solvable_copy(s, r, repodata, dircache);
+		      solvable_copy(s, r, data, dircache);
 		      continue;
 		    }
 		}
@@ -1515,7 +1515,7 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 
-	  rpm2solv(pool, repo, repodata, s, rpmhead);
+	  rpm2solv(pool, repo, data, s, rpmhead);
 	}
 
       if (refhash)
@@ -1527,8 +1527,8 @@ repo_add_rpmdb(Repo *repo, Repodata *repodata, Repo *ref, const char *rootdir)
 	  sat_free(rpmids);
 	}
     }
-  if (repodata && repodata_self)
-    repodata_internalize(repodata);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
   if (rpmhead)
     sat_free(rpmhead);
   if (db)
@@ -1550,8 +1550,6 @@ add_location(Repodata *data, Solvable *s, Id handle, const char *location)
   Pool *pool = s->repo->pool;
   const char *name, *n1, *n2;
   int l;
-
-  repodata_extend(data, s - pool->solvables);
 
   /* skip ./ prefix */
   if (location[0] == '.' && location[1] == '/' && location[2] != '/')
@@ -1603,7 +1601,7 @@ nontrivial:
 }
 
 void
-repo_add_rpms(Repo *repo, Repodata *repodata, const char **rpms, int nrpms)
+repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 {
   int i, sigdsize, sigcnt, l;
   Pool *pool = repo->pool;
@@ -1615,6 +1613,12 @@ repo_add_rpms(Repo *repo, Repodata *repodata, const char **rpms, int nrpms)
   unsigned char lead[4096];
   int headerstart, headerend;
   struct stat stb;
+  Repodata *data;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
 
   if (nrpms <= 0)
     return;
@@ -1719,16 +1723,17 @@ repo_add_rpms(Repo *repo, Repodata *repodata, const char **rpms, int nrpms)
 	}
       fclose(fp);
       s = pool_id2solvable(pool, repo_add_solvable(repo));
-      rpm2solv(pool, repo, repodata, s, rpmhead);
-      if (repodata)
+      rpm2solv(pool, repo, data, s, rpmhead);
+      if (data)
 	{
-	  Id handle = (s - pool->solvables) - repodata->start;
-	  handle = repodata_get_handle(repodata, handle);
-	  add_location(repodata, s, handle, rpms[i]);
-	  repodata_set_num(repodata, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
-	  repodata_set_num(repodata, handle, SOLVABLE_HEADEREND, headerend);
+	  Id handle = s - pool->solvables;
+	  add_location(data, s, handle, rpms[i]);
+	  repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
+	  repodata_set_num(data, handle, SOLVABLE_HEADEREND, headerend);
 	}
     }
   if (rpmhead)
     sat_free(rpmhead);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }

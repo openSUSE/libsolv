@@ -702,9 +702,8 @@ startElement(void *userData, const char *name, const char **atts)
           /* this is a new package */
           pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
           pd->freshens = 0;
-          repodata_extend(pd->data, pd->solvable - pool->solvables);
         }
-      pd->handle = repodata_get_handle(pd->data, (pd->solvable - pool->solvables) - pd->data->start);
+      pd->handle = pd->solvable - pool->solvables;
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -1104,6 +1103,12 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
+  Repodata *data;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
@@ -1115,7 +1120,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   pd.common.pool = pool;
   pd.common.repo = repo;
 
-  pd.data = repo_add_repodata(repo, 0);
+  pd.data = data;
 
   pd.content = sat_malloc(256);
   pd.acontent = 256;
@@ -1147,11 +1152,10 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
 	break;
     }
   XML_ParserFree(parser);
-
-  if (pd.data)
-    repodata_internalize(pd.data);
   sat_free(pd.content);
   join_freemem();
   stringpool_free(&pd.cspool);
   sat_free(pd.cscache);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }

@@ -103,9 +103,11 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       dp = data_read_id(dp, &kv->id);
       dp = data_read_id(dp, &kv->num);
       return data_read_ideof(dp, &kv->num2, &kv->eof);
-    case REPOKEY_TYPE_COUNTED:
+    case REPOKEY_TYPE_FIXARRAY:
       dp = data_read_id(dp, &kv->num);
       return data_read_id(dp, &kv->id);
+    case REPOKEY_TYPE_FLEXARRAY:
+      return data_read_id(dp, &kv->num);
     default:
       return 0;
     }
@@ -171,13 +173,6 @@ data_skip(unsigned char *dp, int type)
             return dp + 1;
           dp++;
         }
-    case REPOKEY_TYPE_COUNTED:
-      while ((*dp & 0x80) != 0)
-        dp++;
-      dp++;
-      while ((*dp & 0x80) != 0)
-        dp++;
-      return dp + 1;
     default:
       return 0;
     }
@@ -257,19 +252,11 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
             return dp + 1;
           dp++;
         }
-    case REPOKEY_TYPE_COUNTED:
-      while ((*dp & 0x80) != 0)
-        dp++;
-      dp++;
-      while ((*dp & 0x80) != 0)
-        dp++;
-      return dp + 1;
     default:
       return 0;
     }
 }
 
-unsigned char * data_skip_recursive(Repodata *data, unsigned char *dp,
-				    Repokey *key);
+unsigned char *data_skip_key(Repodata *data, unsigned char *dp, Repokey *key);
 
 #endif	/* SATSOLVER_REPOPACK */

@@ -108,7 +108,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
  */
 
 static void
-add_location(struct parsedata *pd, char *line, Solvable *s, unsigned handle)
+add_location(struct parsedata *pd, char *line, Solvable *s, Id handle)
 {
   Pool *pool = s->repo->pool;
   char *sp[3];
@@ -179,7 +179,7 @@ nontrivial:
  */
 
 static void
-add_source(struct parsedata *pd, char *line, Solvable *s, unsigned handle)
+add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
 {
   Repo *repo = s->repo;
   Pool *pool = repo->pool;
@@ -237,7 +237,7 @@ fprintf(stderr, "%s -> %d\n", sp[0], dirid);
 }
 
 static void
-set_checksum(struct parsedata *pd, Repodata *data, int handle, Id keyname, char *line)
+set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *line)
 {
   char *sp[3];
   int l;
@@ -285,7 +285,7 @@ id3_cmp (const void *v1, const void *v2)
  */
 
 static void
-commit_diskusage (struct parsedata *pd, unsigned handle)
+commit_diskusage (struct parsedata *pd, Id handle)
 {
   unsigned i;
   Dirpool *dp = &pd->data->dirpool;
@@ -388,7 +388,7 @@ tag_from_string (char *cs)
  */
 
 static void
-finish_solvable(struct parsedata *pd, Solvable *s, int handle, Offset freshens)
+finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
 {
   Pool *pool = pd->repo->pool;
 
@@ -489,21 +489,20 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
   char *sp[5];
   struct parsedata pd;
   Repodata *data = 0;
-  Id blanr = -1;
   Id handle = 0;
   Id vendor = 0;
 
   if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
     indesc = 1;
-  if (repo->nrepodata)
-    /* use last repodata */
-    data = repo->repodata + repo->nrepodata - 1;
-  else
+
+  if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
 
   if (product)
     {
-      if (!strncmp (id2str(pool, pool->solvables[product].name), "product:", 8))
+      if (!strncmp(id2str(pool, pool->solvables[product].name), "product:", 8))
         vendor = pool->solvables[product].vendor;
     }
 
@@ -519,8 +518,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
   s = 0;
   freshens = 0;
 
-  /* XXX deactivate test code */
-  blanr = 0;
   /*
    * read complete file
    *
@@ -707,7 +704,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	      else
 		{
 		  last_found_pack = nn - repo->start;
-		  handle = repodata_get_handle(data, last_found_pack);
+		  handle = nn;
 		}
 	    }
 
@@ -718,10 +715,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
 	      last_found_pack = (s - pool->solvables) - repo->start;
 	      if (data)
-		{
-		  repodata_extend(data, s - pool->solvables);
-		  handle = repodata_get_handle(data, last_found_pack);
-		}
+		handle = s - pool->solvables;
 	      if (name)
 	        s->name = name;
 	      else if (pd.kind)
@@ -852,8 +846,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
           case CTAG('=', 'S', 'i', 'z'):
 	    if (split (line + 6, sp, 3) == 2)
 	      {
-		repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (atoi(sp[0]) + 1023) / 1024);
-		repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, (atoi(sp[1]) + 1023) / 1024);
+		repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)(atoi(sp[0]) + 1023) / 1024);
+		repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, (unsigned int)(atoi(sp[1]) + 1023) / 1024);
 	      }
 	    continue;
           case CTAG('=', 'T', 'i', 'm'):
@@ -880,12 +874,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    continue;
           case CTAG('=', 'I', 'n', 's'):
 	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_MESSAGEINS, language), line + 6);
-	    if (blanr)
-	      {
-		/* XXX testcode */
-		repo_set_str(repo, blanr, SOLVABLE_MESSAGEINS, line + 6);
-		blanr--;
-	      }
 	    continue;
           case CTAG('=', 'D', 'e', 'l'):
 	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_MESSAGEDEL, language), line + 6);
@@ -902,16 +890,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
           case CTAG('=', 'S', 'h', 'r'):
 	    if (last_found_pack >= pd.nshare)
 	      {
-	        if (pd.share_with)
-		  {
-		    pd.share_with = realloc (pd.share_with, (last_found_pack + 256) * sizeof (*pd.share_with));
-		    memset (pd.share_with + pd.nshare, 0, (last_found_pack + 256 - pd.nshare) * sizeof (*pd.share_with));
-		  }
-		else
-		  pd.share_with = calloc (last_found_pack + 256, sizeof (*pd.share_with));
+		pd.share_with = sat_realloc2(pd.share_with, last_found_pack + 256, sizeof (*pd.share_with));
+		memset(pd.share_with + pd.nshare, 0, (last_found_pack + 256 - pd.nshare) * sizeof (*pd.share_with));
 		pd.nshare = last_found_pack + 256;
 	      }
-	    pd.share_with[last_found_pack] = strdup (line + 6);
+	    pd.share_with[last_found_pack] = strdup(line + 6);
 	    continue;
 	  case CTAG('=', 'D', 'i', 'r'):
 	    add_dirline (&pd, line + 6);
@@ -935,6 +918,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    break;
 	  case CTAG('=', 'C', 'k', 's'):
 	    set_checksum(&pd, data, handle, SOLVABLE_CHECKSUM, line + 6);
+#if 0
 	    if (0)
 	      {
 		Id sub = repodata_create_struct(data, handle, str2id(pool, "solvable:komisch", 1));
@@ -944,6 +928,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 		repodata_set_poolstr(data, sub, str2id(pool, "sub:key1", 1), line + 7);
 		repodata_set_num(data, sub, str2id(pool, "sub:key2", 1), last_found_pack+1);
 	      }
+#endif
 	    break;
 	  case CTAG('=', 'L', 'a', 'n'):
 	    language = strdup(line + 6);
@@ -1025,12 +1010,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 		  }
 	      }
 	    if (n != repo->end)
-	      repodata_merge_attrs(data, i, last_found);
+	      repodata_merge_attrs(data, repo->start + i, repo->start + last_found);
+	    free(pd.share_with[i]);
 	  }
-      free (pd.share_with);
+      free(pd.share_with);
     }
 
-  if (data)
+  if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 
   if (pd.common.tmp)

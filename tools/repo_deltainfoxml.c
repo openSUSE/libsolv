@@ -23,7 +23,7 @@
 #define DISABLE_SPLIT
 #include "tools_util.h"
 
-//#define DUMPOUT 0
+/* #define DUMPOUT 1 */
 
 /*
  * <deltainfo>
@@ -88,7 +88,7 @@ struct deltarpm {
   unsigned buildtime;
   unsigned downloadsize, archivesize;
   char *filechecksum;
-  
+  int filechecksumtype;
   /* Baseversion.  deltarpm only has one. */
   Id *bevr;
   unsigned nbevr;
@@ -108,7 +108,6 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
-  int datanum;
   
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
@@ -119,6 +118,9 @@ struct parsedata {
   Id newpkgevr;
   Id newpkgname;
   Id newpkgarch;
+
+  Id *handles;
+  int nhandles;
 };
 
 /*
@@ -182,7 +184,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(r) + 1;
   if (l > pd->acontent)
     {
-      pd->content = realloc(pd->content, l + 256);
+      pd->content = sat_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content;
@@ -316,25 +318,23 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_START:
       break;
     case STATE_NEWPACKAGE:
-      if ( (str = find_attr("name", atts)) )
+      if ((str = find_attr("name", atts)) != 0)
 	{
 	  pd->newpkgname = str2id(pool, str, 1);
 	}
       pd->newpkgevr = makeevr_atts(pool, pd, atts);
-      if ( (str = find_attr("arch", atts)) )
+      if ((str = find_attr("arch", atts)) != 0)
 	{
 	  pd->newpkgarch = str2id(pool, str, 1);
 	}
       break;
 
     case STATE_DELTA:
-      memset(&pd->delta, 0, sizeof (pd->delta));
+      memset(&pd->delta, 0, sizeof(pd->delta));
       *pd->tempstr = 0;
       pd->ltemp = 0;
-      pd->delta.nbevr++;
-      pd->delta.bevr = sat_realloc (pd->delta.bevr, pd->delta.nbevr * sizeof(Id));
-      pd->delta.bevr[pd->delta.nbevr - 1] = makeevr_atts(pool, pd, atts);
-      --(pd->datanum);
+      pd->delta.bevr = sat_extend(pd->delta.bevr, pd->delta.nbevr, 1, sizeof(Id), 7);
+      pd->delta.bevr[pd->delta.nbevr++] = makeevr_atts(pool, pd, atts);
       break;
     case STATE_FILENAME:
       break;
@@ -343,6 +343,20 @@ startElement(void *userData, const char *name, const char **atts)
       break;
     case STATE_SIZE:
       break;
+    case STATE_CHECKSUM:
+      pd->delta.filechecksum = 0;
+      pd->delta.filechecksumtype = REPOKEY_TYPE_SHA1;
+      if ((str = find_attr("type", atts)) != 0)
+	{
+	  if (!strcasecmp(str, "sha"))
+	    pd->delta.filechecksumtype = REPOKEY_TYPE_SHA1;
+	  else if (!strcasecmp(str, "sha256"))
+	    pd->delta.filechecksumtype = REPOKEY_TYPE_SHA256;
+	  else if (!strcasecmp(str, "md5"))
+	    pd->delta.filechecksumtype = REPOKEY_TYPE_MD5;
+	  else
+	    fprintf(stderr, "warning: unknown checksum type: '%s'\n", str);
+	}
     case STATE_SEQUENCE:
       break;
     default:
@@ -380,23 +394,33 @@ endElement(void *userData, const char *name)
       break;
     case STATE_DELTA:
       {
+	/* read all data for a deltarpm. commit into attributes */
+	Id handle;
+	struct deltarpm *d = &pd->delta;
 #ifdef DUMPOUT
 	int i;
 #endif
-	struct deltarpm *d = &pd->delta;
 
 #ifdef DUMPOUT
 
 	fprintf (stderr, "found deltarpm for %s:\n", id2str(pool, pd->newpkgname));
 #endif
-	repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_NAME, pd->newpkgname);
-	repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_EVR, pd->newpkgevr);
-	repo_set_id(pd->repo, pd->datanum, DELTA_PACKAGE_ARCH, pd->newpkgarch);
-	repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_NAME, d->locname);
-	repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_DIR, d->locdir);
-	repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_EVR, d->locevr);
-	repo_set_id(pd->repo, pd->datanum, DELTA_LOCATION_SUFFIX, d->locsuffix);
-
+	handle = repodata_new_handle(pd->data);
+	/* we commit all handles later on in one go so that the
+         * repodata code doesn't need to realloc every time */
+	pd->handles = sat_extend(pd->handles, pd->nhandles, 1, sizeof(Id), 63);
+        pd->handles[pd->nhandles++] = handle;
+	repodata_set_id(pd->data, handle, DELTA_PACKAGE_NAME, pd->newpkgname);
+	repodata_set_id(pd->data, handle, DELTA_PACKAGE_EVR, pd->newpkgevr);
+	repodata_set_id(pd->data, handle, DELTA_PACKAGE_ARCH, pd->newpkgarch);
+	repodata_set_id(pd->data, handle, DELTA_LOCATION_NAME, d->locname);
+	repodata_set_id(pd->data, handle, DELTA_LOCATION_DIR, d->locdir);
+	repodata_set_id(pd->data, handle, DELTA_LOCATION_EVR, d->locevr);
+	repodata_set_id(pd->data, handle, DELTA_LOCATION_SUFFIX, d->locsuffix);
+	if (d->downloadsize)
+	  repodata_set_num(pd->data, handle, DELTA_DOWNLOADSIZE, (d->downloadsize + 1023) / 1024);
+	if (d->filechecksum)
+	  repodata_set_checksum(pd->data, handle, DELTA_CHECKSUM, d->filechecksumtype, d->filechecksum);
 #ifdef DUMPOUT
 	fprintf (stderr, "   loc: %s %s %s %s\n", id2str(pool, d->locdir),
 		 id2str(pool, d->locname), id2str(pool, d->locevr),
@@ -404,9 +428,6 @@ endElement(void *userData, const char *name)
 	fprintf (stderr, "  size: %d down\n", d->downloadsize);
 	fprintf (stderr, "  chek: %s\n", d->filechecksum);
 #endif
-
-	repo_set_num(pd->repo, pd->datanum, DELTA_DOWNLOADSIZE, d->downloadsize);
-	repo_set_str(pd->repo, pd->datanum, DELTA_CHECKSUM, d->filechecksum);
 
 	if (d->seqnum)
 	  {
@@ -420,10 +441,11 @@ endElement(void *userData, const char *name)
 	    fprintf (stderr, "                 %s\n",
 		     d->seqnum);
 #endif
-	    repo_set_id(pd->repo, pd->datanum, DELTA_BASE_EVR, d->bevr[0]);
-	    repo_set_id(pd->repo, pd->datanum, DELTA_SEQ_NAME, d->seqname);
-	    repo_set_id(pd->repo, pd->datanum, DELTA_SEQ_EVR, d->seqevr);
-	    repo_set_str(pd->repo, pd->datanum, DELTA_SEQ_NUM, d->seqnum);
+	    repodata_set_id(pd->data, handle, DELTA_BASE_EVR, d->bevr[0]);
+	    repodata_set_id(pd->data, handle, DELTA_SEQ_NAME, d->seqname);
+	    repodata_set_id(pd->data, handle, DELTA_SEQ_EVR, d->seqevr);
+	    /* should store as binary blob! */
+	    repodata_set_str(pd->data, handle, DELTA_SEQ_NUM, d->seqnum);
 
 #ifdef DUMPOUT
 	    fprintf(stderr, "OK\n");
@@ -432,9 +454,9 @@ endElement(void *userData, const char *name)
 #ifdef DUMPOUT              
 	    if (d->seqevr != d->bevr[0])
 	      fprintf (stderr, "XXXXX evr\n");
-	    /* Name of package ("atom:xxxx") should match the sequence info
+	    /* Name of package ("xxxx") should match the sequence info
 	       name.  */
-	    if (strcmp(id2str(pool, d->seqname), id2str(pool, pd->newpkgname) + 5))
+	    if (strcmp(id2str(pool, d->seqname), id2str(pool, pd->newpkgname)))
 	      fprintf (stderr, "XXXXX name\n");
 #endif
 	  }
@@ -450,9 +472,10 @@ endElement(void *userData, const char *name)
 	  }
 
       }
-      free(pd->delta.filechecksum);
-      free(pd->delta.bevr);
-      free(pd->delta.seqnum);
+      pd->delta.filechecksum = sat_free(pd->delta.filechecksum);
+      pd->delta.bevr = sat_free(pd->delta.bevr);
+      pd->delta.nbevr = 0;
+      pd->delta.seqnum = sat_free(pd->delta.seqnum);
       break;
     case STATE_FILENAME:
       parse_delta_location(pd, pd->content);
@@ -508,7 +531,7 @@ characterData(void *userData, const XML_Char *s, int len)
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
-      pd->content = realloc(pd->content, l + 256);
+      pd->content = sat_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content + pd->lcontent;
@@ -528,6 +551,12 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
+  Repodata *data;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
@@ -538,15 +567,15 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
     }
   pd.pool = pool;
   pd.repo = repo;
-  pd.data = repo_add_repodata(pd.repo, 0);
+  pd.data = data;
 
-  pd.content = malloc(256);
+  pd.content = sat_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
   pd.tempstr = malloc(256);
   pd.atemp = 256;
   pd.ltemp = 0;
-  pd.datanum = 0;
+
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   XML_SetElementHandler(parser, startElement, endElement);
@@ -563,12 +592,17 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
 	break;
     }
   XML_ParserFree(parser);
-
-  if (pd.data)
-    repodata_internalize(pd.data);
-
-  free(pd.content);
+  sat_free(pd.content);
+  sat_free(pd.tempstr);
   join_freemem();
+
+  /* now commit all handles */
+  for (i = 0; i < pd.nhandles; i++)
+    repodata_add_flexarray(pd.data, REPOENTRY_META, REPOSITORY_DELTAINFO, pd.handles[i]);
+  sat_free(pd.handles);
+
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }
 
 /* EOF */

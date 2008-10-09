@@ -30,7 +30,7 @@ main(int argc, char **argv)
 {
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
-  repo_add_helix(repo, stdin);
+  repo_add_helix(repo, stdin, 0);
   tool_write(repo, 0, 0);
   pool_free(pool);
   exit(0);

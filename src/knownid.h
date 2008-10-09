@@ -53,12 +53,19 @@ KNOWNID(SYSTEM_SYSTEM,			"system:system"),
 KNOWNID(ARCH_SRC,			"src"),
 KNOWNID(ARCH_NOSRC,			"nosrc"),
 KNOWNID(ARCH_NOARCH,			"noarch"),
-KNOWNID(REPODATA_INFO,			"repodata:info"),
-KNOWNID(REPODATA_EXTERNAL,		"repodata:external"),
-KNOWNID(REPODATA_KEYS,			"repodata:keys"),
-KNOWNID(REPODATA_LOCATION,		"repodata:location"),
-KNOWNID(REPODATA_ADDEDFILEPROVIDES,	"repodata:addedfileprovides"),
-KNOWNID(REPODATA_RPMDBCOOKIE,		"repodata:rpmdbcookie"),
+
+KNOWNID(REPOSITORY_SOLVABLES,		"repository:solvables"),
+KNOWNID(REPOSITORY_DELTAINFO,		"repository:deltainfo"),
+
+/* sub-repository information, they will get loaded on demand */
+KNOWNID(REPOSITORY_EXTERNAL,		"repository:external"),
+KNOWNID(REPOSITORY_KEYS,		"repository:keys"),
+KNOWNID(REPOSITORY_LOCATION,		"repository:location"),
+
+/* file provides already added to our solvables */
+KNOWNID(REPOSITORY_ADDEDFILEPROVIDES,	"repository:addedfileprovides"),
+/* inode of the rpm database for rpm --rebuilddb detection */
+KNOWNID(REPOSITORY_RPMDBCOOKIE,		"repository:rpmdbcookie"),
 
 /* The void type is usable to encode one-valued attributes, they have
    no associated data.  This is useful to encode values which many solvables
@@ -81,7 +88,8 @@ KNOWNID(REPOKEY_TYPE_DIRNUMNUMARRAY,	"repokey:type:dirnumnumarray"),
 KNOWNID(REPOKEY_TYPE_MD5,		"repokey:type:md5"),
 KNOWNID(REPOKEY_TYPE_SHA1,		"repokey:type:sha1"),
 KNOWNID(REPOKEY_TYPE_SHA256,		"repokey:type:sha256"),
-KNOWNID(REPOKEY_TYPE_COUNTED,		"repokey:type:counted"),
+KNOWNID(REPOKEY_TYPE_FIXARRAY,		"repokey:type:fixarray"),
+KNOWNID(REPOKEY_TYPE_FLEXARRAY,		"repokey:type:flexarray"),
 
 KNOWNID(SOLVABLE_SUMMARY,		"solvable:summary"),
 KNOWNID(SOLVABLE_DESCRIPTION,		"solvable:description"),
@@ -121,37 +129,38 @@ KNOWNID(SOLVABLE_LEADSIGID,		"solvable:leadsigid"),
 KNOWNID(SOLVABLE_PATCHCATEGORY,		"solvable:patchcategory"),
 KNOWNID(SOLVABLE_HEADEREND,		"solvable:headerend"),
 
+/* stuff for solvables of type pattern */
 KNOWNID(SOLVABLE_CATEGORY,		"solvable:category"),
 KNOWNID(SOLVABLE_INCLUDES,		"solvable:includes"),
 KNOWNID(SOLVABLE_EXTENDS,		"solvable:extends"),
 KNOWNID(SOLVABLE_ICON,			"solvable:icon"),
 KNOWNID(SOLVABLE_ORDER,			"solvable:order"),
 
-KNOWNID(UPDATE_REBOOT,		        "update:reboot"),   /* reboot suggested (kernel update) */
-KNOWNID(UPDATE_RESTART,		        "update:restart"),  /* restart suggested (update stack update) */
-KNOWNID(UPDATE_RELOGIN,		        "update:relogin"),  /* restart suggested (update stack update) */
+KNOWNID(UPDATE_REBOOT,			"update:reboot"),	/* reboot suggested (kernel update) */
+KNOWNID(UPDATE_RESTART,			"update:restart"),	/* restart suggested (update stack update) */
+KNOWNID(UPDATE_RELOGIN,			"update:relogin"),	/* restart suggested (update stack update) */
 
-KNOWNID(UPDATE_MESSAGE,		        "update:message"),  /* restart suggested (update stack update) */
+KNOWNID(UPDATE_MESSAGE,			"update:message"),	/* restart suggested (update stack update) */
                                                                        /* 'content' of patch, usually list of packages */
-KNOWNID(UPDATE_COLLECTION,	        "update:collection"),          /*  "name evr arch" */
-KNOWNID(UPDATE_COLLECTION_NAME,	        "update:collection:name"),     /*   name */
-KNOWNID(UPDATE_COLLECTION_EVR,	        "update:collection:evr"),      /*   epoch:version-release */
-KNOWNID(UPDATE_COLLECTION_ARCH,	        "update:collection:arch"),     /*   architecture */
-KNOWNID(UPDATE_COLLECTION_FILENAME,     "update:collection:filename"), /*   filename (of rpm) */
-KNOWNID(UPDATE_COLLECTION_FLAGS,        "update:collection:flags"),    /*   reboot(1)/restart(2) suggested if this rpm gets updated */
+KNOWNID(UPDATE_COLLECTION,		"update:collection"),          /*  "name evr arch" */
+KNOWNID(UPDATE_COLLECTION_NAME,		"update:collection:name"),     /*   name */
+KNOWNID(UPDATE_COLLECTION_EVR,		"update:collection:evr"),      /*   epoch:version-release */
+KNOWNID(UPDATE_COLLECTION_ARCH,		"update:collection:arch"),     /*   architecture */
+KNOWNID(UPDATE_COLLECTION_FILENAME,	"update:collection:filename"), /*   filename (of rpm) */
+KNOWNID(UPDATE_COLLECTION_FLAGS,	"update:collection:flags"),    /*   reboot(1)/restart(2) suggested if this rpm gets updated */
 
-                                                                   /* external references for the update */
-KNOWNID(UPDATE_REFERENCE_TYPE,	        "update:reference:type"),  /*  type, e.g. 'bugzilla' or 'cve' */
-KNOWNID(UPDATE_REFERENCE_HREF,	        "update:reference:href"),  /*  href, e.g. 'http://bugzilla...' */
-KNOWNID(UPDATE_REFERENCE_ID,	        "update:reference:id"),    /*  id, e.g. bug number */
-KNOWNID(UPDATE_REFERENCE_TITLE,	        "update:reference:title"), /*  title, e.g. "the bla forz scribs on fuggle" */
+KNOWNID(UPDATE_REFERENCE,		"update:reference"),		/* external references for the update */
+KNOWNID(UPDATE_REFERENCE_TYPE,		"update:reference:type"),	/*  type, e.g. 'bugzilla' or 'cve' */
+KNOWNID(UPDATE_REFERENCE_HREF,		"update:reference:href"),	/*  href, e.g. 'http://bugzilla...' */
+KNOWNID(UPDATE_REFERENCE_ID,		"update:reference:id"),		/*  id, e.g. bug number */
+KNOWNID(UPDATE_REFERENCE_TITLE,		"update:reference:title"),	/*  title, e.g. "the bla forz scribs on fuggle" */
 
 /* name */
 KNOWNID(PRODUCT_SHORTLABEL,		"product:shortlabel"),
 KNOWNID(PRODUCT_DISTPRODUCT,		"product:distproduct"),
 KNOWNID(PRODUCT_DISTVERSION,		"product:distversion"),
 KNOWNID(PRODUCT_TYPE,			"product:type"),
-KNOWNID(PRODUCT_URL,		        "product:url"),
+KNOWNID(PRODUCT_URL,			"product:url"),
 KNOWNID(PRODUCT_URL_TYPE,		"product:url:type"),
 KNOWNID(PRODUCT_FLAGS,			"product:flags"),
 KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),
@@ -163,30 +172,30 @@ KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
 
 /* timestamp then the repository was generated */
-KNOWNID(REPOSITORY_TIMESTAMP,           "repository:timestamp"),
+KNOWNID(REPOSITORY_TIMESTAMP,		"repository:timestamp"),
 /* hint when the metadata could be outdated
    w/respect to generated timestamp */
-KNOWNID(REPOSITORY_EXPIRE,              "repository:expire"),
+KNOWNID(REPOSITORY_EXPIRE,		"repository:expire"),
 /* which things does this repo provides updates for, if it does */
-KNOWNID(REPOSITORY_UPDATES,              "repository:updates"),
+KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),
 /* which products this repository is supposed to be for */
-KNOWNID(REPOSITORY_PRODUCTS,             "repository:products"),
+KNOWNID(REPOSITORY_PRODUCTS,		"repository:products"),
 /* keyword (tags) for this repository */
-KNOWNID(REPOSITORY_KEYWORDS,             "repository:keywords"),
+KNOWNID(REPOSITORY_KEYWORDS,		"repository:keywords"),
 
 KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
-KNOWNID(DELTA_PACKAGE_EVR,              "delta:pkgevr"),
-KNOWNID(DELTA_PACKAGE_ARCH,             "delta:pkgarch"),
+KNOWNID(DELTA_PACKAGE_EVR,		"delta:pkgevr"),
+KNOWNID(DELTA_PACKAGE_ARCH,		"delta:pkgarch"),
 KNOWNID(DELTA_LOCATION_DIR,		"delta:locdir"),
 KNOWNID(DELTA_LOCATION_NAME,		"delta:locname"),
 KNOWNID(DELTA_LOCATION_EVR,		"delta:locevr"),
 KNOWNID(DELTA_LOCATION_SUFFIX,		"delta:locsuffix"),
 KNOWNID(DELTA_DOWNLOADSIZE,		"delta:downloadsize"),
-KNOWNID(DELTA_CHECKSUM,		        "delta:checksum"),
-KNOWNID(DELTA_BASE_EVR,		        "delta:baseevr"),
-KNOWNID(DELTA_SEQ_NAME,		        "delta:seqname"),
-KNOWNID(DELTA_SEQ_EVR,		        "delta:seqevr"),
-KNOWNID(DELTA_SEQ_NUM,		        "delta:seqnum"),
+KNOWNID(DELTA_CHECKSUM,			"delta:checksum"),
+KNOWNID(DELTA_BASE_EVR,			"delta:baseevr"),
+KNOWNID(DELTA_SEQ_NAME,			"delta:seqname"),
+KNOWNID(DELTA_SEQ_EVR,			"delta:seqevr"),
+KNOWNID(DELTA_SEQ_NUM,			"delta:seqnum"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 

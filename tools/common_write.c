@@ -39,12 +39,25 @@ static char *languagetags[] = {
 
 static int test_separate = 0;
 
+struct keyfilter_data {
+  char **languages;
+  int nlanguages;
+  int haveaddedfileprovides;
+  int haveexternal;
+};
+
 static int
 keyfilter_solv(Repo *data, Repokey *key, void *kfdata)
 {
+  struct keyfilter_data *kd = kfdata;
   int i;
   const char *keyname;
+
   if (test_separate && key->storage != KEY_STORAGE_SOLVABLE)
+    return KEY_STORAGE_DROPPED;
+  if (!kd->haveaddedfileprovides && key->name == REPOSITORY_ADDEDFILEPROVIDES)
+    return KEY_STORAGE_DROPPED;
+  if (!kd->haveexternal && key->name == REPOSITORY_EXTERNAL)
     return KEY_STORAGE_DROPPED;
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
@@ -62,6 +75,9 @@ keyfilter_attr(Repo *data, Repokey *key, void *kfdata)
   int i;
   const char *keyname;
   if (key->storage == KEY_STORAGE_SOLVABLE)
+    return KEY_STORAGE_DROPPED;
+  /* those two must only be in the main solv file */
+  if (key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_ADDEDFILEPROVIDES)
     return KEY_STORAGE_DROPPED;
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
@@ -119,17 +135,17 @@ keyfilter_FL(Repo *repo, Repokey *key, void *kfdata)
   return KEY_STORAGE_INCORE;
 }
 
-struct keyfilter_other_data {
-  char **languages;
-  int nlanguages;
-};
-
 static int
 keyfilter_other(Repo *repo, Repokey *key, void *kfdata)
 {
   const char *name, *p;
-  struct keyfilter_other_data *kd = kfdata;
+  struct keyfilter_data *kd = kfdata;
   int i;
+
+  if (!kd->haveaddedfileprovides && key->name == REPOSITORY_ADDEDFILEPROVIDES)
+    return KEY_STORAGE_DROPPED;
+  if (!kd->haveexternal && key->name == REPOSITORY_EXTERNAL)
+    return KEY_STORAGE_DROPPED;
 
   if (key->name == SOLVABLE_FILELIST || key->name == SOLVABLE_DISKUSAGE)
     return KEY_STORAGE_DROPPED;
@@ -156,30 +172,49 @@ keyfilter_other(Repo *repo, Repokey *key, void *kfdata)
 
 #define REPODATAFILE_BLOCK 15
 
+static void
+write_info(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Repodata *info, const char *location)
+{
+  Id h, *keyarray = 0;
+  int i;
+
+  repo_write(repo, fp, keyfilter, kfdata, &keyarray);
+  h = repodata_new_handle(info);
+  if (keyarray)
+    {
+      for (i = 0; keyarray[i]; i++)
+        repodata_add_idarray(info, h, REPOSITORY_KEYS, keyarray[i]);
+    }
+  sat_free(keyarray);
+  repodata_set_str(info, h, REPOSITORY_LOCATION, location);
+  repodata_add_flexarray(info, REPOENTRY_META, REPOSITORY_EXTERNAL, h);
+}
+
 int
 tool_write(Repo *repo, const char *basename, const char *attrname)
 {
   Repodata *data;
+  Repodata *info = 0;
   Repokey *key;
-  Repodatafile *fileinfos = 0;
-  int nfileinfos = 0;
   char **languages = 0;
   int nlanguages = 0;
   int i, j, k, l;
+  Id *addedfileprovides = 0;
+  struct keyfilter_data kd;
 
-  fileinfos = sat_zextend(fileinfos, nfileinfos, 1, sizeof(Repodatafile), REPODATAFILE_BLOCK);
-  pool_addfileprovides_ids(repo->pool, 0, &fileinfos[nfileinfos].addedfileprovides);
-  for (i = 0; i < 32; i++)
-    if (repo->rpmdbcookie[i])
-      break;
-  if (i < 32)
-    fileinfos[nfileinfos].rpmdbcookie = repo->rpmdbcookie;
-  if (fileinfos[nfileinfos].addedfileprovides || fileinfos[nfileinfos].rpmdbcookie)
-    nfileinfos++;
+  memset(&kd, 0, sizeof(kd));
+  info = repo_add_repodata(repo, 0);
+  pool_addfileprovides_ids(repo->pool, 0, &addedfileprovides);
+  if (addedfileprovides && *addedfileprovides)
+    {
+      kd.haveaddedfileprovides = 1;
+      for (i = 0; addedfileprovides[i]; i++)
+        repodata_add_idarray(info, REPOENTRY_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
+    }
+  sat_free(addedfileprovides);
 
   if (basename)
     {
-      struct keyfilter_other_data kd;
       char fn[4096];
       FILE *fp;
       int has_DU = 0;
@@ -212,7 +247,6 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	      languages[nlanguages++] = strdup(keyname + l);
 	    }
 	}
-      fileinfos = sat_zextend(fileinfos, nfileinfos, nlanguages + 2, sizeof(Repodatafile), REPODATAFILE_BLOCK);
       /* write language subfiles */
       for (i = 0; i < nlanguages; i++)
         {
@@ -222,10 +256,9 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	      perror(fn);
 	      exit(1);
 	    }
-          repo_write(repo, fp, keyfilter_language, languages[i], fileinfos + nfileinfos, 0);
-	  fileinfos[nfileinfos].location = strdup(fn);
+	  write_info(repo, fp, keyfilter_language, languages[i], info, fn);
 	  fclose(fp);
-	  nfileinfos++;
+	  kd.haveexternal = 1;
         }
       /* write DU subfile */
       if (has_DU)
@@ -236,10 +269,9 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	      perror(fn);
 	      exit(1);
 	    }
-	  repo_write(repo, fp, keyfilter_DU, 0, fileinfos + nfileinfos, 0);
-	  fileinfos[nfileinfos].location = strdup(fn);
+	  write_info(repo, fp, keyfilter_DU, 0, info, fn);
 	  fclose(fp);
-	  nfileinfos++;
+	  kd.haveexternal = 1;
 	}
       /* write filelist */
       if (has_FL)
@@ -250,10 +282,9 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	      perror(fn);
 	      exit(1);
 	    }
-	  repo_write(repo, fp, keyfilter_FL, 0, fileinfos + nfileinfos, 0);
-	  fileinfos[nfileinfos].location = strdup(fn);
+	  write_info(repo, fp, keyfilter_FL, 0, info, fn);
 	  fclose(fp);
-	  nfileinfos++;
+	  kd.haveexternal = 1;
 	}
       /* write everything else */
       sprintf(fn, "%s.solv", basename);
@@ -264,37 +295,27 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	}
       kd.languages = languages;
       kd.nlanguages = nlanguages;
-      repo_write(repo, fp, keyfilter_other, &kd, nfileinfos ? fileinfos : 0, nfileinfos);
+      repodata_internalize(info);
+      repo_write(repo, fp, keyfilter_other, &kd, 0);
       fclose(fp);
       for (i = 0; i < nlanguages; i++)
 	free(languages[i]);
       sat_free(languages);
-      for (i = 0; i < nfileinfos; i++)
-	{
-	  sat_free(fileinfos[i].addedfileprovides);
-	  sat_free(fileinfos[i].location);
-	  sat_free(fileinfos[i].keys);
-	}
-      sat_free(fileinfos);
+      repodata_free(info);
+      repo->nrepodata--;
       return 0;
     }
   if (attrname)
     {
-      fileinfos = sat_zextend(fileinfos, nfileinfos, 1, sizeof(Repodatafile), REPODATAFILE_BLOCK);
       test_separate = 1;
-      FILE *fp = fopen (attrname, "w");
-      repo_write(repo, fp, keyfilter_attr, 0, fileinfos + nfileinfos, 0);
-      fileinfos[nfileinfos].location = strdup(attrname);
+      FILE *fp = fopen(attrname, "w");
+      write_info(repo, fp, keyfilter_attr, 0, info, attrname);
       fclose(fp);
-      nfileinfos++;
+      kd.haveexternal = 1;
     }
-  repo_write(repo, stdout, keyfilter_solv, 0, nfileinfos ? fileinfos : 0, nfileinfos);
-  for (i = 0; i < nfileinfos; i++)
-    {
-      sat_free(fileinfos[i].addedfileprovides);
-      sat_free(fileinfos[i].location);
-      sat_free(fileinfos[i].keys);
-    }
-  sat_free(fileinfos);
+  repodata_internalize(info);
+  repo_write(repo, stdout, keyfilter_solv, &kd, 0);
+  repodata_free(info);
+  repo->nrepodata--;
   return 0;
 }

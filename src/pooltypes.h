@@ -22,6 +22,7 @@
 #define SOLV_VERSION_5 5
 #define SOLV_VERSION_6 6
 #define SOLV_VERSION_7 7
+#define SOLV_VERSION_8 8
 
 /* The format of .solv files might change incompatibly, and that is described
    by the above version number.  But sometimes we also extend the emitted

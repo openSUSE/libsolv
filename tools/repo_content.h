@@ -5,4 +5,4 @@
  * for further information
  */
 
-void repo_add_content(Repo *repo, FILE *fp);
+void repo_add_content(Repo *repo, FILE *fp, int flags);

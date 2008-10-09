@@ -112,6 +112,9 @@ main(int argc, char **argv)
     }
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<susetags>");
+
+  repo_add_repodata(repo, 0);
+
   if (contentfile)
     {
       FILE *fp = fopen (contentfile, "r");
@@ -120,11 +123,11 @@ main(int argc, char **argv)
 	  perror(contentfile);
 	  exit(1);
 	}
-      repo_add_content(repo, fp);
+      repo_add_content(repo, fp, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
       product = repo->start;
-
       fclose (fp);
     }
+
   if (attrname)
     {
       /* ensure '.attr' suffix */
@@ -189,7 +192,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, product, 0, flags);
+	      repo_add_susetags(repo, fp, product, 0, flags | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 	      fclose(fp);
 	    }
 	  else if (!strcmp(fn, "packages.DU") || !strcmp(fn, "packages.DU.gz"))
@@ -201,7 +204,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, product, 0, flags | SUSETAGS_EXTEND);
+	      repo_add_susetags(repo, fp, product, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 	      fclose(fp);
  	    }
 	  else if (!strcmp(fn, "packages.FL") || !strcmp(fn, "packages.FL.gz"))
@@ -214,7 +217,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, product, 0, flags | SUSETAGS_EXTEND);
+	      repo_add_susetags(repo, fp, product, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 	      fclose(fp);
 #else
 	      /* ignore for now. reactivate when filters work */
@@ -242,7 +245,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, product, lang, flags | SUSETAGS_EXTEND);
+	      repo_add_susetags(repo, fp, product, lang, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 	      fclose(fp);
 	    }
 	}
@@ -250,11 +253,12 @@ main(int argc, char **argv)
 	free(files[i]);
       free(files);
       free(fnp);
+      repo_internalize(repo);
     }
   else
     /* read data from stdin */
-    repo_add_susetags(repo, stdin, product, 0, flags);
-
+    repo_add_susetags(repo, stdin, product, 0, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+  repo_internalize(repo);
   tool_write(repo, basefile, attrname);
   pool_free(pool);
   exit(0);

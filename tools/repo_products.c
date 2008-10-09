@@ -221,8 +221,7 @@ startElement(void *userData, const char *name, const char **atts)
       if (!s)
 	{
 	  s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
-	  repodata_extend(pd->data, s - pool->solvables);
-	  pd->handle = repodata_get_handle(pd->data, (s - pool->solvables) - pd->repo->start);
+	  pd->handle = s - pool->solvables;
 	}
       break;
 
@@ -370,18 +369,12 @@ characterData(void *userData, const XML_Char *s, int len)
   struct parsedata *pd = userData;
   int l;
   char *c;
-  if (!pd->docontent) {
-#if 0
-    char *dup = strndup( s, len );
-  fprintf(stderr, "Content: [%d]'%s'\n", pd->state, dup );
-  free( dup );
-#endif
+  if (!pd->docontent)
     return;
-  }
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
-      pd->content = realloc(pd->content, l + 256);
+      pd->content = sat_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content + pd->lcontent;
@@ -400,7 +393,7 @@ characterData(void *userData, const XML_Char *s, int len)
  */
 
 static void
-repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
+repo_add_product(struct parsedata *pd, FILE *fp, int code11)
 {
   char buf[BUFF_SIZE];
   int l;
@@ -526,7 +519,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp, int code11)
  */
 
 static void
-parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, int code11)
+parse_dir(DIR *dir, const char *path, struct parsedata *pd, int code11)
 {
   struct dirent *entry;
   char *suffix = code11 ? ".prod" : "-release";
@@ -564,7 +557,7 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, 
 	      perror(fullpath);
 	      break;
 	    }
-	  repo_add_product(pd, repodata, fp, code11);
+	  repo_add_product(pd, fp, code11);
 	  fclose(fp);
 	}
     }
@@ -580,21 +573,29 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata, 
  * parse each one as a product
  */
 
+/* Oh joy! Three parsers for the price of one! */
+
 void
-repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const char *root, const char *attribute)
+repo_add_products(Repo *repo, const char *proddir, const char *root, const char *attribute, int flags)
 {
   const char *fullpath = proddir;
   DIR *dir;
   int i;
   struct parsedata pd;
   struct stateswitch *sw;
+  Repodata *data;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else 
+    data = repo_last_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;
   pd.pool = repo->pool;
-  pd.data = repodata;
+  pd.data = data;
 
-  pd.content = malloc(256);
+  pd.content = sat_malloc(256);
   pd.acontent = 256;
 
   pd.attribute = attribute;
@@ -609,7 +610,7 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
   dir = opendir(fullpath);
   if (dir)
     {
-      parse_dir(dir, fullpath, &pd, repodata, 1); /* assume 'code11' products */
+      parse_dir(dir, fullpath, &pd, 1); /* assume 'code11' products */
       closedir(dir);
     }
   else
@@ -618,7 +619,7 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
       dir = opendir(fullpath);
       if (dir)
 	{
-	  repo_add_zyppdb_products(repo, repodata, fullpath, dir); /* assume 'code10' zypp-style products */
+	  repo_add_zyppdb_products(repo, data, fullpath, dir);      /* assume 'code10' zypp-style products */
 	  closedir(dir);
 	}
       else
@@ -627,7 +628,7 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
 	  dir = opendir(fullpath);
 	  if (dir)
 	    {
-	      parse_dir(dir, fullpath, &pd, repodata, 0); /* fall back to /etc/<xyz>-release parsing */
+	      parse_dir(dir, fullpath, &pd, 0); /* fall back to /etc/<xyz>-release parsing */
 	      closedir(dir);
 	    }
 	  else
@@ -638,9 +639,12 @@ repo_add_products(Repo *repo, Repodata *repodata, const char *proddir, const cha
     }
 
   sat_free((void *)pd.tmplang);
-  free(pd.content);
+  sat_free(pd.content);
   join_freemem();
 
+
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }
 
 /* EOF */

@@ -37,12 +37,13 @@ static FILE *
 loadcallback (Pool *pool, Repodata *data, void *vdata)
 {
   FILE *fp = 0;
-  if (data->location)
+  const char *location = repodata_lookup_str(data, 0, REPOSITORY_LOCATION);
+  if (location)
     {
-      fprintf(stderr, "Loading SOLV file %s\n", data->location);
-      fp = fopen (data->location, "r");
+      fprintf(stderr, "Loading SOLV file %s\n", location);
+      fp = fopen (location, "r");
       if (!fp)
-	perror(data->location);
+	perror(location);
     }
   return fp;
 }
@@ -85,7 +86,7 @@ main(int argc, char **argv)
       if ((fp = fopen(argv[optind], "r")) == NULL)
 	{
 	  perror(argv[optind]);
-	  exit(0);
+	  exit(1);
 	}
       repo_add_solv(repo, fp);
       fclose(fp);

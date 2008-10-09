@@ -26,6 +26,7 @@
 #include "pool.h"
 #include "util.h"
 #include "repo_write.h"
+#include "repopage.h"
 
 /*------------------------------------------------------------------*/
 /* Id map optimizations */
@@ -392,6 +393,11 @@ struct cbdata {
   Id *dirused;
 
   Id vstart;
+
+  Id maxdata;
+  Id lastlen;
+
+  int doingsolvables;	/* working on solvables data */
 };
 
 #define NEEDED_BLOCK 1023
@@ -637,11 +643,17 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
   Id id;
   int rm;
 
+  if (key->name == REPOSITORY_SOLVABLES)
+    return SEARCH_NEXT_KEY;	/* we do not want this one */
+  if (data != data->repo->repodata + data->repo->nrepodata - 1)
+    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS)
+      return SEARCH_NEXT_KEY;
+
   rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];
   if (!rm)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
   /* record key in schema */
-  if ((key->type != REPOKEY_TYPE_COUNTED || kv->eof == 0)
+  if ((key->type != REPOKEY_TYPE_FIXARRAY || kv->eof == 0)
       && (cbdata->sp == cbdata->schema || cbdata->sp[-1] != rm))
     *cbdata->sp++ = rm;
   switch(key->type)
@@ -662,7 +674,7 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
 	else
 	  setdirused(cbdata, &data->dirpool, id);
 	break;
-      case REPOKEY_TYPE_COUNTED:
+      case REPOKEY_TYPE_FIXARRAY:
 	if (kv->eof == 0)
 	  {
 	    if (cbdata->oldschema)
@@ -694,6 +706,24 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
 	    cbdata->oldsp = cbdata->oldschema = 0;
 	  }
 	break;
+      case REPOKEY_TYPE_FLEXARRAY:
+	if (kv->entry == 0)
+	  {
+	    if (!kv->eof)
+	      *cbdata->sp++ = 0;	/* mark start */
+	  }
+	else
+	  {
+	    /* just finished a schema, rewind */
+	    Id *sp = cbdata->sp - 1;
+	    *sp = 0;
+	    while (sp[-1])
+	      sp--;
+	    cbdata->subschemata = sat_extend(cbdata->subschemata, cbdata->nsubschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
+	    cbdata->subschemata[cbdata->nsubschemata++] = addschema(cbdata, sp);
+	    cbdata->sp = kv->eof ? sp - 1: sp;
+	  }
+	break;
       default:
 	break;
     }
@@ -704,9 +734,11 @@ static int
 repo_write_cb_needed(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
   struct cbdata *cbdata = vcbdata;
-  Repo *repo = s ? s->repo : 0;
+  Repo *repo = data->repo;
+
 #if 0
-  fprintf(stderr, "solvable %d (%s): key (%d)%s %d\n", s ? s - s->repo->pool->solvables : 0, s ? id2str(s->repo->pool, s->name) : "", key->name, id2str(repo->pool, key->name), key->type);
+  if (s)
+    fprintf(stderr, "solvable %d (%s): key (%d)%s %d\n", s ? s - repo->pool->solvables : 0, s ? id2str(repo->pool, s->name) : "", key->name, id2str(repo->pool, key->name), key->type);
 #endif
   return repo_write_collect_needed(cbdata, repo, data, key, kv);
 }
@@ -720,9 +752,15 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
   unsigned char v[4];
   struct extdata *xd;
 
+  if (key->name == REPOSITORY_SOLVABLES)
+    return SEARCH_NEXT_KEY;
+  if (data != data->repo->repodata + data->repo->nrepodata - 1)
+    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS)
+      return SEARCH_NEXT_KEY;
+
   rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];
   if (!rm)
-    return 0;	/* we do not want this one */
+    return SEARCH_NEXT_KEY;	/* we do not want this one */
   
   if (cbdata->mykeys[rm].storage == KEY_STORAGE_VERTICAL_OFFSET)
     {
@@ -761,6 +799,9 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
       case REPOKEY_TYPE_SHA1:
 	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA1);
 	break;
+      case REPOKEY_TYPE_SHA256:
+	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA256);
+	break;
       case REPOKEY_TYPE_U32:
 	u32 = kv->num;
 	v[0] = u32 >> 24;
@@ -796,7 +837,7 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	data_addideof(xd, id, kv->eof);
 	data_addblob(xd, (unsigned char *)kv->str, strlen(kv->str) + 1);
 	break;
-      case REPOKEY_TYPE_COUNTED:
+      case REPOKEY_TYPE_FIXARRAY:
 	if (kv->eof == 0)
 	  {
 	    if (kv->num)
@@ -814,6 +855,18 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	  }
 	else
 	  {
+	  }
+	break;
+      case REPOKEY_TYPE_FLEXARRAY:
+	if (!kv->entry)
+	  data_addid(xd, kv->num);
+	if (!kv->eof)
+	  data_addid(xd, cbdata->subschemata[cbdata->current_sub++]);
+	if (xd == cbdata->extdata + 0 && !kv->path && !cbdata->doingsolvables)
+	  {
+	    if (xd->len - cbdata->lastlen > cbdata->maxdata)
+	      cbdata->maxdata = xd->len - cbdata->lastlen;
+	    cbdata->lastlen = xd->len;
 	  }
 	break;
       default:
@@ -871,9 +924,6 @@ traverse_dirs(Dirpool *dp, Id *dirmap, Id n, Id dir, Id *used)
   return n;
 }
 
-#define BLOB_PAGEBITS 15
-#define BLOB_PAGESIZE (1 << BLOB_PAGEBITS)
-
 static void
 write_compressed_page(FILE *fp, unsigned char *page, int len)
 {
@@ -894,6 +944,7 @@ write_compressed_page(FILE *fp, unsigned char *page, int len)
 }
 
 
+#if 0
 static Id subfilekeys[] = {
   REPODATA_INFO, REPOKEY_TYPE_VOID,
   REPODATA_EXTERNAL, REPOKEY_TYPE_VOID,
@@ -903,13 +954,14 @@ static Id subfilekeys[] = {
   REPODATA_RPMDBCOOKIE, REPOKEY_TYPE_SHA256,
   0,
 };
+#endif
 
 /*
  * Repo
  */
 
 void
-repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Repodatafile *fileinfo, int nsubfiles)
+repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp)
 {
   Pool *pool = repo->pool;
   int i, j, k, n;
@@ -939,21 +991,12 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   Stringpool ownspool, *spool;
   Dirpool owndirpool, *dirpool;
 
-  int setfileinfo = 0;
   Id *repodataschemata = 0;
+  Id mainschema;
 
   struct extdata *xd;
 
-  int entrysize;
-  Id maxentrysize;
   Id type_constantid = 0;
-
-  /* If we're given a fileinfo structure, but have no subfiles, then we're
-     writing a subfile and our callers wants info about it.  */
-  if (fileinfo && nsubfiles == 0)
-    setfileinfo = 1;
-  if (nsubfiles)
-    repodataschemata = sat_calloc(nsubfiles, sizeof(Id));
 
   memset(&cbdata, 0, sizeof(cbdata));
   cbdata.repo = repo;
@@ -1003,6 +1046,17 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
     }
   cbdata.nmykeys = i;
 
+  if (repo->nsolvables)
+    {
+      key = cbdata.mykeys + cbdata.nmykeys;
+      key->name = REPOSITORY_SOLVABLES;
+      key->type = REPOKEY_TYPE_FLEXARRAY;
+      key->size = 0;
+      key->storage = KEY_STORAGE_INCORE;
+      cbdata.keymap[key->name] = cbdata.nmykeys++;
+    }
+
+#if 0
   /* If we store subfile info, generate the necessary keys.  */
   if (nsubfiles)
     {
@@ -1016,6 +1070,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	  cbdata.keymap[key->name] = cbdata.nmykeys++;
 	}
     }
+#endif
 
   dirpoolusage = 0;
 
@@ -1196,10 +1251,13 @@ for (i = 1; i < cbdata.nmykeys; i++)
   cbdata.schema = sat_calloc(cbdata.nmykeys, sizeof(Id));
   cbdata.sp = cbdata.schema;
   cbdata.solvschemata = sat_calloc(repo->nsolvables, sizeof(Id));
+#if 0
   cbdata.extraschemata = sat_calloc(repo->nextra, sizeof(Id));
+#endif
 
   idarraydata = repo->idarraydata;
 
+  cbdata.doingsolvables = 1;
   for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
     {
       if (s->repo != repo)
@@ -1282,7 +1340,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
 		continue;
 	      if (i < data->start || i >= data->end)
 		continue;
-	      repodata_search(data, i - data->start, 0, repo_write_cb_needed, &cbdata);
+	      repodata_search(data, i, 0, repo_write_cb_needed, &cbdata);
 	      needid = cbdata.needid;
 	    }
 	}
@@ -1290,6 +1348,26 @@ for (i = 1; i < cbdata.nmykeys; i++)
       cbdata.solvschemata[n] = addschema(&cbdata, cbdata.schema);
       n++;
     }
+  cbdata.doingsolvables = 0;
+  assert(n == repo->nsolvables);
+
+  /* create main schema */
+  cbdata.sp = cbdata.schema;
+  /* collect all other data from all repodatas */
+  /* XXX: merge arrays of equal keys? */
+  for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
+    repodata_search(data, REPOENTRY_META, 0, repo_write_cb_needed, &cbdata);
+  sp = cbdata.sp;
+  /* add solvables if needed */
+  if (repo->nsolvables)
+    {
+      *sp++ = cbdata.keymap[REPOSITORY_SOLVABLES];
+      cbdata.mykeys[cbdata.keymap[REPOSITORY_SOLVABLES]].size++;
+    }
+  *sp = 0;
+  mainschema = addschema(&cbdata, cbdata.schema);
+
+#if 0
   if (repo->nextra && anyrepodataused)
     for (i = -1; i >= -repo->nextra; i--)
       {
@@ -1340,6 +1418,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
 	  needid[fileinfo[i].keys[j].name].need++;
 	}
     }
+#endif
 
 /********************************************************************/
 
@@ -1494,15 +1573,29 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 
 /********************************************************************/
   cbdata.extdata = sat_calloc(cbdata.nmykeys, sizeof(struct extdata));
-  
-  cbdata.current_sub = 0;
+
   xd = cbdata.extdata;
-  maxentrysize = 0;
+  cbdata.current_sub = 0;
+  /* write main schema */
+  cbdata.lastlen = 0;
+  data_addid(xd, mainschema);
+
+#if 1
+  for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
+    repodata_search(data, REPOENTRY_META, 0, repo_write_cb_adddata, &cbdata);
+#endif
+
+  if (xd->len - cbdata.lastlen > cbdata.maxdata)
+    cbdata.maxdata = xd->len - cbdata.lastlen;
+  cbdata.lastlen = xd->len;
+
+  if (repo->nsolvables)
+    data_addid(xd, repo->nsolvables);	/* FLEXARRAY nentries */
+  cbdata.doingsolvables = 1;
   for (i = repo->start, s = pool->solvables + i, n = 0; i < repo->end; i++, s++)
     {
       if (s->repo != repo)
 	continue;
-      entrysize = xd->len;
       data_addid(xd, cbdata.solvschemata[n]);
       if (cbdata.keymap[SOLVABLE_NAME])
         data_addid(xd, needid[s->name].need);
@@ -1539,15 +1632,24 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 		continue;
 	      if (i < data->start || i >= data->end)
 		continue;
-	      repodata_search(data, i - data->start, 0, repo_write_cb_adddata, &cbdata);
+	      repodata_search(data, i, 0, repo_write_cb_adddata, &cbdata);
 	    }
 	}
-      entrysize = xd->len - entrysize;
-      if (entrysize > maxentrysize)
-        maxentrysize = entrysize;
+      if (xd->len - cbdata.lastlen > cbdata.maxdata)
+	cbdata.maxdata = xd->len - cbdata.lastlen;
+      cbdata.lastlen = xd->len;
       n++;
     }
+  cbdata.doingsolvables = 0;
 
+  assert(cbdata.current_sub == cbdata.nsubschemata);
+  if (cbdata.subschemata)
+    {
+      cbdata.subschemata = sat_free(cbdata.subschemata);
+      cbdata.nsubschemata = 0;
+    }
+
+#if 0
   if (repo->nextra && anyrepodataused)
     for (i = -1; i >= -repo->nextra; i--)
       {
@@ -1562,6 +1664,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	if (entrysize > maxentrysize)
 	  maxentrysize = entrysize;
       }
+#endif
 
 /********************************************************************/
 
@@ -1569,7 +1672,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 
   /* write file header */
   write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
-  write_u32(fp, repo->nextra ? SOLV_VERSION_7 : SOLV_VERSION_6);
+  write_u32(fp, SOLV_VERSION_8);
 
 
   /* write counts */
@@ -1579,12 +1682,6 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   write_u32(fp, repo->nsolvables);
   write_u32(fp, cbdata.nmykeys);
   write_u32(fp, cbdata.nmyschemata);
-  write_u32(fp, nsubfiles);	/* info blocks.  */
-  if (repo->nextra)
-    {
-      write_u32(fp, repo->nextra);
-      write_u32(fp, SOLV_CONTENT_VERSION);
-    }
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
   write_u32(fp, solv_flags);
@@ -1654,11 +1751,8 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   /*
    * write keys
    */
-  if (setfileinfo)
-    {
-      fileinfo->nkeys = cbdata.nmykeys;
-      fileinfo->keys = sat_calloc(fileinfo->nkeys, sizeof (*fileinfo->keys));
-    }
+  if (keyarrayp)
+    *keyarrayp = sat_calloc(2 * cbdata.nmykeys + 1, sizeof(Id));
   for (i = 1; i < cbdata.nmykeys; i++)
     {
       write_id(fp, needid[cbdata.mykeys[i].name].need);
@@ -1673,8 +1767,11 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       else
         write_id(fp, cbdata.extdata[i].len);
       write_id(fp, cbdata.mykeys[i].storage);
-      if (setfileinfo)
-        fileinfo->keys[i] = cbdata.mykeys[i];
+      if (keyarrayp)
+	{
+          (*keyarrayp)[2 * i - 2] = cbdata.mykeys[i].name;
+          (*keyarrayp)[2 * i - 1] = cbdata.mykeys[i].type;
+	}
     }
 
   /*
@@ -1687,6 +1784,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	write_idarray(fp, pool, 0, cbdata.myschemadata + cbdata.myschemata[i]);
     }
 
+#if 0
   /*
    * write info block
    */
@@ -1731,10 +1829,17 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       write_blob(fp, xd.buf, xd.len);
       sat_free(xd.buf);
     }
+#endif
 
 /********************************************************************/
 
+  write_id(fp, cbdata.maxdata);
+  write_id(fp, cbdata.extdata[0].len);
+  if (cbdata.extdata[0].len)
+    write_blob(fp, cbdata.extdata[0].buf, cbdata.extdata[0].len);
+  sat_free(cbdata.extdata[0].buf);
 
+#if 0
   /*
    * write Solvable data
    */
@@ -1745,6 +1850,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       write_blob(fp, cbdata.extdata[0].buf, cbdata.extdata[0].len);
     }
   sat_free(cbdata.extdata[0].buf);
+#endif
 
   /* write vertical data */
   for (i = 1; i < cbdata.nmykeys; i++)
@@ -1788,7 +1894,6 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   for (i = 1; i < cbdata.nmykeys; i++)
     if (cbdata.extdata[i].len)
       write_blob(fp, cbdata.extdata[i].buf, cbdata.extdata[i].len);
-#endif
 
   /* Fill fileinfo for our caller.  */
   if (setfileinfo)
@@ -1798,6 +1903,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       fileinfo->checksumtype = 0;
       fileinfo->location = 0;
     }
+#endif
 
   for (i = 1; i < cbdata.nmykeys; i++)
     sat_free(cbdata.extdata[i].buf);

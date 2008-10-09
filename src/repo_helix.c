@@ -396,6 +396,8 @@ startElement(void *userData, const char *name, const char **atts)
   pd->depth++;
 
   /* find node name in stateswitch */
+  if (!pd->swtab[pd->state])
+    return;
   for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)
   {
     if (!strcmp(sw->ename, name))
@@ -437,9 +439,6 @@ startElement(void *userData, const char *name, const char **atts)
 
     case STATE_PACKAGE:		       /* solvable name */
       pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
-      if (pd->data)
-	repodata_extend(pd->data, pd->solvable - pool->solvables);
-      
       if (!strcmp(name, "selection"))
         pd->kind = "selection";
       else if (!strcmp(name, "pattern"))
@@ -721,7 +720,7 @@ endElement(void *userData, const char *name)
     case STATE_BUILDTIME:
       t = atoi (pd->content);
       if (t)
-	repodata_set_num(pd->data, repodata_get_handle(pd->data, (s - pool->solvables) - pd->repo->start), SOLVABLE_BUILDTIME, t);
+	repodata_set_num(pd->data, s - pool->solvables, SOLVABLE_BUILDTIME, t);
       break;	
     case STATE_UPDATE:		       /* new version, keeping all other metadata */
       evr = evr2id(pool, pd,
@@ -813,20 +812,19 @@ characterData(void *userData, const XML_Char *s, int len)
  */
 
 void
-repo_add_helix(Repo *repo, FILE *fp)
+repo_add_helix(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   Parsedata pd;
-  Repodata *data = 0;
+  Repodata *data;
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
 
-  if (repo->nrepodata)
-    /* use last repodata */
-    data = repo->repodata + repo->nrepodata - 1;
-  else
+  if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
   
   /* prepare parsedata */
   memset(&pd, 0, sizeof(pd));
@@ -869,10 +867,9 @@ repo_add_helix(Repo *repo, FILE *fp)
 	break;
     }
   XML_ParserFree(parser);
-
-  if (pd.data)
-    repodata_internalize(pd.data);
-
   free(pd.content);
   free(pd.evrspace);
+
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }

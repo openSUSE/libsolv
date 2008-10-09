@@ -414,9 +414,7 @@ startElement(void *userData, const char *name, const char **atts)
 
       if (!strcmp(pd->kind, "patch"))
         {
-          pd->datanum = (pd->solvable - pool->solvables) - pd->repo->start;
-	  repodata_extend(pd->data, pd->solvable - pool->solvables);
-	  pd->datanum = repodata_get_handle(pd->data, pd->datanum);
+          pd->datanum = pd->solvable - pool->solvables;
           repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, pd->timestamp);
 	}
 #if 0
@@ -723,6 +721,12 @@ repo_add_patchxml(Repo *repo, FILE *fp, int flags)
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
+  Repodata *data;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
@@ -733,7 +737,7 @@ repo_add_patchxml(Repo *repo, FILE *fp, int flags)
     }
   pd.pool = pool;
   pd.repo = repo;
-  pd.data = repo_add_repodata(pd.repo, 0);
+  pd.data = data;
 
   pd.content = malloc(256);
   pd.acontent = 256;
@@ -758,8 +762,8 @@ repo_add_patchxml(Repo *repo, FILE *fp, int flags)
     }
   XML_ParserFree(parser);
 
-  if (pd.data)
-    repodata_internalize(pd.data);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 
   free(pd.content);
 }

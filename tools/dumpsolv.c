@@ -15,6 +15,8 @@ static int with_attr = 0;
 #include "pool.h"
 #include "repo_solv.h"
 
+static int dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv);
+
 static void
 dump_repodata (Repo *repo)
 {
@@ -32,24 +34,19 @@ dump_repodata (Repo *repo)
 	printf("%02x", repo->rpmdbcookie[i]);
       printf("\n");
     }
-  printf("repo refers to %d subfiles:\n", repo->nrepodata);
+  printf("repo contains %d repodata sections:\n", repo->nrepodata);
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
       unsigned int j;
-      printf("%s has %d keys, %d schemata\n", data->location ? data->location : "**EMBED**", data->nkeys, data->nschemata);
+      printf("\nrepodata %d has %d keys, %d schemata\n", i + 1, data->nkeys - 1, data->nschemata - 1);
       for (j = 1; j < data->nkeys; j++)
         printf("  %s (type %s size %d storage %d)\n", id2str(repo->pool, data->keys[j].name), id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
       if (data->localpool)
 	printf("  localpool has %d strings, size is %d\n", data->spool.nstrings, data->spool.sstrings);
       if (data->dirpool.ndirs)
 	printf("  localpool has %d directories\n", data->dirpool.ndirs);
-      if (data->addedfileprovides)
-	{
-	  printf("  added file provides:\n");
-	  for (j = 0; data->addedfileprovides[j]; j++)
-	    printf("    %s\n", id2str(repo->pool, data->addedfileprovides[j]));
-	}
       printf("\n");
+      repodata_search(data, REPOENTRY_META, 0, dump_repoattrs_cb, 0);
     }
   printf("\n");
 }
@@ -71,8 +68,12 @@ int
 dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
 {
   const char *keyname;
+  KeyValue *kvp;
+  int indent = 0;
 
   keyname = id2str(repo->pool, key->name);
+  for (kvp = kv; (kvp = kvp->path) != 0; indent += 2)
+    printf("  ");
   switch(key->type)
     {
     case REPOKEY_TYPE_ID:
@@ -86,10 +87,12 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
       printf("%s: %s\n", keyname, dep2str(repo->pool, kv->id));
       break;
     case REPOKEY_TYPE_IDARRAY:
+      if (!kv->entry)
+        printf("%s:\n%*s", keyname, indent, "");
       if (data && data->localpool)
-        printf("%s: %s\n", keyname, stringpool_id2str(&data->spool, kv->id));
+        printf("  %s\n", stringpool_id2str(&data->spool, kv->id));
       else
-        printf("%s: %s\n", keyname, dep2str(repo->pool, kv->id));
+        printf("  %s\n", dep2str(repo->pool, kv->id));
       break;
     case REPOKEY_TYPE_STR:
       printf("%s: %s\n", keyname, kv->str);
@@ -97,7 +100,7 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
     case REPOKEY_TYPE_SHA256:
-      printf("%s: %s\n", keyname, repodata_chk2str(data, key->type, (unsigned char *)kv->str));
+      printf("%s: %s (%s)\n", keyname, repodata_chk2str(data, key->type, (unsigned char *)kv->str), id2str(repo->pool, key->type));
       break;
     case REPOKEY_TYPE_VOID:
       printf("%s: (void)\n", keyname);
@@ -108,13 +111,21 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
       printf("%s: %d\n", keyname, kv->num);
       break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
-      printf("%s: %s %d %d\n", keyname, repodata_dir2str(data, kv->id, 0), kv->num, kv->num2);
+      if (!kv->entry)
+        printf("%s:\n%*s", keyname, indent, "");
+      printf("  %s %d %d\n", repodata_dir2str(data, kv->id, 0), kv->num, kv->num2);
       break;
     case REPOKEY_TYPE_DIRSTRARRAY:
-      printf("%s: %s\n", keyname, repodata_dir2str(data, kv->id, kv->str));
+      if (!kv->entry)
+        printf("%s:\n%*s", keyname, indent, "");
+      printf("  %s\n", repodata_dir2str(data, kv->id, kv->str));
       break;
-    case REPOKEY_TYPE_COUNTED:
-      printf("%s: %s\n", keyname, kv->eof == 0 ? "open" : kv->eof == 1 ? "next" : "close");
+    case REPOKEY_TYPE_FIXARRAY:
+    case REPOKEY_TYPE_FLEXARRAY:
+      if (!kv->entry)
+        printf("%s:\n", keyname);
+      else
+        printf("\n");
       break;
     default:
       printf("%s: ?\n", keyname);
@@ -123,11 +134,15 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
   return 0;
 }
 
-/*static int
+#if 1
+static int
 dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
-  return dump_attr(s->repo, data, key, kv);
-}*/
+  if (key->name == REPOSITORY_SOLVABLES)
+    return SEARCH_NEXT_SOLVABLE;
+  return dump_attr(data->repo, data, key, kv);
+}
+#endif
 
 /*
  * dump all attributes for Id <p>
@@ -136,7 +151,7 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 void
 dump_repoattrs(Repo *repo, Id p)
 {
-#if 0
+#if 1
   repo_search(repo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE, dump_repoattrs_cb, 0);
 #else
   Dataiterator di;
@@ -166,12 +181,15 @@ static FILE *
 loadcallback (Pool *pool, Repodata *data, void *vdata)
 {
   FILE *fp = 0;
-  if (data->location && with_attr)
+printf("LOADCALLBACK\n");
+  const char *location = repodata_lookup_str(data, REPOENTRY_META, REPOSITORY_LOCATION);
+printf("loc %s\n", location);
+  if (location && with_attr)
     {
-      fprintf (stderr, "Loading SOLV file %s\n", data->location);
-      fp = fopen (data->location, "r");
+      fprintf (stderr, "Loading SOLV file %s\n", location);
+      fp = fopen (location, "r");
       if (!fp)
-	perror(data->location);
+	perror(location);
     }
   return fp;
 }
@@ -266,10 +284,22 @@ int main(int argc, char **argv)
 	printf("could not read repository\n");
     }
   printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);
+
+#if 0
+{
+  Dataiterator di;
+  dataiterator_init(&di, repo, -1, 0, "oo", DI_SEARCHSUB|SEARCH_SUBSTRING);
+  while (dataiterator_step(&di))
+    dump_attr(di.repo, di.data, di.key, &di.kv);
+  exit(0);
+}
+#endif
+
   for (j = 0; 1 && j < pool->nrepos; j++)
     {
       repo = pool->repos[j];
       dump_repodata(repo);
+
       printf("repo %d contains %d solvables %d non-solvables\n", j, repo->nsolvables, repo->nextra);
       printf("repo start: %d end: %d\n", repo->start, repo->end);
       for (i = repo->start, n = 1; i < repo->end; i++)

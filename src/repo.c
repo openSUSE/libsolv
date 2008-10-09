@@ -665,11 +665,14 @@ static void
 domatch_idarray(Solvable *s, Id keyname, struct matchdata *md, Id *ida)
 {
   KeyValue kv;
+  kv.entry = 0;
+  kv.parent = 0;
   for (; *ida && !md->stop; ida++)
     {
       kv.id = *ida;
       kv.eof = ida[1] ? 0 : 1;
       repo_matchvalue(md, s, 0, solvablekeys + (keyname - SOLVABLE_NAME), &kv);
+      kv.entry++;
     }
 }
 
@@ -682,6 +685,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
   int i, j, flags;
   Solvable *s;
 
+  kv.parent = 0;
   md->stop = 0;
   if (!p)
     {
@@ -795,6 +799,8 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
     {
       if (p < data->start || p >= data->end)
 	continue;
+      if (keyname && !repodata_precheck_keyname(data, keyname))
+	continue;
       if (data->state == REPODATA_STUB)
 	{
 	  if (keyname)
@@ -813,7 +819,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	}
       if (data->state == REPODATA_ERROR)
 	continue;
-      repodata_search(data, p - data->start, keyname, repo_matchvalue, md);
+      repodata_search(data, p, keyname, repo_matchvalue, md);
       if (md->stop > SEARCH_NEXT_KEY)
 	break;
     }
@@ -834,33 +840,33 @@ repo_search(Repo *repo, Id p, Id keyname, const char *match, int flags, int (*ca
 }
 
 const char *
-repo_lookup_str(Solvable *s, Id key)
+repo_lookup_str(Repo *repo, Id entry, Id keyname)
 {
-  Repo *repo = s->repo;
   Pool *pool = repo->pool;
   Repodata *data;
-  int i, j, n;
+  int i, j;
 
-  switch(key)
+  switch(keyname)
     {
     case SOLVABLE_NAME:
-      return id2str(pool, s->name);
+      return id2str(pool, pool->solvables[entry].name);
     case SOLVABLE_ARCH:
-      return id2str(pool, s->arch);
+      return id2str(pool, pool->solvables[entry].arch);
     case SOLVABLE_EVR:
-      return id2str(pool, s->evr);
+      return id2str(pool, pool->solvables[entry].evr);
     case SOLVABLE_VENDOR:
-      return id2str(pool, s->vendor);
+      return id2str(pool, pool->solvables[entry].vendor);
     }
-  n = s - pool->solvables;
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      if (n < data->start || n >= data->end)
+      if (entry && (entry < data->start || entry >= data->end))
+	continue;
+      if (!repodata_precheck_keyname(data, keyname))
 	continue;
       for (j = 1; j < data->nkeys; j++)
 	{
-	  if (data->keys[j].name == key && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID || data->keys[j].type == REPOKEY_TYPE_STR))
-	    return repodata_lookup_str(data, n - data->start, j);
+	  if (data->keys[j].name == keyname && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID || data->keys[j].type == REPOKEY_TYPE_STR))
+	    return repodata_lookup_str(data, entry, keyname);
 	}
     }
   return 0;
@@ -868,67 +874,127 @@ repo_lookup_str(Solvable *s, Id key)
 
 
 unsigned int
-repo_lookup_num(Solvable *s, Id key)
+repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound)
 {
-  Repo *repo = s->repo;
-  Pool *pool = repo->pool;
   Repodata *data;
-  int i, j, n;
+  int i, j;
 
-  if (key == RPM_RPMDBID)
+  if (keyname == RPM_RPMDBID)
     {
-      if (repo->rpmdbid)
-	return repo->rpmdbid[(s - pool->solvables) - repo->start];
-      return 0;
+      if (repo->rpmdbid && entry && entry >= repo->start && entry < repo->end)
+	return repo->rpmdbid[entry - repo->start];
+      return notfound;
     }
-  n = s - pool->solvables;
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      if (n < data->start || n >= data->end)
+      if (entry && (entry < data->start || entry >= data->end))
+	continue;
+      if (!repodata_precheck_keyname(data, keyname))
 	continue;
       for (j = 1; j < data->nkeys; j++)
 	{
-	  if (data->keys[j].name == key
+	  if (data->keys[j].name == keyname
 	      && (data->keys[j].type == REPOKEY_TYPE_U32
 	          || data->keys[j].type == REPOKEY_TYPE_NUM
 		  || data->keys[j].type == REPOKEY_TYPE_CONSTANT))
 	    {
 	      unsigned value;
-	      if (repodata_lookup_num(data, n - data->start, j, &value))
+	      if (repodata_lookup_num(data, entry, keyname, &value))
 	        return value;
+	    }
+	}
+    }
+  return notfound;
+}
+
+Id
+repo_lookup_id(Repo *repo, Id entry, Id keyname)
+{
+  Repodata *data;
+  int i, j;
+
+  switch(keyname)
+    {   
+    case SOLVABLE_NAME:
+      return repo->pool->solvables[entry].name;
+    case SOLVABLE_ARCH:
+      return repo->pool->solvables[entry].arch;
+    case SOLVABLE_EVR:
+      return repo->pool->solvables[entry].evr;
+    case SOLVABLE_VENDOR:
+      return repo->pool->solvables[entry].vendor;
+    }   
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {   
+      if (entry && (entry < data->start || entry >= data->end))
+	continue;
+      if (!repodata_precheck_keyname(data, keyname))
+	continue;
+      for (j = 1; j < data->nkeys; j++)
+	{
+	  if (data->keys[j].name == keyname && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID))
+	    {
+	      Id id = repodata_lookup_id(data, entry, keyname); 
+	      if (id)
+		{
+		  if (data->localpool)
+		    id = repodata_globalize_id(data, id);
+		  return id; 
+		}
+	    }
+	}
+    }   
+  return 0;
+}
+
+const unsigned char *
+repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
+{
+  Repodata *data;
+  int i, j;
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      if (entry && (entry < data->start || entry >= data->end))
+	continue;
+      if (!repodata_precheck_keyname(data, keyname))
+	continue;
+      for (j = 1; j < data->nkeys; j++)
+	{
+	  if (data->keys[j].name == keyname)
+	    {
+	      const unsigned char *chk = repodata_lookup_bin_checksum(data, entry, keyname, typep);
+	      if (chk)
+		return chk;
+	    }
+	}
+    }
+  *typep = 0;
+  return 0;
+}
+
+int
+repo_lookup_void(Repo *repo, Id entry, Id keyname)
+{
+  Repodata *data;
+  int i, j;
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      if (entry && (entry < data->start || entry >= data->end))
+	continue;
+      if (!repodata_precheck_keyname(data, keyname))
+	continue;
+      for (j = 1; j < data->nkeys; j++)
+	{
+	  if (data->keys[j].name == keyname
+	      && (data->keys[j].type == REPOKEY_TYPE_VOID))
+	    {
+	      if (repodata_lookup_void(data, entry, keyname))
+		return 1;
 	    }
 	}
     }
   return 0;
 }
-
-
-/*
- * generic attribute lookup
- * returns non-zero if found
- * zero if not found
- * (XXX: return value is broken atm!)
- */
-
-int
-repo_lookup(Solvable *s, Id key, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
-{
-  Repo *repo = s->repo;
-  Pool *pool = repo->pool;
-  Repodata *data;
-  int i, s_id;
-
-  s_id = s - pool->solvables;
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    {
-      if (s_id < data->start || s_id >= data->end)
-	continue;
-      repodata_search(data, s_id - data->start, key, callback, cbdata);
-      return 1;
-    }
-  return 0;
-}
-
 
 /***********************************************************************/
 
@@ -944,99 +1010,49 @@ repo_add_repodata(Repo *repo, int localpool)
   return data;
 }
 
-static Repodata *
-repo_findrepodata(Repo *repo, Id p, Id keyname)
+Repodata *
+repo_last_repodata(Repo *repo)
 {
   int i;
-  Repodata *data;
-
-  /* FIXME: enter nice code here */
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    if ((p < 0 && (-1 - p) >= data->extrastart && (-1 - p) < (data->extrastart + data->nextra))
-	|| (p >= 0 && p >= data->start && p < data->end))
-      return data;
-  if (p < 0)
-    {
-      data = repo->repodata;
-      if (data)
-	{
-	  for (i = 1; i < repo->nrepodata; i++)
-	    if (data->extrastart + data->nextra
-		> repo->repodata[i].extrastart + repo->repodata[i].nextra)
-	      data = repo->repodata + i;
-	}
-      else
-	data = repo_add_repodata(repo, 0);
-      repodata_extend_extra(data, (-1 - p) - data->extrastart + 1);
-      if (-p > repo->nextra)
-	repo->nextra = -p;
-      return data;
-    }
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    if (p == data->end)
-      break;
-  if (i < repo->nrepodata)
-    {
-      repodata_extend(data, p);
-      return data;
-    }
+  for (i = repo->nrepodata - 1; i >= 0; i--)
+    if (repo->repodata[i].state != REPODATA_STUB)
+      return repo->repodata + i;
   return repo_add_repodata(repo, 0);
 }
 
 void
 repo_set_id(Repo *repo, Id p, Id keyname, Id id)
 {
-  Repodata *data = repo_findrepodata(repo, p, keyname);
-  if (p < 0)
-    /* This is -1 - ((-1 - p) - data->extrastart).  */
-    p = p + data->extrastart;
-  else
-    p = p - data->start;
-  repodata_set_id(data, repodata_get_handle(data, p), keyname, id);
+  Repodata *data = repo_last_repodata(repo);
+  repodata_set_id(data, p, keyname, id);
 }
 
 void
 repo_set_num(Repo *repo, Id p, Id keyname, Id num)
 {
-  Repodata *data = repo_findrepodata(repo, p, keyname);
-  if (p < 0)
-    p = p + data->extrastart;
-  else
-    p = p - data->start;
-  repodata_set_num(data, repodata_get_handle(data, p), keyname, num);
+  Repodata *data = repo_last_repodata(repo);
+  repodata_set_num(data, p, keyname, num);
 }
 
 void
 repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
 {
-  Repodata *data = repo_findrepodata(repo, p, keyname);
-  if (p < 0)
-    p = p + data->extrastart;
-  else
-    p = p - data->start;
-  repodata_set_str(data, repodata_get_handle(data, p), keyname, str);
+  Repodata *data = repo_last_repodata(repo);
+  repodata_set_str(data, p, keyname, str);
 }
 
 void
 repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str)
 {
-  Repodata *data = repo_findrepodata(repo, p, keyname);
-  if (p < 0)
-    p = p + data->extrastart;
-  else
-    p = p - data->start;
-  repodata_set_poolstr(data, repodata_get_handle(data, p), keyname, str);
+  Repodata *data = repo_last_repodata(repo);
+  repodata_set_poolstr(data, p, keyname, str);
 }
 
 void
 repo_add_poolstr_array(Repo *repo, Id p, Id keyname, const char *str)
 {
-  Repodata *data = repo_findrepodata(repo, p, keyname);
-  if (p < 0)
-    p = p + data->extrastart;
-  else
-    p = p - data->start;
-  repodata_add_poolstr_array(data, repodata_get_handle(data, p), keyname, str);
+  Repodata *data = repo_last_repodata(repo);
+  repodata_add_poolstr_array(data, p, keyname, str);
 }
 
 void
@@ -1046,7 +1062,7 @@ repo_internalize(Repo *repo)
   Repodata *data;
 
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    if (data->attrs || data->extraattrs)
+    if (data->attrs || data->xattrs)
       repodata_internalize(data);
 }
 

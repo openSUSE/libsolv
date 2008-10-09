@@ -134,7 +134,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
       if (!strncmp (name, "package:", 8))
         name += 8;
       id = str2id(pool, name, 1);
-      if (strpbrk(line, "<>=") == line) /* next(!) word is rel */
+      if (*line == '<' || *line == '>' || *line == '=')	/* rel follows */
 	{
 	  char *rel = splitword(&line);
           char *evr = splitword(&line);
@@ -198,7 +198,7 @@ add_multiple_urls(Repodata *data, Id handle, char *value, Id type)
  */
 
 void
-repo_add_content(Repo *repo, FILE *fp)
+repo_add_content(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   char *line, *linep;
@@ -219,6 +219,11 @@ repo_add_content(Repo *repo, FILE *fp)
   */
   unsigned int numotherarchs = 0;
   Id *otherarchs = 0;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
@@ -302,7 +307,7 @@ repo_add_content(Repo *repo, FILE *fp)
 	      /* create new solvable */
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
 	      repodata_extend(data, s - pool->solvables);
-	      handle = repodata_get_handle(data, s - pool->solvables - repo->start);
+	      handle = s - pool->solvables;
 	      s->name = str2id(pool, join(&pd, "product", ":", value), 1);
 	      continue;
 	    }
@@ -313,7 +318,7 @@ repo_add_content(Repo *repo, FILE *fp)
 	    {
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
 	      repodata_extend(data, s - pool->solvables);
-	      handle = repodata_get_handle(data, s - pool->solvables - repo->start);
+	      handle = s - pool->solvables;
 	    }
 
 	  if (istag ("VERSION"))
@@ -422,7 +427,6 @@ repo_add_content(Repo *repo, FILE *fp)
     {
       Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
       repodata_extend(data, p - pool->solvables);
-      /*handle = repodata_get_handle(data, p - pool->solvables - repo->start);*/
       p->name = s->name;
       p->evr = s->evr;
       p->vendor = s->vendor;
@@ -433,14 +437,13 @@ repo_add_content(Repo *repo, FILE *fp)
           p->provides = repo_addid_dep(repo, p->provides, rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
 
       /* now merge the attributes */
-      repodata_merge_attrs(data, p - pool->solvables - repo->start, s - pool->solvables- repo->start);
+      repodata_merge_attrs(data, p - pool->solvables, s - pool->solvables);
     }
-
-  if (data)
-    repodata_internalize(data);
 
   if (pd.tmp)
     sat_free(pd.tmp);
   sat_free(line);
   sat_free(otherarchs);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }
