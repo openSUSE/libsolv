@@ -279,6 +279,7 @@ typedef struct _Dataiterator
        dosomething(di.solvid, di.key, di.kv);  */
 void dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
 		       const char *match, int flags);
+void dataiterator_free(Dataiterator *di);
 int dataiterator_step(Dataiterator *di);
 int dataiterator_match(Dataiterator *di, int flags, const void *match);
 void dataiterator_skip_attribute(Dataiterator *di);
