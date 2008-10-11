@@ -275,9 +275,10 @@ endElement(void *userData, const char *name)
 
       // output distver if requested, only if the product is
       // a base product
+      // this is yum $releasever variable
       if (pd->currentproduct == pd->baseproduct
 	  && pd->attribute
-	  && !strcmp(pd->attribute, "distver"))
+	  && !strcmp(pd->attribute, "releasever"))
 	{
 	  printf("%s\n", pd->tmpvers);
 	}
