@@ -687,6 +687,7 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
 	  ddp = data_read_id(ddp, &nentries);
 	  kv.num = nentries;
 	  kv.entry = 0;
+	  kv.eof = 0;
           while (ddp && nentries > 0)
 	    {
 	      if (key->type == REPOKEY_TYPE_FLEXARRAY || !kv.entry)
