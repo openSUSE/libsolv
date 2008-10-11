@@ -273,6 +273,15 @@ endElement(void *userData, const char *name)
       if (pd->currentproduct == pd->baseproduct)
 	repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, "base");
 
+      // output distver if requested, only if the product is
+      // a base product
+      if (pd->currentproduct == pd->baseproduct
+	  && pd->attribute
+	  && !strcmp(pd->attribute, "distver"))
+	{
+	  printf("%s\n", pd->tmpvers);
+	}
+
       if (pd->tmprel)
 	{
 	  if (pd->tmpvers)
