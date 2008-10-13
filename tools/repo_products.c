@@ -91,6 +91,7 @@ static struct stateswitch stateswitches[] = {
 };
 
 struct parsedata {
+  const char *filename;
   int depth;
   enum state state;
   int statedepth;
@@ -433,8 +434,9 @@ repo_add_product(struct parsedata *pd, FILE *fp, int code11)
 	  l = fread(buf, 1, sizeof(buf), fp);
 	  if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	    {
-	      fprintf(stderr, "repo_products: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	      exit(1);
+	      fprintf(stderr, "%s: %s at line %u:%u\n", pd->filename, XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	      fprintf(stderr, "Skipping this product\n");
+	      return;
 	    }
 	  if (l == 0)
 	    break;
@@ -567,6 +569,7 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, int code11)
 	      perror(fullpath);
 	      break;
 	    }
+	  pd->filename = fullpath;
 	  repo_add_product(pd, fp, code11);
 	  fclose(fp);
 	}
