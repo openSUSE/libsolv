@@ -13,8 +13,6 @@
 #ifndef SATSOLVER_REPO_H
 #define SATSOLVER_REPO_H
 
-#include <regex.h>
-
 #include "pooltypes.h"
 #include "pool.h"
 #include "repodata.h"
@@ -270,11 +268,16 @@ typedef struct _Dataiterator
 
 #endif
 
+void datamatcher_init(Datamatcher *ma, Pool *pool, const char *match, int flags);
+void datamatcher_free(Datamatcher *ma);
+int datamatcher_match(Datamatcher *ma, Repodata *data, Repokey *key, KeyValue *kv);
+
 /* Use these like:
      Dataiterator di;
      dataiterator_init(&di, repo, 0, 0, "bla", SEARCH_SUBSTRING);
      while (dataiterator_step(&di))
-       dosomething(di.solvid, di.key, di.kv);  */
+       dosomething(di.solvid, di.key, di.kv);
+     dataiterator_free(&di);	*/
 void dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
 		       const char *match, int flags);
 void dataiterator_free(Dataiterator *di);

@@ -782,7 +782,7 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
 
   /* If we can't seek on our input we have to slurp in everything.  */
   if (!can_seek)
-    store->blob_store = sat_malloc(npages * BLOB_PAGESIZE);
+    store->blob_store = sat_malloc2(npages, BLOB_PAGESIZE);
   for (i = 0; i < npages; i++)
     {
       unsigned int in_len = read_u32(fp);

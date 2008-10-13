@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
+#include <regex.h>
 
 #include "repo.h"
 #include "pool.h"

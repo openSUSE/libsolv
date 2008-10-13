@@ -569,11 +569,8 @@ repo_fix_conflicts(Repo *repo, Offset conflicts)
 struct matchdata
 {
   Pool *pool;
-  const char *match;
   int flags;
-#if 0
-  regex_t regex;
-#endif
+  Datamatcher matcher;
   int stop;
   int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv);
   void *callback_data;
@@ -583,63 +580,9 @@ int
 repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
   struct matchdata *md = cbdata;
-  int flags = md->flags;
 
-  if ((flags & SEARCH_STRINGMASK) != 0)
-    {
-      switch (key->type)
-	{
-	case REPOKEY_TYPE_ID:
-	case REPOKEY_TYPE_IDARRAY:
-	  if (data && data->localpool)
-	    kv->str = stringpool_id2str(&data->spool, kv->id);
-	  else
-	    kv->str = id2str(s->repo->pool, kv->id);
-	  break;
-	case REPOKEY_TYPE_STR:
-	  break;
-	default:
-	  return 0;
-	}
-      switch ((flags & SEARCH_STRINGMASK))
-	{
-	  case SEARCH_SUBSTRING:
-	    if (flags & SEARCH_NOCASE)
-	      {
-	        if (!strcasestr(kv->str, md->match))
-		  return 0;
-	      }
-	    else
-	      {
-	        if (!strstr(kv->str, md->match))
-		  return 0;
-	      }
-	    break;
-	  case SEARCH_STRING:
-	    if (flags & SEARCH_NOCASE)
-	      {
-	        if (strcasecmp(md->match, kv->str))
-		  return 0;
-	      }
-	    else
-	      {
-	        if (strcmp(md->match, kv->str))
-		  return 0;
-	      }
-	    break;
-	  case SEARCH_GLOB:
-	    if (fnmatch(md->match, kv->str, (flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
-	      return 0;
-	    break;
-#if 0
-	  case SEARCH_REGEX:
-	    if (regexec(&md->regexp, kv->str, 0, NULL, 0))
-	      return 0;
-#endif
-	  default:
-	    return 0;
-	}
-    }
+  if (md->matcher.match && !datamatcher_match(&md->matcher, data, key, kv))
+    return 0;
   md->stop = md->callback(md->callback_data, s, data, key, kv);
   return md->stop;
 }
@@ -832,11 +775,14 @@ repo_search(Repo *repo, Id p, Id keyname, const char *match, int flags, int (*ca
 
   memset(&md, 0, sizeof(md));
   md.pool = repo->pool;
-  md.match = match;
   md.flags = flags;
   md.callback = callback;
   md.callback_data = cbdata;
+  if (match)
+    datamatcher_init(&md.matcher, md.pool, match, flags);
   repo_search_md(repo, p, keyname, &md);
+  if (match)
+    datamatcher_free(&md.matcher);
 }
 
 const char *
