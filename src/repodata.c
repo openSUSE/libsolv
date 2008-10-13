@@ -9,7 +9,7 @@
  * repodata.c
  *
  * Manage data coming from one repository
- * 
+ *
  */
 
 #define _GNU_SOURCE
@@ -107,13 +107,13 @@ repodata_key2id(Repodata *data, Repokey *key, int create)
 
   for (keyid = 1; keyid < data->nkeys; keyid++)
     if (data->keys[keyid].name == key->name && data->keys[keyid].type == key->type)
-      {    
+      {
         if ((key->type == REPOKEY_TYPE_CONSTANT || key->type == REPOKEY_TYPE_CONSTANTID) && key->size != data->keys[keyid].size)
           continue;
         break;
       }
   if (keyid == data->nkeys)
-    {    
+    {
       if (!create)
 	return 0;
       /* allocate new key */
@@ -122,7 +122,7 @@ repodata_key2id(Repodata *data, Repokey *key, int create)
       if (data->verticaloffset)
         {
           data->verticaloffset = sat_realloc2(data->verticaloffset, data->nkeys, sizeof(Id));
-          data->verticaloffset[data->nkeys - 1] = 0; 
+          data->verticaloffset[data->nkeys - 1] = 0;
         }
       data->keybits[(key->name >> 3) & (sizeof(data->keybits) - 1)] |= 1 << (key->name & 7);
     }
@@ -140,8 +140,8 @@ repodata_key2id(Repodata *data, Repokey *key, int create)
 Id
 repodata_schema2id(Repodata *data, Id *schema, int create)
 {
-  int h, len, i; 
-  Id *sp, cid; 
+  int h, len, i;
+  Id *sp, cid;
   Id *schematahash;
 
   if ((schematahash = data->schematahash) == 0)
@@ -154,18 +154,18 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
 	  h &= 255;
 	  schematahash[h] = i + 1;
 	}
-      data->schemadata = sat_extend_resize(data->schemadata, data->schemadatalen, sizeof(Id), SCHEMATADATA_BLOCK); 
+      data->schemadata = sat_extend_resize(data->schemadata, data->schemadatalen, sizeof(Id), SCHEMATADATA_BLOCK);
       data->schemata = sat_extend_resize(data->schemata, data->nschemata, sizeof(Id), SCHEMATA_BLOCK);
     }
 
   for (sp = schema, len = 0, h = 0; *sp; len++)
     h = h * 7 + *sp++;
-  h &= 255; 
+  h &= 255;
   len++;
 
   cid = schematahash[h];
   if (cid)
-    {    
+    {
       cid--;
       if (!memcmp(data->schemadata + data->schemata[cid], schema, len * sizeof(Id)))
         return cid;
@@ -177,7 +177,7 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
   /* a new one */
   if (!create)
     return 0;
-  data->schemadata = sat_extend(data->schemadata, data->schemadatalen, len, sizeof(Id), SCHEMATADATA_BLOCK); 
+  data->schemadata = sat_extend(data->schemadata, data->schemadatalen, len, sizeof(Id), SCHEMATADATA_BLOCK);
   data->schemata = sat_extend(data->schemata, data->nschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
   /* add schema */
   memcpy(data->schemadata + data->schemadatalen, schema, len * sizeof(Id));
@@ -187,7 +187,7 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
 #if 0
 fprintf(stderr, "schema2id: new schema\n");
 #endif
-  return data->nschemata++; 
+  return data->nschemata++;
 }
 
 void
@@ -1011,8 +1011,8 @@ dataiterator_step(Dataiterator *di)
 	    {
 	      Id *keyp = di->keyp;
 	      for (keyp++; *keyp; keyp++)
-		if (di->data->keys[*keyp].name == di->keyname || 
-		    di->data->keys[*keyp].type == REPOKEY_TYPE_FIXARRAY || 
+		if (di->data->keys[*keyp].name == di->keyname ||
+		    di->data->keys[*keyp].type == REPOKEY_TYPE_FIXARRAY ||
 		    di->data->keys[*keyp].type == REPOKEY_TYPE_FLEXARRAY)
 		  break;
 	      if (*keyp && (di->dp = forward_to_key(di->data, *keyp, di->keyp, di->dp)) != 0)
@@ -1159,7 +1159,7 @@ dataiterator_step(Dataiterator *di)
 	  di->nparents++;
 	  di->keyp--;
 	  goto di_nextkey;
-	  
+
 	case di_leavesub: di_leavesub:
 	  di->nparents--;
 	  di->dp = di->parents[di->nparents].dp;
@@ -1283,6 +1283,7 @@ dataiterator_match(Dataiterator *di, int flags, const void *vmatch)
   Datamatcher matcher = di->matcher;
   matcher.flags = flags;
   matcher.match = (void *)vmatch;
+  matcher.pool = di->pool;
   return datamatcher_match(&matcher, di->data, di->key, &di->kv);
 }
 
@@ -2193,7 +2194,7 @@ repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
 
 Id
 repodata_globalize_id(Repodata *data, Id id)
-{ 
+{
   if (!data || !data->localpool)
     return id;
   return str2id(data->repo->pool, stringpool_id2str(&data->spool, id), 1);
@@ -2684,7 +2685,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
   data->incoredata = newincore.buf;
   data->incoredatalen = newincore.len;
   data->incoredatafree = 0;
-  
+
   sat_free(data->vincore);
   data->vincore = newvincore.buf;
   data->vincorelen = newvincore.len;
