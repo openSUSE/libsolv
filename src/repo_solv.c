@@ -543,7 +543,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   memset(&data, 0, sizeof(data));
   data.repo = repo;
   data.fp = fp;
-  data.pagefd = -1;
+  repopagestore_init(&data.store);
 
   mypool = pool;
 
@@ -1290,7 +1290,7 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
 	  }
       data.lastverticaloffset = fileoffset;
       pagesize = read_u32(&data);
-      repodata_read_or_setup_pages(&data, pagesize, fileoffset);
+      data.error = repopagestore_read_or_setup_pages(&data.store, data.fp, pagesize, fileoffset);
     }
   else
     {

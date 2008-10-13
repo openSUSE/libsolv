@@ -53,7 +53,7 @@ repodata_init(Repodata *data, Repo *repo, int localpool)
   data->schemadata = sat_calloc(1, sizeof(Id));
   data->nschemata = 1;
   data->schemadatalen = 1;
-  data->pagefd = -1;
+  repopagestore_init(&data->store);
 }
 
 void
@@ -75,9 +75,7 @@ repodata_free(Repodata *data)
   sat_free(data->incoreoffset);
   sat_free(data->verticaloffset);
 
-  sat_free(data->blob_store);
-  sat_free(data->pages);
-  sat_free(data->mapped);
+  repopagestore_free(&data->store);
 
   sat_free(data->vincore);
 
@@ -92,9 +90,6 @@ repodata_free(Repodata *data)
 
   sat_free(data->attrdata);
   sat_free(data->attriddata);
-  
-  if (data->pagefd != -1)
-    close(data->pagefd);
 }
 
 
@@ -376,7 +371,7 @@ get_vertical_data(Repodata *data, Repokey *key, Id off, Id len)
   /* we now have the offset, go into vertical */
   off += data->verticaloffset[key - data->keys];
   /* fprintf(stderr, "key %d page %d\n", key->name, off / BLOB_PAGESIZE); */
-  dp = repodata_load_page_range(data, off / BLOB_PAGESIZE, (off + len - 1) / BLOB_PAGESIZE);
+  dp = repopagestore_load_page_range(&data->store, off / BLOB_PAGESIZE, (off + len - 1) / BLOB_PAGESIZE);
   if (dp)
     dp += off % BLOB_PAGESIZE;
   return dp;
@@ -2679,9 +2674,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 void
 repodata_disable_paging(Repodata *data)
 {
-  if (maybe_load_repodata(data, 0)
-      && data->num_pages)
-    repodata_load_page_range(data, 0, data->num_pages - 1);
+  if (maybe_load_repodata(data, 0))
+    repopagestore_disable_paging(&data->store);
 }
 
 /*

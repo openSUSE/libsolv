@@ -930,7 +930,7 @@ write_compressed_page(FILE *fp, unsigned char *page, int len)
   int clen;
   unsigned char cpage[BLOB_PAGESIZE];
 
-  clen = repodata_compress_page(page, len, cpage, len - 1);
+  clen = repopagestore_compress_page(page, len, cpage, len - 1);
   if (!clen)
     {
       write_u32(fp, len * 2);

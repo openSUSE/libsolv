@@ -18,6 +18,7 @@
 #include "pooltypes.h"
 #include "pool.h"
 #include "dirpool.h"
+#include "repopage.h"
 
 #define SIZEOF_MD5	16
 #define SIZEOF_SHA1	20
@@ -26,19 +27,6 @@
 struct _Repo;
 struct _Repokey;
 struct _KeyValue;
-
-typedef struct _Attrblobpage
-{
-  /* mapped_at == -1  --> not loaded, otherwise offset into
-     store->blob_store.  The size of the mapping is BLOB_PAGESIZE
-     except for the last page.  */
-  unsigned int mapped_at;
-  long file_offset;
-  /* file_size == 0 means the page is not backed by some file storage.
-     Otherwise it is L*2+(compressed ? 1 : 0), with L being the data
-     length.  */
-  long file_size;
-} Attrblobpage;
 
 typedef struct _Repodata {
   struct _Repo *repo;		/* back pointer to repo */
@@ -85,16 +73,7 @@ typedef struct _Repodata {
   Id *verticaloffset;		/* offset for all verticals, nkeys elements */
   Id lastverticaloffset;	/* end of verticals */
 
-  int pagefd;			/* file descriptor of page file */
-  unsigned char *blob_store;
-  Attrblobpage *pages;
-  unsigned int num_pages;
-
-  /* mapped[i] is zero if nothing is mapped at logical page I,
-     otherwise it contains the pagenumber plus one (of the mapped page).  */
-  unsigned int *mapped;
-  unsigned int nmapped, ncanmap;
-  unsigned int rr_counter;
+  Repopagestore store;		/* our page store */
 
   unsigned char *vincore;	
   unsigned int vincorelen;
