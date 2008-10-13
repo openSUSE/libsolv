@@ -598,7 +598,7 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
 
   /* now commit all handles */
   for (i = 0; i < pd.nhandles; i++)
-    repodata_add_flexarray(pd.data, REPOENTRY_META, REPOSITORY_DELTAINFO, pd.handles[i]);
+    repodata_add_flexarray(pd.data, SOLVID_META, REPOSITORY_DELTAINFO, pd.handles[i]);
   sat_free(pd.handles);
 
   if (!(flags & REPO_NO_INTERNALIZE))

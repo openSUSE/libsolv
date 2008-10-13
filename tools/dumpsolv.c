@@ -46,7 +46,7 @@ dump_repodata (Repo *repo)
       if (data->dirpool.ndirs)
 	printf("  localpool has %d directories\n", data->dirpool.ndirs);
       printf("\n");
-      repodata_search(data, REPOENTRY_META, 0, dump_repoattrs_cb, 0);
+      repodata_search(data, SOLVID_META, 0, dump_repoattrs_cb, 0);
     }
   printf("\n");
 }
@@ -182,7 +182,7 @@ loadcallback (Pool *pool, Repodata *data, void *vdata)
 {
   FILE *fp = 0;
 printf("LOADCALLBACK\n");
-  const char *location = repodata_lookup_str(data, REPOENTRY_META, REPOSITORY_LOCATION);
+  const char *location = repodata_lookup_str(data, SOLVID_META, REPOSITORY_LOCATION);
 printf("loc %s\n", location);
   if (location && with_attr)
     {

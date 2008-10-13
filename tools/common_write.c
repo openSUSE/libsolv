@@ -187,7 +187,7 @@ write_info(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
     }
   sat_free(keyarray);
   repodata_set_str(info, h, REPOSITORY_LOCATION, location);
-  repodata_add_flexarray(info, REPOENTRY_META, REPOSITORY_EXTERNAL, h);
+  repodata_add_flexarray(info, SOLVID_META, REPOSITORY_EXTERNAL, h);
 }
 
 int
@@ -209,7 +209,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
     {
       kd.haveaddedfileprovides = 1;
       for (i = 0; addedfileprovides[i]; i++)
-        repodata_add_idarray(info, REPOENTRY_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
+        repodata_add_idarray(info, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
     }
   sat_free(addedfileprovides);
 

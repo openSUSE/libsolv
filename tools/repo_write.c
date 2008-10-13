@@ -1356,7 +1356,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
   /* collect all other data from all repodatas */
   /* XXX: merge arrays of equal keys? */
   for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
-    repodata_search(data, REPOENTRY_META, 0, repo_write_cb_needed, &cbdata);
+    repodata_search(data, SOLVID_META, 0, repo_write_cb_needed, &cbdata);
   sp = cbdata.sp;
   /* add solvables if needed */
   if (repo->nsolvables)
@@ -1582,7 +1582,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 
 #if 1
   for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
-    repodata_search(data, REPOENTRY_META, 0, repo_write_cb_adddata, &cbdata);
+    repodata_search(data, SOLVID_META, 0, repo_write_cb_adddata, &cbdata);
 #endif
 
   if (xd->len - cbdata.lastlen > cbdata.maxdata)

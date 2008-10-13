@@ -1246,10 +1246,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       exit(1);
     }
   mkrpmdbcookie(&packagesstat, newcookie);
-  repodata_set_bin_checksum(data, REPOENTRY_META, REPOSITORY_RPMDBCOOKIE, REPOKEY_TYPE_SHA256, newcookie);
+  repodata_set_bin_checksum(data, SOLVID_META, REPOSITORY_RPMDBCOOKIE, REPOKEY_TYPE_SHA256, newcookie);
 
   if (ref)
-    oldcookie = repo_lookup_bin_checksum(ref, REPOENTRY_META, REPOSITORY_RPMDBCOOKIE, &oldcookietype);
+    oldcookie = repo_lookup_bin_checksum(ref, SOLVID_META, REPOSITORY_RPMDBCOOKIE, &oldcookietype);
   if (!ref || !oldcookie || oldcookietype != REPOKEY_TYPE_SHA256 || memcmp(oldcookie, newcookie, 32) != 0)
     {
       Id *pkgids;

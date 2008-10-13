@@ -449,9 +449,9 @@ entry2data(Repodata *data, Id entry, Id *schemap)
   unsigned char *dp = data->incoredata;
   if (!dp)
     return 0;
-  if (entry == REPOENTRY_META)	/* META */
+  if (entry == SOLVID_META)	/* META */
     dp += 1;
-  else if (entry == REPOENTRY_POS)	/* META */
+  else if (entry == SOLVID_POS)	/* META */
     {
       Pool *pool = data->repo->pool;
       if (data->repo != pool->pos.repo)
@@ -632,7 +632,7 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
 
   if (!maybe_load_repodata(data, keyname))
     return;
-  if (entry == REPOENTRY_SUBSCHEMA)
+  if (entry == SOLVID_SUBSCHEMA)
     {
       struct subschema_data *subd = cbdata;
       cbdata = subd->cbdata;
@@ -696,7 +696,7 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
 	      if (stop)
 		break;
 	      if (!keyname)
-	        repodata_search(data, REPOENTRY_SUBSCHEMA, 0, callback, &subd);
+	        repodata_search(data, SOLVID_SUBSCHEMA, 0, callback, &subd);
 	      ddp = data_skip_schema(data, ddp, schema);
 	      nentries--;
 	      kv.entry++;
@@ -952,16 +952,16 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname, const char *ma
   memset(di, 0, sizeof(*di));
   di->repo = repo;
   di->keyname = keyname;
-  di->entry = p;
+  di->solvid = p;
   di->pool = repo->pool;
   if (p)
-    flags |= SEARCH_THISENTRY;
+    flags |= SEARCH_THISSOLVID;
   di->flags = flags;
   if (repo)
     di->repoid = -1;
   if (match)
     datamatcher_init(&di->matcher, di->pool, match, flags);
-  if (p == REPOENTRY_POS)
+  if (p == SOLVID_POS)
     {
       di->repo = di->pool->pos.repo;
       di->data = di->repo->repodata + di->pool->pos.repodataid;
@@ -1027,15 +1027,15 @@ dataiterator_step(Dataiterator *di)
 	  /* FALLTHROUGH */
 
 	case di_nextsolvable:
-	  if (!(di->flags & SEARCH_THISENTRY))
+	  if (!(di->flags & SEARCH_THISSOLVID))
 	    {
-	      if (di->entry < 0)
-		di->entry = di->repo->start;
+	      if (di->solvid < 0)
+		di->solvid = di->repo->start;
 	      else
-	        di->entry++;
-	      for (; di->entry < di->repo->end; di->entry++)
+	        di->solvid++;
+	      for (; di->solvid < di->repo->end; di->solvid++)
 		{
-		  if (di->pool->solvables[di->entry].repo == di->repo)
+		  if (di->pool->solvables[di->solvid].repo == di->repo)
 		    goto di_entersolvable;
 		}
 	    }
@@ -1058,15 +1058,15 @@ dataiterator_step(Dataiterator *di)
 	  return 0;
 
 	case di_enterrepo: di_enterrepo:
-	  if (!(di->flags & SEARCH_THISENTRY))
-	    di->entry = di->repo->start;
+	  if (!(di->flags & SEARCH_THISSOLVID))
+	    di->solvid = di->repo->start;
 	  /* FALLTHROUGH */
 
 	case di_entersolvable: di_entersolvable:
 	  if (di->repodataid >= 0)
 	    {
 	      di->repodataid = 0;
-	      if (di->entry > 0 && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)))
+	      if (di->solvid > 0 && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)))
 		{
 		  di->key = solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
 		  di->data = 0;
@@ -1079,7 +1079,7 @@ dataiterator_step(Dataiterator *di)
 	    di->data = di->repo->repodata + di->repodataid;
 	  if (!maybe_load_repodata(di->data, di->keyname))
 	    goto di_nextrepodata;
-	  di->dp = entry2data(di->data, di->entry, &schema);
+	  di->dp = entry2data(di->data, di->solvid, &schema);
 	  if (!di->dp)
 	    goto di_nextrepodata;
 	  di->keyp = di->data->schemadata + di->data->schemata[schema];
@@ -1183,7 +1183,7 @@ dataiterator_step(Dataiterator *di)
 	  /* FALLTHROUGH */
 
 	case di_entersolvablekey: di_entersolvablekey:
-	  di->idp = solvabledata_fetch(di->pool->solvables + di->entry, &di->kv, di->key->name);
+	  di->idp = solvabledata_fetch(di->pool->solvables + di->solvid, &di->kv, di->key->name);
 	  if (!di->idp || !di->idp[0])
 	    goto di_nextsolvablekey;
 	  di->kv.id = di->idp[0];
@@ -1241,7 +1241,7 @@ dataiterator_jump_to_solvable(Dataiterator *di, Solvable *s)
 {
   di->repo = s->repo;
   di->repoid = -1;
-  di->entry = s - di->pool->solvables;
+  di->solvid = s - di->pool->solvables;
   di->state = di_entersolvable;
 }
 
@@ -1862,7 +1862,7 @@ repodata_new_handle(Repodata *data)
 static inline Id **
 repodata_get_attrp(Repodata *data, Id handle)
 {
-  if (handle == REPOENTRY_META)
+  if (handle == SOLVID_META)
     {
       if (!data->xattrs)
 	{

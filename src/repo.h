@@ -177,7 +177,7 @@ typedef struct _KeyValue {
 #define SEARCH_FILES			(1<<13)
 
 /* Internal */
-#define SEARCH_THISENTRY		(1<<31)
+#define SEARCH_THISSOLVID		(1<<31)
 
 
 /* standard flags used in the repo_add functions */
@@ -254,7 +254,7 @@ typedef struct _Dataiterator
   /* iterators/filters */
   Id keyname;
   Id repodataid;
-  Id entry;
+  Id solvid;
   Id repoid;
 
   /* recursion data */

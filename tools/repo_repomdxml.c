@@ -210,7 +210,7 @@ startElement(void *userData, const char *name, const char **atts)
 		if (*p)
 		  *p++ = 0;
 		if (*value)
-		  repo_add_poolstr_array(pd->repo, REPOENTRY_META, REPOSITORY_UPDATES, value);
+		  repo_add_poolstr_array(pd->repo, SOLVID_META, REPOSITORY_UPDATES, value);
 		value = p;
 	      }
 	    free(fvalue);
@@ -259,7 +259,7 @@ endElement(void *userData, const char *name)
     case STATE_START: break;
     case STATE_REPOMD: 
       if (pd->timestamp > 0)
-        repodata_set_num(pd->data, REPOENTRY_META, REPOSITORY_TIMESTAMP, pd->timestamp);
+        repodata_set_num(pd->data, SOLVID_META, REPOSITORY_TIMESTAMP, pd->timestamp);
       break;
     case STATE_DATA: break;
     case STATE_LOCATION: break;
@@ -281,16 +281,16 @@ endElement(void *userData, const char *name)
       {
         int expire = atoi(pd->content);
 	if (expire > 0)
-	  repodata_set_num(pd->data, REPOENTRY_META, REPOSITORY_EXPIRE, expire);
+	  repodata_set_num(pd->data, SOLVID_META, REPOSITORY_EXPIRE, expire);
         break;
       }
     case STATE_PRODUCT:
       if (pd->content)
-	repodata_add_poolstr_array(pd->data, REPOENTRY_META, REPOSITORY_PRODUCTS, pd->content);
+	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_PRODUCTS, pd->content);
       break;
     case STATE_KEYWORD:
       if (pd->content)
-	repodata_add_poolstr_array(pd->data, REPOENTRY_META, REPOSITORY_KEYWORDS, pd->content);
+	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_KEYWORDS, pd->content);
       break;
     case STATE_SUSEINFO: break;
     case STATE_PRODUCTS: break;

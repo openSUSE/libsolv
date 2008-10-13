@@ -94,9 +94,9 @@ typedef struct _Repodata {
 
 } Repodata;
 
-#define REPOENTRY_META		-1
-#define REPOENTRY_POS		-2
-#define REPOENTRY_SUBSCHEMA	-3		/* internal! */
+#define SOLVID_META		-1
+#define SOLVID_POS		-2
+#define SOLVID_SUBSCHEMA	-3		/* internal! */
 
 /*-----
  * management functions

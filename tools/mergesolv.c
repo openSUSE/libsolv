@@ -37,7 +37,7 @@ static FILE *
 loadcallback (Pool *pool, Repodata *data, void *vdata)
 {
   FILE *fp = 0;
-  const char *location = repodata_lookup_str(data, REPOENTRY_META, REPOSITORY_LOCATION);
+  const char *location = repodata_lookup_str(data, SOLVID_META, REPOSITORY_LOCATION);
   if (location)
     {
       fprintf(stderr, "Loading SOLV file %s\n", location);

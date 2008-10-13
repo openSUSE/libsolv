@@ -885,7 +885,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	  if (data)
 	    {
 	      map_init(&providedids, pool->ss.nstrings);
-	      repodata_search(data, REPOENTRY_META, REPOSITORY_ADDEDFILEPROVIDES, addfileprovides_setid_cb, &providedids);
+	      repodata_search(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addfileprovides_setid_cb, &providedids);
 	      for (i = 0; i < cbd->nfiles; i++)
 		if (!MAPTST(&providedids, cbd->ids[i]))
 		  break;

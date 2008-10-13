@@ -442,22 +442,22 @@ create_stub_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue
   switch(key->type)
     {
     case REPOKEY_TYPE_ID:
-      repodata_set_id(stubdata->data, REPOENTRY_META, key->name, kv->id);
+      repodata_set_id(stubdata->data, SOLVID_META, key->name, kv->id);
       break;
     case REPOKEY_TYPE_CONSTANTID:
-      repodata_set_constantid(stubdata->data, REPOENTRY_META, key->name, kv->id);
+      repodata_set_constantid(stubdata->data, SOLVID_META, key->name, kv->id);
       break;
     case REPOKEY_TYPE_STR:
-      repodata_set_str(stubdata->data, REPOENTRY_META, key->name, kv->str);
+      repodata_set_str(stubdata->data, SOLVID_META, key->name, kv->str);
       break;
     case REPOKEY_TYPE_VOID:
-      repodata_set_void(stubdata->data, REPOENTRY_META, key->name);
+      repodata_set_void(stubdata->data, SOLVID_META, key->name);
       break;
     case REPOKEY_TYPE_NUM:
-      repodata_set_num(stubdata->data, REPOENTRY_META, key->name, kv->num);
+      repodata_set_num(stubdata->data, SOLVID_META, key->name, kv->num);
       break;
     case REPOKEY_TYPE_IDARRAY:
-      repodata_add_idarray(stubdata->data, REPOENTRY_META, key->name, kv->id);
+      repodata_add_idarray(stubdata->data, SOLVID_META, key->name, kv->id);
       if (key->name == REPOSITORY_KEYS)
 	{
 	  if (!stubdata->xkeyname)
@@ -480,7 +480,7 @@ create_stub_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
     case REPOKEY_TYPE_SHA256:
-      repodata_set_checksum(stubdata->data, REPOENTRY_META, key->name, key->type, kv->str);
+      repodata_set_checksum(stubdata->data, SOLVID_META, key->name, key->type, kv->str);
       break;
     default:
       return SEARCH_NEXT_KEY;
@@ -1328,7 +1328,7 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
       struct create_stub_data stubdata;
       /* got some */
       memset(&stubdata, 0, sizeof(stubdata));
-      repodata_search(&data, REPOENTRY_META, REPOSITORY_EXTERNAL, create_stub_cb, &stubdata);
+      repodata_search(&data, SOLVID_META, REPOSITORY_EXTERNAL, create_stub_cb, &stubdata);
     }
   return 0;
 }
