@@ -283,6 +283,7 @@ void dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
 void dataiterator_free(Dataiterator *di);
 int dataiterator_step(Dataiterator *di);
 void dataiterator_setpos(Dataiterator *di);
+void dataiterator_setpos_parent(Dataiterator *di);
 int dataiterator_match(Dataiterator *di, int flags, const void *match);
 void dataiterator_skip_attribute(Dataiterator *di);
 void dataiterator_skip_solvable(Dataiterator *di);

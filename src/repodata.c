@@ -964,6 +964,11 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname, const char *ma
   if (p == SOLVID_POS)
     {
       di->repo = di->pool->pos.repo;
+      if (!di->repo)
+	{
+	  di->state = di_bye;
+	  return;
+	}
       di->data = di->repo->repodata + di->pool->pos.repodataid;
       di->repoid = -1;
       di->repodataid = -1;
@@ -1209,10 +1214,29 @@ dataiterator_step(Dataiterator *di)
 void
 dataiterator_setpos(Dataiterator *di)
 {
+  if (di->kv.eof)
+    {
+      memset(&di->pool->pos, 0, sizeof(di->pool->pos));
+      return;
+    }
   di->pool->pos.repo = di->repo;
   di->pool->pos.repodataid = di->data - di->repo->repodata;
   di->pool->pos.schema = di->kv.id;
   di->pool->pos.dp = (unsigned char *)di->kv.str - di->data->incoredata;
+}
+
+void
+dataiterator_setpos_parent(Dataiterator *di)
+{
+  if (!di->kv.parent)
+    {
+      memset(&di->pool->pos, 0, sizeof(di->pool->pos));
+      return;
+    }
+  di->pool->pos.repo = di->repo;
+  di->pool->pos.repodataid = di->data - di->repo->repodata;
+  di->pool->pos.schema = di->kv.parent->id;
+  di->pool->pos.dp = (unsigned char *)di->kv.parent->str - di->data->incoredata;
 }
 
 void
