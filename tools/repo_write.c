@@ -1255,6 +1255,23 @@ for (i = 1; i < cbdata.nmykeys; i++)
   cbdata.extraschemata = sat_calloc(repo->nextra, sizeof(Id));
 #endif
 
+  /* create main schema */
+  cbdata.sp = cbdata.schema;
+  /* collect all other data from all repodatas */
+  /* XXX: merge arrays of equal keys? */
+  for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
+    repodata_search(data, SOLVID_META, 0, repo_write_cb_needed, &cbdata);
+  sp = cbdata.sp;
+  /* add solvables if needed */
+  if (repo->nsolvables)
+    {
+      *sp++ = cbdata.keymap[REPOSITORY_SOLVABLES];
+      cbdata.mykeys[cbdata.keymap[REPOSITORY_SOLVABLES]].size++;
+    }
+  *sp = 0;
+  mainschema = addschema(&cbdata, cbdata.schema);
+
+
   idarraydata = repo->idarraydata;
 
   cbdata.doingsolvables = 1;
@@ -1350,22 +1367,6 @@ for (i = 1; i < cbdata.nmykeys; i++)
     }
   cbdata.doingsolvables = 0;
   assert(n == repo->nsolvables);
-
-  /* create main schema */
-  cbdata.sp = cbdata.schema;
-  /* collect all other data from all repodatas */
-  /* XXX: merge arrays of equal keys? */
-  for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
-    repodata_search(data, SOLVID_META, 0, repo_write_cb_needed, &cbdata);
-  sp = cbdata.sp;
-  /* add solvables if needed */
-  if (repo->nsolvables)
-    {
-      *sp++ = cbdata.keymap[REPOSITORY_SOLVABLES];
-      cbdata.mykeys[cbdata.keymap[REPOSITORY_SOLVABLES]].size++;
-    }
-  *sp = 0;
-  mainschema = addschema(&cbdata, cbdata.schema);
 
 #if 0
   if (repo->nextra && anyrepodataused)
