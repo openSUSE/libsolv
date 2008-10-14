@@ -337,6 +337,14 @@ forward_to_key(Repodata *data, Id keyid, Id *keyp, unsigned char *dp)
 
   if (!keyid)
     return 0;
+  if (data->mainschemaoffsets && dp == data->incoredata + data->mainschemaoffsets[0] && keyp == data->schemadata + data->schemata[data->mainschema])
+    {
+      int i;
+      for (i = 0; (k = *keyp++) != 0; i++)
+        if (k == keyid)
+	  return data->incoredata + data->mainschemaoffsets[i];
+      return 0;
+    }
   while ((k = *keyp++) != 0)
     {
       if (k == keyid)
@@ -379,7 +387,7 @@ get_vertical_data(Repodata *data, Repokey *key, Id off, Id len)
 }
 
 static inline unsigned char *
-get_data(Repodata *data, Repokey *key, unsigned char **dpp)
+get_data(Repodata *data, Repokey *key, unsigned char **dpp, int advance)
 {
   unsigned char *dp = *dpp;
 
@@ -387,8 +395,8 @@ get_data(Repodata *data, Repokey *key, unsigned char **dpp)
     return 0;
   if (key->storage == KEY_STORAGE_INCORE)
     {
-      /* hmm, this is a bit expensive */
-      *dpp = data_skip_key(data, dp, key);
+      if (advance)
+        *dpp = data_skip_key(data, dp, key);
       return dp;
     }
   else if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
@@ -396,7 +404,8 @@ get_data(Repodata *data, Repokey *key, unsigned char **dpp)
       Id off, len;
       dp = data_read_id(dp, &off);
       dp = data_read_id(dp, &len);
-      *dpp = dp;
+      if (advance)
+        *dpp = dp;
       return get_vertical_data(data, key, off, len);
     }
   return 0;
@@ -444,14 +453,14 @@ maybe_load_repodata(Repodata *data, Id keyname)
 }
 
 static inline unsigned char*
-entry2data(Repodata *data, Id entry, Id *schemap)
+solvid2data(Repodata *data, Id solvid, Id *schemap)
 {
   unsigned char *dp = data->incoredata;
   if (!dp)
     return 0;
-  if (entry == SOLVID_META)	/* META */
+  if (solvid == SOLVID_META)	/* META */
     dp += 1;
-  else if (entry == SOLVID_POS)	/* META */
+  else if (solvid == SOLVID_POS)	/* META */
     {
       Pool *pool = data->repo->pool;
       if (data->repo != pool->pos.repo)
@@ -463,9 +472,9 @@ entry2data(Repodata *data, Id entry, Id *schemap)
     }
   else
     {
-      if (entry < data->start || entry >= data->end)
+      if (solvid < data->start || solvid >= data->end)
 	return 0;
-      dp += data->incoreoffset[entry - data->start];
+      dp += data->incoreoffset[solvid - data->start];
     }
   return data_read_id(dp, schemap);
 }
@@ -474,51 +483,42 @@ entry2data(Repodata *data, Id entry, Id *schemap)
  * data lookup
  */
 
-static inline Id
-find_schema_key(Repodata *data, Id schema, Id keyname)
-{
-  Id *keyp;
-  for (keyp = data->schemadata + data->schemata[schema]; *keyp; keyp++)
-    if (data->keys[*keyp].name == keyname)
-      return *keyp;
-  return 0;
-}
-
 static inline unsigned char *
-find_key_data(Repodata *data, Id entry, Id keyname, Repokey **keyp)
+find_key_data(Repodata *data, Id solvid, Id keyname, Repokey **keypp)
 {
-  unsigned char *dp, *ddp;
-  Id keyid, schema;
+  unsigned char *dp;
+  Id schema, *keyp, *kp;
   Repokey *key;
 
   if (!maybe_load_repodata(data, keyname))
     return 0;
-  dp = entry2data(data, entry, &schema);
+  dp = solvid2data(data, solvid, &schema);
   if (!dp)
     return 0;
-  keyid = find_schema_key(data, schema, keyname);
-  if (!keyid)
+  keyp = data->schemadata + data->schemata[schema];
+  for (kp = keyp; *kp; kp++)
+    if (data->keys[*kp].name == keyname)
+      break;
+  if (!*kp)
     return 0;
-  key = data->keys + keyid;
-  *keyp = key;
+  *keypp = key = data->keys + *kp;
   if (key->type == REPOKEY_TYPE_VOID || key->type == REPOKEY_TYPE_CONSTANT || key->type == REPOKEY_TYPE_CONSTANTID)
-    return dp;
-  dp = forward_to_key(data, keyid, data->schemadata + data->schemata[schema], dp);
+    return dp;	/* no need to forward... */
+  dp = forward_to_key(data, *kp, keyp, dp);
   if (!dp)
     return 0;
-  ddp = get_data(data, key, &dp);
-  return ddp;
+  return get_data(data, key, &dp, 0);
 }
 
 
 Id
-repodata_lookup_id(Repodata *data, Id entry, Id keyname)
+repodata_lookup_id(Repodata *data, Id solvid, Id keyname)
 {
   unsigned char *dp;
   Repokey *key;
   Id id;
 
-  dp = find_key_data(data, entry, keyname, &key);
+  dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
     return 0;
   if (key->type == REPOKEY_TYPE_CONSTANTID)
@@ -530,13 +530,13 @@ repodata_lookup_id(Repodata *data, Id entry, Id keyname)
 }
 
 const char *
-repodata_lookup_str(Repodata *data, Id entry, Id keyname)
+repodata_lookup_str(Repodata *data, Id solvid, Id keyname)
 {
   unsigned char *dp;
   Repokey *key;
   Id id;
 
-  dp = find_key_data(data, entry, keyname, &key);
+  dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
     return 0;
   if (key->type == REPOKEY_TYPE_STR)
@@ -553,14 +553,14 @@ repodata_lookup_str(Repodata *data, Id entry, Id keyname)
 }
 
 int
-repodata_lookup_num(Repodata *data, Id entry, Id keyname, unsigned int *value)
+repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value)
 {
   unsigned char *dp;
   Repokey *key;
   KeyValue kv;
 
   *value = 0;
-  dp = find_key_data(data, entry, keyname, &key);
+  dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
     return 0;
   if (key->type == REPOKEY_TYPE_NUM
@@ -575,7 +575,7 @@ repodata_lookup_num(Repodata *data, Id entry, Id keyname, unsigned int *value)
 }
 
 int
-repodata_lookup_void(Repodata *data, Id entry, Id keyname)
+repodata_lookup_void(Repodata *data, Id solvid, Id keyname)
 {
   Id schema;
   Id *keyp;
@@ -583,10 +583,10 @@ repodata_lookup_void(Repodata *data, Id entry, Id keyname)
 
   if (!maybe_load_repodata(data, keyname))
     return 0;
-  dp = entry2data(data, entry, &schema);
+  dp = solvid2data(data, solvid, &schema);
   if (!dp)
     return 0;
-  /* can't use find_schema_key as we need to test the type */
+  /* can't use find_key_data as we need to test the type */
   for (keyp = data->schemadata + data->schemata[schema]; *keyp; keyp++)
     if (data->keys[*keyp].name == keyname && data->keys[*keyp].type == REPOKEY_TYPE_VOID)
       return 1;
@@ -594,12 +594,12 @@ repodata_lookup_void(Repodata *data, Id entry, Id keyname)
 }
 
 const unsigned char *
-repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyname, Id *typep)
+repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep)
 {
   unsigned char *dp;
   Repokey *key;
 
-  dp = find_key_data(data, entry, keyname, &key);
+  dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
     return 0;
   *typep = key->type;
@@ -617,13 +617,13 @@ struct subschema_data {
   KeyValue *parent;
 };
 
-/* search in a specific entry */
+/* search a specific repodata */
 void
-repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+repodata_search(Repodata *data, Id solvid, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
 {
   Id schema;
   Repokey *key;
-  Id k, keyid, *kp, *keyp;
+  Id keyid, *kp, *keyp;
   unsigned char *dp, *ddp;
   int onekey = 0;
   int stop;
@@ -632,7 +632,7 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
 
   if (!maybe_load_repodata(data, keyname))
     return;
-  if (entry == SOLVID_SUBSCHEMA)
+  if (solvid == SOLVID_SUBSCHEMA)
     {
       struct subschema_data *subd = cbdata;
       cbdata = subd->cbdata;
@@ -644,32 +644,32 @@ repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbda
   else
     {
       schema = 0;
-      dp = entry2data(data, entry, &schema);
+      dp = solvid2data(data, solvid, &schema);
       if (!dp)
 	return;
-      s = data->repo->pool->solvables + entry;
+      s = data->repo->pool->solvables + solvid;
       kv.parent = 0;
     }
   keyp = data->schemadata + data->schemata[schema];
   if (keyname)
     {
       /* search for a specific key */
-      for (kp = keyp; (k = *kp++) != 0; )
-	if (data->keys[k].name == keyname)
+      for (kp = keyp; *kp; kp++)
+	if (data->keys[*kp].name == keyname)
 	  break;
-      if (k == 0)
+      if (!*kp)
 	return;
-      dp = forward_to_key(data, k, data->schemadata + data->schemata[schema], dp);
+      dp = forward_to_key(data, *kp, keyp, dp);
       if (!dp)
 	return;
-      keyp = kp - 1;
+      keyp = kp;
       onekey = 1;
     }
   while ((keyid = *keyp++) != 0)
     {
       stop = 0;
       key = data->keys + keyid;
-      ddp = get_data(data, key, &dp);
+      ddp = get_data(data, key, &dp, *keyp ? 1 : 0);
 
       if (key->type == REPOKEY_TYPE_FLEXARRAY || key->type == REPOKEY_TYPE_FIXARRAY)
 	{
@@ -749,7 +749,9 @@ repodata_setpos_kv(Repodata *data, KeyValue *kv)
     }
 }
 
-/************************************************************************/
+/************************************************************************
+ * data iterator functions
+ */
 
 static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
   { SOLVABLE_NAME,        REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
@@ -767,7 +769,6 @@ static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
   { RPM_RPMDBID,          REPOKEY_TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
 };
 
-#if 1
 static inline Id *
 solvabledata_fetch(Solvable *s, KeyValue *kv, Id keyname)
 {
@@ -926,18 +927,20 @@ datamatcher_match(Datamatcher *ma, Repodata *data, Repokey *key, KeyValue *kv)
 enum {
   di_bye,
 
+  di_enterrepo,
+  di_entersolvable,
+  di_enterrepodata,
+  di_enterkey,
+
   di_nextattr,
   di_nextkey,
   di_nextrepodata,
   di_nextsolvable,
   di_nextrepo,
 
-  di_enterrepo,
-  di_entersolvable,
-  di_enterrepodata,
-  di_enterkey,
-
+  di_enterarray,
   di_nextarrayelement,
+
   di_entersub,
   di_leavesub,
 
@@ -983,6 +986,36 @@ dataiterator_free(Dataiterator *di)
     datamatcher_free(&di->matcher);
 }
 
+static inline unsigned char *
+dataiterator_find_keyname(Dataiterator *di, Id keyname)
+{
+  Id *keyp = di->keyp;
+  Repokey *keys = di->data->keys;
+  unsigned char *dp;
+
+  if (!(di->flags & SEARCH_SUB))
+    {
+      for (keyp = di->keyp; *keyp; keyp++)
+	if (keys[*keyp].name == di->keyname)
+	  break;
+    }
+  else
+    {
+      for (keyp++; *keyp; keyp++)
+	if (keys[*keyp].name == di->keyname || 
+	    keys[*keyp].type == REPOKEY_TYPE_FIXARRAY || 
+	    keys[*keyp].type == REPOKEY_TYPE_FLEXARRAY)
+	  break;
+    }
+  if (!*keyp)
+    return 0;
+  dp = forward_to_key(di->data, *keyp, di->keyp, di->dp);
+  if (!dp)
+    return 0;
+  di->keyp = keyp;
+  return dp;
+}
+
 int
 dataiterator_step(Dataiterator *di)
 {
@@ -992,7 +1025,52 @@ dataiterator_step(Dataiterator *di)
     {
       switch (di->state)
 	{
-	case di_nextattr: di_nextattr:
+	case di_enterrepo: di_enterrepo:
+	  if (!(di->flags & SEARCH_THISSOLVID))
+	    di->solvid = di->repo->start;
+	  /* FALLTHROUGH */
+
+	case di_entersolvable: di_entersolvable:
+	  if (di->repodataid >= 0)
+	    {
+	      di->repodataid = 0;
+	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)))
+		{
+		  di->key = solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
+		  di->data = 0;
+		  goto di_entersolvablekey;
+		}
+	    }
+	  /* FALLTHROUGH */
+
+	case di_enterrepodata: di_enterrepodata:
+	  if (di->repodataid >= 0)
+	    di->data = di->repo->repodata + di->repodataid;
+	  if (!maybe_load_repodata(di->data, di->keyname))
+	    goto di_nextrepodata;
+	  di->dp = solvid2data(di->data, di->solvid, &schema);
+	  if (!di->dp)
+	    goto di_nextrepodata;
+	  di->keyp = di->data->schemadata + di->data->schemata[schema];
+	  if (di->keyname)
+	    {
+	      di->dp = dataiterator_find_keyname(di, di->keyname);
+	      if (!di->dp)
+		goto di_nextrepodata;
+	    }
+	  /* FALLTHROUGH */
+
+	case di_enterkey: di_enterkey:
+	  di->kv.entry = -1;
+	  di->key = di->data->keys + *di->keyp;
+	  di->ddp = get_data(di->data, di->key, &di->dp, di->keyp[1] && (!di->keyname || (di->flags & SEARCH_SUB) != 0) ? 1 : 0);
+	  if (!di->ddp)
+	    goto di_nextkey;
+	  if (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY)
+	    goto di_enterarray;
+	  /* FALLTHROUGH */
+
+	case di_nextattr:
           di->kv.entry++;
 	  di->ddp = data_fetch(di->ddp, &di->kv, di->key);
 	  if (di->kv.eof)
@@ -1009,19 +1087,10 @@ dataiterator_step(Dataiterator *di)
 	    }
 	  else if ((di->flags & SEARCH_SUB) != 0)
 	    {
-	      Id *keyp = di->keyp;
-	      for (keyp++; *keyp; keyp++)
-		if (di->data->keys[*keyp].name == di->keyname ||
-		    di->data->keys[*keyp].type == REPOKEY_TYPE_FIXARRAY ||
-		    di->data->keys[*keyp].type == REPOKEY_TYPE_FLEXARRAY)
-		  break;
-	      if (*keyp && (di->dp = forward_to_key(di->data, *keyp, di->keyp, di->dp)) != 0)
-		{
-		  di->keyp = keyp;
-		  goto di_enterkey;
-		}
+	      di->dp = dataiterator_find_keyname(di, di->keyname);
+	      if (di->dp)
+		goto di_enterkey;
 	    }
-
 	  if (di->kv.parent)
 	    goto di_leavesub;
 	  /* FALLTHROUGH */
@@ -1056,71 +1125,17 @@ dataiterator_step(Dataiterator *di)
 	          goto di_enterrepo;
 		}
 	    }
-
 	/* FALLTHROUGH */
+
 	case di_bye:
 	  di->state = di_bye;
 	  return 0;
 
-	case di_enterrepo: di_enterrepo:
-	  if (!(di->flags & SEARCH_THISSOLVID))
-	    di->solvid = di->repo->start;
-	  /* FALLTHROUGH */
-
-	case di_entersolvable: di_entersolvable:
-	  if (di->repodataid >= 0)
-	    {
-	      di->repodataid = 0;
-	      if (di->solvid > 0 && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)))
-		{
-		  di->key = solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
-		  di->data = 0;
-		  goto di_entersolvablekey;
-		}
-	    }
-
-	case di_enterrepodata: di_enterrepodata:
-	  if (di->repodataid >= 0)
-	    di->data = di->repo->repodata + di->repodataid;
-	  if (!maybe_load_repodata(di->data, di->keyname))
-	    goto di_nextrepodata;
-	  di->dp = entry2data(di->data, di->solvid, &schema);
-	  if (!di->dp)
-	    goto di_nextrepodata;
-	  di->keyp = di->data->schemadata + di->data->schemata[schema];
-	  if (di->keyname)
-	    {
-	      Id *keyp;
-	      if ((di->flags & SEARCH_SUB) != 0)
-		{
-		  di->keyp--;
-		  goto di_nextkey;
-		}
-	      for (keyp = di->keyp; *keyp; keyp++)
-		if (di->data->keys[*keyp].name == di->keyname)
-		  break;
-	      if (!*keyp)
-		goto di_nextrepodata;
-	      di->dp = forward_to_key(di->data, *keyp, di->keyp, di->dp);
-	      di->keyp = keyp;
-	      if (!di->dp)
-		goto di_nextrepodata;
-	    }
-
-	case di_enterkey: di_enterkey:
+	case di_enterarray: di_enterarray:
+	  di->ddp = data_read_id(di->ddp, &di->kv.num);
+	  di->kv.eof = 0;
 	  di->kv.entry = -1;
-	  di->key = di->data->keys + *di->keyp;
-	  di->ddp = get_data(di->data, di->key, &di->dp);
-	  if (!di->ddp)
-	    goto di_nextkey;
-	  if (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY)
-	    {
-	      di->ddp = data_read_id(di->ddp, &di->kv.num);
-	      di->kv.entry = -1;
-	      di->kv.eof = 0;
-	      goto di_nextarrayelement;
-	    }
-	  goto di_nextattr;
+	  /* FALLTHROUGH */
 
 	case di_nextarrayelement: di_nextarrayelement:
 	  di->kv.entry++;
@@ -1212,6 +1227,13 @@ dataiterator_step(Dataiterator *di)
 }
 
 void
+dataiterator_entersub(Dataiterator *di)
+{
+  if (di->state == di_nextarrayelement)
+    di->state = di_entersub;
+}
+
+void
 dataiterator_setpos(Dataiterator *di)
 {
   if (di->kv.eof)
@@ -1287,525 +1309,6 @@ dataiterator_match(Dataiterator *di, int flags, const void *vmatch)
   return datamatcher_match(&matcher, di->data, di->key, &di->kv);
 }
 
-#else
-
-/************************************************************************
- * data search iterator
- */
-
-static void
-dataiterator_newdata(Dataiterator *di)
-{
-  Id keyname = di->keyname;
-  Repodata *data = di->data;
-  di->nextkeydp = 0;
-
-  if (data->state == REPODATA_STUB)
-    {
-      if (keyname)
-	{
-	  int j;
-	  for (j = 1; j < data->nkeys; j++)
-	    if (keyname == data->keys[j].name)
-	      break;
-	  if (j == data->nkeys)
-	    return;
-	}
-      /* load it */
-      if (data->loadcallback)
-	data->loadcallback(data);
-      else
-	data->state = REPODATA_ERROR;
-    }
-  if (data->state == REPODATA_ERROR)
-    return;
-
-  Id schema;
-  unsigned char *dp = data->incoredata;
-  if (!dp)
-    return;
-  if (di->solvid >= 0)
-    dp += data->incoreoffset[di->solvid - data->start];
-  dp = data_read_id(dp, &schema);
-  Id *keyp = data->schemadata + data->schemata[schema];
-  if (keyname)
-    {
-      Id k, *kp;
-      /* search in a specific key */
-      for (kp = keyp; (k = *kp++) != 0; )
-	if (data->keys[k].name == keyname)
-	  break;
-      if (k == 0)
-	return;
-      dp = forward_to_key(data, k, keyp, dp);
-      if (!dp)
-	return;
-      keyp = kp - 1;
-    }
-  Id keyid = *keyp++;
-  if (!keyid)
-    return;
-
-  di->data = data;
-  di->key = di->data->keys + keyid;
-  di->keyp = keyp;
-  di->dp = 0;
-
-  di->nextkeydp = dp;
-  di->dp = get_data(di->data, di->key, &di->nextkeydp);
-  di->kv.eof = 0;
-}
-
-void
-dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
-		  const char *match, int flags)
-{
-  di->flags = flags;
-  if (p > 0)
-    {
-      di->solvid = p;
-      di->flags |= __SEARCH_ONESOLVABLE;
-      di->data = repo->repodata - 1;
-      if (flags & SEARCH_NO_STORAGE_SOLVABLE)
-	di->state = 0;
-      else
-	di->state = 1;
-    }
-  else
-    {
-      di->solvid = repo->start - 1;
-      if (di->solvid < 0)
-	{
-	  fprintf(stderr, "A repo contains the NULL solvable!\n");
-	  exit(1);
-	}
-      di->data = repo->repodata + repo->nrepodata - 1;
-      di->state = 0;
-    }
-
-  di->match = match;
-  if ((di->flags & SEARCH_STRINGMASK) == SEARCH_REGEX)
-    {
-      if (di->match)
-        {
-          /* We feed multiple lines eventually (e.g. authors or descriptions),
-             so set REG_NEWLINE. */
-          di->regex_err =
-            regcomp(&di->regex, di->match,
-              REG_EXTENDED | REG_NOSUB | REG_NEWLINE
-              | ((di->flags & SEARCH_NOCASE) ? REG_ICASE : 0));
-#if 0
-          if (di->regex_err != 0)
-            {
-              fprintf(stderr, "Given regex failed to compile: %s\n", di->match);
-              fprintf(stderr, "regcomp error code: %d\n", di->regex_err);
-              exit(1);
-            }
-#else
-        }
-      else
-        {
-          di->flags |= (di->flags & SEARCH_STRINGMASK) | SEARCH_STRING;
-          di->regex_err = 0;
-#endif
-        }
-    }
-
-  di->keyname = keyname;
-  static Id zeroid = 0;
-  di->keyp = &zeroid;
-  di->kv.eof = 1;
-  di->repo = repo;
-  di->idp = 0;
-  di->subkeyp = 0;
-}
-
-/* FIXME factor and merge with repo_matchvalue */
-static int
-dataiterator_match_int_real(Dataiterator *di, int flags, const void *vmatch)
-{
-  KeyValue *kv = &di->kv;
-  const char *match = vmatch;
-  if ((flags & SEARCH_STRINGMASK) != 0)
-    {
-      switch (di->key->type)
-	{
-	case REPOKEY_TYPE_ID:
-	case REPOKEY_TYPE_IDARRAY:
-	  if (di->data && di->data->localpool)
-	    kv->str = stringpool_id2str(&di->data->spool, kv->id);
-	  else
-	    kv->str = id2str(di->repo->pool, kv->id);
-	  break;
-	case REPOKEY_TYPE_STR:
-	  break;
-	case REPOKEY_TYPE_DIRSTRARRAY:
-	  if (!(flags & SEARCH_FILES))
-	    return 0;
-	  /* Put the full filename into kv->str.  */
-	  kv->str = repodata_dir2str(di->data, kv->id, kv->str);
-	  /* And to compensate for that put the "empty" directory into
-	     kv->id, so that later calls to repodata_dir2str on this data
-	     come up with the same filename again.  */
-	  kv->id = 0;
-	  break;
-	default:
-	  return 0;
-	}
-      /* Maybe skip the kind specifier.  Do this only for SOLVABLE attributes,
-         for the others we can't know if a colon separates a kind or not.  */
-      if ((flags & SEARCH_SKIP_KIND)
-	  && di->key->storage == KEY_STORAGE_SOLVABLE)
-	{
-	  const char *s = strchr(kv->str, ':');
-	  if (s)
-	    kv->str = s + 1;
-	}
-      switch ((flags & SEARCH_STRINGMASK))
-	{
-	  case SEARCH_SUBSTRING:
-	    if (flags & SEARCH_NOCASE)
-	      {
-	        if (!strcasestr(kv->str, match))
-		  return 0;
-	      }
-	    else
-	      {
-	        if (!strstr(kv->str, match))
-		  return 0;
-	      }
-	    break;
-	  case SEARCH_STRING:
-	    if (flags & SEARCH_NOCASE)
-	      {
-	        if (strcasecmp(match, kv->str))
-		  return 0;
-	      }
-	    else
-	      {
-	        if (strcmp(match, kv->str))
-		  return 0;
-	      }
-	    break;
-	  case SEARCH_GLOB:
-	    if (fnmatch(match, kv->str, (flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
-	      return 0;
-	    break;
-	  case SEARCH_REGEX:
-	    if (regexec((const regex_t *)vmatch, kv->str, 0, NULL, 0))
-	      return 0;
-	    break;
-	  default:
-	    return 0;
-	}
-    }
-  return 1;
-}
-
-static int
-dataiterator_match_int(Dataiterator *di)
-{
-  if ((di->flags & SEARCH_STRINGMASK) == SEARCH_REGEX)
-    return dataiterator_match_int_real(di, di->flags, &di->regex);
-  else
-    return dataiterator_match_int_real(di, di->flags, di->match);
-}
-
-int
-dataiterator_match(Dataiterator *di, int flags, const void *vmatch)
-{
-  return dataiterator_match_int_real(di, flags, vmatch);
-}
-
-int
-dataiterator_step(Dataiterator *di)
-{
-restart:
-  while (1)
-    {
-      if (di->state)
-	{
-	  /* we're stepping through solvable data, 1 -> SOLVABLE_NAME... */
-	  if (di->idp)
-	    {
-	      /* we're stepping through an id array */
-	      Id *idp = di->idp;
-	      if (*idp)
-		{
-		  di->kv.id = *idp;
-		  di->idp++;
-		  di->kv.eof = idp[1] ? 0 : 1;
-		  goto weg2;
-		}
-	      else
-		di->idp = 0;
-	    }
-	  Solvable *s = di->repo->pool->solvables + di->solvid;
-	  int state = di->state;
-	  di->key = solvablekeys + state - 1;
-	  if (di->keyname)
-	    di->state = RPM_RPMDBID;
-	  else
-	    di->state++;
-	  if (state == 1)
-	    {
-	      di->data = 0;
-	      if (di->keyname)
-		state = di->keyname - 1;
-	    }
-	  switch (state + 1)
-	    {
-	      case SOLVABLE_NAME:
-		if (!s->name)
-		  continue;
-		di->kv.id = s->name;
-		di->kv.eof = 1;
-		break;
-	      case SOLVABLE_ARCH:
-		if (!s->arch)
-		  continue;
-		di->kv.id = s->arch;
-		di->kv.eof = 1;
-		break;
-	      case SOLVABLE_EVR:
-		if (!s->evr)
-		  continue;
-		di->kv.id = s->evr;
-		di->kv.eof = 1;
-		break;
-	      case SOLVABLE_VENDOR:
-		if (!s->vendor)
-		  continue;
-		di->kv.id = s->vendor;
-		di->kv.eof = 1;
-		break;
-	      case SOLVABLE_PROVIDES:
-		di->idp = s->provides
-		    ? di->repo->idarraydata + s->provides : 0;
-		continue;
-	      case SOLVABLE_OBSOLETES:
-		di->idp = s->obsoletes
-		    ? di->repo->idarraydata + s->obsoletes : 0;
-		continue;
-	      case SOLVABLE_CONFLICTS:
-		di->idp = s->conflicts
-		    ? di->repo->idarraydata + s->conflicts : 0;
-		continue;
-	      case SOLVABLE_REQUIRES:
-		di->idp = s->requires
-		    ? di->repo->idarraydata + s->requires : 0;
-		continue;
-	      case SOLVABLE_RECOMMENDS:
-		di->idp = s->recommends
-		    ? di->repo->idarraydata + s->recommends : 0;
-		continue;
-	      case SOLVABLE_SUPPLEMENTS:
-		di->idp = s->supplements
-		    ? di->repo->idarraydata + s->supplements : 0;
-		continue;
-	      case SOLVABLE_SUGGESTS:
-		di->idp = s->suggests
-		    ? di->repo->idarraydata + s->suggests : 0;
-		continue;
-	      case SOLVABLE_ENHANCES:
-		di->idp = s->enhances
-		    ? di->repo->idarraydata + s->enhances : 0;
-		continue;
-	      case RPM_RPMDBID:
-		if (!di->repo->rpmdbid)
-		  continue;
-		di->kv.num = di->repo->rpmdbid[di->solvid - di->repo->start];
-		di->kv.eof = 1;
-		break;
-	      default:
-		di->data = di->repo->repodata - 1;
-		di->kv.eof = 1;
-		di->state = 0;
-		continue;
-	    }
-	}
-      else if (di->subkeyp)
-	{
-	  Id keyid;
-	  if (!di->subnum)
-	    {
-	      /* Send end-of-substruct.  We are here only when we saw a
-	         _COUNTED key one level up.  Since then we didn't increment
-		 ->keyp, so it still can be found at keyp[-1].  */
-	      di->kv.eof = 2;
-	      di->key = di->data->keys + di->keyp[-1];
-	      di->subkeyp = 0;
-	    }
-	  else if (!(keyid = *di->subkeyp++))
-	    {
-	      /* Send end-of-element.  See above for keyp[-1].  */
-	      di->kv.eof = 1;
-	      di->key = di->data->keys + di->keyp[-1];
-	      if (di->subschema)
-	        di->subkeyp = di->data->schemadata + di->data->schemata[di->subschema];
-	      else
-		{
-		  di->dp = data_read_id(di->dp, &di->subschema);
-		  di->subkeyp = di->data->schemadata + di->data->schemata[di->subschema];
-		  di->subschema = 0;
-		}
-	      di->subnum--;
-	    }
-	  else
-	    {
-	      di->key = di->data->keys + keyid;
-	      di->dp = data_fetch(di->dp, &di->kv, di->key);
-	      if (!di->dp)
-		exit(1);
-	    }
-	}
-      else
-	{
-	  if (di->kv.eof)
-	    di->dp = 0;
-	  else
-	    di->dp = data_fetch(di->dp, &di->kv, di->key);
-
-	  while (!di->dp)
-	    {
-	      Id keyid;
-	      if (di->keyname || !(keyid = *di->keyp++))
-		{
-		  while (1)
-		    {
-		      Repo *repo = di->repo;
-		      Repodata *data = ++di->data;
-		      if (data >= repo->repodata + repo->nrepodata)
-			{
-			  if (di->flags & __SEARCH_ONESOLVABLE)
-			    return 0;
-			  if (di->solvid >= 0)
-			    {
-			      while (++di->solvid < repo->end)
-				if (repo->pool->solvables[di->solvid].repo == repo)
-				  break;
-			      if (di->solvid >= repo->end)
-				{
-				  if (!(di->flags & SEARCH_EXTRA))
-				    goto skiprepo;
-				  goto skiprepo;
-				}
-			    }
-			  else
-			    {
-				{
-skiprepo:;
-				  Pool *pool = di->repo->pool;
-				  if (!(di->flags & SEARCH_ALL_REPOS)
-				      || di->repo == pool->repos[pool->nrepos - 1])
-				    return 0;
-				  int i;
-				  for (i = 0; i < pool->nrepos; i++)
-				    if (di->repo == pool->repos[i])
-				      break;
-				  di->repo = pool->repos[i + 1];
-				  dataiterator_init(di, di->repo, 0, di->keyname, di->match, di->flags);
-				  continue;
-				}
-			    }
-			  di->data = repo->repodata - 1;
-			  if ((di->flags & SEARCH_NO_STORAGE_SOLVABLE))
-			    continue;
-			  static Id zeroid = 0;
-			  di->keyp = &zeroid;
-			  di->state = 1;
-			  goto restart;
-			}
-		      if ((di->solvid >= 0 && di->solvid >= data->start && di->solvid < data->end))
-			{
-			  dataiterator_newdata(di);
-			  if (di->nextkeydp)
-			    break;
-			}
-		    }
-		}
-	      else
-		{
-		  di->key = di->data->keys + keyid;
-		  di->dp = get_data(di->data, di->key, &di->nextkeydp);
-		}
-	      di->dp = data_fetch(di->dp, &di->kv, di->key);
-	    }
-	  if (di->key->type == REPOKEY_TYPE_FIXARRAY)
-	    {
-	      di->subnum = di->kv.num;
-	      di->subschema = di->kv.id;
-	      di->kv.eof = 0;
-	      di->subkeyp = di->data->schemadata + di->data->schemata[di->subschema];
-	    }
-	  if (di->key->type == REPOKEY_TYPE_FLEXARRAY)
-	    {
-	      di->subnum = di->kv.num;
-	      di->kv.eof = 0;
-	      di->dp = data_read_id(di->dp, &di->subschema);
-	      di->subkeyp = di->data->schemadata + di->data->schemata[di->subschema];
-	      di->subschema = 0;
-	    }
-	}
-weg2:
-      if (!di->match
-	  || dataiterator_match_int(di))
-	break;
-    }
-  return 1;
-}
-
-void
-dataiterator_skip_attribute(Dataiterator *di)
-{
-  if (di->state)
-    di->idp = 0;
-  /* This will make the next _step call to retrieve the next field.  */
-  di->kv.eof = 1;
-}
-
-void
-dataiterator_skip_solvable(Dataiterator *di)
-{
-  /* We're done with this field.  */
-  di->kv.eof = 1;
-  /* And with solvable data.  */
-  di->state = 0;
-  /* And with all keys for this repodata and thing. */
-  static Id zeroid = 0;
-  di->keyp = &zeroid;
-  /* And with all repodatas for this thing.  */
-  di->data = di->repo->repodata + di->repo->nrepodata - 1;
-  /* Hence the next call to _step will retrieve the next thing.  */
-}
-
-void
-dataiterator_skip_repo(Dataiterator *di)
-{
-  dataiterator_skip_solvable(di);
-  /* We're done with all solvables and all extra things for this repo.  */
-  di->solvid = -1;
-}
-
-void
-dataiterator_jump_to_solvable(Dataiterator *di, Solvable *s)
-{
-  di->repo = s->repo;
-  /* Simulate us being done with the solvable before the requested one.  */
-  dataiterator_skip_solvable(di);
-  di->solvid = s - s->repo->pool->solvables;
-  di->solvid--;
-}
-
-void
-dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
-{
-  di->repo = repo;
-  dataiterator_skip_solvable(di);
-  di->solvid = repo->start - 1;
-}
-
-#endif
 
 /************************************************************************
  * data modify functions
@@ -1823,8 +1326,8 @@ repodata_extend(Repodata *data, Id p)
       int new = p - data->end + 1;
       if (data->attrs)
 	{
-	  data->attrs = sat_extend(data->attrs, old, new, sizeof(Id), REPODATA_BLOCK);
-	  memset(data->attrs + old, 0, new * sizeof(Id));
+	  data->attrs = sat_extend(data->attrs, old, new, sizeof(Id *), REPODATA_BLOCK);
+	  memset(data->attrs + old, 0, new * sizeof(Id *));
 	}
       data->incoreoffset = sat_extend(data->incoreoffset, old, new, sizeof(Id), REPODATA_BLOCK);
       memset(data->incoreoffset + old, 0, new * sizeof(Id));
@@ -1836,9 +1339,9 @@ repodata_extend(Repodata *data, Id p)
       int new = data->start - p;
       if (data->attrs)
 	{
-	  data->attrs = sat_extend_resize(data->attrs, old + new, sizeof(Id), REPODATA_BLOCK);
-	  memmove(data->attrs + new, data->attrs, old * sizeof(Id));
-	  memset(data->attrs, 0, new * sizeof(Id));
+	  data->attrs = sat_extend_resize(data->attrs, old + new, sizeof(Id *), REPODATA_BLOCK);
+	  memmove(data->attrs + new, data->attrs, old * sizeof(Id *));
+	  memset(data->attrs, 0, new * sizeof(Id *));
 	}
       data->incoreoffset = sat_extend_resize(data->incoreoffset, old + new, sizeof(Id), REPODATA_BLOCK);
       memmove(data->incoreoffset + new, data->incoreoffset, old * sizeof(Id));
@@ -1942,38 +1445,38 @@ repodata_insert_keyid(Repodata *data, Id handle, Id keyid, Id val, int overwrite
 
 
 void
-repodata_set(Repodata *data, Id handle, Repokey *key, Id val)
+repodata_set(Repodata *data, Id solvid, Repokey *key, Id val)
 {
   Id keyid;
 
   keyid = repodata_key2id(data, key, 1);
-  repodata_insert_keyid(data, handle, keyid, val, 1);
+  repodata_insert_keyid(data, solvid, keyid, val, 1);
 }
 
 void
-repodata_set_id(Repodata *data, Id handle, Id keyname, Id id)
+repodata_set_id(Repodata *data, Id solvid, Id keyname, Id id)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_ID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, handle, &key, id);
+  repodata_set(data, solvid, &key, id);
 }
 
 void
-repodata_set_num(Repodata *data, Id handle, Id keyname, unsigned int num)
+repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned int num)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_NUM;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, handle, &key, (Id)num);
+  repodata_set(data, solvid, &key, (Id)num);
 }
 
 void
-repodata_set_poolstr(Repodata *data, Id handle, Id keyname, const char *str)
+repodata_set_poolstr(Repodata *data, Id solvid, Id keyname, const char *str)
 {
   Repokey key;
   Id id;
@@ -1985,44 +1488,44 @@ repodata_set_poolstr(Repodata *data, Id handle, Id keyname, const char *str)
   key.type = REPOKEY_TYPE_ID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, handle, &key, id);
+  repodata_set(data, solvid, &key, id);
 }
 
 void
-repodata_set_constant(Repodata *data, Id handle, Id keyname, unsigned int constant)
+repodata_set_constant(Repodata *data, Id solvid, Id keyname, unsigned int constant)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_CONSTANT;
   key.size = constant;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, handle, &key, 0);
+  repodata_set(data, solvid, &key, 0);
 }
 
 void
-repodata_set_constantid(Repodata *data, Id handle, Id keyname, Id id)
+repodata_set_constantid(Repodata *data, Id solvid, Id keyname, Id id)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_CONSTANTID;
   key.size = id;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, handle, &key, 0);
+  repodata_set(data, solvid, &key, 0);
 }
 
 void
-repodata_set_void(Repodata *data, Id handle, Id keyname)
+repodata_set_void(Repodata *data, Id solvid, Id keyname)
 {
   Repokey key;
   key.name = keyname;
   key.type = REPOKEY_TYPE_VOID;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  repodata_set(data, handle, &key, 0);
+  repodata_set(data, solvid, &key, 0);
 }
 
 void
-repodata_set_str(Repodata *data, Id handle, Id keyname, const char *str)
+repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str)
 {
   Repokey key;
   int l;
@@ -2034,7 +1537,7 @@ repodata_set_str(Repodata *data, Id handle, Id keyname, const char *str)
   key.storage = KEY_STORAGE_INCORE;
   data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
-  repodata_set(data, handle, &key, data->attrdatalen);
+  repodata_set(data, solvid, &key, data->attrdatalen);
   data->attrdatalen += l;
 }
 
@@ -2110,7 +1613,7 @@ checksumtype2len(Id type)
 }
 
 void
-repodata_set_bin_checksum(Repodata *data, Id handle, Id keyname, Id type,
+repodata_set_bin_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 		      const unsigned char *str)
 {
   Repokey key;
@@ -2124,7 +1627,7 @@ repodata_set_bin_checksum(Repodata *data, Id handle, Id keyname, Id type,
   key.storage = KEY_STORAGE_INCORE;
   data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
-  repodata_set(data, handle, &key, data->attrdatalen);
+  repodata_set(data, solvid, &key, data->attrdatalen);
   data->attrdatalen += l;
 }
 
@@ -2154,7 +1657,7 @@ hexstr2bytes(unsigned char *buf, const char *str, int buflen)
 }
 
 void
-repodata_set_checksum(Repodata *data, Id handle, Id keyname, Id type,
+repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 		      const char *str)
 {
   unsigned char buf[64];
@@ -2167,7 +1670,7 @@ repodata_set_checksum(Repodata *data, Id handle, Id keyname, Id type,
       fprintf(stderr, "Invalid hex character in '%s'\n", str);
       return;
     }
-  repodata_set_bin_checksum(data, handle, keyname, type, buf);
+  repodata_set_bin_checksum(data, solvid, keyname, type, buf);
 }
 
 const char *
@@ -2201,13 +1704,13 @@ repodata_globalize_id(Repodata *data, Id id)
 }
 
 void
-repodata_add_dirnumnum(Repodata *data, Id handle, Id keyname, Id dir, Id num, Id num2)
+repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2)
 {
   assert(dir);
 #if 0
-fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", handle, dir, num, num2, data->attriddatalen);
+fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", solvid, dir, num, num2, data->attriddatalen);
 #endif
-  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_DIRNUMNUMARRAY, 3);
+  repodata_add_array(data, solvid, keyname, REPOKEY_TYPE_DIRNUMNUMARRAY, 3);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = num;
   data->attriddata[data->attriddatalen++] = num2;
@@ -2215,7 +1718,7 @@ fprintf(stderr, "repodata_add_dirnumnum %d %d %d %d (%d)\n", handle, dir, num, n
 }
 
 void
-repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const char *str)
+repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const char *str)
 {
   Id stroff;
   int l;
@@ -2228,27 +1731,27 @@ repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const char *s
   data->attrdatalen += l;
 
 #if 0
-fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", handle, dir, str,  data->attriddatalen);
+fprintf(stderr, "repodata_add_dirstr %d %d %s (%d)\n", solvid, dir, str,  data->attriddatalen);
 #endif
-  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_DIRSTRARRAY, 2);
+  repodata_add_array(data, solvid, keyname, REPOKEY_TYPE_DIRSTRARRAY, 2);
   data->attriddata[data->attriddatalen++] = dir;
   data->attriddata[data->attriddatalen++] = stroff;
   data->attriddata[data->attriddatalen++] = 0;
 }
 
 void
-repodata_add_idarray(Repodata *data, Id handle, Id keyname, Id id)
+repodata_add_idarray(Repodata *data, Id solvid, Id keyname, Id id)
 {
 #if 0
-fprintf(stderr, "repodata_add_idarray %d %d (%d)\n", handle, id, data->attriddatalen);
+fprintf(stderr, "repodata_add_idarray %d %d (%d)\n", solvid, id, data->attriddatalen);
 #endif
-  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_IDARRAY, 1);
+  repodata_add_array(data, solvid, keyname, REPOKEY_TYPE_IDARRAY, 1);
   data->attriddata[data->attriddatalen++] = id;
   data->attriddata[data->attriddatalen++] = 0;
 }
 
 void
-repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname,
+repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname,
 			   const char *str)
 {
   Id id;
@@ -2256,21 +1759,21 @@ repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname,
     id = stringpool_str2id(&data->spool, str, 1);
   else
     id = str2id(data->repo->pool, str, 1);
-  repodata_add_idarray(data, handle, keyname, id);
+  repodata_add_idarray(data, solvid, keyname, id);
 }
 
 void
-repodata_add_fixarray(Repodata *data, Id handle, Id keyname, Id ghandle)
+repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
 {
-  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_FIXARRAY, 1);
+  repodata_add_array(data, solvid, keyname, REPOKEY_TYPE_FIXARRAY, 1);
   data->attriddata[data->attriddatalen++] = ghandle;
   data->attriddata[data->attriddatalen++] = 0;
 }
 
 void
-repodata_add_flexarray(Repodata *data, Id handle, Id keyname, Id ghandle)
+repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
 {
-  repodata_add_array(data, handle, keyname, REPOKEY_TYPE_FLEXARRAY, 1);
+  repodata_add_array(data, solvid, keyname, REPOKEY_TYPE_FLEXARRAY, 1);
   data->attriddata[data->attriddatalen++] = ghandle;
   data->attriddata[data->attriddatalen++] = 0;
 }

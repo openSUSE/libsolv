@@ -123,18 +123,17 @@ repodata_precheck_keyname(Repodata *data, Id keyname)
  * access functions
  */
 
-/* Search key <keyname> (all keys, if keyname == 0) for Id <entry>
- * <entry> is _relative_ Id for <data>
+/* Search key <keyname> (all keys, if keyname == 0) for Id <solvid>
  * Call <callback> for each match
  */
-void repodata_search(Repodata *data, Id entry, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
+void repodata_search(Repodata *data, Id solvid, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
 
 /* lookup functions */
-Id repodata_lookup_id(Repodata *data, Id entry, Id keyname);
-const char *repodata_lookup_str(Repodata *data, Id entry, Id keyname);
-int repodata_lookup_num(Repodata *data, Id entry, Id keyname, unsigned int *value);
-int repodata_lookup_void(Repodata *data, Id entry, Id keyname);
-const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id entry, Id keyname, Id *typep);
+Id repodata_lookup_id(Repodata *data, Id solvid, Id keyname);
+const char *repodata_lookup_str(Repodata *data, Id solvid, Id keyname);
+int repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value);
+int repodata_lookup_void(Repodata *data, Id solvid, Id keyname);
+const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep);
 
 
 /*-----
@@ -147,37 +146,37 @@ Id repodata_new_handle(Repodata *data);
 
 /* basic types: void, num, string, Id */
 
-void repodata_set_void(Repodata *data, Id handle, Id keyname);
-void repodata_set_num(Repodata *data, Id handle, Id keyname, unsigned int num);
-void repodata_set_str(Repodata *data, Id handle, Id keyname, const char *str);
-void repodata_set_id(Repodata *data, Id handle, Id keyname, Id id);
+void repodata_set_void(Repodata *data, Id solvid, Id keyname);
+void repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned int num);
+void repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str);
+void repodata_set_id(Repodata *data, Id solvid, Id keyname, Id id);
 
 /*  */
 
-void repodata_set_poolstr(Repodata *data, Id handle, Id keyname, const char *str);
+void repodata_set_poolstr(Repodata *data, Id solvid, Id keyname, const char *str);
 
 /* set numeric constant */
-void repodata_set_constant(Repodata *data, Id handle, Id keyname, unsigned int constant);
+void repodata_set_constant(Repodata *data, Id solvid, Id keyname, unsigned int constant);
 
 /* set Id constant */
-void repodata_set_constantid(Repodata *data, Id handle, Id keyname, Id id);
+void repodata_set_constantid(Repodata *data, Id solvid, Id keyname, Id id);
 
 /* checksum */
-void repodata_set_bin_checksum(Repodata *data, Id handle, Id keyname, Id type,
+void repodata_set_bin_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 			       const unsigned char *buf);
-void repodata_set_checksum(Repodata *data, Id handle, Id keyname, Id type,
+void repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 			   const char *str);
 
 /* directory (for package file list) */
-void repodata_add_dirnumnum(Repodata *data, Id handle, Id keyname, Id dir, Id num, Id num2);
-void repodata_add_dirstr(Repodata *data, Id handle, Id keyname, Id dir, const char *str);
+void repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2);
+void repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const char *str);
 
 
 /* Arrays */
-void repodata_add_idarray(Repodata *data, Id handle, Id keyname, Id id);
-void repodata_add_poolstr_array(Repodata *data, Id handle, Id keyname, const char *str);
-void repodata_add_fixarray(Repodata *data, Id handle, Id keyname, Id ghandle);
-void repodata_add_flexarray(Repodata *data, Id handle, Id keyname, Id ghandle);
+void repodata_add_idarray(Repodata *data, Id solvid, Id keyname, Id id);
+void repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname, const char *str);
+void repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
+void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 
 
 /*-----
