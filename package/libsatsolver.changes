@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Tue Oct 14 18:28:57 CEST 2008 - mls@suse.de
+
+- the big solv data change
+  * incompatible new file format
+  * repodata handles are solvable ids
+  * no more extra handles
+  * no need to call repodata_extend anymore
+- work around solver dup repo priority bug, real fix follows soon
+- implement releasever
+- repo_products.c is now more robust
+
+-------------------------------------------------------------------
 Mon Oct 13 16:50:14 CEST 2008 - kkaempf@suse.de
 
 - make product parsing more robust (bnc#433362)
