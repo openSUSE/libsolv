@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu Oct 16 00:50:47 CEST 2008 - mls@suse.de
+
+- make iterator work with completely empty repos [bnc#435838]
+
+-------------------------------------------------------------------
 Tue Oct 14 18:28:57 CEST 2008 - mls@suse.de
 
 - the big solv data change
