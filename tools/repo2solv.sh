@@ -143,6 +143,7 @@ if test -d repodata ; then
   # This contains a updateinfo.xml* and maybe patches
   cmd=
   for i in updateinfo.xml*; do
+      test -s "$i" || continue
       case $i in
 	  *.gz) cmd="gzip -dc" ;;
 	  *.bz2) cmd="bzip2 -dc" ;;
@@ -177,6 +178,7 @@ if test -d repodata ; then
   # This contains a deltainfo.xml*
   cmd=
   for i in deltainfo.xml*; do
+      test -s "$i" || continue
       case $i in
 	  *.gz) cmd="gzip -dc" ;;
 	  *.bz2) cmd="bzip2 -dc" ;;
