@@ -960,8 +960,10 @@ dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname, const char *ma
   if (p)
     flags |= SEARCH_THISSOLVID;
   di->flags = flags;
-  if (repo)
+  if (repo && !(flags & SEARCH_ALL_REPOS))
     di->repoid = -1;
+  else
+    di->repo = di->pool->repos[0];
   if (match)
     datamatcher_init(&di->matcher, di->pool, match, flags);
   if (p == SOLVID_POS)
