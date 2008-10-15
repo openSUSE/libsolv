@@ -17,17 +17,22 @@ test_susetags() {
   fi
 }
 
-# this should signal an error if there is a problem
+# signal an error if there is a problem
 set -e 
 
 LANG=C
 unset CDPATH
 parser_options=${PARSER_OPTIONS:-}
 
+if test "$1" = "-o" ; then
+  exec > "$2"
+  shift
+  shift
+fi
 
 dir="$1"
 cd "$dir" || exit 1
-if test -d repodata; then
+if test -d repodata ; then
   cd repodata || exit 2
 
   primfile="/nonexist"
@@ -79,83 +84,78 @@ if test -d repodata; then
     ) | grep -v '\?xml' | rpmmd2solv $parser_options > $prodfile || exit 4
   fi
 
+  cmd=
   patternfile="/nonexist"
   for i in patterns.xml*; do
     test -s "$i" || continue
-    # got one!
-    patternfile=`mktemp` || exit 3
-    (
-      for i in patterns.xml*; do
-        test -s "$i" || continue
-        case $i in
-          *.gz) gzip -dc "$i" ;;
-	  *.bz2) bzip2 -dc "$i" ;;
-	  *) cat "$i" ;;
-        esac
-      done
-    ) | rpmmd2solv $parser_options > $patternfile || exit 4
+    case $i in
+      *.gz) cmd='gzip -dc' ;;
+      *.bz2) cmd='bzip2 -dc' ;;
+      *) cmd='cat' ;;
+    esac
     break
   done
+  if test -n "$cmd" ; then
+    patternfile=`mktemp` || exit 3
+    $cmd "$i" | rpmmd2solv $parser_options > $patternfile || exit 4
+  fi
 
   # This contains repomd.xml
   # for now we only read some keys like timestamp
-  if test -f repomd.xml || test -f repomd.xml.gz || test -f repomd.xml.bz2 ; then
-      for i in repomd.xml*; do
-          case $i in
-              *.gz) cmd="gzip -dc" ;;
-              *.bz2) cmd="bzip2 -dc" ;;
-              *) cmd="cat" ;;
-          esac
-          # only check the first repomd.xml*, in case there are more
-          break
-      done
-
-      repomdfile="/nonexist"
-      if test -n "$cmd"; then
+  cmd=
+  for i in repomd.xml*; do
+      test -s "$i" || continue
+      case $i in
+	  *.gz) cmd="gzip -dc" ;;
+	  *.bz2) cmd="bzip2 -dc" ;;
+	  *) cmd="cat" ;;
+      esac
+      # only check the first repomd.xml*, in case there are more
+      break
+  done
+  repomdfile="/nonexist"
+  if test -n "$cmd"; then
       # we have some repomd.xml*
-          repomdfile=`mktemp` || exit 3
-          $cmd $i | repomdxml2solv $parser_options > $repomdfile || exit 4
-      fi
+      repomdfile=`mktemp` || exit 3
+      $cmd "$i" | repomdxml2solv $parser_options > $repomdfile || exit 4
   fi
 
   # This contains suseinfo.xml, which is extensions to repomd.xml
   # for now we only read some keys like expiration and products
-  if test -f suseinfo.xml || test -f suseinfo.xml.gz || test -f suseinfo.xml.bz2 ; then
-      for i in suseinfo.xml*; do
-          case $i in
-              *.gz) cmd="gzip -dc" ;;
-              *.bz2) cmd="bzip2 -dc" ;;
-              *) cmd="cat" ;;
-          esac
-          # only check the first suseinfo.xml*, in case there are more
-          break
-      done
-
-      suseinfofile="/nonexist"
-      if test -n "$cmd"; then
+  cmd=
+  for i in suseinfo.xml*; do
+      test -s "$i" || continue
+      case $i in
+	  *.gz) cmd="gzip -dc" ;;
+	  *.bz2) cmd="bzip2 -dc" ;;
+	  *) cmd="cat" ;;
+      esac
+      # only check the first suseinfo.xml*, in case there are more
+      break
+  done
+  suseinfofile="/nonexist"
+  if test -n "$cmd"; then
       # we have some suseinfo.xml*
-          suseinfofile=`mktemp` || exit 3
-          $cmd $i | repomdxml2solv $parser_options > $suseinfofile || exit 4
-      fi
+      suseinfofile=`mktemp` || exit 3
+      $cmd "$i" | repomdxml2solv $parser_options > $suseinfofile || exit 4
   fi
 
   # This contains a updateinfo.xml* and maybe patches
-  if test -f updateinfo.xml || test -f updateinfo.xml.gz || test -f updateinfo.xml.bz2 ; then
-      for i in updateinfo.xml*; do
-          case $i in
-              *.gz) cmd="gzip -dc" ;;
-              *.bz2) cmd="bzip2 -dc" ;;
-              *) cmd="cat" ;;
-          esac
-          # only check the first updateinfo.xml*, in case there are more
-          break
-      done
-      updateinfofile="/nonexist"
-      if test -n "$cmd"; then
+  cmd=
+  for i in updateinfo.xml*; do
+      case $i in
+	  *.gz) cmd="gzip -dc" ;;
+	  *.bz2) cmd="bzip2 -dc" ;;
+	  *) cmd="cat" ;;
+      esac
+      # only check the first updateinfo.xml*, in case there are more
+      break
+  done
+  updateinfofile="/nonexist"
+  if test -n "$cmd"; then
       # we have some updateinfo.xml*
-          updateinfofile=`mktemp` || exit 3
-          $cmd $i | updateinfoxml2solv $parser_options > $updateinfofile || exit 4
-      fi
+      updateinfofile=`mktemp` || exit 3
+      $cmd "$i" | updateinfoxml2solv $parser_options > $updateinfofile || exit 4
   fi
 
   patchfile="/nonexist"
@@ -175,22 +175,21 @@ if test -d repodata; then
   fi
 
   # This contains a deltainfo.xml*
-  if test -f deltainfo.xml || test -f deltainfo.xml.gz || test -f deltainfo.xml.bz2 ; then
-      for i in deltainfo.xml*; do
-          case $i in
-              *.gz) cmd="gzip -dc" ;;
-              *.bz2) cmd="bzip2 -dc" ;;
-              *) cmd="cat" ;;
-          esac
-          # only check the first deltainfo.xml*, in case there are more
-          break
-      done
-      deltainfofile="/nonexist"
-      if test -n "$cmd"; then
+  cmd=
+  for i in deltainfo.xml*; do
+      case $i in
+	  *.gz) cmd="gzip -dc" ;;
+	  *.bz2) cmd="bzip2 -dc" ;;
+	  *) cmd="cat" ;;
+      esac
+      # only check the first deltainfo.xml*, in case there are more
+      break
+  done
+  deltainfofile="/nonexist"
+  if test -n "$cmd"; then
       # we have some deltainfo.xml*
-          deltainfofile=`mktemp` || exit 3
-          $cmd $i | deltainfoxml2solv $parser_options > $deltainfofile || exit 4
-      fi
+      deltainfofile=`mktemp` || exit 3
+      $cmd "$i" | deltainfoxml2solv $parser_options > $deltainfofile || exit 4
   fi
 
   # Now merge primary, patches, updateinfo, and deltainfo
@@ -283,7 +282,7 @@ elif test_susetags; then
 	*) 
 	  suff=${name#packages.}
 	  echo "=Lan: $suff"
-	  eval "$prog '$i'" ;;
+	  $prog "$i" ;;
       esac
     done
 
@@ -292,11 +291,12 @@ elif test_susetags; then
 else
   rpms=''
   for r in *.rpm ; do
-    rpms="$rpms$r
-"
+    test -e "$r" || continue
+    rpms="$rpms
+$r"
   done
   if test -n "$rpms" ; then
-      echo "$rpms" | rpms2solv -m -
+      echo "${rpms#?}" | rpms2solv -m -
   else
       exit 1
   fi
