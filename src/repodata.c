@@ -1047,7 +1047,11 @@ dataiterator_step(Dataiterator *di)
 
 	case di_enterrepodata: di_enterrepodata:
 	  if (di->repodataid >= 0)
-	    di->data = di->repo->repodata + di->repodataid;
+	    {
+	      if (di->repodataid >= di->repo->nrepodata)
+		goto di_nextsolvable;
+	      di->data = di->repo->repodata + di->repodataid;
+	    }
 	  if (!maybe_load_repodata(di->data, di->keyname))
 	    goto di_nextrepodata;
 	  di->dp = solvid2data(di->data, di->solvid, &schema);
@@ -1102,7 +1106,7 @@ dataiterator_step(Dataiterator *di)
 	      goto di_enterrepodata;
 	  /* FALLTHROUGH */
 
-	case di_nextsolvable:
+	case di_nextsolvable: di_nextsolvable:
 	  if (!(di->flags & SEARCH_THISSOLVID))
 	    {
 	      if (di->solvid < 0)
