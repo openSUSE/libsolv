@@ -956,15 +956,6 @@ int
 dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, const char *match, int flags)
 {
   memset(di, 0, sizeof(*di));
-  if (pool == NULL)
-    {
-      if (repo == NULL)
-	{
-	  return -1;
-	}
-      pool = repo->pool;
-    }
-  
   di->pool = pool;
   if (match)
     {
