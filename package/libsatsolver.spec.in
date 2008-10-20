@@ -23,7 +23,7 @@ BuildRequires: expat-devel
 %endif
 BuildRequires:  cmake rpm-devel gcc-c++ ruby-devel swig perl python-devel
 # the testsuite uses the check framework
-BuildRequires:  check check-devel
+BuildRequires:  check-devel
 Summary:        A new approach to package dependency solving
 
 %description

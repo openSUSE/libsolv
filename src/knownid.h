@@ -26,6 +26,9 @@ enum sat_knownid {
 
 KNOWNID(ID_NULL,			"<NULL>"),
 KNOWNID(ID_EMPTY,			""),
+
+/* The following Ids are stored in the solvable and must
+ * come in one block */
 KNOWNID(SOLVABLE_NAME,			"solvable:name"),
 KNOWNID(SOLVABLE_ARCH,			"solvable:arch"),
 KNOWNID(SOLVABLE_EVR,			"solvable:evr"),
@@ -39,6 +42,7 @@ KNOWNID(SOLVABLE_SUGGESTS,		"solvable:suggests"),
 KNOWNID(SOLVABLE_SUPPLEMENTS,		"solvable:supplements"),
 KNOWNID(SOLVABLE_ENHANCES,		"solvable:enhances"),
 KNOWNID(RPM_RPMDBID,			"rpm:dbid"),
+
 /* normal requires before this, prereqs after this */
 KNOWNID(SOLVABLE_PREREQMARKER,		"solvable:prereqmarker"),
 /* normal provides before this, generated file provides after this */
@@ -119,12 +123,9 @@ KNOWNID(SOLVABLE_SOURCENAME,		"solvable:sourcename"),
 KNOWNID(SOLVABLE_SOURCEEVR,		"solvable:sourceevr"),
 KNOWNID(SOLVABLE_ISVISIBLE,		"solvable:isvisible"),
 KNOWNID(SOLVABLE_CHECKSUM,		"solvable:checksum"),
-/* pkgid: md5sum over header + payload */
-KNOWNID(SOLVABLE_PKGID,			"solvable:pkgid"),
-/* hdrid: sha1sum over header only */
-KNOWNID(SOLVABLE_HDRID,			"solvable:hdrid"),
-/* leadsigid: md5sum over lead + sigheader */
-KNOWNID(SOLVABLE_LEADSIGID,		"solvable:leadsigid"),
+KNOWNID(SOLVABLE_PKGID,			"solvable:pkgid"),	/* pkgid: md5sum over header + payload */
+KNOWNID(SOLVABLE_HDRID,			"solvable:hdrid"),	/* hdrid: sha1sum over header only */
+KNOWNID(SOLVABLE_LEADSIGID,		"solvable:leadsigid"),  /* leadsigid: md5sum over lead + sigheader */
 
 KNOWNID(SOLVABLE_PATCHCATEGORY,		"solvable:patchcategory"),
 KNOWNID(SOLVABLE_HEADEREND,		"solvable:headerend"),

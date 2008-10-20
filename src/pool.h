@@ -45,6 +45,7 @@ struct _KeyValue;
 
 typedef struct _Repopos {
   struct _Repo *repo;
+  Id solvid;
   Id repodataid;
   Id schema;
   Id dp; 
@@ -269,6 +270,9 @@ static inline void pool_setloadcallback(Pool *pool, FILE *(*cb)(struct _Pool *, 
  *   match - key must match this string
  */
 void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, struct _Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
+
+void pool_clear_pos(Pool *pool);
+
 
 typedef struct _duchanges {
   const char *path;

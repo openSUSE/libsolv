@@ -709,7 +709,7 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
       case REPOKEY_TYPE_FLEXARRAY:
 	if (kv->entry == 0)
 	  {
-	    if (!kv->eof)
+	    if (kv->eof != 2)
 	      *cbdata->sp++ = 0;	/* mark start */
 	  }
 	else
@@ -721,7 +721,7 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
 	      sp--;
 	    cbdata->subschemata = sat_extend(cbdata->subschemata, cbdata->nsubschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
 	    cbdata->subschemata[cbdata->nsubschemata++] = addschema(cbdata, sp);
-	    cbdata->sp = kv->eof ? sp - 1: sp;
+	    cbdata->sp = kv->eof == 2 ? sp - 1: sp;
 	  }
 	break;
       default:
@@ -860,7 +860,7 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
       case REPOKEY_TYPE_FLEXARRAY:
 	if (!kv->entry)
 	  data_addid(xd, kv->num);
-	if (!kv->eof)
+	if (kv->eof != 2)
 	  data_addid(xd, cbdata->subschemata[cbdata->current_sub++]);
 	if (xd == cbdata->extdata + 0 && !kv->parent && !cbdata->doingsolvables)
 	  {
@@ -1260,7 +1260,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
   /* collect all other data from all repodatas */
   /* XXX: merge arrays of equal keys? */
   for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
-    repodata_search(data, SOLVID_META, 0, repo_write_cb_needed, &cbdata);
+    repodata_search(data, SOLVID_META, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, repo_write_cb_needed, &cbdata);
   sp = cbdata.sp;
   /* add solvables if needed */
   if (repo->nsolvables)
@@ -1357,7 +1357,7 @@ for (i = 1; i < cbdata.nmykeys; i++)
 		continue;
 	      if (i < data->start || i >= data->end)
 		continue;
-	      repodata_search(data, i, 0, repo_write_cb_needed, &cbdata);
+	      repodata_search(data, i, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, repo_write_cb_needed, &cbdata);
 	      needid = cbdata.needid;
 	    }
 	}
@@ -1583,7 +1583,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 
 #if 1
   for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
-    repodata_search(data, SOLVID_META, 0, repo_write_cb_adddata, &cbdata);
+    repodata_search(data, SOLVID_META, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, repo_write_cb_adddata, &cbdata);
 #endif
 
   if (xd->len - cbdata.lastlen > cbdata.maxdata)
@@ -1633,7 +1633,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 		continue;
 	      if (i < data->start || i >= data->end)
 		continue;
-	      repodata_search(data, i, 0, repo_write_cb_adddata, &cbdata);
+	      repodata_search(data, i, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, repo_write_cb_adddata, &cbdata);
 	    }
 	}
       if (xd->len - cbdata.lastlen > cbdata.maxdata)

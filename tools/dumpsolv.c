@@ -18,22 +18,12 @@ static int with_attr = 0;
 static int dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv);
 
 static void
-dump_repodata (Repo *repo)
+dump_repodata(Repo *repo)
 {
   unsigned i;
   Repodata *data;
   if (repo->nrepodata == 0)
     return;
-  for (i = 0; i < 32; i++)
-    if (repo->rpmdbcookie[i])
-      break;
-  if (i < 32)
-    {
-      printf("rpmdb cookie: ");
-      for (i = 0; i < 32; i++)
-	printf("%02x", repo->rpmdbcookie[i]);
-      printf("\n");
-    }
   printf("repo contains %d repodata sections:\n", repo->nrepodata);
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
@@ -46,11 +36,12 @@ dump_repodata (Repo *repo)
       if (data->dirpool.ndirs)
 	printf("  localpool has %d directories\n", data->dirpool.ndirs);
       printf("\n");
-      repodata_search(data, SOLVID_META, 0, dump_repoattrs_cb, 0);
+      repodata_search(data, SOLVID_META, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB, dump_repoattrs_cb, 0);
     }
   printf("\n");
 }
 
+#if 0
 static void
 printids(Repo *repo, char *kind, Offset ido)
 {
@@ -63,6 +54,7 @@ printids(Repo *repo, char *kind, Offset ido)
   while((id = *ids++) != 0)
     printf("  %s\n", dep2str(pool, id));
 }
+#endif
 
 int
 dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
@@ -151,11 +143,11 @@ dump_repoattrs_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 void
 dump_repoattrs(Repo *repo, Id p)
 {
-#if 1
-  repo_search(repo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE, dump_repoattrs_cb, 0);
+#if 0
+  repo_search(repo, p, 0, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB, dump_repoattrs_cb, 0);
 #else
   Dataiterator di;
-  dataiterator_init(&di, repo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE);
+  dataiterator_init(&di, repo->pool, repo, p, 0, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB);
   while (dataiterator_step(&di))
     dump_attr(repo, di.data, di.key, &di.kv);
 #endif
@@ -309,6 +301,7 @@ int main(int argc, char **argv)
 	    continue;
 	  printf("\n");
 	  printf("solvable %d (%d):\n", n, i);
+#if 0
 	  if (s->name || s->evr || s->arch)
 	    printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
 	  if (s->vendor)
@@ -326,22 +319,13 @@ int main(int argc, char **argv)
 #if 0
 	  dump_attrs (repo, n - 1);
 #endif
+#endif
 	  dump_repoattrs(repo, i);
 #if 0
 	  dump_some_attrs(repo, s);
 #endif
 	  n++;
 	}
-#if 0
-      for (i = 0; i < repo->nextra; i++)
-	{
-	  printf("\nextra %d:\n", i);
-	  Dataiterator di;
-	  dataiterator_init(&di, repo, -1 - i, 0, 0, SEARCH_EXTRA | SEARCH_NO_STORAGE_SOLVABLE);
-	  while (dataiterator_step(&di))
-	    dump_attr(repo, di.data, di.key, &di.kv);
-	}
-#endif
 #if 0
       tryme(repo, 0, SOLVABLE_MEDIANR, 0, 0);
       printf("\n");
@@ -353,7 +337,7 @@ int main(int argc, char **argv)
 #if 0
   printf ("\nSearchresults:\n");
   Dataiterator di;
-  dataiterator_init(&di, pool->repos[0], 0, 0, "3", SEARCH_EXTRA | SEARCH_SUBSTRING | SEARCH_ALL_REPOS | SEARCH_FILES);
+  dataiterator_init(&di, pool, 0, 0, 0, "3", SEARCH_SUB | SEARCH_SUBSTRING | SEARCH_FILES);
   //int count = 0;
   while (dataiterator_step(&di))
     {

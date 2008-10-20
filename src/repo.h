@@ -44,8 +44,7 @@ typedef struct _Repo {
   int idarraysize;
   Offset lastoff;
 
-  Id *rpmdbid;			/* hmm, go to repodata? */
-  unsigned char rpmdbcookie[32];
+  Id *rpmdbid;			/* solvable side data */
 
   Repodata *repodata;		/* our stores for non-solvable related data */
   unsigned nrepodata;		/* number of our stores..  */
@@ -142,6 +141,7 @@ static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int
 #define SEARCH_NEXT_KEY         1
 #define SEARCH_NEXT_SOLVABLE    2
 #define SEARCH_STOP             3
+#define SEARCH_ENTERSUB		-1
 
 typedef struct _KeyValue {
   Id id;
@@ -166,7 +166,7 @@ typedef struct _KeyValue {
 #define	SEARCH_NOCASE			(1<<8)
 #define	SEARCH_NO_STORAGE_SOLVABLE	(1<<9)
 #define SEARCH_SUB			(1<<10)
-#define SEARCH_ALL_REPOS		(1<<11)
+#define SEARCH_ARRAYSENTINEL		(1<<11)
 #define SEARCH_SKIP_KIND		(1<<12)
 
 
@@ -223,7 +223,6 @@ typedef struct _Dataiterator
 #else
 
 typedef struct _Datamatcher {
-  Pool *pool;
   int flags;
   void *match;
   int error;
@@ -264,35 +263,40 @@ typedef struct _Dataiterator
     Id *keyp;
   } parents[3];
   int nparents;
+  Id keynames[3 + 1];
+  int nkeynames;
+
 } Dataiterator;
 
 #endif
 
-void datamatcher_init(Datamatcher *ma, Pool *pool, const char *match, int flags);
+int datamatcher_init(Datamatcher *ma, const char *match, int flags);
 void datamatcher_free(Datamatcher *ma);
-int datamatcher_match(Datamatcher *ma, Repodata *data, Repokey *key, KeyValue *kv);
+int datamatcher_match(Datamatcher *ma, const char *str);
 
 /* Use these like:
      Dataiterator di;
-     dataiterator_init(&di, repo, 0, 0, "bla", SEARCH_SUBSTRING);
+     dataiterator_init(&di, repo->pool, repo, 0, 0, "bla", SEARCH_SUBSTRING);
      while (dataiterator_step(&di))
        dosomething(di.solvid, di.key, di.kv);
      dataiterator_free(&di);	*/
-void dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname,
+int dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname,
 		       const char *match, int flags);
+void dataiterator_prepend_keyname(Dataiterator *di, Id keyname);
 void dataiterator_free(Dataiterator *di);
 int dataiterator_step(Dataiterator *di);
 void dataiterator_setpos(Dataiterator *di);
 void dataiterator_setpos_parent(Dataiterator *di);
-int dataiterator_match(Dataiterator *di, int flags, const void *match);
+int dataiterator_match(Dataiterator *di, Datamatcher *ma);
 void dataiterator_skip_attribute(Dataiterator *di);
 void dataiterator_skip_solvable(Dataiterator *di);
 void dataiterator_skip_repo(Dataiterator *di);
-void dataiterator_jump_to_solvable(Dataiterator *di, Solvable *s);
+void dataiterator_jump_to_solvid(Dataiterator *di, Id solvid);
 void dataiterator_jump_to_repo(Dataiterator *di, Repo *repo);
+void dataiterator_entersub(Dataiterator *di);
 
 /* to be removed ... */
-int dataiterator_match(Dataiterator *di, int flags, const void *match);
+int dataiterator_match_obsolete(Dataiterator *di, int flags, const void *match);
 
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
 void repo_set_num(Repo *repo, Id p, Id keyname, Id num);

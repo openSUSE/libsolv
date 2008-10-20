@@ -430,12 +430,12 @@ create_stub_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue
 	    }
 	  stubdata->data = 0;
 	}
-      if (kv->eof)
+      if (kv->eof == 2)
 	return SEARCH_NEXT_SOLVABLE;
       stubdata->data = repo_add_repodata(data->repo, 0);
       stubdata->data->state = REPODATA_STUB;
       stubdata->data->loadcallback = repodata_load_stub;
-      return 0;
+      return SEARCH_ENTERSUB;
     }
   if (!stubdata->data)
     return SEARCH_NEXT_KEY;
@@ -1328,7 +1328,7 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
       struct create_stub_data stubdata;
       /* got some */
       memset(&stubdata, 0, sizeof(stubdata));
-      repodata_search(&data, SOLVID_META, REPOSITORY_EXTERNAL, create_stub_cb, &stubdata);
+      repodata_search(&data, SOLVID_META, REPOSITORY_EXTERNAL, SEARCH_ARRAYSENTINEL, create_stub_cb, &stubdata);
     }
   return 0;
 }

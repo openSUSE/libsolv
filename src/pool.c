@@ -885,7 +885,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	  if (data)
 	    {
 	      map_init(&providedids, pool->ss.nstrings);
-	      repodata_search(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addfileprovides_setid_cb, &providedids);
+	      repodata_search(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, 0, addfileprovides_setid_cb, &providedids);
 	      for (i = 0; i < cbd->nfiles; i++)
 		if (!MAPTST(&providedids, cbd->ids[i]))
 		  break;
@@ -1007,6 +1007,12 @@ pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callba
   for (p = 1; p < pool->nsolvables; p++)
     if (pool->solvables[p].repo)
       repo_search(pool->solvables[p].repo, p, key, match, flags, callback, cbdata);
+}
+
+void
+pool_clear_pos(Pool *pool)
+{
+  memset(&pool->pos, 0, sizeof(pool->pos));
 }
 
 

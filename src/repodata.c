@@ -611,6 +611,44 @@ repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep)
  * data search
  */
 
+
+int
+repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int flags)
+{
+  switch (key->type)
+    {
+    case REPOKEY_TYPE_ID:
+    case REPOKEY_TYPE_CONSTANTID:
+    case REPOKEY_TYPE_IDARRAY:
+      if (data && data->localpool)
+	kv->str = stringpool_id2str(&data->spool, kv->id);
+      else
+	kv->str = id2str(pool, kv->id);
+      if ((flags & SEARCH_SKIP_KIND) != 0 && key->storage == KEY_STORAGE_SOLVABLE)
+	{
+	  const char *s = strchr(kv->str, ':');
+	  if (s)
+	    kv->str = s + 1;
+	}
+      return 1;
+    case REPOKEY_TYPE_STR:
+      return 1;
+    case REPOKEY_TYPE_DIRSTRARRAY:
+      if (!(flags & SEARCH_FILES))
+	return 1;	/* match just the basename */
+      /* Put the full filename into kv->str.  */
+      kv->str = repodata_dir2str(data, kv->id, kv->str);
+      /* And to compensate for that put the "empty" directory into
+	 kv->id, so that later calls to repodata_dir2str on this data
+	 come up with the same filename again.  */
+      kv->id = 0;
+      return 1;
+    default:
+      return 0;
+    }
+}
+
+
 struct subschema_data {
   Solvable *s;
   void *cbdata;
@@ -619,7 +657,7 @@ struct subschema_data {
 
 /* search a specific repodata */
 void
-repodata_search(Repodata *data, Id solvid, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
 {
   Id schema;
   Repokey *key;
@@ -686,6 +724,8 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int (*callback)(void *cbd
 	  kv.eof = 0;
           while (ddp && nentries > 0)
 	    {
+	      if (!--nentries)
+		kv.eof = 1;
 	      if (key->type == REPOKEY_TYPE_FLEXARRAY || !kv.entry)
 	        ddp = data_read_id(ddp, &schema);
 	      kv.id = schema;
@@ -693,18 +733,17 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int (*callback)(void *cbd
 	      stop = callback(cbdata, s, data, key, &kv);
 	      if (stop > SEARCH_NEXT_KEY)
 		return;
-	      if (stop)
+	      if (stop && stop != SEARCH_ENTERSUB)
 		break;
-	      if (!keyname)
-	        repodata_search(data, SOLVID_SUBSCHEMA, 0, callback, &subd);
+	      if ((flags & SEARCH_SUB) != 0 || stop == SEARCH_ENTERSUB)
+	        repodata_search(data, SOLVID_SUBSCHEMA, 0, flags, callback, &subd);
 	      ddp = data_skip_schema(data, ddp, schema);
-	      nentries--;
 	      kv.entry++;
 	    }
-	  if (!nentries)
+	  if (!nentries && (flags & SEARCH_ARRAYSENTINEL) != 0)
 	    {
 	      /* sentinel */
-	      kv.eof = 1;
+	      kv.eof = 2;
 	      kv.str = (char *)ddp;
 	      stop = callback(cbdata, s, data, key, &kv);
 	      if (stop > SEARCH_NEXT_KEY)
@@ -734,15 +773,10 @@ repodata_setpos_kv(Repodata *data, KeyValue *kv)
 {
   Pool *pool = data->repo->pool;
   if (!kv)
-    {
-      pool->pos.repo = 0;
-      pool->pos.repodataid = 0;
-      pool->pos.dp = 0;
-      pool->pos.schema = 0;
-    }
+    pool_clear_pos(pool);
   else
     {
-      pool->pos.repo = 0;
+      pool->pos.repo = data->repo;
       pool->pos.repodataid = data - data->repo->repodata;
       pool->pos.dp = (unsigned char *)kv->str - data->incoredata;
       pool->pos.schema = kv->id;
@@ -819,10 +853,9 @@ solvabledata_fetch(Solvable *s, KeyValue *kv, Id keyname)
     }
 }
 
-void
-datamatcher_init(Datamatcher *ma, Pool *pool, const char *match, int flags)
+int
+datamatcher_init(Datamatcher *ma, const char *match, int flags)
 {
-  ma->pool = pool;
   ma->match = (void *)match;
   ma->flags = flags;
   ma->error = 0;
@@ -837,6 +870,7 @@ datamatcher_init(Datamatcher *ma, Pool *pool, const char *match, int flags)
 	  ma->flags = (flags & ~SEARCH_STRINGMASK) | SEARCH_ERROR;
 	}
     }
+  return ma->error;
 }
 
 void
@@ -850,72 +884,40 @@ datamatcher_free(Datamatcher *ma)
 }
 
 int
-datamatcher_match(Datamatcher *ma, Repodata *data, Repokey *key, KeyValue *kv)
+datamatcher_match(Datamatcher *ma, const char *str)
 {
-  switch (key->type)
-    {
-    case REPOKEY_TYPE_ID:
-    case REPOKEY_TYPE_IDARRAY:
-      if (data && data->localpool)
-	kv->str = stringpool_id2str(&data->spool, kv->id);
-      else
-	kv->str = id2str(ma->pool, kv->id);
-      break;
-    case REPOKEY_TYPE_STR:
-      break;
-    case REPOKEY_TYPE_DIRSTRARRAY:
-      if (!(ma->flags & SEARCH_FILES))
-	return 0;
-      /* Put the full filename into kv->str.  */
-      kv->str = repodata_dir2str(data, kv->id, kv->str);
-      /* And to compensate for that put the "empty" directory into
-	 kv->id, so that later calls to repodata_dir2str on this data
-	 come up with the same filename again.  */
-      kv->id = 0;
-      break;
-    default:
-      return 0;
-    }
-  /* Maybe skip the kind specifier.  Do this only for SOLVABLE attributes,
-     for the others we can't know if a colon separates a kind or not.  */
-  if ((ma->flags & SEARCH_SKIP_KIND) != 0 && key->storage == KEY_STORAGE_SOLVABLE)
-    {
-      const char *s = strchr(kv->str, ':');
-      if (s)
-	kv->str = s + 1;
-    }
   switch ((ma->flags & SEARCH_STRINGMASK))
     {
     case SEARCH_SUBSTRING:
       if (ma->flags & SEARCH_NOCASE)
 	{
-	  if (!strcasestr(kv->str, (const char *)ma->match))
+	  if (!strcasestr(str, (const char *)ma->match))
 	    return 0;
 	}
       else
 	{
-	  if (!strstr(kv->str, (const char *)ma->match))
+	  if (!strstr(str, (const char *)ma->match))
 	    return 0;
 	}
       break;
     case SEARCH_STRING:
       if (ma->flags & SEARCH_NOCASE)
 	{
-	  if (strcasecmp((const char *)ma->match, kv->str))
+	  if (strcasecmp((const char *)ma->match, str))
 	    return 0;
 	}
       else
 	{
-	  if (strcmp((const char *)ma->match, kv->str))
+	  if (strcmp((const char *)ma->match, str))
 	    return 0;
 	}
       break;
     case SEARCH_GLOB:
-      if (fnmatch((const char *)ma->match, kv->str, (ma->flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
+      if (fnmatch((const char *)ma->match, str, (ma->flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
 	return 0;
       break;
     case SEARCH_REGEX:
-      if (regexec((const regex_t *)ma->match, kv->str, 0, NULL, 0))
+      if (regexec((const regex_t *)ma->match, str, 0, NULL, 0))
 	return 0;
       break;
     default:
@@ -930,6 +932,7 @@ enum {
   di_enterrepo,
   di_entersolvable,
   di_enterrepodata,
+  di_enterschema,
   di_enterkey,
 
   di_nextattr,
@@ -949,36 +952,55 @@ enum {
   di_entersolvablekey
 };
 
-void
-dataiterator_init(Dataiterator *di, Repo *repo, Id p, Id keyname, const char *match, int flags)
+int
+dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, const char *match, int flags)
 {
   memset(di, 0, sizeof(*di));
-  di->repo = repo;
-  di->keyname = keyname;
-  di->solvid = p;
-  di->pool = repo->pool;
-  if (p)
-    flags |= SEARCH_THISSOLVID;
-  di->flags = flags;
-  if (repo && !(flags & SEARCH_ALL_REPOS))
-    di->repoid = -1;
-  else
-    di->repo = di->pool->repos[0];
+  di->pool = pool;
   if (match)
-    datamatcher_init(&di->matcher, di->pool, match, flags);
-  if (p == SOLVID_POS)
     {
-      di->repo = di->pool->pos.repo;
-      if (!di->repo)
+      int error;
+      if ((error = datamatcher_init(&di->matcher, match, flags)) != 0)
 	{
 	  di->state = di_bye;
-	  return;
+	  return error;
 	}
-      di->data = di->repo->repodata + di->pool->pos.repodataid;
-      di->repoid = -1;
-      di->repodataid = -1;
     }
-  di->state = di_enterrepo;
+  di->repo = repo;
+  di->keyname = keyname;
+  di->keynames[0] = keyname;
+  di->flags = flags & ~SEARCH_THISSOLVID;
+  if (!pool->nrepos)
+    {
+      di->state = di_bye;
+      return 0;
+    }
+  if (repo)
+    di->repoid = -1;
+  if (p)
+    dataiterator_jump_to_solvid(di, p);
+  else
+    {
+      di->repo = pool->repos[0];
+      di->state = di_enterrepo;
+    }
+  return 0;
+}
+
+void
+dataiterator_prepend_keyname(Dataiterator *di, Id keyname)
+{
+  int i;
+
+  if (di->nkeynames >= sizeof(di->keynames)/sizeof(*di->keynames) - 2)
+    {
+      di->state = di_bye;	/* sorry */
+      return;
+    }
+  for (i = di->nkeynames + 1; i > 0; i--)
+    di->keynames[i] = di->keynames[i - 1];
+  di->keynames[0] = di->keyname = keyname;
+  di->nkeynames++;
 }
 
 void
@@ -995,20 +1017,9 @@ dataiterator_find_keyname(Dataiterator *di, Id keyname)
   Repokey *keys = di->data->keys;
   unsigned char *dp;
 
-  if (!(di->flags & SEARCH_SUB))
-    {
-      for (keyp = di->keyp; *keyp; keyp++)
-	if (keys[*keyp].name == di->keyname)
-	  break;
-    }
-  else
-    {
-      for (keyp++; *keyp; keyp++)
-	if (keys[*keyp].name == di->keyname || 
-	    keys[*keyp].type == REPOKEY_TYPE_FIXARRAY || 
-	    keys[*keyp].type == REPOKEY_TYPE_FLEXARRAY)
-	  break;
-    }
+  for (keyp = di->keyp; *keyp; keyp++)
+    if (keys[*keyp].name == keyname)
+      break;
   if (!*keyp)
     return 0;
   dp = forward_to_key(di->data, *keyp, di->keyp, di->dp);
@@ -1029,13 +1040,16 @@ dataiterator_step(Dataiterator *di)
 	{
 	case di_enterrepo: di_enterrepo:
 	  if (!(di->flags & SEARCH_THISSOLVID))
-	    di->solvid = di->repo->start;
+	    {
+	      di->solvid = di->repo->start - 1;	/* reset solvid iterator */
+	      goto di_nextsolvable;
+	    }
 	  /* FALLTHROUGH */
 
 	case di_entersolvable: di_entersolvable:
 	  if (di->repodataid >= 0)
 	    {
-	      di->repodataid = 0;
+	      di->repodataid = 0;	/* reset repodata iterator */
 	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)))
 		{
 		  di->key = solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
@@ -1057,12 +1071,18 @@ dataiterator_step(Dataiterator *di)
 	  di->dp = solvid2data(di->data, di->solvid, &schema);
 	  if (!di->dp)
 	    goto di_nextrepodata;
+	  /* reset key iterator */
 	  di->keyp = di->data->schemadata + di->data->schemata[schema];
+	  /* FALLTHROUGH */
+
+	case di_enterschema: di_enterschema:
 	  if (di->keyname)
+	    di->dp = dataiterator_find_keyname(di, di->keyname);
+	  if (!di->dp || !*di->keyp)
 	    {
-	      di->dp = dataiterator_find_keyname(di, di->keyname);
-	      if (!di->dp)
-		goto di_nextrepodata;
+	      if (di->kv.parent)
+		goto di_leavesub;
+	      goto di_nextrepodata;
 	    }
 	  /* FALLTHROUGH */
 
@@ -1074,6 +1094,8 @@ dataiterator_step(Dataiterator *di)
 	    goto di_nextkey;
 	  if (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY)
 	    goto di_enterarray;
+	  if (di->nparents < di->nkeynames)
+	    goto di_nextkey;
 	  /* FALLTHROUGH */
 
 	case di_nextattr:
@@ -1086,17 +1108,8 @@ dataiterator_step(Dataiterator *di)
 	  break;
 
 	case di_nextkey: di_nextkey:
-	  if (!di->keyname)
-	    {
-	      if (*++di->keyp)
-		goto di_enterkey;
-	    }
-	  else if ((di->flags & SEARCH_SUB) != 0)
-	    {
-	      di->dp = dataiterator_find_keyname(di, di->keyname);
-	      if (di->dp)
-		goto di_enterkey;
-	    }
+	  if (!di->keyname && *++di->keyp)
+	    goto di_enterkey;
 	  if (di->kv.parent)
 	    goto di_leavesub;
 	  /* FALLTHROUGH */
@@ -1138,6 +1151,8 @@ dataiterator_step(Dataiterator *di)
 	  return 0;
 
 	case di_enterarray: di_enterarray:
+	  if (di->key->name == REPOSITORY_SOLVABLES)
+	    goto di_nextkey;
 	  di->ddp = data_read_id(di->ddp, &di->kv.num);
 	  di->kv.eof = 0;
 	  di->kv.entry = -1;
@@ -1149,17 +1164,21 @@ dataiterator_step(Dataiterator *di)
 	    di->ddp = data_skip_schema(di->data, di->ddp, di->kv.id);
 	  if (di->kv.entry == di->kv.num)
 	    {
-	      if (di->keyname && di->key->name != di->keyname)
+	      if (di->nparents < di->nkeynames)
+		goto di_nextkey;
+	      if (!(di->flags & SEARCH_ARRAYSENTINEL))
 		goto di_nextkey;
 	      di->kv.str = (char *)di->ddp;
-	      di->kv.eof = 1;
+	      di->kv.eof = 2;
 	      di->state = di_nextkey;
 	      break;
 	    }
+	  if (di->kv.entry == di->kv.num - 1)
+	    di->kv.eof = 1;
 	  if (di->key->type == REPOKEY_TYPE_FLEXARRAY || !di->kv.entry)
 	    di->ddp = data_read_id(di->ddp, &di->kv.id);
 	  di->kv.str = (char *)di->ddp;
-	  if (di->keyname && di->key->name != di->keyname)
+	  if (di->nparents < di->nkeynames)
 	    goto di_entersub;
 	  if ((di->flags & SEARCH_SUB) != 0)
 	    di->state = di_entersub;
@@ -1178,8 +1197,8 @@ dataiterator_step(Dataiterator *di)
 	  memset(&di->kv, 0, sizeof(di->kv));
 	  di->kv.parent = &di->parents[di->nparents].kv;
 	  di->nparents++;
-	  di->keyp--;
-	  goto di_nextkey;
+	  di->keyname = di->keynames[di->nparents];
+	  goto di_enterschema;
 
 	case di_leavesub: di_leavesub:
 	  di->nparents--;
@@ -1188,6 +1207,7 @@ dataiterator_step(Dataiterator *di)
 	  di->keyp = di->parents[di->nparents].keyp;
 	  di->key = di->data->keys + *di->keyp;
 	  di->ddp = (unsigned char *)di->kv.str;
+	  di->keyname = di->keynames[di->nparents];
 	  goto di_nextarrayelement;
 
         /* special solvable attr handling follows */
@@ -1225,8 +1245,16 @@ dataiterator_step(Dataiterator *di)
 	}
 
       if (di->matcher.match)
-	if (!datamatcher_match(&di->matcher, di->data, di->key, &di->kv))
+	{
+	  if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags))
+	    {
+	      if (di->keyname && (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY))
+		return 1;
+	      continue;
+	    }
+	  if (!datamatcher_match(&di->matcher, di->kv.str))
 	  continue;
+	}
       /* found something! */
       return 1;
     }
@@ -1244,9 +1272,10 @@ dataiterator_setpos(Dataiterator *di)
 {
   if (di->kv.eof)
     {
-      memset(&di->pool->pos, 0, sizeof(di->pool->pos));
+      pool_clear_pos(di->pool);
       return;
     }
+  di->pool->pos.solvid = di->solvid;
   di->pool->pos.repo = di->repo;
   di->pool->pos.repodataid = di->data - di->repo->repodata;
   di->pool->pos.schema = di->kv.id;
@@ -1258,9 +1287,10 @@ dataiterator_setpos_parent(Dataiterator *di)
 {
   if (!di->kv.parent)
     {
-      memset(&di->pool->pos, 0, sizeof(di->pool->pos));
+      pool_clear_pos(di->pool);
       return;
     }
+  di->pool->pos.solvid = di->solvid;
   di->pool->pos.repo = di->repo;
   di->pool->pos.repodataid = di->data - di->repo->repodata;
   di->pool->pos.schema = di->kv.parent->id;
@@ -1289,30 +1319,78 @@ dataiterator_skip_repo(Dataiterator *di)
 }
 
 void
-dataiterator_jump_to_solvable(Dataiterator *di, Solvable *s)
+dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
 {
-  di->repo = s->repo;
-  di->repoid = -1;
-  di->solvid = s - di->pool->solvables;
+  di->nparents = 0;
+  if (solvid == SOLVID_POS)
+    {
+      di->repo = di->pool->pos.repo;
+      if (!di->repo)
+	{
+	  di->state = di_bye;
+	  return;
+	}
+      di->repoid = -1;
+      di->data = di->repo->repodata + di->pool->pos.repodataid;
+      di->repodataid = -1;
+      di->solvid = di->pool->pos.solvid;
+      di->state = di_enterrepo;
+      di->flags |= SEARCH_THISSOLVID;
+      return;
+    }
+  if (solvid > 0)
+    {
+      di->repo = di->pool->solvables[solvid].repo;
+      di->repoid = -1;
+    }
+  else if (di->repoid >= 0)
+    {
+      if (!di->pool->nrepos)
+	{
+	  di->state = di_bye;
+	  return;
+	}
+      di->repo = di->pool->repos[0];
+      di->repoid = 0;
+    }
+  di->repodataid = 0;
+  di->solvid = solvid;
+  if (solvid)
+    di->flags |= SEARCH_THISSOLVID;
   di->state = di_entersolvable;
 }
 
 void
 dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
 {
+  di->nparents = 0;
   di->repo = repo;
   di->repoid = -1;
+  di->repodataid = 0;
+  di->solvid = 0;
+  di->flags &= ~SEARCH_THISSOLVID;
   di->state = di_enterrepo;
 }
 
 int
-dataiterator_match(Dataiterator *di, int flags, const void *vmatch)
+dataiterator_match(Dataiterator *di, Datamatcher *ma)
 {
-  Datamatcher matcher = di->matcher;
+  if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags))
+    return 0;
+  return datamatcher_match(ma, di->kv.str);
+}
+
+int
+dataiterator_match_obsolete(Dataiterator *di, int flags, const void *vmatch)
+{
+  Datamatcher matcher;
+
+  if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, flags))
+    return 0;
+  matcher = di->matcher;
   matcher.flags = flags;
   matcher.match = (void *)vmatch;
-  matcher.pool = di->pool;
-  return datamatcher_match(&matcher, di->data, di->key, &di->kv);
+  return datamatcher_match(&matcher, di->kv.str);
 }
 
 

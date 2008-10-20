@@ -126,7 +126,9 @@ repodata_precheck_keyname(Repodata *data, Id keyname)
 /* Search key <keyname> (all keys, if keyname == 0) for Id <solvid>
  * Call <callback> for each match
  */
-void repodata_search(Repodata *data, Id solvid, Id keyname, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
+void repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata);
+int repodata_stringify(Pool *pool, Repodata *data, struct _Repokey *key, struct _KeyValue *kv, int flags);
+
 
 /* lookup functions */
 Id repodata_lookup_id(Repodata *data, Id solvid, Id keyname);

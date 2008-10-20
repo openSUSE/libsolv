@@ -581,8 +581,13 @@ repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValu
 {
   struct matchdata *md = cbdata;
 
-  if (md->matcher.match && !datamatcher_match(&md->matcher, data, key, kv))
-    return 0;
+  if (md->matcher.match)
+    {
+      if (!repodata_stringify(md->pool, data, key, kv, md->flags))
+	return 0;
+      if (!datamatcher_match(&md->matcher, kv->str))
+	return 0;
+    }
   md->stop = md->callback(md->callback_data, s, data, key, kv);
   return md->stop;
 }
@@ -762,7 +767,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	}
       if (data->state == REPODATA_ERROR)
 	continue;
-      repodata_search(data, p, keyname, repo_matchvalue, md);
+      repodata_search(data, p, keyname, md->flags, repo_matchvalue, md);
       if (md->stop > SEARCH_NEXT_KEY)
 	break;
     }
@@ -779,7 +784,7 @@ repo_search(Repo *repo, Id p, Id keyname, const char *match, int flags, int (*ca
   md.callback = callback;
   md.callback_data = cbdata;
   if (match)
-    datamatcher_init(&md.matcher, md.pool, match, flags);
+    datamatcher_init(&md.matcher, match, flags);
   repo_search_md(repo, p, keyname, &md);
   if (match)
     datamatcher_free(&md.matcher);
