@@ -12,7 +12,7 @@ FIND_LIBRARY(CHECK_LIBRARY NAMES check)
 # handle the QUIETLY and REQUIRED arguments and set CHECK_FOUND to TRUE if
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(CHECK "Please install 'check' and 'check-devel' packages" CHECK_LIBRARY CHECK_INCLUDE_DIR)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(Check "Please install 'check' and 'check-devel' packages" CHECK_LIBRARY CHECK_INCLUDE_DIR)
 
 IF(CHECK_FOUND)
   SET( CHECK_LIBRARIES ${CHECK_LIBRARY} )
