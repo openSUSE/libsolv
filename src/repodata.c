@@ -1045,6 +1045,8 @@ dataiterator_step(Dataiterator *di)
       switch (di->state)
 	{
 	case di_enterrepo: di_enterrepo:
+	  if (!di->repo)
+	    goto di_bye;
 	  if (!(di->flags & SEARCH_THISSOLVID))
 	    {
 	      di->solvid = di->repo->start - 1;	/* reset solvid iterator */
@@ -1363,7 +1365,7 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
   di->solvid = solvid;
   if (solvid)
     di->flags |= SEARCH_THISSOLVID;
-  di->state = di_entersolvable;
+  di->state = di_enterrepo;
 }
 
 void
