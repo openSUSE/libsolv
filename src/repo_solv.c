@@ -299,6 +299,7 @@ data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *err
  * functions to add data to our incore memory space
  */
 
+#define INCORE_ADD_CHUNK 8192
 
 static void
 incore_add_id(Repodata *data, Id x)
@@ -307,8 +308,8 @@ incore_add_id(Repodata *data, Id x)
   /* make sure we have at least 5 bytes free */
   if (data->incoredatafree < 5)
     {
-      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + 1024);
-      data->incoredatafree = 1024;
+      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK);
+      data->incoredatafree = INCORE_ADD_CHUNK;
     }
   dp = data->incoredata + data->incoredatalen;
   if (x < 0)
@@ -333,8 +334,8 @@ incore_add_blob(Repodata *data, unsigned char *buf, int len)
 {
   if (data->incoredatafree < len)
     {
-      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + 1024 + len);
-      data->incoredatafree = 1024 + len;
+      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK + len);
+      data->incoredatafree = INCORE_ADD_CHUNK + len;
     }
   memcpy(data->incoredata + data->incoredatalen, buf, len);
   data->incoredatafree -= len;
@@ -374,8 +375,8 @@ incore_add_u32(Repodata *data, unsigned int x)
   /* make sure we have at least 4 bytes free */
   if (data->incoredatafree < 4)
     {
-      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + 1024);
-      data->incoredatafree = 1024;
+      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK);
+      data->incoredatafree = INCORE_ADD_CHUNK;
     }
   dp = data->incoredata + data->incoredatalen;
   *dp++ = x >> 24;
@@ -535,6 +536,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   int left;
   Id stack[10];
   int keydepth;
+  int needchunk;	/* need a new chunk of data */
 
   struct _Stringpool *spool;
 
@@ -1007,6 +1009,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   nentries = 0;
   keydepth = 0;
   s = 0;
+  needchunk = 1;
   for(;;)
     {
       key = *keyp++;
@@ -1015,6 +1018,8 @@ printf("key %d at %d\n", key, keyp - 1 - schemadata);
 #endif
       if (!key)
 	{
+	  if (keydepth <= 2)
+	    needchunk = 1;
 	  if (nentries)
 	    {
 	      if (s && keydepth == 2)
@@ -1041,10 +1046,10 @@ printf("pop flexarray %d %d\n", keydepth, nentries);
 	  continue;
 	}
 
-      if (keydepth <= 2)
+      if (keydepth == 0)
+	data.mainschemaoffsets[keyp - 1 - (schemadata + schemata[data.mainschema])] = data.incoredatalen;
+      if (needchunk)
 	{
-	  if (keydepth == 0)
-	    data.mainschemaoffsets[keyp - 1 - (schemadata + schemata[data.mainschema])] = data.incoredatalen;
 	  /* read data chunk to dp */
 	  if (data.error)
 	    break;
@@ -1069,6 +1074,7 @@ printf("pop flexarray %d %d\n", keydepth, nentries);
 	  allsize -= l;
 	  left += l;
 	  dp = buf;
+	  needchunk = 0;
 	}
 
 #if 0
