@@ -1048,7 +1048,7 @@ printf("pop flexarray %d %d\n", keydepth, nentries);
 
       if (keydepth == 0)
 	data.mainschemaoffsets[keyp - 1 - (schemadata + schemata[data.mainschema])] = data.incoredatalen;
-      if (needchunk)
+      if (keydepth == 0 || needchunk)
 	{
 	  /* read data chunk to dp */
 	  if (data.error)
