@@ -2628,7 +2628,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
        * decide
        */
 
-      POOL_DEBUG(SAT_DEBUG_STATS, "deciding unresolved rules\n");
+      POOL_DEBUG(SAT_DEBUG_POLICY, "deciding unresolved rules\n");
       for (i = 1, n = 1; ; i++, n++)
 	{
 	  if (n == solv->nrules)
@@ -2717,7 +2717,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	{
 	  int qcount;
 
-	  POOL_DEBUG(SAT_DEBUG_STATS, "installing recommended packages\n");
+	  POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended packages\n");
 	  queue_empty(&dq);
 	  queue_empty(&dqs);
 	  for (i = 1; i < pool->nsolvables; i++)
@@ -2806,7 +2806,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (dq.count > 1)
 	        policy_filter_unwanted(solv, &dq, 0, POLICY_MODE_RECOMMEND);
 	      p = dq.elements[0];
-	      POOL_DEBUG(SAT_DEBUG_STATS, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
+	      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
 	      queue_push(&solv->recommendations, p);
 	      level = setpropagatelearn(solv, level, p, 0);
 	      continue;
@@ -3791,7 +3791,7 @@ removedisabledconflicts(Solver *solv, Queue *removed)
   Rule *r;
   Id *decisionmap = solv->decisionmap;
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "removedisabledconflicts\n");
+  POOL_DEBUG(SAT_DEBUG_SCHUBI, "removedisabledconflicts\n");
   queue_empty(removed);
   for (i = 0; i < solv->decisionq.count; i++)
     {
@@ -3806,7 +3806,7 @@ removedisabledconflicts(Solver *solv, Queue *removed)
       if (r->d < 0 && decisionmap[-p])
 	{
 	  /* rule is now disabled, remove from decisionmap */
-	  POOL_DEBUG(SAT_DEBUG_STATS, "removing conflict for package %s[%d]\n", solvable2str(pool, pool->solvables - p), -p);
+	  POOL_DEBUG(SAT_DEBUG_SCHUBI, "removing conflict for package %s[%d]\n", solvable2str(pool, pool->solvables - p), -p);
 	  queue_push(removed, -p);
 	  queue_push(removed, decisionmap[-p]);
 	  decisionmap[-p] = 0;
@@ -3869,7 +3869,7 @@ removedisabledconflicts(Solver *solv, Queue *removed)
 	}
       if (new)
 	{
-	  POOL_DEBUG(SAT_DEBUG_STATS, "re-conflicting package %s[%d]\n", solvable2str(pool, pool->solvables - new), -new);
+	  POOL_DEBUG(SAT_DEBUG_SCHUBI, "re-conflicting package %s[%d]\n", solvable2str(pool, pool->solvables - new), -new);
 	  decisionmap[-new] = -1;
 	  new = 0;
 	  n = 0;	/* redo all rules */
