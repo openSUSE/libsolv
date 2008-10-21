@@ -1154,7 +1154,7 @@ dataiterator_step(Dataiterator *di)
 	    }
 	/* FALLTHROUGH */
 
-	case di_bye:
+	case di_bye: di_bye:
 	  di->state = di_bye;
 	  return 0;
 
