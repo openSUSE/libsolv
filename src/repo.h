@@ -274,12 +274,32 @@ int datamatcher_init(Datamatcher *ma, const char *match, int flags);
 void datamatcher_free(Datamatcher *ma);
 int datamatcher_match(Datamatcher *ma, const char *str);
 
-/* Use these like:
-     Dataiterator di;
-     dataiterator_init(&di, repo->pool, repo, 0, 0, "bla", SEARCH_SUBSTRING);
-     while (dataiterator_step(&di))
-       dosomething(di.solvid, di.key, di.kv);
-     dataiterator_free(&di);	*/
+/*
+ * Dataiterator
+ * 
+ * Iterator like interface to 'search' functionality
+ * 
+ * Dataiterator is per-pool, additional filters can be applied
+ * to limit the search domain. See dataiterator_init below.
+ * 
+ * Use these like:
+ *    Dataiterator di;
+ *    dataiterator_init(&di, repo->pool, repo, 0, 0, "bla", SEARCH_SUBSTRING);
+ *    while (dataiterator_step(&di))
+ *      dosomething(di.solvid, di.key, di.kv);
+ *    dataiterator_free(&di);
+ */
+
+/*
+ * Initialize dataiterator
+ * 
+ * di:      Pointer to Dataiterator to be initialized
+ * pool:    Search domain for the iterator
+ * repo:    if non-null, limit search to this repo
+ * solvid:  if non-null, limit search to this solvable
+ * keyname: if non-null, limit search to this keyname
+ * match:   if non-null, limit search to this match
+ */
 int dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname,
 		       const char *match, int flags);
 void dataiterator_prepend_keyname(Dataiterator *di, Id keyname);
