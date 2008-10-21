@@ -958,21 +958,10 @@ dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, co
 {
   memset(di, 0, sizeof(*di));
   di->pool = pool;
-  if (!pool)
+  if (!pool || (repo && repo->pool != pool))
     {
-      fprintf(stderr, "dataiterator_init: no Pool given\n");
       di->state = di_bye;
       return -1;
-    }
-  if (repo)
-    {
-      if (repo->pool != pool)
-	{
-	  fprintf(stderr, "dataiterator_init: repo from different pool\n");
-	  di->state = di_bye;
-	  return -1;
-	}
-      
     }
   if (match)
     {
