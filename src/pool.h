@@ -54,13 +54,15 @@ typedef struct _Repopos {
 struct _Pool {
   struct _Stringpool ss;
 
-  Reldep *rels;               // table of rels: Id -> Reldep
-  int nrels;                  // number of unique rels
-  Hashtable relhashtbl;       // hash table: (name,evr,op ->) Hash -> Id
+  Reldep *rels;			/* table of rels: Id -> Reldep */
+  int nrels;			/* number of unique rels */
+  Hashtable relhashtbl;		/* hashtable: (name,evr,op)Hash -> Id */
   Hashmask relhashmask;
 
   struct _Repo **repos;
   int nrepos;
+
+  struct _Repo *installed; 	/* packages considered installed */
 
   Solvable *solvables;
   int nsolvables;
@@ -163,6 +165,8 @@ extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribut
 
 extern char *pool_alloctmpspace(Pool *pool, int len);
 
+extern void pool_set_installed(Pool *pool, struct _Repo *repo);
+
 /**
  * Solvable management
  */
@@ -212,7 +216,7 @@ static inline int pool_match_nevr(Pool *pool, Solvable *s, Id d)
  * Prepares a pool for solving
  */
 extern void pool_createwhatprovides(Pool *pool);
-extern void pool_addfileprovides(Pool *pool, struct _Repo *installed);
+extern void pool_addfileprovides(Pool *pool);
 extern void pool_addfileprovides_ids(Pool *pool, struct _Repo *installed, Id **idp);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
@@ -280,9 +284,9 @@ typedef struct _duchanges {
   int files;
 } DUChanges;
 
-void pool_calc_duchanges(Pool *pool, struct _Repo *oldinstalled, Map *installedmap, DUChanges *mps, int nmps);
-int pool_calc_installsizechange(Pool *pool, struct _Repo *oldinstalled, Map *installedmap);
-void pool_trivial_installable(Pool *pool, struct _Repo *oldinstalled, Map *installedmap, Queue *pkgs, Queue *res);
+void pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps);
+int pool_calc_installsizechange(Pool *pool, Map *installedmap);
+void pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res);
 
 
 /* loop over all providers of d */

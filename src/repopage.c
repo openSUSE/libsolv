@@ -704,7 +704,9 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 						  dest, BLOB_PAGESIZE);
 	      if (out_len != BLOB_PAGESIZE && i < store->num_pages - 1)
 	        {
+#ifdef DEBUG_PAGING
 	          fprintf(stderr, "can't decompress\n");
+#endif
 		  return 0;
 		}
 #ifdef DEBUG_PAGING
@@ -801,8 +803,6 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
 	  p->file_size = in_len * 2 + compressed;
 	  if (fseek(fp, in_len, SEEK_CUR) < 0)
 	    {
-	      perror ("fseek");
-	      fprintf (stderr, "can't seek after we thought we can\n");
 	      /* We can't fall back to non-seeking behaviour as we already
 	         read over some data pages without storing them away.  */
 	      close(store->pagefd);

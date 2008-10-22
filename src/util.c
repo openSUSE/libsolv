@@ -18,7 +18,8 @@ sat_oom(size_t num, size_t len)
   if (num)
     fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
   else
-    fprintf(stderr, "Out of memory allocating %zu bytes!\n", num);
+    fprintf(stderr, "Out of memory allocating %zu bytes!\n", len);
+  abort();
   exit(1);
 }
 
@@ -55,7 +56,7 @@ void *
 sat_realloc2(void *old, size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
-   sat_oom(num, len);
+    sat_oom(num, len);
   return sat_realloc(old, num * len);
 }
 

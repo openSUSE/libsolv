@@ -1758,10 +1758,7 @@ repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
   if (!l)
     return;
   if (hexstr2bytes(buf, str, l) != l)
-    {
-      fprintf(stderr, "Invalid hex character in '%s'\n", str);
-      return;
-    }
+    return;
   repodata_set_bin_checksum(data, solvid, keyname, type, buf);
 }
 
@@ -2020,7 +2017,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	      schemaid = repodata_schema2id(data, schema, 1);
 	    else if (schemaid != repodata_schema2id(data, schema, 0))
 	      {
-		fprintf(stderr, "  not yet implemented: substructs with different schemas\n");
+	 	pool_debug(data->repo->pool, SAT_FATAL, "substructs with different schemas\n");
 		exit(1);
 	      }
 #if 0
@@ -2074,7 +2071,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	break;
       }
     default:
-      fprintf(stderr, "don't know how to handle type %d\n", key->type);
+      pool_debug(data->repo->pool, SAT_FATAL, "don't know how to handle type %d\n", key->type);
       exit(1);
     }
   if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
@@ -2149,7 +2146,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	{
 	  if (seen[*keyp])
 	    {
-	      fprintf(stderr, "Inconsistent old data (key occured twice).\n");
+	      pool_debug(data->repo->pool, SAT_FATAL, "Inconsistent old data (key occured twice).\n");
 	      exit(1);
 	    }
 	  seen[*keyp] = -1;

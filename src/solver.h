@@ -262,7 +262,7 @@ typedef enum {
 } SolverProbleminfo;
 
 
-extern Solver *solver_create(Pool *pool, Repo *installed);
+extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern void solver_solve(Solver *solv, Queue *job);
 extern int solver_dep_installed(Solver *solv, Id dep);

@@ -275,6 +275,8 @@ repo_free(Repo *repo, int reuseids)
   int i;
 
   pool_freewhatprovides(pool);
+  if (repo == pool->installed)
+    pool->installed = 0;
 
   if (reuseids && repo->end == pool->nsolvables)
     {

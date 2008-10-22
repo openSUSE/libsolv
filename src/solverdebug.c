@@ -566,7 +566,7 @@ solver_printtrivial(Solver *solv)
     }
   solver_create_state_maps(solv, &installedmap, 0); 
   queue_init(&out);
-  pool_trivial_installable(pool, solv->installed, &installedmap, &in, &out);
+  pool_trivial_installable(pool, &installedmap, &in, &out);
   POOL_DEBUG(SAT_DEBUG_RESULT, "trivial installable status:\n");
   for (i = 0; i < in.count; i++)
     POOL_DEBUG(SAT_DEBUG_RESULT, "  %s: %d\n", solvable2str(pool, pool->solvables + in.elements[i]), out.elements[i]);

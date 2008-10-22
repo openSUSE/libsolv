@@ -2320,12 +2320,12 @@ selectandinstall(Solver *solv, int level, Queue *dq, Id inst, int disablerules)
  */
 
 Solver *
-solver_create(Pool *pool, Repo *installed)
+solver_create(Pool *pool)
 {
   Solver *solv;
   solv = (Solver *)sat_calloc(1, sizeof(Solver));
   solv->pool = pool;
-  solv->installed = installed;
+  solv->installed = pool->installed;
 
   queue_init(&solv->ruletojob);
   queue_init(&solv->decisionq);
@@ -2343,7 +2343,7 @@ solver_create(Pool *pool, Repo *installed)
 
   map_init(&solv->recommendsmap, pool->nsolvables);
   map_init(&solv->suggestsmap, pool->nsolvables);
-  map_init(&solv->noupdate, installed ? installed->end - installed->start : 0);
+  map_init(&solv->noupdate, solv->installed ? solv->installed->end - solv->installed->start : 0);
   solv->recommends_index = 0;
 
   solv->decisionmap = (Id *)sat_calloc(pool->nsolvables, sizeof(Id));
@@ -4545,7 +4545,7 @@ solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps)
   Map installedmap;
 
   solver_create_state_maps(solv, &installedmap, 0);
-  pool_calc_duchanges(solv->pool, solv->installed, &installedmap, mps, nmps);
+  pool_calc_duchanges(solv->pool, &installedmap, mps, nmps);
   map_free(&installedmap);
 }
 
@@ -4562,7 +4562,7 @@ solver_calc_installsizechange(Solver *solv)
   int change;
 
   solver_create_state_maps(solv, &installedmap, 0);
-  change = pool_calc_installsizechange(solv->pool, solv->installed, &installedmap);
+  change = pool_calc_installsizechange(solv->pool, &installedmap);
   map_free(&installedmap);
   return change;
 }

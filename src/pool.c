@@ -123,6 +123,15 @@ pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids)
 }
 
 
+void
+pool_set_installed(Pool *pool, Repo *installed)
+{
+  if (pool->installed == installed)
+    return;
+  pool->installed = installed;
+  pool_freewhatprovides(pool);
+}
+
 static Pool *pool_shrink_whatprovides_sortcmp_data;
 
 static int
@@ -251,6 +260,7 @@ pool_createwhatprovides(Pool *pool)
   Offset *idp, n;
   Offset *whatprovides;
   Id *whatprovidesdata, *d;
+  Repo *installed = pool->installed;
 
   POOL_DEBUG(SAT_DEBUG_STATS, "number of solvables: %d\n", pool->nsolvables);
   POOL_DEBUG(SAT_DEBUG_STATS, "number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
@@ -268,7 +278,9 @@ pool_createwhatprovides(Pool *pool)
       s = pool->solvables + i;
       if (!s->provides)
 	continue;
-      if (!pool_installable(pool, s))
+      /* we always need the installed solvable in the whatprovides data,
+         otherwise obsoletes/conflicts on them won't work */
+      if (s->repo != installed && !pool_installable(pool, s))
 	continue;
       pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != ID_NULL)
@@ -314,7 +326,7 @@ pool_createwhatprovides(Pool *pool)
       s = pool->solvables + i;
       if (!s->provides)
 	continue;
-      if (!pool_installable(pool, s))
+      if (s->repo != installed && !pool_installable(pool, s))
 	continue;
 
       /* for all provides of this solvable */
@@ -989,9 +1001,9 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
 }
 
 void
-pool_addfileprovides(Pool *pool, Repo *installed)
+pool_addfileprovides(Pool *pool)
 {
-  pool_addfileprovides_ids(pool, installed, 0);
+  pool_addfileprovides_ids(pool, pool->installed, 0);
 }
 
 void
@@ -1188,7 +1200,7 @@ propagate_mountpoints(struct mptree *mptree, int pos, Id mountpoint)
 #define MPTREE_BLOCK 15
 
 void
-pool_calc_duchanges(Pool *pool, Repo *oldinstalled, Map *installedmap, DUChanges *mps, int nmps)
+pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
 {
   char *p;
   const char *path, *compstr;
@@ -1200,6 +1212,7 @@ pool_calc_duchanges(Pool *pool, Repo *oldinstalled, Map *installedmap, DUChanges
   Solvable *s;
   Id sp;
   Map ignoredu;
+  Repo *oldinstalled = pool->installed;
 
   memset(&ignoredu, 0, sizeof(ignoredu));
   cbd.mps = mps;
@@ -1326,11 +1339,12 @@ pool_calc_duchanges(Pool *pool, Repo *oldinstalled, Map *installedmap, DUChanges
 }
 
 int
-pool_calc_installsizechange(Pool *pool, Repo *oldinstalled, Map *installedmap)
+pool_calc_installsizechange(Pool *pool, Map *installedmap)
 {
   Id sp;
   Solvable *s;
   int change = 0;
+  Repo *oldinstalled = pool->installed;
 
   for (sp = 1, s = pool->solvables + sp; sp < pool->nsolvables; sp++, s++)
     {
@@ -1396,7 +1410,7 @@ static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep)
  */
 
 void
-pool_trivial_installable(Pool *pool, Repo *oldinstalled, Map *installedmap, Queue *pkgs, Queue *res)
+pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 {
   int i, r, m, did;
   Id p, *dp, con, *conp, req, *reqp;
@@ -1512,7 +1526,7 @@ pool_trivial_installable(Pool *pool, Repo *oldinstalled, Map *installedmap, Queu
 #endif
       if (m != map[p])
 	{
-          map[p] = m;
+	  map[p] = m;
 	  did = 0;
 	}
     }
