@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Oct 22 13:00:56 CEST 2008 - mls@suse.de
+
+- add pool_set_installed()
+- drop "installed" arguments from some functions
+- 0.12.0
+
+-------------------------------------------------------------------
 Thu Oct 16 00:50:47 CEST 2008 - mls@suse.de
 
 - make iterator work with completely empty repos [bnc#435838]
