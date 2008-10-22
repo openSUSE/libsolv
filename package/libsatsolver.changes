@@ -6,6 +6,13 @@ Wed Oct 22 13:00:56 CEST 2008 - mls@suse.de
 - 0.12.0
 
 -------------------------------------------------------------------
+Wed Oct 22 13:00:25 CEST 2008 - dmacvicar@suse.de
+
+- support the new standarized tags available in
+  createrepo > 0.9.6
+  saving of the distro tag still missing.
+
+-------------------------------------------------------------------
 Thu Oct 16 00:50:47 CEST 2008 - mls@suse.de
 
 - make iterator work with completely empty repos [bnc#435838]

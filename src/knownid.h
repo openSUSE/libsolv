@@ -183,6 +183,8 @@ KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),
 KNOWNID(REPOSITORY_PRODUCTS,		"repository:products"),
 /* keyword (tags) for this repository */
 KNOWNID(REPOSITORY_KEYWORDS,		"repository:keywords"),
+/* revision of the repository. arbitrary string */
+KNOWNID(REPOSITORY_REVISION,		"repository:revision"),
 
 KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
 KNOWNID(DELTA_PACKAGE_EVR,		"delta:pkgevr"),

@@ -24,42 +24,53 @@
 
 /*
 <repomd>
-<data type="primary">
-<location href="repodata/primary.xml.gz"/>
-<checksum type="sha">e9162516fa25fec8d60caaf4682d2e49967786cc</checksum>
-<timestamp>1215708444</timestamp>
-<open-checksum type="sha">c796c48184cd5abc260e4ba929bdf01be14778a7</open-checksum>
-</data>
-<data type="filelists">
-<location href="repodata/filelists.xml.gz"/>
-<checksum type="sha">1c638295c49e9707c22810004ebb0799791fcf45</checksum>
-<timestamp>1215708445</timestamp>
-<open-checksum type="sha">54a40d5db3df0813b8acbe58cea616987eb9dc16</open-checksum>
-</data>
-<data type="other">
-<location href="repodata/other.xml.gz"/>
-<checksum type="sha">a81ef39eaa70e56048f8351055119d8c82af2491</checksum>
-<timestamp>1215708447</timestamp>
-<open-checksum type="sha">4d1ee867c8864025575a2fb8fde3b85371d51978</open-checksum>
-</data>
-<data type="deltainfo">
-<location href="repodata/deltainfo.xml.gz"/>
-<checksum type="sha">5880cfa5187026a24a552d3c0650904a44908c28</checksum>
-<timestamp>1215708447</timestamp>
-<open-checksum type="sha">7c964a2c3b17df5bfdd962c3be952c9ca6978d8b</open-checksum>
-</data>
-<data type="updateinfo">
-<location href="repodata/updateinfo.xml.gz"/>
-<checksum type="sha">4097f7e25c7bb0770ae31b2471a9c8c077ee904b</checksum>
-<timestamp>1215708447</timestamp>
-<open-checksum type="sha">24f8252f3dd041e37e7c3feb2d57e02b4422d316</open-checksum>
-</data>
-<data type="diskusage">
-<location href="repodata/diskusage.xml.gz"/>
-<checksum type="sha">4097f7e25c7bb0770ae31b2471a9c8c077ee904b</checksum>
-<timestamp>1215708447</timestamp>
-<open-checksum type="sha">24f8252f3dd041e37e7c3feb2d57e02b4422d316</open-checksum>
-</data>
+
+  <!-- these tags are available in create repo > 0.9.6 -->
+  <revision>timestamp_or_arbitrary_user_supplied_string</revision>
+  <tags>
+    <content>opensuse</content>
+    <content>i386</content>
+    <content>other string</content>
+    <distro cpeid="cpe://o:opensuse_project:opensuse:11">openSUSE 11.0</distro>
+  </tags>
+  <!-- end -->
+
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+    <checksum type="sha">e9162516fa25fec8d60caaf4682d2e49967786cc</checksum>
+    <timestamp>1215708444</timestamp>
+    <open-checksum type="sha">c796c48184cd5abc260e4ba929bdf01be14778a7</open-checksum>
+  </data>
+  <data type="filelists">
+    <location href="repodata/filelists.xml.gz"/>
+    <checksum type="sha">1c638295c49e9707c22810004ebb0799791fcf45</checksum>
+    <timestamp>1215708445</timestamp>
+    <open-checksum type="sha">54a40d5db3df0813b8acbe58cea616987eb9dc16</open-checksum>
+  </data>
+  <data type="other">
+    <location href="repodata/other.xml.gz"/>
+    <checksum type="sha">a81ef39eaa70e56048f8351055119d8c82af2491</checksum>
+    <timestamp>1215708447</timestamp>
+    <open-checksum type="sha">4d1ee867c8864025575a2fb8fde3b85371d51978</open-checksum>
+  </data>
+  <data type="deltainfo">
+    <location href="repodata/deltainfo.xml.gz"/>
+    <checksum type="sha">5880cfa5187026a24a552d3c0650904a44908c28</checksum>
+    <timestamp>1215708447</timestamp>
+    <open-checksum type="sha">7c964a2c3b17df5bfdd962c3be952c9ca6978d8b</open-checksum>
+  </data>
+  <data type="updateinfo">
+    <location href="repodata/updateinfo.xml.gz"/>
+    <checksum type="sha">4097f7e25c7bb0770ae31b2471a9c8c077ee904b</checksum>
+    <timestamp>1215708447</timestamp>
+    <open-checksum type="sha">24f8252f3dd041e37e7c3feb2d57e02b4422d316</open-checksum>
+  </data>
+  <data type="diskusage">
+    <location href="repodata/diskusage.xml.gz"/>
+    <checksum type="sha">4097f7e25c7bb0770ae31b2471a9c8c077ee904b</checksum>
+    <timestamp>1215708447</timestamp>
+    <open-checksum type="sha">24f8252f3dd041e37e7c3feb2d57e02b4422d316</open-checksum>
+  </data>
 </repomd>
 
 support also extension suseinfo format
@@ -86,6 +97,10 @@ enum state {
   STATE_KEYWORD,
   /* normal repomd.xml */
   STATE_REPOMD,
+  STATE_REVISION,
+  STATE_TAGS,
+  STATE_CONTENT,
+  STATE_DISTRO,
   STATE_DATA,
   STATE_LOCATION,
   STATE_CHECKSUM,
@@ -109,10 +124,19 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUSEINFO,    "expire",          STATE_EXPIRE, 1 },  
   { STATE_SUSEINFO,    "products",        STATE_PRODUCTS, 0 },  
   { STATE_SUSEINFO,    "keywords",        STATE_KEYWORDS, 0 },  
-  { STATE_PRODUCTS,    "id",              STATE_PRODUCT, 1 },  
+  { STATE_PRODUCTS,    "id",              STATE_PRODUCT, 1 }, 
+  /* keywords is the suse extension equivalent of
+     tags/content when this one was not yet available.
+     therefore we parse both */ 
   { STATE_KEYWORDS,    "k",               STATE_KEYWORD, 1 },  
   /* standard tags */
+  { STATE_REPOMD,      "revision",        STATE_REVISION, 1 },
+  { STATE_REPOMD,      "tags",            STATE_TAGS,  0 },
   { STATE_REPOMD,      "data",            STATE_DATA,  0 },
+ 
+  { STATE_TAGS,        "content",         STATE_CONTENT,  1 },
+  { STATE_TAGS,        "distro",          STATE_DISTRO,  1 },
+
   { STATE_DATA,        "location",        STATE_LOCATION, 0 },
   { STATE_DATA,        "checksum",        STATE_CHECKSUM, 1 },  
   { STATE_DATA,        "timestamp",       STATE_TIMESTAMP, 1 },
@@ -223,6 +247,9 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_PRODUCT: break;
     case STATE_KEYWORDS: break;
     case STATE_KEYWORD: break;
+    case STATE_CONTENT: break;
+    case STATE_REVISION: break;
+    case STATE_DISTRO: break;
     case STATE_DATA: break;
     case STATE_LOCATION: break;
     case STATE_CHECKSUM: break;
@@ -288,10 +315,17 @@ endElement(void *userData, const char *name)
       if (pd->content)
 	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_PRODUCTS, pd->content);
       break;
+      /* repomd.xml content and suseinfo.xml keywords are equivalent */
+    case STATE_CONTENT:
     case STATE_KEYWORD:
       if (pd->content)
 	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_KEYWORDS, pd->content);
       break;
+    case STATE_REVISION:
+      if (pd->content)
+	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REVISION, pd->content);
+      break;
+    case STATE_DISTRO: break;
     case STATE_SUSEINFO: break;
     case STATE_PRODUCTS: break;
     case STATE_KEYWORDS: break;
