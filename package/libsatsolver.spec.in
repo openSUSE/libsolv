@@ -11,17 +11,18 @@ Prefix:         /usr
 
 %if 0%{?mandriva_version}
 # force this version on mandriva
-BuildRequires: libneon0.26-devel
+BuildRequires:  libneon0.26-devel
 %endif
 %if 0%{?fedora_version}
-BuildRequires: perl-devel
+BuildRequires:  perl-devel
 %endif
 %if 0%{?suse_version}
-BuildRequires: libexpat-devel
+BuildRequires:  libexpat-devel
 %else
-BuildRequires: expat-devel
+BuildRequires:  expat-devel
 %endif
 BuildRequires:  cmake rpm-devel gcc-c++ ruby-devel swig perl python-devel
+BuildRequires:  zlib-devel
 # the testsuite uses the check framework
 BuildRequires:  check-devel
 Summary:        A new approach to package dependency solving
@@ -38,6 +39,7 @@ Authors:
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
 Requires:       satsolver-tools = %version
+Requires:       rpm-devel
 
 %description devel
 A new approach to package dependency solving

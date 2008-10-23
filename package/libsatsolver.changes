@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Thu Oct 23 10:49:40 CEST 2008 - mrueckert@suse.de
+
+- add zlib-devel as buildrequires, cmake is looking for it
+  explicitely. rpm-devel used to require it but you dont really
+  need it to link against librpm*
+- requires rpm-devel in the devel package, it is required to link
+  against libsatsolver.
+
+-------------------------------------------------------------------
 Wed Oct 22 13:00:56 CEST 2008 - mls@suse.de
 
 - add pool_set_installed()
