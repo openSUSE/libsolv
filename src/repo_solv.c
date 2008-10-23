@@ -300,6 +300,7 @@ data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *err
  */
 
 #define INCORE_ADD_CHUNK 8192
+#define DATA_READ_CHUNK 8192
 
 static void
 incore_add_id(Repodata *data, Id x)
@@ -532,9 +533,8 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   int nentries;
   int have_xdata;
   int maxsize, allsize;
-  unsigned char *buf, *dp, *dps;
-  int left;
-  Id stack[10];
+  unsigned char *buf, *bufend, *dp, *dps;
+  Id stack[3 * 5];
   int keydepth;
   int needchunk;	/* need a new chunk of data */
 
@@ -973,15 +973,17 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 
   maxsize = read_id(&data, 0);
   allsize = read_id(&data, 0);
-  maxsize += 5;	/* so we can read the next schema */
+  maxsize += 5;	/* so we can read the next schema of an array */
   if (maxsize > allsize)
     maxsize = allsize;
 
-  left = 0;
-  buf = sat_calloc(maxsize + 4, 1);
+  buf = sat_calloc(maxsize + DATA_READ_CHUNK + 4, 1);	/* 4 extra bytes to detect overflows */
+  bufend = buf;
   dp = buf;
 
   l = maxsize;
+  if (l < DATA_READ_CHUNK)
+    l = DATA_READ_CHUNK;
   if (l > allsize)
     l = allsize;
   if (!l || fread(buf, l, 1, data.fp) != 1)
@@ -992,7 +994,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
     }
   else
     {
-      left = l;
+      bufend = buf + l;
       allsize -= l;
       dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
     }
@@ -1018,24 +1020,29 @@ printf("key %d at %d\n", key, keyp - 1 - schemadata);
 #endif
       if (!key)
 	{
-	  if (keydepth <= 2)
+	  if (keydepth <= 3)
 	    needchunk = 1;
 	  if (nentries)
 	    {
-	      if (s && keydepth == 2)
+	      if (s && keydepth == 3)
 		{
 		  s++;	/* next solvable */
 	          if (have_xdata)
 		    data.incoreoffset[(s - pool->solvables) - data.start] = data.incoredatalen;
 		}
-	      dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
-	      incore_add_id(&data, id);
+	      id = stack[keydepth - 1];
+	      if (!id)
+		{
+		  dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
+		  incore_add_id(&data, id);
+		}
 	      keyp = schemadata + schemata[id];
 	      nentries--;
 	      continue;
 	    }
 	  if (!keydepth)
 	    break;
+	  --keydepth;
 	  keyp = schemadata + stack[--keydepth];
 	  nentries = stack[--keydepth];
 #if 0
@@ -1050,30 +1057,38 @@ printf("pop flexarray %d %d\n", keydepth, nentries);
 	data.mainschemaoffsets[keyp - 1 - (schemadata + schemata[data.mainschema])] = data.incoredatalen;
       if (keydepth == 0 || needchunk)
 	{
+	  int left = bufend - dp;
 	  /* read data chunk to dp */
 	  if (data.error)
 	    break;
-	  left -= (dp - buf);
 	  if (left < 0)
 	    {
 	      pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
 	      data.error = SOLV_ERROR_EOF;
 	      break;
 	    }
-	  if (left)
-	    memmove(buf, dp, left);
-	  l = maxsize - left;
-	  if (l > allsize)
-	    l = allsize;
-	  if (l && fread(buf + left, l, 1, data.fp) != 1)
+	  if (left < maxsize)
 	    {
-	      pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
-	      data.error = SOLV_ERROR_EOF;
-	      break;
+	      if (left)
+		memmove(buf, dp, left);
+	      l = maxsize - left;
+	      if (l < DATA_READ_CHUNK)
+		l = DATA_READ_CHUNK;
+	      if (l > allsize)
+		l = allsize;
+	      if (l && fread(buf + left, l, 1, data.fp) != 1)
+		{
+		  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+		  data.error = SOLV_ERROR_EOF;
+		  break;
+		}
+	      allsize -= l;
+	      left += l;
+	      bufend = buf + left;
+	      if (allsize + left < maxsize)
+		maxsize = allsize + left;
+	      dp = buf;
 	    }
-	  allsize -= l;
-	  left += l;
-	  dp = buf;
 	  needchunk = 0;
 	}
 
@@ -1172,25 +1187,29 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
 	    POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", dep2str(pool, repo->idarraydata[ido]));
 #endif
 	  break;
+	case REPOKEY_TYPE_FIXARRAY:
 	case REPOKEY_TYPE_FLEXARRAY:
+	  if (!keydepth)
+	    needchunk = 1;
           if (keydepth == sizeof(stack)/sizeof(*stack))
 	    {
-	      pool_debug(pool, SAT_ERROR, "flexarray stack overflow\n");
+	      pool_debug(pool, SAT_ERROR, "array stack overflow\n");
 	      data.error = SOLV_ERROR_CORRUPT;
 	      break;
 	    }
 	  stack[keydepth++] = nentries;
 	  stack[keydepth++] = keyp - schemadata;
+	  stack[keydepth++] = 0;
 	  dp = data_read_id(dp, &nentries);
 	  incore_add_id(&data, nentries);
 	  if (!nentries)
 	    {
 	      /* zero size array? */
-	      keydepth--;
+	      keydepth -= 2;
 	      nentries = stack[--keydepth];
 	      break;
 	    }
-	  if (keydepth == 2 && id == REPOSITORY_SOLVABLES)
+	  if (keydepth == 3 && id == REPOSITORY_SOLVABLES)
 	    {
 	      /* horray! here come the solvables */
 	      if (nentries != numsolv)
@@ -1232,6 +1251,15 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
 	  nentries--;
 	  dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
 	  incore_add_id(&data, id);
+	  if (keys[key].type == REPOKEY_TYPE_FIXARRAY)
+	    {
+	      if (!id)
+		{
+		  pool_debug(pool, SAT_ERROR, "illegal fixarray\n");
+		  data.error = SOLV_ERROR_CORRUPT;
+		}
+	      stack[keydepth - 1] = id;
+	    }
 	  keyp = schemadata + schemata[id];
 	  break;
 	default:
@@ -1251,8 +1279,7 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
     }
   if (!data.error)
     {
-      left -= (dp - buf);
-      if (left < 0)
+      if (dp > bufend)
         {
 	  pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
 	  data.error = SOLV_ERROR_EOF;
