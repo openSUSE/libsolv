@@ -1242,7 +1242,8 @@ dataiterator_step(Dataiterator *di)
 	    goto di_nextsolvablekey;
 	  di->kv.id = di->idp[0];
 	  di->kv.num = di->idp[0];
-	  if (!di->kv.eof && !di->idp[1])
+	  di->idp++;
+	  if (!di->kv.eof && !di->idp[0])
 	    di->kv.eof = 1;
 	  di->kv.entry = 0;
 	  if (di->kv.eof)
