@@ -92,6 +92,7 @@ static struct stateswitch stateswitches[] = {
 
 struct parsedata {
   const char *filename;
+  const char *basename;
   int depth;
   enum state state;
   int statedepth;
@@ -269,6 +270,9 @@ endElement(void *userData, const char *name)
       /* product done, finish solvable */
       if (pd->ctime)
         repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, pd->ctime);
+
+      if ( pd->basename )
+        repodata_set_str(pd->data, pd->handle, PRODUCT_REFERENCEFILE, pd->basename);
 
       /* this is where <productsdir>/baseproduct points to */
       if (pd->currentproduct == pd->baseproduct)
@@ -570,6 +574,7 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, int code11)
 	      break;
 	    }
 	  pd->filename = fullpath;
+	  pd->basename = entry->d_name;
 	  repo_add_product(pd, fp, code11);
 	  fclose(fp);
 	}
@@ -600,7 +605,7 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, const char 
 
   if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
-  else 
+  else
     data = repo_last_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
