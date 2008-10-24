@@ -225,7 +225,7 @@ startElement(void *userData, const char *name, const char **atts)
 
   if (sw->from != pd->state)
     {
-#if 1
+#if 0
       fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
       exit( 1 );
 #endif
@@ -329,10 +329,14 @@ startElement(void *userData, const char *name, const char **atts)
 	      type = atts[1];
 	  }
 	handle = repodata_new_handle(pd->data);
-	repodata_set_str(pd->data, handle, UPDATE_REFERENCE_HREF, href);
-	repodata_set_str(pd->data, handle, UPDATE_REFERENCE_ID, id);
-	repodata_set_str(pd->data, handle, UPDATE_REFERENCE_TITLE, title);
-	repodata_set_poolstr(pd->data, handle, UPDATE_REFERENCE_TYPE, type);
+	if (href)
+	  repodata_set_str(pd->data, handle, UPDATE_REFERENCE_HREF, href);
+	if (id)
+	  repodata_set_str(pd->data, handle, UPDATE_REFERENCE_ID, id);
+	if (title)
+	  repodata_set_str(pd->data, handle, UPDATE_REFERENCE_TITLE, title);
+	if (type)
+	  repodata_set_poolstr(pd->data, handle, UPDATE_REFERENCE_TYPE, type);
 	repodata_add_flexarray(pd->data, pd->datanum, UPDATE_REFERENCE, handle);
       }
       break;
@@ -427,7 +431,7 @@ endElement(void *userData, const char *name)
   if (pd->depth != pd->statedepth)
     {
       pd->depth--;
-#if 1
+#if 0
       fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
 #endif
       return;
