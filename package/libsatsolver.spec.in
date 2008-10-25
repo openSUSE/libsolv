@@ -27,6 +27,12 @@ BuildRequires:  zlib-devel
 BuildRequires:  check-devel
 Summary:        A new approach to package dependency solving
 
+#define some macros missing on fedora
+%if 0%{?fedora_version}
+%{!?py_sitedir: %define py_sitedir %(%{__python} -c "from distutils.sysconfig import get_python_lib()")}
+%{!?py_requires: %define py_requires Requires: python}
+%endif
+
 %description
 A new approach to package dependency solving
 
@@ -67,11 +73,7 @@ Group:          Development/Languages/Ruby
 .
 
 %package -n python-satsolver
-%if 0%{?fedora_version}
-Requires: python
-%else
 %py_requires
-%endif
 Summary:        Python bindings for sat solver
 Group:          Development/Languages/Python
 
