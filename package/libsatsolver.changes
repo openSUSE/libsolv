@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Oct 27 10:54:36 CET 2008 - kkaempf@suse.de
+
+- Improve error detection and reporting when parsing 'content' file
+
+-------------------------------------------------------------------
 Fri Oct 24 16:03:13 CEST 2008 - ma@suse.de
 
 - Remember the /etc/products.d enties filename in .solv 
