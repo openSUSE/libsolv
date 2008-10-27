@@ -365,6 +365,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	   *
 	   */
 
+	  else if (code10 && istag ("CONTENTSTYLE"))
+	    /* CONTENTSTYLE must be first line */
+	    fprintf(stderr, "repo_content: 'CONTENTSTYLE' must be first line of 'content'\n");
 	  else if (code10 && istag ("DISTPRODUCT"))
 	    /* DISTPRODUCT is for registration and Yast, not for the solver. */
 	    repo_set_str(repo, s - pool->solvables, PRODUCT_DISTPRODUCT, value);
