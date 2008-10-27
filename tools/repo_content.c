@@ -142,7 +142,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 
 	  if (!rel || !evr)
 	    {
-	      fprintf(stderr, "bad relation '%s %s'\n", name, rel);
+	      fprintf(stderr, "repo_content: bad relation '%s %s'\n", name, rel);
 	      exit(1);
 	    }
 	  for (flags = 0; flags < 6; flags++)
@@ -150,7 +150,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	      break;
 	  if (flags == 6)
 	    {
-	      fprintf(stderr, "Unknown relation '%s'\n", rel);
+	      fprintf(stderr, "repo_content: Unknown relation '%s'\n", rel);
 	      exit(1);
 	    }
 	  id = rel2id(pool, id, str2id(pool, evr, 1), flags + 1, 1);
@@ -404,12 +404,12 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 #undef istag
 	}
       else
-	fprintf (stderr, "malformed line: %s\n", line);
+	fprintf (stderr, "repo_content: malformed line: %s\n", line);
     }
 
   if (!s || !s->name)
     {
-      fprintf(stderr, "No product solvable created !\n");
+      fprintf(stderr, "repo_content: 'content' incomplete, no product solvable created !\n");
       exit(1);
     }
 
