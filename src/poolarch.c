@@ -7,7 +7,7 @@
 
 /*
  * poolarch.c
- * 
+ *
  * create architecture policies
  */
 
@@ -21,16 +21,23 @@
 #include "util.h"
 
 const char *archpolicies[] = {
-  "x86_64", "x86_64:i686:i586:i486:i386",
-  "i686",   "i686:i586:i486:i386",
-  "i586",   "i586:i486:i386",
-  "i486",   "i486:i386",
-  "i386",   "i386",
-  "s390x",  "s390x:s390",
-  "s390",   "s390",
-  "ia64",   "ia64:i686:i586:i486:i386",
-  "ppc64",  "ppc64:ppc",
-  "ppc",    "ppc",
+  "x86_64",	"x86_64:i686:i586:i486:i386",
+  "i686",	"i686:i586:i486:i386",
+  "i586",	"i586:i486:i386",
+  "i486",	"i486:i386",
+  "i386",	"i386",
+  "s390x",	"s390x:s390",
+  "s390",	"s390",
+  "ia64",	"ia64:i686:i586:i486:i386",
+  "ppc64",	"ppc64:ppc",
+  "ppc",	"ppc",
+  "armv6l",	"armv6l:armv5tejl:armv5tel:armv5l:armv4tl:armv4l:armv3l",
+  "armv5tejl",	"armv5tejl:armv5tel:armv5l:armv4tl:armv4l:armv3l",
+  "armv5tel",	"armv5tel:armv5l:armv4tl:armv4l:armv3l",
+  "armv5l",	"armv5l:armv4tl:armv4l:armv3l",
+  "armv4tl",	"armv4tl:armv4l:armv3l",
+  "armv4l",	"armv4l:armv3l",
+  "armv3l",	"armv3l",
   0
 };
 
@@ -45,7 +52,7 @@ pool_setarch(Pool *pool, const char *arch)
   int i;
   Id *id2arch;
   Id id, lastarch;
-  
+
   pool->id2arch = sat_free(pool->id2arch);
   if (!arch)
     {

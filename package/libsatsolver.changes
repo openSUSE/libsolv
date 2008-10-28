@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Oct 28 16:55:03 CET 2008 - ma@suse.de
+
+- Add 'arm' architectures.
+
+-------------------------------------------------------------------
 Mon Oct 27 10:54:36 CET 2008 - kkaempf@suse.de
 
 - Improve error detection and reporting when parsing 'content' file
