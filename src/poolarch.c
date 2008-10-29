@@ -38,6 +38,9 @@ const char *archpolicies[] = {
   "armv4tl",	"armv4tl:armv4l:armv3l",
   "armv4l",	"armv4l:armv3l",
   "armv3l",	"armv3l",
+  "sh3",	"sh3",
+  "sh4",	"sh4",
+  "sh4a",	"sh4a:sh4",
   0
 };
 
