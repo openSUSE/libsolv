@@ -914,7 +914,10 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
 	    break;
 	  if (s->repo == installed)
-	    break;
+	    {
+	      MAPSET(&solv->noupdate, what - installed->start);
+	      break;
+	    }
 	  if (s->obsoletes)
 	    {
 	      Id obs, *obsp;
@@ -962,7 +965,18 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	    break;
 	  s = pool->solvables + what;
 	  if (s->repo == installed)
-	    break;
+	    {
+	      r = solv->rules + solv->updaterules + (what - installed->start);
+	      if (r->d >= 0)
+	        break;
+	      enablerule(solv, r);
+	      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+	        {
+		  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+		  solver_printrule(solv, SAT_DEBUG_SOLUTIONS, r);
+	        }
+	      break;
+	    }
 	  if (s->obsoletes)
 	    {
 	      Id obs, *obsp;
