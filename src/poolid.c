@@ -27,7 +27,7 @@ Id
 str2id(Pool *pool, const char *str, int create)
 {
   int oldnstrings = pool->ss.nstrings;
-  Id id = stringpool_str2id (&pool->ss, str, create);
+  Id id = stringpool_str2id(&pool->ss, str, create);
   if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
     {
       /* grow whatprovides array */
@@ -41,7 +41,7 @@ Id
 strn2id(Pool *pool, const char *str, unsigned int len, int create)
 {
   int oldnstrings = pool->ss.nstrings;
-  Id id = stringpool_strn2id (&pool->ss, str, len, create);
+  Id id = stringpool_strn2id(&pool->ss, str, len, create);
   if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
     {
       /* grow whatprovides array */

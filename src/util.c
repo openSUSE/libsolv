@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "util.h"
 
@@ -79,5 +80,19 @@ sat_free(void *mem)
   if (mem)
     free(mem);
   return 0;
+}
+
+unsigned int
+sat_timems(unsigned int subtract)
+{
+  struct timeval tv;
+  unsigned int r;
+
+  if (gettimeofday(&tv, 0))
+    return 0;
+  r = (((unsigned int)tv.tv_sec >> 16) * 1000) << 16;
+  r += ((unsigned int)tv.tv_sec & 0xffff) * 1000;
+  r += (unsigned int)tv.tv_usec / 1000;
+  return r - subtract;
 }
 

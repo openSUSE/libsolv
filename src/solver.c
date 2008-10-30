@@ -3149,9 +3149,11 @@ problems_to_solutions(Solver *solv, Queue *job)
   Id *problem;
   Id why;
   int i, j, nsol;
+  unsigned int now, refnow;
 
   if (!solv->problems.count)
     return;
+  now = sat_timems(0);
   problems_sort(solv);
   queue_clone(&problems, &solv->problems);
   queue_init(&solution);
@@ -3159,6 +3161,7 @@ problems_to_solutions(Solver *solv, Queue *job)
   /* copy over proof index */
   queue_push(&solutions, problems.elements[0]);
   problem = problems.elements + 1;
+  refnow = sat_timems(0);
   for (i = 1; i < problems.count; i++)
     {
       Id v = problems.elements[i];
@@ -3167,12 +3170,14 @@ problems_to_solutions(Solver *solv, Queue *job)
 	  /* mark end of this problem */
 	  queue_push(&solutions, 0);
 	  queue_push(&solutions, 0);
+	  POOL_DEBUG(SAT_DEBUG_STATS, "refining took %d ms\n", sat_timems(refnow));
 	  if (i + 1 == problems.count)
 	    break;
 	  /* copy over proof of next problem */
           queue_push(&solutions, problems.elements[i + 1]);
 	  i++;
 	  problem = problems.elements + i + 1;
+	  refnow = sat_timems(0);
 	  continue;
 	}
       refine_suggestion(solv, job, problem, v, &solution);
@@ -3261,6 +3266,7 @@ problems_to_solutions(Solver *solv, Queue *job)
 
   assert(solv->problems.count == solutions.count);
   queue_free(&solutions);
+  POOL_DEBUG(SAT_DEBUG_STATS, "problems_to_solutions took %d ms\n", sat_timems(now));
 }
 
 
@@ -3922,7 +3928,9 @@ solver_solve(Solver *solv, Queue *job)
   Solvable *s;
   int goterase;
   Rule *r;
+  int now, solve_start;
 
+  solve_start = sat_timems(0);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver started\n");
   POOL_DEBUG(SAT_DEBUG_STATS, "fixsystem=%d updatesystem=%d dosplitprovides=%d, noupdateprovide=%d\n", solv->fixsystem, solv->updatesystem, solv->dosplitprovides, solv->noupdateprovide);
   POOL_DEBUG(SAT_DEBUG_STATS, "distupgrade=%d distupgrade_removeunsupported=%d\n", solv->distupgrade, solv->distupgrade_removeunsupported);
@@ -3969,6 +3977,7 @@ solver_solve(Solver *solv, Queue *job)
   queue_push(&solv->decisionq_why, 0);
   solv->decisionmap[SYSTEMSOLVABLE] = 1; /* installed at level '1' */
 
+  now = sat_timems(0);
   /*
    * create rules for all package that could be involved with the solving
    * so called: rpm rules
@@ -4056,6 +4065,7 @@ solver_solve(Solver *solv, Queue *job)
 
   solv->directdecisions = solv->decisionq.count;
   POOL_DEBUG(SAT_DEBUG_STATS, "decisions so far: %d\n", solv->decisionq.count);
+  POOL_DEBUG(SAT_DEBUG_STATS, "rpm rule creation took %d ms\n", sat_timems(now));
 
   /*
    * create feature rules
@@ -4341,7 +4351,9 @@ solver_solve(Solver *solv, Queue *job)
    * ********************************************
    */
     
+  now = sat_timems(0);
   run_solver(solv, 1, solv->dontinstallrecommended ? 0 : 1);
+  POOL_DEBUG(SAT_DEBUG_STATS, "solver took %d ms\n", sat_timems(now));
 
   queue_init(&redoq);
   goterase = 0;
@@ -4527,8 +4539,9 @@ solver_solve(Solver *solv, Queue *job)
       solv->recommendations.count = recocount;
     }
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
   queue_free(&redoq);
+  POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
+  POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
 }
 
 /***********************************************************************/

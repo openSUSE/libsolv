@@ -88,8 +88,8 @@ compress_buf(const unsigned char *in, unsigned int in_len,
 #define HS (65536)
   Ref htab[HS];
   Ref hnext[BLOCK_SIZE];
-  memset (htab, -1, sizeof (htab));
-  memset (hnext, -1, sizeof (hnext));
+  memset(htab, -1, sizeof (htab));
+  memset(hnext, -1, sizeof (hnext));
   unsigned int litofs = 0;
   while (io + 2 < in_len)
     {
@@ -118,8 +118,8 @@ compress_buf(const unsigned char *in, unsigned int in_len,
 	}
       for (; try != -1 && tries < 12; tries++)
 	{
-	  //assert (mlen >= 2);
-	  //assert (io + mlen < in_len);
+	  //assert(mlen >= 2);
+	  //assert(io + mlen < in_len);
 	  /* Try a match starting from [io] with the strings at [try].
 	     That's only sensible if TRY actually is before IO (can happen
 	     with uninit hash table).  If we have a previous match already
@@ -128,7 +128,7 @@ compress_buf(const unsigned char *in, unsigned int in_len,
 	  if (try < io && in[try + mlen] == in[io + mlen])
 	    {
 	      unsigned int this_len, this_ofs;
-	      if (memcmp (in + try, in + io, mlen))
+	      if (memcmp(in + try, in + io, mlen))
 		goto no_match;
 	      this_len = mlen + 1;
 	      /* Now try extending the match by more characters.  */
@@ -139,15 +139,15 @@ compress_buf(const unsigned char *in, unsigned int in_len,
 #if 0
 	      unsigned int testi;
 	      for (testi = 0; testi < this_len; testi++)
-		assert (in[try + testi] == in[io + testi]);
+		assert(in[try + testi] == in[io + testi]);
 #endif
 	      this_ofs = (io - try) - 1;
 	      /*if (this_ofs > 65535)
 		 goto no_match; */
 #if 0
-	      assert (this_len >= 2);
-	      assert (this_len >= mlen);
-	      assert (this_len > mlen || (this_len == mlen && this_ofs > mofs));
+	      assert(this_len >= 2);
+	      assert(this_len >= mlen);
+	      assert(this_len > mlen || (this_len == mlen && this_ofs > mofs));
 #endif
 	      mlen = this_len, mofs = this_ofs;
 	      /* If our match extends up to the end of input, no next
@@ -166,7 +166,7 @@ compress_buf(const unsigned char *in, unsigned int in_len,
 match_done:
       if (mlen)
 	{
-	  //fprintf (stderr, "%d %d\n", mlen, mofs);
+	  /*fprintf(stderr, "%d %d\n", mlen, mofs);*/
 	  if (mlen == 2 && (litofs || mofs >= 1024))
 	    mlen = 0;
 	  /*else if (mofs >= 65536)
@@ -223,7 +223,7 @@ match_done:
 	    {
 	      litofs--;
 	      unsigned litlen = io - litofs;
-	      //fprintf (stderr, "lit: %d\n", litlen);
+	      //fprintf(stderr, "lit: %d\n", litlen);
 	      while (litlen)
 		{
 		  unsigned int easy_sz;
@@ -239,7 +239,7 @@ match_done:
 		    {
 		      if (oo + easy_sz >= out_len)
 			return 0;
-		      memcpy (out + oo, in + litofs, easy_sz);
+		      memcpy(out + oo, in + litofs, easy_sz);
 		      litofs += easy_sz;
 		      oo += easy_sz;
 		      litlen -= easy_sz;
@@ -261,7 +261,7 @@ match_done:
 		      if (oo + 1 + 32 >= out_len)
 			return 0;
 		      out[oo++] = 0x80 | 31;
-		      memcpy (out + oo, in + litofs, 32);
+		      memcpy(out + oo, in + litofs, 32);
 		      oo += 32;
 		      litofs += 32;
 		      litlen -= 32;
@@ -270,7 +270,7 @@ match_done:
 	      litofs = 0;
 	    }
 
-	  //fprintf (stderr, "ref: %d @ %d\n", mlen, mofs);
+	  //fprintf(stderr, "ref: %d @ %d\n", mlen, mofs);
 
 	  if (mlen >= 2 && mlen <= 9 && mofs < 1024)
 	    {
@@ -288,7 +288,7 @@ match_done:
 	    }
 	  else if (mofs >= 65536)
 	    {
-	      assert (mlen >= 5 && mlen < 2048 + 5);
+	      assert(mlen >= 5 && mlen < 2048 + 5);
 	      if (oo + 5 >= out_len)
 	        return 0;
 	      out[oo++] = 0xf8 | ((mlen - 5) >> 8);
@@ -299,7 +299,7 @@ match_done:
 	    }
 	  else if (mlen >= 3 && mlen <= 18)
 	    {
-	      assert (mofs < 65536);
+	      assert(mofs < 65536);
 	      if (oo + 3 >= out_len)
 		return 0;
 	      out[oo++] = 0xe0 | (mlen - 3);
@@ -308,7 +308,7 @@ match_done:
 	    }
 	  else
 	    {
-	      assert (mlen >= 19 && mlen <= 4095 + 19 && mofs < 65536);
+	      assert(mlen >= 19 && mlen <= 4095 + 19 && mofs < 65536);
 	      if (oo + 4 >= out_len)
 		return 0;
 	      out[oo++] = 0xf0 | ((mlen - 19) >> 8);
@@ -346,7 +346,7 @@ match_done:
     {
       litofs--;
       unsigned litlen = io - litofs;
-      //fprintf (stderr, "lit: %d\n", litlen);
+      //fprintf(stderr, "lit: %d\n", litlen);
       while (litlen)
 	{
 	  unsigned int easy_sz;
@@ -361,7 +361,7 @@ match_done:
 	    {
 	      if (oo + easy_sz >= out_len)
 		return 0;
-	      memcpy (out + oo, in + litofs, easy_sz);
+	      memcpy(out + oo, in + litofs, easy_sz);
 	      litofs += easy_sz;
 	      oo += easy_sz;
 	      litlen -= easy_sz;
@@ -383,7 +383,7 @@ match_done:
 	      if (oo + 1 + 32 >= out_len)
 		return 0;
 	      out[oo++] = 0x80 | 31;
-	      memcpy (out + oo, in + litofs, 32);
+	      memcpy(out + oo, in + litofs, 32);
 	      oo += 32;
 	      litofs += 32;
 	      litlen -= 32;
@@ -476,7 +476,7 @@ unchecked_decompress_buf(const unsigned char *in, unsigned int in_len,
 	    break;
 	  }
 	}
-      //fprintf (stderr, "ref: %d @ %d\n", first, o);
+      //fprintf(stderr, "ref: %d @ %d\n", first, o);
       o++;
       o = -o;
 #if 0
@@ -591,10 +591,10 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
       if (store->ncanmap < 4)
         store->ncanmap = 4;
       store->mapped = sat_realloc2(store->mapped, store->ncanmap, sizeof(store->mapped[0]));
-      memset (store->mapped + oldcan, 0, (store->ncanmap - oldcan) * sizeof (store->mapped[0]));
+      memset(store->mapped + oldcan, 0, (store->ncanmap - oldcan) * sizeof (store->mapped[0]));
       store->blob_store = sat_realloc2(store->blob_store, store->ncanmap, BLOB_PAGESIZE);
 #ifdef DEBUG_PAGING
-      fprintf (stderr, "PAGE: can map %d pages\n", store->ncanmap);
+      fprintf(stderr, "PAGE: can map %d pages\n", store->ncanmap);
 #endif
     }
 
@@ -612,7 +612,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
         {
 	  pnum--;
 	  Attrblobpage *p = store->pages + pnum;
-	  assert (p->mapped_at != -1);
+	  assert(p->mapped_at != -1);
 	  if (pnum >= pstart && pnum <= pend)
 	    cost[i] = 1;
 	  else
@@ -658,7 +658,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	{
 	  /* Evict this page.  */
 #ifdef DEBUG_PAGING
-	  fprintf (stderr, "PAGE: evict page %d from %d\n", pnum, i);
+	  fprintf(stderr, "PAGE: evict page %d from %d\n", pnum, i);
 #endif
 	  cost[i] = 0;
 	  store->mapped[i] = 0;
@@ -677,10 +677,10 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  if (p->mapped_at != pnum * BLOB_PAGESIZE)
 	    {
 #ifdef DEBUG_PAGING
-	      fprintf (stderr, "PAGECOPY: %d to %d\n", i, pnum);
+	      fprintf(stderr, "PAGECOPY: %d to %d\n", i, pnum);
 #endif
 	      /* Still mapped somewhere else, so just copy it from there.  */
-	      memcpy (dest, store->blob_store + p->mapped_at, BLOB_PAGESIZE);
+	      memcpy(dest, store->blob_store + p->mapped_at, BLOB_PAGESIZE);
 	      store->mapped[p->mapped_at / BLOB_PAGESIZE] = 0;
 	    }
 	}
@@ -690,11 +690,11 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  unsigned int compressed = in_len & 1;
 	  in_len >>= 1;
 #ifdef DEBUG_PAGING
-	  fprintf (stderr, "PAGEIN: %d to %d", i, pnum);
+	  fprintf(stderr, "PAGEIN: %d to %d", i, pnum);
 #endif
           if (pread(store->pagefd, compressed ? buf : dest, in_len, p->file_offset) != in_len)
 	    {
-	      perror ("mapping pread");
+	      perror("mapping pread");
 	      return 0;
 	    }
 	  if (compressed)
@@ -710,11 +710,11 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 		  return 0;
 		}
 #ifdef DEBUG_PAGING
-	      fprintf (stderr, " (expand %d to %d)", in_len, out_len);
+	      fprintf(stderr, " (expand %d to %d)", in_len, out_len);
 #endif
 	    }
 #ifdef DEBUG_PAGING
-	  fprintf (stderr, "\n");
+	  fprintf(stderr, "\n");
 #endif
 	}
       p->mapped_at = pnum * BLOB_PAGESIZE;
@@ -775,7 +775,7 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
     can_seek = 0;
 
 #ifdef DEBUG_PAGING
-  fprintf (stderr, "can %sseek\n", can_seek ? "" : "NOT ");
+  fprintf(stderr, "can %sseek\n", can_seek ? "" : "NOT ");
 #endif
   npages = (blobsz + BLOB_PAGESIZE - 1) / BLOB_PAGESIZE;
 
@@ -792,7 +792,7 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
       Attrblobpage *p = store->pages + i;
       in_len >>= 1;
 #ifdef DEBUG_PAGING
-      fprintf (stderr, "page %d: len %d (%scompressed)\n",
+      fprintf(stderr, "page %d: len %d (%scompressed)\n",
       	       i, in_len, compressed ? "" : "not ");
 #endif
       if (can_seek)
@@ -847,7 +847,7 @@ repopagestore_disable_paging(Repopagestore *store)
 #ifdef STANDALONE
 
 static void
-transfer_file (FILE * from, FILE * to, int compress)
+transfer_file(FILE * from, FILE * to, int compress)
 {
   unsigned char inb[BLOCK_SIZE];
   unsigned char outb[BLOCK_SIZE];
@@ -856,45 +856,45 @@ transfer_file (FILE * from, FILE * to, int compress)
       unsigned int in_len, out_len;
       if (compress)
 	{
-	  in_len = fread (inb, 1, BLOCK_SIZE, from);
+	  in_len = fread(inb, 1, BLOCK_SIZE, from);
 	  if (in_len)
 	    {
 	      unsigned char *b = outb;
-	      out_len = compress_buf (inb, in_len, outb, sizeof (outb));
+	      out_len = compress_buf(inb, in_len, outb, sizeof (outb));
 	      if (!out_len)
 		b = inb, out_len = in_len;
-	      if (fwrite (&out_len, sizeof (out_len), 1, to) != 1)
+	      if (fwrite(&out_len, sizeof (out_len), 1, to) != 1)
 		{
-		  perror ("write size");
+		  perror("write size");
 		  exit (1);
 		}
-	      if (fwrite (b, out_len, 1, to) != 1)
+	      if (fwrite(b, out_len, 1, to) != 1)
 		{
-		  perror ("write data");
+		  perror("write data");
 		  exit (1);
 		}
 	    }
 	}
       else
 	{
-	  if (fread (&in_len, sizeof (in_len), 1, from) != 1)
+	  if (fread(&in_len, sizeof(in_len), 1, from) != 1)
 	    {
-	      if (feof (from))
+	      if (feof(from))
 		return;
-	      perror ("can't read size");
-	      exit (1);
+	      perror("can't read size");
+	      exit(1);
 	    }
-	  if (fread (inb, in_len, 1, from) != 1)
+	  if (fread(inb, in_len, 1, from) != 1)
 	    {
-	      perror ("can't read data");
-	      exit (1);
+	      perror("can't read data");
+	      exit(1);
 	    }
 	  out_len =
-	    unchecked_decompress_buf (inb, in_len, outb, sizeof (outb));
-	  if (fwrite (outb, out_len, 1, to) != 1)
+	    unchecked_decompress_buf(inb, in_len, outb, sizeof(outb));
+	  if (fwrite(outb, out_len, 1, to) != 1)
 	    {
-	      perror ("can't write output");
-	      exit (1);
+	      perror("can't write output");
+	      exit(1);
 	    }
 	}
     }
@@ -902,7 +902,7 @@ transfer_file (FILE * from, FILE * to, int compress)
 
 /* Just for benchmarking purposes.  */
 static void
-dumb_memcpy (void *dest, const void *src, unsigned int len)
+dumb_memcpy(void *dest, const void *src, unsigned int len)
 {
   char *d = dest;
   const char *s = src;
@@ -911,16 +911,16 @@ dumb_memcpy (void *dest, const void *src, unsigned int len)
 }
 
 static void
-benchmark (FILE * from)
+benchmark(FILE * from)
 {
   unsigned char inb[BLOCK_SIZE];
   unsigned char outb[BLOCK_SIZE];
-  unsigned int in_len = fread (inb, 1, BLOCK_SIZE, from);
+  unsigned int in_len = fread(inb, 1, BLOCK_SIZE, from);
   unsigned int out_len;
   if (!in_len)
     {
-      perror ("can't read from input");
-      exit (1);
+      perror("can't read from input");
+      exit(1);
     }
 
   unsigned int calib_loop;
@@ -932,71 +932,71 @@ benchmark (FILE * from)
 #if 0
   calib_loop = 1;
   per_loop = 0;
-  start = clock ();
-  while ((clock () - start) < CLOCKS_PER_SEC / 4)
+  start = clock();
+  while ((clock() - start) < CLOCKS_PER_SEC / 4)
     {
       calib_loop *= 2;
       for (i = 0; i < calib_loop; i++)
-	dumb_memcpy (outb, inb, in_len);
+	dumb_memcpy(outb, inb, in_len);
       per_loop += calib_loop;
     }
 
-  fprintf (stderr, "memcpy:\nCalibrated to %d iterations per loop\n",
+  fprintf(stderr, "memcpy:\nCalibrated to %d iterations per loop\n",
 	   per_loop);
 
-  start = clock ();
+  start = clock();
   for (i = 0; i < 10; i++)
     for (j = 0; j < per_loop; j++)
-      dumb_memcpy (outb, inb, in_len);
-  end = clock ();
+      dumb_memcpy(outb, inb, in_len);
+  end = clock();
   seconds = (end - start) / (float) CLOCKS_PER_SEC;
-  fprintf (stderr, "%.2f seconds == %.2f MB/s\n", seconds,
+  fprintf(stderr, "%.2f seconds == %.2f MB/s\n", seconds,
 	   ((long long) in_len * per_loop * 10) / (1024 * 1024 * seconds));
 #endif
 
   calib_loop = 1;
   per_loop = 0;
-  start = clock ();
-  while ((clock () - start) < CLOCKS_PER_SEC / 4)
+  start = clock();
+  while ((clock() - start) < CLOCKS_PER_SEC / 4)
     {
       calib_loop *= 2;
       for (i = 0; i < calib_loop; i++)
-	compress_buf(inb, in_len, outb, sizeof (outb));
+	compress_buf(inb, in_len, outb, sizeof(outb));
       per_loop += calib_loop;
     }
 
   fprintf(stderr, "compression:\nCalibrated to %d iterations per loop\n",
 	   per_loop);
 
-  start = clock ();
+  start = clock();
   for (i = 0; i < 10; i++)
     for (j = 0; j < per_loop; j++)
-      compress_buf (inb, in_len, outb, sizeof (outb));
-  end = clock ();
+      compress_buf(inb, in_len, outb, sizeof(outb));
+  end = clock();
   seconds = (end - start) / (float) CLOCKS_PER_SEC;
   fprintf(stderr, "%.2f seconds == %.2f MB/s\n", seconds,
 	   ((long long) in_len * per_loop * 10) / (1024 * 1024 * seconds));
 
-  out_len = compress_buf(inb, in_len, outb, sizeof (outb));
+  out_len = compress_buf(inb, in_len, outb, sizeof(outb));
 
   calib_loop = 1;
   per_loop = 0;
-  start = clock ();
-  while ((clock () - start) < CLOCKS_PER_SEC / 4)
+  start = clock();
+  while ((clock() - start) < CLOCKS_PER_SEC / 4)
     {
       calib_loop *= 2;
       for (i = 0; i < calib_loop; i++)
-	unchecked_decompress_buf(outb, out_len, inb, sizeof (inb));
+	unchecked_decompress_buf(outb, out_len, inb, sizeof(inb));
       per_loop += calib_loop;
     }
 
   fprintf(stderr, "decompression:\nCalibrated to %d iterations per loop\n",
 	   per_loop);
 
-  start = clock ();
+  start = clock();
   for (i = 0; i < 10; i++)
     for (j = 0; j < per_loop; j++)
-      unchecked_decompress_buf(outb, out_len, inb, sizeof (inb));
+      unchecked_decompress_buf(outb, out_len, inb, sizeof(inb));
   end = clock();
   seconds = (end - start) / (float) CLOCKS_PER_SEC;
   fprintf(stderr, "%.2f seconds == %.2f MB/s\n", seconds,
@@ -1004,15 +1004,15 @@ benchmark (FILE * from)
 }
 
 int
-main (int argc, char *argv[])
+main(int argc, char *argv[])
 {
   int compress = 1;
-  if (argc > 1 && !strcmp (argv[1], "-d"))
+  if (argc > 1 && !strcmp(argv[1], "-d"))
     compress = 0;
-  if (argc > 1 && !strcmp (argv[1], "-b"))
-    benchmark (stdin);
+  if (argc > 1 && !strcmp(argv[1], "-b"))
+    benchmark(stdin);
   else
-    transfer_file (stdin, stdout, compress);
+    transfer_file(stdin, stdout, compress);
   return 0;
 }
 

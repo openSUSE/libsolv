@@ -77,7 +77,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
       i = split(line + 5, sp, 4); /* name, <op>, evr, ? */
       if (i != 1 && i != 3) /* expect either 'name' or 'name' <op> 'evr' */
         {
-          fprintf(stderr, "Bad dependency line: %d: %s\n", pd->lineno, line);
+	  pool_debug(pool, SAT_FATAL, "susetags: bad dependency line: %d: %s\n", pd->lineno, line);
           exit(1);
         }
       if (kind)
@@ -92,7 +92,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
               break;
           if (flags == 6)
             {
-              fprintf(stderr, "Unknown relation %d: '%s'\n", pd->lineno, sp[1]);
+	      pool_debug(pool, SAT_FATAL, "susetags: unknown relation in %d: '%s'\n", pd->lineno, sp[1]);
               exit(1);
             }
           id = rel2id(pool, id, evrid, flags + 1, 1);
@@ -117,7 +117,7 @@ add_location(struct parsedata *pd, char *line, Solvable *s, Id handle)
   i = split(line, sp, 3);
   if (i != 2 && i != 3)
     {
-      fprintf(stderr, "Bad location line: %d: %s\n", pd->lineno, line);
+      pool_debug(pool, SAT_FATAL, "susetags: bad location line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
   /* If we have a dirname, let's see if it's the same as arch.  In that
@@ -187,7 +187,7 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
 
   if (split(line, sp, 5) != 4)
     {
-      fprintf(stderr, "Bad source line: %d: %s\n", pd->lineno, line);
+      pool_debug(pool, SAT_FATAL, "susetags: bad source line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
 
@@ -244,7 +244,7 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
   Id type;
   if (split(line, sp, 3) != 2)
     {
-      fprintf(stderr, "Bad source line: %d: %s\n", pd->lineno, line);
+      pool_debug(pd->repo->pool, SAT_FATAL, "susetags: bad checksum line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
   if (!strcasecmp (sp[0], "sha1"))
@@ -253,12 +253,12 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
     l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
   else
     {
-      fprintf(stderr, "Unknown checksum type: %d: %s\n", pd->lineno, sp[0]);
+      pool_debug(pd->repo->pool, SAT_FATAL, "susetags: unknown checksum type: %d: %s\n", pd->lineno, sp[0]);
       exit(1);
     }
   if (strlen(sp[1]) != l)
     {
-      fprintf(stderr, "Invalid checksum length: %d: for %s: %s\n", pd->lineno, sp[0], sp[1]);
+      pool_debug(pd->repo->pool, SAT_FATAL, "susetags: bad checksum length: %d: for %s: %s\n", pd->lineno, sp[0], sp[1]);
       exit(1);
     }
   repodata_set_checksum(data, handle, keyname, type, sp[1]);
@@ -559,7 +559,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	  if (is_end
 	      && strncmp(linep - 1 - intag, line + 1, intag))
 	    {
-	      fprintf(stderr, "Nonmatching multi-line tags: %d: '%s' '%s' %d\n", pd.lineno, linep - 1 - intag, line + 1, intag);
+	      pool_debug(pool, SAT_ERROR, "susetags: Nonmatching multi-line tags: %d: '%s' '%s' %d\n", pd.lineno, linep - 1 - intag, line + 1, intag);
 	    }
 	  if (cummulate && !is_end)
 	    {
@@ -591,7 +591,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	  char *tagend = strchr(line, ':');
 	  if (!tagend)
 	    {
-	      fprintf(stderr, "bad line: %d: %s\n", pd.lineno, line);
+	      pool_debug(pool, SAT_FATAL, "susetags: bad line: %d: %s\n", pd.lineno, line);
 	      exit(1);
 	    }
 	  intag = tagend - (line + 1);
@@ -666,7 +666,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 
           if (split(line + 5, sp, 5) != 4)
 	    {
-	      fprintf(stderr, "Bad line: %d: %s\n", pd.lineno, line);
+	      pool_debug(pool, SAT_FATAL, "susetags: bad line: %d: %s\n", pd.lineno, line);
 	      exit(1);
 	    }
 	  /* Lookup (but don't construct) the name and arch.  */
@@ -964,7 +964,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    break;
 
 	  default:
-            fprintf(stderr,"unknown line %s\n", line);
+	    pool_debug(pool, SAT_ERROR, "susetags: unknown line: %d: %s\n", pd.lineno, line);
 	    break;
 	}
 
@@ -985,7 +985,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	  {
 	    if (split(pd.share_with[i], sp, 5) != 4)
 	      {
-	        fprintf(stderr, "Bad =Shr line: %s\n", pd.share_with[i]);
+		pool_debug(pool, SAT_FATAL, "susetags: bad =Shr line: %s\n", pd.share_with[i]);
 	        exit(1);
 	      }
 

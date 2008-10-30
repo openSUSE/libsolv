@@ -271,7 +271,7 @@ endElement(void *userData, const char *name)
       if (pd->ctime)
         repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, pd->ctime);
 
-      if ( pd->basename )
+      if (pd->basename)
         repodata_set_str(pd->data, pd->handle, PRODUCT_REFERENCEFILE, pd->basename);
 
       /* this is where <productsdir>/baseproduct points to */
@@ -659,7 +659,6 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, const char 
   sat_free((void *)pd.tmplang);
   sat_free(pd.content);
   join_freemem();
-
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

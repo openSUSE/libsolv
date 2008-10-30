@@ -70,7 +70,7 @@ stringpool_clone(Stringpool *ss, Stringpool *from)
 }
 
 Id
-stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
+stringpool_strn2id(Stringpool *ss, const char *str, unsigned len, int create)
 {
   Hashval h;
   unsigned int hh;
@@ -148,18 +148,18 @@ stringpool_strn2id (Stringpool *ss, const char *str, unsigned len, int create)
 }
 
 Id
-stringpool_str2id (Stringpool *ss, const char *str, int create)
+stringpool_str2id(Stringpool *ss, const char *str, int create)
 {
-  if ( !str )
+  if (!str)
     return STRID_NULL;
-  if ( !*str )
+  if (!*str)
     return STRID_EMPTY;
-  unsigned len = strlen (str);
-  return stringpool_strn2id (ss, str, len, create);
+  unsigned len = strlen(str);
+  return stringpool_strn2id(ss, str, len, create);
 }
 
 void
-stringpool_shrink (Stringpool *ss)
+stringpool_shrink(Stringpool *ss)
 {
   ss->stringspace = sat_extend_resize(ss->stringspace, ss->sstrings, 1, STRINGSPACE_BLOCK);
   ss->strings = sat_extend_resize(ss->strings, ss->nstrings, sizeof(Offset), STRING_BLOCK);

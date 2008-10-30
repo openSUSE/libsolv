@@ -17,17 +17,6 @@
 #include "pool.h"
 #include "repodata.h"
 
-typedef struct _Repokey {
-  Id name;
-  Id type;		 /* REPOKEY_TYPE_xxx */
-  unsigned int size;
-  unsigned int storage; /* KEY_STORAGE_xxx */
-} Repokey;
-
-#define KEY_STORAGE_DROPPED             0
-#define KEY_STORAGE_SOLVABLE		1
-#define KEY_STORAGE_INCORE		2
-#define KEY_STORAGE_VERTICAL_OFFSET	3
 
 
 typedef struct _Repo {
@@ -197,31 +186,6 @@ Id repo_lookup_id(Repo *repo, Id entry, Id keyid);
 int repo_lookup_void(Repo *repo, Id entry, Id keyid);
 const unsigned char *repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyid, Id *typep);
 
-
-#if 0
-typedef struct _Dataiterator
-{
-  Repodata *data;
-  Id *keyp;
-  unsigned char *nextkeydp;
-  unsigned char *dp;
-  Repokey *key;
-  Repo *repo;
-  Id *idp;
-  const char *match;
-  Id solvid;
-  Id keyname;
-  unsigned flags;
-  unsigned state;
-  KeyValue kv;
-  regex_t regex;
-  int regex_err;
-  Id *subkeyp;
-  int subnum;
-  Id subschema;
-} Dataiterator;
-#else
-
 typedef struct _Datamatcher {
   int flags;
   void *match;
@@ -267,8 +231,6 @@ typedef struct _Dataiterator
   int nkeynames;
 
 } Dataiterator;
-
-#endif
 
 int datamatcher_init(Datamatcher *ma, const char *match, int flags);
 void datamatcher_free(Datamatcher *ma);

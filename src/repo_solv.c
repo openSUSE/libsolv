@@ -955,10 +955,10 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       schemadatap = read_idarray(&data, numid, 0, schemadatap, schemadataend);
 #if 0
       Id *sp = schemadata + schemata[i];
-      fprintf (stderr, "schema %d:", i);
+      fprintf(stderr, "schema %d:", i);
       for (; *sp; sp++)
-        fprintf (stderr, " %d", *sp);
-      fprintf (stderr, "\n");
+        fprintf(stderr, " %d", *sp);
+      fprintf(stderr, "\n");
 #endif
     }
   data.schemata = schemata;

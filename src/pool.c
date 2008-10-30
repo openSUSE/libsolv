@@ -261,7 +261,9 @@ pool_createwhatprovides(Pool *pool)
   Offset *whatprovides;
   Id *whatprovidesdata, *d;
   Repo *installed = pool->installed;
+  unsigned int now;
 
+  now = sat_timems(0);
   POOL_DEBUG(SAT_DEBUG_STATS, "number of solvables: %d\n", pool->nsolvables);
   POOL_DEBUG(SAT_DEBUG_STATS, "number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
 
@@ -354,6 +356,7 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
   pool_shrink_whatprovides(pool);
+  POOL_DEBUG(SAT_DEBUG_STATS, "createwhatprovides took %d ms\n", sat_timems(now));
 }
 
 /*

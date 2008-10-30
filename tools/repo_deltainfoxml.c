@@ -285,7 +285,7 @@ startElement(void *userData, const char *name, const char **atts)
   const char *str;
 
 #if 0
-      fprintf(stderr, "start: [%d]%s\n", pd->state, name);
+  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
     {
@@ -301,7 +301,7 @@ startElement(void *userData, const char *name, const char **atts)
       break;
   if (sw->from != pd->state)
     {
-#if 1
+#if 0
       fprintf(stderr, "into unknown: [%d]%s (from: %d)\n", sw->to, name, sw->from);
       exit( 1 );
 #endif
@@ -355,7 +355,7 @@ startElement(void *userData, const char *name, const char **atts)
 	  else if (!strcasecmp(str, "md5"))
 	    pd->delta.filechecksumtype = REPOKEY_TYPE_MD5;
 	  else
-	    fprintf(stderr, "warning: unknown checksum type: '%s'\n", str);
+	    pool_debug(pool, SAT_ERROR, "unknown checksum type: '%s'\n", str);
 	}
     case STATE_SEQUENCE:
       break;
@@ -373,12 +373,12 @@ endElement(void *userData, const char *name)
   const char *str;
 
 #if 0
-      fprintf(stderr, "end: %s\n", name);
+  fprintf(stderr, "end: %s\n", name);
 #endif
   if (pd->depth != pd->statedepth)
     {
       pd->depth--;
-#if 1
+#if 0
       fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
 #endif
       return;
@@ -585,7 +585,7 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  fprintf(stderr, "repo_updateinfoxml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  pool_debug(pool, SAT_FATAL, "repo_updateinfoxml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
 	  exit(1);
 	}
       if (l == 0)

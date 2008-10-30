@@ -27,6 +27,7 @@ extern void *sat_realloc(void *, size_t);
 extern void *sat_realloc2(void *, size_t, size_t);
 extern void *sat_free(void *);
 extern void sat_oom(size_t, size_t);
+extern unsigned int sat_timems(unsigned int subtract);
 
 static inline void *sat_extend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
 {
