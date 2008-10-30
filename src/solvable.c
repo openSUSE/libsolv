@@ -191,6 +191,17 @@ solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep)
   return chk ? repodata_chk2str(s->repo->repodata, *typep, chk) : 0;
 }
 
+static inline const char *
+evrid2vrstr(Pool *pool, Id evrid)
+{
+  const char *p, *evr = id2str(pool, evrid);
+  if (!evr)
+    return evr;
+  for (p = evr; *p >= '0' && *p <= '9'; p++)
+    ;
+  return p != evr && *p == ':' ? p + 1 : evr;
+}
+
 char *
 solvable_get_location(Solvable *s, unsigned int *medianrp)
 {
@@ -214,9 +225,9 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
     {
       const char *name, *evr, *arch;
       name = id2str(pool, s->name);
-      evr = id2str(pool, s->evr);
+      evr = evrid2vrstr(pool, s->evr);
       arch = id2str(pool, s->arch);
-      /* name-evr.arch.rpm */
+      /* name-vr.arch.rpm */
       loc = pool_alloctmpspace(pool, l + strlen(name) + strlen(evr) + strlen(arch) + 7);
       if (mediadir)
 	sprintf(loc, "%s/%s-%s.%s.rpm", mediadir, name, evr, arch);

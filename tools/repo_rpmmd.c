@@ -773,19 +773,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_LOCATION:
       str = find_attr("href", atts);
       if (str)
-	{
-	  const char *str2 = strrchr(str, '/');
-	  if (str2)
-	    {
-	      char *str3 = strdup(str);
-	      str3[str2 - str] = 0;
-	      repodata_set_poolstr(pd->data, handle, SOLVABLE_MEDIADIR, str3);
-	      free(str3);
-              repodata_set_str(pd->data, handle, SOLVABLE_MEDIAFILE, str2 + 1);
-	    }
-	  else
-            repodata_set_str(pd->data, handle, SOLVABLE_MEDIAFILE, str);
-	}
+	repodata_set_location(pd->data, handle, 0, 0, str);
       break;
     case STATE_CHECKSUM:
       pd->tmpattr = find_attr("type", atts);

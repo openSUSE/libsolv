@@ -234,5 +234,6 @@ Id repodata_globalize_id(Repodata *data, Id id);
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
 const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
+void repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, const char *file);
 
 #endif /* SATSOLVER_REPODATA_H */

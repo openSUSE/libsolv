@@ -103,77 +103,6 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 
 
 /*
- * add_location
- *
- */
-
-static void
-add_location(struct parsedata *pd, char *line, Solvable *s, Id handle)
-{
-  Pool *pool = s->repo->pool;
-  char *sp[3];
-  int i;
-
-  i = split(line, sp, 3);
-  if (i != 2 && i != 3)
-    {
-      pool_debug(pool, SAT_FATAL, "susetags: bad location line: %d: %s\n", pd->lineno, line);
-      exit(1);
-    }
-  /* If we have a dirname, let's see if it's the same as arch.  In that
-     case don't store it.  */
-  if (i == 3 && !strcmp (sp[2], id2str (pool, s->arch)))
-    sp[2] = 0, i = 2;
-  if (i == 3 && sp[2])
-    {
-      /* medianr filename dir
-         don't optimize this one */
-      repodata_set_constant(pd->data, handle, SOLVABLE_MEDIANR, atoi(sp[0]));
-      repodata_set_poolstr(pd->data, handle, SOLVABLE_MEDIADIR, sp[2]);
-      repodata_set_str(pd->data, handle, SOLVABLE_MEDIAFILE, sp[1]);
-      return;
-    }
-  else
-    {
-      /* Let's see if we can optimize this a bit.  If the media file name
-         can be formed by the base rpm information we don't store it, but
-	 only a flag that we've seen it.  */
-      unsigned int medianr = atoi (sp[0]);
-      const char *n1 = sp[1];
-      const char *n2 = id2str (pool, s->name);
-      for (n2 = id2str (pool, s->name); *n2; n1++, n2++)
-        if (*n1 != *n2)
-	  break;
-      if (*n2 || *n1 != '-')
-        goto nontrivial;
-
-      n1++;
-      for (n2 = id2str (pool, s->evr); *n2; n1++, n2++)
-	if (*n1 != *n2)
-	  break;
-      if (*n2 || *n1 != '.')
-        goto nontrivial;
-      n1++;
-      for (n2 = id2str (pool, s->arch); *n2; n1++, n2++)
-	if (*n1 != *n2)
-	  break;
-      if (*n2 || strcmp (n1, ".rpm"))
-        goto nontrivial;
-
-      repodata_set_constant(pd->data, handle, SOLVABLE_MEDIANR, medianr);
-      repodata_set_void(pd->data, handle, SOLVABLE_MEDIADIR);
-      repodata_set_void(pd->data, handle, SOLVABLE_MEDIAFILE);
-      return;
-
-nontrivial:
-      repodata_set_constant(pd->data, handle, SOLVABLE_MEDIANR, medianr);
-      repodata_set_void(pd->data, handle, SOLVABLE_MEDIADIR);
-      repodata_set_str(pd->data, handle, SOLVABLE_MEDIAFILE, sp[1]);
-      return;
-    }
-}
-
-/*
  * add_source
  *
  */
@@ -329,8 +258,8 @@ commit_diskusage (struct parsedata *pd, Id handle)
   unsigned slen = sizeof (sbuf);
   for (i = 0; i < pd->ndirs; i++)
     {
-      dir2str (attr, pd->dirs[i][0], &buf, &slen);
-      fprintf (stderr, "have dir %d %d %d %s\n", pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2], buf);
+      dir2str(attr, pd->dirs[i][0], &buf, &slen);
+      fprintf(stderr, "have dir %d %d %d %s\n", pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2], buf);
     }
   if (buf != sbuf)
     free (buf);
@@ -736,7 +665,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	 solvables.  */
       if (indesc >= 2 && !s)
         {
-	  fprintf (stderr, "Huh %d: %s?\n", pd.lineno, line);
+	  pool_debug(pool, SAT_ERROR, "susetags: huh %d: %s?\n", pd.lineno, line);
           continue;
 	}
       switch (tag)
@@ -838,13 +767,21 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    repodata_set_poolstr(data, handle, SOLVABLE_LICENSE, line + 6);
 	    continue;
           case CTAG('=', 'L', 'o', 'c'):
-	    add_location(&pd, line + 6, s, handle);
+	    {
+	      int i = split(line + 6, sp, 3);
+	      if (i != 2 && i != 3)
+		{
+		  pool_debug(pool, SAT_FATAL, "susetags: bad location line: %d: %s\n", pd.lineno, line);
+		  exit(1);
+		}
+	      repodata_set_location(data, handle, atoi(sp[0]), i == 3 ? sp[2] : id2str(pool, s->arch), sp[1]);
+	    }
 	    continue;
           case CTAG('=', 'S', 'r', 'c'):
 	    add_source(&pd, line + 6, s, handle);
 	    continue;
           case CTAG('=', 'S', 'i', 'z'):
-	    if (split (line + 6, sp, 3) == 2)
+	    if (split(line + 6, sp, 3) == 2)
 	      {
 		repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)(atoi(sp[0]) + 1023) / 1024);
 		repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, (unsigned int)(atoi(sp[1]) + 1023) / 1024);

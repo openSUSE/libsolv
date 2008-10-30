@@ -1545,62 +1545,6 @@ getu32(unsigned char *dp)
 }
 
 
-static void
-add_location(Repodata *data, Solvable *s, Id handle, const char *location)
-{
-  Pool *pool = s->repo->pool;
-  const char *name, *n1, *n2;
-  int l;
-
-  /* skip ./ prefix */
-  if (location[0] == '.' && location[1] == '/' && location[2] != '/')
-    location += 2;
-
-  name = strrchr(location, '/');
-  if (!name)
-    name = location;
-  else
-    {
-      name++;
-      n2 = id2str(pool, s->arch);
-      l = strlen(n2);
-      if (strncmp(location, n2, l) != 0 || location + l + 1 != name)
-	{
-	  /* too bad, need to store directory */
-	  char *dir = strdup(location);
-	  dir[name - location - 1] = 0;
-	  repodata_set_str(data, handle, SOLVABLE_MEDIADIR, dir);
-	  free(dir);
-	}
-      else
-        repodata_set_void(data, handle, SOLVABLE_MEDIADIR);
-    }
-  n1 = name;
-  for (n2 = id2str(pool, s->name); *n2; n1++, n2++)
-    if (*n1 != *n2)
-      break;
-  if (*n2 || *n1 != '-')
-    goto nontrivial;
-  n1++;
-  for (n2 = id2str (pool, s->evr); *n2; n1++, n2++)
-    if (*n1 != *n2)
-      break;
-  if (*n2 || *n1 != '.')
-    goto nontrivial;
-  n1++;
-  for (n2 = id2str (pool, s->arch); *n2; n1++, n2++)
-    if (*n1 != *n2)
-      break;
-  if (*n2 || strcmp (n1, ".rpm"))
-    goto nontrivial;
-  repodata_set_void(data, handle, SOLVABLE_MEDIAFILE);
-  return;
-
-nontrivial:
-  repodata_set_str(data, handle, SOLVABLE_MEDIAFILE, name);
-  return;
-}
-
 void
 repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 {
@@ -1728,7 +1672,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
       if (data)
 	{
 	  Id handle = s - pool->solvables;
-	  add_location(data, s, handle, rpms[i]);
+	  repodata_set_location(data, handle, 0, 0, rpms[i]);
 	  repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
 	  repodata_set_num(data, handle, SOLVABLE_HEADEREND, headerend);
 	}
