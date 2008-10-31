@@ -60,12 +60,13 @@ main(int argc, char **argv)
   const char *basefile = 0;
   char *proddir = 0;
   const char *attribute = 0;
+  char *outfile = 0;
 
   /*
    * parse arguments
    */
   
-  while ((c = getopt(argc, argv, "Pa:hnxb:r:p:")) >= 0)
+  while ((c = getopt(argc, argv, "Pa:hnxb:r:p:o:")) >= 0)
     switch (c)
       {
       case 'h':
@@ -92,10 +93,19 @@ main(int argc, char **argv)
       case 'x':
         extrapool = 1;
         break;
+      case 'o':
+        outfile = optarg;
+        break;
       default:
 	usage(1);
       }
   
+  if (outfile && !freopen(outfile, "w", stdout))
+    {
+      perror(outfile);
+      exit(1);
+    }
+    
   /*
    * ???
    */
