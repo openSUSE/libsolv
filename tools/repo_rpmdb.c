@@ -1174,6 +1174,50 @@ mkrpmdbcookie(struct stat *st, unsigned char *cookie)
   memcpy(cookie + 24, &st->st_dev, sizeof(st->st_dev));
 }
 
+static int
+count_headers(const char *rootdir, DB_ENV *dbenv)
+{
+  char dbpath[PATH_MAX];
+  struct stat statbuf;
+  int byteswapped;
+  DB *db = 0;
+  DBC *dbc = 0;
+  int count = 0;
+  DBT dbkey;
+  DBT dbdata;
+
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", rootdir);
+  if (stat(dbpath, &statbuf))
+    return 0;
+  memset(&dbkey, 0, sizeof(dbkey));
+  memset(&dbdata, 0, sizeof(dbdata));
+  if (db_create(&db, dbenv, 0))
+    {
+      perror("db_create");
+      exit(1);
+    }
+  if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
+    {
+      perror("db->open var/lib/rpm/Name");
+      exit(1);
+    }
+  if (db->get_byteswapped(db, &byteswapped))
+    {
+      perror("db->get_byteswapped");
+      exit(1);
+    }
+  if (db->cursor(db, NULL, &dbc, 0))
+    {
+      perror("db->cursor");
+      exit(1);
+    }
+  while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
+    count += dbdata.size >> 3;
+  dbc->c_close(dbc);
+  db->close(db, 0);
+  return count;
+}
+
 /*
  * read rpm db as repo
  * 
@@ -1206,6 +1250,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   const unsigned char *oldcookie = 0;
   Id oldcookietype = 0;
   Repodata *data;
+  int count = 0, done = 0;
   
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
@@ -1254,6 +1299,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   if (!ref || !oldcookie || oldcookietype != REPOKEY_TYPE_SHA256 || memcmp(oldcookie, newcookie, 32) != 0)
     {
       Id *pkgids;
+
+      if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+	count = count_headers(rootdir, dbenv);
       if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
 	{
 	  perror("db->open var/lib/rpm/Packages");
@@ -1326,6 +1374,13 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 		 associated with this repo.  */
 	      memset(s, 0, sizeof(*s));
 	      s->repo = repo;
+	    }
+	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+	    {
+	      if (done < count)
+	        done++;
+	      if (done < count && (done - 1) * 100 / count != done * 100 / count)
+	        pool_debug(pool, SAT_ERROR, "%%%% %d\n", done * 100 / count);
 	    }
 	}
       if (s)
@@ -1415,7 +1470,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       /* sort rpmids */
       qsort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp);
 
-      rp = rpmids;
       dbidp = (unsigned char *)&dbid;
       rpmheadsize = 0;
       rpmhead = 0;
@@ -1432,12 +1486,34 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	    h = (h + 317) & refmask;
 	  refhash[h] = i + 1;	/* make it non-zero */
 	}
+      
+      /* count the misses, they will cost us time */
+      if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+        {
+	  for (i = 0, rp = rpmids; i < nrpmids; i++, rp++)
+	    {
+	      dbid = rp->dbid;
+	      if (refhash)
+		{
+		  h = dbid & refmask;
+		  while ((id = refhash[h]))
+		    {
+		      if (ref->rpmdbid[id - 1] == dbid)
+			break;
+		      h = (h + 317) & refmask;
+		    }
+		  if (id)
+		    continue;
+		}
+	      count++;
+	    }
+        }
 
       s = pool_id2solvable(pool, repo_add_solvable_block(repo, nrpmids));
       if (!repo->rpmdbid)
         repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 
-      for (i = 0; i < nrpmids; i++, rp++, s++)
+      for (i = 0, rp = rpmids; i < nrpmids; i++, rp++, s++)
 	{
 	  dbid = rp->dbid;
 	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
@@ -1517,6 +1593,13 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 
 	  rpm2solv(pool, repo, data, s, rpmhead);
+	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+	    {
+	      if (done < count)
+		done++;
+	      if (done < count && (done - 1) * 100 / count != done * 100 / count)
+		pool_debug(pool, SAT_ERROR, "%%%% %d\n", done * 100 / count);
+	    }
 	}
 
       if (refhash)
@@ -1535,6 +1618,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   if (db)
     db->close(db, 0);
   dbenv->close(dbenv, 0);
+  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+    pool_debug(pool, SAT_ERROR, "%%%% 100\n");
 }
 
 

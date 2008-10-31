@@ -53,7 +53,7 @@ main(int argc, char **argv)
   Repodata *data;
   FILE *fp;
   Pool *refpool;
-  int c;
+  int c, percent = 0;
   int extrapool = 0;
   int nopacks = 0;
   const char *root = 0;
@@ -65,7 +65,7 @@ main(int argc, char **argv)
    * parse arguments
    */
   
-  while ((c = getopt (argc, argv, "a:hnxb:r:p:")) >= 0)
+  while ((c = getopt(argc, argv, "Pa:hnxb:r:p:")) >= 0)
     switch (c)
       {
       case 'h':
@@ -82,6 +82,9 @@ main(int argc, char **argv)
         break;
       case 'n':
 	nopacks = 1;
+	break;
+      case 'P':
+	percent = 1;
 	break;
       case 'p':
 	proddir = optarg;
@@ -125,7 +128,7 @@ main(int argc, char **argv)
   data = repo_add_repodata(repo, 0);
 
   if (!nopacks)
-    repo_add_rpmdb(repo, ref, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+    repo_add_rpmdb(repo, ref, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0));
 
   if (proddir && *proddir)
     {

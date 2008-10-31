@@ -7,3 +7,5 @@
 
 extern void repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags);
 extern void repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags);
+
+#define RPMDB_REPORT_PROGRESS (1 << 8)
