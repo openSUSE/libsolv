@@ -812,7 +812,7 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
     }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      if (entry && (entry < data->start || entry >= data->end))
+      if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
@@ -834,13 +834,13 @@ repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound)
 
   if (keyname == RPM_RPMDBID)
     {
-      if (repo->rpmdbid && entry && entry >= repo->start && entry < repo->end)
+      if (repo->rpmdbid && entry >= repo->start && entry < repo->end)
 	return repo->rpmdbid[entry - repo->start];
       return notfound;
     }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      if (entry && (entry < data->start || entry >= data->end))
+      if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
@@ -879,7 +879,7 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
     }   
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {   
-      if (entry && (entry < data->start || entry >= data->end))
+      if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
@@ -907,7 +907,7 @@ repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
   int i, j;
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      if (entry && (entry < data->start || entry >= data->end))
+      if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
@@ -932,7 +932,7 @@ repo_lookup_void(Repo *repo, Id entry, Id keyname)
   int i, j;
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
-      if (entry && (entry < data->start || entry >= data->end))
+      if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
