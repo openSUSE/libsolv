@@ -463,7 +463,7 @@ solver_printsolutions(Solver *solv, Queue *job)
 	      if (p == 0)
 		{
 		  /* job, rp is index into job queue */
-		  how = job->elements[rp - 1] & ~SOLVER_WEAK;
+		  how = job->elements[rp - 1];
 		  what = job->elements[rp];
 		  select = how & SOLVER_SELECTMASK;
 		  switch (how & SOLVER_JOBMASK)

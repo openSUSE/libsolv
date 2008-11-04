@@ -230,6 +230,7 @@ typedef struct solver {
 #define SOLVER_JOBMASK			0xff00
 
 #define SOLVER_WEAK			0x010000
+#define SOLVER_ESSENTIAL		0x020000
 
 /* old API compatibility, do not use in new code */
 #if 1

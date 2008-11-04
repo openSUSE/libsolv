@@ -3027,7 +3027,11 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	  else if (v > 0)
 	    nupdate++;
 	  else
-	    njob++;
+	    {
+	      if ((job->elements[-v -1] & SOLVER_ESSENTIAL) != 0)
+		continue;	/* not that one! */
+	      njob++;
+	    }
 	  queue_push(&disabled, v);
 	}
       if (disabled.count == disabledcnt)
@@ -3111,7 +3115,12 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 
 /*-------------------------------------------------------------------
  * sorting helper for problems
+ *
+ * bring update rules before job rules
+ * make essential job rules last
  */
+
+Queue *problems_sort_data;
 
 static int
 problems_sortcmp(const void *ap, const void *bp)
@@ -3121,6 +3130,15 @@ problems_sortcmp(const void *ap, const void *bp)
     return 1;
   if (a > 0 && b < 0)
     return -1;
+  if (a < 0 && b < 0)
+    {
+      Queue *job = problems_sort_data;
+      int af = job->elements[-a - 1] & SOLVER_ESSENTIAL;
+      int bf = job->elements[-a - 1] & SOLVER_ESSENTIAL;
+      int x = bf - af;
+      if (x)
+	return x;
+    }
   return a - b;
 }
 
@@ -3130,7 +3148,7 @@ problems_sortcmp(const void *ap, const void *bp)
  */
 
 static void
-problems_sort(Solver *solv)
+problems_sort(Solver *solv, Queue *job)
 {
   int i, j;
   if (!solv->problems.count)
@@ -3140,7 +3158,10 @@ problems_sort(Solver *solv)
       if (!solv->problems.elements[i])
 	{
 	  if (i > j + 1)
-	    qsort(solv->problems.elements + j, i - j, sizeof(Id), problems_sortcmp);
+	    {
+	      problems_sort_data = job;
+	      qsort(solv->problems.elements + j, i - j, sizeof(Id), problems_sortcmp);
+	    }
 	  if (++i == solv->problems.count)
 	    break;
 	  j = i + 1;
@@ -3162,19 +3183,20 @@ problems_to_solutions(Solver *solv, Queue *job)
   Queue solutions;
   Id *problem;
   Id why;
-  int i, j, nsol;
+  int i, j, nsol, probsolved;
   unsigned int now, refnow;
 
   if (!solv->problems.count)
     return;
   now = sat_timems(0);
-  problems_sort(solv);
+  problems_sort(solv, job);
   queue_clone(&problems, &solv->problems);
   queue_init(&solution);
   queue_init(&solutions);
   /* copy over proof index */
   queue_push(&solutions, problems.elements[0]);
   problem = problems.elements + 1;
+  probsolved = 0;
   refnow = sat_timems(0);
   for (i = 1; i < problems.count; i++)
     {
@@ -3192,7 +3214,14 @@ problems_to_solutions(Solver *solv, Queue *job)
 	  i++;
 	  problem = problems.elements + i + 1;
 	  refnow = sat_timems(0);
+	  probsolved = 0;
 	  continue;
+	}
+      if (v < 0 && (job->elements[-v - 1] & SOLVER_ESSENTIAL))
+	{
+	  /* essential job, skip if we already have a solution */
+	  if (probsolved)
+	    continue;
 	}
       refine_suggestion(solv, job, problem, v, &solution);
       if (!solution.count)
@@ -3260,6 +3289,7 @@ problems_to_solutions(Solver *solv, Queue *job)
       /* mark end of this solution */
       if (nsol)
 	{
+	  probsolved = 1;
 	  queue_push(&solutions, 0);
 	  queue_push(&solutions, 0);
 	}
