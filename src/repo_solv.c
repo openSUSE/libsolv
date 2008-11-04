@@ -537,10 +537,13 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   Id stack[3 * 5];
   int keydepth;
   int needchunk;	/* need a new chunk of data */
+  unsigned int now;
 
   struct _Stringpool *spool;
 
   Repodata data;
+
+  now = sat_timems(0);
 
   memset(&data, 0, sizeof(data));
   data.repo = repo;
@@ -1363,6 +1366,10 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
       memset(&stubdata, 0, sizeof(stubdata));
       repodata_search(&data, SOLVID_META, REPOSITORY_EXTERNAL, SEARCH_ARRAYSENTINEL, create_stub_cb, &stubdata);
     }
+
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_solv took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data.incoredatalen/1024, repo->idarraysize / (1024/sizeof(Id)));
   return 0;
 }
 

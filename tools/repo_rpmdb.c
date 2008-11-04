@@ -1251,13 +1251,14 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   Id oldcookietype = 0;
   Repodata *data;
   int count = 0, done = 0;
+  unsigned int now;
   
+  now = sat_timems(0);
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
 
   if (!rootdir)
     rootdir = "";
-
   
   if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
@@ -1611,15 +1612,18 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  sat_free(rpmids);
 	}
     }
-  if (!(flags & REPO_NO_INTERNALIZE))
-    repodata_internalize(data);
-  if (rpmhead)
-    sat_free(rpmhead);
   if (db)
     db->close(db, 0);
   dbenv->close(dbenv, 0);
+  if (rpmhead)
+    sat_free(rpmhead);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
   if ((flags & RPMDB_REPORT_PROGRESS) != 0)
     pool_debug(pool, SAT_ERROR, "%%%% 100\n");
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmdb took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (1024/sizeof(Id)));
 }
 
 

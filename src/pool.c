@@ -356,6 +356,7 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
   pool_shrink_whatprovides(pool);
+  POOL_DEBUG(SAT_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (1024/sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (1024/sizeof(Id)));
   POOL_DEBUG(SAT_DEBUG_STATS, "createwhatprovides took %d ms\n", sat_timems(now));
 }
 

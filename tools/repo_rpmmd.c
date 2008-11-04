@@ -1092,7 +1092,9 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   int i, l;
   struct stateswitch *sw;
   Repodata *data;
+  unsigned int now;
 
+  now = sat_timems(0);
   if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
   else
@@ -1146,4 +1148,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   sat_free(pd.cscache);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (1024/sizeof(Id)));
 }
