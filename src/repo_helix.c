@@ -820,7 +820,9 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
   char buf[BUFF_SIZE];
   int i, l;
   struct stateswitch *sw;
+  unsigned int now;
 
+  now = sat_timems(0);
   if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
   else
@@ -872,4 +874,7 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_helix took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (1024/sizeof(Id)));
 }
