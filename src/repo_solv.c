@@ -1369,7 +1369,7 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
 
   POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_solv took %d ms\n", sat_timems(now));
   POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data.incoredatalen/1024, repo->idarraysize / (1024/sizeof(Id)));
+  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %ld K incore, %ld K idarray\n", (unsigned long)data.incoredatalen/1024, (unsigned long)repo->idarraysize / (1024/sizeof(Id)));
   return 0;
 }
 
