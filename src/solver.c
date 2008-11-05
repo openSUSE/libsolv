@@ -4108,7 +4108,7 @@ solver_solve(Solver *solv, Queue *job)
   solv->rpmrules_end = solv->nrules;              /* mark end of rpm rules */
 
   solv->directdecisions = solv->decisionq.count;
-  POOL_DEBUG(SAT_DEBUG_STATS, "rpm rule memory usage: %ld K\n", (unsigned long)solv->nrules * sizeof(Rule) / 1024);
+  POOL_DEBUG(SAT_DEBUG_STATS, "rpm rule memory usage: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
   POOL_DEBUG(SAT_DEBUG_STATS, "decisions so far: %d\n", solv->decisionq.count);
   POOL_DEBUG(SAT_DEBUG_STATS, "rpm rule creation took %d ms\n", sat_timems(now));
 
