@@ -3219,9 +3219,11 @@ problems_to_solutions(Solver *solv, Queue *job)
 	}
       if (v < 0 && (job->elements[-v - 1] & SOLVER_ESSENTIAL))
 	{
-	  /* essential job, skip if we already have a solution */
-	  if (probsolved)
+	  /* essential job, skip if we already have a non-essential
+             solution */
+	  if (probsolved > 0)
 	    continue;
+	  probsolved = -1;	/* show all solutions */
 	}
       refine_suggestion(solv, job, problem, v, &solution);
       if (!solution.count)
@@ -3289,7 +3291,8 @@ problems_to_solutions(Solver *solv, Queue *job)
       /* mark end of this solution */
       if (nsol)
 	{
-	  probsolved = 1;
+	  if (!probsolved)
+	    probsolved = 1;
 	  queue_push(&solutions, 0);
 	  queue_push(&solutions, 0);
 	}
