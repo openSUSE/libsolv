@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Nov  6 09:49:51 CET 2008 - kkaempf@suse.de
+
+- Add 'user_data' argument to all applayer iterator callbacks
+  (bnc#418491)
+
+-------------------------------------------------------------------
 Wed Oct 29 12:36:57 CET 2008 - ma@suse.de
 
 - Add 'sh4' architectures.
