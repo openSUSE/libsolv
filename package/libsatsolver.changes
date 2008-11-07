@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Nov  7 11:56:37 CET 2008 - kkaempf@suse.de
+
+- make repo_zyppdb more robust (bnc#441043)
+
+-------------------------------------------------------------------
 Thu Nov  6 09:49:51 CET 2008 - kkaempf@suse.de
 
 - Add 'user_data' argument to all applayer iterator callbacks
