@@ -137,6 +137,7 @@ typedef struct solver {
 
   Id *obsoletes;			/* obsoletes for each installed solvable */
   Id *obsoletes_data;			/* data area for obsoletes */
+  Id *multiversionupdaters;		/* updaters for multiversion packages in updatesystem mode */
 
   /*-------------------------------------------------------------------------------------------------------------
    * Solver configuration
