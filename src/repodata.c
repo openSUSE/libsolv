@@ -1080,6 +1080,8 @@ dataiterator_step(Dataiterator *di)
 	  di->dp = solvid2data(di->data, di->solvid, &schema);
 	  if (!di->dp)
 	    goto di_nextrepodata;
+	  if (di->solvid == SOLVID_POS)
+	    di->solvid = di->pool->pos.solvid;
 	  /* reset key iterator */
 	  di->keyp = di->data->schemadata + di->data->schemata[schema];
 	  /* FALLTHROUGH */
@@ -1280,7 +1282,7 @@ dataiterator_entersub(Dataiterator *di)
 void
 dataiterator_setpos(Dataiterator *di)
 {
-  if (di->kv.eof)
+  if (di->kv.eof == 2)
     {
       pool_clear_pos(di->pool);
       return;
@@ -1295,7 +1297,7 @@ dataiterator_setpos(Dataiterator *di)
 void
 dataiterator_setpos_parent(Dataiterator *di)
 {
-  if (!di->kv.parent)
+  if (!di->kv.parent || di->kv.parent->eof == 2)
     {
       pool_clear_pos(di->pool);
       return;
