@@ -1343,7 +1343,7 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
       di->repoid = -1;
       di->data = di->repo->repodata + di->pool->pos.repodataid;
       di->repodataid = -1;
-      di->solvid = di->pool->pos.solvid;
+      di->solvid = solvid;
       di->state = di_enterrepo;
       di->flags |= SEARCH_THISSOLVID;
       return;
@@ -1790,10 +1790,10 @@ static inline const char *
 evrid2vrstr(Pool *pool, Id evrid)
 {
   const char *p, *evr = id2str(pool, evrid);
-  if (!evr) 
+  if (!evr)
     return evr;
   for (p = evr; *p >= '0' && *p <= '9'; p++)
-    ; 
+    ;
   return p != evr && *p == ':' ? p + 1 : evr;
 }
 
