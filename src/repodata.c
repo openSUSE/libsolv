@@ -987,7 +987,8 @@ dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, co
     dataiterator_jump_to_solvid(di, p);
   else
     {
-      di->repo = pool->repos[0];
+      if (!di->repo)
+        di->repo = pool->repos[0];
       di->state = di_enterrepo;
     }
   return 0;
