@@ -438,8 +438,9 @@ repo_add_product(struct parsedata *pd, FILE *fp, int code11)
 	  l = fread(buf, 1, sizeof(buf), fp);
 	  if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	    {
-	      fprintf(stderr, "%s: %s at line %u:%u\n", pd->filename, XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	      fprintf(stderr, "Skipping this product\n");
+	      pool_debug(pd->pool, SAT_ERROR, "%s: %s at line %u:%u\n", pd->filename, XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	      pool_debug(pd->pool, SAT_ERROR, "Skipping this product\n");
+	      XML_ParserFree(parser);
 	      return;
 	    }
 	  if (l == 0)
@@ -525,7 +526,6 @@ repo_add_product(struct parsedata *pd, FILE *fp, int code11)
 	    s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
 	}
     }
-  return;
 }
 
 
