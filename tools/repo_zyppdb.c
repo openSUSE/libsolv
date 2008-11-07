@@ -318,7 +318,7 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
 	  fprintf(stderr, "repo_zyppdb: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  exit(1);
+	  return;
 	}
       if (l == 0)
 	break;
