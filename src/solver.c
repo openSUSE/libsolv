@@ -1517,6 +1517,34 @@ addupdaterule(Solver *solv, Solvable *s, int allow_all)
   else
     policy_findupdatepackages(solv, s, &qs, allow_all);
   d = qs.count ? pool_queuetowhatprovides(pool, &qs) : 0;
+  if (!allow_all && solv->noobsoletes.size)
+    {
+      int i, j;
+
+      /* filter out all noobsoletes packages as they don't update */
+      for (i = j = 0; i < qs.count; i++)
+	{
+	  if (MAPTST(&solv->noobsoletes, qs.elements[i]))
+	    {
+	      /* it's ok if they have same nevra */
+	      Solvable *ps = pool->solvables + qs.elements[i];
+	      if (ps->name != s->name || ps->evr != s->evr || ps->arch != s->arch)
+	        continue;
+	    }
+	  qs.elements[j++] = qs.elements[i];
+	}
+      if (j < qs.count)
+	{
+	  if (d && solv->updatesystem && solv->installed && s->repo == solv->installed)
+	    {
+	      if (!solv->multiversionupdaters)
+		solv->multiversionupdaters = sat_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
+	      solv->multiversionupdaters[s - pool->solvables - solv->installed->start] = d;
+	    }
+	  qs.count = j;
+	  d = qs.count ? pool_queuetowhatprovides(pool, &qs) : 0;
+	}
+    }
   queue_free(&qs);
   addrule(solv, p, d);	/* allow update of s */
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "-----  addupdaterule end -----\n");
@@ -2402,6 +2430,7 @@ solver_free(Solver *solv)
   sat_free(solv->watches);
   sat_free(solv->obsoletes);
   sat_free(solv->obsoletes_data);
+  sat_free(solv->multiversionupdaters);
   sat_free(solv);
 }
 
@@ -2570,6 +2599,59 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (level <= olevel)
 		    break;
 		}
+	      systemlevel = level + 1;
+	      if (i < solv->installed->end)
+		continue;
+	    }
+	  else if (solv->noobsoletes.size && solv->multiversionupdaters)
+	    {
+	      /* see if we can multi-version install the newest package */
+	      for (i = solv->installed->start; i < solv->installed->end; i++)
+		{
+		  Id d;
+		  s = pool->solvables + i;
+		  if (s->repo != solv->installed)
+		    continue;
+		  if (MAPTST(&solv->noupdate, i - solv->installed->start))
+		    continue;
+		  d = solv->multiversionupdaters[i - solv->installed->start];
+		  if (!d)
+		    continue;
+		  queue_empty(&dq);
+		  while ((p = pool->whatprovidesdata[d++]) != 0)
+		    if (solv->decisionmap[p] >= 0)
+		      queue_push(&dq, p);
+		  policy_filter_unwanted(solv, &dq, i, POLICY_MODE_CHOOSE);
+		  p = dq.elements[0];
+		  if (p != i && solv->decisionmap[p] == 0)
+		    {
+		      olevel = level;
+		      POOL_DEBUG(SAT_DEBUG_POLICY, "installing (multi-version) %s\n", solvable2str(pool, pool->solvables + p));
+		      level = setpropagatelearn(solv, level, p, disablerules);
+		      if (level == 0)
+			{
+			  queue_free(&dq);
+			  return;
+			}
+		      if (level <= olevel)
+			break;
+		    }
+		  p = i;
+		  if (solv->decisionmap[p] == 0)
+		    {
+		      olevel = level;
+		      POOL_DEBUG(SAT_DEBUG_POLICY, "keeping (multi-version) %s\n", solvable2str(pool, pool->solvables + p));
+		      level = setpropagatelearn(solv, level, p, disablerules);
+		      if (level == 0)
+			{
+			  queue_free(&dq);
+			  return;
+			}
+		      if (level <= olevel)
+			break;
+		    }
+		}
+	      systemlevel = level + 1;
 	      if (i < solv->installed->end)
 		continue;
 	    }
@@ -2601,7 +2683,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (!rr->p)	/* identical to update rule? */
 		rr = r;
 	      if (rr->p <= 0)
-		continue;
+		continue;	/* no such rule or disabled */
 	
 	      FOR_RULELITERALS(p, dp, rr)
 		{
