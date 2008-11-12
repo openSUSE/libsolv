@@ -213,7 +213,7 @@ prune_to_best_arch(Pool *pool, Queue *plist)
 }
 
 /*
- * prune_best_version_arch
+ * prune_to_best_version
  *
  * sort list of packages (given through plist) by name and evr
  * return result through plist
