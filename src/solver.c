@@ -1474,7 +1474,7 @@ finddistupgradepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
         return 0;
       policy_findupdatepackages(solv, s, qs, 1);
       if (!qs->count)
-	return 0;
+	return 0;	/* orphaned */
       qs->count = 0;
       return -SYSTEMSOLVABLE;
     }
@@ -1488,7 +1488,7 @@ finddistupgradepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
         return s - pool->solvables;
     }
   /* nope, it must be some other package */
-  return queue_shift(qs);
+  return -SYSTEMSOLVABLE;
 }
 
 /*-------------------------------------------------------------------
@@ -1516,11 +1516,11 @@ addupdaterule(Solver *solv, Solvable *s, int allow_all)
     p = finddistupgradepackages(solv, s, &qs, allow_all);
   else
     policy_findupdatepackages(solv, s, &qs, allow_all);
-  d = qs.count ? pool_queuetowhatprovides(pool, &qs) : 0;
-  if (!allow_all && solv->noobsoletes.size)
+  if (!allow_all && qs.count && solv->noobsoletes.size)
     {
       int i, j;
 
+      d = pool_queuetowhatprovides(pool, &qs);
       /* filter out all noobsoletes packages as they don't update */
       for (i = j = 0; i < qs.count; i++)
 	{
@@ -1533,6 +1533,11 @@ addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	    }
 	  qs.elements[j++] = qs.elements[i];
 	}
+      if (j == 0 && p == -SYSTEMSOLVABLE && solv->distupgrade)
+	{
+	  queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
+	  j = qs.count;
+	}
       if (j < qs.count)
 	{
 	  if (d && solv->updatesystem && solv->installed && s->repo == solv->installed)
@@ -1542,9 +1547,11 @@ addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	      solv->multiversionupdaters[s - pool->solvables - solv->installed->start] = d;
 	    }
 	  qs.count = j;
-	  d = qs.count ? pool_queuetowhatprovides(pool, &qs) : 0;
 	}
     }
+  if (qs.count && p == -SYSTEMSOLVABLE)
+    p = queue_shift(&qs);
+  d = qs.count ? pool_queuetowhatprovides(pool, &qs) : 0;
   queue_free(&qs);
   addrule(solv, p, d);	/* allow update of s */
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "-----  addupdaterule end -----\n");
@@ -2637,7 +2644,14 @@ run_solver(Solver *solv, int disablerules, int doweak)
 			break;
 		    }
 		  p = i;
-		  if (solv->decisionmap[p] == 0)
+		  /* now that the best version is installed, try to
+                   * keep the original one */
+		  if (solv->decisionmap[p])	/* already decided? */
+		   continue;
+		  r = solv->rules + solv->updaterules + (i - solv->installed->start);
+		  if (!r->p)		/* update rule == feature rule? */
+		    r = r - solv->updaterules + solv->featurerules;
+		  if (r->p == p)	/* allowed to keep package? */
 		    {
 		      olevel = level;
 		      POOL_DEBUG(SAT_DEBUG_POLICY, "keeping (multi-version) %s\n", solvable2str(pool, pool->solvables + p));
@@ -2912,29 +2926,25 @@ run_solver(Solver *solv, int disablerules, int doweak)
      if (solv->distupgrade && solv->installed)
 	{
 	  /* let's see if we can install some unsupported package */
-	  int ri;
 	  POOL_DEBUG(SAT_DEBUG_STATS, "deciding unsupported packages\n");
-	  for (i = solv->installed->start, ri = 0; i < solv->installed->end; i++, ri++)
+	  for (i = 0; i < solv->orphaned.count; i++)
 	    {
-	      s = pool->solvables + i;
-	      if (s->repo != solv->installed)
-		continue;
-	      if (solv->decisionmap[i])
-		continue;
-	      if (!solv->rules[solv->updaterules + ri].p && !solv->rules[solv->featurerules + ri].p)
+	      p = solv->orphaned.elements[i];
+	      if (!solv->decisionmap[p])
 		break;
 	    }
-	  if (i < solv->installed->end)
+	  if (i < solv->orphaned.count)
 	    {
+	      p = solv->orphaned.elements[i];
 	      if (solv->distupgrade_removeunsupported)
 		{
-		  POOL_DEBUG(SAT_DEBUG_STATS, "removing unsupported %s\n", solvable2str(pool, pool->solvables + i));
-		  level = setpropagatelearn(solv, level, -i, 0);
+		  POOL_DEBUG(SAT_DEBUG_STATS, "removing unsupported %s\n", solvable2str(pool, pool->solvables + p));
+		  level = setpropagatelearn(solv, level, -p, 0);
 		}
 	      else
 		{
-		  POOL_DEBUG(SAT_DEBUG_STATS, "keeping unsupported %s\n", solvable2str(pool, pool->solvables + i));
-		  level = setpropagatelearn(solv, level, i, 0);
+		  POOL_DEBUG(SAT_DEBUG_STATS, "keeping unsupported %s\n", solvable2str(pool, pool->solvables + p));
+		  level = setpropagatelearn(solv, level, p, 0);
 		}
 	      continue;
 	    }
@@ -3329,7 +3339,7 @@ problems_to_solutions(Solver *solv, Queue *job)
 	  else
 	    {
 	      /* update rule, find replacement package */
-	      Id p, d, *dp, rp = 0;
+	      Id p, *dp, rp = 0;
 	      Rule *rr;
 	      p = solv->installed->start + (why - solv->updaterules);
 	      rr = solv->rules + solv->featurerules + (why - solv->updaterules);
@@ -3347,23 +3357,24 @@ problems_to_solutions(Solver *solv, Queue *job)
 		continue;	/* false alarm, turned out we can keep the package */
 	      if (rr->w2)
 		{
-		  d = rr->d < 0 ? -rr->d - 1 : rr->d;
-		  if (!d)
+		  int mvrp = 0;		/* multi-version replacement */
+	          FOR_RULELITERALS(rp, dp, rr)
 		    {
-		      if (solv->decisionmap[rr->w2] > 0 && pool->solvables[rr->w2].repo != solv->installed)
-			rp = rr->w2;
-		    }
-		  else
-		    {
-		      for (dp = pool->whatprovidesdata + d; *dp; dp++)
+		      if (rp > 0 && solv->decisionmap[rp] > 0 && pool->solvables[rp].repo != solv->installed)
 			{
-			  if (solv->decisionmap[*dp] > 0 && pool->solvables[*dp].repo != solv->installed)
-			    {
-			      rp = *dp;
-			      break;
-			    }
+			  mvrp = rp;
+			  if (!(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, rp)))
+			    break;
 			}
-	 	    }
+		    }
+		  if (!rp && mvrp)
+		    {
+		      /* found only multi-version replacements */
+		      /* have to split solution into two parts */
+		      queue_push(&solutions, p);
+		      queue_push(&solutions, mvrp);
+		      nsol++;
+		    }
 		}
 	      queue_push(&solutions, p);
 	      queue_push(&solutions, rp);
@@ -4266,7 +4277,7 @@ solver_solve(Solver *solv, Queue *job)
 	    queue_push(&solv->orphaned, i);
           if (!r->p)
 	    {
-	      assert(!sr->p);	/* can't have feature rule and no update rule */
+	      assert(solv->distupgrade && !sr->p);
 	      continue;
 	    }
 	  unifyrules_sortcmp_data = pool;
