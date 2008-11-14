@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Nov 14 18:00:19 CET 2008 - mls@suse.de
+
+- fix bugs in multiversion handling
+- bring perl bindings up to speed
+- 0.12.2
+
+-------------------------------------------------------------------
 Fri Nov  7 18:26:07 CET 2008 - ma@suse.de
 
 - fix SOLVID_POS dataiterator handling
