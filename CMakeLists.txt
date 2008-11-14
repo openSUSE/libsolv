@@ -90,7 +90,10 @@ SET (CPACK_SOURCE_IGNORE_FILES
 "CMakeFiles"
 "cmake_install.cmake$"
 "CMakeLists.txt.auto$"
+"CTestTestfile.cmake"
 "CPackConfig.cmake$"
+"CPackSourceConfig.cmake$"
+"libsatsolver.spec$"
 )
 
 INCLUDE(CPack)
@@ -154,6 +157,7 @@ ADD_CUSTOM_TARGET( svncheck
 
 SET( AUTOBUILD_COMMAND
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/package/*.tar.bz2
+  COMMAND mkdir -p _CPack_Packages/${CPACK_TOPLEVEL_TAG}
   COMMAND ${CMAKE_MAKE_PROGRAM} package_source
   COMMAND ${CMAKE_COMMAND} -E copy ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2 ${CMAKE_BINARY_DIR}/package
   COMMAND ${CMAKE_COMMAND} -E remove ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
