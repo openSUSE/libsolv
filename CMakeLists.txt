@@ -48,9 +48,11 @@ SET(CPACK_PACKAGE_VENDOR "Novell Inc.")
 SET(CPACK_PACKAGE_VERSION_MAJOR ${LIBSATSOLVER_MAJOR})
 SET(CPACK_PACKAGE_VERSION_MINOR ${LIBSATSOLVER_MINOR})
 SET(CPACK_PACKAGE_VERSION_PATCH ${LIBSATSOLVER_PATCH})
-SET( CPACK_GENERATOR "TBZ2")
-SET( CPACK_SOURCE_GENERATOR "TBZ2")
-SET( CPACK_SOURCE_PACKAGE_FILE_NAME "${PACKAGE}-${VERSION}" )
+SET(CPACK_GENERATOR "TBZ2")
+SET(CPACK_SOURCE_GENERATOR "TBZ2")
+SET(CPACK_SOURCE_PACKAGE_FILE_NAME "${PACKAGE}-${VERSION}")
+SET(CPACK_SOURCE_TOPLEVEL_TAG "Linux-Source:")
+SET(CPACK_TOPLEVEL_TAG "Linux-Source:")
 
 # The following components are regex's to match anywhere (unless anchored)
 # in absolute path + filename to find files or directories to be excluded
@@ -82,8 +84,6 @@ SET (CPACK_SOURCE_IGNORE_FILES
 "\\\\.lo$"
 "\\\\.la$"
 "Makefile\\\\.in$"
-"testsuite/data.libzypp/kernel-tests/kernel-hardware"
-"testsuite/data.libzypp/yast-tests/kernel3-hardware"
 # cmake cache files
 "CMakeCache.txt"
 "CMakeFiles"
@@ -148,24 +148,11 @@ ADD_CUSTOM_TARGET( svncheck
   COMMAND cd $(CMAKE_SOURCE_DIR) && ! LC_ALL=C svn status --show-updates --quiet | grep -v '^Status against revision'
 )
 
-
-# backup dist command while cpack is kaputt
-SET(DIST_COMMAND 
-  COMMAND rm -rf ${CMAKE_BUILD_DIR}/package/${CPACK_SOURCE_PACKAGE_FILE_NAME}
-#  COMMAND mkdir -p "${CMAKE_BUILD_DIR}/package/${CPACK_SOURCE_PACKAGE_FILE_NAME}"
-                  COMMAND cp -r "${CMAKE_SOURCE_DIR}" "/tmp/${CPACK_SOURCE_PACKAGE_FILE_NAME}"
-                  COMMAND tar -jcf "${CMAKE_BINARY_DIR}/package/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2" -C "/tmp" --exclude-vcs --exclude=".hidden" --exclude="build" ${CPACK_SOURCE_PACKAGE_FILE_NAME} WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-                  COMMAND rm -rf "/tmp/${CPACK_SOURCE_PACKAGE_FILE_NAME}"
-)
-
-ADD_CUSTOM_TARGET( dist ${DIST_COMMAND} )
-
 SET( AUTOBUILD_COMMAND
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/package/*.tar.bz2
-#  COMMAND ${CMAKE_MAKE_PROGRAM} package_source
-  COMMAND ${CMAKE_MAKE_PROGRAM} dist
-  #COMMAND ${CMAKE_COMMAND} -E copy ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2 ${CMAKE_BINARY_DIR}/package
-  #COMMAND ${CMAKE_COMMAND} -E remove ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
+  COMMAND ${CMAKE_MAKE_PROGRAM} package_source
+  COMMAND ${CMAKE_COMMAND} -E copy ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2 ${CMAKE_BINARY_DIR}/package
+  COMMAND ${CMAKE_COMMAND} -E remove ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/package/libsatsolver.changes" "${CMAKE_BINARY_DIR}/package/libsatsolver.changes"
 )
 
