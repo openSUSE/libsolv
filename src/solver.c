@@ -2508,6 +2508,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (analyze_unsolvable(solv, r, disablerules))
 		continue;
 	      queue_free(&dq);
+	      queue_free(&dqs);
 	      return;
 	    }
 	}
@@ -2556,6 +2557,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (level == 0)
 		{
 		  queue_free(&dq);
+		  queue_free(&dqs);
 		  return;
 		}
 	      if (level <= olevel)
@@ -2601,6 +2603,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (level == 0)                /* unsolvable */
 		    {
 		      queue_free(&dq);
+		      queue_free(&dqs);
 		      return;
 		    }
 		  if (level <= olevel)
@@ -2638,6 +2641,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		      if (level == 0)
 			{
 			  queue_free(&dq);
+			  queue_free(&dqs);
 			  return;
 			}
 		      if (level <= olevel)
@@ -2659,6 +2663,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		      if (level == 0)
 			{
 			  queue_free(&dq);
+			  queue_free(&dqs);
 			  return;
 			}
 		      if (level <= olevel)
@@ -2721,6 +2726,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (level == 0)
 		{
 		  queue_free(&dq);
+		  queue_free(&dqs);
 		  return;
 		}
 	      if (level <= olevel)
@@ -2813,6 +2819,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (level == 0)
 	    {
 	      queue_free(&dq);
+	      queue_free(&dqs);
 	      return;
 	    }
 	  if (level < systemlevel)
@@ -2976,6 +2983,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (level == 0)
 		{
 		  queue_free(&dq);
+		  queue_free(&dqs);
 		  return;
 		}
 	      continue;
@@ -3014,6 +3022,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (level == 0)
 		{
 		  queue_free(&dq);
+		  queue_free(&dqs);
 		  return;
 		}
 	      continue;

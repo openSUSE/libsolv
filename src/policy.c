@@ -294,7 +294,7 @@ prune_to_best_version(Solver *solv, Queue *plist)
 
       if (pool->solvables[best].evr != s->evr)   /* compare evr */
         {
-          if (evrcmp(pool, pool->solvables[best].evr, s->evr, EVRCMP_MATCH_RELEASE) < 0)
+          if (evrcmp(pool, pool->solvables[best].evr, s->evr, EVRCMP_COMPARE) < 0)
             best = plist->elements[i];
         }
     }
@@ -429,7 +429,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       ps = pool->solvables + p;
       if (s->name == ps->name)	/* name match */
 	{
-	  if (!allow_all && !solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_MATCH_RELEASE) > 0)
+	  if (!allow_all && !solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_COMPARE) > 0)
 	    continue;
 	}
       else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
