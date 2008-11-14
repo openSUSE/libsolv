@@ -83,10 +83,14 @@ SET (CPACK_SOURCE_IGNORE_FILES
 "\\\\.o$"
 "\\\\.lo$"
 "\\\\.la$"
+"Makefile$"
 "Makefile\\\\.in$"
 # cmake cache files
 "CMakeCache.txt"
 "CMakeFiles"
+"cmake_install.cmake$"
+"CMakeLists.txt.auto$"
+"CPackConfig.cmake$"
 )
 
 INCLUDE(CPack)
