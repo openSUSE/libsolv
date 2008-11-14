@@ -8,31 +8,11 @@ Solver algorithms:
 - vendow changes are allowed from unknown to known. libzypp doesn't
   allow that. Feature?
 
-- arch changes are only considered if the name stays the same, so
-  a rename can install a different architecture.
-
-- same with vendor.
-
 - should prune_best_version_arch consider the arch or the vendor this
   is about an installed package?
 
-- we disable conflicting rules when searching for a suggestion, should
-  we first extend them with arch changes/vendor changes/downgrades?
-  In what order?
-
-- distupdate sets 'allowuninstall'. Should it only allow uninstall
-  for packages that do not have an update in the repositories?
-
-- splitprovides don't work at all.
-
 - repo priorities should influence the order in which package rules
   are fulfilled.
-
-- weak systemrules should be created for all installed packages, so
-  that they are available when the erase rule is disabled if a
-  suggestion is calculated.
-
-- should we implement weak systemrules as weak rules?
 
 - prune_best_version_arch has a n^2 loop when looking at obsoletes.
   Should we create an obsoletes index to speed that up?
