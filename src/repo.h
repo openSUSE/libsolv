@@ -28,6 +28,7 @@ typedef struct _Repo {
   int nsolvables;		/* number of solvables repo is contributing to pool */
 
   int priority;			/* priority of this repo */
+  int subpriority;		/* sub-priority of this repo, used just for sorting, not pruning */
 
   Id *idarraydata;		/* array of metadata Ids, solvable dependencies are offsets into this array */
   int idarraysize;

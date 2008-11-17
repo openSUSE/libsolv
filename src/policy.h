@@ -55,7 +55,7 @@ extern void prune_to_best_version(Solver *solv, Queue *plist);
  *     candidates : List of candidates (This list depends on other
  *                  restrictions like architecture and vendor policies too)
  */   
-extern void policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode);
+extern void policy_filter_unwanted(Solver *solv, Queue *plist, int mode);
 extern int  policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2);
 extern int  policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2);
 extern void policy_findupdatepackages(Solver *solv,

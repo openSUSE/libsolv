@@ -22,7 +22,7 @@
 #include "poolarch.h"
 
 
-static Solver *prune_best_version_arch_sortcmp_data;
+static Solver *prune_to_best_version_sortcmp_data;
 
 /*-----------------------------------------------------------------*/
 
@@ -32,21 +32,25 @@ static Solver *prune_best_version_arch_sortcmp_data;
  */
 
 static int
-prune_best_version_arch_sortcmp(const void *ap, const void *bp)
+prune_to_best_version_sortcmp(const void *ap, const void *bp)
 {
-  Solver *solv = prune_best_version_arch_sortcmp_data;
+  Solver *solv = prune_to_best_version_sortcmp_data;
   Pool *pool = solv->pool;
   int r;
   Id a = *(Id *)ap;
   Id b = *(Id *)bp;
-  r = pool->solvables[a].name - pool->solvables[b].name;
+  Solvable *sa, *sb;
+
+  sa = pool->solvables + a;
+  sb = pool->solvables + b;
+  r = sa->name - sb->name;
   if (r)
     {
       const char *na, *nb;
       /* different names. We use real strcmp here so that the result
        * is not depending on some random solvable order */
-      na = id2str(pool, pool->solvables[a].name);
-      nb = id2str(pool, pool->solvables[b].name);
+      na = id2str(pool, sa->name);
+      nb = id2str(pool, sb->name);
       /* bring patterns to the front */
       /* XXX: no longer needed? */
       if (!strncmp(na, "pattern:", 8))
@@ -61,22 +65,29 @@ prune_best_version_arch_sortcmp(const void *ap, const void *bp)
 	}
       return strcmp(na, nb);
     }
-  /* the same name */
-  if (pool->solvables[a].evr == pool->solvables[b].evr && solv->installed)
+  /* the same name, bring installed solvables to the front */
+  if (solv->installed)
     {
-	/* prefer installed solvables */
-      if (pool->solvables[a].repo == solv->installed)
-	return -1;
-      if (pool->solvables[b].repo == solv->installed)
+      if (sa->repo == solv->installed)
+	{
+	  if (sb->repo != solv->installed)
+	    return -1;
+	}
+      else if (sb->repo == solv->installed)
 	return 1;	
     }
+  /* sort by repository sub-prio (installed repo handled above) */
+  r = (sb->repo ? sb->repo->subpriority : 0) - (sa->repo ? sa->repo->subpriority : 0);
+  if (r)
+    return r;
+  /* no idea about the order, sort by id */
   return a - b;
 }
 
 
 /*
- * prune to repository with highest priority
- * 
+ * prune to repository with highest priority.
+ * does not prune installed solvables.
  */
 
 static void
@@ -90,13 +101,15 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
   for (i = 0; i < plist->count; i++)  /* find highest prio in queue */
     {
       s = pool->solvables + plist->elements[i];
+      if (pool->installed && s->repo == pool->installed)
+	continue;
       if (i == 0 || s->repo->priority > bestprio)
 	bestprio = s->repo->priority;
     }
   for (i = j = 0; i < plist->count; i++) /* remove all with lower prio */
     {
       s = pool->solvables + plist->elements[i];
-      if (s->repo->priority == bestprio)
+      if (s->repo->priority == bestprio || (pool->installed && s->repo == pool->installed))
 	plist->elements[j++] = plist->elements[i];
     }
   plist->count = j;
@@ -104,20 +117,33 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
 
 
 /*
- * prune_to_recommended
- *
- * XXX: should we prune to requires/suggests that are already
- * fulfilled by other packages?
+ * prune to recommended/suggested packages.
+ * does not prune installed packages (they are also somewhat recommended).
  */
 
 static void
 prune_to_recommended(Solver *solv, Queue *plist)
 {
   Pool *pool = solv->pool;
-  int i, j;
+  int i, j, k, ninst;
   Solvable *s;
   Id p, pp, rec, *recp, sug, *sugp;
 
+  ninst = 0;
+  if (pool->installed)
+    {
+      for (i = 0; i < plist->count; i++)
+	{
+	  p = plist->elements[i];
+	  s = pool->solvables + p;
+	  if (pool->installed && s->repo == pool->installed)
+	    ninst++;
+	}
+    }
+  if (plist->count - ninst < 2)
+    return;
+
+  /* update our recommendsmap/suggestsmap */
   if (solv->recommends_index < 0)
     {
       MAPZERO(&solv->recommendsmap);
@@ -145,34 +171,67 @@ prune_to_recommended(Solver *solv, Queue *plist)
 	      MAPSET(&solv->suggestsmap, p);
 	}
     }
+
   /* prune to recommended/supplemented */
+  ninst = 0;
   for (i = j = 0; i < plist->count; i++)
     {
       p = plist->elements[i];
-      if (MAPTST(&solv->recommendsmap, p))
+      s = pool->solvables + p;
+      if (pool->installed && s->repo == pool->installed)
 	{
-	  plist->elements[j++] = p;
+	  ninst++;
+	  if (j)
+	    plist->elements[j++] = p;
 	  continue;
 	}
-      if (solver_is_supplementing(solv, pool->solvables + p))
-        plist->elements[j++] = p;
+      if (!MAPTST(&solv->recommendsmap, p))
+	if (!solver_is_supplementing(solv, s))
+	  continue;
+      if (!j && ninst)
+	{
+	  for (k = 0; j < ninst; k++)
+	    {
+	      s = pool->solvables + plist->elements[k];
+	      if (pool->installed && s->repo == pool->installed)
+	        plist->elements[j++] = plist->elements[k];
+	    }
+	}
+      plist->elements[j++] = p;
     }
   if (j)
     plist->count = j;
 
-  /* prune to suggested/enhanced*/
-  if (plist->count < 2)
+  /* anything left to prune? */
+  if (plist->count - ninst < 2)
     return;
+
+  /* prune to suggested/enhanced*/
+  ninst = 0;
   for (i = j = 0; i < plist->count; i++)
     {
       p = plist->elements[i];
-      if (MAPTST(&solv->suggestsmap, p))
+      s = pool->solvables + p;
+      if (pool->installed && s->repo == pool->installed)
 	{
-	  plist->elements[j++] = p;
+	  ninst++;
+	  if (j)
+	    plist->elements[j++] = p;
 	  continue;
 	}
-      if (solver_is_enhancing(solv, pool->solvables + p))
-        plist->elements[j++] = p;
+      if (!MAPTST(&solv->suggestsmap, p))
+        if (!solver_is_enhancing(solv, s))
+	  continue;
+      if (!j && ninst)
+	{
+	  for (k = 0; j < ninst; k++)
+	    {
+	      s = pool->solvables + plist->elements[k];
+	      if (pool->installed && s->repo == pool->installed)
+	        plist->elements[j++] = plist->elements[k];
+	    }
+	}
+      plist->elements[j++] = p;
     }
   if (j)
     plist->count = j;
@@ -217,14 +276,12 @@ prune_to_best_arch(Pool *pool, Queue *plist)
  *
  * sort list of packages (given through plist) by name and evr
  * return result through plist
- *
  */
-
 void
 prune_to_best_version(Solver *solv, Queue *plist)
 {
   Pool *pool = solv->pool;
-  Id best = ID_NULL;
+  Id best;
   int i, j;
   Solvable *s;
 
@@ -232,9 +289,9 @@ prune_to_best_version(Solver *solv, Queue *plist)
     return;
   POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
 
-  prune_best_version_arch_sortcmp_data = solv;
+  prune_to_best_version_sortcmp_data = solv;
   /* sort by name first, prefer installed */
-  qsort(plist->elements, plist->count, sizeof(Id), prune_best_version_arch_sortcmp);
+  qsort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp);
 
   /* delete obsoleted. hmm, looks expensive! */
   /* FIXME maybe also check provides depending on noupdateprovide? */
@@ -264,12 +321,14 @@ prune_to_best_version(Solver *solv, Queue *plist)
 	    }
 	}
     }
+  /* delete zeroed out queue entries */
   for (i = j = 0; i < plist->count; i++)
     if (plist->elements[i])
       plist->elements[j++] = plist->elements[i];
   plist->count = j;
 
   /* now find best 'per name' */
+  best = 0;
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
@@ -327,17 +386,13 @@ prune_best_arch_name_version(Solver *solv, Pool *pool, Queue *plist)
 
 
 void
-policy_filter_unwanted(Solver *solv, Queue *plist, Id inst, int mode)
+policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 {
   Pool *pool = solv->pool;
   if (plist->count > 1 && mode != POLICY_MODE_SUGGEST)
     prune_to_highest_prio(pool, plist);
   if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)
     prune_to_recommended(solv, plist);
-  /* FIXME: do this different! */
-  if (inst)
-    queue_push(plist, inst);
-
   prune_best_arch_name_version(solv, pool, plist);
 }
 

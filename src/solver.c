@@ -2308,42 +2308,36 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules)
  */
 
 static int
-selectandinstall(Solver *solv, int level, Queue *dq, Id inst, int disablerules)
+selectandinstall(Solver *solv, int level, Queue *dq, int disablerules)
 {
   Pool *pool = solv->pool;
   Id p;
   int i;
 
-  /* FIXME: do we really need that inst handling? */
-  if (solv->distupgrade && inst && dq->count)
-    {
-      policy_filter_unwanted(solv, dq, 0, POLICY_MODE_CHOOSE);
-      for (i = 0; i < dq->count; i++)
-	if (solvable_identical(pool, pool->solvables + inst, pool->solvables + dq->elements[i]))
-	  dq->elements[i] = inst;
-    }
-  else
-    {
-      if (dq->count > 1 || inst)
-	policy_filter_unwanted(solv, dq, inst, POLICY_MODE_CHOOSE);
-    }
-
-  i = 0;
+  if (dq->count > 1)
+    policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
   if (dq->count > 1)
     {
+      /* XXX: didn't we already do that? */
+      /* XXX: shouldn't we prefer installed packages? */
+      /* XXX: move to policy.c? */
       /* choose the supplemented one */
       for (i = 0; i < dq->count; i++)
 	if (solver_is_supplementing(solv, pool->solvables + dq->elements[i]))
-	  break;
-      if (i == dq->count)
-	{
-	  for (i = 1; i < dq->count; i++)
-	    queue_push(&solv->branches, dq->elements[i]);
-	  queue_push(&solv->branches, -level);
-	  i = 0;
-	}
+	  {
+	    dq->elements[0] = dq->elements[i];
+	    dq->count = 1;
+	    break;
+	  }
     }
-  p = dq->elements[i];
+  if (dq->count > 1)
+    {
+      /* multiple candidates, open a branch */
+      for (i = 1; i < dq->count; i++)
+	queue_push(&solv->branches, dq->elements[i]);
+      queue_push(&solv->branches, -level);
+    }
+  p = dq->elements[0];
 
   POOL_DEBUG(SAT_DEBUG_POLICY, "installing %s\n", solvable2str(pool, pool->solvables + p));
 
@@ -2553,7 +2547,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    dq.count = k;
 		}
 	      olevel = level;
-	      level = selectandinstall(solv, level, &dq, 0, disablerules);
+	      level = selectandinstall(solv, level, &dq, disablerules);
 	      if (level == 0)
 		{
 		  queue_free(&dq);
@@ -2628,10 +2622,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (!d)
 		    continue;
 		  queue_empty(&dq);
+		  queue_push(&dq, i);
 		  while ((p = pool->whatprovidesdata[d++]) != 0)
 		    if (solv->decisionmap[p] >= 0)
 		      queue_push(&dq, p);
-		  policy_filter_unwanted(solv, &dq, i, POLICY_MODE_CHOOSE);
+		  policy_filter_unwanted(solv, &dq, POLICY_MODE_CHOOSE);
 		  p = dq.elements[0];
 		  if (p != i && solv->decisionmap[p] == 0)
 		    {
@@ -2680,7 +2675,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  for (i = solv->installed->start, r = solv->rules + solv->updaterules; i < solv->installed->end; i++, r++)
 	    {
 	      Rule *rr;
-	      Id inst;
 	      s = pool->solvables + i;
 		
 		/* skip if not installed (can't update) */
@@ -2713,16 +2707,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		}
 	      if (p || !dq.count)	/* already fulfilled or empty */
 		continue;
-	      if (dq.elements[0] == i)
-		inst = queue_shift(&dq);
-	      else
-		inst = 0;
 	      olevel = level;
-	      /* FIXME: it is handled a bit different because we do not want
-	       * to have it pruned just because it is not recommened.
-	       * we should not prune installed packages instead.
-	       */
-	      level = selectandinstall(solv, level, &dq, inst, disablerules);
+	      level = selectandinstall(solv, level, &dq, disablerules);
 	      if (level == 0)
 		{
 		  queue_free(&dq);
@@ -2815,7 +2801,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  assert(dq.count > 1);
 
 	  olevel = level;
-	  level = selectandinstall(solv, level, &dq, 0, disablerules);
+	  level = selectandinstall(solv, level, &dq, disablerules);
 	  if (level == 0)
 	    {
 	      queue_free(&dq);
@@ -2921,7 +2907,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (dq.count)
 	    {
 	      if (dq.count > 1)
-	        policy_filter_unwanted(solv, &dq, 0, POLICY_MODE_RECOMMEND);
+	        policy_filter_unwanted(solv, &dq, POLICY_MODE_RECOMMEND);
 	      p = dq.elements[0];
 	      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
 	      queue_push(&solv->recommendations, p);
@@ -4588,7 +4574,7 @@ solver_solve(Solver *solv, Queue *job)
 	    queue_pushunique(&solv->recommendations, i);
 	}
       /* we use MODE_SUGGEST here so that repo prio is ignored */
-      policy_filter_unwanted(solv, &solv->recommendations, 0, POLICY_MODE_SUGGEST);
+      policy_filter_unwanted(solv, &solv->recommendations, POLICY_MODE_SUGGEST);
     }
 
   /*
@@ -4649,7 +4635,7 @@ solver_solve(Solver *solv, Queue *job)
 	    }
 	  queue_push(&solv->suggestions, i);
 	}
-      policy_filter_unwanted(solv, &solv->suggestions, 0, POLICY_MODE_SUGGEST);
+      policy_filter_unwanted(solv, &solv->suggestions, POLICY_MODE_SUGGEST);
     }
 
   if (redoq.count)
