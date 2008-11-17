@@ -86,6 +86,7 @@ SET (CPACK_SOURCE_IGNORE_FILES
 "Makefile$"
 "Makefile\\\\.in$"
 # cmake cache files
+"DartConfiguration.tcl$"
 "CMakeCache.txt"
 "CMakeFiles"
 "cmake_install.cmake$"
