@@ -95,7 +95,7 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
 {
   int i, j;
   Solvable *s;
-  int bestprio = 0;
+  int bestprio = 0, bestprioset = 0;
 
   /* prune to highest priority */
   for (i = 0; i < plist->count; i++)  /* find highest prio in queue */
@@ -103,9 +103,14 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
       s = pool->solvables + plist->elements[i];
       if (pool->installed && s->repo == pool->installed)
 	continue;
-      if (i == 0 || s->repo->priority > bestprio)
-	bestprio = s->repo->priority;
+      if (!bestprioset || s->repo->priority > bestprio)
+	{
+	  bestprio = s->repo->priority;
+	  bestprioset = 1;
+	}
     }
+  if (!bestprioset)
+    return;
   for (i = j = 0; i < plist->count; i++) /* remove all with lower prio */
     {
       s = pool->solvables + plist->elements[i];
