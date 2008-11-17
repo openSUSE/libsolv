@@ -3783,18 +3783,22 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	    {
 	      if (!d && r->w2 == 0 && !reqassert)
 		{
-		  /* prefer assertions (XXX: bad idea?) */
+		  if (*reqrp > 0 && r->p < -1)
+		    {
+		      Id op = -solv->rules[*reqrp].p;
+		      if (op > 1 && solv->pool->solvables[op].arch != solv->pool->solvables[-r->p].arch)
+			continue;	/* different arch, skip */
+		    }
+		  /* prefer assertions */
 		  *reqrp = rid;
 		  reqassert = 1;
 		}
 	      if (!*reqrp)
 		*reqrp = rid;
-	      else if (solv->installed && r->p < 0 && solv->pool->solvables[-r->p].repo == solv->installed)
+	      else if (solv->installed && r->p < 0 && solv->pool->solvables[-r->p].repo == solv->installed && !reqassert)
 		{
 		  /* prefer rules of installed packages */
-		  Id op = *reqrp >= 0 ? solv->rules[*reqrp].p : -*reqrp;
-		  if (op <= 0 || solv->pool->solvables[op].repo != solv->installed)
-		    *reqrp = rid;
+		  *reqrp = rid;
 		}
 	    }
 	}
