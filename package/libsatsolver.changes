@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Nov 17 14:30:08 CET 2008 - ma@suse.de
+
+- Parse RELEASE tag from contentfile (bnc #444978)
+- 0.12.3
+
+-------------------------------------------------------------------
 Fri Nov 14 18:00:19 CET 2008 - mls@suse.de
 
 - fix bugs in multiversion handling

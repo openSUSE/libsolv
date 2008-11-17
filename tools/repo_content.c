@@ -24,7 +24,8 @@
 #include "repo.h"
 #include "util.h"
 #include "repo_content.h"
-
+#define DISABLE_SPLIT
+#include "tools_util.h"
 
 /* split off a word, return null terminated pointer to it.
  * return NULL if there is no word left. */
@@ -50,16 +51,10 @@ struct parsedata {
   Repo *repo;
   char *tmp;
   int tmpl;
+
+  const char *tmpvers;
+  const char *tmprel;
 };
-
-
-static Id
-makeevr(Pool *pool, char *s)
-{
-  if (!strncmp(s, "0:", 2) && s[2])
-    s += 2;
-  return str2id(pool, s, 1);
-}
 
 /*
  * dependency relations
@@ -322,7 +317,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	    }
 
 	  if (istag ("VERSION"))
-	    s->evr = makeevr(pool, value);
+            pd.tmpvers = strdup(value);
+          else if (istag ("RELEASE"))
+            pd.tmprel = strdup(value);
 	  else if (code11 && istag ("DISTRIBUTION"))
 	    repo_set_str(repo, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
 	  else if (istag ("DATADIR"))
@@ -415,6 +412,20 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
       pool_debug(pool, SAT_FATAL, "repo_content: 'content' incomplete, no product solvable created !\n");
       exit(1);
     }
+
+  if (pd.tmpvers)
+    {
+      if (pd.tmprel)
+        s->evr = makeevr(pool, join2(pd.tmpvers, "-", pd.tmprel));
+      else
+        s->evr = makeevr(pool, pd.tmpvers);
+    }
+  else if (pd.tmprel)
+    {
+      s->evr = makeevr(pool, join2("", "-", pd.tmprel));
+    }
+  pd.tmpvers = sat_free((void *)pd.tmpvers);
+  pd.tmprel = sat_free((void *)pd.tmprel);
 
   if (!s->arch)
     s->arch = ARCH_NOARCH;
