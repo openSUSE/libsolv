@@ -24,11 +24,21 @@ LANG=C
 unset CDPATH
 parser_options=${PARSER_OPTIONS:-}
 
-if test "$1" = "-o" ; then
-  exec > "$2"
-  shift
-  shift
-fi
+findopt="-prune"
+
+while true ; do
+  if test "$1" = "-o" ; then
+    exec > "$2"
+    shift
+    shift
+  elif test "$1" = "-R" ; then
+    # recursive
+    findopt=
+    shift
+  else
+    break
+  fi
+done
 
 dir="$1"
 cd "$dir" || exit 1
@@ -291,15 +301,5 @@ elif test_susetags; then
   ) | susetags2solv -c "${olddir}/content" $parser_options || exit 4
   cd "$olddir"
 else
-  rpms=''
-  for r in *.rpm ; do
-    test -e "$r" || continue
-    rpms="$rpms
-$r"
-  done
-  if test -n "$rpms" ; then
-      echo "${rpms#?}" | rpms2solv -m -
-  else
-      exit 1
-  fi
+  find * -name .\* -prune -o $findopt -name \*.delta.rpm -o -name \*.patch.rpm -o -name \*.rpm -a -type f -print0 | rpms2solv -0 -m -
 fi
