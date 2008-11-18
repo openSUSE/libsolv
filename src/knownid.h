@@ -166,6 +166,7 @@ KNOWNID(PRODUCT_URL,			"product:url"),
 KNOWNID(PRODUCT_URL_TYPE,		"product:url:type"),
 KNOWNID(PRODUCT_FLAGS,			"product:flags"),
 KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),
+/* this has to be obsoleted */
 KNOWNID(PRODUCT_UPDATEREPOKEY,		"product:updaterepokey"),
 KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),
 KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),
@@ -178,10 +179,17 @@ KNOWNID(REPOSITORY_TIMESTAMP,		"repository:timestamp"),
 /* hint when the metadata could be outdated
    w/respect to generated timestamp */
 KNOWNID(REPOSITORY_EXPIRE,		"repository:expire"),
-/* which things does this repo provides updates for, if it does */
+
+/* which things does this repo provides updates for, if it does (array) */
 KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),
-/* which products this repository is supposed to be for */
+KNOWNID(REPOSITORY_UPDATE_LABEL,     	"repository:update:label"),
+KNOWNID(REPOSITORY_UPDATE_CPEID,	"repository:update:cpeid"),
+
+/* which products this repository is supposed to be for (array) */
 KNOWNID(REPOSITORY_PRODUCTS,		"repository:products"),
+KNOWNID(REPOSITORY_PRODUCT_LABEL,       "repository:product:label"),
+KNOWNID(REPOSITORY_PRODUCT_CPEID,	"repository:product:cpeid"),
+
 /* keyword (tags) for this repository */
 KNOWNID(REPOSITORY_KEYWORDS,		"repository:keywords"),
 /* revision of the repository. arbitrary string */

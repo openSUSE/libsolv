@@ -160,6 +160,12 @@ struct parsedata {
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
   int timestamp;
+  /* handles for collection
+     structures */
+  /* repo updates */
+  Id ruhandle;
+  /* repo products */
+  Id rphandle;
 };
 
 /*
@@ -249,7 +255,18 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_KEYWORD: break;
     case STATE_CONTENT: break;
     case STATE_REVISION: break;
-    case STATE_DISTRO: break;
+    case STATE_DISTRO:
+      {
+        /* this is extra metadata about the product this repository
+           was designed for */
+        const char *cpeid = find_attr("cpeid", atts);
+        pd->rphandle = repodata_new_handle(pd->data);
+        /* set the cpeid for the product 
+           the label is set in the content of the tag */
+        if (cpeid)
+          repodata_set_poolstr(pd->data, pd->rphandle, REPOSITORY_PRODUCT_CPEID, cpeid);
+        break;
+      }
     case STATE_DATA: break;
     case STATE_LOCATION: break;
     case STATE_CHECKSUM: break;
@@ -325,7 +342,13 @@ endElement(void *userData, const char *name)
       if (pd->content)
 	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REVISION, pd->content);
       break;
-    case STATE_DISTRO: break;
+    case STATE_DISTRO:
+      /* distro tag is used in repomd.xml to say the product this repo is
+         made for */
+      if (pd->content)
+        repodata_set_str(pd->data, pd->rphandle, REPOSITORY_PRODUCT_LABEL, pd->content);
+      repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_PRODUCTS, pd->rphandle);
+      break;
     case STATE_SUSEINFO: break;
     case STATE_PRODUCTS: break;
     case STATE_KEYWORDS: break;
