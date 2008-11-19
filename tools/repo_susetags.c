@@ -142,16 +142,16 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
  */
 
 static void
-add_dirline (struct parsedata *pd, char *line)
+add_dirline(struct parsedata *pd, char *line)
 {
   char *sp[6];
   if (split(line, sp, 6) != 5)
     return;
   pd->dirs = sat_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
-  long filesz = strtol (sp[1], 0, 0);
-  filesz += strtol (sp[2], 0, 0);
-  long filenum = strtol (sp[3], 0, 0);
-  filenum += strtol (sp[4], 0, 0);
+  long filesz = strtol(sp[1], 0, 0);
+  filesz += strtol(sp[2], 0, 0);
+  long filenum = strtol(sp[3], 0, 0);
+  filenum += strtol(sp[4], 0, 0);
   /* hack: we know that there's room for a / */
   if (*sp[0] != '/')
     *--sp[0] = '/';
@@ -176,9 +176,9 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
       pool_debug(pd->repo->pool, SAT_FATAL, "susetags: bad checksum line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
-  if (!strcasecmp (sp[0], "sha1"))
+  if (!strcasecmp(sp[0], "sha1"))
     l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
-  else if (!strcasecmp (sp[0], "md5"))
+  else if (!strcasecmp(sp[0], "md5"))
     l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
   else
     {
@@ -200,7 +200,7 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
  */
 
 static int
-id3_cmp (const void *v1, const void *v2)
+id3_cmp(const void *v1, const void *v2)
 {
   Id *i1 = (Id*)v1;
   Id *i2 = (Id*)v2;
@@ -214,14 +214,14 @@ id3_cmp (const void *v1, const void *v2)
  */
 
 static void
-commit_diskusage (struct parsedata *pd, Id handle)
+commit_diskusage(struct parsedata *pd, Id handle)
 {
   unsigned i;
   Dirpool *dp = &pd->data->dirpool;
   /* Now sort in dirid order.  This ensures that parents come before
      their children.  */
   if (pd->ndirs > 1)
-    qsort(pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp);
+    qsort(pd->dirs, pd->ndirs, sizeof(pd->dirs[0]), id3_cmp);
   /* Substract leaf numbers from all parents to make the numbers
      non-cumulative.  This must be done post-order (i.e. all leafs
      adjusted before parents).  We ensure this by starting at the end of
@@ -255,7 +255,7 @@ commit_diskusage (struct parsedata *pd, Id handle)
 #if 0
   char sbuf[1024];
   char *buf = sbuf;
-  unsigned slen = sizeof (sbuf);
+  unsigned slen = sizeof(sbuf);
   for (i = 0; i < pd->ndirs; i++)
     {
       dir2str(attr, pd->dirs[i][0], &buf, &slen);
@@ -286,9 +286,9 @@ commit_diskusage (struct parsedata *pd, Id handle)
  */
 
 static inline unsigned
-tag_from_string (char *cs)
+tag_from_string(char *cs)
 {
-  unsigned char *s = (unsigned char*) cs;
+  unsigned char *s = (unsigned char *)cs;
   return ((s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3]);
 }
 
@@ -390,7 +390,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
   s->supplements = repo_fix_supplements(pd->repo, s->provides, s->supplements, freshens);
   s->conflicts = repo_fix_conflicts(pd->repo, s->conflicts);
   if (pd->ndirs)
-    commit_diskusage (pd, handle);
+    commit_diskusage(pd, handle);
 }
 
 
@@ -525,7 +525,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    }
 	  intag = tagend - (line + 1);
 	  cummulate = 0;
-	  switch (tag_from_string (line))       /* check if accumulation is needed */
+	  switch (tag_from_string(line))       /* check if accumulation is needed */
 	    {
 	      case CTAG('+', 'P', 'r', 'q'):
 	      case CTAG('+', 'P', 'r', 'c'):
@@ -562,7 +562,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
         }
       else
         line_lang[0] = 0;
-      tag = tag_from_string (line);
+      tag = tag_from_string(line);
 
 
       /*
@@ -722,31 +722,31 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    continue;
           case CTAG('=', 'P', 'c', 'n'):                                        /* pattern: package conflicts */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf (stderr, "Unsupported: pattern -> package conflicts\n");
+	      fprintf(stderr, "Unsupported: pattern -> package conflicts\n");
 	    else
 	      s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, 0);
 	    continue;
 	  case CTAG('=', 'P', 'o', 'b'):                                        /* pattern: package obsoletes */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf (stderr, "Unsupported: pattern -> package obsoletes\n");
+	      fprintf(stderr, "Unsupported: pattern -> package obsoletes\n");
 	    else
 	      s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 'f', 'r'):                                        /* pattern: package freshens */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf (stderr, "Unsupported: pattern -> package freshens\n");
+	      fprintf(stderr, "Unsupported: pattern -> package freshens\n");
 	    else
 	      freshens = adddep(pool, &pd, freshens, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 's', 'p'):                                        /* pattern: package supplements */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf (stderr, "Unsupported: pattern -> package supplements\n");
+	      fprintf(stderr, "Unsupported: pattern -> package supplements\n");
 	    else
 	      s->supplements = adddep(pool, &pd, s->supplements, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 'e', 'n'):                                        /* pattern: package enhances */
 	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf (stderr, "Unsupported: pattern -> package enhances\n");
+	      fprintf(stderr, "Unsupported: pattern -> package enhances\n");
 	    else
 	      s->enhances = adddep(pool, &pd, s->enhances, line, 0, 0);
 	    continue;
@@ -789,7 +789,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    continue;
           case CTAG('=', 'T', 'i', 'm'):
 	    {
-	      unsigned int t = atoi (line + 6);
+	      unsigned int t = atoi(line + 6);
 	      if (t)
 		repodata_set_num(data, handle, SOLVABLE_BUILDTIME, t);
 	    }
@@ -819,22 +819,22 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    {
 	      /* Accept numbers and textual bools.  */
 	      unsigned k;
-	      k = atoi (line + 6);
-	      if (k || !strcasecmp (line + 6, "true"))
+	      k = atoi(line + 6);
+	      if (k || !strcasecmp(line + 6, "true"))
 	        repodata_set_void(data, handle, SOLVABLE_ISVISIBLE );
 	    }
 	    continue;
           case CTAG('=', 'S', 'h', 'r'):
 	    if (last_found_pack >= pd.nshare)
 	      {
-		pd.share_with = sat_realloc2(pd.share_with, last_found_pack + 256, sizeof (*pd.share_with));
-		memset(pd.share_with + pd.nshare, 0, (last_found_pack + 256 - pd.nshare) * sizeof (*pd.share_with));
+		pd.share_with = sat_realloc2(pd.share_with, last_found_pack + 256, sizeof(*pd.share_with));
+		memset(pd.share_with + pd.nshare, 0, (last_found_pack + 256 - pd.nshare) * sizeof(*pd.share_with));
 		pd.nshare = last_found_pack + 256;
 	      }
 	    pd.share_with[last_found_pack] = strdup(line + 6);
 	    continue;
 	  case CTAG('=', 'D', 'i', 'r'):
-	    add_dirline (&pd, line + 6);
+	    add_dirline(&pd, line + 6);
 	    continue;
 	  case CTAG('=', 'C', 'a', 't'):
 	    repodata_set_poolstr(data, handle, langtag(&pd, SOLVABLE_CATEGORY, line_lang), line + 3 + keylen);
@@ -855,17 +855,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	    break;
 	  case CTAG('=', 'C', 'k', 's'):
 	    set_checksum(&pd, data, handle, SOLVABLE_CHECKSUM, line + 6);
-#if 0
-	    if (0)
-	      {
-		Id sub = repodata_create_struct(data, handle, str2id(pool, "solvable:komisch", 1));
-		repodata_set_poolstr(data, sub, str2id(pool, "sub:key1", 1), line + 6);
-		repodata_set_num(data, sub, str2id(pool, "sub:key2", 1), last_found_pack);
-		sub = repodata_create_struct(data, handle, str2id(pool, "solvable:komisch", 1));
-		repodata_set_poolstr(data, sub, str2id(pool, "sub:key1", 1), line + 7);
-		repodata_set_num(data, sub, str2id(pool, "sub:key2", 1), last_found_pack+1);
-	      }
-#endif
 	    break;
 	  case CTAG('=', 'L', 'a', 'n'):
 	    language = strdup(line + 6);
@@ -893,8 +882,18 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	      if (!did)
 	        did = repodata_str2dir(data, "/", 1);
 	      repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, p);
-	      continue;
+	      break;
 	    }
+	  case CTAG('=', 'H', 'd', 'r'):
+	    /* rpm header range */
+	    if (split(line + 6, sp, 3) == 2)
+	      {
+		/* we ignore the start value */
+		unsigned int end = (unsigned int)atoi(sp[1]);
+		if (end)
+		  repodata_set_num(data, handle, SOLVABLE_HEADEREND, end);
+	      }
+	    break;
 
 	  case CTAG('=', 'P', 'a', 't'):
 	  case CTAG('=', 'P', 'k', 'g'):
