@@ -143,12 +143,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root,-)
 #%doc swig/python/examples/*.py
 %{py_sitedir}/_satsolver.so
-%{py_sitedir}/satsolver.py
-#see http://fedoraproject.org/wiki/Packaging/Python
-%if 0%{?fedora_version}
-%exclude %{py_sitedir}/satsolver.pyc
-%exclude %{py_sitedir}/satsolver.pyo
-%endif
+%{py_sitedir}/satsolver.py*
 
 %files -n perl-satsolver
 %defattr(-,root,root,-)
