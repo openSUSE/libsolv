@@ -2,61 +2,57 @@
 # CMakeLists.txt for sat-solver/tools
 #
 
+# Let's not compile the same files ten times; this library is not installed
+ADD_LIBRARY( toolstuff STATIC repo_write.c common_write.c )
+
 SET(rpmdb2solv_REPOS
   rpmdb2solv.c
-  repo_rpmdb.h
   repo_rpmdb.c
   repo_products.c
-  repo_products.h
   repo_zyppdb.c
-  repo_zyppdb.h
-  repo_write.c
-  common_write.c
 )
 
 ADD_EXECUTABLE( rpmdb2solv ${rpmdb2solv_REPOS} )
-TARGET_LINK_LIBRARIES( rpmdb2solv satsolver ${RPMDB_LIBRARY} ${EXPAT_LIBRARY})
+TARGET_LINK_LIBRARIES( rpmdb2solv satsolver toolstuff ${RPMDB_LIBRARY} ${EXPAT_LIBRARY})
 
-SET(rpms2solv_REPOS rpms2solv.c repo_rpmdb.h repo_rpmdb.c repo_write.c common_write.c )
+SET(rpms2solv_REPOS rpms2solv.c repo_rpmdb.c )
 ADD_EXECUTABLE( rpms2solv ${rpms2solv_REPOS} )
-TARGET_LINK_LIBRARIES( rpms2solv satsolver ${RPMDB_LIBRARY})
+TARGET_LINK_LIBRARIES( rpms2solv satsolver toolstuff ${RPMDB_LIBRARY})
 
-SET(rpmmd2solv_REPOS rpmmd2solv.c repo_rpmmd.h repo_rpmmd.c repo_write.c common_write.c )
+SET(rpmmd2solv_REPOS rpmmd2solv.c repo_rpmmd.c )
 ADD_EXECUTABLE( rpmmd2solv ${rpmmd2solv_REPOS} )
-TARGET_LINK_LIBRARIES( rpmmd2solv satsolver ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
+TARGET_LINK_LIBRARIES( rpmmd2solv satsolver toolstuff ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
 
-SET(helix2solv_REPOS helix2solv.c repo_write.c common_write.c )
+SET(helix2solv_REPOS helix2solv.c )
 ADD_EXECUTABLE( helix2solv ${helix2solv_REPOS} )
-TARGET_LINK_LIBRARIES( helix2solv satsolver ${EXPAT_LIBRARY})
+TARGET_LINK_LIBRARIES( helix2solv satsolver toolstuff ${EXPAT_LIBRARY})
 
-SET(susetags2solv_REPOS susetags2solv.c repo_susetags.h repo_susetags.c repo_content.c repo_write.c common_write.c)
+SET(susetags2solv_REPOS susetags2solv.c repo_susetags.c repo_content.c )
 ADD_EXECUTABLE( susetags2solv ${susetags2solv_REPOS} )
-TARGET_LINK_LIBRARIES( susetags2solv satsolver ${ZLIB_LIBRARY})
+TARGET_LINK_LIBRARIES( susetags2solv satsolver toolstuff ${ZLIB_LIBRARY})
 
-SET(patchxml2solv_REPOS patchxml2solv.c repo_patchxml.h repo_patchxml.c repo_write.c common_write.c)
+SET(patchxml2solv_REPOS patchxml2solv.c repo_patchxml.c )
 ADD_EXECUTABLE( patchxml2solv ${patchxml2solv_REPOS} )
-TARGET_LINK_LIBRARIES( patchxml2solv satsolver ${EXPAT_LIBRARY})
+TARGET_LINK_LIBRARIES( patchxml2solv satsolver toolstuff ${EXPAT_LIBRARY})
 
-SET(updateinfoxml2solv_REPOS updateinfoxml2solv.c repo_updateinfoxml.h repo_updateinfoxml.c repo_write.c common_write.c)
+SET(updateinfoxml2solv_REPOS updateinfoxml2solv.c repo_updateinfoxml.c)
 ADD_EXECUTABLE( updateinfoxml2solv ${updateinfoxml2solv_REPOS} )
-TARGET_LINK_LIBRARIES( updateinfoxml2solv satsolver ${EXPAT_LIBRARY})
+TARGET_LINK_LIBRARIES( updateinfoxml2solv satsolver toolstuff ${EXPAT_LIBRARY})
 
-SET(deltainfoxml2solv_REPOS deltainfoxml2solv.c repo_deltainfoxml.h repo_deltainfoxml.c repo_write.c common_write.c)
+SET(deltainfoxml2solv_REPOS deltainfoxml2solv.c repo_deltainfoxml.c)
 ADD_EXECUTABLE( deltainfoxml2solv ${deltainfoxml2solv_REPOS} )
-TARGET_LINK_LIBRARIES( deltainfoxml2solv satsolver ${EXPAT_LIBRARY})
+TARGET_LINK_LIBRARIES( deltainfoxml2solv satsolver toolstuff ${EXPAT_LIBRARY})
 
-SET(repomdxml2solv_REPOS repomdxml2solv.c repo_repomdxml.h repo_repomdxml.c repo_write.c common_write.c)
+SET(repomdxml2solv_REPOS repomdxml2solv.c repo_repomdxml.c)
 ADD_EXECUTABLE( repomdxml2solv ${repomdxml2solv_REPOS} )
-TARGET_LINK_LIBRARIES( repomdxml2solv satsolver ${EXPAT_LIBRARY})
+TARGET_LINK_LIBRARIES( repomdxml2solv satsolver toolstuff ${EXPAT_LIBRARY})
 
 
-SET(dumpsolv_REPOS dumpsolv.c)
-ADD_EXECUTABLE( dumpsolv ${dumpsolv_REPOS} )
+ADD_EXECUTABLE( dumpsolv dumpsolv.c )
 TARGET_LINK_LIBRARIES( dumpsolv satsolver)
 
-SET(mergesolv_REPOS mergesolv.c repo_write.c common_write.c)
-ADD_EXECUTABLE( mergesolv ${mergesolv_REPOS} )
-TARGET_LINK_LIBRARIES( mergesolv satsolver)
+ADD_EXECUTABLE( mergesolv mergesolv.c )
+TARGET_LINK_LIBRARIES( mergesolv satsolver toolstuff)
 
 install(TARGETS
                 mergesolv
