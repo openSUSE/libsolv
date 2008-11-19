@@ -5,4 +5,4 @@
  * for further information
  */
 
-void repo_add_products(Repo *repo, const char *proddir, const char *root, const char *attribute, int flags);
+void repo_add_products(Repo *repo, const char *proddir, const char *root, int flags);

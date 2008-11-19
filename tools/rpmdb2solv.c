@@ -34,7 +34,6 @@ usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
 	  "rpmdb2solv [-n] [-x] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
-	  " -a <attr> : Only print this attribute, no .solv generation. E.g. '-a distribution.target'\n"
 	  " -n : No packages, do not read rpmdb, useful to only parse products\n"
 	  " -x : use extrapool\n"
 	  " -b <basefile> : Write .solv to <basefile>.solv instead of stdout\n"
@@ -52,29 +51,25 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo, *ref = 0;
   Repodata *data;
-  FILE *fp;
   Pool *refpool;
   int c, percent = 0;
   int extrapool = 0;
   int nopacks = 0;
   const char *root = 0;
   const char *basefile = 0;
+  const char *refname = 0;
   char *proddir = 0;
-  const char *attribute = 0;
   char *outfile = 0;
 
   /*
    * parse arguments
    */
   
-  while ((c = getopt(argc, argv, "Pa:hnxb:r:p:o:")) >= 0)
+  while ((c = getopt(argc, argv, "Phnxb:r:p:o:")) >= 0)
     switch (c)
       {
       case 'h':
 	  usage(0);
-	break;
-      case 'a':
-	attribute = optarg;
 	break;
       case 'r':
         root = optarg;
@@ -108,24 +103,31 @@ main(int argc, char **argv)
     }
     
   /*
-   * ???
+   * optional arg is old version of rpmdb solv file
+   * should make this a real option instead
    */
   
   if (optind < argc)
+    refname = argv[optind];
+
+  if (refname)
     {
-      if (extrapool)
-	refpool = pool_create();
-      else
-        refpool = pool;
-      if ((fp = fopen(argv[optind], "r")) == NULL)
+      FILE *fp;
+      if ((fp = fopen(refname, "r")) == NULL)
         {
-          perror(argv[optind]);
-          exit(1);
+          perror(refname);
         }
-      ref = repo_create(refpool, "ref");
-      repo_add_solv(ref, fp);
-      repo_disable_paging(ref);
-      fclose(fp);
+      else
+	{
+	  if (extrapool)
+	    refpool = pool_create();
+	  else
+	    refpool = pool;
+	  ref = repo_create(refpool, "ref");
+	  repo_add_solv(ref, fp);
+	  repo_disable_paging(ref);
+	  fclose(fp);
+	}
     }
 
   /*
@@ -157,7 +159,7 @@ main(int argc, char **argv)
 	      strcpy(buf + rootlen, proddir);
 	    }
 	}
-      repo_add_products(repo, proddir, root, attribute, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+      repo_add_products(repo, proddir, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
       if (buf != proddir)
 	sat_free(buf);
     }
@@ -173,10 +175,7 @@ main(int argc, char **argv)
       ref = 0;
     }
 
-  if (!attribute)
-    tool_write(repo, basefile, 0);
-
+  tool_write(repo, basefile, 0);
   pool_free(pool);
-
   exit(0);
 }

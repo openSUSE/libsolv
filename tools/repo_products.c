@@ -106,7 +106,6 @@ struct parsedata {
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
-  const char *attribute; /* only print this attribute, if currentproduct == baseproduct */
 
   const char *tmplang;
 
@@ -278,16 +277,6 @@ endElement(void *userData, const char *name)
       if (pd->currentproduct == pd->baseproduct)
 	repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, "base");
 
-      // output distver if requested, only if the product is
-      // a base product
-      // this is yum $releasever variable
-      if (pd->currentproduct == pd->baseproduct
-	  && pd->attribute
-	  && !strcmp(pd->attribute, "releasever"))
-	{
-	  printf("%s\n", pd->tmpvers);
-	}
-
       if (pd->tmprel)
 	{
 	  if (pd->tmpvers)
@@ -346,22 +335,10 @@ endElement(void *userData, const char *name)
       break;
     case STATE_TARGET:
       repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_TARGET, pd->content);
-      if (pd->currentproduct == pd->baseproduct
-	  && pd->attribute
-	  && !strcmp(pd->attribute, "register.target"))
-	{
-	  printf("%s\n", pd->content);
-	}
-    break;
+      break;
     case STATE_REGRELEASE:
       repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_RELEASE, pd->content);
-      if (pd->currentproduct == pd->baseproduct
-	  && pd->attribute
-	  && !strcmp(pd->attribute, "register.release"))
-	{
-	  printf("%s\n", pd->content);
-	}
-    break;
+      break;
     case STATE_CPEID:
       if (pd->content)
         repodata_set_str(pd->data, pd->handle, SOLVABLE_CPE_ID, pd->content);
@@ -594,7 +571,7 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, int code11)
 /* Oh joy! Three parsers for the price of one! */
 
 void
-repo_add_products(Repo *repo, const char *proddir, const char *root, const char *attribute, int flags)
+repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
 {
   const char *fullpath = proddir;
   DIR *dir;
@@ -615,8 +592,6 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, const char 
 
   pd.content = sat_malloc(256);
   pd.acontent = 256;
-
-  pd.attribute = attribute;
 
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
     {
