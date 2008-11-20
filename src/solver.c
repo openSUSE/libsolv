@@ -1484,7 +1484,7 @@ finddistupgradepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
   for (i = 0; i < qs->count; i++)
     {
       Solvable *ns = pool->solvables + qs->elements[i];
-      if (s->evr == ns->evr && solvable_identical(pool, s, ns))
+      if (s->evr == ns->evr && solvable_identical(s, ns))
         return s - pool->solvables;
     }
   /* nope, it must be some other package */

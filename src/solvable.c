@@ -469,8 +469,11 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
     }
 }
 
+/* Tests if two solvables have identical content. Currently
+ * both solvables need to come from the same pool */
+
 int
-solvable_identical(Pool *pool, Solvable *s1, Solvable *s2)
+solvable_identical(Solvable *s1, Solvable *s2)
 {
   unsigned int bt1, bt2;
   Id rq1, rq2;
