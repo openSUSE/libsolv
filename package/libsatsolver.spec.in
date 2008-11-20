@@ -41,6 +41,9 @@ Authors:
 --------
     Michael Schroeder <mls@suse.de>
     Klaus Kaempf <kkaempf@suse.de>
+    Stephan Kulow <coolo@suse.de>
+    Michael Matz <matz@suse.de>
+    Duncan Mac-Vicar P. <dmacvicar@suse.de>
 
 %package devel
 Summary:        A new approach to package dependency solving
