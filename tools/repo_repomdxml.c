@@ -211,9 +211,8 @@ startElement(void *userData, const char *name, const char **atts)
   
   if (sw->from != pd->state)
     {
-#if 1
+#if 0
       fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
-      exit( 1 );
 #endif
       return;
     }
@@ -297,12 +296,12 @@ endElement(void *userData, const char *name)
   /* Pool *pool = pd->pool; */
 
 #if 0
-      fprintf(stderr, "end: %s\n", name);
+  fprintf(stderr, "endElement: %s\n", name);
 #endif
   if (pd->depth != pd->statedepth)
     {
       pd->depth--;
-#if 1
+#if 0
       fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
 #endif
       return;
