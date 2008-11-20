@@ -91,8 +91,6 @@ enum state {
   /* extension tags */
   STATE_SUSEINFO,
   STATE_EXPIRE,
-  STATE_PRODUCTS,
-  STATE_PRODUCT,
   STATE_KEYWORDS,
   STATE_KEYWORD,
   /* normal repomd.xml */
@@ -101,6 +99,7 @@ enum state {
   STATE_TAGS,
   STATE_CONTENT,
   STATE_DISTRO,
+  STATE_UPDATES,
   STATE_DATA,
   STATE_LOCATION,
   STATE_CHECKSUM,
@@ -120,11 +119,12 @@ struct stateswitch {
 static struct stateswitch stateswitches[] = {
   /* suseinfo tags */
   { STATE_START,       "repomd",          STATE_REPOMD, 0 },
-  { STATE_START,       "suseinfo",        STATE_SUSEINFO, 0 },  
+  { STATE_START,       "suseinfo",        STATE_SUSEINFO, 0 },
+  /* we support the tags element in suseinfo in case
+     createrepo version does not support it yet */
+  { STATE_SUSEINFO,    "tags",            STATE_TAGS, 0 },    
   { STATE_SUSEINFO,    "expire",          STATE_EXPIRE, 1 },  
-  { STATE_SUSEINFO,    "products",        STATE_PRODUCTS, 0 },  
   { STATE_SUSEINFO,    "keywords",        STATE_KEYWORDS, 0 },  
-  { STATE_PRODUCTS,    "id",              STATE_PRODUCT, 1 }, 
   /* keywords is the suse extension equivalent of
      tags/content when this one was not yet available.
      therefore we parse both */ 
@@ -136,6 +136,8 @@ static struct stateswitch stateswitches[] = {
  
   { STATE_TAGS,        "content",         STATE_CONTENT,  1 },
   { STATE_TAGS,        "distro",          STATE_DISTRO,  1 },
+  /* this tag is only valid in suseinfo.xml for now */
+  { STATE_TAGS,        "updates",         STATE_UPDATES,  1 },
 
   { STATE_DATA,        "location",        STATE_LOCATION, 0 },
   { STATE_DATA,        "checksum",        STATE_CHECKSUM, 1 },  
@@ -249,8 +251,6 @@ startElement(void *userData, const char *name, const char **atts)
         }
     case STATE_SUSEINFO: break;
     case STATE_EXPIRE: break;
-    case STATE_PRODUCTS: break;
-    case STATE_PRODUCT: break;
     case STATE_KEYWORDS: break;
     case STATE_KEYWORD: break;
     case STATE_CONTENT: break;
@@ -265,6 +265,18 @@ startElement(void *userData, const char *name, const char **atts)
            the label is set in the content of the tag */
         if (cpeid)
           repodata_set_poolstr(pd->data, pd->rphandle, REPOSITORY_PRODUCT_CPEID, cpeid);
+        break;
+      }
+    case STATE_UPDATES:
+      {
+        /* this is extra metadata about the product this repository
+           was designed for */
+        const char *cpeid = find_attr("cpeid", atts);
+        pd->ruhandle = repodata_new_handle(pd->data);
+        /* set the cpeid for the product 
+           the label is set in the content of the tag */
+        if (cpeid)
+          repodata_set_poolstr(pd->data, pd->ruhandle, REPOSITORY_UPDATE_CPEID, cpeid);
         break;
       }
     case STATE_DATA: break;
@@ -328,10 +340,6 @@ endElement(void *userData, const char *name)
 	  repodata_set_num(pd->data, SOLVID_META, REPOSITORY_EXPIRE, expire);
         break;
       }
-    case STATE_PRODUCT:
-      if (pd->content)
-	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_PRODUCTS, pd->content);
-      break;
       /* repomd.xml content and suseinfo.xml keywords are equivalent */
     case STATE_CONTENT:
     case STATE_KEYWORD:
@@ -349,8 +357,14 @@ endElement(void *userData, const char *name)
         repodata_set_str(pd->data, pd->rphandle, REPOSITORY_PRODUCT_LABEL, pd->content);
       repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_PRODUCTS, pd->rphandle);
       break;
+    case STATE_UPDATES:
+      /* distro tag is used in suseinfo.xml to say the repo updates a product
+         however it s not yet a tag standarized for repomd.xml */
+      if (pd->content)
+        repodata_set_str(pd->data, pd->ruhandle, REPOSITORY_UPDATE_LABEL, pd->content);
+      repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_UPDATES, pd->ruhandle);
+      break;
     case STATE_SUSEINFO: break;
-    case STATE_PRODUCTS: break;
     case STATE_KEYWORDS: break;
     case NUMSTATES: break;              
     default:

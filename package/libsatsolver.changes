@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Nov 20 10:32:01 CET 2008 - dmacvicar@suse.de
+
+- support content, distro and updates tag properly
+- remove the unused products tag
+
+-------------------------------------------------------------------
 Mon Nov 17 14:30:08 CET 2008 - ma@suse.de
 
 - Parse RELEASE tag from contentfile (bnc #444978)
