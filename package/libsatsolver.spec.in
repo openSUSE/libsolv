@@ -9,6 +9,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
 Prefix:         /usr
 
+BuildRequires:  doxygen
 %if 0%{?mandriva_version}
 # force this version on mandriva
 BuildRequires:  libneon0.26-devel
