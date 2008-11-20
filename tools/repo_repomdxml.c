@@ -275,7 +275,7 @@ startElement(void *userData, const char *name, const char **atts)
         /* set the cpeid for the product 
            the label is set in the content of the tag */
         if (cpeid)
-          repodata_set_poolstr(pd->data, pd->ruhandle, REPOSITORY_UPDATE_CPEID, cpeid);
+          repodata_set_poolstr(pd->data, pd->ruhandle, REPOSITORY_PRODUCT_CPEID, cpeid);
         break;
       }
     case STATE_DATA: break;
@@ -354,13 +354,13 @@ endElement(void *userData, const char *name)
          made for */
       if (pd->content)
         repodata_set_str(pd->data, pd->rphandle, REPOSITORY_PRODUCT_LABEL, pd->content);
-      repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_PRODUCTS, pd->rphandle);
+      repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_DISTROS, pd->rphandle);
       break;
     case STATE_UPDATES:
       /* distro tag is used in suseinfo.xml to say the repo updates a product
          however it s not yet a tag standarized for repomd.xml */
       if (pd->content)
-        repodata_set_str(pd->data, pd->ruhandle, REPOSITORY_UPDATE_LABEL, pd->content);
+        repodata_set_str(pd->data, pd->ruhandle, REPOSITORY_PRODUCT_LABEL, pd->content);
       repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_UPDATES, pd->ruhandle);
       break;
     case STATE_SUSEINFO: break;

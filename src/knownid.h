@@ -182,11 +182,11 @@ KNOWNID(REPOSITORY_EXPIRE,		"repository:expire"),
 
 /* which things does this repo provides updates for, if it does (array) */
 KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),
-KNOWNID(REPOSITORY_UPDATE_LABEL,     	"repository:update:label"),
-KNOWNID(REPOSITORY_UPDATE_CPEID,	"repository:update:cpeid"),
+/* for the repository:update label and cpeid, use the repository:product
+   sub attributes */
 
 /* which products this repository is supposed to be for (array) */
-KNOWNID(REPOSITORY_PRODUCTS,		"repository:products"),
+KNOWNID(REPOSITORY_DISTROS,		"repository:distros"),
 KNOWNID(REPOSITORY_PRODUCT_LABEL,       "repository:product:label"),
 KNOWNID(REPOSITORY_PRODUCT_CPEID,	"repository:product:cpeid"),
 
