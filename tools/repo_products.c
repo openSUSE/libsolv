@@ -315,7 +315,7 @@ endElement(void *userData, const char *name)
       repodata_set_str(pd->data, pd->handle, PRODUCT_PRODUCTLINE, pd->content);
     break;
     case STATE_UPDATEREPOKEY:
-      repodata_set_str(pd->data, pd->handle, langtag(pd, PRODUCT_UPDATEREPOKEY, pd->tmplang), pd->content);
+      /** obsolete **/
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);

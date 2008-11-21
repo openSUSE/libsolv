@@ -166,8 +166,6 @@ KNOWNID(PRODUCT_URL,			"product:url"),
 KNOWNID(PRODUCT_URL_TYPE,		"product:url:type"),
 KNOWNID(PRODUCT_FLAGS,			"product:flags"),
 KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),
-/* this has to be obsoleted */
-KNOWNID(PRODUCT_UPDATEREPOKEY,		"product:updaterepokey"),
 KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),
 KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),
 
