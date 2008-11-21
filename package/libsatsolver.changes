@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Nov 21 16:54:44 CET 2008 - dmacvicar@suse.de
+
+- remove unused updaterepokey, replaced by repo
+  product information
+
+-------------------------------------------------------------------
 Thu Nov 20 10:32:01 CET 2008 - dmacvicar@suse.de
 
 - support content, distro and updates tag properly
