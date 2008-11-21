@@ -82,7 +82,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PRODUCT,   "runtimeconfig", STATE_RUNTIMECONFIG, 0 },
   { STATE_PRODUCT,   "linguas",       STATE_LINGUAS,       0 },
   { STATE_PRODUCT,   "updaterepokey", STATE_UPDATEREPOKEY, 1 },
-  { STATE_PRODUCT,   "cpename",       STATE_CPEID,         1 },
+  { STATE_PRODUCT,   "cpeid",         STATE_CPEID,         1 },
   { STATE_URLS,      "url",           STATE_URL,           1 },
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
   { STATE_REGISTER,  "target",        STATE_TARGET,        1 },
