@@ -51,13 +51,24 @@ Group:          Development/Libraries/C and C++
 Requires:       satsolver-tools = %version
 Requires:       rpm-devel
 
+#%package devel-doc
+#Summary:        satsolver developer documentation
+#Group:          Documentation/HTML
+
 %description devel
-A new approach to package dependency solving
+Development files for satsolver, a new approach to package dependency solving
+
+#%description devel-doc
+#Developer documentation for satsolver, a new approach to package dependency solving
+
 
 Authors:
 --------
     Michael Schroeder <mls@suse.de>
     Klaus Kaempf <kkaempf@suse.de>
+    Stephan Kulow <coolo@suse.de>
+    Michael Matz <matz@suse.de>
+    Duncan Mac-Vicar P. <dmacvicar@suse.de>
 
 %package -n satsolver-tools
 Summary:        A new approach to package dependency solving
@@ -106,11 +117,15 @@ cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SKIP_RPATH=1 
 make %{?jobs:-j %jobs}
+make doc_forced
 
 %install
 make DESTDIR=$RPM_BUILD_ROOT install
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
+#pushd doc/autodoc
+#make install
+#popd
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
@@ -126,13 +141,15 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root)
 %_libdir/libsatsolver.a
 %_libdir/libappsatsolver.a
-%doc doc/README*
-%doc doc/THEORY
-%doc doc/PLANNING
 %dir /usr/include/satsolver
 /usr/include/satsolver/*
 /usr/bin/deptestomatic
 /usr/bin/helix2solv
+
+#%files devel-doc
+#%defattr(-,root,root)
+#%dir %_docdir/satsolver
+#%_docdir/satsolver/*
 
 %files -n ruby-satsolver
 %defattr(-,root,root,-)
