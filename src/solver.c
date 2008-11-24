@@ -2456,6 +2456,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
   Solvable *s;
   Pool *pool = solv->pool;
   Id p, *dp;
+  int minimizationsteps;
 
   IF_POOLDEBUG (SAT_DEBUG_RULE_CREATION)
     {
@@ -2488,6 +2489,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
    * with step 1
    */
    
+  minimizationsteps = 0;
   for (;;)
     {
       /*
@@ -3000,6 +3002,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      p = solv->branches.elements[lasti];
 	      solv->branches.elements[lasti] = 0;
 	      POOL_DEBUG(SAT_DEBUG_STATS, "minimizing %d -> %d with %s\n", solv->decisionmap[p], l, solvable2str(pool, pool->solvables + p));
+	      minimizationsteps++;
 
 	      level = lastl;
 	      revert(solv, level);
@@ -3016,7 +3019,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	}
       break;
     }
-  POOL_DEBUG(SAT_DEBUG_STATS, "solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
+  POOL_DEBUG(SAT_DEBUG_STATS, "solver statistics: %d learned rules, %d unsolvable, %d minimization steps\n", solv->stats_learned, solv->stats_unsolvable, minimizationsteps);
 
   POOL_DEBUG(SAT_DEBUG_STATS, "done solving.\n\n");
   queue_free(&dq);

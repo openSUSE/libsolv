@@ -51,18 +51,6 @@ prune_to_best_version_sortcmp(const void *ap, const void *bp)
        * is not depending on some random solvable order */
       na = id2str(pool, sa->name);
       nb = id2str(pool, sb->name);
-      /* bring patterns to the front */
-      /* XXX: no longer needed? */
-      if (!strncmp(na, "pattern:", 8))
-	{
-          if (strncmp(nb, "pattern:", 8))
-	    return -1;
-	}
-      else if (!strncmp(nb, "pattern:", 8))
-	{
-          if (strncmp(na, "pattern:", 8))
-	    return 1;
-	}
       return strcmp(na, nb);
     }
   /* the same name, bring installed solvables to the front */
