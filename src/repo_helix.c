@@ -45,6 +45,8 @@ enum state {
   STATE_PROVIDESENTRY,
   STATE_REQUIRES,
   STATE_REQUIRESENTRY,
+  STATE_PREREQUIRES,
+  STATE_PREREQUIRESENTRY,
   STATE_OBSOLETES,
   STATE_OBSOLETESENTRY,
   STATE_CONFLICTS,
@@ -100,6 +102,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PACKAGE,     "history",         STATE_HISTORY, 0 },
   { STATE_PACKAGE,     "provides",        STATE_PROVIDES, 0 },
   { STATE_PACKAGE,     "requires",        STATE_REQUIRES, 0 },
+  { STATE_PACKAGE,     "prerequires",     STATE_PREREQUIRES, 0 },
   { STATE_PACKAGE,     "obsoletes",       STATE_OBSOLETES , 0 },
   { STATE_PACKAGE,     "conflicts",       STATE_CONFLICTS , 0 },
   { STATE_PACKAGE,     "recommends" ,     STATE_RECOMMENDS , 0 },
@@ -116,6 +119,7 @@ static struct stateswitch stateswitches[] = {
 
   { STATE_PROVIDES,    "dep",             STATE_PROVIDESENTRY, 0 },
   { STATE_REQUIRES,    "dep",             STATE_REQUIRESENTRY, 0 },
+  { STATE_PREREQUIRES, "dep",             STATE_PREREQUIRESENTRY, 0 },
   { STATE_OBSOLETES,   "dep",             STATE_OBSOLETESENTRY, 0 },
   { STATE_CONFLICTS,   "dep",             STATE_CONFLICTSENTRY, 0 },
   { STATE_RECOMMENDS,  "dep",             STATE_RECOMMENDSENTRY, 0 },
@@ -298,14 +302,13 @@ static struct flagtab flagtab[] = {
  */
 
 static unsigned int
-adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, int isreq)
+adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, Id marker)
 {
-  Id id, name, marker;
+  Id id, name;
   const char *n, *f, *k;
   const char **a;
 
   n = f = k = NULL;
-  marker = isreq ? -SOLVABLE_PREREQMARKER : 0;
 
   /* loop over name,value pairs */
   for (a = atts; *a; a += 2)
@@ -316,7 +319,7 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, int i
 	k = a[1];
       else if (!strcmp(*a, "op"))
 	f = a[1];
-      else if (isreq && !strcmp(*a, "pre") && a[1][0] == '1')
+      else if (marker && !strcmp(*a, "pre") && a[1][0] == '1')
         marker = SOLVABLE_PREREQMARKER;
     }
   if (!n)			       /* quit if no name found */
@@ -474,11 +477,11 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_PROVIDESENTRY:	       /* entry within provides */
       s->provides = adddep(pool, pd, s->provides, atts, 0);
       break;
-    case STATE_REQUIRES:
-      s->requires = 0;
-      break;
     case STATE_REQUIRESENTRY:
-      s->requires = adddep(pool, pd, s->requires, atts, 1);
+      s->requires = adddep(pool, pd, s->requires, atts, -SOLVABLE_PREREQMARKER);
+      break;
+    case STATE_PREREQUIRESENTRY:
+      s->requires = adddep(pool, pd, s->requires, atts, SOLVABLE_PREREQMARKER);
       break;
     case STATE_OBSOLETES:
       s->obsoletes = 0;
