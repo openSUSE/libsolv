@@ -3224,8 +3224,8 @@ problems_sortcmp(const void *ap, const void *bp)
     {
       Queue *job = problems_sort_data;
       int af = job->elements[-a - 1] & SOLVER_ESSENTIAL;
-      int bf = job->elements[-a - 1] & SOLVER_ESSENTIAL;
-      int x = bf - af;
+      int bf = job->elements[-b - 1] & SOLVER_ESSENTIAL;
+      int x = af - bf;
       if (x)
 	return x;
     }
