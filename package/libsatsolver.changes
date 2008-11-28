@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Nov 28 18:29:08 CET 2008 - mls@suse.de
+
+- correct problem solving algorithm
+
+-------------------------------------------------------------------
 Fri Nov 21 16:54:44 CET 2008 - dmacvicar@suse.de
 
 - remove unused updaterepokey, replaced by repo
