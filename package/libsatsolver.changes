@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Dec  1 11:13:55 CET 2008 - mls@suse.de
+
+- susetags: fix file dependency parsing [bnc#450286]
+
+-------------------------------------------------------------------
 Fri Nov 28 18:29:08 CET 2008 - mls@suse.de
 
 - correct problem solving algorithm
