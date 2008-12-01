@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Dec  1 11:50:12 CET 2008 - mls@suse.de
+
+- prefer patterns again until there's a real fix [bnc#450226]
+
+-------------------------------------------------------------------
 Mon Dec  1 11:13:55 CET 2008 - mls@suse.de
 
 - susetags: fix file dependency parsing [bnc#450286]
