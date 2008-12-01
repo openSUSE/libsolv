@@ -2911,6 +2911,14 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      if (dq.count > 1)
 	        policy_filter_unwanted(solv, &dq, POLICY_MODE_RECOMMEND);
 	      p = dq.elements[0];
+	      /* prefer recommended patterns (bnc#450226) */
+	      /* real fix is to minimize recommended packages as well */
+	      for (i = 0; i < dq.count; i++)
+	        if (!strncmp(id2str(pool, pool->solvables[dq.elements[i]].name), "pattern:", 8))
+		  {
+		    p = dq.elements[i];
+		    break;
+		  }
 	      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
 	      queue_push(&solv->recommendations, p);
 	      level = setpropagatelearn(solv, level, p, 0);
