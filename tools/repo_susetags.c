@@ -66,15 +66,14 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   Id id, evrid;
   char *sp[4];
 
-  if (*line=='/')
+  if (line[6] == '/')
     {
-      /* Allow spaces in file dependencies. Autobuild may generate
-         such filedeps into the provides list. */
-      id = str2id(pool, line, 1);
+      /* A file dependency. Do not try to parse it */
+      id = str2id(pool, line + 6, 1);
     }
   else
     {
-      i = split(line + 5, sp, 4); /* name, <op>, evr, ? */
+      i = split(line + 6, sp, 4); /* name, <op>, evr, ? */
       if (i != 1 && i != 3) /* expect either 'name' or 'name' <op> 'evr' */
         {
 	  pool_debug(pool, SAT_FATAL, "susetags: bad dependency line: %d: %s\n", pd->lineno, line);
@@ -549,7 +548,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	continue;
       if (! (line[0] && line[1] && line[2] && line[3] && (line[4] == ':' || line[4] == '.')))
         continue;
-      if ( line[4] == '.')
+      if (line[4] == '.')
         {
           char *endlang;
           endlang = strchr(line + 5, ':');
