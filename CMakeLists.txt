@@ -117,10 +117,6 @@ INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOU
 ####################################################################
 
 MESSAGE(STATUS "Looking modules in ${CMAKE_MODULE_PATH}")
-#FIND_PROGRAM(SWIG_EXECUTABLE
-#  NAMES swig-1.3 swig
-#  PATHS ${SWIG_DIR} ${SWIG_DIR}/.. ${SWIG_DIR}/../../bin /usr/bin /usr/local/bin ${CMAKE_INSTALL_PREFIX}/bin
-#)
 
 set ( CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} -Werror -Wall" )
 set ( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -g -O3" )
@@ -132,10 +128,19 @@ ADD_SUBDIRECTORY(applayer)
 ADD_SUBDIRECTORY(tests)
 ADD_SUBDIRECTORY(doc)
 
-FIND_PACKAGE(SWIG REQUIRED)
+FIND_PACKAGE(SWIG)
 
 IF ( SWIG_FOUND )
   ADD_SUBDIRECTORY(bindings)
+ELSE ( SWIG_FOUND )
+ # for older version of swig/cmake
+ FIND_PROGRAM(SWIG_EXECUTABLE
+   NAMES swig-1.3 swig
+  PATHS ${SWIG_DIR} ${SWIG_DIR}/.. ${SWIG_DIR}/../../bin /usr/bin /usr/local/bin ${CMAKE_INSTALL_PREFIX}/bin
+ )
+ IF ( SWIG_EXECUTABLE )
+  ADD_SUBDIRECTORY(bindings)
+ ENDIF ( SWIG_EXECUTABLE )
 ENDIF ( SWIG_FOUND )
 
 MESSAGE(STATUS "version: ${VERSION}")
