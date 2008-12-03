@@ -18,7 +18,11 @@ BuildRequires:  libneon0.26-devel
 BuildRequires:  perl-devel
 %endif
 %if 0%{?suse_version}
+%if 0%{?suse_version} < 1030
+BuildRequires:  expat
+%else
 BuildRequires:  libexpat-devel
+%endif
 %if 0%{?suse_version} < 1100
 BuildRequires:  graphviz
 %endif
@@ -157,7 +161,12 @@ rm -rf "$RPM_BUILD_ROOT"
 %files -n ruby-satsolver
 %defattr(-,root,root,-)
 %if 0%{?suse_version}
+%if 0%{?suse_version} < 1100
+%dir %{_libdir}/ruby/site_ruby/%{rb_ver}/%{rb_arch}
+%{_libdir}/ruby/site_ruby/%{rb_ver}/%{rb_arch}/satsolver.so
+%else
 %{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolver.so
+%endif
 %endif
 %if 0%{?mandriva_version}
 %{ruby_sitearchdir}/satsolverx.so
