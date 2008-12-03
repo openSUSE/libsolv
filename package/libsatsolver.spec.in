@@ -19,6 +19,9 @@ BuildRequires:  perl-devel
 %endif
 %if 0%{?suse_version}
 BuildRequires:  libexpat-devel
+%if 0%{?suse_version} < 1100
+BuildRequires:  graphviz
+%endif
 %else
 BuildRequires:  expat-devel
 %endif
