@@ -2823,8 +2823,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  int qcount;
 
 	  POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended packages\n");
-	  queue_empty(&dq);
-	  queue_empty(&dqs);
+	  queue_empty(&dq);	/* recommended packages */
+	  queue_empty(&dqs);	/* supplemented packages */
 	  for (i = 1; i < pool->nsolvables; i++)
 	    {
 	      if (solv->decisionmap[i] < 0)
@@ -2867,12 +2867,11 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (!solver_is_supplementing(solv, s))
 		    continue;
-		  if (solv->ignorealreadyrecommended && solv->installed)
-		    queue_pushunique(&dqs, i);	/* needs filter */
-		  else
-		    queue_pushunique(&dq, i);
+		  queue_push(&dqs, i);
 		}
 	    }
+
+          /* filter out all already supplemented packages if requested */
           if (solv->ignorealreadyrecommended && dqs.count)
 	    {
 	      /* turn off all new packages */
@@ -2886,15 +2885,16 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    solv->decisionmap[p] = -solv->decisionmap[p];
 		}
 	      /* filter out old supplements */
-	      for (i = 0; i < dqs.count; i++)
+	      for (i = j = 0; i < dqs.count; i++)
 		{
 		  p = dqs.elements[i];
 		  s = pool->solvables + p;
 		  if (!s->supplements)
 		    continue;
 		  if (!solver_is_supplementing(solv, s))
-		    queue_pushunique(&dq, p);
+		    dqs.elements[j++] = p;
 		}
+	      dqs.count = j;
 	      /* undo turning off */
 	      for (i = 0; i < solv->decisionq.count; i++)
 		{
@@ -2906,6 +2906,111 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    solv->decisionmap[p] = -solv->decisionmap[p];
 		}
 	    }
+
+          /* make dq contain both recommended and supplemented pkgs */
+	  if (dqs.count)
+	    {
+	      for (i = 0; i < dqs.count; i++)
+		queue_pushunique(&dq, dqs.elements[i]);
+	    }
+
+#if 1
+	  if (dq.count)
+	    {
+	      Map dqmap;
+	      int decisioncount;
+
+	      if (dq.count == 1)
+		{
+		  /* simple case, just one package. no need to choose  */
+		  p = dq.elements[0];
+		  if (dqs.count)
+		    POOL_DEBUG(SAT_DEBUG_POLICY, "installing supplemented %s\n", solvable2str(pool, pool->solvables + p));
+		  else
+		    POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
+		  queue_push(&solv->recommendations, p);
+		  level = setpropagatelearn(solv, level, p, 0);
+		  continue;
+		}
+
+	      /* filter and create a map of result */
+	      policy_filter_unwanted(solv, &dq, POLICY_MODE_RECOMMEND);
+	      map_init(&dqmap, pool->nsolvables);
+	      for (i = 0; i < dq.count; i++)
+		MAPSET(&dqmap, dq.elements[i]);
+
+	      /* install all supplemented packages */
+	      for (i = 0; i < dqs.count; i++)
+		{
+		  p = dqs.elements[i];
+		  if (solv->decisionmap[p] || !MAPTST(&dqmap, p))
+		    continue;
+		  POOL_DEBUG(SAT_DEBUG_POLICY, "installing supplemented %s\n", solvable2str(pool, pool->solvables + p));
+		  queue_push(&solv->recommendations, p);
+		  olevel = level;
+		  level = setpropagatelearn(solv, level, p, 0);
+		  if (level <= olevel)
+		    break;
+		}
+	      if (i < dqs.count)
+		{
+		  map_free(&dqmap);
+		  continue;
+		}
+
+	      /* install all recommended packages */
+	      /* more work as we want to created branches if multiple
+               * choices are valid */
+	      decisioncount = solv->decisionq.count;
+	      for (i = 0; i < decisioncount; i++)
+		{
+		  Id rec, *recp, pp;
+		  p = solv->decisionq.elements[i];
+		  if (p < 0)
+		    continue;
+		  s = pool->solvables + p;
+		  if (!s->repo || (solv->ignorealreadyrecommended && s->repo == solv->installed))
+		    continue;
+		  if (!s->recommends)
+		    continue;
+		  recp = s->repo->idarraydata + s->recommends;
+		  while ((rec = *recp++) != 0)
+		    {
+		      queue_empty(&dq);
+		      FOR_PROVIDES(p, pp, rec)
+			{
+			  if (solv->decisionmap[p] > 0)
+			    {
+			      dq.count = 0;
+			      break;
+			    }
+			  else if (solv->decisionmap[p] == 0 && MAPTST(&dqmap, p))
+			    queue_pushunique(&dq, p);
+			}
+		      if (!dq.count)
+			continue;
+		      if (dq.count > 1)
+			{
+			  /* multiple candidates, open a branch */
+			  for (i = 1; i < dq.count; i++)
+			    queue_push(&solv->branches, dq.elements[i]);
+			  queue_push(&solv->branches, -level);
+			}
+		      p = dq.elements[0];
+		      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
+		      queue_push(&solv->recommendations, p);
+		      olevel = level;
+		      level = setpropagatelearn(solv, level, p, 0);
+		      if (level <= olevel || solv->decisionq.count < decisioncount)
+			break;
+		    }
+		  if (rec)
+		    break;	/* had a problem above, quit loop */
+		}
+	      map_free(&dqmap);
+	      continue;
+	    }
+#else
 	  if (dq.count)
 	    {
 	      if (dq.count > 1)
@@ -2924,6 +3029,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      level = setpropagatelearn(solv, level, p, 0);
 	      continue;
 	    }
+#endif
 	}
 
      if (solv->distupgrade && solv->installed)
@@ -3009,7 +3115,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      /* kill old solvable so that we do not loop */
 	      p = solv->branches.elements[lasti];
 	      solv->branches.elements[lasti] = 0;
-	      POOL_DEBUG(SAT_DEBUG_STATS, "minimizing %d -> %d with %s\n", solv->decisionmap[p], l, solvable2str(pool, pool->solvables + p));
+	      POOL_DEBUG(SAT_DEBUG_STATS, "minimizing %d -> %d with %s\n", solv->decisionmap[p], lastl, solvable2str(pool, pool->solvables + p));
 	      minimizationsteps++;
 
 	      level = lastl;
