@@ -25,6 +25,7 @@ unset CDPATH
 parser_options=${PARSER_OPTIONS:-}
 
 findopt="-prune"
+repotype=
 
 while true ; do
   if test "$1" = "-o" ; then
@@ -34,6 +35,7 @@ while true ; do
   elif test "$1" = "-R" ; then
     # recursive
     findopt=
+    repotype=plaindir
     shift
   else
     break
@@ -42,7 +44,19 @@ done
 
 dir="$1"
 cd "$dir" || exit 1
-if test -d repodata ; then
+
+if test -z "$repotype" ; then
+  # autodetect repository type
+  if test -d repodata ; then
+    repotype=rpmmd
+  elif test_susetags ; then
+    repotype=susetags
+  else
+    repotype=plaindir
+  fi
+fi
+
+if test "$repotype" = rpmmd ; then
   cd repodata || exit 2
 
   primfile="/nonexist"
@@ -232,7 +246,7 @@ if test -d repodata ; then
   mergesolv $m_repomdfile $m_suseinfofile $m_primfile $m_prodfile $m_patternfile $m_patchfile $m_updateinfofile $m_deltainfofile
   rm -f $repomdfile $suseinfofile $primfile $patternfile $prodfile $patchfile $updateinfofile $deltainfofile
 
-elif test_susetags; then
+elif test "$repotype" = susetags ; then
   olddir=`pwd`
   DESCR=`grep DESCRDIR content | cut -d ' ' -f 2`
   if test -z $DESCR; then
@@ -300,6 +314,9 @@ elif test_susetags; then
 
   ) | susetags2solv -c "${olddir}/content" $parser_options || exit 4
   cd "$olddir"
-else
+elif test "$repotype" = plaindir ; then
   find * -name .\* -prune -o $findopt -name \*.delta.rpm -o -name \*.patch.rpm -o -name \*.rpm -a -type f -print0 | rpms2solv -0 -m -
+else
+  echo "unknown repository type '$repotype'" >&2
+  exit 1
 fi
