@@ -27,6 +27,8 @@
 
 #define RULES_BLOCK 63
 
+static void disableupdaterules(Solver *solv, Queue *job, int jobidx);
+
 /********************************************************************
  *
  * dependency check helpers
@@ -774,7 +776,14 @@ makeruledecisions(Solver *solv)
 	
       POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "assertion conflict, but I am weak, disabling ");
       solver_printrule(solv, SAT_DEBUG_UNSOLVABLE, r);
-      disablerule(solv, r);
+
+      if (ri >= solv->jobrules && ri < solv->jobrules_end)
+	v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+      else
+	v = ri;
+      disableproblem(solv, v);
+      if (v < 0)
+	disableupdaterules(solv, solv->job, -(v + 1));
     }
   
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
@@ -967,6 +976,8 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
 	  s = pool->solvables + what;
 	  if (s->repo == installed)
 	    {
+	      if (MAPTST(&solv->noupdate, what - installed->start))
+		break;
 	      r = solv->rules + solv->updaterules + (what - installed->start);
 	      if (r->d >= 0)
 	        break;
@@ -2125,13 +2136,19 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 
   if (lastweak)
     {
+      Id v;
       /* disable last weak rule */
       solv->problems.count = oldproblemcount;
       solv->learnt_pool.count = oldlearntpoolcount;
-      r = solv->rules + lastweak;
+      if (lastweak >= solv->jobrules && lastweak < solv->jobrules_end)
+	v = -(solv->ruletojob.elements[lastweak - solv->jobrules] + 1);
+      else
+        v = lastweak;
       POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "disabling ");
-      solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, r);
-      disablerule(solv, r);
+      solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, solv->rules + lastweak);
+      disableproblem(solv, v);
+      if (v < 0)
+	disableupdaterules(solv, solv->job, -(v + 1));
       reset_solver(solv);
       return 1;
     }
@@ -4198,8 +4215,11 @@ solver_solve(Solver *solv, Queue *job)
   if (!pool->whatprovides)
     pool_createwhatprovides(pool);
 
-  /* create obsolete index if needed */
+  /* create obsolete index */
   create_obsolete_index(solv);
+
+  /* remember job */
+  solv->job = job;
 
   /*
    * create basic rule set of all involved packages
@@ -4799,6 +4819,7 @@ solver_solve(Solver *solv, Queue *job)
   queue_free(&redoq);
   POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
+  solv->job = 0;
 }
 
 /***********************************************************************/

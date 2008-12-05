@@ -204,10 +204,10 @@ typedef struct solver {
     
 
   /* some strange queue that doesn't belong here */
-
   Queue covenantq;                      /* Covenants honored by this solver (generic locks) */
 
   
+  Queue *job;				/* tmp store for job we're working on */
 } Solver;
 
 /*
