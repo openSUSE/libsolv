@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Dec  5 14:43:55 CET 2008 - kkaempf@suse.de
+
+- enhance bindings to provide reasons for solver decisions
+
+-------------------------------------------------------------------
 Mon Dec  1 11:50:12 CET 2008 - mls@suse.de
 
 - prefer patterns again until there's a real fix [bnc#450226]
