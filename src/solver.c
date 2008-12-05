@@ -2918,7 +2918,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	  if (dq.count)
 	    {
 	      Map dqmap;
-	      int decisioncount;
+	      int decisioncount = solv->decisionq.count;
 
 	      if (dq.count == 1)
 		{
@@ -2952,7 +2952,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (level <= olevel)
 		    break;
 		}
-	      if (i < dqs.count)
+	      if (i < dqs.count || solv->decisionq.count < decisioncount)
 		{
 		  map_free(&dqmap);
 		  continue;
@@ -2961,7 +2961,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      /* install all recommended packages */
 	      /* more work as we want to created branches if multiple
                * choices are valid */
-	      decisioncount = solv->decisionq.count;
 	      for (i = 0; i < decisioncount; i++)
 		{
 		  Id rec, *recp, pp;
