@@ -298,11 +298,12 @@ hashrule(Solver *solv, Id p, Id d, int n)
  * d == 0: unary rule, assertion => (A) or (-A)
  *
  *   Install:    p > 0, d = 0   (A)             user requested install
- *   Remove:     p < 0, d = 0   (-A)            user requested remove
+ *   Remove:     p < 0, d = 0   (-A)            user requested remove (also: uninstallable)
  *   Requires:   p < 0, d > 0   (-A|B1|B2|...)  d: <list of providers for requirement of p>
  *   Updates:    p > 0, d > 0   (A|B1|B2|...)   d: <list of updates for solvable p>
  *   Conflicts:  p < 0, d < 0   (-A|-B)         either p (conflict issuer) or d (conflict provider) (binary rule)
- *   ?           p > 0, d < 0   (A|-B)
+ *                                              also used for obsoletes
+ *   ?:          p > 0, d < 0   (A|-B)          
  *   No-op ?:    p = 0, d = 0   (null)          (used as policy rule placeholder)
  *
  *   resulting watches:
