@@ -430,7 +430,7 @@ policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
   if (!vendormask1)
     return 0;
   vendormask2 = pool_vendor2mask(pool, s2->vendor);
-  if ((vendormask1 & vendormask2) == 0)
+  if ((vendormask1 & vendormask2) != 0)
     return 0;
   return 1;
 }
