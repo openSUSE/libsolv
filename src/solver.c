@@ -2883,6 +2883,40 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		}
 	    }
 
+	  /* filter out all packages obsoleted by installed packages */
+	  /* this is no longer needed if we have reverse obsoletes */
+          if ((dqs.count || dq.count) && solv->installed)
+	    {
+	      Map obsmap;
+	      Id obs, *obsp, po, ppo;
+
+	      map_init(&obsmap, pool->nsolvables);
+	      for (p = solv->installed->start; p < solv->installed->end; p++)
+		{
+		  s = pool->solvables + p;
+		  if (s->repo != solv->installed || !s->obsoletes)
+		    continue;
+		  if (solv->decisionmap[p] <= 0)
+		    continue;
+		  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p))
+		    continue;
+		  obsp = s->repo->idarraydata + s->obsoletes;
+		  /* foreach obsoletes */
+		  while ((obs = *obsp++) != 0)
+		    FOR_PROVIDES(po, ppo, obs)
+		      MAPSET(&obsmap, po);
+		}
+	      for (i = j = 0; i < dqs.count; i++)
+		if (!MAPTST(&obsmap, dqs.elements[i]))
+		  dqs.elements[j++] = dqs.elements[i];
+	      dqs.count = j;
+	      for (i = j = 0; i < dq.count; i++)
+		if (!MAPTST(&obsmap, dq.elements[i]))
+		  dq.elements[j++] = dq.elements[i];
+	      dq.count = j;
+	      map_free(&obsmap);
+	    }
+
           /* filter out all already supplemented packages if requested */
           if (solv->ignorealreadyrecommended && dqs.count)
 	    {
