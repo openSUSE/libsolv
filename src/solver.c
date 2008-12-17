@@ -2597,7 +2597,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  r = solv->rules + solv->updaterules + (i - solv->installed->start);
 		  if (!r->p)		/* update rule == feature rule? */
 		    r = r - solv->updaterules + solv->featurerules;
-		  if (r->p && r->p != i)	/* allowed to keep package? */
+		  if (r->p != i)	/* allowed to keep package? */
 		    continue;
 
 		  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "keeping %s\n", solvable2str(pool, s));
@@ -2690,28 +2690,26 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	    {
 	      Rule *rr;
 	      s = pool->solvables + i;
-		
-		/* skip if not installed (can't update) */
 	      if (s->repo != solv->installed)
 		continue;
-		/* skip if already decided */
+
+	      /* skip if already decided */
 	      if (solv->decisionmap[i] > 0)
 		continue;
 		
-		/* noupdate is set if a job is erasing the installed solvable or installing a specific version */
+	      /* noupdate is set if a job is erasing the installed solvable or installing a specific version */
 	      if (MAPTST(&solv->noupdate, i - solv->installed->start))
 		continue;
 		
-	      queue_empty(&dq);
-
 	      rr = r;
-	      if (rr->d < 0)	/* disabled -> look at feature rule ? */
+	      if (rr->d < 0)	/* disabled -> look at feature rule */
 		rr -= solv->installed->end - solv->installed->start;
 	      if (!rr->p)	/* identical to update rule? */
 		rr = r;
-	      if (rr->p <= 0)
-		continue;	/* no such rule or disabled */
+	      if (!rr->p || rr->d < 0)
+		continue;	/* no such rule (orpaned package) or disabled */
 	
+	      queue_empty(&dq);
 	      FOR_RULELITERALS(p, dp, rr)
 		{
 		  if (solv->decisionmap[p] > 0)
@@ -2719,18 +2717,34 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (solv->decisionmap[p] == 0)
 		    queue_push(&dq, p);
 		}
-	      if (p || !dq.count)	/* already fulfilled or empty */
-		continue;
-	      olevel = level;
-	      level = selectandinstall(solv, level, &dq, disablerules, rr - solv->rules);
-	      if (level == 0)
+	      if (!p && dq.count)	/* neither fulfilled nor empty */
 		{
-		  queue_free(&dq);
-		  queue_free(&dqs);
-		  return;
+		  olevel = level;
+		  level = selectandinstall(solv, level, &dq, disablerules, rr - solv->rules);
+		  if (level == 0)
+		    {
+		      queue_free(&dq);
+		      queue_free(&dqs);
+		      return;
+		    }
+		  if (level <= olevel)
+		    break;
 		}
-	      if (level <= olevel)
-		break;
+	      /* if still undecided, keep it */
+	      if (solv->decisionmap[i] == 0)
+		{
+		  olevel = level;
+		  POOL_DEBUG(SAT_DEBUG_POLICY, "keeping %s\n", solvable2str(pool, pool->solvables + i));
+		  level = setpropagatelearn(solv, level, i, disablerules, r - solv->rules);
+		  if (level == 0)
+		    {
+		      queue_free(&dq);
+		      queue_free(&dqs);
+		      return;
+		    }
+		  if (level <= olevel)
+		    break;
+		}
 	    }
 	  systemlevel = level + 1;
 	  if (i < solv->installed->end)
