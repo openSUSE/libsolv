@@ -273,11 +273,11 @@ solver_printdecisions(Solver *solv)
     {
       FOR_REPO_SOLVABLES(installed, p, s)
 	{
-	  if (solv->decisionmap[p] >= 0)
+	  if (solv->decisionmap[p] > 0)
 	    continue;
 	  if (obsoletesmap[p])
 	    continue;
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "  erase   %s\n", solvable2str(pool, s));
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "  erase     %s\n", solvable2str(pool, s));
 	}
     }
 
