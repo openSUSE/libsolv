@@ -22,7 +22,11 @@
 #include <unistd.h>
 #include <assert.h>
 
+#ifdef FEDORA
+#include <db4/db.h>
+#else
 #include <rpm/db.h>
+#endif
 
 #include "pool.h"
 #include "repo.h"
@@ -1274,7 +1278,12 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       exit(1);
     }
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir);
+  /* should look in /usr/lib/rpm/macros instead, but we want speed... */
+#ifdef FEDORA
+  if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0))
+#else
   if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
+#endif
     {
       perror("dbenv open");
       exit(1);
