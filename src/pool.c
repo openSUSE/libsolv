@@ -1387,7 +1387,7 @@ static inline Id dep2name(Pool *pool, Id dep)
   return dep;
 }
 
-static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep)
+static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, int ispatch)
 {
   Id p, pp;
   int r = 0;
@@ -1395,6 +1395,8 @@ static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep)
     {
       if (p == SYSTEMSOLVABLE)
         return 1;	/* always boring, as never constraining */
+      if (ispatch && !pool_match_nevr(pool, pool->solvables + p, dep))
+	continue;
       if ((map[p] & 9) == 9)
 	return 9;
       r |= map[p] & 17;
@@ -1462,7 +1464,7 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)
 		continue;
-	      r = providedbyinstalled(pool, map, req);
+	      r = providedbyinstalled(pool, map, req, 0);
 	      if (!r)
 		{
 		  /* decided and miss */
@@ -1478,10 +1480,14 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 	}
       if (s->conflicts)
 	{
+	  int ispatch = 0;	/* see solver.c patch handling */
+
+	  if (!strncmp("patch:", id2str(pool, s->name), 6))
+	    ispatch = 1;
 	  conp = s->repo->idarraydata + s->conflicts;
 	  while ((con = *conp++) != 0)
 	    {
-	      if ((providedbyinstalled(pool, map, con) & 1) != 0)
+	      if ((providedbyinstalled(pool, map, con, ispatch) & 1) != 0)
 		{
 		  map[p] = 2;
 		  break;
@@ -1489,7 +1495,7 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 	      if ((m == 1 || m == 17) && ISRELDEP(con))
 		{
 		  con = dep2name(pool, con);
-		  if ((providedbyinstalled(pool, map, con) & 1) != 0)
+		  if ((providedbyinstalled(pool, map, con, ispatch) & 1) != 0)
 		    m = 9;
 		}
 	    }
@@ -1506,7 +1512,7 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 	      obsp = s->repo->idarraydata + s->obsoletes;
 	      while ((obs = *obsp++) != 0)
 		{
-		  if ((providedbyinstalled(pool, map, obs) & 1) != 0)
+		  if ((providedbyinstalled(pool, map, obs, 0) & 1) != 0)
 		    {
 		      map[p] = 2;
 		      break;
