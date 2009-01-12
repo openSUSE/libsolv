@@ -274,6 +274,8 @@ extern Id solver_next_problem(Solver *solv, Id problem);
 extern Id solver_next_solution(Solver *solv, Id problem, Id solution);
 extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
 extern Id solver_findproblemrule(Solver *solv, Id problem);
+extern void solver_findallproblemrules(Solver *solv, Id problem, Queue *rules);
+
 extern SolverProbleminfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
 
 /* XXX: why is this not static? */

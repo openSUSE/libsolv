@@ -777,7 +777,7 @@ makeruledecisions(Solver *solv)
  * enable/disable learnt rules 
  *
  * we have enabled or disabled some of our rules. We now reenable all
- * of our learnt rules but the ones that were learnt from rules that
+ * of our learnt rules except the ones that were learnt from rules that
  * are now disabled.
  */
 static void
@@ -837,7 +837,7 @@ enableweakrules(Solver *solv)
 
   for (i = 1, r = solv->rules + i; i < solv->learntrules; i++, r++)
     {
-      if (r->d >= 0) /* skip non-direct literals */
+      if (r->d >= 0) /* already enabled? */
 	continue;
       if (!MAPTST(&solv->weakrulemap, i))
 	continue;
@@ -847,7 +847,7 @@ enableweakrules(Solver *solv)
 
 
 /* FIXME: bad code ahead, replace as soon as possible */
-/* FIXME: should probably look at SOLVER_INSTALL|SOLVABLE_ONE_OF */
+/* FIXME: maybe also look at SOLVER_INSTALL|SOLVABLE_ONE_OF */
 
 /*-------------------------------------------------------------------
  * disable update rules
@@ -2269,7 +2269,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id rul
       POOL_DEBUG(SAT_DEBUG_ANALYZE, "reverting decisions (level %d -> %d)\n", level, l);
       level = l;
       revert(solv, level);
-      r = addrule(solv, p, d);       /* p requires d */
+      r = addrule(solv, p, d);
       assert(r);
       assert(solv->learnt_why.count == (r - solv->rules) - solv->learntrules);
       queue_push(&solv->learnt_why, why);
@@ -4023,6 +4023,28 @@ solver_findproblemrule(Solver *solv, Id problem)
   if (jobr)
     return jobr;
   assert(0);
+}
+
+static void
+findallproblemrules_internal(Solver *solv, Id idx, Queue *rules)
+{
+  Id rid;
+  while ((rid = solv->learnt_pool.elements[idx++]) != 0)
+    {
+      if (rid >= solv->learntrules)
+        {
+	  findallproblemrules_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], rules);
+          continue;
+	}
+      queue_pushunique(rules, rid);
+    }
+}
+
+void
+solver_findallproblemrules(Solver *solv, Id problem, Queue *rules)
+{
+  queue_empty(rules);
+  findallproblemrules_internal(solv, solv->problems.elements[problem - 1], rules);
 }
 
 
