@@ -47,6 +47,9 @@ SET(repomdxml2solv_REPOS repomdxml2solv.c repo_repomdxml.c)
 ADD_EXECUTABLE( repomdxml2solv ${repomdxml2solv_REPOS} )
 TARGET_LINK_LIBRARIES( repomdxml2solv satsolver toolstuff ${EXPAT_LIBRARY})
 
+SET(installcheck_SOURCES installcheck.c repo_rpmmd.c repo_susetags.c)
+ADD_EXECUTABLE(installcheck ${installcheck_SOURCES})
+TARGET_LINK_LIBRARIES(installcheck satsolver ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
 
 ADD_EXECUTABLE( dumpsolv dumpsolv.c )
 TARGET_LINK_LIBRARIES( dumpsolv satsolver)

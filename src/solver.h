@@ -208,6 +208,13 @@ typedef struct solver {
 
   
   Queue *job;				/* tmp store for job we're working on */
+  Id infarchrules;			/* inferior arch rules */
+  Id infarchrules_end;
+  Id duprules;				/* dist upgrade rules */
+  Id duprules_end;
+  Map updatemap;			/* bring those packages to the newest version */
+  Map dupmap;				/* packages from dup repos */
+  Map dupinvolvedmap;			/* packages involved in dup process */
 } Solver;
 
 /*
@@ -227,6 +234,7 @@ typedef struct solver {
 #define SOLVER_WEAKENDEPS      		0x0400
 #define SOLVER_NOOBSOLETES   		0x0500
 #define SOLVER_LOCK			0x0600
+#define SOLVER_DISTUPGRADE		0x0700
 
 #define SOLVER_JOBMASK			0xff00
 
@@ -260,9 +268,14 @@ typedef enum {
   SOLVER_PROBLEM_PACKAGE_OBSOLETES,
   SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE,
   SOLVER_PROBLEM_SELF_CONFLICT,
-  SOLVER_PROBLEM_RPM_RULE
+  SOLVER_PROBLEM_RPM_RULE,
+  SOLVER_PROBLEM_DISTUPGRADE_RULE,
+  SOLVER_PROBLEM_INFARCH_RULE
 } SolverProbleminfo;
 
+#define SOLVER_SOLUTION_JOB		(0)
+#define SOLVER_SOLUTION_DISTUPGRADE	(-1)
+#define SOLVER_SOLUTION_INFARCH		(-2)
 
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);

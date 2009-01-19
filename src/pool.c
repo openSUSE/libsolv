@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2007-2009, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -636,8 +636,13 @@ pool_addrelproviders(Pool *pool, Id d)
 	      else
 		{
 		  int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
+#ifdef DEBIAN_SEMANTICS
+		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_COMPARE)))) != 0)
+		    break;
+#else
 		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_MATCH_RELEASE)))) != 0)
 		    break;
+#endif
 		}
 	    }
 	  if (!pid)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2007-2009, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -15,6 +15,50 @@
 #include <string.h>
 #include "evr.h"
 #include "pool.h"
+
+
+#ifdef DEBIAN_SEMANTICS
+
+int
+vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
+{
+  int r, c1, c2;
+  while (1)
+    {
+      c1 = s1 < q1 ? *(const unsigned char *)s1++ : 0;
+      c2 = s2 < q2 ? *(const unsigned char *)s2++ : 0;
+      if ((c1 >= '0' && c1 <= '9') && (c2 >= '0' && c2 <= '9'))
+	{
+	  while (c1 == '0')
+            c1 = s1 < q1 ? *(const unsigned char *)s1++ : 0;
+	  while (c2 == '0')
+            c2 = s2 < q2 ? *(const unsigned char *)s2++ : 0;
+	  r = 0;
+	  while ((c1 >= '0' && c1 <= '9') && (c2 >= '0' && c2 <= '9'))
+	    {
+	      if (!r)
+		r = c1 - c2;
+              c1 = s1 < q1 ? *(const unsigned char *)s1++ : 0;
+              c2 = s2 < q2 ? *(const unsigned char *)s2++ : 0;
+	    }
+	  if (c1 >= '0' && c1 <= '9')
+	    return 1;
+	  if (c2 >= '0' && c2 <= '9')
+	    return -1;
+	  if (r)
+	    return r < 0 ? -1 : 1;
+	}
+      c1 = c1 == '~' ? -1 : !c1 || (c1 >= '0' && c1 <= '9') || (c1 >= 'A' && c1 <= 'Z') || (c1 >= 'a' && c1 <= 'z')  ? c1 : c1 + 256;
+      c2 = c2 == '~' ? -1 : !c2 || (c2 >= '0' && c2 <= '9') || (c2 >= 'A' && c2 <= 'Z') || (c2 >= 'a' && c2 <= 'z')  ? c2 : c2 + 256;
+      r = c1 - c2;
+      if (r)
+	return r < 0 ? -1 : 1;
+      if (!c1)
+	return 0;
+    }
+}
+
+#else
 
 int
 vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
@@ -72,6 +116,9 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
     }
   return s1 < q1 ? 1 : s2 < q2 ? -1 : 0;
 }
+
+#endif
+
 
 /* edition (e:v-r) compare */
 int

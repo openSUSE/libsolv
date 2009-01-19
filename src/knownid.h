@@ -207,6 +207,8 @@ KNOWNID(DELTA_SEQ_NAME,			"delta:seqname"),
 KNOWNID(DELTA_SEQ_EVR,			"delta:seqevr"),
 KNOWNID(DELTA_SEQ_NUM,			"delta:seqnum"),
 
+KNOWNID(NAMESPACE_PRODUCTBUDDY,         "namespace:productbuddy"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

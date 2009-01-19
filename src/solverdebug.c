@@ -195,6 +195,10 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
       POOL_DEBUG(type, "WEAK ");
   if (p >= solv->learntrules)
     POOL_DEBUG(type, "LEARNT ");
+  else if (p >= solv->infarchrules && p < solv->infarchrules_end)
+    POOL_DEBUG(type, "INFARCH ");
+  else if (p >= solv->duprules && p < solv->duprules_end)
+    POOL_DEBUG(type, "DUP ");
   else if (p >= solv->jobrules && p < solv->jobrules_end)
     POOL_DEBUG(type, "JOB ");
   else if (p >= solv->updaterules && p < solv->updaterules_end)
@@ -389,6 +393,12 @@ solver_printprobleminfo(Solver *solv, Queue *job, Id problem)
   probr = solver_findproblemrule(solv, problem);
   switch (solver_problemruleinfo(solv, job, probr, &dep, &source, &target))
     {
+    case SOLVER_PROBLEM_DISTUPGRADE_RULE:
+      POOL_DEBUG(SAT_DEBUG_RESULT, "install %s from distupgrade repositories\n", dep2str(pool, dep));
+      return;
+    case SOLVER_PROBLEM_INFARCH_RULE:
+      POOL_DEBUG(SAT_DEBUG_RESULT, "do not install %s because of inferior architecture\n", dep2str(pool, dep));
+      return;
     case SOLVER_PROBLEM_UPDATE_RULE:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "problem with installed package %s\n", solvable2str(pool, s));
@@ -460,7 +470,7 @@ solver_printsolutions(Solver *solv, Queue *job)
 	  element = 0;
 	  while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
 	    {
-	      if (p == 0)
+	      if (p == SOLVER_SOLUTION_JOB)
 		{
 		  /* job, rp is index into job queue */
 		  how = job->elements[rp - 1];
@@ -494,6 +504,22 @@ solver_printsolutions(Solver *solv, Queue *job)
 		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do something different\n");
 		      break;
 		    }
+		}
+	      else if (p == SOLVER_SOLUTION_INFARCH)
+		{
+		  s = pool->solvables + rp;
+		  if (solv->installed && s->repo == solv->installed)
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "- keep %s despite the inferior architecture\n", solvable2str(pool, s));
+		  else
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "- install %s despite the inferior architecture\n", solvable2str(pool, s));
+		}
+	      else if (p == SOLVER_SOLUTION_DISTUPGRADE)
+		{
+		  s = pool->solvables + rp;
+		  if (solv->installed && s->repo == solv->installed)
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "- keep obsolete %s\n", solvable2str(pool, s));
+		  else
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "- install %s from excluded repository\n", solvable2str(pool, s));
 		}
 	      else
 		{
