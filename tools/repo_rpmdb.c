@@ -7,9 +7,9 @@
 
 /*
  * repo_rpmdb
- * 
+ *
  * convert rpm db to repo
- * 
+ *
  */
 
 #include <sys/types.h>
@@ -158,12 +158,12 @@ headint32(RpmHead *h, int tag)
   unsigned int i, o;
   unsigned char *d, taga[4];
 
-  d = h->dp - 16; 
-  taga[0] = tag >> 24; 
-  taga[1] = tag >> 16; 
+  d = h->dp - 16;
+  taga[0] = tag >> 24;
+  taga[1] = tag >> 16;
   taga[2] = tag >> 8;
   taga[3] = tag;
-  for (i = 0; i < h->cnt; i++, d -= 16) 
+  for (i = 0; i < h->cnt; i++, d -= 16)
     if (d[3] == taga[3] && d[2] == taga[2] && d[1] == taga[1] && d[0] == taga[0])
       break;
   if (i >= h->cnt)
@@ -348,10 +348,8 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
             c = (c & 0x0f) | 0xbff00000;    /* 2 */
           else if (c >= 0xc2)
             c = (c & 0x1f) | 0xfc000000;    /* 1 */
-          else if (c >= 0xc0)
-            c = 0xfdffffff;         /* overlong */
           else if (c >= 0x80)
-            c = 0xfffd;
+            break;
         }
       state = (c & 0x80000000) ? c : 0;
     }
@@ -1224,7 +1222,7 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
 
 /*
  * read rpm db as repo
- * 
+ *
  */
 
 void
@@ -1256,19 +1254,19 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   Repodata *data;
   int count = 0, done = 0;
   unsigned int now;
-  
+
   now = sat_timems(0);
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
 
   if (!rootdir)
     rootdir = "";
-  
+
   if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
   else
     data = repo_last_repodata(repo);
-  
+
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
 
@@ -1496,7 +1494,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	    h = (h + 317) & refmask;
 	  refhash[h] = i + 1;	/* make it non-zero */
 	}
-      
+
       /* count the misses, they will cost us time */
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
         {
