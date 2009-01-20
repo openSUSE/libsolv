@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Jan 20 17:12:17 CET 2009 - ma@suse.de
+
+- repo_rpmdb: Fix conversion to UTF8
+
+-------------------------------------------------------------------
 Fri Dec  5 14:43:55 CET 2008 - kkaempf@suse.de
 
 - enhance bindings to provide reasons for solver decisions
