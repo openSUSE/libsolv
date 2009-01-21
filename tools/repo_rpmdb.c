@@ -337,7 +337,7 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
 	{
           /* new sequence */
           if (c >= 0xfe)
-            c = 0xfffd;
+            break;
           else if (c >= 0xfc)
             c = (c & 0x01) | 0xbffffffc;    /* 5 bytes to follow */
           else if (c >= 0xf8)
