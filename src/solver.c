@@ -1283,6 +1283,8 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
             {
               addrule(solv, n, -buddy);
               addrule(solv, buddy, -n); 
+	      if (!MAPTST(m, buddy))
+		queue_push(&workq, buddy);
             }
         }
 
@@ -3911,6 +3913,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
     {
       /* rule looks like -p|-c|x|x|x..., we only create this for patches with multiversion */
       /* reduce it to -p|-c case */
+      d = 0;
       w2 = pool->whatprovidesdata[d];
     }
   if (d == 0 && w2 < 0)
@@ -4067,6 +4070,58 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
 	  return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
 	}
     }
+
+  /* check for product buddy requires */
+  if (d == 0 && w2 > 0 && pool->nscallback)
+    {    
+      Id buddy = 0; 
+      s = pool->solvables - r->p;
+      if (!strncmp("product:", id2str(pool, s->name), 8))
+	{
+	  buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, -r->p);
+	  if (buddy != w2)
+	    buddy = 0; 
+	}
+      if (!buddy)
+	{
+	  s = pool->solvables + w2;
+	  if (!strncmp("product:", id2str(pool, s->name), 8))
+	    {
+	      buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, w2); 
+	      if (buddy != -r->p)
+		buddy = 0; 
+	    }
+	}
+      if (buddy)
+	{
+	  /* have buddy relation, now fake requires */
+	  s = pool->solvables + w2;
+	  Reldep *rd; 
+	  if (s->repo && s->provides)
+	    {
+	      Id prov, *provp;
+	      provp = s->repo->idarraydata + s->provides;
+	      while ((prov = *provp++) != 0)
+		{
+		  if (!ISRELDEP(prov))
+		    continue;
+		  rd = GETRELDEP(pool, prov);
+		  if (rd->name == s->name && rd->evr == s->evr && rd->flags == REL_EQ)
+		    {
+		      *depp = prov;
+		      *sourcep = -r->p;
+		      *targetp = 0; 
+		      return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
+		    }
+		}
+	    }
+	  *depp = s->name;
+	  *sourcep = -r->p;
+	  *targetp = 0; 
+	  return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
+	}
+    }
+
   /* all cases checked, can't happen */
   *depp = 0;
   *sourcep = -r->p;
