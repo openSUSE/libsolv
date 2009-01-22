@@ -244,6 +244,12 @@ main(int argc, char **argv)
 		  Id dep, source, target;
 		  switch (solver_problemruleinfo(solv, &job, probr, &dep, &source, &target))
 		    {
+		    case SOLVER_PROBLEM_DISTUPGRADE_RULE:
+		      break;
+		    case SOLVER_PROBLEM_INFARCH_RULE:
+		      s = pool_id2solvable(pool, source);
+		      printf("  %s has inferior architecture\n", solvable2str(pool, s));
+		      break;
 		    case SOLVER_PROBLEM_UPDATE_RULE:
 		      break;
 		    case SOLVER_PROBLEM_JOB_RULE:
@@ -295,7 +301,7 @@ main(int argc, char **argv)
 		      s = pool_id2solvable(pool, source);
 		      printf("  package %s conflicts with %s provided by itself\n", solvable2str(pool, s), dep2str(pool, dep));
 		      break;
-		    }   
+		    }
 		}
 	    }
 	}

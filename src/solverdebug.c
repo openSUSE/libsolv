@@ -394,10 +394,12 @@ solver_printprobleminfo(Solver *solv, Queue *job, Id problem)
   switch (solver_problemruleinfo(solv, job, probr, &dep, &source, &target))
     {
     case SOLVER_PROBLEM_DISTUPGRADE_RULE:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "install %s from distupgrade repositories\n", dep2str(pool, dep));
+      s = pool_id2solvable(pool, source);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "%s does not belong to a distupgrade repository\n", solvable2str(pool, s));
       return;
     case SOLVER_PROBLEM_INFARCH_RULE:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "do not install %s because of inferior architecture\n", dep2str(pool, dep));
+      s = pool_id2solvable(pool, source);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "%s has inferior architecture\n", solvable2str(pool, s));
       return;
     case SOLVER_PROBLEM_UPDATE_RULE:
       s = pool_id2solvable(pool, source);

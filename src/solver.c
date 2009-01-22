@@ -3821,7 +3821,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
     {
       r = solv->rules + rid;
       *depp = r->p < 0 ? pool->solvables[-r->p].name : 0;
-      *sourcep = 0;
+      *sourcep = r->p < 0 ? -r->p : 0;
       *targetp = 0;
       return SOLVER_PROBLEM_INFARCH_RULE;
     }
@@ -3829,7 +3829,7 @@ solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, 
     {
       r = solv->rules + rid;
       *depp = r->p < 0 ? pool->solvables[-r->p].name : 0;
-      *sourcep = 0;
+      *sourcep = r->p < 0 ? -r->p : 0;
       *targetp = 0;
       return SOLVER_PROBLEM_DISTUPGRADE_RULE;
     }
