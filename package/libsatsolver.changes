@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Jan 26 13:55:35 CET 2009 - mls@suse.de
+
+- fix segfault caused by whatprovides reallocation [bnc#468313]
+- 0.13.1
+
+-------------------------------------------------------------------
 Tue Jan 20 17:12:17 CET 2009 - ma@suse.de
 
 - repo_rpmdb: Fix conversion to UTF8
