@@ -491,8 +491,8 @@ pool_addrelproviders(Pool *pool, Id d)
     {
     case REL_AND:
     case REL_WITH:
-      pp = pool->whatprovidesdata + pool_whatprovides(pool, name);
-      pp2 = pool->whatprovidesdata + pool_whatprovides(pool, evr);
+      pp = pool_whatprovides_ptr(pool, name);
+      pp2 = pool_whatprovides_ptr(pool, evr);
       while ((p = *pp++) != 0)
 	{
 	  for (pp3 = pp2; *pp3;)
@@ -504,10 +504,10 @@ pool_addrelproviders(Pool *pool, Id d)
 	}
       break;
     case REL_OR:
-      pp = pool->whatprovidesdata + pool_whatprovides(pool, name);
+      pp = pool_whatprovides_ptr(pool, name);
       while ((p = *pp++) != 0)
 	queue_push(&plist, p);
-      pp = pool->whatprovidesdata + pool_whatprovides(pool, evr);
+      pp = pool_whatprovides_ptr(pool, evr);
       while ((p = *pp++) != 0)
 	queue_pushunique(&plist, p);
       break;
@@ -579,7 +579,7 @@ pool_addrelproviders(Pool *pool, Id d)
 #endif
   if (flags && flags < 8)
     {
-      pp = pool->whatprovidesdata + pool_whatprovides(pool, name);
+      pp = pool_whatprovides_ptr(pool, name);
       while (ISRELDEP(name))
 	{
           rd = GETRELDEP(pool, name);
@@ -1440,7 +1440,7 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
 	{
-	  dp = pool->whatprovidesdata + pool_whatprovides(pool, con);
+	  dp = pool_whatprovides_ptr(pool, con);
 	  for (; *dp; dp++)
 	    map[p] |= 2;	/* XXX: self conflict ? */
 	}

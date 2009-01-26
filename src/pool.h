@@ -249,6 +249,12 @@ static inline Id pool_whatprovides(Pool *pool, Id d)
   return pool_addrelproviders(pool, d);
 }
 
+static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
+{
+  Id off = pool_whatprovides(pool, d);
+  return pool->whatprovidesdata + off;
+}
+
 extern void pool_setdebuglevel(Pool *pool, int level);
 
 static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
