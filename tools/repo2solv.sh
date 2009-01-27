@@ -5,7 +5,7 @@
 # tries to detect the repo type and generate one SOLV file on stdout
 
 get_DESCRDIR () {
-  local d=$(grep '^DESCRDIR' content | sed 's/^DESCRDIR[[:space:]]\+\(.*\)[[:space:]]*$/\1/')
+  local d=$(grep '^DESCRDIR' content | sed 's/^DESCRDIR[[:space:]]\+\(.*[^[:space:]]\)[[:space:]]*$/\1/')
   if  test -z "$d"; then
     echo suse/setup/desc
   else
