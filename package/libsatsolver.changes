@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Jan 27 13:12:30 CET 2009 - ma@suse.de
+
+- Ignore trailing whitespace in content file parser.
+
+-------------------------------------------------------------------
 Mon Jan 26 13:55:35 CET 2009 - mls@suse.de
 
 - fix segfault caused by whatprovides reallocation [bnc#468313]

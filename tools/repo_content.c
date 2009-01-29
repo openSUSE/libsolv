@@ -251,7 +251,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
       linep += strlen(linep);
       if (linep == line || linep[-1] != '\n')
         continue;
-      *--linep = 0;
+      while ( --linep > line && ( linep[-1] == ' ' ||  linep[-1] == '\t' ) )
+        ; /* skip trailing ws */
+      *linep = 0;
       linep = line;
 
       /* expect "key value" lines */

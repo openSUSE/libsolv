@@ -4,12 +4,18 @@
 # give it a directory of a local mirror of a repo and this
 # tries to detect the repo type and generate one SOLV file on stdout
 
+get_DESCRDIR () {
+  local d=$(grep '^DESCRDIR' content | sed 's/^DESCRDIR[[:space:]]\+\(.*[^[:space:]]\)[[:space:]]*$/\1/')
+  if  test -z "$d"; then
+    echo suse/setup/desc
+  else
+    echo ${d}
+  fi
+}
+
 test_susetags() {
   if test -s content; then
-    DESCR=`grep DESCRDIR content | cut -d ' ' -f 2`
-    if test -z $DESCR; then
-      DESCR=suse/setup/descr
-    fi
+    DESCR=$(get_DESCRDIR)
     test -d $DESCR
     return $?
   else
@@ -18,7 +24,7 @@ test_susetags() {
 }
 
 # signal an error if there is a problem
-set -e 
+set -e
 
 LANG=C
 unset CDPATH
@@ -248,10 +254,7 @@ if test "$repotype" = rpmmd ; then
 
 elif test "$repotype" = susetags ; then
   olddir=`pwd`
-  DESCR=`grep DESCRDIR content | cut -d ' ' -f 2`
-  if test -z $DESCR; then
-    DESCR=suse/setup/descr
-  fi
+  DESCR=$(get_DESCRDIR)
   cd ${DESCR} || exit 2
   (
     # First packages
@@ -305,7 +308,7 @@ elif test "$repotype" = susetags ; then
       case $name in
 	# ignore files we handled already
 	*.DU | *.en | *.FL | packages ) continue ;;
-	*) 
+	*)
 	  suff=${name#packages.}
 	  echo "=Lan: $suff"
 	  $prog "$i" ;;
