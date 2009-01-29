@@ -766,7 +766,7 @@ makeruledecisions(Solver *solv)
       r = solv->rules + ri;
       if (r->d < 0 || r->w2)	                 /* disabled or no assertion */
 	continue;
-      if (!MAPTST(&solv->weakrulemap, ri))       /* skip non-weak */
+      if (ri >= solv->learntrules || !MAPTST(&solv->weakrulemap, ri))       /* skip non-weak */
 	continue;
       v = r->p;
       vv = v > 0 ? v : -v;
