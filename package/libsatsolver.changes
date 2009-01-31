@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Jan 30 14:26:42 CET 2009 - mls@suse.de
+
+- fix weakmap boundary check
+- 0.13.3
+
+-------------------------------------------------------------------
 Tue Jan 27 13:12:30 CET 2009 - ma@suse.de
 
 - Ignore trailing whitespace in content file parser.
