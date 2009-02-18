@@ -896,6 +896,8 @@ endElement(void *userData, const char *name)
   switch (pd->state)
     {
     case STATE_SOLVABLE:
+      if ( pd->kind && !s->name ) /* add namespace in case of NULL name */
+        s->name = str2id(pool, join2( pd->kind, ":", ""), 1);
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (!s->evr)
