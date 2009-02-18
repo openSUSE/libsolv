@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Wed Feb 18 16:48:41 CET 2009 - ma@suse.de
+
+- Use correct namespace (e.g. pattern:) even if solvable has no name [bnc#470011]
+
+-------------------------------------------------------------------
 Fri Jan 30 14:26:42 CET 2009 - mls@suse.de
 
 - fix weakmap boundary check
