@@ -27,13 +27,13 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "susetags2solv [-a][-s][-c <content>][-h]\n"
+          "susetags2solv [-b <base>][-c <content>][-d <descrdir>][-h][-k][-n <name>]\n"
 	  "  reads a 'susetags' repository from <stdin> and writes a .solv file to <stdout>\n"
+	  "  -b <base>: save as multiple files starting with <base>\n"
 	  "  -c <contentfile> : parse given contentfile (for product information)\n"
           "  -d <descrdir> : do not read from stdin, but use data in descrdir\n"
 	  "  -h : print help & exit\n"
 	  "  -k : don't mix kinds (experimental!)\n"
-	  "  -b <base>: save as multiple files starting with <base>\n"
 	  "  -n <name>: save attributes as <name>.attr\n"
 	 );
    exit(status);
