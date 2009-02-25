@@ -126,6 +126,10 @@ cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
 make %{?jobs:-j %jobs}
 make doc_forced
 
+%if 0%{?run_testsuite}
+  ctest .
+%endif
+
 %install
 make DESTDIR=$RPM_BUILD_ROOT install
 # we want to leave the .a file untouched
