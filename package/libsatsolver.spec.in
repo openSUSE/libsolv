@@ -127,6 +127,7 @@ make %{?jobs:-j %jobs}
 make doc_forced
 
 %if 0%{?run_testsuite}
+  ln -s . build
   ctest .
 %endif
 
