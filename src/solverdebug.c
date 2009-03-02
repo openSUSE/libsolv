@@ -573,7 +573,6 @@ solver_printtrivial(Solver *solv)
 {
   Pool *pool = solv->pool;
   Queue in, out;
-  Map installedmap;
   Id p;
   const char *n; 
   Solvable *s; 
@@ -592,14 +591,12 @@ solver_printtrivial(Solver *solv)
       queue_free(&in);
       return;
     }
-  solver_create_state_maps(solv, &installedmap, 0); 
   queue_init(&out);
-  pool_trivial_installable(pool, &installedmap, &in, &out);
+  solver_trivial_installable(solv, &in, &out);
   POOL_DEBUG(SAT_DEBUG_RESULT, "trivial installable status:\n");
   for (i = 0; i < in.count; i++)
     POOL_DEBUG(SAT_DEBUG_RESULT, "  %s: %d\n", solvable2str(pool, pool->solvables + in.elements[i]), out.elements[i]);
   POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
-  map_free(&installedmap);
   queue_free(&in);
   queue_free(&out);
 }

@@ -5360,6 +5360,16 @@ solver_calc_installsizechange(Solver *solv)
   return change;
 }
 
+void
+solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res)
+{
+  Map installedmap;
+  solver_create_state_maps(solv, &installedmap, 0);
+  pool_trivial_installable_noobsoletesmap(solv->pool, &installedmap, pkgs, res, solv->noobsoletes.size ? &solv->noobsoletes : 0);
+  map_free(&installedmap);
+}
+
+
 #define FIND_INVOLVED_DEBUG 0
 void
 solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)

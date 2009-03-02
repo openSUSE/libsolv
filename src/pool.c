@@ -1392,7 +1392,23 @@ static inline Id dep2name(Pool *pool, Id dep)
   return dep;
 }
 
-static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, int ispatch)
+static int providedbyinstalled_multiversion(Pool *pool, unsigned char *map, Id n, Id dep) 
+{
+  Id p, pp;
+  Solvable *sn = pool->solvables + n; 
+
+  FOR_PROVIDES(p, pp, sn->name)
+    {    
+      Solvable *s = pool->solvables + p; 
+      if (s->name != sn->name || s->arch != sn->arch)
+        continue;
+      if ((map[p] & 9) == 9)
+        return 1;
+    }    
+  return 0;
+}
+
+static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, int ispatch, Map *noobsoletesmap)
 {
   Id p, pp;
   int r = 0;
@@ -1402,6 +1418,9 @@ static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, in
         return 1;	/* always boring, as never constraining */
       if (ispatch && !pool_match_nevr(pool, pool->solvables + p, dep))
 	continue;
+      if (ispatch && noobsoletesmap && noobsoletesmap->size && MAPTST(noobsoletesmap, p) && ISRELDEP(dep))
+	if (providedbyinstalled_multiversion(pool, map, p, dep))
+	  continue;
       if ((map[p] & 9) == 9)
 	return 9;
       r |= map[p] & 17;
@@ -1421,7 +1440,7 @@ static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, in
  */
 
 void
-pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
+pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res, Map *noobsoletesmap)
 {
   int i, r, m, did;
   Id p, *dp, con, *conp, req, *reqp;
@@ -1469,7 +1488,7 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)
 		continue;
-	      r = providedbyinstalled(pool, map, req, 0);
+	      r = providedbyinstalled(pool, map, req, 0, 0);
 	      if (!r)
 		{
 		  /* decided and miss */
@@ -1492,7 +1511,7 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 	  conp = s->repo->idarraydata + s->conflicts;
 	  while ((con = *conp++) != 0)
 	    {
-	      if ((providedbyinstalled(pool, map, con, ispatch) & 1) != 0)
+	      if ((providedbyinstalled(pool, map, con, ispatch, noobsoletesmap) & 1) != 0)
 		{
 		  map[p] = 2;
 		  break;
@@ -1500,7 +1519,7 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 	      if ((m == 1 || m == 17) && ISRELDEP(con))
 		{
 		  con = dep2name(pool, con);
-		  if ((providedbyinstalled(pool, map, con, ispatch) & 1) != 0)
+		  if ((providedbyinstalled(pool, map, con, ispatch, noobsoletesmap) & 1) != 0)
 		    m = 9;
 		}
 	    }
@@ -1517,7 +1536,7 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 	      obsp = s->repo->idarraydata + s->obsoletes;
 	      while ((obs = *obsp++) != 0)
 		{
-		  if ((providedbyinstalled(pool, map, obs, 0) & 1) != 0)
+		  if ((providedbyinstalled(pool, map, obs, 0, 0) & 1) != 0)
 		    {
 		      map[p] = 2;
 		      break;
@@ -1559,6 +1578,12 @@ pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
       res->elements[i] = r;
     }
   free(map);
+}
+
+void
+pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
+{
+  pool_trivial_installable_noobsoletesmap(pool, installedmap, pkgs, res, 0);
 }
 
 // EOF

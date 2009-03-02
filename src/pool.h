@@ -293,6 +293,7 @@ typedef struct _duchanges {
 void pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps);
 int pool_calc_installsizechange(Pool *pool, Map *installedmap);
 void pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res);
+void pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res, Map *noobsoletesmap);
 
 
 /* loop over all providers of d */
