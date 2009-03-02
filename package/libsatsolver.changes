@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Mar  2 18:20:22 CET 2009 - mls@suse.de
+
+- add solver_trivial_installable() to fix multiversion patches [bnc#480303]
+- 0.13.5
+
+-------------------------------------------------------------------
 Wed Feb 18 16:48:41 CET 2009 - ma@suse.de
 
 - Use correct namespace (e.g. pattern:) even if solvable has no name [bnc#470011]
