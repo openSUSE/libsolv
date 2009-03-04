@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Mar  4 14:39:00 CET 2009 - mls@suse.de
+
+- fix problem_to_solutions segfault
+- bump version to 0.14 to make it different from code11 branch
+- 0.14.0
+
+-------------------------------------------------------------------
 Mon Mar  2 18:20:22 CET 2009 - mls@suse.de
 
 - add solver_trivial_installable() to fix multiversion patches [bnc#480303]

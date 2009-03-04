@@ -3608,7 +3608,7 @@ problems_to_solutions(Solver *solv, Queue *job)
 	      /* infarch rule, find replacement */
 	      assert(solv->rules[why].p < 0);
 	      name = pool->solvables[-solv->rules[why].p].name;
-	      while (why >= solv->infarchrules && pool->solvables[-solv->rules[why - 1].p].name == name)
+	      while (why > solv->infarchrules && pool->solvables[-solv->rules[why - 1].p].name == name)
 		why--;
 	      p = 0;
 	      for (; why < solv->infarchrules_end && pool->solvables[-solv->rules[why].p].name == name; why++)
@@ -3628,10 +3628,10 @@ problems_to_solutions(Solver *solv, Queue *job)
 	      /* dist upgrade rule, find replacement */
 	      assert(solv->rules[why].p < 0);
 	      name = pool->solvables[-solv->rules[why].p].name;
-	      while (why >= solv->infarchrules && pool->solvables[-solv->rules[why - 1].p].name == name)
+	      while (why > solv->duprules && pool->solvables[-solv->rules[why - 1].p].name == name)
 		why--;
 	      p = 0;
-	      for (; why < solv->infarchrules_end && pool->solvables[-solv->rules[why].p].name == name; why++)
+	      for (; why < solv->duprules_end && pool->solvables[-solv->rules[why].p].name == name; why++)
 		if (solv->decisionmap[-solv->rules[why].p] > 0)
 		  {
 		    p = -solv->rules[why].p;

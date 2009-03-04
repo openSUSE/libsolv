@@ -228,6 +228,7 @@ typedef struct solver {
 
 #define SOLVER_SELECTMASK		0xff
 
+#define SOLVER_NOOP			0x0000
 #define SOLVER_INSTALL       		0x0100
 #define SOLVER_ERASE         		0x0200
 #define SOLVER_UPDATE			0x0300
