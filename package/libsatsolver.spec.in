@@ -174,7 +174,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %endif
 %endif
 %if 0%{?mandriva_version}
-%{ruby_sitearchdir}/satsolverx.so
+%{ruby_sitearchdir}/satsolver.so
 %endif
 
 %files -n python-satsolver
