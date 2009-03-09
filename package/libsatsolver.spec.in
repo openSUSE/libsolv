@@ -26,6 +26,9 @@ BuildRequires:  libexpat-devel
 %if 0%{?suse_version} < 1100
 BuildRequires:  graphviz
 %endif
+%if 0%{?suse_version} > 1020
+BuildRequires:  fdupes
+%endif
 %else
 BuildRequires:  expat-devel
 %endif
@@ -138,6 +141,11 @@ export NO_BRP_STRIP_DEBUG=true
 #pushd doc/autodoc
 #make install
 #popd
+%if 0%{?suse_version} > 1020
+# create symlinks for documentation
+#%fdupes -s %{buildroot}%{_docdir}/ruby-satsolver
+%fdupes -s bindings/ruby/html
+%endif
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
@@ -176,6 +184,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %if 0%{?mandriva_version}
 %{ruby_sitearchdir}/satsolver.so
 %endif
+%doc bindings/ruby/html
 
 %files -n python-satsolver
 %defattr(-,root,root,-)
