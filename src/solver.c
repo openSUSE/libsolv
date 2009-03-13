@@ -27,7 +27,7 @@
 
 #define RULES_BLOCK 63
 
-static void disableupdaterules(Solver *solv, Queue *job, int jobidx);
+static void reenablepolicyrules(Solver *solv, Queue *job, int jobidx);
 
 /********************************************************************
  *
@@ -806,7 +806,7 @@ makeruledecisions(Solver *solv)
 	v = ri;
       disableproblem(solv, v);
       if (v < 0)
-	disableupdaterules(solv, solv->job, -(v + 1));
+	reenablepolicyrules(solv, solv->job, -(v + 1));
     }
   
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
@@ -886,49 +886,241 @@ enableweakrules(Solver *solv)
 }
 
 
-/* FIXME: bad code ahead, replace as soon as possible */
-/* FIXME: maybe also look at SOLVER_INSTALL|SOLVABLE_ONE_OF */
-
 /*-------------------------------------------------------------------
- * disable update rules depending on enabled job
- * if jobidx is set we just disabled this job, so we may want
- * to re-enable some rules
- * otherwise we disable all update rules that conflict with some job.
+ * policy rule enabling/disabling
+ *
+ * we need to disable policy rules that conflict with our job list, and
+ * also reenable such rules with the job was changed due to solution generation
+ *
  */
 
-static void
-disableupdaterules(Solver *solv, Queue *job, int jobidx)
+static inline void
+disableinfarchrule(Solver *solv, Id name)
 {
   Pool *pool = solv->pool;
-  int i, j;
-  Id how, select, what, p, pp;
-  Solvable *s;
-  Repo *installed;
   Rule *r;
-  Id lastjob = -1;
-  Map nolockrules;
-
-  installed = solv->installed;
-
-  if (jobidx != -1)
+  int i;
+  for (i = solv->infarchrules, r = solv->rules + i; i < solv->infarchrules_end; i++, r++)
     {
-      how = job->elements[jobidx];
-      select = how & SOLVER_SELECTMASK;
-      switch (how & SOLVER_JOBMASK)
+      if (r->p < 0 && r->d >= 0 && pool->solvables[-r->p].name == name)
+	disablerule(solv, r);
+    }
+}
+
+static inline void
+reenableinfarchrule(Solver *solv, Id name)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  int i;
+  for (i = solv->infarchrules, r = solv->rules + i; i < solv->infarchrules_end; i++, r++)
+    {
+      if (r->p < 0 && r->d < 0 && pool->solvables[-r->p].name == name)
 	{
-	case SOLVER_ERASE:
-	  break;
-	case SOLVER_INSTALL:
-	  if (select != SOLVER_SOLVABLE)
-	    return;
-	  break;
-	default:
-	  return;
+	  enablerule(solv, r);
+	  IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+	    {
+	      POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	      solver_printruleclass(solv, SAT_DEBUG_SOLUTIONS, r);
+	    }
 	}
     }
-  /* go through all enabled job rules */
-  map_init(&nolockrules, pool->nsolvables);
-  MAPZERO(&solv->noupdate);
+}
+
+static inline void
+disableduprule(Solver *solv, Id name)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  int i;
+  for (i = solv->duprules, r = solv->rules + i; i < solv->duprules_end; i++, r++)
+    {
+      if (r->p < 0 && r->d >= 0 && pool->solvables[-r->p].name == name)
+	disablerule(solv, r);
+    }
+}
+
+static inline void
+reenableduprule(Solver *solv, Id name)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  int i;
+  for (i = solv->duprules, r = solv->rules + i; i < solv->duprules_end; i++, r++)
+    {
+      if (r->p < 0 && r->d < 0 && pool->solvables[-r->p].name == name)
+	{
+	  enablerule(solv, r);
+	  IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+	    {
+	      POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	      solver_printruleclass(solv, SAT_DEBUG_SOLUTIONS, r);
+	    }
+	}
+    }
+}
+
+static inline void
+disableupdaterule(Solver *solv, Id p)
+{
+  Rule *r;
+
+  MAPSET(&solv->noupdate, p - solv->installed->start);
+  r = solv->rules + solv->updaterules + (p - solv->installed->start);
+  if (r->p && r->d >= 0)
+    disablerule(solv, r);
+  r = solv->rules + solv->featurerules + (p - solv->installed->start);
+  if (r->p && r->d >= 0)
+    disablerule(solv, r);
+}
+
+static inline void
+reenableupdaterule(Solver *solv, Id p)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+
+  MAPCLR(&solv->noupdate, p - solv->installed->start);
+  r = solv->rules + solv->updaterules + (p - solv->installed->start);
+  if (r->p)
+    {
+      if (r->d >= 0)
+	return;
+      enablerule(solv, r);
+      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+	{
+	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	  solver_printruleclass(solv, SAT_DEBUG_SOLUTIONS, r);
+	}
+      return;
+    }
+  r = solv->rules + solv->featurerules + (p - solv->installed->start);
+  if (r->p && r->d < 0)
+    {
+      enablerule(solv, r);
+      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+	{
+	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	  solver_printruleclass(solv, SAT_DEBUG_SOLUTIONS, r);
+	}
+    }
+}
+
+#define DISABLE_UPDATE	1
+#define DISABLE_INFARCH	2
+#define DISABLE_DUP	3
+
+static void
+jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
+{
+  Pool *pool = solv->pool;
+  Id select, p, pp;
+  Repo *installed;
+  Solvable *s;
+  int i;
+
+  installed = solv->installed;
+  select = how & SOLVER_SELECTMASK;
+  switch (how & SOLVER_JOBMASK)
+    {
+    case SOLVER_INSTALL:
+      if ((select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES) && solv->infarchrules != solv->infarchrules_end && ISRELDEP(what))
+	{
+	  Reldep *rd = GETRELDEP(pool, what);
+	  if (rd->flags == REL_ARCH)
+	    {
+	      int qcnt = q->count;
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  /* unify names */
+		  for (i = qcnt; i < q->count; i += 2)
+		    if (q->elements[i + 1] == s->name)
+		      break;
+		  if (i < q->count)
+		    continue;
+		  queue_push(q, DISABLE_INFARCH);
+		  queue_push(q, s->name);
+		}
+	    }
+	}
+      if (select != SOLVER_SOLVABLE)
+	break;
+      s = pool->solvables + what;
+      if (solv->infarchrules != solv->infarchrules_end)
+	{
+	  queue_push(q, DISABLE_INFARCH);
+	  queue_push(q, s->name);
+	}
+      if (solv->duprules != solv->duprules_end)
+	{
+	  queue_push(q, DISABLE_DUP);
+	  queue_push(q, s->name);
+	}
+      if (!installed)
+	return;
+      if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
+	return;
+      if (s->repo == installed)
+	{
+	  queue_push(q, DISABLE_UPDATE);
+	  queue_push(q, what);
+	  return;
+	}
+      if (s->obsoletes)
+	{
+	  Id obs, *obsp;
+	  obsp = s->repo->idarraydata + s->obsoletes;
+	  while ((obs = *obsp++) != 0)
+	    FOR_PROVIDES(p, pp, obs)
+	      {
+		Solvable *ps = pool->solvables + p;
+		if (ps->repo != installed)
+		  continue;
+		if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
+		  continue;
+		queue_push(q, DISABLE_UPDATE);
+		queue_push(q, p);
+	      }
+	}
+      FOR_PROVIDES(p, pp, s->name)
+	{
+	  Solvable *ps = pool->solvables + p;
+	  if (ps->repo != installed)
+	    continue;
+	  if (!solv->implicitobsoleteusesprovides && ps->name != s->name)
+	    continue;
+	  queue_push(q, DISABLE_UPDATE);
+	  queue_push(q, p);
+	}
+      return;
+    case SOLVER_ERASE:
+      if (!installed)
+	break;
+      FOR_JOB_SELECT(p, pp, select, what)
+	if (pool->solvables[p].repo == installed)
+	  {
+	    queue_push(q, DISABLE_UPDATE);
+	    queue_push(q, p);
+	  }
+      return;
+    default:
+      return;
+    }
+}
+
+/* disable all policy rules that are in conflict with our job list */
+static void
+disablepolicyrules(Solver *solv, Queue *job)
+{
+  int i, j;
+  Queue allq;
+  Rule *r;
+  Id lastjob = -1;
+  Id allqbuf[128];
+
+  queue_init_buffer(&allq, allqbuf, sizeof(allqbuf)/sizeof(*allqbuf));
+
   for (i = solv->jobrules; i < solv->jobrules_end; i++)
     {
       r = solv->rules + i;
@@ -938,217 +1130,86 @@ disableupdaterules(Solver *solv, Queue *job, int jobidx)
       if (j == lastjob)
 	continue;
       lastjob = j;
-      how = job->elements[j];
-      what = job->elements[j + 1];
-      select = how & SOLVER_SELECTMASK;
-      switch (how & SOLVER_JOBMASK)
+      jobtodisablelist(solv, job->elements[j], job->elements[j + 1], &allq);
+    }
+  MAPZERO(&solv->noupdate);
+  for (i = 0; i < allq.count; i += 2)
+    {
+      Id type = allq.elements[i], arg = allq.elements[i + 1];
+      switch(type)
 	{
-	case SOLVER_INSTALL:
-	  if (select != SOLVER_SOLVABLE)
-	    break;
-	  s = pool->solvables + what;
-          FOR_PROVIDES(p, pp, s->name)
-	    {
-	      Solvable *ps = pool->solvables + p;
-	      if (ps->name == s->name)
-	        MAPSET(&nolockrules, p);
-	    }
-          if (!installed)
-	    break;
-	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
-	    break;
-	  if (s->repo == installed)
-	    {
-	      MAPSET(&solv->noupdate, what - installed->start);
-	      break;
-	    }
-	  if (s->obsoletes)
-	    {
-	      Id obs, *obsp;
-	      obsp = s->repo->idarraydata + s->obsoletes;
-	      while ((obs = *obsp++) != 0)
-		FOR_PROVIDES(p, pp, obs)
-		  {
-		    Solvable *ps = pool->solvables + p;
-		    if (ps->repo != installed)
-		      continue;
-		    if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
-		      continue;
-	            MAPSET(&solv->noupdate, p - installed->start);
-		  }
-	    }
-	  FOR_PROVIDES(p, pp, s->name)
-	    {
-              Solvable *ps = pool->solvables + p;
-	      if (ps->repo != installed)
-	        continue;
-	      if (!solv->implicitobsoleteusesprovides && ps->name != s->name)
-		continue;
-	      MAPSET(&solv->noupdate, p - installed->start);
-	    }
+	case DISABLE_UPDATE:
+	  disableupdaterule(solv, arg);
 	  break;
-	case SOLVER_ERASE:
-          if (!installed)
-	    break;
-	  FOR_JOB_SELECT(p, pp, select, what)
-	    if (pool->solvables[p].repo == installed)
-	      MAPSET(&solv->noupdate, p - installed->start);
+	case DISABLE_INFARCH:
+	  disableinfarchrule(solv, arg);
+	  break;
+	case DISABLE_DUP:
+	  disableduprule(solv, arg);
 	  break;
 	default:
 	  break;
 	}
     }
-
-  /* fixup update rule status */
-  if (jobidx != -1)
-    {
-      /* we just disabled job #jobidx. enable all update rules
-       * that aren't disabled by the remaining job rules */
-      how = job->elements[jobidx];
-      what = job->elements[jobidx + 1];
-      select = how & SOLVER_SELECTMASK;
-      if ((how & SOLVER_JOBMASK) == SOLVER_INSTALL && select == SOLVER_SOLVABLE)
-	{
-	  /* check if we need to enable some lock rule */
-	  for (i = solv->infarchrules, r = solv->rules + i; i < solv->infarchrules_end; i++, r++)
-	    {
-	      if (r->p != -what || r->d >= 0 || !MAPTST(&nolockrules, -r->p))
-		continue;
-	      enablerule(solv, r);
-	      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
-	        {
-		  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-		  solver_printrule(solv, SAT_DEBUG_SOLUTIONS, r);
-	        }
-	    }
-	  for (i = solv->duprules, r = solv->rules + i; i < solv->duprules_end; i++, r++)
-	    {
-	      if (r->p != -what || r->d >= 0 || !MAPTST(&nolockrules, -r->p))
-		continue;
-	      enablerule(solv, r);
-	      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
-	        {
-		  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-		  solver_printrule(solv, SAT_DEBUG_SOLUTIONS, r);
-	        }
-	    }
-	}
-      map_free(&nolockrules);
-      if (!installed)
-	return;
-      switch (how & SOLVER_JOBMASK)
-	{
-	case SOLVER_INSTALL:
-	  if (select != SOLVER_SOLVABLE)
-	    break;
-	  s = pool->solvables + what;
-	  if (s->repo == installed)
-	    {
-	      if (MAPTST(&solv->noupdate, what - installed->start))
-		break;
-	      r = solv->rules + solv->updaterules + (what - installed->start);
-	      if (r->d >= 0)
-	        break;
-	      enablerule(solv, r);
-	      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
-	        {
-		  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-		  solver_printrule(solv, SAT_DEBUG_SOLUTIONS, r);
-	        }
-	      break;
-	    }
-	  if (s->obsoletes)
-	    {
-	      Id obs, *obsp;
-	      obsp = s->repo->idarraydata + s->obsoletes;
-	      while ((obs = *obsp++) != 0)
-		FOR_PROVIDES(p, pp, obs)
-		  {
-		    if (pool->solvables[p].repo != installed)
-		      continue;
-		    if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
-		      continue;
-		    if (MAPTST(&solv->noupdate, p - installed->start))
-		      continue;
-		    r = solv->rules + solv->updaterules + (p - installed->start);
-		    if (r->d >= 0)
-		      continue;
-		    enablerule(solv, r);
-		    IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
-		      {
-			POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-			solver_printrule(solv, SAT_DEBUG_SOLUTIONS, r);
-		      }
-		  }
-	    }
-	  FOR_PROVIDES(p, pp, s->name)
-	    {
-	      if (!solv->implicitobsoleteusesprovides && pool->solvables[p].name != s->name)
-		continue;
-	      if (pool->solvables[p].repo != installed)
-		continue;
-	      if (MAPTST(&solv->noupdate, p - installed->start))
-		continue;
-	      r = solv->rules + solv->updaterules + (p - installed->start);
-	      if (r->d >= 0)
-		continue;
-	      enablerule(solv, r);
-	      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
-		{
-		  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-		  solver_printrule(solv, SAT_DEBUG_SOLUTIONS, r);
-		}
-	    }
-	  break;
-	case SOLVER_ERASE:
-	  FOR_JOB_SELECT(p, pp, select, what)
-	    {
-	      if (pool->solvables[p].repo != installed)
-		continue;
-	      if (MAPTST(&solv->noupdate, p - installed->start))
-		continue;
-	      r = solv->rules + solv->updaterules + (p - installed->start);
-	      if (r->d >= 0)
-		continue;
-	      enablerule(solv, r);
-	      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
-		{
-		  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-		  solver_printrule(solv, SAT_DEBUG_SOLUTIONS, r);
-		}
-	    }
-	  break;
-	default:
-	  break;
-	}
-      return;
-    }
-
-  for (i = solv->infarchrules, r = solv->rules + i; i < solv->infarchrules_end; i++, r++)
-    {
-      if (r->p < 0 && r->d >= 0 && MAPTST(&nolockrules, -r->p))
-	disablerule(solv, r);	/* was enabled, need to disable */
-    }
-  for (i = solv->duprules, r = solv->rules + i; i < solv->duprules_end; i++, r++)
-    {
-      if (r->p < 0 && r->d >= 0 && MAPTST(&nolockrules, -r->p))
-	disablerule(solv, r);	/* was enabled, need to disable */
-    }
-  map_free(&nolockrules);
-  if (installed)
-    {
-      for (i = 0; i < installed->nsolvables; i++)
-	{
-	  r = solv->rules + solv->updaterules + i;
-	  if (r->d >= 0 && MAPTST(&solv->noupdate, i))
-	    disablerule(solv, r);	/* was enabled, need to disable */
-	  r = solv->rules + solv->featurerules + i;
-	  if (r->d >= 0 && MAPTST(&solv->noupdate, i))
-	    disablerule(solv, r);	/* was enabled, need to disable */
-	}
-    }
+  queue_free(&allq);
 }
 
+/* we just disabled job #jobidx, now reenable all policy rules that were
+ * disabled because of this job */
+static void
+reenablepolicyrules(Solver *solv, Queue *job, int jobidx)
+{
+  int i, j;
+  Queue q, allq;
+  Rule *r;
+  Id lastjob = -1;
+  Id qbuf[32], allqbuf[128];
+
+  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  queue_init_buffer(&allq, allqbuf, sizeof(allqbuf)/sizeof(*allqbuf));
+  jobtodisablelist(solv, job->elements[jobidx], job->elements[jobidx + 1], &q);
+  if (!q.count)
+    return;
+  for (i = solv->jobrules; i < solv->jobrules_end; i++)
+    {
+      r = solv->rules + i;
+      if (r->d < 0)	/* disabled? */
+	continue;
+      j = solv->ruletojob.elements[i - solv->jobrules];
+      if (j == lastjob)
+	continue;
+      lastjob = j;
+      jobtodisablelist(solv, job->elements[j], job->elements[j + 1], &allq);
+    }
+  for (j = 0; j < q.count; j += 2)
+    {
+      Id type = q.elements[j], arg = q.elements[j + 1];
+      for (i = 0; i < allq.count; i += 2)
+	if (allq.elements[i] == type && allq.elements[i + 1] == arg)
+	  break;
+      if (i < allq.count)
+	continue;	/* still disabled */
+      switch(type)
+	{
+	case DISABLE_UPDATE:
+	  reenableupdaterule(solv, arg);
+	  break;
+	case DISABLE_INFARCH:
+	  reenableinfarchrule(solv, arg);
+	  break;
+	case DISABLE_DUP:
+	  reenableduprule(solv, arg);
+	  break;
+	}
+    }
+  queue_free(&allq);
+  queue_free(&q);
+}
+
+/*-------------------------------------------------------------------
+ * rule generation
+ *
+ */
 
 /*
  *  special multiversion patch conflict handling:
@@ -2286,7 +2347,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, solv->rules + lastweak);
       disableproblem(solv, v);
       if (v < 0)
-	disableupdaterules(solv, solv->job, -(v + 1));
+	reenablepolicyrules(solv, solv->job, -(v + 1));
       reset_solver(solv);
       return 1;
     }
@@ -2744,6 +2805,8 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  Rule *rr;
 		  Id d;
 
+		  /* XXX: noupdate check is probably no longer needed, as all jobs should
+                   * already be satisfied */
 		  if (MAPTST(&solv->noupdate, i - installed->start))
 		    continue;
 		  if (solv->decisionmap[i] > 0)
@@ -3338,7 +3401,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
       enableproblem(solv, problem[i]);
 
   if (sug < 0)
-    disableupdaterules(solv, job, -(sug + 1));
+    reenablepolicyrules(solv, job, -(sug + 1));
   else if (sug >= solv->updaterules && sug < solv->updaterules_end)
     {
       /* enable feature rule */
@@ -3426,7 +3489,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 		enablerule(solv, r);	/* enable corresponding feature rule */
 	    }
 	  if (v < 0)
-	    disableupdaterules(solv, job, -(v + 1));
+	    reenablepolicyrules(solv, job, -(v + 1));
 	}
       else
 	{
@@ -3458,13 +3521,10 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
   for (i = 0; i < disabled.count; i++)
     enableproblem(solv, disabled.elements[i]);
   queue_free(&disabled);
-  /* disable problem rules again */
-
-  /* FIXME! */
+  /* reset policy rules */
   for (i = 0; problem[i]; i++)
     enableproblem(solv, problem[i]);
-  disableupdaterules(solv, job, -1);
-
+  disablepolicyrules(solv, job);
   /* disable problem rules again */
   for (i = 0; problem[i]; i++)
     disableproblem(solv, problem[i]);
@@ -5114,7 +5174,7 @@ solver_solve(Solver *solv, Queue *job)
       queue_push(&solv->ruleassertions, i);
 
   /* disable update rules that conflict with our job */
-  disableupdaterules(solv, job, -1);
+  disablepolicyrules(solv, job);
 
   /* make decisions based on job/update assertions */
   makeruledecisions(solv);

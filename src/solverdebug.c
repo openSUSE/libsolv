@@ -223,7 +223,7 @@ solver_printproblem(Solver *solv, Id v)
       v = -(v + 1);
       POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "JOB %d\n", v);
       jp = solv->ruletojob.elements;
-      for (i = solv->jobrules, r = solv->rules + i; i < solv->learntrules; i++, r++, jp++)
+      for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++, jp++)
 	if (*jp == v)
 	  {
 	    POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "- ");
