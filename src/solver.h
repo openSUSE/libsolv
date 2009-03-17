@@ -61,7 +61,9 @@ struct solver;
 
 typedef struct solver {
   Pool *pool;
-  Repo *installed;
+  Queue job;				/* copy of the job we're solving */
+
+  Repo *installed;			/* copy of pool->installed */
   
   /* list of rules, ordered
    * rpm rules first, then features, updates, jobs, learnt
@@ -84,6 +86,12 @@ typedef struct solver {
     
   Id jobrules;				/* user rules */
   Id jobrules_end;
+
+  Id infarchrules;			/* inferior arch rules */
+  Id infarchrules_end;
+
+  Id duprules;				/* dist upgrade rules */
+  Id duprules_end;
     
   Id learntrules;			/* learnt rules, (end == nrules) */
 
@@ -92,6 +100,7 @@ typedef struct solver {
   Map noobsoletes;			/* ignore obsoletes for these
 					   (multiinstall) */
 
+  Map updatemap;			/* bring those packages to the newest version */
   Queue weakruleq;			/* index into 'rules' for weak ones */
   Map weakrulemap;			/* map rule# to '1' for weak rules, 1..learntrules */
 
@@ -163,6 +172,8 @@ typedef struct solver {
   int distupgrade;
   int distupgrade_removeunsupported;
 
+  int noinfarchcheck;			/* true: do not forbid inferior architectures */
+
   /* Callbacks for defining the bahaviour of the SAT solver */
 
   /* Finding best candidate
@@ -207,14 +218,10 @@ typedef struct solver {
   Queue covenantq;                      /* Covenants honored by this solver (generic locks) */
 
   
-  Queue *job;				/* tmp store for job we're working on */
-  Id infarchrules;			/* inferior arch rules */
-  Id infarchrules_end;
-  Id duprules;				/* dist upgrade rules */
-  Id duprules_end;
-  Map updatemap;			/* bring those packages to the newest version */
   Map dupmap;				/* packages from dup repos */
   Map dupinvolvedmap;			/* packages involved in dup process */
+
+  Queue *ruleinfoq;			/* tmp space for solver_ruleinfo() */
 } Solver;
 
 /*
@@ -274,6 +281,44 @@ typedef enum {
   SOLVER_PROBLEM_INFARCH_RULE
 } SolverProbleminfo;
 
+typedef enum {
+  SOLVER_RULE_UNKNOWN = 0,
+  SOLVER_RULE_RPM = 0x100,
+  SOLVER_RULE_RPM_NOT_INSTALLABLE,
+  SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP,
+  SOLVER_RULE_RPM_PACKAGE_REQUIRES,
+  SOLVER_RULE_RPM_SELF_CONFLICT,
+  SOLVER_RULE_RPM_PACKAGE_CONFLICT,
+  SOLVER_RULE_RPM_SAME_NAME,
+  SOLVER_RULE_RPM_PACKAGE_OBSOLETES,
+  SOLVER_RULE_RPM_IMPLICIT_OBSOLETES,
+  SOLVER_RULE_UPDATE = 0x200,
+  SOLVER_RULE_FEATURE = 0x300,
+  SOLVER_RULE_JOB = 0x400,
+  SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP,
+  SOLVER_RULE_DISTUPGRADE = 0x500,
+  SOLVER_RULE_INFARCH = 0x600,
+  SOLVER_RULE_LEARNT = 0x700
+} SolverRuleinfo;
+
+#define SOLVER_RULE_TYPEMASK	0xff00
+
+/* backward compatibility */
+#define SOLVER_PROBLEM_UPDATE_RULE 		SOLVER_RULE_UPDATE
+#define SOLVER_PROBLEM_JOB_RULE			SOLVER_RULE_JOB
+#define SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP	SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP
+#define SOLVER_PROBLEM_NOT_INSTALLABLE		SOLVER_RULE_RPM_NOT_INSTALLABLE
+#define SOLVER_PROBLEM_NOTHING_PROVIDES_DEP	SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP
+#define SOLVER_PROBLEM_SAME_NAME		SOLVER_RULE_RPM_SAME_NAME
+#define SOLVER_PROBLEM_PACKAGE_CONFLICT		SOLVER_RULE_RPM_PACKAGE_CONFLICT
+#define SOLVER_PROBLEM_PACKAGE_OBSOLETES	SOLVER_RULE_RPM_PACKAGE_OBSOLETES
+#define SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE SOLVER_RULE_RPM_PACKAGE_REQUIRES
+#define SOLVER_PROBLEM_SELF_CONFLICT		SOLVER_RULE_RPM_SELF_CONFLICT
+#define SOLVER_PROBLEM_RPM_RULE			SOLVER_RULE_RPM
+#define SOLVER_PROBLEM_DISTUPGRADE_RULE		SOLVER_RULE_DISTUPGRADE
+#define SOLVER_PROBLEM_INFARCH_RULE		SOLVER_RULE_INFARCH
+
+
 #define SOLVER_SOLUTION_JOB		(0)
 #define SOLVER_SOLUTION_DISTUPGRADE	(-1)
 #define SOLVER_SOLUTION_INFARCH		(-2)
@@ -290,7 +335,9 @@ extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id 
 extern Id solver_findproblemrule(Solver *solv, Id problem);
 extern void solver_findallproblemrules(Solver *solv, Id problem, Queue *rules);
 
-extern SolverProbleminfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
+extern SolverRuleinfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
+extern SolverRuleinfo solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
+extern int solver_allruleinfos(Solver *solv, Id rid, Queue *rq);
 
 /* XXX: why is this not static? */
 Id *solver_create_decisions_obsoletesmap(Solver *solv);

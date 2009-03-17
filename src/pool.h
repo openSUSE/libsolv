@@ -194,6 +194,7 @@ char * solvable_get_location(Solvable *s, unsigned int *medianrp);
 const unsigned char *solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep);
 const char *solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep);
 int solvable_identical(Solvable *s1, Solvable *s2);
+Id solvable_selfprovidedep(Solvable *s);
 
 int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap);
 int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed);

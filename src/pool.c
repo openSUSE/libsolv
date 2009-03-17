@@ -362,7 +362,8 @@ pool_createwhatprovides(Pool *pool)
 
 /*
  * free all of our whatprovides data
- * be careful, everything internalized with pool_queuetowhatprovides is gone, too
+ * be careful, everything internalized with pool_queuetowhatprovides is
+ * gone, too
  */
 void
 pool_freewhatprovides(Pool *pool)

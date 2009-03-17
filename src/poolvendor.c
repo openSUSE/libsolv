@@ -22,6 +22,7 @@
 #include "util.h"
 
 const char *vendors[] = {
+  "!openSUSE Build Service*",
   "SUSE*",
   "openSUSE*",
   "SGI*",
@@ -39,7 +40,7 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   const char *vstr;
   int i;
   Id mask, m;
-  const char **v;
+  const char **v, *vs;
 
   if (vendor == 0)
     return 0;
@@ -51,19 +52,21 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   mask = 0;
   for (v = vendors; ; v++)
     {
-      if (*v == 0)
+      vs = *v;
+      if (vs == 0)	/* end of block? */
 	{
 	  v++;
 	  if (*v == 0)
 	    break;
 	  if (m == (1 << 31))
 	    break;
-	  m <<= 1;
+	  m <<= 1;	/* next vendor equivalence class */
 	}
-      if (fnmatch(*v, vstr, FNM_CASEFOLD) == 0)
+      if (fnmatch(*vs == '!' ? vs + 1 : vs, vstr, FNM_CASEFOLD) == 0)
 	{
-	  mask |= m;
-	  while (v[1])
+	  if (*vs != '!')
+	    mask |= m;
+	  while (v[1])	/* forward to next block */
 	    v++;
 	}
     }

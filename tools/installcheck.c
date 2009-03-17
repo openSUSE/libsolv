@@ -241,66 +241,77 @@ main(int argc, char **argv)
 	      for (j = 0; j < rids.count; j++)
 		{
 		  Id probr = rids.elements[j];
-		  Id dep, source, target;
-		  switch (solver_problemruleinfo(solv, &job, probr, &dep, &source, &target))
+		  int k;
+		  Queue rinfo;
+		  queue_init(&rinfo);
+
+		  solver_allruleinfos(solv, probr, &rinfo);
+		  for (k = 0; k < rinfo.count; k += 4)
 		    {
-		    case SOLVER_PROBLEM_DISTUPGRADE_RULE:
-		      break;
-		    case SOLVER_PROBLEM_INFARCH_RULE:
-		      s = pool_id2solvable(pool, source);
-		      printf("  %s has inferior architecture\n", solvable2str(pool, s));
-		      break;
-		    case SOLVER_PROBLEM_UPDATE_RULE:
-		      break;
-		    case SOLVER_PROBLEM_JOB_RULE:
-		      break;
-		    case SOLVER_PROBLEM_RPM_RULE:
-		      printf("  some dependency problem\n");
-		      break;
-		    case SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP:
-		      printf("  nothing provides requested %s\n", dep2str(pool, dep));
-		      break;
-		    case SOLVER_PROBLEM_NOT_INSTALLABLE:
-		      s = pool_id2solvable(pool, source);
-		      printf("  package %s is not installable\n", solvable2str(pool, s));
-		      break;
-		    case SOLVER_PROBLEM_NOTHING_PROVIDES_DEP:
-		      s = pool_id2solvable(pool, source);
-		      printf("  nothing provides %s needed by %s\n", dep2str(pool, dep), solvable2str(pool, s));
-		      if (ISRELDEP(dep))
+		      Id dep, source, target;
+		      source = rinfo.elements[k + 1];
+		      target = rinfo.elements[k + 2];
+		      dep = rinfo.elements[k + 3];
+		      switch (rinfo.elements[k])
 			{
-			  Reldep *rd = GETRELDEP(pool, dep);
-			  if (!ISRELDEP(rd->name))
+			case SOLVER_PROBLEM_DISTUPGRADE_RULE:
+			  break;
+			case SOLVER_PROBLEM_INFARCH_RULE:
+			  s = pool_id2solvable(pool, source);
+			  printf("  %s has inferior architecture\n", solvable2str(pool, s));
+			  break;
+			case SOLVER_PROBLEM_UPDATE_RULE:
+			  break;
+			case SOLVER_PROBLEM_JOB_RULE:
+			  break;
+			case SOLVER_PROBLEM_RPM_RULE:
+			  printf("  some dependency problem\n");
+			  break;
+			case SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP:
+			  printf("  nothing provides requested %s\n", dep2str(pool, dep));
+			  break;
+			case SOLVER_PROBLEM_NOT_INSTALLABLE:
+			  s = pool_id2solvable(pool, source);
+			  printf("  package %s is not installable\n", solvable2str(pool, s));
+			  break;
+			case SOLVER_PROBLEM_NOTHING_PROVIDES_DEP:
+			  s = pool_id2solvable(pool, source);
+			  printf("  nothing provides %s needed by %s\n", dep2str(pool, dep), solvable2str(pool, s));
+			  if (ISRELDEP(dep))
 			    {
-			      Id rp, rpp;
-			      FOR_PROVIDES(rp, rpp, rd->name)
-				printf("    (we have %s)\n", solvable2str(pool, pool->solvables + rp));
+			      Reldep *rd = GETRELDEP(pool, dep);
+			      if (!ISRELDEP(rd->name))
+				{
+				  Id rp, rpp;
+				  FOR_PROVIDES(rp, rpp, rd->name)
+				    printf("    (we have %s)\n", solvable2str(pool, pool->solvables + rp));
+				}
 			    }
+			  break;
+			case SOLVER_PROBLEM_SAME_NAME:
+			  s = pool_id2solvable(pool, source);
+			  s2 = pool_id2solvable(pool, target);
+			  printf("  cannot install both %s and %s\n", solvable2str(pool, s), solvable2str(pool, s2));
+			  break;
+			case SOLVER_PROBLEM_PACKAGE_CONFLICT:
+			  s = pool_id2solvable(pool, source);
+			  s2 = pool_id2solvable(pool, target);
+			  printf("  package %s conflicts with %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
+			  break;
+			case SOLVER_PROBLEM_PACKAGE_OBSOLETES:
+			  s = pool_id2solvable(pool, source);
+			  s2 = pool_id2solvable(pool, target);
+			  printf("  package %s obsoletes %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
+			  break;
+			case SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE:
+			  s = pool_id2solvable(pool, source);
+			  printf("  package %s requires %s, but none of the providers can be installed\n", solvable2str(pool, s), dep2str(pool, dep));
+			  break;
+			case SOLVER_PROBLEM_SELF_CONFLICT:
+			  s = pool_id2solvable(pool, source);
+			  printf("  package %s conflicts with %s provided by itself\n", solvable2str(pool, s), dep2str(pool, dep));
+			  break;
 			}
-		      break;
-		    case SOLVER_PROBLEM_SAME_NAME:
-		      s = pool_id2solvable(pool, source);
-		      s2 = pool_id2solvable(pool, target);
-		      printf("  cannot install both %s and %s\n", solvable2str(pool, s), solvable2str(pool, s2));
-		      break;
-		    case SOLVER_PROBLEM_PACKAGE_CONFLICT:
-		      s = pool_id2solvable(pool, source);
-		      s2 = pool_id2solvable(pool, target);
-		      printf("  package %s conflicts with %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
-		      break;
-		    case SOLVER_PROBLEM_PACKAGE_OBSOLETES:
-		      s = pool_id2solvable(pool, source);
-		      s2 = pool_id2solvable(pool, target);
-		      printf("  package %s obsoletes %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
-		      break;
-		    case SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE:
-		      s = pool_id2solvable(pool, source);
-		      printf("  package %s requires %s, but none of the providers can be installed\n", solvable2str(pool, s), dep2str(pool, dep));
-		      break;
-		    case SOLVER_PROBLEM_SELF_CONFLICT:
-		      s = pool_id2solvable(pool, source);
-		      printf("  package %s conflicts with %s provided by itself\n", solvable2str(pool, s), dep2str(pool, dep));
-		      break;
 		    }
 		}
 	    }

@@ -393,57 +393,67 @@ solver_printprobleminfo(Solver *solv, Queue *job, Id problem)
   probr = solver_findproblemrule(solv, problem);
   switch (solver_problemruleinfo(solv, job, probr, &dep, &source, &target))
     {
-    case SOLVER_PROBLEM_DISTUPGRADE_RULE:
+    case SOLVER_RULE_DISTUPGRADE:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "%s does not belong to a distupgrade repository\n", solvable2str(pool, s));
       return;
-    case SOLVER_PROBLEM_INFARCH_RULE:
+    case SOLVER_RULE_INFARCH:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "%s has inferior architecture\n", solvable2str(pool, s));
       return;
-    case SOLVER_PROBLEM_UPDATE_RULE:
+    case SOLVER_RULE_UPDATE:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "problem with installed package %s\n", solvable2str(pool, s));
       return;
-    case SOLVER_PROBLEM_JOB_RULE:
+    case SOLVER_RULE_JOB:
       POOL_DEBUG(SAT_DEBUG_RESULT, "conflicting requests\n");
       return;
-    case SOLVER_PROBLEM_RPM_RULE:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "some dependency problem\n");
-      return;
-    case SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP:
+    case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
       POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides requested %s\n", dep2str(pool, dep));
       return;
-    case SOLVER_PROBLEM_NOT_INSTALLABLE:
+    case SOLVER_RULE_RPM:
+      POOL_DEBUG(SAT_DEBUG_RESULT, "some dependency problem\n");
+      return;
+    case SOLVER_RULE_RPM_NOT_INSTALLABLE:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "package %s is not installable\n", solvable2str(pool, s));
       return;
-    case SOLVER_PROBLEM_NOTHING_PROVIDES_DEP:
+    case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides %s needed by %s\n", dep2str(pool, dep), solvable2str(pool, s));
       return;
-    case SOLVER_PROBLEM_SAME_NAME:
+    case SOLVER_RULE_RPM_SAME_NAME:
       s = pool_id2solvable(pool, source);
       s2 = pool_id2solvable(pool, target);
       POOL_DEBUG(SAT_DEBUG_RESULT, "cannot install both %s and %s\n", solvable2str(pool, s), solvable2str(pool, s2));
       return;
-    case SOLVER_PROBLEM_PACKAGE_CONFLICT:
+    case SOLVER_RULE_RPM_PACKAGE_CONFLICT:
       s = pool_id2solvable(pool, source);
       s2 = pool_id2solvable(pool, target);
       POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
       return;
-    case SOLVER_PROBLEM_PACKAGE_OBSOLETES:
+    case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
       s = pool_id2solvable(pool, source);
       s2 = pool_id2solvable(pool, target);
       POOL_DEBUG(SAT_DEBUG_RESULT, "package %s obsoletes %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
       return;
-    case SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE:
+    case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
+      s = pool_id2solvable(pool, source);
+      s2 = pool_id2solvable(pool, target);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s implicitely obsoletes %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
+      return;
+    case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but none of the providers can be installed\n", solvable2str(pool, s), dep2str(pool, dep));
       return;
-    case SOLVER_PROBLEM_SELF_CONFLICT:
+    case SOLVER_RULE_RPM_SELF_CONFLICT:
       s = pool_id2solvable(pool, source);
       POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by itself\n", solvable2str(pool, s), dep2str(pool, dep));
+      return;
+    case SOLVER_RULE_UNKNOWN:
+    case SOLVER_RULE_FEATURE:
+    case SOLVER_RULE_LEARNT:
+      POOL_DEBUG(SAT_DEBUG_RESULT, "bad rule type\n");
       return;
     }
 }

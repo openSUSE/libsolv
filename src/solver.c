@@ -28,6 +28,7 @@
 #define RULES_BLOCK 63
 
 static void reenablepolicyrules(Solver *solv, Queue *job, int jobidx);
+static void addrpmruleinfo(Solver *solv, Id p, Id d, int type, Id dep);
 
 /********************************************************************
  *
@@ -806,7 +807,7 @@ makeruledecisions(Solver *solv)
 	v = ri;
       disableproblem(solv, v);
       if (v < 0)
-	reenablepolicyrules(solv, solv->job, -(v + 1));
+	reenablepolicyrules(solv, &solv->job, -(v + 1));
     }
   
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
@@ -1247,6 +1248,14 @@ makemultiversionconflict(Solver *solv, Id n, Id con)
   return pool_queuetowhatprovides(pool, &q);
 }
 
+static inline void
+addrpmrule(Solver *solv, Id p, Id d, int type, Id dep)
+{
+  if (!solv->ruleinfoq)
+    addrule(solv, p, d);
+  else
+    addrpmruleinfo(solv, p, d, type, dep);
+}
 
 /*-------------------------------------------------------------------
  * 
@@ -1292,12 +1301,9 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id obs, *obsp;
   Id rec, *recp;
   Id sug, *sugp;
-    /* var and ptr for loops */
-  Id p, pp;
-    /* ptr to 'whatprovides' */
-  Id *dp;
-    /* Id for current solvable 's' */
-  Id n;
+  Id p, pp;		/* whatprovides loops */
+  Id *dp;		/* ptr to 'whatprovides' */
+  Id n;			/* Id for current solvable 's' */
 
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforsolvable -----\n");
 
@@ -1312,20 +1318,23 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        * s: Pointer to solvable
        */
 
-      n = queue_shift(&workq);             /* 'pop' next solvable to work on from queue */
-      if (MAPTST(m, n))		           /* continue if already visited */
-	continue;
+      n = queue_shift(&workq);		/* 'pop' next solvable to work on from queue */
+      if (m)
+	{
+	  if (MAPTST(m, n))		/* continue if already visited */
+	    continue;
+	  MAPSET(m, n);			/* mark as visited */
+	}
 
-      MAPSET(m, n);                        /* mark as visited */
-      s = pool->solvables + n;	           /* s = Solvable in question */
+      s = pool->solvables + n;		/* s = Solvable in question */
 
       dontfix = 0;
-      if (installed			   /* Installed system available */
-	  && !solv->fixsystem		   /* NOT repair errors in rpm dependency graph */
-	  && s->repo == installed)	   /* solvable is installed? */
-      {
-	dontfix = 1;		           /* dont care about broken rpm deps */
-      }
+      if (installed			/* Installed system available */
+	  && !solv->fixsystem		/* NOT repair errors in rpm dependency graph */
+	  && s->repo == installed)	/* solvable is installed? */
+        {
+	  dontfix = 1;			/* dont care about broken rpm deps */
+        }
 
       if (!dontfix
 	  && s->arch != ARCH_SRC
@@ -1333,7 +1342,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  && !pool_installable(pool, s))
 	{
 	  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", solvable2str(pool, s), (Id)(s - pool->solvables));
-	  addrule(solv, -n, 0);		   /* uninstallable */
+	  addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOT_INSTALLABLE, 0);
 	}
 
       /* yet another SUSE hack, sigh */
@@ -1342,9 +1351,9 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
           Id buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, n);
           if (buddy > 0 && buddy != SYSTEMSOLVABLE && buddy != n && buddy < pool->nsolvables)
             {
-              addrule(solv, n, -buddy);
-              addrule(solv, buddy, -n); 
-	      if (!MAPTST(m, buddy))
+              addrpmrule(solv, n, -buddy, SOLVER_RULE_RPM_PACKAGE_REQUIRES, solvable_selfprovidedep(pool->solvables + n));
+              addrpmrule(solv, buddy, -n, SOLVER_RULE_RPM_PACKAGE_REQUIRES, solvable_selfprovidedep(pool->solvables + buddy)); 
+	      if (m && !MAPTST(m, buddy))
 		queue_push(&workq, buddy);
             }
         }
@@ -1392,7 +1401,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		{
 		  /* nothing provides req! */
 		  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", solvable2str(pool, s), (Id)(s - pool->solvables), dep2str(pool, req));
-		  addrule(solv, -n, 0); /* mark requestor as uninstallable */
+		  addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, req);
 		  continue;
 		}
 
@@ -1405,14 +1414,17 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 	      /* add 'requires' dependency */
               /* rule: (-requestor|provider1|provider2|...|providerN) */
-	      addrule(solv, -n, dp - pool->whatprovidesdata);
+	      addrpmrule(solv, -n, dp - pool->whatprovidesdata, SOLVER_RULE_RPM_PACKAGE_REQUIRES, req);
 
 	      /* descend the dependency tree
 	         push all non-visited providers on the work queue */
-	      for (; *dp; dp++)
+	      if (m)
 		{
-		  if (!MAPTST(m, *dp))
-		    queue_push(&workq, *dp);
+		  for (; *dp; dp++)
+		    {
+		      if (!MAPTST(m, *dp))
+			queue_push(&workq, *dp);
+		    }
 		}
 
 	    } /* while, requirements of n */
@@ -1468,7 +1480,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		      p = -makemultiversionconflict(solv, p, con);
 		    }
                  /* rule: -n|-p: either solvable _or_ provider of conflict */
-		  addrule(solv, -n, -p);
+		  addrpmrule(solv, -n, -p, p ? SOLVER_RULE_RPM_PACKAGE_CONFLICT : SOLVER_RULE_RPM_SELF_CONFLICT, con);
 		}
 	    }
 	}
@@ -1492,7 +1504,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		      if (!solv->obsoleteusesprovides /* obsoletes are matched names, not provides */
 			  && !pool_match_nevr(pool, pool->solvables + p, obs))
 			continue;
-		      addrule(solv, -n, -p);
+		      addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_PACKAGE_OBSOLETES, obs);
 		    }
 		}
 	    }
@@ -1505,14 +1517,17 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		continue;
 	      if (!solv->implicitobsoleteusesprovides && s->name != ps->name)
 		continue;
-	      addrule(solv, -n, -p);
+	      if (s->name == ps->name)
+	        addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_SAME_NAME, 0);
+	      else
+	        addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_IMPLICIT_OBSOLETES, s->name);
 	    }
 	}
 
       /*-----------------------------------------
        * add recommends to the work queue
        */
-      if (s->recommends)
+      if (s->recommends && m)
 	{
 	  recp = s->repo->idarraydata + s->recommends;
 	  while ((rec = *recp++) != 0)
@@ -1522,7 +1537,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  queue_push(&workq, p);
 	    }
 	}
-      if (s->suggests)
+      if (s->suggests && m)
 	{
 	  sugp = s->repo->idarraydata + s->suggests;
 	  while ((sug = *sugp++) != 0)
@@ -1557,13 +1572,13 @@ addrpmrulesforweak(Solver *solv, Map *m)
     /* foreach solvable in pool */
   for (i = n = 1; n < pool->nsolvables; i++, n++)
     {
-      if (i == pool->nsolvables)                 /* wrap i */
+      if (i == pool->nsolvables)		/* wrap i */
 	i = 1;
-      if (MAPTST(m, i))                          /* been there */
+      if (MAPTST(m, i))				/* been there */
 	continue;
 
       s = pool->solvables + i;
-      if (!pool_installable(pool, s))            /* only look at installable ones */
+      if (!pool_installable(pool, s))		/* only look at installable ones */
 	continue;
 
       sup = 0;
@@ -1576,7 +1591,7 @@ addrpmrulesforweak(Solver *solv, Map *m)
 	      break;
 	}
 
-	/* if nothing found, check for enhances */
+      /* if nothing found, check for enhances */
       if (!sup && s->enhances)
 	{
 	  supp = s->repo->idarraydata + s->enhances;
@@ -1584,11 +1599,11 @@ addrpmrulesforweak(Solver *solv, Map *m)
 	    if (dep_possible(solv, sup, m))
 	      break;
 	}
-	/* if nothing found, goto next solvables */
+      /* if nothing found, goto next solvables */
       if (!sup)
 	continue;
       addrpmrulesforsolvable(solv, s, m);
-      n = 0;
+      n = 0;			/* check all solvables again */
     }
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforweak end -----\n");
 }
@@ -2347,7 +2362,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, solv->rules + lastweak);
       disableproblem(solv, v);
       if (v < 0)
-	reenablepolicyrules(solv, solv->job, -(v + 1));
+	reenablepolicyrules(solv, &solv->job, -(v + 1));
       reset_solver(solv);
       return 1;
     }
@@ -3861,337 +3876,6 @@ solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, I
 
 /*-------------------------------------------------------------------
  * 
- * Retrieve information about a problematic rule
- *
- * this is basically the reverse of addrpmrulesforsolvable
- */
-
-SolverProbleminfo
-solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp)
-{
-  Pool *pool = solv->pool;
-  Repo *installed = solv->installed;
-  Rule *r;
-  Solvable *s;
-  int dontfix = 0;
-  Id p, d, w2, pp, req, *reqp, con, *conp, obs, *obsp, *dp;
-
-  assert(rid > 0);
-  if (rid >= solv->infarchrules && rid < solv->infarchrules_end)
-    {
-      r = solv->rules + rid;
-      *depp = r->p < 0 ? pool->solvables[-r->p].name : 0;
-      *sourcep = r->p < 0 ? -r->p : 0;
-      *targetp = 0;
-      return SOLVER_PROBLEM_INFARCH_RULE;
-    }
-  if (rid >= solv->duprules && rid < solv->duprules_end)
-    {
-      r = solv->rules + rid;
-      *depp = r->p < 0 ? pool->solvables[-r->p].name : 0;
-      *sourcep = r->p < 0 ? -r->p : 0;
-      *targetp = 0;
-      return SOLVER_PROBLEM_DISTUPGRADE_RULE;
-    }
-  if (rid >= solv->jobrules && rid < solv->jobrules_end)
-    {
-
-      r = solv->rules + rid;
-      p = solv->ruletojob.elements[rid - solv->jobrules];
-      *depp = job->elements[p + 1];
-      *sourcep = p;
-      *targetp = job->elements[p];
-      d = r->d < 0 ? -r->d - 1 : r->d;
-      if (d == 0 && r->w2 == 0 && r->p == -SYSTEMSOLVABLE && (job->elements[p] & SOLVER_SELECTMASK) != SOLVER_SOLVABLE_ONE_OF)
-	return SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP;
-      return SOLVER_PROBLEM_JOB_RULE;
-    }
-  if (rid >= solv->updaterules && rid < solv->updaterules_end)
-    {
-      *depp = 0;
-      *sourcep = solv->installed->start + (rid - solv->updaterules);
-      *targetp = 0;
-      return SOLVER_PROBLEM_UPDATE_RULE;
-    }
-  assert(rid < solv->rpmrules_end);
-  r = solv->rules + rid;
-  assert(r->p < 0);
-  d = r->d < 0 ? -r->d - 1 : r->d;
-  if (d == 0 && r->w2 == 0)
-    {
-      /* a rpm rule assertion */
-      s = pool->solvables - r->p;
-      if (installed && !solv->fixsystem && s->repo == installed)
-	dontfix = 1;
-      assert(!dontfix);	/* dontfix packages never have a neg assertion */
-      *sourcep = -r->p;
-      *targetp = 0;
-      /* see why the package is not installable */
-      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC && !pool_installable(pool, s))
-	{
-	  *depp = 0;
-	  return SOLVER_PROBLEM_NOT_INSTALLABLE;
-	}
-      /* check requires */
-      if (s->requires)
-	{
-	  reqp = s->repo->idarraydata + s->requires;
-	  while ((req = *reqp++) != 0)
-	    {
-	      if (req == SOLVABLE_PREREQMARKER)
-		continue;
-	      dp = pool_whatprovides_ptr(pool, req);
-	      if (*dp == 0)
-		break;
-	    }
-	  if (req)
-	    {
-	      *depp = req;
-	      return SOLVER_PROBLEM_NOTHING_PROVIDES_DEP;
-	    }
-	}
-      if (!solv->allowselfconflicts && s->conflicts)
-	{
-	  conp = s->repo->idarraydata + s->conflicts;
-	  while ((con = *conp++) != 0)
-	    FOR_PROVIDES(p, pp, con)
-	      if (p == -r->p)
-		{
-		  *depp = con;
-		  return SOLVER_PROBLEM_SELF_CONFLICT;
-		}
-	}
-      /* should never happen */
-      *depp = 0;
-      return SOLVER_PROBLEM_RPM_RULE;
-    }
-  s = pool->solvables - r->p;
-  if (installed && !solv->fixsystem && s->repo == installed)
-    dontfix = 1;
-  w2 = r->w2;
-  if (d && pool->whatprovidesdata[d] < 0)
-    {
-      /* rule looks like -p|-c|x|x|x..., we only create this for patches with multiversion */
-      /* reduce it to -p|-c case */
-      d = 0;
-      w2 = pool->whatprovidesdata[d];
-    }
-  if (d == 0 && w2 < 0)
-    {
-      /* a package conflict */
-      Solvable *s2 = pool->solvables - w2;
-      int dontfix2 = 0;
-
-      if (installed && !solv->fixsystem && s2->repo == installed)
-	dontfix2 = 1;
-
-      /* if both packages have the same name and at least one of them
-       * is not installed, they conflict */
-      if (s->name == s2->name && !(installed && s->repo == installed && s2->repo == installed))
-	{
-	  /* also check noobsoletes map */
-	  if ((s->evr == s2->evr && s->arch == s2->arch) || !solv->noobsoletes.size
-		|| ((!installed || s->repo != installed) && !MAPTST(&solv->noobsoletes, -r->p))
-		|| ((!installed || s2->repo != installed) && !MAPTST(&solv->noobsoletes, -w2)))
-	    {
-	      *depp = 0;
-	      *sourcep = -r->p;
-	      *targetp = -w2;
-	      return SOLVER_PROBLEM_SAME_NAME;
-	    }
-	}
-
-      /* check conflicts in both directions */
-      if (s->conflicts)
-	{
-	  conp = s->repo->idarraydata + s->conflicts;
-	  while ((con = *conp++) != 0)
-            {
-              FOR_PROVIDES(p, pp, con)
-		{
-		  if (dontfix && pool->solvables[p].repo == installed)
-		    continue;
-		  if (p != -w2)
-		    continue;
-		  *depp = con;
-		  *sourcep = -r->p;
-		  *targetp = p;
-		  return SOLVER_PROBLEM_PACKAGE_CONFLICT;
-		}
-	    }
-	}
-      if (s2->conflicts)
-	{
-	  conp = s2->repo->idarraydata + s2->conflicts;
-	  while ((con = *conp++) != 0)
-            {
-              FOR_PROVIDES(p, pp, con)
-		{
-		  if (dontfix2 && pool->solvables[p].repo == installed)
-		    continue;
-		  if (p != -r->p)
-		    continue;
-		  *depp = con;
-		  *sourcep = -w2;
-		  *targetp = p;
-		  return SOLVER_PROBLEM_PACKAGE_CONFLICT;
-		}
-	    }
-	}
-      /* check obsoletes in both directions */
-      if ((!installed || s->repo != installed) && s->obsoletes && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -r->p)))
-	{
-	  obsp = s->repo->idarraydata + s->obsoletes;
-	  while ((obs = *obsp++) != 0)
-	    {
-	      FOR_PROVIDES(p, pp, obs)
-		{
-		  if (p != -w2)
-		    continue;
-		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
-		    continue;
-		  *depp = obs;
-		  *sourcep = -r->p;
-		  *targetp = p;
-		  return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
-		}
-	    }
-	}
-      if ((!installed || s2->repo != installed) && s2->obsoletes && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -w2)))
-	{
-	  obsp = s2->repo->idarraydata + s2->obsoletes;
-	  while ((obs = *obsp++) != 0)
-	    {
-	      FOR_PROVIDES(p, pp, obs)
-		{
-		  if (p != -r->p)
-		    continue;
-		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
-		    continue;
-		  *depp = obs;
-		  *sourcep = -w2;
-		  *targetp = p;
-		  return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
-		}
-	    }
-	}
-      if (solv->implicitobsoleteusesprovides && (!installed || s->repo != installed) && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -r->p)))
-	{
-	  FOR_PROVIDES(p, pp, s->name)
-	    {
-	      if (p != -w2)
-		continue;
-	      *depp = s->name;
-	      *sourcep = -r->p;
-	      *targetp = p;
-	      return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
-	    }
-	}
-      if (solv->implicitobsoleteusesprovides && (!installed || s2->repo != installed) && !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, -w2)))
-	{
-	  FOR_PROVIDES(p, pp, s2->name)
-	    {
-	      if (p != -r->p)
-		continue;
-	      *depp = s2->name;
-	      *sourcep = -w2;
-	      *targetp = p;
-	      return SOLVER_PROBLEM_PACKAGE_OBSOLETES;
-	    }
-	}
-      /* all cases checked, can't happen */
-      *depp = 0;
-      *sourcep = -r->p;
-      *targetp = 0;
-      return SOLVER_PROBLEM_RPM_RULE;
-    }
-  /* simple requires */
-  if (s->requires)
-    {
-      reqp = s->repo->idarraydata + s->requires;
-      while ((req = *reqp++) != 0)
-	{
-	  if (req == SOLVABLE_PREREQMARKER)
-	    continue;
-	  dp = pool_whatprovides_ptr(pool, req);
-	  if (d == 0)
-	    {
-	      if (*dp == r->w2 && dp[1] == 0)
-		break;
-	    }
-	  else if (dp - pool->whatprovidesdata == d)
-	    break;
-	}
-      if (req)
-	{
-	  *depp = req;
-	  *sourcep = -r->p;
-	  *targetp = 0;
-	  return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
-	}
-    }
-
-  /* check for product buddy requires */
-  if (d == 0 && w2 > 0 && pool->nscallback)
-    {    
-      Id buddy = 0; 
-      s = pool->solvables - r->p;
-      if (!strncmp("product:", id2str(pool, s->name), 8))
-	{
-	  buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, -r->p);
-	  if (buddy != w2)
-	    buddy = 0; 
-	}
-      if (!buddy)
-	{
-	  s = pool->solvables + w2;
-	  if (!strncmp("product:", id2str(pool, s->name), 8))
-	    {
-	      buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, w2); 
-	      if (buddy != -r->p)
-		buddy = 0; 
-	    }
-	}
-      if (buddy)
-	{
-	  /* have buddy relation, now fake requires */
-	  s = pool->solvables + w2;
-	  Reldep *rd; 
-	  if (s->repo && s->provides)
-	    {
-	      Id prov, *provp;
-	      provp = s->repo->idarraydata + s->provides;
-	      while ((prov = *provp++) != 0)
-		{
-		  if (!ISRELDEP(prov))
-		    continue;
-		  rd = GETRELDEP(pool, prov);
-		  if (rd->name == s->name && rd->evr == s->evr && rd->flags == REL_EQ)
-		    {
-		      *depp = prov;
-		      *sourcep = -r->p;
-		      *targetp = 0; 
-		      return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
-		    }
-		}
-	    }
-	  *depp = s->name;
-	  *sourcep = -r->p;
-	  *targetp = 0; 
-	  return SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE;
-	}
-    }
-
-  /* all cases checked, can't happen */
-  *depp = 0;
-  *sourcep = -r->p;
-  *targetp = 0;
-  return SOLVER_PROBLEM_RPM_RULE;
-}
-
-
-/*-------------------------------------------------------------------
- * 
  * find problem rule
  */
 
@@ -4744,13 +4428,16 @@ solver_solve(Solver *solv, Queue *job)
   int hasdupjob = 0;
 
   solve_start = sat_timems(0);
+
+  /* log solver options */
   POOL_DEBUG(SAT_DEBUG_STATS, "solver started\n");
-  POOL_DEBUG(SAT_DEBUG_STATS, "fixsystem=%d updatesystem=%d dosplitprovides=%d, noupdateprovide=%d\n", solv->fixsystem, solv->updatesystem, solv->dosplitprovides, solv->noupdateprovide);
+  POOL_DEBUG(SAT_DEBUG_STATS, "fixsystem=%d updatesystem=%d dosplitprovides=%d, noupdateprovide=%d noinfarchcheck=%d\n", solv->fixsystem, solv->updatesystem, solv->dosplitprovides, solv->noupdateprovide, solv->noinfarchcheck);
   POOL_DEBUG(SAT_DEBUG_STATS, "distupgrade=%d distupgrade_removeunsupported=%d\n", solv->distupgrade, solv->distupgrade_removeunsupported);
   POOL_DEBUG(SAT_DEBUG_STATS, "allowuninstall=%d, allowdowngrade=%d, allowarchchange=%d, allowvendorchange=%d\n", solv->allowuninstall, solv->allowdowngrade, solv->allowarchchange, solv->allowvendorchange);
   POOL_DEBUG(SAT_DEBUG_STATS, "promoteepoch=%d, allowvirtualconflicts=%d, allowselfconflicts=%d\n", pool->promoteepoch, solv->allowvirtualconflicts, solv->allowselfconflicts);
   POOL_DEBUG(SAT_DEBUG_STATS, "obsoleteusesprovides=%d, implicitobsoleteusesprovides=%d\n", solv->obsoleteusesprovides, solv->implicitobsoleteusesprovides);
   POOL_DEBUG(SAT_DEBUG_STATS, "dontinstallrecommended=%d, ignorealreadyrecommended=%d, dontshowinstalledrecommended=%d\n", solv->dontinstallrecommended, solv->ignorealreadyrecommended, solv->dontshowinstalledrecommended);
+
   /* create whatprovides if not already there */
   if (!pool->whatprovides)
     pool_createwhatprovides(pool);
@@ -4759,12 +4446,12 @@ solver_solve(Solver *solv, Queue *job)
   create_obsolete_index(solv);
 
   /* remember job */
-  solv->job = job;
+  queue_free(&solv->job);
+  queue_clone(&solv->job, job);
 
   /*
    * create basic rule set of all involved packages
    * use addedmap bitmap to make sure we don't create rules twice
-   *
    */
 
   /* create noobsolete map if needed */
@@ -4885,7 +4572,7 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SAT_DEBUG_STATS, "decisions so far: %d\n", solv->decisionq.count);
   POOL_DEBUG(SAT_DEBUG_STATS, "rpm rule creation took %d ms\n", sat_timems(now));
 
-  /* create dup maps if needed. We need the maps to create our
+  /* create dup maps if needed. We need the maps early to create our
    * update rules */
   if (hasdupjob)
     createdupmaps(solv, job);
@@ -5135,7 +4822,11 @@ solver_solve(Solver *solv, Queue *job)
   solv->jobrules_end = solv->nrules;
 
   /* now create infarch and dup rules */
-  addinfarchrules(solv, &addedmap);
+  if (!solv->noinfarchcheck)
+    addinfarchrules(solv, &addedmap);
+  else
+    solv->infarchrules = solv->infarchrules_end = solv->nrules;
+
   if (hasdupjob)
     {
       addduprules(solv, &addedmap);
@@ -5143,6 +4834,7 @@ solver_solve(Solver *solv, Queue *job)
     }
   else
     solv->duprules = solv->duprules_end = solv->nrules;
+
 
     /* all rules created
      * --------------------------------------------------------------
@@ -5381,7 +5073,6 @@ solver_solve(Solver *solv, Queue *job)
   queue_free(&redoq);
   POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
-  solv->job = 0;
 }
 
 /***********************************************************************/
@@ -5659,6 +5350,268 @@ solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)
   map_free(&im);
   map_free(&installedm);
   queue_free(&installedq_internal);
+}
+
+
+static void
+addrpmruleinfo(Solver *solv, Id p, Id d, int type, Id dep)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  Id w2, op, od, ow2;
+
+  /* check if this creates the rule we're searching for */
+  r = solv->rules + solv->ruleinfoq->elements[0];
+  op = r->p;
+  od = r->d < 0 ? -r->d - 1 : r->d;
+  ow2 = 0;
+
+  /* normalize */
+  w2 = d > 0 ? 0 : d;
+  if (p < 0 && d > 0 && (!pool->whatprovidesdata[d] || !pool->whatprovidesdata[d + 1]))
+    {
+      w2 = pool->whatprovidesdata[d];
+      d = 0;
+
+    }
+  if (p > 0 && d < 0)		/* this hack is used for buddy deps */
+    {
+      w2 = p;
+      p = d;
+    }
+
+  if (d > 0)
+    {
+      if (p != op && !od)
+	return;
+      if (d != od)
+	{
+	  Id *dp = pool->whatprovidesdata + d;
+	  Id *odp = pool->whatprovidesdata + od;
+	  while (*dp)
+	    if (*dp++ != *odp++)
+	      return;
+	  if (*odp)
+	    return;
+	}
+      w2 = 0;
+      /* handle multiversion conflict rules */
+      if (p < 0 && pool->whatprovidesdata[d] < 0)
+	{
+	  w2 = pool->whatprovidesdata[d];
+	  /* XXX: free memory */
+	}
+    }
+  else
+    {
+      if (od)
+	return;
+      ow2 = r->w2;
+      if (p > w2)
+	{
+	  if (w2 != op || p != ow2)
+	    return;
+	}
+      else
+	{
+	  if (p != op || w2 != ow2)
+	    return;
+	}
+    }
+  /* yep, rule matches. record info */
+  queue_push(solv->ruleinfoq, type);
+  if (type == SOLVER_RULE_RPM_SAME_NAME)
+    {
+      /* we normalize same name order */
+      queue_push(solv->ruleinfoq, op < 0 ? -op : 0);
+      queue_push(solv->ruleinfoq, ow2 < 0 ? -ow2 : 0);
+    }
+  else
+    {
+      queue_push(solv->ruleinfoq, p < 0 ? -p : 0);
+      queue_push(solv->ruleinfoq, w2 < 0 ? -w2 : 0);
+    }
+  queue_push(solv->ruleinfoq, dep);
+}
+
+static int
+solver_allruleinfos_cmp(const void *ap, const void *bp)
+{
+  const Id *a = ap, *b = bp;
+  int r;
+
+  r = a[0] - b[0];
+  if (r)
+    return r;
+  r = a[1] - b[1];
+  if (r)
+    return r;
+  r = a[2] - b[2];
+  if (r)
+    return r;
+  r = a[3] - b[3];
+  if (r)
+    return r;
+  return 0;
+}
+
+int
+solver_allruleinfos(Solver *solv, Id rid, Queue *rq)
+{
+  Pool *pool = solv->pool;
+  Rule *r = solv->rules + rid;
+  int i, j;
+
+  queue_empty(rq);
+  if (rid <= 0 || rid >= solv->rpmrules_end)
+    {
+      Id type, from, to, dep;
+      type = solver_ruleinfo(solv, rid, &from, &to, &dep);
+      queue_push(rq, type);
+      queue_push(rq, from);
+      queue_push(rq, to);
+      queue_push(rq, dep);
+      return 1;
+    }
+  if (r->p >= 0)
+    return 0;
+  queue_push(rq, rid);
+  solv->ruleinfoq = rq;
+  addrpmrulesforsolvable(solv, pool->solvables - r->p, 0);
+  /* also try reverse direction for conflicts */
+  if ((r->d == 0 || r->d == -1) && r->w2 < 0)
+    addrpmrulesforsolvable(solv, pool->solvables - r->w2, 0);
+  solv->ruleinfoq = 0;
+  queue_shift(rq);
+  /* now sort & unify em */
+  if (!rq->count)
+    return 0;
+  qsort(rq->elements, rq->count / 4, 4 * sizeof(Id), solver_allruleinfos_cmp);
+  /* throw out identical entries */
+  for (i = j = 0; i < rq->count; i += 4)
+    {
+      if (j)
+	{
+	  if (rq->elements[i] == rq->elements[j - 4] && 
+	      rq->elements[i + 1] == rq->elements[j - 3] &&
+	      rq->elements[i + 2] == rq->elements[j - 2] &&
+	      rq->elements[i + 3] == rq->elements[j - 1])
+	    continue;
+	}
+      rq->elements[j++] = rq->elements[i];
+      rq->elements[j++] = rq->elements[i + 1];
+      rq->elements[j++] = rq->elements[i + 2];
+      rq->elements[j++] = rq->elements[i + 3];
+    }
+  rq->count = j;
+  return j / 4;
+}
+
+SolverRuleinfo
+solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
+{
+  Pool *pool = solv->pool;
+  Rule *r = solv->rules + rid;
+  SolverRuleinfo type = SOLVER_RULE_UNKNOWN;
+
+  if (fromp)
+    *fromp = 0;
+  if (top)
+    *top = 0;
+  if (depp)
+    *depp = 0;
+  if (rid > 0 && rid < solv->rpmrules_end)
+    {
+      Queue rq;
+      int i;
+
+      if (r->p >= 0)
+	return SOLVER_RULE_RPM;
+      if (fromp)
+	*fromp = -r->p;
+      queue_init(&rq);
+      queue_push(&rq, rid);
+      solv->ruleinfoq = &rq;
+      addrpmrulesforsolvable(solv, pool->solvables - r->p, 0);
+      /* also try reverse direction for conflicts */
+      if ((r->d == 0 || r->d == -1) && r->w2 < 0)
+	addrpmrulesforsolvable(solv, pool->solvables - r->w2, 0);
+      solv->ruleinfoq = 0;
+      type = SOLVER_RULE_RPM;
+      for (i = 1; i < rq.count; i += 4)
+	{
+	  Id qt, qo, qp, qd;
+	  qt = rq.elements[i];
+	  qp = rq.elements[i + 1];
+	  qo = rq.elements[i + 2];
+	  qd = rq.elements[i + 3];
+	  if (type == SOLVER_RULE_RPM || type > qt)
+	    {
+	      type = qt;
+	      if (fromp)
+		*fromp = qp;
+	      if (top)
+		*top = qo;
+	      if (depp)
+		*depp = qd;
+	    }
+	}
+      queue_free(&rq);
+      return type;
+    }
+  if (rid >= solv->jobrules && rid < solv->jobrules_end)
+    {
+      Id jidx = solv->ruletojob.elements[rid - solv->jobrules];
+      if (fromp)
+	*fromp = jidx;
+      if (top)
+	*top = solv->job.elements[jidx];
+      if (depp)
+	*depp = solv->job.elements[jidx + 1];
+      if ((r->d == 0 || r->d == -1) && r->w2 == 0 && r->p == -SYSTEMSOLVABLE && (solv->job.elements[jidx] & SOLVER_SELECTMASK) != SOLVER_SOLVABLE_ONE_OF)
+	return SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
+      return SOLVER_RULE_JOB;
+    }
+  if (rid >= solv->updaterules && rid < solv->updaterules_end)
+    {
+      if (fromp)
+	*fromp = solv->installed->start + (rid - solv->updaterules);
+      return SOLVER_RULE_UPDATE;
+    }
+  if (rid >= solv->featurerules && rid < solv->featurerules_end)
+    {
+      if (fromp)
+	*fromp = solv->installed->start + (rid - solv->featurerules);
+      return SOLVER_RULE_FEATURE;
+    }
+  if (rid >= solv->duprules && rid < solv->duprules_end)
+    {
+      if (fromp)
+	*fromp = -r->p;
+      if (depp)
+	*depp = pool->solvables[-r->p].name;
+      return SOLVER_RULE_DISTUPGRADE;
+    }
+  if (rid >= solv->infarchrules && rid < solv->infarchrules_end)
+    {
+      if (fromp)
+	*fromp = -r->p;
+      if (depp)
+	*depp = pool->solvables[-r->p].name;
+      return SOLVER_RULE_INFARCH;
+    }
+  if (rid >= solv->learntrules)
+    {
+      return SOLVER_RULE_LEARNT;
+    }
+  return SOLVER_RULE_UNKNOWN;
+}
+
+/* obsolete function */
+SolverRuleinfo
+solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp)
+{
+  return solver_ruleinfo(solv, rid, sourcep, targetp, depp);
 }
 
 /* EOF */

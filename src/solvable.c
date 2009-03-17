@@ -512,3 +512,29 @@ solvable_identical(Solvable *s1, Solvable *s2)
     }
   return 1;
 }
+
+/* return the self provide dependency of a solvable */
+Id
+solvable_selfprovidedep(Solvable *s)
+{
+  Pool *pool;
+  Reldep *rd;
+  Id prov, *provp;
+
+  if (!s->repo)
+    return s->name;
+  pool = s->repo->pool;
+  if (s->provides)
+    {
+      provp = s->repo->idarraydata + s->provides;
+      while ((prov = *provp++) != 0)
+	{
+	  if (!ISRELDEP(prov))
+	    continue;
+	  rd = GETRELDEP(pool, prov);
+	  if (rd->name == s->name && rd->evr == s->evr && rd->flags == REL_EQ)
+	    return prov;
+	}
+    }
+  return rel2id(pool, s->name, s->evr, REL_EQ, 1);
+}
