@@ -189,22 +189,6 @@ if test "$repotype" = rpmmd ; then
       $cmd "$i" | updateinfoxml2solv $parser_options > $updateinfofile || exit 4
   fi
 
-  patchfile="/nonexist"
-  if test -f patches.xml; then
-    patchfile=`mktemp` || exit 3
-    (
-     echo '<patches>'
-     for i in patch-*.xml*; do
-       case $i in
-         *.gz) gzip -dc "$i" ;;
-	 *.bz2) bzip2 -dc "$i" ;;
-	 *) cat "$i" ;;
-       esac
-     done
-     echo '</patches>'
-    ) | grep -v '\?xml' | patchxml2solv $parser_options > $patchfile || exit 4
-  fi
-
   # This contains a deltainfo.xml*
   cmd=
   for i in deltainfo.xml*; do
@@ -240,17 +224,14 @@ if test "$repotype" = rpmmd ; then
   if test -s $prodfile; then
     m_prodfile=$prodfile
   fi
-  if test -s $patchfile; then
-    m_patchfile=$patchfile
-  fi
   if test -s $updateinfofile; then
     m_updateinfofile=$updateinfofile
   fi
   if test -s $deltainfofile; then
     m_deltainfofile=$deltainfofile
   fi
-  mergesolv $m_repomdfile $m_suseinfofile $m_primfile $m_prodfile $m_patternfile $m_patchfile $m_updateinfofile $m_deltainfofile
-  rm -f $repomdfile $suseinfofile $primfile $patternfile $prodfile $patchfile $updateinfofile $deltainfofile
+  mergesolv $m_repomdfile $m_suseinfofile $m_primfile $m_prodfile $m_patternfile $m_updateinfofile $m_deltainfofile
+  rm -f $repomdfile $suseinfofile $primfile $patternfile $prodfile $updateinfofile $deltainfofile
 
 elif test "$repotype" = susetags ; then
   olddir=`pwd`

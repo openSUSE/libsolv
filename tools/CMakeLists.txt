@@ -31,10 +31,6 @@ SET(susetags2solv_REPOS susetags2solv.c repo_susetags.c repo_content.c )
 ADD_EXECUTABLE( susetags2solv ${susetags2solv_REPOS} )
 TARGET_LINK_LIBRARIES( susetags2solv satsolver toolstuff ${ZLIB_LIBRARY})
 
-SET(patchxml2solv_REPOS patchxml2solv.c repo_patchxml.c )
-ADD_EXECUTABLE( patchxml2solv ${patchxml2solv_REPOS} )
-TARGET_LINK_LIBRARIES( patchxml2solv satsolver toolstuff ${EXPAT_LIBRARY})
-
 SET(updateinfoxml2solv_REPOS updateinfoxml2solv.c repo_updateinfoxml.c)
 ADD_EXECUTABLE( updateinfoxml2solv ${updateinfoxml2solv_REPOS} )
 TARGET_LINK_LIBRARIES( updateinfoxml2solv satsolver toolstuff ${EXPAT_LIBRARY})
@@ -60,7 +56,6 @@ TARGET_LINK_LIBRARIES( mergesolv satsolver toolstuff)
 install(TARGETS
                 mergesolv
                 dumpsolv
-                patchxml2solv
                 susetags2solv
                 helix2solv
                 rpmmd2solv
