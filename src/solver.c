@@ -4080,6 +4080,10 @@ create_obsolete_index(Solver *solv)
 /*-------------------------------------------------------------------
  * 
  * remove disabled conflicts
+ *
+ * purpose: update the decisionmap after some rules were disabled.
+ * this is used to calculate the suggested/recommended package list.
+ * Also returns a "removed" list to undo the discisionmap changes.
  */
 
 static void
@@ -4176,6 +4180,14 @@ removedisabledconflicts(Solver *solv, Queue *removed)
 	  n = 0;	/* redo all rules */
 	}
     }
+}
+
+static inline void
+undo_removedisabledconflicts(Solver *solv, Queue *removed)
+{
+  int i;
+  for (i = 0; i < removed->count; i += 2)
+    solv->decisionmap[removed->elements[i]] = removed->elements[i + 1];
 }
 
 
@@ -4404,6 +4416,201 @@ addduprules(Solver *solv, Map *addedmap)
   solv->duprules_end = solv->nrules;
 }
 
+
+static void
+findrecommendedsuggested(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Queue redoq, disabledq;
+  int goterase, i;
+  Solvable *s;
+  Rule *r;
+  Map obsmap;
+
+  map_init(&obsmap, pool->nsolvables);
+  if (solv->installed)
+    {
+      Id obs, *obsp, p, po, ppo;
+      for (p = solv->installed->start; p < solv->installed->end; p++)
+	{
+	  s = pool->solvables + p;
+	  if (s->repo != solv->installed || !s->obsoletes)
+	    continue;
+	  if (solv->decisionmap[p] <= 0)
+	    continue;
+	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p))
+	    continue;
+	  obsp = s->repo->idarraydata + s->obsoletes;
+	  /* foreach obsoletes */
+	  while ((obs = *obsp++) != 0)
+	    FOR_PROVIDES(po, ppo, obs)
+	      MAPSET(&obsmap, po);
+	}
+    }
+
+  queue_init(&redoq);
+  queue_init(&disabledq);
+  goterase = 0;
+  /* disable all erase jobs (including weak "keep uninstalled" rules) */
+  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++)
+    {
+      if (r->d < 0)	/* disabled ? */
+	continue;
+      if (r->p >= 0)	/* install job? */
+	continue;
+      queue_push(&disabledq, i);
+      disablerule(solv, r);
+      goterase++;
+    }
+  
+  if (goterase)
+    {
+      enabledisablelearntrules(solv);
+      removedisabledconflicts(solv, &redoq);
+    }
+
+  /*
+   * find recommended packages
+   */
+    
+  /* if redoq.count == 0 we already found all recommended in the
+   * solver run */
+  if (redoq.count || solv->dontinstallrecommended || !solv->dontshowinstalledrecommended || solv->ignorealreadyrecommended)
+    {
+      Id rec, *recp, p, pp;
+
+      /* create map of all recommened packages */
+      solv->recommends_index = -1;
+      MAPZERO(&solv->recommendsmap);
+      for (i = 0; i < solv->decisionq.count; i++)
+	{
+	  p = solv->decisionq.elements[i];
+	  if (p < 0)
+	    continue;
+	  s = pool->solvables + p;
+	  if (s->recommends)
+	    {
+	      recp = s->repo->idarraydata + s->recommends;
+	      while ((rec = *recp++) != 0)
+		{
+		  FOR_PROVIDES(p, pp, rec)
+		    if (solv->decisionmap[p] > 0)
+		      break;
+		  if (p)
+		    {
+		      if (!solv->dontshowinstalledrecommended)
+			{
+			  FOR_PROVIDES(p, pp, rec)
+			    if (solv->decisionmap[p] > 0)
+			      MAPSET(&solv->recommendsmap, p);
+			}
+		      continue;	/* p != 0: already fulfilled */
+		    }
+		  FOR_PROVIDES(p, pp, rec)
+		    MAPSET(&solv->recommendsmap, p);
+		}
+	    }
+	}
+      for (i = 1; i < pool->nsolvables; i++)
+	{
+	  if (solv->decisionmap[i] < 0)
+	    continue;
+	  if (solv->decisionmap[i] > 0 && solv->dontshowinstalledrecommended)
+	    continue;
+          if (MAPTST(&obsmap, i))
+	    continue;
+	  s = pool->solvables + i;
+	  if (!MAPTST(&solv->recommendsmap, i))
+	    {
+	      if (!s->supplements)
+		continue;
+	      if (!pool_installable(pool, s))
+		continue;
+	      if (!solver_is_supplementing(solv, s))
+		continue;
+	    }
+	  if (solv->dontinstallrecommended)
+	    queue_push(&solv->recommendations, i);
+	  else
+	    queue_pushunique(&solv->recommendations, i);
+	}
+      /* we use MODE_SUGGEST here so that repo prio is ignored */
+      policy_filter_unwanted(solv, &solv->recommendations, POLICY_MODE_SUGGEST);
+    }
+
+  /*
+   * find suggested packages
+   */
+    
+  if (1)
+    {
+      Id sug, *sugp, p, pp;
+
+      /* create map of all suggests that are still open */
+      solv->recommends_index = -1;
+      MAPZERO(&solv->suggestsmap);
+      for (i = 0; i < solv->decisionq.count; i++)
+	{
+	  p = solv->decisionq.elements[i];
+	  if (p < 0)
+	    continue;
+	  s = pool->solvables + p;
+	  if (s->suggests)
+	    {
+	      sugp = s->repo->idarraydata + s->suggests;
+	      while ((sug = *sugp++) != 0)
+		{
+		  FOR_PROVIDES(p, pp, sug)
+		    if (solv->decisionmap[p] > 0)
+		      break;
+		  if (p)
+		    {
+		      if (!solv->dontshowinstalledrecommended)
+			{
+			  FOR_PROVIDES(p, pp, sug)
+			    if (solv->decisionmap[p] > 0)
+			      MAPSET(&solv->suggestsmap, p);
+			}
+		      continue;	/* already fulfilled */
+		    }
+		  FOR_PROVIDES(p, pp, sug)
+		    MAPSET(&solv->suggestsmap, p);
+		}
+	    }
+	}
+      for (i = 1; i < pool->nsolvables; i++)
+	{
+	  if (solv->decisionmap[i] < 0)
+	    continue;
+	  if (solv->decisionmap[i] > 0 && solv->dontshowinstalledrecommended)
+	    continue;
+          if (MAPTST(&obsmap, i))
+	    continue;
+	  s = pool->solvables + i;
+	  if (!MAPTST(&solv->suggestsmap, i))
+	    {
+	      if (!s->enhances)
+		continue;
+	      if (!pool_installable(pool, s))
+		continue;
+	      if (!solver_is_enhancing(solv, s))
+		continue;
+	    }
+	  queue_push(&solv->suggestions, i);
+	}
+      policy_filter_unwanted(solv, &solv->suggestions, POLICY_MODE_SUGGEST);
+    }
+
+  /* undo removedisabledconflicts */
+  if (redoq.count)
+    undo_removedisabledconflicts(solv, &redoq);
+  
+  /* undo job rule disabling */
+  for (i = 0; i < disabledq.count; i++)
+    enablerule(solv, solv->rules + disabledq.elements[i]);
+  map_free(&obsmap);
+}
+
 /*
  *
  * solve job queue
@@ -4420,9 +4627,8 @@ solver_solve(Solver *solv, Queue *job)
   Map addedmap;		       /* '1' == have rpm-rules for solvable */
   Map installcandidatemap;
   Id how, what, select, name, weak, p, pp, d;
-  Queue q, redoq;
+  Queue q;
   Solvable *s;
-  int goterase;
   Rule *r;
   int now, solve_start;
   int hasdupjob = 0;
@@ -4886,169 +5092,20 @@ solver_solve(Solver *solv, Queue *job)
   run_solver(solv, 1, solv->dontinstallrecommended ? 0 : 1);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver took %d ms\n", sat_timems(now));
 
-  queue_init(&redoq);
-  goterase = 0;
-  /* disable all erase jobs (including weak "keep uninstalled" rules) */
-  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++)
-    {
-      if (r->d < 0)	/* disabled ? */
-	continue;
-      if (r->p > 0)	/* install job? */
-	continue;
-      disablerule(solv, r);
-      goterase++;
-    }
-  
-  if (goterase)
-    {
-      enabledisablelearntrules(solv);
-      removedisabledconflicts(solv, &redoq);
-    }
+  /*
+   * calculate recommended/suggested packages
+   */
+  findrecommendedsuggested(solv);
 
   /*
-   * find recommended packages
+   * if unsolvable, prepare solutions
    */
-    
-  /* if redoq.count == 0 we already found all recommended in the
-   * solver run */
-  if (redoq.count || solv->dontinstallrecommended || !solv->dontshowinstalledrecommended || solv->ignorealreadyrecommended)
-    {
-      Id rec, *recp, p, pp;
-
-      /* create map of all recommened packages */
-      solv->recommends_index = -1;
-      MAPZERO(&solv->recommendsmap);
-      for (i = 0; i < solv->decisionq.count; i++)
-	{
-	  p = solv->decisionq.elements[i];
-	  if (p < 0)
-	    continue;
-	  s = pool->solvables + p;
-	  if (s->recommends)
-	    {
-	      recp = s->repo->idarraydata + s->recommends;
-	      while ((rec = *recp++) != 0)
-		{
-		  FOR_PROVIDES(p, pp, rec)
-		    if (solv->decisionmap[p] > 0)
-		      break;
-		  if (p)
-		    {
-		      if (!solv->dontshowinstalledrecommended)
-			{
-			  FOR_PROVIDES(p, pp, rec)
-			    if (solv->decisionmap[p] > 0)
-			      MAPSET(&solv->recommendsmap, p);
-			}
-		      continue;	/* p != 0: already fulfilled */
-		    }
-		  FOR_PROVIDES(p, pp, rec)
-		    MAPSET(&solv->recommendsmap, p);
-		}
-	    }
-	}
-      for (i = 1; i < pool->nsolvables; i++)
-	{
-	  if (solv->decisionmap[i] < 0)
-	    continue;
-	  if (solv->decisionmap[i] > 0 && solv->dontshowinstalledrecommended)
-	    continue;
-	  s = pool->solvables + i;
-	  if (!MAPTST(&solv->recommendsmap, i))
-	    {
-	      if (!s->supplements)
-		continue;
-	      if (!pool_installable(pool, s))
-		continue;
-	      if (!solver_is_supplementing(solv, s))
-		continue;
-	    }
-	  if (solv->dontinstallrecommended)
-	    queue_push(&solv->recommendations, i);
-	  else
-	    queue_pushunique(&solv->recommendations, i);
-	}
-      /* we use MODE_SUGGEST here so that repo prio is ignored */
-      policy_filter_unwanted(solv, &solv->recommendations, POLICY_MODE_SUGGEST);
-    }
-
-  /*
-   * find suggested packages
-   */
-    
-  if (1)
-    {
-      Id sug, *sugp, p, pp;
-
-      /* create map of all suggests that are still open */
-      solv->recommends_index = -1;
-      MAPZERO(&solv->suggestsmap);
-      for (i = 0; i < solv->decisionq.count; i++)
-	{
-	  p = solv->decisionq.elements[i];
-	  if (p < 0)
-	    continue;
-	  s = pool->solvables + p;
-	  if (s->suggests)
-	    {
-	      sugp = s->repo->idarraydata + s->suggests;
-	      while ((sug = *sugp++) != 0)
-		{
-		  FOR_PROVIDES(p, pp, sug)
-		    if (solv->decisionmap[p] > 0)
-		      break;
-		  if (p)
-		    {
-		      if (!solv->dontshowinstalledrecommended)
-			{
-			  FOR_PROVIDES(p, pp, sug)
-			    if (solv->decisionmap[p] > 0)
-			      MAPSET(&solv->suggestsmap, p);
-			}
-		      continue;	/* already fulfilled */
-		    }
-		  FOR_PROVIDES(p, pp, sug)
-		    MAPSET(&solv->suggestsmap, p);
-		}
-	    }
-	}
-      for (i = 1; i < pool->nsolvables; i++)
-	{
-	  if (solv->decisionmap[i] < 0)
-	    continue;
-	  if (solv->decisionmap[i] > 0 && solv->dontshowinstalledrecommended)
-	    continue;
-	  s = pool->solvables + i;
-	  if (!MAPTST(&solv->suggestsmap, i))
-	    {
-	      if (!s->enhances)
-		continue;
-	      if (!pool_installable(pool, s))
-		continue;
-	      if (!solver_is_enhancing(solv, s))
-		continue;
-	    }
-	  queue_push(&solv->suggestions, i);
-	}
-      policy_filter_unwanted(solv, &solv->suggestions, POLICY_MODE_SUGGEST);
-    }
-
-  if (redoq.count)
-    {
-      /* restore decisionmap */
-      for (i = 0; i < redoq.count; i += 2)
-	solv->decisionmap[redoq.elements[i]] = redoq.elements[i + 1];
-    }
-
-    /*
-     * if unsolvable, prepare solutions
-     */
-
   if (solv->problems.count)
     {
+      Queue redoq;
       int recocount = solv->recommendations.count;
       solv->recommendations.count = 0;	/* so that revert() doesn't mess with it */
-      queue_empty(&redoq);
+      queue_init(&redoq);
       for (i = 0; i < solv->decisionq.count; i++)
 	{
 	  Id p = solv->decisionq.elements[i];
@@ -5068,9 +5125,9 @@ solver_solve(Solver *solv, Queue *job)
 	  solv->decisionmap[p > 0 ? p : -p] = redoq.elements[i + 2];
 	}
       solv->recommendations.count = recocount;
+      queue_free(&redoq);
     }
 
-  queue_free(&redoq);
   POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
 }

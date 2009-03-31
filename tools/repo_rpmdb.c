@@ -782,11 +782,11 @@ addsourcerpm(Pool *pool, Repodata *data, Id handle, char *sourcerpm, char *name,
     repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
   else
     repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
-  if (!strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
+  if (evr && !strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
     repodata_set_void(data, handle, SOLVABLE_SOURCEEVR);
   else
     repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
-  if (!strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
+  if (name && !strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
     repodata_set_void(data, handle, SOLVABLE_SOURCENAME);
   else
     repodata_set_id(data, handle, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
