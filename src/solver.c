@@ -2639,12 +2639,14 @@ solver_create(Pool *pool)
 void
 solver_free(Solver *solv)
 {
+  queue_free(&solv->job);
   queue_free(&solv->ruletojob);
   queue_free(&solv->decisionq);
   queue_free(&solv->decisionq_why);
   queue_free(&solv->learnt_why);
   queue_free(&solv->learnt_pool);
   queue_free(&solv->problems);
+  queue_free(&solv->solutions);
   queue_free(&solv->suggestions);
   queue_free(&solv->recommendations);
   queue_free(&solv->orphaned);
@@ -3385,7 +3387,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 /* FIXME: think about conflicting assertions */
 
 static void
-refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
+refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined, int essentialok)
 {
   Pool *pool = solv->pool;
   int i, j;
@@ -3403,8 +3405,10 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	  solver_printproblem(solv, problem[i]);
 	}
     }
-  queue_init(&disabled);
   queue_empty(refined);
+  if (!essentialok && sug < 0 && (job->elements[-sug - 1] & SOLVER_ESSENTIAL) != 0)
+    return;
+  queue_init(&disabled);
   queue_push(refined, sug);
 
   /* re-enable all problem rules with the exception of "sug"(gestion) */
@@ -3464,7 +3468,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined)
 	    nupdate++;
 	  else
 	    {
-	      if ((job->elements[-v -1] & SOLVER_ESSENTIAL) != 0)
+	      if (!essentialok && (job->elements[-v -1] & SOLVER_ESSENTIAL) != 0)
 		continue;	/* not that one! */
 	      njob++;
 	    }
@@ -3576,303 +3580,274 @@ problems_sortcmp(const void *ap, const void *bp)
   return a - b;
 }
 
-
-/*-------------------------------------------------------------------
- * sort problems
+/*
+ * convert a solution rule into a job modifier
  */
-
 static void
-problems_sort(Solver *solv, Queue *job)
-{
-  int i, j;
-  if (!solv->problems.count)
-    return;
-  for (i = j = 1; i < solv->problems.count; i++)
-    {
-      if (!solv->problems.elements[i])
-	{
-	  if (i > j + 1)
-	    {
-	      problems_sort_data = job;
-	      qsort(solv->problems.elements + j, i - j, sizeof(Id), problems_sortcmp);
-	    }
-	  if (++i == solv->problems.count)
-	    break;
-	  j = i + 1;
-	}
-    }
-}
-
-
-/*-------------------------------------------------------------------
- * convert problems to solutions
- */
-
-static void
-problems_to_solutions(Solver *solv, Queue *job)
+convertsolution(Solver *solv, Id why, Queue *solutionq)
 {
   Pool *pool = solv->pool;
-  Queue problems;
-  Queue solution;
-  Queue solutions;
-  Id *problem;
-  Id why;
-  int i, j, nsol, probsolved;
-  unsigned int now, refnow;
-
-  if (!solv->problems.count)
-    return;
-  now = sat_timems(0);
-  problems_sort(solv, job);
-  queue_clone(&problems, &solv->problems);
-  queue_init(&solution);
-  queue_init(&solutions);
-  /* copy over proof index */
-  queue_push(&solutions, problems.elements[0]);
-  problem = problems.elements + 1;
-  probsolved = 0;
-  refnow = sat_timems(0);
-  for (i = 1; i < problems.count; i++)
+  if (why < 0)
     {
-      Id v = problems.elements[i];
-      if (v == 0)
-	{
-	  /* mark end of this problem */
-	  queue_push(&solutions, 0);
-	  queue_push(&solutions, 0);
-	  POOL_DEBUG(SAT_DEBUG_STATS, "refining took %d ms\n", sat_timems(refnow));
-	  if (i + 1 == problems.count)
+      queue_push(solutionq, 0);
+      queue_push(solutionq, -why);
+      return;
+    }
+  if (why >= solv->infarchrules && why < solv->infarchrules_end)
+    {
+      Id p, name;
+      /* infarch rule, find replacement */
+      assert(solv->rules[why].p < 0);
+      name = pool->solvables[-solv->rules[why].p].name;
+      while (why > solv->infarchrules && pool->solvables[-solv->rules[why - 1].p].name == name)
+	why--;
+      p = 0;
+      for (; why < solv->infarchrules_end && pool->solvables[-solv->rules[why].p].name == name; why++)
+	if (solv->decisionmap[-solv->rules[why].p] > 0)
+	  {
+	    p = -solv->rules[why].p;
 	    break;
-	  /* copy over proof of next problem */
-          queue_push(&solutions, problems.elements[i + 1]);
-	  i++;
-	  problem = problems.elements + i + 1;
-	  refnow = sat_timems(0);
-	  probsolved = 0;
+	  }
+      if (!p)
+	p = -solv->rules[why].p; /* XXX: what to do here? */
+      queue_push(solutionq, SOLVER_SOLUTION_INFARCH);
+      queue_push(solutionq, p);
+      return;
+    }
+  if (why >= solv->duprules && why < solv->duprules_end)
+    {
+      Id p, name;
+      /* dist upgrade rule, find replacement */
+      assert(solv->rules[why].p < 0);
+      name = pool->solvables[-solv->rules[why].p].name;
+      while (why > solv->duprules && pool->solvables[-solv->rules[why - 1].p].name == name)
+	why--;
+      p = 0;
+      for (; why < solv->duprules_end && pool->solvables[-solv->rules[why].p].name == name; why++)
+	if (solv->decisionmap[-solv->rules[why].p] > 0)
+	  {
+	    p = -solv->rules[why].p;
+	    break;
+	  }
+      if (!p)
+	p = -solv->rules[why].p; /* XXX: what to do here? */
+      queue_push(solutionq, SOLVER_SOLUTION_DISTUPGRADE);
+      queue_push(solutionq, p);
+      return;
+    }
+  if (why >= solv->updaterules && why < solv->updaterules_end)
+    {
+      /* update rule, find replacement package */
+      Id p, *dp, rp = 0;
+      Rule *rr;
+
+      assert(why >= solv->updaterules && why < solv->updaterules_end);
+      /* check if this is a false positive, i.e. the update rule is fulfilled */
+      rr = solv->rules + why;
+      FOR_RULELITERALS(p, dp, rr)
+	if (p > 0 && solv->decisionmap[p] > 0)
+	  break;
+      if (p)
+	return;		/* false alarm */
+
+      p = solv->installed->start + (why - solv->updaterules);
+      rr = solv->rules + solv->featurerules + (why - solv->updaterules);
+      if (!rr->p)
+	rr = solv->rules + why;
+      if (solv->distupgrade && solv->rules[why].p != p && solv->decisionmap[p] > 0)
+	{
+	  /* distupgrade case, allow to keep old package */
+	  queue_push(solutionq, p);
+	  queue_push(solutionq, p);
+	  return;
+	}
+      if (solv->decisionmap[p] > 0)
+	return;		/* false alarm, turned out we can keep the package */
+      if (rr->w2)
+	{
+	  int mvrp = 0;		/* multi-version replacement */
+	  FOR_RULELITERALS(rp, dp, rr)
+	    {
+	      if (rp > 0 && solv->decisionmap[rp] > 0 && pool->solvables[rp].repo != solv->installed)
+		{
+		  mvrp = rp;
+		  if (!(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, rp)))
+		    break;
+		}
+	    }
+	  if (!rp && mvrp)
+	    {
+	      /* found only multi-version replacements */
+	      /* have to split solution into two parts */
+	      queue_push(solutionq, p);
+	      queue_push(solutionq, mvrp);
+	    }
+	}
+      queue_push(solutionq, p);
+      queue_push(solutionq, rp);
+      return;
+    }
+}
+
+/*
+ * refine the simple solution rule list provided by
+ * the solver into multiple lists of job modifiers.
+ */
+static void
+create_solutions(Solver *solv, int probnr, int solidx)
+{
+  Pool *pool = solv->pool;
+  Queue redoq;
+  Queue problem, solution, problems_save;
+  int i, j, nsol;
+  int essentialok;
+  int recocount;
+  unsigned int now;
+
+  now = sat_timems(0);
+  recocount = solv->recommendations.count;
+  solv->recommendations.count = 0;	/* so that revert() doesn't mess with it */
+  queue_init(&redoq);
+  /* save decisionq, decisionq_why, decisionmap */
+  for (i = 0; i < solv->decisionq.count; i++)
+    {
+      Id p = solv->decisionq.elements[i];
+      queue_push(&redoq, p);
+      queue_push(&redoq, solv->decisionq_why.elements[i]);
+      queue_push(&redoq, solv->decisionmap[p > 0 ? p : -p]);
+    }
+  /* save problems queue */
+  problems_save = solv->problems;
+  memset(&solv->problems, 0, sizeof(solv->problems));
+
+  /* extract problem from queue */
+  queue_init(&problem);
+  for (i = solidx + 1; i < solv->solutions.count; i++)
+    {
+      Id v = solv->solutions.elements[i];
+      if (!v)
+	break;
+      queue_push(&problem, v);
+    }
+  problems_sort_data = &solv->job;
+  if (problem.count > 1)
+    qsort(problem.elements, problem.count, sizeof(Id), problems_sortcmp);
+  queue_push(&problem, 0);	/* mark end for refine_suggestion */
+  problem.count--;
+#if 0
+  for (i = 0; i < problem.count; i++)
+    printf("PP %d %d\n", i, problem.elements[i]);
+#endif
+
+  /* refine each solution element */
+  nsol = 0;
+  essentialok = 0;
+  queue_init(&solution);
+  for (i = 0; i < problem.count; i++)
+    {
+      int solstart = solv->solutions.count;
+      refine_suggestion(solv, &solv->job, problem.elements, problem.elements[i], &solution, essentialok);
+      queue_push(&solv->solutions, 0);	/* reserve room for number of elements */
+      for (j = 0; j < solution.count; j++)
+	convertsolution(solv, solution.elements[j], &solv->solutions);
+      if (solv->solutions.count == solstart + 1)
+	{
+	  solv->solutions.count--;
+	  if (!essentialok && i + 1 == problem.count)
+	    {
+	      /* nothing found, start over */
+	      essentialok = 1;
+	      i = -1;
+	    }
 	  continue;
 	}
-      if (v < 0 && (job->elements[-v - 1] & SOLVER_ESSENTIAL))
-	{
-	  /* essential job, skip if we already have a non-essential
-             solution */
-	  if (probsolved > 0)
-	    continue;
-	  probsolved = -1;	/* show all solutions */
-	}
-      refine_suggestion(solv, job, problem, v, &solution);
-      if (!solution.count)
-	continue;	/* this solution didn't work out */
-
-      nsol = 0;
-      for (j = 0; j < solution.count; j++)
-	{
-	  why = solution.elements[j];
-	  /* must be either job descriptor or update rule */
-#if 0
-	  solver_printproblem(solv, why);
-#endif
-	  if (why < 0)
-	    {
-	      /* job descriptor */
-	      queue_push(&solutions, 0);
-	      queue_push(&solutions, -why);
-	    }
-	  else if (why >= solv->infarchrules && why < solv->infarchrules_end)
-	    {
-	      Id p, name;
-	      /* infarch rule, find replacement */
-	      assert(solv->rules[why].p < 0);
-	      name = pool->solvables[-solv->rules[why].p].name;
-	      while (why > solv->infarchrules && pool->solvables[-solv->rules[why - 1].p].name == name)
-		why--;
-	      p = 0;
-	      for (; why < solv->infarchrules_end && pool->solvables[-solv->rules[why].p].name == name; why++)
-		if (solv->decisionmap[-solv->rules[why].p] > 0)
-		  {
-		    p = -solv->rules[why].p;
-		    break;
-		  }
-	      if (!p)
-		p = -solv->rules[why].p; /* XXX: what to do here? */
-	      queue_push(&solutions, SOLVER_SOLUTION_INFARCH);
-	      queue_push(&solutions, p);
-	    }
-	  else if (why >= solv->duprules && why < solv->duprules_end)
-	    {
-	      Id p, name;
-	      /* dist upgrade rule, find replacement */
-	      assert(solv->rules[why].p < 0);
-	      name = pool->solvables[-solv->rules[why].p].name;
-	      while (why > solv->duprules && pool->solvables[-solv->rules[why - 1].p].name == name)
-		why--;
-	      p = 0;
-	      for (; why < solv->duprules_end && pool->solvables[-solv->rules[why].p].name == name; why++)
-		if (solv->decisionmap[-solv->rules[why].p] > 0)
-		  {
-		    p = -solv->rules[why].p;
-		    break;
-		  }
-	      if (!p)
-		p = -solv->rules[why].p; /* XXX: what to do here? */
-	      queue_push(&solutions, SOLVER_SOLUTION_DISTUPGRADE);
-	      queue_push(&solutions, p);
-	    }
-	  else
-	    {
-	      /* update rule, find replacement package */
-	      Id p, *dp, rp = 0;
-	      Rule *rr;
-
-	      assert(why >= solv->updaterules && why < solv->updaterules_end);
-	      /* check if this is a false positive, i.e. the update rule is fulfilled */
-	      rr = solv->rules + why;
-	      FOR_RULELITERALS(p, dp, rr)
-		if (p > 0 && solv->decisionmap[p] > 0)
-		  break;
-	      if (p)
-		continue;	/* false alarm */
-
-	      p = solv->installed->start + (why - solv->updaterules);
-	      rr = solv->rules + solv->featurerules + (why - solv->updaterules);
-	      if (!rr->p)
-		rr = solv->rules + why;
-	      if (solv->distupgrade && solv->rules[why].p != p && solv->decisionmap[p] > 0)
-		{
-		  /* distupgrade case, allow to keep old package */
-		  queue_push(&solutions, p);
-		  queue_push(&solutions, p);
-		  nsol++;
-		  continue;
-		}
-	      if (solv->decisionmap[p] > 0)
-		continue;	/* false alarm, turned out we can keep the package */
-	      if (rr->w2)
-		{
-		  int mvrp = 0;		/* multi-version replacement */
-	          FOR_RULELITERALS(rp, dp, rr)
-		    {
-		      if (rp > 0 && solv->decisionmap[rp] > 0 && pool->solvables[rp].repo != solv->installed)
-			{
-			  mvrp = rp;
-			  if (!(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, rp)))
-			    break;
-			}
-		    }
-		  if (!rp && mvrp)
-		    {
-		      /* found only multi-version replacements */
-		      /* have to split solution into two parts */
-		      queue_push(&solutions, p);
-		      queue_push(&solutions, mvrp);
-		      nsol++;
-		    }
-		}
-	      queue_push(&solutions, p);
-	      queue_push(&solutions, rp);
-	    }
-	  nsol++;
-	}
-      /* mark end of this solution */
-      if (nsol)
-	{
-	  if (!probsolved)
-	    probsolved = 1;
-	  queue_push(&solutions, 0);
-	  queue_push(&solutions, 0);
-	}
-      else
-	{
-	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "Oops, everything was fine?\n");
-	}
+      /* patch in number of solution elements */
+      solv->solutions.elements[solstart] = (solv->solutions.count - (solstart + 1)) / 2;
+      queue_push(&solv->solutions, 0);	/* add end marker */
+      queue_push(&solv->solutions, 0);	/* add end marker */
+      solv->solutions.elements[solidx + 1 + nsol++] = solstart;
     }
+  solv->solutions.elements[solidx + 1 + nsol] = 0;	/* end marker */
+  solv->solutions.elements[solidx] = nsol;
+  queue_free(&problem);
   queue_free(&solution);
-  queue_free(&problems);
-  /* copy queue over to solutions */
+
+  /* restore decisions */
+  memset(solv->decisionmap, 0, pool->nsolvables * sizeof(Id));
+  queue_empty(&solv->decisionq);
+  queue_empty(&solv->decisionq_why);
+  for (i = 0; i < redoq.count; i += 3)
+    {
+      Id p = redoq.elements[i];
+      queue_push(&solv->decisionq, p);
+      queue_push(&solv->decisionq_why, redoq.elements[i + 1]);
+      solv->decisionmap[p > 0 ? p : -p] = redoq.elements[i + 2];
+    }
+  solv->recommendations.count = recocount;
+  queue_free(&redoq);
+  /* restore problems */
   queue_free(&solv->problems);
-  queue_clone(&solv->problems, &solutions);
-
-  /* bring solver back into problem state */
-  revert(solv, 1);		/* XXX move to reset_solver? */
-  reset_solver(solv);
-
-  assert(solv->problems.count == solutions.count);
-  queue_free(&solutions);
-  POOL_DEBUG(SAT_DEBUG_STATS, "problems_to_solutions took %d ms\n", sat_timems(now));
+  solv->problems = problems_save;
+  POOL_DEBUG(SAT_DEBUG_STATS, "create_solutions for problem #%d took %d ms\n", probnr, sat_timems(now));
 }
 
 
-/*-------------------------------------------------------------------
- * 
- * problem iterator
- * 
- * advance to next problem
- */
+/**************************************************************************/
+
+Id
+solver_problem_count(Solver *solv)
+{
+  return solv->problems.count / 2;
+}
 
 Id
 solver_next_problem(Solver *solv, Id problem)
 {
-  Id *pp;
-  if (problem == 0)
+  if (!problem)
     return solv->problems.count ? 1 : 0;
-  pp = solv->problems.elements + problem;
-  while (pp[0] || pp[1])
-    {
-      /* solution */
-      pp += 2;
-      while (pp[0] || pp[1])
-        pp += 2;
-      pp += 2;
-    }
-  pp += 2;
-  problem = pp - solv->problems.elements;
-  if (problem >= solv->problems.count)
-    return 0;
-  return problem + 1;
+  return (problem + 1) * 2 - 1 < solv->problems.count ? problem + 1 : 0;
 }
 
-
-/*-------------------------------------------------------------------
- * 
- * solution iterator
- */
+Id
+solver_solution_count(Solver *solv, Id problem)
+{
+  Id solidx = solv->problems.elements[problem * 2 - 1];
+  if (solv->solutions.elements[solidx] < 0)
+    create_solutions(solv, problem, solidx);
+  return solv->solutions.elements[solidx];
+}
 
 Id
 solver_next_solution(Solver *solv, Id problem, Id solution)
 {
-  Id *pp;
-  if (solution == 0)
-    {
-      solution = problem;
-      pp = solv->problems.elements + solution;
-      return pp[0] || pp[1] ? solution : 0;
-    }
-  pp = solv->problems.elements + solution;
-  while (pp[0] || pp[1])
-    pp += 2;
-  pp += 2;
-  solution = pp - solv->problems.elements;
-  return pp[0] || pp[1] ? solution : 0;
+  Id solidx = solv->problems.elements[problem * 2 - 1];
+  if (solv->solutions.elements[solidx] < 0)
+    create_solutions(solv, problem, solidx);
+  return solv->solutions.elements[solidx + solution + 1] ? solution + 1 : 0;
 }
 
-
-/*-------------------------------------------------------------------
- * 
- * solution element iterator
- */
+Id
+solver_solutionelement_count(Solver *solv, Id problem, Id solution)
+{
+  Id solidx = solv->problems.elements[problem * 2 - 1];
+  solidx = solv->solutions.elements[solidx + solution];
+  return solv->solutions.elements[solidx];
+}
 
 Id
 solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp)
 {
-  Id *pp;
-  element = element ? element + 2 : solution;
-  pp = solv->problems.elements + element;
-  if (!(pp[0] || pp[1]))
+  Id solidx = solv->problems.elements[problem * 2 - 1];
+  solidx = solv->solutions.elements[solidx + solution];
+  if (!solidx)
     return 0;
-  *p = pp[0];
-  *rp = pp[1];
-  return element;
+  solidx += 1 + element * 2;
+  if (!solv->solutions.elements[solidx] && !solv->solutions.elements[solidx + 1])
+    return 0;
+  *p = solv->solutions.elements[solidx];
+  *rp = solv->solutions.elements[solidx + 1];
+  return element + 1;
 }
-
 
 /*-------------------------------------------------------------------
  * 
@@ -3961,7 +3936,7 @@ Id
 solver_findproblemrule(Solver *solv, Id problem)
 {
   Id reqr, conr, sysr, jobr;
-  Id idx = solv->problems.elements[problem - 1];
+  Id idx = solv->problems.elements[2 * problem - 2];
   reqr = conr = sysr = jobr = 0;
   findproblemrule_internal(solv, idx, &reqr, &conr, &sysr, &jobr);
   if (reqr)
@@ -3994,7 +3969,7 @@ void
 solver_findallproblemrules(Solver *solv, Id problem, Queue *rules)
 {
   queue_empty(rules);
-  findallproblemrules_internal(solv, solv->problems.elements[problem - 1], rules);
+  findallproblemrules_internal(solv, solv->problems.elements[2 * problem - 2], rules);
 }
 
 
@@ -4604,10 +4579,12 @@ findrecommendedsuggested(Solver *solv)
   /* undo removedisabledconflicts */
   if (redoq.count)
     undo_removedisabledconflicts(solv, &redoq);
+  queue_free(&redoq);
   
   /* undo job rule disabling */
   for (i = 0; i < disabledq.count; i++)
     enablerule(solv, solv->rules + disabledq.elements[i]);
+  queue_free(&disabledq);
   map_free(&obsmap);
 }
 
@@ -5098,37 +5075,29 @@ solver_solve(Solver *solv, Queue *job)
   findrecommendedsuggested(solv);
 
   /*
-   * if unsolvable, prepare solutions
+   * if unsolvable, prepare solution queue
    */
   if (solv->problems.count)
     {
-      Queue redoq;
-      int recocount = solv->recommendations.count;
-      solv->recommendations.count = 0;	/* so that revert() doesn't mess with it */
-      queue_init(&redoq);
-      for (i = 0; i < solv->decisionq.count; i++)
+      int j = 1, idx = 1;
+      queue_push(&solv->solutions, 0);
+      queue_push(&solv->solutions, -1);	/* unrefined */
+      for (i = 1; i < solv->problems.count; i++)
 	{
-	  Id p = solv->decisionq.elements[i];
-	  queue_push(&redoq, p);
-	  queue_push(&redoq, solv->decisionq_why.elements[i]);
-	  queue_push(&redoq, solv->decisionmap[p > 0 ? p : -p]);
+	  Id p = solv->problems.elements[i];
+	  queue_push(&solv->solutions, p);
+	  if (p)
+	    continue;
+	  solv->problems.elements[j++] = idx;
+	  if (i + 1 >= solv->problems.count)
+	    break;
+	  solv->problems.elements[j++] = solv->problems.elements[++i];	/* copy proofidx */
+	  idx = solv->solutions.count;
+	  queue_push(&solv->solutions, -1);
 	}
-      problems_to_solutions(solv, job);
-      memset(solv->decisionmap, 0, pool->nsolvables * sizeof(Id));
-      queue_empty(&solv->decisionq);
-      queue_empty(&solv->decisionq_why);
-      for (i = 0; i < redoq.count; i += 3)
-	{
-	  Id p = redoq.elements[i];
-	  queue_push(&solv->decisionq, p);
-	  queue_push(&solv->decisionq_why, redoq.elements[i + 1]);
-	  solv->decisionmap[p > 0 ? p : -p] = redoq.elements[i + 2];
-	}
-      solv->recommendations.count = recocount;
-      queue_free(&redoq);
+      solv->problems.count = j;
     }
-
-  POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d learned rules, %d unsolvable\n", solv->stats_learned, solv->stats_unsolvable);
+  POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d problems, %d learned rules, %d unsolvable\n", solv->problems.count / 2, solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
 }
 

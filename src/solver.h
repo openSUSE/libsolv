@@ -132,7 +132,9 @@ typedef struct solver {
 
   int propagate_index;                  /* index into decisionq for non-propagated decisions */
 
-  Queue problems;                       /* index of conflicting rules, < 0 for job rules */
+  Queue problems;                       /* list of lists of conflicting rules, < 0 for job rules */
+  Queue solutions;			/* refined problem storage space */
+
   Queue recommendations;		/* recommended packages */
   Queue suggestions;			/* suggested packages */
   Queue orphaned;			/* orphaned packages */
@@ -157,7 +159,7 @@ typedef struct solver {
   int allowarchchange;			/* allow to change architecture of installed solvables */
   int allowvendorchange;		/* allow to change vendor of installed solvables */
   int allowuninstall;			/* allow removal of installed solvables */
-  int updatesystem;			/* distupgrade */
+  int updatesystem;			/* update all packages to the newest version */
   int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
   int allowselfconflicts;		/* true: packages wich conflict with itself are installable */
   int obsoleteusesprovides;		/* true: obsoletes are matched against provides, not names */
@@ -329,8 +331,11 @@ extern void solver_solve(Solver *solv, Queue *job);
 extern int solver_dep_installed(Solver *solv, Id dep);
 extern int solver_splitprovides(Solver *solv, Id dep);
 
+extern Id solver_problem_count(Solver *solv);
 extern Id solver_next_problem(Solver *solv, Id problem);
+extern Id solver_solution_count(Solver *solv, Id problem);
 extern Id solver_next_solution(Solver *solv, Id problem, Id solution);
+extern Id solver_solutionelement_count(Solver *solv, Id problem, Id solution);
 extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
 extern Id solver_findproblemrule(Solver *solv, Id problem);
 extern void solver_findallproblemrules(Solver *solv, Id problem, Queue *rules);
