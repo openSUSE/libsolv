@@ -1,4 +1,29 @@
 -------------------------------------------------------------------
+Wed Apr  1 10:32:43 CEST 2009 - kkaempf@suse.de
+
+- 0.14.1
+  Core changes
+  - fix potential NULL deref in srcrpm handling (mls)
+  - clean up and fix suggested/recommended list creation code (mls)
+  - kill obsolete and broken patchxml support (mls)
+  - replace old solver_problemruleinfo with new solver_ruleinfo
+    function (mls)
+  - add solvable_selfprovidedep() function (mls)
+  - add noinfarchcheck solver option (mls)
+  - clone job queue to make the code more flexible (mls)
+  - rewrite policy rule disabling/re-enabling (bnc#481836) (mls)
+  - fix out-of-bounds in solver_printproblem() (mls)
+  Bindings changes
+  - provide 'Repo.attr(String)' accessor function (kkaempf)
+  - provide 'Solver.sizechange' to compute the changes of the
+    installed size after a transaction is applied (kkaempf)
+  - solver result iterators for Python (jblunck)
+  - add %newobject to track newly created objects better (kkaempf)
+  - generate rdoc documentation from swig input files (kkaempf)
+  - add a no-op Pool destructor (bnc#483252) (kkaempf)
+  - provide access to all flags and settings (kkaempf)
+  
+-------------------------------------------------------------------
 Wed Mar  4 14:39:00 CET 2009 - mls@suse.de
 
 - fix problem_to_solutions segfault
