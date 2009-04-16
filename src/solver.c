@@ -2603,6 +2603,8 @@ solver_create(Pool *pool)
   solv->pool = pool;
   solv->installed = pool->installed;
 
+  queue_init(&solv->transaction);
+  queue_init(&solv->transaction_info);
   queue_init(&solv->ruletojob);
   queue_init(&solv->decisionq);
   queue_init(&solv->decisionq_why);
@@ -2639,6 +2641,8 @@ solver_create(Pool *pool)
 void
 solver_free(Solver *solv)
 {
+  queue_free(&solv->transaction);
+  queue_free(&solv->transaction_info);
   queue_free(&solv->job);
   queue_free(&solv->ruletojob);
   queue_free(&solv->decisionq);
@@ -4588,6 +4592,241 @@ findrecommendedsuggested(Solver *solv)
   map_free(&obsmap);
 }
 
+
+Solver *obsq_sortcmp_data;
+
+static int
+obsq_sortcmp(const void *ap, const void *bp)
+{
+  Id a, b, oa, ob;
+  Solver *solv = obsq_sortcmp_data;
+  Pool *pool = solv->pool;
+  Solvable *s, *oas, *obs;
+  int r;
+
+  a = ((Id *)ap)[0];
+  oa = ((Id *)ap)[1];
+  b = ((Id *)bp)[0];
+  ob = ((Id *)bp)[1];
+  if (a != b)
+    return a - b;
+  if (oa == ob)
+    return 0;
+  s = pool->solvables + a;
+  oas = pool->solvables + oa;
+  obs = pool->solvables + ob;
+  if (oas->name != obs->name)
+    {
+      if (oas->name == s->name)
+        return -1;
+      if (obs->name == s->name)
+        return 1;
+      return strcmp(id2str(pool, oas->name), id2str(pool, obs->name));
+    }
+  r = evrcmp(pool, oas->evr, obs->evr, EVRCMP_COMPARE);
+  if (r)
+    return -r;	/* highest version first */
+  return oa - ob;
+}
+
+void
+solver_transaction_info(Solver *solv, Id p, Queue *out)
+{
+  Pool *pool = solv->pool;
+  Solvable *s = pool->solvables + p;
+  Queue *ti = &solv->transaction_info;
+  int i;
+
+  queue_empty(out);
+  if (p <= 0 || !s->repo)
+    return;
+  if (s->repo == solv->installed)
+    {
+      /* find which packages obsolete us */
+      for (i = 0; i < ti->count; i += 2)
+	if (ti->elements[i + 1] == p)
+	  {
+	    queue_push(out, p);
+	    queue_push(out, ti->elements[i]);
+	  }
+      if (out->count > 2)
+	{
+	  /* sort obsoleters */
+	  obsq_sortcmp_data = solv;
+	  qsort(out->elements, out->count / 2, 2 * sizeof(Id), obsq_sortcmp);
+	}
+      for (i = 0; i < out->count; i += 2)
+	out->elements[i] = out->elements[i / 2 + 1];
+      out->count /= 2;
+    }
+  else
+    {
+      /* find the packages we obsolete */
+      for (i = 0; i < ti->count; i += 2)
+	{
+	  if (ti->elements[i] == p)
+	    queue_push(out, ti->elements[i + 1]);
+	  else if (out->count)
+	    break;
+	}
+    }
+}
+
+Id
+solver_transaction_pkg(Solver *solv, Id p)
+{
+  Queue ti;
+  Id tibuf[5];
+
+  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
+  solver_transaction_info(solv, p, &ti);
+  p = ti.count ? ti.elements[0] : 0;
+  queue_free(&ti);
+  return p;
+}
+
+static void
+create_transaction(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Queue *ti = &solv->transaction_info;
+  int i, j, r, noobs;
+  Id p, p2, pp2;
+  Solvable *s, *s2;
+
+  queue_empty(&solv->transaction);
+  queue_empty(ti);
+
+  /* first create obsoletes index */
+  if (installed)
+    {
+      for (i = 0; i < solv->decisionq.count; i++)
+	{
+	  p = solv->decisionq.elements[i];
+	  if (p <= 0 || p == SYSTEMSOLVABLE)
+	    continue;
+	  s = pool->solvables + p;
+	  if (s->repo == installed)
+	    continue;
+	  noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p);
+	  FOR_PROVIDES(p2, pp2, s->name)
+	    {
+	      if (solv->decisionmap[p2] > 0)
+		continue;
+	      s2 = pool->solvables + p2;
+	      if (s2->repo != installed)
+		continue;
+	      if (noobs && (s->name != s2->name || s->evr != s2->evr || s->arch != s2->arch))
+		continue;
+	      if (!solv->implicitobsoleteusesprovides && s->name != s2->name)
+		continue;
+	      queue_push(ti, p);
+	      queue_push(ti, p2);
+	    }
+	  if (s->obsoletes && !noobs)
+	    {
+	      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+	      while ((obs = *obsp++) != 0)
+		{
+		  FOR_PROVIDES(p2, pp2, obs)
+		    {
+		      s2 = pool->solvables + p2;
+		      if (s2->repo != installed)
+			continue;
+		      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+			continue;
+		      queue_push(ti, p);
+		      queue_push(ti, p2);
+		    }
+		}
+	    }
+	}
+      obsq_sortcmp_data = solv;
+      qsort(ti->elements, ti->count / 2, 2 * sizeof(Id), obsq_sortcmp);
+      /* now unify */
+      for (i = j = 0; i < ti->count; i += 2)
+	{
+	  if (j && ti->elements[i] == ti->elements[j - 2] && ti->elements[i + 1] == ti->elements[j - 1])
+	    continue;
+	  ti->elements[j++] = ti->elements[i];
+	  ti->elements[j++] = ti->elements[i + 1];
+	}
+      ti->count = j;
+    }
+
+  if (installed)
+    {
+      FOR_REPO_SOLVABLES(installed, p, s)
+	{
+	  if (solv->decisionmap[p] > 0)
+	    continue;
+	  p2 = solver_transaction_pkg(solv, p);
+	  if (!p2)
+	    queue_push(&solv->transaction, SOLVER_TRANSACTION_ERASE);
+	  else
+	    {
+	      s2 = pool->solvables + p2;
+	      if (s->name == s2->name)
+		{
+		  if (s->evr == s2->evr && solvable_identical(s, s2))
+		    queue_push(&solv->transaction, SOLVER_TRANSACTION_REINSTALLED);
+		  else
+		    {
+		      r = evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
+		      if (r < 0)
+			queue_push(&solv->transaction, SOLVER_TRANSACTION_UPGRADED);
+		      else if (r > 0)
+			queue_push(&solv->transaction, SOLVER_TRANSACTION_DOWNGRADED);
+		      else
+			queue_push(&solv->transaction, SOLVER_TRANSACTION_CHANGED);
+		    }
+		}
+	      else
+		queue_push(&solv->transaction, SOLVER_TRANSACTION_OBSOLETED);
+	    }
+	  queue_push(&solv->transaction, p);
+	}
+    }
+  for (i = 0; i < solv->decisionq.count; i++)
+    {
+      p = solv->decisionq.elements[i];
+      if (p < 0 || p == SYSTEMSOLVABLE)
+	continue;
+      s = pool->solvables + p;
+      if (solv->installed && s->repo == solv->installed)
+	continue;
+      noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p);
+      p2 = solver_transaction_pkg(solv, p);
+      if (noobs)
+	queue_push(&solv->transaction, p2 ? SOLVER_TRANSACTION_MULTIREINSTALL : SOLVER_TRANSACTION_MULTIINSTALL);
+      else if (!p2)
+	queue_push(&solv->transaction, SOLVER_TRANSACTION_INSTALL);
+      else
+	{
+	  s2 = pool->solvables + p2;
+	  if (s->name == s2->name)
+	    {
+	      if (s->evr == s2->evr && solvable_identical(s, s2))
+		queue_push(&solv->transaction, SOLVER_TRANSACTION_REINSTALL);
+	      else
+		{
+		  r = evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
+		  if (r > 0)
+		    queue_push(&solv->transaction, SOLVER_TRANSACTION_UPGRADE);
+		  else if (r < 0)
+		    queue_push(&solv->transaction, SOLVER_TRANSACTION_DOWNGRADE);
+		  else
+		    queue_push(&solv->transaction, SOLVER_TRANSACTION_CHANGE);
+		}
+	    }
+	  else
+	    queue_push(&solv->transaction, SOLVER_TRANSACTION_RENAME);
+	}
+      queue_push(&solv->transaction, p);
+    }
+}
+
 /*
  *
  * solve job queue
@@ -5097,6 +5336,12 @@ solver_solve(Solver *solv, Queue *job)
 	}
       solv->problems.count = j;
     }
+
+  /*
+   * finally prepare transaction info
+   */
+  create_transaction(solv);
+
   POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d problems, %d learned rules, %d unsolvable\n", solv->problems.count / 2, solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
 }

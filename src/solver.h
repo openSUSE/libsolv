@@ -63,6 +63,9 @@ typedef struct solver {
   Pool *pool;
   Queue job;				/* copy of the job we're solving */
 
+  Queue transaction;			/* solver result */
+  Queue transaction_info;		/* transaction obsoletes info */
+
   Repo *installed;			/* copy of pool->installed */
   
   /* list of rules, ordered
@@ -325,9 +328,30 @@ typedef enum {
 #define SOLVER_SOLUTION_DISTUPGRADE	(-1)
 #define SOLVER_SOLUTION_INFARCH		(-2)
 
+#define SOLVER_TRANSACTION_ERASE		0x10
+#define SOLVER_TRANSACTION_REINSTALLED		0x11
+#define SOLVER_TRANSACTION_DOWNGRADED		0x12
+#define SOLVER_TRANSACTION_CHANGED		0x13
+#define SOLVER_TRANSACTION_UPGRADED		0x14
+#define SOLVER_TRANSACTION_OBSOLETED		0x15
+
+#define SOLVER_TRANSACTION_INSTALL		0x20
+#define SOLVER_TRANSACTION_REINSTALL		0x21
+#define SOLVER_TRANSACTION_DOWNGRADE		0x22
+#define SOLVER_TRANSACTION_CHANGE		0x23
+#define SOLVER_TRANSACTION_UPGRADE		0x24
+#define SOLVER_TRANSACTION_RENAME		0x25
+
+#define SOLVER_TRANSACTION_MULTIINSTALL		0x30
+#define SOLVER_TRANSACTION_MULTIREINSTALL	0x31
+
+
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern void solver_solve(Solver *solv, Queue *job);
+extern void solver_transaction_info(Solver *solv, Id p, Queue *info);
+extern Id solver_transaction_pkg(Solver *solv, Id p);
+
 extern int solver_dep_installed(Solver *solv, Id dep);
 extern int solver_splitprovides(Solver *solv, Id dep);
 

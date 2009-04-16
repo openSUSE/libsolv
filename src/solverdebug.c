@@ -253,9 +253,10 @@ solver_printdecisions(Solver *solv)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
-  Id p, *obsoletesmap = solver_create_decisions_obsoletesmap(solv);
-  int i;
+  Id p;
+  int i, j;
   Solvable *s;
+  Queue iq;
 
   IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
     {
@@ -271,64 +272,68 @@ solver_printdecisions(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
   POOL_DEBUG(SAT_DEBUG_RESULT, "transaction:\n");
 
-  /* print solvables to be erased */
-
-  if (installed)
+  queue_init(&iq);
+  for (i = 0; i < solv->transaction.count; i += 2)
     {
-      FOR_REPO_SOLVABLES(installed, p, s)
-	{
-	  if (solv->decisionmap[p] > 0)
-	    continue;
-	  if (obsoletesmap[p])
-	    continue;
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "  erase     %s\n", solvable2str(pool, s));
-	}
-    }
-
-  /* print solvables to be installed */
-
-  for (i = 0; i < solv->decisionq.count; i++)
-    {
-      int j;
-      p = solv->decisionq.elements[i];
-      if (p < 0)
-	continue;
-      if (p == SYSTEMSOLVABLE)
-	continue;
-      s = pool->solvables + p;
-      if (installed && s->repo == installed)
-	continue;
-
-      if (!obsoletesmap[p])
+      s = pool->solvables + solv->transaction.elements[i + 1];
+      switch(solv->transaction.elements[i])
         {
+	case SOLVER_TRANSACTION_MULTI_INSTALL:
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  multi install %s", solvable2str(pool, s));
+	  break;
+	case SOLVER_TRANSACTION_MULTI_REINSTALL:
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  multi reinstall %s", solvable2str(pool, s));
+	  break;
+	case SOLVER_TRANSACTION_INSTALL:
           POOL_DEBUG(SAT_DEBUG_RESULT, "  install   %s", solvable2str(pool, s));
+	  break;
+	case SOLVER_TRANSACTION_REINSTALL:
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  reinstall %s", solvable2str(pool, s));
+	  break;
+	case SOLVER_TRANSACTION_DOWNGRADE:
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  downgrade %s", solvable2str(pool, s));
+	  break;
+	case SOLVER_TRANSACTION_CHANGE:
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  change    %s", solvable2str(pool, s));
+	  break;
+	case SOLVER_TRANSACTION_UPGRADE:
+	case SOLVER_TRANSACTION_RENAME:
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  upgrade   %s", solvable2str(pool, s));
+	  break;
+	case SOLVER_TRANSACTION_ERASE:
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  erase     %s", solvable2str(pool, s));
+	  break;
+	default:
+	  break;
         }
-      else
-	{
-	  Id xp, xpp;
-	  FOR_PROVIDES(xp, xpp, s->name)
+      switch(solv->transaction.elements[i])
+        {
+	case SOLVER_TRANSACTION_INSTALL:
+	case SOLVER_TRANSACTION_ERASE:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
+	  break;
+	case SOLVER_TRANSACTION_REINSTALL:
+	case SOLVER_TRANSACTION_DOWNGRADE:
+	case SOLVER_TRANSACTION_CHANGE:
+	case SOLVER_TRANSACTION_UPGRADE:
+	case SOLVER_TRANSACTION_RENAME:
+	  solver_transaction_info(solv, solv->transaction.elements[i + 1], &iq);
+	  if (iq.count)
 	    {
-	      Solvable *s2 = pool->solvables + xp;
-	      if (s2->name != s->name)
-		continue;
-	      if (evrcmp(pool, s->evr, s2->evr, EVRCMP_MATCH_RELEASE) < 0)
-		break;
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  (obsoletes");
+	      for (j = 0; j < iq.count; j++)
+		POOL_DEBUG(SAT_DEBUG_RESULT, " %s", solvable2str(pool, pool->solvables + iq.elements[j]));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, ")");
 	    }
-	  if (xp)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  downgrade %s", solvable2str(pool, s));
-	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  upgrade   %s", solvable2str(pool, s));
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  (obsoletes");
-	  for (j = installed->start; j < installed->end; j++)
-	    if (obsoletesmap[j] == p)
-	      POOL_DEBUG(SAT_DEBUG_RESULT, " %s", solvable2str(pool, pool->solvables + j));
-	  POOL_DEBUG(SAT_DEBUG_RESULT, ")");
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
+	  break;
+	default:
+	  break;
 	}
-      POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
-  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
+  queue_free(&iq);
 
-  sat_free(obsoletesmap);
+  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
 
   if (solv->recommendations.count)
     {

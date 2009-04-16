@@ -1265,7 +1265,7 @@ dataiterator_step(Dataiterator *di)
 	      continue;
 	    }
 	  if (!datamatcher_match(&di->matcher, di->kv.str))
-	  continue;
+	    continue;
 	}
       /* found something! */
       return 1;

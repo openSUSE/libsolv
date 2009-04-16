@@ -586,18 +586,18 @@ set_sourcerpm(Repodata *data, Solvable *s, Id handle, char *sourcerpm)
     return;
   sevr = p + 1;
   pool = s->repo->pool;
-  name = id2str(pool, s->name);
-  evr = id2str(pool, s->evr);
   if (!strcmp(sarch, "src.rpm"))
     repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_SRC);
   else if (!strcmp(sarch, "nosrc.rpm"))
     repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
   else
     repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
+  evr = id2str(pool, s->evr);
   if (evr && !strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
     repodata_set_void(data, handle, SOLVABLE_SOURCEEVR);
   else
     repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
+  name = id2str(pool, s->name);
   if (name && !strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
     repodata_set_void(data, handle, SOLVABLE_SOURCENAME);
   else
