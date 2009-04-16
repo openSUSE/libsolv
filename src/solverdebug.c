@@ -278,10 +278,10 @@ solver_printdecisions(Solver *solv)
       s = pool->solvables + solv->transaction.elements[i + 1];
       switch(solv->transaction.elements[i])
         {
-	case SOLVER_TRANSACTION_MULTI_INSTALL:
+	case SOLVER_TRANSACTION_MULTIINSTALL:
           POOL_DEBUG(SAT_DEBUG_RESULT, "  multi install %s", solvable2str(pool, s));
 	  break;
-	case SOLVER_TRANSACTION_MULTI_REINSTALL:
+	case SOLVER_TRANSACTION_MULTIREINSTALL:
           POOL_DEBUG(SAT_DEBUG_RESULT, "  multi reinstall %s", solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
