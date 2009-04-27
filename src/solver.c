@@ -4227,9 +4227,10 @@ addinfarchrules(Solver *solv, Map *addedmap)
 	    break;
 	  a = ps->arch;
 	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
-	  if (a != 1 && pool->installed && ps->repo == pool->installed && !solv->distupgrade)
+	  if (a != 1 && pool->installed && ps->repo == pool->installed)
 	    {
-	      queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
+	      if (!solv->distupgrade)
+	        queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
 	      continue;		/* ignore installed solvables when calculating the best arch */
 	    }
 	  if (a && a != 1 && (!bestarch || a < bestarch))
