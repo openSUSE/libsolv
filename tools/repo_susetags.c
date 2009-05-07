@@ -177,6 +177,8 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
     }
   if (!strcasecmp(sp[0], "sha1"))
     l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
+  else if (!strcasecmp(sp[0], "sha256"))
+    l = SIZEOF_SHA256 * 2, type = REPOKEY_TYPE_SHA256;
   else if (!strcasecmp(sp[0], "md5"))
     l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
   else
