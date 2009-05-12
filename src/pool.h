@@ -179,6 +179,10 @@ static inline Solvable *pool_id2solvable(Pool *pool, Id p)
   return pool->solvables + p;
 }
 extern const char *solvable2str(Pool *pool, Solvable *s);
+static inline const char *solvid2str(Pool *pool, Id p)
+{
+  return solvable2str(pool, pool->solvables + p);
+}
 
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
 Id pool_id2langid(Pool *pool, Id id, const char *lang, int create);

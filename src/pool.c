@@ -132,13 +132,11 @@ pool_set_installed(Pool *pool, Repo *installed)
   pool_freewhatprovides(pool);
 }
 
-static Pool *pool_shrink_whatprovides_sortcmp_data;
-
 static int
-pool_shrink_whatprovides_sortcmp(const void *ap, const void *bp)
+pool_shrink_whatprovides_sortcmp(const void *ap, const void *bp, void *dp)
 {
   int r;
-  Pool *pool = pool_shrink_whatprovides_sortcmp_data;
+  Pool *pool = dp;
   Id oa, ob, *da, *db;
   oa = pool->whatprovides[*(Id *)ap];
   ob = pool->whatprovides[*(Id *)bp];
@@ -178,8 +176,7 @@ pool_shrink_whatprovides(Pool *pool)
   sorted = sat_malloc2(pool->ss.nstrings, sizeof(Id));
   for (id = 0; id < pool->ss.nstrings; id++)
     sorted[id] = id;
-  pool_shrink_whatprovides_sortcmp_data = pool;
-  qsort(sorted + 1, pool->ss.nstrings - 1, sizeof(Id), pool_shrink_whatprovides_sortcmp);
+  sat_sort(sorted + 1, pool->ss.nstrings - 1, sizeof(Id), pool_shrink_whatprovides_sortcmp, pool);
   last = 0;
   lastid = 0;
   for (i = 1; i < pool->ss.nstrings; i++)

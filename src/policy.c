@@ -22,8 +22,6 @@
 #include "poolarch.h"
 
 
-static Solver *prune_to_best_version_sortcmp_data;
-
 /*-----------------------------------------------------------------*/
 
 /*
@@ -32,9 +30,9 @@ static Solver *prune_to_best_version_sortcmp_data;
  */
 
 static int
-prune_to_best_version_sortcmp(const void *ap, const void *bp)
+prune_to_best_version_sortcmp(const void *ap, const void *bp, void *dp)
 {
-  Solver *solv = prune_to_best_version_sortcmp_data;
+  Solver *solv = dp;
   Pool *pool = solv->pool;
   int r;
   Id a = *(Id *)ap;
@@ -282,9 +280,8 @@ prune_to_best_version(Solver *solv, Queue *plist)
     return;
   POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
 
-  prune_to_best_version_sortcmp_data = solv;
   /* sort by name first, prefer installed */
-  qsort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp);
+  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, solv);
 
   /* delete obsoleted. hmm, looks expensive! */
   /* FIXME maybe also check provides depending on noupdateprovide? */

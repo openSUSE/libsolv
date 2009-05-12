@@ -96,7 +96,7 @@ incneedidarray(Pool *pool, Id *idarray, NeedId *needid)
  */
 
 static int
-needid_cmp_need(const void *ap, const void *bp)
+needid_cmp_need(const void *ap, const void *bp, void *dp)
 {
   const NeedId *a = ap;
   const NeedId *b = bp;
@@ -107,19 +107,19 @@ needid_cmp_need(const void *ap, const void *bp)
   return a->map - b->map;
 }
 
-static Stringpool *cmp_spool;
-
 static int
-needid_cmp_need_s(const void *ap, const void *bp)
+needid_cmp_need_s(const void *ap, const void *bp, void *dp)
 {
   const NeedId *a = ap;
   const NeedId *b = bp;
+  Stringpool *spool = dp;
+
   int r;
   r = b->need - a->need;
   if (r)
     return r;
-  const char *as = cmp_spool->stringspace + cmp_spool->strings[a->map];
-  const char *bs = cmp_spool->stringspace + cmp_spool->strings[b->map];
+  const char *as = spool->stringspace + spool->strings[a->map];
+  const char *bs = spool->stringspace + spool->strings[b->map];
   return strcmp(as, bs);
 }
 
@@ -251,7 +251,7 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
 }
 
 static int
-cmp_ids (const void *pa, const void *pb)
+cmp_ids (const void *pa, const void *pb, void *dp)
 {
   Id a = *(Id *)pa;
   Id b = *(Id *)pb;
@@ -303,9 +303,9 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
     if (sids[i] == marker)
       break;
   if (i > 1)
-    qsort(sids, i, sizeof (Id), cmp_ids);
+    sat_sort(sids, i, sizeof (Id), cmp_ids, 0);
   if ((len - i) > 2)
-    qsort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids);
+    sat_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
 
   Id id, old = 0;
 
@@ -478,9 +478,9 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
     if (sids[i] == marker)
       break;
   if (i > 1)
-    qsort(sids, i, sizeof (Id), cmp_ids);
+    sat_sort(sids, i, sizeof (Id), cmp_ids, 0);
   if ((len - i) > 2)
-    qsort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids);
+    sat_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
 
   Id id, old = 0;
 
@@ -1509,15 +1509,14 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   for (i = 1; i < reloff + pool->nrels; i++)
     needid[i].map = i;
 
-  cmp_spool = spool;
 #if 0
-  qsort(needid + 1, spool->nstrings - 1, sizeof(*needid), needid_cmp_need_s);
+  sat_sort(needid + 1, spool->nstrings - 1, sizeof(*needid), needid_cmp_need_s, spool);
 #else
   /* make first entry '' */
   needid[1].need = 1;
-  qsort(needid + 2, spool->nstrings - 2, sizeof(*needid), needid_cmp_need_s);
+  sat_sort(needid + 2, spool->nstrings - 2, sizeof(*needid), needid_cmp_need_s, spool);
 #endif
-  qsort(needid + reloff, pool->nrels, sizeof(*needid), needid_cmp_need);
+  sat_sort(needid + reloff, pool->nrels, sizeof(*needid), needid_cmp_need, 0);
 
   sizeid = 0;
   for (i = 1; i < reloff; i++)

@@ -1117,7 +1117,7 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
 
 /* used to sort entries returned in some database order */
 static int
-rpmids_sort_cmp(const void *va, const void *vb)
+rpmids_sort_cmp(const void *va, const void *vb, void *dp)
 {
   struct rpmid const *a = va, *b = vb;
   int r;
@@ -1127,20 +1127,19 @@ rpmids_sort_cmp(const void *va, const void *vb)
   return a->dbid - b->dbid;
 }
 
-static Repo *pkgids_sort_cmp_data;
-
 static int
-pkgids_sort_cmp(const void *va, const void *vb)
+pkgids_sort_cmp(const void *va, const void *vb, void *dp)
 {
-  Pool *pool = pkgids_sort_cmp_data->pool;
+  Repo *repo = dp;
+  Pool *pool = repo->pool;
   Solvable *a = pool->solvables + *(Id *)va;
   Solvable *b = pool->solvables + *(Id *)vb;
   Id *rpmdbid;
 
   if (a->name != b->name)
     return strcmp(id2str(pool, a->name), id2str(pool, b->name));
-  rpmdbid = pkgids_sort_cmp_data->rpmdbid;
-  return rpmdbid[(a - pool->solvables) - pkgids_sort_cmp_data->start] - rpmdbid[(b - pool->solvables) - pkgids_sort_cmp_data->start];
+  rpmdbid = repo->rpmdbid;
+  return rpmdbid[(a - pool->solvables) - repo->start] - rpmdbid[(b - pool->solvables) - repo->start];
 }
 
 static void
@@ -1406,8 +1405,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  pkgids = sat_malloc2(repo->end - repo->start, sizeof(Id));
 	  for (i = repo->start; i < repo->end; i++)
 	    pkgids[i - repo->start] = i;
-	  pkgids_sort_cmp_data = repo;
-	  qsort(pkgids, repo->end - repo->start, sizeof(Id), pkgids_sort_cmp);
+	  sat_sort(pkgids, repo->end - repo->start, sizeof(Id), pkgids_sort_cmp, repo);
 	  /* adapt order */
 	  for (i = repo->start; i < repo->end; i++)
 	    {
@@ -1476,7 +1474,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       db = 0;
 
       /* sort rpmids */
-      qsort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp);
+      sat_sort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp, 0);
 
       dbidp = (unsigned char *)&dbid;
       rpmheadsize = 0;
