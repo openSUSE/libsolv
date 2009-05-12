@@ -5,6 +5,8 @@
  * for further information
  */
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -96,3 +98,10 @@ sat_timems(unsigned int subtract)
   return r - subtract;
 }
 
+/* bsd's qsort_r has different arguments, so we define our
+   own version in case we need to do some clever mapping */
+void
+sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
+{
+  qsort_r(base, nmemb, size, compar, compard);
+}
