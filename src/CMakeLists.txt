@@ -2,7 +2,8 @@
 SET(libsatsolver_SRCS
     bitmap.c poolarch.c poolvendor.c poolid.c strpool.c dirpool.c
     solver.c solverdebug.c repo_solv.c repo_helix.c evr.c pool.c
-    queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c)
+    queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
+    transaction.c)
 
 ADD_LIBRARY(satsolver STATIC ${libsatsolver_SRCS})
 
@@ -10,7 +11,7 @@ SET(libsatsolver_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h
     poolid.h pooltypes.h queue.h solvable.h solver.h solverdebug.h
     repo.h repodata.h repopage.h repo_solv.h repo_helix.h util.h
-    strpool.h dirpool.h knownid.h)
+    strpool.h dirpool.h knownid.h transaction.h)
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 

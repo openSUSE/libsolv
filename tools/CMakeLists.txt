@@ -47,6 +47,10 @@ SET(installcheck_SOURCES installcheck.c repo_rpmmd.c repo_susetags.c)
 ADD_EXECUTABLE(installcheck ${installcheck_SOURCES})
 TARGET_LINK_LIBRARIES(installcheck satsolver ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
 
+SET(patchcheck_SOURCES patchcheck.c repo_rpmmd.c repo_susetags.c repo_updateinfoxml.c)
+ADD_EXECUTABLE(patchcheck ${patchcheck_SOURCES})
+TARGET_LINK_LIBRARIES(patchcheck satsolver ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
+
 ADD_EXECUTABLE( dumpsolv dumpsolv.c )
 TARGET_LINK_LIBRARIES( dumpsolv satsolver)
 

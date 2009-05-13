@@ -140,8 +140,6 @@ dep_possible(Solver *solv, Id dep, Map *m)
  * - unify rules, remove duplicates
  */
 
-static Pool *unifyrules_sortcmp_data;
-
 /*-------------------------------------------------------------------
  *
  * compare rules for unification sort
@@ -149,9 +147,9 @@ static Pool *unifyrules_sortcmp_data;
  */
 
 static int
-unifyrules_sortcmp(const void *ap, const void *bp)
+unifyrules_sortcmp(const void *ap, const void *bp, void *dp)
 {
-  Pool *pool = unifyrules_sortcmp_data;
+  Pool *pool = dp;
   Rule *a = (Rule *)ap;
   Rule *b = (Rule *)bp;
   Id *ad, *bd;
@@ -206,8 +204,7 @@ unifyrules(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- unifyrules -----\n");
 
   /* sort rules first */
-  unifyrules_sortcmp_data = solv->pool;
-  qsort(solv->rules + 1, solv->nrules - 1, sizeof(Rule), unifyrules_sortcmp);
+  sat_sort(solv->rules + 1, solv->nrules - 1, sizeof(Rule), unifyrules_sortcmp, solv->pool);
 
   /* prune rules
    * i = unpruned
@@ -216,7 +213,7 @@ unifyrules(Solver *solv)
   jr = 0;
   for (i = j = 1, ir = solv->rules + i; i < solv->nrules; i++, ir++)
     {
-      if (jr && !unifyrules_sortcmp(ir, jr))
+      if (jr && !unifyrules_sortcmp(ir, jr, pool))
 	continue;		       /* prune! */
       jr = solv->rules + j++;	       /* keep! */
       if (ir != jr)
@@ -1409,7 +1406,7 @@ addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	        {
 		  POOL_DEBUG(SAT_DEBUG_RULE_CREATION,"  %s requires %s\n", solvable2str(pool, s), dep2str(pool, req));
 		  for (i = 0; dp[i]; i++)
-		    POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "   provided by %s\n", solvable2str(pool, pool->solvables + dp[i]));
+		    POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "   provided by %s\n", solvid2str(pool, dp[i]));
 	        }
 
 	      /* add 'requires' dependency */
@@ -1974,9 +1971,9 @@ propagate(Solver *solv, int level)
 		  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
 		    {
 		      if (p > 0)
-			POOL_DEBUG(SAT_DEBUG_PROPAGATE, "    -> move w%d to %s\n", (pkg == r->w1 ? 1 : 2), solvable2str(pool, pool->solvables + p));
+			POOL_DEBUG(SAT_DEBUG_PROPAGATE, "    -> move w%d to %s\n", (pkg == r->w1 ? 1 : 2), solvid2str(pool, p));
 		      else
-			POOL_DEBUG(SAT_DEBUG_PROPAGATE,"    -> move w%d to !%s\n", (pkg == r->w1 ? 1 : 2), solvable2str(pool, pool->solvables - p));
+			POOL_DEBUG(SAT_DEBUG_PROPAGATE,"    -> move w%d to !%s\n", (pkg == r->w1 ? 1 : 2), solvid2str(pool, -p));
 		    }
 		    
 		  *rp = *next_rp;
@@ -2022,11 +2019,10 @@ propagate(Solver *solv, int level)
 
 	  IF_POOLDEBUG (SAT_DEBUG_PROPAGATE)
 	    {
-	      Solvable *s = pool->solvables + (other_watch > 0 ? other_watch : -other_watch);
 	      if (other_watch > 0)
-		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "    -> decided to install %s\n", solvable2str(pool, s));
+		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "    -> decided to install %s\n", solvid2str(pool, other_watch));
 	      else
-		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "    -> decided to conflict %s\n", solvable2str(pool, s));
+		POOL_DEBUG(SAT_DEBUG_PROPAGATE, "    -> decided to conflict %s\n", solvid2str(pool, -other_watch));
 	    }
 	    
 	} /* foreach rule involving 'pkg' */
@@ -2572,7 +2568,7 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
     }
   p = dq->elements[0];
 
-  POOL_DEBUG(SAT_DEBUG_POLICY, "installing %s\n", solvable2str(pool, pool->solvables + p));
+  POOL_DEBUG(SAT_DEBUG_POLICY, "installing %s\n", solvid2str(pool, p));
 
   return setpropagatelearn(solv, level, p, disablerules, ruleid);
 }
@@ -2675,6 +2671,7 @@ solver_free(Solver *solv)
   sat_free(solv->obsoletes);
   sat_free(solv->obsoletes_data);
   sat_free(solv->multiversionupdaters);
+  sat_free(solv->transaction_installed);
   sat_free(solv);
 }
 
@@ -2899,7 +2896,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  if (solv->decisionmap[i] == 0)
 		    {
 		      olevel = level;
-		      POOL_DEBUG(SAT_DEBUG_POLICY, "keeping %s\n", solvable2str(pool, pool->solvables + i));
+		      POOL_DEBUG(SAT_DEBUG_POLICY, "keeping %s\n", solvid2str(pool, i));
 		      level = setpropagatelearn(solv, level, i, disablerules, r - solv->rules);
 		      if (level == 0)
 			{
@@ -3004,7 +3001,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      queue_free(&dqs);
 	      return;
 	    }
-	  if (level < systemlevel)
+	  if (level < systemlevel || level == 1)
 	    break;
 	  n = 0;
 	} /* for(), decide */
@@ -3153,9 +3150,9 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  /* simple case, just one package. no need to choose  */
 		  p = dq.elements[0];
 		  if (dqs.count)
-		    POOL_DEBUG(SAT_DEBUG_POLICY, "installing supplemented %s\n", solvable2str(pool, pool->solvables + p));
+		    POOL_DEBUG(SAT_DEBUG_POLICY, "installing supplemented %s\n", solvid2str(pool, p));
 		  else
-		    POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
+		    POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvid2str(pool, p));
 		  queue_push(&solv->recommendations, p);
 		  level = setpropagatelearn(solv, level, p, 0, 0);
 		  continue;
@@ -3173,7 +3170,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		  p = dqs.elements[i];
 		  if (solv->decisionmap[p] || !MAPTST(&dqmap, p))
 		    continue;
-		  POOL_DEBUG(SAT_DEBUG_POLICY, "installing supplemented %s\n", solvable2str(pool, pool->solvables + p));
+		  POOL_DEBUG(SAT_DEBUG_POLICY, "installing supplemented %s\n", solvid2str(pool, p));
 		  queue_push(&solv->recommendations, p);
 		  olevel = level;
 		  level = setpropagatelearn(solv, level, p, 0, 0);
@@ -3224,7 +3221,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 			  queue_push(&solv->branches, -level);
 			}
 		      p = dq.elements[0];
-		      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
+		      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvid2str(pool, p));
 		      queue_push(&solv->recommendations, p);
 		      olevel = level;
 		      level = setpropagatelearn(solv, level, p, 0, 0);
@@ -3251,7 +3248,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    p = dq.elements[i];
 		    break;
 		  }
-	      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvable2str(pool, pool->solvables + p));
+	      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvid2str(pool, p));
 	      queue_push(&solv->recommendations, p);
 	      level = setpropagatelearn(solv, level, p, 0, 0);
 	      continue;
@@ -3273,12 +3270,12 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      olevel = level;
 	      if (solv->distupgrade_removeunsupported)
 		{
-		  POOL_DEBUG(SAT_DEBUG_STATS, "removing unsupported %s\n", solvable2str(pool, pool->solvables + p));
+		  POOL_DEBUG(SAT_DEBUG_STATS, "removing unsupported %s\n", solvid2str(pool, p));
 		  level = setpropagatelearn(solv, level, -p, 0, 0);
 		}
 	      else
 		{
-		  POOL_DEBUG(SAT_DEBUG_STATS, "keeping unsupported %s\n", solvable2str(pool, pool->solvables + p));
+		  POOL_DEBUG(SAT_DEBUG_STATS, "keeping unsupported %s\n", solvid2str(pool, p));
 		  level = setpropagatelearn(solv, level, p, 0, 0);
 		  installedone = 1;
 		}
@@ -3302,7 +3299,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		if (solv->branches.elements[i - 1] < 0)
 		  break;
 	      p = solv->branches.elements[i];
-	      POOL_DEBUG(SAT_DEBUG_STATS, "branching with %s\n", solvable2str(pool, pool->solvables + p));
+	      POOL_DEBUG(SAT_DEBUG_STATS, "branching with %s\n", solvid2str(pool, p));
 	      queue_empty(&dq);
 	      for (j = i + 1; j < solv->branches.count; j++)
 		queue_push(&dq, solv->branches.elements[j]);
@@ -3351,7 +3348,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 	      /* kill old solvable so that we do not loop */
 	      p = solv->branches.elements[lasti];
 	      solv->branches.elements[lasti] = 0;
-	      POOL_DEBUG(SAT_DEBUG_STATS, "minimizing %d -> %d with %s\n", solv->decisionmap[p], lastl, solvable2str(pool, pool->solvables + p));
+	      POOL_DEBUG(SAT_DEBUG_STATS, "minimizing %d -> %d with %s\n", solv->decisionmap[p], lastl, solvid2str(pool, p));
 	      minimizationsteps++;
 
 	      level = lastl;
@@ -3562,11 +3559,10 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined,
  * make essential job rules last
  */
 
-Queue *problems_sort_data;
-
 static int
-problems_sortcmp(const void *ap, const void *bp)
+problems_sortcmp(const void *ap, const void *bp, void *dp)
 {
+  Queue *job = dp;
   Id a = *(Id *)ap, b = *(Id *)bp;
   if (a < 0 && b > 0)
     return 1;
@@ -3574,7 +3570,6 @@ problems_sortcmp(const void *ap, const void *bp)
     return -1;
   if (a < 0 && b < 0)
     {
-      Queue *job = problems_sort_data;
       int af = job->elements[-a - 1] & SOLVER_ESSENTIAL;
       int bf = job->elements[-b - 1] & SOLVER_ESSENTIAL;
       int x = af - bf;
@@ -3694,6 +3689,36 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 }
 
 /*
+ * convert problem data into a form usable for refining.
+ * Returns the number of problems.
+ */
+int
+prepare_solutions(Solver *solv)
+{
+  int i, j = 1, idx = 1;  
+
+  if (!solv->problems.count)
+    return 0;
+  queue_push(&solv->solutions, 0); 
+  queue_push(&solv->solutions, -1); /* unrefined */
+  for (i = 1; i < solv->problems.count; i++) 
+    {   
+      Id p = solv->problems.elements[i];
+      queue_push(&solv->solutions, p); 
+      if (p) 
+        continue;
+      solv->problems.elements[j++] = idx; 
+      if (i + 1 >= solv->problems.count)
+        break;
+      solv->problems.elements[j++] = solv->problems.elements[++i];  /* copy proofidx */
+      idx = solv->solutions.count;
+      queue_push(&solv->solutions, -1); 
+    }   
+  solv->problems.count = j;  
+  return j / 2;
+}
+
+/*
  * refine the simple solution rule list provided by
  * the solver into multiple lists of job modifiers.
  */
@@ -3733,9 +3758,8 @@ create_solutions(Solver *solv, int probnr, int solidx)
 	break;
       queue_push(&problem, v);
     }
-  problems_sort_data = &solv->job;
   if (problem.count > 1)
-    qsort(problem.elements, problem.count, sizeof(Id), problems_sortcmp);
+    sat_sort(problem.elements, problem.count, sizeof(Id), problems_sortcmp, &solv->job);
   queue_push(&problem, 0);	/* mark end for refine_suggestion */
   problem.count--;
 #if 0
@@ -3926,14 +3950,13 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
     *sysrp = lsysr;
 }
 
-
-/*-------------------------------------------------------------------
- * 
+/* 
  * find problem rule
  *
  * search for a rule that describes the problem to the
- * user. A pretty hopeless task, actually. We currently
- * prefer simple requires.
+ * user. Actually a pretty hopeless task that may leave the user
+ * puzzled. To get all of the needed information use
+ * solver_findallproblemrules() instead.
  */
 
 Id
@@ -3944,15 +3967,17 @@ solver_findproblemrule(Solver *solv, Id problem)
   reqr = conr = sysr = jobr = 0;
   findproblemrule_internal(solv, idx, &reqr, &conr, &sysr, &jobr);
   if (reqr)
-    return reqr;
+    return reqr;	/* some requires */
   if (conr)
-    return conr;
+    return conr;	/* some conflict */
   if (sysr)
-    return sysr;
+    return sysr;	/* an update rule */
   if (jobr)
-    return jobr;
+    return jobr;	/* a user request */
   assert(0);
 }
+
+/*-------------------------------------------------------------------*/
 
 static void
 findallproblemrules_internal(Solver *solv, Id idx, Queue *rules)
@@ -3969,6 +3994,14 @@ findallproblemrules_internal(Solver *solv, Id idx, Queue *rules)
     }
 }
 
+/*
+ * find all problem rule
+ *
+ * return all rules that lead to the problem. This gives the user
+ * all of the information to understand the problem, but the result
+ * can be a large number of rules.
+ */
+
 void
 solver_findallproblemrules(Solver *solv, Id problem, Queue *rules)
 {
@@ -3981,9 +4014,10 @@ solver_findallproblemrules(Solver *solv, Id problem, Queue *rules)
  * 
  * create reverse obsoletes map for installed solvables
  *
- * for each installed solvable find which packages with *different* names
+ * For each installed solvable find which packages with *different* names
  * obsolete the solvable.
- * this index is used in policy_findupdatepackages if noupdateprovide is set.
+ * This index is used in policy_findupdatepackages if noupdateprovide is
+ * set.
  */
 
 static void
@@ -3993,11 +4027,12 @@ create_obsolete_index(Solver *solv)
   Solvable *s;
   Repo *installed = solv->installed;
   Id p, pp, obs, *obsp, *obsoletes, *obsoletes_data;
-  int i, n;
+  int i, n, cnt;
 
-  if (!installed || !installed->nsolvables)
+  if (!installed || installed->start == installed->end)
     return;
-  solv->obsoletes = obsoletes = sat_calloc(installed->end - installed->start, sizeof(Id));
+  cnt = installed->end - installed->start;
+  solv->obsoletes = obsoletes = sat_calloc(cnt, sizeof(Id));
   for (i = 1; i < pool->nsolvables; i++)
     {
       s = pool->solvables + i;
@@ -4021,7 +4056,7 @@ create_obsolete_index(Solver *solv)
 	}
     }
   n = 0;
-  for (i = 0; i < installed->nsolvables; i++)
+  for (i = 0; i < cnt; i++)
     if (obsoletes[i])
       {
         n += obsoletes[i] + 1;
@@ -4090,7 +4125,7 @@ removedisabledconflicts(Solver *solv, Queue *removed)
       if (r->d < 0 && decisionmap[-p])
 	{
 	  /* rule is now disabled, remove from decisionmap */
-	  POOL_DEBUG(SAT_DEBUG_SCHUBI, "removing conflict for package %s[%d]\n", solvable2str(pool, pool->solvables - p), -p);
+	  POOL_DEBUG(SAT_DEBUG_SCHUBI, "removing conflict for package %s[%d]\n", solvid2str(pool, -p), -p);
 	  queue_push(removed, -p);
 	  queue_push(removed, decisionmap[-p]);
 	  decisionmap[-p] = 0;
@@ -4153,7 +4188,7 @@ removedisabledconflicts(Solver *solv, Queue *removed)
 	}
       if (new)
 	{
-	  POOL_DEBUG(SAT_DEBUG_SCHUBI, "re-conflicting package %s[%d]\n", solvable2str(pool, pool->solvables - new), -new);
+	  POOL_DEBUG(SAT_DEBUG_SCHUBI, "re-conflicting package %s[%d]\n", solvid2str(pool, -new), -new);
 	  decisionmap[-new] = -1;
 	  new = 0;
 	  n = 0;	/* redo all rules */
@@ -4594,240 +4629,6 @@ findrecommendedsuggested(Solver *solv)
 }
 
 
-Solver *obsq_sortcmp_data;
-
-static int
-obsq_sortcmp(const void *ap, const void *bp)
-{
-  Id a, b, oa, ob;
-  Solver *solv = obsq_sortcmp_data;
-  Pool *pool = solv->pool;
-  Solvable *s, *oas, *obs;
-  int r;
-
-  a = ((Id *)ap)[0];
-  oa = ((Id *)ap)[1];
-  b = ((Id *)bp)[0];
-  ob = ((Id *)bp)[1];
-  if (a != b)
-    return a - b;
-  if (oa == ob)
-    return 0;
-  s = pool->solvables + a;
-  oas = pool->solvables + oa;
-  obs = pool->solvables + ob;
-  if (oas->name != obs->name)
-    {
-      if (oas->name == s->name)
-        return -1;
-      if (obs->name == s->name)
-        return 1;
-      return strcmp(id2str(pool, oas->name), id2str(pool, obs->name));
-    }
-  r = evrcmp(pool, oas->evr, obs->evr, EVRCMP_COMPARE);
-  if (r)
-    return -r;	/* highest version first */
-  return oa - ob;
-}
-
-void
-solver_transaction_info(Solver *solv, Id p, Queue *out)
-{
-  Pool *pool = solv->pool;
-  Solvable *s = pool->solvables + p;
-  Queue *ti = &solv->transaction_info;
-  int i;
-
-  queue_empty(out);
-  if (p <= 0 || !s->repo)
-    return;
-  if (s->repo == solv->installed)
-    {
-      /* find which packages obsolete us */
-      for (i = 0; i < ti->count; i += 2)
-	if (ti->elements[i + 1] == p)
-	  {
-	    queue_push(out, p);
-	    queue_push(out, ti->elements[i]);
-	  }
-      if (out->count > 2)
-	{
-	  /* sort obsoleters */
-	  obsq_sortcmp_data = solv;
-	  qsort(out->elements, out->count / 2, 2 * sizeof(Id), obsq_sortcmp);
-	}
-      for (i = 0; i < out->count; i += 2)
-	out->elements[i] = out->elements[i / 2 + 1];
-      out->count /= 2;
-    }
-  else
-    {
-      /* find the packages we obsolete */
-      for (i = 0; i < ti->count; i += 2)
-	{
-	  if (ti->elements[i] == p)
-	    queue_push(out, ti->elements[i + 1]);
-	  else if (out->count)
-	    break;
-	}
-    }
-}
-
-Id
-solver_transaction_pkg(Solver *solv, Id p)
-{
-  Queue ti;
-  Id tibuf[5];
-
-  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
-  solver_transaction_info(solv, p, &ti);
-  p = ti.count ? ti.elements[0] : 0;
-  queue_free(&ti);
-  return p;
-}
-
-static void
-create_transaction(Solver *solv)
-{
-  Pool *pool = solv->pool;
-  Repo *installed = solv->installed;
-  Queue *ti = &solv->transaction_info;
-  int i, j, r, noobs;
-  Id p, p2, pp2;
-  Solvable *s, *s2;
-
-  queue_empty(&solv->transaction);
-  queue_empty(ti);
-
-  /* first create obsoletes index */
-  if (installed)
-    {
-      for (i = 0; i < solv->decisionq.count; i++)
-	{
-	  p = solv->decisionq.elements[i];
-	  if (p <= 0 || p == SYSTEMSOLVABLE)
-	    continue;
-	  s = pool->solvables + p;
-	  if (s->repo == installed)
-	    continue;
-	  noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p);
-	  FOR_PROVIDES(p2, pp2, s->name)
-	    {
-	      if (solv->decisionmap[p2] > 0)
-		continue;
-	      s2 = pool->solvables + p2;
-	      if (s2->repo != installed)
-		continue;
-	      if (noobs && (s->name != s2->name || s->evr != s2->evr || s->arch != s2->arch))
-		continue;
-	      if (!solv->implicitobsoleteusesprovides && s->name != s2->name)
-		continue;
-	      queue_push(ti, p);
-	      queue_push(ti, p2);
-	    }
-	  if (s->obsoletes && !noobs)
-	    {
-	      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
-	      while ((obs = *obsp++) != 0)
-		{
-		  FOR_PROVIDES(p2, pp2, obs)
-		    {
-		      s2 = pool->solvables + p2;
-		      if (s2->repo != installed)
-			continue;
-		      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
-			continue;
-		      queue_push(ti, p);
-		      queue_push(ti, p2);
-		    }
-		}
-	    }
-	}
-      obsq_sortcmp_data = solv;
-      qsort(ti->elements, ti->count / 2, 2 * sizeof(Id), obsq_sortcmp);
-      /* now unify */
-      for (i = j = 0; i < ti->count; i += 2)
-	{
-	  if (j && ti->elements[i] == ti->elements[j - 2] && ti->elements[i + 1] == ti->elements[j - 1])
-	    continue;
-	  ti->elements[j++] = ti->elements[i];
-	  ti->elements[j++] = ti->elements[i + 1];
-	}
-      ti->count = j;
-    }
-
-  if (installed)
-    {
-      FOR_REPO_SOLVABLES(installed, p, s)
-	{
-	  if (solv->decisionmap[p] > 0)
-	    continue;
-	  p2 = solver_transaction_pkg(solv, p);
-	  if (!p2)
-	    queue_push(&solv->transaction, SOLVER_TRANSACTION_ERASE);
-	  else
-	    {
-	      s2 = pool->solvables + p2;
-	      if (s->name == s2->name)
-		{
-		  if (s->evr == s2->evr && solvable_identical(s, s2))
-		    queue_push(&solv->transaction, SOLVER_TRANSACTION_REINSTALLED);
-		  else
-		    {
-		      r = evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
-		      if (r < 0)
-			queue_push(&solv->transaction, SOLVER_TRANSACTION_UPGRADED);
-		      else if (r > 0)
-			queue_push(&solv->transaction, SOLVER_TRANSACTION_DOWNGRADED);
-		      else
-			queue_push(&solv->transaction, SOLVER_TRANSACTION_CHANGED);
-		    }
-		}
-	      else
-		queue_push(&solv->transaction, SOLVER_TRANSACTION_OBSOLETED);
-	    }
-	  queue_push(&solv->transaction, p);
-	}
-    }
-  for (i = 0; i < solv->decisionq.count; i++)
-    {
-      p = solv->decisionq.elements[i];
-      if (p < 0 || p == SYSTEMSOLVABLE)
-	continue;
-      s = pool->solvables + p;
-      if (solv->installed && s->repo == solv->installed)
-	continue;
-      noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p);
-      p2 = solver_transaction_pkg(solv, p);
-      if (noobs)
-	queue_push(&solv->transaction, p2 ? SOLVER_TRANSACTION_MULTIREINSTALL : SOLVER_TRANSACTION_MULTIINSTALL);
-      else if (!p2)
-	queue_push(&solv->transaction, SOLVER_TRANSACTION_INSTALL);
-      else
-	{
-	  s2 = pool->solvables + p2;
-	  if (s->name == s2->name)
-	    {
-	      if (s->evr == s2->evr && solvable_identical(s, s2))
-		queue_push(&solv->transaction, SOLVER_TRANSACTION_REINSTALL);
-	      else
-		{
-		  r = evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
-		  if (r > 0)
-		    queue_push(&solv->transaction, SOLVER_TRANSACTION_UPGRADE);
-		  else if (r < 0)
-		    queue_push(&solv->transaction, SOLVER_TRANSACTION_DOWNGRADE);
-		  else
-		    queue_push(&solv->transaction, SOLVER_TRANSACTION_CHANGE);
-		}
-	    }
-	  else
-	    queue_push(&solv->transaction, SOLVER_TRANSACTION_RENAME);
-	}
-      queue_push(&solv->transaction, p);
-    }
-}
-
 /*
  *
  * solve job queue
@@ -5072,8 +4873,7 @@ solver_solve(Solver *solv, Queue *job)
 	      assert(solv->distupgrade && !sr->p);
 	      continue;
 	    }
-	  unifyrules_sortcmp_data = pool;
-	  if (!unifyrules_sortcmp(r, sr))
+	  if (!unifyrules_sortcmp(r, sr, pool))
 	    {
 	      /* identical rule, kill unneeded one */
 	      if (solv->allowuninstall)
@@ -5259,10 +5059,10 @@ solver_solve(Solver *solv, Queue *job)
     solv->duprules = solv->duprules_end = solv->nrules;
 
 
-    /* all rules created
-     * --------------------------------------------------------------
-     * prepare for solving
-     */
+  /* all rules created
+   * --------------------------------------------------------------
+   * prepare for solving
+   */
     
   /* free unneeded memory */
   map_free(&addedmap);
@@ -5315,33 +5115,14 @@ solver_solve(Solver *solv, Queue *job)
   findrecommendedsuggested(solv);
 
   /*
-   * if unsolvable, prepare solution queue
+   * prepare solution queue if there were problems
    */
-  if (solv->problems.count)
-    {
-      int j = 1, idx = 1;
-      queue_push(&solv->solutions, 0);
-      queue_push(&solv->solutions, -1);	/* unrefined */
-      for (i = 1; i < solv->problems.count; i++)
-	{
-	  Id p = solv->problems.elements[i];
-	  queue_push(&solv->solutions, p);
-	  if (p)
-	    continue;
-	  solv->problems.elements[j++] = idx;
-	  if (i + 1 >= solv->problems.count)
-	    break;
-	  solv->problems.elements[j++] = solv->problems.elements[++i];	/* copy proofidx */
-	  idx = solv->solutions.count;
-	  queue_push(&solv->solutions, -1);
-	}
-      solv->problems.count = j;
-    }
+  prepare_solutions(solv);
 
   /*
    * finally prepare transaction info
    */
-  create_transaction(solv);
+  solver_create_transaction(solv);
 
   POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d problems, %d learned rules, %d unsolvable\n", solv->problems.count / 2, solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
@@ -5465,7 +5246,7 @@ solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)
 		  if (MAPTST(&im, p))
 		    {
 #if FIND_INVOLVED_DEBUG
-		      printf("%s requires %s\n", solvable2str(pool, pool->solvables + ip), solvable2str(pool, pool->solvables + p));
+		      printf("%s requires %s\n", solvid2str(pool, ip), solvid2str(pool, p));
 #endif
 		      queue_push(&iq, p);
 		    }
@@ -5488,7 +5269,7 @@ solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)
 		  if (MAPTST(&im, p))
 		    {
 #if FIND_INVOLVED_DEBUG
-		      printf("%s recommends %s\n", solvable2str(pool, pool->solvables + ip), solvable2str(pool, pool->solvables + p));
+		      printf("%s recommends %s\n", solvid2str(pool, ip), solvid2str(pool, p));
 #endif
 		      queue_push(&iq, p);
 		    }
@@ -5514,7 +5295,7 @@ solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)
 	      if (sup)
 		{
 #if FIND_INVOLVED_DEBUG
-		  printf("%s supplemented\n", solvable2str(pool, pool->solvables + ip));
+		  printf("%s supplemented\n", solvid2str(pool, ip));
 #endif
 		  queue_push(&iq, ip);
 		}
@@ -5550,7 +5331,7 @@ solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)
 		      if (p == tp)
 			continue;
 #if FIND_INVOLVED_DEBUG
-		      printf("%s requires %s\n", solvable2str(pool, pool->solvables + ip), solvable2str(pool, pool->solvables + p));
+		      printf("%s requires %s\n", solvid2str(pool, ip), solvid2str(pool, p));
 #endif
 		      MAPSET(&im, p);
 		      queue_push(&iq, p);
@@ -5570,7 +5351,7 @@ solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)
 		      if (p == tp)
 			continue;
 #if FIND_INVOLVED_DEBUG
-		      printf("%s recommends %s\n", solvable2str(pool, pool->solvables + ip), solvable2str(pool, pool->solvables + p));
+		      printf("%s recommends %s\n", solvid2str(pool, ip), solvid2str(pool, p));
 #endif
 		      MAPSET(&im, p);
 		      queue_push(&iq, p);
@@ -5598,7 +5379,7 @@ solver_find_involved(Solver *solv, Queue *installedq, Solvable *ts, Queue *q)
 	      if (sup)
 		{
 #if FIND_INVOLVED_DEBUG
-		  printf("%s supplemented\n", solvable2str(pool, pool->solvables + ip));
+		  printf("%s supplemented\n", solvid2str(pool, ip));
 #endif
 		  MAPSET(&im, ip);
 		  queue_push(&iq, ip);
@@ -5707,7 +5488,7 @@ addrpmruleinfo(Solver *solv, Id p, Id d, int type, Id dep)
 }
 
 static int
-solver_allruleinfos_cmp(const void *ap, const void *bp)
+solver_allruleinfos_cmp(const void *ap, const void *bp, void *dp)
 {
   const Id *a = ap, *b = bp;
   int r;
@@ -5758,7 +5539,7 @@ solver_allruleinfos(Solver *solv, Id rid, Queue *rq)
   /* now sort & unify em */
   if (!rq->count)
     return 0;
-  qsort(rq->elements, rq->count / 4, 4 * sizeof(Id), solver_allruleinfos_cmp);
+  sat_sort(rq->elements, rq->count / 4, 4 * sizeof(Id), solver_allruleinfos_cmp, 0);
   /* throw out identical entries */
   for (i = j = 0; i < rq->count; i += 4)
     {
