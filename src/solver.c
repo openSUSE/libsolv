@@ -3862,6 +3862,31 @@ solver_solutionelement_count(Solver *solv, Id problem, Id solution)
   return solv->solutions.elements[solidx];
 }
 
+
+/*
+ *  return the next item of the proposed solution
+ *  here are the possibilities for p / rp and what
+ *  the solver expects the application to do:
+ *    p                             rp
+ *  -------------------------------------------------------
+ *    SOLVER_SOLUTION_INFARCH       pkgid
+ *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
+ *    SOLVER_SOLUTION_DISTUPGRADE   pkgid
+ *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
+ *    SOLVER_SOLUTION_JOB           jobidx
+ *    -> remove job (jobidx - 1, jobidx) from job queue
+ *    pkgid (> 0)                   0
+ *    -> add (SOLVER_ERASE|SOLVER_SOLVABLE, p) to the job
+ *    pkgid (> 0)                   pkgid (> 0)
+ *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
+ *       (this will replace package p)
+ *         
+ * Thus, the solver will either ask the application to remove
+ * a specific job from the job queue, or ask to add an install/erase
+ * job to it.
+ *
+ */
+
 Id
 solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp)
 {
