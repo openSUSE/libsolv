@@ -433,6 +433,85 @@ policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
 }
 
 
+/*-------------------------------------------------------------------
+ * 
+ * create reverse obsoletes map for installed solvables
+ *
+ * For each installed solvable find which packages with *different* names
+ * obsolete the solvable.
+ * This index is used in policy_findupdatepackages() below.
+ */
+void
+policy_create_obsolete_index(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Solvable *s;
+  Repo *installed = solv->installed;
+  Id p, pp, obs, *obsp, *obsoletes, *obsoletes_data;
+  int i, n, cnt;
+
+  if (!installed || installed->start == installed->end)
+    return;
+  cnt = installed->end - installed->start;
+  solv->obsoletes = obsoletes = sat_calloc(cnt, sizeof(Id));
+  for (i = 1; i < pool->nsolvables; i++)
+    {
+      s = pool->solvables + i;
+      if (!s->obsoletes)
+	continue;
+      if (!pool_installable(pool, s))
+	continue;
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(p, pp, obs)
+	    {
+	      if (pool->solvables[p].repo != installed)
+		continue;
+	      if (pool->solvables[p].name == s->name)
+		continue;
+	      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		continue;
+	      obsoletes[p - installed->start]++;
+	    }
+	}
+    }
+  n = 0;
+  for (i = 0; i < cnt; i++)
+    if (obsoletes[i])
+      {
+        n += obsoletes[i] + 1;
+        obsoletes[i] = n;
+      }
+  solv->obsoletes_data = obsoletes_data = sat_calloc(n + 1, sizeof(Id));
+  POOL_DEBUG(SAT_DEBUG_STATS, "obsoletes data: %d entries\n", n + 1);
+  for (i = pool->nsolvables - 1; i > 0; i--)
+    {
+      s = pool->solvables + i;
+      if (!s->obsoletes)
+	continue;
+      if (!pool_installable(pool, s))
+	continue;
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(p, pp, obs)
+	    {
+	      if (pool->solvables[p].repo != installed)
+		continue;
+	      if (pool->solvables[p].name == s->name)
+		continue;
+	      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		continue;
+	      p -= installed->start;
+	      if (obsoletes_data[obsoletes[p]] != i)
+		obsoletes_data[--obsoletes[p]] = i;
+	    }
+	}
+    }
+}
+
+
 /*
  * find update candidates
  * 

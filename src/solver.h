@@ -120,7 +120,6 @@ typedef struct _Solver {
   /* our decisions: */
   Queue decisionq;                      /* >0:install, <0:remove/conflict */
   Queue decisionq_why;			/* index of rule, Offset into rules */
-  int directdecisions;			/* number of decisions with no rule */
 
   Id *decisionmap;			/* map for all available solvables,
 					 * = 0: undecided

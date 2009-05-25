@@ -63,3 +63,5 @@ extern void policy_findupdatepackages(Solver *solv,
 				      Queue *qs,
 				      int allowall); /* do not regard policies for vendor,architecuture,... change */
 
+extern void policy_create_obsolete_index(Solver *solv);
+

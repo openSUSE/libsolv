@@ -457,8 +457,65 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
     return 1;
   if (flags != 2 && flags != 5)
     flags ^= 5;
+#ifdef DEBIAN_SEMANTICS
+  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_COMPARE)))) != 0)
+    return 1;
+#else
   if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_MATCH_RELEASE)))) != 0)
     return 1;
+#endif
+  return 0;
+}
+
+/* match two dependencies */
+
+int
+pool_match_dep(Pool *pool, Id d1, Id d2)
+{
+  Reldep *rd1, *rd2;
+  int pflags, flags;
+
+  if (d1 == d2)
+    return 1;
+  if (!ISRELDEP(d1))
+    {
+      if (!ISRELDEP(d2))
+	return 0;
+      rd2 = GETRELDEP(pool, d2);
+      return pool_match_dep(pool, d1, rd2->name);
+    }
+  rd1 = GETRELDEP(pool, d1);
+  if (!ISRELDEP(d2))
+    {
+      return pool_match_dep(pool, rd1->name, d2);
+    }
+  rd2 = GETRELDEP(pool, d2);
+  if (!pool_match_dep(pool, rd1->name, rd2->name))
+    return 0;
+  pflags = rd1->flags;
+  flags = rd2->flags;
+  if (!pflags || !flags || pflags >= 8 || flags >= 8)
+    return 0;
+  if (flags == 7 || pflags == 7)
+    return 1;
+  if ((pflags & flags & 5) != 0)
+    return 1;
+  if (rd1->evr == rd2->evr)
+    {
+      if ((pflags & flags & 2) != 0)
+	return 1;
+    }
+  else
+    {
+      int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
+#ifdef DEBIAN_SEMANTICS
+      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_COMPARE)))) != 0)
+	return 1;
+#else
+      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_MATCH_RELEASE)))) != 0)
+	return 1;
+#endif
+    }
   return 0;
 }
 

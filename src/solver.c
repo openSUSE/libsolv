@@ -369,9 +369,9 @@ addrule(Solver *solv, Id p, Id d)
       n = 1;			       /* re-set n, was used as temp var */
     }
 
-    /*
-     * check for duplicate
-     */
+  /*
+   * check for duplicate
+   */
     
   /* check if the last added rule (r) is exactly the same as what we're looking for. */
   if (r && n == 1 && !r->d && r->p == p && r->w2 == d)
@@ -392,9 +392,9 @@ addrule(Solver *solv, Id p, Id d)
 	return r;
    }
 
-    /*
-     * allocate new rule
-     */
+  /*
+   * allocate new rule
+   */
 
   /* extend rule buffer */
   solv->rules = sat_extend(solv->rules, solv->nrules, 1, sizeof(Rule), RULES_BLOCK);
@@ -569,9 +569,8 @@ enableproblem(Solver *solv, Id v)
 /*
  * make assertion rules into decisions
  * 
- * go through update and job rules and add direct assertions
- * to the decisionqueue. If we find a conflict, disable rules and
- * add them to problem queue.
+ * Go through rules and add direct assertions to the decisionqueue.
+ * If we find a conflict, disable rules and add them to problem queue.
  */
 
 static void
@@ -584,6 +583,12 @@ makeruledecisions(Solver *solv)
   int decisionstart;
 
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
+
+  /* The system solvable is always installed first */
+  assert(solv->decisionq.count == 0);
+  queue_push(&solv->decisionq, SYSTEMSOLVABLE);
+  queue_push(&solv->decisionq_why, 0);
+  solv->decisionmap[SYSTEMSOLVABLE] = 1;	/* installed at level '1' */
 
   decisionstart = solv->decisionq.count;
   for (ii = 0; ii < solv->ruleassertions.count; ii++)
@@ -654,9 +659,9 @@ makeruledecisions(Solver *solv)
 	  break;
       assert(i < solv->decisionq.count);         /* assert that we found it */
 	
-	/*
-	 * conflict with system solvable ?
-	 */
+      /*
+       * conflict with system solvable ?
+       */
 	
       if (v == -SYSTEMSOLVABLE) {
 	/* conflict with system solvable */
@@ -676,9 +681,9 @@ makeruledecisions(Solver *solv)
 
       assert(solv->decisionq_why.elements[i] > 0);
 	
-        /*
-	 * conflict with an rpm rule ?
-	 */
+      /*
+       * conflict with an rpm rule ?
+       */
 	
       if (solv->decisionq_why.elements[i] < solv->rpmrules_end)
 	{
@@ -699,9 +704,9 @@ makeruledecisions(Solver *solv)
 	  continue;
 	}
 
-        /*
-	 * conflict with another job or update/feature rule
-	 */
+      /*
+       * conflict with another job or update/feature rule
+       */
 	
       /* record proof */
       queue_push(&solv->problems, solv->learnt_pool.count);
@@ -741,10 +746,10 @@ makeruledecisions(Solver *solv)
 	}
       queue_push(&solv->problems, 0);
 
-       /*
-	* start over
-	* (back up from decisions)
-	*/
+      /*
+       * start over
+       * (back up from decisions)
+       */
       while (solv->decisionq.count > decisionstart)
 	{
 	  v = solv->decisionq.elements[--solv->decisionq.count];
@@ -755,9 +760,9 @@ makeruledecisions(Solver *solv)
       ii = -1; /* restarts loop at 0 */
     }
 
-    /*
-     * phase 2: now do the weak assertions
-     */
+  /*
+   * phase 2: now do the weak assertions
+   */
   for (ii = 0; ii < solv->ruleassertions.count; ii++)
     {
       ri = solv->ruleassertions.elements[ii];
@@ -768,10 +773,10 @@ makeruledecisions(Solver *solv)
 	continue;
       v = r->p;
       vv = v > 0 ? v : -v;
-	/*
-	 * decide !
-	 * (if not yet decided)
-	 */
+      /*
+       * decide !
+       * (if not yet decided)
+       */
       if (!solv->decisionmap[vv])
 	{
 	  queue_push(&solv->decisionq, v);
@@ -787,9 +792,9 @@ makeruledecisions(Solver *solv)
 	    }
 	  continue;
 	}
-	/*
-	 * previously decided, sane ?
-	 */
+      /*
+       * previously decided, sane ?
+       */
       if (v > 0 && solv->decisionmap[vv] > 0)
 	continue;
       if (v < 0 && solv->decisionmap[vv] < 0)
@@ -1808,10 +1813,10 @@ makewatches(Solver *solv)
 
 /*-------------------------------------------------------------------
  *
- * add watches (for rule)
+ * add watches (for a new learned rule)
  * sets up watches for a single rule
  * 
- * see also makewatches()
+ * see also makewatches() above.
  */
 
 static inline void
@@ -2172,17 +2177,14 @@ reset_solver(Solver *solv)
   int i;
   Id v;
 
-  /* rewind decisions to direct rpm rule assertions */
-  for (i = solv->decisionq.count - 1; i >= solv->directdecisions; i--)
+  /* rewind all decisions */
+  for (i = solv->decisionq.count - 1; i >= 0; i--)
     {
       v = solv->decisionq.elements[i];
       solv->decisionmap[v > 0 ? v : -v] = 0;
     }
-
-  POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "decisions done reduced from %d to %d\n", solv->decisionq.count, solv->directdecisions);
-
-  solv->decisionq_why.count = solv->directdecisions;
-  solv->decisionq.count = solv->directdecisions;
+  solv->decisionq_why.count = 0;
+  solv->decisionq.count = 0;
   solv->recommends_index = -1;
   solv->propagate_index = 0;
 
@@ -2510,6 +2512,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id rul
 	  /* learnt rule is an assertion */
           queue_push(&solv->ruleassertions, r - solv->rules);
 	}
+      /* the new rule is unit by design */
       solv->decisionmap[p > 0 ? p : -p] = p > 0 ? level : -level;
       queue_push(&solv->decisionq, p);
       queue_push(&solv->decisionq_why, r - solv->rules);
@@ -3132,6 +3135,29 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		}
 	    }
 
+	  /* multiversion doesn't mix well with supplements.
+	   * filter supplemented packages where we already decided
+	   * to install a different version (see bnc#501088) */
+          if (dqs.count && solv->noobsoletes.size)
+	    {
+	      for (i = j = 0; i < dqs.count; i++)
+		{
+		  p = dqs.elements[i];
+		  if (MAPTST(&solv->noobsoletes, p))
+		    {
+		      Id p2, pp2;
+		      s = pool->solvables + p;
+		      FOR_PROVIDES(p2, pp2, s->name)
+			if (solv->decisionmap[p2] > 0 && pool->solvables[p2].name == s->name)
+			  break;
+		      if (p2)
+			continue;	/* ignore this package */
+		    }
+		  dqs.elements[j++] = p;
+		}
+	      dqs.count = j;
+	    }
+
           /* make dq contain both recommended and supplemented pkgs */
 	  if (dqs.count)
 	    {
@@ -3139,7 +3165,6 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		queue_pushunique(&dq, dqs.elements[i]);
 	    }
 
-#if 1
 	  if (dq.count)
 	    {
 	      Map dqmap;
@@ -3155,11 +3180,13 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		    POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvid2str(pool, p));
 		  queue_push(&solv->recommendations, p);
 		  level = setpropagatelearn(solv, level, p, 0, 0);
-		  continue;
+		  continue;	/* back to main loop */
 		}
 
-	      /* filter and create a map of result */
+	      /* filter packages, this gives us the best versions */
 	      policy_filter_unwanted(solv, &dq, POLICY_MODE_RECOMMEND);
+
+	      /* create map of result */
 	      map_init(&dqmap, pool->nsolvables);
 	      for (i = 0; i < dq.count; i++)
 		MAPSET(&dqmap, dq.elements[i]);
@@ -3226,34 +3253,15 @@ run_solver(Solver *solv, int disablerules, int doweak)
 		      olevel = level;
 		      level = setpropagatelearn(solv, level, p, 0, 0);
 		      if (level <= olevel || solv->decisionq.count < decisioncount)
-			break;
+			break;	/* we had to revert some decisions */
 		    }
 		  if (rec)
 		    break;	/* had a problem above, quit loop */
 		}
 	      map_free(&dqmap);
-	      continue;
+
+	      continue;		/* back to main loop */
 	    }
-#else
-	  if (dq.count)
-	    {
-	      if (dq.count > 1)
-	        policy_filter_unwanted(solv, &dq, POLICY_MODE_RECOMMEND);
-	      p = dq.elements[0];
-	      /* prefer recommended patterns (bnc#450226) */
-	      /* real fix is to minimize recommended packages as well */
-	      for (i = 0; i < dq.count; i++)
-	        if (!strncmp(id2str(pool, pool->solvables[dq.elements[i]].name), "pattern:", 8))
-		  {
-		    p = dq.elements[i];
-		    break;
-		  }
-	      POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", solvid2str(pool, p));
-	      queue_push(&solv->recommendations, p);
-	      level = setpropagatelearn(solv, level, p, 0, 0);
-	      continue;
-	    }
-#endif
 	}
 
      if (solv->distupgrade && solv->installed)
@@ -4037,87 +4045,6 @@ solver_findallproblemrules(Solver *solv, Id problem, Queue *rules)
 
 /*-------------------------------------------------------------------
  * 
- * create reverse obsoletes map for installed solvables
- *
- * For each installed solvable find which packages with *different* names
- * obsolete the solvable.
- * This index is used in policy_findupdatepackages if noupdateprovide is
- * set.
- */
-
-static void
-create_obsolete_index(Solver *solv)
-{
-  Pool *pool = solv->pool;
-  Solvable *s;
-  Repo *installed = solv->installed;
-  Id p, pp, obs, *obsp, *obsoletes, *obsoletes_data;
-  int i, n, cnt;
-
-  if (!installed || installed->start == installed->end)
-    return;
-  cnt = installed->end - installed->start;
-  solv->obsoletes = obsoletes = sat_calloc(cnt, sizeof(Id));
-  for (i = 1; i < pool->nsolvables; i++)
-    {
-      s = pool->solvables + i;
-      if (!s->obsoletes)
-	continue;
-      if (!pool_installable(pool, s))
-	continue;
-      obsp = s->repo->idarraydata + s->obsoletes;
-      while ((obs = *obsp++) != 0)
-	{
-	  FOR_PROVIDES(p, pp, obs)
-	    {
-	      if (pool->solvables[p].repo != installed)
-		continue;
-	      if (pool->solvables[p].name == s->name)
-		continue;
-	      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
-		continue;
-	      obsoletes[p - installed->start]++;
-	    }
-	}
-    }
-  n = 0;
-  for (i = 0; i < cnt; i++)
-    if (obsoletes[i])
-      {
-        n += obsoletes[i] + 1;
-        obsoletes[i] = n;
-      }
-  solv->obsoletes_data = obsoletes_data = sat_calloc(n + 1, sizeof(Id));
-  POOL_DEBUG(SAT_DEBUG_STATS, "obsoletes data: %d entries\n", n + 1);
-  for (i = pool->nsolvables - 1; i > 0; i--)
-    {
-      s = pool->solvables + i;
-      if (!s->obsoletes)
-	continue;
-      if (!pool_installable(pool, s))
-	continue;
-      obsp = s->repo->idarraydata + s->obsoletes;
-      while ((obs = *obsp++) != 0)
-	{
-	  FOR_PROVIDES(p, pp, obs)
-	    {
-	      if (pool->solvables[p].repo != installed)
-		continue;
-	      if (pool->solvables[p].name == s->name)
-		continue;
-	      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
-		continue;
-	      p -= installed->start;
-	      if (obsoletes_data[obsoletes[p]] != i)
-		obsoletes_data[--obsoletes[p]] = i;
-	    }
-	}
-    }
-}
-
-
-/*-------------------------------------------------------------------
- * 
  * remove disabled conflicts
  *
  * purpose: update the decisionmap after some rules were disabled.
@@ -4250,6 +4177,7 @@ weaken_solvable_deps(Solver *solv, Id p)
       queue_push(&solv->weakruleq, i);
     }
 }
+
 
 /********************************************************************/
 /* main() */
@@ -4692,7 +4620,7 @@ solver_solve(Solver *solv, Queue *job)
     pool_createwhatprovides(pool);
 
   /* create obsolete index */
-  create_obsolete_index(solv);
+  policy_create_obsolete_index(solv);
 
   /* remember job */
   queue_free(&solv->job);
@@ -4718,16 +4646,10 @@ solver_solve(Solver *solv, Queue *job)
     }
 
   map_init(&addedmap, pool->nsolvables);
+  MAPSET(&addedmap, SYSTEMSOLVABLE);
+
   map_init(&installcandidatemap, pool->nsolvables);
   queue_init(&q);
-
-  /*
-   * always install our system solvable
-   */
-  MAPSET(&addedmap, SYSTEMSOLVABLE);
-  queue_push(&solv->decisionq, SYSTEMSOLVABLE);
-  queue_push(&solv->decisionq_why, 0);
-  solv->decisionmap[SYSTEMSOLVABLE] = 1; /* installed at level '1' */
 
   now = sat_timems(0);
   /*
@@ -4816,9 +4738,7 @@ solver_solve(Solver *solv, Queue *job)
 
   solv->rpmrules_end = solv->nrules;              /* mark end of rpm rules */
 
-  solv->directdecisions = solv->decisionq.count;
   POOL_DEBUG(SAT_DEBUG_STATS, "rpm rule memory usage: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
-  POOL_DEBUG(SAT_DEBUG_STATS, "decisions so far: %d\n", solv->decisionq.count);
   POOL_DEBUG(SAT_DEBUG_STATS, "rpm rule creation took %d ms\n", sat_timems(now));
 
   /* create dup maps if needed. We need the maps early to create our
@@ -5107,6 +5027,9 @@ solver_solve(Solver *solv, Queue *job)
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
 
+  /* create watches chains */
+  makewatches(solv);
+
   /* create assertion index. it is only used to speed up
    * makeruledecsions() a bit */
   for (i = 1, r = solv->rules + i; i < solv->nrules; i++, r++)
@@ -5118,10 +5041,6 @@ solver_solve(Solver *solv, Queue *job)
 
   /* make decisions based on job/update assertions */
   makeruledecisions(solv);
-
-  /* create watches chains */
-  makewatches(solv);
-
   POOL_DEBUG(SAT_DEBUG_STATS, "problems so far: %d\n", solv->problems.count);
 
   /*
