@@ -23,6 +23,8 @@ extern "C" {
 #include "queue.h"
 #include "bitmap.h"
 #include "transaction.h"
+#include "rules.h"
+
 /*
  * Callback definitions in order to "overwrite" the policies by an external application.
  */
@@ -32,31 +34,6 @@ typedef int  (*ArchCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable
 typedef int  (*VendorCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
 typedef void (*UpdateCandidateCb) (Pool *pool, Solvable *solvable, Queue *canditates);
 
-
-/* ----------------------------------------------
- * Rule
- *
- *   providerN(B) == Package Id of package providing tag B
- *   N = 1, 2, 3, in case of multiple providers
- *
- * A requires B : !A | provider1(B) | provider2(B)
- *
- * A conflicts B : (!A | !provider1(B)) & (!A | !provider2(B)) ...
- *
- * 'not' is encoded as a negative Id
- * 
- * Binary rule: p = first literal, d = 0, w2 = second literal, w1 = p
- */
-
-typedef struct rule {
-  Id p;			/* first literal in rule */
-  Id d;			/* Id offset into 'list of providers terminated by 0' as used by whatprovides; pool->whatprovides + d */
-			/* in case of binary rules, d == 0, w1 == p, w2 == other literal */
-			/* in case of disabled rules: ~d, aka -d - 1 */
-  Id w1, w2;		/* watches, literals not-yet-decided */
-  				       /* if !w2, assertion, not rule */
-  Id n1, n2;		/* next rules in linked list, corresponding to w1,w2 */
-} Rule;
 
 struct _Solver;
 
@@ -271,44 +248,6 @@ typedef struct _Solver {
 #define SOLVER_NOOBSOLETES_SOLVABLE_PROVIDES (SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_PROVIDES)
 #endif
 
-typedef enum {
-  SOLVER_PROBLEM_UPDATE_RULE,
-  SOLVER_PROBLEM_JOB_RULE,
-  SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP,
-  SOLVER_PROBLEM_NOT_INSTALLABLE,
-  SOLVER_PROBLEM_NOTHING_PROVIDES_DEP,
-  SOLVER_PROBLEM_SAME_NAME,
-  SOLVER_PROBLEM_PACKAGE_CONFLICT,
-  SOLVER_PROBLEM_PACKAGE_OBSOLETES,
-  SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE,
-  SOLVER_PROBLEM_SELF_CONFLICT,
-  SOLVER_PROBLEM_RPM_RULE,
-  SOLVER_PROBLEM_DISTUPGRADE_RULE,
-  SOLVER_PROBLEM_INFARCH_RULE
-} SolverProbleminfo;
-
-typedef enum {
-  SOLVER_RULE_UNKNOWN = 0,
-  SOLVER_RULE_RPM = 0x100,
-  SOLVER_RULE_RPM_NOT_INSTALLABLE,
-  SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP,
-  SOLVER_RULE_RPM_PACKAGE_REQUIRES,
-  SOLVER_RULE_RPM_SELF_CONFLICT,
-  SOLVER_RULE_RPM_PACKAGE_CONFLICT,
-  SOLVER_RULE_RPM_SAME_NAME,
-  SOLVER_RULE_RPM_PACKAGE_OBSOLETES,
-  SOLVER_RULE_RPM_IMPLICIT_OBSOLETES,
-  SOLVER_RULE_UPDATE = 0x200,
-  SOLVER_RULE_FEATURE = 0x300,
-  SOLVER_RULE_JOB = 0x400,
-  SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP,
-  SOLVER_RULE_DISTUPGRADE = 0x500,
-  SOLVER_RULE_INFARCH = 0x600,
-  SOLVER_RULE_LEARNT = 0x700
-} SolverRuleinfo;
-
-#define SOLVER_RULE_TYPEMASK	0xff00
-
 /* backward compatibility */
 #define SOLVER_PROBLEM_UPDATE_RULE 		SOLVER_RULE_UPDATE
 #define SOLVER_PROBLEM_JOB_RULE			SOLVER_RULE_JOB
@@ -346,8 +285,6 @@ extern Id solver_findproblemrule(Solver *solv, Id problem);
 extern void solver_findallproblemrules(Solver *solv, Id problem, Queue *rules);
 
 extern SolverRuleinfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
-extern SolverRuleinfo solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
-extern int solver_allruleinfos(Solver *solv, Id rid, Queue *rq);
 
 /* XXX: why is this not static? */
 Id *solver_create_decisions_obsoletesmap(Solver *solv);
