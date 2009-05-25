@@ -27,7 +27,7 @@
 
 #define RULES_BLOCK 63
 
-static void reenablepolicyrules(Solver *solv, Queue *job, int jobidx);
+static void reenablepolicyrules(Solver *solv, int jobidx);
 static void addrpmruleinfo(Solver *solv, Id p, Id d, int type, Id dep);
 
 /********************************************************************
@@ -463,7 +463,7 @@ enablerule(Solver *solv, Rule *r)
 /**********************************************************************************/
 
 /* a problem is an item on the solver's problem list. It can either be >0, in that
- * case it is a update rule, or it can be <0, which makes it refer to a job
+ * case it is a update/infarch/dup rule, or it can be <0, which makes it refer to a job
  * consisting of multiple job rules.
  */
 
@@ -809,7 +809,7 @@ makeruledecisions(Solver *solv)
 	v = ri;
       disableproblem(solv, v);
       if (v < 0)
-	reenablepolicyrules(solv, &solv->job, -(v + 1));
+	reenablepolicyrules(solv, -(v + 1));
     }
   
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
@@ -867,8 +867,7 @@ enabledisablelearntrules(Solver *solv)
 /*-------------------------------------------------------------------
  * enable weak rules
  * 
- * Enable all rules, except learnt rules, which are
- * - disabled and weak (set in weakrulemap)
+ * Reenable all disabled weak rules (marked in weakrulemap)
  * 
  */
 
@@ -1114,8 +1113,9 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 
 /* disable all policy rules that are in conflict with our job list */
 static void
-disablepolicyrules(Solver *solv, Queue *job)
+disablepolicyrules(Solver *solv)
 {
+  Queue *job = &solv->job;
   int i, j;
   Queue allq;
   Rule *r;
@@ -1160,8 +1160,9 @@ disablepolicyrules(Solver *solv, Queue *job)
 /* we just disabled job #jobidx, now reenable all policy rules that were
  * disabled because of this job */
 static void
-reenablepolicyrules(Solver *solv, Queue *job, int jobidx)
+reenablepolicyrules(Solver *solv, int jobidx)
 {
+  Queue *job = &solv->job;
   int i, j;
   Queue q, allq;
   Rule *r;
@@ -1221,7 +1222,7 @@ reenablepolicyrules(Solver *solv, Queue *job, int jobidx)
  *  get's installed. The generated rule is thus:
  *  -patch|-cpack|opack1|opack2|...
  */
-Id
+static Id
 makemultiversionconflict(Solver *solv, Id n, Id con)
 {
   Pool *pool = solv->pool;
@@ -2360,7 +2361,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, solv->rules + lastweak);
       disableproblem(solv, v);
       if (v < 0)
-	reenablepolicyrules(solv, &solv->job, -(v + 1));
+	reenablepolicyrules(solv, -(v + 1));
       reset_solver(solv);
       return 1;
     }
@@ -3396,7 +3397,7 @@ run_solver(Solver *solv, int disablerules, int doweak)
 /* FIXME: think about conflicting assertions */
 
 static void
-refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined, int essentialok)
+refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essentialok)
 {
   Pool *pool = solv->pool;
   int i, j;
@@ -3415,7 +3416,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined,
 	}
     }
   queue_empty(refined);
-  if (!essentialok && sug < 0 && (job->elements[-sug - 1] & SOLVER_ESSENTIAL) != 0)
+  if (!essentialok && sug < 0 && (solv->job.elements[-sug - 1] & SOLVER_ESSENTIAL) != 0)
     return;
   queue_init(&disabled);
   queue_push(refined, sug);
@@ -3429,7 +3430,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined,
       enableproblem(solv, problem[i]);
 
   if (sug < 0)
-    reenablepolicyrules(solv, job, -(sug + 1));
+    reenablepolicyrules(solv, -(sug + 1));
   else if (sug >= solv->updaterules && sug < solv->updaterules_end)
     {
       /* enable feature rule */
@@ -3477,7 +3478,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined,
 	    nupdate++;
 	  else
 	    {
-	      if (!essentialok && (job->elements[-v -1] & SOLVER_ESSENTIAL) != 0)
+	      if (!essentialok && (solv->job.elements[-v -1] & SOLVER_ESSENTIAL) != 0)
 		continue;	/* not that one! */
 	      njob++;
 	    }
@@ -3517,7 +3518,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined,
 		enablerule(solv, r);	/* enable corresponding feature rule */
 	    }
 	  if (v < 0)
-	    reenablepolicyrules(solv, job, -(v + 1));
+	    reenablepolicyrules(solv, -(v + 1));
 	}
       else
 	{
@@ -3552,7 +3553,7 @@ refine_suggestion(Solver *solv, Queue *job, Id *problem, Id sug, Queue *refined,
   /* reset policy rules */
   for (i = 0; problem[i]; i++)
     enableproblem(solv, problem[i]);
-  disablepolicyrules(solv, job);
+  disablepolicyrules(solv);
   /* disable problem rules again */
   for (i = 0; problem[i]; i++)
     disableproblem(solv, problem[i]);
@@ -3700,7 +3701,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
  * convert problem data into a form usable for refining.
  * Returns the number of problems.
  */
-int
+static int
 prepare_solutions(Solver *solv)
 {
   int i, j = 1, idx = 1;  
@@ -3782,7 +3783,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
   for (i = 0; i < problem.count; i++)
     {
       int solstart = solv->solutions.count;
-      refine_suggestion(solv, &solv->job, problem.elements, problem.elements[i], &solution, essentialok);
+      refine_suggestion(solv, problem.elements, problem.elements[i], &solution, essentialok);
       queue_push(&solv->solutions, 0);	/* reserve room for number of elements */
       for (j = 0; j < solution.count; j++)
 	convertsolution(solv, solution.elements[j], &solv->solutions);
@@ -5037,7 +5038,7 @@ solver_solve(Solver *solv, Queue *job)
       queue_push(&solv->ruleassertions, i);
 
   /* disable update rules that conflict with our job */
-  disablepolicyrules(solv, job);
+  disablepolicyrules(solv);
 
   /* make decisions based on job/update assertions */
   makeruledecisions(solv);
