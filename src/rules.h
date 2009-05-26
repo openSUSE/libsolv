@@ -95,9 +95,28 @@ solver_enablerule(struct _Solver *solv, Rule *r)
 Rule *solver_addrule(struct _Solver *solv, Id p, Id d);
 void solver_unifyrules(struct _Solver *solv);
 int solver_samerule(struct _Solver *solv, Rule *r1, Rule *r2);
+
+/* rpm rules */
 void solver_addrpmrulesforsolvable(struct _Solver *solv, Solvable *s, Map *m);
 void solver_addrpmrulesforweak(struct _Solver *solv, Map *m);
 void solver_addrpmrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
+
+/* update/feature rules */
+void solver_addupdaterule(struct _Solver *solv, Solvable *s, int allow_all);
+
+/* infarch rules */
+void solver_addinfarchrules(struct _Solver *solv, Map *addedmap);
+
+/* dup rules */
+void solver_createdupmaps(struct _Solver *solv);
+void solver_freedupmaps(struct _Solver *solv);
+void solver_addduprules(struct _Solver *solv, Map *addedmap);
+
+/* policy rule disabling/reenabling */
+void solver_disablepolicyrules(struct _Solver *solv);
+void solver_reenablepolicyrules(struct _Solver *solv, int jobidx);
+
+/* rule info */
 int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
 SolverRuleinfo solver_ruleinfo(struct _Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
 

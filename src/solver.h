@@ -271,8 +271,6 @@ extern void solver_solve(Solver *solv, Queue *job);
 
 extern void solver_run_sat(Solver *solv, int disablerules, int doweak);
 extern void solver_reset(Solver *solv);
-extern void solver_reenablepolicyrules(Solver *solv, int jobidx);
-extern void solver_disablepolicyrules(Solver *solv);
 
 extern int solver_dep_installed(Solver *solv, Id dep);
 extern int solver_splitprovides(Solver *solv, Id dep);
