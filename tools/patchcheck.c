@@ -1,3 +1,6 @@
+/* vim: sw=2 et
+ */
+
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -168,9 +171,23 @@ toinst(Solver *solv, Repo *repo, Repo *instrepo)
       p = solv->decisionq.elements[k];
       if (p < 0 || p == SYSTEMSOLVABLE)
 	continue;
+
+     /* printf(" toinstall %s\n", solvid2str(pool, p));*/
       /* oh my! */
       pool->solvables[p].repo = instrepo;
     }
+}
+
+void
+dump_instrepo(Repo *instrepo, Pool *pool)
+{
+  Solvable *s;
+  Id p;
+
+  printf("instrepo..\n");
+  FOR_REPO_SOLVABLES(instrepo, p, s)
+    printf("  %s\n", solvable2str(pool, s));
+  printf("done.\n");
 }
 
 void
@@ -182,6 +199,18 @@ frominst(Solver *solv, Repo *repo, Repo *instrepo)
   for (k = 1; k < pool->nsolvables; k++)
     if (pool->solvables[k].repo == instrepo)
       pool->solvables[k].repo = repo;
+}
+
+void
+usage(char** argv)
+{
+
+  printf("%s: <arch> <patchnameprefix> [repos] [--updaterepos] [repos]...\n"
+      "\t repos: repository ending in\n"
+      "\t\tpackages, packages.gz, primary.xml.gz, updateinfo.xml.gz or .solv\n",
+      argv[0]);
+
+  exit(1);
 }
 
 int
@@ -204,9 +233,19 @@ main(int argc, char **argv)
   int tests = 0;
   int updatestart = 0;
 
+  if (argc <= 3)
+    usage(argv);
+
   arch = argv[1];
   pool = pool_create();
   pool_setarch(pool, arch);
+  static const char* langs[] = {"en"};
+  pool_set_languages(pool, langs, 1);
+
+#if 0
+  pool_setdebuglevel(pool, 2);
+#endif
+
   mypatch = argv[2];
 
   repo = repo_create(pool, 0);
@@ -251,23 +290,21 @@ main(int argc, char **argv)
         fclose(fp);
     }
 
+  pool_addfileprovides(pool);
+
   /* bad hack ahead: clone repo */
   instrepo->idarraydata = repo->idarraydata;
+  instrepo->idarraysize = repo->idarraysize;
   instrepo->start = repo->start;
   instrepo->end = repo->end;
   instrepo->nsolvables = repo->nsolvables;	/* sic! */
+  instrepo->lastoff = repo->lastoff;	/* sic! */
   pool_set_installed(pool, instrepo);
-
-  pool_addfileprovides(pool);
   pool_createwhatprovides(pool);
 
   queue_init(&job);
   queue_init(&cand);
   queue_init(&badguys);
-
-#if 0
-  pool_setdebuglevel(pool, 2);
-#endif
 
   for (pid = 1; pid < pool->nsolvables; pid++)
     {
@@ -279,6 +316,7 @@ main(int argc, char **argv)
       pname = id2str(pool, s->name);
       if (strncmp(pname, "patch:", 6) != 0)
 	continue;
+
       if (*mypatch)
 	{
 	  if (strncmp(mypatch, pname + 6, strlen(pname + 6)) != 0)
@@ -300,8 +338,10 @@ main(int argc, char **argv)
 	      if (evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) < 0)
 		break;
 	    }
-	  if (p)
+	  if (p) {
+            /* printf("found a newer one for %s\n", pname+6); */
 	    continue;	/* found a newer one */
+          }
 	}
       tests++;
       if (!s->conflicts)
@@ -310,6 +350,8 @@ main(int argc, char **argv)
 #if 0
       printf("testing patch %s-%s\n", pname + 6, id2str(pool, s->evr));
 #endif
+
+      if (1) {
 
       /* Test 1: are all old patches included */
       FOR_PROVIDES(p, pp, s->name)
@@ -347,6 +389,9 @@ main(int argc, char **argv)
 		}
 	    }
 	}
+      }
+
+      if (1) {
 
       /* Test 2: are the packages installable */
       conp = s->repo->idarraydata + s->conflicts;
@@ -365,11 +410,22 @@ main(int argc, char **argv)
 	      queue_push(&job, str2id(pool, "aaa_base", 1));
 
 	      solv = solver_create(pool);
-	      solv->dontinstallrecommended = 1;
-	      solv = solver_create(pool);
+	      solv->dontinstallrecommended = 0;
 	      solver_solve(solv, &job);
+	      if (solv->problems.count)
+		{
+		  status = 1;
+                  printf("error installing original package\n");
+		  showproblems(solv, s, 0, 0);
+		}
 	      toinst(solv, repo, instrepo);
 	      solver_free(solv);
+
+#if 0
+              dump_instrepo(instrepo, pool);
+
+#endif
+#if 1
 	      queue_empty(&job);
 	      for (i = 1; i < updatestart; i++)
 		{
@@ -381,7 +437,7 @@ main(int argc, char **argv)
 	      queue_push(&job, SOLVER_INSTALL_SOLVABLE);
 	      queue_push(&job, pid);
 	      solv = solver_create(pool);
-	      solv->dontinstallrecommended = 1;
+	      /*solv->dontinstallrecommended = 1;*/
 	      solver_solve(solv, &job);
 	      if (solv->problems.count)
 		{
@@ -390,11 +446,12 @@ main(int argc, char **argv)
 		}
 	      frominst(solv, repo, instrepo);
 	      solver_free(solv);
+#endif
 	    }
 	}
+      }
 
-      if (0)
-	continue;
+      if (1) {
 
       /* Test 3: can we upgrade all packages? */
       queue_empty(&cand);
@@ -412,8 +469,6 @@ main(int argc, char **argv)
 	}
       while (cand.count)
 	{
-	  solv = solver_create(pool);
-	  solv->dontinstallrecommended = 1;
 	  solv = solver_create(pool);
 	  queue_empty(&job);
 	  for (i = 0; i < badguys.count; i++)
@@ -482,6 +537,8 @@ main(int argc, char **argv)
 	    break;	/* no progress */
 	  cand.count = j;
 	}
+      }
     }
+
   exit(status);
 }
