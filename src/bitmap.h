@@ -7,11 +7,13 @@
 
 /*
  * bitmap.h
- * 
+ *
  */
 
 #ifndef SATSOLVER_BITMAP_H
 #define SATSOLVER_BITMAP_H
+
+#include <string.h>
 
 typedef struct _Map {
   unsigned char *map;
