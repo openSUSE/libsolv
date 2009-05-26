@@ -1620,7 +1620,7 @@ pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pk
 	}
     }
   queue_free(res);
-  queue_clone(res, pkgs);
+  queue_init_clone(res, pkgs);
   for (i = 0; i < pkgs->count; i++)
     {
       m = map[pkgs->elements[i]];

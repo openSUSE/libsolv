@@ -24,6 +24,7 @@ extern "C" {
 #include "bitmap.h"
 #include "transaction.h"
 #include "rules.h"
+#include "problems.h"
 
 /*
  * Callback definitions in order to "overwrite" the policies by an external application.
@@ -264,26 +265,19 @@ typedef struct _Solver {
 #define SOLVER_PROBLEM_INFARCH_RULE		SOLVER_RULE_INFARCH
 
 
-#define SOLVER_SOLUTION_JOB		(0)
-#define SOLVER_SOLUTION_DISTUPGRADE	(-1)
-#define SOLVER_SOLUTION_INFARCH		(-2)
-
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern void solver_solve(Solver *solv, Queue *job);
 
+extern void solver_run_sat(Solver *solv, int disablerules, int doweak);
+extern void solver_reset(Solver *solv);
+extern void solver_reenablepolicyrules(Solver *solv, int jobidx);
+extern void solver_disablepolicyrules(Solver *solv);
+
 extern int solver_dep_installed(Solver *solv, Id dep);
 extern int solver_splitprovides(Solver *solv, Id dep);
 
-extern Id solver_problem_count(Solver *solv);
-extern Id solver_next_problem(Solver *solv, Id problem);
-extern Id solver_solution_count(Solver *solv, Id problem);
-extern Id solver_next_solution(Solver *solv, Id problem, Id solution);
-extern Id solver_solutionelement_count(Solver *solv, Id problem, Id solution);
-extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
-extern Id solver_findproblemrule(Solver *solv, Id problem);
-extern void solver_findallproblemrules(Solver *solv, Id problem, Queue *rules);
-
+/* obsolete */
 extern SolverRuleinfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
 
 /* XXX: why is this not static? */

@@ -17,7 +17,7 @@
 #include "util.h"
 
 void
-queue_clone(Queue *t, Queue *s)
+queue_init_clone(Queue *t, Queue *s)
 {
   t->alloc = t->elements = sat_malloc2(s->count + 8, sizeof(Id));
   if (s->count)

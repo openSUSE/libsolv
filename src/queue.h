@@ -16,16 +16,16 @@
 #include "pooltypes.h"
 
 typedef struct _Queue {
-  Id *elements;		// current elements
-  int count;		// current number of elements (minimal size for elements pointer)
-  Id *alloc;		// this is whats actually allocated, elements > alloc if shifted
-  int left;		// space left in alloc *after* elements+count
+  Id *elements;		/* pointer to elements */
+  int count;		/* current number of elements in queue */
+  Id *alloc;		/* this is whats actually allocated, elements > alloc if shifted */
+  int left;		/* space left in alloc *after* elements+count */
 } Queue;
 
 
 extern void queue_alloc_one(Queue *q);
 
-// clear queue
+/* clear queue */
 static inline void
 queue_empty(Queue *q)
 {
@@ -48,6 +48,33 @@ queue_shift(Queue *q)
   return *q->elements++;
 }
 
+static inline Id
+queue_pop(Queue *q)
+{
+  if (!q->count)
+    return 0;
+  q->left++;
+  return q->elements[--q->count];
+}
+
+static inline void
+queue_unshift(Queue *q, Id id)
+{
+  if (q->alloc && q->alloc != q->elements)
+    {
+      *--q->elements = id;
+      q->count++;
+      return;
+    }
+  if (!q->left)
+    queue_alloc_one(q);
+  if (q->count)
+    memmove(q->elements + 1, q->elements, sizeof(Id) * q->count);
+  q->count++;
+  q->elements[0] = id;
+  q->left--;
+}
+
 static inline void
 queue_push(Queue *q, Id id)
 {
@@ -67,9 +94,16 @@ queue_pushunique(Queue *q, Id id)
   queue_push(q, id);
 }
 
-extern void queue_clone(Queue *t, Queue *s);
+static inline void
+queue_push2(Queue *q, Id id1, Id id2)
+{
+  queue_push(q, id1);
+  queue_push(q, id2);
+}
+
 extern void queue_init(Queue *q);
 extern void queue_init_buffer(Queue *q, Id *buf, int size);
+extern void queue_init_clone(Queue *t, Queue *s);
 extern void queue_free(Queue *q);
 
 #endif /* SATSOLVER_QUEUE_H */

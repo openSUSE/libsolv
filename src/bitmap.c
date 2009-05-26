@@ -33,7 +33,7 @@ map_free(Map *m)
 
 // copy t <- s
 void
-map_clone(Map *t, Map *s)
+map_init_clone(Map *t, Map *s)
 {
   t->size = s->size;
   t->map = sat_malloc(s->size);
