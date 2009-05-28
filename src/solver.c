@@ -21,7 +21,6 @@
 #include "bitmap.h"
 #include "pool.h"
 #include "util.h"
-#include "evr.h"
 #include "policy.h"
 #include "solverdebug.h"
 

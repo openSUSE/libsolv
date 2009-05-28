@@ -1389,9 +1389,10 @@ dataiterator_match(Dataiterator *di, Datamatcher *ma)
 {
   if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags))
     return 0;
+  if (!ma)
+    return 1;
   return datamatcher_match(ma, di->kv.str);
 }
-
 
 /************************************************************************
  * data modify functions
