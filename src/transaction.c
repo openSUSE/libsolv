@@ -395,16 +395,19 @@ solver_create_transaction(Solver *solv)
     }
 }
 
-#define TYPE_REQ    (1<<0)
-#define TYPE_PREREQ (1<<1)
-#define TYPE_CON    (1<<2)
-#define TYPE_ERASE  (1<<3)
+#define TYPE_BROKEN	(1<<0)
+#define TYPE_REQ    	(1<<1)
+#define TYPE_PREREQ 	(1<<2)
+#define TYPE_CON    	(1<<3)
+#define TYPE_ERASE  	(1<<4)
 
-#define EDGEDATA_BLOCK 127
+#define EDGEDATA_BLOCK	127
 
 struct transel {
   Id p;
   Id edges;
+  Id mark;
+  Id ddeg;
 };
 
 struct orderdata {
@@ -509,6 +512,171 @@ addedge(struct orderdata *od, Id from, Id to, int type)
   od->edgedata[i + 1] = type;
   od->edgedata[i + 2] = 0;
   od->nedgedata = i + 3;
+  te->ddeg++;
+  od->tes[to].ddeg--;
+}
+
+static void
+addsolvableedges(struct orderdata *od, Solvable *s)
+{
+  Solver *solv = od->solv;
+  Pool *pool = solv->pool;
+  Id req, *reqp, con, *conp;
+  Id p, p2, pp2;
+  int pre;
+  Repo *installed = solv->installed;
+  Solvable *s2;
+
+  p = s - pool->solvables;
+  if (s->requires)
+    {
+      reqp = s->repo->idarraydata + s->requires;
+      pre = TYPE_REQ;
+      while ((req = *reqp++) != 0)
+	{
+	  int eraseonly = 0;
+	  if (req == SOLVABLE_PREREQMARKER)
+	    {
+	      pre = TYPE_PREREQ;
+	      continue;
+	    }
+#if 1
+	  if (s->repo == installed && pre != TYPE_PREREQ)
+	    continue;
+#endif
+	  FOR_PROVIDES(p2, pp2, req)
+	    {
+	      if (p2 == p)
+		continue;
+	      s2 = pool->solvables + p2;
+	      if (!s2->repo)
+		continue;
+	      if (s2->repo == installed && solv->decisionmap[p2] > 0)
+		continue;
+	      if (s2->repo != installed && solv->decisionmap[p2] < 0)
+		continue;	/* not interesting */
+	      if (s->repo == installed)
+		{
+		  /* we're uninstalling s */
+		  if (s2->repo == installed)
+		    {
+		      if (eraseonly == 0)
+			eraseonly = 1;
+		    }
+		  if (s2->repo != installed)
+		    {
+		      /* update p2 before erasing p */
+#if 1
+		      addedge(od, p, p2, pre);
+#endif
+		      eraseonly = -1;
+		    }
+		}
+	      else
+		{
+		  /* install p2 before installing p */
+		  if (s2->repo != installed)
+		    addedge(od, p, p2, pre);
+		}
+	    }
+	  if (eraseonly == 1)
+	    {
+	      printf("eraseonlyedge for %s req %s\n", solvable2str(pool, s), dep2str(pool, req));
+	      /* need edges to uninstalled pkgs */
+#if 1
+	      FOR_PROVIDES(p2, pp2, req)
+		{
+		  if (p2 == p)
+		    continue;
+		  s2 = pool->solvables + p2;
+		  if (!s2->repo || s2->repo != installed)
+		    continue;
+		  if (solv->decisionmap[p2] > 0)
+		    continue;
+#if 0
+		  addedge(od, p2, p, pre);
+#else
+		  addedge(od, p2, p, TYPE_ERASE);
+#endif
+		}
+#endif
+	    }
+	}
+    }
+  if (s->conflicts)
+    {
+      conp = s->repo->idarraydata + s->conflicts;
+      while ((con = *conp++) != 0)
+	{
+#if 1
+	  FOR_PROVIDES(p2, pp2, con)
+	    {
+	      if (p2 == p)
+		continue;
+	      s2 = pool->solvables + p2;
+	      if (!s2->repo)
+		continue;
+	      if (s->repo == installed)
+		{
+		  if (s2->repo != installed && solv->decisionmap[p2] >= 0)
+		    {
+		      /* deinstall p before installing p2 */
+		      addedge(od, p2, p, TYPE_CON);
+		    }
+		}
+	      else
+		{
+		  if (s2->repo == installed && solv->decisionmap[p2] < 0)
+		    {
+		      /* deinstall p2 before installing p */
+#if 1
+		      addedge(od, p, p2, TYPE_CON);
+#endif
+		    }
+		}
+
+	    }
+#endif
+	}
+    }
+}
+
+void
+breakcycle(struct orderdata *od, Id *cycle)
+{
+  Pool *pool = od->solv->pool;
+  Id ddeg, ddegm;
+  int k, l;
+  struct transel *te;
+
+  l = 0;
+  ddegm = 0;
+  for (k = 0; cycle[k + 1]; k += 2)
+    {
+      ddeg = od->tes[cycle[k]].ddeg - od->tes[cycle[k + 2]].ddeg;
+      if (!k || ddeg < ddegm)
+	{
+	  l = k;
+	  ddegm = ddeg;
+	}
+    }
+#if 0
+  l = 0;
+#endif
+
+  od->edgedata[cycle[l + 1] + 1] |= TYPE_BROKEN;
+
+  /* cycle recorded, print it */
+  printf("cycle: --> ");
+  for (k = 0; cycle[k + 1]; k += 2)
+    {
+      te = od->tes +  cycle[k];
+      if ((od->edgedata[cycle[k + 1] + 1] & TYPE_BROKEN) != 0)
+        printf("%s ##%x##> ", solvid2str(pool, te->p), od->edgedata[cycle[k + 1] + 1]);
+      else
+        printf("%s --%x--> ", solvid2str(pool, te->p), od->edgedata[cycle[k + 1] + 1]);
+    }
+  printf("\n");
 }
 
 void
@@ -518,12 +686,13 @@ solver_order_transaction(Solver *solv)
   Queue *tr = &solv->transaction;
   Repo *installed = solv->installed;
   Id type, p;
-  Solvable *s, *s2;
-  Id req, *reqp, con, *conp;
-  Id p2, pp2;
-  int i, j, pre, numte, numedge;
+  Solvable *s;
+  int i, j, k, numte, numedge;
   struct orderdata od;
   struct transel *te;
+  Queue todo;
+  int cycstart, cycel, broken;
+  Id *cycle;
 
   /* create a transaction element for every active component */
   numte = 0;
@@ -562,127 +731,105 @@ solver_order_transaction(Solver *solv)
     {
       type = tr->elements[i];
       p = tr->elements[i + 1];
-      s = pool->solvables + p;
-      if (s->requires)
-	{
-	  reqp = s->repo->idarraydata + s->requires;
-	  pre = TYPE_REQ;
-	  while ((req = *reqp++) != 0)
-	    {
-	      int eraseonly = 0;
-	      if (req == SOLVABLE_PREREQMARKER)
-		{
-		  pre = TYPE_PREREQ;
-		  continue;
-		}
-#if 1
-	      if (s->repo == installed && pre != TYPE_PREREQ)
-		continue;
-#endif
-	      FOR_PROVIDES(p2, pp2, req)
-		{
-		  if (p2 == p)
-		    continue;
-		  s2 = pool->solvables + p2;
-		  if (!s2->repo)
-		    continue;
-		  if (s2->repo == installed && solv->decisionmap[p2] > 0)
-		    continue;
-		  if (s2->repo != installed && solv->decisionmap[p2] < 0)
-		    continue;	/* not interesting */
-		  if (s->repo == installed)
-		    {
-		      /* we're uninstalling s */
-		      if (s2->repo == installed)
-			{
-			  if (eraseonly == 0)
-			    eraseonly = 1;
-			}
-		      if (s2->repo != installed)
-			{
-			  /* update p2 before erasing p */
-#if 1
-		          addedge(&od, p, p2, pre);
-#endif
-			  eraseonly = -1;
-			}
-		    }
-		  else
-		    {
-		      /* install p2 before installing p */
-		      if (s2->repo != installed)
-		        addedge(&od, p, p2, pre);
-		    }
-		}
-	      if (eraseonly == 1)
-		{
-		  printf("eraseonlyedge for %s req %s\n", solvable2str(pool, s), dep2str(pool, req));
-		  /* need edges to uninstalled pkgs */
-#if 1
-		  FOR_PROVIDES(p2, pp2, req)
-		    {
-		      if (p2 == p)
-			continue;
-		      s2 = pool->solvables + p2;
-		      if (!s2->repo || s2->repo != installed)
-			continue;
-		      if (solv->decisionmap[p2] > 0)
-			continue;
-#if 0
-		      addedge(&od, p2, p, pre);
-#else
-		      addedge(&od, p2, p, TYPE_ERASE);
-#endif
-		    }
-#endif
-		}
-	    }
-	}
-      if (s->conflicts)
-	{
-	  conp = s->repo->idarraydata + s->conflicts;
-	  while ((con = *conp++) != 0)
-	    {
-#if 1
-	      FOR_PROVIDES(p2, pp2, con)
-		{
-		  if (p2 == p)
-		    continue;
-		  s2 = pool->solvables + p2;
-		  if (!s2->repo)
-		    continue;
-		  if (s->repo == installed)
-		    {
-		      if (s2->repo != installed && solv->decisionmap[p2] >= 0)
-			{
-			  /* deinstall p before installing p2 */
-			  addedge(&od, p2, p, TYPE_CON);
-			}
-		    }
-		  else
-		    {
-		      if (s2->repo == installed && solv->decisionmap[p2] < 0)
-			{
-			  /* deinstall p2 before installing p */
-#if 1
-			  addedge(&od, p, p2, TYPE_CON);
-#endif
-			}
-		    }
-
-		}
-#endif
-	    }
-	}
+      addsolvableedges(&od, pool->solvables + p);
     }
+
+  /* kill all cycles */
+  broken = 0;
+
+  queue_init(&todo);
+  for (i = numte - 1; i > 0; i--)
+    queue_push(&todo, i);
+
+  while (todo.count)
+    {
+      i = queue_pop(&todo);
+      /* printf("- look at TE %d\n", i); */
+      if (i < 0)
+	{
+	  i = -i;
+	  od.tes[i].mark = 2;	/* done with that one */
+	  continue;
+	}
+      te = od.tes + i;
+      if (te->mark == 2)
+	continue;		/* already finished before */
+      if (te->mark == 0)
+	{
+	  int edgestovisit = 0;
+	  /* new node, visit edges */
+	  for (j = te->edges; (k = od.edgedata[j]) != 0; j += 2)
+	    {
+	      if ((od.edgedata[j + 1] & TYPE_BROKEN) != 0)
+		continue;
+	      if (od.tes[k].mark == 2)
+		continue;	/* no need to visit again */
+	      if (!edgestovisit++)
+	        queue_push(&todo, -i);	/* end of edges marker */
+	      queue_push(&todo, k);
+	    }
+	  if (!edgestovisit)
+	    te->mark = 2;	/* no edges, done with that one */
+	  else
+	    te->mark = 1;	/* under investigation */
+	  continue;
+	}
+      /* oh no, we found a cycle */
+      /* find start of cycle node (<0) */
+      for (j = todo.count - 1; j >= 0; j--)
+	if (todo.elements[j] == -i)
+	  break;
+      assert(j >= 0);
+      cycstart = j;
+      /* build te/edge chain */
+      k = cycstart;
+      for (j = k; j < todo.count; j++)
+	if (todo.elements[j] < 0)
+	  todo.elements[k++] = -todo.elements[j];
+      cycel = k - cycstart;
+      assert(cycel > 1);
+      /* make room for edges, two extra element for cycle loop + terminating 0 */
+      while (todo.count < cycstart + 2 * cycel + 2)
+	queue_push(&todo, 0);
+      cycle = todo.elements + cycstart;
+      cycle[cycel] = i;		/* close the loop */
+      cycle[2 * cycel + 1] = 0;	/* terminator */
+      for (k = cycel; k > 0; k--)
+	{
+	  cycle[k * 2] = cycle[k];
+	  te = od.tes + cycle[k - 1];
+	  if (te->mark == 1)
+	    te->mark = 0;	/* reset investigation marker */
+	  /* printf("searching for edge from %d to %d\n", cycle[k - 1], cycle[k]); */
+	  for (j = te->edges; od.edgedata[j]; j += 2)
+	    if (od.edgedata[j] == cycle[k])
+	      break;
+	  assert(od.edgedata[j]);
+	  cycle[k * 2 - 1] = j;
+	}
+      /* now cycle looks like this: */
+      /* te1 edge te2 edge te3 ... teN edge te1 0 */
+      breakcycle(&od, cycle);
+      broken++;
+      /* restart with start of cycle */
+      todo.count = cycstart + 1;
+    }
+  printf("Broken: %d\n", broken);
+
   numedge = 0;
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     {
+#if 0
       printf("TE #%d, %d(%s)\n", i, te->p, solvid2str(pool, te->p));
+#endif
       for (j = te->edges; od.edgedata[j]; j += 2)
         {
+#if 0
 	  struct transel *te2 = od.tes + od.edgedata[j];
+	  if ((od.edgedata[j + 1] & TYPE_BROKEN) != 0)
+	    continue;
 	  printf("  depends %x on TE %d, %d(%s)\n", od.edgedata[j + 1], od.edgedata[j], te2->p, solvid2str(pool, te2->p));
+#endif
           numedge++;
  	}
     }
