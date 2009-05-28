@@ -1,6 +1,13 @@
 /* vim: sw=2 et
  */
 
+/*
+ * Copyright (c) 2009, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -308,6 +315,8 @@ main(int argc, char **argv)
 
   for (pid = 1; pid < pool->nsolvables; pid++)
     {
+      int shown = 0;
+#define SHOW_PATCH() if (!shown++) printf("%s:\n", solvable2str(pool, s));
       Solvable *s = pool->solvables + pid;
       if (!s->repo)
         continue;
@@ -358,23 +367,21 @@ main(int argc, char **argv)
         {
 	  Solvable *s2 = pool->solvables + p;
 	  Id con2, *conp2;
-	  int shown = 0;
 
-	  if (evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) <= 0)
-	    continue;
 	  if (!s2->conflicts)
+	    continue;
+	  if (evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) <= 0)
 	    continue;
 	  conp2 = s2->repo->idarraydata + s2->conflicts;
           while ((con2 = *conp2++) != 0)
 	    {
-	      Reldep *rd2;
+	      Reldep *rd2, *rd;
 	      if (!ISRELDEP(con2))
 		continue;
 	      rd2 = GETRELDEP(pool, con2);
 	      conp = s->repo->idarraydata + s->conflicts;
 	      while ((con = *conp++) != 0)
 		{
-		  Reldep *rd;
 		  if (!ISRELDEP(con))
 		    continue;
 		  rd = GETRELDEP(pool, con);
@@ -383,16 +390,25 @@ main(int argc, char **argv)
 		}
 	      if (!con)
 		{
-		  if (!shown++)
-		    printf("%s:\n", solvable2str(pool, s));
+                  SHOW_PATCH();
 		  printf("  %s contained %s\n", solvable2str(pool, s2), dep2str(pool, rd2->name));
 		}
+              else
+               {
+                 if (evrcmp(pool, rd->evr, rd2->evr, EVRCMP_COMPARE) < 0)
+                   {
+                     SHOW_PATCH();
+                     printf("  %s required newer version %s-%s of %s-%s\n",
+                         solvable2str(pool, s2), dep2str(pool, rd2->name), dep2str(pool, rd2->evr),
+                         dep2str(pool, rd->name), dep2str(pool, rd->evr));
+                   }
+               }
+	
 	    }
 	}
       }
 
       if (1) {
-
       /* Test 2: are the packages installable */
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
@@ -538,6 +554,35 @@ main(int argc, char **argv)
 	  cand.count = j;
 	}
       }
+
+      if (1)
+        {
+          /* Test 4: no GA package fulfills patch dependency */
+          conp = s->repo->idarraydata + s->conflicts;
+          while ((con = *conp++) != 0)
+            {
+              Reldep *rd;
+              Id rp, rpp;
+
+              if (!ISRELDEP(con))
+                continue;
+              rd = GETRELDEP(pool, con);
+              FOR_PROVIDES(rp, rpp, rd->name)
+                {
+                  Solvable *s2 = pool_id2solvable(pool, rp);
+                  if (rp < updatestart
+                      && evrcmp(pool, rd->evr, s2->evr, EVRCMP_COMPARE) < 0
+                      && pool_match_nevr_rel(pool, s2, rd->name)
+                      )
+                    {
+                      SHOW_PATCH();
+                      printf("  conflict %s < %s satisfied by non-updated package %s\n",
+                          dep2str(pool, rd->name), dep2str(pool, rd->evr), solvable2str(pool, s2));
+                      break;
+                    }
+                }
+            }
+	}
     }
 
   exit(status);
