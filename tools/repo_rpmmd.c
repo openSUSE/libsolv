@@ -833,7 +833,8 @@ startElement(void *userData, const char *name, const char **atts)
           }
         else
           {
-            fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n", atts, *atts);
+            fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n",
+                    (void*) atts, *atts);
             break;
           }
         if ( (str = find_attr("size", atts)) )
