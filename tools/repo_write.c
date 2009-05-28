@@ -1217,7 +1217,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
     {
       dirpool = &owndirpool;
       dirpooldata = 0;
-      dirpool_create(dirpool);
+      dirpool_init(dirpool);
       cbdata.owndirpool = dirpool;
     }
   else if (dirpool)

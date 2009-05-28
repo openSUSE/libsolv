@@ -15,7 +15,7 @@
 #define DIR_BLOCK 127
 
 void
-dirpool_create(Dirpool *dp)
+dirpool_init(Dirpool *dp)
 {
   memset(dp, 0, sizeof(*dp));
 }
