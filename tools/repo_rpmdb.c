@@ -358,7 +358,7 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
       /* not utf8, assume latin1 */
       buf = sat_malloc(2 * strlen(str) + 1);
       cp = (const unsigned char *)str;
-      str = (char*) buf;
+      str = (char *)buf;
       bp = buf;
       while ((c = *cp++) != 0)
 	{
