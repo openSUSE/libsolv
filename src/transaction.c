@@ -396,18 +396,24 @@ solver_create_transaction(Solver *solv)
 }
 
 #define TYPE_BROKEN	(1<<0)
-#define TYPE_REQ    	(1<<1)
-#define TYPE_PREREQ 	(1<<2)
-#define TYPE_CON    	(1<<3)
-#define TYPE_ERASE  	(1<<4)
+#define TYPE_CON    	(1<<1)
+
+#define TYPE_REQ_P    	(1<<2)
+#define TYPE_PREREQ_P 	(1<<3)
+
+#define TYPE_REQ    	(1<<4)
+#define TYPE_PREREQ 	(1<<5)
 
 #define EDGEDATA_BLOCK	127
 
 struct transel {
   Id p;
+  Id type;
   Id edges;
+  Id invedges;
   Id mark;
-  Id ddeg;
+  Id medianr;
+  Id ddeg;	/* unused */
 };
 
 struct orderdata {
@@ -416,9 +422,11 @@ struct orderdata {
   int ntes;
   Id *edgedata;
   int nedgedata;
+  Id *invedgedata;
+  Map cycletes;
 };
 
-static void
+static int
 addedge(struct orderdata *od, Id from, Id to, int type)
 {
   Solver *solv = od->solv;
@@ -436,15 +444,17 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 	from = solv->transaction_installed[from - solv->installed->start];
       else
 	{
+	  int ret = 0;
 	  Queue ti;
 	  Id tibuf[5];
+
 	  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
 	  solver_transaction_all_pkgs(solv, from, &ti);
 	  for (i = 0; i < ti.count; i++)
-	    addedge(od, ti.elements[i], to, type);
+	    ret |= addedge(od, ti.elements[i], to, type);
 	  queue_free(&ti);
+	  return ret;
 	}
-      return;
     }
   s = pool->solvables + to;
   if (s->repo == solv->installed && solv->transaction_installed[to - solv->installed->start])
@@ -454,14 +464,16 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 	to = solv->transaction_installed[to - solv->installed->start];
       else
 	{
+	  int ret = 0;
 	  Queue ti;
 	  Id tibuf[5];
+
 	  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
 	  solver_transaction_all_pkgs(solv, to, &ti);
 	  for (i = 0; i < ti.count; i++)
-	    addedge(od, from, ti.elements[i], type);
+	    ret |= addedge(od, from, ti.elements[i], type);
 	  queue_free(&ti);
-	  return;
+	  return ret;
 	}
     }
 
@@ -470,38 +482,41 @@ addedge(struct orderdata *od, Id from, Id to, int type)
     if (te->p == to)
       break;
   if (i == od->ntes)
-    return;
+    return 0;
   to = i;
 
   for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
     if (te->p == from)
       break;
   if (i == od->ntes)
-    return;
+    return 0;
 
   if (i == to)
-    return;	/* no edges to ourselfes */
+    return 0;	/* no edges to ourselfes */
 
-  // printf("edge %d -> %d type %x\n", i, to, type);
+  /* printf("edge %d(%s) -> %d(%s) type %x\n", i, solvid2str(pool, od->tes[i].p), to, solvid2str(pool, od->tes[to].p), type); */
 
   for (i = te->edges; od->edgedata[i]; i += 2)
     if (od->edgedata[i] == to)
       break;
+  /* test of brokenness */
+  if (type == TYPE_BROKEN)
+    return od->edgedata[i] && (od->edgedata[i + 1] & TYPE_BROKEN) != 0 ? 1 : 0;
   if (od->edgedata[i])
     {
       od->edgedata[i + 1] |= type;
-      return;
+      return 0;
     }
   if (i + 1 == od->nedgedata)
     {
-      // printf("tail add %d\n", i - te->edges);
+      /* printf("tail add %d\n", i - te->edges); */
       if (!i)
 	te->edges = ++i;
       od->edgedata = sat_extend(od->edgedata, od->nedgedata, 3, sizeof(Id), EDGEDATA_BLOCK);
     }
   else
     {
-      // printf("extend %d\n", i - te->edges);
+      /* printf("extend %d\n", i - te->edges); */
       od->edgedata = sat_extend(od->edgedata, od->nedgedata, 3 + (i - te->edges), sizeof(Id), EDGEDATA_BLOCK);
       if (i > te->edges)
 	memcpy(od->edgedata + od->nedgedata, od->edgedata + te->edges, sizeof(Id) * (i - te->edges));
@@ -514,6 +529,44 @@ addedge(struct orderdata *od, Id from, Id to, int type)
   od->nedgedata = i + 3;
   te->ddeg++;
   od->tes[to].ddeg--;
+  return 0;
+}
+
+static int
+havechoice(struct orderdata *od, Id p, Id q1, Id q2)
+{
+  Solver *solv = od->solv;
+  Id ti1buf[5], ti2buf[5];
+  Queue ti1, ti2;
+  int i, j;
+
+  /* both q1 and q2 are uninstalls. check if their TEs intersect */
+  /* common case: just one TE for both packages */
+  printf("havechoice %d %d %d\n", p, q1, q2);
+  if (solv->transaction_installed[q1 - solv->installed->start] == 0)
+    return 1;
+  if (solv->transaction_installed[q2 - solv->installed->start] == 0)
+    return 1;
+  if (solv->transaction_installed[q1 - solv->installed->start] == solv->transaction_installed[q2 - solv->installed->start])
+    return 0;
+  if (solv->transaction_installed[q1 - solv->installed->start] > 0 && solv->transaction_installed[q2 - solv->installed->start] > 0)
+    return 1;
+  queue_init_buffer(&ti1, ti1buf, sizeof(ti1buf)/sizeof(*ti1buf));
+  solver_transaction_all_pkgs(solv, q1, &ti1);
+  queue_init_buffer(&ti2, ti2buf, sizeof(ti2buf)/sizeof(*ti2buf));
+  solver_transaction_all_pkgs(solv, q2, &ti2);
+  for (i = 0; i < ti1.count; i++)
+    for (j = 0; j < ti2.count; j++)
+      if (ti1.elements[i] == ti2.elements[j])
+	{
+	  /* found a common edge */
+	  queue_free(&ti1);
+	  queue_free(&ti2);
+	  return 0;
+	}
+  queue_free(&ti1);
+  queue_free(&ti2);
+  return 1;
 }
 
 static void
@@ -523,83 +576,107 @@ addsolvableedges(struct orderdata *od, Solvable *s)
   Pool *pool = solv->pool;
   Id req, *reqp, con, *conp;
   Id p, p2, pp2;
-  int pre;
+  int i, j, pre, numins;
   Repo *installed = solv->installed;
   Solvable *s2;
+  Queue reqq;
 
   p = s - pool->solvables;
+  queue_init(&reqq);
   if (s->requires)
     {
       reqp = s->repo->idarraydata + s->requires;
       pre = TYPE_REQ;
       while ((req = *reqp++) != 0)
 	{
-	  int eraseonly = 0;
 	  if (req == SOLVABLE_PREREQMARKER)
 	    {
 	      pre = TYPE_PREREQ;
 	      continue;
 	    }
-#if 1
-	  if (s->repo == installed && pre != TYPE_PREREQ)
-	    continue;
-#endif
+	  queue_empty(&reqq);
+	  numins = 0;	/* number of packages to be installed providing it */
 	  FOR_PROVIDES(p2, pp2, req)
 	    {
-	      if (p2 == p)
-		continue;
 	      s2 = pool->solvables + p2;
-	      if (!s2->repo)
-		continue;
+	      if (p2 == p)
+		{
+		  reqq.count = 0;	/* self provides */
+		  break;
+		}
 	      if (s2->repo == installed && solv->decisionmap[p2] > 0)
-		continue;
-	      if (s2->repo != installed && solv->decisionmap[p2] < 0)
-		continue;	/* not interesting */
+		{
+		  reqq.count = 0;	/* provided by package that stays installed */
+		  break;
+		}
+	      if (s2->repo != installed && solv->decisionmap[p2] <= 0)
+		continue;		/* package stays uninstalled */
+	      
 	      if (s->repo == installed)
 		{
-		  /* we're uninstalling s */
-		  if (s2->repo == installed)
-		    {
-		      if (eraseonly == 0)
-			eraseonly = 1;
-		    }
+		  /* s gets uninstalled */
+		  queue_pushunique(&reqq, p2);
 		  if (s2->repo != installed)
+		    numins++;
+		}
+	      else
+		{
+		  if (s2->repo == installed)
+		    continue;	/* s2 gets uninstalled */
+		  queue_pushunique(&reqq, p2);
+		  /* EDGE s(A) -> s2(A) */
+		}
+	    }
+	  if (numins && reqq.count)
+	    {
+	      /* no mixed types, remove all deps on uninstalls */
+	      for (i = j = 0; i < reqq.count; i++)
+		if (pool->solvables[reqq.elements[i]].repo != installed)
+		  reqq.elements[j++] = reqq.elements[i];
+	      reqq.count = j;
+	    }
+          if (!reqq.count)
+	    continue;
+          for (i = 0; i < reqq.count; i++)
+	    {
+	      int choice = 0;
+	      p2 = reqq.elements[i];
+	      if (pool->solvables[p2].repo != installed)
+		{
+		  /* all elements of reqq are installs, thus have different TEs */
+		  choice = reqq.count - 1;
+		  if (pool->solvables[p].repo != installed)
 		    {
-		      /* update p2 before erasing p */
-#if 1
-		      addedge(od, p, p2, pre);
+#if 0
+		      printf("add inst edge choice %d (%s -> %s -> %s)\n", choice, solvid2str(pool, p), dep2str(pool, req), solvid2str(pool, p2));
 #endif
-		      eraseonly = -1;
+		      addedge(od, p, p2, pre);
+		    }
+		  else
+		    {
+#if 0
+		      printf("add uninst->inst edge choice %d (%s -> %s -> %s)\n", choice, solvid2str(pool, p), dep2str(pool, req), solvid2str(pool, p2));
+#endif
+		      addedge(od, p, p2, pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
 		    }
 		}
 	      else
 		{
-		  /* install p2 before installing p */
-		  if (s2->repo != installed)
-		    addedge(od, p, p2, pre);
-		}
-	    }
-	  if (eraseonly == 1)
-	    {
-	      printf("eraseonlyedge for %s req %s\n", solvable2str(pool, s), dep2str(pool, req));
-	      /* need edges to uninstalled pkgs */
 #if 1
-	      FOR_PROVIDES(p2, pp2, req)
-		{
-		  if (p2 == p)
-		    continue;
-		  s2 = pool->solvables + p2;
-		  if (!s2->repo || s2->repo != installed)
-		    continue;
-		  if (solv->decisionmap[p2] > 0)
-		    continue;
+		  choice = 0;
+		  for (j = 0; j < reqq.count; j++)
+		    {
+		      if (i == j)
+			continue;
+		      if (havechoice(od, p, reqq.elements[i], reqq.elements[j]))
+			choice++;
+		    }
+#endif
 #if 0
-		  addedge(od, p2, p, pre);
-#else
-		  addedge(od, p2, p, TYPE_ERASE);
+		  printf("add uninst->uninst edge choice %d (%s -> %s -> %s)\n", choice, solvid2str(pool, p), dep2str(pool, req), solvid2str(pool, p2));
 #endif
+	          addedge(od, p2, p, pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
 		}
-#endif
 	    }
 	}
     }
@@ -608,7 +685,6 @@ addsolvableedges(struct orderdata *od, Solvable *s)
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
 	{
-#if 1
 	  FOR_PROVIDES(p2, pp2, con)
 	    {
 	      if (p2 == p)
@@ -629,44 +705,85 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		  if (s2->repo == installed && solv->decisionmap[p2] < 0)
 		    {
 		      /* deinstall p2 before installing p */
-#if 1
 		      addedge(od, p, p2, TYPE_CON);
-#endif
 		    }
 		}
 
 	    }
-#endif
 	}
     }
+  queue_free(&reqq);
+}
+
+static inline int
+haveprereq(Pool *pool, Id solvid)
+{
+  Solvable *s = pool->solvables + solvid;
+  if (s->requires)
+    {
+      Id req, *reqp;
+      int inpre = 0;
+      reqp = s->repo->idarraydata + s->requires;
+      while ((req = *reqp++) != 0)
+	{
+          if (req == SOLVABLE_PREREQMARKER)
+	    {
+	      inpre = 1;
+	      continue;
+	    }
+	  if (inpre && strncmp(id2str(pool, req), "rpmlib(", 7) != 0)
+	    return 1;
+	}
+    }
+  return 0;
 }
 
 void
 breakcycle(struct orderdata *od, Id *cycle)
 {
   Pool *pool = od->solv->pool;
-  Id ddeg, ddegm;
+  Id ddegmin, ddegmax, ddeg;
   int k, l;
   struct transel *te;
 
   l = 0;
-  ddegm = 0;
+  ddegmin = ddegmax = 0;
   for (k = 0; cycle[k + 1]; k += 2)
     {
-      ddeg = od->tes[cycle[k]].ddeg - od->tes[cycle[k + 2]].ddeg;
-      if (!k || ddeg < ddegm)
+      MAPSET(&od->cycletes, cycle[k]);	/* this te is involved in a cycle */
+      ddeg = od->edgedata[cycle[k + 1] + 1];
+      if (ddeg > ddegmax)
+	ddegmax = ddeg;
+      if (!k || ddeg < ddegmin)
 	{
 	  l = k;
-	  ddegm = ddeg;
+	  ddegmin = ddeg;
+	  continue;
+	}
+      if (ddeg == ddegmin)
+	{
+	  if (haveprereq(pool, od->tes[cycle[l]].p) && !haveprereq(pool, od->tes[cycle[k]].p))
+	    {
+	      /* prefer k, as l comes from a package with contains scriptlets */
+	      l = k;
+	      ddegmin = ddeg;
+	      continue;
+	    }
+	  /* same edge value, check for prereq */
 	}
     }
-#if 0
-  l = 0;
-#endif
 
   od->edgedata[cycle[l + 1] + 1] |= TYPE_BROKEN;
 
+#if 1
+  if (ddegmin < TYPE_REQ)
+    return;
+#endif
+
+
   /* cycle recorded, print it */
+  if ((ddegmax & TYPE_PREREQ) != 0)
+    printf("CRITICAL ");
   printf("cycle: --> ");
   for (k = 0; cycle[k + 1]; k += 2)
     {
@@ -690,10 +807,14 @@ solver_order_transaction(Solver *solv)
   int i, j, k, numte, numedge;
   struct orderdata od;
   struct transel *te;
-  Queue todo;
+  Queue todo, obsq;
   int cycstart, cycel, broken;
-  Id *cycle;
+  Id *cycle, *obstypes;
+  int oldcount;
+  int now;
 
+  POOL_DEBUG(SAT_DEBUG_STATS, "ordering transaction\n");
+  now = sat_timems(0);
   /* create a transaction element for every active component */
   numte = 0;
   for (i = 0; i < tr->count; i += 2)
@@ -706,15 +827,16 @@ solver_order_transaction(Solver *solv)
   if (!numte)
     return;	/* nothing to do... */
 
-
-  printf("numte = %d\n", numte);
+  POOL_DEBUG(SAT_DEBUG_STATS, "transaction elements: %d\n", numte);
   numte++;	/* leave first one zero */
+  memset(&od, 0, sizeof(od));
   od.solv = solv;
   od.ntes = numte;
   od.tes = sat_calloc(numte, sizeof(*od.tes));
   od.edgedata = sat_extend(0, 0, 1, sizeof(Id), EDGEDATA_BLOCK);
   od.edgedata[0] = 0;
   od.nedgedata = 1;
+  map_init(&od.cycletes, numte);
 
   for (i = 0, te = od.tes + 1; i < tr->count; i += 2)
     {
@@ -723,6 +845,8 @@ solver_order_transaction(Solver *solv)
       if (s->repo == installed && solv->transaction_installed[p - solv->installed->start])
 	continue;
       te->p = p;
+      te->type = tr->elements[i];
+      te->medianr = solvable_lookup_num(s, SOLVABLE_MEDIANR, 0);
       te++;
     }
 
@@ -734,6 +858,13 @@ solver_order_transaction(Solver *solv)
       addsolvableedges(&od, pool->solvables + p);
     }
 
+  /* count edges */
+  numedge = 0;
+  for (i = 1, te = od.tes + i; i < numte; i++, te++)
+    for (j = te->edges; od.edgedata[j]; j += 2)
+      numedge++;
+  POOL_DEBUG(SAT_DEBUG_STATS, "edges: %d, edge space: %d\n", numedge, od.nedgedata / 2);
+  
   /* kill all cycles */
   broken = 0;
 
@@ -814,24 +945,128 @@ solver_order_transaction(Solver *solv)
       /* restart with start of cycle */
       todo.count = cycstart + 1;
     }
-  printf("Broken: %d\n", broken);
+  POOL_DEBUG(SAT_DEBUG_STATS, "cycles broken: %d\n", broken);
 
-  numedge = 0;
+  /* invert all edges */
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     {
-#if 0
-      printf("TE #%d, %d(%s)\n", i, te->p, solvid2str(pool, te->p));
-#endif
+      te->invedges = 1;	/* term 0 */
+      te->mark = 0;	/* backref count */
+    }
+
+  for (i = 1, te = od.tes + i; i < numte; i++, te++)
+    {
       for (j = te->edges; od.edgedata[j]; j += 2)
         {
-#if 0
-	  struct transel *te2 = od.tes + od.edgedata[j];
 	  if ((od.edgedata[j + 1] & TYPE_BROKEN) != 0)
 	    continue;
-	  printf("  depends %x on TE %d, %d(%s)\n", od.edgedata[j + 1], od.edgedata[j], te2->p, solvid2str(pool, te2->p));
-#endif
-          numedge++;
- 	}
+	  struct transel *te2 = od.tes + od.edgedata[j];
+	  te2->invedges++;
+	}
     }
-  printf("TEs: %d, Edges: %d, Space: %d\n", numte - 1, numedge, od.nedgedata / 2);
+  j = 1;
+  for (i = 1, te = od.tes + i; i < numte; i++, te++)
+    {
+      te->invedges += j;
+      j = te->invedges;
+    }
+  POOL_DEBUG(SAT_DEBUG_STATS, "invedge space: %d\n", j + 1);
+  od.invedgedata = sat_calloc(j + 1, sizeof(Id));
+  for (i = 1, te = od.tes + i; i < numte; i++, te++)
+    {
+      for (j = te->edges; od.edgedata[j]; j += 2)
+        {
+	  if ((od.edgedata[j + 1] & TYPE_BROKEN) != 0)
+	    continue;
+	  struct transel *te2 = od.tes + od.edgedata[j];
+	  od.invedgedata[--te2->invedges] = i;
+	  te->mark++;
+	}
+    }
+  /* now the final ordering */
+  for (i = 1, te = od.tes + i; i < numte; i++, te++)
+    if (te->mark == 0)
+      queue_push(&todo, i);
+  assert(todo.count > 0);
+  if (installed)
+    {
+      obstypes = sat_calloc(installed->end - installed->start, sizeof(Id));
+      for (i = 0; i < tr->count; i += 2)
+	{
+	  p = tr->elements[i + 1];
+	  s = pool->solvables + p;
+	  if (s->repo == installed && solv->transaction_installed[p - installed->start])
+	    obstypes[p - installed->start] = tr->elements[i];
+	}
+    }
+  else
+    obstypes = 0;
+  oldcount = tr->count;
+  queue_empty(tr);
+  queue_init(&obsq);
+  
+  while (todo.count)
+    {
+      /* select an i */
+      i = todo.count;
+      if (installed)
+	{
+	  for (i = 0; i < todo.count; i++)
+	    {
+	      j = todo.elements[i];
+	      if (pool->solvables[od.tes[j].p].repo == installed)
+	        break;
+	    }
+	}
+      if (i == todo.count)
+	{
+	  for (i = 0; i < todo.count; i++)
+	    {
+	      j = todo.elements[i];
+	      if (MAPTST(&od.cycletes, j))
+		break;
+	    }
+	}
+      if (i == todo.count)
+        i = 0;
+      te = od.tes + todo.elements[i];
+      queue_push(tr, te->type);
+      queue_push(tr, te->p);
+      s = pool->solvables + te->p;
+      if (installed && s->repo != installed)
+	{
+	  queue_empty(&obsq);
+	  solver_transaction_all_pkgs(solv, te->p, &obsq);
+	  for (j = 0; j < obsq.count; j++)
+	    {
+	      p = obsq.elements[j];
+	      assert(p >= installed->start && p < installed->end);
+	      if (obstypes[p - installed->start])
+		{
+		  queue_push(tr, obstypes[p - installed->start]);
+		  queue_push(tr, p);
+		  obstypes[p - installed->start] = 0;
+		}
+	    }
+	}
+      if (i < todo.count - 1)
+        memmove(todo.elements + i, todo.elements + i + 1, (todo.count - 1 - i) * sizeof(Id));
+      queue_pop(&todo);
+      for (j = te->invedges; od.invedgedata[j]; j++)
+	{
+	  struct transel *te2 = od.tes + od.invedgedata[j];
+	  assert(te2->mark > 0);
+	  if (--te2->mark == 0)
+	    {
+	      queue_push(&todo, od.invedgedata[j]);
+	    }
+	}
+    }
+  queue_free(&todo);
+  queue_free(&obsq);
+  for (i = 1, te = od.tes + i; i < numte; i++, te++)
+    assert(te->mark == 0);
+  assert(tr->count == oldcount);
+  POOL_DEBUG(SAT_DEBUG_STATS, "transaction ordering took %d ms\n", sat_timems(now));
 }
+
