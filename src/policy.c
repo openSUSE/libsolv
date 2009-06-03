@@ -414,22 +414,25 @@ int
 policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
 {
   Pool *pool = solv->pool;
+  Id v1, v2;
   Id vendormask1, vendormask2;
 
-  if (solv && solv->vendorCheckCb)
+  if (solv->vendorCheckCb)
    {   /* The application is responsible for */
-     return solv->vendorCheckCb(solv->pool, s1, s2);
+     return solv->vendorCheckCb(pool, s1, s2);
    }
-
-  if (s1->vendor == s2->vendor)
+  /* treat a missing vendor as empty string */
+  v1 = s1->vendor ? s1->vendor : ID_EMPTY;
+  v2 = s2->vendor ? s2->vendor : ID_EMPTY;
+  if (v1 == v2)
     return 0;
-  vendormask1 = pool_vendor2mask(pool, s1->vendor);
+  vendormask1 = pool_vendor2mask(pool, v1);
   if (!vendormask1)
-    return 0;
-  vendormask2 = pool_vendor2mask(pool, s2->vendor);
+    return 1;	/* can't match */
+  vendormask2 = pool_vendor2mask(pool, v2);
   if ((vendormask1 & vendormask2) != 0)
     return 0;
-  return 1;
+  return 1;	/* no class matches */
 }
 
 
