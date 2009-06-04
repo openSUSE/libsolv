@@ -20,7 +20,7 @@ void
 map_init(Map *m, int n)
 {
   m->size = (n + 7) >> 3;
-  m->map = sat_calloc(m->size, 1);
+  m->map = n ? sat_calloc(m->size, 1) : 0;
 }
 
 // free space allocated

@@ -58,20 +58,20 @@ obsq_sortcmp(const void *ap, const void *bp, void *dp)
 }
 
 void
-solver_transaction_all_pkgs(Solver *solv, Id p, Queue *pkgs)
+solver_transaction_all_pkgs(Transaction *trans, Id p, Queue *pkgs)
 {
-  Pool *pool = solv->pool;
+  Pool *pool = trans->pool;
   Solvable *s = pool->solvables + p;
-  Queue *ti = &solv->transaction_info;
+  Queue *ti = &trans->transaction_info;
   Id q;
   int i;
 
   queue_empty(pkgs);
   if (p <= 0 || !s->repo)
     return;
-  if (s->repo == solv->installed)
+  if (s->repo == pool->installed)
     {
-      q = solv->transaction_installed[p - solv->installed->start];
+      q = trans->transaction_installed[p - pool->installed->start];
       if (!q)
 	return;
       if (q > 0)
@@ -107,22 +107,22 @@ solver_transaction_all_pkgs(Solver *solv, Id p, Queue *pkgs)
 }
 
 Id
-solver_transaction_pkg(Solver *solv, Id p)
+solver_transaction_pkg(Transaction *trans, Id p)
 {
-  Pool *pool = solv->pool;
+  Pool *pool = trans->pool;
   Solvable *s = pool->solvables + p;
   Queue ti;
   Id tibuf[5];
 
   if (p <= 0 || !s->repo)
     return 0;
-  if (s->repo == solv->installed)
+  if (s->repo == pool->installed)
     {
-      p = solv->transaction_installed[p - solv->installed->start];
+      p = trans->transaction_installed[p - pool->installed->start];
       return p < 0 ? -p : p;
     }
   queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
-  solver_transaction_all_pkgs(solv, p, &ti);
+  solver_transaction_all_pkgs(trans, p, &ti);
   p = ti.count ? ti.elements[0] : 0;
   queue_free(&ti);
   return p;
@@ -133,9 +133,9 @@ solver_transaction_pkg(Solver *solv, Id p)
  * transaction might not be shown to the user */
 
 Id
-solver_transaction_filter(Solver *solv, Id type, Id p, int flags)
+solver_transaction_show(Transaction *trans, Id type, Id p, int flags)
 {
-  Pool *pool = solv->pool;
+  Pool *pool = trans->pool;
   Solvable *s = pool->solvables + p;
   Queue oq, rq;
   Id q;
@@ -159,7 +159,7 @@ solver_transaction_filter(Solver *solv, Id type, Id p, int flags)
     }
 
   /* most of the time there's only one reference, so check it first */
-  q = solver_transaction_pkg(solv, p);
+  q = solver_transaction_pkg(trans, p);
   if ((flags & SOLVER_TRANSACTION_SHOW_REPLACES) == 0)
     {
       Solvable *sq = pool->solvables + q;
@@ -173,13 +173,13 @@ solver_transaction_filter(Solver *solv, Id type, Id p, int flags)
 	    return SOLVER_TRANSACTION_INSTALL;
 	}
     }
-  if (solver_transaction_pkg(solv, q) == p)
+  if (solver_transaction_pkg(trans, q) == p)
     return type;
 
   /* too bad, a miss. check em all */
   queue_init(&oq);
   queue_init(&rq);
-  solver_transaction_all_pkgs(solv, p, &oq);
+  solver_transaction_all_pkgs(trans, p, &oq);
   for (i = 0; i < oq.count; i++)
     {
       q = oq.elements[i];
@@ -192,7 +192,7 @@ solver_transaction_filter(Solver *solv, Id type, Id p, int flags)
       /* check if we are referenced? */
       if ((flags & SOLVER_TRANSACTION_SHOW_ALL) != 0)
 	{
-	  solver_transaction_all_pkgs(solv, q, &rq);
+	  solver_transaction_all_pkgs(trans, q, &rq);
 	  for (j = 0; j < rq.count; j++)
 	    if (rq.elements[j] == p)
 	      {
@@ -202,7 +202,7 @@ solver_transaction_filter(Solver *solv, Id type, Id p, int flags)
 	  if (ref)
 	    break;
 	}
-      else if (solver_transaction_pkg(solv, q) == p)
+      else if (solver_transaction_pkg(trans, q) == p)
         {
 	  ref = 1;
 	  break;
@@ -224,11 +224,11 @@ solver_transaction_filter(Solver *solv, Id type, Id p, int flags)
 }
 
 static void
-create_transaction_info(Solver *solv)
+create_transaction_info(Transaction *trans, Queue *decisionq, Map *noobsmap)
 {
-  Pool *pool = solv->pool;
-  Queue *ti = &solv->transaction_info;
-  Repo *installed = solv->installed;
+  Pool *pool = trans->pool;
+  Queue *ti = &trans->transaction_info;
+  Repo *installed = pool->installed;
   int i, j, noobs;
   Id p, p2, pp2;
   Solvable *s, *s2;
@@ -236,25 +236,25 @@ create_transaction_info(Solver *solv)
   queue_empty(ti);
   if (!installed)
     return;	/* no info needed */
-  for (i = 0; i < solv->decisionq.count; i++)
+  for (i = 0; i < decisionq->count; i++)
     {
-      p = solv->decisionq.elements[i];
+      p = decisionq->elements[i];
       if (p <= 0 || p == SYSTEMSOLVABLE)
 	continue;
       s = pool->solvables + p;
       if (s->repo == installed)
 	continue;
-      noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p);
+      noobs = noobsmap && MAPTST(noobsmap, p);
       FOR_PROVIDES(p2, pp2, s->name)
 	{
-	  if (solv->decisionmap[p2] > 0)
+	  if (!MAPTST(&trans->transactsmap, p2))
 	    continue;
 	  s2 = pool->solvables + p2;
 	  if (s2->repo != installed)
 	    continue;
 	  if (noobs && (s->name != s2->name || s->evr != s2->evr || s->arch != s2->arch))
 	    continue;
-	  if (!solv->implicitobsoleteusesprovides && s->name != s2->name)
+	  if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
 	    continue;
 	  queue_push(ti, p);
 	  queue_push(ti, p2);
@@ -269,7 +269,7 @@ create_transaction_info(Solver *solv)
 		  s2 = pool->solvables + p2;
 		  if (s2->repo != installed)
 		    continue;
-		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
 		    continue;
 		  queue_push(ti, p);
 		  queue_push(ti, p2);
@@ -289,109 +289,138 @@ create_transaction_info(Solver *solv)
   ti->count = j;
 
   /* create transaction_installed helper */
-  solv->transaction_installed = sat_calloc(installed->end - installed->start, sizeof(Id));
+  trans->transaction_installed = sat_calloc(installed->end - installed->start, sizeof(Id));
   for (i = 0; i < ti->count; i += 2)
     {
       j = ti->elements[i + 1] - installed->start;
-      if (!solv->transaction_installed[j])
-	solv->transaction_installed[j] = ti->elements[i];
+      if (!trans->transaction_installed[j])
+	trans->transaction_installed[j] = ti->elements[i];
       else
 	{
 	  /* more than one package obsoletes us. compare */
 	  Id q[4];
-	  if (solv->transaction_installed[j] > 0)
-	    solv->transaction_installed[j] = -solv->transaction_installed[j];
+	  if (trans->transaction_installed[j] > 0)
+	    trans->transaction_installed[j] = -trans->transaction_installed[j];
 	  q[0] = q[2] = ti->elements[i + 1];
 	  q[1] = ti->elements[i];
-	  q[3] = -solv->transaction_installed[j];
+	  q[3] = -trans->transaction_installed[j];
 	  if (obsq_sortcmp(q, q + 2, pool) < 0)
-	    solv->transaction_installed[j] = -ti->elements[i];
+	    trans->transaction_installed[j] = -ti->elements[i];
 	}
     }
 }
 
+void
+transaction_init(Transaction *trans, Pool *pool)
+{
+  memset(trans, 0, sizeof(*trans));
+  trans->pool = pool;
+}
 
 void
-solver_create_transaction(Solver *solv)
+transaction_free(Transaction *trans)
 {
-  Pool *pool = solv->pool;
-  Repo *installed = solv->installed;
+  queue_free(&trans->steps);
+  queue_free(&trans->transaction_info);
+  trans->transaction_installed = sat_free(trans->transaction_installed);
+  map_free(&trans->transactsmap);
+}
+
+void
+transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
+{
+  Pool *pool = trans->pool;
+  Repo *installed = pool->installed;
   int i, r, noobs;
   Id p, p2;
   Solvable *s, *s2;
 
-  queue_empty(&solv->transaction);
-  create_transaction_info(solv);
+  if (noobsmap && !noobsmap->size)
+    noobsmap = 0;	/* ignore empty map */
+  queue_empty(&trans->steps);
+  map_init(&trans->transactsmap, pool->nsolvables);
+  for (i = 0; i < decisionq->count; i++)
+    {
+      p = decisionq->elements[i];
+      s = pool->solvables + (p > 0 ? p : -p);
+      if (!s->repo)
+	continue;
+      if (installed && s->repo == installed && p < 0)
+	MAPSET(&trans->transactsmap, -p);
+      if ((!installed || s->repo != installed) && p > 0)
+	MAPSET(&trans->transactsmap, p);
+    }
+  create_transaction_info(trans, decisionq, noobsmap);
 
   if (installed)
     {
       FOR_REPO_SOLVABLES(installed, p, s)
 	{
-	  if (solv->decisionmap[p] > 0)
+	  if (!MAPTST(&trans->transactsmap, p))
 	    continue;
-	  p2 = solver_transaction_pkg(solv, p);
+	  p2 = solver_transaction_pkg(trans, p);
 	  if (!p2)
-	    queue_push(&solv->transaction, SOLVER_TRANSACTION_ERASE);
+	    queue_push(&trans->steps, SOLVER_TRANSACTION_ERASE);
 	  else
 	    {
 	      s2 = pool->solvables + p2;
 	      if (s->name == s2->name)
 		{
 		  if (s->evr == s2->evr && solvable_identical(s, s2))
-		    queue_push(&solv->transaction, SOLVER_TRANSACTION_REINSTALLED);
+		    queue_push(&trans->steps, SOLVER_TRANSACTION_REINSTALLED);
 		  else
 		    {
 		      r = evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
 		      if (r < 0)
-			queue_push(&solv->transaction, SOLVER_TRANSACTION_UPGRADED);
+			queue_push(&trans->steps, SOLVER_TRANSACTION_UPGRADED);
 		      else if (r > 0)
-			queue_push(&solv->transaction, SOLVER_TRANSACTION_DOWNGRADED);
+			queue_push(&trans->steps, SOLVER_TRANSACTION_DOWNGRADED);
 		      else
-			queue_push(&solv->transaction, SOLVER_TRANSACTION_CHANGED);
+			queue_push(&trans->steps, SOLVER_TRANSACTION_CHANGED);
 		    }
 		}
 	      else
-		queue_push(&solv->transaction, SOLVER_TRANSACTION_REPLACED);
+		queue_push(&trans->steps, SOLVER_TRANSACTION_REPLACED);
 	    }
-	  queue_push(&solv->transaction, p);
+	  queue_push(&trans->steps, p);
 	}
     }
-  for (i = 0; i < solv->decisionq.count; i++)
+  for (i = 0; i < decisionq->count; i++)
     {
-      p = solv->decisionq.elements[i];
+      p = decisionq->elements[i];
       if (p < 0 || p == SYSTEMSOLVABLE)
 	continue;
       s = pool->solvables + p;
-      if (solv->installed && s->repo == solv->installed)
+      if (installed && s->repo == installed)
 	continue;
-      noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p);
-      p2 = solver_transaction_pkg(solv, p);
+      noobs = noobsmap && MAPTST(noobsmap, p);
+      p2 = solver_transaction_pkg(trans, p);
       if (noobs)
-	queue_push(&solv->transaction, p2 ? SOLVER_TRANSACTION_MULTIREINSTALL : SOLVER_TRANSACTION_MULTIINSTALL);
+	queue_push(&trans->steps, p2 ? SOLVER_TRANSACTION_MULTIREINSTALL : SOLVER_TRANSACTION_MULTIINSTALL);
       else if (!p2)
-	queue_push(&solv->transaction, SOLVER_TRANSACTION_INSTALL);
+	queue_push(&trans->steps, SOLVER_TRANSACTION_INSTALL);
       else
 	{
 	  s2 = pool->solvables + p2;
 	  if (s->name == s2->name)
 	    {
 	      if (s->evr == s2->evr && solvable_identical(s, s2))
-		queue_push(&solv->transaction, SOLVER_TRANSACTION_REINSTALL);
+		queue_push(&trans->steps, SOLVER_TRANSACTION_REINSTALL);
 	      else
 		{
 		  r = evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
 		  if (r > 0)
-		    queue_push(&solv->transaction, SOLVER_TRANSACTION_UPGRADE);
+		    queue_push(&trans->steps, SOLVER_TRANSACTION_UPGRADE);
 		  else if (r < 0)
-		    queue_push(&solv->transaction, SOLVER_TRANSACTION_DOWNGRADE);
+		    queue_push(&trans->steps, SOLVER_TRANSACTION_DOWNGRADE);
 		  else
-		    queue_push(&solv->transaction, SOLVER_TRANSACTION_CHANGE);
+		    queue_push(&trans->steps, SOLVER_TRANSACTION_CHANGE);
 		}
 	    }
 	  else
-	    queue_push(&solv->transaction, SOLVER_TRANSACTION_REPLACE);
+	    queue_push(&trans->steps, SOLVER_TRANSACTION_REPLACE);
 	}
-      queue_push(&solv->transaction, p);
+      queue_push(&trans->steps, p);
     }
 }
 
@@ -417,7 +446,7 @@ struct transel {
 };
 
 struct orderdata {
-  Solver *solv;
+  Transaction *trans;
   struct transel *tes;
   int ntes;
   Id *edgedata;
@@ -429,19 +458,19 @@ struct orderdata {
 static int
 addedge(struct orderdata *od, Id from, Id to, int type)
 {
-  Solver *solv = od->solv;
-  Pool *pool = solv->pool;
+  Transaction *trans = od->trans;
+  Pool *pool = trans->pool;
   Solvable *s;
   struct transel *te;
   int i;
 
   // printf("addedge %d %d type %d\n", from, to, type);
   s = pool->solvables + from;
-  if (s->repo == solv->installed && solv->transaction_installed[from - solv->installed->start])
+  if (s->repo == pool->installed && trans->transaction_installed[from - pool->installed->start])
     {
       /* passive, map to active */
-      if (solv->transaction_installed[from - solv->installed->start] > 0)
-	from = solv->transaction_installed[from - solv->installed->start];
+      if (trans->transaction_installed[from - pool->installed->start] > 0)
+	from = trans->transaction_installed[from - pool->installed->start];
       else
 	{
 	  int ret = 0;
@@ -449,7 +478,7 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 	  Id tibuf[5];
 
 	  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
-	  solver_transaction_all_pkgs(solv, from, &ti);
+	  solver_transaction_all_pkgs(trans, from, &ti);
 	  for (i = 0; i < ti.count; i++)
 	    ret |= addedge(od, ti.elements[i], to, type);
 	  queue_free(&ti);
@@ -457,11 +486,11 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 	}
     }
   s = pool->solvables + to;
-  if (s->repo == solv->installed && solv->transaction_installed[to - solv->installed->start])
+  if (s->repo == pool->installed && trans->transaction_installed[to - pool->installed->start])
     {
       /* passive, map to active */
-      if (solv->transaction_installed[to - solv->installed->start] > 0)
-	to = solv->transaction_installed[to - solv->installed->start];
+      if (trans->transaction_installed[to - pool->installed->start] > 0)
+	to = trans->transaction_installed[to - pool->installed->start];
       else
 	{
 	  int ret = 0;
@@ -469,7 +498,7 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 	  Id tibuf[5];
 
 	  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
-	  solver_transaction_all_pkgs(solv, to, &ti);
+	  solver_transaction_all_pkgs(trans, to, &ti);
 	  for (i = 0; i < ti.count; i++)
 	    ret |= addedge(od, from, ti.elements[i], type);
 	  queue_free(&ti);
@@ -535,7 +564,8 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 static int
 havechoice(struct orderdata *od, Id p, Id q1, Id q2)
 {
-  Solver *solv = od->solv;
+  Transaction *trans = od->trans;
+  Pool *pool = trans->pool;
   Id ti1buf[5], ti2buf[5];
   Queue ti1, ti2;
   int i, j;
@@ -543,18 +573,18 @@ havechoice(struct orderdata *od, Id p, Id q1, Id q2)
   /* both q1 and q2 are uninstalls. check if their TEs intersect */
   /* common case: just one TE for both packages */
   printf("havechoice %d %d %d\n", p, q1, q2);
-  if (solv->transaction_installed[q1 - solv->installed->start] == 0)
+  if (trans->transaction_installed[q1 - pool->installed->start] == 0)
     return 1;
-  if (solv->transaction_installed[q2 - solv->installed->start] == 0)
+  if (trans->transaction_installed[q2 - pool->installed->start] == 0)
     return 1;
-  if (solv->transaction_installed[q1 - solv->installed->start] == solv->transaction_installed[q2 - solv->installed->start])
+  if (trans->transaction_installed[q1 - pool->installed->start] == trans->transaction_installed[q2 - pool->installed->start])
     return 0;
-  if (solv->transaction_installed[q1 - solv->installed->start] > 0 && solv->transaction_installed[q2 - solv->installed->start] > 0)
+  if (trans->transaction_installed[q1 - pool->installed->start] > 0 && trans->transaction_installed[q2 - pool->installed->start] > 0)
     return 1;
   queue_init_buffer(&ti1, ti1buf, sizeof(ti1buf)/sizeof(*ti1buf));
-  solver_transaction_all_pkgs(solv, q1, &ti1);
+  solver_transaction_all_pkgs(trans, q1, &ti1);
   queue_init_buffer(&ti2, ti2buf, sizeof(ti2buf)/sizeof(*ti2buf));
-  solver_transaction_all_pkgs(solv, q2, &ti2);
+  solver_transaction_all_pkgs(trans, q2, &ti2);
   for (i = 0; i < ti1.count; i++)
     for (j = 0; j < ti2.count; j++)
       if (ti1.elements[i] == ti2.elements[j])
@@ -572,12 +602,12 @@ havechoice(struct orderdata *od, Id p, Id q1, Id q2)
 static void
 addsolvableedges(struct orderdata *od, Solvable *s)
 {
-  Solver *solv = od->solv;
-  Pool *pool = solv->pool;
+  Transaction *trans = od->trans;
+  Pool *pool = trans->pool;
   Id req, *reqp, con, *conp;
   Id p, p2, pp2;
   int i, j, pre, numins;
-  Repo *installed = solv->installed;
+  Repo *installed = pool->installed;
   Solvable *s2;
   Queue reqq;
 
@@ -604,12 +634,12 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		  reqq.count = 0;	/* self provides */
 		  break;
 		}
-	      if (s2->repo == installed && solv->decisionmap[p2] > 0)
+	      if (s2->repo == installed && !MAPTST(&trans->transactsmap, p2))
 		{
 		  reqq.count = 0;	/* provided by package that stays installed */
 		  break;
 		}
-	      if (s2->repo != installed && solv->decisionmap[p2] <= 0)
+	      if (s2->repo != installed && !MAPTST(&trans->transactsmap, p2))
 		continue;		/* package stays uninstalled */
 	      
 	      if (s->repo == installed)
@@ -694,7 +724,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		continue;
 	      if (s->repo == installed)
 		{
-		  if (s2->repo != installed && solv->decisionmap[p2] >= 0)
+		  if (s2->repo != installed && MAPTST(&trans->transactsmap, p2))
 		    {
 		      /* deinstall p before installing p2 */
 		      addedge(od, p2, p, TYPE_CON);
@@ -702,7 +732,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		}
 	      else
 		{
-		  if (s2->repo == installed && solv->decisionmap[p2] < 0)
+		  if (s2->repo == installed && MAPTST(&trans->transactsmap, p2))
 		    {
 		      /* deinstall p2 before installing p */
 		      addedge(od, p, p2, TYPE_CON);
@@ -741,7 +771,7 @@ haveprereq(Pool *pool, Id solvid)
 void
 breakcycle(struct orderdata *od, Id *cycle)
 {
-  Pool *pool = od->solv->pool;
+  Pool *pool = od->trans->pool;
   Id ddegmin, ddegmax, ddeg;
   int k, l;
   struct transel *te;
@@ -797,11 +827,11 @@ breakcycle(struct orderdata *od, Id *cycle)
 }
 
 void
-solver_order_transaction(Solver *solv)
+transaction_order(Transaction *trans)
 {
-  Pool *pool = solv->pool;
-  Queue *tr = &solv->transaction;
-  Repo *installed = solv->installed;
+  Pool *pool = trans->pool;
+  Queue *tr = &trans->steps;
+  Repo *installed = pool->installed;
   Id type, p;
   Solvable *s;
   int i, j, k, numte, numedge;
@@ -821,8 +851,9 @@ solver_order_transaction(Solver *solv)
     {
       p = tr->elements[i + 1];
       s = pool->solvables + p;
-      if (s->repo != installed || !solv->transaction_installed[p - solv->installed->start])
-	numte++;
+      if (installed && s->repo == installed && trans->transaction_installed[p - installed->start])
+	continue;
+      numte++;
     }
   if (!numte)
     return;	/* nothing to do... */
@@ -830,7 +861,7 @@ solver_order_transaction(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_STATS, "transaction elements: %d\n", numte);
   numte++;	/* leave first one zero */
   memset(&od, 0, sizeof(od));
-  od.solv = solv;
+  od.trans = trans;
   od.ntes = numte;
   od.tes = sat_calloc(numte, sizeof(*od.tes));
   od.edgedata = sat_extend(0, 0, 1, sizeof(Id), EDGEDATA_BLOCK);
@@ -842,7 +873,7 @@ solver_order_transaction(Solver *solv)
     {
       p = tr->elements[i + 1];
       s = pool->solvables + p;
-      if (s->repo == installed && solv->transaction_installed[p - solv->installed->start])
+      if (installed && s->repo == installed && trans->transaction_installed[p - installed->start])
 	continue;
       te->p = p;
       te->type = tr->elements[i];
@@ -864,6 +895,7 @@ solver_order_transaction(Solver *solv)
     for (j = te->edges; od.edgedata[j]; j += 2)
       numedge++;
   POOL_DEBUG(SAT_DEBUG_STATS, "edges: %d, edge space: %d\n", numedge, od.nedgedata / 2);
+  POOL_DEBUG(SAT_DEBUG_STATS, "edge creation took %d ms\n", sat_timems(now));
   
   /* kill all cycles */
   broken = 0;
@@ -995,7 +1027,7 @@ solver_order_transaction(Solver *solv)
 	{
 	  p = tr->elements[i + 1];
 	  s = pool->solvables + p;
-	  if (s->repo == installed && solv->transaction_installed[p - installed->start])
+	  if (s->repo == installed && trans->transaction_installed[p - installed->start])
 	    obstypes[p - installed->start] = tr->elements[i];
 	}
     }
@@ -1036,7 +1068,7 @@ solver_order_transaction(Solver *solv)
       if (installed && s->repo != installed)
 	{
 	  queue_empty(&obsq);
-	  solver_transaction_all_pkgs(solv, te->p, &obsq);
+	  solver_transaction_all_pkgs(trans, te->p, &obsq);
 	  for (j = 0; j < obsq.count; j++)
 	    {
 	      p = obsq.elements[j];
