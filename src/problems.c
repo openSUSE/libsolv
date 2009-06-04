@@ -392,7 +392,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	    break;
 	  }
       if (!p)
-	p = -solv->rules[why].p; /* XXX: what to do here? */
+	return;		/* false alarm */
       queue_push(solutionq, SOLVER_SOLUTION_INFARCH);
       queue_push(solutionq, p);
       return;
@@ -413,7 +413,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	    break;
 	  }
       if (!p)
-	p = -solv->rules[why].p; /* XXX: what to do here? */
+	return;		/* false alarm */
       queue_push(solutionq, SOLVER_SOLUTION_DISTUPGRADE);
       queue_push(solutionq, p);
       return;
@@ -565,7 +565,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
       if (solv->solutions.count == solstart + 1)
 	{
 	  solv->solutions.count--;
-	  if (!essentialok && i + 1 == problem.count)
+	  if (!essentialok && i + 1 == problem.count && !nsol)
 	    {
 	      /* nothing found, start over */
 	      essentialok = 1;
