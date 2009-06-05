@@ -1543,7 +1543,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	    }
 	  if (!db)
 	    {
-	      if (db_create(&db, 0, 0))
+	      if (db_create(&db, dbenv, 0))
 		{
 		  perror("db_create");
 		  exit(1);
