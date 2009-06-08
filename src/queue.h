@@ -106,4 +106,9 @@ extern void queue_init_buffer(Queue *q, Id *buf, int size);
 extern void queue_init_clone(Queue *t, Queue *s);
 extern void queue_free(Queue *q);
 
+extern void queue_insert(Queue *q, int pos, Id id);
+extern void queue_insert2(Queue *q, int pos, Id id1, Id id2);
+extern void queue_delete(Queue *q, int pos);
+extern void queue_delete2(Queue *q, int pos);
+
 #endif /* SATSOLVER_QUEUE_H */

@@ -23,12 +23,27 @@ extern "C" {
 
 struct _Pool;
 
+/* internal */
+struct _TransactionElement {
+  Id p;			/* solvable id */
+  Id type;		/* installation type */
+  Id edges;
+  Id mark;
+};
+
 typedef struct _Transaction {
-  struct _Pool *pool;
-  Queue steps;
+  struct _Pool *pool;		/* back pointer to pool */
+
+  Queue steps;			/* the transaction steps */
+
   Queue transaction_info;
   Id *transaction_installed;
   Map transactsmap;
+
+  struct _TransactionElement *tes;
+  int ntes;
+  Id *invedgedata;
+
 } Transaction;
 
 
@@ -62,6 +77,7 @@ extern void solver_transaction_all_pkgs(Transaction *trans, Id p, Queue *pkgs);
 extern Id   solver_transaction_pkg(Transaction *trans, Id p);
 extern Id   solver_transaction_show(Transaction *trans, Id type, Id p, int mode);
 extern void transaction_order(Transaction *trans);
+extern void transaction_check(Transaction *trans);
 
 #ifdef __cplusplus
 }
