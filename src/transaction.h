@@ -22,14 +22,7 @@ extern "C" {
 #include "bitmap.h"
 
 struct _Pool;
-
-/* internal */
-struct _TransactionElement {
-  Id p;			/* solvable id */
-  Id type;		/* installation type */
-  Id edges;
-  Id mark;
-};
+struct _TransactionOrderdata;
 
 typedef struct _Transaction {
   struct _Pool *pool;		/* back pointer to pool */
@@ -40,9 +33,7 @@ typedef struct _Transaction {
   Id *transaction_installed;
   Map transactsmap;
 
-  struct _TransactionElement *tes;
-  int ntes;
-  Id *invedgedata;
+  struct _TransactionOrderdata *orderdata;
 
 } Transaction;
 
@@ -76,8 +67,12 @@ extern void transaction_calculate(Transaction *trans, Queue *decisionq, Map *noo
 extern void solver_transaction_all_pkgs(Transaction *trans, Id p, Queue *pkgs);
 extern Id   solver_transaction_pkg(Transaction *trans, Id p);
 extern Id   solver_transaction_show(Transaction *trans, Id type, Id p, int mode);
-extern void transaction_order(Transaction *trans);
+extern void transaction_order(Transaction *trans, int flags);
 extern void transaction_check(Transaction *trans);
+extern int  transaction_add_choices(Transaction *trans, Queue *choices, Id chosen);
+
+/* order flags */
+#define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
 
 #ifdef __cplusplus
 }

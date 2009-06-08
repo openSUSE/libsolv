@@ -311,25 +311,6 @@ create_transaction_info(Transaction *trans, Queue *decisionq, Map *noobsmap)
 }
 
 void
-transaction_init(Transaction *trans, Pool *pool)
-{
-  memset(trans, 0, sizeof(*trans));
-  trans->pool = pool;
-}
-
-void
-transaction_free(Transaction *trans)
-{
-  queue_free(&trans->steps);
-  queue_free(&trans->transaction_info);
-  trans->transaction_installed = sat_free(trans->transaction_installed);
-  map_free(&trans->transactsmap);
-  trans->tes = sat_free(trans->tes);
-  trans->ntes = 0;
-  trans->invedgedata = sat_free(trans->invedgedata);
-}
-
-void
 transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
 {
   Pool *pool = trans->pool;
@@ -427,6 +408,20 @@ transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
     }
 }
 
+
+struct _TransactionElement {
+  Id p;		/* solvable id */
+  Id type;	/* installation type */
+  Id edges;	/* pointer into edges data */
+  Id mark;
+};
+
+struct _TransactionOrderdata {
+  struct _TransactionElement *tes;
+  int ntes;
+  Id *invedgedata;
+};
+
 #define TYPE_BROKEN	(1<<0)
 #define TYPE_CON    	(1<<1)
 
@@ -440,6 +435,29 @@ transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
 #define TYPE_CYCLEHEAD  (1<<17)
 
 #define EDGEDATA_BLOCK	127
+
+void
+transaction_init(Transaction *trans, Pool *pool)
+{
+  memset(trans, 0, sizeof(*trans));
+  trans->pool = pool;
+}
+
+void
+transaction_free(Transaction *trans)
+{
+  queue_free(&trans->steps);
+  queue_free(&trans->transaction_info);
+  trans->transaction_installed = sat_free(trans->transaction_installed);
+  map_free(&trans->transactsmap);
+  if (trans->orderdata)
+    {
+      struct _TransactionOrderdata *od = trans->orderdata;
+      od->tes = sat_free(od->tes);
+      od->invedgedata = sat_free(od->invedgedata);
+      trans->orderdata = sat_free(trans->orderdata);
+    }
+}
 
 struct orderdata {
   Transaction *trans;
@@ -1092,7 +1110,7 @@ addcycleedges(struct orderdata *od, Id *cycle, Queue *todo)
 }
 
 void
-transaction_order(Transaction *trans)
+transaction_order(Transaction *trans, int flags)
 {
   Pool *pool = trans->pool;
   Queue *tr = &trans->steps;
@@ -1108,8 +1126,17 @@ transaction_order(Transaction *trans)
   int oldcount;
   int start, now;
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "ordering transaction\n");
   start = now = sat_timems(0);
+  POOL_DEBUG(SAT_DEBUG_STATS, "ordering transaction\n");
+  /* free old data if present */
+  if (trans->orderdata)
+    {
+      struct _TransactionOrderdata *od = trans->orderdata;
+      od->tes = sat_free(od->tes);
+      od->invedgedata = sat_free(od->invedgedata);
+      trans->orderdata = sat_free(trans->orderdata);
+    }
+
   /* create a transaction element for every active component */
   numte = 0;
   for (i = 0; i < tr->count; i += 2)
@@ -1120,10 +1147,10 @@ transaction_order(Transaction *trans)
 	continue;
       numte++;
     }
+  POOL_DEBUG(SAT_DEBUG_STATS, "transaction elements: %d\n", numte);
   if (!numte)
     return;	/* nothing to do... */
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "transaction elements: %d\n", numte);
   numte++;	/* leave first one zero */
   memset(&od, 0, sizeof(od));
   od.trans = trans;
@@ -1385,9 +1412,18 @@ printf("free %s\n", solvid2str(pool, od.tes[od.invedgedata[j]].p));
   POOL_DEBUG(SAT_DEBUG_STATS, "creating new transaction took %d ms\n", sat_timems(now));
   POOL_DEBUG(SAT_DEBUG_STATS, "transaction ordering took %d ms\n", sat_timems(start));
 
-  trans->tes = od.tes;
-  trans->ntes = numte;
-  trans->invedgedata = od.invedgedata;
+  if ((flags & SOLVER_TRANSACTION_KEEP_ORDERDATA) != 0)
+    {
+      trans->orderdata = sat_calloc(1, sizeof(*trans->orderdata));
+      trans->orderdata->tes = od.tes;
+      trans->orderdata->ntes = numte;
+      trans->orderdata->invedgedata = od.invedgedata;
+    }
+  else
+    {
+      sat_free(od.tes);
+      sat_free(od.invedgedata);
+    }
 }
 
 static void
@@ -1504,19 +1540,22 @@ int
 transaction_add_choices(Transaction *trans, Queue *choices, Id chosen)
 {
   int i, j;
+  struct _TransactionOrderdata *od = trans->orderdata;
   struct _TransactionElement *te;
 
+  if (!od)
+     return choices->count;
   if (!chosen)
     {
       /* initialization step */
-      for (i = 1, te = trans->tes + i; i < trans->ntes; i++, te++)
+      for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
 	te->mark = 0;
-      for (i = 1, te = trans->tes + i; i < trans->ntes; i++, te++)
+      for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
 	{
-	  for (j = te->edges; trans->invedgedata[j]; j++)
-	    trans->tes[trans->invedgedata[j]].mark++;
+	  for (j = te->edges; od->invedgedata[j]; j++)
+	    od->tes[od->invedgedata[j]].mark++;
 	}
-      for (i = 1, te = trans->tes + i; i < trans->ntes; i++, te++)
+      for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
 	if (!te->mark)
 	  {
 	    queue_push(choices, te->type);
@@ -1524,19 +1563,19 @@ transaction_add_choices(Transaction *trans, Queue *choices, Id chosen)
 	  }
       return choices->count;
     }
-  for (i = 1, te = trans->tes + i; i < trans->ntes; i++, te++)
+  for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
     if (te->p == chosen)
       break;
-  if (i == trans->ntes)
+  if (i == od->ntes)
     return choices->count;
   if (te->mark > 0)
     {
       /* hey! out-of-order installation! */
       te->mark = -1;
     }
-  for (j = te->edges; trans->invedgedata[j]; j++)
+  for (j = te->edges; od->invedgedata[j]; j++)
     {
-      te = trans->tes + trans->invedgedata[j];
+      te = od->tes + od->invedgedata[j];
       assert(te->mark > 0 || te->mark == -1);
       if (te->mark > 0 && --te->mark == 0)
 	{
