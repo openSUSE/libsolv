@@ -1120,11 +1120,14 @@ transaction_order(Transaction *trans, int flags)
   int i, j, k, numte, numedge;
   struct orderdata od;
   struct _TransactionElement *te;
-  Queue todo, obsq;
+  Queue todo, obsq, samerepoq, uninstq;
   int cycstart, cycel;
   Id *cycle, *obstypes;
   int oldcount;
   int start, now;
+  Repo *lastrepo;
+  int lastmedia;
+  Id *temedianr;
 
   start = now = sat_timems(0);
   POOL_DEBUG(SAT_DEBUG_STATS, "ordering transaction\n");
@@ -1330,10 +1333,19 @@ transaction_order(Transaction *trans, int flags)
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     for (j = te->edges; od.invedgedata[j]; j++)
       od.tes[od.invedgedata[j]].mark++;
+
+  queue_init(&samerepoq);
+  queue_init(&uninstq);
+  queue_empty(&todo);
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     if (te->mark == 0)
-      queue_push(&todo, i);
-  assert(todo.count > 0);
+      {
+	if (installed && pool->solvables[te->p].repo == installed)
+          queue_push(&uninstq, i);
+	else
+          queue_push(&todo, i);
+      }
+  assert(todo.count > 0 || uninstq.count > 0);
   if (installed)
     {
       obstypes = sat_calloc(installed->end - installed->start, sizeof(Id));
@@ -1349,28 +1361,63 @@ transaction_order(Transaction *trans, int flags)
     obstypes = 0;
   oldcount = tr->count;
   queue_empty(tr);
+
   queue_init(&obsq);
   
-  while (todo.count)
+  lastrepo = 0;
+  lastmedia = 0;
+  temedianr = sat_calloc(numte, sizeof(Id));
+  for (i = 1; i < numte; i++)
     {
-      /* select an i */
-      i = todo.count;
-      if (installed)
+      Solvable *s = pool->solvables + od.tes[i].p;
+      if (installed && s->repo == installed)
+	j = 1;
+      else
+        j = solvable_lookup_num(s, SOLVABLE_MEDIANR, 1);
+      temedianr[i] = j;
+    }
+  for (;;)
+    {
+      /* select an TE i */
+      if (uninstq.count)
+	i = queue_shift(&uninstq);
+      else if (samerepoq.count)
+	i = queue_shift(&samerepoq);
+      else if (todo.count)
 	{
-	  for (i = 0; i < todo.count; i++)
+	  /* find next repo/media */
+	  for (j = 0; j < todo.count; j++)
 	    {
-	      j = todo.elements[i];
-	      if (pool->solvables[od.tes[j].p].repo == installed)
-	        break;
+	      if (!j || temedianr[todo.elements[j]] < lastmedia)
+		{
+		  i = j;
+		  lastmedia = temedianr[todo.elements[j]];
+		}
 	    }
+	  lastrepo = pool->solvables[od.tes[todo.elements[i]].p].repo;
+
+	  /* move all matching TEs to samerepoq */
+	  for (i = j = 0; j < todo.count; j++)
+	    {
+	      int k = todo.elements[j];
+	      if (temedianr[k] == lastmedia && pool->solvables[od.tes[k].p].repo == lastrepo)
+		queue_push(&samerepoq, k);
+	      else
+		todo.elements[i++] = k;
+	    }
+	  todo.count = i;
+
+	  assert(samerepoq.count);
+	  i = queue_shift(&samerepoq);
 	}
-      if (i == todo.count)
-	i = 0;
-      te = od.tes + todo.elements[i];
+      else
+	break;
+
+      te = od.tes + i;
       queue_push(tr, te->type);
       queue_push(tr, te->p);
 #if 0
-printf("do %s\n", solvid2str(pool, te->p));
+printf("do %s [%d]\n", solvid2str(pool, te->p), temedianr[i]);
 #endif
       s = pool->solvables + te->p;
       if (installed && s->repo != installed)
@@ -1389,22 +1436,30 @@ printf("do %s\n", solvid2str(pool, te->p));
 		}
 	    }
 	}
-      queue_delete(&todo, i);
       for (j = te->edges; od.invedgedata[j]; j++)
 	{
 	  struct _TransactionElement *te2 = od.tes + od.invedgedata[j];
 	  assert(te2->mark > 0);
 	  if (--te2->mark == 0)
 	    {
-	      queue_push(&todo, od.invedgedata[j]);
+	      Solvable *s = pool->solvables + te2->p;
 #if 0
-printf("free %s\n", solvid2str(pool, od.tes[od.invedgedata[j]].p));
+printf("free %s [%d]\n", solvid2str(pool, te2->p), temedianr[od.invedgedata[j]]);
 #endif
+	      if (installed && s->repo == installed)
+	        queue_push(&uninstq, od.invedgedata[j]);
+	      else if (s->repo == lastrepo && temedianr[od.invedgedata[j]] == lastmedia)
+	        queue_push(&samerepoq, od.invedgedata[j]);
+	      else
+	        queue_push(&todo, od.invedgedata[j]);
 	    }
 	}
     }
   sat_free(obstypes);
+  sat_free(temedianr);
   queue_free(&todo);
+  queue_free(&samerepoq);
+  queue_free(&uninstq);
   queue_free(&obsq);
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     assert(te->mark == 0);
