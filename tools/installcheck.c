@@ -1,3 +1,14 @@
+/* vim: sw=2 et cino=>4,n-2,{1s
+ */
+
+/*
+ * Copyright (c) 2009, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
+
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -46,6 +57,15 @@ myfopen(const char *fn)
   return  fopencookie(gzf, "r", cio);
 }
 
+void
+usage(char** argv)
+{
+    printf("Usage:\n%s: <arch> repo [--nocheck repo]...\n",
+        argv[0]);
+    exit(1);
+}
+
+
 int
 main(int argc, char **argv)
 {
@@ -55,14 +75,18 @@ main(int argc, char **argv)
   Queue rids;
   Queue cand;
   Queue archlocks;
-  char *arch;
+  char *arch, *exclude_pat;
   int i, j;
   Id p;
   Id rpmid, rpmarch, rpmrel, archlock;
   int status = 0;
   int nocheck = 0;
 
+  exclude_pat = 0;
   archlock = 0;
+  if (argc < 3)
+    usage(argv);
+
   arch = argv[1];
   pool = pool_create();
   pool_setarch(pool, arch);
@@ -77,6 +101,17 @@ main(int argc, char **argv)
 	    nocheck = pool->nsolvables;
 	  continue;
 	}
+      if (!strcmp(argv[i], "--exclude"))
+        {
+          if (i + 1 >= argc)
+            {
+              printf("--exclude needs a whitespace separated list of substrings as parameter\n");
+              exit(1);
+            }
+          exclude_pat = argv[i + 1];
+          ++i;
+          continue;
+        }
       l = strlen(argv[i]);
       if (!strcmp(argv[i], "-"))
 	fp = stdin;
@@ -211,6 +246,26 @@ main(int argc, char **argv)
       p = cand.elements[i];
       if (nocheck && p >= nocheck)
 	continue;
+      if (exclude_pat)
+        {
+          char *ptr, *save = 0, *pattern;
+          int match = 0;
+          pattern = strdup(exclude_pat);
+
+          for (ptr = strtok_r(pattern, " ", &save);
+              ptr;
+              ptr = strtok_r(NULL, " ", &save))
+            {
+              if (*ptr && strstr(solvid2str(pool, p), ptr))
+                {
+                  match = 1;
+                  break;
+                }
+            }
+          free(pattern);
+          if (match)
+            continue;
+        }
       s = pool->solvables + p;
       solv = solver_create(pool);
       queue_empty(&job);
