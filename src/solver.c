@@ -1228,8 +1228,7 @@ solver_create(Pool *pool)
   solv->pool = pool;
   solv->installed = pool->installed;
 
-  queue_init(&solv->transaction);
-  queue_init(&solv->transaction_info);
+  transaction_init(&solv->trans, pool);
   queue_init(&solv->ruletojob);
   queue_init(&solv->decisionq);
   queue_init(&solv->decisionq_why);
@@ -1266,8 +1265,7 @@ solver_create(Pool *pool)
 void
 solver_free(Solver *solv)
 {
-  queue_free(&solv->transaction);
-  queue_free(&solv->transaction_info);
+  transaction_free(&solv->trans);
   queue_free(&solv->job);
   queue_free(&solv->ruletojob);
   queue_free(&solv->decisionq);
@@ -1300,7 +1298,6 @@ solver_free(Solver *solv)
   sat_free(solv->obsoletes);
   sat_free(solv->obsoletes_data);
   sat_free(solv->multiversionupdaters);
-  sat_free(solv->transaction_installed);
   sat_free(solv);
 }
 
@@ -2346,6 +2343,25 @@ findrecommendedsuggested(Solver *solv)
   map_free(&obsmap);
 }
 
+void
+solver_calculate_noobsmap(Pool *pool, Map *noobsmap, Queue *job)
+{
+  int i;
+  Id how, what, select;
+  Id p, pp;
+  for (i = 0; i < job->count; i += 2)
+    {
+      how = job->elements[i];
+      if ((how & SOLVER_JOBMASK) != SOLVER_NOOBSOLETES)
+	continue;
+      what = job->elements[i + 1];
+      select = how & SOLVER_SELECTMASK;
+      if (!noobsmap->size)
+	map_init(noobsmap, pool->nsolvables);
+      FOR_JOB_SELECT(p, pp, select, what)
+        MAPSET(noobsmap, p);
+    }
+}
 
 /*
  *
@@ -2376,8 +2392,8 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SAT_DEBUG_STATS, "fixsystem=%d updatesystem=%d dosplitprovides=%d, noupdateprovide=%d noinfarchcheck=%d\n", solv->fixsystem, solv->updatesystem, solv->dosplitprovides, solv->noupdateprovide, solv->noinfarchcheck);
   POOL_DEBUG(SAT_DEBUG_STATS, "distupgrade=%d distupgrade_removeunsupported=%d\n", solv->distupgrade, solv->distupgrade_removeunsupported);
   POOL_DEBUG(SAT_DEBUG_STATS, "allowuninstall=%d, allowdowngrade=%d, allowarchchange=%d, allowvendorchange=%d\n", solv->allowuninstall, solv->allowdowngrade, solv->allowarchchange, solv->allowvendorchange);
-  POOL_DEBUG(SAT_DEBUG_STATS, "promoteepoch=%d, allowvirtualconflicts=%d, allowselfconflicts=%d\n", pool->promoteepoch, solv->allowvirtualconflicts, solv->allowselfconflicts);
-  POOL_DEBUG(SAT_DEBUG_STATS, "obsoleteusesprovides=%d, implicitobsoleteusesprovides=%d\n", solv->obsoleteusesprovides, solv->implicitobsoleteusesprovides);
+  POOL_DEBUG(SAT_DEBUG_STATS, "promoteepoch=%d, novirtualconflicts=%d, allowselfconflicts=%d\n", pool->promoteepoch, pool->novirtualconflicts, pool->allowselfconflicts);
+  POOL_DEBUG(SAT_DEBUG_STATS, "obsoleteusesprovides=%d, implicitobsoleteusesprovides=%d\n", pool->obsoleteusesprovides, pool->implicitobsoleteusesprovides);
   POOL_DEBUG(SAT_DEBUG_STATS, "dontinstallrecommended=%d, ignorealreadyrecommended=%d, dontshowinstalledrecommended=%d\n", solv->dontinstallrecommended, solv->ignorealreadyrecommended, solv->dontshowinstalledrecommended);
 
   /* create whatprovides if not already there */
@@ -2397,18 +2413,7 @@ solver_solve(Solver *solv, Queue *job)
    */
 
   /* create noobsolete map if needed */
-  for (i = 0; i < job->count; i += 2)
-    {
-      how = job->elements[i];
-      if ((how & SOLVER_JOBMASK) != SOLVER_NOOBSOLETES)
-	continue;
-      what = job->elements[i + 1];
-      select = how & SOLVER_SELECTMASK;
-      if (!solv->noobsoletes.size)
-	map_init(&solv->noobsoletes, pool->nsolvables);
-      FOR_JOB_SELECT(p, pp, select, what)
-        MAPSET(&solv->noobsoletes, p);
-    }
+  solver_calculate_noobsmap(pool, &solv->noobsoletes, job);
 
   map_init(&addedmap, pool->nsolvables);
   MAPSET(&addedmap, SYSTEMSOLVABLE);
@@ -2825,7 +2830,7 @@ solver_solve(Solver *solv, Queue *job)
   /*
    * finally prepare transaction info
    */
-  solver_create_transaction(solv);
+  transaction_calculate(&solv->trans, &solv->decisionq, &solv->noobsoletes);
 
   POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d problems, %d learned rules, %d unsolvable\n", solv->problems.count / 2, solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));

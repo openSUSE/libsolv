@@ -42,9 +42,7 @@ typedef struct _Solver {
   Pool *pool;
   Queue job;				/* copy of the job we're solving */
 
-  Queue transaction;			/* solver result */
-  Queue transaction_info;		/* transaction obsoletes info */
-  Id *transaction_installed;            /* data for installed packages */
+  Transaction trans;			/* calculated transaction */
 
   Repo *installed;			/* copy of pool->installed */
   
@@ -142,10 +140,6 @@ typedef struct _Solver {
   int allowvendorchange;		/* allow to change vendor of installed solvables */
   int allowuninstall;			/* allow removal of installed solvables */
   int updatesystem;			/* update all packages to the newest version */
-  int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
-  int allowselfconflicts;		/* true: packages wich conflict with itself are installable */
-  int obsoleteusesprovides;		/* true: obsoletes are matched against provides, not names */
-  int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
@@ -274,6 +268,8 @@ extern void solver_reset(Solver *solv);
 
 extern int solver_dep_installed(Solver *solv, Id dep);
 extern int solver_splitprovides(Solver *solv, Id dep);
+
+extern void solver_calculate_noobsmap(Pool *pool, Map *noobsmap, Queue *job);
 
 /* obsolete */
 extern SolverRuleinfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);

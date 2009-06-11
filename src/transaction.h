@@ -19,9 +19,26 @@ extern "C" {
 
 #include "pooltypes.h"
 #include "queue.h"
+#include "bitmap.h"
 
-struct _Solver;
+struct _Pool;
+struct _TransactionOrderdata;
 
+typedef struct _Transaction {
+  struct _Pool *pool;		/* back pointer to pool */
+
+  Queue steps;			/* the transaction steps */
+
+  Queue transaction_info;
+  Id *transaction_installed;
+  Map transactsmap;
+
+  struct _TransactionOrderdata *orderdata;
+
+} Transaction;
+
+
+/* step types */
 #define SOLVER_TRANSACTION_ERASE		0x10
 #define SOLVER_TRANSACTION_REINSTALLED		0x11
 #define SOLVER_TRANSACTION_DOWNGRADED		0x12
@@ -39,14 +56,23 @@ struct _Solver;
 #define SOLVER_TRANSACTION_MULTIINSTALL		0x30
 #define SOLVER_TRANSACTION_MULTIREINSTALL	0x31
 
+/* show modes */
 #define SOLVER_TRANSACTION_SHOW_ACTIVE          (1 << 0)
 #define SOLVER_TRANSACTION_SHOW_ALL             (1 << 1)
 #define SOLVER_TRANSACTION_SHOW_REPLACES        (1 << 2)
 
-extern void solver_create_transaction(struct _Solver *solv);
-extern void solver_transaction_all_pkgs(struct _Solver *solv, Id p, Queue *pkgs);
-extern Id   solver_transaction_pkg(struct _Solver *solv, Id p);
-extern Id   solver_transaction_filter(struct _Solver *solv, Id type, Id p, int mode);
+extern void transaction_init(Transaction *trans, struct _Pool *pool);
+extern void transaction_free(Transaction *trans);
+extern void transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap);
+extern void solver_transaction_all_pkgs(Transaction *trans, Id p, Queue *pkgs);
+extern Id   solver_transaction_pkg(Transaction *trans, Id p);
+extern Id   solver_transaction_show(Transaction *trans, Id type, Id p, int mode);
+extern void transaction_order(Transaction *trans, int flags);
+extern void transaction_check(Transaction *trans);
+extern int  transaction_add_choices(Transaction *trans, Queue *choices, Id chosen);
+
+/* order flags */
+#define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
 
 #ifdef __cplusplus
 }

@@ -72,7 +72,12 @@ struct _Pool {
   Id *languagecache;
   int languagecacheother;
 
-  int promoteepoch;             /* 0/1  */
+  /* flags to tell the library how the installed rpm works */
+  int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */
+  int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
+  int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
+  int novirtualconflicts;	/* true: conflicts on names, not on provides */
+  int allowselfconflicts;	/* true: packages which conflict with itself are installable */
 
   Id *id2arch;			/* map arch ids to scores */
   Id lastarch;			/* last valid entry in id2arch */

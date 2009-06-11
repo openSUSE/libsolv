@@ -37,6 +37,8 @@
  *
  */
 
+/* OBSOLETE: use transaction code instead! */
+
 Id *
 solver_create_decisions_obsoletesmap(Solver *solv)
 {
@@ -68,7 +70,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	      Solvable *ps = pool->solvables + p;
 	      if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
 		continue;
-	      if (!solv->implicitobsoleteusesprovides && s->name != ps->name)
+	      if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
 		continue;
 	      if (pool->solvables[p].repo == installed && !obsoletesmap[p])
 		{
@@ -99,7 +101,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	    {
 	      FOR_PROVIDES(p, pp, obs)
 		{
-		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		    continue;
 		  if (pool->solvables[p].repo == installed && !obsoletesmap[p])
 		    {
@@ -273,10 +275,10 @@ solver_printdecisions(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_RESULT, "transaction:\n");
 
   queue_init(&iq);
-  for (i = 0; i < solv->transaction.count; i += 2)
+  for (i = 0; i < solv->trans.steps.count; i += 2)
     {
-      s = pool->solvables + solv->transaction.elements[i + 1];
-      switch(solv->transaction.elements[i])
+      s = pool->solvables + solv->trans.steps.elements[i + 1];
+      switch(solv->trans.steps.elements[i])
         {
 	case SOLVER_TRANSACTION_MULTIINSTALL:
           POOL_DEBUG(SAT_DEBUG_RESULT, "  multi install %s", solvable2str(pool, s));
@@ -306,7 +308,7 @@ solver_printdecisions(Solver *solv)
 	default:
 	  break;
         }
-      switch(solv->transaction.elements[i])
+      switch(solv->trans.steps.elements[i])
         {
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_ERASE:
@@ -317,7 +319,7 @@ solver_printdecisions(Solver *solv)
 	case SOLVER_TRANSACTION_CHANGE:
 	case SOLVER_TRANSACTION_UPGRADE:
 	case SOLVER_TRANSACTION_REPLACE:
-	  solver_transaction_all_pkgs(solv, solv->transaction.elements[i + 1], &iq);
+	  solver_transaction_all_pkgs(&solv->trans, solv->trans.steps.elements[i + 1], &iq);
 	  if (iq.count)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_RESULT, "  (obsoletes");
