@@ -21,7 +21,8 @@
 
 typedef struct _Repo {
   const char *name;
-  struct _Pool *pool;		/* pool containing repo data */
+  Id repoid;			/* our id */
+  Pool *pool;			/* pool containing repo data */
 
   int start;			/* start of this repo solvables within pool->solvables */
   int end;			/* last solvable + 1 of this repo */
@@ -119,6 +120,11 @@ static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int
   for (s = repo->pool->solvables + start, i = count; i--; s++)
     s->repo = 0;
   pool_free_solvable_block(repo->pool, start, count, reuseids);
+}
+
+static inline Repo *pool_id2repo(Pool *pool, Id repoid)
+{
+  return pool->repos[repoid - 1];
 }
 
 #define FOR_REPO_SOLVABLES(r, p, s)						\

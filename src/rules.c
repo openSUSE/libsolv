@@ -1149,9 +1149,9 @@ solver_createdupmaps(Solver *solv)
       switch (how & SOLVER_JOBMASK)
 	{
 	case SOLVER_DISTUPGRADE:
-	  if (what < 0 || what > pool->nrepos)
+	  if (what <= 0 || what > pool->nrepos)
 	    break;
-	  repo = pool->repos[what];
+	  repo = pool_id2repo(pool, what);
 	  FOR_REPO_SOLVABLES(repo, p, s)
 	    {
 	      MAPSET(&solv->dupmap, p);

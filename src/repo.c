@@ -46,6 +46,7 @@ repo_create(Pool *pool, const char *name)
   repo = (Repo *)sat_calloc(1, sizeof(*repo));
   pool->repos = (Repo **)sat_realloc2(pool->repos, pool->nrepos + 1, sizeof(Repo *));
   pool->repos[pool->nrepos++] = repo;
+  repo->repoid = pool->nrepos;
   repo->name = name ? strdup(name) : 0;
   repo->pool = pool;
   repo->start = pool->nsolvables;
@@ -298,7 +299,12 @@ repo_free(Repo *repo, int reuseids)
   if (i == pool->nrepos)	       /* repo not in pool, return */
     return;
   if (i < pool->nrepos - 1)
-    memmove(pool->repos + i, pool->repos + i + 1, (pool->nrepos - 1 - i) * sizeof(Repo *));
+    {
+      memmove(pool->repos + i, pool->repos + i + 1, (pool->nrepos - 1 - i) * sizeof(Repo *));
+      /* fix repo ids */
+      for (; i < pool->nrepos - 1; i++)
+	pool->repos[i]->repoid = i + 1;
+    }
   pool->nrepos--;
   repo_freedata(repo);
 }
