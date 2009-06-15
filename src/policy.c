@@ -22,8 +22,6 @@
 #include "poolarch.h"
 
 
-static Solver *prune_to_best_version_sortcmp_data;
-
 /*-----------------------------------------------------------------*/
 
 /*
@@ -32,10 +30,9 @@ static Solver *prune_to_best_version_sortcmp_data;
  */
 
 static int
-prune_to_best_version_sortcmp(const void *ap, const void *bp)
+prune_to_best_version_sortcmp(const void *ap, const void *bp, void *dp)
 {
-  Solver *solv = prune_to_best_version_sortcmp_data;
-  Pool *pool = solv->pool;
+  Pool *pool = dp;
   int r;
   Id a = *(Id *)ap;
   Id b = *(Id *)bp;
@@ -54,14 +51,14 @@ prune_to_best_version_sortcmp(const void *ap, const void *bp)
       return strcmp(na, nb);
     }
   /* the same name, bring installed solvables to the front */
-  if (solv->installed)
+  if (pool->installed)
     {
-      if (sa->repo == solv->installed)
+      if (sa->repo == pool->installed)
 	{
-	  if (sb->repo != solv->installed)
+	  if (sb->repo != pool->installed)
 	    return -1;
 	}
-      else if (sb->repo == solv->installed)
+      else if (sb->repo == pool->installed)
 	return 1;	
     }
   /* sort by repository sub-prio (installed repo handled above) */
@@ -271,9 +268,8 @@ prune_to_best_arch(Pool *pool, Queue *plist)
  * return result through plist
  */
 void
-prune_to_best_version(Solver *solv, Queue *plist)
+prune_to_best_version(Pool *pool, Queue *plist)
 {
-  Pool *pool = solv->pool;
   Id best;
   int i, j;
   Solvable *s;
@@ -282,9 +278,8 @@ prune_to_best_version(Solver *solv, Queue *plist)
     return;
   POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
 
-  prune_to_best_version_sortcmp_data = solv;
   /* sort by name first, prefer installed */
-  qsort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp);
+  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
 
   /* delete obsoleted. hmm, looks expensive! */
   /* FIXME maybe also check provides depending on noupdateprovide? */
@@ -302,7 +297,7 @@ prune_to_best_version(Solver *solv, Queue *plist)
 	    {
 	      if (pool->solvables[p].name == s->name)
 		continue;
-	      if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		continue;
 	      for (j = 0; j < plist->count; j++)
 		{
@@ -328,7 +323,7 @@ prune_to_best_version(Solver *solv, Queue *plist)
 
       POOL_DEBUG(SAT_DEBUG_POLICY, "- %s[%s]\n",
 		 solvable2str(pool, s),
-		 (solv->installed && s->repo == solv->installed) ? "installed" : "not installed");
+		 (pool->installed && s->repo == pool->installed) ? "installed" : "not installed");
 
       if (!best)		       /* if no best yet, the current is best */
         {
@@ -374,7 +369,7 @@ prune_best_arch_name_version(Solver *solv, Pool *pool, Queue *plist)
   if (plist->count > 1)
     prune_to_best_arch(pool, plist);
   if (plist->count > 1)
-    prune_to_best_version(solv, plist);
+    prune_to_best_version(pool, plist);
 }
 
 
@@ -417,22 +412,104 @@ int
 policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
 {
   Pool *pool = solv->pool;
+  Id v1, v2;
   Id vendormask1, vendormask2;
 
-  if (solv && solv->vendorCheckCb)
+  if (solv->vendorCheckCb)
    {   /* The application is responsible for */
-     return solv->vendorCheckCb(solv->pool, s1, s2);
+     return solv->vendorCheckCb(pool, s1, s2);
    }
-
-  if (s1->vendor == s2->vendor)
+  /* treat a missing vendor as empty string */
+  v1 = s1->vendor ? s1->vendor : ID_EMPTY;
+  v2 = s2->vendor ? s2->vendor : ID_EMPTY;
+  if (v1 == v2)
     return 0;
-  vendormask1 = pool_vendor2mask(pool, s1->vendor);
+  vendormask1 = pool_vendor2mask(pool, v1);
   if (!vendormask1)
-    return 0;
-  vendormask2 = pool_vendor2mask(pool, s2->vendor);
+    return 1;	/* can't match */
+  vendormask2 = pool_vendor2mask(pool, v2);
   if ((vendormask1 & vendormask2) != 0)
     return 0;
-  return 1;
+  return 1;	/* no class matches */
+}
+
+
+/*-------------------------------------------------------------------
+ * 
+ * create reverse obsoletes map for installed solvables
+ *
+ * For each installed solvable find which packages with *different* names
+ * obsolete the solvable.
+ * This index is used in policy_findupdatepackages() below.
+ */
+void
+policy_create_obsolete_index(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Solvable *s;
+  Repo *installed = solv->installed;
+  Id p, pp, obs, *obsp, *obsoletes, *obsoletes_data;
+  int i, n, cnt;
+
+  if (!installed || installed->start == installed->end)
+    return;
+  cnt = installed->end - installed->start;
+  solv->obsoletes = obsoletes = sat_calloc(cnt, sizeof(Id));
+  for (i = 1; i < pool->nsolvables; i++)
+    {
+      s = pool->solvables + i;
+      if (!s->obsoletes)
+	continue;
+      if (!pool_installable(pool, s))
+	continue;
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(p, pp, obs)
+	    {
+	      if (pool->solvables[p].repo != installed)
+		continue;
+	      if (pool->solvables[p].name == s->name)
+		continue;
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		continue;
+	      obsoletes[p - installed->start]++;
+	    }
+	}
+    }
+  n = 0;
+  for (i = 0; i < cnt; i++)
+    if (obsoletes[i])
+      {
+        n += obsoletes[i] + 1;
+        obsoletes[i] = n;
+      }
+  solv->obsoletes_data = obsoletes_data = sat_calloc(n + 1, sizeof(Id));
+  POOL_DEBUG(SAT_DEBUG_STATS, "obsoletes data: %d entries\n", n + 1);
+  for (i = pool->nsolvables - 1; i > 0; i--)
+    {
+      s = pool->solvables + i;
+      if (!s->obsoletes)
+	continue;
+      if (!pool_installable(pool, s))
+	continue;
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(p, pp, obs)
+	    {
+	      if (pool->solvables[p].repo != installed)
+		continue;
+	      if (pool->solvables[p].name == s->name)
+		continue;
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		continue;
+	      p -= installed->start;
+	      if (obsoletes_data[obsoletes[p]] != i)
+		obsoletes_data[--obsoletes[p]] = i;
+	    }
+	}
+    }
 }
 
 
@@ -452,6 +529,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
   Id p, pp, n, p2, pp2;
   Id obs, *obsp;
   Solvable *ps;
+  int haveprovobs = 0;
 
   queue_empty(qs);
 
@@ -487,7 +565,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	    {
 	      FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
 		{
-		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
 		    continue;
 		  if (p2 == n)		/* match ! */
 		    break;
@@ -500,6 +578,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	  /* here we have 'p' with a matching provides/obsoletes combination
 	   * thus flagging p as a valid update candidate for s
 	   */
+	  haveprovobs = 1;
 	}
       else
         continue;
@@ -511,7 +590,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
     }
   /* if we have found some valid candidates and noupdateprovide is not set, we're
      done. otherwise we fallback to all obsoletes */
-  if (!solv->noupdateprovide && qs->count)
+  if (!solv->noupdateprovide && haveprovobs)
     return;
   if (solv->obsoletes && solv->obsoletes[n - solv->installed->start])
     {

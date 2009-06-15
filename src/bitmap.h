@@ -7,11 +7,13 @@
 
 /*
  * bitmap.h
- * 
+ *
  */
 
 #ifndef SATSOLVER_BITMAP_H
 #define SATSOLVER_BITMAP_H
+
+#include <string.h>
 
 typedef struct _Map {
   unsigned char *map;
@@ -23,8 +25,14 @@ typedef struct _Map {
 #define MAPCLR(m, n) ((m)->map[(n) >> 3] &= ~(1 << ((n) & 7))) // Reset Bit
 #define MAPTST(m, n) ((m)->map[(n) >> 3] & (1 << ((n) & 7))) // Test Bit
 
+static inline void
+map_empty(Map *m)
+{
+  MAPZERO(m);
+}
+
 extern void map_init(Map *m, int n);
+extern void map_init_clone(Map *t, Map *s);
 extern void map_free(Map *m);
-extern void map_clone(Map *t, Map *s);
 
 #endif /* SATSOLVER_BITMAP_H */

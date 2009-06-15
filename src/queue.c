@@ -17,7 +17,7 @@
 #include "util.h"
 
 void
-queue_clone(Queue *t, Queue *s)
+queue_init_clone(Queue *t, Queue *s)
 {
   t->alloc = t->elements = sat_malloc2(s->count + 8, sizeof(Id));
   if (s->count)
@@ -75,3 +75,54 @@ queue_alloc_one(Queue *q)
     }
 }
 
+void
+queue_insert(Queue *q, int pos, Id id)
+{
+  queue_push(q, id);	/* make room */
+  if (pos < q->count - 1)
+    {
+      memmove(q->elements + pos + 1, q->elements + pos, (q->count - 1 - pos) * sizeof(Id));
+      q->elements[pos] = id;
+    }
+}
+
+void
+queue_delete(Queue *q, int pos)
+{
+  if (pos >= q->count)
+    return;
+  if (pos < q->count - 1)
+    memmove(q->elements + pos, q->elements + pos + 1, (q->count - 1 - pos) * sizeof(Id));
+  q->left++;
+  q->count--;
+}
+
+void
+queue_insert2(Queue *q, int pos, Id id1, Id id2)
+{
+  queue_push(q, id1);	/* make room */
+  queue_push(q, id2);	/* make room */
+  if (pos < q->count - 2)
+    {
+      memmove(q->elements + pos + 2, q->elements + pos, (q->count - 2 - pos) * sizeof(Id));
+      q->elements[pos] = id1;
+      q->elements[pos] = id2;
+    }
+}
+
+void
+queue_delete2(Queue *q, int pos)
+{
+  if (pos >= q->count)
+    return;
+  if (pos == q->count - 1)
+    {
+      q->left++;
+      q->count--;
+      return;
+    }
+  if (pos < q->count - 2)
+    memmove(q->elements + pos, q->elements + pos + 2, (q->count - 2 - pos) * sizeof(Id));
+  q->left += 2;
+  q->count -= 2;
+}

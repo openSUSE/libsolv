@@ -269,7 +269,7 @@ langtag(struct parsedata *pd, Id tag, const char *language)
 }
 
 static int
-id3_cmp (const void *v1, const void *v2)
+id3_cmp (const void *v1, const void *v2, void *dp)
 {
   Id *i1 = (Id*)v1;
   Id *i2 = (Id*)v2;
@@ -284,7 +284,7 @@ commit_diskusage (struct parsedata *pd, unsigned handle)
   /* Now sort in dirid order.  This ensures that parents come before
      their children.  */
   if (pd->ndirs > 1)
-    qsort(pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp);
+    sat_sort(pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp, 0);
   /* Substract leaf numbers from all parents to make the numbers
      non-cumulative.  This must be done post-order (i.e. all leafs
      adjusted before parents).  We ensure this by starting at the end of
@@ -833,7 +833,8 @@ startElement(void *userData, const char *name, const char **atts)
           }
         else
           {
-            fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n", atts, *atts);
+            fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n",
+                    (void *)atts, *atts);
             break;
           }
         if ( (str = find_attr("size", atts)) )
@@ -932,6 +933,8 @@ endElement(void *userData, const char *name)
         Id type, index;
         if (!strcasecmp (pd->tmpattr, "sha") || !strcasecmp (pd->tmpattr, "sha1"))
           l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
+        else if (!strcasecmp (pd->tmpattr, "sha256"))
+          l = SIZEOF_SHA256 * 2, type = REPOKEY_TYPE_SHA256;
         else if (!strcasecmp (pd->tmpattr, "md5"))
           l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
         else

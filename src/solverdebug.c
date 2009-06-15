@@ -37,6 +37,8 @@
  *
  */
 
+/* OBSOLETE: use transaction code instead! */
+
 Id *
 solver_create_decisions_obsoletesmap(Solver *solv)
 {
@@ -68,7 +70,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	      Solvable *ps = pool->solvables + p;
 	      if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
 		continue;
-	      if (!solv->implicitobsoleteusesprovides && s->name != ps->name)
+	      if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
 		continue;
 	      if (pool->solvables[p].repo == installed && !obsoletesmap[p])
 		{
@@ -99,7 +101,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	    {
 	      FOR_PROVIDES(p, pp, obs)
 		{
-		  if (!solv->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
 		    continue;
 		  if (pool->solvables[p].repo == installed && !obsoletesmap[p])
 		    {
@@ -273,10 +275,10 @@ solver_printdecisions(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_RESULT, "transaction:\n");
 
   queue_init(&iq);
-  for (i = 0; i < solv->transaction.count; i += 2)
+  for (i = 0; i < solv->trans.steps.count; i += 2)
     {
-      s = pool->solvables + solv->transaction.elements[i + 1];
-      switch(solv->transaction.elements[i])
+      s = pool->solvables + solv->trans.steps.elements[i + 1];
+      switch(solv->trans.steps.elements[i])
         {
 	case SOLVER_TRANSACTION_MULTIINSTALL:
           POOL_DEBUG(SAT_DEBUG_RESULT, "  multi install %s", solvable2str(pool, s));
@@ -297,7 +299,7 @@ solver_printdecisions(Solver *solv)
           POOL_DEBUG(SAT_DEBUG_RESULT, "  change    %s", solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_UPGRADE:
-	case SOLVER_TRANSACTION_RENAME:
+	case SOLVER_TRANSACTION_REPLACE:
           POOL_DEBUG(SAT_DEBUG_RESULT, "  upgrade   %s", solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_ERASE:
@@ -306,7 +308,7 @@ solver_printdecisions(Solver *solv)
 	default:
 	  break;
         }
-      switch(solv->transaction.elements[i])
+      switch(solv->trans.steps.elements[i])
         {
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_ERASE:
@@ -316,13 +318,13 @@ solver_printdecisions(Solver *solv)
 	case SOLVER_TRANSACTION_DOWNGRADE:
 	case SOLVER_TRANSACTION_CHANGE:
 	case SOLVER_TRANSACTION_UPGRADE:
-	case SOLVER_TRANSACTION_RENAME:
-	  solver_transaction_info(solv, solv->transaction.elements[i + 1], &iq);
+	case SOLVER_TRANSACTION_REPLACE:
+	  solver_transaction_all_pkgs(&solv->trans, solv->trans.steps.elements[i + 1], &iq);
 	  if (iq.count)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_RESULT, "  (obsoletes");
 	      for (j = 0; j < iq.count; j++)
-		POOL_DEBUG(SAT_DEBUG_RESULT, " %s", solvable2str(pool, pool->solvables + iq.elements[j]));
+		POOL_DEBUG(SAT_DEBUG_RESULT, " %s", solvid2str(pool, iq.elements[j]));
 	      POOL_DEBUG(SAT_DEBUG_RESULT, ")");
 	    }
 	  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
@@ -393,22 +395,18 @@ solver_printprobleminfo(Solver *solv, Queue *job, Id problem)
   Pool *pool = solv->pool;
   Id probr;
   Id dep, source, target;
-  Solvable *s, *s2;
 
   probr = solver_findproblemrule(solv, problem);
   switch (solver_problemruleinfo(solv, job, probr, &dep, &source, &target))
     {
     case SOLVER_RULE_DISTUPGRADE:
-      s = pool_id2solvable(pool, source);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "%s does not belong to a distupgrade repository\n", solvable2str(pool, s));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "%s does not belong to a distupgrade repository\n", solvid2str(pool, source));
       return;
     case SOLVER_RULE_INFARCH:
-      s = pool_id2solvable(pool, source);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "%s has inferior architecture\n", solvable2str(pool, s));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "%s has inferior architecture\n", solvid2str(pool, source));
       return;
     case SOLVER_RULE_UPDATE:
-      s = pool_id2solvable(pool, source);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "problem with installed package %s\n", solvable2str(pool, s));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "problem with installed package %s\n", solvid2str(pool, source));
       return;
     case SOLVER_RULE_JOB:
       POOL_DEBUG(SAT_DEBUG_RESULT, "conflicting requests\n");
@@ -420,40 +418,28 @@ solver_printprobleminfo(Solver *solv, Queue *job, Id problem)
       POOL_DEBUG(SAT_DEBUG_RESULT, "some dependency problem\n");
       return;
     case SOLVER_RULE_RPM_NOT_INSTALLABLE:
-      s = pool_id2solvable(pool, source);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s is not installable\n", solvable2str(pool, s));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s is not installable\n", solvid2str(pool, source));
       return;
     case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
-      s = pool_id2solvable(pool, source);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides %s needed by %s\n", dep2str(pool, dep), solvable2str(pool, s));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides %s needed by %s\n", dep2str(pool, dep), solvid2str(pool, source));
       return;
     case SOLVER_RULE_RPM_SAME_NAME:
-      s = pool_id2solvable(pool, source);
-      s2 = pool_id2solvable(pool, target);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "cannot install both %s and %s\n", solvable2str(pool, s), solvable2str(pool, s2));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "cannot install both %s and %s\n", solvid2str(pool, source), solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_PACKAGE_CONFLICT:
-      s = pool_id2solvable(pool, source);
-      s2 = pool_id2solvable(pool, target);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
-      s = pool_id2solvable(pool, source);
-      s2 = pool_id2solvable(pool, target);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s obsoletes %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
-      s = pool_id2solvable(pool, source);
-      s2 = pool_id2solvable(pool, target);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s implicitely obsoletes %s provided by %s\n", solvable2str(pool, s), dep2str(pool, dep), solvable2str(pool, s2));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s implicitely obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
-      s = pool_id2solvable(pool, source);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but none of the providers can be installed\n", solvable2str(pool, s), dep2str(pool, dep));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but none of the providers can be installed\n", solvid2str(pool, source), dep2str(pool, dep));
       return;
     case SOLVER_RULE_RPM_SELF_CONFLICT:
-      s = pool_id2solvable(pool, source);
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by itself\n", solvable2str(pool, s), dep2str(pool, dep));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by itself\n", solvid2str(pool, source), dep2str(pool, dep));
       return;
     case SOLVER_RULE_UNKNOWN:
     case SOLVER_RULE_FEATURE:
@@ -497,7 +483,7 @@ solver_printsolutions(Solver *solv, Queue *job)
 		    {
 		    case SOLVER_INSTALL:
 		      if (select == SOLVER_SOLVABLE && solv->installed && pool->solvables[what].repo == solv->installed)
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not keep %s installed\n", solvable2str(pool, pool->solvables + what));
+			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not keep %s installed\n", solvid2str(pool, what));
 		      else if (select == SOLVER_SOLVABLE_PROVIDES)
 			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install a solvable %s\n", solver_select2str(solv, select, what));
 		      else
@@ -505,7 +491,7 @@ solver_printsolutions(Solver *solv, Queue *job)
 		      break;
 		    case SOLVER_ERASE:
 		      if (select == SOLVER_SOLVABLE && !(solv->installed && pool->solvables[what].repo == solv->installed))
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not forbid installation of %s\n", solvable2str(pool, pool->solvables + what));
+			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not forbid installation of %s\n", solvid2str(pool, what));
 		      else if (select == SOLVER_SOLVABLE_PROVIDES)
 			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall all solvables %s\n", solver_select2str(solv, select, what));
 		      else
@@ -610,7 +596,7 @@ solver_printtrivial(Solver *solv)
   solver_trivial_installable(solv, &in, &out);
   POOL_DEBUG(SAT_DEBUG_RESULT, "trivial installable status:\n");
   for (i = 0; i < in.count; i++)
-    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s: %d\n", solvable2str(pool, pool->solvables + in.elements[i]), out.elements[i]);
+    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s: %d\n", solvid2str(pool, in.elements[i]), out.elements[i]);
   POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
   queue_free(&in);
   queue_free(&out);
@@ -623,7 +609,7 @@ solver_select2str(Solver *solv, Id select, Id what)
   const char *s;
   char *b;
   if (select == SOLVER_SOLVABLE)
-    return solvable2str(pool, pool->solvables + what);
+    return solvid2str(pool, what);
   if (select == SOLVER_SOLVABLE_NAME)
     return dep2str(pool, what);
   if (select == SOLVER_SOLVABLE_PROVIDES)
@@ -640,7 +626,7 @@ solver_select2str(Solver *solv, Id select, Id what)
       b = "";
       while ((p = pool->whatprovidesdata[what++]) != 0)
 	{
-	  s = solvable2str(pool, pool->solvables + p);
+	  s = solvid2str(pool, p);
 	  b2 = pool_alloctmpspace(pool, strlen(b) + strlen(s) + 3);
 	  sprintf(b2, "%s, %s", b, s);
 	  b = b2;

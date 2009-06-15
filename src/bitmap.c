@@ -20,7 +20,7 @@ void
 map_init(Map *m, int n)
 {
   m->size = (n + 7) >> 3;
-  m->map = sat_calloc(m->size, 1);
+  m->map = n ? sat_calloc(m->size, 1) : 0;
 }
 
 // free space allocated
@@ -33,7 +33,7 @@ map_free(Map *m)
 
 // copy t <- s
 void
-map_clone(Map *t, Map *s)
+map_init_clone(Map *t, Map *s)
 {
   t->size = s->size;
   t->map = sat_malloc(s->size);

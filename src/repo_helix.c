@@ -658,13 +658,10 @@ endElement(void *userData, const char *name)
 		    }
 
 
-		  if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
+		  if (!strncmp(depname, "kernel(", 7) && !strchr(depname, ':'))
 		    {
 		      char newdep[100];
-		      strcpy(newdep, "kernel(");
-		      strncat(newdep, cflavor, sizeof(newdep) - 1);
-		      strncat(newdep, ":", sizeof(newdep) - 1);
-		      strncat(newdep, depname + strlen("kernel("), sizeof(newdep) - 1);
+		      snprintf(newdep, sizeof(newdep), "kernel(%s:%s", cflavor, depname + 7);
 		      pid = str2id(pool, newdep, 1);
 		      if (prd)
 			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
@@ -695,13 +692,10 @@ endElement(void *userData, const char *name)
 		      depname = id2str(pool, pid);
 		    }
 
-		  if (!strncmp(depname, "kernel(", strlen("kernel(")) && !strchr(depname, ':'))
+		  if (!strncmp(depname, "kernel(", 7) && !strchr(depname, ':'))
 		    {
 		      char newdep[100];
-		      strcpy(newdep, "kernel(");
-		      strncat(newdep, cflavor, sizeof(newdep) - 1);
-		      strncat(newdep, ":", sizeof(newdep) - 1);
-		      strncat(newdep, depname + strlen("kernel("), sizeof(newdep) - 1);
+		      snprintf(newdep, sizeof(newdep), "kernel(%s:%s", cflavor, depname + 7);
 		      pid = str2id(pool, newdep, 1);
 		      if (prd)
 			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);

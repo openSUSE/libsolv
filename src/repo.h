@@ -278,9 +278,6 @@ void dataiterator_jump_to_solvid(Dataiterator *di, Id solvid);
 void dataiterator_jump_to_repo(Dataiterator *di, Repo *repo);
 void dataiterator_entersub(Dataiterator *di);
 
-/* to be removed ... */
-int dataiterator_match_obsolete(Dataiterator *di, int flags, const void *match);
-
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
 void repo_set_num(Repo *repo, Id p, Id keyname, Id num);
 void repo_set_str(Repo *repo, Id p, Id keyname, const char *str);

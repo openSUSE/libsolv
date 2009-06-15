@@ -22,6 +22,10 @@ extern "C" {
 #include "repo.h"
 #include "queue.h"
 #include "bitmap.h"
+#include "transaction.h"
+#include "rules.h"
+#include "problems.h"
+
 /*
  * Callback definitions in order to "overwrite" the policies by an external application.
  */
@@ -32,39 +36,13 @@ typedef int  (*VendorCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvab
 typedef void (*UpdateCandidateCb) (Pool *pool, Solvable *solvable, Queue *canditates);
 
 
-/* ----------------------------------------------
- * Rule
- *
- *   providerN(B) == Package Id of package providing tag B
- *   N = 1, 2, 3, in case of multiple providers
- *
- * A requires B : !A | provider1(B) | provider2(B)
- *
- * A conflicts B : (!A | !provider1(B)) & (!A | !provider2(B)) ...
- *
- * 'not' is encoded as a negative Id
- * 
- * Binary rule: p = first literal, d = 0, w2 = second literal, w1 = p
- */
+struct _Solver;
 
-typedef struct rule {
-  Id p;			/* first literal in rule */
-  Id d;			/* Id offset into 'list of providers terminated by 0' as used by whatprovides; pool->whatprovides + d */
-			/* in case of binary rules, d == 0, w1 == p, w2 == other literal */
-			/* in case of disabled rules: ~d, aka -d - 1 */
-  Id w1, w2;		/* watches, literals not-yet-decided */
-  				       /* if !w2, assertion, not rule */
-  Id n1, n2;		/* next rules in linked list, corresponding to w1,w2 */
-} Rule;
-
-struct solver;
-
-typedef struct solver {
+typedef struct _Solver {
   Pool *pool;
   Queue job;				/* copy of the job we're solving */
 
-  Queue transaction;			/* solver result */
-  Queue transaction_info;		/* transaction obsoletes info */
+  Transaction trans;			/* calculated transaction */
 
   Repo *installed;			/* copy of pool->installed */
   
@@ -118,7 +96,6 @@ typedef struct solver {
   /* our decisions: */
   Queue decisionq;                      /* >0:install, <0:remove/conflict */
   Queue decisionq_why;			/* index of rule, Offset into rules */
-  int directdecisions;			/* number of decisions with no rule */
 
   Id *decisionmap;			/* map for all available solvables,
 					 * = 0: undecided
@@ -130,7 +107,7 @@ typedef struct solver {
   Queue learnt_pool;
 
   Queue branches;
-  int (*solution_callback)(struct solver *solv, void *data);
+  int (*solution_callback)(struct _Solver *solv, void *data);
   void *solution_callback_data;
 
   int propagate_index;                  /* index into decisionq for non-propagated decisions */
@@ -163,10 +140,6 @@ typedef struct solver {
   int allowvendorchange;		/* allow to change vendor of installed solvables */
   int allowuninstall;			/* allow removal of installed solvables */
   int updatesystem;			/* update all packages to the newest version */
-  int allowvirtualconflicts;		/* false: conflicts on package name, true: conflicts on package provides */
-  int allowselfconflicts;		/* true: packages wich conflict with itself are installable */
-  int obsoleteusesprovides;		/* true: obsoletes are matched against provides, not names */
-  int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
@@ -270,44 +243,6 @@ typedef struct solver {
 #define SOLVER_NOOBSOLETES_SOLVABLE_PROVIDES (SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_PROVIDES)
 #endif
 
-typedef enum {
-  SOLVER_PROBLEM_UPDATE_RULE,
-  SOLVER_PROBLEM_JOB_RULE,
-  SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP,
-  SOLVER_PROBLEM_NOT_INSTALLABLE,
-  SOLVER_PROBLEM_NOTHING_PROVIDES_DEP,
-  SOLVER_PROBLEM_SAME_NAME,
-  SOLVER_PROBLEM_PACKAGE_CONFLICT,
-  SOLVER_PROBLEM_PACKAGE_OBSOLETES,
-  SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE,
-  SOLVER_PROBLEM_SELF_CONFLICT,
-  SOLVER_PROBLEM_RPM_RULE,
-  SOLVER_PROBLEM_DISTUPGRADE_RULE,
-  SOLVER_PROBLEM_INFARCH_RULE
-} SolverProbleminfo;
-
-typedef enum {
-  SOLVER_RULE_UNKNOWN = 0,
-  SOLVER_RULE_RPM = 0x100,
-  SOLVER_RULE_RPM_NOT_INSTALLABLE,
-  SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP,
-  SOLVER_RULE_RPM_PACKAGE_REQUIRES,
-  SOLVER_RULE_RPM_SELF_CONFLICT,
-  SOLVER_RULE_RPM_PACKAGE_CONFLICT,
-  SOLVER_RULE_RPM_SAME_NAME,
-  SOLVER_RULE_RPM_PACKAGE_OBSOLETES,
-  SOLVER_RULE_RPM_IMPLICIT_OBSOLETES,
-  SOLVER_RULE_UPDATE = 0x200,
-  SOLVER_RULE_FEATURE = 0x300,
-  SOLVER_RULE_JOB = 0x400,
-  SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP,
-  SOLVER_RULE_DISTUPGRADE = 0x500,
-  SOLVER_RULE_INFARCH = 0x600,
-  SOLVER_RULE_LEARNT = 0x700
-} SolverRuleinfo;
-
-#define SOLVER_RULE_TYPEMASK	0xff00
-
 /* backward compatibility */
 #define SOLVER_PROBLEM_UPDATE_RULE 		SOLVER_RULE_UPDATE
 #define SOLVER_PROBLEM_JOB_RULE			SOLVER_RULE_JOB
@@ -324,49 +259,20 @@ typedef enum {
 #define SOLVER_PROBLEM_INFARCH_RULE		SOLVER_RULE_INFARCH
 
 
-#define SOLVER_SOLUTION_JOB		(0)
-#define SOLVER_SOLUTION_DISTUPGRADE	(-1)
-#define SOLVER_SOLUTION_INFARCH		(-2)
-
-#define SOLVER_TRANSACTION_ERASE		0x10
-#define SOLVER_TRANSACTION_REINSTALLED		0x11
-#define SOLVER_TRANSACTION_DOWNGRADED		0x12
-#define SOLVER_TRANSACTION_CHANGED		0x13
-#define SOLVER_TRANSACTION_UPGRADED		0x14
-#define SOLVER_TRANSACTION_OBSOLETED		0x15
-
-#define SOLVER_TRANSACTION_INSTALL		0x20
-#define SOLVER_TRANSACTION_REINSTALL		0x21
-#define SOLVER_TRANSACTION_DOWNGRADE		0x22
-#define SOLVER_TRANSACTION_CHANGE		0x23
-#define SOLVER_TRANSACTION_UPGRADE		0x24
-#define SOLVER_TRANSACTION_RENAME		0x25
-
-#define SOLVER_TRANSACTION_MULTIINSTALL		0x30
-#define SOLVER_TRANSACTION_MULTIREINSTALL	0x31
-
-
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern void solver_solve(Solver *solv, Queue *job);
-extern void solver_transaction_info(Solver *solv, Id p, Queue *info);
-extern Id solver_transaction_pkg(Solver *solv, Id p);
+
+extern void solver_run_sat(Solver *solv, int disablerules, int doweak);
+extern void solver_reset(Solver *solv);
 
 extern int solver_dep_installed(Solver *solv, Id dep);
 extern int solver_splitprovides(Solver *solv, Id dep);
 
-extern Id solver_problem_count(Solver *solv);
-extern Id solver_next_problem(Solver *solv, Id problem);
-extern Id solver_solution_count(Solver *solv, Id problem);
-extern Id solver_next_solution(Solver *solv, Id problem, Id solution);
-extern Id solver_solutionelement_count(Solver *solv, Id problem, Id solution);
-extern Id solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
-extern Id solver_findproblemrule(Solver *solv, Id problem);
-extern void solver_findallproblemrules(Solver *solv, Id problem, Queue *rules);
+extern void solver_calculate_noobsmap(Pool *pool, Map *noobsmap, Queue *job);
 
+/* obsolete */
 extern SolverRuleinfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
-extern SolverRuleinfo solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
-extern int solver_allruleinfos(Solver *solv, Id rid, Queue *rq);
 
 /* XXX: why is this not static? */
 Id *solver_create_decisions_obsoletesmap(Solver *solv);

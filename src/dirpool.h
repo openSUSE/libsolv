@@ -17,7 +17,7 @@ typedef struct _Dirpool {
   Id *dirtraverse;
 } Dirpool;
 
-void dirpool_create(Dirpool *dp);
+void dirpool_init(Dirpool *dp);
 void dirpool_free(Dirpool *dp);
 
 void dirpool_make_dirtraverse(Dirpool *dp);

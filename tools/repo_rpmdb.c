@@ -309,7 +309,7 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
   const unsigned char *cp;
   int state = 0;
   int c;
-  char *buf = 0, *bp;
+  unsigned char *buf = 0, *bp;
 
   /* check if it's already utf8, code taken from screen ;-) */
   cp = (const unsigned char *)str;
@@ -358,7 +358,7 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
       /* not utf8, assume latin1 */
       buf = sat_malloc(2 * strlen(str) + 1);
       cp = (const unsigned char *)str;
-      str = buf;
+      str = (char *)buf;
       bp = buf;
       while ((c = *cp++) != 0)
 	{
@@ -1117,7 +1117,7 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
 
 /* used to sort entries returned in some database order */
 static int
-rpmids_sort_cmp(const void *va, const void *vb)
+rpmids_sort_cmp(const void *va, const void *vb, void *dp)
 {
   struct rpmid const *a = va, *b = vb;
   int r;
@@ -1127,20 +1127,19 @@ rpmids_sort_cmp(const void *va, const void *vb)
   return a->dbid - b->dbid;
 }
 
-static Repo *pkgids_sort_cmp_data;
-
 static int
-pkgids_sort_cmp(const void *va, const void *vb)
+pkgids_sort_cmp(const void *va, const void *vb, void *dp)
 {
-  Pool *pool = pkgids_sort_cmp_data->pool;
+  Repo *repo = dp;
+  Pool *pool = repo->pool;
   Solvable *a = pool->solvables + *(Id *)va;
   Solvable *b = pool->solvables + *(Id *)vb;
   Id *rpmdbid;
 
   if (a->name != b->name)
     return strcmp(id2str(pool, a->name), id2str(pool, b->name));
-  rpmdbid = pkgids_sort_cmp_data->rpmdbid;
-  return rpmdbid[(a - pool->solvables) - pkgids_sort_cmp_data->start] - rpmdbid[(b - pool->solvables) - pkgids_sort_cmp_data->start];
+  rpmdbid = repo->rpmdbid;
+  return rpmdbid[(a - pool->solvables) - repo->start] - rpmdbid[(b - pool->solvables) - repo->start];
 }
 
 static void
@@ -1198,7 +1197,7 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
       perror("db_create");
       exit(1);
     }
-  if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
+  if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
     {
       perror("db->open var/lib/rpm/Name");
       exit(1);
@@ -1310,7 +1309,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	count = count_headers(rootdir, dbenv);
-      if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
+      if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 	{
 	  perror("db->open var/lib/rpm/Packages");
 	  exit(1);
@@ -1406,8 +1405,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  pkgids = sat_malloc2(repo->end - repo->start, sizeof(Id));
 	  for (i = repo->start; i < repo->end; i++)
 	    pkgids[i - repo->start] = i;
-	  pkgids_sort_cmp_data = repo;
-	  qsort(pkgids, repo->end - repo->start, sizeof(Id), pkgids_sort_cmp);
+	  sat_sort(pkgids, repo->end - repo->start, sizeof(Id), pkgids_sort_cmp, repo);
 	  /* adapt order */
 	  for (i = repo->start; i < repo->end; i++)
 	    {
@@ -1425,8 +1423,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       Id dircache[512];
 
       memset(dircache, 0, sizeof(dircache));
-      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", rootdir);
-      if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
+      if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 	{
 	  perror("db->open var/lib/rpm/Name");
 	  exit(1);
@@ -1476,7 +1473,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       db = 0;
 
       /* sort rpmids */
-      qsort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp);
+      sat_sort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp, 0);
 
       dbidp = (unsigned char *)&dbid;
       rpmheadsize = 0;
@@ -1546,13 +1543,12 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	    }
 	  if (!db)
 	    {
-	      if (db_create(&db, 0, 0))
+	      if (db_create(&db, dbenv, 0))
 		{
 		  perror("db_create");
 		  exit(1);
 		}
-	      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
-	      if (db->open(db, 0, dbpath, 0, DB_HASH, DB_RDONLY, 0664))
+	      if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 		{
 		  perror("db->open var/lib/rpm/Packages");
 		  exit(1);
@@ -1579,7 +1575,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  if (db->get(db, NULL, &dbkey, &dbdata, 0))
 	    {
 	      perror("db->get");
-	      fprintf(stderr, "corrupt rpm database\n");
+	      fprintf(stderr, "corrupt rpm database, key %d not found\n", dbid);
+	      fprintf(stderr, "please run 'rpm --rebuilddb' to recreate the database index files\n");
 	      exit(1);
 	    }
 	  if (dbdata.size < 8)

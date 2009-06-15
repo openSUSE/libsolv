@@ -72,7 +72,12 @@ struct _Pool {
   Id *languagecache;
   int languagecacheother;
 
-  int promoteepoch;             /* 0/1  */
+  /* flags to tell the library how the installed rpm works */
+  int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */
+  int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
+  int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
+  int novirtualconflicts;	/* true: conflicts on names, not on provides */
+  int allowselfconflicts;	/* true: packages which conflict with itself are installable */
 
   Id *id2arch;			/* map arch ids to scores */
   Id lastarch;			/* last valid entry in id2arch */
@@ -179,6 +184,10 @@ static inline Solvable *pool_id2solvable(Pool *pool, Id p)
   return pool->solvables + p;
 }
 extern const char *solvable2str(Pool *pool, Solvable *s);
+static inline const char *solvid2str(Pool *pool, Id p)
+{
+  return solvable2str(pool, pool->solvables + p);
+}
 
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
 Id pool_id2langid(Pool *pool, Id id, const char *lang, int create);
@@ -203,6 +212,7 @@ int solvable_trivial_installable_queue(Solvable *s, Queue *installed);
 void pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
 
 int pool_match_nevr_rel(Pool *pool, Solvable *s, Id d);
+int pool_match_dep(Pool *pool, Id d1, Id d2);
 
 static inline int pool_match_nevr(Pool *pool, Solvable *s, Id d)
 {
@@ -295,6 +305,13 @@ void pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps
 int pool_calc_installsizechange(Pool *pool, Map *installedmap);
 void pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res);
 void pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res, Map *noobsoletesmap);
+
+const char *pool_lookup_str(Pool *pool, Id entry, Id keyname);
+Id pool_lookup_id(Pool *pool, Id entry, Id keyname);
+unsigned int pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned int notfound);
+int pool_lookup_void(Pool *pool, Id entry, Id keyname);
+const unsigned char *pool_lookup_bin_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
+const char *pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
 
 
 /* loop over all providers of d */

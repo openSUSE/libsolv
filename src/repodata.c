@@ -1389,22 +1389,10 @@ dataiterator_match(Dataiterator *di, Datamatcher *ma)
 {
   if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags))
     return 0;
+  if (!ma)
+    return 1;
   return datamatcher_match(ma, di->kv.str);
 }
-
-int
-dataiterator_match_obsolete(Dataiterator *di, int flags, const void *vmatch)
-{
-  Datamatcher matcher;
-
-  if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, flags))
-    return 0;
-  matcher = di->matcher;
-  matcher.flags = flags;
-  matcher.match = (void *)vmatch;
-  return datamatcher_match(&matcher, di->kv.str);
-}
-
 
 /************************************************************************
  * data modify functions

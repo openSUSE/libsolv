@@ -416,7 +416,7 @@ struct create_stub_data {
   Id xkeyname;
 };
 
-int
+static int
 create_stub_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
   struct create_stub_data *stubdata = cbdata;

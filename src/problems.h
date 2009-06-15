@@ -1,0 +1,45 @@
+/*
+ * Copyright (c) 2007-2009, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
+/*
+ * problems.h
+ *
+ */
+
+#ifndef SATSOLVER_PROBLEMS_H
+#define SATSOLVER_PROBLEMS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+struct _Solver;
+
+#define SOLVER_SOLUTION_JOB             (0)
+#define SOLVER_SOLUTION_DISTUPGRADE     (-1)
+#define SOLVER_SOLUTION_INFARCH         (-2)
+
+void solver_disableproblem(struct _Solver *solv, Id v);
+void solver_enableproblem(struct _Solver *solv, Id v);
+int solver_prepare_solutions(struct _Solver *solv);
+
+Id solver_problem_count(struct _Solver *solv);
+Id solver_next_problem(struct _Solver *solv, Id problem);
+Id solver_solution_count(struct _Solver *solv, Id problem);
+Id solver_next_solution(struct _Solver *solv, Id problem, Id solution);
+Id solver_solutionelement_count(struct _Solver *solv, Id problem, Id solution);
+Id solver_next_solutionelement(struct _Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
+
+Id solver_findproblemrule(struct _Solver *solv, Id problem);
+void solver_findallproblemrules(struct _Solver *solv, Id problem, Queue *rules);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
