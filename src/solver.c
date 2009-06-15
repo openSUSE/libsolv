@@ -2344,7 +2344,7 @@ findrecommendedsuggested(Solver *solv)
 }
 
 void
-solver_calculate_noobsmap(Pool *pool, Map *noobsmap, Queue *job)
+solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap)
 {
   int i;
   Id how, what, select;
@@ -2413,7 +2413,7 @@ solver_solve(Solver *solv, Queue *job)
    */
 
   /* create noobsolete map if needed */
-  solver_calculate_noobsmap(pool, &solv->noobsoletes, job);
+  solver_calculate_noobsmap(pool, job, &solv->noobsoletes);
 
   map_init(&addedmap, pool->nsolvables);
   MAPSET(&addedmap, SYSTEMSOLVABLE);

@@ -320,9 +320,10 @@ const char *pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
   for (vp = pool_whatprovides(pool, d) ; (v = pool->whatprovidesdata[vp++]) != 0; )
 
 /* loop over all repositories */
-#define FOR_REPOS(rid, r)						\
-  for (rid = 0; rid < pool->nrepos; rid++)				\
-    if ((r = pool->repos[rid]) != 0)
+/* note that idx is not the repoid */
+#define FOR_REPOS(idx, r)						\
+  for (idx = 0; idx < pool->nrepos; idx++)				\
+    if ((r = pool->repos[idx]) != 0)
     
 
 #define POOL_DEBUG(type, ...) do {if ((pool->debugmask & (type)) != 0) pool_debug(pool, (type), __VA_ARGS__);} while (0)

@@ -269,7 +269,7 @@ extern void solver_reset(Solver *solv);
 extern int solver_dep_installed(Solver *solv, Id dep);
 extern int solver_splitprovides(Solver *solv, Id dep);
 
-extern void solver_calculate_noobsmap(Pool *pool, Map *noobsmap, Queue *job);
+extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap);
 
 /* obsolete */
 extern SolverRuleinfo solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp);
