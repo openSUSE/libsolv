@@ -255,7 +255,7 @@ solver_printdecisions(Solver *solv)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
-  Id p;
+  Id p, type;
   int i, j;
   Solvable *s;
   Queue iq;
@@ -275,10 +275,12 @@ solver_printdecisions(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_RESULT, "transaction:\n");
 
   queue_init(&iq);
-  for (i = 0; i < solv->trans.steps.count; i += 2)
+  for (i = 0; i < solv->trans.steps.count; i++)
     {
-      s = pool->solvables + solv->trans.steps.elements[i + 1];
-      switch(solv->trans.steps.elements[i])
+      p = solv->trans.steps.elements[i];
+      s = pool->solvables + p;
+      type = transaction_type(&solv->trans, p, SOLVER_TRANSACTION_SHOW_ACTIVE|SOLVER_TRANSACTION_SHOW_ALL|SOLVER_TRANSACTION_SHOW_OBSOLETES|SOLVER_TRANSACTION_SHOW_MULTIINSTALL);
+      switch(type)
         {
 	case SOLVER_TRANSACTION_MULTIINSTALL:
           POOL_DEBUG(SAT_DEBUG_RESULT, "  multi install %s", solvable2str(pool, s));
@@ -299,7 +301,7 @@ solver_printdecisions(Solver *solv)
           POOL_DEBUG(SAT_DEBUG_RESULT, "  change    %s", solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_UPGRADE:
-	case SOLVER_TRANSACTION_REPLACE:
+	case SOLVER_TRANSACTION_OBSOLETES:
           POOL_DEBUG(SAT_DEBUG_RESULT, "  upgrade   %s", solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_ERASE:
@@ -308,7 +310,7 @@ solver_printdecisions(Solver *solv)
 	default:
 	  break;
         }
-      switch(solv->trans.steps.elements[i])
+      switch(type)
         {
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_ERASE:
@@ -318,8 +320,8 @@ solver_printdecisions(Solver *solv)
 	case SOLVER_TRANSACTION_DOWNGRADE:
 	case SOLVER_TRANSACTION_CHANGE:
 	case SOLVER_TRANSACTION_UPGRADE:
-	case SOLVER_TRANSACTION_REPLACE:
-	  solver_transaction_all_pkgs(&solv->trans, solv->trans.steps.elements[i + 1], &iq);
+	case SOLVER_TRANSACTION_OBSOLETES:
+	  transaction_all_obs_pkgs(&solv->trans, p, &iq);
 	  if (iq.count)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_RESULT, "  (obsoletes");
@@ -387,6 +389,115 @@ solver_printdecisions(Solver *solv)
 	}
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
+}
+
+static inline
+const char *id2strnone(Pool *pool, Id id)
+{
+  return !id || id == 1 ? "(none)" : id2str(pool, id);
+}
+
+void
+solver_printtransaction(Solver *solv)
+{
+  Transaction *trans = &solv->trans;
+  Pool *pool = solv->pool;
+  Queue classes, pkgs;
+  int i, j, mode, l, linel;
+  char line[76];
+  const char *n;
+
+  queue_init(&classes);
+  queue_init(&pkgs);
+  mode = 0;
+  transaction_classify(trans, &classes, mode);
+  for (i = 0; i < classes.count; i += 4)
+    {
+      Id class = classes.elements[i];
+      Id cnt = classes.elements[i + 1];
+      switch(class)
+	{
+	case SOLVER_TRANSACTION_ERASE:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "erased packages (%d):\n", cnt);
+	  break;
+	case SOLVER_TRANSACTION_INSTALL:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "installed packages (%d):\n", cnt);
+	  break;
+	case SOLVER_TRANSACTION_REINSTALLED:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "reinstalled packages (%d):\n", cnt);
+	  break;
+	case SOLVER_TRANSACTION_DOWNGRADED:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "downgraded packages (%d):\n", cnt);
+	  break;
+	case SOLVER_TRANSACTION_CHANGED:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "changed packages (%d):\n", cnt);
+	  break;
+	case SOLVER_TRANSACTION_UPGRADED:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "upgraded packages (%d):\n", cnt);
+	  break;
+	case SOLVER_TRANSACTION_VENDORCHANGE:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "vendor change from %s to %s (%d):\n", id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]), cnt);
+	  break;
+	case SOLVER_TRANSACTION_ARCHCHANGE:
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "arch change from %s to %s (%d):\n", id2str(pool, classes.elements[i + 2]), id2str(pool, classes.elements[i + 3]), cnt);
+	  break;
+	default:
+	  class = SOLVER_TRANSACTION_IGNORE;
+	  break;
+	}
+      if (class == SOLVER_TRANSACTION_IGNORE)
+	continue;
+      transaction_classify_pkgs(trans, &pkgs, mode, class, classes.elements[i + 2], classes.elements[i + 3]);
+      *line = 0;
+      linel = 0;
+      for (j = 0; j < pkgs.count; j++)
+	{
+	  Id p = pkgs.elements[j];
+	  Solvable *s = pool->solvables + p;
+	  Solvable *s2;
+
+	  switch(class)
+	    {
+	    case SOLVER_TRANSACTION_DOWNGRADED:
+	    case SOLVER_TRANSACTION_UPGRADED:
+	      s2 = pool->solvables + transaction_obs_pkg(trans, p);
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - %s -> %s\n", solvable2str(pool, s), solvable2str(pool, s2));
+	      break;
+	    case SOLVER_TRANSACTION_VENDORCHANGE:
+	    case SOLVER_TRANSACTION_ARCHCHANGE:
+	      n = id2str(pool, s->name);
+	      l = strlen(n);
+	      if (l + linel > sizeof(line) - 3)
+		{
+		  if (*line)
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "    %s\n", line);
+		  *line = 0;
+		  linel = 0;
+		}
+	      if (l + linel > sizeof(line) - 3)
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "    %s\n", n);
+	      else
+		{
+		  if (*line)
+		    {
+		      strcpy(line + linel, ", ");
+		      linel += 2;
+		    }
+		  strcpy(line + linel, n);
+		  linel += l;
+		}
+	      break;
+	    default:
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - %s\n", solvable2str(pool, s));
+	      break;
+	    }
+	}
+      if (*line)
+	POOL_DEBUG(SAT_DEBUG_RESULT, "    %s\n", line);
+      POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
+    }
+  queue_free(&classes);
+  queue_free(&pkgs);
 }
 
 void

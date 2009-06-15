@@ -24,6 +24,7 @@ extern void solver_printruleclass(Solver *solv, int type, Rule *r);
 extern void solver_printproblem(Solver *solv, Id v);
 extern void solver_printwatches(Solver *solv, int type);
 extern void solver_printdecisions(Solver *solv);
+extern void solver_printtransaction(Solver *solv);
 extern void solver_printprobleminfo(Solver *solv, Queue *job, Id problem);
 extern void solver_printsolutions(Solver *solv, Queue *job);
 extern void solver_printtrivial(Solver *solv);
