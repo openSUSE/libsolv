@@ -60,9 +60,8 @@ myfopen(const char *fn)
 void
 usage(char** argv)
 {
-    printf("Usage:\n%s: <arch> repo [--nocheck repo]...\n",
-        argv[0]);
-    exit(1);
+  printf("Usage:\n%s: <arch> repo [--nocheck repo]...\n", argv[0]);
+  exit(1);
 }
 
 
