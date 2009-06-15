@@ -287,18 +287,16 @@ int main(int argc, char **argv)
 }
 #endif
 
-  for (j = 0; 1 && j < pool->nrepos; j++)
+  n = 0;
+  FOR_REPOS(j, repo)
     {
-      repo = pool->repos[j];
       dump_repodata(repo);
 
       printf("repo %d contains %d solvables\n", j, repo->nsolvables);
       printf("repo start: %d end: %d\n", repo->start, repo->end);
-      for (i = repo->start, n = 1; i < repo->end; i++)
+      FOR_REPO_SOLVABLES(repo, i, s)
 	{
-	  s = pool->solvables + i;
-	  if (s->repo != repo)
-	    continue;
+	  n++;
 	  printf("\n");
 	  printf("solvable %d (%d):\n", n, i);
 #if 0
@@ -316,15 +314,11 @@ int main(int argc, char **argv)
 	  printids(repo, "enhances", s->enhances);
 	  if (repo->rpmdbid)
 	    printf("rpmdbid: %u\n", repo->rpmdbid[i - repo->start]);
-#if 0
-	  dump_attrs (repo, n - 1);
-#endif
 #endif
 	  dump_repoattrs(repo, i);
 #if 0
 	  dump_some_attrs(repo, s);
 #endif
-	  n++;
 	}
 #if 0
       tryme(repo, 0, SOLVABLE_MEDIANR, 0, 0);
