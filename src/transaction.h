@@ -61,7 +61,7 @@ typedef struct _Transaction {
 
 #define SOLVER_TRANSACTION_MAXTYPE		0x3f
 
-/* show modes */
+/* modes */
 #define SOLVER_TRANSACTION_SHOW_ACTIVE		(1 << 0)
 #define SOLVER_TRANSACTION_SHOW_ALL		(1 << 1)
 #define SOLVER_TRANSACTION_SHOW_OBSOLETES	(1 << 2)
@@ -76,21 +76,38 @@ typedef struct _Transaction {
 #define SOLVER_TRANSACTION_ARCHCHANGE		0x100
 #define SOLVER_TRANSACTION_VENDORCHANGE		0x101
 
+/* order flags */
+#define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
+
 extern void transaction_init(Transaction *trans, struct _Pool *pool);
 extern void transaction_free(Transaction *trans);
 extern void transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap);
-extern void transaction_all_obs_pkgs(Transaction *trans, Id p, Queue *pkgs);
-extern Id   transaction_obs_pkg(Transaction *trans, Id p);
-extern Id   transaction_type(Transaction *trans, Id p, int mode);
-extern void transaction_classify(Transaction *trans, Queue *classes, int mode);
-extern void transaction_classify_pkgs(Transaction *trans, Queue *pkgs, int mode, Id class, Id from, Id to);
 
+/* if p is installed, returns with pkg(s) obsolete p */
+/* if p is not installed, returns with pkg(s) we obsolete */
+extern Id   transaction_obs_pkg(Transaction *trans, Id p);
+extern void transaction_all_obs_pkgs(Transaction *trans, Id p, Queue *pkgs);
+
+/* return step type of a transaction element */
+extern Id   transaction_type(Transaction *trans, Id p, int mode);
+
+/* return sorted collection of all step types */
+/* classify_pkgs can be used to return all packages of a type */
+extern void transaction_classify(Transaction *trans, int mode, Queue *classes);
+extern void transaction_classify_pkgs(Transaction *trans, int mode, Id type, Id from, Id to, Queue *pkgs);
+
+/* order a transaction */
 extern void transaction_order(Transaction *trans, int flags);
-extern int  transaction_order_add_choices(Transaction *trans, Queue *choices, Id chosen);
+
+/* roll your own order funcion: 
+ * add pkgs free for installation to queue choices after chosen was
+ * installed. start with chosen = 0
+ * needs an ordered transaction created with SOLVER_TRANSACTION_KEEP_ORDERDATA */
+extern int  transaction_order_add_choices(Transaction *trans, Id chosen, Queue *choices);
+
+/* debug function, report problems found in the order */
 extern void transaction_check_order(Transaction *trans);
 
-/* order flags */
-#define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
 
 #ifdef __cplusplus
 }

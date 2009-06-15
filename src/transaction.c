@@ -388,7 +388,7 @@ classify_cmp_pkgs(const void *ap, const void *bp, void *dp)
 }
 
 void
-transaction_classify(Transaction *trans, Queue *classes, int mode)
+transaction_classify(Transaction *trans, int mode, Queue *classes)
 {
   Pool *pool = trans->pool;
   int ntypes[SOLVER_TRANSACTION_MAXTYPE];
@@ -479,7 +479,7 @@ transaction_classify(Transaction *trans, Queue *classes, int mode)
 }
 
 void
-transaction_classify_pkgs(Transaction *trans, Queue *pkgs, int mode, Id class, Id from, Id to)
+transaction_classify_pkgs(Transaction *trans, int mode, Id class, Id from, Id to, Queue *pkgs)
 {
   Pool *pool = trans->pool;
   int i;
@@ -1725,7 +1725,7 @@ printf("free %s [%d]\n", solvid2str(pool, te2->p), temedianr[od.invedgedata[j]])
 
 
 int
-transaction_order_add_choices(Transaction *trans, Queue *choices, Id chosen)
+transaction_order_add_choices(Transaction *trans, Id chosen, Queue *choices)
 {
   int i, j;
   struct _TransactionOrderdata *od = trans->orderdata;

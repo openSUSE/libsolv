@@ -410,7 +410,7 @@ solver_printtransaction(Solver *solv)
   queue_init(&classes);
   queue_init(&pkgs);
   mode = 0;
-  transaction_classify(trans, &classes, mode);
+  transaction_classify(trans, mode, &classes);
   for (i = 0; i < classes.count; i += 4)
     {
       Id class = classes.elements[i];
@@ -447,7 +447,7 @@ solver_printtransaction(Solver *solv)
 	}
       if (class == SOLVER_TRANSACTION_IGNORE)
 	continue;
-      transaction_classify_pkgs(trans, &pkgs, mode, class, classes.elements[i + 2], classes.elements[i + 3]);
+      transaction_classify_pkgs(trans, mode, class, classes.elements[i + 2], classes.elements[i + 3], &pkgs);
       *line = 0;
       linel = 0;
       for (j = 0; j < pkgs.count; j++)
