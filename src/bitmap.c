@@ -16,6 +16,7 @@
 #include "bitmap.h"
 #include "util.h"
 
+/* constructor */
 void
 map_init(Map *m, int n)
 {
@@ -23,7 +24,7 @@ map_init(Map *m, int n)
   m->map = n ? sat_calloc(m->size, 1) : 0;
 }
 
-// free space allocated
+/* destructor */
 void
 map_free(Map *m)
 {
@@ -31,7 +32,7 @@ map_free(Map *m)
   m->size = 0;
 }
 
-// copy t <- s
+/* copy constructor t <- s */
 void
 map_init_clone(Map *t, Map *s)
 {
@@ -40,4 +41,17 @@ map_init_clone(Map *t, Map *s)
   memcpy(t->map, s->map, t->size);
 }
 
-// EOF
+/* grow a map */
+void
+map_grow(Map *m, int n)
+{
+  n = (n + 7) >> 3;
+  if (m->size < n)
+    {
+      m->map = sat_realloc(m->map, n);
+      memset(m->map + m->size, 0, n - m->size);
+      m->size = n;
+    }
+}
+
+/* EOF */

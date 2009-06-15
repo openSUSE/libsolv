@@ -1221,7 +1221,7 @@ solver_addduprules(Solver *solv, Map *addedmap)
 	  if (solv->installed && ps->repo == solv->installed)
 	    {
 	      if (!solv->updatemap.size)
-		map_init(&solv->updatemap, pool->nsolvables);
+		map_grow(&solv->updatemap, pool->nsolvables);
 	      MAPSET(&solv->updatemap, p);
 	      if (!MAPTST(&solv->dupmap, p))
 		{

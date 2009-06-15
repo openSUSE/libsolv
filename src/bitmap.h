@@ -33,6 +33,7 @@ map_empty(Map *m)
 
 extern void map_init(Map *m, int n);
 extern void map_init_clone(Map *t, Map *s);
+extern void map_grow(Map *m, int n);
 extern void map_free(Map *m);
 
 #endif /* SATSOLVER_BITMAP_H */

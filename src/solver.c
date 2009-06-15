@@ -2357,7 +2357,7 @@ solver_calculate_noobsmap(Pool *pool, Map *noobsmap, Queue *job)
       what = job->elements[i + 1];
       select = how & SOLVER_SELECTMASK;
       if (!noobsmap->size)
-	map_init(noobsmap, pool->nsolvables);
+	map_grow(noobsmap, pool->nsolvables);
       FOR_JOB_SELECT(p, pp, select, what)
         MAPSET(noobsmap, p);
     }
@@ -2698,7 +2698,7 @@ solver_solve(Solver *solv, Queue *job)
 	      if (!solv->installed || s->repo != solv->installed)
 		continue;
 	      if (!solv->updatemap.size)
-		map_init(&solv->updatemap, pool->nsolvables);
+		map_grow(&solv->updatemap, pool->nsolvables);
 	      MAPSET(&solv->updatemap, p);
 	    }
 	  break;

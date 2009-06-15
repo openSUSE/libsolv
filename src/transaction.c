@@ -210,6 +210,9 @@ transaction_type(Transaction *trans, Id p, int mode)
 
   type = transaction_base_type(trans, p);
 
+  if (type == SOLVER_TRANSACTION_IGNORE)
+    return SOLVER_TRANSACTION_IGNORE;	/* not part of the transaction */
+
   if ((mode & SOLVER_TRANSACTION_RPM_ONLY) != 0)
     {
       /* application wants to know what to feed to rpm */
@@ -454,7 +457,7 @@ transaction_classify(Transaction *trans, int mode, Queue *classes)
 	}
     }
   /* now sort all vendor/arch changes */
-  if (classes->count)
+  if (classes->count > 4)
     sat_sort(classes->elements, classes->count / 4, 4 * sizeof(Id), classify_cmp, trans);
   /* finally add all classes. put erases last */
   i = SOLVER_TRANSACTION_ERASE;
@@ -519,7 +522,7 @@ transaction_classify_pkgs(Transaction *trans, int mode, Id class, Id from, Id to
 	  continue;
 	}
     }
-  if (pkgs->count)
+  if (pkgs->count > 1)
     sat_sort(pkgs->elements, pkgs->count, sizeof(Id), classify_cmp_pkgs, trans);
 }
 
@@ -543,7 +546,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
       if (p <= 0 || p == SYSTEMSOLVABLE)
 	continue;
       s = pool->solvables + p;
-      if (s->repo == installed)
+      if (!s->repo || s->repo == installed)
 	continue;
       noobs = trans->noobsmap.size && MAPTST(&trans->noobsmap, p);
       FOR_PROVIDES(p2, pp2, s->name)
