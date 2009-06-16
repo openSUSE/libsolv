@@ -340,7 +340,7 @@ repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count)
     { 
       int d = repo->start - p;
       b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
-      memmove((char*)b + d * size, b, n * size);
+      memmove((char *)b + d * size, b, n * size);
       memset(b, 0, d * size);
       n += d;
     }     
@@ -348,7 +348,7 @@ repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count)
     { 
       int d = p + count - repo->end;
       b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
-      memset((char*)b + n * size, 0, d * size);
+      memset((char *)b + n * size, 0, d * size);
     }     
   return b;
 }

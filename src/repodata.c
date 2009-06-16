@@ -452,7 +452,7 @@ maybe_load_repodata(Repodata *data, Id keyname)
     }
 }
 
-static inline unsigned char*
+static inline unsigned char *
 solvid2data(Repodata *data, Id solvid, Id *schemap)
 {
   unsigned char *dp = data->incoredata;

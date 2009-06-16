@@ -530,15 +530,15 @@ startElement(void *userData, const char *name, const char **atts)
     }
 }
 
-static const char* findKernelFlavor(Parsedata *pd, Solvable *s)
+static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
 {
   Pool *pool = pd->pool;
-
-  Id pid, *pidp = 0;
+  Id pid, *pidp;
   
   if (s->provides)
     {
-      for (pidp = pd->repo->idarraydata + s->provides; pidp && (pid = *pidp++) != 0; )
+      pidp = pd->repo->idarraydata + s->provides;
+      while ((pid = *pidp++) != 0)
 	{
 	  Reldep *prd;
 	  const char *depname;
@@ -547,32 +547,29 @@ static const char* findKernelFlavor(Parsedata *pd, Solvable *s)
 	    continue;               /* wrong provides name */
 	  prd = GETRELDEP(pool, pid);
 	  depname = id2str(pool, prd->name);
-	  if (!strncmp(depname, "kernel-", strlen("kernel-")))
-	    {
-	      return depname + strlen("kernel-");
-	    }
+	  if (!strncmp(depname, "kernel-", 7))
+	    return depname + 7;
 	}
     }
 
-  if (!s->requires)
-    return 0;
-
-  for (pidp = pd->repo->idarraydata + s->requires ; pidp && (pid = *pidp++) != 0; )
+  if (s->requires)
     {
-      const char *depname = 0;
+      pidp = pd->repo->idarraydata + s->requires;
+      while ((pid = *pidp++) != 0)
+	{
+	  const char *depname;
 
-      if (!ISRELDEP(pid))
-	{
-	  depname = id2str(pool, pid);
-	} 
-      else 
-	{
-	  Reldep *prd = GETRELDEP(pool, pid);
-	  depname = id2str(pool, prd->name);
-	}
-      if (!strncmp(depname, "kernel-", strlen("kernel-")))
-	{
-	  return depname + strlen("kernel-");
+	  if (!ISRELDEP(pid))
+	    {
+	      depname = id2str(pool, pid);
+	    } 
+	  else 
+	    {
+	      Reldep *prd = GETRELDEP(pool, pid);
+	      depname = id2str(pool, prd->name);
+	    }
+	  if (!strncmp(depname, "kernel-", 7))
+	    return depname + 7;
 	}
     }
 
@@ -594,7 +591,7 @@ endElement(void *userData, const char *name)
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   Id evr;
-  unsigned int t=0;
+  unsigned int t = 0;
 
   if (pd->depth != pd->statedepth)
     {
