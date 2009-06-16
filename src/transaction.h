@@ -104,6 +104,8 @@ extern void transaction_order(Transaction *trans, int flags);
  * installed. start with chosen = 0
  * needs an ordered transaction created with SOLVER_TRANSACTION_KEEP_ORDERDATA */
 extern int  transaction_order_add_choices(Transaction *trans, Id chosen, Queue *choices);
+/* add obsoleted packages into transaction steps */
+extern void transaction_add_obsoleted(Transaction *trans);
 
 /* debug function, report problems found in the order */
 extern void transaction_check_order(Transaction *trans);

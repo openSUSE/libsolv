@@ -1382,7 +1382,6 @@ transaction_order(Transaction *trans, int flags)
   Queue todo, obsq, samerepoq, uninstq;
   int cycstart, cycel;
   Id *cycle;
-  unsigned char *obsoleted;
   int oldcount;
   int start, now;
   Repo *lastrepo;
@@ -1602,10 +1601,6 @@ transaction_order(Transaction *trans, int flags)
           queue_push(&todo, i);
       }
   assert(todo.count > 0 || uninstq.count > 0);
-  if (installed)
-    obsoleted = sat_calloc(installed->end - installed->start, 1);
-  else
-    obsoleted = 0;
   oldcount = tr->count;
   queue_empty(tr);
 
@@ -1666,21 +1661,6 @@ transaction_order(Transaction *trans, int flags)
 printf("do %s [%d]\n", solvid2str(pool, te->p), temedianr[i]);
 #endif
       s = pool->solvables + te->p;
-      if (installed && s->repo != installed)
-	{
-	  queue_empty(&obsq);
-	  transaction_all_obs_pkgs(trans, te->p, &obsq);
-	  for (j = 0; j < obsq.count; j++)
-	    {
-	      p = obsq.elements[j];
-	      assert(p >= installed->start && p < installed->end);
-	      if (!obsoleted[p - installed->start])
-		{
-		  queue_push(tr, p);
-		  obsoleted[p - installed->start] = 1;
-		}
-	    }
-	}
       for (j = te->edges; od.invedgedata[j]; j++)
 	{
 	  struct _TransactionElement *te2 = od.tes + od.invedgedata[j];
@@ -1700,7 +1680,6 @@ printf("free %s [%d]\n", solvid2str(pool, te2->p), temedianr[od.invedgedata[j]])
 	    }
 	}
     }
-  sat_free(obsoleted);
   sat_free(temedianr);
   queue_free(&todo);
   queue_free(&samerepoq);
@@ -1708,7 +1687,11 @@ printf("free %s [%d]\n", solvid2str(pool, te2->p), temedianr[od.invedgedata[j]])
   queue_free(&obsq);
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     assert(te->mark == 0);
+
+  /* add back obsoleted packages */
+  transaction_add_obsoleted(trans);
   assert(tr->count == oldcount);
+
   POOL_DEBUG(SAT_DEBUG_STATS, "creating new transaction took %d ms\n", sat_timems(now));
   POOL_DEBUG(SAT_DEBUG_STATS, "transaction ordering took %d ms\n", sat_timems(start));
 
@@ -1769,6 +1752,63 @@ transaction_order_add_choices(Transaction *trans, Id chosen, Queue *choices)
 	queue_push(choices, te->p);
     }
   return choices->count;
+}
+
+void
+transaction_add_obsoleted(Transaction *trans)
+{
+  Pool *pool = trans->pool;
+  Repo *installed = pool->installed;
+  Id p;
+  Solvable *s;
+  int i, j, k, max, oldcount;
+  Map done;
+  Queue obsq, *steps;
+
+  if (!installed || !trans->steps.count)
+    return;
+  /* calculate upper bound */
+  max = 0;
+  FOR_REPO_SOLVABLES(installed, p, s)
+    if (MAPTST(&trans->transactsmap, p))
+      max++;
+  if (!max)
+    return;
+  /* make room */
+  steps = &trans->steps;
+  oldcount = steps->count;
+  for (i = 0; i < max; i++)
+    queue_push(steps, 0);
+  memmove(steps->elements + max, steps->elements, oldcount * sizeof(Id));
+  /* now add em */
+  map_init(&done, installed->end - installed->start);
+  queue_init(&obsq);
+  for (j = 0, i = max; i < steps->count; i++)
+    {
+      p = trans->steps.elements[i];
+      if (pool->solvables[p].repo == installed)
+	{
+	  if (!trans->transaction_installed[p - pool->installed->start])
+	    trans->steps.elements[j++] = p;
+	  continue;
+	}
+      trans->steps.elements[j++] = p;
+      queue_empty(&obsq);
+      transaction_all_obs_pkgs(trans, p, &obsq);
+      for (k = 0; k < obsq.count; k++)
+	{
+	  p = obsq.elements[k];
+	  assert(p >= installed->start && p < installed->end);
+	  if (MAPTST(&done, p - installed->start))
+	    continue;
+	  MAPSET(&done, p - installed->start);
+	  trans->steps.elements[j++] = p;
+	}
+    }
+  map_free(&done);
+  queue_free(&obsq);
+  while (steps->count > j)
+    queue_pop(steps);
 }
 
 static void
