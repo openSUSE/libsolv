@@ -23,7 +23,8 @@ typedef struct _Queue {
 } Queue;
 
 
-extern void queue_alloc_one(Queue *q);
+extern void queue_alloc_one(Queue *q);		/* internal */
+extern void queue_alloc_one_head(Queue *q);	/* internal */
 
 /* clear queue */
 static inline void
@@ -60,19 +61,10 @@ queue_pop(Queue *q)
 static inline void
 queue_unshift(Queue *q, Id id)
 {
-  if (q->alloc && q->alloc != q->elements)
-    {
-      *--q->elements = id;
-      q->count++;
-      return;
-    }
-  if (!q->left)
-    queue_alloc_one(q);
-  if (q->count)
-    memmove(q->elements + 1, q->elements, sizeof(Id) * q->count);
+  if (!q->alloc || q->alloc == q->elements)
+    queue_alloc_one_head(q);
+  *--q->elements = id;
   q->count++;
-  q->elements[0] = id;
-  q->left--;
 }
 
 static inline void
@@ -101,6 +93,16 @@ queue_push2(Queue *q, Id id1, Id id2)
   queue_push(q, id2);
 }
 
+static inline void
+queue_truncate(Queue *q, int n)
+{
+  if (q->count > n)
+    {
+      q->left += q->count - n;
+      q->count = n;
+    }
+}
+
 extern void queue_init(Queue *q);
 extern void queue_init_buffer(Queue *q, Id *buf, int size);
 extern void queue_init_clone(Queue *t, Queue *s);
@@ -108,7 +110,9 @@ extern void queue_free(Queue *q);
 
 extern void queue_insert(Queue *q, int pos, Id id);
 extern void queue_insert2(Queue *q, int pos, Id id1, Id id2);
+extern void queue_insertn(Queue *q, int pos, int n);
 extern void queue_delete(Queue *q, int pos);
 extern void queue_delete2(Queue *q, int pos);
+extern void queue_deleten(Queue *q, int pos, int n);
 
 #endif /* SATSOLVER_QUEUE_H */

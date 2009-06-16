@@ -1777,9 +1777,8 @@ transaction_add_obsoleted(Transaction *trans)
   /* make room */
   steps = &trans->steps;
   oldcount = steps->count;
-  for (i = 0; i < max; i++)
-    queue_push(steps, 0);
-  memmove(steps->elements + max, steps->elements, oldcount * sizeof(Id));
+  queue_insertn(steps, 0, max);
+
   /* now add em */
   map_init(&done, installed->end - installed->start);
   queue_init(&obsq);
@@ -1805,10 +1804,11 @@ transaction_add_obsoleted(Transaction *trans)
 	  trans->steps.elements[j++] = p;
 	}
     }
+
+  /* free unneeded space */
+  queue_truncate(steps, j);
   map_free(&done);
   queue_free(&obsq);
-  while (steps->count > j)
-    queue_pop(steps);
 }
 
 static void

@@ -143,3 +143,40 @@ queue_delete2(Queue *q, int pos)
   q->left += 2;
   q->count -= 2;
 }
+
+void
+queue_insertn(Queue *q, int pos, int n)
+{
+  if (n <= 0)
+    return;
+  if (pos > q->count)
+    pos = q->count;
+  if (q->left < n)
+    {
+      int off;
+      if (!q->alloc)
+	queue_alloc_one(q);
+      off = q->elements - q->alloc;
+      q->alloc = sat_realloc2(q->alloc, off + q->count + n + 8, sizeof(Id));
+      q->elements = q->alloc + off;
+      q->left = n + 8;
+    }
+  if (pos < q->count)
+    memmove(q->elements + pos + n, q->elements + pos, (q->count - pos) * sizeof(Id));
+  memset(q->elements + pos, 0, n * sizeof(Id));
+  q->left -= n;
+  q->count += n;
+}
+
+void
+queue_deleten(Queue *q, int pos, int n)
+{
+  if (n <= 0 || pos >= q->count)
+    return;
+  if (pos + n >= q->count)
+    n = q->count - pos;
+  else
+    memmove(q->elements + pos, q->elements + pos + n, (q->count - n - pos) * sizeof(Id));
+  q->left += n;
+  q->count -= n;
+}
