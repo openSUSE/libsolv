@@ -21,7 +21,7 @@ void
 map_init(Map *m, int n)
 {
   m->size = (n + 7) >> 3;
-  m->map = n ? sat_calloc(m->size, 1) : 0;
+  m->map = m->size ? sat_calloc(m->size, 1) : 0;
 }
 
 /* destructor */
@@ -37,8 +37,13 @@ void
 map_init_clone(Map *t, Map *s)
 {
   t->size = s->size;
-  t->map = sat_malloc(s->size);
-  memcpy(t->map, s->map, t->size);
+  if (s->size)
+    {
+      t->map = sat_malloc(s->size);
+      memcpy(t->map, s->map, s->size);
+    }
+  else
+    t->map = 0;
 }
 
 /* grow a map */

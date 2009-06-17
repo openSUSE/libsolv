@@ -16,6 +16,9 @@
 #include "queue.h"
 #include "util.h"
 
+#define EXTRA_SPACE 8
+#define EXTRA_SPACE_HEAD 8
+
 void
 queue_init(Queue *q)
 {
@@ -26,11 +29,17 @@ queue_init(Queue *q)
 void
 queue_init_clone(Queue *t, Queue *s)
 {
-  t->alloc = t->elements = sat_malloc2(s->count + 8, sizeof(Id));
+  if (!s->elements)
+    {
+      t->alloc = t->elements = 0;
+      t->count = t->left = 0;
+      return;
+    }
+  t->alloc = t->elements = sat_malloc2(s->count + EXTRA_SPACE, sizeof(Id));
   if (s->count)
     memcpy(t->alloc, s->elements, s->count * sizeof(Id));
   t->count = s->count;
-  t->left = 8;
+  t->left = EXTRA_SPACE;
 }
 
 void
@@ -56,12 +65,11 @@ queue_alloc_one(Queue *q)
 {
   if (!q->alloc)
     {
-      /* queue was created with queue_init_buf */
-      q->alloc = sat_malloc2(q->count + 8, sizeof(Id));
+      q->alloc = sat_malloc2(q->count + EXTRA_SPACE, sizeof(Id));
       if (q->count)
 	memcpy(q->alloc, q->elements, q->count * sizeof(Id));
       q->elements = q->alloc;
-      q->left = 8;
+      q->left = EXTRA_SPACE;
     }
   else if (q->alloc != q->elements)
     {
@@ -73,8 +81,8 @@ queue_alloc_one(Queue *q)
     }
   else
     {
-      q->elements = q->alloc = sat_realloc2(q->alloc, q->count + 8, sizeof(Id));
-      q->left = 8;
+      q->elements = q->alloc = sat_realloc2(q->alloc, q->count + EXTRA_SPACE, sizeof(Id));
+      q->left = EXTRA_SPACE;
     }
 }
 
@@ -85,7 +93,7 @@ queue_alloc_one_head(Queue *q)
   int l;
   if (!q->alloc || !q->left)
     queue_alloc_one(q);
-  l = q->left > 8 ? 8 : q->left;
+  l = q->left > EXTRA_SPACE_HEAD ? EXTRA_SPACE_HEAD : q->left;
   if (q->count);
     memmove(q->elements + l, q->elements, q->count * sizeof(Id));
   q->elements += l;
@@ -157,9 +165,9 @@ queue_insertn(Queue *q, int pos, int n)
       if (!q->alloc)
 	queue_alloc_one(q);
       off = q->elements - q->alloc;
-      q->alloc = sat_realloc2(q->alloc, off + q->count + n + 8, sizeof(Id));
+      q->alloc = sat_realloc2(q->alloc, off + q->count + n + EXTRA_SPACE, sizeof(Id));
       q->elements = q->alloc + off;
-      q->left = n + 8;
+      q->left = n + EXTRA_SPACE;
     }
   if (pos < q->count)
     memmove(q->elements + pos + n, q->elements + pos, (q->count - pos) * sizeof(Id));
