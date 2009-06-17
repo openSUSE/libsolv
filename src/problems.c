@@ -686,6 +686,41 @@ solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, I
   return element + 1;
 }
 
+void
+solver_take_solutionelement(Solver *solv, Id p, Id rp, Queue *job)
+{
+  int i;
+
+  if (p == SOLVER_SOLUTION_JOB)
+    {
+      job->elements[rp - 1] = SOLVER_NOOP;
+      job->elements[rp] = 0;
+      return;
+    }
+  if (rp <= 0 && p <= 0)
+    return;	/* just in case */
+  if (rp > 0)
+    p = SOLVER_INSTALL|SOLVER_SOLVABLE;
+  else
+    {
+      rp = p;
+      p = SOLVER_ERASE|SOLVER_SOLVABLE;
+    }
+  for (i = 0; i < job->count; i += 2)
+    if (job->elements[i] == p && job->elements[i + 2] == rp)
+      return;
+  queue_push2(job, p, rp);
+}
+
+void
+solver_take_solution(Solver *solv, Id problem, Id solution, Queue *job)
+{
+  Id p, rp, element = 0;
+  while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
+    solver_take_solutionelement(solv, p, rp, job);
+}
+
+
 /*-------------------------------------------------------------------
  * 
  * find problem rule

@@ -678,6 +678,7 @@ struct _TransactionOrderdata {
   struct _TransactionElement *tes;
   int ntes;
   Id *invedgedata;
+  int ninvedgedata;
 };
 
 #define TYPE_BROKEN	(1<<0)
@@ -702,6 +703,34 @@ transaction_init(Transaction *trans, Pool *pool)
 }
 
 void
+transaction_init_clone(Transaction *trans, Transaction *srctrans)
+{
+  memset(trans, 0, sizeof(*trans));
+  trans->pool = srctrans->pool;
+  queue_init_clone(&trans->steps, &srctrans->steps);
+  queue_init_clone(&trans->transaction_info, &srctrans->transaction_info);
+  if (srctrans->transaction_installed)
+    {
+      Repo *installed = srctrans->pool->installed;
+      trans->transaction_installed = sat_calloc(installed->end - installed->start, sizeof(Id));
+      memcpy(trans->transaction_installed, srctrans->transaction_installed, (installed->end - installed->start) * sizeof(Id));
+    }
+  map_init_clone(&trans->transactsmap, &srctrans->transactsmap);
+  map_init_clone(&trans->noobsmap, &srctrans->noobsmap);
+  if (srctrans->orderdata)
+    {
+      struct _TransactionOrderdata *od = srctrans->orderdata;
+      trans->orderdata = sat_calloc(1, sizeof(*trans->orderdata));
+      trans->orderdata->tes = sat_malloc2(od->ntes, sizeof(*od->tes));
+      memcpy(trans->orderdata->tes, od->tes, od->ntes * sizeof(*od->tes));
+      trans->orderdata->ntes = od->ntes;
+      trans->orderdata->invedgedata = sat_malloc2(od->ninvedgedata, sizeof(Id));
+      memcpy(trans->orderdata->invedgedata, od->invedgedata, od->ninvedgedata * sizeof(Id));
+      trans->orderdata->ninvedgedata = od->ninvedgedata;
+    }
+}
+
+void
 transaction_free(Transaction *trans)
 {
   queue_free(&trans->steps);
@@ -709,6 +738,12 @@ transaction_free(Transaction *trans)
   trans->transaction_installed = sat_free(trans->transaction_installed);
   map_free(&trans->transactsmap);
   map_free(&trans->noobsmap);
+  transaction_free_orderdata(trans);
+}
+
+void
+transaction_free_orderdata(Transaction *trans)
+{
   if (trans->orderdata)
     {
       struct _TransactionOrderdata *od = trans->orderdata;
@@ -1581,6 +1616,7 @@ transaction_order(Transaction *trans, int flags)
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     te->edges = te->mark;	/* edges now points into invedgedata */
   od.edgedata = sat_free(od.edgedata);
+  od.nedgedata = j + 1;
 
   /* now the final ordering */
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
@@ -1701,6 +1737,7 @@ printf("free %s [%d]\n", solvid2str(pool, te2->p), temedianr[od.invedgedata[j]])
       trans->orderdata->tes = od.tes;
       trans->orderdata->ntes = numte;
       trans->orderdata->invedgedata = od.invedgedata;
+      trans->orderdata->ninvedgedata = od.nedgedata;
     }
   else
     {

@@ -25,8 +25,9 @@ extern void solver_printproblem(Solver *solv, Id v);
 extern void solver_printwatches(Solver *solv, int type);
 extern void solver_printdecisions(Solver *solv);
 extern void solver_printtransaction(Solver *solv);
-extern void solver_printprobleminfo(Solver *solv, Queue *job, Id problem);
-extern void solver_printsolutions(Solver *solv, Queue *job);
+extern void solver_printprobleminfo(Solver *solv, Id problem);
+extern void solver_printsolution(Solver *solv, Id problem, Id solution);
+extern void solver_printallsolutions(Solver *solv);
 extern void solver_printtrivial(Solver *solv);
 extern const char *solver_select2str(Solver *solv, Id select, Id what);
 

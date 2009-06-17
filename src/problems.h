@@ -35,6 +35,9 @@ Id solver_next_solution(struct _Solver *solv, Id problem, Id solution);
 Id solver_solutionelement_count(struct _Solver *solv, Id problem, Id solution);
 Id solver_next_solutionelement(struct _Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
 
+void solver_take_solutionelement(struct _Solver *solv, Id p, Id rp, Queue *job);
+void solver_take_solution(struct _Solver *solv, Id problem, Id solution, Queue *job);
+
 Id solver_findproblemrule(struct _Solver *solv, Id problem);
 void solver_findallproblemrules(struct _Solver *solv, Id problem, Queue *rules);
 

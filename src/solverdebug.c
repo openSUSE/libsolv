@@ -501,14 +501,14 @@ solver_printtransaction(Solver *solv)
 }
 
 void
-solver_printprobleminfo(Solver *solv, Queue *job, Id problem)
+solver_printprobleminfo(Solver *solv, Id problem)
 {
   Pool *pool = solv->pool;
   Id probr;
   Id dep, source, target;
 
   probr = solver_findproblemrule(solv, problem);
-  switch (solver_problemruleinfo(solv, job, probr, &dep, &source, &target))
+  switch (solver_ruleinfo(solv, probr, &source, &target, &dep))
     {
     case SOLVER_RULE_DISTUPGRADE:
       POOL_DEBUG(SAT_DEBUG_RESULT, "%s does not belong to a distupgrade repository\n", solvid2str(pool, source));
@@ -561,121 +561,130 @@ solver_printprobleminfo(Solver *solv, Queue *job, Id problem)
 }
 
 void
-solver_printsolutions(Solver *solv, Queue *job)
+solver_printsolution(Solver *solv, Id problem, Id solution)
+{
+  Pool *pool = solv->pool;
+  Id p, rp, element, how, what, select;
+  Solvable *s, *sd;
+
+  element = 0;
+  while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
+    {
+      if (p == SOLVER_SOLUTION_JOB)
+	{
+	  /* job, rp is index into job queue */
+	  how = solv->job.elements[rp - 1];
+	  what = solv->job.elements[rp];
+	  select = how & SOLVER_SELECTMASK;
+	  switch (how & SOLVER_JOBMASK)
+	    {
+	    case SOLVER_INSTALL:
+	      if (select == SOLVER_SOLVABLE && solv->installed && pool->solvables[what].repo == solv->installed)
+		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not keep %s installed\n", solvid2str(pool, what));
+	      else if (select == SOLVER_SOLVABLE_PROVIDES)
+		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install a solvable %s\n", solver_select2str(solv, select, what));
+	      else
+		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install %s\n", solver_select2str(solv, select, what));
+	      break;
+	    case SOLVER_ERASE:
+	      if (select == SOLVER_SOLVABLE && !(solv->installed && pool->solvables[what].repo == solv->installed))
+		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not forbid installation of %s\n", solvid2str(pool, what));
+	      else if (select == SOLVER_SOLVABLE_PROVIDES)
+		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall all solvables %s\n", solver_select2str(solv, select, what));
+	      else
+		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall %s\n", solver_select2str(solv, select, what));
+	      break;
+	    case SOLVER_UPDATE:
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install most recent version of %s\n", solver_select2str(solv, select, what));
+	      break;
+	    case SOLVER_LOCK:
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not lock %s\n", solver_select2str(solv, select, what));
+	      break;
+	    default:
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "- do something different\n");
+	      break;
+	    }
+	}
+      else if (p == SOLVER_SOLUTION_INFARCH)
+	{
+	  s = pool->solvables + rp;
+	  if (solv->installed && s->repo == solv->installed)
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "- keep %s despite the inferior architecture\n", solvable2str(pool, s));
+	  else
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "- install %s despite the inferior architecture\n", solvable2str(pool, s));
+	}
+      else if (p == SOLVER_SOLUTION_DISTUPGRADE)
+	{
+	  s = pool->solvables + rp;
+	  if (solv->installed && s->repo == solv->installed)
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "- keep obsolete %s\n", solvable2str(pool, s));
+	  else
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "- install %s from excluded repository\n", solvable2str(pool, s));
+	}
+      else
+	{
+	  /* policy, replace p with rp */
+	  s = pool->solvables + p;
+	  sd = rp ? pool->solvables + rp : 0;
+	  if (s == sd && solv->distupgrade)
+	    {
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "- keep obsolete %s\n", solvable2str(pool, s));
+	    }
+	  else if (sd)
+	    {
+	      int gotone = 0;
+	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr, EVRCMP_MATCH_RELEASE) > 0)
+		{
+		  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+		  gotone = 1;
+		}
+	      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(solv, s, sd))
+		{
+		  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+		  gotone = 1;
+		}
+	      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(solv, s, sd))
+		{
+		  if (sd->vendor)
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "- allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));
+		  else
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "- allow vendor change from '%s' (%s) to no vendor (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), solvable2str(pool, sd));
+		  gotone = 1;
+		}
+	      if (!gotone)
+		POOL_DEBUG(SAT_DEBUG_RESULT, "- allow replacement of %s with %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+	    }
+	  else
+	    {
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "- allow deinstallation of %s\n", solvable2str(pool, s));
+	    }
+
+	}
+    }
+}
+
+void
+solver_printallsolutions(Solver *solv)
 {
   Pool *pool = solv->pool;
   int pcnt;
-  Id p, rp, how, what, select;
-  Id problem, solution, element;
-  Solvable *s, *sd;
+  Id problem, solution;
 
   POOL_DEBUG(SAT_DEBUG_RESULT, "Encountered problems! Here are the solutions:\n\n");
-  pcnt = 1;
+  pcnt = 0;
   problem = 0;
   while ((problem = solver_next_problem(solv, problem)) != 0)
     {
-      POOL_DEBUG(SAT_DEBUG_RESULT, "Problem %d:\n", pcnt++);
+      pcnt++;
+      POOL_DEBUG(SAT_DEBUG_RESULT, "Problem %d:\n", pcnt);
       POOL_DEBUG(SAT_DEBUG_RESULT, "====================================\n");
-      solver_printprobleminfo(solv, job, problem);
+      solver_printprobleminfo(solv, problem);
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
       solution = 0;
       while ((solution = solver_next_solution(solv, problem, solution)) != 0)
         {
-	  element = 0;
-	  while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
-	    {
-	      if (p == SOLVER_SOLUTION_JOB)
-		{
-		  /* job, rp is index into job queue */
-		  how = job->elements[rp - 1];
-		  what = job->elements[rp];
-		  select = how & SOLVER_SELECTMASK;
-		  switch (how & SOLVER_JOBMASK)
-		    {
-		    case SOLVER_INSTALL:
-		      if (select == SOLVER_SOLVABLE && solv->installed && pool->solvables[what].repo == solv->installed)
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not keep %s installed\n", solvid2str(pool, what));
-		      else if (select == SOLVER_SOLVABLE_PROVIDES)
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install a solvable %s\n", solver_select2str(solv, select, what));
-		      else
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install %s\n", solver_select2str(solv, select, what));
-		      break;
-		    case SOLVER_ERASE:
-		      if (select == SOLVER_SOLVABLE && !(solv->installed && pool->solvables[what].repo == solv->installed))
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not forbid installation of %s\n", solvid2str(pool, what));
-		      else if (select == SOLVER_SOLVABLE_PROVIDES)
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall all solvables %s\n", solver_select2str(solv, select, what));
-		      else
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall %s\n", solver_select2str(solv, select, what));
-		      break;
-		    case SOLVER_UPDATE:
-		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install most recent version of %s\n", solver_select2str(solv, select, what));
-		      break;
-		    case SOLVER_LOCK:
-		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not lock %s\n", solver_select2str(solv, select, what));
-		      break;
-		    default:
-		      POOL_DEBUG(SAT_DEBUG_RESULT, "- do something different\n");
-		      break;
-		    }
-		}
-	      else if (p == SOLVER_SOLUTION_INFARCH)
-		{
-		  s = pool->solvables + rp;
-		  if (solv->installed && s->repo == solv->installed)
-		    POOL_DEBUG(SAT_DEBUG_RESULT, "- keep %s despite the inferior architecture\n", solvable2str(pool, s));
-		  else
-		    POOL_DEBUG(SAT_DEBUG_RESULT, "- install %s despite the inferior architecture\n", solvable2str(pool, s));
-		}
-	      else if (p == SOLVER_SOLUTION_DISTUPGRADE)
-		{
-		  s = pool->solvables + rp;
-		  if (solv->installed && s->repo == solv->installed)
-		    POOL_DEBUG(SAT_DEBUG_RESULT, "- keep obsolete %s\n", solvable2str(pool, s));
-		  else
-		    POOL_DEBUG(SAT_DEBUG_RESULT, "- install %s from excluded repository\n", solvable2str(pool, s));
-		}
-	      else
-		{
-		  /* policy, replace p with rp */
-		  s = pool->solvables + p;
-		  sd = rp ? pool->solvables + rp : 0;
-		  if (s == sd && solv->distupgrade)
-		    {
-		      POOL_DEBUG(SAT_DEBUG_RESULT, "- keep obsolete %s\n", solvable2str(pool, s));
-		    }
-		  else if (sd)
-		    {
-		      int gotone = 0;
-		      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr, EVRCMP_MATCH_RELEASE) > 0)
-			{
-			  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
-			  gotone = 1;
-			}
-		      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(solv, s, sd))
-			{
-			  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
-			  gotone = 1;
-			}
-		      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(solv, s, sd))
-			{
-			  if (sd->vendor)
-			    POOL_DEBUG(SAT_DEBUG_RESULT, "- allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));
-			  else
-			    POOL_DEBUG(SAT_DEBUG_RESULT, "- allow vendor change from '%s' (%s) to no vendor (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), solvable2str(pool, sd));
-			  gotone = 1;
-			}
-		      if (!gotone)
-			POOL_DEBUG(SAT_DEBUG_RESULT, "- allow replacement of %s with %s\n", solvable2str(pool, s), solvable2str(pool, sd));
-		    }
-		  else
-		    {
-		      POOL_DEBUG(SAT_DEBUG_RESULT, "- allow deinstallation of %s\n", solvable2str(pool, s));
-		    }
-
-		}
-	    }
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
+	  solver_printsolution(solv, problem, solution);
+          POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
         }
     }
 }
