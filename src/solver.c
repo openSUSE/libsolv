@@ -1331,7 +1331,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	solver_printruleclass(solv, SAT_DEBUG_RULE_CREATION, solv->rules + i);
     }
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "initial decisions: %d\n", solv->decisionq.count);
+  POOL_DEBUG(SAT_DEBUG_SOLVER, "initial decisions: %d\n", solv->decisionq.count);
 
   IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
     solver_printdecisions(solv);
@@ -1377,7 +1377,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
      if (level < systemlevel)
 	{
-	  POOL_DEBUG(SAT_DEBUG_STATS, "resolving job rules\n");
+	  POOL_DEBUG(SAT_DEBUG_SOLVER, "resolving job rules\n");
 	  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++)
 	    {
 	      Id l;
@@ -1892,7 +1892,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  int installedone = 0;
 
 	  /* let's see if we can install some unsupported package */
-	  POOL_DEBUG(SAT_DEBUG_STATS, "deciding unsupported packages\n");
+	  POOL_DEBUG(SAT_DEBUG_SOLVER, "deciding unsupported packages\n");
 	  for (i = 0; i < solv->orphaned.count; i++)
 	    {
 	      p = solv->orphaned.elements[i];
@@ -1901,12 +1901,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      olevel = level;
 	      if (solv->distupgrade_removeunsupported)
 		{
-		  POOL_DEBUG(SAT_DEBUG_STATS, "removing unsupported %s\n", solvid2str(pool, p));
+		  POOL_DEBUG(SAT_DEBUG_SOLVER, "removing unsupported %s\n", solvid2str(pool, p));
 		  level = setpropagatelearn(solv, level, -p, 0, 0);
 		}
 	      else
 		{
-		  POOL_DEBUG(SAT_DEBUG_STATS, "keeping unsupported %s\n", solvid2str(pool, p));
+		  POOL_DEBUG(SAT_DEBUG_SOLVER, "keeping unsupported %s\n", solvid2str(pool, p));
 		  level = setpropagatelearn(solv, level, p, 0, 0);
 		  installedone = 1;
 		}
@@ -1930,7 +1930,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		if (solv->branches.elements[i - 1] < 0)
 		  break;
 	      p = solv->branches.elements[i];
-	      POOL_DEBUG(SAT_DEBUG_STATS, "branching with %s\n", solvid2str(pool, p));
+	      POOL_DEBUG(SAT_DEBUG_SOLVER, "branching with %s\n", solvid2str(pool, p));
 	      queue_empty(&dq);
 	      for (j = i + 1; j < solv->branches.count; j++)
 		queue_push(&dq, solv->branches.elements[j]);
@@ -1979,7 +1979,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      /* kill old solvable so that we do not loop */
 	      p = solv->branches.elements[lasti];
 	      solv->branches.elements[lasti] = 0;
-	      POOL_DEBUG(SAT_DEBUG_STATS, "minimizing %d -> %d with %s\n", solv->decisionmap[p], lastl, solvid2str(pool, p));
+	      POOL_DEBUG(SAT_DEBUG_SOLVER, "minimizing %d -> %d with %s\n", solv->decisionmap[p], lastl, solvid2str(pool, p));
 	      minimizationsteps++;
 
 	      level = lastl;
@@ -2805,7 +2805,7 @@ solver_solve(Solver *solv, Queue *job)
 
   /* make decisions based on job/update assertions */
   makeruledecisions(solv);
-  POOL_DEBUG(SAT_DEBUG_STATS, "problems so far: %d\n", solv->problems.count);
+  POOL_DEBUG(SAT_DEBUG_SOLVER, "problems so far: %d\n", solv->problems.count);
 
   /*
    * ********************************************

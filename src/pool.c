@@ -749,7 +749,7 @@ pool_setdebuglevel(Pool *pool, int level)
 {
   int mask = SAT_DEBUG_RESULT;
   if (level > 0)
-    mask |= SAT_DEBUG_STATS|SAT_DEBUG_ANALYZE|SAT_DEBUG_UNSOLVABLE;
+    mask |= SAT_DEBUG_STATS|SAT_DEBUG_ANALYZE|SAT_DEBUG_UNSOLVABLE|SAT_DEBUG_SOLVER|SAT_DEBUG_TRANSACTION;
   if (level > 1)
     mask |= SAT_DEBUG_JOB|SAT_DEBUG_SOLUTIONS|SAT_DEBUG_POLICY;
   if (level > 2)
