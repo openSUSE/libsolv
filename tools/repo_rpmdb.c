@@ -55,6 +55,8 @@
 #define TAG_ARCH		1022
 #define TAG_FILESIZES		1028
 #define TAG_FILEMODES		1030
+#define TAG_FILEMD5S		1035
+#define TAG_FILELINKTOS		1036
 #define TAG_SOURCERPM		1044
 #define TAG_PROVIDENAME		1047
 #define TAG_REQUIREFLAGS	1048
@@ -1358,7 +1360,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	      exit(1);
 	    }
 	  if (dbdata.size > rpmheadsize)
-	    rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + dbdata.size);
+	    {
+	      rpmheadsize = dbdata.size + 128;
+	      rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	    }
 	  memcpy(buf, dbdata.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
@@ -1585,7 +1590,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	      exit(1);
 	    }
 	  if (dbdata.size > rpmheadsize)
-	    rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + dbdata.size);
+	    {
+	      rpmheadsize = dbdata.size + 128;
+	      rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	    }
 	  memcpy(buf, dbdata.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
@@ -1736,7 +1744,10 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
       l = sigdsize + sigcnt * 16;
       headerend = headerstart + 16 + l;
       if (l > rpmheadsize)
-	rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + l);
+	{
+	  rpmheadsize = l + 128;
+	  rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	}
       if (fread(rpmhead->data, l, 1, fp) != 1)
 	{
 	  fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
@@ -1775,3 +1786,351 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 }
+
+static inline void
+linkhash(const char *lt, char *hash)
+{
+  unsigned int r = 0;
+  const unsigned char *str = (const unsigned char *)lt;
+  int l, c;
+
+  l = strlen(lt);
+  while ((c = *str++) != 0)
+    r += (r << 3) + c;
+  sprintf(hash, "%08x", r);
+  sprintf(hash + 8, "%08x", l);
+  sprintf(hash + 16, "%08x", 0);
+  sprintf(hash + 24, "%08x", 0);
+}
+
+void
+rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, char *, int, char *), void *cbdata)
+{
+  RpmHead *rpmhead = rpmhandle;
+  char **bn;
+  char **dn;
+  char **md = 0;
+  char **lt = 0;
+  unsigned int *di;
+  unsigned int *fm;
+  int cnt, dcnt, cnt2;
+  int i, l1, l;
+  char *space = 0;
+  int spacen = 0;
+  char md5[33], *md5p = 0;
+
+  dn = headstringarray(rpmhead, TAG_DIRNAMES, &dcnt);
+  if (!dn)
+    return;
+  if ((flags & RPM_ITERATE_FILELIST_ONLYDIRS) != 0)
+    {
+      for (i = 0; i < dcnt; i++)
+	(*cb)(cbdata, dn[i], 0, (char *)0);
+      sat_free(dn);
+      return;
+    }
+  bn = headstringarray(rpmhead, TAG_BASENAMES, &cnt);
+  if (!bn)
+    {
+      sat_free(dn);
+      return;
+    }
+  di = headint32array(rpmhead, TAG_DIRINDEXES, &cnt2);
+  if (!di || cnt != cnt2)
+    {
+      sat_free(di);
+      sat_free(bn);
+      sat_free(dn);
+      return;
+    }
+  fm = headint16array(rpmhead, TAG_FILEMODES, &cnt2);
+  if (!fm || cnt != cnt2)
+    {
+      sat_free(fm);
+      sat_free(di);
+      sat_free(bn);
+      sat_free(dn);
+      return;
+    }
+  if ((flags & RPM_ITERATE_FILELIST_WITHMD5) != 0)
+    {
+      md = headstringarray(rpmhead, TAG_FILEMD5S, &cnt2);
+      if (!md || cnt != cnt2)
+	{
+	  sat_free(md);
+	  sat_free(fm);
+	  sat_free(di);
+	  sat_free(bn);
+	  sat_free(dn);
+	  return;
+	}
+    }
+  for (i = 0; i < cnt; i++)
+    {
+      if (di[i] >= dcnt)
+	continue;
+      l1 = strlen(dn[di[i]]);
+      if (l1 == 0)
+	continue;
+      l = l1 + strlen(bn[i]) + 1;
+      if (l > spacen)
+	{
+	  spacen = l + 16;
+	  space = sat_realloc(space, spacen);
+	}
+      strcpy(space, dn[di[i]]);
+      strcpy(space + l1, bn[i]);
+      if (md)
+	{
+	  md5p = md[i];
+	  if (S_ISLNK(fm[i]))
+	    {
+	      md5p = 0;
+	      if (!lt)
+		{
+		  lt = headstringarray(rpmhead, TAG_FILELINKTOS, &cnt2);
+		  if (cnt != cnt2)
+		    lt = sat_free(lt);
+		}
+	      if (lt)
+		{
+		  linkhash(lt[i], md5);
+		  md5p = md5;
+		}
+	    }
+	  if (!md5p)
+	    md5p = "";
+	}
+      (*cb)(cbdata, space, fm[i], md5p);
+    }
+  sat_free(lt);
+  sat_free(md);
+  sat_free(fm);
+  sat_free(di);
+  sat_free(bn);
+  sat_free(dn);
+}
+
+
+struct rpm_by_state {
+  RpmHead *rpmhead;
+  int rpmheadsize;
+
+  int dbopened;
+  DB_ENV *dbenv;
+  DB *db;
+  int byteswapped;
+};
+
+void *
+rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
+{
+  struct rpm_by_state *state = *statep;
+  unsigned char buf[16];
+  DBT dbkey;
+  DBT dbdata;
+  RpmHead *rpmhead;
+
+  if (!rpmdbid)
+    {
+      /* close down */
+      if (!state)
+	return 0;
+      if (state->db)
+	state->db->close(state->db, 0);
+      if (state->dbenv)
+        state->dbenv->close(state->dbenv, 0);
+      sat_free(state->rpmhead);
+      sat_free(state);
+      *statep = (void *)0;
+      return 0;
+    }
+
+  if (!state)
+    {
+      state = sat_calloc(1, sizeof(*state));
+      *statep = state;
+    }
+  if (!state->dbopened)
+    {
+      char dbpath[PATH_MAX];
+      state->dbopened = 1;
+      if (db_env_create(&state->dbenv, 0))
+	{
+	  perror("db_env_create");
+	  state->dbenv = 0;
+	  return 0;
+	}
+      if (!rootdir)
+	rootdir = "";
+      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir);
+#ifdef FEDORA
+      if (state->dbenv->open(state->dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0))
+#else
+      if (state->dbenv->open(state->dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
+#endif
+	{
+	  perror("dbenv open");
+	  state->dbenv->close(state->dbenv, 0);
+	  state->dbenv = 0;
+	  return 0;
+	}
+      if (db_create(&state->db, state->dbenv, 0))
+	{
+	  perror("db_create");
+	  state->db = 0;
+	  state->dbenv->close(state->dbenv, 0);
+	  state->dbenv = 0;
+	  return 0;
+	}
+      if (state->db->open(state->db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
+	{
+	  perror("db->open var/lib/rpm/Packages");
+	  state->db->close(state->db, 0);
+	  state->db = 0;
+	  state->dbenv->close(state->dbenv, 0);
+	  state->dbenv = 0;
+	  return 0;
+	}
+      if (state->db->get_byteswapped(state->db, &state->byteswapped))
+	{
+	  perror("db->get_byteswapped");
+	  state->db->close(state->db, 0);
+	  state->db = 0;
+	  state->dbenv->close(state->dbenv, 0);
+	  state->dbenv = 0;
+	  return 0;
+	}
+    }
+  memcpy(buf, &rpmdbid, 4);
+  if (state->byteswapped)
+    {
+      unsigned char bx;
+      bx = buf[0]; buf[0] = buf[3]; buf[3] = bx;
+      bx = buf[1]; buf[1] = buf[2]; buf[2] = bx;
+    }
+  memset(&dbkey, 0, sizeof(dbkey));
+  memset(&dbdata, 0, sizeof(dbdata));
+  dbkey.data = buf;
+  dbkey.size = 4;
+  dbdata.data = 0;
+  dbdata.size = 0;
+  if (state->db->get(state->db, NULL, &dbkey, &dbdata, 0))
+    {
+      perror("db->get");
+      return 0;
+    }
+  if (dbdata.size < 8)
+    {
+      fprintf(stderr, "corrupt rpm database (size)\n");
+      return 0;
+    }
+  if (dbdata.size > state->rpmheadsize)
+    {
+      state->rpmheadsize = dbdata.size + 128;
+      state->rpmhead = sat_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
+    }
+  rpmhead = state->rpmhead;
+  memcpy(buf, dbdata.data, 8);
+  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
+  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
+  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
+    {
+      fprintf(stderr, "corrupt rpm database (data size)\n");
+      return 0;
+    }
+  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
+  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+  return rpmhead;
+}
+ 
+void *
+rpm_byfp(FILE *fp, const char *name, void **statep)
+{
+  struct rpm_by_state *state = *statep;
+  int headerstart, headerend;
+  RpmHead *rpmhead;
+  int sigdsize, sigcnt, l;
+  unsigned char lead[4096];
+
+  if (!fp)
+    return rpm_byrpmdbid(0, 0, statep);
+  if (!state)
+    {
+      state = sat_calloc(1, sizeof(*state));
+      *statep = state;
+    }
+  if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
+    {
+      fprintf(stderr, "%s: not a rpm\n", name);
+      return 0;
+    }
+  if (lead[78] != 0 || lead[79] != 5)
+    {
+      fprintf(stderr, "%s: not a V5 header\n", name);
+      return 0;
+    }
+  if (getu32(lead + 96) != 0x8eade801)
+    {
+      fprintf(stderr, "%s: bad signature header\n", name);
+      return 0;
+    }
+  sigcnt = getu32(lead + 96 + 8);
+  sigdsize = getu32(lead + 96 + 12);
+  if (sigcnt >= 0x4000000 || sigdsize >= 0x40000000)
+    {
+      fprintf(stderr, "%s: bad signature header\n", name);
+      return 0;
+    }
+  sigdsize += sigcnt * 16;
+  sigdsize = (sigdsize + 7) & ~7;
+  headerstart = 96 + 16 + sigdsize;
+  while (sigdsize)
+    {
+      l = sigdsize > 4096 ? 4096 : sigdsize;
+      if (fread(lead, l, 1, fp) != 1)
+	{
+	  fprintf(stderr, "%s: unexpected EOF\n", name);
+	  return 0;
+	}
+      sigdsize -= l;
+    }
+  if (fread(lead, 16, 1, fp) != 1)
+    {
+      fprintf(stderr, "%s: unexpected EOF\n", name);
+      return 0;
+    }
+  if (getu32(lead) != 0x8eade801)
+    {
+      fprintf(stderr, "%s: bad header\n", name);
+      fclose(fp);
+      return 0;
+    }
+  sigcnt = getu32(lead + 8);
+  sigdsize = getu32(lead + 12);
+  if (sigcnt >= 0x4000000 || sigdsize >= 0x40000000)
+    {
+      fprintf(stderr, "%s: bad header\n", name);
+      fclose(fp);
+      return 0;
+    }
+  l = sigdsize + sigcnt * 16;
+  headerend = headerstart + 16 + l;
+  if (l > state->rpmheadsize)
+    {
+      state->rpmheadsize = l + 128;
+      state->rpmhead = sat_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
+    }
+  rpmhead = state->rpmhead;
+  if (fread(rpmhead->data, l, 1, fp) != 1)
+    {
+      fprintf(stderr, "%s: unexpected EOF\n", name);
+      fclose(fp);
+      return 0;
+    }
+  rpmhead->cnt = sigcnt;
+  rpmhead->dcnt = sigdsize;
+  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+  return rpmhead;
+}
+
