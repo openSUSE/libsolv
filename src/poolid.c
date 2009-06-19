@@ -168,6 +168,8 @@ id2rel(Pool *pool, Id id)
       return " NAMESPACE ";	/* actually not used in dep2str */
     case REL_ARCH:
       return ".";
+    case REL_FILECONFLICT:
+      return " FILECONFLICT ";
     default:
       break;
     }
@@ -230,6 +232,11 @@ dep2strcpy(Pool *pool, char *p, Id id, int oldrel)
 	  *p++ = '(';
 	  dep2strcpy(pool, p, rd->evr, rd->flags);
 	  strcat(p, ")");
+	  return;
+	}
+      if (rd->flags == REL_FILECONFLICT)
+	{
+	  *p = 0;
 	  return;
 	}
       strcpy(p, id2rel(pool, id));

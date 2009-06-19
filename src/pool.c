@@ -620,8 +620,25 @@ pool_addrelproviders(Pool *pool, Id d)
 	}
       if (wp)
 	{
+	  /* all solvables match, no need to create a new list */
 	  pool->whatprovides_rel[d] = wp;
 	  return wp;
+	}
+      break;
+    case REL_FILECONFLICT:
+      pp = pool_whatprovides_ptr(pool, name);
+      while ((p = *pp++) != 0)
+	{
+	  Id origd = MAKERELDEP(d);
+	  Solvable *s = pool->solvables + p;
+	  if (!s->provides)
+	    continue;
+	  pidp = s->repo->idarraydata + s->provides;
+	  while ((pid = *pidp++) != 0)
+	    if (pid == origd)
+	      break;
+	  if (pid)
+	    queue_push(&plist, p);
 	}
       break;
     default:
@@ -809,6 +826,11 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
 		  MAPSET(&csf->seen, sid);
 		}
 	      dep = rd->evr;
+	    }
+	  else if (rd->flags == REL_FILECONFLICT)
+	    {
+	      dep = 0;
+	      break;
 	    }
 	  else
 	    {
@@ -1709,4 +1731,36 @@ pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep)
   return solvable_lookup_checksum(pool->solvables + entry, keyname, typep);
 }
 
-// EOF
+void
+pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts)
+{
+  int hadhashes = pool->relhashtbl ? 1 : 0;
+  Solvable *s;
+  Id fn, p, q, md5;
+  Id id;
+  int i;
+
+  if (!conflicts->count)
+    return;
+  pool_freewhatprovides(pool);
+  for (i = 0; i < conflicts->count; i += 5)
+    {
+      fn = conflicts->elements[i];
+      p = conflicts->elements[i + 1];
+      md5 = conflicts->elements[i + 2];
+      q = conflicts->elements[i + 3];
+      id = rel2id(pool, fn, md5, REL_FILECONFLICT, 1);
+      s = pool->solvables + p;
+      if (!s->repo)
+	continue;
+      s->provides = repo_addid_dep(s->repo, s->provides, id, SOLVABLE_FILEMARKER);
+      s = pool->solvables + q;
+      if (!s->repo)
+	continue;
+      s->conflicts = repo_addid_dep(s->repo, s->conflicts, id, 0);
+    }
+  if (!hadhashes)
+    pool_freeidhashes(pool);
+}
+
+/* EOF */
