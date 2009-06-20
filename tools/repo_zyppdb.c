@@ -1,8 +1,8 @@
 /*
  * repo_zyppdb.c
  *
- * Parses /var/lib/zypp/db/products/...
- * The are old (pre Code11) products. See bnc#429177
+ * Parses legacy /var/lib/zypp/db/products/... files.
+ * They are old (pre Code11) product descriptions. See bnc#429177
  *
  *
  * Copyright (c) 2008, Novell Inc.
@@ -302,7 +302,7 @@ characterData(void *userData, const XML_Char *s, int len)
  */
 
 static void
-repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
+add_zyppdb_product(struct parsedata *pd, FILE *fp)
 {
   char buf[BUFF_SIZE];
   int l;
@@ -327,34 +327,6 @@ repo_add_product(struct parsedata *pd, Repodata *data, FILE *fp)
 }
 
 
-
-/*
- * parse dir for products
- */
-
-static void
-parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata)
-{
-  struct dirent *entry;
-
-  while ((entry = readdir(dir)))
-    {
-      int len = strlen(entry->d_name);
-      if (len < 3)   /* skip '.' and '..' */
-	continue;
-      char *fullpath = join2(path, "/", entry->d_name);
-      FILE *fp = fopen(fullpath, "r");
-      if (!fp)
-	{
-	  perror(fullpath);
-	  break;
-	}
-      repo_add_product(pd, repodata, fp);
-      fclose(fp);
-    }
-}
-
-
 /*
  * read all installed products
  *
@@ -362,16 +334,26 @@ parse_dir(DIR *dir, const char *path, struct parsedata *pd, Repodata *repodata)
  */
 
 void
-repo_add_zyppdb_products(Repo *repo, Repodata *repodata, const char *fullpath, DIR *dir)
+repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
 {
   int i;
   struct parsedata pd;
   struct stateswitch *sw;
+  struct dirent *entry;
+  char *fullpath;
+  DIR *dir;
+  FILE *fp;
+  Repodata *data;
+  
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
 
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;
   pd.pool = repo->pool;
-  pd.data = repodata;
+  pd.data = data;
 
   pd.content = malloc(256);
   pd.acontent = 256;
@@ -383,11 +365,30 @@ repo_add_zyppdb_products(Repo *repo, Repodata *repodata, const char *fullpath, D
       pd.sbtab[sw->to] = sw->from;
     }
 
-  parse_dir(dir, fullpath, &pd, repodata);
+  dir = opendir(dirpath);
+  if (dir)
+    {
+      while ((entry = readdir(dir)))
+	{
+	  if (strlen(entry->d_name) < 3)
+	    continue;	/* skip '.' and '..' */
+	  fullpath = join2(dirpath, "/", entry->d_name);
+	  if ((fp = fopen(fullpath, "r")) == 0)
+	    {
+	      perror(fullpath);
+	      continue;
+	    }
+	  add_zyppdb_product(&pd, fp);
+	  fclose(fp);
+	}
+    }
+  closedir(dir);
 
   sat_free((void *)pd.tmplang);
   free(pd.content);
   join_freemem();
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }
 
 /* EOF */

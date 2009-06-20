@@ -159,7 +159,7 @@ main(int argc, char **argv)
 	      strcpy(buf + rootlen, proddir);
 	    }
 	}
-      repo_add_products(repo, proddir, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+      repo_add_products(repo, buf, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
       if (buf != proddir)
 	sat_free(buf);
     }

@@ -31,6 +31,7 @@
 #include "tools_util.h"
 #include "repo_content.h"
 #include "repo_zyppdb.h"
+#include "repo_releasefile_products.h"
 
 
 //#define DUMPOUT 0
@@ -385,7 +386,7 @@ characterData(void *userData, const XML_Char *s, int len)
  */
 
 static void
-repo_add_product(struct parsedata *pd, FILE *fp, int code11)
+add_code11_product(struct parsedata *pd, FILE *fp)
 {
   char buf[BUFF_SIZE];
   int l;
@@ -403,182 +404,36 @@ repo_add_product(struct parsedata *pd, FILE *fp, int code11)
       pd->ctime = 0;
     }
 
-  if (code11)
+  XML_Parser parser = XML_ParserCreate(NULL);
+  XML_SetUserData(parser, pd);
+  XML_SetElementHandler(parser, startElement, endElement);
+  XML_SetCharacterDataHandler(parser, characterData);
+
+  for (;;)
     {
-      XML_Parser parser = XML_ParserCreate(NULL);
-      XML_SetUserData(parser, pd);
-      XML_SetElementHandler(parser, startElement, endElement);
-      XML_SetCharacterDataHandler(parser, characterData);
-
-      for (;;)
+      l = fread(buf, 1, sizeof(buf), fp);
+      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  l = fread(buf, 1, sizeof(buf), fp);
-	  if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	    {
-	      pool_debug(pd->pool, SAT_ERROR, "%s: %s at line %u:%u\n", pd->filename, XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	      pool_debug(pd->pool, SAT_ERROR, "Skipping this product\n");
-	      XML_ParserFree(parser);
-	      return;
-	    }
-	  if (l == 0)
-	    break;
+	  pool_debug(pd->pool, SAT_ERROR, "%s: %s at line %u:%u\n", pd->filename, XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  pool_debug(pd->pool, SAT_ERROR, "skipping this product\n");
+	  XML_ParserFree(parser);
+	  return;
 	}
-      XML_ParserFree(parser);
+      if (l == 0)
+	break;
     }
-  else
-    {
-      Id name = 0;
-      Id arch = 0;
-      Id version = 0;
-      int lnum = 0; /* line number */
-      char *ptr, *ptr1;
-      /* parse /etc/<xyz>-release file */
-      while (fgets(buf, sizeof(buf), fp))
-	{
-	  /* remove trailing \n */
-	  int l = strlen(buf);
-	  if (*(buf + l - 1) == '\n')
-	    {
-	      --l;
-	      *(buf + l) = 0;
-	    }
-	  ++lnum;
-
-	  if (lnum == 1)
-	    {
-	      /* 1st line, <name> [(<arch>)] */
-	      ptr = strchr(buf, '(');
-	      if (ptr)
-		{
-		  ptr1 = ptr - 1;
-		  *ptr++ = 0;
-		}
-	      else
-		ptr1 = buf + l - 1;
-
-	      /* track back until non-blank, non-digit */
-	      while (ptr1 > buf
-		     && (*ptr1 == ' ' || isdigit(*ptr1) || *ptr1 == '.'))
-		--ptr1;
-	      *(++ptr1) = 0;
-	      name = str2id(pd->pool, join2("product", ":", buf), 1);
-
-	      if (ptr)
-		{
-		  /* have arch */
-		  char *ptr1 = strchr(ptr, ')');
-		  if (ptr1)
-		    {
-		      *ptr1 = 0;
-		      /* downcase arch */
-		      ptr1 = ptr;
-		      while (*ptr1)
-			{
-			  if (isupper(*ptr1)) *ptr1 = tolower(*ptr1);
-			  ++ptr1;
-			}
-		      arch = str2id(pd->pool, ptr, 1);
-		    }
-		}
-	    }
-	  else if (strncmp(buf, "VERSION", 7) == 0)
-	    {
-	      ptr = strchr(buf+7, '=');
-	      if (ptr)
-		{
-		  while (*++ptr == ' ');
-		  version = makeevr(pd->pool, ptr);
-		}
-	    }
-	}
-      if (name)
-	{
-	  Solvable *s = pd->solvable = pool_id2solvable(pd->pool, repo_add_solvable(pd->repo));
-	  s->name = name;
-	  if (version)
-	    s->evr = version;
-	  if (arch)
-	    s->arch = arch;
-	  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	    s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
-	}
-    }
+  XML_ParserFree(parser);
 }
 
-
-
-/*
- * parse dir looking for files ending in suffix
- */
-
-static void
-parse_dir(DIR *dir, const char *path, struct parsedata *pd, int code11)
-{
-  struct dirent *entry;
-  char *suffix = code11 ? ".prod" : "-release";
-  int slen = code11 ? 5 : 8;  /* strlen(".prod") : strlen("-release") */
-  struct stat st;
-
-  /* check for <productsdir>/baseproduct on code11 and remember its target inode */
-  if (code11
-      && stat(join2(path, "/", "baseproduct"), &st) == 0) /* follow symlink */
-    {
-      pd->baseproduct = st.st_ino;
-    }
-  else
-    pd->baseproduct = 0;
-
-  while ((entry = readdir(dir)))
-    {
-      int len;
-      len = strlen(entry->d_name);
-
-      /* skip /etc/lsb-release, thats not a product per-se */
-      if (!code11
-	  && strcmp(entry->d_name, "lsb-release") == 0)
-	{
-	  continue;
-	}
-
-      if (len > slen
-	  && strcmp(entry->d_name + len - slen, suffix) == 0)
-	{
-	  char *fullpath = join2(path, "/", entry->d_name);
-	  FILE *fp = fopen(fullpath, "r");
-	  if (!fp)
-	    {
-	      perror(fullpath);
-	      break;
-	    }
-	  pd->filename = fullpath;
-	  pd->basename = entry->d_name;
-	  repo_add_product(pd, fp, code11);
-	  fclose(fp);
-	}
-    }
-}
-
-
-/*
- * read all installed products
- *
- * try proddir (reading all .xml files from this directory) first
- * if not available, assume non-code11 layout and parse /etc/xyz-release
- *
- * parse each one as a product
- */
-
-/* Oh joy! Three parsers for the price of one! */
 
 void
-repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
+repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 {
-  const char *fullpath = proddir;
-  DIR *dir;
-  int i;
+  Repodata *data;
   struct parsedata pd;
   struct stateswitch *sw;
-  Repodata *data;
+  DIR *dir;
+  int i;
 
   if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
@@ -600,43 +455,102 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
       pd.sbtab[sw->to] = sw->from;
     }
 
-  dir = opendir(fullpath);
+  dir = opendir(dirpath);
   if (dir)
     {
-      parse_dir(dir, fullpath, &pd, 1); /* assume 'code11' products */
-      closedir(dir);
-    }
-  else
-    {
-      fullpath = root ? join2(root, "", "/var/lib/zypp/db/products") : "/var/lib/zypp/db/products";
-      dir = opendir(fullpath);
-      if (dir)
-	{
-	  repo_add_zyppdb_products(repo, data, fullpath, dir);      /* assume 'code10' zypp-style products */
-	  closedir(dir);
-	}
+      struct dirent *entry;
+      struct stat st;
+      char *fullpath;
+
+      /* check for <productsdir>/baseproduct on code11 and remember its target inode */
+      if (stat(join2(dirpath, "/", "baseproduct"), &st) == 0) /* follow symlink */
+	pd.baseproduct = st.st_ino;
       else
+	pd.baseproduct = 0;
+
+      while ((entry = readdir(dir)))
 	{
-	  fullpath = root ? join2(root, "", "/etc") : "/etc";
-	  dir = opendir(fullpath);
-	  if (dir)
-	    {
-	      parse_dir(dir, fullpath, &pd, 0); /* fall back to /etc/<xyz>-release parsing */
-	      closedir(dir);
-	    }
-	  else
+	  int len = strlen(entry->d_name);
+	  if (len <= 5 || strcmp(entry->d_name + len - 5, ".prod") != 0)
+	    continue;
+	  fullpath = join2(dirpath, "/", entry->d_name);
+	  FILE *fp = fopen(fullpath, "r");
+	  if (!fp)
 	    {
 	      perror(fullpath);
+	      continue;
 	    }
+	  pd.filename = fullpath;
+	  pd.basename = entry->d_name;
+	  add_code11_product(&pd, fp);
+	  fclose(fp);
 	}
+      closedir(dir);
     }
-
   sat_free((void *)pd.tmplang);
   sat_free(pd.content);
   join_freemem();
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+}
+
+
+/******************************************************************************************/
+
+
+/*
+ * read all installed products
+ *
+ * try proddir (reading all .xml files from this directory) first
+ * if not available, assume non-code11 layout and parse /etc/xyz-release
+ *
+ * parse each one as a product
+ */
+
+/* Oh joy! Three parsers for the price of one! */
+
+void
+repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
+{
+  const char *fullpath;
+  DIR *dir;
+
+  dir = opendir(proddir);
+  if (dir)
+    {
+      /* assume code11 stype products */
+      closedir(dir);
+      repo_add_code11_products(repo, proddir, flags);
+      return;
+    }
+
+  /* code11 didn't work, try old zyppdb */
+  fullpath = root ? join2(root, "", "/var/lib/zypp/db/products") : "/var/lib/zypp/db/products";
+  dir = opendir(fullpath);
+  if (dir)
+    {
+      closedir(dir);
+      /* assume code10 style products */
+      repo_add_zyppdb_products(repo, fullpath, flags);
+      join_freemem();
+      return;
+    }
+  
+  /* code11 didn't work, try -release files parsing */
+  fullpath = root ? join2(root, "", "/etc") : "/etc";
+  dir = opendir(fullpath);
+  if (dir)
+    {
+      closedir(dir);
+      repo_add_releasefile_products(repo, fullpath, flags);
+      join_freemem();
+      return;
+    }
+
+  /* no luck. print an error message in case the root argument is wrong */
+  perror(fullpath);
+  join_freemem();
 }
 
 /* EOF */

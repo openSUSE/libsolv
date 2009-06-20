@@ -10,6 +10,7 @@ SET(rpmdb2solv_REPOS
   repo_rpmdb.c
   repo_products.c
   repo_zyppdb.c
+  repo_releasefile_products.c
 )
 
 ADD_EXECUTABLE( rpmdb2solv ${rpmdb2solv_REPOS} )
