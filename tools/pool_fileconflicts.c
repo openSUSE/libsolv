@@ -5,9 +5,12 @@
 #include "repo.h"
 #include "hash.h"
 #include "repo_rpmdb.h"
+#include "pool_fileconflicts.h"
 
 struct cbdata {
   Pool *pool;
+  int create;
+
   Queue lookat;
   Queue lookat_dir;
 
@@ -84,6 +87,8 @@ finddirs_cb(void *cbdatav, char *fn, int fmode, char *md5)
   if (!qx)
     {
       /* a miss */
+      if (!cbdata->create)
+	return;
       cbdata->dirmap[2 * h] = hx;
       cbdata->dirmap[2 * h + 1] = idx;
       cbdata->dirmapused++;
@@ -154,6 +159,9 @@ findfileconflicts_cb(void *cbdatav, char *fn, int fmode, char *md5)
     }
   if (!qx)
     {
+      /* a miss */
+      if (!cbdata->create)
+	return;
       cbdata->cflmap[2 * h] = hx;
       cbdata->cflmap[2 * h + 1] = (isdir ? ~idx : idx);
       cbdata->cflmapused++;
@@ -240,7 +248,7 @@ static int conflicts_cmp(const void *ap, const void *bp, void *dp)
 }
 
 int
-pool_findfileconflicts(Pool *pool, Queue *pkgs, Queue *conflicts, void *(*handle_cb)(Pool *, Id, void *) , void *handle_cbdata)
+pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, void *(*handle_cb)(Pool *, Id, void *) , void *handle_cbdata)
 {
   int i, j, cflmapn;
   unsigned int hx;
@@ -253,55 +261,63 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, Queue *conflicts, void *(*handle
     return 0;
 
   now = start = sat_timems(0);
-  printf("packages: %d\n", pkgs->count);
+  POOL_DEBUG(SAT_DEBUG_STATS, "packages: %d, cutoff %d\n", pkgs->count, cutoff);
 
   memset(&cbdata, 0, sizeof(cbdata));
   cbdata.pool = pool;
   queue_init(&cbdata.lookat);
   queue_init(&cbdata.lookat_dir);
   queue_init(&cbdata.files);
+  if (cutoff <= 0)
+    cutoff = pkgs->count;
 
   /* avarage file list size: 200 files per package */
   /* avarage dir count: 20 dirs per package */
 
   /* first pass: scan dirs */
-  cflmapn = pkgs->count * 64;
+  cflmapn = (cutoff + 3) * 64;
   while ((cflmapn & (cflmapn - 1)) != 0)
     cflmapn = cflmapn & (cflmapn - 1);
   cbdata.dirmap = sat_calloc(cflmapn, 2 * sizeof(Id));
   cbdata.dirmapn = cflmapn - 1;	/* make it a mask */
+  cbdata.create = 1;
   for (i = 0; i < pkgs->count; i++)
     {
       Id p = pkgs->elements[i];
-      cbdata.idx = p;
+      cbdata.idx = i;
+      if (i == cutoff)
+	cbdata.create = 0;
       handle = (*handle_cb)(pool, p, handle_cbdata);
       if (handle)
         rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_ONLYDIRS, finddirs_cb, &cbdata);
     }
 
-  printf("dirmap size: %d used %d\n", cbdata.dirmapn + 1, cbdata.dirmapused);
-  printf("dirmap memory usage: %d K\n", (cbdata.dirmapn + 1) * 2 * (int)sizeof(Id) / 1024);
-  printf("dirmap creation took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SAT_DEBUG_STATS, "dirmap size: %d used %d\n", cbdata.dirmapn + 1, cbdata.dirmapused);
+  POOL_DEBUG(SAT_DEBUG_STATS, "dirmap memory usage: %d K\n", (cbdata.dirmapn + 1) * 2 * (int)sizeof(Id) / 1024);
+  POOL_DEBUG(SAT_DEBUG_STATS, "dirmap creation took %d ms\n", sat_timems(now));
 
   /* second pass: scan files */
   now = sat_timems(0);
-  cflmapn = pkgs->count * 128;
+  cflmapn = (cutoff + 3) * 128;
   while ((cflmapn & (cflmapn - 1)) != 0)
     cflmapn = cflmapn & (cflmapn - 1);
   cbdata.cflmap = sat_calloc(cflmapn, 2 * sizeof(Id));
   cbdata.cflmapn = cflmapn - 1;	/* make it a mask */
+  cbdata.create = 1;
   for (i = 0; i < pkgs->count; i++)
     {
       Id p = pkgs->elements[i];
-      cbdata.idx = p;
+      cbdata.idx = i;
+      if (i == cutoff)
+	cbdata.create = 0;
       handle = (*handle_cb)(pool, p, handle_cbdata);
       if (handle)
         rpm_iterate_filelist(handle, 0, findfileconflicts_cb, &cbdata);
     }
 
-  printf("filemap size: %d used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
-  printf("filemap memory usage: %d K\n", (cbdata.cflmapn + 1) * 2 * (int)sizeof(Id) / 1024);
-  printf("filemap creation took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SAT_DEBUG_STATS, "filemap size: %d used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
+  POOL_DEBUG(SAT_DEBUG_STATS, "filemap memory usage: %d K\n", (cbdata.cflmapn + 1) * 2 * (int)sizeof(Id) / 1024);
+  POOL_DEBUG(SAT_DEBUG_STATS, "filemap creation took %d ms\n", sat_timems(now));
 
   cbdata.dirmap = sat_free(cbdata.dirmap);
   cbdata.dirmapn = 0;
@@ -311,26 +327,27 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, Queue *conflicts, void *(*handle
   cbdata.cflmapused = 0;
 
   now = sat_timems(0);
-  printf("lookat_dir size: %d\n", cbdata.lookat_dir.count);
+  POOL_DEBUG(SAT_DEBUG_STATS, "lookat_dir size: %d\n", cbdata.lookat_dir.count);
   queue_free(&cbdata.lookat_dir);
   sat_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &cand_sort, pool);
   /* unify */
   for (i = j = 0; i < cbdata.lookat.count; i += 2)
     {
       hx = cbdata.lookat.elements[i];
-      Id p = cbdata.lookat.elements[i + 1];
-      if (j && hx == cbdata.lookat.elements[j - 2] && p == cbdata.lookat.elements[j - 1])
+      Id idx = cbdata.lookat.elements[i + 1];
+      if (j && hx == cbdata.lookat.elements[j - 2] && idx == cbdata.lookat.elements[j - 1])
 	continue;
       cbdata.lookat.elements[j++] = hx;
-      cbdata.lookat.elements[j++] = p;
+      cbdata.lookat.elements[j++] = idx;
     }
-  printf("candidates: %d\n", cbdata.lookat.count / 2);
+  POOL_DEBUG(SAT_DEBUG_STATS, "candidates: %d\n", cbdata.lookat.count / 2);
 
   /* third pass: scan candidates */
   for (i = 0; i < cbdata.lookat.count - 2; i += 2)
     {
       int pend, ii, jj;
-      Id p = cbdata.lookat.elements[i + 1];
+      int pidx = cbdata.lookat.elements[i + 1];
+      Id p = pkgs->elements[pidx];
 
       hx = cbdata.lookat.elements[i];
       if (cbdata.lookat.elements[i + 2] != hx)
@@ -349,7 +366,10 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, Queue *conflicts, void *(*handle
       pend = cbdata.files.count;
       for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j++)
 	{
-	  Id q = cbdata.lookat.elements[j + 1];
+	  int qidx = cbdata.lookat.elements[j + 1];
+	  Id q = pkgs->elements[qidx];
+	  if (pidx >= cutoff && qidx >= cutoff)
+	    continue;	/* no conflicts between packages with idx >= cutoff */
 	  cbdata.idx = q;
 	  handle = (*handle_cb)(pool, q, handle_cbdata);
 	  if (!handle)
@@ -372,11 +392,11 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, Queue *conflicts, void *(*handle
     }
   cbdata.filesspace = sat_free(cbdata.filesspace);
   cbdata.filesspacen = 0;
-  printf("candidate check took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SAT_DEBUG_STATS, "candidate check took %d ms\n", sat_timems(now));
   if (conflicts->count > 5)
     sat_sort(conflicts->elements, conflicts->count / 5, 5 * sizeof(Id), conflicts_cmp, pool);
   (*handle_cb)(pool, 0, handle_cbdata);
-  printf("conflict detection took %d ms\n", sat_timems(start));
+  POOL_DEBUG(SAT_DEBUG_STATS, "conflict detection took %d ms\n", sat_timems(start));
   return conflicts->count;
 }
 

@@ -751,7 +751,7 @@ pool_debug(Pool *pool, int type, const char *format, ...)
   va_start(args, format);
   if (!pool->debugcallback)
     {
-      if ((type & (SAT_FATAL|SAT_ERROR)) == 0)
+      if ((type & (SAT_FATAL|SAT_ERROR)) == 0 || !(pool->debugmask & SAT_DEBUG_TO_STDERR))
         vprintf(format, args);
       else
         vfprintf(stderr, format, args);
@@ -775,6 +775,7 @@ pool_setdebuglevel(Pool *pool, int level)
     mask |= SAT_DEBUG_RULE_CREATION;
   if (level > 4)
     mask |= SAT_DEBUG_SCHUBI;
+  mask |= pool->debugmask & SAT_DEBUG_TO_STDERR;	/* keep bit */
   pool->debugmask = mask;
 }
 

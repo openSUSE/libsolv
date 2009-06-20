@@ -39,6 +39,7 @@ int main()
   void *state = 0;
  
   pool = pool_create();
+  pool_setdebuglevel(pool, 1);
   installed = repo_create(pool, "@System");
   pool_set_installed(pool, installed);
   repo_add_rpmdb(installed, 0, 0, 0);
@@ -46,7 +47,7 @@ int main()
   queue_init(&conflicts);
   FOR_REPO_SOLVABLES(installed, p, s)
     queue_push(&todo, p);
-  pool_findfileconflicts(pool, &todo, &conflicts, &iterate_handle, (void *)&state);
+  pool_findfileconflicts(pool, &todo, 0, &conflicts, &iterate_handle, (void *)&state);
   queue_free(&todo);
   for (i = 0; i < conflicts.count; i += 5)
     printf("%s: %s[%s] %s[%s]\n", id2str(pool, conflicts.elements[i]), solvid2str(pool, conflicts.elements[i + 1]), id2str(pool, conflicts.elements[i + 2]), solvid2str(pool, conflicts.elements[i + 3]), id2str(pool, conflicts.elements[i + 4]));

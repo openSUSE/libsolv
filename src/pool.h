@@ -135,6 +135,8 @@ struct _Pool {
 #define SAT_DEBUG_SOLVER		(1<<13)
 #define SAT_DEBUG_TRANSACTION		(1<<14)
 
+#define SAT_DEBUG_TO_STDERR		(1<<30)
+
 //-----------------------------------------------
 
 
