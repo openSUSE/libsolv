@@ -51,6 +51,16 @@ strnhash(const char *str, unsigned len)
   return r;
 }
 
+static inline Hashval
+strhash_cont(const char *str, Hashval r)
+{
+  unsigned int c;
+  while ((c = *(const unsigned char *)str++) != 0)
+    r += (r << 3) + c;
+  return r;
+}
+
+
 /* hash for rel
  * rel -> hash
  */

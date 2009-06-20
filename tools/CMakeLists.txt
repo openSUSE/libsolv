@@ -57,6 +57,10 @@ TARGET_LINK_LIBRARIES( dumpsolv satsolver)
 ADD_EXECUTABLE( mergesolv mergesolv.c )
 TARGET_LINK_LIBRARIES( mergesolv satsolver toolstuff)
 
+SET(findfileconflicts_SOURCES findfileconflicts.c pool_fileconflicts.c repo_rpmdb.c )
+ADD_EXECUTABLE( findfileconflicts ${findfileconflicts_SOURCES} )
+TARGET_LINK_LIBRARIES( findfileconflicts satsolver ${RPMDB_LIBRARY} ${EXPAT_LIBRARY} )
+
 install(TARGETS
                 mergesolv
                 dumpsolv

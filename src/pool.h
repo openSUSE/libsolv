@@ -154,6 +154,7 @@ struct _Pool {
 #define REL_WITH	18
 #define REL_NAMESPACE	19
 #define REL_ARCH	20
+#define REL_FILECONFLICT	21
 
 #if !defined(__GNUC__) && !defined(__attribute__)
 # define __attribute__(x)
@@ -315,6 +316,9 @@ unsigned int pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned int notf
 int pool_lookup_void(Pool *pool, Id entry, Id keyname);
 const unsigned char *pool_lookup_bin_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
 const char *pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
+
+void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
+
 
 
 /* loop over all providers of d */
