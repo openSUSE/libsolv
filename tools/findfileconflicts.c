@@ -61,9 +61,14 @@ int main()
       pool_setdebuglevel(pool, 0);
       Solver *solv = solver_create(pool);
       solv->fixsystem = 1;
+#if 0
+      solv->allowuninstall = 1;
+#endif
       solver_solve(solv, &job);
       if (solv->problems.count)
         solver_printallsolutions(solv);
+      else
+        solver_printtransaction(solv);
       queue_free(&job);
       solver_free(solv);
     }

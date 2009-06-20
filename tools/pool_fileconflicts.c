@@ -261,6 +261,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
     return 0;
 
   now = start = sat_timems(0);
+  POOL_DEBUG(SAT_DEBUG_STATS, "searching for file conflicts\n");
   POOL_DEBUG(SAT_DEBUG_STATS, "packages: %d, cutoff %d\n", pkgs->count, cutoff);
 
   memset(&cbdata, 0, sizeof(cbdata));
@@ -396,7 +397,8 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   if (conflicts->count > 5)
     sat_sort(conflicts->elements, conflicts->count / 5, 5 * sizeof(Id), conflicts_cmp, pool);
   (*handle_cb)(pool, 0, handle_cbdata);
-  POOL_DEBUG(SAT_DEBUG_STATS, "conflict detection took %d ms\n", sat_timems(start));
+  POOL_DEBUG(SAT_DEBUG_STATS, "found %d file conflicts\n", conflicts->count / 5);
+  POOL_DEBUG(SAT_DEBUG_STATS, "file conflict detection took %d ms\n", sat_timems(start));
   return conflicts->count;
 }
 
