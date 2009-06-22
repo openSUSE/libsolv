@@ -99,7 +99,10 @@ sat_timems(unsigned int subtract)
 }
 
 /* bsd's qsort_r has different arguments, so we define our
-   own version in case we need to do some clever mapping */
+   own version in case we need to do some clever mapping
+ 
+   see also: http://sources.redhat.com/ml/libc-alpha/2008-12/msg00003.html
+ */
 void
 sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
 {
