@@ -32,6 +32,7 @@
 #include "repo.h"
 #include "hash.h"
 #include "util.h"
+#include "queue.h"
 #include "repo_rpmdb.h"
 
 #define RPMDB_COOKIE_VERSION 2
@@ -977,6 +978,8 @@ copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
   return ido;
 }
 
+#define COPYDIR_DIRCACHE_SIZE 512
+
 static Id copydir_complex(Pool *pool, Repodata *data, Stringpool *fromspool, Repodata *fromdata, Id did, Id *cache);
 
 static inline Id
@@ -1201,7 +1204,7 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
     }
   if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
     {
-      perror("db->open var/lib/rpm/Name");
+      perror("db->open Name index");
       exit(1);
     }
   if (db->get_byteswapped(db, &byteswapped))
@@ -1287,11 +1290,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       perror("dbenv open");
       exit(1);
     }
-  if (db_create(&db, dbenv, 0))
-    {
-      perror("db_create");
-      exit(1);
-    }
 
   /* XXX: should get ro lock of Packages database! */
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
@@ -1311,9 +1309,14 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	count = count_headers(rootdir, dbenv);
+      if (db_create(&db, dbenv, 0))
+	{
+	  perror("db_create");
+	  exit(1);
+	}
       if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 	{
-	  perror("db->open var/lib/rpm/Packages");
+	  perror("db->open Packages index");
 	  exit(1);
 	}
       if (db->get_byteswapped(db, &byteswapped))
@@ -1425,12 +1428,17 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
     }
   else
     {
-      Id dircache[512];
+      Id dircache[COPYDIR_DIRCACHE_SIZE];		/* see copydir */
 
       memset(dircache, 0, sizeof(dircache));
+      if (db_create(&db, dbenv, 0))
+	{
+	  perror("db_create");
+	  exit(1);
+	}
       if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 	{
-	  perror("db->open var/lib/rpm/Name");
+	  perror("db->open Name index");
 	  exit(1);
 	}
       if (db->get_byteswapped(db, &byteswapped))
@@ -1804,14 +1812,16 @@ linkhash(const char *lt, char *hash)
 }
 
 void
-rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, char *, int, char *), void *cbdata)
+rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, int, const char *), void *cbdata)
 {
   RpmHead *rpmhead = rpmhandle;
   char **bn;
   char **dn;
   char **md = 0;
   char **lt = 0;
-  unsigned int *di;
+  unsigned int *di, diidx;
+  unsigned int lastdir;
+  int lastdirl;
   unsigned int *fm;
   int cnt, dcnt, cnt2;
   int i, l1, l;
@@ -1865,11 +1875,14 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, char *, int,
 	  return;
 	}
     }
+  lastdir = dcnt;
+  lastdirl = 0;
   for (i = 0; i < cnt; i++)
     {
-      if (di[i] >= dcnt)
+      diidx = di[i];
+      if (diidx >= dcnt)
 	continue;
-      l1 = strlen(dn[di[i]]);
+      l1 = lastdir == diidx ? lastdirl : strlen(dn[diidx]);
       if (l1 == 0)
 	continue;
       l = l1 + strlen(bn[i]) + 1;
@@ -1878,7 +1891,12 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, char *, int,
 	  spacen = l + 16;
 	  space = sat_realloc(space, spacen);
 	}
-      strcpy(space, dn[di[i]]);
+      if (lastdir != diidx)
+	{
+          strcpy(space, dn[diidx]);
+	  lastdir = diidx;
+	  lastdirl = l1;
+	}
       strcpy(space + l1, bn[i]);
       if (md)
 	{
@@ -1903,6 +1921,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, char *, int,
 	}
       (*cb)(cbdata, space, fm[i], md5p);
     }
+  sat_free(space);
   sat_free(lt);
   sat_free(md);
   sat_free(fm);
@@ -1921,6 +1940,99 @@ struct rpm_by_state {
   DB *db;
   int byteswapped;
 };
+
+int
+rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq)
+{
+  char dbpath[PATH_MAX];
+  DB_ENV *dbenv = 0;
+  DB *db = 0;
+  DBC *dbc = 0;
+  int byteswapped;
+  DBT dbkey;
+  DBT dbdata;
+  Id rpmdbid;
+  unsigned char *dp;
+  int dl, cnt;
+
+  if (rpmdbidq)
+    queue_empty(rpmdbidq);
+  cnt = 0;
+
+  if (db_env_create(&dbenv, 0))
+    {
+      perror("db_env_create");
+      return 0;
+    }
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
+#ifdef FEDORA
+  if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0))
+#else
+  if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
+#endif
+    {
+      perror("dbenv open");
+      dbenv->close(dbenv, 0);
+      return 0;
+    }
+  if (db_create(&db, dbenv, 0))
+    {
+      perror("db_create");
+      dbenv->close(dbenv, 0);
+      return 0;
+    }
+  if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
+    {
+      perror("db->open Name index");
+      db->close(db, 0);
+      dbenv->close(dbenv, 0);
+      return 0;
+    }
+  if (db->get_byteswapped(db, &byteswapped))
+    {
+      perror("db->get_byteswapped");
+      db->close(db, 0);
+      dbenv->close(dbenv, 0);
+      return 0;
+    }
+  if (db->cursor(db, NULL, &dbc, 0))
+    {
+      perror("db->cursor");
+      db->close(db, 0);
+      dbenv->close(dbenv, 0);
+      return 0;
+    }
+  memset(&dbkey, 0, sizeof(dbkey));
+  memset(&dbdata, 0, sizeof(dbdata));
+  while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
+    {
+      if (dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
+	continue;
+      dl = dbdata.size;
+      dp = dbdata.data;
+      while(dl >= 8)
+	{
+	  if (byteswapped)
+	    {
+	      ((char *)&rpmdbid)[0] = dp[3];
+	      ((char *)&rpmdbid)[1] = dp[2];
+	      ((char *)&rpmdbid)[2] = dp[1];
+	      ((char *)&rpmdbid)[3] = dp[0];
+	    }
+	  else
+	    memcpy((char *)&rpmdbid, dp, 4);
+	  if (rpmdbidq)
+	    queue_push(rpmdbidq, rpmdbid);
+	  cnt++;
+	  dp += 8;
+	  dl -= 8;
+	}
+    }
+  dbc->c_close(dbc);
+  db->close(db, 0);
+  dbenv->close(dbenv, 0);
+  return cnt;
+}
 
 void *
 rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
