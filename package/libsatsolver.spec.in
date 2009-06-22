@@ -160,6 +160,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %files devel
 %defattr(-,root,root)
 %_libdir/libsatsolver.a
+%_libdir/libsatsolverext.a
 %_libdir/libappsatsolver.a
 %dir /usr/include/satsolver
 /usr/include/satsolver/*
