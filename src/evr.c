@@ -122,7 +122,7 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 
 /* edition (e:v-r) compare */
 int
-evrcmp_str(Pool *pool, const char *evr1, const char *evr2, int mode)
+evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 {
   int r;
   const char *s1, *s2;
@@ -208,7 +208,7 @@ evrcmp_str(Pool *pool, const char *evr1, const char *evr2, int mode)
 }
 
 int
-evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode)
+evrcmp(const Pool *pool, Id evr1id, Id evr2id, int mode)
 {
   const char *evr1, *evr2;
   if (evr1id == evr2id)
@@ -219,7 +219,7 @@ evrcmp(Pool *pool, Id evr1id, Id evr2id, int mode)
 }
 
 int
-evrmatch(Pool *pool, Id evrid, const char *epoch, const char *version, const char *release)
+evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version, const char *release)
 {
   const char *evr1;
   const char *s1;
