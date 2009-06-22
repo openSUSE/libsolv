@@ -184,7 +184,7 @@ extern Id pool_add_solvable(Pool *pool);
 extern Id pool_add_solvable_block(Pool *pool, int count);
 
 extern void pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids);
-static inline Solvable *pool_id2solvable(Pool *pool, Id p)
+static inline Solvable *pool_id2solvable(const Pool *pool, Id p)
 {
   return pool->solvables + p;
 }
