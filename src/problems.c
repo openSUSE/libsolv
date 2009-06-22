@@ -606,7 +606,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
 
 /**************************************************************************/
 
-Id
+unsigned int
 solver_problem_count(Solver *solv)
 {
   return solv->problems.count / 2;
@@ -620,7 +620,7 @@ solver_next_problem(Solver *solv, Id problem)
   return (problem + 1) * 2 - 1 < solv->problems.count ? problem + 1 : 0;
 }
 
-Id
+unsigned int
 solver_solution_count(Solver *solv, Id problem)
 {
   Id solidx = solv->problems.elements[problem * 2 - 1];
@@ -638,7 +638,7 @@ solver_next_solution(Solver *solv, Id problem, Id solution)
   return solv->solutions.elements[solidx + solution + 1] ? solution + 1 : 0;
 }
 
-Id
+unsigned int
 solver_solutionelement_count(Solver *solv, Id problem, Id solution)
 {
   Id solidx = solv->problems.elements[problem * 2 - 1];
