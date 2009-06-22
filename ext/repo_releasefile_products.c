@@ -144,13 +144,7 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
   closedir(dir);
   join_freemem();
 
-  if (!(flags & REPO_NO_INTERNALIZE))
-    {
-      if (!(flags & REPO_REUSE_REPODATA))
-	{
-	  Repodata *data = repo_add_repodata(repo, 0);
-	  repodata_internalize(data);
-	}
-    }
+  if (!(flags & REPO_NO_INTERNALIZE) && (flags & REPO_REUSE_REPODATA) != 0)
+    repodata_internalize(repo_last_repodata(repo));
 }
 

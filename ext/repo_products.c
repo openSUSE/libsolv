@@ -551,6 +551,10 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
   /* no luck. print an error message in case the root argument is wrong */
   perror(fullpath);
   join_freemem();
+
+  /* the least we can do... */
+  if (!(flags & REPO_NO_INTERNALIZE) && (flags & REPO_REUSE_REPODATA) != 0)
+    repodata_internalize(repo_last_repodata(repo));
 }
 
 /* EOF */
