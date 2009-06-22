@@ -108,7 +108,7 @@ struct _Pool {
 
   /* debug mask and callback */
   int  debugmask;
-  void (*debugcallback)(const struct _Pool *, void *data, int type, const char *str);
+  void (*debugcallback)(struct _Pool *, void *data, int type, const char *str);
   void *debugcallbackdata;
 
   /* load callback */
@@ -171,7 +171,7 @@ extern Pool *pool_create(void);
  */
 extern void pool_free(Pool *pool);
 
-extern void pool_debug(const Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
+extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 extern char *pool_alloctmpspace(Pool *pool, int len);
 
@@ -274,7 +274,7 @@ static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
 
 extern void pool_setdebuglevel(Pool *pool, int level);
 
-static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(const struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
+static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
 {
   pool->debugcallback = debugcallback;
   pool->debugcallbackdata = debugcallbackdata;
