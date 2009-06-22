@@ -121,7 +121,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 // for rels (returns name only) and strings
 // 
 const char *
-id2str(Pool *pool, Id id)
+id2str(const Pool *pool, Id id)
 {
   if (ISRELDEP(id))
     {
@@ -147,7 +147,7 @@ static const char *rels[] = {
 
 // get operator for RelId
 const char *
-id2rel(Pool *pool, Id id)
+id2rel(const Pool *pool, Id id)
 {
   Reldep *rd;
   if (!ISRELDEP(id))
@@ -180,7 +180,7 @@ id2rel(Pool *pool, Id id)
 // get e:v.r for Id
 // 
 const char *
-id2evr(Pool *pool, Id id)
+id2evr(const Pool *pool, Id id)
 {
   Reldep *rd;
   if (!ISRELDEP(id))
@@ -192,7 +192,7 @@ id2evr(Pool *pool, Id id)
 }
 
 static int
-dep2strlen(Pool *pool, Id id)
+dep2strlen(const Pool *pool, Id id)
 {
   int l = 0;
 
@@ -207,7 +207,7 @@ dep2strlen(Pool *pool, Id id)
 }
 
 static void
-dep2strcpy(Pool *pool, char *p, Id id, int oldrel)
+dep2strcpy(const Pool *pool, char *p, Id id, int oldrel)
 {
   while (ISRELDEP(id))
     {

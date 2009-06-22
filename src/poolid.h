@@ -28,10 +28,10 @@ typedef struct _Reldep {
 extern Id str2id(Pool *pool, const char *, int);
 extern Id strn2id(Pool *pool, const char *, unsigned int, int);
 extern Id rel2id(Pool *pool, Id, Id, int, int);
-extern const char *id2str(Pool *pool, Id);
-extern const char *dep2str(Pool *pool, Id);
-extern const char *id2rel(Pool *pool, Id);
-extern const char *id2evr(Pool *pool, Id);
+extern const char *id2str(const Pool *pool, Id);
+extern const char *dep2str(Pool *pool, Id); /* might alloc tmpspace */
+extern const char *id2rel(const Pool *pool, Id);
+extern const char *id2evr(const Pool *pool, Id);
 
 extern void pool_shrink_strings(Pool *pool);
 extern void pool_shrink_rels(Pool *pool);

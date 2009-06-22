@@ -108,7 +108,7 @@ struct _Pool {
 
   /* debug mask and callback */
   int  debugmask;
-  void (*debugcallback)(struct _Pool *, void *data, int type, const char *str);
+  void (*debugcallback)(const struct _Pool *, void *data, int type, const char *str);
   void *debugcallbackdata;
 
   /* load callback */
@@ -171,7 +171,7 @@ extern Pool *pool_create(void);
  */
 extern void pool_free(Pool *pool);
 
-extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
+extern void pool_debug(const Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 extern char *pool_alloctmpspace(Pool *pool, int len);
 
@@ -184,7 +184,7 @@ extern Id pool_add_solvable(Pool *pool);
 extern Id pool_add_solvable_block(Pool *pool, int count);
 
 extern void pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids);
-static inline Solvable *pool_id2solvable(Pool *pool, Id p)
+static inline Solvable *pool_id2solvable(const Pool *pool, Id p)
 {
   return pool->solvables + p;
 }
@@ -238,7 +238,7 @@ extern void pool_addfileprovides_ids(Pool *pool, struct _Repo *installed, Id **i
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
 
-static inline int pool_installable(Pool *pool, Solvable *s)
+static inline int pool_installable(const Pool *pool, Solvable *s)
 {
   if (!s->arch || s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
     return 0;
@@ -274,7 +274,7 @@ static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
 
 extern void pool_setdebuglevel(Pool *pool, int level);
 
-static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
+static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(const struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
 {
   pool->debugcallback = debugcallback;
   pool->debugcallbackdata = debugcallbackdata;
