@@ -228,7 +228,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
 }
 
 void
-prune_to_best_arch(Pool *pool, Queue *plist)
+prune_to_best_arch(const Pool *pool, Queue *plist)
 {
   Id a, bestscore;
   Solvable *s;
@@ -359,7 +359,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
  */
 
 void
-prune_best_arch_name_version(Solver *solv, Pool *pool, Queue *plist)
+prune_best_arch_name_version(const Solver *solv, Pool *pool, Queue *plist)
 {
   if (solv && solv->bestSolvableCb)
     { /* The application is responsible for */

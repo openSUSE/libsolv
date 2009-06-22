@@ -18,9 +18,9 @@
 
 /* This functions can be used for sorting solvables to a specific order like architecture, version. */
 /* Solvables which does not fit to the system will be deleted from the list.                        */    
-extern void prune_best_arch_name_version(Solver *solv, Pool *pool, Queue *plist);
+extern void prune_best_arch_name_version(const Solver *solv, Pool *pool, Queue *plist);
 
-extern void prune_to_best_arch(Pool *pool, Queue *plist);
+extern void prune_to_best_arch(const Pool *pool, Queue *plist);
 extern void prune_to_best_version(Pool *pool, Queue *plist);
 
 
