@@ -931,11 +931,11 @@ endElement(void *userData, const char *name)
       {
         int l;
         Id type, index;
-        if (!strcasecmp (pd->tmpattr, "sha") || !strcasecmp (pd->tmpattr, "sha1"))
+        if (!strcasecmp(pd->tmpattr, "sha") || !strcasecmp(pd->tmpattr, "sha1"))
           l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
-        else if (!strcasecmp (pd->tmpattr, "sha256"))
+        else if (!strcasecmp(pd->tmpattr, "sha256"))
           l = SIZEOF_SHA256 * 2, type = REPOKEY_TYPE_SHA256;
-        else if (!strcasecmp (pd->tmpattr, "md5"))
+        else if (!strcasecmp(pd->tmpattr, "md5"))
           l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
         else
           {

@@ -209,6 +209,13 @@ KNOWNID(DELTA_SEQ_NUM,			"delta:seqnum"),
 
 KNOWNID(NAMESPACE_PRODUCTBUDDY,         "namespace:productbuddy"),
 
+KNOWNID(REPOSITORY_REPOMD,		"repository:repomd"),
+KNOWNID(REPOSITORY_REPOMD_TYPE,		"repository:repomd:type"),
+KNOWNID(REPOSITORY_REPOMD_LOCATION,	"repository:repomd:location"),
+KNOWNID(REPOSITORY_REPOMD_TIMESTAMP,	"repository:repomd:timestamp"),
+KNOWNID(REPOSITORY_REPOMD_CHECKSUM,	"repository:repomd:checksum"),
+KNOWNID(REPOSITORY_REPOMD_OPENCHECKSUM,	"repository:repomd:openchecksum"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

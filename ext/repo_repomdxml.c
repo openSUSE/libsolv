@@ -93,6 +93,7 @@ enum state {
   STATE_EXPIRE,
   STATE_KEYWORDS,
   STATE_KEYWORD,
+
   /* normal repomd.xml */
   STATE_REPOMD,
   STATE_REVISION,
@@ -159,6 +160,7 @@ struct parsedata {
   Repo *repo;
   Repodata *data;
   
+  XML_Parser *parser;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
   int timestamp;
@@ -168,6 +170,10 @@ struct parsedata {
   Id ruhandle;
   /* repo products */
   Id rphandle;
+  /* repo data handle */
+  Id rdhandle;
+
+  const char *tmpattr;
 };
 
 /*
@@ -278,13 +284,26 @@ startElement(void *userData, const char *name, const char **atts)
           repodata_set_poolstr(pd->data, pd->ruhandle, REPOSITORY_PRODUCT_CPEID, cpeid);
         break;
       }
-    case STATE_DATA: break;
-    case STATE_LOCATION: break;
-    case STATE_CHECKSUM: break;
-    case STATE_TIMESTAMP: break;
-    case STATE_OPENCHECKSUM: break;
-    case NUMSTATES: break;
-    default: break;
+    case STATE_DATA:
+      {
+        const char *type= find_attr("type", atts);
+        pd->rdhandle = repodata_new_handle(pd->data);
+	if (type)
+          repodata_set_poolstr(pd->data, pd->rdhandle, REPOSITORY_REPOMD_TYPE, type);
+        break;
+      }
+    case STATE_LOCATION:
+      {
+        const char *href = find_attr("href", atts);
+	if (href)
+          repodata_set_str(pd->data, pd->rdhandle, REPOSITORY_REPOMD_LOCATION, href);
+      }
+    case STATE_CHECKSUM:
+    case STATE_OPENCHECKSUM:
+      pd->tmpattr= find_attr("type", atts);
+      break;
+    default:
+      break;
     }
   return;
 }
@@ -316,10 +335,38 @@ endElement(void *userData, const char *name)
       if (pd->timestamp > 0)
         repodata_set_num(pd->data, SOLVID_META, REPOSITORY_TIMESTAMP, pd->timestamp);
       break;
-    case STATE_DATA: break;
+    case STATE_DATA:
+      if (pd->rdhandle)
+        repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_REPOMD, pd->rdhandle);
+      pd->rdhandle = 0;
+      break;
     case STATE_LOCATION: break;
-    case STATE_CHECKSUM: break;
-    case STATE_OPENCHECKSUM: break;
+
+    case STATE_CHECKSUM:
+    case STATE_OPENCHECKSUM:
+      {
+        int l;
+        Id type;
+        if (!strcasecmp(pd->tmpattr, "sha") || !strcasecmp(pd->tmpattr, "sha1"))
+          l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
+        else if (!strcasecmp(pd->tmpattr, "sha256"))
+          l = SIZEOF_SHA256 * 2, type = REPOKEY_TYPE_SHA256;
+        else if (!strcasecmp(pd->tmpattr, "md5"))
+          l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
+        else
+          {
+            fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
+            exit(1);
+          }
+        if (strlen(pd->content) != l)
+          {
+            fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
+            exit(1);
+          }
+        repodata_set_checksum(pd->data, pd->rdhandle, pd->state == STATE_CHECKSUM ? REPOSITORY_REPOMD_CHECKSUM : REPOSITORY_REPOMD_OPENCHECKSUM, type, pd->content);
+        break;
+      }
+
     case STATE_TIMESTAMP:
       {
         /**
@@ -328,6 +375,8 @@ endElement(void *userData, const char *name)
          * the metadata was generated
          */
         int timestamp = atoi(pd->content);
+	if (timestamp)
+          repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_TIMESTAMP, timestamp);
         if (timestamp > pd->timestamp)
           pd->timestamp = timestamp;
         break;
@@ -432,6 +481,7 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
   pd.lcontent = 0;
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
+  pd.parser = &parser;
   XML_SetElementHandler(parser, startElement, endElement);
   XML_SetCharacterDataHandler(parser, characterData);
   for (;;)
