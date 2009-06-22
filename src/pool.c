@@ -738,7 +738,7 @@ pool_addrelproviders(Pool *pool, Id d)
 /*************************************************************************/
 
 void
-pool_debug(Pool *pool, int type, const char *format, ...)
+pool_debug(const Pool *pool, int type, const char *format, ...)
 {
   va_list args;
   char buf[1024];
