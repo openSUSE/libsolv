@@ -2,7 +2,7 @@
 # CMakeLists.txt for sat-solver/tools
 #
 
-ADD_LIBRARY( toolstuff STATIC common_write.c )
+ADD_LIBRARY(toolstuff STATIC common_write.c)
 
 ADD_EXECUTABLE(rpmdb2solv rpmdb2solv.c)
 TARGET_LINK_LIBRARIES(rpmdb2solv toolstuff satsolverext satsolver ${RPMDB_LIBRARY} ${EXPAT_LIBRARY})
@@ -13,7 +13,7 @@ TARGET_LINK_LIBRARIES(rpms2solv toolstuff satsolverext satsolver ${RPMDB_LIBRARY
 ADD_EXECUTABLE(rpmmd2solv rpmmd2solv.c)
 TARGET_LINK_LIBRARIES(rpmmd2solv toolstuff satsolverext satsolver ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
 
-ADD_EXECUTABLE(helix2solv helix2solv.c ${helix2solv_REPOS} )
+ADD_EXECUTABLE(helix2solv helix2solv.c)
 TARGET_LINK_LIBRARIES(helix2solv toolstuff satsolverext satsolver ${EXPAT_LIBRARY})
 
 ADD_EXECUTABLE(susetags2solv susetags2solv.c)
