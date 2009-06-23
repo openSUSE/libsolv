@@ -1,0 +1,2 @@
+ADD_EXECUTABLE(solv solv.c)
+TARGET_LINK_LIBRARIES(solv satsolverext satsolver ${RPMDB_LIBRARY} ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
