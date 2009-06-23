@@ -281,6 +281,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    break;
 	  repo = repo_create(pool, cinfo->alias);
 	  cinfo->repo = repo;
+	  repo->appdata = cinfo;
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
 	  if ((fp = curlfopen(cinfo->baseurl, "repodata/primary.xml.gz", 1)) == 0)
@@ -294,6 +295,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    break;
 	  repo = repo_create(pool, cinfo->alias);
 	  cinfo->repo = repo;
+	  repo->appdata = cinfo;
 	  repo_add_susetags(repo, fp, 0, 0, 0);
 	  fclose(fp);
 	  break;
@@ -403,7 +405,7 @@ yesno(const char *str)
 
 struct fcstate {
   FILE **newpkgsfps;
-  Id *newpkgsps;
+  Queue *checkq;
   int newpkgscnt;
   void *rpmdbstate;
 };
@@ -433,7 +435,7 @@ fc_cb(Pool *pool, Id p, void *cbdata)
        return rpm_byrpmdbid(rpmdbid, 0, &fcstate->rpmdbstate);
     }
   for (i = 0; i < fcstate->newpkgscnt; i++)
-    if (fcstate->newpkgsps[i] == p)
+    if (fcstate->checkq->elements[i] == p)
       break;
   if (i == fcstate->newpkgscnt)
     return 0;
@@ -492,7 +494,6 @@ main(int argc, char **argv)
   char inbuf[128], *ip;
   int updateall = 0;
   FILE **newpkgsfps = 0;
-  Id *newpkgsps = 0;
   struct fcstate fcstate;
 
   if (!strcmp(argv[1], "install") || !strcmp(argv[1], "in"))
@@ -630,29 +631,25 @@ rerunsolver:
       Queue conflicts;
       printf("Downloading %d packages\n", newpkgs);
       newpkgsfps = sat_calloc(newpkgs, sizeof(*newpkgsfps));
-      newpkgsps = sat_calloc(newpkgs, sizeof(Id));
       for (i = 0; i < newpkgs; i++)
 	{
-	  int j;
 	  unsigned int medianr;
 	  char *loc;
 	  Solvable *s;
 	  struct repoinfo *cinfo;
 
 	  p = checkq.elements[i];
-	  newpkgsps[i] = p;
 	  s = pool_id2solvable(pool, p);
+	  cinfo = s->repo->appdata;
+	  if (!cinfo)
+	    {
+	      printf("%s: no repository information\n", s->repo->name);
+	      exit(1);
+	    }
 	  loc = solvable_get_location(s, &medianr);
-	  cinfo = 0;
-	  for (j = 0; j < nrepoinfos; j++)
-	    if (s->repo == repoinfos[j].repo)
-	      {
-		cinfo = repoinfos + j;
-		break;
-	      }
 	  if ((newpkgsfps[i] = curlfopen(cinfo->baseurl, loc, 0)) == 0)
 	    {
-	      printf("%s: %s not found\n", cinfo->alias, loc);
+	      printf("%s: %s not found\n", s->repo->name, loc);
 	      exit(1);
 	    }
 	}
@@ -660,15 +657,14 @@ rerunsolver:
       queue_init(&conflicts);
       fcstate.rpmdbstate = 0;
       fcstate.newpkgscnt = newpkgs;
+      fcstate.checkq = &checkq;
       fcstate.newpkgsfps = newpkgsfps;
-      fcstate.newpkgsps = newpkgsps;
       pool_findfileconflicts(pool, &checkq, newpkgs, &conflicts, &fc_cb, &fcstate);
       if (conflicts.count)
 	{
 	  for (i = 0; i < newpkgs; i++)
 	    fclose(newpkgsfps[i]);
 	  sat_free(newpkgsfps);
-	  sat_free(newpkgsps);
 	  solver_free(solv);
 
 	  printf("\n");
@@ -718,7 +714,7 @@ rerunsolver:
 	case SOLVER_TRANSACTION_MULTIINSTALL:
 	  printf("install %s\n", solvid2str(pool, p));
 	  for (j = 0; j < newpkgs; j++)
-	    if (newpkgsps[j] == p)
+	    if (checkq.elements[j] == p)
 	      break;
 	  fp = j < newpkgs ? newpkgsfps[j] : 0;
 	  rewind(fp);
@@ -735,8 +731,9 @@ rerunsolver:
     if (newpkgsfps[i])
       fclose(newpkgsfps[i]);
   sat_free(newpkgsfps);
-  sat_free(newpkgsps);
+  queue_free(&checkq);
   solver_free(solv);
+  queue_free(&job);
   pool_free(pool);
   exit(0);
 }
