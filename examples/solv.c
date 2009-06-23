@@ -1,3 +1,17 @@
+/*
+ * Copyright (c) 2009, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
+/* solv, a little software installer demoing the sat solver library */
+
+/* things missing:
+ * - repository data caching
+ * - signature verification
+ */
+
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -23,7 +37,6 @@
 #include "repo_repomdxml.h"
 #include "pool_fileconflicts.h"
 
-/* solv, a little demo application */
 
 struct repoinfo {
   Repo *repo;
@@ -493,7 +506,7 @@ main(int argc, char **argv)
   Transaction *trans;
   char inbuf[128], *ip;
   int updateall = 0;
-  FILE **newpkgsfps = 0;
+  FILE **newpkgsfps;
   struct fcstate fcstate;
 
   if (!strcmp(argv[1], "install") || !strcmp(argv[1], "in"))
@@ -530,8 +543,10 @@ main(int argc, char **argv)
       printf("nothing matched\n");
       exit(1);
     }
+
   if (!mode)
     {
+      /* show mode, no solver needed */
       for (i = 0; i < job.count; i += 2)
 	{
 	  FOR_JOB_SELECT(p, pp, job.elements[i], job.elements[i + 1])
@@ -542,6 +557,7 @@ main(int argc, char **argv)
 	}
       exit(0);
     }
+
   // add mode
   for (i = 0; i < job.count; i += 2)
     job.elements[i] |= mode;
@@ -626,9 +642,10 @@ rerunsolver:
   trans = &solv->trans;
   queue_init(&checkq);
   newpkgs = transaction_installedresult(trans, &checkq);
+  newpkgsfps = 0;
+
   if (newpkgs)
     {
-      Queue conflicts;
       printf("Downloading %d packages\n", newpkgs);
       newpkgsfps = sat_calloc(newpkgs, sizeof(*newpkgsfps));
       for (i = 0; i < newpkgs; i++)
@@ -653,6 +670,12 @@ rerunsolver:
 	      exit(1);
 	    }
 	}
+    }
+
+  if (newpkgs)
+    {
+      Queue conflicts;
+
       printf("Searching for file conflicts\n");
       queue_init(&conflicts);
       fcstate.rpmdbstate = 0;
@@ -662,29 +685,26 @@ rerunsolver:
       pool_findfileconflicts(pool, &checkq, newpkgs, &conflicts, &fc_cb, &fcstate);
       if (conflicts.count)
 	{
-	  for (i = 0; i < newpkgs; i++)
-	    fclose(newpkgsfps[i]);
-	  sat_free(newpkgsfps);
-	  solver_free(solv);
-
 	  printf("\n");
 	  for (i = 0; i < conflicts.count; i += 5)
 	    printf("file %s of package %s conflicts with package %s\n", id2str(pool, conflicts.elements[i]), solvid2str(pool, conflicts.elements[i + 1]), solvid2str(pool, conflicts.elements[i + 3]));
 	  printf("\n");
-	  if (!yesno("Re-run solver (y/n)? "))
+	  if (yesno("Re-run solver (y/n/q)? "))
 	    {
-	      printf("Abort.\n");
-	      exit(1);
+	      for (i = 0; i < newpkgs; i++)
+		fclose(newpkgsfps[i]);
+	      newpkgsfps = sat_free(newpkgsfps);
+	      solver_free(solv);
+	      pool_add_fileconflicts_deps(pool, &conflicts);
+	      pool_createwhatprovides(pool);	/* Hmm... */
+	      goto rerunsolver;
 	    }
-	  pool_add_fileconflicts_deps(pool, &conflicts);
-	  pool_createwhatprovides(pool);
-	  goto rerunsolver;
 	}
       queue_free(&conflicts);
     }
-  transaction_order(trans, 0);
 
   printf("Committing transaction:\n\n");
+  transaction_order(trans, 0);
   for (i = 0; i < trans->steps.count; i++)
     {
       char rpmname[256];
@@ -727,6 +747,7 @@ rerunsolver:
 	  break;
 	}
     }
+
   for (i = 0; i < newpkgs; i++)
     if (newpkgsfps[i])
       fclose(newpkgsfps[i]);
