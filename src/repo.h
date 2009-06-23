@@ -22,6 +22,8 @@
 typedef struct _Repo {
   const char *name;
   Id repoid;			/* our id */
+  void *appdata;		/* application private pointer */
+
   Pool *pool;			/* pool containing repo data */
 
   int start;			/* start of this repo solvables within pool->solvables */

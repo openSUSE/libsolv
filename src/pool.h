@@ -52,6 +52,8 @@ typedef struct _Repopos {
 } Repopos;
 
 struct _Pool {
+  void *appdata;		/* application private pointer */
+
   struct _Stringpool ss;
 
   Reldep *rels;			/* table of rels: Id -> Reldep */
