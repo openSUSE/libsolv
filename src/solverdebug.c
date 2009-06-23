@@ -401,7 +401,7 @@ void
 solver_printtransaction(Solver *solv)
 {
   Transaction *trans = &solv->trans;
-  Pool *pool = solv->pool;
+  Pool *pool = trans->pool;
   Queue classes, pkgs;
   int i, j, mode, l, linel;
   char line[76];

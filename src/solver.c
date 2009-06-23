@@ -2699,7 +2699,7 @@ solver_solve(Solver *solv, Queue *job)
 		continue;
 	      if (!solv->updatemap.size)
 		map_grow(&solv->updatemap, pool->nsolvables);
-	      MAPSET(&solv->updatemap, p);
+	      MAPSET(&solv->updatemap, p - solv->installed->start);
 	    }
 	  break;
 	case SOLVER_WEAKENDEPS:
