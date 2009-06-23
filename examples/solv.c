@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <fcntl.h>
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -239,6 +240,7 @@ curlfopen(char *baseurl, char *file, int uncompress)
       cio.close = cookie_gzclose;
       return fopencookie(gzf, "r", cio);
     }
+  fcntl(fd, F_SETFD, FD_CLOEXEC);
   return fdopen(fd, "r");
 }
 
@@ -441,7 +443,7 @@ fc_cb(Pool *pool, Id p, void *cbdata)
 }
 
 void
-runrpm(const char *arg, const char *name, int dupfd3, FILE **newpkgsfps, int newpkgs)
+runrpm(const char *arg, const char *name, int dupfd3)
 {
   pid_t pid;
   int status;
@@ -453,20 +455,13 @@ runrpm(const char *arg, const char *name, int dupfd3, FILE **newpkgsfps, int new
     }
   if (pid == 0)
     {
-      int i;
-      for (i = 0; i < newpkgs; i++)
-	{
-	  if (!newpkgsfps[i])
-	    continue;
-	  if (dupfd3 != -1 && fileno(newpkgsfps[i]) == dupfd3)
-	    continue;
-	  close(fileno(newpkgsfps[i]));
-	}
       if (dupfd3 != -1 && dupfd3 != 3)
 	{
 	  dup2(dupfd3, 3);
 	  close(dupfd3);
 	}
+      if (dupfd3 != -1)
+	fcntl(3, F_SETFD, 0);	/* clear CLOEXEC */
       if (strcmp(arg, "-e") == 0)
         execlp("rpm", "rpm", arg, "--nodeps", "--nodigest", "--nosignature", name, (char *)0);
       else
@@ -675,6 +670,7 @@ rerunsolver:
 	  sat_free(newpkgsfps);
 	  sat_free(newpkgsps);
 	  solver_free(solv);
+
 	  printf("\n");
 	  for (i = 0; i < conflicts.count; i += 5)
 	    printf("file %s of package %s conflicts with package %s\n", id2str(pool, conflicts.elements[i]), solvid2str(pool, conflicts.elements[i + 1]), solvid2str(pool, conflicts.elements[i + 3]));
@@ -716,7 +712,7 @@ rerunsolver:
 	  if (evrp > evr && evrp[0] == ':' && evrp[1])
 	    evr = evrp + 1;
 	  sprintf(rpmname, "%s-%s.%s", id2str(pool, s->name), evr, id2str(pool, s->arch));
-	  runrpm("-e", rpmname, -1, newpkgsfps, newpkgs);
+	  runrpm("-e", rpmname, -1);
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_MULTIINSTALL:
@@ -727,7 +723,7 @@ rerunsolver:
 	  fp = j < newpkgs ? newpkgsfps[j] : 0;
 	  rewind(fp);
 	  lseek(fileno(fp), 0, SEEK_SET);
-	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp), newpkgsfps, newpkgs);
+	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp));
 	  fclose(fp);
 	  newpkgsfps[j] = 0;
 	  break;
