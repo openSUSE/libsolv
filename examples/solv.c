@@ -441,7 +441,7 @@ fc_cb(Pool *pool, Id p, void *cbdata)
 }
 
 void
-runrpm(const char *arg, const char *name)
+runrpm(const char *arg, const char *name, int dupfd3, FILE **newpkgsfps, int newpkgs)
 {
   pid_t pid;
   int status;
@@ -453,6 +453,20 @@ runrpm(const char *arg, const char *name)
     }
   if (pid == 0)
     {
+      int i;
+      for (i = 0; i < newpkgs; i++)
+	{
+	  if (!newpkgsfps[i])
+	    continue;
+	  if (dupfd3 != -1 && fileno(newpkgsfps[i]) == dupfd3)
+	    continue;
+	  close(fileno(newpkgsfps[i]));
+	}
+      if (dupfd3 != -1 && dupfd3 != 3)
+	{
+	  dup2(dupfd3, 3);
+	  close(dupfd3);
+	}
       if (strcmp(arg, "-e") == 0)
         execlp("rpm", "rpm", arg, "--nodeps", "--nodigest", "--nosignature", name, (char *)0);
       else
@@ -486,15 +500,6 @@ main(int argc, char **argv)
   Id *newpkgsps = 0;
   struct fcstate fcstate;
 
-  pool = pool_create();
-  // pool_setdebuglevel(pool, 2);
-  setarch(pool);
-  repoinfos = read_repoinfos(pool, "/etc/zypp/repos.d", &nrepoinfos);
-  read_repos(pool, repoinfos, nrepoinfos);
-  // FOR_REPOS(i, repo)
-  //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
-  pool_addfileprovides(pool);
-  pool_createwhatprovides(pool);
   if (!strcmp(argv[1], "install") || !strcmp(argv[1], "in"))
     mode = SOLVER_INSTALL;
   else if (!strcmp(argv[1], "erase") || !strcmp(argv[1], "rm"))
@@ -508,6 +513,17 @@ main(int argc, char **argv)
       fprintf(stderr, "Usage: solv install|erase|update|show <select>\n");
       exit(1);
     }
+
+  pool = pool_create();
+  // pool_setdebuglevel(pool, 2);
+  setarch(pool);
+  repoinfos = read_repoinfos(pool, "/etc/zypp/repos.d", &nrepoinfos);
+  read_repos(pool, repoinfos, nrepoinfos);
+  // FOR_REPOS(i, repo)
+  //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
+  pool_addfileprovides(pool);
+  pool_createwhatprovides(pool);
+
   queue_init(&job);
   for (i = 2; i < argc; i++)
     mkselect(pool, argv[i], 0, &job);
@@ -523,7 +539,10 @@ main(int argc, char **argv)
       for (i = 0; i < job.count; i += 2)
 	{
 	  FOR_JOB_SELECT(p, pp, job.elements[i], job.elements[i + 1])
-	    printf("  - %s\n", solvid2str(pool, p));
+	    {
+	      Solvable *s = pool_id2solvable(pool, p);
+	      printf("  - %s [%s]\n", solvable2str(pool, s), s->repo->name);
+	    }
 	}
       exit(0);
     }
@@ -673,7 +692,7 @@ rerunsolver:
     }
   transaction_order(trans, 0);
 
-  printf("Committing transaction:\n");
+  printf("Committing transaction:\n\n");
   for (i = 0; i < trans->steps.count; i++)
     {
       char rpmname[256];
@@ -697,7 +716,7 @@ rerunsolver:
 	  if (evrp > evr && evrp[0] == ':' && evrp[1])
 	    evr = evrp + 1;
 	  sprintf(rpmname, "%s-%s.%s", id2str(pool, s->name), evr, id2str(pool, s->arch));
-	  runrpm("-e", rpmname);
+	  runrpm("-e", rpmname, -1, newpkgsfps, newpkgs);
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_MULTIINSTALL:
@@ -708,15 +727,17 @@ rerunsolver:
 	  fp = j < newpkgs ? newpkgsfps[j] : 0;
 	  rewind(fp);
 	  lseek(fileno(fp), 0, SEEK_SET);
-	  sprintf(rpmname, "/dev/fd/%d", fileno(fp));
-	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", rpmname);
+	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp), newpkgsfps, newpkgs);
+	  fclose(fp);
+	  newpkgsfps[j] = 0;
 	  break;
 	default:
 	  break;
 	}
     }
   for (i = 0; i < newpkgs; i++)
-    fclose(newpkgsfps[i]);
+    if (newpkgsfps[i])
+      fclose(newpkgsfps[i]);
   sat_free(newpkgsfps);
   sat_free(newpkgsps);
   solver_free(solv);

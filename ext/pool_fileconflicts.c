@@ -104,6 +104,7 @@ finddirs_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
   /* found a conflict, this dir is used in multiple packages */
   if (cbdata->dirmap[2 * h + 1] != -1)
     {
+      MAPSET(&cbdata->idxmap, cbdata->dirmap[2 * h + 1]);
       cbdata->dirmap[2 * h + 1] = -1;
       cbdata->dirconflicts++;
     }

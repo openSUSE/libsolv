@@ -666,7 +666,34 @@ transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
     }
 }
 
+int
+transaction_installedresult(Transaction *trans, Queue *installedq)
+{
+  Pool *pool = trans->pool;
+  Repo *installed = pool->installed;
+  Solvable *s;
+  int i, cutoff;
+  Id p;
 
+  queue_empty(installedq);
+  /* first the new installs, than the kept packages */
+  for (i = 0; i < trans->steps.count; i++)
+    {
+      p = trans->steps.elements[i];
+      s = pool->solvables + p;
+      if (installed && s->repo == installed)
+	continue;
+      queue_push(installedq, p);
+    }
+  cutoff = installedq->count;
+  if (installed)
+    {
+      FOR_REPO_SOLVABLES(installed, p, s)
+	if (!MAPTST(&trans->transactsmap, p))
+          queue_push(installedq, p);
+    }
+  return cutoff;
+}
 
 struct _TransactionElement {
   Id p;		/* solvable id */

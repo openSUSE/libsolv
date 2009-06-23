@@ -98,6 +98,11 @@ extern Id   transaction_type(Transaction *trans, Id p, int mode);
 extern void transaction_classify(Transaction *trans, int mode, Queue *classes);
 extern void transaction_classify_pkgs(Transaction *trans, int mode, Id type, Id from, Id to, Queue *pkgs);
 
+/* return all packages that will be installed after the transaction is run*/
+/* The new packages are put at the head of the queue, the number of new
+   packages is returned */
+extern int transaction_installedresult(Transaction *trans, Queue *installedq);
+
 /* order a transaction */
 extern void transaction_order(Transaction *trans, int flags);
 
