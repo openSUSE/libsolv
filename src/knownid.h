@@ -173,6 +173,10 @@ KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),
 /* argh */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
 KNOWNID(SUSETAGS_DESCRDIR,		"susetags:descrdir"),
+KNOWNID(SUSETAGS_FILE,			"susetags:file"),
+KNOWNID(SUSETAGS_FILE_NAME,		"susetags:file:name"),
+KNOWNID(SUSETAGS_FILE_TYPE,		"susetags:file:type"),
+KNOWNID(SUSETAGS_FILE_CHECKSUM,		"susetags:file:checksum"),
 
 /* timestamp then the repository was generated */
 KNOWNID(REPOSITORY_TIMESTAMP,		"repository:timestamp"),

@@ -303,13 +303,41 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      continue;
 	    }
 
-	  /* XXX: add those to SOLVID_META, too */
-	  if (istag ("META"))
-	    continue;
-	  if (istag ("HASH"))
-	    continue;
-	  if (istag ("KEY"))
-	    continue;
+	  if (istag ("META") || istag ("HASH") || istag ("KEY"))
+	    {
+	      char *checksumtype, *checksum;
+	      Id fh, type;
+	      int l;
+
+	      if ((checksumtype = splitword(&value)) == 0)
+		continue;
+	      if ((checksum = splitword(&value)) == 0)
+		continue;
+	      if (!*value)
+		continue;
+	      if (!strcasecmp(checksumtype, "sha") || !strcasecmp(checksumtype, "sha1"))
+	        l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
+	      else if (!strcasecmp(checksumtype, "sha256"))
+	        l = SIZEOF_SHA256 * 2, type = REPOKEY_TYPE_SHA256;
+	      else if (!strcasecmp(checksumtype, "md5"))
+	        l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
+	      else
+	        {
+		  fprintf(stderr, "Unknown checksum type: %s: %s\n", value, checksumtype);
+		  exit(1);
+	        }
+	      if (strlen(checksum) != l)
+	        {
+		  fprintf(stderr, "Invalid checksum length: %s: for %s\n", value, checksum);
+		  exit(1);
+	        }
+	      fh = repodata_new_handle(data);
+	      repodata_set_poolstr(data, fh, SUSETAGS_FILE_TYPE, key);
+	      repodata_set_str(data, fh, SUSETAGS_FILE_NAME, value);
+	      repodata_set_checksum(data, fh, SUSETAGS_FILE_CHECKSUM, type, checksum);
+	      repodata_add_flexarray(data, SOLVID_META, SUSETAGS_FILE, fh);
+	      continue;
+	    }
 
 	  if ((code10 && istag ("PRODUCT"))
 	      || (code11 && istag ("NAME")))
