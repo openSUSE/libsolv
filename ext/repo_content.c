@@ -205,6 +205,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   int contentstyle = 0;
   char *descrdir = 0;
   char *datadir = 0;
+  char *defvendor = 0;
 
   int i = 0;
 
@@ -272,13 +273,20 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 #define code10 (contentstyle == 10)
 #define code11 (contentstyle == 11)
 
+
 	  if (istag ("CONTENTSTYLE"))
 	    {
+	      if (contentstyle)
+	        pool_debug(pool, SAT_ERROR, "repo_content: 'CONTENTSTYLE' must be first line of 'content'\n");
 	      contentstyle = atoi(value);
 	      continue;
 	    }
 	  if (!contentstyle)
 	    contentstyle = 10;
+
+	  /* repository tags */
+          /* we also replicate some of them into the product solvables
+           * to be backward compatible */
 
 	  if (istag ("DESCRDIR"))
 	    {
@@ -300,6 +308,17 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      if (s)
 	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, value);
 	      datadir = strdup(value);
+	      continue;
+	    }
+	  if (istag ("VENDOR"))
+	    {
+	      if (defvendor)
+		free(defvendor);
+	      else
+	        repo_set_poolstr(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR, value);
+	      if (s)
+		s->vendor = str2id(pool, value, 1);
+	      defvendor = strdup(value);
 	      continue;
 	    }
 
@@ -339,6 +358,8 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      continue;
 	    }
 
+	  /* product tags */
+
 	  if ((code10 && istag ("PRODUCT"))
 	      || (code11 && istag ("NAME")))
 	    {
@@ -368,6 +389,8 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, datadir);
 	      if (descrdir)
 	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DESCRDIR, descrdir);
+	      if (defvendor)
+		s->vendor = str2id(pool, defvendor, 1);
 	      continue;
 	    }
 
@@ -402,7 +425,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	    repo_set_str(repo, s - pool->solvables, pool_id2langid(pool, SOLVABLE_SUMMARY, key + 6, 1), value);
 	  else if (istag ("FLAGS"))
 	    add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
-	  else if (istag ("VENDOR"))
+	  else if (istag ("VENDOR"))	/* actually already handled above */
 	    s->vendor = str2id(pool, value, 1);
           else if (istag ("BASEARCHS"))
             {
@@ -424,10 +447,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	   *
 	   */
 
-	  else if (code10 && istag ("CONTENTSTYLE"))
-	    /* CONTENTSTYLE must be first line */
-	    pool_debug(pool, SAT_ERROR, "repo_content: 'CONTENTSTYLE' must be first line of 'content'\n");
-	  else if (code10 && istag ("DISTPRODUCT"))
+	  if (code10 && istag ("DISTPRODUCT"))
 	    /* DISTPRODUCT is for registration and Yast, not for the solver. */
 	    repo_set_str(repo, s - pool->solvables, PRODUCT_DISTPRODUCT, value);
 	  else if (code10 && istag ("DISTVERSION"))
@@ -473,6 +493,8 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
     free(datadir);
   if (descrdir)
     free(descrdir);
+  if (defvendor)
+    free(defvendor);
 
   if (!s || !s->name)
     {
