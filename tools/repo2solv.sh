@@ -7,7 +7,7 @@
 get_DESCRDIR () {
   local d=$(grep '^DESCRDIR' content | sed 's/^DESCRDIR[[:space:]]\+\(.*[^[:space:]]\)[[:space:]]*$/\1/')
   if  test -z "$d"; then
-    echo suse/setup/desc
+    echo suse/setup/descr
   else
     echo ${d}
   fi
