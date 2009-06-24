@@ -144,11 +144,8 @@ main(int argc, char **argv)
 	  perror(contentfile);
 	  exit(1);
 	}
-      repo_add_content(repo, fp, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
-      if (repo->start < repo->end)
-        if (!strncmp(id2str(pool, pool->solvables[repo->start].name), "product:", 8))
-	  defvendor = pool->solvables[repo->start].vendor;
-      fclose(fp);
+      repo_add_content(repo, fp, REPO_REUSE_REPODATA);
+      defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
     }
 
   if (attrname)
