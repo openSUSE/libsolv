@@ -108,3 +108,31 @@ sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, cons
 {
   qsort_r(base, nmemb, size, compar, compard);
 }
+
+char *
+sat_dupjoin(const char *str1, const char *str2, const char *str3)
+{
+  int l1, l2, l3;
+  char *s, *str;
+  l1 = str1 ? strlen(str1) : 0;
+  l2 = str2 ? strlen(str2) : 0;
+  l3 = str3 ? strlen(str3) : 0;
+  s = str = sat_malloc(l1 + l2 + l3 + 1);
+  if (l1)
+    {
+      strcpy(s, str1);
+      s += l1;
+    }
+  if (l2)
+    {
+      strcpy(s, str2);
+      s += l2;
+    }
+  if (l3)
+    {
+      strcpy(s, str3);
+      s += l3;
+    }
+  *s = 0;
+  return str;
+}
