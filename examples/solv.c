@@ -32,11 +32,16 @@
 #include "solverdebug.h"
 
 #include "repo_rpmdb.h"
+#include "repo_products.h"
 #include "repo_rpmmd.h"
 #include "repo_susetags.h"
 #include "repo_repomdxml.h"
+#include "repo_content.h"
 #include "pool_fileconflicts.h"
 
+
+#define ZYPP_REPOINFO_PATH "/etc/zypp/repos.d"
+#define ZYPP_PRODUCTS_PATH "/etc/products.d"
 
 struct repoinfo {
   Repo *repo;
@@ -150,13 +155,6 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    cinfo->keeppackages = *vp == '0' ? 0 : 1;
 	}
       fclose(fp);
-      if (cinfo->type == TYPE_SUSETAGS && cinfo->baseurl)
-	{
-	  char *old = cinfo->baseurl;
-	  cinfo->baseurl = sat_malloc(5 + strlen(old) + 1);
-	  sprintf(cinfo->baseurl, "%s/suse", old);
-	  free(old);
-	}
       cinfo = 0;
     }
   closedir(dir);
@@ -237,6 +235,12 @@ curlfopen(const char *baseurl, const char *file, int uncompress)
     }
   while (waitpid(pid, &status, 0) != pid)
     ;
+  if (lseek(fd, 0, SEEK_END) == 0)
+    {
+      /* empty file */
+      close(fd);
+      return 0;
+    }
   lseek(fd, 0, SEEK_SET);
   if (uncompress)
     {
@@ -279,10 +283,14 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   FILE *fp;
   Dataiterator di;
   const char *primaryfile;
+  const char *descrdir;
+  int defvendor;
 
   printf("reading rpm database\n");
   repo = repo_create(pool, "@System");
-  repo_add_rpmdb(repo, 0, 0, 0);
+  repo_add_products(repo, ZYPP_PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
+  repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
+  
   pool_set_installed(pool, repo);
   for (i = 0; i < nrepoinfos; i++)
     {
@@ -318,12 +326,24 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  break;
         case TYPE_SUSETAGS:
 	  printf("reading susetags repo '%s'\n", cinfo->alias);
-	  if ((fp = curlfopen(cinfo->baseurl, "setup/descr/packages.gz", 1)) == 0)
-	    break;
 	  repo = repo_create(pool, cinfo->alias);
 	  cinfo->repo = repo;
 	  repo->appdata = cinfo;
-	  repo_add_susetags(repo, fp, 0, 0, 0);
+	  descrdir = 0;
+	  defvendor = 0;
+	  if ((fp = curlfopen(cinfo->baseurl, "content", 0)) != 0)
+	    {
+	      repo_add_content(repo, fp, 0);
+	      fclose(fp);
+	      defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
+	      descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
+	    }
+	  if (!descrdir)
+	    descrdir = "suse/setup/descr";
+	  if ((fp = curlfopen(cinfo->baseurl, pool_tmpjoin(pool, descrdir, "/packages.gz", 0), 1)) == 0)
+	    if ((fp = curlfopen(cinfo->baseurl, pool_tmpjoin(pool, descrdir, "/packages", 0), 0)) == 0)
+	      break;
+	  repo_add_susetags(repo, fp, defvendor, 0, 0);
 	  fclose(fp);
 	  break;
 	default:
@@ -540,7 +560,7 @@ main(int argc, char **argv)
   pool = pool_create();
   // pool_setdebuglevel(pool, 2);
   setarch(pool);
-  repoinfos = read_repoinfos(pool, "/etc/zypp/repos.d", &nrepoinfos);
+  repoinfos = read_repoinfos(pool, ZYPP_REPOINFO_PATH, &nrepoinfos);
   read_repos(pool, repoinfos, nrepoinfos);
   // FOR_REPOS(i, repo)
   //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
@@ -575,6 +595,11 @@ main(int argc, char **argv)
   // add mode
   for (i = 0; i < job.count; i += 2)
     job.elements[i] |= mode;
+
+  // multiversion test
+  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae", 1));
+  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae-base", 1));
+  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae-extra", 1));
 
 rerunsolver:
   for (;;)
@@ -678,6 +703,11 @@ rerunsolver:
 	      exit(1);
 	    }
 	  loc = solvable_get_location(s, &medianr);
+	  if (cinfo->type == TYPE_SUSETAGS)
+	    {
+	      const char *datadir = repo_lookup_str(cinfo->repo, SOLVID_META, SUSETAGS_DATADIR);
+	      loc = pool_tmpjoin(pool, datadir ? datadir : "suse", "/", loc);
+	    }
 	  if ((newpkgsfps[i] = curlfopen(cinfo->baseurl, loc, 0)) == 0)
 	    {
 	      printf("%s: %s not found\n", s->repo->name, loc);
