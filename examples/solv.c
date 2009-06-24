@@ -306,6 +306,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repo = repo_create(pool, cinfo->alias);
 	  cinfo->repo = repo;
 	  repo->appdata = cinfo;
+	  repo->priority = 99 - cinfo->priority;
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
 	  primaryfile = 0;
@@ -329,6 +330,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repo = repo_create(pool, cinfo->alias);
 	  cinfo->repo = repo;
 	  repo->appdata = cinfo;
+	  repo->priority = 99 - cinfo->priority;
 	  descrdir = 0;
 	  defvendor = 0;
 	  if ((fp = curlfopen(cinfo->baseurl, "content", 0)) != 0)
