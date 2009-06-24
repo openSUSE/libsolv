@@ -40,8 +40,13 @@
 #include "pool_fileconflicts.h"
 
 
-#define ZYPP_REPOINFO_PATH "/etc/zypp/repos.d"
-#define ZYPP_PRODUCTS_PATH "/etc/products.d"
+#ifdef FEDORA
+# define REPOINFO_PATH "/etc/yum.repos.d"
+#else
+# define REPOINFO_PATH "/etc/zypp/repos.d"
+# define PRODUCTS_PATH "/etc/products.d"
+#endif
+
 
 struct repoinfo {
   Repo *repo;
@@ -53,13 +58,15 @@ struct repoinfo {
   char *baseurl;
   char *path;
   int type;
+  int gpgcheck;
   int priority;
   int keeppackages;
 };
 
-#define TYPE_UNKNOWN 0
-#define TYPE_SUSETAGS 1
-#define TYPE_RPMMD 2
+#define TYPE_UNKNOWN	0
+#define TYPE_SUSETAGS	1
+#define TYPE_RPMMD	2
+#define TYPE_PLAINDIR	3
 
 struct repoinfo *
 read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
@@ -116,6 +123,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	      cinfo = repoinfos + nrepoinfos++;
 	      memset(cinfo, 0, sizeof(*cinfo));
 	      cinfo->alias = strdup(kp + 1);
+	      cinfo->gpgcheck = 1;
+	      cinfo->type = TYPE_RPMMD;
 	      continue;
 	    }
           vp = strchr(kp, '=');
@@ -136,6 +145,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    cinfo->enabled = *vp == '0' ? 0 : 1;
 	  else if (!strcmp(kp, "autorefresh"))
 	    cinfo->autorefresh = *vp == '0' ? 0 : 1;
+	  else if (!strcmp(kp, "gpgcheck"))
+	    cinfo->gpgcheck = *vp == '0' ? 0 : 1;
 	  else if (!strcmp(kp, "baseurl"))
 	    cinfo->baseurl = strdup(vp);
 	  else if (!strcmp(kp, "path"))
@@ -146,6 +157,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	        cinfo->type = TYPE_SUSETAGS;
 	      else if (!strcmp(vp, "rpm-md"))
 	        cinfo->type = TYPE_RPMMD;
+	      else if (!strcmp(vp, "plaindir"))
+	        cinfo->type = TYPE_PLAINDIR;
 	      else
 	        cinfo->type = TYPE_UNKNOWN;
 	    }
@@ -288,7 +301,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 
   printf("reading rpm database\n");
   repo = repo_create(pool, "@System");
-  repo_add_products(repo, ZYPP_PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
+#ifdef PRODUCTS_PATH
+  repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
+#endif
   repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
   
   pool_set_installed(pool, repo);
@@ -592,7 +607,7 @@ main(int argc, char **argv)
   pool->nscallback = nscallback;
   // pool_setdebuglevel(pool, 2);
   setarch(pool);
-  repoinfos = read_repoinfos(pool, ZYPP_REPOINFO_PATH, &nrepoinfos);
+  repoinfos = read_repoinfos(pool, REPOINFO_PATH, &nrepoinfos);
   read_repos(pool, repoinfos, nrepoinfos);
   // FOR_REPOS(i, repo)
   //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
@@ -606,7 +621,7 @@ main(int argc, char **argv)
     updateall = 1;
   else if (!job.count)
     {
-      printf("nothing matched\n");
+      printf("no package matched\n");
       exit(1);
     }
 
@@ -786,8 +801,7 @@ rerunsolver:
   transaction_order(trans, 0);
   for (i = 0; i < trans->steps.count; i++)
     {
-      char rpmname[256];
-      const char *evr, *evrp;
+      const char *evr, *evrp, *nvra;
       Solvable *s;
       int j;
       FILE *fp;
@@ -801,15 +815,15 @@ rerunsolver:
 	  printf("erase %s\n", solvid2str(pool, p));
 	  if (!s->repo->rpmdbid || !s->repo->rpmdbid[p - s->repo->start])
 	    continue;
-	  if (strlen(solvid2str(pool, p)) > 255)
-	    continue;
+	  /* strip epoch from evr */
 	  evr = evrp = id2str(pool, s->evr);
 	  while (*evrp >= '0' && *evrp <= '9')
 	    evrp++;
 	  if (evrp > evr && evrp[0] == ':' && evrp[1])
 	    evr = evrp + 1;
-	  sprintf(rpmname, "%s-%s.%s", id2str(pool, s->name), evr, id2str(pool, s->arch));
-	  runrpm("-e", rpmname, -1);
+	  nvra = pool_tmpjoin(pool, id2str(pool, s->name), "-", evr);
+	  nvra = pool_tmpjoin(pool, nvra, ".", id2str(pool, s->arch));
+	  runrpm("-e", nvra, -1);	/* to bad that --querybynumber doesn't work */
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_MULTIINSTALL:
