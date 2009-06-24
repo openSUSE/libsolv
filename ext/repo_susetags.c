@@ -399,13 +399,13 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
  * parse susetags
  *
  * fp: file to read from
- * product: solvable representing the product (0 if none)
+ * defvendor: default vendor (0 if none)
  * language: current language (0 if none)
  * flags: flags
  */
 
 void
-repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int flags)
+repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int flags)
 {
   Pool *pool = repo->pool;
   char *line, *linep;
@@ -420,7 +420,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
   struct parsedata pd;
   Repodata *data = 0;
   Id handle = 0;
-  Id vendor = 0;
 
   if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
     indesc = 1;
@@ -429,12 +428,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
     data = repo_add_repodata(repo, 0);
   else
     data = repo_last_repodata(repo);
-
-  if (product)
-    {
-      if (!strncmp(id2str(pool, pool->solvables[product].name), "product:", 8))
-        vendor = pool->solvables[product].vendor;
-    }
 
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);
@@ -657,7 +650,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int fl
 	        s->arch = arch;
 	      else
 	        s->arch = str2id(pool, sp[3], 1);
-	      s->vendor = vendor; /* default to product vendor */
+	      s->vendor = defvendor;
 	    }
 	}
 

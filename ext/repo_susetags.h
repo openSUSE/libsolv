@@ -12,4 +12,4 @@
 #define SUSETAGS_KINDS_SEPARATELY	(1 << 2)
 #define SUSETAGS_EXTEND			(1 << 3)
 
-extern void repo_add_susetags(Repo *repo, FILE *fp, Id product, const char *language, int flags);
+extern void repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int flags);

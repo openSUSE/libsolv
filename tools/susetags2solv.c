@@ -97,7 +97,7 @@ main(int argc, char **argv)
   const char *descrdir = 0;
   const char *basefile = 0;
   const char *query = 0;
-  Id product = 0;
+  Id defvendor = 0;
   int flags = 0;
   int c;
 
@@ -145,8 +145,10 @@ main(int argc, char **argv)
 	  exit(1);
 	}
       repo_add_content(repo, fp, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
-      product = repo->start;
-      fclose (fp);
+      if (repo->start < repo->end)
+        if (!strncmp(id2str(pool, pool->solvables[repo->start].name), "product:", 8))
+	  defvendor = pool->solvables[repo->start].vendor;
+      fclose(fp);
     }
 
   if (attrname)
@@ -213,7 +215,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, product, 0, flags | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+	      repo_add_susetags(repo, fp, defvendor, 0, flags | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 	      fclose(fp);
 	    }
 	  else if (!strcmp(fn, "packages.DU") || !strcmp(fn, "packages.DU.gz"))
@@ -225,7 +227,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, product, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+	      repo_add_susetags(repo, fp, defvendor, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 	      fclose(fp);
  	    }
 	  else if (!strcmp(fn, "packages.FL") || !strcmp(fn, "packages.FL.gz"))
@@ -238,7 +240,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, product, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+	      repo_add_susetags(repo, fp, defvendor, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 	      fclose(fp);
 #else
 	      /* ignore for now. reactivate when filters work */
@@ -266,7 +268,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, product, lang, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+	      repo_add_susetags(repo, fp, defvendor, lang, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 	      fclose(fp);
 	    }
 	}
@@ -278,7 +280,7 @@ main(int argc, char **argv)
     }
   else
     /* read data from stdin */
-    repo_add_susetags(repo, stdin, product, 0, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+    repo_add_susetags(repo, stdin, defvendor, 0, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
   repo_internalize(repo);
 
   if (query)
