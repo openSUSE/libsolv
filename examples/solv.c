@@ -487,6 +487,8 @@ fc_cb(Pool *pool, Id p, void *cbdata)
   if (i == fcstate->newpkgscnt)
     return 0;
   fp = fcstate->newpkgsfps[i];
+  if (!fp)
+    return 0;
   rewind(fp);
   return rpm_byfp(fp, solvable2str(pool, s), &fcstate->rpmdbstate);
 }
@@ -527,6 +529,33 @@ runrpm(const char *arg, const char *name, int dupfd3)
     }
 }
 
+static Id
+nscallback(Pool *pool, void *data, Id name, Id evr)
+{
+  if (name == NAMESPACE_PRODUCTBUDDY)
+    {    
+      /* SUSE specific hack: each product has an associated rpm */
+      Solvable *s = pool->solvables + evr; 
+      Id p, pp, cap; 
+      
+      cap = str2id(pool, pool_tmpjoin(pool, "product(", id2str(pool, s->name) + 8, ")"), 0);
+      if (!cap)
+        return 0;
+      cap = rel2id(pool, cap, s->evr, REL_EQ, 0);
+      if (!cap)
+        return 0;
+      FOR_PROVIDES(p, pp, cap) 
+        {
+          Solvable *ps = pool->solvables + p; 
+          if (ps->repo == s->repo && ps->arch == s->arch)
+            break;
+        }
+      return p;
+    }
+  return 0;
+}
+
+
 int
 main(int argc, char **argv)
 {
@@ -558,6 +587,7 @@ main(int argc, char **argv)
     }
 
   pool = pool_create();
+  pool->nscallback = nscallback;
   // pool_setdebuglevel(pool, 2);
   setarch(pool);
   repoinfos = read_repoinfos(pool, ZYPP_REPOINFO_PATH, &nrepoinfos);
@@ -703,6 +733,8 @@ rerunsolver:
 	      exit(1);
 	    }
 	  loc = solvable_get_location(s, &medianr);
+	  if (!loc)
+	     continue;
 	  if (cinfo->type == TYPE_SUSETAGS)
 	    {
 	      const char *datadir = repo_lookup_str(cinfo->repo, SOLVID_META, SUSETAGS_DATADIR);
@@ -710,7 +742,7 @@ rerunsolver:
 	    }
 	  if ((newpkgsfps[i] = curlfopen(cinfo->baseurl, loc, 0)) == 0)
 	    {
-	      printf("%s: %s not found\n", s->repo->name, loc);
+	      printf("%s: %s not found in repository\n", s->repo->name, loc);
 	      exit(1);
 	    }
 	}
@@ -736,7 +768,8 @@ rerunsolver:
 	  if (yesno("Re-run solver (y/n/q)? "))
 	    {
 	      for (i = 0; i < newpkgs; i++)
-		fclose(newpkgsfps[i]);
+		if (newpkgsfps[i])
+		  fclose(newpkgsfps[i]);
 	      newpkgsfps = sat_free(newpkgsfps);
 	      solver_free(solv);
 	      pool_add_fileconflicts_deps(pool, &conflicts);
@@ -764,6 +797,8 @@ rerunsolver:
 	{
 	case SOLVER_TRANSACTION_ERASE:
 	  printf("erase %s\n", solvid2str(pool, p));
+	  if (!s->repo->rpmdbid || !s->repo->rpmdbid[p - s->repo->start])
+	    continue;
 	  if (strlen(solvid2str(pool, p)) > 255)
 	    continue;
 	  evr = evrp = id2str(pool, s->evr);
@@ -781,6 +816,8 @@ rerunsolver:
 	    if (checkq.elements[j] == p)
 	      break;
 	  fp = j < newpkgs ? newpkgsfps[j] : 0;
+	  if (!fp)
+	    continue;
 	  rewind(fp);
 	  lseek(fileno(fp), 0, SEEK_SET);
 	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp));

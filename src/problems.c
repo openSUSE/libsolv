@@ -707,7 +707,7 @@ solver_take_solutionelement(Solver *solv, Id p, Id rp, Queue *job)
       p = SOLVER_ERASE|SOLVER_SOLVABLE;
     }
   for (i = 0; i < job->count; i += 2)
-    if (job->elements[i] == p && job->elements[i + 2] == rp)
+    if (job->elements[i] == p && job->elements[i + 1] == rp)
       return;
   queue_push2(job, p, rp);
 }
