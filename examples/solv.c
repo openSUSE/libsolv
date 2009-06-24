@@ -198,7 +198,7 @@ myfopen(const char *fn)
 }
 
 FILE *
-curlfopen(char *baseurl, char *file, int uncompress)
+curlfopen(const char *baseurl, const char *file, int uncompress)
 {
   pid_t pid;
   int fd, l;
@@ -269,6 +269,7 @@ setarch(Pool *pool)
   pool_setarch(pool, un.machine);
 }
 
+
 void
 read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 {
@@ -276,6 +277,8 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   struct repoinfo *cinfo;
   int i;
   FILE *fp;
+  Dataiterator di;
+  const char *primaryfile;
 
   printf("reading rpm database\n");
   repo = repo_create(pool, "@System");
@@ -297,7 +300,18 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repo->appdata = cinfo;
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
-	  if ((fp = curlfopen(cinfo->baseurl, "repodata/primary.xml.gz", 1)) == 0)
+	  primaryfile = 0;
+	  dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_REPOMD_TYPE, "primary", SEARCH_STRING);
+	  dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
+	  if (dataiterator_step(&di))
+	    {
+	      dataiterator_setpos_parent(&di);
+	      primaryfile = pool_lookup_str(pool, SOLVID_POS, REPOSITORY_REPOMD_LOCATION);
+	    }
+	  dataiterator_free(&di);
+	  if (!primaryfile)
+	    primaryfile = "repodata/primary.xml.gz";
+	  if ((fp = curlfopen(cinfo->baseurl, primaryfile, 1)) == 0)
 	    continue;
 	  repo_add_rpmmd(repo, fp, 0, 0);
 	  fclose(fp);
