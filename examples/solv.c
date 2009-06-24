@@ -654,7 +654,7 @@ rerunsolver:
 	  solver_printprobleminfo(solv, problem);
 	  printf("\n");
 	  scnt = solver_solution_count(solv, problem);
-	  for (solution = 1; solution <= pcnt; solution++)
+	  for (solution = 1; solution <= scnt; solution++)
 	    {
 	      printf("Solution %d:\n", solution);
 	      solver_printsolution(solv, problem, solution);
@@ -675,7 +675,7 @@ rerunsolver:
 	      if (*ip >= '0' && *ip <= '9')
 		{
 		  take = atoi(ip);
-		  if (take >= 1 && take <= solution)
+		  if (take >= 1 && take <= scnt)
 		    break;
 		}
 	      if (*ip == 's')
