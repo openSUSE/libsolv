@@ -72,6 +72,23 @@ myfopen(const char *fn)
   return  fopencookie(gzf, "r", cio);
 }
 
+/* content file query */
+static void
+doquery(Pool *pool, Repo *repo, const char *arg)
+{
+  char qbuf[256];
+  const char *str;
+  Id id;
+
+  snprintf(qbuf, sizeof(qbuf), "susetags:%s", arg);
+  id = str2id(pool, qbuf, 0);
+  if (!id)
+    return;
+  str = repo_lookup_str(repo, SOLVID_META, id);
+  if (str)
+    printf("%s\n", str);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -79,11 +96,12 @@ main(int argc, char **argv)
   const char *attrname = 0;
   const char *descrdir = 0;
   const char *basefile = 0;
+  const char *query = 0;
   Id product = 0;
   int flags = 0;
   int c;
 
-  while ((c = getopt(argc, argv, "hkn:c:d:b:")) >= 0)
+  while ((c = getopt(argc, argv, "hkn:c:d:b:q:")) >= 0)
     {
       switch (c)
 	{
@@ -104,6 +122,9 @@ main(int argc, char **argv)
 	  break;
 	case 'b':
 	  basefile = optarg;
+	  break;
+	case 'q':
+	  query = optarg;
 	  break;
 	default:
 	  usage(1);
@@ -259,7 +280,11 @@ main(int argc, char **argv)
     /* read data from stdin */
     repo_add_susetags(repo, stdin, product, 0, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
   repo_internalize(repo);
-  tool_write(repo, basefile, attrname);
+
+  if (query)
+    doquery(pool, repo, query);
+  else
+    tool_write(repo, basefile, attrname);
   pool_free(pool);
   exit(0);
 }

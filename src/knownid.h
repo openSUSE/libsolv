@@ -139,10 +139,11 @@ KNOWNID(SOLVABLE_ORDER,			"solvable:order"),
 
 KNOWNID(UPDATE_REBOOT,			"update:reboot"),	/* reboot suggested (kernel update) */
 KNOWNID(UPDATE_RESTART,			"update:restart"),	/* restart suggested (update stack update) */
-KNOWNID(UPDATE_RELOGIN,			"update:relogin"),	/* restart suggested (update stack update) */
+KNOWNID(UPDATE_RELOGIN,			"update:relogin"),	/* relogin suggested */
 
-KNOWNID(UPDATE_MESSAGE,			"update:message"),	/* restart suggested (update stack update) */
-                                                                       /* 'content' of patch, usually list of packages */
+KNOWNID(UPDATE_MESSAGE,			"update:message"),	/* informative message */
+
+/* 'content' of patch, usually list of packages */
 KNOWNID(UPDATE_COLLECTION,		"update:collection"),          /*  "name evr arch" */
 KNOWNID(UPDATE_COLLECTION_NAME,		"update:collection:name"),     /*   name */
 KNOWNID(UPDATE_COLLECTION_EVR,		"update:collection:evr"),      /*   epoch:version-release */
@@ -171,6 +172,7 @@ KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),
 
 /* argh */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
+KNOWNID(SUSETAGS_DESCRDIR,		"susetags:descrdir"),
 
 /* timestamp then the repository was generated */
 KNOWNID(REPOSITORY_TIMESTAMP,		"repository:timestamp"),
@@ -207,6 +209,7 @@ KNOWNID(DELTA_SEQ_NAME,			"delta:seqname"),
 KNOWNID(DELTA_SEQ_EVR,			"delta:seqevr"),
 KNOWNID(DELTA_SEQ_NUM,			"delta:seqnum"),
 
+/* XXX: shouldn't use a real ID */
 KNOWNID(NAMESPACE_PRODUCTBUDDY,         "namespace:productbuddy"),
 
 KNOWNID(REPOSITORY_REPOMD,		"repository:repomd"),

@@ -203,6 +203,8 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   Repodata *data;
   Id handle = 0;
   int contentstyle = 0;
+  char *descrdir = 0;
+  char *datadir = 0;
 
   int i = 0;
 
@@ -270,16 +272,44 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 #define code10 (contentstyle == 10)
 #define code11 (contentstyle == 11)
 
-	  if (contentstyle == 0)
+	  if (istag ("CONTENTSTYLE"))
 	    {
-	      if (istag ("CONTENTSTYLE"))
-		{
-		  contentstyle = atoi(value);
-		  continue;
-		}
-	      else
-		contentstyle = 10;
+	      contentstyle = atoi(value);
+	      continue;
 	    }
+	  if (!contentstyle)
+	    contentstyle = 10;
+
+	  if (istag ("DESCRDIR"))
+	    {
+	      if (descrdir)
+		free(descrdir);
+	      else
+	        repo_set_str(repo, SOLVID_META, SUSETAGS_DESCRDIR, value);
+	      if (s)
+	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DESCRDIR, value);
+	      descrdir = strdup(value);
+	      continue;
+	    }
+	  if (istag ("DATADIR"))
+	    {
+	      if (datadir)
+		free(datadir);
+	      else
+	        repo_set_str(repo, SOLVID_META, SUSETAGS_DATADIR, value);
+	      if (s)
+	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, value);
+	      datadir = strdup(value);
+	      continue;
+	    }
+
+	  /* XXX: add those to SOLVID_META, too */
+	  if (istag ("META"))
+	    continue;
+	  if (istag ("HASH"))
+	    continue;
+	  if (istag ("KEY"))
+	    continue;
 
 	  if ((code10 && istag ("PRODUCT"))
 	      || (code11 && istag ("NAME")))
@@ -306,6 +336,10 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      repodata_extend(data, s - pool->solvables);
 	      handle = s - pool->solvables;
 	      s->name = str2id(pool, join(&pd, "product", ":", value), 1);
+	      if (datadir)
+	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, datadir);
+	      if (descrdir)
+	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DESCRDIR, descrdir);
 	      continue;
 	    }
 
@@ -324,8 +358,6 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
             pd.tmprel = strdup(value);
 	  else if (code11 && istag ("DISTRIBUTION"))
 	    repo_set_str(repo, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
-	  else if (istag ("DATADIR"))
-	    repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, value);
 	  else if (istag ("UPDATEURLS"))
 	    add_multiple_urls(data, handle, value, str2id(pool, "update", 1));
 	  else if (istag ("EXTRAURLS"))
@@ -409,9 +441,14 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	pool_debug(pool, SAT_ERROR, "repo_content: malformed line: %s\n", line);
     }
 
+  if (datadir)
+    free(datadir);
+  if (descrdir)
+    free(descrdir);
+
   if (!s || !s->name)
     {
-      pool_debug(pool, SAT_FATAL, "repo_content: 'content' incomplete, no product solvable created !\n");
+      pool_debug(pool, SAT_FATAL, "repo_content: 'content' incomplete, no product solvable created!\n");
       exit(1);
     }
 
@@ -460,6 +497,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
     sat_free(pd.tmp);
   sat_free(line);
   sat_free(otherarchs);
+  join_freemem();
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 }
