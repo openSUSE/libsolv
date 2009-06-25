@@ -94,6 +94,7 @@ join2(const char *s1, const char *s2, const char *s3)
       strcpy(p, s3);
       p += strlen(s3);
     }
+  *p = 0;
   return _join_tmp;
 }
 

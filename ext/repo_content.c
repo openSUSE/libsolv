@@ -107,6 +107,7 @@ join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
       strcpy(p, s3);
       p += strlen(s3);
     }
+  *p = 0;
   return pd->tmp;
 }
 
@@ -496,51 +497,45 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   if (defvendor)
     free(defvendor);
 
-  if (!s || !s->name)
+  if (s)
     {
-      pool_debug(pool, SAT_FATAL, "repo_content: 'content' incomplete, no product solvable created!\n");
-      exit(1);
-    }
+      if (!s->name)
+	{
+	  pool_debug(pool, SAT_FATAL, "repo_content: 'content' incomplete, no product solvable created!\n");
+	  exit(1);
+	}
 
-  if (pd.tmpvers)
-    {
       if (pd.tmprel)
-        s->evr = makeevr(pool, join2(pd.tmpvers, "-", pd.tmprel));
+	s->evr = makeevr(pool, join(&pd, pd.tmpvers, "-", pd.tmprel));
       else
-        s->evr = makeevr(pool, pd.tmpvers);
-    }
-  else if (pd.tmprel)
-    {
-      s->evr = makeevr(pool, join2("", "-", pd.tmprel));
-    }
-  pd.tmpvers = sat_free((void *)pd.tmpvers);
-  pd.tmprel = sat_free((void *)pd.tmprel);
+	s->evr = makeevr(pool, pd.tmpvers);
+      pd.tmpvers = sat_free((void *)pd.tmpvers);
+      pd.tmprel = sat_free((void *)pd.tmprel);
 
-  if (!s->arch)
-    s->arch = ARCH_NOARCH;
-  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-    {
-      s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      if (!s->arch)
+	s->arch = ARCH_NOARCH;
+      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+        s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (code10)
 	s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
-    }
 
-  /* now for every other arch, clone the product except the architecture */
-  for (i = 0; i < numotherarchs; ++i)
-    {
-      Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
-      repodata_extend(data, p - pool->solvables);
-      p->name = s->name;
-      p->evr = s->evr;
-      p->vendor = s->vendor;
-      p->arch = otherarchs[i];
+      /* now for every other arch, clone the product except the architecture */
+      for (i = 0; i < numotherarchs; ++i)
+	{
+	  Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
+	  repodata_extend(data, p - pool->solvables);
+	  p->name = s->name;
+	  p->evr = s->evr;
+	  p->vendor = s->vendor;
+	  p->arch = otherarchs[i];
 
-      /* self provides */
-      if (p->arch != ARCH_SRC && p->arch != ARCH_NOSRC)
-          p->provides = repo_addid_dep(repo, p->provides, rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
+	  /* self provides */
+	  if (p->arch != ARCH_SRC && p->arch != ARCH_NOSRC)
+	      p->provides = repo_addid_dep(repo, p->provides, rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
 
-      /* now merge the attributes */
-      repodata_merge_attrs(data, p - pool->solvables, s - pool->solvables);
+	  /* now merge the attributes */
+	  repodata_merge_attrs(data, p - pool->solvables, s - pool->solvables);
+	}
     }
 
   if (pd.tmp)
