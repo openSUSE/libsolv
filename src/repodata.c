@@ -10,6 +10,8 @@
  *
  * Manage data coming from one repository
  *
+ * a repository can contain multiple repodata entries, consisting of
+ * different sets of keys and different sets of solvables
  */
 
 #define _GNU_SOURCE
@@ -527,6 +529,14 @@ repodata_lookup_id(Repodata *data, Id solvid, Id keyname)
     return 0;
   dp = data_read_id(dp, &id);
   return id;
+}
+
+Id
+repodata_globalize_id(Repodata *data, Id id, int create)
+{
+  if (!id || !data || !data->localpool)
+    return id;
+  return str2id(data->repo->pool, stringpool_id2str(&data->spool, id), create);
 }
 
 const char *
@@ -1434,6 +1444,7 @@ repodata_extend(Repodata *data, Id p)
     }
 }
 
+/* extend repodata so that it includes solvables from start to start + num - 1 */
 void
 repodata_extend_block(Repodata *data, Id start, Id num)
 {
@@ -1625,6 +1636,8 @@ repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str)
   data->attrdatalen += l;
 }
 
+/* add an array element consisting of entrysize Ids to the repodata. modifies attriddata
+ * so that the caller can append the new element there */
 static void
 repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrysize)
 {
@@ -1721,9 +1734,9 @@ hexstr2bytes(unsigned char *buf, const char *str, int buflen)
   int i;
   for (i = 0; i < buflen; i++)
     {
-#define c2h(c) (((c)>='0' && (c)<='9') ? ((c)-'0')	\
-		: ((c)>='a' && (c)<='f') ? ((c)-'a'+10)	\
-		: ((c)>='A' && (c)<='F') ? ((c)-'A'+10)	\
+#define c2h(c) (((c)>='0' && (c)<='9') ? ((c)-'0')		\
+		: ((c)>='a' && (c)<='f') ? ((c)-('a'-10))	\
+		: ((c)>='A' && (c)<='F') ? ((c)-('A'-10))	\
 		: -1)
       int v = c2h(*str);
       str++;
@@ -1776,6 +1789,7 @@ repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
   return str;
 }
 
+/* rpm filenames don't contain the epoch, so strip it */
 static inline const char *
 evrid2vrstr(Pool *pool, Id evrid)
 {
@@ -1856,14 +1870,6 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
   repodata_set_str(data, solvid, SOLVABLE_MEDIAFILE, file);
 }
 
-Id
-repodata_globalize_id(Repodata *data, Id id)
-{
-  if (!data || !data->localpool)
-    return id;
-  return str2id(data->repo->pool, stringpool_id2str(&data->spool, id), 1);
-}
-
 void
 repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2)
 {
@@ -1939,6 +1945,7 @@ repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
   data->attriddata[data->attriddatalen++] = 0;
 }
 
+/* add all attrs from src to dest */
 void
 repodata_merge_attrs(Repodata *data, Id dest, Id src)
 {
@@ -2089,7 +2096,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	      schemaid = repodata_schema2id(data, schema, 1);
 	    else if (schemaid != repodata_schema2id(data, schema, 0))
 	      {
-	 	pool_debug(data->repo->pool, SAT_FATAL, "substructs with different schemas\n");
+	 	pool_debug(data->repo->pool, SAT_FATAL, "fixarray substructs with different schemas\n");
 		exit(1);
 	      }
 #if 0

@@ -436,7 +436,7 @@ solver_printtransaction(Solver *solv)
 	  POOL_DEBUG(SAT_DEBUG_RESULT, "upgraded packages (%d):\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_VENDORCHANGE:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "vendor change from %s to %s (%d):\n", id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]), cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "vendor change from '%s' to '%s' (%d):\n", id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]), cnt);
 	  break;
 	case SOLVER_TRANSACTION_ARCHCHANGE:
 	  POOL_DEBUG(SAT_DEBUG_RESULT, "arch change from %s to %s (%d):\n", id2str(pool, classes.elements[i + 2]), id2str(pool, classes.elements[i + 3]), cnt);

@@ -69,9 +69,106 @@ repo_freedata(Repo *repo)
 }
 
 /*
- * add Id to repo
- * olddeps = old array to extend
+ * remove repo from pool, zero out (i.e. free) solvables 
  * 
+ */
+
+void
+repo_free(Repo *repo, int reuseids)
+{
+  Pool *pool = repo->pool;
+  Solvable *s;
+  int i;
+
+  pool_freewhatprovides(pool);
+  if (repo == pool->installed)
+    pool->installed = 0;
+
+  if (reuseids && repo->end == pool->nsolvables)
+    {
+      /* it's ok to reuse the ids. As this is the last repo, we can
+         just shrink the solvable array */
+      for (i = repo->end - 1, s = pool->solvables + i; i >= repo->start; i--, s--)
+	if (s->repo != repo)
+	  break;
+      repo->end = i + 1;
+      pool->nsolvables = i + 1;
+    }
+  /* zero out (i.e. free) solvables belonging to this repo */
+  for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
+    if (s->repo == repo)
+      memset(s, 0, sizeof(*s));
+  for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
+    if (pool->repos[i] == repo)
+      break;
+  if (i == pool->nrepos)	       /* repo not in pool, return */
+    return;
+  if (i < pool->nrepos - 1)
+    {
+      memmove(pool->repos + i, pool->repos + i + 1, (pool->nrepos - 1 - i) * sizeof(Repo *));
+      /* fix repo ids */
+      for (; i < pool->nrepos - 1; i++)
+	pool->repos[i]->repoid = i + 1;
+    }
+  pool->nrepos--;
+  repo_freedata(repo);
+}
+
+void
+repo_freeallrepos(Pool *pool, int reuseids)
+{
+  int i;
+
+  pool_freewhatprovides(pool);
+  for (i = 0; i < pool->nrepos; i++)
+    repo_freedata(pool->repos[i]);
+  pool->repos = sat_free(pool->repos);
+  pool->nrepos = 0;
+  /* the first two solvables don't belong to a repo */
+  pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
+}
+
+
+/* repository sidedata is solvable data allocated on demand.
+ * It is used for data that is normally not present
+ * in the solvable like the rpmdbid.
+ * The solvable allocation funcions need to make sure that
+ * the sidedata gets extended if new solvables get added.
+ */
+
+#define REPO_SIDEDATA_BLOCK 63
+
+void *
+repo_sidedata_create(Repo *repo, size_t size)
+{
+  return sat_calloc_block(repo->end - repo->start, size, REPO_SIDEDATA_BLOCK);
+}
+
+void *
+repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count)
+{ 
+  int n = repo->end - repo->start;
+  if (p < repo->start)
+    { 
+      int d = repo->start - p;
+      b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
+      memmove((char *)b + d * size, b, n * size);
+      memset(b, 0, d * size);
+      n += d;
+    }     
+  if (p + count > repo->end)
+    { 
+      int d = p + count - repo->end;
+      b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
+      memset((char *)b + n * size, 0, d * size);
+    }     
+  return b;
+}
+
+/*
+ * add Id to idarraydata used to store dependencies
+ * olddeps: old array offset to extend
+ * returns new array offset
  */
 
 Offset
@@ -129,7 +226,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
  * marker= 0 for normal dep
  * marker > 0 add dep after marker
  * marker < 0 add dep after -marker
- * 
+ * returns new start of dependency array
  */
 Offset
 repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker)
@@ -211,6 +308,9 @@ repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker)
 /*
  * reserve Ids
  * make space for 'num' more dependencies
+ * returns new start of dependency array
+ *
+ * reserved ids will always begin at offset idarraysize
  */
 
 Offset
@@ -263,95 +363,6 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
 }
 
 
-/*
- * remove repo from pool, zero out solvables 
- * 
- */
-
-void
-repo_free(Repo *repo, int reuseids)
-{
-  Pool *pool = repo->pool;
-  Solvable *s;
-  int i;
-
-  pool_freewhatprovides(pool);
-  if (repo == pool->installed)
-    pool->installed = 0;
-
-  if (reuseids && repo->end == pool->nsolvables)
-    {
-      /* it's ok to reuse the ids. As this is the last repo, we can
-         just shrink the solvable array */
-      for (i = repo->end - 1, s = pool->solvables + i; i >= repo->start; i--, s--)
-	if (s->repo != repo)
-	  break;
-      repo->end = i + 1;
-      pool->nsolvables = i + 1;
-    }
-  /* zero out solvables belonging to this repo */
-  for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
-    if (s->repo == repo)
-      memset(s, 0, sizeof(*s));
-  for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
-    if (pool->repos[i] == repo)
-      break;
-  if (i == pool->nrepos)	       /* repo not in pool, return */
-    return;
-  if (i < pool->nrepos - 1)
-    {
-      memmove(pool->repos + i, pool->repos + i + 1, (pool->nrepos - 1 - i) * sizeof(Repo *));
-      /* fix repo ids */
-      for (; i < pool->nrepos - 1; i++)
-	pool->repos[i]->repoid = i + 1;
-    }
-  pool->nrepos--;
-  repo_freedata(repo);
-}
-
-void
-repo_freeallrepos(Pool *pool, int reuseids)
-{
-  int i;
-
-  pool_freewhatprovides(pool);
-  for (i = 0; i < pool->nrepos; i++)
-    repo_freedata(pool->repos[i]);
-  pool->repos = sat_free(pool->repos);
-  pool->nrepos = 0;
-  /* the first two solvables don't belong to a repo */
-  pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
-}
-
-
-#define REPO_SIDEDATA_BLOCK 63
-
-void *
-repo_sidedata_create(Repo *repo, size_t size)
-{
-  return sat_calloc_block(repo->end - repo->start, size, REPO_SIDEDATA_BLOCK);
-}
-
-void *
-repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count)
-{ 
-  int n = repo->end - repo->start;
-  if (p < repo->start)
-    { 
-      int d = repo->start - p;
-      b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
-      memmove((char *)b + d * size, b, n * size);
-      memset(b, 0, d * size);
-      n += d;
-    }     
-  if (p + count > repo->end)
-    { 
-      int d = p + count - repo->end;
-      b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
-      memset((char *)b + n * size, 0, d * size);
-    }     
-  return b;
-}
 
 Offset
 repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset freshens)
@@ -895,11 +906,7 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
 	    {
 	      Id id = repodata_lookup_id(data, entry, keyname); 
 	      if (id)
-		{
-		  if (data->localpool)
-		    id = repodata_globalize_id(data, id);
-		  return id; 
-		}
+		return data->localpool ? repodata_globalize_id(data, id, 1) : id; 
 	    }
 	}
     }   

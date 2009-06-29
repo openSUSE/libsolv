@@ -1267,18 +1267,21 @@ dump_tes(struct orderdata *od)
   for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
     {
       Solvable *s = pool->solvables + te->p;
-      POOL_DEBUG(SAT_WARN, "TE %4d: %c%s\n", i, s->repo == pool->installed ? '-' : '+', solvable2str(pool, s));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "TE %4d: %c%s\n", i, s->repo == pool->installed ? '-' : '+', solvable2str(pool, s));
       if (s->repo != pool->installed)
         {
 	  queue_empty(&obsq);
 	  transaction_all_obs_pkgs(od->trans, te->p, &obsq);
 	  for (j = 0; j < obsq.count; j++)
-	    POOL_DEBUG(SAT_WARN, "         -%s\n", solvid2str(pool, obsq.elements[j]));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "         -%s\n", solvid2str(pool, obsq.elements[j]));
 	}
       for (j = te->edges; od->edgedata[j]; j += 2)
 	{
 	  te2 = od->tes + od->edgedata[j];
-	  POOL_DEBUG(SAT_WARN, "       --%x--> TE %4d: %s\n", od->edgedata[j + 1], od->edgedata[j], solvid2str(pool, te2->p));
+	  if ((od->edgedata[j + 1] & TYPE_BROKEN) == 0)
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "       --%x--> TE %4d: %s\n", od->edgedata[j + 1], od->edgedata[j], solvid2str(pool, te2->p));
+	  else
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "       ##%x##> TE %4d: %s\n", od->edgedata[j + 1], od->edgedata[j], solvid2str(pool, te2->p));
 	}
     }
 }
@@ -1608,6 +1611,7 @@ transaction_order(Transaction *trans, int flags)
      }
   POOL_DEBUG(SAT_DEBUG_STATS, "cycle edge creation took %d ms\n", sat_timems(now));
 
+  dump_tes(&od);
   /* all edges are finally set up and there are no cycles, now the easy part.
    * Create an ordered transaction */
   now = sat_timems(0);
@@ -1941,7 +1945,7 @@ transaction_check_pkg(Transaction *trans, Id tepkg, Id pkg, Map *ins, Map *seen,
 	    }
 	  if (!good)
 	    {
-	      POOL_DEBUG(SAT_WARN, "  %c%s: nothing provides %s needed by %c%s\n", pool->solvables[tepkg].repo == pool->installed ? '-' : '+', solvid2str(pool, tepkg), dep2str(pool, req), s->repo == pool->installed ? '-' : '+', solvable2str(pool, s));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  %c%s: nothing provides %s needed by %c%s\n", pool->solvables[tepkg].repo == pool->installed ? '-' : '+', solvid2str(pool, tepkg), dep2str(pool, req), s->repo == pool->installed ? '-' : '+', solvable2str(pool, s));
 	    }
 	}
     }

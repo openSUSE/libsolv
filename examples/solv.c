@@ -68,6 +68,14 @@ struct repoinfo {
 #define TYPE_RPMMD	2
 #define TYPE_PLAINDIR	3
 
+static int
+read_repoinfos_sort(const void *ap, const void *bp)
+{
+  const struct repoinfo *a = ap;
+  const struct repoinfo *b = bp;
+  return strcmp(a->alias, b->alias);
+}
+
 struct repoinfo *
 read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 {
@@ -171,6 +179,7 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
       cinfo = 0;
     }
   closedir(dir);
+  qsort(repoinfos, nrepoinfos, sizeof(*repoinfos), read_repoinfos_sort);
   *nrepoinfosp = nrepoinfos;
   return repoinfos;
 }
@@ -589,13 +598,15 @@ main(int argc, char **argv)
   FILE **newpkgsfps;
   struct fcstate fcstate;
 
-  if (!strcmp(argv[1], "install") || !strcmp(argv[1], "in"))
+  argc--;
+  argv++;
+  if (!strcmp(argv[0], "install") || !strcmp(argv[0], "in"))
     mode = SOLVER_INSTALL;
-  else if (!strcmp(argv[1], "erase") || !strcmp(argv[1], "rm"))
+  else if (!strcmp(argv[0], "erase") || !strcmp(argv[0], "rm"))
     mode = SOLVER_ERASE;
-  else if (!strcmp(argv[1], "show"))
+  else if (!strcmp(argv[0], "show"))
     mode = 0;
-  else if (!strcmp(argv[1], "update") || !strcmp(argv[1], "up"))
+  else if (!strcmp(argv[0], "update") || !strcmp(argv[0], "up"))
     mode = SOLVER_UPDATE;
   else
     {
@@ -615,7 +626,7 @@ main(int argc, char **argv)
   pool_createwhatprovides(pool);
 
   queue_init(&job);
-  for (i = 2; i < argc; i++)
+  for (i = 1; i < argc; i++)
     mkselect(pool, argv[i], 0, &job);
   if (!job.count && mode == SOLVER_UPDATE)
     updateall = 1;

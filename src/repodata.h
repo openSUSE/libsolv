@@ -230,7 +230,7 @@ void repodata_merge_attrs(Repodata *data, Id dest, Id src);
 void repodata_disable_paging(Repodata *data);
 
 /* helper functions */
-Id repodata_globalize_id(Repodata *data, Id id);
+Id repodata_globalize_id(Repodata *data, Id id, int create);
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
 const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);

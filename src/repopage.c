@@ -8,8 +8,14 @@
 /*
  * repopage.c
  *
- * Pageing and compression functions for the vertical repository data
- * 
+ * Paging and compression functions for the vertical repository data.
+ * Vertical data is grouped by key, normal data is grouped by solvable.
+ * This makes searching for a string in vertical data fast as there's
+ * no need to skip over data if keys we're not interested in.
+ *
+ * The vertical data is split into pages, each page is compressed with a fast
+ * compression algorithm. These pages are read in on demand, not recently used
+ * pages automatically get dropped.
  */
 
 #define _XOPEN_SOURCE 500

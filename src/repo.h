@@ -71,13 +71,13 @@ static inline Id repo_add_solvable(Repo *repo)
     }
   else
     {
-      if (repo->rpmdbid)
-	repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, 1);
       if (p < repo->start)
 	repo->start = p;
       if (p + 1 > repo->end)
 	repo->end = p + 1;
     }
+  if (repo->rpmdbid)
+    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, 1);
   repo->nsolvables++;
   repo->pool->solvables[p].repo = repo;
   return p;
@@ -98,13 +98,13 @@ static inline Id repo_add_solvable_block(Repo *repo, int count)
     }
   else
     {
-      if (repo->rpmdbid)
-	repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, count);
       if (p < repo->start)
 	repo->start = p;
       if (p + count > repo->end)
 	repo->end = p + count;
     }
+  if (repo->rpmdbid)
+    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, count);
   repo->nsolvables += count;
   for (s = repo->pool->solvables + p; count--; s++)
     s->repo = repo;

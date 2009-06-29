@@ -88,6 +88,11 @@
 #define TAG_ENHANCESVERSION	1160
 #define TAG_ENHANCESFLAGS	1161
 
+#define SIGTAG_SIZE		1000
+#define SIGTAG_PGP		1002	/* RSA signature */
+#define SIGTAG_MD5		1004	/* header+payload md5 checksum */
+#define SIGTAG_GPG		1005	/* DSA signature */
+
 #define DEP_LESS		(1 << 1)
 #define DEP_GREATER		(1 << 2)
 #define DEP_EQUAL		(1 << 3)
@@ -107,12 +112,12 @@ typedef struct rpmhead {
   unsigned char data[1];
 } RpmHead;
 
-static int
-headexists(RpmHead *h, int tag)
+
+static inline unsigned char *
+headfindtag(RpmHead *h, int tag)
 {
   unsigned int i;
   unsigned char *d, taga[4];
-
   d = h->dp - 16;
   taga[0] = tag >> 24;
   taga[1] = tag >> 16;
@@ -120,27 +125,23 @@ headexists(RpmHead *h, int tag)
   taga[3] = tag;
   for (i = 0; i < h->cnt; i++, d -= 16)
     if (d[3] == taga[3] && d[2] == taga[2] && d[1] == taga[1] && d[0] == taga[0])
-      return 1;
+      return d;
   return 0;
+}
+
+static int
+headexists(RpmHead *h, int tag)
+{
+  return headfindtag(h, tag) ? 1 : 0;
 }
 
 static unsigned int *
 headint32array(RpmHead *h, int tag, int *cnt)
 {
   unsigned int i, o, *r;
-  unsigned char *d, taga[4];
+  unsigned char *d = headfindtag(h, tag);
 
-  d = h->dp - 16;
-  taga[0] = tag >> 24;
-  taga[1] = tag >> 16;
-  taga[2] = tag >> 8;
-  taga[3] = tag;
-  for (i = 0; i < h->cnt; i++, d -= 16)
-    if (d[3] == taga[3] && d[2] == taga[2] && d[1] == taga[1] && d[0] == taga[0])
-      break;
-  if (i >= h->cnt)
-    return 0;
-  if (d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 4)
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 4)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
@@ -155,23 +156,14 @@ headint32array(RpmHead *h, int tag, int *cnt)
   return r;
 }
 
+/* returns the first entry of an integer array */
 static unsigned int
 headint32(RpmHead *h, int tag)
 {
   unsigned int i, o;
-  unsigned char *d, taga[4];
+  unsigned char *d = headfindtag(h, tag);
 
-  d = h->dp - 16;
-  taga[0] = tag >> 24;
-  taga[1] = tag >> 16;
-  taga[2] = tag >> 8;
-  taga[3] = tag;
-  for (i = 0; i < h->cnt; i++, d -= 16)
-    if (d[3] == taga[3] && d[2] == taga[2] && d[1] == taga[1] && d[0] == taga[0])
-      break;
-  if (i >= h->cnt)
-    return 0;
-  if (d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 4)
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 4)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
@@ -185,19 +177,9 @@ static unsigned int *
 headint16array(RpmHead *h, int tag, int *cnt)
 {
   unsigned int i, o, *r;
-  unsigned char *d, taga[4];
+  unsigned char *d = headfindtag(h, tag);
 
-  d = h->dp - 16;
-  taga[0] = tag >> 24;
-  taga[1] = tag >> 16;
-  taga[2] = tag >> 8;
-  taga[3] = tag;
-  for (i = 0; i < h->cnt; i++, d -= 16)
-    if (d[3] == taga[3] && d[2] == taga[2] && d[1] == taga[1] && d[0] == taga[0])
-      break;
-  if (i >= h->cnt)
-    return 0;
-  if (d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 3)
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 3)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
@@ -215,22 +197,14 @@ headint16array(RpmHead *h, int tag, int *cnt)
 static char *
 headstring(RpmHead *h, int tag)
 {
-  unsigned int i, o;
-  unsigned char *d, taga[4];
-  d = h->dp - 16;
-  taga[0] = tag >> 24;
-  taga[1] = tag >> 16;
-  taga[2] = tag >> 8;
-  taga[3] = tag;
-  for (i = 0; i < h->cnt; i++, d -= 16)
-    if (d[3] == taga[3] && d[2] == taga[2] && d[1] == taga[1] && d[0] == taga[0])
-      break;
-  if (i >= h->cnt)
-    return 0;
+  unsigned int o;
+  unsigned char *d = headfindtag(h, tag);
   /* 6: STRING, 9: I18NSTRING */
-  if (d[4] != 0 || d[5] != 0 || d[6] != 0 || (d[7] != 6 && d[7] != 9))
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || (d[7] != 6 && d[7] != 9))
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  if (o >= h->dcnt)
+    return 0;
   return (char *)h->dp + o;
 }
 
@@ -238,20 +212,10 @@ static char **
 headstringarray(RpmHead *h, int tag, int *cnt)
 {
   unsigned int i, o;
-  unsigned char *d, taga[4];
+  unsigned char *d = headfindtag(h, tag);
   char **r;
 
-  d = h->dp - 16;
-  taga[0] = tag >> 24;
-  taga[1] = tag >> 16;
-  taga[2] = tag >> 8;
-  taga[3] = tag;
-  for (i = 0; i < h->cnt; i++, d -= 16)
-    if (d[3] == taga[3] && d[2] == taga[2] && d[1] == taga[1] && d[0] == taga[0])
-      break;
-  if (i >= h->cnt)
-    return 0;
-  if (d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 8)
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 8)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
@@ -271,6 +235,22 @@ headstringarray(RpmHead *h, int tag, int *cnt)
         }
     }
   return r;
+}
+
+static unsigned char *
+headbinary(RpmHead *h, int tag, unsigned int *sizep)
+{
+  unsigned int i, o;
+  unsigned char *d = headfindtag(h, tag);
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 7)
+    return 0;
+  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  if (o > h->dcnt || o + i < o || o + i > h->dcnt)
+    return 0;
+  if (sizep)
+    *sizep = i;
+  return h->dp + o;
 }
 
 static char *headtoevr(RpmHead *h)
@@ -381,16 +361,28 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
     sat_free(buf);
 }
 
+
+#define MAKEDEPS_FILTER_WEAK	(1 << 0)
+#define MAKEDEPS_FILTER_STRONG	(1 << 1)
+#define MAKEDEPS_NO_RPMLIB	(1 << 2)
+
+/*
+ * strong: 0: ignore strongness
+ *         1: filter to strong
+ *         2: filter to weak
+ */
 static unsigned int
-makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int strong)
+makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int flags)
 {
   char **n, **v;
   unsigned int *f;
   int i, cc, nc, vc, fc;
-  int haspre = 0;
+  int haspre;
   unsigned int olddeps;
   Id *ida;
+  int strong;
 
+  strong = flags & (MAKEDEPS_FILTER_STRONG|MAKEDEPS_FILTER_WEAK);
   n = headstringarray(rpmhead, tagn, &nc);
   if (!n)
     return 0;
@@ -414,19 +406,26 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
     }
 
   cc = nc;
-  if (strong)
+  haspre = 0;	/* add no prereq marker */
+  if (flags)
     {
+      /* we do filtering */
       cc = 0;
       for (i = 0; i < nc; i++)
-	if ((f[i] & DEP_STRONG) == (strong == 1 ? 0 : DEP_STRONG))
-	  {
-	    cc++;
-	    if ((f[i] & DEP_PRE) != 0)
-	      haspre = 1;
-	  }
+	{
+	  if (strong && (f[i] & DEP_STRONG) != (strong == MAKEDEPS_FILTER_WEAK ? 0 : DEP_STRONG))
+	    continue;
+	  if ((flags & MAKEDEPS_NO_RPMLIB) != 0)
+	    if (!strncmp(n[i], "rpmlib(", 7))
+	      continue;
+	  if ((f[i] & DEP_PRE) != 0)
+	    haspre = 1;
+	  cc++;
+	}
     }
-  else
+  else if (tagn == TAG_REQUIRENAME)
     {
+      /* no filtering, just look for the first prereq */
       for (i = 0; i < nc; i++)
 	if ((f[i] & DEP_PRE) != 0)
 	  {
@@ -434,8 +433,6 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	    break;
 	  }
     }
-  if (tagn != TAG_REQUIRENAME)
-     haspre = 0;
   if (cc == 0)
     {
       sat_free(n);
@@ -452,16 +449,19 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	{
 	  if (haspre != 1)
 	    break;
-	  haspre = 2;
+	  haspre = 2;	/* pass two: prereqs */
 	  i = 0;
 	  *ida++ = SOLVABLE_PREREQMARKER;
 	}
-      if (strong && (f[i] & DEP_STRONG) != (strong == 1 ? 0 : DEP_STRONG))
+      if (strong && (f[i] & DEP_STRONG) != (strong == MAKEDEPS_FILTER_WEAK ? 0 : DEP_STRONG))
 	continue;
       if (haspre == 1 && (f[i] & DEP_PRE) != 0)
 	continue;
       if (haspre == 2 && (f[i] & DEP_PRE) == 0)
 	continue;
+      if ((flags & MAKEDEPS_NO_RPMLIB) != 0)
+	if (!strncmp(n[i], "rpmlib(", 7))
+	  continue;
       if (f[i] & (DEP_LESS|DEP_GREATER|DEP_EQUAL))
 	{
 	  Id name, evr;
@@ -796,7 +796,7 @@ addsourcerpm(Pool *pool, Repodata *data, Id handle, char *sourcerpm, char *name,
 }
 
 static int
-rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead)
+rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, int flags)
 {
   char *name;
   char *evr;
@@ -828,17 +828,18 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead)
   s->vendor = str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
-  s->provides = addfileprovides(pool, repo, data, s, rpmhead, s->provides);
+  if ((flags & RPM_ADD_NO_FILELIST) == 0)
+    s->provides = addfileprovides(pool, repo, data, s, rpmhead, s->provides);
   if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, 0);
+  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, (flags & RPM_ADD_NO_RPMLIBREQS) ? MAKEDEPS_NO_RPMLIB : 0);
   s->conflicts = makedeps(pool, repo, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0);
   s->obsoletes = makedeps(pool, repo, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0);
 
-  s->recommends = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 2);
-  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, 1);
-  s->supplements = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 2);
-  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, 1);
+  s->recommends = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, MAKEDEPS_FILTER_STRONG);
+  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, MAKEDEPS_FILTER_WEAK);
+  s->supplements = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, MAKEDEPS_FILTER_STRONG);
+  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, MAKEDEPS_FILTER_WEAK);
   s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
   s->conflicts = repo_fix_conflicts(repo, s->conflicts);
 
@@ -1378,7 +1379,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
-	  if (rpm2solv(pool, repo, data, s, rpmhead))
+	  if (rpm2solv(pool, repo, data, s, rpmhead, flags))
 	    {
 	      i++;
 	      s = 0;
@@ -1613,7 +1614,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 
-	  rpm2solv(pool, repo, data, s, rpmhead);
+	  rpm2solv(pool, repo, data, s, rpmhead, flags);
 	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	    {
 	      if (done < count)
@@ -1668,6 +1669,8 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
   int headerstart, headerend;
   struct stat stb;
   Repodata *data;
+  unsigned char pkgid[16];
+  int gotpkgid;
 
   if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
@@ -1718,16 +1721,47 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
       sigdsize += sigcnt * 16;
       sigdsize = (sigdsize + 7) & ~7;
       headerstart = 96 + 16 + sigdsize;
-      while (sigdsize)
+      gotpkgid = 0;
+      if ((flags & RPM_ADD_WITH_PKGID) != 0)
 	{
-	  l = sigdsize > 4096 ? 4096 : sigdsize;
-	  if (fread(lead, l, 1, fp) != 1)
+	  unsigned char *chksum;
+	  unsigned int chksumsize;
+	  /* extract pkgid from the signature header */
+	  if (sigdsize > rpmheadsize)
+	    {
+	      rpmheadsize = sigdsize + 128;
+	      rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	    }
+	  if (fread(rpmhead->data, sigdsize, 1, fp) != 1)
 	    {
 	      fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
 	      fclose(fp);
 	      continue;
 	    }
-	  sigdsize -= l;
+	  rpmhead->cnt = sigcnt;
+	  rpmhead->dcnt = sigdsize - sigcnt * 16;
+	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+	  chksum = headbinary(rpmhead, SIGTAG_MD5, &chksumsize);
+	  if (chksum && chksumsize == 16)
+	    {
+	      gotpkgid = 1;
+	      memcpy(pkgid, chksum, 16);
+	    }
+	}
+      else
+	{
+	  /* just skip the signature header */
+	  while (sigdsize)
+	    {
+	      l = sigdsize > 4096 ? 4096 : sigdsize;
+	      if (fread(lead, l, 1, fp) != 1)
+		{
+		  fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
+		  fclose(fp);
+		  continue;
+		}
+	      sigdsize -= l;
+	    }
 	}
       if (fread(lead, 16, 1, fp) != 1)
 	{
@@ -1780,13 +1814,15 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	}
       fclose(fp);
       s = pool_id2solvable(pool, repo_add_solvable(repo));
-      rpm2solv(pool, repo, data, s, rpmhead);
+      rpm2solv(pool, repo, data, s, rpmhead, flags);
       if (data)
 	{
 	  Id handle = s - pool->solvables;
 	  repodata_set_location(data, handle, 0, 0, rpms[i]);
 	  repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
 	  repodata_set_num(data, handle, SOLVABLE_HEADEREND, headerend);
+	  if (gotpkgid)
+	    repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
 	}
     }
   if (rpmhead)
