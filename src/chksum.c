@@ -99,8 +99,15 @@ sat_chksum_get(void *handle, int *lenp)
 }
 
 void *
-sat_chksum_free(void *handle)
+sat_chksum_free(void *handle, unsigned char *cp)
 {
+  if (cp)
+    {
+      unsigned char *res;
+      int l;
+      res = sat_chksum_get(handle, &l);
+      memcpy(cp, res, l);
+    }
   sat_free(handle);
   return 0;
 }
