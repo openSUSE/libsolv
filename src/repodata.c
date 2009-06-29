@@ -1069,7 +1069,7 @@ dataiterator_step(Dataiterator *di)
 	  if (di->repodataid >= 0)
 	    {
 	      di->repodataid = 0;	/* reset repodata iterator */
-	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)))
+	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)) && di->nparents == di->nkeynames)
 		{
 		  di->key = solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
 		  di->data = 0;
