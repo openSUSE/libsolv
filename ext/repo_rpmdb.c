@@ -1677,9 +1677,6 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
   else
     data = repo_last_repodata(repo);
 
-  if (nrpms <= 0)
-    return;
-
   for (i = 0; i < nrpms; i++)
     {
       if ((fp = fopen(rpms[i], "r")) == 0)
