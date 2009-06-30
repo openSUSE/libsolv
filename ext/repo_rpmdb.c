@@ -1816,7 +1816,8 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	{
 	  Id handle = s - pool->solvables;
 	  repodata_set_location(data, handle, 0, 0, rpms[i]);
-	  repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
+	  if (S_ISREG(stb.st_mode))
+	    repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
 	  repodata_set_num(data, handle, SOLVABLE_HEADEREND, headerend);
 	  if (gotpkgid)
 	    repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);

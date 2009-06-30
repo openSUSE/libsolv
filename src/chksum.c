@@ -76,23 +76,23 @@ sat_chksum_get(void *handle, int *lenp)
     case REPOKEY_TYPE_MD5:
       sat_MD5_Final(h->result, &h->c.md5);
       h->done = 1;
-      if (*lenp)
+      if (lenp)
 	*lenp = 16;
       return h->result;
     case REPOKEY_TYPE_SHA1:
       sat_SHA1_Final(&h->c.sha1, h->result);
       h->done = 1;
-      if (*lenp)
+      if (lenp)
 	*lenp = 20;
       return h->result;
     case REPOKEY_TYPE_SHA256:
       sat_SHA256_Final(h->result, &h->c.sha256);
       h->done = 1;
-      if (*lenp)
+      if (lenp)
 	*lenp = 32;
       return h->result;
     default:
-      if (*lenp)
+      if (lenp)
 	*lenp = 0;
       return 0;
     }

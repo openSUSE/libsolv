@@ -69,7 +69,6 @@ makedeps(Repo *repo, char *deps, unsigned int olddeps, Id marker)
   Pool *pool = repo->pool;
   char *p, *n, *ne, *e, *ee;
   Id id, name, evr;
-  int c;
   int flags;
 
   while ((p = strchr(deps, ',')) != 0)
@@ -296,13 +295,13 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
           continue;
         }
       l = fread(buf, 1, sizeof(buf), fp);
-      if (l < 8 + 60 || strncmp(buf, "!<arch>\ndebian-binary   ", 8 + 16) != 0)
+      if (l < 8 + 60 || strncmp((char *)buf, "!<arch>\ndebian-binary   ", 8 + 16) != 0)
 	{
 	  fprintf(stderr, "%s: not a deb package\n", debs[i]);
 	  fclose(fp);
           continue;
 	}
-      vlen = atoi(buf + 8 + 48);
+      vlen = atoi((char *)buf + 8 + 48);
       if (vlen < 0 || vlen > l)
 	{
 	  fprintf(stderr, "%s: not a deb package\n", debs[i]);
@@ -316,13 +315,13 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 	  fclose(fp);
           continue;
 	}
-      if (strncmp(buf + 8 + 60 + vlen, "control.tar.gz  ", 16) != 0)
+      if (strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz  ", 16) != 0)
 	{
 	  fprintf(stderr, "%s: control.tar.gz is not second entry\n", debs[i]);
 	  fclose(fp);
           continue;
 	}
-      clen = atoi(buf + 8 + 60 + vlen + 48);
+      clen = atoi((char *)buf + 8 + 60 + vlen + 48);
       if (clen <= 0)
 	{
 	  fprintf(stderr, "%s: control.tar.gz has illegal size\n", debs[i]);
@@ -411,7 +410,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 	  for (j = 124; j < 124 + 12; j++)
 	    if (bp[j] >= '0' && bp[j] <= '7')
 	      l2 = l2 * 8 + (bp[j] - '0');
-	  if (!strcmp(bp, "./control"))
+	  if (!strcmp((char *)bp, "./control"))
 	    break;
 	  l2 = 512 + ((l2 + 511) & ~511);
 	  l -= l2;

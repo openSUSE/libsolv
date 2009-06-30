@@ -135,10 +135,18 @@ id2str(const Pool *pool, Id id)
 
 static const char *rels[] = {
   " ! ",
+#ifndef DEBIAN_SEMANTICS
   " > ",
+#else
+  " >> ",
+#endif
   " = ",
   " >= ",
+#ifndef DEBIAN_SEMANTICS
   " < ",
+#else
+  " << ",
+#endif
   " <> ",
   " <= ",
   " <=> "
