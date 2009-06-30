@@ -140,9 +140,10 @@ makedeps(Repo *repo, char *deps, unsigned int olddeps, Id marker)
       if (!id)
 	id = name;
       else
-        id = rel2id(pool, id, name, REL_OR, 1);
+	id = rel2id(pool, id, name, REL_OR, 1);
       if (*p != '|')
 	break;
+      p++;
     }
   if (!id)
     return olddeps;
