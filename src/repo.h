@@ -65,19 +65,14 @@ static inline Id repo_add_solvable(Repo *repo)
   extern Id pool_add_solvable(Pool *pool);
   Id p = pool_add_solvable(repo->pool);
   if (!repo->start || repo->start == repo->end)
-    {
-      repo->start = p;
-      repo->end = p + 1;
-    }
-  else
-    {
-      if (p < repo->start)
-	repo->start = p;
-      if (p + 1 > repo->end)
-	repo->end = p + 1;
-    }
+    repo->start = repo->end = p;
+  /* warning: sidedata must be extended before adapting start/end */
   if (repo->rpmdbid)
     repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, 1);
+  if (p < repo->start)
+    repo->start = p;
+  if (p + 1 > repo->end)
+    repo->end = p + 1;
   repo->nsolvables++;
   repo->pool->solvables[p].repo = repo;
   return p;
@@ -92,19 +87,14 @@ static inline Id repo_add_solvable_block(Repo *repo, int count)
     return 0;
   p = pool_add_solvable_block(repo->pool, count);
   if (!repo->start || repo->start == repo->end)
-    {
-      repo->start = p;
-      repo->end = p + count;
-    }
-  else
-    {
-      if (p < repo->start)
-	repo->start = p;
-      if (p + count > repo->end)
-	repo->end = p + count;
-    }
+    repo->start = repo->end = p;
+  /* warning: sidedata must be extended before adapting start/end */
   if (repo->rpmdbid)
     repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, count);
+  if (p < repo->start)
+    repo->start = p;
+  if (p + count > repo->end)
+    repo->end = p + count;
   repo->nsolvables += count;
   for (s = repo->pool->solvables + p; count--; s++)
     s->repo = repo;
