@@ -232,6 +232,10 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  if (!strcasecmp(tag, "enhances"))
 	    s->enhances = makedeps(repo, q, s->enhances, 0);
 	  break;
+	case 'H' << 8 | 'O':
+	  if (!strcasecmp(tag, "homepage"))
+	    repodata_set_str(data, s - pool->solvables, SOLVABLE_URL, q);
+	  break;
 	case 'I' << 8 | 'N':
 	  if (!strcasecmp(tag, "installed-size"))
 	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, atoi(q));
