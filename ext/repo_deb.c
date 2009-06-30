@@ -63,9 +63,205 @@ decompress(unsigned char *in, int inl, int *outlp)
   return out;
 }
 
-static void
-control2solvable(Solvable *s, char *control)
+static unsigned int
+makedeps(Repo *repo, char *deps, unsigned int olddeps, Id marker)
 {
+  Pool *pool = repo->pool;
+  char *p, *n, *ne, *e, *ee;
+  Id id, name, evr;
+  int c;
+  int flags;
+
+  while ((p = strchr(deps, ',')) != 0)
+    {
+      *p++ = 0;
+      olddeps = makedeps(repo, deps, olddeps, marker);
+      deps = p;
+    }
+  id = 0;
+  p = deps;
+  for (;;)
+    {
+      while (*p == ' ' || *p == '\t' || *p == '\n')
+	p++;
+      if (!*p || *p == '(')
+	break;
+      n = p;
+      while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != '(' && *p != '|')
+	p++;
+      ne = p;
+      while (*p == ' ' || *p == '\t' || *p == '\n')
+	p++;
+      evr = 0;
+      flags = 0;
+      e = ee = 0;
+      if (*p == '(')
+	{
+	  p++;
+	  while (*p == ' ' || *p == '\t' || *p == '\n')
+	    p++;
+	  if (*p == '>')
+	    flags |= REL_GT;
+	  else if (*p == '=')
+	    flags |= REL_EQ;
+	  else if (*p == '<')
+	    flags |= REL_LT;
+	  if (flags)
+	    {
+	      p++;
+	      if (*p == '>')
+		flags |= REL_GT;
+	      else if (*p == '=')
+		flags |= REL_EQ;
+	      else if (*p == '<')
+		flags |= REL_LT;
+	      else
+		p--;
+	      p++;
+	    }
+	  while (*p == ' ' || *p == '\t' || *p == '\n')
+	    p++;
+	  e = p;
+	  while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != ')')
+	    p++;
+	  ee = p;
+	  while (*p && *p != ')')
+	    p++;
+	  if (*p)
+	    p++;
+	  while (*p == ' ' || *p == '\t' || *p == '\n')
+	    p++;
+	}
+      name = strn2id(pool, n, ne - n, 1);
+      if (e)
+	{
+	  evr = strn2id(pool, e, ee - e, 1);
+	  name = rel2id(pool, name, evr, flags, 1);
+	}
+      if (!id)
+	id = name;
+      else
+        id = rel2id(pool, id, name, REL_OR, 1);
+      if (*p != '|')
+	break;
+    }
+  if (!id)
+    return olddeps;
+  return repo_addid_dep(repo, olddeps, id, marker);
+}
+
+
+/* put data from control file into the solvable */
+/* warning: does inplace changes */
+static void
+control2solvable(Solvable *s, Repodata *data, char *control)
+{
+  Repo *repo = s->repo;
+  Pool *pool = repo->pool;
+  char *p, *q, *end, *tag;
+  int x, l;
+
+  p = control;
+  while (*p)
+    {
+      p = strchr(p, '\n');
+      if (!p)
+	break;
+      if (p[1] == ' ' || p[1] == '\t')
+	{
+	  char *q;
+	  /* continuation line */
+	  q = p - 1;
+	  while (q >= control && *q == ' ' && *q == '\t')
+	    q--;
+	  l = q + 1 - control;
+	  if (l)
+	    memmove(p + 1 - l, control, l);
+	  control = p + 1 - l;
+	  p[1] = '\n';
+	  p += 2;
+	  continue;
+	}
+      end = p - 1;
+      if (*p)
+        *p++ = 0;
+      /* strip trailing space */
+      while (end >= control && *end == ' ' && *end == '\t')
+	*end-- = 0;
+      tag = control;
+      control = p;
+      q = strchr(tag, ':');
+      if (!q || q - tag < 4)
+	continue;
+      *q++ = 0;
+      while (*q == ' ' || *q == '\t')
+	q++;
+      x = '@' + (tag[0] & 0x1f);
+      x = (x << 8) + '@' + (tag[1] & 0x1f);
+      switch(x)
+	{
+	case 'A' << 8 | 'R':
+	  if (!strcasecmp(tag, "architecture"))
+	    s->arch = str2id(pool, q, 1);
+	  break;
+	case 'B' << 8 | 'R':
+	  if (!strcasecmp(tag, "breaks"))
+	    s->conflicts = makedeps(repo, q, s->conflicts, 0);
+	  break;
+	case 'C' << 8 | 'O':
+	  if (!strcasecmp(tag, "conflicts"))
+	    s->conflicts = makedeps(repo, q, s->conflicts, 0);
+	  break;
+	case 'D' << 8 | 'E':
+	  if (!strcasecmp(tag, "depends"))
+	    s->requires = makedeps(repo, q, s->requires, -SOLVABLE_PREREQMARKER);
+	  else if (!strcasecmp(tag, "description"))
+	    {
+	      char *ld = strchr(q, '\n');
+	      if (ld)
+		{
+		  *ld++ = 0;
+	          repodata_set_str(data, s - pool->solvables, SOLVABLE_DESCRIPTION, ld);
+		}
+	      else
+	        repodata_set_str(data, s - pool->solvables, SOLVABLE_DESCRIPTION, q);
+	      repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, q);
+	    }
+	  break;
+	case 'E' << 8 | 'N':
+	  if (!strcasecmp(tag, "enhances"))
+	    s->enhances = makedeps(repo, q, s->enhances, 0);
+	  break;
+	case 'I' << 8 | 'N':
+	  if (!strcasecmp(tag, "installed-size"))
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, atoi(q));
+	  break;
+	case 'P' << 8 | 'A':
+	  if (!strcasecmp(tag, "package"))
+	    s->name = str2id(pool, q, 1);
+	  break;
+	case 'P' << 8 | 'R':
+	  if (!strcasecmp(tag, "pre-depends"))
+	    s->requires = makedeps(repo, q, s->requires, SOLVABLE_PREREQMARKER);
+	  else if (!strcasecmp(tag, "provides"))
+	    s->provides = makedeps(repo, q, s->provides, 0);
+	  break;
+	case 'R' << 8 | 'E':
+	  if (!strcasecmp(tag, "replaces"))
+	    s->obsoletes = makedeps(repo, q, s->conflicts, 0);
+	  else if (!strcasecmp(tag, "recommends"))
+	    s->recommends = makedeps(repo, q, s->recommends, 0);
+	  break;
+	case 'S' << 8 | 'U':
+	  if (!strcasecmp(tag, "suggests"))
+	    s->suggests = makedeps(repo, q, s->suggests, 0);
+	  break;
+	case 'V' << 8 | 'E':
+	  if (!strcasecmp(tag, "version"))
+	    s->evr = str2id(pool, q, 1);
+	  break;
+	}
+    }
 }
 
 void
@@ -231,23 +427,14 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
       ctar = sat_realloc(ctar, l2 + 1);
       ctar[l2] = 0;
       s = pool_id2solvable(pool, repo_add_solvable(repo));
-      control2solvable(s, (char *)ctar);
+      control2solvable(s, data, (char *)ctar);
       repodata_set_location(data, s - pool->solvables, 0, 0, debs[i]);
-      repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
+      if (S_ISREG(stb.st_mode))
+        repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
       if (gotpkgid)
 	repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
       sat_free(ctar);
     }
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-}
-
-int
-main(int argc, const char **argv)
-{
-  Pool *pool = pool_create();
-  Repo *repo = repo_create(pool, "debs2solv");
-  repo_add_debs(repo, argv + 1, argc - 1, DEBS_ADD_WITH_PKGID);
-  repo_write(repo, stdout, 0, 0, 0);
-  pool_free(pool);
 }
