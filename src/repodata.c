@@ -1229,6 +1229,8 @@ dataiterator_step(Dataiterator *di)
 	  di->key = di->data->keys + *di->keyp;
 	  di->ddp = (unsigned char *)di->kv.str;
 	  di->keyname = di->keynames[di->nparents];
+	  if (!di->ddp)
+	    goto di_bye;
 	  goto di_nextarrayelement;
 
         /* special solvable attr handling follows */
@@ -1317,6 +1319,81 @@ dataiterator_setpos_parent(Dataiterator *di)
   di->pool->pos.repodataid = di->data - di->repo->repodata;
   di->pool->pos.schema = di->kv.parent->id;
   di->pool->pos.dp = (unsigned char *)di->kv.parent->str - di->data->incoredata;
+}
+
+/* clones just the position, not the search keys/matcher */
+void
+dataiterator_clonepos(Dataiterator *di, Dataiterator *from)
+{
+  di->state = from->state;
+  di->flags &= ~SEARCH_THISSOLVID;
+  di->flags |= (from->flags & SEARCH_THISSOLVID);
+  di->repo = from->repo;
+  di->data = from->data;
+  di->dp = from->dp;
+  di->ddp = from->ddp;
+  di->idp = from->idp;
+  di->keyp = from->keyp;
+  di->key = from->key;
+  di->kv = from->kv;
+  di->repodataid = from->repodataid;
+  di->solvid = from->solvid;
+  di->repoid = from->repoid;
+  memcpy(di->parents, from->parents, sizeof(from->parents));
+  if (di->nparents)
+    {
+      int i;
+      for (i = 1; i < di->nparents; i++)
+	di->parents[i].kv.parent = &di->parents[i - 1].kv;
+      di->kv.parent = &di->parents[di->nparents - 1].kv;
+    }
+}
+
+void
+dataiterator_seek(Dataiterator *di, int whence)
+{
+  const char *lastparentstr = 0;
+  int i;
+
+  if ((whence & DI_SEEK_STAY) != 0)
+    {
+      for (i = 0; i < di->nparents; i++)
+	di->parents[i].kv.str = 0;
+      lastparentstr = di->nparents ? di->parents[di->nparents - 1].kv.str : 0;
+    }
+  switch (whence & ~DI_SEEK_STAY)
+    {
+    case DI_SEEK_CHILD:
+      if (di->state != di_nextarrayelement)
+	break;
+      if ((whence & DI_SEEK_STAY) != 0)
+	di->kv.str = 0;
+      di->state = di_entersub;
+      break;
+    case DI_SEEK_PARENT:
+      if (!di->nparents)
+	break;
+      if ((whence & DI_SEEK_STAY) != 0)
+	di->parents[di->nparents - 1].kv.str = lastparentstr;
+      di->nparents--;
+      di->dp = di->parents[di->nparents].dp;
+      di->kv = di->parents[di->nparents].kv;
+      di->keyp = di->parents[di->nparents].keyp;
+      di->key = di->data->keys + *di->keyp;
+      di->ddp = (unsigned char *)di->kv.str;
+      di->keyname = di->keynames[di->nparents];
+      di->state = di->ddp ? di_nextarrayelement : di_bye;
+      break;
+    case DI_SEEK_REWIND:
+      if (!di->nparents)
+	break;
+      di->dp = (unsigned char *)di->kv.parent->str;
+      di->keyp = di->data->schemadata + di->data->schemata[di->kv.parent->id];
+      di->state = di_enterschema;
+      break;
+    default:
+      break;
+    }
 }
 
 void

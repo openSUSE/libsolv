@@ -275,6 +275,14 @@ void dataiterator_skip_repo(Dataiterator *di);
 void dataiterator_jump_to_solvid(Dataiterator *di, Id solvid);
 void dataiterator_jump_to_repo(Dataiterator *di, Repo *repo);
 void dataiterator_entersub(Dataiterator *di);
+void dataiterator_clonepos(Dataiterator *di, Dataiterator *from);
+void dataiterator_seek(Dataiterator *di, int whence);
+
+#define DI_SEEK_STAY    (1 << 16)
+#define DI_SEEK_CHILD   1
+#define DI_SEEK_PARENT  2
+#define DI_SEEK_REWIND  3
+
 
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
 void repo_set_num(Repo *repo, Id p, Id keyname, Id num);
