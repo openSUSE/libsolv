@@ -275,6 +275,73 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 }
 
 void
+repo_add_debpackages(Repo *repo, FILE *fp, int flags)
+{
+  Pool *pool = repo->pool;
+  Repodata *data;
+  char *buf, *p;
+  int bufl, l, ll;
+  Solvable *s;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
+  buf = sat_malloc(4096);
+  bufl = 4096;
+  l = 0;
+  buf[l] = 0;
+  p = buf;
+  for (;;)
+    {
+      if (!(p = strchr(p, '\n')))
+	{
+	  int l3;
+	  if (l + 1024 >= bufl)
+	    {
+	      buf = sat_realloc(buf, bufl + 4096);
+	      bufl += 4096;
+	      p = buf + l;
+	      continue;
+	    }
+	  p = buf + l;
+	  ll = fread(p, 1, bufl - l - 1, fp);
+	  if (ll <= 0)
+	    break;
+	  p[ll] = 0;
+	  while ((l3 = strlen(p)) < ll)
+	    p[l3] = '\n';
+	  l += ll;
+	  continue;
+	}
+      p++;
+      if (*p != '\n')
+	continue;
+      *p = 0;
+      ll = p - buf + 1;
+      s = pool_id2solvable(pool, repo_add_solvable(repo));
+      control2solvable(s, data, buf);
+      if (!s->name)
+	repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+      if (l > ll)
+        memmove(buf, p + 1, l - ll);
+      l -= ll;
+      p = buf;
+      buf[l] = 0;
+    }
+  if (l)
+    {
+      s = pool_id2solvable(pool, repo_add_solvable(repo));
+      control2solvable(s, data, buf);
+      if (!s->name)
+	repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+    }
+  sat_free(buf);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+}
+
+void
 repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 {
   Pool *pool = repo->pool;
