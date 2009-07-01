@@ -397,8 +397,13 @@ policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2)
     }
 
   /* we allow changes to/from noarch */
+#ifndef DEBIAN_SEMANTICS
   if (a1 == a2 || a1 == ARCH_NOARCH || a2 == ARCH_NOARCH)
     return 0;
+#else
+  if (a1 == a2 || a1 == ARCH_ALL || a2 == ARCH_ALL)
+    return 0;
+#endif
   if (!pool->id2arch)
     return 0;
   a1 = a1 <= pool->lastarch ? pool->id2arch[a1] : 0;

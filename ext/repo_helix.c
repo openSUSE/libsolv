@@ -619,7 +619,7 @@ endElement(void *userData, const char *name)
                         pd->version ? pd->evrspace + pd->version : 0,
                         pd->release ? pd->evrspace + pd->release : 0);
       /* ensure self-provides */
-      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+      if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_supplements(pd->repo, s->provides, s->supplements, pd->freshens);
       s->conflicts = repo_fix_conflicts(pd->repo, s->conflicts);

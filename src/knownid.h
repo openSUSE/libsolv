@@ -57,6 +57,7 @@ KNOWNID(SYSTEM_SYSTEM,			"system:system"),
 KNOWNID(ARCH_SRC,			"src"),
 KNOWNID(ARCH_NOSRC,			"nosrc"),
 KNOWNID(ARCH_NOARCH,			"noarch"),
+KNOWNID(ARCH_ALL,			"all"),
 
 KNOWNID(REPOSITORY_SOLVABLES,		"repository:solvables"),
 KNOWNID(REPOSITORY_DELTAINFO,		"repository:deltainfo"),

@@ -376,7 +376,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		  /* finish old solvable */
 		  if (!s->arch)
 		    s->arch = ARCH_NOARCH;
-		  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+		  if (!s->evr)
+		    s->evr = ID_EMPTY;
+		  if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 		    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 		  if (code10)
 		    s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
@@ -514,7 +516,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 
       if (!s->arch)
 	s->arch = ARCH_NOARCH;
-      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+      if (!s->evr)
+	s->evr = ID_EMPTY;
+      if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (code10)
 	s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
@@ -530,7 +534,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	  p->arch = otherarchs[i];
 
 	  /* self provides */
-	  if (p->arch != ARCH_SRC && p->arch != ARCH_NOSRC)
+	  if (s->name && p->arch != ARCH_SRC && p->arch != ARCH_NOSRC)
 	      p->provides = repo_addid_dep(repo, p->provides, rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
 
 	  /* now merge the attributes */

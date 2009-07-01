@@ -102,11 +102,9 @@ add_releasefile_product(Repo *repo, FILE *fp)
     {
       Solvable *s = pool_id2solvable(pool, repo_add_solvable(repo));
       s->name = name;
-      if (version)
-	s->evr = version;
-      if (arch)
-	s->arch = arch;
-      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+      s->evr = version ? version : ID_EMPTY;
+      s->arch = arch ? arch : ARCH_NOARCH;
+      if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
     }
 }

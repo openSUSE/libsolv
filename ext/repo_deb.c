@@ -266,6 +266,12 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	}
     }
+  if (!s->arch)
+    s->arch = ARCH_ALL;
+  if (!s->evr)
+    s->evr = ID_EMPTY;
+  if (s->name)
+    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 }
 
 void

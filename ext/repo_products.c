@@ -293,7 +293,9 @@ endElement(void *userData, const char *name)
       pd->tmprel = sat_free((void *)pd->tmprel);
       if (!s->arch)
 	s->arch = ARCH_NOARCH;
-      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+      if (!s->evr)
+	s->evr = ID_EMPTY;
+      if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->solvable = 0;
       break;

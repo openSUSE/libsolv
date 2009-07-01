@@ -383,7 +383,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
 #endif
   /* A self provide, except for source packages.  This is harmless
      to do twice (in case we see the same package twice).  */
-  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+  if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(pd->repo, s->provides,
 		rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   /* XXX This uses repo_addid_dep internally, so should also be
