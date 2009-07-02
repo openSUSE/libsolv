@@ -219,6 +219,10 @@ typedef struct _Dataiterator
   Id solvid;
   Id repoid;
 
+  Id keynames[3 + 1];
+  int nkeynames;
+  int rootlevel;
+
   /* recursion data */
   struct di_parent {
     KeyValue kv;
@@ -226,8 +230,6 @@ typedef struct _Dataiterator
     Id *keyp;
   } parents[3];
   int nparents;
-  Id keynames[3 + 1];
-  int nkeynames;
 
 } Dataiterator;
 

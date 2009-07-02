@@ -1069,7 +1069,7 @@ dataiterator_step(Dataiterator *di)
 	  if (di->repodataid >= 0)
 	    {
 	      di->repodataid = 0;	/* reset repodata iterator */
-	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)) && di->nparents == di->nkeynames)
+	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)) && di->nparents - di->rootlevel == di->nkeynames)
 		{
 		  di->key = solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
 		  di->data = 0;
@@ -1115,7 +1115,7 @@ dataiterator_step(Dataiterator *di)
 	    goto di_nextkey;
 	  if (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY)
 	    goto di_enterarray;
-	  if (di->nparents < di->nkeynames)
+	  if (di->nkeynames && di->nparents - di->rootlevel < di->nkeynames)
 	    goto di_nextkey;
 	  /* FALLTHROUGH */
 
@@ -1185,7 +1185,7 @@ dataiterator_step(Dataiterator *di)
 	    di->ddp = data_skip_schema(di->data, di->ddp, di->kv.id);
 	  if (di->kv.entry == di->kv.num)
 	    {
-	      if (di->nparents < di->nkeynames)
+	      if (di->nkeynames && di->nparents - di->rootlevel < di->nkeynames)
 		goto di_nextkey;
 	      if (!(di->flags & SEARCH_ARRAYSENTINEL))
 		goto di_nextkey;
@@ -1199,7 +1199,7 @@ dataiterator_step(Dataiterator *di)
 	  if (di->key->type == REPOKEY_TYPE_FLEXARRAY || !di->kv.entry)
 	    di->ddp = data_read_id(di->ddp, &di->kv.id);
 	  di->kv.str = (char *)di->ddp;
-	  if (di->nparents < di->nkeynames)
+	  if (di->nkeynames && di->nparents - di->rootlevel < di->nkeynames)
 	    goto di_entersub;
 	  if ((di->flags & SEARCH_SUB) != 0)
 	    di->state = di_entersub;
@@ -1218,19 +1218,19 @@ dataiterator_step(Dataiterator *di)
 	  memset(&di->kv, 0, sizeof(di->kv));
 	  di->kv.parent = &di->parents[di->nparents].kv;
 	  di->nparents++;
-	  di->keyname = di->keynames[di->nparents];
+	  di->keyname = di->keynames[di->nparents - di->rootlevel];
 	  goto di_enterschema;
 
 	case di_leavesub: di_leavesub:
+	  if (di->nparents - 1 < di->rootlevel)
+	    goto di_bye;
 	  di->nparents--;
 	  di->dp = di->parents[di->nparents].dp;
 	  di->kv = di->parents[di->nparents].kv;
 	  di->keyp = di->parents[di->nparents].keyp;
 	  di->key = di->data->keys + *di->keyp;
 	  di->ddp = (unsigned char *)di->kv.str;
-	  di->keyname = di->keynames[di->nparents];
-	  if (!di->ddp)
-	    goto di_bye;
+	  di->keyname = di->keynames[di->nparents - di->rootlevel];
 	  goto di_nextarrayelement;
 
         /* special solvable attr handling follows */
@@ -1339,6 +1339,7 @@ dataiterator_clonepos(Dataiterator *di, Dataiterator *from)
   di->repodataid = from->repodataid;
   di->solvid = from->solvid;
   di->repoid = from->repoid;
+  di->rootlevel = from->rootlevel;
   memcpy(di->parents, from->parents, sizeof(from->parents));
   if (di->nparents)
     {
@@ -1352,41 +1353,40 @@ dataiterator_clonepos(Dataiterator *di, Dataiterator *from)
 void
 dataiterator_seek(Dataiterator *di, int whence)
 {
-  const char *lastparentstr = 0;
-  int i;
-
   if ((whence & DI_SEEK_STAY) != 0)
-    {
-      for (i = 0; i < di->nparents; i++)
-	di->parents[i].kv.str = 0;
-      lastparentstr = di->nparents ? di->parents[di->nparents - 1].kv.str : 0;
-    }
+    di->rootlevel = di->nparents;
   switch (whence & ~DI_SEEK_STAY)
     {
     case DI_SEEK_CHILD:
       if (di->state != di_nextarrayelement)
 	break;
       if ((whence & DI_SEEK_STAY) != 0)
-	di->kv.str = 0;
+	di->rootlevel = di->nparents + 1;	/* XXX: dangerous! */
       di->state = di_entersub;
       break;
     case DI_SEEK_PARENT:
       if (!di->nparents)
-	break;
-      if ((whence & DI_SEEK_STAY) != 0)
-	di->parents[di->nparents - 1].kv.str = lastparentstr;
+	{
+	  di->state = di_bye;
+	  break;
+	}
       di->nparents--;
+      if (di->rootlevel > di->nparents)
+	di->rootlevel = di->nparents;
       di->dp = di->parents[di->nparents].dp;
       di->kv = di->parents[di->nparents].kv;
       di->keyp = di->parents[di->nparents].keyp;
       di->key = di->data->keys + *di->keyp;
       di->ddp = (unsigned char *)di->kv.str;
-      di->keyname = di->keynames[di->nparents];
-      di->state = di->ddp ? di_nextarrayelement : di_bye;
+      di->keyname = di->keynames[di->nparents - di->rootlevel];
+      di->state = di_nextarrayelement;
       break;
     case DI_SEEK_REWIND:
       if (!di->nparents)
-	break;
+	{
+	  di->state = di_bye;
+	  break;
+	}
       di->dp = (unsigned char *)di->kv.parent->str;
       di->keyp = di->data->schemadata + di->data->schemata[di->kv.parent->id];
       di->state = di_enterschema;
@@ -1421,6 +1421,7 @@ void
 dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
 {
   di->nparents = 0;
+  di->rootlevel = 0;
   if (solvid == SOLVID_POS)
     {
       di->repo = di->pool->pos.repo;
@@ -1463,6 +1464,7 @@ void
 dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
 {
   di->nparents = 0;
+  di->rootlevel = 0;
   di->repo = repo;
   di->repoid = -1;
   di->repodataid = 0;
