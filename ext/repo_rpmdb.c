@@ -33,6 +33,7 @@
 #include "hash.h"
 #include "util.h"
 #include "queue.h"
+#include "chksum.h"
 #include "repo_rpmdb.h"
 
 #define RPMDB_COOKIE_VERSION 2
@@ -1671,12 +1672,18 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
   Repodata *data;
   unsigned char pkgid[16];
   int gotpkgid;
+  Id chksumtype = 0;
+  void *chksumh = 0;
 
   if (!(flags & REPO_REUSE_REPODATA))
     data = repo_add_repodata(repo, 0);
   else
     data = repo_last_repodata(repo);
 
+  if ((flags & RPM_ADD_WITH_SHA256SUM) != 0)
+    chksumtype = REPOKEY_TYPE_SHA256;
+  else if ((flags & RPM_ADD_WITH_SHA1SUM) != 0)
+    chksumtype = REPOKEY_TYPE_SHA1;
   for (i = 0; i < nrpms; i++)
     {
       if ((fp = fopen(rpms[i], "r")) == 0)
@@ -1689,12 +1696,18 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  perror("stat");
 	  continue;
 	}
+      if (chksumh)
+	chksumh = sat_chksum_free(chksumh, 0);
+      if (chksumtype)
+	chksumh = sat_chksum_create(chksumtype);
       if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
 	{
 	  fprintf(stderr, "%s: not a rpm\n", rpms[i]);
 	  fclose(fp);
 	  continue;
 	}
+      if (chksumh)
+	sat_chksum_add(chksumh, lead, 96 + 16);
       if (lead[78] != 0 || lead[79] != 5)
 	{
 	  fprintf(stderr, "%s: not a V5 header\n", rpms[i]);
@@ -1735,6 +1748,8 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	      fclose(fp);
 	      continue;
 	    }
+	  if (chksumh)
+	    sat_chksum_add(chksumh, rpmhead->data, sigdsize);
 	  rpmhead->cnt = sigcnt;
 	  rpmhead->dcnt = sigdsize - sigcnt * 16;
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -1757,6 +1772,8 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 		  fclose(fp);
 		  continue;
 		}
+	      if (chksumh)
+		sat_chksum_add(chksumh, lead, l);
 	      sigdsize -= l;
 	    }
 	}
@@ -1766,6 +1783,8 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  fclose(fp);
 	  continue;
 	}
+      if (chksumh)
+	sat_chksum_add(chksumh, lead, 16);
       if (getu32(lead) != 0x8eade801)
 	{
 	  fprintf(stderr, "%s: bad header\n", rpms[i]);
@@ -1793,6 +1812,8 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  fclose(fp);
 	  continue;
 	}
+      if (chksumh)
+	sat_chksum_add(chksumh, rpmhead->data, l);
       rpmhead->cnt = sigcnt;
       rpmhead->dcnt = sigdsize;
       rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -1809,6 +1830,9 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  fclose(fp);
 	  continue;
 	}
+      if (chksumh)
+	while ((l = fread(lead, 1, sizeof(lead), fp)) > 0)
+	  sat_chksum_add(chksumh, lead, l);
       fclose(fp);
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       rpm2solv(pool, repo, data, s, rpmhead, flags);
@@ -1821,8 +1845,12 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  repodata_set_num(data, handle, SOLVABLE_HEADEREND, headerend);
 	  if (gotpkgid)
 	    repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
+	  if (chksumh)
+	    repodata_set_bin_checksum(data, handle, SOLVABLE_CHECKSUM, chksumtype, sat_chksum_get(chksumh, 0));
 	}
     }
+  if (chksumh)
+    chksumh = sat_chksum_free(chksumh, 0);
   if (rpmhead)
     sat_free(rpmhead);
   if (!(flags & REPO_NO_INTERNALIZE))
