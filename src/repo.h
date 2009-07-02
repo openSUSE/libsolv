@@ -187,7 +187,8 @@ const unsigned char *repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyid, Id
 
 typedef struct _Datamatcher {
   int flags;
-  void *match;
+  const char *match;
+  void *matchdata;
   int error;
 } Datamatcher;
 
@@ -264,6 +265,7 @@ int datamatcher_match(Datamatcher *ma, const char *str);
  * match:   if non-null, limit search to this match
  */
 int dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, const char *match, int flags);
+void datamatcher_init_clone(Dataiterator *di, Dataiterator *from);
 void dataiterator_set_search(Dataiterator *di, Repo *repo, Id p);
 void dataiterator_set_keyname(Dataiterator *di, Id keyname);
 int dataiterator_set_match(Dataiterator *di, const char *match, int flags);

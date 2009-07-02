@@ -866,17 +866,17 @@ solvabledata_fetch(Solvable *s, KeyValue *kv, Id keyname)
 int
 datamatcher_init(Datamatcher *ma, const char *match, int flags)
 {
-  ma->match = (void *)match;
+  ma->match = match;
   ma->flags = flags;
   ma->error = 0;
+  ma->matchdata = 0;
   if ((flags & SEARCH_STRINGMASK) == SEARCH_REGEX)
     {
-      ma->match = sat_calloc(1, sizeof(regex_t));
-      ma->error = regcomp((regex_t *)ma->match, match, REG_EXTENDED | REG_NOSUB | REG_NEWLINE | ((flags & SEARCH_NOCASE) ? REG_ICASE : 0));
+      ma->matchdata = sat_calloc(1, sizeof(regex_t));
+      ma->error = regcomp((regex_t *)ma->matchdata, match, REG_EXTENDED | REG_NOSUB | REG_NEWLINE | ((flags & SEARCH_NOCASE) ? REG_ICASE : 0));
       if (ma->error)
 	{
-	  sat_free(ma->match);
-	  ma->match = (void *)match;
+	  sat_free(ma->matchdata);
 	  ma->flags = (flags & ~SEARCH_STRINGMASK) | SEARCH_ERROR;
 	}
     }
@@ -886,10 +886,10 @@ datamatcher_init(Datamatcher *ma, const char *match, int flags)
 void
 datamatcher_free(Datamatcher *ma)
 {
-  if ((ma->flags & SEARCH_STRINGMASK) == SEARCH_REGEX && ma->match)
+  if ((ma->flags & SEARCH_STRINGMASK) == SEARCH_REGEX && ma->matchdata)
     {
-      regfree(ma->match);
-      ma->match = sat_free(ma->match);
+      regfree(ma->matchdata);
+      ma->matchdata = sat_free(ma->matchdata);
     }
 }
 
@@ -901,33 +901,33 @@ datamatcher_match(Datamatcher *ma, const char *str)
     case SEARCH_SUBSTRING:
       if (ma->flags & SEARCH_NOCASE)
 	{
-	  if (!strcasestr(str, (const char *)ma->match))
+	  if (!strcasestr(str, ma->match))
 	    return 0;
 	}
       else
 	{
-	  if (!strstr(str, (const char *)ma->match))
+	  if (!strstr(str, ma->match))
 	    return 0;
 	}
       break;
     case SEARCH_STRING:
       if (ma->flags & SEARCH_NOCASE)
 	{
-	  if (strcasecmp((const char *)ma->match, str))
+	  if (strcasecmp(ma->match, str))
 	    return 0;
 	}
       else
 	{
-	  if (strcmp((const char *)ma->match, str))
+	  if (strcmp(ma->match, str))
 	    return 0;
 	}
       break;
     case SEARCH_GLOB:
-      if (fnmatch((const char *)ma->match, str, (ma->flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
+      if (fnmatch(ma->match, str, (ma->flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
 	return 0;
       break;
     case SEARCH_REGEX:
-      if (regexec((const regex_t *)ma->match, str, 0, NULL, 0))
+      if (regexec((const regex_t *)ma->matchdata, str, 0, NULL, 0))
 	return 0;
       break;
     default:
@@ -986,6 +986,23 @@ dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, co
   di->keynames[0] = keyname;
   dataiterator_set_search(di, repo, p);
   return 0;
+}
+
+void
+dataiterator_init_clone(Dataiterator *di, Dataiterator *from)
+{
+  *di = *from;
+  memset(&di->matcher, 0, sizeof(di->matcher));
+  if (from->matcher.match)
+    datamatcher_init(&di->matcher, from->matcher.match, from->matcher.flags);
+  if (di->nparents)
+    {
+      /* fix pointers */
+      int i;
+      for (i = 1; i < di->nparents; i++)
+	di->parents[i].kv.parent = &di->parents[i - 1].kv;
+      di->kv.parent = &di->parents[di->nparents - 1].kv;
+    }
 }
 
 int
