@@ -636,8 +636,10 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
 	kv->str = id2str(pool, kv->id);
       if ((flags & SEARCH_SKIP_KIND) != 0 && key->storage == KEY_STORAGE_SOLVABLE)
 	{
-	  const char *s = strchr(kv->str, ':');
-	  if (s)
+	  const char *s;
+	  for (s = kv->str; *s >= 'a' && *s <= 'z'; s++)
+	    ;
+	  if (*s == ':' && s > kv->str)
 	    kv->str = s + 1;
 	}
       return 1;
@@ -968,6 +970,7 @@ dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, co
 {
   memset(di, 0, sizeof(*di));
   di->pool = pool;
+  di->flags = flags & ~SEARCH_THISSOLVID;
   if (!pool || (repo && repo->pool != pool))
     {
       di->state = di_bye;
