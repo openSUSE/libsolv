@@ -263,8 +263,11 @@ int datamatcher_match(Datamatcher *ma, const char *str);
  * keyname: if non-null, limit search to this keyname
  * match:   if non-null, limit search to this match
  */
-int dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname,
-		       const char *match, int flags);
+int dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, const char *match, int flags);
+void dataiterator_set_search(Dataiterator *di, Repo *repo, Id p);
+void dataiterator_set_keyname(Dataiterator *di, Id keyname);
+int dataiterator_set_match(Dataiterator *di, const char *match, int flags);
+
 void dataiterator_prepend_keyname(Dataiterator *di, Id keyname);
 void dataiterator_free(Dataiterator *di);
 int dataiterator_step(Dataiterator *di);

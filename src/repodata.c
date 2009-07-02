@@ -982,26 +982,60 @@ dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, co
 	  return error;
 	}
     }
-  di->repo = repo;
   di->keyname = keyname;
   di->keynames[0] = keyname;
-  di->flags = flags & ~SEARCH_THISSOLVID;
-  if (!pool->nrepos)
+  dataiterator_set_search(di, repo, p);
+  return 0;
+}
+
+int
+dataiterator_set_match(Dataiterator *di, const char *match, int flags)
+{
+  di->flags = (flags & ~SEARCH_THISSOLVID) | (di->flags & SEARCH_THISSOLVID);
+  datamatcher_free(&di->matcher);
+  memset(&di->matcher, 0, sizeof(di->matcher));
+  if (match)
     {
-      di->state = di_bye;
-      return 0;
-    }
-  if (repo)
-    di->repoid = -1;
-  if (p)
-    dataiterator_jump_to_solvid(di, p);
-  else
-    {
-      if (!di->repo)
-        di->repo = pool->repos[0];
-      di->state = di_enterrepo;
+      int error;
+      if ((error = datamatcher_init(&di->matcher, match, flags)) != 0)
+	{
+	  di->state = di_bye;
+	  return error;
+	}
     }
   return 0;
+}
+
+void
+dataiterator_set_search(Dataiterator *di, Repo *repo, Id p)
+{
+  di->repo = repo;
+  di->repoid = -1;
+  di->flags &= ~SEARCH_THISSOLVID;
+  di->nparents = 0;
+  di->rootlevel = 0;
+  di->repodataid = 0;
+  if (!di->pool->nrepos)
+    {
+      di->state = di_bye;
+      return;
+    }
+  if (!repo)
+    {
+      di->repoid = 0;
+      di->repo = di->pool->repos[0];
+    }
+  di->state = di_enterrepo;
+  if (p)
+    dataiterator_jump_to_solvid(di, p);
+}
+
+void
+dataiterator_set_keyname(Dataiterator *di, Id keyname)
+{
+  di->nkeynames = 0;
+  di->keyname = keyname;
+  di->keynames[0] = keyname;
 }
 
 void
@@ -1341,6 +1375,7 @@ dataiterator_clonepos(Dataiterator *di, Dataiterator *from)
   di->repoid = from->repoid;
   di->rootlevel = from->rootlevel;
   memcpy(di->parents, from->parents, sizeof(from->parents));
+  di->nparents = from->nparents;
   if (di->nparents)
     {
       int i;
