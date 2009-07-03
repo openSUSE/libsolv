@@ -401,7 +401,13 @@ writecachedrepo(Repo *repo, unsigned char *cookie)
   repodata_internalize(info);
   repo_write(repo, fp, 0, 0, 0);
   repodata_free(info);
-  fwrite(cookie, 32, 1, fp);
+  if (fwrite(cookie, 32, 1, fp) != 1)
+    {
+      fclose(fp);
+      unlink(tmpl);
+      free(tmpl);
+      return;
+    }
   if (fclose(fp))
     {
       unlink(tmpl);
