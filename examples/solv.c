@@ -50,7 +50,7 @@
 # define PRODUCTS_PATH "/etc/products.d"
 #endif
 
-#define SOLVCACHE_PATH "/var/lib/solv.cache"
+#define SOLVCACHE_PATH "/var/cache/solv"
 
 
 struct repoinfo {
