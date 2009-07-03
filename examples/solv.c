@@ -226,7 +226,7 @@ myfopen(const char *fn)
 }
 
 FILE *
-curlfopen(struct repoinfo *cinfo, const char *file, int uncompress)
+curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype)
 {
   pid_t pid;
   int fd, l;
@@ -273,6 +273,31 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress)
       return 0;
     }
   lseek(fd, 0, SEEK_SET);
+  if (chksumtype)
+    {
+      char buf[1024];
+      unsigned char *sum;
+      void *h = sat_chksum_create(chksumtype);
+      int l;
+
+      if (!h)
+	{
+	  printf("%s: unknown checksum type\n", file);
+	  close(fd);
+	  return 0;
+	}
+      while ((l = read(fd, buf, sizeof(buf))) > 0)
+	sat_chksum_add(h, buf, l);
+      lseek(fd, 0, SEEK_SET);
+      l = 0;
+      sum = sat_chksum_get(h, &l);
+      if (memcmp(sum, chksum, l))
+	{
+	  printf("%s: checksum mismatch\n", file);
+	  close(fd);
+	  return 0;
+	}
+    }
   if (uncompress)
     {
       cookie_io_functions_t cio;
@@ -330,8 +355,8 @@ setarch(Pool *pool)
 
 char *calccachepath(Repo *repo)
 {
-  char *p = pool_tmpjoin(repo->pool, SOLVCACHE_PATH, "/", repo->name);
-  char *q = p;
+  char *q, *p = pool_tmpjoin(repo->pool, SOLVCACHE_PATH, "/", repo->name);
+  p = pool_tmpjoin(repo->pool, p, ".solv", 0);
   q = p + strlen(SOLVCACHE_PATH) + 1;
   if (*q == '.')
     *q = '_';
@@ -432,6 +457,8 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   FILE *fp;
   Dataiterator di;
   const char *primaryfile;
+  const unsigned char *primaryfilechksum;
+  Id primaryfilechksumtype;
   const char *descrdir;
   int defvendor;
   int havecontent;
@@ -493,7 +520,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
         case TYPE_RPMMD:
 	  printf("rpmmd repo '%s':", cinfo->alias);
 	  fflush(stdout);
-	  if ((fp = curlfopen(cinfo, "repodata/repomd.xml", 0)) == 0)
+	  if ((fp = curlfopen(cinfo, "repodata/repomd.xml", 0, 0, 0)) == 0)
 	    {
 	      printf(" no data, skipped\n");
 	      repo_free(repo, 1);
@@ -511,17 +538,20 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
 	  primaryfile = 0;
+	  primaryfilechksum = 0;
+	  primaryfilechksumtype = 0;
 	  dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_REPOMD_TYPE, "primary", SEARCH_STRING);
 	  dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
 	  if (dataiterator_step(&di))
 	    {
 	      dataiterator_setpos_parent(&di);
 	      primaryfile = pool_lookup_str(pool, SOLVID_POS, REPOSITORY_REPOMD_LOCATION);
+	      primaryfilechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, REPOSITORY_REPOMD_CHECKSUM, &primaryfilechksumtype);
 	    }
 	  dataiterator_free(&di);
 	  if (!primaryfile)
 	    primaryfile = "repodata/primary.xml.gz";
-	  if ((fp = curlfopen(cinfo, primaryfile, 1)) == 0)
+	  if ((fp = curlfopen(cinfo, primaryfile, 1, primaryfilechksum, primaryfilechksumtype)) == 0)
 	    continue;
 	  repo_add_rpmmd(repo, fp, 0, 0);
 	  fclose(fp);
@@ -536,7 +566,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repo->priority = 99 - cinfo->priority;
 	  descrdir = 0;
 	  defvendor = 0;
-	  if ((fp = curlfopen(cinfo, "content", 0)) != 0)
+	  if ((fp = curlfopen(cinfo, "content", 0, 0, 0)) != 0)
 	    {
 	      calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
 	      if (usecachedrepo(repo, cookie))
@@ -554,8 +584,8 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  if (!descrdir)
 	    descrdir = "suse/setup/descr";
 	  printf(" reading\n");
-	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/packages.gz", 0), 1)) == 0)
-	    if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/packages", 0), 0)) == 0)
+	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/packages.gz", 0), 1, 0, 0)) == 0)
+	    if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/packages", 0), 0, 0, 0)) == 0)
 	      break;
 	  repo_add_susetags(repo, fp, defvendor, 0, 0);
 	  fclose(fp);
@@ -787,11 +817,17 @@ main(int argc, char **argv)
   Transaction *trans;
   char inbuf[128], *ip;
   int updateall = 0;
+  int distupgrade = 0;
   FILE **newpkgsfps;
   struct fcstate fcstate;
 
   argc--;
   argv++;
+  if (!argv[0])
+    {
+      fprintf(stderr, "Usage: solv install|erase|update|show <select>\n");
+      exit(1);
+    }
   if (!strcmp(argv[0], "install") || !strcmp(argv[0], "in"))
     mode = SOLVER_INSTALL;
   else if (!strcmp(argv[0], "erase") || !strcmp(argv[0], "rm"))
@@ -800,6 +836,11 @@ main(int argc, char **argv)
     mode = 0;
   else if (!strcmp(argv[0], "update") || !strcmp(argv[0], "up"))
     mode = SOLVER_UPDATE;
+  else if (!strcmp(argv[0], "dist-upgrade") || !strcmp(argv[0], "dup"))
+    {
+      mode = SOLVER_UPDATE;
+      distupgrade = 1;
+    }
   else
     {
       fprintf(stderr, "Usage: solv install|erase|update|show <select>\n");
@@ -860,6 +901,15 @@ rerunsolver:
       solv = solver_create(pool);
       solv->ignorealreadyrecommended = 1;
       solv->updatesystem = updateall;
+      solv->dosplitprovides = updateall;
+      if (updateall && distupgrade)
+	{
+	  solv->distupgrade = 1;
+          solv->allowdowngrade = 1;
+          solv->allowarchchange = 1;
+          solv->allowvendorchange = 1;
+	}
+      // queue_push2(&job, SOLVER_DISTUPGRADE, 3);
       solver_solve(solv, &job);
       if (!solv->problems.count)
 	break;
@@ -943,6 +993,8 @@ rerunsolver:
 	  char *loc;
 	  Solvable *s;
 	  struct repoinfo *cinfo;
+	  const unsigned char *chksum;
+	  Id chksumtype;
 
 	  p = checkq.elements[i];
 	  s = pool_id2solvable(pool, p);
@@ -960,7 +1012,9 @@ rerunsolver:
 	      const char *datadir = repo_lookup_str(cinfo->repo, SOLVID_META, SUSETAGS_DATADIR);
 	      loc = pool_tmpjoin(pool, datadir ? datadir : "suse", "/", loc);
 	    }
-	  if ((newpkgsfps[i] = curlfopen(cinfo, loc, 0)) == 0)
+	  chksumtype = 0;
+	  chksum = solvable_lookup_bin_checksum(s, SOLVABLE_CHECKSUM, &chksumtype);
+	  if ((newpkgsfps[i] = curlfopen(cinfo, loc, 0, chksum, chksumtype)) == 0)
 	    {
 	      printf("%s: %s not found in repository\n", s->repo->name, loc);
 	      exit(1);

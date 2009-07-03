@@ -2698,7 +2698,7 @@ solver_solve(Solver *solv, Queue *job)
 	      if (!solv->installed || s->repo != solv->installed)
 		continue;
 	      if (!solv->updatemap.size)
-		map_grow(&solv->updatemap, pool->nsolvables);
+		map_grow(&solv->updatemap, solv->installed->end - solv->installed->start);
 	      MAPSET(&solv->updatemap, p - solv->installed->start);
 	    }
 	  break;
