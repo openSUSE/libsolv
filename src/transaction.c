@@ -1611,7 +1611,9 @@ transaction_order(Transaction *trans, int flags)
      }
   POOL_DEBUG(SAT_DEBUG_STATS, "cycle edge creation took %d ms\n", sat_timems(now));
 
+#if 0
   dump_tes(&od);
+#endif
   /* all edges are finally set up and there are no cycles, now the easy part.
    * Create an ordered transaction */
   now = sat_timems(0);

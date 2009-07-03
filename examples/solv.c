@@ -8,8 +8,8 @@
 /* solv, a little software installer demoing the sat solver library */
 
 /* things missing:
- * - repository data caching
- * - signature verification
+ * - signature and checksum verification
+ * - vendor policy loading
  */
 
 #define _GNU_SOURCE
@@ -30,7 +30,10 @@
 #include "util.h"
 #include "solver.h"
 #include "solverdebug.h"
+#include "chksum.h"
+#include "repo_solv.h"
 
+#include "repo_write.h"
 #include "repo_rpmdb.h"
 #include "repo_products.h"
 #include "repo_rpmmd.h"
@@ -46,6 +49,8 @@
 # define REPOINFO_PATH "/etc/zypp/repos.d"
 # define PRODUCTS_PATH "/etc/products.d"
 #endif
+
+#define SOLVCACHE_PATH "/var/lib/solv.cache"
 
 
 struct repoinfo {
@@ -284,6 +289,30 @@ curlfopen(const char *baseurl, const char *file, int uncompress)
 }
 
 void
+calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
+{
+  char buf[4096];
+  void *h = sat_chksum_create(chktype);
+  int l;
+
+  while ((l = fread(buf, 1, sizeof(buf), fp)) > 0)
+    sat_chksum_add(h, buf, l);
+  rewind(fp);
+  sat_chksum_free(h, out);
+}
+
+void
+calc_checksum_stat(struct stat *stb, Id chktype, unsigned char *out)
+{
+  void *h = sat_chksum_create(chktype);
+  sat_chksum_add(h, &stb->st_dev, sizeof(stb->st_dev));
+  sat_chksum_add(h, &stb->st_ino, sizeof(stb->st_ino));
+  sat_chksum_add(h, &stb->st_size, sizeof(stb->st_size));
+  sat_chksum_add(h, &stb->st_mtime, sizeof(stb->st_mtime));
+  sat_chksum_free(h, out);
+}
+
+void
 setarch(Pool *pool)
 {
   struct utsname un;
@@ -295,6 +324,94 @@ setarch(Pool *pool)
   pool_setarch(pool, un.machine);
 }
 
+char *calccachepath(Repo *repo)
+{
+  char *p = pool_tmpjoin(repo->pool, SOLVCACHE_PATH, "/", repo->name);
+  char *q = p;
+  q = p + strlen(SOLVCACHE_PATH) + 1;
+  if (*q == '.')
+    *q = '_';
+  for (; *q; q++)
+    if (*q == '/')
+      *q = '_';
+  return p;
+}
+
+int
+usecachedrepo(Repo *repo, unsigned char *cookie)
+{
+  FILE *fp;
+  unsigned char mycookie[32];
+
+  if (!(fp = fopen(calccachepath(repo), "r")))
+    return 0;
+  if (fseek(fp, -sizeof(mycookie), SEEK_END) || fread(mycookie, sizeof(mycookie), 1, fp) != 1)
+    {
+      fclose(fp);
+      return 0;
+    }
+  if (cookie && memcmp(cookie, mycookie, sizeof(mycookie)))
+    {
+      fclose(fp);
+      return 0;
+    }
+  rewind(fp);
+  if (repo_add_solv(repo, fp))
+    {
+      fclose(fp);
+      return 0;
+    }
+  fclose(fp);
+  return 1;
+}
+
+void
+writecachedrepo(Repo *repo, unsigned char *cookie)
+{
+  Id *addedfileprovides = 0;
+  FILE *fp;
+  int i, fd;
+  char *tmpl;
+  Repodata *info;
+
+  mkdir(SOLVCACHE_PATH, 0755);
+  tmpl = sat_dupjoin(SOLVCACHE_PATH, "/", ".newsolv-XXXXXX");
+  fd = mkstemp(tmpl);
+  if (!fd)
+    {
+      free(tmpl);
+      return;
+    }
+  fchmod(fd, 0444);
+  if (!(fp = fdopen(fd, "w")))
+    {
+      close(fd);
+      unlink(tmpl);
+      free(tmpl);
+      return;
+    }
+  info = repo_add_repodata(repo, 0);
+  pool_addfileprovides_ids(repo->pool, 0, &addedfileprovides);
+  if (addedfileprovides && *addedfileprovides)
+    {
+      for (i = 0; addedfileprovides[i]; i++)
+	repodata_add_idarray(info, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
+    }
+  sat_free(addedfileprovides);
+  repodata_internalize(info);
+  repo_write(repo, fp, 0, 0, 0);
+  repodata_free(info);
+  fwrite(cookie, 32, 1, fp);
+  if (fclose(fp))
+    {
+      unlink(tmpl);
+      free(tmpl);
+      return;
+    }
+  if (!rename(tmpl, calccachepath(repo)))
+    unlink(tmpl);
+  free(tmpl);
+}
 
 void
 read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
@@ -307,30 +424,74 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   const char *primaryfile;
   const char *descrdir;
   int defvendor;
+  int havecontent;
+  struct stat stb;
+  unsigned char cookie[32];
 
-  printf("reading rpm database\n");
   repo = repo_create(pool, "@System");
+  printf("rpm database:");
+  if (stat("/var/lib/rpm/Packages", &stb))
+    memset(&stb, 0, sizeof(&stb));
+  calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cookie);
+  if (usecachedrepo(repo, cookie))
+    printf(" cached\n");
+  else
+    {
+      FILE *ofp;
+      printf(" reading\n");
+      int done = 0;
+
 #ifdef PRODUCTS_PATH
-  repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
+      repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
 #endif
-  repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
-  
+      if ((ofp = fopen(calccachepath(repo), "r")) != 0)
+	{
+	  Repo *ref = repo_create(pool, "@System.old");
+	  if (!repo_add_solv(ref, ofp))
+	    {
+	      repo_add_rpmdb(repo, ref, 0, REPO_REUSE_REPODATA);
+	      done = 1;
+	    }
+	  fclose(ofp);
+	  repo_free(ref, 1);
+	}
+      if (!done)
+        repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
+      writecachedrepo(repo, cookie);
+    }
   pool_set_installed(pool, repo);
+
   for (i = 0; i < nrepoinfos; i++)
     {
       cinfo = repoinfos + i;
       if (!cinfo->enabled)
 	continue;
+
+      repo = repo_create(pool, cinfo->alias);
+      cinfo->repo = repo;
+      repo->appdata = cinfo;
+      repo->priority = 99 - cinfo->priority;
+
       switch (cinfo->type)
 	{
         case TYPE_RPMMD:
-	  printf("reading rpmmd repo '%s'\n", cinfo->alias);
+	  printf("rpmmd repo '%s':", cinfo->alias);
+	  fflush(stdout);
 	  if ((fp = curlfopen(cinfo->baseurl, "repodata/repomd.xml", 0)) == 0)
-	    break;
-	  repo = repo_create(pool, cinfo->alias);
-	  cinfo->repo = repo;
-	  repo->appdata = cinfo;
-	  repo->priority = 99 - cinfo->priority;
+	    {
+	      printf(" no data, skipped\n");
+	      repo_free(repo, 1);
+	      cinfo->repo = 0;
+	      break;
+	    }
+	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
+	  if (usecachedrepo(repo, cookie))
+	    {
+	      printf(" cached\n");
+              fclose(fp);
+	      break;
+	    }
+	  printf(" reading\n");
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
 	  primaryfile = 0;
@@ -348,9 +509,11 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    continue;
 	  repo_add_rpmmd(repo, fp, 0, 0);
 	  fclose(fp);
+	  writecachedrepo(repo, cookie);
 	  break;
         case TYPE_SUSETAGS:
-	  printf("reading susetags repo '%s'\n", cinfo->alias);
+	  printf("susetags repo '%s':", cinfo->alias);
+	  fflush(stdout);
 	  repo = repo_create(pool, cinfo->alias);
 	  cinfo->repo = repo;
 	  repo->appdata = cinfo;
@@ -359,6 +522,14 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  defvendor = 0;
 	  if ((fp = curlfopen(cinfo->baseurl, "content", 0)) != 0)
 	    {
+	      calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
+	      if (usecachedrepo(repo, cookie))
+		{
+		  printf(" cached\n");
+		  fclose(fp);
+		  break;
+		}
+	      havecontent = 1;	/* ok to write cache */
 	      repo_add_content(repo, fp, 0);
 	      fclose(fp);
 	      defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
@@ -366,14 +537,19 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    }
 	  if (!descrdir)
 	    descrdir = "suse/setup/descr";
+	  printf(" reading\n");
 	  if ((fp = curlfopen(cinfo->baseurl, pool_tmpjoin(pool, descrdir, "/packages.gz", 0), 1)) == 0)
 	    if ((fp = curlfopen(cinfo->baseurl, pool_tmpjoin(pool, descrdir, "/packages", 0), 0)) == 0)
 	      break;
 	  repo_add_susetags(repo, fp, defvendor, 0, 0);
 	  fclose(fp);
+	  if (havecontent)
+	    writecachedrepo(repo, cookie);
 	  break;
 	default:
-	  printf("skipping unknown repo '%s'\n", cinfo->alias);
+	  printf("unsupported repo '%s': skipped\n", cinfo->alias);
+	  repo_free(repo, 1);
+	  cinfo->repo = 0;
 	  break;
 	}
     }
