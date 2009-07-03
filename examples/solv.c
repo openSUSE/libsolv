@@ -163,7 +163,10 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	  else if (!strcmp(kp, "baseurl"))
 	    cinfo->baseurl = strdup(vp);
 	  else if (!strcmp(kp, "path"))
-	    cinfo->path = strdup(vp);
+	    {
+	      if (vp && strcmp(vp, "/") != 0)
+	        cinfo->path = strdup(vp);
+	    }
 	  else if (!strcmp(kp, "type"))
 	    {
 	      if (!strcmp(vp, "yast2"))
@@ -223,13 +226,14 @@ myfopen(const char *fn)
 }
 
 FILE *
-curlfopen(const char *baseurl, const char *file, int uncompress)
+curlfopen(struct repoinfo *cinfo, const char *file, int uncompress)
 {
   pid_t pid;
   int fd, l;
   int status;
   char tmpl[100];
   char url[4096];
+  const char *baseurl = cinfo->baseurl;
 
   l = strlen(baseurl);
   if (l && baseurl[l - 1] == '/')
@@ -478,12 +482,18 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       repo->appdata = cinfo;
       repo->priority = 99 - cinfo->priority;
 
+      if (!cinfo->autorefresh && usecachedrepo(repo, 0))
+	{
+	  printf("repo '%s':", cinfo->alias);
+	  printf(" cached\n");
+	  continue;
+	}
       switch (cinfo->type)
 	{
         case TYPE_RPMMD:
 	  printf("rpmmd repo '%s':", cinfo->alias);
 	  fflush(stdout);
-	  if ((fp = curlfopen(cinfo->baseurl, "repodata/repomd.xml", 0)) == 0)
+	  if ((fp = curlfopen(cinfo, "repodata/repomd.xml", 0)) == 0)
 	    {
 	      printf(" no data, skipped\n");
 	      repo_free(repo, 1);
@@ -511,7 +521,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  dataiterator_free(&di);
 	  if (!primaryfile)
 	    primaryfile = "repodata/primary.xml.gz";
-	  if ((fp = curlfopen(cinfo->baseurl, primaryfile, 1)) == 0)
+	  if ((fp = curlfopen(cinfo, primaryfile, 1)) == 0)
 	    continue;
 	  repo_add_rpmmd(repo, fp, 0, 0);
 	  fclose(fp);
@@ -526,7 +536,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repo->priority = 99 - cinfo->priority;
 	  descrdir = 0;
 	  defvendor = 0;
-	  if ((fp = curlfopen(cinfo->baseurl, "content", 0)) != 0)
+	  if ((fp = curlfopen(cinfo, "content", 0)) != 0)
 	    {
 	      calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
 	      if (usecachedrepo(repo, cookie))
@@ -544,8 +554,8 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  if (!descrdir)
 	    descrdir = "suse/setup/descr";
 	  printf(" reading\n");
-	  if ((fp = curlfopen(cinfo->baseurl, pool_tmpjoin(pool, descrdir, "/packages.gz", 0), 1)) == 0)
-	    if ((fp = curlfopen(cinfo->baseurl, pool_tmpjoin(pool, descrdir, "/packages", 0), 0)) == 0)
+	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/packages.gz", 0), 1)) == 0)
+	    if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/packages", 0), 0)) == 0)
 	      break;
 	  repo_add_susetags(repo, fp, defvendor, 0, 0);
 	  fclose(fp);
@@ -950,7 +960,7 @@ rerunsolver:
 	      const char *datadir = repo_lookup_str(cinfo->repo, SOLVID_META, SUSETAGS_DATADIR);
 	      loc = pool_tmpjoin(pool, datadir ? datadir : "suse", "/", loc);
 	    }
-	  if ((newpkgsfps[i] = curlfopen(cinfo->baseurl, loc, 0)) == 0)
+	  if ((newpkgsfps[i] = curlfopen(cinfo, loc, 0)) == 0)
 	    {
 	      printf("%s: %s not found in repository\n", s->repo->name, loc);
 	      exit(1);

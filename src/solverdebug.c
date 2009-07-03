@@ -580,28 +580,28 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	    {
 	    case SOLVER_INSTALL:
 	      if (select == SOLVER_SOLVABLE && solv->installed && pool->solvables[what].repo == solv->installed)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not keep %s installed\n", solvid2str(pool, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not keep %s installed\n", solvid2str(pool, what));
 	      else if (select == SOLVER_SOLVABLE_PROVIDES)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install a solvable %s\n", solver_select2str(solv, select, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install a solvable %s\n", solver_select2str(solv, select, what));
 	      else
-		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install %s\n", solver_select2str(solv, select, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install %s\n", solver_select2str(solv, select, what));
 	      break;
 	    case SOLVER_ERASE:
 	      if (select == SOLVER_SOLVABLE && !(solv->installed && pool->solvables[what].repo == solv->installed))
-		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not forbid installation of %s\n", solvid2str(pool, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not forbid installation of %s\n", solvid2str(pool, what));
 	      else if (select == SOLVER_SOLVABLE_PROVIDES)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall all solvables %s\n", solver_select2str(solv, select, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not deinstall all solvables %s\n", solver_select2str(solv, select, what));
 	      else
-		POOL_DEBUG(SAT_DEBUG_RESULT, "- do not deinstall %s\n", solver_select2str(solv, select, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not deinstall %s\n", solver_select2str(solv, select, what));
 	      break;
 	    case SOLVER_UPDATE:
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not install most recent version of %s\n", solver_select2str(solv, select, what));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install most recent version of %s\n", solver_select2str(solv, select, what));
 	      break;
 	    case SOLVER_LOCK:
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "- do not lock %s\n", solver_select2str(solv, select, what));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not lock %s\n", solver_select2str(solv, select, what));
 	      break;
 	    default:
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "- do something different\n");
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - do something different\n");
 	      break;
 	    }
 	}
@@ -609,17 +609,17 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	{
 	  s = pool->solvables + rp;
 	  if (solv->installed && s->repo == solv->installed)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "- keep %s despite the inferior architecture\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep %s despite the inferior architecture\n", solvable2str(pool, s));
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "- install %s despite the inferior architecture\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - install %s despite the inferior architecture\n", solvable2str(pool, s));
 	}
       else if (p == SOLVER_SOLUTION_DISTUPGRADE)
 	{
 	  s = pool->solvables + rp;
 	  if (solv->installed && s->repo == solv->installed)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "- keep obsolete %s\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep obsolete %s\n", solvable2str(pool, s));
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "- install %s from excluded repository\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - install %s from excluded repository\n", solvable2str(pool, s));
 	}
       else
 	{
@@ -628,35 +628,35 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	  sd = rp ? pool->solvables + rp : 0;
 	  if (s == sd && solv->distupgrade)
 	    {
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "- keep obsolete %s\n", solvable2str(pool, s));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep obsolete %s\n", solvable2str(pool, s));
 	    }
 	  else if (sd)
 	    {
 	      int gotone = 0;
 	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr, EVRCMP_MATCH_RELEASE) > 0)
 		{
-		  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+		  POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 		  gotone = 1;
 		}
 	      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(solv, s, sd))
 		{
-		  POOL_DEBUG(SAT_DEBUG_RESULT, "- allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+		  POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 		  gotone = 1;
 		}
 	      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(solv, s, sd))
 		{
 		  if (sd->vendor)
-		    POOL_DEBUG(SAT_DEBUG_RESULT, "- allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));
 		  else
-		    POOL_DEBUG(SAT_DEBUG_RESULT, "- allow vendor change from '%s' (%s) to no vendor (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), solvable2str(pool, sd));
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow vendor change from '%s' (%s) to no vendor (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), solvable2str(pool, sd));
 		  gotone = 1;
 		}
 	      if (!gotone)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "- allow replacement of %s with %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow replacement of %s with %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 	    }
 	  else
 	    {
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "- allow deinstallation of %s\n", solvable2str(pool, s));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow deinstallation of %s\n", solvable2str(pool, s));
 	    }
 
 	}
