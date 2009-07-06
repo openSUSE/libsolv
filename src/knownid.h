@@ -225,6 +225,11 @@ KNOWNID(REPOSITORY_REPOMD_TIMESTAMP,	"repository:repomd:timestamp"),
 KNOWNID(REPOSITORY_REPOMD_CHECKSUM,	"repository:repomd:checksum"),
 KNOWNID(REPOSITORY_REPOMD_OPENCHECKSUM,	"repository:repomd:openchecksum"),
 
+KNOWNID(PUBKEY_KEYID,		        "pubkey:keyid"),
+KNOWNID(PUBKEY_FINGERPRINT,	        "pubkey:fingerprint"),
+KNOWNID(PUBKEY_EXPIRES,		        "pubkey:expires"),
+KNOWNID(PUBKEY_SIGNATURES,	        "pubkey:signatures"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

@@ -27,6 +27,8 @@
 #else
 #include <rpm/db.h>
 #endif
+#include <rpm/rpmio.h>
+#include <rpm/rpmpgp.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -2003,10 +2005,45 @@ struct rpm_by_state {
   int byteswapped;
 };
 
-int
-rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq)
+struct rpmdbentry {
+  Id rpmdbid;
+  Id nameoff;
+};
+
+#define ENTRIES_BLOCK 255
+#define NAMEDATA_BLOCK 1023
+
+static int
+opendbenv(struct rpm_by_state *state, const char *rootdir)
 {
   char dbpath[PATH_MAX];
+
+  if (state->dbenv)
+    return 1;
+  if (db_env_create(&state->dbenv, 0))
+    {
+      perror("db_env_create");
+      return 0;
+    }
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
+#ifdef FEDORA
+  if (state->dbenv->open(state->dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0))
+#else
+  if (state->dbenv->open(state->dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
+#endif
+    {
+      perror("dbenv open");
+      state->dbenv->close(state->dbenv, 0);
+      return 0;
+    }
+  return 1;
+}
+ 
+#define FLAGS_GET_PUBKEYS 1
+
+struct rpmdbentry *
+getinstalledrpmdbids(struct rpm_by_state *state, int *nentriesp, char **namedatap, int flags)
+{
   DB_ENV *dbenv = 0;
   DB *db = 0;
   DBC *dbc = 0;
@@ -2015,61 +2052,54 @@ rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq)
   DBT dbdata;
   Id rpmdbid;
   unsigned char *dp;
-  int dl, cnt;
+  int dl;
 
-  if (rpmdbidq)
-    queue_empty(rpmdbidq);
-  cnt = 0;
+  char *namedata = 0;
+  int namedatal = 0;
+  struct rpmdbentry *entries = 0;
+  int nentries = 0;
 
-  if (db_env_create(&dbenv, 0))
-    {
-      perror("db_env_create");
-      return 0;
-    }
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
-#ifdef FEDORA
-  if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0))
-#else
-  if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
-#endif
-    {
-      perror("dbenv open");
-      dbenv->close(dbenv, 0);
-      return 0;
-    }
+  *nentriesp = 0;
+  *namedatap = 0;
+
+  dbenv = state->dbenv;
   if (db_create(&db, dbenv, 0))
     {
       perror("db_create");
-      dbenv->close(dbenv, 0);
       return 0;
     }
   if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
     {
       perror("db->open Name index");
       db->close(db, 0);
-      dbenv->close(dbenv, 0);
       return 0;
     }
   if (db->get_byteswapped(db, &byteswapped))
     {
       perror("db->get_byteswapped");
       db->close(db, 0);
-      dbenv->close(dbenv, 0);
       return 0;
     }
   if (db->cursor(db, NULL, &dbc, 0))
     {
       perror("db->cursor");
       db->close(db, 0);
-      dbenv->close(dbenv, 0);
       return 0;
     }
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
   while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
     {
-      if (dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
-	continue;
+      if ((flags & FLAGS_GET_PUBKEYS))
+	{
+	  if (dbkey.size != 10 || memcmp(dbkey.data, "gpg-pubkey", 10))
+	    continue;
+	}
+      else
+	{
+	  if (dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
+	    continue;
+	}
       dl = dbdata.size;
       dp = dbdata.data;
       while(dl >= 8)
@@ -2083,17 +2113,46 @@ rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq)
 	    }
 	  else
 	    memcpy((char *)&rpmdbid, dp, 4);
-	  if (rpmdbidq)
-	    queue_push(rpmdbidq, rpmdbid);
-	  cnt++;
+	  entries = sat_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
+	  entries[nentries].rpmdbid = rpmdbid;
+	  entries[nentries].nameoff = namedatal;
+	  nentries++;
+	  namedata = sat_extend(namedata, namedatal, dbkey.size + 1, 1, NAMEDATA_BLOCK);
+	  memcpy(namedata + namedatal, dbkey.data, dbkey.size);
+	  namedata[namedatal + dbkey.size] = 0;
+	  namedatal += dbkey.size + 1;
 	  dp += 8;
 	  dl -= 8;
 	}
     }
   dbc->c_close(dbc);
   db->close(db, 0);
-  dbenv->close(dbenv, 0);
-  return cnt;
+  *nentriesp = nentries;
+  *namedatap = namedata;
+  return entries;
+}
+
+int
+rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq)
+{
+  struct rpm_by_state state;
+  struct rpmdbentry *entries;
+  int nentries, i;
+  char *namedata;
+
+  if (rpmdbidq)
+    queue_empty(rpmdbidq);
+  memset(&state, 0, sizeof(state));
+  if (!opendbenv(&state, rootdir))
+    return 0;
+  entries = getinstalledrpmdbids(&state, &nentries, &namedata, 0);
+  if (rpmdbidq)
+    for (i = 0; i < nentries; i++)
+      queue_push(rpmdbidq, entries[i].rpmdbid);
+  sat_free(entries);
+  sat_free(namedata);
+  rpm_byrpmdbid(0, 0, (void **)&state);
+  return nentries;
 }
 
 void *
@@ -2127,28 +2186,9 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
     }
   if (!state->dbopened)
     {
-      char dbpath[PATH_MAX];
       state->dbopened = 1;
-      if (db_env_create(&state->dbenv, 0))
-	{
-	  perror("db_env_create");
-	  state->dbenv = 0;
-	  return 0;
-	}
-      if (!rootdir)
-	rootdir = "";
-      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir);
-#ifdef FEDORA
-      if (state->dbenv->open(state->dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0))
-#else
-      if (state->dbenv->open(state->dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
-#endif
-	{
-	  perror("dbenv open");
-	  state->dbenv->close(state->dbenv, 0);
-	  state->dbenv = 0;
-	  return 0;
-	}
+      if (!opendbenv(state, rootdir))
+	return 0;
       if (db_create(&state->db, state->dbenv, 0))
 	{
 	  perror("db_create");
@@ -2308,3 +2348,494 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
   return rpmhead;
 }
 
+
+static char *
+r64dec1(char *p, unsigned int *vp, int *eofp)
+{
+  int i, x;
+  unsigned int v = 0;
+
+  for (i = 0; i < 4; )
+    {
+      x = *p++;
+      if (!x)
+	return 0;
+      if (x >= 'A' && x <= 'Z')
+	x -= 'A';
+      else if (x >= 'a' && x <= 'z')
+	x -= 'a' - 26;
+      else if (x >= '0' && x <= '9')
+	x -= '0' - 52;
+      else if (x == '+')
+	x = 62;
+      else if (x == '/')
+	x = 63;
+      else if (x == '=')
+	{
+	  x = 0;
+	  if (i == 0)
+	    {
+	      *eofp = 3;
+	      *vp = 0;
+	      return p - 1;
+	    }
+	  *eofp += 1;
+	}
+      else
+	continue;
+      v = v << 6 | x;
+      i++;
+    }
+  *vp = v;
+  return p;
+}
+
+static unsigned int 
+crc24(unsigned char *p, int len)
+{
+  unsigned int crc = 0xb704ceL;
+  int i;
+
+  while (len--)
+    {
+      crc ^= (*p++) << 16;
+      for (i = 0; i < 8; i++)
+        if ((crc <<= 1) & 0x1000000)
+	  crc ^= 0x1864cfbL;
+    }
+  return crc & 0xffffffL;
+}
+
+static unsigned char *
+unarmor(char *pubkey, int *pktlp)
+{
+  char *p;
+  int l, eof;
+  unsigned char *buf, *bp;
+  unsigned int v;
+
+  *pktlp = 0;
+  while (strncmp(pubkey, "-----BEGIN PGP PUBLIC KEY BLOCK-----", 36) != 0)
+    {
+      pubkey = strchr(pubkey, '\n');
+      if (!pubkey)
+	return 0;
+      pubkey++;
+    }
+  pubkey = strchr(pubkey, '\n');
+  if (!pubkey++)
+    return 0;
+  /* skip header lines */
+  for (;;)
+    {
+      while (*pubkey == ' ' || *pubkey == '\t')
+	pubkey++;
+      if (*pubkey == '\n')
+	break;
+      pubkey = strchr(pubkey, '\n');
+      if (!pubkey++)
+	return 0;
+    }
+  pubkey++;
+  p = strchr(pubkey, '=');
+  if (!p)
+    return 0;
+  l = p - pubkey;
+  bp = buf = sat_malloc(l * 3 / 4 + 4);
+  eof = 0;
+  while (!eof)
+    {
+      pubkey = r64dec1(pubkey, &v, &eof);
+      if (!pubkey)
+	{
+	  sat_free(buf);
+	  return 0;
+	}
+      *bp++ = v >> 16;
+      *bp++ = v >> 8;
+      *bp++ = v;
+    }
+  while (*pubkey == ' ' || *pubkey == '\t' || *pubkey == '\n' || *pubkey == '\r')
+    pubkey++;
+  bp -= eof;
+  if (*pubkey != '=' || (pubkey = r64dec1(pubkey + 1, &v, &eof)) == 0)
+    {
+      sat_free(buf);
+      return 0;
+    }
+  if (v != crc24(buf, bp - buf))
+    {
+      sat_free(buf);
+      return 0;
+    }
+  while (*pubkey == ' ' || *pubkey == '\t' || *pubkey == '\n' || *pubkey == '\r')
+    pubkey++;
+  if (strncmp(pubkey, "-----END PGP PUBLIC KEY BLOCK-----", 34) != 0)
+    {
+      sat_free(buf);
+      return 0;
+    }
+  *pktlp = bp - buf;
+  return buf;
+}
+
+static void
+parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
+{
+  int x, tag, l;
+  unsigned char keyid[8];
+  unsigned int maxex = 0;
+
+  for (; pl; p += l, pl -= l)
+    {
+      x = *p++;
+      pl--;
+      if (!(x & 128) || pl <= 0)
+	return;
+      if ((x & 64) == 0)
+	{
+	  /* old format */
+	  tag = (x & 0x3c) >> 2;
+	  x &= 3;
+	  if (x == 3)
+	    return;
+	  l = 1 << x;
+	  if (pl < l)
+	    return;
+	  x = 0;
+	  while (l--)
+	    {
+	      x = x << 8 | *p++;
+	      pl--;
+	    }
+	  l = x;
+	}
+      else
+	{
+	  tag = (x & 0x3f);
+	  x = *p++;
+	  pl--;
+	  if (x < 192)
+	    l = x;
+	  else if (x >= 192 && x < 224)
+	    {
+	      if (pl <= 0)
+		return;
+	      l = ((x - 192) << 8) + *p++ + 192;
+	      pl--;
+	    }
+	  else if (x == 255)
+	    {
+	      if (pl <= 4)
+		return;
+	      l = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
+	      p += 4;
+	      pl -= 4;
+	    }
+	  else
+	    return;
+	}
+      if (pl < l)
+	return;
+      if (tag == 6)
+	{
+	  if (p[0] == 3)
+	    {
+	      unsigned int cr, ex;
+	      void *h;
+	      cr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
+	      ex = 0;
+	      if (p[5] || p[6])
+		{
+		  ex = cr + 24*3600 * (p[5] << 8 | p[6]);
+		  if (ex > maxex)
+		    maxex = ex;
+		}
+	      memset(keyid, 0, 8);
+	      if (p[7] == 1)	/* RSA */
+		{
+		  int i, ql;
+		  unsigned char fp[16];
+		  char fpx[32 + 1];
+		  unsigned char *q;
+
+		  ql = ((p[8] << 8 | p[9]) + 7) / 8;
+		  memcpy(keyid, p + 10 + ql - 8, 8);
+		  h = sat_chksum_create(REPOKEY_TYPE_MD5);
+		  sat_chksum_add(h, p + 10, ql);
+		  q = p + 10 + ql;
+		  ql = ((q[0] << 8 | q[1]) + 7) / 8;
+		  sat_chksum_add(h, q + 2, ql);
+		  sat_chksum_free(h, fp);
+		  for (i = 0; i < 16; i++)
+		    sprintf(fpx + i * 2, "%02x", fp[i]);
+		  setutf8string(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
+		}
+	    }
+	  else if (p[0] == 4)
+	    {
+	      int i;
+	      void *h;
+	      unsigned char hdr[3];
+	      unsigned char fp[20];
+	      char fpx[40 + 1];
+
+	      hdr[0] = 0x99;
+	      hdr[1] = l >> 8;
+	      hdr[2] = l;
+	      h = sat_chksum_create(REPOKEY_TYPE_SHA1);
+	      sat_chksum_add(h, hdr, 3);
+	      sat_chksum_add(h, p, l);
+	      sat_chksum_free(h, fp);
+	      for (i = 0; i < 20; i++)
+		sprintf(fpx + i * 2, "%02x", fp[i]);
+	      setutf8string(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
+	      memcpy(keyid, fp + 12, 8);
+	    }
+	}
+      if (tag == 2)
+	{
+	  if (p[0] == 3 && p[1] == 5)
+	    {
+	      // printf("V3 signature packet\n");
+	      if (p[2] != 0x10 && p[2] != 0x11 && p[2] != 0x12 && p[2] != 0x13 && p[2] != 0x1f)
+		continue;
+	      if (!memcmp(keyid, p + 6, 8))
+		{
+		  // printf("SELF SIG\n");
+		}
+	      else
+		{
+		  // printf("OTHER SIG\n");
+		}
+	    }
+	  if (p[0] == 4)
+	    {
+	      int j, ql, haveissuer;
+	      unsigned char *q;
+	      unsigned int ex = 0, cr = 0;
+	      unsigned char issuer[8];
+
+	      // printf("V4 signature packet\n");
+	      if (p[1] != 0x10 && p[1] != 0x11 && p[1] != 0x12 && p[1] != 0x13 && p[1] != 0x1f)
+		continue;
+	      haveissuer = 0;
+	      ex = 0;
+	      q = p + 4;
+	      for (j = 0; q && j < 2; j++)
+		{
+		  ql = q[0] << 8 | q[1];
+		  q += 2;
+		  while (ql)
+		    {
+		      int sl;
+		      x = *q++;
+		      ql--;
+		      if (x < 192)
+			sl = x;
+		      else if (x == 255)
+			{
+			  if (ql < 4)
+			    {
+			      q = 0;
+			      break;
+			    }
+			  sl = q[0] << 24 | q[1] << 16 | q[2] << 8 | q[3];
+			  q += 4;
+			  ql -= 4;
+			}
+		      else
+			{
+			  if (ql < 1)
+			    {
+			      q = 0;
+			      break;
+			    }
+			  sl = ((x - 192) << 8) + *q++ + 192;
+			  ql--;
+			}
+		      if (ql < sl)
+			{
+			  q = 0;
+			  break;
+			}
+		      x = q[0] & 127;
+		      // printf("%d SIGSUB %d %d\n", j, x, sl);
+		      if (x == 16 && sl == 9 && !haveissuer)
+			{
+			  memcpy(issuer, q + 1, 8);
+			  haveissuer = 1;
+			}
+		      if (x == 2 && j == 0)
+			cr = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+		      if (x == 9 && j == 0)
+			ex = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+		      q += sl;
+		      ql -= sl;
+		    }
+		}
+	      if (!cr)
+		ex = 0;
+	      if (ex)
+	        ex += cr;
+	      if (haveissuer)
+		{
+		  if (!memcmp(keyid, issuer, 8))
+		    {
+		      // printf("SELF SIG cr %d ex %d\n", cr, ex);
+		      if (ex > maxex)
+			maxex = ex;
+		    }
+		  else
+		    {
+		      // printf("OTHER SIG cr %d ex %d\n", cr, ex);
+		    }
+		}
+	    }
+	}
+    }
+  if (maxex)
+    repodata_set_num(data, s - s->repo->pool->solvables, PUBKEY_EXPIRES, maxex);
+}
+
+/* this is private to rpm, but rpm lacks an interface to retrieve
+ * the values. Sigh. */
+struct pgpDigParams_s {
+    const char * userid;
+    const byte * hash;
+    const char * params[4];
+    byte tag;
+    byte version;               /*!< version number. */
+    byte time[4];               /*!< time that the key was created. */
+    byte pubkey_algo;           /*!< public key algorithm. */
+    byte hash_algo;
+    byte sigtype;
+    byte hashlen;
+    byte signhash16[2];
+    byte signid[8];
+    byte saved;
+};
+
+struct pgpDig_s {
+    struct pgpDigParams_s signature;
+    struct pgpDigParams_s pubkey;
+};
+
+static int
+pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
+{
+  Pool *pool = s->repo->pool;
+  unsigned char *pkts;
+  unsigned int btime;
+  int pktsl, i;
+  pgpDig dig = 0;
+  char keyid[16 + 1];
+  char evrbuf[8 + 1 + 8 + 1];
+
+  pkts = unarmor(pubkey, &pktsl);
+  if (!pkts)
+    return 0;
+  setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_DESCRIPTION, pubkey);
+  parsekeydata(s, data, pkts, pktsl);
+  dig = pgpNewDig();
+  (void) pgpPrtPkts(pkts, pktsl, dig, 0);
+  btime = dig->pubkey.time[0] << 24 | dig->pubkey.time[1] << 16 | dig->pubkey.time[2] << 8 | dig->pubkey.signid[3];
+  sprintf(evrbuf, "%02x%02x%02x%02x-%02x%02x%02x%02x", dig->pubkey.signid[4], dig->pubkey.signid[5], dig->pubkey.signid[6], dig->pubkey.signid[7], dig->pubkey.time[0], dig->pubkey.time[1], dig->pubkey.time[2], dig->pubkey.time[3]);
+  repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, btime);
+  s->name = str2id(pool, "gpg-pubkey", 1);
+  s->evr = str2id(pool, evrbuf, 1);
+  s->arch = 1;
+  for (i = 0; i < 8; i++)
+    sprintf(keyid + 2 * i, "%02x", dig->pubkey.signid[i]);
+  repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_KEYID, keyid);
+  if (dig->pubkey.userid)
+    setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, dig->pubkey.userid);
+  pgpFreeDig(dig);
+  sat_free((void *)pkts);
+  return 1;
+}
+
+void
+repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
+{
+  Pool *pool = repo->pool;
+  struct rpm_by_state state;
+  struct rpmdbentry *entries;
+  int nentries, i;
+  char *namedata, *str;
+  unsigned int u32;
+  Repodata *data;
+  Solvable *s;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
+
+  memset(&state, 0, sizeof(state));
+  if (!opendbenv(&state, rootdir))
+    return;
+  entries = getinstalledrpmdbids(&state, &nentries, &namedata, FLAGS_GET_PUBKEYS);
+  for (i = 0 ; i < nentries; i++)
+    {
+      RpmHead *rpmhead = rpm_byrpmdbid(entries[i].rpmdbid, rootdir, (void **)&state);
+      if (!rpmhead)
+	continue;
+      str = headstring(rpmhead, TAG_DESCRIPTION);
+      if (!str)
+	continue;
+      s = pool_id2solvable(pool, repo_add_solvable(repo));
+      pubkey2solvable(s, data, str);
+      u32 = headint32(rpmhead, TAG_INSTALLTIME);
+      if (u32)
+        repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLTIME, u32);
+      if (!repo->rpmdbid)
+	repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
+      repo->rpmdbid[s - pool->solvables - repo->start] = entries[i].rpmdbid;
+    }
+  rpm_byrpmdbid(0, 0, (void **)&state);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+}
+
+void
+repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
+{
+  Pool *pool = repo->pool;
+  Repodata *data;
+  Solvable *s;
+  char *buf;
+  int i, bufl, l, ll;
+  FILE *fp;
+
+  if (!(flags & REPO_REUSE_REPODATA))
+    data = repo_add_repodata(repo, 0);
+  else
+    data = repo_last_repodata(repo);
+  buf = 0;
+  bufl = 0;
+  for (i = 0; i < nkeys; i++)
+    {
+      if ((fp = fopen(keys[i], "r")) == 0)
+	{
+	  perror(keys[i]);
+	  continue;
+	}
+      for (l = 0; ;)
+	{
+	  if (bufl - l < 4096)
+	    {
+	      buf = sat_realloc(buf, bufl + 4096);
+	      bufl += 4096;
+	    }
+	  ll = fread(buf, 1, bufl - l, fp);
+	  if (ll <= 0)
+	    break;
+	  l += ll;
+	}
+      buf[l] = 0;
+      s = pool_id2solvable(pool, repo_add_solvable(repo));
+      pubkey2solvable(s, data, buf);
+    }
+  sat_free(buf);
+}
