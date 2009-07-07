@@ -8,7 +8,6 @@
 /* solv, a little software installer demoing the sat solver library */
 
 /* things missing:
- * - signature and checksum verification
  * - vendor policy loading
  */
 
@@ -20,6 +19,7 @@
 #include <unistd.h>
 #include <zlib.h>
 #include <fcntl.h>
+#include <assert.h>
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -205,27 +205,6 @@ cookie_gzclose(void *cookie)
 }
 
 FILE *
-myfopen(const char *fn)
-{
-  cookie_io_functions_t cio;
-  char *suf;
-  gzFile *gzf;
-
-  if (!fn)
-    return 0;
-  suf = strrchr(fn, '.');
-  if (!suf || strcmp(suf, ".gz") != 0)
-    return fopen(fn, "r");
-  gzf = gzopen(fn, "r");
-  if (!gzf)
-    return 0;
-  memset(&cio, 0, sizeof(cio));
-  cio.read = cookie_gzread;
-  cio.close = cookie_gzclose;
-  return  fopencookie(gzf, "r", cio);
-}
-
-FILE *
 curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype)
 {
   pid_t pid;
@@ -328,6 +307,86 @@ calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
     sat_chksum_add(h, buf, l);
   rewind(fp);
   sat_chksum_free(h, out);
+}
+
+void
+cleanupgpg(char *gpgdir)
+{
+  char cmd[256];
+  snprintf(cmd, sizeof(cmd), "%s/pubring.gpg", gpgdir);
+  unlink(cmd);
+  snprintf(cmd, sizeof(cmd), "%s/pubring.gpg~", gpgdir);
+  unlink(cmd);
+  snprintf(cmd, sizeof(cmd), "%s/secring.gpg", gpgdir);
+  unlink(cmd);
+  snprintf(cmd, sizeof(cmd), "%s/trustdb.gpg", gpgdir);
+  unlink(cmd);
+  snprintf(cmd, sizeof(cmd), "%s/keys", gpgdir);
+  unlink(cmd);
+  rmdir(gpgdir);
+}
+
+int
+checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
+{
+  char *gpgdir;
+  char *keysfile;
+  const char *pubkey;
+  char cmd[256];
+  FILE *kfp;
+  Solvable *s;
+  Id p;
+  off_t posfp, possigfp;
+  int r;
+
+  gpgdir = mkdtemp(pool_tmpjoin(sigpool, "/var/tmp/solvgpg.XXXXXX", 0, 0));
+  if (!gpgdir)
+    return 0;
+  keysfile = pool_tmpjoin(sigpool, gpgdir, "/keys", 0);
+  if (!(kfp = fopen(keysfile, "w")) )
+    {
+      cleanupgpg(gpgdir);
+      return 0;
+    }
+  for (p = 1, s = sigpool->solvables + p; p < sigpool->nsolvables; p++, s++)
+    {
+      if (!s->repo)
+	continue;
+      pubkey = solvable_lookup_str(s, SOLVABLE_DESCRIPTION);
+      if (!pubkey || !*pubkey)
+	continue;
+      if (fwrite(pubkey, strlen(pubkey), 1, kfp) != 1)
+	break;
+      if (fputc('\n', kfp) == EOF)	/* Just in case... */
+	break;
+    }
+  if (fclose(kfp))
+    {
+      cleanupgpg(gpgdir);
+      return 0;
+    }
+  snprintf(cmd, sizeof(cmd), "gpg -q --homedir %s --import %s", gpgdir, keysfile);
+  if (system(cmd))
+    {
+      fprintf(stderr, "key import error\n");
+      cleanupgpg(gpgdir);
+      return 0;
+    }
+  unlink(keysfile);
+  posfp = lseek(fileno(fp), 0, SEEK_CUR);
+  lseek(fileno(fp), 0, SEEK_SET);
+  possigfp = lseek(fileno(sigfp), 0, SEEK_CUR);
+  lseek(fileno(sigfp), 0, SEEK_SET);
+  snprintf(cmd, sizeof(cmd), "gpg -q --homedir %s --verify /dev/fd/%d /dev/fd/%d >/dev/null 2>&1", gpgdir, fileno(sigfp), fileno(fp));
+  fcntl(fileno(fp), F_SETFD, 0);	/* clear CLOEXEC */
+  fcntl(fileno(sigfp), F_SETFD, 0);	/* clear CLOEXEC */
+  r = system(cmd);
+  lseek(fileno(sigfp), possigfp, SEEK_SET);
+  lseek(fileno(fp), posfp, SEEK_SET);
+  fcntl(fileno(fp), F_SETFD, FD_CLOEXEC);
+  fcntl(fileno(sigfp), F_SETFD, FD_CLOEXEC);
+  cleanupgpg(gpgdir);
+  return r == 0 ? 1 : 0;
 }
 
 void
@@ -448,6 +507,15 @@ writecachedrepo(Repo *repo, unsigned char *cookie)
   free(tmpl);
 }
 
+static Pool *
+read_sigs()
+{
+  Pool *sigpool = pool_create();
+  Repo *repo = repo_create(sigpool, "rpmdbkeys");
+  repo_add_rpmdb_pubkeys(repo, 0, 0);
+  return sigpool;
+}
+
 void
 read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 {
@@ -461,9 +529,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   Id primaryfilechksumtype;
   const char *descrdir;
   int defvendor;
-  int havecontent;
   struct stat stb;
   unsigned char cookie[32];
+  Pool *sigpool = 0;
 
   repo = repo_create(pool, "@System");
   printf("rpm database:");
@@ -522,7 +590,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  fflush(stdout);
 	  if ((fp = curlfopen(cinfo, "repodata/repomd.xml", 0, 0, 0)) == 0)
 	    {
-	      printf(" no data, skipped\n");
+	      printf(" no repomd.xml file, skipped\n");
 	      repo_free(repo, 1);
 	      cinfo->repo = 0;
 	      break;
@@ -534,7 +602,26 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
               fclose(fp);
 	      break;
 	    }
-	  printf(" reading\n");
+	  if (cinfo->gpgcheck)
+	    {
+	      FILE *sigfp;
+	      if ((sigfp = curlfopen(cinfo, "repodata/repomd.xml.asc", 0, 0, 0)) == 0)
+		{
+		  printf(" unsigned, skipped\n");
+		  fclose(fp);
+		  break;
+		}
+	      if (!sigpool)
+		sigpool = read_sigs();
+	      if (!checksig(sigpool, fp, sigfp))
+		{
+		  printf(" checksig failed, skipped\n");
+		  fclose(sigfp);
+		  fclose(fp);
+		  break;
+		}
+	      fclose(sigfp);
+	    }
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
 	  primaryfile = 0;
@@ -550,7 +637,16 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    }
 	  dataiterator_free(&di);
 	  if (!primaryfile)
-	    primaryfile = "repodata/primary.xml.gz";
+	    {
+	      printf(" no primary file entry, skipped\n");
+	      break;
+	    }
+	  if (!primaryfilechksumtype)
+	    {
+	      printf(" no primary file checksum, skipped\n");
+	      break;
+	    }
+	  printf(" reading\n");
 	  if ((fp = curlfopen(cinfo, primaryfile, 1, primaryfilechksum, primaryfilechksumtype)) == 0)
 	    continue;
 	  repo_add_rpmmd(repo, fp, 0, 0);
@@ -566,31 +662,83 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repo->priority = 99 - cinfo->priority;
 	  descrdir = 0;
 	  defvendor = 0;
-	  if ((fp = curlfopen(cinfo, "content", 0, 0, 0)) != 0)
+	  if ((fp = curlfopen(cinfo, "content", 0, 0, 0)) == 0)
 	    {
-	      calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
-	      if (usecachedrepo(repo, cookie))
+	      printf(" no content file, skipped\n");
+	      repo_free(repo, 1);
+	      cinfo->repo = 0;
+	      break;
+	    }
+	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
+	  if (usecachedrepo(repo, cookie))
+	    {
+	      printf(" cached\n");
+	      fclose(fp);
+	      break;
+	    }
+	  if (cinfo->gpgcheck)
+	    {
+	      FILE *sigfp;
+	      if ((sigfp = curlfopen(cinfo, "content.asc", 0, 0, 0)) == 0)
 		{
-		  printf(" cached\n");
+		  printf(" unsigned, skipped\n");
 		  fclose(fp);
 		  break;
 		}
-	      havecontent = 1;	/* ok to write cache */
-	      repo_add_content(repo, fp, 0);
-	      fclose(fp);
-	      defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
-	      descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
+	      if (!sigpool)
+		sigpool = read_sigs();
+	      if (!checksig(sigpool, fp, sigfp))
+		{
+		  printf(" checksig failed, skipped\n");
+		  fclose(sigfp);
+		  fclose(fp);
+		  break;
+		}
 	    }
+	  repo_add_content(repo, fp, 0);
+	  fclose(fp);
+	  defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
+	  descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
 	  if (!descrdir)
 	    descrdir = "suse/setup/descr";
-	  printf(" reading\n");
-	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/packages.gz", 0), 1, 0, 0)) == 0)
-	    if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/packages", 0), 0, 0, 0)) == 0)
+	  primaryfile = 0;
+	  dataiterator_init(&di, pool, repo, SOLVID_META, SUSETAGS_FILE_NAME, "packages.gz", SEARCH_STRING);
+	  dataiterator_prepend_keyname(&di, SUSETAGS_FILE);
+	  if (dataiterator_step(&di))
+	    {
+	      dataiterator_setpos_parent(&di);
+	      primaryfilechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, &primaryfilechksumtype);
+	      primaryfile = "packages.gz";
+	    }
+	  dataiterator_free(&di);
+	  if (!primaryfile)
+	    {
+	      dataiterator_init(&di, pool, repo, SOLVID_META, SUSETAGS_FILE_NAME, "packages", SEARCH_STRING);
+	      dataiterator_prepend_keyname(&di, SUSETAGS_FILE);
+	      if (dataiterator_step(&di))
+		{
+		  dataiterator_setpos_parent(&di);
+		  primaryfilechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, &primaryfilechksumtype);
+		  primaryfile = "packages";
+		}
+	      dataiterator_free(&di);
+	    }
+	  if (!primaryfile)
+	    {
+	      printf(" no packages file entry, skipped\n");
 	      break;
+	    }
+	  if (!primaryfilechksumtype)
+	    {
+	      printf(" no packages file checksum, skipped\n");
+	      break;
+	    }
+	  printf(" reading\n");
+	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", primaryfile), !strcmp(primaryfile, "packages.gz") ? 1 : 0, primaryfilechksum, primaryfilechksumtype)) == 0)
+	    break;
 	  repo_add_susetags(repo, fp, defvendor, 0, 0);
 	  fclose(fp);
-	  if (havecontent)
-	    writecachedrepo(repo, cookie);
+	  writecachedrepo(repo, cookie);
 	  break;
 	default:
 	  printf("unsupported repo '%s': skipped\n", cinfo->alias);
@@ -599,6 +747,8 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  break;
 	}
     }
+  if (sigpool)
+    pool_free(sigpool);
 }
 
 void
