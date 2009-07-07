@@ -9,6 +9,8 @@
 
 /* things missing:
  * - vendor policy loading
+ * - soft locks file handling
+ * - multi version handling
  */
 
 #define _GNU_SOURCE
@@ -41,6 +43,7 @@
 #include "repo_susetags.h"
 #include "repo_repomdxml.h"
 #include "repo_updateinfoxml.h"
+#include "repo_deltainfoxml.h"
 #include "repo_content.h"
 #include "pool_fileconflicts.h"
 
@@ -206,21 +209,12 @@ cookie_gzclose(void *cookie)
   return gzclose((gzFile *)cookie);
 }
 
-FILE *
-curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype)
+static inline int
+opentmpfile()
 {
-  pid_t pid;
-  int fd, l;
-  int status;
   char tmpl[100];
-  char url[4096];
-  const char *baseurl = cinfo->baseurl;
+  int fd;
 
-  l = strlen(baseurl);
-  if (l && baseurl[l - 1] == '/')
-    snprintf(url, sizeof(url), "%s%s", baseurl, file);
-  else
-    snprintf(url, sizeof(url), "%s/%s", baseurl, file);
   strcpy(tmpl, "/var/tmp/solvXXXXXX");
   fd = mkstemp(tmpl);
   if (fd < 0)
@@ -229,6 +223,51 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       exit(1);
     }
   unlink(tmpl);
+  return fd;
+}
+
+static int
+verify_checksum(int fd, const char *file, const unsigned char *chksum, Id chksumtype)
+{
+  char buf[1024];
+  unsigned char *sum;
+  void *h;
+  int l;
+
+  h = sat_chksum_create(chksumtype);
+  if (!h)
+    {
+      printf("%s: unknown checksum type\n", file);
+      return 0;
+    }
+  while ((l = read(fd, buf, sizeof(buf))) > 0)
+    sat_chksum_add(h, buf, l);
+  lseek(fd, 0, SEEK_SET);
+  l = 0;
+  sum = sat_chksum_get(h, &l);
+  if (memcmp(sum, chksum, l))
+    {
+      printf("%s: checksum mismatch\n", file);
+      return 0;
+    }
+  return 1;
+}
+
+FILE *
+curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype)
+{
+  pid_t pid;
+  int fd, l;
+  int status;
+  char url[4096];
+  const char *baseurl = cinfo->baseurl;
+
+  l = strlen(baseurl);
+  if (l && baseurl[l - 1] == '/')
+    snprintf(url, sizeof(url), "%s%s", baseurl, file);
+  else
+    snprintf(url, sizeof(url), "%s/%s", baseurl, file);
+  fd = opentmpfile();
   if ((pid = fork()) == (pid_t)-1)
     {
       perror("fork");
@@ -254,33 +293,14 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       return 0;
     }
   lseek(fd, 0, SEEK_SET);
-  if (chksumtype)
+  if (chksumtype && !verify_checksum(fd, file, chksum, chksumtype))
     {
-      char buf[1024];
-      unsigned char *sum;
-      void *h = sat_chksum_create(chksumtype);
-      int l;
-
-      if (!h)
-	{
-	  printf("%s: unknown checksum type\n", file);
-	  close(fd);
-	  return 0;
-	}
-      while ((l = read(fd, buf, sizeof(buf))) > 0)
-	sat_chksum_add(h, buf, l);
-      lseek(fd, 0, SEEK_SET);
-      l = 0;
-      sum = sat_chksum_get(h, &l);
-      if (memcmp(sum, chksum, l))
-	{
-	  printf("%s: checksum mismatch\n", file);
-	  close(fd);
-	  return 0;
-	}
+      close(fd);
+      return 0;
     }
   if (uncompress)
     {
+      char tmpl[100];
       cookie_io_functions_t cio;
       gzFile *gzf;
 
@@ -378,7 +398,7 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   return r == 0 ? 1 : 0;
 }
 
-#define CHKSUM_IDENT "1.0"
+#define CHKSUM_IDENT "1.1"
 
 void
 calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
@@ -676,6 +696,13 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) != 0)
 	    {
 	      repo_add_updateinfoxml(repo, fp, 0);
+	      fclose(fp);
+	    }
+
+	  filename = findinrepomd(repo, "deltainfo", &filechksum, &filechksumtype);
+	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) != 0)
+	    {
+	      repo_add_deltainfoxml(repo, fp, 0);
 	      fclose(fp);
 	    }
 	  
@@ -1232,6 +1259,7 @@ rerunsolver:
 	  struct repoinfo *cinfo;
 	  const unsigned char *chksum;
 	  Id chksumtype;
+	  Dataiterator di;
 
 	  p = checkq.elements[i];
 	  s = pool_id2solvable(pool, p);
@@ -1244,6 +1272,90 @@ rerunsolver:
 	  loc = solvable_get_location(s, &medianr);
 	  if (!loc)
 	     continue;
+
+	  if (pool->installed && pool->installed->nsolvables)
+	    {
+	      /* try a delta first */
+	      dataiterator_init(&di, pool, 0, SOLVID_META, DELTA_PACKAGE_NAME, id2str(pool, s->name), SEARCH_STRING);
+	      dataiterator_prepend_keyname(&di, REPOSITORY_DELTAINFO);
+	      while (dataiterator_step(&di))
+		{
+		  Id baseevr, op;
+
+		  dataiterator_setpos_parent(&di);
+		  if (pool_lookup_id(pool, SOLVID_POS, DELTA_PACKAGE_EVR) != s->evr ||
+		      pool_lookup_id(pool, SOLVID_POS, DELTA_PACKAGE_ARCH) != s->arch)
+		    continue;
+		  baseevr = pool_lookup_id(pool, SOLVID_POS, DELTA_BASE_EVR);
+		  FOR_PROVIDES(op, pp, s->name)
+		    {
+		      Solvable *os = pool->solvables + op;
+		      if (os->repo == pool->installed && os->name == s->name && os->arch == s->arch && os->evr == baseevr)
+			break;
+		    }
+		  if (op)
+		    {
+		      /* base is installed, run sequence check */
+		      const char *seqname;
+		      const char *seqevr;
+		      const char *seqnum;
+		      const char *seq;
+		      const char *dloc;
+		      FILE *fp;
+		      char cmd[128];
+		      int newfd;
+
+		      seqname = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NAME);
+		      seqevr = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_EVR);
+		      seqnum = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NUM);
+		      seq = pool_tmpjoin(pool, seqname, "-", seqevr);
+		      seq = pool_tmpjoin(pool, seq, "-", seqnum);
+		      if (system(pool_tmpjoin(pool, "applydeltarpm -c -s ", seq, 0)) != 0)
+			continue;	/* didn't match */
+		      /* looks good, download delta */
+		      chksumtype = 0;
+		      chksum = pool_lookup_bin_checksum(pool, SOLVID_POS, DELTA_CHECKSUM, &chksumtype);
+		      if (!chksumtype)
+			continue;	/* no way! */
+		      dloc = pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_DIR);
+		      dloc = pool_tmpjoin(pool, dloc, "/", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_NAME));
+		      dloc = pool_tmpjoin(pool, dloc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_EVR));
+		      dloc = pool_tmpjoin(pool, dloc, ".", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
+		      if ((fp = curlfopen(cinfo, dloc, 0, chksum, chksumtype)) == 0)
+			continue;
+		      /* got it, now reconstruct */
+		      newfd = opentmpfile();
+		      sprintf(cmd, "applydeltarpm /dev/fd/%d /dev/fd/%d", fileno(fp), newfd);
+		      fcntl(fileno(fp), F_SETFD, 0);
+		      if (system(cmd))
+			{
+			  close(newfd);
+			  fclose(fp);
+			  continue;
+			}
+		      lseek(newfd, 0, SEEK_SET);
+		      chksumtype = 0;
+		      chksum = solvable_lookup_bin_checksum(s, SOLVABLE_CHECKSUM, &chksumtype);
+		      if (chksumtype && !verify_checksum(newfd, loc, chksum, chksumtype))
+			{
+			  close(newfd);
+			  fclose(fp);
+			  continue;
+			}
+		      newpkgsfps[i] = fdopen(newfd, "r");
+		      fclose(fp);
+		      break;
+		    }
+		}
+	      dataiterator_free(&di);
+	    }
+	  
+	  if (newpkgsfps[i])
+	    {
+	      putchar('d');
+	      fflush(stdout);
+	      continue;		/* delta worked! */
+	    }
 	  if (cinfo->type == TYPE_SUSETAGS)
 	    {
 	      const char *datadir = repo_lookup_str(cinfo->repo, SOLVID_META, SUSETAGS_DATADIR);
@@ -1253,10 +1365,13 @@ rerunsolver:
 	  chksum = solvable_lookup_bin_checksum(s, SOLVABLE_CHECKSUM, &chksumtype);
 	  if ((newpkgsfps[i] = curlfopen(cinfo, loc, 0, chksum, chksumtype)) == 0)
 	    {
-	      printf("%s: %s not found in repository\n", s->repo->name, loc);
+	      printf("\n%s: %s not found in repository\n", s->repo->name, loc);
 	      exit(1);
 	    }
+	  putchar('.');
+	  fflush(stdout);
 	}
+      putchar('\n');
     }
 
   if (newpkgs)
