@@ -1310,6 +1310,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   if (!ref || !oldcookie || oldcookietype != REPOKEY_TYPE_SHA256 || memcmp(oldcookie, newcookie, 32) != 0)
     {
       Id *pkgids;
+      int solvstart = 0, solvend = 0;
 
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	count = count_headers(rootdir, dbenv);
@@ -1341,7 +1342,12 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
 	{
 	  if (!s)
-	    s = pool_id2solvable(pool, repo_add_solvable(repo));
+	    {
+	      s = pool_id2solvable(pool, repo_add_solvable(repo));
+	      if (!solvstart)
+		solvstart = s - pool->solvables;
+	      solvend = s - pool->solvables + 1;
+	    }
 	  if (!repo->rpmdbid)
 	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
           if (dbkey.size != 4)
@@ -1406,24 +1412,25 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	{
 	  /* oops, could not reuse. free it instead */
           repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+	  solvend--;
 	  s = 0;
 	}
       dbc->c_close(dbc);
       db->close(db, 0);
       db = 0;
-      /* now sort all solvables */
-      if (repo->end - repo->start > 1)
+      /* now sort all solvables in the new solvstart..solvend block */
+      if (solvend - solvstart > 1)
 	{
-	  pkgids = sat_malloc2(repo->end - repo->start, sizeof(Id));
-	  for (i = repo->start; i < repo->end; i++)
-	    pkgids[i - repo->start] = i;
-	  sat_sort(pkgids, repo->end - repo->start, sizeof(Id), pkgids_sort_cmp, repo);
+	  pkgids = sat_malloc2(solvend - solvstart, sizeof(Id));
+	  for (i = solvstart; i < solvend; i++)
+	    pkgids[i - solvstart] = i;
+	  sat_sort(pkgids, solvend - solvstart, sizeof(Id), pkgids_sort_cmp, repo);
 	  /* adapt order */
-	  for (i = repo->start; i < repo->end; i++)
+	  for (i = solvstart; i < solvend; i++)
 	    {
-	      int j = pkgids[i - repo->start];
+	      int j = pkgids[i - solvstart];
 	      while (j < i)
-		j = pkgids[i - repo->start] = pkgids[j - repo->start];
+		j = pkgids[i - solvstart] = pkgids[j - solvstart];
 	      if (j != i)
 	        swap_solvables(repo, data, i, j);
 	    }
@@ -2484,7 +2491,11 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 {
   int x, tag, l;
   unsigned char keyid[8];
-  unsigned int maxex = 0;
+  unsigned int kcr = 0, maxex = 0;
+  unsigned char *pubkey = 0;
+  int pubkeyl = 0;
+  unsigned char *userid = 0;
+  int useridl = 0;
 
   for (; pl; p += l, pl -= l)
     {
@@ -2539,15 +2550,20 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	return;
       if (tag == 6)
 	{
+	  pubkey = sat_realloc(pubkey, l);
+	  if (l)
+	    memcpy(pubkey, p, l);
+	  pubkeyl = l;
+	  kcr = 0;
 	  if (p[0] == 3)
 	    {
-	      unsigned int cr, ex;
+	      unsigned int ex;
 	      void *h;
-	      cr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
+	      kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
 	      ex = 0;
 	      if (p[5] || p[6])
 		{
-		  ex = cr + 24*3600 * (p[5] << 8 | p[6]);
+		  ex = kcr + 24*3600 * (p[5] << 8 | p[6]);
 		  if (ex > maxex)
 		    maxex = ex;
 		}
@@ -2580,6 +2596,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      unsigned char fp[20];
 	      char fpx[40 + 1];
 
+	      kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
 	      hdr[0] = 0x99;
 	      hdr[1] = l >> 8;
 	      hdr[2] = l;
@@ -2597,6 +2614,9 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	{
 	  if (p[0] == 3 && p[1] == 5)
 	    {
+#if 0
+	      Id htype = 0;
+#endif
 	      // printf("V3 signature packet\n");
 	      if (p[2] != 0x10 && p[2] != 0x11 && p[2] != 0x12 && p[2] != 0x13 && p[2] != 0x1f)
 		continue;
@@ -2608,12 +2628,36 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 		{
 		  // printf("OTHER SIG\n");
 		}
+#if 0
+	      if (p[16] == 1)
+		htype = REPOKEY_TYPE_MD5;
+	      else if (p[16] == 2)
+		htype = REPOKEY_TYPE_SHA1;
+	      else if (p[16] == 8)
+		htype = REPOKEY_TYPE_SHA256;
+	      if (htype)
+		{
+		  void *h = sat_chksum_create(htype);
+		  unsigned char b[3], *cs;
+
+		  b[0] = 0x99;
+		  b[1] = pubkeyl >> 8;
+		  b[2] = pubkeyl;
+		  sat_chksum_add(h, b, 3);
+		  sat_chksum_add(h, pubkey, pubkeyl);
+		  if (p[2] >= 0x10 && p[2] <= 0x13)
+		    sat_chksum_add(h, userid, useridl);
+		  sat_chksum_add(h, p + 2, 5);
+		  cs = sat_chksum_get(h, 0);
+		  sat_chksum_free(h, 0);
+		}
+#endif
 	    }
 	  if (p[0] == 4)
 	    {
 	      int j, ql, haveissuer;
 	      unsigned char *q;
-	      unsigned int ex = 0, cr = 0;
+	      unsigned int ex = 0, scr = 0;
 	      unsigned char issuer[8];
 
 	      // printf("V4 signature packet\n");
@@ -2667,19 +2711,59 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 			  haveissuer = 1;
 			}
 		      if (x == 2 && j == 0)
-			cr = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+			scr = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
 		      if (x == 9 && j == 0)
 			ex = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
 		      q += sl;
 		      ql -= sl;
 		    }
 		}
-	      if (!cr)
-		ex = 0;
 	      if (ex)
-	        ex += cr;
+	        ex += kcr;
 	      if (haveissuer)
 		{
+#if 0
+		  Id htype = 0;
+		  if (p[3] == 1)
+		    htype = REPOKEY_TYPE_MD5;
+		  else if (p[3] == 2)
+		    htype = REPOKEY_TYPE_SHA1;
+		  else if (p[3] == 8)
+		    htype = REPOKEY_TYPE_SHA256;
+		  if (htype && pubkeyl)
+		    {
+		      void *h = sat_chksum_create(htype);
+		      unsigned char b[6], *cs;
+		      unsigned int hl;
+
+		      b[0] = 0x99;
+		      b[1] = pubkeyl >> 8;
+		      b[2] = pubkeyl;
+		      sat_chksum_add(h, b, 3);
+		      sat_chksum_add(h, pubkey, pubkeyl);
+		      if (p[1] >= 0x10 && p[1] <= 0x13)
+			{
+			  b[0] = 0xb4;
+			  b[1] = useridl >> 24;
+			  b[2] = useridl >> 16;
+			  b[3] = useridl >> 8;
+			  b[4] = useridl;
+			  sat_chksum_add(h, b, 5);
+			  sat_chksum_add(h, userid, useridl);
+			}
+		      hl = 6 + (p[4] << 8 | p[5]);
+		      sat_chksum_add(h, p, hl);
+		      b[0] = 4;
+		      b[1] = 0xff;
+		      b[2] = hl >> 24;
+		      b[3] = hl >> 16;
+		      b[4] = hl >> 8;
+		      b[5] = hl;
+		      sat_chksum_add(h, b, 6);
+		      cs = sat_chksum_get(h, 0);
+		      sat_chksum_free(h, 0);
+		    }
+#endif
 		  if (!memcmp(keyid, issuer, 8))
 		    {
 		      // printf("SELF SIG cr %d ex %d\n", cr, ex);
@@ -2693,9 +2777,18 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 		}
 	    }
 	}
+      if (tag == 13)
+	{
+	  userid = sat_realloc(userid, l);
+	  if (l)
+	    memcpy(userid, p, l);
+	  useridl = l;
+	}
     }
   if (maxex)
     repodata_set_num(data, s - s->repo->pool->solvables, PUBKEY_EXPIRES, maxex);
+  sat_free(pubkey);
+  sat_free(userid);
 }
 
 /* this is private to rpm, but rpm lacks an interface to retrieve
