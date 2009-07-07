@@ -27,6 +27,7 @@
 #include "pool.h"
 #include "poolarch.h"
 #include "repo.h"
+#include "evr.h"
 #include "util.h"
 #include "solver.h"
 #include "solverdebug.h"
@@ -39,6 +40,7 @@
 #include "repo_rpmmd.h"
 #include "repo_susetags.h"
 #include "repo_repomdxml.h"
+#include "repo_updateinfoxml.h"
 #include "repo_content.h"
 #include "pool_fileconflicts.h"
 
@@ -297,19 +299,6 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
 }
 
 void
-calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
-{
-  char buf[4096];
-  void *h = sat_chksum_create(chktype);
-  int l;
-
-  while ((l = fread(buf, 1, sizeof(buf), fp)) > 0)
-    sat_chksum_add(h, buf, l);
-  rewind(fp);
-  sat_chksum_free(h, out);
-}
-
-void
 cleanupgpg(char *gpgdir)
 {
   char cmd[256];
@@ -389,10 +378,27 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   return r == 0 ? 1 : 0;
 }
 
+#define CHKSUM_IDENT "1.0"
+
+void
+calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
+{
+  char buf[4096];
+  void *h = sat_chksum_create(chktype);
+  int l;
+
+  sat_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
+  while ((l = fread(buf, 1, sizeof(buf), fp)) > 0)
+    sat_chksum_add(h, buf, l);
+  rewind(fp);
+  sat_chksum_free(h, out);
+}
+
 void
 calc_checksum_stat(struct stat *stb, Id chktype, unsigned char *out)
 {
   void *h = sat_chksum_create(chktype);
+  sat_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
   sat_chksum_add(h, &stb->st_dev, sizeof(stb->st_dev));
   sat_chksum_add(h, &stb->st_ino, sizeof(stb->st_ino));
   sat_chksum_add(h, &stb->st_size, sizeof(stb->st_size));
@@ -516,6 +522,40 @@ read_sigs()
   return sigpool;
 }
 
+static inline int
+iscompressed(const char *name)
+{
+  int l = strlen(name);
+  return l > 3 && !strcmp(name + l - 3, ".gz") ? 1 : 0;
+}
+
+static inline const char *
+findinrepomd(Repo *repo, const char *what, const unsigned char **chksump, Id *chksumtypep)
+{
+  Pool *pool = repo->pool;
+  Dataiterator di;
+  const char *filename;
+
+  filename = 0;
+  *chksump = 0;
+  *chksumtypep = 0;
+  dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_REPOMD_TYPE, what, SEARCH_STRING);
+  dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
+  if (dataiterator_step(&di))
+    {
+      dataiterator_setpos_parent(&di);
+      filename = pool_lookup_str(pool, SOLVID_POS, REPOSITORY_REPOMD_LOCATION);
+      *chksump = pool_lookup_bin_checksum(pool, SOLVID_POS, REPOSITORY_REPOMD_CHECKSUM, chksumtypep);
+    }
+  dataiterator_free(&di);
+  if (filename && !*chksumtypep)
+    {
+      printf("no %s file checksum!\n", what);
+      filename = 0;
+    }
+  return filename;
+}
+
 void
 read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 {
@@ -524,9 +564,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   int i;
   FILE *fp;
   Dataiterator di;
-  const char *primaryfile;
-  const unsigned char *primaryfilechksum;
-  Id primaryfilechksumtype;
+  const char *filename;
+  const unsigned char *filechksum;
+  Id filechksumtype;
   const char *descrdir;
   int defvendor;
   struct stat stb;
@@ -624,35 +664,24 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    }
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
-	  primaryfile = 0;
-	  primaryfilechksum = 0;
-	  primaryfilechksumtype = 0;
-	  dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_REPOMD_TYPE, "primary", SEARCH_STRING);
-	  dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
-	  if (dataiterator_step(&di))
-	    {
-	      dataiterator_setpos_parent(&di);
-	      primaryfile = pool_lookup_str(pool, SOLVID_POS, REPOSITORY_REPOMD_LOCATION);
-	      primaryfilechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, REPOSITORY_REPOMD_CHECKSUM, &primaryfilechksumtype);
-	    }
-	  dataiterator_free(&di);
-	  if (!primaryfile)
-	    {
-	      printf(" no primary file entry, skipped\n");
-	      break;
-	    }
-	  if (!primaryfilechksumtype)
-	    {
-	      printf(" no primary file checksum, skipped\n");
-	      break;
-	    }
 	  printf(" reading\n");
-	  if ((fp = curlfopen(cinfo, primaryfile, 1, primaryfilechksum, primaryfilechksumtype)) == 0)
-	    continue;
-	  repo_add_rpmmd(repo, fp, 0, 0);
-	  fclose(fp);
+	  filename = findinrepomd(repo, "primary", &filechksum, &filechksumtype);
+	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) != 0)
+	    {
+	      repo_add_rpmmd(repo, fp, 0, 0);
+	      fclose(fp);
+	    }
+
+	  filename = findinrepomd(repo, "updateinfo", &filechksum, &filechksumtype);
+	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) != 0)
+	    {
+	      repo_add_updateinfoxml(repo, fp, 0);
+	      fclose(fp);
+	    }
+	  
 	  writecachedrepo(repo, cookie);
 	  break;
+
         case TYPE_SUSETAGS:
 	  printf("susetags repo '%s':", cinfo->alias);
 	  fflush(stdout);
@@ -701,40 +730,40 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
 	  if (!descrdir)
 	    descrdir = "suse/setup/descr";
-	  primaryfile = 0;
+	  filename = 0;
 	  dataiterator_init(&di, pool, repo, SOLVID_META, SUSETAGS_FILE_NAME, "packages.gz", SEARCH_STRING);
 	  dataiterator_prepend_keyname(&di, SUSETAGS_FILE);
 	  if (dataiterator_step(&di))
 	    {
 	      dataiterator_setpos_parent(&di);
-	      primaryfilechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, &primaryfilechksumtype);
-	      primaryfile = "packages.gz";
+	      filechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
+	      filename = "packages.gz";
 	    }
 	  dataiterator_free(&di);
-	  if (!primaryfile)
+	  if (!filename)
 	    {
 	      dataiterator_init(&di, pool, repo, SOLVID_META, SUSETAGS_FILE_NAME, "packages", SEARCH_STRING);
 	      dataiterator_prepend_keyname(&di, SUSETAGS_FILE);
 	      if (dataiterator_step(&di))
 		{
 		  dataiterator_setpos_parent(&di);
-		  primaryfilechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, &primaryfilechksumtype);
-		  primaryfile = "packages";
+		  filechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
+		  filename = "packages";
 		}
 	      dataiterator_free(&di);
 	    }
-	  if (!primaryfile)
+	  if (!filename)
 	    {
 	      printf(" no packages file entry, skipped\n");
 	      break;
 	    }
-	  if (!primaryfilechksumtype)
+	  if (!filechksumtype)
 	    {
 	      printf(" no packages file checksum, skipped\n");
 	      break;
 	    }
 	  printf(" reading\n");
-	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", primaryfile), !strcmp(primaryfile, "packages.gz") ? 1 : 0, primaryfilechksum, primaryfilechksumtype)) == 0)
+	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype)) == 0)
 	    break;
 	  repo_add_susetags(repo, fp, defvendor, 0, 0);
 	  fclose(fp);
@@ -968,6 +997,7 @@ main(int argc, char **argv)
   char inbuf[128], *ip;
   int updateall = 0;
   int distupgrade = 0;
+  int patchmode = 0;
   FILE **newpkgsfps;
   struct fcstate fcstate;
 
@@ -980,6 +1010,11 @@ main(int argc, char **argv)
     }
   if (!strcmp(argv[0], "install") || !strcmp(argv[0], "in"))
     mode = SOLVER_INSTALL;
+  else if (!strcmp(argv[0], "patch"))
+    {
+      mode = SOLVER_UPDATE;
+      patchmode = 1;
+    }
   else if (!strcmp(argv[0], "erase") || !strcmp(argv[0], "rm"))
     mode = SOLVER_ERASE;
   else if (!strcmp(argv[0], "show"))
@@ -1031,6 +1066,58 @@ main(int argc, char **argv)
 	    }
 	}
       exit(0);
+    }
+
+  if (updateall && patchmode)
+    {
+      int pruneyou = 0;
+      Map installedmap;
+      Solvable *s;
+
+      map_init(&installedmap, pool->nsolvables);
+      if (pool->installed)
+        FOR_REPO_SOLVABLES(pool->installed, p, s)
+	  MAPSET(&installedmap, p);
+
+      /* install all patches */
+      updateall = 0;
+      mode = SOLVER_INSTALL;
+      for (p = 1; p < pool->nsolvables; p++)
+	{
+	  const char *type;
+	  int r;
+	  Id p2;
+
+	  s = pool->solvables + p;
+	  if (strncmp(id2str(pool, s->name), "patch:", 6) != 0)
+	    continue;
+	  FOR_PROVIDES(p2, pp, s->name)
+	    {
+	      Solvable *s2 = pool->solvables + p2;
+	      if (s2->name != s->name)
+		continue;
+	      r = evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
+	      if (r < 0 || (r == 0 && p > p2))
+		break;
+	    }
+	  if (p2)
+	    continue;
+	  type = solvable_lookup_str(s, SOLVABLE_PATCHCATEGORY);
+	  if (type && !strcmp(type, "optional"))
+	    continue;
+	  r = solvable_trivial_installable_map(s, &installedmap, 0);
+	  if (r == -1)
+	    continue;
+	  if (solvable_lookup_bool(s, UPDATE_RESTART) && r == 0)
+	    {
+	      if (!pruneyou++)
+		queue_empty(&job);
+	    }
+	  else if (pruneyou)
+	    continue;
+	  queue_push2(&job, SOLVER_SOLVABLE, p);
+	}
+      map_free(&installedmap);
     }
 
   // add mode
