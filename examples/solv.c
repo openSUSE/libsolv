@@ -129,10 +129,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    kp++;
 	  if (!*kp || *kp == '#')
 	    continue;
-	  if (!cinfo)
+	  if (*kp == '[')
 	    {
-	      if (*kp != '[')
-		continue;
 	      vp = strrchr(kp, ']');
 	      if (!vp)
 		continue;
@@ -141,10 +139,11 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	      cinfo = repoinfos + nrepoinfos++;
 	      memset(cinfo, 0, sizeof(*cinfo));
 	      cinfo->alias = strdup(kp + 1);
-	      cinfo->gpgcheck = 1;
 	      cinfo->type = TYPE_RPMMD;
 	      continue;
 	    }
+	  if (!cinfo)
+	    continue;
           vp = strchr(kp, '=');
 	  if (!vp)
 	    continue;
@@ -262,6 +261,8 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
   char url[4096];
   const char *baseurl = cinfo->baseurl;
 
+  if (!baseurl)
+    return 0;
   l = strlen(baseurl);
   if (l && baseurl[l - 1] == '/')
     snprintf(url, sizeof(url), "%s%s", baseurl, file);
@@ -346,7 +347,7 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   Solvable *s;
   Id p;
   off_t posfp, possigfp;
-  int r;
+  int r, nkeys;
 
   gpgdir = mkdtemp(pool_tmpjoin(sigpool, "/var/tmp/solvgpg.XXXXXX", 0, 0));
   if (!gpgdir)
@@ -357,6 +358,7 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
       cleanupgpg(gpgdir);
       return 0;
     }
+  nkeys = 0;
   for (p = 1, s = sigpool->solvables + p; p < sigpool->nsolvables; p++, s++)
     {
       if (!s->repo)
@@ -368,8 +370,9 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
 	break;
       if (fputc('\n', kfp) == EOF)	/* Just in case... */
 	break;
+      nkeys++;
     }
-  if (fclose(kfp))
+  if (fclose(kfp) || !nkeys)
     {
       cleanupgpg(gpgdir);
       return 0;
@@ -514,7 +517,7 @@ writecachedrepo(Repo *repo, unsigned char *cookie)
   sat_free(addedfileprovides);
   repodata_internalize(info);
   repo_write(repo, fp, 0, 0, 0);
-  repodata_free(info);
+  repo_free_repodata(repo, info);
   if (fwrite(cookie, 32, 1, fp) != 1)
     {
       fclose(fp);
@@ -583,6 +586,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   struct repoinfo *cinfo;
   int i;
   FILE *fp;
+  FILE *sigfp;
   Dataiterator di;
   const char *filename;
   const unsigned char *filechksum;
@@ -662,15 +666,17 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
               fclose(fp);
 	      break;
 	    }
-	  if (cinfo->gpgcheck)
+	  sigfp = curlfopen(cinfo, "repodata/repomd.xml.asc", 0, 0, 0);
+#ifndef FEDORA
+	  if (!sigfp)
 	    {
-	      FILE *sigfp;
-	      if ((sigfp = curlfopen(cinfo, "repodata/repomd.xml.asc", 0, 0, 0)) == 0)
-		{
-		  printf(" unsigned, skipped\n");
-		  fclose(fp);
-		  break;
-		}
+	      printf(" unsigned, skipped\n");
+	      fclose(fp);
+	      break;
+	    }
+#endif
+	  if (sigfp)
+	    {
 	      if (!sigpool)
 		sigpool = read_sigs();
 	      if (!checksig(sigpool, fp, sigfp))
@@ -700,6 +706,8 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    }
 
 	  filename = findinrepomd(repo, "deltainfo", &filechksum, &filechksumtype);
+	  if (!filename)
+	    filename = findinrepomd(repo, "prestodelta", &filechksum, &filechksumtype);
 	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) != 0)
 	    {
 	      repo_add_deltainfoxml(repo, fp, 0);
@@ -732,15 +740,15 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      fclose(fp);
 	      break;
 	    }
-	  if (cinfo->gpgcheck)
+	  sigfp = curlfopen(cinfo, "content.asc", 0, 0, 0);
+	  if (!sigfp)
 	    {
-	      FILE *sigfp;
-	      if ((sigfp = curlfopen(cinfo, "content.asc", 0, 0, 0)) == 0)
-		{
-		  printf(" unsigned, skipped\n");
-		  fclose(fp);
-		  break;
-		}
+	      printf(" unsigned, skipped\n");
+	      fclose(fp);
+	      break;
+	    }
+	  if (sigfp)
+	    {
 	      if (!sigpool)
 		sigpool = read_sigs();
 	      if (!checksig(sigpool, fp, sigfp))
@@ -750,6 +758,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 		  fclose(fp);
 		  break;
 		}
+	      fclose(sigfp);
 	    }
 	  repo_add_content(repo, fp, 0);
 	  fclose(fp);
