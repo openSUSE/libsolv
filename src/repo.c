@@ -987,6 +987,16 @@ repo_last_repodata(Repo *repo)
 }
 
 void
+repo_free_repodata(Repo *repo, Repodata *data)
+{
+  int i = data - repo->repodata;
+  repodata_free(data);
+  if (i < repo->nrepodata - 1)
+    memmove(repo->repodata + i, repo->repodata + i + 1, (repo->nrepodata - 1 - i) * sizeof(Repodata));
+  repo->nrepodata--;
+}
+
+void
 repo_set_id(Repo *repo, Id p, Id keyname, Id id)
 {
   Repodata *data = repo_last_repodata(repo);

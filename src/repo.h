@@ -174,6 +174,7 @@ typedef struct _KeyValue {
 
 Repodata *repo_add_repodata(Repo *repo, int localpool);
 Repodata *repo_last_repodata(Repo *repo);
+void repo_free_repodata(Repo *repo, Repodata *data);
 
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
