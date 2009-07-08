@@ -1184,6 +1184,42 @@ mkrpmdbcookie(struct stat *st, unsigned char *cookie)
   memcpy(cookie + 24, &st->st_dev, sizeof(st->st_dev));
 }
 
+/* should look in /usr/lib/rpm/macros instead, but we want speed... */
+static DB_ENV *
+opendbenv(const char *rootdir)
+{
+  char dbpath[PATH_MAX];
+  DB_ENV *dbenv = 0;
+  int r;
+
+  if (db_env_create(&dbenv, 0))
+    {
+      perror("db_env_create");
+      return 0;
+    }
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
+  if (access(dbpath, W_OK) == -1)
+    {
+      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
+    }
+  else
+    {
+#ifdef FEDORA
+      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0644);
+#else
+      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
+#endif
+    }
+  if (r)
+    {
+      perror("dbenv open");
+      dbenv->close(dbenv, 0);
+      return 0;
+    }
+  return dbenv;
+}
+ 
+
 static int
 count_headers(const char *rootdir, DB_ENV *dbenv)
 {
@@ -1278,22 +1314,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
 
-  if (db_env_create(&dbenv, 0))
-    {
-      perror("db_env_create");
-      exit(1);
-    }
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir);
-  /* should look in /usr/lib/rpm/macros instead, but we want speed... */
-#ifdef FEDORA
-  if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0))
-#else
-  if (dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
-#endif
-    {
-      perror("dbenv open");
-      exit(1);
-    }
+  if (!(dbenv = opendbenv(rootdir)))
+    exit(1);
 
   /* XXX: should get ro lock of Packages database! */
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
@@ -2020,32 +2042,6 @@ struct rpmdbentry {
 #define ENTRIES_BLOCK 255
 #define NAMEDATA_BLOCK 1023
 
-static int
-opendbenv(struct rpm_by_state *state, const char *rootdir)
-{
-  char dbpath[PATH_MAX];
-
-  if (state->dbenv)
-    return 1;
-  if (db_env_create(&state->dbenv, 0))
-    {
-      perror("db_env_create");
-      return 0;
-    }
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
-#ifdef FEDORA
-  if (state->dbenv->open(state->dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0))
-#else
-  if (state->dbenv->open(state->dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0))
-#endif
-    {
-      perror("dbenv open");
-      state->dbenv->close(state->dbenv, 0);
-      return 0;
-    }
-  return 1;
-}
- 
 #define FLAGS_GET_PUBKEYS 1
 
 struct rpmdbentry *
@@ -2150,7 +2146,7 @@ rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq)
   if (rpmdbidq)
     queue_empty(rpmdbidq);
   memset(&state, 0, sizeof(state));
-  if (!opendbenv(&state, rootdir))
+  if (!(state.dbenv = opendbenv(rootdir)))
     return 0;
   entries = getinstalledrpmdbids(&state, &nentries, &namedata, 0);
   if (rpmdbidq)
@@ -2194,7 +2190,7 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
   if (!state->dbopened)
     {
       state->dbopened = 1;
-      if (!opendbenv(state, rootdir))
+      if (!state->dbenv && !(state->dbenv = opendbenv(rootdir)))
 	return 0;
       if (db_create(&state->db, state->dbenv, 0))
 	{
@@ -2795,18 +2791,18 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
  * the values. Sigh. */
 struct pgpDigParams_s {
     const char * userid;
-    const byte * hash;
+    const unsigned char * hash;
     const char * params[4];
-    byte tag;
-    byte version;               /*!< version number. */
-    byte time[4];               /*!< time that the key was created. */
-    byte pubkey_algo;           /*!< public key algorithm. */
-    byte hash_algo;
-    byte sigtype;
-    byte hashlen;
-    byte signhash16[2];
-    byte signid[8];
-    byte saved;
+    unsigned char tag;
+    unsigned char version;               /*!< version number. */
+    unsigned char time[4];               /*!< time that the key was created. */
+    unsigned char pubkey_algo;           /*!< public key algorithm. */
+    unsigned char hash_algo;
+    unsigned char sigtype;
+    unsigned char hashlen;
+    unsigned char signhash16[2];
+    unsigned char signid[8];
+    unsigned char saved;
 };
 
 struct pgpDig_s {
@@ -2866,7 +2862,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
     data = repo_last_repodata(repo);
 
   memset(&state, 0, sizeof(state));
-  if (!opendbenv(&state, rootdir))
+  if (!(state.dbenv = opendbenv(rootdir)))
     return;
   entries = getinstalledrpmdbids(&state, &nentries, &namedata, FLAGS_GET_PUBKEYS);
   for (i = 0 ; i < nentries; i++)
