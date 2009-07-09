@@ -66,12 +66,74 @@ struct repoinfo {
   int enabled;
   int autorefresh;
   char *baseurl;
+  char *metalink;
   char *path;
   int type;
   int gpgcheck;
   int priority;
   int keeppackages;
 };
+
+#ifdef FEDORA
+char *
+yum_substitute(Pool *pool, char *line)
+{
+  char *p, *p2;
+
+  p = line;
+  while ((p2 = strchr(p, '$')) != 0)
+    {
+      if (!strncmp(p2, "$releasever", 11))
+	{
+	  static char *releaseevr;
+	  if (!releaseevr)
+	    {
+	      FILE *fp;
+	      char buf[1024], *bp;
+
+	      fp = popen("rpm --nodigest --nosignature -q --qf '%{VERSION}\n' --whatprovides redhat-release", "r");
+	      fread(buf, 1, sizeof(buf), fp);
+	      fclose(fp);
+	      bp = buf;
+	      while (*bp != ' ' && *bp != '\t' && *bp != '\n')
+		bp++;
+	      *bp = 0;
+	      releaseevr = strdup(buf);
+	    }
+	  *p2 = 0;
+	  p = pool_tmpjoin(pool, line, releaseevr, p2 + 11);
+	  p2 = p + (p2 - line);
+	  line = p;
+	  p = p2 + strlen(releaseevr);
+	  continue;
+	}
+      if (!strncmp(p2, "$basearch", 9))
+	{
+	  static char *basearch;
+	  if (!basearch)
+	    {
+	      struct utsname un;
+	      if (uname(&un))
+		{
+		  perror("uname");
+		  exit(1);
+		}
+	      basearch = strdup(un.machine);
+	      if (basearch[0] == 'i' && basearch[1] && !strcmp(basearch + 2, "86"))
+		basearch[1] = '3';
+	    }
+	  *p2 = 0;
+	  p = pool_tmpjoin(pool, line, basearch, p2 + 9);
+	  p2 = p + (p2 - line);
+	  line = p;
+	  p = p2 + strlen(basearch);
+	  continue;
+	}
+      p = p2 + 1;
+    }
+  return line;
+}
+#endif
 
 #define TYPE_UNKNOWN	0
 #define TYPE_SUSETAGS	1
@@ -129,6 +191,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    kp++;
 	  if (!*kp || *kp == '#')
 	    continue;
+	  if (strchr(kp, '$'))
+	    kp = yum_substitute(pool, kp);
 	  if (*kp == '[')
 	    {
 	      vp = strrchr(kp, ']');
@@ -140,6 +204,7 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	      memset(cinfo, 0, sizeof(*cinfo));
 	      cinfo->alias = strdup(kp + 1);
 	      cinfo->type = TYPE_RPMMD;
+	      cinfo->autorefresh = 1;
 	      continue;
 	    }
 	  if (!cinfo)
@@ -166,6 +231,11 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    cinfo->gpgcheck = *vp == '0' ? 0 : 1;
 	  else if (!strcmp(kp, "baseurl"))
 	    cinfo->baseurl = strdup(vp);
+	  else if (!strcmp(kp, "mirrorlist"))
+	    {
+	      if (strstr(vp, "metalink"))
+	        cinfo->metalink = strdup(vp);
+	    }
 	  else if (!strcmp(kp, "path"))
 	    {
 	      if (vp && strcmp(vp, "/") != 0)
@@ -252,6 +322,31 @@ verify_checksum(int fd, const char *file, const unsigned char *chksum, Id chksum
   return 1;
 }
 
+char *
+findmetalinkurl(FILE *fp)
+{
+  char buf[4096], *bp, *ep;
+  while((bp = fgets(buf, sizeof(buf), fp)) != 0)
+    {
+      while (*bp == ' ' || *bp == '\t')
+	bp++;
+      if (strncmp(bp, "<url", 4))
+	continue;
+      bp = strchr(bp, '>');
+      if (!bp)
+	continue;
+      bp++;
+      ep = strstr(bp, "repodata/repomd.xml</url>");
+      if (!ep)
+	continue;
+      *ep = 0;
+      if (strncmp(bp, "http", 4))
+	continue;
+      return strdup(bp);
+    }
+  return 0;
+}
+
 FILE *
 curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype)
 {
@@ -262,12 +357,30 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
   const char *baseurl = cinfo->baseurl;
 
   if (!baseurl)
-    return 0;
-  l = strlen(baseurl);
-  if (l && baseurl[l - 1] == '/')
-    snprintf(url, sizeof(url), "%s%s", baseurl, file);
+    {
+      if (!cinfo->metalink)
+        return 0;
+      if (file != cinfo->metalink)
+	{
+	  FILE *fp = curlfopen(cinfo, cinfo->metalink, 0, 0, 0);
+	  if (!fp)
+	    return 0;
+	  cinfo->baseurl = findmetalinkurl(fp);
+	  fclose(fp);
+	  if (!cinfo->baseurl)
+	    return 0;
+	  return curlfopen(cinfo, file, uncompress, chksum, chksumtype);
+	}
+      snprintf(url, sizeof(url), "%s", file);
+    }
   else
-    snprintf(url, sizeof(url), "%s/%s", baseurl, file);
+    {
+      l = strlen(baseurl);
+      if (l && baseurl[l - 1] == '/')
+	snprintf(url, sizeof(url), "%s%s", baseurl, file);
+      else
+	snprintf(url, sizeof(url), "%s/%s", baseurl, file);
+    }
   fd = opentmpfile();
   if ((pid = fork()) == (pid_t)-1)
     {
@@ -281,7 +394,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
           dup2(fd, 1);
 	  close(fd);
 	}
-      execlp("curl", "curl", "-s", "-L", url, (char *)0);
+      execlp("curl", "curl", "-f", "-s", "-L", url, (char *)0);
       perror("curl");
       _exit(0);
     }
