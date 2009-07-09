@@ -275,7 +275,7 @@ pool_createwhatprovides(Pool *pool)
     {
       Id *pp;
       s = pool->solvables + i;
-      if (!s->provides)
+      if (!s->provides || !s->repo || s->repo->disabled)
 	continue;
       /* we always need the installed solvable in the whatprovides data,
          otherwise obsoletes/conflicts on them won't work */
@@ -323,7 +323,7 @@ pool_createwhatprovides(Pool *pool)
     {
       Id *pp;
       s = pool->solvables + i;
-      if (!s->provides)
+      if (!s->provides || !s->repo || s->repo->disabled)
 	continue;
       if (s->repo != installed && !pool_installable(pool, s))
 	continue;

@@ -1435,7 +1435,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
        * installed packages
        */
 
-      if (level < systemlevel && solv->installed && solv->installed->nsolvables)
+      if (level < systemlevel && solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
 	{
 	  Repo *installed = solv->installed;
 	  int pass;
