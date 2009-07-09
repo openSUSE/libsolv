@@ -191,8 +191,10 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    kp++;
 	  if (!*kp || *kp == '#')
 	    continue;
+#ifdef FEDORA
 	  if (strchr(kp, '$'))
 	    kp = yum_substitute(pool, kp);
+#endif
 	  if (*kp == '[')
 	    {
 	      vp = strrchr(kp, ']');
