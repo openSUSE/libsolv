@@ -57,6 +57,7 @@ pool_setarch(Pool *pool, const char *arch)
   Id id, lastarch;
 
   pool->id2arch = sat_free(pool->id2arch);
+  pool->id2color = sat_free(pool->id2color);
   if (!arch)
     {
       pool->lastarch = 0;
@@ -108,3 +109,24 @@ pool_setarch(Pool *pool, const char *arch)
   pool->id2arch = id2arch;
   pool->lastarch = lastarch;
 }
+
+unsigned char
+pool_arch2color_slow(Pool *pool, Id arch)
+{
+  const char *s;
+  unsigned char color;
+
+  if (arch > pool->lastarch)
+    return ARCHCOLOR_ALL;
+  if (!pool->id2color)
+    pool->id2color = sat_calloc(pool->lastarch + 1, 1);
+  s = id2str(pool, arch);
+  if (arch == ARCH_NOARCH || arch == ARCH_ALL)
+    color = ARCHCOLOR_ALL;
+  else if (!strcmp(s, "s390x") || strstr(s, "64"))
+    color = ARCHCOLOR_64;
+  else
+    color = ARCHCOLOR_32;
+  return color;
+}
+

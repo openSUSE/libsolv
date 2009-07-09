@@ -21,6 +21,7 @@
 #include "solver.h"
 #include "bitmap.h"
 #include "pool.h"
+#include "poolarch.h"
 #include "evr.h"
 #include "util.h"
 
@@ -394,7 +395,7 @@ void
 transaction_classify(Transaction *trans, int mode, Queue *classes)
 {
   Pool *pool = trans->pool;
-  int ntypes[SOLVER_TRANSACTION_MAXTYPE];
+  int ntypes[SOLVER_TRANSACTION_MAXTYPE + 1];
   Solvable *s, *sq;
   Id v, vq, type, p, q;
   int i, j;
@@ -560,6 +561,8 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	    continue;
 	  if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
 	    continue;
+	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+	    continue;
 	  queue_push(ti, p);
 	  queue_push(ti, p2);
 	}
@@ -574,6 +577,8 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 		  if (s2->repo != installed)
 		    continue;
 		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+		    continue;
+		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
 		    continue;
 		  queue_push(ti, p);
 		  queue_push(ti, p2);
@@ -639,6 +644,11 @@ transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
 	MAPSET(&trans->transactsmap, -p);
       if ((!installed || s->repo != installed) && p > 0)
 	{
+	  const char *n = id2str(pool, s->name);
+	  if (!strncmp(n, "patch:", 6))
+	    continue;
+	  if (!strncmp(n, "pattern:", 8))
+	    continue;
 	  MAPSET(&trans->transactsmap, p);
 	  if (noobsmap && MAPTST(noobsmap, p))
 	    neednoobs = 1;

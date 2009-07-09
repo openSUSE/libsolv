@@ -60,7 +60,7 @@ repo_freedata(Repo *repo)
 {
   int i;
   for (i = 0; i < repo->nrepodata; i++)
-    repodata_free(repo->repodata + i);
+    repodata_freedata(repo->repodata + i);
   sat_free(repo->repodata);
   sat_free(repo->idarraydata);
   sat_free(repo->rpmdbid);
@@ -797,6 +797,8 @@ repo_search(Repo *repo, Id p, Id keyname, const char *match, int flags, int (*ca
 {
   struct matchdata md;
 
+  if (repo->disabled && !(flags & SEARCH_DISABLED_REPOS))
+    return;
   memset(&md, 0, sizeof(md));
   md.pool = repo->pool;
   md.flags = flags;
@@ -972,7 +974,7 @@ repo_add_repodata(Repo *repo, int localpool)
   repo->nrepodata++;
   repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
   data = repo->repodata + repo->nrepodata - 1;
-  repodata_init(data, repo, localpool);
+  repodata_initdata(data, repo, localpool);
   return data;
 }
 
@@ -984,16 +986,6 @@ repo_last_repodata(Repo *repo)
     if (repo->repodata[i].state != REPODATA_STUB)
       return repo->repodata + i;
   return repo_add_repodata(repo, 0);
-}
-
-void
-repo_free_repodata(Repo *repo, Repodata *data)
-{
-  int i = data - repo->repodata;
-  repodata_free(data);
-  if (i < repo->nrepodata - 1)
-    memmove(repo->repodata + i, repo->repodata + i + 1, (repo->nrepodata - 1 - i) * sizeof(Repodata));
-  repo->nrepodata--;
 }
 
 void

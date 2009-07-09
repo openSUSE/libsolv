@@ -43,7 +43,7 @@ extern unsigned int unchecked_decompress_buf (const unsigned char *in,
 
 
 void
-repodata_init(Repodata *data, Repo *repo, int localpool)
+repodata_initdata(Repodata *data, Repo *repo, int localpool)
 {
   memset(data, 0, sizeof (*data));
   data->repo = repo;
@@ -60,7 +60,7 @@ repodata_init(Repodata *data, Repo *repo, int localpool)
 }
 
 void
-repodata_free(Repodata *data)
+repodata_freedata(Repodata *data)
 {
   int i;
 
@@ -93,6 +93,17 @@ repodata_free(Repodata *data)
 
   sat_free(data->attrdata);
   sat_free(data->attriddata);
+}
+
+void
+repodata_free(Repodata *data)
+{
+  Repo *repo = data->repo;
+  int i = data - repo->repodata;
+  repodata_freedata(data);
+  if (i < repo->nrepodata - 1)
+  memmove(repo->repodata + i, repo->repodata + i + 1, (repo->nrepodata - 1 - i) * sizeof(Repodata));
+  repo->nrepodata--;
 }
 
 
@@ -655,6 +666,13 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
 	 come up with the same filename again.  */
       kv->id = 0;
       return 1;
+    case REPOKEY_TYPE_MD5:
+    case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA256:
+      if (!(flags & SEARCH_CHECKSUMS))
+	return 0;	/* skip em */
+      kv->str = repodata_chk2str(data, key->type, (const unsigned char *)kv->str);
+      return 1;
     default:
       return 0;
     }
@@ -1112,6 +1130,8 @@ dataiterator_step(Dataiterator *di)
 	case di_enterrepo: di_enterrepo:
 	  if (!di->repo)
 	    goto di_bye;
+	  if (di->repo->disabled && !(di->flags & SEARCH_DISABLED_REPOS))
+	    goto di_nextrepo;
 	  if (!(di->flags & SEARCH_THISSOLVID))
 	    {
 	      di->solvid = di->repo->start - 1;	/* reset solvid iterator */
@@ -1209,7 +1229,7 @@ dataiterator_step(Dataiterator *di)
 	    }
 	  /* FALLTHROUGH */
 
-	case di_nextrepo:
+	case di_nextrepo: di_nextrepo:
 	  if (di->repoid >= 0)
 	    {
 	      di->repoid++;

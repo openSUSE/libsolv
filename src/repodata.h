@@ -113,7 +113,8 @@ typedef struct _Repodata {
 /*-----
  * management functions
  */
-void repodata_init(Repodata *data, struct _Repo *repo, int localpool);
+void repodata_initdata(Repodata *data, struct _Repo *repo, int localpool);
+void repodata_freedata(Repodata *data);
 void repodata_free(Repodata *data);
 
 

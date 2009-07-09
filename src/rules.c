@@ -20,6 +20,7 @@
 #include "solver.h"
 #include "bitmap.h"
 #include "pool.h"
+#include "poolarch.h"
 #include "util.h"
 #include "policy.h"
 #include "solverdebug.h"
@@ -669,8 +670,11 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  /* foreach provider of an obsoletes of 's' */ 
 		  FOR_PROVIDES(p, pp, obs)
 		    {
+		      Solvable *ps = pool->solvables + p;
 		      if (!pool->obsoleteusesprovides /* obsoletes are matched names, not provides */
-			  && !pool_match_nevr(pool, pool->solvables + p, obs))
+			  && !pool_match_nevr(pool, ps, obs))
+			continue;
+		      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 			continue;
 		      addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_PACKAGE_OBSOLETES, obs);
 		    }
@@ -684,6 +688,8 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
 		continue;
 	      if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
+		continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		continue;
 	      if (s->name == ps->name)
 	        addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_SAME_NAME, 0);
@@ -1170,7 +1176,10 @@ solver_createdupmaps(Solver *solv)
 		    {
 		      FOR_PROVIDES(pi, pp, obs)
 			{
-			  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + pi, obs))
+			  Solvable *pis = pool->solvables + pi;
+			  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pis, obs))
+			    continue;
+			  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, pis))
 			    continue;
 		          MAPSET(&solv->dupinvolvedmap, pi);
 			}
@@ -1363,6 +1372,8 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		  continue;
 		if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
 		  continue;
+	        if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		  continue;
 		queue_push(q, DISABLE_UPDATE);
 		queue_push(q, p);
 	      }
@@ -1373,6 +1384,8 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	  if (ps->repo != installed)
 	    continue;
 	  if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
+	    continue;
+	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 	    continue;
 	  queue_push(q, DISABLE_UPDATE);
 	  queue_push(q, p);

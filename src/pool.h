@@ -78,11 +78,14 @@ struct _Pool {
   int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */
   int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
   int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
+  int obsoleteusescolors;	/* true: obsoletes check arch color */
   int novirtualconflicts;	/* true: conflicts on names, not on provides */
   int allowselfconflicts;	/* true: packages which conflict with itself are installable */
 
   Id *id2arch;			/* map arch ids to scores */
-  Id lastarch;			/* last valid entry in id2arch */
+  unsigned char *id2color;	/* map arch ids to colors */
+  Id lastarch;			/* last valid entry in id2arch/id2color */
+
   Queue vendormap;		/* map vendor to vendorclasses mask */
 
   /* providers data, as two-step indirect list
@@ -240,21 +243,6 @@ extern void pool_addfileprovides(Pool *pool);
 extern void pool_addfileprovides_ids(Pool *pool, struct _Repo *installed, Id **idp);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
-
-static inline int pool_installable(const Pool *pool, Solvable *s)
-{
-  if (!s->arch || s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-    return 0;
-  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
-    return 0;
-  if (pool->considered)
-    { 
-      Id id = s - pool->solvables;
-      if (!MAPTST(pool->considered, id))
-	return 0;
-    }
-  return 1;
-}
 
 extern Id pool_addrelproviders(Pool *pool, Id d);
 

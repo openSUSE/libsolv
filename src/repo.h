@@ -20,22 +20,23 @@
 
 
 typedef struct _Repo {
-  const char *name;
+  const char *name;		/* application private name pointer */
   Id repoid;			/* our id */
   void *appdata;		/* application private pointer */
 
-  Pool *pool;			/* pool containing repo data */
+  Pool *pool;			/* pool containing this repo */
 
   int start;			/* start of this repo solvables within pool->solvables */
   int end;			/* last solvable + 1 of this repo */
   int nsolvables;		/* number of solvables repo is contributing to pool */
 
+  int disabled;			/* ignore the solvables? */
   int priority;			/* priority of this repo */
   int subpriority;		/* sub-priority of this repo, used just for sorting, not pruning */
 
   Id *idarraydata;		/* array of metadata Ids, solvable dependencies are offsets into this array */
   int idarraysize;
-  Offset lastoff;
+  Offset lastoff;		/* start of last array in idarraydata */
 
   Id *rpmdbid;			/* solvable side data */
 
@@ -114,15 +115,34 @@ static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int
   pool_free_solvable_block(repo->pool, start, count, reuseids);
 }
 
+#define FOR_REPO_SOLVABLES(r, p, s)						\
+  for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\
+    if (s->repo == (r))
+
+
+/* those two functions are here because they need the Repo definition */
+
 static inline Repo *pool_id2repo(Pool *pool, Id repoid)
 {
   return pool->repos[repoid - 1];
 }
 
-#define FOR_REPO_SOLVABLES(r, p, s)						\
-  for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\
-    if (s->repo == (r))
-
+static inline int pool_installable(const Pool *pool, Solvable *s)
+{
+  if (!s->arch || s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+    return 0;
+  if (s->repo && s->repo->disabled)
+    return 0;
+  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+    return 0;
+  if (pool->considered)
+    { 
+      Id id = s - pool->solvables;
+      if (!MAPTST(pool->considered, id))
+	return 0;
+    }
+  return 1;
+}
 
 /* search callback values */
 
@@ -143,28 +163,30 @@ typedef struct _KeyValue {
   struct _KeyValue *parent;
 } KeyValue;
 
-/* search flags */
+/* search matcher flags */
 #define SEARCH_STRINGMASK	15
 #define SEARCH_STRING		1
 #define SEARCH_SUBSTRING	2
 #define SEARCH_GLOB 		3
 #define SEARCH_REGEX 		4
 #define SEARCH_ERROR 		5
+#define	SEARCH_NOCASE			(1<<7)
 
-#define	SEARCH_NOCASE			(1<<8)
-#define	SEARCH_NO_STORAGE_SOLVABLE	(1<<9)
-#define SEARCH_SUB			(1<<10)
-#define SEARCH_ARRAYSENTINEL		(1<<11)
-#define SEARCH_SKIP_KIND		(1<<12)
+/* iterator control */
+#define	SEARCH_NO_STORAGE_SOLVABLE	(1<<8)
+#define SEARCH_SUB			(1<<9)
+#define SEARCH_ARRAYSENTINEL		(1<<10)
+#define SEARCH_DISABLED_REPOS		(1<<11)
 
+/* stringification flags */
+#define SEARCH_SKIP_KIND		(1<<16)
+/* By default we stringify just to the basename of a file because
+   the construction of the full filename is costly.  Specify this
+   flag if you want to match full filenames */
+#define SEARCH_FILES			(1<<17)
+#define SEARCH_CHECKSUMS		(1<<18)
 
-/* By default we don't match in attributes representing filelists
-   because the construction of those strings is costly.  Specify this
-   flag if you want this.  In that case kv->str will contain the full
-   filename (if matched of course).  */
-#define SEARCH_FILES			(1<<13)
-
-/* Internal */
+/* dataiterator internal */
 #define SEARCH_THISSOLVID		(1<<31)
 
 
@@ -174,7 +196,6 @@ typedef struct _KeyValue {
 
 Repodata *repo_add_repodata(Repo *repo, int localpool);
 Repodata *repo_last_repodata(Repo *repo);
-void repo_free_repodata(Repo *repo, Repodata *data);
 
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 

@@ -11,5 +11,28 @@
 #include "pool.h"
 
 extern void pool_setarch(Pool *, const char *);
+extern unsigned char pool_arch2color_slow(Pool *pool, Id arch);
+
+#define ARCHCOLOR_32    1
+#define ARCHCOLOR_64    2
+#define ARCHCOLOR_ALL   255
+
+static inline unsigned char pool_arch2color(Pool *pool, Id arch)
+{
+  if (arch > pool->lastarch)
+    return ARCHCOLOR_ALL;
+  if (pool->id2color && pool->id2color[arch])
+    return pool->id2color[arch];
+  return pool_arch2color_slow(pool, arch);
+}
+
+static inline int pool_colormatch(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  if (s1->arch == s2->arch)
+    return 1;
+  if ((pool_arch2color(pool, s1->arch) & pool_arch2color(pool, s2->arch)) != 0)
+    return 1;
+  return 0;
+}
 
 #endif /* SATSOLVER_POOLARCH_H */

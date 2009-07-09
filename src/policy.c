@@ -295,9 +295,12 @@ prune_to_best_version(Pool *pool, Queue *plist)
 	{
 	  FOR_PROVIDES(p, pp, obs)
 	    {
-	      if (pool->solvables[p].name == s->name)
+	      Solvable *ps = pool->solvables + p;
+	      if (ps->name == s->name)
 		continue;
-	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
+		continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		continue;
 	      for (j = 0; j < plist->count; j++)
 		{
@@ -472,11 +475,14 @@ policy_create_obsolete_index(Solver *solv)
 	{
 	  FOR_PROVIDES(p, pp, obs)
 	    {
-	      if (pool->solvables[p].repo != installed)
+	      Solvable *ps = pool->solvables + p;;
+	      if (ps->repo != installed)
 		continue;
-	      if (pool->solvables[p].name == s->name)
+	      if (ps->name == s->name)
 		continue;
-	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
+		continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		continue;
 	      obsoletes[p - installed->start]++;
 	    }
@@ -503,15 +509,17 @@ policy_create_obsolete_index(Solver *solv)
 	{
 	  FOR_PROVIDES(p, pp, obs)
 	    {
-	      if (pool->solvables[p].repo != installed)
+	      Solvable *ps = pool->solvables + p;;
+	      if (ps->repo != installed)
 		continue;
-	      if (pool->solvables[p].name == s->name)
+	      if (ps->name == s->name)
 		continue;
-	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
 		continue;
-	      p -= installed->start;
-	      if (obsoletes_data[obsoletes[p]] != i)
-		obsoletes_data[--obsoletes[p]] = i;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		continue;
+	      if (obsoletes_data[obsoletes[p - installed->start]] != i)
+		obsoletes_data[--obsoletes[p - installed->start]] = i;
 	    }
 	}
     }
@@ -570,7 +578,10 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	    {
 	      FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
 		{
-		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+		  Solvable *ps2 = pool->solvables + p2;
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps2, obs))
+		    continue;
+		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps2))
 		    continue;
 		  if (p2 == n)		/* match ! */
 		    break;

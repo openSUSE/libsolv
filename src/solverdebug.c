@@ -21,6 +21,7 @@
 #include "solverdebug.h"
 #include "bitmap.h"
 #include "pool.h"
+#include "poolarch.h"
 #include "util.h"
 #include "evr.h"
 #include "policy.h"
@@ -72,7 +73,9 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 		continue;
 	      if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
 		continue;
-	      if (pool->solvables[p].repo == installed && !obsoletesmap[p])
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		continue;
+	      if (ps->repo == installed && !obsoletesmap[p])
 		{
 		  obsoletesmap[p] = n;
 		  obsoletesmap[n]++;
@@ -101,7 +104,10 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	    {
 	      FOR_PROVIDES(p, pp, obs)
 		{
-		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p, obs))
+		  Solvable *ps = pool->solvables + p;
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
+		    continue;
+		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		    continue;
 		  if (pool->solvables[p].repo == installed && !obsoletesmap[p])
 		    {

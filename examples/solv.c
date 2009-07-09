@@ -492,7 +492,7 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
       cleanupgpg(gpgdir);
       return 0;
     }
-  snprintf(cmd, sizeof(cmd), "gpg -q --homedir %s --import %s", gpgdir, keysfile);
+  snprintf(cmd, sizeof(cmd), "gpg2 -q --homedir %s --import %s", gpgdir, keysfile);
   if (system(cmd))
     {
       fprintf(stderr, "key import error\n");
@@ -632,7 +632,7 @@ writecachedrepo(Repo *repo, unsigned char *cookie)
   sat_free(addedfileprovides);
   repodata_internalize(info);
   repo_write(repo, fp, 0, 0, 0);
-  repo_free_repodata(repo, info);
+  repodata_free(info);
   if (fwrite(cookie, 32, 1, fp) != 1)
     {
       fclose(fp);
@@ -1417,7 +1417,7 @@ rerunsolver:
 		      if (os->repo == pool->installed && os->name == s->name && os->arch == s->arch && os->evr == baseevr)
 			break;
 		    }
-		  if (op)
+		  if (op && access("/usr/bin/applydeltarpm", X_OK) == 0)
 		    {
 		      /* base is installed, run sequence check */
 		      const char *seqname;
@@ -1434,7 +1434,7 @@ rerunsolver:
 		      seqnum = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NUM);
 		      seq = pool_tmpjoin(pool, seqname, "-", seqevr);
 		      seq = pool_tmpjoin(pool, seq, "-", seqnum);
-		      if (system(pool_tmpjoin(pool, "applydeltarpm -c -s ", seq, 0)) != 0)
+		      if (system(pool_tmpjoin(pool, "/usr/bin/applydeltarpm -c -s ", seq, 0)) != 0)
 			continue;	/* didn't match */
 		      /* looks good, download delta */
 		      chksumtype = 0;
