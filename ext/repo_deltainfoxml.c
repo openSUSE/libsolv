@@ -553,10 +553,7 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
   struct stateswitch *sw;
   Repodata *data;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)

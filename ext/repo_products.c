@@ -437,10 +437,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
   DIR *dir;
   int i;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;

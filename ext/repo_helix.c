@@ -817,10 +817,7 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
   unsigned int now;
 
   now = sat_timems(0);
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
   
   /* prepare parsedata */
   memset(&pd, 0, sizeof(pd));

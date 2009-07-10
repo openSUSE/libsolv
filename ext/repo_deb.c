@@ -283,10 +283,7 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
   int bufl, l, ll;
   Solvable *s;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
   buf = sat_malloc(4096);
   bufl = 4096;
   l = 0;
@@ -356,10 +353,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
   Solvable *s;
   struct stat stb;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
   for (i = 0; i < ndebs; i++)
     {
       if ((fp = fopen(debs[i], "r")) == 0)

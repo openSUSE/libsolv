@@ -424,10 +424,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
     indesc = 1;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
   line = malloc(1024);

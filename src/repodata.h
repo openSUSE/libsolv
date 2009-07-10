@@ -115,6 +115,8 @@ typedef struct _Repodata {
  */
 void repodata_initdata(Repodata *data, struct _Repo *repo, int localpool);
 void repodata_freedata(Repodata *data);
+
+Repodata *repodata_create(struct _Repo *repo, int localpool);
 void repodata_free(Repodata *data);
 
 
@@ -179,6 +181,7 @@ const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id 
  */
 void repodata_extend(Repodata *data, Id p);
 void repodata_extend_block(Repodata *data, Id p, int num);
+void repodata_shrink(Repodata *data, int end);
 
 /* internalize freshly set data, so that it is found by the search
  * functions and written out */
@@ -224,6 +227,8 @@ void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
  works only if the data is not yet internalized
 */
 void repodata_merge_attrs(Repodata *data, Id dest, Id src);
+
+void repodata_join(Repodata *data, Id joinkey);
 
 /*
  * load all paged data, used to speed up copying in repo_rpmdb

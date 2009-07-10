@@ -459,10 +459,7 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
   int i, l;
   struct stateswitch *sw;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
   pd.timestamp = 0;

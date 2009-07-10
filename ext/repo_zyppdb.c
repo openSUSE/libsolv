@@ -346,11 +346,7 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
   FILE *fp;
   Repodata *data;
   
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
-
+  data = repo_add_repodata(repo, flags);
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;
   pd.pool = repo->pool;

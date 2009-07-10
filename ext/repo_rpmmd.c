@@ -1099,10 +1099,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   unsigned int now;
 
   now = sat_timems(0);
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)

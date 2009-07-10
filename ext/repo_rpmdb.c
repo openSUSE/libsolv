@@ -1306,10 +1306,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   if (!rootdir)
     rootdir = "";
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
 
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
@@ -1706,10 +1703,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
   Id chksumtype = 0;
   void *chksumh = 0;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
 
   if ((flags & RPM_ADD_WITH_SHA256SUM) != 0)
     chksumtype = REPOKEY_TYPE_SHA256;
@@ -2856,10 +2850,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
   Repodata *data;
   Solvable *s;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
 
   memset(&state, 0, sizeof(state));
   if (!(state.dbenv = opendbenv(rootdir)))
@@ -2897,10 +2888,7 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
   int i, bufl, l, ll;
   FILE *fp;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
+  data = repo_add_repodata(repo, flags);
   buf = 0;
   bufl = 0;
   for (i = 0; i < nkeys; i++)
@@ -2927,4 +2915,6 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
       pubkey2solvable(s, data, buf);
     }
   sat_free(buf);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
 }

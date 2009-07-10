@@ -219,24 +219,15 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   unsigned int numotherarchs = 0;
   Id *otherarchs = 0;
 
-  if (!(flags & REPO_REUSE_REPODATA))
-    data = repo_add_repodata(repo, 0);
-  else
-    data = repo_last_repodata(repo);
-
   memset(&pd, 0, sizeof(pd));
   line = sat_malloc(1024);
   aline = 1024;
 
-  if (repo->nrepodata)
-    /* use last repodata */
-    data = repo->repodata + repo->nrepodata - 1;
-  else
-    data = repo_add_repodata(repo, 0);
-
   pd.repo = repo;
   linep = line;
   s = 0;
+
+  data = repo_add_repodata(repo, flags);
 
   for (;;)
     {

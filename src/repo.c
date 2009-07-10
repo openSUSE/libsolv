@@ -128,6 +128,22 @@ repo_freeallrepos(Pool *pool, int reuseids)
   pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
 }
 
+void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
+{
+  Solvable *s; 
+  Repodata *data;
+  int i;
+  if (start + count == repo->end)
+    repo->end -= count;
+  repo->nsolvables -= count;
+  for (s = repo->pool->solvables + start, i = count; i--; s++)
+    s->repo = 0;
+  pool_free_solvable_block(repo->pool, start, count, reuseids);
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    if (data->end > repo->end)
+      repodata_shrink(data, repo->end);
+}
+
 
 /* repository sidedata is solvable data allocated on demand.
  * It is used for data that is normally not present
@@ -967,15 +983,16 @@ repo_lookup_void(Repo *repo, Id entry, Id keyname)
 /***********************************************************************/
 
 Repodata *
-repo_add_repodata(Repo *repo, int localpool)
+repo_add_repodata(Repo *repo, int flags)
 {
-  Repodata *data;
-
-  repo->nrepodata++;
-  repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
-  data = repo->repodata + repo->nrepodata - 1;
-  repodata_initdata(data, repo, localpool);
-  return data;
+  if ((flags & REPO_REUSE_REPODATA) != 0)
+    {
+      int i;
+      for (i = repo->nrepodata - 1; i >= 0; i--)
+	if (repo->repodata[i].state != REPODATA_STUB)
+	  return repo->repodata + i;
+    }
+  return repodata_create(repo, (flags & REPO_LOCALPOOL) ? 1 : 0);
 }
 
 Repodata *

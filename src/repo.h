@@ -47,6 +47,7 @@ typedef struct _Repo {
 extern Repo *repo_create(Pool *pool, const char *name);
 extern void repo_free(Repo *repo, int reuseids);
 extern void repo_freeallrepos(Pool *pool, int reuseids);
+extern void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids);
 extern void *repo_sidedata_create(Repo *repo, size_t size);
 extern void *repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count);
 
@@ -102,18 +103,6 @@ static inline Id repo_add_solvable_block(Repo *repo, int count)
   return p;
 }
 
-static inline void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
-{
-  extern void pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids);
-  Solvable *s;
-  int i;
-  if (start + count == repo->end)
-    repo->end -= count;
-  repo->nsolvables -= count;
-  for (s = repo->pool->solvables + start, i = count; i--; s++)
-    s->repo = 0;
-  pool_free_solvable_block(repo->pool, start, count, reuseids);
-}
 
 #define FOR_REPO_SOLVABLES(r, p, s)						\
   for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\
@@ -193,8 +182,9 @@ typedef struct _KeyValue {
 /* standard flags used in the repo_add functions */
 #define REPO_REUSE_REPODATA		(1 << 0)
 #define REPO_NO_INTERNALIZE		(1 << 1)
+#define REPO_LOCALPOOL			(1 << 2)
 
-Repodata *repo_add_repodata(Repo *repo, int localpool);
+Repodata *repo_add_repodata(Repo *repo, int flags);
 Repodata *repo_last_repodata(Repo *repo);
 
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);

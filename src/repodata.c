@@ -28,6 +28,8 @@
 #include "pool.h"
 #include "poolid_private.h"
 #include "util.h"
+#include "hash.h"
+#include "chksum.h"
 
 #include "repopack.h"
 #include "repopage.h"
@@ -93,6 +95,18 @@ repodata_freedata(Repodata *data)
 
   sat_free(data->attrdata);
   sat_free(data->attriddata);
+}
+
+Repodata *
+repodata_create(Repo *repo, int localpool)
+{
+  Repodata *data;
+
+  repo->nrepodata++;
+  repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
+  data = repo->repodata + repo->nrepodata - 1;
+  repodata_initdata(data, repo, localpool);
+  return data;
 }
 
 void
@@ -1598,6 +1612,36 @@ repodata_extend(Repodata *data, Id p)
     }
 }
 
+void
+repodata_shrink(Repodata *data, int end)
+{
+  int i;
+
+  if (data->end <= end)
+    return;
+  if (data->start >= end)
+    {
+      if (data->attrs)
+	{
+	  for (i = 0; i < data->end - data->start; i++)
+	    sat_free(data->attrs[i]);
+          data->attrs = sat_free(data->attrs);
+	}
+      data->incoreoffset = sat_free(data->incoreoffset);
+      data->start = data->end = 0;
+      return;
+    }
+  if (data->attrs)
+    {
+      for (i = end; i < data->end; i++)
+	sat_free(data->attrs[i - data->start]);
+      data->attrs = sat_extend_resize(data->attrs, end - data->start, sizeof(Id *), REPODATA_BLOCK);
+    }
+  if (data->incoreoffset)
+    data->incoreoffset = sat_extend_resize(data->incoreoffset, end - data->start, sizeof(Id), REPODATA_BLOCK);
+  data->end = end;
+}
+
 /* extend repodata so that it includes solvables from start to start + num - 1 */
 void
 repodata_extend_block(Repodata *data, Id start, Id num)
@@ -2527,6 +2571,98 @@ repodata_disable_paging(Repodata *data)
 {
   if (maybe_load_repodata(data, 0))
     repopagestore_disable_paging(&data->store);
+}
+
+static inline Hashval
+repodata_join_hash(Solvable *s, Id joinkey)
+{
+  if (joinkey == SOLVABLE_NAME)
+    return s->name;
+  if (joinkey == SOLVABLE_CHECKSUM)
+    {
+      Id type;
+      const unsigned char *chk = solvable_lookup_bin_checksum(s, joinkey, &type);
+      if (chk)
+        return 1 << 31 | chk[0] << 24 | chk[1] << 16 | chk[2] << 7 | chk[3];
+    }
+  return 0;
+}
+
+static inline int
+repodata_join_match(Solvable *s1, Solvable *s2, Id joinkey)
+{
+  if (joinkey == SOLVABLE_NAME)
+    return s1->name == s2->name && s1->evr == s2->evr && s1->arch == s2->arch ? 1 : 0;
+  if (joinkey == SOLVABLE_CHECKSUM)
+    {
+      const unsigned char *chk1, *chk2;
+      Id type1, type2;
+      chk1 = solvable_lookup_bin_checksum(s1, joinkey, &type1);
+      if (!chk1)
+	return 0;
+      chk2 = solvable_lookup_bin_checksum(s2, joinkey, &type2);
+      if (!chk2 || type1 != type2)
+	return 0;
+      return memcmp(chk1, chk2, sat_chksum_len(type1)) ? 0 : 1;
+    }
+  return 0;
+}
+
+void
+repodata_join(Repodata *data, Id joinkey)
+{
+  Repo *repo = data->repo;
+  Pool *pool = repo->pool;
+  Hashmask hm = mkmask(repo->nsolvables);
+  Hashtable ht = sat_calloc(hm + 1, sizeof(*ht));
+  Hashval h, hh;
+  int i, datastart, dataend;
+  Solvable *s;
+
+  datastart = data->start;
+  dataend = data->end;
+  if (datastart == dataend || repo->start == repo->end)
+    return;
+  FOR_REPO_SOLVABLES(repo, i, s)
+    {
+      if (i >= datastart && i < dataend)
+	continue;
+      h = repodata_join_hash(s, joinkey);
+      if (!h)
+	continue;
+      h &= hm;
+      hh = HASHCHAIN_START;
+      while (ht[h])
+        h = HASHCHAIN_NEXT(h, hh, hm);
+      ht[h] = i;
+    }
+  for (i = datastart; i < dataend; i++)
+    {
+      Solvable *s = pool->solvables + i;
+      if (s->repo != data->repo)
+	continue;
+      if (!data->attrs[i - data->start])
+	continue;
+      h = repodata_join_hash(s, joinkey);
+      if (!h)
+	continue;
+      h &= hm;
+      hh = HASHCHAIN_START;
+      while (ht[h])
+	{
+	  Solvable *s2 = pool->solvables + ht[h];
+	  if (repodata_join_match(s, s2, joinkey))
+	    {
+	      /* a match! move data over */
+	      repodata_extend(data, ht[h]);
+	      repodata_merge_attrs(data, ht[h], i);
+	    }
+          h = HASHCHAIN_NEXT(h, hh, hm);
+	}
+    }
+  sat_free(ht);
+  /* all done! now free solvables */
+  repo_free_solvable_block(repo, datastart, dataend - datastart, 1);
 }
 
 /*
