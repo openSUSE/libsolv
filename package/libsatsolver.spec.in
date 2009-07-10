@@ -71,47 +71,39 @@ Development files for satsolver, a new approach to package dependency solving
 #%description devel-doc
 #Developer documentation for satsolver, a new approach to package dependency solving
 
-
-Authors:
---------
-    Michael Schroeder <mls@suse.de>
-    Klaus Kaempf <kkaempf@suse.de>
-    Stephan Kulow <coolo@suse.de>
-    Michael Matz <matz@suse.de>
-    Duncan Mac-Vicar P. <dmacvicar@suse.de>
-
 %package -n satsolver-tools
 Summary:        A new approach to package dependency solving
-Group:          Development/Libraries/C and C++
+Group:          System/Base
 Obsoletes:      libsatsolver <= 0.0.15
 Provides:       libsatsolver = %{version}-%{release}
 Requires:       gzip bzip2 coreutils
 
 %description -n satsolver-tools
-. 
+A new approach to package dependency solving
 
 %package -n ruby-satsolver
 Summary:        Ruby bindings for sat solver
 Group:          Development/Languages/Ruby
 
 %description -n ruby-satsolver
-.
+A new approach to package dependency solving
+
 
 %package -n python-satsolver
 %py_requires
-Summary:        Python bindings for sat solver
-Group:          Development/Languages/Python
+Summary:        Python bindings for satsolver
+Group:          Development/Libraries/C and C++
 
 %description -n python-satsolver
-.
+This allows to use satsolver functionality from Python
 
 %package -n perl-satsolver
 Requires:       perl = %{perl_version}
-Summary:        Perl bindings for sat solver
-Group:          Development/Languages/Perl
+Summary:        A new approach to package dependency solving
+Group:          Development/Libraries/C and C++
 
 %description -n perl-satsolver
-.
+A new approach to package dependency solving
 
 %prep
 %setup -n satsolver-%{version}
@@ -197,4 +189,5 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root,-)
 %{perl_vendorarch}/satsolver.so
 %{perl_vendorlib}/satsolver.pm
+
 %changelog
