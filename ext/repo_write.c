@@ -956,6 +956,42 @@ static Id subfilekeys[] = {
 };
 #endif
 
+static Id verticals[] = {
+  SOLVABLE_AUTHORS,
+  SOLVABLE_DESCRIPTION,
+  SOLVABLE_MESSAGEDEL,
+  SOLVABLE_MESSAGEINS,
+  SOLVABLE_EULA,
+  SOLVABLE_DISKUSAGE,
+  SOLVABLE_FILELIST,
+  0
+};
+
+static char *languagetags[] = {
+  "solvable:summary:",
+  "solvable:description:",
+  "solvable:messageins:",
+  "solvable:messagedel:",
+  "solvable:eula:",
+  0
+};
+
+int
+repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata)
+{
+  const char *keyname;
+  int i;
+
+  for (i = 0; verticals[i]; i++)
+    if (key->name == verticals[i])
+      return KEY_STORAGE_VERTICAL_OFFSET;
+  keyname = id2str(repo->pool, key->name);
+  for (i = 0; languagetags[i] != 0; i++)
+    if (!strncmp(keyname, languagetags[i], strlen(languagetags[i])))
+      return KEY_STORAGE_VERTICAL_OFFSET;
+  return KEY_STORAGE_INCORE;
+}
+
 /*
  * Repo
  */
@@ -1087,6 +1123,11 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       for (j = 1; j < data->nkeys; j++, n++)
 	{
 	  key = data->keys + j;
+	  if (key->name == REPOSITORY_SOLVABLES && key->type == REPOKEY_TYPE_FLEXARRAY)
+	    {
+	      cbdata.keymap[n] = cbdata.keymap[key->name];
+	      continue;
+	    }
 	  /* see if we already had this one, should use hash for fast miss */
 	  for (k = 0; k < cbdata.nmykeys; k++)
 	    {
@@ -1260,7 +1301,11 @@ for (i = 1; i < cbdata.nmykeys; i++)
   /* collect all other data from all repodatas */
   /* XXX: merge arrays of equal keys? */
   for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
-    repodata_search(data, SOLVID_META, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, repo_write_cb_needed, &cbdata);
+    {
+      if (!repodataused[j])
+	continue;
+      repodata_search(data, SOLVID_META, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, repo_write_cb_needed, &cbdata);
+    }
   sp = cbdata.sp;
   /* add solvables if needed */
   if (repo->nsolvables)
@@ -1582,7 +1627,11 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 
 #if 1
   for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
-    repodata_search(data, SOLVID_META, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, repo_write_cb_adddata, &cbdata);
+    {
+      if (!repodataused[j])
+	continue;
+      repodata_search(data, SOLVID_META, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, repo_write_cb_adddata, &cbdata);
+    }
 #endif
 
   if (xd->len - cbdata.lastlen > cbdata.maxdata)

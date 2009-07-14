@@ -1707,7 +1707,11 @@ Id
 pool_lookup_id(Pool *pool, Id entry, Id keyname)
 {
   if (entry == SOLVID_POS && pool->pos.repo)
-    return repodata_lookup_id(pool->pos.repo->repodata + pool->pos.repodataid, SOLVID_POS, keyname);
+    {
+      Repodata *data = pool->pos.repo->repodata + pool->pos.repodataid;
+      Id id = repodata_lookup_id(data, SOLVID_POS, keyname);
+      return data->localpool ? repodata_globalize_id(data, id, 1) : id;
+    }
   if (entry <= 0)
     return 0;
   return solvable_lookup_id(pool->solvables + entry, keyname);
