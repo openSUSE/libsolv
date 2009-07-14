@@ -1120,6 +1120,17 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       cbdata.keymap[n++] = 0;	/* key 0 */
       idused = 0;
       dirused = 0;
+      if (keyfilter)
+	{
+	  Repokey zerokey;
+	  /* check if we want this repodata */
+	  memset(&zerokey, 0, sizeof(zerokey));
+	  zerokey.name = 1;
+	  zerokey.type = 1;
+	  zerokey.size = i;
+	  if (keyfilter(repo, &zerokey, kfdata) == -1)
+	    continue;
+	}
       for (j = 1; j < data->nkeys; j++, n++)
 	{
 	  key = data->keys + j;

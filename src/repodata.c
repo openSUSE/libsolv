@@ -472,6 +472,7 @@ maybe_load_repodata(Repodata *data, Id keyname)
     case REPODATA_ERROR:
       return 0;
     case REPODATA_AVAILABLE:
+    case REPODATA_LOADING:
       return 1;
     default:
       data->state = REPODATA_ERROR;
@@ -1133,6 +1134,47 @@ dataiterator_find_keyname(Dataiterator *di, Id keyname)
 }
 
 int
+repodata_filelistfilter_matches(Repodata *data, const char *str)
+{
+  /* '.*bin\/.*', '^\/etc\/.*', '^\/usr\/lib\/sendmail$' */
+  /* for now hardcoded */
+  if (strstr(str, "bin/"))
+    return 1;
+  if (!strncmp(str, "/etc/", 5))
+    return 1;
+  if (!strcmp(str, "/usr/bin/sendmail"))
+    return 1;
+  return 0;
+}
+
+static int
+dataiterator_filelistcheck(Dataiterator *di)
+{
+  int i;
+  Repodata *data = di->data;
+  if (data->state != REPODATA_AVAILABLE)
+    return 1;
+  if (!repodata_precheck_keyname(data, REPOSITORY_EXTERNAL))
+    return 1;
+  for (i = 0; i < data->nkeys; i++)
+    if (data->keys[i].name == REPOSITORY_EXTERNAL)
+      break;
+  if (i == data->nkeys)
+    return 1;
+  if (!(di->matcher.flags & SEARCH_COMPLETE_FILELIST))
+    {
+      di->repodataid = -1;	/* do not look somewhere else */
+      return 1;
+    }
+  if (di->matcher.match && (di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) == SEARCH_STRING && repodata_filelistfilter_matches(di->data, di->matcher.match))
+    {
+      di->repodataid = -1;	/* do not look somewhere else */
+      return 1;
+    }
+  return 1;
+}
+
+int
 dataiterator_step(Dataiterator *di)
 {
   Id schema;
@@ -1173,6 +1215,8 @@ dataiterator_step(Dataiterator *di)
 		goto di_nextsolvable;
 	      di->data = di->repo->repodata + di->repodataid;
 	    }
+	  if (di->repodataid >= 0 && di->keyname == SOLVABLE_FILELIST && !dataiterator_filelistcheck(di))
+	    goto di_nextrepodata;
 	  if (!maybe_load_repodata(di->data, di->keyname))
 	    goto di_nextrepodata;
 	  di->dp = solvid2data(di->data, di->solvid, &schema);
@@ -1247,6 +1291,7 @@ dataiterator_step(Dataiterator *di)
 	  if (di->repoid >= 0)
 	    {
 	      di->repoid++;
+	      di->repodataid = 0;
 	      if (di->repoid < di->pool->nrepos)
 		{
 		  di->repo = di->pool->repos[di->repoid];
@@ -2500,7 +2545,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	  key = data->keys + *keyp;
 #if 0
-	  fprintf(stderr, "internalize %d:%s:%s\n", entry, id2str(data->repo->pool, key->name), id2str(data->repo->pool, key->type));
+	  fprintf(stderr, "internalize %d(%d):%s:%s\n", entry, entry + data->start, id2str(data->repo->pool, key->name), id2str(data->repo->pool, key->type));
 #endif
 	  ndp = dp;
 	  if (oldcount)
@@ -2573,96 +2618,113 @@ repodata_disable_paging(Repodata *data)
     repopagestore_disable_paging(&data->store);
 }
 
-static inline Hashval
-repodata_join_hash(Solvable *s, Id joinkey)
-{
-  if (joinkey == SOLVABLE_NAME)
-    return s->name;
-  if (joinkey == SOLVABLE_CHECKSUM)
-    {
-      Id type;
-      const unsigned char *chk = solvable_lookup_bin_checksum(s, joinkey, &type);
-      if (chk)
-        return 1 << 31 | chk[0] << 24 | chk[1] << 16 | chk[2] << 7 | chk[3];
-    }
-  return 0;
-}
-
-static inline int
-repodata_join_match(Solvable *s1, Solvable *s2, Id joinkey)
-{
-  if (joinkey == SOLVABLE_NAME)
-    return s1->name == s2->name && s1->evr == s2->evr && s1->arch == s2->arch ? 1 : 0;
-  if (joinkey == SOLVABLE_CHECKSUM)
-    {
-      const unsigned char *chk1, *chk2;
-      Id type1, type2;
-      chk1 = solvable_lookup_bin_checksum(s1, joinkey, &type1);
-      if (!chk1)
-	return 0;
-      chk2 = solvable_lookup_bin_checksum(s2, joinkey, &type2);
-      if (!chk2 || type1 != type2)
-	return 0;
-      return memcmp(chk1, chk2, sat_chksum_len(type1)) ? 0 : 1;
-    }
-  return 0;
-}
-
-void
-repodata_join(Repodata *data, Id joinkey)
+static void
+repodata_load_stub(Repodata *data)
 {
   Repo *repo = data->repo;
   Pool *pool = repo->pool;
-  Hashmask hm = mkmask(repo->nsolvables);
-  Hashtable ht = sat_calloc(hm + 1, sizeof(*ht));
-  Hashval h, hh;
-  int i, datastart, dataend;
-  Solvable *s;
+  int r;
 
-  datastart = data->start;
-  dataend = data->end;
-  if (datastart == dataend || repo->start == repo->end)
-    return;
-  FOR_REPO_SOLVABLES(repo, i, s)
+  if (!pool->loadcallback)
     {
-      if (i >= datastart && i < dataend)
-	continue;
-      h = repodata_join_hash(s, joinkey);
-      if (!h)
-	continue;
-      h &= hm;
-      hh = HASHCHAIN_START;
-      while (ht[h])
-        h = HASHCHAIN_NEXT(h, hh, hm);
-      ht[h] = i;
+      data->state = REPODATA_ERROR;
+      return;
     }
-  for (i = datastart; i < dataend; i++)
+  data->state = REPODATA_LOADING;
+  r = pool->loadcallback(pool, data, pool->loadcallbackdata);
+  if (!r)
+    data->state = REPODATA_ERROR;
+}
+
+void
+repodata_create_stubs(Repodata *data)
+{
+  Repo *repo = data->repo;
+  Pool *pool = repo->pool;
+  Repodata *sdata;
+  int *stubdataids;
+  Dataiterator di;
+  Id xkeyname = 0;
+  int i, cnt = 0;
+
+  dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_EXTERNAL, 0, 0);
+  while (dataiterator_step(&di))
+    cnt++;
+  dataiterator_free(&di);
+  if (!cnt)
+    return;
+  stubdataids = sat_calloc(cnt, sizeof(*stubdataids));
+  for (i = 0; i < cnt; i++)
     {
-      Solvable *s = pool->solvables + i;
-      if (s->repo != data->repo)
-	continue;
-      if (!data->attrs[i - data->start])
-	continue;
-      h = repodata_join_hash(s, joinkey);
-      if (!h)
-	continue;
-      h &= hm;
-      hh = HASHCHAIN_START;
-      while (ht[h])
+      sdata = repo_add_repodata(repo, 0);
+      if (data->end > data->start)
 	{
-	  Solvable *s2 = pool->solvables + ht[h];
-	  if (repodata_join_match(s, s2, joinkey))
+	  repodata_extend(sdata, data->start);
+	  repodata_extend(sdata, data->end - 1);
+	}
+      stubdataids[i] = sdata - repo->repodata;
+      sdata->state = REPODATA_STUB;
+      sdata->loadcallback = repodata_load_stub;
+    }
+  i = 0;
+  dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_EXTERNAL, 0, 0);
+  sdata = 0;
+  while (dataiterator_step(&di))
+    {
+      if (di.key->name == REPOSITORY_EXTERNAL && !di.nparents)
+	{
+	  dataiterator_entersub(&di);
+	  sdata = repo->repodata + stubdataids[i++];
+	  xkeyname = 0;
+	  continue;
+	}
+      switch (di.key->type)
+	{
+        case REPOKEY_TYPE_ID:
+	  repodata_set_id(sdata, SOLVID_META, di.key->name, di.kv.id);
+	  break;
+	case REPOKEY_TYPE_CONSTANTID:
+	  repodata_set_constantid(sdata, SOLVID_META, di.key->name, di.kv.id);
+	  break;
+	case REPOKEY_TYPE_STR:
+	  repodata_set_str(sdata, SOLVID_META, di.key->name, di.kv.str);
+	  break;
+	case REPOKEY_TYPE_VOID:
+	  repodata_set_void(sdata, SOLVID_META, di.key->name);
+	  break;
+	case REPOKEY_TYPE_NUM:
+	  repodata_set_num(sdata, SOLVID_META, di.key->name, di.kv.num);
+	  break;
+	case REPOKEY_TYPE_MD5:
+	case REPOKEY_TYPE_SHA1:
+	case REPOKEY_TYPE_SHA256:
+	  repodata_set_checksum(sdata, SOLVID_META, di.key->name, di.key->type, di.kv.str);
+	  break;
+	case REPOKEY_TYPE_IDARRAY:
+	  repodata_add_idarray(sdata, SOLVID_META, di.key->name, di.kv.id);
+	  if (di.key->name == REPOSITORY_KEYS)
 	    {
-	      /* a match! move data over */
-	      repodata_extend(data, ht[h]);
-	      repodata_merge_attrs(data, ht[h], i);
+	      Repokey xkey;
+
+	      if (!xkeyname)
+		{
+		  if (!di.kv.eof)
+		    xkeyname = di.kv.id;
+		  continue;
+		}
+	      xkey.name = xkeyname;
+              xkey.type = di.kv.id;
+              xkey.storage = KEY_STORAGE_INCORE;
+              xkey.size = 0; 
+              repodata_key2id(sdata, &xkey, 1);
+              xkeyname = 0;
 	    }
-          h = HASHCHAIN_NEXT(h, hh, hm);
 	}
     }
-  sat_free(ht);
-  /* all done! now free solvables */
-  repo_free_solvable_block(repo, datastart, dataend - datastart, 1);
+  dataiterator_free(&di);
+  for (i = 0; i < cnt; i++)
+    repodata_internalize(repo->repodata + stubdataids[i]);
+  sat_free(stubdataids);
 }
 
 /*

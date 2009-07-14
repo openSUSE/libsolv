@@ -705,6 +705,53 @@ transaction_installedresult(Transaction *trans, Queue *installedq)
   return cutoff;
 }
 
+static void
+transaction_create_installedmap(Transaction *trans, Map *installedmap)
+{
+  Pool *pool = trans->pool;
+  Repo *installed = pool->installed;
+  Solvable *s;
+  Id p;
+  int i;
+
+  map_init(installedmap, pool->nsolvables);
+  for (i = 0; i < trans->steps.count; i++)
+    {
+      p = trans->steps.elements[i];
+      s = pool->solvables + p;
+      if (!installed || s->repo != installed)
+        MAPSET(installedmap, p);
+    }
+  if (installed)
+    {
+      FOR_REPO_SOLVABLES(installed, p, s)
+	if (!MAPTST(&trans->transactsmap, p))
+          MAPSET(installedmap, p);
+    }
+}
+
+int
+transaction_calc_installsizechange(Transaction *trans)
+{
+  Map installedmap;
+  int change;
+
+  transaction_create_installedmap(trans, &installedmap);
+  change = pool_calc_installsizechange(trans->pool, &installedmap);
+  map_free(&installedmap);
+  return change;
+}
+
+void
+transaction_calc_duchanges(Transaction *trans, DUChanges *mps, int nmps)
+{
+  Map installedmap;
+
+  transaction_create_installedmap(trans, &installedmap);
+  pool_calc_duchanges(trans->pool, &installedmap, mps, nmps);
+  map_free(&installedmap);
+}
+
 struct _TransactionElement {
   Id p;		/* solvable id */
   Id edges;	/* pointer into edges data */

@@ -169,21 +169,27 @@ dump_some_attrs(Repo *repo, Solvable *s)
 #endif
 
 
-static FILE *
+static int
 loadcallback (Pool *pool, Repodata *data, void *vdata)
 {
   FILE *fp = 0;
+  int r;
+
 printf("LOADCALLBACK\n");
   const char *location = repodata_lookup_str(data, SOLVID_META, REPOSITORY_LOCATION);
 printf("loc %s\n", location);
-  if (location && with_attr)
+  if (!location || !with_attr)
+    return 0;
+  fprintf (stderr, "Loading SOLV file %s\n", location);
+  fp = fopen (location, "r");
+  if (!fp)
     {
-      fprintf (stderr, "Loading SOLV file %s\n", location);
-      fp = fopen (location, "r");
-      if (!fp)
-	perror(location);
+      perror(location);
+      return 0;
     }
-  return fp;
+  r = repo_add_solv_flags(data->repo, fp, REPO_USE_LOADING|REPO_LOCALPOOL);
+  fclose(fp);
+  return !r ? 1 : 0;
 }
 
 

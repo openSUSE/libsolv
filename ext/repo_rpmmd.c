@@ -18,6 +18,7 @@
 #define DISABLE_SPLIT
 #include "tools_util.h"
 #include "repo_rpmmd.h"
+#include "chksum.h"
 
 
 enum state {
@@ -126,6 +127,7 @@ static struct stateswitch stateswitches[] = {
   /** tags for different package data, we just ignore the tag **/
   { STATE_START,       "metadata",        STATE_START,    0 },
   { STATE_START,       "otherdata",       STATE_START,    0 },
+  { STATE_START,       "filelists",       STATE_START,    0 },
   { STATE_START,       "diskusagedata",   STATE_START,    0 },
   { STATE_START,       "susedata",        STATE_START,    0 },
 
@@ -1125,6 +1127,29 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
      the package checksums we know about, to get an Id
      we can use in a cache */
   stringpool_init_empty(&pd.cspool);
+  if ((flags & REPO_EXTEND_SOLVABLES) != 0)
+    {
+      /* setup join data */
+      Dataiterator di;
+      dataiterator_init(&di, pool, repo, 0, SOLVABLE_CHECKSUM, 0, 0);
+      while (dataiterator_step(&di))
+	{
+	  const char *str;
+	  int index;
+	  
+	  if (!sat_chksum_len(di.key->type))
+	    continue;
+	  str = repodata_chk2str(di.data, di.key->type, (const unsigned char *)di.kv.str);
+          index = stringpool_str2id(&pd.cspool, str, 1);
+	  if (index >= pd.ncscache)
+	    {
+	      pd.cscache = sat_zextend(pd.cscache, pd.ncscache, index + 1 - pd.ncscache, sizeof(Id), 255);
+	      pd.ncscache = index + 1;
+	    }
+          pd.cscache[index] = di.solvid;
+	}
+      dataiterator_free(&di);
+    }
 
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
@@ -1147,6 +1172,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   join_freemem();
   stringpool_free(&pd.cspool);
   sat_free(pd.cscache);
+  
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", sat_timems(now));

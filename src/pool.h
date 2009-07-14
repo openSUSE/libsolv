@@ -117,7 +117,7 @@ struct _Pool {
   void *debugcallbackdata;
 
   /* load callback */
-  FILE * (*loadcallback)(struct _Pool *, struct _Repodata *, void *);
+  int (*loadcallback)(struct _Pool *, struct _Repodata *, void *);
   void *loadcallbackdata;
 
   /* search position */
@@ -276,7 +276,7 @@ static inline void pool_setdebugmask(Pool *pool, int mask)
   pool->debugmask = mask;
 }
 
-static inline void pool_setloadcallback(Pool *pool, FILE *(*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata)
+static inline void pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata)
 {
   pool->loadcallback = cb;
   pool->loadcallbackdata = loadcbdata;
@@ -292,7 +292,7 @@ void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*c
 void pool_clear_pos(Pool *pool);
 
 
-typedef struct _duchanges {
+typedef struct _DUChanges {
   const char *path;
   int kbytes;
   int files;

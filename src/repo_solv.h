@@ -23,6 +23,7 @@ extern "C" {
 #include "repo.h"
 
 extern int repo_add_solv(Repo *repo, FILE *fp);
+extern int repo_add_solv_flags(Repo *repo, FILE *fp, int flags);
 
 #ifdef __cplusplus
 }

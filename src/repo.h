@@ -166,6 +166,7 @@ typedef struct _KeyValue {
 #define SEARCH_SUB			(1<<9)
 #define SEARCH_ARRAYSENTINEL		(1<<10)
 #define SEARCH_DISABLED_REPOS		(1<<11)
+#define SEARCH_COMPLETE_FILELIST	(1<<12)
 
 /* stringification flags */
 #define SEARCH_SKIP_KIND		(1<<16)
@@ -183,6 +184,8 @@ typedef struct _KeyValue {
 #define REPO_REUSE_REPODATA		(1 << 0)
 #define REPO_NO_INTERNALIZE		(1 << 1)
 #define REPO_LOCALPOOL			(1 << 2)
+#define REPO_USE_LOADING		(1 << 3)
+#define REPO_EXTEND_SOLVABLES		(1 << 4)
 
 Repodata *repo_add_repodata(Repo *repo, int flags);
 Repodata *repo_last_repodata(Repo *repo);

@@ -22,6 +22,7 @@ extern "C" {
 #include "bitmap.h"
 
 struct _Pool;
+struct _DUChanges;
 struct _TransactionOrderdata;
 
 typedef struct _Transaction {
@@ -102,6 +103,9 @@ extern void transaction_classify_pkgs(Transaction *trans, int mode, Id type, Id 
 /* The new packages are put at the head of the queue, the number of new
    packages is returned */
 extern int transaction_installedresult(Transaction *trans, Queue *installedq);
+
+int transaction_calc_installsizechange(Transaction *trans);
+void transaction_calc_duchanges(Transaction *trans, struct _DUChanges *mps, int nmps);
 
 /* order a transaction */
 extern void transaction_order(Transaction *trans, int flags);

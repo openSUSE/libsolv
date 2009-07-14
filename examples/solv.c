@@ -72,6 +72,8 @@ struct repoinfo {
   int gpgcheck;
   int priority;
   int keeppackages;
+
+  unsigned char extcookie[32];
 };
 
 #ifdef FEDORA
@@ -556,10 +558,16 @@ setarch(Pool *pool)
   pool_setarch(pool, un.machine);
 }
 
-char *calccachepath(Repo *repo)
+char *calccachepath(Repo *repo, const char *repoext)
 {
   char *q, *p = pool_tmpjoin(repo->pool, SOLVCACHE_PATH, "/", repo->name);
-  p = pool_tmpjoin(repo->pool, p, ".solv", 0);
+  if (repoext)
+    {
+      p = pool_tmpjoin(repo->pool, p, "_", repoext);
+      p = pool_tmpjoin(repo->pool, p, ".solvx", 0);
+    }
+  else
+    p = pool_tmpjoin(repo->pool, p, ".solv", 0);
   q = p + strlen(SOLVCACHE_PATH) + 1;
   if (*q == '.')
     *q = '_';
@@ -570,12 +578,15 @@ char *calccachepath(Repo *repo)
 }
 
 int
-usecachedrepo(Repo *repo, unsigned char *cookie)
+usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie)
 {
   FILE *fp;
   unsigned char mycookie[32];
+  struct repoinfo *cinfo;
+  int flags = 0;
 
-  if (!(fp = fopen(calccachepath(repo), "r")))
+  cinfo = repo->appdata;
+  if (!(fp = fopen(calccachepath(repo, repoext), "r")))
     return 0;
   if (fseek(fp, -sizeof(mycookie), SEEK_END) || fread(mycookie, sizeof(mycookie), 1, fp) != 1)
     {
@@ -588,28 +599,53 @@ usecachedrepo(Repo *repo, unsigned char *cookie)
       return 0;
     }
   rewind(fp);
-  if (repo_add_solv(repo, fp))
+  if (repoext && !strcmp(repoext, "DL"))
+    flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
+  else if (repoext)
+    flags = REPO_USE_LOADING|REPO_LOCALPOOL|REPO_EXTEND_SOLVABLES;
+
+  if (repo_add_solv_flags(repo, fp, flags))
     {
       fclose(fp);
       return 0;
+    }
+  if (!repoext && cinfo)
+    {
+      struct stat stb;
+      if (!fstat(fileno(fp), &stb))
+        calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
     }
   fclose(fp);
   return 1;
 }
 
-void
-writecachedrepo(Repo *repo, unsigned char *cookie)
+int
+myrepodatafilter(Repo *repo, Repokey *key, void *kfdata)
+{
+  Repodata *data = kfdata;
+
+  if (key->name == 1 && key->size != data - repo->repodata)
+    return -1;
+  if (key->storage == KEY_STORAGE_SOLVABLE)
+    return KEY_STORAGE_DROPPED;
+  return repo_write_stdkeyfilter(repo, key, kfdata);
+}
+
+static void
+writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *cookie)
 {
   Id *addedfileprovides = 0;
   FILE *fp;
   int i, fd;
   char *tmpl;
-  Repodata *info;
+  int myinfo = 0;
+  struct repoinfo *cinfo;
 
+  cinfo = repo->appdata;
   mkdir(SOLVCACHE_PATH, 0755);
   tmpl = sat_dupjoin(SOLVCACHE_PATH, "/", ".newsolv-XXXXXX");
   fd = mkstemp(tmpl);
-  if (!fd)
+  if (fd < 0)
     {
       free(tmpl);
       return;
@@ -622,17 +658,27 @@ writecachedrepo(Repo *repo, unsigned char *cookie)
       free(tmpl);
       return;
     }
-  info = repo_add_repodata(repo, 0);
-  pool_addfileprovides_ids(repo->pool, 0, &addedfileprovides);
-  if (addedfileprovides && *addedfileprovides)
+  if (!repoext)
     {
-      for (i = 0; addedfileprovides[i]; i++)
-	repodata_add_idarray(info, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
+      if (!info)
+	{
+	  info = repo_add_repodata(repo, 0);
+	  myinfo = 1;
+	}
+      pool_addfileprovides_ids(repo->pool, 0, &addedfileprovides);
+      if (addedfileprovides && *addedfileprovides)
+	{
+	  for (i = 0; addedfileprovides[i]; i++)
+	    repodata_add_idarray(info, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
+	}
+      sat_free(addedfileprovides);
+      repodata_internalize(info);
+      repo_write(repo, fp, repo_write_stdkeyfilter, 0, 0);
     }
-  sat_free(addedfileprovides);
-  repodata_internalize(info);
-  repo_write(repo, fp, 0, 0, 0);
-  repodata_free(info);
+  else
+    repo_write(repo, fp, myrepodatafilter, info, 0);
+  if (myinfo)
+    repodata_free(info);
   if (fwrite(cookie, 32, 1, fp) != 1)
     {
       fclose(fp);
@@ -646,7 +692,13 @@ writecachedrepo(Repo *repo, unsigned char *cookie)
       free(tmpl);
       return;
     }
-  if (!rename(tmpl, calccachepath(repo)))
+  if (!repoext && cinfo)
+    {
+      struct stat stb;
+      if (!stat(tmpl, &stb))
+        calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
+    }
+  if (!rename(tmpl, calccachepath(repo, repoext)))
     unlink(tmpl);
   free(tmpl);
 }
@@ -668,7 +720,7 @@ iscompressed(const char *name)
 }
 
 static inline const char *
-findinrepomd(Repo *repo, const char *what, const unsigned char **chksump, Id *chksumtypep)
+repomd_find(Repo *repo, const char *what, const unsigned char **chksump, Id *chksumtypep)
 {
   Pool *pool = repo->pool;
   Dataiterator di;
@@ -694,6 +746,228 @@ findinrepomd(Repo *repo, const char *what, const unsigned char **chksump, Id *ch
   return filename;
 }
 
+int
+repomd_add_ext(Repo *repo, Repodata *data, const char *what)
+{
+  Pool *pool = repo->pool;
+  Dataiterator di;
+  Id chksumtype, handle;
+  const unsigned char *chksum;
+  const char *filename;
+
+  dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_REPOMD_TYPE, what, SEARCH_STRING);
+  dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
+  if (!dataiterator_step(&di))
+    {
+      dataiterator_free(&di);
+      return 0;
+    }
+  if (!strcmp(what, "prestodelta"))
+    what = "deltainfo";
+  dataiterator_setpos_parent(&di);
+  filename = pool_lookup_str(pool, SOLVID_POS, REPOSITORY_REPOMD_LOCATION);
+  chksum = pool_lookup_bin_checksum(pool, SOLVID_POS, REPOSITORY_REPOMD_CHECKSUM, &chksumtype);
+  if (!filename || !chksum)
+    {
+      dataiterator_free(&di);
+      return 0;
+    }
+  handle = repodata_new_handle(data);
+  repodata_set_poolstr(data, handle, REPOSITORY_REPOMD_TYPE, what);
+  repodata_set_str(data, handle, REPOSITORY_REPOMD_LOCATION, filename);
+  if (chksumtype)
+    repodata_set_bin_checksum(data, handle, REPOSITORY_REPOMD_CHECKSUM, chksumtype, chksum);
+  if (!strcmp(what, "deltainfo"))
+    {
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOSITORY_DELTAINFO);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_FLEXARRAY);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, DELTA_PACKAGE_NAME);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_ID);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, DELTA_PACKAGE_EVR);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_ID);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, DELTA_PACKAGE_ARCH);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_ID);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, DELTA_BASE_EVR);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_ID);
+    }
+  if (!strcmp(what, "filelists"))
+    {
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, SOLVABLE_FILELIST);
+      repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_DIRSTRARRAY);
+    }
+  dataiterator_free(&di);
+  repodata_add_flexarray(data, SOLVID_META, REPOSITORY_EXTERNAL, handle);
+  return 1;
+}
+
+static inline const char *
+susetags_find(Repo *repo, const char *what, const unsigned char **chksump, Id *chksumtypep)
+{
+  Pool *pool = repo->pool;
+  Dataiterator di;
+  const char *filename;
+
+  filename = 0;
+  *chksump = 0;
+  *chksumtypep = 0;
+  dataiterator_init(&di, pool, repo, SOLVID_META, SUSETAGS_FILE_NAME, what, SEARCH_STRING);
+  dataiterator_prepend_keyname(&di, SUSETAGS_FILE);
+  if (dataiterator_step(&di))
+    {
+      dataiterator_setpos_parent(&di);
+      *chksump = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, chksumtypep);
+      filename = what;
+    }
+  dataiterator_free(&di);
+  if (filename && !*chksumtypep)
+    {
+      printf("no %s file checksum!\n", what);
+      filename = 0;
+    }
+  return filename;
+}
+
+
+int
+load_stub(Pool *pool, Repodata *data, void *dp)
+{
+  const char *filename, *descrdir, *repomdtype;
+  const unsigned char *filechksum;
+  Id filechksumtype;
+  struct repoinfo *cinfo;
+  FILE *fp;
+  Id defvendor;
+  char ext[3];
+
+  cinfo = data->repo->appdata;
+
+  filename = repodata_lookup_str(data, SOLVID_META, SUSETAGS_FILE_NAME);
+  if (filename)
+    {
+      /* susetags load */
+      ext[0] = filename[9];
+      ext[1] = filename[10];
+      ext[2] = 0;
+#if 1
+      printf("[%s:%s", data->repo->name, ext);
+#endif
+      if (usecachedrepo(data->repo, ext, cinfo->extcookie))
+	{
+          printf(" cached]"); fflush(stdout);
+	  return 1;
+	}
+#if 1
+      printf(" loading]"); fflush(stdout);
+#endif
+      defvendor = repo_lookup_id(data->repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
+      descrdir = repo_lookup_str(data->repo, SOLVID_META, SUSETAGS_DESCRDIR);
+      if (!descrdir)
+	descrdir = "suse/setup/descr";
+      filechksumtype = 0;
+      filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
+      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype)) == 0)
+	return 0;
+      repo_add_susetags(data->repo, fp, defvendor, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+      fclose(fp);
+      writecachedrepo(data->repo, data, ext, cinfo->extcookie);
+      return 1;
+    }
+
+  repomdtype = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_TYPE);
+  if (repomdtype)
+    {
+      if (!strcmp(repomdtype, "filelists"))
+	strcpy(ext, "FL");
+      else if (!strcmp(repomdtype, "deltainfo"))
+	strcpy(ext, "DL");
+      else
+	return 0;
+#if 1
+      printf("[%s:%s", data->repo->name, ext);
+#endif
+      if (usecachedrepo(data->repo, ext, cinfo->extcookie))
+	{
+	  printf(" cached]");fflush(stdout);
+	  return 1;
+	}
+      printf(" loading]"); fflush(stdout);
+      filename = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_LOCATION);
+      filechksumtype = 0;
+      filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
+      if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) == 0)
+	return 0;
+      if (!strcmp(ext, "FL"))
+        repo_add_rpmmd(data->repo, fp, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+      else if (!strcmp(ext, "DL"))
+        repo_add_deltainfoxml(data->repo, fp, REPO_USE_LOADING);
+      fclose(fp);
+      writecachedrepo(data->repo, data, ext, cinfo->extcookie);
+      return 1;
+    }
+
+  return 0;
+}
+
+Id susetags_langtags[] = {
+  SOLVABLE_SUMMARY, REPOKEY_TYPE_STR,
+  SOLVABLE_DESCRIPTION, REPOKEY_TYPE_STR,
+  SOLVABLE_EULA, REPOKEY_TYPE_STR,
+  SOLVABLE_MESSAGEINS, REPOKEY_TYPE_STR,
+  SOLVABLE_MESSAGEDEL, REPOKEY_TYPE_STR,
+  SOLVABLE_CATEGORY, REPOKEY_TYPE_ID,
+  0, 0
+};
+
+void
+susetags_add_ext(Repo *repo, Repodata *data)
+{
+  Pool *pool = repo->pool;
+  Dataiterator di;
+  char ext[3];
+  Id handle, filechksumtype;
+  const unsigned char *filechksum;
+  int i;
+
+  dataiterator_init(&di, pool, repo, SOLVID_META, SUSETAGS_FILE_NAME, 0, 0);
+  dataiterator_prepend_keyname(&di, SUSETAGS_FILE);
+  while (dataiterator_step(&di))
+    {
+      if (strncmp(di.kv.str, "packages.", 9) != 0)
+	continue;
+      if (!di.kv.str[9] || !di.kv.str[10] || (di.kv.str[11] && di.kv.str[11] != '.'))
+	continue;
+      ext[0] = di.kv.str[9];
+      ext[1] = di.kv.str[10];
+      ext[2] = 0;
+      if (!susetags_find(repo, di.kv.str, &filechksum, &filechksumtype))
+	continue;
+      handle = repodata_new_handle(data);
+      repodata_set_str(data, handle, SUSETAGS_FILE_NAME, di.kv.str);
+      if (filechksumtype)
+	repodata_set_bin_checksum(data, handle, SUSETAGS_FILE_CHECKSUM, filechksumtype, filechksum);
+      if (!strcmp(ext, "DU"))
+	{
+	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, SOLVABLE_DISKUSAGE);
+	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_DIRNUMNUMARRAY);
+	}
+      if (!strcmp(ext, "FL"))
+	{
+	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, SOLVABLE_FILELIST);
+	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_DIRSTRARRAY);
+	}
+      else
+	{
+	  for (i = 0; susetags_langtags[i]; i += 2)
+	    {
+	      repodata_add_idarray(data, handle, REPOSITORY_KEYS, pool_id2langid(pool, susetags_langtags[i], ext, 1));
+	      repodata_add_idarray(data, handle, REPOSITORY_KEYS, susetags_langtags[i + 1]);
+	    }
+	}
+      repodata_add_flexarray(data, SOLVID_META, REPOSITORY_EXTERNAL, handle);
+    }
+  dataiterator_free(&di);
+}
+
 void
 read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 {
@@ -702,7 +976,6 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   int i;
   FILE *fp;
   FILE *sigfp;
-  Dataiterator di;
   const char *filename;
   const unsigned char *filechksum;
   Id filechksumtype;
@@ -711,13 +984,14 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   struct stat stb;
   unsigned char cookie[32];
   Pool *sigpool = 0;
+  Repodata *data;
 
   repo = repo_create(pool, "@System");
   printf("rpm database:");
   if (stat("/var/lib/rpm/Packages", &stb))
     memset(&stb, 0, sizeof(&stb));
   calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cookie);
-  if (usecachedrepo(repo, cookie))
+  if (usecachedrepo(repo, 0, cookie))
     printf(" cached\n");
   else
     {
@@ -728,7 +1002,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 #ifdef PRODUCTS_PATH
       repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
 #endif
-      if ((ofp = fopen(calccachepath(repo), "r")) != 0)
+      if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
 	{
 	  Repo *ref = repo_create(pool, "@System.old");
 	  if (!repo_add_solv(ref, ofp))
@@ -741,7 +1015,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	}
       if (!done)
         repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
-      writecachedrepo(repo, cookie);
+      writecachedrepo(repo, 0, 0, cookie);
     }
   pool_set_installed(pool, repo);
 
@@ -756,7 +1030,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       repo->appdata = cinfo;
       repo->priority = 99 - cinfo->priority;
 
-      if (!cinfo->autorefresh && usecachedrepo(repo, 0))
+      if (!cinfo->autorefresh && usecachedrepo(repo, 0, 0))
 	{
 	  printf("repo '%s':", cinfo->alias);
 	  printf(" cached\n");
@@ -775,7 +1049,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      break;
 	    }
 	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
-	  if (usecachedrepo(repo, cookie))
+	  if (usecachedrepo(repo, 0, cookie))
 	    {
 	      printf(" cached\n");
               fclose(fp);
@@ -806,39 +1080,32 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
 	  printf(" reading\n");
-	  filename = findinrepomd(repo, "primary", &filechksum, &filechksumtype);
+	  filename = repomd_find(repo, "primary", &filechksum, &filechksumtype);
 	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) != 0)
 	    {
 	      repo_add_rpmmd(repo, fp, 0, 0);
 	      fclose(fp);
 	    }
 
-	  filename = findinrepomd(repo, "updateinfo", &filechksum, &filechksumtype);
+	  filename = repomd_find(repo, "updateinfo", &filechksum, &filechksumtype);
 	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) != 0)
 	    {
 	      repo_add_updateinfoxml(repo, fp, 0);
 	      fclose(fp);
 	    }
 
-	  filename = findinrepomd(repo, "deltainfo", &filechksum, &filechksumtype);
-	  if (!filename)
-	    filename = findinrepomd(repo, "prestodelta", &filechksum, &filechksumtype);
-	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype)) != 0)
-	    {
-	      repo_add_deltainfoxml(repo, fp, 0);
-	      fclose(fp);
-	    }
-	  
-	  writecachedrepo(repo, cookie);
+	  data = repo_last_repodata(repo);
+	  if (!repomd_add_ext(repo, data, "deltainfo"))
+	    repomd_add_ext(repo, data, "prestodelta");
+	  repomd_add_ext(repo, data, "filelists");
+	  repodata_internalize(data);
+	  writecachedrepo(repo, data, 0, cookie);
+	  repodata_create_stubs(data);
 	  break;
 
         case TYPE_SUSETAGS:
 	  printf("susetags repo '%s':", cinfo->alias);
 	  fflush(stdout);
-	  repo = repo_create(pool, cinfo->alias);
-	  cinfo->repo = repo;
-	  repo->appdata = cinfo;
-	  repo->priority = 99 - cinfo->priority;
 	  descrdir = 0;
 	  defvendor = 0;
 	  if ((fp = curlfopen(cinfo, "content", 0, 0, 0)) == 0)
@@ -849,7 +1116,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      break;
 	    }
 	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
-	  if (usecachedrepo(repo, cookie))
+	  if (usecachedrepo(repo, 0, cookie))
 	    {
 	      printf(" cached\n");
 	      fclose(fp);
@@ -881,36 +1148,12 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
 	  if (!descrdir)
 	    descrdir = "suse/setup/descr";
-	  filename = 0;
-	  dataiterator_init(&di, pool, repo, SOLVID_META, SUSETAGS_FILE_NAME, "packages.gz", SEARCH_STRING);
-	  dataiterator_prepend_keyname(&di, SUSETAGS_FILE);
-	  if (dataiterator_step(&di))
-	    {
-	      dataiterator_setpos_parent(&di);
-	      filechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
-	      filename = "packages.gz";
-	    }
-	  dataiterator_free(&di);
-	  if (!filename)
-	    {
-	      dataiterator_init(&di, pool, repo, SOLVID_META, SUSETAGS_FILE_NAME, "packages", SEARCH_STRING);
-	      dataiterator_prepend_keyname(&di, SUSETAGS_FILE);
-	      if (dataiterator_step(&di))
-		{
-		  dataiterator_setpos_parent(&di);
-		  filechksum = pool_lookup_bin_checksum(pool, SOLVID_POS, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
-		  filename = "packages";
-		}
-	      dataiterator_free(&di);
-	    }
+	  filename = susetags_find(repo, "packages.gz", &filechksum, &filechksumtype);
+          if (!filename)
+	    filename = susetags_find(repo, "packages", &filechksum, &filechksumtype);
 	  if (!filename)
 	    {
 	      printf(" no packages file entry, skipped\n");
-	      break;
-	    }
-	  if (!filechksumtype)
-	    {
-	      printf(" no packages file checksum, skipped\n");
 	      break;
 	    }
 	  printf(" reading\n");
@@ -918,7 +1161,11 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    break;
 	  repo_add_susetags(repo, fp, defvendor, 0, 0);
 	  fclose(fp);
-	  writecachedrepo(repo, cookie);
+	  data = repo_last_repodata(repo);
+	  susetags_add_ext(repo, data);
+	  repodata_internalize(data);
+	  writecachedrepo(repo, data, 0, cookie);
+	  repodata_create_stubs(data);
 	  break;
 	default:
 	  printf("unsupported repo '%s': skipped\n", cinfo->alias);
@@ -1184,6 +1431,7 @@ main(int argc, char **argv)
     }
 
   pool = pool_create();
+  pool_setloadcallback(pool, load_stub, 0);
   pool->nscallback = nscallback;
   // pool_setdebuglevel(pool, 2);
   setarch(pool);
@@ -1213,7 +1461,10 @@ main(int argc, char **argv)
 	  FOR_JOB_SELECT(p, pp, job.elements[i], job.elements[i + 1])
 	    {
 	      Solvable *s = pool_id2solvable(pool, p);
+	      const char *sum = solvable_lookup_str_lang(s, SOLVABLE_SUMMARY, "de");
 	      printf("  - %s [%s]\n", solvable2str(pool, s), s->repo->name);
+	      if (sum)
+                printf("    %s\n", sum);
 	    }
 	}
       exit(0);
@@ -1352,7 +1603,9 @@ rerunsolver:
       solver_free(solv);
       solv = 0;
     }
-  if (!solv->trans.steps.count)
+
+  trans = &solv->trans;
+  if (!trans->steps.count)
     {
       printf("Nothing to do.\n");
       exit(1);
@@ -1360,13 +1613,30 @@ rerunsolver:
   printf("\n");
   printf("Transaction summary:\n\n");
   solver_printtransaction(solv);
+
+#if 1
+  if (1)
+    {
+      DUChanges duc[4];
+      int i;
+
+      duc[0].path = "/";
+      duc[1].path = "/usr/share/man";
+      duc[2].path = "/sbin";
+      duc[3].path = "/etc";
+      transaction_calc_duchanges(trans, duc, 4);
+      for (i = 0; i < 4; i++)
+        printf("duchanges %s: %d K  %d\n", duc[i].path, duc[i].kbytes, duc[i].files);
+      printf("install size change: %d K\n", transaction_calc_installsizechange(trans));
+    }
+#endif
+
   if (!yesno("OK to continue (y/n)? "))
     {
       printf("Abort.\n");
       exit(1);
     }
 
-  trans = &solv->trans;
   queue_init(&checkq);
   newpkgs = transaction_installedresult(trans, &checkq);
   newpkgsfps = 0;
@@ -1400,7 +1670,7 @@ rerunsolver:
 	  if (pool->installed && pool->installed->nsolvables)
 	    {
 	      /* try a delta first */
-	      dataiterator_init(&di, pool, 0, SOLVID_META, DELTA_PACKAGE_NAME, id2str(pool, s->name), SEARCH_STRING);
+	      dataiterator_init(&di, pool, s->repo, SOLVID_META, DELTA_PACKAGE_NAME, id2str(pool, s->name), SEARCH_STRING);
 	      dataiterator_prepend_keyname(&di, REPOSITORY_DELTAINFO);
 	      while (dataiterator_step(&di))
 		{

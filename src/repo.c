@@ -805,6 +805,13 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
       repodata_search(data, p, keyname, md->flags, repo_matchvalue, md);
       if (md->stop > SEARCH_NEXT_KEY)
 	break;
+      if (keyname == SOLVABLE_FILELIST)
+	{
+	  if (!(md->flags & SEARCH_COMPLETE_FILELIST))
+	    break;
+          if (md->matcher.match && (md->flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) == SEARCH_STRING && repodata_filelistfilter_matches(data, md->matcher.match))
+	    break;
+	}
     }
 }
 
@@ -985,9 +992,26 @@ repo_lookup_void(Repo *repo, Id entry, Id keyname)
 Repodata *
 repo_add_repodata(Repo *repo, int flags)
 {
+  int i;
+  if ((flags & REPO_USE_LOADING) != 0)
+    {
+      for (i = repo->nrepodata - 1; i >= 0; i--)
+	if (repo->repodata[i].state == REPODATA_LOADING)
+	  {
+	    Repodata *data = repo->repodata + i;
+	    /* re-init */
+	    /* hack: we mis-use REPO_REUSE_REPODATA here */
+	    if (!(flags & REPO_REUSE_REPODATA))
+	      {
+		repodata_freedata(data);
+		repodata_initdata(data, repo, (flags & REPO_LOCALPOOL) ? 1 : 0);
+	      }
+	    return data;
+	  }
+      return 0;	/* must not create a new repodata! */
+    }
   if ((flags & REPO_REUSE_REPODATA) != 0)
     {
-      int i;
       for (i = repo->nrepodata - 1; i >= 0; i--)
 	if (repo->repodata[i].state != REPODATA_STUB)
 	  return repo->repodata + i;

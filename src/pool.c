@@ -926,10 +926,11 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
   Id p, start, end;
   Solvable *s;
   Repodata *data = 0, *nextdata;
-  Repo *oldrepo = 0;
+  Repo *repo, *oldrepo = 0;
   int dataincludes = 0;
-  int i, j;
+  int i, j, flags;
   Map providedids;
+  Repodata *ffldata = 0;
 
   cbd->nfiles = sf->nfiles;
   cbd->ids = sf->ids;
@@ -947,12 +948,14 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
       start = 2;	/* skip system solvable */
       end = pool->nsolvables;
     }
+  flags = 0;
   for (p = start, s = pool->solvables + p; p < end; p++, s++)
     {
-      if (!s->repo || (repoonly && s->repo != repoonly))
+      repo = s->repo;
+      if (!repo || (repoonly && repo != repoonly))
 	continue;
       /* check if p is in (oldrepo,data) */
-      if (s->repo != oldrepo || (data && p >= data->end))
+      if (repo != oldrepo || (data && p >= data->end))
 	{
 	  data = 0;
 	  oldrepo = 0;
@@ -962,7 +965,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	  /* nope, find new repo/repodata */
           /* if we don't find a match, set data to the next repodata */
 	  nextdata = 0;
-	  for (i = 0, data = s->repo->repodata; i < s->repo->nrepodata; i++, data++)
+	  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
 	    {
 	      if (p >= data->end)
 		continue;
@@ -979,7 +982,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	      if (p >= data->start)
 		break;
 	    }
-	  if (i == s->repo->nrepodata)
+	  if (i == repo->nrepodata)
 	    data = nextdata;	/* no direct hit, use next repodata */
 	  if (data)
 	    {
@@ -991,11 +994,32 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	      map_free(&providedids);
 	      dataincludes = i == cbd->nfiles;
 	    }
-	  oldrepo = s->repo;
+	  oldrepo = repo;
 	}
       if (data && p >= data->start && dataincludes)
 	continue;
-      repo_search(s->repo, p, SOLVABLE_FILELIST, 0, 0, addfileprovides_cb, cbd);
+      if (ffldata == 0 || p < ffldata->start || p >= ffldata->end)
+	{
+	  for (i = 0, ffldata = repo->repodata; i < repo->nrepodata; i++, ffldata++)
+	    if (p >= ffldata->start && p < ffldata->end)
+	      break;
+	  if (i == repo->nrepodata)
+	    ffldata = 0;
+	  flags = 0;
+	  if (ffldata)
+	    {
+	      for (i = 0; i < cbd->nfiles; i++)
+		if (!repodata_filelistfilter_matches(ffldata, id2str(pool, cbd->ids[i])))
+		  {
+#if 0
+		    printf("Need the complete filelist in repo %s because of %s\n", repo->name, id2str(pool, cbd->ids[i]));
+#endif
+		    flags = SEARCH_COMPLETE_FILELIST;
+		    break;
+		  }
+	    }
+	}
+      repo_search(repo, p, SOLVABLE_FILELIST, 0, flags, addfileprovides_cb, cbd);
     }
 }
 
