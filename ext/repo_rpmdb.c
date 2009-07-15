@@ -2185,19 +2185,21 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
 }
 
 int
-rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq)
+rpm_installedrpmdbids(const char *rootdir, const char *index, const char *match, Queue *rpmdbidq)
 {
   struct rpm_by_state state;
   struct rpmdbentry *entries;
   int nentries, i;
   char *namedata;
 
+  if (!index)
+    index = "Name";
   if (rpmdbidq)
     queue_empty(rpmdbidq);
   memset(&state, 0, sizeof(state));
   if (!(state.dbenv = opendbenv(rootdir)))
     return 0;
-  entries = getinstalledrpmdbids(&state, "Name", 0, &nentries, &namedata, 0);
+  entries = getinstalledrpmdbids(&state, index, match, &nentries, &namedata, 0);
   if (rpmdbidq)
     for (i = 0; i < nentries; i++)
       queue_push(rpmdbidq, entries[i].rpmdbid);

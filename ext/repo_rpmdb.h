@@ -32,4 +32,4 @@ void *rpm_byrpmh(struct headerToken_s *h, void **statep);
 
 char *rpm_query(void *rpmhandle, Id what);
 void rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, int, const char *), void *cbdata);
-int  rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq);
+int  rpm_installedrpmdbids(const char *rootdir, const char *index, const char *match, Queue *rpmdbidq);
