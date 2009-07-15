@@ -637,7 +637,34 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	  s = 0;
           freshens = 0;
 
-	  if (!joinhash)
+	  if (joinhash)
+	    {
+	      /* data join operation. find solvable matching name/arch/evr and
+               * add data to it */
+	      Id name, evr, arch;
+	      /* we don't use the create flag here as a simple pre-check for existance */
+	      if (pd.kind)
+		name = str2id(pool, join2(pd.kind, ":", sp[0]), 0);
+	      else
+		name = str2id(pool, sp[0], 0);
+	      evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+	      arch = str2id(pool, sp[3], 0);
+	      if (name && arch)
+		{
+		  if (repo->start + last_found_pack + 1 < repo->end)
+		    {
+		      s = pool->solvables + repo->start + last_found_pack + 1;
+		      if (s->repo != repo || s->name != name || s->evr != evr || s->arch != arch)
+			s = 0;
+		    }
+		  if (!s)
+		    s = joinhash_lookup(repo, joinhash, joinhashm, name, evr, arch);
+		}
+	      if (!s && (flags & REPO_EXTEND_SOLVABLES) != 0)
+		continue;
+	      /* fallthrough to package creation */
+	    }
+	  if (!s)
 	    {
 	      /* normal operation. create a new solvable. */
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
@@ -650,30 +677,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      s->vendor = defvendor;
 	    }
 	  else
-	    {
-	      /* data join operation. find solvable matching name/arch/evr and
-               * add data to it */
-	      Id name, evr, arch;
-	      /* we don't use the create flag here as a simple pre-check for existance */
-	      if (pd.kind)
-		name = str2id(pool, join2(pd.kind, ":", sp[0]), 0);
-	      else
-		name = str2id(pool, sp[0], 0);
-	      evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-	      arch = str2id(pool, sp[3], 0);
-	      if (!name || !arch)
-		continue;	/* ids didn't exist */
-	      if (repo->start + last_found_pack + 1 < repo->end)
-		{
-		  s = pool->solvables + repo->start + last_found_pack + 1;
-		  if (s->repo != repo || s->name != name || s->evr != evr || s->arch != arch)
-		    s = 0;
-		}
-	      if (!s)
-	        s = joinhash_lookup(repo, joinhash, joinhashm, name, evr, arch);
-	      if (!s)
-		continue;
-	    }
 	  last_found_pack = (s - pool->solvables) - repo->start;
 	  if (data)
 	    handle = s - pool->solvables;
