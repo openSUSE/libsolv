@@ -231,6 +231,7 @@ void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
  works only if the data is not yet internalized
 */
 void repodata_merge_attrs(Repodata *data, Id dest, Id src);
+void repodata_merge_some_attrs(Repodata *data, Id dest, Id src, Map *keyidmap, int overwrite);
 
 void repodata_create_stubs(Repodata *data);
 void repodata_join(Repodata *data, Id joinkey);

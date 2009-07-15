@@ -676,7 +676,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      s->arch = str2id(pool, sp[3], 1);
 	      s->vendor = defvendor;
 	    }
-	  else
 	  last_found_pack = (s - pool->solvables) - repo->start;
 	  if (data)
 	    handle = s - pool->solvables;
@@ -946,6 +945,24 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
     {
       int i, last_found;
       last_found = 0;
+      Map keyidmap;
+
+      map_init(&keyidmap, data->nkeys);
+      for (i = 1; i < data->nkeys; i++)
+	{
+	  Id keyname = data->keys[i].name;
+	  if (keyname == SOLVABLE_INSTALLSIZE || keyname == SOLVABLE_DISKUSAGE || keyname == SOLVABLE_FILELIST)
+	    continue;
+	  if (keyname == SOLVABLE_MEDIADIR || keyname == SOLVABLE_MEDIAFILE || keyname == SOLVABLE_MEDIANR)
+	    continue;
+	  if (keyname == SOLVABLE_DOWNLOADSIZE || keyname == SOLVABLE_CHECKSUM)
+	    continue;
+	  if (keyname == SOLVABLE_SOURCENAME || keyname == SOLVABLE_SOURCEARCH || keyname == SOLVABLE_SOURCEEVR)
+	    continue;
+	  if (keyname == SOLVABLE_PKGID || keyname == SOLVABLE_HDRID || keyname == SOLVABLE_LEADSIGID)
+	    continue;
+	  MAPSET(&keyidmap, i);
+	}
       for (i = 0; i < pd.nshare; i++)
         if (pd.share_with[i])
 	  {
@@ -976,10 +993,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		  }
 	      }
 	    if (n != repo->end)
-	      repodata_merge_attrs(data, repo->start + i, repo->start + last_found);
+	      repodata_merge_some_attrs(data, repo->start + i, repo->start + last_found, &keyidmap, 0);
 	    free(pd.share_with[i]);
 	  }
       free(pd.share_with);
+      map_free(&keyidmap);
     }
 
   sat_free(joinhash);

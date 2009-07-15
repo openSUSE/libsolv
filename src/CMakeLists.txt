@@ -4,7 +4,7 @@ SET(libsatsolver_SRCS
     solver.c solverdebug.c repo_solv.c evr.c pool.c
     queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
     transaction.c rules.c problems.c
-    chksum.c md5.c sha1.c sha2.c)
+    chksum.c md5.c sha1.c sha2.c satversion.c)
 
 ADD_LIBRARY(satsolver STATIC ${libsatsolver_SRCS})
 
