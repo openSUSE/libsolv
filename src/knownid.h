@@ -95,6 +95,7 @@ KNOWNID(REPOKEY_TYPE_SHA1,		"repokey:type:sha1"),
 KNOWNID(REPOKEY_TYPE_SHA256,		"repokey:type:sha256"),
 KNOWNID(REPOKEY_TYPE_FIXARRAY,		"repokey:type:fixarray"),
 KNOWNID(REPOKEY_TYPE_FLEXARRAY,		"repokey:type:flexarray"),
+KNOWNID(REPOKEY_TYPE_DELETED,		"repokey:type:deleted"),
 
 KNOWNID(SOLVABLE_SUMMARY,		"solvable:summary"),
 KNOWNID(SOLVABLE_DESCRIPTION,		"solvable:description"),
