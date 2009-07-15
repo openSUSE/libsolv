@@ -19,6 +19,7 @@ extern "C" {
 
 #include <stdio.h>
 
+#include "satversion.h"
 #include "pooltypes.h"
 #include "poolid.h"
 #include "solvable.h"
