@@ -153,12 +153,14 @@ typedef struct _KeyValue {
 } KeyValue;
 
 /* search matcher flags */
-#define SEARCH_STRINGMASK	15
-#define SEARCH_STRING		1
-#define SEARCH_SUBSTRING	2
-#define SEARCH_GLOB 		3
-#define SEARCH_REGEX 		4
-#define SEARCH_ERROR 		5
+#define SEARCH_STRINGMASK		15
+#define SEARCH_STRING			1
+#define SEARCH_STRINGSTART		2
+#define SEARCH_STRINGEND		3
+#define SEARCH_SUBSTRING		4
+#define SEARCH_GLOB 			5
+#define SEARCH_REGEX 			6
+#define SEARCH_ERROR 			15
 #define	SEARCH_NOCASE			(1<<7)
 
 /* iterator control */

@@ -931,6 +931,7 @@ datamatcher_free(Datamatcher *ma)
 int
 datamatcher_match(Datamatcher *ma, const char *str)
 {
+  int l;
   switch ((ma->flags & SEARCH_STRINGMASK))
     {
     case SEARCH_SUBSTRING:
@@ -954,6 +955,33 @@ datamatcher_match(Datamatcher *ma, const char *str)
       else
 	{
 	  if (strcmp(ma->match, str))
+	    return 0;
+	}
+      break;
+    case SEARCH_STRINGSTART:
+      if (ma->flags & SEARCH_NOCASE)
+	{
+	  if (strncasecmp(ma->match, str, strlen(ma->match)))
+	    return 0;
+	}
+      else
+	{
+	  if (strncmp(ma->match, str, strlen(ma->match)))
+	    return 0;
+	}
+      break;
+    case SEARCH_STRINGEND:
+      l = strlen(str) - strlen(ma->match);
+      if (l < 0)
+	return 0;
+      if (ma->flags & SEARCH_NOCASE)
+	{
+	  if (strcasecmp(ma->match, str + l))
+	    return 0;
+	}
+      else
+	{
+	  if (strcmp(ma->match, str + l))
 	    return 0;
 	}
       break;
