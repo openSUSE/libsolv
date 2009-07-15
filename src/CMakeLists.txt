@@ -13,7 +13,7 @@ SET(libsatsolver_HEADERS
     poolid.h pooltypes.h queue.h solvable.h solver.h solverdebug.h
     repo.h repodata.h repopage.h repo_solv.h util.h
     strpool.h dirpool.h knownid.h transaction.h rules.h problems.h
-    chksum.h md5.h sha1.h sha2.h satversion.h)
+    chksum.h md5.h sha1.h sha2.h ${CMAKE_BINARY_DIR}/src/satversion.h)
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
