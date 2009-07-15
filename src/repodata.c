@@ -999,6 +999,21 @@ datamatcher_match(Datamatcher *ma, const char *str)
   return 1;
 }
 
+int
+repodata_filelistfilter_matches(Repodata *data, const char *str)
+{
+  /* '.*bin\/.*', '^\/etc\/.*', '^\/usr\/lib\/sendmail$' */
+  /* for now hardcoded */
+  if (strstr(str, "bin/"))
+    return 1;
+  if (!strncmp(str, "/etc/", 5))
+    return 1;
+  if (!strcmp(str, "/usr/lib/sendmail"))
+    return 1;
+  return 0;
+}
+
+
 enum {
   di_bye,
 
@@ -1159,20 +1174,6 @@ dataiterator_find_keyname(Dataiterator *di, Id keyname)
     return 0;
   di->keyp = keyp;
   return dp;
-}
-
-int
-repodata_filelistfilter_matches(Repodata *data, const char *str)
-{
-  /* '.*bin\/.*', '^\/etc\/.*', '^\/usr\/lib\/sendmail$' */
-  /* for now hardcoded */
-  if (strstr(str, "bin/"))
-    return 1;
-  if (!strncmp(str, "/etc/", 5))
-    return 1;
-  if (!strcmp(str, "/usr/bin/sendmail"))
-    return 1;
-  return 0;
 }
 
 static int
@@ -1692,6 +1693,7 @@ repodata_extend(Repodata *data, Id p)
     }
 }
 
+/* shrink end of repodata */
 void
 repodata_shrink(Repodata *data, int end)
 {
@@ -1741,6 +1743,7 @@ repodata_extend_block(Repodata *data, Id start, Id num)
 }
 
 /**********************************************************************/
+
 
 #define REPODATA_ATTRS_BLOCK 63
 #define REPODATA_ATTRDATA_BLOCK 1023
@@ -1792,9 +1795,9 @@ repodata_insert_keyid(Repodata *data, Id handle, Id keyid, Id val, int overwrite
   i = 0;
   if (ap)
     {
+      /* Determine equality based on the name only, allows us to change
+         type (when overwrite is set), and makes TYPE_CONSTANT work.  */
       for (pp = ap; *pp; pp += 2)
-	/* Determine equality based on the name only, allows us to change
-	   type (when overwrite is set), and makes TYPE_CONSTANT work.  */
         if (data->keys[*pp].name == data->keys[keyid].name)
           break;
       if (*pp)
@@ -1817,7 +1820,7 @@ repodata_insert_keyid(Repodata *data, Id handle, Id keyid, Id val, int overwrite
 }
 
 
-void
+static void
 repodata_set(Repodata *data, Id solvid, Repokey *key, Id val)
 {
   Id keyid;
@@ -1922,6 +1925,7 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
   int oldsize;
   Id *ida, *pp, **ppp;
 
+  /* check if it is the same as last time, this speeds things up a lot */
   if (handle == data->lasthandle && data->keys[data->lastkey].name == keyname && data->keys[data->lastkey].type == keytype && data->attriddatalen == data->lastdatalen)
     {
       /* great! just append the new data */
@@ -1930,6 +1934,7 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
       data->lastdatalen += entrysize;
       return;
     }
+
   ppp = repodata_get_attrp(data, handle);
   pp = *ppp;
   if (pp)
@@ -1971,30 +1976,14 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
   data->lastdatalen = data->attriddatalen + entrysize + 1;
 }
 
-static inline int
-checksumtype2len(Id type)
-{
-  switch (type)
-    {
-    case REPOKEY_TYPE_MD5:
-      return SIZEOF_MD5;
-    case REPOKEY_TYPE_SHA1:
-      return SIZEOF_SHA1;
-    case REPOKEY_TYPE_SHA256:
-      return SIZEOF_SHA256;
-    default:
-      return 0;
-    }
-}
-
 void
 repodata_set_bin_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 		      const unsigned char *str)
 {
   Repokey key;
-  int l = checksumtype2len(type);
+  int l;
 
-  if (!l)
+  if (!(l = sat_chksum_len(type)))
     return;
   key.name = keyname;
   key.type = type;
@@ -2036,9 +2025,9 @@ repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 		      const char *str)
 {
   unsigned char buf[64];
-  int l = checksumtype2len(type);
+  int l;
 
-  if (!l)
+  if (!(l = sat_chksum_len(type)))
     return;
   if (hexstr2bytes(buf, str, l) != l)
     return;
@@ -2051,8 +2040,7 @@ repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
   int i, l;
   char *str, *s;
 
-  l = checksumtype2len(type);
-  if (!l)
+  if (!(l = sat_chksum_len(type)))
     return "";
   s = str = pool_alloctmpspace(data->repo->pool, 2 * l + 1);
   for (i = 0; i < l; i++)
@@ -2249,7 +2237,7 @@ repodata_merge_some_attrs(Repodata *data, Id dest, Id src, Map *keyidmap, int ov
 
 /**********************************************************************/
 
-/* unify with repo_write! */
+/* TODO: unify with repo_write! */
 
 #define EXTDATA_BLOCK 1023
 
