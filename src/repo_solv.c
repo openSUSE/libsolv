@@ -462,6 +462,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
     {
       /* this is a stub replace operation */
       flags |= REPO_EXTEND_SOLVABLES;
+      /* use REPO_REUSE_REPODATA hack so that the old repodata is kept */
       parent = repo_add_repodata(repo, flags | REPO_REUSE_REPODATA);
     }
     
@@ -508,10 +509,20 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       pool_debug(pool, SAT_ERROR, "relations are forbidden in a local pool\n");
       return SOLV_ERROR_CORRUPT;
     }
-  if (parent && numsolv && parent->end - parent->start != numsolv)
+  if (parent && numsolv)
     {
-      pool_debug(pool, SAT_ERROR, "sub-repository solvable number doesn't match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
-      return SOLV_ERROR_CORRUPT;
+      /* make sure that we exactly replace the stub repodata */
+      if (parent->end - parent->start != numsolv)
+	{
+	  pool_debug(pool, SAT_ERROR, "sub-repository solvable number doesn't match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
+	  return SOLV_ERROR_CORRUPT;
+	}
+      for (i = 0; i < numsolv; i++)
+	if (pool->solvables[parent->start + i].repo != repo)
+	  {
+	    pool_debug(pool, SAT_ERROR, "main repository contains holes\n");
+	    return SOLV_ERROR_CORRUPT;
+	  }
     }
 
   /*******  Part 1: string IDs  *****************************************/
