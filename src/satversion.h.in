@@ -19,4 +19,9 @@
 #define SATSOLVER_VERSION_PATCH @LIBSATSOLVER_PATCH@
 #define SATSOLVER_VERSION (SATSOLVER_VERSION_MAJOR * 10000 + SATSOLVER_VERSION_MINOR * 100 + SATSOLVER_VERSION_PATCH)
 
+extern const char sat_version[];
+extern int sat_version_major;
+extern int sat_version_minor;
+extern int sat_version_patch;
+
 #endif
