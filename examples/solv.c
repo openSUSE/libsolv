@@ -1250,8 +1250,10 @@ depglob(Pool *pool, char *name, Queue *job)
 	  return 1;
 	}
     }
+
   if (strpbrk(name, "[*?") == 0)
     return 0;
+
   /* looks like a name glob. hard work. */
   for (p = 1; p < pool->nsolvables; p++)
     {
@@ -1392,6 +1394,30 @@ mkselect(Pool *pool, char *name, Queue *job)
   char *r, *r2;
   Id archid;
 
+  if (*name == '/')
+    {
+      Dataiterator di;
+      Queue q;
+      int match = 0;
+
+      queue_init(&q);
+      dataiterator_init(&di, pool, 0, 0, SOLVABLE_FILELIST, name, SEARCH_STRING|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
+      while (dataiterator_step(&di))
+	{
+	  queue_push(&q, di.solvid);
+	  dataiterator_skip_solvable(&di);
+	}
+      dataiterator_free(&di);
+      if (q.count)
+	{
+	  printf("[using file list match for '%s']\n", name);
+	  match = 1;
+	  queue_push2(job, SOLVER_SOLVABLE_ONE_OF, pool_queuetowhatprovides(pool, &q));
+	}
+      queue_free(&q);
+      if (match)
+	return;
+    }
   if ((r = strpbrk(name, "<=>")) != 0)
     {
       /* relation case, support:
@@ -1486,8 +1512,8 @@ mkselect(Pool *pool, char *name, Queue *job)
 	  *r = '-';
 	}
     }
-  fprintf(stderr, "nothing matches %s\n", name);
-  exit(0);
+  fprintf(stderr, "nothing matches '%s'\n", name);
+  exit(1);
 }
 
 
@@ -1629,11 +1655,11 @@ main(int argc, char **argv)
 {
   Pool *pool;
   Repo *commandlinerepo = 0;
+  Id *commandlinepkgs = 0;
   Id p, pp;
   struct repoinfo *repoinfos;
   int nrepoinfos = 0;
   int i, mode, newpkgs;
-  int needwhatprovidesrefresh;
   Queue job, checkq;
   Solver *solv = 0;
   Transaction *trans;
@@ -1682,41 +1708,45 @@ main(int argc, char **argv)
   setarch(pool);
   repoinfos = read_repoinfos(pool, REPOINFO_PATH, &nrepoinfos);
   read_repos(pool, repoinfos, nrepoinfos);
+
+  if (mode == 0 || mode == SOLVER_INSTALL)
+    {
+      for (i = 1; i < argc; i++)
+	{
+	  int l;
+          l = strlen(argv[i]);
+	  if (l <= 4 || strcmp(argv[i] + l - 4, ".rpm"))
+	    continue;
+	  if (access(argv[i], R_OK))
+	    {
+	      perror(argv[i]);
+	      exit(1);
+	    }
+	  if (!commandlinepkgs)
+	    commandlinepkgs = sat_calloc(argc, sizeof(Id));
+	  if (!commandlinerepo)
+	    commandlinerepo = repo_create(pool, "@commandline");
+	  repo_add_rpms(commandlinerepo, (const char **)argv + i, 1, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+	  commandlinepkgs[i] = commandlinerepo->end - 1;
+	}
+      if (commandlinerepo)
+	repo_internalize(commandlinerepo);
+    }
+
   // FOR_REPOS(i, repo)
   //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
-  needwhatprovidesrefresh = 1;
+  pool_addfileprovides(pool);
+  pool_createwhatprovides(pool);
 
   queue_init(&job);
   for (i = 1; i < argc; i++)
     {
-      if (mode == 0 || mode == SOLVER_INSTALL)
+      if (commandlinepkgs && commandlinepkgs[i])
 	{
-	  int l;
-          l = strlen(argv[i]);
-	  if (l > 4 && !strcmp(argv[i] + l - 4, ".rpm") && !access(argv[i], R_OK))
-	    {
-	      FILE *fp;
-	      if (!commandlinerepo)
-		commandlinerepo = repo_create(pool, "@commandline");
-	      fp = fopen(argv[i], "r");
-	      repo_add_rpms(commandlinerepo, (const char **)argv + i, 1, 0);
-	      queue_push2(&job, SOLVER_SOLVABLE, commandlinerepo->end - 1);
-	      continue;
-	    }
-	}
-      if (needwhatprovidesrefresh)
-	{
-	  pool_addfileprovides(pool);
-	  pool_createwhatprovides(pool);
-	  needwhatprovidesrefresh = 0;
+	  queue_push2(&job, SOLVER_SOLVABLE, commandlinepkgs[i]);
+	  continue;
 	}
       mkselect(pool, argv[i], &job);
-    }
-  if (needwhatprovidesrefresh)
-    {
-      pool_addfileprovides(pool);
-      pool_createwhatprovides(pool);
-      needwhatprovidesrefresh = 0;
     }
   if (!job.count && mode == SOLVER_UPDATE)
     updateall = 1;
@@ -1743,6 +1773,7 @@ main(int argc, char **argv)
       queue_free(&job);
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);
+      sat_free(commandlinepkgs);
       exit(0);
     }
 
@@ -2157,5 +2188,6 @@ rerunsolver:
   queue_free(&job);
   pool_free(pool);
   free_repoinfos(repoinfos, nrepoinfos);
+  sat_free(commandlinepkgs);
   exit(0);
 }

@@ -1191,7 +1191,7 @@ dataiterator_filelistcheck(Dataiterator *di)
   for (j = 1; j < data->nkeys; j++)
     if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
       break;
-  return j == data->nkeys && needcomplete ? 1 : 0;
+  return j == data->nkeys && !needcomplete ? 0 : 1;
 }
 
 int
@@ -1423,6 +1423,13 @@ dataiterator_step(Dataiterator *di)
 
       if (di->matcher.match)
 	{
+	  /* simple pre-check so that we don't need to stringify */
+	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && di->matcher.match && (di->matcher.flags & (SEARCH_FILES|SEARCH_NOCASE|SEARCH_STRINGMASK)) == (SEARCH_FILES|SEARCH_STRING))
+	    {
+	      int l = strlen(di->matcher.match) - strlen(di->kv.str);
+	      if (l < 0 || strcmp(di->matcher.match + l, di->kv.str))
+		continue;
+	    }
 	  if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags))
 	    {
 	      if (di->keyname && (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY))
