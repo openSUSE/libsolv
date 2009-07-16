@@ -789,10 +789,8 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	  /* do not search filelist extensions */
 	  if (data->state != REPODATA_AVAILABLE)
 	    continue;
-	  if (!repodata_precheck_keyname(data, REPOSITORY_EXTERNAL))
-	    continue;
-	  for (j = 0; j < data->nkeys; j++)
-	    if (data->keys[j].name == REPOSITORY_EXTERNAL)
+	  for (j = 1; j < data->nkeys; j++)
+	    if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
 	      break;
 	  if (j == data->nkeys)
 	    continue;

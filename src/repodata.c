@@ -1179,28 +1179,19 @@ dataiterator_find_keyname(Dataiterator *di, Id keyname)
 static int
 dataiterator_filelistcheck(Dataiterator *di)
 {
-  int i;
+  int j;
+  int needcomplete = 0;
   Repodata *data = di->data;
+
+  if ((di->matcher.flags & SEARCH_COMPLETE_FILELIST) != 0)
+    if (!di->matcher.match || (di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_STRING || !repodata_filelistfilter_matches(di->data, di->matcher.match))
+      needcomplete = 1;
   if (data->state != REPODATA_AVAILABLE)
-    return 1;
-  if (!repodata_precheck_keyname(data, REPOSITORY_EXTERNAL))
-    return 1;
-  for (i = 0; i < data->nkeys; i++)
-    if (data->keys[i].name == REPOSITORY_EXTERNAL)
+    return needcomplete ? 1 : 0;
+  for (j = 1; j < data->nkeys; j++)
+    if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
       break;
-  if (i == data->nkeys)
-    return 1;
-  if (!(di->matcher.flags & SEARCH_COMPLETE_FILELIST))
-    {
-      di->repodataid = -1;	/* do not look somewhere else */
-      return 1;
-    }
-  if (di->matcher.match && (di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) == SEARCH_STRING && repodata_filelistfilter_matches(di->data, di->matcher.match))
-    {
-      di->repodataid = -1;	/* do not look somewhere else */
-      return 1;
-    }
-  return 1;
+  return j == data->nkeys && needcomplete ? 1 : 0;
 }
 
 int
