@@ -1389,7 +1389,7 @@ limitevr(Pool *pool, char *evr, Queue *job, Id archid)
 }
 
 void
-mkselect(Pool *pool, char *name, Queue *job)
+mkselect(Pool *pool, int mode, char *name, Queue *job)
 {
   char *r, *r2;
   Id archid;
@@ -1401,9 +1401,12 @@ mkselect(Pool *pool, char *name, Queue *job)
       int match = 0;
 
       queue_init(&q);
-      dataiterator_init(&di, pool, 0, 0, SOLVABLE_FILELIST, name, SEARCH_STRING|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
+      dataiterator_init(&di, pool, mode == SOLVER_ERASE ? pool->installed : 0, 0, SOLVABLE_FILELIST, name, SEARCH_STRING|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
       while (dataiterator_step(&di))
 	{
+	  Solvable *s = pool->solvables + di.solvid;
+	  if (!s->repo || !pool_installable(pool, s))
+	    continue;
 	  queue_push(&q, di.solvid);
 	  dataiterator_skip_solvable(&di);
 	}
@@ -1412,7 +1415,10 @@ mkselect(Pool *pool, char *name, Queue *job)
 	{
 	  printf("[using file list match for '%s']\n", name);
 	  match = 1;
-	  queue_push2(job, SOLVER_SOLVABLE_ONE_OF, pool_queuetowhatprovides(pool, &q));
+	  if (q.count > 1)
+	    queue_push2(job, SOLVER_SOLVABLE_ONE_OF, pool_queuetowhatprovides(pool, &q));
+	  else
+	    queue_push2(job, SOLVER_SOLVABLE, q.elements[0]);
 	}
       queue_free(&q);
       if (match)
@@ -1746,7 +1752,7 @@ main(int argc, char **argv)
 	  queue_push2(&job, SOLVER_SOLVABLE, commandlinepkgs[i]);
 	  continue;
 	}
-      mkselect(pool, argv[i], &job);
+      mkselect(pool, mode, argv[i], &job);
     }
   if (!job.count && mode == SOLVER_UPDATE)
     updateall = 1;
