@@ -784,6 +784,19 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	continue;
       if (keyname && !repodata_precheck_keyname(data, keyname))
 	continue;
+      if (keyname == SOLVABLE_FILELIST && !(md->flags & SEARCH_COMPLETE_FILELIST))
+	{
+	  /* do not search filelist extensions */
+	  if (data->state != REPODATA_AVAILABLE)
+	    continue;
+	  if (!repodata_precheck_keyname(data, REPOSITORY_EXTERNAL))
+	    continue;
+	  for (j = 0; j < data->nkeys; j++)
+	    if (data->keys[j].name == REPOSITORY_EXTERNAL)
+	      break;
+	  if (j == data->nkeys)
+	    continue;
+	}
       if (data->state == REPODATA_STUB)
 	{
 	  if (keyname)
@@ -805,13 +818,6 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
       repodata_search(data, p, keyname, md->flags, repo_matchvalue, md);
       if (md->stop > SEARCH_NEXT_KEY)
 	break;
-      if (keyname == SOLVABLE_FILELIST)
-	{
-	  if (!(md->flags & SEARCH_COMPLETE_FILELIST))
-	    break;
-          if (md->matcher.match && (md->flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) == SEARCH_STRING && repodata_filelistfilter_matches(data, md->matcher.match))
-	    break;
-	}
     }
 }
 
