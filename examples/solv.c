@@ -1800,7 +1800,20 @@ main(int argc, char **argv)
 
   // add mode
   for (i = 0; i < job.count; i += 2)
-    job.elements[i] |= mode;
+    {
+      if (mode == SOLVER_UPDATE)
+	{
+	  FOR_JOB_SELECT(p, pp, job.elements[i], job.elements[i + 1])
+	    if (pool->installed && pool->solvables[p].repo == pool->installed)
+	      break;
+	  if (!p)
+	    {
+	      job.elements[i] |= SOLVER_INSTALL;
+	      continue;
+	    }
+	}
+      job.elements[i] |= mode;
+    }
 
   // multiversion test
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae", 1));
