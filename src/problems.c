@@ -749,6 +749,8 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	}
     }
 
+  /* the problem rules are somewhat ordered from "near to the problem" to
+   * "near to the job" */
   lreqr = lconr = lsysr = ljobr = 0;
   while ((rid = solv->learnt_pool.elements[idx++]) != 0)
     {
