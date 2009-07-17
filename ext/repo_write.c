@@ -1994,3 +1994,35 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   sat_free(repodataused);
   sat_free(repodataschemata);
 }
+
+struct repodata_write_data {
+  int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata);
+  void *kfdata;
+  int repodataid;
+};
+
+static int
+repodata_write_keyfilter(Repo *repo, Repokey *key, void *kfdata)
+{
+  struct repodata_write_data *wd = kfdata;
+
+  /* XXX: special repodata selection hack */
+  if (key->name == 1 && key->size != wd->repodataid)
+    return -1;
+  if (key->storage == KEY_STORAGE_SOLVABLE)
+    return KEY_STORAGE_DROPPED;	/* not part of this repodata */
+  if (wd->keyfilter)
+    return (*wd->keyfilter)(repo, key, wd->kfdata);
+  return key->storage;
+}
+
+void
+repodata_write(Repodata *data, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata)
+{
+  struct repodata_write_data wd;
+
+  wd.keyfilter = keyfilter;
+  wd.kfdata = kfdata;
+  wd.repodataid = data - data->repo->repodata;
+  repo_write(data->repo, fp, repodata_write_keyfilter, &wd, 0);
+}

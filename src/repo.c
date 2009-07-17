@@ -68,13 +68,10 @@ repo_freedata(Repo *repo)
   sat_free(repo);
 }
 
-/*
- * remove repo from pool, zero out (i.e. free) solvables 
- * 
- */
+/* delete all solvables and repodata blocks from this repo */
 
 void
-repo_free(Repo *repo, int reuseids)
+repo_empty(Repo *repo, int reuseids)
 {
   Pool *pool = repo->pool;
   Solvable *s;
@@ -91,13 +88,37 @@ repo_free(Repo *repo, int reuseids)
       for (i = repo->end - 1, s = pool->solvables + i; i >= repo->start; i--, s--)
 	if (s->repo != repo)
 	  break;
-      repo->end = i + 1;
-      pool->nsolvables = i + 1;
+      pool_free_solvable_block(pool, i + 1, repo->end - (i + 1), reuseids);
     }
   /* zero out (i.e. free) solvables belonging to this repo */
   for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
     if (s->repo == repo)
       memset(s, 0, sizeof(*s));
+  repo->nsolvables = 0;
+
+  /* free all data belonging to this repo */
+  repo->idarraydata = sat_free(repo->idarraydata);
+  repo->idarraysize = 0;
+  repo->lastoff = 0;
+  repo->rpmdbid = sat_free(repo->rpmdbid);
+  for (i = 0; i < repo->nrepodata; i++)
+    repodata_freedata(repo->repodata + i);
+  repo->repodata = 0;
+  repo->nrepodata = 0;
+}
+
+/*
+ * remove repo from pool, delete solvables 
+ * 
+ */
+
+void
+repo_free(Repo *repo, int reuseids)
+{
+  Pool *pool = repo->pool;
+  int i;
+
+  repo_empty(repo, reuseids);
   for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
     if (pool->repos[i] == repo)
       break;

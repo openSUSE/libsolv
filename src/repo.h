@@ -20,7 +20,7 @@
 
 
 typedef struct _Repo {
-  const char *name;		/* application private name pointer */
+  const char *name;		/* name pointer */
   Id repoid;			/* our id */
   void *appdata;		/* application private pointer */
 
@@ -46,6 +46,7 @@ typedef struct _Repo {
 
 extern Repo *repo_create(Pool *pool, const char *name);
 extern void repo_free(Repo *repo, int reuseids);
+extern void repo_empty(Repo *repo, int reuseids);
 extern void repo_freeallrepos(Pool *pool, int reuseids);
 extern void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids);
 extern void *repo_sidedata_create(Repo *repo, size_t size);

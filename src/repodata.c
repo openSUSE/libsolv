@@ -116,7 +116,7 @@ repodata_free(Repodata *data)
   int i = data - repo->repodata;
   repodata_freedata(data);
   if (i < repo->nrepodata - 1)
-  memmove(repo->repodata + i, repo->repodata + i + 1, (repo->nrepodata - 1 - i) * sizeof(Repodata));
+    memmove(repo->repodata + i, repo->repodata + i + 1, (repo->nrepodata - 1 - i) * sizeof(Repodata));
   repo->nrepodata--;
 }
 

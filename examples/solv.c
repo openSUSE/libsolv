@@ -646,19 +646,6 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie)
   return 1;
 }
 
-static int
-myrepodatafilter(Repo *repo, Repokey *key, void *kfdata)
-{
-  Repodata *data = kfdata;
-
-  /* XXX: special repodata selection hack */
-  if (key->name == 1 && key->size != data - repo->repodata)
-    return -1;
-  if (key->storage == KEY_STORAGE_SOLVABLE)
-    return KEY_STORAGE_DROPPED;
-  return repo_write_stdkeyfilter(repo, key, kfdata);
-}
-
 void
 writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *cookie)
 {
@@ -668,6 +655,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
   char *tmpl;
   int myinfo = 0;
   struct repoinfo *cinfo;
+  int onepiece;
 
   cinfo = repo->appdata;
   mkdir(SOLVCACHE_PATH, 0755);
@@ -686,6 +674,14 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
       free(tmpl);
       return;
     }
+
+  onepiece = 1;
+  for (i = repo->start; i < repo->end; i++)
+   if (repo->pool->solvables[i].repo != repo)
+     break;
+  if (i < repo->end)
+    onepiece = 0;
+
   if (!repoext)
     {
       if (!info)
@@ -704,7 +700,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
       repo_write(repo, fp, repo_write_stdkeyfilter, 0, 0);
     }
   else
-    repo_write(repo, fp, myrepodatafilter, info, 0);
+    repodata_write(info, fp, repo_write_stdkeyfilter, 0);
   if (myinfo)
     repodata_free(info);
   if (fwrite(cookie, 32, 1, fp) != 1)
@@ -726,6 +722,36 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
       struct stat stb;
       if (!stat(tmpl, &stb))
         calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
+    }
+  if (onepiece)
+    {
+      /* switch to just saved repo to activate paging and save memory */
+      FILE *fp = fopen(tmpl, "r");
+      if (fp)
+	{
+	  if (!repoext)
+	    {
+	      /* main repo */
+	      repo_empty(repo, 1);
+	      if (repo_add_solv(repo, fp))
+		{
+		  /* oops, no way to recover from here */
+		  fprintf(stderr, "internal error\n");
+		  exit(1);
+		}
+	    }
+	  else
+	    {
+	      /* make sure repodata contains complete repo */
+	      /* (this is how repodata_write saves it) */
+	      repodata_extend_block(info, repo->start, repo->end - repo->start);
+	      info->state = REPODATA_LOADING;
+	      /* no need for LOCALPOOL as pool already contains ids */
+	      repo_add_solv_flags(repo, fp, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+	      info->state = REPODATA_AVAILABLE;	/* in case the load failed */
+	    }
+	  fclose(fp);
+	}
     }
   if (!rename(tmpl, calccachepath(repo, repoext)))
     unlink(tmpl);
