@@ -732,7 +732,22 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
   Id rid, d;
   Id lreqr, lconr, lsysr, ljobr;
   Rule *r;
-  int reqassert = 0;
+  Id jobassert = 0;
+  int i, reqset = 0;	/* 0: unset, 1: installed, 2: jobassert, 3: assert */
+
+  /* find us a jobassert rule */
+  for (i = idx; (rid = solv->learnt_pool.elements[i]) != 0; i++)
+    {
+      if (rid < solv->jobrules || rid >= solv->jobrules_end)
+	continue;
+      r = solv->rules + rid;
+      d = r->d < 0 ? -r->d - 1 : r->d;
+      if (!d && r->w2 == 0 && r->p > 0)
+	{
+	  jobassert = r->p;
+	  break;
+	}
+    }
 
   lreqr = lconr = lsysr = ljobr = 0;
   while ((rid = solv->learnt_pool.elements[idx++]) != 0)
@@ -762,7 +777,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	    }
 	  else
 	    {
-	      if (!d && r->w2 == 0 && !reqassert)
+	      if (!d && r->w2 == 0 && reqset < 3)
 		{
 		  if (*reqrp > 0 && r->p < -1)
 		    {
@@ -772,15 +787,22 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 		    }
 		  /* prefer assertions */
 		  *reqrp = rid;
-		  reqassert = 1;
+		  reqset = 3;
 		}
-	      if (!*reqrp)
-		*reqrp = rid;
-	      else if (solv->installed && r->p < 0 && solv->pool->solvables[-r->p].repo == solv->installed && !reqassert)
+	      else if (jobassert && r->p == -jobassert)
 		{
-		  /* prefer rules of installed packages */
+		  /* prefer rules of job assertions */
 		  *reqrp = rid;
+		  reqset = 2;
 		}
+	      else if (solv->installed && r->p < 0 && solv->pool->solvables[-r->p].repo == solv->installed && reqset <= 1)
+		{
+		  /* prefer rules of job installed package so that the user doesn't get confused by strange packages */
+		  *reqrp = rid;
+		  reqset = 1;
+		}
+	      else if (!*reqrp)
+		*reqrp = rid;
 	    }
 	}
     }
