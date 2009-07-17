@@ -945,9 +945,47 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
   needchunk = 1;
   for(;;)
     {
+      /* make sure we have enough room */
+      if (keydepth == 0 || needchunk)
+	{
+	  int left = bufend - dp;
+	  /* read data chunk to dp */
+	  if (data.error)
+	    break;
+	  if (left < 0)
+	    {
+	      pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
+	      data.error = SOLV_ERROR_EOF;
+	      break;
+	    }
+	  if (left < maxsize)
+	    {
+	      if (left)
+		memmove(buf, dp, left);
+	      l = maxsize - left;
+	      if (l < DATA_READ_CHUNK)
+		l = DATA_READ_CHUNK;
+	      if (l > allsize)
+		l = allsize;
+	      if (l && fread(buf + left, l, 1, data.fp) != 1)
+		{
+		  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+		  data.error = SOLV_ERROR_EOF;
+		  break;
+		}
+	      allsize -= l;
+	      left += l;
+	      bufend = buf + left;
+	      if (allsize + left < maxsize)
+		maxsize = allsize + left;
+	      dp = buf;
+	    }
+	  needchunk = 0;
+	}
+
       key = *keyp++;
 #if 0
-printf("key %d at %d\n", key, keyp - 1 - schemadata);
+printf("key %d at %d\n", key, (int)(keyp - 1 - schemadata));
 #endif
       if (!key)
 	{
@@ -986,42 +1024,6 @@ printf("pop flexarray %d %d\n", keydepth, nentries);
 
       if (keydepth == 0)
 	data.mainschemaoffsets[keyp - 1 - (schemadata + schemata[data.mainschema])] = data.incoredatalen;
-      if (keydepth == 0 || needchunk)
-	{
-	  int left = bufend - dp;
-	  /* read data chunk to dp */
-	  if (data.error)
-	    break;
-	  if (left < 0)
-	    {
-	      pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
-	      data.error = SOLV_ERROR_EOF;
-	      break;
-	    }
-	  if (left < maxsize)
-	    {
-	      if (left)
-		memmove(buf, dp, left);
-	      l = maxsize - left;
-	      if (l < DATA_READ_CHUNK)
-		l = DATA_READ_CHUNK;
-	      if (l > allsize)
-		l = allsize;
-	      if (l && fread(buf + left, l, 1, data.fp) != 1)
-		{
-		  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
-		  data.error = SOLV_ERROR_EOF;
-		  break;
-		}
-	      allsize -= l;
-	      left += l;
-	      bufend = buf + left;
-	      if (allsize + left < maxsize)
-		maxsize = allsize + left;
-	      dp = buf;
-	    }
-	  needchunk = 0;
-	}
 
 #if 0
 printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].type), s);
