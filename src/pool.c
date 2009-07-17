@@ -751,7 +751,7 @@ pool_debug(Pool *pool, int type, const char *format, ...)
   va_start(args, format);
   if (!pool->debugcallback)
     {
-      if ((type & (SAT_FATAL|SAT_ERROR)) == 0 || !(pool->debugmask & SAT_DEBUG_TO_STDERR))
+      if ((type & (SAT_FATAL|SAT_ERROR)) == 0 && !(pool->debugmask & SAT_DEBUG_TO_STDERR))
         vprintf(format, args);
       else
         vfprintf(stderr, format, args);
