@@ -1,9 +1,8 @@
-
 Name:           libsatsolver
 Version:        @VERSION@
 Release:        1
 License:        BSD 3-Clause
-Url:            http://svn.opensuse.org/svn/zypp/trunk/sat-solver
+Url:            git://git.opensuse.org/projects/zypp/sat-solver.git
 Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
@@ -88,14 +87,22 @@ Provides:       libsatsolver = %{version}-%{release}
 Requires:       gzip bzip2 coreutils
 
 %description -n satsolver-tools
-. 
+A new approach to package dependency solving.
+
+%package demo
+Summary:        Applications demoing the satsolver library
+Group:          System/Management
+Requires:       gpg2 curl
+
+%description demo
+Applications demoing the satsolver library.
 
 %package -n ruby-satsolver
 Summary:        Ruby bindings for sat solver
 Group:          Development/Languages/Ruby
 
 %description -n ruby-satsolver
-.
+Ruby bindings for sat solver.
 
 %package -n python-satsolver
 %py_requires
@@ -103,7 +110,7 @@ Summary:        Python bindings for sat solver
 Group:          Development/Languages/Python
 
 %description -n python-satsolver
-.
+Python bindings for sat solver.
 
 %package -n perl-satsolver
 Requires:       perl = %{perl_version}
@@ -111,7 +118,8 @@ Summary:        Perl bindings for sat solver
 Group:          Development/Languages/Perl
 
 %description -n perl-satsolver
-.
+Perl bindings for sat solver.
+
 
 %prep
 %setup -n satsolver-%{version}
@@ -120,12 +128,18 @@ Group:          Development/Languages/Perl
 export CFLAGS="$RPM_OPT_FLAGS"
 export CXXFLAGS="$CFLAGS"
 
-cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
-      -DPYTHON_SITEDIR=%{py_sitedir} \
-      -DLIB=%{_lib} \
-      -DCMAKE_VERBOSE_MAKEFILE=TRUE \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_SKIP_RPATH=1 
+CMAKE_FLAGS=
+%if 0%{?fedora_version}
+CMAKE_FLAGS="-DFEDORA=1"
+%endif
+
+cmake   $CMAKE_FLAGS \
+	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
+	-DPYTHON_SITEDIR=%{py_sitedir} \
+	-DLIB=%{_lib} \
+	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
+	-DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_SKIP_RPATH=1 
 make %{?jobs:-j %jobs}
 make doc_forced
 
@@ -155,6 +169,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %doc LICENSE*
 %exclude /usr/bin/deptestomatic
 %exclude /usr/bin/helix2solv
+%exclude /usr/bin/solv
 /usr/bin/*
 
 %files devel
@@ -166,6 +181,10 @@ rm -rf "$RPM_BUILD_ROOT"
 /usr/include/satsolver/*
 /usr/bin/deptestomatic
 /usr/bin/helix2solv
+
+%files demo
+%defattr(-,root,root)
+/usr/bin/solv
 
 #%files devel-doc
 #%defattr(-,root,root)
@@ -197,4 +216,5 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root,-)
 %{perl_vendorarch}/satsolver.so
 %{perl_vendorlib}/satsolver.pm
+
 %changelog
