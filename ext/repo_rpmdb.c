@@ -1908,6 +1908,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   char **md = 0;
   char **lt = 0;
   unsigned int *di, diidx;
+  unsigned int *co = 0;
   unsigned int lastdir;
   int lastdirl;
   unsigned int *fm;
@@ -1963,6 +1964,20 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	  return;
 	}
     }
+  if ((flags & RPM_ITERATE_FILELIST_WITHCOL) != 0)
+    {
+      co = headint32array(rpmhead, TAG_FILECOLORS, &cnt2);
+      if (!co || cnt != cnt2)
+	{
+	  sat_free(co);
+	  sat_free(md);
+	  sat_free(fm);
+	  sat_free(di);
+	  sat_free(bn);
+	  sat_free(dn);
+	  return;
+	}
+    }
   lastdir = dcnt;
   lastdirl = 0;
   for (i = 0; i < cnt; i++)
@@ -2005,9 +2020,12 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 		}
 	    }
 	  if (!md5p)
-	    md5p = "";
+	    {
+	      sprintf(md5, "%08x%08x", (fm[i] >> 12) & 65535, 0);
+	      md5p = md5;
+	    }
 	}
-      (*cb)(cbdata, space, fm[i], md5p);
+      (*cb)(cbdata, space, co ? (fm[i] | co[i] << 24) : fm[i], md5p);
     }
   sat_free(space);
   sat_free(lt);
@@ -2016,6 +2034,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   sat_free(di);
   sat_free(bn);
   sat_free(dn);
+  sat_free(co);
 }
 
 char *

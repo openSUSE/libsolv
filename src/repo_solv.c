@@ -514,7 +514,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       /* make sure that we exactly replace the stub repodata */
       if (parent->end - parent->start != numsolv)
 	{
-	  pool_debug(pool, SAT_ERROR, "sub-repository solvable number doesn't match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
+	  pool_debug(pool, SAT_ERROR, "sub-repository solvable number does not match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
 	  return SOLV_ERROR_CORRUPT;
 	}
       for (i = 0; i < numsolv; i++)

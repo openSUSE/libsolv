@@ -1289,6 +1289,7 @@ solver_free(Solver *solv)
   map_free(&solv->noobsoletes);
 
   map_free(&solv->updatemap);
+  map_free(&solv->fixmap);
   map_free(&solv->dupmap);
   map_free(&solv->dupinvolvedmap);
 
@@ -2429,6 +2430,30 @@ solver_solve(Solver *solv, Queue *job)
    */
   if (installed)
     {
+      /* check for verify jobs */
+      for (i = 0; i < job->count; i += 2)
+	{
+	  how = job->elements[i];
+	  what = job->elements[i + 1];
+	  select = how & SOLVER_SELECTMASK;
+	  switch (how & SOLVER_JOBMASK)
+	    {
+	    case SOLVER_VERIFY:
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  if (!solv->installed || s->repo != solv->installed)
+		    continue;
+		  if (!solv->fixmap.size)
+		    map_grow(&solv->fixmap, solv->installed->end - solv->installed->start);
+		  MAPSET(&solv->fixmap, p - solv->installed->start);
+		}
+	      break;
+	    default:
+	      break;
+	    }
+	}
+
       oldnrules = solv->nrules;
       POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** create rpm rules for installed solvables ***\n");
       FOR_REPO_SOLVABLES(installed, p, s)
@@ -2701,6 +2726,9 @@ solver_solve(Solver *solv, Queue *job)
 		map_grow(&solv->updatemap, solv->installed->end - solv->installed->start);
 	      MAPSET(&solv->updatemap, p - solv->installed->start);
 	    }
+	  break;
+	case SOLVER_VERIFY:
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sverify %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
 	  break;
 	case SOLVER_WEAKENDEPS:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sweaken deps %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));

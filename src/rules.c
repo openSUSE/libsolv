@@ -500,7 +500,8 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       dontfix = 0;
       if (installed			/* Installed system available */
 	  && !solv->fixsystem		/* NOT repair errors in rpm dependency graph */
-	  && s->repo == installed)	/* solvable is installed? */
+	  && s->repo == installed	/* solvable is installed */
+	  && (!solv->fixmap.size || !MAPTST(&solv->fixmap, n - installed->start)))
         {
 	  dontfix = 1;			/* dont care about broken rpm deps */
         }

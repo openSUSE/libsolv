@@ -7,7 +7,7 @@
 
 /* solv, a little software installer demoing the sat solver library */
 
-/* things missing:
+/* things available in the library but missing from solv:
  * - vendor policy loading
  * - soft locks file handling
  * - multi version handling
@@ -74,11 +74,13 @@ struct repoinfo {
   char *metalink;
   char *path;
   int type;
-  int gpgcheck;
+  int pkgs_gpgcheck;
+  int repo_gpgcheck;
   int priority;
   int keeppackages;
   int metadata_expire;
 
+  unsigned char cookie[32];
   unsigned char extcookie[32];
 };
 
@@ -221,6 +223,9 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	      cinfo->alias = strdup(kp + 1);
 	      cinfo->type = TYPE_RPMMD;
 	      cinfo->autorefresh = 1;
+#ifndef FEDORA
+	      cinfo->repo_gpgcheck = 1;
+#endif
 	      cinfo->metadata_expire = METADATA_EXPIRE;
 	      continue;
 	    }
@@ -245,7 +250,9 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	  else if (!strcmp(kp, "autorefresh"))
 	    cinfo->autorefresh = *vp == '0' ? 0 : 1;
 	  else if (!strcmp(kp, "gpgcheck"))
-	    cinfo->gpgcheck = *vp == '0' ? 0 : 1;
+	    cinfo->pkgs_gpgcheck = *vp == '0' ? 0 : 1;
+	  else if (!strcmp(kp, "repo_gpgcheck"))
+	    cinfo->repo_gpgcheck = *vp == '0' ? 0 : 1;
 	  else if (!strcmp(kp, "baseurl"))
 	    cinfo->baseurl = strdup(vp);
 	  else if (!strcmp(kp, "mirrorlist"))
@@ -344,13 +351,38 @@ verify_checksum(int fd, const char *file, const unsigned char *chksum, Id chksum
 }
 
 char *
-findmetalinkurl(FILE *fp)
+findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
 {
   char buf[4096], *bp, *ep;
+
+  if (chksumtypep)
+    *chksumtypep = 0;
   while((bp = fgets(buf, sizeof(buf), fp)) != 0)
     {
       while (*bp == ' ' || *bp == '\t')
 	bp++;
+      if (chksumtypep && !*chksumtypep && !strncmp(bp, "<hash type=\"sha256\">", 20))
+	{
+	  int i;
+
+	  bp += 20;
+	  memset(chksumtypep, 0, 32);
+	  for (i = 0; i < 64; i++)
+	    {
+	      int c = *bp++;
+	      if (c >= '0' && c <= '9')
+		chksump[i / 2] = chksump[i / 2] * 16 + (c - '0');
+	      else if (c >= 'a' && c <= 'f')
+		chksump[i / 2] = chksump[i / 2] * 16 + (c - ('a' - 10));
+	      else if (c >= 'A' && c <= 'F')
+		chksump[i / 2] = chksump[i / 2] * 16 + (c - ('A' - 10));
+	      else
+		break;
+	    }
+	  if (i == 64)
+	    *chksumtypep = REPOKEY_TYPE_SHA256;
+	  continue;
+	}
       if (strncmp(bp, "<url", 4))
 	continue;
       bp = strchr(bp, '>');
@@ -396,12 +428,19 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       if (file != cinfo->metalink)
 	{
 	  FILE *fp = curlfopen(cinfo, cinfo->metalink, 0, 0, 0, 0);
+	  unsigned char mlchksum[32];
+	  Id mlchksumtype = 0;
 	  if (!fp)
 	    return 0;
-	  cinfo->baseurl = findmetalinkurl(fp);
+	  cinfo->baseurl = findmetalinkurl(fp, mlchksum, &mlchksumtype);
 	  fclose(fp);
 	  if (!cinfo->baseurl)
 	    return 0;
+	  if (!chksumtype && mlchksumtype)
+	    {
+	      chksumtype = mlchksumtype;
+	      chksum = mlchksum;
+	    }
 	  return curlfopen(cinfo, file, uncompress, chksum, chksumtype, badchecksump);
 	}
       snprintf(url, sizeof(url), "%s", file);
@@ -659,7 +698,14 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
       /* set the checksum so that we can use it with the stub loads */
       struct stat stb;
       if (!fstat(fileno(fp), &stb))
-        calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
+	{
+	  int i;
+
+	  stb.st_mtime = 0;
+          calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
+	  for (i = 0; i < 32; i++)
+	    cinfo->extcookie[i] ^= cinfo->cookie[i];
+	}
     }
   if (mark)
     futimes(fileno(fp), 0);	/* try to set modification time */
@@ -742,7 +788,14 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
       /* set the checksum so that we can use it with the stub loads */
       struct stat stb;
       if (!stat(tmpl, &stb))
-        calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
+	{
+	  int i;
+
+	  stb.st_mtime = 0;
+          calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
+	  for (i = 0; i < 32; i++)
+	    cinfo->extcookie[i] ^= cinfo->cookie[i];
+	}
     }
   if (onepiece)
     {
@@ -1113,7 +1166,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       dorefresh = cinfo->autorefresh;
       if (dorefresh && cinfo->metadata_expire && stat(calccachepath(repo, 0), &stb) == 0)
 	{
-	  if (time(0) - stb.st_mtime < cinfo->metadata_expire)
+	  if (cinfo->metadata_expire == -1 || time(0) - stb.st_mtime < cinfo->metadata_expire)
 	    dorefresh = 0;
 	}
       if (!dorefresh && usecachedrepo(repo, 0, 0, 0))
@@ -1135,24 +1188,22 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      cinfo->repo = 0;
 	      break;
 	    }
-	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
-	  if (usecachedrepo(repo, 0, cookie, 1))
+	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cinfo->cookie);
+	  if (usecachedrepo(repo, 0, cinfo->cookie, 1))
 	    {
 	      printf(" cached\n");
               fclose(fp);
 	      break;
 	    }
-	  sigfp = curlfopen(cinfo, "repodata/repomd.xml.asc", 0, 0, 0, 0);
-#ifndef FEDORA
-	  if (!sigfp)
+	  if (cinfo->repo_gpgcheck)
 	    {
-	      printf(" unsigned, skipped\n");
-	      fclose(fp);
-	      break;
-	    }
-#endif
-	  if (sigfp)
-	    {
+	      sigfp = curlfopen(cinfo, "repodata/repomd.xml.asc", 0, 0, 0, 0);
+	      if (!sigfp)
+		{
+		  printf(" unsigned, skipped\n");
+		  fclose(fp);
+		  break;
+		}
 	      if (!sigpool)
 		sigpool = read_sigs();
 	      if (!checksig(sigpool, fp, sigfp))
@@ -1189,7 +1240,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repomd_add_ext(repo, data, "filelists");
 	  repodata_internalize(data);
 	  if (!badchecksum)
-	    writecachedrepo(repo, data, 0, cookie);
+	    writecachedrepo(repo, data, 0, cinfo->cookie);
 	  repodata_create_stubs(data);
 	  break;
 
@@ -1205,32 +1256,35 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      cinfo->repo = 0;
 	      break;
 	    }
-	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cookie);
-	  if (usecachedrepo(repo, 0, cookie, 1))
+	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cinfo->cookie);
+	  if (usecachedrepo(repo, 0, cinfo->cookie, 1))
 	    {
 	      printf(" cached\n");
 	      fclose(fp);
 	      break;
 	    }
-	  sigfp = curlfopen(cinfo, "content.asc", 0, 0, 0, 0);
-	  if (!sigfp)
+	  if (cinfo->repo_gpgcheck)
 	    {
-	      printf(" unsigned, skipped\n");
-	      fclose(fp);
-	      break;
-	    }
-	  if (sigfp)
-	    {
-	      if (!sigpool)
-		sigpool = read_sigs();
-	      if (!checksig(sigpool, fp, sigfp))
+	      sigfp = curlfopen(cinfo, "content.asc", 0, 0, 0, 0);
+	      if (!sigfp)
 		{
-		  printf(" checksig failed, skipped\n");
-		  fclose(sigfp);
+		  printf(" unsigned, skipped\n");
 		  fclose(fp);
 		  break;
 		}
-	      fclose(sigfp);
+	      if (sigfp)
+		{
+		  if (!sigpool)
+		    sigpool = read_sigs();
+		  if (!checksig(sigpool, fp, sigfp))
+		    {
+		      printf(" checksig failed, skipped\n");
+		      fclose(sigfp);
+		      fclose(fp);
+		      break;
+		    }
+		  fclose(sigfp);
+		}
 	    }
 	  repo_add_content(repo, fp, 0);
 	  fclose(fp);
@@ -1255,7 +1309,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  susetags_add_ext(repo, data);
 	  repodata_internalize(data);
 	  if (!badchecksum)
-	    writecachedrepo(repo, data, 0, cookie);
+	    writecachedrepo(repo, data, 0, cinfo->cookie);
 	  repodata_create_stubs(data);
 	  break;
 	default:
@@ -1715,6 +1769,34 @@ nscallback(Pool *pool, void *data, Id name, Id evr)
   return 0;
 }
 
+#define MODE_LIST        0
+#define MODE_INSTALL     1
+#define MODE_ERASE       2
+#define MODE_UPDATE      3
+#define MODE_DISTUPGRADE 4
+#define MODE_VERIFY      5
+#define MODE_PATCH       6
+#define MODE_INFO        7
+#define MODE_REPOLIST    8
+#define MODE_SEARCH	 9
+
+void
+usage(int r)
+{
+  fprintf(stderr, "Usage: solv COMMAND <select>\n");
+  fprintf(stderr, "\n");
+  fprintf(stderr, "    distupgrade: replace installed packages with\n");
+  fprintf(stderr, "                 versions from the repositories\n");
+  fprintf(stderr, "    erase:       erase installed packages\n");
+  fprintf(stderr, "    info:        display package information\n");
+  fprintf(stderr, "    install:     install packages\n");
+  fprintf(stderr, "    list:        list packages\n");
+  fprintf(stderr, "    repos:       list enabled repositories\n");
+  fprintf(stderr, "    search:      search name/summary/description\n");
+  fprintf(stderr, "    update:      update installed packages\n");
+  fprintf(stderr, "\n");
+  exit(r);
+}
 
 int
 main(int argc, char **argv)
@@ -1725,57 +1807,132 @@ main(int argc, char **argv)
   Id p, pp;
   struct repoinfo *repoinfos;
   int nrepoinfos = 0;
-  int i, mode, newpkgs;
+  int i, mainmode, mode, newpkgs;
   Queue job, checkq;
   Solver *solv = 0;
   Transaction *trans;
   char inbuf[128], *ip;
-  int updateall = 0;
-  int distupgrade = 0;
-  int patchmode = 0;
+  int allpkgs = 0;
   FILE **newpkgsfps;
   struct fcstate fcstate;
 
   argc--;
   argv++;
   if (!argv[0])
-    {
-      fprintf(stderr, "Usage: solv install|erase|update|show <select>\n");
-      exit(1);
-    }
+    usage(1);
   if (!strcmp(argv[0], "install") || !strcmp(argv[0], "in"))
-    mode = SOLVER_INSTALL;
+    {
+      mainmode = MODE_INSTALL;
+      mode = SOLVER_INSTALL;
+    }
   else if (!strcmp(argv[0], "patch"))
     {
-      mode = SOLVER_UPDATE;
-      patchmode = 1;
+      mainmode = MODE_PATCH;
+      mode = SOLVER_INSTALL;
     }
   else if (!strcmp(argv[0], "erase") || !strcmp(argv[0], "rm"))
-    mode = SOLVER_ERASE;
-  else if (!strcmp(argv[0], "show"))
-    mode = 0;
+    {
+      mainmode = MODE_ERASE;
+      mode = SOLVER_ERASE;
+    }
+  else if (!strcmp(argv[0], "list"))
+    {
+      mainmode = MODE_LIST;
+      mode = 0;
+    }
+  else if (!strcmp(argv[0], "info"))
+    {
+      mainmode = MODE_INFO;
+      mode = 0;
+    }
+  else if (!strcmp(argv[0], "search"))
+    {
+      mainmode = MODE_SEARCH;
+      mode = 0;
+    }
+  else if (!strcmp(argv[0], "verify"))
+    {
+      mainmode = MODE_VERIFY;
+      mode = SOLVER_VERIFY;
+    }
   else if (!strcmp(argv[0], "update") || !strcmp(argv[0], "up"))
-    mode = SOLVER_UPDATE;
+    {
+      mainmode = MODE_UPDATE;
+      mode = SOLVER_UPDATE;
+    }
   else if (!strcmp(argv[0], "dist-upgrade") || !strcmp(argv[0], "dup"))
     {
+      mainmode = MODE_DISTUPGRADE;
       mode = SOLVER_UPDATE;
-      distupgrade = 1;
+    }
+  else if (!strcmp(argv[0], "repos") || !strcmp(argv[0], "repolist") || !strcmp(argv[0], "lr"))
+    {
+      mainmode = MODE_REPOLIST;
+      mode = 0;
     }
   else
-    {
-      fprintf(stderr, "Usage: solv install|erase|update|show <select>\n");
-      exit(1);
-    }
+    usage(1);
 
   pool = pool_create();
+#ifdef FEDORA
+  pool->obsoleteusescolors = 1;
+#endif
   pool_setloadcallback(pool, load_stub, 0);
   pool->nscallback = nscallback;
   // pool_setdebuglevel(pool, 2);
   setarch(pool);
   repoinfos = read_repoinfos(pool, REPOINFO_PATH, &nrepoinfos);
+
+  if (mainmode == MODE_REPOLIST)
+    {
+      int j = 1;
+      for (i = 0; i < nrepoinfos; i++)
+	{
+	  struct repoinfo *cinfo = repoinfos + i;
+	  if (!cinfo->enabled)
+	    continue;
+	  printf("%d: %-20s %s\n", j++, cinfo->alias, cinfo->name);
+	}
+      exit(0);
+    }
+
   read_repos(pool, repoinfos, nrepoinfos);
 
-  if (mode == 0 || mode == SOLVER_INSTALL)
+  if (mainmode == MODE_SEARCH)
+    {
+      Dataiterator di;
+      Map m;
+      if (argc != 2)
+	usage(1);
+      map_init(&m, pool->nsolvables);
+      dataiterator_init(&di, pool, 0, 0, 0, argv[1], SEARCH_SUBSTRING|SEARCH_NOCASE);
+      dataiterator_set_keyname(&di, SOLVABLE_NAME);
+      dataiterator_set_search(&di, 0, 0);
+      while (dataiterator_step(&di))
+	MAPSET(&m, di.solvid);
+      dataiterator_set_keyname(&di, SOLVABLE_SUMMARY);
+      dataiterator_set_search(&di, 0, 0);
+      while (dataiterator_step(&di))
+	MAPSET(&m, di.solvid);
+      dataiterator_set_keyname(&di, SOLVABLE_DESCRIPTION);
+      dataiterator_set_search(&di, 0, 0);
+      while (dataiterator_step(&di))
+	MAPSET(&m, di.solvid);
+      dataiterator_free(&di);
+
+      for (p = 1; p < pool->nsolvables; p++)
+	{
+	  Solvable *s = pool_id2solvable(pool, p);
+	  if (!MAPTST(&m, p))
+	    continue;
+	  printf("  - %s: %s\n", solvable2str(pool, s), solvable_lookup_str(s, SOLVABLE_SUMMARY));
+	}
+      map_free(&m);
+      exit(0);
+    }
+
+
+  if (mainmode == MODE_LIST || mainmode == MODE_INSTALL)
     {
       for (i = 1; i < argc; i++)
 	{
@@ -1807,33 +1964,55 @@ main(int argc, char **argv)
   queue_init(&job);
   for (i = 1; i < argc; i++)
     {
+      Queue job2;
+      int j;
+
       if (commandlinepkgs && commandlinepkgs[i])
 	{
 	  queue_push2(&job, SOLVER_SOLVABLE, commandlinepkgs[i]);
 	  continue;
 	}
-      mkselect(pool, mode, argv[i], &job);
+      queue_init(&job2);
+      mkselect(pool, mode, argv[i], &job2);
+      for (j = 0; j < job2.count; j++)
+	queue_push(&job, job2.elements[j]);
+      queue_free(&job2);
     }
-  if (!job.count && mode == SOLVER_UPDATE)
-    updateall = 1;
-  else if (!job.count)
+
+  if (!job.count && mainmode != MODE_UPDATE && mainmode != MODE_DISTUPGRADE && mainmode != MODE_VERIFY && mainmode != MODE_PATCH)
     {
       printf("no package matched\n");
       exit(1);
     }
 
-  if (!mode)
+  if (!job.count)
+    allpkgs = 1;
+
+  if (mainmode == MODE_LIST || mainmode == MODE_INFO)
     {
-      /* show mode, no solver needed */
+      /* list mode, no solver needed */
       for (i = 0; i < job.count; i += 2)
 	{
 	  FOR_JOB_SELECT(p, pp, job.elements[i], job.elements[i + 1])
 	    {
 	      Solvable *s = pool_id2solvable(pool, p);
-	      const char *sum = solvable_lookup_str_lang(s, SOLVABLE_SUMMARY, "de");
-	      printf("  - %s [%s]\n", solvable2str(pool, s), s->repo->name);
-	      if (sum)
-                printf("    %s\n", sum);
+	      if (mainmode == MODE_INFO)
+		{
+		  printf("Name:        %s\n", solvable2str(pool, s));
+		  printf("Repo:        %s\n", s->repo->name);
+		  printf("Summary:     %s\n", solvable_lookup_str(s, SOLVABLE_SUMMARY));
+		  printf("Url:         %s\n", solvable_lookup_str(s, SOLVABLE_URL));
+		  printf("License:     %s\n", solvable_lookup_str(s, SOLVABLE_LICENSE));
+		  printf("Description:\n%s\n", solvable_lookup_str(s, SOLVABLE_DESCRIPTION));
+		  printf("\n");
+		}
+	      else
+		{
+		  const char *sum = solvable_lookup_str_lang(s, SOLVABLE_SUMMARY, "de");
+		  printf("  - %s [%s]\n", solvable2str(pool, s), s->repo->name);
+		  if (sum)
+		    printf("    %s\n", sum);
+		}
 	    }
 	}
       queue_free(&job);
@@ -1843,7 +2022,7 @@ main(int argc, char **argv)
       exit(0);
     }
 
-  if (updateall && patchmode)
+  if (mainmode == MODE_PATCH)
     {
       int pruneyou = 0;
       Map installedmap;
@@ -1855,8 +2034,6 @@ main(int argc, char **argv)
 	  MAPSET(&installedmap, p);
 
       /* install all patches */
-      updateall = 0;
-      mode = SOLVER_INSTALL;
       for (p = 1; p < pool->nsolvables; p++)
 	{
 	  const char *type;
@@ -1900,6 +2077,7 @@ main(int argc, char **argv)
     {
       if (mode == SOLVER_UPDATE)
 	{
+	  /* make update of not installed packages an install */
 	  FOR_JOB_SELECT(p, pp, job.elements[i], job.elements[i + 1])
 	    if (pool->installed && pool->solvables[p].repo == pool->installed)
 	      break;
@@ -1925,15 +2103,19 @@ rerunsolver:
 
       solv = solver_create(pool);
       solv->ignorealreadyrecommended = 1;
-      solv->updatesystem = updateall;
-      solv->dosplitprovides = updateall;
-      if (updateall && distupgrade)
+      solv->updatesystem = allpkgs && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE);
+      solv->dosplitprovides = solv->updatesystem;
+      solv->fixsystem = allpkgs && (mainmode == MODE_VERIFY);
+      if (mainmode == MODE_DISTUPGRADE)
 	{
 	  solv->distupgrade = 1;
           solv->allowdowngrade = 1;
           solv->allowarchchange = 1;
           solv->allowvendorchange = 1;
 	}
+      /* infarch check currently doesn't work with colors */
+      solv->noinfarchcheck = pool->obsoleteusescolors;
+
       // queue_push2(&job, SOLVER_DISTUPGRADE, 3);
       solver_solve(solv, &job);
       if (!solv->problems.count)

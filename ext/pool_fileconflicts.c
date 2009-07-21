@@ -214,7 +214,7 @@ findfileconflicts2_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 {
   struct cbdata *cbdata = cbdatav;
   unsigned int hx = strhash(fn);
-  char md5padded[33];
+  char md5padded[34];
 
   if (!hx)
     hx = strlen(fn) + 1;
@@ -222,9 +222,10 @@ findfileconflicts2_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
     return;
   strncpy(md5padded, md5, 32);
   md5padded[32] = 0;
+  md5padded[33] = fmode >> 24;
   // printf("%d, hx %x -> %s   %d %s\n", cbdata->idx, hx, fn, fmode, md5);
   queue_push(&cbdata->files, cbdata->filesspacen);
-  addfilesspace(cbdata, (unsigned char *)md5padded, 33);
+  addfilesspace(cbdata, (unsigned char *)md5padded, 34);
   addfilesspace(cbdata, (unsigned char *)fn, strlen(fn) + 1);
 }
 
@@ -367,6 +368,11 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
     {
       int pend, ii, jj;
       int pidx = cbdata.lookat.elements[i + 1];
+      int iterflags;
+
+      iterflags = RPM_ITERATE_FILELIST_WITHMD5;
+      if (pool->obsoleteusescolors)
+	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
       p = pkgs->elements[pidx];
       hx = cbdata.lookat.elements[i];
       if (cbdata.lookat.elements[i + 2] != hx)
@@ -380,7 +386,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       handle = (*handle_cb)(pool, p, handle_cbdata);
       if (!handle)
 	continue;
-      rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_WITHMD5, findfileconflicts2_cb, &cbdata);
+      rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
 
       pend = cbdata.files.count;
       for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j++)
@@ -393,15 +399,19 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
 	  handle = (*handle_cb)(pool, q, handle_cbdata);
 	  if (!handle)
 	    continue;
-	  rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_WITHMD5, findfileconflicts2_cb, &cbdata);
+	  rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
           for (ii = 0; ii < pend; ii++)
 	    for (jj = pend; jj < cbdata.files.count; jj++)
 	      {
-		if (strcmp((char *)cbdata.filesspace + cbdata.files.elements[ii] + 33, (char *)cbdata.filesspace + cbdata.files.elements[jj] + 33))
-		  continue;
-		if (!strcmp((char *)cbdata.filesspace + cbdata.files.elements[ii], (char *)cbdata.filesspace + cbdata.files.elements[jj]))
-		  continue;
-		queue_push(conflicts, str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii] + 33, 1));
+		char *fsi = (char *)cbdata.filesspace + cbdata.files.elements[ii];
+		char *fsj = (char *)cbdata.filesspace + cbdata.files.elements[jj];
+		if (strcmp(fsi + 34, fsj + 34))
+		  continue;	/* different file names */
+		if (!strcmp(fsi, fsj))
+		  continue;	/* md5 sum matches */
+		if (pool->obsoleteusescolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
+		  continue;	/* colors do not conflict */
+		queue_push(conflicts, str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii] + 34, 1));
 		queue_push(conflicts, p);
 		queue_push(conflicts, str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii], 1));
 		queue_push(conflicts, q);

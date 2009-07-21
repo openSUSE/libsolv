@@ -81,7 +81,9 @@ typedef struct _Solver {
   Map noobsoletes;			/* ignore obsoletes for these
 					   (multiinstall) */
 
-  Map updatemap;			/* bring those packages to the newest version */
+  Map updatemap;			/* bring those installed packages to the newest version */
+  Map fixmap;				/* fix those packages */
+
   Queue weakruleq;			/* index into 'rules' for weak ones */
   Map weakrulemap;			/* map rule# to '1' for weak rules, 1..learntrules */
 
@@ -221,6 +223,7 @@ typedef struct _Solver {
 #define SOLVER_NOOBSOLETES   		0x0500
 #define SOLVER_LOCK			0x0600
 #define SOLVER_DISTUPGRADE		0x0700
+#define SOLVER_VERIFY			0x0800
 
 #define SOLVER_JOBMASK			0xff00
 
