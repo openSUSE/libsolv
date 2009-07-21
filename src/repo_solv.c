@@ -1286,11 +1286,14 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
     }
 
   /* create stub repodata entries for all external */
-  for (key = 1 ; key < data.nkeys; key++)
-    if (data.keys[key].name == REPOSITORY_EXTERNAL && data.keys[key].type == REPOKEY_TYPE_FLEXARRAY)
-      break;
-  if (key < data.nkeys && !parent)
-    repodata_create_stubs(&data);
+  if (!(flags & SOLV_ADD_NO_STUBS) && !parent)
+    {
+      for (key = 1 ; key < data.nkeys; key++)
+	if (data.keys[key].name == REPOSITORY_EXTERNAL && data.keys[key].type == REPOKEY_TYPE_FLEXARRAY)
+	  break;
+      if (key < data.nkeys)
+	repodata_create_stubs(repo->repodata + (repo->nrepodata - 1));
+    }
 
   POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_solv took %d ms\n", sat_timems(now));
   POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);

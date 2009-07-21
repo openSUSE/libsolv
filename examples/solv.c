@@ -436,7 +436,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
 	  fclose(fp);
 	  if (!cinfo->baseurl)
 	    return 0;
-	  if (!chksumtype && mlchksumtype)
+	  if (!chksumtype && mlchksumtype && !strcmp(file, "repodata/repomd.xml"))
 	    {
 	      chksumtype = mlchksumtype;
 	      chksum = mlchksum;
@@ -454,6 +454,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
 	snprintf(url, sizeof(url), "%s/%s", baseurl, file);
     }
   fd = opentmpfile();
+  // printf("url: %s\n", url);
   if ((pid = fork()) == (pid_t)-1)
     {
       perror("fork");
@@ -807,7 +808,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 	    {
 	      /* main repo */
 	      repo_empty(repo, 1);
-	      if (repo_add_solv(repo, fp))
+	      if (repo_add_solv_flags(repo, fp, SOLV_ADD_NO_STUBS))
 		{
 		  /* oops, no way to recover from here */
 		  fprintf(stderr, "internal error\n");
@@ -1084,7 +1085,7 @@ load_stub(Pool *pool, Repodata *data, void *dp)
       printf(" loading]\n"); fflush(stdout);
       filename = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_LOCATION);
       filechksumtype = 0;
-      filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
+      filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, REPOSITORY_REPOMD_CHECKSUM, &filechksumtype);
       if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
 	return 0;
       if (!strcmp(ext, "FL"))
@@ -1241,7 +1242,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repodata_internalize(data);
 	  if (!badchecksum)
 	    writecachedrepo(repo, data, 0, cinfo->cookie);
-	  repodata_create_stubs(data);
+	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
 
         case TYPE_SUSETAGS:
@@ -1310,7 +1311,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repodata_internalize(data);
 	  if (!badchecksum)
 	    writecachedrepo(repo, data, 0, cinfo->cookie);
-	  repodata_create_stubs(data);
+	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
 	default:
 	  printf("unsupported repo '%s': skipped\n", cinfo->alias);

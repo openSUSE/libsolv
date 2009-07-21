@@ -25,6 +25,8 @@ extern "C" {
 extern int repo_add_solv(Repo *repo, FILE *fp);
 extern int repo_add_solv_flags(Repo *repo, FILE *fp, int flags);
 
+#define SOLV_ADD_NO_STUBS	(1 << 8)
+
 #ifdef __cplusplus
 }
 #endif

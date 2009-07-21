@@ -2677,10 +2677,19 @@ repodata_create_stubs(Repodata *data)
   Dataiterator di;
   Id xkeyname = 0;
   int i, cnt = 0;
+  int repodataid;
+  int datastart, dataend;
 
+  repodataid = data - repo->repodata;
+  datastart = data->start;
+  dataend = data->end;
   dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_EXTERNAL, 0, 0);
   while (dataiterator_step(&di))
-    cnt++;
+    {
+      if (di.data - repo->repodata != repodataid)
+	continue;
+      cnt++;
+    }
   dataiterator_free(&di);
   if (!cnt)
     return;
@@ -2688,11 +2697,8 @@ repodata_create_stubs(Repodata *data)
   for (i = 0; i < cnt; i++)
     {
       sdata = repo_add_repodata(repo, 0);
-      if (data->end > data->start)
-	{
-	  repodata_extend(sdata, data->start);
-	  repodata_extend(sdata, data->end - 1);
-	}
+      if (dataend > datastart)
+        repodata_extend_block(sdata, datastart, dataend - datastart);
       stubdataids[i] = sdata - repo->repodata;
       sdata->state = REPODATA_STUB;
       sdata->loadcallback = repodata_load_stub;
@@ -2702,6 +2708,8 @@ repodata_create_stubs(Repodata *data)
   sdata = 0;
   while (dataiterator_step(&di))
     {
+      if (di.data - repo->repodata != repodataid)
+	continue;
       if (di.key->name == REPOSITORY_EXTERNAL && !di.nparents)
 	{
 	  dataiterator_entersub(&di);
@@ -2729,7 +2737,7 @@ repodata_create_stubs(Repodata *data)
 	case REPOKEY_TYPE_MD5:
 	case REPOKEY_TYPE_SHA1:
 	case REPOKEY_TYPE_SHA256:
-	  repodata_set_checksum(sdata, SOLVID_META, di.key->name, di.key->type, di.kv.str);
+	  repodata_set_bin_checksum(sdata, SOLVID_META, di.key->name, di.key->type, (const unsigned char *)di.kv.str);
 	  break;
 	case REPOKEY_TYPE_IDARRAY:
 	  repodata_add_idarray(sdata, SOLVID_META, di.key->name, di.kv.id);
