@@ -1808,7 +1808,8 @@ main(int argc, char **argv)
   Id p, pp;
   struct repoinfo *repoinfos;
   int nrepoinfos = 0;
-  int i, mainmode, mode, newpkgs;
+  int mainmode = 0, mode = 0;
+  int i, newpkgs;
   Queue job, checkq;
   Solver *solv = 0;
   Transaction *trans;
