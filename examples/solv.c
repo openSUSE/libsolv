@@ -29,6 +29,11 @@
 #include <time.h>
 #include <sys/time.h>
 
+#include <sys/socket.h>
+#include <netdb.h>
+#include <poll.h>
+#include <errno.h>
+
 #include "pool.h"
 #include "poolarch.h"
 #include "repo.h"
@@ -200,7 +205,7 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	  l = strlen(buf2);
 	  if (l == 0)
 	    continue;
-	  while (buf2[l - 1] == '\n' || buf2[l - 1] == ' ' || buf2[l - 1] == '\t')
+	  while (l && (buf2[l - 1] == '\n' || buf2[l - 1] == ' ' || buf2[l - 1] == '\t'))
 	    buf2[--l] = 0;
 	  kp = buf2;
 	  while (*kp == ' ' || *kp == '\t')
@@ -350,10 +355,148 @@ verify_checksum(int fd, const char *file, const unsigned char *chksum, Id chksum
   return 1;
 }
 
+void
+findfastest(char **urls, int nurls)
+{
+  int i, j, port;
+  int *socks, qc;
+  struct pollfd *fds;
+  char *p, *p2, *q;
+  char portstr[16];
+  struct addrinfo hints, *result;;
+
+  fds = sat_calloc(nurls, sizeof(*fds));
+  socks = sat_calloc(nurls, sizeof(*socks));
+  for (i = 0; i < nurls; i++)
+    {
+      socks[i] = -1;
+      p = strchr(urls[i], '/');
+      if (!p)
+	continue;
+      if (p[1] != '/')
+	continue;
+      p += 2;
+      q = strchr(p, '/');
+      qc = 0;
+      if (q)
+	{
+	  qc = *q;
+	  *q = 0;
+	}
+      if ((p2 = strchr(p, '@')) != 0)
+	p = p2 + 1;
+      port = 80;
+      if (!strncmp("https:", urls[i], 6))
+	port = 443;
+      else if (!strncmp("ftp:", urls[i], 4))
+	port = 21;
+      if ((p2 = strrchr(p, ':')) != 0)
+	{
+	  port = atoi(p2 + 1);
+	  if (q)
+	    *q = qc;
+	  q = p2;
+	  qc = *q;
+	  *q = 0;
+	}
+      sprintf(portstr, "%d", port);
+      memset(&hints, 0, sizeof(struct addrinfo));
+      hints.ai_family = AF_UNSPEC;
+      hints.ai_socktype = SOCK_STREAM;
+      hints.ai_flags = AI_NUMERICSERV;
+      result = 0;
+      if (!getaddrinfo(p, portstr, &hints, &result))
+	{
+	  socks[i] = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+	  if (socks[i] >= 0)
+	    {
+	      fcntl(socks[i], F_SETFL, O_NONBLOCK);
+	      if (connect(socks[i], result->ai_addr, result->ai_addrlen) == -1)
+		{
+		  if (errno != EINPROGRESS)
+		    {
+		      close(socks[i]);
+		      socks[i] = -1;
+		    }
+		}
+	    }
+	  freeaddrinfo(result);
+	}
+      if (q)
+	*q = qc;
+    }
+  for (;;)
+    {
+      for (i = j = 0; i < nurls; i++)
+	{
+	  if (socks[i] < 0)
+	    continue;
+	  fds[j].fd = socks[i];
+	  fds[j].events = POLLOUT;
+	  j++;
+	}
+      if (j < 2)
+	{
+	  i = j - 1;
+	  break;
+	}
+      if (poll(fds, j, 10000) <= 0)
+	{
+	  i = -1;	/* something is wrong */
+	  break;
+	}
+      for (i = 0; i < j; i++)
+	if ((fds[i].revents & POLLOUT) != 0)
+	  {
+	    int soe = 0;
+	    socklen_t soel = sizeof(int);
+	    if (getsockopt(fds[i].fd, SOL_SOCKET, SO_ERROR, &soe, &soel) == -1 || soe != 0)
+	      {
+	        /* connect failed, kill socket */
+	        for (j = 0; j < nurls; j++)
+		  if (socks[j] == fds[i].fd)
+		    {
+		      close(socks[j]);
+		      socks[j] = -1;
+		    }
+		i = j + 1;
+		break;
+	      }
+	    break;	/* horray! */
+	  }
+      if (i == j + 1)
+	continue;
+      if (i == j)
+        i = -1;		/* something is wrong, no bit was set */
+      break;
+    }
+  /* now i contains the fastest fd index */
+  if (i >= 0)
+    {
+      for (j = 0; j < nurls; j++)
+	if (socks[j] == fds[i].fd)
+	  break;
+      if (j != 0)
+	{
+	  char *url0 = urls[0];
+	  urls[0] = urls[j];
+	  urls[j] = url0;
+	}
+    }
+  for (i = j = 0; i < nurls; i++)
+    if (socks[i] >= 0)
+      close(socks[i]);
+  free(socks);
+  free(fds);
+}
+
 char *
 findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
 {
   char buf[4096], *bp, *ep;
+  char **urls = 0;
+  int nurls = 0;
+  int i;
 
   if (chksumtypep)
     *chksumtypep = 0;
@@ -366,7 +509,7 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
 	  int i;
 
 	  bp += 20;
-	  memset(chksumtypep, 0, 32);
+	  memset(chksump, 0, 32);
 	  for (i = 0; i < 64; i++)
 	    {
 	      int c = *bp++;
@@ -395,7 +538,26 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
       *ep = 0;
       if (strncmp(bp, "http", 4))
 	continue;
-      return strdup(bp);
+      urls = sat_extend(urls, nurls, 1, sizeof(*urls), 15);
+      urls[nurls++] = strdup(bp);
+    }
+  if (nurls)
+    {
+      if (nurls > 1)
+        findfastest(urls, nurls > 5 ? 5 : nurls);
+      bp = urls[0];
+      urls[0] = 0;
+      for (i = 0; i < nurls; i++)
+        sat_free(urls[i]);
+      sat_free(urls);
+      ep = strchr(bp, '/');
+      if ((ep = strchr(ep + 2, '/')) != 0)
+	{
+	  *ep = 0;
+	  printf("[using mirror %s]\n", bp);
+	  *ep = '/';
+	}
+      return bp;
     }
   return 0;
 }
@@ -1189,6 +1351,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      cinfo->repo = 0;
 	      break;
 	    }
+printf("cinfo: %p\n", cinfo);
 	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cinfo->cookie);
 	  if (usecachedrepo(repo, 0, cinfo->cookie, 1))
 	    {
@@ -1235,7 +1398,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      fclose(fp);
 	    }
 
-	  data = repo_last_repodata(repo);
+	  data = repo_add_repodata(repo, 0);
 	  if (!repomd_add_ext(repo, data, "deltainfo"))
 	    repomd_add_ext(repo, data, "prestodelta");
 	  repomd_add_ext(repo, data, "filelists");
@@ -1306,7 +1469,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    break;	/* hopeless */
 	  repo_add_susetags(repo, fp, defvendor, 0, 0);
 	  fclose(fp);
-	  data = repo_last_repodata(repo);
+	  data = repo_add_repodata(repo, 0);
 	  susetags_add_ext(repo, data);
 	  repodata_internalize(data);
 	  if (!badchecksum)
@@ -1673,7 +1836,7 @@ struct fcstate {
 };
 
 static void *
-fc_cb(Pool *pool, Id p, void *cbdata)
+fileconflict_cb(Pool *pool, Id p, void *cbdata)
 {
   struct fcstate *fcstate = cbdata;
   Solvable *s;
@@ -2251,7 +2414,8 @@ rerunsolver:
 	  if (pool->installed && pool->installed->nsolvables)
 	    {
 	      /* try a delta first */
-	      dataiterator_init(&di, pool, s->repo, SOLVID_META, DELTA_PACKAGE_NAME, id2str(pool, s->name), SEARCH_STRING);
+	      char *matchname = strdup(id2str(pool, s->name));
+	      dataiterator_init(&di, pool, s->repo, SOLVID_META, DELTA_PACKAGE_NAME, matchname, SEARCH_STRING);
 	      dataiterator_prepend_keyname(&di, REPOSITORY_DELTAINFO);
 	      while (dataiterator_step(&di))
 		{
@@ -2285,7 +2449,12 @@ rerunsolver:
 		      seqnum = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NUM);
 		      seq = pool_tmpjoin(pool, seqname, "-", seqevr);
 		      seq = pool_tmpjoin(pool, seq, "-", seqnum);
-		      if (system(pool_tmpjoin(pool, "/usr/bin/applydeltarpm -c -s ", seq, 0)) != 0)
+#ifdef FEDORA
+		      sprintf(cmd, "/usr/bin/applydeltarpm -a %s -c -s ", id2str(pool, s->arch));
+#else
+		      sprintf(cmd, "/usr/bin/applydeltarpm -c -s ");
+#endif
+		      if (system(pool_tmpjoin(pool, cmd, seq, 0)) != 0)
 			continue;	/* didn't match */
 		      /* looks good, download delta */
 		      chksumtype = 0;
@@ -2300,7 +2469,11 @@ rerunsolver:
 			continue;
 		      /* got it, now reconstruct */
 		      newfd = opentmpfile();
+#ifdef FEDORA
+		      sprintf(cmd, "applydeltarpm -a %s /dev/fd/%d /dev/fd/%d", id2str(pool, s->arch), fileno(fp), newfd);
+#else
 		      sprintf(cmd, "applydeltarpm /dev/fd/%d /dev/fd/%d", fileno(fp), newfd);
+#endif
 		      fcntl(fileno(fp), F_SETFD, 0);
 		      if (system(cmd))
 			{
@@ -2323,6 +2496,7 @@ rerunsolver:
 		    }
 		}
 	      dataiterator_free(&di);
+	      sat_free(matchname);
 	    }
 	  
 	  if (newpkgsfps[i])
@@ -2359,7 +2533,7 @@ rerunsolver:
       fcstate.newpkgscnt = newpkgs;
       fcstate.checkq = &checkq;
       fcstate.newpkgsfps = newpkgsfps;
-      pool_findfileconflicts(pool, &checkq, newpkgs, &conflicts, &fc_cb, &fcstate);
+      pool_findfileconflicts(pool, &checkq, newpkgs, &conflicts, &fileconflict_cb, &fcstate);
       if (conflicts.count)
 	{
 	  printf("\n");

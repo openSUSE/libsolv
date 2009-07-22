@@ -1036,7 +1036,9 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
   struct searchfiles sf, isf, *isfp;
   struct addfileprovides_cbdata cbd;
   int i;
+  unsigned int now;
 
+  now = sat_timems(0);
   memset(&sf, 0, sizeof(sf));
   map_init(&sf.seen, pool->ss.nstrings + pool->nrels);
   memset(&isf, 0, sizeof(isf));
@@ -1065,8 +1067,7 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
     }
   map_free(&sf.seen);
   map_free(&isf.seen);
-  POOL_DEBUG(SAT_DEBUG_STATS, "found %d file dependencies\n", sf.nfiles);
-  POOL_DEBUG(SAT_DEBUG_STATS, "found %d installed file dependencies\n", isf.nfiles);
+  POOL_DEBUG(SAT_DEBUG_STATS, "found %d file dependencies, %d installed file dependencies\n", sf.nfiles, isf.nfiles);
   cbd.dids = 0;
   map_init(&cbd.useddirs, 1);
   if (idp)
@@ -1114,6 +1115,7 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
   map_free(&cbd.useddirs);
   sat_free(cbd.dids);
   pool_freewhatprovides(pool);	/* as we have added provides */
+  POOL_DEBUG(SAT_DEBUG_STATS, "addfileprovides took %d ms\n", sat_timems(now));
 }
 
 void
