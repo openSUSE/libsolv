@@ -41,6 +41,7 @@ Summary:        A new approach to package dependency solving
 %if 0%{?fedora_version}
 %{!?py_sitedir: %define py_sitedir %(%__python -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
 %{!?py_requires: %define py_requires Requires: python}
+%{!?ruby_sitearch: %global ruby_sitearch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"] ')}
 %endif
 
 %description
@@ -203,6 +204,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %endif
 %if 0%{?mandriva_version}
 %{ruby_sitearchdir}/satsolver.so
+%endif
+%if 0%{?fedora_version}
+%{ruby_sitearch}/satsolver.so
 %endif
 %doc bindings/ruby/html
 
