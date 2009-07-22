@@ -537,7 +537,7 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
       sat_free(fsz);
       return;
     }
-  /* stupid rpm recodrs sizes of directories, so we have to check the mode */
+  /* stupid rpm records sizes of directories, so we have to check the mode */
   fm = headint16array(rpmhead, TAG_FILEMODES, &fszc);
   if (!fm || fc != fszc)
     {
@@ -623,11 +623,11 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
   fkb = sat_calloc(dic, sizeof(unsigned int));
   for (i = 0; i < fc; i++)
     {
-      if (fsz[i] == 0 || !S_ISREG(fm[i]))
-	continue;
       if (di[i] >= dic)
 	continue;
       fn[di[i]]++;
+      if (fsz[i] == 0 || !S_ISREG(fm[i]))
+	continue;
       fkb[di[i]] += fsz[i] / 1024 + 1;
     }
   sat_free(fsz);
