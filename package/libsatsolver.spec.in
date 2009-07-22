@@ -14,7 +14,7 @@ BuildRequires:  doxygen
 BuildRequires:  libneon0.26-devel
 %endif
 %if 0%{?fedora_version}
-BuildRequires:  perl-devel db4-devel
+BuildRequires:  perl-devel db4-devel ruby ruby-rdoc
 %endif
 %if 0%{?suse_version}
 %if 0%{?suse_version} < 1030
