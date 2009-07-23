@@ -283,8 +283,7 @@ pool_shrink_rels(Pool *pool)
 void
 pool_freeidhashes(Pool *pool)
 {
-  pool->ss.stringhashtbl = sat_free(pool->ss.stringhashtbl);
-  pool->ss.stringhashmask = 0;
+  stringpool_freehash(&pool->ss);
   pool->relhashtbl = sat_free(pool->relhashtbl);
   pool->relhashmask = 0;
 }

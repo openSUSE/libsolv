@@ -47,6 +47,13 @@ stringpool_free(Stringpool *ss)
 }
 
 void
+stringpool_freehash(Stringpool *ss)
+{
+  ss->stringhashtbl = sat_free(ss->stringhashtbl);
+  ss->stringhashmask = 0;
+}
+
+void
 stringpool_init_empty(Stringpool *ss)
 {
   const char *emptystrs[] = {
@@ -70,27 +77,25 @@ stringpool_clone(Stringpool *ss, Stringpool *from)
 }
 
 Id
-stringpool_strn2id(Stringpool *ss, const char *str, unsigned len, int create)
+stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create)
 {
   Hashval h;
   unsigned int hh;
   Hashmask hashmask;
-  int i, space_needed;
+  int i;
   Id id;
   Hashtable hashtbl;
 
   // check string
   if (!str)
     return STRID_NULL;
-  if (!*str)
+  if (!len)
     return STRID_EMPTY;
 
   hashmask = ss->stringhashmask;
   hashtbl = ss->stringhashtbl;
 
   // expand hashtable if needed
-  //
-  //
   if (ss->nstrings * 2 > hashmask)
     {
       sat_free(hashtbl);
@@ -111,7 +116,6 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned len, int create)
     }
 
   // compute hash and check for match
-
   h = strnhash(str, len) & hashmask;
   hh = HASHCHAIN_START;
   while ((id = hashtbl[h]) != 0)  // follow hash overflow chain
@@ -130,20 +134,13 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned len, int create)
   hashtbl[h] = id;
 
   ss->strings = sat_extend(ss->strings, id, 1, sizeof(Offset), STRING_BLOCK);
-  // 'pointer' into stringspace is Offset of next free pos: sstrings
-  ss->strings[id] = ss->sstrings;
+  ss->strings[id] = ss->sstrings;	/* we will append to the end */
 
-  space_needed = len + 1;
-  // make room in string buffer
-  ss->stringspace = sat_extend(ss->stringspace, ss->sstrings, space_needed, 1, STRINGSPACE_BLOCK);
-  // copy new string into buffer
-  memcpy(ss->stringspace + ss->sstrings, str, space_needed - 1);
-  // add the sentinel, we can't rely on it being in the source string (in
-  // case the LEN is not really strlen(str))
-  ss->stringspace[ss->sstrings + space_needed - 1] = 0;
-  // next free pos is behind new string
-  ss->sstrings += space_needed;
-
+  // append string to stringspace
+  ss->stringspace = sat_extend(ss->stringspace, ss->sstrings, len + 1, 1, STRINGSPACE_BLOCK);
+  memcpy(ss->stringspace + ss->sstrings, str, len);
+  ss->stringspace[ss->sstrings + len] = 0;
+  ss->sstrings += len + 1;
   return id;
 }
 
@@ -154,8 +151,7 @@ stringpool_str2id(Stringpool *ss, const char *str, int create)
     return STRID_NULL;
   if (!*str)
     return STRID_EMPTY;
-  unsigned len = strlen(str);
-  return stringpool_strn2id(ss, str, len, create);
+  return stringpool_strn2id(ss, str, (unsigned int)strlen(str), create);
 }
 
 void

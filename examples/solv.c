@@ -2277,6 +2277,9 @@ rerunsolver:
           solv->allowarchchange = 1;
           solv->allowvendorchange = 1;
 	}
+      if (mainmode == MODE_ERASE)
+	solv->allowuninstall = 1;	/* don't nag */
+
       // queue_push2(&job, SOLVER_DISTUPGRADE, 3);
       solver_solve(solv, &job);
       if (!solv->problems.count)
@@ -2343,7 +2346,7 @@ rerunsolver:
   printf("Transaction summary:\n\n");
   solver_printtransaction(solv);
 
-#if 1
+#ifndef FEDORA
   if (1)
     {
       DUChanges duc[4];
@@ -2355,10 +2358,11 @@ rerunsolver:
       duc[3].path = "/etc";
       transaction_calc_duchanges(trans, duc, 4);
       for (i = 0; i < 4; i++)
-        printf("duchanges %s: %d K  %d\n", duc[i].path, duc[i].kbytes, duc[i].files);
-      printf("install size change: %d K\n", transaction_calc_installsizechange(trans));
+        printf("duchanges %s: %d K  %d inodes\n", duc[i].path, duc[i].kbytes, duc[i].files);
     }
 #endif
+  printf("install size change: %d K\n", transaction_calc_installsizechange(trans));
+  printf("\n");
 
   if (!yesno("OK to continue (y/n)? "))
     {
@@ -2372,7 +2376,16 @@ rerunsolver:
 
   if (newpkgs)
     {
-      printf("Downloading %d packages\n", newpkgs);
+      int downloadsize = 0;
+      for (i = 0; i < newpkgs; i++)
+	{
+	  Solvable *s;
+
+	  p = checkq.elements[i];
+	  s = pool_id2solvable(pool, p);
+	  downloadsize += solvable_lookup_num(s, SOLVABLE_DOWNLOADSIZE, 0);
+	}
+      printf("Downloading %d packages, %d K\n", newpkgs, downloadsize);
       newpkgsfps = sat_calloc(newpkgs, sizeof(*newpkgsfps));
       for (i = 0; i < newpkgs; i++)
 	{
