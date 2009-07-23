@@ -424,28 +424,28 @@ solver_printtransaction(Solver *solv)
       switch(class)
 	{
 	case SOLVER_TRANSACTION_ERASE:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "erased packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d erased packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "installed packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d installed packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_REINSTALLED:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "reinstalled packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d reinstalled packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_DOWNGRADED:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "downgraded packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d downgraded packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_CHANGED:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "changed packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d changed packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_UPGRADED:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "upgraded packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d upgraded packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_VENDORCHANGE:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "vendor change from '%s' to '%s' (%d):\n", id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]), cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d vendor changes from '%s' to '%s':\n", cnt, id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]));
 	  break;
 	case SOLVER_TRANSACTION_ARCHCHANGE:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "arch change from %s to %s (%d):\n", id2str(pool, classes.elements[i + 2]), id2str(pool, classes.elements[i + 3]), cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d arch changes from %s to %s:\n", cnt, id2str(pool, classes.elements[i + 2]), id2str(pool, classes.elements[i + 3]));
 	  break;
 	default:
 	  class = SOLVER_TRANSACTION_IGNORE;

@@ -2783,7 +2783,16 @@ solver_solve(Solver *solv, Queue *job)
 
   /* now create infarch and dup rules */
   if (!solv->noinfarchcheck)
-    solver_addinfarchrules(solv, &addedmap);
+    {
+      solver_addinfarchrules(solv, &addedmap);
+      if (pool->obsoleteusescolors)
+	{
+	  /* currently doesn't work well with infarch rules, so make
+           * them weak */
+	  for (i = solv->infarchrules; i < solv->infarchrules_end; i++)
+	    queue_push(&solv->weakruleq, i);
+	}
+    }
   else
     solv->infarchrules = solv->infarchrules_end = solv->nrules;
 

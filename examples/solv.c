@@ -1351,7 +1351,6 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      cinfo->repo = 0;
 	      break;
 	    }
-printf("cinfo: %p\n", cinfo);
 	  calc_checksum_fp(fp, REPOKEY_TYPE_SHA256, cinfo->cookie);
 	  if (usecachedrepo(repo, 0, cinfo->cookie, 1))
 	    {
@@ -2278,9 +2277,6 @@ rerunsolver:
           solv->allowarchchange = 1;
           solv->allowvendorchange = 1;
 	}
-      /* infarch check currently doesn't work with colors */
-      solv->noinfarchcheck = pool->obsoleteusescolors;
-
       // queue_push2(&job, SOLVER_DISTUPGRADE, 3);
       solver_solve(solv, &job);
       if (!solv->problems.count)
