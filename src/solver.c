@@ -2804,6 +2804,11 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->duprules = solv->duprules_end = solv->nrules;
 
+  if (1)
+    {
+      extern void addchoicerules(Solver *solv);
+      addchoicerules(solv);
+    }
 
   /* all rules created
    * --------------------------------------------------------------
@@ -2815,7 +2820,7 @@ solver_solve(Solver *solv, Queue *job)
   map_free(&installcandidatemap);
   queue_free(&q);
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "%d rpm rules, %d job rules, %d infarch rules, %d dup rules\n", solv->rpmrules_end - 1, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules);
+  POOL_DEBUG(SAT_DEBUG_STATS, "%d rpm rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules\n", solv->rpmrules_end - 1, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules);
 
   /* create weak map */
   map_init(&solv->weakrulemap, solv->nrules);

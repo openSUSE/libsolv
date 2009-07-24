@@ -136,6 +136,8 @@ solver_printruleelement(Solver *solv, int type, Rule *r, Id v)
       s = pool->solvables + v;
       POOL_DEBUG(type, "    %s [%d]", solvable2str(pool, s), v);
     }
+  if (pool->installed && s->repo == pool->installed)
+    POOL_DEBUG(type, "I");
   if (r)
     {
       if (r->w1 == v)
@@ -203,6 +205,8 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
       POOL_DEBUG(type, "WEAK ");
   if (p >= solv->learntrules)
     POOL_DEBUG(type, "LEARNT ");
+  else if (p >= solv->choicerules && p < solv->choicerules_end)
+    POOL_DEBUG(type, "CHOICE ");
   else if (p >= solv->infarchrules && p < solv->infarchrules_end)
     POOL_DEBUG(type, "INFARCH ");
   else if (p >= solv->duprules && p < solv->duprules_end)
@@ -561,6 +565,7 @@ solver_printprobleminfo(Solver *solv, Id problem)
     case SOLVER_RULE_UNKNOWN:
     case SOLVER_RULE_FEATURE:
     case SOLVER_RULE_LEARNT:
+    case SOLVER_RULE_CHOICE:
       POOL_DEBUG(SAT_DEBUG_RESULT, "bad rule type\n");
       return;
     }

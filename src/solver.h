@@ -74,6 +74,9 @@ typedef struct _Solver {
   Id duprules;				/* dist upgrade rules */
   Id duprules_end;
     
+  Id choicerules;			/* choice rules (always weak) */
+  Id choicerules_end;
+
   Id learntrules;			/* learnt rules, (end == nrules) */
 
   Map noupdate;				/* don't try to update these

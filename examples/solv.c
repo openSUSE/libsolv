@@ -62,6 +62,7 @@
 #else
 # define REPOINFO_PATH "/etc/zypp/repos.d"
 # define PRODUCTS_PATH "/etc/products.d"
+# define SOFTLOCKS_PATH "/var/lib/zypp/SoftLocks"
 #endif
 
 #define SOLVCACHE_PATH "/var/cache/solv"
@@ -1932,6 +1933,49 @@ nscallback(Pool *pool, void *data, Id name, Id evr)
   return 0;
 }
 
+#ifdef SOFTLOCKS_PATH
+
+void
+addsoftlocks(Pool *pool, Queue *job)
+{
+  FILE *fp;
+  Id type, id, p, pp;
+  char *bp, *ep, buf[4096];
+
+  if ((fp = fopen(SOFTLOCKS_PATH, "r")) == 0)
+    return;
+  while((bp = fgets(buf, sizeof(buf), fp)) != 0)
+    {
+      while (*bp == ' ' || *bp == '\t')
+	bp++;
+      if (!*bp || *bp == '#')
+	continue;
+      for (ep = bp; *ep; ep++)
+	if (*ep == ' ' || *ep == '\t' || *ep == '\n')
+	  break;
+      *ep = 0;
+      type = SOLVER_SOLVABLE_NAME;
+      if (!strncmp(bp, "provides:", 9) && bp[9])
+	{
+	  type = SOLVER_SOLVABLE_PROVIDES;
+	  bp += 9;
+	}
+      id = str2id(pool, bp, 1);
+      if (pool->installed)
+	{
+	  FOR_JOB_SELECT(p, pp, type, id)
+	    if (pool->solvables[p].repo == pool->installed)
+	      break;
+	  if (p)
+	    continue;	/* ignore, as it is already installed */
+	}
+      queue_push2(job, SOLVER_LOCK|SOLVER_WEAK|type, id);
+    }
+  fclose(fp);
+}
+
+#endif
+
 #define MODE_LIST        0
 #define MODE_INSTALL     1
 #define MODE_ERASE       2
@@ -2258,6 +2302,10 @@ main(int argc, char **argv)
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae", 1));
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae-base", 1));
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae-extra", 1));
+
+#ifdef SOFTLOCKS_PATH
+  addsoftlocks(pool, &job);
+#endif
 
 rerunsolver:
   for (;;)

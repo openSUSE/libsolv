@@ -1760,11 +1760,141 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*depp = pool->solvables[-r->p].name;
       return SOLVER_RULE_INFARCH;
     }
+  if (rid >= solv->choicerules && rid < solv->choicerules_end)
+    {
+      return SOLVER_RULE_CHOICE;
+    }
   if (rid >= solv->learntrules)
     {
       return SOLVER_RULE_LEARNT;
     }
   return SOLVER_RULE_UNKNOWN;
+}
+
+void
+addchoicerules(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  Queue q;
+  int i, rid, havechoice;
+  Id p, d, *pp;
+  Id p2, pp2;
+  Solvable *s, *s2;
+
+  solv->choicerules = solv->nrules;
+  if (!pool->installed)
+    {
+      solv->choicerules_end = solv->nrules;
+      return;
+    }
+  queue_init(&q);
+  for (rid = 1; rid < solv->rpmrules_end ; rid++)
+    {
+      r = solv->rules + rid;
+      if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 < 0))
+	continue;	/* only look at requires rules */
+      // solver_printrule(solv, SAT_DEBUG_RESULT, r);
+      queue_empty(&q);
+      havechoice = 0;
+      FOR_RULELITERALS(p, pp, r)
+	{
+	  if (p < 0)
+	    continue;
+	  s = pool->solvables + p;
+	  if (!s->repo)
+	    continue;
+	  if (s->repo == pool->installed)
+	    {
+	      queue_push(&q, p);
+	      continue;
+	    }
+	  /* check if this package is "blocked" by a installed package */
+	  s2 = 0;
+	  FOR_PROVIDES(p2, pp2, s->name)
+	    {
+	      s2 = pool->solvables + p2;
+	      if (s2->repo != pool->installed)
+		continue;
+	      if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
+	        continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+	        continue;
+	      break;
+	    }
+	  if (p2)
+	    {
+	      /* found one */
+	      if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
+		continue;
+	      if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
+		continue;
+	      queue_push(&q, p);
+	      continue;
+	    }
+	  if (s->obsoletes)
+	    {
+	      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+	      s2 = 0;
+	      while ((obs = *obsp++) != 0)
+		{
+		  FOR_PROVIDES(p2, pp2, obs)
+		    {
+		      s2 = pool->solvables + p2;
+		      if (s2->repo != pool->installed)
+			continue;
+		      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+			continue;
+		      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+			continue;
+		      break;
+		    }
+		  if (p2)
+		    break;
+		}
+	      if (obs)
+		{
+		  /* found one */
+		  if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
+		    continue;
+		  if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
+		    continue;
+		  queue_push(&q, p);
+		  continue;
+		}
+	    }
+	  /* this package is independent if the installed ones */
+	  havechoice = 1;
+	}
+      if (!havechoice || !q.count)
+	continue;	/* no choice */
+      for (i = 0; i < q.count; i++)
+	{
+	  int j;
+	  s = pool->solvables + q.elements[i];
+	  if (s->repo == pool->installed)
+	    continue;
+	  for (j = 0; j < q.count; j++)
+	    {
+	      if (i == j)
+		continue;
+	      s2 = pool->solvables + q.elements[j];
+	      if (s2->repo != pool->installed)
+		continue;
+	      if (solvable_identical(s, s2))
+		break;
+	    }
+	  if (j == q.count)
+	    break;
+	}
+      if (i == q.count)
+	continue;	/* only (identical to) installed packages */
+      d = q.count ? pool_queuetowhatprovides(pool, &q) : 0;
+      solver_addrule(solv, r->p, d);
+      queue_push(&solv->weakruleq, solv->nrules - 1);
+    }
+  queue_free(&q);
+  solv->choicerules_end = solv->nrules;
 }
 
 /* EOF */
