@@ -1777,7 +1777,7 @@ addchoicerules(Solver *solv)
   Pool *pool = solv->pool;
   Rule *r;
   Queue q;
-  int i, rid, havechoice;
+  int rid, havechoice;
   Id p, d, *pp;
   Id p2, pp2;
   Solvable *s, *s2;
@@ -1868,30 +1868,10 @@ addchoicerules(Solver *solv)
 	}
       if (!havechoice || !q.count)
 	continue;	/* no choice */
-      for (i = 0; i < q.count; i++)
-	{
-	  int j;
-	  s = pool->solvables + q.elements[i];
-	  if (s->repo == pool->installed)
-	    continue;
-	  for (j = 0; j < q.count; j++)
-	    {
-	      if (i == j)
-		continue;
-	      s2 = pool->solvables + q.elements[j];
-	      if (s2->repo != pool->installed)
-		continue;
-	      if (solvable_identical(s, s2))
-		break;
-	    }
-	  if (j == q.count)
-	    break;
-	}
-      if (i == q.count)
-	continue;	/* only (identical to) installed packages */
       d = q.count ? pool_queuetowhatprovides(pool, &q) : 0;
       solver_addrule(solv, r->p, d);
       queue_push(&solv->weakruleq, solv->nrules - 1);
+      /* solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + solv->nrules - 1); */
     }
   queue_free(&q);
   solv->choicerules_end = solv->nrules;
