@@ -76,6 +76,7 @@ typedef struct _Solver {
     
   Id choicerules;			/* choice rules (always weak) */
   Id choicerules_end;
+  Id *choicerules_ref;
 
   Id learntrules;			/* learnt rules, (end == nrules) */
 

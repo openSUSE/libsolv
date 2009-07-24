@@ -975,6 +975,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   if (lastweak)
     {
       Id v;
+      extern void disablechoicerules(Solver *solv, Rule *r);
       /* disable last weak rule */
       solv->problems.count = oldproblemcount;
       solv->learnt_pool.count = oldlearntpoolcount;
@@ -984,6 +985,8 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
         v = lastweak;
       POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "disabling ");
       solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, solv->rules + lastweak);
+      if (lastweak >= solv->choicerules && lastweak < solv->choicerules_end)
+	disablechoicerules(solv, solv->rules + lastweak);
       solver_disableproblem(solv, v);
       if (v < 0)
 	solver_reenablepolicyrules(solv, -(v + 1));
@@ -1299,6 +1302,7 @@ solver_free(Solver *solv)
   sat_free(solv->obsoletes);
   sat_free(solv->obsoletes_data);
   sat_free(solv->multiversionupdaters);
+  sat_free(solv->choicerules_ref);
   sat_free(solv);
 }
 
@@ -1324,6 +1328,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   Pool *pool = solv->pool;
   Id p, *dp;
   int minimizationsteps;
+  int installedpos = solv->installed ? solv->installed->start : 0;
 
   IF_POOLDEBUG (SAT_DEBUG_RULE_CREATION)
     {
@@ -1340,7 +1345,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   /* start SAT algorithm */
   level = 1;
   systemlevel = level + 1;
-  POOL_DEBUG(SAT_DEBUG_STATS, "solving...\n");
+  POOL_DEBUG(SAT_DEBUG_SOLVER, "solving...\n");
 
   queue_init(&dq);
   queue_init(&dqs);
@@ -1362,7 +1367,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * propagate
        */
-
       if (level == 1)
 	{
 	  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "propagating (propagate_index: %d;  size decisionq: %d)...\n", solv->propagate_index, solv->decisionq.count);
@@ -1441,20 +1445,29 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  Repo *installed = solv->installed;
 	  int pass;
 
+	  POOL_DEBUG(SAT_DEBUG_SOLVER, "resolving installed packages\n");
 	  /* we use two passes if we need to update packages 
            * to create a better user experience */
 	  for (pass = solv->updatemap.size ? 0 : 1; pass < 2; pass++)
 	    {
-	      FOR_REPO_SOLVABLES(installed, i, s)
+	      int passlevel = level;
+	      /* start with installedpos, the position that gave us problems last time */
+	      for (i = installedpos, n = installed->start; n < installed->end; i++, n++)
 		{
 		  Rule *rr;
 		  Id d;
 
+		  if (i == installed->end)
+		    i = installed->start;
+		  s = pool->solvables + i;
+		  if (s->repo != installed)
+		    continue;
+
+		  if (solv->decisionmap[i] > 0)
+		    continue;
 		  /* XXX: noupdate check is probably no longer needed, as all jobs should
                    * already be satisfied */
 		  if (MAPTST(&solv->noupdate, i - installed->start))
-		    continue;
-		  if (solv->decisionmap[i] > 0)
 		    continue;
 		  if (!pass && solv->updatemap.size && !MAPTST(&solv->updatemap, i - installed->start))
 		    continue;		/* updates first */
@@ -1517,7 +1530,15 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			  return;
 			}
 		      if (level <= olevel)
-			break;
+			{
+			  if (level < passlevel)
+			    break;	/* trouble */
+			  if (level < olevel)
+			    n = installed->start;	/* redo all */
+			  i--;
+			  n--;
+			  continue;
+			}
 		    }
 		  /* if still undecided keep package */
 		  if (solv->decisionmap[i] == 0)
@@ -1532,11 +1553,23 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			  return;
 			}
 		      if (level <= olevel)
-			break;
+			{
+			  if (level < passlevel)
+			    break;	/* trouble */
+			  if (level < olevel)
+			    n = installed->start;	/* redo all */
+			  i--;
+			  n--;
+			  continue; /* retry with learnt rule */
+			}
 		    }
 		}
-	      if (i < installed->end)
-		break;
+	      if (n < installed->end)
+		{
+		  installedpos = i;	/* retry problem solvable next time */
+		  break;		/* ran into trouble */
+		}
+	      installedpos = installed->start;	/* reset installedpos */
 	    }
 	  systemlevel = level + 1;
 	  if (pass < 2)
@@ -1551,10 +1584,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
        */
 
       POOL_DEBUG(SAT_DEBUG_POLICY, "deciding unresolved rules\n");
-      for (i = 1, n = 1; ; i++, n++)
+      for (i = 1, n = 1; n < solv->nrules; i++, n++)
 	{
-	  if (n == solv->nrules)
-	    break;
 	  if (i == solv->nrules)
 	    i = 1;
 	  r = solv->rules + i;
@@ -2005,6 +2036,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   POOL_DEBUG(SAT_DEBUG_STATS, "done solving.\n\n");
   queue_free(&dq);
   queue_free(&dqs);
+#if 0
+  solver_printdecisionq(solv, SAT_DEBUG_RESULT);
+#endif
 }
 
 

@@ -203,7 +203,7 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
   if (p < solv->learntrules)
     if (MAPTST(&solv->weakrulemap, p))
       POOL_DEBUG(type, "WEAK ");
-  if (p >= solv->learntrules)
+  if (solv->learntrules && p >= solv->learntrules)
     POOL_DEBUG(type, "LEARNT ");
   else if (p >= solv->choicerules && p < solv->choicerules_end)
     POOL_DEBUG(type, "CHOICE ");
@@ -254,6 +254,37 @@ solver_printwatches(Solver *solv, int type)
   POOL_DEBUG(type, "Watches: \n");
   for (counter = -(pool->nsolvables - 1); counter < pool->nsolvables; counter++)
     POOL_DEBUG(type, "    solvable [%d] -- rule [%d]\n", counter, solv->watches[counter + pool->nsolvables]);
+}
+
+void
+solver_printdecisionq(Solver *solv, int type)
+{
+  Pool *pool = solv->pool;
+  int i;
+  Id p, why;
+
+  POOL_DEBUG(type, "Decisions:\n");
+  for (i = 0; i < solv->decisionq.count; i++)
+    {
+      p = solv->decisionq.elements[i];
+      if (p > 0)
+        POOL_DEBUG(type, "%d %d install  %s, ", i, solv->decisionmap[p], solvid2str(pool, p));
+      else
+        POOL_DEBUG(type, "%d %d conflict %s, ", i, -solv->decisionmap[-p], solvid2str(pool, -p));
+      why = solv->decisionq_why.elements[i];
+      if (why > 0)
+	{
+	  POOL_DEBUG(type, "forced by ");
+	  solver_printruleclass(solv, type, solv->rules + why);
+	}
+      else if (why < 0)
+	{
+	  POOL_DEBUG(type, "chosen from ");
+	  solver_printruleclass(solv, type, solv->rules - why);
+	}
+      else
+        POOL_DEBUG(type, "picked for some unknown reason.\n");
+    }
 }
 
 /*

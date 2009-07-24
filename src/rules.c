@@ -1788,6 +1788,7 @@ addchoicerules(Solver *solv)
       solv->choicerules_end = solv->nrules;
       return;
     }
+  solv->choicerules_ref = sat_calloc(solv->rpmrules_end, sizeof(Id));
   queue_init(&q);
   for (rid = 1; rid < solv->rpmrules_end ; rid++)
     {
@@ -1871,10 +1872,46 @@ addchoicerules(Solver *solv)
       d = q.count ? pool_queuetowhatprovides(pool, &q) : 0;
       solver_addrule(solv, r->p, d);
       queue_push(&solv->weakruleq, solv->nrules - 1);
-      /* solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + solv->nrules - 1); */
+      solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
+#if 0
+      printf("OLD ");
+      solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + rid);
+      printf("WEAK CHOICE ");
+      solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + solv->nrules - 1);
+#endif
     }
   queue_free(&q);
   solv->choicerules_end = solv->nrules;
+}
+
+void
+disablechoicerules(Solver *solv, Rule *r)
+{
+  Id rid, p, *pp;
+  Pool *pool = solv->pool;
+  Map m;
+  Rule *or;
+
+  or = solv->rules + solv->choicerules_ref[(r - solv->rules) - solv->choicerules];
+  map_init(&m, pool->nsolvables);
+  FOR_RULELITERALS(p, pp, or)
+    if (p > 0)
+      MAPSET(&m, p);
+  FOR_RULELITERALS(p, pp, r)
+    if (p > 0)
+      MAPCLR(&m, p);
+  for (rid = solv->choicerules; rid < solv->choicerules_end; rid++)
+    {
+      r = solv->rules + rid;
+      if (r->d < 0)
+	continue;
+      or = solv->rules + solv->choicerules_ref[(r - solv->rules) - solv->choicerules];
+      FOR_RULELITERALS(p, pp, or)
+        if (p > 0 && MAPTST(&m, p))
+	  break;
+      if (p)
+	solver_disablerule(solv, r);
+    }
 }
 
 /* EOF */
