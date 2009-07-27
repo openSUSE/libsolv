@@ -2001,6 +2001,7 @@ usage(int r)
   fprintf(stderr, "    repos:       list enabled repositories\n");
   fprintf(stderr, "    search:      search name/summary/description\n");
   fprintf(stderr, "    update:      update installed packages\n");
+  fprintf(stderr, "    verify:      check dependencies of installed packages\n");
   fprintf(stderr, "\n");
   exit(r);
 }

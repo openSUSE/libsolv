@@ -1775,9 +1775,10 @@ void
 addchoicerules(Solver *solv)
 {
   Pool *pool = solv->pool;
+  Map m;
   Rule *r;
-  Queue q;
-  int rid, havechoice;
+  Queue q, qi;
+  int i, j, rid, havechoice;
   Id p, d, *pp;
   Id p2, pp2;
   Solvable *s, *s2;
@@ -1790,6 +1791,8 @@ addchoicerules(Solver *solv)
     }
   solv->choicerules_ref = sat_calloc(solv->rpmrules_end, sizeof(Id));
   queue_init(&q);
+  queue_init(&qi);
+  map_init(&m, pool->nsolvables);
   for (rid = 1; rid < solv->rpmrules_end ; rid++)
     {
       r = solv->rules + rid;
@@ -1797,6 +1800,7 @@ addchoicerules(Solver *solv)
 	continue;	/* only look at requires rules */
       // solver_printrule(solv, SAT_DEBUG_RESULT, r);
       queue_empty(&q);
+      queue_empty(&qi);
       havechoice = 0;
       FOR_RULELITERALS(p, pp, r)
 	{
@@ -1825,11 +1829,12 @@ addchoicerules(Solver *solv)
 	    }
 	  if (p2)
 	    {
-	      /* found one */
+	      /* found installed package */
 	      if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
 		continue;
 	      if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
 		continue;
+	      queue_push(&qi, p2);
 	      queue_push(&q, p);
 	      continue;
 	    }
@@ -1860,6 +1865,7 @@ addchoicerules(Solver *solv)
 		    continue;
 		  if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
 		    continue;
+		  queue_push(&qi, p2);
 		  queue_push(&q, p);
 		  continue;
 		}
@@ -1869,6 +1875,40 @@ addchoicerules(Solver *solv)
 	}
       if (!havechoice || !q.count)
 	continue;	/* no choice */
+
+      /* now check the update rules of the installed package.
+       * if all packages of the update rules are contained in
+       * the dependency rules, there's no need to set up the choice rule */
+      map_empty(&m);
+      FOR_RULELITERALS(p, pp, r)
+        if (p > 0)
+	  MAPSET(&m, p);
+      for (i = 0; i < qi.count; i++)
+	{
+	  if (!qi.elements[i])
+	    continue;
+	  Rule *ur = solv->rules + solv->updaterules + (qi.elements[i] - pool->installed->start);
+	  if (!ur->p)
+	    ur = solv->rules + solv->featurerules + (qi.elements[i] - pool->installed->start);
+	  if (!ur->p)
+	    continue;
+	  FOR_RULELITERALS(p, pp, ur)
+	    if (!MAPTST(&m, p))
+	      break;
+	  if (p)
+	    break;
+	  for (j = i + 1; j < qi.count; j++)
+	    if (qi.elements[i] == qi.elements[j])
+	      qi.elements[j] = 0;
+	}
+      if (i == qi.count)
+	{
+#if 0
+	  printf("skipping choice ");
+	  solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + rid);
+#endif
+	  continue;
+	}
       d = q.count ? pool_queuetowhatprovides(pool, &q) : 0;
       solver_addrule(solv, r->p, d);
       queue_push(&solv->weakruleq, solv->nrules - 1);
@@ -1881,9 +1921,15 @@ addchoicerules(Solver *solv)
 #endif
     }
   queue_free(&q);
+  queue_free(&qi);
+  map_free(&m);
   solv->choicerules_end = solv->nrules;
 }
 
+/* called when a choice rule is disabled by analyze_unsolvable. We also
+ * have to disable all other choice rules so that the best packages get
+ * picked */
+ 
 void
 disablechoicerules(Solver *solv, Rule *r)
 {

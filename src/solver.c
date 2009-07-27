@@ -1660,11 +1660,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      return;
 	    }
 	  if (level < systemlevel || level == 1)
-	    break;
+	    break;		/* trouble */
+	  /* something changed, so look at all rules again */
 	  n = 0;
-	} /* for(), decide */
+	}
 
-      if (n != solv->nrules)	/* continue if level < systemlevel */
+      if (n != solv->nrules)	/* ran into trouble, restart */
 	continue;
 
       if (doweak)
@@ -2029,6 +2030,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      continue;
 	    }
 	}
+      /* no minimization found, we're finally finished! */
       break;
     }
   POOL_DEBUG(SAT_DEBUG_STATS, "solver statistics: %d learned rules, %d unsolvable, %d minimization steps\n", solv->stats_learned, solv->stats_unsolvable, minimizationsteps);
@@ -2843,6 +2845,8 @@ solver_solve(Solver *solv, Queue *job)
       extern void addchoicerules(Solver *solv);
       addchoicerules(solv);
     }
+  else
+    solv->choicerules = solv->choicerules_end = solv->nrules;
 
   /* all rules created
    * --------------------------------------------------------------
