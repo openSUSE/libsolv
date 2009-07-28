@@ -78,6 +78,7 @@ struct repoinfo {
   int autorefresh;
   char *baseurl;
   char *metalink;
+  char *mirrorlist;
   char *path;
   int type;
   int pkgs_gpgcheck;
@@ -265,6 +266,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    {
 	      if (strstr(vp, "metalink"))
 	        cinfo->metalink = strdup(vp);
+	      else
+	        cinfo->mirrorlist = strdup(vp);
 	    }
 	  else if (!strcmp(kp, "path"))
 	    {
@@ -307,6 +310,7 @@ free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
       sat_free(cinfo->alias);
       sat_free(cinfo->path);
       sat_free(cinfo->metalink);
+      sat_free(cinfo->mirrorlist);
       sat_free(cinfo->baseurl);
     }
   sat_free(repoinfos);
@@ -563,6 +567,47 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
   return 0;
 }
 
+char *
+findmirrorlisturl(FILE *fp)
+{
+  char buf[4096], *bp, *ep;
+  int i, l;
+  char **urls = 0;
+  int nurls = 0;
+
+  while((bp = fgets(buf, sizeof(buf), fp)) != 0)
+    {
+      while (*bp == ' ' || *bp == '\t')
+	bp++;
+      if (!*bp || *bp == '#')
+	continue;
+      l = strlen(bp);
+      while (l > 0 && (bp[l - 1] == ' ' || bp[l - 1] == '\t' || bp[l - 1] == '\n'))
+	bp[--l] = 0;
+      urls = sat_extend(urls, nurls, 1, sizeof(*urls), 15);
+      urls[nurls++] = strdup(bp);
+    }
+  if (nurls)
+    {
+      if (nurls > 1)
+        findfastest(urls, nurls > 5 ? 5 : nurls);
+      bp = urls[0];
+      urls[0] = 0;
+      for (i = 0; i < nurls; i++)
+        sat_free(urls[i]);
+      sat_free(urls);
+      ep = strchr(bp, '/');
+      if ((ep = strchr(ep + 2, '/')) != 0)
+	{
+	  *ep = 0;
+	  printf("[using mirror %s]\n", bp);
+	  *ep = '/';
+	}
+      return bp;
+    }
+  return 0;
+}
+
 static ssize_t
 cookie_gzread(void *cookie, char *buf, size_t nbytes)
 {
@@ -586,16 +631,19 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
 
   if (!baseurl)
     {
-      if (!cinfo->metalink)
+      if (!cinfo->metalink && !cinfo->mirrorlist)
         return 0;
-      if (file != cinfo->metalink)
+      if (file != cinfo->metalink && file != cinfo->mirrorlist)
 	{
-	  FILE *fp = curlfopen(cinfo, cinfo->metalink, 0, 0, 0, 0);
+	  FILE *fp = curlfopen(cinfo, cinfo->metalink ? cinfo->metalink : cinfo->mirrorlist, 0, 0, 0, 0);
 	  unsigned char mlchksum[32];
 	  Id mlchksumtype = 0;
 	  if (!fp)
 	    return 0;
-	  cinfo->baseurl = findmetalinkurl(fp, mlchksum, &mlchksumtype);
+	  if (cinfo->metalink)
+	    cinfo->baseurl = findmetalinkurl(fp, mlchksum, &mlchksumtype);
+	  else
+	    cinfo->baseurl = findmirrorlisturl(fp);
 	  fclose(fp);
 	  if (!cinfo->baseurl)
 	    return 0;
