@@ -249,6 +249,10 @@ struct parsedata {
   /** system language */
   const char *language;
 
+  Id lastdir;
+  char *lastdirstr;
+  int lastdirstrl;
+
   /** Hash to maps checksums to solv */
   Stringpool cspool;
   /** Cache of known checksums to solvable id */
@@ -829,24 +833,18 @@ startElement(void *userData, const char *name, const char **atts)
       {
         long filesz = 0, filenum = 0;
         unsigned dirid;
-        if ( (str = find_attr("name", atts)) )
-          {
-            dirid = repodata_str2dir(pd->data, str, 1);
-          }
+        if ((str = find_attr("name", atts)) != 0)
+          dirid = repodata_str2dir(pd->data, str, 1);
         else
           {
             fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n",
                     (void *)atts, *atts);
             break;
           }
-        if ( (str = find_attr("size", atts)) )
-          {
-            filesz = strtol (str, 0, 0);
-          }
-        if ( (str = find_attr("count", atts)) )
-          {
-            filenum = strtol (str, 0, 0);
-          }
+        if ((str = find_attr("size", atts)) != 0)
+          filesz = strtol(str, 0, 0);
+        if ((str = find_attr("count", atts)) != 0)
+          filenum = strtol(str, 0, 0);
         pd->dirs = sat_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
         pd->dirs[pd->ndirs][0] = dirid;
         pd->dirs[pd->ndirs][1] = filesz;
@@ -898,8 +896,8 @@ endElement(void *userData, const char *name)
   switch (pd->state)
     {
     case STATE_SOLVABLE:
-      if ( pd->kind && !s->name ) /* add namespace in case of NULL name */
-        s->name = str2id(pool, join2( pd->kind, ":", ""), 1);
+      if (pd->kind && !s->name) /* add namespace in case of NULL name */
+        s->name = str2id(pool, join2(pd->kind, ":", ""), 1);
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (!s->evr)
@@ -912,10 +910,10 @@ endElement(void *userData, const char *name)
       pd->kind = 0;
       break;
     case STATE_NAME:
-      if ( pd->kind )
-          s->name = str2id(pool, join2( pd->kind, ":", pd->content), 1);
+      if (pd->kind)
+        s->name = str2id(pool, join2(pd->kind, ":", pd->content), 1);
       else
-          s->name = str2id(pool, pd->content, 1);
+        s->name = str2id(pool, pd->content, 1);
       break;
     case STATE_ARCH:
       s->arch = str2id(pool, pd->content, 1);
@@ -970,7 +968,23 @@ endElement(void *userData, const char *name)
       if ((p = strrchr(pd->content, '/')) != 0)
 	{
 	  *p++ = 0;
-	  id = repodata_str2dir(pd->data, pd->content, 1);
+	  if (pd->lastdir && !strcmp(pd->lastdirstr, pd->content))
+	    {
+	      id = pd->lastdir;
+	    }
+	  else
+	    {
+	      int l;
+	      id = repodata_str2dir(pd->data, pd->content, 1);
+	      l = strlen(pd->content) + 1;
+	      if (l > pd->lastdirstrl)
+		{
+		  pd->lastdirstrl = l + 128;
+		  pd->lastdirstr = sat_realloc(pd->lastdirstr, pd->lastdirstrl);
+		}
+	      strcpy(pd->lastdirstr, pd->content);
+	      pd->lastdir = id;
+	    }
 	}
       else
 	{
@@ -1038,7 +1052,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_DISKUSAGE:
       if (pd->ndirs)
-        commit_diskusage (pd, pd->handle);
+        commit_diskusage(pd, pd->handle);
       break;
     default:
       break;
@@ -1169,6 +1183,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
     }
   XML_ParserFree(parser);
   sat_free(pd.content);
+  sat_free(pd.lastdirstr);
   join_freemem();
   stringpool_free(&pd.cspool);
   sat_free(pd.cscache);

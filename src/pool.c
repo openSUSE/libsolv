@@ -1005,6 +1005,11 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 		  break;
 	      if (j < data->nkeys)
 		{
+#if 0
+		  for (i = 0; i < cbd->nfiles; i++)
+		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, id2str(pool, cbd->ids[i])))
+		      printf("need complete filelist because of %s\n", id2str(pool, cbd->ids[i]));
+#endif
 		  for (i = 0; i < cbd->nfiles; i++)
 		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, id2str(pool, cbd->ids[i])))
 		      break;

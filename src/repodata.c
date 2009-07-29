@@ -241,7 +241,11 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
   while (*dir == '/' && dir[1] == '/')
     dir++;
   if (*dir == '/' && !dir[1])
-    return 1;
+    {
+      if (data->dirpool.ndirs)
+        return 1;
+      return dirpool_add_dir(&data->dirpool, 0, 1, 1);
+    }
   while (*dir)
     {
       dire = strchrnul(dir, '/');
