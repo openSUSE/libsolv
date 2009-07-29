@@ -1645,6 +1645,7 @@ limitevr(Pool *pool, char *evr, Queue *job, Id archid)
   int matched = 0;
   int i, j;
   Solvable *s;
+  const char *sevr;
 
   queue_init(&mq);
   for (i = 0; i < job->count; i += 2)
@@ -1655,7 +1656,10 @@ limitevr(Pool *pool, char *evr, Queue *job, Id archid)
 	  s = pool_id2solvable(pool, p);
 	  if (archid && s->arch != archid)
 	    continue;
-	  if (evrcmp_str(pool, id2str(pool, s->evr), evr, EVRCMP_MATCH) == 0)
+          sevr = id2str(pool, s->evr);
+          if (!strchr(evr, ':') && strchr(sevr, ':'))
+	    sevr = strchr(sevr, ':') + 1;
+	  if (evrcmp_str(pool, sevr, evr, EVRCMP_MATCH) == 0)
 	     queue_push(&mq, p);
 	}
       if (mq.count)
