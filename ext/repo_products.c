@@ -344,7 +344,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_CPEID:
       if (pd->content)
-        repodata_set_str(pd->data, pd->handle, SOLVABLE_CPE_ID, pd->content);
+        repodata_set_str(pd->data, pd->handle, SOLVABLE_CPEID, pd->content);
     default:
       break;
     }
