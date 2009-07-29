@@ -876,6 +876,7 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
 {
   FILE *fp;
   unsigned char mycookie[32];
+  unsigned char myextcookie[32];
   struct repoinfo *cinfo;
   int flags;
 
@@ -892,6 +893,14 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
       fclose(fp);
       return 0;
     }
+  if (cinfo && !repoext)
+    {
+      if (fseek(fp, -sizeof(mycookie) * 2, SEEK_END) || fread(myextcookie, sizeof(myextcookie), 1, fp) != 1)
+	{
+	  fclose(fp);
+	  return 0;
+	}
+    }
   rewind(fp);
 
   flags = 0;
@@ -907,17 +916,8 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
     }
   if (cinfo && !repoext)
     {
-      /* set the checksum so that we can use it with the stub loads */
-      struct stat stb;
-      if (!fstat(fileno(fp), &stb))
-	{
-	  int i;
-
-	  stb.st_mtime = 0;
-          calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
-	  for (i = 0; i < 32; i++)
-	    cinfo->extcookie[i] ^= cinfo->cookie[i];
-	}
+      memcpy(cinfo->cookie, mycookie, sizeof(mycookie));
+      memcpy(cinfo->extcookie, myextcookie, sizeof(myextcookie));
     }
   if (mark)
     futimes(fileno(fp), 0);	/* try to set modification time */
@@ -928,11 +928,9 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
 void
 writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *cookie)
 {
-  Id *addedfileprovides = 0;
   FILE *fp;
   int i, fd;
   char *tmpl;
-  int myinfo = 0;
   struct repoinfo *cinfo;
   int onepiece;
 
@@ -961,27 +959,46 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
   if (i < repo->end)
     onepiece = 0;
 
-  if (!repoext)
-    {
-      if (!info)
-	{
-	  info = repo_add_repodata(repo, 0);
-	  myinfo = 1;
-	}
-      pool_addfileprovides_ids(repo->pool, 0, &addedfileprovides);
-      if (addedfileprovides && *addedfileprovides)
-	{
-	  for (i = 0; addedfileprovides[i]; i++)
-	    repodata_add_idarray(info, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
-	}
-      sat_free(addedfileprovides);
-      repodata_internalize(info);
-      repo_write(repo, fp, repo_write_stdkeyfilter, 0, 0);
-    }
-  else
+  if (!info)
+    repo_write(repo, fp, repo_write_stdkeyfilter, 0, 0);
+  else if (repoext)
     repodata_write(info, fp, repo_write_stdkeyfilter, 0);
-  if (myinfo)
-    repodata_free(info);
+  else
+    {
+      int oldnrepodata = repo->nrepodata;
+      repo->nrepodata = 1;	/* XXX: do this right */
+      repo_write(repo, fp, repo_write_stdkeyfilter, 0, 0);
+      repo->nrepodata = oldnrepodata;
+      onepiece = 0;
+    }
+
+  if (!repoext && cinfo)
+    {
+      if (!cinfo->extcookie[0])
+	{
+	  /* create the ext cookie and append it */
+	  /* we just need some unique ID */
+	  struct stat stb;
+	  if (!fstat(fileno(fp), &stb))
+	    {
+	      int i;
+
+	      calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
+	      for (i = 0; i < 32; i++)
+		cinfo->extcookie[i] ^= cookie[i];
+	    }
+	  if (cinfo->extcookie[0] == 0)
+	    cinfo->extcookie[0] = 1;
+	}
+      if (fwrite(cinfo->extcookie, 32, 1, fp) != 1)
+	{
+	  fclose(fp);
+	  unlink(tmpl);
+	  free(tmpl);
+	  return;
+	}
+    }
+  /* append our cookie describing the metadata state */
   if (fwrite(cookie, 32, 1, fp) != 1)
     {
       fclose(fp);
@@ -994,20 +1011,6 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
       unlink(tmpl);
       free(tmpl);
       return;
-    }
-  if (!repoext && cinfo)
-    {
-      /* set the checksum so that we can use it with the stub loads */
-      struct stat stb;
-      if (!stat(tmpl, &stb))
-	{
-	  int i;
-
-	  stb.st_mtime = 0;
-          calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
-	  for (i = 0; i < 32; i++)
-	    cinfo->extcookie[i] ^= cinfo->cookie[i];
-	}
     }
   if (onepiece)
     {
@@ -1260,7 +1263,7 @@ load_stub(Pool *pool, Repodata *data, void *dp)
 	  return 1;
 	}
 #if 1
-      printf(" loading]\n"); fflush(stdout);
+      printf(" fetching]\n"); fflush(stdout);
 #endif
       defvendor = repo_lookup_id(data->repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
       descrdir = repo_lookup_str(data->repo, SOLVID_META, SUSETAGS_DESCRDIR);
@@ -1293,7 +1296,7 @@ load_stub(Pool *pool, Repodata *data, void *dp)
 	  printf(" cached]\n");fflush(stdout);
 	  return 1;
 	}
-      printf(" loading]\n"); fflush(stdout);
+      printf(" fetching]\n"); fflush(stdout);
       filename = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_LOCATION);
       filechksumtype = 0;
       filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, REPOSITORY_REPOMD_CHECKSUM, &filechksumtype);
@@ -1311,6 +1314,8 @@ load_stub(Pool *pool, Repodata *data, void *dp)
   return 0;
 }
 
+static unsigned char installedcookie[32];
+
 void
 read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 {
@@ -1325,7 +1330,6 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   const char *descrdir;
   int defvendor;
   struct stat stb;
-  unsigned char cookie[32];
   Pool *sigpool = 0;
   Repodata *data;
   int badchecksum;
@@ -1335,8 +1339,8 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   printf("rpm database:");
   if (stat("/var/lib/rpm/Packages", &stb))
     memset(&stb, 0, sizeof(&stb));
-  calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cookie);
-  if (usecachedrepo(repo, 0, cookie, 0))
+  calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, installedcookie);
+  if (usecachedrepo(repo, 0, installedcookie, 0))
     printf(" cached\n");
   else
     {
@@ -1360,7 +1364,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	}
       if (!done)
         repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
-      writecachedrepo(repo, 0, 0, cookie);
+      writecachedrepo(repo, 0, 0, installedcookie);
     }
   pool_set_installed(pool, repo);
 
@@ -1429,7 +1433,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    }
 	  repo_add_repomdxml(repo, fp, 0);
 	  fclose(fp);
-	  printf(" reading\n");
+	  printf(" fetching\n");
 	  filename = repomd_find(repo, "primary", &filechksum, &filechksumtype);
 	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
 	    {
@@ -1452,7 +1456,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  repomd_add_ext(repo, data, "filelists");
 	  repodata_internalize(data);
 	  if (!badchecksum)
-	    writecachedrepo(repo, data, 0, cinfo->cookie);
+	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
 
@@ -1512,7 +1516,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      printf(" no packages file entry, skipped\n");
 	      break;
 	    }
-	  printf(" reading\n");
+	  printf(" fetching\n");
 	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) == 0)
 	    break;	/* hopeless */
 	  repo_add_susetags(repo, fp, defvendor, 0, 0);
@@ -1521,7 +1525,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  susetags_add_ext(repo, data);
 	  repodata_internalize(data);
 	  if (!badchecksum)
-	    writecachedrepo(repo, data, 0, cinfo->cookie);
+	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
 	default:
@@ -2024,6 +2028,50 @@ addsoftlocks(Pool *pool, Queue *job)
 
 #endif
 
+
+void
+rewrite_repos(Pool *pool, Id *addedfileprovides)
+{
+  Repo *repo;
+  Repodata *data;
+  Map providedids;
+  Queue fileprovidesq;
+  Id id;
+  int i, j, n, nprovidedids;
+  struct repoinfo *cinfo;
+
+  map_init(&providedids, pool->ss.nstrings);
+  queue_init(&fileprovidesq);
+  for (nprovidedids = 0; (id = addedfileprovides[nprovidedids]) != 0; nprovidedids++)
+    MAPSET(&providedids, id);
+  FOR_REPOS(i, repo)
+    {
+      /* make sure this repo has just one main repodata */
+      if (!repo->nrepodata)
+	continue;
+      cinfo = repo->appdata;
+      data = repo->repodata + 0;
+      if (data->store.pagefd == -1)
+	continue;
+      if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
+	{
+	  n = 0;
+	  for (j = 0; j < fileprovidesq.count; j++)
+	    if (MAPTST(&providedids, fileprovidesq.elements[j]))
+	      n++;
+	  if (n == nprovidedids)
+	    continue;	/* nothing new added */
+	}
+      /* oh my! */
+      for (j = 0; addedfileprovides[j]; j++)
+	repodata_add_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[j]);
+      repodata_internalize(data);
+      writecachedrepo(repo, data, 0, cinfo ? cinfo->cookie : installedcookie);
+    }
+  queue_free(&fileprovidesq);
+  map_free(&providedids);
+}
+
 #define MODE_LIST        0
 #define MODE_INSTALL     1
 #define MODE_ERASE       2
@@ -2072,6 +2120,7 @@ main(int argc, char **argv)
   int allpkgs = 0;
   FILE **newpkgsfps;
   struct fcstate fcstate;
+  Id *addedfileprovides = 0;
 
   argc--;
   argv++;
@@ -2215,7 +2264,11 @@ main(int argc, char **argv)
 
   // FOR_REPOS(i, repo)
   //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
-  pool_addfileprovides(pool);
+  addedfileprovides = 0;
+  pool_addfileprovides_ids(pool, 0, &addedfileprovides);
+  if (addedfileprovides && *addedfileprovides)
+    rewrite_repos(pool, addedfileprovides);
+  sat_free(addedfileprovides);
   pool_createwhatprovides(pool);
 
   queue_init(&job);

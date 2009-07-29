@@ -172,7 +172,7 @@ const char *repodata_lookup_str(Repodata *data, Id solvid, Id keyname);
 int repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value);
 int repodata_lookup_void(Repodata *data, Id solvid, Id keyname);
 const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep);
-
+int repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
 
 
 /*-----

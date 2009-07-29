@@ -870,8 +870,10 @@ struct addfileprovides_cbdata {
   char **dirs;
   char **names;
 
-  Repodata *olddata;
   Id *dids;
+
+  Map providedids;
+
   Map useddirs;
 };
 
@@ -881,18 +883,22 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   struct addfileprovides_cbdata *cbd = cbdata;
   int i;
 
-  if (data != cbd->olddata)
+  if (!cbd->useddirs.size)
     {
-      map_free(&cbd->useddirs);
-      map_init(&cbd->useddirs, data->dirpool.ndirs);
+      map_init(&cbd->useddirs, data->dirpool.ndirs + 1);
       for (i = 0; i < cbd->nfiles; i++)
 	{
-	  Id did = repodata_str2dir(data, cbd->dirs[i], 0);
-          cbd->dids[i] = did;
+	  Id did;
+	  if (MAPTST(&cbd->providedids, cbd->ids[i]))
+	    {
+	      cbd->dids[i] = 0;
+	      continue;
+	    }
+	  did = repodata_str2dir(data, cbd->dirs[i], 0);
+	  cbd->dids[i] = did;
 	  if (did)
 	    MAPSET(&cbd->useddirs, did);
 	}
-      cbd->olddata = data;
     }
   if (!MAPTST(&cbd->useddirs, value->id))
     return 0;
@@ -909,123 +915,128 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   return 0;
 }
 
-static int
-addfileprovides_setid_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
-{
-  Map *provideids = cbdata;
-  if (key->type != REPOKEY_TYPE_IDARRAY)
-    return 0;
-  MAPSET(provideids, kv->id);
-  return kv->eof ? SEARCH_NEXT_SOLVABLE : 0;
-}
-
-
 static void
 pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, struct searchfiles *sf, Repo *repoonly)
 {
-  Id p, start, end;
-  Solvable *s;
-  Repodata *data = 0, *nextdata;
-  Repo *repo, *oldrepo = 0;
-  int dataincludes = 0;
-  int i, j, flags;
-  Map providedids;
-  Repodata *ffldata = 0;
+  Id p;
+  Repodata *data;
+  Repo *repo;
+  Queue fileprovidesq;
+  int i, j, repoid, repodataid;
+  int provstart, provend;
+  Map donemap;
+  int ndone, incomplete;
+
+  if (!pool->nrepos)
+    return;
 
   cbd->nfiles = sf->nfiles;
   cbd->ids = sf->ids;
   cbd->dirs = sf->dirs;
   cbd->names = sf->names;
-  cbd->olddata = 0;
   cbd->dids = sat_realloc2(cbd->dids, sf->nfiles, sizeof(Id));
-  if (repoonly)
+  map_init(&cbd->providedids, pool->ss.nstrings);
+
+  repoid = 0;
+  repo = repoonly ? repoonly : pool->repos[0];
+  map_init(&donemap, pool->nsolvables);
+  queue_init(&fileprovidesq);
+  provstart = provend = 0;
+  for (;;)
     {
-      start = repoonly->start;
-      end = repoonly->end;
-    }
-  else
-    {
-      start = 2;	/* skip system solvable */
-      end = pool->nsolvables;
-    }
-  flags = 0;
-  map_init(&providedids, pool->ss.nstrings);
-  for (p = start, s = pool->solvables + p; p < end; p++, s++)
-    {
-      repo = s->repo;
-      if (!repo || (repoonly && repo != repoonly))
-	continue;
-      /* check if p is in (oldrepo,data) */
-      if (repo != oldrepo || (data && p >= data->end))
+      if (repo->disabled)
 	{
-	  data = 0;
-	  oldrepo = 0;
+	  if (repoonly || ++repoid == pool->nrepos)
+	    break;
+	  repo = pool->repos[repoid];
+	  continue;
 	}
-      if (oldrepo == 0)
+      ndone = 0;
+      for (data = repo->repodata, repodataid = 0; repodataid < repo->nrepodata; repodataid++, data++)
 	{
-	  /* nope, find new repo/repodata */
-          /* if we don't find a match, set data to the next repodata */
-	  nextdata = 0;
-	  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-	    {
-	      if (p >= data->end)
-		continue;
-	      if (data->state != REPODATA_AVAILABLE)
-		continue;
-	      for (j = 1; j < data->nkeys; j++)
-		if (data->keys[j].name == REPOSITORY_ADDEDFILEPROVIDES && data->keys[j].type == REPOKEY_TYPE_IDARRAY)
-		  break;
-	      if (j == data->nkeys)
-		continue;
-	      /* great, this repodata contains addedfileprovides */
-	      if (!nextdata || nextdata->start > data->start)
-		nextdata = data;
-	      if (p >= data->start)
-		break;
-	    }
-	  if (i == repo->nrepodata)
-	    data = nextdata;	/* no direct hit, use next repodata */
-	  if (data)
-	    {
-	      map_empty(&providedids);
-	      repodata_search(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, 0, addfileprovides_setid_cb, &providedids);
-	      for (i = 0; i < cbd->nfiles; i++)
-		if (!MAPTST(&providedids, cbd->ids[i]))
-		  break;
-	      dataincludes = i == cbd->nfiles;
-	    }
-	  oldrepo = repo;
-	}
-      if (data && p >= data->start && dataincludes)
-	continue;
-      if (ffldata == 0 || p < ffldata->start || p >= ffldata->end)
-	{
-	  for (i = 0, ffldata = repo->repodata; i < repo->nrepodata; i++, ffldata++)
-	    if (p >= ffldata->start && p < ffldata->end)
+	  if (ndone >= repo->nsolvables)
+	    break;
+	  if (!repodata_precheck_keyname(data, SOLVABLE_FILELIST))
+	    continue;
+	  for (j = 1; j < data->nkeys; j++)
+	    if (data->keys[j].name == SOLVABLE_FILELIST)
 	      break;
-	  if (i == repo->nrepodata)
-	    ffldata = 0;
-	  flags = 0;
-	  if (ffldata)
+	  if (j == data->nkeys)
+	    continue;
+	  if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
 	    {
+	      map_empty(&cbd->providedids);
+	      for (i = 0; i < fileprovidesq.count; i++)
+		MAPSET(&cbd->providedids, fileprovidesq.elements[i]);
+	      provstart = data->start;
+	      provend = data->end;
 	      for (i = 0; i < cbd->nfiles; i++)
+		if (!MAPTST(&cbd->providedids, cbd->ids[i]))
+		  break;
+	      if (i == cbd->nfiles)
 		{
-		  if (data && p >= data->start && MAPTST(&providedids, cbd->ids[i]))
-		    continue;
-		  if (!repodata_filelistfilter_matches(ffldata, id2str(pool, cbd->ids[i])))
-		    {
-  #if 0
-		      printf("Need the complete filelist in repo %s because of %s\n", repo->name, id2str(pool, cbd->ids[i]));
-  #endif
-		      flags = SEARCH_COMPLETE_FILELIST;
-		      break;
-		    }
+		  /* great! no need to search files */
+		  for (p = data->start; p < data->end; p++)
+		    if (pool->solvables[p].repo == repo)
+		      {
+			if (MAPTST(&donemap, p))
+			  continue;
+			MAPSET(&donemap, p);
+			ndone++;
+		      }
+		  continue;
 		}
 	    }
+          else
+	    {
+	      if (data->start < provstart || data->end > provend)
+		{
+		  map_empty(&cbd->providedids);
+		  provstart = provend = 0;
+		}
+	    }
+
+	  /* check if the data is incomplete */
+	  incomplete = 0;
+	  if (data->state == REPODATA_AVAILABLE)
+	    {
+	      for (j = 1; j < data->nkeys; j++)
+		if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
+		  break;
+	      if (j < data->nkeys)
+		{
+		  for (i = 0; i < cbd->nfiles; i++)
+		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, id2str(pool, cbd->ids[i])))
+		      break;
+		  if (i < cbd->nfiles)
+		    incomplete = 1;
+		}
+	    }
+
+	  /* do the search */
+	  map_init(&cbd->useddirs, 0);
+	  for (p = data->start; p < data->end; p++)
+	    if (pool->solvables[p].repo == repo)
+	      {
+		if (MAPTST(&donemap, p))
+		  continue;
+	        repodata_search(data, p, SOLVABLE_FILELIST, 0, addfileprovides_cb, cbd);
+		if (!incomplete)
+		  {
+		    MAPSET(&donemap, p);
+		    ndone++;
+		  }
+	      }
+	  map_free(&cbd->useddirs);
 	}
-      repo_search(repo, p, SOLVABLE_FILELIST, 0, flags, addfileprovides_cb, cbd);
+
+      if (repoonly || ++repoid == pool->nrepos)
+	break;
+      repo = pool->repos[repoid];
     }
-  map_free(&providedids);
+  map_free(&donemap);
+  queue_free(&fileprovidesq);
+  map_free(&cbd->providedids);
 }
 
 void
@@ -1069,7 +1080,6 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
   map_free(&isf.seen);
   POOL_DEBUG(SAT_DEBUG_STATS, "found %d file dependencies, %d installed file dependencies\n", sf.nfiles, isf.nfiles);
   cbd.dids = 0;
-  map_init(&cbd.useddirs, 1);
   if (idp)
     *idp = 0;
   if (sf.nfiles)
@@ -1112,7 +1122,6 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
       sat_free(isf.dirs);
       sat_free(isf.names);
     }
-  map_free(&cbd.useddirs);
   sat_free(cbd.dids);
   pool_freewhatprovides(pool);	/* as we have added provides */
   POOL_DEBUG(SAT_DEBUG_STATS, "addfileprovides took %d ms\n", sat_timems(now));

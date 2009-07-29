@@ -1352,11 +1352,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
   /*
    * here's the main loop:
-   * 1) propagate new decisions (only needed for level 1)
-   * 2) try to keep installed packages
-   * 3) fulfill all unresolved rules
-   * 4) install recommended packages
-   * 5) minimalize solution if we had choices
+   * 1) propagate new decisions (only needed once)
+   * 2) fulfill jobs
+   * 3) try to keep installed packages
+   * 4) fulfill all unresolved rules
+   * 5) install recommended packages
+   * 6) minimalize solution if we had choices
    * if we encounter a problem, we rewind to a safe level and restart
    * with step 1
    */
@@ -1365,7 +1366,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   for (;;)
     {
       /*
-       * propagate
+       * initial propagation of the assertions
        */
       if (level == 1)
 	{
@@ -1380,6 +1381,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 	}
 
+      /*
+       * resolve jobs first
+       */
      if (level < systemlevel)
 	{
 	  POOL_DEBUG(SAT_DEBUG_SOLVER, "resolving job rules\n");
@@ -1439,7 +1443,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * installed packages
        */
-
       if (level < systemlevel && solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
 	{
 	  Repo *installed = solv->installed;
@@ -1582,7 +1585,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * decide
        */
-
       POOL_DEBUG(SAT_DEBUG_POLICY, "deciding unresolved rules\n");
       for (i = 1, n = 1; n < solv->nrules; i++, n++)
 	{
@@ -1667,6 +1669,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
       if (n != solv->nrules)	/* ran into trouble, restart */
 	continue;
+
+      /* at this point we have a consistent system. now do the extras... */
 
       if (doweak)
 	{
@@ -1916,7 +1920,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		}
 	      map_free(&dqmap);
 
-	      continue;		/* back to main loop */
+	      continue;		/* back to main loop so that all deps are checked */
 	    }
 	}
 
@@ -1947,7 +1951,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		break;
 	    }
 	  if (installedone || i < solv->orphaned.count)
-	    continue;
+	    continue;		/* back to main loop */
 	}
 
      if (solv->solution_callback)
@@ -2027,12 +2031,13 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  queue_free(&dqs);
 		  return;
 		}
-	      continue;
+	      continue;		/* back to main loop */
 	    }
 	}
       /* no minimization found, we're finally finished! */
       break;
     }
+
   POOL_DEBUG(SAT_DEBUG_STATS, "solver statistics: %d learned rules, %d unsolvable, %d minimization steps\n", solv->stats_learned, solv->stats_unsolvable, minimizationsteps);
 
   POOL_DEBUG(SAT_DEBUG_STATS, "done solving.\n\n");

@@ -642,6 +642,27 @@ repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep)
   return dp;
 }
 
+int
+repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
+{
+  unsigned char *dp;
+  Repokey *key;
+  Id id;
+  int eof = 0;
+
+  queue_empty(q);
+  dp = find_key_data(data, solvid, keyname, &key);
+  if (!dp)
+    return 0;
+  for (;;)
+    {
+      dp = data_read_ideof(dp, &id, &eof);
+      queue_push(q, id);
+      if (eof)
+	break;
+    }
+  return 1;
+}
 
 /************************************************************************
  * data search
