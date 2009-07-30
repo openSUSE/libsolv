@@ -93,7 +93,13 @@ A new approach to package dependency solving.
 %package demo
 Summary:        Applications demoing the satsolver library
 Group:          System/Management
-Requires:       gpg2 curl
+Requires:       curl
+%if 0%{?fedora_version}
+Requires:       gnupg2
+%endif
+%if 0%{?suse_version}
+Requires:       gpg2
+%endif
 
 %description demo
 Applications demoing the satsolver library.

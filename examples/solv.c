@@ -96,13 +96,22 @@ char *
 yum_substitute(Pool *pool, char *line)
 {
   char *p, *p2;
+  static char *releaseevr;
+  static char *basearch;
 
+  if (!line)
+    {
+      sat_free(releaseevr);
+      releaseevr = 0;
+      sat_free(basearch);
+      basearch = 0;
+      return 0;
+    }
   p = line;
   while ((p2 = strchr(p, '$')) != 0)
     {
       if (!strncmp(p2, "$releasever", 11))
 	{
-	  static char *releaseevr;
 	  if (!releaseevr)
 	    {
 	      Queue q;
@@ -132,7 +141,6 @@ yum_substitute(Pool *pool, char *line)
 	}
       if (!strncmp(p2, "$basearch", 9))
 	{
-	  static char *basearch;
 	  if (!basearch)
 	    {
 	      struct utsname un;
@@ -355,8 +363,10 @@ verify_checksum(int fd, const char *file, const unsigned char *chksum, Id chksum
   if (memcmp(sum, chksum, l))
     {
       printf("%s: checksum mismatch\n", file);
+      sat_chksum_free(h, 0);
       return 0;
     }
+  sat_chksum_free(h, 0);
   return 1;
 }
 
@@ -647,6 +657,14 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
 	  fclose(fp);
 	  if (!cinfo->baseurl)
 	    return 0;
+#ifdef FEDORA
+	  if (strchr(cinfo->baseurl, '$'))
+	    {
+	      char *b = yum_substitute(cinfo->repo->pool, cinfo->baseurl);
+	      free(cinfo->baseurl);
+	      cinfo->baseurl = strdup(b);
+	    }
+#endif
 	  if (!chksumtype && mlchksumtype && !strcmp(file, "repodata/repomd.xml"))
 	    {
 	      chksumtype = mlchksumtype;
@@ -2333,6 +2351,9 @@ main(int argc, char **argv)
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);
       sat_free(commandlinepkgs);
+#ifdef FEDORA
+      yum_substitute(pool, 0);
+#endif
       exit(0);
     }
 
@@ -2776,5 +2797,8 @@ rerunsolver:
   pool_free(pool);
   free_repoinfos(repoinfos, nrepoinfos);
   sat_free(commandlinepkgs);
+#ifdef FEDORA
+  yum_substitute(pool, 0);
+#endif
   exit(0);
 }

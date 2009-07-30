@@ -103,6 +103,7 @@ repo_empty(Repo *repo, int reuseids)
   repo->rpmdbid = sat_free(repo->rpmdbid);
   for (i = 0; i < repo->nrepodata; i++)
     repodata_freedata(repo->repodata + i);
+  sat_free(repo->repodata);
   repo->repodata = 0;
   repo->nrepodata = 0;
 }

@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Thu Jul 30 12:49:38 CEST 2009 - mls@suse.de
+
+- speed up file list parsing
+- speed up addfileprovides
+- fix bugs in pubkey handling
+- fix bug in filelist handling when there are no abs paths
+- 0.14.4
+
+-------------------------------------------------------------------
 Fri Jul 17 14:07:07 CEST 2009 - mls@suse.de
 
 - add satversion.h header file
