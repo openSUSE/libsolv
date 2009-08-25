@@ -795,5 +795,11 @@ solver_select2str(Solver *solv, Id select, Id what)
 	}
       return *b ? b + 2 : "nothing";
     }
+  if (select == SOLVER_SOLVABLE_REPO)
+    {
+      b = pool_alloctmpspace(pool, 20);
+      sprintf(b, "repo #%d", what);
+      return b;
+    }
   return "unknown job select";
 }

@@ -1156,6 +1156,8 @@ solver_createdupmaps(Solver *solv)
       switch (how & SOLVER_JOBMASK)
 	{
 	case SOLVER_DISTUPGRADE:
+	  if ((how & SOLVER_SELECTMASK) != SOLVER_SOLVABLE_REPO)
+	    break;
 	  if (what <= 0 || what > pool->nrepos)
 	    break;
 	  repo = pool_id2repo(pool, what);

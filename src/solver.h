@@ -216,6 +216,7 @@ typedef struct _Solver {
 #define SOLVER_SOLVABLE_NAME		0x02
 #define SOLVER_SOLVABLE_PROVIDES	0x03
 #define SOLVER_SOLVABLE_ONE_OF		0x04
+#define SOLVER_SOLVABLE_REPO		0x05
 
 #define SOLVER_SELECTMASK		0xff
 
@@ -359,9 +360,11 @@ solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
          l = r->p; l; l = (dp != &r->w2 + 1 ? *dp++ : 0))
 
 /* iterate over all packages selected by a job */
-#define FOR_JOB_SELECT(p, pp, select, what) \
-    for (pp = (select == SOLVER_SOLVABLE ? 0 :	\
-               select == SOLVER_SOLVABLE_ONE_OF ? what : \
+#define FOR_JOB_SELECT(p, pp, select, what)			\
+    if (select == SOLVER_SOLVABLE_REPO)				\
+	p = pp = 0;						\
+    else for (pp = (select == SOLVER_SOLVABLE ? 0 :		\
+               select == SOLVER_SOLVABLE_ONE_OF ? what : 	\
                pool_whatprovides(pool, what)),				\
          p = (select == SOLVER_SOLVABLE ? what : pool->whatprovidesdata[pp++]) ; p ; p = pool->whatprovidesdata[pp++]) \
       if (select != SOLVER_SOLVABLE_NAME || pool_match_nevr(pool, pool->solvables + p, what))

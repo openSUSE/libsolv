@@ -2796,7 +2796,7 @@ solver_solve(Solver *solv, Queue *job)
 	    }
 	  break;
 	case SOLVER_DISTUPGRADE:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: distupgrade repo #%d\n", what);
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: distupgrade %s\n", solver_select2str(solv, select, what));
 	  break;
 	default:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: unknown job\n");
