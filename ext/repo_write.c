@@ -1120,6 +1120,17 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       cbdata.keymap[n++] = 0;	/* key 0 */
       idused = 0;
       dirused = 0;
+      if (keyfilter)
+	{
+	  Repokey zerokey;
+	  /* check if we want this repodata */
+	  memset(&zerokey, 0, sizeof(zerokey));
+	  zerokey.name = 1;
+	  zerokey.type = 1;
+	  zerokey.size = i;
+	  if (keyfilter(repo, &zerokey, kfdata) == -1)
+	    continue;
+	}
       for (j = 1; j < data->nkeys; j++, n++)
 	{
 	  key = data->keys + j;
@@ -1982,4 +1993,36 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   sat_free(cbdata.dirused);
   sat_free(repodataused);
   sat_free(repodataschemata);
+}
+
+struct repodata_write_data {
+  int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata);
+  void *kfdata;
+  int repodataid;
+};
+
+static int
+repodata_write_keyfilter(Repo *repo, Repokey *key, void *kfdata)
+{
+  struct repodata_write_data *wd = kfdata;
+
+  /* XXX: special repodata selection hack */
+  if (key->name == 1 && key->size != wd->repodataid)
+    return -1;
+  if (key->storage == KEY_STORAGE_SOLVABLE)
+    return KEY_STORAGE_DROPPED;	/* not part of this repodata */
+  if (wd->keyfilter)
+    return (*wd->keyfilter)(repo, key, wd->kfdata);
+  return key->storage;
+}
+
+void
+repodata_write(Repodata *data, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata)
+{
+  struct repodata_write_data wd;
+
+  wd.keyfilter = keyfilter;
+  wd.kfdata = kfdata;
+  wd.repodataid = data - data->repo->repodata;
+  repo_write(data->repo, fp, repodata_write_keyfilter, &wd, 0);
 }

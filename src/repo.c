@@ -68,13 +68,10 @@ repo_freedata(Repo *repo)
   sat_free(repo);
 }
 
-/*
- * remove repo from pool, zero out (i.e. free) solvables 
- * 
- */
+/* delete all solvables and repodata blocks from this repo */
 
 void
-repo_free(Repo *repo, int reuseids)
+repo_empty(Repo *repo, int reuseids)
 {
   Pool *pool = repo->pool;
   Solvable *s;
@@ -91,13 +88,38 @@ repo_free(Repo *repo, int reuseids)
       for (i = repo->end - 1, s = pool->solvables + i; i >= repo->start; i--, s--)
 	if (s->repo != repo)
 	  break;
-      repo->end = i + 1;
-      pool->nsolvables = i + 1;
+      pool_free_solvable_block(pool, i + 1, repo->end - (i + 1), reuseids);
     }
   /* zero out (i.e. free) solvables belonging to this repo */
   for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
     if (s->repo == repo)
       memset(s, 0, sizeof(*s));
+  repo->nsolvables = 0;
+
+  /* free all data belonging to this repo */
+  repo->idarraydata = sat_free(repo->idarraydata);
+  repo->idarraysize = 0;
+  repo->lastoff = 0;
+  repo->rpmdbid = sat_free(repo->rpmdbid);
+  for (i = 0; i < repo->nrepodata; i++)
+    repodata_freedata(repo->repodata + i);
+  sat_free(repo->repodata);
+  repo->repodata = 0;
+  repo->nrepodata = 0;
+}
+
+/*
+ * remove repo from pool, delete solvables 
+ * 
+ */
+
+void
+repo_free(Repo *repo, int reuseids)
+{
+  Pool *pool = repo->pool;
+  int i;
+
+  repo_empty(repo, reuseids);
   for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
     if (pool->repos[i] == repo)
       break;
@@ -784,6 +806,17 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	continue;
       if (keyname && !repodata_precheck_keyname(data, keyname))
 	continue;
+      if (keyname == SOLVABLE_FILELIST && !(md->flags & SEARCH_COMPLETE_FILELIST))
+	{
+	  /* do not search filelist extensions */
+	  if (data->state != REPODATA_AVAILABLE)
+	    continue;
+	  for (j = 1; j < data->nkeys; j++)
+	    if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
+	      break;
+	  if (j == data->nkeys)
+	    continue;
+	}
       if (data->state == REPODATA_STUB)
 	{
 	  if (keyname)
@@ -985,9 +1018,26 @@ repo_lookup_void(Repo *repo, Id entry, Id keyname)
 Repodata *
 repo_add_repodata(Repo *repo, int flags)
 {
+  int i;
+  if ((flags & REPO_USE_LOADING) != 0)
+    {
+      for (i = repo->nrepodata - 1; i >= 0; i--)
+	if (repo->repodata[i].state == REPODATA_LOADING)
+	  {
+	    Repodata *data = repo->repodata + i;
+	    /* re-init */
+	    /* hack: we mis-use REPO_REUSE_REPODATA here */
+	    if (!(flags & REPO_REUSE_REPODATA))
+	      {
+		repodata_freedata(data);
+		repodata_initdata(data, repo, (flags & REPO_LOCALPOOL) ? 1 : 0);
+	      }
+	    return data;
+	  }
+      return 0;	/* must not create a new repodata! */
+    }
   if ((flags & REPO_REUSE_REPODATA) != 0)
     {
-      int i;
       for (i = repo->nrepodata - 1; i >= 0; i--)
 	if (repo->repodata[i].state != REPODATA_STUB)
 	  return repo->repodata + i;

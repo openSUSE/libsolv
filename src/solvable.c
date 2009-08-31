@@ -508,7 +508,8 @@ solvable_identical(Solvable *s1, Solvable *s2)
     return 0;
   if (s1->evr != s2->evr)
     return 0;
-  if (s1->vendor != s2->vendor)
+  /* map missing vendor to empty string */
+  if ((s1->vendor ? s1->vendor : 1) != (s2->vendor ? s2->vendor : 1))
     return 0;
 
   /* looking good, try some fancier stuff */

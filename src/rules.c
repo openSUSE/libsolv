@@ -500,7 +500,8 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       dontfix = 0;
       if (installed			/* Installed system available */
 	  && !solv->fixsystem		/* NOT repair errors in rpm dependency graph */
-	  && s->repo == installed)	/* solvable is installed? */
+	  && s->repo == installed	/* solvable is installed */
+	  && (!solv->fixmap.size || !MAPTST(&solv->fixmap, n - installed->start)))
         {
 	  dontfix = 1;			/* dont care about broken rpm deps */
         }
@@ -1155,6 +1156,8 @@ solver_createdupmaps(Solver *solv)
       switch (how & SOLVER_JOBMASK)
 	{
 	case SOLVER_DISTUPGRADE:
+	  if ((how & SOLVER_SELECTMASK) != SOLVER_SOLVABLE_REPO)
+	    break;
 	  if (what <= 0 || what > pool->nrepos)
 	    break;
 	  repo = pool_id2repo(pool, what);
@@ -1759,11 +1762,204 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*depp = pool->solvables[-r->p].name;
       return SOLVER_RULE_INFARCH;
     }
+  if (rid >= solv->choicerules && rid < solv->choicerules_end)
+    {
+      return SOLVER_RULE_CHOICE;
+    }
   if (rid >= solv->learntrules)
     {
       return SOLVER_RULE_LEARNT;
     }
   return SOLVER_RULE_UNKNOWN;
+}
+
+void
+addchoicerules(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Map m;
+  Rule *r;
+  Queue q, qi;
+  int i, j, rid, havechoice;
+  Id p, d, *pp;
+  Id p2, pp2;
+  Solvable *s, *s2;
+
+  solv->choicerules = solv->nrules;
+  if (!pool->installed)
+    {
+      solv->choicerules_end = solv->nrules;
+      return;
+    }
+  solv->choicerules_ref = sat_calloc(solv->rpmrules_end, sizeof(Id));
+  queue_init(&q);
+  queue_init(&qi);
+  map_init(&m, pool->nsolvables);
+  for (rid = 1; rid < solv->rpmrules_end ; rid++)
+    {
+      r = solv->rules + rid;
+      if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 < 0))
+	continue;	/* only look at requires rules */
+      // solver_printrule(solv, SAT_DEBUG_RESULT, r);
+      queue_empty(&q);
+      queue_empty(&qi);
+      havechoice = 0;
+      FOR_RULELITERALS(p, pp, r)
+	{
+	  if (p < 0)
+	    continue;
+	  s = pool->solvables + p;
+	  if (!s->repo)
+	    continue;
+	  if (s->repo == pool->installed)
+	    {
+	      queue_push(&q, p);
+	      continue;
+	    }
+	  /* check if this package is "blocked" by a installed package */
+	  s2 = 0;
+	  FOR_PROVIDES(p2, pp2, s->name)
+	    {
+	      s2 = pool->solvables + p2;
+	      if (s2->repo != pool->installed)
+		continue;
+	      if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
+	        continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+	        continue;
+	      break;
+	    }
+	  if (p2)
+	    {
+	      /* found installed package */
+	      if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
+		continue;
+	      if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
+		continue;
+	      queue_push(&qi, p2);
+	      queue_push(&q, p);
+	      continue;
+	    }
+	  if (s->obsoletes)
+	    {
+	      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+	      s2 = 0;
+	      while ((obs = *obsp++) != 0)
+		{
+		  FOR_PROVIDES(p2, pp2, obs)
+		    {
+		      s2 = pool->solvables + p2;
+		      if (s2->repo != pool->installed)
+			continue;
+		      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+			continue;
+		      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+			continue;
+		      break;
+		    }
+		  if (p2)
+		    break;
+		}
+	      if (obs)
+		{
+		  /* found one */
+		  if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
+		    continue;
+		  if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
+		    continue;
+		  queue_push(&qi, p2);
+		  queue_push(&q, p);
+		  continue;
+		}
+	    }
+	  /* this package is independent if the installed ones */
+	  havechoice = 1;
+	}
+      if (!havechoice || !q.count)
+	continue;	/* no choice */
+
+      /* now check the update rules of the installed package.
+       * if all packages of the update rules are contained in
+       * the dependency rules, there's no need to set up the choice rule */
+      map_empty(&m);
+      FOR_RULELITERALS(p, pp, r)
+        if (p > 0)
+	  MAPSET(&m, p);
+      for (i = 0; i < qi.count; i++)
+	{
+	  if (!qi.elements[i])
+	    continue;
+	  Rule *ur = solv->rules + solv->updaterules + (qi.elements[i] - pool->installed->start);
+	  if (!ur->p)
+	    ur = solv->rules + solv->featurerules + (qi.elements[i] - pool->installed->start);
+	  if (!ur->p)
+	    continue;
+	  FOR_RULELITERALS(p, pp, ur)
+	    if (!MAPTST(&m, p))
+	      break;
+	  if (p)
+	    break;
+	  for (j = i + 1; j < qi.count; j++)
+	    if (qi.elements[i] == qi.elements[j])
+	      qi.elements[j] = 0;
+	}
+      if (i == qi.count)
+	{
+#if 0
+	  printf("skipping choice ");
+	  solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + rid);
+#endif
+	  continue;
+	}
+      d = q.count ? pool_queuetowhatprovides(pool, &q) : 0;
+      solver_addrule(solv, r->p, d);
+      queue_push(&solv->weakruleq, solv->nrules - 1);
+      solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
+#if 0
+      printf("OLD ");
+      solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + rid);
+      printf("WEAK CHOICE ");
+      solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + solv->nrules - 1);
+#endif
+    }
+  queue_free(&q);
+  queue_free(&qi);
+  map_free(&m);
+  solv->choicerules_end = solv->nrules;
+}
+
+/* called when a choice rule is disabled by analyze_unsolvable. We also
+ * have to disable all other choice rules so that the best packages get
+ * picked */
+ 
+void
+disablechoicerules(Solver *solv, Rule *r)
+{
+  Id rid, p, *pp;
+  Pool *pool = solv->pool;
+  Map m;
+  Rule *or;
+
+  or = solv->rules + solv->choicerules_ref[(r - solv->rules) - solv->choicerules];
+  map_init(&m, pool->nsolvables);
+  FOR_RULELITERALS(p, pp, or)
+    if (p > 0)
+      MAPSET(&m, p);
+  FOR_RULELITERALS(p, pp, r)
+    if (p > 0)
+      MAPCLR(&m, p);
+  for (rid = solv->choicerules; rid < solv->choicerules_end; rid++)
+    {
+      r = solv->rules + rid;
+      if (r->d < 0)
+	continue;
+      or = solv->rules + solv->choicerules_ref[(r - solv->rules) - solv->choicerules];
+      FOR_RULELITERALS(p, pp, or)
+        if (p > 0 && MAPTST(&m, p))
+	  break;
+      if (p)
+	solver_disablerule(solv, r);
+    }
 }
 
 /* EOF */

@@ -1,3 +1,5 @@
 *~
 build
 tests/solver/data.libzypp/*/*.result
+src/satversion.h
+

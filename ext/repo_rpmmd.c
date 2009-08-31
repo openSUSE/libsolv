@@ -18,6 +18,7 @@
 #define DISABLE_SPLIT
 #include "tools_util.h"
 #include "repo_rpmmd.h"
+#include "chksum.h"
 
 
 enum state {
@@ -126,6 +127,7 @@ static struct stateswitch stateswitches[] = {
   /** tags for different package data, we just ignore the tag **/
   { STATE_START,       "metadata",        STATE_START,    0 },
   { STATE_START,       "otherdata",       STATE_START,    0 },
+  { STATE_START,       "filelists",       STATE_START,    0 },
   { STATE_START,       "diskusagedata",   STATE_START,    0 },
   { STATE_START,       "susedata",        STATE_START,    0 },
 
@@ -246,6 +248,10 @@ struct parsedata {
   Id langcache[ID_NUM_INTERNAL];
   /** system language */
   const char *language;
+
+  Id lastdir;
+  char *lastdirstr;
+  int lastdirstrl;
 
   /** Hash to maps checksums to solv */
   Stringpool cspool;
@@ -827,24 +833,18 @@ startElement(void *userData, const char *name, const char **atts)
       {
         long filesz = 0, filenum = 0;
         unsigned dirid;
-        if ( (str = find_attr("name", atts)) )
-          {
-            dirid = repodata_str2dir(pd->data, str, 1);
-          }
+        if ((str = find_attr("name", atts)) != 0)
+          dirid = repodata_str2dir(pd->data, str, 1);
         else
           {
             fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n",
                     (void *)atts, *atts);
             break;
           }
-        if ( (str = find_attr("size", atts)) )
-          {
-            filesz = strtol (str, 0, 0);
-          }
-        if ( (str = find_attr("count", atts)) )
-          {
-            filenum = strtol (str, 0, 0);
-          }
+        if ((str = find_attr("size", atts)) != 0)
+          filesz = strtol(str, 0, 0);
+        if ((str = find_attr("count", atts)) != 0)
+          filenum = strtol(str, 0, 0);
         pd->dirs = sat_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
         pd->dirs[pd->ndirs][0] = dirid;
         pd->dirs[pd->ndirs][1] = filesz;
@@ -896,8 +896,8 @@ endElement(void *userData, const char *name)
   switch (pd->state)
     {
     case STATE_SOLVABLE:
-      if ( pd->kind && !s->name ) /* add namespace in case of NULL name */
-        s->name = str2id(pool, join2( pd->kind, ":", ""), 1);
+      if (pd->kind && !s->name) /* add namespace in case of NULL name */
+        s->name = str2id(pool, join2(pd->kind, ":", ""), 1);
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (!s->evr)
@@ -910,10 +910,10 @@ endElement(void *userData, const char *name)
       pd->kind = 0;
       break;
     case STATE_NAME:
-      if ( pd->kind )
-          s->name = str2id(pool, join2( pd->kind, ":", pd->content), 1);
+      if (pd->kind)
+        s->name = str2id(pool, join2(pd->kind, ":", pd->content), 1);
       else
-          s->name = str2id(pool, pd->content, 1);
+        s->name = str2id(pool, pd->content, 1);
       break;
     case STATE_ARCH:
       s->arch = str2id(pool, pd->content, 1);
@@ -968,7 +968,23 @@ endElement(void *userData, const char *name)
       if ((p = strrchr(pd->content, '/')) != 0)
 	{
 	  *p++ = 0;
-	  id = repodata_str2dir(pd->data, pd->content, 1);
+	  if (pd->lastdir && !strcmp(pd->lastdirstr, pd->content))
+	    {
+	      id = pd->lastdir;
+	    }
+	  else
+	    {
+	      int l;
+	      id = repodata_str2dir(pd->data, pd->content, 1);
+	      l = strlen(pd->content) + 1;
+	      if (l > pd->lastdirstrl)
+		{
+		  pd->lastdirstrl = l + 128;
+		  pd->lastdirstr = sat_realloc(pd->lastdirstr, pd->lastdirstrl);
+		}
+	      strcpy(pd->lastdirstr, pd->content);
+	      pd->lastdir = id;
+	    }
 	}
       else
 	{
@@ -1036,7 +1052,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_DISKUSAGE:
       if (pd->ndirs)
-        commit_diskusage (pd, pd->handle);
+        commit_diskusage(pd, pd->handle);
       break;
     default:
       break;
@@ -1125,6 +1141,29 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
      the package checksums we know about, to get an Id
      we can use in a cache */
   stringpool_init_empty(&pd.cspool);
+  if ((flags & REPO_EXTEND_SOLVABLES) != 0)
+    {
+      /* setup join data */
+      Dataiterator di;
+      dataiterator_init(&di, pool, repo, 0, SOLVABLE_CHECKSUM, 0, 0);
+      while (dataiterator_step(&di))
+	{
+	  const char *str;
+	  int index;
+	  
+	  if (!sat_chksum_len(di.key->type))
+	    continue;
+	  str = repodata_chk2str(di.data, di.key->type, (const unsigned char *)di.kv.str);
+          index = stringpool_str2id(&pd.cspool, str, 1);
+	  if (index >= pd.ncscache)
+	    {
+	      pd.cscache = sat_zextend(pd.cscache, pd.ncscache, index + 1 - pd.ncscache, sizeof(Id), 255);
+	      pd.ncscache = index + 1;
+	    }
+          pd.cscache[index] = di.solvid;
+	}
+      dataiterator_free(&di);
+    }
 
   XML_Parser parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
@@ -1144,9 +1183,11 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
     }
   XML_ParserFree(parser);
   sat_free(pd.content);
+  sat_free(pd.lastdirstr);
   join_freemem();
   stringpool_free(&pd.cspool);
   sat_free(pd.cscache);
+  
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", sat_timems(now));

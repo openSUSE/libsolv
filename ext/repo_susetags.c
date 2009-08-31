@@ -14,6 +14,7 @@
 
 #include "pool.h"
 #include "repo.h"
+#include "hash.h"
 #include "tools_util.h"
 #include "repo_susetags.h"
 
@@ -394,6 +395,46 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
     commit_diskusage(pd, handle);
 }
 
+static Hashtable
+joinhash_init(Repo *repo, Hashmask *hmp)
+{
+  Hashmask hm = mkmask(repo->nsolvables);
+  Hashtable ht = sat_calloc(hm + 1, sizeof(*ht));
+  Hashval h, hh;
+  Solvable *s;
+  int i;
+
+  FOR_REPO_SOLVABLES(repo, i, s)
+    {
+      hh = HASHCHAIN_START;
+      h = s->name & hm;
+      while (ht[h])
+        h = HASHCHAIN_NEXT(h, hh, hm);
+      ht[h] = i;
+    }
+  *hmp = hm;
+  return ht;
+}
+
+static Solvable *
+joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, Id name, Id evr, Id arch)
+{
+  Hashval h, hh;
+
+  if (!name || !arch || !evr)
+    return 0;
+  hh = HASHCHAIN_START;
+  h = name & hm;
+  while (ht[h])
+    {
+      Solvable *s = repo->pool->solvables + ht[h];
+      if (s->name == name && s->evr == evr && s->arch == arch)
+	return s;
+      h = HASHCHAIN_NEXT(h, hh, hm);
+    }
+  return 0;
+}
+
 
 /*
  * parse susetags
@@ -420,9 +461,14 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   struct parsedata pd;
   Repodata *data = 0;
   Id handle = 0;
+  Hashtable joinhash = 0;
+  Hashmask joinhashm = 0;
 
-  if ((flags & SUSETAGS_EXTEND) && repo->nrepodata)
-    indesc = 1;
+  if ((flags & (SUSETAGS_EXTEND|REPO_EXTEND_SOLVABLES)) != 0 && repo->nrepodata)
+    {
+      joinhash = joinhash_init(repo, &joinhashm);
+      indesc = 1;
+    }
 
   data = repo_add_repodata(repo, flags);
 
@@ -566,7 +612,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
       if ((tag == CTAG('=', 'P', 'k', 'g')
 	   || tag == CTAG('=', 'P', 'a', 't')))
 	{
-	  Id name, evr, arch;
 	  /* If we have an old solvable, complete it by filling in some
 	     default stuff.  */
 	  if (s)
@@ -589,66 +634,51 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      pool_debug(pool, SAT_FATAL, "susetags: bad line: %d: %s\n", pd.lineno, line);
 	      exit(1);
 	    }
-	  /* Lookup (but don't construct) the name and arch.  */
-	  if (pd.kind)
-	    name = str2id(pool, join2(pd.kind, ":", sp[0]), 0);
-	  else
-	    name = str2id(pool, sp[0], 0);
-	  arch = str2id(pool, sp[3], 0);
-	  evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-
 	  s = 0;
           freshens = 0;
 
-	  /* Now see if we know this solvable already.  If we found neither
-	     the name nor the arch at all in this repo
-	     there's no chance of finding the exact solvable either.  */
-	  if (name && arch && (indesc >= 2))
+	  if (joinhash)
 	    {
-	      int n, nn;
-	      /* Now look for a solvable with the given name,evr,arch.
-	       Our input is structured so, that the second set of =Pkg
-	       lines comes in roughly the same order as the first set, so we
-	       have a hint at where to start our search, namely were we found
-	       the last entry.  */
-	      for (n = repo->start, nn = n + last_found_pack; n < repo->end; n++, nn++)
-		{
-		  if (nn >= repo->end)
-		    nn = repo->start;
-		  s = pool->solvables + nn;
-		  if (s->repo == repo && s->name == name && s->evr == evr && s->arch == arch)
-		    break;
-		}
-	      if (n == repo->end)
-		s = 0;
+	      /* data join operation. find solvable matching name/arch/evr and
+               * add data to it */
+	      Id name, evr, arch;
+	      /* we don't use the create flag here as a simple pre-check for existance */
+	      if (pd.kind)
+		name = str2id(pool, join2(pd.kind, ":", sp[0]), 0);
 	      else
+		name = str2id(pool, sp[0], 0);
+	      evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+	      arch = str2id(pool, sp[3], 0);
+	      if (name && arch)
 		{
-		  last_found_pack = nn - repo->start;
-		  handle = nn;
+		  if (repo->start + last_found_pack + 1 < repo->end)
+		    {
+		      s = pool->solvables + repo->start + last_found_pack + 1;
+		      if (s->repo != repo || s->name != name || s->evr != evr || s->arch != arch)
+			s = 0;
+		    }
+		  if (!s)
+		    s = joinhash_lookup(repo, joinhash, joinhashm, name, evr, arch);
 		}
+	      if (!s && (flags & REPO_EXTEND_SOLVABLES) != 0)
+		continue;
+	      /* fallthrough to package creation */
 	    }
-
-
-	  /* And if we still don't have a solvable, create a new one.  */
 	  if (!s)
 	    {
+	      /* normal operation. create a new solvable. */
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
-	      last_found_pack = (s - pool->solvables) - repo->start;
-	      if (data)
-		handle = s - pool->solvables;
-	      if (name)
-	        s->name = name;
-	      else if (pd.kind)
+	      if (pd.kind)
 		s->name = str2id(pool, join2(pd.kind, ":", sp[0]), 1);
 	      else
 		s->name = str2id(pool, sp[0], 1);
-	      s->evr = evr;
-	      if (arch)
-	        s->arch = arch;
-	      else
-	        s->arch = str2id(pool, sp[3], 1);
+	      s->evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+	      s->arch = str2id(pool, sp[3], 1);
 	      s->vendor = defvendor;
 	    }
+	  last_found_pack = (s - pool->solvables) - repo->start;
+	  if (data)
+	    handle = s - pool->solvables;
 	}
 
       /* If we have no current solvable to add to, ignore all further lines
@@ -656,7 +686,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	 solvables.  */
       if (indesc >= 2 && !s)
         {
+#if 0
 	  pool_debug(pool, SAT_ERROR, "susetags: huh %d: %s?\n", pd.lineno, line);
+#endif
           continue;
 	}
       switch (tag)
@@ -745,6 +777,12 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    last_found_pack = 0;
 	    handle = 0;
 	    indesc++;
+	    if (indesc > 1)
+	      {
+	        sat_free(joinhash);
+		repodata_internalize(data);
+	        joinhash = joinhash_init(repo, &joinhashm);
+	      }
 	    continue;
           case CTAG('=', 'V', 'n', 'd'):                                        /* vendor */
             s->vendor = str2id(pool, line + 6, 1);
@@ -907,6 +945,24 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
     {
       int i, last_found;
       last_found = 0;
+      Map keyidmap;
+
+      map_init(&keyidmap, data->nkeys);
+      for (i = 1; i < data->nkeys; i++)
+	{
+	  Id keyname = data->keys[i].name;
+	  if (keyname == SOLVABLE_INSTALLSIZE || keyname == SOLVABLE_DISKUSAGE || keyname == SOLVABLE_FILELIST)
+	    continue;
+	  if (keyname == SOLVABLE_MEDIADIR || keyname == SOLVABLE_MEDIAFILE || keyname == SOLVABLE_MEDIANR)
+	    continue;
+	  if (keyname == SOLVABLE_DOWNLOADSIZE || keyname == SOLVABLE_CHECKSUM)
+	    continue;
+	  if (keyname == SOLVABLE_SOURCENAME || keyname == SOLVABLE_SOURCEARCH || keyname == SOLVABLE_SOURCEEVR)
+	    continue;
+	  if (keyname == SOLVABLE_PKGID || keyname == SOLVABLE_HDRID || keyname == SOLVABLE_LEADSIGID)
+	    continue;
+	  MAPSET(&keyidmap, i);
+	}
       for (i = 0; i < pd.nshare; i++)
         if (pd.share_with[i])
 	  {
@@ -937,12 +993,14 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		  }
 	      }
 	    if (n != repo->end)
-	      repodata_merge_attrs(data, repo->start + i, repo->start + last_found);
+	      repodata_merge_some_attrs(data, repo->start + i, repo->start + last_found, &keyidmap, 0);
 	    free(pd.share_with[i]);
 	  }
       free(pd.share_with);
+      map_free(&keyidmap);
     }
 
+  sat_free(joinhash);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 

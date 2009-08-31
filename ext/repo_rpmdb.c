@@ -22,14 +22,14 @@
 #include <unistd.h>
 #include <assert.h>
 
-#ifdef FEDORA
-#include <db4/db.h>
-#else
-#include <rpm/db.h>
-#endif
 #include <rpm/rpmio.h>
 #include <rpm/rpmpgp.h>
 #include <rpm/header.h>
+#include <rpm/rpmdb.h>
+
+#ifndef DB_CREATE
+#include <db4/db.h>
+#endif
 
 #include "pool.h"
 #include "repo.h"
@@ -537,7 +537,7 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
       sat_free(fsz);
       return;
     }
-  /* stupid rpm recodrs sizes of directories, so we have to check the mode */
+  /* stupid rpm records sizes of directories, so we have to check the mode */
   fm = headint16array(rpmhead, TAG_FILEMODES, &fszc);
   if (!fm || fc != fszc)
     {
@@ -623,11 +623,11 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
   fkb = sat_calloc(dic, sizeof(unsigned int));
   for (i = 0; i < fc; i++)
     {
-      if (fsz[i] == 0 || !S_ISREG(fm[i]))
-	continue;
       if (di[i] >= dic)
 	continue;
       fn[di[i]]++;
+      if (fsz[i] == 0 || !S_ISREG(fm[i]))
+	continue;
       fkb[di[i]] += fsz[i] / 1024 + 1;
     }
   sat_free(fsz);
@@ -1908,6 +1908,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   char **md = 0;
   char **lt = 0;
   unsigned int *di, diidx;
+  unsigned int *co = 0;
   unsigned int lastdir;
   int lastdirl;
   unsigned int *fm;
@@ -1963,6 +1964,20 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	  return;
 	}
     }
+  if ((flags & RPM_ITERATE_FILELIST_WITHCOL) != 0)
+    {
+      co = headint32array(rpmhead, TAG_FILECOLORS, &cnt2);
+      if (!co || cnt != cnt2)
+	{
+	  sat_free(co);
+	  sat_free(md);
+	  sat_free(fm);
+	  sat_free(di);
+	  sat_free(bn);
+	  sat_free(dn);
+	  return;
+	}
+    }
   lastdir = dcnt;
   lastdirl = 0;
   for (i = 0; i < cnt; i++)
@@ -2005,9 +2020,12 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 		}
 	    }
 	  if (!md5p)
-	    md5p = "";
+	    {
+	      sprintf(md5, "%08x%08x", (fm[i] >> 12) & 65535, 0);
+	      md5p = md5;
+	    }
 	}
-      (*cb)(cbdata, space, fm[i], md5p);
+      (*cb)(cbdata, space, co ? (fm[i] | co[i] << 24) : fm[i], md5p);
     }
   sat_free(space);
   sat_free(lt);
@@ -2016,6 +2034,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   sat_free(di);
   sat_free(bn);
   sat_free(dn);
+  sat_free(co);
 }
 
 char *
@@ -2081,10 +2100,8 @@ struct rpmdbentry {
 #define ENTRIES_BLOCK 255
 #define NAMEDATA_BLOCK 1023
 
-#define FLAGS_GET_PUBKEYS 1
-
 static struct rpmdbentry *
-getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *match, int *nentriesp, char **namedatap, int flags)
+getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *match, int *nentriesp, char **namedatap)
 {
   DB_ENV *dbenv = 0;
   DB *db = 0;
@@ -2137,19 +2154,8 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
     }
   while (dbc->c_get(dbc, &dbkey, &dbdata, match ? DB_SET : DB_NEXT) == 0)
     {
-      if (!match)
-	{
-	  if ((flags & FLAGS_GET_PUBKEYS))
-	    {
-	      if (dbkey.size != 10 || memcmp(dbkey.data, "gpg-pubkey", 10))
-		continue;
-	    }
-	  else
-	    {
-	      if (dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
-		continue;
-	    }
-	}
+      if (!match && dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
+	continue;
       dl = dbdata.size;
       dp = dbdata.data;
       while(dl >= 8)
@@ -2184,26 +2190,41 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
   return entries;
 }
 
+static void
+freestate(struct rpm_by_state *state)
+{
+  /* close down */
+  if (!state)
+    return;
+  if (state->db)
+    state->db->close(state->db, 0);
+  if (state->dbenv)
+    state->dbenv->close(state->dbenv, 0);
+  sat_free(state->rpmhead);
+}
+
 int
-rpm_installedrpmdbids(const char *rootdir, Queue *rpmdbidq)
+rpm_installedrpmdbids(const char *rootdir, const char *index, const char *match, Queue *rpmdbidq)
 {
   struct rpm_by_state state;
   struct rpmdbentry *entries;
   int nentries, i;
   char *namedata;
 
+  if (!index)
+    index = "Name";
   if (rpmdbidq)
     queue_empty(rpmdbidq);
   memset(&state, 0, sizeof(state));
   if (!(state.dbenv = opendbenv(rootdir)))
     return 0;
-  entries = getinstalledrpmdbids(&state, "Name", 0, &nentries, &namedata, 0);
+  entries = getinstalledrpmdbids(&state, index, match, &nentries, &namedata);
   if (rpmdbidq)
     for (i = 0; i < nentries; i++)
       queue_push(rpmdbidq, entries[i].rpmdbid);
   sat_free(entries);
   sat_free(namedata);
-  rpm_byrpmdbid(0, 0, (void **)&state);
+  freestate(&state);
   return nentries;
 }
 
@@ -2219,13 +2240,7 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
   if (!rpmdbid)
     {
       /* close down */
-      if (!state)
-	return 0;
-      if (state->db)
-	state->db->close(state->db, 0);
-      if (state->dbenv)
-        state->dbenv->close(state->dbenv, 0);
-      sat_free(state->rpmhead);
+      freestate(state);
       sat_free(state);
       *statep = (void *)0;
       return 0;
@@ -2943,10 +2958,11 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
   memset(&state, 0, sizeof(state));
   if (!(state.dbenv = opendbenv(rootdir)))
     return;
-  entries = getinstalledrpmdbids(&state, "Name", 0, &nentries, &namedata, FLAGS_GET_PUBKEYS);
+  entries = getinstalledrpmdbids(&state, "Name", "gpg-pubkey", &nentries, &namedata);
   for (i = 0 ; i < nentries; i++)
     {
-      RpmHead *rpmhead = rpm_byrpmdbid(entries[i].rpmdbid, rootdir, (void **)&state);
+      void *statep = &state;
+      RpmHead *rpmhead = rpm_byrpmdbid(entries[i].rpmdbid, rootdir, &statep);
       if (!rpmhead)
 	continue;
       str = headstring(rpmhead, TAG_DESCRIPTION);
@@ -2961,7 +2977,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
 	repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
       repo->rpmdbid[s - pool->solvables - repo->start] = entries[i].rpmdbid;
     }
-  rpm_byrpmdbid(0, 0, (void **)&state);
+  freestate(&state);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 }

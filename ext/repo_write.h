@@ -20,4 +20,6 @@
 void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp);
 int repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata);
 
+void repodata_write(Repodata *data , FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata);
+
 #endif

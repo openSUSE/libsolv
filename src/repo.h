@@ -20,7 +20,7 @@
 
 
 typedef struct _Repo {
-  const char *name;		/* application private name pointer */
+  const char *name;		/* name pointer */
   Id repoid;			/* our id */
   void *appdata;		/* application private pointer */
 
@@ -46,6 +46,7 @@ typedef struct _Repo {
 
 extern Repo *repo_create(Pool *pool, const char *name);
 extern void repo_free(Repo *repo, int reuseids);
+extern void repo_empty(Repo *repo, int reuseids);
 extern void repo_freeallrepos(Pool *pool, int reuseids);
 extern void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids);
 extern void *repo_sidedata_create(Repo *repo, size_t size);
@@ -153,12 +154,14 @@ typedef struct _KeyValue {
 } KeyValue;
 
 /* search matcher flags */
-#define SEARCH_STRINGMASK	15
-#define SEARCH_STRING		1
-#define SEARCH_SUBSTRING	2
-#define SEARCH_GLOB 		3
-#define SEARCH_REGEX 		4
-#define SEARCH_ERROR 		5
+#define SEARCH_STRINGMASK		15
+#define SEARCH_STRING			1
+#define SEARCH_STRINGSTART		2
+#define SEARCH_STRINGEND		3
+#define SEARCH_SUBSTRING		4
+#define SEARCH_GLOB 			5
+#define SEARCH_REGEX 			6
+#define SEARCH_ERROR 			15
 #define	SEARCH_NOCASE			(1<<7)
 
 /* iterator control */
@@ -166,6 +169,7 @@ typedef struct _KeyValue {
 #define SEARCH_SUB			(1<<9)
 #define SEARCH_ARRAYSENTINEL		(1<<10)
 #define SEARCH_DISABLED_REPOS		(1<<11)
+#define SEARCH_COMPLETE_FILELIST	(1<<12)
 
 /* stringification flags */
 #define SEARCH_SKIP_KIND		(1<<16)
@@ -183,6 +187,8 @@ typedef struct _KeyValue {
 #define REPO_REUSE_REPODATA		(1 << 0)
 #define REPO_NO_INTERNALIZE		(1 << 1)
 #define REPO_LOCALPOOL			(1 << 2)
+#define REPO_USE_LOADING		(1 << 3)
+#define REPO_EXTEND_SOLVABLES		(1 << 4)
 
 Repodata *repo_add_repodata(Repo *repo, int flags);
 Repodata *repo_last_repodata(Repo *repo);

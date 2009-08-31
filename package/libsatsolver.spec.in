@@ -1,9 +1,8 @@
-
 Name:           libsatsolver
 Version:        @VERSION@
 Release:        1
 License:        BSD 3-Clause
-Url:            http://svn.opensuse.org/svn/zypp/trunk/sat-solver
+Url:            git://git.opensuse.org/projects/zypp/sat-solver.git
 Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
@@ -15,7 +14,7 @@ BuildRequires:  doxygen
 BuildRequires:  libneon0.26-devel
 %endif
 %if 0%{?fedora_version}
-BuildRequires:  perl-devel
+BuildRequires:  perl-devel db4-devel ruby ruby-rdoc
 %endif
 %if 0%{?suse_version}
 %if 0%{?suse_version} < 1030
@@ -42,6 +41,7 @@ Summary:        A new approach to package dependency solving
 %if 0%{?fedora_version}
 %{!?py_sitedir: %define py_sitedir %(%__python -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
 %{!?py_requires: %define py_requires Requires: python}
+%{!?ruby_sitearch: %global ruby_sitearch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"] ')}
 %endif
 
 %description
@@ -71,39 +71,62 @@ Development files for satsolver, a new approach to package dependency solving
 #%description devel-doc
 #Developer documentation for satsolver, a new approach to package dependency solving
 
+
+Authors:
+--------
+    Michael Schroeder <mls@suse.de>
+    Klaus Kaempf <kkaempf@suse.de>
+    Stephan Kulow <coolo@suse.de>
+    Michael Matz <matz@suse.de>
+    Duncan Mac-Vicar P. <dmacvicar@suse.de>
+
 %package -n satsolver-tools
 Summary:        A new approach to package dependency solving
-Group:          System/Base
+Group:          Development/Libraries/C and C++
 Obsoletes:      libsatsolver <= 0.0.15
 Provides:       libsatsolver = %{version}-%{release}
 Requires:       gzip bzip2 coreutils
 
 %description -n satsolver-tools
-A new approach to package dependency solving
+A new approach to package dependency solving.
+
+%package demo
+Summary:        Applications demoing the satsolver library
+Group:          System/Management
+Requires:       curl
+%if 0%{?fedora_version}
+Requires:       gnupg2
+%endif
+%if 0%{?suse_version}
+Requires:       gpg2
+%endif
+
+%description demo
+Applications demoing the satsolver library.
 
 %package -n ruby-satsolver
 Summary:        Ruby bindings for sat solver
 Group:          Development/Languages/Ruby
 
 %description -n ruby-satsolver
-A new approach to package dependency solving
-
+Ruby bindings for sat solver.
 
 %package -n python-satsolver
 %py_requires
-Summary:        Python bindings for satsolver
-Group:          Development/Libraries/C and C++
+Summary:        Python bindings for sat solver
+Group:          Development/Languages/Python
 
 %description -n python-satsolver
-This allows to use satsolver functionality from Python
+Python bindings for sat solver.
 
 %package -n perl-satsolver
 Requires:       perl = %{perl_version}
-Summary:        A new approach to package dependency solving
-Group:          Development/Libraries/C and C++
+Summary:        Perl bindings for sat solver
+Group:          Development/Languages/Perl
 
 %description -n perl-satsolver
-A new approach to package dependency solving
+Perl bindings for sat solver.
+
 
 %prep
 %setup -n satsolver-%{version}
@@ -112,12 +135,18 @@ A new approach to package dependency solving
 export CFLAGS="$RPM_OPT_FLAGS"
 export CXXFLAGS="$CFLAGS"
 
-cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
-      -DPYTHON_SITEDIR=%{py_sitedir} \
-      -DLIB=%{_lib} \
-      -DCMAKE_VERBOSE_MAKEFILE=TRUE \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_SKIP_RPATH=1 
+CMAKE_FLAGS=
+%if 0%{?fedora_version}
+CMAKE_FLAGS="-DFEDORA=1"
+%endif
+
+cmake   $CMAKE_FLAGS \
+	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
+	-DPYTHON_SITEDIR=%{py_sitedir} \
+	-DLIB=%{_lib} \
+	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
+	-DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_SKIP_RPATH=1 
 make %{?jobs:-j %jobs}
 make doc_forced
 
@@ -147,6 +176,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %doc LICENSE*
 %exclude /usr/bin/deptestomatic
 %exclude /usr/bin/helix2solv
+%exclude /usr/bin/solv
 /usr/bin/*
 
 %files devel
@@ -158,6 +188,10 @@ rm -rf "$RPM_BUILD_ROOT"
 /usr/include/satsolver/*
 /usr/bin/deptestomatic
 /usr/bin/helix2solv
+
+%files demo
+%defattr(-,root,root)
+/usr/bin/solv
 
 #%files devel-doc
 #%defattr(-,root,root)
@@ -176,6 +210,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %endif
 %if 0%{?mandriva_version}
 %{ruby_sitearchdir}/satsolver.so
+%endif
+%if 0%{?fedora_version}
+%{ruby_sitearch}/satsolver.so
 %endif
 %doc bindings/ruby/html
 

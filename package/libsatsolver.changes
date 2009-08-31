@@ -1,4 +1,29 @@
 -------------------------------------------------------------------
+Fri Aug 28 11:06:31 CEST 2009 - ma@suse.de
+
+- add support for SOLVER_SOLVABLE_REPO
+- 0.14.5
+
+-------------------------------------------------------------------
+Thu Jul 30 12:49:38 CEST 2009 - mls@suse.de
+
+- speed up file list parsing
+- speed up addfileprovides
+- fix bugs in pubkey handling
+- fix bug in filelist handling when there are no abs paths
+- 0.14.4
+
+-------------------------------------------------------------------
+Fri Jul 17 14:07:07 CEST 2009 - mls@suse.de
+
+- add satversion.h header file
+- many changes regarding the load callback
+- more dataiterator control functions
+- add transaction ordering code
+- add support for file conflict checking
+- 0.14.3
+
+-------------------------------------------------------------------
 Mon Jun 22 16:01:02 CEST 2009 - mls@suse.de
 
 - create libsatsolverext.a

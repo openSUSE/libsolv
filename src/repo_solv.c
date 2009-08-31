@@ -42,8 +42,6 @@
 static Pool *mypool;		/* for pool_debug... */
 
 
-static void repodata_load_stub(Repodata *data);
-
 
 /*******************************************************************************
  * functions to extract data from a file handle
@@ -408,101 +406,15 @@ incore_add_u8(Repodata *data, unsigned int x)
 
 
 /*******************************************************************************
- * callback to create our stub sub-repodatas from the incore data
- */
-
-struct create_stub_data {
-  Repodata *data;
-  Id xkeyname;
-};
-
-static int
-create_stub_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
-{
-  struct create_stub_data *stubdata = cbdata;
-  if (key->name == REPOSITORY_EXTERNAL && key->type == REPOKEY_TYPE_FLEXARRAY)
-    {
-      if (stubdata->data)
-	{
-	  repodata_internalize(stubdata->data);
-	  if (data->start != data->end)
-	    {
-	      repodata_extend(stubdata->data, data->start);
-	      repodata_extend(stubdata->data, data->end - 1);
-	    }
-	  stubdata->data = 0;
-	}
-      if (kv->eof == 2)
-	return SEARCH_NEXT_SOLVABLE;
-      stubdata->data = repo_add_repodata(data->repo, 0);
-      stubdata->data->state = REPODATA_STUB;
-      stubdata->data->loadcallback = repodata_load_stub;
-      return SEARCH_ENTERSUB;
-    }
-  if (!stubdata->data)
-    return SEARCH_NEXT_KEY;
-  switch(key->type)
-    {
-    case REPOKEY_TYPE_ID:
-      repodata_set_id(stubdata->data, SOLVID_META, key->name, kv->id);
-      break;
-    case REPOKEY_TYPE_CONSTANTID:
-      repodata_set_constantid(stubdata->data, SOLVID_META, key->name, kv->id);
-      break;
-    case REPOKEY_TYPE_STR:
-      repodata_set_str(stubdata->data, SOLVID_META, key->name, kv->str);
-      break;
-    case REPOKEY_TYPE_VOID:
-      repodata_set_void(stubdata->data, SOLVID_META, key->name);
-      break;
-    case REPOKEY_TYPE_NUM:
-      repodata_set_num(stubdata->data, SOLVID_META, key->name, kv->num);
-      break;
-    case REPOKEY_TYPE_IDARRAY:
-      repodata_add_idarray(stubdata->data, SOLVID_META, key->name, kv->id);
-      if (key->name == REPOSITORY_KEYS)
-	{
-	  if (!stubdata->xkeyname)
-	    stubdata->xkeyname = kv->id;
-	  else
-	    {
-	      Repokey xkey;
-
-	      xkey.name = stubdata->xkeyname;
-	      xkey.type = kv->id;
-	      xkey.storage = KEY_STORAGE_INCORE;
-	      xkey.size = 0;
-	      repodata_key2id(stubdata->data, &xkey, 1);
-	      stubdata->xkeyname = 0;
-	    }
-	  if (kv->eof)
-	    stubdata->xkeyname = 0;
-	}
-      break;
-    case REPOKEY_TYPE_MD5:
-    case REPOKEY_TYPE_SHA1:
-    case REPOKEY_TYPE_SHA256:
-      repodata_set_checksum(stubdata->data, SOLVID_META, key->name, key->type, kv->str);
-      break;
-    default:
-      return SEARCH_NEXT_KEY;
-    }
-  return 0;
-}
-
-
-/*******************************************************************************
  * our main function
  */
 
 /*
  * read repo from .solv file and add it to pool
- * if stubdata is set, substitute it with read data
- * (this is used to replace a repodata stub with the real data)
  */
 
-static int
-repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
+int
+repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   int i, l;
@@ -519,7 +431,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   int hh;
   Id *hashtbl;
   Id name, evr, did;
-  int flags;
+  int relflags;
   Reldep *ran;
   unsigned int size_idarray;
   Id *idarraydatap, *idarraydataend;
@@ -541,10 +453,19 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 
   struct _Stringpool *spool;
 
+  Repodata *parent = 0;
   Repodata data;
 
   now = sat_timems(0);
 
+  if ((flags & REPO_USE_LOADING) != 0)
+    {
+      /* this is a stub replace operation */
+      flags |= REPO_EXTEND_SOLVABLES;
+      /* use REPO_REUSE_REPODATA hack so that the old repodata is kept */
+      parent = repo_add_repodata(repo, flags | REPO_REUSE_REPODATA);
+    }
+    
   memset(&data, 0, sizeof(data));
   data.repo = repo;
   data.fp = fp;
@@ -583,18 +504,25 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       return SOLV_ERROR_CORRUPT;
     }
 
-  if (parent)
+  if (numrel && (flags & REPO_LOCALPOOL) != 0)
     {
-      if (numrel)
-	{
-	  pool_debug(pool, SAT_ERROR, "relations are forbidden in a sub-repository\n");
-	  return SOLV_ERROR_CORRUPT;
-	}
+      pool_debug(pool, SAT_ERROR, "relations are forbidden in a local pool\n");
+      return SOLV_ERROR_CORRUPT;
+    }
+  if (parent && numsolv)
+    {
+      /* make sure that we exactly replace the stub repodata */
       if (parent->end - parent->start != numsolv)
 	{
-	  pool_debug(pool, SAT_ERROR, "sub-repository solvable number doesn't match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
+	  pool_debug(pool, SAT_ERROR, "sub-repository solvable number does not match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
 	  return SOLV_ERROR_CORRUPT;
 	}
+      for (i = 0; i < numsolv; i++)
+	if (pool->solvables[parent->start + i].repo != repo)
+	  {
+	    pool_debug(pool, SAT_ERROR, "main repository contains holes\n");
+	    return SOLV_ERROR_CORRUPT;
+	  }
     }
 
   /*******  Part 1: string IDs  *****************************************/
@@ -611,7 +539,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
    * alloc buffers
    */
 
-  if (!parent)
+  if (!(flags & REPO_LOCALPOOL))
     spool = &pool->ss;
   else
     {
@@ -690,7 +618,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
 
-  if (parent)
+  if ((flags & REPO_LOCALPOOL) != 0)
     {
       /* no shared pool, thus no idmap and no unification */
       idmap = 0;
@@ -841,17 +769,17 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	{
 	  name = read_id(&data, i + numid);	/* read (repo relative) Ids */
 	  evr = read_id(&data, i + numid);
-	  flags = read_u8(&data);
+	  relflags = read_u8(&data);
 	  name = idmap[name];		/* map to (pool relative) Ids */
 	  evr = idmap[evr];
-	  h = relhash(name, evr, flags) & hashmask;
+	  h = relhash(name, evr, relflags) & hashmask;
 	  hh = HASHCHAIN_START;
 	  for (;;)
 	    {
 	      id = hashtbl[h];
 	      if (id == ID_NULL)	/* end of hash chain */
 		break;
-	      if (ran[id].name == name && ran[id].evr == evr && ran[id].flags == flags)
+	      if (ran[id].name == name && ran[id].evr == evr && ran[id].flags == relflags)
 		break;
 	      h = HASHCHAIN_NEXT(h, hh, hashmask);
 	    }
@@ -861,7 +789,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	      hashtbl[h] = id;
 	      ran[id].name = name;
 	      ran[id].evr = evr;
-	      ran[id].flags = flags;
+	      ran[id].flags = relflags;
 	    }
 	  idmap[i + numid] = MAKERELDEP(id);   /* fill Id map */
 	}
@@ -898,12 +826,12 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
       id = read_id(&data, numid);
       if (idmap)
 	id = idmap[id];
-      else if (parent)
+      else if ((flags & REPO_LOCALPOOL) != 0)
         id = str2id(pool, stringpool_id2str(spool, id), 1);
       type = read_id(&data, numid);
       if (idmap)
 	type = idmap[type];
-      else if (parent)
+      else if ((flags & REPO_LOCALPOOL) != 0)
         type = str2id(pool, stringpool_id2str(spool, type), 1);
       if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_FLEXARRAY)
 	{
@@ -923,7 +851,7 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
 	{
 	  if (idmap)
 	    keys[i].size = idmap[keys[i].size];
-	  else if (parent)
+	  else if ((flags & REPO_LOCALPOOL) != 0)
 	    keys[i].size = str2id(pool, stringpool_id2str(spool, keys[i].size), 1);
 	}
 #if 0
@@ -1017,9 +945,47 @@ repo_add_solv_parent(Repo *repo, FILE *fp, Repodata *parent)
   needchunk = 1;
   for(;;)
     {
+      /* make sure we have enough room */
+      if (keydepth == 0 || needchunk)
+	{
+	  int left = bufend - dp;
+	  /* read data chunk to dp */
+	  if (data.error)
+	    break;
+	  if (left < 0)
+	    {
+	      pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
+	      data.error = SOLV_ERROR_EOF;
+	      break;
+	    }
+	  if (left < maxsize)
+	    {
+	      if (left)
+		memmove(buf, dp, left);
+	      l = maxsize - left;
+	      if (l < DATA_READ_CHUNK)
+		l = DATA_READ_CHUNK;
+	      if (l > allsize)
+		l = allsize;
+	      if (l && fread(buf + left, l, 1, data.fp) != 1)
+		{
+		  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+		  data.error = SOLV_ERROR_EOF;
+		  break;
+		}
+	      allsize -= l;
+	      left += l;
+	      bufend = buf + left;
+	      if (allsize + left < maxsize)
+		maxsize = allsize + left;
+	      dp = buf;
+	    }
+	  needchunk = 0;
+	}
+
       key = *keyp++;
 #if 0
-printf("key %d at %d\n", key, keyp - 1 - schemadata);
+printf("key %d at %d\n", key, (int)(keyp - 1 - schemadata));
 #endif
       if (!key)
 	{
@@ -1058,42 +1024,6 @@ printf("pop flexarray %d %d\n", keydepth, nentries);
 
       if (keydepth == 0)
 	data.mainschemaoffsets[keyp - 1 - (schemadata + schemata[data.mainschema])] = data.incoredatalen;
-      if (keydepth == 0 || needchunk)
-	{
-	  int left = bufend - dp;
-	  /* read data chunk to dp */
-	  if (data.error)
-	    break;
-	  if (left < 0)
-	    {
-	      pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
-	      data.error = SOLV_ERROR_EOF;
-	      break;
-	    }
-	  if (left < maxsize)
-	    {
-	      if (left)
-		memmove(buf, dp, left);
-	      l = maxsize - left;
-	      if (l < DATA_READ_CHUNK)
-		l = DATA_READ_CHUNK;
-	      if (l > allsize)
-		l = allsize;
-	      if (l && fread(buf + left, l, 1, data.fp) != 1)
-		{
-		  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
-		  data.error = SOLV_ERROR_EOF;
-		  break;
-		}
-	      allsize -= l;
-	      left += l;
-	      bufend = buf + left;
-	      if (allsize + left < maxsize)
-		maxsize = allsize + left;
-	      dp = buf;
-	    }
-	  needchunk = 0;
-	}
 
 #if 0
 printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].type), s);
@@ -1345,7 +1275,7 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
   if (parent)
     {
       /* overwrite stub repodata */
-      repodata_free(parent);
+      repodata_freedata(parent);
       *parent = data;
     }
   else
@@ -1356,15 +1286,13 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
     }
 
   /* create stub repodata entries for all external */
-  for (key = 1 ; key < data.nkeys; key++)
-    if (data.keys[key].name == REPOSITORY_EXTERNAL && data.keys[key].type == REPOKEY_TYPE_FLEXARRAY)
-      break;
-  if (key < data.nkeys)
+  if (!(flags & SOLV_ADD_NO_STUBS) && !parent)
     {
-      struct create_stub_data stubdata;
-      /* got some */
-      memset(&stubdata, 0, sizeof(stubdata));
-      repodata_search(&data, SOLVID_META, REPOSITORY_EXTERNAL, SEARCH_ARRAYSENTINEL, create_stub_cb, &stubdata);
+      for (key = 1 ; key < data.nkeys; key++)
+	if (data.keys[key].name == REPOSITORY_EXTERNAL && data.keys[key].type == REPOKEY_TYPE_FLEXARRAY)
+	  break;
+      if (key < data.nkeys)
+	repodata_create_stubs(repo->repodata + (repo->nrepodata - 1));
     }
 
   POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_solv took %d ms\n", sat_timems(now));
@@ -1376,30 +1304,5 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
 int
 repo_add_solv(Repo *repo, FILE *fp)
 {
-  return repo_add_solv_parent(repo, fp, 0);
-}
-
-static void
-repodata_load_stub(Repodata *data)
-{
-  FILE *fp;
-  Pool *pool = data->repo->pool;
-  if (!pool->loadcallback)
-    {   
-      data->state = REPODATA_ERROR;
-      return;
-    }   
-  /* so that we can retrieve meta data */
-  data->state = REPODATA_AVAILABLE;
-  fp = pool->loadcallback(pool, data, pool->loadcallbackdata);
-  if (!fp)
-    {   
-      data->state = REPODATA_ERROR;
-      return;
-    }   
-  if (repo_add_solv_parent(data->repo, fp, data))
-    data->state = REPODATA_ERROR;
-  else
-    data->state = REPODATA_AVAILABLE;
-  fclose(fp);
+  return repo_add_solv_flags(repo, fp, 0);
 }

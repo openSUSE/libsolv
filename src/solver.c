@@ -975,6 +975,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   if (lastweak)
     {
       Id v;
+      extern void disablechoicerules(Solver *solv, Rule *r);
       /* disable last weak rule */
       solv->problems.count = oldproblemcount;
       solv->learnt_pool.count = oldlearntpoolcount;
@@ -984,6 +985,8 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
         v = lastweak;
       POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "disabling ");
       solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, solv->rules + lastweak);
+      if (lastweak >= solv->choicerules && lastweak < solv->choicerules_end)
+	disablechoicerules(solv, solv->rules + lastweak);
       solver_disableproblem(solv, v);
       if (v < 0)
 	solver_reenablepolicyrules(solv, -(v + 1));
@@ -1289,6 +1292,7 @@ solver_free(Solver *solv)
   map_free(&solv->noobsoletes);
 
   map_free(&solv->updatemap);
+  map_free(&solv->fixmap);
   map_free(&solv->dupmap);
   map_free(&solv->dupinvolvedmap);
 
@@ -1298,6 +1302,7 @@ solver_free(Solver *solv)
   sat_free(solv->obsoletes);
   sat_free(solv->obsoletes_data);
   sat_free(solv->multiversionupdaters);
+  sat_free(solv->choicerules_ref);
   sat_free(solv);
 }
 
@@ -1323,6 +1328,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   Pool *pool = solv->pool;
   Id p, *dp;
   int minimizationsteps;
+  int installedpos = solv->installed ? solv->installed->start : 0;
 
   IF_POOLDEBUG (SAT_DEBUG_RULE_CREATION)
     {
@@ -1339,18 +1345,19 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   /* start SAT algorithm */
   level = 1;
   systemlevel = level + 1;
-  POOL_DEBUG(SAT_DEBUG_STATS, "solving...\n");
+  POOL_DEBUG(SAT_DEBUG_SOLVER, "solving...\n");
 
   queue_init(&dq);
   queue_init(&dqs);
 
   /*
    * here's the main loop:
-   * 1) propagate new decisions (only needed for level 1)
-   * 2) try to keep installed packages
-   * 3) fulfill all unresolved rules
-   * 4) install recommended packages
-   * 5) minimalize solution if we had choices
+   * 1) propagate new decisions (only needed once)
+   * 2) fulfill jobs
+   * 3) try to keep installed packages
+   * 4) fulfill all unresolved rules
+   * 5) install recommended packages
+   * 6) minimalize solution if we had choices
    * if we encounter a problem, we rewind to a safe level and restart
    * with step 1
    */
@@ -1359,9 +1366,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   for (;;)
     {
       /*
-       * propagate
+       * initial propagation of the assertions
        */
-
       if (level == 1)
 	{
 	  POOL_DEBUG(SAT_DEBUG_PROPAGATE, "propagating (propagate_index: %d;  size decisionq: %d)...\n", solv->propagate_index, solv->decisionq.count);
@@ -1375,6 +1381,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 	}
 
+      /*
+       * resolve jobs first
+       */
      if (level < systemlevel)
 	{
 	  POOL_DEBUG(SAT_DEBUG_SOLVER, "resolving job rules\n");
@@ -1434,26 +1443,34 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * installed packages
        */
-
       if (level < systemlevel && solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
 	{
 	  Repo *installed = solv->installed;
 	  int pass;
 
+	  POOL_DEBUG(SAT_DEBUG_SOLVER, "resolving installed packages\n");
 	  /* we use two passes if we need to update packages 
            * to create a better user experience */
 	  for (pass = solv->updatemap.size ? 0 : 1; pass < 2; pass++)
 	    {
-	      FOR_REPO_SOLVABLES(installed, i, s)
+	      int passlevel = level;
+	      /* start with installedpos, the position that gave us problems last time */
+	      for (i = installedpos, n = installed->start; n < installed->end; i++, n++)
 		{
 		  Rule *rr;
 		  Id d;
 
+		  if (i == installed->end)
+		    i = installed->start;
+		  s = pool->solvables + i;
+		  if (s->repo != installed)
+		    continue;
+
+		  if (solv->decisionmap[i] > 0)
+		    continue;
 		  /* XXX: noupdate check is probably no longer needed, as all jobs should
                    * already be satisfied */
 		  if (MAPTST(&solv->noupdate, i - installed->start))
-		    continue;
-		  if (solv->decisionmap[i] > 0)
 		    continue;
 		  if (!pass && solv->updatemap.size && !MAPTST(&solv->updatemap, i - installed->start))
 		    continue;		/* updates first */
@@ -1516,7 +1533,15 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			  return;
 			}
 		      if (level <= olevel)
-			break;
+			{
+			  if (level < passlevel)
+			    break;	/* trouble */
+			  if (level < olevel)
+			    n = installed->start;	/* redo all */
+			  i--;
+			  n--;
+			  continue;
+			}
 		    }
 		  /* if still undecided keep package */
 		  if (solv->decisionmap[i] == 0)
@@ -1531,11 +1556,23 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			  return;
 			}
 		      if (level <= olevel)
-			break;
+			{
+			  if (level < passlevel)
+			    break;	/* trouble */
+			  if (level < olevel)
+			    n = installed->start;	/* redo all */
+			  i--;
+			  n--;
+			  continue; /* retry with learnt rule */
+			}
 		    }
 		}
-	      if (i < installed->end)
-		break;
+	      if (n < installed->end)
+		{
+		  installedpos = i;	/* retry problem solvable next time */
+		  break;		/* ran into trouble */
+		}
+	      installedpos = installed->start;	/* reset installedpos */
 	    }
 	  systemlevel = level + 1;
 	  if (pass < 2)
@@ -1548,12 +1585,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * decide
        */
-
       POOL_DEBUG(SAT_DEBUG_POLICY, "deciding unresolved rules\n");
-      for (i = 1, n = 1; ; i++, n++)
+      for (i = 1, n = 1; n < solv->nrules; i++, n++)
 	{
-	  if (n == solv->nrules)
-	    break;
 	  if (i == solv->nrules)
 	    i = 1;
 	  r = solv->rules + i;
@@ -1628,12 +1662,15 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      return;
 	    }
 	  if (level < systemlevel || level == 1)
-	    break;
+	    break;		/* trouble */
+	  /* something changed, so look at all rules again */
 	  n = 0;
-	} /* for(), decide */
+	}
 
-      if (n != solv->nrules)	/* continue if level < systemlevel */
+      if (n != solv->nrules)	/* ran into trouble, restart */
 	continue;
+
+      /* at this point we have a consistent system. now do the extras... */
 
       if (doweak)
 	{
@@ -1883,7 +1920,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		}
 	      map_free(&dqmap);
 
-	      continue;		/* back to main loop */
+	      continue;		/* back to main loop so that all deps are checked */
 	    }
 	}
 
@@ -1914,7 +1951,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		break;
 	    }
 	  if (installedone || i < solv->orphaned.count)
-	    continue;
+	    continue;		/* back to main loop */
 	}
 
      if (solv->solution_callback)
@@ -1994,16 +2031,21 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  queue_free(&dqs);
 		  return;
 		}
-	      continue;
+	      continue;		/* back to main loop */
 	    }
 	}
+      /* no minimization found, we're finally finished! */
       break;
     }
+
   POOL_DEBUG(SAT_DEBUG_STATS, "solver statistics: %d learned rules, %d unsolvable, %d minimization steps\n", solv->stats_learned, solv->stats_unsolvable, minimizationsteps);
 
   POOL_DEBUG(SAT_DEBUG_STATS, "done solving.\n\n");
   queue_free(&dq);
   queue_free(&dqs);
+#if 0
+  solver_printdecisionq(solv, SAT_DEBUG_RESULT);
+#endif
 }
 
 
@@ -2429,6 +2471,30 @@ solver_solve(Solver *solv, Queue *job)
    */
   if (installed)
     {
+      /* check for verify jobs */
+      for (i = 0; i < job->count; i += 2)
+	{
+	  how = job->elements[i];
+	  what = job->elements[i + 1];
+	  select = how & SOLVER_SELECTMASK;
+	  switch (how & SOLVER_JOBMASK)
+	    {
+	    case SOLVER_VERIFY:
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  if (!solv->installed || s->repo != solv->installed)
+		    continue;
+		  if (!solv->fixmap.size)
+		    map_grow(&solv->fixmap, solv->installed->end - solv->installed->start);
+		  MAPSET(&solv->fixmap, p - solv->installed->start);
+		}
+	      break;
+	    default:
+	      break;
+	    }
+	}
+
       oldnrules = solv->nrules;
       POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** create rpm rules for installed solvables ***\n");
       FOR_REPO_SOLVABLES(installed, p, s)
@@ -2702,6 +2768,9 @@ solver_solve(Solver *solv, Queue *job)
 	      MAPSET(&solv->updatemap, p - solv->installed->start);
 	    }
 	  break;
+	case SOLVER_VERIFY:
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sverify %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
+	  break;
 	case SOLVER_WEAKENDEPS:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sweaken deps %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
 	  if (select != SOLVER_SOLVABLE)
@@ -2727,7 +2796,7 @@ solver_solve(Solver *solv, Queue *job)
 	    }
 	  break;
 	case SOLVER_DISTUPGRADE:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: distupgrade repo #%d\n", what);
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: distupgrade %s\n", solver_select2str(solv, select, what));
 	  break;
 	default:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: unknown job\n");
@@ -2755,7 +2824,16 @@ solver_solve(Solver *solv, Queue *job)
 
   /* now create infarch and dup rules */
   if (!solv->noinfarchcheck)
-    solver_addinfarchrules(solv, &addedmap);
+    {
+      solver_addinfarchrules(solv, &addedmap);
+      if (pool->obsoleteusescolors)
+	{
+	  /* currently doesn't work well with infarch rules, so make
+           * them weak */
+	  for (i = solv->infarchrules; i < solv->infarchrules_end; i++)
+	    queue_push(&solv->weakruleq, i);
+	}
+    }
   else
     solv->infarchrules = solv->infarchrules_end = solv->nrules;
 
@@ -2767,6 +2845,13 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->duprules = solv->duprules_end = solv->nrules;
 
+  if (1)
+    {
+      extern void addchoicerules(Solver *solv);
+      addchoicerules(solv);
+    }
+  else
+    solv->choicerules = solv->choicerules_end = solv->nrules;
 
   /* all rules created
    * --------------------------------------------------------------
@@ -2778,7 +2863,7 @@ solver_solve(Solver *solv, Queue *job)
   map_free(&installcandidatemap);
   queue_free(&q);
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "%d rpm rules, %d job rules, %d infarch rules, %d dup rules\n", solv->rpmrules_end - 1, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules);
+  POOL_DEBUG(SAT_DEBUG_STATS, "%d rpm rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules\n", solv->rpmrules_end - 1, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules);
 
   /* create weak map */
   map_init(&solv->weakrulemap, solv->nrules);

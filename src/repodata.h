@@ -47,6 +47,8 @@ typedef struct _Repodata {
 #define REPODATA_STUB		1
 #define REPODATA_ERROR		2
 #define REPODATA_STORE		3
+#define REPODATA_LOADING	4
+
   int state;			/* available, stub or error */
 
   void (*loadcallback)(struct _Repodata *);
@@ -161,6 +163,8 @@ void repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*cal
  * if not possible */
 int repodata_stringify(Pool *pool, Repodata *data, Repokey *key, struct _KeyValue *kv, int flags);
 
+int repodata_filelistfilter_matches(Repodata *data, const char *str);
+
 
 /* lookup functions */
 Id repodata_lookup_id(Repodata *data, Id solvid, Id keyname);
@@ -168,7 +172,7 @@ const char *repodata_lookup_str(Repodata *data, Id solvid, Id keyname);
 int repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value);
 int repodata_lookup_void(Repodata *data, Id solvid, Id keyname);
 const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep);
-
+int repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
 
 
 /*-----
@@ -227,7 +231,9 @@ void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
  works only if the data is not yet internalized
 */
 void repodata_merge_attrs(Repodata *data, Id dest, Id src);
+void repodata_merge_some_attrs(Repodata *data, Id dest, Id src, Map *keyidmap, int overwrite);
 
+void repodata_create_stubs(Repodata *data);
 void repodata_join(Repodata *data, Id joinkey);
 
 /*

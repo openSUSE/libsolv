@@ -33,19 +33,25 @@ usage()
   exit(0);
 }
 
-static FILE *
+static int
 loadcallback (Pool *pool, Repodata *data, void *vdata)
 {
-  FILE *fp = 0;
+  FILE *fp;
   const char *location = repodata_lookup_str(data, SOLVID_META, REPOSITORY_LOCATION);
-  if (location)
+  int r;
+
+  if (!location)
+    return 0;
+  fprintf(stderr, "Loading SOLV file %s\n", location);
+  fp = fopen (location, "r");
+  if (!fp)
     {
-      fprintf(stderr, "Loading SOLV file %s\n", location);
-      fp = fopen (location, "r");
-      if (!fp)
-	perror(location);
+      perror(location);
+      return 0;
     }
-  return fp;
+  r = repo_add_solv_flags(data->repo, fp, REPO_USE_LOADING|REPO_LOCALPOOL);
+  fclose(fp);
+  return r ? 0 : 1;
 }
 
 int

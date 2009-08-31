@@ -205,8 +205,15 @@ transaction_type(Transaction *trans, Id p, int mode)
   Queue oq, rq;
   Id type, q;
   int i, j, ref = 0;
+  const char *n;
 
   if (!s->repo)
+    return SOLVER_TRANSACTION_IGNORE;
+
+  n = id2str(pool, s->name);
+  if (!strncmp(n, "patch:", 6))
+    return SOLVER_TRANSACTION_IGNORE;
+  if (!strncmp(n, "pattern:", 8))
     return SOLVER_TRANSACTION_IGNORE;
 
   type = transaction_base_type(trans, p);
@@ -644,11 +651,13 @@ transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
 	MAPSET(&trans->transactsmap, -p);
       if ((!installed || s->repo != installed) && p > 0)
 	{
+#if 0
 	  const char *n = id2str(pool, s->name);
 	  if (!strncmp(n, "patch:", 6))
 	    continue;
 	  if (!strncmp(n, "pattern:", 8))
 	    continue;
+#endif
 	  MAPSET(&trans->transactsmap, p);
 	  if (noobsmap && MAPTST(noobsmap, p))
 	    neednoobs = 1;
@@ -703,6 +712,53 @@ transaction_installedresult(Transaction *trans, Queue *installedq)
           queue_push(installedq, p);
     }
   return cutoff;
+}
+
+static void
+transaction_create_installedmap(Transaction *trans, Map *installedmap)
+{
+  Pool *pool = trans->pool;
+  Repo *installed = pool->installed;
+  Solvable *s;
+  Id p;
+  int i;
+
+  map_init(installedmap, pool->nsolvables);
+  for (i = 0; i < trans->steps.count; i++)
+    {
+      p = trans->steps.elements[i];
+      s = pool->solvables + p;
+      if (!installed || s->repo != installed)
+        MAPSET(installedmap, p);
+    }
+  if (installed)
+    {
+      FOR_REPO_SOLVABLES(installed, p, s)
+	if (!MAPTST(&trans->transactsmap, p))
+          MAPSET(installedmap, p);
+    }
+}
+
+int
+transaction_calc_installsizechange(Transaction *trans)
+{
+  Map installedmap;
+  int change;
+
+  transaction_create_installedmap(trans, &installedmap);
+  change = pool_calc_installsizechange(trans->pool, &installedmap);
+  map_free(&installedmap);
+  return change;
+}
+
+void
+transaction_calc_duchanges(Transaction *trans, DUChanges *mps, int nmps)
+{
+  Map installedmap;
+
+  transaction_create_installedmap(trans, &installedmap);
+  pool_calc_duchanges(trans->pool, &installedmap, mps, nmps);
+  map_free(&installedmap);
 }
 
 struct _TransactionElement {

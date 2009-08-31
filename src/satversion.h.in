@@ -1,0 +1,27 @@
+/*
+ * Copyright (c) 2007, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
+/*
+ * satversion.h
+ * 
+ */
+
+#ifndef SATSOLVER_SATVERSION_H
+#define SATSOLVER_SATVERSION_H
+
+#define SATSOLVER_VERSION_STRING "@VERSION@"
+#define SATSOLVER_VERSION_MAJOR @LIBSATSOLVER_MAJOR@
+#define SATSOLVER_VERSION_MINOR @LIBSATSOLVER_MINOR@
+#define SATSOLVER_VERSION_PATCH @LIBSATSOLVER_PATCH@
+#define SATSOLVER_VERSION (SATSOLVER_VERSION_MAJOR * 10000 + SATSOLVER_VERSION_MINOR * 100 + SATSOLVER_VERSION_PATCH)
+
+extern const char sat_version[];
+extern int sat_version_major;
+extern int sat_version_minor;
+extern int sat_version_patch;
+
+#endif

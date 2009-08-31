@@ -136,6 +136,8 @@ solver_printruleelement(Solver *solv, int type, Rule *r, Id v)
       s = pool->solvables + v;
       POOL_DEBUG(type, "    %s [%d]", solvable2str(pool, s), v);
     }
+  if (pool->installed && s->repo == pool->installed)
+    POOL_DEBUG(type, "I");
   if (r)
     {
       if (r->w1 == v)
@@ -201,8 +203,10 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
   if (p < solv->learntrules)
     if (MAPTST(&solv->weakrulemap, p))
       POOL_DEBUG(type, "WEAK ");
-  if (p >= solv->learntrules)
+  if (solv->learntrules && p >= solv->learntrules)
     POOL_DEBUG(type, "LEARNT ");
+  else if (p >= solv->choicerules && p < solv->choicerules_end)
+    POOL_DEBUG(type, "CHOICE ");
   else if (p >= solv->infarchrules && p < solv->infarchrules_end)
     POOL_DEBUG(type, "INFARCH ");
   else if (p >= solv->duprules && p < solv->duprules_end)
@@ -250,6 +254,37 @@ solver_printwatches(Solver *solv, int type)
   POOL_DEBUG(type, "Watches: \n");
   for (counter = -(pool->nsolvables - 1); counter < pool->nsolvables; counter++)
     POOL_DEBUG(type, "    solvable [%d] -- rule [%d]\n", counter, solv->watches[counter + pool->nsolvables]);
+}
+
+void
+solver_printdecisionq(Solver *solv, int type)
+{
+  Pool *pool = solv->pool;
+  int i;
+  Id p, why;
+
+  POOL_DEBUG(type, "Decisions:\n");
+  for (i = 0; i < solv->decisionq.count; i++)
+    {
+      p = solv->decisionq.elements[i];
+      if (p > 0)
+        POOL_DEBUG(type, "%d %d install  %s, ", i, solv->decisionmap[p], solvid2str(pool, p));
+      else
+        POOL_DEBUG(type, "%d %d conflict %s, ", i, -solv->decisionmap[-p], solvid2str(pool, -p));
+      why = solv->decisionq_why.elements[i];
+      if (why > 0)
+	{
+	  POOL_DEBUG(type, "forced by ");
+	  solver_printruleclass(solv, type, solv->rules + why);
+	}
+      else if (why < 0)
+	{
+	  POOL_DEBUG(type, "chosen from ");
+	  solver_printruleclass(solv, type, solv->rules - why);
+	}
+      else
+        POOL_DEBUG(type, "picked for some unknown reason.\n");
+    }
 }
 
 /*
@@ -424,28 +459,28 @@ solver_printtransaction(Solver *solv)
       switch(class)
 	{
 	case SOLVER_TRANSACTION_ERASE:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "erased packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d erased packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "installed packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d installed packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_REINSTALLED:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "reinstalled packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d reinstalled packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_DOWNGRADED:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "downgraded packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d downgraded packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_CHANGED:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "changed packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d changed packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_UPGRADED:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "upgraded packages (%d):\n", cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d upgraded packages:\n", cnt);
 	  break;
 	case SOLVER_TRANSACTION_VENDORCHANGE:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "vendor change from '%s' to '%s' (%d):\n", id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]), cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d vendor changes from '%s' to '%s':\n", cnt, id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]));
 	  break;
 	case SOLVER_TRANSACTION_ARCHCHANGE:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "arch change from %s to %s (%d):\n", id2str(pool, classes.elements[i + 2]), id2str(pool, classes.elements[i + 3]), cnt);
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d arch changes from %s to %s:\n", cnt, id2str(pool, classes.elements[i + 2]), id2str(pool, classes.elements[i + 3]));
 	  break;
 	default:
 	  class = SOLVER_TRANSACTION_IGNORE;
@@ -561,6 +596,7 @@ solver_printprobleminfo(Solver *solv, Id problem)
     case SOLVER_RULE_UNKNOWN:
     case SOLVER_RULE_FEATURE:
     case SOLVER_RULE_LEARNT:
+    case SOLVER_RULE_CHOICE:
       POOL_DEBUG(SAT_DEBUG_RESULT, "bad rule type\n");
       return;
     }
@@ -758,6 +794,12 @@ solver_select2str(Solver *solv, Id select, Id what)
 	  b = b2;
 	}
       return *b ? b + 2 : "nothing";
+    }
+  if (select == SOLVER_SOLVABLE_REPO)
+    {
+      b = pool_alloctmpspace(pool, 20);
+      sprintf(b, "repo #%d", what);
+      return b;
     }
   return "unknown job select";
 }
