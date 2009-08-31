@@ -28,6 +28,9 @@ BuildRequires:  graphviz
 %if 0%{?suse_version} > 1020
 BuildRequires:  fdupes
 %endif
+%if 0%{?suse_version} > 1110
+BuildRequires:  libdb-4_5-devel
+%endif
 %else
 BuildRequires:  expat-devel
 %endif
