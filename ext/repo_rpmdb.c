@@ -22,14 +22,14 @@
 #include <unistd.h>
 #include <assert.h>
 
-#ifdef FEDORA
-#include <db4/db.h>
-#else
-#include <rpm/db.h>
-#endif
 #include <rpm/rpmio.h>
 #include <rpm/rpmpgp.h>
 #include <rpm/header.h>
+#include <rpm/rpmdb.h>
+
+#ifndef DB_CREATE
+#include <db4/db.h>
+#endif
 
 #include "pool.h"
 #include "repo.h"
