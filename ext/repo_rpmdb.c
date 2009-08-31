@@ -28,7 +28,11 @@
 #include <rpm/rpmdb.h>
 
 #ifndef DB_CREATE
-#include <db4/db.h>
+# ifndef FEDORA
+#  define db_env_create db_env_create_rpmdb
+#  define db_create db_create_rpmdb
+# endif
+# include <db4/db.h>
 #endif
 
 #include "pool.h"
