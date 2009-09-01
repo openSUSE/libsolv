@@ -463,6 +463,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   Id handle = 0;
   Hashtable joinhash = 0;
   Hashmask joinhashm = 0;
+  int createdpkgs = 0;
 
   if ((flags & (SUSETAGS_EXTEND|REPO_EXTEND_SOLVABLES)) != 0 && repo->nrepodata)
     {
@@ -675,6 +676,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      s->evr = makeevr(pool, join2(sp[1], "-", sp[2]));
 	      s->arch = str2id(pool, sp[3], 1);
 	      s->vendor = defvendor;
+	      createdpkgs = 1;
 	    }
 	  last_found_pack = (s - pool->solvables) - repo->start;
 	  if (data)
@@ -777,11 +779,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    last_found_pack = 0;
 	    handle = 0;
 	    indesc++;
-	    if (indesc > 1)
+	    if (createdpkgs)
 	      {
 	        sat_free(joinhash);
-		repodata_internalize(data);
 	        joinhash = joinhash_init(repo, &joinhashm);
+		createdpkgs = 0;
 	      }
 	    continue;
           case CTAG('=', 'V', 'n', 'd'):                                        /* vendor */
