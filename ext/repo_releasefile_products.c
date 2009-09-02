@@ -137,6 +137,7 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
 	      continue;
 	    }
 	  add_releasefile_product(repo, fp);
+	  fclose(fp);
 	}
     }
   closedir(dir);
