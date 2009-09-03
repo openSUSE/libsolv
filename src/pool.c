@@ -1544,7 +1544,7 @@ static inline Id dep2name(Pool *pool, Id dep)
   return dep;
 }
 
-static int providedbyinstalled_multiversion(Pool *pool, unsigned char *map, Id n, Id dep) 
+static int providedbyinstalled_multiversion(Pool *pool, unsigned char *map, Id n, Id con) 
 {
   Id p, pp;
   Solvable *sn = pool->solvables + n; 
@@ -1554,9 +1554,12 @@ static int providedbyinstalled_multiversion(Pool *pool, unsigned char *map, Id n
       Solvable *s = pool->solvables + p; 
       if (s->name != sn->name || s->arch != sn->arch)
         continue;
-      if ((map[p] & 9) == 9)
-        return 1;
-    }    
+      if ((map[p] & 9) != 9)
+        continue;
+      if (pool_match_nevr(pool, pool->solvables + p, con))
+	continue;
+      return 1;		/* found installed package that doesn't conflict */
+    }
   return 0;
 }
 
