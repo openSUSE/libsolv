@@ -1,4 +1,18 @@
 -------------------------------------------------------------------
+Fri Sep  4 11:40:47 CEST 2009 - mls@suse.de
+
+- fix multiversion handling for real
+- fix speed regression in repo_susetags
+- close fd leak [#527506]
+- remove db.h workaround
+- 0.14.6
+
+-------------------------------------------------------------------
+Mon Aug 31 13:57:29 CEST 2009 - mls@suse.de
+
+- fix to build with rpm-4.7
+
+-------------------------------------------------------------------
 Fri Aug 28 11:06:31 CEST 2009 - ma@suse.de
 
 - add support for SOLVER_SOLVABLE_REPO

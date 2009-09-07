@@ -28,7 +28,11 @@
 #include <rpm/rpmdb.h>
 
 #ifndef DB_CREATE
-#include <db4/db.h>
+# ifdef FEDORA
+#  include <db4/db.h>
+# else
+#  include <rpm/db.h>
+# endif
 #endif
 
 #include "pool.h"
@@ -2923,11 +2927,14 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
     return 0;
   setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_DESCRIPTION, pubkey);
   parsekeydata(s, data, pkts, pktsl);
+  /* only rpm knows how to do the release calculation, we don't dare
+   * to recreate all the bugs */
   dig = pgpNewDig();
   (void) pgpPrtPkts(pkts, pktsl, dig, 0);
   btime = dig->pubkey.time[0] << 24 | dig->pubkey.time[1] << 16 | dig->pubkey.time[2] << 8 | dig->pubkey.signid[3];
   sprintf(evrbuf, "%02x%02x%02x%02x-%02x%02x%02x%02x", dig->pubkey.signid[4], dig->pubkey.signid[5], dig->pubkey.signid[6], dig->pubkey.signid[7], dig->pubkey.time[0], dig->pubkey.time[1], dig->pubkey.time[2], dig->pubkey.time[3]);
   repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, btime);
+
   s->name = str2id(pool, "gpg-pubkey", 1);
   s->evr = str2id(pool, evrbuf, 1);
   s->arch = 1;
