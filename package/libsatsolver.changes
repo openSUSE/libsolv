@@ -3,7 +3,7 @@ Fri Sep  4 11:40:47 CEST 2009 - mls@suse.de
 
 - fix multiversion handling for real
 - fix speed regression in repo_susetags
-- close fd leak [#527506]
+- close fd leak [bnc#527506]
 - remove db.h workaround
 - 0.14.6
 
