@@ -53,6 +53,8 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 
   if (!dp->ndirs)
     {
+      if (!create)
+	return 0;
       dp->ndirs = 2;
       dp->dirs = sat_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
       dp->dirs[0] = 0;

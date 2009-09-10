@@ -244,7 +244,7 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
     {
       if (data->dirpool.ndirs)
         return 1;
-      return dirpool_add_dir(&data->dirpool, 0, 1, 1);
+      return dirpool_add_dir(&data->dirpool, 0, 1, create);
     }
   while (*dir)
     {

@@ -900,7 +900,7 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 	    MAPSET(&cbd->useddirs, did);
 	}
     }
-  if (!MAPTST(&cbd->useddirs, value->id))
+  if (value->id >= data->dirpool.ndirs || !MAPTST(&cbd->useddirs, value->id))
     return 0;
   for (i = 0; i < cbd->nfiles; i++)
     {
@@ -956,6 +956,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	{
 	  if (ndone >= repo->nsolvables)
 	    break;
+
 	  if (!repodata_precheck_keyname(data, SOLVABLE_FILELIST))
 	    continue;
 	  for (j = 1; j < data->nkeys; j++)
@@ -963,6 +964,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	      break;
 	  if (j == data->nkeys)
 	    continue;
+
 	  if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
 	    {
 	      map_empty(&cbd->providedids);
