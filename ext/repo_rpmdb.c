@@ -3013,8 +3013,8 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
 	{
 	  if (bufl - l < 4096)
 	    {
-	      buf = sat_realloc(buf, bufl + 4096);
 	      bufl += 4096;
+	      buf = sat_realloc(buf, bufl);
 	    }
 	  ll = fread(buf, 1, bufl - l, fp);
 	  if (ll <= 0)
@@ -3022,6 +3022,7 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
 	  l += ll;
 	}
       buf[l] = 0;
+      fclose(fp);
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       pubkey2solvable(s, data, buf);
     }
