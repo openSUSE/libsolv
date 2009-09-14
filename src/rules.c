@@ -1067,6 +1067,8 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
 	  if (a != 1 && bestarch && ((a ^ bestarch) & 0xffff0000) != 0)
 	    {
+	      if (pool->installed && ps->repo == pool->installed)
+		continue;	/* always ok to keep an installed package */
 	      for (j = 0; j < allowedarchs.count; j++)
 		{
 		  aa = allowedarchs.elements[j];

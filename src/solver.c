@@ -1534,7 +1534,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			}
 		      if (level <= olevel)
 			{
-			  if (level < passlevel)
+			  if (level == 1 || level < passlevel)
 			    break;	/* trouble */
 			  if (level < olevel)
 			    n = installed->start;	/* redo all */
@@ -1557,7 +1557,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			}
 		      if (level <= olevel)
 			{
-			  if (level < passlevel)
+			  if (level == 1 || level < passlevel)
 			    break;	/* trouble */
 			  if (level < olevel)
 			    n = installed->start;	/* redo all */
