@@ -23,6 +23,35 @@ test_susetags() {
   fi
 }
 
+repomd_findfile() {
+  local t=$1
+  local p=$2
+  local f
+  if test -n "$t" -a -s repomd.xml ; then
+    f=`repomdxml2solv -q $t:location < repomd.xml 2>/dev/null`
+    f=${f##*/}
+    if test -f "$f" ; then
+      echo "$f"
+      return
+    fi
+  fi
+  if test -f "$p.bz2" ; then
+    echo "$p.bz2"
+  elif test -f "$p.gz" ; then
+    echo "$p.gz"
+  elif test -f "$p" ; then
+    echo "$p"
+  fi
+}
+
+repomd_decompress() {
+  case $1 in
+   *.gz) gzip -dc "$1" ;;
+   *.bz2) bzip2 -dc "$1" ;;
+   *) cat "$1" ;;
+  esac
+}
+
 # signal an error if there is a problem
 set -e
 
@@ -65,172 +94,82 @@ fi
 if test "$repotype" = rpmmd ; then
   cd repodata || exit 2
 
-  primfile="/nonexist"
-  if test -f primary.xml || test -f primary.xml.gz || test -f primary.xml.bz2 ; then
+  primfile=
+  primxml=`repomd_findfile primary primary.xml`
+  if test -n "$primxml" -a -s "$primxml" ; then
     primfile=`mktemp` || exit 3
     (
      # fake tag to combine primary.xml and extensions
      # like susedata.xml, other.xml, filelists.xml
      echo '<rpmmd>'
-     for i in primary.xml* susedata.xml*; do
-       test -s "$i" || continue
-       case $i in
-         *.gz) gzip -dc "$i";;
-	 *.bz2) bzip2 -dc "$i";;
-	 *) cat "$i";;
-       esac
-       # add a newline
-       echo
-       # only the first
-       break
-     done
-     for i in susedata.xml*; do
-       test -s "$i" || continue
-       case $i in
-         *.gz) gzip -dc "$i";;
- 	 *.bz2) bzip2 -dc "$i";;
-         *) cat "$i";;
-       esac
-       # only the first
-       break
-     done
+     if test -f $primxml ; then
+	repomd_decompress $primxml
+         # add a newline
+        echo
+     fi
+     susedataxml=`repomd_findfile susedata susedata.xml`
+     if test -f $susedataxml ; then
+	repomd_decompress $susedataxml
+     fi
      echo '</rpmmd>'
     ) | grep -v '\?xml' |  sed '1i\<?xml version="1.0" encoding="UTF-8"?>' | rpmmd2solv $parser_options > $primfile || exit 4
   fi
 
-  prodfile="/nonexist"
+  prodfile=
   if test -f product.xml; then
     prodfile=`mktemp` || exit 3
     (
      echo '<products>'
      for i in product*.xml*; do
-       case $i in
-         *.gz) gzip -dc "$i" ;;
-	 *.bz2) bzip2 -dc "$i" ;;
-	 *) cat "$i" ;;
-       esac
+       repomd_decompress $i
      done
      echo '</products>'
     ) | grep -v '\?xml' | rpmmd2solv $parser_options > $prodfile || exit 4
   fi
 
-  cmd=
-  patternfile="/nonexist"
-  for i in patterns.xml*; do
-    test -s "$i" || continue
-    case $i in
-      *.gz) cmd='gzip -dc' ;;
-      *.bz2) cmd='bzip2 -dc' ;;
-      *) cmd='cat' ;;
-    esac
-    break
-  done
-  if test -n "$cmd" ; then
-    patternfile=`mktemp` || exit 3
-    $cmd "$i" | rpmmd2solv $parser_options > $patternfile || exit 4
+  patternfile=
+  patternxml=`repomd_findfile '' patterns.xml`
+  if test -n "$patternxml" -a -s "$patternxml" ; then
+      patternfile=`mktemp` || exit 3
+      repomd_decompress "$patternxml" | rpmmd2solv $parser_options > $patternfile || exit 4
   fi
 
   # This contains repomd.xml
   # for now we only read some keys like timestamp
-  cmd=
-  for i in repomd.xml*; do
-      test -s "$i" || continue
-      case $i in
-	  *.gz) cmd="gzip -dc" ;;
-	  *.bz2) cmd="bzip2 -dc" ;;
-	  *) cmd="cat" ;;
-      esac
-      # only check the first repomd.xml*, in case there are more
-      break
-  done
-  repomdfile="/nonexist"
-  if test -n "$cmd"; then
-      # we have some repomd.xml*
+  repomdfile=
+  repomdxml=`repomd_findfile '' repomd.xml`
+  if test -n "$repomdxml" -a -s "$repomdxml" ; then
       repomdfile=`mktemp` || exit 3
-      $cmd "$i" | repomdxml2solv $parser_options > $repomdfile || exit 4
+      repomd_decompress "$repomdxml" | repomdxml2solv $parser_options > $repomdfile || exit 4
   fi
 
-  # This contains suseinfo.xml, which is extensions to repomd.xml
+  # This contains suseinfo.xml, which is an extension to repomd.xml
   # for now we only read some keys like expiration and products
-  cmd=
-  for i in suseinfo.xml*; do
-      test -s "$i" || continue
-      case $i in
-	  *.gz) cmd="gzip -dc" ;;
-	  *.bz2) cmd="bzip2 -dc" ;;
-	  *) cmd="cat" ;;
-      esac
-      # only check the first suseinfo.xml*, in case there are more
-      break
-  done
-  suseinfofile="/nonexist"
-  if test -n "$cmd"; then
-      # we have some suseinfo.xml*
+  suseinfofile=
+  suseinfoxml=`repomd_findfile '' suseinfo.xml`
+  if test -n "$suseinfoxml" -a -s "$suseinfoxml" ; then
       suseinfofile=`mktemp` || exit 3
-      $cmd "$i" | repomdxml2solv $parser_options > $suseinfofile || exit 4
+      repomd_decompress "$suseinfoxml" | repomdxml2solv $parser_options > $suseinfofile || exit 4
   fi
 
   # This contains a updateinfo.xml* and maybe patches
-  cmd=
-  for i in updateinfo.xml*; do
-      test -s "$i" || continue
-      case $i in
-	  *.gz) cmd="gzip -dc" ;;
-	  *.bz2) cmd="bzip2 -dc" ;;
-	  *) cmd="cat" ;;
-      esac
-      # only check the first updateinfo.xml*, in case there are more
-      break
-  done
-  updateinfofile="/nonexist"
-  if test -n "$cmd"; then
-      # we have some updateinfo.xml*
+  updateinfofile=
+  updateinfoxml=`repomd_findfile updateinfo updateinfo.xml`
+  if test -n "$updateinfoxml" -a -s "$updateinfoxml" ; then
       updateinfofile=`mktemp` || exit 3
-      $cmd "$i" | updateinfoxml2solv $parser_options > $updateinfofile || exit 4
+      repomd_decompress "$updateinfoxml" | updateinfoxml2solv $parser_options > $updateinfofile || exit 4
   fi
 
   # This contains a deltainfo.xml*
-  cmd=
-  for i in deltainfo.xml*; do
-      test -s "$i" || continue
-      case $i in
-	  *.gz) cmd="gzip -dc" ;;
-	  *.bz2) cmd="bzip2 -dc" ;;
-	  *) cmd="cat" ;;
-      esac
-      # only check the first deltainfo.xml*, in case there are more
-      break
-  done
-  deltainfofile="/nonexist"
-  if test -n "$cmd"; then
-      # we have some deltainfo.xml*
+  deltainfofile=
+  deltainfoxml=`repomd_findfile deltainfo deltainfo.xml`
+  if test -n "$deltainfoxml" -a -s "$deltainfoxml" ; then
       deltainfofile=`mktemp` || exit 3
-      $cmd "$i" | deltainfoxml2solv $parser_options > $deltainfofile || exit 4
+      repomd_decompress "$deltainfoxml" | deltainfoxml2solv $parser_options > $deltainfofile || exit 4
   fi
 
   # Now merge primary, patches, updateinfo, and deltainfo
-  if test -s $repomdfile; then
-    m_repomdfile=$repomdfile
-  fi
-  if test -s $suseinfofile; then
-    m_suseinfofile=$suseinfofile
-  fi
-  if test -s $primfile; then
-    m_primfile=$primfile
-  fi
-  if test -s $patternfile; then
-    m_patternfile=$patternfile
-  fi
-  if test -s $prodfile; then
-    m_prodfile=$prodfile
-  fi
-  if test -s $updateinfofile; then
-    m_updateinfofile=$updateinfofile
-  fi
-  if test -s $deltainfofile; then
-    m_deltainfofile=$deltainfofile
-  fi
-  mergesolv $m_repomdfile $m_suseinfofile $m_primfile $m_prodfile $m_patternfile $m_updateinfofile $m_deltainfofile
+  mergesolv $repomdfile $suseinfofile $primfile $prodfile $patternfile $updateinfofile $deltainfofile
   rm -f $repomdfile $suseinfofile $primfile $patternfile $prodfile $updateinfofile $deltainfofile
 
 elif test "$repotype" = susetags ; then
