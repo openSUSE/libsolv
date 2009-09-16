@@ -92,22 +92,21 @@ keyfilter_attr(Repo *data, Repokey *key, void *kfdata)
 static int
 keyfilter_language(Repo *repo, Repokey *key, void *kfdata)
 {
+  Pool *pool = repo->pool;
   const char *name, *p;
-  char *lang = kfdata, *bname;
+  char *lang = kfdata;
   int i;
-  Id id;
 
   name = id2str(repo->pool, key->name);
   p = strrchr(name, ':');
   if (!p || strcmp(p + 1, lang) != 0)
     return KEY_STORAGE_DROPPED;
-  /* find base name id */
-  bname = strdup(name);
-  bname[p - name] = 0;
-  id = str2id(repo->pool, bname, 1);
   for (i = 0; verticals[i]; i++)
-    if (id == verticals[i])
-      return KEY_STORAGE_VERTICAL_OFFSET;
+    {
+      const char *vname = id2str(pool, verticals[i]);
+      if (!strncmp(name, vname, p - name) && vname[p - name] == 0)
+	return KEY_STORAGE_VERTICAL_OFFSET;
+    }
   return KEY_STORAGE_INCORE;
 }
 
@@ -213,6 +212,8 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
     }
   sat_free(addedfileprovides);
 
+  pool_freeidhashes(repo->pool);	/* free some mem */
+
   if (basename)
     {
       char fn[4096];
@@ -302,7 +303,6 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	free(languages[i]);
       sat_free(languages);
       repodata_free(info);
-      repo->nrepodata--;
       return 0;
     }
   if (attrname)
@@ -316,6 +316,5 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
   repodata_internalize(info);
   repo_write(repo, stdout, keyfilter_solv, &kd, 0);
   repodata_free(info);
-  repo->nrepodata--;
   return 0;
 }

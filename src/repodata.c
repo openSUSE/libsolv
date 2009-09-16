@@ -1768,7 +1768,7 @@ repodata_extend_block(Repodata *data, Id start, Id num)
 /**********************************************************************/
 
 
-#define REPODATA_ATTRS_BLOCK 63
+#define REPODATA_ATTRS_BLOCK 31
 #define REPODATA_ATTRDATA_BLOCK 1023
 #define REPODATA_ATTRIDDATA_BLOCK 63
 
