@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Sep 16 10:56:44 CEST 2009 - mls@suse.de
+
+- use repomdxml to query for the location [bnc#501425]
+- fix assertion failue... again
+- fix fp leak [bnc#535468]
+- 0.14.6
+
+-------------------------------------------------------------------
 Fri Sep  4 11:40:47 CEST 2009 - mls@suse.de
 
 - fix multiversion handling for real

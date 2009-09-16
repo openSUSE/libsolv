@@ -2455,7 +2455,7 @@ rerunsolver:
       if (mainmode == MODE_ERASE)
 	solv->allowuninstall = 1;	/* don't nag */
 
-      // queue_push2(&job, SOLVER_DISTUPGRADE, 3);
+      // queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_REPO, 3);
       solver_solve(solv, &job);
       if (!solv->problems.count)
 	break;
