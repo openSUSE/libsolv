@@ -238,6 +238,7 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	      cinfo->alias = strdup(kp + 1);
 	      cinfo->type = TYPE_RPMMD;
 	      cinfo->autorefresh = 1;
+	      cinfo->priority = 99;
 #ifndef FEDORA
 	      cinfo->repo_gpgcheck = 1;
 #endif
@@ -2268,7 +2269,7 @@ main(int argc, char **argv)
 	  struct repoinfo *cinfo = repoinfos + i;
 	  if (!cinfo->enabled)
 	    continue;
-	  printf("%d: %-20s %s\n", j++, cinfo->alias, cinfo->name);
+	  printf("%d: %-20s %s (prio %d)\n", j++, cinfo->alias, cinfo->name, cinfo->priority);
 	}
       exit(0);
     }
