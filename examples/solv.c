@@ -2408,7 +2408,7 @@ main(int argc, char **argv)
       exit(1);
     }
 
-  if (!job.count && !repofilter)
+  if (!job.count)
     allpkgs = 1;
 
   if (mainmode == MODE_LIST || mainmode == MODE_INFO)
@@ -2516,6 +2516,9 @@ main(int argc, char **argv)
       job.elements[i] |= mode;
     }
 
+  if (mainmode == MODE_DISTUPGRADE && allpkgs && repofilter)
+    queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_REPO, repofilter);
+
   // multiversion test
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae", 1));
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae-base", 1));
@@ -2533,21 +2536,19 @@ rerunsolver:
 
       solv = solver_create(pool);
       solv->ignorealreadyrecommended = 1;
-      solv->updatesystem = allpkgs && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE);
+      solv->updatesystem = allpkgs && !repofilter && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE);
       solv->dosplitprovides = solv->updatesystem;
-      solv->fixsystem = allpkgs && (mainmode == MODE_VERIFY);
-      if (mainmode == MODE_DISTUPGRADE && allpkgs)
+      solv->fixsystem = allpkgs && !repofilter && mainmode == MODE_VERIFY;
+      if (mainmode == MODE_DISTUPGRADE && allpkgs && !repofilter)
 	{
 	  solv->distupgrade = 1;
-          solv->allowdowngrade = 1;
-          solv->allowarchchange = 1;
-          solv->allowvendorchange = 1;
+	  solv->allowdowngrade = 1;
+	  solv->allowarchchange = 1;
+	  solv->allowvendorchange = 1;
 	}
       if (mainmode == MODE_ERASE)
 	solv->allowuninstall = 1;	/* don't nag */
 
-      if (mainmode == MODE_DISTUPGRADE && repofilter)
-        queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_REPO, repofilter);
       solver_solve(solv, &job);
       if (!solv->problems.count)
 	break;
