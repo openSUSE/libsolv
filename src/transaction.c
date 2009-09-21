@@ -1243,6 +1243,33 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	    }
 	}
     }
+  if (s->repo == installed && solvable_lookup_idarray(s, SOLVABLE_TRIGGERS, &reqq) && reqq.count)
+    {
+      /* we're getting deinstalled/updated. Try to do this before our
+       * triggers are hit */
+      for (i = 0; i < reqq.count; i++)
+	{
+	  Id tri = reqq.elements[i];
+	  FOR_PROVIDES(p2, pp2, tri)
+	    {
+	      if (p2 == p)
+		continue;
+	      s2 = pool->solvables + p2;
+	      if (!s2->repo)
+		continue;
+	      if (s2->name == s->name)
+		continue;	/* obsoleted anyway */
+	      if (s2->repo != installed && MAPTST(&trans->transactsmap, p2))
+		{
+		  /* deinstall/update p before installing p2 */
+#if 0
+		  printf("add trigger uninst->inst edge (%s -> %s -> %s)\n", solvid2str(pool, p2), dep2str(pool, tri), solvid2str(pool, p));
+#endif
+		  addedge(od, p2, p, TYPE_CON);
+		}
+	    }
+	}
+    }
   queue_free(&reqq);
 }
 

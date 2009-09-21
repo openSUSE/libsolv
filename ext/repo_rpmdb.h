@@ -21,6 +21,7 @@ void repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags);
 #define RPM_ADD_NO_RPMLIBREQS	(1 << 11)
 #define RPM_ADD_WITH_SHA1SUM	(1 << 12)
 #define RPM_ADD_WITH_SHA256SUM	(1 << 13)
+#define RPM_ADD_TRIGGERS	(1 << 14)
 
 #define RPM_ITERATE_FILELIST_ONLYDIRS	(1 << 0)
 #define RPM_ITERATE_FILELIST_WITHMD5	(1 << 1)

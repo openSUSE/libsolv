@@ -215,6 +215,7 @@ int solvable_lookup_void(Solvable *s, Id keyname);
 char * solvable_get_location(Solvable *s, unsigned int *medianrp);
 const unsigned char *solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep);
 const char *solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep);
+int solvable_lookup_idarray(Solvable *s, Id keyname, Queue *q);
 int solvable_identical(Solvable *s1, Solvable *s2);
 Id solvable_selfprovidedep(Solvable *s);
 

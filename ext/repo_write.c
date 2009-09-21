@@ -749,6 +749,7 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
   unsigned int u32;
   unsigned char v[4];
   struct extdata *xd;
+  NeedId *needid;
 
   if (key->name == REPOSITORY_SOLVABLES)
     return SEARCH_NEXT_KEY;
@@ -778,14 +779,16 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	id = kv->id;
 	if (!ISRELDEP(id) && cbdata->ownspool && id > 1)
 	  id = putinownpool(cbdata, data->localpool ? &data->spool : &data->repo->pool->ss, id);
-	id = cbdata->needid[id].need;
+	needid = cbdata->needid;
+	id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
 	data_addid(xd, id);
 	break;
       case REPOKEY_TYPE_IDARRAY:
 	id = kv->id;
 	if (cbdata->ownspool && id > 1)
 	  id = putinownpool(cbdata, data->localpool ? &data->spool : &data->repo->pool->ss, id);
-	id = cbdata->needid[id].need;
+	needid = cbdata->needid;
+	id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
 	data_addideof(xd, id, kv->eof);
 	break;
       case REPOKEY_TYPE_STR:

@@ -43,7 +43,8 @@
 #include "chksum.h"
 #include "repo_rpmdb.h"
 
-#define RPMDB_COOKIE_VERSION 2
+/* 3: added triggers */
+#define RPMDB_COOKIE_VERSION 3
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
@@ -76,6 +77,9 @@
 #define TAG_CONFLICTFLAGS	1053
 #define TAG_CONFLICTNAME	1054
 #define TAG_CONFLICTVERSION	1055
+#define TAG_TRIGGERNAME		1066
+#define TAG_TRIGGERVERSION	1067
+#define TAG_TRIGGERFLAGS	1068
 #define TAG_OBSOLETENAME	1090
 #define TAG_FILEDEVICES		1095
 #define TAG_FILEINODES		1096
@@ -930,6 +934,27 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
         repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
       if (sourcerpm)
 	addsourcerpm(pool, data, handle, sourcerpm, name, evr);
+      if ((flags & RPM_ADD_TRIGGERS) != 0)
+	{
+	  Id id, lastid;
+	  unsigned int ida = makedeps(pool, repo, rpmhead, TAG_TRIGGERNAME, TAG_TRIGGERVERSION, TAG_TRIGGERFLAGS, 0);
+
+	  lastid = 0;
+	  for (; (id = repo->idarraydata[ida]) != 0; ida++)
+	    {
+	      /* we currently do not support rel ids in incore data, so
+	       * strip off versioning information */
+	      while (ISRELDEP(id))
+		{
+		  Reldep *rd = GETRELDEP(pool, id);
+		  id = rd->name;
+		}
+	      if (id == lastid)
+		continue;
+	      repodata_add_idarray(data, handle, SOLVABLE_TRIGGERS, id);
+	      lastid = id;
+	    }
+	}
     }
   sat_free(evr);
   return 1;
@@ -1412,7 +1437,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
-	  if (rpm2solv(pool, repo, data, s, rpmhead, flags))
+	  if (rpm2solv(pool, repo, data, s, rpmhead, flags | RPM_ADD_TRIGGERS))
 	    {
 	      i++;
 	      s = 0;
@@ -1648,7 +1673,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 
-	  rpm2solv(pool, repo, data, s, rpmhead, flags);
+	  rpm2solv(pool, repo, data, s, rpmhead, flags | RPM_ADD_TRIGGERS);
 	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	    {
 	      if (done < count)
