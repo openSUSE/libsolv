@@ -102,6 +102,12 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
     case REPOKEY_TYPE_CONSTANT:
       printf("%s: %d\n", keyname, kv->num);
       break;
+    case REPOKEY_TYPE_BINARY:
+      if (kv->num)
+        printf("%s: %02x..%02x len %d\n", keyname, (unsigned char)kv->str[0], (unsigned char)kv->str[kv->num - 1], kv->num);
+      else
+        printf("%s: len 0\n", keyname);
+      break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       if (!kv->entry)
         printf("%s:\n%*s", keyname, indent, "");

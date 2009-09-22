@@ -1208,11 +1208,15 @@ susetags_add_ext(Repo *repo, Repodata *data)
     {
       if (strncmp(di.kv.str, "packages.", 9) != 0)
 	continue;
+      if (!strcmp(di.kv.str + 9, "gz"))
+	continue;
       if (!di.kv.str[9] || !di.kv.str[10] || (di.kv.str[11] && di.kv.str[11] != '.'))
 	continue;
       ext[0] = di.kv.str[9];
       ext[1] = di.kv.str[10];
       ext[2] = 0;
+      if (!strcmp(ext, "en"))
+	continue;
       if (!susetags_find(repo, di.kv.str, &filechksum, &filechksumtype))
 	continue;
       handle = repodata_new_handle(data);
@@ -1224,7 +1228,7 @@ susetags_add_ext(Repo *repo, Repodata *data)
 	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, SOLVABLE_DISKUSAGE);
 	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_DIRNUMNUMARRAY);
 	}
-      if (!strcmp(ext, "FL"))
+      else if (!strcmp(ext, "FL"))
 	{
 	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, SOLVABLE_FILELIST);
 	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_DIRSTRARRAY);
@@ -1538,8 +1542,21 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  printf(" fetching\n");
 	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) == 0)
 	    break;	/* hopeless */
-	  repo_add_susetags(repo, fp, defvendor, 0, 0);
+	  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE);
 	  fclose(fp);
+	  /* add default language */
+	  filename = susetags_find(repo, "packages.en.gz", &filechksum, &filechksumtype);
+          if (!filename)
+	    filename = susetags_find(repo, "packages.en", &filechksum, &filechksumtype);
+	  if (filename)
+	    {
+	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+		{
+		  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|REPO_REUSE_REPODATA|REPO_EXTEND_SOLVABLES);
+		  fclose(fp);
+		}
+	    }
+          repo_internalize(repo);
 	  data = repo_add_repodata(repo, 0);
 	  susetags_add_ext(repo, data);
 	  repodata_internalize(data);

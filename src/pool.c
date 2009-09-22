@@ -957,14 +957,6 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	  if (ndone >= repo->nsolvables)
 	    break;
 
-	  if (!repodata_precheck_keyname(data, SOLVABLE_FILELIST))
-	    continue;
-	  for (j = 1; j < data->nkeys; j++)
-	    if (data->keys[j].name == SOLVABLE_FILELIST)
-	      break;
-	  if (j == data->nkeys)
-	    continue;
-
 	  if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
 	    {
 	      map_empty(&cbd->providedids);
@@ -989,13 +981,14 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 		  continue;
 		}
 	    }
-          else
+
+	  if (!repodata_has_keyname(data, SOLVABLE_FILELIST))
+	    continue;
+
+	  if (data->start < provstart || data->end > provend)
 	    {
-	      if (data->start < provstart || data->end > provend)
-		{
-		  map_empty(&cbd->providedids);
-		  provstart = provend = 0;
-		}
+	      map_empty(&cbd->providedids);
+	      provstart = provend = 0;
 	    }
 
 	  /* check if the data is incomplete */

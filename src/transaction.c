@@ -1228,6 +1228,9 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		  if (s2->repo != installed && MAPTST(&trans->transactsmap, p2))
 		    {
 		      /* deinstall p before installing p2 */
+#if 0
+		      printf("add conflict uninst->inst edge (%s -> %s -> %s)\n", solvid2str(pool, p2), dep2str(pool, con), solvid2str(pool, p));
+#endif
 		      addedge(od, p2, p, TYPE_CON);
 		    }
 		}
@@ -1236,6 +1239,9 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		  if (s2->repo == installed && MAPTST(&trans->transactsmap, p2))
 		    {
 		      /* deinstall p2 before installing p */
+#if 0
+		      printf("add conflict uninst->inst edge (%s -> %s -> %s)\n", solvid2str(pool, p), dep2str(pool, con), solvid2str(pool, p2));
+#endif
 		      addedge(od, p, p2, TYPE_CON);
 		    }
 		}

@@ -155,6 +155,19 @@ repodata_precheck_keyname(Repodata *data, Id keyname)
   return x && (x & (1 << (keyname & 7))) ? 1 : 0;
 }
 
+/* check if the repodata contains data for the specified keyname */
+static inline int
+repodata_has_keyname(Repodata *data, Id keyname)
+{
+  int i;
+  if (!repodata_precheck_keyname(data, keyname))
+    return 0;
+  for (i = 1; i < data->nkeys; i++)
+    if (data->keys[i].name == keyname)
+      return 1;
+  return 0;
+}
+
 /* search key <keyname> (all keys, if keyname == 0) for Id <solvid>
  * Call <callback> for each match */
 void repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
@@ -200,6 +213,7 @@ void repodata_set_void(Repodata *data, Id solvid, Id keyname);
 void repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned int num);
 void repodata_set_id(Repodata *data, Id solvid, Id keyname, Id id);
 void repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str);
+void repodata_set_binary(Repodata *data, Id solvid, Id keyname, void *buf, int len);
 /* create id from string, then set_id */
 void repodata_set_poolstr(Repodata *data, Id solvid, Id keyname, const char *str);
 

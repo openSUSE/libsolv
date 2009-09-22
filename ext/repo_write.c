@@ -821,6 +821,11 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	id = cbdata->dirused[id];
 	data_addid(xd, id);
 	break;
+      case REPOKEY_TYPE_BINARY:
+	data_addid(xd, kv->num);
+	if (kv->num)
+	  data_addblob(xd, (unsigned char *)kv->str, kv->num);
+	break;
       case REPOKEY_TYPE_DIRNUMNUMARRAY:
 	id = kv->id;
 	if (cbdata->owndirpool)
@@ -853,9 +858,6 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	else if (kv->eof == 1)
 	  {
 	    cbdata->current_sub++;
-	  }
-	else
-	  {
 	  }
 	break;
       case REPOKEY_TYPE_FLEXARRAY:

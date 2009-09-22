@@ -22,6 +22,7 @@ struct parsedata {
   char *kind;
   Repo *repo;
   Repodata *data;
+  int flags;
   struct parsedata_common common;
   int last_found_source;
   char **share_with;
@@ -326,7 +327,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
 #if 1
   /* move file provides to filelist */
   /* relies on the fact that rpm inserts self-provides at the end */
-  if (s->provides)
+  if (s->provides && (pd->flags & REPO_EXTEND_SOLVABLES) == 0)
     {
       Id *p, *lastreal, did;
       const char *str, *sp;
@@ -480,6 +481,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   pd.repo = pd.common.repo = repo;
   pd.data = data;
   pd.common.pool = pool;
+  pd.flags = flags;
 
   linep = line;
   s = 0;
