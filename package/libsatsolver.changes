@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Sep 23 11:10:08 CEST 2009 - mls@suse.de
+
+- get missing translations from other solvables [bnc#386449]
+- also look at triggers when ordering packages
+- add support for REPOKEY_TYPE_BINARY
+- 0.14.8
+
+-------------------------------------------------------------------
 Wed Sep 16 10:56:44 CEST 2009 - mls@suse.de
 
 - use repomdxml to query for the location [bnc#501425]
