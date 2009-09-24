@@ -73,7 +73,7 @@ solvable_lookup_str(Solvable *s, Id keyname)
   return repo_lookup_str(s->repo, s - s->repo->pool->solvables, keyname);
 }
 
-const char *
+static const char *
 solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname)
 {
   Pool *pool;
@@ -94,7 +94,7 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname)
   /* search for a solvable with same name and same base that has the
    * translation */
   if (!pool->whatprovides)
-    return 0;
+    return basestr;
   /* we do this in two passes, first same vendor, then all other vendors */
   for (pass = 0; pass < 2; pass++)
     {
@@ -113,7 +113,7 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname)
 	    return str;
 	}
     }
-  return 0;
+  return basestr;
 }
 
 const char *
