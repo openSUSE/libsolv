@@ -2263,6 +2263,31 @@ repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
   data->attriddata[data->attriddatalen++] = 0;
 }
 
+void
+repodata_delete_uninternalized(Repodata *data, Id solvid, Id keyname)
+{
+  Id *pp, *ap, **app;
+  app = repodata_get_attrp(data, solvid);
+  ap = *app;
+  if (!ap)
+    return;
+  for (; *ap; ap += 2)
+    if (data->keys[*ap].name == keyname)
+      break;
+  if (!*ap)
+    return;
+  pp = ap;
+  ap += 2;
+  for (; *ap; ap += 2)
+    {
+      if (data->keys[*ap].name == keyname)
+	continue;
+      *pp++ = ap[0];
+      *pp++ = ap[1];
+    }
+  *pp = 0;
+}
+
 /* add all attrs from src to dest */
 void
 repodata_merge_attrs(Repodata *data, Id dest, Id src)

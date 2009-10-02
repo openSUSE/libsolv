@@ -88,6 +88,14 @@ pool_free(Pool *pool)
   sat_free(pool);
 }
 
+#ifdef MULTI_SEMANTICS
+void
+pool_setdisttype(Pool *pool, int disttype)
+{
+  pool->disttype = disttype;
+}
+#endif
+
 Id
 pool_add_solvable(Pool *pool)
 {
@@ -416,6 +424,14 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 
 /*************************************************************************/
 
+#if defined(MULTI_SEMANTICS)
+# define EVRCMP_DEPCMP (pool->disttype == DISTTYPE_DEB ? EVRCMP_COMPARE : EVRCMP_MATCH_RELEASE)
+#elif defined(DEBIAN_SEMANTICS)
+# define EVRCMP_DEPCMP EVRCMP_COMPARE
+#else
+# define EVRCMP_DEPCMP EVRCMP_MATCH_RELEASE
+#endif
+
 /* check if a package's nevr matches a dependency */
 
 int
@@ -457,13 +473,8 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
     return 1;
   if (flags != 2 && flags != 5)
     flags ^= 5;
-#ifdef DEBIAN_SEMANTICS
-  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_COMPARE)))) != 0)
+  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_DEPCMP)))) != 0)
     return 1;
-#else
-  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_MATCH_RELEASE)))) != 0)
-    return 1;
-#endif
   return 0;
 }
 
@@ -508,13 +519,8 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
   else
     {
       int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-#ifdef DEBIAN_SEMANTICS
-      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_COMPARE)))) != 0)
+      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_DEPCMP)))) != 0)
 	return 1;
-#else
-      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_MATCH_RELEASE)))) != 0)
-	return 1;
-#endif
     }
   return 0;
 }
@@ -679,7 +685,12 @@ pool_addrelproviders(Pool *pool, Id d)
 
 	      if (pid == name)
 		{
-#ifdef DEBIAN_SEMANTICS
+#if defined(MULTI_SEMANTICS)
+		  if (pool->disttype == DISTTYPE_DEB)
+		    continue;
+		  else
+		    break;
+#elif defined(DEBIAN_SEMANTICS)
 		  continue;		/* unversioned provides can
 				 	 * never match versioned deps */
 #else
@@ -708,13 +719,8 @@ pool_addrelproviders(Pool *pool, Id d)
 	      else
 		{
 		  int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-#ifdef DEBIAN_SEMANTICS
-		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_COMPARE)))) != 0)
+		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
 		    break;
-#else
-		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_MATCH_RELEASE)))) != 0)
-		    break;
-#endif
 		}
 	    }
 	  if (!pid)

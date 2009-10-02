@@ -240,6 +240,8 @@ void repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname, const cha
 void repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 
+void repodata_delete_uninternalized(Repodata *data, Id solvid, Id keyname);
+
 /* 
  merge attributes from one solvable to another
  works only if the data is not yet internalized

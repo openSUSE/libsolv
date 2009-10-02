@@ -82,6 +82,9 @@ struct _Pool {
   int obsoleteusescolors;	/* true: obsoletes check arch color */
   int novirtualconflicts;	/* true: conflicts on names, not on provides */
   int allowselfconflicts;	/* true: packages which conflict with itself are installable */
+#ifdef MULTI_SEMANTICS
+  int disttype;
+#endif
 
   Id *id2arch;			/* map arch ids to scores */
   unsigned char *id2color;	/* map arch ids to colors */
@@ -124,6 +127,11 @@ struct _Pool {
   /* search position */
   Repopos pos;
 };
+
+#ifdef MULTI_SEMANTICS
+# define DISTTYPE_RPM	0
+# define DISTTYPE_DEB	1
+#endif
 
 #define SAT_FATAL			(1<<0)
 #define SAT_ERROR			(1<<1)
@@ -176,6 +184,11 @@ extern Pool *pool_create(void);
  * Delete a pool
  */
 extern void pool_free(Pool *pool);
+
+extern void pool_setdebuglevel(Pool *pool, int level);
+#ifdef MULTI_SEMANTICS
+extern void pool_setdisttype(Pool *pool, int disttype);
+#endif
 
 extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
@@ -264,8 +277,6 @@ static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
   Id off = pool_whatprovides(pool, d);
   return pool->whatprovidesdata + off;
 }
-
-extern void pool_setdebuglevel(Pool *pool, int level);
 
 static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
 {

@@ -63,88 +63,94 @@ decompress(unsigned char *in, int inl, int *outlp)
   return out;
 }
 
-static unsigned int
-makedeps(Repo *repo, char *deps, unsigned int olddeps, Id marker)
+static Id
+parseonedep(Pool *pool, char *p)
 {
-  Pool *pool = repo->pool;
-  char *p, *n, *ne, *e, *ee;
-  Id id, name, evr;
+  char *n, *ne, *e, *ee;
+  Id name, evr;
   int flags;
 
-  while ((p = strchr(deps, ',')) != 0)
+  while (*p == ' ' || *p == '\t' || *p == '\n')
+    p++;
+  if (!*p || *p == '(')
+    return 0;
+  n = p;
+  /* find end of name */
+  while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != '(' && *p != '|')
+    p++;
+  ne = p;
+  while (*p == ' ' || *p == '\t' || *p == '\n')
+    p++;
+  evr = 0;
+  flags = 0;
+  e = ee = 0;
+  if (*p == '(')
     {
-      *p++ = 0;
-      olddeps = makedeps(repo, deps, olddeps, marker);
-      deps = p;
-    }
-  id = 0;
-  p = deps;
-  for (;;)
-    {
+      p++;
       while (*p == ' ' || *p == '\t' || *p == '\n')
 	p++;
-      if (!*p || *p == '(')
-	break;
-      n = p;
-      while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != '(' && *p != '|')
-	p++;
-      ne = p;
-      while (*p == ' ' || *p == '\t' || *p == '\n')
-	p++;
-      evr = 0;
-      flags = 0;
-      e = ee = 0;
-      if (*p == '(')
+      if (*p == '>')
+	flags |= REL_GT;
+      else if (*p == '=')
+	flags |= REL_EQ;
+      else if (*p == '<')
+	flags |= REL_LT;
+      if (flags)
 	{
 	  p++;
-	  while (*p == ' ' || *p == '\t' || *p == '\n')
-	    p++;
 	  if (*p == '>')
 	    flags |= REL_GT;
 	  else if (*p == '=')
 	    flags |= REL_EQ;
 	  else if (*p == '<')
 	    flags |= REL_LT;
-	  if (flags)
-	    {
-	      p++;
-	      if (*p == '>')
-		flags |= REL_GT;
-	      else if (*p == '=')
-		flags |= REL_EQ;
-	      else if (*p == '<')
-		flags |= REL_LT;
-	      else
-		p--;
-	      p++;
-	    }
-	  while (*p == ' ' || *p == '\t' || *p == '\n')
-	    p++;
-	  e = p;
-	  while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != ')')
-	    p++;
-	  ee = p;
-	  while (*p && *p != ')')
-	    p++;
-	  if (*p)
-	    p++;
-	  while (*p == ' ' || *p == '\t' || *p == '\n')
-	    p++;
+	  else
+	    p--;
+	  p++;
 	}
-      name = strn2id(pool, n, ne - n, 1);
-      if (e)
-	{
-	  evr = strn2id(pool, e, ee - e, 1);
-	  name = rel2id(pool, name, evr, flags, 1);
-	}
-      if (!id)
-	id = name;
-      else
-	id = rel2id(pool, id, name, REL_OR, 1);
-      if (*p != '|')
-	break;
-      p++;
+      while (*p == ' ' || *p == '\t' || *p == '\n')
+	p++;
+      e = p;
+      while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != ')')
+	p++;
+      ee = p;
+      while (*p && *p != ')')
+	p++;
+      if (*p)
+	p++;
+      while (*p == ' ' || *p == '\t' || *p == '\n')
+	p++;
     }
+  name = strn2id(pool, n, ne - n, 1);
+  if (e)
+    {
+      evr = strn2id(pool, e, ee - e, 1);
+      name = rel2id(pool, name, evr, flags, 1);
+    }
+  if (*p == '|')
+    {
+      Id id = parseonedep(pool, p + 1);
+      if (id)
+	name = rel2id(pool, name, id, REL_OR, 1);
+    }
+  return name;
+}
+
+static unsigned int
+makedeps(Repo *repo, char *deps, unsigned int olddeps, Id marker)
+{
+  Pool *pool = repo->pool;
+  char *p;
+  Id id;
+
+  while ((p = strchr(deps, ',')) != 0)
+    {
+      *p = 0;
+      olddeps = makedeps(repo, deps, olddeps, marker);
+      *p = ',';
+      deps = p + 1;
+    }
+  id = parseonedep(pool, deps);
   if (!id)
     return olddeps;
   return repo_addid_dep(repo, olddeps, id, marker);
@@ -160,6 +166,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
   Pool *pool = repo->pool;
   char *p, *q, *end, *tag;
   int x, l;
+  int havesource = 0;
 
   p = control;
   while (*p)
@@ -256,6 +263,16 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  else if (!strcasecmp(tag, "recommends"))
 	    s->recommends = makedeps(repo, q, s->recommends, 0);
 	  break;
+	case 'S' << 8 | 'O':
+	  if (!strcasecmp(tag, "source"))
+	    {
+	      if (s->name && !strcmp(q, id2str(pool, s->name)))
+		repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
+	      else
+		repodata_set_id(data, s - pool->solvables, SOLVABLE_SOURCENAME, str2id(pool, q, 1));
+	      havesource = 1;
+	    }
+	  break;
 	case 'S' << 8 | 'U':
 	  if (!strcasecmp(tag, "suggests"))
 	    s->suggests = makedeps(repo, q, s->suggests, 0);
@@ -272,6 +289,8 @@ control2solvable(Solvable *s, Repodata *data, char *control)
     s->evr = ID_EMPTY;
   if (s->name)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  if (s->name && !havesource)
+    repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
 }
 
 void
