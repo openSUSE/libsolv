@@ -4,6 +4,7 @@ Wed Oct 14 16:21:32 CEST 2009 - mls@suse.de
 - ignore products element so that repo2solv works
 - support MULTI_SEMANTICS
 - add --withsrc option for installcheck
+- add SOLVER_DROP_ORPHANED job type
 - 0.14.9
 
 -------------------------------------------------------------------
