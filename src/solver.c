@@ -1295,6 +1295,7 @@ solver_free(Solver *solv)
   map_free(&solv->fixmap);
   map_free(&solv->dupmap);
   map_free(&solv->dupinvolvedmap);
+  map_free(&solv->droporphanedmap);
 
   sat_free(solv->decisionmap);
   sat_free(solv->rules);
@@ -1929,7 +1930,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  int installedone = 0;
 
 	  /* let's see if we can install some unsupported package */
-	  POOL_DEBUG(SAT_DEBUG_SOLVER, "deciding unsupported packages\n");
+	  POOL_DEBUG(SAT_DEBUG_SOLVER, "deciding orphaned packages\n");
 	  for (i = 0; i < solv->orphaned.count; i++)
 	    {
 	      p = solv->orphaned.elements[i];
@@ -1937,20 +1938,29 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		continue;	/* already decided */
 	      olevel = level;
 	      if (solv->distupgrade_removeunsupported)
-		{
-		  POOL_DEBUG(SAT_DEBUG_SOLVER, "removing unsupported %s\n", solvid2str(pool, p));
-		  level = setpropagatelearn(solv, level, -p, 0, 0);
-		}
-	      else
-		{
-		  POOL_DEBUG(SAT_DEBUG_SOLVER, "keeping unsupported %s\n", solvid2str(pool, p));
-		  level = setpropagatelearn(solv, level, p, 0, 0);
-		  installedone = 1;
-		}
+		continue;
+	      if (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))
+		continue;
+	      POOL_DEBUG(SAT_DEBUG_SOLVER, "keeping orphaned %s\n", solvid2str(pool, p));
+	      level = setpropagatelearn(solv, level, p, 0, 0);
+	      installedone = 1;
 	      if (level < olevel)
 		break;
 	    }
 	  if (installedone || i < solv->orphaned.count)
+	    continue;		/* back to main loop */
+	  for (i = 0; i < solv->orphaned.count; i++)
+	    {
+	      p = solv->orphaned.elements[i];
+	      if (solv->decisionmap[p])
+		continue;	/* already decided */
+	      POOL_DEBUG(SAT_DEBUG_SOLVER, "removing orphaned %s\n", solvid2str(pool, p));
+	      olevel = level;
+	      level = setpropagatelearn(solv, level, -p, 0, 0);
+	      if (level < olevel)
+		break;
+	    }
+	  if (i < solv->orphaned.count)
 	    continue;		/* back to main loop */
 	}
 
@@ -2797,6 +2807,18 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_DISTUPGRADE:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: distupgrade %s\n", solver_select2str(solv, select, what));
+	  break;
+	case SOLVER_DROP_ORPHANED:
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: drop orphaned %s\n", solver_select2str(solv, select, what));
+	  FOR_JOB_SELECT(p, pp, select, what)
+	    {
+	      s = pool->solvables + p;
+	      if (!installed || s->repo != installed)
+		continue;
+	      if (!solv->droporphanedmap.size)
+		map_grow(&solv->droporphanedmap, installed->end - installed->start);
+	      MAPSET(&solv->droporphanedmap, p - installed->start);
+	    }
 	  break;
 	default:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: unknown job\n");
