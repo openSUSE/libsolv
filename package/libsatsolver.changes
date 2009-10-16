@@ -5,6 +5,7 @@ Wed Oct 14 16:21:32 CEST 2009 - mls@suse.de
 - support MULTI_SEMANTICS
 - add --withsrc option for installcheck
 - add SOLVER_DROP_ORPHANED job type
+- fix dropped package handling in removedisabledconflicts
 - 0.14.9
 
 -------------------------------------------------------------------
