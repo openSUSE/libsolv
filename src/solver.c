@@ -2084,10 +2084,15 @@ removedisabledconflicts(Solver *solv, Queue *removed)
     {
       p = solv->decisionq.elements[i];
       if (p > 0)
-	continue;
-      /* a conflict. we never do conflicts on free decisions, so there
-       * must have been an unit rule */
+	continue;	/* conflicts only, please */
       why = solv->decisionq_why.elements[i];
+      if (why == 0)
+	{
+	  /* no rule involved, must be a orphan package drop */
+	  continue;
+	}
+      /* we never do conflicts on free decisions, so there
+       * must have been an unit rule */
       assert(why > 0);
       r = solv->rules + why;
       if (r->d < 0 && decisionmap[-p])
