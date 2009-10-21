@@ -266,6 +266,14 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	case 'S' << 8 | 'O':
 	  if (!strcasecmp(tag, "source"))
 	    {
+	      char *q2;
+	      /* ignore version for now */
+	      for (q2 = q; *q2; q2++)
+		if (*q2 == ' ' || *q2 == '\t')
+		  {
+		    *q2 = 0;
+		    break;
+		  }
 	      if (s->name && !strcmp(q, id2str(pool, s->name)))
 		repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
 	      else
