@@ -1779,7 +1779,7 @@ void
 addchoicerules(Solver *solv)
 {
   Pool *pool = solv->pool;
-  Map m;
+  Map m, mneg;
   Rule *r;
   Queue q, qi;
   int i, j, rid, havechoice;
@@ -1797,6 +1797,14 @@ addchoicerules(Solver *solv)
   queue_init(&q);
   queue_init(&qi);
   map_init(&m, pool->nsolvables);
+  map_init(&mneg, pool->nsolvables);
+  /* set up negative assertion map from infarch and dup rules */
+  for (rid = solv->infarchrules, r = solv->rules + rid; rid < solv->infarchrules_end; rid++, r++)
+    if (r->p < 0 && !r->w2 && (r->d == 0 || r->d == -1))
+      MAPSET(&mneg, -r->p);
+  for (rid = solv->duprules, r = solv->rules + rid; rid < solv->duprules_end; rid++, r++)
+    if (r->p < 0 && !r->w2 && (r->d == 0 || r->d == -1))
+      MAPSET(&mneg, -r->p);
   for (rid = 1; rid < solv->rpmrules_end ; rid++)
     {
       r = solv->rules + rid;
@@ -1838,6 +1846,8 @@ addchoicerules(Solver *solv)
 		continue;
 	      if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
 		continue;
+	      if (MAPSET(&mneg, p2))
+		continue;
 	      queue_push(&qi, p2);
 	      queue_push(&q, p);
 	      continue;
@@ -1868,6 +1878,8 @@ addchoicerules(Solver *solv)
 		  if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
 		    continue;
 		  if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
+		    continue;
+		  if (MAPSET(&mneg, p2))
 		    continue;
 		  queue_push(&qi, p2);
 		  queue_push(&q, p);
@@ -1927,6 +1939,7 @@ addchoicerules(Solver *solv)
   queue_free(&q);
   queue_free(&qi);
   map_free(&m);
+  map_free(&mneg);
   solv->choicerules_end = solv->nrules;
 }
 

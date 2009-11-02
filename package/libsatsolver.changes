@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Nov  2 14:10:23 CET 2009 - mls@suse.de
+
+- look at infarch/dup rules when creating choice rules, makes dup
+  also install 32bit packages [bnc#551637]
+- 0.14.10
+
+-------------------------------------------------------------------
 Wed Oct 14 16:21:32 CEST 2009 - mls@suse.de
 
 - ignore products element so that repo2solv works
