@@ -116,13 +116,15 @@ if test "$repotype" = rpmmd ; then
   fi
 
   prodfile=
-  if test -f product.xml; then
+  prodxml=`repomd_findfile product product.xml`
+  if test -z "$prodxml" ; then
+    prodxml=`repomd_findfile products products.xml`
+  fi
+  if test -n "$prodxml" -a -s "$prodxml" ; then
     prodfile=`mktemp` || exit 3
     (
      echo '<products>'
-     for i in product*.xml*; do
-       repomd_decompress $i
-     done
+     repomd_decompress "$prodxml"
      echo '</products>'
     ) | grep -v '\?xml' | rpmmd2solv $parser_options > $prodfile || exit 4
   fi
