@@ -928,11 +928,6 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	    }
 	  qs.elements[j++] = qs.elements[i];
 	}
-      if (j == 0 && p == -SYSTEMSOLVABLE && solv->distupgrade)
-	{
-	  queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
-	  j = qs.count;
-	}
       if (j < qs.count)
 	{
 	  if (d && solv->updatesystem && solv->installed && s->repo == solv->installed)
@@ -940,6 +935,11 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	      if (!solv->multiversionupdaters)
 		solv->multiversionupdaters = sat_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
 	      solv->multiversionupdaters[s - pool->solvables - solv->installed->start] = d;
+	    }
+	  if (j == 0 && p == -SYSTEMSOLVABLE && solv->distupgrade)
+	    {
+	      queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
+	      j = qs.count;
 	    }
 	  qs.count = j;
 	}
@@ -1358,7 +1358,16 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       if (!installed)
 	return;
       if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
-	return;
+	{
+	  /* XXX: remove if we always do distupgrade with DUP rules */
+	  if (solv->distupgrade && s->repo == installed)
+	    {
+	      queue_push(q, DISABLE_UPDATE);
+	      queue_push(q, what);
+	      return;
+	    }
+	  return;
+	}
       if (s->repo == installed)
 	{
 	  queue_push(q, DISABLE_UPDATE);
