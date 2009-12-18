@@ -530,7 +530,7 @@ static struct filefilter filefilters[] = {
 #endif
 
 static void
-adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dic)
+adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dc)
 {
   Id handle, did;
   int i, fszc;
@@ -627,11 +627,11 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
       sat_free(fdev);
     }
   sat_free(fino);
-  fn = sat_calloc(dic, sizeof(unsigned int));
-  fkb = sat_calloc(dic, sizeof(unsigned int));
+  fn = sat_calloc(dc, sizeof(unsigned int));
+  fkb = sat_calloc(dc, sizeof(unsigned int));
   for (i = 0; i < fc; i++)
     {
-      if (di[i] >= dic)
+      if (di[i] >= dc)
 	continue;
       fn[di[i]]++;
       if (fsz[i] == 0 || !S_ISREG(fm[i]))
@@ -642,12 +642,17 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
   sat_free(fm);
   /* commit */
   handle = s - pool->solvables;
-  for (i = 0; i < fc; i++)
+  for (i = 0; i < dc; i++)
     {
       if (!fn[i])
 	continue;
-      if (!*dn[i] && (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC))
-        did = repodata_str2dir(data, "/usr/src", 1);
+      if (!*dn[i])
+	{
+          if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	    did = repodata_str2dir(data, "/usr/src", 1);
+	  else
+	    continue;	/* work around rpm bug */
+	}
       else
         did = repodata_str2dir(data, dn[i], 1);
       repodata_add_dirnumnum(data, handle, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
@@ -699,7 +704,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
     }
 
   if (data)
-    adddudata(pool, repo, data, s, rpmhead, dn, di, bnc, dic);
+    adddudata(pool, repo, data, s, rpmhead, dn, di, bnc, dnc);
 
   for (i = 0; i < bnc; i++)
     {
@@ -750,11 +755,17 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
       if (data)
 	{
 	  Id handle, did;
+	  char *b = bn[i];
+
 	  handle = s - pool->solvables;
 	  did = repodata_str2dir(data, dn[di[i]], 1);
 	  if (!did)
-	    did = repodata_str2dir(data, "/", 1);
-	  repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, bn[i]);
+	    {
+	      did = repodata_str2dir(data, "/", 1);
+	      if (b && b[0] == '/')
+		b++;	/* work around rpm bug */
+	    }
+	  repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, b);
 	}
     }
 #if 0
