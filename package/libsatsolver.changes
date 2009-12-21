@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Mon Dec 21 14:29:24 CET 2009 - mls@suse.de
+
+- disable update rule in noobsoletes case if installed package is to
+  be kept [bnc#564239]
+- work around rpm bug when --prefix is used [bnc#565525]
+- add support for sparc architecture [bnc#566291]
+- 0.14.12
+
+-------------------------------------------------------------------
 Mon Dec  7 13:59:08 CET 2009 - ma@suse.de
 
 - Support optionally compressed product(s).xml in rpmmd metadata.
