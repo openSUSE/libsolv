@@ -41,9 +41,10 @@ const char *archpolicies[] = {
   "sh3",	"sh3",
   "sh4",	"sh4",
   "sh4a",	"sh4a:sh4",
-  "sparcv8",    "sparcv8:sparc",
-  "sparcv9",    "sparcv9:sparcv8:sparc",
-  "sparc64",    "sparc64:sparcv9:sparcv8:sparc",
+  "sparc64",	"sparc64:sparcv9:sparcv8:sparc",
+  "sparcv9",	"sparcv9:sparcv8:sparc",
+  "sparcv8",	"sparcv8:sparc",
+  "sparc",	"sparc",
   0
 };
 
