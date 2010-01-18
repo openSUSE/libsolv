@@ -17,6 +17,8 @@
 #include "repo_write.h"
 #include "common_write.h"
 
+#define SATSOLVER_TOOLVERSION "1.0"
+
 static Id verticals[] = {
   SOLVABLE_AUTHORS,
   SOLVABLE_DESCRIPTION,
@@ -76,8 +78,8 @@ keyfilter_attr(Repo *data, Repokey *key, void *kfdata)
   const char *keyname;
   if (key->storage == KEY_STORAGE_SOLVABLE)
     return KEY_STORAGE_DROPPED;
-  /* those two must only be in the main solv file */
-  if (key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_ADDEDFILEPROVIDES)
+  /* those must only be in the main solv file */
+  if (key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_TOOLVERSION)
     return KEY_STORAGE_DROPPED;
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
@@ -203,6 +205,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 
   memset(&kd, 0, sizeof(kd));
   info = repo_add_repodata(repo, 0);
+  repodata_set_str(info, SOLVID_META, REPOSITORY_TOOLVERSION, SATSOLVER_TOOLVERSION);
   pool_addfileprovides_ids(repo->pool, 0, &addedfileprovides);
   if (addedfileprovides && *addedfileprovides)
     {

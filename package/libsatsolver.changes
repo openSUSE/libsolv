@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Jan 18 14:42:27 CET 2010 - mls@suse.de
+
+- set repository:toolversion to 1.0 in common_write
+- 0.14.13
+
+-------------------------------------------------------------------
 Mon Dec 21 14:29:24 CET 2009 - mls@suse.de
 
 - disable update rule in noobsoletes case if installed package is to

@@ -644,7 +644,7 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
   if (key->name == REPOSITORY_SOLVABLES)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
   if (data != data->repo->repodata + data->repo->nrepodata - 1)
-    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS)
+    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS || key->name == REPOSITORY_TOOLVERSION)
       return SEARCH_NEXT_KEY;
 
   rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];
@@ -754,7 +754,7 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
   if (key->name == REPOSITORY_SOLVABLES)
     return SEARCH_NEXT_KEY;
   if (data != data->repo->repodata + data->repo->nrepodata - 1)
-    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS)
+    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS || key->name == REPOSITORY_TOOLVERSION)
       return SEARCH_NEXT_KEY;
 
   rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];

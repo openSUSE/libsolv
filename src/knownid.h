@@ -233,6 +233,8 @@ KNOWNID(PUBKEY_FINGERPRINT,	        "pubkey:fingerprint"),
 KNOWNID(PUBKEY_EXPIRES,		        "pubkey:expires"),
 KNOWNID(PUBKEY_SIGNATURES,	        "pubkey:signatures"),
 
+KNOWNID(REPOSITORY_TOOLVERSION,		"repository:toolversion"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
