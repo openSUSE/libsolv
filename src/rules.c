@@ -1850,12 +1850,12 @@ addchoicerules(Solver *solv)
 	    }
 	  if (p2)
 	    {
-	      /* found installed package */
+	      /* found installed package p2 that we can update to p */
 	      if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
 		continue;
 	      if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
 		continue;
-	      if (MAPSET(&mneg, p2))
+	      if (MAPTST(&mneg, p))
 		continue;
 	      queue_push(&qi, p2);
 	      queue_push(&q, p);
@@ -1883,19 +1883,19 @@ addchoicerules(Solver *solv)
 		}
 	      if (obs)
 		{
-		  /* found one */
+		  /* found installed package p2 that we can update to p */
 		  if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
 		    continue;
 		  if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
 		    continue;
-		  if (MAPSET(&mneg, p2))
+		  if (MAPTST(&mneg, p))
 		    continue;
 		  queue_push(&qi, p2);
 		  queue_push(&q, p);
 		  continue;
 		}
 	    }
-	  /* this package is independent if the installed ones */
+	  /* package p is independent of the installed ones */
 	  havechoice = 1;
 	}
       if (!havechoice || !q.count)

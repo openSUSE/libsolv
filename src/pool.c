@@ -279,7 +279,7 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovides_rel = sat_calloc_block(pool->nrels, sizeof(Offset), WHATPROVIDES_BLOCK);
 
   /* count providers for each name */
-  for (i = 1; i < pool->nsolvables; i++)
+  for (i = pool->nsolvables - 1; i > 0; i--)
     {
       Id *pp;
       s = pool->solvables + i;
@@ -290,7 +290,7 @@ pool_createwhatprovides(Pool *pool)
       if (s->repo != installed && !pool_installable(pool, s))
 	continue;
       pp = s->repo->idarraydata + s->provides;
-      while ((id = *pp++) != ID_NULL)
+      while ((id = *pp++) != 0)
 	{
 	  while (ISRELDEP(id))
 	    {
@@ -302,16 +302,15 @@ pool_createwhatprovides(Pool *pool)
     }
 
   off = 2;	/* first entry is undef, second is empty list */
-  idp = whatprovides;
   np = 0;			       /* number of names provided */
-  for (i = 0; i < num; i++, idp++)
+  for (i = 0, idp = whatprovides; i < num; i++, idp++)
     {
       n = *idp;
       if (!n)			       /* no providers */
 	continue;
-      *idp = off;		       /* move from counts to offsets into whatprovidesdata */
-      off += n + 1;		       /* make space for all providers + terminating ID_NULL */
-      np++;			       /* inc # of provider 'slots' */
+      off += n;			       /* make space for all providers */
+      *idp = off++;		       /* now idp points to terminating zero */
+      np++;			       /* inc # of provider 'slots' for stats */
     }
 
   POOL_DEBUG(SAT_DEBUG_STATS, "provide ids: %d\n", np);
@@ -327,7 +326,7 @@ pool_createwhatprovides(Pool *pool)
   whatprovidesdata = sat_calloc(off + extra, sizeof(Id));
 
   /* now fill data for all provides */
-  for (i = 1; i < pool->nsolvables; i++)
+  for (i = pool->nsolvables - 1; i > 0; i--)
     {
       Id *pp;
       s = pool->solvables + i;
@@ -346,15 +345,11 @@ pool_createwhatprovides(Pool *pool)
 	      id = rd->name;
 	    }
 	  d = whatprovidesdata + whatprovides[id];   /* offset into whatprovidesdata */
-	  if (*d)
+	  if (*d != i)		/* don't add same solvable twice */
 	    {
-	      d++;
-	      while (*d)	       /* find free slot */
-		d++;
-	      if (d[-1] == i)          /* solvable already tacked at end ? */
-		continue;              /* Y: skip, on to next provides */
+	      d[-1] = i;
+	      whatprovides[id]--;
 	    }
-	  *d = i;		       /* put solvable Id into data */
 	}
     }
   pool->whatprovidesdata = whatprovidesdata;
