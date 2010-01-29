@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Jan 29 14:48:34 CET 2010 - mls@suse.de
+
+- speed up createwhatprovides when many solvables provide the same dep
+- fix choice rule creation for real (bnc#551637)
+- 0.14.14
+
+-------------------------------------------------------------------
 Mon Jan 18 14:42:27 CET 2010 - mls@suse.de
 
 - set repository:toolversion to 1.0 in common_write
