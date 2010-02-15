@@ -17,8 +17,14 @@
 #include "pool.h"
 
 
-#ifdef DEBIAN_SEMANTICS
 
+#if defined(DEBIAN_SEMANTICS) || defined(MULTI_SEMANTICS)
+
+#ifdef MULTI_SEMANTICS
+# define vercmp vercmp_deb
+#endif
+
+/* debian type version compare */
 int
 vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
@@ -58,8 +64,15 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
     }
 }
 
-#else
+#ifdef MULTI_SEMANTICS
+# undef vercmp
+#endif
 
+#endif
+
+#if !defined(DEBIAN_SEMANTICS) || defined(MULTI_SEMANTICS)
+
+/* rpm type version compare */
 int
 vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
@@ -119,6 +132,9 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 
 #endif
 
+#if defined(MULTI_SEMANTICS)
+# define vercmp (*(pool->disttype == DISTTYPE_DEB ? &vercmp_deb : &ver##cmp))
+#endif
 
 /* edition (e:v-r) compare */
 int

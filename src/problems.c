@@ -440,7 +440,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
       if (solv->distupgrade && solv->rules[why].p != p && solv->decisionmap[p] > 0)
 	{
 	  /* distupgrade case, allow to keep old package */
-	  queue_push(solutionq, p);
+	  queue_push(solutionq, SOLVER_SOLUTION_DISTUPGRADE);
 	  queue_push(solutionq, p);
 	  return;
 	}

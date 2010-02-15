@@ -928,11 +928,6 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	    }
 	  qs.elements[j++] = qs.elements[i];
 	}
-      if (j == 0 && p == -SYSTEMSOLVABLE && solv->distupgrade)
-	{
-	  queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
-	  j = qs.count;
-	}
       if (j < qs.count)
 	{
 	  if (d && solv->updatesystem && solv->installed && s->repo == solv->installed)
@@ -940,6 +935,11 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	      if (!solv->multiversionupdaters)
 		solv->multiversionupdaters = sat_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
 	      solv->multiversionupdaters[s - pool->solvables - solv->installed->start] = d;
+	    }
+	  if (j == 0 && p == -SYSTEMSOLVABLE && solv->distupgrade)
+	    {
+	      queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
+	      j = qs.count;
 	    }
 	  qs.count = j;
 	}
@@ -1067,6 +1067,8 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
 	  if (a != 1 && bestarch && ((a ^ bestarch) & 0xffff0000) != 0)
 	    {
+	      if (pool->installed && ps->repo == pool->installed)
+		continue;	/* always ok to keep an installed package */
 	      for (j = 0; j < allowedarchs.count; j++)
 		{
 		  aa = allowedarchs.elements[j];
@@ -1356,7 +1358,16 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       if (!installed)
 	return;
       if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
-	return;
+	{
+	  /* XXX: remove if we always do distupgrade with DUP rules */
+	  if (solv->distupgrade && s->repo == installed)
+	    {
+	      queue_push(q, DISABLE_UPDATE);
+	      queue_push(q, what);
+	      return;
+	    }
+	  return;
+	}
       if (s->repo == installed)
 	{
 	  queue_push(q, DISABLE_UPDATE);
@@ -1777,7 +1788,7 @@ void
 addchoicerules(Solver *solv)
 {
   Pool *pool = solv->pool;
-  Map m;
+  Map m, mneg;
   Rule *r;
   Queue q, qi;
   int i, j, rid, havechoice;
@@ -1795,6 +1806,14 @@ addchoicerules(Solver *solv)
   queue_init(&q);
   queue_init(&qi);
   map_init(&m, pool->nsolvables);
+  map_init(&mneg, pool->nsolvables);
+  /* set up negative assertion map from infarch and dup rules */
+  for (rid = solv->infarchrules, r = solv->rules + rid; rid < solv->infarchrules_end; rid++, r++)
+    if (r->p < 0 && !r->w2 && (r->d == 0 || r->d == -1))
+      MAPSET(&mneg, -r->p);
+  for (rid = solv->duprules, r = solv->rules + rid; rid < solv->duprules_end; rid++, r++)
+    if (r->p < 0 && !r->w2 && (r->d == 0 || r->d == -1))
+      MAPSET(&mneg, -r->p);
   for (rid = 1; rid < solv->rpmrules_end ; rid++)
     {
       r = solv->rules + rid;
@@ -1831,10 +1850,12 @@ addchoicerules(Solver *solv)
 	    }
 	  if (p2)
 	    {
-	      /* found installed package */
+	      /* found installed package p2 that we can update to p */
 	      if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
 		continue;
 	      if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
+		continue;
+	      if (MAPTST(&mneg, p))
 		continue;
 	      queue_push(&qi, p2);
 	      queue_push(&q, p);
@@ -1862,17 +1883,19 @@ addchoicerules(Solver *solv)
 		}
 	      if (obs)
 		{
-		  /* found one */
+		  /* found installed package p2 that we can update to p */
 		  if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
 		    continue;
 		  if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
+		    continue;
+		  if (MAPTST(&mneg, p))
 		    continue;
 		  queue_push(&qi, p2);
 		  queue_push(&q, p);
 		  continue;
 		}
 	    }
-	  /* this package is independent if the installed ones */
+	  /* package p is independent of the installed ones */
 	  havechoice = 1;
 	}
       if (!havechoice || !q.count)
@@ -1925,6 +1948,7 @@ addchoicerules(Solver *solv)
   queue_free(&q);
   queue_free(&qi);
   map_free(&m);
+  map_free(&mneg);
   solv->choicerules_end = solv->nrules;
 }
 

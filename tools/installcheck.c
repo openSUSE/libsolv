@@ -80,6 +80,7 @@ main(int argc, char **argv)
   Id rpmid, rpmarch, rpmrel, archlock;
   int status = 0;
   int nocheck = 0;
+  int withsrc = 0;
 
   exclude_pat = 0;
   archlock = 0;
@@ -94,6 +95,11 @@ main(int argc, char **argv)
       FILE *fp;
       int l;
 
+      if (!strcmp(argv[i], "--withsrc"))
+	{
+	  withsrc++;
+	  continue;
+	}
       if (!strcmp(argv[i], "--nocheck"))
 	{
 	  if (!nocheck)
@@ -166,6 +172,11 @@ main(int argc, char **argv)
       Solvable *s = pool->solvables + p;
       if (!s->repo)
 	continue;
+      if (withsrc && (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC))
+	{
+	  queue_push(&cand, p);
+	  continue;
+	}
       if (!pool_installable(pool, s))
 	continue;
       if (rpmrel && s->arch != rpmarch)

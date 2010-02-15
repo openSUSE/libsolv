@@ -1,4 +1,70 @@
 -------------------------------------------------------------------
+Fri Jan 29 14:48:34 CET 2010 - mls@suse.de
+
+- speed up createwhatprovides when many solvables provide the same dep
+- fix choice rule creation for real (bnc#551637)
+- 0.14.14
+
+-------------------------------------------------------------------
+Mon Jan 18 14:42:27 CET 2010 - mls@suse.de
+
+- set repository:toolversion to 1.0 in common_write
+- 0.14.13
+
+-------------------------------------------------------------------
+Mon Dec 21 14:29:24 CET 2009 - mls@suse.de
+
+- disable update rule in noobsoletes case if installed package is to
+  be kept [bnc#564239]
+- work around rpm bug when --prefix is used [bnc#565525]
+- add support for sparc architecture [bnc#566291]
+- 0.14.12
+
+-------------------------------------------------------------------
+Mon Dec  7 13:59:08 CET 2009 - ma@suse.de
+
+- Support optionally compressed product(s).xml in rpmmd metadata.
+- 0.14.11
+
+-------------------------------------------------------------------
+Mon Nov  2 14:10:23 CET 2009 - mls@suse.de
+
+- look at infarch/dup rules when creating choice rules, makes dup
+  also install 32bit packages [bnc#551637]
+- 0.14.10
+
+-------------------------------------------------------------------
+Wed Oct 14 16:21:32 CEST 2009 - mls@suse.de
+
+- ignore products element so that repo2solv works
+- support MULTI_SEMANTICS
+- add --withsrc option for installcheck
+- add SOLVER_DROP_ORPHANED job type
+- fix dropped package handling in removedisabledconflicts
+- 0.14.9
+
+-------------------------------------------------------------------
+Thu Sep 24 10:27:42 CEST 2009 - mls@suse.de
+
+- fix bug in solvable_lookup_str_base
+
+-------------------------------------------------------------------
+Wed Sep 23 11:10:08 CEST 2009 - mls@suse.de
+
+- get missing translations from other solvables [bnc#386449]
+- also look at triggers when ordering packages
+- add support for REPOKEY_TYPE_BINARY
+- 0.14.8
+
+-------------------------------------------------------------------
+Wed Sep 16 10:56:44 CEST 2009 - mls@suse.de
+
+- use repomdxml to query for the location [bnc#501425]
+- fix assertion failue... again
+- fix fp leak [bnc#535468]
+- 0.14.7
+
+-------------------------------------------------------------------
 Fri Sep  4 11:40:47 CEST 2009 - mls@suse.de
 
 - fix multiversion handling for real

@@ -207,17 +207,15 @@ write_id_eof(FILE *fp, Id x, int eof)
 
 
 
-#if 0
-static void
+static inline void
 write_str(FILE *fp, const char *str)
 {
-  if (fputs (str, fp) == EOF || putc (0, fp) == EOF)
+  if (fputs(str, fp) == EOF || putc(0, fp) == EOF)
     {
-      perror("write error");
+      perror("write error str");
       exit(1);
     }
 }
-#endif
 
 /*
  * Array of Ids
@@ -251,7 +249,7 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
 }
 
 static int
-cmp_ids (const void *pa, const void *pb, void *dp)
+cmp_ids(const void *pa, const void *pb, void *dp)
 {
   Id a = *(Id *)pa;
   Id b = *(Id *)pb;
@@ -303,7 +301,7 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
     if (sids[i] == marker)
       break;
   if (i > 1)
-    sat_sort(sids, i, sizeof (Id), cmp_ids, 0);
+    sat_sort(sids, i, sizeof(Id), cmp_ids, 0);
   if ((len - i) > 2)
     sat_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
 
@@ -478,7 +476,7 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
     if (sids[i] == marker)
       break;
   if (i > 1)
-    sat_sort(sids, i, sizeof (Id), cmp_ids, 0);
+    sat_sort(sids, i, sizeof(Id), cmp_ids, 0);
   if ((len - i) > 2)
     sat_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
 
@@ -646,7 +644,7 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
   if (key->name == REPOSITORY_SOLVABLES)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
   if (data != data->repo->repodata + data->repo->nrepodata - 1)
-    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS)
+    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS || key->name == REPOSITORY_TOOLVERSION)
       return SEARCH_NEXT_KEY;
 
   rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];
@@ -751,11 +749,12 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
   unsigned int u32;
   unsigned char v[4];
   struct extdata *xd;
+  NeedId *needid;
 
   if (key->name == REPOSITORY_SOLVABLES)
     return SEARCH_NEXT_KEY;
   if (data != data->repo->repodata + data->repo->nrepodata - 1)
-    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS)
+    if (key->name == REPOSITORY_ADDEDFILEPROVIDES || key->name == REPOSITORY_EXTERNAL || key->name == REPOSITORY_LOCATION || key->name == REPOSITORY_KEYS || key->name == REPOSITORY_TOOLVERSION)
       return SEARCH_NEXT_KEY;
 
   rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];
@@ -780,14 +779,16 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	id = kv->id;
 	if (!ISRELDEP(id) && cbdata->ownspool && id > 1)
 	  id = putinownpool(cbdata, data->localpool ? &data->spool : &data->repo->pool->ss, id);
-	id = cbdata->needid[id].need;
+	needid = cbdata->needid;
+	id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
 	data_addid(xd, id);
 	break;
       case REPOKEY_TYPE_IDARRAY:
 	id = kv->id;
 	if (cbdata->ownspool && id > 1)
 	  id = putinownpool(cbdata, data->localpool ? &data->spool : &data->repo->pool->ss, id);
-	id = cbdata->needid[id].need;
+	needid = cbdata->needid;
+	id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
 	data_addideof(xd, id, kv->eof);
 	break;
       case REPOKEY_TYPE_STR:
@@ -819,6 +820,11 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	  id = putinowndirpool(cbdata, data, &data->dirpool, id);
 	id = cbdata->dirused[id];
 	data_addid(xd, id);
+	break;
+      case REPOKEY_TYPE_BINARY:
+	data_addid(xd, kv->num);
+	if (kv->num)
+	  data_addblob(xd, (unsigned char *)kv->str, kv->num);
 	break;
       case REPOKEY_TYPE_DIRNUMNUMARRAY:
 	id = kv->id;
@@ -852,9 +858,6 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	else if (kv->eof == 1)
 	  {
 	    cbdata->current_sub++;
-	  }
-	else
-	  {
 	  }
 	break;
       case REPOKEY_TYPE_FLEXARRAY:
@@ -1746,6 +1749,44 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
   write_u32(fp, solv_flags);
 
+  /*
+   * calculate prefix encoding of the strings
+   */
+  unsigned char *prefixcomp = sat_malloc(nstrings);
+  unsigned int compsum = 0;
+  char *old_str = "";
+  
+  prefixcomp[0] = 0;
+  for (i = 1; i < nstrings; i++)
+    {
+      char *str = spool->stringspace + spool->strings[needid[i].map];
+      int same;
+      for (same = 0; same < 255; same++)
+	if (!old_str[same] || old_str[same] != str[same])
+	  break;
+      prefixcomp[i] = same;
+      compsum += same;
+      old_str = str;
+    }
+
+  /*
+   * write strings
+   */
+  write_u32(fp, sizeid);
+  /* we save compsum bytes but need 1 extra byte for every string */
+  write_u32(fp, sizeid + (nstrings ? nstrings - 1 : 0) - compsum);
+  if (sizeid + (nstrings ? nstrings - 1 : 0) != compsum)
+    {
+      for (i = 1; i < nstrings; i++)
+	{
+	  char *str = spool->stringspace + spool->strings[needid[i].map];
+	  write_u8(fp, prefixcomp[i]);
+	  write_str(fp, str + prefixcomp[i]);
+	}
+    }
+  sat_free(prefixcomp);
+
+#if 0
   /* Build the prefix-encoding of the string pool.  We need to know
      the size of that before writing it to the file, so we have to
      build a separate buffer for that.  As it's temporarily possible
@@ -1765,7 +1806,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  break;
       *pp++ = same;
       len = strlen(str + same) + 1;
-      memcpy (pp, str + same, len);
+      memcpy(pp, str + same, len);
       pp += len;
       old_str = str;
     }
@@ -1784,6 +1825,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	}
     }
   sat_free(prefix);
+#endif
 
   /*
    * write RelDeps

@@ -41,6 +41,12 @@ const char *archpolicies[] = {
   "sh3",	"sh3",
   "sh4",	"sh4",
   "sh4a",	"sh4a:sh4",
+  "sparc64v",	"sparc64v:sparc64:sparcv9v:sparcv9:sparcv8:sparc",
+  "sparc64",	"sparc64:sparcv9:sparcv8:sparc",
+  "sparcv9v",	"sparcv9v:sparcv9:sparcv8:sparc",
+  "sparcv9",	"sparcv9:sparcv8:sparc",
+  "sparcv8",	"sparcv8:sparc",
+  "sparc",	"sparc",
   0
 };
 
@@ -48,7 +54,6 @@ void
 pool_setarch(Pool *pool, const char *arch)
 {
   const char *a;
-  char buf[256];
   unsigned int score = 0x10001;
   size_t l;
   char d;
@@ -82,11 +87,9 @@ pool_setarch(Pool *pool, const char *arch)
   while (*a)
     {
       l = strcspn(a, ":=>");
-      if (l && l < sizeof(buf) - 1)
+      if (l)
 	{
-	  strncpy(buf, a, l);
-	  buf[l] = 0;
-	  id = str2id(pool, buf, 1);
+	  id = strn2id(pool, a, l, 1);
 	  if (id > lastarch)
 	    {
 	      id2arch = sat_realloc(id2arch, (id + 255 + 1) * sizeof(Id));

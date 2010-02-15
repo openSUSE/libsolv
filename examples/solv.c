@@ -238,6 +238,7 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	      cinfo->alias = strdup(kp + 1);
 	      cinfo->type = TYPE_RPMMD;
 	      cinfo->autorefresh = 1;
+	      cinfo->priority = 99;
 #ifndef FEDORA
 	      cinfo->repo_gpgcheck = 1;
 #endif
@@ -1207,11 +1208,15 @@ susetags_add_ext(Repo *repo, Repodata *data)
     {
       if (strncmp(di.kv.str, "packages.", 9) != 0)
 	continue;
+      if (!strcmp(di.kv.str + 9, "gz"))
+	continue;
       if (!di.kv.str[9] || !di.kv.str[10] || (di.kv.str[11] && di.kv.str[11] != '.'))
 	continue;
       ext[0] = di.kv.str[9];
       ext[1] = di.kv.str[10];
       ext[2] = 0;
+      if (!strcmp(ext, "en"))
+	continue;
       if (!susetags_find(repo, di.kv.str, &filechksum, &filechksumtype))
 	continue;
       handle = repodata_new_handle(data);
@@ -1223,7 +1228,7 @@ susetags_add_ext(Repo *repo, Repodata *data)
 	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, SOLVABLE_DISKUSAGE);
 	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_DIRNUMNUMARRAY);
 	}
-      if (!strcmp(ext, "FL"))
+      else if (!strcmp(ext, "FL"))
 	{
 	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, SOLVABLE_FILELIST);
 	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_DIRSTRARRAY);
@@ -1537,8 +1542,21 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  printf(" fetching\n");
 	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) == 0)
 	    break;	/* hopeless */
-	  repo_add_susetags(repo, fp, defvendor, 0, 0);
+	  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE);
 	  fclose(fp);
+	  /* add default language */
+	  filename = susetags_find(repo, "packages.en.gz", &filechksum, &filechksumtype);
+          if (!filename)
+	    filename = susetags_find(repo, "packages.en", &filechksum, &filechksumtype);
+	  if (filename)
+	    {
+	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+		{
+		  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|REPO_REUSE_REPODATA|REPO_EXTEND_SOLVABLES);
+		  fclose(fp);
+		}
+	    }
+          repo_internalize(repo);
 	  data = repo_add_repodata(repo, 0);
 	  susetags_add_ext(repo, data);
 	  repodata_internalize(data);
@@ -1738,6 +1756,54 @@ limitevr(Pool *pool, char *evr, Queue *job, Id archid)
 	}
     }
   return 0;
+}
+
+int
+limitrepo(Pool *pool, Id repofilter, Queue *job)
+{
+  Queue mq;
+  Id p, pp;
+  int matched = 0;
+  int i;
+  Solvable *s;
+
+  queue_init(&mq);
+  for (i = 0; i < job->count; i += 2)
+    {
+      queue_empty(&mq);
+      FOR_JOB_SELECT(p, pp, job->elements[i], job->elements[i + 1])
+	{
+	  s = pool_id2solvable(pool, p);
+	  if (s->repo && s->repo->repoid == repofilter)
+	     queue_push(&mq, p);
+	}
+      if (mq.count)
+	{
+	  if (!matched && i)
+	    {
+	      queue_deleten(job, 0, i);
+	      i = 0;
+	    }
+	  matched = 1;
+	  if (mq.count > 1)
+	    {
+	      job->elements[i] = SOLVER_SOLVABLE_ONE_OF;
+	      job->elements[i + 1] = pool_queuetowhatprovides(pool, &mq);
+	    }
+	  else
+	    {
+	      job->elements[i] = SOLVER_SOLVABLE;
+	      job->elements[i + 1] = mq.elements[0];
+	    }
+	}
+      else if (matched)
+	{
+	  queue_deleten(job, i, 2);
+	  i -= 2;
+	}
+    }
+  queue_free(&mq);
+  return matched;
 }
 
 void
@@ -2110,16 +2176,16 @@ usage(int r)
 {
   fprintf(stderr, "Usage: solv COMMAND <select>\n");
   fprintf(stderr, "\n");
-  fprintf(stderr, "    distupgrade: replace installed packages with\n");
-  fprintf(stderr, "                 versions from the repositories\n");
-  fprintf(stderr, "    erase:       erase installed packages\n");
-  fprintf(stderr, "    info:        display package information\n");
-  fprintf(stderr, "    install:     install packages\n");
-  fprintf(stderr, "    list:        list packages\n");
-  fprintf(stderr, "    repos:       list enabled repositories\n");
-  fprintf(stderr, "    search:      search name/summary/description\n");
-  fprintf(stderr, "    update:      update installed packages\n");
-  fprintf(stderr, "    verify:      check dependencies of installed packages\n");
+  fprintf(stderr, "    dist-upgrade: replace installed packages with\n");
+  fprintf(stderr, "                  versions from the repositories\n");
+  fprintf(stderr, "    erase:        erase installed packages\n");
+  fprintf(stderr, "    info:         display package information\n");
+  fprintf(stderr, "    install:      install packages\n");
+  fprintf(stderr, "    list:         list packages\n");
+  fprintf(stderr, "    repos:        list enabled repositories\n");
+  fprintf(stderr, "    search:       search name/summary/description\n");
+  fprintf(stderr, "    update:       update installed packages\n");
+  fprintf(stderr, "    verify:       check dependencies of installed packages\n");
   fprintf(stderr, "\n");
   exit(r);
 }
@@ -2143,6 +2209,7 @@ main(int argc, char **argv)
   FILE **newpkgsfps;
   struct fcstate fcstate;
   Id *addedfileprovides = 0;
+  Id repofilter = 0;
 
   argc--;
   argv++;
@@ -2219,13 +2286,50 @@ main(int argc, char **argv)
 	  struct repoinfo *cinfo = repoinfos + i;
 	  if (!cinfo->enabled)
 	    continue;
-	  printf("%d: %-20s %s\n", j++, cinfo->alias, cinfo->name);
+	  printf("%d: %-20s %s (prio %d)\n", j++, cinfo->alias, cinfo->name, cinfo->priority);
 	}
       exit(0);
     }
 
   read_repos(pool, repoinfos, nrepoinfos);
 
+  if (argc > 2 && !strcmp(argv[1], "-r"))
+    {
+      const char *rname = argv[2], *rp;
+      for (rp = rname; *rp; rp++)
+	if (*rp <= '0' || *rp >= '9')
+	  break;
+      if (!*rp)
+	{
+	  /* repo specified by number */
+	  int rnum = atoi(rname);
+	  for (i = 0; i < nrepoinfos; i++)
+	    {
+	      struct repoinfo *cinfo = repoinfos + i;
+	      if (!cinfo->enabled)
+		continue;
+	      if (--rnum == 0)
+	        repofilter = cinfo->repo->repoid;
+	    }
+	}
+      else
+	{
+	  /* repo specified by alias */
+	  Repo *repo;
+	  FOR_REPOS(i, repo)
+	    {
+	      if (!strcasecmp(rname, repo->name))
+		repofilter = repo->repoid;
+	    }
+	}
+      if (!repofilter)
+	{
+	  fprintf(stderr, "%s: no such repo\n", rname);
+	  exit(1);
+	}
+      argc -= 2;
+      argv += 2;
+    }
   if (mainmode == MODE_SEARCH)
     {
       Dataiterator di;
@@ -2306,6 +2410,11 @@ main(int argc, char **argv)
 	}
       queue_init(&job2);
       mkselect(pool, mode, argv[i], &job2);
+      if (repofilter && !limitrepo(pool, repofilter, &job2))
+        {
+	  fprintf(stderr, "nothing in repo matches '%s'\n", argv[i]);
+	  exit(1);
+        }
       for (j = 0; j < job2.count; j++)
 	queue_push(&job, job2.elements[j]);
       queue_free(&job2);
@@ -2425,6 +2534,9 @@ main(int argc, char **argv)
       job.elements[i] |= mode;
     }
 
+  if (mainmode == MODE_DISTUPGRADE && allpkgs && repofilter)
+    queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_REPO, repofilter);
+
   // multiversion test
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae", 1));
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae-base", 1));
@@ -2442,20 +2554,19 @@ rerunsolver:
 
       solv = solver_create(pool);
       solv->ignorealreadyrecommended = 1;
-      solv->updatesystem = allpkgs && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE);
+      solv->updatesystem = allpkgs && !repofilter && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE);
       solv->dosplitprovides = solv->updatesystem;
-      solv->fixsystem = allpkgs && (mainmode == MODE_VERIFY);
-      if (mainmode == MODE_DISTUPGRADE)
+      solv->fixsystem = allpkgs && !repofilter && mainmode == MODE_VERIFY;
+      if (mainmode == MODE_DISTUPGRADE && allpkgs && !repofilter)
 	{
 	  solv->distupgrade = 1;
-          solv->allowdowngrade = 1;
-          solv->allowarchchange = 1;
-          solv->allowvendorchange = 1;
+	  solv->allowdowngrade = 1;
+	  solv->allowarchchange = 1;
+	  solv->allowvendorchange = 1;
 	}
       if (mainmode == MODE_ERASE)
 	solv->allowuninstall = 1;	/* don't nag */
 
-      // queue_push2(&job, SOLVER_DISTUPGRADE, 3);
       solver_solve(solv, &job);
       if (!solv->problems.count)
 	break;

@@ -88,6 +88,14 @@ pool_free(Pool *pool)
   sat_free(pool);
 }
 
+#ifdef MULTI_SEMANTICS
+void
+pool_setdisttype(Pool *pool, int disttype)
+{
+  pool->disttype = disttype;
+}
+#endif
+
 Id
 pool_add_solvable(Pool *pool)
 {
@@ -271,7 +279,7 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovides_rel = sat_calloc_block(pool->nrels, sizeof(Offset), WHATPROVIDES_BLOCK);
 
   /* count providers for each name */
-  for (i = 1; i < pool->nsolvables; i++)
+  for (i = pool->nsolvables - 1; i > 0; i--)
     {
       Id *pp;
       s = pool->solvables + i;
@@ -282,7 +290,7 @@ pool_createwhatprovides(Pool *pool)
       if (s->repo != installed && !pool_installable(pool, s))
 	continue;
       pp = s->repo->idarraydata + s->provides;
-      while ((id = *pp++) != ID_NULL)
+      while ((id = *pp++) != 0)
 	{
 	  while (ISRELDEP(id))
 	    {
@@ -294,16 +302,15 @@ pool_createwhatprovides(Pool *pool)
     }
 
   off = 2;	/* first entry is undef, second is empty list */
-  idp = whatprovides;
   np = 0;			       /* number of names provided */
-  for (i = 0; i < num; i++, idp++)
+  for (i = 0, idp = whatprovides; i < num; i++, idp++)
     {
       n = *idp;
       if (!n)			       /* no providers */
 	continue;
-      *idp = off;		       /* move from counts to offsets into whatprovidesdata */
-      off += n + 1;		       /* make space for all providers + terminating ID_NULL */
-      np++;			       /* inc # of provider 'slots' */
+      off += n;			       /* make space for all providers */
+      *idp = off++;		       /* now idp points to terminating zero */
+      np++;			       /* inc # of provider 'slots' for stats */
     }
 
   POOL_DEBUG(SAT_DEBUG_STATS, "provide ids: %d\n", np);
@@ -319,7 +326,7 @@ pool_createwhatprovides(Pool *pool)
   whatprovidesdata = sat_calloc(off + extra, sizeof(Id));
 
   /* now fill data for all provides */
-  for (i = 1; i < pool->nsolvables; i++)
+  for (i = pool->nsolvables - 1; i > 0; i--)
     {
       Id *pp;
       s = pool->solvables + i;
@@ -338,15 +345,11 @@ pool_createwhatprovides(Pool *pool)
 	      id = rd->name;
 	    }
 	  d = whatprovidesdata + whatprovides[id];   /* offset into whatprovidesdata */
-	  if (*d)
+	  if (*d != i)		/* don't add same solvable twice */
 	    {
-	      d++;
-	      while (*d)	       /* find free slot */
-		d++;
-	      if (d[-1] == i)          /* solvable already tacked at end ? */
-		continue;              /* Y: skip, on to next provides */
+	      d[-1] = i;
+	      whatprovides[id]--;
 	    }
-	  *d = i;		       /* put solvable Id into data */
 	}
     }
   pool->whatprovidesdata = whatprovidesdata;
@@ -416,6 +419,14 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 
 /*************************************************************************/
 
+#if defined(MULTI_SEMANTICS)
+# define EVRCMP_DEPCMP (pool->disttype == DISTTYPE_DEB ? EVRCMP_COMPARE : EVRCMP_MATCH_RELEASE)
+#elif defined(DEBIAN_SEMANTICS)
+# define EVRCMP_DEPCMP EVRCMP_COMPARE
+#else
+# define EVRCMP_DEPCMP EVRCMP_MATCH_RELEASE
+#endif
+
 /* check if a package's nevr matches a dependency */
 
 int
@@ -457,13 +468,8 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
     return 1;
   if (flags != 2 && flags != 5)
     flags ^= 5;
-#ifdef DEBIAN_SEMANTICS
-  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_COMPARE)))) != 0)
+  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_DEPCMP)))) != 0)
     return 1;
-#else
-  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_MATCH_RELEASE)))) != 0)
-    return 1;
-#endif
   return 0;
 }
 
@@ -508,13 +514,8 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
   else
     {
       int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-#ifdef DEBIAN_SEMANTICS
-      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_COMPARE)))) != 0)
+      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_DEPCMP)))) != 0)
 	return 1;
-#else
-      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_MATCH_RELEASE)))) != 0)
-	return 1;
-#endif
     }
   return 0;
 }
@@ -679,7 +680,12 @@ pool_addrelproviders(Pool *pool, Id d)
 
 	      if (pid == name)
 		{
-#ifdef DEBIAN_SEMANTICS
+#if defined(MULTI_SEMANTICS)
+		  if (pool->disttype == DISTTYPE_DEB)
+		    continue;
+		  else
+		    break;
+#elif defined(DEBIAN_SEMANTICS)
 		  continue;		/* unversioned provides can
 				 	 * never match versioned deps */
 #else
@@ -708,13 +714,8 @@ pool_addrelproviders(Pool *pool, Id d)
 	      else
 		{
 		  int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-#ifdef DEBIAN_SEMANTICS
-		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_COMPARE)))) != 0)
+		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
 		    break;
-#else
-		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_MATCH_RELEASE)))) != 0)
-		    break;
-#endif
 		}
 	    }
 	  if (!pid)
@@ -957,14 +958,6 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	  if (ndone >= repo->nsolvables)
 	    break;
 
-	  if (!repodata_precheck_keyname(data, SOLVABLE_FILELIST))
-	    continue;
-	  for (j = 1; j < data->nkeys; j++)
-	    if (data->keys[j].name == SOLVABLE_FILELIST)
-	      break;
-	  if (j == data->nkeys)
-	    continue;
-
 	  if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
 	    {
 	      map_empty(&cbd->providedids);
@@ -989,13 +982,14 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 		  continue;
 		}
 	    }
-          else
+
+	  if (!repodata_has_keyname(data, SOLVABLE_FILELIST))
+	    continue;
+
+	  if (data->start < provstart || data->end > provend)
 	    {
-	      if (data->start < provstart || data->end > provend)
-		{
-		  map_empty(&cbd->providedids);
-		  provstart = provend = 0;
-		}
+	      map_empty(&cbd->providedids);
+	      provstart = provend = 0;
 	    }
 
 	  /* check if the data is incomplete */

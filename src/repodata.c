@@ -1768,7 +1768,7 @@ repodata_extend_block(Repodata *data, Id start, Id num)
 /**********************************************************************/
 
 
-#define REPODATA_ATTRS_BLOCK 63
+#define REPODATA_ATTRS_BLOCK 31
 #define REPODATA_ATTRDATA_BLOCK 1023
 #define REPODATA_ATTRIDDATA_BLOCK 63
 
@@ -1938,6 +1938,35 @@ repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str)
   memcpy(data->attrdata + data->attrdatalen, str, l);
   repodata_set(data, solvid, &key, data->attrdatalen);
   data->attrdatalen += l;
+}
+
+void
+repodata_set_binary(Repodata *data, Id solvid, Id keyname, void *buf, int len)
+{
+  Repokey key;
+  unsigned char *dp;
+
+  key.name = keyname;
+  key.type = REPOKEY_TYPE_BINARY;
+  key.size = 0;
+  key.storage = KEY_STORAGE_INCORE;
+  data->attrdata = sat_extend(data->attrdata, data->attrdatalen, len + 5, 1, REPODATA_ATTRDATA_BLOCK);
+  dp = data->attrdata + data->attrdatalen;
+  if (len >= (1 << 14))
+    {
+      if (len >= (1 << 28))
+        *dp++ = (len >> 28) | 128;
+      if (len >= (1 << 21))
+        *dp++ = (len >> 21) | 128;
+      *dp++ = (len >> 14) | 128;
+    }
+  if (len >= (1 << 7))
+    *dp++ = (len >> 7) | 128;
+  *dp++ = len & 127;
+  if (len)
+    memcpy(dp, buf, len);
+  repodata_set(data, solvid, &key, data->attrdatalen);
+  data->attrdatalen = dp + len - data->attrdata;
 }
 
 /* add an array element consisting of entrysize Ids to the repodata. modifies attriddata
@@ -2234,6 +2263,31 @@ repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
   data->attriddata[data->attriddatalen++] = 0;
 }
 
+void
+repodata_delete_uninternalized(Repodata *data, Id solvid, Id keyname)
+{
+  Id *pp, *ap, **app;
+  app = repodata_get_attrp(data, solvid);
+  ap = *app;
+  if (!ap)
+    return;
+  for (; *ap; ap += 2)
+    if (data->keys[*ap].name == keyname)
+      break;
+  if (!*ap)
+    return;
+  pp = ap;
+  ap += 2;
+  for (; *ap; ap += 2)
+    {
+      if (data->keys[*ap].name == keyname)
+	continue;
+      *pp++ = ap[0];
+      *pp++ = ap[1];
+    }
+  *pp = 0;
+}
+
 /* add all attrs from src to dest */
 void
 repodata_merge_attrs(Repodata *data, Id dest, Id src)
@@ -2260,7 +2314,7 @@ repodata_merge_some_attrs(Repodata *data, Id dest, Id src, Map *keyidmap, int ov
 
 /**********************************************************************/
 
-/* TODO: unify with repo_write! */
+/* TODO: unify with repo_write and repo_solv! */
 
 #define EXTDATA_BLOCK 1023
 
@@ -2273,6 +2327,7 @@ static void
 data_addid(struct extdata *xd, Id x)
 {
   unsigned char *dp;
+
   xd->buf = sat_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
   dp = xd->buf + xd->len;
 
@@ -2295,7 +2350,7 @@ data_addideof(struct extdata *xd, Id x, int eof)
 {
   if (x >= 64)
     x = (x & 63) | ((x & ~63) << 1);
-  data_addid(xd, (eof ? x: x | 64));
+  data_addid(xd, (eof ? x : x | 64));
 }
 
 static void
@@ -2349,6 +2404,14 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
     case REPOKEY_TYPE_NUM:
     case REPOKEY_TYPE_DIR:
       data_addid(xd, val);
+      break;
+    case REPOKEY_TYPE_BINARY:
+      {
+	Id len;
+	unsigned char *dp = data_read_id(data->attrdata + val, &len);
+	dp += len;
+	data_addblob(xd, data->attrdata + val, dp - (data->attrdata + val));
+      }
       break;
     case REPOKEY_TYPE_IDARRAY:
       for (ida = data->attriddata + val; *ida; ida++)

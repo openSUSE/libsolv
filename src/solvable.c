@@ -73,6 +73,49 @@ solvable_lookup_str(Solvable *s, Id keyname)
   return repo_lookup_str(s->repo, s - s->repo->pool->solvables, keyname);
 }
 
+static const char *
+solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname)
+{
+  Pool *pool;
+  const char *str, *basestr;
+  Id p, pp;
+  Solvable *s2;
+  int pass;
+
+  if (!s->repo)
+    return 0;
+  pool = s->repo->pool;
+  str = solvable_lookup_str(s, keyname);
+  if (str || keyname == basekeyname)
+    return str;
+  basestr = solvable_lookup_str(s, basekeyname);
+  if (!basestr)
+    return 0;
+  /* search for a solvable with same name and same base that has the
+   * translation */
+  if (!pool->whatprovides)
+    return basestr;
+  /* we do this in two passes, first same vendor, then all other vendors */
+  for (pass = 0; pass < 2; pass++)
+    {
+      FOR_PROVIDES(p, pp, s->name)
+	{
+	  s2 = pool->solvables + p;
+	  if (s2->name != s->name)
+	    continue;
+	  if ((s->vendor == s2->vendor) != (pass == 0))
+	    continue;
+	  str = solvable_lookup_str(s2, basekeyname);
+	  if (!str || strcmp(str, basestr))
+	    continue;
+	  str = solvable_lookup_str(s2, keyname);
+	  if (str)
+	    return str;
+	}
+    }
+  return basestr;
+}
+
 const char *
 solvable_lookup_str_poollang(Solvable *s, Id keyname)
 {
@@ -101,8 +144,8 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
       if (i >= pool->languagecacheother)
 	{
 	  pool->languagecache = sat_realloc2(pool->languagecache, pool->languagecacheother + 1, cols * sizeof(Id));
-	  pool->languagecacheother++;
 	  row = pool->languagecache + cols * (ID_NUM_INTERNAL + pool->languagecacheother++);
+	  *row = keyname;
 	}
     }
   else
@@ -121,7 +164,7 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
 	  *row = str2id(pool, p, 1);
           sat_free(p);
 	}
-      str = solvable_lookup_str(s, *row);
+      str = solvable_lookup_str_base(s, *row, keyname);
       if (str)
 	return str;
     }
@@ -135,7 +178,7 @@ solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang)
     {
       const char *str;
       Id id = pool_id2langid(s->repo->pool, keyname, lang, 0);
-      if (id && (str = solvable_lookup_str(s, id)) != 0)
+      if (id && (str = solvable_lookup_str_base(s, id, keyname)) != 0)
         return str;
     }
   return solvable_lookup_str(s, keyname);
