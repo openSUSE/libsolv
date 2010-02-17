@@ -1238,6 +1238,9 @@ opendbenv(const char *rootdir)
       perror("db_env_create");
       return 0;
     }
+#if defined(FEDORA) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
+  dbenv->set_thread_count(dbenv, 8);
+#endif
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
   if (access(dbpath, W_OK) == -1)
     {
