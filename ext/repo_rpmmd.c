@@ -777,6 +777,9 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_DESCRIPTION:
       pd->tmplang = find_attr("lang", atts);
       break;
+    case STATE_USERVISIBLE:
+      repodata_set_void(pd->data, handle, SOLVABLE_ISVISIBLE );
+      break;
     case STATE_LOCATION:
       str = find_attr("href", atts);
       if (str)

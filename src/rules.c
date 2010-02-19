@@ -1241,12 +1241,12 @@ solver_addduprules(Solver *solv, Map *addedmap)
 		{
 		  Id ip, ipp;
 		  /* is installed identical to a good one? */
-		  FOR_PROVIDES(ip, ipp, s->name)
+		  FOR_PROVIDES(ip, ipp, ps->name)
 		    {
 		      Solvable *is = pool->solvables + ip;
 		      if (!MAPTST(&solv->dupmap, ip))
 			continue;
-		      if (is->evr == s->evr && solvable_identical(s, is))
+		      if (is->evr == ps->evr && solvable_identical(ps, is))
 			break;
 		    }
 		  if (!ip)
