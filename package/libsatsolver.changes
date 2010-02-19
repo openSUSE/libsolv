@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Feb 19 17:31:51 CET 2010 - mls@suse.de
+
+- make dup rules work when system repo is not first [bnc#581276]
+- parse pattern visibility flag in repomd format
+- 0.14.15
+
+-------------------------------------------------------------------
 Fri Jan 29 14:48:34 CET 2010 - mls@suse.de
 
 - speed up createwhatprovides when many solvables provide the same dep
