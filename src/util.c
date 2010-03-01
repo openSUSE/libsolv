@@ -106,7 +106,16 @@ sat_timems(unsigned int subtract)
 void
 sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
 {
+#if defined(__GLIBC__)
+# if __GLIBC_PREREQ(2, 8)
   qsort_r(base, nmemb, size, compar, compard);
+# else
+  /* backported for SLE10-SP2 */
+  __qsort_r(base, nmemb, size, compar, compard);
+# endif
+#else
+# error please add qsort_r call here
+#endif
 }
 
 char *
