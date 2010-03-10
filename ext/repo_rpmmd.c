@@ -277,7 +277,7 @@ langtag(struct parsedata *pd, Id tag, const char *language)
 {
   if (!language)	/* fall back to default if not specified */
     language = pd->language;
-  if (language && !language[0])
+  if (language && (!language[0] || !strcmp(language, "en")))
     language = 0;
   if (!language || tag >= ID_NUM_INTERNAL)
     return pool_id2langid(pd->common.repo->pool, tag, language, 1);
