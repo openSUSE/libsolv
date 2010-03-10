@@ -275,7 +275,7 @@ struct parsedata {
 static Id
 langtag(struct parsedata *pd, Id tag, const char *language)
 {
-  if ( !language )	/* fall back to default if not specified */
+  if (!language)	/* fall back to default if not specified */
     language = pd->language;
   if (language && !language[0])
     language = 0;
@@ -796,15 +796,15 @@ startElement(void *userData, const char *name, const char **atts)
       break;
     case STATE_INCLUDESENTRY:
       {
-	const char * tmp = find_attr( "pattern", atts );
-	if ( tmp )
+	const char *tmp = find_attr("pattern", atts);
+	if (tmp)
 	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_INCLUDES, join2("pattern", ":", tmp));
       }
       break;
     case STATE_EXTENDSENTRY:
       {
-	const char * tmp = find_attr( "pattern", atts );
-	if ( tmp )
+	const char *tmp = find_attr("pattern", atts);
+	if (tmp)
 	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, join2("pattern", ":", tmp));
       }
       break;
