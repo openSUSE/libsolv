@@ -66,6 +66,11 @@ enum state {
 
   // pattern attributes
   STATE_CATEGORY, /* pattern and patches */
+  STATE_ORDER,
+  STATE_INCLUDES,
+  STATE_INCLUDESENTRY,
+  STATE_EXTENDS,
+  STATE_EXTENDSENTRY,
   STATE_SCRIPT,
   STATE_ICON,
   STATE_USERVISIBLE,
@@ -170,6 +175,9 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "icon",            STATE_ICON,          1 },
   { STATE_SOLVABLE,    "uservisible",     STATE_USERVISIBLE,   1 },
   { STATE_SOLVABLE,    "category",        STATE_CATEGORY,      1 },
+  { STATE_SOLVABLE,    "order",           STATE_ORDER,         1 },
+  { STATE_SOLVABLE,    "includes",        STATE_INCLUDES,      0 },
+  { STATE_SOLVABLE,    "extends",         STATE_EXTENDS,       0 },
   { STATE_SOLVABLE,    "default",         STATE_DEFAULT,       1 },
   { STATE_SOLVABLE,    "install-time",    STATE_INSTALL_TIME,  1 },
 
@@ -211,6 +219,9 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUGGESTS,    "rpm:entry",       STATE_SUGGESTSENTRY, 0 },
   { STATE_ENHANCES,    "rpm:entry",       STATE_ENHANCESENTRY, 0 },
   { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
+
+  { STATE_INCLUDES,    "item",            STATE_INCLUDESENTRY, 0 },
+  { STATE_EXTENDS,     "item",            STATE_EXTENDSENTRY,  0 },
 
   { NUMSTATES}
 };
@@ -264,6 +275,8 @@ struct parsedata {
 static Id
 langtag(struct parsedata *pd, Id tag, const char *language)
 {
+  if ( !language )	/* fall back to default if not specified */
+    language = pd->language;
   if (language && !language[0])
     language = 0;
   if (!language || tag >= ID_NUM_INTERNAL)
@@ -512,12 +525,11 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 
 
 /*
- * set_desciption_author
+ * set_description_author
  *
  */
-
 static void
-set_desciption_author(Repodata *data, Id handle, char *str)
+set_description_author(Repodata *data, Id handle, char *str, struct parsedata *pd)
 {
   char *aut, *p;
 
@@ -534,7 +546,7 @@ set_desciption_author(Repodata *data, Id handle, char *str)
       while (l > 0 && str[l - 1] == '\n')
 	str[--l] = 0;
       if (l)
-	repodata_set_str(data, handle, SOLVABLE_DESCRIPTION, str);
+	repodata_set_str(data, handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), str);
       p = aut + 19;
       aut = str;        /* copy over */
       while (*p == ' ' || *p == '\n')
@@ -557,7 +569,7 @@ set_desciption_author(Repodata *data, Id handle, char *str)
 	repodata_set_str(data, handle, SOLVABLE_AUTHORS, str);
     }
   else if (*str)
-    repodata_set_str(data, handle, SOLVABLE_DESCRIPTION, str);
+    repodata_set_str(data, handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), str);
 }
 
 
@@ -773,12 +785,28 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_FRESHENSENTRY:
       pd->freshens = adddep(pool, pd, pd->freshens, atts, 0);
       break;
+    case STATE_EULA:
     case STATE_SUMMARY:
+    case STATE_CATEGORY:
     case STATE_DESCRIPTION:
       pd->tmplang = find_attr("lang", atts);
       break;
     case STATE_USERVISIBLE:
       repodata_set_void(pd->data, handle, SOLVABLE_ISVISIBLE );
+      break;
+    case STATE_INCLUDESENTRY:
+      {
+	const char * tmp = find_attr( "pattern", atts );
+	if ( tmp )
+	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_INCLUDES, join2("pattern", ":", tmp));
+      }
+      break;
+    case STATE_EXTENDSENTRY:
+      {
+	const char * tmp = find_attr( "pattern", atts );
+	if ( tmp )
+	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, join2("pattern", ":", tmp));
+      }
       break;
     case STATE_LOCATION:
       str = find_attr("href", atts);
@@ -1003,12 +1031,13 @@ endElement(void *userData, const char *name)
       repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, id, p);
       break;
     case STATE_SUMMARY:
-      pd->tmplang = 0;
-      repodata_set_str(pd->data, handle, SOLVABLE_SUMMARY, pd->content);
+      repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
       break;
     case STATE_DESCRIPTION:
-      pd->tmplang = 0;
-      set_desciption_author(pd->data, handle, pd->content);
+      set_description_author(pd->data, handle, pd->content, pd);
+      break;
+    case STATE_CATEGORY:
+      repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_CATEGORY, pd->tmplang), pd->content);
       break;
     case STATE_DISTRIBUTION:
         repodata_set_poolstr(pd->data, handle, SOLVABLE_DISTRIBUTION, pd->content);
@@ -1051,7 +1080,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_EULA:
       if (pd->content[0])
-        repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->language), pd->content);
+	repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->tmplang), pd->content);
       break;
     case STATE_KEYWORD:
       if (pd->content[0])
@@ -1061,6 +1090,9 @@ endElement(void *userData, const char *name)
       if (pd->ndirs)
         commit_diskusage(pd, pd->handle);
       break;
+    case STATE_ORDER:
+      if (pd->content[0])
+        repodata_set_str(pd->data, pd->handle, SOLVABLE_ORDER, pd->content);
     default:
       break;
     }
@@ -1157,7 +1189,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
 	{
 	  const char *str;
 	  int index;
-	  
+
 	  if (!sat_chksum_len(di.key->type))
 	    continue;
 	  str = repodata_chk2str(di.data, di.key->type, (const unsigned char *)di.kv.str);
@@ -1194,7 +1226,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   join_freemem();
   stringpool_free(&pd.cspool);
   sat_free(pd.cscache);
-  
+
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", sat_timems(now));
