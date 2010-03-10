@@ -116,9 +116,9 @@ if test "$repotype" = rpmmd ; then
   fi
 
   prodfile=
-  prodxml=`repomd_findfile product product.xml`
+  prodxml=`repomd_findfile products products.xml`
   if test -z "$prodxml" ; then
-    prodxml=`repomd_findfile products products.xml`
+    prodxml=`repomd_findfile product product.xml`
   fi
   if test -n "$prodxml" -a -s "$prodxml" ; then
     prodfile=`mktemp` || exit 3
@@ -130,7 +130,7 @@ if test "$repotype" = rpmmd ; then
   fi
 
   patternfile=
-  patternxml=`repomd_findfile '' patterns.xml`
+  patternxml=`repomd_findfile 'patterns' patterns.xml`
   if test -n "$patternxml" -a -s "$patternxml" ; then
       patternfile=`mktemp` || exit 3
       repomd_decompress "$patternxml" | rpmmd2solv $parser_options > $patternfile || exit 4
@@ -148,7 +148,7 @@ if test "$repotype" = rpmmd ; then
   # This contains suseinfo.xml, which is an extension to repomd.xml
   # for now we only read some keys like expiration and products
   suseinfofile=
-  suseinfoxml=`repomd_findfile '' suseinfo.xml`
+  suseinfoxml=`repomd_findfile suseinfo suseinfo.xml`
   if test -n "$suseinfoxml" -a -s "$suseinfoxml" ; then
       suseinfofile=`mktemp` || exit 3
       repomd_decompress "$suseinfoxml" | repomdxml2solv $parser_options > $suseinfofile || exit 4
@@ -165,6 +165,9 @@ if test "$repotype" = rpmmd ; then
   # This contains a deltainfo.xml*
   deltainfofile=
   deltainfoxml=`repomd_findfile deltainfo deltainfo.xml`
+  if test -z "$deltainfoxml"; then 
+      deltainfoxml=`repomd_findfile prestodelta prestodelta.xml`
+  fi
   if test -n "$deltainfoxml" -a -s "$deltainfoxml" ; then
       deltainfofile=`mktemp` || exit 3
       repomd_decompress "$deltainfoxml" | deltainfoxml2solv $parser_options > $deltainfofile || exit 4
