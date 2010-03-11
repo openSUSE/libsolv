@@ -2269,6 +2269,14 @@ main(int argc, char **argv)
     usage(1);
 
   pool = pool_create();
+
+#if 0
+  {
+    const char *langs[] = {"de_DE", "de", "en"};
+    pool_set_languages(pool, langs, sizeof(langs)/sizeof(*langs));
+  }
+#endif
+
 #ifdef FEDORA
   pool->obsoleteusescolors = 1;
 #endif
@@ -2449,7 +2457,11 @@ main(int argc, char **argv)
 		}
 	      else
 		{
-		  const char *sum = solvable_lookup_str_lang(s, SOLVABLE_SUMMARY, "de");
+#if 1
+		  const char *sum = solvable_lookup_str_lang(s, SOLVABLE_SUMMARY, "de", 1);
+#else
+		  const char *sum = solvable_lookup_str_poollang(s, SOLVABLE_SUMMARY);
+#endif
 		  printf("  - %s [%s]\n", solvable2str(pool, s), s->repo->name);
 		  if (sum)
 		    printf("    %s\n", sum);

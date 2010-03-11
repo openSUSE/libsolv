@@ -222,7 +222,7 @@ Id solvable_lookup_id(Solvable *s, Id keyname);
 unsigned int solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound);
 const char *solvable_lookup_str(Solvable *s, Id keyname);
 const char *solvable_lookup_str_poollang(Solvable *s, Id keyname);
-const char *solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang);
+const char *solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase);
 int solvable_lookup_bool(Solvable *s, Id keyname);
 int solvable_lookup_void(Solvable *s, Id keyname);
 char * solvable_get_location(Solvable *s, unsigned int *medianrp);
