@@ -98,6 +98,7 @@ enum state {
   STATE_REPOMD,
   STATE_REVISION,
   STATE_TAGS,
+  STATE_REPO,
   STATE_CONTENT,
   STATE_DISTRO,
   STATE_UPDATES,
@@ -123,25 +124,26 @@ static struct stateswitch stateswitches[] = {
   { STATE_START,       "suseinfo",        STATE_SUSEINFO, 0 },
   /* we support the tags element in suseinfo in case
      createrepo version does not support it yet */
-  { STATE_SUSEINFO,    "tags",            STATE_TAGS, 0 },    
-  { STATE_SUSEINFO,    "expire",          STATE_EXPIRE, 1 },  
-  { STATE_SUSEINFO,    "keywords",        STATE_KEYWORDS, 0 },  
+  { STATE_SUSEINFO,    "tags",            STATE_TAGS, 0 },
+  { STATE_SUSEINFO,    "expire",          STATE_EXPIRE, 1 },
+  { STATE_SUSEINFO,    "keywords",        STATE_KEYWORDS, 0 },
   /* keywords is the suse extension equivalent of
      tags/content when this one was not yet available.
-     therefore we parse both */ 
-  { STATE_KEYWORDS,    "k",               STATE_KEYWORD, 1 },  
+     therefore we parse both */
+  { STATE_KEYWORDS,    "k",               STATE_KEYWORD, 1 },
   /* standard tags */
   { STATE_REPOMD,      "revision",        STATE_REVISION, 1 },
   { STATE_REPOMD,      "tags",            STATE_TAGS,  0 },
   { STATE_REPOMD,      "data",            STATE_DATA,  0 },
- 
-  { STATE_TAGS,        "content",         STATE_CONTENT,  1 },
+
+  { STATE_TAGS,        "repo",            STATE_REPO,    1 },
+  { STATE_TAGS,        "content",         STATE_CONTENT, 1 },
   { STATE_TAGS,        "distro",          STATE_DISTRO,  1 },
   /* this tag is only valid in suseinfo.xml for now */
   { STATE_TAGS,        "updates",         STATE_UPDATES,  1 },
 
   { STATE_DATA,        "location",        STATE_LOCATION, 0 },
-  { STATE_DATA,        "checksum",        STATE_CHECKSUM, 1 },  
+  { STATE_DATA,        "checksum",        STATE_CHECKSUM, 1 },
   { STATE_DATA,        "timestamp",       STATE_TIMESTAMP, 1 },
   { STATE_DATA,        "open-checksum",    STATE_OPENCHECKSUM, 1 },
   { NUMSTATES }
@@ -159,7 +161,7 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
-  
+
   XML_Parser *parser;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
@@ -214,7 +216,7 @@ startElement(void *userData, const char *name, const char **atts)
   for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
     if (!strcmp(sw->ename, name))
       break;
-  
+
   if (sw->from != pd->state)
     {
 #if 0
@@ -266,7 +268,7 @@ startElement(void *userData, const char *name, const char **atts)
            was designed for */
         const char *cpeid = find_attr("cpeid", atts);
         pd->rphandle = repodata_new_handle(pd->data);
-        /* set the cpeid for the product 
+        /* set the cpeid for the product
            the label is set in the content of the tag */
         if (cpeid)
           repodata_set_poolstr(pd->data, pd->rphandle, REPOSITORY_PRODUCT_CPEID, cpeid);
@@ -278,7 +280,7 @@ startElement(void *userData, const char *name, const char **atts)
            was designed for */
         const char *cpeid = find_attr("cpeid", atts);
         pd->ruhandle = repodata_new_handle(pd->data);
-        /* set the cpeid for the product 
+        /* set the cpeid for the product
            the label is set in the content of the tag */
         if (cpeid)
           repodata_set_poolstr(pd->data, pd->ruhandle, REPOSITORY_PRODUCT_CPEID, cpeid);
@@ -331,7 +333,7 @@ endElement(void *userData, const char *name)
   switch (pd->state)
     {
     case STATE_START: break;
-    case STATE_REPOMD: 
+    case STATE_REPOMD:
       if (pd->timestamp > 0)
         repodata_set_num(pd->data, SOLVID_META, REPOSITORY_TIMESTAMP, pd->timestamp);
       break;
@@ -412,16 +414,20 @@ endElement(void *userData, const char *name)
         repodata_set_str(pd->data, pd->ruhandle, REPOSITORY_PRODUCT_LABEL, pd->content);
       repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_UPDATES, pd->ruhandle);
       break;
+    case STATE_REPO:
+      if (pd->content)
+	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_GLOBALID, pd->content);
+      break;
     case STATE_SUSEINFO: break;
     case STATE_KEYWORDS: break;
-    case NUMSTATES: break;              
+    case NUMSTATES: break;
     default:
       break;
     }
 
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
-  
+
   return;
 }
 

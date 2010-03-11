@@ -280,6 +280,12 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
           /* we also replicate some of them into the product solvables
            * to be backward compatible */
 
+	  if (istag ("REPOTAGS"))
+	    {
+	      repodata_add_poolstr_array(data, SOLVID_META, REPOSITORY_GLOBALID, value);
+	      continue;
+	    }
+
 	  if (istag ("DESCRDIR"))
 	    {
 	      if (descrdir)
