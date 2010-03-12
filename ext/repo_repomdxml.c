@@ -416,7 +416,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_REPO:
       if (pd->content)
-	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_GLOBALID, pd->content);
+	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REPOID, pd->content);
       break;
     case STATE_SUSEINFO: break;
     case STATE_KEYWORDS: break;
