@@ -234,6 +234,7 @@ KNOWNID(PUBKEY_EXPIRES,		        "pubkey:expires"),
 KNOWNID(PUBKEY_SIGNATURES,	        "pubkey:signatures"),
 
 KNOWNID(REPOSITORY_TOOLVERSION,		"repository:toolversion"),
+KNOWNID(REPOSITORY_REPOID,		"repository:repoid"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 

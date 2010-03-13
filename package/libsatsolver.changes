@@ -1,4 +1,17 @@
 -------------------------------------------------------------------
+Thu Mar 11 22:13:26 CET 2010 - ma@suse.de
+
+- parse global repository ids. [bnc#377568]
+- fix pattern parsing in repomd format. [bnc#585000]
+- 0.14.16
+
+-------------------------------------------------------------------
+Thu Mar 11 12:18:23 CET 2010 - mls@suse.de
+
+- fix language code lookup for fallback languages [bnc#584644]
+- change solvable_lookup_str_lang interface a bit for libzypp
+
+-------------------------------------------------------------------
 Fri Feb 19 17:31:51 CET 2010 - mls@suse.de
 
 - make dup rules work when system repo is not first [bnc#581276]

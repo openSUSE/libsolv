@@ -74,7 +74,7 @@ solvable_lookup_str(Solvable *s, Id keyname)
 }
 
 static const char *
-solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname)
+solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname, int usebase)
 {
   Pool *pool;
   const char *str, *basestr;
@@ -94,7 +94,7 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname)
   /* search for a solvable with same name and same base that has the
    * translation */
   if (!pool->whatprovides)
-    return basestr;
+    return usebase ? basestr : 0;
   /* we do this in two passes, first same vendor, then all other vendors */
   for (pass = 0; pass < 2; pass++)
     {
@@ -113,7 +113,7 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname)
 	    return str;
 	}
     }
-  return basestr;
+  return usebase ? basestr : 0;
 }
 
 const char *
@@ -154,17 +154,8 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
   for (i = 0; i < pool->nlanguages; i++, row++)
     {
       if (!*row)
-	{
-	  char *p;
-	  const char *kn;
-
-	  kn = id2str(pool, keyname);
-          p = sat_malloc(strlen(kn) + strlen(pool->languages[i]) + 2);
-	  sprintf(p, "%s:%s", kn, pool->languages[i]);
-	  *row = str2id(pool, p, 1);
-          sat_free(p);
-	}
-      str = solvable_lookup_str_base(s, *row, keyname);
+        *row = pool_id2langid(pool, keyname, pool->languages[i], 1);
+      str = solvable_lookup_str_base(s, *row, keyname, 0);
       if (str)
 	return str;
     }
@@ -172,14 +163,15 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
 }
 
 const char *
-solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang)
+solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase)
 {
   if (s->repo)
     {
-      const char *str;
       Id id = pool_id2langid(s->repo->pool, keyname, lang, 0);
-      if (id && (str = solvable_lookup_str_base(s, id, keyname)) != 0)
-        return str;
+      if (id)
+        return solvable_lookup_str_base(s, id, keyname, usebase);
+      if (!usebase)
+	return 0;
     }
   return solvable_lookup_str(s, keyname);
 }
