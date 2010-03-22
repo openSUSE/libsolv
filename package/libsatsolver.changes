@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Mar 22 18:45:42 CET 2010 - mls@suse.de
+
+- dataiterator: reset parent when jumping to a solvid [bnc#589640]
+- 0.14.17
+
+-------------------------------------------------------------------
 Thu Mar 11 22:13:26 CET 2010 - ma@suse.de
 
 - parse global repository ids. [bnc#377568]

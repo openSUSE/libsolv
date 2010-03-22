@@ -1595,6 +1595,7 @@ void
 dataiterator_skip_solvable(Dataiterator *di)
 {
   di->nparents = 0;
+  di->kv.parent = 0;
   di->rootlevel = 0;
   di->keyname = di->keynames[0];
   di->state = di_nextsolvable;
@@ -1604,6 +1605,7 @@ void
 dataiterator_skip_repo(Dataiterator *di)
 {
   di->nparents = 0;
+  di->kv.parent = 0;
   di->rootlevel = 0;
   di->keyname = di->keynames[0];
   di->state = di_nextrepo;
@@ -1613,6 +1615,7 @@ void
 dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
 {
   di->nparents = 0;
+  di->kv.parent = 0;
   di->rootlevel = 0;
   di->keyname = di->keynames[0];
   if (solvid == SOLVID_POS)
@@ -1657,6 +1660,7 @@ void
 dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
 {
   di->nparents = 0;
+  di->kv.parent = 0;
   di->rootlevel = 0;
   di->repo = repo;
   di->repoid = -1;
