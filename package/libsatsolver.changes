@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Mar 23 17:24:46 CET 2010 - ma@suse.de
+
+- Parse an installed products <shortsummary> tag [bnc#586303]
+
+-------------------------------------------------------------------
 Mon Mar 22 18:45:42 CET 2010 - mls@suse.de
 
 - dataiterator: reset parent when jumping to a solvid [bnc#589640]
