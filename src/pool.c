@@ -61,6 +61,9 @@ pool_create(void)
   queue_init(&pool->vendormap);
 
   pool->debugmask = SAT_DEBUG_RESULT;	/* FIXME */
+#ifdef FEDORA
+  pool->obsoleteusescolors = 1;
+#endif
   return pool;
 }
 
@@ -473,13 +476,36 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
   return 0;
 }
 
-/* match two dependencies */
+/* match (flags, evr) against provider (pflags, pevr) */
+static inline int
+pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
+{
+  if (!pflags || !flags || pflags >= 8 || flags >= 8)
+    return 0;
+  if (flags == 7 || pflags == 7)
+    return 1;		/* rel provides every version */
+  if ((pflags & flags & 5) != 0)
+    return 1;		/* both rels show in the same direction */
+  if (pevr == evr)
+    {
+      if ((pflags & flags & 2) != 0)
+	return 1;	/* both have '=', match */
+    }
+  else
+    {
+      int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
+      if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
+	return 1;
+    }
+  return 0;
+}
+
+/* match two dependencies (d1 = provider) */
 
 int
 pool_match_dep(Pool *pool, Id d1, Id d2)
 {
   Reldep *rd1, *rd2;
-  int pflags, flags;
 
   if (d1 == d2)
     return 1;
@@ -496,28 +522,11 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
       return pool_match_dep(pool, rd1->name, d2);
     }
   rd2 = GETRELDEP(pool, d2);
+  /* first match name */
   if (!pool_match_dep(pool, rd1->name, rd2->name))
     return 0;
-  pflags = rd1->flags;
-  flags = rd2->flags;
-  if (!pflags || !flags || pflags >= 8 || flags >= 8)
-    return 0;
-  if (flags == 7 || pflags == 7)
-    return 1;
-  if ((pflags & flags & 5) != 0)
-    return 1;
-  if (rd1->evr == rd2->evr)
-    {
-      if ((pflags & flags & 2) != 0)
-	return 1;
-    }
-  else
-    {
-      int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_DEPCMP)))) != 0)
-	return 1;
-    }
-  return 0;
+  /* name matches, check flags and evr */
+  return pool_match_flags_evr(pool, rd1->flags, rd1->evr, rd2->flags, rd2->evr);
 }
 
 /*
@@ -675,9 +684,6 @@ pool_addrelproviders(Pool *pool, Id d)
 	  pidp = s->repo->idarraydata + s->provides;
 	  while ((pid = *pidp++) != 0)
 	    {
-	      int pflags;
-	      Id pevr;
-
 	      if (pid == name)
 		{
 #if defined(MULTI_SEMANTICS)
@@ -697,29 +703,12 @@ pool_addrelproviders(Pool *pool, Id d)
 	      prd = GETRELDEP(pool, pid);
 	      if (prd->name != name)
 		continue;		/* wrong provides name */
-	      /* right package, both deps are rels */
-	      pflags = prd->flags;
-	      if (!pflags)
-		continue;
-	      if (flags == 7 || pflags == 7)
-		break; /* included */
-	      if ((pflags & flags & 5) != 0)
-		break; /* same direction, match */
-	      pevr = prd->evr;
-	      if (pevr == evr)
-		{
-		  if ((pflags & flags & 2) != 0)
-		    break; /* both have =, match */
-		}
-	      else
-		{
-		  int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
-		    break;
-		}
+	      /* right package, both deps are rels. check flags/evr */
+	      if (pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
+		break;	/* matches */
 	    }
 	  if (!pid)
-	    continue;	/* no rel match */
+	    continue;	/* none of the providers matched */
 	  queue_push(&plist, p);
 	}
       /* make our system solvable provide all unknown rpmlib() stuff */
