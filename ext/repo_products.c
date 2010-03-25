@@ -45,6 +45,7 @@ enum state {
   STATE_RELEASE,         // 5
   STATE_ARCH,            // 6
   STATE_SUMMARY,         // 7
+  STATE_SHORTSUMMARY,
   STATE_DESCRIPTION,     // 8
   STATE_UPDATEREPOKEY,   // 9 should go away
   STATE_CPEID,         // 9
@@ -77,6 +78,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PRODUCT,   "arch",          STATE_ARCH,          1 },
   { STATE_PRODUCT,   "productline",   STATE_PRODUCTLINE,   1 },
   { STATE_PRODUCT,   "summary",       STATE_SUMMARY,       1 },
+  { STATE_PRODUCT,   "shortsummary",  STATE_SHORTSUMMARY,  1 },
   { STATE_PRODUCT,   "description",   STATE_DESCRIPTION,   1 },
   { STATE_PRODUCT,   "register",      STATE_REGISTER,      0 },
   { STATE_PRODUCT,   "urls",          STATE_URLS,          0 },
@@ -324,6 +326,9 @@ endElement(void *userData, const char *name)
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
       pd->tmplang = sat_free((void *)pd->tmplang);
       break;
+    case STATE_SHORTSUMMARY:
+      repodata_set_str(pd->data, pd->handle, PRODUCT_SHORTLABEL, pd->content);
+      break;
     case STATE_DESCRIPTION:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), pd->content );
       pd->tmplang = sat_free((void *)pd->tmplang);
@@ -535,7 +540,7 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
       join_freemem();
       return;
     }
-  
+
   /* code11 didn't work, try -release files parsing */
   fullpath = root ? join2(root, "", "/etc") : "/etc";
   dir = opendir(fullpath);
