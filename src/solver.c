@@ -1469,10 +1469,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
 		  if (solv->decisionmap[i] > 0)
 		    continue;
-		  /* XXX: noupdate check is probably no longer needed, as all jobs should
-                   * already be satisfied */
-		  if (MAPTST(&solv->noupdate, i - installed->start))
-		    continue;
 		  if (!pass && solv->updatemap.size && !MAPTST(&solv->updatemap, i - installed->start))
 		    continue;		/* updates first */
 		  r = solv->rules + solv->updaterules + (i - installed->start);
@@ -1484,8 +1480,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (!rr->p)
 		    continue;		/* orpaned package */
 
+		  /* XXX: noupdate check is probably no longer needed, as all jobs should
+		   * already be satisfied */
+		  /* Actually we currently still need it because of erase jobs */
+		  /* if noupdate is set we do not look at update candidates */
 		  queue_empty(&dq);
-		  if (solv->decisionmap[i] < 0 || solv->updatesystem || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || rr->p != i)
+		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatesystem || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || rr->p != i))
 		    {
 		      if (solv->noobsoletes.size && solv->multiversionupdaters
 			     && (d = solv->multiversionupdaters[i - installed->start]) != 0)
