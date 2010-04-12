@@ -543,14 +543,12 @@ solver_printtransaction(Solver *solv)
   queue_free(&pkgs);
 }
 
-void
-solver_printprobleminfo(Solver *solv, Id problem)
+static void
+solver_printproblemruleinfo(Solver *solv, Id probr)
 {
   Pool *pool = solv->pool;
-  Id probr;
   Id dep, source, target;
 
-  probr = solver_findproblemrule(solv, problem);
   switch (solver_ruleinfo(solv, probr, &source, &target, &dep))
     {
     case SOLVER_RULE_DISTUPGRADE:
@@ -586,6 +584,9 @@ solver_printprobleminfo(Solver *solv, Id problem)
     case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
       POOL_DEBUG(SAT_DEBUG_RESULT, "package %s obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
       return;
+    case SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES:
+      POOL_DEBUG(SAT_DEBUG_RESULT, "installed package %s obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
+      return;
     case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
       POOL_DEBUG(SAT_DEBUG_RESULT, "package %s implicitely obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
       return;
@@ -602,6 +603,40 @@ solver_printprobleminfo(Solver *solv, Id problem)
       POOL_DEBUG(SAT_DEBUG_RESULT, "bad rule type\n");
       return;
     }
+}
+
+void
+solver_printprobleminfo(Solver *solv, Id problem)
+{
+  solver_printproblemruleinfo(solv, solver_findproblemrule(solv, problem));
+}
+
+void
+solver_printcompleteprobleminfo(Solver *solv, Id problem)
+{
+  Queue q;
+  Id probr;
+  int i, nobad = 0;
+
+  queue_init(&q);
+  solver_findallproblemrules(solv, problem, &q);
+  for (i = 0; i < q.count; i++)
+    {
+      probr = q.elements[i];
+      if (!(probr >= solv->updaterules && probr < solv->updaterules_end) && !(probr >= solv->jobrules && probr < solv->jobrules_end))
+	{
+	  nobad = 1;
+	  break;
+	}
+    }
+  for (i = 0; i < q.count; i++)
+    {
+      probr = q.elements[i];
+      if (nobad && ((probr >= solv->updaterules && probr < solv->updaterules_end) || (probr >= solv->jobrules && probr < solv->jobrules_end)))
+	continue;
+      solver_printproblemruleinfo(solv, probr);
+    }
+  queue_free(&q);
 }
 
 void
@@ -722,7 +757,11 @@ solver_printallsolutions(Solver *solv)
       pcnt++;
       POOL_DEBUG(SAT_DEBUG_RESULT, "Problem %d:\n", pcnt);
       POOL_DEBUG(SAT_DEBUG_RESULT, "====================================\n");
+#if 1
       solver_printprobleminfo(solv, problem);
+#else
+      solver_printcompleteprobleminfo(solv, problem);
+#endif
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
       solution = 0;
       while ((solution = solver_next_solution(solv, problem, solution)) != 0)

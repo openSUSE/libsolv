@@ -383,9 +383,9 @@ solver_addrule(Solver *solv, Id p, Id d)
 
 /*
  *  special multiversion patch conflict handling:
- *  a patch conflict is also satisfied, if some other
+ *  a patch conflict is also satisfied if some other
  *  version with the same name/arch that doesn't conflict
- *  get's installed. The generated rule is thus:
+ *  gets installed. The generated rule is thus:
  *  -patch|-cpack|opack1|opack2|...
  */
 static Id
@@ -656,12 +656,14 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	}
 
       /*-----------------------------------------
-       * check obsoletes if not installed
-       * (only installation will trigger the obsoletes in rpm)
+       * check obsoletes and implicit obsoletes of a package
+       * if ignoreinstalledsobsoletes is not set, we're also checking
+       * obsoletes of installed packages (like newer rpm versions)
        */
-      if (!installed || pool->solvables[n].repo != installed)
-	{			       /* not installed */
+      if ((!installed || s->repo != installed) || !pool->noinstalledobsoletes)
+	{
 	  int noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, n);
+	  int isinstalled = (installed && s->repo == installed);
 	  if (s->obsoletes && !noobs)
 	    {
 	      obsp = s->repo->idarraydata + s->obsoletes;
@@ -672,30 +674,49 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  FOR_PROVIDES(p, pp, obs)
 		    {
 		      Solvable *ps = pool->solvables + p;
+		      if (p == n)
+			continue;
+		      if (isinstalled && dontfix && ps->repo == installed)
+			continue;	/* don't repair installed/installed problems */
 		      if (!pool->obsoleteusesprovides /* obsoletes are matched names, not provides */
 			  && !pool_match_nevr(pool, ps, obs))
 			continue;
 		      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 			continue;
-		      addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_PACKAGE_OBSOLETES, obs);
+		      if (!isinstalled)
+			addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_PACKAGE_OBSOLETES, obs);
+		      else
+			addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES, obs);
 		    }
 		}
 	    }
-	  FOR_PROVIDES(p, pp, s->name)
+	  /* check implicit obsoletes
+           * for installed packages we only need to check installed/installed problems (and
+           * only when dontfix is not set), as the others are picked up when looking at the
+           * uninstalled package.
+           */
+	  if (!isinstalled || !dontfix)
 	    {
-	      Solvable *ps = pool->solvables + p;
-	      /* we still obsolete packages with same nevra, like rpm does */
-	      /* (actually, rpm mixes those packages. yuck...) */
-	      if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
-		continue;
-	      if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
-		continue;
-	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
-		continue;
-	      if (s->name == ps->name)
-	        addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_SAME_NAME, 0);
-	      else
-	        addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_IMPLICIT_OBSOLETES, s->name);
+	      FOR_PROVIDES(p, pp, s->name)
+		{
+		  Solvable *ps = pool->solvables + p;
+		  if (p == n)
+		    continue;
+		  if (isinstalled && ps->repo != installed)
+		    continue;
+		  /* we still obsolete packages with same nevra, like rpm does */
+		  /* (actually, rpm mixes those packages. yuck...) */
+		  if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
+		    continue;
+		  if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
+		    continue;
+		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		    continue;
+		  if (s->name == ps->name)
+		    addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_SAME_NAME, 0);
+		  else
+		    addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_IMPLICIT_OBSOLETES, s->name);
+		}
 	    }
 	}
 
