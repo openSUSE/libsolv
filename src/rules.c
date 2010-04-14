@@ -2030,15 +2030,13 @@ void solver_createcleandepsmap(Solver *solv)
   for (i = 0; i < job->count; i += 2)
     {
       how = job->elements[i];
-      switch (how & SOLVER_JOBMASK)
+      if ((how & SOLVER_JOBMASK) == SOLVER_USERINSTALLED)
 	{
-	case SOLVER_USERINSTALLED:
 	  what = job->elements[i + 1];
 	  select = how & SOLVER_SELECTMASK;
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    if (pool->solvables[p].repo == installed)
 	      MAPSET(&userinstalled, p - installed->start);
-	  break;
 	}
     }
   /* add all positive elements (e.g. locks) to "userinstalled" */
@@ -2191,6 +2189,19 @@ void solver_createcleandepsmap(Solver *solv)
       FOR_RULELITERALS(p, jp, r)
 	if (p > 0)
           queue_push(&iq, p);
+    }
+  /* also put directly addressed packages on the install queue
+   * so we can mark patterns as installed */
+  for (i = 0; i < job->count; i += 2)
+    {
+      how = job->elements[i];
+      if ((how & SOLVER_JOBMASK) == SOLVER_USERINSTALLED)
+	{
+	  what = job->elements[i + 1];
+	  select = how & SOLVER_SELECTMASK;
+	  if (select == SOLVER_SOLVABLE && pool->solvables[what].repo != installed)
+            queue_push(&iq, what);
+	}
     }
   while (iq.count)
     {
