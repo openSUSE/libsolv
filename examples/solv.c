@@ -2170,6 +2170,7 @@ rewrite_repos(Pool *pool, Id *addedfileprovides)
 #define MODE_INFO        7
 #define MODE_REPOLIST    8
 #define MODE_SEARCH	 9
+#define MODE_ERASECLEAN  10
 
 void
 usage(int r)
@@ -2228,6 +2229,11 @@ main(int argc, char **argv)
   else if (!strcmp(argv[0], "erase") || !strcmp(argv[0], "rm"))
     {
       mainmode = MODE_ERASE;
+      mode = SOLVER_ERASE;
+    }
+  else if (!strcmp(argv[0], "eraseclean") || !strcmp(argv[0], "rmclean"))
+    {
+      mainmode = MODE_ERASECLEAN;
       mode = SOLVER_ERASE;
     }
   else if (!strcmp(argv[0], "list"))
@@ -2544,6 +2550,8 @@ main(int argc, char **argv)
 	    }
 	}
       job.elements[i] |= mode;
+      if (mainmode == MODE_ERASECLEAN)
+        job.elements[i] |= SOLVER_CLEANDEPS;
     }
 
   if (mainmode == MODE_DISTUPGRADE && allpkgs && repofilter)
@@ -2576,7 +2584,7 @@ rerunsolver:
 	  solv->allowarchchange = 1;
 	  solv->allowvendorchange = 1;
 	}
-      if (mainmode == MODE_ERASE)
+      if (mainmode == MODE_ERASE || mainmode == MODE_ERASECLEAN)
 	solv->allowuninstall = 1;	/* don't nag */
 
       solver_solve(solv, &job);
@@ -2665,6 +2673,14 @@ rerunsolver:
   if (!yesno("OK to continue (y/n)? "))
     {
       printf("Abort.\n");
+      solver_free(solv);
+      queue_free(&job);
+      pool_free(pool);
+      free_repoinfos(repoinfos, nrepoinfos);
+      sat_free(commandlinepkgs);
+#ifdef FEDORA
+      yum_substitute(pool, 0);
+#endif
       exit(1);
     }
 

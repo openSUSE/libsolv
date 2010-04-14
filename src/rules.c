@@ -28,6 +28,7 @@
 #define RULES_BLOCK 63
 
 static void addrpmruleinfo(Solver *solv, Id p, Id d, int type, Id dep);
+static void solver_createcleandepsmap(Solver *solv);
 
 /*-------------------------------------------------------------------
  * Check if dependency is possible
@@ -1358,8 +1359,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		      break;
 		  if (i < q->count)
 		    continue;
-		  queue_push(q, DISABLE_INFARCH);
-		  queue_push(q, s->name);
+		  queue_push2(q, DISABLE_INFARCH, s->name);
 		}
 	    }
 	}
@@ -1367,32 +1367,21 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	break;
       s = pool->solvables + what;
       if (solv->infarchrules != solv->infarchrules_end)
-	{
-	  queue_push(q, DISABLE_INFARCH);
-	  queue_push(q, s->name);
-	}
+	queue_push2(q, DISABLE_INFARCH, s->name);
       if (solv->duprules != solv->duprules_end)
-	{
-	  queue_push(q, DISABLE_DUP);
-	  queue_push(q, s->name);
-	}
+	queue_push2(q, DISABLE_DUP, s->name);
       if (!installed)
 	return;
       if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
 	{
 	  /* XXX: remove if we always do distupgrade with DUP rules */
 	  if (solv->distupgrade && s->repo == installed)
-	    {
-	      queue_push(q, DISABLE_UPDATE);
-	      queue_push(q, what);
-	      return;
-	    }
+	    queue_push2(q, DISABLE_UPDATE, what);
 	  return;
 	}
       if (s->repo == installed)
 	{
-	  queue_push(q, DISABLE_UPDATE);
-	  queue_push(q, what);
+	  queue_push2(q, DISABLE_UPDATE, what);
 	  return;
 	}
       if (s->obsoletes)
@@ -1409,8 +1398,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		  continue;
 	        if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		  continue;
-		queue_push(q, DISABLE_UPDATE);
-		queue_push(q, p);
+		queue_push2(q, DISABLE_UPDATE, p);
 	      }
 	}
       FOR_PROVIDES(p, pp, s->name)
@@ -1422,8 +1410,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	    continue;
 	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 	    continue;
-	  queue_push(q, DISABLE_UPDATE);
-	  queue_push(q, p);
+	  queue_push2(q, DISABLE_UPDATE, p);
 	}
       return;
     case SOLVER_ERASE:
@@ -1431,10 +1418,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	break;
       FOR_JOB_SELECT(p, pp, select, what)
 	if (pool->solvables[p].repo == installed)
-	  {
-	    queue_push(q, DISABLE_UPDATE);
-	    queue_push(q, p);
-	  }
+	  queue_push2(q, DISABLE_UPDATE, p);
       return;
     default:
       return;
@@ -1464,6 +1448,13 @@ solver_disablepolicyrules(Solver *solv)
 	continue;
       lastjob = j;
       jobtodisablelist(solv, job->elements[j], job->elements[j + 1], &allq);
+    }
+  if (solv->cleandepsmap.size)
+    {
+      solver_createcleandepsmap(solv);
+      for (i = solv->installed->start; i < solv->installed->end; i++)
+	if (MAPTST(&solv->cleandepsmap, i - solv->installed->start))
+	  queue_push2(&allq, DISABLE_UPDATE, i);
     }
   MAPZERO(&solv->noupdate);
   for (i = 0; i < allq.count; i += 2)
@@ -1514,6 +1505,13 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
 	continue;
       lastjob = j;
       jobtodisablelist(solv, job->elements[j], job->elements[j + 1], &allq);
+    }
+  if (solv->cleandepsmap.size)
+    {
+      solver_createcleandepsmap(solv);
+      for (i = solv->installed->start; i < solv->installed->end; i++)
+	if (MAPTST(&solv->cleandepsmap, i - solv->installed->start))
+	  queue_push2(&allq, DISABLE_UPDATE, i);
     }
   for (j = 0; j < q.count; j += 2)
     {
@@ -2006,5 +2004,285 @@ disablechoicerules(Solver *solv, Rule *r)
 	solver_disablerule(solv, r);
     }
 }
+
+void solver_createcleandepsmap(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Queue *job = &solv->job;
+  Map userinstalled;
+  Map im;
+  Map installedm;
+  Rule *r;
+  Id rid, how, what, select;
+  Id p, pp, ip, *jp;
+  Id req, *reqp, sup, *supp;
+  Solvable *s;
+  Queue iq;
+  int i;
+
+  map_init(&userinstalled, installed->end - installed->start);
+  map_init(&im, pool->nsolvables);
+  map_init(&installedm, pool->nsolvables);
+  map_empty(&solv->cleandepsmap);
+  queue_init(&iq);
+
+  for (i = 0; i < job->count; i += 2)
+    {
+      how = job->elements[i];
+      switch (how & SOLVER_JOBMASK)
+	{
+	case SOLVER_USERINSTALLED:
+	  what = job->elements[i + 1];
+	  select = how & SOLVER_SELECTMASK;
+	  FOR_JOB_SELECT(p, pp, select, what)
+	    if (pool->solvables[p].repo == installed)
+	      MAPSET(&userinstalled, p - installed->start);
+	  break;
+	}
+    }
+  /* add all positive elements (e.g. locks) to "userinstalled" */
+  for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
+    {
+      r = solv->rules + rid;
+      if (r->d < 0)
+	continue;
+      FOR_RULELITERALS(p, jp, r)
+	if (p > 0 && pool->solvables[p].repo == installed)
+	  MAPSET(&userinstalled, p - installed->start);
+    }
+  for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
+    {
+      r = solv->rules + rid;
+      if (r->p >= 0 || r->d != 0)
+	continue;	/* disabled or not erase */
+      p = -r->p;
+      if (pool->solvables[p].repo != installed)
+	continue;
+      MAPCLR(&userinstalled, p - installed->start);
+      i = solv->ruletojob.elements[rid - solv->jobrules];
+      how = job->elements[i];
+      if ((how & (SOLVER_JOBMASK|SOLVER_CLEANDEPS)) == (SOLVER_ERASE|SOLVER_CLEANDEPS))
+	queue_push(&iq, p);
+    }
+  for (p = installed->start; p < installed->end; p++)
+    {
+      if (pool->solvables[p].repo != installed)
+	continue;
+      MAPSET(&installedm, p);
+      MAPSET(&im, p);
+    }
+
+  while (iq.count)
+    {
+      ip = queue_shift(&iq);
+      if (!MAPTST(&im, ip))
+	continue;
+      if (!MAPTST(&installedm, ip))
+	continue;
+      if (MAPTST(&userinstalled, ip))
+	continue;
+      MAPCLR(&im, ip);
+      s = pool->solvables + ip;
+#ifdef CLEANDEPSDEBUG
+      printf("hello %s\n", solvable2str(pool, s));
+#endif
+      if (s->requires)
+	{
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    {
+	      if (req == SOLVABLE_PREREQMARKER)
+		continue;
+#if 0
+	      /* count number of installed packages that match */
+	      count = 0;
+	      FOR_PROVIDES(p, pp, req)
+		if (MAPTST(&installedm, p))
+		  count++;
+	      if (count > 1)
+		continue;
+#endif
+	      FOR_PROVIDES(p, pp, req)
+		{
+		  if (MAPTST(&im, p))
+		    {
+#ifdef CLEANDEPSDEBUG
+		      printf("%s requires %s\n", solvid2str(pool, ip), solvid2str(pool, p));
+#endif
+		      queue_push(&iq, p);
+		    }
+		}
+	    }
+	}
+      if (s->recommends)
+	{
+	  reqp = s->repo->idarraydata + s->recommends;
+	  while ((req = *reqp++) != 0)
+	    {
+#if 0
+	      count = 0;
+	      FOR_PROVIDES(p, pp, req)
+		if (MAPTST(&installedm, p))
+		  count++;
+	      if (count > 1)
+		continue;
+#endif
+	      FOR_PROVIDES(p, pp, req)
+		{
+		  if (MAPTST(&im, p))
+		    {
+#ifdef CLEANDEPSDEBUG
+		      printf("%s recommends %s\n", solvid2str(pool, ip), solvid2str(pool, p));
+#endif
+		      queue_push(&iq, p);
+		    }
+		}
+	    }
+	}
+      if (!iq.count)
+	{
+	  /* supplements pass */
+	  for (ip = solv->installed->start; ip < solv->installed->end; ip++)
+	    {
+	      if (!MAPTST(&installedm, ip))
+		continue;
+	      s = pool->solvables + ip;
+	      if (!s->supplements)
+		continue;
+	      if (!MAPTST(&im, ip))
+		continue;
+	      supp = s->repo->idarraydata + s->supplements;
+	      while ((sup = *supp++) != 0)
+		if (!dep_possible(solv, sup, &im) && dep_possible(solv, sup, &installedm))
+		  break;
+	      /* no longer supplemented, also erase */
+	      if (sup)
+		{
+#ifdef CLEANDEPSDEBUG
+		  printf("%s supplemented\n", solvid2str(pool, ip));
+#endif
+		  queue_push(&iq, ip);
+		}
+	    }
+	}
+    }
+
+  /* turn userinstalled into remove set for pruning */
+  map_empty(&userinstalled);
+  for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
+    {
+      r = solv->rules + rid;
+      if (r->p >= 0 || r->d != 0)
+	continue;	/* disabled or not erase */
+      p = -r->p;
+      MAPCLR(&im, p);
+      if (pool->solvables[p].repo == installed)
+        MAPSET(&userinstalled, p - installed->start);
+    }
+  for (p = installed->start; p < installed->end; p++)
+    if (MAPTST(&im, p))
+      queue_push(&iq, p);
+  for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
+    {
+      r = solv->rules + rid;
+      if (r->d < 0)
+	continue;
+      FOR_RULELITERALS(p, jp, r)
+	if (p > 0)
+          queue_push(&iq, p);
+    }
+  while (iq.count)
+    {
+      ip = queue_shift(&iq);
+      s = pool->solvables + ip;
+#ifdef CLEANDEPSDEBUG
+      printf("bye %s\n", solvable2str(pool, s));
+#endif
+      if (s->requires)
+	{
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, req)
+		{
+		  if (!MAPTST(&im, p) && MAPTST(&installedm, p))
+		    {
+		      if (p == ip)
+			continue;
+#ifdef CLEANDEPSDEBUG
+		      printf("%s requires %s\n", solvid2str(pool, ip), solvid2str(pool, p));
+#endif
+		      MAPSET(&im, p);
+		      queue_push(&iq, p);
+		    }
+		}
+	    }
+	}
+      if (s->recommends)
+	{
+	  reqp = s->repo->idarraydata + s->recommends;
+	  while ((req = *reqp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, req)
+		{
+		  if (!MAPTST(&im, p) && MAPTST(&installedm, p))
+		    {
+		      if (p == ip)
+			continue;
+		      if (MAPTST(&userinstalled, p - installed->start))
+			continue;
+#ifdef CLEANDEPSDEBUG
+		      printf("%s recommends %s\n", solvid2str(pool, ip), solvid2str(pool, p));
+#endif
+		      MAPSET(&im, p);
+		      queue_push(&iq, p);
+		    }
+		}
+	    }
+	}
+      if (!iq.count)
+	{
+	  /* supplements pass */
+	  for (ip = installed->start; ip < installed->end; ip++)
+	    {
+	      if (!MAPTST(&installedm, ip))
+		continue;
+	      if (MAPTST(&userinstalled, ip - installed->start))
+	        continue;
+	      s = pool->solvables + ip;
+	      if (!s->supplements)
+		continue;
+	      if (MAPTST(&im, ip) || !MAPTST(&installedm, ip))
+		continue;
+	      supp = s->repo->idarraydata + s->supplements;
+	      while ((sup = *supp++) != 0)
+		if (dep_possible(solv, sup, &im))
+		  break;
+	      if (sup)
+		{
+#ifdef CLEANDEPSDEBUG
+		  printf("%s supplemented\n", solvid2str(pool, ip));
+#endif
+		  MAPSET(&im, ip);
+		  queue_push(&iq, ip);
+		}
+	    }
+	}
+    }
+    
+  queue_free(&iq);
+  for (p = installed->start; p < installed->end; p++)
+    {
+      if (pool->solvables[p].repo != installed)
+	continue;
+      if (!MAPTST(&im, p))
+        MAPSET(&solv->cleandepsmap, p - installed->start);
+    }
+  map_free(&im);
+  map_free(&installedm);
+  map_free(&userinstalled);
+}
+
 
 /* EOF */

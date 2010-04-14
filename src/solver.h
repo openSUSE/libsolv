@@ -205,6 +205,7 @@ typedef struct _Solver {
   Map dupmap;				/* packages from dup repos */
   Map dupinvolvedmap;			/* packages involved in dup process */
   Map droporphanedmap;			/* packages to drop in dup mode */
+  Map cleandepsmap;			/* try to drop those packages as of cleandeps erases */
 
   Queue *ruleinfoq;			/* tmp space for solver_ruleinfo() */
 } Solver;
@@ -231,11 +232,13 @@ typedef struct _Solver {
 #define SOLVER_DISTUPGRADE		0x0700
 #define SOLVER_VERIFY			0x0800
 #define SOLVER_DROP_ORPHANED		0x0900
+#define SOLVER_USERINSTALLED            0x0a00
 
 #define SOLVER_JOBMASK			0xff00
 
 #define SOLVER_WEAK			0x010000
 #define SOLVER_ESSENTIAL		0x020000
+#define SOLVER_CLEANDEPS                0x040000
 
 /* old API compatibility, do not use in new code */
 #if 1
