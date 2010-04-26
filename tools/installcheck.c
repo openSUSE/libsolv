@@ -64,7 +64,11 @@ myfopen(const char *fn)
 void
 usage(char** argv)
 {
-  printf("Usage:\n%s: <arch> repo [--nocheck repo]...\n", argv[0]);
+  printf("Usage:\n%s: <arch> [options..] repo [--nocheck repo]...\n"
+         "\t--exclude <pattern>\twhitespace-separated list of (sub-)"
+         "packagenames to ignore\n"
+         "\t--withsrc\t\tAlso check dependencies of src.rpm\n\n"
+         , argv[0]);
   exit(1);
 }
 
