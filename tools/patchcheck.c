@@ -282,7 +282,7 @@ test_all_old_patches_included(context_t *c, Id pid)
                      dep2str(pool, rd->name), dep2str(pool, rd->evr));
                }
            }
-    
+
         }
     }
 }
@@ -345,20 +345,20 @@ test_all_packages_installable(context_t *c, Id pid)
                   queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE);
                   queue_push(&job, i);
                 }
-              queue_push(&job, SOLVER_INSTALL_SOLVABLE);
-              queue_push(&job, pid);
-              solv = solver_create(pool);
-              /*solv->dontinstallrecommended = 1;*/
-              ++solver_runs;
-              solver_solve(solv, &job);
-              if (solv->problems.count)
-                {
-                  c->status = 1;
-                  showproblems(solv, s, 0, 0);
-                }
-              frominst(solv, c->repo, c->instrepo);
-              solver_free(solv);
             }
+          queue_push(&job, SOLVER_INSTALL_SOLVABLE);
+          queue_push(&job, pid);
+          solv = solver_create(pool);
+          /*solv->dontinstallrecommended = 1;*/
+          ++solver_runs;
+          solver_solve(solv, &job);
+          if (solv->problems.count)
+            {
+              c->status = 1;
+              showproblems(solv, s, 0, 0);
+            }
+          frominst(solv, c->repo, c->instrepo);
+          solver_free(solv);
         }
     }
 
@@ -376,11 +376,15 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
   Queue cand;
   Queue badguys;
   int i, j;
+  unsigned int now, solver_runs;
   Solvable *s = pool->solvables + pid;
 
   queue_init(&job);
   queue_init(&cand);
   queue_init(&badguys);
+
+  now = sat_timems(0);
+  solver_runs = 0;
 
   /* Test 3: can we upgrade all packages? */
   for (p = 1; p < pool->nsolvables; p++)
@@ -415,6 +419,7 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
           queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_WEAK);
           queue_push(&job, p);
         }
+      ++solver_runs;
       solver_solve(solv, &job);
 #if 0
       solver_printdecisions(solv);
@@ -431,19 +436,21 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
 
       /* now the interesting part: test patch */
       queue_empty(&job);
-#if 0
-      for (i = 1; i < updatestart; i++)
+      if (!c->install_available)
         {
-          if (pool->solvables[i].repo != repo || i == pid)
-            continue;
-          queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE);
-          queue_push(&job, i);
+          for (i = 1; i < c->updatestart; i++)
+            {
+              if (pool->solvables[i].repo != c->repo || i == pid)
+                continue;
+              queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE);
+              queue_push(&job, i);
+            }
         }
-#endif
       queue_push(&job, SOLVER_INSTALL_SOLVABLE);
       queue_push(&job, pid);
       solv = solver_create(pool);
       solv->dontinstallrecommended = 1;
+      ++solver_runs;
       solver_solve(solv, &job);
 
       if (solv->problems.count)
@@ -464,6 +471,8 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
         break;	/* no progress */
       cand.count = j;
     }
+  if (PERF_DEBUGGING)
+    printf("  test_can_upgrade_all_packages took %d ms in %d runs\n", sat_timems(now), solver_runs);
 }
 
 void
