@@ -975,7 +975,6 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   if (lastweak)
     {
       Id v;
-      extern void disablechoicerules(Solver *solv, Rule *r);
       /* disable last weak rule */
       solv->problems.count = oldproblemcount;
       solv->learnt_pool.count = oldlearntpoolcount;
@@ -986,7 +985,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "disabling ");
       solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, solv->rules + lastweak);
       if (lastweak >= solv->choicerules && lastweak < solv->choicerules_end)
-	disablechoicerules(solv, solv->rules + lastweak);
+	solver_disablechoicerules(solv, solv->rules + lastweak);
       solver_disableproblem(solv, v);
       if (v < 0)
 	solver_reenablepolicyrules(solv, -(v + 1));

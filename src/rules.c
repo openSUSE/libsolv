@@ -1974,9 +1974,8 @@ addchoicerules(Solver *solv)
 /* called when a choice rule is disabled by analyze_unsolvable. We also
  * have to disable all other choice rules so that the best packages get
  * picked */
- 
 void
-disablechoicerules(Solver *solv, Rule *r)
+solver_disablechoicerules(Solver *solv, Rule *r)
 {
   Id rid, p, *pp;
   Pool *pool = solv->pool;
@@ -2005,7 +2004,7 @@ disablechoicerules(Solver *solv, Rule *r)
     }
 }
 
-void solver_createcleandepsmap(Solver *solv)
+static void solver_createcleandepsmap(Solver *solv)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
