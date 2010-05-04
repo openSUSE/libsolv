@@ -123,6 +123,7 @@ int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
 SolverRuleinfo solver_ruleinfo(struct _Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
 
 /* misc functions */
+void solver_addchoicerules(struct _Solver *solv);
 void solver_disablechoicerules(struct _Solver *solv, Rule *r);
 
 #ifdef __cplusplus

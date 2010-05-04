@@ -2594,7 +2594,10 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_DISTUPGRADE:
 	  if (select == SOLVER_SOLVABLE_ALL)
-	    solv->dupmap_all = 1;
+	    {
+	      solv->dupmap_all = 1;
+	      solv->updatemap_all = 1;
+	    }
 	  if (!solv->dupmap_all)
 	    hasdupjob = 1;
 	  break;
@@ -2905,10 +2908,7 @@ solver_solve(Solver *solv, Queue *job)
     solv->duprules = solv->duprules_end = solv->nrules;
 
   if (1)
-    {
-      extern void addchoicerules(Solver *solv);
-      addchoicerules(solv);
-    }
+    solver_addchoicerules(solv);
   else
     solv->choicerules = solv->choicerules_end = solv->nrules;
 

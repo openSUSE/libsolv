@@ -1805,7 +1805,7 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 }
 
 void
-addchoicerules(Solver *solv)
+solver_addchoicerules(Solver *solv)
 {
   Pool *pool = solv->pool;
   Map m, mneg;

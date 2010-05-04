@@ -705,11 +705,7 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	  /* policy, replace p with rp */
 	  s = pool->solvables + p;
 	  sd = rp ? pool->solvables + rp : 0;
-	  if (s == sd && solv->dupmap_all)
-	    {
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep obsolete %s\n", solvable2str(pool, s));
-	    }
-	  else if (sd)
+	  if (sd)
 	    {
 	      int gotone = 0;
 	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr, EVRCMP_MATCH_RELEASE) > 0)
@@ -737,7 +733,6 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow deinstallation of %s\n", solvable2str(pool, s));
 	    }
-
 	}
     }
 }
