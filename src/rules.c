@@ -500,9 +500,9 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
       dontfix = 0;
       if (installed			/* Installed system available */
-	  && !solv->fixsystem		/* NOT repair errors in rpm dependency graph */
 	  && s->repo == installed	/* solvable is installed */
-	  && (!solv->fixmap.size || !MAPTST(&solv->fixmap, n - installed->start)))
+	  && !solv->fixmap_all		/* NOT repair errors in rpm dependency graph */
+	  && !(solv->fixmap.size && MAPTST(&solv->fixmap, n - installed->start)))
         {
 	  dontfix = 1;			/* dont care about broken rpm deps */
         }
@@ -926,11 +926,11 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   p = s - pool->solvables;
   /* find update candidates for 's' */
-  if (solv->distupgrade)
+  if (solv->dupmap_all)
     p = finddistupgradepackages(solv, s, &qs, allow_all);
   else
     policy_findupdatepackages(solv, s, &qs, allow_all);
-  if (!allow_all && !solv->distupgrade && solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
+  if (!allow_all && !solv->dupmap_all && solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
     addduppackages(solv, s, &qs);
 
   if (!allow_all && qs.count && solv->noobsoletes.size)
@@ -952,13 +952,14 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	}
       if (j < qs.count)
 	{
-	  if (d && solv->updatesystem && solv->installed && s->repo == solv->installed)
+	  if (d && solv->installed && s->repo == solv->installed &&
+              (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
 	    {
 	      if (!solv->multiversionupdaters)
 		solv->multiversionupdaters = sat_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
 	      solv->multiversionupdaters[s - pool->solvables - solv->installed->start] = d;
 	    }
-	  if (j == 0 && p == -SYSTEMSOLVABLE && solv->distupgrade)
+	  if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
 	    {
 	      queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
 	      j = qs.count;
@@ -1064,7 +1065,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
 	  if (a != 1 && pool->installed && ps->repo == pool->installed)
 	    {
-	      if (!solv->distupgrade)
+	      if (!solv->dupmap_all && !(solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
 	        queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
 	      continue;		/* ignore installed solvables when calculating the best arch */
 	    }
@@ -1375,7 +1376,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
 	{
 	  /* XXX: remove if we always do distupgrade with DUP rules */
-	  if (solv->distupgrade && s->repo == installed)
+	  if (solv->dupmap_all && s->repo == installed)
 	    queue_push2(q, DISABLE_UPDATE, what);
 	  return;
 	}

@@ -437,7 +437,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
       rr = solv->rules + solv->featurerules + (why - solv->updaterules);
       if (!rr->p)
 	rr = solv->rules + why;
-      if (solv->distupgrade && solv->rules[why].p != p && solv->decisionmap[p] > 0)
+      if (solv->dupmap_all && solv->rules[why].p != p && solv->decisionmap[p] > 0)
 	{
 	  /* distupgrade case, allow to keep old package */
 	  queue_push(solutionq, SOLVER_SOLUTION_DISTUPGRADE);

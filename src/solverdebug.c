@@ -705,7 +705,7 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	  /* policy, replace p with rp */
 	  s = pool->solvables + p;
 	  sd = rp ? pool->solvables + rp : 0;
-	  if (s == sd && solv->distupgrade)
+	  if (s == sd && solv->dupmap_all)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep obsolete %s\n", solvable2str(pool, s));
 	    }
@@ -842,5 +842,7 @@ solver_select2str(Solver *solv, Id select, Id what)
       sprintf(b, "repo #%d", what);
       return b;
     }
+  if (select == SOLVER_SOLVABLE_ALL)
+    return "all packages";
   return "unknown job select";
 }

@@ -1412,14 +1412,21 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      if (l || !dq.count)
 		continue;
 	      /* prune to installed if not updating */
-	      if (!solv->updatesystem && solv->installed && dq.count > 1)
+	      if (dq.count > 1 && solv->installed && !solv->updatemap_all)
 		{
 		  int j, k;
 		  for (j = k = 0; j < dq.count; j++)
 		    {
 		      Solvable *s = pool->solvables + dq.elements[j];
 		      if (s->repo == solv->installed)
-			dq.elements[k++] = dq.elements[j];
+			{
+			  dq.elements[k++] = dq.elements[j];
+			  if (solv->updatemap.size && MAPTST(&solv->updatemap, dq.elements[j] - solv->installed->start))
+			    {
+			      k = 0;	/* package wants to be updated, do not prune */
+			      break;
+			    }
+			}
 		    }
 		  if (k)
 		    dq.count = k;
@@ -1485,7 +1492,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  /* Actually we currently still need it because of erase jobs */
 		  /* if noupdate is set we do not look at update candidates */
 		  queue_empty(&dq);
-		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatesystem || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || rr->p != i))
+		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || rr->p != i))
 		    {
 		      if (solv->noobsoletes.size && solv->multiversionupdaters
 			     && (d = solv->multiversionupdaters[i - installed->start]) != 0)
@@ -1933,7 +1940,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 	}
 
-     if (solv->distupgrade && solv->installed)
+     if (solv->dupmap_all && solv->installed)
 	{
 	  int installedone = 0;
 
@@ -1945,7 +1952,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      if (solv->decisionmap[p])
 		continue;	/* already decided */
 	      olevel = level;
-	      if (solv->distupgrade_removeunsupported)
+	      if (solv->droporphanedmap_all)
 		continue;
 	      if (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))
 		continue;
@@ -2484,6 +2491,12 @@ solver_solve(Solver *solv, Queue *job)
   queue_free(&solv->job);
   queue_init_clone(&solv->job, job);
 
+  /* initialize with legacy values */
+  solv->fixmap_all = solv->fixsystem;
+  solv->updatemap_all = solv->updatesystem;
+  solv->droporphanedmap_all = solv->distupgrade_removeunsupported;
+  solv->dupmap_all = solv->distupgrade;
+
   /*
    * create basic rule set of all involved packages
    * use addedmap bitmap to make sure we don't create rules twice
@@ -2506,7 +2519,7 @@ solver_solve(Solver *solv, Queue *job)
    */
   if (installed)
     {
-      /* check for verify jobs */
+      /* check for update/verify jobs as they need to be known early */
       for (i = 0; i < job->count; i += 2)
 	{
 	  how = job->elements[i];
@@ -2515,6 +2528,8 @@ solver_solve(Solver *solv, Queue *job)
 	  switch (how & SOLVER_JOBMASK)
 	    {
 	    case SOLVER_VERIFY:
+	      if (select == SOLVER_SOLVABLE_ALL)
+	        solv->fixmap_all = 1;
 	      FOR_JOB_SELECT(p, pp, select, what)
 		{
 		  s = pool->solvables + p;
@@ -2523,6 +2538,19 @@ solver_solve(Solver *solv, Queue *job)
 		  if (!solv->fixmap.size)
 		    map_grow(&solv->fixmap, solv->installed->end - solv->installed->start);
 		  MAPSET(&solv->fixmap, p - solv->installed->start);
+		}
+	      break;
+	    case SOLVER_UPDATE:
+	      if (select == SOLVER_SOLVABLE_ALL)
+		solv->updatemap_all = 1;
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  if (!solv->installed || s->repo != solv->installed)
+		    continue;
+		  if (!solv->updatemap.size)
+		    map_grow(&solv->updatemap, solv->installed->end - solv->installed->start);
+		  MAPSET(&solv->updatemap, p - solv->installed->start);
 		}
 	      break;
 	    default:
@@ -2565,7 +2593,9 @@ solver_solve(Solver *solv, Queue *job)
 	    }
 	  break;
 	case SOLVER_DISTUPGRADE:
-	  if (!solv->distupgrade)
+	  if (select == SOLVER_SOLVABLE_ALL)
+	    solv->dupmap_all = 1;
+	  if (!solv->dupmap_all)
 	    hasdupjob = 1;
 	  break;
 	default:
@@ -2680,7 +2710,7 @@ solver_solve(Solver *solv, Queue *job)
 	    queue_push(&solv->orphaned, i);
           if (!r->p)
 	    {
-	      assert(solv->distupgrade && !sr->p);
+	      assert(solv->dupmap_all && !sr->p);
 	      continue;
 	    }
 	  if (!solver_samerule(solv, r, sr))
@@ -2785,15 +2815,6 @@ solver_solve(Solver *solv, Queue *job)
 
 	case SOLVER_UPDATE:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %supdate %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
-	  FOR_JOB_SELECT(p, pp, select, what)
-	    {
-	      s = pool->solvables + p;
-	      if (!solv->installed || s->repo != solv->installed)
-		continue;
-	      if (!solv->updatemap.size)
-		map_grow(&solv->updatemap, solv->installed->end - solv->installed->start);
-	      MAPSET(&solv->updatemap, p - solv->installed->start);
-	    }
 	  break;
 	case SOLVER_VERIFY:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sverify %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
@@ -2821,6 +2842,8 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_DROP_ORPHANED:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: drop orphaned %s\n", solver_select2str(solv, select, what));
+	  if (select == SOLVER_SOLVABLE_ALL)
+	    solv->droporphanedmap_all = 1;
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
 	      s = pool->solvables + p;
