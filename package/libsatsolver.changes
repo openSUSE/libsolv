@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Thu May  6 17:39:20 CEST 2010 - mls@suse.de
+
+- fix bug in cleandeps code
+- bump version to 0.15 to make it different from code11_2 branch
+- 0.15.0
+
+-------------------------------------------------------------------
 Tue Mar 23 17:24:46 CET 2010 - ma@suse.de
 
 - Parse an installed products <shortsummary> tag [bnc#586303]
