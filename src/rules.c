@@ -2221,6 +2221,8 @@ static void solver_createcleandepsmap(Solver *solv)
 		    {
 		      if (p == ip)
 			continue;
+		      if (MAPTST(&userinstalled, p - installed->start))
+			continue;
 #ifdef CLEANDEPSDEBUG
 		      printf("%s requires %s\n", solvid2str(pool, ip), solvid2str(pool, p));
 #endif
