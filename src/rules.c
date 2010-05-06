@@ -2074,14 +2074,14 @@ static void solver_createcleandepsmap(Solver *solv)
   while (iq.count)
     {
       ip = queue_shift(&iq);
+      s = pool->solvables + ip;
       if (!MAPTST(&im, ip))
 	continue;
       if (!MAPTST(&installedm, ip))
 	continue;
-      if (MAPTST(&userinstalled, ip))
+      if (s->repo == installed && MAPTST(&userinstalled, ip - installed->start))
 	continue;
       MAPCLR(&im, ip);
-      s = pool->solvables + ip;
 #ifdef CLEANDEPSDEBUG
       printf("hello %s\n", solvable2str(pool, s));
 #endif
