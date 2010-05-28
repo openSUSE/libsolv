@@ -22,6 +22,7 @@
 #include "pool.h"
 #include "poolarch.h"
 #include "util.h"
+#include "evr.h"
 #include "policy.h"
 #include "solverdebug.h"
 
@@ -1338,17 +1339,44 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
   Id select, p, pp;
   Repo *installed;
   Solvable *s;
-  int i;
+  int i, j, set, qstart, pass;
+  Map omap;
 
   installed = solv->installed;
   select = how & SOLVER_SELECTMASK;
   switch (how & SOLVER_JOBMASK)
     {
     case SOLVER_INSTALL:
-      if ((select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES) && solv->infarchrules != solv->infarchrules_end && ISRELDEP(what))
+      set = how & SOLVER_SETMASK;
+      if (select == SOLVER_SOLVABLE)
+	set |= SOLVER_SETARCH | SOLVER_SETVENDOR | SOLVER_SETREPO | SOLVER_SETEVR;
+      else if ((select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES) && ISRELDEP(what))
 	{
 	  Reldep *rd = GETRELDEP(pool, what);
+	  if (rd->flags == REL_EQ && select == SOLVER_SOLVABLE_NAME)
+	    {
+#if !defined(DEBIAN_SEMANTICS)
+	      const char *evr = id2str(pool, rd->evr);
+	      if (strchr(evr, '-'))
+		set |= SOLVER_SETEVR;
+	      else
+		set |= SOLVER_SETEV;
+#else
+	      set |= SOLVER_SETEVR;
+#endif
+	    }
+	  if (rd->flags <= 7 && ISRELDEP(rd->name))
+	    rd = GETRELDEP(pool, rd->name);
 	  if (rd->flags == REL_ARCH)
+	    set |= SOLVER_SETARCH;
+	}
+      if (!set)
+	return;
+      if ((set & SOLVER_SETARCH) != 0 && solv->infarchrules != solv->infarchrules_end)
+	{
+	  if (select == SOLVER_SOLVABLE)
+	    queue_push2(q, DISABLE_INFARCH, pool->solvables[what].name);
+	  else
 	    {
 	      int qcnt = q->count;
 	      FOR_JOB_SELECT(p, pp, select, what)
@@ -1364,55 +1392,143 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		}
 	    }
 	}
-      if (select != SOLVER_SOLVABLE)
-	break;
-      s = pool->solvables + what;
-      if (solv->infarchrules != solv->infarchrules_end)
-	queue_push2(q, DISABLE_INFARCH, s->name);
-      if (solv->duprules != solv->duprules_end)
-	queue_push2(q, DISABLE_DUP, s->name);
+      if ((set & SOLVER_SETREPO) != 0 && solv->duprules != solv->duprules_end)
+	{
+	  if (select == SOLVER_SOLVABLE)
+	    queue_push2(q, DISABLE_DUP, pool->solvables[what].name);
+	  else
+	    {
+	      int qcnt = q->count;
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  /* unify names */
+		  for (i = qcnt; i < q->count; i += 2)
+		    if (q->elements[i + 1] == s->name)
+		      break;
+		  if (i < q->count)
+		    continue;
+		  queue_push2(q, DISABLE_DUP, s->name);
+		}
+	    }
+	}
       if (!installed)
 	return;
-      if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, what))
+      /* now the hard part: disable some update rules */
+
+      /* first check if we have noobs or installed packages in the job */
+      FOR_JOB_SELECT(p, pp, select, what)
 	{
-	  /* XXX: remove if we always do distupgrade with DUP rules */
-	  if (solv->dupmap_all && s->repo == installed)
-	    queue_push2(q, DISABLE_UPDATE, what);
-	  return;
+	  if (pool->solvables[p].repo == installed)
+	    {
+	      if (select == SOLVER_SOLVABLE)
+	        queue_push2(q, DISABLE_UPDATE, what);
+	      return;
+	    }
+	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p))
+	    return;
 	}
-      if (s->repo == installed)
+
+      /* all job packages obsolete */
+      qstart = q->count;
+      pass = 0;
+      memset(&omap, 0, sizeof(omap));
+      FOR_JOB_SELECT(p, pp, select, what)
 	{
-	  queue_push2(q, DISABLE_UPDATE, what);
-	  return;
+	  Id p2, pp2;
+
+	  if (pass == 1)
+	    map_grow(&omap, installed->end - installed->start);
+	  s = pool->solvables + p;
+	  if (s->obsoletes)
+	    {
+	      Id obs, *obsp;
+	      obsp = s->repo->idarraydata + s->obsoletes;
+	      while ((obs = *obsp++) != 0)
+		FOR_PROVIDES(p2, pp2, obs)
+		  {
+		    Solvable *ps = pool->solvables + p2;
+		    if (ps->repo != installed)
+		      continue;
+		    if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
+		      continue;
+		    if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		      continue;
+		    if (pass)
+		      MAPSET(&omap, p2 - installed->start);
+		    else
+		      queue_push2(q, DISABLE_UPDATE, p2);
+		  }
+	    }
+	  FOR_PROVIDES(p2, pp2, s->name)
+	    {
+	      Solvable *ps = pool->solvables + p2;
+	      if (ps->repo != installed)
+		continue;
+	      if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
+		continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		continue;
+	      if (pass)
+	        MAPSET(&omap, p2 - installed->start);
+              else
+	        queue_push2(q, DISABLE_UPDATE, p2);
+	    }
+	  if (pass)
+	    {
+	      for (i = j = qstart; i < q->count; i += 2)
+		{
+		  if (MAPTST(&omap, q->elements[i + 1] - installed->start))
+		    {
+		      MAPCLR(&omap, q->elements[i + 1] - installed->start);
+		      q->elements[j + 1] = q->elements[i + 1];
+		      j += 2;
+		    }
+		}
+	      queue_truncate(q, j);
+	    }
+	  if (q->count == qstart)
+	    break;
+	  pass++;
 	}
-      if (s->obsoletes)
+      if (omap.size)
+        map_free(&omap);
+      if (select == SOLVER_SOLVABLE || qstart == q->count)
+	return;		/* all done already */
+
+      /* now that we know which installed packages are obsoleted check each of them */
+      for (i = j = qstart; i < q->count; i += 2)
 	{
-	  Id obs, *obsp;
-	  obsp = s->repo->idarraydata + s->obsoletes;
-	  while ((obs = *obsp++) != 0)
-	    FOR_PROVIDES(p, pp, obs)
-	      {
-		Solvable *ps = pool->solvables + p;
-		if (ps->repo != installed)
-		  continue;
-		if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
-		  continue;
-	        if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
-		  continue;
-		queue_push2(q, DISABLE_UPDATE, p);
-	      }
+	  Solvable *is = pool->solvables + q->elements[i + 1];
+	  FOR_JOB_SELECT(p, pp, select, what)
+	    {
+	      int illegal = 0;
+	      s = pool->solvables + p;
+	      if ((set & SOLVER_SETEVR) != 0)
+		illegal |= POLICY_ILLEGAL_DOWNGRADE;	/* ignore */
+	      if ((set & SOLVER_SETARCH) != 0)
+		illegal |= POLICY_ILLEGAL_ARCHCHANGE;	/* ignore */
+	      if ((set & SOLVER_SETVENDOR) != 0)
+		illegal |= POLICY_ILLEGAL_VENDORCHANGE;	/* ignore */
+	      illegal = policy_is_illegal(solv, is, s, illegal);
+	      if (illegal && illegal == POLICY_ILLEGAL_DOWNGRADE && (set & SOLVER_SETEV) != 0)
+		{
+		  /* it's ok if the EV is different */
+		  if (evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE_EVONLY) != 0)
+		    illegal = 0;
+		}
+	      if (illegal)
+		break;
+	    }
+	  if (!p)
+	    {	
+	      /* no package conflicts with the update rule */
+	      /* thus keep the DISABLE_UPDATE */
+	      q->elements[j + 1] = q->elements[i + 1];
+	      j += 2;
+	    }
 	}
-      FOR_PROVIDES(p, pp, s->name)
-	{
-	  Solvable *ps = pool->solvables + p;
-	  if (ps->repo != installed)
-	    continue;
-	  if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
-	    continue;
-	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
-	    continue;
-	  queue_push2(q, DISABLE_UPDATE, p);
-	}
+      queue_truncate(q, j);
       return;
     case SOLVER_ERASE:
       if (!installed)
@@ -1871,11 +1987,9 @@ solver_addchoicerules(Solver *solv)
 	  if (p2)
 	    {
 	      /* found installed package p2 that we can update to p */
-	      if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
-		continue;
-	      if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
-		continue;
 	      if (MAPTST(&mneg, p))
+		continue;
+	      if (policy_is_illegal(solv, s2, s, 0))
 		continue;
 	      queue_push(&qi, p2);
 	      queue_push(&q, p);
@@ -1904,11 +2018,9 @@ solver_addchoicerules(Solver *solv)
 	      if (obs)
 		{
 		  /* found installed package p2 that we can update to p */
-		  if (!solv->allowarchchange && s->arch != s2->arch && policy_illegal_archchange(solv, s, s2))
-		    continue;
-		  if (!solv->allowvendorchange && s->vendor != s2->vendor && policy_illegal_vendorchange(solv, s, s2))
-		    continue;
 		  if (MAPTST(&mneg, p))
+		    continue;
+		  if (policy_is_illegal(solv, s2, s, 0))
 		    continue;
 		  queue_push(&qi, p2);
 		  queue_push(&q, p);

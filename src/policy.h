@@ -56,9 +56,15 @@ extern void prune_to_best_version(Pool *pool, Queue *plist);
  *     candidates : List of candidates (This list depends on other
  *                  restrictions like architecture and vendor policies too)
  */   
+
+#define POLICY_ILLEGAL_DOWNGRADE	1
+#define POLICY_ILLEGAL_ARCHCHANGE	2
+#define POLICY_ILLEGAL_VENDORCHANGE	4
+
 extern void policy_filter_unwanted(Solver *solv, Queue *plist, int mode);
 extern int  policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2);
 extern int  policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2);
+extern int  policy_is_illegal(Solver *solv, Solvable *s1, Solvable *s2, int ignore);
 extern void policy_findupdatepackages(Solver *solv,
 				      Solvable *s,
 				      Queue *qs,

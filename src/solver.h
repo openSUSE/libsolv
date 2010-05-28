@@ -247,6 +247,14 @@ typedef struct _Solver {
 #define SOLVER_ESSENTIAL		0x020000
 #define SOLVER_CLEANDEPS                0x040000
 
+#define SOLVER_SETEV			0x01000000
+#define SOLVER_SETEVR			0x02000000
+#define SOLVER_SETARCH			0x04000000
+#define SOLVER_SETVENDOR		0x08000000
+#define SOLVER_SETREPO			0x10000000
+
+#define SOLVER_SETMASK			0x1f000000
+
 /* old API compatibility, do not use in new code */
 #if 1
 #define SOLVER_INSTALL_SOLVABLE (SOLVER_INSTALL|SOLVER_SOLVABLE)

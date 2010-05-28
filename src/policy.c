@@ -441,6 +441,31 @@ policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
   return 1;	/* no class matches */
 }
 
+/* check if it is illegal to replace installed
+ * package "is" with package "s" (which must obsolete "is")
+ */
+int
+policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
+{
+  Pool *pool = solv->pool;
+  int ret = 0;
+  if (!(ignore & POLICY_ILLEGAL_DOWNGRADE) && !solv->allowdowngrade)
+    {
+      if (is->name == s->name && evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE) > 0)
+	ret |= POLICY_ILLEGAL_DOWNGRADE;
+    }
+  if (!(ignore & POLICY_ILLEGAL_ARCHCHANGE) && !solv->allowarchchange)
+    {
+      if (is->arch != s->arch && policy_illegal_archchange(solv, s, is))
+	ret |= POLICY_ILLEGAL_ARCHCHANGE;
+    }
+  if (!(ignore & POLICY_ILLEGAL_VENDORCHANGE) && !solv->allowvendorchange)
+    {
+      if (is->vendor != s->vendor && policy_illegal_vendorchange(solv, s, is))
+	ret |= POLICY_ILLEGAL_VENDORCHANGE;
+    }
+  return ret;
+}
 
 /*-------------------------------------------------------------------
  * 

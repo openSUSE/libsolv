@@ -2764,7 +2764,7 @@ solver_solve(Solver *solv, Queue *job)
       switch (how & SOLVER_JOBMASK)
 	{
 	case SOLVER_INSTALL:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sinstall %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sinstall %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  if (select == SOLVER_SOLVABLE)
 	    {
 	      p = what;
@@ -2786,7 +2786,7 @@ solver_solve(Solver *solv, Queue *job)
 	  solver_addjobrule(solv, p, d, i, weak);
 	  break;
 	case SOLVER_ERASE:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %s%serase %s\n", weak ? "weak " : "", how & SOLVER_CLEANDEPS ? "clean deps " : "", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %s%serase %s\n", weak ? "weak " : "", how & SOLVER_CLEANDEPS ? "clean deps " : "", solver_select2str(pool, select, what));
 	  if ((how & SOLVER_CLEANDEPS) != 0 && !solv->cleandepsmap.size && solv->installed)
 	    map_grow(&solv->cleandepsmap, solv->installed->end - solv->installed->start);
           if (select == SOLVER_SOLVABLE && solv->installed && pool->solvables[what].repo == solv->installed)
@@ -2817,23 +2817,23 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 
 	case SOLVER_UPDATE:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %supdate %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %supdate %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  break;
 	case SOLVER_VERIFY:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sverify %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sverify %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  break;
 	case SOLVER_WEAKENDEPS:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sweaken deps %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sweaken deps %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  if (select != SOLVER_SOLVABLE)
 	    break;
 	  s = pool->solvables + what;
 	  weaken_solvable_deps(solv, what);
 	  break;
 	case SOLVER_NOOBSOLETES:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sno obsolete %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %sno obsolete %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  break;
 	case SOLVER_LOCK:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %slock %s\n", weak ? "weak " : "", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: %slock %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
 	      s = pool->solvables + p;
@@ -2841,10 +2841,10 @@ solver_solve(Solver *solv, Queue *job)
 	    }
 	  break;
 	case SOLVER_DISTUPGRADE:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: distupgrade %s\n", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: distupgrade %s\n", solver_select2str(pool, select, what));
 	  break;
 	case SOLVER_DROP_ORPHANED:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: drop orphaned %s\n", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: drop orphaned %s\n", solver_select2str(pool, select, what));
 	  if (select == SOLVER_SOLVABLE_ALL)
 	    solv->droporphanedmap_all = 1;
 	  FOR_JOB_SELECT(p, pp, select, what)
@@ -2858,7 +2858,7 @@ solver_solve(Solver *solv, Queue *job)
 	    }
 	  break;
 	case SOLVER_USERINSTALLED:
-	  POOL_DEBUG(SAT_DEBUG_JOB, "job: user installed %s\n", solver_select2str(solv, select, what));
+	  POOL_DEBUG(SAT_DEBUG_JOB, "job: user installed %s\n", solver_select2str(pool, select, what));
 	  break;
 	default:
 	  POOL_DEBUG(SAT_DEBUG_JOB, "job: unknown job\n");

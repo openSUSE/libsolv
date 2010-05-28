@@ -661,23 +661,23 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	      if (select == SOLVER_SOLVABLE && solv->installed && pool->solvables[what].repo == solv->installed)
 		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not keep %s installed\n", solvid2str(pool, what));
 	      else if (select == SOLVER_SOLVABLE_PROVIDES)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install a solvable %s\n", solver_select2str(solv, select, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install a solvable %s\n", solver_select2str(pool, select, what));
 	      else
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install %s\n", solver_select2str(solv, select, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install %s\n", solver_select2str(pool, select, what));
 	      break;
 	    case SOLVER_ERASE:
 	      if (select == SOLVER_SOLVABLE && !(solv->installed && pool->solvables[what].repo == solv->installed))
 		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not forbid installation of %s\n", solvid2str(pool, what));
 	      else if (select == SOLVER_SOLVABLE_PROVIDES)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not deinstall all solvables %s\n", solver_select2str(solv, select, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not deinstall all solvables %s\n", solver_select2str(pool, select, what));
 	      else
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not deinstall %s\n", solver_select2str(solv, select, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not deinstall %s\n", solver_select2str(pool, select, what));
 	      break;
 	    case SOLVER_UPDATE:
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install most recent version of %s\n", solver_select2str(solv, select, what));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install most recent version of %s\n", solver_select2str(pool, select, what));
 	      break;
 	    case SOLVER_LOCK:
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not lock %s\n", solver_select2str(solv, select, what));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not lock %s\n", solver_select2str(pool, select, what));
 	      break;
 	    default:
 	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - do something different\n");
@@ -707,26 +707,19 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	  sd = rp ? pool->solvables + rp : 0;
 	  if (sd)
 	    {
-	      int gotone = 0;
-	      if (!solv->allowdowngrade && evrcmp(pool, s->evr, sd->evr, EVRCMP_MATCH_RELEASE) > 0)
-		{
-		  POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
-		  gotone = 1;
-		}
-	      if (!solv->allowarchchange && s->name == sd->name && s->arch != sd->arch && policy_illegal_archchange(solv, s, sd))
-		{
-		  POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
-		  gotone = 1;
-		}
-	      if (!solv->allowvendorchange && s->name == sd->name && s->vendor != sd->vendor && policy_illegal_vendorchange(solv, s, sd))
+	      int illegal = policy_is_illegal(solv, s, sd, 0);
+	      if ((illegal & POLICY_ILLEGAL_DOWNGRADE) != 0)
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+	      if ((illegal & POLICY_ILLEGAL_ARCHCHANGE) != 0)
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+	      if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0)
 		{
 		  if (sd->vendor)
 		    POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));
 		  else
 		    POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow vendor change from '%s' (%s) to no vendor (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), solvable2str(pool, sd));
-		  gotone = 1;
 		}
-	      if (!gotone)
+	      if (!illegal)
 		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow replacement of %s with %s\n", solvable2str(pool, s), solvable2str(pool, sd));
 	    }
 	  else
@@ -801,9 +794,8 @@ solver_printtrivial(Solver *solv)
 }
 
 const char *
-solver_select2str(Solver *solv, Id select, Id what)
+solver_select2str(Pool *pool, Id select, Id what)
 {
-  Pool *pool = solv->pool;
   const char *s;
   char *b;
   if (select == SOLVER_SOLVABLE)
