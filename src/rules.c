@@ -1348,28 +1348,34 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
     {
     case SOLVER_INSTALL:
       set = how & SOLVER_SETMASK;
-      if (select == SOLVER_SOLVABLE)
-	set |= SOLVER_SETARCH | SOLVER_SETVENDOR | SOLVER_SETREPO | SOLVER_SETEVR;
-      else if ((select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES) && ISRELDEP(what))
+      if (!(set & SOLVER_NOAUTOSET))
 	{
-	  Reldep *rd = GETRELDEP(pool, what);
-	  if (rd->flags == REL_EQ && select == SOLVER_SOLVABLE_NAME)
+	  /* automatically add set bits by analysing the job */
+	  if (select == SOLVER_SOLVABLE)
+	    set |= SOLVER_SETARCH | SOLVER_SETVENDOR | SOLVER_SETREPO | SOLVER_SETEVR;
+	  else if ((select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES) && ISRELDEP(what))
 	    {
+	      Reldep *rd = GETRELDEP(pool, what);
+	      if (rd->flags == REL_EQ && select == SOLVER_SOLVABLE_NAME)
+		{
 #if !defined(DEBIAN_SEMANTICS)
-	      const char *evr = id2str(pool, rd->evr);
-	      if (strchr(evr, '-'))
-		set |= SOLVER_SETEVR;
-	      else
-		set |= SOLVER_SETEV;
+		  const char *evr = id2str(pool, rd->evr);
+		  if (strchr(evr, '-'))
+		    set |= SOLVER_SETEVR;
+		  else
+		    set |= SOLVER_SETEV;
 #else
-	      set |= SOLVER_SETEVR;
+		  set |= SOLVER_SETEVR;
 #endif
+		}
+	      if (rd->flags <= 7 && ISRELDEP(rd->name))
+		rd = GETRELDEP(pool, rd->name);
+	      if (rd->flags == REL_ARCH)
+		set |= SOLVER_SETARCH;
 	    }
-	  if (rd->flags <= 7 && ISRELDEP(rd->name))
-	    rd = GETRELDEP(pool, rd->name);
-	  if (rd->flags == REL_ARCH)
-	    set |= SOLVER_SETARCH;
 	}
+      else
+	set &= ~SOLVER_NOAUTOSET;
       if (!set)
 	return;
       if ((set & SOLVER_SETARCH) != 0 && solv->infarchrules != solv->infarchrules_end)
@@ -1493,8 +1499,11 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	}
       if (omap.size)
         map_free(&omap);
-      if (select == SOLVER_SOLVABLE || qstart == q->count)
-	return;		/* all done already */
+
+      if (qstart == q->count)
+	return;		/* nothing to prune */
+      if ((set & (SOLVER_SETEVR | SOLVER_SETARCH | SOLVER_SETVENDOR)) == (SOLVER_SETEVR | SOLVER_SETARCH | SOLVER_SETVENDOR))
+	return;		/* all is set */
 
       /* now that we know which installed packages are obsoleted check each of them */
       for (i = j = qstart; i < q->count; i += 2)
@@ -1530,6 +1539,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	}
       queue_truncate(q, j);
       return;
+
     case SOLVER_ERASE:
       if (!installed)
 	break;

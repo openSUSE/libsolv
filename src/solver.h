@@ -252,8 +252,9 @@ typedef struct _Solver {
 #define SOLVER_SETARCH			0x04000000
 #define SOLVER_SETVENDOR		0x08000000
 #define SOLVER_SETREPO			0x10000000
+#define SOLVER_NOAUTOSET		0x20000000
 
-#define SOLVER_SETMASK			0x1f000000
+#define SOLVER_SETMASK			0x2f000000
 
 /* old API compatibility, do not use in new code */
 #if 1
