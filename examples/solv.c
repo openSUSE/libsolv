@@ -407,6 +407,7 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    continue;
 	  repoinfos = sat_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
 	  cinfo = repoinfos + nrepoinfos++;
+	  memset(cinfo, 0, sizeof(*cinfo));
 	  cinfo->baseurl = strdup(url);
 	  cinfo->alias = sat_dupjoin(url, "/", distro);
 	  cinfo->name = strdup(distro);
@@ -3072,6 +3073,14 @@ rerunsolver:
   if (!trans->steps.count)
     {
       printf("Nothing to do.\n");
+      solver_free(solv);
+      queue_free(&job);
+      pool_free(pool);
+      free_repoinfos(repoinfos, nrepoinfos);
+      sat_free(commandlinepkgs);
+#ifdef FEDORA
+      yum_substitute(pool, 0);
+#endif
       exit(1);
     }
   printf("\n");
