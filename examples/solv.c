@@ -334,78 +334,106 @@ struct repoinfo *
 read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 {
   FILE *fp;
+  char buf[4096];
   char buf2[4096];
   int l;
   char *kp, *url, *distro;
   struct repoinfo *repoinfos = 0, *cinfo;
   int nrepoinfos = 0;
+  DIR *dir = 0;
+  struct dirent *ent;
 
-  if (!(fp = fopen("/etc/apt/sources.list", "r")))
-    return 0;
-  while(fgets(buf2, sizeof(buf2), fp))
+  fp = fopen("/etc/apt/sources.list", "r");
+  while (1)
     {
-      l = strlen(buf2);
-      if (l == 0)
-	continue;
-      while (l && (buf2[l - 1] == '\n' || buf2[l - 1] == ' ' || buf2[l - 1] == '\t'))
-	buf2[--l] = 0;
-      kp = buf2;
-      while (*kp == ' ' || *kp == '\t')
-	kp++;
-      if (!*kp || *kp == '#')
-	continue;
-      if (strncmp(kp, "deb", 3) != 0)
-	continue;
-      kp += 3;
-      if (*kp != ' ' && *kp != '\t')
-	continue;
-      while (*kp == ' ' || *kp == '\t')
-	kp++;
-      if (!*kp)
-	continue;
-      url = kp;
-      while (*kp && *kp != ' ' && *kp != '\t')
-	kp++;
-      if (*kp)
-        *kp++ = 0;
-      while (*kp == ' ' || *kp == '\t')
-	kp++;
-      if (!*kp)
-	continue;
-      distro = kp;
-      while (*kp && *kp != ' ' && *kp != '\t')
-	kp++;
-      if (*kp)
-        *kp++ = 0;
-      while (*kp == ' ' || *kp == '\t')
-	kp++;
-      if (!*kp)
-	continue;
-      repoinfos = sat_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
-      cinfo = repoinfos + nrepoinfos++;
-      cinfo->baseurl = strdup(url);
-      cinfo->alias = sat_dupjoin(url, "/", distro);
-      cinfo->name = strdup(distro);
-      cinfo->type = TYPE_DEBIAN;
-      cinfo->enabled = 1;
-      cinfo->repo_gpgcheck = 1;
-      while (*kp)
+      if (!fp)
 	{
-	  char *compo;
+	  if (!dir)
+	    {
+	      dir = opendir("/etc/apt/sources.list.d");
+	      if (!dir)
+		break;
+	    }
+	  if ((ent = readdir(dir)) == 0)
+	    {
+	      closedir(dir);
+	      break;
+	    }
+	  l = strlen(ent->d_name);
+	  if (l < 5 || strcmp(ent->d_name + l - 5, ".list") != 0)
+	    continue;
+	  snprintf(buf, sizeof(buf), "%s/%s", "/etc/apt/sources.list.d", ent->d_name);
+	  if (!(fp = fopen(buf, "r")))
+	    continue;
+	}
+      while(fgets(buf2, sizeof(buf2), fp))
+	{
+	  l = strlen(buf2);
+	  if (l == 0)
+	    continue;
+	  while (l && (buf2[l - 1] == '\n' || buf2[l - 1] == ' ' || buf2[l - 1] == '\t'))
+	    buf2[--l] = 0;
+	  kp = buf2;
+	  while (*kp == ' ' || *kp == '\t')
+	    kp++;
+	  if (!*kp || *kp == '#')
+	    continue;
+	  if (strncmp(kp, "deb", 3) != 0)
+	    continue;
+	  kp += 3;
+	  if (*kp != ' ' && *kp != '\t')
+	    continue;
 	  while (*kp == ' ' || *kp == '\t')
 	    kp++;
 	  if (!*kp)
-	    break;
-	  compo = kp;
+	    continue;
+	  url = kp;
 	  while (*kp && *kp != ' ' && *kp != '\t')
 	    kp++;
 	  if (*kp)
 	    *kp++ = 0;
-	  cinfo->components = sat_extend(cinfo->components, cinfo->ncomponents, 1, sizeof(*cinfo->components), 15);
-	  cinfo->components[cinfo->ncomponents++] = strdup(compo);
+	  while (*kp == ' ' || *kp == '\t')
+	    kp++;
+	  if (!*kp)
+	    continue;
+	  distro = kp;
+	  while (*kp && *kp != ' ' && *kp != '\t')
+	    kp++;
+	  if (*kp)
+	    *kp++ = 0;
+	  while (*kp == ' ' || *kp == '\t')
+	    kp++;
+	  if (!*kp)
+	    continue;
+	  repoinfos = sat_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
+	  cinfo = repoinfos + nrepoinfos++;
+	  cinfo->baseurl = strdup(url);
+	  cinfo->alias = sat_dupjoin(url, "/", distro);
+	  cinfo->name = strdup(distro);
+	  cinfo->type = TYPE_DEBIAN;
+	  cinfo->enabled = 1;
+	  cinfo->autorefresh = 1;
+	  cinfo->repo_gpgcheck = 1;
+	  cinfo->metadata_expire = METADATA_EXPIRE;
+	  while (*kp)
+	    {
+	      char *compo;
+	      while (*kp == ' ' || *kp == '\t')
+		kp++;
+	      if (!*kp)
+		break;
+	      compo = kp;
+	      while (*kp && *kp != ' ' && *kp != '\t')
+		kp++;
+	      if (*kp)
+		*kp++ = 0;
+	      cinfo->components = sat_extend(cinfo->components, cinfo->ncomponents, 1, sizeof(*cinfo->components), 15);
+	      cinfo->components[cinfo->ncomponents++] = strdup(compo);
+	    }
 	}
+      fclose(fp);
+      fp = 0;
     }
-  fclose(fp);
   qsort(repoinfos, nrepoinfos, sizeof(*repoinfos), read_repoinfos_sort);
   *nrepoinfosp = nrepoinfos;
   return repoinfos;
@@ -1486,6 +1514,31 @@ repo_add_debdb(Repo *repo, int flags)
   fclose(fp);
 }
 
+static int
+hexstr2bytes(unsigned char *buf, const char *str, int buflen)
+{
+  int i;
+  for (i = 0; i < buflen; i++) 
+    {    
+#define c2h(c) (((c)>='0' && (c)<='9') ? ((c)-'0')              \
+                : ((c)>='a' && (c)<='f') ? ((c)-('a'-10))       \
+                : ((c)>='A' && (c)<='F') ? ((c)-('A'-10))       \
+                : -1)
+      int v = c2h(*str);
+      str++;
+      if (v < 0) 
+        return 0;
+      buf[i] = v; 
+      v = c2h(*str);
+      str++;
+      if (v < 0) 
+        return 0;
+      buf[i] = (buf[i] << 4) | v; 
+#undef c2h
+    }    
+  return buflen;
+}
+
 const char *
 debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsigned char **chksump, Id *chksumtypep)
 {
@@ -1496,12 +1549,29 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
   int l, compl;
   char *ch, *fn, *bp;
   char *filename;
+  static char *basearch;
+  char *binarydir;
+  int lbinarydir;
 
+  if (!basearch)
+    {
+      struct utsname un;
+      if (uname(&un))
+	{
+	  perror("uname");
+	  exit(1);
+	}
+      basearch = strdup(un.machine);
+      if (basearch[0] == 'i' && basearch[1] && !strcmp(basearch + 2, "86"))
+	basearch[1] = '3';
+    }
+  binarydir = sat_dupjoin("binary-", basearch, "/");
+  lbinarydir = strlen(binarydir);
   compl = strlen(comp);
   rewind(fp);
   curchksumtype = 0;
   filename = 0;
-  chksum = 0;
+  chksum = sat_malloc(32);
   chksumtype = 0;
   while(fgets(buf, sizeof(buf), fp))
     {
@@ -1551,17 +1621,23 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
       if (strncmp(fn, comp, compl) != 0 || fn[compl] != '/')
 	continue;
       bp += compl + 1;
-      if (strncmp(bp, "binary-i386/", 12))
+      if (strncmp(bp, binarydir, lbinarydir))
 	continue;
-      bp += 12;
+      bp += lbinarydir;
       if (!strcmp(bp, "Packages") || !strcmp(bp, "Packages.gz"))
 	{
 	  if (filename && !strcmp(bp, "Packages"))
 	    continue;
+	  if (chksumtype && sat_chksum_len(chksumtype) > sat_chksum_len(curchksumtype))
+	    continue;
+	  if (!hexstr2bytes(chksum, ch, sat_chksum_len(curchksumtype)))
+	    continue;
 	  sat_free(filename);
 	  filename = strdup(fn);
+	  chksumtype = curchksumtype;
 	}
     }
+  free(binarydir);
   if (filename)
     {
       fn = sat_dupjoin("/", filename, 0);
@@ -1569,6 +1645,8 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
       filename = sat_dupjoin("dists/", cinfo->name, fn);
       sat_free(fn);
     }
+  if (!chksumtype)
+    chksum = sat_free(chksum);
   *chksump = chksum;
   *chksumtypep = chksumtype;
   return filename;

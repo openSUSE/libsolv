@@ -167,6 +167,8 @@ control2solvable(Solvable *s, Repodata *data, char *control)
   char *p, *q, *end, *tag;
   int x, l;
   int havesource = 0;
+  char checksum[32 * 2 + 1];
+  Id checksumtype = 0;
 
   p = control;
   while (*p)
@@ -251,6 +253,13 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  if (!strcasecmp(tag, "installed-size"))
 	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, atoi(q));
 	  break;
+	case 'M' << 8 | 'D':
+	  if (!strcasecmp(tag, "md5sum") && !checksumtype && strlen(q) == 16 * 2)
+	    {
+	      strcpy(checksum, q);
+	      checksumtype = REPOKEY_TYPE_MD5;
+	    }
+	  break;
 	case 'P' << 8 | 'A':
 	  if (!strcasecmp(tag, "package"))
 	    s->name = str2id(pool, q, 1);
@@ -266,6 +275,18 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	    s->obsoletes = makedeps(repo, q, s->conflicts, 0);
 	  else if (!strcasecmp(tag, "recommends"))
 	    s->recommends = makedeps(repo, q, s->recommends, 0);
+	  break;
+	case 'S' << 8 | 'H':
+	  if (!strcasecmp(tag, "sha1") && checksumtype != REPOKEY_TYPE_SHA256 && strlen(q) == 20 * 2)
+	    {
+	      strcpy(checksum, q);
+	      checksumtype = REPOKEY_TYPE_SHA1;
+	    }
+	  else if (!strcasecmp(tag, "sha256") && strlen(q) == 32 * 2)
+	    {
+	      strcpy(checksum, q);
+	      checksumtype = REPOKEY_TYPE_SHA256;
+	    }
 	  break;
 	case 'S' << 8 | 'O':
 	  if (!strcasecmp(tag, "source"))
@@ -295,6 +316,8 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	}
     }
+  if (checksumtype)
+    repodata_set_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, checksumtype, checksum);
   if (!s->arch)
     s->arch = ARCH_ALL;
   if (!s->evr)
