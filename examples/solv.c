@@ -7,7 +7,18 @@
 
 /* solv, a little software installer demoing the sat solver library */
 
-/* things available in the library but missing from solv:
+/* things it does:
+ * - understands globs for package names / dependencies
+ * - understands .arch suffix
+ * - installation of commandline packages
+ * - repository data caching
+ * - on demand loading of secondary repository data
+ * - gpg and checksum verification
+ * - file conflicts
+ * - deltarpm support
+ * - fastestmirror implementation
+ *
+ * things available in the library but missing from solv:
  * - vendor policy loading
  * - soft locks file handling
  * - multi version handling
@@ -46,7 +57,11 @@
 #include "repo_solv.h"
 
 #include "repo_write.h"
+#ifndef DEBIAN
 #include "repo_rpmdb.h"
+#else
+#include "repo_deb.h"
+#endif
 #include "repo_products.h"
 #include "repo_rpmmd.h"
 #include "repo_susetags.h"
@@ -86,6 +101,8 @@ struct repoinfo {
   int priority;
   int keeppackages;
   int metadata_expire;
+  char **components;
+  int ncomponents;
 
   unsigned char cookie[32];
   unsigned char extcookie[32];
@@ -170,6 +187,7 @@ yum_substitute(Pool *pool, char *line)
 #define TYPE_SUSETAGS	1
 #define TYPE_RPMMD	2
 #define TYPE_PLAINDIR	3
+#define TYPE_DEBIAN     4
 
 static int
 read_repoinfos_sort(const void *ap, const void *bp)
@@ -178,6 +196,8 @@ read_repoinfos_sort(const void *ap, const void *bp)
   const struct repoinfo *b = bp;
   return strcmp(a->alias, b->alias);
 }
+
+#ifndef DEBIAN
 
 struct repoinfo *
 read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
@@ -308,10 +328,95 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
   return repoinfos;
 }
 
+#else
+
+struct repoinfo *
+read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
+{
+  FILE *fp;
+  char buf2[4096];
+  int l;
+  char *kp, *url, *distro;
+  struct repoinfo *repoinfos = 0, *cinfo;
+  int nrepoinfos = 0;
+
+  if (!(fp = fopen("/etc/apt/sources.list", "r")))
+    return 0;
+  while(fgets(buf2, sizeof(buf2), fp))
+    {
+      l = strlen(buf2);
+      if (l == 0)
+	continue;
+      while (l && (buf2[l - 1] == '\n' || buf2[l - 1] == ' ' || buf2[l - 1] == '\t'))
+	buf2[--l] = 0;
+      kp = buf2;
+      while (*kp == ' ' || *kp == '\t')
+	kp++;
+      if (!*kp || *kp == '#')
+	continue;
+      if (strncmp(kp, "deb", 3) != 0)
+	continue;
+      kp += 3;
+      if (*kp != ' ' && *kp != '\t')
+	continue;
+      while (*kp == ' ' || *kp == '\t')
+	kp++;
+      if (!*kp)
+	continue;
+      url = kp;
+      while (*kp && *kp != ' ' && *kp != '\t')
+	kp++;
+      if (*kp)
+        *kp++ = 0;
+      while (*kp == ' ' || *kp == '\t')
+	kp++;
+      if (!*kp)
+	continue;
+      distro = kp;
+      while (*kp && *kp != ' ' && *kp != '\t')
+	kp++;
+      if (*kp)
+        *kp++ = 0;
+      while (*kp == ' ' || *kp == '\t')
+	kp++;
+      if (!*kp)
+	continue;
+      repoinfos = sat_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
+      cinfo = repoinfos + nrepoinfos++;
+      cinfo->baseurl = strdup(url);
+      cinfo->alias = sat_dupjoin(url, "/", distro);
+      cinfo->name = strdup(distro);
+      cinfo->type = TYPE_DEBIAN;
+      cinfo->enabled = 1;
+      cinfo->repo_gpgcheck = 1;
+      while (*kp)
+	{
+	  char *compo;
+	  while (*kp == ' ' || *kp == '\t')
+	    kp++;
+	  if (!*kp)
+	    break;
+	  compo = kp;
+	  while (*kp && *kp != ' ' && *kp != '\t')
+	    kp++;
+	  if (*kp)
+	    *kp++ = 0;
+	  cinfo->components = sat_extend(cinfo->components, cinfo->ncomponents, 1, sizeof(*cinfo->components), 15);
+	  cinfo->components[cinfo->ncomponents++] = strdup(compo);
+	}
+    }
+  fclose(fp);
+  qsort(repoinfos, nrepoinfos, sizeof(*repoinfos), read_repoinfos_sort);
+  *nrepoinfosp = nrepoinfos;
+  return repoinfos;
+}
+
+#endif
+
 void
 free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
 {
-  int i;
+  int i, j;
   for (i = 0; i < nrepoinfos; i++)
     {
       struct repoinfo *cinfo = repoinfos + i;
@@ -321,6 +426,9 @@ free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
       sat_free(cinfo->metalink);
       sat_free(cinfo->mirrorlist);
       sat_free(cinfo->baseurl);
+      for (j = 0; j < cinfo->ncomponents; j++)
+        sat_free(cinfo->components[j]);
+      sat_free(cinfo->components);
     }
   sat_free(repoinfos);
 }
@@ -749,6 +857,8 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
   return fdopen(fd, "r");
 }
 
+#ifndef DEBIAN
+
 static void
 cleanupgpg(char *gpgdir)
 {
@@ -830,6 +940,25 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   cleanupgpg(gpgdir);
   return r == 0 ? 1 : 0;
 }
+
+#else
+
+int
+checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
+{
+  char cmd[256];
+  int r;
+
+  snprintf(cmd, sizeof(cmd), "gpgv -q --keyring /etc/apt/trusted.gpg /dev/fd/%d /dev/fd/%d >/dev/null 2>&1", fileno(sigfp), fileno(fp));
+  fcntl(fileno(fp), F_SETFD, 0);	/* clear CLOEXEC */
+  fcntl(fileno(sigfp), F_SETFD, 0);	/* clear CLOEXEC */
+  r = system(cmd);
+  fcntl(fileno(fp), F_SETFD, FD_CLOEXEC);
+  fcntl(fileno(sigfp), F_SETFD, FD_CLOEXEC);
+  return r == 0 ? 1 : 0;
+}
+
+#endif
 
 #define CHKSUM_IDENT "1.1"
 
@@ -1073,8 +1202,10 @@ static Pool *
 read_sigs()
 {
   Pool *sigpool = pool_create();
+#ifndef DEBIAN
   Repo *repo = repo_create(sigpool, "rpmdbkeys");
   repo_add_rpmdb_pubkeys(repo, 0, 0);
+#endif
   return sigpool;
 }
 
@@ -1341,6 +1472,109 @@ load_stub(Pool *pool, Repodata *data, void *dp)
 
 static unsigned char installedcookie[32];
 
+#ifdef DEBIAN
+void
+repo_add_debdb(Repo *repo, int flags)
+{
+  FILE *fp;
+  if ((fp = fopen("/var/lib/dpkg/status", "r")) == 0)
+    {
+      perror("/var/lib/dpkg/status");
+      exit(1);
+    }
+  repo_add_debpackages(repo, fp, flags);
+  fclose(fp);
+}
+
+const char *
+debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsigned char **chksump, Id *chksumtypep)
+{
+  char buf[4096];
+  Id chksumtype;
+  unsigned char *chksum;
+  Id curchksumtype;
+  int l, compl;
+  char *ch, *fn, *bp;
+  char *filename;
+
+  compl = strlen(comp);
+  rewind(fp);
+  curchksumtype = 0;
+  filename = 0;
+  chksum = 0;
+  chksumtype = 0;
+  while(fgets(buf, sizeof(buf), fp))
+    {
+      l = strlen(buf);
+      if (l == 0)
+	continue;
+      while (l && (buf[l - 1] == '\n' || buf[l - 1] == ' ' || buf[l - 1] == '\t'))
+	buf[--l] = 0;
+      if (!strncasecmp(buf, "MD5Sum:", 7))
+	{
+	  curchksumtype = REPOKEY_TYPE_MD5;
+	  continue;
+	}
+      if (!strncasecmp(buf, "SHA1:", 5))
+	{
+	  curchksumtype = REPOKEY_TYPE_SHA1;
+	  continue;
+	}
+      if (!strncasecmp(buf, "SHA256:", 7))
+	{
+	  curchksumtype = REPOKEY_TYPE_SHA256;
+	  continue;
+	}
+      if (!curchksumtype)
+	continue;
+      bp = buf;
+      if (*bp++ != ' ')
+	{
+	  curchksumtype = 0;
+	  continue;
+	}
+      ch = bp;
+      while (*bp && *bp != ' ' && *bp != '\t')
+	bp++;
+      if (!*bp)
+	continue;
+      *bp++ = 0;
+      while (*bp == ' ' || *bp == '\t')
+	bp++;
+      while (*bp && *bp != ' ' && *bp != '\t')
+	bp++;
+      if (!*bp)
+	continue;
+      while (*bp == ' ' || *bp == '\t')
+	bp++;
+      fn = bp;
+      if (strncmp(fn, comp, compl) != 0 || fn[compl] != '/')
+	continue;
+      bp += compl + 1;
+      if (strncmp(bp, "binary-i386/", 12))
+	continue;
+      bp += 12;
+      if (!strcmp(bp, "Packages") || !strcmp(bp, "Packages.gz"))
+	{
+	  if (filename && !strcmp(bp, "Packages"))
+	    continue;
+	  sat_free(filename);
+	  filename = strdup(fn);
+	}
+    }
+  if (filename)
+    {
+      fn = sat_dupjoin("/", filename, 0);
+      sat_free(filename);
+      filename = sat_dupjoin("dists/", cinfo->name, fn);
+      sat_free(fn);
+    }
+  *chksump = chksum;
+  *chksumtypep = chksumtype;
+  return filename;
+}
+#endif
+
 void
 read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 {
@@ -1359,23 +1593,36 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   Repodata *data;
   int badchecksum;
   int dorefresh;
+#ifdef DEBIAN
+  FILE *fpr;
+  int j;
+#endif
 
   repo = repo_create(pool, "@System");
+#ifndef DEBIAN
   printf("rpm database:");
   if (stat("/var/lib/rpm/Packages", &stb))
     memset(&stb, 0, sizeof(&stb));
+#else
+  printf("dpgk database:");
+  if (stat("/var/lib/dpkg/status", &stb))
+    memset(&stb, 0, sizeof(&stb));
+#endif
   calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, installedcookie);
   if (usecachedrepo(repo, 0, installedcookie, 0))
     printf(" cached\n");
   else
     {
+#ifndef DEBIAN
       FILE *ofp;
-      printf(" reading\n");
       int done = 0;
+#endif
+      printf(" reading\n");
 
 #ifdef PRODUCTS_PATH
       repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
 #endif
+#ifndef DEBIAN
       if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
 	{
 	  Repo *ref = repo_create(pool, "@System.old");
@@ -1389,6 +1636,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	}
       if (!done)
         repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
+#else
+        repo_add_debdb(repo, REPO_REUSE_REPODATA);
+#endif
       writecachedrepo(repo, 0, 0, installedcookie);
     }
   pool_set_installed(pool, repo);
@@ -1566,6 +1816,72 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
+
+#ifdef DEBIAN
+        case TYPE_DEBIAN:
+	  printf("debian repo '%s':", cinfo->alias);
+	  fflush(stdout);
+	  filename = sat_dupjoin("dists/", cinfo->name, "/Release");
+	  if ((fpr = curlfopen(cinfo, filename, 0, 0, 0, 0)) == 0)
+	    {
+	      printf(" no Release file, skipped\n");
+	      repo_free(repo, 1);
+	      cinfo->repo = 0;
+	      free((char *)filename);
+	      break;
+	    }
+	  sat_free((char *)filename);
+	  if (cinfo->repo_gpgcheck)
+	    {
+	      filename = sat_dupjoin("dists/", cinfo->name, "/Release.gpg");
+	      sigfp = curlfopen(cinfo, filename, 0, 0, 0, 0);
+	      sat_free((char *)filename);
+	      if (!sigfp)
+		{
+		  printf(" unsigned, skipped\n");
+		  fclose(fpr);
+		  break;
+		}
+	      if (!sigpool)
+		sigpool = read_sigs();
+	      if (!checksig(sigpool, fpr, sigfp))
+		{
+		  printf(" checksig failed, skipped\n");
+		  fclose(sigfp);
+		  fclose(fpr);
+		  break;
+		}
+	      fclose(sigfp);
+	    }
+	  calc_checksum_fp(fpr, REPOKEY_TYPE_SHA256, cinfo->cookie);
+	  if (usecachedrepo(repo, 0, cinfo->cookie, 1))
+	    {
+	      printf(" cached\n");
+              fclose(fpr);
+	      break;
+	    }
+	  printf(" fetching\n");
+          for (j = 0; j < cinfo->ncomponents; j++)
+	    {
+	      if (!(filename = debian_find_component(cinfo, fpr, cinfo->components[j], &filechksum, &filechksumtype)))
+		{
+		  printf("[component %s not found]\n", cinfo->components[j]);
+		  continue;
+		}
+	      if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+		{
+	          repo_add_debpackages(repo, fp, 0);
+		  fclose(fp);
+		}
+	      sat_free((char *)filechksum);
+	      sat_free((char *)filename);
+	    }
+	  fclose(fpr);
+	  if (!badchecksum)
+	    writecachedrepo(repo, 0, 0, cinfo->cookie);
+	  break;
+#endif
+
 	default:
 	  printf("unsupported repo '%s': skipped\n", cinfo->alias);
 	  repo_free(repo, 1);
@@ -1693,11 +2009,13 @@ limitrelation(Pool *pool, Queue *job, int flags, Id evr)
 	job->elements[i] |= SOLVER_SETARCH;
       if (flags == REL_EQ && select == SOLVER_SOLVABLE_NAME && job->elements[i])
 	{
+#ifndef DEBIAN
 	  const char *evrstr = id2str(pool, evr);
-	  if (strchr(evrstr, '-'))
-	    job->elements[i] |= SOLVER_SETEVR;
-	  else
+	  if (!strchr(evrstr, '-'))
 	    job->elements[i] |= SOLVER_SETEV;
+	  else
+#endif
+	    job->elements[i] |= SOLVER_SETEVR;
 	}
       /* make sure we still have matches */
       FOR_JOB_SELECT(p, pp, job->elements[i], job->elements[i + 1])
@@ -1934,6 +2252,8 @@ yesno(const char *str)
     }
 }
 
+#ifndef DEBIAN
+
 struct fcstate {
   FILE **newpkgsfps;
   Queue *checkq;
@@ -1977,6 +2297,7 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
   return rpm_byfp(fp, solvable2str(pool, s), &fcstate->rpmdbstate);
 }
 
+
 void
 runrpm(const char *arg, const char *name, int dupfd3)
 {
@@ -2012,6 +2333,48 @@ runrpm(const char *arg, const char *name, int dupfd3)
       exit(1);
     }
 }
+
+#endif
+
+#ifdef DEBIAN
+
+void
+rundpkg(const char *arg, const char *name, int dupfd3)
+{
+  pid_t pid;
+  int status;
+
+  if ((pid = fork()) == (pid_t)-1)
+    {
+      perror("fork");
+      exit(1);
+    }
+  if (pid == 0)
+    {
+      if (dupfd3 != -1 && dupfd3 != 3)
+	{
+	  dup2(dupfd3, 3);
+	  close(dupfd3);
+	}
+      if (dupfd3 != -1)
+	fcntl(3, F_SETFD, 0);	/* clear CLOEXEC */
+      if (strcmp(arg, "--install") == 0)
+        execlp("dpkg", "dpkg", "--install", "--force", "all", name, (char *)0);
+      else
+        execlp("dpkg", "dpkg", "--remove", "--force", "all", name, (char *)0);
+      perror("dpkg");
+      _exit(0);
+    }
+  while (waitpid(pid, &status, 0) != pid)
+    ;
+  if (status)
+    {
+      printf("dpkg failed\n");
+      exit(1);
+    }
+}
+
+#endif
 
 static Id
 nscallback(Pool *pool, void *data, Id name, Id evr)
@@ -2174,7 +2537,6 @@ main(int argc, char **argv)
   char inbuf[128], *ip;
   int allpkgs = 0;
   FILE **newpkgsfps;
-  struct fcstate fcstate;
   Id *addedfileprovides = 0;
   Id repofilter = 0;
 
@@ -2350,8 +2712,13 @@ main(int argc, char **argv)
 	{
 	  int l;
           l = strlen(argv[i]);
+#ifndef DEBIAN
 	  if (l <= 4 || strcmp(argv[i] + l - 4, ".rpm"))
 	    continue;
+#else
+	  if (l <= 4 || strcmp(argv[i] + l - 4, ".deb"))
+	    continue;
+#endif
 	  if (access(argv[i], R_OK))
 	    {
 	      perror(argv[i]);
@@ -2361,7 +2728,11 @@ main(int argc, char **argv)
 	    commandlinepkgs = sat_calloc(argc, sizeof(Id));
 	  if (!commandlinerepo)
 	    commandlinerepo = repo_create(pool, "@commandline");
+#ifndef DEBIAN
 	  repo_add_rpms(commandlinerepo, (const char **)argv + i, 1, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+#else
+	  repo_add_debs(commandlinerepo, (const char **)argv + i, 1, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+#endif
 	  commandlinepkgs[i] = commandlinerepo->end - 1;
 	}
       if (commandlinerepo)
@@ -2536,7 +2907,9 @@ main(int argc, char **argv)
   addsoftlocks(pool, &job);
 #endif
 
+#ifndef DEBIAN
 rerunsolver:
+#endif
   for (;;)
     {
       Id problem, solution;
@@ -2622,7 +2995,7 @@ rerunsolver:
   printf("Transaction summary:\n\n");
   solver_printtransaction(solv);
 
-#ifndef FEDORA
+#if !defined(FEDORA) && !defined(DEBIAN)
   if (1)
     {
       DUChanges duc[4];
@@ -2816,9 +3189,11 @@ rerunsolver:
       putchar('\n');
     }
 
+#ifndef DEBIAN
   if (newpkgs)
     {
       Queue conflicts;
+      struct fcstate fcstate;
 
       printf("Searching for file conflicts\n");
       queue_init(&conflicts);
@@ -2847,12 +3222,15 @@ rerunsolver:
 	}
       queue_free(&conflicts);
     }
+#endif
 
   printf("Committing transaction:\n\n");
   transaction_order(trans, 0);
   for (i = 0; i < trans->steps.count; i++)
     {
+#ifndef DEBIAN
       const char *evr, *evrp, *nvra;
+#endif
       Solvable *s;
       int j;
       FILE *fp;
@@ -2864,6 +3242,7 @@ rerunsolver:
 	{
 	case SOLVER_TRANSACTION_ERASE:
 	  printf("erase %s\n", solvid2str(pool, p));
+#ifndef DEBIAN
 	  if (!s->repo->rpmdbid || !s->repo->rpmdbid[p - s->repo->start])
 	    continue;
 	  /* strip epoch from evr */
@@ -2874,7 +3253,10 @@ rerunsolver:
 	    evr = evrp + 1;
 	  nvra = pool_tmpjoin(pool, id2str(pool, s->name), "-", evr);
 	  nvra = pool_tmpjoin(pool, nvra, ".", id2str(pool, s->arch));
-	  runrpm("-e", nvra, -1);	/* to bad that --querybynumber doesn't work */
+	  runrpm("-e", nvra, -1);	/* too bad that --querybynumber doesn't work */
+#else
+	  rundpkg("--remove", id2str(pool, s->name), 0);
+#endif
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_MULTIINSTALL:
@@ -2887,7 +3269,11 @@ rerunsolver:
 	    continue;
 	  rewind(fp);
 	  lseek(fileno(fp), 0, SEEK_SET);
+#ifndef DEBIAN
 	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp));
+#else
+	  rundpkg("--install", "/dev/fd/3", fileno(fp));
+#endif
 	  fclose(fp);
 	  newpkgsfps[j] = 0;
 	  break;

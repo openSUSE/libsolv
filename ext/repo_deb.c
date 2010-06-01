@@ -239,6 +239,10 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  if (!strcasecmp(tag, "enhances"))
 	    s->enhances = makedeps(repo, q, s->enhances, 0);
 	  break;
+	case 'F' << 8 | 'I':
+	  if (!strcasecmp(tag, "filename"))
+	    repodata_set_location(data, s - pool->solvables, 0, 0, q);
+	  break;
 	case 'H' << 8 | 'O':
 	  if (!strcasecmp(tag, "homepage"))
 	    repodata_set_str(data, s - pool->solvables, SOLVABLE_URL, q);
@@ -299,6 +303,26 @@ control2solvable(Solvable *s, Repodata *data, char *control)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   if (s->name && !havesource)
     repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
+  if (s->obsoletes)
+    {
+      /* obsoletes only count when the packages also conflict */
+      int i, j, k;
+      Id d;
+      for (i = j = s->obsoletes; (d = repo->idarraydata[i]) != 0; i++)
+	{
+	  if (s->conflicts)
+	    {
+	      for (k = s->conflicts; repo->idarraydata[k] != 0; k++)
+		if (repo->idarraydata[k] == d)
+		  break;
+	      if (repo->idarraydata[k])
+		{
+		  repo->idarraydata[j++] = d;
+		}
+	    }
+	}
+      repo->idarraydata[j] = 0;
+    }
 }
 
 void

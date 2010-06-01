@@ -64,6 +64,12 @@ pool_create(void)
 #ifdef FEDORA
   pool->obsoleteusescolors = 1;
 #endif
+#ifdef DEBIAN 
+  pool->allowselfconflicts = 1;
+# ifdef MULTI_SEMANTICS
+  pool->disttype = DISTTYPE_DEB;
+# endif
+#endif
   return pool;
 }
 

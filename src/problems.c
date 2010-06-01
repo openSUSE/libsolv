@@ -564,14 +564,34 @@ create_solutions(Solver *solv, int probnr, int solidx)
 	convertsolution(solv, solution.elements[j], &solv->solutions);
       if (solv->solutions.count == solstart + 1)
 	{
-	  solv->solutions.count--;
-	  if (!essentialok && i + 1 == problem.count && !nsol)
+	  solv->solutions.count--;	/* this one did not work out */
+	  if (nsol || i + 1 < problem.count)
+	    continue;			/* got one or still hope */
+	  if (!essentialok)
 	    {
 	      /* nothing found, start over */
+	      POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "nothing found, re-run with essentialok = 1\n");
 	      essentialok = 1;
 	      i = -1;
+	      continue;
 	    }
-	  continue;
+	  /* this is bad, we found no solution */
+	  /* for now just offer a rule */
+	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "nothing found, already did essentialok, fake it\n");
+	  queue_push(&solv->solutions, 0);
+	  for (j = 0; j < problem.count; j++)
+	    {
+	      queue_empty(&solution);
+	      queue_push(&solution, problem.elements[j]);
+	      convertsolution(solv, solution.elements[j], &solv->solutions);
+	      if (solv->solutions.count > solstart + 1)
+		break;
+	    }
+	  if (solv->solutions.count == solstart + 1)
+	    {
+	      solv->solutions.count--;
+	      continue;		/* sorry */
+	    }
 	}
       /* patch in number of solution elements */
       solv->solutions.elements[solstart] = (solv->solutions.count - (solstart + 1)) / 2;
