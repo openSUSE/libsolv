@@ -220,6 +220,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
     }
   while ((ent = readdir(dir)) != 0)
     {
+      if (ent->d_name[0] == '.')
+	continue;
       l = strlen(ent->d_name);
       if (l < 6 || rdlen + 2 + l >= sizeof(buf) || strcmp(ent->d_name + l - 5, ".repo") != 0)
 	continue;
@@ -359,6 +361,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	      closedir(dir);
 	      break;
 	    }
+	  if (ent->d_name[0] == '.')
+	    continue;
 	  l = strlen(ent->d_name);
 	  if (l < 5 || strcmp(ent->d_name + l - 5, ".list") != 0)
 	    continue;
