@@ -2794,11 +2794,16 @@ main(int argc, char **argv)
 	      Solvable *s = pool_id2solvable(pool, p);
 	      if (mainmode == MODE_INFO)
 		{
+		  const char *str;
 		  printf("Name:        %s\n", solvable2str(pool, s));
 		  printf("Repo:        %s\n", s->repo->name);
 		  printf("Summary:     %s\n", solvable_lookup_str(s, SOLVABLE_SUMMARY));
-		  printf("Url:         %s\n", solvable_lookup_str(s, SOLVABLE_URL));
-		  printf("License:     %s\n", solvable_lookup_str(s, SOLVABLE_LICENSE));
+		  str = solvable_lookup_str(s, SOLVABLE_URL);
+		  if (str)
+		    printf("Url:         %s\n", str);
+		  str = solvable_lookup_str(s, SOLVABLE_LICENSE);
+		  if (str)
+		    printf("License:     %s\n", str);
 		  printf("Description:\n%s\n", solvable_lookup_str(s, SOLVABLE_DESCRIPTION));
 		  printf("\n");
 		}
