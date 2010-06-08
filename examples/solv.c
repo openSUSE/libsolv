@@ -39,6 +39,8 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/dir.h>
+#include <sys/stat.h>
 
 #include <sys/socket.h>
 #include <netdb.h>
