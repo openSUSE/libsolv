@@ -56,13 +56,13 @@ repomd_decompress() {
 
 susetags_findfile_cat() {
   if test -s "$1.xz" ; then
-    xz -dc "$1"
+    xz -dc "$1.xz"
   elif test -s "$1.lzma" ; then
-    lzma -dc "$1"
+    lzma -dc "$1.lzma"
   elif test -s "$1.bz2" ; then
-    bzip2 -dc "$1"
+    bzip2 -dc "$1.bz2"
   elif test -s "$1.gz" ; then
-    gzip -dc "$1"
+    gzip -dc "$1.gz"
   elif test -s "$1" ; then
     cat "$1"
   fi
