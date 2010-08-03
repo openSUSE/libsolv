@@ -637,6 +637,7 @@ pool_addrelproviders(Pool *pool, Id d)
       if (wp)
 	{
 	  /* all solvables match, no need to create a new list */
+	  queue_free(&plist);
 	  pool->whatprovides_rel[d] = wp;
 	  return wp;
 	}
