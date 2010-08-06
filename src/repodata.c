@@ -1209,7 +1209,10 @@ dataiterator_filelistcheck(Dataiterator *di)
   Repodata *data = di->data;
 
   if ((di->matcher.flags & SEARCH_COMPLETE_FILELIST) != 0)
-    if (!di->matcher.match || (di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_STRING || !repodata_filelistfilter_matches(di->data, di->matcher.match))
+    if (!di->matcher.match
+       || ((di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_STRING
+           && (di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_GLOB)
+       || !repodata_filelistfilter_matches(di->data, di->matcher.match))
       needcomplete = 1;
   if (data->state != REPODATA_AVAILABLE)
     return needcomplete ? 1 : 0;
