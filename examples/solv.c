@@ -2181,10 +2181,10 @@ mkselect(Pool *pool, int mode, char *name, Queue *job)
   if (*name == '/')
     {
       Dataiterator di;
+      int type = strpbrk(name, "[*?") == 0 ? SEARCH_STRING : SEARCH_GLOB;
       Queue q;
-
       queue_init(&q);
-      dataiterator_init(&di, pool, mode == SOLVER_ERASE ? pool->installed : 0, 0, SOLVABLE_FILELIST, name, SEARCH_STRING|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
+      dataiterator_init(&di, pool, mode == SOLVER_ERASE ? pool->installed : 0, 0, SOLVABLE_FILELIST, name, type|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
       while (dataiterator_step(&di))
 	{
 	  Solvable *s = pool->solvables + di.solvid;
