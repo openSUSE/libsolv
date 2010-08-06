@@ -2754,6 +2754,8 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      Id htype = 0;
 #endif
 	      // printf("V3 signature packet\n");
+	      if (l < 17)
+		continue;
 	      if (p[2] != 0x10 && p[2] != 0x11 && p[2] != 0x12 && p[2] != 0x13 && p[2] != 0x1f)
 		continue;
 	      if (!memcmp(keyid, p + 6, 8))
@@ -2797,6 +2799,8 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      unsigned char issuer[8];
 
 	      // printf("V4 signature packet\n");
+	      if (l < 6)
+		continue;
 	      if (p[1] != 0x10 && p[1] != 0x11 && p[1] != 0x12 && p[1] != 0x13 && p[1] != 0x1f)
 		continue;
 	      haveissuer = 0;
@@ -2804,8 +2808,18 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      q = p + 4;
 	      for (j = 0; q && j < 2; j++)
 		{
+		  if (q + 2 > p + l)
+		    {
+		      q = 0;
+		      break;
+		    }
 		  ql = q[0] << 8 | q[1];
 		  q += 2;
+		  if (q + ql > p + l)
+		    {
+		      q = 0;
+		      break;
+		    }
 		  while (ql)
 		    {
 		      int sl;
