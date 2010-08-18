@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Wed Aug 18 14:11:08 UTC 2010 - kkaempf@novell.com
+
+- refactor ruby-satsolver, pure-Ruby extensions added
+- 0.15.1
+
+-------------------------------------------------------------------
 Thu May  6 17:39:20 CEST 2010 - mls@suse.de
 
 - fix bug in cleandeps code
