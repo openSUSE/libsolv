@@ -203,15 +203,25 @@ rm -rf "$RPM_BUILD_ROOT"
 %if 0%{?suse_version}
 %if 0%{?suse_version} < 1100
 %dir %{_libdir}/ruby/site_ruby/%{rb_ver}/%{rb_arch}
+%dir %{_libdir}/ruby/site_ruby/%{rb_ver}/satsolver
+%{_libdir}/ruby/site_ruby/%{rb_ver}/satsolver/*.rb
+%{_libdir}/ruby/site_ruby/%{rb_ver}/satsolver.rb
 %{_libdir}/ruby/site_ruby/%{rb_ver}/%{rb_arch}/satsolver.so
 %else
+%dir %{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver
+%{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver/*.rb
+%{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver.rb
 %{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolver.so
 %endif
 %endif
 %if 0%{?mandriva_version}
+%dir %{ruby_sitelibdir}/satsolver
+%{ruby_sitelibdir}/satsolver.rb
 %{ruby_sitearchdir}/satsolver.so
 %endif
 %if 0%{?fedora_version}
+%dir %{ruby_sitelibdir}/satsolver
+%{ruby_sitelibdir}/satsolver.rb
 %{ruby_sitearch}/satsolver.so
 %endif
 %doc bindings/ruby/html
