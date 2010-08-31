@@ -381,7 +381,34 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 {
   Pool *pool = solv->pool;
   if (plist->count > 1 && mode != POLICY_MODE_SUGGEST)
-    prune_to_highest_prio(pool, plist);
+    {
+      prune_to_highest_prio(pool, plist);
+      /* installed packages involed in a dup operation can only be kept
+       * if they are identical to a non-installed one */
+      if (plist->count > 1 && pool->installed && (solv->dupmap_all || solv->dupinvolvedmap.size))
+	{
+	  int i, j, k;
+	  for (i = j = 0; i < plist->count; i++)
+	    {
+	      Id p = plist->elements[i];
+	      Solvable *s = pool->solvables + p;
+	      if (s->repo == pool->installed && (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))))
+		{
+		  for (k = 0; k < plist->count; k++)
+		    {
+		      Solvable *s2 = pool->solvables + plist->elements[k];
+		      if (s2->repo != pool->installed && solvable_identical(s, s2))
+			break;
+		    }
+		  if (k == plist->count)
+		    continue;	/* no identical package found, ignore installed package */
+		}
+	      plist->elements[j++] = p;
+	    }
+	  if (j)
+	    plist->count = j;
+	}
+    }
   if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)
     prune_to_recommended(solv, plist);
   prune_best_arch_name_version(solv, pool, plist);
