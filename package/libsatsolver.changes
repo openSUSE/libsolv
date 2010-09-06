@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Sep  6 13:50:02 UTC 2010 - dmacvicar@novell.com
+
+- ruby bindings: fix bugs regarding include path loading
+  (was hardcoded) and refactor the way the library path is defined
+  (only once in a helper)
+
+-------------------------------------------------------------------
 Mon Sep  6 12:38:21 UTC 2010 - dmacvicar@novell.com
 
 - SLE10SP3 also has vendor_ruby 
