@@ -221,12 +221,14 @@ rm -rf "$RPM_BUILD_ROOT"
 %endif
 %if 0%{?mandriva_version}
 %dir %{ruby_sitelibdir}/satsolver
+%{ruby_sitelibdir}/satsolver/*.rb
 %{ruby_sitelibdir}/satsolver.rb
 %{ruby_sitearchdir}/satsolver.so
 %endif
 %if 0%{?fedora_version}
 %dir %{ruby_sitelib}/satsolver
 %{ruby_sitelib}/satsolver.rb
+%{ruby_sitelib}/satsolver/*.rb
 %{ruby_sitearch}/satsolver.so
 %endif
 %doc bindings/ruby/html
