@@ -294,25 +294,16 @@ prune_to_best_arch(const Pool *pool, Queue *plist)
 }
 
 /*
- * prune_to_best_version
- *
- * sort list of packages (given through plist) by name and evr
- * return result through plist
+ * remove entries from plist that are obsoleted by other entries
+ * with different name.
+ * plist should be sorted in some way.
  */
-void
-prune_to_best_version(Pool *pool, Queue *plist)
+static void
+prune_obsoleted(Pool *pool, Queue *plist)
 {
   int i, j;
-  Solvable *s, *best;
+  Solvable *s;
 
-  if (plist->count < 2)		/* no need to prune for a single entry */
-    return;
-  POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
-
-  /* sort by name first, prefer installed */
-  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
-
-  /* delete obsoleted. hmm, looks expensive! */
   /* FIXME maybe also check provides depending on noupdateprovide? */
   /* FIXME do not prune cycles */
   for (i = 0; i < plist->count; i++)
@@ -333,6 +324,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
 		continue;
 	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		continue;
+	      /* hmm, expensive. should use hash if plist is big */
 	      for (j = 0; j < plist->count; j++)
 		{
 		  if (i == j)
@@ -348,9 +340,26 @@ prune_to_best_version(Pool *pool, Queue *plist)
     if (plist->elements[i])
       plist->elements[j++] = plist->elements[i];
   plist->count = j;
+}
 
-  if (plist->count < 2)
+/*
+ * prune_to_best_version
+ *
+ * sort list of packages (given through plist) by name and evr
+ * return result through plist
+ */
+void
+prune_to_best_version(Pool *pool, Queue *plist)
+{
+  int i, j;
+  Solvable *s, *best;
+
+  if (plist->count < 2)		/* no need to prune for a single entry */
     return;
+  POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
+
+  /* sort by name first, prefer installed */
+  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
 
   /* now find best 'per name' */
   best = 0;
@@ -384,6 +393,11 @@ prune_to_best_version(Pool *pool, Queue *plist)
     }
   plist->elements[j++] = best - pool->solvables;	/* finish last group */
   plist->count = j;
+
+  /* we reduced the list to one package per name, now look at
+   * package obsoletes */
+  if (plist->count > 1)
+    prune_obsoleted(pool, plist);
 }
 
 
