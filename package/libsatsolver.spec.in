@@ -201,7 +201,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %files -n ruby-satsolver
 %defattr(-,root,root,-)
 %if 0%{?suse_version}
-%if 0%{?suse_version} < 1100
+%if 0%{?suse_version} < 1010
 %dir %{_libdir}/ruby/site_ruby/%{rb_ver}/%{rb_arch}
 %dir %{_libdir}/ruby/site_ruby/%{rb_ver}/satsolver
 %{_libdir}/ruby/site_ruby/%{rb_ver}/satsolver/*.rb
