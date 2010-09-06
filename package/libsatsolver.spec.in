@@ -1,3 +1,8 @@
+%if 0%{?fedora_version}
+%{!?ruby_sitelib: %global ruby_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
+%{!?ruby_sitearch: %global ruby_sitearch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"] ')}
+%endif
+
 Name:           libsatsolver
 Version:        @VERSION@
 Release:        1
@@ -220,8 +225,8 @@ rm -rf "$RPM_BUILD_ROOT"
 %{ruby_sitearchdir}/satsolver.so
 %endif
 %if 0%{?fedora_version}
-%dir %{ruby_sitelibdir}/satsolver
-%{ruby_sitelibdir}/satsolver.rb
+%dir %{ruby_sitelib}/satsolver
+%{ruby_sitelib}/satsolver.rb
 %{ruby_sitearch}/satsolver.so
 %endif
 %doc bindings/ruby/html
