@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Sep  9 17:30:36 CEST 2010 - mls@suse.de
+
+- bump version to 0.16 to make it different from code11_3 branch
+- 0.16.0
+
+-------------------------------------------------------------------
 Mon Sep  6 13:50:02 UTC 2010 - dmacvicar@novell.com
 
 - ruby bindings: fix bugs regarding include path loading
