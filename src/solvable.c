@@ -180,7 +180,7 @@ unsigned int
 solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound)
 {
   if (!s->repo)
-    return 0;
+    return notfound;
   return repo_lookup_num(s->repo, s - s->repo->pool->solvables, keyname, notfound);
 }
 

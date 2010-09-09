@@ -1227,7 +1227,7 @@ void
 solver_freedupmaps(Solver *solv)
 {
   map_free(&solv->dupmap);
-  /* wee no longer free solv->dupinvolvedmap as we need it in
+  /* we no longer free solv->dupinvolvedmap as we need it in
    * policy's priority pruning code. sigh. */
 }
 
