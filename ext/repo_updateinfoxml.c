@@ -6,6 +6,7 @@
  */
 
 #define _GNU_SOURCE
+#define _XOPEN_SOURCE /* glibc2 needs this */
 #include <sys/types.h>
 #include <limits.h>
 #include <fcntl.h>
@@ -13,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <expat.h>
+#include <time.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -119,9 +121,29 @@ struct parsedata {
 };
 
 /*
+ * Convert date strings ("1287746075" or "2010-10-22 13:14:35")
+ * to timestamp.
+ */
+static time_t
+datestr2timestamp(const char *date)
+{
+  if (!date)
+    return 0;
+
+  if (strlen(date) == strspn(date, "0123456789"))
+    return atoi(date);
+
+  struct tm tm;
+  memset(&tm, 0, sizeof(tm));
+  if (!strptime(date, "%F%T", &tm))
+    return 0;
+  return timegm(&tm);
+}
+
+/*
  * if we have seen a <filename>...
  * inside of <package>...
- * 
+ *
  *
  * If not, we must insert an empty filename to UPDATE_COLLECTION_FILENAME
  * at </package> in order to keep all UPDATE_COLLECTION_* arrays in sync
@@ -263,11 +285,11 @@ startElement(void *userData, const char *name, const char **atts)
 	    else if (!strcmp(*atts, "version"))
 	      version = atts[1];
 	  }
-	
+
 
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 	pd->datanum = pd->solvable - pool->solvables;
-	
+
 	solvable->vendor = str2id(pool, from, 1);
 	solvable->evr = str2id(pool, version, 1);
 	solvable->arch = ARCH_NOARCH;
@@ -296,13 +318,7 @@ startElement(void *userData, const char *name, const char **atts)
 	  }
 	if (date)
 	  {
-	    if (strlen(date) == strspn(date, "0123456789"))
-	      repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, atoi(date));
-	    else
-	      {
-		/* FIXME: must convert to interger! */
-	        repodata_set_str(pd->data, pd->datanum, SOLVABLE_BUILDTIME, date);
-	      }
+	    repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, datestr2timestamp(date));
 	  }
       }
       break;
@@ -351,13 +367,13 @@ startElement(void *userData, const char *name, const char **atts)
       /* <collection short="F8" */
     case STATE_COLLECTION:
       break;
-      /* <name>Fedora 8</name> */ 
+      /* <name>Fedora 8</name> */
     case STATE_NAME:
       break;
       /*   <package arch="ppc64" name="imlib-debuginfo" release="6.fc8"
        *            src="http://download.fedoraproject.org/pub/fedora/linux/updates/8/ppc64/imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm"
        *            version="1.9.15">
-       * 
+       *
        *
        * -> patch.conflicts: {name} < {version}.{release}
        */
@@ -397,7 +413,7 @@ startElement(void *userData, const char *name, const char **atts)
 	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
         break;
       }
-      /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
+      /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
     case STATE_FILENAME:
       break;
@@ -473,7 +489,7 @@ endElement(void *userData, const char *name)
        */
     case STATE_DESCRIPTION:
       repodata_set_str(pd->data, pd->datanum, SOLVABLE_DESCRIPTION, pd->content);
-      break;   
+      break;
       /*
        * <message>Warning! ...</message>
        */
@@ -490,7 +506,7 @@ endElement(void *userData, const char *name)
       repodata_add_flexarray(pd->data, pd->datanum, UPDATE_COLLECTION, pd->collhandle);
       pd->collhandle = 0;
       break;
-      /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */ 
+      /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
     case STATE_FILENAME:
       repodata_set_str(pd->data, pd->collhandle, UPDATE_COLLECTION_FILENAME, pd->content);
