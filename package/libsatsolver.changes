@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Oct 22 15:51:11 CEST 2010 - ma@suse.de
+
+- updateinfoxml: Correctly parse 'issued date' field.
+- 0.16.1
+
+-------------------------------------------------------------------
 Thu Sep  9 17:30:36 CEST 2010 - mls@suse.de
 
 - bump version to 0.16 to make it different from code11_3 branch
