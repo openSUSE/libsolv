@@ -212,7 +212,8 @@ void
 usage(char** argv)
 {
 
-  printf("%s: <arch> <patchnameprefix> [repos] [--updaterepos] [repos]...\n"
+  printf("%s: <arch> <patchnameprefix>  [--install-available] [repos] [--updaterepos] [repos]...\n"
+      "\t --install-available: installation repository is available during update\n"
       "\t repos: repository ending in\n"
       "\t\tpackages, packages.gz, primary.xml.gz, updateinfo.xml.gz or .solv\n",
       argv[0]);
@@ -220,25 +221,308 @@ usage(char** argv)
   exit(1);
 }
 
+typedef struct {
+  int updatestart;
+  int shown;
+  int status;
+  int install_available;
+  Repo *repo;
+  Repo *instrepo;
+} context_t;
+
+#define SHOW_PATCH(c) if (!(c)->shown++) printf("%s:\n", solvable2str(pool, s));
+#define PERF_DEBUGGING 0
+ 
+static Pool *pool;
+
+void
+test_all_old_patches_included(context_t *c, Id pid)
+{
+  Id p, pp;
+  Id con, *conp;
+  Solvable *s = pool->solvables + pid;
+  /* Test 1: are all old patches included */
+  FOR_PROVIDES(p, pp, s->name)
+    {
+      Solvable *s2 = pool->solvables + p;
+      Id con2, *conp2;
+
+      if (!s2->conflicts)
+        continue;
+      if (evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) <= 0)
+        continue;
+      conp2 = s2->repo->idarraydata + s2->conflicts;
+      while ((con2 = *conp2++) != 0)
+        {
+          Reldep *rd2, *rd;
+          if (!ISRELDEP(con2))
+            continue;
+          rd2 = GETRELDEP(pool, con2);
+          conp = s->repo->idarraydata + s->conflicts;
+          while ((con = *conp++) != 0)
+            {
+              if (!ISRELDEP(con))
+                continue;
+              rd = GETRELDEP(pool, con);
+              if (rd->name == rd2->name)
+                break;
+            }
+          if (!con)
+            {
+              SHOW_PATCH(c);
+              printf("  %s contained %s\n", solvable2str(pool, s2), dep2str(pool, rd2->name));
+            }
+          else
+           {
+             if (evrcmp(pool, rd->evr, rd2->evr, EVRCMP_COMPARE) < 0)
+               {
+                 SHOW_PATCH(c);
+                 printf("  %s required newer version %s-%s of %s-%s\n",
+                     solvable2str(pool, s2), dep2str(pool, rd2->name), dep2str(pool, rd2->evr),
+                     dep2str(pool, rd->name), dep2str(pool, rd->evr));
+               }
+           }
+
+        }
+    }
+}
+
+void
+test_all_packages_installable(context_t *c, Id pid)
+{
+  Solver *solv;
+  Queue job;
+  Id p, pp;
+  Id con, *conp;
+  unsigned int now, solver_runs;
+  int i;
+  Solvable *s = pool->solvables + pid;
+
+  queue_init(&job);
+
+  now = sat_timems(0);
+  solver_runs = 0;
+
+  conp = s->repo->idarraydata + s->conflicts;
+  while ((con = *conp++) != 0)
+    {
+      FOR_PROVIDES(p, pp, con)
+        {
+          queue_empty(&job);
+          queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_WEAK);
+          queue_push(&job, p);
+
+          /* also set up some minimal system */
+          queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES|SOLVER_WEAK);
+          queue_push(&job, str2id(pool, "rpm", 1));
+          queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES|SOLVER_WEAK);
+          queue_push(&job, str2id(pool, "aaa_base", 1));
+
+          solv = solver_create(pool);
+          solv->dontinstallrecommended = 0;
+          ++solver_runs;
+          solver_solve(solv, &job);
+          if (solv->problems.count)
+            {
+              c->status = 1;
+              printf("error installing original package\n");
+              showproblems(solv, s, 0, 0);
+            }
+          toinst(solv, c->repo, c->instrepo);
+          solver_free(solv);
+
+#if 0
+          dump_instrepo(instrepo, pool);
+
+#endif
+          if (!c->install_available)
+            {
+              queue_empty(&job);
+              for (i = 1; i < c->updatestart; i++)
+                {
+                  if (pool->solvables[i].repo != c->repo || i == pid)
+                    continue;
+                  queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE);
+                  queue_push(&job, i);
+                }
+            }
+          queue_push(&job, SOLVER_INSTALL_SOLVABLE);
+          queue_push(&job, pid);
+          solv = solver_create(pool);
+          /*solv->dontinstallrecommended = 1;*/
+          ++solver_runs;
+          solver_solve(solv, &job);
+          if (solv->problems.count)
+            {
+              c->status = 1;
+              showproblems(solv, s, 0, 0);
+            }
+          frominst(solv, c->repo, c->instrepo);
+          solver_free(solv);
+        }
+    }
+
+  if (PERF_DEBUGGING)
+    printf("  test_all_packages_installable took %d ms in %d runs\n", sat_timems(now), solver_runs);
+}
+
+void
+test_can_upgrade_all_packages(context_t *c, Id pid)
+{
+  Solver *solv;
+  Id p;
+  Id con, *conp;
+  Queue job;
+  Queue cand;
+  Queue badguys;
+  int i, j;
+  unsigned int now, solver_runs;
+  Solvable *s = pool->solvables + pid;
+
+  queue_init(&job);
+  queue_init(&cand);
+  queue_init(&badguys);
+
+  now = sat_timems(0);
+  solver_runs = 0;
+
+  /* Test 3: can we upgrade all packages? */
+  for (p = 1; p < pool->nsolvables; p++)
+    {
+      Solvable *s = pool->solvables + p;
+      if (!s->repo)
+        continue;
+      if (strchr(id2str(pool, s->name), ':'))
+        continue;	/* only packages, please */
+      if (!pool_installable(pool, s))
+        continue;
+      queue_push(&cand, p);
+    }
+  while (cand.count)
+    {
+      solv = solver_create(pool);
+      queue_empty(&job);
+      for (i = 0; i < badguys.count; i++)
+        {
+          queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE|SOLVER_WEAK);
+          queue_push(&job, badguys.elements[i]);
+        }
+      conp = s->repo->idarraydata + s->conflicts;
+      while ((con = *conp++) != 0)
+        {
+          queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES|SOLVER_WEAK);
+          queue_push(&job, con);
+        }
+      for (i = 0; i < cand.count; i++)
+        {
+          p = cand.elements[i];
+          queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_WEAK);
+          queue_push(&job, p);
+        }
+      ++solver_runs;
+      solver_solve(solv, &job);
+#if 0
+      solver_printdecisions(solv);
+#endif
+      /* put packages into installed repo and prune them from cand */
+      toinst(solv, c->repo, c->instrepo);
+      for (i = 0; i < cand.count; i++)
+        {
+          p = cand.elements[i];
+          if (p > 0 && solv->decisionmap[p] > 0)
+            cand.elements[i] = -p;	/* drop candidate */
+        }
+      solver_free(solv);
+
+      /* now the interesting part: test patch */
+      queue_empty(&job);
+      if (!c->install_available)
+        {
+          for (i = 1; i < c->updatestart; i++)
+            {
+              if (pool->solvables[i].repo != c->repo || i == pid)
+                continue;
+              queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE);
+              queue_push(&job, i);
+            }
+        }
+      queue_push(&job, SOLVER_INSTALL_SOLVABLE);
+      queue_push(&job, pid);
+      solv = solver_create(pool);
+      solv->dontinstallrecommended = 1;
+      ++solver_runs;
+      solver_solve(solv, &job);
+
+      if (solv->problems.count)
+        {
+          c->status = 1;
+          showproblems(solv, s, &cand, &badguys);
+        }
+      frominst(solv, c->repo, c->instrepo);
+      solver_free(solv);
+      /* now drop all negative elements from cand */
+      for (i = j = 0; i < cand.count; i++)
+        {
+          if (cand.elements[i] < 0)
+            continue;
+          cand.elements[j++] = cand.elements[i];
+        }
+      if (i == j)
+        break;	/* no progress */
+      cand.count = j;
+    }
+  if (PERF_DEBUGGING)
+    printf("  test_can_upgrade_all_packages took %d ms in %d runs\n", sat_timems(now), solver_runs);
+}
+
+void
+test_no_ga_package_fulfills_dependency(context_t *c, Id pid)
+{
+  Id con, *conp;
+  Solvable *s = pool->solvables + pid;
+
+  /* Test 4: no GA package fulfills patch dependency */
+  conp = s->repo->idarraydata + s->conflicts;
+  while ((con = *conp++) != 0)
+    {
+      Reldep *rd;
+      Id rp, rpp;
+
+      if (!ISRELDEP(con))
+        continue;
+      rd = GETRELDEP(pool, con);
+      FOR_PROVIDES(rp, rpp, rd->name)
+        {
+          Solvable *s2 = pool_id2solvable(pool, rp);
+          if (rp < c->updatestart
+              && evrcmp(pool, rd->evr, s2->evr, EVRCMP_COMPARE) < 0
+              && pool_match_nevr_rel(pool, s2, rd->name)
+             )
+            {
+              SHOW_PATCH(c);
+              printf("  conflict %s < %s satisfied by non-updated package %s\n",
+                  dep2str(pool, rd->name), dep2str(pool, rd->evr), solvable2str(pool, s2));
+              break;
+            }
+        }
+    }
+}
+
 int
 main(int argc, char **argv)
 {
-  Pool *pool;
   char *arch, *mypatch;
   const char *pname;
   int l;
   FILE *fp;
-  int i, j;
-  Queue job;
-  Queue cand;
-  Queue badguys;
+  int i;
   Id pid, p, pp;
-  Id con, *conp;
-  Solver *solv;
-  Repo *repo, *instrepo;
-  int status = 0;
   int tests = 0;
-  int updatestart = 0;
+  context_t c;
+
+  c.install_available = 0;
+  c.updatestart = 0;
+  c.status = 0;
 
   if (argc <= 3)
     usage(argv);
@@ -255,15 +539,22 @@ main(int argc, char **argv)
 
   mypatch = argv[2];
 
-  repo = repo_create(pool, 0);
-  instrepo = repo_create(pool, 0);
+  c.repo = repo_create(pool, 0);
+  c.instrepo = repo_create(pool, 0);
   for (i = 3; i < argc; i++)
     {
       if (!strcmp(argv[i], "--updaterepos"))
 	{
-	  updatestart = pool->nsolvables;
+	  c.updatestart = pool->nsolvables;
 	  continue;
 	}
+
+      if (!strcmp(argv[i], "--install-available"))
+	{
+	  c.install_available = 1;
+	  continue;
+	}
+ 
       l = strlen(argv[i]);
       if (!strcmp(argv[i], "-"))
         fp = stdin;
@@ -274,21 +565,21 @@ main(int argc, char **argv)
         }
       if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
         {
-          repo_add_susetags(repo, fp, 0, 0, 0);
+          repo_add_susetags(c.repo, fp, 0, 0, 0);
         }
       else if (l >= 11 && !strcmp(argv[i] + l - 11, "packages.gz"))
         {
-          repo_add_susetags(repo, fp, 0, 0, 0);
+          repo_add_susetags(c.repo, fp, 0, 0, 0);
         }
       else if (l >= 14 && !strcmp(argv[i] + l - 14, "primary.xml.gz"))
         {
-          repo_add_rpmmd(repo, fp, 0, 0);
+          repo_add_rpmmd(c.repo, fp, 0, 0);
         }
       else if (l >= 17 && !strcmp(argv[i] + l - 17, "updateinfo.xml.gz"))
 	{
-          repo_add_updateinfoxml(repo, fp, 0);
+          repo_add_updateinfoxml(c.repo, fp, 0);
 	}
-      else if (repo_add_solv(repo, fp))
+      else if (repo_add_solv(c.repo, fp))
         {
           fprintf(stderr, "could not add repo %s\n", argv[i]);
           exit(1);
@@ -300,23 +591,18 @@ main(int argc, char **argv)
   pool_addfileprovides(pool);
 
   /* bad hack ahead: clone repo */
-  instrepo->idarraydata = repo->idarraydata;
-  instrepo->idarraysize = repo->idarraysize;
-  instrepo->start = repo->start;
-  instrepo->end = repo->end;
-  instrepo->nsolvables = repo->nsolvables;	/* sic! */
-  instrepo->lastoff = repo->lastoff;	/* sic! */
-  pool_set_installed(pool, instrepo);
+  c.instrepo->idarraydata = c.repo->idarraydata;
+  c.instrepo->idarraysize = c.repo->idarraysize;
+  c.instrepo->start = c.repo->start;
+  c.instrepo->end = c.repo->end;
+  c.instrepo->nsolvables = c.repo->nsolvables;	/* sic! */
+  c.instrepo->lastoff = c.repo->lastoff;	/* sic! */
+  pool_set_installed(pool, c.instrepo);
   pool_createwhatprovides(pool);
-
-  queue_init(&job);
-  queue_init(&cand);
-  queue_init(&badguys);
 
   for (pid = 1; pid < pool->nsolvables; pid++)
     {
-      int shown = 0;
-#define SHOW_PATCH() if (!shown++) printf("%s:\n", solvable2str(pool, s));
+      c.shown = 0;
       Solvable *s = pool->solvables + pid;
       if (!s->repo)
         continue;
@@ -360,230 +646,11 @@ main(int argc, char **argv)
       printf("testing patch %s-%s\n", pname + 6, id2str(pool, s->evr));
 #endif
 
-      if (1) {
-
-      /* Test 1: are all old patches included */
-      FOR_PROVIDES(p, pp, s->name)
-        {
-	  Solvable *s2 = pool->solvables + p;
-	  Id con2, *conp2;
-
-	  if (!s2->conflicts)
-	    continue;
-	  if (evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) <= 0)
-	    continue;
-	  conp2 = s2->repo->idarraydata + s2->conflicts;
-          while ((con2 = *conp2++) != 0)
-	    {
-	      Reldep *rd2, *rd;
-	      if (!ISRELDEP(con2))
-		continue;
-	      rd2 = GETRELDEP(pool, con2);
-	      conp = s->repo->idarraydata + s->conflicts;
-	      while ((con = *conp++) != 0)
-		{
-		  if (!ISRELDEP(con))
-		    continue;
-		  rd = GETRELDEP(pool, con);
-		  if (rd->name == rd2->name)
-		    break;
-		}
-	      if (!con)
-		{
-                  SHOW_PATCH();
-		  printf("  %s contained %s\n", solvable2str(pool, s2), dep2str(pool, rd2->name));
-		}
-              else
-               {
-                 if (evrcmp(pool, rd->evr, rd2->evr, EVRCMP_COMPARE) < 0)
-                   {
-                     SHOW_PATCH();
-                     printf("  %s required newer version %s-%s of %s-%s\n",
-                         solvable2str(pool, s2), dep2str(pool, rd2->name), dep2str(pool, rd2->evr),
-                         dep2str(pool, rd->name), dep2str(pool, rd->evr));
-                   }
-               }
-	
-	    }
-	}
-      }
-
-      if (1) {
-      /* Test 2: are the packages installable */
-      conp = s->repo->idarraydata + s->conflicts;
-      while ((con = *conp++) != 0)
-	{
-	  FOR_PROVIDES(p, pp, con)
-	    {
-	      queue_empty(&job);
-	      queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_WEAK);
-	      queue_push(&job, p);
-
-	      /* also set up some minimal system */
-	      queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES|SOLVER_WEAK);
-	      queue_push(&job, str2id(pool, "rpm", 1));
-	      queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES|SOLVER_WEAK);
-	      queue_push(&job, str2id(pool, "aaa_base", 1));
-
-	      solv = solver_create(pool);
-	      solv->dontinstallrecommended = 0;
-	      solver_solve(solv, &job);
-	      if (solv->problems.count)
-		{
-		  status = 1;
-                  printf("error installing original package\n");
-		  showproblems(solv, s, 0, 0);
-		}
-	      toinst(solv, repo, instrepo);
-	      solver_free(solv);
-
-#if 0
-              dump_instrepo(instrepo, pool);
-
-#endif
-#if 1
-	      queue_empty(&job);
-	      for (i = 1; i < updatestart; i++)
-		{
-		  if (pool->solvables[i].repo != repo || i == pid)
-		    continue;
-		  queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE);
-		  queue_push(&job, i);
-		}
-	      queue_push(&job, SOLVER_INSTALL_SOLVABLE);
-	      queue_push(&job, pid);
-	      solv = solver_create(pool);
-	      /*solv->dontinstallrecommended = 1;*/
-	      solver_solve(solv, &job);
-	      if (solv->problems.count)
-		{
-		  status = 1;
-		  showproblems(solv, s, 0, 0);
-		}
-	      frominst(solv, repo, instrepo);
-	      solver_free(solv);
-#endif
-	    }
-	}
-      }
-
-      if (1) {
-
-      /* Test 3: can we upgrade all packages? */
-      queue_empty(&cand);
-      queue_empty(&badguys);
-      for (p = 1; p < pool->nsolvables; p++)
-	{
-	  Solvable *s = pool->solvables + p;
-          if (!s->repo)
-	    continue;
-          if (strchr(id2str(pool, s->name), ':'))
-	    continue;	/* only packages, please */
-	  if (!pool_installable(pool, s))
-	    continue;
-	  queue_push(&cand, p);
-	}
-      while (cand.count)
-	{
-	  solv = solver_create(pool);
-	  queue_empty(&job);
-	  for (i = 0; i < badguys.count; i++)
-	    {
-	      queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE|SOLVER_WEAK);
-	      queue_push(&job, badguys.elements[i]);
-	    }
-	  conp = s->repo->idarraydata + s->conflicts;
-          while ((con = *conp++) != 0)
-	    {
-	      queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES|SOLVER_WEAK);
-	      queue_push(&job, con);
-	    }
-	  for (i = 0; i < cand.count; i++)
-	    {
-	      p = cand.elements[i];
-	      queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_WEAK);
-	      queue_push(&job, p);
-	    }
-	  solver_solve(solv, &job);
-#if 0
-	  solver_printdecisions(solv);
-#endif
-	  /* put packages into installed repo and prune them from cand */
-          toinst(solv, repo, instrepo);
-	  for (i = 0; i < cand.count; i++)
-	    {
-	      p = cand.elements[i];
-	      if (p > 0 && solv->decisionmap[p] > 0)
-		cand.elements[i] = -p;	/* drop candidate */
-	    }
-	  solver_free(solv);
-
-	  /* now the interesting part: test patch */
-	  queue_empty(&job);
-#if 0
-	  for (i = 1; i < updatestart; i++)
-	    {
-	      if (pool->solvables[i].repo != repo || i == pid)
-		continue;
-	      queue_push(&job, SOLVER_ERASE|SOLVER_SOLVABLE);
-	      queue_push(&job, i);
-	    }
-#endif
-	  queue_push(&job, SOLVER_INSTALL_SOLVABLE);
-	  queue_push(&job, pid);
-	  solv = solver_create(pool);
-	  solv->dontinstallrecommended = 1;
-	  solver_solve(solv, &job);
-
-	  if (solv->problems.count)
-	    {
-	      status = 1;
-	      showproblems(solv, s, &cand, &badguys);
-	    }
-          frominst(solv, repo, instrepo);
-	  solver_free(solv);
-	  /* now drop all negative elements from cand */
-	  for (i = j = 0; i < cand.count; i++)
-	    {
-	      if (cand.elements[i] < 0)
-		continue;
-	      cand.elements[j++] = cand.elements[i];
-	    }
-	  if (i == j)
-	    break;	/* no progress */
-	  cand.count = j;
-	}
-      }
-
-      if (1)
-        {
-          /* Test 4: no GA package fulfills patch dependency */
-          conp = s->repo->idarraydata + s->conflicts;
-          while ((con = *conp++) != 0)
-            {
-              Reldep *rd;
-              Id rp, rpp;
-
-              if (!ISRELDEP(con))
-                continue;
-              rd = GETRELDEP(pool, con);
-              FOR_PROVIDES(rp, rpp, rd->name)
-                {
-                  Solvable *s2 = pool_id2solvable(pool, rp);
-                  if (rp < updatestart
-                      && evrcmp(pool, rd->evr, s2->evr, EVRCMP_COMPARE) < 0
-                      && pool_match_nevr_rel(pool, s2, rd->name)
-                      )
-                    {
-                      SHOW_PATCH();
-                      printf("  conflict %s < %s satisfied by non-updated package %s\n",
-                          dep2str(pool, rd->name), dep2str(pool, rd->evr), solvable2str(pool, s2));
-                      break;
-                    }
-                }
-            }
-	}
+      test_all_old_patches_included(&c, pid);
+      test_all_packages_installable(&c, pid);
+      test_can_upgrade_all_packages(&c, pid);
+      test_no_ga_package_fulfills_dependency(&c, pid);
     }
 
-  exit(status);
+  exit(c.status);
 }

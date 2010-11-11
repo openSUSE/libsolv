@@ -215,6 +215,8 @@ evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
       if (r1 && !r2)
 	return 1;
     }
+  if (mode == EVRCMP_COMPARE_EVONLY)
+    return 0;
   if (r1 && r2)
     {
       if (s1 != ++r1 && s2 != ++r2)

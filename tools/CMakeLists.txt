@@ -4,11 +4,17 @@
 
 ADD_LIBRARY(toolstuff STATIC common_write.c)
 
+IF ( NOT DEBIAN )
 ADD_EXECUTABLE(rpmdb2solv rpmdb2solv.c)
 TARGET_LINK_LIBRARIES(rpmdb2solv toolstuff satsolverext satsolver ${RPMDB_LIBRARY} ${EXPAT_LIBRARY})
 
 ADD_EXECUTABLE(rpms2solv rpms2solv.c)
 TARGET_LINK_LIBRARIES(rpms2solv toolstuff satsolverext satsolver ${RPMDB_LIBRARY})
+
+ADD_EXECUTABLE(findfileconflicts findfileconflicts.c)
+TARGET_LINK_LIBRARIES(findfileconflicts satsolverext satsolver ${RPMDB_LIBRARY})
+
+ENDIF ( NOT DEBIAN )
 
 ADD_EXECUTABLE(rpmmd2solv rpmmd2solv.c)
 TARGET_LINK_LIBRARIES(rpmmd2solv toolstuff satsolverext satsolver ${EXPAT_LIBRARY} ${ZLIB_LIBRARY})
@@ -40,21 +46,23 @@ TARGET_LINK_LIBRARIES(dumpsolv satsolver)
 ADD_EXECUTABLE(mergesolv mergesolv.c )
 TARGET_LINK_LIBRARIES(mergesolv toolstuff satsolverext satsolver)
 
-ADD_EXECUTABLE(findfileconflicts findfileconflicts.c)
-TARGET_LINK_LIBRARIES(findfileconflicts satsolverext satsolver ${RPMDB_LIBRARY})
-
 install(TARGETS
     mergesolv
     dumpsolv
     susetags2solv
     helix2solv
     rpmmd2solv
-    rpmdb2solv
-    rpms2solv
     updateinfoxml2solv
     deltainfoxml2solv
     repomdxml2solv
     DESTINATION ${BIN_INSTALL_DIR})
+
+IF ( NOT DEBIAN )
+install(TARGETS
+    rpmdb2solv
+    rpms2solv
+    DESTINATION ${BIN_INSTALL_DIR})
+ENDIF ( NOT DEBIAN )
 
 install(PROGRAMS
    repo2solv.sh

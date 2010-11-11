@@ -114,7 +114,7 @@ static inline Id repo_add_solvable_block(Repo *repo, int count)
 
 static inline Repo *pool_id2repo(Pool *pool, Id repoid)
 {
-  return pool->repos[repoid - 1];
+  return repoid ? pool->repos[repoid - 1] : 0;
 }
 
 static inline int pool_installable(const Pool *pool, Solvable *s)

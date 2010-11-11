@@ -167,6 +167,8 @@ control2solvable(Solvable *s, Repodata *data, char *control)
   char *p, *q, *end, *tag;
   int x, l;
   int havesource = 0;
+  char checksum[32 * 2 + 1];
+  Id checksumtype = 0;
 
   p = control;
   while (*p)
@@ -239,6 +241,10 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  if (!strcasecmp(tag, "enhances"))
 	    s->enhances = makedeps(repo, q, s->enhances, 0);
 	  break;
+	case 'F' << 8 | 'I':
+	  if (!strcasecmp(tag, "filename"))
+	    repodata_set_location(data, s - pool->solvables, 0, 0, q);
+	  break;
 	case 'H' << 8 | 'O':
 	  if (!strcasecmp(tag, "homepage"))
 	    repodata_set_str(data, s - pool->solvables, SOLVABLE_URL, q);
@@ -246,6 +252,13 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	case 'I' << 8 | 'N':
 	  if (!strcasecmp(tag, "installed-size"))
 	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, atoi(q));
+	  break;
+	case 'M' << 8 | 'D':
+	  if (!strcasecmp(tag, "md5sum") && !checksumtype && strlen(q) == 16 * 2)
+	    {
+	      strcpy(checksum, q);
+	      checksumtype = REPOKEY_TYPE_MD5;
+	    }
 	  break;
 	case 'P' << 8 | 'A':
 	  if (!strcasecmp(tag, "package"))
@@ -262,6 +275,18 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	    s->obsoletes = makedeps(repo, q, s->conflicts, 0);
 	  else if (!strcasecmp(tag, "recommends"))
 	    s->recommends = makedeps(repo, q, s->recommends, 0);
+	  break;
+	case 'S' << 8 | 'H':
+	  if (!strcasecmp(tag, "sha1") && checksumtype != REPOKEY_TYPE_SHA256 && strlen(q) == 20 * 2)
+	    {
+	      strcpy(checksum, q);
+	      checksumtype = REPOKEY_TYPE_SHA1;
+	    }
+	  else if (!strcasecmp(tag, "sha256") && strlen(q) == 32 * 2)
+	    {
+	      strcpy(checksum, q);
+	      checksumtype = REPOKEY_TYPE_SHA256;
+	    }
 	  break;
 	case 'S' << 8 | 'O':
 	  if (!strcasecmp(tag, "source"))
@@ -291,6 +316,8 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	}
     }
+  if (checksumtype)
+    repodata_set_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, checksumtype, checksum);
   if (!s->arch)
     s->arch = ARCH_ALL;
   if (!s->evr)
@@ -299,6 +326,26 @@ control2solvable(Solvable *s, Repodata *data, char *control)
     s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   if (s->name && !havesource)
     repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
+  if (s->obsoletes)
+    {
+      /* obsoletes only count when the packages also conflict */
+      int i, j, k;
+      Id d;
+      for (i = j = s->obsoletes; (d = repo->idarraydata[i]) != 0; i++)
+	{
+	  if (s->conflicts)
+	    {
+	      for (k = s->conflicts; repo->idarraydata[k] != 0; k++)
+		if (repo->idarraydata[k] == d)
+		  break;
+	      if (repo->idarraydata[k])
+		{
+		  repo->idarraydata[j++] = d;
+		}
+	    }
+	}
+      repo->idarraydata[j] = 0;
+    }
 }
 
 void

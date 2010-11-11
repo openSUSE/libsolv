@@ -57,6 +57,7 @@ typedef enum {
   SOLVER_RULE_RPM_SAME_NAME,
   SOLVER_RULE_RPM_PACKAGE_OBSOLETES,
   SOLVER_RULE_RPM_IMPLICIT_OBSOLETES,
+  SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES,
   SOLVER_RULE_UPDATE = 0x200,
   SOLVER_RULE_FEATURE = 0x300,
   SOLVER_RULE_JOB = 0x400,
@@ -121,6 +122,9 @@ void solver_reenablepolicyrules(struct _Solver *solv, int jobidx);
 int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
 SolverRuleinfo solver_ruleinfo(struct _Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
 
+/* misc functions */
+void solver_addchoicerules(struct _Solver *solv);
+void solver_disablechoicerules(struct _Solver *solv, Rule *r);
 
 #ifdef __cplusplus
 }

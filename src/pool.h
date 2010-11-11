@@ -80,6 +80,7 @@ struct _Pool {
   int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
   int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
   int obsoleteusescolors;	/* true: obsoletes check arch color */
+  int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
   int novirtualconflicts;	/* true: conflicts on names, not on provides */
   int allowselfconflicts;	/* true: packages which conflict with itself are installable */
 #ifdef MULTI_SEMANTICS

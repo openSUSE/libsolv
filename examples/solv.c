@@ -7,7 +7,18 @@
 
 /* solv, a little software installer demoing the sat solver library */
 
-/* things available in the library but missing from solv:
+/* things it does:
+ * - understands globs for package names / dependencies
+ * - understands .arch suffix
+ * - installation of commandline packages
+ * - repository data caching
+ * - on demand loading of secondary repository data
+ * - gpg and checksum verification
+ * - file conflicts
+ * - deltarpm support
+ * - fastestmirror implementation
+ *
+ * things available in the library but missing from solv:
  * - vendor policy loading
  * - soft locks file handling
  * - multi version handling
@@ -28,6 +39,8 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/dir.h>
+#include <sys/stat.h>
 
 #include <sys/socket.h>
 #include <netdb.h>
@@ -46,7 +59,11 @@
 #include "repo_solv.h"
 
 #include "repo_write.h"
+#ifndef DEBIAN
 #include "repo_rpmdb.h"
+#else
+#include "repo_deb.h"
+#endif
 #include "repo_products.h"
 #include "repo_rpmmd.h"
 #include "repo_susetags.h"
@@ -86,6 +103,8 @@ struct repoinfo {
   int priority;
   int keeppackages;
   int metadata_expire;
+  char **components;
+  int ncomponents;
 
   unsigned char cookie[32];
   unsigned char extcookie[32];
@@ -170,6 +189,7 @@ yum_substitute(Pool *pool, char *line)
 #define TYPE_SUSETAGS	1
 #define TYPE_RPMMD	2
 #define TYPE_PLAINDIR	3
+#define TYPE_DEBIAN     4
 
 static int
 read_repoinfos_sort(const void *ap, const void *bp)
@@ -178,6 +198,8 @@ read_repoinfos_sort(const void *ap, const void *bp)
   const struct repoinfo *b = bp;
   return strcmp(a->alias, b->alias);
 }
+
+#ifndef DEBIAN
 
 struct repoinfo *
 read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
@@ -200,6 +222,8 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
     }
   while ((ent = readdir(dir)) != 0)
     {
+      if (ent->d_name[0] == '.')
+	continue;
       l = strlen(ent->d_name);
       if (l < 6 || rdlen + 2 + l >= sizeof(buf) || strcmp(ent->d_name + l - 5, ".repo") != 0)
 	continue;
@@ -308,10 +332,126 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
   return repoinfos;
 }
 
+#else
+
+struct repoinfo *
+read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
+{
+  FILE *fp;
+  char buf[4096];
+  char buf2[4096];
+  int l;
+  char *kp, *url, *distro;
+  struct repoinfo *repoinfos = 0, *cinfo;
+  int nrepoinfos = 0;
+  DIR *dir = 0;
+  struct dirent *ent;
+
+  fp = fopen("/etc/apt/sources.list", "r");
+  while (1)
+    {
+      if (!fp)
+	{
+	  if (!dir)
+	    {
+	      dir = opendir("/etc/apt/sources.list.d");
+	      if (!dir)
+		break;
+	    }
+	  if ((ent = readdir(dir)) == 0)
+	    {
+	      closedir(dir);
+	      break;
+	    }
+	  if (ent->d_name[0] == '.')
+	    continue;
+	  l = strlen(ent->d_name);
+	  if (l < 5 || strcmp(ent->d_name + l - 5, ".list") != 0)
+	    continue;
+	  snprintf(buf, sizeof(buf), "%s/%s", "/etc/apt/sources.list.d", ent->d_name);
+	  if (!(fp = fopen(buf, "r")))
+	    continue;
+	}
+      while(fgets(buf2, sizeof(buf2), fp))
+	{
+	  l = strlen(buf2);
+	  if (l == 0)
+	    continue;
+	  while (l && (buf2[l - 1] == '\n' || buf2[l - 1] == ' ' || buf2[l - 1] == '\t'))
+	    buf2[--l] = 0;
+	  kp = buf2;
+	  while (*kp == ' ' || *kp == '\t')
+	    kp++;
+	  if (!*kp || *kp == '#')
+	    continue;
+	  if (strncmp(kp, "deb", 3) != 0)
+	    continue;
+	  kp += 3;
+	  if (*kp != ' ' && *kp != '\t')
+	    continue;
+	  while (*kp == ' ' || *kp == '\t')
+	    kp++;
+	  if (!*kp)
+	    continue;
+	  url = kp;
+	  while (*kp && *kp != ' ' && *kp != '\t')
+	    kp++;
+	  if (*kp)
+	    *kp++ = 0;
+	  while (*kp == ' ' || *kp == '\t')
+	    kp++;
+	  if (!*kp)
+	    continue;
+	  distro = kp;
+	  while (*kp && *kp != ' ' && *kp != '\t')
+	    kp++;
+	  if (*kp)
+	    *kp++ = 0;
+	  while (*kp == ' ' || *kp == '\t')
+	    kp++;
+	  if (!*kp)
+	    continue;
+	  repoinfos = sat_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
+	  cinfo = repoinfos + nrepoinfos++;
+	  memset(cinfo, 0, sizeof(*cinfo));
+	  cinfo->baseurl = strdup(url);
+	  cinfo->alias = sat_dupjoin(url, "/", distro);
+	  cinfo->name = strdup(distro);
+	  cinfo->type = TYPE_DEBIAN;
+	  cinfo->enabled = 1;
+	  cinfo->autorefresh = 1;
+	  cinfo->repo_gpgcheck = 1;
+	  cinfo->metadata_expire = METADATA_EXPIRE;
+	  while (*kp)
+	    {
+	      char *compo;
+	      while (*kp == ' ' || *kp == '\t')
+		kp++;
+	      if (!*kp)
+		break;
+	      compo = kp;
+	      while (*kp && *kp != ' ' && *kp != '\t')
+		kp++;
+	      if (*kp)
+		*kp++ = 0;
+	      cinfo->components = sat_extend(cinfo->components, cinfo->ncomponents, 1, sizeof(*cinfo->components), 15);
+	      cinfo->components[cinfo->ncomponents++] = strdup(compo);
+	    }
+	}
+      fclose(fp);
+      fp = 0;
+    }
+  qsort(repoinfos, nrepoinfos, sizeof(*repoinfos), read_repoinfos_sort);
+  *nrepoinfosp = nrepoinfos;
+  return repoinfos;
+}
+
+#endif
+
 void
 free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
 {
-  int i;
+  int i, j;
   for (i = 0; i < nrepoinfos; i++)
     {
       struct repoinfo *cinfo = repoinfos + i;
@@ -321,6 +461,9 @@ free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
       sat_free(cinfo->metalink);
       sat_free(cinfo->mirrorlist);
       sat_free(cinfo->baseurl);
+      for (j = 0; j < cinfo->ncomponents; j++)
+        sat_free(cinfo->components[j]);
+      sat_free(cinfo->components);
     }
   sat_free(repoinfos);
 }
@@ -749,6 +892,8 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
   return fdopen(fd, "r");
 }
 
+#ifndef DEBIAN
+
 static void
 cleanupgpg(char *gpgdir)
 {
@@ -830,6 +975,25 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   cleanupgpg(gpgdir);
   return r == 0 ? 1 : 0;
 }
+
+#else
+
+int
+checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
+{
+  char cmd[256];
+  int r;
+
+  snprintf(cmd, sizeof(cmd), "gpgv -q --keyring /etc/apt/trusted.gpg /dev/fd/%d /dev/fd/%d >/dev/null 2>&1", fileno(sigfp), fileno(fp));
+  fcntl(fileno(fp), F_SETFD, 0);	/* clear CLOEXEC */
+  fcntl(fileno(sigfp), F_SETFD, 0);	/* clear CLOEXEC */
+  r = system(cmd);
+  fcntl(fileno(fp), F_SETFD, FD_CLOEXEC);
+  fcntl(fileno(sigfp), F_SETFD, FD_CLOEXEC);
+  return r == 0 ? 1 : 0;
+}
+
+#endif
 
 #define CHKSUM_IDENT "1.1"
 
@@ -924,9 +1088,11 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
 
   flags = 0;
   if (repoext)
-    flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
-  if (repoext && strcmp(repoext, "DL") != 0)
-    flags |= REPO_LOCALPOOL;	/* no local pool for DL so that we can compare IDs */
+    {
+      flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
+      if (strcmp(repoext, "DL") != 0)
+        flags |= REPO_LOCALPOOL;	/* no local pool for DL so that we can compare IDs */
+    }
 
   if (repo_add_solv_flags(repo, fp, flags))
     {
@@ -1071,8 +1237,10 @@ static Pool *
 read_sigs()
 {
   Pool *sigpool = pool_create();
+#ifndef DEBIAN
   Repo *repo = repo_create(sigpool, "rpmdbkeys");
   repo_add_rpmdb_pubkeys(repo, 0, 0);
+#endif
   return sigpool;
 }
 
@@ -1339,6 +1507,159 @@ load_stub(Pool *pool, Repodata *data, void *dp)
 
 static unsigned char installedcookie[32];
 
+#ifdef DEBIAN
+void
+repo_add_debdb(Repo *repo, int flags)
+{
+  FILE *fp;
+  if ((fp = fopen("/var/lib/dpkg/status", "r")) == 0)
+    {
+      perror("/var/lib/dpkg/status");
+      exit(1);
+    }
+  repo_add_debpackages(repo, fp, flags);
+  fclose(fp);
+}
+
+static int
+hexstr2bytes(unsigned char *buf, const char *str, int buflen)
+{
+  int i;
+  for (i = 0; i < buflen; i++) 
+    {    
+#define c2h(c) (((c)>='0' && (c)<='9') ? ((c)-'0')              \
+                : ((c)>='a' && (c)<='f') ? ((c)-('a'-10))       \
+                : ((c)>='A' && (c)<='F') ? ((c)-('A'-10))       \
+                : -1)
+      int v = c2h(*str);
+      str++;
+      if (v < 0) 
+        return 0;
+      buf[i] = v; 
+      v = c2h(*str);
+      str++;
+      if (v < 0) 
+        return 0;
+      buf[i] = (buf[i] << 4) | v; 
+#undef c2h
+    }    
+  return buflen;
+}
+
+const char *
+debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsigned char **chksump, Id *chksumtypep)
+{
+  char buf[4096];
+  Id chksumtype;
+  unsigned char *chksum;
+  Id curchksumtype;
+  int l, compl;
+  char *ch, *fn, *bp;
+  char *filename;
+  static char *basearch;
+  char *binarydir;
+  int lbinarydir;
+
+  if (!basearch)
+    {
+      struct utsname un;
+      if (uname(&un))
+	{
+	  perror("uname");
+	  exit(1);
+	}
+      basearch = strdup(un.machine);
+      if (basearch[0] == 'i' && basearch[1] && !strcmp(basearch + 2, "86"))
+	basearch[1] = '3';
+    }
+  binarydir = sat_dupjoin("binary-", basearch, "/");
+  lbinarydir = strlen(binarydir);
+  compl = strlen(comp);
+  rewind(fp);
+  curchksumtype = 0;
+  filename = 0;
+  chksum = sat_malloc(32);
+  chksumtype = 0;
+  while(fgets(buf, sizeof(buf), fp))
+    {
+      l = strlen(buf);
+      if (l == 0)
+	continue;
+      while (l && (buf[l - 1] == '\n' || buf[l - 1] == ' ' || buf[l - 1] == '\t'))
+	buf[--l] = 0;
+      if (!strncasecmp(buf, "MD5Sum:", 7))
+	{
+	  curchksumtype = REPOKEY_TYPE_MD5;
+	  continue;
+	}
+      if (!strncasecmp(buf, "SHA1:", 5))
+	{
+	  curchksumtype = REPOKEY_TYPE_SHA1;
+	  continue;
+	}
+      if (!strncasecmp(buf, "SHA256:", 7))
+	{
+	  curchksumtype = REPOKEY_TYPE_SHA256;
+	  continue;
+	}
+      if (!curchksumtype)
+	continue;
+      bp = buf;
+      if (*bp++ != ' ')
+	{
+	  curchksumtype = 0;
+	  continue;
+	}
+      ch = bp;
+      while (*bp && *bp != ' ' && *bp != '\t')
+	bp++;
+      if (!*bp)
+	continue;
+      *bp++ = 0;
+      while (*bp == ' ' || *bp == '\t')
+	bp++;
+      while (*bp && *bp != ' ' && *bp != '\t')
+	bp++;
+      if (!*bp)
+	continue;
+      while (*bp == ' ' || *bp == '\t')
+	bp++;
+      fn = bp;
+      if (strncmp(fn, comp, compl) != 0 || fn[compl] != '/')
+	continue;
+      bp += compl + 1;
+      if (strncmp(bp, binarydir, lbinarydir))
+	continue;
+      bp += lbinarydir;
+      if (!strcmp(bp, "Packages") || !strcmp(bp, "Packages.gz"))
+	{
+	  if (filename && !strcmp(bp, "Packages"))
+	    continue;
+	  if (chksumtype && sat_chksum_len(chksumtype) > sat_chksum_len(curchksumtype))
+	    continue;
+	  if (!hexstr2bytes(chksum, ch, sat_chksum_len(curchksumtype)))
+	    continue;
+	  sat_free(filename);
+	  filename = strdup(fn);
+	  chksumtype = curchksumtype;
+	}
+    }
+  free(binarydir);
+  if (filename)
+    {
+      fn = sat_dupjoin("/", filename, 0);
+      sat_free(filename);
+      filename = sat_dupjoin("dists/", cinfo->name, fn);
+      sat_free(fn);
+    }
+  if (!chksumtype)
+    chksum = sat_free(chksum);
+  *chksump = chksum;
+  *chksumtypep = chksumtype;
+  return filename;
+}
+#endif
+
 void
 read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 {
@@ -1357,23 +1678,36 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   Repodata *data;
   int badchecksum;
   int dorefresh;
+#ifdef DEBIAN
+  FILE *fpr;
+  int j;
+#endif
 
   repo = repo_create(pool, "@System");
+#ifndef DEBIAN
   printf("rpm database:");
   if (stat("/var/lib/rpm/Packages", &stb))
     memset(&stb, 0, sizeof(&stb));
+#else
+  printf("dpgk database:");
+  if (stat("/var/lib/dpkg/status", &stb))
+    memset(&stb, 0, sizeof(&stb));
+#endif
   calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, installedcookie);
   if (usecachedrepo(repo, 0, installedcookie, 0))
     printf(" cached\n");
   else
     {
+#ifndef DEBIAN
       FILE *ofp;
-      printf(" reading\n");
       int done = 0;
+#endif
+      printf(" reading\n");
 
 #ifdef PRODUCTS_PATH
       repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
 #endif
+#ifndef DEBIAN
       if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
 	{
 	  Repo *ref = repo_create(pool, "@System.old");
@@ -1387,6 +1721,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	}
       if (!done)
         repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
+#else
+        repo_add_debdb(repo, REPO_REUSE_REPODATA);
+#endif
       writecachedrepo(repo, 0, 0, installedcookie);
     }
   pool_set_installed(pool, repo);
@@ -1564,6 +1901,72 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
+
+#ifdef DEBIAN
+        case TYPE_DEBIAN:
+	  printf("debian repo '%s':", cinfo->alias);
+	  fflush(stdout);
+	  filename = sat_dupjoin("dists/", cinfo->name, "/Release");
+	  if ((fpr = curlfopen(cinfo, filename, 0, 0, 0, 0)) == 0)
+	    {
+	      printf(" no Release file, skipped\n");
+	      repo_free(repo, 1);
+	      cinfo->repo = 0;
+	      free((char *)filename);
+	      break;
+	    }
+	  sat_free((char *)filename);
+	  if (cinfo->repo_gpgcheck)
+	    {
+	      filename = sat_dupjoin("dists/", cinfo->name, "/Release.gpg");
+	      sigfp = curlfopen(cinfo, filename, 0, 0, 0, 0);
+	      sat_free((char *)filename);
+	      if (!sigfp)
+		{
+		  printf(" unsigned, skipped\n");
+		  fclose(fpr);
+		  break;
+		}
+	      if (!sigpool)
+		sigpool = read_sigs();
+	      if (!checksig(sigpool, fpr, sigfp))
+		{
+		  printf(" checksig failed, skipped\n");
+		  fclose(sigfp);
+		  fclose(fpr);
+		  break;
+		}
+	      fclose(sigfp);
+	    }
+	  calc_checksum_fp(fpr, REPOKEY_TYPE_SHA256, cinfo->cookie);
+	  if (usecachedrepo(repo, 0, cinfo->cookie, 1))
+	    {
+	      printf(" cached\n");
+              fclose(fpr);
+	      break;
+	    }
+	  printf(" fetching\n");
+          for (j = 0; j < cinfo->ncomponents; j++)
+	    {
+	      if (!(filename = debian_find_component(cinfo, fpr, cinfo->components[j], &filechksum, &filechksumtype)))
+		{
+		  printf("[component %s not found]\n", cinfo->components[j]);
+		  continue;
+		}
+	      if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+		{
+	          repo_add_debpackages(repo, fp, 0);
+		  fclose(fp);
+		}
+	      sat_free((char *)filechksum);
+	      sat_free((char *)filename);
+	    }
+	  fclose(fpr);
+	  if (!badchecksum)
+	    writecachedrepo(repo, 0, 0, cinfo->cookie);
+	  break;
+#endif
+
 	default:
 	  printf("unsupported repo '%s': skipped\n", cinfo->alias);
 	  repo_free(repo, 1);
@@ -1590,8 +1993,13 @@ str2archid(Pool *pool, char *arch)
   return id;
 }
 
+
+#define DEPGLOB_NAME     1
+#define DEPGLOB_DEP      2
+#define DEPGLOB_NAMEDEP  3
+
 int
-depglob(Pool *pool, char *name, Queue *job)
+depglob(Pool *pool, char *name, Queue *job, int what)
 {
   Id p, pp;
   Id id = str2id(pool, name, 0);
@@ -1603,7 +2011,7 @@ depglob(Pool *pool, char *name, Queue *job)
 	{
 	  Solvable *s = pool->solvables + p;
 	  match = 1;
-	  if (s->name == id)
+	  if (s->name == id && (what & DEPGLOB_NAME) != 0)
 	    {
 	      queue_push2(job, SOLVER_SOLVABLE_NAME, id);
 	      return 1;
@@ -1611,7 +2019,8 @@ depglob(Pool *pool, char *name, Queue *job)
 	}
       if (match)
 	{
-	  printf("[using capability match for '%s']\n", name);
+	  if (what == DEPGLOB_NAMEDEP)
+	    printf("[using capability match for '%s']\n", name);
 	  queue_push2(job, SOLVER_SOLVABLE_PROVIDES, id);
 	  return 1;
 	}
@@ -1620,142 +2029,108 @@ depglob(Pool *pool, char *name, Queue *job)
   if (strpbrk(name, "[*?") == 0)
     return 0;
 
-  /* looks like a name glob. hard work. */
-  for (p = 1; p < pool->nsolvables; p++)
+  if ((what & DEPGLOB_NAME) != 0)
     {
-      Solvable *s = pool->solvables + p;
-      if (!s->repo || !pool_installable(pool, s))
-	continue;
-      id = s->name;
-      if (fnmatch(name, id2str(pool, id), 0) == 0)
+      /* looks like a name glob. hard work. */
+      for (p = 1; p < pool->nsolvables; p++)
 	{
-	  for (i = 0; i < job->count; i += 2)
-	    if (job->elements[i] == SOLVER_SOLVABLE_NAME && job->elements[i + 1] == id)
-	      break;
-	  if (i == job->count)
-	    queue_push2(job, SOLVER_SOLVABLE_NAME, id);
-	  match = 1;
+	  Solvable *s = pool->solvables + p;
+	  if (!s->repo || !pool_installable(pool, s))
+	    continue;
+	  id = s->name;
+	  if (fnmatch(name, id2str(pool, id), 0) == 0)
+	    {
+	      for (i = 0; i < job->count; i += 2)
+		if (job->elements[i] == SOLVER_SOLVABLE_NAME && job->elements[i + 1] == id)
+		  break;
+	      if (i == job->count)
+		queue_push2(job, SOLVER_SOLVABLE_NAME, id);
+	      match = 1;
+	    }
 	}
+      if (match)
+	return 1;
     }
-  if (match)
-    return 1;
-  /* looks like a dep glob. really hard work. */
-  for (id = 1; id < pool->ss.nstrings; id++)
+  if ((what & DEPGLOB_DEP))
     {
-      if (!pool->whatprovides[id])
-	continue;
-      if (fnmatch(name, id2str(pool, id), 0) == 0)
+      /* looks like a dep glob. really hard work. */
+      for (id = 1; id < pool->ss.nstrings; id++)
 	{
-	  if (!match)
-	    printf("[using capability match for '%s']\n", name);
-	  for (i = 0; i < job->count; i += 2)
-	    if (job->elements[i] == SOLVER_SOLVABLE_PROVIDES && job->elements[i + 1] == id)
-	      break;
-	  if (i == job->count)
-	    queue_push2(job, SOLVER_SOLVABLE_PROVIDES, id);
-	  match = 1;
+	  if (!pool->whatprovides[id])
+	    continue;
+	  if (fnmatch(name, id2str(pool, id), 0) == 0)
+	    {
+	      if (!match && what == DEPGLOB_NAMEDEP)
+		printf("[using capability match for '%s']\n", name);
+	      for (i = 0; i < job->count; i += 2)
+		if (job->elements[i] == SOLVER_SOLVABLE_PROVIDES && job->elements[i + 1] == id)
+		  break;
+	      if (i == job->count)
+		queue_push2(job, SOLVER_SOLVABLE_PROVIDES, id);
+	      match = 1;
+	    }
 	}
+      if (match)
+	return 1;
     }
-  if (match)
-    return 1;
   return 0;
-}
-
-void
-addrelation(Pool *pool, Queue *job, int flags, Id evr)
-{
-  int i;
-  for (i = 0; i < job->count; i += 2)
-    {
-      if (job->elements[i] != SOLVER_SOLVABLE_NAME && job->elements[i] != SOLVER_SOLVABLE_PROVIDES)
-	continue;
-      job->elements[i + 1] = rel2id(pool, job->elements[i + 1], evr, flags, 1);
-    }
 }
 
 int
-limitevr(Pool *pool, char *evr, Queue *job, Id archid)
+limitrelation(Pool *pool, Queue *job, int flags, Id evr)
 {
-  Queue mq;
-  Id p, pp, evrid;
-  int matched = 0;
   int i, j;
-  Solvable *s;
-  const char *sevr;
-
-  queue_init(&mq);
-  for (i = 0; i < job->count; i += 2)
+  Id p, pp;
+  for (i = j = 0; i < job->count; i += 2)
     {
-      queue_empty(&mq);
-      FOR_JOB_SELECT(p, pp, job->elements[i], job->elements[i + 1])
+      Id select = job->elements[i] & SOLVER_SELECTMASK;
+      if (select != SOLVER_SOLVABLE_NAME && select != SOLVER_SOLVABLE_PROVIDES)
 	{
-	  s = pool_id2solvable(pool, p);
-	  if (archid && s->arch != archid)
-	    continue;
-          sevr = id2str(pool, s->evr);
-          if (!strchr(evr, ':') && strchr(sevr, ':'))
-	    sevr = strchr(sevr, ':') + 1;
-	  if (evrcmp_str(pool, sevr, evr, EVRCMP_MATCH) == 0)
-	     queue_push(&mq, p);
+	  fprintf(stderr, "limitrelation only works on name/provides jobs\n");
+	  exit(1);
 	}
-      if (mq.count)
+      job->elements[i + 1] = rel2id(pool, job->elements[i + 1], evr, flags, 1);
+      if (flags == REL_ARCH)
+	job->elements[i] |= SOLVER_SETARCH;
+      if (flags == REL_EQ && select == SOLVER_SOLVABLE_NAME && job->elements[i])
 	{
-	  if (!matched && i)
-	    {
-	      queue_deleten(job, 0, i);
-	      i = 0;
-	    }
-	  matched = 1;
-	  /* if all solvables have the same evr */
-	  s = pool_id2solvable(pool, mq.elements[0]);
-	  evrid = s->evr;
-	  for (j = 0; j < mq.count; j++)
-	    {
-	      s = pool_id2solvable(pool, mq.elements[j]);
-	      if (s->evr != evrid)
-		break;
-	    }
-	  if (j == mq.count && j > 1)
-	    {
-	      prune_to_best_arch(pool, &mq);
-	      // prune_to_highest_prio(pool, &mq);
-	      mq.count = 1;
-	    }
-	  if (mq.count > 1)
-	    {
-	      job->elements[i] = SOLVER_SOLVABLE_ONE_OF;
-	      job->elements[i + 1] = pool_queuetowhatprovides(pool, &mq);
-	    }
+#ifndef DEBIAN
+	  const char *evrstr = id2str(pool, evr);
+	  if (!strchr(evrstr, '-'))
+	    job->elements[i] |= SOLVER_SETEV;
 	  else
-	    {
-	      job->elements[i] = SOLVER_SOLVABLE;
-	      job->elements[i + 1] = mq.elements[0];
-	    }
+#endif
+	    job->elements[i] |= SOLVER_SETEVR;
 	}
-      else if (matched)
+      /* make sure we still have matches */
+      FOR_JOB_SELECT(p, pp, job->elements[i], job->elements[i + 1])
+	break;
+      if (p)
 	{
-	  queue_deleten(job, i, 2);
-	  i -= 2;
+	  job->elements[j] = job->elements[i];
+	  job->elements[j + 1] = job->elements[i + 1];
+	  j += 2;
 	}
     }
-  queue_free(&mq);
-  if (matched)
-    return 1;
-  if (!archid)
+  queue_truncate(job, j);
+  return j / 2;
+}
+
+int
+limitrelation_arch(Pool *pool, Queue *job, int flags, char *evr)
+{
+  char *r;
+  Id archid;
+  if ((r = strrchr(evr, '.')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
     {
-      char *r;
-      if ((r = strrchr(evr, '.')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
-	{
-	  *r = 0;
-	  if (limitevr(pool, evr, job, archid))
-	    {
-	      *r = '.';
-	      return 1;
-	    }
-	  *r = '.';
-	}
+      *r = 0;
+      limitrelation(pool, job, REL_ARCH, archid);
+      limitrelation(pool, job, flags, str2id(pool, evr, 1));
+      *r = '.';
     }
-  return 0;
+  else
+    limitrelation(pool, job, flags, str2id(pool, evr, 1));
+  return job->count / 2;
 }
 
 int
@@ -1763,12 +2138,11 @@ limitrepo(Pool *pool, Id repofilter, Queue *job)
 {
   Queue mq;
   Id p, pp;
-  int matched = 0;
-  int i;
+  int i, j;
   Solvable *s;
 
   queue_init(&mq);
-  for (i = 0; i < job->count; i += 2)
+  for (i = j = 0; i < job->count; i += 2)
     {
       queue_empty(&mq);
       FOR_JOB_SELECT(p, pp, job->elements[i], job->elements[i + 1])
@@ -1779,34 +2153,26 @@ limitrepo(Pool *pool, Id repofilter, Queue *job)
 	}
       if (mq.count)
 	{
-	  if (!matched && i)
+	  /* here we assume that repo == vendor, so we also set SOLVER_SETVENDOR */
+	  if (mq.count == 1)
 	    {
-	      queue_deleten(job, 0, i);
-	      i = 0;
-	    }
-	  matched = 1;
-	  if (mq.count > 1)
-	    {
-	      job->elements[i] = SOLVER_SOLVABLE_ONE_OF;
-	      job->elements[i + 1] = pool_queuetowhatprovides(pool, &mq);
+	      job->elements[j] = SOLVER_SOLVABLE | (job->elements[i] & SOLVER_SETMASK) | SOLVER_SETVENDOR | SOLVER_SETREPO | SOLVER_NOAUTOSET;
+	      job->elements[j + 1] = mq.elements[0];
 	    }
 	  else
 	    {
-	      job->elements[i] = SOLVER_SOLVABLE;
-	      job->elements[i + 1] = mq.elements[0];
+	      job->elements[j] = SOLVER_SOLVABLE_ONE_OF | (job->elements[i] & SOLVER_SETMASK) | SOLVER_SETVENDOR | SOLVER_SETREPO;
+	      job->elements[j + 1] = pool_queuetowhatprovides(pool, &mq);
 	    }
-	}
-      else if (matched)
-	{
-	  queue_deleten(job, i, 2);
-	  i -= 2;
+	  j += 2;
 	}
     }
+  queue_truncate(job, j);
   queue_free(&mq);
-  return matched;
+  return j / 2;
 }
 
-void
+int
 mkselect(Pool *pool, int mode, char *name, Queue *job)
 {
   char *r, *r2;
@@ -1815,11 +2181,10 @@ mkselect(Pool *pool, int mode, char *name, Queue *job)
   if (*name == '/')
     {
       Dataiterator di;
+      int type = strpbrk(name, "[*?") == 0 ? SEARCH_STRING : SEARCH_GLOB;
       Queue q;
-      int match = 0;
-
       queue_init(&q);
-      dataiterator_init(&di, pool, mode == SOLVER_ERASE ? pool->installed : 0, 0, SOLVABLE_FILELIST, name, SEARCH_STRING|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
+      dataiterator_init(&di, pool, mode == SOLVER_ERASE ? pool->installed : 0, 0, SOLVABLE_FILELIST, name, type|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
       while (dataiterator_step(&di))
 	{
 	  Solvable *s = pool->solvables + di.solvid;
@@ -1832,24 +2197,23 @@ mkselect(Pool *pool, int mode, char *name, Queue *job)
       if (q.count)
 	{
 	  printf("[using file list match for '%s']\n", name);
-	  match = 1;
 	  if (q.count > 1)
 	    queue_push2(job, SOLVER_SOLVABLE_ONE_OF, pool_queuetowhatprovides(pool, &q));
 	  else
-	    queue_push2(job, SOLVER_SOLVABLE, q.elements[0]);
+	    queue_push2(job, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, q.elements[0]);
+	  queue_free(&q);
+	  return job->count / 2;
 	}
-      queue_free(&q);
-      if (match)
-	return;
     }
   if ((r = strpbrk(name, "<=>")) != 0)
     {
       /* relation case, support:
        * depglob rel
-       * depglob.rpm rel
+       * depglob.arch rel
        */
       int rflags = 0;
       int nend = r - name;
+      char oldnend;
       for (; *r; r++)
 	{
 	  if (*r == '<')
@@ -1865,79 +2229,84 @@ mkselect(Pool *pool, int mode, char *name, Queue *job)
 	r++;
       while (nend && (name[nend - 1] == ' ' || name[nend -1 ] == '\t'))
 	nend--;
-      name[nend] = 0;
       if (!*name || !*r)
 	{
 	  fprintf(stderr, "bad relation\n");
 	  exit(1);
 	}
-      if (depglob(pool, name, job))
+      oldnend = name[nend];
+      name[nend] = 0;
+      if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
 	{
-	  addrelation(pool, job, rflags, str2id(pool, r, 1));
-	  return;
+	  name[nend] = oldnend;
+	  limitrelation(pool, job, rflags, str2id(pool, r, 1));
+	  return job->count / 2;
 	}
       if ((r2 = strrchr(name, '.')) != 0 && r2[1] && (archid = str2archid(pool, r2 + 1)) != 0)
 	{
 	  *r2 = 0;
-	  if (depglob(pool, name, job))
+	  if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
 	    {
+	      name[nend] = oldnend;
 	      *r2 = '.';
-	      addrelation(pool, job, REL_ARCH, archid);
-	      addrelation(pool, job, rflags, str2id(pool, r, 1));
-	      return;
+	      limitrelation(pool, job, REL_ARCH, archid);
+	      limitrelation(pool, job, rflags, str2id(pool, r, 1));
+	      return job->count / 2;
 	    }
 	  *r2 = '.';
 	}
+      name[nend] = oldnend;
     }
   else
     {
       /* no relation case, support:
        * depglob
        * depglob.arch
-       * depglob-version-release
-       * depglob-version-release.arch
+       * nameglob-version
+       * nameglob-version.arch
+       * nameglob-version-release
+       * nameglob-version-release.arch
        */
-      if (depglob(pool, name, job))
-	return;
-      archid = 0;
+      if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
+	return job->count / 2;
       if ((r = strrchr(name, '.')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
 	{
 	  *r = 0;
-	  if (depglob(pool, name, job))
+	  if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
 	    {
 	      *r = '.';
-	      addrelation(pool, job, REL_ARCH, archid);
-	      return;
+	      limitrelation(pool, job, REL_ARCH, archid);
+	      return job->count / 2;
 	    }
 	  *r = '.';
 	}
       if ((r = strrchr(name, '-')) != 0)
 	{
 	  *r = 0;
-	  if (depglob(pool, name, job))
+	  if (depglob(pool, name, job, DEPGLOB_NAME))
 	    {
 	      /* have just the version */
+	      limitrelation_arch(pool, job, REL_EQ, r + 1);
 	      *r = '-';
-	      if (limitevr(pool, r + 1, job, 0))
-	        return;
+	      return job->count / 2;
 	    }
 	  if ((r2 = strrchr(name, '-')) != 0)
 	    {
 	      *r = '-';
 	      *r2 = 0;
-	      if (depglob(pool, name, job))
+	      r = r2;
+	      if (depglob(pool, name, job, DEPGLOB_NAME))
 		{
-		  *r2 = '-';
-		  if (limitevr(pool, r2 + 1, job, 0))
-		    return;
+		  /* have version-release */
+		  limitrelation_arch(pool, job, REL_EQ, r + 1);
+		  *r = '-';
+		  return job->count / 2;
 		}
-	      *r2 = '-';
 	    }
 	  *r = '-';
 	}
     }
-  fprintf(stderr, "nothing matches '%s'\n", name);
-  exit(1);
+  return 0;
 }
 
 
@@ -1967,6 +2336,8 @@ yesno(const char *str)
 	return *ip == 'y' ? 1 : 0;
     }
 }
+
+#ifndef DEBIAN
 
 struct fcstate {
   FILE **newpkgsfps;
@@ -2011,6 +2382,7 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
   return rpm_byfp(fp, solvable2str(pool, s), &fcstate->rpmdbstate);
 }
 
+
 void
 runrpm(const char *arg, const char *name, int dupfd3)
 {
@@ -2046,6 +2418,48 @@ runrpm(const char *arg, const char *name, int dupfd3)
       exit(1);
     }
 }
+
+#endif
+
+#ifdef DEBIAN
+
+void
+rundpkg(const char *arg, const char *name, int dupfd3)
+{
+  pid_t pid;
+  int status;
+
+  if ((pid = fork()) == (pid_t)-1)
+    {
+      perror("fork");
+      exit(1);
+    }
+  if (pid == 0)
+    {
+      if (dupfd3 != -1 && dupfd3 != 3)
+	{
+	  dup2(dupfd3, 3);
+	  close(dupfd3);
+	}
+      if (dupfd3 != -1)
+	fcntl(3, F_SETFD, 0);	/* clear CLOEXEC */
+      if (strcmp(arg, "--install") == 0)
+        execlp("dpkg", "dpkg", "--install", "--force", "all", name, (char *)0);
+      else
+        execlp("dpkg", "dpkg", "--remove", "--force", "all", name, (char *)0);
+      perror("dpkg");
+      _exit(0);
+    }
+  while (waitpid(pid, &status, 0) != pid)
+    ;
+  if (status)
+    {
+      printf("dpkg failed\n");
+      exit(1);
+    }
+}
+
+#endif
 
 static Id
 nscallback(Pool *pool, void *data, Id name, Id evr)
@@ -2170,6 +2584,7 @@ rewrite_repos(Pool *pool, Id *addedfileprovides)
 #define MODE_INFO        7
 #define MODE_REPOLIST    8
 #define MODE_SEARCH	 9
+#define MODE_ERASECLEAN  10
 
 void
 usage(int r)
@@ -2207,7 +2622,6 @@ main(int argc, char **argv)
   char inbuf[128], *ip;
   int allpkgs = 0;
   FILE **newpkgsfps;
-  struct fcstate fcstate;
   Id *addedfileprovides = 0;
   Id repofilter = 0;
 
@@ -2228,6 +2642,11 @@ main(int argc, char **argv)
   else if (!strcmp(argv[0], "erase") || !strcmp(argv[0], "rm"))
     {
       mainmode = MODE_ERASE;
+      mode = SOLVER_ERASE;
+    }
+  else if (!strcmp(argv[0], "eraseclean") || !strcmp(argv[0], "rmclean"))
+    {
+      mainmode = MODE_ERASECLEAN;
       mode = SOLVER_ERASE;
     }
   else if (!strcmp(argv[0], "list"))
@@ -2378,8 +2797,13 @@ main(int argc, char **argv)
 	{
 	  int l;
           l = strlen(argv[i]);
+#ifndef DEBIAN
 	  if (l <= 4 || strcmp(argv[i] + l - 4, ".rpm"))
 	    continue;
+#else
+	  if (l <= 4 || strcmp(argv[i] + l - 4, ".deb"))
+	    continue;
+#endif
 	  if (access(argv[i], R_OK))
 	    {
 	      perror(argv[i]);
@@ -2389,7 +2813,11 @@ main(int argc, char **argv)
 	    commandlinepkgs = sat_calloc(argc, sizeof(Id));
 	  if (!commandlinerepo)
 	    commandlinerepo = repo_create(pool, "@commandline");
+#ifndef DEBIAN
 	  repo_add_rpms(commandlinerepo, (const char **)argv + i, 1, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+#else
+	  repo_add_debs(commandlinerepo, (const char **)argv + i, 1, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+#endif
 	  commandlinepkgs[i] = commandlinerepo->end - 1;
 	}
       if (commandlinerepo)
@@ -2417,7 +2845,11 @@ main(int argc, char **argv)
 	  continue;
 	}
       queue_init(&job2);
-      mkselect(pool, mode, argv[i], &job2);
+      if (!mkselect(pool, mode, argv[i], &job2))
+	{
+	  fprintf(stderr, "nothing matches '%s'\n", argv[i]);
+	  exit(1);
+	}
       if (repofilter && !limitrepo(pool, repofilter, &job2))
         {
 	  fprintf(stderr, "nothing in repo matches '%s'\n", argv[i]);
@@ -2447,11 +2879,16 @@ main(int argc, char **argv)
 	      Solvable *s = pool_id2solvable(pool, p);
 	      if (mainmode == MODE_INFO)
 		{
+		  const char *str;
 		  printf("Name:        %s\n", solvable2str(pool, s));
 		  printf("Repo:        %s\n", s->repo->name);
 		  printf("Summary:     %s\n", solvable_lookup_str(s, SOLVABLE_SUMMARY));
-		  printf("Url:         %s\n", solvable_lookup_str(s, SOLVABLE_URL));
-		  printf("License:     %s\n", solvable_lookup_str(s, SOLVABLE_LICENSE));
+		  str = solvable_lookup_str(s, SOLVABLE_URL);
+		  if (str)
+		    printf("Url:         %s\n", str);
+		  str = solvable_lookup_str(s, SOLVABLE_LICENSE);
+		  if (str)
+		    printf("License:     %s\n", str);
 		  printf("Description:\n%s\n", solvable_lookup_str(s, SOLVABLE_DESCRIPTION));
 		  printf("\n");
 		}
@@ -2544,6 +2981,8 @@ main(int argc, char **argv)
 	    }
 	}
       job.elements[i] |= mode;
+      if (mainmode == MODE_ERASECLEAN)
+        job.elements[i] |= SOLVER_CLEANDEPS;
     }
 
   if (mainmode == MODE_DISTUPGRADE && allpkgs && repofilter)
@@ -2558,7 +2997,9 @@ main(int argc, char **argv)
   addsoftlocks(pool, &job);
 #endif
 
+#ifndef DEBIAN
 rerunsolver:
+#endif
   for (;;)
     {
       Id problem, solution;
@@ -2576,7 +3017,7 @@ rerunsolver:
 	  solv->allowarchchange = 1;
 	  solv->allowvendorchange = 1;
 	}
-      if (mainmode == MODE_ERASE)
+      if (mainmode == MODE_ERASE || mainmode == MODE_ERASECLEAN)
 	solv->allowuninstall = 1;	/* don't nag */
 
       solver_solve(solv, &job);
@@ -2638,13 +3079,21 @@ rerunsolver:
   if (!trans->steps.count)
     {
       printf("Nothing to do.\n");
+      solver_free(solv);
+      queue_free(&job);
+      pool_free(pool);
+      free_repoinfos(repoinfos, nrepoinfos);
+      sat_free(commandlinepkgs);
+#ifdef FEDORA
+      yum_substitute(pool, 0);
+#endif
       exit(1);
     }
   printf("\n");
   printf("Transaction summary:\n\n");
   solver_printtransaction(solv);
 
-#ifndef FEDORA
+#if !defined(FEDORA) && !defined(DEBIAN)
   if (1)
     {
       DUChanges duc[4];
@@ -2665,6 +3114,14 @@ rerunsolver:
   if (!yesno("OK to continue (y/n)? "))
     {
       printf("Abort.\n");
+      solver_free(solv);
+      queue_free(&job);
+      pool_free(pool);
+      free_repoinfos(repoinfos, nrepoinfos);
+      sat_free(commandlinepkgs);
+#ifdef FEDORA
+      yum_substitute(pool, 0);
+#endif
       exit(1);
     }
 
@@ -2830,9 +3287,11 @@ rerunsolver:
       putchar('\n');
     }
 
+#ifndef DEBIAN
   if (newpkgs)
     {
       Queue conflicts;
+      struct fcstate fcstate;
 
       printf("Searching for file conflicts\n");
       queue_init(&conflicts);
@@ -2861,12 +3320,15 @@ rerunsolver:
 	}
       queue_free(&conflicts);
     }
+#endif
 
   printf("Committing transaction:\n\n");
   transaction_order(trans, 0);
   for (i = 0; i < trans->steps.count; i++)
     {
+#ifndef DEBIAN
       const char *evr, *evrp, *nvra;
+#endif
       Solvable *s;
       int j;
       FILE *fp;
@@ -2878,6 +3340,7 @@ rerunsolver:
 	{
 	case SOLVER_TRANSACTION_ERASE:
 	  printf("erase %s\n", solvid2str(pool, p));
+#ifndef DEBIAN
 	  if (!s->repo->rpmdbid || !s->repo->rpmdbid[p - s->repo->start])
 	    continue;
 	  /* strip epoch from evr */
@@ -2888,7 +3351,10 @@ rerunsolver:
 	    evr = evrp + 1;
 	  nvra = pool_tmpjoin(pool, id2str(pool, s->name), "-", evr);
 	  nvra = pool_tmpjoin(pool, nvra, ".", id2str(pool, s->arch));
-	  runrpm("-e", nvra, -1);	/* to bad that --querybynumber doesn't work */
+	  runrpm("-e", nvra, -1);	/* too bad that --querybynumber doesn't work */
+#else
+	  rundpkg("--remove", id2str(pool, s->name), 0);
+#endif
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_MULTIINSTALL:
@@ -2901,7 +3367,11 @@ rerunsolver:
 	    continue;
 	  rewind(fp);
 	  lseek(fileno(fp), 0, SEEK_SET);
+#ifndef DEBIAN
 	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp));
+#else
+	  rundpkg("--install", "/dev/fd/3", fileno(fp));
+#endif
 	  fclose(fp);
 	  newpkgsfps[j] = 0;
 	  break;

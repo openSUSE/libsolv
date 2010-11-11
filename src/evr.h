@@ -19,9 +19,10 @@ extern "C" {
 
 #include "pooltypes.h"
 
-#define EVRCMP_COMPARE                  0
-#define EVRCMP_MATCH_RELEASE            1
-#define EVRCMP_MATCH                    2
+#define EVRCMP_COMPARE			0
+#define EVRCMP_MATCH_RELEASE		1
+#define EVRCMP_MATCH			2
+#define EVRCMP_COMPARE_EVONLY		3
 
 extern int vercmp(const char *s1, const char *q1, const char *s2, const char *q2);
 extern int evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode);

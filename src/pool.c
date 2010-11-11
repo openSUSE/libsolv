@@ -61,6 +61,15 @@ pool_create(void)
   queue_init(&pool->vendormap);
 
   pool->debugmask = SAT_DEBUG_RESULT;	/* FIXME */
+#ifdef FEDORA
+  pool->obsoleteusescolors = 1;
+#endif
+#ifdef DEBIAN 
+  pool->allowselfconflicts = 1;
+# ifdef MULTI_SEMANTICS
+  pool->disttype = DISTTYPE_DEB;
+# endif
+#endif
   return pool;
 }
 
@@ -473,13 +482,36 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
   return 0;
 }
 
-/* match two dependencies */
+/* match (flags, evr) against provider (pflags, pevr) */
+static inline int
+pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
+{
+  if (!pflags || !flags || pflags >= 8 || flags >= 8)
+    return 0;
+  if (flags == 7 || pflags == 7)
+    return 1;		/* rel provides every version */
+  if ((pflags & flags & 5) != 0)
+    return 1;		/* both rels show in the same direction */
+  if (pevr == evr)
+    {
+      if ((pflags & flags & 2) != 0)
+	return 1;	/* both have '=', match */
+    }
+  else
+    {
+      int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
+      if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
+	return 1;
+    }
+  return 0;
+}
+
+/* match two dependencies (d1 = provider) */
 
 int
 pool_match_dep(Pool *pool, Id d1, Id d2)
 {
   Reldep *rd1, *rd2;
-  int pflags, flags;
 
   if (d1 == d2)
     return 1;
@@ -496,28 +528,11 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
       return pool_match_dep(pool, rd1->name, d2);
     }
   rd2 = GETRELDEP(pool, d2);
+  /* first match name */
   if (!pool_match_dep(pool, rd1->name, rd2->name))
     return 0;
-  pflags = rd1->flags;
-  flags = rd2->flags;
-  if (!pflags || !flags || pflags >= 8 || flags >= 8)
-    return 0;
-  if (flags == 7 || pflags == 7)
-    return 1;
-  if ((pflags & flags & 5) != 0)
-    return 1;
-  if (rd1->evr == rd2->evr)
-    {
-      if ((pflags & flags & 2) != 0)
-	return 1;
-    }
-  else
-    {
-      int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-      if ((f & (1 << (1 + evrcmp(pool, rd1->evr, rd2->evr, EVRCMP_DEPCMP)))) != 0)
-	return 1;
-    }
-  return 0;
+  /* name matches, check flags and evr */
+  return pool_match_flags_evr(pool, rd1->flags, rd1->evr, rd2->flags, rd2->evr);
 }
 
 /*
@@ -539,119 +554,134 @@ pool_addrelproviders(Pool *pool, Id d)
   Id evr = rd->evr;
   int flags = rd->flags;
   Id pid, *pidp;
-  Id p, wp, *pp, *pp2, *pp3;
+  Id p, *pp;
 
   d = GETRELID(d);
   queue_init_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
-  switch (flags)
+
+  if (flags >= 8)
     {
-    case REL_AND:
-    case REL_WITH:
-      pp = pool_whatprovides_ptr(pool, name);
-      pp2 = pool_whatprovides_ptr(pool, evr);
-      while ((p = *pp++) != 0)
+      /* special relation */
+      Id wp = 0;
+      Id *pp2, *pp3;
+
+      switch (flags)
 	{
-	  for (pp3 = pp2; *pp3;)
-	    if (*pp3++ == p)
-	      {
-	        queue_push(&plist, p);
-		break;
-	      }
-	}
-      break;
-    case REL_OR:
-      pp = pool_whatprovides_ptr(pool, name);
-      while ((p = *pp++) != 0)
-	queue_push(&plist, p);
-      pp = pool_whatprovides_ptr(pool, evr);
-      while ((p = *pp++) != 0)
-	queue_pushunique(&plist, p);
-      break;
-    case REL_NAMESPACE:
-      if (name == NAMESPACE_OTHERPROVIDERS)
-	{
-	  wp = pool_whatprovides(pool, evr);
-	  pool->whatprovides_rel[d] = wp;
-	  return wp;
-	}
-      if (pool->nscallback)
-	{
-	  /* ask callback which packages provide the dependency
-           * 0:  none
-           * 1:  the system (aka SYSTEMSOLVABLE)
-           * >1: a set of packages, stored as offset on whatprovidesdata
-           */
-	  p = pool->nscallback(pool, pool->nscallbackdata, name, evr);
-	  if (p > 1)
+	case REL_AND:
+	case REL_WITH:
+	  wp = pool_whatprovides(pool, name);
+	  pp2 = pool_whatprovides_ptr(pool, evr);
+	  pp = pool->whatprovidesdata + wp;
+	  while ((p = *pp++) != 0)
 	    {
-	      queue_free(&plist);
-	      pool->whatprovides_rel[d] = p;
-	      return p;
+	      for (pp3 = pp2; *pp3; pp3++)
+		if (*pp3 == p)
+		  break;
+	      if (*pp3)
+		queue_push(&plist, p);	/* found it */
+	      else
+		wp = 0;
 	    }
-	  if (p == 1)
-	    queue_push(&plist, SYSTEMSOLVABLE);
-	}
-      break;
-    case REL_ARCH:
-      /* small hack: make it possible to match <pkg>.src
-       * we have to iterate over the solvables as src packages do not
-       * provide anything, thus they are not indexed in our
-       * whatprovides hash */
-      if (evr == ARCH_SRC)
-	{
-	  Solvable *s;
-	  for (p = 1, s = pool->solvables + p; p < pool->nsolvables; p++, s++)
+	  break;
+	case REL_OR:
+	  wp = pool_whatprovides(pool, name);
+	  pp = pool->whatprovidesdata + wp;
+	  if (!*pp)
+	    wp = pool_whatprovides(pool, evr);
+	  else
 	    {
-	      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+	      int cnt;
+	      while ((p = *pp++) != 0)
+		queue_push(&plist, p);
+	      cnt = plist.count;
+	      pp = pool_whatprovides_ptr(pool, evr);
+	      while ((p = *pp++) != 0)
+		queue_pushunique(&plist, p);
+	      if (plist.count != cnt)
+		wp = 0;
+	    }
+	  break;
+	case REL_NAMESPACE:
+	  if (name == NAMESPACE_OTHERPROVIDERS)
+	    {
+	      wp = pool_whatprovides(pool, evr);
+	      break;
+	    }
+	  if (pool->nscallback)
+	    {
+	      /* ask callback which packages provide the dependency
+	       * 0:  none
+	       * 1:  the system (aka SYSTEMSOLVABLE)
+	       * >1: set of packages, stored as offset on whatprovidesdata
+	       */
+	      p = pool->nscallback(pool, pool->nscallbackdata, name, evr);
+	      if (p > 1)
+		wp = p;
+	      if (p == 1)
+		queue_push(&plist, SYSTEMSOLVABLE);
+	    }
+	  break;
+	case REL_ARCH:
+	  /* small hack: make it possible to match <pkg>.src
+	   * we have to iterate over the solvables as src packages do not
+	   * provide anything, thus they are not indexed in our
+	   * whatprovides hash */
+	  if (evr == ARCH_SRC)
+	    {
+	      Solvable *s;
+	      for (p = 1, s = pool->solvables + p; p < pool->nsolvables; p++, s++)
+		{
+		  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+		    continue;
+		  if (pool_match_nevr(pool, s, name))
+		    queue_push(&plist, p);
+		}
+	      break;
+	    }
+	  wp = pool_whatprovides(pool, name);
+	  pp = pool->whatprovidesdata + wp;
+	  while ((p = *pp++) != 0)
+	    {
+	      Solvable *s = pool->solvables + p;
+	      if (s->arch == evr)
+		queue_push(&plist, p);
+	      else
+		wp = 0;
+	    }
+	  break;
+	case REL_FILECONFLICT:
+	  pp = pool_whatprovides_ptr(pool, name);
+	  while ((p = *pp++) != 0)
+	    {
+	      Id origd = MAKERELDEP(d);
+	      Solvable *s = pool->solvables + p;
+	      if (!s->provides)
 		continue;
-	      if (pool_match_nevr(pool, s, name))
+	      pidp = s->repo->idarraydata + s->provides;
+	      while ((pid = *pidp++) != 0)
+		if (pid == origd)
+		  break;
+	      if (pid)
 		queue_push(&plist, p);
 	    }
 	  break;
-	}
-      wp = pool_whatprovides(pool, name);
-      pp = pool->whatprovidesdata + wp;
-      while ((p = *pp++) != 0)
-	{
-	  Solvable *s = pool->solvables + p;
-	  if (s->arch == evr)
-	    queue_push(&plist, p);
-	  else
-	    wp = 0;
+	default:
+	  break;
 	}
       if (wp)
 	{
-	  /* all solvables match, no need to create a new list */
+	  /* we can reuse an existing entry */
+	  queue_free(&plist);
 	  pool->whatprovides_rel[d] = wp;
 	  return wp;
 	}
-      break;
-    case REL_FILECONFLICT:
-      pp = pool_whatprovides_ptr(pool, name);
-      while ((p = *pp++) != 0)
-	{
-	  Id origd = MAKERELDEP(d);
-	  Solvable *s = pool->solvables + p;
-	  if (!s->provides)
-	    continue;
-	  pidp = s->repo->idarraydata + s->provides;
-	  while ((pid = *pidp++) != 0)
-	    if (pid == origd)
-	      break;
-	  if (pid)
-	    queue_push(&plist, p);
-	}
-      break;
-    default:
-      break;
     }
-
-  /* convert to whatprovides id */
-#if 0
-  POOL_DEBUG(SAT_DEBUG_STATS, "addrelproviders: what provides %s?\n", dep2str(pool, name));
-#endif
-  if (flags && flags < 8)
+  else if (flags)
     {
+      /* simple version comparison relation */
+#if 0
+      POOL_DEBUG(SAT_DEBUG_STATS, "addrelproviders: what provides %s?\n", dep2str(pool, name));
+#endif
       pp = pool_whatprovides_ptr(pool, name);
       while (ISRELDEP(name))
 	{
@@ -661,9 +691,6 @@ pool_addrelproviders(Pool *pool, Id d)
       while ((p = *pp++) != 0)
 	{
 	  Solvable *s = pool->solvables + p;
-#if 0
-	  POOL_DEBUG(DEBUG_1, "addrelproviders: checking package %s\n", id2str(pool, s->name));
-#endif
 	  if (!s->provides)
 	    {
 	      /* no provides - check nevr */
@@ -675,9 +702,6 @@ pool_addrelproviders(Pool *pool, Id d)
 	  pidp = s->repo->idarraydata + s->provides;
 	  while ((pid = *pidp++) != 0)
 	    {
-	      int pflags;
-	      Id pevr;
-
 	      if (pid == name)
 		{
 #if defined(MULTI_SEMANTICS)
@@ -697,29 +721,12 @@ pool_addrelproviders(Pool *pool, Id d)
 	      prd = GETRELDEP(pool, pid);
 	      if (prd->name != name)
 		continue;		/* wrong provides name */
-	      /* right package, both deps are rels */
-	      pflags = prd->flags;
-	      if (!pflags)
-		continue;
-	      if (flags == 7 || pflags == 7)
-		break; /* included */
-	      if ((pflags & flags & 5) != 0)
-		break; /* same direction, match */
-	      pevr = prd->evr;
-	      if (pevr == evr)
-		{
-		  if ((pflags & flags & 2) != 0)
-		    break; /* both have =, match */
-		}
-	      else
-		{
-		  int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-		  if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
-		    break;
-		}
+	      /* right package, both deps are rels. check flags/evr */
+	      if (pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
+		break;	/* matches */
 	    }
 	  if (!pid)
-	    continue;	/* no rel match */
+	    continue;	/* none of the providers matched */
 	  queue_push(&plist, p);
 	}
       /* make our system solvable provide all unknown rpmlib() stuff */

@@ -26,6 +26,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <time.h>
 
 #include "repo.h"
@@ -779,6 +780,8 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
     store->pagefd = dup(fileno(fp));
   if (store->pagefd == -1)
     can_seek = 0;
+  else
+    fcntl(store->pagefd, F_SETFD, FD_CLOEXEC);
 
 #ifdef DEBUG_PAGING
   fprintf(stderr, "can %sseek\n", can_seek ? "" : "NOT ");

@@ -180,7 +180,7 @@ unsigned int
 solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound)
 {
   if (!s->repo)
-    return 0;
+    return notfound;
   return repo_lookup_num(s->repo, s - s->repo->pool->solvables, keyname, notfound);
 }
 
@@ -562,10 +562,10 @@ solvable_identical(Solvable *s1, Solvable *s2)
       rq1 = rq2 = 0;
       if (s1->requires)
 	for (reqp = s1->repo->idarraydata + s1->requires; *reqp; reqp++)
-	  rq1 ^= *reqp++;
+	  rq1 ^= *reqp;
       if (s2->requires)
 	for (reqp = s2->repo->idarraydata + s2->requires; *reqp; reqp++)
-	  rq2 ^= *reqp++;
+	  rq2 ^= *reqp;
       if (rq1 != rq2)
 	 return 0;
     }

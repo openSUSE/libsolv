@@ -20,8 +20,12 @@
 #include "pool.h"
 #include "poolarch.h"
 #include "repo_solv.h"
+#ifndef DEBIAN
 #include "repo_susetags.h"
 #include "repo_rpmmd.h"
+#else
+#include "repo_deb.h"
+#endif
 #include "solver.h"
 
 static ssize_t
@@ -60,7 +64,11 @@ myfopen(const char *fn)
 void
 usage(char** argv)
 {
-  printf("Usage:\n%s: <arch> repo [--nocheck repo]...\n", argv[0]);
+  printf("Usage:\n%s: <arch> [options..] repo [--nocheck repo]...\n"
+         "\t--exclude <pattern>\twhitespace-separated list of (sub-)"
+         "packagenames to ignore\n"
+         "\t--withsrc\t\tAlso check dependencies of src.rpm\n\n"
+         , argv[0]);
   exit(1);
 }
 
@@ -126,6 +134,7 @@ main(int argc, char **argv)
 	  exit(1);
 	}
       Repo *repo = repo_create(pool, argv[i]);
+#ifndef DEBIAN
       if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
 	{
 	  repo_add_susetags(repo, fp, 0, 0, 0);
@@ -138,6 +147,16 @@ main(int argc, char **argv)
 	{
 	  repo_add_rpmmd(repo, fp, 0, 0);
 	}
+#else
+      if (l >= 8 && !strcmp(argv[i] + l - 8, "Packages"))
+	{
+	  repo_add_debpackages(repo, fp, 0);
+	}
+      else if (l >= 11 && !strcmp(argv[i] + l - 11, "Packages.gz"))
+	{
+	  repo_add_debpackages(repo, fp, 0);
+	}
+#endif
       else if (repo_add_solv(repo, fp))
 	{
 	  fprintf(stderr, "could not add repo %s\n", argv[i]);
@@ -151,6 +170,7 @@ main(int argc, char **argv)
   rpmid = str2id(pool, "rpm", 0);
   rpmarch = str2id(pool, arch, 0);
   rpmrel = 0;
+#ifndef DEBIAN
   if (rpmid && rpmarch)
     {
       for (p = 1; p < pool->nsolvables; p++)
@@ -162,6 +182,7 @@ main(int argc, char **argv)
       if (p < pool->nsolvables)
         rpmrel = rel2id(pool, rpmid, rpmarch, REL_ARCH, 1);
     }
+#endif
   
   queue_init(&job);
   queue_init(&rids);

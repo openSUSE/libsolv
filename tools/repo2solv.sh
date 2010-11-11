@@ -48,8 +48,24 @@ repomd_decompress() {
   case $1 in
    *.gz) gzip -dc "$1" ;;
    *.bz2) bzip2 -dc "$1" ;;
+   *.lzma) lzma -dc "$1" ;;
+   *.xz) xz -dc "$1" ;;
    *) cat "$1" ;;
   esac
+}
+
+susetags_findfile_cat() {
+  if test -s "$1.xz" ; then
+    xz -dc "$1.xz"
+  elif test -s "$1.lzma" ; then
+    lzma -dc "$1.lzma"
+  elif test -s "$1.bz2" ; then
+    bzip2 -dc "$1.bz2"
+  elif test -s "$1.gz" ; then
+    gzip -dc "$1.gz"
+  elif test -s "$1" ; then
+    cat "$1"
+  fi
 }
 
 # signal an error if there is a problem
@@ -183,52 +199,30 @@ elif test "$repotype" = susetags ; then
   cd ${DESCR} || exit 2
   (
     # First packages
-    if test -s packages.gz; then
-      gzip -dc packages.gz
-    elif test -s packages.bz2; then
-      bzip2 -dc packages.bz2
-    elif test -s packages; then
-      cat packages
-    fi
+    susetags_findfile_cat packages
 
     # DU
-    if test -s packages.DU.gz; then
-      gzip -dc packages.DU.gz
-    elif test -s packages.DU.bz2; then
-      bzip2 -dc packages.DU.bz2
-    elif test -s packages.DU; then
-      cat packages.DU
-    fi
+    susetags_findfile_cat packages.DU
 
     # Now default language
-    if test -s packages.en.gz; then
-      gzip -dc packages.en.gz
-    elif test -s packages.en.bz2; then
-      bzip2 -dc packages.en.bz2
-    elif test -s packages.en; then
-      cat packages.en
-    fi
+    susetags_findfile_cat packages.en
 
     # Now patterns.  Not simply those files matching *.pat{,.gz,bz2},
     # but only those mentioned in the file 'patterns'
-    if test -f patterns; then
+    if test -f patterns ; then
       for i in `cat patterns`; do
-        test -s "$i" || continue
-        case $i in
-          *.gz) gzip -dc "$i" ;;
-	  *.bz2) bzip2 -dc "$i" ;;
-	  *) cat "$i" ;;
-	esac
+        if test -s "$i" ; then
+	  repomd_decompress "$i"
+	fi
       done
     fi
 
     # Now all other packages.{lang}.  Needs to come last as it switches
     # languages for all following susetags files
-    for i in packages.*; do
+    for i in packages.* ; do
       case $i in
-	*.gz) name="${i%.gz}" ; prog="gzip -dc" ;;
-	*.bz2) name="${i%.bz2}" ; prog="bzip2 -dc" ;;
-	*) name="$i"; prog=cat ;;
+	*.gz|*.bz2|*.xz|*.lzma) name="${i%.*}" ;;
+	*) name="$i" ;;
       esac
       case $name in
 	# ignore files we handled already
@@ -236,7 +230,7 @@ elif test "$repotype" = susetags ; then
 	*)
 	  suff=${name#packages.}
 	  echo "=Lan: $suff"
-	  $prog "$i" ;;
+	  repomd_decompress "$i"
       esac
     done
 

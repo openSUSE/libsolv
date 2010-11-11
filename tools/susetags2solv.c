@@ -138,7 +138,7 @@ main(int argc, char **argv)
 
   if (contentfile)
     {
-      FILE *fp = fopen (contentfile, "r");
+      FILE *fp = fopen(contentfile, "r");
       if (!fp)
         {
 	  perror(contentfile);
@@ -146,6 +146,7 @@ main(int argc, char **argv)
 	}
       repo_add_content(repo, fp, REPO_REUSE_REPODATA);
       defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
+      fclose(fp);
     }
 
   if (attrname)

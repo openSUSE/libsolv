@@ -31,6 +31,7 @@ const char *archpolicies[] = {
   "ia64",	"ia64:i686:i586:i486:i386",
   "ppc64",	"ppc64:ppc",
   "ppc",	"ppc",
+  "armv7l",	"armv7l:armv6l:armv5tejl:armv5tel:armv5l:armv4tl:armv4l:armv3l",
   "armv6l",	"armv6l:armv5tejl:armv5tel:armv5l:armv4tl:armv4l:armv3l",
   "armv5tejl",	"armv5tejl:armv5tel:armv5l:armv4tl:armv4l:armv3l",
   "armv5tel",	"armv5tel:armv5l:armv4tl:armv4l:armv3l",

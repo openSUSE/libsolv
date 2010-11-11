@@ -25,7 +25,7 @@
 /*-----------------------------------------------------------------*/
 
 /*
- * prep for prune_best_version_arch
+ * prep for prune_best_version
  *   sort by name
  */
 
@@ -102,6 +102,38 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
       if (s->repo->priority == bestprio || (pool->installed && s->repo == pool->installed))
 	plist->elements[j++] = plist->elements[i];
     }
+  plist->count = j;
+}
+
+static void
+prune_to_highest_prio_per_name(Pool *pool, Queue *plist)
+{
+  Queue pq;
+  int i, j, k;
+  Id name;
+
+  queue_init(&pq);
+  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
+  queue_push(&pq, plist->elements[0]);
+  name = pool->solvables[pq.elements[0]].name;
+  for (i = 1, j = 0; i < plist->count; i++)
+    {
+      if (pool->solvables[plist->elements[i]].name != name)
+	{
+	  if (pq.count > 2)
+	    prune_to_highest_prio(pool, &pq);
+	  for (k = 0; k < pq.count; k++)
+	    plist->elements[j++] = pq.elements[k];
+	  queue_empty(&pq);
+	  queue_push(&pq, plist->elements[i]);
+	  name = pool->solvables[pq.elements[0]].name;
+	}
+    }
+  if (pq.count > 2)
+    prune_to_highest_prio(pool, &pq);
+  for (k = 0; k < pq.count; k++)
+    plist->elements[j++] = pq.elements[k];
+  queue_free(&pq);
   plist->count = j;
 }
 
@@ -262,26 +294,16 @@ prune_to_best_arch(const Pool *pool, Queue *plist)
 }
 
 /*
- * prune_to_best_version
- *
- * sort list of packages (given through plist) by name and evr
- * return result through plist
+ * remove entries from plist that are obsoleted by other entries
+ * with different name.
+ * plist should be sorted in some way.
  */
-void
-prune_to_best_version(Pool *pool, Queue *plist)
+static void
+prune_obsoleted(Pool *pool, Queue *plist)
 {
-  Id best;
   int i, j;
   Solvable *s;
 
-  if (plist->count < 2)		/* no need to prune for a single entry */
-    return;
-  POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
-
-  /* sort by name first, prefer installed */
-  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
-
-  /* delete obsoleted. hmm, looks expensive! */
   /* FIXME maybe also check provides depending on noupdateprovide? */
   /* FIXME do not prune cycles */
   for (i = 0; i < plist->count; i++)
@@ -302,6 +324,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
 		continue;
 	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		continue;
+	      /* hmm, expensive. should use hash if plist is big */
 	      for (j = 0; j < plist->count; j++)
 		{
 		  if (i == j)
@@ -317,6 +340,26 @@ prune_to_best_version(Pool *pool, Queue *plist)
     if (plist->elements[i])
       plist->elements[j++] = plist->elements[i];
   plist->count = j;
+}
+
+/*
+ * prune_to_best_version
+ *
+ * sort list of packages (given through plist) by name and evr
+ * return result through plist
+ */
+void
+prune_to_best_version(Pool *pool, Queue *plist)
+{
+  int i, j;
+  Solvable *s, *best;
+
+  if (plist->count < 2)		/* no need to prune for a single entry */
+    return;
+  POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
+
+  /* sort by name first, prefer installed */
+  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
 
   /* now find best 'per name' */
   best = 0;
@@ -328,32 +371,33 @@ prune_to_best_version(Pool *pool, Queue *plist)
 		 solvable2str(pool, s),
 		 (pool->installed && s->repo == pool->installed) ? "installed" : "not installed");
 
-      if (!best)		       /* if no best yet, the current is best */
+      if (!best)		/* if no best yet, the current is best */
         {
-          best = plist->elements[i];
+          best = s;
           continue;
         }
 
-      /* name switch: re-init */
-      if (pool->solvables[best].name != s->name)   /* new name */
+      /* name switch: finish group, re-init */
+      if (best->name != s->name)   /* new name */
         {
-          plist->elements[j++] = best; /* move old best to front */
-          best = plist->elements[i];   /* take current as new best */
+          plist->elements[j++] = best - pool->solvables; /* move old best to front */
+          best = s;		/* take current as new best */
           continue;
         }
 
-      if (pool->solvables[best].evr != s->evr)   /* compare evr */
+      if (best->evr != s->evr)	/* compare evr */
         {
-          if (evrcmp(pool, pool->solvables[best].evr, s->evr, EVRCMP_COMPARE) < 0)
-            best = plist->elements[i];
+          if (evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) < 0)
+            best = s;
         }
     }
-
-  if (!best)
-    best = plist->elements[0];
-
-  plist->elements[j++] = best;
+  plist->elements[j++] = best - pool->solvables;	/* finish last group */
   plist->count = j;
+
+  /* we reduced the list to one package per name, now look at
+   * package obsoletes */
+  if (plist->count > 1)
+    prune_obsoleted(pool, plist);
 }
 
 
@@ -375,13 +419,55 @@ prune_best_arch_name_version(const Solver *solv, Pool *pool, Queue *plist)
     prune_to_best_version(pool, plist);
 }
 
+/* installed packages involed in a dup operation can only be kept
+* if they are identical to a non-installed one */
+static void
+prune_installed_dup_packages(Solver *solv, Queue *plist)
+{
+  Pool *pool = solv->pool;
+  int i, j, k;
 
+  for (i = j = 0; i < plist->count; i++)
+    {
+      Id p = plist->elements[i];
+      Solvable *s = pool->solvables + p;
+      if (s->repo == pool->installed && (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))))
+	{
+	  for (k = 0; k < plist->count; k++)
+	    {
+	      Solvable *s2 = pool->solvables + plist->elements[k];
+	      if (s2->repo != pool->installed && solvable_identical(s, s2))
+		break;
+	    }
+	  if (k == plist->count)
+	    continue;	/* no identical package found, ignore installed package */
+	}
+      plist->elements[j++] = p;
+    }
+  if (j)
+    plist->count = j;
+}
+
+/*
+ *  POLICY_MODE_CHOOSE:     default, do all pruning steps
+ *  POLICY_MODE_RECOMMEND:  leave out prune_to_recommended
+ *  POLICY_MODE_SUGGEST:    leave out prune_to_recommended, do prio pruning just per name
+ */
 void
 policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 {
   Pool *pool = solv->pool;
-  if (plist->count > 1 && mode != POLICY_MODE_SUGGEST)
-    prune_to_highest_prio(pool, plist);
+  if (plist->count > 1)
+    {
+      if (mode != POLICY_MODE_SUGGEST)
+        prune_to_highest_prio(pool, plist);
+      else
+        prune_to_highest_prio_per_name(pool, plist);
+      /* installed dup packages need special treatment as prio pruning
+       * does not prune installed packages */
+      if (plist->count > 1 && pool->installed && (solv->dupmap_all || solv->dupinvolvedmap.size))
+	prune_installed_dup_packages(solv, plist);
+    }
   if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)
     prune_to_recommended(solv, plist);
   prune_best_arch_name_version(solv, pool, plist);
@@ -441,6 +527,31 @@ policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
   return 1;	/* no class matches */
 }
 
+/* check if it is illegal to replace installed
+ * package "is" with package "s" (which must obsolete "is")
+ */
+int
+policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
+{
+  Pool *pool = solv->pool;
+  int ret = 0;
+  if (!(ignore & POLICY_ILLEGAL_DOWNGRADE) && !solv->allowdowngrade)
+    {
+      if (is->name == s->name && evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE) > 0)
+	ret |= POLICY_ILLEGAL_DOWNGRADE;
+    }
+  if (!(ignore & POLICY_ILLEGAL_ARCHCHANGE) && !solv->allowarchchange)
+    {
+      if (is->arch != s->arch && policy_illegal_archchange(solv, s, is))
+	ret |= POLICY_ILLEGAL_ARCHCHANGE;
+    }
+  if (!(ignore & POLICY_ILLEGAL_VENDORCHANGE) && !solv->allowvendorchange)
+    {
+      if (is->vendor != s->vendor && policy_illegal_vendorchange(solv, s, is))
+	ret |= POLICY_ILLEGAL_VENDORCHANGE;
+    }
+  return ret;
+}
 
 /*-------------------------------------------------------------------
  * 

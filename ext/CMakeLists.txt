@@ -1,8 +1,12 @@
 SET(libsatsolverext_SRCS
-    pool_fileconflicts.c repo_content.c repo_deltainfoxml.c repo_helix.c repo_products.c
-    repo_releasefile_products.c repo_repomdxml.c repo_rpmdb.c repo_rpmmd.c
+    repo_content.c repo_deltainfoxml.c repo_helix.c repo_products.c
+    repo_releasefile_products.c repo_repomdxml.c repo_rpmmd.c
     repo_susetags.c repo_updateinfoxml.c repo_write.c repo_zyppdb.c
     repo_deb.c)
+IF ( NOT DEBIAN )
+SET(libsatsolverext_SRCS
+    ${libsatsolverext_SRCS} pool_fileconflicts.c repo_rpmdb.c)
+ENDIF (NOT DEBIAN)
 
 ADD_LIBRARY(satsolverext STATIC ${libsatsolverext_SRCS})
 

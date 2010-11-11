@@ -1,4 +1,52 @@
 -------------------------------------------------------------------
+Fri Oct 22 15:51:11 CEST 2010 - ma@suse.de
+
+- updateinfoxml: Correctly parse 'issued date' field.
+- 0.16.1
+
+-------------------------------------------------------------------
+Thu Sep  9 17:30:36 CEST 2010 - mls@suse.de
+
+- bump version to 0.16 to make it different from code11_3 branch
+- 0.16.0
+
+-------------------------------------------------------------------
+Mon Sep  6 13:50:02 UTC 2010 - dmacvicar@novell.com
+
+- ruby bindings: fix bugs regarding include path loading
+  (was hardcoded) and refactor the way the library path is defined
+  (only once in a helper)
+
+-------------------------------------------------------------------
+Mon Sep  6 12:38:21 UTC 2010 - dmacvicar@novell.com
+
+- SLE10SP3 also has vendor_ruby 
+
+-------------------------------------------------------------------
+Wed Aug 18 14:11:08 UTC 2010 - kkaempf@novell.com
+
+- refactor ruby-satsolver, pure-Ruby extensions added
+- 0.15.1
+
+-------------------------------------------------------------------
+Thu May  6 17:39:20 CEST 2010 - mls@suse.de
+
+- fix bug in cleandeps code
+- bump version to 0.15 to make it different from code11_2 branch
+- 0.15.0
+
+-------------------------------------------------------------------
+Tue Mar 23 17:24:46 CET 2010 - ma@suse.de
+
+- Parse an installed products <shortsummary> tag [bnc#586303]
+
+-------------------------------------------------------------------
+Mon Mar 22 18:45:42 CET 2010 - mls@suse.de
+
+- dataiterator: reset parent when jumping to a solvid [bnc#589640]
+- 0.14.17
+
+-------------------------------------------------------------------
 Thu Mar 11 22:13:26 CET 2010 - ma@suse.de
 
 - parse global repository ids. [bnc#377568]

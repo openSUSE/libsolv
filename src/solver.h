@@ -82,11 +82,13 @@ typedef struct _Solver {
 
   Map noupdate;				/* don't try to update these
                                            installed solvables */
-  Map noobsoletes;			/* ignore obsoletes for these
-					   (multiinstall) */
+  Map noobsoletes;			/* ignore obsoletes for these (multiinstall) */
 
-  Map updatemap;			/* bring those installed packages to the newest version */
-  Map fixmap;				/* fix those packages */
+  Map updatemap;			/* bring these installed packages to the newest version */
+  int updatemap_all;			/* bring all packages to the newest version */
+
+  Map fixmap;				/* fix these packages */
+  int fixmap_all;			/* fix all packages */
 
   Queue weakruleq;			/* index into 'rules' for weak ones */
   Map weakrulemap;			/* map rule# to '1' for weak rules, 1..learntrules */
@@ -202,9 +204,14 @@ typedef struct _Solver {
   Queue covenantq;                      /* Covenants honored by this solver (generic locks) */
 
   
-  Map dupmap;				/* packages from dup repos */
+  Map dupmap;				/* dup these packages*/
+  int dupmap_all;			/* dup all packages */
   Map dupinvolvedmap;			/* packages involved in dup process */
+
   Map droporphanedmap;			/* packages to drop in dup mode */
+  int droporphanedmap_all;
+
+  Map cleandepsmap;			/* try to drop these packages as of cleandeps erases */
 
   Queue *ruleinfoq;			/* tmp space for solver_ruleinfo() */
 } Solver;
@@ -218,6 +225,7 @@ typedef struct _Solver {
 #define SOLVER_SOLVABLE_PROVIDES	0x03
 #define SOLVER_SOLVABLE_ONE_OF		0x04
 #define SOLVER_SOLVABLE_REPO		0x05
+#define SOLVER_SOLVABLE_ALL		0x06
 
 #define SOLVER_SELECTMASK		0xff
 
@@ -231,11 +239,22 @@ typedef struct _Solver {
 #define SOLVER_DISTUPGRADE		0x0700
 #define SOLVER_VERIFY			0x0800
 #define SOLVER_DROP_ORPHANED		0x0900
+#define SOLVER_USERINSTALLED            0x0a00
 
 #define SOLVER_JOBMASK			0xff00
 
 #define SOLVER_WEAK			0x010000
 #define SOLVER_ESSENTIAL		0x020000
+#define SOLVER_CLEANDEPS                0x040000
+
+#define SOLVER_SETEV			0x01000000
+#define SOLVER_SETEVR			0x02000000
+#define SOLVER_SETARCH			0x04000000
+#define SOLVER_SETVENDOR		0x08000000
+#define SOLVER_SETREPO			0x10000000
+#define SOLVER_NOAUTOSET		0x20000000
+
+#define SOLVER_SETMASK			0x2f000000
 
 /* old API compatibility, do not use in new code */
 #if 1
@@ -362,12 +381,12 @@ solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
          l = r->p; l; l = (dp != &r->w2 + 1 ? *dp++ : 0))
 
 /* iterate over all packages selected by a job */
-#define FOR_JOB_SELECT(p, pp, select, what)			\
-    if (select == SOLVER_SOLVABLE_REPO)				\
-	p = pp = 0;						\
-    else for (pp = (select == SOLVER_SOLVABLE ? 0 :		\
-               select == SOLVER_SOLVABLE_ONE_OF ? what : 	\
-               pool_whatprovides(pool, what)),				\
+#define FOR_JOB_SELECT(p, pp, select, what)					\
+    if (select == SOLVER_SOLVABLE_REPO || select == SOLVER_SOLVABLE_ALL)	\
+	p = pp = 0;								\
+    else for (pp = (select == SOLVER_SOLVABLE ? 0 :				\
+               select == SOLVER_SOLVABLE_ONE_OF ? what : 			\
+               pool_whatprovides(pool, what)),					\
          p = (select == SOLVER_SOLVABLE ? what : pool->whatprovidesdata[pp++]) ; p ; p = pool->whatprovidesdata[pp++]) \
       if (select != SOLVER_SOLVABLE_NAME || pool_match_nevr(pool, pool->solvables + p, what))
 
