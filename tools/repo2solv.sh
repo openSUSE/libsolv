@@ -124,8 +124,8 @@ if test "$repotype" = rpmmd ; then
         echo
      fi
      susedataxml=`repomd_findfile susedata susedata.xml`
-     if test -f $susedataxml ; then
-	repomd_decompress $susedataxml
+     if test -f "$susedataxml" ; then
+	repomd_decompress "$susedataxml"
      fi
      echo '</rpmmd>'
     ) | grep -v '\?xml' |  sed '1i\<?xml version="1.0" encoding="UTF-8"?>' | rpmmd2solv $parser_options > $primfile || exit 4
