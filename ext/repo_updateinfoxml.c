@@ -127,13 +127,15 @@ struct parsedata {
 static time_t
 datestr2timestamp(const char *date)
 {
-  if (!date)
-    return 0;
-
-  if (strlen(date) == strspn(date, "0123456789"))
-    return atoi(date);
-
+  const char *p;
   struct tm tm;
+
+  if (!date || !*date)
+    return 0;
+  for (p = date; *p >= '0' && *p <= '9'; p++)
+    ;
+  if (!*p)
+    return atoi(date);
   memset(&tm, 0, sizeof(tm));
   if (!strptime(date, "%F%T", &tm))
     return 0;
@@ -318,7 +320,9 @@ startElement(void *userData, const char *name, const char **atts)
 	  }
 	if (date)
 	  {
-	    repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, datestr2timestamp(date));
+	    time_t t = datestr2timestamp(date);
+	    if (t)
+	      repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, t);
 	  }
       }
       break;
