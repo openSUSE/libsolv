@@ -29,7 +29,7 @@
 
 #ifndef DB_CREATE
 # ifdef FEDORA
-#  include <db4/db.h>
+#  include <db.h>
 # else
 #  include <rpm/db.h>
 # endif
@@ -1262,7 +1262,7 @@ opendbenv(const char *rootdir)
     }
   return dbenv;
 }
- 
+
 
 static int
 count_headers(const char *rootdir, DB_ENV *dbenv)
@@ -2367,7 +2367,7 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
   rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
   return rpmhead;
 }
- 
+
 void *
 rpm_byfp(FILE *fp, const char *name, void **statep)
 {
@@ -2533,7 +2533,7 @@ r64dec1(char *p, unsigned int *vp, int *eofp)
   return p;
 }
 
-static unsigned int 
+static unsigned int
 crc24(unsigned char *p, int len)
 {
   unsigned int crc = 0xb704ceL;
