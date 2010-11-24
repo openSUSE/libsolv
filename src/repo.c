@@ -1063,7 +1063,7 @@ repo_set_id(Repo *repo, Id p, Id keyname, Id id)
 }
 
 void
-repo_set_num(Repo *repo, Id p, Id keyname, Id num)
+repo_set_num(Repo *repo, Id p, Id keyname, unsigned int num)
 {
   Repodata *data = repo_last_repodata(repo);
   repodata_set_num(data, p, keyname, num);

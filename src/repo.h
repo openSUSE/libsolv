@@ -310,7 +310,7 @@ void dataiterator_seek(Dataiterator *di, int whence);
 
 
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
-void repo_set_num(Repo *repo, Id p, Id keyname, Id num);
+void repo_set_num(Repo *repo, Id p, Id keyname, unsigned int num);
 void repo_set_str(Repo *repo, Id p, Id keyname, const char *str);
 void repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str);
 void repo_add_poolstr_array(Repo *repo, Id p, Id keyname, const char *str);
