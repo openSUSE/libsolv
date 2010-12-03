@@ -133,6 +133,17 @@ Group:          Development/Languages/Perl
 Perl bindings for sat solver.
 
 
+%package -n satsolver-bindings-devel
+Requires:       swig %{name}-devel
+Summary:        Swig input files for satsolver bindings
+Group:          Development/Libraries
+BuildArch:      noarch
+
+%description -n satsolver-bindings-devel
+The Swig input files for satsolver bindings allow for reuse of the
+bindings concept in other projects, i.e. libzypp-bindings.
+
+
 %prep
 %setup -n satsolver-%{version}
 
@@ -243,5 +254,11 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root,-)
 %{perl_vendorarch}/satsolver.so
 %{perl_vendorlib}/satsolver.pm
+
+%files -n satsolver-bindings-devel
+%defattr(-,root,root,-)
+%dir %{prefix}/share/satsolver-bindings
+%{prefix}/share/satsolver-bindings/*.i
+%{prefix}/share/satsolver-bindings/*.h
 
 %changelog
