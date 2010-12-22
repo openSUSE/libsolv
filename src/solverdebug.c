@@ -543,7 +543,7 @@ solver_printtransaction(Solver *solv)
   queue_free(&pkgs);
 }
 
-static void
+void
 solver_printproblemruleinfo(Solver *solv, Id probr)
 {
   Pool *pool = solv->pool;
