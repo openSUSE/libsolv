@@ -567,11 +567,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	  cummulate = 0;
 	  switch (tag_from_string(line))       /* check if accumulation is needed */
 	    {
-	      case CTAG('+', 'P', 'r', 'q'):
-	      case CTAG('+', 'P', 'r', 'c'):
-	      case CTAG('+', 'P', 's', 'g'):
-	        if (!pd.kind || !(flags & SUSETAGS_KINDS_SEPARATELY))
-		  break;
 	      case CTAG('+', 'D', 'e', 's'):
 	      case CTAG('+', 'E', 'u', 'l'):
 	      case CTAG('+', 'I', 'n', 's'):
@@ -579,6 +574,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      case CTAG('+', 'A', 'u', 't'):
 	        if (line[4] == ':')
 	          cummulate = 1;
+		break;
+	      default:
+		break;
 	    }
 	  line[0] = '=';                       /* handle lines between +Key:/-Key: as =Key: */
 	  line[intag + keylen - 1] = ' ';
@@ -706,10 +704,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
           case CTAG('=', 'P', 'r', 'q'):                                        /* pre-requires / packages required */
 	    if (pd.kind)
 	      {
-		if (flags & SUSETAGS_KINDS_SEPARATELY)
-		  repodata_set_poolstr(data, handle, str2id(pool, "solvable:must", 1), line + 6);
-		else
-		  s->requires = adddep(pool, &pd, s->requires, line, 0, 0);           /* patterns: a required package */
+	        s->requires = adddep(pool, &pd, s->requires, line, 0, 0);           /* patterns: a required package */
 	      }
 	    else
 	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0); /* package: pre-requires */
@@ -736,46 +731,25 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    freshens = adddep(pool, &pd, freshens, line, 0, pd.kind);
 	    continue;
           case CTAG('=', 'P', 'r', 'c'):                                        /* packages recommended */
-	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      repodata_set_poolstr(data, handle, str2id(pool, "solvable:should", 1), line + 6);
-	    else
-	      s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
+	    s->recommends = adddep(pool, &pd, s->recommends, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 's', 'g'):                                        /* packages suggested */
-	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      repodata_set_poolstr(data, handle, str2id(pool, "solvable:may", 1), line + 6);
-	    else
-	      s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
+	    s->suggests = adddep(pool, &pd, s->suggests, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 'c', 'n'):                                        /* pattern: package conflicts */
-	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf(stderr, "Unsupported: pattern -> package conflicts\n");
-	    else
-	      s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, 0);
+	    s->conflicts = adddep(pool, &pd, s->conflicts, line, 0, 0);
 	    continue;
 	  case CTAG('=', 'P', 'o', 'b'):                                        /* pattern: package obsoletes */
-	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf(stderr, "Unsupported: pattern -> package obsoletes\n");
-	    else
-	      s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, 0);
+	    s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 'f', 'r'):                                        /* pattern: package freshens */
-	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf(stderr, "Unsupported: pattern -> package freshens\n");
-	    else
-	      freshens = adddep(pool, &pd, freshens, line, 0, 0);
+	    freshens = adddep(pool, &pd, freshens, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 's', 'p'):                                        /* pattern: package supplements */
-	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf(stderr, "Unsupported: pattern -> package supplements\n");
-	    else
-	      s->supplements = adddep(pool, &pd, s->supplements, line, 0, 0);
+	    s->supplements = adddep(pool, &pd, s->supplements, line, 0, 0);
 	    continue;
           case CTAG('=', 'P', 'e', 'n'):                                        /* pattern: package enhances */
-	    if (flags & SUSETAGS_KINDS_SEPARATELY)
-	      fprintf(stderr, "Unsupported: pattern -> package enhances\n");
-	    else
-	      s->enhances = adddep(pool, &pd, s->enhances, line, 0, 0);
+	    s->enhances = adddep(pool, &pd, s->enhances, line, 0, 0);
 	    continue;
           case CTAG('=', 'V', 'e', 'r'):                                        /* - version - */
 	    last_found_pack = 0;

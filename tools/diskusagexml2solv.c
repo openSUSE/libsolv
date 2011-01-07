@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -18,58 +19,43 @@
 #include "common_write.h"
 
 static void
-usage(const char *err)
+usage(int status)
 {
-  if (err)
-    fprintf(stderr, "\n** Error:\n  %s\n", err);
   fprintf(stderr, "\nUsage:\n"
-          "diskusagexml2solv [-a][-h][-k][-n <attrname>]\n"
+          "diskusagexml2solv [-a][-h][-n <attrname>]\n"
 	  "  reads a 'diskusage.xml' file from <stdin> and writes a .solv file to <stdout>\n"
 	  "  -h : print help & exit\n"
-	  "  -k : don't mix kinds (experimental!)\n"
 	  "  -n <name>: save attributes as <name>.attr\n"
 	 );
-   exit(0);
+  exit(status);
 }
 
 int
 main(int argc, char **argv)
 {
-  int flags = 0;
+  int c, flags = 0;
   char *attrname = 0;
   
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
 
-  argv++;
-  argc--;
-  while (argc--)
-    {
-      const char *s = argv[0];
-      if (*s++ == '-')
-        while (*s)
-          switch (*s++)
-	    {
-	      case 'h': usage(NULL); break;
-	      case 'n':
-	        if (argc)
-		  {
-		    attrname = argv[1];
-		    argv++;
-		    argc--;
-		  }
-	        else
-		  usage("argument required for '-n'");
-		break;
-	      case 'k':
-	      break;
-	      default : break;
-	    }
-      argv++;
+  while ((c = getopt(argc, argv, "hn:")) >= 0)
+    {   
+      switch(c)
+	{
+	case 'h':
+	  usage(0);
+	  break;
+	case 'n':
+	  attrname = optarg;
+	  break;
+	default:
+	  usage(1);
+	  break;
+	}
     }
-
   repo_add_diskusagexml(repo, stdin, flags);
-  tool_write(repo, 0, 0);
+  tool_write(repo, 0, attrname);
   pool_free(pool);
   exit(0);
 }

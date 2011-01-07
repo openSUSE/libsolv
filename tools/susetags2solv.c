@@ -27,13 +27,12 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "susetags2solv [-b <base>][-c <content>][-d <descrdir>][-h][-k][-n <name>]\n"
+          "susetags2solv [-b <base>][-c <content>][-d <descrdir>][-h][-n <name>]\n"
 	  "  reads a 'susetags' repository from <stdin> and writes a .solv file to <stdout>\n"
 	  "  -b <base>: save as multiple files starting with <base>\n"
 	  "  -c <contentfile> : parse given contentfile (for product information)\n"
           "  -d <descrdir> : do not read from stdin, but use data in descrdir\n"
 	  "  -h : print help & exit\n"
-	  "  -k : don't mix kinds (experimental!)\n"
 	  "  -n <name>: save attributes as <name>.attr\n"
 	 );
    exit(status);
@@ -101,15 +100,12 @@ main(int argc, char **argv)
   int flags = 0;
   int c;
 
-  while ((c = getopt(argc, argv, "hkn:c:d:b:q:")) >= 0)
+  while ((c = getopt(argc, argv, "hn:c:d:b:q:")) >= 0)
     {
       switch (c)
 	{
 	case 'h':
 	  usage(0);
-	  break;
-	case 'k':
-	  flags |= SUSETAGS_KINDS_SEPARATELY;	/* do not use! */
 	  break;
 	case 'n':
 	  attrname = optarg;
