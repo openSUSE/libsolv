@@ -200,15 +200,13 @@ printf("loc %s\n", location);
 
 
 static void
-usage( const char *err )
+usage(int status)
 {
-  if (err)
-    fprintf (stderr, "\n** Error:\n  %s\n", err);
   fprintf( stderr, "\nUsage:\n"
 	   "dumpsolv [-a] [<solvfile>]\n"
 	   "  -a  read attributes.\n"
 	   );
-  exit(0);
+  exit(status);
 }
 
 #if 0
@@ -247,40 +245,39 @@ int main(int argc, char **argv)
 {
   Repo *repo;
   Pool *pool;
-  int i, j, n;
+  int c, i, j, n;
   Solvable *s;
   
   pool = pool_create();
   pool_setdebuglevel(pool, 1);
   pool_setloadcallback(pool, loadcallback, 0);
 
-  argv++;
-  argc--;
-  while (argc--)
+  while ((c = getopt(argc, argv, "ha")) >= 0)
     {
-      const char *s = argv[0];
-      if (*s++ == '-')
-        while (*s)
-          switch (*s++)
-	    {
-	      case 'h': usage(NULL); break;
-	      case 'a': with_attr = 1; break;
-	      default : break;
-	    }
-      else
+      switch(c)
 	{
-	  if (freopen (argv[0], "r", stdin) == 0)
-	    {
-	      perror(argv[0]);
-	      exit(1);
-	    }
-	  repo = repo_create(pool, argv[0]);
-	  if (repo_add_solv(repo, stdin))
-	    printf("could not read repository\n");
+	case 'h':
+	  usage(0);
+	  break;
+	case 'a':
+	  with_attr = 1;
+	  break;
+	default:
+          usage(1);
+          break;
 	}
-      argv++;
     }
-
+  for (; optind < argc; optind++)
+    {
+      if (freopen(argv[optind], "r", stdin) == 0)
+	{
+	  perror(argv[optind]);
+	  exit(1);
+	}
+      repo = repo_create(pool, argv[optind]);
+      if (repo_add_solv(repo, stdin))
+	printf("could not read repository\n");
+    }
   if (!pool->nrepos)
     {
       repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");

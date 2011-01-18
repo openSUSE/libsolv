@@ -141,7 +141,7 @@ startElement(void *userData, const char *name, const char **atts)
   struct stateswitch *sw;
 
 #if 0
-      fprintf(stderr, "start: [%d]%s\n", pd->state, name);
+  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
     {
@@ -214,7 +214,7 @@ endElement(void *userData, const char *name)
   Solvable *s = pd->solvable;
 
 #if 0
-      fprintf(stderr, "end: [%d]%s\n", pd->state, name);
+  fprintf(stderr, "end: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
     {
@@ -262,7 +262,7 @@ endElement(void *userData, const char *name)
   pd->docontent = 0;
 
 #if 0
-      fprintf(stderr, "end: [%s] -> %d\n", name, pd->state);
+  fprintf(stderr, "end: [%s] -> %d\n", name, pd->state);
 #endif
 }
 
@@ -273,14 +273,8 @@ characterData(void *userData, const XML_Char *s, int len)
   struct parsedata *pd = userData;
   int l;
   char *c;
-  if (!pd->docontent) {
-#if 0
-    char *dup = strndup( s, len );
-  fprintf(stderr, "Content: [%d]'%s'\n", pd->state, dup );
-  free( dup );
-#endif
+  if (!pd->docontent)
     return;
-  }
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {

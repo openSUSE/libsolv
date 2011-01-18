@@ -59,10 +59,9 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "rpmmd2solv [-a][-h][-k][-n <attrname>][-l <locale>]\n"
+          "rpmmd2solv [-a][-h][-n <attrname>][-l <locale>]\n"
 	  "  reads 'primary' from a 'rpmmd' repository from <stdin> and writes a .solv file to <stdout>\n"
 	  "  -h : print help & exit\n"
-	  "  -k : don't mix kinds (experimental!)\n"
 	  "  -n <name>: save attributes as <name>.attr\n"
 	  "  -l <locale>: parse localization data for <locale>\n"
 	 );
@@ -81,15 +80,12 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
 
-  while ((c = getopt (argc, argv, "hkn:b:d:l:")) >= 0)
+  while ((c = getopt (argc, argv, "hn:b:d:l:")) >= 0)
     {
       switch(c)
 	{
         case 'h':
           usage(0);
-          break;
-        case 'k':
-          flags |= RPMMD_KINDS_SEPARATELY;   /* do not use! */
           break;
         case 'n':
           attrname = optarg;
