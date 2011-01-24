@@ -73,6 +73,8 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 #if !defined(DEBIAN_SEMANTICS) || defined(MULTI_SEMANTICS)
 
 /* rpm type version compare */
+/* note: the code assumes that *q1 and *q2 are not alphanumeric! */
+
 int
 vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
@@ -97,7 +99,7 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 	    e1++;
 	  for (e2 = s2; *e2 >= '0' && *e2 <= '9'; )
 	    e2++;
-	  r = e1 - s1 - (e2 - s2);
+	  r = (e1 - s1) - (e2 - s2);
           if (!r)
 	    r = strncmp(s1, s2, e1 - s1);
           if (r)
@@ -109,7 +111,7 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 	    e1++;
 	  for (e2 = s2; (*e2 >= 'a' && *e2 <= 'z') || (*e2 >= 'A' && *e2 <= 'Z'); )
 	    e2++;
-	  r = e1 - s1 - (e2 - s2);
+	  r = (e1 - s1) - (e2 - s2);
           if (r > 0)
 	    {
 	      r = strncmp(s1, s2, e2 - s2);

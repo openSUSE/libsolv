@@ -27,39 +27,8 @@
 #include "repo_deb.h"
 #endif
 #include "solver.h"
+#include "common_myfopen.h"
 
-static ssize_t
-cookie_gzread(void *cookie, char *buf, size_t nbytes)
-{
-  return gzread((gzFile *)cookie, buf, nbytes);
-}
-
-static int
-cookie_gzclose(void *cookie)
-{
-  return gzclose((gzFile *)cookie);
-}
-
-FILE *
-myfopen(const char *fn)
-{
-  cookie_io_functions_t cio;
-  char *suf;
-  gzFile *gzf;
-
-  if (!fn)
-    return 0;
-  suf = strrchr(fn, '.');
-  if (!suf || strcmp(suf, ".gz") != 0)
-    return fopen(fn, "r");
-  gzf = gzopen(fn, "r");
-  if (!gzf)
-    return 0;
-  memset(&cio, 0, sizeof(cio));
-  cio.read = cookie_gzread;
-  cio.close = cookie_gzclose;
-  return  fopencookie(gzf, "r", cio);
-}
 
 void
 usage(char** argv)

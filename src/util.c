@@ -114,7 +114,7 @@ sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, cons
   __qsort_r(base, nmemb, size, compar, compard);
 # endif
 #else
-# error please add qsort_r call here
+# error please add correct qsort_r call here, note different ordering on BSD
 #endif
 }
 

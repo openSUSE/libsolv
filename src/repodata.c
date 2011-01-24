@@ -231,6 +231,14 @@ repodata_free_schemahash(Repodata *data)
  * dir pool management
  */
 
+#ifndef HAVE_STRCHRNUL
+static inline const char *strchrnul(const char *str, char x)
+{
+  const char *p = strchr(str, x);
+  return p ? p : str + strlen(str);
+}
+#endif
+
 Id
 repodata_str2dir(Repodata *data, const char *dir, int create)
 {
