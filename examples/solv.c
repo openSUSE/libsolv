@@ -73,6 +73,7 @@
 #include "repo_content.h"
 #include "pool_fileconflicts.h"
 
+#include "../tools/common_myfopen.h"
 
 #ifdef FEDORA
 # define REPOINFO_PATH "/etc/yum.repos.d"
@@ -762,18 +763,6 @@ findmirrorlisturl(FILE *fp)
   return 0;
 }
 
-static ssize_t
-cookie_gzread(void *cookie, char *buf, size_t nbytes)
-{
-  return gzread((gzFile *)cookie, buf, nbytes);
-}
-
-static int
-cookie_gzclose(void *cookie)
-{
-  return gzclose((gzFile *)cookie);
-}
-
 FILE *
 curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype, int *badchecksump)
 {
@@ -872,7 +861,6 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
   if (uncompress)
     {
       char tmpl[100];
-      cookie_io_functions_t cio;
       gzFile *gzf;
 
       sprintf(tmpl, "/dev/fd/%d", fd);
@@ -883,10 +871,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
 	  fprintf(stderr, "could not open /dev/fd/%d, /proc not mounted?\n", fd);
 	  exit(1);
 	}
-      memset(&cio, 0, sizeof(cio));
-      cio.read = cookie_gzread;
-      cio.close = cookie_gzclose;
-      return fopencookie(gzf, "r", cio);
+      return mygzfopen(gzf);
     }
   fcntl(fd, F_SETFD, FD_CLOEXEC);
   return fdopen(fd, "r");

@@ -22,6 +22,7 @@
 #include "repo_susetags.h"
 #include "repo_content.h"
 #include "common_write.h"
+#include "common_myfopen.h"
 
 static void
 usage(int status)
@@ -36,39 +37,6 @@ usage(int status)
 	  "  -n <name>: save attributes as <name>.attr\n"
 	 );
    exit(status);
-}
-
-static ssize_t
-cookie_gzread(void *cookie, char *buf, size_t nbytes)
-{
-  return gzread((gzFile *)cookie, buf, nbytes);
-}
-
-static int
-cookie_gzclose(void *cookie)
-{
-  return gzclose((gzFile *)cookie);
-}
-
-FILE *
-myfopen(const char *fn)
-{
-  cookie_io_functions_t cio;
-  char *suf;
-  gzFile *gzf;
-
-  if (!fn)
-    return 0;
-  suf = strrchr(fn, '.');
-  if (!suf || strcmp(suf, ".gz") != 0)
-    return fopen(fn, "r");
-  gzf = gzopen(fn, "r");
-  if (!gzf)
-    return 0;
-  memset(&cio, 0, sizeof(cio));
-  cio.read = cookie_gzread;
-  cio.close = cookie_gzclose;
-  return  fopencookie(gzf, "r", cio);
 }
 
 /* content file query */

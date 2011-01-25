@@ -40,7 +40,6 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <inttypes.h>
-#include <endian.h>
 
 #include "sha2.h"
 
@@ -96,9 +95,6 @@
  * <machine/endian.h> where the appropriate definitions are actually
  * made).
  */
-#if !defined(__BYTE_ORDER) || (__BYTE_ORDER != __LITTLE_ENDIAN && __BYTE_ORDER != __BIG_ENDIAN)
-#error Define __BYTE_ORDER to be equal to either __LITTLE_ENDIAN or __BIG_ENDIAN
-#endif
 
 /*
  * Define the following sha2_* types to types of the correct length on
@@ -127,7 +123,7 @@ typedef uint64_t sha2_word64;	/* Exactly 8 bytes */
 
 
 /*** ENDIAN REVERSAL MACROS *******************************************/
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 #define REVERSE32(w,x)	{ \
 	sha2_word32 tmp = (w); \
 	tmp = (tmp >> 16) | (tmp << 16); \
@@ -141,7 +137,7 @@ typedef uint64_t sha2_word64;	/* Exactly 8 bytes */
 	(x) = ((tmp & 0xffff0000ffff0000ULL) >> 16) | \
 	      ((tmp & 0x0000ffff0000ffffULL) << 16); \
 }
-#endif /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#endif /* !WORDS_BIGENDIAN */
 
 /*
  * Macro for incrementally adding the unsigned 64-bit integer n to the
@@ -347,7 +343,7 @@ void sat_SHA256_Init(SHA256_CTX* context) {
 
 /* Unrolled SHA-256 round macros: */
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 
 #define ROUND256_0_TO_15(a,b,c,d,e,f,g,h)	\
 	REVERSE32(*data++, W256[j]); \
@@ -358,7 +354,7 @@ void sat_SHA256_Init(SHA256_CTX* context) {
 	j++
 
 
-#else /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#else /* !WORDS_BIGENDIAN */
 
 #define ROUND256_0_TO_15(a,b,c,d,e,f,g,h)	\
 	T1 = (h) + Sigma1_256(e) + Ch((e), (f), (g)) + \
@@ -367,7 +363,7 @@ void sat_SHA256_Init(SHA256_CTX* context) {
 	(h) = T1 + Sigma0_256(a) + Maj((a), (b), (c)); \
 	j++
 
-#endif /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#endif /* !WORDS_BIGENDIAN */
 
 #define ROUND256(a,b,c,d,e,f,g,h)	\
 	s0 = W256[(j+1)&0x0f]; \
@@ -457,15 +453,15 @@ static void SHA256_Transform(SHA256_CTX* context, const sha2_word32* data) {
 
 	j = 0;
 	do {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 		/* Copy data while converting to host byte order */
 		REVERSE32(*data++,W256[j]);
 		/* Apply the SHA-256 compression function to update a..h */
 		T1 = h + Sigma1_256(e) + Ch(e, f, g) + K256[j] + W256[j];
-#else /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#else /* !WORDS_BIGENDIAN */
 		/* Apply the SHA-256 compression function to update a..h with copy */
 		T1 = h + Sigma1_256(e) + Ch(e, f, g) + K256[j] + (W256[j] = *data++);
-#endif /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#endif /* !WORDS_BIGENDIAN */
 		T2 = Sigma0_256(a) + Maj(a, b, c);
 		h = g;
 		g = f;
@@ -576,7 +572,7 @@ void sat_SHA256_Final(sha2_byte digest[], SHA256_CTX* context) {
 	/* If no digest buffer is passed, we don't bother doing this: */
 	if (digest != (sha2_byte*)0) {
 		usedspace = (context->bitcount >> 3) % SHA256_BLOCK_LENGTH;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 		/* Convert FROM host byte order */
 		REVERSE64(context->bitcount,context->bitcount);
 #endif
@@ -610,7 +606,7 @@ void sat_SHA256_Final(sha2_byte digest[], SHA256_CTX* context) {
 		/* Final transform: */
 		SHA256_Transform(context, (sha2_word32*)context->buffer);
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 		{
 			/* Convert TO host byte order */
 			int	j;
@@ -674,7 +670,7 @@ void sat_SHA512_Init(SHA512_CTX* context) {
 #ifdef SHA2_UNROLL_TRANSFORM
 
 /* Unrolled SHA-512 round macros: */
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 
 #define ROUND512_0_TO_15(a,b,c,d,e,f,g,h)	\
 	REVERSE64(*data++, W512[j]); \
@@ -685,7 +681,7 @@ void sat_SHA512_Init(SHA512_CTX* context) {
 	j++
 
 
-#else /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#else /* !WORDS_BIGENDIAN */
 
 #define ROUND512_0_TO_15(a,b,c,d,e,f,g,h)	\
 	T1 = (h) + Sigma1_512(e) + Ch((e), (f), (g)) + \
@@ -694,7 +690,7 @@ void sat_SHA512_Init(SHA512_CTX* context) {
 	(h) = T1 + Sigma0_512(a) + Maj((a), (b), (c)); \
 	j++
 
-#endif /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#endif /* !WORDS_BIGENDIAN */
 
 #define ROUND512(a,b,c,d,e,f,g,h)	\
 	s0 = W512[(j+1)&0x0f]; \
@@ -779,15 +775,15 @@ static void SHA512_Transform(SHA512_CTX* context, const sha2_word64* data) {
 
 	j = 0;
 	do {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 		/* Convert TO host byte order */
 		REVERSE64(*data++, W512[j]);
 		/* Apply the SHA-512 compression function to update a..h */
 		T1 = h + Sigma1_512(e) + Ch(e, f, g) + K512[j] + W512[j];
-#else /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#else /* !WORDS_BIGENDIAN */
 		/* Apply the SHA-512 compression function to update a..h with copy */
 		T1 = h + Sigma1_512(e) + Ch(e, f, g) + K512[j] + (W512[j] = *data++);
-#endif /* __BYTE_ORDER == __LITTLE_ENDIAN */
+#endif /* !WORDS_BIGENDIAN */
 		T2 = Sigma0_512(a) + Maj(a, b, c);
 		h = g;
 		g = f;
@@ -892,7 +888,7 @@ static void SHA512_Last(SHA512_CTX* context) {
 	unsigned int	usedspace;
 
 	usedspace = (context->bitcount[0] >> 3) % SHA512_BLOCK_LENGTH;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 	/* Convert FROM host byte order */
 	REVERSE64(context->bitcount[0],context->bitcount[0]);
 	REVERSE64(context->bitcount[1],context->bitcount[1]);
@@ -940,7 +936,7 @@ void sat_SHA512_Final(sha2_byte digest[], SHA512_CTX* context) {
 		SHA512_Last(context);
 
 		/* Save the hash data for output: */
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 		{
 			/* Convert TO host byte order */
 			int	j;
@@ -1015,7 +1011,7 @@ void sat_SHA384_Final(sha2_byte digest[], SHA384_CTX* context) {
 		SHA512_Last((SHA512_CTX*)context);
 
 		/* Save the hash data for output: */
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifndef WORDS_BIGENDIAN
 		{
 			/* Convert TO host byte order */
 			int	j;
