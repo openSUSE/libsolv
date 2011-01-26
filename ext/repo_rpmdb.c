@@ -3037,6 +3037,8 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
 	repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
       repo->rpmdbid[s - pool->solvables - repo->start] = entries[i].rpmdbid;
     }
+  sat_free(entries);
+  sat_free(namedata);
   freestate(&state);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
