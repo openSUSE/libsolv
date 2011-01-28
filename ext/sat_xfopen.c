@@ -5,8 +5,13 @@
  * for further information
  */
 
-#ifndef SATSOLVER_COMMON_MYFOPEN_H
-#define SATSOLVER_COMMON_MYFOPEN_H
+#define _GNU_SOURCE
+
+#include <stdio.h>
+#include <string.h>
+#include <zlib.h>
+
+#include "sat_xfopen.h"
 
 static ssize_t cookie_gzread(void *cookie, char *buf, size_t nbytes)
 {
@@ -40,7 +45,7 @@ static FILE *mygzfopen(gzFile* gzf)
 }
 
 FILE *
-myfopen(const char *fn)
+sat_xfopen(const char *fn)
 {
   char *suf;
   gzFile *gzf;
@@ -56,4 +61,20 @@ myfopen(const char *fn)
   return mygzfopen(gzf);
 }
 
-#endif /* SATSOLVER_COMMON_MYFOPEN_H */
+FILE *
+sat_xfopen_fd(const char *fn, int fd)
+{
+  char *suf;
+  gzFile *gzf;
+
+  if (!fn)
+    return 0;
+  suf = strrchr(fn, '.');
+  if (!suf || strcmp(suf, ".gz") != 0)
+    return fdopen(fd, "r");
+  gzf = gzdopen(fd, "r");
+  if (!gzf)
+    return 0;
+  return mygzfopen(gzf);
+}
+

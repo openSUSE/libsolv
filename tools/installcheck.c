@@ -27,7 +27,7 @@
 #include "repo_deb.h"
 #endif
 #include "solver.h"
-#include "common_myfopen.h"
+#include "sat_xfopen.h"
 
 
 void
@@ -97,7 +97,7 @@ main(int argc, char **argv)
       l = strlen(argv[i]);
       if (!strcmp(argv[i], "-"))
 	fp = stdin;
-      else if ((fp = myfopen(argv[i])) == 0)
+      else if ((fp = sat_xfopen(argv[i])) == 0)
 	{
 	  perror(argv[i]);
 	  exit(1);

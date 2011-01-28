@@ -20,7 +20,7 @@
 #include "repo.h"
 #include "repo_rpmmd.h"
 #include "common_write.h"
-#include "common_myfopen.h"
+#include "sat_xfopen.h"
 
 
 static void
@@ -80,7 +80,7 @@ main(int argc, char **argv)
       l = strlen(dir) + 128;
       fnp = sat_malloc(l+1);
       snprintf(fnp, l, "%s/primary.xml.gz", dir);
-      if (!(fp = myfopen(fnp)))
+      if (!(fp = sat_xfopen(fnp)))
 	{
 	  perror(fnp);
 	  exit(1);
@@ -88,7 +88,7 @@ main(int argc, char **argv)
       repo_add_rpmmd(repo, fp, 0, flags);
       fclose(fp);
       snprintf(fnp, l, "%s/diskusagedata.xml.gz", dir);
-      if ((fp = myfopen(fnp)))
+      if ((fp = sat_xfopen(fnp)))
 	{
 	  repo_add_rpmmd(repo, fp, 0, flags);
 	  fclose(fp);
@@ -100,7 +100,7 @@ main(int argc, char **argv)
 	      fprintf(stderr, "-l parameter too long\n");
 	      exit(1);
 	    }
-	  while (!(fp = myfopen(fnp)))
+	  while (!(fp = sat_xfopen(fnp)))
 	    {
 	      fprintf(stderr, "not opened %s\n", fnp);
 	      if (strlen(locale) > 2)
@@ -110,7 +110,7 @@ main(int argc, char **argv)
 		      fprintf(stderr, "-l parameter too long\n");
 		      exit(1);
 		    }
-		  if ((fp = myfopen(fnp)))
+		  if ((fp = sat_xfopen(fnp)))
 		    break;
 		}
 	      perror(fnp);

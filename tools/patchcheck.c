@@ -26,7 +26,7 @@
 #include "solver.h"
 #include "solverdebug.h"
 
-#include "common_myfopen.h"
+#include "sat_xfopen.h"
 
 void
 showproblems(Solver *solv, Solvable *s, Queue *cand, Queue *badguys)
@@ -527,7 +527,7 @@ main(int argc, char **argv)
       l = strlen(argv[i]);
       if (!strcmp(argv[i], "-"))
         fp = stdin;
-      else if ((fp = myfopen(argv[i])) == 0)
+      else if ((fp = sat_xfopen(argv[i])) == 0)
         {
           perror(argv[i]);
           exit(1);

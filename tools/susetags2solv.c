@@ -22,7 +22,7 @@
 #include "repo_susetags.h"
 #include "repo_content.h"
 #include "common_write.h"
-#include "common_myfopen.h"
+#include "sat_xfopen.h"
 
 static void
 usage(int status)
@@ -171,7 +171,7 @@ main(int argc, char **argv)
 	  if (!strcmp(fn, "packages") || !strcmp(fn, "packages.gz"))
 	    {
 	      sprintf(fnp, "%s/%s", descrdir, fn);
-	      FILE *fp = myfopen(fnp);
+	      FILE *fp = sat_xfopen(fnp);
 	      if (!fp)
 		{
 		  perror(fn);
@@ -183,7 +183,7 @@ main(int argc, char **argv)
 	  else if (!strcmp(fn, "packages.DU") || !strcmp(fn, "packages.DU.gz"))
 	    {
 	      sprintf(fnp, "%s/%s", descrdir, fn);
-	      FILE *fp = myfopen(fnp);
+	      FILE *fp = sat_xfopen(fnp);
 	      if (!fp)
 		{
 		  perror(fn);
@@ -196,7 +196,7 @@ main(int argc, char **argv)
 	    {
 #if 0
 	      sprintf(fnp, "%s/%s", descrdir, fn);
-	      FILE *fp = myfopen(fnp);
+	      FILE *fp = sat_xfopen(fnp);
 	      if (!fp)
 		{
 		  perror(fn);
@@ -224,7 +224,7 @@ main(int argc, char **argv)
 		continue;
 	      strcpy(lang, p + 1);
 	      sprintf(fnp, "%s/%s", descrdir, fn);
-	      FILE *fp = myfopen(fnp);
+	      FILE *fp = sat_xfopen(fnp);
 	      if (!fp)
 		{
 		  perror(fn);

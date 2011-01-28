@@ -72,8 +72,7 @@
 #include "repo_deltainfoxml.h"
 #include "repo_content.h"
 #include "pool_fileconflicts.h"
-
-#include "../tools/common_myfopen.h"
+#include "sat_xfopen.h"
 
 #ifdef FEDORA
 # define REPOINFO_PATH "/etc/yum.repos.d"
@@ -859,20 +858,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       return 0;
     }
   if (uncompress)
-    {
-      char tmpl[100];
-      gzFile *gzf;
-
-      sprintf(tmpl, "/dev/fd/%d", fd);
-      gzf = gzopen(tmpl, "r");
-      close(fd);
-      if (!gzf)
-	{
-	  fprintf(stderr, "could not open /dev/fd/%d, /proc not mounted?\n", fd);
-	  exit(1);
-	}
-      return mygzfopen(gzf);
-    }
+    return sat_xfopen_fd(".gz", fd);
   fcntl(fd, F_SETFD, FD_CLOEXEC);
   return fdopen(fd, "r");
 }
@@ -2859,7 +2845,8 @@ main(int argc, char **argv)
       /* list mode, no solver needed */
       for (i = 0; i < job.count; i += 2)
 	{
-	  FOR_JOB_SELECT(p, pp, job.elements[i], job.elements[i + 1])
+	  Id how = job.elements[i] & SOLVER_SELECTMASK;
+	  FOR_JOB_SELECT(p, pp, how, job.elements[i + 1])
 	    {
 	      Solvable *s = pool_id2solvable(pool, p);
 	      if (mainmode == MODE_INFO)
