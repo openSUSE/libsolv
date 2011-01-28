@@ -55,6 +55,7 @@ install(TARGETS
     updateinfoxml2solv
     deltainfoxml2solv
     repomdxml2solv
+    installcheck
     DESTINATION ${BIN_INSTALL_DIR})
 
 IF ( NOT DEBIAN )
