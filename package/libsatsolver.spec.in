@@ -7,7 +7,7 @@ Name:           libsatsolver
 Version:        @VERSION@
 Release:        1
 License:        BSD 3-Clause
-Url:            git://git.opensuse.org/projects/zypp/sat-solver.git
+Url:            git://gitorious.org/opensuse/sat-solver.git
 Source:         satsolver-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
