@@ -10,7 +10,7 @@ ENDIF (NOT DEBIAN)
 
 ADD_LIBRARY(satsolverext STATIC ${libsatsolverext_SRCS})
 
-SET(libsatsolver_HEADERS
+SET(libsatsolverext_HEADERS
     pool_fileconflicts.h repo_content.h repo_deltainfoxml.h repo_helix.h repo_products.h
     repo_releasefile_products.h repo_repomdxml.h repo_rpmdb.h repo_rpmmd.h
     repo_susetags.h repo_updateinfoxml.h repo_write.h repo_zyppdb.h
