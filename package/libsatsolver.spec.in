@@ -1,8 +1,3 @@
-%if 0%{?fedora_version}
-%{!?ruby_sitelib: %global ruby_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
-%{!?ruby_sitearch: %global ruby_sitearch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"] ')}
-%endif
-
 Name:           libsatsolver
 Version:        @VERSION@
 Release:        1
@@ -19,7 +14,7 @@ BuildRequires:  doxygen
 BuildRequires:  libneon0.26-devel
 %endif
 %if 0%{?fedora_version}
-BuildRequires:  perl-devel db4-devel ruby ruby-rdoc
+BuildRequires:  db4-devel ruby ruby-rdoc
 %endif
 %if 0%{?suse_version}
 %if 0%{?suse_version} < 1030
@@ -36,18 +31,12 @@ BuildRequires:  fdupes
 %else
 BuildRequires:  expat-devel
 %endif
-BuildRequires:  cmake rpm-devel gcc-c++ ruby-devel swig perl python-devel
+BuildRequires:  cmake rpm-devel gcc-c++
 BuildRequires:  zlib-devel
 # the testsuite uses the check framework
 BuildRequires:  check-devel
 Summary:        A new approach to package dependency solving
 
-#define some macros missing on fedora
-%if 0%{?fedora_version}
-%{!?py_sitedir: %define py_sitedir %(%__python -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
-%{!?py_requires: %define py_requires Requires: python}
-%{!?ruby_sitearch: %global ruby_sitearch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"] ')}
-%endif
 
 %description
 A new approach to package dependency solving
@@ -109,41 +98,6 @@ Requires:       gpg2
 %description demo
 Applications demoing the satsolver library.
 
-%package -n ruby-satsolver
-Summary:        Ruby bindings for sat solver
-Group:          Development/Languages/Ruby
-
-%description -n ruby-satsolver
-Ruby bindings for sat solver.
-
-%package -n python-satsolver
-%py_requires
-Summary:        Python bindings for sat solver
-Group:          Development/Languages/Python
-
-%description -n python-satsolver
-Python bindings for sat solver.
-
-%package -n perl-satsolver
-Requires:       perl = %{perl_version}
-Summary:        Perl bindings for sat solver
-Group:          Development/Languages/Perl
-
-%description -n perl-satsolver
-Perl bindings for sat solver.
-
-
-%package -n satsolver-bindings-devel
-Requires:       swig %{name}-devel
-Summary:        Swig input files for satsolver bindings
-Group:          Development/Libraries
-BuildArch:      noarch
-
-%description -n satsolver-bindings-devel
-The Swig input files for satsolver bindings allow for reuse of the
-bindings concept in other projects, i.e. libzypp-bindings.
-
-
 %prep
 %setup -n satsolver-%{version}
 
@@ -158,7 +112,6 @@ CMAKE_FLAGS="-DFEDORA=1"
 
 cmake   $CMAKE_FLAGS \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
-	-DPYTHON_SITEDIR=%{py_sitedir} \
 	-DLIB=%{_lib} \
 	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
 	-DCMAKE_BUILD_TYPE=Release \
@@ -178,11 +131,6 @@ export NO_BRP_STRIP_DEBUG=true
 #pushd doc/autodoc
 #make install
 #popd
-%if 0%{?suse_version} > 1020
-# create symlinks for documentation
-#%fdupes -s %{buildroot}%{_docdir}/ruby-satsolver
-%fdupes -s bindings/ruby/html
-%endif
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
@@ -199,7 +147,6 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root)
 %_libdir/libsatsolver.a
 %_libdir/libsatsolverext.a
-%_libdir/libappsatsolver.a
 %dir /usr/include/satsolver
 /usr/include/satsolver/*
 /usr/bin/deptestomatic
@@ -213,52 +160,5 @@ rm -rf "$RPM_BUILD_ROOT"
 #%defattr(-,root,root)
 #%dir %_docdir/satsolver
 #%_docdir/satsolver/*
-
-%files -n ruby-satsolver
-%defattr(-,root,root,-)
-%if 0%{?suse_version}
-%if 0%{?suse_version} < 1010
-%dir %{_libdir}/ruby/site_ruby/%{rb_ver}/%{rb_arch}
-%dir %{_libdir}/ruby/site_ruby/%{rb_ver}/satsolver
-%{_libdir}/ruby/site_ruby/%{rb_ver}/satsolver/*.rb
-%{_libdir}/ruby/site_ruby/%{rb_ver}/satsolver.rb
-%{_libdir}/ruby/site_ruby/%{rb_ver}/%{rb_arch}/satsolver.so
-%else
-%dir %{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver
-%{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver/*.rb
-%{_libdir}/ruby/vendor_ruby/%{rb_ver}/satsolver.rb
-%{_libdir}/ruby/vendor_ruby/%{rb_ver}/%{rb_arch}/satsolver.so
-%endif
-%endif
-%if 0%{?mandriva_version}
-%dir %{ruby_sitelibdir}/satsolver
-%{ruby_sitelibdir}/satsolver/*.rb
-%{ruby_sitelibdir}/satsolver.rb
-%{ruby_sitearchdir}/satsolver.so
-%endif
-%if 0%{?fedora_version}
-%dir %{ruby_sitelib}/satsolver
-%{ruby_sitelib}/satsolver.rb
-%{ruby_sitelib}/satsolver/*.rb
-%{ruby_sitearch}/satsolver.so
-%endif
-%doc bindings/ruby/html
-
-%files -n python-satsolver
-%defattr(-,root,root,-)
-#%doc swig/python/examples/*.py
-%{py_sitedir}/_satsolver.so
-%{py_sitedir}/satsolver.py*
-
-%files -n perl-satsolver
-%defattr(-,root,root,-)
-%{perl_vendorarch}/satsolver.so
-%{perl_vendorlib}/satsolver.pm
-
-%files -n satsolver-bindings-devel
-%defattr(-,root,root,-)
-%dir %{prefix}/share/satsolver-bindings
-%{prefix}/share/satsolver-bindings/*.i
-%{prefix}/share/satsolver-bindings/*.h
 
 %changelog

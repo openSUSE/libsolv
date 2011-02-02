@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Feb  2 09:24:42 UTC 2011 - kkaempf@novell.com
+
+- Split off 'applayer' and 'bindings' as a separate package
+  to make the bindings more independant of libsatsolver
+- 0.16.4
+
+-------------------------------------------------------------------
 Tue Jan 25 09:52:48 CET 2011 - ma@suse.de
 
 - Apply patch introducing armv7nhl:armv7h
