@@ -1018,7 +1018,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   int ndirmap;
   Id *keyused;
   unsigned char *repodataused;
-  int anyrepodataused;
+  int anyrepodataused = 0;
   
   struct cbdata cbdata;
   int needrels;
