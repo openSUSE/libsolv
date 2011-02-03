@@ -98,6 +98,12 @@ sat_timems(unsigned int subtract)
   return r - subtract;
 }
 
+#ifdef HAVE_OWN_QSORT
+#define __FBSDID(x)
+#define I_AM_QSORT_R
+#include "qsort.c"
+#endif
+
 /* bsd's qsort_r has different arguments, so we define our
    own version in case we need to do some clever mapping
  
@@ -107,7 +113,7 @@ void
 sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
 {
 #if defined(__GLIBC__)
-# if __GLIBC_PREREQ(2, 8)
+# if __GLIBC_PREREQ(2, 8) || defined(HAVE_OWN_QSORT)
   qsort_r(base, nmemb, size, compar, compard);
 # else
   /* backported for SLE10-SP2 */
