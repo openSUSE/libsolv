@@ -109,6 +109,10 @@ CMAKE_FLAGS=
 %if 0%{?fedora_version}
 CMAKE_FLAGS="-DFEDORA=1"
 %endif
+# Where does RHEL provide qsort_r ?
+%if 0%{?rhel_version} > 0 || 0%{?centos_version} > 0
+export CFLAGS="$RPM_OPT_FLAGS -DHAVE_OWN_QSORT=1"
+%endif
 
 cmake   $CMAKE_FLAGS \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
