@@ -99,9 +99,7 @@ sat_timems(unsigned int subtract)
 }
 
 #ifdef HAVE_OWN_QSORT
-#define __FBSDID(x)
-#define I_AM_QSORT_R
-#include "qsort.c"
+#include "qsort_r.c"
 #endif
 
 /* bsd's qsort_r has different arguments, so we define our
