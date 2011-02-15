@@ -98,29 +98,54 @@ sat_timems(unsigned int subtract)
   return r - subtract;
 }
 
-#ifdef HAVE_OWN_QSORT
+#ifdef USE_OWN_QSORT
 #include "qsort_r.c"
-#endif
+#else
 
 /* bsd's qsort_r has different arguments, so we define our
    own version in case we need to do some clever mapping
  
    see also: http://sources.redhat.com/ml/libc-alpha/2008-12/msg00003.html
  */
+#if defined(__GLIBC__)
+
 void
 sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
 {
-#if defined(__GLIBC__)
-# if __GLIBC_PREREQ(2, 8) || defined(HAVE_OWN_QSORT)
+# if __GLIBC_PREREQ(2, 8)
   qsort_r(base, nmemb, size, compar, compard);
 # else
   /* backported for SLE10-SP2 */
   __qsort_r(base, nmemb, size, compar, compard);
 # endif
-#else
-# error please add correct qsort_r call here, note different ordering on BSD
-#endif
 }
+
+#else
+
+struct sat_sort_data {
+  int (*compar)(const void *, const void *, void *);
+  void *compard;
+};
+
+static int
+sat_sort_helper(void *compard, const void *a, const void *b)
+{
+  struct sat_sort_data *d = compard;
+  return (*d->compar)(a, b, d->compard);
+}
+
+void
+sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
+{
+  struct sat_sort_data d;
+  d.compar = compar;
+  d.compard = compard;
+  qsort_r(base, nmemb, size, &d, sat_sort_helper);
+}
+
+#endif
+
+#endif	/* USE_OWN_QSORT */
 
 char *
 sat_dupjoin(const char *str1, const char *str2, const char *str3)
