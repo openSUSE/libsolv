@@ -9,8 +9,9 @@ import tempfile
 import time
 import subprocess
 import fnmatch
+import rpm
 from stat import *
-from solv import Pool, Repo, Dataiterator, Job
+from solv import Pool, Repo, Dataiterator, Job, Solver, Transaction
 from iniparse import INIConfig
 from optparse import OptionParser
 
@@ -168,7 +169,7 @@ def limitjobs(pool, jobs, flags, evr):
 		how |= Job.SOLVER_SETEVR
 	    else:
 		how |= Job.SOLVER_SETEV
-	njobs.append(Job(how, what))
+	njobs.append(pool.Job(how, what))
     return njobs
 
 def limitjobs_arch(pool, jobs, flags, evr):
@@ -198,9 +199,9 @@ def mkjobs(pool, cmd, arg):
 	if len(matches):
 	    print "[using file list match for '%s']" % arg
 	    if len(matches) > 1:
-		return [ Job(Job.SOLVER_SOLVABLE_ONE_OF, pool.towhatprovides(matches)) ]
+		return [ pool.Job(Job.SOLVER_SOLVABLE_ONE_OF, pool.towhatprovides(matches)) ]
 	    else:
-		return [ Job(Job.SOLVER_SOLVABLE | Job.SOLVER_NOAUTOSET, matches[0]) ]
+		return [ pool.Job(Job.SOLVER_SOLVABLE | Job.SOLVER_NOAUTOSET, matches[0]) ]
     m = re.match(r'(.+?)\s*([<=>]+)\s*(.+?)$', arg)
     if m:
 	(name, rel, evr) = m.group(1, 2, 3);
@@ -245,12 +246,12 @@ def depglob(pool, name, globname, globdep):
 	match = False
 	for s in pool.providers(id):
 	    if globname and s.nameid == id:
-		return [ Job(Job.SOLVER_SOLVABLE_NAME, id) ]
+		return [ pool.Job(Job.SOLVER_SOLVABLE_NAME, id) ]
 	    match = True
 	if match:
 	    if globname and globdep:
 		print "[using capability match for '%s']" % name
-	    return [ Job(Job.SOLVER_SOLVABLE_PROVIDES, id) ]
+	    return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) ]
     if not re.search(r'[[*?]', name):
 	return []
     if globname:
@@ -260,7 +261,7 @@ def depglob(pool, name, globname, globdep):
 	    if s.installable() and fnmatch.fnmatch(s.name, name):
 		idmatches[s.nameid] = True
 	if len(idmatches):
-	    return [ Job(Job.SOLVER_SOLVABLE_NAME, id) for id in sorted(idmatches.keys()) ]
+	    return [ pool.Job(Job.SOLVER_SOLVABLE_NAME, id) for id in sorted(idmatches.keys()) ]
     if globdep:
 	# try dependency glob
 	idmatches = {}
@@ -269,7 +270,7 @@ def depglob(pool, name, globname, globdep):
 		idmatches[id] = True
 	if len(idmatches):
 	    print "[using capability match for '%s']" % name
-	    return [ Job(Job.SOLVER_SOLVABLE_PROVIDES, id) for id in sorted(idmatches.keys()) ]
+	    return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) for id in sorted(idmatches.keys()) ]
     return []
     
 
@@ -379,7 +380,7 @@ if cmd == 'se' or cmd == 'search':
 	matches[di.solvid] = True
     for solvid in sorted(matches.keys()):
 	print " - %s: %s" % (pool.solvid2str(solvid), pool.lookup_str(solvid, solv.SOLVABLE_SUMMARY))
-    exit(0)
+    sys.exit(0)
 
 # XXX: insert rewrite_repos function
 
@@ -394,7 +395,7 @@ for arg in args:
 if cmd == 'li' or cmd == 'list' or cmd == 'info':
     if not jobs:
 	print "no package matched."
-	exit(1)
+	sys.exit(1)
     for job in jobs:
 	for s in pool.jobsolvables(job):
 	    if cmd == 'info':
@@ -412,14 +413,14 @@ if cmd == 'li' or cmd == 'list' or cmd == 'info':
 	    else:
 		print "  - %s [%s]" % (s.str(), s.repo.name)
 		print "    %s" % s.lookup_str(solv.SOLVABLE_SUMMARY)
-    exit(0)
+    sys.exit(0)
 
 if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'up':
     if cmd == 'up' and not jobs:
-	jobs = [ Job(Job.SOLVER_SOLVABLE_ALL, 0) ]
+	jobs = [ pool.Job(Job.SOLVER_SOLVABLE_ALL, 0) ]
     if not jobs:
 	print "no package matched."
-	exit(1)
+	sys.exit(1)
     for job in jobs:
 	if cmd == 'up':
 	    if job.how == Job.SOLVER_SOLVABLE_ALL or filter(lambda s: s.isinstalled(), pool.jobsolvables(job)):
@@ -433,12 +434,177 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 
     #pool.set_debuglevel(2)
     solver = pool.create_solver()
+    solver.ignorealreadyrecommended = True
     problems = solver.solve(jobs)
     if problems:
 	for problem in problems:
 	    print "Problem %d:" % problem.id
 	    r = problem.findproblemrule()
-	    type, source, target, dep = solver.ruleinfo(r)
-	    print type, source, target, dep
+	    type, source, target, dep = r.info()
+	    if type == Solver.SOLVER_RULE_DISTUPGRADE:
+		print "%s does not belong to a distupgrade repository" % source.str()
+	    elif type == Solver.SOLVER_RULE_INFARCH:
+		print "%s has inferiour architecture" % source.str()
+	    elif type == Solver.SOLVER_RULE_UPDATE:
+		print "problem with installed package %s" % source.str()
+	    elif type == Solver.SOLVER_RULE_JOB:
+		print "conflicting requests"
+	    elif type == Solver.SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
+		print "nothing provides requested %s" % pool.dep2str(dep)
+	    elif type == Solver.SOLVER_RULE_RPM:
+		print "some dependency problem"
+	    elif type == Solver.SOLVER_RULE_RPM_NOT_INSTALLABLE:
+		print "package %s is not installable" % source.str()
+	    elif type == Solver.SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
+		print "nothing provides %s needed by %s" % (pool.dep2str(dep), source.str())
+	    elif type == Solver.SOLVER_RULE_RPM_SAME_NAME:
+		print "cannot install both %s and %s" % (source.str(), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_CONFLICT:
+		print "package %s conflicts with %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
+		print "package %s obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES:
+		print "installed package %s obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
+		print "package %s implicitely obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_REQUIRES:
+		print "package %s requires %s, but none of the providers can be installed" % (source.str(), pool.dep2str(dep))
+	    elif type == Solver.SOLVER_RULE_RPM_SELF_CONFLICT:
+		print "package %s conflicts with %s provided by itself" % (source.str(), pool.dep2str(dep))
+	    else:
+		print "bad rule type", type
+	    solutions = problem.solutions()
+	    for solution in solutions:
+	        print "  Solution %d:" % solution.id
+	        elements = solution.elements()
+                for element in elements:
+		    etype = element.type
+		    if etype == Solver.SOLVER_SOLUTION_JOB:
+			print "  - remove job %d" % element.jobidx
+		    elif etype == Solver.SOLVER_SOLUTION_INFARCH:
+			if element.solvable.isinstalled():
+			    print "  - keep %s despite the inferior architecture" % element.solvable.str()
+			else:
+			    print "  - install %s despite the inferior architecture" % element.solvable.str()
+		    elif etype == Solver.SOLVER_SOLUTION_DISTUPGRADE:
+			if element.solvable.isinstalled():
+			    print "  - keep obsolete %s" % element.solvable.str()
+			else:
+			    print "  - install %s from excluded repository" % element.solvable.str()
+		    elif etype == Solver.SOLVER_SOLUTION_REPLACE:
+			print "  - allow replacement of %s with %s" % (element.solvable.str(), element.replacement.str())
+		    elif etype == Solver.SOLVER_SOLUTION_DEINSTALL:
+			print "  - allow deinstallation of %s" % element.solvable.str()
+	sys.exit(1)
+    # no problems, show transaction
+    trans = solver.transaction()
+    del solver
+    if trans.isempty():
+        print "Nothing to do."
+        sys.exit(0)
+    print
+    print "Transaction summary:"
+    print
+    for ctype, fromid, toid, pkgs in trans.classify():
+	if ctype == Transaction.SOLVER_TRANSACTION_ERASE:
+	    print "%d erased packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_INSTALL:
+	    print "%d installed packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_REINSTALLED:
+	    print "%d reinstalled packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+	    print "%d downgraded packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_CHANGED:
+	    print "%d changed packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_UPGRADED:
+	    print "%d upgraded packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
+	    print "%d vendor changes from '%s' to '%s':" % (len(pkgs), pool.id2str(fromid), pool.id2str(toid))
+	elif ctype == Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
+	    print "%d arch changes from '%s' to '%s':" % (len(pkgs), pool.id2str(fromid), pool.id2str(toid))
+	else:
+	    continue
+	for p in pkgs:
+	    if ctype == Transaction.SOLVER_TRANSACTION_UPGRADED or ctype == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+		op = trans.othersolvable(p)
+		print "  - %s -> %s" % (p.str(), op.str())
+	    else:
+		print "  - %s" % p.str()
+        print
+    print "install size change: %d K" % trans.calc_installsizechange()
+    print
     
 # vim: sw=4 et
+    while True:
+	sys.stdout.write("OK to continue (y/n)? ")
+	sys.stdout.flush()
+	yn = sys.stdin.readline().strip()
+	if yn == 'y': break
+	if yn == 'n': sys.exit(1)
+    newpkgs, keptpkgs = trans.installedresult()
+    newpkgsfp = {}
+    if newpkgs:
+	downloadsize = 0
+	for p in newpkgs:
+	    downloadsize += p.lookup_num(solv.SOLVABLE_DOWNLOADSIZE);
+	print "Downloading %d packages, %d K" % (len(newpkgs), downloadsize)
+	for p in newpkgs:
+	    repo = p.repo.appdata
+	    location, medianr = p.lookup_location()
+	    if not location:
+		continue
+	    if sysrepo['handle'].nsolvables:
+		pname = p.name
+		di = p.repo.dataiterator_new(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
+		di.prepend_keyname(solv.REPOSITORY_DELTAINFO);
+		for d in di:
+		    d.setpos_parent()
+		    if pool.lookup_id(solv.SOLVID_POS, solv.DELTA_PACKAGE_EVR) != p.evrid or pool.lookup_id(solv.SOLVID_POS, solv.DELTA_PACKAGE_ARCH) != p.archid:
+			continue
+		    baseevrid = pool.lookup_id(solv.SOLVID_POS, solv.DELTA_BASE_EVR)
+		    for installedp in pool.providers(p.nameid):
+			if installedp.isinstalled() and installedp.nameid == p.nameid and installedp.archid == p.archid and installedp.evrid == baseevrid:
+			    candidate = installedp
+		    # add applydeltarpm code here...
+	    chksum, chksumtype = p.lookup_bin_checksum(solv.SOLVABLE_CHECKSUM);
+	    f = curlfopen(repo, location, False, chksum, chksumtype)
+	    if not f:
+		sys.exit("\n%s: %s not found in repository" % (repo['alias'], location))
+	    newpkgsfp[p.id] = f
+	    sys.stdout.write(".")
+	    sys.stdout.flush()
+	print
+    print "Committing transaction:"
+    print
+    ts = rpm.TransactionSet('/')
+    for p in trans.steps():
+	type = trans.steptype(p, Transaction.SOLVER_TRANSACTION_RPM_ONLY)
+	if type == Transaction.SOLVER_TRANSACTION_ERASE:
+	    rpmdbid = p.lookup_num(solv.RPM_RPMDBID)
+	    if not rpmdbid:
+		sys.exit("\ninternal error: installed package %s has no rpmdbid\n" % p.str())
+	    ts.addErase(rpmdbid)
+	elif type == Transaction.SOLVER_TRANSACTION_INSTALL:
+	    f = newpkgsfp[p.id]
+	    h = ts.hdrFromFdno(solv.xfileno(f))
+	    os.lseek(solv.xfileno(f), 0, os.SEEK_SET)
+	    ts.addInstall(h, p, 'u')
+	elif type == Transaction.SOLVER_TRANSACTION_MULTIINSTALL:
+	    f = newpkgsfp[p.id]
+	    h = ts.hdrFromFdno(solv.xfileno(f))
+	    os.lseek(solv.xfileno(f), 0, os.SEEK_SET)
+	    ts.addInstall(h, p, 'i')
+    checkproblems = ts.check()
+    if checkproblems:
+	print checkproblems
+	sys.exit("Sorry.")
+    ts.order()
+    def runCallback(reason, amount, total, p, fps):
+	if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
+	    return solv.xfileno(fps[p.id])
+	if reason == rpm.RPMCALLBACK_INST_START:
+	    print "install", p.str()
+    runproblems = ts.run(runCallback, newpkgsfp)
+    if runproblems:
+	print runproblems
+	sys.exit(1)

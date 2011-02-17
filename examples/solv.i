@@ -1,3 +1,12 @@
+#
+##if defined(SWIGRUBY)
+#  %rename("to_s") string();
+##endif
+##if defined(SWIGPYTHON)
+#  %rename("__str__") string();
+##endif
+#
+
 %module solv
 
 %typemap(in) (Id *idarray, int idarraylen) {
@@ -90,13 +99,20 @@
 #define true 1
 #define false 1
 
+#define SOLVER_SOLUTION_DEINSTALL -100
+#define SOLVER_SOLUTION_REPLACE -101
 typedef struct chksum Chksum;
 typedef int bool;
 
 typedef struct {
   Pool* pool;
   Id id;
-} xSolvable;
+} XSolvable;
+
+typedef struct {
+  Solver* solv;
+  Id id;
+} XRule;
 
 typedef struct {
   Pool *pool;
@@ -114,6 +130,7 @@ typedef struct {
 } Repo_solvable_iterator;
 
 typedef struct {
+  Pool *pool;
   Id how;
   Id what;
 } Job;
@@ -123,13 +140,22 @@ typedef struct {
   Id id;
 } Problem;
 
-static inline xSolvable *xSolvable_create(Pool *pool, Id id)
-{
-  xSolvable *s = sat_calloc(sizeof(*s), 1);
-  s->pool = pool;
-  s->id = id;
-  return s;
-}
+typedef struct {
+  Solver *solv;
+  Id problemid;
+  Id id;
+} Solution;
+
+typedef struct {
+  Solver *solv;
+  Id problemid;
+  Id solutionid;
+  Id id;
+
+  Id type;
+  Id p;
+  Id rp;
+} Solutionelement;
 
 %}
 
@@ -147,6 +173,16 @@ typedef int Id;
 %constant int REL_ARCH;
 
 
+typedef struct {
+  Pool* const pool;
+  Id const id;
+} XSolvable;
+
+typedef struct {
+  Solver* const solv;
+  Id const id;
+} XRule;
+
 # put before pool/repo so we can access the constructor
 %nodefaultctor Dataiterator;
 %nodefaultdtor Dataiterator;
@@ -156,6 +192,13 @@ typedef struct _Dataiterator {
   const Id solvid;
 } Dataiterator;
 
+typedef struct {
+  Pool * const pool;
+  Id how;
+  Id what;
+} Job;
+
+%nodefaultctor Pool;
 %nodefaultdtor Pool;
 typedef struct {
 } Pool;
@@ -166,25 +209,31 @@ typedef struct _Repo {
   const char * const name;
   int priority;
   int subpriority;
+  int const nsolvables;
+#if defined(SWIGPYTHON)
   PyObject *appdata;
+#endif
+#if defined(SWIGRUBY)
+  VALUE appdata;
+#endif
+#if defined(SWIGPERL)
+  SV *appdata;
+#endif
 } Repo;
-
-%nodefaultctor xSolvable;
-typedef struct {
-  Pool* const pool;
-  const Id id;
-} xSolvable;
 
 %nodefaultctor Pool_solvable_iterator;
 typedef struct {} Pool_solvable_iterator;
+
 %nodefaultctor Pool_repo_iterator;
 typedef struct {} Pool_repo_iterator;
+
 %nodefaultctor Repo_solvable_iterator;
 typedef struct {} Repo_solvable_iterator;
 
 %nodefaultctor Solver;
 %nodefaultdtor Solver;
 typedef struct {
+  Pool * const pool;
   bool ignorealreadyrecommended;
   bool dosplitprovides;
   bool fixsystem;
@@ -200,6 +249,7 @@ typedef struct chksum {} Chksum;
 %rename(xfopen) sat_xfopen;
 %rename(xfopen_fd) sat_xfopen_fd;
 %rename(xfclose) sat_xfclose;
+%rename(xfileno) sat_xfileno;
 
 FILE *sat_xfopen(const char *fn);
 FILE *sat_xfopen_fd(const char *fn, int fd);
@@ -207,16 +257,37 @@ FILE *sat_xfopen_fd(const char *fn, int fd);
   int sat_xfclose(FILE *fp) {
     return fclose(fp);
   }
+  int sat_xfileno(FILE *fp) {
+    return fileno(fp);
+  }
 }
-typedef struct {
-  Id how;
-  Id what;
-} Job;
 
 typedef struct {
-  Solver *solv;
-  Id id;
+  Solver * const solv;
+  Id const id;
 } Problem;
+
+typedef struct {
+  Solver * const solv;
+  Id const problemid;
+  Id const id;
+} Solution;
+
+typedef struct {
+  Solver *const solv;
+  Id const problemid;
+  Id const solutionid;
+  Id const id;
+  Id const type;
+} Solutionelement;
+
+%nodefaultctor Transaction;
+%nodefaultdtor Transaction;
+typedef struct {
+  Pool * const pool;
+} Transaction;
+
+
 
 %extend Job {
   static const Id SOLVER_SOLVABLE = SOLVER_SOLVABLE;
@@ -249,8 +320,9 @@ typedef struct {
   static const Id SOLVER_NOAUTOSET = SOLVER_NOAUTOSET;
   static const Id SOLVER_SETMASK = SOLVER_SETMASK;
 
-  Job(Id how, Id what) {
-    Job *job = sat_calloc(sizeof(*job), 1);
+  Job(Pool *pool, Id how, Id what) {
+    Job *job = sat_calloc(1, sizeof(*job));
+    job->pool = pool;
     job->how = how;
     job->what = what;
     return job;
@@ -265,7 +337,7 @@ typedef struct {
     sat_chksum_free($self, 0);
   }
   void add(const char *str) {
-    sat_chksum_add($self, str, strlen((char *)$self));
+    sat_chksum_add($self, str, strlen((char *)str));
   }
   void addfp(FILE *fp) {
     char buf[4096];
@@ -369,7 +441,7 @@ typedef struct {
   %{
   SWIGINTERN Pool_solvable_iterator * Pool_solvables_get(Pool *pool) {
     Pool_solvable_iterator *s;
-    s = sat_calloc(sizeof(*s), 1);
+    s = sat_calloc(1, sizeof(*s));
     s->pool = pool;
     s->id = 0;
     return s;
@@ -379,7 +451,7 @@ typedef struct {
   %{
   SWIGINTERN Pool_repo_iterator * Pool_repos_get(Pool *pool) {
     Pool_repo_iterator *s;
-    s = sat_calloc(sizeof(*s), 1);
+    s = sat_calloc(1, sizeof(*s));
     s->pool = pool;
     s->id = 0;
     return s;
@@ -425,13 +497,18 @@ typedef struct {
       queue_push(&q, p);
     return q;
   }
+  Job *Job(Id how, Id what) {
+    return new_Job($self, how, what);
+  }
 
-  %pythoncode %{
+#if defined(SWIGPYTHON)
+  %pythoncode {
     def jobsolvables (self, *args):
       return [ self.solvables[id] for id in self.jobsolvids(*args) ]
     def providers(self, *args):
       return [ self.solvables[id] for id in self.providerids(*args) ]
-  %}
+  }
+#endif
 
   Id towhatprovides(Queue q) {
     return pool_queuetowhatprovides($self, &q);
@@ -532,7 +609,7 @@ typedef struct {
   %{
   SWIGINTERN Repo_solvable_iterator * Repo_solvables_get(Repo *repo) {
     Repo_solvable_iterator *s;
-    s = sat_calloc(sizeof(*s), 1);
+    s = sat_calloc(1, sizeof(*s));
     s->repo = repo;
     s->id = 0;
     return s;
@@ -550,7 +627,7 @@ typedef struct {
   static const int SEARCH_COMPLETE_FILELIST = SEARCH_COMPLETE_FILELIST;
 
   Dataiterator(Pool *pool, Repo *repo, Id p, Id key, const char *match, int flags) {
-    Dataiterator *di = sat_calloc(sizeof(*di), 1);
+    Dataiterator *di = sat_calloc(1, sizeof(*di));
     dataiterator_init(di, pool, repo, p, key, match, flags);
     return di;
   }
@@ -573,7 +650,7 @@ typedef struct {
     if (!dataiterator_step($self)) {
       return 0;
     }
-    ndi = sat_calloc(sizeof(*ndi), 1);
+    ndi = sat_calloc(1, sizeof(*ndi));
     dataiterator_init_clone(ndi, $self);
     return ndi;
   }
@@ -588,10 +665,10 @@ typedef struct {
   }
 
   %newobject solvable;
-  xSolvable * const solvable;
+  XSolvable * const solvable;
   %{
-  SWIGINTERN xSolvable *Dataiterator_solvable_get(Dataiterator *di) {
-    return di->solvid ? xSolvable_create(di->pool, di->solvid) : 0;
+  SWIGINTERN XSolvable *Dataiterator_solvable_get(Dataiterator *di) {
+    return new_XSolvable(di->pool, di->solvid);
   }
   %}
   Id key_id() {
@@ -636,21 +713,21 @@ typedef struct {
     }
   }
   %newobject next;
-  xSolvable *next() {
+  XSolvable *next() {
     Pool *pool = $self->pool;
-    xSolvable *s;
+    XSolvable *s;
     if ($self->id >= pool->nsolvables)
       return 0;
     while (++$self->id < pool->nsolvables)
       if (pool->solvables[$self->id].repo)
-        return xSolvable_create(pool, $self->id);
+        return new_XSolvable(pool, $self->id);
     return 0;
   }
   %newobject __getitem__;
-  xSolvable *__getitem__(Id key) {
+  XSolvable *__getitem__(Id key) {
     Pool *pool = $self->pool;
     if (key > 0 && key < pool->nsolvables && pool->solvables[key].repo)
-      return xSolvable_create(pool, key);
+      return new_XSolvable(pool, key);
     return 0;
   }
 }
@@ -697,37 +774,45 @@ typedef struct {
     }
   }
   %newobject next;
-  xSolvable *next() {
+  XSolvable *next() {
     Repo *repo = $self->repo;
     Pool *pool = repo->pool;
-    xSolvable *s;
+    XSolvable *s;
     if (repo->start > 0 && $self->id < repo->start)
       $self->id = repo->start - 1;
     if ($self->id >= repo->end)
       return 0;
     while (++$self->id < repo->end)
       if (pool->solvables[$self->id].repo == repo)
-        return xSolvable_create(pool, $self->id);
+        return new_XSolvable(pool, $self->id);
     return 0;
   }
   %newobject __getitem__;
-  xSolvable *__getitem__(Id key) {
+  XSolvable *__getitem__(Id key) {
     Repo *repo = $self->repo;
     Pool *pool = repo->pool;
     if (key > 0 && key < pool->nsolvables && pool->solvables[key].repo == repo)
-      return xSolvable_create(pool, key);
+      return new_XSolvable(pool, key);
     return 0;
   }
 }
 
-%extend xSolvable {
+%extend XSolvable {
+  XSolvable(Pool *pool, Id id) {
+    if (!id)
+      return 0;
+    XSolvable *s = sat_calloc(1, sizeof(*s));
+    s->pool = pool;
+    s->id = id;
+    return s;
+  }
   const char *str() {
     return solvid2str($self->pool, $self->id);
   }
   const char *lookup_str(Id keyname) {
     return pool_lookup_str($self->pool, $self->id, keyname);
   }
-  Id lookup_id(Id entry, Id keyname) {
+  Id lookup_id(Id keyname) {
     return pool_lookup_id($self->pool, $self->id, keyname);
   }
   unsigned int lookup_num(Id keyname, unsigned int notfound = 0) {
@@ -751,6 +836,9 @@ typedef struct {
     const char *b = pool_lookup_checksum($self->pool, $self->id, keyname, OUTPUT);
     return b;
   }
+  const char *lookup_location(int *OUTPUT) {
+    return solvable_get_location($self->pool->solvables + $self->id, OUTPUT);
+  }
   bool installable() {
     return pool_installable($self->pool, pool_id2solvable($self->pool, $self->id));
   }
@@ -761,46 +849,46 @@ typedef struct {
 
   const char * const name;
   %{
-    SWIGINTERN const char *xSolvable_name_get(xSolvable *xs) {
+    SWIGINTERN const char *XSolvable_name_get(XSolvable *xs) {
       Pool *pool = xs->pool;
       return id2str(pool, pool->solvables[xs->id].name);
     }
   %}
   Id const nameid;
   %{
-    SWIGINTERN Id xSolvable_nameid_get(xSolvable *xs) {
+    SWIGINTERN Id XSolvable_nameid_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].name;
     }
   %}
   const char * const evr;
   %{
-    SWIGINTERN const char *xSolvable_evr_get(xSolvable *xs) {
+    SWIGINTERN const char *XSolvable_evr_get(XSolvable *xs) {
       Pool *pool = xs->pool;
       return id2str(pool, pool->solvables[xs->id].evr);
     }
   %}
   Id const evrid;
   %{
-    SWIGINTERN Id xSolvable_evrid_get(xSolvable *xs) {
+    SWIGINTERN Id XSolvable_evrid_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].evr;
     }
   %}
   const char * const arch;
   %{
-    SWIGINTERN const char *xSolvable_arch_get(xSolvable *xs) {
+    SWIGINTERN const char *XSolvable_arch_get(XSolvable *xs) {
       Pool *pool = xs->pool;
       return id2str(pool, pool->solvables[xs->id].arch);
     }
   %}
   Id const archid;
   %{
-    SWIGINTERN Id xSolvable_archid_get(xSolvable *xs) {
+    SWIGINTERN Id XSolvable_archid_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].arch;
     }
   %}
   Repo * const repo;
   %{
-    SWIGINTERN Repo *xSolvable_repo_get(xSolvable *xs) {
+    SWIGINTERN Repo *XSolvable_repo_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].repo;
     }
   %}
@@ -809,15 +897,15 @@ typedef struct {
 %extend Problem {
   Problem(Solver *solv, Id id) {
     Problem *p;
-    p = sat_calloc(sizeof(*p), 1);
+    p = sat_calloc(1, sizeof(*p));
     p->solv = solv;
     p->id = id;
     return p;
   }
-  Id findproblemrule() {
+  Id findproblemrule_helper() {
     return solver_findproblemrule($self->solv, $self->id);
   }
-  Queue findallproblemrules(int unfiltered=0) {
+  Queue findallproblemrules_helper(int unfiltered=0) {
     Solver *solv = $self->solv;
     Id probr;
     int i, j;
@@ -838,25 +926,249 @@ typedef struct {
       }
     return q;
   }
+  int solution_count() {
+    return solver_solution_count($self->solv, $self->id);
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def findproblemrule(self):
+      return XRule(self.solv, self.findproblemrule_helper())
+    def findallproblemrules(self, unfiltered=0):
+      return [ XRule(self.solv, i) for i in self.findallproblemrules_helper(unfiltered) ]
+    def solutions(self):
+      return [ Solution(self, i) for i in range(1, self.solution_count() + 1) ];
+  }
+#endif
+}
+
+%extend Solution {
+  Solution(Problem *p, Id id) {
+    Solution *s;
+    s = sat_calloc(1, sizeof(*s));
+    s->solv = p->solv;
+    s->problemid = p->id;
+    s->id = id;
+    return s;
+  }
+  int element_count() {
+    return solver_solutionelement_count($self->solv, $self->problemid, $self->id);
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def elements(self):
+      return [ Solutionelement(self, i) for i in range(1, self.element_count() + 1) ];
+  }
+#endif
+}
+
+%extend Solutionelement {
+  Solutionelement(Solution *s, Id id) {
+    Solutionelement *e;
+    e = sat_calloc(1, sizeof(*e));
+    e->solv = s->solv;
+    e->problemid = s->problemid;
+    e->solutionid = s->id;
+    e->id = id;
+    solver_next_solutionelement(e->solv, e->problemid, e->solutionid, e->id - 1, &e->p, &e->rp);
+    if (e->p > 0) {
+      e->type = e->rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_DEINSTALL;
+    } else {
+      e->type = e->p;
+      e->p = e->rp;
+      e->rp = 0;
+    }
+    return e;
+  }
+  %newobject solvable;
+  XSolvable * const solvable;
+  %newobject replacement;
+  XSolvable * const replacement;
+  int const jobidx;
+  %{
+    SWIGINTERN XSolvable *Solutionelement_solvable_get(Solutionelement *e) {
+      return new_XSolvable(e->solv->pool, e->p);
+    }
+    SWIGINTERN XSolvable *Solutionelement_replacement_get(Solutionelement *e) {
+      return new_XSolvable(e->solv->pool, e->rp);
+    }
+    SWIGINTERN int Solutionelement_jobidx_get(Solutionelement *e) {
+      return (e->p - 1) / 2;
+    }
+  %}
 }
 
 %extend Solver {
+  static const int SOLVER_RULE_UNKNOWN = SOLVER_RULE_UNKNOWN;
+  static const int SOLVER_RULE_RPM = SOLVER_RULE_RPM;
+  static const int SOLVER_RULE_RPM_NOT_INSTALLABLE = SOLVER_RULE_RPM_NOT_INSTALLABLE;
+  static const int SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP = SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP;
+  static const int SOLVER_RULE_RPM_PACKAGE_REQUIRES = SOLVER_RULE_RPM_PACKAGE_REQUIRES;
+  static const int SOLVER_RULE_RPM_SELF_CONFLICT = SOLVER_RULE_RPM_SELF_CONFLICT;
+  static const int SOLVER_RULE_RPM_PACKAGE_CONFLICT = SOLVER_RULE_RPM_PACKAGE_CONFLICT;
+  static const int SOLVER_RULE_RPM_SAME_NAME = SOLVER_RULE_RPM_SAME_NAME;
+  static const int SOLVER_RULE_RPM_PACKAGE_OBSOLETES = SOLVER_RULE_RPM_PACKAGE_OBSOLETES;
+  static const int SOLVER_RULE_RPM_IMPLICIT_OBSOLETES = SOLVER_RULE_RPM_IMPLICIT_OBSOLETES;
+  static const int SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES = SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES;
+  static const int SOLVER_RULE_UPDATE = SOLVER_RULE_UPDATE;
+  static const int SOLVER_RULE_FEATURE = SOLVER_RULE_FEATURE;
+  static const int SOLVER_RULE_JOB = SOLVER_RULE_JOB;
+  static const int SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP = SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
+  static const int SOLVER_RULE_DISTUPGRADE = SOLVER_RULE_DISTUPGRADE;
+  static const int SOLVER_RULE_INFARCH = SOLVER_RULE_INFARCH;
+  static const int SOLVER_RULE_CHOICE = SOLVER_RULE_CHOICE;
+  static const int SOLVER_RULE_LEARNT = SOLVER_RULE_LEARNT;
+
+  static const int SOLVER_SOLUTION_JOB = SOLVER_SOLUTION_JOB;
+  static const int SOLVER_SOLUTION_INFARCH = SOLVER_SOLUTION_INFARCH;
+  static const int SOLVER_SOLUTION_DISTUPGRADE = SOLVER_SOLUTION_DISTUPGRADE;
+  static const int SOLVER_SOLUTION_DEINSTALL = SOLVER_SOLUTION_DEINSTALL;
+  static const int SOLVER_SOLUTION_REPLACE = SOLVER_SOLUTION_REPLACE;
+
   ~Solver() {
     solver_free($self);
   }
-  %pythoncode %{
+#if defined(SWIGPYTHON)
+  %pythoncode {
     def solve(self, jobs):
       j = []
       for job in jobs: j += [job.how, job.what]
-      nprob = self.solve_wrap(j)
+      nprob = self.solve_helper(j)
       return [ Problem(self, pid) for pid in range(1, nprob + 1) ]
-  %}
-  int solve_wrap(Queue jobs) {
+  }
+#endif
+  int solve_helper(Queue jobs) {
     solver_solve($self, &jobs);
     return solver_problem_count($self);
   }
-  %apply Id *OUTPUT { Id *source, Id *target, Id *dep };
-  int ruleinfo(Id ruleid, Id *source, Id *target, Id *dep) {
-    return solver_ruleinfo($self, ruleid, source, target, dep);
+  %newobject transaction;
+  Transaction *transaction() {
+    Transaction *t;
+    t = sat_calloc(1, sizeof(*t));
+    transaction_init_clone(t, &$self->trans);
+    return t;
   }
+}
+
+%extend Transaction {
+  static const int SOLVER_TRANSACTION_IGNORE = SOLVER_TRANSACTION_IGNORE;
+  static const int SOLVER_TRANSACTION_ERASE = SOLVER_TRANSACTION_ERASE;
+  static const int SOLVER_TRANSACTION_REINSTALLED = SOLVER_TRANSACTION_REINSTALLED;
+  static const int SOLVER_TRANSACTION_DOWNGRADED = SOLVER_TRANSACTION_DOWNGRADED;
+  static const int SOLVER_TRANSACTION_CHANGED = SOLVER_TRANSACTION_CHANGED;
+  static const int SOLVER_TRANSACTION_UPGRADED = SOLVER_TRANSACTION_UPGRADED;
+  static const int SOLVER_TRANSACTION_OBSOLETED = SOLVER_TRANSACTION_OBSOLETED;
+  static const int SOLVER_TRANSACTION_INSTALL = SOLVER_TRANSACTION_INSTALL;
+  static const int SOLVER_TRANSACTION_REINSTALL = SOLVER_TRANSACTION_REINSTALL;
+  static const int SOLVER_TRANSACTION_DOWNGRADE = SOLVER_TRANSACTION_DOWNGRADE;
+  static const int SOLVER_TRANSACTION_CHANGE = SOLVER_TRANSACTION_CHANGE;
+  static const int SOLVER_TRANSACTION_UPGRADE = SOLVER_TRANSACTION_UPGRADE;
+  static const int SOLVER_TRANSACTION_OBSOLETES = SOLVER_TRANSACTION_OBSOLETES;
+  static const int SOLVER_TRANSACTION_MULTIINSTALL = SOLVER_TRANSACTION_MULTIINSTALL;
+  static const int SOLVER_TRANSACTION_MULTIREINSTALL = SOLVER_TRANSACTION_MULTIREINSTALL;
+  static const int SOLVER_TRANSACTION_MAXTYPE = SOLVER_TRANSACTION_MAXTYPE;
+  static const int SOLVER_TRANSACTION_SHOW_ACTIVE = SOLVER_TRANSACTION_SHOW_ACTIVE;
+  static const int SOLVER_TRANSACTION_SHOW_ALL = SOLVER_TRANSACTION_SHOW_ALL;
+  static const int SOLVER_TRANSACTION_SHOW_OBSOLETES = SOLVER_TRANSACTION_SHOW_OBSOLETES;
+  static const int SOLVER_TRANSACTION_SHOW_MULTIINSTALL = SOLVER_TRANSACTION_SHOW_MULTIINSTALL;
+  static const int SOLVER_TRANSACTION_CHANGE_IS_REINSTALL = SOLVER_TRANSACTION_CHANGE_IS_REINSTALL;
+  static const int SOLVER_TRANSACTION_MERGE_VENDORCHANGES = SOLVER_TRANSACTION_MERGE_VENDORCHANGES;
+  static const int SOLVER_TRANSACTION_MERGE_ARCHCHANGES = SOLVER_TRANSACTION_MERGE_ARCHCHANGES;
+  static const int SOLVER_TRANSACTION_RPM_ONLY = SOLVER_TRANSACTION_RPM_ONLY;
+  static const int SOLVER_TRANSACTION_ARCHCHANGE = SOLVER_TRANSACTION_ARCHCHANGE;
+  static const int SOLVER_TRANSACTION_VENDORCHANGE = SOLVER_TRANSACTION_VENDORCHANGE;
+  static const int SOLVER_TRANSACTION_KEEP_ORDERDATA = SOLVER_TRANSACTION_KEEP_ORDERDATA;
+  ~Transaction() {
+    transaction_free($self);
+    sat_free($self);
+  }
+  bool isempty() {
+    return $self->steps.count == 0;
+  }
+  Queue classify_helper(int mode) {
+    Queue q;
+    queue_init(&q);
+    transaction_classify($self, mode, &q);
+    return q;
+  }
+  Queue classify_pkgs_helper(int mode, Id cl, Id from, Id to) {
+    Queue q;
+    queue_init(&q);
+    transaction_classify_pkgs($self, mode, cl, from, to, &q);
+    return q;
+  }
+  %newobject othersolvable;
+  XSolvable *othersolvable(XSolvable *s) {
+    Id op = transaction_obs_pkg($self, s->id);
+    return new_XSolvable($self->pool, op);
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def classify(self, mode = 0):
+      r = []
+      cr = self.classify_helper(mode)
+      for i in xrange(0, len(cr), 4):
+        if cr[i] != self.SOLVER_TRANSACTION_IGNORE:
+          r.append([ cr[i], cr[i + 2], cr[i + 3], [ self.pool.solvables[j] for j in self.classify_pkgs_helper(mode, cr[i], cr[i + 2], cr[i + 3]) ] ])
+      return r
+    }
+#endif
+  Queue installedresult_helper(int *OUTPUT) {
+    Queue q;
+    queue_init(&q);
+    *OUTPUT = transaction_installedresult(self, &q);
+    return q;
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def installedresult(self):
+      r = self.installedresult_helper()
+      newpkgs = r.pop()
+      rn = [ self.pool.solvables[r[i]] for i in range(0, newpkgs) ]
+      rk = [ self.pool.solvables[r[i]] for i in range(newpkgs, len(r)) ]
+      return rn, rk
+  }
+#endif
+  Queue steps_helper() {
+    Queue q;
+    queue_init_clone(&q, &$self->steps);
+    return q;
+  }
+  int steptype(XSolvable *s, int mode) {
+    return transaction_type($self, s->id, mode);
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def steps(self):
+      return [ self.pool.solvables[i] for i in self.steps_helper() ]
+  }
+#endif
+  int calc_installsizechange() {
+    return transaction_calc_installsizechange($self);
+  }
+}
+
+%extend XRule {
+  XRule(Solver *solv, Id id) {
+    if (!id)
+      return 0;
+    XRule *xr = sat_calloc(1, sizeof(*xr));
+    xr->solv = solv;
+    xr->id = id;
+    return xr;
+  }
+  %apply Id *OUTPUT { Id *source, Id *target, Id *dep };
+  int info_helper(Id *source, Id *target, Id *dep) {
+    return solver_ruleinfo($self->solv, $self->id, source, target, dep);
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def info(self):
+      type, source, target, dep = self.info_helper()
+      if source:
+          source = self.solv.pool.solvables[source]
+      if target:
+          target = self.solv.pool.solvables[target]
+      return type, source, target, dep
+  }
+#endif
 }
