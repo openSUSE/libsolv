@@ -236,6 +236,10 @@ KNOWNID(PUBKEY_SIGNATURES,	        "pubkey:signatures"),
 KNOWNID(REPOSITORY_TOOLVERSION,		"repository:toolversion"),
 KNOWNID(REPOSITORY_REPOID,		"repository:repoid"),
 
+KNOWNID(SUSETAGS_SHARE_NAME,		"susetags:share:name"),
+KNOWNID(SUSETAGS_SHARE_EVR,		"susetags:share:evr"),
+KNOWNID(SUSETAGS_SHARE_ARCH,		"susetags:share:arch"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

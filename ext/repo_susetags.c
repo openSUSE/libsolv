@@ -18,6 +18,11 @@
 #include "tools_util.h"
 #include "repo_susetags.h"
 
+struct datashare {
+  Id name;
+  Id evr;
+  Id arch;
+};
 struct parsedata {
   char *kind;
   Repo *repo;
@@ -25,7 +30,7 @@ struct parsedata {
   int flags;
   struct parsedata_common common;
   int last_found_source;
-  char **share_with;
+  struct datashare *share_with;
   int nshare;
   Id (*dirs)[3]; // dirid, size, nfiles
   int ndirs;
@@ -436,6 +441,33 @@ joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, Id name, Id evr, Id arch)
   return 0;
 }
 
+static Id
+lookup_shared_id(Repodata *data, Id p, Id keyname, Id voidid, int uninternalized)
+{
+  Id r;
+  if (repodata_lookup_void(data, p, keyname))
+    return voidid;
+  r = repodata_lookup_id(data, p, keyname);
+  if (r)
+    return r;
+  if (uninternalized && data->attrs)
+    {
+      Id *ap = data->attrs[p - data->start];
+      if (ap)
+	{
+	  for (; *ap; ap += 2)
+	    {
+	      if (data->keys[*ap].name != keyname)
+		continue;
+	      if (data->keys[*ap].type == REPOKEY_TYPE_VOID)
+	        return voidid;
+	      if (data->keys[*ap].type == REPOKEY_TYPE_ID)
+	        return ap[1];
+	    }
+	}
+    }
+  return 0;
+}
 
 /*
  * parse susetags
@@ -487,6 +519,41 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   s = 0;
   freshens = 0;
 
+  /* if this is a join setup the recorded share data */
+  if (joinhash)
+    {
+      Repodata *sdata;
+      int i;
+      for (i = 0, sdata = repo->repodata; i < repo->nrepodata; i++, sdata++)
+	{
+	  int p;
+	  if (!repodata_has_keyname(sdata, SUSETAGS_SHARE_NAME))
+	    continue;
+	  for (p = sdata->start; p < sdata->end; p++)
+	    {
+	      Id name, evr, arch;
+	      name = lookup_shared_id(sdata, p, SUSETAGS_SHARE_NAME, pool->solvables[p].name, sdata == data);
+	      if (!name)
+		continue;
+	      evr = lookup_shared_id(sdata, p, SUSETAGS_SHARE_EVR, pool->solvables[p].evr, sdata == data);
+	      if (!evr)
+		continue;
+	      arch = lookup_shared_id(sdata, p, SUSETAGS_SHARE_ARCH, pool->solvables[p].arch, sdata == data);
+	      if (!arch)
+		continue;
+	      if (p - repo->start >= pd.nshare)
+		{
+		  pd.share_with = sat_realloc2(pd.share_with, p - repo->start + 256, sizeof(*pd.share_with));
+		  memset(pd.share_with + pd.nshare, 0, (p - repo->start + 256 - pd.nshare) * sizeof(*pd.share_with));
+		  pd.nshare = p - repo->start + 256;
+		}
+	      pd.share_with[p - repo->start].name = name;
+	      pd.share_with[p - repo->start].evr = evr;
+	      pd.share_with[p - repo->start].arch = arch;
+	    }
+	}
+    }
+  
   /*
    * read complete file
    *
@@ -832,14 +899,42 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    }
 	    continue;
           case CTAG('=', 'S', 'h', 'r'):
-	    if (last_found_pack >= pd.nshare)
-	      {
-		pd.share_with = sat_realloc2(pd.share_with, last_found_pack + 256, sizeof(*pd.share_with));
-		memset(pd.share_with + pd.nshare, 0, (last_found_pack + 256 - pd.nshare) * sizeof(*pd.share_with));
-		pd.nshare = last_found_pack + 256;
-	      }
-	    pd.share_with[last_found_pack] = strdup(line + 6);
-	    continue;
+	    {
+	      Id name, evr, arch;
+	      if (split(line + 6, sp, 5) != 4)
+		{
+		  pool_debug(pool, SAT_FATAL, "susetags: bad =Shr line: %s\n", line + 6);
+		  exit(1);
+		}
+	      name = str2id(pool, sp[0], 1);
+	      evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+	      arch = str2id(pool, sp[3], 1);
+	      if (last_found_pack >= pd.nshare)
+		{
+		  pd.share_with = sat_realloc2(pd.share_with, last_found_pack + 256, sizeof(*pd.share_with));
+		  memset(pd.share_with + pd.nshare, 0, (last_found_pack + 256 - pd.nshare) * sizeof(*pd.share_with));
+		  pd.nshare = last_found_pack + 256;
+		}
+	      pd.share_with[last_found_pack].name = name;
+	      pd.share_with[last_found_pack].evr = evr;
+	      pd.share_with[last_found_pack].arch = arch;
+	      if ((flags & SUSETAGS_RECORD_SHARES) != 0)
+		{
+		  if (s->name == name)
+		    repodata_set_void(data, handle, SUSETAGS_SHARE_NAME);
+		  else
+		    repodata_set_id(data, handle, SUSETAGS_SHARE_NAME, name);
+		  if (s->evr == evr)
+		    repodata_set_void(data, handle, SUSETAGS_SHARE_EVR);
+		  else
+		    repodata_set_id(data, handle, SUSETAGS_SHARE_EVR, evr);
+		  if (s->arch == arch)
+		    repodata_set_void(data, handle, SUSETAGS_SHARE_ARCH);
+		  else
+		    repodata_set_id(data, handle, SUSETAGS_SHARE_ARCH, arch);
+		}
+	      continue;
+	    }
 	  case CTAG('=', 'D', 'i', 'r'):
 	    add_dirline(&pd, line + 6);
 	    continue;
@@ -922,7 +1017,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   if (pd.nshare)
     {
       int i, last_found;
-      last_found = 0;
       Map keyidmap;
 
       map_init(&keyidmap, data->nkeys);
@@ -939,41 +1033,34 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    continue;
 	  if (keyname == SOLVABLE_PKGID || keyname == SOLVABLE_HDRID || keyname == SOLVABLE_LEADSIGID)
 	    continue;
+	  if (keyname == SUSETAGS_SHARE_NAME || keyname == SUSETAGS_SHARE_EVR || keyname == SUSETAGS_SHARE_ARCH)
+	    continue;
 	  MAPSET(&keyidmap, i);
 	}
+      last_found = 0;
       for (i = 0; i < pd.nshare; i++)
-        if (pd.share_with[i])
-	  {
-	    if (split(pd.share_with[i], sp, 5) != 4)
-	      {
-		pool_debug(pool, SAT_FATAL, "susetags: bad =Shr line: %s\n", pd.share_with[i]);
-	        exit(1);
-	      }
-
-	    Id name = str2id(pool, sp[0], 1);
-	    Id evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-	    Id arch = str2id(pool, sp[3], 1);
-	    unsigned n, nn;
-	    Solvable *found = 0;
-	    for (n = repo->start, nn = repo->start + last_found;
-		 n < repo->end; n++, nn++)
-	      {
-		if (nn >= repo->end)
-		  nn = repo->start;
-		found = pool->solvables + nn;
-		if (found->repo == repo
-		    && found->name == name
-		    && found->evr == evr
-		    && found->arch == arch)
-		  {
-		    last_found = nn - repo->start;
-		    break;
-		  }
-	      }
-	    if (n != repo->end)
-	      repodata_merge_some_attrs(data, repo->start + i, repo->start + last_found, &keyidmap, 0);
-	    free(pd.share_with[i]);
-	  }
+	{
+	  unsigned n, nn;
+	  Solvable *found = 0;
+          if (!pd.share_with[i].name)
+	    continue;
+	  for (n = repo->start, nn = repo->start + last_found; n < repo->end; n++, nn++)
+	    {
+	      if (nn >= repo->end)
+		nn = repo->start;
+	      found = pool->solvables + nn;
+	      if (found->repo == repo
+		  && found->name == pd.share_with[i].name
+		  && found->evr == pd.share_with[i].evr
+		  && found->arch == pd.share_with[i].arch)
+		{
+		  last_found = nn - repo->start;
+		  break;
+		}
+	    }
+	  if (n != repo->end)
+	    repodata_merge_some_attrs(data, repo->start + i, repo->start + last_found, &keyidmap, 0);
+        }
       free(pd.share_with);
       map_free(&keyidmap);
     }
