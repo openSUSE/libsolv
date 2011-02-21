@@ -1142,6 +1142,11 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	      cbdata.keymap[n] = cbdata.keymap[key->name];
 	      continue;
 	    }
+	  if (key->type == REPOKEY_TYPE_DELETED)
+	    {
+	      cbdata.keymap[n] = 0;
+	      continue;
+	    }
 	  /* see if we already had this one, should use hash for fast miss */
 	  for (k = 0; k < cbdata.nmykeys; k++)
 	    {

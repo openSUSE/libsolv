@@ -180,6 +180,7 @@ int repodata_filelistfilter_matches(Repodata *data, const char *str);
 
 
 /* lookup functions */
+Id repodata_lookup_type(Repodata *data, Id solvid, Id keyname);
 Id repodata_lookup_id(Repodata *data, Id solvid, Id keyname);
 const char *repodata_lookup_str(Repodata *data, Id solvid, Id keyname);
 int repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value);
@@ -240,6 +241,7 @@ void repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname, const cha
 void repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 
+void repodata_delete(Repodata *data, Id solvid, Id keyname);
 void repodata_delete_uninternalized(Repodata *data, Id solvid, Id keyname);
 
 /* 

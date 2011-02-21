@@ -126,6 +126,7 @@ data_skip(unsigned char *dp, int type)
     case REPOKEY_TYPE_VOID:
     case REPOKEY_TYPE_CONSTANT:
     case REPOKEY_TYPE_CONSTANTID:
+    case REPOKEY_TYPE_DELETED:
       return dp;
     case REPOKEY_TYPE_ID:
     case REPOKEY_TYPE_NUM:
@@ -199,6 +200,7 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
     case REPOKEY_TYPE_VOID:
     case REPOKEY_TYPE_CONSTANT:
     case REPOKEY_TYPE_CONSTANTID:
+    case REPOKEY_TYPE_DELETED:
       return dp;
     case REPOKEY_TYPE_NUM:
       while ((*dp & 0x80) != 0)

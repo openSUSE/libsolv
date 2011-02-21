@@ -445,11 +445,15 @@ static Id
 lookup_shared_id(Repodata *data, Id p, Id keyname, Id voidid, int uninternalized)
 {
   Id r;
-  if (repodata_lookup_void(data, p, keyname))
-    return voidid;
-  r = repodata_lookup_id(data, p, keyname);
+  r = repodata_lookup_type(data, p, keyname);
   if (r)
-    return r;
+    {
+      if (r == REPOKEY_TYPE_VOID)
+	return voidid;
+      r = repodata_lookup_id(data, p, keyname);
+      if (r)
+	return r;
+    }
   if (uninternalized && data->attrs)
     {
       Id *ap = data->attrs[p - data->start];

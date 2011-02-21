@@ -542,6 +542,8 @@ find_key_data(Repodata *data, Id solvid, Id keyname, Repokey **keypp)
   if (!*kp)
     return 0;
   *keypp = key = data->keys + *kp;
+  if (key->type == REPOKEY_TYPE_DELETED)
+    return 0;
   if (key->type == REPOKEY_TYPE_VOID || key->type == REPOKEY_TYPE_CONSTANT || key->type == REPOKEY_TYPE_CONSTANTID)
     return dp;	/* no need to forward... */
   dp = forward_to_key(data, *kp, keyp, dp);
@@ -550,6 +552,20 @@ find_key_data(Repodata *data, Id solvid, Id keyname, Repokey **keypp)
   return get_data(data, key, &dp, 0);
 }
 
+Id
+repodata_lookup_type(Repodata *data, Id solvid, Id keyname)
+{
+  Id schema, *keyp, *kp;
+  if (!maybe_load_repodata(data, keyname))
+    return 0;
+  if (!solvid2data(data, solvid, &schema))
+    return 0;
+  keyp = data->schemadata + data->schemata[schema];
+  for (kp = keyp; *kp; kp++)
+    if (data->keys[*kp].name == keyname)
+      return data->keys[*kp].type == REPOKEY_TYPE_DELETED ? 0 : data->keys[*kp].type;
+  return 0;
+}
 
 Id
 repodata_lookup_id(Repodata *data, Id solvid, Id keyname)
@@ -567,14 +583,6 @@ repodata_lookup_id(Repodata *data, Id solvid, Id keyname)
     return 0;
   dp = data_read_id(dp, &id);
   return id;
-}
-
-Id
-repodata_globalize_id(Repodata *data, Id id, int create)
-{
-  if (!id || !data || !data->localpool)
-    return id;
-  return str2id(data->repo->pool, stringpool_id2str(&data->spool, id), create);
 }
 
 const char *
@@ -675,6 +683,15 @@ repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
     }
   return 1;
 }
+
+Id
+repodata_globalize_id(Repodata *data, Id id, int create)
+{
+  if (!id || !data || !data->localpool)
+    return id;
+  return str2id(data->repo->pool, stringpool_id2str(&data->spool, id), create);
+}
+
 
 /************************************************************************
  * data search
@@ -787,6 +804,8 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback
       key = data->keys + keyid;
       ddp = get_data(data, key, &dp, *keyp ? 1 : 0);
 
+      if (key->type == REPOKEY_TYPE_DELETED)
+	continue;
       if (key->type == REPOKEY_TYPE_FLEXARRAY || key->type == REPOKEY_TYPE_FIXARRAY)
 	{
 	  struct subschema_data subd;
@@ -1300,6 +1319,8 @@ dataiterator_step(Dataiterator *di)
 	  di->key = di->data->keys + *di->keyp;
 	  di->ddp = get_data(di->data, di->key, &di->dp, di->keyp[1] && (!di->keyname || (di->flags & SEARCH_SUB) != 0) ? 1 : 0);
 	  if (!di->ddp)
+	    goto di_nextkey;
+          if (di->key->type == REPOKEY_TYPE_DELETED)
 	    goto di_nextkey;
 	  if (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY)
 	    goto di_enterarray;
@@ -2303,7 +2324,19 @@ repodata_delete_uninternalized(Repodata *data, Id solvid, Id keyname)
   *pp = 0;
 }
 
-/* add all attrs from src to dest */
+/* XXX: does not work correctly, needs fix in iterators! */
+void
+repodata_delete(Repodata *data, Id solvid, Id keyname)
+{
+  Repokey key;
+  key.name = keyname;
+  key.type = REPOKEY_TYPE_DELETED;
+  key.size = 0;
+  key.storage = KEY_STORAGE_INCORE;
+  repodata_set(data, solvid, &key, 0);
+}
+
+/* add all (uninternalized) attrs from src to dest */
 void
 repodata_merge_attrs(Repodata *data, Id dest, Id src)
 {
@@ -2314,6 +2347,7 @@ repodata_merge_attrs(Repodata *data, Id dest, Id src)
     repodata_insert_keyid(data, dest, keyp[0], keyp[1], 0);
 }
 
+/* add some (uninternalized) attrs from src to dest */
 void
 repodata_merge_some_attrs(Repodata *data, Id dest, Id src, Map *keyidmap, int overwrite)
 {
@@ -2861,6 +2895,8 @@ repodata_create_stubs(Repodata *data)
               repodata_key2id(sdata, &xkey, 1);
               xkeyname = 0;
 	    }
+	default:
+	  break;
 	}
     }
   dataiterator_free(&di);
