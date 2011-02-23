@@ -563,7 +563,7 @@ repodata_lookup_type(Repodata *data, Id solvid, Id keyname)
   keyp = data->schemadata + data->schemata[schema];
   for (kp = keyp; *kp; kp++)
     if (data->keys[*kp].name == keyname)
-      return data->keys[*kp].type == REPOKEY_TYPE_DELETED ? 0 : data->keys[*kp].type;
+      return data->keys[*kp].type;
   return 0;
 }
 
@@ -673,6 +673,8 @@ repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
   queue_empty(q);
   dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
+    return 0;
+  if (key->type != REPOKEY_TYPE_IDARRAY && key->type != REPOKEY_TYPE_REL_IDARRAY)
     return 0;
   for (;;)
     {
@@ -1861,7 +1863,7 @@ repodata_insert_keyid(Repodata *data, Id handle, Id keyid, Id val, int overwrite
           break;
       if (*pp)
         {
-	  if (overwrite)
+	  if (overwrite || data->keys[*pp].type == REPOKEY_TYPE_DELETED)
 	    {
 	      pp[0] = keyid;
               pp[1] = val;
@@ -2006,7 +2008,7 @@ repodata_set_binary(Repodata *data, Id solvid, Id keyname, void *buf, int len)
 }
 
 /* add an array element consisting of entrysize Ids to the repodata. modifies attriddata
- * so that the caller can append the new element there */
+ * so that the caller can append entrysize new elements plus the termination zero there */
 static void
 repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrysize)
 {
@@ -2026,20 +2028,26 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
   ppp = repodata_get_attrp(data, handle);
   pp = *ppp;
   if (pp)
-    for (; *pp; pp += 2)
-      if (data->keys[*pp].name == keyname && data->keys[*pp].type == keytype)
-        break;
-  if (!pp || !*pp)
+    {
+      for (; *pp; pp += 2)
+        if (data->keys[*pp].name == keyname)
+          break;
+    }
+  if (!pp || !*pp || data->keys[*pp].type != keytype)
     {
       /* not found. allocate new key */
       Repokey key;
+      Id keyid;
       key.name = keyname;
       key.type = keytype;
       key.size = 0;
       key.storage = KEY_STORAGE_INCORE;
       data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
-      repodata_set(data, handle, &key, data->attriddatalen);
-      data->lasthandle = 0;	/* next time... */
+      keyid = repodata_key2id(data, &key, 1);
+      repodata_insert_keyid(data, handle, keyid, data->attriddatalen, 1);
+      data->lasthandle = handle;
+      data->lastkey = keyid;
+      data->lastdatalen = data->attriddatalen + entrysize + 1;
       return;
     }
   oldsize = 0;
