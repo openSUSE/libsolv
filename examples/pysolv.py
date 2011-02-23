@@ -38,6 +38,7 @@ def calccachepath(repo, repoext = None):
     return "/var/cache/solv/" + re.sub(r'[/]', '_', path)
     
 def usecachedrepo(repo, repoext, cookie, mark=False):
+    cookie = repo['cookie']
     handle = repo['handle']
     try: 
         repopath = calccachepath(repo, repoext)
@@ -68,13 +69,13 @@ def usecachedrepo(repo, repoext, cookie, mark=False):
 	    # no futimes in python?
 	    try:
 		os.utime(repopath, None)
-	    except e:
+	    except Exception, e:
 		pass
     except IOError, e:
 	return False
     return True
 
-def writecachedrepo(repo, repoext, cookie, info=None):
+def writecachedrepo(repo, repoext, info=None):
     try:
 	if not os.path.isdir("/var/cache/solv"):
 	    os.mkdir("/var/cache/solv", 0755);
@@ -91,12 +92,12 @@ def writecachedrepo(repo, repoext, cookie, info=None):
 	    if 'extcookie' not in repo:
 		# create unique id
 		extcookie = calc_checksum_stat(os.fstat(f.fileno()))
-		extcookie = ''.join(chr(ord(s)^ord(c)) for s,c in zip(extcookie, cookie))
+		extcookie = ''.join(chr(ord(s)^ord(c)) for s,c in zip(extcookie, repo['cookie']))
 		if ord(extcookie[0]) == 0:
 		    extcookie[0] = chr(1)
 		repo['extcookie'] = extcookie
 	    f.write(repo['extcookie'])
-	f.write(cookie)
+	f.write(repo['cookie'])
 	f.close()
 	os.rename(tmpname, calccachepath(repo, repoext))
     except IOError, e:
@@ -146,6 +147,15 @@ def repomd_find(repo, what):
 	    chksum = None
         if filename:
             return (filename, chksum, chksumtype)
+    return (None, None, None)
+
+def susetags_find(repo, what):
+    di = repo['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
+    di.prepend_keyname(solv.SUSETAGS_FILE);
+    for d in di:
+        d.setpos_parent()
+        chksum, chksumtype = d.pool.lookup_bin_checksum(solv.SOLVID_POS, solv.SUSETAGS_FILE_CHECKSUM);
+	return (what, chksum, chksumtype)
     return (None, None, None)
 
 def validarch(pool, arch):
@@ -299,6 +309,8 @@ for reposdir in ["/etc/zypp/repos.d"]:
 		repo['priority'] = 99
 	    if 'autorefresh' not in repo:
 		repo['autorefresh'] = 1
+	    if 'type' not in repo:
+		repo['type'] = 'rpm-md'
 	    repo['metadata_expire'] = 900
 	    repos.append(repo)
 
@@ -309,13 +321,14 @@ sysrepo['handle'].appdata = sysrepo
 pool.installed = sysrepo['handle']
 sysrepostat = os.stat("/var/lib/rpm/Packages")
 sysrepocookie = calc_checksum_stat(sysrepostat)
+sysrepo['cookie'] = sysrepocookie
 if usecachedrepo(sysrepo, None, sysrepocookie):
     print "cached"
 else:
     print "reading"
     sysrepo['handle'].add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE);
     sysrepo['handle'].add_rpmdb(None)
-    writecachedrepo(sysrepo, None, sysrepocookie)
+    writecachedrepo(sysrepo, None)
 
 for repo in repos:
     if not int(repo.enabled):
@@ -332,54 +345,99 @@ for repo in repos:
 		dorefresh = False
 	except OSError, e:
 	    pass
+    repo['cookie'] = None
     if not dorefresh and usecachedrepo(repo, None, None):
 	print "repo: '%s': cached" % repo['alias']
 	continue
 
     badchecksum = {}
 
-    print "rpmmd repo '%s':" % repo['alias'],
-    sys.stdout.flush()
-    f = curlfopen(repo, "repodata/repomd.xml", False, None, None)
-    if not f:
-	print "no repomd.xml file, skipped"
+    if repo['type'] == 'rpm-md':
+	print "rpmmd repo '%s':" % repo['alias'],
+	sys.stdout.flush()
+	f = curlfopen(repo, "repodata/repomd.xml", False, None, None)
+	if not f:
+	    print "no repomd.xml file, skipped"
+	    repo['handle'].free(True)
+	    del repo['handle']
+	    continue
+	repo['cookie'] = calc_checksum_fp(f)
+	if usecachedrepo(repo, None, repo['cookie'], True):
+	    print "cached"
+	    solv.xfclose(f)
+	    continue
+	repo['handle'].add_repomdxml(f, 0)
+	solv.xfclose(f)
+	print "fetching"
+	(filename, filechksum, filechksumtype) = repomd_find(repo, 'primary')
+	if filename:
+	    f = curlfopen(repo, filename, True, filechksum, filechksumtype, badchecksum)
+	    if f:
+		repo['handle'].add_rpmmd(f, None, 0)
+		solv.xfclose(f)
+	    if badchecksum:
+		continue	# hopeless, need good primary
+	(filename, filechksum, filechksumtype) = repomd_find(repo, 'updateinfo')
+	if filename:
+	    f = curlfopen(repo, filename, True, filechksum, filechksumtype, badchecksum)
+	    if f:
+		repo['handle'].add_updateinfoxml(f, 0)
+		solv.xfclose(f)
+    elif repo['type'] == 'yast2':
+	print "susetags repo '%s':" % repo['alias'],
+	sys.stdout.flush()
+	f = curlfopen(repo, "content", False, None, None)
+        if not f:
+	    print "no content file, skipped"
+	    repo['handle'].free(True)
+	    del repo['handle']
+	    continue
+	repo['cookie'] = calc_checksum_fp(f)
+	if usecachedrepo(repo, None, repo['cookie'], True):
+	    print "cached"
+	    solv.xfclose(f)
+	    continue
+	repo['handle'].add_content(f, 0)
+	solv.xfclose(f)
+	print "fetching"
+	defvendorid = repo['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR);
+	descrdir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR);
+	if not descrdir:
+	    descrdir = "suse/setup/descr"
+	(filename, filechksum, filechksumtype) = susetags_find(repo, 'packages.gz')
+	if not filename:
+	    (filename, filechksum, filechksumtype) = susetags_find(repo, 'packages')
+	if filename:
+	    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum, filechksumtype, badchecksum)
+	    if f:
+		repo['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.SUSETAGS_RECORD_SHARES)
+		solv.xfclose(f)
+		(filename, filechksum, filechksumtype) = susetags_find(repo, 'packages.en.gz')
+		if not filename:
+		    (filename, filechksum, filechksumtype) = susetags_find(repo, 'packages.en')
+		if filename:
+		    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum, filechksumtype, badchecksum)
+		    if f:
+			repo['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.REPO_REUSE_REPODATA|Repo.REPO_EXTEND_SOLVABLES)
+			solv.xfclose(f)
+		repo['handle'].internalize()
+    else:
+	print "unsupported repo '%s': skipped" % repo['alias']
 	repo['handle'].free(True)
 	del repo['handle']
 	continue
-    repo['cookie'] = calc_checksum_fp(f)
-    if usecachedrepo(repo, None, repo['cookie'], True):
-	print "cached"
-        solv.xfclose(f)
-	continue
-    repo['handle'].add_repomdxml(f, 0)
-    solv.xfclose(f)
-    print "fetching"
-    (filename, filechksum, filechksumtype) = repomd_find(repo, 'primary')
-    if filename:
-	f = curlfopen(repo, filename, True, filechksum, filechksumtype, badchecksum)
-	if f:
-	    repo['handle'].add_rpmmd(f, None, 0)
-	    solv.xfclose(f)
-	if badchecksum:
-	    continue	# hopeless, need good primary
-    (filename, filechksum, filechksumtype) = repomd_find(repo, 'updateinfo')
-    if filename:
-	f = curlfopen(repo, filename, True, filechksum, filechksumtype, badchecksum)
-	if f:
-	    repo['handle'].add_updateinfoxml(f, 0)
-	    solv.xfclose(f)
+
     # if the checksum was bad we work with the data we got, but don't cache it
     if 'True' not in badchecksum:
-	writecachedrepo(repo, None, repo['cookie'])
+	writecachedrepo(repo, None)
     
 if cmd == 'se' or cmd == 'search':
     matches = {}
-    print "searching for", args[1]
-    di = pool.dataiterator_new(0, solv.SOLVABLE_NAME, args[1], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
+    di = pool.dataiterator_new(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
     for d in di:
 	matches[di.solvid] = True
     for solvid in sorted(matches.keys()):
-	print " - %s: %s" % (pool.solvid2str(solvid), pool.lookup_str(solvid, solv.SOLVABLE_SUMMARY))
+	print " - %s [%s]: %s" % (pool.solvid2str(solvid), pool.solvables[solvid].repo.name, pool.lookup_str(solvid, solv.SOLVABLE_SUMMARY))
     sys.exit(0)
 
 # XXX: insert rewrite_repos function
@@ -505,7 +563,7 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
     print
     print "Transaction summary:"
     print
-    for ctype, fromid, toid, pkgs in trans.classify():
+    for ctype, pkgs, fromid, toid in trans.classify():
 	if ctype == Transaction.SOLVER_TRANSACTION_ERASE:
 	    print "%d erased packages:" % len(pkgs)
 	elif ctype == Transaction.SOLVER_TRANSACTION_INSTALL:
@@ -577,10 +635,12 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
     print "Committing transaction:"
     print
     ts = rpm.TransactionSet('/')
+    erasenamehelper = {}
     for p in trans.steps():
 	type = trans.steptype(p, Transaction.SOLVER_TRANSACTION_RPM_ONLY)
 	if type == Transaction.SOLVER_TRANSACTION_ERASE:
 	    rpmdbid = p.lookup_num(solv.RPM_RPMDBID)
+	    erasenamehelper[p.name] = p
 	    if not rpmdbid:
 		sys.exit("\ninternal error: installed package %s has no rpmdbid\n" % p.str())
 	    ts.addErase(rpmdbid)
@@ -599,12 +659,17 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 	print checkproblems
 	sys.exit("Sorry.")
     ts.order()
-    def runCallback(reason, amount, total, p, fps):
+    def runCallback(reason, amount, total, p, d):
 	if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
-	    return solv.xfileno(fps[p.id])
+	    return solv.xfileno(newpkgsfp[p.id])
 	if reason == rpm.RPMCALLBACK_INST_START:
 	    print "install", p.str()
-    runproblems = ts.run(runCallback, newpkgsfp)
+	if reason == rpm.RPMCALLBACK_UNINST_START:
+	    # argh, p is just the name of the package
+	    if p in erasenamehelper:
+		p = erasenamehelper[p]
+		print "erase", p.str()
+    runproblems = ts.run(runCallback, '')
     if runproblems:
 	print runproblems
 	sys.exit(1)

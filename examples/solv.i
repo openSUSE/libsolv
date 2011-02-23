@@ -535,6 +535,7 @@ typedef struct {
   static const int REPO_USE_LOADING = REPO_USE_LOADING;
   static const int REPO_EXTEND_SOLVABLES = REPO_EXTEND_SOLVABLES;
   static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS;       /* repo_solv */
+  static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES; /* repo_susetags */
 
   void free(int reuseids = 0) {
     repo_free($self, reuseids);
@@ -581,6 +582,18 @@ typedef struct {
   bool add_deltainfoxml(FILE *fp, int flags = 0) {
     repo_add_deltainfoxml($self, fp, flags);
     return 1;
+  }
+  void internalize() {
+    repo_internalize($self);
+  }
+  const char *lookup_str(Id entry, Id keyname) {
+    return repo_lookup_str($self, entry, keyname);
+  }
+  Id lookup_id(Id entry, Id keyname) {
+    return repo_lookup_id($self, entry, keyname);
+  }
+  unsigned int lookup_num(Id entry, Id keyname, unsigned int notfound = 0) {
+    return repo_lookup_num($self, entry, keyname, notfound);
   }
   bool write(FILE *fp, int flags = 0) {
     repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
@@ -1106,9 +1119,9 @@ typedef struct {
     def classify(self, mode = 0):
       r = []
       cr = self.classify_helper(mode)
-      for i in xrange(0, len(cr), 4):
-        if cr[i] != self.SOLVER_TRANSACTION_IGNORE:
-          r.append([ cr[i], cr[i + 2], cr[i + 3], [ self.pool.solvables[j] for j in self.classify_pkgs_helper(mode, cr[i], cr[i + 2], cr[i + 3]) ] ])
+      for type, cnt, fromid, toid in zip(*([iter(cr)] * 4)):
+        if type != self.SOLVER_TRANSACTION_IGNORE:
+          r.append([ type, [ self.pool.solvables[j] for j in self.classify_pkgs_helper(mode, type, fromid, toid) ], fromid, toid ])
       return r
     }
 #endif
