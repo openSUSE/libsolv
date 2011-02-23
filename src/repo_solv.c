@@ -843,10 +843,29 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       keys[i].type = type;
       keys[i].size = read_id(&data, keys[i].type == REPOKEY_TYPE_CONSTANTID ? numid + numrel : 0);
       keys[i].storage = read_id(&data, 0);
-      if (id >= SOLVABLE_NAME && id <= RPM_RPMDBID)
-	keys[i].storage = KEY_STORAGE_SOLVABLE;
-      else if (keys[i].storage == KEY_STORAGE_SOLVABLE)
+      /* old versions used SOLVABLE for main solvable data */
+      if (keys[i].storage == KEY_STORAGE_SOLVABLE)
 	keys[i].storage = KEY_STORAGE_INCORE;
+      if (keys[i].storage != KEY_STORAGE_INCORE && keys[i].storage != KEY_STORAGE_VERTICAL_OFFSET)
+	{
+	  pool_debug(pool, SAT_ERROR, "unsupported storage type %d\n", keys[i].storage);
+	  data.error = SOLV_ERROR_UNSUPPORTED;
+	}
+      if (id >= SOLVABLE_NAME && id <= RPM_RPMDBID)
+	{
+	  if (keys[i].storage != KEY_STORAGE_INCORE)
+	    {
+	      pool_debug(pool, SAT_ERROR, "main solvable data must use incore storage%d\n", keys[i].storage);
+	      data.error = SOLV_ERROR_UNSUPPORTED;
+	    }
+	  keys[i].storage = KEY_STORAGE_SOLVABLE;
+	}
+      /* cannot handle rel idarrays in incore/vertical */
+      if (type == REPOKEY_TYPE_REL_IDARRAY && keys[i].storage != KEY_STORAGE_SOLVABLE)
+	{
+	  pool_debug(pool, SAT_ERROR, "type REL_IDARRAY only supported for STORAGE_SOLVABLE\n");
+	  data.error = SOLV_ERROR_UNSUPPORTED;
+	}
       if (keys[i].type == REPOKEY_TYPE_CONSTANTID)
 	{
 	  if (idmap)
@@ -1034,7 +1053,7 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
 	  dps = dp;
 	  dp = data_skip(dp, REPOKEY_TYPE_ID);
 	  dp = data_skip(dp, REPOKEY_TYPE_ID);
-	  incore_add_blob(&data, dps, dp - dps);
+	  incore_add_blob(&data, dps, dp - dps);	/* just record offset/size */
 	  continue;
 	}
       switch (keys[key].type)
