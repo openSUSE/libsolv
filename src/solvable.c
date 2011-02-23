@@ -195,37 +195,12 @@ solvable_lookup_void(Solvable *s, Id keyname)
 int
 solvable_lookup_bool(Solvable *s, Id keyname)
 {
-  Repo *repo = s->repo;
-  Pool *pool;
-  Repodata *data;
-  int i, j, n;
-
-  if (!repo)
+  if (!s->repo)
     return 0;
-  pool = repo->pool;
-  n = s - pool->solvables;
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    {
-      if (n < data->start || n >= data->end)
-        continue;
-      /* there are two ways of storing a bool, as num == 1 or void */
-      for (j = 1; j < data->nkeys; j++)
-        {
-          if (data->keys[j].name == keyname
-              && (data->keys[j].type == REPOKEY_TYPE_U32
-                  || data->keys[j].type == REPOKEY_TYPE_NUM
-                  || data->keys[j].type == REPOKEY_TYPE_CONSTANT
-                  || data->keys[j].type == REPOKEY_TYPE_VOID))
-            {
-              unsigned int value;
-              if (repodata_lookup_num(data, n, keyname, &value))
-                return value == 1;
-              if (repodata_lookup_void(data, n, keyname))
-                return 1;
-            }
-        }
-    }
-  return 0;
+  /* historic nonsense: there are two ways of storing a bool, as num == 1 or void. test both. */
+  if (repo_lookup_type(s->repo, s - s->repo->pool->solvables, keyname) == REPOKEY_TYPE_VOID)
+    return 1;
+  return repo_lookup_num(s->repo, s - s->repo->pool->solvables, keyname, 0) == 1;
 }
 
 const unsigned char *

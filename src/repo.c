@@ -865,7 +865,8 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
 {
   Pool *pool = repo->pool;
   Repodata *data;
-  int i, j;
+  int i;
+  const char *str;
 
   switch(keyname)
     {
@@ -884,11 +885,11 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
-      for (j = 1; j < data->nkeys; j++)
-	{
-	  if (data->keys[j].name == keyname && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID || data->keys[j].type == REPOKEY_TYPE_STR))
-	    return repodata_lookup_str(data, entry, keyname);
-	}
+      str = repodata_lookup_str(data, entry, keyname);
+      if (str)
+	return str;
+      if (repodata_lookup_type(data, entry, keyname))
+	return 0;
     }
   return 0;
 }
@@ -898,7 +899,8 @@ unsigned int
 repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound)
 {
   Repodata *data;
-  int i, j;
+  int i;
+  unsigned int value;
 
   if (keyname == RPM_RPMDBID)
     {
@@ -912,18 +914,10 @@ repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound)
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
-      for (j = 1; j < data->nkeys; j++)
-	{
-	  if (data->keys[j].name == keyname
-	      && (data->keys[j].type == REPOKEY_TYPE_U32
-	          || data->keys[j].type == REPOKEY_TYPE_NUM
-		  || data->keys[j].type == REPOKEY_TYPE_CONSTANT))
-	    {
-	      unsigned value;
-	      if (repodata_lookup_num(data, entry, keyname, &value))
-	        return value;
-	    }
-	}
+      if (repodata_lookup_num(data, entry, keyname, &value))
+	return value;
+      if (repodata_lookup_type(data, entry, keyname))
+	return notfound;
     }
   return notfound;
 }
@@ -932,7 +926,8 @@ Id
 repo_lookup_id(Repo *repo, Id entry, Id keyname)
 {
   Repodata *data;
-  int i, j;
+  int i;
+  Id id;
 
   switch(keyname)
     {   
@@ -951,15 +946,11 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
-      for (j = 1; j < data->nkeys; j++)
-	{
-	  if (data->keys[j].name == keyname && (data->keys[j].type == REPOKEY_TYPE_ID || data->keys[j].type == REPOKEY_TYPE_CONSTANTID))
-	    {
-	      Id id = repodata_lookup_id(data, entry, keyname); 
-	      if (id)
-		return data->localpool ? repodata_globalize_id(data, id, 1) : id; 
-	    }
-	}
+      id = repodata_lookup_id(data, entry, keyname); 
+      if (id)
+	return data->localpool ? repodata_globalize_id(data, id, 1) : id; 
+      if (repodata_lookup_type(data, entry, keyname))
+	return 0;
     }   
   return 0;
 }
@@ -968,22 +959,20 @@ const unsigned char *
 repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
 {
   Repodata *data;
-  int i, j;
+  int i;
+  const unsigned char *chk;
+
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
-      for (j = 1; j < data->nkeys; j++)
-	{
-	  if (data->keys[j].name == keyname)
-	    {
-	      const unsigned char *chk = repodata_lookup_bin_checksum(data, entry, keyname, typep);
-	      if (chk)
-		return chk;
-	    }
-	}
+      chk = repodata_lookup_bin_checksum(data, entry, keyname, typep);
+      if (chk)
+	return chk;
+      if (repodata_lookup_type(data, entry, keyname))
+	return 0;
     }
   *typep = 0;
   return 0;
@@ -993,22 +982,38 @@ int
 repo_lookup_void(Repo *repo, Id entry, Id keyname)
 {
   Repodata *data;
-  int i, j;
+  int i;
+  Id type;
+
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
-      for (j = 1; j < data->nkeys; j++)
-	{
-	  if (data->keys[j].name == keyname
-	      && (data->keys[j].type == REPOKEY_TYPE_VOID))
-	    {
-	      if (repodata_lookup_void(data, entry, keyname))
-		return 1;
-	    }
-	}
+      type = repodata_lookup_type(data, entry, keyname);
+      if (type)
+	return type == REPOKEY_TYPE_VOID;
+    }
+  return 0;
+}
+
+Id
+repo_lookup_type(Repo *repo, Id entry, Id keyname)
+{
+  Repodata *data;
+  int i;
+  Id type;
+
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {
+      if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
+	continue;
+      if (!repodata_precheck_keyname(data, keyname))
+	continue;
+      type = repodata_lookup_type(data, entry, keyname);
+      if (type)
+	return type == REPOKEY_TYPE_DELETED ? 0 : type;
     }
   return 0;
 }

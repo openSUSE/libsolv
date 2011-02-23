@@ -196,8 +196,9 @@ Repodata *repo_last_repodata(Repo *repo);
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
 /* returns the string value of the attribute, or NULL if not found */
+Id repo_lookup_type(Repo *repo, Id entry, Id key);
 const char *repo_lookup_str(Repo *repo, Id entry, Id key);
-/* returns the integer value of the attribute, or 0 if not found */
+/* returns the integer value of the attribute, or notfound if not found */
 unsigned int repo_lookup_num(Repo *repo, Id entry, Id key, unsigned int notfound);
 Id repo_lookup_id(Repo *repo, Id entry, Id keyid);
 int repo_lookup_void(Repo *repo, Id entry, Id keyid);
