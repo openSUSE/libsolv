@@ -1850,7 +1850,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  printf(" fetching\n");
 	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) == 0)
 	    break;	/* hopeless */
-	  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE);
+	  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|SUSETAGS_RECORD_SHARES);
 	  fclose(fp);
 	  /* add default language */
 	  filename = susetags_find(repo, "packages.en.gz", &filechksum, &filechksumtype);
