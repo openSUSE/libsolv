@@ -37,8 +37,11 @@ def calccachepath(repo, repoext = None):
 	path += ".solv"
     return "/var/cache/solv/" + re.sub(r'[/]', '_', path)
     
-def usecachedrepo(repo, repoext, cookie, mark=False):
-    cookie = repo['cookie']
+def usecachedrepo(repo, repoext, mark=False):
+    if not repoext:
+	cookie = repo['cookie']
+    else:
+	cookie = repo['extcookie']
     handle = repo['handle']
     try: 
         repopath = calccachepath(repo, repoext)
@@ -97,7 +100,10 @@ def writecachedrepo(repo, repoext, info=None):
 		    extcookie[0] = chr(1)
 		repo['extcookie'] = extcookie
 	    f.write(repo['extcookie'])
-	f.write(repo['cookie'])
+	if not repoext:
+	    f.write(repo['cookie'])
+	else:
+	    f.write(repo['extcookie'])
 	f.close()
 	os.rename(tmpname, calccachepath(repo, repoext))
     except IOError, e:
@@ -149,6 +155,53 @@ def repomd_find(repo, what):
             return (filename, chksum, chksumtype)
     return (None, None, None)
 
+def repomd_add_ext(repo, repodata, what):
+    filename, chksum, chksumtype = repomd_find(repo, what)
+    if not filename:
+	return False
+    if what == 'prestodelta':
+	what = 'deltainfo'
+    handle = repodata.new_handle()
+    repodata.set_poolstr(handle, solv.REPOSITORY_REPOMD_TYPE, what)
+    repodata.set_str(handle, solv.REPOSITORY_REPOMD_LOCATION, filename)
+    repodata.set_bin_checksum(handle, solv.REPOSITORY_REPOMD_CHECKSUM, chksumtype, chksum)
+    if what == 'deltainfo':
+	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOSITORY_DELTAINFO)
+	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_FLEXARRAY)
+    elif what == 'filelists':
+	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_FILELIST)
+	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
+    repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
+    return True
+    
+def repomd_load_ext(repo, repodata):
+    repomdtype = repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE)
+    if repomdtype == 'filelists':
+	ext = 'FL'
+    elif repomdtype == 'deltainfo':
+	ext = 'DL'
+    else:
+	return False
+    sys.stdout.write("[%s:%s" % (repo['alias'], ext))
+    if usecachedrepo(repo, ext):
+	sys.stdout.write(" cached]\n")
+	sys.stdout.flush()
+	return True
+    sys.stdout.write(" fetching]\n")
+    sys.stdout.flush()
+    filename = repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_LOCATION)
+    filechksum, filechksumtype = repodata.lookup_bin_checksum(solv.SOLVID_META, solv.REPOSITORY_REPOMD_CHECKSUM)
+    f = curlfopen(repo, filename, True, filechksum, filechksumtype)
+    if not f:
+	return False
+    if ext == 'FL':
+	repo['handle'].add_rpmmd(f, 'FL', Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+    elif ext == 'DL':
+	repo['handle'].add_deltainfoxml(f, Repo.REPO_USE_LOADING)
+    solv.xfclose(f)
+    writecachedrepo(repo, ext, repodata)
+    return True
+
 def susetags_find(repo, what):
     di = repo['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
     di.prepend_keyname(solv.SUSETAGS_FILE);
@@ -157,6 +210,9 @@ def susetags_find(repo, what):
         chksum, chksumtype = d.pool.lookup_bin_checksum(solv.SOLVID_POS, solv.SUSETAGS_FILE_CHECKSUM);
 	return (what, chksum, chksumtype)
     return (None, None, None)
+
+def susetags_load_ext(repo, repodata):
+    return False
 
 def validarch(pool, arch):
     if not arch:
@@ -283,6 +339,13 @@ def depglob(pool, name, globname, globdep):
 	    return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) for id in sorted(idmatches.keys()) ]
     return []
     
+def load_stub(repodata):
+    if repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE):
+	return repomd_load_ext(repodata.repo.appdata, repodata)
+    if repodata.lookup_str(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME):
+	return susetags_load_ext(repodata.repo.appdata, repodata)
+    return False
+    
 
 parser = OptionParser(usage="usage: solv.py [options] COMMAND")
 (options, args) = parser.parse_args()
@@ -295,6 +358,7 @@ args = args[1:]
 
 pool = solv.Pool()
 pool.setarch(os.uname()[4])
+pool.set_loadcallback(load_stub)
 
 repos = []
 for reposdir in ["/etc/zypp/repos.d"]:
@@ -305,6 +369,9 @@ for reposdir in ["/etc/zypp/repos.d"]:
 	for alias in cfg:
 	    repo = cfg[alias]
 	    repo['alias'] = alias
+	    if 'baseurl' not in repo:
+		print "repo %s has no baseurl" % alias
+		continue
 	    if 'priority' not in repo:
 		repo['priority'] = 99
 	    if 'autorefresh' not in repo:
@@ -322,7 +389,7 @@ pool.installed = sysrepo['handle']
 sysrepostat = os.stat("/var/lib/rpm/Packages")
 sysrepocookie = calc_checksum_stat(sysrepostat)
 sysrepo['cookie'] = sysrepocookie
-if usecachedrepo(sysrepo, None, sysrepocookie):
+if usecachedrepo(sysrepo, None):
     print "cached"
 else:
     print "reading"
@@ -346,7 +413,7 @@ for repo in repos:
 	except OSError, e:
 	    pass
     repo['cookie'] = None
-    if not dorefresh and usecachedrepo(repo, None, None):
+    if not dorefresh and usecachedrepo(repo, None):
 	print "repo: '%s': cached" % repo['alias']
 	continue
 
@@ -362,7 +429,7 @@ for repo in repos:
 	    del repo['handle']
 	    continue
 	repo['cookie'] = calc_checksum_fp(f)
-	if usecachedrepo(repo, None, repo['cookie'], True):
+	if usecachedrepo(repo, None, True):
 	    print "cached"
 	    solv.xfclose(f)
 	    continue
@@ -383,6 +450,11 @@ for repo in repos:
 	    if f:
 		repo['handle'].add_updateinfoxml(f, 0)
 		solv.xfclose(f)
+	repodata = repo['handle'].add_repodata(0)
+	if not repomd_add_ext(repo, repodata, 'deltainfo'):
+	    repomd_add_ext(repo, repodata, 'prestodelta')
+	repomd_add_ext(repo, repodata, 'filelists')
+	repodata.internalize()
     elif repo['type'] == 'yast2':
 	print "susetags repo '%s':" % repo['alias'],
 	sys.stdout.flush()
@@ -393,7 +465,7 @@ for repo in repos:
 	    del repo['handle']
 	    continue
 	repo['cookie'] = calc_checksum_fp(f)
-	if usecachedrepo(repo, None, repo['cookie'], True):
+	if usecachedrepo(repo, None, True):
 	    print "cached"
 	    solv.xfclose(f)
 	    continue
@@ -430,6 +502,8 @@ for repo in repos:
     # if the checksum was bad we work with the data we got, but don't cache it
     if 'True' not in badchecksum:
 	writecachedrepo(repo, None)
+    # must be called after writing the repo
+    repo['handle'].create_stubs()
     
 if cmd == 'se' or cmd == 'search':
     matches = {}
@@ -620,10 +694,13 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 		    if pool.lookup_id(solv.SOLVID_POS, solv.DELTA_PACKAGE_EVR) != p.evrid or pool.lookup_id(solv.SOLVID_POS, solv.DELTA_PACKAGE_ARCH) != p.archid:
 			continue
 		    baseevrid = pool.lookup_id(solv.SOLVID_POS, solv.DELTA_BASE_EVR)
+		    candidate = None
 		    for installedp in pool.providers(p.nameid):
 			if installedp.isinstalled() and installedp.nameid == p.nameid and installedp.archid == p.archid and installedp.evrid == baseevrid:
 			    candidate = installedp
-		    # add applydeltarpm code here...
+		    if candidate:
+			# add applydeltarpm code here...
+			print "PKG", p.str(), "CANDIDATE", candidate.str()
 	    chksum, chksumtype = p.lookup_bin_checksum(solv.SOLVABLE_CHECKSUM);
 	    f = curlfopen(repo, location, False, chksum, chksumtype)
 	    if not f:

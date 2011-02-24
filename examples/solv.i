@@ -115,6 +115,11 @@ typedef struct {
 } XRule;
 
 typedef struct {
+  Repo* repo;
+  Id id;
+} XRepodata;
+
+typedef struct {
   Pool *pool;
   Id id;
 } Pool_solvable_iterator;
@@ -183,6 +188,11 @@ typedef struct {
   Id const id;
 } XRule;
 
+typedef struct {
+  Repo* const repo;
+  Id const id;
+} XRepodata;
+
 # put before pool/repo so we can access the constructor
 %nodefaultctor Dataiterator;
 %nodefaultdtor Dataiterator;
@@ -210,9 +220,6 @@ typedef struct _Repo {
   int priority;
   int subpriority;
   int const nsolvables;
-#if defined(SWIGPYTHON)
-  PyObject *appdata;
-#endif
 #if defined(SWIGRUBY)
   VALUE appdata;
 #endif
@@ -378,6 +385,32 @@ typedef struct {
   }
   void set_debuglevel(int level) {
     pool_setdebuglevel($self, level);
+  }
+  %{
+  SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
+    XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
+    PyObject *args = Py_BuildValue("(O)", SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0));
+    PyObject *result = PyEval_CallObject((PyObject *)d, args);
+    if (!result)
+      return 0; /* exception */
+    int ecode = 0;
+    int vresult = 0;
+    Py_DECREF(args);
+    ecode = SWIG_AsVal_int(result, &vresult);
+    Py_DECREF(result);
+    return SWIG_IsOK(ecode) ? vresult : 0;
+  }
+  %}
+  void set_loadcallback(PyObject *callable) {
+    if (!callable) {
+      if ($self->loadcallback == loadcallback) {
+        Py_DECREF($self->loadcallbackdata);
+        pool_setloadcallback($self, 0, 0);
+      }
+      return;
+    }
+    Py_INCREF(callable);
+    pool_setloadcallback($self, loadcallback, callable);
   }
   Id str2id(const char *str, int create=1) {
     return str2id($self, str, create);
@@ -595,9 +628,8 @@ typedef struct {
   unsigned int lookup_num(Id entry, Id keyname, unsigned int notfound = 0) {
     return repo_lookup_num($self, entry, keyname, notfound);
   }
-  bool write(FILE *fp, int flags = 0) {
+  void write(FILE *fp) {
     repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
-    return 1;
   }
   # HACK, remove if no longer needed!
   bool write_first_repodata(FILE *fp, int flags = 0) {
@@ -628,6 +660,33 @@ typedef struct {
     return s;
   }
   %}
+
+  XRepodata *add_repodata(int flags = 0) {
+    Repodata *rd = repo_add_repodata($self, flags);
+    return new_XRepodata($self, rd - $self->repodata);
+  }
+
+  void create_stubs() {
+    Repodata *data;
+    if (!$self->nrepodata)
+      return;
+    data = $self->repodata  + ($self->nrepodata - 1);
+    if (data->state != REPODATA_STUB)
+      repodata_create_stubs(data);
+  }
+#if defined(SWIGPYTHON)
+  PyObject *appdata;
+  %{
+  SWIGINTERN void Repo_appdata_set(Repo *repo, PyObject *o) {
+    repo->appdata = o;
+  }
+  SWIGINTERN PyObject *Repo_appdata_get(Repo *repo) {
+    PyObject *o = repo->appdata;
+    Py_INCREF(o);
+    return o;
+  }
+  %}
+#endif
 }
 
 %extend Dataiterator {
@@ -1184,4 +1243,53 @@ typedef struct {
       return type, source, target, dep
   }
 #endif
+}
+
+
+%extend XRepodata {
+  XRepodata(Repo *repo, Id id) {
+    XRepodata *xr = sat_calloc(1, sizeof(*xr));
+    xr->repo = repo;
+    xr->id = id;
+    return xr;
+  }
+  Id new_handle() {
+    return repodata_new_handle($self->repo->repodata + $self->id);
+  }
+  void set_id(Id solvid, Id keyname, Id id) {
+    repodata_set_id($self->repo->repodata + $self->id, solvid, keyname, id);
+  }
+  void set_str(Id solvid, Id keyname, const char *str) {
+    repodata_set_str($self->repo->repodata + $self->id, solvid, keyname, str);
+  }
+  void set_poolstr(Id solvid, Id keyname, const char *str) {
+    repodata_set_poolstr($self->repo->repodata + $self->id, solvid, keyname, str);
+  }
+  void add_idarray(Id solvid, Id keyname, Id id) {
+    repodata_add_idarray($self->repo->repodata + $self->id, solvid, keyname, id);
+  }
+  void add_flexarray(Id solvid, Id keyname, Id handle) {
+    repodata_add_flexarray($self->repo->repodata + $self->id, solvid, keyname, handle);
+  }
+  void set_bin_checksum(Id solvid, Id keyname, Id chksumtype, const char *chksum) {
+    repodata_set_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, chksumtype, (const unsigned char *)chksum);
+  }
+  const char *lookup_str(Id solvid, Id keyname) {
+    return repodata_lookup_str($self->repo->repodata + $self->id, solvid, keyname);
+  }
+  SWIGCDATA lookup_bin_checksum(Id solvid, Id keyname, Id *OUTPUT) {
+    const unsigned char *b;
+    *OUTPUT = 0;
+    b = repodata_lookup_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, OUTPUT);
+    return cdata_void((char *)b, sat_chksum_len(*OUTPUT));
+  }
+  void internalize() {
+    repodata_internalize($self->repo->repodata + $self->id);
+  }
+  void create_stubs() {
+    repodata_create_stubs($self->repo->repodata + $self->id);
+  }
+  void write(FILE *fp) {
+    repodata_write($self->repo->repodata + $self->id, fp, repo_write_stdkeyfilter, 0);
+  }
 }
