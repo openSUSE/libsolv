@@ -386,6 +386,7 @@ typedef struct {
   void set_debuglevel(int level) {
     pool_setdebuglevel($self, level);
   }
+#if defined(SWIGPYTHON)
   %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
@@ -411,6 +412,13 @@ typedef struct {
     }
     Py_INCREF(callable);
     pool_setloadcallback($self, loadcallback, callable);
+  }
+#endif
+  void free() {
+#if defined(SWIGPYTHON)
+    Pool_set_loadcallback($self, 0);
+#endif
+    pool_free($self);
   }
   Id str2id(const char *str, int create=1) {
     return str2id($self, str, create);
@@ -470,6 +478,7 @@ typedef struct {
   void createwhatprovides() {
     pool_createwhatprovides($self);
   }
+  %newobject solvables;
   Pool_solvable_iterator * const solvables;
   %{
   SWIGINTERN Pool_solvable_iterator * Pool_solvables_get(Pool *pool) {
@@ -480,6 +489,7 @@ typedef struct {
     return s;
   }
   %}
+  %newobject repos;
   Pool_repo_iterator * const repos;
   %{
   SWIGINTERN Pool_repo_iterator * Pool_repos_get(Pool *pool) {
@@ -705,6 +715,7 @@ typedef struct {
   }
   ~Dataiterator() {
     dataiterator_free($self);
+    sat_free($self);
   }
   Dataiterator *__iter__() {
     return $self;
