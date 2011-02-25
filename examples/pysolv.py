@@ -84,7 +84,7 @@ def usecachedrepo(repo, repoext, mark=False):
 def writecachedrepo(repo, repoext, info=None):
     try:
 	if not os.path.isdir("/var/cache/solv"):
-	    os.mkdir("/var/cache/solv", 0755);
+	    os.mkdir("/var/cache/solv", 0755)
 	(fd, tmpname) = tempfile.mkstemp(prefix='.newsolv-', dir='/var/cache/solv')
 	os.fchmod(fd, 0444)
         f = os.fdopen(fd, 'w+')
@@ -115,7 +115,7 @@ def writecachedrepo(repo, repoext, info=None):
 
 def curlfopen(repo, file, uncompress, chksum, chksumtype, badchecksum=None):
     baseurl = repo['baseurl']
-    url = re.sub(r'/$', '', baseurl) + '/' + file;
+    url = re.sub(r'/$', '', baseurl) + '/' + file
     f = tempfile.TemporaryFile()
     st = subprocess.call(['curl', '-f', '-s', '-L', url], stdout=f.fileno())
     if os.lseek(f.fileno(), 0, os.SEEK_CUR) == 0 and (st == 0 or not chksumtype):
@@ -145,11 +145,11 @@ def curlfopen(repo, file, uncompress, chksum, chksumtype, badchecksum=None):
 
 def repomd_find(repo, what):
     di = repo['handle'].dataiterator_new(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, Dataiterator.SEARCH_STRING)
-    di.prepend_keyname(solv.REPOSITORY_REPOMD);
+    di.prepend_keyname(solv.REPOSITORY_REPOMD)
     for d in di:
         d.setpos_parent()
-        filename = d.pool.lookup_str(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_LOCATION);
-        chksum, chksumtype = d.pool.lookup_bin_checksum(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_CHECKSUM);
+        filename = d.pool.lookup_str(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_LOCATION)
+        chksum, chksumtype = d.pool.lookup_bin_checksum(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_CHECKSUM)
         if filename and not chksumtype:
 	    print "no %s file checksum!" % filename
 	    filename = None
@@ -214,10 +214,10 @@ def repomd_load_ext(repo, repodata):
 
 def susetags_find(repo, what):
     di = repo['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
-    di.prepend_keyname(solv.SUSETAGS_FILE);
+    di.prepend_keyname(solv.SUSETAGS_FILE)
     for d in di:
         d.setpos_parent()
-        chksum, chksumtype = d.pool.lookup_bin_checksum(solv.SOLVID_POS, solv.SUSETAGS_FILE_CHECKSUM);
+        chksum, chksumtype = d.pool.lookup_bin_checksum(solv.SOLVID_POS, solv.SUSETAGS_FILE_CHECKSUM)
 	return (what, chksum, chksumtype)
     return (None, None, None)
 
@@ -252,7 +252,7 @@ def susetags_add_ext(repo, repodata, what, ext):
 def susetags_add_exts(repo):
     repodata = repo['handle'].add_repodata(0)
     di = repo['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
-    di.prepend_keyname(solv.SUSETAGS_FILE);
+    di.prepend_keyname(solv.SUSETAGS_FILE)
     for d in di:
 	filename = d.match_str()
 	if not filename:
@@ -281,7 +281,7 @@ def susetags_load_ext(repo, repodata):
     sys.stdout.write(" fetching]\n")
     sys.stdout.flush()
     defvendorid = repo['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
-    descrdir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR);
+    descrdir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
     if not descrdir:
 	descrdir = "suse/setup/descr"
     filechksum, filechksumtype = repodata.lookup_bin_checksum(solv.SOLVID_META, solv.SUSETAGS_FILE_CHECKSUM)
@@ -304,7 +304,7 @@ def validarch(pool, arch):
 def limitjobs(pool, jobs, flags, evr):
     njobs = []
     for j in jobs:
-	how = j.how;
+	how = j.how
 	sel = how & Job.SOLVER_SELECTMASK
 	what = pool.rel2id(j.what, evr, flags)
         if flags == solv.REL_ARCH:
@@ -349,7 +349,7 @@ def mkjobs(pool, cmd, arg):
 		return [ pool.Job(Job.SOLVER_SOLVABLE | Job.SOLVER_NOAUTOSET, matches[0]) ]
     m = re.match(r'(.+?)\s*([<=>]+)\s*(.+?)$', arg)
     if m:
-	(name, rel, evr) = m.group(1, 2, 3);
+	(name, rel, evr) = m.group(1, 2, 3)
 	flags = 0
 	if rel.find('<') >= 0: flags |= solv.REL_LT
 	if rel.find('=') >= 0: flags |= solv.REL_EQ 
@@ -472,7 +472,7 @@ if usecachedrepo(sysrepo, None):
     print "cached"
 else:
     print "reading"
-    sysrepo['handle'].add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE);
+    sysrepo['handle'].add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
     sysrepo['handle'].add_rpmdb(None)
     writecachedrepo(sysrepo, None)
 
@@ -547,8 +547,8 @@ for repo in repos:
 	repo['handle'].add_content(f, 0)
 	solv.xfclose(f)
 	print "fetching"
-	defvendorid = repo['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR);
-	descrdir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR);
+	defvendorid = repo['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
+	descrdir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
 	if not descrdir:
 	    descrdir = "suse/setup/descr"
 	(filename, filechksum, filechksumtype) = susetags_find(repo, 'packages.gz')
@@ -754,17 +754,17 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
     if newpkgs:
 	downloadsize = 0
 	for p in newpkgs:
-	    downloadsize += p.lookup_num(solv.SOLVABLE_DOWNLOADSIZE);
+	    downloadsize += p.lookup_num(solv.SOLVABLE_DOWNLOADSIZE)
 	print "Downloading %d packages, %d K" % (len(newpkgs), downloadsize)
 	for p in newpkgs:
 	    repo = p.repo.appdata
 	    location, medianr = p.lookup_location()
 	    if not location:
 		continue
-	    if sysrepo['handle'].nsolvables:
+	    if sysrepo['handle'].nsolvables and os.access('/usr/bin/applydeltarpm', os.X_OK):
 		pname = p.name
 		di = p.repo.dataiterator_new(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
-		di.prepend_keyname(solv.REPOSITORY_DELTAINFO);
+		di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
 		for d in di:
 		    d.setpos_parent()
 		    if pool.lookup_id(solv.SOLVID_POS, solv.DELTA_PACKAGE_EVR) != p.evrid or pool.lookup_id(solv.SOLVID_POS, solv.DELTA_PACKAGE_ARCH) != p.archid:
@@ -774,10 +774,32 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 		    for installedp in pool.providers(p.nameid):
 			if installedp.isinstalled() and installedp.nameid == p.nameid and installedp.archid == p.archid and installedp.evrid == baseevrid:
 			    candidate = installedp
-		    if candidate:
-			# add applydeltarpm code here...
-			print "PKG", p.str(), "CANDIDATE", candidate.str()
-	    chksum, chksumtype = p.lookup_bin_checksum(solv.SOLVABLE_CHECKSUM);
+		    if not candidate:
+			continue
+		    seq = pool.lookup_str(solv.SOLVID_POS, solv.DELTA_SEQ_NAME) + '-' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_SEQ_EVR) + '-' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_SEQ_NUM)
+		    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, '-c', '-s', seq])
+		    if st:
+			continue
+		    chksum, chksumtype = pool.lookup_bin_checksum(solv.SOLVID_POS, solv.DELTA_CHECKSUM)
+		    if not chksum:
+			continue
+		    dloc = pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_DIR) + '/' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_NAME) + '-' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_EVR) + '.' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_SUFFIX)
+		    f = curlfopen(repo, dloc, False, chksum, chksumtype)
+		    if not f:
+			continue
+		    nf = tempfile.TemporaryFile()
+		    nf = os.dup(nf.fileno())
+		    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, "/dev/fd/%d" % solv.xfileno(f), "/dev/fd/%d" % nf])
+		    solv.xfclose(f)
+		    os.lseek(nf, 0, os.SEEK_SET)
+		    newpkgsfp[p.id] = solv.xfopen_fd("", nf)
+		    break
+		if p.id in newpkgsfp:
+		    sys.stdout.write("d")
+		    sys.stdout.flush()
+		    continue
+			
+	    chksum, chksumtype = p.lookup_bin_checksum(solv.SOLVABLE_CHECKSUM)
 	    f = curlfopen(repo, location, False, chksum, chksumtype)
 	    if not f:
 		sys.exit("\n%s: %s not found in repository" % (repo['alias'], location))
