@@ -216,6 +216,7 @@ typedef struct {
 %nodefaultctor Repo;
 %nodefaultdtor Repo;
 typedef struct _Repo {
+  Pool * const pool;
   const char * const name;
   int priority;
   int subpriority;
@@ -431,6 +432,9 @@ typedef struct {
   }
   Id rel2id(Id name, Id evr, int flags, int create=1) {
     return rel2id($self, name, evr, flags, create);
+  }
+  Id id2langid(Id id, const char *lang, int create=1) {
+    return pool_id2langid($self, id, lang, create);
   }
   void setarch(const char *arch) {
     pool_setarch($self, arch);

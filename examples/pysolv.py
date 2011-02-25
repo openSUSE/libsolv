@@ -15,6 +15,9 @@ from solv import Pool, Repo, Dataiterator, Job, Solver, Transaction
 from iniparse import INIConfig
 from optparse import OptionParser
 
+#import gc
+#gc.set_debug(gc.DEBUG_LEAK)
+
 def calc_checksum_stat(stat, type=solv.REPOKEY_TYPE_SHA256):
     chksum = solv.Chksum(type)
     chksum.add("1.1")
@@ -155,7 +158,7 @@ def repomd_find(repo, what):
             return (filename, chksum, chksumtype)
     return (None, None, None)
 
-def repomd_add_ext(repo, repodata, what):
+def repomd_add_ext(repo, repodata, what, ext):
     filename, chksum, chksumtype = repomd_find(repo, what)
     if not filename:
 	return False
@@ -173,6 +176,13 @@ def repomd_add_ext(repo, repodata, what):
 	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
     repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
     return True
+
+def repomd_add_exts(repo):
+    repodata = repo['handle'].add_repodata(0)
+    if not repomd_add_ext(repo, repodata, 'deltainfo', 'DL'):
+	repomd_add_ext(repo, repodata, 'prestodelta', 'DL')
+    repomd_add_ext(repo, repodata, 'filelists', 'FL')
+    repodata.internalize()
     
 def repomd_load_ext(repo, repodata):
     repomdtype = repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE)
@@ -211,8 +221,77 @@ def susetags_find(repo, what):
 	return (what, chksum, chksumtype)
     return (None, None, None)
 
+def susetags_add_ext(repo, repodata, what, ext):
+    (filename, chksum, chksumtype) = susetags_find(repo, what)
+    if not filename:
+	return False
+    handle = repodata.new_handle()
+    repodata.set_str(handle, solv.SUSETAGS_FILE_NAME, filename)
+    if chksumtype:
+	repodata.set_bin_checksum(handle, solv.SUSETAGS_FILE_CHECKSUM, chksumtype, chksum)
+    if ext == 'DU':
+	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_DISKUSAGE)
+	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRNUMNUMARRAY)
+    elif ext == 'FL':
+	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_FILELIST)
+	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
+    else:
+	for langtag, langtagtype in [
+	    (solv.SOLVABLE_SUMMARY, solv.REPOKEY_TYPE_STR),
+	    (solv.SOLVABLE_DESCRIPTION, solv.REPOKEY_TYPE_STR),
+	    (solv.SOLVABLE_EULA, solv.REPOKEY_TYPE_STR),
+	    (solv.SOLVABLE_MESSAGEINS, solv.REPOKEY_TYPE_STR),
+	    (solv.SOLVABLE_MESSAGEDEL, solv.REPOKEY_TYPE_STR),
+	    (solv.SOLVABLE_CATEGORY, solv.REPOKEY_TYPE_ID)
+	]:
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, repo['handle'].pool.id2langid(langtag, ext, 1))
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, langtagtype)
+    repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
+    return True
+    
+def susetags_add_exts(repo):
+    repodata = repo['handle'].add_repodata(0)
+    di = repo['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
+    di.prepend_keyname(solv.SUSETAGS_FILE);
+    for d in di:
+	filename = d.match_str()
+	if not filename:
+	    continue
+	if filename[0:9] != "packages.":
+	    continue
+        if len(filename) == 11 and filename != "packages.gz":
+	    ext = filename[9:11]
+	elif filename[11:12] == ".":
+	    ext = filename[9:11]
+	else:
+	    continue
+	if ext == "en":
+	    continue
+	susetags_add_ext(repo, repodata, filename, ext)
+    repodata.internalize()
+
 def susetags_load_ext(repo, repodata):
-    return False
+    filename = repodata.lookup_str(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME)
+    ext = filename[9:11]
+    sys.stdout.write("[%s:%s" % (repo['alias'], ext))
+    if usecachedrepo(repo, ext):
+	sys.stdout.write(" cached]\n")
+	sys.stdout.flush()
+	return True
+    sys.stdout.write(" fetching]\n")
+    sys.stdout.flush()
+    defvendorid = repo['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
+    descrdir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR);
+    if not descrdir:
+	descrdir = "suse/setup/descr"
+    filechksum, filechksumtype = repodata.lookup_bin_checksum(solv.SOLVID_META, solv.SUSETAGS_FILE_CHECKSUM)
+    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum, filechksumtype)
+    if not f:
+	return False
+    repo['handle'].add_susetags(f, defvendorid, None, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+    solv.xfclose(f)
+    writecachedrepo(repo, ext, repodata)
+    return True
 
 def validarch(pool, arch):
     if not arch:
@@ -450,11 +529,7 @@ for repo in repos:
 	    if f:
 		repo['handle'].add_updateinfoxml(f, 0)
 		solv.xfclose(f)
-	repodata = repo['handle'].add_repodata(0)
-	if not repomd_add_ext(repo, repodata, 'deltainfo'):
-	    repomd_add_ext(repo, repodata, 'prestodelta')
-	repomd_add_ext(repo, repodata, 'filelists')
-	repodata.internalize()
+	repomd_add_exts(repo)
     elif repo['type'] == 'yast2':
 	print "susetags repo '%s':" % repo['alias'],
 	sys.stdout.flush()
@@ -493,6 +568,7 @@ for repo in repos:
 			repo['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.REPO_REUSE_REPODATA|Repo.REPO_EXTEND_SOLVABLES)
 			solv.xfclose(f)
 		repo['handle'].internalize()
+	susetags_add_exts(repo)
     else:
 	print "unsupported repo '%s': skipped" % repo['alias']
 	repo['handle'].free(True)
