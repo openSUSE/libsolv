@@ -479,6 +479,17 @@ typedef struct {
   void addfileprovides() {
     pool_addfileprovides($self);
   }
+  Queue addfileprovides_ids() {
+    Queue r;
+    Id *addedfileprovides = 0;
+    queue_init(&r);
+    pool_addfileprovides_ids($self, $self->installed, &addedfileprovides);
+    if (addedfileprovides) {
+      for (; *addedfileprovides; addedfileprovides++)
+        queue_push(&r, *addedfileprovides);
+    }
+    return r;
+  }
   void createwhatprovides() {
     pool_createwhatprovides($self);
   }
@@ -583,9 +594,13 @@ typedef struct {
   static const int REPO_EXTEND_SOLVABLES = REPO_EXTEND_SOLVABLES;
   static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS;       /* repo_solv */
   static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES; /* repo_susetags */
+  static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS ; /* repo_solv */
 
   void free(int reuseids = 0) {
     repo_free($self, reuseids);
+  }
+  void empty(int reuseids = 0) {
+    repo_empty($self, reuseids);
   }
   bool add_solv(const char *name, int flags = 0) {
     FILE *fp = fopen(name, "r");
@@ -701,6 +716,25 @@ typedef struct {
   }
   %}
 #endif
+  bool iscontiguous() {
+    int i;
+    for (i = $self->start; i < $self->end; i++)
+      if ($self->pool->solvables[i].repo != $self)
+        return 0;
+    return 1;
+  }
+  XRepodata *first_repodata() {
+     int i;
+     if (!$self->nrepodata)
+       return 0;
+     /* make sure all repodatas but the first are extensions */
+     if ($self->repodata[0].loadcallback)
+        return 0;
+     for (i = 1; i < $self->nrepodata; i++)
+       if (!$self->repodata[i].loadcallback)
+         return 0;       /* oops, not an extension */
+     return new_XRepodata($self, 0);
+   }
 }
 
 %extend Dataiterator {
@@ -721,8 +755,12 @@ typedef struct {
     dataiterator_free($self);
     sat_free($self);
   }
+  %newobject __iter__;
   Dataiterator *__iter__() {
-    return $self;
+    Dataiterator *ndi;
+    ndi = sat_calloc(1, sizeof(*ndi));
+    dataiterator_init_clone(ndi, $self);
+    return ndi;
   }
   %exception next {
     $action
@@ -789,8 +827,12 @@ typedef struct {
 
 
 %extend Pool_solvable_iterator {
+  %newobject __iter__;
   Pool_solvable_iterator *__iter__() {
-    return $self;
+    Pool_solvable_iterator *s;
+    s = sat_calloc(1, sizeof(*s));
+    *s = *$self;
+    return s;
   }
   %exception next {
     $action
@@ -820,8 +862,12 @@ typedef struct {
 }
 
 %extend Pool_repo_iterator {
+  %newobject __iter__;
   Pool_repo_iterator *__iter__() {
-    return $self;
+    Pool_repo_iterator *s;
+    s = sat_calloc(1, sizeof(*s));
+    *s = *$self;
+    return s;
   }
   %exception next {
     $action
@@ -850,8 +896,12 @@ typedef struct {
 }
 
 %extend Repo_solvable_iterator {
+  %newobject __iter__;
   Repo_solvable_iterator *__iter__() {
-    return $self;
+    Repo_solvable_iterator *s;
+    s = sat_calloc(1, sizeof(*s));
+    *s = *$self;
+    return s;
   }
   %exception next {
     $action
@@ -1292,6 +1342,12 @@ typedef struct {
   const char *lookup_str(Id solvid, Id keyname) {
     return repodata_lookup_str($self->repo->repodata + $self->id, solvid, keyname);
   }
+  Queue lookup_idarray(Id solvid, Id keyname) {
+    Queue r;
+    queue_init(&r);
+    repodata_lookup_idarray($self->repo->repodata + $self->id, solvid, keyname, &r);
+    return r;
+  }
   SWIGCDATA lookup_bin_checksum(Id solvid, Id keyname, Id *OUTPUT) {
     const unsigned char *b;
     *OUTPUT = 0;
@@ -1306,5 +1362,18 @@ typedef struct {
   }
   void write(FILE *fp) {
     repodata_write($self->repo->repodata + $self->id, fp, repo_write_stdkeyfilter, 0);
+  }
+  bool read_solv_flags(FILE *fp, int flags = 0) {
+    Repodata *data = $self->repo->repodata + $self->id;
+    int r, oldstate = data->state;
+    data->state = REPODATA_LOADING;
+    r = repo_add_solv_flags(data->repo, fp, flags | REPO_USE_LOADING);
+    if (r)
+      data->state = oldstate;
+    return r;
+  }
+  void extend_to_repo() {
+    Repodata *data = $self->repo->repodata + $self->id;
+    repodata_extend_block(data, data->repo->start, data->repo->end - data->repo->start);
   }
 }

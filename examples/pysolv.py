@@ -1,5 +1,33 @@
 #!/usr/bin/python
 
+#
+# Copyright (c) 2011, Novell Inc.
+#
+# This program is licensed under the BSD license, read LICENSE.BSD
+# for further information
+#
+
+# pysolv a little software installer demoing the sat solver library/bindings
+
+# things it does:
+# - understands globs for package names / dependencies
+# - understands .arch suffix
+# - repository data caching
+# - on demand loading of secondary repository data
+# - checksum verification
+# - deltarpm support
+#
+# things not yet ported:
+# - installation of commandline packages
+# - gpg verification
+# - file conflicts
+# - fastestmirror implementation
+#
+# things available in the library but missing from pysolv:
+# - vendor policy loading
+# - soft locks file handling
+# - multi version handling
+
 import sys
 import os
 import glob
@@ -93,6 +121,7 @@ def writecachedrepo(repo, repoext, info=None):
 	elif repoext:
 	    info.write(f)
 	else:
+	    # rewrite_repos case
 	    repo['handle'].write_first_repodata(f)
 	if repo['alias'] != '@System' and not repoext:
 	    if 'extcookie' not in repo:
@@ -108,6 +137,22 @@ def writecachedrepo(repo, repoext, info=None):
 	else:
 	    f.write(repo['extcookie'])
 	f.close()
+	if repo['handle'].iscontiguous():
+	    # switch to saved repo to activate paging and save memory
+	    nf = solv.xfopen(tmpname)
+	    if not repoext:
+		# main repo
+		repo['handle'].empty()
+		if not repo['handle'].add_solv(nf, Repo.SOLV_ADD_NO_STUBS):
+		    sys.exit("internal error, cannot reload solv file")
+	    else:
+		# extension repodata
+		# need to extend to repo boundaries, as this is how
+		# info.write() has written the data
+		info.extend_to_repo()
+		# LOCALPOOL does not help as pool already contains all ids
+		info.read_solv_flags(nf, Repo.REPO_EXTEND_SOLVABLES)
+	    solv.xfclose(nf)
 	os.rename(tmpname, calccachepath(repo, repoext))
     except IOError, e:
 	if tmpname:
@@ -418,12 +463,31 @@ def depglob(pool, name, globname, globdep):
 	    return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) for id in sorted(idmatches.keys()) ]
     return []
     
+
 def load_stub(repodata):
     if repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE):
 	return repomd_load_ext(repodata.repo.appdata, repodata)
     if repodata.lookup_str(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME):
 	return susetags_load_ext(repodata.repo.appdata, repodata)
     return False
+
+def rewrite_repos(pool, addedprovides):
+    addedprovidesset = set(addedprovides)
+    for repohandle in pool.repos:
+	repo = repohandle.appdata
+	if not repohandle.nsolvables:
+	    continue
+	# make sure there's just one real repodata with extensions
+	repodata = repohandle.first_repodata()
+	if not repodata:
+	    continue
+	oldaddedprovides = repodata.lookup_idarray(solv.SOLVID_META, solv.REPOSITORY_ADDEDFILEPROVIDES)
+	oldaddedprovidesset = set(oldaddedprovides)
+	if not addedprovidesset <= oldaddedprovidesset:
+	    for id in addedprovides:
+		repodata.add_idarray(solv.SOLVID_META, solv.REPOSITORY_ADDEDFILEPROVIDES, id)
+	    repodata.internalize()
+	    writecachedrepo(repo, None, repodata)
     
 
 parser = OptionParser(usage="usage: solv.py [options] COMMAND")
@@ -592,7 +656,9 @@ if cmd == 'se' or cmd == 'search':
 
 # XXX: insert rewrite_repos function
 
-pool.addfileprovides()
+addedprovides = pool.addfileprovides_ids()
+if addedprovides:
+    rewrite_repos(pool, addedprovides)
 pool.createwhatprovides()
 
 jobs = []
