@@ -78,9 +78,6 @@ repo_empty(Repo *repo, int reuseids)
   int i;
 
   pool_freewhatprovides(pool);
-  if (repo == pool->installed)
-    pool->installed = 0;
-
   if (reuseids && repo->end == pool->nsolvables)
     {
       /* it's ok to reuse the ids. As this is the last repo, we can
@@ -119,6 +116,8 @@ repo_free(Repo *repo, int reuseids)
   Pool *pool = repo->pool;
   int i;
 
+  if (repo == pool->installed)
+    pool->installed = 0;
   repo_empty(repo, reuseids);
   for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
     if (pool->repos[i] == repo)
@@ -1034,8 +1033,12 @@ repo_add_repodata(Repo *repo, int flags)
 	    /* hack: we mis-use REPO_REUSE_REPODATA here */
 	    if (!(flags & REPO_REUSE_REPODATA))
 	      {
+		/* save state and loadcallback */
+		void (*loadcallback)(Repodata *) = data->loadcallback;
 		repodata_freedata(data);
 		repodata_initdata(data, repo, (flags & REPO_LOCALPOOL) ? 1 : 0);
+		data->state = REPODATA_LOADING;
+		data->loadcallback = loadcallback;
 	      }
 	    return data;
 	  }

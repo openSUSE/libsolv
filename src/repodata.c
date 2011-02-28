@@ -2808,8 +2808,7 @@ repodata_load_stub(Repodata *data)
     }
   data->state = REPODATA_LOADING;
   r = pool->loadcallback(pool, data, pool->loadcallbackdata);
-  if (!r)
-    data->state = REPODATA_ERROR;
+  data->state = r ? REPODATA_AVAILABLE : REPODATA_ERROR;
 }
 
 void
