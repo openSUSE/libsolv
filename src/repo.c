@@ -1032,14 +1032,7 @@ repo_add_repodata(Repo *repo, int flags)
 	    /* re-init */
 	    /* hack: we mis-use REPO_REUSE_REPODATA here */
 	    if (!(flags & REPO_REUSE_REPODATA))
-	      {
-		/* save state and loadcallback */
-		void (*loadcallback)(Repodata *) = data->loadcallback;
-		repodata_freedata(data);
-		repodata_initdata(data, repo, (flags & REPO_LOCALPOOL) ? 1 : 0);
-		data->state = REPODATA_LOADING;
-		data->loadcallback = loadcallback;
-	      }
+	      repodata_empty(data, (flags & REPO_LOCALPOOL) ? 1 : 0);
 	    return data;
 	  }
       return 0;	/* must not create a new repodata! */

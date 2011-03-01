@@ -120,6 +120,7 @@ void repodata_freedata(Repodata *data);
 
 Repodata *repodata_create(struct _Repo *repo, int localpool);
 void repodata_free(Repodata *data);
+void repodata_empty(Repodata *data, int localpool);
 
 
 /*
