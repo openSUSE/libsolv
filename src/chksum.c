@@ -40,15 +40,33 @@ sat_chksum_create(Id type)
     case REPOKEY_TYPE_SHA256:
       sat_SHA256_Init(&h->c.sha256);
       return h;
+    default:
+      break;
     }
   free(h);
   return 0;
+}
+
+void *
+sat_chksum_create_from_bin(Id type, const unsigned char *buf)
+{
+  struct ctxhandle *h;
+  int l = sat_chksum_len(type);
+  if (buf == 0 || l == 0)
+    return 0;
+  h = sat_calloc(1, sizeof(*h));
+  h->type = type;
+  h->done = 1;
+  memcpy(h->result, buf, l);
+  return h;
 }
 
 void
 sat_chksum_add(void *handle, const void *data, int len)
 {
   struct ctxhandle *h = handle;
+  if (h->done)
+    return;
   switch(h->type)
     {
     case REPOKEY_TYPE_MD5:
@@ -65,12 +83,16 @@ sat_chksum_add(void *handle, const void *data, int len)
     }
 }
 
-unsigned char *
+const unsigned char *
 sat_chksum_get(void *handle, int *lenp)
 {
   struct ctxhandle *h = handle;
   if (h->done)
-    return h->result;
+    {
+      if (lenp)
+        *lenp = sat_chksum_len(h->type);
+      return h->result;
+    }
   switch(h->type)
     {
     case REPOKEY_TYPE_MD5:
@@ -98,15 +120,23 @@ sat_chksum_get(void *handle, int *lenp)
     }
 }
 
+Id
+sat_chksum_get_type(void *handle)
+{
+  struct ctxhandle *h = handle;
+  return h->type;
+}
+
 void *
 sat_chksum_free(void *handle, unsigned char *cp)
 {
   if (cp)
     {
-      unsigned char *res;
+      const unsigned char *res;
       int l;
       res = sat_chksum_get(handle, &l);
-      memcpy(cp, res, l);
+      if (l && res)
+        memcpy(cp, res, l);
     }
   sat_free(handle);
   return 0;
