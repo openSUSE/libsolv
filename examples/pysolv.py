@@ -16,9 +16,9 @@
 # - on demand loading of secondary repository data
 # - checksum verification
 # - deltarpm support
+# - installation of commandline packages
 #
 # things not yet ported:
-# - installation of commandline packages
 # - gpg verification
 # - file conflicts
 # - fastestmirror implementation
@@ -46,8 +46,8 @@ from optparse import OptionParser
 #import gc
 #gc.set_debug(gc.DEBUG_LEAK)
 
-def calc_checksum_stat(stat, type=solv.REPOKEY_TYPE_SHA256):
-    chksum = solv.Chksum(type)
+def calc_cookie_stat(stat):
+    chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
     chksum.add("1.1")
     chksum.add(str(stat[ST_DEV]))
     chksum.add(str(stat[ST_INO]))
@@ -55,9 +55,9 @@ def calc_checksum_stat(stat, type=solv.REPOKEY_TYPE_SHA256):
     chksum.add(str(stat[ST_MTIME]))
     return chksum.raw()
 
-def calc_checksum_fp(fp, type=solv.REPOKEY_TYPE_SHA256):
-    chksum = solv.Chksum(type)
-    chksum.addfp(fp)
+def calc_cookie_fp(fp):
+    chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
+    chksum.add_fp(fp)
     return chksum.raw()
 
 def calccachepath(repo, repoext = None):
@@ -126,7 +126,7 @@ def writecachedrepo(repo, repoext, info=None):
 	if repo['alias'] != '@System' and not repoext:
 	    if 'extcookie' not in repo:
 		# create unique id
-		extcookie = calc_checksum_stat(os.fstat(f.fileno()))
+		extcookie = calc_cookie_stat(os.fstat(f.fileno()))
 		extcookie = ''.join(chr(ord(s)^ord(c)) for s,c in zip(extcookie, repo['cookie']))
 		if ord(extcookie[0]) == 0:
 		    extcookie[0] = chr(1)
@@ -158,12 +158,12 @@ def writecachedrepo(repo, repoext, info=None):
 	if tmpname:
 	    os.unlink(tmpname)
 
-def curlfopen(repo, file, uncompress, chksum, chksumtype, badchecksum=None):
+def curlfopen(repo, file, uncompress, chksum, badchecksum=None):
     baseurl = repo['baseurl']
     url = re.sub(r'/$', '', baseurl) + '/' + file
     f = tempfile.TemporaryFile()
     st = subprocess.call(['curl', '-f', '-s', '-L', url], stdout=f.fileno())
-    if os.lseek(f.fileno(), 0, os.SEEK_CUR) == 0 and (st == 0 or not chksumtype):
+    if os.lseek(f.fileno(), 0, os.SEEK_CUR) == 0 and (st == 0 or not chksum):
 	return None
     os.lseek(f.fileno(), 0, os.SEEK_SET)
     if st:
@@ -171,14 +171,14 @@ def curlfopen(repo, file, uncompress, chksum, chksumtype, badchecksum=None):
 	if badchecksum:
 	    badchecksum['True'] = 'True'
         return None
-    if chksumtype:
-	fchksum = solv.Chksum(chksumtype)
+    if chksum:
+	fchksum = solv.Chksum(chksum.type)
 	if not fchksum:
 	    print "%s: unknown checksum type" % file
 	    if badchecksum:
 		badchecksum['True'] = 'True'
 	    return None
-	fchksum.addfd(f.fileno())
+	fchksum.add_fd(f.fileno())
 	if not fchksum.matches(chksum):
 	    print "%s: checksum mismatch" % file
 	    if badchecksum:
@@ -194,17 +194,17 @@ def repomd_find(repo, what):
     for d in di:
         d.setpos_parent()
         filename = d.pool.lookup_str(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_LOCATION)
-        chksum, chksumtype = d.pool.lookup_bin_checksum(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_CHECKSUM)
-        if filename and not chksumtype:
+        chksum = d.pool.lookup_checksum(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_CHECKSUM)
+        if filename and not chksum:
 	    print "no %s file checksum!" % filename
 	    filename = None
 	    chksum = None
         if filename:
-            return (filename, chksum, chksumtype)
-    return (None, None, None)
+            return (filename, chksum)
+    return (None, None)
 
 def repomd_add_ext(repo, repodata, what, ext):
-    filename, chksum, chksumtype = repomd_find(repo, what)
+    filename, chksum = repomd_find(repo, what)
     if not filename:
 	return False
     if what == 'prestodelta':
@@ -212,7 +212,7 @@ def repomd_add_ext(repo, repodata, what, ext):
     handle = repodata.new_handle()
     repodata.set_poolstr(handle, solv.REPOSITORY_REPOMD_TYPE, what)
     repodata.set_str(handle, solv.REPOSITORY_REPOMD_LOCATION, filename)
-    repodata.set_bin_checksum(handle, solv.REPOSITORY_REPOMD_CHECKSUM, chksumtype, chksum)
+    repodata.set_bin_checksum(handle, solv.REPOSITORY_REPOMD_CHECKSUM, chksum)
     if what == 'deltainfo':
 	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOSITORY_DELTAINFO)
 	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_FLEXARRAY)
@@ -245,8 +245,8 @@ def repomd_load_ext(repo, repodata):
     sys.stdout.write(" fetching]\n")
     sys.stdout.flush()
     filename = repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_LOCATION)
-    filechksum, filechksumtype = repodata.lookup_bin_checksum(solv.SOLVID_META, solv.REPOSITORY_REPOMD_CHECKSUM)
-    f = curlfopen(repo, filename, True, filechksum, filechksumtype)
+    filechksum = repodata.lookup_checksum(solv.SOLVID_META, solv.REPOSITORY_REPOMD_CHECKSUM)
+    f = curlfopen(repo, filename, True, filechksum)
     if not f:
 	return False
     if ext == 'FL':
@@ -262,18 +262,18 @@ def susetags_find(repo, what):
     di.prepend_keyname(solv.SUSETAGS_FILE)
     for d in di:
         d.setpos_parent()
-        chksum, chksumtype = d.pool.lookup_bin_checksum(solv.SOLVID_POS, solv.SUSETAGS_FILE_CHECKSUM)
-	return (what, chksum, chksumtype)
-    return (None, None, None)
+        chksum = d.pool.lookup_checksum(solv.SOLVID_POS, solv.SUSETAGS_FILE_CHECKSUM)
+	return (what, chksum)
+    return (None, None)
 
 def susetags_add_ext(repo, repodata, what, ext):
-    (filename, chksum, chksumtype) = susetags_find(repo, what)
+    (filename, chksum) = susetags_find(repo, what)
     if not filename:
 	return False
     handle = repodata.new_handle()
     repodata.set_str(handle, solv.SUSETAGS_FILE_NAME, filename)
-    if chksumtype:
-	repodata.set_bin_checksum(handle, solv.SUSETAGS_FILE_CHECKSUM, chksumtype, chksum)
+    if chksum:
+	repodata.set_bin_checksum(handle, solv.SUSETAGS_FILE_CHECKSUM, chksum)
     if ext == 'DU':
 	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_DISKUSAGE)
 	repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRNUMNUMARRAY)
@@ -329,8 +329,8 @@ def susetags_load_ext(repo, repodata):
     descrdir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
     if not descrdir:
 	descrdir = "suse/setup/descr"
-    filechksum, filechksumtype = repodata.lookup_bin_checksum(solv.SOLVID_META, solv.SUSETAGS_FILE_CHECKSUM)
-    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum, filechksumtype)
+    filechksum = repodata.lookup_checksum(solv.SOLVID_META, solv.SUSETAGS_FILE_CHECKSUM)
+    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum)
     if not f:
 	return False
     repo['handle'].add_susetags(f, defvendorid, None, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
@@ -475,6 +475,8 @@ def rewrite_repos(pool, addedprovides):
     addedprovidesset = set(addedprovides)
     for repohandle in pool.repos:
 	repo = repohandle.appdata
+	if 'cookie' not in repo:	# ignore commandlinerepo
+	    continue
 	if not repohandle.nsolvables:
 	    continue
 	# make sure there's just one real repodata with extensions
@@ -530,7 +532,7 @@ sysrepo['handle'] = pool.add_repo(sysrepo['alias'])
 sysrepo['handle'].appdata = sysrepo
 pool.installed = sysrepo['handle']
 sysrepostat = os.stat("/var/lib/rpm/Packages")
-sysrepocookie = calc_checksum_stat(sysrepostat)
+sysrepocookie = calc_cookie_stat(sysrepostat)
 sysrepo['cookie'] = sysrepocookie
 if usecachedrepo(sysrepo, None):
     print "cached"
@@ -571,7 +573,7 @@ for repo in repos:
 	    repo['handle'].free(True)
 	    del repo['handle']
 	    continue
-	repo['cookie'] = calc_checksum_fp(f)
+	repo['cookie'] = calc_cookie_fp(f)
 	if usecachedrepo(repo, None, True):
 	    print "cached"
 	    solv.xfclose(f)
@@ -579,17 +581,17 @@ for repo in repos:
 	repo['handle'].add_repomdxml(f, 0)
 	solv.xfclose(f)
 	print "fetching"
-	(filename, filechksum, filechksumtype) = repomd_find(repo, 'primary')
+	(filename, filechksum) = repomd_find(repo, 'primary')
 	if filename:
-	    f = curlfopen(repo, filename, True, filechksum, filechksumtype, badchecksum)
+	    f = curlfopen(repo, filename, True, filechksum, badchecksum)
 	    if f:
 		repo['handle'].add_rpmmd(f, None, 0)
 		solv.xfclose(f)
 	    if badchecksum:
 		continue	# hopeless, need good primary
-	(filename, filechksum, filechksumtype) = repomd_find(repo, 'updateinfo')
+	(filename, filechksum) = repomd_find(repo, 'updateinfo')
 	if filename:
-	    f = curlfopen(repo, filename, True, filechksum, filechksumtype, badchecksum)
+	    f = curlfopen(repo, filename, True, filechksum, badchecksum)
 	    if f:
 		repo['handle'].add_updateinfoxml(f, 0)
 		solv.xfclose(f)
@@ -603,7 +605,7 @@ for repo in repos:
 	    repo['handle'].free(True)
 	    del repo['handle']
 	    continue
-	repo['cookie'] = calc_checksum_fp(f)
+	repo['cookie'] = calc_cookie_fp(f)
 	if usecachedrepo(repo, None, True):
 	    print "cached"
 	    solv.xfclose(f)
@@ -615,19 +617,19 @@ for repo in repos:
 	descrdir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
 	if not descrdir:
 	    descrdir = "suse/setup/descr"
-	(filename, filechksum, filechksumtype) = susetags_find(repo, 'packages.gz')
+	(filename, filechksum) = susetags_find(repo, 'packages.gz')
 	if not filename:
-	    (filename, filechksum, filechksumtype) = susetags_find(repo, 'packages')
+	    (filename, filechksum) = susetags_find(repo, 'packages')
 	if filename:
-	    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum, filechksumtype, badchecksum)
+	    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum, badchecksum)
 	    if f:
 		repo['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.SUSETAGS_RECORD_SHARES)
 		solv.xfclose(f)
-		(filename, filechksum, filechksumtype) = susetags_find(repo, 'packages.en.gz')
+		(filename, filechksum) = susetags_find(repo, 'packages.en.gz')
 		if not filename:
-		    (filename, filechksum, filechksumtype) = susetags_find(repo, 'packages.en')
+		    (filename, filechksum) = susetags_find(repo, 'packages.en')
 		if filename:
-		    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum, filechksumtype, badchecksum)
+		    f = curlfopen(repo, descrdir + '/' + filename, True, filechksum, badchecksum)
 		    if f:
 			repo['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.REPO_REUSE_REPODATA|Repo.REPO_EXTEND_SOLVABLES)
 			solv.xfclose(f)
@@ -654,7 +656,18 @@ if cmd == 'se' or cmd == 'search':
 	print " - %s [%s]: %s" % (pool.solvid2str(solvid), pool.solvables[solvid].repo.name, pool.lookup_str(solvid, solv.SOLVABLE_SUMMARY))
     sys.exit(0)
 
-# XXX: insert rewrite_repos function
+cmdlinerepo = None
+cmdlinepkgs = {}
+if cmd == 'li' or cmd == 'list' or cmd == 'info' or cmd == 'in' or cmd == 'install':
+    for arg in args:
+	if arg.endswith(".rpm") and os.access(arg, os.R_OK):
+	    if not cmdlinerepo:
+		cmdlinerepo = { 'alias': '@commandline' }
+		cmdlinerepo['handle'] = pool.add_repo(cmdlinerepo['alias'])
+		cmdlinerepo['handle'].appdata = cmdlinerepo
+	    cmdlinepkgs[arg] = cmdlinerepo['handle'].add_rpm(arg, Repo.REPO_REUSE_REPODATA|Repo.REPO_NO_INTERNALIZE)
+    if cmdlinerepo:
+	cmdlinerepo['handle'].internalize()
 
 addedprovides = pool.addfileprovides_ids()
 if addedprovides:
@@ -663,6 +676,9 @@ pool.createwhatprovides()
 
 jobs = []
 for arg in args:
+    if cmdlinerepo and arg in cmdlinepkgs:
+	jobs.append(pool.Job(Job.SOLVER_SOLVABLE, cmdlinepkgs[arg]))
+	continue
     argjob = mkjobs(pool, cmd, arg)
     jobs += argjob
 
@@ -707,10 +723,15 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 	    job.how |= Job.SOLVER_ERASE
 
     #pool.set_debuglevel(2)
-    solver = pool.create_solver()
-    solver.ignorealreadyrecommended = True
-    problems = solver.solve(jobs)
-    if problems:
+    solver = None
+    while True:
+	solver = pool.create_solver()
+	solver.ignorealreadyrecommended = True
+	if cmd == 'rm' or cmd == 'erase':
+	    solver.allowuninstall = True
+	problems = solver.solve(jobs)
+	if not problems:
+	    break
 	for problem in problems:
 	    print "Problem %d:" % problem.id
 	    r = problem.findproblemrule()
@@ -769,7 +790,34 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 			print "  - allow replacement of %s with %s" % (element.solvable.str(), element.replacement.str())
 		    elif etype == Solver.SOLVER_SOLUTION_DEINSTALL:
 			print "  - allow deinstallation of %s" % element.solvable.str()
-	sys.exit(1)
+	    sol = ''
+	    while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
+		sys.stdout.write("Please choose a solution: ")
+		sys.stdout.flush()
+		sol = sys.stdin.readline().strip()
+	    if sol == 's':
+		continue	# skip problem
+	    if sol == 'q':
+		sys.exit(1)
+	    solution = solutions[int(sol) - 1]
+	    for element in solution.elements():
+		etype = element.type
+		newjob = None
+		if etype == Solver.SOLVER_SOLUTION_JOB:
+		    jobs[element.jobidx] = pool.Job(Job.SOLVER_NOOP, 0)
+		elif etype == Solver.SOLVER_SOLUTION_INFARCH or etype == Solver.SOLVER_SOLUTION_DISTUPGRADE:
+		    newjob = pool.Job(Job.SOLVER_INSTALL|Job.SOLVER_SOLVABLE, element.solvable.id)
+		elif etype == Solver.SOLVER_SOLUTION_REPLACE:
+		    newjob = pool.Job(Job.SOLVER_INSTALL|Job.SOLVER_SOLVABLE, element.replacement.id)
+		elif etype == Solver.SOLVER_SOLUTION_DEINSTALL:
+		    newjob = pool.Job(Job.SOLVER_ERASE|Job.SOLVER_SOLVABLE, element.solvable.id)
+		if newjob:
+		    for job in jobs:
+			if job.how == newjob.how and job.what == newjob.what:
+			    newjob = None
+			    break
+		    if newjob:
+			jobs.append(newjob)
     # no problems, show transaction
     trans = solver.transaction()
     del solver
@@ -827,6 +875,12 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 	    location, medianr = p.lookup_location()
 	    if not location:
 		continue
+	    if repo == cmdlinerepo:
+		f = solv.xfopen(location)
+		if not f:
+		    sys.exit("\n%s: %s not found" % location)
+		newpkgsfp[p.id] = f
+		continue
 	    if sysrepo['handle'].nsolvables and os.access('/usr/bin/applydeltarpm', os.X_OK):
 		pname = p.name
 		di = p.repo.dataiterator_new(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
@@ -846,11 +900,11 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 		    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, '-c', '-s', seq])
 		    if st:
 			continue
-		    chksum, chksumtype = pool.lookup_bin_checksum(solv.SOLVID_POS, solv.DELTA_CHECKSUM)
+		    chksum = pool.lookup_checksum(solv.SOLVID_POS, solv.DELTA_CHECKSUM)
 		    if not chksum:
 			continue
 		    dloc = pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_DIR) + '/' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_NAME) + '-' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_EVR) + '.' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_SUFFIX)
-		    f = curlfopen(repo, dloc, False, chksum, chksumtype)
+		    f = curlfopen(repo, dloc, False, chksum)
 		    if not f:
 			continue
 		    nf = tempfile.TemporaryFile()
@@ -865,8 +919,13 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
 		    sys.stdout.flush()
 		    continue
 			
-	    chksum, chksumtype = p.lookup_bin_checksum(solv.SOLVABLE_CHECKSUM)
-	    f = curlfopen(repo, location, False, chksum, chksumtype)
+	    if repo['type'] == 'yast2':
+		datadir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DATADIR)
+		if not datadir:
+		    datadir = 'suse'
+		location = datadir + '/' + location
+	    chksum = p.lookup_checksum(solv.SOLVABLE_CHECKSUM)
+	    f = curlfopen(repo, location, False, chksum)
 	    if not f:
 		sys.exit("\n%s: %s not found in repository" % (repo['alias'], location))
 	    newpkgsfp[p.id] = f
@@ -876,6 +935,7 @@ if cmd == 'in' or cmd == 'install' or cmd == 'rm' or cmd == 'erase' or cmd == 'u
     print "Committing transaction:"
     print
     ts = rpm.TransactionSet('/')
+    ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
     erasenamehelper = {}
     for p in trans.steps():
 	type = trans.steptype(p, Transaction.SOLVER_TRANSACTION_RPM_ONLY)

@@ -9,33 +9,6 @@
 
 %module solv
 
-%typemap(in) (Id *idarray, int idarraylen) {
-  /* Check if is a list */
-  if (PyList_Check($input)) {
-    int size = PyList_Size($input);
-    int i = 0;
-    $1 = (Id *)sat_malloc2(size, sizeof(Id));
-    for (i = 0; i < size; i++) {
-      PyObject *o = PyList_GetItem($input,i);
-      int v;
-      int e = SWIG_AsVal_int(o, &v);
-      if (!SWIG_IsOK(e)) {
-        SWIG_exception_fail(SWIG_ArgError(e), "list must contain integers");
-        sat_free($1);
-        return NULL;
-      }
-      $1[i] = v;
-    }
-    $2 = size;
-  } else {
-    PyErr_SetString(PyExc_TypeError,"not a list");
-    return NULL;
-  }
-}
-%typemap(freearg) (Id *idarray, int idarraylen) {
-  sat_free($1);
-}
-
 %typemap(in) Queue {
   /* Check if is a list */
   queue_init(&$1);
@@ -252,7 +225,8 @@ typedef struct {
   bool allowvendorchange;
 } Solver;
 
-typedef struct chksum {} Chksum;
+typedef struct chksum {
+} Chksum;
 
 %rename(xfopen) sat_xfopen;
 %rename(xfopen_fd) sat_xfopen_fd;
@@ -344,34 +318,63 @@ typedef struct {
   ~Chksum() {
     sat_chksum_free($self, 0);
   }
+  Id const type;
+  %{
+  SWIGINTERN Id Chksum_type_get(Chksum *chksum) {
+    return sat_chksum_get_type(chksum);
+  }
+  %}
   void add(const char *str) {
     sat_chksum_add($self, str, strlen((char *)str));
   }
-  void addfp(FILE *fp) {
+  void add_fp(FILE *fp) {
     char buf[4096];
     int l;
     while ((l = fread(buf, 1, sizeof(buf), fp)) > 0)
       sat_chksum_add($self, buf, l);
     rewind(fp);         /* convenience */
   }
-  void addfd(int fd) {
+  void add_fd(int fd) {
     char buf[4096];
     int l;
     while ((l = read(fd, buf, sizeof(buf))) > 0)
       sat_chksum_add($self, buf, l);
     lseek(fd, 0, 0);    /* convenience */
   }
-  bool matches(char *othersum) {
+  bool matches(Chksum *othersum) {
     int l;
-    unsigned char *b;
+    const unsigned char *b, *bo;
+    if (!othersum)
+      return 0;
+    if (sat_chksum_get_type($self) != sat_chksum_get_type(othersum))
+      return 0;
     b = sat_chksum_get($self, &l);
-    return memcmp(b, (void *)othersum, l) == 0;
+    bo = sat_chksum_get(othersum, 0);
+    return memcmp(b, bo, l) == 0;
   }
   SWIGCDATA raw() {
     int l;
-    unsigned char *b;
+    const unsigned char *b;
     b = sat_chksum_get($self, &l);
     return cdata_void((void *)b, l);
+  }
+  %newobject hex;
+  char *hex() {
+    int i, l, c;
+    const unsigned char *b;
+    char *ret, *rp;
+
+    b = sat_chksum_get($self, &l);
+    ret = rp = sat_malloc(2 * l + 1);
+    for (i = 0; i < l; i++)
+      {
+        c = b[i] >> 4;
+        *rp++ = c < 10 ? c + '0' : c + ('a' - 10);
+        c = b[i] & 15;
+        *rp++ = c < 10 ? c + '0' : c + ('a' - 10);
+      }
+    *rp++ = 0;
+    return ret;
   }
 }
 
@@ -454,20 +457,11 @@ typedef struct {
   bool lookup_void(Id entry, Id keyname) {
     return pool_lookup_void($self, entry, keyname);
   }
-  SWIGCDATA lookup_bin_checksum(Id entry, Id keyname, Id *OUTPUT) {
-    int l;
-    const unsigned char *b;
-    *OUTPUT = 0;
-    b = pool_lookup_bin_checksum($self, entry, keyname, OUTPUT);
-    if (!b)
-      return cdata_void(0, 0);
-    return cdata_void((char *)b, sat_chksum_len(*OUTPUT));
-  }
-  const char *lookup_checksum(Id entry, Id keyname, Id *OUTPUT) {
+  %newobject lookup_checksum;
+  Chksum *lookup_checksum(Id entry, Id keyname) {
     Id type = 0;
-    *OUTPUT = 0;
-    const char *b = pool_lookup_checksum($self, entry, keyname, OUTPUT);
-    return b;
+    const unsigned char *b = pool_lookup_bin_checksum($self, entry, keyname, &type);
+    return sat_chksum_create_from_bin(type, b);
   }
   %newobject dataiterator_new;
   Dataiterator *dataiterator_new(Id p, Id key,  const char *match, int flags) {
@@ -624,6 +618,13 @@ typedef struct {
   bool add_rpmdb(Repo *ref, int flags = 0) {
     repo_add_rpmdb($self, ref, 0, flags);
     return 1;
+  }
+  Id add_rpm(const char *name, int flags = 0) {
+    int oldend = $self->end;
+    repo_add_rpms($self, &name, 1, flags);
+    if (oldend == $self->end)
+      return 0;
+    return $self->end - 1;
   }
   bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0) {
     repo_add_susetags($self, fp, defvendor, language, flags);
@@ -958,20 +959,11 @@ typedef struct {
   bool lookup_void(Id keyname) {
     return pool_lookup_void($self->pool, $self->id, keyname);
   }
-  SWIGCDATA lookup_bin_checksum(Id keyname, Id *OUTPUT) {
-    int l;
-    const unsigned char *b;
-    *OUTPUT = 0;
-    b = pool_lookup_bin_checksum($self->pool, $self->id, keyname, OUTPUT);
-    if (!b)
-      return cdata_void(0, 0);
-    return cdata_void((char *)b, sat_chksum_len(*OUTPUT));
-  }
-  const char *lookup_checksum(Id keyname, Id *OUTPUT) {
+  %newobject lookup_checksum;
+  Chksum *lookup_checksum(Id keyname) {
     Id type = 0;
-    *OUTPUT = 0;
-    const char *b = pool_lookup_checksum($self->pool, $self->id, keyname, OUTPUT);
-    return b;
+    const unsigned char *b = pool_lookup_bin_checksum($self->pool, $self->id, keyname, &type);
+    return sat_chksum_create_from_bin(type, b);
   }
   const char *lookup_location(int *OUTPUT) {
     return solvable_get_location($self->pool->solvables + $self->id, OUTPUT);
@@ -1336,8 +1328,10 @@ typedef struct {
   void add_flexarray(Id solvid, Id keyname, Id handle) {
     repodata_add_flexarray($self->repo->repodata + $self->id, solvid, keyname, handle);
   }
-  void set_bin_checksum(Id solvid, Id keyname, Id chksumtype, const char *chksum) {
-    repodata_set_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, chksumtype, (const unsigned char *)chksum);
+  void set_bin_checksum(Id solvid, Id keyname, Chksum *chksum) {
+    const unsigned char *buf = sat_chksum_get(chksum, 0);
+    if (buf)
+      repodata_set_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, sat_chksum_get_type(chksum), buf);
   }
   const char *lookup_str(Id solvid, Id keyname) {
     return repodata_lookup_str($self->repo->repodata + $self->id, solvid, keyname);
@@ -1348,11 +1342,11 @@ typedef struct {
     repodata_lookup_idarray($self->repo->repodata + $self->id, solvid, keyname, &r);
     return r;
   }
-  SWIGCDATA lookup_bin_checksum(Id solvid, Id keyname, Id *OUTPUT) {
-    const unsigned char *b;
-    *OUTPUT = 0;
-    b = repodata_lookup_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, OUTPUT);
-    return cdata_void((char *)b, sat_chksum_len(*OUTPUT));
+  %newobject lookup_checksum;
+  Chksum *lookup_checksum(Id solvid, Id keyname) {
+    Id type = 0;
+    const unsigned char *b = repodata_lookup_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, &type);
+    return sat_chksum_create_from_bin(type, b);
   }
   void internalize() {
     repodata_internalize($self->repo->repodata + $self->id);

@@ -489,7 +489,7 @@ static int
 verify_checksum(int fd, const char *file, const unsigned char *chksum, Id chksumtype)
 {
   char buf[1024];
-  unsigned char *sum;
+  const unsigned char *sum;
   void *h;
   int l;
 
@@ -1248,34 +1248,19 @@ repomd_find(Repo *repo, const char *what, const unsigned char **chksump, Id *chk
 int
 repomd_add_ext(Repo *repo, Repodata *data, const char *what)
 {
-  Pool *pool = repo->pool;
-  Dataiterator di;
   Id chksumtype, handle;
   const unsigned char *chksum;
   const char *filename;
 
-  dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_REPOMD_TYPE, what, SEARCH_STRING);
-  dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
-  if (!dataiterator_step(&di))
-    {
-      dataiterator_free(&di);
-      return 0;
-    }
+  filename = repomd_find(repo, what, &chksum, &chksumtype);
+  if (!filename)
+    return 0;
   if (!strcmp(what, "prestodelta"))
     what = "deltainfo";
-  dataiterator_setpos_parent(&di);
-  filename = pool_lookup_str(pool, SOLVID_POS, REPOSITORY_REPOMD_LOCATION);
-  chksum = pool_lookup_bin_checksum(pool, SOLVID_POS, REPOSITORY_REPOMD_CHECKSUM, &chksumtype);
-  if (!filename || !chksum)
-    {
-      dataiterator_free(&di);
-      return 0;
-    }
   handle = repodata_new_handle(data);
   repodata_set_poolstr(data, handle, REPOSITORY_REPOMD_TYPE, what);
   repodata_set_str(data, handle, REPOSITORY_REPOMD_LOCATION, filename);
-  if (chksumtype)
-    repodata_set_bin_checksum(data, handle, REPOSITORY_REPOMD_CHECKSUM, chksumtype, chksum);
+  repodata_set_bin_checksum(data, handle, REPOSITORY_REPOMD_CHECKSUM, chksumtype, chksum);
   if (!strcmp(what, "deltainfo"))
     {
       repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOSITORY_DELTAINFO);
@@ -1286,7 +1271,6 @@ repomd_add_ext(Repo *repo, Repodata *data, const char *what)
       repodata_add_idarray(data, handle, REPOSITORY_KEYS, SOLVABLE_FILELIST);
       repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOKEY_TYPE_DIRSTRARRAY);
     }
-  dataiterator_free(&di);
   repodata_add_flexarray(data, SOLVID_META, REPOSITORY_EXTERNAL, handle);
   return 1;
 }
@@ -2785,11 +2769,11 @@ main(int argc, char **argv)
 	  if (!commandlinerepo)
 	    commandlinerepo = repo_create(pool, "@commandline");
 #ifndef DEBIAN
-	  repo_add_rpms(commandlinerepo, (const char **)argv + i, 1, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+	  p = repo_add_rpm(commandlinerepo, (const char *)argv[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
 #else
-	  repo_add_debs(commandlinerepo, (const char **)argv + i, 1, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+	  p = repo_add_deb(commandlinerepo, (const char *)argv[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
 #endif
-	  commandlinepkgs[i] = commandlinerepo->end - 1;
+	  commandlinepkgs[i] = p;
 	}
       if (commandlinerepo)
 	repo_internalize(commandlinerepo);
@@ -2798,7 +2782,7 @@ main(int argc, char **argv)
   // FOR_REPOS(i, repo)
   //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
   addedfileprovides = 0;
-  pool_addfileprovides_ids(pool, 0, &addedfileprovides);
+  pool_addfileprovides_ids(pool, pool->installed, &addedfileprovides);
   if (addedfileprovides && *addedfileprovides)
     rewrite_repos(pool, addedfileprovides);
   sat_free(addedfileprovides);
