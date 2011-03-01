@@ -1926,6 +1926,17 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
     repodata_internalize(data);
 }
 
+Id
+repo_add_rpm(Repo *repo, const char *rpm, int flags)
+{
+  int end = repo->end;
+  repo_add_rpms(repo, &rpm, 1, flags);
+  if (end == repo->end)
+    return 0;
+  else
+    return repo->end - 1;
+}
+
 static inline void
 linkhash(const char *lt, char *hash)
 {

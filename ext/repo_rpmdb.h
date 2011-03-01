@@ -12,6 +12,7 @@ struct headerToken_s;
 
 extern void repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags);
 extern void repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags);
+extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
 void repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags);
 void repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags);
 

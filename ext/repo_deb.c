@@ -583,3 +583,14 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 }
+
+Id
+repo_add_deb(Repo *repo, const char *deb, int flags)
+{
+  int end = repo->end;
+  repo_add_debs(repo, &deb, 1, flags);
+  if (end == repo->end)
+    return 0;
+  else
+    return repo->end - 1;
+}
