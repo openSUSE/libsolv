@@ -2,6 +2,8 @@
  * repo_content.c
  *
  * Parses 'content' file into .solv
+ * A 'content' file is the repomd.xml of the susetags format
+ *
  * See http://en.opensuse.org/Standards/YaST2_Repository_Metadata/content for a description
  * of the syntax
  *
@@ -23,6 +25,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#include "chksum.h"
 #include "repo_content.h"
 #define DISABLE_SPLIT
 #include "tools_util.h"
@@ -139,7 +142,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	  if (!rel || !evr)
 	    {
 	      pool_debug(pool, SAT_FATAL, "repo_content: bad relation '%s %s'\n", name, rel);
-	      exit(1);
+	      continue;
 	    }
 	  for (flags = 0; flags < 6; flags++)
 	    if (!strcmp(rel, flagtab[flags]))
@@ -147,7 +150,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	  if (flags == 6)
 	    {
 	      pool_debug(pool, SAT_FATAL, "repo_content: unknown relation '%s'\n", rel);
-	      exit(1);
+	      continue;
 	    }
 	  id = rel2id(pool, id, str2id(pool, evr, 1), flags + 1, 1);
 	}
@@ -332,21 +335,17 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		continue;
 	      if (!*value)
 		continue;
-	      if (!strcasecmp(checksumtype, "sha") || !strcasecmp(checksumtype, "sha1"))
-	        l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
-	      else if (!strcasecmp(checksumtype, "sha256"))
-	        l = SIZEOF_SHA256 * 2, type = REPOKEY_TYPE_SHA256;
-	      else if (!strcasecmp(checksumtype, "md5"))
-	        l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
-	      else
-	        {
+	      type = sat_chksum_str2type(checksumtype);
+	      if (!type)
+		{
 		  fprintf(stderr, "Unknown checksum type: %s: %s\n", value, checksumtype);
-		  exit(1);
-	        }
-	      if (strlen(checksum) != l)
+		  continue;
+		}
+              l = sat_chksum_len(type);
+	      if (strlen(checksum) != 2 * l)
 	        {
 		  fprintf(stderr, "Invalid checksum length: %s: for %s\n", value, checksum);
-		  exit(1);
+		  continue;
 	        }
 	      fh = repodata_new_handle(data);
 	      repodata_set_poolstr(data, fh, SUSETAGS_FILE_TYPE, key);
@@ -496,14 +495,14 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   if (defvendor)
     free(defvendor);
 
+  if (s && !s->name)
+    {
+      pool_debug(pool, SAT_FATAL, "repo_content: 'content' incomplete, no product solvable created!\n");
+      repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+      s = 0;
+    }
   if (s)
     {
-      if (!s->name)
-	{
-	  pool_debug(pool, SAT_FATAL, "repo_content: 'content' incomplete, no product solvable created!\n");
-	  exit(1);
-	}
-
       if (pd.tmprel)
 	s->evr = makeevr(pool, join(&pd, pd.tmpvers, "-", pd.tmprel));
       else

@@ -169,6 +169,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
   int havesource = 0;
   char checksum[32 * 2 + 1];
   Id checksumtype = 0;
+  Id newtype;
 
   p = control;
   while (*p)
@@ -277,15 +278,13 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	    s->recommends = makedeps(repo, q, s->recommends, 0);
 	  break;
 	case 'S' << 8 | 'H':
-	  if (!strcasecmp(tag, "sha1") && checksumtype != REPOKEY_TYPE_SHA256 && strlen(q) == 20 * 2)
+	  newtype = sat_chksum_str2type(tag);
+	  if (!newtype || sat_chksum_len(newtype) * 2 != strlen(q))
+	    break;
+	  if (!checksumtype || (newtype == REPOKEY_TYPE_SHA1 && checksumtype != REPOKEY_TYPE_SHA256) || newtype == REPOKEY_TYPE_SHA256)
 	    {
 	      strcpy(checksum, q);
-	      checksumtype = REPOKEY_TYPE_SHA1;
-	    }
-	  else if (!strcasecmp(tag, "sha256") && strlen(q) == 32 * 2)
-	    {
-	      strcpy(checksum, q);
-	      checksumtype = REPOKEY_TYPE_SHA256;
+	      checksumtype = newtype;
 	    }
 	  break;
 	case 'S' << 8 | 'O':

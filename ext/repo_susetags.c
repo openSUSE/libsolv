@@ -15,6 +15,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "hash.h"
+#include "chksum.h"
 #include "tools_util.h"
 #include "repo_susetags.h"
 
@@ -175,25 +176,19 @@ static void
 set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *line)
 {
   char *sp[3];
-  int l;
   Id type;
   if (split(line, sp, 3) != 2)
     {
       pool_debug(pd->repo->pool, SAT_FATAL, "susetags: bad checksum line: %d: %s\n", pd->lineno, line);
       exit(1);
     }
-  if (!strcasecmp(sp[0], "sha1"))
-    l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
-  else if (!strcasecmp(sp[0], "sha256"))
-    l = SIZEOF_SHA256 * 2, type = REPOKEY_TYPE_SHA256;
-  else if (!strcasecmp(sp[0], "md5"))
-    l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
-  else
+  type = sat_chksum_str2type(sp[0]);
+  if (!type)
     {
       pool_debug(pd->repo->pool, SAT_FATAL, "susetags: unknown checksum type: %d: %s\n", pd->lineno, sp[0]);
       exit(1);
     }
-  if (strlen(sp[1]) != l)
+  if (strlen(sp[1]) != 2 * sat_chksum_len(type))
     {
       pool_debug(pd->repo->pool, SAT_FATAL, "susetags: bad checksum length: %d: for %s: %s\n", pd->lineno, sp[0], sp[1]);
       exit(1);

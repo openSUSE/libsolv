@@ -964,20 +964,14 @@ endElement(void *userData, const char *name)
       break;
     case STATE_CHECKSUM:
       {
-        int l;
         Id type, index;
-        if (!strcasecmp(pd->tmpattr, "sha") || !strcasecmp(pd->tmpattr, "sha1"))
-          l = SIZEOF_SHA1 * 2, type = REPOKEY_TYPE_SHA1;
-        else if (!strcasecmp(pd->tmpattr, "sha256"))
-          l = SIZEOF_SHA256 * 2, type = REPOKEY_TYPE_SHA256;
-        else if (!strcasecmp(pd->tmpattr, "md5"))
-          l = SIZEOF_MD5 * 2, type = REPOKEY_TYPE_MD5;
-        else
-          {
+	type = sat_chksum_str2type(pd->tmpattr);
+	if (!type)
+	  {
             fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
             exit(1);
-          }
-        if (strlen(pd->content) != l)
+	  }
+        if (strlen(pd->content) != 2 * sat_chksum_len(type))
           {
             fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
             exit(1);

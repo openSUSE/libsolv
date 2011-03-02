@@ -6,6 +6,8 @@ void sat_chksum_add(void *handle, const void *data, int len);
 Id sat_chksum_get_type(void *handle);
 const unsigned char *sat_chksum_get(void *handle, int *lenp);
 void *sat_chksum_free(void *handle, unsigned char *cp);
+const char *sat_chksum_type2str(Id type);
+Id sat_chksum_str2type(const char *str);
 
 static inline int sat_chksum_len(Id type)
 {

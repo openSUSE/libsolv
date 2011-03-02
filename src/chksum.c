@@ -127,6 +127,34 @@ sat_chksum_get_type(void *handle)
   return h->type;
 }
 
+const char *
+sat_chksum_type2str(Id type)
+{
+  switch(type)
+    {
+    case REPOKEY_TYPE_MD5:
+      return "md5";
+    case REPOKEY_TYPE_SHA1:
+      return "sha1";
+    case REPOKEY_TYPE_SHA256:
+      return "sha256";
+    default:
+      return 0;
+    }
+}
+
+Id
+sat_chksum_str2type(const char *str)
+{
+  if (!strcasecmp(str, "md5"))
+    return REPOKEY_TYPE_MD5;
+  if (!strcasecmp(str, "sha") || !strcasecmp(str, "sha1"))
+    return REPOKEY_TYPE_SHA1;
+  if (!strcasecmp(str, "sha256"))
+    return REPOKEY_TYPE_SHA256;
+  return 0;
+}
+
 void *
 sat_chksum_free(void *handle, unsigned char *cp)
 {
