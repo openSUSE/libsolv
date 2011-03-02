@@ -1722,6 +1722,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 				}
 			      else if (solv->decisionmap[p] == 0)
 				{
+				  if (solv->dupmap_all && solv->installed && pool->solvables[p].repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
+				    continue;
 				  queue_pushunique(&dq, p);
 				}
 			    }
@@ -1736,6 +1738,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (!pool_installable(pool, s))
 		    continue;
 		  if (!solver_is_supplementing(solv, s))
+		    continue;
+		  if (solv->dupmap_all && solv->installed && s->repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, i - solv->installed->start))))
 		    continue;
 		  queue_push(&dqs, i);
 		}

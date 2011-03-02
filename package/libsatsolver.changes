@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Feb 24 17:44:05 CET 2011 - mls@suse.de
+
+- ignore to be dropped orhaned packages when calculating
+  candidates for recommends/supplements installation
+
+-------------------------------------------------------------------
 Wed Feb  2 09:24:42 UTC 2011 - kkaempf@novell.com
 
 - Split off 'applayer' and 'bindings' as a separate package
