@@ -665,23 +665,8 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
 	bp++;
       if (chksumtypep && !*chksumtypep && !strncmp(bp, "<hash type=\"sha256\">", 20))
 	{
-	  int i;
-
 	  bp += 20;
-	  memset(chksump, 0, 32);
-	  for (i = 0; i < 64; i++)
-	    {
-	      int c = *bp++;
-	      if (c >= '0' && c <= '9')
-		chksump[i / 2] = chksump[i / 2] * 16 + (c - '0');
-	      else if (c >= 'a' && c <= 'f')
-		chksump[i / 2] = chksump[i / 2] * 16 + (c - ('a' - 10));
-	      else if (c >= 'A' && c <= 'F')
-		chksump[i / 2] = chksump[i / 2] * 16 + (c - ('A' - 10));
-	      else
-		break;
-	    }
-	  if (i == 64)
+	  if (sat_hex2bin((const char **)&bp, chksump, 32) == 32)
 	    *chksumtypep = REPOKEY_TYPE_SHA256;
 	  continue;
 	}
@@ -760,6 +745,13 @@ findmirrorlisturl(FILE *fp)
       return bp;
     }
   return 0;
+}
+
+static inline int
+iscompressed(const char *name)
+{
+  int l = strlen(name);
+  return l > 3 && !strcmp(name + l - 3, ".gz") ? 1 : 0;
 }
 
 FILE *
@@ -1011,11 +1003,11 @@ char *calccachepath(Repo *repo, const char *repoext)
   char *q, *p = pool_tmpjoin(repo->pool, SOLVCACHE_PATH, "/", repo->name);
   if (repoext)
     {
-      p = pool_tmpjoin(repo->pool, p, "_", repoext);
-      p = pool_tmpjoin(repo->pool, p, ".solvx", 0);
+      p = pool_tmpappend(repo->pool, p, "_", repoext);
+      p = pool_tmpappend(repo->pool, p, ".solvx", 0);
     }
   else
-    p = pool_tmpjoin(repo->pool, p, ".solv", 0);
+    p = pool_tmpappend(repo->pool, p, ".solv", 0);
   q = p + strlen(SOLVCACHE_PATH) + 1;
   if (*q == '.')
     *q = '_';
@@ -1092,6 +1084,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 
   cinfo = repo->appdata;
   mkdir(SOLVCACHE_PATH, 0755);
+  /* use dupjoin instead of tmpjoin because tmpl must survive repo_write */
   tmpl = sat_dupjoin(SOLVCACHE_PATH, "/", ".newsolv-XXXXXX");
   fd = mkstemp(tmpl);
   if (fd < 0)
@@ -1275,6 +1268,49 @@ repomd_add_ext(Repo *repo, Repodata *data, const char *what)
   return 1;
 }
 
+int
+repomd_load_ext(Repo *repo, Repodata *data)
+{
+  const char *filename, *repomdtype;
+  char ext[3];
+  FILE *fp;
+  struct repoinfo *cinfo;
+  const unsigned char *filechksum;
+  Id filechksumtype;
+
+  cinfo = repo->appdata;
+  repomdtype = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_TYPE);
+  if (!repomdtype)
+    return 0;
+  if (!strcmp(repomdtype, "filelists"))
+    strcpy(ext, "FL");
+  else if (!strcmp(repomdtype, "deltainfo"))
+    strcpy(ext, "DL");
+  else
+    return 0;
+#if 1
+  printf("[%s:%s", repo->name, ext);
+#endif
+  if (usecachedrepo(repo, ext, cinfo->extcookie, 0))
+    {
+      printf(" cached]\n");fflush(stdout);
+      return 1;
+    }
+  printf(" fetching]\n"); fflush(stdout);
+  filename = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_LOCATION);
+  filechksumtype = 0;
+  filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, REPOSITORY_REPOMD_CHECKSUM, &filechksumtype);
+  if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
+    return 0;
+  if (!strcmp(ext, "FL"))
+    repo_add_rpmmd(repo, fp, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+  else if (!strcmp(ext, "DL"))
+    repo_add_deltainfoxml(repo, fp, REPO_USE_LOADING);
+  fclose(fp);
+  writecachedrepo(repo, data, ext, cinfo->extcookie);
+  return 1;
+}
+
 
 /* susetags helpers */
 
@@ -1369,13 +1405,50 @@ susetags_add_ext(Repo *repo, Repodata *data)
   dataiterator_free(&di);
 }
 
-
-static inline int
-iscompressed(const char *name)
+int
+susetags_load_ext(Repo *repo, Repodata *data)
 {
-  int l = strlen(name);
-  return l > 3 && !strcmp(name + l - 3, ".gz") ? 1 : 0;
+  const char *filename, *descrdir;
+  Id defvendor;
+  char ext[3];
+  FILE *fp;
+  struct repoinfo *cinfo;
+  const unsigned char *filechksum;
+  Id filechksumtype;
+
+  cinfo = repo->appdata;
+  filename = repodata_lookup_str(data, SOLVID_META, SUSETAGS_FILE_NAME);
+  if (!filename)
+    return 0;
+  /* susetags load */
+  ext[0] = filename[9];
+  ext[1] = filename[10];
+  ext[2] = 0;
+#if 1
+  printf("[%s:%s", repo->name, ext);
+#endif
+  if (usecachedrepo(repo, ext, cinfo->extcookie, 0))
+    {
+      printf(" cached]\n"); fflush(stdout);
+      return 1;
+    }
+#if 1
+  printf(" fetching]\n"); fflush(stdout);
+#endif
+  defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
+  descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
+  if (!descrdir)
+    descrdir = "suse/setup/descr";
+  filechksumtype = 0;
+  filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
+  if ((fp = curlfopen(cinfo, pool_tmpjoin(repo->pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
+    return 0;
+  repo_add_susetags(repo, fp, defvendor, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+  fclose(fp);
+  writecachedrepo(repo, data, ext, cinfo->extcookie);
+  return 1;
 }
+
 
 
 /* load callback */
@@ -1383,80 +1456,11 @@ iscompressed(const char *name)
 int
 load_stub(Pool *pool, Repodata *data, void *dp)
 {
-  const char *filename, *descrdir, *repomdtype;
-  const unsigned char *filechksum;
-  Id filechksumtype;
-  struct repoinfo *cinfo;
-  FILE *fp;
-  Id defvendor;
-  char ext[3];
-
-  cinfo = data->repo->appdata;
-
-  filename = repodata_lookup_str(data, SOLVID_META, SUSETAGS_FILE_NAME);
-  if (filename)
-    {
-      /* susetags load */
-      ext[0] = filename[9];
-      ext[1] = filename[10];
-      ext[2] = 0;
-#if 1
-      printf("[%s:%s", data->repo->name, ext);
-#endif
-      if (usecachedrepo(data->repo, ext, cinfo->extcookie, 0))
-	{
-          printf(" cached]\n"); fflush(stdout);
-	  return 1;
-	}
-#if 1
-      printf(" fetching]\n"); fflush(stdout);
-#endif
-      defvendor = repo_lookup_id(data->repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
-      descrdir = repo_lookup_str(data->repo, SOLVID_META, SUSETAGS_DESCRDIR);
-      if (!descrdir)
-	descrdir = "suse/setup/descr";
-      filechksumtype = 0;
-      filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
-      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
-	return 0;
-      repo_add_susetags(data->repo, fp, defvendor, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
-      fclose(fp);
-      writecachedrepo(data->repo, data, ext, cinfo->extcookie);
-      return 1;
-    }
-
-  repomdtype = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_TYPE);
-  if (repomdtype)
-    {
-      if (!strcmp(repomdtype, "filelists"))
-	strcpy(ext, "FL");
-      else if (!strcmp(repomdtype, "deltainfo"))
-	strcpy(ext, "DL");
-      else
-	return 0;
-#if 1
-      printf("[%s:%s", data->repo->name, ext);
-#endif
-      if (usecachedrepo(data->repo, ext, cinfo->extcookie, 0))
-	{
-	  printf(" cached]\n");fflush(stdout);
-	  return 1;
-	}
-      printf(" fetching]\n"); fflush(stdout);
-      filename = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_LOCATION);
-      filechksumtype = 0;
-      filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, REPOSITORY_REPOMD_CHECKSUM, &filechksumtype);
-      if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
-	return 0;
-      if (!strcmp(ext, "FL"))
-        repo_add_rpmmd(data->repo, fp, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
-      else if (!strcmp(ext, "DL"))
-        repo_add_deltainfoxml(data->repo, fp, REPO_USE_LOADING);
-      fclose(fp);
-      writecachedrepo(data->repo, data, ext, cinfo->extcookie);
-      return 1;
-    }
-
+  struct repoinfo *cinfo = data->repo->appdata;
+  if (cinfo->type == TYPE_SUSETAGS)
+    return susetags_load_ext(data->repo, data);
+  if (cinfo->type == TYPE_RPMMD)
+    return repomd_load_ext(data->repo, data);
   return 0;
 }
 
@@ -1474,31 +1478,6 @@ repo_add_debdb(Repo *repo, int flags)
     }
   repo_add_debpackages(repo, fp, flags);
   fclose(fp);
-}
-
-static int
-hexstr2bytes(unsigned char *buf, const char *str, int buflen)
-{
-  int i;
-  for (i = 0; i < buflen; i++) 
-    {    
-#define c2h(c) (((c)>='0' && (c)<='9') ? ((c)-'0')              \
-                : ((c)>='a' && (c)<='f') ? ((c)-('a'-10))       \
-                : ((c)>='A' && (c)<='F') ? ((c)-('A'-10))       \
-                : -1)
-      int v = c2h(*str);
-      str++;
-      if (v < 0) 
-        return 0;
-      buf[i] = v; 
-      v = c2h(*str);
-      str++;
-      if (v < 0) 
-        return 0;
-      buf[i] = (buf[i] << 4) | v; 
-#undef c2h
-    }    
-  return buflen;
 }
 
 const char *
@@ -1588,15 +1567,19 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
       bp += lbinarydir;
       if (!strcmp(bp, "Packages") || !strcmp(bp, "Packages.gz"))
 	{
+	  unsigned char curchksum[32];
+	  int curl;
 	  if (filename && !strcmp(bp, "Packages"))
 	    continue;
-	  if (chksumtype && sat_chksum_len(chksumtype) > sat_chksum_len(curchksumtype))
+	  curl = sat_chksum_len(curchksumtype);
+	  if (!curl || (chksumtype && sat_chksum_len(chksumtype) > curl))
 	    continue;
-	  if (!hexstr2bytes(chksum, ch, sat_chksum_len(curchksumtype)))
+          if (sat_hex2bin(&ch, curchksum, sizeof(curchksum)) != curl)
 	    continue;
 	  sat_free(filename);
 	  filename = strdup(fn);
 	  chksumtype = curchksumtype;
+	  memcpy(chksum, curchksum, curl);
 	}
     }
   free(binarydir);
@@ -3168,7 +3151,7 @@ rerunsolver:
 		      seqevr = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_EVR);
 		      seqnum = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NUM);
 		      seq = pool_tmpjoin(pool, seqname, "-", seqevr);
-		      seq = pool_tmpjoin(pool, seq, "-", seqnum);
+		      seq = pool_tmpappend(pool, seq, "-", seqnum);
 #ifdef FEDORA
 		      sprintf(cmd, "/usr/bin/applydeltarpm -a %s -c -s ", id2str(pool, s->arch));
 #else
@@ -3182,9 +3165,9 @@ rerunsolver:
 		      if (!chksumtype)
 			continue;	/* no way! */
 		      dloc = pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_DIR);
-		      dloc = pool_tmpjoin(pool, dloc, "/", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_NAME));
-		      dloc = pool_tmpjoin(pool, dloc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_EVR));
-		      dloc = pool_tmpjoin(pool, dloc, ".", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
+		      dloc = pool_tmpappend(pool, dloc, "/", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_NAME));
+		      dloc = pool_tmpappend(pool, dloc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_EVR));
+		      dloc = pool_tmpappend(pool, dloc, ".", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
 		      if ((fp = curlfopen(cinfo, dloc, 0, chksum, chksumtype, 0)) == 0)
 			continue;
 		      /* got it, now reconstruct */
@@ -3306,7 +3289,7 @@ rerunsolver:
 	  if (evrp > evr && evrp[0] == ':' && evrp[1])
 	    evr = evrp + 1;
 	  nvra = pool_tmpjoin(pool, id2str(pool, s->name), "-", evr);
-	  nvra = pool_tmpjoin(pool, nvra, ".", id2str(pool, s->arch));
+	  nvra = pool_tmpappend(pool, nvra, ".", id2str(pool, s->arch));
 	  runrpm("-e", nvra, -1);	/* too bad that --querybynumber doesn't work */
 #else
 	  rundpkg("--remove", id2str(pool, s->name), 0);

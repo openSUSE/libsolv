@@ -1,0 +1,1118 @@
+#!/usr/bin/python
+
+#
+# Copyright (c) 2011, Novell Inc.
+#
+# This program is licensed under the BSD license, read LICENSE.BSD
+# for further information
+#
+
+# pysolv a little software installer demoing the sat solver library/bindings
+
+# things it does:
+# - understands globs for package names / dependencies
+# - understands .arch suffix
+# - repository data caching
+# - on demand loading of secondary repository data
+# - checksum verification
+# - deltarpm support
+# - installation of commandline packages
+#
+# things not yet ported:
+# - gpg verification
+# - file conflicts
+# - fastestmirror implementation
+#
+# things available in the library but missing from pysolv:
+# - vendor policy loading
+# - soft locks file handling
+# - multi version handling
+
+import sys
+import os
+import glob
+import solv
+import re
+import tempfile
+import time
+import subprocess
+import fnmatch
+import rpm
+from stat import *
+from solv import Pool, Repo, Dataiterator, Job, Solver, Transaction
+from iniparse import INIConfig
+from optparse import OptionParser
+
+#import gc
+#gc.set_debug(gc.DEBUG_LEAK)
+
+def calc_cookie_file(filename):
+    chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
+    chksum.add("1.1")
+    chksum.add_stat(filename)
+    return chksum.raw()
+
+def calc_cookie_fp(fp):
+    chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
+    chksum.add_fp(fp)
+    return chksum.raw()
+
+class generic_repo(dict):
+    def __init__(self, attribs):
+	for k in attribs:
+	    self[k] = attribs[k]
+
+    def cachepath(self, ext = None):
+	path = re.sub(r'^\.', '_', self['alias'])
+	if ext:
+	    path += "_" + ext + ".solvx"
+	else:
+	    path += ".solv"
+	return "/var/cache/solv/" + re.sub(r'[/]', '_', path)
+	
+    def load(self, pool):
+	self['handle'] = pool.add_repo(repo['alias'])
+	self['handle'].appdata = repo
+	self['handle'].priority = 99 - repo['priority']
+	if self['autorefresh']:
+	    dorefresh = True
+	if dorefresh:
+	    try:
+		st = os.stat(self.cachepath())
+		if time.time() - st[ST_MTIME] < self['metadata_expire']:
+		    dorefresh = False
+	    except OSError, e:
+		pass
+	self['cookie'] = ''
+	if not dorefresh and self.usecachedrepo(None):
+	    print "repo: '%s': cached" % self['alias']
+	    return True
+	return self.load_if_changed()
+
+    def load_ext(repodata):
+	return False
+
+    def setfromurls(self, urls):
+	if not urls:
+	    return
+	url = urls[0]
+	print "[using mirror %s]" % re.sub(r'^(.*?/...*?)/.*$', r'\1', url)
+	self['baseurl'] = url
+
+    def setfrommetalink(self, metalink):
+	nf = self.download(metalink, False, None)
+	if not nf:
+	    return None
+	f = os.fdopen(os.dup(solv.xfileno(nf)), 'r')
+	solv.xfclose(nf)
+	urls = []
+	chksum = None
+	for l in f.readlines():
+	    l = l.strip()
+	    m = re.match(r'^<hash type="sha256">([0-9a-fA-F]{64})</hash>', l)
+	    if m:
+		chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256, m.group(1))
+	    m = re.match(r'^<url.*>(https?://.+)repodata/repomd.xml</url>', l)
+	    if m:
+		urls.append(m.group(1))
+	if not urls:
+	    chksum = None	# in case the metalink is about a different file
+	f.close()
+	self.setfromurls(urls)
+        return chksum
+	
+    def setfrommirrorlist(self, mirrorlist):
+	nf = self.download(mirrorlist, False, None)
+	if not nf:
+	    return
+	f = os.fdopen(os.dup(solv.xfileno(nf)), 'r')
+	solv.xfclose(nf)
+	urls = []
+	for l in f.readline():
+	    l = l.strip()
+	    if l[0:6] == 'http://' or l[0:7] == 'https://':
+		urls.append(l)
+	self.setfromurls(urls)
+	f.close()
+	
+    def download(self, file, uncompress, chksum, markincomplete=False):
+	url = None
+        if 'baseurl' not in self:
+	    if 'metalink' in self:
+		if file != self['metalink']:
+		    metalinkchksum = self.setfrommetalink(self['metalink'])
+		    if file == 'repodata/repomd.xml' and metalinkchksum and not chksum:
+			chksum = metalinkchksum
+		else:
+		    url = file
+	    elif 'mirrorlist' in self:
+		if file != self['mirrorlist']:
+		    self.setfrommirrorlist(self['mirrorlist'])
+		else:
+		    url = file
+	if not url:
+	    if 'baseurl' not in self:
+		print "%s: no baseurl" % self['alias']
+		return None
+	    url = re.sub(r'/$', '', self['baseurl']) + '/' + file
+	f = tempfile.TemporaryFile()
+	st = subprocess.call(['curl', '-f', '-s', '-L', url], stdout=f.fileno())
+	if os.lseek(f.fileno(), 0, os.SEEK_CUR) == 0 and (st == 0 or not chksum):
+	    return None
+	os.lseek(f.fileno(), 0, os.SEEK_SET)
+	if st:
+	    print "%s: download error %d" % (file, st)
+	    if markincomplete:
+		self['incomplete'] = True
+	    return None
+	if chksum:
+	    fchksum = solv.Chksum(chksum.type)
+	    if not fchksum:
+		print "%s: unknown checksum type" % file
+		if markincomplete:
+		    self['incomplete'] = True
+		return None
+	    fchksum.add_fd(f.fileno())
+	    if not fchksum.matches(chksum):
+		print "%s: checksum mismatch" % file
+		if markincomplete:
+		    self['incomplete'] = True
+		return None
+	if uncompress:
+	    return solv.xfopen_fd(file, os.dup(f.fileno()))
+	return solv.xfopen_fd("", os.dup(f.fileno()))
+
+    def usecachedrepo(self, ext, mark=False):
+	if not ext:
+	    cookie = self['cookie']
+	else:
+	    cookie = self['extcookie']
+	handle = self['handle']
+	try: 
+	    repopath = self.cachepath(ext)
+	    f = open(repopath, 'r')
+	    f.seek(-32, os.SEEK_END)
+	    fcookie = f.read(32)
+	    if len(fcookie) != 32:
+		return False
+	    if cookie and fcookie != cookie:
+		return False
+	    if self['alias'] != '@System' and not ext:
+		f.seek(-32 * 2, os.SEEK_END)
+		fextcookie = f.read(32)
+		if len(fextcookie) != 32:
+		    return False
+	    f.seek(0)
+	    flags = 0
+	    if ext:
+		flags = Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES
+		if ext != 'DL':
+		    flags |= Repo.REPO_LOCALPOOL
+	    if not self['handle'].add_solv(f, flags):
+		return False
+	    if self['alias'] != '@System' and not ext:
+		self['cookie'] = fcookie
+		self['extcookie'] = fextcookie
+	    if mark:
+		# no futimes in python?
+		try:
+		    os.utime(repopath, None)
+		except Exception, e:
+		    pass
+	except IOError, e:
+	    return False
+	return True
+
+    def genextcookie(self, f):
+	chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
+	chksum.add(self['cookie'])
+	if f:
+	    stat = os.fstat(f.fileno())
+	    chksum.add(str(stat[ST_DEV]))
+	    chksum.add(str(stat[ST_INO]))
+	    chksum.add(str(stat[ST_SIZE]))
+	    chksum.add(str(stat[ST_MTIME]))
+	extcookie = chksum.raw()
+	# compatibility to c code
+	if ord(extcookie[0]) == 0:
+	    extcookie[0] = chr(1)
+	self['extcookie'] = extcookie
+	
+    def writecachedrepo(self, ext, info=None):
+	try:
+	    if not os.path.isdir("/var/cache/solv"):
+		os.mkdir("/var/cache/solv", 0755)
+	    (fd, tmpname) = tempfile.mkstemp(prefix='.newsolv-', dir='/var/cache/solv')
+	    os.fchmod(fd, 0444)
+	    f = os.fdopen(fd, 'w+')
+	    if not info:
+		self['handle'].write(f)
+	    elif ext:
+		info.write(f)
+	    else:	# rewrite_repos case
+		self['handle'].write_first_repodata(f)
+	    if self['alias'] != '@System' and not ext:
+		if 'extcookie' not in self:
+		    self.genextcookie(f)
+		f.write(self['extcookie'])
+	    if not ext:
+		f.write(self['cookie'])
+	    else:
+		f.write(self['extcookie'])
+	    f.close()
+	    if self['handle'].iscontiguous():
+		# switch to saved repo to activate paging and save memory
+		nf = solv.xfopen(tmpname)
+		if not ext:
+		    # main repo
+		    self['handle'].empty()
+		    if not self['handle'].add_solv(nf, Repo.SOLV_ADD_NO_STUBS):
+			sys.exit("internal error, cannot reload solv file")
+		else:
+		    # extension repodata
+		    # need to extend to repo boundaries, as this is how
+		    # info.write() has written the data
+		    info.extend_to_repo()
+		    # LOCALPOOL does not help as pool already contains all ids
+		    info.read_solv_flags(nf, Repo.REPO_EXTEND_SOLVABLES)
+		solv.xfclose(nf)
+	    os.rename(tmpname, self.cachepath(ext))
+	except IOError, e:
+	    if tmpname:
+		os.unlink(tmpname)
+		
+    def updateaddedprovides(self, addedprovides):
+	if 'incomplete' in self:
+	    return 
+	if 'handle' not in self:
+	    return 
+	if not self['handle'].nsolvables:
+	    return
+	# make sure there's just one real repodata with extensions
+	repodata = self['handle'].first_repodata()
+	if not repodata:
+	    return
+	oldaddedprovides = repodata.lookup_idarray(solv.SOLVID_META, solv.REPOSITORY_ADDEDFILEPROVIDES)
+	if not set(addedprovides) <= set(oldaddedprovides):
+	    for id in addedprovides:
+		repodata.add_idarray(solv.SOLVID_META, solv.REPOSITORY_ADDEDFILEPROVIDES, id)
+	    repodata.internalize()
+	    self.writecachedrepo(None, repodata)
+
+class repomd_repo(generic_repo):
+    def load_if_changed(self):
+	print "rpmmd repo '%s':" % self['alias'],
+	sys.stdout.flush()
+	f = self.download("repodata/repomd.xml", False, None, None)
+	if not f:
+	    print "no repomd.xml file, skipped"
+	    self['handle'].free(True)
+	    del self['handle']
+	    return False
+	self['cookie'] = calc_cookie_fp(f)
+	if self.usecachedrepo(None, True):
+	    print "cached"
+	    solv.xfclose(f)
+	    return True
+	self['handle'].add_repomdxml(f, 0)
+	solv.xfclose(f)
+	print "fetching"
+	(filename, filechksum) = self.find('primary')
+	if filename:
+	    f = self.download(filename, True, filechksum, True)
+	    if f:
+		self['handle'].add_rpmmd(f, None, 0)
+		solv.xfclose(f)
+	    if 'incomplete' in self:
+		return False # hopeless, need good primary
+	(filename, filechksum) = self.find('updateinfo')
+	if filename:
+	    f = self.download(filename, True, filechksum, True)
+	    if f:
+		self['handle'].add_updateinfoxml(f, 0)
+		solv.xfclose(f)
+	self.add_exts()
+	if 'incomplete' not in self:
+	    self.writecachedrepo(None)
+	# must be called after writing the repo
+	self['handle'].create_stubs()
+	return True
+
+    def find(self, what):
+	di = self['handle'].dataiterator_new(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, Dataiterator.SEARCH_STRING)
+	di.prepend_keyname(solv.REPOSITORY_REPOMD)
+	for d in di:
+	    d.setpos_parent()
+	    filename = d.pool.lookup_str(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_LOCATION)
+	    chksum = d.pool.lookup_checksum(solv.SOLVID_POS, solv.REPOSITORY_REPOMD_CHECKSUM)
+	    if filename and not chksum:
+		print "no %s file checksum!" % filename
+		filename = None
+		chksum = None
+	    if filename:
+		return (filename, chksum)
+	return (None, None)
+	
+    def add_ext(self, repodata, what, ext):
+	filename, chksum = self.find(what)
+	if not filename and what == 'deltainfo':
+	    filename, chksum = self.find('prestodelta')
+	if not filename:
+	    return
+	handle = repodata.new_handle()
+	repodata.set_poolstr(handle, solv.REPOSITORY_REPOMD_TYPE, what)
+	repodata.set_str(handle, solv.REPOSITORY_REPOMD_LOCATION, filename)
+	repodata.set_bin_checksum(handle, solv.REPOSITORY_REPOMD_CHECKSUM, chksum)
+	if what == 'deltainfo':
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOSITORY_DELTAINFO)
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_FLEXARRAY)
+	elif what == 'filelists':
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_FILELIST)
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
+	repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
+
+    def add_exts(self):
+	repodata = self['handle'].add_repodata(0)
+	self.add_ext(repodata, 'deltainfo', 'DL')
+	self.add_ext(repodata, 'filelists', 'FL')
+	repodata.internalize()
+    
+    def load_ext(self, repodata):
+	repomdtype = repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE)
+	if repomdtype == 'filelists':
+	    ext = 'FL'
+	elif repomdtype == 'deltainfo':
+	    ext = 'DL'
+	else:
+	    return False
+	sys.stdout.write("[%s:%s" % (self['alias'], ext))
+	if self.usecachedrepo(ext):
+	    sys.stdout.write(" cached]\n")
+	    sys.stdout.flush()
+	    return True
+	sys.stdout.write(" fetching]\n")
+	sys.stdout.flush()
+	filename = repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_LOCATION)
+	filechksum = repodata.lookup_checksum(solv.SOLVID_META, solv.REPOSITORY_REPOMD_CHECKSUM)
+	f = self.download(filename, True, filechksum)
+	if not f:
+	    return False
+	if ext == 'FL':
+	    self['handle'].add_rpmmd(f, 'FL', Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+	elif ext == 'DL':
+	    self['handle'].add_deltainfoxml(f, Repo.REPO_USE_LOADING)
+	solv.xfclose(f)
+	self.writecachedrepo(ext, repodata)
+	return True
+
+class susetags_repo(generic_repo):
+    def load_if_changed(self):
+	print "susetags repo '%s':" % self['alias'],
+	sys.stdout.flush()
+	f = self.download("content", False, None, None)
+        if not f:
+	    print "no content file, skipped"
+	    self['handle'].free(True)
+	    del self['handle']
+	    return False
+	self['cookie'] = calc_cookie_fp(f)
+	if self.usecachedrepo(None, True):
+	    print "cached"
+	    solv.xfclose(f)
+	    return True
+	self['handle'].add_content(f, 0)
+	solv.xfclose(f)
+	print "fetching"
+	defvendorid = self['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
+	descrdir = self['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
+	if not descrdir:
+	    descrdir = "suse/setup/descr"
+	(filename, filechksum) = self.find('packages.gz')
+	if not filename:
+	    (filename, filechksum) = self.find('packages')
+	if filename:
+	    f = self.download(descrdir + '/' + filename, True, filechksum, True)
+	    if f:
+		self['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.SUSETAGS_RECORD_SHARES)
+		solv.xfclose(f)
+		(filename, filechksum) = self.find('packages.en.gz')
+		if not filename:
+		    (filename, filechksum) = self.find('packages.en')
+		if filename:
+		    f = self.download(descrdir + '/' + filename, True, filechksum, True)
+		    if f:
+			self['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.REPO_REUSE_REPODATA|Repo.REPO_EXTEND_SOLVABLES)
+			solv.xfclose(f)
+		self['handle'].internalize()
+	self.add_exts()
+	if 'incomplete' not in self:
+	    self.writecachedrepo(None)
+	# must be called after writing the repo
+	self['handle'].create_stubs()
+	return True
+
+    def find(self, what):
+	di = self['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
+	di.prepend_keyname(solv.SUSETAGS_FILE)
+	for d in di:
+	    d.setpos_parent()
+	    chksum = d.pool.lookup_checksum(solv.SOLVID_POS, solv.SUSETAGS_FILE_CHECKSUM)
+	    return (what, chksum)
+	return (None, None)
+
+    def add_ext(self, repodata, what, ext):
+	(filename, chksum) = self.find(what)
+	if not filename:
+	    return
+	handle = repodata.new_handle()
+	repodata.set_str(handle, solv.SUSETAGS_FILE_NAME, filename)
+	if chksum:
+	    repodata.set_bin_checksum(handle, solv.SUSETAGS_FILE_CHECKSUM, chksum)
+	if ext == 'DU':
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_DISKUSAGE)
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRNUMNUMARRAY)
+	elif ext == 'FL':
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_FILELIST)
+	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
+	else:
+	    for langtag, langtagtype in [
+		(solv.SOLVABLE_SUMMARY, solv.REPOKEY_TYPE_STR),
+		(solv.SOLVABLE_DESCRIPTION, solv.REPOKEY_TYPE_STR),
+		(solv.SOLVABLE_EULA, solv.REPOKEY_TYPE_STR),
+		(solv.SOLVABLE_MESSAGEINS, solv.REPOKEY_TYPE_STR),
+		(solv.SOLVABLE_MESSAGEDEL, solv.REPOKEY_TYPE_STR),
+		(solv.SOLVABLE_CATEGORY, solv.REPOKEY_TYPE_ID)
+	    ]:
+		repodata.add_idarray(handle, solv.REPOSITORY_KEYS, self['handle'].pool.id2langid(langtag, ext, 1))
+		repodata.add_idarray(handle, solv.REPOSITORY_KEYS, langtagtype)
+	repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
+	
+    def add_exts(self):
+	repodata = self['handle'].add_repodata(0)
+	di = self['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
+	di.prepend_keyname(solv.SUSETAGS_FILE)
+	for d in di:
+	    filename = d.match_str()
+	    if not filename:
+		continue
+	    if filename[0:9] != "packages.":
+		continue
+	    if len(filename) == 11 and filename != "packages.gz":
+		ext = filename[9:11]
+	    elif filename[11:12] == ".":
+		ext = filename[9:11]
+	    else:
+		continue
+	    if ext == "en":
+		continue
+	    self.add_ext(repodata, filename, ext)
+	repodata.internalize()
+
+    def load_ext(self, repodata):
+	filename = repodata.lookup_str(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME)
+	ext = filename[9:11]
+	sys.stdout.write("[%s:%s" % (self['alias'], ext))
+	if self.usecachedrepo(ext):
+	    sys.stdout.write(" cached]\n")
+	    sys.stdout.flush()
+	    return True
+	sys.stdout.write(" fetching]\n")
+	sys.stdout.flush()
+	defvendorid = self['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
+	descrdir = self['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
+	if not descrdir:
+	    descrdir = "suse/setup/descr"
+	filechksum = repodata.lookup_checksum(solv.SOLVID_META, solv.SUSETAGS_FILE_CHECKSUM)
+	f = self.download(descrdir + '/' + filename, True, filechksum)
+	if not f:
+	    return False
+	self['handle'].add_susetags(f, defvendorid, None, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+	solv.xfclose(f)
+	self.writecachedrepo(ext, repodata)
+	return True
+
+class unknown_repo(generic_repo):
+    def load(self, pool):
+	print "unsupported repo '%s': skipped" % self['alias']
+	return False
+
+class system_repo(generic_repo):
+    def load(self, pool):
+	self['handle'] = pool.add_repo(self['alias'])
+	self['handle'].appdata = self
+	pool.installed = self['handle']
+	print "rpm database:",
+	self['cookie'] = calc_cookie_file("/var/lib/rpm/Packages")
+	if self.usecachedrepo(None):
+	    print "cached"
+	    return True
+	print "reading"
+	self['handle'].add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
+	self['handle'].add_rpmdb(None)
+	self.writecachedrepo(None)
+	return True
+
+class cmdline_repo(generic_repo):
+    def load(self, pool):
+	self['handle'] = pool.add_repo(self['alias'])
+	self['handle'].appdata = self 
+	return True
+
+def validarch(pool, arch):
+    if not arch:
+	return False
+    id = pool.str2id(arch, False)
+    if not id:
+	return False
+    return pool.isknownarch(id)
+
+def limitjobs(pool, jobs, flags, evr):
+    njobs = []
+    for j in jobs:
+	how = j.how
+	sel = how & Job.SOLVER_SELECTMASK
+	what = pool.rel2id(j.what, evr, flags)
+        if flags == solv.REL_ARCH:
+	    how |= Job.SOLVER_SETARCH
+	if flags == solv.REL_EQ and sel == Job.SOLVER_SOLVABLE_NAME:
+	    if pool.id2str(evr).find('-') >= 0:
+		how |= Job.SOLVER_SETEVR
+	    else:
+		how |= Job.SOLVER_SETEV
+	njobs.append(pool.Job(how, what))
+    return njobs
+
+def limitjobs_arch(pool, jobs, flags, evr):
+    m = re.match(r'(.+)\.(.+?)$', evr)
+    if m and validarch(pool, m.group(2)):
+	jobs = limitjobs(pool, jobs, solv.REL_ARCH, pool.str2id(m.group(2)))
+	return limitjobs(pool, jobs, flags, pool.str2id(m.group(1)))
+    else:
+	return limitjobs(pool, jobs, flags, pool.str2id(evr))
+
+def mkjobs_filelist(pool, cmd, arg):
+    if re.search(r'[[*?]', arg):
+	type = Dataiterator.SEARCH_GLOB
+    else:
+	type = Dataiterator.SEARCH_STRING
+    if cmd == 'rm' or cmd == 'erase':
+	di = pool.installed.dataiterator_new(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
+    else:
+	di = pool.dataiterator_new(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
+    matches = []
+    for d in di:
+	s = d.solvable
+	if s and s.installable():
+	    matches.append(s.id)
+	    di.skip_solvable()	# one match is enough
+    if matches:
+	print "[using file list match for '%s']" % arg
+	if len(matches) > 1:
+	    return [ pool.Job(Job.SOLVER_SOLVABLE_ONE_OF, pool.towhatprovides(matches)) ]
+	else:
+	    return [ pool.Job(Job.SOLVER_SOLVABLE | Job.SOLVER_NOAUTOSET, matches[0]) ]
+    return []
+
+def mkjobs_rel(pool, cmd, name, rel, evr):
+    flags = 0
+    if rel.find('<') >= 0: flags |= solv.REL_LT
+    if rel.find('=') >= 0: flags |= solv.REL_EQ 
+    if rel.find('>') >= 0: flags |= solv.REL_GT
+    jobs = depglob(pool, name, True, True)
+    if jobs:
+	return limitjobs(pool, jobs, flags, pool.str2id(evr))
+    m = re.match(r'(.+)\.(.+?)$', name)
+    if m and validarch(pool, m.group(2)):
+	jobs = depglob(pool, m.group(1), True, True)
+	if jobs:
+	    jobs = limitjobs(pool, jobs, solv.REL_ARCH, pool.str2id(m.group(2)))
+	    return limitjobs(pool, jobs, flags, pool.str2id(evr))
+    return []
+
+def mkjobs_nevra(pool, cmd, arg):
+    jobs = depglob(pool, arg, True, True)
+    if jobs:
+	return jobs
+    m = re.match(r'(.+)\.(.+?)$', arg)
+    if m and validarch(pool, m.group(2)):
+	jobs = depglob(pool, m.group(1), True, True)
+	if jobs:
+	    return limitjobs(pool, jobs, solv.REL_ARCH, pool.str2id(m.group(2)))
+    m = re.match(r'(.+)-(.+?)$', arg)
+    if m:
+	jobs = depglob(pool, m.group(1), True, False)
+	if jobs:
+	    return limitjobs_arch(pool, jobs, solv.REL_EQ, m.group(2))
+    m = re.match(r'(.+)-(.+?-.+?)$', arg)
+    if m:
+	jobs = depglob(pool, m.group(1), True, False)
+	if jobs:
+	    return limitjobs_arch(pool, jobs, solv.REL_EQ, m.group(2))
+    return []
+
+def mkjobs(pool, cmd, arg):
+    if len(arg) and arg[0] == '/':
+	jobs = mkjobs_filelist(pool, cmd, arg)
+	if jobs:
+	    return jobs
+    m = re.match(r'(.+?)\s*([<=>]+)\s*(.+?)$', arg)
+    if m:
+	return mkjobs_rel(pool, cmd, m.group(1), m.group(2), m.group(3))
+    else:
+	return mkjobs_nevra(pool, cmd, arg)
+	    
+def depglob(pool, name, globname, globdep):
+    id = pool.str2id(name, False)
+    if id:
+	match = False
+	for s in pool.providers(id):
+	    if globname and s.nameid == id:
+		return [ pool.Job(Job.SOLVER_SOLVABLE_NAME, id) ]
+	    match = True
+	if match:
+	    if globname and globdep:
+		print "[using capability match for '%s']" % name
+	    return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) ]
+    if not re.search(r'[[*?]', name):
+	return []
+    if globname:
+	# try name glob
+	idmatches = {}
+	for s in pool.solvables:
+	    if s.installable() and fnmatch.fnmatch(s.name, name):
+		idmatches[s.nameid] = True
+	if idmatches:
+	    return [ pool.Job(Job.SOLVER_SOLVABLE_NAME, id) for id in sorted(idmatches.keys()) ]
+    if globdep:
+	# try dependency glob
+	idmatches = {}
+	for id in pool.allprovidingids():
+	    if fnmatch.fnmatch(pool.id2str(id), name):
+		idmatches[id] = True
+	if idmatches:
+	    print "[using capability match for '%s']" % name
+	    return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) for id in sorted(idmatches.keys()) ]
+    return []
+    
+
+def load_stub(repodata):
+    repo = repodata.repo.appdata
+    if repo:
+	return repo.load_ext(repodata)
+    return False
+
+
+parser = OptionParser(usage="usage: solv.py [options] COMMAND")
+(options, args) = parser.parse_args()
+if not args:
+    parser.print_help(sys.stderr)
+    sys.exit(1)
+
+cmd = args[0]
+args = args[1:]
+if cmd == 'li':
+    cmd = 'list'
+if cmd == 'in':
+    cmd = 'install'
+if cmd == 'rm':
+    cmd = 'erase'
+if cmd == 've':
+    cmd = 'verify'
+if cmd == 'se':
+    cmd = 'search'
+
+
+pool = solv.Pool()
+pool.setarch(os.uname()[4])
+pool.set_loadcallback(load_stub)
+
+# read all repo configs
+repos = []
+for reposdir in ["/etc/zypp/repos.d"]:
+    if not os.path.isdir(reposdir):
+	continue
+    for reponame in sorted(glob.glob('%s/*.repo' % reposdir)):
+	cfg = INIConfig(open(reponame))
+	for alias in cfg:
+	    repoattr = {'alias': alias, 'enabled': 0, 'priority': 99, 'autorefresh': 1, 'type': 'rpm-md', 'metadata_expire': 900}
+	    for k in cfg[alias]:
+		repoattr[k] = cfg[alias][k]
+	    if 'mirrorlist' in repoattr and 'metalink' not in repoattr:
+		if repoattr['mirrorlist'].find('/metalink'):
+		    repoattr['metalink'] = repoattr['mirrorlist']
+		    del repoattr['mirrorlist']
+	    if repoattr['type'] == 'rpm-md':
+		repo = repomd_repo(repoattr)
+	    elif repoattr['type'] == 'yast2':
+		repo = susetags_repo(repoattr)
+	    else:
+		repo = unknown_repo(repoattr)
+	    repos.append(repo)
+
+# now load all enabled repos into the pool
+sysrepo = system_repo({ 'alias': '@System', 'type': 'system' })
+sysrepo.load(pool)
+for repo in repos:
+    if int(repo['enabled']):
+	repo.load(pool)
+    
+if cmd == 'search':
+    matches = {}
+    di = pool.dataiterator_new(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
+    for d in di:
+	matches[d.solvid] = True
+    for solvid in sorted(matches.keys()):
+	print " - %s [%s]: %s" % (pool.solvid2str(solvid), pool.solvables[solvid].repo.name, pool.lookup_str(solvid, solv.SOLVABLE_SUMMARY))
+    sys.exit(0)
+
+cmdlinerepo = None
+if cmd == 'list' or cmd == 'info' or cmd == 'install':
+    for arg in args:
+	if arg.endswith(".rpm") and os.access(arg, os.R_OK):
+	    if not cmdlinerepo:
+		cmdlinerepo = cmdline_repo({ 'alias': '@commandline', 'type': 'commandline' })
+		cmdlinerepo.load(pool)
+		cmdlinerepo['packages'] = {}
+	    cmdlinerepo['packages'][arg] = cmdlinerepo['handle'].add_rpm(arg, Repo.REPO_REUSE_REPODATA|Repo.REPO_NO_INTERNALIZE)
+    if cmdlinerepo:
+	cmdlinerepo['handle'].internalize()
+
+addedprovides = pool.addfileprovides_ids()
+if addedprovides:
+    sysrepo.updateaddedprovides(addedprovides)
+    for repo in repos:
+	repo.updateaddedprovides(addedprovides)
+
+pool.createwhatprovides()
+
+# convert arguments into jobs
+jobs = []
+for arg in args:
+    if cmdlinerepo and arg in cmdlinerepo['packages']:
+	jobs.append(pool.Job(Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
+    else:
+	jobs += mkjobs(pool, cmd, arg)
+
+if cmd == 'list' or cmd == 'info':
+    if not jobs:
+	print "no package matched."
+	sys.exit(1)
+    for job in jobs:
+	for s in pool.jobsolvables(job):
+	    if cmd == 'info':
+		print "Name:        %s" % s.str()
+		print "Repo:        %s" % s.repo.name
+		print "Summary:     %s" % s.lookup_str(solv.SOLVABLE_SUMMARY)
+		str = s.lookup_str(solv.SOLVABLE_URL)
+		if str:
+		    print "Url:         %s" % str
+		str = s.lookup_str(solv.SOLVABLE_LICENSE)
+		if str:
+		    print "License:     %s" % str
+		print "Description:\n%s" % s.lookup_str(solv.SOLVABLE_DESCRIPTION)
+		print
+	    else:
+		print "  - %s [%s]" % (s.str(), s.repo.name)
+		print "    %s" % s.lookup_str(solv.SOLVABLE_SUMMARY)
+    sys.exit(0)
+
+if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == 'verify':
+    if not jobs:
+	if cmd == 'up' or cmd == 'verify':
+	    jobs = [ pool.Job(Job.SOLVER_SOLVABLE_ALL, 0) ]
+	elif cmd == 'dup':
+	    pass
+	else:
+	    print "no package matched."
+	    sys.exit(1)
+    for job in jobs:
+	if cmd == 'up':
+	    # up magic: use install instead of update if no installed package matches
+	    if job.how == Job.SOLVER_SOLVABLE_ALL or filter(lambda s: s.isinstalled(), pool.jobsolvables(job)):
+		job.how |= Job.SOLVER_UPDATE
+	    else:
+		job.how |= Job.SOLVER_INSTALL
+	elif cmd == 'install':
+	    job.how |= Job.SOLVER_INSTALL
+	elif cmd == 'erase':
+	    job.how |= Job.SOLVER_ERASE
+	elif cmd == 'dup':
+	    job.how |= Job.SOLVER_DISTUPGRADE
+	elif cmd == 'verify':
+	    job.how |= Job.SOLVER_VERIFY
+
+    #pool.set_debuglevel(2)
+    solver = None
+    while True:
+	solver = pool.create_solver()
+	solver.ignorealreadyrecommended = True
+	if cmd == 'erase':
+	    solver.allowuninstall = True
+	if cmd == 'dup' and not jobs:
+	    solver.distupgrade = True
+	    solver.updatesystem = True
+	    solver.allowdowngrade = True
+	    solver.allowvendorchange = True
+	    solver.dosplitprovides = True
+	if cmd == 'up' and len(jobs) == 1 and jobs[0].how == (Job.SOLVER_UPDATE | Job.SOLVER_SOLVABLE_ALL):
+	    solver.dosplitprovides = True
+	problems = solver.solve(jobs)
+	if not problems:
+	    break
+	for problem in problems:
+	    print "Problem %d:" % problem.id
+	    r = problem.findproblemrule()
+	    type, source, target, dep = r.info()
+	    if type == Solver.SOLVER_RULE_DISTUPGRADE:
+		print "%s does not belong to a distupgrade repository" % source.str()
+	    elif type == Solver.SOLVER_RULE_INFARCH:
+		print "%s has inferiour architecture" % source.str()
+	    elif type == Solver.SOLVER_RULE_UPDATE:
+		print "problem with installed package %s" % source.str()
+	    elif type == Solver.SOLVER_RULE_JOB:
+		print "conflicting requests"
+	    elif type == Solver.SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
+		print "nothing provides requested %s" % pool.dep2str(dep)
+	    elif type == Solver.SOLVER_RULE_RPM:
+		print "some dependency problem"
+	    elif type == Solver.SOLVER_RULE_RPM_NOT_INSTALLABLE:
+		print "package %s is not installable" % source.str()
+	    elif type == Solver.SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
+		print "nothing provides %s needed by %s" % (pool.dep2str(dep), source.str())
+	    elif type == Solver.SOLVER_RULE_RPM_SAME_NAME:
+		print "cannot install both %s and %s" % (source.str(), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_CONFLICT:
+		print "package %s conflicts with %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
+		print "package %s obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES:
+		print "installed package %s obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
+		print "package %s implicitely obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
+	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_REQUIRES:
+		print "package %s requires %s, but none of the providers can be installed" % (source.str(), pool.dep2str(dep))
+	    elif type == Solver.SOLVER_RULE_RPM_SELF_CONFLICT:
+		print "package %s conflicts with %s provided by itself" % (source.str(), pool.dep2str(dep))
+	    else:
+		print "bad rule type", type
+	    solutions = problem.solutions()
+	    for solution in solutions:
+	        print "  Solution %d:" % solution.id
+	        elements = solution.elements()
+                for element in elements:
+		    etype = element.type
+		    if etype == Solver.SOLVER_SOLUTION_JOB:
+			print "  - do not ask to", jobs[element.jobidx].str()
+		    elif etype == Solver.SOLVER_SOLUTION_INFARCH:
+			if element.solvable.isinstalled():
+			    print "  - keep %s despite the inferior architecture" % element.solvable.str()
+			else:
+			    print "  - install %s despite the inferior architecture" % element.solvable.str()
+		    elif etype == Solver.SOLVER_SOLUTION_DISTUPGRADE:
+			if element.solvable.isinstalled():
+			    print "  - keep obsolete %s" % element.solvable.str()
+			else:
+			    print "  - install %s from excluded repository" % element.solvable.str()
+		    elif etype == Solver.SOLVER_SOLUTION_REPLACE:
+			illegal = element.illegalreplace()
+			if illegal & solver.POLICY_ILLEGAL_DOWNGRADE:
+			    print "  - allow downgrade of %s to %s" % (element.solvable.str(), element.replacement.str())
+			if illegal & solver.POLICY_ILLEGAL_ARCHCHANGE:
+			    print "  - allow architecture change of %s to %s" % (element.solvable.str(), element.replacement.str())
+			if illegal & solver.POLICY_ILLEGAL_VENDORCHANGE:
+			    if element.replacement.vendorid:
+				print "  - allow vendor change from '%s' (%s) to '%s' (%s)" % (element.solvable.vendor, element.solvable.str(), element.replacement.vendor, element.replacement.str())
+			    else:
+				print "  - allow vendor change from '%s' (%s) to no vendor (%s)" % (element.solvable.vendor, element.solvable.str(), element.replacement.str())
+			if illegal == 0:
+			    print "  - allow replacement of %s with %s" % (element.solvable.str(), element.replacement.str())
+		    elif etype == Solver.SOLVER_SOLUTION_DEINSTALL:
+			print "  - allow deinstallation of %s" % element.solvable.str()
+	    sol = ''
+	    while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
+		sys.stdout.write("Please choose a solution: ")
+		sys.stdout.flush()
+		sol = sys.stdin.readline().strip()
+	    if sol == 's':
+		continue	# skip problem
+	    if sol == 'q':
+		sys.exit(1)
+	    solution = solutions[int(sol) - 1]
+	    for element in solution.elements():
+		etype = element.type
+		newjob = None
+		if etype == Solver.SOLVER_SOLUTION_JOB:
+		    jobs[element.jobidx] = pool.Job(Job.SOLVER_NOOP, 0)
+		elif etype == Solver.SOLVER_SOLUTION_INFARCH or etype == Solver.SOLVER_SOLUTION_DISTUPGRADE:
+		    newjob = pool.Job(Job.SOLVER_INSTALL|Job.SOLVER_SOLVABLE, element.solvable.id)
+		elif etype == Solver.SOLVER_SOLUTION_REPLACE:
+		    newjob = pool.Job(Job.SOLVER_INSTALL|Job.SOLVER_SOLVABLE, element.replacement.id)
+		elif etype == Solver.SOLVER_SOLUTION_DEINSTALL:
+		    newjob = pool.Job(Job.SOLVER_ERASE|Job.SOLVER_SOLVABLE, element.solvable.id)
+		if newjob:
+		    for job in jobs:
+			if job.how == newjob.how and job.what == newjob.what:
+			    newjob = None
+			    break
+		    if newjob:
+			jobs.append(newjob)
+    # no problems, show transaction
+    trans = solver.transaction()
+    del solver
+    if trans.isempty():
+        print "Nothing to do."
+        sys.exit(0)
+    print
+    print "Transaction summary:"
+    print
+    for ctype, pkgs, fromid, toid in trans.classify():
+	if ctype == Transaction.SOLVER_TRANSACTION_ERASE:
+	    print "%d erased packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_INSTALL:
+	    print "%d installed packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_REINSTALLED:
+	    print "%d reinstalled packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+	    print "%d downgraded packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_CHANGED:
+	    print "%d changed packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_UPGRADED:
+	    print "%d upgraded packages:" % len(pkgs)
+	elif ctype == Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
+	    print "%d vendor changes from '%s' to '%s':" % (len(pkgs), pool.id2str(fromid), pool.id2str(toid))
+	elif ctype == Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
+	    print "%d arch changes from '%s' to '%s':" % (len(pkgs), pool.id2str(fromid), pool.id2str(toid))
+	else:
+	    continue
+	for p in pkgs:
+	    if ctype == Transaction.SOLVER_TRANSACTION_UPGRADED or ctype == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+		op = trans.othersolvable(p)
+		print "  - %s -> %s" % (p.str(), op.str())
+	    else:
+		print "  - %s" % p.str()
+        print
+    print "install size change: %d K" % trans.calc_installsizechange()
+    print
+    
+# vim: sw=4 et
+    while True:
+	sys.stdout.write("OK to continue (y/n)? ")
+	sys.stdout.flush()
+	yn = sys.stdin.readline().strip()
+	if yn == 'y': break
+	if yn == 'n': sys.exit(1)
+    newpkgs, keptpkgs = trans.installedresult()
+    newpkgsfp = {}
+    if newpkgs:
+	downloadsize = 0
+	for p in newpkgs:
+	    downloadsize += p.lookup_num(solv.SOLVABLE_DOWNLOADSIZE)
+	print "Downloading %d packages, %d K" % (len(newpkgs), downloadsize)
+	for p in newpkgs:
+	    repo = p.repo.appdata
+	    location, medianr = p.lookup_location()
+	    if not location:
+		continue
+	    if repo['type'] == 'commandline':
+		f = solv.xfopen(location)
+		if not f:
+		    sys.exit("\n%s: %s not found" % location)
+		newpkgsfp[p.id] = f
+		continue
+	    if sysrepo['handle'].nsolvables and os.access('/usr/bin/applydeltarpm', os.X_OK):
+		pname = p.name
+		di = p.repo.dataiterator_new(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
+		di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
+		for d in di:
+		    d.setpos_parent()
+		    if pool.lookup_id(solv.SOLVID_POS, solv.DELTA_PACKAGE_EVR) != p.evrid or pool.lookup_id(solv.SOLVID_POS, solv.DELTA_PACKAGE_ARCH) != p.archid:
+			continue
+		    baseevrid = pool.lookup_id(solv.SOLVID_POS, solv.DELTA_BASE_EVR)
+		    candidate = None
+		    for installedp in pool.providers(p.nameid):
+			if installedp.isinstalled() and installedp.nameid == p.nameid and installedp.archid == p.archid and installedp.evrid == baseevrid:
+			    candidate = installedp
+		    if not candidate:
+			continue
+		    seq = pool.lookup_str(solv.SOLVID_POS, solv.DELTA_SEQ_NAME) + '-' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_SEQ_EVR) + '-' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_SEQ_NUM)
+		    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, '-c', '-s', seq])
+		    if st:
+			continue
+		    chksum = pool.lookup_checksum(solv.SOLVID_POS, solv.DELTA_CHECKSUM)
+		    if not chksum:
+			continue
+		    dloc = pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_DIR) + '/' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_NAME) + '-' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_EVR) + '.' + pool.lookup_str(solv.SOLVID_POS, solv.DELTA_LOCATION_SUFFIX)
+		    f = repo.download(dloc, False, chksum)
+		    if not f:
+			continue
+		    nf = tempfile.TemporaryFile()
+		    nf = os.dup(nf.fileno())
+		    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, "/dev/fd/%d" % solv.xfileno(f), "/dev/fd/%d" % nf])
+		    solv.xfclose(f)
+		    os.lseek(nf, 0, os.SEEK_SET)
+		    newpkgsfp[p.id] = solv.xfopen_fd("", nf)
+		    break
+		if p.id in newpkgsfp:
+		    sys.stdout.write("d")
+		    sys.stdout.flush()
+		    continue
+			
+	    if repo['type'] == 'yast2':
+		datadir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DATADIR)
+		if not datadir:
+		    datadir = 'suse'
+		location = datadir + '/' + location
+	    chksum = p.lookup_checksum(solv.SOLVABLE_CHECKSUM)
+	    f = repo.download(location, False, chksum)
+	    if not f:
+		sys.exit("\n%s: %s not found in repository" % (repo['alias'], location))
+	    newpkgsfp[p.id] = f
+	    sys.stdout.write(".")
+	    sys.stdout.flush()
+	print
+    print "Committing transaction:"
+    print
+    ts = rpm.TransactionSet('/')
+    ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
+    erasenamehelper = {}
+    for p in trans.steps():
+	type = trans.steptype(p, Transaction.SOLVER_TRANSACTION_RPM_ONLY)
+	if type == Transaction.SOLVER_TRANSACTION_ERASE:
+	    rpmdbid = p.lookup_num(solv.RPM_RPMDBID)
+	    erasenamehelper[p.name] = p
+	    if not rpmdbid:
+		sys.exit("\ninternal error: installed package %s has no rpmdbid\n" % p.str())
+	    ts.addErase(rpmdbid)
+	elif type == Transaction.SOLVER_TRANSACTION_INSTALL:
+	    f = newpkgsfp[p.id]
+	    h = ts.hdrFromFdno(solv.xfileno(f))
+	    os.lseek(solv.xfileno(f), 0, os.SEEK_SET)
+	    ts.addInstall(h, p, 'u')
+	elif type == Transaction.SOLVER_TRANSACTION_MULTIINSTALL:
+	    f = newpkgsfp[p.id]
+	    h = ts.hdrFromFdno(solv.xfileno(f))
+	    os.lseek(solv.xfileno(f), 0, os.SEEK_SET)
+	    ts.addInstall(h, p, 'i')
+    checkproblems = ts.check()
+    if checkproblems:
+	print checkproblems
+	sys.exit("Sorry.")
+    ts.order()
+    def runCallback(reason, amount, total, p, d):
+	if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
+	    return solv.xfileno(newpkgsfp[p.id])
+	if reason == rpm.RPMCALLBACK_INST_START:
+	    print "install", p.str()
+	if reason == rpm.RPMCALLBACK_UNINST_START:
+	    # argh, p is just the name of the package
+	    if p in erasenamehelper:
+		p = erasenamehelper[p]
+		print "erase", p.str()
+    runproblems = ts.run(runCallback, '')
+    if runproblems:
+	print runproblems
+	sys.exit(1)
+    sys.exit(0)
+
+print "unknown command", cmd
+sys.exit(1)

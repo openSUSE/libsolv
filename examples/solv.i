@@ -55,6 +55,8 @@
 #include "stdio.h"
 #include "pool.h"
 #include "solver.h"
+#include "policy.h"
+#include "solverdebug.h"
 #include "repo_solv.h"
 #include "chksum.h"
 
@@ -309,11 +311,53 @@ typedef struct {
     job->what = what;
     return job;
   }
+
+  const char *str() {
+    Pool *pool = $self->pool;
+    Id select = $self->how & SOLVER_SELECTMASK;
+    char *strstart = 0, *strend = 0;
+    switch ($self->how & SOLVER_JOBMASK) {
+      case SOLVER_INSTALL:
+        if (select == SOLVER_SOLVABLE && pool->installed && pool->solvables[$self->what].repo == pool->installed)
+          strstart = "keep ", strend = "installed";
+        else if (select == SOLVER_SOLVABLE_PROVIDES)
+          strstart = "install a solvable ";
+        else
+          strstart = "install ";
+        break;
+      case SOLVER_ERASE:
+        if (select == SOLVER_SOLVABLE && !(pool->installed && pool->solvables[$self->what].repo == pool->installed))
+          strstart = "keep ", strend = "uninstalled";
+        else if (select == SOLVER_SOLVABLE_PROVIDES)
+          strstart = "deinstall all solvables ";
+        else
+          strstart = "deinstall ";
+        break;
+      case SOLVER_UPDATE:
+        strstart = "install the most recent version of ";
+        break;
+      case SOLVER_LOCK:
+        strstart = "lock ";
+        break;
+      default:
+        return "unknwon job";
+    }
+    return pool_tmpjoin(pool, strstart, solver_select2str(pool, select, $self->what), strend);
+  }
 }
 
 %extend Chksum {
   Chksum(Id type) {
     return (Chksum *)sat_chksum_create(type);
+  }
+  Chksum(Id type, const char *hex) {
+    unsigned char buf[64];
+    int l = sat_chksum_len(type);
+    if (!l)
+      return 0;
+    if (sat_hex2bin(&hex, buf, sizeof(buf)) != l || hex[0])
+      return 0;
+    return (Chksum *)sat_chksum_create_from_bin(type, buf);
   }
   ~Chksum() {
     sat_chksum_free($self, 0);
@@ -341,6 +385,15 @@ typedef struct {
       sat_chksum_add($self, buf, l);
     lseek(fd, 0, 0);    /* convenience */
   }
+  void add_stat(const char *filename) {
+    struct stat stb;
+    if (stat(filename, &stb))
+      memset(&stb, 0, sizeof(stb));
+    sat_chksum_add($self, &stb.st_dev, sizeof(stb.st_dev));
+    sat_chksum_add($self, &stb.st_ino, sizeof(stb.st_ino));
+    sat_chksum_add($self, &stb.st_size, sizeof(stb.st_size));
+    sat_chksum_add($self, &stb.st_mtime, sizeof(stb.st_mtime));
+  }
   bool matches(Chksum *othersum) {
     int l;
     const unsigned char *b, *bo;
@@ -360,20 +413,13 @@ typedef struct {
   }
   %newobject hex;
   char *hex() {
-    int i, l, c;
+    int l;
     const unsigned char *b;
     char *ret, *rp;
 
     b = sat_chksum_get($self, &l);
-    ret = rp = sat_malloc(2 * l + 1);
-    for (i = 0; i < l; i++)
-      {
-        c = b[i] >> 4;
-        *rp++ = c < 10 ? c + '0' : c + ('a' - 10);
-        c = b[i] & 15;
-        *rp++ = c < 10 ? c + '0' : c + ('a' - 10);
-      }
-    *rp++ = 0;
+    ret = sat_malloc(2 * l + 1);
+    sat_bin2hex(b, l, ret);
     return ret;
   }
 }
@@ -620,11 +666,7 @@ typedef struct {
     return 1;
   }
   Id add_rpm(const char *name, int flags = 0) {
-    int oldend = $self->end;
-    repo_add_rpms($self, &name, 1, flags);
-    if (oldend == $self->end)
-      return 0;
-    return $self->end - 1;
+    return repo_add_rpm($self, name, flags);
   }
   bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0) {
     repo_add_susetags($self, fp, defvendor, language, flags);
@@ -1015,6 +1057,19 @@ typedef struct {
       return xs->pool->solvables[xs->id].arch;
     }
   %}
+  const char * const vendor;
+  %{
+    SWIGINTERN const char *XSolvable_vendor_get(XSolvable *xs) {
+      Pool *pool = xs->pool;
+      return id2str(pool, pool->solvables[xs->id].vendor);
+    }
+  %}
+  Id const vendorid;
+  %{
+    SWIGINTERN Id XSolvable_vendorid_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].vendor;
+    }
+  %}
   Repo * const repo;
   %{
     SWIGINTERN Repo *XSolvable_repo_get(XSolvable *xs) {
@@ -1108,6 +1163,11 @@ typedef struct {
     }
     return e;
   }
+  int illegalreplace() {
+    if ($self->type != SOLVER_SOLUTION_REPLACE || $self->p <= 0 || $self->rp <= 0)
+      return 0;
+    return policy_is_illegal($self->solv, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp, 0);
+  }
   %newobject solvable;
   XSolvable * const solvable;
   %newobject replacement;
@@ -1152,6 +1212,10 @@ typedef struct {
   static const int SOLVER_SOLUTION_DISTUPGRADE = SOLVER_SOLUTION_DISTUPGRADE;
   static const int SOLVER_SOLUTION_DEINSTALL = SOLVER_SOLUTION_DEINSTALL;
   static const int SOLVER_SOLUTION_REPLACE = SOLVER_SOLUTION_REPLACE;
+
+  static const int POLICY_ILLEGAL_DOWNGRADE = POLICY_ILLEGAL_DOWNGRADE;
+  static const int POLICY_ILLEGAL_ARCHCHANGE = POLICY_ILLEGAL_ARCHCHANGE;
+  static const int POLICY_ILLEGAL_VENDORCHANGE = POLICY_ILLEGAL_VENDORCHANGE;
 
   ~Solver() {
     solver_free($self);
