@@ -2102,31 +2102,6 @@ repodata_set_bin_checksum(Repodata *data, Id solvid, Id keyname, Id type,
   data->attrdatalen += l;
 }
 
-static int
-hexstr2bytes(unsigned char *buf, const char *str, int buflen)
-{
-  int i;
-  for (i = 0; i < buflen; i++)
-    {
-#define c2h(c) (((c)>='0' && (c)<='9') ? ((c)-'0')		\
-		: ((c)>='a' && (c)<='f') ? ((c)-('a'-10))	\
-		: ((c)>='A' && (c)<='F') ? ((c)-('A'-10))	\
-		: -1)
-      int v = c2h(*str);
-      str++;
-      if (v < 0)
-	return 0;
-      buf[i] = v;
-      v = c2h(*str);
-      str++;
-      if (v < 0)
-	return 0;
-      buf[i] = (buf[i] << 4) | v;
-#undef c2h
-    }
-  return buflen;
-}
-
 void
 repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 		      const char *str)
@@ -2136,7 +2111,7 @@ repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 
   if (!(l = sat_chksum_len(type)))
     return;
-  if (hexstr2bytes(buf, str, l) != l)
+  if (l > sizeof(buf) || sat_hex2bin(&str, buf, l) != l)
     return;
   repodata_set_bin_checksum(data, solvid, keyname, type, buf);
 }
@@ -2144,22 +2119,11 @@ repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 const char *
 repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
 {
-  int i, l;
-  char *str, *s;
+  int l;
 
   if (!(l = sat_chksum_len(type)))
     return "";
-  s = str = pool_alloctmpspace(data->repo->pool, 2 * l + 1);
-  for (i = 0; i < l; i++)
-    {
-      unsigned char v = buf[i];
-      unsigned char w = v >> 4;
-      *s++ = w >= 10 ? w + ('a' - 10) : w + '0';
-      w = v & 15;
-      *s++ = w >= 10 ? w + ('a' - 10) : w + '0';
-    }
-  *s = 0;
-  return str;
+  return pool_bin2hex(data->repo->pool, buf, l);
 }
 
 /* rpm filenames don't contain the epoch, so strip it */

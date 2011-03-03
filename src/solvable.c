@@ -20,6 +20,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#include "chksum.h"
 
 const char *
 solvable2str(Pool *pool, Solvable *s)
@@ -220,8 +221,7 @@ const char *
 solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep)
 {
   const unsigned char *chk = solvable_lookup_bin_checksum(s, keyname, typep);
-  /* we need the repodata just as a reference for a pool */
-  return chk ? repodata_chk2str(s->repo->repodata, *typep, chk) : 0;
+  return chk ? pool_bin2hex(s->repo->pool, chk, sat_chksum_len(*typep)) : 0;
 }
 
 static inline const char *

@@ -30,6 +30,10 @@ extern void sat_oom(size_t, size_t);
 extern unsigned int sat_timems(unsigned int subtract);
 extern void sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard);
 extern char *sat_dupjoin(const char *str1, const char *str2, const char *str3);
+extern char *sat_dupappend(const char *str1, const char *str2, const char *str3);
+extern int sat_hex2bin(const char **strp, unsigned char *buf, int bufl);
+extern char *sat_bin2hex(const unsigned char *buf, int l, char *str);
+
 
 static inline void *sat_extend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
 {

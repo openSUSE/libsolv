@@ -174,3 +174,63 @@ sat_dupjoin(const char *str1, const char *str2, const char *str3)
   *s = 0;
   return str;
 }
+
+char *
+sat_dupappend(const char *str1, const char *str2, const char *str3)
+{
+  char *str = sat_dupjoin(str1, str2, str3);
+  sat_free((void *)str1);
+  return str;
+}
+
+int
+sat_hex2bin(const char **strp, unsigned char *buf, int bufl)
+{
+  const char *str = *strp;
+  int i;
+
+  for (i = 0; i < bufl; i++)
+    {
+      int c = *str;
+      int d;
+      if (c >= '0' && c <= '9')
+        d = c - '0';
+      else if (c >= 'a' && c <= 'f')
+        d = c - ('a' - 10);
+      else if (c >= 'A' && c <= 'F')
+        d = c - ('A' - 10);
+      else
+	break;
+      c = *++str;
+      d <<= 4;
+      if (c >= '0' && c <= '9')
+        d |= c - '0';
+      else if (c >= 'a' && c <= 'f')
+        d |= c - ('a' - 10);
+      else if (c >= 'A' && c <= 'F')
+        d |= c - ('A' - 10);
+      else
+	break;
+      buf[i] = d;
+      ++str;
+    }
+  *strp = str;
+  return i;
+}
+
+char *
+sat_bin2hex(const unsigned char *buf, int l, char *str)
+{
+  int i;
+  for (i = 0; i < l; i++, buf++)
+    {
+      int c = *buf >> 4;
+      *str++ = c < 10 ? c + '0' : c + ('a' - 10);
+      c = *buf & 15;
+      *str++ = c < 10 ? c + '0' : c + ('a' - 10);
+    }
+  *str = 0;
+  return str;
+}
+
+

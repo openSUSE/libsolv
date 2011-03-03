@@ -1221,6 +1221,43 @@ pool_alloctmpspace(Pool *pool, int len)
   return pool->tmpspacebuf[n];
 }
 
+static char *
+pool_alloctmpspace_free(Pool *pool, const char *space, int len)
+{
+  if (space)
+    {
+      int n, oldn;
+      n = oldn = pool->tmpspacen;
+      for (;;)
+	{
+	  if (!n--)
+	    n = POOL_TMPSPACEBUF - 1;
+	  if (n == oldn)
+	    break;
+	  if (pool->tmpspacebuf[n] != space)
+	    continue;
+	  if (len > pool->tmpspacelen[n])
+	    {
+	      pool->tmpspacebuf[n] = sat_realloc(pool->tmpspacebuf[n], len + 32);
+	      pool->tmpspacelen[n] = len + 32;
+	    }
+          return pool->tmpspacebuf[n];
+	}
+    }
+  return 0;
+}
+
+void
+pool_freetmpspace(Pool *pool, const char *space)
+{
+  int n = pool->tmpspacen;
+  if (!space)
+    return;
+  n = (n + (POOL_TMPSPACEBUF - 1)) % POOL_TMPSPACEBUF;
+  if (pool->tmpspacebuf[n] == space)
+    pool->tmpspacen = n;
+}
+
 char *
 pool_tmpjoin(Pool *pool, const char *str1, const char *str2, const char *str3)
 {
@@ -1249,6 +1286,51 @@ pool_tmpjoin(Pool *pool, const char *str1, const char *str2, const char *str3)
   return str;
 }
 
+char *
+pool_tmpappend(Pool *pool, const char *str1, const char *str2, const char *str3)
+{
+  int l1, l2, l3;
+  char *s, *str;
+
+  l1 = str1 ? strlen(str1) : 0;
+  l2 = str2 ? strlen(str2) : 0;
+  l3 = str3 ? strlen(str3) : 0;
+  str = pool_alloctmpspace_free(pool, str1, l1 + l2 + l3 + 1);
+  if (str)
+    str1 = str;
+  else
+    str = pool_alloctmpspace(pool, l1 + l2 + l3 + 1);
+  s = str;
+  if (l1)
+    {
+      if (s != str1)
+        strcpy(s, str1);
+      s += l1;
+    }
+  if (l2)
+    {
+      strcpy(s, str2);
+      s += l2;
+    }
+  if (l3)
+    {
+      strcpy(s, str3);
+      s += l3;
+    }
+  *s = 0;
+  return str;
+}
+
+const char *
+pool_bin2hex(Pool *pool, const unsigned char *buf, int len)
+{
+  char *s;
+  if (!len)
+    return "";
+  s = pool_alloctmpspace(pool, 2 * len + 1);
+  sat_bin2hex(buf, len, s);
+  return s;
+}
 
 /*******************************************************************/
 

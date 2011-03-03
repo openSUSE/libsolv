@@ -194,7 +194,10 @@ extern void pool_setdisttype(Pool *pool, int disttype);
 extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 extern char *pool_alloctmpspace(Pool *pool, int len);
+extern void  pool_freetmpspace(Pool *pool, const char *space);
 extern char *pool_tmpjoin(Pool *pool, const char *str1, const char *str2, const char *str3);
+extern char *pool_tmpappend(Pool *pool, const char *str1, const char *str2, const char *str3);
+extern const char *pool_bin2hex(Pool *pool, const unsigned char *buf, int len);
 
 extern void pool_set_installed(Pool *pool, struct _Repo *repo);
 

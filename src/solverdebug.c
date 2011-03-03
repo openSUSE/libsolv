@@ -812,16 +812,17 @@ solver_select2str(Pool *pool, Id select, Id what)
   if (select == SOLVER_SOLVABLE_ONE_OF)
     {
       Id p;
-      char *b2;
-      b = "";
+      b = 0;
       while ((p = pool->whatprovidesdata[what++]) != 0)
 	{
 	  s = solvid2str(pool, p);
-	  b2 = pool_alloctmpspace(pool, strlen(b) + strlen(s) + 3);
-	  sprintf(b2, "%s, %s", b, s);
-	  b = b2;
+	  if (b)
+	    b = pool_tmpappend(pool, b, ", ", s);
+	  else
+	    b = pool_tmpjoin(pool, s, 0, 0);
+	  pool_freetmpspace(pool, s);
 	}
-      return *b ? b + 2 : "nothing";
+      return b ? b : "nothing";
     }
   if (select == SOLVER_SOLVABLE_REPO)
     {
