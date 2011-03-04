@@ -9,6 +9,7 @@
 
 %module solv
 
+#if defined(SWIGPYTHON)
 %typemap(in) Queue {
   /* Check if is a list */
   queue_init(&$1);
@@ -39,6 +40,35 @@
   queue_free(&$1);
   $result = o;
 }
+#endif
+#if defined(SWIGPERL)
+%typemap(in) Queue {
+  AV *av;
+  int i, size;
+  queue_init(&$1);
+  if (!SvROK($input) || SvTYPE(SvRV($input)) != SVt_PVAV)
+    SWIG_croak("Argument $argnum is not an array reference.");
+  av = (AV*)SvRV($input);
+  size = av_len(av);
+  for (i = 0; i <= size; i++) {
+    SV **sv = av_fetch(av, i, 0);
+    int v;
+    int e = SWIG_AsVal_int(*sv, &v);
+    if (!SWIG_IsOK(e)) {
+      SWIG_croak("list must contain only integers");
+    }
+    queue_push(&$1, v);
+  }
+}
+%typemap(out) Queue {
+  int i;
+  AV *o = newAV();
+  for (i = 0; i < $1.count; i++)
+    av_push(o, SvREFCNT_inc(SWIG_From_int($1.elements[i])));
+  queue_free(&$1);
+  $result = newRV_noinc((SV*)o); argvi++;
+}
+#endif
 %typemap(arginit) Queue {
   queue_init(&$1);
 }
@@ -46,9 +76,51 @@
   queue_free(&$1);
 }
 
+#if defined(SWIGPERL)
+%define perlmkarray(class,accessor,constructor)
+  %perlcode {
+    *solv::##class##::array::TIEARRAY = sub { bless $_[1], 'solv::class::array' };
+    *solv::##class##::array::FETCHSIZE = *solv::##class##::__len__;
+    *solv::##class##::array::FETCH = *solv::##class##::__getitem__;
+    undef *solv::##accessor##;
+    *solv::##accessor = sub { my @a; tie(@a, 'solv::class::array', ##constructor##(@_)); \@a };
+  }
+%enddef
+%define perlmkiter(class,accessor,constructor)
+  %perlcode {
+    *solv::##class##::iter::TIEARRAY = sub { bless [$_[1], 0], 'solv::class::iter' };
+    *solv::##class##::iter::FETCHSIZE = sub { ($_[0]->[2] = $_[0]->[0]->__next__()) ? ++$_[0]->[1] : 0 };
+    *solv::##class##::iter::FETCH = sub { $_[1] == $_[0]->[1] - 1 ? $_[0]->[2] : undef };
+    *solv::##class##::iter::iter = sub { return $_[0]->[0] };
+    undef *solv::##accessor##;
+    *solv::##accessor = sub { my @a; tie(@a, 'solv::class::iter', ##constructor##(@_)); \@a };
+  }
+%enddef
+#endif
+
+
+#if defined(SWIGPYTHON)
+typedef PyObject *AppObjectPtr;
+%typemap(out) AppObjectPtr {
+  $result = $1;
+  Py_INCREF($result);
+}
+#endif
+#if defined(SWIGPERL)
+typedef SV *AppObjectPtr;
+%typemap(out) AppObjectPtr {
+  $result = $1;
+  SvREFCNT_inc($result);
+}
+#endif
+#if defined(SWIGRUBY)
+typedef VALUE AppObjectPtr;
+#endif
 
 %include "cdata.i"
+#ifndef SWIGPERL
 %include "file.i"
+#endif
 %include "typemaps.i"
 
 %{
@@ -78,6 +150,7 @@
 #define SOLVER_SOLUTION_REPLACE -101
 typedef struct chksum Chksum;
 typedef int bool;
+typedef void *AppObjectPtr;
 
 typedef struct {
   Pool* pool;
@@ -186,6 +259,7 @@ typedef struct {
 %nodefaultctor Pool;
 %nodefaultdtor Pool;
 typedef struct {
+  AppObjectPtr appdata;
 } Pool;
 
 %nodefaultctor Repo;
@@ -196,12 +270,7 @@ typedef struct _Repo {
   int priority;
   int subpriority;
   int const nsolvables;
-#if defined(SWIGRUBY)
-  VALUE appdata;
-#endif
-#if defined(SWIGPERL)
-  SV *appdata;
-#endif
+  AppObjectPtr appdata;
 } Repo;
 
 %nodefaultctor Pool_solvable_iterator;
@@ -509,6 +578,10 @@ typedef struct {
     const unsigned char *b = pool_lookup_bin_checksum($self, entry, keyname, &type);
     return sat_chksum_create_from_bin(type, b);
   }
+
+#ifdef SWIGPERL
+  perlmkiter(Dataiterator, Pool::dataiterator_new, solvc::Pool_dataiterator_new)
+#endif
   %newobject dataiterator_new;
   Dataiterator *dataiterator_new(Id p, Id key,  const char *match, int flags) {
     return new_Dataiterator($self, 0, p, key, match, flags);
@@ -533,6 +606,13 @@ typedef struct {
   void createwhatprovides() {
     pool_createwhatprovides($self);
   }
+
+
+#if defined(SWIGPERL)
+  perlmkarray(Pool_solvable_iterator, Pool::swig_solvables_get, solvc::Pool_solvables_get)
+  perlmkiter(Pool_solvable_iterator, Pool::swig_solvables_iter_get, solvc::Pool_solvables_get)
+#endif
+
   %newobject solvables;
   Pool_solvable_iterator * const solvables;
   %{
@@ -544,6 +624,12 @@ typedef struct {
     return s;
   }
   %}
+
+#if defined(SWIGPERL)
+  perlmkarray(Pool_repo_iterator, Pool::swig_repos_get, solvc::Pool_repos_get)
+  perlmkiter(Pool_repo_iterator, Pool::swig_repos_iter_get, solvc::Pool_repos_get)
+#endif
+
   %newobject repos;
   Pool_repo_iterator * const repos;
   %{
@@ -555,6 +641,7 @@ typedef struct {
     return s;
   }
   %}
+
   Repo *installed;
   %{
   SWIGINTERN void Pool_installed_set(Pool *pool, Repo *installed) {
@@ -605,6 +692,18 @@ typedef struct {
       return [ self.solvables[id] for id in self.jobsolvids(*args) ]
     def providers(self, *args):
       return [ self.solvables[id] for id in self.providerids(*args) ]
+  }
+#endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Pool::jobsolvables {
+      my ($self, @args) = @_;
+      return map {$self->{'solvables'}->[$_]} @{$self->jobsolvids(@args)};
+    }
+    sub solv::Pool::providers {
+      my ($self, @args) = @_;
+      return map {$self->{'solvables'}->[$_]} @{$self->providerids(@args)};
+    }
   }
 #endif
 
@@ -711,6 +810,11 @@ typedef struct {
     $self->nrepodata = oldnrepodata;
     return 1;
   }
+
+#ifdef SWIGPERL
+  perlmkiter(Dataiterator, Repo::dataiterator_new, solvc::Repo_dataiterator_new)
+#endif
+
   %newobject dataiterator_new;
   Dataiterator *dataiterator_new(Id p, Id key,  const char *match, int flags) {
     return new_Dataiterator($self->pool, $self, p, key, match, flags);
@@ -746,19 +850,6 @@ typedef struct {
     if (data->state != REPODATA_STUB)
       repodata_create_stubs(data);
   }
-#if defined(SWIGPYTHON)
-  PyObject *appdata;
-  %{
-  SWIGINTERN void Repo_appdata_set(Repo *repo, PyObject *o) {
-    repo->appdata = o;
-  }
-  SWIGINTERN PyObject *Repo_appdata_get(Repo *repo) {
-    PyObject *o = repo->appdata;
-    Py_INCREF(o);
-    return o;
-  }
-  %}
-#endif
   bool iscontiguous() {
     int i;
     for (i = $self->start; i < $self->end; i++)
@@ -798,6 +889,7 @@ typedef struct {
     dataiterator_free($self);
     sat_free($self);
   }
+#if defined(SWIGPYTHON)
   %newobject __iter__;
   Dataiterator *__iter__() {
     Dataiterator *ndi;
@@ -805,15 +897,17 @@ typedef struct {
     dataiterator_init_clone(ndi, $self);
     return ndi;
   }
-  %exception next {
+  %rename("next") __next__();
+  %exception __next__ {
     $action
     if (!result) {
       PyErr_SetString(PyExc_StopIteration,"no more matches");
       return NULL;
     }
   }
-  %newobject next;
-  Dataiterator *next() {
+#endif
+  %newobject __next__;
+  Dataiterator *__next__() {
     Dataiterator *ndi;
     if (!dataiterator_step($self)) {
       return 0;
@@ -868,8 +962,8 @@ typedef struct {
   }
 }
 
-
 %extend Pool_solvable_iterator {
+#if defined(SWIGPYTHON)
   %newobject __iter__;
   Pool_solvable_iterator *__iter__() {
     Pool_solvable_iterator *s;
@@ -877,15 +971,17 @@ typedef struct {
     *s = *$self;
     return s;
   }
-  %exception next {
+  %rename("next") __next__();
+  %exception __next__ {
     $action
     if (!result) {
       PyErr_SetString(PyExc_StopIteration,"no more matches");
       return NULL;
     }
   }
-  %newobject next;
-  XSolvable *next() {
+#endif
+  %newobject __next__;
+  XSolvable *__next__() {
     Pool *pool = $self->pool;
     XSolvable *s;
     if ($self->id >= pool->nsolvables)
@@ -902,9 +998,13 @@ typedef struct {
       return new_XSolvable(pool, key);
     return 0;
   }
+  int __len__() {
+    return $self->pool->nsolvables;
+  }
 }
 
 %extend Pool_repo_iterator {
+#if defined(SWIGPYTHON)
   %newobject __iter__;
   Pool_repo_iterator *__iter__() {
     Pool_repo_iterator *s;
@@ -912,14 +1012,17 @@ typedef struct {
     *s = *$self;
     return s;
   }
-  %exception next {
+  %rename("next") __next__();
+  %exception __next__ {
     $action
     if (!result) {
       PyErr_SetString(PyExc_StopIteration,"no more matches");
       return NULL;
     }
   }
-  Repo *next() {
+#endif
+  %newobject __next__;
+  Repo *__next__() {
     Pool *pool = $self->pool;
     if ($self->id >= pool->nrepos + 1)
       return 0;
@@ -936,9 +1039,13 @@ typedef struct {
       return pool_id2repo(pool, key);
     return 0;
   }
+  int __len__() {
+    return $self->pool->nrepos + 1;
+  }
 }
 
 %extend Repo_solvable_iterator {
+#if defined(SWIGPYTHON)
   %newobject __iter__;
   Repo_solvable_iterator *__iter__() {
     Repo_solvable_iterator *s;
@@ -946,15 +1053,17 @@ typedef struct {
     *s = *$self;
     return s;
   }
-  %exception next {
+  %rename("next") __next__();
+  %exception __next__ {
     $action
     if (!result) {
       PyErr_SetString(PyExc_StopIteration,"no more matches");
       return NULL;
     }
   }
-  %newobject next;
-  XSolvable *next() {
+#endif
+  %newobject __next__;
+  XSolvable *__next__() {
     Repo *repo = $self->repo;
     Pool *pool = repo->pool;
     XSolvable *s;
@@ -974,6 +1083,9 @@ typedef struct {
     if (key > 0 && key < pool->nsolvables && pool->solvables[key].repo == repo)
       return new_XSolvable(pool, key);
     return 0;
+  }
+  int __len__() {
+    return $self->repo->pool->nsolvables;
   }
 }
 
@@ -1123,6 +1235,22 @@ typedef struct {
       return [ Solution(self, i) for i in range(1, self.solution_count() + 1) ];
   }
 #endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Problem::findproblemrule {
+      my ($self) = @_;
+      return solv::XRule->new($self->{'solv'}, $self->findproblemrule_helper());
+    }
+    sub solv::Problem::findallproblemrule {
+      my ($self, $unfiltered) = @_;
+      return map {solv::XRule->new($self->{'solv'}, $_)} @{$self->findallproblemrule_helper($unfiltered)};
+    }
+    sub solv::Problem::solutions {
+      my ($self) = @_;
+      return map {solv::Solution->new($self, $_)} 1..($self->solution_count());
+    }
+  }
+#endif
 }
 
 %extend Solution {
@@ -1141,6 +1269,14 @@ typedef struct {
   %pythoncode {
     def elements(self):
       return [ Solutionelement(self, i) for i in range(1, self.element_count() + 1) ];
+  }
+#endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Solution::elements {
+      my ($self) = @_;
+      return map {solv::Solutionelement->new($self, $_)} 1..($self->element_count());
+    }
   }
 #endif
 }
@@ -1227,6 +1363,16 @@ typedef struct {
       for job in jobs: j += [job.how, job.what]
       nprob = self.solve_helper(j)
       return [ Problem(self, pid) for pid in range(1, nprob + 1) ]
+  }
+#endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Solver::solve {
+      my ($self, $jobs) = @_;
+      my @j = map {($_->{'how'}, $_->{'what'})} @$jobs;
+      my $nprob = $self->solve_helper(\@j);
+      return map {solv::Problem->new($self, $_)} 1..$nprob;
+    }
   }
 #endif
   int solve_helper(Queue jobs) {
@@ -1364,6 +1510,17 @@ typedef struct {
       return type, source, target, dep
   }
 #endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::XRule::info {
+      my ($self) = @_;
+      my ($type, $source, $target, $dep) = $self->info_helper();
+      $source = $self->{'solv'}->{'pool'}->{'solvables'}->[$source] if $source;
+      $target = $self->{'solv'}->{'pool'}->{'solvables'}->[$target] if $target;
+      return ($type, $source, $target, $dep);
+    }
+  }
+#endif
 }
 
 
@@ -1435,3 +1592,4 @@ typedef struct {
     repodata_extend_block(data, data->repo->start, data->repo->end - data->repo->start);
   }
 }
+

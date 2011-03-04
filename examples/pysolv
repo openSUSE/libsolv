@@ -574,7 +574,7 @@ def limitjobs(pool, jobs, flags, evr):
 	what = pool.rel2id(j.what, evr, flags)
         if flags == solv.REL_ARCH:
 	    how |= Job.SOLVER_SETARCH
-	if flags == solv.REL_EQ and sel == Job.SOLVER_SOLVABLE_NAME:
+	elif flags == solv.REL_EQ and sel == Job.SOLVER_SOLVABLE_NAME:
 	    if pool.id2str(evr).find('-') >= 0:
 		how |= Job.SOLVER_SETEVR
 	    else:
@@ -595,7 +595,7 @@ def mkjobs_filelist(pool, cmd, arg):
 	type = Dataiterator.SEARCH_GLOB
     else:
 	type = Dataiterator.SEARCH_STRING
-    if cmd == 'rm' or cmd == 'erase':
+    if cmd == 'erase':
 	di = pool.installed.dataiterator_new(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
     else:
 	di = pool.dataiterator_new(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
@@ -791,7 +791,11 @@ for arg in args:
     if cmdlinerepo and arg in cmdlinerepo['packages']:
 	jobs.append(pool.Job(Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
     else:
-	jobs += mkjobs(pool, cmd, arg)
+	njobs = mkjobs(pool, cmd, arg)
+	if not njobs:
+	    print "nothing matches '%s'" % arg
+	    sys.exit(1)
+	jobs += njobs
 
 if cmd == 'list' or cmd == 'info':
     if not jobs:
@@ -853,6 +857,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	    solver.updatesystem = True
 	    solver.allowdowngrade = True
 	    solver.allowvendorchange = True
+	    solver.allowarchchange = True
 	    solver.dosplitprovides = True
 	if cmd == 'up' and len(jobs) == 1 and jobs[0].how == (Job.SOLVER_UPDATE | Job.SOLVER_SOLVABLE_ALL):
 	    solver.dosplitprovides = True
