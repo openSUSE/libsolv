@@ -34,7 +34,8 @@ extern void solver_printallsolutions(Solver *solv);
 extern void solver_printtrivial(Solver *solv);
 
 extern const char *solver_select2str(Pool *pool, Id select, Id what);
-
+extern const char *pool_job2str(Pool *pool, Id how, Id what, int withflags);
+extern const char *solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id dep);
 
 #endif /* SATSOLVER_SOLVERDEBUG_H */
 

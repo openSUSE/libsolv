@@ -834,3 +834,144 @@ solver_select2str(Pool *pool, Id select, Id what)
     return "all packages";
   return "unknown job select";
 }
+
+const char *
+pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
+{
+  Id select = how & SOLVER_SELECTMASK;
+  const char *strstart = 0, *strend = 0;
+  char *s;
+  int o;
+
+  switch (how & SOLVER_JOBMASK)
+    {
+    case SOLVER_NOOP:
+      return "do nothing";
+    case SOLVER_INSTALL:
+      if (select == SOLVER_SOLVABLE && pool->installed && pool->solvables[what].repo == pool->installed)
+	strstart = "keep ", strend = "installed";
+      else if (select == SOLVER_SOLVABLE || select == SOLVER_SOLVABLE_NAME)
+	strstart = "install ";
+      else if (select == SOLVER_SOLVABLE_PROVIDES)
+	strstart = "install a package ";
+      else
+	strstart = "install one of ";
+      break;
+    case SOLVER_ERASE:
+      if (select == SOLVER_SOLVABLE && !(pool->installed && pool->solvables[what].repo == pool->installed))
+	strstart = "keep ", strend = "unstalled";
+      else if (select == SOLVER_SOLVABLE_PROVIDES)
+	strstart = "deinstall all packages ";
+      else
+	strstart = "deinstall ";
+      break;
+    case SOLVER_UPDATE:
+      strstart = "update ";
+      break;
+    case SOLVER_WEAKENDEPS:
+      strstart = "weaken deps of ";
+      break;
+    case SOLVER_NOOBSOLETES:
+      strstart = "multi version ";
+      break;
+    case SOLVER_LOCK:
+      strstart = "update ";
+      break;
+    case SOLVER_DISTUPGRADE:
+      strstart = "dist upgrade ";
+      break;
+    case SOLVER_VERIFY:
+      strstart = "verify ";
+      break;
+    case SOLVER_DROP_ORPHANED:
+      strstart = "deinstall ", strend = "if orphaned";
+      break;
+    case SOLVER_USERINSTALLED:
+      strstart = "regard ", strend = "as userinstalled";
+      break;
+    default:
+      strstart = "unknown job ";
+      break;
+    }
+  s = pool_tmpjoin(pool, strstart, solver_select2str(pool, select, what), strend);
+  if ((how & flagmask & ~(SOLVER_SELECTMASK|SOLVER_JOBMASK)) == 0)
+    return s;
+  o = strlen(s);
+  s = pool_tmpappend(pool, s, " ", 0);
+  if (how & SOLVER_WEAK)
+    s = pool_tmpappend(pool, s, ",weak", 0);
+  if (how & SOLVER_ESSENTIAL)
+    s = pool_tmpappend(pool, s, ",essential", 0);
+  if (how & SOLVER_CLEANDEPS)
+    s = pool_tmpappend(pool, s, ",cleandeps", 0);
+  if (how & SOLVER_SETEV)
+    s = pool_tmpappend(pool, s, ",setev", 0);
+  if (how & SOLVER_SETEVR)
+    s = pool_tmpappend(pool, s, ",setevr", 0);
+  if (how & SOLVER_SETARCH)
+    s = pool_tmpappend(pool, s, ",setarch", 0);
+  if (how & SOLVER_SETVENDOR)
+    s = pool_tmpappend(pool, s, ",setvendor", 0);
+  if (how & SOLVER_SETREPO)
+    s = pool_tmpappend(pool, s, ",setrepo", 0);
+  if (how & SOLVER_NOAUTOSET)
+    s = pool_tmpappend(pool, s, ",noautoset", 0);
+  if (s[o + 1] != ',')
+    s = pool_tmpappend(pool, s, ",?", 0);
+  s[o + 1] = '[';
+  return pool_tmpappend(pool, s, "]", 0);
+}
+
+const char *
+solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id dep)
+{
+  Pool *pool = solv->pool;
+  char *s;
+  switch (type)
+    {
+    case SOLVER_RULE_DISTUPGRADE:
+      return pool_tmpjoin(pool, solvid2str(pool, source), " does not belong to a distupgrade repository", 0);
+    case SOLVER_RULE_INFARCH:
+      return pool_tmpjoin(pool, solvid2str(pool, source), " has inferior architecture", 0);
+    case SOLVER_RULE_UPDATE:
+      return pool_tmpjoin(pool, "problem with installed package ", solvid2str(pool, source), 0);
+    case SOLVER_RULE_JOB:
+      return "conflicting requests";
+    case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
+      return pool_tmpjoin(pool, "nothing provides requested ", dep2str(pool, dep), 0);
+    case SOLVER_RULE_RPM:
+      return "some dependency problem";
+    case SOLVER_RULE_RPM_NOT_INSTALLABLE:
+      return pool_tmpjoin(pool, "package ", solvid2str(pool, source), " is not installable");
+    case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
+      s = pool_tmpjoin(pool, "nothing provides ", dep2str(pool, dep), 0);
+      return pool_tmpappend(pool, s, " needed by ", solvid2str(pool, source));
+    case SOLVER_RULE_RPM_SAME_NAME:
+      s = pool_tmpjoin(pool, "cannot install both ", solvid2str(pool, source), 0);
+      return pool_tmpappend(pool, s, " and ", solvid2str(pool, target));
+    case SOLVER_RULE_RPM_PACKAGE_CONFLICT:
+      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " conflicts with ", dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " provided by ", solvid2str(pool, target));
+    case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
+      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " obsoletes ", dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " provided by ", solvid2str(pool, target));
+    case SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES:
+      s = pool_tmpjoin(pool, "installed package ", solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " obsoletes ", dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " provided by ", solvid2str(pool, target));
+    case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
+      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " implicitely obsoletes ", dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " provided by ", solvid2str(pool, target));
+    case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
+      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), " requires ");
+      return pool_tmpappend(pool, s, dep2str(pool, dep), ", but none of the providers can be installed");
+    case SOLVER_RULE_RPM_SELF_CONFLICT:
+      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), " conflicts with ");
+      return pool_tmpappend(pool, s, dep2str(pool, dep), " provided by itself");
+    default:
+      return "bad problem rule type";
+    }
+}
