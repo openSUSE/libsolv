@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <zlib.h>
+#include <fcntl.h>
 
 #include "sat_xfopen.h"
 
@@ -67,11 +68,19 @@ sat_xfopen_fd(const char *fn, int fd)
   char *suf;
   gzFile *gzf;
 
-  if (!fn)
-    return 0;
-  suf = strrchr(fn, '.');
+  suf = fn ? strrchr(fn, '.') : 0;
   if (!suf || strcmp(suf, ".gz") != 0)
-    return fdopen(fd, "r");
+    {
+      int fl = fcntl(fd, F_GETFL, 0);
+      if (fl == -1)
+	return 0;
+      fl &= O_RDONLY|O_WRONLY|O_RDWR;
+      if (fl == O_WRONLY)
+        return fdopen(fd, "w");
+      else if (fl == O_RDWR)
+        return fdopen(fd, "r+");
+      return fdopen(fd, "r");
+    }
   gzf = gzdopen(fd, "r");
   if (!gzf)
     return 0;
