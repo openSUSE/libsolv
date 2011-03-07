@@ -638,7 +638,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      case CTAG('+', 'I', 'n', 's'):
 	      case CTAG('+', 'D', 'e', 'l'):
 	      case CTAG('+', 'A', 'u', 't'):
-	        if (line[4] == ':')
+	        if (line[4] == ':' || line[4] == '.')
 	          cummulate = 1;
 		break;
 	      default:
