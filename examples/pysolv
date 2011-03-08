@@ -678,20 +678,18 @@ def depglob(pool, name, globname, globdep):
     if globname:
 	# try name glob
 	idmatches = {}
-	for s in pool.solvables:
-	    if s.installable() and fnmatch.fnmatch(s.name, name):
+	for d in pool.dataiterator_new(0, solv.SOLVABLE_NAME, name, Dataiterator.SEARCH_GLOB):
+	    s = d.solvable
+	    if s.installable():
 		idmatches[s.nameid] = True
 	if idmatches:
 	    return [ pool.Job(Job.SOLVER_SOLVABLE_NAME, id) for id in sorted(idmatches.keys()) ]
     if globdep:
 	# try dependency glob
-	idmatches = {}
-	for id in pool.allprovidingids():
-	    if fnmatch.fnmatch(pool.id2str(id), name):
-		idmatches[id] = True
+	idmatches = pool.matchprovidingids(name, Dataiterator.SEARCH_GLOB)
 	if idmatches:
 	    print "[using capability match for '%s']" % name
-	    return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) for id in sorted(idmatches.keys()) ]
+	    return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) for id in sorted(idmatches) ]
     return []
     
 
@@ -867,39 +865,8 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	for problem in problems:
 	    print "Problem %d:" % problem.id
 	    r = problem.findproblemrule()
-	    type, source, target, dep = r.info()
-	    if type == Solver.SOLVER_RULE_DISTUPGRADE:
-		print "%s does not belong to a distupgrade repository" % source.str()
-	    elif type == Solver.SOLVER_RULE_INFARCH:
-		print "%s has inferiour architecture" % source.str()
-	    elif type == Solver.SOLVER_RULE_UPDATE:
-		print "problem with installed package %s" % source.str()
-	    elif type == Solver.SOLVER_RULE_JOB:
-		print "conflicting requests"
-	    elif type == Solver.SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
-		print "nothing provides requested %s" % pool.dep2str(dep)
-	    elif type == Solver.SOLVER_RULE_RPM:
-		print "some dependency problem"
-	    elif type == Solver.SOLVER_RULE_RPM_NOT_INSTALLABLE:
-		print "package %s is not installable" % source.str()
-	    elif type == Solver.SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
-		print "nothing provides %s needed by %s" % (pool.dep2str(dep), source.str())
-	    elif type == Solver.SOLVER_RULE_RPM_SAME_NAME:
-		print "cannot install both %s and %s" % (source.str(), target.str())
-	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_CONFLICT:
-		print "package %s conflicts with %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
-	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
-		print "package %s obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
-	    elif type == Solver.SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES:
-		print "installed package %s obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
-	    elif type == Solver.SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
-		print "package %s implicitely obsoletes %s provided by %s" % (source.str(), pool.dep2str(dep), target.str())
-	    elif type == Solver.SOLVER_RULE_RPM_PACKAGE_REQUIRES:
-		print "package %s requires %s, but none of the providers can be installed" % (source.str(), pool.dep2str(dep))
-	    elif type == Solver.SOLVER_RULE_RPM_SELF_CONFLICT:
-		print "package %s conflicts with %s provided by itself" % (source.str(), pool.dep2str(dep))
-	    else:
-		print "bad rule type", type
+	    ri = r.info()
+	    print ri.problemstr()
 	    solutions = problem.solutions()
 	    for solution in solutions:
 	        print "  Solution %d:" % solution.id
@@ -931,7 +898,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 				print "  - allow vendor change from '%s' (%s) to no vendor (%s)" % (element.solvable.vendor, element.solvable.str(), element.replacement.str())
 			if illegal == 0:
 			    print "  - allow replacement of %s with %s" % (element.solvable.str(), element.replacement.str())
-		    elif etype == Solver.SOLVER_SOLUTION_DEINSTALL:
+		    elif etype == Solver.SOLVER_SOLUTION_ERASE:
 			print "  - allow deinstallation of %s" % element.solvable.str()
 	    sol = ''
 	    while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
@@ -945,22 +912,17 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	    solution = solutions[int(sol) - 1]
 	    for element in solution.elements():
 		etype = element.type
-		newjob = None
 		if etype == Solver.SOLVER_SOLUTION_JOB:
 		    jobs[element.jobidx] = pool.Job(Job.SOLVER_NOOP, 0)
-		elif etype == Solver.SOLVER_SOLUTION_INFARCH or etype == Solver.SOLVER_SOLUTION_DISTUPGRADE:
-		    newjob = pool.Job(Job.SOLVER_INSTALL|Job.SOLVER_SOLVABLE, element.solvable.id)
-		elif etype == Solver.SOLVER_SOLUTION_REPLACE:
-		    newjob = pool.Job(Job.SOLVER_INSTALL|Job.SOLVER_SOLVABLE, element.replacement.id)
-		elif etype == Solver.SOLVER_SOLUTION_DEINSTALL:
-		    newjob = pool.Job(Job.SOLVER_ERASE|Job.SOLVER_SOLVABLE, element.solvable.id)
-		if newjob:
-		    for job in jobs:
-			if job.how == newjob.how and job.what == newjob.what:
-			    newjob = None
-			    break
+		else:
+		    newjob = element.Job()
 		    if newjob:
-			jobs.append(newjob)
+			for job in jobs:
+			    if job.how == newjob.how and job.what == newjob.what:
+				newjob = None
+				break
+			if newjob:
+			    jobs.append(newjob)
     # no problems, show transaction
     trans = solver.transaction()
     del solver
@@ -1006,7 +968,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	yn = sys.stdin.readline().strip()
 	if yn == 'y': break
 	if yn == 'n': sys.exit(1)
-    newpkgs, keptpkgs = trans.installedresult()
+    newpkgs = trans.newpackages()
     newpkgsfp = {}
     if newpkgs:
 	downloadsize = 0

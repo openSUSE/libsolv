@@ -60,13 +60,19 @@
     queue_push(&$1, v);
   }
 }
+# AV *o = newAV();
+# av_push(o, SvREFCNT_inc(SWIG_From_int($1.elements[i])));
+# $result = newRV_noinc((SV*)o); argvi++;
+#
 %typemap(out) Queue {
   int i;
-  AV *o = newAV();
+  if (argvi + $1.count + 1>= items) {
+    EXTEND(sp, items - (argvi + $1.count + 1) + 1);
+  }
   for (i = 0; i < $1.count; i++)
-    av_push(o, SvREFCNT_inc(SWIG_From_int($1.elements[i])));
+    ST(argvi++) = SvREFCNT_inc(SWIG_From_int($1.elements[i]));
   queue_free(&$1);
-  $result = newRV_noinc((SV*)o); argvi++;
+  $result = 0;
 }
 #endif
 %typemap(arginit) Queue {
@@ -77,26 +83,105 @@
 }
 
 #if defined(SWIGPERL)
-%define perlmkarray(class,accessor,constructor)
+
+# work around a swig bug
+%{
+#undef SWIG_CALLXS
+#ifdef PERL_OBJECT 
+#  define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(cv,pPerl) 
+#else 
+#  ifndef MULTIPLICITY 
+#    define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(cv) 
+#  else 
+#    define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(PERL_GET_THX, cv) 
+#  endif 
+#endif 
+%}
+
+
+%define perliter(class)
   %perlcode {
-    *solv::##class##::array::TIEARRAY = sub { bless $_[1], 'solv::class::array' };
-    *solv::##class##::array::FETCHSIZE = *solv::##class##::__len__;
-    *solv::##class##::array::FETCH = *solv::##class##::__getitem__;
-    undef *solv::##accessor##;
-    *solv::##accessor = sub { my @a; tie(@a, 'solv::class::array', ##constructor##(@_)); \@a };
+    sub class##::FETCH {
+      my $i = ${##class##::ITERATORS}{$_[0]};
+      if ($i) {
+        $_[1] == $i->[0] - 1 ? $i->[1] : undef;
+      } else {
+        $_[0]->__getitem__($_[1]);
+      }
+    }
+    sub class##::FETCHSIZE {
+      my $i = ${##class##::ITERATORS}{$_[0]};
+      if ($i) {
+        ($i->[1] = $_[0]->__next__()) ? ++$i->[0]  : 0;
+      } else {
+        $_[0]->__len__();
+      }
+    }
   }
 %enddef
-%define perlmkiter(class,accessor,constructor)
-  %perlcode {
-    *solv::##class##::iter::TIEARRAY = sub { bless [$_[1], 0], 'solv::class::iter' };
-    *solv::##class##::iter::FETCHSIZE = sub { ($_[0]->[2] = $_[0]->[0]->__next__()) ? ++$_[0]->[1] : 0 };
-    *solv::##class##::iter::FETCH = sub { $_[1] == $_[0]->[1] - 1 ? $_[0]->[2] : undef };
-    *solv::##class##::iter::iter = sub { return $_[0]->[0] };
-    undef *solv::##accessor##;
-    *solv::##accessor = sub { my @a; tie(@a, 'solv::class::iter', ##constructor##(@_)); \@a };
+
+%{
+
+#define SWIG_PERL_ITERATOR      0x80
+
+SWIGRUNTIMEINLINE SV *
+SWIG_Perl_NewArrayObj(SWIG_MAYBE_PERL_OBJECT void *ptr, swig_type_info *t, int flags) {
+  SV *result = sv_newmortal();
+  if (ptr && (flags & (SWIG_SHADOW | SWIG_POINTER_OWN))) {
+    SV *self;
+    SV *obj=newSV(0);
+    AV *array=newAV();
+    HV *stash;
+    sv_setref_pv(obj, (char *) SWIG_Perl_TypeProxyName(t), ptr);
+    stash=SvSTASH(SvRV(obj));
+    if (flags & SWIG_POINTER_OWN) {
+      HV *hv;
+      GV *gv=*(GV**)hv_fetch(stash, "OWNER", 5, TRUE);
+      if (!isGV(gv))
+        gv_init(gv, stash, "OWNER", 5, FALSE);
+      hv=GvHVn(gv);
+      hv_store_ent(hv, obj, newSViv(1), 0);
+    }
+    if (flags & SWIG_PERL_ITERATOR) {
+      HV *hv;
+      GV *gv=*(GV**)hv_fetch(stash, "ITERATORS", 9, TRUE);
+      AV *av=newAV();
+      if (!isGV(gv))
+        gv_init(gv, stash, "ITERATORS", 9, FALSE);
+      hv=GvHVn(gv);
+      hv_store_ent(hv, obj, newRV_inc((SV *)av), 0);
+    }
+    sv_magic((SV *)array, (SV *)obj, 'P', Nullch, 0);
+    SvREFCNT_dec(obj);
+    self=newRV_noinc((SV *)array);
+    sv_setsv(result, self);
+    SvREFCNT_dec((SV *)self);
+    sv_bless(result, stash);
+  } else {
+    sv_setref_pv(result, (char *) SWIG_Perl_TypeProxyName(t), ptr);
   }
-%enddef
+  return result;
+}
+
+%}
+
+%typemap(out) Perlarray {
+  ST(argvi) = SWIG_Perl_NewArrayObj(SWIG_PERL_OBJECT_CALL SWIG_as_voidptr(result), $1_descriptor, $owner | $shadow); argvi++;
+}
+%typemap(out) Perliterator {
+  ST(argvi) = SWIG_Perl_NewArrayObj(SWIG_PERL_OBJECT_CALL SWIG_as_voidptr(result), $1_descriptor, $owner | $shadow | SWIG_PERL_ITERATOR); argvi++;
+}
+
+%typemap(out) Pool_solvable_iterator * = Perlarray;
+%typemap(out) Pool_solvable_iterator * solvables_iter = Perliterator;
+%typemap(out) Pool_repo_iterator * = Perlarray;
+%typemap(out) Pool_repo_iterator * repos_iter = Perliterator;
+%typemap(out) Repo_solvable_iterator * = Perlarray;
+%typemap(out) Repo_solvable_iterator * solvables_iter = Perliterator;
+%typemap(out) Dataiterator * = Perliterator;
+
 #endif
+
 
 
 #if defined(SWIGPYTHON)
@@ -108,9 +193,12 @@ typedef PyObject *AppObjectPtr;
 #endif
 #if defined(SWIGPERL)
 typedef SV *AppObjectPtr;
+%typemap(in) AppObjectPtr {
+  $1 = SvROK($input) ? SvRV($input) : 0;
+}
 %typemap(out) AppObjectPtr {
-  $result = $1;
-  SvREFCNT_inc($result);
+  $result = $1 ? newRV_inc($1) : newSV(0);
+  argvi++;
 }
 #endif
 #if defined(SWIGRUBY)
@@ -146,7 +234,7 @@ typedef VALUE AppObjectPtr;
 #define true 1
 #define false 1
 
-#define SOLVER_SOLUTION_DEINSTALL -100
+#define SOLVER_SOLUTION_ERASE -100
 #define SOLVER_SOLUTION_REPLACE -101
 typedef struct chksum Chksum;
 typedef int bool;
@@ -210,6 +298,17 @@ typedef struct {
   Id rp;
 } Solutionelement;
 
+typedef struct {
+  Solver *solv;
+  Id rid;
+  Id type;
+  Id source;
+  Id target;
+  Id dep;
+} Ruleinfo;
+
+typedef Dataiterator Datamatch;
+
 %}
 
 typedef int Id;
@@ -231,6 +330,13 @@ typedef struct {
   Id const id;
 } XSolvable;
 
+%nodefaultctor Ruleinfo;
+typedef struct {
+  Solver* const solv;
+  Id const type;
+  Id const dep;
+} Ruleinfo;
+
 typedef struct {
   Solver* const solv;
   Id const id;
@@ -242,13 +348,19 @@ typedef struct {
 } XRepodata;
 
 # put before pool/repo so we can access the constructor
-%nodefaultctor Dataiterator;
 %nodefaultdtor Dataiterator;
-typedef struct _Dataiterator {
+typedef struct {} Dataiterator;
+typedef struct {} Pool_solvable_iterator;
+typedef struct {} Pool_repo_iterator;
+typedef struct {} Repo_solvable_iterator;
+
+%nodefaultctor Datamatch;
+%nodefaultdtor Datamatch;
+typedef struct {
   Pool * const pool;
   Repo * const repo;
   const Id solvid;
-} Dataiterator;
+} Datamatch;
 
 typedef struct {
   Pool * const pool;
@@ -273,27 +385,24 @@ typedef struct _Repo {
   AppObjectPtr appdata;
 } Repo;
 
-%nodefaultctor Pool_solvable_iterator;
-typedef struct {} Pool_solvable_iterator;
-
-%nodefaultctor Pool_repo_iterator;
-typedef struct {} Pool_repo_iterator;
-
-%nodefaultctor Repo_solvable_iterator;
-typedef struct {} Repo_solvable_iterator;
-
 %nodefaultctor Solver;
 %nodefaultdtor Solver;
 typedef struct {
   Pool * const pool;
-  bool ignorealreadyrecommended;
-  bool dosplitprovides;
   bool fixsystem;
-  bool allowuninstall;
-  bool distupgrade;
   bool allowdowngrade;
   bool allowarchchange;
   bool allowvendorchange;
+  bool allowuninstall;
+  bool updatesystem;
+  bool noupdateprovide;
+  bool dosplitprovides;
+  bool dontinstallrecommended;
+  bool ignorealreadyrecommended;
+  bool dontshowinstalledrecommended;
+  bool distupgrade;
+  bool distupgrade_removeunsupported;
+  bool noinfarchcheck;
 } Solver;
 
 typedef struct chksum {
@@ -304,8 +413,8 @@ typedef struct chksum {
 %rename(xfclose) sat_xfclose;
 %rename(xfileno) sat_xfileno;
 
-FILE *sat_xfopen(const char *fn);
-FILE *sat_xfopen_fd(const char *fn, int fd);
+FILE *sat_xfopen(const char *fn, const char *mode = 0);
+FILE *sat_xfopen_fd(const char *fn, int fd, const char *mode = 0);
 %inline {
   int sat_xfclose(FILE *fp) {
     return fclose(fp);
@@ -382,36 +491,7 @@ typedef struct {
   }
 
   const char *str() {
-    Pool *pool = $self->pool;
-    Id select = $self->how & SOLVER_SELECTMASK;
-    char *strstart = 0, *strend = 0;
-    switch ($self->how & SOLVER_JOBMASK) {
-      case SOLVER_INSTALL:
-        if (select == SOLVER_SOLVABLE && pool->installed && pool->solvables[$self->what].repo == pool->installed)
-          strstart = "keep ", strend = "installed";
-        else if (select == SOLVER_SOLVABLE_PROVIDES)
-          strstart = "install a solvable ";
-        else
-          strstart = "install ";
-        break;
-      case SOLVER_ERASE:
-        if (select == SOLVER_SOLVABLE && !(pool->installed && pool->solvables[$self->what].repo == pool->installed))
-          strstart = "keep ", strend = "uninstalled";
-        else if (select == SOLVER_SOLVABLE_PROVIDES)
-          strstart = "deinstall all solvables ";
-        else
-          strstart = "deinstall ";
-        break;
-      case SOLVER_UPDATE:
-        strstart = "install the most recent version of ";
-        break;
-      case SOLVER_LOCK:
-        strstart = "lock ";
-        break;
-      default:
-        return "unknwon job";
-    }
-    return pool_tmpjoin(pool, strstart, solver_select2str(pool, select, $self->what), strend);
+    return pool_job2str($self->pool, $self->how, $self->what, 0);
   }
 }
 
@@ -579,9 +659,6 @@ typedef struct {
     return sat_chksum_create_from_bin(type, b);
   }
 
-#ifdef SWIGPERL
-  perlmkiter(Dataiterator, Pool::dataiterator_new, solvc::Pool_dataiterator_new)
-#endif
   %newobject dataiterator_new;
   Dataiterator *dataiterator_new(Id p, Id key,  const char *match, int flags) {
     return new_Dataiterator($self, 0, p, key, match, flags);
@@ -607,40 +684,29 @@ typedef struct {
     pool_createwhatprovides($self);
   }
 
-
-#if defined(SWIGPERL)
-  perlmkarray(Pool_solvable_iterator, Pool::swig_solvables_get, solvc::Pool_solvables_get)
-  perlmkiter(Pool_solvable_iterator, Pool::swig_solvables_iter_get, solvc::Pool_solvables_get)
-#endif
-
   %newobject solvables;
   Pool_solvable_iterator * const solvables;
   %{
   SWIGINTERN Pool_solvable_iterator * Pool_solvables_get(Pool *pool) {
-    Pool_solvable_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
-    s->pool = pool;
-    s->id = 0;
-    return s;
+    return new_Pool_solvable_iterator(pool);
   }
   %}
-
-#if defined(SWIGPERL)
-  perlmkarray(Pool_repo_iterator, Pool::swig_repos_get, solvc::Pool_repos_get)
-  perlmkiter(Pool_repo_iterator, Pool::swig_repos_iter_get, solvc::Pool_repos_get)
-#endif
+  %newobject solvables_iter;
+  Pool_solvable_iterator * solvables_iter() {
+    return new_Pool_solvable_iterator($self);
+  }
 
   %newobject repos;
   Pool_repo_iterator * const repos;
   %{
   SWIGINTERN Pool_repo_iterator * Pool_repos_get(Pool *pool) {
-    Pool_repo_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
-    s->pool = pool;
-    s->id = 0;
-    return s;
+    return new_Pool_repo_iterator(pool);
   }
   %}
+  %newobject repos_iter;
+  Pool_repo_iterator * repos_iter() {
+    return new_Pool_repo_iterator($self);
+  }
 
   Repo *installed;
   %{
@@ -661,14 +727,24 @@ typedef struct {
       queue_push(&q, p);
     return q;
   }
-  Queue allprovidingids() {
+  Queue matchprovidingids(const char *match, int flags) {
     Pool *pool = $self;
     Queue q;
     Id id;
     queue_init(&q);
-    for (id = 1; id < pool->ss.nstrings; id++)
-      if (pool->whatprovides[id])
-        queue_push(&q, id);
+    if (!flags) {
+      for (id = 1; id < pool->ss.nstrings; id++)
+        if (pool->whatprovides[id])
+          queue_push(&q, id);
+    } else {
+      Datamatcher ma;
+      if (!datamatcher_init(&ma, match, flags)) {
+        for (id = 1; id < pool->ss.nstrings; id++)
+          if (pool->whatprovides[id] && datamatcher_match(&ma, id2str(pool, id)))
+            queue_push(&q, id);
+        datamatcher_free(&ma);
+      }
+    }
     return q;
   }
   # move to job?
@@ -698,11 +774,11 @@ typedef struct {
   %perlcode {
     sub solv::Pool::jobsolvables {
       my ($self, @args) = @_;
-      return map {$self->{'solvables'}->[$_]} @{$self->jobsolvids(@args)};
+      return map {$self->{'solvables'}->[$_]} $self->jobsolvids(@args);
     }
     sub solv::Pool::providers {
       my ($self, @args) = @_;
-      return map {$self->{'solvables'}->[$_]} @{$self->providerids(@args)};
+      return map {$self->{'solvables'}->[$_]} $self->providerids(@args);
     }
   }
 #endif
@@ -811,10 +887,6 @@ typedef struct {
     return 1;
   }
 
-#ifdef SWIGPERL
-  perlmkiter(Dataiterator, Repo::dataiterator_new, solvc::Repo_dataiterator_new)
-#endif
-
   %newobject dataiterator_new;
   Dataiterator *dataiterator_new(Id p, Id key,  const char *match, int flags) {
     return new_Dataiterator($self->pool, $self, p, key, match, flags);
@@ -829,13 +901,13 @@ typedef struct {
   Repo_solvable_iterator * const solvables;
   %{
   SWIGINTERN Repo_solvable_iterator * Repo_solvables_get(Repo *repo) {
-    Repo_solvable_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
-    s->repo = repo;
-    s->id = 0;
-    return s;
+    return new_Repo_solvable_iterator(repo);
   }
   %}
+  %newobject solvables_iter;
+  Repo_solvable_iterator *solvables_iter() {
+    return new_Repo_solvable_iterator($self);
+  }
 
   XRepodata *add_repodata(int flags = 0) {
     Repodata *rd = repo_add_repodata($self, flags);
@@ -906,8 +978,13 @@ typedef struct {
     }
   }
 #endif
+
+#ifdef SWIGPERL
+  perliter(solv::Dataiterator)
+#endif
+
   %newobject __next__;
-  Dataiterator *__next__() {
+  Datamatch *__next__() {
     Dataiterator *ndi;
     if (!dataiterator_step($self)) {
       return 0;
@@ -916,20 +993,23 @@ typedef struct {
     dataiterator_init_clone(ndi, $self);
     return ndi;
   }
-  void setpos_parent() {
-    dataiterator_setpos_parent($self);
-  }
   void prepend_keyname(Id key) {
     dataiterator_prepend_keyname($self, key);
   }
   void skip_solvable() {
     dataiterator_skip_solvable($self);
   }
+}
 
+%extend Datamatch {
+  ~Datamatch() {
+    dataiterator_free($self);
+    sat_free($self);
+  }
   %newobject solvable;
   XSolvable * const solvable;
   %{
-  SWIGINTERN XSolvable *Dataiterator_solvable_get(Dataiterator *di) {
+  SWIGINTERN XSolvable *Datamatch_solvable_get(Dataiterator *di) {
     return new_XSolvable(di->pool, di->solvid);
   }
   %}
@@ -960,9 +1040,18 @@ typedef struct {
   int match_num2() {
      return $self->kv.num2;
   }
+  void setpos_parent() {
+    dataiterator_setpos_parent($self);
+  }
 }
 
 %extend Pool_solvable_iterator {
+  Pool_solvable_iterator(Pool *pool) {
+    Pool_solvable_iterator *s;
+    s = sat_calloc(1, sizeof(*s));
+    s->pool = pool;
+    return s;
+  }
 #if defined(SWIGPYTHON)
   %newobject __iter__;
   Pool_solvable_iterator *__iter__() {
@@ -979,6 +1068,10 @@ typedef struct {
       return NULL;
     }
   }
+#endif
+
+#ifdef SWIGPERL
+  perliter(solv::Pool_solvable_iterator)
 #endif
   %newobject __next__;
   XSolvable *__next__() {
@@ -1004,6 +1097,12 @@ typedef struct {
 }
 
 %extend Pool_repo_iterator {
+  Pool_repo_iterator(Pool *pool) {
+    Pool_repo_iterator *s;
+    s = sat_calloc(1, sizeof(*s));
+    s->pool = pool;
+    return s;
+  }
 #if defined(SWIGPYTHON)
   %newobject __iter__;
   Pool_repo_iterator *__iter__() {
@@ -1045,6 +1144,12 @@ typedef struct {
 }
 
 %extend Repo_solvable_iterator {
+  Repo_solvable_iterator(Repo *repo) {
+    Repo_solvable_iterator *s;
+    s = sat_calloc(1, sizeof(*s));
+    s->repo = repo;
+    return s;
+  }
 #if defined(SWIGPYTHON)
   %newobject __iter__;
   Repo_solvable_iterator *__iter__() {
@@ -1243,7 +1348,7 @@ typedef struct {
     }
     sub solv::Problem::findallproblemrule {
       my ($self, $unfiltered) = @_;
-      return map {solv::XRule->new($self->{'solv'}, $_)} @{$self->findallproblemrule_helper($unfiltered)};
+      return map {solv::XRule->new($self->{'solv'}, $_)} $self->findallproblemrule_helper($unfiltered);
     }
     sub solv::Problem::solutions {
       my ($self) = @_;
@@ -1291,7 +1396,7 @@ typedef struct {
     e->id = id;
     solver_next_solutionelement(e->solv, e->problemid, e->solutionid, e->id - 1, &e->p, &e->rp);
     if (e->p > 0) {
-      e->type = e->rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_DEINSTALL;
+      e->type = e->rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_ERASE;
     } else {
       e->type = e->p;
       e->p = e->rp;
@@ -1320,6 +1425,16 @@ typedef struct {
       return (e->p - 1) / 2;
     }
   %}
+  %newobject Job;
+  Job *Job() {
+    if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE)
+      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE, $self->p);
+    if ($self->type == SOLVER_SOLUTION_REPLACE)
+      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE, $self->rp);
+    if ($self->type == SOLVER_SOLUTION_ERASE)
+      return new_Job($self->solv->pool, SOLVER_ERASE|SOLVER_SOLVABLE, $self->p);
+    return 0;
+  }
 }
 
 %extend Solver {
@@ -1346,7 +1461,7 @@ typedef struct {
   static const int SOLVER_SOLUTION_JOB = SOLVER_SOLUTION_JOB;
   static const int SOLVER_SOLUTION_INFARCH = SOLVER_SOLUTION_INFARCH;
   static const int SOLVER_SOLUTION_DISTUPGRADE = SOLVER_SOLUTION_DISTUPGRADE;
-  static const int SOLVER_SOLUTION_DEINSTALL = SOLVER_SOLUTION_DEINSTALL;
+  static const int SOLVER_SOLUTION_ERASE = SOLVER_SOLUTION_ERASE;
   static const int SOLVER_SOLUTION_REPLACE = SOLVER_SOLUTION_REPLACE;
 
   static const int POLICY_ILLEGAL_DOWNGRADE = POLICY_ILLEGAL_DOWNGRADE;
@@ -1451,22 +1566,39 @@ typedef struct {
       return r
     }
 #endif
-  Queue installedresult_helper(int *OUTPUT) {
-    Queue q;
-    queue_init(&q);
-    *OUTPUT = transaction_installedresult(self, &q);
-    return q;
-  }
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def installedresult(self):
-      r = self.installedresult_helper()
-      newpkgs = r.pop()
-      rn = [ self.pool.solvables[r[i]] for i in range(0, newpkgs) ]
-      rk = [ self.pool.solvables[r[i]] for i in range(newpkgs, len(r)) ]
-      return rn, rk
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Transaction::classify {
+      my ($self, $mode) = @_;
+      $mode ||= 0;
+      my @r = $self->classify_helper($mode);
+      my @res;
+      while (@r) {
+        my ($type, $cnt, $fromid, $toid) = splice(@r, 0, 4);
+        next if $type == $solv::Transaction::SOLVER_TRANSACTION_IGNORE;
+        push @res, [$type, [ map {$self->{'pool'}->{'solvables'}->[$_]} $self->classify_pkgs_helper($mode, $type, $fromid, $toid) ], $fromid, $toid];
+      }
+      return @res;
+    }
   }
 #endif
+  Queue newpackages_helper() {
+    Queue q;
+    int cut;
+    queue_init(&q);
+    cut = transaction_installedresult(self, &q);
+    queue_truncate(&q, cut);
+    return q;
+  }
+  Queue keptpackages_helper() {
+    Queue q;
+    int cut;
+    queue_init(&q);
+    cut = transaction_installedresult(self, &q);
+    if (cut)
+      queue_deleten(&q, 0, cut);
+    return q;
+  }
   Queue steps_helper() {
     Queue q;
     queue_init_clone(&q, &$self->steps);
@@ -1477,12 +1609,35 @@ typedef struct {
   }
 #if defined(SWIGPYTHON)
   %pythoncode {
+    def newpackages(self):
+      return [ self.pool.solvables[i] for i in self.newpackages_helper() ]
+    def keptpackages(self):
+      return [ self.pool.solvables[i] for i in self.keptpackages_helper() ]
     def steps(self):
       return [ self.pool.solvables[i] for i in self.steps_helper() ]
   }
 #endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Transaction::newpackages {
+      my ($self) = @_;
+      return map {$self->{'pool'}->{'solvables'}->[$_]} $self->newpackages_helper();
+    }
+    sub solv::Transaction::keptpackages {
+      my ($self) = @_;
+      return map {$self->{'pool'}->{'solvables'}->[$_]} $self->newpackages_helper();
+    }
+    sub solv::Transaction::steps {
+      my ($self) = @_;
+      return map {$self->{'pool'}->{'solvables'}->[$_]} $self->steps_helper();
+    }
+  }
+#endif
   int calc_installsizechange() {
     return transaction_calc_installsizechange($self);
+  }
+  void order(int flags) {
+    transaction_order($self, flags);
   }
 }
 
@@ -1495,34 +1650,29 @@ typedef struct {
     xr->id = id;
     return xr;
   }
-  %apply Id *OUTPUT { Id *source, Id *target, Id *dep };
-  int info_helper(Id *source, Id *target, Id *dep) {
-    return solver_ruleinfo($self->solv, $self->id, source, target, dep);
+  Ruleinfo *info() {
+    Ruleinfo *ri = sat_calloc(1, sizeof(*ri));
+    ri->solv = $self->solv;
+    ri->type = solver_ruleinfo($self->solv, $self->id, &ri->source, &ri->target, &ri->dep);
+    return ri;
   }
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def info(self):
-      type, source, target, dep = self.info_helper()
-      if source:
-          source = self.solv.pool.solvables[source]
-      if target:
-          target = self.solv.pool.solvables[target]
-      return type, source, target, dep
-  }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::XRule::info {
-      my ($self) = @_;
-      my ($type, $source, $target, $dep) = $self->info_helper();
-      $source = $self->{'solv'}->{'pool'}->{'solvables'}->[$source] if $source;
-      $target = $self->{'solv'}->{'pool'}->{'solvables'}->[$target] if $target;
-      return ($type, $source, $target, $dep);
-    }
-  }
-#endif
 }
 
+%extend Ruleinfo {
+  XSolvable * const solvable;
+  XSolvable * const othersolvable;
+  %{
+    SWIGINTERN XSolvable *Ruleinfo_solvable_get(Ruleinfo *ri) {
+      return new_XSolvable(ri->solv->pool, ri->source);
+    }
+    SWIGINTERN XSolvable *Ruleinfo_othersolvable_get(Ruleinfo *ri) {
+      return new_XSolvable(ri->solv->pool, ri->target);
+    }
+  %}
+  const char *problemstr() {
+    return solver_problemruleinfo2str($self->solv, $self->type, $self->source, $self->target, $self->dep);
+  }
+}
 
 %extend XRepodata {
   XRepodata(Repo *repo, Id id) {

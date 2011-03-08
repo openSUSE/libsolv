@@ -1,10 +1,13 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 
 use POSIX;
+use Fcntl;
 use Config::IniFiles;
 use File::FnMatch;
 use Data::Dumper;
 use solv;
+use Devel::Peek;
+use FileHandle;
 use strict;
 
 package Repo::generic;
@@ -33,6 +36,43 @@ sub load {
   $self->usecachedrepo();
 }
 
+sub download {
+  my ($self, $file, $uncompress, $chksum, $markincomplete) = @_;
+  if (!$self->{'baseurl'}) {
+    print "$self->{'alias'}: no baseurl\n";
+    return undef;
+  }
+  my $url = $self->{'baseurl'};
+  $url =~ s/\/$//;
+  $url .= "/$file";
+  open(my $f, '+>', undef) || die;
+  fcntl($f, Fcntl::F_SETFD, 0);
+  my $st = system('curl', '-f', '-s', '-L', '-o', "/dev/fd/".fileno($f), '--', $url);
+  if (POSIX::lseek(fileno($f), 0, POSIX::SEEK_END) == 0 && ($st == 0 || !$chksum)) {
+    return undef;
+  }
+  POSIX::lseek(fileno($f), 0, POSIX::SEEK_SET);
+  if ($st) {
+    print "$file: download error #$st\n";
+    $self->{'incomplete'} = 1 if $markincomplete;
+    return undef;
+  }
+  if ($chksum) {
+    my $fchksum = solv::Chksum->new($chksum->{'type'});
+    $fchksum->add_fd(fileno($f));
+    if (!$fchksum->matches($chksum)) {
+      print "$file: checksum error\n";
+      $self->{'incomplete'} = 1 if $markincomplete;
+      return undef;
+    }
+  }
+  if ($uncompress) {
+    return solv::xfopen_fd($file, POSIX::dup(fileno($f)));
+  } else {
+    return solv::xfopen_fd('', POSIX::dup(fileno($f)));
+  }
+}
+
 sub usecachedrepo {
   my ($self, $ext, $mark) = @_;
   my $cookie = $ext ? $self->{'extcookie'} : $self->{'cookie'};
@@ -46,6 +86,7 @@ sub usecachedrepo {
       solv::xfclose($f);
       return undef;
     }
+    solv::xfclose($f);
     return 1;
   }
   return undef;
@@ -54,6 +95,20 @@ sub usecachedrepo {
 package Repo::rpmmd;
 
 our @ISA = ('Repo::generic');
+
+package Repo::susetags;
+
+our @ISA = ('Repo::generic');
+
+package Repo::unknown;
+
+our @ISA = ('Repo::generic');
+
+sub load {
+  my ($self, $pool) = @_;
+  print "unsupported repo '$self->{'alias'}': skipped\n";
+  return 0;
+}
 
 package Repo::system;
 
@@ -109,21 +164,19 @@ sub depglob {
   return unless $name =~ /[[*?]/;
   if ($globname) {
     my %idmatches;
-    for my $s (@{$pool->{'solvables_iter'}}) {
-      $idmatches{$s->{'nameid'}} = 1 if $s->installable() && File::FnMatch::fnmatch($name, $s->{'name'}, 0);
+    for my $d (@{$pool->dataiterator_new(0, $solv::SOLVABLE_NAME, $name, $solv::Dataiterator::SEARCH_GLOB)}) {
+      my $s = $d->{'solvable'};
+      $idmatches{$s->{'nameid'}} = 1 if $s->installable();
     }
     if (%idmatches) {
       return map {$pool->Job($solv::Job::SOLVER_SOLVABLE_NAME, $_)} sort(keys %idmatches);
     }
   }
   if ($globdep) {
-    my %idmatches;
-    for $id (@{$pool->allprovidingids()}) {
-      $idmatches{$id} = 1 if File::FnMatch::fnmatch($name, $pool->id2str($id), 0);
-    }
-    if (%idmatches) {
+    my @idmatches = $pool->matchprovidingids($name, $solv::Dataiterator::SEARCH_GLOB);
+    if (@idmatches) {
       print "[using capability match for '$name']\n";
-      return map {$pool->Job($solv::Job::SOLVER_SOLVABLE_PROVIDES, $_)} sort(keys %idmatches);
+      return map {$pool->Job($solv::Job::SOLVER_SOLVABLE_PROVIDES, $_)} sort(@idmatches);
     }
   }
   return;
@@ -150,7 +203,7 @@ sub limitjobs_arch {
   my ($pool, $jobs, $flags, $evrstr) = @_;
   if ($evrstr =~ /^(.+)\.(.+?)$/ && validarch($pool, $2)) {
     my $evr = $pool->str2id($1);
-    my @jobs = limitjobs($pool, $jobs, $solv::solv::REL_ARCH, $pool->str2id($2));
+    my @jobs = limitjobs($pool, $jobs, $solv::REL_ARCH, $pool->str2id($2));
     return limitjobs($pool, \@jobs, $flags, $evr);
   }
   return limitjobs($pool, $jobs, $flags, $pool->str2id($evrstr));
@@ -168,7 +221,7 @@ sub mkjobs_rel {
     my $arch = $2;
     @jobs = depglob($pool, $1, 1, 1);
     if (@jobs) {
-      @jobs = limitjobs($pool, \@jobs, $solv::solv::REL_ARCH, $pool->str2id($arch));
+      @jobs = limitjobs($pool, \@jobs, $solv::REL_ARCH, $pool->str2id($arch));
       return limitjobs($pool, \@jobs, $flags, $pool->str2id($evr));
     }
   }
@@ -219,7 +272,7 @@ sub mkjobs_filelist {
   if (@matches > 1) {
     return $pool->Job($solv::Job::SOLVER_SOLVABLE_ONE_OF, $pool->towhatprovides(\@matches));
   } else {
-    return $pool->Job($solv::Job::SOLVER_SOLVABLE | $solv::Job::NOAUTOSET, $matches[0]);
+    return $pool->Job($solv::Job::SOLVER_SOLVABLE | $solv::Job::SOLVER_NOAUTOSET, $matches[0]);
   }
 }
 
@@ -258,8 +311,12 @@ for my $reposdir ('/etc/zypp/repos.d') {
 	$repoattr->{$p} = $cfg->val($alias, $p);
       }
       my $repo;
-      if ($repoattr->{'type'} == 'rpm-md') {
+      if ($repoattr->{'type'} eq 'rpm-md') {
 	$repo = Repo::rpmmd->new($repoattr);
+      } elsif ($repoattr->{'type'} eq 'yast2') {
+	$repo = Repo::susetags->new($repoattr);
+      } else {
+	$repo = Repo::unknown->new($repoattr);
       }
       push @repos, $repo;
     }
@@ -285,7 +342,7 @@ if ($cmd eq 'search') {
   exit(0);
 }
 
-my $addedprovides =  $pool->addfileprovides_ids();
+my @addedprovides =  $pool->addfileprovides_ids();
 $pool->createwhatprovides();
 
 my @jobs;
@@ -305,7 +362,7 @@ if ($cmd eq 'list' || $cmd eq 'info') {
         printf "Summary:     %s\n", $s->lookup_str($solv::SOLVABLE_SUMMARY);
 	my $str = $s->lookup_str($solv::SOLVABLE_URL);
         printf "Url:         %s\n", $str if $str;
-	my $str = $s->lookup_str($solv::SOLVABLE_LICENSE);
+	$str = $s->lookup_str($solv::SOLVABLE_LICENSE);
         printf "License:     %s\n", $str if $str;
         printf "Description:\n%s\n", $s->lookup_str($solv::SOLVABLE_DESCRIPTION);
       } else {
@@ -327,7 +384,7 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
   }
   for my $job (@jobs) {
     if ($cmd eq 'up') {
-      if ($job->{'how'} == $solv::Job::SOLVER_SOLVABLE_ALL || grep {$_->isinstalled()} @{$pool->jobsolvables($job)}) {
+      if ($job->{'how'} == $solv::Job::SOLVER_SOLVABLE_ALL || grep {$_->isinstalled()} $pool->jobsolvables($job)) {
         $job->{'how'} |= $solv::Job::SOLVER_UPDATE;
       } else {
         $job->{'how'} |= $solv::Job::SOLVER_INSTALL;
@@ -360,18 +417,145 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
     my @problems = $solver->solve(\@jobs);
     last unless @problems;
     for my $problem (@problems) {
-      print "Problem $problem->{'id'}:\n";
+      print "Problem $problem->{'id'}/".@problems.":\n";
       my $r = $problem->findproblemrule();
-      my ($type, $source, $target, $dep) = $r->info();
-      if ($type == $solv::Solver::SOLVER_RULE_RPM_PACKAGE_CONFLICT) {
-        printf "package %s conflicts with %s provided by %s\n", $source->str(), $pool->dep2str($dep), $target->str();
+      my $ri = $r->info();
+      print $ri->problemstr()."\n";
+      my @solutions = $problem->solutions();
+      for my $solution (@solutions) {
+	print "  Solution $solution->{'id'}:\n";
+	for my $element ($solution->elements()) {
+	  my $etype = $element->{'type'};
+	  if ($etype == $solv::Solver::SOLVER_SOLUTION_JOB) {
+	    print "  - do not ask to ".$jobs[$element->{'jobidx'}]->str()."\n";
+	  } elsif ($etype == $solv::Solver::SOLVER_SOLUTION_INFARCH) {
+	    if ($element->{'solvable'}->isinstalled()) {
+	      print "  - keep ".$element->{'solvable'}->str()." despite the inferior architecture\n";
+	    } else {
+	      print "  - install ".$element->{'solvable'}->str()." despite the inferior architecture\n";
+	    }
+	  } elsif ($etype == $solv::Solver::SOLVER_SOLUTION_DISTUPGRADE) {
+	    if ($element->{'solvable'}->isinstalled()) {
+	      print "  - keep obsolete ".$element->{'solvable'}->str()."\n";
+	    } else {
+	      print "  - install ".$element->{'solvable'}->str()." from excluded repository\n";
+	    }
+	  } elsif ($etype == $solv::Solver::SOLVER_SOLUTION_REPLACE) {
+	    print "  - allow replacement of ".$element->{'solvable'}->str()." with ".$element->{'replacement'}->str()."\n";
+	  } elsif ($etype == $solv::Solver::SOLVER_SOLUTION_ERASE) {
+	    print "  - allow deinstallation of ".$element->{'solvable'}->str()."\n";
+	  } else {
+	    print "  - allow something else\n";
+	  }
+        }
       }
-      print "TYPE: $type\n";
-      printf "SOURCE: %s\n", $source->str() if $source;
-      printf "TARGET: %s\n", $target->str() if $target;
-      printf "DEP: %s\n", $pool->dep2str($dep) if $dep;
+      my $sol;
+      while (1) {
+	print "Please choose a solution: ";
+	$sol = <STDIN>;
+	chomp $sol;
+	last if $sol eq 's' || $sol eq 'q' || ($sol =~ /^\d+$/ && $sol >= 1 && $sol <= @solutions);
+      }
+      next if $sol eq 's';
+      exit(1) if $sol eq 'q';
+      my $solution = $solutions[$sol - 1];
+      for my $element ($solution->elements()) {
+        my $etype = $element->{'type'};
+        if ($etype == $solv::Solver::SOLVER_SOLUTION_JOB) {
+	  $jobs[$element->{'jobidx'}] = $pool->Job($solv::Job::SOLVER_NOOP, 0);
+        } else {
+	  my $newjob = $element->Job();
+	  push @jobs, $newjob if $newjob && !grep {$_->{'how'} == $newjob->{'how'} && $_->{'what'} == $newjob->{'what'}} @jobs;
+	}
+      }
     }
-    exit(0);
+  }
+  my $trans = $solver->transaction();
+  undef $solver;
+  if ($trans->isempty()) {
+    print "Nothing to do.\n";
+    exit 0;
+  }
+  print "\nTransaction summary:\n\n";
+  for my $c ($trans->classify()) {
+    my ($ctype, $pkgs, $fromid, $toid) = @$c;
+    if ($ctype == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
+      printf "%d erased packages:\n", scalar(@$pkgs);
+    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL) {
+      printf "%d installed packages:\n", scalar(@$pkgs);
+    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_REINSTALLED) {
+      printf "%d reinstalled packages:\n", scalar(@$pkgs);
+    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
+      printf "%d downgraded packages:\n", scalar(@$pkgs);
+    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_CHANGED) {
+      printf "%d changed packages:\n", scalar(@$pkgs);
+    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
+      printf "%d upgraded packages:\n", scalar(@$pkgs);
+    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
+      printf "%d vendor changes from '%s' to '%s':\n", scalar(@$pkgs), $pool->id2str($fromid), $pool->id2str($toid);
+    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
+      printf "%d arch changes from '%s' to '%s':\n", scalar(@$pkgs), $pool->id2str($fromid), $pool->id2str($toid);
+    } else {
+      next;
+    }
+    for my $p (@$pkgs) {
+      if ($ctype == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED || $ctype == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
+	my $other = $trans->othersolvable($p);
+	printf "  - %s -> %s\n", $p->str(), $other->str();
+      } else {
+	printf "  - %s\n", $p->str();
+      }
+    }
+    print "\n";
+  }
+  printf "install size change: %d K\n\n", $trans->calc_installsizechange();
+  while (1) {
+    print("OK to continue (y/n)? ");
+    my $yn = <STDIN>;
+    chomp $yn;
+    last if $yn eq 'y';
+    exit(1) if $yn eq 'n';
+  }
+  my @newpkgs = $trans->newpackages();
+  my %newpkgsfps;
+  if (@newpkgs) {
+    my $downloadsize = 0;
+    $downloadsize += $_->lookup_num($solv::SOLVABLE_DOWNLOADSIZE) for @newpkgs;
+    printf "Downloading %d packages, %d K\n", scalar(@newpkgs), $downloadsize;
+    for my $p (@newpkgs) {
+      my $repo = $p->{'repo'}->{'appdata'};
+      my ($location, $medianr) = $p->lookup_location();
+      next unless $location;
+      if ($repo->{'type'} eq 'yast2') {
+	$location = ($repo->{'handle'}->lookup_str($solv::SOLVID_META, $solv::SUSETAGS_DATADIR) || 'suse') ."/$location";
+      }
+      my $chksum = $p->lookup_checksum($solv::SOLVABLE_CHECKSUM);
+      my $f = $repo->download($location, 0, $chksum);
+      die("\n$repo->{'alias'}: $location not found in repository\n") unless $f;
+      $newpkgsfps{$p->{'id'}} = $f;
+      print ".";
+      STDOUT->flush();
+    }
+    print "\n";
+  }
+  print "Committing transaction:\n\n";
+  $trans->order(0);
+  for my $p ($trans->steps()) {
+    my $steptype = $trans->steptype($p, $solv::Transaction::SOLVER_TRANSACTION_RPM_ONLY);
+    if ($steptype == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
+      print "erase ".$p->str()."\n";
+      next unless $p->lookup_num($solv::RPM_RPMDBID);
+      my $evr = $p->{'evr'};
+      $evr =~ s/^[0-9]+://;	# strip epoch
+      system('rpm', '-e', '--nodeps', '--nodigest', '--nosignature', "$p->{'name'}-$evr.$p->{'arch'}") && die("rpm failed: $?\n");
+    } elsif ($steptype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL || $steptype == $solv::Transaction::SOLVER_TRANSACTION_MULTIINSTALL) {
+      print "install ".$p->str()."\n";
+      my $f = $newpkgsfps{$p->{'id'}};
+      my $mode = $steptype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i';
+      system('rpm', $mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/".solv::xfileno($f)) && die("rpm failed: $?\n");
+      solv::xfclose($f);
+      delete $newpkgsfps{$p->{'id'}};
+    }
   }
 }
 
