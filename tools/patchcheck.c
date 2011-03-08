@@ -527,7 +527,7 @@ main(int argc, char **argv)
       l = strlen(argv[i]);
       if (!strcmp(argv[i], "-"))
         fp = stdin;
-      else if ((fp = sat_xfopen(argv[i])) == 0)
+      else if ((fp = sat_xfopen(argv[i], 0)) == 0)
         {
           perror(argv[i]);
           exit(1);

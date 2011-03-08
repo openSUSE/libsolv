@@ -80,7 +80,7 @@ main(int argc, char **argv)
       l = strlen(dir) + 128;
       fnp = sat_malloc(l+1);
       snprintf(fnp, l, "%s/primary.xml.gz", dir);
-      if (!(fp = sat_xfopen(fnp)))
+      if (!(fp = sat_xfopen(fnp, 0)))
 	{
 	  perror(fnp);
 	  exit(1);
@@ -88,7 +88,7 @@ main(int argc, char **argv)
       repo_add_rpmmd(repo, fp, 0, flags);
       fclose(fp);
       snprintf(fnp, l, "%s/diskusagedata.xml.gz", dir);
-      if ((fp = sat_xfopen(fnp)))
+      if ((fp = sat_xfopen(fnp, 0)))
 	{
 	  repo_add_rpmmd(repo, fp, 0, flags);
 	  fclose(fp);
@@ -100,7 +100,7 @@ main(int argc, char **argv)
 	      fprintf(stderr, "-l parameter too long\n");
 	      exit(1);
 	    }
-	  while (!(fp = sat_xfopen(fnp)))
+	  while (!(fp = sat_xfopen(fnp, 0)))
 	    {
 	      fprintf(stderr, "not opened %s\n", fnp);
 	      if (strlen(locale) > 2)
@@ -110,7 +110,7 @@ main(int argc, char **argv)
 		      fprintf(stderr, "-l parameter too long\n");
 		      exit(1);
 		    }
-		  if ((fp = sat_xfopen(fnp)))
+		  if ((fp = sat_xfopen(fnp, 0)))
 		    break;
 		}
 	      perror(fnp);

@@ -850,7 +850,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       return 0;
     }
   if (uncompress)
-    return sat_xfopen_fd(".gz", fd);
+    return sat_xfopen_fd(".gz", fd, 0);
   fcntl(fd, F_SETFD, FD_CLOEXEC);
   return fdopen(fd, "r");
 }
