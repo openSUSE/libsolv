@@ -339,7 +339,7 @@ class repomd_repo(generic_repo):
 	return True
 
     def find(self, what):
-	di = self['handle'].dataiterator_new(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, Dataiterator.SEARCH_STRING)
+	di = self['handle'].Dataiterator(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, Dataiterator.SEARCH_STRING)
 	di.prepend_keyname(solv.REPOSITORY_REPOMD)
 	for d in di:
 	    d.setpos_parent()
@@ -363,10 +363,10 @@ class repomd_repo(generic_repo):
 	repodata.set_poolstr(handle, solv.REPOSITORY_REPOMD_TYPE, what)
 	repodata.set_str(handle, solv.REPOSITORY_REPOMD_LOCATION, filename)
 	repodata.set_bin_checksum(handle, solv.REPOSITORY_REPOMD_CHECKSUM, chksum)
-	if what == 'deltainfo':
+	if ext == 'DL':
 	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOSITORY_DELTAINFO)
 	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_FLEXARRAY)
-	elif what == 'filelists':
+	elif ext == 'FL':
 	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_FILELIST)
 	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
 	repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
@@ -385,12 +385,12 @@ class repomd_repo(generic_repo):
 	    ext = 'DL'
 	else:
 	    return False
-	sys.stdout.write("[%s:%s" % (self['alias'], ext))
+	sys.stdout.write("[%s:%s: " % (self['alias'], ext))
 	if self.usecachedrepo(ext):
-	    sys.stdout.write(" cached]\n")
+	    sys.stdout.write("cached]\n")
 	    sys.stdout.flush()
 	    return True
-	sys.stdout.write(" fetching]\n")
+	sys.stdout.write("fetching]\n")
 	sys.stdout.flush()
 	filename = repodata.lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_LOCATION)
 	filechksum = repodata.lookup_checksum(solv.SOLVID_META, solv.REPOSITORY_REPOMD_CHECKSUM)
@@ -452,7 +452,7 @@ class susetags_repo(generic_repo):
 	return True
 
     def find(self, what):
-	di = self['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
+	di = self['handle'].Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
 	di.prepend_keyname(solv.SUSETAGS_FILE)
 	for d in di:
 	    d.setpos_parent()
@@ -489,7 +489,7 @@ class susetags_repo(generic_repo):
 	
     def add_exts(self):
 	repodata = self['handle'].add_repodata(0)
-	di = self['handle'].dataiterator_new(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
+	di = self['handle'].Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
 	di.prepend_keyname(solv.SUSETAGS_FILE)
 	for d in di:
 	    filename = d.match_str()
@@ -511,12 +511,12 @@ class susetags_repo(generic_repo):
     def load_ext(self, repodata):
 	filename = repodata.lookup_str(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME)
 	ext = filename[9:11]
-	sys.stdout.write("[%s:%s" % (self['alias'], ext))
+	sys.stdout.write("[%s:%s: " % (self['alias'], ext))
 	if self.usecachedrepo(ext):
-	    sys.stdout.write(" cached]\n")
+	    sys.stdout.write("cached]\n")
 	    sys.stdout.flush()
 	    return True
-	sys.stdout.write(" fetching]\n")
+	sys.stdout.write("fetching]\n")
 	sys.stdout.flush()
 	defvendorid = self['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
 	descrdir = self['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
@@ -526,7 +526,7 @@ class susetags_repo(generic_repo):
 	f = self.download(descrdir + '/' + filename, True, filechksum)
 	if not f:
 	    return False
-	self['handle'].add_susetags(f, defvendorid, None, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+	self['handle'].add_susetags(f, defvendorid, $ext, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
 	solv.xfclose(f)
 	self.writecachedrepo(ext, repodata)
 	return True
@@ -596,9 +596,9 @@ def mkjobs_filelist(pool, cmd, arg):
     else:
 	type = Dataiterator.SEARCH_STRING
     if cmd == 'erase':
-	di = pool.installed.dataiterator_new(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
+	di = pool.installed.Dataiterator(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
     else:
-	di = pool.dataiterator_new(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
+	di = pool.Dataiterator(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
     matches = []
     for d in di:
 	s = d.solvable
@@ -678,7 +678,7 @@ def depglob(pool, name, globname, globdep):
     if globname:
 	# try name glob
 	idmatches = {}
-	for d in pool.dataiterator_new(0, solv.SOLVABLE_NAME, name, Dataiterator.SEARCH_GLOB):
+	for d in pool.Dataiterator(0, solv.SOLVABLE_NAME, name, Dataiterator.SEARCH_GLOB):
 	    s = d.solvable
 	    if s.installable():
 		idmatches[s.nameid] = True
@@ -756,7 +756,7 @@ for repo in repos:
     
 if cmd == 'search':
     matches = {}
-    di = pool.dataiterator_new(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
+    di = pool.Dataiterator(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
     for d in di:
 	matches[d.solvid] = True
     for solvid in sorted(matches.keys()):
@@ -988,7 +988,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 		continue
 	    if sysrepo['handle'].nsolvables and os.access('/usr/bin/applydeltarpm', os.X_OK):
 		pname = p.name
-		di = p.repo.dataiterator_new(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
+		di = p.repo.Dataiterator(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
 		di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
 		for d in di:
 		    d.setpos_parent()

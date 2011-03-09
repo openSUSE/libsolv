@@ -1,4 +1,10 @@
 #
+# WARNING: for perl iterator/array support you need to run
+#   sed -i -e 's/SvTYPE(tsv) == SVt_PVHV/SvTYPE(tsv) == SVt_PVHV || SvTYPE(tsv) == SVt_PVAV/'
+# on the generated c code
+#
+
+#
 ##if defined(SWIGRUBY)
 #  %rename("to_s") string();
 ##endif
@@ -204,6 +210,7 @@ typedef SV *AppObjectPtr;
 #if defined(SWIGRUBY)
 typedef VALUE AppObjectPtr;
 #endif
+
 
 %include "cdata.i"
 #ifndef SWIGPERL
@@ -591,30 +598,60 @@ typedef struct {
     XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
     PyObject *args = Py_BuildValue("(O)", SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0));
     PyObject *result = PyEval_CallObject((PyObject *)d, args);
-    if (!result)
-      return 0; /* exception */
     int ecode = 0;
     int vresult = 0;
     Py_DECREF(args);
+    if (!result)
+      return 0; /* exception */
     ecode = SWIG_AsVal_int(result, &vresult);
     Py_DECREF(result);
     return SWIG_IsOK(ecode) ? vresult : 0;
   }
   %}
   void set_loadcallback(PyObject *callable) {
-    if (!callable) {
-      if ($self->loadcallback == loadcallback) {
-        Py_DECREF($self->loadcallbackdata);
-        pool_setloadcallback($self, 0, 0);
-      }
-      return;
-    }
-    Py_INCREF(callable);
-    pool_setloadcallback($self, loadcallback, callable);
+    if ($self->loadcallback == loadcallback)
+      Py_DECREF($self->loadcallbackdata);
+    if (callable)
+      Py_INCREF(callable);
+    pool_setloadcallback($self, callable ? loadcallback : 0, callable);
   }
 #endif
+#if defined(SWIGPERL)
+  %{
+
+SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
+  int count;
+  int ret = 0;
+  dSP;
+  XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
+
+  ENTER;
+  SAVETMPS;
+  PUSHMARK(SP);
+  XPUSHs(SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_OWNER | SWIG_SHADOW));
+  PUTBACK;
+  count = perl_call_sv((SV *)d, G_EVAL|G_SCALAR);
+  SPAGAIN;
+  if (count)
+    ret = POPi;
+  PUTBACK;
+  FREETMPS;
+  LEAVE;
+  return ret;
+}
+
+  %}
+  void set_loadcallback(SV *callable) {
+    if ($self->loadcallback == loadcallback)
+      SvREFCNT_dec($self->loadcallbackdata);
+    if (callable)
+      SvREFCNT_inc(callable);
+    pool_setloadcallback($self, callable ? loadcallback : 0, callable);
+  }
+#endif
+
   void free() {
-#if defined(SWIGPYTHON)
+#if defined(SWIGPYTHON) || defined(SWIGPERL)
     Pool_set_loadcallback($self, 0);
 #endif
     pool_free($self);
@@ -659,8 +696,8 @@ typedef struct {
     return sat_chksum_create_from_bin(type, b);
   }
 
-  %newobject dataiterator_new;
-  Dataiterator *dataiterator_new(Id p, Id key,  const char *match, int flags) {
+  %newobject Dataiterator;
+  Dataiterator *Dataiterator(Id p, Id key, const char *match, int flags) {
     return new_Dataiterator($self, 0, p, key, match, flags);
   }
   const char *solvid2str(Id solvid) {
@@ -887,8 +924,8 @@ typedef struct {
     return 1;
   }
 
-  %newobject dataiterator_new;
-  Dataiterator *dataiterator_new(Id p, Id key,  const char *match, int flags) {
+  %newobject Dataiterator;
+  Dataiterator *Dataiterator(Id p, Id key, const char *match, int flags) {
     return new_Dataiterator($self->pool, $self, p, key, match, flags);
   }
 
