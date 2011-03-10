@@ -846,7 +846,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
     #pool.set_debuglevel(2)
     solver = None
     while True:
-	solver = pool.create_solver()
+	solver = pool.Solver()
 	solver.ignorealreadyrecommended = True
 	if cmd == 'erase':
 	    solver.allowuninstall = True
@@ -986,7 +986,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 		    sys.exit("\n%s: %s not found" % location)
 		newpkgsfp[p.id] = f
 		continue
-	    if sysrepo['handle'].nsolvables and os.access('/usr/bin/applydeltarpm', os.X_OK):
+	    if not sysrepo['handle'].isempty() and os.access('/usr/bin/applydeltarpm', os.X_OK):
 		pname = p.name
 		di = p.repo.Dataiterator(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
 		di.prepend_keyname(solv.REPOSITORY_DELTAINFO)

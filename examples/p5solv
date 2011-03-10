@@ -495,7 +495,6 @@ sub depglob {
     }
     if ($match) {
       print "[using capability match for '$name']\n" if $globname && $globdep;
-      my @j = $pool->Job($solv::Job::SOLVER_SOLVABLE_PROVIDES, $id);
       return $pool->Job($solv::Job::SOLVER_SOLVABLE_PROVIDES, $id);
     }
   }
@@ -746,7 +745,7 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
   }
   my $solver;
   while (1) {
-    $solver = $pool->create_solver();
+    $solver = $pool->Solver();
     $solver->{'ignorealreadyrecommended'} = 1;
     $solver->{'allowuninstall'} = 1 if $cmd eq 'erase';
     if ($cmd eq 'dup' && !@jobs) {

@@ -1,0 +1,71 @@
+#!/usr/bin/ruby
+
+#  bool: method?
+#  inplace mod: method!
+#  set method: method=
+
+# map  => collect
+# grep => find_all
+
+require 'solv'
+
+def depglob(pool, name, globname, globdep)
+  id = pool.str2id(name, 0)
+  if id != 0
+    match = false
+    providers = pool.providers(id)
+    if globname && providers.find {|s| s.nameid == id }
+      return [ pool.Job(Solv::Job::SOLVER_SOLVABLE_NAME, id) ]
+    end
+    if !providers.empty?
+      puts "[using capability match for '#{name}']" if globname && globdep
+      return [ pool.Job(Solv::Job::SOLVER_SOLVABLE_PROVIDES, id) ]
+    end
+  end
+  return [] unless name =~ /[\[*?]/;
+  if globname
+    idmatches = {}
+    for d in pool.Dataiterator(0, Solv::SOLVABLE_NAME, name, Solv::Dataiterator::SEARCH_GLOB)
+      s = d.solvable
+      idmatches[s.nameid] = 1 if s.installable?
+    end
+    if !idmatches.empty?
+      return idmatches.keys.sort.collect { |id| pool.Job(Solv::Job::SOLVER_SOLVABLE_NAME, id) }
+    end
+  end
+  if globdep
+    idmatches = pool.matchprovidingids(name, Solv::Dataiterator::SEARCH_GLOB);
+    if !idmatches.empty?
+      puts "[using capability match for '#{name}']"
+      return idmatches.sort.collect { |id| pool.Job(Solv::Job::SOLVER_SOLVABLE_PROVIDES, id) }
+    end
+  end
+  return []
+end
+
+
+pool = Solv::Pool.new()
+repo = pool.add_repo("TEST")
+pool.installed = repo
+repo.add_solv("/var/cache/solv/@System.solv", 0);
+
+pool.addfileprovides
+pool.createwhatprovides
+jobs = depglob(pool, ARGV[0], true, true)
+for job in jobs
+  job.how |= Solv::Job::SOLVER_ERASE
+end
+solver = pool.Solver
+problems = solver.solve(jobs)
+for problem in problems
+  puts "Problem #{problem.id}:"
+  puts problem.findproblemrule.info.problemstr
+  solutions = problem.solutions
+  for solution in solutions
+    puts "  Solution #{solution.id}:"
+    elements = solution.elements
+    for element in elements:
+      puts "  - type #{element.type}"
+    end
+  end
+end

@@ -88,6 +88,38 @@
   queue_free(&$1);
 }
 
+#if defined(SWIGRUBY)
+%typemap(in) Queue {
+  int size, i;
+  VALUE *o;
+  queue_init(&$1);
+  size = RARRAY($input)->len;
+  i = 0;
+  o = RARRAY($input)->ptr;
+  for (i = 0; i < size; i++, o++) {
+    int v;
+    int e = SWIG_AsVal_int(*o, &v);
+    if (!SWIG_IsOK(e))
+      SWIG_croak("list must contain only integers");
+    queue_push(&$1, v);
+  }
+}
+%typemap(out) Queue {
+  int i;
+  VALUE o = rb_ary_new2($1.count);
+  for (i = 0; i < $1.count; i++)
+    rb_ary_store(o, i, SWIG_From_int($1.elements[i]));
+  queue_free(&$1);
+  $result = o;
+}
+%typemap(arginit) Queue {
+  queue_init(&$1);
+}
+%typemap(freearg) Queue {
+  queue_free(&$1);
+}
+#endif
+
 #if defined(SWIGPERL)
 
 # work around a swig bug
@@ -209,6 +241,12 @@ typedef SV *AppObjectPtr;
 #endif
 #if defined(SWIGRUBY)
 typedef VALUE AppObjectPtr;
+%typemap(in) AppObjectPtr {
+  $1 = (void *)$input;
+}
+%typemap(out) AppObjectPtr {
+  $result = (VALUE)$1;
+}
 #endif
 
 
@@ -220,6 +258,8 @@ typedef VALUE AppObjectPtr;
 
 %{
 #include "stdio.h"
+#include "sys/stat.h"
+
 #include "pool.h"
 #include "solver.h"
 #include "policy.h"
@@ -248,17 +288,22 @@ typedef int bool;
 typedef void *AppObjectPtr;
 
 typedef struct {
-  Pool* pool;
+  Pool *pool;
+  Id id;
+} XId;
+
+typedef struct {
+  Pool *pool;
   Id id;
 } XSolvable;
 
 typedef struct {
-  Solver* solv;
+  Solver *solv;
   Id id;
 } XRule;
 
 typedef struct {
-  Repo* repo;
+  Repo *repo;
   Id id;
 } XRepodata;
 
@@ -318,6 +363,13 @@ typedef Dataiterator Datamatch;
 
 %}
 
+#ifdef SWIGRUBY
+%mixin Dataiterator "Enumerable";
+%mixin Pool_solvable_iterator "Enumerable";
+%mixin Pool_repo_iterator "Enumerable";
+%mixin Repo_solvable_iterator "Enumerable";
+#endif
+
 typedef int Id;
 
 %include "knownid.h"
@@ -331,6 +383,10 @@ typedef int Id;
 %constant int REL_LT;
 %constant int REL_ARCH;
 
+typedef struct {
+  Pool* const pool;
+  Id const id;
+} XId;
 
 typedef struct {
   Pool* const pool;
@@ -417,19 +473,28 @@ typedef struct chksum {
 
 %rename(xfopen) sat_xfopen;
 %rename(xfopen_fd) sat_xfopen_fd;
+%rename(xfopen_dup) sat_xfopen_dup;
 %rename(xfclose) sat_xfclose;
 %rename(xfileno) sat_xfileno;
 
 FILE *sat_xfopen(const char *fn, const char *mode = 0);
 FILE *sat_xfopen_fd(const char *fn, int fd, const char *mode = 0);
-%inline {
-  int sat_xfclose(FILE *fp) {
+FILE *sat_xfopen_dup(const char *fn, int fd, const char *mode = 0);
+int sat_xfclose(FILE *fp);
+int sat_fileno(FILE *fp);
+
+%{
+  SWIGINTERN int sat_xfclose(FILE *fp) {
     return fclose(fp);
   }
-  int sat_xfileno(FILE *fp) {
+  SWIGINTERN int sat_fileno(FILE *fp) {
     return fileno(fp);
   }
-}
+  SWIGINTERN FILE *sat_xfopen_dup(const char *fn, int fd, const char *mode) {
+    fd = dup(fd);
+    return fd == -1 ? 0 : sat_xfopen_fd(fn, fd, mode);
+  }
+%}
 
 typedef struct {
   Solver * const solv;
@@ -500,6 +565,45 @@ typedef struct {
   const char *str() {
     return pool_job2str($self->pool, $self->how, $self->what, 0);
   }
+
+  Queue solvableids() {
+    Pool *pool = $self->pool;
+    Id p, pp, how;
+    Queue q;
+    queue_init(&q);
+    how = $self->how & SOLVER_SELECTMASK;
+    FOR_JOB_SELECT(p, pp, how, $self->what)
+      queue_push(&q, p);
+    return q;
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def solvables(self, *args):
+      return [ self.pool.solvables[id] for id in self.solvableids(*args) ]
+  }
+#endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Job::solvables {
+      my ($self, @args) = @_;
+      return map {$self->{'pool'}->{'solvables'}->[$_]} $self->solvableids(@args);
+    }
+  }
+#endif
+#if defined(SWIGRUBY)
+%init %{
+rb_eval_string(
+    "class Solv::Job\n"
+    "  def solvables\n"
+    "    solvableids.collect do |id|\n"
+    "      pool.solvables[id]\n"
+    "    end\n"
+    "  end\n"
+    "end\n"
+);
+%}
+#endif
+
 }
 
 %extend Chksum {
@@ -785,39 +889,36 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     return q;
   }
   # move to job?
-  Queue jobsolvids(Job *job) {
-    Pool *pool = $self;
-    Id p, pp, how;
-    Queue q;
-    queue_init(&q);
-    how = job->how & SOLVER_SELECTMASK;
-    FOR_JOB_SELECT(p, pp, how, job->what)
-      queue_push(&q, p);
-    return q;
-  }
   Job *Job(Id how, Id what) {
     return new_Job($self, how, what);
   }
 
 #if defined(SWIGPYTHON)
   %pythoncode {
-    def jobsolvables (self, *args):
-      return [ self.solvables[id] for id in self.jobsolvids(*args) ]
     def providers(self, *args):
       return [ self.solvables[id] for id in self.providerids(*args) ]
   }
 #endif
 #if defined(SWIGPERL)
   %perlcode {
-    sub solv::Pool::jobsolvables {
-      my ($self, @args) = @_;
-      return map {$self->{'solvables'}->[$_]} $self->jobsolvids(@args);
-    }
     sub solv::Pool::providers {
       my ($self, @args) = @_;
       return map {$self->{'solvables'}->[$_]} $self->providerids(@args);
     }
   }
+#endif
+#if defined(SWIGRUBY)
+%init %{
+rb_eval_string(
+    "class Solv::Pool\n"
+    "  def providers(dep)\n"
+    "    providerids(dep).collect do |id|\n"
+    "      solvables[id]\n"
+    "    end\n"
+    "  end\n"
+    "end\n"
+  );
+%}
 #endif
 
   Id towhatprovides(Queue q) {
@@ -825,6 +926,8 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   }
   bool isknownarch(Id id) {
     Pool *pool = $self;
+    if (!id || id == ID_EMPTY)
+      return 0;
     if (id == ARCH_SRC || id == ARCH_NOSRC || id == ARCH_NOARCH)
       return 1;
     if (pool->id2arch && (id > pool->lastarch || !pool->id2arch[id]))
@@ -832,8 +935,8 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     return 1;
   }
 
-  %newobject create_solver;
-  Solver *create_solver() {
+  %newobject Solver;
+  Solver *Solver() {
     return solver_create($self);
   }
 }
@@ -854,11 +957,18 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   void empty(int reuseids = 0) {
     repo_empty($self, reuseids);
   }
+#ifdef SWIGRUBY
+  %rename("isempty?") isempty();
+#endif
+  bool isempty() {
+    return !$self->nsolvables;
+  }
   bool add_solv(const char *name, int flags = 0) {
     FILE *fp = fopen(name, "r");
+    int r;
     if (!fp)
       return 0;
-    int r = repo_add_solv_flags($self, fp, flags);
+    r = repo_add_solv_flags($self, fp, flags);
     fclose(fp);
     return r == 0;
   }
@@ -959,6 +1069,9 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     if (data->state != REPODATA_STUB)
       repodata_create_stubs(data);
   }
+#ifdef SWIGRUBY
+  %rename("iscontiguous?") iscontiguous();
+#endif
   bool iscontiguous() {
     int i;
     for (i = $self->start; i < $self->end; i++)
@@ -1030,6 +1143,14 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     dataiterator_init_clone(ndi, $self);
     return ndi;
   }
+#ifdef SWIGRUBY
+  void each() {
+    Datamatch *d;
+    while ((d = Dataiterator___next__($self)) != 0) {
+      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(d), SWIGTYPE_p_Datamatch, SWIG_POINTER_OWN | 0));
+    }
+  }
+#endif
   void prepend_keyname(Id key) {
     dataiterator_prepend_keyname($self, key);
   }
@@ -1121,6 +1242,14 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
         return new_XSolvable(pool, $self->id);
     return 0;
   }
+#ifdef SWIGRUBY
+  void each() {
+    XSolvable *n;
+    while ((n = Pool_solvable_iterator___next__($self)) != 0) {
+      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p_XSolvable, SWIG_POINTER_OWN | 0));
+    }
+  }
+#endif
   %newobject __getitem__;
   XSolvable *__getitem__(Id key) {
     Pool *pool = $self->pool;
@@ -1169,6 +1298,14 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     }
     return 0;
   }
+#ifdef SWIGRUBY
+  void each() {
+    Repo *n;
+    while ((n = Pool_repo_iterator___next__($self)) != 0) {
+      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p__Repo, SWIG_POINTER_OWN | 0));
+    }
+  }
+#endif
   Repo *__getitem__(Id key) {
     Pool *pool = $self->pool;
     if (key > 0 && key < pool->nrepos + 1)
@@ -1218,6 +1355,14 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
         return new_XSolvable(pool, $self->id);
     return 0;
   }
+#ifdef SWIGRUBY
+  void each() {
+    XSolvable *n;
+    while ((n = Repo_solvable_iterator___next__($self)) != 0) {
+      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p_XSolvable, SWIG_POINTER_OWN | 0));
+    }
+  }
+#endif
   %newobject __getitem__;
   XSolvable *__getitem__(Id key) {
     Repo *repo = $self->repo;
@@ -1231,11 +1376,27 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   }
 }
 
-%extend XSolvable {
-  XSolvable(Pool *pool, Id id) {
+%extend XId {
+  XId(Pool *pool, Id id) {
+    XId *s;
     if (!id)
       return 0;
-    XSolvable *s = sat_calloc(1, sizeof(*s));
+    s = sat_calloc(1, sizeof(*s));
+    s->pool = pool;
+    s->id = id;
+    return s;
+  }
+  const char *str() {
+    return dep2str($self->pool, $self->id);
+  }
+}
+
+%extend XSolvable {
+  XSolvable(Pool *pool, Id id) {
+    XSolvable *s;
+    if (!id)
+      return 0;
+    s = sat_calloc(1, sizeof(*s));
     s->pool = pool;
     s->id = id;
     return s;
@@ -1264,6 +1425,9 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   const char *lookup_location(int *OUTPUT) {
     return solvable_get_location($self->pool->solvables + $self->id, OUTPUT);
   }
+#ifdef SWIGRUBY
+  %rename("installable?") installable();
+#endif
   bool installable() {
     return pool_installable($self->pool, pool_id2solvable($self->pool, $self->id));
   }
@@ -1340,8 +1504,10 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     p->id = id;
     return p;
   }
-  Id findproblemrule_helper() {
-    return solver_findproblemrule($self->solv, $self->id);
+  %newobject findproblemrule;
+  XRule *findproblemrule() {
+    Id r = solver_findproblemrule($self->solv, $self->id);
+    return new_XRule($self->solv, r);
   }
   Queue findallproblemrules_helper(int unfiltered=0) {
     Solver *solv = $self->solv;
@@ -1369,8 +1535,6 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   }
 #if defined(SWIGPYTHON)
   %pythoncode {
-    def findproblemrule(self):
-      return XRule(self.solv, self.findproblemrule_helper())
     def findallproblemrules(self, unfiltered=0):
       return [ XRule(self.solv, i) for i in self.findallproblemrules_helper(unfiltered) ]
     def solutions(self):
@@ -1379,19 +1543,26 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
 #endif
 #if defined(SWIGPERL)
   %perlcode {
-    sub solv::Problem::findproblemrule {
-      my ($self) = @_;
-      return solv::XRule->new($self->{'solv'}, $self->findproblemrule_helper());
-    }
-    sub solv::Problem::findallproblemrule {
+    sub solv::Problem::findallproblemrules {
       my ($self, $unfiltered) = @_;
-      return map {solv::XRule->new($self->{'solv'}, $_)} $self->findallproblemrule_helper($unfiltered);
+      return map {solv::XRule->new($self->{'solv'}, $_)} $self->findallproblemrules_helper($unfiltered);
     }
     sub solv::Problem::solutions {
       my ($self) = @_;
       return map {solv::Solution->new($self, $_)} 1..($self->solution_count());
     }
   }
+#endif
+#if defined(SWIGRUBY)
+%init %{
+rb_eval_string(
+    "class Solv::Problem\n"
+    "  def solutions()\n"
+    "    (1..solution_count).collect do |id| ; Solv::Solution.new(self,id) ; end\n"
+    "  end\n"
+    "end\n"
+  );
+%}
 #endif
 }
 
@@ -1420,6 +1591,17 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
       return map {solv::Solutionelement->new($self, $_)} 1..($self->element_count());
     }
   }
+#endif
+#if defined(SWIGRUBY)
+%init %{
+rb_eval_string(
+    "class Solv::Solution\n"
+    "  def elements()\n"
+    "    (1..element_count).collect do |id| ; Solv::Solutionelement.new(self,id) ; end\n"
+    "  end\n"
+    "end\n"
+  );
+%}
 #endif
 }
 
@@ -1527,6 +1709,20 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     }
   }
 #endif
+#if defined(SWIGRUBY)
+%init %{
+rb_eval_string(
+    "class Solv::Solver\n"
+    "  def solve(jobs)\n"
+    "    jl = []\n"
+    "    jobs.each do |j| ; jl << j.how << j.what ; end\n"
+    "    nprob = solve_helper(jl)\n"
+    "    (1..nprob).collect do |id| ; Solv::Problem.new(self,id) ; end\n"
+    "  end\n"
+    "end\n"
+  );
+%}
+#endif
   int solve_helper(Queue jobs) {
     solver_solve($self, &jobs);
     return solver_problem_count($self);
@@ -1572,6 +1768,9 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     transaction_free($self);
     sat_free($self);
   }
+#ifdef SWIGRUBY
+  %rename("isempty?") isempty();
+#endif
   bool isempty() {
     return $self->steps.count == 0;
   }
