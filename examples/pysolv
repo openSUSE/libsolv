@@ -58,12 +58,14 @@ def calc_cookie_fp(fp):
     return chksum.raw()
 
 class generic_repo(dict):
-    def __init__(self, attribs):
+    def __init__(self, name, type, attribs = {}):
 	for k in attribs:
 	    self[k] = attribs[k]
+	self.name = name
+	self.type = type
 
     def cachepath(self, ext = None):
-	path = re.sub(r'^\.', '_', self['alias'])
+	path = re.sub(r'^\.', '_', self.name)
 	if ext:
 	    path += "_" + ext + ".solvx"
 	else:
@@ -71,9 +73,9 @@ class generic_repo(dict):
 	return "/var/cache/solv/" + re.sub(r'[/]', '_', path)
 	
     def load(self, pool):
-	self['handle'] = pool.add_repo(repo['alias'])
-	self['handle'].appdata = repo
-	self['handle'].priority = 99 - repo['priority']
+	self.handle = pool.add_repo(repo.name)
+	self.handle.appdata = repo
+	self.handle.priority = 99 - repo['priority']
 	if self['autorefresh']:
 	    dorefresh = True
 	if dorefresh:
@@ -85,7 +87,7 @@ class generic_repo(dict):
 		pass
 	self['cookie'] = ''
 	if not dorefresh and self.usecachedrepo(None):
-	    print "repo: '%s': cached" % self['alias']
+	    print "repo: '%s': cached" % self.name
 	    return True
 	return self.load_if_changed()
 
@@ -152,7 +154,7 @@ class generic_repo(dict):
 		    url = file
 	if not url:
 	    if 'baseurl' not in self:
-		print "%s: no baseurl" % self['alias']
+		print "%s: no baseurl" % self.name
 		return None
 	    url = re.sub(r'/$', '', self['baseurl']) + '/' + file
 	f = tempfile.TemporaryFile()
@@ -187,7 +189,6 @@ class generic_repo(dict):
 	    cookie = self['cookie']
 	else:
 	    cookie = self['extcookie']
-	handle = self['handle']
 	try: 
 	    repopath = self.cachepath(ext)
 	    f = open(repopath, 'r')
@@ -197,7 +198,7 @@ class generic_repo(dict):
 		return False
 	    if cookie and fcookie != cookie:
 		return False
-	    if self['alias'] != '@System' and not ext:
+	    if self.type != 'system' and not ext:
 		f.seek(-32 * 2, os.SEEK_END)
 		fextcookie = f.read(32)
 		if len(fextcookie) != 32:
@@ -208,9 +209,9 @@ class generic_repo(dict):
 		flags = Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES
 		if ext != 'DL':
 		    flags |= Repo.REPO_LOCALPOOL
-	    if not self['handle'].add_solv(f, flags):
+	    if not self.handle.add_solv(f, flags):
 		return False
-	    if self['alias'] != '@System' and not ext:
+	    if self.type != 'system' and not ext:
 		self['cookie'] = fcookie
 		self['extcookie'] = fextcookie
 	    if mark:
@@ -246,12 +247,12 @@ class generic_repo(dict):
 	    os.fchmod(fd, 0444)
 	    f = os.fdopen(fd, 'w+')
 	    if not info:
-		self['handle'].write(f)
+		self.handle.write(f)
 	    elif ext:
 		info.write(f)
 	    else:	# rewrite_repos case
-		self['handle'].write_first_repodata(f)
-	    if self['alias'] != '@System' and not ext:
+		self.handle.write_first_repodata(f)
+	    if self.type != 'system' and not ext:
 		if 'extcookie' not in self:
 		    self.genextcookie(f)
 		f.write(self['extcookie'])
@@ -260,13 +261,13 @@ class generic_repo(dict):
 	    else:
 		f.write(self['extcookie'])
 	    f.close()
-	    if self['handle'].iscontiguous():
+	    if self.handle.iscontiguous():
 		# switch to saved repo to activate paging and save memory
 		nf = solv.xfopen(tmpname)
 		if not ext:
 		    # main repo
-		    self['handle'].empty()
-		    if not self['handle'].add_solv(nf, Repo.SOLV_ADD_NO_STUBS):
+		    self.handle.empty()
+		    if not self.handle.add_solv(nf, Repo.SOLV_ADD_NO_STUBS):
 			sys.exit("internal error, cannot reload solv file")
 		else:
 		    # extension repodata
@@ -286,10 +287,10 @@ class generic_repo(dict):
 	    return 
 	if 'handle' not in self:
 	    return 
-	if not self['handle'].nsolvables:
+	if not self.handle.nsolvables:
 	    return
 	# make sure there's just one real repodata with extensions
-	repodata = self['handle'].first_repodata()
+	repodata = self.handle.first_repodata()
 	if not repodata:
 	    return
 	oldaddedprovides = repodata.lookup_idarray(solv.SOLVID_META, solv.REPOSITORY_ADDEDFILEPROVIDES)
@@ -301,27 +302,27 @@ class generic_repo(dict):
 
 class repomd_repo(generic_repo):
     def load_if_changed(self):
-	print "rpmmd repo '%s':" % self['alias'],
+	print "rpmmd repo '%s':" % self.name,
 	sys.stdout.flush()
 	f = self.download("repodata/repomd.xml", False, None, None)
 	if not f:
 	    print "no repomd.xml file, skipped"
-	    self['handle'].free(True)
-	    del self['handle']
+	    self.handle.free(True)
+	    del self.handle
 	    return False
 	self['cookie'] = calc_cookie_fp(f)
 	if self.usecachedrepo(None, True):
 	    print "cached"
 	    solv.xfclose(f)
 	    return True
-	self['handle'].add_repomdxml(f, 0)
+	self.handle.add_repomdxml(f, 0)
 	solv.xfclose(f)
 	print "fetching"
 	(filename, filechksum) = self.find('primary')
 	if filename:
 	    f = self.download(filename, True, filechksum, True)
 	    if f:
-		self['handle'].add_rpmmd(f, None, 0)
+		self.handle.add_rpmmd(f, None, 0)
 		solv.xfclose(f)
 	    if 'incomplete' in self:
 		return False # hopeless, need good primary
@@ -329,17 +330,17 @@ class repomd_repo(generic_repo):
 	if filename:
 	    f = self.download(filename, True, filechksum, True)
 	    if f:
-		self['handle'].add_updateinfoxml(f, 0)
+		self.handle.add_updateinfoxml(f, 0)
 		solv.xfclose(f)
 	self.add_exts()
 	if 'incomplete' not in self:
 	    self.writecachedrepo(None)
 	# must be called after writing the repo
-	self['handle'].create_stubs()
+	self.handle.create_stubs()
 	return True
 
     def find(self, what):
-	di = self['handle'].Dataiterator(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, Dataiterator.SEARCH_STRING)
+	di = self.handle.Dataiterator(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, Dataiterator.SEARCH_STRING)
 	di.prepend_keyname(solv.REPOSITORY_REPOMD)
 	for d in di:
 	    d.setpos_parent()
@@ -372,7 +373,7 @@ class repomd_repo(generic_repo):
 	repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
 
     def add_exts(self):
-	repodata = self['handle'].add_repodata(0)
+	repodata = self.handle.add_repodata(0)
 	self.add_ext(repodata, 'deltainfo', 'DL')
 	self.add_ext(repodata, 'filelists', 'FL')
 	repodata.internalize()
@@ -385,7 +386,7 @@ class repomd_repo(generic_repo):
 	    ext = 'DL'
 	else:
 	    return False
-	sys.stdout.write("[%s:%s: " % (self['alias'], ext))
+	sys.stdout.write("[%s:%s: " % (self.name, ext))
 	if self.usecachedrepo(ext):
 	    sys.stdout.write("cached]\n")
 	    sys.stdout.flush()
@@ -398,33 +399,33 @@ class repomd_repo(generic_repo):
 	if not f:
 	    return False
 	if ext == 'FL':
-	    self['handle'].add_rpmmd(f, 'FL', Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+	    self.handle.add_rpmmd(f, 'FL', Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
 	elif ext == 'DL':
-	    self['handle'].add_deltainfoxml(f, Repo.REPO_USE_LOADING)
+	    self.handle.add_deltainfoxml(f, Repo.REPO_USE_LOADING)
 	solv.xfclose(f)
 	self.writecachedrepo(ext, repodata)
 	return True
 
 class susetags_repo(generic_repo):
     def load_if_changed(self):
-	print "susetags repo '%s':" % self['alias'],
+	print "susetags repo '%s':" % self.name,
 	sys.stdout.flush()
 	f = self.download("content", False, None, None)
         if not f:
 	    print "no content file, skipped"
-	    self['handle'].free(True)
-	    del self['handle']
+	    self.handle.free(True)
+	    del self.handle
 	    return False
 	self['cookie'] = calc_cookie_fp(f)
 	if self.usecachedrepo(None, True):
 	    print "cached"
 	    solv.xfclose(f)
 	    return True
-	self['handle'].add_content(f, 0)
+	self.handle.add_content(f, 0)
 	solv.xfclose(f)
 	print "fetching"
-	defvendorid = self['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
-	descrdir = self['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
+	defvendorid = self.handle.lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
+	descrdir = self.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
 	if not descrdir:
 	    descrdir = "suse/setup/descr"
 	(filename, filechksum) = self.find('packages.gz')
@@ -433,7 +434,7 @@ class susetags_repo(generic_repo):
 	if filename:
 	    f = self.download(descrdir + '/' + filename, True, filechksum, True)
 	    if f:
-		self['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.SUSETAGS_RECORD_SHARES)
+		self.handle.add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.SUSETAGS_RECORD_SHARES)
 		solv.xfclose(f)
 		(filename, filechksum) = self.find('packages.en.gz')
 		if not filename:
@@ -441,18 +442,18 @@ class susetags_repo(generic_repo):
 		if filename:
 		    f = self.download(descrdir + '/' + filename, True, filechksum, True)
 		    if f:
-			self['handle'].add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.REPO_REUSE_REPODATA|Repo.REPO_EXTEND_SOLVABLES)
+			self.handle.add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.REPO_REUSE_REPODATA|Repo.REPO_EXTEND_SOLVABLES)
 			solv.xfclose(f)
-		self['handle'].internalize()
+		self.handle.internalize()
 	self.add_exts()
 	if 'incomplete' not in self:
 	    self.writecachedrepo(None)
 	# must be called after writing the repo
-	self['handle'].create_stubs()
+	self.handle.create_stubs()
 	return True
 
     def find(self, what):
-	di = self['handle'].Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
+	di = self.handle.Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
 	di.prepend_keyname(solv.SUSETAGS_FILE)
 	for d in di:
 	    d.setpos_parent()
@@ -483,13 +484,13 @@ class susetags_repo(generic_repo):
 		(solv.SOLVABLE_MESSAGEDEL, solv.REPOKEY_TYPE_STR),
 		(solv.SOLVABLE_CATEGORY, solv.REPOKEY_TYPE_ID)
 	    ]:
-		repodata.add_idarray(handle, solv.REPOSITORY_KEYS, self['handle'].pool.id2langid(langtag, ext, 1))
+		repodata.add_idarray(handle, solv.REPOSITORY_KEYS, self.handle.pool.id2langid(langtag, ext, 1))
 		repodata.add_idarray(handle, solv.REPOSITORY_KEYS, langtagtype)
 	repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
 	
     def add_exts(self):
-	repodata = self['handle'].add_repodata(0)
-	di = self['handle'].Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
+	repodata = self.handle.add_repodata(0)
+	di = self.handle.Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
 	di.prepend_keyname(solv.SUSETAGS_FILE)
 	for d in di:
 	    filename = d.match_str()
@@ -511,51 +512,51 @@ class susetags_repo(generic_repo):
     def load_ext(self, repodata):
 	filename = repodata.lookup_str(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME)
 	ext = filename[9:11]
-	sys.stdout.write("[%s:%s: " % (self['alias'], ext))
+	sys.stdout.write("[%s:%s: " % (self.name, ext))
 	if self.usecachedrepo(ext):
 	    sys.stdout.write("cached]\n")
 	    sys.stdout.flush()
 	    return True
 	sys.stdout.write("fetching]\n")
 	sys.stdout.flush()
-	defvendorid = self['handle'].lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
-	descrdir = self['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
+	defvendorid = self.handle.lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
+	descrdir = self.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
 	if not descrdir:
 	    descrdir = "suse/setup/descr"
 	filechksum = repodata.lookup_checksum(solv.SOLVID_META, solv.SUSETAGS_FILE_CHECKSUM)
 	f = self.download(descrdir + '/' + filename, True, filechksum)
 	if not f:
 	    return False
-	self['handle'].add_susetags(f, defvendorid, $ext, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+	self.handle.add_susetags(f, defvendorid, ext, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
 	solv.xfclose(f)
 	self.writecachedrepo(ext, repodata)
 	return True
 
 class unknown_repo(generic_repo):
     def load(self, pool):
-	print "unsupported repo '%s': skipped" % self['alias']
+	print "unsupported repo '%s': skipped" % self.name
 	return False
 
 class system_repo(generic_repo):
     def load(self, pool):
-	self['handle'] = pool.add_repo(self['alias'])
-	self['handle'].appdata = self
-	pool.installed = self['handle']
+	self.handle = pool.add_repo(self.name)
+	self.handle.appdata = self
+	pool.installed = self.handle
 	print "rpm database:",
 	self['cookie'] = calc_cookie_file("/var/lib/rpm/Packages")
 	if self.usecachedrepo(None):
 	    print "cached"
 	    return True
 	print "reading"
-	self['handle'].add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
-	self['handle'].add_rpmdb(None)
+	self.handle.add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
+	self.handle.add_rpmdb(None)
 	self.writecachedrepo(None)
 	return True
 
 class cmdline_repo(generic_repo):
     def load(self, pool):
-	self['handle'] = pool.add_repo(self['alias'])
-	self['handle'].appdata = self 
+	self.handle = pool.add_repo(self.name)
+	self.handle.appdata = self 
 	return True
 
 def validarch(pool, arch):
@@ -732,7 +733,7 @@ for reposdir in ["/etc/zypp/repos.d"]:
     for reponame in sorted(glob.glob('%s/*.repo' % reposdir)):
 	cfg = INIConfig(open(reponame))
 	for alias in cfg:
-	    repoattr = {'alias': alias, 'enabled': 0, 'priority': 99, 'autorefresh': 1, 'type': 'rpm-md', 'metadata_expire': 900}
+	    repoattr = {'enabled': 0, 'priority': 99, 'autorefresh': 1, 'type': 'rpm-md', 'metadata_expire': 900}
 	    for k in cfg[alias]:
 		repoattr[k] = cfg[alias][k]
 	    if 'mirrorlist' in repoattr and 'metalink' not in repoattr:
@@ -740,15 +741,15 @@ for reposdir in ["/etc/zypp/repos.d"]:
 		    repoattr['metalink'] = repoattr['mirrorlist']
 		    del repoattr['mirrorlist']
 	    if repoattr['type'] == 'rpm-md':
-		repo = repomd_repo(repoattr)
+		repo = repomd_repo(alias, 'repomd', repoattr)
 	    elif repoattr['type'] == 'yast2':
-		repo = susetags_repo(repoattr)
+		repo = susetags_repo(alias, 'susetags', repoattr)
 	    else:
-		repo = unknown_repo(repoattr)
+		repo = unknown_repo(alias, 'unknown', repoattr)
 	    repos.append(repo)
 
 # now load all enabled repos into the pool
-sysrepo = system_repo({ 'alias': '@System', 'type': 'system' })
+sysrepo = system_repo('@System', 'system')
 sysrepo.load(pool)
 for repo in repos:
     if int(repo['enabled']):
@@ -768,12 +769,12 @@ if cmd == 'list' or cmd == 'info' or cmd == 'install':
     for arg in args:
 	if arg.endswith(".rpm") and os.access(arg, os.R_OK):
 	    if not cmdlinerepo:
-		cmdlinerepo = cmdline_repo({ 'alias': '@commandline', 'type': 'commandline' })
+		cmdlinerepo = cmdline_repo('@commandline', 'cmdline')
 		cmdlinerepo.load(pool)
 		cmdlinerepo['packages'] = {}
-	    cmdlinerepo['packages'][arg] = cmdlinerepo['handle'].add_rpm(arg, Repo.REPO_REUSE_REPODATA|Repo.REPO_NO_INTERNALIZE)
+	    cmdlinerepo['packages'][arg] = cmdlinerepo.handle.add_rpm(arg, Repo.REPO_REUSE_REPODATA|Repo.REPO_NO_INTERNALIZE)
     if cmdlinerepo:
-	cmdlinerepo['handle'].internalize()
+	cmdlinerepo.handle.internalize()
 
 addedprovides = pool.addfileprovides_ids()
 if addedprovides:
@@ -800,7 +801,7 @@ if cmd == 'list' or cmd == 'info':
 	print "no package matched."
 	sys.exit(1)
     for job in jobs:
-	for s in pool.jobsolvables(job):
+	for s in job.solvables():
 	    if cmd == 'info':
 		print "Name:        %s" % s.str()
 		print "Repo:        %s" % s.repo.name
@@ -980,13 +981,13 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	    location, medianr = p.lookup_location()
 	    if not location:
 		continue
-	    if repo['type'] == 'commandline':
+	    if repo.type == 'commandline':
 		f = solv.xfopen(location)
 		if not f:
 		    sys.exit("\n%s: %s not found" % location)
 		newpkgsfp[p.id] = f
 		continue
-	    if not sysrepo['handle'].isempty() and os.access('/usr/bin/applydeltarpm', os.X_OK):
+	    if not sysrepo.handle.isempty() and os.access('/usr/bin/applydeltarpm', os.X_OK):
 		pname = p.name
 		di = p.repo.Dataiterator(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
 		di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
@@ -1024,15 +1025,15 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 		    sys.stdout.flush()
 		    continue
 			
-	    if repo['type'] == 'yast2':
-		datadir = repo['handle'].lookup_str(solv.SOLVID_META, solv.SUSETAGS_DATADIR)
+	    if repo.type == 'susetags':
+		datadir = repo.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DATADIR)
 		if not datadir:
 		    datadir = 'suse'
 		location = datadir + '/' + location
 	    chksum = p.lookup_checksum(solv.SOLVABLE_CHECKSUM)
 	    f = repo.download(location, False, chksum)
 	    if not f:
-		sys.exit("\n%s: %s not found in repository" % (repo['alias'], location))
+		sys.exit("\n%s: %s not found in repository" % (repo.name, location))
 	    newpkgsfp[p.id] = f
 	    sys.stdout.write(".")
 	    sys.stdout.flush()

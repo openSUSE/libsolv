@@ -481,13 +481,13 @@ FILE *sat_xfopen(const char *fn, const char *mode = 0);
 FILE *sat_xfopen_fd(const char *fn, int fd, const char *mode = 0);
 FILE *sat_xfopen_dup(const char *fn, int fd, const char *mode = 0);
 int sat_xfclose(FILE *fp);
-int sat_fileno(FILE *fp);
+int sat_xfileno(FILE *fp);
 
 %{
   SWIGINTERN int sat_xfclose(FILE *fp) {
     return fclose(fp);
   }
-  SWIGINTERN int sat_fileno(FILE *fp) {
+  SWIGINTERN int sat_xfileno(FILE *fp) {
     return fileno(fp);
   }
   SWIGINTERN FILE *sat_xfopen_dup(const char *fn, int fd, const char *mode) {
