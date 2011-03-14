@@ -38,6 +38,7 @@
     return NULL;
   }
 }
+
 %typemap(out) Queue {
   int i;
   PyObject *o = PyList_New($1.count);
@@ -46,7 +47,30 @@
   queue_free(&$1);
   $result = o;
 }
+
+%define Queue2Array(type, step, con) %{
+  int i;
+  int cnt = $1.count / step;
+  Id *idp = $1.elements;
+  PyObject *o = PyList_New(cnt);
+  for (i = 0; i < cnt; i++, idp += step)
+    {
+      Id id = *idp;
+#define result resultx
+      type result = con;
+      $typemap(out, type)
+      PyList_SetItem(o, i, $result);
+#undef result
+    }
+  queue_free(&$1);
+  $result = o;
+%}
+
+%enddef
+
 #endif
+
+
 #if defined(SWIGPERL)
 %typemap(in) Queue {
   AV *av;
@@ -80,7 +104,29 @@
   queue_free(&$1);
   $result = 0;
 }
+%define Queue2Array(type, step, con) %{
+  int i;
+  int cnt = $1.count / step;
+  Id *idp = $1.elements;
+  if (argvi + cnt + 1 >= items) {
+    EXTEND(sp, items - (argvi + cnt + 1) + 1);
+  }
+  for (i = 0; i < cnt; i++, idp += step)
+    {
+      Id id = *idp;
+#define result resultx
+      type result = con;
+      $typemap(out, type)
+      SvREFCNT_inc(ST(argvi - 1));
+#undef result
+    }
+  queue_free(&$1);
+  $result = 0;
+%}
+%enddef
+
 #endif
+
 %typemap(arginit) Queue {
   queue_init(&$1);
 }
@@ -118,7 +164,28 @@
 %typemap(freearg) Queue {
   queue_free(&$1);
 }
+%define Queue2Array(type, step, con) %{
+  int i;
+  int cnt = $1.count / step;
+  Id *idp = $1.elements;
+  VALUE o = rb_ary_new2(cnt);
+  for (i = 0; i < cnt; i++, idp += step)
+    {
+      Id id = *idp;
+#define result resultx
+      type result = con;
+      $typemap(out, type)
+      rb_ary_store(o, i, $result);
+#undef result
+    }
+  queue_free(&$1);
+  $result = o;
+%}
+%enddef
 #endif
+
+
+
 
 #if defined(SWIGPERL)
 
@@ -393,7 +460,6 @@ typedef struct {
   Id const id;
 } XSolvable;
 
-%nodefaultctor Ruleinfo;
 typedef struct {
   Solver* const solv;
   Id const type;
@@ -576,34 +642,11 @@ typedef struct {
       queue_push(&q, p);
     return q;
   }
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def solvables(self, *args):
-      return [ self.pool.solvables[id] for id in self.solvableids(*args) ]
+  %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject solvables;
+  Queue solvables() {
+    return Job_solvableids($self);
   }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::Job::solvables {
-      my ($self, @args) = @_;
-      return map {$self->{'pool'}->{'solvables'}->[$_]} $self->solvableids(@args);
-    }
-  }
-#endif
-#if defined(SWIGRUBY)
-%init %{
-rb_eval_string(
-    "class Solv::Job\n"
-    "  def solvables\n"
-    "    solvableids.collect do |id|\n"
-    "      pool.solvables[id]\n"
-    "    end\n"
-    "  end\n"
-    "end\n"
-);
-%}
-#endif
-
 }
 
 %extend Chksum {
@@ -760,7 +803,7 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
 #endif
     pool_free($self);
   }
-  Id str2id(const char *str, int create=1) {
+  Id str2id(const char *str, bool create=1) {
     return str2id($self, str, create);
   }
   const char *id2str(Id id) {
@@ -769,10 +812,10 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   const char *dep2str(Id id) {
     return dep2str($self, id);
   }
-  Id rel2id(Id name, Id evr, int flags, int create=1) {
+  Id rel2id(Id name, Id evr, int flags, bool create=1) {
     return rel2id($self, name, evr, flags, create);
   }
-  Id id2langid(Id id, const char *lang, int create=1) {
+  Id id2langid(Id id, const char *lang, bool create=1) {
     return pool_id2langid($self, id, lang, create);
   }
   void setarch(const char *arch) {
@@ -888,38 +931,22 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     }
     return q;
   }
-  # move to job?
+
   Job *Job(Id how, Id what) {
     return new_Job($self, how, what);
   }
 
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def providers(self, *args):
-      return [ self.solvables[id] for id in self.providerids(*args) ]
+  %typemap(out) Queue providers Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
+  %newobject providers;
+  Queue providers(Id dep) {
+    Pool *pool = $self;
+    Queue q;
+    Id p, pp;
+    queue_init(&q);
+    FOR_PROVIDES(p, pp, dep)
+      queue_push(&q, p);
+    return q;
   }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::Pool::providers {
-      my ($self, @args) = @_;
-      return map {$self->{'solvables'}->[$_]} $self->providerids(@args);
-    }
-  }
-#endif
-#if defined(SWIGRUBY)
-%init %{
-rb_eval_string(
-    "class Solv::Pool\n"
-    "  def providers(dep)\n"
-    "    providerids(dep).collect do |id|\n"
-    "      solvables[id]\n"
-    "    end\n"
-    "  end\n"
-    "end\n"
-  );
-%}
-#endif
 
   Id towhatprovides(Queue q) {
     return pool_queuetowhatprovides($self, &q);
@@ -951,10 +978,10 @@ rb_eval_string(
   static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES; /* repo_susetags */
   static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS ; /* repo_solv */
 
-  void free(int reuseids = 0) {
+  void free(bool reuseids = 0) {
     repo_free($self, reuseids);
   }
-  void empty(int reuseids = 0) {
+  void empty(bool reuseids = 0) {
     repo_empty($self, reuseids);
   }
 #ifdef SWIGRUBY
@@ -1509,7 +1536,9 @@ rb_eval_string(
     Id r = solver_findproblemrule($self->solv, $self->id);
     return new_XRule($self->solv, r);
   }
-  Queue findallproblemrules_helper(int unfiltered=0) {
+  %newobject findallproblemrules;
+  %typemap(out) Queue findallproblemrules Queue2Array(XRule *, 1, new_XRule(arg1->solv, id));
+  Queue findallproblemrules(int unfiltered=0) {
     Solver *solv = $self->solv;
     Id probr;
     int i, j;
@@ -1533,37 +1562,17 @@ rb_eval_string(
   int solution_count() {
     return solver_solution_count($self->solv, $self->id);
   }
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def findallproblemrules(self, unfiltered=0):
-      return [ XRule(self.solv, i) for i in self.findallproblemrules_helper(unfiltered) ]
-    def solutions(self):
-      return [ Solution(self, i) for i in range(1, self.solution_count() + 1) ];
+  %newobject solutions;
+  %typemap(out) Queue solutions Queue2Array(Solution *, 1, new_Solution(arg1, id));
+  Queue solutions() {
+    Queue q;
+    int i, cnt;
+    queue_init(&q);
+    cnt = solver_solution_count($self->solv, $self->id);
+    for (i = 1; i <= cnt; i++)
+      queue_push(&q, i);
+    return q;
   }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::Problem::findallproblemrules {
-      my ($self, $unfiltered) = @_;
-      return map {solv::XRule->new($self->{'solv'}, $_)} $self->findallproblemrules_helper($unfiltered);
-    }
-    sub solv::Problem::solutions {
-      my ($self) = @_;
-      return map {solv::Solution->new($self, $_)} 1..($self->solution_count());
-    }
-  }
-#endif
-#if defined(SWIGRUBY)
-%init %{
-rb_eval_string(
-    "class Solv::Problem\n"
-    "  def solutions()\n"
-    "    (1..solution_count).collect do |id| ; Solv::Solution.new(self,id) ; end\n"
-    "  end\n"
-    "end\n"
-  );
-%}
-#endif
 }
 
 %extend Solution {
@@ -1578,31 +1587,17 @@ rb_eval_string(
   int element_count() {
     return solver_solutionelement_count($self->solv, $self->problemid, $self->id);
   }
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def elements(self):
-      return [ Solutionelement(self, i) for i in range(1, self.element_count() + 1) ];
+  %newobject elements;
+  %typemap(out) Queue elements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1, id));
+  Queue elements() {
+    Queue q;
+    int i, cnt;
+    queue_init(&q);
+    cnt = solver_solution_count($self->solv, $self->id);
+    for (i = 1; i <= cnt; i++)
+      queue_push(&q, i);
+    return q;
   }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::Solution::elements {
-      my ($self) = @_;
-      return map {solv::Solutionelement->new($self, $_)} 1..($self->element_count());
-    }
-  }
-#endif
-#if defined(SWIGRUBY)
-%init %{
-rb_eval_string(
-    "class Solv::Solution\n"
-    "  def elements()\n"
-    "    (1..element_count).collect do |id| ; Solv::Solutionelement.new(self,id) ; end\n"
-    "  end\n"
-    "end\n"
-  );
-%}
-#endif
 }
 
 %extend Solutionelement {
@@ -1695,8 +1690,7 @@ rb_eval_string(
     def solve(self, jobs):
       j = []
       for job in jobs: j += [job.how, job.what]
-      nprob = self.solve_helper(j)
-      return [ Problem(self, pid) for pid in range(1, nprob + 1) ]
+      return self.solve_helper(j)
   }
 #endif
 #if defined(SWIGPERL)
@@ -1704,8 +1698,7 @@ rb_eval_string(
     sub solv::Solver::solve {
       my ($self, $jobs) = @_;
       my @j = map {($_->{'how'}, $_->{'what'})} @$jobs;
-      my $nprob = $self->solve_helper(\@j);
-      return map {solv::Problem->new($self, $_)} 1..$nprob;
+      return $self->solve_helper(\@j);
     }
   }
 #endif
@@ -1716,16 +1709,23 @@ rb_eval_string(
     "  def solve(jobs)\n"
     "    jl = []\n"
     "    jobs.each do |j| ; jl << j.how << j.what ; end\n"
-    "    nprob = solve_helper(jl)\n"
-    "    (1..nprob).collect do |id| ; Solv::Problem.new(self,id) ; end\n"
+    "    solve_helper(jl)\n"
     "  end\n"
     "end\n"
   );
 %}
 #endif
-  int solve_helper(Queue jobs) {
+  %typemap(out) Queue solve_helper Queue2Array(Problem *, 1, new_Problem(arg1, id));
+  %newobject solve_helper;
+  Queue solve_helper(Queue jobs) {
+    Queue q;
+    int i, cnt;
+    queue_init(&q);
     solver_solve($self, &jobs);
-    return solver_problem_count($self);
+    cnt = solver_problem_count($self);
+    for (i = 1; i <= cnt; i++)
+      queue_push(&q, i);
+    return q;
   }
   %newobject transaction;
   Transaction *transaction() {
@@ -1818,7 +1818,10 @@ rb_eval_string(
     }
   }
 #endif
-  Queue newpackages_helper() {
+
+  %typemap(out) Queue newpackages Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject newpackages;
+  Queue newpackages() {
     Queue q;
     int cut;
     queue_init(&q);
@@ -1826,7 +1829,10 @@ rb_eval_string(
     queue_truncate(&q, cut);
     return q;
   }
-  Queue keptpackages_helper() {
+
+  %typemap(out) Queue keptpackages Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject keptpackages;
+  Queue keptpackages() {
     Queue q;
     int cut;
     queue_init(&q);
@@ -1835,40 +1841,18 @@ rb_eval_string(
       queue_deleten(&q, 0, cut);
     return q;
   }
-  Queue steps_helper() {
+
+  %typemap(out) Queue steps Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject steps ;
+  Queue steps() {
     Queue q;
     queue_init_clone(&q, &$self->steps);
     return q;
   }
+
   int steptype(XSolvable *s, int mode) {
     return transaction_type($self, s->id, mode);
   }
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def newpackages(self):
-      return [ self.pool.solvables[i] for i in self.newpackages_helper() ]
-    def keptpackages(self):
-      return [ self.pool.solvables[i] for i in self.keptpackages_helper() ]
-    def steps(self):
-      return [ self.pool.solvables[i] for i in self.steps_helper() ]
-  }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::Transaction::newpackages {
-      my ($self) = @_;
-      return map {$self->{'pool'}->{'solvables'}->[$_]} $self->newpackages_helper();
-    }
-    sub solv::Transaction::keptpackages {
-      my ($self) = @_;
-      return map {$self->{'pool'}->{'solvables'}->[$_]} $self->newpackages_helper();
-    }
-    sub solv::Transaction::steps {
-      my ($self) = @_;
-      return map {$self->{'pool'}->{'solvables'}->[$_]} $self->steps_helper();
-    }
-  }
-#endif
   int calc_installsizechange() {
     return transaction_calc_installsizechange($self);
   }
@@ -1887,14 +1871,31 @@ rb_eval_string(
     return xr;
   }
   Ruleinfo *info() {
-    Ruleinfo *ri = sat_calloc(1, sizeof(*ri));
-    ri->solv = $self->solv;
-    ri->type = solver_ruleinfo($self->solv, $self->id, &ri->source, &ri->target, &ri->dep);
-    return ri;
+    Id type, source, target, dep;
+    type =  solver_ruleinfo($self->solv, $self->id, &source, &target, &dep);
+    return new_Ruleinfo($self, type, source, target, dep);
+  }
+  %typemap(out) Queue allinfos Queue2Array(Ruleinfo *, 4, new_Ruleinfo(arg1, id, idp[1], idp[2], idp[3]));
+  %newobject allinfos;
+  Queue allinfos() {
+    Queue q;
+    queue_init(&q);
+    solver_allruleinfos($self->solv, $self->id, &q);
+    return q;
   }
 }
 
 %extend Ruleinfo {
+  Ruleinfo(XRule *r, Id type, Id source, Id target, Id dep) {
+    Ruleinfo *ri = sat_calloc(1, sizeof(*ri));
+    ri->solv = r->solv;
+    ri->rid = r->id;
+    ri->type = type;
+    ri->source = source;
+    ri->target = target;
+    ri->dep = dep;
+    return ri;
+  }
   XSolvable * const solvable;
   XSolvable * const othersolvable;
   %{
@@ -1935,7 +1936,7 @@ rb_eval_string(
   void add_flexarray(Id solvid, Id keyname, Id handle) {
     repodata_add_flexarray($self->repo->repodata + $self->id, solvid, keyname, handle);
   }
-  void set_bin_checksum(Id solvid, Id keyname, Chksum *chksum) {
+  void set_checksum(Id solvid, Id keyname, Chksum *chksum) {
     const unsigned char *buf = sat_chksum_get(chksum, 0);
     if (buf)
       repodata_set_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, sat_chksum_get_type(chksum), buf);

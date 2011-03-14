@@ -8,9 +8,166 @@
 # grep => find_all
 
 require 'solv'
+require 'rubygems'
+require 'inifile'
+
+class Repo_generic
+  def initialize(name, type, attribs = {})
+    @name = name
+    @type = type
+    @attribs = attribs.dup
+  end
+
+  def enabled?
+    return @attribs['enabled'].to_i != 0
+  end
+
+  def autorefresh?
+    return @attribs['autorefresh'].to_i != 0
+  end
+
+  def calc_cookie_fp(f)
+    chksum = Solv::Chksum.new(Solv::REPOKEY_TYPE_SHA256)
+    chksum.add_fp(f)
+    return chksum.raw
+  end
+
+  def calc_cookie_file(filename)
+    chksum = Solv::Chksum.new(Solv::REPOKEY_TYPE_SHA256)
+    chksum.add("1.1")
+    chksum.add_stat(filename)
+    return chksum.raw
+  end
+
+  def cachepath(ext = nil)
+    path = @name.sub(/^\./, '_')
+    path += ext ? "_#{ext}.solvx" : '.solv'
+    return '/var/cache/solv/' + path.gsub(/\//, '_')
+  end
+
+  def load(pool)
+    @handle = pool.add_repo(@name)
+    @handle.appdata = self
+    @handle.priority = 99 - @attribs['priority'] if @attribs['priority']
+    dorefresh = autorefresh?
+    if dorefresh
+      begin
+        s = File.stat(cachepath)
+        dorefresh = false if s && Time.now - s.mtime < @attribs['metadata_expire']
+      rescue SystemCallError
+      end
+    end
+    @cookie = nil
+    if !dorefresh && usecachedrepo()
+      puts "repo: '#{@name}' cached"
+      return true
+    end
+    return load_if_changed()
+  end
+
+  def load_ext
+    return false
+  end
+
+  def load_if_changed
+    return false
+  end
+
+  def download(file, uncompress, chksum, markincomplete = false)
+    return nil
+  end
+
+  def usecachedrepo(ext, mark = false)
+    cookie = ext ? @extcookie : @cookie
+    begin
+      repopath = cachepath(ext)
+      @handle.add_solv(repopath)
+    rescue
+      return false
+    end
+    return true
+  end
+
+  def genextcookie(f)
+  end
+
+  def writecachedrepo(ext, info = nil)
+  end
+
+end
+
+class Repo_rpmmd < Repo_generic
+
+  def load_if_changed
+    print "rpmmd repo '#{@attribs['alias']}: "
+    f = download("repodata/repomd.xml", false, nil, nil)
+    if !f
+      puts "no repomd.xml file, skipped"
+      @handle.free(true)
+      @handle = nil
+      return false
+    end
+    @cookie = calc_cookie_fp(f)
+    if usecachedrepo(nil, true)
+      puts "cached"
+      Solv.xfclose(f)
+      return true
+    end
+    return false
+  end
+
+end
+
+class Repo_susetags < Repo_generic
+
+  def load_if_changed
+    print "susetags repo '#{@attribs['alias']}: "
+    f = download("content", false, nil, nil)
+    if !f
+      puts "no content file, skipped"
+      @handle.free(true)
+      @handle = nil
+      return false
+    end
+    @cookie = calc_cookie_fp(f)
+    if usecachedrepo(nil, true)
+      puts "cached"
+      Solv.xfclose(f)
+      return true
+    end
+    return false
+  end
+
+end
+
+class Repo_unknown < Repo_generic
+  def load(pool)
+    puts "unsupported repo '#{@attribs['alias']}: skipped"
+    return false
+  end
+end
+
+class Repo_system < Repo_generic
+  def load(pool)
+    @handle = pool.add_repo(@name)
+    @handle.appdata = self
+    pool.installed = @handle
+    print "rpm database: "
+    @cookie = calc_cookie_file("/var/lib/rpm/Packages")
+    if usecachedrepo(nil)
+      puts "cached"
+      return true
+    end
+    puts "reading"
+    @handle.add_products("/etc/products.d", Solv::Repo::REPO_NO_INTERNALIZE)
+    @handle.add_rpmdb(nil, Solv::Repo::REPO_REUSE_REPODATA)
+    writecachedrepo(nil)
+    return true
+  end
+end
 
 def depglob(pool, name, globname, globdep)
-  id = pool.str2id(name, 0)
+  id = pool.str2id(name, false)
   if id != 0
     match = false
     providers = pool.providers(id)
@@ -44,17 +201,71 @@ def depglob(pool, name, globname, globdep)
 end
 
 
+args = ARGV
+cmd = args.shift
+cmd = 'list' if cmd == 'li'
+cmd = 'install' if cmd == 'in'
+cmd = 'erase' if cmd == 'rm'
+cmd = 'verify' if cmd == 've'
+cmd = 'search' if cmd == 'se'
+
+repos = []
+for reposdir in [ '/etc/zypp/repos.d' ] do
+  next unless FileTest.directory?(reposdir)
+  for reponame in Dir["#{reposdir}/*.repo"].sort do
+    cfg = IniFile.new(reponame)
+    cfg.each_section do |ali|
+      repoattr = { 'alias' => ali, 'enabled' => 0, 'priority' => 99, 'autorefresh' => 1, 'type' => 'rpm-md', 'metadata_expire' => 900}
+      repoattr.update(cfg[ali])
+      if repoattr['type'] == 'rpm-md'
+        repo = Repo_rpmmd.new(ali, 'repomd', repoattr)
+      elsif repoattr['type'] == 'yast2'
+        repo = Repo_susetags.new(ali, 'susetags', repoattr)
+      else
+        repo = Repo_unknown.new(ali, 'unknown', repoattr)
+      end
+      repos.push(repo)
+    end
+  end
+end
+
 pool = Solv::Pool.new()
-repo = pool.add_repo("TEST")
-pool.installed = repo
-repo.add_solv("/var/cache/solv/@System.solv", 0);
+# require 'sys/uname' ; sysarch = Sys::Uname.machine
+sysarch = `uname -p`.strip
+pool.setarch(sysarch)
+
+sysrepo = Repo_system.new('@System', 'system')
+sysrepo.load(pool)
+for repo in repos
+  repo.load(pool) if repo.enabled?
+end
+
+if cmd == 'search'
+  matches = {}
+  for di in pool.Dataiterator(0, Solv::SOLVABLE_NAME, args[0], Solv::Dataiterator::SEARCH_SUBSTRING | Solv::Dataiterator::SEARCH_NOCASE)
+    matches[di.solvid] = true
+  end
+  for solvid in matches.keys.sort
+    s = pool.solvables[solvid]
+    puts "- #{s.str} [#{s.repo.name}]"
+  end
+  exit
+end
 
 pool.addfileprovides
 pool.createwhatprovides
-jobs = depglob(pool, ARGV[0], true, true)
+
+jobs = []
+for arg in args
+  njobs = depglob(pool, ARGV[0], true, true)
+  abort("nothing matches '#{arg}'") if njobs.empty?
+  jobs += njobs
+end
+
 for job in jobs
   job.how |= Solv::Job::SOLVER_ERASE
 end
+
 solver = pool.Solver
 problems = solver.solve(jobs)
 for problem in problems

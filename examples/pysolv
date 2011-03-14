@@ -57,7 +57,7 @@ def calc_cookie_fp(fp):
     chksum.add_fp(fp)
     return chksum.raw()
 
-class generic_repo(dict):
+class repo_generic(dict):
     def __init__(self, name, type, attribs = {}):
 	for k in attribs:
 	    self[k] = attribs[k]
@@ -73,9 +73,9 @@ class generic_repo(dict):
 	return "/var/cache/solv/" + re.sub(r'[/]', '_', path)
 	
     def load(self, pool):
-	self.handle = pool.add_repo(repo.name)
-	self.handle.appdata = repo
-	self.handle.priority = 99 - repo['priority']
+	self.handle = pool.add_repo(self.name)
+	self.handle.appdata = self
+	self.handle.priority = 99 - self['priority']
 	if self['autorefresh']:
 	    dorefresh = True
 	if dorefresh:
@@ -90,6 +90,9 @@ class generic_repo(dict):
 	    print "repo: '%s': cached" % self.name
 	    return True
 	return self.load_if_changed()
+
+    def load_if_changed(self):
+	return False
 
     def load_ext(repodata):
 	return False
@@ -300,7 +303,7 @@ class generic_repo(dict):
 	    repodata.internalize()
 	    self.writecachedrepo(None, repodata)
 
-class repomd_repo(generic_repo):
+class repo_repomd(repo_generic):
     def load_if_changed(self):
 	print "rpmmd repo '%s':" % self.name,
 	sys.stdout.flush()
@@ -363,7 +366,7 @@ class repomd_repo(generic_repo):
 	handle = repodata.new_handle()
 	repodata.set_poolstr(handle, solv.REPOSITORY_REPOMD_TYPE, what)
 	repodata.set_str(handle, solv.REPOSITORY_REPOMD_LOCATION, filename)
-	repodata.set_bin_checksum(handle, solv.REPOSITORY_REPOMD_CHECKSUM, chksum)
+	repodata.set_checksum(handle, solv.REPOSITORY_REPOMD_CHECKSUM, chksum)
 	if ext == 'DL':
 	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOSITORY_DELTAINFO)
 	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_FLEXARRAY)
@@ -406,7 +409,7 @@ class repomd_repo(generic_repo):
 	self.writecachedrepo(ext, repodata)
 	return True
 
-class susetags_repo(generic_repo):
+class repo_susetags(repo_generic):
     def load_if_changed(self):
 	print "susetags repo '%s':" % self.name,
 	sys.stdout.flush()
@@ -468,7 +471,7 @@ class susetags_repo(generic_repo):
 	handle = repodata.new_handle()
 	repodata.set_str(handle, solv.SUSETAGS_FILE_NAME, filename)
 	if chksum:
-	    repodata.set_bin_checksum(handle, solv.SUSETAGS_FILE_CHECKSUM, chksum)
+	    repodata.set_checksum(handle, solv.SUSETAGS_FILE_CHECKSUM, chksum)
 	if ext == 'DU':
 	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_DISKUSAGE)
 	    repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRNUMNUMARRAY)
@@ -532,12 +535,12 @@ class susetags_repo(generic_repo):
 	self.writecachedrepo(ext, repodata)
 	return True
 
-class unknown_repo(generic_repo):
+class repo_unknown(repo_generic):
     def load(self, pool):
 	print "unsupported repo '%s': skipped" % self.name
 	return False
 
-class system_repo(generic_repo):
+class repo_system(repo_generic):
     def load(self, pool):
 	self.handle = pool.add_repo(self.name)
 	self.handle.appdata = self
@@ -549,11 +552,11 @@ class system_repo(generic_repo):
 	    return True
 	print "reading"
 	self.handle.add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
-	self.handle.add_rpmdb(None)
+	self.handle.add_rpmdb(None, Repo.REPO_REUSE_REPODATA)
 	self.writecachedrepo(None)
 	return True
 
-class cmdline_repo(generic_repo):
+class repo_cmdline(repo_generic):
     def load(self, pool):
 	self.handle = pool.add_repo(self.name)
 	self.handle.appdata = self 
@@ -721,10 +724,6 @@ if cmd == 'se':
     cmd = 'search'
 
 
-pool = solv.Pool()
-pool.setarch(os.uname()[4])
-pool.set_loadcallback(load_stub)
-
 # read all repo configs
 repos = []
 for reposdir in ["/etc/zypp/repos.d"]:
@@ -741,15 +740,19 @@ for reposdir in ["/etc/zypp/repos.d"]:
 		    repoattr['metalink'] = repoattr['mirrorlist']
 		    del repoattr['mirrorlist']
 	    if repoattr['type'] == 'rpm-md':
-		repo = repomd_repo(alias, 'repomd', repoattr)
+		repo = repo_repomd(alias, 'repomd', repoattr)
 	    elif repoattr['type'] == 'yast2':
-		repo = susetags_repo(alias, 'susetags', repoattr)
+		repo = repo_susetags(alias, 'susetags', repoattr)
 	    else:
-		repo = unknown_repo(alias, 'unknown', repoattr)
+		repo = repo_unknown(alias, 'unknown', repoattr)
 	    repos.append(repo)
 
+pool = solv.Pool()
+pool.setarch(os.uname()[4])
+pool.set_loadcallback(load_stub)
+
 # now load all enabled repos into the pool
-sysrepo = system_repo('@System', 'system')
+sysrepo = repo_system('@System', 'system')
 sysrepo.load(pool)
 for repo in repos:
     if int(repo['enabled']):
@@ -769,7 +772,7 @@ if cmd == 'list' or cmd == 'info' or cmd == 'install':
     for arg in args:
 	if arg.endswith(".rpm") and os.access(arg, os.R_OK):
 	    if not cmdlinerepo:
-		cmdlinerepo = cmdline_repo('@commandline', 'cmdline')
+		cmdlinerepo = repo_cmdline('@commandline', 'cmdline')
 		cmdlinerepo.load(pool)
 		cmdlinerepo['packages'] = {}
 	    cmdlinerepo['packages'][arg] = cmdlinerepo.handle.add_rpm(arg, Repo.REPO_REUSE_REPODATA|Repo.REPO_NO_INTERNALIZE)

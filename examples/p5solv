@@ -14,8 +14,10 @@ use strict;
 package Repo::generic;
 
 sub new {
-  my ($class, $attr) = @_;
-  my $r = { %$attr };
+  my ($class, $alias, $type, $attr) = @_;
+  my $r = { %{$attr || {}} };
+  $r->{'alias'} = $alias;
+  $r->{'type'} = $type;
   return bless $r, $class;
 }
 
@@ -59,6 +61,10 @@ sub load {
     return 1;
   }
   return $self->load_if_changed();
+}
+
+sub load_if_changed {
+  return 0;
 }
 
 sub load_ext {
@@ -113,7 +119,7 @@ sub usecachedrepo {
     my $fcookie = '';
     return undef if sysread($f, $fcookie, 32) != 32;
     return undef if $cookie && $fcookie ne $cookie;
-    if ($self->{'alias'} ne '@System' && !$ext) {
+    if ($self->{'type'} ne 'system' && !$ext) {
       sysseek($f, -32 * 2, Fcntl::SEEK_END);
       return undef if sysread($f, $fextcookie, 32) != 32;
     }
@@ -165,7 +171,7 @@ sub writecachedrepo {
      $self->{'handle'}->write_first_repodata($ff);
   }
   solv::xfclose($ff);
-  if ($self->{'alias'} ne '@System' && !$ext) {
+  if ($self->{'type'} ne 'system' && !$ext) {
     $self->genextcookie($f) unless $self->{'extcookie'};
     syswrite($f, $self->{'extcookie'});
   }
@@ -216,7 +222,7 @@ sub add_ext {
   my $handle = $repodata->new_handle();
   $repodata->set_poolstr($handle, $solv::REPOSITORY_REPOMD_TYPE, $what);
   $repodata->set_str($handle, $solv::REPOSITORY_REPOMD_LOCATION, $filename);
-  $repodata->set_bin_checksum($handle, $solv::REPOSITORY_REPOMD_CHECKSUM, $chksum);
+  $repodata->set_checksum($handle, $solv::REPOSITORY_REPOMD_CHECKSUM, $chksum);
   if ($ext eq 'DL') {
     $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $solv::REPOSITORY_DELTAINFO);
     $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $solv::REPOKEY_TYPE_FLEXARRAY);
@@ -341,7 +347,7 @@ sub add_ext {
   my ($filename, $chksum) = $self->find($what);
   my $handle = $repodata->new_handle();
   $repodata->set_str($handle, $solv::SUSETAGS_FILE_NAME, $filename);
-  $repodata->set_bin_checksum($handle, $solv::SUSETAGS_FILE_CHECKSUM, $chksum);
+  $repodata->set_checksum($handle, $solv::SUSETAGS_FILE_CHECKSUM, $chksum);
   if ($ext eq 'DL') {
     $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $solv::REPOSITORY_DELTAINFO);
     $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $solv::REPOKEY_TYPE_FLEXARRAY);
@@ -471,7 +477,7 @@ sub load {
   }
   print "reading\n";
   $self->{'handle'}->add_products("/etc/products.d", $solv::Repo::REPO_NO_INTERNALIZE);
-  $self->{'handle'}->add_rpmdb(undef, 0);
+  $self->{'handle'}->add_rpmdb(undef, $solv::Repo::REPO_REUSE_REPODATA);
   return 1;
 }
 
@@ -640,9 +646,6 @@ $cmd = 'erase' if $cmd eq 'rm';
 $cmd = 'verify' if $cmd eq 've';
 $cmd = 'search' if $cmd eq 'se';
 
-my $pool = solv::Pool->new();
-$pool->setarch((POSIX::uname())[4]);
-$pool->set_loadcallback(\&load_stub);
 my @repos;
 for my $reposdir ('/etc/zypp/repos.d') {
   next unless -d $reposdir;
@@ -656,18 +659,22 @@ for my $reposdir ('/etc/zypp/repos.d') {
       }
       my $repo;
       if ($repoattr->{'type'} eq 'rpm-md') {
-	$repo = Repo::rpmmd->new($repoattr);
+	$repo = Repo::rpmmd->new($alias, 'repomd', $repoattr);
       } elsif ($repoattr->{'type'} eq 'yast2') {
-	$repo = Repo::susetags->new($repoattr);
+	$repo = Repo::susetags->new($alias, 'susetags', $repoattr);
       } else {
-	$repo = Repo::unknown->new($repoattr);
+	$repo = Repo::unknown->new($alias, 'unknown', $repoattr);
       }
       push @repos, $repo;
     }
   }
 }
 
-my $sysrepo = Repo::system->new({'alias' => '@System', 'type' => 'system'});
+my $pool = solv::Pool->new();
+$pool->setarch((POSIX::uname())[4]);
+$pool->set_loadcallback(\&load_stub);
+
+my $sysrepo = Repo::system->new('@System', 'system');
 $sysrepo->load($pool);
 for my $repo (@repos) {
   $repo->load($pool) if $repo->{'enabled'};
@@ -870,7 +877,7 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
       my $repo = $p->{'repo'}->{'appdata'};
       my ($location, $medianr) = $p->lookup_location();
       next unless $location;
-      if ($repo->{'type'} eq 'yast2') {
+      if ($repo->{'type'} eq 'susetags') {
 	$location = ($repo->{'handle'}->lookup_str($solv::SOLVID_META, $solv::SUSETAGS_DATADIR) || 'suse') ."/$location";
       }
       my $chksum = $p->lookup_checksum($solv::SOLVABLE_CHECKSUM);
