@@ -204,12 +204,13 @@ sub find {
   for my $d (@$di) {
     $d->setpos_parent();
     my $filename = $d->{'pool'}->lookup_str($solv::SOLVID_POS, $solv::REPOSITORY_REPOMD_LOCATION);
+    next unless $filename;
     my $chksum = $d->{'pool'}->lookup_checksum($solv::SOLVID_POS, $solv::REPOSITORY_REPOMD_CHECKSUM);
-    if ($filename && !$chksum) {
+    if (!$chksum) {
       print "no $filename file checksum!\n";
       return (undef, undef);
     }
-    return ($filename, $chksum) if $filename;
+    return ($filename, $chksum);
   }
   return (undef, undef);
 }

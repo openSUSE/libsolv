@@ -15,6 +15,10 @@
 
 %module solv
 
+#ifdef SWIGRUBY
+%markfunc Pool "mark_Pool";
+#endif
+
 #if defined(SWIGPYTHON)
 %typemap(in) Queue {
   /* Check if is a list */
@@ -727,8 +731,6 @@ typedef struct {
   }
 }
 
-
-
 %extend Pool {
   Pool() {
     Pool *pool = pool_create();
@@ -797,10 +799,33 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   }
 #endif
 
-  void free() {
-#if defined(SWIGPYTHON) || defined(SWIGPERL)
-    Pool_set_loadcallback($self, 0);
+#if defined(SWIGRUBY)
+%{
+  SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
+    XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
+    VALUE callable = (VALUE)d;
+    VALUE rd = SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0);
+    VALUE res = rb_funcall(callable, rb_intern("call"), 1, rd);
+    return res == Qtrue;
+  }
+  SWIGINTERN void mark_Pool(void *ptr) {
+    Pool *pool = ptr;
+    if (pool->loadcallback == loadcallback && pool->loadcallbackdata) {
+      VALUE callable = (VALUE)pool->loadcallbackdata;
+      rb_gc_mark(callable);
+    }
+  }
+%}
+  %typemap(in, numinputs=0) VALUE callable {
+    $1 = rb_block_given_p() ? rb_block_proc() : 0;
+  }
+  void set_loadcallback(VALUE callable) {
+    pool_setloadcallback($self, callable ? loadcallback : 0, (void *)callable);
+  }
 #endif
+
+  void free() {
+    Pool_set_loadcallback($self, 0);
     pool_free($self);
   }
   Id str2id(const char *str, bool create=1) {
