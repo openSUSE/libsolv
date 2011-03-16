@@ -179,6 +179,19 @@ class Repo_generic
       end
       f.syswrite(ext ? @extcookie : @cookie)
       f.close(false)
+      if @handle.iscontiguous?
+	sf = Solv::xfopen(f.path)
+	if sf
+	  if !ext
+	    @handle.empty()
+	    abort("internal error, cannot reload solv file") unless @handle.add_solv(sf, Solv::Repo::SOLV_ADD_NO_STUBS)
+	  else
+	    info.extend_to_repo()
+	    info.add_solv(sf, Solv::Repo::REPO_EXTEND_SOLVABLES)
+	  end
+	  Solv::xfclose(sf)
+	end
+      end
       File.rename(f.path, cachepath(ext))
       f.unlink
       return true
@@ -187,6 +200,19 @@ class Repo_generic
     end
   end
 
+  def updateaddedprovides(addedprovides)
+    return if @incomplete
+    return unless @handle && !@handle.isempty?
+    repodata = @handle.first_repodata()
+    return unless repodata
+    oldaddedprovides = repodata.lookup_idarray(Solv::SOLVID_META, Solv::REPOSITORY_ADDEDFILEPROVIDES)
+    return if (oldaddedprovides | addedprovides) == oldaddedprovides
+    for id in addedprovides
+      repodata.add_idarray(Solv::SOLVID_META, Solv::REPOSITORY_ADDEDFILEPROVIDES, id)
+    end
+    repodata.internalize()
+    writecachedrepo(nil, repodata)
+  end
 end
 
 class Repo_rpmmd < Repo_generic
@@ -365,9 +391,71 @@ class Repo_susetags < Repo_generic
     return true
   end
 
+  @@langtags = {
+    Solv::SOLVABLE_SUMMARY     => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_DESCRIPTION => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_EULA        => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_MESSAGEINS  => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_MESSAGEDEL  => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_CATEGORY    => Solv::REPOKEY_TYPE_ID,
+  }
+
+  def add_ext(repodata, what, ext)
+    (filename, filechksum) = find(what)
+    h = repodata.new_handle()
+    repodata.set_str(h, Solv::SUSETAGS_FILE_NAME, filename)
+    repodata.set_checksum(h, Solv::SUSETAGS_FILE_CHECKSUM, filechksum)
+    if ext == 'DL'
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOSITORY_DELTAINFO)
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_FLEXARRAY)
+    elsif ext == 'DU'
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::SOLVABLE_DISKUSAGE)
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_DIRNUMNUMARRAY)
+    elsif ext == 'FL'
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::SOLVABLE_FILELIST)
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_DIRSTRARRAY)
+    else
+      @@langtags.sort.each do |langid, langtype|
+        repodata.add_idarray(h, Solv::REPOSITORY_KEYS, @handle.pool.id2langid(langid, ext, true))
+        repodata.add_idarray(h, Solv::REPOSITORY_KEYS, langtype)
+      end
+    end
+    repodata.add_flexarray(Solv::SOLVID_META, Solv::REPOSITORY_EXTERNAL, h)
+  end
+
   def add_exts
     repodata = @handle.add_repodata(0)
+    di = @handle.Dataiterator(Solv::SOLVID_META, Solv::SUSETAGS_FILE_NAME, nil, 0)
+    di.prepend_keyname(Solv::SUSETAGS_FILE)
+    for d in di
+      filename = d.match_str
+      next unless filename && filename =~ /^packages\.(..)(?:\..*)$/
+      next if $1 == 'en' || $1 == 'gz'
+      add_ext(repodata, filename, $1)
+    end
     repodata.internalize()
+  end
+
+  def load_ext(repodata)
+    filename = repodata.lookup_str(Solv::SOLVID_META, Solv::SUSETAGS_FILE_NAME)
+    ext = filename[9,2]
+    print "[#{@name}:#{ext}: "
+    STDOUT.flush
+    if usecachedrepo(ext)
+      puts "cached]\n"
+      return true
+    end
+    puts "fetching]\n"
+    defvendorid = @handle.lookup_id(Solv::SOLVID_META, Solv::SUSETAGS_DEFAULTVENDOR)
+    descrdir = @handle.lookup_str(Solv::SOLVID_META, Solv::SUSETAGS_DESCRDIR)
+    descrdir = "suse/setup/descr" unless descrdir
+    filechksum = repodata.lookup_checksum(Solv::SOLVID_META, Solv::SUSETAGS_FILE_CHECKSUM)
+    f = download("#{descrdir}/#{filename}", true, filechksum)
+    return false unless f
+    @handle.add_susetags(f, defvendorid, ext, Solv::Repo::REPO_USE_LOADING|Solv::Repo::REPO_EXTEND_SOLVABLES)
+    Solv::xfclose(f)
+    writecachedrepo(ext, repodata)
+    return true
   end
 
 end
@@ -518,7 +606,7 @@ def mkjobs_filelist(pool, cmd, arg)
     di.skip_solvable()
   end
   return [] if matches.empty?
-  puts "[using file list match for '#{arg}'"
+  puts "[using file list match for '#{arg}']"
   if matches.length > 1
     return [ pool.Job(Solv::Job::SOLVER_SOLVABLE_ONE_OF, pool.towhatprovides(matches)) ]
   else
@@ -594,8 +682,14 @@ if cmd == 'search'
   exit
 end
 
-pool.addfileprovides
-pool.createwhatprovides
+addedprovides = pool.addfileprovides_ids()
+if !addedprovides.empty?
+  sysrepo.updateaddedprovides(addedprovides)
+  for repo in repos
+    repo.updateaddedprovides(addedprovides)
+  end
+end
+pool.createwhatprovides()
 
 jobs = []
 for arg in args

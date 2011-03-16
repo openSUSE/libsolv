@@ -2088,7 +2088,7 @@ rb_eval_string(
   void write(FILE *fp) {
     repodata_write($self->repo->repodata + $self->id, fp, repo_write_stdkeyfilter, 0);
   }
-  bool read_solv_flags(FILE *fp, int flags = 0) {
+  bool add_solv(FILE *fp, int flags = 0) {
     Repodata *data = $self->repo->repodata + $self->id;
     int r, oldstate = data->state;
     data->state = REPODATA_LOADING;

@@ -185,7 +185,7 @@ sub writecachedrepo {
         die("internal error, cannot reload solv file\n") unless $self->{'handle'}->add_solv($f, $solv::Repo::SOLV_ADD_NO_STUBS);
       } else {
 	$info->extend_to_repo();
-	$info->read_solv_flags($f, $solv::Repo::REPO_EXTEND_SOLVABLES);
+	$info->add_solv($f, $solv::Repo::REPO_EXTEND_SOLVABLES);
       }
       solv::xfclose($f);
     }

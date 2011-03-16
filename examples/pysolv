@@ -278,7 +278,7 @@ class repo_generic(dict):
 		    # info.write() has written the data
 		    info.extend_to_repo()
 		    # LOCALPOOL does not help as pool already contains all ids
-		    info.read_solv_flags(nf, Repo.REPO_EXTEND_SOLVABLES)
+		    info.add_solv(nf, Repo.REPO_EXTEND_SOLVABLES)
 		solv.xfclose(nf)
 	    os.rename(tmpname, self.cachepath(ext))
 	except IOError, e:
@@ -290,7 +290,7 @@ class repo_generic(dict):
 	    return 
 	if 'handle' not in self:
 	    return 
-	if not self.handle.nsolvables:
+	if self.handle.isempty():
 	    return
 	# make sure there's just one real repodata with extensions
 	repodata = self.handle.first_repodata()
