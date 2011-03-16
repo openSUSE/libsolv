@@ -36,6 +36,9 @@ extern void solver_printtrivial(Solver *solv);
 extern const char *solver_select2str(Pool *pool, Id select, Id what);
 extern const char *pool_job2str(Pool *pool, Id how, Id what, int withflags);
 extern const char *solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id dep);
+extern const char *solver_solutionelement2str(Solver *solv, Id p, Id rp);
+extern const char *policy_illegal2str(Solver *solv, int illegal, Solvable *s, Solvable *rs);
+
 
 #endif /* SATSOLVER_SOLVERDEBUG_H */
 

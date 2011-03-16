@@ -975,3 +975,72 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       return "bad problem rule type";
     }
 }
+
+const char *
+solver_solutionelement2str(Solver *solv, Id p, Id rp)
+{
+  Pool *pool = solv->pool;
+  if (p == SOLVER_SOLUTION_JOB)
+    {
+      Id how = solv->job.elements[rp - 1];
+      Id what = solv->job.elements[rp];
+      return pool_tmpjoin(pool, "do not ask to ", pool_job2str(pool, how, what, 0), 0);
+    }
+  else if (p == SOLVER_SOLUTION_INFARCH)
+    {
+      Solvable *s = pool->solvables + rp;
+      if (solv->installed && s->repo == solv->installed)
+        return pool_tmpjoin(pool, "keep ", solvable2str(pool, s), " despite the inferior architecture");
+      else
+        return pool_tmpjoin(pool, "install ", solvable2str(pool, s), " despite the inferior architecture");
+    }
+  else if (p == SOLVER_SOLUTION_DISTUPGRADE)
+    {
+      Solvable *s = pool->solvables + rp;
+      if (solv->installed && s->repo == solv->installed)
+        return pool_tmpjoin(pool, "keep obsolete ", solvable2str(pool, s), 0);
+      else
+        return pool_tmpjoin(pool, "install ", solvable2str(pool, s), " from excluded repository");
+    }
+  else if (p > 0 && rp == 0)
+    return pool_tmpjoin(pool, "allow deinstallation of ", solvid2str(pool, p), 0);
+  else if (p > 0 && rp > 0)
+    {
+      const char *sp = solvid2str(pool, p);
+      const char *srp = solvid2str(pool, rp);
+      const char *str = pool_tmpjoin(pool, "allow replacement of ", sp, 0);
+      return pool_tmpappend(pool, str, " with ", srp);
+    }
+  else
+    return "bad solution element";
+}
+
+const char *
+policy_illegal2str(Solver *solv, int illegal, Solvable *s, Solvable *rs)
+{
+  Pool *pool = solv->pool;
+  const char *str;
+  if (illegal == POLICY_ILLEGAL_DOWNGRADE)
+    {
+      str = pool_tmpjoin(pool, "downgrade of ", solvable2str(pool, s), 0);
+      return pool_tmpappend(pool, str, " to ", solvable2str(pool, rs));
+    }
+  if (illegal == POLICY_ILLEGAL_ARCHCHANGE)
+    {
+      str = pool_tmpjoin(pool, "architecture change of ", solvable2str(pool, s), 0);
+      return pool_tmpappend(pool, str, " to ", solvable2str(pool, rs));
+    }
+  if (illegal == POLICY_ILLEGAL_VENDORCHANGE)
+    {
+      str = pool_tmpjoin(pool, "vendor change from '", id2str(pool, s->vendor), "' (");
+      if (rs->vendor)
+	{
+          str = pool_tmpappend(pool, str, solvable2str(pool, s), ") to '");
+          str = pool_tmpappend(pool, str, id2str(pool, rs->vendor), "' (");
+	}
+      else
+        str = pool_tmpappend(pool, str, solvable2str(pool, s), ") to no vendor (");
+      return pool_tmpappend(pool, str, solvable2str(pool, rs), ")");
+    }
+  return "unknown illegal change";
+}
