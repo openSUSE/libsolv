@@ -21,10 +21,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
+#include <stdint.h>
 
 #include <rpm/rpmio.h>
 #include <rpm/rpmpgp.h>
+#ifndef RPM5
 #include <rpm/header.h>
+#endif
 #include <rpm/rpmdb.h>
 
 #ifndef DB_CREATE
@@ -111,6 +114,12 @@
 #define DEP_STRONG		(1 << 27)
 #define DEP_PRE			((1 << 6) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12))
 
+
+#ifdef RPM5
+# define RPM_INDEX_SIZE 4
+#else
+# define RPM_INDEX_SIZE 8
+#endif
 
 struct rpmid {
   unsigned int dbid;
@@ -1302,7 +1311,7 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
       exit(1);
     }
   while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
-    count += dbdata.size >> 3;
+    count += dbdata.size / RPM_INDEX_SIZE;
   dbc->c_close(dbc);
   db->close(db, 0);
   return count;
@@ -1392,6 +1401,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  perror("db->get_byteswapped");
 	  exit(1);
 	}
+#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
+      byteswapped = !byteswapped;
+#endif
       if (db->cursor(db, NULL, &dbc, 0))
 	{
 	  perror("db->cursor");
@@ -1520,6 +1532,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  perror("db->get_byteswapped");
 	  exit(1);
 	}
+#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
+      byteswapped = !byteswapped;
+#endif
       if (db->cursor(db, NULL, &dbc, 0))
 	{
 	  perror("db->cursor");
@@ -1534,7 +1549,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	    continue;
 	  dl = dbdata.size;
 	  dp = dbdata.data;
-	  while(dl >= 8)
+	  while(dl >= RPM_INDEX_SIZE)
 	    {
 	      if (byteswapped)
 		{
@@ -1551,8 +1566,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	      memcpy(rpmids[nrpmids].name, dbkey.data, (int)dbkey.size);
 	      rpmids[nrpmids].name[(int)dbkey.size] = 0;
 	      nrpmids++;
-	      dp += 8;
-	      dl -= 8;
+	      dp += RPM_INDEX_SIZE;
+	      dl -= RPM_INDEX_SIZE;
 	    }
 	}
       dbc->c_close(dbc);
@@ -1645,6 +1660,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 		  perror("db->get_byteswapped");
 		  exit(1);
 		}
+#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
+	      byteswapped = !byteswapped;
+#endif
 	    }
 	  if (byteswapped)
 	    {
@@ -2193,6 +2211,9 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
       db->close(db, 0);
       return 0;
     }
+#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
+  byteswapped = !byteswapped;
+#endif
   if (db->cursor(db, NULL, &dbc, 0))
     {
       perror("db->cursor");
@@ -2212,7 +2233,7 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
 	continue;
       dl = dbdata.size;
       dp = dbdata.data;
-      while(dl >= 8)
+      while(dl >= RPM_INDEX_SIZE)
 	{
 	  if (byteswapped)
 	    {
@@ -2231,8 +2252,8 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
 	  memcpy(namedata + namedatal, dbkey.data, dbkey.size);
 	  namedata[namedatal + dbkey.size] = 0;
 	  namedatal += dbkey.size + 1;
-	  dp += 8;
-	  dl -= 8;
+	  dp += RPM_INDEX_SIZE;
+	  dl -= RPM_INDEX_SIZE;
 	}
       if (match)
 	break;
@@ -2336,6 +2357,9 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
 	  state->dbenv = 0;
 	  return 0;
 	}
+#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
+      state->byteswapped = !state->byteswapped;
+#endif
     }
   memcpy(buf, &rpmdbid, 4);
   if (state->byteswapped)
@@ -2477,7 +2501,11 @@ rpm_byrpmh(Header h, void **statep)
   int sigdsize, sigcnt, l;
   RpmHead *rpmhead;
 
+#ifndef RPM5
   uh = headerUnload(h);
+#else
+  uh = headerUnload(h, NULL);
+#endif
   if (!uh)
     return 0;
   sigcnt = getu32(uh);
@@ -2993,7 +3021,11 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   parsekeydata(s, data, pkts, pktsl);
   /* only rpm knows how to do the release calculation, we don't dare
    * to recreate all the bugs */
+#ifndef RPM5
   dig = pgpNewDig();
+#else
+  dig = pgpDigNew(RPMVSF_DEFAULT, 0);
+#endif
   (void) pgpPrtPkts(pkts, pktsl, dig, 0);
   btime = dig->pubkey.time[0] << 24 | dig->pubkey.time[1] << 16 | dig->pubkey.time[2] << 8 | dig->pubkey.signid[3];
   sprintf(evrbuf, "%02x%02x%02x%02x-%02x%02x%02x%02x", dig->pubkey.signid[4], dig->pubkey.signid[5], dig->pubkey.signid[6], dig->pubkey.signid[7], dig->pubkey.time[0], dig->pubkey.time[1], dig->pubkey.time[2], dig->pubkey.time[3]);
@@ -3007,7 +3039,7 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_KEYID, keyid);
   if (dig->pubkey.userid)
     setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, dig->pubkey.userid);
-  pgpFreeDig(dig);
+  (void)pgpFreeDig(dig);
   sat_free((void *)pkts);
   return 1;
 }
