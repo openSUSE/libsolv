@@ -1,12 +1,5 @@
 #!/usr/bin/ruby
 
-#  bool: method?
-#  inplace mod: method!
-#  set method: method=
-
-# map  => collect
-# grep => find_all
-
 require 'solv'
 require 'rubygems'
 require 'inifile'
@@ -107,6 +100,12 @@ class Repo_generic
     end
   end
 
+  def download_location(location, chksum)
+    f = download(location, false, chksum)
+    abort("\n#{@name}: #{location} not found in repository\n") unless f
+    return f
+  end
+
   def usecachedrepo(ext, mark = false)
     cookie = ext ? @extcookie : @cookie
     begin
@@ -149,10 +148,10 @@ class Repo_generic
     chksum.add(@cookie)
     if f
       s = f.stat()
-      chksum.add(s.dev.to_s);
-      chksum.add(s.ino.to_s);
-      chksum.add(s.size.to_s);
-      chksum.add(s.mtime.to_s);
+      chksum.add(s.dev.to_s)
+      chksum.add(s.ino.to_s)
+      chksum.add(s.size.to_s)
+      chksum.add(s.mtime.to_s)
     end
     @extcookie = chksum.raw()
     @extcookie[0] = 1 if @extcookie[0] == 0
@@ -458,6 +457,12 @@ class Repo_susetags < Repo_generic
     return true
   end
 
+  def download_location(location, chksum)
+    datadir = @handle.lookup_str(Solv::SOLVID_META, Solv::SUSETAGS_DATADIR)
+    datadir = "suse" unless datadir
+    super("#{datadir}/#{location}", chksum)
+  end
+
 end
 
 class Repo_unknown < Repo_generic
@@ -506,7 +511,7 @@ def depglob(pool, name, globname, globdep)
       return [ pool.Job(Solv::Job::SOLVER_SOLVABLE_PROVIDES, id) ]
     end
   end
-  return [] unless name =~ /[\[*?]/;
+  return [] unless name =~ /[\[*?]/
   if globname
     idmatches = {}
     for d in pool.Dataiterator(0, Solv::SOLVABLE_NAME, name, Solv::Dataiterator::SEARCH_GLOB)
@@ -518,7 +523,7 @@ def depglob(pool, name, globname, globdep)
     end
   end
   if globdep
-    idmatches = pool.matchprovidingids(name, Solv::Dataiterator::SEARCH_GLOB);
+    idmatches = pool.matchprovidingids(name, Solv::Dataiterator::SEARCH_GLOB)
     if !idmatches.empty?
       puts "[using capability match for '#{name}']"
       return idmatches.sort.collect { |id| pool.Job(Solv::Job::SOLVER_SOLVABLE_PROVIDES, id) }
@@ -775,8 +780,27 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
 	for element in elements
 	  puts "  - #{element.str}"
 	end
+	puts
       end
-      exit
+      sol = nil
+      while true
+        print "Please choose a solution: "
+        STDOUT.flush
+        sol = STDIN.gets.strip
+        break if sol == 's' || sol == 'q'
+        break if sol =~ /^\d+$/ && sol.to_i >= 1 && sol.to_i <= solutions.length
+      end
+      next if sol == 's'
+      abort if sol == 'q'
+      solution = solutions[sol.to_i - 1]
+      for element in solution.elements
+        if element.type == Solv::Solver::SOLVER_SOLUTION_JOB
+          jobs[element.jobidx] = pool.Job(Solv::Job::SOLVER_NOOP, 0)
+	else
+          newjob = element.Job()
+          jobs.push(newjob) if newjob && !jobs.find {|j| j.how == newjob.how && j.what == newjob.what}
+	end
+      end
     end
   end
   trans = solver.transaction
@@ -816,4 +840,50 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
     puts
   end
   puts "install size change: #{trans.calc_installsizechange()} K\n\n"
+  while true:
+    print("OK to continue (y/n)? ")
+    STDOUT.flush
+    yn = STDIN.gets.strip
+    break if yn == 'y'
+    abort if yn == 'n'
+  end
+  newpkgs = trans.newpackages()
+  newpkgsfp = {}
+  if !newpkgs.empty?
+    downloadsize = 0
+    for p in newpkgs
+      downloadsize += p.lookup_num(Solv::SOLVABLE_DOWNLOADSIZE)
+    end
+    puts "Downloading #{newpkgs.length} packages, #{downloadsize} K"
+    for p in newpkgs
+      repo = p.repo.appdata
+      location, medianr = p.lookup_location()
+      next unless location
+      chksum = p.lookup_checksum(Solv::SOLVABLE_CHECKSUM)
+      f = repo.download_location(location, chksum)
+      newpkgsfp[p.id] = f
+      print "."
+      STDOUT.flush()
+    end
+    puts
+  end
+  puts "Committing transaction:"
+  puts
+  trans.order(0)
+  for p in trans.steps
+    steptype = trans.steptype(p, Solv::Transaction::SOLVER_TRANSACTION_RPM_ONLY)
+    if steptype == Solv::Transaction::SOLVER_TRANSACTION_ERASE
+      puts "erase #{p.str}"
+      next unless p.lookup_num(Solv::RPM_RPMDBID)
+      evr = p.evr.sub(/^[0-9]+:/, '')
+      system('rpm', '-e', '--nodeps', '--nodigest', '--nosignature', "#{p.name}-#{evr}.#{p.arch}") || abort("rpm failed: #{$? >> 8}") 
+    elsif (steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL || steptype == Solv::Transaction::SOLVER_TRANSACTION_MULTIINSTALL)
+      puts "install #{p.str}"
+      f = newpkgsfp.delete(p.id)
+      next unless f
+      mode = steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i'
+      system('rpm', mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/#{Solv::xfileno(f).to_s}") || abort("rpm failed: #{$? >> 8}")
+      solv::xfclose(f)
+    end
+  end
 end
