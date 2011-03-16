@@ -399,6 +399,11 @@ class Repo_system < Repo_generic
 end
 
 
+def validarch?(pool, arch)
+  return false unless arch && arch != ''
+  id = pool.str2id(arch, false)
+  return id != 0 && pool.isknownarch?(id)
+end
 
 def depglob(pool, name, globname, globdep)
   id = pool.str2id(name, false)
@@ -434,6 +439,69 @@ def depglob(pool, name, globname, globdep)
   return []
 end
 
+def limitjobs(pool, jobs, flags, evrstr)
+  njobs = []
+  evr = pool.str2id(evrstr)
+  for j in jobs
+    how = j.how
+    sel = how & Solv::Job::SOLVER_SELECTMASK
+    what = pool.rel2id(j.what, evr, flags)
+    if flags == Solv::REL_ARCH
+      how |= Solv::Job::SOLVER_SETARCH
+    elsif flags == Solv::REL_EQ && sel == Solv::Job::SOLVER_SOLVABLE_NAME
+      how |= evrstr.include?(?-) ? Solv::Job::SOLVER_SETEVR : Solv::Job::SOLVER_SETEV
+    end
+    njobs << pool.Job(how, what)
+  end
+  return njobs
+end
+
+def limitjobs_evrarch(pool, jobs, flags, evrstr)
+  if evrstr =~ /^(.+)\.(.+?)$/ && validarch?(pool, $2)
+    evrstr = $1
+    jobs = limitjobs(pool, jobs, Solv::REL_ARCH, $2)
+  end
+  return limitjobs(pool, jobs, flags, evrstr)
+end
+
+def mkjobs_rel(pool, cmd, name, rel, evr)
+  flags = 0
+  flags |= Solv::REL_LT if rel.include?(?<)
+  flags |= Solv::REL_EQ if rel.include?(?=)
+  flags |= Solv::REL_GT if rel.include?(?>)
+  jobs = depglob(pool, name, true, true)
+  return limitjobs(pool, jobs, flags, evr) unless jobs.empty?
+  if (name =~ /^(.+)\.(.+?)$/) && validarch?(pool, $2)
+    arch = $2
+    jobs = depglob(pool, name, true, true)
+    return [] if jobs.empty?
+    jobs = limitjobs(pool, jobs, Solv::REL_ARCH, arch)
+    return limitjobs(pool, jobs, flags, evr)
+  end
+  return []
+end
+
+def mkjobs_nevra(pool, cmd, arg)
+  jobs = depglob(pool, arg, true, true)
+  return jobs unless jobs.empty?
+  if ((arg =~ /^(.+)\.(.+?)$/) && validarch?(pool, $2))
+    arch = $2
+    jobs = depglob(pool, $1, true, true)
+    return limitjobs(pool, jobs, Solv::REL_ARCH, arch) unless jobs.empty?
+  end
+  if (arg =~ /^(.+)-(.+?)$/)
+    evr = $2
+    jobs = depglob(pool, $1, true, false)
+    return limitjobs_evrarch(pool, jobs, Solv::REL_EQ, evr) unless jobs.empty?
+  end
+  if (arg =~ /^(.+)-(.+?-.+?)$/)
+    evr = $2
+    jobs = depglob(pool, $1, true, false)
+    return limitjobs_evrarch(pool, jobs, Solv::REL_EQ, evr) unless jobs.empty?
+  end
+  return []
+end
+
 def mkjobs_filelist(pool, cmd, arg)
   type = Solv::Dataiterator::SEARCH_STRING
   type = Solv::Dataiterator::SEARCH_GLOB if arg =~ /[\[*?]/
@@ -463,7 +531,11 @@ def mkjobs(pool, cmd, arg)
     jobs = mkjobs_filelist(pool, cmd, arg)
     return jobs unless jobs.empty?
   end
-  return depglob(pool, arg, true, true)
+  if (arg =~ /^(.+?)\s*([<=>]+)\s*(.+?)$/)
+    return mkjobs_rel(pool, cmd, $1, $2, $3)
+  else
+    return mkjobs_nevra(pool, cmd, arg)
+  end
 end
 
 args = ARGV
@@ -532,21 +604,122 @@ for arg in args
   jobs += njobs
 end
 
-for job in jobs
-  job.how |= Solv::Job::SOLVER_ERASE
+if cmd == 'list' || cmd == 'info'
+  abort("no package matched.") if jobs.empty?
+    for job in jobs
+      for s in job.solvables()
+        if cmd == 'info'
+	  puts "Name:        #{s.str}"
+          puts "Repo:        #{s.repo.name}"
+          puts "Summary:     #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
+          str = s.lookup_str(Solv::SOLVABLE_URL)
+          puts "Url:         #{str}" if str
+          str = s.lookup_str(Solv::SOLVABLE_LICENSE)
+          puts "License:     #{str}" if str
+          puts "Description:\n#{s.lookup_str(Solv::SOLVABLE_DESCRIPTION)}"
+          puts
+        else
+	  puts "  - #{s.str} [#{s.repo.name}]"
+	  puts "    #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
+        end
+      end
+    end
+  exit
 end
 
-solver = pool.Solver
-problems = solver.solve(jobs)
-for problem in problems
-  puts "Problem #{problem.id}:"
-  puts problem.findproblemrule.info.problemstr
-  solutions = problem.solutions
-  for solution in solutions
-    puts "  Solution #{solution.id}:"
-    elements = solution.elements
-    for element in elements
-      puts "  - type #{element.type}"
+if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == 'verify'
+  if jobs.empty?
+    if cmd == 'up' || cmd == 'verify'
+      jobs = [ pool.Job(Solv::Job::SOLVER_SOLVABLE_ALL, 0) ]
+    elsif cmd != 'dup'
+      abort("no package matched.")
     end
   end
+  for job in jobs
+    if cmd == 'up'
+      if job.how == Solv::Job::SOLVER_SOLVABLE_ALL || job.solvables.any? {|s| s.isinstalled?}
+        job.how |= Solv::Job::SOLVER_UPDATE
+      else
+        job.how |= Solv::Job::SOLVER_INSTALL
+      end
+    elsif cmd == 'install'
+      job.how |= Solv::Job::SOLVER_INSTALL
+    elsif cmd == 'erase'
+      job.how |= Solv::Job::SOLVER_ERASE
+    elsif cmd == 'dup'
+      job.how |= Solv::Job::SOLVER_DISTUPGRADE
+    elsif cmd == 'verify'
+      job.how |= Solv::Job::SOLVER_VERIFY
+    end
+  end
+
+  solver = nil
+  #pool.set_debuglevel(1)
+  while true
+    solver = pool.Solver
+    solver.ignorealreadyrecommended = true
+    solver.allowuninstall = true if cmd == 'erase'
+    if cmd == 'dup' && jobs.empty?
+      solver.distupgrade = true
+      solver.updatesystem = true
+      solver.allowdowngrade = true
+      solver.allowvendorchange = true
+      solver.allowarchchange = true
+      solver.dosplitprovides = true
+    elsif cmd == 'up' && jobs.length == 1 && jobs[0].how == (Solv::Job::SOLVER_UPDATE | Solv::Job::SOLVER_SOLVABLE_ALL)
+      solver.dosplitprovides = true
+    end
+    problems = solver.solve(jobs)
+    break if problems.empty?
+    for problem in problems
+      puts "Problem #{problem.id}:"
+      puts problem.findproblemrule.info.problemstr
+      solutions = problem.solutions
+      for solution in solutions
+	puts "  Solution #{solution.id}:"
+	elements = solution.elements(true)
+	for element in elements
+	  puts "  - #{element.str}"
+	end
+      end
+      exit
+    end
+  end
+  trans = solver.transaction
+  solver = nil
+  if trans.isempty?
+    puts "Nothing to do."
+    exit
+  end
+  puts "\nTransaction summary:\n"
+  for cl in trans.classify()
+    if cl.type == Solv::Transaction::SOLVER_TRANSACTION_ERASE
+      puts "#{cl.count} erased packages:"
+    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_INSTALL
+      puts "#{cl.count} installed packages:"
+    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_REINSTALLED
+      puts "#{cl.count} reinstalled packages:"
+    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED
+      puts "#{cl.count} downgraded packages:"
+    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_CHANGED
+      puts "#{cl.count} changed packages:"
+    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_UPGRADED
+      puts "#{cl.count} upgraded packages:"
+    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE
+      puts "#{cl.count} vendor changes from '#{pool.id2str(cl.fromid)}' to '#{pool.id2str(cl.toid)}':"
+    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE
+      puts "#{cl.count} arch changes from '#{pool.id2str(cl.fromid)}' to '#{pool.id2str(cl.toid)}':"
+    else
+      next
+    end
+    for p in cl.solvables
+      if cl.type == Solv::Transaction::SOLVER_TRANSACTION_UPGRADED || cl.type == Solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED
+	puts "  - #{p.str} -> #{trans.othersolvable(p).str}"
+      else
+	puts "  - #{p.str}"
+      end
+    end
+    puts
+  end
+  puts "install size change: #{trans.calc_installsizechange()} K\n\n"
 end

@@ -352,8 +352,12 @@ typedef VALUE AppObjectPtr;
 #define true 1
 #define false 1
 
-#define SOLVER_SOLUTION_ERASE -100
-#define SOLVER_SOLUTION_REPLACE -101
+#define SOLVER_SOLUTION_ERASE                   -100
+#define SOLVER_SOLUTION_REPLACE                 -101
+#define SOLVER_SOLUTION_REPLACE_DOWNGRADE       -102
+#define SOLVER_SOLUTION_REPLACE_ARCHCHANGE      -103
+#define SOLVER_SOLUTION_REPLACE_VENDORCHANGE    -104
+
 typedef struct chksum Chksum;
 typedef int bool;
 typedef void *AppObjectPtr;
@@ -429,6 +433,15 @@ typedef struct {
   Id target;
   Id dep;
 } Ruleinfo;
+
+typedef struct {
+  Transaction *transaction;
+  int mode;
+  Id type;
+  int count;
+  Id fromid;
+  Id toid;
+} TransactionClass;
 
 typedef Dataiterator Datamatch;
 
@@ -591,6 +604,13 @@ typedef struct {
   Pool * const pool;
 } Transaction;
 
+typedef struct {
+  Transaction * const transaction;
+  Id const type;
+  Id const fromid;
+  Id const toid;
+  int const count;
+} TransactionClass;
 
 
 %extend Job {
@@ -976,6 +996,9 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   Id towhatprovides(Queue q) {
     return pool_queuetowhatprovides($self, &q);
   }
+#ifdef SWIGRUBY
+  %rename("isknownarch?") isknownarch;
+#endif
   bool isknownarch(Id id) {
     Pool *pool = $self;
     if (!id || id == ID_EMPTY)
@@ -1010,7 +1033,7 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     repo_empty($self, reuseids);
   }
 #ifdef SWIGRUBY
-  %rename("isempty?") isempty();
+  %rename("isempty?") isempty;
 #endif
   bool isempty() {
     return !$self->nsolvables;
@@ -1122,7 +1145,7 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
       repodata_create_stubs(data);
   }
 #ifdef SWIGRUBY
-  %rename("iscontiguous?") iscontiguous();
+  %rename("iscontiguous?") iscontiguous;
 #endif
   bool iscontiguous() {
     int i;
@@ -1478,11 +1501,14 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     return solvable_get_location($self->pool->solvables + $self->id, OUTPUT);
   }
 #ifdef SWIGRUBY
-  %rename("installable?") installable();
+  %rename("installable?") installable;
 #endif
   bool installable() {
     return pool_installable($self->pool, pool_id2solvable($self->pool, $self->id));
   }
+#ifdef SWIGRUBY
+  %rename("isinstalled?") isinstalled;
+#endif
   bool isinstalled() {
     Pool *pool = $self->pool;
     return pool->installed && pool_id2solvable(pool, $self->id)->repo == pool->installed;
@@ -1612,36 +1638,104 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   int element_count() {
     return solver_solutionelement_count($self->solv, $self->problemid, $self->id);
   }
+
   %newobject elements;
-  %typemap(out) Queue elements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1, id));
-  Queue elements() {
+  %typemap(out) Queue elements Queue2Array(Solutionelement *, 4, new_Solutionelement(arg1->solv, arg1->problemid, arg1->id, id, idp[1], idp[2], idp[3]));
+  Queue elements(bool expandreplaces=0) {
     Queue q;
     int i, cnt;
     queue_init(&q);
-    cnt = solver_solution_count($self->solv, $self->id);
+    cnt = solver_solutionelement_count($self->solv, $self->problemid, $self->id);
     for (i = 1; i <= cnt; i++)
-      queue_push(&q, i);
+      {
+        Id p, rp, type;
+        solver_next_solutionelement($self->solv, $self->problemid, $self->id, i - 1, &p, &rp);
+        if (p > 0) {
+          type = rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_ERASE;
+        } else {
+          type = p;
+          p = rp;
+          rp = 0;
+        }
+        if (type == SOLVER_SOLUTION_REPLACE && expandreplaces) {
+          int illegal = policy_is_illegal(self->solv, self->solv->pool->solvables + p, self->solv->pool->solvables + rp, 0);
+          if (illegal) {
+            if ((illegal & POLICY_ILLEGAL_DOWNGRADE) != 0) {
+              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_DOWNGRADE);
+              queue_push2(&q, p, rp);
+            }
+            if ((illegal & POLICY_ILLEGAL_ARCHCHANGE) != 0) {
+              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_ARCHCHANGE);
+              queue_push2(&q, p, rp);
+            }
+            if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0) {
+              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_VENDORCHANGE);
+              queue_push2(&q, p, rp);
+            }
+            continue;
+          }
+        }
+        queue_push2(&q, i, type);
+        queue_push2(&q, p, rp);
+      }
     return q;
   }
 }
 
 %extend Solutionelement {
-  Solutionelement(Solution *s, Id id) {
+  Solutionelement(Solver *solv, Id problemid, Id solutionid, Id id, Id type, Id p, Id rp) {
     Solutionelement *e;
     e = sat_calloc(1, sizeof(*e));
-    e->solv = s->solv;
-    e->problemid = s->problemid;
-    e->solutionid = s->id;
+    e->solv = solv;
+    e->problemid = problemid;
+    e->solutionid = id;
     e->id = id;
-    solver_next_solutionelement(e->solv, e->problemid, e->solutionid, e->id - 1, &e->p, &e->rp);
-    if (e->p > 0) {
-      e->type = e->rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_ERASE;
-    } else {
-      e->type = e->p;
-      e->p = e->rp;
-      e->rp = 0;
-    }
+    e->type = type;
+    e->p = p;
+    e->rp = rp;
     return e;
+  }
+  const char *str() {
+    Id p = $self->type;
+    Id rp = $self->p;
+    if (p == SOLVER_SOLUTION_ERASE)
+      {
+        p = rp;
+        rp = 0;
+      }
+    else if (p == SOLVER_SOLUTION_REPLACE)
+      {
+        p = rp;
+        rp = $self->rp;
+      }
+    else if (p == SOLVER_SOLUTION_REPLACE_DOWNGRADE)
+      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, POLICY_ILLEGAL_DOWNGRADE, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
+    else if (p == SOLVER_SOLUTION_REPLACE_ARCHCHANGE)
+      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, POLICY_ILLEGAL_ARCHCHANGE, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
+    else if (p == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)
+      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, POLICY_ILLEGAL_VENDORCHANGE, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
+    return solver_solutionelement2str($self->solv, p, rp);
+  }
+  %newobject replaceelements;
+  %typemap(out) Queue replaceelements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1->solv, arg1->problemid, arg1->solutionid, arg1->id, id, arg1->p, arg1->rp));
+  Queue replaceelements() {
+    Queue q;
+    int illegal;
+
+    queue_init(&q);
+    if ($self->type != SOLVER_SOLUTION_REPLACE || $self->p <= 0 || $self->rp <= 0)
+      illegal = 0;
+    else
+      illegal = policy_is_illegal($self->solv, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp, 0);
+    if ((illegal & POLICY_ILLEGAL_DOWNGRADE) != 0)
+      queue_push(&q, SOLVER_SOLUTION_REPLACE_DOWNGRADE);
+    if ((illegal & POLICY_ILLEGAL_ARCHCHANGE) != 0)
+      queue_push(&q, SOLVER_SOLUTION_REPLACE_ARCHCHANGE);
+    if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0)
+      queue_push(&q, SOLVER_SOLUTION_REPLACE_VENDORCHANGE);
+    if (!q.count)
+      queue_push(&q, $self->type);
+    return q;
   }
   int illegalreplace() {
     if ($self->type != SOLVER_SOLUTION_REPLACE || $self->p <= 0 || $self->rp <= 0)
@@ -1668,7 +1762,7 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   Job *Job() {
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE, $self->p);
-    if ($self->type == SOLVER_SOLUTION_REPLACE)
+    if ($self->type == SOLVER_SOLUTION_REPLACE || $self->type == SOLVER_SOLUTION_REPLACE_DOWNGRADE || $self->type == SOLVER_SOLUTION_REPLACE_ARCHCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE, $self->rp);
     if ($self->type == SOLVER_SOLUTION_ERASE)
       return new_Job($self->solv->pool, SOLVER_ERASE|SOLVER_SOLVABLE, $self->p);
@@ -1702,6 +1796,9 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   static const int SOLVER_SOLUTION_DISTUPGRADE = SOLVER_SOLUTION_DISTUPGRADE;
   static const int SOLVER_SOLUTION_ERASE = SOLVER_SOLUTION_ERASE;
   static const int SOLVER_SOLUTION_REPLACE = SOLVER_SOLUTION_REPLACE;
+  static const int SOLVER_SOLUTION_REPLACE_DOWNGRADE = SOLVER_SOLUTION_REPLACE_DOWNGRADE;
+  static const int SOLVER_SOLUTION_REPLACE_ARCHCHANGE = SOLVER_SOLUTION_REPLACE_ARCHCHANGE;
+  static const int SOLVER_SOLUTION_REPLACE_VENDORCHANGE = SOLVER_SOLUTION_REPLACE_VENDORCHANGE;
 
   static const int POLICY_ILLEGAL_DOWNGRADE = POLICY_ILLEGAL_DOWNGRADE;
   static const int POLICY_ILLEGAL_ARCHCHANGE = POLICY_ILLEGAL_ARCHCHANGE;
@@ -1794,55 +1891,35 @@ rb_eval_string(
     sat_free($self);
   }
 #ifdef SWIGRUBY
-  %rename("isempty?") isempty();
+  %rename("isempty?") isempty;
 #endif
   bool isempty() {
     return $self->steps.count == 0;
   }
-  Queue classify_helper(int mode) {
-    Queue q;
-    queue_init(&q);
-    transaction_classify($self, mode, &q);
-    return q;
-  }
-  Queue classify_pkgs_helper(int mode, Id cl, Id from, Id to) {
-    Queue q;
-    queue_init(&q);
-    transaction_classify_pkgs($self, mode, cl, from, to, &q);
-    return q;
-  }
+
   %newobject othersolvable;
   XSolvable *othersolvable(XSolvable *s) {
     Id op = transaction_obs_pkg($self, s->id);
     return new_XSolvable($self->pool, op);
   }
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def classify(self, mode = 0):
-      r = []
-      cr = self.classify_helper(mode)
-      for type, cnt, fromid, toid in zip(*([iter(cr)] * 4)):
-        if type != self.SOLVER_TRANSACTION_IGNORE:
-          r.append([ type, [ self.pool.solvables[j] for j in self.classify_pkgs_helper(mode, type, fromid, toid) ], fromid, toid ])
-      return r
-    }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::Transaction::classify {
-      my ($self, $mode) = @_;
-      $mode ||= 0;
-      my @r = $self->classify_helper($mode);
-      my @res;
-      while (@r) {
-        my ($type, $cnt, $fromid, $toid) = splice(@r, 0, 4);
-        next if $type == $solv::Transaction::SOLVER_TRANSACTION_IGNORE;
-        push @res, [$type, [ map {$self->{'pool'}->{'solvables'}->[$_]} $self->classify_pkgs_helper($mode, $type, $fromid, $toid) ], $fromid, $toid];
-      }
-      return @res;
-    }
+
+  %newobject allothersolvables;
+  %typemap(out) Queue allothersolvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  Queue allothersolvables(XSolvable *s) {
+    Queue q;
+    queue_init(&q);
+    transaction_all_obs_pkgs($self, s->id, &q);
+    return q;
   }
-#endif
+
+  %typemap(out) Queue classify Queue2Array(TransactionClass *, 4, new_TransactionClass(arg1, arg2, id, idp[1], idp[2], idp[3]));
+  %newobject classify;
+  Queue classify(int mode = 0) {
+    Queue q;
+    queue_init(&q);
+    transaction_classify($self, mode, &q);
+    return q;
+  }
 
   %typemap(out) Queue newpackages Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
   %newobject newpackages;
@@ -1883,6 +1960,27 @@ rb_eval_string(
   }
   void order(int flags) {
     transaction_order($self, flags);
+  }
+}
+
+%extend TransactionClass {
+  TransactionClass(Transaction *trans, int mode, Id type, int count, Id fromid, Id toid) {
+    TransactionClass *cl = sat_calloc(1, sizeof(*cl));
+    cl->transaction = trans;
+    cl->mode = mode;
+    cl->type = type;
+    cl->count = count;
+    cl->fromid = fromid;
+    cl->toid = toid;
+    return cl;
+  }
+  %newobject solvables;
+  %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->transaction->pool, id));
+  Queue solvables() {
+    Queue q;
+    queue_init(&q);
+    transaction_classify_pkgs($self->transaction, $self->mode, $self->type, $self->fromid, $self->toid, &q);
+    return q;
   }
 }
 

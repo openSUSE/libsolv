@@ -527,8 +527,9 @@ sub depglob {
 }
 
 sub limitjobs {
-  my ($pool, $jobs, $flags, $evr) = @_;
+  my ($pool, $jobs, $flags, $evrstr) = @_;
   my @jobs;
+  my $evr = $pool->str2id($evrstr);
   for my $j (@$jobs) {
     my $how = $j->{'how'};
     my $sel = $how & $solv::Job::SOLVER_SELECTMASK;
@@ -536,21 +537,20 @@ sub limitjobs {
     if ($flags == $solv::REL_ARCH) {
       $how |= $solv::Job::SOLVER_SETARCH;
     } elsif ($flags == $solv::REL_EQ && $sel == $solv::Job::SOLVER_SOLVABLE_NAME) {
-      $how |= $pool->id2str($evr) =~ /-/ ? $solv::Job::SOLVER_SETEVR : $solv::Job::SOLVER_SETEV;
+      $how |= $evrstr =~ /-/ ? $solv::Job::SOLVER_SETEVR : $solv::Job::SOLVER_SETEV;
     }
     push @jobs, $pool->Job($how, $what);
   }
   return @jobs;
 }
 
-sub limitjobs_arch {
+sub limitjobs_evrarch {
   my ($pool, $jobs, $flags, $evrstr) = @_;
   if ($evrstr =~ /^(.+)\.(.+?)$/ && validarch($pool, $2)) {
-    my $evr = $pool->str2id($1);
-    my @jobs = limitjobs($pool, $jobs, $solv::REL_ARCH, $pool->str2id($2));
-    return limitjobs($pool, \@jobs, $flags, $evr);
+    $evrstr = $1;
+    $jobs = [ limitjobs($pool, $jobs, $solv::REL_ARCH, $2) ];
   }
-  return limitjobs($pool, $jobs, $flags, $pool->str2id($evrstr));
+  return limitjobs($pool, $jobs, $flags, $evrstr);
 }
 
 sub mkjobs_rel {
@@ -560,13 +560,13 @@ sub mkjobs_rel {
   $flags |= $solv::REL_EQ if $rel =~ /=/;
   $flags |= $solv::REL_GT if $rel =~ />/;
   my @jobs = depglob($pool, $name, 1, 1);
-  return limitjobs($pool, \@jobs, $flags, $pool->str2id($evr)) if @jobs;
+  return limitjobs($pool, \@jobs, $flags, $evr) if @jobs;
   if (($name =~ /^(.+)\.(.+?)$/s) && validarch($pool, $2)) {
     my $arch = $2;
     @jobs = depglob($pool, $1, 1, 1);
     if (@jobs) {
-      @jobs = limitjobs($pool, \@jobs, $solv::REL_ARCH, $pool->str2id($arch));
-      return limitjobs($pool, \@jobs, $flags, $pool->str2id($evr));
+      @jobs = limitjobs($pool, \@jobs, $solv::REL_ARCH, $arch);
+      return limitjobs($pool, \@jobs, $flags, $evr);
     }
   }
   return ();
@@ -579,17 +579,17 @@ sub mkjobs_nevra {
   if (($arg =~ /^(.+)\.(.+?)$/s) && validarch($pool, $2)) {
     my $arch = $2;
     @jobs = depglob($pool, $1, 1, 1);
-    return limitjobs($pool, \@jobs, $solv::REL_ARCH, $pool->str2id($arch)) if @jobs;
+    return limitjobs($pool, \@jobs, $solv::REL_ARCH, $arch) if @jobs;
   }
   if ($arg =~ /^(.+)-(.+?)$/s) {
     my $evr = $2;
     @jobs = depglob($pool, $1, 1, 0);
-    return limitjobs_arch($pool, \@jobs, $solv::REL_EQ, $evr) if @jobs;
+    return limitjobs_evrarch($pool, \@jobs, $solv::REL_EQ, $evr) if @jobs;
   }
   if ($arg =~ /^(.+)-(.+?-.+?)$/s) {
     my $evr = $2;
     @jobs = depglob($pool, $1, 1, 0);
-    return limitjobs_arch($pool, \@jobs, $solv::REL_EQ, $evr) if @jobs;
+    return limitjobs_evrarch($pool, \@jobs, $solv::REL_EQ, $evr) if @jobs;
   }
   return ();
 }
@@ -707,7 +707,7 @@ for my $arg (@ARGV) {
 if ($cmd eq 'list' || $cmd eq 'info') {
   die("no package matched.\n") unless @jobs;
   for my $job (@jobs) {
-    for my $s ($pool->jobsolvables($job)) {
+    for my $s ($job->solvables()) {
       if ($cmd eq 'info') {
         printf "Name:        %s\n", $s->str();
         printf "Repo:        %s\n", $s->{'repo'}->{'name'};
@@ -736,7 +736,7 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
   }
   for my $job (@jobs) {
     if ($cmd eq 'up') {
-      if ($job->{'how'} == $solv::Job::SOLVER_SOLVABLE_ALL || grep {$_->isinstalled()} $pool->jobsolvables($job)) {
+      if ($job->{'how'} == $solv::Job::SOLVER_SOLVABLE_ALL || grep {$_->isinstalled()} $job->solvables()) {
         $job->{'how'} |= $solv::Job::SOLVER_UPDATE;
       } else {
         $job->{'how'} |= $solv::Job::SOLVER_INSTALL;
@@ -830,28 +830,27 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
   }
   print "\nTransaction summary:\n\n";
   for my $c ($trans->classify()) {
-    my ($ctype, $pkgs, $fromid, $toid) = @$c;
-    if ($ctype == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
-      printf "%d erased packages:\n", scalar(@$pkgs);
-    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL) {
-      printf "%d installed packages:\n", scalar(@$pkgs);
-    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_REINSTALLED) {
-      printf "%d reinstalled packages:\n", scalar(@$pkgs);
-    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
-      printf "%d downgraded packages:\n", scalar(@$pkgs);
-    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_CHANGED) {
-      printf "%d changed packages:\n", scalar(@$pkgs);
-    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
-      printf "%d upgraded packages:\n", scalar(@$pkgs);
-    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
-      printf "%d vendor changes from '%s' to '%s':\n", scalar(@$pkgs), $pool->id2str($fromid), $pool->id2str($toid);
-    } elsif ($ctype == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
-      printf "%d arch changes from '%s' to '%s':\n", scalar(@$pkgs), $pool->id2str($fromid), $pool->id2str($toid);
+    if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
+      print "$c->{'count'} erased packages:\n";
+    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_INSTALL) {
+      print "$c->{'count'} installed packages:\n";
+    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_REINSTALLED) {
+      print "$c->{'count'} reinstalled packages:\n";
+    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
+      print "$c->{'count'} downgraded packages:\n";
+    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_CHANGED) {
+      print "$c->{'count'} changed packages:\n";
+    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
+      print "$c->{'count'} upgraded packages:\n";
+    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
+      printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $pool->id2str($c->{'fromid'}), $pool->id2str($c->{'toid'});
+    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
+      printf "$c->{'count'} arch changes from '%s' to '%s':\n", $pool->id2str($c->{'fromid'}), $pool->id2str($c->{'toid'});
     } else {
       next;
     }
-    for my $p (@$pkgs) {
-      if ($ctype == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED || $ctype == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
+    for my $p ($c->solvables()) {
+      if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED || $c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
 	my $other = $trans->othersolvable($p);
 	printf "  - %s -> %s\n", $p->str(), $other->str();
       } else {

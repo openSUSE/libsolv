@@ -570,8 +570,9 @@ def validarch(pool, arch):
 	return False
     return pool.isknownarch(id)
 
-def limitjobs(pool, jobs, flags, evr):
+def limitjobs(pool, jobs, flags, evrstr):
     njobs = []
+    evr = pool.str2id(evrstr)
     for j in jobs:
 	how = j.how
 	sel = how & Job.SOLVER_SELECTMASK
@@ -579,20 +580,19 @@ def limitjobs(pool, jobs, flags, evr):
         if flags == solv.REL_ARCH:
 	    how |= Job.SOLVER_SETARCH
 	elif flags == solv.REL_EQ and sel == Job.SOLVER_SOLVABLE_NAME:
-	    if pool.id2str(evr).find('-') >= 0:
+	    if evrstr.find('-') >= 0:
 		how |= Job.SOLVER_SETEVR
 	    else:
 		how |= Job.SOLVER_SETEV
 	njobs.append(pool.Job(how, what))
     return njobs
 
-def limitjobs_arch(pool, jobs, flags, evr):
-    m = re.match(r'(.+)\.(.+?)$', evr)
+def limitjobs_evrarch(pool, jobs, flags, evrstr):
+    m = re.match(r'(.+)\.(.+?)$', evrstr)
     if m and validarch(pool, m.group(2)):
-	jobs = limitjobs(pool, jobs, solv.REL_ARCH, pool.str2id(m.group(2)))
-	return limitjobs(pool, jobs, flags, pool.str2id(m.group(1)))
-    else:
-	return limitjobs(pool, jobs, flags, pool.str2id(evr))
+	jobs = limitjobs(pool, jobs, solv.REL_ARCH, m.group(2))
+        evrstr = m.group(1)
+    return limitjobs(pool, jobs, flags, evrstr)
 
 def mkjobs_filelist(pool, cmd, arg):
     if re.search(r'[[*?]', arg):
@@ -624,13 +624,13 @@ def mkjobs_rel(pool, cmd, name, rel, evr):
     if rel.find('>') >= 0: flags |= solv.REL_GT
     jobs = depglob(pool, name, True, True)
     if jobs:
-	return limitjobs(pool, jobs, flags, pool.str2id(evr))
+	return limitjobs(pool, jobs, flags, evr)
     m = re.match(r'(.+)\.(.+?)$', name)
     if m and validarch(pool, m.group(2)):
 	jobs = depglob(pool, m.group(1), True, True)
 	if jobs:
-	    jobs = limitjobs(pool, jobs, solv.REL_ARCH, pool.str2id(m.group(2)))
-	    return limitjobs(pool, jobs, flags, pool.str2id(evr))
+	    jobs = limitjobs(pool, jobs, solv.REL_ARCH, m.group(2))
+	    return limitjobs(pool, jobs, flags, evr)
     return []
 
 def mkjobs_nevra(pool, cmd, arg):
@@ -641,17 +641,17 @@ def mkjobs_nevra(pool, cmd, arg):
     if m and validarch(pool, m.group(2)):
 	jobs = depglob(pool, m.group(1), True, True)
 	if jobs:
-	    return limitjobs(pool, jobs, solv.REL_ARCH, pool.str2id(m.group(2)))
+	    return limitjobs(pool, jobs, solv.REL_ARCH, m.group(2))
     m = re.match(r'(.+)-(.+?)$', arg)
     if m:
 	jobs = depglob(pool, m.group(1), True, False)
 	if jobs:
-	    return limitjobs_arch(pool, jobs, solv.REL_EQ, m.group(2))
+	    return limitjobs_evrarch(pool, jobs, solv.REL_EQ, m.group(2))
     m = re.match(r'(.+)-(.+?-.+?)$', arg)
     if m:
 	jobs = depglob(pool, m.group(1), True, False)
 	if jobs:
-	    return limitjobs_arch(pool, jobs, solv.REL_EQ, m.group(2))
+	    return limitjobs_evrarch(pool, jobs, solv.REL_EQ, m.group(2))
     return []
 
 def mkjobs(pool, cmd, arg):
@@ -834,7 +834,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
     for job in jobs:
 	if cmd == 'up':
 	    # up magic: use install instead of update if no installed package matches
-	    if job.how == Job.SOLVER_SOLVABLE_ALL or filter(lambda s: s.isinstalled(), pool.jobsolvables(job)):
+	    if job.how == Job.SOLVER_SOLVABLE_ALL or filter(lambda s: s.isinstalled(), job.solvables()):
 		job.how |= Job.SOLVER_UPDATE
 	    else:
 		job.how |= Job.SOLVER_INSTALL
@@ -936,26 +936,26 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
     print
     print "Transaction summary:"
     print
-    for ctype, pkgs, fromid, toid in trans.classify():
-	if ctype == Transaction.SOLVER_TRANSACTION_ERASE:
-	    print "%d erased packages:" % len(pkgs)
-	elif ctype == Transaction.SOLVER_TRANSACTION_INSTALL:
-	    print "%d installed packages:" % len(pkgs)
-	elif ctype == Transaction.SOLVER_TRANSACTION_REINSTALLED:
-	    print "%d reinstalled packages:" % len(pkgs)
-	elif ctype == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
-	    print "%d downgraded packages:" % len(pkgs)
-	elif ctype == Transaction.SOLVER_TRANSACTION_CHANGED:
-	    print "%d changed packages:" % len(pkgs)
-	elif ctype == Transaction.SOLVER_TRANSACTION_UPGRADED:
-	    print "%d upgraded packages:" % len(pkgs)
-	elif ctype == Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
-	    print "%d vendor changes from '%s' to '%s':" % (len(pkgs), pool.id2str(fromid), pool.id2str(toid))
-	elif ctype == Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
-	    print "%d arch changes from '%s' to '%s':" % (len(pkgs), pool.id2str(fromid), pool.id2str(toid))
+    for cl in trans.classify():
+	if cl.type == Transaction.SOLVER_TRANSACTION_ERASE:
+	    print "%d erased packages:" % cl.count
+	elif cl.type == Transaction.SOLVER_TRANSACTION_INSTALL:
+	    print "%d installed packages:" % cl.count
+	elif cl.type == Transaction.SOLVER_TRANSACTION_REINSTALLED:
+	    print "%d reinstalled packages:" % cl.count
+	elif cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+	    print "%d downgraded packages:" % cl.count
+	elif cl.type == Transaction.SOLVER_TRANSACTION_CHANGED:
+	    print "%d changed packages:" % cl.count
+	elif cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED:
+	    print "%d upgraded packages:" % cl.count
+	elif cl.type == Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
+	    print "%d vendor changes from '%s' to '%s':" % (cl.count, pool.id2str(cl.fromid), pool.id2str(cl.toid))
+	elif cl.type == Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
+	    print "%d arch changes from '%s' to '%s':" % (cl.count, pool.id2str(cl.fromid), pool.id2str(cl.toid))
 	else:
 	    continue
-	for p in pkgs:
+	for p in cl.solvables():
 	    if ctype == Transaction.SOLVER_TRANSACTION_UPGRADED or ctype == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
 		op = trans.othersolvable(p)
 		print "  - %s -> %s" % (p.str(), op.str())
