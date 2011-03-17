@@ -955,7 +955,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	else:
 	    continue
 	for p in cl.solvables():
-	    if ctype == Transaction.SOLVER_TRANSACTION_UPGRADED or ctype == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+	    if cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED or cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
 		op = trans.othersolvable(p)
 		print "  - %s -> %s" % (p.str(), op.str())
 	    else:
