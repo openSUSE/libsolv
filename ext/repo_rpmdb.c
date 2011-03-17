@@ -47,7 +47,8 @@
 #include "repo_rpmdb.h"
 
 /* 3: added triggers */
-#define RPMDB_COOKIE_VERSION 3
+/* 4: fixed triggers */
+#define RPMDB_COOKIE_VERSION 4
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
@@ -1123,6 +1124,15 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       id = copydir(pool, data, fromspool, fromdata, id, cbdata->dircache);
       repodata_add_dirstr(data, handle, keyname, id, kv->str);
       break;
+    case REPOKEY_TYPE_IDARRAY:	/* used for triggers */
+      id = kv->id;
+      assert(!data->localpool);	/* implement me! */
+      if (ISRELDEP(id))
+	break;		/* can't do those at the moment */
+      if (pool != frompool || fromdata->localpool)
+	id = str2id(pool, stringpool_id2str(fromspool, id), 1);
+      repodata_add_idarray(data, handle, keyname, id);
+      break;
     default:
       break;
     }
@@ -1225,6 +1235,38 @@ swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
     }
 }
 
+
+static inline Id db2rpmdbid(unsigned char *db, int byteswapped)
+{
+#ifdef RPM5
+  return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
+#else
+# if defined(WORDS_BIGENDIAN)
+  if (!byteswapped)
+# else
+  if (byteswapped)
+# endif
+    return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
+  else
+    return db[3] << 24 | db[2] << 16 | db[1] << 8 | db[0];
+#endif
+}
+
+static inline void rpmdbid2db(unsigned char *db, Id id, int byteswapped)
+{
+#ifdef RPM5
+  db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
+#else
+# if defined(WORDS_BIGENDIAN)
+  if (!byteswapped)
+    db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
+# else
+  if (byteswapped)
+    db[3] = id >> 24, db[2] = id >> 16, db[1] = id >> 8, db[0] = id;
+# endif
+#endif
+}
+
 static void
 mkrpmdbcookie(struct stat *st, unsigned char *cookie)
 {
@@ -1278,7 +1320,6 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
 {
   char dbpath[PATH_MAX];
   struct stat statbuf;
-  int byteswapped;
   DB *db = 0;
   DBC *dbc = 0;
   int count = 0;
@@ -1298,11 +1339,6 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
   if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
     {
       perror("db->open Name index");
-      exit(1);
-    }
-  if (db->get_byteswapped(db, &byteswapped))
-    {
-      perror("db->get_byteswapped");
       exit(1);
     }
   if (db->cursor(db, NULL, &dbc, 0))
@@ -1401,9 +1437,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  perror("db->get_byteswapped");
 	  exit(1);
 	}
-#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
-      byteswapped = !byteswapped;
-#endif
       if (db->cursor(db, NULL, &dbc, 0))
 	{
 	  perror("db->cursor");
@@ -1430,16 +1463,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	      fprintf(stderr, "corrupt Packages database (key size)\n");
 	      exit(1);
 	    }
-	  dp = dbkey.data;
-	  if (byteswapped)
-	    {
-	      dbidp[0] = dp[3];
-	      dbidp[1] = dp[2];
-	      dbidp[2] = dp[1];
-	      dbidp[3] = dp[0];
-	    }
-	  else
-	    memcpy(dbidp, dp, 4);
+	  dbid = db2rpmdbid(dbkey.data, byteswapped);
 	  if (dbid == 0)		/* the join key */
 	    continue;
 	  if (dbdata.size < 8)
@@ -1532,9 +1556,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  perror("db->get_byteswapped");
 	  exit(1);
 	}
-#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
-      byteswapped = !byteswapped;
-#endif
       if (db->cursor(db, NULL, &dbc, 0))
 	{
 	  perror("db->cursor");
@@ -1551,17 +1572,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  dp = dbdata.data;
 	  while(dl >= RPM_INDEX_SIZE)
 	    {
-	      if (byteswapped)
-		{
-		  dbidp[0] = dp[3];
-		  dbidp[1] = dp[2];
-		  dbidp[2] = dp[1];
-		  dbidp[3] = dp[0];
-		}
-	      else
-		memcpy(dbidp, dp, 4);
 	      rpmids = sat_extend(rpmids, nrpmids, 1, sizeof(*rpmids), 255);
-	      rpmids[nrpmids].dbid = dbid;
+	      rpmids[nrpmids].dbid = db2rpmdbid(dp, byteswapped);
 	      rpmids[nrpmids].name = sat_malloc((int)dbkey.size + 1);
 	      memcpy(rpmids[nrpmids].name, dbkey.data, (int)dbkey.size);
 	      rpmids[nrpmids].name[(int)dbkey.size] = 0;
@@ -1623,7 +1635,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       for (i = 0, rp = rpmids; i < nrpmids; i++, rp++, s++)
 	{
 	  dbid = rp->dbid;
-	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
+	  repo->rpmdbid[(s - pool->solvables) - repo->start] = rp->dbid;
 	  if (refhash)
 	    {
 	      h = dbid & refmask;
@@ -1660,19 +1672,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 		  perror("db->get_byteswapped");
 		  exit(1);
 		}
-#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
-	      byteswapped = !byteswapped;
-#endif
 	    }
-	  if (byteswapped)
-	    {
-	      buf[0] = dbidp[3];
-	      buf[1] = dbidp[2];
-	      buf[2] = dbidp[1];
-	      buf[3] = dbidp[0];
-	    }
-	  else
-	    memcpy(buf, dbidp, 4);
+          rpmdbid2db(buf, rp->dbid, byteswapped);
 	  dbkey.data = buf;
 	  dbkey.size = 4;
 	  dbdata.data = 0;
@@ -2181,7 +2182,6 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
   int byteswapped;
   DBT dbkey;
   DBT dbdata;
-  Id rpmdbid;
   unsigned char *dp;
   int dl;
 
@@ -2211,9 +2211,6 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
       db->close(db, 0);
       return 0;
     }
-#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
-  byteswapped = !byteswapped;
-#endif
   if (db->cursor(db, NULL, &dbc, 0))
     {
       perror("db->cursor");
@@ -2235,17 +2232,8 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
       dp = dbdata.data;
       while(dl >= RPM_INDEX_SIZE)
 	{
-	  if (byteswapped)
-	    {
-	      ((char *)&rpmdbid)[0] = dp[3];
-	      ((char *)&rpmdbid)[1] = dp[2];
-	      ((char *)&rpmdbid)[2] = dp[1];
-	      ((char *)&rpmdbid)[3] = dp[0];
-	    }
-	  else
-	    memcpy((char *)&rpmdbid, dp, 4);
 	  entries = sat_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
-	  entries[nentries].rpmdbid = rpmdbid;
+	  entries[nentries].rpmdbid = db2rpmdbid(dp, byteswapped);
 	  entries[nentries].nameoff = namedatal;
 	  nentries++;
 	  namedata = sat_extend(namedata, namedatal, dbkey.size + 1, 1, NAMEDATA_BLOCK);
@@ -2357,17 +2345,8 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
 	  state->dbenv = 0;
 	  return 0;
 	}
-#if defined(RPM5) && !defined(WORDS_BIGENDIAN)
-      state->byteswapped = !state->byteswapped;
-#endif
     }
-  memcpy(buf, &rpmdbid, 4);
-  if (state->byteswapped)
-    {
-      unsigned char bx;
-      bx = buf[0]; buf[0] = buf[3]; buf[3] = bx;
-      bx = buf[1]; buf[1] = buf[2]; buf[2] = bx;
-    }
+  rpmdbid2db(buf, rpmdbid, state->byteswapped);
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
   dbkey.data = buf;
