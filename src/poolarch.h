@@ -11,6 +11,7 @@
 #include "pool.h"
 
 extern void pool_setarch(Pool *, const char *);
+extern void pool_setarchpolicy(Pool *, const char *);
 extern unsigned char pool_arch2color_slow(Pool *pool, Id arch);
 
 #define ARCHCOLOR_32    1

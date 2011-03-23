@@ -20,7 +20,7 @@
 #include "poolarch.h"
 #include "util.h"
 
-const char *archpolicies[] = {
+static const char *archpolicies[] = {
   "x86_64",	"x86_64:i686:i586:i486:i386",
   "i686",	"i686:i586:i486:i386",
   "i586",	"i586:i486:i386",
@@ -56,11 +56,37 @@ const char *archpolicies[] = {
 void
 pool_setarch(Pool *pool, const char *arch)
 {
-  const char *a;
+  if (arch)
+    {
+      int i;
+
+      /* convert arch to known policy */
+      for (i = 0; archpolicies[i]; i += 2)
+	if (!strcmp(archpolicies[i], arch))
+	  break;
+      if (archpolicies[i])
+	arch = archpolicies[i + 1];
+      else
+	arch = "";
+    }
+  pool_setarchpolicy(pool, arch);
+}
+
+/*
+ * we support three relations:
+ *
+ * a = b   both architectures a and b are treated as equivalent
+ * a > b   a is considered a "better" architecture, the solver
+ *         should change from a to b, but must not change from b to a
+ * a : b   a is considered a "better" architecture, the solver
+ *         must not change the architecture from a to b or b to a
+ */
+void
+pool_setarchpolicy(Pool *pool, const char *arch)
+{
   unsigned int score = 0x10001;
   size_t l;
   char d;
-  int i;
   Id *id2arch;
   Id id, lastarch;
 
@@ -78,24 +104,18 @@ pool_setarch(Pool *pool, const char *arch)
 #endif
   lastarch = id + 255;
   id2arch = sat_calloc(lastarch + 1, sizeof(Id));
-  id2arch[id] = 1;
+  id2arch[id] = 1;	/* the "noarch" class */
 
-  a = "";
-  for (i = 0; archpolicies[i]; i += 2)
-    if (!strcmp(archpolicies[i], arch))
-      break;
-  if (archpolicies[i])
-    a = archpolicies[i + 1];
   d = 0;
-  while (*a)
+  while (*arch)
     {
-      l = strcspn(a, ":=>");
+      l = strcspn(arch, ":=>");
       if (l)
 	{
-	  id = strn2id(pool, a, l, 1);
+	  id = strn2id(pool, arch, l, 1);
 	  if (id > lastarch)
 	    {
-	      id2arch = sat_realloc(id2arch, (id + 255 + 1) * sizeof(Id));
+	      id2arch = sat_realloc2(id2arch, (id + 255 + 1), sizeof(Id));
 	      memset(id2arch + lastarch + 1, 0, (id + 255 - lastarch) * sizeof(Id));
 	      lastarch = id + 255;
 	    }
@@ -108,8 +128,8 @@ pool_setarch(Pool *pool, const char *arch)
 	      id2arch[id] = score;
 	    }
 	}
-      a += l;
-      if ((d = *a++) == 0)
+      arch += l;
+      if ((d = *arch++) == 0)
 	break;
     }
   pool->id2arch = id2arch;
