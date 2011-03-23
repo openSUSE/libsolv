@@ -127,6 +127,13 @@ sat_chksum_get_type(void *handle)
   return h->type;
 }
 
+int
+sat_chksum_isfinished(void *handle)
+{
+  struct ctxhandle *h = handle;
+  return h->done != 0;
+}
+
 const char *
 sat_chksum_type2str(Id type)
 {

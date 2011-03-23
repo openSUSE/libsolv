@@ -4,6 +4,7 @@ void *sat_chksum_create(Id type);
 void *sat_chksum_create_from_bin(Id type, const unsigned char *buf);
 void sat_chksum_add(void *handle, const void *data, int len);
 Id sat_chksum_get_type(void *handle);
+int sat_chksum_isfinished(void *handle);
 const unsigned char *sat_chksum_get(void *handle, int *lenp);
 void *sat_chksum_free(void *handle, unsigned char *cp);
 const char *sat_chksum_type2str(Id type);
