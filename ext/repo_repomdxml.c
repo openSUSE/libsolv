@@ -250,7 +250,7 @@ startElement(void *userData, const char *name, const char **atts)
 		if (*p)
 		  *p++ = 0;
 		if (*value)
-		  repo_add_poolstr_array(pd->repo, SOLVID_META, REPOSITORY_UPDATES, value);
+		  repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_UPDATES, value);
 		value = p;
 	      }
 	    free(fvalue);
