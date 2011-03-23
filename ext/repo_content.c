@@ -294,9 +294,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      if (descrdir)
 		free(descrdir);
 	      else
-	        repo_set_str(repo, SOLVID_META, SUSETAGS_DESCRDIR, value);
+	        repodata_set_str(data, SOLVID_META, SUSETAGS_DESCRDIR, value);
 	      if (s)
-	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DESCRDIR, value);
+	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DESCRDIR, value);
 	      descrdir = strdup(value);
 	      continue;
 	    }
@@ -305,9 +305,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      if (datadir)
 		free(datadir);
 	      else
-	        repo_set_str(repo, SOLVID_META, SUSETAGS_DATADIR, value);
+	        repodata_set_str(data, SOLVID_META, SUSETAGS_DATADIR, value);
 	      if (s)
-	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, value);
+	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DATADIR, value);
 	      datadir = strdup(value);
 	      continue;
 	    }
@@ -316,7 +316,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      if (defvendor)
 		free(defvendor);
 	      else
-	        repo_set_poolstr(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR, value);
+	        repodata_set_poolstr(data, SOLVID_META, SUSETAGS_DEFAULTVENDOR, value);
 	      if (s)
 		s->vendor = str2id(pool, value, 1);
 	      defvendor = strdup(value);
@@ -385,9 +385,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      handle = s - pool->solvables;
 	      s->name = str2id(pool, join(&pd, "product", ":", value), 1);
 	      if (datadir)
-	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DATADIR, datadir);
+	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DATADIR, datadir);
 	      if (descrdir)
-	        repo_set_str(repo, s - pool->solvables, SUSETAGS_DESCRDIR, descrdir);
+	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DESCRDIR, descrdir);
 	      if (defvendor)
 		s->vendor = str2id(pool, defvendor, 1);
 	      continue;
@@ -407,7 +407,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
           else if (istag ("RELEASE"))
             pd.tmprel = strdup(value);
 	  else if (code11 && istag ("DISTRIBUTION"))
-	    repo_set_str(repo, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
+	    repodata_set_str(data, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
 	  else if (istag ("UPDATEURLS"))
 	    add_multiple_urls(data, handle, value, str2id(pool, "update", 1));
 	  else if (istag ("EXTRAURLS"))
@@ -417,11 +417,11 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	  else if (istag ("RELNOTESURL"))
 	    add_multiple_urls(data, handle, value, str2id(pool, "releasenotes", 1));
 	  else if (istag ("SHORTLABEL"))
-	    repo_set_str(repo, s - pool->solvables, PRODUCT_SHORTLABEL, value);
+	    repodata_set_str(data, s - pool->solvables, PRODUCT_SHORTLABEL, value);
 	  else if (istag ("LABEL")) /* LABEL is the products SUMMARY. */
-	    repo_set_str(repo, s - pool->solvables, SOLVABLE_SUMMARY, value);
+	    repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, value);
 	  else if (!strncmp (key, "LABEL.", 6))
-	    repo_set_str(repo, s - pool->solvables, pool_id2langid(pool, SOLVABLE_SUMMARY, key + 6, 1), value);
+	    repodata_set_str(data, s - pool->solvables, pool_id2langid(pool, SOLVABLE_SUMMARY, key + 6, 1), value);
 	  else if (istag ("FLAGS"))
 	    add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
 	  else if (istag ("VENDOR"))	/* actually already handled above */
@@ -448,10 +448,10 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 
 	  if (code10 && istag ("DISTPRODUCT"))
 	    /* DISTPRODUCT is for registration and Yast, not for the solver. */
-	    repo_set_str(repo, s - pool->solvables, PRODUCT_DISTPRODUCT, value);
+	    repodata_set_str(data, s - pool->solvables, PRODUCT_DISTPRODUCT, value);
 	  else if (code10 && istag ("DISTVERSION"))
 	    /* DISTVERSION is for registration and Yast, not for the solver. */
-	    repo_set_str(repo, s - pool->solvables, PRODUCT_DISTVERSION, value);
+	    repodata_set_str(data, s - pool->solvables, PRODUCT_DISTVERSION, value);
 	  else if (code10 && istag ("ARCH"))
 	    /* Theoretically we want to have the best arch of the given
 	       modifiers which still is compatible with the system
@@ -477,7 +477,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	    s->enhances = adddep(pool, &pd, s->enhances, value, 0);
 	  /* FRESHENS doesn't seem to exist.  */
 	  else if (code10 && istag ("TYPE"))
-	    repo_set_str(repo, s - pool->solvables, PRODUCT_TYPE, value);
+	    repodata_set_str(data, s - pool->solvables, PRODUCT_TYPE, value);
 
 	  /* XXX do something about LINGUAS and ARCH?
           * <ma>: Don't think so. zypp does not use or propagate them.
