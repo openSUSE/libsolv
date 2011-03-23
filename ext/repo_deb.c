@@ -412,6 +412,22 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
 }
 
 void
+repo_add_debdb(Repo *repo, const char *rootdir, int flags)
+{
+  FILE *fp;
+  const char *path = "/var/lib/dpkg/status";
+  if (rootdir)
+    path = pool_tmpjoin(repo->pool, rootdir, path, 0);
+  if ((fp = fopen(path, "r")) == 0)
+    {
+      perror(path);
+      exit(1);
+    }
+  repo_add_debpackages(repo, fp, flags);
+  fclose(fp);
+}
+
+void
 repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 {
   Pool *pool = repo->pool;

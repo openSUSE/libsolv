@@ -6,6 +6,7 @@
  */
 
 extern void repo_add_debpackages(Repo *repo, FILE *fp, int flags);
+extern void repo_add_debdb(Repo *repo, const char *rootdir, int flags);
 extern void repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags);
 extern Id repo_add_deb(Repo *repo, const char *deb, int flags);
 
