@@ -230,6 +230,8 @@ void repodata_set_bin_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 			       const unsigned char *buf);
 void repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 			   const char *str);
+void repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
+
 
 /* directory (for package file list) */
 void repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2);
@@ -262,6 +264,7 @@ void repodata_disable_paging(Repodata *data);
 
 /* helper functions */
 Id repodata_globalize_id(Repodata *data, Id id, int create);
+Id repodata_localize_id(Repodata *data, Id id, int create);
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
 const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);

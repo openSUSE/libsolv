@@ -25,9 +25,7 @@
 #include "pool.h"
 #include "poolid_private.h"
 #include "util.h"
-#if 0
-#include "attr_store_p.h"
-#endif
+#include "chksum.h"
 
 #define IDARRAY_BLOCK     4095
 
@@ -867,16 +865,19 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
   int i;
   const char *str;
 
-  switch(keyname)
+  if (entry >= 0)
     {
-    case SOLVABLE_NAME:
-      return id2str(pool, pool->solvables[entry].name);
-    case SOLVABLE_ARCH:
-      return id2str(pool, pool->solvables[entry].arch);
-    case SOLVABLE_EVR:
-      return id2str(pool, pool->solvables[entry].evr);
-    case SOLVABLE_VENDOR:
-      return id2str(pool, pool->solvables[entry].vendor);
+      switch (keyname)
+	{
+	case SOLVABLE_NAME:
+	  return id2str(pool, pool->solvables[entry].name);
+	case SOLVABLE_ARCH:
+	  return id2str(pool, pool->solvables[entry].arch);
+	case SOLVABLE_EVR:
+	  return id2str(pool, pool->solvables[entry].evr);
+	case SOLVABLE_VENDOR:
+	  return id2str(pool, pool->solvables[entry].vendor);
+	}
     }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
@@ -901,11 +902,14 @@ repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound)
   int i;
   unsigned int value;
 
-  if (keyname == RPM_RPMDBID)
+  if (entry >= 0)
     {
-      if (repo->rpmdbid && entry >= repo->start && entry < repo->end)
-	return repo->rpmdbid[entry - repo->start];
-      return notfound;
+      if (keyname == RPM_RPMDBID)
+	{
+	  if (repo->rpmdbid && entry >= repo->start && entry < repo->end)
+	    return repo->rpmdbid[entry - repo->start];
+	  return notfound;
+	}
     }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {
@@ -928,17 +932,20 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
   int i;
   Id id;
 
-  switch(keyname)
-    {   
-    case SOLVABLE_NAME:
-      return repo->pool->solvables[entry].name;
-    case SOLVABLE_ARCH:
-      return repo->pool->solvables[entry].arch;
-    case SOLVABLE_EVR:
-      return repo->pool->solvables[entry].evr;
-    case SOLVABLE_VENDOR:
-      return repo->pool->solvables[entry].vendor;
-    }   
+  if (entry >= 0)
+    {
+      switch (keyname)
+	{   
+	case SOLVABLE_NAME:
+	  return repo->pool->solvables[entry].name;
+	case SOLVABLE_ARCH:
+	  return repo->pool->solvables[entry].arch;
+	case SOLVABLE_EVR:
+	  return repo->pool->solvables[entry].evr;
+	case SOLVABLE_VENDOR:
+	  return repo->pool->solvables[entry].vendor;
+	}   
+    }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
     {   
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
@@ -951,6 +958,67 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
       if (repodata_lookup_type(data, entry, keyname))
 	return 0;
     }   
+  return 0;
+}
+
+static int
+lookup_idarray_solvable(Repo *repo, Offset off, Queue *q)
+{
+  Id *p;
+
+  queue_empty(q);
+  if (off)
+    for (p = repo->idarraydata + off; *p; p++)
+      queue_push(q, *p);
+  return 1;
+}
+
+int
+repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q)
+{
+  Repodata *data;
+  int i;
+  if (entry >= 0)
+    {
+      switch (keyname)
+        {
+	case SOLVABLE_PROVIDES:
+	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].provides, q);
+	case SOLVABLE_OBSOLETES:
+	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].obsoletes, q);
+	case SOLVABLE_CONFLICTS:
+	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].conflicts, q);
+	case SOLVABLE_REQUIRES:
+	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].requires, q);
+	case SOLVABLE_RECOMMENDS:
+	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].recommends, q);
+	case SOLVABLE_SUGGESTS:
+	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].suggests, q);
+	case SOLVABLE_SUPPLEMENTS:
+	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].supplements, q);
+	case SOLVABLE_ENHANCES:
+	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].enhances, q);
+        }
+    }
+  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+    {   
+      if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
+	continue;
+      if (!repodata_precheck_keyname(data, keyname))
+	continue;
+      if (repodata_lookup_idarray(data, entry, keyname, q))
+	{
+	  if (data->localpool)
+	    {
+	      for (i = 0; i < q->count; i++)
+		q->elements[i] = repodata_globalize_id(data, q->elements[i], 1);
+	    }
+	  return 1;
+	}
+      if (repodata_lookup_type(data, entry, keyname))
+	break;
+    }
+  queue_empty(q);
   return 0;
 }
 
@@ -975,6 +1043,13 @@ repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
     }
   *typep = 0;
   return 0;
+}
+
+const char *
+repo_lookup_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
+{
+  const unsigned char *chk = repo_lookup_bin_checksum(repo, entry, keyname, typep);
+  return chk ? pool_bin2hex(repo->pool, chk, sat_chksum_len(*typep)) : 0;
 }
 
 int
@@ -1060,13 +1135,26 @@ void
 repo_set_id(Repo *repo, Id p, Id keyname, Id id)
 {
   Repodata *data = repo_last_repodata(repo);
+  if (data->localpool)
+    id = repodata_localize_id(data, id, 1);
   repodata_set_id(data, p, keyname, id);
 }
 
 void
 repo_set_num(Repo *repo, Id p, Id keyname, unsigned int num)
 {
-  Repodata *data = repo_last_repodata(repo);
+  Repodata *data;
+  if (p >= 0)
+    {
+      if (keyname == RPM_RPMDBID)
+	{
+	  if (!repo->rpmdbid)
+	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
+	  repo->rpmdbid[p] = num;
+	  return;
+	}
+    }
+  data = repo_last_repodata(repo);
   repodata_set_num(data, p, keyname, num);
 }
 

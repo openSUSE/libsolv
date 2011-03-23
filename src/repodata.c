@@ -705,6 +705,14 @@ repodata_globalize_id(Repodata *data, Id id, int create)
   return str2id(data->repo->pool, stringpool_id2str(&data->spool, id), create);
 }
 
+Id
+repodata_localize_id(Repodata *data, Id id, int create)
+{
+  if (!id || !data || !data->localpool)
+    return id;
+  return stringpool_str2id(&data->spool, id2str(data->repo->pool, id), create);
+}
+
 
 /************************************************************************
  * data search
@@ -1828,7 +1836,7 @@ repodata_new_handle(Repodata *data)
   if (!data->nxattrs)
     {
       data->xattrs = sat_calloc_block(1, sizeof(Id *), REPODATA_BLOCK);
-      data->nxattrs = 2;
+      data->nxattrs = 2;	/* -1: SOLVID_META */
     }
   data->xattrs = sat_extend(data->xattrs, data->nxattrs, 1, sizeof(Id *), REPODATA_BLOCK);
   data->xattrs[data->nxattrs] = 0;
@@ -1838,16 +1846,15 @@ repodata_new_handle(Repodata *data)
 static inline Id **
 repodata_get_attrp(Repodata *data, Id handle)
 {
-  if (handle == SOLVID_META)
+  if (handle < 0)
     {
-      if (!data->xattrs)
+      if (handle == SOLVID_META && !data->xattrs)
 	{
 	  data->xattrs = sat_calloc_block(1, sizeof(Id *), REPODATA_BLOCK);
           data->nxattrs = 2;
 	}
+      return data->xattrs - handle;
     }
-  if (handle < 0)
-    return data->xattrs - handle;
   if (handle < data->start || handle >= data->end)
     repodata_extend(data, handle);
   if (!data->attrs)
@@ -2208,6 +2215,23 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
 }
 
 void
+repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
+{
+  Repokey key;
+  int i;
+
+  key.name = keyname;
+  key.type = REPOKEY_TYPE_IDARRAY;
+  key.size = 0;
+  key.storage = KEY_STORAGE_INCORE;
+  repodata_set(data, solvid, &key, data->attriddatalen);
+  data->attriddata = sat_extend(data->attriddata, data->attriddatalen, q->count + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+  for (i = 0; i < q->count; i++)
+    data->attriddata[data->attriddatalen++] = q->elements[i];
+  data->attriddata[data->attriddatalen++] = 0;
+}
+
+void
 repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2)
 {
   assert(dir);
@@ -2395,14 +2419,14 @@ data_addblob(struct extdata *xd, unsigned char *blob, int len)
 
 /*********************************/
 
+/* internalalize some key into incore/vincore data */
+
 static void
 repodata_serialize_key(Repodata *data, struct extdata *newincore,
 		       struct extdata *newvincore,
 		       Id *schema,
 		       Repokey *key, Id val)
 {
-  /* Otherwise we have a new value.  Parse it into the internal
-     form.  */
   Id *ida;
   struct extdata *xd;
   unsigned int oldvincorelen = 0;
@@ -2470,21 +2494,13 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	schemaid = 0;
 	for (ida = data->attriddata + val; *ida; ida++)
 	  {
-#if 0
-	    fprintf(stderr, "serialize struct %d\n", *ida);
-#endif
 	    sp = schema;
 	    Id *kp = data->xattrs[-*ida];
 	    if (!kp)
 	      continue;
 	    num++;
 	    for (;*kp; kp += 2)
-	      {
-#if 0
-		fprintf(stderr, "  %s:%d\n", id2str(data->repo->pool, data->keys[*kp].name), kp[1]);
-#endif
-		*sp++ = *kp;
-	      }
+	      *sp++ = *kp;
 	    *sp = 0;
 	    if (!schemaid)
 	      schemaid = repodata_schema2id(data, schema, 1);
@@ -2493,9 +2509,6 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	 	pool_debug(data->repo->pool, SAT_FATAL, "fixarray substructs with different schemas\n");
 		exit(1);
 	      }
-#if 0
-	    fprintf(stderr, "  schema %d\n", schemaid);
-#endif
 	  }
 	if (!num)
 	  break;
@@ -2507,10 +2520,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	    if (!kp)
 	      continue;
 	    for (;*kp; kp += 2)
-	      {
-		repodata_serialize_key(data, newincore, newvincore,
-				       schema, data->keys + *kp, kp[1]);
-	      }
+	      repodata_serialize_key(data, newincore, newvincore, schema, data->keys + *kp, kp[1]);
 	  }
 	break;
       }
@@ -2536,10 +2546,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	    data_addid(xd, schemaid);
 	    kp = data->xattrs[-*ida];
 	    for (;*kp; kp += 2)
-	      {
-		repodata_serialize_key(data, newincore, newvincore,
-				       schema, data->keys + *kp, kp[1]);
-	      }
+	      repodata_serialize_key(data, newincore, newvincore, schema, data->keys + *kp, kp[1]);
 	  }
 	break;
       }

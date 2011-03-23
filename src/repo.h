@@ -196,13 +196,15 @@ Repodata *repo_last_repodata(Repo *repo);
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
 /* returns the string value of the attribute, or NULL if not found */
-Id repo_lookup_type(Repo *repo, Id entry, Id key);
-const char *repo_lookup_str(Repo *repo, Id entry, Id key);
+Id repo_lookup_type(Repo *repo, Id entry, Id keyname);
+const char *repo_lookup_str(Repo *repo, Id entry, Id keyname);
 /* returns the integer value of the attribute, or notfound if not found */
-unsigned int repo_lookup_num(Repo *repo, Id entry, Id key, unsigned int notfound);
-Id repo_lookup_id(Repo *repo, Id entry, Id keyid);
-int repo_lookup_void(Repo *repo, Id entry, Id keyid);
-const unsigned char *repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyid, Id *typep);
+unsigned int repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound);
+Id repo_lookup_id(Repo *repo, Id entry, Id keyname);
+int repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q);
+int repo_lookup_void(Repo *repo, Id entry, Id keyname);
+const char *repo_lookup_checksum(Repo *repo, Id entry, Id keyname, Id *typep);
+const unsigned char *repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep);
 
 typedef struct _Datamatcher {
   int flags;

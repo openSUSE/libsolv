@@ -46,24 +46,12 @@ solvable_lookup_id(Solvable *s, Id keyname)
 int
 solvable_lookup_idarray(Solvable *s, Id keyname, Queue *q)
 {
-  Dataiterator di;
-  int found = 0;
-
-  queue_empty(q);
   if (!s->repo)
-    return 0;
-  dataiterator_init(&di, s->repo->pool, s->repo, s - s->repo->pool->solvables, keyname, 0, SEARCH_ARRAYSENTINEL);
-  while (dataiterator_step(&di))
     {
-      if (di.key->type != REPOKEY_TYPE_IDARRAY && di.key->type != REPOKEY_TYPE_REL_IDARRAY)
-	continue;
-      found = 1;
-      if (di.kv.eof)
-	break;
-      queue_push(q, di.kv.id);
+      queue_empty(q);
+      return 0;
     }
-  dataiterator_free(&di);
-  return found;
+  return repo_lookup_idarray(s->repo, s - s->repo->pool->solvables, keyname, q);
 }
 
 const char *
@@ -243,11 +231,13 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
   char *loc;
   const char *mediadir, *mediafile;
 
-  *medianrp = 0;
+  if (medianrp)
+    *medianrp = 0;
   if (!s->repo)
     return 0;
   pool = s->repo->pool;
-  *medianrp = solvable_lookup_num(s, SOLVABLE_MEDIANR, 1);
+  if (medianrp)
+    *medianrp = solvable_lookup_num(s, SOLVABLE_MEDIANR, 1);
   if (solvable_lookup_void(s, SOLVABLE_MEDIADIR))
     mediadir = id2str(pool, s->arch);
   else
@@ -503,8 +493,8 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
 }
 
 /* Tests if two solvables have identical content. Currently
- * both solvables need to come from the same pool */
-
+ * both solvables need to come from the same pool
+ */
 int
 solvable_identical(Solvable *s1, Solvable *s2)
 {
