@@ -277,6 +277,8 @@ prune_to_best_arch(const Pool *pool, Queue *plist)
       if (a && a != 1 && (!bestscore || a < bestscore))
 	bestscore = a;
     }
+  if (!bestscore)
+    return;
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
@@ -474,6 +476,8 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 }
 
 
+/* check if there is an illegal architecture change if
+ * installed solvable s1 is replaced by s2 */
 int
 policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2)
 {
@@ -502,6 +506,8 @@ policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2)
   return 0;
 }
 
+/* check if there is an illegal vendor change if
+ * installed solvable s1 is replaced by s2 */
 int
 policy_illegal_vendorchange(Solver *solv, Solvable *s1, Solvable *s2)
 {
@@ -542,12 +548,12 @@ policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
     }
   if (!(ignore & POLICY_ILLEGAL_ARCHCHANGE) && !solv->allowarchchange)
     {
-      if (is->arch != s->arch && policy_illegal_archchange(solv, s, is))
+      if (is->arch != s->arch && policy_illegal_archchange(solv, is, s))
 	ret |= POLICY_ILLEGAL_ARCHCHANGE;
     }
   if (!(ignore & POLICY_ILLEGAL_VENDORCHANGE) && !solv->allowvendorchange)
     {
-      if (is->vendor != s->vendor && policy_illegal_vendorchange(solv, s, is))
+      if (is->vendor != s->vendor && policy_illegal_vendorchange(solv, is, s))
 	ret |= POLICY_ILLEGAL_VENDORCHANGE;
     }
   return ret;
@@ -640,7 +646,7 @@ policy_create_obsolete_index(Solver *solv)
 /*
  * find update candidates
  * 
- * s: solvable to be updated
+ * s: installed solvable to be updated
  * qs: [out] queue to hold Ids of candidates
  * allow_all: 0 = dont allow downgrades, 1 = allow all candidates
  * 
@@ -662,10 +668,6 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       return solv->updateCandidateCb(solv->pool, s, qs);
     }
 
-  /*
-   * s = solvable ptr
-   * n = solvable Id
-   */
   n = s - pool->solvables;
 
   /*
