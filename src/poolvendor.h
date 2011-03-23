@@ -11,5 +11,6 @@
 #include "pool.h"
 
 Id pool_vendor2mask(Pool *pool, Id vendor);
+void pool_setvendorclasses(Pool *pool, const char **vendorclasses);
 
 #endif /* SATSOLVER_POOLVENDOR_H */

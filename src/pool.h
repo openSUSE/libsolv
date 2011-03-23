@@ -44,13 +44,13 @@ struct _Repodata;
 struct _Repokey;
 struct _KeyValue;
 
-typedef struct _Repopos {
+typedef struct _Datapos {
   struct _Repo *repo;
   Id solvid;
   Id repodataid;
   Id schema;
   Id dp; 
-} Repopos;
+} Datapos;
 
 struct _Pool {
   void *appdata;		/* application private pointer */
@@ -92,6 +92,7 @@ struct _Pool {
   Id lastarch;			/* last valid entry in id2arch/id2color */
 
   Queue vendormap;		/* map vendor to vendorclasses mask */
+  const char **vendorclasses;	/* vendor equivalence classes */
 
   /* providers data, as two-step indirect list
    * whatprovides[Id] -> Offset into whatprovidesdata for name
@@ -126,7 +127,7 @@ struct _Pool {
   void *loadcallbackdata;
 
   /* search position */
-  Repopos pos;
+  Datapos pos;
 };
 
 #ifdef MULTI_SEMANTICS
@@ -190,6 +191,7 @@ extern void pool_setdebuglevel(Pool *pool, int level);
 #ifdef MULTI_SEMANTICS
 extern void pool_setdisttype(Pool *pool, int disttype);
 #endif
+extern void pool_setvendorclasses(Pool *pool, const char **vendorclasses);
 
 extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
 

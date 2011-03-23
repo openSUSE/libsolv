@@ -21,19 +21,23 @@
 #include "poolvendor.h"
 #include "util.h"
 
-const char *vendors[] = {
-  "!openSUSE Build Service*",
-  "SUSE*",
-  "openSUSE*",
-  "SGI*",
-  "Novell*",
-  "Silicon Graphics*",
-  "Jpackage Project*",
-  "ATI Technologies Inc.*",
-  "Nvidia*",
-  0,
-  0,
-};
+/*
+ *  const char *vendorsclasses[] = {
+ *    "!openSUSE Build Service*",
+ *    "SUSE*",
+ *    "openSUSE*",
+ *    "SGI*",
+ *    "Novell*",
+ *    "Silicon Graphics*",
+ *    "Jpackage Project*",
+ *    "ATI Technologies Inc.*",
+ *    "Nvidia*",
+ *    0,
+ *    0,
+ *  };
+ */
+
+/* allows for 32 different vendor classes */
 
 Id pool_vendor2mask(Pool *pool, Id vendor)
 {
@@ -42,7 +46,7 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   Id mask, m;
   const char **v, *vs;
 
-  if (vendor == 0)
+  if (vendor == 0 || !pool->vendorclasses)
     return 0;
   for (i = 0; i < pool->vendormap.count; i += 2)
     if (pool->vendormap.elements[i] == vendor)
@@ -50,7 +54,7 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   vstr = id2str(pool, vendor);
   m = 1;
   mask = 0;
-  for (v = vendors; ; v++)
+  for (v = pool->vendorclasses; ; v++)
     {
       vs = *v;
       if (vs == 0)	/* end of block? */
@@ -59,7 +63,7 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
 	  if (*v == 0)
 	    break;
 	  if (m == (1 << 31))
-	    break;
+	    break;	/* sorry, out of bits */
 	  m <<= 1;	/* next vendor equivalence class */
 	}
       if (fnmatch(*vs == '!' ? vs + 1 : vs, vstr, FNM_CASEFOLD) == 0)
@@ -74,3 +78,28 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   queue_push(&pool->vendormap, mask);
   return mask;
 }
+
+void
+pool_setvendorclasses(Pool *pool, const char **vendorclasses)
+{
+  int i;
+  const char **v;
+
+  if (pool->vendorclasses)
+    {
+      for (v = pool->vendorclasses; v[0] || v[1]; v++)
+	sat_free((void *)*v);
+      pool->vendorclasses = sat_free(pool->vendorclasses);
+    }
+  if (!vendorclasses || !vendorclasses[0])
+    return;
+  for (v = vendorclasses; v[0] || v[1]; v++)
+    ;
+  pool->vendorclasses = sat_calloc(v - vendorclasses + 2, sizeof(const char *));
+  for (v = vendorclasses, i = 0; v[0] || v[1]; v++, i++)
+    pool->vendorclasses[i] = *v ? strdup(*v) : 0;
+  pool->vendorclasses[i++] = 0;
+  pool->vendorclasses[i] = 0;
+  queue_empty(&pool->vendormap);
+}
+

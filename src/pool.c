@@ -87,6 +87,7 @@ pool_free(Pool *pool)
   sat_free(pool->solvables);
   stringpool_free(&pool->ss);
   sat_free(pool->rels);
+  pool_setvendorclasses(pool, 0);
   queue_free(&pool->vendormap);
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
     sat_free(pool->tmpspacebuf[i]);
