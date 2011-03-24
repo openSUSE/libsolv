@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu Mar 24 10:04:16 UTC 2011 - mls@suse.de
+
+- add missing else part in rpmdbid2db()
+
+-------------------------------------------------------------------
 Thu Feb 24 17:44:05 CET 2011 - mls@suse.de
 
 - ignore to be dropped orhaned packages when calculating
