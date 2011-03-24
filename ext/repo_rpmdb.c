@@ -1259,11 +1259,12 @@ static inline void rpmdbid2db(unsigned char *db, Id id, int byteswapped)
 #else
 # if defined(WORDS_BIGENDIAN)
   if (!byteswapped)
-    db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
 # else
   if (byteswapped)
-    db[3] = id >> 24, db[2] = id >> 16, db[1] = id >> 8, db[0] = id;
 # endif
+    db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
+  else
+    db[3] = id >> 24, db[2] = id >> 16, db[1] = id >> 8, db[0] = id;
 #endif
 }
 
