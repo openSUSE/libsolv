@@ -127,6 +127,7 @@ void repodata_empty(Repodata *data, int localpool);
  * key management functions
  */
 Id repodata_key2id(Repodata *data, Repokey *key, int create);
+
 static inline Repokey *
 repodata_id2key(Repodata *data, Id keyid)
 {
@@ -137,6 +138,8 @@ repodata_id2key(Repodata *data, Id keyid)
  * schema management functions
  */
 Id repodata_schema2id(Repodata *data, Id *schema, int create);
+void repodata_free_schemahash(Repodata *data);
+
 static inline Id *
 repodata_id2schema(Repodata *data, Id schemaid)
 {

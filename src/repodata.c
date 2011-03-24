@@ -52,6 +52,7 @@ repodata_initdata(Repodata *data, Repo *repo, int localpool)
   data->localpool = localpool;
   if (localpool)
     stringpool_init_empty(&data->spool);
+  /* dirpool_init(&data->dirpool);	just zeros out again */
   data->keys = sat_calloc(1, sizeof(Repokey));
   data->nkeys = 1;
   data->schemata = sat_calloc(1, sizeof(Id));
@@ -182,15 +183,17 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
   Id *sp, cid;
   Id *schematahash;
 
+  if (!*schema)
+    return 0;	/* XXX: allow empty schema? */
   if ((schematahash = data->schematahash) == 0)
     {
       data->schematahash = schematahash = sat_calloc(256, sizeof(Id));
-      for (i = 0; i < data->nschemata; i++)
+      for (i = 1; i < data->nschemata; i++)
 	{
 	  for (sp = data->schemadata + data->schemata[i], h = 0; *sp; len++)
 	    h = h * 7 + *sp++;
 	  h &= 255;
-	  schematahash[h] = i + 1;
+	  schematahash[h] = i;
 	}
       data->schemadata = sat_extend_resize(data->schemadata, data->schemadatalen, sizeof(Id), SCHEMATADATA_BLOCK);
       data->schemata = sat_extend_resize(data->schemata, data->nschemata, sizeof(Id), SCHEMATA_BLOCK);
@@ -204,11 +207,10 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
   cid = schematahash[h];
   if (cid)
     {
-      cid--;
       if (!memcmp(data->schemadata + data->schemata[cid], schema, len * sizeof(Id)))
         return cid;
-      /* cache conflict */
-      for (cid = 0; cid < data->nschemata; cid++)
+      /* cache conflict, do a slow search */
+      for (cid = 1; cid < data->nschemata; cid++)
         if (!memcmp(data->schemadata + data->schemata[cid], schema, len * sizeof(Id)))
           return cid;
     }
@@ -221,7 +223,7 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
   memcpy(data->schemadata + data->schemadatalen, schema, len * sizeof(Id));
   data->schemata[data->nschemata] = data->schemadatalen;
   data->schemadatalen += len;
-  schematahash[h] = data->nschemata + 1;
+  schematahash[h] = data->nschemata;
 #if 0
 fprintf(stderr, "schema2id: new schema\n");
 #endif
