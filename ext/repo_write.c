@@ -564,6 +564,11 @@ putinowndirpool(struct cbdata *cbdata, Repodata *data, Dirpool *dp, Id dir)
   return dirpool_add_dir(cbdata->owndirpool, parent, compid, 1);
 }
 
+/*
+ * collect usage information about the dirs
+ * 1: dir used, no child of dir used
+ * 2: dir used as parent of another used dir
+ */
 static inline void
 setdirused(struct cbdata *cbdata, Dirpool *dp, Id dir)
 {
@@ -734,7 +739,7 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	break;
       case REPOKEY_TYPE_IDARRAY:
 	id = kv->id;
-	if (cbdata->ownspool && id > 1)
+	if (!ISRELDEP(id) && cbdata->ownspool && id > 1)
 	  id = putinownpool(cbdata, data->localpool ? &data->spool : &data->repo->pool->ss, id);
 	needid = cbdata->needid;
 	id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
@@ -842,6 +847,7 @@ repo_write_cb_adddata(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, 
   return repo_write_adddata(cbdata, data, key, kv);
 }
 
+/* traverse through directory with first child "dir" */
 static int
 traverse_dirs(Dirpool *dp, Id *dirmap, Id n, Id dir, Id *used)
 {
@@ -860,16 +866,19 @@ traverse_dirs(Dirpool *dp, Id *dirmap, Id n, Id dir, Id *used)
 	continue;	/* already did that one above */
       dirmap[n++] = sib;
     }
+
+  /* now go through all the siblings we just added and
+   * do recursive calls on them */
   lastn = n;
   for (; parent < lastn; parent++)
     {
       sib = dirmap[parent];
-      if (used && used[sib] != 2)
+      if (used && used[sib] != 2)	/* 2: used as parent */
 	continue;
       child = dirpool_child(dp, sib);
       if (child)
 	{
-	  dirmap[n++] = -parent;
+	  dirmap[n++] = -parent;	/* start new block */
 	  n = traverse_dirs(dp, dirmap, n, child, used);
 	}
     }
@@ -1508,16 +1517,23 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 
 /********************************************************************/
 
-  /* create dir map */
   ndirmap = 0;
   dirmap = 0;
   if (dirpool)
     {
+      /* create our new target directory structure by traversing through all
+       * used dirs. This will concatenate blocks with the same parent
+       * directory into single blocks.
+       * Instead of components, traverse_dirs stores the old dirids,
+       * we will change this in the second step below */
       if (cbdata.dirused && !cbdata.dirused[1])
 	cbdata.dirused[1] = 1;	/* always want / entry */
       dirmap = sat_calloc(dirpool->ndirs, sizeof(Id));
       dirmap[0] = 0;
       ndirmap = traverse_dirs(dirpool, dirmap, 1, dirpool_child(dirpool, 0), cbdata.dirused);
+
+      /* (re)create dirused, so that it maps from "old dirid" to "new dirid" */
+      /* change dirmap so that it maps from "new dirid" to "new compid" */
       if (!cbdata.dirused)
 	cbdata.dirused = sat_malloc2(dirpool->ndirs, sizeof(Id));
       memset(cbdata.dirused, 0, dirpool->ndirs * sizeof(Id));
@@ -1531,6 +1547,8 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	    id = putinownpool(&cbdata, dirpooldata->localpool ? &dirpooldata->spool : &pool->ss, id);
 	  dirmap[i] = needid[id].need;
 	}
+      /* now the new target directory structure is complete, and we have
+       * dirused[] to map from old dirids to new dirids */
     }
 
 /********************************************************************/
