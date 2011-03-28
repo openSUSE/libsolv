@@ -2783,7 +2783,8 @@ repodata_load_stub(Repodata *data)
 {
   Repo *repo = data->repo;
   Pool *pool = repo->pool;
-  int r;
+  int r, i;
+  struct _Pool_tmpspace oldtmpspace;
 
   if (!pool->loadcallback)
     {
@@ -2791,7 +2792,18 @@ repodata_load_stub(Repodata *data)
       return;
     }
   data->state = REPODATA_LOADING;
+
+  /* save tmp space */
+  oldtmpspace = pool->tmpspace;
+  memset(&pool->tmpspace, 0, sizeof(pool->tmpspace));
+
   r = pool->loadcallback(pool, data, pool->loadcallbackdata);
+
+  /* restore tmp space */
+  for (i = 0; i < POOL_TMPSPACEBUF; i++)
+    sat_free(pool->tmpspace.buf[i]);
+  pool->tmpspace = oldtmpspace;
+
   data->state = r ? REPODATA_AVAILABLE : REPODATA_ERROR;
 }
 
