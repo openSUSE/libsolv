@@ -70,6 +70,10 @@ pool_create(void)
   pool->disttype = DISTTYPE_DEB;
 # endif
 #endif
+#ifdef RPM5
+  pool->obsoleteusesprovides = 1;
+  pool->implicitobsoleteusesprovides = 1;
+#endif
   return pool;
 }
 
@@ -90,7 +94,7 @@ pool_free(Pool *pool)
   pool_setvendorclasses(pool, 0);
   queue_free(&pool->vendormap);
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
-    sat_free(pool->tmpspacebuf[i]);
+    sat_free(pool->tmpspace.buf[i]);
   for (i = 0; i < pool->nlanguages; i++)
     free((char *)pool->languages[i]);
   sat_free(pool->languages);
@@ -1210,16 +1214,16 @@ pool_id2langid(Pool *pool, Id id, const char *lang, int create)
 char *
 pool_alloctmpspace(Pool *pool, int len)
 {
-  int n = pool->tmpspacen;
+  int n = pool->tmpspace.n;
   if (!len)
     return 0;
-  if (len > pool->tmpspacelen[n])
+  if (len > pool->tmpspace.len[n])
     {
-      pool->tmpspacebuf[n] = sat_realloc(pool->tmpspacebuf[n], len + 32);
-      pool->tmpspacelen[n] = len + 32;
+      pool->tmpspace.buf[n] = sat_realloc(pool->tmpspace.buf[n], len + 32);
+      pool->tmpspace.len[n] = len + 32;
     }
-  pool->tmpspacen = (n + 1) % POOL_TMPSPACEBUF;
-  return pool->tmpspacebuf[n];
+  pool->tmpspace.n = (n + 1) % POOL_TMPSPACEBUF;
+  return pool->tmpspace.buf[n];
 }
 
 static char *
@@ -1228,21 +1232,21 @@ pool_alloctmpspace_free(Pool *pool, const char *space, int len)
   if (space)
     {
       int n, oldn;
-      n = oldn = pool->tmpspacen;
+      n = oldn = pool->tmpspace.n;
       for (;;)
 	{
 	  if (!n--)
 	    n = POOL_TMPSPACEBUF - 1;
 	  if (n == oldn)
 	    break;
-	  if (pool->tmpspacebuf[n] != space)
+	  if (pool->tmpspace.buf[n] != space)
 	    continue;
-	  if (len > pool->tmpspacelen[n])
+	  if (len > pool->tmpspace.len[n])
 	    {
-	      pool->tmpspacebuf[n] = sat_realloc(pool->tmpspacebuf[n], len + 32);
-	      pool->tmpspacelen[n] = len + 32;
+	      pool->tmpspace.buf[n] = sat_realloc(pool->tmpspace.buf[n], len + 32);
+	      pool->tmpspace.len[n] = len + 32;
 	    }
-          return pool->tmpspacebuf[n];
+          return pool->tmpspace.buf[n];
 	}
     }
   return 0;
@@ -1251,12 +1255,12 @@ pool_alloctmpspace_free(Pool *pool, const char *space, int len)
 void
 pool_freetmpspace(Pool *pool, const char *space)
 {
-  int n = pool->tmpspacen;
+  int n = pool->tmpspace.n;
   if (!space)
     return;
   n = (n + (POOL_TMPSPACEBUF - 1)) % POOL_TMPSPACEBUF;
-  if (pool->tmpspacebuf[n] == space)
-    pool->tmpspacen = n;
+  if (pool->tmpspace.buf[n] == space)
+    pool->tmpspace.n = n;
 }
 
 char *

@@ -52,6 +52,12 @@ typedef struct _Datapos {
   Id dp; 
 } Datapos;
 
+struct _Pool_tmpspace {
+  char *buf[POOL_TMPSPACEBUF];
+  int   len[POOL_TMPSPACEBUF];
+  int   n;
+};
+
 struct _Pool {
   void *appdata;		/* application private pointer */
 
@@ -113,9 +119,7 @@ struct _Pool {
   void *nscallbackdata;
 
   /* our tmp space string space */
-  char *tmpspacebuf[POOL_TMPSPACEBUF];
-  int   tmpspacelen[POOL_TMPSPACEBUF];
-  int   tmpspacen;
+  struct _Pool_tmpspace tmpspace;
 
   /* debug mask and callback */
   int  debugmask;
