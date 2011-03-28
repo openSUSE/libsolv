@@ -14,6 +14,56 @@
 
 #define DIR_BLOCK 127
 
+/* directories are stored as components,
+ * components are simple ids from the string pool
+ *   /usr/bin   ->  "", "usr", "bin"
+ *   /usr/lib   ->  "", "usr", "lib"
+ *   foo/bar    ->  "foo", "bar"
+ *   /usr/games ->  "", "usr", "games"
+ *
+ * all directories are stores in the "dirs" array
+ *   dirs[id] > 0 : component string pool id
+ *   dirs[id] <= 0 : -(parent directory id)
+ *
+ * Directories with the same parent are stored as
+ * multiple blocks. We need multiple blocks, because
+ * we cannot insert entries into old blocks, as that
+ * would shift the ids of already used directories.
+ * Each block starts with (-parent_dirid) and contains
+ * component ids of the directory entries.
+ * (The (-parent_dirid) entry is not a valid directory
+ * id, it's just used internally)
+ *
+ * There is also the aux "dirtraverse" array, which
+ * is created on demand to speed things up a bit.
+ * if dirs[id] > 0, dirtravers[id] points to the first
+ * entry in the last block with parent id
+ * if dirs[id] <= 0, dirtravers[id] points to the entry
+ * in the previous block with the same parent.
+ * (Thus it acts as a linked list that starts at the
+ * parent dirid and chains all the blocks with that
+ * parent.)
+ *
+ *  id    dirs[id]  dirtraverse[id]
+ *   0     0           8       [block#0 no parent]
+ *   1    ""           3
+ *   2    -1                   [block#0 parent 1, /]
+ *   3    "usr"       12
+ *   4    -3                   [block#0 parent 3, /usr]
+ *   5    "bin"
+ *   6    "lib"
+ *   7     0           1       [block#1 no parent]
+ *   8    "foo"       10
+ *   9    -8                   [block#0 parent 8, foo]
+ *  10    "bar"
+ *  11    -3           5       [block#1 parent 3, /usr]
+ *  12    "games"
+ *   
+ * to find all children of dirid 3, "/usr", follow the
+ * dirtraverse link to 12 -> "games". Then follow the
+ * dirtraverse link of this block to 5 -> "bin", "lib"
+ */
+
 void
 dirpool_init(Dirpool *dp)
 {
@@ -64,6 +114,8 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
     return 1;
   if (!dp->dirtraverse)
     dirpool_make_dirtraverse(dp);
+  /* check all entries with this parent if we
+   * already have this component */
   dirtraverse = dp->dirtraverse;
   ds = dirtraverse[parent];
   while (ds)
@@ -74,7 +126,7 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 	{
 	  if (dp->dirs[d] == comp)
 	    return d;
-	  if (dp->dirs[d] <= 0)
+	  if (dp->dirs[d] <= 0)	/* reached end of this block */
 	    break;
 	}
       if (ds)

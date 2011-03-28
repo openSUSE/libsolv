@@ -23,6 +23,7 @@ void dirpool_free(Dirpool *dp);
 void dirpool_make_dirtraverse(Dirpool *dp);
 Id dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create);
 
+/* return the parent directory of child did */
 static inline Id dirpool_parent(Dirpool *dp, Id did)
 {
   if (!did)
@@ -32,11 +33,15 @@ static inline Id dirpool_parent(Dirpool *dp, Id did)
   return -dp->dirs[did];
 }
 
+/* return the next child entry of child did */
 static inline Id
 dirpool_sibling(Dirpool *dp, Id did)
 {
+  /* if this block contains another entry, simply return it */
   if (did + 1 < dp->ndirs && dp->dirs[did + 1] > 0)
     return did + 1;
+  /* end of block reached, rewind to get to the block's
+   * dirtraverse entry */
   while (dp->dirs[--did] > 0)
     ;
   /* need to special case did == 0 to prevent looping */
@@ -47,6 +52,7 @@ dirpool_sibling(Dirpool *dp, Id did)
   return dp->dirtraverse[did];
 }
 
+/* return the first child entry of directory did */
 static inline Id
 dirpool_child(Dirpool *dp, Id did)
 {
