@@ -1159,7 +1159,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	  if (data->localpool)
 	    {
 	      if (poolusage)
-		poolusage = 3;	/* need local pool */
+		poolusage = 3;	/* need own pool */
 	      else
 		{
 		  poolusage = 2;
@@ -1171,13 +1171,13 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	      if (poolusage == 0)
 		poolusage = 1;
 	      else if (poolusage != 1)
-		poolusage = 3;	/* need local pool */
+		poolusage = 3;	/* need own pool */
 	    }
 	}
       if (dirused)
 	{
 	  if (dirpoolusage)
-	    dirpoolusage = 3;	/* need local dirpool */
+	    dirpoolusage = 3;	/* need own dirpool */
 	  else
 	    {
 	      dirpoolusage = 2;
@@ -1432,26 +1432,35 @@ for (i = 1; i < target.nkeys; i++)
 
 /********************************************************************/
 
-  /* increment need id for used dir components */
-  if (cbdata.dirused && !cbdata.dirused[0])
+  if (dirpool && cbdata.dirused && !cbdata.dirused[0])
     {
       /* no dirs used at all */
       cbdata.dirused = sat_free(cbdata.dirused);
       dirpool = 0;
     }
+
+  /* increment need id for used dir components */
   if (dirpool)
     {
+      /* if we have own dirpool, all entries in it are used.
+	 also, all comp ids are already mapped by putinowndirpool(),
+	 so we can simply increment needid.
+	 (owndirpool != 0, dirused == 0, dirpooldata == 0) */
+      /* else we re-use a dirpool of repodata "dirpooldata".
+	 dirused tells us which of the ids are used.
+	 we need to map comp ids if we generate a new pool.
+	 (owndirpool == 0, dirused != 0, dirpooldata != 0) */
       for (i = 1; i < dirpool->ndirs; i++)
 	{
 #if 0
 fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 #endif
+	  if (cbdata.dirused && !cbdata.dirused[i])
+	    continue;
 	  id = dirpool->dirs[i];
 	  if (id <= 0)
 	    continue;
-	  if (cbdata.dirused && !cbdata.dirused[i])
-	    continue;
-	  if (cbdata.ownspool && dirpooldata && id > 1)
+	  if (dirpooldata && cbdata.ownspool && id > 1)
 	    {
 	      id = putinownpool(&cbdata, dirpooldata->localpool ? &dirpooldata->spool : &pool->ss, id);
 	      needid = cbdata.needid;
@@ -1459,8 +1468,6 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  needid[id].need++;
 	}
     }
-
-  reloff = needid[0].map;
 
 
 /********************************************************************/
@@ -1473,7 +1480,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
    */
 
   /* zero out id 0 and rel 0 just in case */
-
+  reloff = needid[0].map;
   needid[0].need = 0;
   needid[reloff].need = 0;
 
@@ -1488,31 +1495,38 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   sat_sort(needid + 2, spool->nstrings - 2, sizeof(*needid), needid_cmp_need_s, spool);
 #endif
   sat_sort(needid + reloff, pool->nrels, sizeof(*needid), needid_cmp_need, 0);
+  /* now needid is in new order, needid[newid].map -> oldid */
 
+  /* calculate string space size, also zero out needid[].need */
   sizeid = 0;
   for (i = 1; i < reloff; i++)
     {
       if (!needid[i].need)
-        break;
+        break;	/* as we have sorted, every entry after this also has need == 0 */
       needid[i].need = 0;
       sizeid += strlen(spool->stringspace + spool->strings[needid[i].map]) + 1;
     }
+  nstrings = i;	/* our new string id end */
 
-  nstrings = i;
+  /* make needid[oldid].need point to newid */
   for (i = 1; i < nstrings; i++)
     needid[needid[i].map].need = i;
 
+  /* same as above for relations */
   for (i = 0; i < pool->nrels; i++)
     {
       if (!needid[reloff + i].need)
         break;
-      else
-        needid[reloff + i].need = 0;
+      needid[reloff + i].need = 0;
     }
+  nrels = i;	/* our new rel id end */
 
-  nrels = i;
   for (i = 0; i < nrels; i++)
     needid[needid[reloff + i].map].need = nstrings + i;
+
+  /* now we have: needid[oldid].need -> newid
+                  needid[newid].map  -> oldid
+     both for strings and relations  */
 
 
 /********************************************************************/
@@ -1526,6 +1540,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
        * directory into single blocks.
        * Instead of components, traverse_dirs stores the old dirids,
        * we will change this in the second step below */
+      /* (dirpooldata and dirused are 0 if we have our own dirpool) */
       if (cbdata.dirused && !cbdata.dirused[1])
 	cbdata.dirused[1] = 1;	/* always want / entry */
       dirmap = sat_calloc(dirpool->ndirs, sizeof(Id));
@@ -1543,15 +1558,20 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	    continue;
 	  cbdata.dirused[dirmap[i]] = i;
 	  id = dirpool->dirs[dirmap[i]];
-	  if (cbdata.ownspool && dirpooldata && id > 1)
+	  if (dirpooldata && cbdata.ownspool && id > 1)
 	    id = putinownpool(&cbdata, dirpooldata->localpool ? &dirpooldata->spool : &pool->ss, id);
 	  dirmap[i] = needid[id].need;
 	}
-      /* now the new target directory structure is complete, and we have
-       * dirused[] to map from old dirids to new dirids */
+      /* now the new target directory structure is complete (dirmap), and we have
+       * dirused[olddirid] -> newdirid */
     }
 
 /********************************************************************/
+
+  /* collect all data
+   * we use extdata[0] for incore data and extdata[keyid] for vertical data
+   */
+
   cbdata.extdata = sat_calloc(target.nkeys, sizeof(struct extdata));
 
   xd = cbdata.extdata;
@@ -1797,12 +1817,13 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
     write_blob(fp, cbdata.extdata[0].buf, cbdata.extdata[0].len);
   sat_free(cbdata.extdata[0].buf);
 
-  /* write vertical data */
+  /* do we have vertical data? */
   for (i = 1; i < target.nkeys; i++)
     if (cbdata.extdata[i].len)
       break;
   if (i < target.nkeys)
     {
+      /* yes, write it in pages */
       unsigned char *dp, vpage[BLOB_PAGESIZE];
       int l, ll, lpage = 0;
 
