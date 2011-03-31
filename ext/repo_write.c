@@ -589,6 +589,10 @@ setdirused(struct cbdata *cbdata, Dirpool *dp, Id dir)
   cbdata->dirused[0] = 2;
 }
 
+/*
+ * pass 1 callback:
+ * collect key/id/dirid usage information, create needed schemas
+ */
 static int
 repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
 {
@@ -604,10 +608,12 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
   rm = cbdata->keymap[cbdata->keymapstart[data - data->repo->repodata] + (key - data->keys)];
   if (!rm)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
+
   /* record key in schema */
   if ((key->type != REPOKEY_TYPE_FIXARRAY || kv->eof == 0)
       && (cbdata->sp == cbdata->schema || cbdata->sp[-1] != rm))
     *cbdata->sp++ = rm;
+
   switch(key->type)
     {
       case REPOKEY_TYPE_ID:
@@ -694,6 +700,12 @@ repo_write_cb_needed(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, K
 #endif
   return repo_write_collect_needed(cbdata, repo, data, key, kv);
 }
+
+
+/*
+ * pass 2 callback:
+ * encode all of the data into the correct buffers
+ */
 
 static int
 repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue *kv)
@@ -904,19 +916,6 @@ write_compressed_page(FILE *fp, unsigned char *page, int len)
     }
 }
 
-
-#if 0
-static Id subfilekeys[] = {
-  REPODATA_INFO, REPOKEY_TYPE_VOID,
-  REPODATA_EXTERNAL, REPOKEY_TYPE_VOID,
-  REPODATA_KEYS, REPOKEY_TYPE_IDARRAY,
-  REPODATA_LOCATION, REPOKEY_TYPE_STR,
-  REPODATA_ADDEDFILEPROVIDES, REPOKEY_TYPE_REL_IDARRAY,
-  REPODATA_RPMDBCOOKIE, REPOKEY_TYPE_SHA256,
-  0,
-};
-#endif
-
 static Id verticals[] = {
   SOLVABLE_AUTHORS,
   SOLVABLE_DESCRIPTION,
@@ -957,6 +956,17 @@ repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata)
  * Repo
  */
 
+/*
+ * the code works the following way:
+ *
+ * 1) find which keys should be written
+ * 2) collect usage information for keys/ids/dirids, create schema
+ *    data
+ * 3) use usage information to create mapping tables, so that often
+ *    used ids get a lower number
+ * 4) encode data into buffers using the mapping tables
+ * 5) write everything to disk
+ */
 void
 repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp)
 {
