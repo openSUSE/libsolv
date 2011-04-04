@@ -611,13 +611,13 @@ repodata_lookup_str(Repodata *data, Id solvid, Id keyname)
   if (key->type == REPOKEY_TYPE_STR)
     return (const char *)dp;
   if (key->type == REPOKEY_TYPE_CONSTANTID)
-    return id2str(data->repo->pool, key->size);
-  if (key->type == REPOKEY_TYPE_ID)
+    id = key->size;
+  else if (key->type == REPOKEY_TYPE_ID)
     dp = data_read_id(dp, &id);
   else
     return 0;
   if (data->localpool)
-    return data->spool.stringspace + data->spool.strings[id];
+    return stringpool_id2str(&data->spool, id);
   return id2str(data->repo->pool, id);
 }
 

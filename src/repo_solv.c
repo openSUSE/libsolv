@@ -866,13 +866,8 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 	  pool_debug(pool, SAT_ERROR, "type REL_IDARRAY only supported for STORAGE_SOLVABLE\n");
 	  data.error = SOLV_ERROR_UNSUPPORTED;
 	}
-      if (keys[i].type == REPOKEY_TYPE_CONSTANTID)
-	{
-	  if (idmap)
-	    keys[i].size = idmap[keys[i].size];
-	  else if ((flags & REPO_LOCALPOOL) != 0)
-	    keys[i].size = str2id(pool, stringpool_id2str(spool, keys[i].size), 1);
-	}
+      if (keys[i].type == REPOKEY_TYPE_CONSTANTID && idmap)
+	keys[i].size = idmap[keys[i].size];
 #if 0
       fprintf(stderr, "key %d %s %s %d %d\n", i, id2str(pool,id), id2str(pool, keys[i].type),
                keys[i].size, keys[i].storage);

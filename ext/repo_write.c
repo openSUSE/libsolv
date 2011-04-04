@@ -1104,12 +1104,21 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 	      cbdata.keymap[n] = 0;
 	      continue;
 	    }
-	  id = repodata_key2id(&target, key, 0);
+	  if (key->type == REPOKEY_TYPE_CONSTANTID && data->localpool)
+	    {
+	      Repokey keyd = *key;
+	      keyd.size = repodata_globalize_id(data, key->size, 1);
+	      id = repodata_key2id(&target, &keyd, 0);
+	    }
+	  else
+	    id = repodata_key2id(&target, key, 0);
 	  if (!id)
 	    {
 	      Repokey keyd = *key;
 	      keyd.storage = KEY_STORAGE_INCORE;
-	      if (keyd.type != REPOKEY_TYPE_CONSTANT && keyd.type != REPOKEY_TYPE_CONSTANTID)
+	      if (keyd.type == REPOKEY_TYPE_CONSTANTID)
+		keyd.size = repodata_globalize_id(data, key->size, 1);
+	      else if (keyd.type != REPOKEY_TYPE_CONSTANT)
 		keyd.size = 0;
 	      if (keyfilter)
 		{
@@ -1230,16 +1239,35 @@ for (i = 1; i < target.nkeys; i++)
   fprintf(stderr, "  %2d: %s[%d] %d %d %d\n", i, id2str(pool, target.keys[i].name), target.keys[i].name, target.keys[i].type, target.keys[i].size, target.keys[i].storage);
 #endif
 
+  /* copy keys if requested */
+  if (keyarrayp)
+    {
+      *keyarrayp = sat_calloc(2 * target.nkeys + 1, sizeof(Id));
+      for (i = 1; i < target.nkeys; i++)
+	{
+          (*keyarrayp)[2 * i - 2] = target.keys[i].name;
+          (*keyarrayp)[2 * i - 1] = target.keys[i].type;
+	}
+    }
+
   if (poolusage > 1)
     {
       /* put all the keys we need in our string pool */
+      /* put mapped ids right into target.keys */
       for (i = 1, key = target.keys + i; i < target.nkeys; i++, key++)
 	{
-	  stringpool_str2id(spool, id2str(pool, key->name), 1);
-	  stringpool_str2id(spool, id2str(pool, key->type), 1);
+	  key->name = stringpool_str2id(spool, id2str(pool, key->name), 1);
 	  if (key->type == REPOKEY_TYPE_CONSTANTID)
-	    stringpool_str2id(spool, id2str(pool, key->size), 1);
+	    {
+	      key->type = stringpool_str2id(spool, id2str(pool, key->type), 1);
+	      type_constantid = key->type;
+	      key->size = stringpool_str2id(spool, id2str(pool, key->size), 1);
+	    }
+	  else
+	    key->type = stringpool_str2id(spool, id2str(pool, key->type), 1);
 	}
+      if (poolusage == 2)
+	stringpool_freehash(spool);	/* free some mem */
     }
 
 
@@ -1413,10 +1441,24 @@ for (i = 1; i < target.nkeys; i++)
 	continue;
       keyused[i] = n;
       if (i != n)
-	target.keys[n] = target.keys[i];
+	{
+	  target.keys[n] = target.keys[i];
+	  if (keyarrayp)
+	    {
+	      *keyarrayp[2 * n - 2] = *keyarrayp[2 * i - 2];
+	      *keyarrayp[2 * n - 1] = *keyarrayp[2 * i - 1];
+	    }
+	}
       n++;
     }
   target.nkeys = n;
+  if (keyarrayp)
+    {
+      /* terminate array */
+      *keyarrayp[2 * n - 2] = 0;
+      *keyarrayp[2 * n - 1] = 0;
+    }
+
   /* update schema data to the new key ids */
   for (i = 1; i < target.schemadatalen; i++)
     target.schemadata[i] = keyused[target.schemadata[i]];
@@ -1425,33 +1467,12 @@ for (i = 1; i < target.nkeys; i++)
     cbdata.keymap[i] = keyused[cbdata.keymap[i]];
   keyused = sat_free(keyused);
 
-  /* copy keys if requested */
-  if (keyarrayp)
-    {
-      *keyarrayp = sat_calloc(2 * target.nkeys + 1, sizeof(Id));
-      for (i = 1; i < target.nkeys; i++)
-	{
-          (*keyarrayp)[2 * i - 2] = target.keys[i].name;
-          (*keyarrayp)[2 * i - 1] = target.keys[i].type;
-	}
-    }
-
-  /* convert ids to local ids and increment their needid */
+  /* increment needid of the used keys, they are already mapped to
+   * the correct string pool  */
   for (i = 1; i < target.nkeys; i++)
     {
-      if (target.keys[i].type == REPOKEY_TYPE_CONSTANTID)
-	{
-	  if (!type_constantid)
-	    type_constantid = poolusage > 1 ? stringpool_str2id(spool, id2str(pool, target.keys[i].type), 1) : REPOKEY_TYPE_CONSTANTID;
-	  if (poolusage > 1)
-	    target.keys[i].size = stringpool_str2id(spool, id2str(pool, target.keys[i].size), 1);
-	  needid[target.keys[i].size].need++;
-	}
-      if (poolusage > 1)
-	{
-	  target.keys[i].name = stringpool_str2id(spool, id2str(pool, target.keys[i].name), 1);
-	  target.keys[i].type = stringpool_str2id(spool, id2str(pool, target.keys[i].type), 1);
-	}
+      if (type_constantid && target.keys[i].type == type_constantid)
+	needid[target.keys[i].size].need++;
       needid[target.keys[i].name].need++;
       needid[target.keys[i].type].need++;
     }
@@ -1811,7 +1832,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       write_id(fp, needid[target.keys[i].type].need);
       if (target.keys[i].storage != KEY_STORAGE_VERTICAL_OFFSET)
 	{
-	  if (target.keys[i].type == type_constantid)
+	  if (type_constantid && target.keys[i].type == type_constantid)
             write_id(fp, needid[target.keys[i].size].need);
 	  else
             write_id(fp, target.keys[i].size);
