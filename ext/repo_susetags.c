@@ -196,6 +196,68 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
   repodata_set_checksum(data, handle, keyname, type, sp[1]);
 }
 
+static void
+set_delta_location(Repodata *data, Id handle, int medianr, char *dir, char *file)
+{
+  Pool *pool = data->repo->pool;
+  int l = 0; 
+  char *p, *op;
+
+  if (!dir)
+    {    
+      if ((dir = strrchr(file, '/')) != 0)
+        {
+          l = dir - file;
+          dir = file;
+          file = dir + l + 1; 
+          if (!l) 
+            l++;
+        }
+    }    
+  else 
+    l = strlen(dir);
+  if (l >= 2 && dir[0] == '.' && dir[1] == '/' && (l == 2 || dir[2] != '/'))
+    {    
+      dir += 2;
+      l -= 2;
+    }    
+  if (l == 1 && dir[0] == '.') 
+    l = 0; 
+  if (dir && l)
+    repodata_set_id(data, handle, DELTA_LOCATION_DIR, strn2id(pool, dir, l, 1));
+  if ((p = strrchr(file, '.')) != 0)
+    {
+      *p = 0;
+      if ((op = strrchr(file, '.')) != 0)
+	{
+	  *p = '.';
+	  p = op;
+	  *p = 0;
+	  if (!strcmp(p + 1, ".delta.rpm") && (op = strrchr(file, '.')) != 0)
+	    {
+	      *p = '.';
+	      p = op;
+	      *p = 0;
+	    }
+	}
+      repodata_set_id(data, handle, DELTA_LOCATION_SUFFIX, str2id(pool, p + 1, 1));
+    }
+  if ((p = strrchr(file, '-')) != 0)
+    {
+      *p = 0;
+      if ((op = strrchr(file, '-')) != 0)
+	{
+	  *p = '-';
+	  p = op;
+	  *p = 0;
+	}
+      repodata_set_id(data, handle, DELTA_LOCATION_EVR, str2id(pool, p + 1, 1));
+    }
+  repodata_set_id(data, handle, DELTA_LOCATION_NAME, str2id(pool, file, 1));
+}
+
+
+
 /*
  * id3_cmp
  * compare
@@ -488,6 +550,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   int intag = 0;
   int cummulate = 0;
   int indesc = 0;
+  int indelta = 0;
   int last_found_pack = 0;
   char *sp[5];
   struct parsedata pd;
@@ -668,16 +731,119 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
         line_lang[0] = 0;
       tag = tag_from_string(line);
 
+      if (indelta)
+	{
+	  /* Example:
+	    =Dlt: subversion 1.6.16 1.3.1 i586
+	    =Dsq: subversion-1.6.15-4.2-d57b3fc86e7a2f73796e8e35b96fa86212c910
+	    =Cks: SHA1 14a8410cf741856a5d70d89dab62984dba6a1ca7
+	    =Loc: 1 subversion-1.6.15_1.6.16-4.2_1.3.1.i586.delta.rpm
+	    =Siz: 81558
+	   */
+	  switch (tag)
+	    {
+	    case CTAG('=', 'D', 's', 'q'):
+	      {
+		char *seqevr = 0, *seqname = 0, *seqnum;
+		seqnum = strrchr(line + 6, '-');
+		if (seqnum)
+		  {
+		    *seqnum++ = 0;
+		    if ((seqevr = strrchr(line + 6, '-')) != 0)
+		      {
+			char *evr2;
+			*seqevr = 0;
+			if ((evr2 = strrchr(line + 6, '-')) != 0)
+			  {
+			    *seqevr = '-';
+			    seqevr = evr2;
+			    *seqevr = 0;
+			  }
+			seqname = line + 6;
+			seqevr++;
+		      }
+		  }
+		else
+		  seqnum = line + 6;
+		if (seqname)
+		  repodata_set_id(data, handle, DELTA_SEQ_NAME, str2id(pool, seqname, 1));
+		if (seqevr)
+		  repodata_set_id(data, handle, DELTA_SEQ_EVR, str2id(pool, seqevr, 1));
+		repodata_set_str(data, handle, DELTA_SEQ_NUM, seqnum);
+	        if (seqevr)
+		  {
+		    if (indelta != 1)
+		      {
+			/* XXX: strip of arch part. should create DELTA_SEQ_ARCH instead. */
+			const char *dltarch = id2str(pool, indelta);
+			int dltarchl = strlen(dltarch);
+			int l = strlen(seqevr);
+			if (l > dltarchl + 1 && seqevr[l - dltarchl - 1] == '.' && !strcmp(seqevr + l - dltarchl, dltarch))
+			  seqevr[l - dltarchl - 1] = 0;
+			repodata_set_id(data, handle, DELTA_BASE_EVR, str2id(pool, seqevr, 1));
+		      }
+		  }
+		continue;
+	      }
+	    case CTAG('=', 'C', 'k', 's'):
+	      set_checksum(&pd, data, handle, DELTA_CHECKSUM, line + 6);
+	      continue;
+	    case CTAG('=', 'L', 'o', 'c'):
+	      {
+		int i = split(line + 6, sp, 3);
+		if (i != 2 && i != 3)
+		  {
+		    pool_debug(pool, SAT_FATAL, "susetags: bad location line: %d: %s\n", pd.lineno, line);
+		    exit(1);
+		  }
+		set_delta_location(data, handle, atoi(sp[0]), i == 3 ? sp[2] : 0, sp[1]);
+		continue;
+	      }
+	    case CTAG('=', 'S', 'i', 'z'):
+	      if (split(line + 6, sp, 3) == 2)
+		repodata_set_num(data, handle, DELTA_DOWNLOADSIZE, (unsigned int)(atoi(sp[0]) + 1023) / 1024);
+	      continue;
+	    case CTAG('=', 'P', 'k', 'g'):
+	    case CTAG('=', 'P', 'a', 't'):
+	    case CTAG('=', 'D', 'l', 't'):
+	      handle = 0;
+	      indelta = 0;
+	      break;
+	    default:
+	      pool_debug(pool, SAT_ERROR, "susetags: unknown line: %d: %s\n", pd.lineno, line);
+	      continue;
+	    }
+	}
 
       /*
-       * start of (next) package or pattern
+       * start of (next) package or pattern or delta
        *
        * =Pkg: <name> <version> <release> <architecture>
        * (=Pat: ...)
        */
-
-      if ((tag == CTAG('=', 'P', 'k', 'g')
-	   || tag == CTAG('=', 'P', 'a', 't')))
+      if (tag == CTAG('=', 'D', 'l', 't'))
+	{
+	  Id dltarch;
+	  if (s)
+	    finish_solvable(&pd, s, handle, freshens);
+	  s = 0;
+	  pd.kind = 0;
+          if (split(line + 5, sp, 5) != 4)
+	    {
+	      pool_debug(pool, SAT_FATAL, "susetags: bad line: %d: %s\n", pd.lineno, line);
+	      exit(1);
+	    }
+	  handle = repodata_new_handle(data);
+	  repodata_set_id(data, handle, DELTA_PACKAGE_NAME, str2id(pool, sp[0], 1));
+	  repodata_set_id(data, handle, DELTA_PACKAGE_EVR, makeevr(pool, join2(sp[1], "-", sp[2])));
+	  dltarch = str2id(pool, sp[3], 1);
+	  repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, dltarch);
+	  repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DELTAINFO, handle);
+	  indelta = dltarch ? dltarch : 1;
+	  continue;
+	}
+      if (tag == CTAG('=', 'P', 'k', 'g')
+	   || tag == CTAG('=', 'P', 'a', 't'))
 	{
 	  /* If we have an old solvable, complete it by filling in some
 	     default stuff.  */
