@@ -1006,7 +1006,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 
   struct extdata *xd;
 
-  Id type_constantid = 0;
+  Id type_constantid = REPOKEY_TYPE_CONSTANTID;
 
 
   memset(&cbdata, 0, sizeof(cbdata));
@@ -1471,7 +1471,7 @@ for (i = 1; i < target.nkeys; i++)
    * the correct string pool  */
   for (i = 1; i < target.nkeys; i++)
     {
-      if (type_constantid && target.keys[i].type == type_constantid)
+      if (target.keys[i].type == type_constantid)
 	needid[target.keys[i].size].need++;
       needid[target.keys[i].name].need++;
       needid[target.keys[i].type].need++;
@@ -1832,7 +1832,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       write_id(fp, needid[target.keys[i].type].need);
       if (target.keys[i].storage != KEY_STORAGE_VERTICAL_OFFSET)
 	{
-	  if (type_constantid && target.keys[i].type == type_constantid)
+	  if (target.keys[i].type == type_constantid)
             write_id(fp, needid[target.keys[i].size].need);
 	  else
             write_id(fp, target.keys[i].size);
