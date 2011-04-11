@@ -233,7 +233,7 @@ set_delta_location(Repodata *data, Id handle, int medianr, char *dir, char *file
 	  *p = '.';
 	  p = op;
 	  *p = 0;
-	  if (!strcmp(p + 1, ".delta.rpm") && (op = strrchr(file, '.')) != 0)
+	  if (!strcmp(p + 1, "delta.rpm") && (op = strrchr(file, '.')) != 0)
 	    {
 	      *p = '.';
 	      p = op;
@@ -735,7 +735,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	{
 	  /* Example:
 	    =Dlt: subversion 1.6.16 1.3.1 i586
-	    =Dsq: subversion-1.6.15-4.2-d57b3fc86e7a2f73796e8e35b96fa86212c910
+	    =Dsq: subversion 1.6.15 4.2 i586 d57b3fc86e7a2f73796e8e35b96fa86212c910
 	    =Cks: SHA1 14a8410cf741856a5d70d89dab62984dba6a1ca7
 	    =Loc: 1 subversion-1.6.15_1.6.16-4.2_1.3.1.i586.delta.rpm
 	    =Siz: 81558
@@ -744,45 +744,15 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    {
 	    case CTAG('=', 'D', 's', 'q'):
 	      {
-		char *seqevr = 0, *seqname = 0, *seqnum;
-		seqnum = strrchr(line + 6, '-');
-		if (seqnum)
-		  {
-		    *seqnum++ = 0;
-		    if ((seqevr = strrchr(line + 6, '-')) != 0)
-		      {
-			char *evr2;
-			*seqevr = 0;
-			if ((evr2 = strrchr(line + 6, '-')) != 0)
-			  {
-			    *seqevr = '-';
-			    seqevr = evr2;
-			    *seqevr = 0;
-			  }
-			seqname = line + 6;
-			seqevr++;
-		      }
-		  }
-		else
-		  seqnum = line + 6;
-		if (seqname)
-		  repodata_set_id(data, handle, DELTA_SEQ_NAME, str2id(pool, seqname, 1));
-		if (seqevr)
-		  repodata_set_id(data, handle, DELTA_SEQ_EVR, str2id(pool, seqevr, 1));
-		repodata_set_str(data, handle, DELTA_SEQ_NUM, seqnum);
-	        if (seqevr)
-		  {
-		    if (indelta != 1)
-		      {
-			/* XXX: strip of arch part. should create DELTA_SEQ_ARCH instead. */
-			const char *dltarch = id2str(pool, indelta);
-			int dltarchl = strlen(dltarch);
-			int l = strlen(seqevr);
-			if (l > dltarchl + 1 && seqevr[l - dltarchl - 1] == '.' && !strcmp(seqevr + l - dltarchl, dltarch))
-			  seqevr[l - dltarchl - 1] = 0;
-			repodata_set_id(data, handle, DELTA_BASE_EVR, str2id(pool, seqevr, 1));
-		      }
-		  }
+		Id evr;
+	        if (split(line + 5, sp, 5) != 5)
+		  continue;
+		repodata_set_id(data, handle, DELTA_SEQ_NAME, str2id(pool, sp[0], 1));
+		evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+		repodata_set_id(data, handle, DELTA_SEQ_EVR, evr);
+		/* repodata_set_id(data, handle, DELTA_SEQ_ARCH, str2id(pool, sp[3], 1)); */
+		repodata_set_str(data, handle, DELTA_SEQ_NUM, sp[4]);
+		repodata_set_id(data, handle, DELTA_BASE_EVR, evr);
 		continue;
 	      }
 	    case CTAG('=', 'C', 'k', 's'):
@@ -823,7 +793,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
        */
       if (tag == CTAG('=', 'D', 'l', 't'))
 	{
-	  Id dltarch;
 	  if (s)
 	    finish_solvable(&pd, s, handle, freshens);
 	  s = 0;
@@ -836,10 +805,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	  handle = repodata_new_handle(data);
 	  repodata_set_id(data, handle, DELTA_PACKAGE_NAME, str2id(pool, sp[0], 1));
 	  repodata_set_id(data, handle, DELTA_PACKAGE_EVR, makeevr(pool, join2(sp[1], "-", sp[2])));
-	  dltarch = str2id(pool, sp[3], 1);
-	  repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, dltarch);
+	  repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, str2id(pool, sp[3], 1));
 	  repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DELTAINFO, handle);
-	  indelta = dltarch ? dltarch : 1;
+	  indelta = 1;
 	  continue;
 	}
       if (tag == CTAG('=', 'P', 'k', 'g')
