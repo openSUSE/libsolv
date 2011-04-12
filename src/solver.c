@@ -829,7 +829,7 @@ solver_reset(Solver *solv)
  */
 
 static void
-analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp)
+analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
 {
   Pool *pool = solv->pool;
   int i;
@@ -837,11 +837,12 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp)
 
   IF_POOLDEBUG (SAT_DEBUG_UNSOLVABLE)
     solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, r);
+  MAPSET(rseen, why);
   if (solv->learntrules && why >= solv->learntrules)
     {
       for (i = solv->learnt_why.elements[why - solv->learntrules]; solv->learnt_pool.elements[i]; i++)
-	if (solv->learnt_pool.elements[i] > 0)
-	  analyze_unsolvable_rule(solv, solv->rules + solv->learnt_pool.elements[i], lastweakp);
+	if (solv->learnt_pool.elements[i] > 0 && !MAPTST(rseen, solv->learnt_pool.elements[i]))
+	  analyze_unsolvable_rule(solv, solv->rules + solv->learnt_pool.elements[i], lastweakp, rseen);
       return;
     }
   if (MAPTST(&solv->weakrulemap, why))
@@ -900,6 +901,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   int oldproblemcount;
   int oldlearntpoolcount;
   Id lastweak;
+  Map rseen;
 
   POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "ANALYZE UNSOLVABLE ----------------------\n");
   solv->stats_unsolvable++;
@@ -913,9 +915,10 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 
   r = cr;
   map_init(&seen, pool->nsolvables);
+  map_init(&rseen, solv->nrules);
   queue_push(&solv->learnt_pool, r - solv->rules);
   lastweak = 0;
-  analyze_unsolvable_rule(solv, r, &lastweak);
+  analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
   d = r->d < 0 ? -r->d - 1 : r->d;
   dp = d ? pool->whatprovidesdata + d : 0;
   for (i = -1; ; i++)
@@ -947,7 +950,8 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       assert(why > 0);
       queue_push(&solv->learnt_pool, why);
       r = solv->rules + why;
-      analyze_unsolvable_rule(solv, r, &lastweak);
+      if (!MAPTST(&rseen, why))
+        analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
       d = r->d < 0 ? -r->d - 1 : r->d;
       dp = d ? pool->whatprovidesdata + d : 0;
       for (i = -1; ; i++)
@@ -970,6 +974,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 	}
     }
   map_free(&seen);
+  map_free(&rseen);
   queue_push(&solv->problems, 0);	/* mark end of this problem */
 
   if (lastweak)
