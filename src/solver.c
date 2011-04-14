@@ -112,6 +112,7 @@ makeruledecisions(Solver *solv)
   Rule *r, *rr;
   Id v, vv;
   int decisionstart;
+  int record_proof = 1;
 
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
 
@@ -194,35 +195,46 @@ makeruledecisions(Solver *solv)
        * conflict with system solvable ?
        */
 	
-      if (v == -SYSTEMSOLVABLE) {
-	/* conflict with system solvable */
-	queue_push(&solv->problems, solv->learnt_pool.count);
-        queue_push(&solv->learnt_pool, ri);
-	queue_push(&solv->learnt_pool, 0);
-	POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
-	if  (ri >= solv->jobrules && ri < solv->jobrules_end)
-	  v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
-	else
-	  v = ri;
-	queue_push(&solv->problems, v);
-	queue_push(&solv->problems, 0);
-	solver_disableproblem(solv, v);
-	continue;
-      }
+      if (v == -SYSTEMSOLVABLE)
+	{
+	  /* conflict with system solvable */
+	  if (record_proof)
+	    {
+	      queue_push(&solv->problems, solv->learnt_pool.count);
+	      queue_push(&solv->learnt_pool, ri);
+	      queue_push(&solv->learnt_pool, 0);
+	    }
+	  else
+	    queue_push(&solv->problems, 0);
+	  POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
+	  if  (ri >= solv->jobrules && ri < solv->jobrules_end)
+	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	  else
+	    v = ri;
+	  queue_push(&solv->problems, v);
+	  queue_push(&solv->problems, 0);
+	  solver_disableproblem(solv, v);
+	  continue;
+	}
 
       assert(solv->decisionq_why.elements[i] > 0);
-	
+
       /*
        * conflict with an rpm rule ?
        */
-	
+
       if (solv->decisionq_why.elements[i] < solv->rpmrules_end)
 	{
 	  /* conflict with rpm rule assertion */
-	  queue_push(&solv->problems, solv->learnt_pool.count);
-	  queue_push(&solv->learnt_pool, ri);
-	  queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
-	  queue_push(&solv->learnt_pool, 0);
+	  if (record_proof)
+	    {
+	      queue_push(&solv->problems, solv->learnt_pool.count);
+	      queue_push(&solv->learnt_pool, ri);
+	      queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
+	      queue_push(&solv->learnt_pool, 0);
+	    }
+	  else
+	    queue_push(&solv->problems, 0);
 	  assert(v > 0 || v == -SYSTEMSOLVABLE);
 	  POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflict with rpm rule, disabling rule #%d\n", ri);
 	  if (ri >= solv->jobrules && ri < solv->jobrules_end)
@@ -240,10 +252,15 @@ makeruledecisions(Solver *solv)
        */
 	
       /* record proof */
-      queue_push(&solv->problems, solv->learnt_pool.count);
-      queue_push(&solv->learnt_pool, ri);
-      queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
-      queue_push(&solv->learnt_pool, 0);
+      if (record_proof)
+	{
+	  queue_push(&solv->problems, solv->learnt_pool.count);
+	  queue_push(&solv->learnt_pool, ri);
+	  queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
+	  queue_push(&solv->learnt_pool, 0);
+	}
+      else
+	queue_push(&solv->problems, 0);
 
       POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "conflicting update/job assertions over literal %d\n", vv);
 
@@ -678,6 +695,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
 {
   Pool *pool = solv->pool;
   Queue r;
+  Id r_buf[4];
   int rlevel = 1;
   Map seen;		/* global? */
   Id d, v, vv, *dp, why;
@@ -686,7 +704,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
   int learnt_why = solv->learnt_pool.count;
   Id *decisionmap = solv->decisionmap;
 
-  queue_init(&r);
+  queue_init_buffer(&r, r_buf, sizeof(r_buf)/sizeof(*r_buf));
 
   POOL_DEBUG(SAT_DEBUG_ANALYZE, "ANALYZE at %d ----------------------\n", level);
   map_init(&seen, pool->nsolvables);
@@ -718,7 +736,7 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
 	  l = solv->decisionmap[vv];
 	  if (l < 0)
 	    l = -l;
-	  MAPSET(&seen, vv);
+	  MAPSET(&seen, vv);		/* mark that we also need to look at this literal */
 	  if (l == 1)
 	    l1num++;			/* need to do this one in level1 pass */
 	  else if (l == level)
@@ -733,6 +751,9 @@ analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
 l1retry:
       if (!num && !--l1num)
 	break;	/* all level 1 literals done */
+
+      /* find the next literal to investigate */
+      /* (as num + l1num > 0, we know that we'll always find one) */
       for (;;)
 	{
 	  assert(idx > 0);
@@ -742,21 +763,24 @@ l1retry:
 	    break;
 	}
       MAPCLR(&seen, vv);
+
       if (num && --num == 0)
 	{
 	  *pr = -v;	/* so that v doesn't get lost */
 	  if (!l1num)
 	    break;
 	  POOL_DEBUG(SAT_DEBUG_ANALYZE, "got %d involved level 1 decisions\n", l1num);
+	  /* clear non-l1 bits from seen map */
 	  for (i = 0; i < r.count; i++)
 	    {
 	      v = r.elements[i];
 	      MAPCLR(&seen, v > 0 ? v : -v);
 	    }
-	  /* only level 1 marks left */
-	  l1num++;
+	  /* only level 1 marks left in seen map */
+	  l1num++;	/* as l1retry decrements it */
 	  goto l1retry;
 	}
+
       why = solv->decisionq_why.elements[idx];
       if (why <= 0)	/* just in case, maybe for SYSTEMSOLVABLE */
 	goto l1retry;
@@ -781,6 +805,7 @@ l1retry:
   queue_push(&solv->learnt_pool, 0);
   if (whyp)
     *whyp = learnt_why;
+  queue_free(&r);
   solv->stats_learned++;
   return rlevel;
 }
@@ -817,7 +842,7 @@ solver_reset(Solver *solv)
   /* adapt learnt rule status to new set of enabled/disabled rules */
   enabledisablelearntrules(solv);
 
-  /* redo all job/update decisions */
+  /* redo all assertion rule decisions */
   makeruledecisions(solv);
   POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "decisions so far: %d\n", solv->decisionq.count);
 }
@@ -895,13 +920,14 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   Pool *pool = solv->pool;
   Rule *r;
   Map seen;		/* global to speed things up? */
+  Map rseen;
   Id d, v, vv, *dp, why;
   int l, i, idx;
   Id *decisionmap = solv->decisionmap;
   int oldproblemcount;
   int oldlearntpoolcount;
   Id lastweak;
-  Map rseen;
+  int record_proof = 1;
 
   POOL_DEBUG(SAT_DEBUG_UNSOLVABLE, "ANALYZE UNSOLVABLE ----------------------\n");
   solv->stats_unsolvable++;
@@ -916,7 +942,8 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   r = cr;
   map_init(&seen, pool->nsolvables);
   map_init(&rseen, solv->nrules);
-  queue_push(&solv->learnt_pool, r - solv->rules);
+  if (record_proof)
+    queue_push(&solv->learnt_pool, r - solv->rules);
   lastweak = 0;
   analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
   d = r->d < 0 ? -r->d - 1 : r->d;
@@ -948,7 +975,8 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 	continue;
       why = solv->decisionq_why.elements[idx];
       assert(why > 0);
-      queue_push(&solv->learnt_pool, why);
+      if (record_proof)
+        queue_push(&solv->learnt_pool, why);
       r = solv->rules + why;
       if (!MAPTST(&rseen, why))
         analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
@@ -999,8 +1027,11 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
     }
 
   /* finish proof */
-  queue_push(&solv->learnt_pool, 0);
-  solv->problems.elements[oldproblemcount] = oldlearntpoolcount;
+  if (record_proof)
+    {
+      queue_push(&solv->learnt_pool, 0);
+      solv->problems.elements[oldproblemcount] = oldlearntpoolcount;
+    }
 
   if (disablerules)
     {
@@ -1021,7 +1052,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 /*-------------------------------------------------------------------
  * 
  * revert
- * revert decision at level
+ * revert decisionq to a level
  */
 
 static void
@@ -1249,6 +1280,8 @@ solver_create(Pool *pool)
   queue_init(&solv->covenantq);
   queue_init(&solv->weakruleq);
   queue_init(&solv->ruleassertions);
+
+  queue_push(&solv->learnt_pool, 0);	/* so that 0 does not describe a proof */
 
   map_init(&solv->recommendsmap, pool->nsolvables);
   map_init(&solv->suggestsmap, pool->nsolvables);
