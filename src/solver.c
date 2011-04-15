@@ -862,11 +862,13 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
 
   IF_POOLDEBUG (SAT_DEBUG_UNSOLVABLE)
     solver_printruleclass(solv, SAT_DEBUG_UNSOLVABLE, r);
-  MAPSET(rseen, why);
   if (solv->learntrules && why >= solv->learntrules)
     {
+      if (MAPTST(rseen, why - solv->learntrules))
+	return;
+      MAPSET(rseen, why - solv->learntrules);
       for (i = solv->learnt_why.elements[why - solv->learntrules]; solv->learnt_pool.elements[i]; i++)
-	if (solv->learnt_pool.elements[i] > 0 && !MAPTST(rseen, solv->learnt_pool.elements[i]))
+	if (solv->learnt_pool.elements[i] > 0)
 	  analyze_unsolvable_rule(solv, solv->rules + solv->learnt_pool.elements[i], lastweakp, rseen);
       return;
     }
@@ -941,7 +943,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 
   r = cr;
   map_init(&seen, pool->nsolvables);
-  map_init(&rseen, solv->nrules);
+  map_init(&rseen, solv->learntrules ? solv->nrules - solv->learntrules : 0);
   if (record_proof)
     queue_push(&solv->learnt_pool, r - solv->rules);
   lastweak = 0;
@@ -978,8 +980,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       if (record_proof)
         queue_push(&solv->learnt_pool, why);
       r = solv->rules + why;
-      if (!MAPTST(&rseen, why))
-        analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
+      analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
       d = r->d < 0 ? -r->d - 1 : r->d;
       dp = d ? pool->whatprovidesdata + d : 0;
       for (i = -1; ; i++)
@@ -2989,7 +2990,7 @@ solver_solve(Solver *solv, Queue *job)
   /* disable update rules that conflict with our job */
   solver_disablepolicyrules(solv);
 
-  /* make decisions based on job/update assertions */
+  /* make initial decisions based on assertion rules */
   makeruledecisions(solv);
   POOL_DEBUG(SAT_DEBUG_SOLVER, "problems so far: %d\n", solv->problems.count);
 
