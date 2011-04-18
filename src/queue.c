@@ -94,7 +94,7 @@ queue_alloc_one_head(Queue *q)
   if (!q->alloc || !q->left)
     queue_alloc_one(q);
   l = q->left > EXTRA_SPACE_HEAD ? EXTRA_SPACE_HEAD : q->left;
-  if (q->count);
+  if (q->count)
     memmove(q->elements + l, q->elements, q->count * sizeof(Id));
   q->elements += l;
   q->left -= l;
