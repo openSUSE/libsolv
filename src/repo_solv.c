@@ -214,7 +214,7 @@ data_read_id_max(unsigned char *dp, Id *ret, Id *map, int max, int *error)
   return dp;
 }
 
-unsigned char *
+static unsigned char *
 data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error)
 {
   Id *store = *storep;
@@ -246,7 +246,7 @@ data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error)
   return dp;
 }
 
-unsigned char *
+static unsigned char *
 data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error, Id marker)
 {
   Id *store = *storep;

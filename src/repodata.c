@@ -348,7 +348,7 @@ data_skip_schema(Repodata *data, unsigned char *dp, Id schema)
   return dp;
 }
 
-unsigned char *
+static unsigned char *
 data_skip_key(Repodata *data, unsigned char *dp, Repokey *key)
 {
   int nentries, schema;
