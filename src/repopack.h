@@ -269,6 +269,4 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
     }
 }
 
-unsigned char *data_skip_key(Repodata *data, unsigned char *dp, Repokey *key);
-
 #endif	/* SATSOLVER_REPOPACK */
