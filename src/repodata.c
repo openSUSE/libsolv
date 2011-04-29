@@ -34,15 +34,9 @@
 #include "repopack.h"
 #include "repopage.h"
 
-extern unsigned int compress_buf (const unsigned char *in, unsigned int in_len,
-				  unsigned char *out, unsigned int out_len);
-extern unsigned int unchecked_decompress_buf (const unsigned char *in,
-					      unsigned int in_len,
-					      unsigned char *out,
-					      unsigned int out_len);
-
 #define REPODATA_BLOCK 255
 
+static unsigned char *data_skip_key(Repodata *data, unsigned char *dp, Repokey *key);
 
 void
 repodata_initdata(Repodata *data, Repo *repo, int localpool)
