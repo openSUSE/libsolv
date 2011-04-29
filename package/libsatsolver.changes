@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Apr 29 14:35:59 CEST 2011 - mls@suse.de
+
+- bup version to 0.17.0 to make it different from 11.4
+- 0.17.0
+
+-------------------------------------------------------------------
 Thu Mar 24 10:04:16 UTC 2011 - mls@suse.de
 
 - add missing else part in rpmdbid2db()
