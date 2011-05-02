@@ -427,7 +427,7 @@ class Repo_susetags < Repo_generic
     di = @handle.Dataiterator(Solv::SOLVID_META, Solv::SUSETAGS_FILE_NAME, nil, 0)
     di.prepend_keyname(Solv::SUSETAGS_FILE)
     for d in di
-      filename = d.match_str
+      filename = d.str
       next unless filename && filename =~ /^packages\.(..)(?:\..*)$/
       next if $1 == 'en' || $1 == 'gz'
       add_ext(repodata, filename, $1)
@@ -502,7 +502,7 @@ def depglob(pool, name, globname, globdep)
   id = pool.str2id(name, false)
   if id != 0
     match = false
-    providers = pool.providers(id)
+    providers = pool.whatprovides(id)
     if globname && providers.find {|s| s.nameid == id }
       return [ pool.Job(Solv::Job::SOLVER_SOLVABLE_NAME, id) ]
     end

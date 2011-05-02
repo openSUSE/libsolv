@@ -95,16 +95,16 @@ sub download {
   if ($chksum) {
     my $fchksum = solv::Chksum->new($chksum->{'type'});
     $fchksum->add_fd(fileno($f));
-    if (!$fchksum->matches($chksum)) {
+    if ($fchksum != $chksum) {
       print "$file: checksum error\n";
       $self->{'incomplete'} = 1 if $markincomplete;
       return undef;
     }
   }
   if ($uncompress) {
-    return solv::xfopen_fd($file, POSIX::dup(fileno($f)));
+    return solv::xfopen_dup($file, fileno($f));
   } else {
-    return solv::xfopen_fd('', POSIX::dup(fileno($f)));
+    return solv::xfopen_dup(undef, fileno($f));
   }
 }
 
@@ -124,7 +124,7 @@ sub usecachedrepo {
       return undef if sysread($f, $fextcookie, 32) != 32;
     }
     sysseek($f, 0, Fcntl::SEEK_SET);
-    $f = solv::xfopen_fd('', POSIX::dup(fileno($f)));
+    $f = solv::xfopen_dup(undef, fileno($f));
     my $flags = $ext ? $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES : 0;
     $flags |= $solv::Repo::REPO_LOCALPOOL if $ext && $ext ne 'DL';
     if (!$self->{'handle'}->add_solv($f, $flags)) {
@@ -162,7 +162,7 @@ sub writecachedrepo {
   };
   return unless $f;
   chmod 0444, $f;
-  my $ff = solv::xfopen_fd('', POSIX::dup(fileno($f)));
+  my $ff = solv::xfopen_dup(undef, fileno($f));
   if (!$info) {
     $self->{'handle'}->write($ff);
   } elsif ($ext) {
@@ -373,7 +373,7 @@ sub add_exts {
   my $di = $self->{'handle'}->Dataiterator($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME, undef, 0);
   $di->prepend_keyname($solv::SUSETAGS_FILE);
   for my $d (@$di) {
-    my $filename = $d->match_str();
+    my $filename = $d->str();
     next unless $filename && $filename =~ /^packages\.(..)(?:\..*)$/;
     next if $1 eq 'en' || $1 eq 'gz';
     $self->add_ext($repodata, $filename, $1);
@@ -479,6 +479,7 @@ sub load {
   print "reading\n";
   $self->{'handle'}->add_products("/etc/products.d", $solv::Repo::REPO_NO_INTERNALIZE);
   $self->{'handle'}->add_rpmdb(undef, $solv::Repo::REPO_REUSE_REPODATA);
+  $self->writecachedrepo();
   return 1;
 }
 
@@ -496,7 +497,7 @@ sub depglob {
   my $id = $pool->str2id($name, 0);
   if ($id) {
     my $match;
-    for my $s ($pool->providers($id)) {
+    for my $s ($pool->whatprovides($id)) {
       return $pool->Job($solv::Job::SOLVER_SOLVABLE_NAME, $id) if $globname && $s->{'nameid'} == $id;
       $match = 1;
     }
@@ -800,6 +801,7 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
 	    print "  - allow something else\n";
 	  }
         }
+        print "\n";
       }
       my $sol;
       while (1) {
@@ -817,7 +819,7 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
 	  $jobs[$element->{'jobidx'}] = $pool->Job($solv::Job::SOLVER_NOOP, 0);
         } else {
 	  my $newjob = $element->Job();
-	  push @jobs, $newjob if $newjob && !grep {$_->{'how'} == $newjob->{'how'} && $_->{'what'} == $newjob->{'what'}} @jobs;
+	  push @jobs, $newjob if $newjob && !grep {$_ == $newjob} @jobs;
 	}
       }
     }

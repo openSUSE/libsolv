@@ -84,7 +84,7 @@
 
 #define SOLVCACHE_PATH "/var/cache/solv"
 
-#define METADATA_EXPIRE (60 * 90)
+#define METADATA_EXPIRE (60 * 15)
 
 struct repoinfo {
   Repo *repo;
@@ -1467,18 +1467,6 @@ load_stub(Pool *pool, Repodata *data, void *dp)
 static unsigned char installedcookie[32];
 
 #ifdef DEBIAN
-void
-repo_add_debdb(Repo *repo, int flags)
-{
-  FILE *fp;
-  if ((fp = fopen("/var/lib/dpkg/status", "r")) == 0)
-    {
-      perror("/var/lib/dpkg/status");
-      exit(1);
-    }
-  repo_add_debpackages(repo, fp, flags);
-  fclose(fp);
-}
 
 const char *
 debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsigned char **chksump, Id *chksumtypep)
@@ -1660,7 +1648,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       if (!done)
         repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
 #else
-        repo_add_debdb(repo, REPO_REUSE_REPODATA);
+        repo_add_debdb(repo, 0, REPO_REUSE_REPODATA);
 #endif
       writecachedrepo(repo, 0, 0, installedcookie);
     }

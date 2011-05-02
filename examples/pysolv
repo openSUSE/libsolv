@@ -177,14 +177,14 @@ class repo_generic(dict):
 		    self['incomplete'] = True
 		return None
 	    fchksum.add_fd(f.fileno())
-	    if not fchksum.matches(chksum):
+	    if fchksum != chksum:
 		print "%s: checksum mismatch" % file
 		if markincomplete:
 		    self['incomplete'] = True
 		return None
 	if uncompress:
 	    return solv.xfopen_fd(file, os.dup(f.fileno()))
-	return solv.xfopen_fd("", os.dup(f.fileno()))
+	return solv.xfopen_fd(None, os.dup(f.fileno()))
 
     def usecachedrepo(self, ext, mark=False):
 	if not ext:
@@ -495,7 +495,7 @@ class repo_susetags(repo_generic):
 	di = self.handle.Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
 	di.prepend_keyname(solv.SUSETAGS_FILE)
 	for d in di:
-	    filename = d.match_str()
+	    filename = d.str
 	    if not filename:
 		continue
 	    if filename[0:9] != "packages.":
@@ -668,7 +668,7 @@ def depglob(pool, name, globname, globdep):
     id = pool.str2id(name, False)
     if id:
 	match = False
-	for s in pool.providers(id):
+	for s in pool.whatprovides(id):
 	    if globname and s.nameid == id:
 		return [ pool.Job(Job.SOLVER_SOLVABLE_NAME, id) ]
 	    match = True
@@ -805,8 +805,8 @@ if cmd == 'list' or cmd == 'info':
     for job in jobs:
 	for s in job.solvables():
 	    if cmd == 'info':
-		print "Name:        %s" % s.str()
-		print "Repo:        %s" % s.repo.name
+		print "Name:        %s" % s
+		print "Repo:        %s" % s.repo
 		print "Summary:     %s" % s.lookup_str(solv.SOLVABLE_SUMMARY)
 		str = s.lookup_str(solv.SOLVABLE_URL)
 		if str:
@@ -817,7 +817,7 @@ if cmd == 'list' or cmd == 'info':
 		print "Description:\n%s" % s.lookup_str(solv.SOLVABLE_DESCRIPTION)
 		print
 	    else:
-		print "  - %s [%s]" % (s.str(), s.repo.name)
+		print "  - %s [%s]" % (s, s.repo)
 		print "    %s" % s.lookup_str(solv.SOLVABLE_SUMMARY)
     sys.exit(0)
 
@@ -877,32 +877,33 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
                 for element in elements:
 		    etype = element.type
 		    if etype == Solver.SOLVER_SOLUTION_JOB:
-			print "  - do not ask to", jobs[element.jobidx].str()
+			print "  - do not ask to", jobs[element.jobidx]
 		    elif etype == Solver.SOLVER_SOLUTION_INFARCH:
 			if element.solvable.isinstalled():
-			    print "  - keep %s despite the inferior architecture" % element.solvable.str()
+			    print "  - keep %s despite the inferior architecture" % element.solvable
 			else:
-			    print "  - install %s despite the inferior architecture" % element.solvable.str()
+			    print "  - install %s despite the inferior architecture" % element.solvable
 		    elif etype == Solver.SOLVER_SOLUTION_DISTUPGRADE:
 			if element.solvable.isinstalled():
-			    print "  - keep obsolete %s" % element.solvable.str()
+			    print "  - keep obsolete %s" % element.solvable
 			else:
-			    print "  - install %s from excluded repository" % element.solvable.str()
+			    print "  - install %s from excluded repository" % element.solvable
 		    elif etype == Solver.SOLVER_SOLUTION_REPLACE:
 			illegal = element.illegalreplace()
 			if illegal & solver.POLICY_ILLEGAL_DOWNGRADE:
-			    print "  - allow downgrade of %s to %s" % (element.solvable.str(), element.replacement.str())
+			    print "  - allow downgrade of %s to %s" % (element.solvable, element.replacement)
 			if illegal & solver.POLICY_ILLEGAL_ARCHCHANGE:
-			    print "  - allow architecture change of %s to %s" % (element.solvable.str(), element.replacement.str())
+			    print "  - allow architecture change of %s to %s" % (element.solvable, element.replacement)
 			if illegal & solver.POLICY_ILLEGAL_VENDORCHANGE:
 			    if element.replacement.vendorid:
-				print "  - allow vendor change from '%s' (%s) to '%s' (%s)" % (element.solvable.vendor, element.solvable.str(), element.replacement.vendor, element.replacement.str())
+				print "  - allow vendor change from '%s' (%s) to '%s' (%s)" % (element.solvable.vendor, element.solvable, element.replacement.vendor, element.replacement)
 			    else:
-				print "  - allow vendor change from '%s' (%s) to no vendor (%s)" % (element.solvable.vendor, element.solvable.str(), element.replacement.str())
+				print "  - allow vendor change from '%s' (%s) to no vendor (%s)" % (element.solvable.vendor, element.solvable, element.replacement)
 			if illegal == 0:
-			    print "  - allow replacement of %s with %s" % (element.solvable.str(), element.replacement.str())
+			    print "  - allow replacement of %s with %s" % (element.solvable, element.replacement)
 		    elif etype == Solver.SOLVER_SOLUTION_ERASE:
-			print "  - allow deinstallation of %s" % element.solvable.str()
+			print "  - allow deinstallation of %s" % element.solvable
+		print
 	    sol = ''
 	    while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
 		sys.stdout.write("Please choose a solution: ")
@@ -919,13 +920,9 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 		    jobs[element.jobidx] = pool.Job(Job.SOLVER_NOOP, 0)
 		else:
 		    newjob = element.Job()
-		    if newjob:
-			for job in jobs:
-			    if job.how == newjob.how and job.what == newjob.what:
-				newjob = None
-				break
-			if newjob:
-			    jobs.append(newjob)
+		    if newjob and newjob not in jobs:
+			jobs.append(newjob)
+			
     # no problems, show transaction
     trans = solver.transaction()
     del solver
@@ -957,9 +954,9 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	for p in cl.solvables():
 	    if cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED or cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
 		op = trans.othersolvable(p)
-		print "  - %s -> %s" % (p.str(), op.str())
+		print "  - %s -> %s" % (p, op)
 	    else:
-		print "  - %s" % p.str()
+		print "  - %s" % p
         print
     print "install size change: %d K" % trans.calc_installsizechange()
     print
@@ -999,7 +996,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 			continue
 		    baseevrid = pool.lookup_id(solv.SOLVID_POS, solv.DELTA_BASE_EVR)
 		    candidate = None
-		    for installedp in pool.providers(p.nameid):
+		    for installedp in pool.whatprovides(p.nameid):
 			if installedp.isinstalled() and installedp.nameid == p.nameid and installedp.archid == p.archid and installedp.evrid == baseevrid:
 			    candidate = installedp
 		    if not candidate:
@@ -1051,7 +1048,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	    rpmdbid = p.lookup_num(solv.RPM_RPMDBID)
 	    erasenamehelper[p.name] = p
 	    if not rpmdbid:
-		sys.exit("\ninternal error: installed package %s has no rpmdbid\n" % p.str())
+		sys.exit("\ninternal error: installed package %s has no rpmdbid\n" % p)
 	    ts.addErase(rpmdbid)
 	elif type == Transaction.SOLVER_TRANSACTION_INSTALL:
 	    f = newpkgsfp[p.id]
@@ -1072,12 +1069,12 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
 	if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
 	    return solv.xfileno(newpkgsfp[p.id])
 	if reason == rpm.RPMCALLBACK_INST_START:
-	    print "install", p.str()
+	    print "install", p
 	if reason == rpm.RPMCALLBACK_UNINST_START:
 	    # argh, p is just the name of the package
 	    if p in erasenamehelper:
 		p = erasenamehelper[p]
-		print "erase", p.str()
+		print "erase", p
     runproblems = ts.run(runCallback, '')
     if runproblems:
 	print runproblems

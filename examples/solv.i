@@ -338,7 +338,10 @@ typedef VALUE AppObjectPtr;
 #include "repo_solv.h"
 #include "chksum.h"
 
+#ifndef DEBIAN
 #include "repo_rpmdb.h"
+#endif
+#include "repo_deb.h"
 #include "repo_rpmmd.h"
 #include "repo_write.h"
 #include "repo_products.h"
@@ -365,7 +368,7 @@ typedef void *AppObjectPtr;
 typedef struct {
   Pool *pool;
   Id id;
-} XId;
+} Dep;
 
 typedef struct {
   Pool *pool;
@@ -399,7 +402,7 @@ typedef struct {
 
 typedef struct {
   Pool *pool;
-  Id how;
+  int how;
   Id what;
 } Job;
 
@@ -470,7 +473,7 @@ typedef int Id;
 typedef struct {
   Pool* const pool;
   Id const id;
-} XId;
+} Dep;
 
 typedef struct {
   Pool* const pool;
@@ -505,12 +508,17 @@ typedef struct {} Repo_solvable_iterator;
 typedef struct {
   Pool * const pool;
   Repo * const repo;
-  const Id solvid;
+  Id const solvid;
 } Datamatch;
+
+%nodefaultctor Datapos;
+typedef struct {
+  Repo * const repo;
+} Datapos;
 
 typedef struct {
   Pool * const pool;
-  Id how;
+  int how;
   Id what;
 } Job;
 
@@ -644,7 +652,7 @@ typedef struct {
   static const Id SOLVER_NOAUTOSET = SOLVER_NOAUTOSET;
   static const Id SOLVER_SETMASK = SOLVER_SETMASK;
 
-  Job(Pool *pool, Id how, Id what) {
+  Job(Pool *pool, int how, Id what) {
     Job *job = sat_calloc(1, sizeof(*job));
     job->pool = pool;
     job->how = how;
@@ -652,11 +660,9 @@ typedef struct {
     return job;
   }
 
-  const char *str() {
-    return pool_job2str($self->pool, $self->how, $self->what, 0);
-  }
-
-  Queue solvableids() {
+  %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject solvables;
+  Queue solvables() {
     Pool *pool = $self->pool;
     Id p, pp, how;
     Queue q;
@@ -666,10 +672,23 @@ typedef struct {
       queue_push(&q, p);
     return q;
   }
-  %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
-  %newobject solvables;
-  Queue solvables() {
-    return Job_solvableids($self);
+
+  const char *str() {
+    return pool_job2str($self->pool, $self->how, $self->what, 0);
+  }
+
+  bool __eq__(Job *j) {
+    return $self->pool == j->pool && $self->how == j->how && $self->what == j->what;
+  }
+  bool __ne__(Job *j) {
+    return !Job___eq__($self, j);
+  }
+  const char *__str__() {
+    return pool_job2str($self->pool, $self->how, $self->what, 0);
+  }
+  const char *__repr__() {
+    const char *str = pool_job2str($self->pool, $self->how, $self->what, ~0);
+    return pool_tmpjoin($self->pool, "<Job ", str, ">");
   }
 }
 
@@ -721,17 +740,6 @@ typedef struct {
     sat_chksum_add($self, &stb.st_size, sizeof(stb.st_size));
     sat_chksum_add($self, &stb.st_mtime, sizeof(stb.st_mtime));
   }
-  bool matches(Chksum *othersum) {
-    int l;
-    const unsigned char *b, *bo;
-    if (!othersum)
-      return 0;
-    if (sat_chksum_get_type($self) != sat_chksum_get_type(othersum))
-      return 0;
-    b = sat_chksum_get($self, &l);
-    bo = sat_chksum_get(othersum, 0);
-    return memcmp(b, bo, l) == 0;
-  }
   SWIGCDATA raw() {
     int l;
     const unsigned char *b;
@@ -748,6 +756,42 @@ typedef struct {
     ret = sat_malloc(2 * l + 1);
     sat_bin2hex(b, l, ret);
     return ret;
+  }
+
+  bool __eq__(Chksum *chk) {
+    int l;
+    const unsigned char *b, *bo;
+    if (!chk)
+      return 0;
+    if (sat_chksum_get_type($self) != sat_chksum_get_type(chk))
+      return 0;
+    b = sat_chksum_get($self, &l);
+    bo = sat_chksum_get(chk, 0);
+    return memcmp(b, bo, l) == 0;
+  }
+  bool __ne__(Chksum *chk) {
+    return !Chksum___eq__($self, chk);
+  }
+#if defined(SWIGRUBY)
+  %rename("to_s") __str__;
+  %rename("inspect") __repr__;
+#endif
+  %newobject __str__;
+  const char *__str__() {
+    const char *str;
+    const char *h = 0;
+    if (sat_chksum_isfinished($self))
+      h = Chksum_hex($self);
+    str = sat_dupjoin(sat_chksum_type2str(sat_chksum_get_type($self)), ":", h ? h : "unfinished");
+    sat_free((void *)h);
+    return str;
+  }
+  %newobject __repr__;
+  const char *__repr__() {
+    const char *h = Chksum___str__($self);
+    const char *str = sat_dupjoin("<Chksum ", h, ">");
+    sat_free((void *)h);
+    return str;
   }
 }
 
@@ -786,30 +830,28 @@ typedef struct {
   }
 #endif
 #if defined(SWIGPERL)
-  %{
+%{
+  SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
+    int count;
+    int ret = 0;
+    dSP;
+    XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
 
-SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
-  int count;
-  int ret = 0;
-  dSP;
-  XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
-
-  ENTER;
-  SAVETMPS;
-  PUSHMARK(SP);
-  XPUSHs(SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_OWNER | SWIG_SHADOW));
-  PUTBACK;
-  count = perl_call_sv((SV *)d, G_EVAL|G_SCALAR);
-  SPAGAIN;
-  if (count)
-    ret = POPi;
-  PUTBACK;
-  FREETMPS;
-  LEAVE;
-  return ret;
-}
-
-  %}
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+    XPUSHs(SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_OWNER | SWIG_SHADOW));
+    PUTBACK;
+    count = perl_call_sv((SV *)d, G_EVAL|G_SCALAR);
+    SPAGAIN;
+    if (count)
+      ret = POPi;
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+    return ret;
+  }
+%}
   void set_loadcallback(SV *callable) {
     if ($self->loadcallback == loadcallback)
       SvREFCNT_dec($self->loadcallbackdata);
@@ -849,16 +891,16 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     pool_free($self);
   }
   Id str2id(const char *str, bool create=1) {
-    return str2id($self, str, create);
+    return pool_str2id($self, str, create);
   }
   const char *id2str(Id id) {
-    return id2str($self, id);
+    return pool_id2str($self, id);
   }
   const char *dep2str(Id id) {
-    return dep2str($self, id);
+    return pool_dep2str($self, id);
   }
   Id rel2id(Id name, Id evr, int flags, bool create=1) {
-    return rel2id($self, name, evr, flags, create);
+    return pool_rel2id($self, name, evr, flags, create);
   }
   Id id2langid(Id id, const char *lang, bool create=1) {
     return pool_id2langid($self, id, lang, create);
@@ -893,7 +935,7 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     return new_Dataiterator($self, 0, p, key, match, flags);
   }
   const char *solvid2str(Id solvid) {
-    return solvid2str($self, solvid);
+    return pool_solvid2str($self, solvid);
   }
   void addfileprovides() {
     pool_addfileprovides($self);
@@ -913,6 +955,9 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     pool_createwhatprovides($self);
   }
 
+  XSolvable *id2solvable(Id id) {
+    return new_XSolvable($self, id);
+  }
   %newobject solvables;
   Pool_solvable_iterator * const solvables;
   %{
@@ -925,6 +970,11 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     return new_Pool_solvable_iterator($self);
   }
 
+  Repo *id2repo(Id id) {
+    if (id < 1 || id > $self->nrepos)
+      return 0;
+    return pool_id2repo($self, id);
+  }
   %newobject repos;
   Pool_repo_iterator * const repos;
   %{
@@ -947,15 +997,6 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   }
   %}
 
-  Queue providerids(Id dep) {
-    Pool *pool = $self;
-    Queue q;
-    Id p, pp;
-    queue_init(&q);
-    FOR_PROVIDES(p, pp, dep)
-      queue_push(&q, p);
-    return q;
-  }
   Queue matchprovidingids(const char *match, int flags) {
     Pool *pool = $self;
     Queue q;
@@ -977,13 +1018,13 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     return q;
   }
 
-  Job *Job(Id how, Id what) {
+  Job *Job(int how, Id what) {
     return new_Job($self, how, what);
   }
 
-  %typemap(out) Queue providers Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
-  %newobject providers;
-  Queue providers(Id dep) {
+  %typemap(out) Queue whatprovides Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
+  %newobject whatprovides;
+  Queue whatprovides(Id dep) {
     Pool *pool = $self;
     Queue q;
     Id p, pp;
@@ -996,6 +1037,7 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   Id towhatprovides(Queue q) {
     return pool_queuetowhatprovides($self, &q);
   }
+
 #ifdef SWIGRUBY
   %rename("isknownarch?") isknownarch;
 #endif
@@ -1058,12 +1100,21 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     repo_add_rpmmd($self, fp, language, flags);
     return 1;
   }
+#ifndef DEBIAN
   bool add_rpmdb(Repo *ref, int flags = 0) {
     repo_add_rpmdb($self, ref, 0, flags);
     return 1;
   }
   Id add_rpm(const char *name, int flags = 0) {
     return repo_add_rpm($self, name, flags);
+  }
+#endif
+  bool add_debdb(int flags = 0) {
+    repo_add_debdb($self, 0, flags);
+    return 1;
+  }
+  Id add_deb(const char *name, int flags = 0) {
+    return repo_add_deb($self, name, flags);
   }
   bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0) {
     repo_add_susetags($self, fp, defvendor, language, flags);
@@ -1101,7 +1152,7 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
   }
   # HACK, remove if no longer needed!
-  bool write_first_repodata(FILE *fp, int flags = 0) {
+  bool write_first_repodata(FILE *fp) {
     int oldnrepodata = $self->nrepodata;
     $self->nrepodata = 1;
     repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
@@ -1166,6 +1217,32 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
          return 0;       /* oops, not an extension */
      return new_XRepodata($self, 0);
    }
+
+  bool __eq__(Repo *repo) {
+    return $self == repo;
+  }
+  bool __ne__(Repo *repo) {
+    return $self != repo;
+  }
+  %newobject __str__;
+  const char *__str__() {
+    char buf[20];
+    if ($self->name)
+      return strdup($self->name);
+    sprintf(buf, "Repo#%d", $self->repoid);
+    return strdup(buf);
+  }
+  %newobject __repr__;
+  const char *__repr__() {
+    char buf[20];
+    if ($self->name)
+      {
+        sprintf(buf, "<Repo #%d ", $self->repoid);
+        return sat_dupjoin(buf, $self->name, ">");
+      }
+    sprintf(buf, "<Repo #%d>", $self->repoid);
+    return strdup(buf);
+  }
 }
 
 %extend Dataiterator {
@@ -1252,26 +1329,29 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   const char *key_idstr() {
     return id2str($self->pool, $self->key->name);
   }
-  Id keytype_id() {
+  Id type_id() {
     return $self->key->type;
   }
-  const char *keytype_idstr() {
+  const char *type_idstr() {
     return id2str($self->pool, $self->key->type);
   }
-  Id match_id() {
+  Id id() {
      return $self->kv.id;
   }
-  const char *match_idstr() {
+  const char *idstr() {
      return id2str($self->pool, $self->kv.id);
   }
-  const char *match_str() {
+  const char *str() {
      return $self->kv.str;
   }
-  int match_num() {
+  int num() {
      return $self->kv.num;
   }
-  int match_num2() {
+  int num2() {
      return $self->kv.num2;
+  }
+  void setpos() {
+    dataiterator_setpos($self);
   }
   void setpos_parent() {
     dataiterator_setpos_parent($self);
@@ -1451,9 +1531,9 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   }
 }
 
-%extend XId {
-  XId(Pool *pool, Id id) {
-    XId *s;
+%extend Dep {
+  Dep(Pool *pool, Id id) {
+    Dep *s;
     if (!id)
       return 0;
     s = sat_calloc(1, sizeof(*s));
@@ -1464,12 +1544,27 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
   const char *str() {
     return dep2str($self->pool, $self->id);
   }
+  bool __eq__(Dep *s) {
+    return $self->pool == s->pool && $self->id == s->id;
+  }
+  bool __ne__(Dep *s) {
+    return !Dep___eq__($self, s);
+  }
+  const char *__str__() {
+    return dep2str($self->pool, $self->id);
+  }
+  %newobject __repr__;
+  const char *__repr__() {
+    char buf[20];
+    sprintf(buf, "<Id #%d ", $self->id);
+    return sat_dupjoin(buf, dep2str($self->pool, $self->id), ">");
+  }
 }
 
 %extend XSolvable {
   XSolvable(Pool *pool, Id id) {
     XSolvable *s;
-    if (!id)
+    if (!id || id >= pool->nsolvables)
       return 0;
     s = sat_calloc(1, sizeof(*s));
     s->pool = pool;
@@ -1477,7 +1572,7 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     return s;
   }
   const char *str() {
-    return solvid2str($self->pool, $self->id);
+    return pool_solvid2str($self->pool, $self->id);
   }
   const char *lookup_str(Id keyname) {
     return pool_lookup_str($self->pool, $self->id, keyname);
@@ -1572,6 +1667,22 @@ SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
       return xs->pool->solvables[xs->id].repo;
     }
   %}
+
+  bool __eq__(XSolvable *s) {
+    return $self->pool == s->pool && $self->id == s->id;
+  }
+  bool __ne__(XSolvable *s) {
+    return !XSolvable___eq__($self, s);
+  }
+  const char *__str__() {
+    return pool_solvid2str($self->pool, $self->id);
+  }
+  %newobject __repr__;
+  const char *__repr__() {
+    char buf[20];
+    sprintf(buf, "<Solvable #%d ", $self->id);
+    return sat_dupjoin(buf, pool_solvid2str($self->pool, $self->id), ">");
+  }
 }
 
 %extend Problem {
@@ -2006,6 +2117,19 @@ rb_eval_string(
     solver_allruleinfos($self->solv, $self->id, &q);
     return q;
   }
+
+  bool __eq__(XRule *xr) {
+    return $self->solv == xr->solv && $self->id == xr->id;
+  }
+  bool __ne__(XRule *xr) {
+    return !XRule___eq__($self, xr);
+  }
+  %newobject __repr__;
+  const char *__repr__() {
+    char buf[20];
+    sprintf(buf, "<Rule #%d>", $self->id);
+    return strdup(buf);
+  }
 }
 
 %extend Ruleinfo {
@@ -2093,13 +2217,25 @@ rb_eval_string(
     int r, oldstate = data->state;
     data->state = REPODATA_LOADING;
     r = repo_add_solv_flags(data->repo, fp, flags | REPO_USE_LOADING);
-    if (r)
+    if (r || data->state == REPODATA_LOADING)
       data->state = oldstate;
     return r;
   }
   void extend_to_repo() {
     Repodata *data = $self->repo->repodata + $self->id;
     repodata_extend_block(data, data->repo->start, data->repo->end - data->repo->start);
+  }
+  bool __eq__(XRepodata *xr) {
+    return $self->repo == xr->repo && $self->id == xr->id;
+  }
+  bool __ne__(XRepodata *xr) {
+    return !XRepodata___eq__($self, xr);
+  }
+  %newobject __repr__;
+  const char *__repr__() {
+    char buf[20];
+    sprintf(buf, "<Repodata #%d>", $self->id);
+    return strdup(buf);
   }
 }
 
