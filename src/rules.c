@@ -35,6 +35,7 @@ static void solver_createcleandepsmap(Solver *solv);
  * Check if dependency is possible
  * 
  * mirrors solver_dep_fulfilled but uses map m instead of the decisionmap
+ * used in solver_addrpmrulesforweak and solver_createcleandepsmap
  */
 
 static inline int
@@ -46,16 +47,19 @@ dep_possible(Solver *solv, Id dep, Map *m)
   if (ISRELDEP(dep))
     {
       Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags == REL_AND)
+      if (rd->flags >= 8)
 	{
-	  if (!dep_possible(solv, rd->name, m))
-	    return 0;
-	  return dep_possible(solv, rd->evr, m);
+	  if (rd->flags == REL_AND)
+	    {
+	      if (!dep_possible(solv, rd->name, m))
+		return 0;
+	      return dep_possible(solv, rd->evr, m);
+	    }
+	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+	    return solver_splitprovides(solv, rd->evr);
+	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+	    return solver_dep_installed(solv, rd->evr);
 	}
-      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-	return solver_splitprovides(solv, rd->evr);
-      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-	return solver_dep_installed(solv, rd->evr);
     }
   FOR_PROVIDES(p, pp, dep)
     {
@@ -136,7 +140,7 @@ solver_unifyrules(Solver *solv)
   int i, j;
   Rule *ir, *jr;
 
-  if (solv->nrules <= 1)	       /* nothing to unify */
+  if (solv->nrules <= 2)	       /* nothing to unify */
     return;
 
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- unifyrules -----\n");
@@ -247,7 +251,7 @@ hashrule(Solver *solv, Id p, Id d, int n)
  *
  *   resulting watches:
  *   ------------------
- *   Direct assertion (no watch needed)( if d <0 ) --> d = 0, w1 = p, w2 = 0
+ *   Direct assertion (no watch needed) --> d = 0, w1 = p, w2 = 0
  *   Binary rule: p = first literal, d = 0, w2 = second literal, w1 = p
  *   every other : w1 = p, w2 = whatprovidesdata[d];
  *   Disabled rule: w1 = 0
@@ -272,11 +276,10 @@ solver_addrule(Solver *solv, Id p, Id d)
    * multiple times, so we prune those duplicates right away to make
    * the work for unifyrules a bit easier */
 
-  if (solv->nrules                      /* we already have rules */
-      && !solv->rpmrules_end)           /* but are not done with rpm rules */
+  if (!solv->rpmrules_end)		/* we add rpm rules */
     {
-      r = solv->rules + solv->nrules - 1;   /* get the last added rule */
-      if (r->p == p && r->d == d && d != 0)   /* identical and not user requested */
+      r = solv->rules + solv->nrules - 1;	/* get the last added rule */
+      if (r->p == p && r->d == d && (d != 0 || !r->w2))
 	return r;
     }
 
@@ -297,8 +300,8 @@ solver_addrule(Solver *solv, Id p, Id d)
 	if (*dp == -p)
 	  return 0;			/* rule is self-fulfilling */
 	
-      if (n == 1)   /* have single provider */
-	d = dp[-1];                     /* take single literal */
+      if (n == 1) 			/* convert to binary rule */
+	d = dp[-1];
     }
 
   if (n == 1 && p > d && !solv->rpmrules_end)
@@ -753,9 +756,9 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 /*-------------------------------------------------------------------
  * 
- * Add package rules for weak rules
+ * Add rules for packages possibly selected in by weak dependencies
  *
- * m: visited solvables
+ * m: already added solvables
  */
 
 void
@@ -767,12 +770,12 @@ solver_addrpmrulesforweak(Solver *solv, Map *m)
   int i, n;
 
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforweak -----\n");
-    /* foreach solvable in pool */
+  /* foreach solvable in pool */
   for (i = n = 1; n < pool->nsolvables; i++, n++)
     {
       if (i == pool->nsolvables)		/* wrap i */
 	i = 1;
-      if (MAPTST(m, i))				/* been there */
+      if (MAPTST(m, i))				/* already added that one */
 	continue;
 
       s = pool->solvables + i;
@@ -784,7 +787,7 @@ solver_addrpmrulesforweak(Solver *solv, Map *m)
 	{
 	  /* find possible supplements */
 	  supp = s->repo->idarraydata + s->supplements;
-	  while ((sup = *supp++) != ID_NULL)
+	  while ((sup = *supp++) != 0)
 	    if (dep_possible(solv, sup, m))
 	      break;
 	}
@@ -793,7 +796,7 @@ solver_addrpmrulesforweak(Solver *solv, Map *m)
       if (!sup && s->enhances)
 	{
 	  supp = s->repo->idarraydata + s->enhances;
-	  while ((sup = *supp++) != ID_NULL)
+	  while ((sup = *supp++) != 0)
 	    if (dep_possible(solv, sup, m))
 	      break;
 	}
@@ -801,7 +804,7 @@ solver_addrpmrulesforweak(Solver *solv, Map *m)
       if (!sup)
 	continue;
       solver_addrpmrulesforsolvable(solv, s, m);
-      n = 0;			/* check all solvables again */
+      n = 0;			/* check all solvables again because we added solvables to m */
     }
   POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforweak end -----\n");
 }
