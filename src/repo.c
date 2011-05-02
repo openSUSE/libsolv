@@ -9,7 +9,7 @@
  * repo.c
  *
  * Manage metadata coming from one repository
- * 
+ *
  */
 
 #define _GNU_SOURCE
@@ -104,8 +104,8 @@ repo_empty(Repo *repo, int reuseids)
 }
 
 /*
- * remove repo from pool, delete solvables 
- * 
+ * remove repo from pool, delete solvables
+ *
  */
 
 void
@@ -149,7 +149,7 @@ repo_freeallrepos(Pool *pool, int reuseids)
 
 void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
 {
-  Solvable *s; 
+  Solvable *s;
   Repodata *data;
   int i;
   if (start + count == repo->end)
@@ -181,22 +181,22 @@ repo_sidedata_create(Repo *repo, size_t size)
 
 void *
 repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count)
-{ 
+{
   int n = repo->end - repo->start;
   if (p < repo->start)
-    { 
+    {
       int d = repo->start - p;
       b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
       memmove((char *)b + d * size, b, n * size);
       memset(b, 0, d * size);
       n += d;
-    }     
+    }
   if (p + count > repo->end)
-    { 
+    {
       int d = p + count - repo->end;
       b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
       memset((char *)b + n * size, 0, d * size);
-    }     
+    }
   return b;
 }
 
@@ -212,7 +212,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
   Id *idarray;
   int idarraysize;
   int i;
-  
+
   idarray = repo->idarraydata;
   idarraysize = repo->idarraysize;
 
@@ -225,10 +225,10 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
     }
 
   if (!olddeps)				/* no deps yet */
-    {   
+    {
       olddeps = idarraysize;
       idarray = sat_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
-    }   
+    }
   else if (olddeps == repo->lastoff)	/* extend at end */
     idarraysize--;
   else					/* can't extend, copy old */
@@ -242,7 +242,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
         }
       idarray = sat_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
     }
-  
+
   idarray[idarraysize++] = id;		/* insert Id into array */
   idarray = sat_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
   idarray[idarraysize++] = 0;		/* ensure NULL termination */
@@ -368,7 +368,7 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
        * so create new space at end and move existing deps there.
        * Leaving 'hole' at old position.
        */
-      
+
       Id *idstart, *idend;
       int count;
 
@@ -935,7 +935,7 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
   if (entry >= 0)
     {
       switch (keyname)
-	{   
+	{
 	case SOLVABLE_NAME:
 	  return repo->pool->solvables[entry].name;
 	case SOLVABLE_ARCH:
@@ -944,20 +944,20 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
 	  return repo->pool->solvables[entry].evr;
 	case SOLVABLE_VENDOR:
 	  return repo->pool->solvables[entry].vendor;
-	}   
+	}
     }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    {   
+    {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
 	continue;
-      id = repodata_lookup_id(data, entry, keyname); 
+      id = repodata_lookup_id(data, entry, keyname);
       if (id)
-	return data->localpool ? repodata_globalize_id(data, id, 1) : id; 
+	return data->localpool ? repodata_globalize_id(data, id, 1) : id;
       if (repodata_lookup_type(data, entry, keyname))
 	return 0;
-    }   
+    }
   return 0;
 }
 
@@ -1001,7 +1001,7 @@ repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q)
         }
     }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
-    {   
+    {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
       if (!repodata_precheck_keyname(data, keyname))
@@ -1134,7 +1134,26 @@ repo_last_repodata(Repo *repo)
 void
 repo_set_id(Repo *repo, Id p, Id keyname, Id id)
 {
-  Repodata *data = repo_last_repodata(repo);
+  Repodata *data;
+  if (p >= 0)
+    {
+      switch (keyname)
+	{
+	case SOLVABLE_NAME:
+	  repo->pool->solvables[p].name = id;
+	  return;
+	case SOLVABLE_ARCH:
+	  repo->pool->solvables[p].arch = id;
+	  return;
+	case SOLVABLE_EVR:
+	  repo->pool->solvables[p].evr = id;
+	  return;
+	case SOLVABLE_VENDOR:
+	  repo->pool->solvables[p].vendor = id;
+	  return;
+	}
+    }
+  data = repo_last_repodata(repo);
   if (data->localpool)
     id = repodata_localize_id(data, id, 1);
   repodata_set_id(data, p, keyname, id);
@@ -1161,14 +1180,40 @@ repo_set_num(Repo *repo, Id p, Id keyname, unsigned int num)
 void
 repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
 {
-  Repodata *data = repo_last_repodata(repo);
+  Repodata *data;
+  if (p >= 0)
+    {
+      switch (keyname)
+	{
+	case SOLVABLE_NAME:
+	case SOLVABLE_ARCH:
+	case SOLVABLE_EVR:
+	case SOLVABLE_VENDOR:
+	  repo_set_id(repo, p, keyname, str2id(repo->pool, str, 1));
+	  return;
+	}
+    }
+  data = repo_last_repodata(repo);
   repodata_set_str(data, p, keyname, str);
 }
 
 void
 repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str)
 {
-  Repodata *data = repo_last_repodata(repo);
+  Repodata *data;
+  if (p >= 0)
+    {
+      switch (keyname)
+	{
+	case SOLVABLE_NAME:
+	case SOLVABLE_ARCH:
+	case SOLVABLE_EVR:
+	case SOLVABLE_VENDOR:
+	  repo_set_id(repo, p, keyname, str2id(repo->pool, str, 1));
+	  return;
+	}
+    }
+  data = repo_last_repodata(repo);
   repodata_set_poolstr(data, p, keyname, str);
 }
 
