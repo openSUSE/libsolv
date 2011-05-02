@@ -21,12 +21,12 @@
 #if defined(DEBIAN_SEMANTICS) || defined(MULTI_SEMANTICS)
 
 #ifdef MULTI_SEMANTICS
-# define vercmp vercmp_deb
+# define sat_vercmp sat_vercmp_deb
 #endif
 
 /* debian type version compare */
 int
-vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
+sat_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
   int r, c1, c2;
   while (1)
@@ -65,7 +65,7 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 }
 
 #ifdef MULTI_SEMANTICS
-# undef vercmp
+# undef sat_vercmp
 #endif
 
 #endif
@@ -76,7 +76,7 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 /* note: the code assumes that *q1 and *q2 are not alphanumeric! */
 
 int
-vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
+sat_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
   int r = 0;
   const char *e1, *e2;
@@ -135,12 +135,12 @@ vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 #endif
 
 #if defined(MULTI_SEMANTICS)
-# define vercmp (*(pool->disttype == DISTTYPE_DEB ? &vercmp_deb : &ver##cmp))
+# define sat_vercmp (*(pool->disttype == DISTTYPE_DEB ? &sat_vercmp_deb : &sat_ver##cmp))
 #endif
 
 /* edition (e:v-r) compare */
 int
-evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
+pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 {
   int r;
   const char *s1, *s2;
@@ -228,7 +228,7 @@ evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 }
 
 int
-evrcmp(const Pool *pool, Id evr1id, Id evr2id, int mode)
+pool_evrcmp(const Pool *pool, Id evr1id, Id evr2id, int mode)
 {
   const char *evr1, *evr2;
   if (evr1id == evr2id)
@@ -239,7 +239,7 @@ evrcmp(const Pool *pool, Id evr1id, Id evr2id, int mode)
 }
 
 int
-evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version, const char *release)
+pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version, const char *release)
 {
   const char *evr1;
   const char *s1;
@@ -286,4 +286,3 @@ evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version, con
   return 0;
 }
 
-// EOF

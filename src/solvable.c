@@ -23,7 +23,7 @@
 #include "chksum.h"
 
 const char *
-solvable2str(Pool *pool, Solvable *s)
+pool_solvable2str(Pool *pool, Solvable *s)
 {
   const char *n, *e, *a;
   char *p;

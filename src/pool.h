@@ -219,10 +219,20 @@ static inline Solvable *pool_id2solvable(const Pool *pool, Id p)
   return pool->solvables + p;
 }
 
-extern const char *solvable2str(Pool *pool, Solvable *s);
+extern const char *pool_solvable2str(Pool *pool, Solvable *s);
+static inline const char *pool_solvid2str(Pool *pool, Id p)
+{
+  return pool_solvable2str(pool, pool->solvables + p);
+}
+
+/* obsolete, do not use anymore */
+static inline const char *solvable2str(Pool *pool, Solvable *s)
+{
+  return pool_solvable2str(pool, s);
+}
 static inline const char *solvid2str(Pool *pool, Id p)
 {
-  return solvable2str(pool, pool->solvables + p);
+  return pool_solvable2str(pool, pool->solvables + p);
 }
 
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);

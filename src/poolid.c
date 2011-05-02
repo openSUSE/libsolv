@@ -24,7 +24,7 @@
 /* intern string into pool, return id */
 
 Id
-str2id(Pool *pool, const char *str, int create)
+pool_str2id(Pool *pool, const char *str, int create)
 {
   int oldnstrings = pool->ss.nstrings;
   Id id = stringpool_str2id(&pool->ss, str, create);
@@ -38,7 +38,7 @@ str2id(Pool *pool, const char *str, int create)
 }
 
 Id
-strn2id(Pool *pool, const char *str, unsigned int len, int create)
+pool_strn2id(Pool *pool, const char *str, unsigned int len, int create)
 {
   int oldnstrings = pool->ss.nstrings;
   Id id = stringpool_strn2id(&pool->ss, str, len, create);
@@ -52,7 +52,7 @@ strn2id(Pool *pool, const char *str, unsigned int len, int create)
 }
 
 Id
-rel2id(Pool *pool, Id name, Id evr, int flags, int create)
+pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 {
   Hashval h;
   unsigned int hh;
@@ -121,7 +121,7 @@ rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 // for rels (returns name only) and strings
 // 
 const char *
-id2str(const Pool *pool, Id id)
+pool_id2str(const Pool *pool, Id id)
 {
   if (ISRELDEP(id))
     {
@@ -155,7 +155,7 @@ static const char *rels[] = {
 
 // get operator for RelId
 const char *
-id2rel(const Pool *pool, Id id)
+pool_id2rel(const Pool *pool, Id id)
 {
   Reldep *rd;
   if (!ISRELDEP(id))
@@ -188,7 +188,7 @@ id2rel(const Pool *pool, Id id)
 // get e:v.r for Id
 // 
 const char *
-id2evr(const Pool *pool, Id id)
+pool_id2evr(const Pool *pool, Id id)
 {
   Reldep *rd;
   if (!ISRELDEP(id))
@@ -256,7 +256,7 @@ dep2strcpy(const Pool *pool, char *p, Id id, int oldrel)
 }
 
 const char *
-dep2str(Pool *pool, Id id)
+pool_dep2str(Pool *pool, Id id)
 {
   char *p;
   if (!ISRELDEP(id))
