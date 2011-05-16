@@ -34,7 +34,11 @@ BuildRequires:  expat-devel
 BuildRequires:  cmake rpm-devel gcc-c++
 BuildRequires:  zlib-devel
 # the testsuite uses the check framework
+%if 0%{?suse_version} >= 1030 || !0%{?suse_version}
 BuildRequires:  check-devel
+%else
+BuildRequires:  check
+%endif
 Summary:        A new approach to package dependency solving
 
 
