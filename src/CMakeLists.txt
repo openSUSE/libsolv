@@ -1,4 +1,16 @@
 
+INCLUDE(CheckFunctionExists)
+CHECK_FUNCTION_EXISTS(qsort_r HAVE_QSORT_R)
+CHECK_FUNCTION_EXISTS(__qsort_r HAVE___QSORT_R)
+
+IF (HAVE_QSORT_R)
+  ADD_DEFINITIONS(-DHAVE_QSORT_R=1)
+ENDIF (HAVE_QSORT_R)
+
+IF (HAVE___QSORT_R)
+  ADD_DEFINITIONS(-DHAVE___QSORT_R=1)
+ENDIF (HAVE___QSORT_R)
+
 SET(libsatsolver_SRCS
     bitmap.c poolarch.c poolvendor.c poolid.c strpool.c dirpool.c
     solver.c solverdebug.c repo_solv.c evr.c pool.c
