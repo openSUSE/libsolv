@@ -1368,7 +1368,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   DBC *dbc = 0;
   int byteswapped;
   unsigned int dbid;
-  unsigned char *dp, *dbidp;
+  unsigned char *dp;
   int dl, nrpmids;
   struct rpmid *rpmids, *rp;
   int i;
@@ -1443,7 +1443,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  perror("db->cursor");
 	  exit(1);
 	}
-      dbidp = (unsigned char *)&dbid;
       rpmheadsize = 0;
       rpmhead = 0;
       i = 0;
@@ -1562,7 +1561,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  perror("db->cursor");
 	  exit(1);
 	}
-      dbidp = (unsigned char *)&dbid;
       nrpmids = 0;
       rpmids = 0;
       while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
@@ -1590,7 +1588,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       /* sort rpmids */
       sat_sort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp, 0);
 
-      dbidp = (unsigned char *)&dbid;
       rpmheadsize = 0;
       rpmhead = 0;
 
@@ -2387,7 +2384,7 @@ void *
 rpm_byfp(FILE *fp, const char *name, void **statep)
 {
   struct rpm_by_state *state = *statep;
-  int headerstart, headerend;
+  /* int headerstart, headerend; */
   RpmHead *rpmhead;
   int sigdsize, sigcnt, l;
   unsigned char lead[4096];
@@ -2423,7 +2420,7 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
     }
   sigdsize += sigcnt * 16;
   sigdsize = (sigdsize + 7) & ~7;
-  headerstart = 96 + 16 + sigdsize;
+  /* headerstart = 96 + 16 + sigdsize; */
   while (sigdsize)
     {
       l = sigdsize > 4096 ? 4096 : sigdsize;
@@ -2454,7 +2451,7 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
       return 0;
     }
   l = sigdsize + sigcnt * 16;
-  headerend = headerstart + 16 + l;
+  /* headerend = headerstart + 16 + l; */
   if (l > state->rpmheadsize)
     {
       state->rpmheadsize = l + 128;
@@ -2648,9 +2645,11 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
   unsigned char keyid[8];
   unsigned int kcr = 0, maxex = 0;
   unsigned char *pubkey = 0;
-  int pubkeyl = 0;
   unsigned char *userid = 0;
+#if 0
+  int pubkeyl = 0;
   int useridl = 0;
+#endif
 
   for (; pl; p += l, pl -= l)
     {
@@ -2708,7 +2707,9 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	  pubkey = sat_realloc(pubkey, l);
 	  if (l)
 	    memcpy(pubkey, p, l);
+#if 0
 	  pubkeyl = l;
+#endif
 	  kcr = 0;
 	  if (p[0] == 3)
 	    {
@@ -2814,7 +2815,10 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	    {
 	      int j, ql, haveissuer;
 	      unsigned char *q;
-	      unsigned int ex = 0, scr = 0;
+	      unsigned int ex = 0;
+#if 0
+	      unsigned int scr = 0;
+#endif
 	      unsigned char issuer[8];
 
 	      // printf("V4 signature packet\n");
@@ -2879,8 +2883,10 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 			  memcpy(issuer, q + 1, 8);
 			  haveissuer = 1;
 			}
+#if 0
 		      if (x == 2 && j == 0)
 			scr = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+#endif
 		      if (x == 9 && j == 0)
 			ex = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
 		      q += sl;
@@ -2951,7 +2957,9 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	  userid = sat_realloc(userid, l);
 	  if (l)
 	    memcpy(userid, p, l);
+#if 0
 	  useridl = l;
+#endif
 	}
     }
   if (maxex)

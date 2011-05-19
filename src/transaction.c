@@ -1930,7 +1930,7 @@ transaction_add_obsoleted(Transaction *trans)
   Repo *installed = pool->installed;
   Id p;
   Solvable *s;
-  int i, j, k, max, oldcount;
+  int i, j, k, max;
   Map done;
   Queue obsq, *steps;
 
@@ -1945,7 +1945,6 @@ transaction_add_obsoleted(Transaction *trans)
     return;
   /* make room */
   steps = &trans->steps;
-  oldcount = steps->count;
   queue_insertn(steps, 0, max);
 
   /* now add em */

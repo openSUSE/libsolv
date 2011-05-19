@@ -630,6 +630,7 @@ repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value)
       || key->type == REPOKEY_TYPE_U32
       || key->type == REPOKEY_TYPE_CONSTANT)
     {
+      kv.num = 0;
       dp = data_fetch(dp, &kv, key);
       *value = kv.num;
       return 1;

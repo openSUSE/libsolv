@@ -275,13 +275,11 @@ startElement(void *userData, const char *name, const char **atts)
        */
     case STATE_UPDATE:
       {
-	const char *from = 0, *status = 0, *type = 0, *version = 0;
+	const char *from = 0, *type = 0, *version = 0;
 	for (; *atts; atts += 2)
 	  {
 	    if (!strcmp(*atts, "from"))
 	      from = atts[1];
-	    else if (!strcmp(*atts, "status"))
-	      status = atts[1];
 	    else if (!strcmp(*atts, "type"))
 	      type = atts[1];
 	    else if (!strcmp(*atts, "version"))
@@ -383,7 +381,7 @@ startElement(void *userData, const char *name, const char **atts)
        */
     case STATE_PACKAGE:
       {
-	const char *arch = 0, *name = 0, *src = 0;
+	const char *arch = 0, *name = 0;
 	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
 	Id n, a = 0;
 	Id rel_id;
@@ -394,8 +392,6 @@ startElement(void *userData, const char *name, const char **atts)
 	      arch = atts[1];
 	    else if (!strcmp(*atts, "name"))
 	      name = atts[1];
-	    else if (!strcmp(*atts, "src"))
-	      src = atts[1];
 	  }
 	/* generated Id for name */
 	n = str2id(pool, name, 1);
