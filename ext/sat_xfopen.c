@@ -80,7 +80,12 @@ sat_xfopen_fd(const char *fn, int fd, const char *mode)
       if (fl == O_WRONLY)
 	mode = "w";
       else if (fl == O_RDWR)
-	mode = "r+";
+	{
+	  if (!suf || strcmp(suf, ".gz") != 0)
+	    mode = "r+";
+	  else
+	    mode = "r";
+	}
       else
 	mode = "r";
     }

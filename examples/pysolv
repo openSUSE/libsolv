@@ -495,7 +495,7 @@ class repo_susetags(repo_generic):
 	di = self.handle.Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
 	di.prepend_keyname(solv.SUSETAGS_FILE)
 	for d in di:
-	    filename = d.str
+	    filename = d.str()
 	    if not filename:
 		continue
 	    if filename[0:9] != "packages.":
