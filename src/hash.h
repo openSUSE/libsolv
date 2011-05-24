@@ -10,8 +10,8 @@
  * generic hash functions
  */
 
-#ifndef SATSOLVER_HASH_H
-#define SATSOLVER_HASH_H
+#ifndef LIBSOLV_HASH_H
+#define LIBSOLV_HASH_H
 
 #include "pooltypes.h"
 
@@ -85,4 +85,4 @@ mkmask(unsigned int num)
   return num * 2 - 1;
 }
 
-#endif /* SATSOLVER_HASH_H */
+#endif /* LIBSOLV_HASH_H */

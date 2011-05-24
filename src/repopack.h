@@ -7,8 +7,8 @@
 
 /* pack/unpack functions for key data */
 
-#ifndef SATSOLVER_REPOPACK_H
-#define SATSOLVER_REPOPACK_H
+#ifndef LIBSOLV_REPOPACK_H
+#define LIBSOLV_REPOPACK_H
 
 static inline unsigned char *
 data_read_id(unsigned char *dp, Id *idp)
@@ -269,4 +269,4 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
     }
 }
 
-#endif	/* SATSOLVER_REPOPACK */
+#endif	/* LIBSOLV_REPOPACK */

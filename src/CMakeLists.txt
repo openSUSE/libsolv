@@ -11,16 +11,16 @@ IF (HAVE___QSORT_R)
   ADD_DEFINITIONS(-DHAVE___QSORT_R=1)
 ENDIF (HAVE___QSORT_R)
 
-SET(libsatsolver_SRCS
+SET(libsolv_SRCS
     bitmap.c poolarch.c poolvendor.c poolid.c strpool.c dirpool.c
     solver.c solverdebug.c repo_solv.c evr.c pool.c
     queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
     transaction.c rules.c problems.c
     chksum.c md5.c sha1.c sha2.c satversion.c)
 
-ADD_LIBRARY(satsolver STATIC ${libsatsolver_SRCS})
+ADD_LIBRARY(libsolv STATIC ${libsolv_SRCS})
 
-SET(libsatsolver_HEADERS
+SET(libsolv_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h
     poolid.h pooltypes.h queue.h solvable.h solver.h solverdebug.h
     repo.h repodata.h repopage.h repo_solv.h util.h
@@ -29,5 +29,5 @@ SET(libsatsolver_HEADERS
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
-INSTALL(FILES ${libsatsolver_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/satsolver")
-INSTALL(TARGETS satsolver LIBRARY DESTINATION ${LIB_INSTALL_DIR} ARCHIVE DESTINATION ${LIB_INSTALL_DIR})
+INSTALL(FILES ${libsolv_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/libsolv")
+INSTALL(TARGETS libsolv LIBRARY DESTINATION ${LIB_INSTALL_DIR} ARCHIVE DESTINATION ${LIB_INSTALL_DIR})

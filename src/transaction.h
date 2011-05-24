@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef SATSOLVER_TRANSACTION_H
-#define SATSOLVER_TRANSACTION_H
+#ifndef LIBSOLV_TRANSACTION_H
+#define LIBSOLV_TRANSACTION_H
 
 #ifdef __cplusplus
 extern "C" {

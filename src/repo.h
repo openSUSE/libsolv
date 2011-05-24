@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef SATSOLVER_REPO_H
-#define SATSOLVER_REPO_H
+#ifndef LIBSOLV_REPO_H
+#define LIBSOLV_REPO_H
 
 #include "pooltypes.h"
 #include "pool.h"
@@ -320,4 +320,4 @@ void repo_add_poolstr_array(Repo *repo, Id p, Id keyname, const char *str);
 void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);
 
-#endif /* SATSOLVER_REPO_H */
+#endif /* LIBSOLV_REPO_H */

@@ -5,8 +5,8 @@
  * for further information
  */
 
-#ifndef SATSOLVER_REPOPAGE_H
-#define SATSOLVER_REPOPAGE_H
+#ifndef LIBSOLV_REPOPAGE_H
+#define LIBSOLV_REPOPAGE_H
 
 #define BLOB_PAGEBITS 15
 #define BLOB_PAGESIZE (1 << BLOB_PAGEBITS)
@@ -52,4 +52,4 @@ int repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned i
 
 void repopagestore_disable_paging(Repopagestore *store);
 
-#endif	/* SATSOLVER_REPOPAGE_H */
+#endif	/* LIBSOLV_REPOPAGE_H */

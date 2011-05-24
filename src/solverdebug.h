@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef SATSOLVER_SOLVERDEBUG_H
-#define SATSOLVER_SOLVERDEBUG_H
+#ifndef LIBSOLV_SOLVERDEBUG_H
+#define LIBSOLV_SOLVERDEBUG_H
 
 #include "pooltypes.h"
 #include "pool.h"
@@ -40,5 +40,5 @@ extern const char *solver_solutionelement2str(Solver *solv, Id p, Id rp);
 extern const char *policy_illegal2str(Solver *solv, int illegal, Solvable *s, Solvable *rs);
 
 
-#endif /* SATSOLVER_SOLVERDEBUG_H */
+#endif /* LIBSOLV_SOLVERDEBUG_H */
 

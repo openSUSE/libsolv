@@ -4,8 +4,8 @@
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
  */
-#ifndef SATSOLVER_DIRPOOL_H
-#define SATSOLVER_DIRPOOL_H
+#ifndef LIBSOLV_DIRPOOL_H
+#define LIBSOLV_DIRPOOL_H
 
 
 #include "pooltypes.h"
@@ -74,4 +74,4 @@ dirpool_compid(Dirpool *dp, Id did)
   return dp->dirs[did];
 }
 
-#endif /* SATSOLVER_DIRPOOL_H */
+#endif /* LIBSOLV_DIRPOOL_H */

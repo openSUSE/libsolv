@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef SATSOLVER_POOL_H
-#define SATSOLVER_POOL_H
+#ifndef LIBSOLV_POOL_H
+#define LIBSOLV_POOL_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -366,4 +366,4 @@ void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
 #endif
 
 
-#endif /* SATSOLVER_POOL_H */
+#endif /* LIBSOLV_POOL_H */

@@ -1,10 +1,5 @@
-SAT-Solver
-
-Using a Satisfyability Solver to compute package dependencies.
-
-See http://idea.opensuse.org/content/ideas/fast-installation-tool
-for the motivation.
-
+libsolv, a free package dependency solver using a satisfyability
+algorihtm
 
 This code is based on two major, but independent, blocks
 
@@ -12,20 +7,9 @@ This code is based on two major, but independent, blocks
    and dependency information.
    
 2. Using satisfiability, a well known and researched topic, for
-   computing package dependencies.
-
+   resolving package dependencies.
 
 Google for 'sat solver' to get links to the theory behind it.
-http://pinboard.in/u:kkaempf/t:solver gives a collection of bookmarks
-related to this topic.
-
-Some research papers are in doc/pdf.
-
-Everything else is below doc.
-
-Please subscribe to zypp-devel@opensuse.org for any questions.
-
-* How to build
 
 Requires: cmake 2.4.x
 
@@ -33,9 +17,6 @@ mkdir build
 cd build
 cmake ..
 make
-
-To install ruby bindings:
-make install
 
 To create a package
 make srcpackage

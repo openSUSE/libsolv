@@ -17,7 +17,7 @@
 #include "repo_write.h"
 #include "common_write.h"
 
-#define SATSOLVER_TOOLVERSION "1.0"
+#define LIBSOLV_TOOLVERSION "1.0"
 
 static Id verticals[] = {
   SOLVABLE_AUTHORS,
@@ -205,7 +205,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 
   memset(&kd, 0, sizeof(kd));
   info = repo_add_repodata(repo, 0);
-  repodata_set_str(info, SOLVID_META, REPOSITORY_TOOLVERSION, SATSOLVER_TOOLVERSION);
+  repodata_set_str(info, SOLVID_META, REPOSITORY_TOOLVERSION, LIBSOLV_TOOLVERSION);
   pool_addfileprovides_ids(repo->pool, 0, &addedfileprovides);
   if (addedfileprovides && *addedfileprovides)
     {

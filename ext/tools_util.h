@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2007, Novell Inc.
  *
@@ -11,8 +10,8 @@
  *
  */
 
-#ifndef SATSOLVER_TOOLS_UTIL_H
-#define SATSOLVER_TOOLS_UTIL_H
+#ifndef LIBSOLV_TOOLS_UTIL_H
+#define LIBSOLV_TOOLS_UTIL_H
 
 static char *_join_tmp;
 static int _join_tmpl;
@@ -115,4 +114,4 @@ static inline void repodata_set_tstr(Repodata *data, Id handle, const char *attr
   repodata_set_str(data, handle, attrid, str);
 }
 
-#endif /* SATSOLVER_TOOLS_UTIL_H */
+#endif /* LIBSOLV_TOOLS_UTIL_H */

@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef SATSOLVER_EVR_H
-#define SATSOLVER_EVR_H
+#ifndef LIBSOLV_EVR_H
+#define LIBSOLV_EVR_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,4 +52,4 @@ static inline int evrmatch(const Pool *pool, Id evrid, const char *epoch, const 
 }
 #endif
 
-#endif /* SATSOLVER_EVR_H */
+#endif /* LIBSOLV_EVR_H */

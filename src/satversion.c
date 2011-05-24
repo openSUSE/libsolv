@@ -7,7 +7,7 @@
 
 #include "satversion.h"
 
-const char sat_version[] = SATSOLVER_VERSION_STRING;
-int sat_version_major = SATSOLVER_VERSION_MAJOR;
-int sat_version_minor = SATSOLVER_VERSION_MINOR;
-int sat_version_patch = SATSOLVER_VERSION_PATCH;
+const char sat_version[] = LIBSOLV_VERSION_STRING;
+int sat_version_major = LIBSOLV_VERSION_MAJOR;
+int sat_version_minor = LIBSOLV_VERSION_MINOR;
+int sat_version_patch = LIBSOLV_VERSION_PATCH;

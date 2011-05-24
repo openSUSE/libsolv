@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef SATSOLVER_BITMAP_H
-#define SATSOLVER_BITMAP_H
+#ifndef LIBSOLV_BITMAP_H
+#define LIBSOLV_BITMAP_H
 
 #include <string.h>
 
@@ -50,4 +50,4 @@ static inline int map_tst(Map *m, int n)
   return MAPTST(m, n);
 }
 
-#endif /* SATSOLVER_BITMAP_H */
+#endif /* LIBSOLV_BITMAP_H */

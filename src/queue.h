@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef SATSOLVER_QUEUE_H
-#define SATSOLVER_QUEUE_H
+#ifndef LIBSOLV_QUEUE_H
+#define LIBSOLV_QUEUE_H
 
 #include "pooltypes.h"
 
@@ -115,4 +115,4 @@ extern void queue_delete(Queue *q, int pos);
 extern void queue_delete2(Queue *q, int pos);
 extern void queue_deleten(Queue *q, int pos, int n);
 
-#endif /* SATSOLVER_QUEUE_H */
+#endif /* LIBSOLV_QUEUE_H */

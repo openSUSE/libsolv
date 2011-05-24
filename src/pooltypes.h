@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef SATSOLVER_POOLTYPES_H
-#define SATSOLVER_POOLTYPES_H
+#ifndef LIBSOLV_POOLTYPES_H
+#define LIBSOLV_POOLTYPES_H
 
 /* format version number for .solv files */
 #define SOLV_VERSION_0 0
@@ -50,4 +50,4 @@ typedef int Id;		/* must be signed!, since negative Id is used in solver rules t
 // offset value, e.g. used to 'point' into the stringspace
 typedef unsigned int Offset;
 
-#endif /* SATSOLVER_POOLTYPES_H */
+#endif /* LIBSOLV_POOLTYPES_H */

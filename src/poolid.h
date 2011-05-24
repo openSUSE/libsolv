@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef SATSOLVER_POOLID_H
-#define SATSOLVER_POOLID_H
+#ifndef LIBSOLV_POOLID_H
+#define LIBSOLV_POOLID_H
 
 #include "pooltypes.h"
 #include "hash.h"
@@ -69,4 +69,4 @@ static inline const char *dep2str(Pool *pool, Id id)
   return pool_dep2str(pool, id);
 }
 
-#endif /* SATSOLVER_POOLID_H */
+#endif /* LIBSOLV_POOLID_H */

@@ -1,9 +1,9 @@
-Name:           libsatsolver
+Name:           libsolv
 Version:        @VERSION@
 Release:        1
 License:        BSD 3-Clause
 Url:            git://gitorious.org/opensuse/sat-solver.git
-Source:         satsolver-%{version}.tar.bz2
+Source:         libsolv-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
 Prefix:         /usr
@@ -56,18 +56,11 @@ Authors:
 %package devel
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
-Requires:       satsolver-tools = %version
+Requires:       libsolv-tools = %version
 Requires:       rpm-devel
 
-#%package devel-doc
-#Summary:        satsolver developer documentation
-#Group:          Documentation/HTML
-
 %description devel
-Development files for satsolver, a new approach to package dependency solving
-
-#%description devel-doc
-#Developer documentation for satsolver, a new approach to package dependency solving
+Development files for libsolv, a new approach to package dependency solving
 
 
 Authors:
@@ -78,18 +71,18 @@ Authors:
     Michael Matz <matz@suse.de>
     Duncan Mac-Vicar P. <dmacvicar@suse.de>
 
-%package -n satsolver-tools
+%package tools
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
 Obsoletes:      libsatsolver <= 0.0.15
 Provides:       libsatsolver = %{version}-%{release}
 Requires:       gzip bzip2 coreutils
 
-%description -n satsolver-tools
+%description tools
 A new approach to package dependency solving.
 
 %package demo
-Summary:        Applications demoing the satsolver library
+Summary:        Applications demoing the libsolv library
 Group:          System/Management
 Requires:       curl
 %if 0%{?fedora_version}
@@ -100,10 +93,10 @@ Requires:       gpg2
 %endif
 
 %description demo
-Applications demoing the satsolver library.
+Applications demoing the libsolv library.
 
 %prep
-%setup -n satsolver-%{version}
+%setup -n libsolv-%{version}
 
 %build
 export CFLAGS="$RPM_OPT_FLAGS"
@@ -143,7 +136,7 @@ export NO_BRP_STRIP_DEBUG=true
 %clean
 rm -rf "$RPM_BUILD_ROOT"
 
-%files -n satsolver-tools
+%files tools
 %defattr(-,root,root)
 %doc LICENSE*
 %exclude /usr/bin/deptestomatic
@@ -153,20 +146,15 @@ rm -rf "$RPM_BUILD_ROOT"
 
 %files devel
 %defattr(-,root,root)
-%_libdir/libsatsolver.a
-%_libdir/libsatsolverext.a
-%dir /usr/include/satsolver
-/usr/include/satsolver/*
+%_libdir/libsolv.a
+%_libdir/libsolvext.a
+%dir /usr/include/libsolv
+/usr/include/libsolv/*
 /usr/bin/deptestomatic
 /usr/bin/helix2solv
 
 %files demo
 %defattr(-,root,root)
 /usr/bin/solv
-
-#%files devel-doc
-#%defattr(-,root,root)
-#%dir %_docdir/satsolver
-#%_docdir/satsolver/*
 
 %changelog

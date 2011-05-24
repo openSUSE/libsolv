@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef SATSOLVER_PROBLEMS_H
-#define SATSOLVER_PROBLEMS_H
+#ifndef LIBSOLV_PROBLEMS_H
+#define LIBSOLV_PROBLEMS_H
 
 #ifdef __cplusplus
 extern "C" {

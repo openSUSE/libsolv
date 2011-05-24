@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef SATSOLVER_SOLVER_H
-#define SATSOLVER_SOLVER_H
+#ifndef LIBSOLV_SOLVER_H
+#define LIBSOLV_SOLVER_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -394,4 +394,4 @@ solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
 }
 #endif
 
-#endif /* SATSOLVER_SOLVER_H */
+#endif /* LIBSOLV_SOLVER_H */

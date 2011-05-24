@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef SATSOLVER_UTIL_H
-#define SATSOLVER_UTIL_H
+#ifndef LIBSOLV_UTIL_H
+#define LIBSOLV_UTIL_H
 
 #include <stddef.h>
 #include <string.h>
@@ -81,4 +81,4 @@ static inline void *sat_calloc_block(size_t len, size_t size, size_t block)
   memset(buf, 0, ((len + block) & ~block) * size);
   return buf;
 }
-#endif /* SATSOLVER_UTIL_H */
+#endif /* LIBSOLV_UTIL_H */

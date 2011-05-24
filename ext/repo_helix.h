@@ -10,8 +10,8 @@
  * 
  */
 
-#ifndef SATSOLVER_REPO_HELIX_H
-#define SATSOLVER_REPO_HELIX_H
+#ifndef LIBSOLV_REPO_HELIX_H
+#define LIBSOLV_REPO_HELIX_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,4 +28,4 @@ extern void repo_add_helix(Repo *repo, FILE *fp, int flags);
 #endif
     
 
-#endif /* SATSOLVER_REPO_HELIX_H */
+#endif /* LIBSOLV_REPO_HELIX_H */

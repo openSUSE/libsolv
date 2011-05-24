@@ -5,8 +5,8 @@
  * for further information
  */
 
-#ifndef SATSOLVER_POOLARCH_H
-#define SATSOLVER_POOLARCH_H
+#ifndef LIBSOLV_POOLARCH_H
+#define LIBSOLV_POOLARCH_H
 
 #include "pool.h"
 
@@ -36,4 +36,4 @@ static inline int pool_colormatch(Pool *pool, Solvable *s1, Solvable *s2)
   return 0;
 }
 
-#endif /* SATSOLVER_POOLARCH_H */
+#endif /* LIBSOLV_POOLARCH_H */

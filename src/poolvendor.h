@@ -5,12 +5,12 @@
  * for further information
  */
 
-#ifndef SATSOLVER_POOLVENDOR_H
-#define SATSOLVER_POOLVENDOR_H
+#ifndef LIBSOLV_POOLVENDOR_H
+#define LIBSOLV_POOLVENDOR_H
 
 #include "pool.h"
 
 Id pool_vendor2mask(Pool *pool, Id vendor);
 void pool_setvendorclasses(Pool *pool, const char **vendorclasses);
 
-#endif /* SATSOLVER_POOLVENDOR_H */
+#endif /* LIBSOLV_POOLVENDOR_H */

@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef SATSOLVER_REPO_SOLVE_H
-#define SATSOLVER_REPO_SOLVE_H
+#ifndef LIBSOLV_REPO_SOLVE_H
+#define LIBSOLV_REPO_SOLVE_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,4 +31,4 @@ extern int repo_add_solv_flags(Repo *repo, FILE *fp, int flags);
 }
 #endif
 
-#endif /* SATSOLVER_REPO_SOLVE_H */
+#endif /* LIBSOLV_REPO_SOLVE_H */
