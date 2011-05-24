@@ -1542,7 +1542,7 @@ typedef struct {
     return s;
   }
   const char *str() {
-    return dep2str($self->pool, $self->id);
+    return pool_dep2str($self->pool, $self->id);
   }
   bool __eq__(Dep *s) {
     return $self->pool == s->pool && $self->id == s->id;
@@ -1551,13 +1551,13 @@ typedef struct {
     return !Dep___eq__($self, s);
   }
   const char *__str__() {
-    return dep2str($self->pool, $self->id);
+    return pool_dep2str($self->pool, $self->id);
   }
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
     sprintf(buf, "<Id #%d ", $self->id);
-    return sat_dupjoin(buf, dep2str($self->pool, $self->id), ">");
+    return sat_dupjoin(buf, pool_dep2str($self->pool, $self->id), ">");
   }
 }
 
