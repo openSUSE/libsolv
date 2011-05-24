@@ -19,6 +19,7 @@ SET (libsolv_SRCS
     chksum.c md5.c sha1.c sha2.c satversion.c)
 
 ADD_LIBRARY (libsolv STATIC ${libsolv_SRCS})
+SET_TARGET_PROPERTIES(libsolv PROPERTIES OUTPUT_NAME "solv")
 
 SET (libsolv_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h
@@ -28,6 +29,7 @@ SET (libsolv_HEADERS
     chksum.h md5.h sha1.h sha2.h ${CMAKE_BINARY_DIR}/src/satversion.h)
 
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+SET (CMAKE_SHARED_LINKER_FLAGS "${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver")
 
-INSTALL (FILES ${libsolv_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/libsolv")
+INSTALL (FILES ${libsolv_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/solv")
 INSTALL (TARGETS libsolv LIBRARY DESTINATION ${LIB_INSTALL_DIR} ARCHIVE DESTINATION ${LIB_INSTALL_DIR})

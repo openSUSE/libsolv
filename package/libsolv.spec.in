@@ -148,8 +148,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root)
 %_libdir/libsolv.a
 %_libdir/libsolvext.a
-%dir /usr/include/libsolv
-/usr/include/libsolv/*
+/usr/include/solv
 /usr/bin/deptestomatic
 /usr/bin/helix2solv
 
