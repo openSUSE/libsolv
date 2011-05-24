@@ -112,7 +112,7 @@ pool_setarchpolicy(Pool *pool, const char *arch)
       l = strcspn(arch, ":=>");
       if (l)
 	{
-	  id = strn2id(pool, arch, l, 1);
+	  id = pool_strn2id(pool, arch, l, 1);
 	  if (id > lastarch)
 	    {
 	      id2arch = sat_realloc2(id2arch, (id + 255 + 1), sizeof(Id));
@@ -146,7 +146,7 @@ pool_arch2color_slow(Pool *pool, Id arch)
     return ARCHCOLOR_ALL;
   if (!pool->id2color)
     pool->id2color = sat_calloc(pool->lastarch + 1, 1);
-  s = id2str(pool, arch);
+  s = pool_id2str(pool, arch);
   if (arch == ARCH_NOARCH || arch == ARCH_ALL)
     color = ARCHCOLOR_ALL;
   else if (!strcmp(s, "s390x") || strstr(s, "64"))

@@ -172,7 +172,7 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
     s2 = 0;
   if (s1 && s2)
     {
-      r = vercmp(evr1, s1, evr2, s2);
+      r = sat_vercmp(evr1, s1, evr2, s2);
       if (r)
 	return r;
       evr1 = s1 + 1;
@@ -206,7 +206,7 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 
   r = 0;
   if (mode != EVRCMP_MATCH || (evr1 != (r1 ? r1 : s1) && evr2 != (r2 ? r2 : s2)))
-    r = vercmp(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2);
+    r = sat_vercmp(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2);
   if (r)
     return r;
 
@@ -222,7 +222,7 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
   if (r1 && r2)
     {
       if (s1 != ++r1 && s2 != ++r2)
-        r = vercmp(r1, s1, r2, s2);
+        r = sat_vercmp(r1, s1, r2, s2);
     }
   return r;
 }
@@ -233,9 +233,9 @@ pool_evrcmp(const Pool *pool, Id evr1id, Id evr2id, int mode)
   const char *evr1, *evr2;
   if (evr1id == evr2id)
     return 0;
-  evr1 = id2str(pool, evr1id);
-  evr2 = id2str(pool, evr2id);
-  return evrcmp_str(pool, evr1, evr2, mode);
+  evr1 = pool_id2str(pool, evr1id);
+  evr2 = pool_id2str(pool, evr2id);
+  return pool_evrcmp_str(pool, evr1, evr2, mode);
 }
 
 int
@@ -246,14 +246,14 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
   const char *r1;
   int r;
 
-  evr1 = id2str(pool, evrid);
+  evr1 = pool_id2str(pool, evrid);
   for (s1 = evr1; *s1 >= '0' && *s1 <= '9'; s1++)
     ;
   if (s1 != evr1 && *s1 == ':')
     {
       if (epoch)
 	{
-	  r = vercmp(evr1, s1, epoch, epoch + strlen(epoch));
+	  r = sat_vercmp(evr1, s1, epoch, epoch + strlen(epoch));
 	  if (r)
 	    return r;
 	}
@@ -271,7 +271,7 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
       r1 = s1;
   if (version)
     {
-      r = vercmp(evr1, r1 ? r1 : s1, version, version + strlen(version));
+      r = sat_vercmp(evr1, r1 ? r1 : s1, version, version + strlen(version));
       if (r)
 	return r;
     }
@@ -279,7 +279,7 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
     {
       if (!r1)
 	return -1;
-      r = vercmp(r1 + 1, s1, release, release + strlen(release));
+      r = sat_vercmp(r1 + 1, s1, release, release + strlen(release));
       if (r)
 	return r;
     }

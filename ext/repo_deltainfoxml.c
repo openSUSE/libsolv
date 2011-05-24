@@ -211,7 +211,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 #if 0
   fprintf(stderr, "evr: %s\n", pd->content);
 #endif
-  return str2id(pool, pd->content, 1);
+  return pool_str2id(pool, pd->content, 1);
 }
 
 static void parse_delta_location( struct parsedata *pd, 
@@ -232,7 +232,7 @@ static void parse_delta_location( struct parsedata *pd,
       s1 = strrchr (s, '/');
       if (s1)
 	{
-	  pd->delta.locdir = strn2id(pool, s, s1 - s, 1);
+	  pd->delta.locdir = pool_strn2id(pool, s, s1 - s, 1);
 	  s = s1 + 1;
 	}
       /* Guess suffix.  */
@@ -253,7 +253,7 @@ static void parse_delta_location( struct parsedata *pd,
 	    }
 	  if (*s1 == '.')
 	    *s1++ = 0;
-	  pd->delta.locsuffix = str2id(pool, s1, 1); 
+	  pd->delta.locsuffix = pool_str2id(pool, s1, 1); 
 	}
       /* Last '-'.  */
       s1 = strrchr (s, '-');
@@ -269,9 +269,9 @@ static void parse_delta_location( struct parsedata *pd,
       if (s2 > s && *s2 == '-')
 	{
 	  *s2++ = 0;
-	  pd->delta.locevr = str2id(pool, s2, 1);
+	  pd->delta.locevr = pool_str2id(pool, s2, 1);
 	}
-      pd->delta.locname = str2id(pool, s, 1);
+      pd->delta.locname = pool_str2id(pool, s, 1);
       free(real_str);
     }
 }
@@ -320,12 +320,12 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_NEWPACKAGE:
       if ((str = find_attr("name", atts)) != 0)
 	{
-	  pd->newpkgname = str2id(pool, str, 1);
+	  pd->newpkgname = pool_str2id(pool, str, 1);
 	}
       pd->newpkgevr = makeevr_atts(pool, pd, atts);
       if ((str = find_attr("arch", atts)) != 0)
 	{
-	  pd->newpkgarch = str2id(pool, str, 1);
+	  pd->newpkgarch = pool_str2id(pool, str, 1);
 	}
       break;
 
@@ -503,8 +503,8 @@ endElement(void *userData, const char *name)
 		      break;
 		  if (*s2 == '-')
 		    {
-		      pd->delta.seqevr = strn2id(pool, s2 + 1, s1 - s2 - 1, 1);
-		      pd->delta.seqname = strn2id(pool, str, s2 - str, 1);
+		      pd->delta.seqevr = pool_strn2id(pool, s2 + 1, s1 - s2 - 1, 1);
+		      pd->delta.seqname = pool_strn2id(pool, str, s2 - str, 1);
 		      str = s1 + 1;
 		    }
 		}

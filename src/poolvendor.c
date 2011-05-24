@@ -51,7 +51,7 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   for (i = 0; i < pool->vendormap.count; i += 2)
     if (pool->vendormap.elements[i] == vendor)
       return pool->vendormap.elements[i + 1];
-  vstr = id2str(pool, vendor);
+  vstr = pool_id2str(pool, vendor);
   m = 1;
   mask = 0;
   for (v = pool->vendorclasses; ; v++)

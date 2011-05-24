@@ -48,7 +48,7 @@ doquery(Pool *pool, Repo *repo, const char *arg)
   Id id;
 
   snprintf(qbuf, sizeof(qbuf), "susetags:%s", arg);
-  id = str2id(pool, qbuf, 0);
+  id = pool_str2id(pool, qbuf, 0);
   if (!id)
     return;
   str = repo_lookup_str(repo, SOLVID_META, id);

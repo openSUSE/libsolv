@@ -129,12 +129,12 @@ solver_printruleelement(Solver *solv, int type, Rule *r, Id v)
   if (v < 0)
     {
       s = pool->solvables + -v;
-      POOL_DEBUG(type, "    !%s [%d]", solvable2str(pool, s), -v);
+      POOL_DEBUG(type, "    !%s [%d]", pool_solvable2str(pool, s), -v);
     }
   else
     {
       s = pool->solvables + v;
-      POOL_DEBUG(type, "    %s [%d]", solvable2str(pool, s), v);
+      POOL_DEBUG(type, "    %s [%d]", pool_solvable2str(pool, s), v);
     }
   if (pool->installed && s->repo == pool->installed)
     POOL_DEBUG(type, "I");
@@ -268,9 +268,9 @@ solver_printdecisionq(Solver *solv, int type)
     {
       p = solv->decisionq.elements[i];
       if (p > 0)
-        POOL_DEBUG(type, "%d %d install  %s, ", i, solv->decisionmap[p], solvid2str(pool, p));
+        POOL_DEBUG(type, "%d %d install  %s, ", i, solv->decisionmap[p], pool_solvid2str(pool, p));
       else
-        POOL_DEBUG(type, "%d %d conflict %s, ", i, -solv->decisionmap[-p], solvid2str(pool, -p));
+        POOL_DEBUG(type, "%d %d conflict %s, ", i, -solv->decisionmap[-p], pool_solvid2str(pool, -p));
       why = solv->decisionq_why.elements[i];
       if (why > 0)
 	{
@@ -324,29 +324,29 @@ solver_printdecisions(Solver *solv)
       switch(type)
         {
 	case SOLVER_TRANSACTION_MULTIINSTALL:
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  multi install %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  multi install %s", pool_solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_MULTIREINSTALL:
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  multi reinstall %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  multi reinstall %s", pool_solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  install   %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  install   %s", pool_solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_REINSTALL:
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  reinstall %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  reinstall %s", pool_solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_DOWNGRADE:
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  downgrade %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  downgrade %s", pool_solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_CHANGE:
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  change    %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  change    %s", pool_solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_UPGRADE:
 	case SOLVER_TRANSACTION_OBSOLETES:
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  upgrade   %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  upgrade   %s", pool_solvable2str(pool, s));
 	  break;
 	case SOLVER_TRANSACTION_ERASE:
-          POOL_DEBUG(SAT_DEBUG_RESULT, "  erase     %s", solvable2str(pool, s));
+          POOL_DEBUG(SAT_DEBUG_RESULT, "  erase     %s", pool_solvable2str(pool, s));
 	  break;
 	default:
 	  break;
@@ -369,7 +369,7 @@ solver_printdecisions(Solver *solv)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_RESULT, "  (obsoletes");
 	      for (j = 0; j < iq.count; j++)
-		POOL_DEBUG(SAT_DEBUG_RESULT, " %s", solvid2str(pool, iq.elements[j]));
+		POOL_DEBUG(SAT_DEBUG_RESULT, " %s", pool_solvid2str(pool, iq.elements[j]));
 	      POOL_DEBUG(SAT_DEBUG_RESULT, ")");
 	    }
 	  POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
@@ -391,12 +391,12 @@ solver_printdecisions(Solver *solv)
           if (solv->decisionmap[solv->recommendations.elements[i]] > 0)
 	    {
 	      if (installed && s->repo == installed)
-	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (installed)\n", solvable2str(pool, s));
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (installed)\n", pool_solvable2str(pool, s));
 	      else
-	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (selected)\n", solvable2str(pool, s));
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (selected)\n", pool_solvable2str(pool, s));
 	    }
           else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s\n", pool_solvable2str(pool, s));
 	}
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
@@ -410,12 +410,12 @@ solver_printdecisions(Solver *solv)
           if (solv->decisionmap[solv->suggestions.elements[i]] > 0)
 	    {
 	      if (installed && s->repo == installed)
-	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (installed)\n", solvable2str(pool, s));
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (installed)\n", pool_solvable2str(pool, s));
 	      else
-	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (selected)\n", solvable2str(pool, s));
+	        POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (selected)\n", pool_solvable2str(pool, s));
 	    }
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s\n", pool_solvable2str(pool, s));
 	}
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
@@ -426,9 +426,9 @@ solver_printdecisions(Solver *solv)
 	{
 	  s = pool->solvables + solv->orphaned.elements[i];
           if (solv->decisionmap[solv->orphaned.elements[i]] > 0)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (kept)\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (kept)\n", pool_solvable2str(pool, s));
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (erased)\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s (erased)\n", pool_solvable2str(pool, s));
 	}
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
@@ -437,7 +437,7 @@ solver_printdecisions(Solver *solv)
 static inline
 const char *id2strnone(Pool *pool, Id id)
 {
-  return !id || id == 1 ? "(none)" : id2str(pool, id);
+  return !id || id == 1 ? "(none)" : pool_id2str(pool, id);
 }
 
 void
@@ -482,7 +482,7 @@ solver_printtransaction(Solver *solv)
 	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d vendor changes from '%s' to '%s':\n", cnt, id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]));
 	  break;
 	case SOLVER_TRANSACTION_ARCHCHANGE:
-	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d arch changes from %s to %s:\n", cnt, id2str(pool, classes.elements[i + 2]), id2str(pool, classes.elements[i + 3]));
+	  POOL_DEBUG(SAT_DEBUG_RESULT, "%d arch changes from %s to %s:\n", cnt, pool_id2str(pool, classes.elements[i + 2]), pool_id2str(pool, classes.elements[i + 3]));
 	  break;
 	default:
 	  class = SOLVER_TRANSACTION_IGNORE;
@@ -504,11 +504,11 @@ solver_printtransaction(Solver *solv)
 	    case SOLVER_TRANSACTION_DOWNGRADED:
 	    case SOLVER_TRANSACTION_UPGRADED:
 	      s2 = pool->solvables + transaction_obs_pkg(trans, p);
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - %s -> %s\n", solvable2str(pool, s), solvable2str(pool, s2));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - %s -> %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, s2));
 	      break;
 	    case SOLVER_TRANSACTION_VENDORCHANGE:
 	    case SOLVER_TRANSACTION_ARCHCHANGE:
-	      n = id2str(pool, s->name);
+	      n = pool_id2str(pool, s->name);
 	      l = strlen(n);
 	      if (l + linel > sizeof(line) - 3)
 		{
@@ -531,7 +531,7 @@ solver_printtransaction(Solver *solv)
 		}
 	      break;
 	    default:
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - %s\n", solvable2str(pool, s));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - %s\n", pool_solvable2str(pool, s));
 	      break;
 	    }
 	}
@@ -552,49 +552,49 @@ solver_printproblemruleinfo(Solver *solv, Id probr)
   switch (solver_ruleinfo(solv, probr, &source, &target, &dep))
     {
     case SOLVER_RULE_DISTUPGRADE:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "%s does not belong to a distupgrade repository\n", solvid2str(pool, source));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "%s does not belong to a distupgrade repository\n", pool_solvid2str(pool, source));
       return;
     case SOLVER_RULE_INFARCH:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "%s has inferior architecture\n", solvid2str(pool, source));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "%s has inferior architecture\n", pool_solvid2str(pool, source));
       return;
     case SOLVER_RULE_UPDATE:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "problem with installed package %s\n", solvid2str(pool, source));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "problem with installed package %s\n", pool_solvid2str(pool, source));
       return;
     case SOLVER_RULE_JOB:
       POOL_DEBUG(SAT_DEBUG_RESULT, "conflicting requests\n");
       return;
     case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides requested %s\n", dep2str(pool, dep));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides requested %s\n", pool_dep2str(pool, dep));
       return;
     case SOLVER_RULE_RPM:
       POOL_DEBUG(SAT_DEBUG_RESULT, "some dependency problem\n");
       return;
     case SOLVER_RULE_RPM_NOT_INSTALLABLE:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s is not installable\n", solvid2str(pool, source));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s is not installable\n", pool_solvid2str(pool, source));
       return;
     case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides %s needed by %s\n", dep2str(pool, dep), solvid2str(pool, source));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "nothing provides %s needed by %s\n", pool_dep2str(pool, dep), pool_solvid2str(pool, source));
       return;
     case SOLVER_RULE_RPM_SAME_NAME:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "cannot install both %s and %s\n", solvid2str(pool, source), solvid2str(pool, target));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "cannot install both %s and %s\n", pool_solvid2str(pool, source), pool_solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_PACKAGE_CONFLICT:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s obsoletes %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "installed package %s obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "installed package %s obsoletes %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s implicitely obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s implicitely obsoletes %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but none of the providers can be installed\n", solvid2str(pool, source), dep2str(pool, dep));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s requires %s, but none of the providers can be installed\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep));
       return;
     case SOLVER_RULE_RPM_SELF_CONFLICT:
-      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by itself\n", solvid2str(pool, source), dep2str(pool, dep));
+      POOL_DEBUG(SAT_DEBUG_RESULT, "package %s conflicts with %s provided by itself\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep));
       return;
     case SOLVER_RULE_UNKNOWN:
     case SOLVER_RULE_FEATURE:
@@ -659,7 +659,7 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	    {
 	    case SOLVER_INSTALL:
 	      if (select == SOLVER_SOLVABLE && solv->installed && pool->solvables[what].repo == solv->installed)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not keep %s installed\n", solvid2str(pool, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not keep %s installed\n", pool_solvid2str(pool, what));
 	      else if (select == SOLVER_SOLVABLE_PROVIDES)
 		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not install a solvable %s\n", solver_select2str(pool, select, what));
 	      else
@@ -667,7 +667,7 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	      break;
 	    case SOLVER_ERASE:
 	      if (select == SOLVER_SOLVABLE && !(solv->installed && pool->solvables[what].repo == solv->installed))
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not forbid installation of %s\n", solvid2str(pool, what));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not forbid installation of %s\n", pool_solvid2str(pool, what));
 	      else if (select == SOLVER_SOLVABLE_PROVIDES)
 		POOL_DEBUG(SAT_DEBUG_RESULT, "  - do not deinstall all solvables %s\n", solver_select2str(pool, select, what));
 	      else
@@ -688,17 +688,17 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	{
 	  s = pool->solvables + rp;
 	  if (solv->installed && s->repo == solv->installed)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep %s despite the inferior architecture\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep %s despite the inferior architecture\n", pool_solvable2str(pool, s));
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - install %s despite the inferior architecture\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - install %s despite the inferior architecture\n", pool_solvable2str(pool, s));
 	}
       else if (p == SOLVER_SOLUTION_DISTUPGRADE)
 	{
 	  s = pool->solvables + rp;
 	  if (solv->installed && s->repo == solv->installed)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep obsolete %s\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - keep obsolete %s\n", pool_solvable2str(pool, s));
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - install %s from excluded repository\n", solvable2str(pool, s));
+	    POOL_DEBUG(SAT_DEBUG_RESULT, "  - install %s from excluded repository\n", pool_solvable2str(pool, s));
 	}
       else
 	{
@@ -709,22 +709,22 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	    {
 	      int illegal = policy_is_illegal(solv, s, sd, 0);
 	      if ((illegal & POLICY_ILLEGAL_DOWNGRADE) != 0)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow downgrade of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow downgrade of %s to %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, sd));
 	      if ((illegal & POLICY_ILLEGAL_ARCHCHANGE) != 0)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow architecture change of %s to %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow architecture change of %s to %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, sd));
 	      if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0)
 		{
 		  if (sd->vendor)
-		    POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow vendor change from '%s' (%s) to '%s' (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), id2str(pool, sd->vendor), solvable2str(pool, sd));
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow vendor change from '%s' (%s) to '%s' (%s)\n", pool_id2str(pool, s->vendor), pool_solvable2str(pool, s), pool_id2str(pool, sd->vendor), pool_solvable2str(pool, sd));
 		  else
-		    POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow vendor change from '%s' (%s) to no vendor (%s)\n", id2str(pool, s->vendor), solvable2str(pool, s), solvable2str(pool, sd));
+		    POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow vendor change from '%s' (%s) to no vendor (%s)\n", pool_id2str(pool, s->vendor), pool_solvable2str(pool, s), pool_solvable2str(pool, sd));
 		}
 	      if (!illegal)
-		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow replacement of %s with %s\n", solvable2str(pool, s), solvable2str(pool, sd));
+		POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow replacement of %s with %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, sd));
 	    }
 	  else
 	    {
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow deinstallation of %s\n", solvable2str(pool, s));
+	      POOL_DEBUG(SAT_DEBUG_RESULT, "  - allow deinstallation of %s\n", pool_solvable2str(pool, s));
 	    }
 	}
     }
@@ -773,7 +773,7 @@ solver_printtrivial(Solver *solv)
   queue_init(&in);
   for (p = 1, s = pool->solvables + p; p < solv->pool->nsolvables; p++, s++)
     {   
-      n = id2str(pool, s->name);
+      n = pool_id2str(pool, s->name);
       if (strncmp(n, "patch:", 6) != 0 && strncmp(n, "pattern:", 8) != 0)
         continue;
       queue_push(&in, p); 
@@ -787,7 +787,7 @@ solver_printtrivial(Solver *solv)
   solver_trivial_installable(solv, &in, &out);
   POOL_DEBUG(SAT_DEBUG_RESULT, "trivial installable status:\n");
   for (i = 0; i < in.count; i++)
-    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s: %d\n", solvid2str(pool, in.elements[i]), out.elements[i]);
+    POOL_DEBUG(SAT_DEBUG_RESULT, "  %s: %d\n", pool_solvid2str(pool, in.elements[i]), out.elements[i]);
   POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
   queue_free(&in);
   queue_free(&out);
@@ -799,12 +799,12 @@ solver_select2str(Pool *pool, Id select, Id what)
   const char *s;
   char *b;
   if (select == SOLVER_SOLVABLE)
-    return solvid2str(pool, what);
+    return pool_solvid2str(pool, what);
   if (select == SOLVER_SOLVABLE_NAME)
-    return dep2str(pool, what);
+    return pool_dep2str(pool, what);
   if (select == SOLVER_SOLVABLE_PROVIDES)
     {
-      s = dep2str(pool, what);
+      s = pool_dep2str(pool, what);
       b = pool_alloctmpspace(pool, 11 + strlen(s));
       sprintf(b, "providing %s", s);
       return b;
@@ -815,7 +815,7 @@ solver_select2str(Pool *pool, Id select, Id what)
       b = 0;
       while ((p = pool->whatprovidesdata[what++]) != 0)
 	{
-	  s = solvid2str(pool, p);
+	  s = pool_solvid2str(pool, p);
 	  if (b)
 	    b = pool_tmpappend(pool, b, ", ", s);
 	  else
@@ -930,47 +930,47 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
   switch (type)
     {
     case SOLVER_RULE_DISTUPGRADE:
-      return pool_tmpjoin(pool, solvid2str(pool, source), " does not belong to a distupgrade repository", 0);
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " does not belong to a distupgrade repository", 0);
     case SOLVER_RULE_INFARCH:
-      return pool_tmpjoin(pool, solvid2str(pool, source), " has inferior architecture", 0);
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " has inferior architecture", 0);
     case SOLVER_RULE_UPDATE:
-      return pool_tmpjoin(pool, "problem with installed package ", solvid2str(pool, source), 0);
+      return pool_tmpjoin(pool, "problem with installed package ", pool_solvid2str(pool, source), 0);
     case SOLVER_RULE_JOB:
       return "conflicting requests";
     case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
-      return pool_tmpjoin(pool, "nothing provides requested ", dep2str(pool, dep), 0);
+      return pool_tmpjoin(pool, "nothing provides requested ", pool_dep2str(pool, dep), 0);
     case SOLVER_RULE_RPM:
       return "some dependency problem";
     case SOLVER_RULE_RPM_NOT_INSTALLABLE:
-      return pool_tmpjoin(pool, "package ", solvid2str(pool, source), " is not installable");
+      return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is not installable");
     case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
-      s = pool_tmpjoin(pool, "nothing provides ", dep2str(pool, dep), 0);
-      return pool_tmpappend(pool, s, " needed by ", solvid2str(pool, source));
+      s = pool_tmpjoin(pool, "nothing provides ", pool_dep2str(pool, dep), 0);
+      return pool_tmpappend(pool, s, " needed by ", pool_solvid2str(pool, source));
     case SOLVER_RULE_RPM_SAME_NAME:
-      s = pool_tmpjoin(pool, "cannot install both ", solvid2str(pool, source), 0);
-      return pool_tmpappend(pool, s, " and ", solvid2str(pool, target));
+      s = pool_tmpjoin(pool, "cannot install both ", pool_solvid2str(pool, source), 0);
+      return pool_tmpappend(pool, s, " and ", pool_solvid2str(pool, target));
     case SOLVER_RULE_RPM_PACKAGE_CONFLICT:
-      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " conflicts with ", dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " provided by ", solvid2str(pool, target));
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " conflicts with ", pool_dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
     case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
-      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " obsoletes ", dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " provided by ", solvid2str(pool, target));
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " obsoletes ", pool_dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
     case SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES:
-      s = pool_tmpjoin(pool, "installed package ", solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " obsoletes ", dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " provided by ", solvid2str(pool, target));
+      s = pool_tmpjoin(pool, "installed package ", pool_solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " obsoletes ", pool_dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
     case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
-      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " implicitely obsoletes ", dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " provided by ", solvid2str(pool, target));
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " implicitely obsoletes ", pool_dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
     case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
-      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), " requires ");
-      return pool_tmpappend(pool, s, dep2str(pool, dep), ", but none of the providers can be installed");
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " requires ");
+      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), ", but none of the providers can be installed");
     case SOLVER_RULE_RPM_SELF_CONFLICT:
-      s = pool_tmpjoin(pool, "package ", solvid2str(pool, source), " conflicts with ");
-      return pool_tmpappend(pool, s, dep2str(pool, dep), " provided by itself");
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " conflicts with ");
+      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), " provided by itself");
     default:
       return "bad problem rule type";
     }
@@ -990,24 +990,24 @@ solver_solutionelement2str(Solver *solv, Id p, Id rp)
     {
       Solvable *s = pool->solvables + rp;
       if (solv->installed && s->repo == solv->installed)
-        return pool_tmpjoin(pool, "keep ", solvable2str(pool, s), " despite the inferior architecture");
+        return pool_tmpjoin(pool, "keep ", pool_solvable2str(pool, s), " despite the inferior architecture");
       else
-        return pool_tmpjoin(pool, "install ", solvable2str(pool, s), " despite the inferior architecture");
+        return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " despite the inferior architecture");
     }
   else if (p == SOLVER_SOLUTION_DISTUPGRADE)
     {
       Solvable *s = pool->solvables + rp;
       if (solv->installed && s->repo == solv->installed)
-        return pool_tmpjoin(pool, "keep obsolete ", solvable2str(pool, s), 0);
+        return pool_tmpjoin(pool, "keep obsolete ", pool_solvable2str(pool, s), 0);
       else
-        return pool_tmpjoin(pool, "install ", solvable2str(pool, s), " from excluded repository");
+        return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " from excluded repository");
     }
   else if (p > 0 && rp == 0)
-    return pool_tmpjoin(pool, "allow deinstallation of ", solvid2str(pool, p), 0);
+    return pool_tmpjoin(pool, "allow deinstallation of ", pool_solvid2str(pool, p), 0);
   else if (p > 0 && rp > 0)
     {
-      const char *sp = solvid2str(pool, p);
-      const char *srp = solvid2str(pool, rp);
+      const char *sp = pool_solvid2str(pool, p);
+      const char *srp = pool_solvid2str(pool, rp);
       const char *str = pool_tmpjoin(pool, "allow replacement of ", sp, 0);
       return pool_tmpappend(pool, str, " with ", srp);
     }
@@ -1022,25 +1022,25 @@ policy_illegal2str(Solver *solv, int illegal, Solvable *s, Solvable *rs)
   const char *str;
   if (illegal == POLICY_ILLEGAL_DOWNGRADE)
     {
-      str = pool_tmpjoin(pool, "downgrade of ", solvable2str(pool, s), 0);
-      return pool_tmpappend(pool, str, " to ", solvable2str(pool, rs));
+      str = pool_tmpjoin(pool, "downgrade of ", pool_solvable2str(pool, s), 0);
+      return pool_tmpappend(pool, str, " to ", pool_solvable2str(pool, rs));
     }
   if (illegal == POLICY_ILLEGAL_ARCHCHANGE)
     {
-      str = pool_tmpjoin(pool, "architecture change of ", solvable2str(pool, s), 0);
-      return pool_tmpappend(pool, str, " to ", solvable2str(pool, rs));
+      str = pool_tmpjoin(pool, "architecture change of ", pool_solvable2str(pool, s), 0);
+      return pool_tmpappend(pool, str, " to ", pool_solvable2str(pool, rs));
     }
   if (illegal == POLICY_ILLEGAL_VENDORCHANGE)
     {
-      str = pool_tmpjoin(pool, "vendor change from '", id2str(pool, s->vendor), "' (");
+      str = pool_tmpjoin(pool, "vendor change from '", pool_id2str(pool, s->vendor), "' (");
       if (rs->vendor)
 	{
-          str = pool_tmpappend(pool, str, solvable2str(pool, s), ") to '");
-          str = pool_tmpappend(pool, str, id2str(pool, rs->vendor), "' (");
+          str = pool_tmpappend(pool, str, pool_solvable2str(pool, s), ") to '");
+          str = pool_tmpappend(pool, str, pool_id2str(pool, rs->vendor), "' (");
 	}
       else
-        str = pool_tmpappend(pool, str, solvable2str(pool, s), ") to no vendor (");
-      return pool_tmpappend(pool, str, solvable2str(pool, rs), ")");
+        str = pool_tmpappend(pool, str, pool_solvable2str(pool, s), ") to no vendor (");
+      return pool_tmpappend(pool, str, pool_solvable2str(pool, rs), ")");
     }
   return "unknown illegal change";
 }

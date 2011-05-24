@@ -235,7 +235,7 @@ evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
   fprintf(stderr, "evr: %s\n", pd->content);
 #endif
   // intern and create
-  return str2id(pool, pd->content, 1);
+  return pool_str2id(pool, pd->content, 1);
 }
 
 
@@ -338,11 +338,11 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, Id ma
 	  pd->acontent = l + 256;
 	}
       sprintf(pd->content, "%s:%s", k, n);
-      name = str2id(pool, pd->content, 1);
+      name = pool_str2id(pool, pd->content, 1);
     }
   else
     {
-      name = str2id(pool, n, 1);       /* package: just intern <name> */
+      name = pool_str2id(pool, n, 1);       /* package: just intern <name> */
     }
 
   if (f)			       /* operator ? */
@@ -360,7 +360,7 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, Id ma
       if (flags > 7)
 	flags = 0;
       /* intern rel */
-      id = rel2id(pool, name, evr, flags, 1);
+      id = pool_rel2id(pool, name, evr, flags, 1);
     }
   else
     id = name;			       /* no operator */
@@ -546,7 +546,7 @@ static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
 	  if (!ISRELDEP(pid))
 	    continue;               /* wrong provides name */
 	  prd = GETRELDEP(pool, pid);
-	  depname = id2str(pool, prd->name);
+	  depname = pool_id2str(pool, prd->name);
 	  if (!strncmp(depname, "kernel-", 7))
 	    return depname + 7;
 	}
@@ -561,12 +561,12 @@ static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
 
 	  if (!ISRELDEP(pid))
 	    {
-	      depname = id2str(pool, pid);
+	      depname = pool_id2str(pool, pid);
 	    } 
 	  else 
 	    {
 	      Reldep *prd = GETRELDEP(pool, pid);
-	      depname = id2str(pool, prd->name);
+	      depname = pool_id2str(pool, prd->name);
 	    }
 	  if (!strncmp(depname, "kernel-", 7))
 	    return depname + 7;
@@ -620,7 +620,7 @@ endElement(void *userData, const char *name)
                         pd->release ? pd->evrspace + pd->release : 0);
       /* ensure self-provides */
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+        s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_supplements(pd->repo, s->provides, s->supplements, pd->freshens);
       s->conflicts = repo_fix_conflicts(pd->repo, s->conflicts);
       pd->freshens = 0;
@@ -647,11 +647,11 @@ endElement(void *userData, const char *name)
 		  if (ISRELDEP(pid))
 		    {
 		      prd = GETRELDEP(pool, pid);
-		      depname = id2str(pool, prd->name);
+		      depname = pool_id2str(pool, prd->name);
 		    }
 		  else
 		    {
-		      depname = id2str(pool, pid);
+		      depname = pool_id2str(pool, pid);
 		    }
 
 
@@ -659,9 +659,9 @@ endElement(void *userData, const char *name)
 		    {
 		      char newdep[100];
 		      snprintf(newdep, sizeof(newdep), "kernel(%s:%s", cflavor, depname + 7);
-		      pid = str2id(pool, newdep, 1);
+		      pid = pool_str2id(pool, newdep, 1);
 		      if (prd)
-			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
+			pid = pool_rel2id(pool, pid, prd->evr, prd->flags, 1);
 		    }
 
 		  npr = repo_addid_dep(pd->repo, npr, pid, 0);
@@ -682,20 +682,20 @@ endElement(void *userData, const char *name)
 		  if (ISRELDEP(pid))
 		    {
 		      prd = GETRELDEP(pool, pid);
-		      depname = id2str(pool, prd->name);
+		      depname = pool_id2str(pool, prd->name);
 		    }
 		  else
 		    {
-		      depname = id2str(pool, pid);
+		      depname = pool_id2str(pool, pid);
 		    }
 
 		  if (!strncmp(depname, "kernel(", 7) && !strchr(depname, ':'))
 		    {
 		      char newdep[100];
 		      snprintf(newdep, sizeof(newdep), "kernel(%s:%s", cflavor, depname + 7);
-		      pid = str2id(pool, newdep, 1);
+		      pid = pool_str2id(pool, newdep, 1);
 		      if (prd)
-			pid = rel2id(pool, pid, prd->evr, prd->flags, 1);
+			pid = pool_rel2id(pool, pid, prd->evr, prd->flags, 1);
 		    }
 		  npr = repo_addid_dep(pd->repo, npr, pid, 0);
 		}
@@ -706,10 +706,10 @@ endElement(void *userData, const char *name)
 	}
       break;
     case STATE_NAME:
-      s->name = str2id(pool, pd->content, 1);
+      s->name = pool_str2id(pool, pd->content, 1);
       break;
     case STATE_VENDOR:
-      s->vendor = str2id(pool, pd->content, 1);
+      s->vendor = pool_str2id(pool, pd->content, 1);
       break;
     case STATE_BUILDTIME:
       t = atoi (pd->content);
@@ -726,7 +726,7 @@ endElement(void *userData, const char *name)
       pd->version = 0;
       pd->release = 0;
       /* use highest evr */
-      if (!s->evr || evrcmp(pool, s->evr, evr, EVRCMP_MATCH_RELEASE) <= 0)
+      if (!s->evr || pool_evrcmp(pool, s->evr, evr, EVRCMP_MATCH_RELEASE) <= 0)
 	s->evr = evr;
       break;
     case STATE_EPOCH:
@@ -752,7 +752,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_ARCH:
     case STATE_PARCH:
-      s->arch = str2id(pool, pd->content, 1);
+      s->arch = pool_str2id(pool, pd->content, 1);
       break;
     default:
       break;

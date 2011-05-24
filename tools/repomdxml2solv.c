@@ -42,7 +42,7 @@ doquery(Pool *pool, Repo *repo, const char *query)
   qp = strchr(query, ':');
   if (qp)
     {
-      type = strn2id(pool, query, qp - query, 0);
+      type = pool_strn2id(pool, query, qp - query, 0);
       if (!type)
 	exit(0);
       qp++;
@@ -50,7 +50,7 @@ doquery(Pool *pool, Repo *repo, const char *query)
   else
     qp = query;
   snprintf(qbuf, sizeof(qbuf), "repository:repomd:%s", qp);
-  id = str2id(pool, qbuf, 0);
+  id = pool_str2id(pool, qbuf, 0);
   if (!id)
     exit(0);
   dataiterator_init(&di, pool, repo, SOLVID_META, id, 0, 0);
@@ -67,7 +67,7 @@ doquery(Pool *pool, Repo *repo, const char *query)
 	{
 	case REPOKEY_TYPE_ID:
 	case REPOKEY_TYPE_CONSTANTID:
-	  printf("%s\n", id2str(pool, di.kv.id));
+	  printf("%s\n", pool_id2str(pool, di.kv.id));
 	  break;
 	case REPOKEY_TYPE_STR:
 	  printf("%s\n", di.kv.str);

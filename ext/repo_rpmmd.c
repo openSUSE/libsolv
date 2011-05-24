@@ -423,7 +423,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 #if 0
   fprintf(stderr, "evr: %s\n", pd->content);
 #endif
-  return str2id(pool, pd->content, 1);
+  return pool_str2id(pool, pd->content, 1);
 }
 
 
@@ -501,10 +501,10 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 	  pd->acontent = l + 256;
 	}
       sprintf(pd->content, "%s:%s", k, n);
-      name = str2id(pool, pd->content, 1);
+      name = pool_str2id(pool, pd->content, 1);
     }
   else
-    name = str2id(pool, (char *)n, 1);
+    name = pool_str2id(pool, (char *)n, 1);
   if (f)
     {
       Id evr = makeevr_atts(pool, pd, atts);
@@ -513,12 +513,12 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 	if (!strcmp(f, flagtab[flags]))
 	  break;
       flags = flags < 6 ? flags + 1 : 0;
-      id = rel2id(pool, name, evr, flags, 1);
+      id = pool_rel2id(pool, name, evr, flags, 1);
     }
   else
     id = name;
 #if 0
-  fprintf(stderr, "new dep %s%s%s\n", id2str(pool, d), id2rel(pool, d), id2evr(pool, d));
+  fprintf(stderr, "new dep %s%s%s\n", pool_id2str(pool, d), id2rel(pool, d), id2evr(pool, d));
 #endif
   return repo_addid_dep(pd->common.repo, olddeps, id, marker);
 }
@@ -609,17 +609,17 @@ set_sourcerpm(Repodata *data, Solvable *s, Id handle, char *sourcerpm)
   else if (!strcmp(sarch, "nosrc.rpm"))
     repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
   else
-    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
-  evr = id2str(pool, s->evr);
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, pool_strn2id(pool, sarch, strlen(sarch) - 4, 1));
+  evr = pool_id2str(pool, s->evr);
   if (evr && !strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
     repodata_set_void(data, handle, SOLVABLE_SOURCEEVR);
   else
-    repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
-  name = id2str(pool, s->name);
+    repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, pool_strn2id(pool, sevr, sarch - sevr - 1, 1));
+  name = pool_id2str(pool, s->name);
   if (name && !strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
     repodata_set_void(data, handle, SOLVABLE_SOURCENAME);
   else
-    repodata_set_id(data, handle, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
+    repodata_set_id(data, handle, SOLVABLE_SOURCENAME, pool_strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
 }
 
 /*-----------------------------------------------*/
@@ -932,13 +932,13 @@ endElement(void *userData, const char *name)
     {
     case STATE_SOLVABLE:
       if (pd->kind && !s->name) /* add namespace in case of NULL name */
-        s->name = str2id(pool, join2(pd->kind, ":", ""), 1);
+        s->name = pool_str2id(pool, join2(pd->kind, ":", ""), 1);
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (!s->evr)
         s->evr = ID_EMPTY;	/* some patterns have this */
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+        s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, pd->freshens);
       s->conflicts = repo_fix_conflicts(repo, s->conflicts);
       pd->freshens = 0;
@@ -946,15 +946,15 @@ endElement(void *userData, const char *name)
       break;
     case STATE_NAME:
       if (pd->kind)
-        s->name = str2id(pool, join2(pd->kind, ":", pd->content), 1);
+        s->name = pool_str2id(pool, join2(pd->kind, ":", pd->content), 1);
       else
-        s->name = str2id(pool, pd->content, 1);
+        s->name = pool_str2id(pool, pd->content, 1);
       break;
     case STATE_ARCH:
-      s->arch = str2id(pool, pd->content, 1);
+      s->arch = pool_str2id(pool, pd->content, 1);
       break;
     case STATE_VENDOR:
-      s->vendor = str2id(pool, pd->content, 1);
+      s->vendor = pool_str2id(pool, pd->content, 1);
       break;
     case STATE_RPM_GROUP:
       repodata_set_poolstr(pd->data, handle, SOLVABLE_GROUP, pd->content);
@@ -991,7 +991,7 @@ endElement(void *userData, const char *name)
       }
     case STATE_FILE:
 #if 0
-      id = str2id(pool, pd->content, 1);
+      id = pool_str2id(pool, pd->content, 1);
       s->provides = repo_addid_dep(repo, s->provides, id, SOLVABLE_FILEMARKER);
 #endif
       if ((p = strrchr(pd->content, '/')) != 0)
@@ -1051,21 +1051,21 @@ endElement(void *userData, const char *name)
       if (pd->content[0])
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pool, "releasenotes", 1));
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pool, "releasenotes", 1));
         }
       break;
     case STATE_UPDATEURL:
       if (pd->content[0])
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pool, "update", 1));
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pool, "update", 1));
         }
       break;
     case STATE_OPTIONALURL:
       if (pd->content[0])
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pool, "optional", 1));
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pool, "optional", 1));
         }
       break;
     case STATE_FLAG:

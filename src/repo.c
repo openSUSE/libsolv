@@ -414,7 +414,7 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	  id = repo->idarraydata[i];
 	  if (ISRELDEP(id))
 	    continue;
-	  dep = (char *)id2str(pool, id);
+	  dep = (char *)pool_id2str(pool, id);
 	  if (!strncmp(dep, "locale(", 7) && strlen(dep) < sizeof(buf) - 2)
 	    {
 	      idp = 0;
@@ -423,7 +423,7 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	      if ((p = strchr(dep, ':')) != 0 && p != dep)
 		{
 		  *p++ = 0;
-		  idp = str2id(pool, dep, 1);
+		  idp = pool_str2id(pool, dep, 1);
 		  dep = p;
 		}
 	      id = 0;
@@ -437,13 +437,13 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 		  *p++ = 0;
 #if 0
 		  strncpy(dep - 9, "language:", 9);
-		  idl = str2id(pool, dep - 9, 1);
+		  idl = pool_str2id(pool, dep - 9, 1);
 #else
-		  idl = str2id(pool, dep, 1);
-		  idl = rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
+		  idl = pool_str2id(pool, dep, 1);
+		  idl = pool_rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
 #endif
 		  if (id)
-		    id = rel2id(pool, id, idl, REL_OR, 1);
+		    id = pool_rel2id(pool, id, idl, REL_OR, 1);
 		  else
 		    id = idl;
 		  dep = p;
@@ -455,18 +455,18 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 		  *p = 0;
 #if 0
 		  strncpy(dep - 9, "language:", 9);
-		  idl = str2id(pool, dep - 9, 1);
+		  idl = pool_str2id(pool, dep - 9, 1);
 #else
-		  idl = str2id(pool, dep, 1);
-		  idl = rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
+		  idl = pool_str2id(pool, dep, 1);
+		  idl = pool_rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
 #endif
 		  if (id)
-		    id = rel2id(pool, id, idl, REL_OR, 1);
+		    id = pool_rel2id(pool, id, idl, REL_OR, 1);
 		  else
 		    id = idl;
 		}
 	      if (idp)
-		id = rel2id(pool, idp, id, REL_AND, 1);
+		id = pool_rel2id(pool, idp, id, REL_AND, 1);
 	      if (id)
 		supplements = repo_addid_dep(repo, supplements, id, 0);
 	    }
@@ -475,14 +475,14 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	      strcpy(buf, dep);
 	      p = buf + (p - dep);
 	      *p++ = 0;
-	      idp = str2id(pool, buf, 1);
+	      idp = pool_str2id(pool, buf, 1);
 	      /* strip trailing slashes */
 	      l = strlen(p);
 	      while (l > 1 && p[l - 1] == '/')
 		p[--l] = 0;
-	      id = str2id(pool, p, 1);
-	      id = rel2id(pool, idp, id, REL_WITH, 1);
-	      id = rel2id(pool, NAMESPACE_SPLITPROVIDES, id, REL_NAMESPACE, 1);
+	      id = pool_str2id(pool, p, 1);
+	      id = pool_rel2id(pool, idp, id, REL_WITH, 1);
+	      id = pool_rel2id(pool, NAMESPACE_SPLITPROVIDES, id, REL_NAMESPACE, 1);
 	      supplements = repo_addid_dep(repo, supplements, id, 0);
 	    }
 	}
@@ -494,7 +494,7 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	  id = repo->idarraydata[i];
 	  if (ISRELDEP(id))
 	    continue;
-	  dep = (char *)id2str(pool, id);
+	  dep = (char *)pool_id2str(pool, id);
 	  if (!strncmp(dep, "system:modalias(", 16))
 	    dep += 7;
 	  if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10] && strlen(dep) < sizeof(buf))
@@ -504,18 +504,18 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	      if (p && p != buf + 9 && strchr(p + 1, ':'))
 		{
 		  *p++ = 0;
-		  idp = str2id(pool, buf + 9, 1);
+		  idp = pool_str2id(pool, buf + 9, 1);
 		  p[strlen(p) - 1] = 0;
-		  id = str2id(pool, p, 1);
-		  id = rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
-		  id = rel2id(pool, idp, id, REL_AND, 1);
+		  id = pool_str2id(pool, p, 1);
+		  id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
+		  id = pool_rel2id(pool, idp, id, REL_AND, 1);
 		}
 	      else
 		{
 		  p = buf + 9;
 		  p[strlen(p) - 1] = 0;
-		  id = str2id(pool, p, 1);
-		  id = rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
+		  id = pool_str2id(pool, p, 1);
+		  id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
 		}
 	      if (id)
 		repo->idarraydata[i] = id;
@@ -533,9 +533,9 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 		      continue;
 		    }
 		  *p++ = 0;
-		  idp = str2id(pool, dep, 1);
+		  idp = pool_str2id(pool, dep, 1);
 		  if (id)
-		    id = rel2id(pool, id, idp, REL_AND, 1);
+		    id = pool_rel2id(pool, id, idp, REL_AND, 1);
 		  else
 		    id = idp;
 		  dep = p;
@@ -543,9 +543,9 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	      if (dep[0] && dep[1])
 		{
 		  dep[strlen(dep) - 1] = 0;
-		  idp = str2id(pool, dep, 1);
+		  idp = pool_str2id(pool, dep, 1);
 		  if (id)
-		    id = rel2id(pool, id, idp, REL_AND, 1);
+		    id = pool_rel2id(pool, id, idp, REL_AND, 1);
 		  else
 		    id = idp;
 		}
@@ -557,8 +557,8 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	      strcpy(buf, dep + 11);
 	      if ((p = strrchr(buf, ')')) != 0)
 		*p = 0;
-	      id = str2id(pool, buf, 1);
-	      id = rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
+	      id = pool_str2id(pool, buf, 1);
+	      id = pool_rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
 	      repo->idarraydata[i] = id;
 	    }
 	}
@@ -573,19 +573,19 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	  if (!idsupp)
 	    idsupp = repo->idarraydata[i];
 	  else
-	    idsupp = rel2id(pool, idsupp, repo->idarraydata[i], REL_OR, 1);
+	    idsupp = pool_rel2id(pool, idsupp, repo->idarraydata[i], REL_OR, 1);
         }
       for (i = freshens; repo->idarraydata[i]; i++)
         {
 	  if (!idfresh)
 	    idfresh = repo->idarraydata[i];
 	  else
-	    idfresh = rel2id(pool, idfresh, repo->idarraydata[i], REL_OR, 1);
+	    idfresh = pool_rel2id(pool, idfresh, repo->idarraydata[i], REL_OR, 1);
         }
       if (!idsupp)
         idsupp = idfresh;
       else
-	idsupp = rel2id(pool, idsupp, idfresh, REL_AND, 1);
+	idsupp = pool_rel2id(pool, idsupp, idfresh, REL_AND, 1);
       supplements = repo_addid_dep(repo, 0, idsupp, 0);
     }
   return supplements;
@@ -606,14 +606,14 @@ repo_fix_conflicts(Repo *repo, Offset conflicts)
       id = repo->idarraydata[i];
       if (ISRELDEP(id))
 	continue;
-      dep = (char *)id2str(pool, id);
+      dep = (char *)pool_id2str(pool, id);
       if (!strncmp(dep, "otherproviders(", 15) && strlen(dep) < sizeof(buf) - 2)
 	{
 	  strcpy(buf, dep + 15);
 	  if ((p = strchr(buf, ')')) != 0)
 	    *p = 0;
-	  id = str2id(pool, buf, 1);
-	  id = rel2id(pool, NAMESPACE_OTHERPROVIDERS, id, REL_NAMESPACE, 1);
+	  id = pool_str2id(pool, buf, 1);
+	  id = pool_rel2id(pool, NAMESPACE_OTHERPROVIDERS, id, REL_NAMESPACE, 1);
 	  repo->idarraydata[i] = id;
 	}
     }
@@ -870,13 +870,13 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
       switch (keyname)
 	{
 	case SOLVABLE_NAME:
-	  return id2str(pool, pool->solvables[entry].name);
+	  return pool_id2str(pool, pool->solvables[entry].name);
 	case SOLVABLE_ARCH:
-	  return id2str(pool, pool->solvables[entry].arch);
+	  return pool_id2str(pool, pool->solvables[entry].arch);
 	case SOLVABLE_EVR:
-	  return id2str(pool, pool->solvables[entry].evr);
+	  return pool_id2str(pool, pool->solvables[entry].evr);
 	case SOLVABLE_VENDOR:
-	  return id2str(pool, pool->solvables[entry].vendor);
+	  return pool_id2str(pool, pool->solvables[entry].vendor);
 	}
     }
   for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
@@ -1189,7 +1189,7 @@ repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
 	case SOLVABLE_ARCH:
 	case SOLVABLE_EVR:
 	case SOLVABLE_VENDOR:
-	  repo_set_id(repo, p, keyname, str2id(repo->pool, str, 1));
+	  repo_set_id(repo, p, keyname, pool_str2id(repo->pool, str, 1));
 	  return;
 	}
     }
@@ -1209,7 +1209,7 @@ repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str)
 	case SOLVABLE_ARCH:
 	case SOLVABLE_EVR:
 	case SOLVABLE_VENDOR:
-	  repo_set_id(repo, p, keyname, str2id(repo->pool, str, 1));
+	  repo_set_id(repo, p, keyname, pool_str2id(repo->pool, str, 1));
 	  return;
 	}
     }

@@ -236,21 +236,21 @@ endElement(void *userData, const char *name)
       if (!s->evr)
 	s->evr = ID_EMPTY;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
+	s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->solvable = 0;
       break;
     case STATE_NAME:
-      s->name = str2id(pd->pool, join2("product", ":", pd->content), 1);
+      s->name = pool_str2id(pd->pool, join2("product", ":", pd->content), 1);
       break;
     case STATE_ARCH:
-      s->arch = str2id(pd->pool, pd->content, 1);
+      s->arch = pool_str2id(pd->pool, pd->content, 1);
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
       pd->tmplang = sat_free((void *)pd->tmplang);
       break;
     case STATE_VENDOR:
-      s->vendor = str2id(pd->pool, pd->content, 1);
+      s->vendor = pool_str2id(pd->pool, pd->content, 1);
       break;
     case STATE_INSTALLTIME:
       repodata_set_num(pd->data, pd->handle, SOLVABLE_INSTALLTIME, atol(pd->content));

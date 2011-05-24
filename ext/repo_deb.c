@@ -121,17 +121,17 @@ parseonedep(Pool *pool, char *p)
       while (*p == ' ' || *p == '\t' || *p == '\n')
 	p++;
     }
-  name = strn2id(pool, n, ne - n, 1);
+  name = pool_strn2id(pool, n, ne - n, 1);
   if (e)
     {
-      evr = strn2id(pool, e, ee - e, 1);
-      name = rel2id(pool, name, evr, flags, 1);
+      evr = pool_strn2id(pool, e, ee - e, 1);
+      name = pool_rel2id(pool, name, evr, flags, 1);
     }
   if (*p == '|')
     {
       Id id = parseonedep(pool, p + 1);
       if (id)
-	name = rel2id(pool, name, id, REL_OR, 1);
+	name = pool_rel2id(pool, name, id, REL_OR, 1);
     }
   return name;
 }
@@ -212,7 +212,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	{
 	case 'A' << 8 | 'R':
 	  if (!strcasecmp(tag, "architecture"))
-	    s->arch = str2id(pool, q, 1);
+	    s->arch = pool_str2id(pool, q, 1);
 	  break;
 	case 'B' << 8 | 'R':
 	  if (!strcasecmp(tag, "breaks"))
@@ -263,7 +263,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	case 'P' << 8 | 'A':
 	  if (!strcasecmp(tag, "package"))
-	    s->name = str2id(pool, q, 1);
+	    s->name = pool_str2id(pool, q, 1);
 	  break;
 	case 'P' << 8 | 'R':
 	  if (!strcasecmp(tag, "pre-depends"))
@@ -298,10 +298,10 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 		    *q2 = 0;
 		    break;
 		  }
-	      if (s->name && !strcmp(q, id2str(pool, s->name)))
+	      if (s->name && !strcmp(q, pool_id2str(pool, s->name)))
 		repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
 	      else
-		repodata_set_id(data, s - pool->solvables, SOLVABLE_SOURCENAME, str2id(pool, q, 1));
+		repodata_set_id(data, s - pool->solvables, SOLVABLE_SOURCENAME, pool_str2id(pool, q, 1));
 	      havesource = 1;
 	    }
 	  break;
@@ -311,7 +311,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	case 'V' << 8 | 'E':
 	  if (!strcasecmp(tag, "version"))
-	    s->evr = str2id(pool, q, 1);
+	    s->evr = pool_str2id(pool, q, 1);
 	  break;
 	}
     }
@@ -322,7 +322,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
   if (!s->evr)
     s->evr = ID_EMPTY;
   if (s->name)
-    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+    s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   if (s->name && !havesource)
     repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
   if (s->obsoletes)

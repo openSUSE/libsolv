@@ -39,7 +39,7 @@ showproblems(Solver *solv, Solvable *s, Queue *cand, Queue *badguys)
 
   queue_init(&rids);
   queue_init(&rinfo);
-  printf("can't install %s:\n", solvable2str(pool, s));
+  printf("can't install %s:\n", pool_solvable2str(pool, s));
   while ((problem = solver_next_problem(solv, problem)) != 0)
     {
       solver_findallproblemrules(solv, problem, &rids);
@@ -58,13 +58,13 @@ showproblems(Solver *solv, Solvable *s, Queue *cand, Queue *badguys)
 	      dep = rinfo.elements[k + 3];
 	      switch (rinfo.elements[k])
 		{
-		case SOLVER_PROBLEM_DISTUPGRADE_RULE:
+		case SOLVER_RULE_DISTUPGRADE:
 		  break;
-		case SOLVER_PROBLEM_INFARCH_RULE:
-		  printf("  %s has inferior architecture\n", solvid2str(pool, source));
+		case SOLVER_RULE_INFARCH:
+		  printf("  %s has inferior architecture\n", pool_solvid2str(pool, source));
 		  break;
-		case SOLVER_PROBLEM_UPDATE_RULE:
-		  printf("  update rule for %s\n", solvid2str(pool, source));
+		case SOLVER_RULE_UPDATE:
+		  printf("  update rule for %s\n", pool_solvid2str(pool, source));
 		  if (badguys)
 		    queue_pushunique(badguys, source);
 		  if (!cand)
@@ -88,19 +88,19 @@ showproblems(Solver *solv, Solvable *s, Queue *cand, Queue *badguys)
 			cand->elements[l] = -source;
 		      }
 		  break;
-		case SOLVER_PROBLEM_JOB_RULE:
+		case SOLVER_RULE_JOB:
 		  break;
-		case SOLVER_PROBLEM_RPM_RULE:
+		case SOLVER_RULE_RPM:
 		  printf("  some dependency problem\n");
 		  break;
-		case SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP:
-		  printf("  nothing provides requested %s\n", dep2str(pool, dep));
+		case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
+		  printf("  nothing provides requested %s\n", pool_dep2str(pool, dep));
 		  break;
-		case SOLVER_PROBLEM_NOT_INSTALLABLE:
-		  printf("  package %s is not installable\n", solvid2str(pool, source));
+		case SOLVER_RULE_RPM_NOT_INSTALLABLE:
+		  printf("  package %s is not installable\n", pool_solvid2str(pool, source));
 		  break;
-		case SOLVER_PROBLEM_NOTHING_PROVIDES_DEP:
-		  printf("  nothing provides %s needed by %s\n", dep2str(pool, dep), solvid2str(pool, source));
+		case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
+		  printf("  nothing provides %s needed by %s\n", pool_dep2str(pool, dep), pool_solvid2str(pool, source));
 		  if (ISRELDEP(dep))
 		    {
 		      Reldep *rd = GETRELDEP(pool, dep);
@@ -108,24 +108,24 @@ showproblems(Solver *solv, Solvable *s, Queue *cand, Queue *badguys)
 			{
 			  Id rp, rpp;
 			  FOR_PROVIDES(rp, rpp, rd->name)
-			    printf("    (we have %s)\n", solvid2str(pool, rp));
+			    printf("    (we have %s)\n", pool_solvid2str(pool, rp));
 			}
 		    }
 		  break;
-		case SOLVER_PROBLEM_SAME_NAME:
-		  printf("  cannot install both %s and %s\n", solvid2str(pool, source), solvid2str(pool, target));
+		case SOLVER_RULE_RPM_SAME_NAME:
+		  printf("  cannot install both %s and %s\n", pool_solvid2str(pool, source), pool_solvid2str(pool, target));
 		  break;
-		case SOLVER_PROBLEM_PACKAGE_CONFLICT:
-		  printf("  package %s conflicts with %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
+		case SOLVER_RULE_RPM_PACKAGE_CONFLICT:
+		  printf("  package %s conflicts with %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
 		  break;
-		case SOLVER_PROBLEM_PACKAGE_OBSOLETES:
-		  printf("  package %s obsoletes %s provided by %s\n", solvid2str(pool, source), dep2str(pool, dep), solvid2str(pool, target));
+		case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
+		  printf("  package %s obsoletes %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
 		  break;
-		case SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE:
-		  printf("  package %s requires %s, but none of the providers can be installed\n", solvid2str(pool, source), dep2str(pool, dep));
+		case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
+		  printf("  package %s requires %s, but none of the providers can be installed\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep));
 		  break;
-		case SOLVER_PROBLEM_SELF_CONFLICT:
-		  printf("  package %s conflicts with %s provided by itself\n", solvid2str(pool, source), dep2str(pool, dep));
+		case SOLVER_RULE_RPM_SELF_CONFLICT:
+		  printf("  package %s conflicts with %s provided by itself\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep));
 		  break;
 		}
 	    }
@@ -148,7 +148,7 @@ toinst(Solver *solv, Repo *repo, Repo *instrepo)
       if (p < 0 || p == SYSTEMSOLVABLE)
 	continue;
 
-     /* printf(" toinstall %s\n", solvid2str(pool, p));*/
+     /* printf(" toinstall %s\n", pool_solvid2str(pool, p));*/
       /* oh my! */
       pool->solvables[p].repo = instrepo;
     }
@@ -162,7 +162,7 @@ dump_instrepo(Repo *instrepo, Pool *pool)
 
   printf("instrepo..\n");
   FOR_REPO_SOLVABLES(instrepo, p, s)
-    printf("  %s\n", solvable2str(pool, s));
+    printf("  %s\n", pool_solvable2str(pool, s));
   printf("done.\n");
 }
 
@@ -199,7 +199,7 @@ typedef struct {
   Repo *instrepo;
 } context_t;
 
-#define SHOW_PATCH(c) if (!(c)->shown++) printf("%s:\n", solvable2str(pool, s));
+#define SHOW_PATCH(c) if (!(c)->shown++) printf("%s:\n", pool_solvable2str(pool, s));
 #define PERF_DEBUGGING 0
  
 static Pool *pool;
@@ -218,7 +218,7 @@ test_all_old_patches_included(context_t *c, Id pid)
 
       if (!s2->conflicts)
         continue;
-      if (evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) <= 0)
+      if (pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) <= 0)
         continue;
       conp2 = s2->repo->idarraydata + s2->conflicts;
       while ((con2 = *conp2++) != 0)
@@ -239,16 +239,16 @@ test_all_old_patches_included(context_t *c, Id pid)
           if (!con)
             {
               SHOW_PATCH(c);
-              printf("  %s contained %s\n", solvable2str(pool, s2), dep2str(pool, rd2->name));
+              printf("  %s contained %s\n", pool_solvable2str(pool, s2), pool_dep2str(pool, rd2->name));
             }
           else
            {
-             if (evrcmp(pool, rd->evr, rd2->evr, EVRCMP_COMPARE) < 0)
+             if (pool_evrcmp(pool, rd->evr, rd2->evr, EVRCMP_COMPARE) < 0)
                {
                  SHOW_PATCH(c);
                  printf("  %s required newer version %s-%s of %s-%s\n",
-                     solvable2str(pool, s2), dep2str(pool, rd2->name), dep2str(pool, rd2->evr),
-                     dep2str(pool, rd->name), dep2str(pool, rd->evr));
+                     pool_solvable2str(pool, s2), pool_dep2str(pool, rd2->name), pool_dep2str(pool, rd2->evr),
+                     pool_dep2str(pool, rd->name), pool_dep2str(pool, rd->evr));
                }
            }
 
@@ -283,9 +283,9 @@ test_all_packages_installable(context_t *c, Id pid)
 
           /* also set up some minimal system */
           queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES|SOLVER_WEAK);
-          queue_push(&job, str2id(pool, "rpm", 1));
+          queue_push(&job, pool_str2id(pool, "rpm", 1));
           queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES|SOLVER_WEAK);
-          queue_push(&job, str2id(pool, "aaa_base", 1));
+          queue_push(&job, pool_str2id(pool, "aaa_base", 1));
 
           solv = solver_create(pool);
           solv->dontinstallrecommended = 0;
@@ -315,7 +315,7 @@ test_all_packages_installable(context_t *c, Id pid)
                   queue_push(&job, i);
                 }
             }
-          queue_push(&job, SOLVER_INSTALL_SOLVABLE);
+          queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE);
           queue_push(&job, pid);
           solv = solver_create(pool);
           /*solv->dontinstallrecommended = 1;*/
@@ -361,7 +361,7 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
       Solvable *s = pool->solvables + p;
       if (!s->repo)
         continue;
-      if (strchr(id2str(pool, s->name), ':'))
+      if (strchr(pool_id2str(pool, s->name), ':'))
         continue;	/* only packages, please */
       if (!pool_installable(pool, s))
         continue;
@@ -415,7 +415,7 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
               queue_push(&job, i);
             }
         }
-      queue_push(&job, SOLVER_INSTALL_SOLVABLE);
+      queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE);
       queue_push(&job, pid);
       solv = solver_create(pool);
       solv->dontinstallrecommended = 1;
@@ -464,13 +464,13 @@ test_no_ga_package_fulfills_dependency(context_t *c, Id pid)
         {
           Solvable *s2 = pool_id2solvable(pool, rp);
           if (rp < c->updatestart
-              && evrcmp(pool, rd->evr, s2->evr, EVRCMP_COMPARE) < 0
+              && pool_evrcmp(pool, rd->evr, s2->evr, EVRCMP_COMPARE) < 0
               && pool_match_nevr_rel(pool, s2, rd->name)
              )
             {
               SHOW_PATCH(c);
               printf("  conflict %s < %s satisfied by non-updated package %s\n",
-                  dep2str(pool, rd->name), dep2str(pool, rd->evr), solvable2str(pool, s2));
+                  pool_dep2str(pool, rd->name), pool_dep2str(pool, rd->evr), pool_solvable2str(pool, s2));
               break;
             }
         }
@@ -577,7 +577,7 @@ main(int argc, char **argv)
         continue;
       if (!pool_installable(pool, s))
         continue;
-      pname = id2str(pool, s->name);
+      pname = pool_id2str(pool, s->name);
       if (strncmp(pname, "patch:", 6) != 0)
 	continue;
 
@@ -590,7 +590,7 @@ main(int argc, char **argv)
 	      l = strlen(pname + 6);
 	      if (mypatch[l] != '-')
 		continue;
-	      if (strcmp(mypatch + l + 1, id2str(pool, s->evr)) != 0)
+	      if (strcmp(mypatch + l + 1, pool_id2str(pool, s->evr)) != 0)
 		continue;
 	    }
 	}
@@ -599,7 +599,7 @@ main(int argc, char **argv)
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
 	      Solvable *s2 = pool->solvables + p;
-	      if (evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) < 0)
+	      if (pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE) < 0)
 		break;
 	    }
 	  if (p) {
@@ -612,7 +612,7 @@ main(int argc, char **argv)
 	continue;
 
 #if 0
-      printf("testing patch %s-%s\n", pname + 6, id2str(pool, s->evr));
+      printf("testing patch %s-%s\n", pname + 6, pool_id2str(pool, s->evr));
 #endif
 
       test_all_old_patches_included(&c, pid);

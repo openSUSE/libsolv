@@ -249,7 +249,7 @@ static int conflicts_cmp(const void *ap, const void *bp, void *dp)
   const Id *a = ap;
   const Id *b = bp;
   if (a[0] != b[0])
-    return strcmp(id2str(pool, a[0]), id2str(pool, b[0]));
+    return strcmp(pool_id2str(pool, a[0]), pool_id2str(pool, b[0]));
   if (a[1] != b[1])
     return a[1] - b[1];
   if (a[3] != b[3])
@@ -411,11 +411,11 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
 		  continue;	/* md5 sum matches */
 		if (pool->obsoleteusescolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
 		  continue;	/* colors do not conflict */
-		queue_push(conflicts, str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii] + 34, 1));
+		queue_push(conflicts, pool_str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii] + 34, 1));
 		queue_push(conflicts, p);
-		queue_push(conflicts, str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii], 1));
+		queue_push(conflicts, pool_str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii], 1));
 		queue_push(conflicts, q);
-		queue_push(conflicts, str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[jj], 1));
+		queue_push(conflicts, pool_str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[jj], 1));
 	      }
 	}
     }

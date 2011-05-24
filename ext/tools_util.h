@@ -28,7 +28,7 @@ makeevr(Pool *pool, const char *s)
 {
   if (!strncmp(s, "0:", 2) && s[2])
     s += 2;
-  return str2id(pool, s, 1);
+  return pool_str2id(pool, s, 1);
 }
 
 /**
@@ -110,7 +110,7 @@ join_freemem(void)
 static inline void repodata_set_tstr(Repodata *data, Id handle, const char *attrname, const char *lang, const char *str)
 {
   Id attrid;
-  attrid = str2id(data->repo->pool, join2(attrname, ":", lang), 1);
+  attrid = pool_str2id(data->repo->pool, join2(attrname, ":", lang), 1);
   repodata_set_str(data, handle, attrid, str);
 }
 

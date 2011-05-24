@@ -696,7 +696,7 @@ repo_write_cb_needed(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, K
 
 #if 0
   if (s)
-    fprintf(stderr, "solvable %d (%s): key (%d)%s %d\n", s ? s - repo->pool->solvables : 0, s ? id2str(repo->pool, s->name) : "", key->name, id2str(repo->pool, key->name), key->type);
+    fprintf(stderr, "solvable %d (%s): key (%d)%s %d\n", s ? s - repo->pool->solvables : 0, s ? pool_id2str(repo->pool, s->name) : "", key->name, pool_id2str(repo->pool, key->name), key->type);
 #endif
   return repo_write_collect_needed(cbdata, repo, data, key, kv);
 }
@@ -945,7 +945,7 @@ repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata)
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
       return KEY_STORAGE_VERTICAL_OFFSET;
-  keyname = id2str(repo->pool, key->name);
+  keyname = pool_id2str(repo->pool, key->name);
   for (i = 0; languagetags[i] != 0; i++)
     if (!strncmp(keyname, languagetags[i], strlen(languagetags[i])))
       return KEY_STORAGE_VERTICAL_OFFSET;
@@ -1236,7 +1236,7 @@ fprintf(stderr, "poolusage: %d\n", poolusage);
 fprintf(stderr, "dirpoolusage: %d\n", dirpoolusage);
 fprintf(stderr, "nkeys: %d\n", target.nkeys);
 for (i = 1; i < target.nkeys; i++)
-  fprintf(stderr, "  %2d: %s[%d] %d %d %d\n", i, id2str(pool, target.keys[i].name), target.keys[i].name, target.keys[i].type, target.keys[i].size, target.keys[i].storage);
+  fprintf(stderr, "  %2d: %s[%d] %d %d %d\n", i, pool_id2str(pool, target.keys[i].name), target.keys[i].name, target.keys[i].type, target.keys[i].size, target.keys[i].storage);
 #endif
 
   /* copy keys if requested */
@@ -1256,15 +1256,15 @@ for (i = 1; i < target.nkeys; i++)
       /* put mapped ids right into target.keys */
       for (i = 1, key = target.keys + i; i < target.nkeys; i++, key++)
 	{
-	  key->name = stringpool_str2id(spool, id2str(pool, key->name), 1);
+	  key->name = stringpool_str2id(spool, pool_id2str(pool, key->name), 1);
 	  if (key->type == REPOKEY_TYPE_CONSTANTID)
 	    {
-	      key->type = stringpool_str2id(spool, id2str(pool, key->type), 1);
+	      key->type = stringpool_str2id(spool, pool_id2str(pool, key->type), 1);
 	      type_constantid = key->type;
-	      key->size = stringpool_str2id(spool, id2str(pool, key->size), 1);
+	      key->size = stringpool_str2id(spool, pool_id2str(pool, key->size), 1);
 	    }
 	  else
-	    key->type = stringpool_str2id(spool, id2str(pool, key->type), 1);
+	    key->type = stringpool_str2id(spool, pool_id2str(pool, key->type), 1);
 	}
       if (poolusage == 2)
 	stringpool_freehash(spool);	/* free some mem */

@@ -494,15 +494,15 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	    flags |= 2;
 	  if ((f[i] & DEP_GREATER) != 0)
 	    flags |= 1;
-	  name = str2id(pool, n[i], 1);
+	  name = pool_str2id(pool, n[i], 1);
 	  if (v[i][0] == '0' && v[i][1] == ':' && v[i][2])
-	    evr = str2id(pool, v[i] + 2, 1);
+	    evr = pool_str2id(pool, v[i] + 2, 1);
 	  else
-	    evr = str2id(pool, v[i], 1);
-	  *ida++ = rel2id(pool, name, evr, flags, 1);
+	    evr = pool_str2id(pool, v[i], 1);
+	  *ida++ = pool_rel2id(pool, name, evr, flags, 1);
 	}
       else
-        *ida++ = str2id(pool, n[i], 1);
+        *ida++ = pool_str2id(pool, n[i], 1);
     }
   *ida++ = 0;
   repo->idarraysize += cc + 1;
@@ -760,7 +760,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
 	}
       strcpy(fn, dn[di[i]]);
       strcat(fn, bn[i]);
-      olddeps = repo_addid_dep(repo, olddeps, str2id(pool, fn, 1), SOLVABLE_FILEMARKER);
+      olddeps = repo_addid_dep(repo, olddeps, pool_str2id(pool, fn, 1), SOLVABLE_FILEMARKER);
 #endif
       if (data)
 	{
@@ -817,15 +817,15 @@ addsourcerpm(Pool *pool, Repodata *data, Id handle, char *sourcerpm, char *name,
   else if (!strcmp(sarch, "nosrc.rpm"))
     repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
   else
-    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, strn2id(pool, sarch, strlen(sarch) - 4, 1));
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, pool_strn2id(pool, sarch, strlen(sarch) - 4, 1));
   if (evr && !strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
     repodata_set_void(data, handle, SOLVABLE_SOURCEEVR);
   else
-    repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, strn2id(pool, sevr, sarch - sevr - 1, 1));
+    repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, pool_strn2id(pool, sevr, sarch - sevr - 1, 1));
   if (name && !strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
     repodata_set_void(data, handle, SOLVABLE_SOURCENAME);
   else
-    repodata_set_id(data, handle, SOLVABLE_SOURCENAME, strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
+    repodata_set_id(data, handle, SOLVABLE_SOURCENAME, pool_strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
 }
 
 static int
@@ -838,7 +838,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   name = headstring(rpmhead, TAG_NAME);
   if (!strcmp(name, "gpg-pubkey"))
     return 0;
-  s->name = str2id(pool, name, 1);
+  s->name = pool_str2id(pool, name, 1);
   if (!s->name)
     {
       fprintf(stderr, "package has no name\n");
@@ -846,7 +846,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
     }
   sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
   if (sourcerpm)
-    s->arch = str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
+    s->arch = pool_str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
   else
     {
       if (headexists(rpmhead, TAG_NOSOURCE) || headexists(rpmhead, TAG_NOPATCH))
@@ -857,14 +857,14 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   if (!s->arch)
     s->arch = ARCH_NOARCH;
   evr = headtoevr(rpmhead);
-  s->evr = str2id(pool, evr, 1);
-  s->vendor = str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
+  s->evr = pool_str2id(pool, evr, 1);
+  s->vendor = pool_str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
   if ((flags & RPM_ADD_NO_FILELIST) == 0)
     s->provides = addfileprovides(pool, repo, data, s, rpmhead, s->provides);
   if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+    s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, (flags & RPM_ADD_NO_RPMLIBREQS) ? MAKEDEPS_NO_RPMLIB : 0);
   s->conflicts = makedeps(pool, repo, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0);
   s->obsoletes = makedeps(pool, repo, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0);
@@ -989,12 +989,12 @@ copyreldep(Pool *pool, Pool *frompool, Id id)
   if (ISRELDEP(name))
     name = copyreldep(pool, frompool, name);
   else
-    name = str2id(pool, id2str(frompool, name), 1);
+    name = pool_str2id(pool, pool_id2str(frompool, name), 1);
   if (ISRELDEP(evr))
     evr = copyreldep(pool, frompool, evr);
   else
-    evr = str2id(pool, id2str(frompool, evr), 1);
-  return rel2id(pool, name, evr, rd->flags, 1);
+    evr = pool_str2id(pool, pool_id2str(frompool, evr), 1);
+  return pool_rel2id(pool, name, evr, rd->flags, 1);
 }
 
 static Offset
@@ -1022,7 +1022,7 @@ copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
 	  if (ISRELDEP(id))
 	    id = copyreldep(pool, frompool, id);
 	  else
-	    id = str2id(pool, id2str(frompool, id), 1);
+	    id = pool_str2id(pool, pool_id2str(frompool, id), 1);
 	  *ida++ = id;
 	}
       *ida = 0;
@@ -1053,7 +1053,7 @@ copydir_complex(Pool *pool, Repodata *data, Stringpool *fromspool, Repodata *fro
   if (parent)
     parent = copydir(pool, data, fromspool, fromdata, parent, cache);
   if (fromspool != &pool->ss)
-    compid = str2id(pool, stringpool_id2str(fromspool, compid), 1);
+    compid = pool_str2id(pool, stringpool_id2str(fromspool, compid), 1);
   compid = dirpool_add_dir(&data->dirpool, parent, compid, 1);
   if (cache)
     {
@@ -1081,7 +1081,7 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
 
   keyname = key->name;
   if (keyname >= ID_NUM_INTERNAL)
-    keyname = str2id(pool, id2str(frompool, keyname), 1);
+    keyname = pool_str2id(pool, pool_id2str(frompool, keyname), 1);
   switch(key->type)
     {
     case REPOKEY_TYPE_ID:
@@ -1093,7 +1093,7 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
 	  if (ISRELDEP(id))
 	    id = copyreldep(pool, frompool, id);
 	  else
-	    id = str2id(pool, stringpool_id2str(fromspool, id), 1);
+	    id = pool_str2id(pool, stringpool_id2str(fromspool, id), 1);
 	}
       if (key->type == REPOKEY_TYPE_ID)
         repodata_set_id(data, handle, keyname, id);
@@ -1130,7 +1130,7 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       if (ISRELDEP(id))
 	break;		/* can't do those at the moment */
       if (pool != frompool || fromdata->localpool)
-	id = str2id(pool, stringpool_id2str(fromspool, id), 1);
+	id = pool_str2id(pool, stringpool_id2str(fromspool, id), 1);
       repodata_add_idarray(data, handle, keyname, id);
       break;
     default:
@@ -1158,13 +1158,13 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
   else
     {
       if (r->name)
-	s->name = str2id(pool, id2str(fromrepo->pool, r->name), 1);
+	s->name = pool_str2id(pool, pool_id2str(fromrepo->pool, r->name), 1);
       if (r->evr)
-	s->evr = str2id(pool, id2str(fromrepo->pool, r->evr), 1);
+	s->evr = pool_str2id(pool, pool_id2str(fromrepo->pool, r->evr), 1);
       if (r->arch)
-	s->arch = str2id(pool, id2str(fromrepo->pool, r->arch), 1);
+	s->arch = pool_str2id(pool, pool_id2str(fromrepo->pool, r->arch), 1);
       if (r->vendor)
-	s->vendor = str2id(pool, id2str(fromrepo->pool, r->vendor), 1);
+	s->vendor = pool_str2id(pool, pool_id2str(fromrepo->pool, r->vendor), 1);
     }
   s->provides = copydeps(pool, repo, r->provides, fromrepo);
   s->requires = copydeps(pool, repo, r->requires, fromrepo);
@@ -1206,7 +1206,7 @@ pkgids_sort_cmp(const void *va, const void *vb, void *dp)
   Id *rpmdbid;
 
   if (a->name != b->name)
-    return strcmp(id2str(pool, a->name), id2str(pool, b->name));
+    return strcmp(pool_id2str(pool, a->name), pool_id2str(pool, b->name));
   rpmdbid = repo->rpmdbid;
   return rpmdbid[(a - pool->solvables) - repo->start] - rpmdbid[(b - pool->solvables) - repo->start];
 }
@@ -3019,8 +3019,8 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   sprintf(evrbuf, "%02x%02x%02x%02x-%02x%02x%02x%02x", dig->pubkey.signid[4], dig->pubkey.signid[5], dig->pubkey.signid[6], dig->pubkey.signid[7], dig->pubkey.time[0], dig->pubkey.time[1], dig->pubkey.time[2], dig->pubkey.time[3]);
   repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, btime);
 
-  s->name = str2id(pool, "gpg-pubkey", 1);
-  s->evr = str2id(pool, evrbuf, 1);
+  s->name = pool_str2id(pool, "gpg-pubkey", 1);
+  s->evr = pool_str2id(pool, evrbuf, 1);
   s->arch = 1;
   for (i = 0; i < 8; i++)
     sprintf(keyid + 2 * i, "%02x", dig->pubkey.signid[i]);

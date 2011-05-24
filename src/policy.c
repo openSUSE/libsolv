@@ -46,8 +46,8 @@ prune_to_best_version_sortcmp(const void *ap, const void *bp, void *dp)
       const char *na, *nb;
       /* different names. We use real strcmp here so that the result
        * is not depending on some random solvable order */
-      na = id2str(pool, sa->name);
-      nb = id2str(pool, sb->name);
+      na = pool_id2str(pool, sa->name);
+      nb = pool_id2str(pool, sb->name);
       return strcmp(na, nb);
     }
   /* the same name, bring installed solvables to the front */
@@ -370,7 +370,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
       s = pool->solvables + plist->elements[i];
 
       POOL_DEBUG(SAT_DEBUG_POLICY, "- %s[%s]\n",
-		 solvable2str(pool, s),
+		 pool_solvable2str(pool, s),
 		 (pool->installed && s->repo == pool->installed) ? "installed" : "not installed");
 
       if (!best)		/* if no best yet, the current is best */
@@ -389,7 +389,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
 
       if (best->evr != s->evr)	/* compare evr */
         {
-          if (evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) < 0)
+          if (pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) < 0)
             best = s;
         }
     }
@@ -543,7 +543,7 @@ policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
   int ret = 0;
   if (!(ignore & POLICY_ILLEGAL_DOWNGRADE) && !solv->allowdowngrade)
     {
-      if (is->name == s->name && evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE) > 0)
+      if (is->name == s->name && pool_evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE) > 0)
 	ret |= POLICY_ILLEGAL_DOWNGRADE;
     }
   if (!(ignore & POLICY_ILLEGAL_ARCHCHANGE) && !solv->allowarchchange)
@@ -681,7 +681,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       ps = pool->solvables + p;
       if (s->name == ps->name)	/* name match */
 	{
-	  if (!allow_all && !solv->allowdowngrade && evrcmp(pool, s->evr, ps->evr, EVRCMP_COMPARE) > 0)
+	  if (!allow_all && !solv->allowdowngrade && pool_evrcmp(pool, s->evr, ps->evr, EVRCMP_COMPARE) > 0)
 	    continue;
 	}
       else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */

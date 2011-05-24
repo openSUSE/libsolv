@@ -298,14 +298,14 @@ endElement(void *userData, const char *name)
       if (!s->evr)
 	s->evr = ID_EMPTY;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	s->provides = repo_addid_dep(pd->repo, s->provides, rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
+	s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->solvable = 0;
       break;
     case STATE_VENDOR:
-      s->vendor = str2id(pd->pool, pd->content, 1);
+      s->vendor = pool_str2id(pd->pool, pd->content, 1);
       break;
     case STATE_NAME:
-      s->name = str2id(pd->pool, join2("product", ":", pd->content), 1);
+      s->name = pool_str2id(pd->pool, join2("product", ":", pd->content), 1);
       break;
     case STATE_VERSION:
       pd->tmpvers = strdup(pd->content);
@@ -314,7 +314,7 @@ endElement(void *userData, const char *name)
       pd->tmprel = strdup(pd->content);
       break;
     case STATE_ARCH:
-      s->arch = str2id(pd->pool, pd->content, 1);
+      s->arch = pool_str2id(pd->pool, pd->content, 1);
       break;
     case STATE_PRODUCTLINE:
       repodata_set_str(pd->data, pd->handle, PRODUCT_PRODUCTLINE, pd->content);
@@ -337,7 +337,7 @@ endElement(void *userData, const char *name)
       if (pd->tmpurltype)
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, str2id(pd->pool, pd->tmpurltype, 1));
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pd->pool, pd->tmpurltype, 1));
         }
       pd->tmpurltype = sat_free((void *)pd->tmpurltype);
       break;

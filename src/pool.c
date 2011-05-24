@@ -482,7 +482,7 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
     return 1;
   if (flags != 2 && flags != 5)
     flags ^= 5;
-  if ((flags & (1 << (1 + evrcmp(pool, s->evr, evr, EVRCMP_DEPCMP)))) != 0)
+  if ((flags & (1 << (1 + pool_evrcmp(pool, s->evr, evr, EVRCMP_DEPCMP)))) != 0)
     return 1;
   return 0;
 }
@@ -505,7 +505,7 @@ pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
   else
     {
       int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-      if ((f & (1 << (1 + evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
+      if ((f & (1 << (1 + pool_evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
 	return 1;
     }
   return 0;
@@ -685,7 +685,7 @@ pool_addrelproviders(Pool *pool, Id d)
     {
       /* simple version comparison relation */
 #if 0
-      POOL_DEBUG(SAT_DEBUG_STATS, "addrelproviders: what provides %s?\n", dep2str(pool, name));
+      POOL_DEBUG(SAT_DEBUG_STATS, "addrelproviders: what provides %s?\n", pool_dep2str(pool, name));
 #endif
       pp = pool_whatprovides_ptr(pool, name);
       while (ISRELDEP(name))
@@ -735,7 +735,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	  queue_push(&plist, p);
 	}
       /* make our system solvable provide all unknown rpmlib() stuff */
-      if (plist.count == 0 && !strncmp(id2str(pool, name), "rpmlib(", 7))
+      if (plist.count == 0 && !strncmp(pool_id2str(pool, name), "rpmlib(", 7))
 	queue_push(&plist, SYSTEMSOLVABLE);
     }
   /* add providers to whatprovides */
@@ -860,7 +860,7 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       if (MAPTST(&csf->seen, dep))
 	continue;
       MAPSET(&csf->seen, dep);
-      s = id2str(pool, dep);
+      s = pool_id2str(pool, dep);
       if (*s != '/')
 	continue;
       csf->ids = sat_extend(csf->ids, csf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
@@ -1015,11 +1015,11 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 		{
 #if 0
 		  for (i = 0; i < cbd->nfiles; i++)
-		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, id2str(pool, cbd->ids[i])))
-		      printf("need complete filelist because of %s\n", id2str(pool, cbd->ids[i]));
+		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, pool_id2str(pool, cbd->ids[i])))
+		      printf("need complete filelist because of %s\n", pool_id2str(pool, cbd->ids[i]));
 #endif
 		  for (i = 0; i < cbd->nfiles; i++)
-		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, id2str(pool, cbd->ids[i])))
+		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, pool_id2str(pool, cbd->ids[i])))
 		      break;
 		  if (i < cbd->nfiles)
 		    incomplete = 1;
@@ -1099,7 +1099,7 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
     {
 #if 0
       for (i = 0; i < sf.nfiles; i++)
-	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", id2str(pool, sf.ids[i]));
+	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", pool_id2str(pool, sf.ids[i]));
 #endif
       pool_addfileprovides_search(pool, &cbd, &sf, 0);
       if (idp)
@@ -1122,7 +1122,7 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
     {
 #if 0
       for (i = 0; i < isf.nfiles; i++)
-	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", id2str(pool, isf.ids[i]));
+	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", pool_id2str(pool, isf.ids[i]));
 #endif
       if (installed)
         pool_addfileprovides_search(pool, &cbd, &isf, installed);
@@ -1198,14 +1198,14 @@ pool_id2langid(Pool *pool, Id id, const char *lang, int create)
 
   if (!lang)
     return id;
-  n = id2str(pool, id);
+  n = pool_id2str(pool, id);
   l = strlen(n) + strlen(lang) + 2;
   if (l > sizeof(buf))
     p = sat_malloc(strlen(n) + strlen(lang) + 2);
   else
     p = buf;
   sprintf(p, "%s:%s", n, lang);
-  id = str2id(pool, p, create);
+  id = pool_str2id(pool, p, create);
   if (p != buf)
     free(p);
   return id;
@@ -1400,7 +1400,7 @@ solver_fill_DU_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyVa
 	  if (data->localpool)
 	    compstr = stringpool_id2str(&data->spool, comp);
 	  else
-	    compstr = id2str(data->repo->pool, comp);
+	    compstr = pool_id2str(data->repo->pool, comp);
 	  compl = strlen(compstr);
 	  for (i = mptree[mp].child; i; i = mptree[i].sibling)
 	    if (mptree[i].compl == compl && !strncmp(mptree[i].comp, compstr, compl))
@@ -1751,7 +1751,7 @@ pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pk
 	{
 	  int ispatch = 0;	/* see solver.c patch handling */
 
-	  if (!strncmp("patch:", id2str(pool, s->name), 6))
+	  if (!strncmp("patch:", pool_id2str(pool, s->name), 6))
 	    ispatch = 1;
 	  conp = s->repo->idarraydata + s->conflicts;
 	  while ((con = *conp++) != 0)
@@ -1921,7 +1921,7 @@ pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts)
       p = conflicts->elements[i + 1];
       md5 = conflicts->elements[i + 2];
       q = conflicts->elements[i + 3];
-      id = rel2id(pool, fn, md5, REL_FILECONFLICT, 1);
+      id = pool_rel2id(pool, fn, md5, REL_FILECONFLICT, 1);
       s = pool->solvables + p;
       if (!s->repo)
 	continue;

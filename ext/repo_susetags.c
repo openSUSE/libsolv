@@ -77,7 +77,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
   if (line[6] == '/')
     {
       /* A file dependency. Do not try to parse it */
-      id = str2id(pool, line + 6, 1);
+      id = pool_str2id(pool, line + 6, 1);
     }
   else
     {
@@ -88,9 +88,9 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
           exit(1);
         }
       if (kind)
-        id = str2id(pool, join2(kind, ":", sp[0]), 1);
+        id = pool_str2id(pool, join2(kind, ":", sp[0]), 1);
       else
-        id = str2id(pool, sp[0], 1);
+        id = pool_str2id(pool, sp[0], 1);
       if (i == 3)
         {
           evrid = makeevr(pool, sp[2]);
@@ -102,7 +102,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	      pool_debug(pool, SAT_FATAL, "susetags: unknown relation in %d: '%s'\n", pd->lineno, sp[1]);
               exit(1);
             }
-          id = rel2id(pool, id, evrid, flags + 1, 1);
+          id = pool_rel2id(pool, id, evrid, flags + 1, 1);
         }
     }
   return repo_addid_dep(pd->repo, olddeps, id, marker);
@@ -127,9 +127,9 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
       exit(1);
     }
 
-  Id name = str2id(pool, sp[0], 1);
+  Id name = pool_str2id(pool, sp[0], 1);
   Id evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-  Id arch = str2id(pool, sp[3], 1);
+  Id arch = pool_str2id(pool, sp[3], 1);
   /* XXX: could record a dep here, depends on where we want to store the data */
   if (name == s->name)
     repodata_set_void(pd->data, handle, SOLVABLE_SOURCENAME);
@@ -224,7 +224,7 @@ set_delta_location(Repodata *data, Id handle, int medianr, char *dir, char *file
   if (l == 1 && dir[0] == '.') 
     l = 0; 
   if (dir && l)
-    repodata_set_id(data, handle, DELTA_LOCATION_DIR, strn2id(pool, dir, l, 1));
+    repodata_set_id(data, handle, DELTA_LOCATION_DIR, pool_strn2id(pool, dir, l, 1));
   if ((p = strrchr(file, '.')) != 0)
     {
       *p = 0;
@@ -240,7 +240,7 @@ set_delta_location(Repodata *data, Id handle, int medianr, char *dir, char *file
 	      *p = 0;
 	    }
 	}
-      repodata_set_id(data, handle, DELTA_LOCATION_SUFFIX, str2id(pool, p + 1, 1));
+      repodata_set_id(data, handle, DELTA_LOCATION_SUFFIX, pool_str2id(pool, p + 1, 1));
     }
   if ((p = strrchr(file, '-')) != 0)
     {
@@ -251,9 +251,9 @@ set_delta_location(Repodata *data, Id handle, int medianr, char *dir, char *file
 	  p = op;
 	  *p = 0;
 	}
-      repodata_set_id(data, handle, DELTA_LOCATION_EVR, str2id(pool, p + 1, 1));
+      repodata_set_id(data, handle, DELTA_LOCATION_EVR, pool_str2id(pool, p + 1, 1));
     }
-  repodata_set_id(data, handle, DELTA_LOCATION_NAME, str2id(pool, file, 1));
+  repodata_set_id(data, handle, DELTA_LOCATION_NAME, pool_str2id(pool, file, 1));
 }
 
 
@@ -399,7 +399,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
 	  lastreal = p + 1;
       for (p = lastreal; *p; p++)
 	{
-	  str = id2str(pool, *p);
+	  str = pool_id2str(pool, *p);
 	  if (*str != '/')
 	    lastreal = p + 1;
 	}
@@ -409,7 +409,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
 	    {
 	      char fname_buf[128];
 	      const char *fname;
-	      str = id2str(pool, *p);
+	      str = pool_id2str(pool, *p);
 	      sp = strrchr(str, '/');
 	      /* Need to copy filename now, before we add string that could
 	         realloc the stringspace (and hence invalidate str).  */
@@ -449,7 +449,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
      to do twice (in case we see the same package twice).  */
   if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(pd->repo, s->provides,
-		rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+		pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   /* XXX This uses repo_addid_dep internally, so should also be
      harmless to do twice.  */
   s->supplements = repo_fix_supplements(pd->repo, s->provides, s->supplements, freshens);
@@ -747,10 +747,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		Id evr;
 	        if (split(line + 5, sp, 5) != 5)
 		  continue;
-		repodata_set_id(data, handle, DELTA_SEQ_NAME, str2id(pool, sp[0], 1));
+		repodata_set_id(data, handle, DELTA_SEQ_NAME, pool_str2id(pool, sp[0], 1));
 		evr = makeevr(pool, join2(sp[1], "-", sp[2]));
 		repodata_set_id(data, handle, DELTA_SEQ_EVR, evr);
-		/* repodata_set_id(data, handle, DELTA_SEQ_ARCH, str2id(pool, sp[3], 1)); */
+		/* repodata_set_id(data, handle, DELTA_SEQ_ARCH, pool_str2id(pool, sp[3], 1)); */
 		repodata_set_str(data, handle, DELTA_SEQ_NUM, sp[4]);
 		repodata_set_id(data, handle, DELTA_BASE_EVR, evr);
 		continue;
@@ -803,9 +803,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      exit(1);
 	    }
 	  handle = repodata_new_handle(data);
-	  repodata_set_id(data, handle, DELTA_PACKAGE_NAME, str2id(pool, sp[0], 1));
+	  repodata_set_id(data, handle, DELTA_PACKAGE_NAME, pool_str2id(pool, sp[0], 1));
 	  repodata_set_id(data, handle, DELTA_PACKAGE_EVR, makeevr(pool, join2(sp[1], "-", sp[2])));
-	  repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, str2id(pool, sp[3], 1));
+	  repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, pool_str2id(pool, sp[3], 1));
 	  repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DELTAINFO, handle);
 	  indelta = 1;
 	  continue;
@@ -845,11 +845,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      Id name, evr, arch;
 	      /* we don't use the create flag here as a simple pre-check for existance */
 	      if (pd.kind)
-		name = str2id(pool, join2(pd.kind, ":", sp[0]), 0);
+		name = pool_str2id(pool, join2(pd.kind, ":", sp[0]), 0);
 	      else
-		name = str2id(pool, sp[0], 0);
+		name = pool_str2id(pool, sp[0], 0);
 	      evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-	      arch = str2id(pool, sp[3], 0);
+	      arch = pool_str2id(pool, sp[3], 0);
 	      if (name && arch)
 		{
 		  if (repo->start + last_found_pack + 1 < repo->end)
@@ -870,11 +870,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      /* normal operation. create a new solvable. */
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
 	      if (pd.kind)
-		s->name = str2id(pool, join2(pd.kind, ":", sp[0]), 1);
+		s->name = pool_str2id(pool, join2(pd.kind, ":", sp[0]), 1);
 	      else
-		s->name = str2id(pool, sp[0], 1);
+		s->name = pool_str2id(pool, sp[0], 1);
 	      s->evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-	      s->arch = str2id(pool, sp[3], 1);
+	      s->arch = pool_str2id(pool, sp[3], 1);
 	      s->vendor = defvendor;
 	      createdpkgs = 1;
 	    }
@@ -963,7 +963,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      }
 	    continue;
           case CTAG('=', 'V', 'n', 'd'):                                        /* vendor */
-            s->vendor = str2id(pool, line + 6, 1);
+            s->vendor = pool_str2id(pool, line + 6, 1);
             continue;
 
         /* From here it's the attribute tags.  */
@@ -981,7 +981,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		  pool_debug(pool, SAT_FATAL, "susetags: bad location line: %d: %s\n", pd.lineno, line);
 		  exit(1);
 		}
-	      repodata_set_location(data, handle, atoi(sp[0]), i == 3 ? sp[2] : id2str(pool, s->arch), sp[1]);
+	      repodata_set_location(data, handle, atoi(sp[0]), i == 3 ? sp[2] : pool_id2str(pool, s->arch), sp[1]);
 	    }
 	    continue;
           case CTAG('=', 'S', 'r', 'c'):
@@ -1039,9 +1039,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		  pool_debug(pool, SAT_FATAL, "susetags: bad =Shr line: %s\n", line + 6);
 		  exit(1);
 		}
-	      name = str2id(pool, sp[0], 1);
+	      name = pool_str2id(pool, sp[0], 1);
 	      evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-	      arch = str2id(pool, sp[3], 1);
+	      arch = pool_str2id(pool, sp[3], 1);
 	      if (last_found_pack >= pd.nshare)
 		{
 		  pd.share_with = sat_realloc2(pd.share_with, last_found_pack + 256, sizeof(*pd.share_with));

@@ -66,7 +66,7 @@ add_releasefile_product(Repo *repo, FILE *fp)
 		 && (*ptr1 == ' ' || isdigit(*ptr1) || *ptr1 == '.'))
 	    --ptr1;
 	  *(++ptr1) = 0;
-	  name = str2id(pool, join2("product", ":", buf), 1);
+	  name = pool_str2id(pool, join2("product", ":", buf), 1);
 
 	  if (ptr)
 	    {
@@ -83,7 +83,7 @@ add_releasefile_product(Repo *repo, FILE *fp)
 			 *ptr1 = tolower(*ptr1);
 		      ++ptr1;
 		    }
-		  arch = str2id(pool, ptr, 1);
+		  arch = pool_str2id(pool, ptr, 1);
 		}
 	    }
 	}
@@ -105,7 +105,7 @@ add_releasefile_product(Repo *repo, FILE *fp)
       s->evr = version ? version : ID_EMPTY;
       s->arch = arch ? arch : ARCH_NOARCH;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+	s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
     }
 }
 

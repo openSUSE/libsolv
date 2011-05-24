@@ -267,7 +267,7 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
       if (data->localpool)
         id = stringpool_strn2id(&data->spool, dir, dire - dir, create);
       else
-	id = strn2id(data->repo->pool, dir, dire - dir, create);
+	id = pool_strn2id(data->repo->pool, dir, dire - dir, create);
       if (!id)
 	return 0;
       parent = dirpool_add_dir(&data->dirpool, parent, id, create);
@@ -612,7 +612,7 @@ repodata_lookup_str(Repodata *data, Id solvid, Id keyname)
     return 0;
   if (data->localpool)
     return stringpool_id2str(&data->spool, id);
-  return id2str(data->repo->pool, id);
+  return pool_id2str(data->repo->pool, id);
 }
 
 int
@@ -699,7 +699,7 @@ repodata_globalize_id(Repodata *data, Id id, int create)
 {
   if (!id || !data || !data->localpool)
     return id;
-  return str2id(data->repo->pool, stringpool_id2str(&data->spool, id), create);
+  return pool_str2id(data->repo->pool, stringpool_id2str(&data->spool, id), create);
 }
 
 Id
@@ -707,7 +707,7 @@ repodata_localize_id(Repodata *data, Id id, int create)
 {
   if (!id || !data || !data->localpool)
     return id;
-  return stringpool_str2id(&data->spool, id2str(data->repo->pool, id), create);
+  return stringpool_str2id(&data->spool, pool_id2str(data->repo->pool, id), create);
 }
 
 
@@ -727,7 +727,7 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
       if (data && data->localpool)
 	kv->str = stringpool_id2str(&data->spool, kv->id);
       else
-	kv->str = id2str(pool, kv->id);
+	kv->str = pool_id2str(pool, kv->id);
       if ((flags & SEARCH_SKIP_KIND) != 0 && key->storage == KEY_STORAGE_SOLVABLE)
 	{
 	  const char *s;
@@ -1935,7 +1935,7 @@ repodata_set_poolstr(Repodata *data, Id solvid, Id keyname, const char *str)
   if (data->localpool)
     id = stringpool_str2id(&data->spool, str, 1);
   else
-    id = str2id(data->repo->pool, str, 1);
+    id = pool_str2id(data->repo->pool, str, 1);
   key.name = keyname;
   key.type = REPOKEY_TYPE_ID;
   key.size = 0;
@@ -2134,7 +2134,7 @@ repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
 static inline const char *
 evrid2vrstr(Pool *pool, Id evrid)
 {
-  const char *p, *evr = id2str(pool, evrid);
+  const char *p, *evr = pool_id2str(pool, evrid);
   if (!evr)
     return evr;
   for (p = evr; *p >= '0' && *p <= '9'; p++)
@@ -2175,7 +2175,7 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
   s = pool->solvables + solvid;
   if (dir && l)
     {
-      str = id2str(pool, s->arch);
+      str = pool_id2str(pool, s->arch);
       if (!strncmp(dir, str, l) && !str[l])
 	repodata_set_void(data, solvid, SOLVABLE_MEDIADIR);
       else if (!dir[l])
@@ -2189,7 +2189,7 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
 	}
     }
   fp = file;
-  str = id2str(pool, s->name);
+  str = pool_id2str(pool, s->name);
   l = strlen(str);
   if ((!l || !strncmp(fp, str, l)) && fp[l] == '-')
     {
@@ -2199,7 +2199,7 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
       if ((!l || !strncmp(fp, str, l)) && fp[l] == '.')
 	{
 	  fp += l + 1;
-	  str = id2str(pool, s->arch);
+	  str = pool_id2str(pool, s->arch);
 	  l = strlen(str);
 	  if ((!l || !strncmp(fp, str, l)) && !strcmp(fp + l, ".rpm"))
 	    {
@@ -2283,7 +2283,7 @@ repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname,
   if (data->localpool)
     id = stringpool_str2id(&data->spool, str, 1);
   else
-    id = str2id(data->repo->pool, str, 1);
+    id = pool_str2id(data->repo->pool, str, 1);
   repodata_add_idarray(data, solvid, keyname, id);
 }
 
@@ -2700,7 +2700,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	  key = data->keys + *keyp;
 #if 0
-	  fprintf(stderr, "internalize %d(%d):%s:%s\n", entry, entry + data->start, id2str(data->repo->pool, key->name), id2str(data->repo->pool, key->type));
+	  fprintf(stderr, "internalize %d(%d):%s:%s\n", entry, entry + data->start, pool_id2str(data->repo->pool, key->name), pool_id2str(data->repo->pool, key->type));
 #endif
 	  ndp = dp;
 	  if (oldcount)

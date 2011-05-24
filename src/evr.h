@@ -31,6 +31,7 @@ extern int pool_evrcmp(const Pool *pool, Id evr1id, Id evr2id, int mode);
 extern int pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version, const char *release);
 
 /* obsolete, do not use in new code */
+#ifdef OBSOLETE_INTERFACE
 static inline int vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
   return sat_vercmp(s1, q1, s2, q2);
@@ -47,6 +48,7 @@ static inline int evrmatch(const Pool *pool, Id evrid, const char *epoch, const 
 {
   return pool_evrmatch(pool, evrid, epoch, version, release);
 }
+#endif
 
 #ifdef __cplusplus
 }

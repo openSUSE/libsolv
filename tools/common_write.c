@@ -64,7 +64,7 @@ keyfilter_solv(Repo *data, Repokey *key, void *kfdata)
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
       return KEY_STORAGE_VERTICAL_OFFSET;
-  keyname = id2str(data->pool, key->name);
+  keyname = pool_id2str(data->pool, key->name);
   for (i = 0; languagetags[i] != 0; i++)
     if (!strncmp(keyname, languagetags[i], strlen(languagetags[i])))
       return KEY_STORAGE_VERTICAL_OFFSET;
@@ -84,7 +84,7 @@ keyfilter_attr(Repo *data, Repokey *key, void *kfdata)
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
       return KEY_STORAGE_VERTICAL_OFFSET;
-  keyname = id2str(data->pool, key->name);
+  keyname = pool_id2str(data->pool, key->name);
   for (i = 0; languagetags[i] != 0; i++)
     if (!strncmp(keyname, languagetags[i], strlen(languagetags[i])))
       return KEY_STORAGE_VERTICAL_OFFSET;
@@ -99,13 +99,13 @@ keyfilter_language(Repo *repo, Repokey *key, void *kfdata)
   char *lang = kfdata;
   int i;
 
-  name = id2str(repo->pool, key->name);
+  name = pool_id2str(repo->pool, key->name);
   p = strrchr(name, ':');
   if (!p || strcmp(p + 1, lang) != 0)
     return KEY_STORAGE_DROPPED;
   for (i = 0; verticals[i]; i++)
     {
-      const char *vname = id2str(pool, verticals[i]);
+      const char *vname = pool_id2str(pool, verticals[i]);
       if (!strncmp(name, vname, p - name) && vname[p - name] == 0)
 	return KEY_STORAGE_VERTICAL_OFFSET;
     }
@@ -151,7 +151,7 @@ keyfilter_other(Repo *repo, Repokey *key, void *kfdata)
   if (key->name == SOLVABLE_FILELIST || key->name == SOLVABLE_DISKUSAGE)
     return KEY_STORAGE_DROPPED;
 
-  name = id2str(repo->pool, key->name);
+  name = pool_id2str(repo->pool, key->name);
   p = strrchr(name, ':');
   if (p)
     {
@@ -229,7 +229,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	{
 	  for (j = 1, key = data->keys + j; j < data->nkeys; j++, key++)
 	    {
-	      const char *keyname = id2str(repo->pool, key->name);
+	      const char *keyname = pool_id2str(repo->pool, key->name);
 	      if (key->name == SOLVABLE_DISKUSAGE)
 		has_DU = 1;
 	      if (key->name == SOLVABLE_FILELIST)

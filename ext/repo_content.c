@@ -132,7 +132,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
          dependencies sometimes.  */
       if (!strncmp (name, "package:", 8))
         name += 8;
-      id = str2id(pool, name, 1);
+      id = pool_str2id(pool, name, 1);
       if (*line == '<' || *line == '>' || *line == '=')	/* rel follows */
 	{
 	  char *rel = splitword(&line);
@@ -152,7 +152,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	      pool_debug(pool, SAT_FATAL, "repo_content: unknown relation '%s'\n", rel);
 	      continue;
 	    }
-	  id = rel2id(pool, id, str2id(pool, evr, 1), flags + 1, 1);
+	  id = pool_rel2id(pool, id, pool_str2id(pool, evr, 1), flags + 1, 1);
 	}
       olddeps = repo_addid_dep(pd->repo, olddeps, id, marker);
     }
@@ -318,7 +318,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      else
 	        repodata_set_poolstr(data, SOLVID_META, SUSETAGS_DEFAULTVENDOR, value);
 	      if (s)
-		s->vendor = str2id(pool, value, 1);
+		s->vendor = pool_str2id(pool, value, 1);
 	      defvendor = strdup(value);
 	      continue;
 	    }
@@ -364,7 +364,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		{
 		  /* this solvable was created without seeing a
 		     PRODUCT entry, just set the name and continue */
-		  s->name = str2id(pool, join(&pd, "product", ":", value), 1);
+		  s->name = pool_str2id(pool, join(&pd, "product", ":", value), 1);
 		  continue;
 		}
 	      if (s)
@@ -375,7 +375,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		  if (!s->evr)
 		    s->evr = ID_EMPTY;
 		  if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-		    s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+		    s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 		  if (code10)
 		    s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
 		}
@@ -383,13 +383,13 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
 	      repodata_extend(data, s - pool->solvables);
 	      handle = s - pool->solvables;
-	      s->name = str2id(pool, join(&pd, "product", ":", value), 1);
+	      s->name = pool_str2id(pool, join(&pd, "product", ":", value), 1);
 	      if (datadir)
 	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DATADIR, datadir);
 	      if (descrdir)
 	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DESCRDIR, descrdir);
 	      if (defvendor)
-		s->vendor = str2id(pool, defvendor, 1);
+		s->vendor = pool_str2id(pool, defvendor, 1);
 	      continue;
 	    }
 
@@ -409,13 +409,13 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	  else if (code11 && istag ("DISTRIBUTION"))
 	    repodata_set_str(data, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
 	  else if (istag ("UPDATEURLS"))
-	    add_multiple_urls(data, handle, value, str2id(pool, "update", 1));
+	    add_multiple_urls(data, handle, value, pool_str2id(pool, "update", 1));
 	  else if (istag ("EXTRAURLS"))
-	    add_multiple_urls(data, handle, value, str2id(pool, "extra", 1));
+	    add_multiple_urls(data, handle, value, pool_str2id(pool, "extra", 1));
 	  else if (istag ("OPTIONALURLS"))
-	    add_multiple_urls(data, handle, value, str2id(pool, "optional", 1));
+	    add_multiple_urls(data, handle, value, pool_str2id(pool, "optional", 1));
 	  else if (istag ("RELNOTESURL"))
-	    add_multiple_urls(data, handle, value, str2id(pool, "releasenotes", 1));
+	    add_multiple_urls(data, handle, value, pool_str2id(pool, "releasenotes", 1));
 	  else if (istag ("SHORTLABEL"))
 	    repodata_set_str(data, s - pool->solvables, PRODUCT_SHORTLABEL, value);
 	  else if (istag ("LABEL")) /* LABEL is the products SUMMARY. */
@@ -425,18 +425,18 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	  else if (istag ("FLAGS"))
 	    add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
 	  else if (istag ("VENDOR"))	/* actually already handled above */
-	    s->vendor = str2id(pool, value, 1);
+	    s->vendor = pool_str2id(pool, value, 1);
           else if (istag ("BASEARCHS"))
             {
               char *arch;
 
 	      if ((arch = splitword(&value)) != 0)
 		{
-		  s->arch = str2id(pool, arch, 1);
+		  s->arch = pool_str2id(pool, arch, 1);
 		  while ((arch = splitword(&value)) != 0)
 		    {
 		       otherarchs = sat_extend(otherarchs, numotherarchs, 1, sizeof(Id), 7);
-		       otherarchs[numotherarchs++] = str2id(pool, arch, 1);
+		       otherarchs[numotherarchs++] = pool_str2id(pool, arch, 1);
 		    }
 		}
             }
@@ -515,7 +515,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
       if (!s->evr)
 	s->evr = ID_EMPTY;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-        s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+        s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (code10)
 	s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
 
@@ -531,7 +531,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 
 	  /* self provides */
 	  if (s->name && p->arch != ARCH_SRC && p->arch != ARCH_NOSRC)
-	      p->provides = repo_addid_dep(repo, p->provides, rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
+	      p->provides = repo_addid_dep(repo, p->provides, pool_rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
 
 	  /* now merge the attributes */
 	  repodata_merge_attrs(data, p - pool->solvables, s - pool->solvables);

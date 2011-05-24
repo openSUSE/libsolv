@@ -827,15 +827,15 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       if (idmap)
 	id = idmap[id];
       else if ((flags & REPO_LOCALPOOL) != 0)
-        id = str2id(pool, stringpool_id2str(spool, id), 1);
+        id = pool_str2id(pool, stringpool_id2str(spool, id), 1);
       type = read_id(&data, numid);
       if (idmap)
 	type = idmap[type];
       else if ((flags & REPO_LOCALPOOL) != 0)
-        type = str2id(pool, stringpool_id2str(spool, type), 1);
+        type = pool_str2id(pool, stringpool_id2str(spool, type), 1);
       if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_FLEXARRAY)
 	{
-	  pool_debug(pool, SAT_ERROR, "unsupported data type '%s'\n", id2str(pool, type));
+	  pool_debug(pool, SAT_ERROR, "unsupported data type '%s'\n", pool_id2str(pool, type));
 	  data.error = SOLV_ERROR_UNSUPPORTED;
 	  type = REPOKEY_TYPE_VOID;
 	}
@@ -869,7 +869,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       if (keys[i].type == REPOKEY_TYPE_CONSTANTID && idmap)
 	keys[i].size = idmap[keys[i].size];
 #if 0
-      fprintf(stderr, "key %d %s %s %d %d\n", i, id2str(pool,id), id2str(pool, keys[i].type),
+      fprintf(stderr, "key %d %s %s %d %d\n", i, pool_id2str(pool,id), pool_id2str(pool, keys[i].type),
                keys[i].size, keys[i].storage);
 #endif
     }
@@ -1040,7 +1040,7 @@ printf("pop flexarray %d %d\n", keydepth, nentries);
 	data.mainschemaoffsets[keyp - 1 - (schemadata + schemata[data.mainschema])] = data.incoredatalen;
 
 #if 0
-printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].type), s);
+printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, keys[key].type), s);
 #endif
       id = keys[key].name;
       if (keys[key].storage == KEY_STORAGE_VERTICAL_OFFSET)
@@ -1066,13 +1066,13 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
 	  else if (keys[key].storage == KEY_STORAGE_INCORE)
 	    incore_add_id(&data, did);
 #if 0
-	  POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %s\n", id2str(pool, id), id2str(pool, did));
+	  POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %s\n", pool_id2str(pool, id), pool_id2str(pool, did));
 #endif
 	  break;
 	case REPOKEY_TYPE_U32:
 	  dp = data_read_u32(dp, &h);
 #if 0
-	  POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %u\n", id2str(pool, id), h);
+	  POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %u\n", pool_id2str(pool, id), h);
 #endif
 	  if (s && id == RPM_RPMDBID)
 	    {
@@ -1129,9 +1129,9 @@ printf("=> %s %s %p\n", id2str(pool, keys[key].name), id2str(pool, keys[key].typ
 	  else if (id == SOLVABLE_ENHANCES)
 	    s->enhances = ido;
 #if 0
-	  POOL_DEBUG(SAT_DEBUG_STATS, "%s ->\n", id2str(pool, id));
+	  POOL_DEBUG(SAT_DEBUG_STATS, "%s ->\n", pool_id2str(pool, id));
 	  for (; repo->idarraydata[ido]; ido++)
-	    POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", dep2str(pool, repo->idarraydata[ido]));
+	    POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", pool_dep2str(pool, repo->idarraydata[ido]));
 #endif
 	  break;
 	case REPOKEY_TYPE_FIXARRAY:

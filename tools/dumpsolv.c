@@ -30,7 +30,7 @@ dump_repodata(Repo *repo)
       unsigned int j;
       printf("\nrepodata %d has %d keys, %d schemata\n", i + 1, data->nkeys - 1, data->nschemata - 1);
       for (j = 1; j < data->nkeys; j++)
-        printf("  %s (type %s size %d storage %d)\n", id2str(repo->pool, data->keys[j].name), id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
+        printf("  %s (type %s size %d storage %d)\n", pool_id2str(repo->pool, data->keys[j].name), pool_id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
       if (data->localpool)
 	printf("  localpool has %d strings, size is %d\n", data->spool.nstrings, data->spool.sstrings);
       if (data->dirpool.ndirs)
@@ -52,7 +52,7 @@ printids(Repo *repo, char *kind, Offset ido)
   printf("%s:\n", kind);
   ids = repo->idarraydata + ido;
   while((id = *ids++) != 0)
-    printf("  %s\n", dep2str(pool, id));
+    printf("  %s\n", pool_dep2str(pool, id));
 }
 #endif
 
@@ -63,7 +63,7 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
   KeyValue *kvp;
   int indent = 0;
 
-  keyname = id2str(repo->pool, key->name);
+  keyname = pool_id2str(repo->pool, key->name);
   for (kvp = kv; (kvp = kvp->parent) != 0; indent += 2)
     printf("  ");
   switch(key->type)
@@ -72,11 +72,11 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
       if (data && data->localpool)
 	kv->str = stringpool_id2str(&data->spool, kv->id);
       else
-        kv->str = id2str(repo->pool, kv->id);
+        kv->str = pool_id2str(repo->pool, kv->id);
       printf("%s: %s\n", keyname, kv->str);
       break;
     case REPOKEY_TYPE_CONSTANTID:
-      printf("%s: %s\n", keyname, dep2str(repo->pool, kv->id));
+      printf("%s: %s\n", keyname, pool_dep2str(repo->pool, kv->id));
       break;
     case REPOKEY_TYPE_IDARRAY:
       if (!kv->entry)
@@ -84,7 +84,7 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
       if (data && data->localpool)
         printf("  %s\n", stringpool_id2str(&data->spool, kv->id));
       else
-        printf("  %s\n", dep2str(repo->pool, kv->id));
+        printf("  %s\n", pool_dep2str(repo->pool, kv->id));
       break;
     case REPOKEY_TYPE_STR:
       printf("%s: %s\n", keyname, kv->str);
@@ -92,7 +92,7 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
     case REPOKEY_TYPE_SHA256:
-      printf("%s: %s (%s)\n", keyname, repodata_chk2str(data, key->type, (unsigned char *)kv->str), id2str(repo->pool, key->type));
+      printf("%s: %s (%s)\n", keyname, repodata_chk2str(data, key->type, (unsigned char *)kv->str), pool_id2str(repo->pool, key->type));
       break;
     case REPOKEY_TYPE_VOID:
       printf("%s: (void)\n", keyname);
@@ -224,7 +224,7 @@ tryme (Repo *repo, Id p, Id keyname, const char *match, int flags)
 	      if (di.data && di.data->localpool)
 		di.kv.str = stringpool_id2str(&di.data->spool, di.kv.id);
 	      else
-		di.kv.str = id2str(repo->pool, di.kv.id);
+		di.kv.str = pool_id2str(repo->pool, di.kv.id);
 	      break;
 	  case REPOKEY_TYPE_STR:
 	  case REPOKEY_TYPE_DIRSTRARRAY:
@@ -234,7 +234,7 @@ tryme (Repo *repo, Id p, Id keyname, const char *match, int flags)
 	}
       fprintf (stdout, "found: %d:%s %d %s %d %d %d\n",
 	       di.solvid,
-	       id2str(repo->pool, di.key->name),
+	       pool_id2str(repo->pool, di.key->name),
 	       di.kv.id,
 	       di.kv.str, di.kv.num, di.kv.num2, di.kv.eof);
     }
@@ -310,9 +310,9 @@ int main(int argc, char **argv)
 	  printf("solvable %d (%d):\n", n, i);
 #if 0
 	  if (s->name || s->evr || s->arch)
-	    printf("name: %s %s %s\n", id2str(pool, s->name), id2str(pool, s->evr), id2str(pool, s->arch));
+	    printf("name: %s %s %s\n", pool_id2str(pool, s->name), pool_id2str(pool, s->evr), pool_id2str(pool, s->arch));
 	  if (s->vendor)
-	    printf("vendor: %s\n", id2str(pool, s->vendor));
+	    printf("vendor: %s\n", pool_id2str(pool, s->vendor));
 	  printids(repo, "provides", s->provides);
 	  printids(repo, "obsoletes", s->obsoletes);
 	  printids(repo, "conflicts", s->conflicts);

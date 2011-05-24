@@ -40,6 +40,7 @@ extern void pool_freeidhashes(Pool *pool);
 
 
 /* deprecated names, do not use in new code */
+#ifdef OBSOLETE_INTERFACE
 static inline Id str2id(Pool *pool, const char *str, int create)
 {
   return pool_str2id(pool, str, create);
@@ -68,5 +69,6 @@ static inline const char *dep2str(Pool *pool, Id id)
 {
   return pool_dep2str(pool, id);
 }
+#endif
 
 #endif /* LIBSOLV_POOLID_H */

@@ -516,12 +516,12 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  && s->arch != ARCH_NOSRC
 	  && !pool_installable(pool, s))
 	{
-	  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", solvable2str(pool, s), (Id)(s - pool->solvables));
+	  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables));
 	  addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOT_INSTALLABLE, 0);
 	}
 
       /* yet another SUSE hack, sigh */
-      if (pool->nscallback && !strncmp("product:", id2str(pool, s->name), 8))
+      if (pool->nscallback && !strncmp("product:", pool_id2str(pool, s->name), 8))
         {
           Id buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, n);
           if (buddy > 0 && buddy != SYSTEMSOLVABLE && buddy != n && buddy < pool->nsolvables)
@@ -567,7 +567,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  /* didn't find an installed provider: previously broken dependency */
 		  if (!p)
 		    {
-		      POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "ignoring broken requires %s of installed package %s\n", dep2str(pool, req), solvable2str(pool, s));
+		      POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "ignoring broken requires %s of installed package %s\n", pool_dep2str(pool, req), pool_solvable2str(pool, s));
 		      continue;
 		    }
 		}
@@ -575,16 +575,16 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (!*dp)
 		{
 		  /* nothing provides req! */
-		  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", solvable2str(pool, s), (Id)(s - pool->solvables), dep2str(pool, req));
+		  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables), pool_dep2str(pool, req));
 		  addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, req);
 		  continue;
 		}
 
 	      IF_POOLDEBUG (SAT_DEBUG_RULE_CREATION)
 	        {
-		  POOL_DEBUG(SAT_DEBUG_RULE_CREATION,"  %s requires %s\n", solvable2str(pool, s), dep2str(pool, req));
+		  POOL_DEBUG(SAT_DEBUG_RULE_CREATION,"  %s requires %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
 		  for (i = 0; dp[i]; i++)
-		    POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "   provided by %s\n", solvid2str(pool, dp[i]));
+		    POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "   provided by %s\n", pool_solvid2str(pool, dp[i]));
 	        }
 
 	      /* add 'requires' dependency */
@@ -624,7 +624,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	   * XXX: we should really handle this different, looking
 	   * at the name is a bad hack
 	   */
-	  if (!strncmp("patch:", id2str(pool, s->name), 6))
+	  if (!strncmp("patch:", pool_id2str(pool, s->name), 6))
 	    ispatch = 1;
 	  conp = s->repo->idarraydata + s->conflicts;
 	  /* foreach conflicts of 's' */
@@ -1363,7 +1363,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	      if (rd->flags == REL_EQ && select == SOLVER_SOLVABLE_NAME)
 		{
 #if !defined(DEBIAN_SEMANTICS)
-		  const char *evr = id2str(pool, rd->evr);
+		  const char *evr = pool_id2str(pool, rd->evr);
 		  if (strchr(evr, '-'))
 		    set |= SOLVER_SETEVR;
 		  else
@@ -1527,7 +1527,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	      if (illegal && illegal == POLICY_ILLEGAL_DOWNGRADE && (set & SOLVER_SETEV) != 0)
 		{
 		  /* it's ok if the EV is different */
-		  if (evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE_EVONLY) != 0)
+		  if (pool_evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE_EVONLY) != 0)
 		    illegal = 0;
 		}
 	      if (illegal)
@@ -2209,7 +2209,7 @@ static void solver_createcleandepsmap(Solver *solv)
 	continue;
       MAPCLR(&im, ip);
 #ifdef CLEANDEPSDEBUG
-      printf("hello %s\n", solvable2str(pool, s));
+      printf("hello %s\n", pool_solvable2str(pool, s));
 #endif
       if (s->requires)
 	{
@@ -2232,7 +2232,7 @@ static void solver_createcleandepsmap(Solver *solv)
 		  if (MAPTST(&im, p))
 		    {
 #ifdef CLEANDEPSDEBUG
-		      printf("%s requires %s\n", solvid2str(pool, ip), solvid2str(pool, p));
+		      printf("%s requires %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
 #endif
 		      queue_push(&iq, p);
 		    }
@@ -2257,7 +2257,7 @@ static void solver_createcleandepsmap(Solver *solv)
 		  if (MAPTST(&im, p))
 		    {
 #ifdef CLEANDEPSDEBUG
-		      printf("%s recommends %s\n", solvid2str(pool, ip), solvid2str(pool, p));
+		      printf("%s recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
 #endif
 		      queue_push(&iq, p);
 		    }
@@ -2284,7 +2284,7 @@ static void solver_createcleandepsmap(Solver *solv)
 	      if (sup)
 		{
 #ifdef CLEANDEPSDEBUG
-		  printf("%s supplemented\n", solvid2str(pool, ip));
+		  printf("%s supplemented\n", pool_solvid2str(pool, ip));
 #endif
 		  queue_push(&iq, ip);
 		}
@@ -2334,7 +2334,7 @@ static void solver_createcleandepsmap(Solver *solv)
       ip = queue_shift(&iq);
       s = pool->solvables + ip;
 #ifdef CLEANDEPSDEBUG
-      printf("bye %s\n", solvable2str(pool, s));
+      printf("bye %s\n", pool_solvable2str(pool, s));
 #endif
       if (s->requires)
 	{
@@ -2350,7 +2350,7 @@ static void solver_createcleandepsmap(Solver *solv)
 		      if (MAPTST(&userinstalled, p - installed->start))
 			continue;
 #ifdef CLEANDEPSDEBUG
-		      printf("%s requires %s\n", solvid2str(pool, ip), solvid2str(pool, p));
+		      printf("%s requires %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
 #endif
 		      MAPSET(&im, p);
 		      queue_push(&iq, p);
@@ -2372,7 +2372,7 @@ static void solver_createcleandepsmap(Solver *solv)
 		      if (MAPTST(&userinstalled, p - installed->start))
 			continue;
 #ifdef CLEANDEPSDEBUG
-		      printf("%s recommends %s\n", solvid2str(pool, ip), solvid2str(pool, p));
+		      printf("%s recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
 #endif
 		      MAPSET(&im, p);
 		      queue_push(&iq, p);
@@ -2401,7 +2401,7 @@ static void solver_createcleandepsmap(Solver *solv)
 	      if (sup)
 		{
 #ifdef CLEANDEPSDEBUG
-		  printf("%s supplemented\n", solvid2str(pool, ip));
+		  printf("%s supplemented\n", pool_solvid2str(pool, ip));
 #endif
 		  MAPSET(&im, ip);
 		  queue_push(&iq, ip);

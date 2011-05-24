@@ -217,7 +217,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 #if 0
   fprintf(stderr, "evr: %s\n", pd->content);
 #endif
-  return str2id(pool, pd->content, 1);
+  return pool_str2id(pool, pd->content, 1);
 }
 
 
@@ -290,8 +290,8 @@ startElement(void *userData, const char *name, const char **atts)
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 	pd->datanum = pd->solvable - pool->solvables;
 
-	solvable->vendor = str2id(pool, from, 1);
-	solvable->evr = str2id(pool, version, 1);
+	solvable->vendor = pool_str2id(pool, from, 1);
+	solvable->evr = pool_str2id(pool, version, 1);
 	solvable->arch = ARCH_NOARCH;
 	if (type)
 	  repodata_set_str(pd->data, pd->datanum, SOLVABLE_PATCHCATEGORY, type);
@@ -394,15 +394,15 @@ startElement(void *userData, const char *name, const char **atts)
 	      name = atts[1];
 	  }
 	/* generated Id for name */
-	n = str2id(pool, name, 1);
+	n = pool_str2id(pool, name, 1);
 	rel_id = n;
 	if (arch)
 	  {
 	    /*  generate Id for arch and combine with name */
-	    a = str2id(pool, arch, 1);
-	    rel_id = rel2id(pool, n, a, REL_ARCH, 1);
+	    a = pool_str2id(pool, arch, 1);
+	    rel_id = pool_rel2id(pool, n, a, REL_ARCH, 1);
 	  }
-	rel_id = rel2id(pool, rel_id, evr, REL_LT, 1);
+	rel_id = pool_rel2id(pool, rel_id, evr, REL_LT, 1);
 
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
 
@@ -462,10 +462,10 @@ endElement(void *userData, const char *name)
     case STATE_UPDATES:
       break;
     case STATE_UPDATE:
-      s->provides = repo_addid_dep(repo, s->provides, rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       break;
     case STATE_ID:
-      s->name = str2id(pool, join2("patch", ":", pd->content), 1);
+      s->name = pool_str2id(pool, join2("patch", ":", pd->content), 1);
       break;
       /* <title>imlib-1.9.15-6.fc8</title> */
     case STATE_TITLE:

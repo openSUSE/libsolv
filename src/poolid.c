@@ -208,7 +208,7 @@ dep2strlen(const Pool *pool, Id id)
     {
       Reldep *rd = GETRELDEP(pool, id);
       /* add 2 for parens */
-      l += 2 + dep2strlen(pool, rd->name) + strlen(id2rel(pool, id));
+      l += 2 + dep2strlen(pool, rd->name) + strlen(pool_id2rel(pool, id));
       id = rd->evr;
     }
   return l + strlen(pool->ss.stringspace + pool->ss.strings[id]);
@@ -227,7 +227,7 @@ dep2strcpy(const Pool *pool, char *p, Id id, int oldrel)
 	      *p++ = '(';
 	      dep2strcpy(pool, p, rd->name, rd->flags);
 	      p += strlen(p);
-	      strcpy(p, id2rel(pool, id));
+	      strcpy(p, pool_id2rel(pool, id));
 	      p += strlen(p);
 	      dep2strcpy(pool, p, rd->evr, rd->flags);
 	      strcat(p, ")");
@@ -247,7 +247,7 @@ dep2strcpy(const Pool *pool, char *p, Id id, int oldrel)
 	  *p = 0;
 	  return;
 	}
-      strcpy(p, id2rel(pool, id));
+      strcpy(p, pool_id2rel(pool, id));
       p += strlen(p);
       id = rd->evr;
       oldrel = rd->flags;

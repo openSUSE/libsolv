@@ -1911,7 +1911,7 @@ str2archid(Pool *pool, char *arch)
   Id id;
   if (!*arch)
     return 0;
-  id = str2id(pool, arch, 0);
+  id = pool_str2id(pool, arch, 0);
   if (id == ARCH_SRC || id == ARCH_NOSRC || id == ARCH_NOARCH)
     return id;
   if (pool->id2arch && (id > pool->lastarch || !pool->id2arch[id]))
@@ -1928,7 +1928,7 @@ int
 depglob(Pool *pool, char *name, Queue *job, int what)
 {
   Id p, pp;
-  Id id = str2id(pool, name, 0);
+  Id id = pool_str2id(pool, name, 0);
   int i, match = 0;
 
   if (id)
@@ -1964,7 +1964,7 @@ depglob(Pool *pool, char *name, Queue *job, int what)
 	  if (!s->repo || !pool_installable(pool, s))
 	    continue;
 	  id = s->name;
-	  if (fnmatch(name, id2str(pool, id), 0) == 0)
+	  if (fnmatch(name, pool_id2str(pool, id), 0) == 0)
 	    {
 	      for (i = 0; i < job->count; i += 2)
 		if (job->elements[i] == SOLVER_SOLVABLE_NAME && job->elements[i + 1] == id)
@@ -1984,7 +1984,7 @@ depglob(Pool *pool, char *name, Queue *job, int what)
 	{
 	  if (!pool->whatprovides[id])
 	    continue;
-	  if (fnmatch(name, id2str(pool, id), 0) == 0)
+	  if (fnmatch(name, pool_id2str(pool, id), 0) == 0)
 	    {
 	      if (!match && what == DEPGLOB_NAMEDEP)
 		printf("[using capability match for '%s']\n", name);
@@ -2015,13 +2015,13 @@ limitrelation(Pool *pool, Queue *job, int flags, Id evr)
 	  fprintf(stderr, "limitrelation only works on name/provides jobs\n");
 	  exit(1);
 	}
-      job->elements[i + 1] = rel2id(pool, job->elements[i + 1], evr, flags, 1);
+      job->elements[i + 1] = pool_rel2id(pool, job->elements[i + 1], evr, flags, 1);
       if (flags == REL_ARCH)
 	job->elements[i] |= SOLVER_SETARCH;
       if (flags == REL_EQ && select == SOLVER_SOLVABLE_NAME && job->elements[i])
 	{
 #ifndef DEBIAN
-	  const char *evrstr = id2str(pool, evr);
+	  const char *evrstr = pool_id2str(pool, evr);
 	  if (!strchr(evrstr, '-'))
 	    job->elements[i] |= SOLVER_SETEV;
 	  else
@@ -2051,11 +2051,11 @@ limitrelation_arch(Pool *pool, Queue *job, int flags, char *evr)
     {
       *r = 0;
       limitrelation(pool, job, REL_ARCH, archid);
-      limitrelation(pool, job, flags, str2id(pool, evr, 1));
+      limitrelation(pool, job, flags, pool_str2id(pool, evr, 1));
       *r = '.';
     }
   else
-    limitrelation(pool, job, flags, str2id(pool, evr, 1));
+    limitrelation(pool, job, flags, pool_str2id(pool, evr, 1));
   return job->count / 2;
 }
 
@@ -2165,7 +2165,7 @@ mkselect(Pool *pool, int mode, char *name, Queue *job)
       if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
 	{
 	  name[nend] = oldnend;
-	  limitrelation(pool, job, rflags, str2id(pool, r, 1));
+	  limitrelation(pool, job, rflags, pool_str2id(pool, r, 1));
 	  return job->count / 2;
 	}
       if ((r2 = strrchr(name, '.')) != 0 && r2[1] && (archid = str2archid(pool, r2 + 1)) != 0)
@@ -2176,7 +2176,7 @@ mkselect(Pool *pool, int mode, char *name, Queue *job)
 	      name[nend] = oldnend;
 	      *r2 = '.';
 	      limitrelation(pool, job, REL_ARCH, archid);
-	      limitrelation(pool, job, rflags, str2id(pool, r, 1));
+	      limitrelation(pool, job, rflags, pool_str2id(pool, r, 1));
 	      return job->count / 2;
 	    }
 	  *r2 = '.';
@@ -2305,7 +2305,7 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
   if (!fp)
     return 0;
   rewind(fp);
-  return rpm_byfp(fp, solvable2str(pool, s), &fcstate->rpmdbstate);
+  return rpm_byfp(fp, pool_solvable2str(pool, s), &fcstate->rpmdbstate);
 }
 
 
@@ -2396,10 +2396,10 @@ nscallback(Pool *pool, void *data, Id name, Id evr)
       Solvable *s = pool->solvables + evr; 
       Id p, pp, cap; 
       
-      cap = str2id(pool, pool_tmpjoin(pool, "product(", id2str(pool, s->name) + 8, ")"), 0);
+      cap = pool_str2id(pool, pool_tmpjoin(pool, "product(", pool_id2str(pool, s->name) + 8, ")"), 0);
       if (!cap)
         return 0;
-      cap = rel2id(pool, cap, s->evr, REL_EQ, 0);
+      cap = pool_rel2id(pool, cap, s->evr, REL_EQ, 0);
       if (!cap)
         return 0;
       FOR_PROVIDES(p, pp, cap) 
@@ -2440,7 +2440,7 @@ addsoftlocks(Pool *pool, Queue *job)
 	  type = SOLVER_SOLVABLE_PROVIDES;
 	  bp += 9;
 	}
-      id = str2id(pool, bp, 1);
+      id = pool_str2id(pool, bp, 1);
       if (pool->installed)
 	{
 	  FOR_JOB_SELECT(p, pp, type, id)
@@ -2710,7 +2710,7 @@ main(int argc, char **argv)
 	  Solvable *s = pool_id2solvable(pool, p);
 	  if (!MAPTST(&m, p))
 	    continue;
-	  printf("  - %s: %s\n", solvable2str(pool, s), solvable_lookup_str(s, SOLVABLE_SUMMARY));
+	  printf("  - %s: %s\n", pool_solvable2str(pool, s), solvable_lookup_str(s, SOLVABLE_SUMMARY));
 	}
       map_free(&m);
       exit(0);
@@ -2807,7 +2807,7 @@ main(int argc, char **argv)
 	      if (mainmode == MODE_INFO)
 		{
 		  const char *str;
-		  printf("Name:        %s\n", solvable2str(pool, s));
+		  printf("Name:        %s\n", pool_solvable2str(pool, s));
 		  printf("Repo:        %s\n", s->repo->name);
 		  printf("Summary:     %s\n", solvable_lookup_str(s, SOLVABLE_SUMMARY));
 		  str = solvable_lookup_str(s, SOLVABLE_URL);
@@ -2826,7 +2826,7 @@ main(int argc, char **argv)
 #else
 		  const char *sum = solvable_lookup_str_poollang(s, SOLVABLE_SUMMARY);
 #endif
-		  printf("  - %s [%s]\n", solvable2str(pool, s), s->repo->name);
+		  printf("  - %s [%s]\n", pool_solvable2str(pool, s), s->repo->name);
 		  if (sum)
 		    printf("    %s\n", sum);
 		}
@@ -2861,14 +2861,14 @@ main(int argc, char **argv)
 	  Id p2;
 
 	  s = pool->solvables + p;
-	  if (strncmp(id2str(pool, s->name), "patch:", 6) != 0)
+	  if (strncmp(pool_id2str(pool, s->name), "patch:", 6) != 0)
 	    continue;
 	  FOR_PROVIDES(p2, pp, s->name)
 	    {
 	      Solvable *s2 = pool->solvables + p2;
 	      if (s2->name != s->name)
 		continue;
-	      r = evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
+	      r = pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
 	      if (r < 0 || (r == 0 && p > p2))
 		break;
 	    }
@@ -2916,9 +2916,9 @@ main(int argc, char **argv)
     queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_REPO, repofilter);
 
   // multiversion test
-  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae", 1));
-  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae-base", 1));
-  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, str2id(pool, "kernel-pae-extra", 1));
+  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae", 1));
+  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-base", 1));
+  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-extra", 1));
 
 #ifdef SOFTLOCKS_PATH
   addsoftlocks(pool, &job);
@@ -3105,7 +3105,7 @@ rerunsolver:
 	  if (pool->installed && pool->installed->nsolvables)
 	    {
 	      /* try a delta first */
-	      char *matchname = strdup(id2str(pool, s->name));
+	      char *matchname = strdup(pool_id2str(pool, s->name));
 	      dataiterator_init(&di, pool, s->repo, SOLVID_META, DELTA_PACKAGE_NAME, matchname, SEARCH_STRING);
 	      dataiterator_prepend_keyname(&di, REPOSITORY_DELTAINFO);
 	      while (dataiterator_step(&di))
@@ -3141,7 +3141,7 @@ rerunsolver:
 		      seq = pool_tmpjoin(pool, seqname, "-", seqevr);
 		      seq = pool_tmpappend(pool, seq, "-", seqnum);
 #ifdef FEDORA
-		      sprintf(cmd, "/usr/bin/applydeltarpm -a %s -c -s ", id2str(pool, s->arch));
+		      sprintf(cmd, "/usr/bin/applydeltarpm -a %s -c -s ", pool_id2str(pool, s->arch));
 #else
 		      sprintf(cmd, "/usr/bin/applydeltarpm -c -s ");
 #endif
@@ -3161,7 +3161,7 @@ rerunsolver:
 		      /* got it, now reconstruct */
 		      newfd = opentmpfile();
 #ifdef FEDORA
-		      sprintf(cmd, "applydeltarpm -a %s /dev/fd/%d /dev/fd/%d", id2str(pool, s->arch), fileno(fp), newfd);
+		      sprintf(cmd, "applydeltarpm -a %s /dev/fd/%d /dev/fd/%d", pool_id2str(pool, s->arch), fileno(fp), newfd);
 #else
 		      sprintf(cmd, "applydeltarpm /dev/fd/%d /dev/fd/%d", fileno(fp), newfd);
 #endif
@@ -3231,7 +3231,7 @@ rerunsolver:
 	{
 	  printf("\n");
 	  for (i = 0; i < conflicts.count; i += 5)
-	    printf("file %s of package %s conflicts with package %s\n", id2str(pool, conflicts.elements[i]), solvid2str(pool, conflicts.elements[i + 1]), solvid2str(pool, conflicts.elements[i + 3]));
+	    printf("file %s of package %s conflicts with package %s\n", pool_id2str(pool, conflicts.elements[i]), pool_solvid2str(pool, conflicts.elements[i + 1]), pool_solvid2str(pool, conflicts.elements[i + 3]));
 	  printf("\n");
 	  if (yesno("Re-run solver (y/n/q)? "))
 	    {
@@ -3266,26 +3266,26 @@ rerunsolver:
       switch(type)
 	{
 	case SOLVER_TRANSACTION_ERASE:
-	  printf("erase %s\n", solvid2str(pool, p));
+	  printf("erase %s\n", pool_solvid2str(pool, p));
 #ifndef DEBIAN
 	  if (!s->repo->rpmdbid || !s->repo->rpmdbid[p - s->repo->start])
 	    continue;
 	  /* strip epoch from evr */
-	  evr = evrp = id2str(pool, s->evr);
+	  evr = evrp = pool_id2str(pool, s->evr);
 	  while (*evrp >= '0' && *evrp <= '9')
 	    evrp++;
 	  if (evrp > evr && evrp[0] == ':' && evrp[1])
 	    evr = evrp + 1;
-	  nvra = pool_tmpjoin(pool, id2str(pool, s->name), "-", evr);
-	  nvra = pool_tmpappend(pool, nvra, ".", id2str(pool, s->arch));
+	  nvra = pool_tmpjoin(pool, pool_id2str(pool, s->name), "-", evr);
+	  nvra = pool_tmpappend(pool, nvra, ".", pool_id2str(pool, s->arch));
 	  runrpm("-e", nvra, -1);	/* too bad that --querybynumber doesn't work */
 #else
-	  rundpkg("--remove", id2str(pool, s->name), 0);
+	  rundpkg("--remove", pool_id2str(pool, s->name), 0);
 #endif
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
 	case SOLVER_TRANSACTION_MULTIINSTALL:
-	  printf("install %s\n", solvid2str(pool, p));
+	  printf("install %s\n", pool_solvid2str(pool, p));
 	  for (j = 0; j < newpkgs; j++)
 	    if (checkq.elements[j] == p)
 	      break;

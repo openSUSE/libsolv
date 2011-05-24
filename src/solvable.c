@@ -27,9 +27,9 @@ pool_solvable2str(Pool *pool, Solvable *s)
 {
   const char *n, *e, *a;
   char *p;
-  n = id2str(pool, s->name);
-  e = id2str(pool, s->evr);
-  a = id2str(pool, s->arch);
+  n = pool_id2str(pool, s->name);
+  e = pool_id2str(pool, s->evr);
+  a = pool_id2str(pool, s->arch);
   p = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3);
   sprintf(p, "%s-%s.%s", n, e, a);
   return p;
@@ -215,7 +215,7 @@ solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep)
 static inline const char *
 evrid2vrstr(Pool *pool, Id evrid)
 {
-  const char *p, *evr = id2str(pool, evrid);
+  const char *p, *evr = pool_id2str(pool, evrid);
   if (!evr)
     return evr;
   for (p = evr; *p >= '0' && *p <= '9'; p++)
@@ -239,7 +239,7 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
   if (medianrp)
     *medianrp = solvable_lookup_num(s, SOLVABLE_MEDIANR, 1);
   if (solvable_lookup_void(s, SOLVABLE_MEDIADIR))
-    mediadir = id2str(pool, s->arch);
+    mediadir = pool_id2str(pool, s->arch);
   else
     mediadir = solvable_lookup_str(s, SOLVABLE_MEDIADIR);
   if (mediadir)
@@ -247,9 +247,9 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
   if (solvable_lookup_void(s, SOLVABLE_MEDIAFILE))
     {
       const char *name, *evr, *arch;
-      name = id2str(pool, s->name);
+      name = pool_id2str(pool, s->name);
       evr = evrid2vrstr(pool, s->evr);
-      arch = id2str(pool, s->arch);
+      arch = pool_id2str(pool, s->arch);
       /* name-vr.arch.rpm */
       loc = pool_alloctmpspace(pool, l + strlen(name) + strlen(evr) + strlen(arch) + 7);
       if (mediadir)
@@ -560,5 +560,5 @@ solvable_selfprovidedep(Solvable *s)
 	    return prov;
 	}
     }
-  return rel2id(pool, s->name, s->evr, REL_EQ, 1);
+  return pool_rel2id(pool, s->name, s->evr, REL_EQ, 1);
 }
