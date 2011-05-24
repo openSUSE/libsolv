@@ -1,7 +1,7 @@
-libsolv, a free package dependency solver using a satisfyability
-algorihtm
+This is libsolv, a free package dependency solver using a satisfyability
+algorihtm.
 
-This code is based on two major, but independent, blocks
+This code is based on two major, but independent, blocks:
 
 1. Using a dictionary approach to store and retrieve package
    and dependency information.
@@ -18,6 +18,6 @@ cd build
 cmake ..
 make
 
-To create a package
+To create a package:
 make srcpackage
 see package/

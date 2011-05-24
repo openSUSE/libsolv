@@ -1,33 +1,33 @@
 
-INCLUDE(CheckFunctionExists)
-CHECK_FUNCTION_EXISTS(qsort_r HAVE_QSORT_R)
-CHECK_FUNCTION_EXISTS(__qsort_r HAVE___QSORT_R)
+INCLUDE (CheckFunctionExists)
+CHECK_FUNCTION_EXISTS (qsort_r HAVE_QSORT_R)
+CHECK_FUNCTION_EXISTS (__qsort_r HAVE___QSORT_R)
 
 IF (HAVE_QSORT_R)
-  ADD_DEFINITIONS(-DHAVE_QSORT_R=1)
+  ADD_DEFINITIONS (-DHAVE_QSORT_R=1)
 ENDIF (HAVE_QSORT_R)
 
 IF (HAVE___QSORT_R)
-  ADD_DEFINITIONS(-DHAVE___QSORT_R=1)
+  ADD_DEFINITIONS (-DHAVE___QSORT_R=1)
 ENDIF (HAVE___QSORT_R)
 
-SET(libsolv_SRCS
+SET (libsolv_SRCS
     bitmap.c poolarch.c poolvendor.c poolid.c strpool.c dirpool.c
     solver.c solverdebug.c repo_solv.c evr.c pool.c
     queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
     transaction.c rules.c problems.c
     chksum.c md5.c sha1.c sha2.c satversion.c)
 
-ADD_LIBRARY(libsolv STATIC ${libsolv_SRCS})
+ADD_LIBRARY (libsolv STATIC ${libsolv_SRCS})
 
-SET(libsolv_HEADERS
+SET (libsolv_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h
     poolid.h pooltypes.h queue.h solvable.h solver.h solverdebug.h
     repo.h repodata.h repopage.h repo_solv.h util.h
     strpool.h dirpool.h knownid.h transaction.h rules.h problems.h
     chksum.h md5.h sha1.h sha2.h ${CMAKE_BINARY_DIR}/src/satversion.h)
 
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
-INSTALL(FILES ${libsolv_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/libsolv")
-INSTALL(TARGETS libsolv LIBRARY DESTINATION ${LIB_INSTALL_DIR} ARCHIVE DESTINATION ${LIB_INSTALL_DIR})
+INSTALL (FILES ${libsolv_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/libsolv")
+INSTALL (TARGETS libsolv LIBRARY DESTINATION ${LIB_INSTALL_DIR} ARCHIVE DESTINATION ${LIB_INSTALL_DIR})

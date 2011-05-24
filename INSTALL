@@ -1,27 +1,18 @@
 Compiling and installing the software
 
-
-** This is a research project, NOT a complete tool. **
-
-
-Requirements
+Requirements:
 
 - C compiler
 - cmake
 - make
 - expat
-- db-4.3
 
-Steps to compile
+Steps to compile/install:
 
 1. mkdir build
 2. cd build
 3. cmake ..
 4. make
 
+5. make install
 
-Steps to run the testsuite
-
-1. cd testsuite
-2a. ./runtest.rb --redcarpet data.libredcarpet
-2b. ./runtest.rb data.libzypp
