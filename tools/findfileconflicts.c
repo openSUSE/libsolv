@@ -54,18 +54,20 @@ int main()
   if (conflicts.count)
     {
       Queue job;
+      int problemcnt;
+
       queue_init(&job);
       pool_add_fileconflicts_deps(pool, &conflicts);
       pool_addfileprovides(pool);
       pool_createwhatprovides(pool);
       pool_setdebuglevel(pool, 0);
       Solver *solv = solver_create(pool);
-      solv->fixsystem = 1;
+      queue_push2(&job, SOLVER_VERIFY|SOLVER_SOLVABLE_ALL, 0);
 #if 0
       solv->allowuninstall = 1;
 #endif
-      solver_solve(solv, &job);
-      if (solv->problems.count)
+      problemcnt = solver_solve(solv, &job);
+      if (problemcnt)
         solver_printallsolutions(solv);
       else
         solver_printtransaction(solv);

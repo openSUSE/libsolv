@@ -1,42 +1,19 @@
 /*
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2011, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
  */
 
 /*
- * solver.h
+ * solver_p.h - private functions
  *
  */
 
-#ifndef LIBSOLV_SOLVER_H
-#define LIBSOLV_SOLVER_H
+#ifndef LIBSOLV_SOLVER_P_H
+#define LIBSOLV_SOLVER_P_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "pooltypes.h"
-#include "pool.h"
-#include "repo.h"
-#include "queue.h"
-#include "bitmap.h"
-#include "transaction.h"
-#include "rules.h"
-#include "problems.h"
-
-/*
- * Callback definitions in order to "overwrite" the policies by an external application.
- */
- 
-typedef void  (*BestSolvableCb) (Pool *pool, Queue *canditates);
-typedef int  (*ArchCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
-typedef int  (*VendorCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
-typedef void (*UpdateCandidateCb) (Pool *pool, Solvable *solvable, Queue *canditates);
-
-
-#if 1
+#if 0
 struct _Solver {
   Pool *pool;				/* back pointer to pool */
   Queue job;				/* copy of the job we're solving */
@@ -209,121 +186,66 @@ struct _Solver {
 
   Queue *ruleinfoq;			/* tmp space for solver_ruleinfo() */
 };
-
 #endif
 
-typedef struct _Solver Solver;
+extern void solver_run_sat(Solver *solv, int disablerules, int doweak);
+extern void solver_reset(Solver *solv);
 
-/*
- * queue commands
- */
+extern int solver_dep_installed(Solver *solv, Id dep);
+extern int solver_splitprovides(Solver *solv, Id dep);
 
-#define SOLVER_SOLVABLE			0x01
-#define SOLVER_SOLVABLE_NAME		0x02
-#define SOLVER_SOLVABLE_PROVIDES	0x03
-#define SOLVER_SOLVABLE_ONE_OF		0x04
-#define SOLVER_SOLVABLE_REPO		0x05
-#define SOLVER_SOLVABLE_ALL		0x06
+static inline int
+solver_dep_fulfilled(Solver *solv, Id dep)
+{
+  Pool *pool = solv->pool;
+  Id p, pp;
 
-#define SOLVER_SELECTMASK		0xff
-
-#define SOLVER_NOOP			0x0000
-#define SOLVER_INSTALL       		0x0100
-#define SOLVER_ERASE         		0x0200
-#define SOLVER_UPDATE			0x0300
-#define SOLVER_WEAKENDEPS      		0x0400
-#define SOLVER_NOOBSOLETES   		0x0500
-#define SOLVER_LOCK			0x0600
-#define SOLVER_DISTUPGRADE		0x0700
-#define SOLVER_VERIFY			0x0800
-#define SOLVER_DROP_ORPHANED		0x0900
-#define SOLVER_USERINSTALLED            0x0a00
-
-#define SOLVER_JOBMASK			0xff00
-
-#define SOLVER_WEAK			0x010000
-#define SOLVER_ESSENTIAL		0x020000
-#define SOLVER_CLEANDEPS                0x040000
-
-#define SOLVER_SETEV			0x01000000
-#define SOLVER_SETEVR			0x02000000
-#define SOLVER_SETARCH			0x04000000
-#define SOLVER_SETVENDOR		0x08000000
-#define SOLVER_SETREPO			0x10000000
-#define SOLVER_NOAUTOSET		0x20000000
-
-#define SOLVER_SETMASK			0x2f000000
-
-/* old API compatibility, do not use in new code */
-#ifdef OBSOLETE_INTERFACE
-
-#define SOLVER_INSTALL_SOLVABLE (SOLVER_INSTALL|SOLVER_SOLVABLE)
-#define SOLVER_ERASE_SOLVABLE (SOLVER_ERASE|SOLVER_SOLVABLE)
-#define SOLVER_INSTALL_SOLVABLE_NAME (SOLVER_INSTALL|SOLVER_SOLVABLE_NAME)
-#define SOLVER_ERASE_SOLVABLE_NAME (SOLVER_ERASE|SOLVER_SOLVABLE_NAME)
-#define SOLVER_INSTALL_SOLVABLE_PROVIDES (SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES)
-#define SOLVER_ERASE_SOLVABLE_PROVIDES (SOLVER_ERASE|SOLVER_SOLVABLE_PROVIDES)
-#define SOLVER_INSTALL_SOLVABLE_UPDATE (SOLVER_UPDATE|SOLVER_SOLVABLE)
-#define SOLVER_INSTALL_SOLVABLE_ONE_OF (SOLVER_INSTALL|SOLVER_SOLVABLE_ONE_OF)
-#define SOLVER_WEAKEN_SOLVABLE_DEPS (SOLVER_WEAKENDEPS|SOLVER_SOLVABLE)
-#define SOLVER_NOOBSOLETES_SOLVABLE (SOLVER_NOOBSOLETES|SOLVER_SOLVABLE)
-#define SOLVER_NOOBSOLETES_SOLVABLE_NAME (SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME)
-#define SOLVER_NOOBSOLETES_SOLVABLE_PROVIDES (SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_PROVIDES)
-
-/* backward compatibility */
-#define SOLVER_PROBLEM_UPDATE_RULE 		SOLVER_RULE_UPDATE
-#define SOLVER_PROBLEM_JOB_RULE			SOLVER_RULE_JOB
-#define SOLVER_PROBLEM_JOB_NOTHING_PROVIDES_DEP	SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP
-#define SOLVER_PROBLEM_NOT_INSTALLABLE		SOLVER_RULE_RPM_NOT_INSTALLABLE
-#define SOLVER_PROBLEM_NOTHING_PROVIDES_DEP	SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP
-#define SOLVER_PROBLEM_SAME_NAME		SOLVER_RULE_RPM_SAME_NAME
-#define SOLVER_PROBLEM_PACKAGE_CONFLICT		SOLVER_RULE_RPM_PACKAGE_CONFLICT
-#define SOLVER_PROBLEM_PACKAGE_OBSOLETES	SOLVER_RULE_RPM_PACKAGE_OBSOLETES
-#define SOLVER_PROBLEM_DEP_PROVIDERS_NOT_INSTALLABLE SOLVER_RULE_RPM_PACKAGE_REQUIRES
-#define SOLVER_PROBLEM_SELF_CONFLICT		SOLVER_RULE_RPM_SELF_CONFLICT
-#define SOLVER_PROBLEM_RPM_RULE			SOLVER_RULE_RPM
-#define SOLVER_PROBLEM_DISTUPGRADE_RULE		SOLVER_RULE_DISTUPGRADE
-#define SOLVER_PROBLEM_INFARCH_RULE		SOLVER_RULE_INFARCH
-
-#endif
-
-
-extern Solver *solver_create(Pool *pool);
-extern void solver_free(Solver *solv);
-extern int  solver_solve(Solver *solv, Queue *job);
-
-extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap);
-extern void solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap);
-
-/* XXX: why is this not static? */
-Id *solver_create_decisions_obsoletesmap(Solver *solv);
-
-void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
-int solver_calc_installsizechange(Solver *solv);
-void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
-
-void solver_find_involved(Solver *solv, Queue *installedq, Solvable *s, Queue *q);
-
-/* iterate over all literals of a rule */
-/* WARNING: loop body must not relocate whatprovidesdata, e.g. by
- * looking up the providers of a dependency */
-#define FOR_RULELITERALS(l, dp, r)				\
-    for (l = r->d < 0 ? -r->d - 1 : r->d,			\
-         dp = !l ? &r->w2 : pool->whatprovidesdata + l,		\
-         l = r->p; l; l = (dp != &r->w2 + 1 ? *dp++ : 0))
-
-/* iterate over all packages selected by a job */
-#define FOR_JOB_SELECT(p, pp, select, what)					\
-    if (select == SOLVER_SOLVABLE_REPO || select == SOLVER_SOLVABLE_ALL)	\
-	p = pp = 0;								\
-    else for (pp = (select == SOLVER_SOLVABLE ? 0 :				\
-               select == SOLVER_SOLVABLE_ONE_OF ? what : 			\
-               pool_whatprovides(pool, what)),					\
-         p = (select == SOLVER_SOLVABLE ? what : pool->whatprovidesdata[pp++]) ; p ; p = pool->whatprovidesdata[pp++]) \
-      if (select != SOLVER_SOLVABLE_NAME || pool_match_nevr(pool, pool->solvables + p, what))
-
-#ifdef __cplusplus
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags == REL_AND)
+        {
+          if (!solver_dep_fulfilled(solv, rd->name))
+            return 0;
+          return solver_dep_fulfilled(solv, rd->evr);
+        }
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+        return solver_splitprovides(solv, rd->evr);
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+        return solver_dep_installed(solv, rd->evr);
+    }
+  FOR_PROVIDES(p, pp, dep)
+    {
+      if (solv->decisionmap[p] > 0)
+        return 1;
+    }
+  return 0;
 }
-#endif
 
-#endif /* LIBSOLV_SOLVER_H */
+static inline int
+solver_is_supplementing(Solver *solv, Solvable *s)
+{
+  Id sup, *supp;
+  if (!s->supplements)
+    return 0;
+  supp = s->repo->idarraydata + s->supplements;
+  while ((sup = *supp++) != 0)
+    if (solver_dep_fulfilled(solv, sup))
+      return 1;
+  return 0;
+}
+
+static inline int
+solver_is_enhancing(Solver *solv, Solvable *s)
+{
+  Id enh, *enhp;
+  if (!s->enhances)
+    return 0;
+  enhp = s->repo->idarraydata + s->enhances;
+  while ((enh = *enhp++) != 0)
+    if (solver_dep_fulfilled(solv, enh))
+      return 1;
+  return 0;
+}
+
+#endif /* LIBSOLV_SOLVER_P_H */

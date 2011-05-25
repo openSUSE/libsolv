@@ -30,7 +30,6 @@ SOLV_1.0 {
 		map_grow;
 		map_init;
 		map_init_clone;
-		policy_create_obsolete_index;
 		policy_filter_unwanted;
 		policy_findupdatepackages;
 		policy_illegal2str;
@@ -253,6 +252,7 @@ SOLV_1.0 {
 		solver_calculate_noobsmap;
 		solver_create;
 		solver_create_decisions_obsoletesmap;
+		solver_create_state_maps;
 		solver_dep_installed;
 		solver_disablechoicerules;
 		solver_disablepolicyrules;

@@ -196,7 +196,7 @@ add_multiple_urls(Repodata *data, Id handle, char *value, Id type)
  *
  */
 
-void
+int
 repo_add_content(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
@@ -545,4 +545,5 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   join_freemem();
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }

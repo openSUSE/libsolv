@@ -38,10 +38,10 @@ typedef struct _Repo {
   int idarraysize;
   Offset lastoff;		/* start of last array in idarraydata */
 
-  Id *rpmdbid;			/* solvable side data */
-
   Repodata *repodata;		/* our stores for non-solvable related data */
   unsigned nrepodata;		/* number of our stores..  */
+
+  Id *rpmdbid;			/* solvable side data: rpm database id */
 } Repo;
 
 extern Repo *repo_create(Pool *pool, const char *name);
@@ -216,9 +216,9 @@ typedef struct _Dataiterator
 
 } Dataiterator;
 
-int datamatcher_init(Datamatcher *ma, const char *match, int flags);
+int  datamatcher_init(Datamatcher *ma, const char *match, int flags);
 void datamatcher_free(Datamatcher *ma);
-int datamatcher_match(Datamatcher *ma, const char *str);
+int  datamatcher_match(Datamatcher *ma, const char *str);
 
 /*
  * Dataiterator
@@ -246,18 +246,18 @@ int datamatcher_match(Datamatcher *ma, const char *str);
  * keyname: if non-null, limit search to this keyname
  * match:   if non-null, limit search to this match
  */
-int dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, const char *match, int flags);
+int  dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, const char *match, int flags);
 void dataiterator_init_clone(Dataiterator *di, Dataiterator *from);
 void dataiterator_set_search(Dataiterator *di, Repo *repo, Id p);
 void dataiterator_set_keyname(Dataiterator *di, Id keyname);
-int dataiterator_set_match(Dataiterator *di, const char *match, int flags);
+int  dataiterator_set_match(Dataiterator *di, const char *match, int flags);
 
 void dataiterator_prepend_keyname(Dataiterator *di, Id keyname);
 void dataiterator_free(Dataiterator *di);
-int dataiterator_step(Dataiterator *di);
+int  dataiterator_step(Dataiterator *di);
 void dataiterator_setpos(Dataiterator *di);
 void dataiterator_setpos_parent(Dataiterator *di);
-int dataiterator_match(Dataiterator *di, Datamatcher *ma);
+int  dataiterator_match(Dataiterator *di, Datamatcher *ma);
 void dataiterator_skip_attribute(Dataiterator *di);
 void dataiterator_skip_solvable(Dataiterator *di);
 void dataiterator_skip_repo(Dataiterator *di);

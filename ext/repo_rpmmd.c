@@ -1136,7 +1136,7 @@ characterData(void *userData, const XML_Char *s, int len)
  *
  */
 
-void
+int
 repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
 {
   Pool *pool = repo->pool;
@@ -1226,4 +1226,5 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", sat_timems(now));
   POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
   POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  return 0;
 }

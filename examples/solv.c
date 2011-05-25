@@ -2947,8 +2947,7 @@ rerunsolver:
       if (mainmode == MODE_ERASE || mainmode == MODE_ERASECLEAN)
 	solv->allowuninstall = 1;	/* don't nag */
 
-      solver_solve(solv, &job);
-      if (!solv->problems.count)
+      if (!solver_solve(solv, &job))
 	break;
       pcnt = solver_problem_count(solv);
       printf("Found %d problems:\n", pcnt);

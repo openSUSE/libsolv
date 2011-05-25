@@ -5,4 +5,4 @@
  * for further information
  */
 
-extern void repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags);
+extern int repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags);

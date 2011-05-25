@@ -18,6 +18,7 @@
 #include <assert.h>
 
 #include "solver.h"
+#include "solver_private.h"
 #include "solverdebug.h"
 #include "bitmap.h"
 #include "pool.h"

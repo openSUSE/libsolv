@@ -110,7 +110,7 @@ add_releasefile_product(Repo *repo, FILE *fp)
 }
 
 
-void
+int
 repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
 {
   DIR *dir;
@@ -120,7 +120,7 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
 
   dir = opendir(dirpath);
   if (!dir)
-    return;
+    return 0;
 
   while ((entry = readdir(dir)))
     {
@@ -145,5 +145,6 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
 
   if (!(flags & REPO_NO_INTERNALIZE) && (flags & REPO_REUSE_REPODATA) != 0)
     repodata_internalize(repo_last_repodata(repo));
+  return 0;
 }
 

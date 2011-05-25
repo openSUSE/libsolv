@@ -577,7 +577,7 @@ characterData(void *userData, const XML_Char *s, int len)
 
 #define BUFF_SIZE 8192
 
-void
+int
 repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
@@ -624,6 +624,6 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }
 
-/* EOF */

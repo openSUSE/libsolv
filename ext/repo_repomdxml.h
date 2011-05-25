@@ -5,4 +5,4 @@
  * for further information
  */
 
-void repo_add_repomdxml(Repo *repo, FILE *fp, int flags);
+extern int repo_add_repomdxml(Repo *repo, FILE *fp, int flags);

@@ -10,11 +10,11 @@
 
 struct headerToken_s;
 
-extern void repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags);
-extern void repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags);
+extern int repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags);
+extern int repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags);
 extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
-void repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags);
-void repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags);
+extern int repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags);
+extern int repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags);
 
 #define RPMDB_REPORT_PROGRESS	(1 << 8)
 #define RPM_ADD_WITH_PKGID	(1 << 9)
@@ -29,11 +29,11 @@ void repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags);
 #define RPM_ITERATE_FILELIST_WITHCOL	(1 << 2)
 #define RPM_ITERATE_FILELIST_NOGHOSTS	(1 << 3)
 
-void *rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep);
-void *rpm_byfp(FILE *fp, const char *name, void **statep);
-void *rpm_byrpmh(struct headerToken_s *h, void **statep);
+extern void *rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep);
+extern void *rpm_byfp(FILE *fp, const char *name, void **statep);
+extern void *rpm_byrpmh(struct headerToken_s *h, void **statep);
 
 
-char *rpm_query(void *rpmhandle, Id what);
-void rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, int, const char *), void *cbdata);
-int  rpm_installedrpmdbids(const char *rootdir, const char *index, const char *match, Queue *rpmdbidq);
+extern char *rpm_query(void *rpmhandle, Id what);
+extern void rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, int, const char *), void *cbdata);
+extern int  rpm_installedrpmdbids(const char *rootdir, const char *index, const char *match, Queue *rpmdbidq);

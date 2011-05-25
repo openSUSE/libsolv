@@ -967,7 +967,7 @@ repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata)
  * 4) encode data into buffers using the mapping tables
  * 5) write everything to disk
  */
-void
+int
 repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp)
 {
   Pool *pool = repo->pool;
@@ -1908,6 +1908,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   sat_free(cbdata.keymapstart);
   sat_free(cbdata.dirused);
   sat_free(repodataused);
+  return 0;
 }
 
 struct repodata_write_data {
@@ -1931,7 +1932,7 @@ repodata_write_keyfilter(Repo *repo, Repokey *key, void *kfdata)
   return key->storage;
 }
 
-void
+int
 repodata_write(Repodata *data, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata)
 {
   struct repodata_write_data wd;
@@ -1939,5 +1940,5 @@ repodata_write(Repodata *data, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *k
   wd.keyfilter = keyfilter;
   wd.kfdata = kfdata;
   wd.repodataid = data - data->repo->repodata;
-  repo_write(data->repo, fp, repodata_write_keyfilter, &wd, 0);
+  return repo_write(data->repo, fp, repodata_write_keyfilter, &wd, 0);
 }

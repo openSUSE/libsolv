@@ -1362,7 +1362,7 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
  *
  */
 
-void
+int
 repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 {
   Pool *pool = repo->pool;
@@ -1738,6 +1738,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmdb took %d ms\n", sat_timems(now));
   POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
   POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  return 0;
 }
 
 
@@ -1748,7 +1749,7 @@ getu32(const unsigned char *dp)
 }
 
 
-void
+int
 repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 {
   int i, sigdsize, sigcnt, l;
@@ -1944,6 +1945,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
     sat_free(rpmhead);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }
 
 Id
@@ -3054,7 +3056,7 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   return 1;
 }
 
-void
+int
 repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
 {
   Pool *pool = repo->pool;
@@ -3070,7 +3072,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
 
   memset(&state, 0, sizeof(state));
   if (!(state.dbenv = opendbenv(rootdir)))
-    return;
+    return 0;
   entries = getinstalledrpmdbids(&state, "Name", "gpg-pubkey", &nentries, &namedata);
   for (i = 0 ; i < nentries; i++)
     {
@@ -3095,9 +3097,10 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
   freestate(&state);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }
 
-void
+int
 repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
 {
   Pool *pool = repo->pool;
@@ -3137,4 +3140,5 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
   sat_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }

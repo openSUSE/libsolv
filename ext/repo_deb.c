@@ -347,7 +347,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
     }
 }
 
-void
+int
 repo_add_debpackages(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
@@ -409,9 +409,10 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
   sat_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }
 
-void
+int
 repo_add_debdb(Repo *repo, const char *rootdir, int flags)
 {
   FILE *fp;
@@ -425,9 +426,10 @@ repo_add_debdb(Repo *repo, const char *rootdir, int flags)
     }
   repo_add_debpackages(repo, fp, flags);
   fclose(fp);
+  return 0;
 }
 
-void
+int
 repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 {
   Pool *pool = repo->pool;
@@ -597,6 +599,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
     }
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }
 
 Id

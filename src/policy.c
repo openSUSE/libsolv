@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "solver.h"
+#include "solver_private.h"
 #include "evr.h"
 #include "policy.h"
 #include "poolvendor.h"
@@ -259,7 +260,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
     plist->count = j;
 }
 
-void
+static void
 prune_to_best_arch(const Pool *pool, Queue *plist)
 {
   Id a, bestscore;
@@ -350,7 +351,7 @@ prune_obsoleted(Pool *pool, Queue *plist)
  * sort list of packages (given through plist) by name and evr
  * return result through plist
  */
-void
+static void
 prune_to_best_version(Pool *pool, Queue *plist)
 {
   int i, j;
@@ -407,7 +408,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
  * (rates arch higher than version, but thats a policy)
  */
 
-void
+static void
 prune_best_arch_name_version(const Solver *solv, Pool *pool, Queue *plist)
 {
   if (solv && solv->bestSolvableCb)

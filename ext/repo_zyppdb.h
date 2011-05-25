@@ -5,4 +5,4 @@
  * for further information
  */
 
-void repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags);
+extern int repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags);

@@ -18,6 +18,7 @@
 #include <assert.h>
 
 #include "solver.h"
+#include "solver_private.h"
 #include "bitmap.h"
 #include "pool.h"
 #include "util.h"
@@ -1274,7 +1275,6 @@ solver_create(Pool *pool)
   queue_init(&solv->learnt_why);
   queue_init(&solv->learnt_pool);
   queue_init(&solv->branches);
-  queue_init(&solv->covenantq);
   queue_init(&solv->weakruleq);
   queue_init(&solv->ruleassertions);
 
@@ -1315,7 +1315,6 @@ solver_free(Solver *solv)
   queue_free(&solv->recommendations);
   queue_free(&solv->orphaned);
   queue_free(&solv->branches);
-  queue_free(&solv->covenantq);
   queue_free(&solv->weakruleq);
   queue_free(&solv->ruleassertions);
 
@@ -2488,7 +2487,7 @@ solver_addjobrule(Solver *solv, Id p, Id d, Id job, int weak)
  *
  */
 
-void
+int
 solver_solve(Solver *solv, Queue *job)
 {
   Pool *pool = solv->pool;
@@ -2511,7 +2510,7 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SAT_DEBUG_STATS, "fixsystem=%d updatesystem=%d dosplitprovides=%d, noupdateprovide=%d noinfarchcheck=%d\n", solv->fixsystem, solv->updatesystem, solv->dosplitprovides, solv->noupdateprovide, solv->noinfarchcheck);
   POOL_DEBUG(SAT_DEBUG_STATS, "distupgrade=%d distupgrade_removeunsupported=%d\n", solv->distupgrade, solv->distupgrade_removeunsupported);
   POOL_DEBUG(SAT_DEBUG_STATS, "allowuninstall=%d, allowdowngrade=%d, allowarchchange=%d, allowvendorchange=%d\n", solv->allowuninstall, solv->allowdowngrade, solv->allowarchchange, solv->allowvendorchange);
-  POOL_DEBUG(SAT_DEBUG_STATS, "promoteepoch=%d, novirtualconflicts=%d, allowselfconflicts=%d\n", pool->promoteepoch, pool->novirtualconflicts, pool->allowselfconflicts);
+  POOL_DEBUG(SAT_DEBUG_STATS, "promoteepoch=%d, allowselfconflicts=%d\n", pool->promoteepoch, pool->allowselfconflicts);
   POOL_DEBUG(SAT_DEBUG_STATS, "obsoleteusesprovides=%d, implicitobsoleteusesprovides=%d, obsoleteusescolors=%d\n", pool->obsoleteusesprovides, pool->implicitobsoleteusesprovides, pool->obsoleteusescolors);
   POOL_DEBUG(SAT_DEBUG_STATS, "dontinstallrecommended=%d, ignorealreadyrecommended=%d, dontshowinstalledrecommended=%d\n", solv->dontinstallrecommended, solv->ignorealreadyrecommended, solv->dontshowinstalledrecommended);
 
@@ -3005,6 +3004,7 @@ solver_solve(Solver *solv, Queue *job)
 
   POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d problems, %d learned rules, %d unsolvable\n", solv->problems.count / 2, solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
+  return solv->problems.count ? solv->problems.count / 2 : 0;
 }
 
 /***********************************************************************/
@@ -3044,10 +3044,16 @@ solver_calc_installsizechange(Solver *solv)
 }
 
 void
+solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
+{
+  pool_create_state_maps(solv->pool, &solv->decisionq, installedmap, conflictsmap);
+}
+
+void
 solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res)
 {
   Map installedmap;
-  solver_create_state_maps(solv, &installedmap, 0);
+  pool_create_state_maps(solv->pool,  &solv->decisionq, &installedmap, 0);
   pool_trivial_installable_noobsoletesmap(solv->pool, &installedmap, pkgs, res, solv->noobsoletes.size ? &solv->noobsoletes : 0);
   map_free(&installedmap);
 }

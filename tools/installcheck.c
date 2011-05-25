@@ -242,6 +242,7 @@ main(int argc, char **argv)
   for (i = 0; i < cand.count; i++)
     {
       Solvable *s;
+      int problemcount;
 
       p = cand.elements[i];
       if (nocheck && p >= nocheck)
@@ -282,8 +283,8 @@ main(int argc, char **argv)
 	  queue_push(&job, archlock);
 	}
       solv->dontinstallrecommended = 1;
-      solver_solve(solv, &job);
-      if (solv->problems.count)
+      problemcount = solver_solve(solv, &job);
+      if (problemcount)
 	{
 	  Id problem = 0;
 	  Solvable *s2;

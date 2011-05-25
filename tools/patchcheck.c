@@ -290,8 +290,7 @@ test_all_packages_installable(context_t *c, Id pid)
           solv = solver_create(pool);
           solv->dontinstallrecommended = 0;
           ++solver_runs;
-          solver_solve(solv, &job);
-          if (solv->problems.count)
+          if (solver_solve(solv, &job))
             {
               c->status = 1;
               printf("error installing original package\n");
@@ -320,8 +319,7 @@ test_all_packages_installable(context_t *c, Id pid)
           solv = solver_create(pool);
           /*solv->dontinstallrecommended = 1;*/
           ++solver_runs;
-          solver_solve(solv, &job);
-          if (solv->problems.count)
+          if (solver_solve(solv, &job))
             {
               c->status = 1;
               showproblems(solv, s, 0, 0);
@@ -420,9 +418,7 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
       solv = solver_create(pool);
       solv->dontinstallrecommended = 1;
       ++solver_runs;
-      solver_solve(solv, &job);
-
-      if (solv->problems.count)
+      if (solver_solve(solv, &job))
         {
           c->status = 1;
           showproblems(solv, s, &cand, &badguys);

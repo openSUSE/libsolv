@@ -539,7 +539,7 @@ lookup_shared_id(Repodata *data, Id p, Id keyname, Id voidid, int uninternalized
  * flags: flags
  */
 
-void
+int
 repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int flags)
 {
   Pool *pool = repo->pool;
@@ -1206,4 +1206,5 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
     free(pd.common.tmp);
   free(line);
   join_freemem();
+  return 0;
 }

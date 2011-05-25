@@ -17,9 +17,9 @@
 
 #include "repo.h"
 
-void repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp);
-int repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata);
+extern int repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp);
+extern int repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata);
 
-void repodata_write(Repodata *data , FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata);
+extern int repodata_write(Repodata *data , FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata);
 
 #endif
