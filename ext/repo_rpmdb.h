@@ -27,6 +27,7 @@ void repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags);
 #define RPM_ITERATE_FILELIST_ONLYDIRS	(1 << 0)
 #define RPM_ITERATE_FILELIST_WITHMD5	(1 << 1)
 #define RPM_ITERATE_FILELIST_WITHCOL	(1 << 2)
+#define RPM_ITERATE_FILELIST_NOGHOSTS	(1 << 3)
 
 void *rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep);
 void *rpm_byfp(FILE *fp, const char *name, void **statep);

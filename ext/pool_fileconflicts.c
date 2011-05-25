@@ -332,7 +332,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
 	cbdata.create = 0;
       handle = (*handle_cb)(pool, p, handle_cbdata);
       if (handle)
-        rpm_iterate_filelist(handle, 0, findfileconflicts_cb, &cbdata);
+        rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_NOGHOSTS, findfileconflicts_cb, &cbdata);
     }
 
   POOL_DEBUG(SAT_DEBUG_STATS, "filemap size: %d used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
@@ -370,7 +370,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       int pidx = cbdata.lookat.elements[i + 1];
       int iterflags;
 
-      iterflags = RPM_ITERATE_FILELIST_WITHMD5;
+      iterflags = RPM_ITERATE_FILELIST_WITHMD5 | RPM_ITERATE_FILELIST_NOGHOSTS;
       if (pool->obsoleteusescolors)
 	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
       p = pkgs->elements[pidx];

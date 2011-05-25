@@ -71,6 +71,7 @@
 #define TAG_FILEMODES		1030
 #define TAG_FILEMD5S		1035
 #define TAG_FILELINKTOS		1036
+#define TAG_FILEFLAGS		1037
 #define TAG_SOURCERPM		1044
 #define TAG_PROVIDENAME		1047
 #define TAG_REQUIREFLAGS	1048
@@ -114,6 +115,8 @@
 #define DEP_EQUAL		(1 << 3)
 #define DEP_STRONG		(1 << 27)
 #define DEP_PRE			((1 << 6) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12))
+
+#define FILEFLAG_GHOST		(1 <<  6)
 
 
 #ifdef RPM5
@@ -1980,6 +1983,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   char **lt = 0;
   unsigned int *di, diidx;
   unsigned int *co = 0;
+  unsigned int *ff = 0;
   unsigned int lastdir;
   int lastdirl;
   unsigned int *fm;
@@ -2049,10 +2053,27 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	  return;
 	}
     }
+  if ((flags & RPM_ITERATE_FILELIST_NOGHOSTS) != 0)
+    {
+      ff = headint32array(rpmhead, TAG_FILEFLAGS, &cnt2);
+      if (!ff || cnt != cnt2)
+	{
+	  sat_free(ff);
+	  sat_free(co);
+	  sat_free(md);
+	  sat_free(fm);
+	  sat_free(di);
+	  sat_free(bn);
+	  sat_free(dn);
+	  return;
+	}
+    }
   lastdir = dcnt;
   lastdirl = 0;
   for (i = 0; i < cnt; i++)
     {
+      if (ff && (ff[i] & FILEFLAG_GHOST) != 0)
+	continue;
       diidx = di[i];
       if (diidx >= dcnt)
 	continue;
@@ -2092,7 +2113,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	    }
 	  if (!md5p)
 	    {
-	      sprintf(md5, "%08x%08x", (fm[i] >> 12) & 65535, 0);
+	      sprintf(md5, "%08x%08x%08x%08x", (fm[i] >> 12) & 65535, 0, 0, 0);
 	      md5p = md5;
 	    }
 	}
@@ -2106,6 +2127,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   sat_free(bn);
   sat_free(dn);
   sat_free(co);
+  sat_free(ff);
 }
 
 char *
