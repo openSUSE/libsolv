@@ -151,9 +151,8 @@ struct _Pool {
 #define SAT_DEBUG_POLICY		(1<<9)
 #define SAT_DEBUG_RESULT		(1<<10)
 #define SAT_DEBUG_JOB			(1<<11)
-#define SAT_DEBUG_SCHUBI		(1<<12)
-#define SAT_DEBUG_SOLVER		(1<<13)
-#define SAT_DEBUG_TRANSACTION		(1<<14)
+#define SAT_DEBUG_SOLVER		(1<<12)
+#define SAT_DEBUG_TRANSACTION		(1<<13)
 
 #define SAT_DEBUG_TO_STDERR		(1<<30)
 
@@ -198,6 +197,10 @@ extern void pool_setdisttype(Pool *pool, int disttype);
 extern void pool_setvendorclasses(Pool *pool, const char **vendorclasses);
 
 extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
+extern void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata);
+extern void pool_setdebugmask(Pool *pool, int mask);
+extern void pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata);
+
 
 extern char *pool_alloctmpspace(Pool *pool, int len);
 extern void  pool_freetmpspace(Pool *pool, const char *space);
@@ -298,23 +301,6 @@ static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
 {
   Id off = pool_whatprovides(pool, d);
   return pool->whatprovidesdata + off;
-}
-
-static inline void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
-{
-  pool->debugcallback = debugcallback;
-  pool->debugcallbackdata = debugcallbackdata;
-}
-
-static inline void pool_setdebugmask(Pool *pool, int mask)
-{
-  pool->debugmask = mask;
-}
-
-static inline void pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata)
-{
-  pool->loadcallback = cb;
-  pool->loadcallbackdata = loadcbdata;
 }
 
 /* search the pool. the following filters are available:

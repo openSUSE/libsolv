@@ -48,6 +48,9 @@ extern Repo *repo_create(Pool *pool, const char *name);
 extern void repo_free(Repo *repo, int reuseids);
 extern void repo_empty(Repo *repo, int reuseids);
 extern void repo_freeallrepos(Pool *pool, int reuseids);
+extern Id repo_add_solvable(Repo *repo);
+extern Id repo_add_solvable_block(Repo *repo, int count);
+extern void repo_free_solvable(Repo *repo, Id p, int reuseids);
 extern void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids);
 extern void *repo_sidedata_create(Repo *repo, size_t size);
 extern void *repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count);
@@ -62,48 +65,6 @@ static inline const char *repo_name(const Repo *repo)
 {
   return repo->name;
 }
-
-static inline Id repo_add_solvable(Repo *repo)
-{
-  extern Id pool_add_solvable(Pool *pool);
-  Id p = pool_add_solvable(repo->pool);
-  if (!repo->start || repo->start == repo->end)
-    repo->start = repo->end = p;
-  /* warning: sidedata must be extended before adapting start/end */
-  if (repo->rpmdbid)
-    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, 1);
-  if (p < repo->start)
-    repo->start = p;
-  if (p + 1 > repo->end)
-    repo->end = p + 1;
-  repo->nsolvables++;
-  repo->pool->solvables[p].repo = repo;
-  return p;
-}
-
-static inline Id repo_add_solvable_block(Repo *repo, int count)
-{
-  extern Id pool_add_solvable_block(Pool *pool, int count);
-  Id p;
-  Solvable *s;
-  if (!count)
-    return 0;
-  p = pool_add_solvable_block(repo->pool, count);
-  if (!repo->start || repo->start == repo->end)
-    repo->start = repo->end = p;
-  /* warning: sidedata must be extended before adapting start/end */
-  if (repo->rpmdbid)
-    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, count);
-  if (p < repo->start)
-    repo->start = p;
-  if (p + count > repo->end)
-    repo->end = p + count;
-  repo->nsolvables += count;
-  for (s = repo->pool->solvables + p; count--; s++)
-    s->repo = repo;
-  return p;
-}
-
 
 #define FOR_REPO_SOLVABLES(r, p, s)						\
   for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\

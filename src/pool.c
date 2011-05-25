@@ -786,10 +786,25 @@ pool_setdebuglevel(Pool *pool, int level)
     mask |= SAT_DEBUG_PROPAGATE;
   if (level > 3)
     mask |= SAT_DEBUG_RULE_CREATION;
-  if (level > 4)
-    mask |= SAT_DEBUG_SCHUBI;
   mask |= pool->debugmask & SAT_DEBUG_TO_STDERR;	/* keep bit */
   pool->debugmask = mask;
+}
+
+void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
+{
+  pool->debugcallback = debugcallback;
+  pool->debugcallbackdata = debugcallbackdata;
+}
+
+void pool_setdebugmask(Pool *pool, int mask)
+{
+  pool->debugmask = mask;
+}
+
+void pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata)
+{
+  pool->loadcallback = cb;
+  pool->loadcallbackdata = loadcbdata;
 }
 
 /*************************************************************************/

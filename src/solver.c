@@ -114,8 +114,6 @@ makeruledecisions(Solver *solv)
   int decisionstart;
   int record_proof = 1;
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions ; size decisionq: %d -----\n",solv->decisionq.count);
-
   /* The system solvable is always installed first */
   assert(solv->decisionq.count == 0);
   queue_push(&solv->decisionq, SYSTEMSOLVABLE);
@@ -359,8 +357,6 @@ makeruledecisions(Solver *solv)
       if (v < 0)
 	solver_reenablepolicyrules(solv, -(v + 1));
     }
-  
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- makeruledecisions end; size decisionq: %d -----\n",solv->decisionq.count);
 }
 
 
@@ -1379,9 +1375,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
   POOL_DEBUG(SAT_DEBUG_SOLVER, "initial decisions: %d\n", solv->decisionq.count);
 
-  IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
-    solver_printdecisions(solv);
-
   /* start SAT algorithm */
   level = 1;
   systemlevel = level + 1;
@@ -2136,7 +2129,6 @@ removedisabledconflicts(Solver *solv, Queue *removed)
   Rule *r;
   Id *decisionmap = solv->decisionmap;
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "removedisabledconflicts\n");
   queue_empty(removed);
   for (i = 0; i < solv->decisionq.count; i++)
     {
@@ -2156,7 +2148,7 @@ removedisabledconflicts(Solver *solv, Queue *removed)
       if (r->d < 0 && decisionmap[-p])
 	{
 	  /* rule is now disabled, remove from decisionmap */
-	  POOL_DEBUG(SAT_DEBUG_SCHUBI, "removing conflict for package %s[%d]\n", pool_solvid2str(pool, -p), -p);
+	  POOL_DEBUG(SAT_DEBUG_SOLVER, "removing conflict for package %s[%d]\n", pool_solvid2str(pool, -p), -p);
 	  queue_push(removed, -p);
 	  queue_push(removed, decisionmap[-p]);
 	  decisionmap[-p] = 0;
@@ -2219,7 +2211,7 @@ removedisabledconflicts(Solver *solv, Queue *removed)
 	}
       if (new)
 	{
-	  POOL_DEBUG(SAT_DEBUG_SCHUBI, "re-conflicting package %s[%d]\n", pool_solvid2str(pool, -new), -new);
+	  POOL_DEBUG(SAT_DEBUG_SOLVER, "re-conflicting package %s[%d]\n", pool_solvid2str(pool, -new), -new);
 	  decisionmap[-new] = -1;
 	  new = 0;
 	  n = 0;	/* redo all rules */
@@ -2602,11 +2594,9 @@ solver_solve(Solver *solv, Queue *job)
 	}
 
       oldnrules = solv->nrules;
-      POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** create rpm rules for installed solvables ***\n");
       FOR_REPO_SOLVABLES(installed, p, s)
 	solver_addrpmrulesforsolvable(solv, s, &addedmap);
       POOL_DEBUG(SAT_DEBUG_STATS, "added %d rpm rules for installed solvables\n", solv->nrules - oldnrules);
-      POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** create rpm rules for updaters of installed solvables ***\n");
       oldnrules = solv->nrules;
       FOR_REPO_SOLVABLES(installed, p, s)
 	solver_addrpmrulesforupdaters(solv, s, &addedmap, 1);
@@ -2618,7 +2608,6 @@ solver_solve(Solver *solv, Queue *job)
    * (to be installed or removed)
    */
     
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** create rpm rules for packages involved with a job ***\n");
   oldnrules = solv->nrules;
   for (i = 0; i < job->count; i += 2)
     {
@@ -2654,7 +2643,6 @@ solver_solve(Solver *solv, Queue *job)
   /*
    * add rules for suggests, enhances
    */
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** create rpm rules for suggested/enhanced packages ***\n");
   oldnrules = solv->nrules;
   solver_addrpmrulesforweak(solv, &addedmap);
   POOL_DEBUG(SAT_DEBUG_STATS, "added %d rpm rules because of weak dependencies\n", solv->nrules - oldnrules);
@@ -2703,7 +2691,6 @@ solver_solve(Solver *solv, Queue *job)
    * best effort mode
    */
     
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add feature rules ***\n");
   solv->featurerules = solv->nrules;              /* mark start of feature rules */
   if (installed)
     {
@@ -2729,7 +2716,6 @@ solver_solve(Solver *solv, Queue *job)
      * except that downgrades/archchanges/vendorchanges are not allowed
      */
     
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add update rules ***\n");
   solv->updaterules = solv->nrules;
 
   if (installed)
@@ -2792,8 +2778,6 @@ solver_solve(Solver *solv, Queue *job)
   /*
    * now add all job rules
    */
-
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "*** Add JOB rules ***\n");
 
   solv->jobrules = solv->nrules;
   for (i = 0; i < job->count; i += 2)

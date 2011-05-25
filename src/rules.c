@@ -143,8 +143,6 @@ solver_unifyrules(Solver *solv)
   if (solv->nrules <= 2)	       /* nothing to unify */
     return;
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- unifyrules -----\n");
-
   /* sort rules first */
   sat_sort(solv->rules + 1, solv->nrules - 1, sizeof(Rule), unifyrules_sortcmp, solv->pool);
 
@@ -194,7 +192,6 @@ solver_unifyrules(Solver *solv)
       POOL_DEBUG(SAT_DEBUG_STATS, "  binary: %d\n", binr);
       POOL_DEBUG(SAT_DEBUG_STATS, "  normal: %d, %d literals\n", solv->nrules - 1 - binr, lits);
     }
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- unifyrules end -----\n");
 }
 
 #if 0
@@ -479,8 +476,6 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Id *dp;		/* ptr to 'whatprovides' */
   Id n;			/* Id for current solvable 's' */
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforsolvable -----\n");
-
   queue_init_buffer(&workq, workqbuf, sizeof(workqbuf)/sizeof(*workqbuf));
   queue_push(&workq, s - pool->solvables);	/* push solvable Id to work queue */
 
@@ -750,7 +745,6 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	}
     }
   queue_free(&workq);
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforsolvable end -----\n");
 }
 
 
@@ -769,7 +763,6 @@ solver_addrpmrulesforweak(Solver *solv, Map *m)
   Id sup, *supp;
   int i, n;
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforweak -----\n");
   /* foreach solvable in pool */
   for (i = n = 1; n < pool->nsolvables; i++, n++)
     {
@@ -806,7 +799,6 @@ solver_addrpmrulesforweak(Solver *solv, Map *m)
       solver_addrpmrulesforsolvable(solv, s, m);
       n = 0;			/* check all solvables again because we added solvables to m */
     }
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforweak end -----\n");
 }
 
 
@@ -828,8 +820,6 @@ solver_addrpmrulesforupdaters(Solver *solv, Solvable *s, Map *m, int allow_all)
   Queue qs;
   Id qsbuf[64];
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforupdaters -----\n");
-
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
     /* find update candidates for 's' */
   policy_findupdatepackages(solv, s, &qs, allow_all);
@@ -841,8 +831,6 @@ solver_addrpmrulesforupdaters(Solver *solv, Solvable *s, Map *m, int allow_all)
     if (!MAPTST(m, qs.elements[i]))
       solver_addrpmrulesforsolvable(solv, pool->solvables + qs.elements[i], m);
   queue_free(&qs);
-
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- addrpmrulesforupdaters -----\n");
 }
 
 
@@ -926,7 +914,6 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
   Queue qs;
   Id qsbuf[64];
 
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "-----  addupdaterule -----\n");
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   p = s - pool->solvables;
   /* find update candidates for 's' */
@@ -976,7 +963,6 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
   d = qs.count ? pool_queuetowhatprovides(pool, &qs) : 0;
   queue_free(&qs);
   solver_addrule(solv, p, d);	/* allow update of s */
-  POOL_DEBUG(SAT_DEBUG_SCHUBI, "-----  addupdaterule end -----\n");
 }
 
 static inline void 

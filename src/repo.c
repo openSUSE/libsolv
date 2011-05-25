@@ -147,6 +147,50 @@ repo_freeallrepos(Pool *pool, int reuseids)
   pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
 }
 
+Id repo_add_solvable(Repo *repo)
+{
+  Id p = pool_add_solvable(repo->pool);
+  if (!repo->start || repo->start == repo->end)
+    repo->start = repo->end = p;
+  /* warning: sidedata must be extended before adapting start/end */
+  if (repo->rpmdbid)
+    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, 1); 
+  if (p < repo->start)
+    repo->start = p;
+  if (p + 1 > repo->end)
+    repo->end = p + 1;
+  repo->nsolvables++;
+  repo->pool->solvables[p].repo = repo;
+  return p;
+}
+
+Id repo_add_solvable_block(Repo *repo, int count)
+{
+  Id p;
+  Solvable *s; 
+  if (!count)
+    return 0;
+  p = pool_add_solvable_block(repo->pool, count);
+  if (!repo->start || repo->start == repo->end)
+    repo->start = repo->end = p;
+  /* warning: sidedata must be extended before adapting start/end */
+  if (repo->rpmdbid)
+    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, count);
+  if (p < repo->start)
+    repo->start = p;
+  if (p + count > repo->end)
+    repo->end = p + count;
+  repo->nsolvables += count;
+  for (s = repo->pool->solvables + p; count--; s++)
+    s->repo = repo;
+  return p;
+}
+
+void repo_free_solvable(Repo *repo, Id p, int reuseids)
+{
+  repo_free_solvable_block(repo, p, 1, reuseids);
+}
+
 void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
 {
   Solvable *s;

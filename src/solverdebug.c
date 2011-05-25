@@ -301,17 +301,6 @@ solver_printdecisions(Solver *solv)
   Solvable *s;
   Queue iq;
 
-  IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
-    {
-      POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions -----\n");
-      for (i = 0; i < solv->decisionq.count; i++)
-	{
-	  p = solv->decisionq.elements[i];
-	  solver_printruleelement(solv, SAT_DEBUG_SCHUBI, 0, p);
-	}
-      POOL_DEBUG(SAT_DEBUG_SCHUBI, "----- Decisions end -----\n");
-    }
-
   POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
   POOL_DEBUG(SAT_DEBUG_RESULT, "transaction:\n");
 

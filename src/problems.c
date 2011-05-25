@@ -229,8 +229,6 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
       if (!solv->problems.count)
 	{
 	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "no more problems!\n");
-	  IF_POOLDEBUG (SAT_DEBUG_SCHUBI)
-	    solver_printdecisions(solv);
 	  break;		/* great, no more problems */
 	}
       disabledcnt = disabled.count;
