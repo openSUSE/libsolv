@@ -142,8 +142,6 @@ SOLV_1.0 {
 		repo_set_num;
 		repo_set_poolstr;
 		repo_set_str;
-		repo_sidedata_create;
-		repo_sidedata_extend;
 		repodata_add_dirnumnum;
 		repodata_add_dirstr;
 		repodata_add_fixarray;
@@ -160,7 +158,6 @@ SOLV_1.0 {
 		repodata_empty;
 		repodata_extend;
 		repodata_extend_block;
-		repodata_filelistfilter_matches;
 		repodata_free;
 		repodata_free_schemahash;
 		repodata_freedata;
@@ -197,12 +194,6 @@ SOLV_1.0 {
 		repodata_shrink;
 		repodata_str2dir;
 		repodata_stringify;
-		repopagestore_compress_page;
-		repopagestore_disable_paging;
-		repopagestore_free;
-		repopagestore_init;
-		repopagestore_load_page_range;
-		repopagestore_read_or_setup_pages;
 		sat_bin2hex;
 		sat_calloc;
 		sat_chksum_add;
@@ -253,9 +244,6 @@ SOLV_1.0 {
 		solver_create;
 		solver_create_decisions_obsoletesmap;
 		solver_create_state_maps;
-		solver_dep_installed;
-		solver_disablechoicerules;
-		solver_disablepolicyrules;
 		solver_disableproblem;
 		solver_enableproblem;
 		solver_findallproblemrules;
@@ -283,17 +271,13 @@ SOLV_1.0 {
 		solver_problem_count;
 		solver_problemruleinfo;
 		solver_problemruleinfo2str;
-		solver_reenablepolicyrules;
-		solver_reset;
 		solver_ruleinfo;
-		solver_run_sat;
 		solver_samerule;
 		solver_select2str;
 		solver_solution_count;
 		solver_solutionelement2str;
 		solver_solutionelement_count;
 		solver_solve;
-		solver_splitprovides;
 		solver_take_solution;
 		solver_take_solutionelement;
 		solver_trivial_installable;
