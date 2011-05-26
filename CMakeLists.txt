@@ -1,13 +1,16 @@
 PROJECT (libsolv)
 
-cmake_minimum_required (VERSION 2.4)
+CMAKE_MINIMUM_REQUIRED (VERSION 2.4)
+
+OPTION(ENABLE_STATIC "Build a static version of the libraries?" OFF)
+OPTION(DISABLE_SHARED "Do not build a shared version of the libraries?" OFF)
 
 #IF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERISION} GREATER 2.4)
 #ENDIF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERISION} GREATER 2.4)
 
 IF (COMMAND cmake_policy)
   # escape preprocessor, see -DVERSION below
-  cmake_policy (SET CMP0005 OLD)
+  CMAKE_POLICY (SET CMP0005 OLD)
 ENDIF (COMMAND cmake_policy)
 
 # Library
@@ -109,7 +112,7 @@ ADD_DEFINITIONS (-D_FILE_OFFSET_BITS=64)
 ADD_DEFINITIONS (-DVERSION=\\\"${VERSION}\\\")
 CONFIGURE_FILE (src/satversion.h.in src/satversion.h)
 
-SET (CPACK_PACKAGE_DESCRIPTION_SUMMARY "SAT Solver library")
+SET (CPACK_PACKAGE_DESCRIPTION_SUMMARY "Package dependency solver library")
 SET (CPACK_PACKAGE_VENDOR "SUSE")
 SET (CPACK_PACKAGE_VERSION_MAJOR ${LIBSOLV_MAJOR})
 SET (CPACK_PACKAGE_VERSION_MINOR ${LIBSOLV_MINOR})
@@ -162,14 +165,6 @@ SET (CPACK_SOURCE_IGNORE_FILES
 INCLUDE(CPack)
 
 ####################################################################
-
-SET (DOC_INSTALL_DIR
-   "${CMAKE_INSTALL_PREFIX}/share/doc/packages/${PACKAGE}"
-   CACHE PATH "The install dir for documentation (default prefix/share/doc/packages/${PACKAGE})"
-   FORCE
-)
-
-####################################################################
 # INCLUDES                                                         #
 ####################################################################
 
@@ -178,9 +173,9 @@ INCLUDE_DIRECTORIES (${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOU
 
 ####################################################################
 
-MESSAGE (STATUS "Looking modules in ${CMAKE_MODULE_PATH}")
+MESSAGE (STATUS "Looking for modules in ${CMAKE_MODULE_PATH}")
 
-set (CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} -Werror -Wall")
+set (CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} -Werror -Wall -Wl,--as-needed")
 set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -g -O3")
 set (CMAKE_C_FLAGS_DEBUG     "${CMAKE_C_FLAGS} -g3 -O0")
 
