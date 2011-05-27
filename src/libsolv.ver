@@ -142,6 +142,7 @@ SOLV_1.0 {
 		repo_set_num;
 		repo_set_poolstr;
 		repo_set_str;
+		repo_sidedata_create;
 		repodata_add_dirnumnum;
 		repodata_add_dirstr;
 		repodata_add_fixarray;
@@ -194,6 +195,7 @@ SOLV_1.0 {
 		repodata_shrink;
 		repodata_str2dir;
 		repodata_stringify;
+		repopagestore_compress_page;
 		sat_bin2hex;
 		sat_calloc;
 		sat_chksum_add;
