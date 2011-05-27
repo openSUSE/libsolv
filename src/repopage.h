@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Novell Inc.
+ * Copyright (c) 2007-2011, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -8,13 +8,13 @@
 #ifndef LIBSOLV_REPOPAGE_H
 #define LIBSOLV_REPOPAGE_H
 
-#define BLOB_PAGEBITS 15
-#define BLOB_PAGESIZE (1 << BLOB_PAGEBITS)
+#define REPOPAGE_BLOBBITS 15
+#define REPOPAGE_BLOBSIZE (1 << REPOPAGE_BLOBBITS)
 
 typedef struct _Attrblobpage
 {
   /* mapped_at == -1  --> not loaded, otherwise offset into
-     store->blob_store.  The size of the mapping is BLOB_PAGESIZE
+     store->blob_store.  The size of the mapping is REPOPAGE_BLOBSIZE
      except for the last page.  */
   unsigned int mapped_at;
   long file_offset;

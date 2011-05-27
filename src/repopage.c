@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Novell Inc.
+ * Copyright (c) 2007-2011, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -574,7 +574,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 {
 /* Make sure all pages from PSTART to PEND (inclusive) are loaded,
    and are consecutive.  Return a pointer to the mapping of PSTART.  */
-  unsigned char buf[BLOB_PAGESIZE];
+  unsigned char buf[REPOPAGE_BLOBSIZE];
   unsigned int i;
 
   /* Quick check in case all pages are there already and consecutive.  */
@@ -582,7 +582,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
     if (store->pages[i].mapped_at == -1
         || (i > pstart
 	    && store->pages[i].mapped_at
-	       != store->pages[i-1].mapped_at + BLOB_PAGESIZE))
+	       != store->pages[i-1].mapped_at + REPOPAGE_BLOBSIZE))
       break;
   if (i > pend)
     return store->blob_store + store->pages[pstart].mapped_at;
@@ -599,7 +599,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
         store->ncanmap = 4;
       store->mapped = sat_realloc2(store->mapped, store->ncanmap, sizeof(store->mapped[0]));
       memset(store->mapped + oldcan, 0, (store->ncanmap - oldcan) * sizeof (store->mapped[0]));
-      store->blob_store = sat_realloc2(store->blob_store, store->ncanmap, BLOB_PAGESIZE);
+      store->blob_store = sat_realloc2(store->blob_store, store->ncanmap, REPOPAGE_BLOBSIZE);
 #ifdef DEBUG_PAGING
       fprintf(stderr, "PAGE: can map %d pages\n", store->ncanmap);
 #endif
@@ -678,17 +678,17 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
     {
       Attrblobpage *p = store->pages + i;
       unsigned int pnum = i - pstart + best;
-      void *dest = store->blob_store + pnum * BLOB_PAGESIZE;
+      void *dest = store->blob_store + pnum * REPOPAGE_BLOBSIZE;
       if (p->mapped_at != -1)
         {
-	  if (p->mapped_at != pnum * BLOB_PAGESIZE)
+	  if (p->mapped_at != pnum * REPOPAGE_BLOBSIZE)
 	    {
 #ifdef DEBUG_PAGING
 	      fprintf(stderr, "PAGECOPY: %d to %d\n", i, pnum);
 #endif
 	      /* Still mapped somewhere else, so just copy it from there.  */
-	      memcpy(dest, store->blob_store + p->mapped_at, BLOB_PAGESIZE);
-	      store->mapped[p->mapped_at / BLOB_PAGESIZE] = 0;
+	      memcpy(dest, store->blob_store + p->mapped_at, REPOPAGE_BLOBSIZE);
+	      store->mapped[p->mapped_at / REPOPAGE_BLOBSIZE] = 0;
 	    }
 	}
       else
@@ -708,8 +708,8 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	    {
 	      unsigned int out_len;
 	      out_len = unchecked_decompress_buf(buf, in_len,
-						  dest, BLOB_PAGESIZE);
-	      if (out_len != BLOB_PAGESIZE && i < store->num_pages - 1)
+						  dest, REPOPAGE_BLOBSIZE);
+	      if (out_len != REPOPAGE_BLOBSIZE && i < store->num_pages - 1)
 	        {
 #ifdef DEBUG_PAGING
 	          fprintf(stderr, "can't decompress\n");
@@ -724,10 +724,10 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  fprintf(stderr, "\n");
 #endif
 	}
-      p->mapped_at = pnum * BLOB_PAGESIZE;
+      p->mapped_at = pnum * REPOPAGE_BLOBSIZE;
       store->mapped[pnum] = i + 1;
     }
-  return store->blob_store + best * BLOB_PAGESIZE;
+  return store->blob_store + best * REPOPAGE_BLOBSIZE;
 }
 
 unsigned int
@@ -765,9 +765,9 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
   unsigned int i;
   unsigned int can_seek;
   long cur_file_ofs;
-  unsigned char buf[BLOB_PAGESIZE];
+  unsigned char buf[REPOPAGE_BLOBSIZE];
 
-  if (pagesz != BLOB_PAGESIZE)
+  if (pagesz != REPOPAGE_BLOBSIZE)
     {
       /* We could handle this by slurping in everything.  */
       return SOLV_ERROR_CORRUPT;
@@ -786,14 +786,14 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
 #ifdef DEBUG_PAGING
   fprintf(stderr, "can %sseek\n", can_seek ? "" : "NOT ");
 #endif
-  npages = (blobsz + BLOB_PAGESIZE - 1) / BLOB_PAGESIZE;
+  npages = (blobsz + REPOPAGE_BLOBSIZE - 1) / REPOPAGE_BLOBSIZE;
 
   store->num_pages = npages;
   store->pages = sat_malloc2(npages, sizeof(store->pages[0]));
 
   /* If we can't seek on our input we have to slurp in everything.  */
   if (!can_seek)
-    store->blob_store = sat_malloc2(npages, BLOB_PAGESIZE);
+    store->blob_store = sat_malloc2(npages, REPOPAGE_BLOBSIZE);
   for (i = 0; i < npages; i++)
     {
       unsigned int in_len = read_u32(fp);
@@ -823,8 +823,8 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
       else
         {
 	  unsigned int out_len;
-	  void *dest = store->blob_store + i * BLOB_PAGESIZE;
-          p->mapped_at = i * BLOB_PAGESIZE;
+	  void *dest = store->blob_store + i * REPOPAGE_BLOBSIZE;
+          p->mapped_at = i * REPOPAGE_BLOBSIZE;
 	  p->file_offset = 0;
 	  p->file_size = 0;
 	  /* We can't seek, so suck everything in.  */
@@ -835,8 +835,8 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
 	    }
 	  if (compressed)
 	    {
-	      out_len = unchecked_decompress_buf(buf, in_len, dest, BLOB_PAGESIZE);
-	      if (out_len != BLOB_PAGESIZE && i < npages - 1)
+	      out_len = unchecked_decompress_buf(buf, in_len, dest, REPOPAGE_BLOBSIZE);
+	      if (out_len != REPOPAGE_BLOBSIZE && i < npages - 1)
 	        {
 		  return SOLV_ERROR_CORRUPT;
 	        }

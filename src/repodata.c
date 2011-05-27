@@ -425,10 +425,10 @@ get_vertical_data(Repodata *data, Repokey *key, Id off, Id len)
     return 0;
   /* we now have the offset, go into vertical */
   off += data->verticaloffset[key - data->keys];
-  /* fprintf(stderr, "key %d page %d\n", key->name, off / BLOB_PAGESIZE); */
-  dp = repopagestore_load_page_range(&data->store, off / BLOB_PAGESIZE, (off + len - 1) / BLOB_PAGESIZE);
+  /* fprintf(stderr, "key %d page %d\n", key->name, off / REPOPAGE_BLOBSIZE); */
+  dp = repopagestore_load_page_range(&data->store, off / REPOPAGE_BLOBSIZE, (off + len - 1) / REPOPAGE_BLOBSIZE);
   if (dp)
-    dp += off % BLOB_PAGESIZE;
+    dp += off % REPOPAGE_BLOBSIZE;
   return dp;
 }
 

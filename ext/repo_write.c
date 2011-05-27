@@ -901,7 +901,7 @@ static void
 write_compressed_page(FILE *fp, unsigned char *page, int len)
 {
   int clen;
-  unsigned char cpage[BLOB_PAGESIZE];
+  unsigned char cpage[REPOPAGE_BLOBSIZE];
 
   clen = repopagestore_compress_page(page, len, cpage, len - 1);
   if (!clen)
@@ -1864,10 +1864,10 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   if (i < target.nkeys)
     {
       /* yes, write it in pages */
-      unsigned char *dp, vpage[BLOB_PAGESIZE];
+      unsigned char *dp, vpage[REPOPAGE_BLOBSIZE];
       int l, ll, lpage = 0;
 
-      write_u32(fp, BLOB_PAGESIZE);
+      write_u32(fp, REPOPAGE_BLOBSIZE);
       for (i = 1; i < target.nkeys; i++)
 	{
 	  if (!cbdata.extdata[i].len)
@@ -1876,14 +1876,14 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  dp = cbdata.extdata[i].buf;
 	  while (l)
 	    {
-	      ll = BLOB_PAGESIZE - lpage;
+	      ll = REPOPAGE_BLOBSIZE - lpage;
 	      if (l < ll)
 		ll = l;
 	      memcpy(vpage + lpage, dp, ll);
 	      dp += ll;
 	      lpage += ll;
 	      l -= ll;
-	      if (lpage == BLOB_PAGESIZE)
+	      if (lpage == REPOPAGE_BLOBSIZE)
 		{
 		  write_compressed_page(fp, vpage, lpage);
 		  lpage = 0;
