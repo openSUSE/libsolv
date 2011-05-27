@@ -33,16 +33,25 @@ BuildRequires:  expat-devel
 %endif
 BuildRequires:  cmake rpm-devel gcc-c++
 BuildRequires:  zlib-devel
-# the testsuite uses the check framework
-%if 0%{?suse_version} >= 1030 || !0%{?suse_version}
-BuildRequires:  check-devel
-%else
-BuildRequires:  check
-%endif
 Summary:        A new approach to package dependency solving
 
 
 %description
+A new approach to package dependency solving
+
+Authors:
+--------
+    Michael Schroeder <mls@suse.de>
+    Klaus Kaempf <kkaempf@suse.de>
+    Stephan Kulow <coolo@suse.de>
+    Michael Matz <matz@suse.de>
+    Duncan Mac-Vicar P. <dmacvicar@suse.de>
+
+%package -n libsolv@LIBSOLV_SOVERSION@
+Summary:        A new approach to package dependency solving
+Group:          Development/Libraries/C and C++
+
+%description -n libsolv@LIBSOLV_SOVERSION@
 A new approach to package dependency solving
 
 Authors:
@@ -61,7 +70,6 @@ Requires:       rpm-devel
 
 %description devel
 Development files for libsolv, a new approach to package dependency solving
-
 
 Authors:
 --------
@@ -106,10 +114,6 @@ CMAKE_FLAGS=
 %if 0%{?fedora_version}
 CMAKE_FLAGS="-DFEDORA=1"
 %endif
-# Where does RHEL provide qsort_r ?
-%if 0%{?rhel_version} > 0 || 0%{?centos_version} > 0
-export CFLAGS="$RPM_OPT_FLAGS -DUSE_OWN_QSORT=1"
-%endif
 
 cmake   $CMAKE_FLAGS \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -118,38 +122,32 @@ cmake   $CMAKE_FLAGS \
 	-DCMAKE_BUILD_TYPE=Release \
 	-DCMAKE_SKIP_RPATH=1 
 make %{?jobs:-j %jobs}
-make doc_forced
-
-%if 0%{?run_testsuite}
-  ln -s . build
-  ctest .
-%endif
 
 %install
 make DESTDIR=$RPM_BUILD_ROOT install
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
-#pushd doc/autodoc
-#make install
-#popd
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
 
-%files tools
+%files -n libsolv@LIBSOLV_SOVERSION@
 %defattr(-,root,root)
 %doc LICENSE*
-%exclude /usr/bin/deptestomatic
+%_libdir/libsolv.so.*
+%_libdir/libsolvext.so.*
+
+%files tools
+%defattr(-,root,root)
 %exclude /usr/bin/helix2solv
 %exclude /usr/bin/solv
 /usr/bin/*
 
 %files devel
 %defattr(-,root,root)
-%_libdir/libsolv.a
-%_libdir/libsolvext.a
+%_libdir/libsolv.so
+%_libdir/libsolvext.so
 /usr/include/solv
-/usr/bin/deptestomatic
 /usr/bin/helix2solv
 
 %files demo
