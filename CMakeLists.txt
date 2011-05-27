@@ -210,3 +210,6 @@ ADD_CUSTOM_TARGET (srcpackage
   ${AUTOBUILD_COMMAND}
 )
 
+ADD_CUSTOM_TARGET (srcpackage_local
+  ${AUTOBUILD_COMMAND}
+)
