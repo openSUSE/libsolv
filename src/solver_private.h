@@ -86,6 +86,9 @@ struct _Solver {
 					 * > 0: level of decision when installed,
 					 * < 0: level of decision when conflict */
 
+  int decisioncnt_weak;
+  int decisioncnt_orphan;
+
   /* learnt rule history */
   Queue learnt_why;
   Queue learnt_pool;

@@ -1407,9 +1407,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    {
 	      if (analyze_unsolvable(solv, r, disablerules))
 		continue;
-	      queue_free(&dq);
-	      queue_free(&dqs);
-	      return;
+	      level = 0;
+	      break;	/* unsolvable */
 	    }
 	}
 
@@ -1465,14 +1464,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      olevel = level;
 	      level = selectandinstall(solv, level, &dq, disablerules, i);
 	      if (level == 0)
-		{
-		  queue_free(&dq);
-		  queue_free(&dqs);
-		  return;
-		}
+		break;
 	      if (level <= olevel)
 		break;
 	    }
+          if (level == 0)
+	    break;	/* unsolvable */
 	  systemlevel = level + 1;
 	  if (i < solv->jobrules_end)
 	    continue;
@@ -1597,11 +1594,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			  level = setpropagatelearn(solv, level, i, disablerules, r - solv->rules);
 			}
 		      if (level == 0)
-			{
-			  queue_free(&dq);
-			  queue_free(&dqs);
-			  return;
-			}
+			break;
 		      if (level <= olevel)
 			{
 			  if (level == 1 || level < passlevel)
@@ -1610,7 +1603,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			    n = installed->start;	/* redo all */
 			  i--;
 			  n--;
-			  continue; /* retry with learnt rule */
+			  continue;	/* retry with learnt rule */
 			}
 		    }
 		}
@@ -1621,6 +1614,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		}
 	      installedpos = installed->start;	/* reset installedpos */
 	    }
+          if (level == 0)
+	    break;		/* unsolvable */
 	  systemlevel = level + 1;
 	  if (pass < 2)
 	    continue;		/* had trouble, retry */
@@ -1703,22 +1698,23 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  olevel = level;
 	  level = selectandinstall(solv, level, &dq, disablerules, r - solv->rules);
 	  if (level == 0)
-	    {
-	      queue_free(&dq);
-	      queue_free(&dqs);
-	      return;
-	    }
+	    break;		/* unsolvable */
 	  if (level < systemlevel || level == 1)
 	    break;		/* trouble */
 	  /* something changed, so look at all rules again */
 	  n = 0;
 	}
 
-      if (n != solv->nrules)	/* ran into trouble, restart */
-	continue;
+      if (n != solv->nrules)	/* ran into trouble? */
+	{
+	  if (level == 0)
+	    break;		/* unsolvable */
+	  continue;		/* start over */
+	}
 
       /* at this point we have a consistent system. now do the extras... */
 
+      solv->decisioncnt_weak = solv->decisionq.count;
       if (doweak)
 	{
 	  int qcount;
@@ -1891,6 +1887,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    POOL_DEBUG(SAT_DEBUG_POLICY, "installing recommended %s\n", pool_solvid2str(pool, p));
 		  queue_push(&solv->recommendations, p);
 		  level = setpropagatelearn(solv, level, p, 0, 0);
+		  if (level == 0)
+		    break;
 		  continue;	/* back to main loop */
 		}
 
@@ -1918,6 +1916,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      if (i < dqs.count || solv->decisionq.count < decisioncount)
 		{
 		  map_free(&dqmap);
+		  if (level == 0)
+		    break;
 		  continue;
 		}
 
@@ -1970,12 +1970,14 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    break;	/* had a problem above, quit loop */
 		}
 	      map_free(&dqmap);
-
+	      if (level == 0)
+		break;
 	      continue;		/* back to main loop so that all deps are checked */
 	    }
 	}
 
-     if (solv->dupmap_all && solv->installed)
+      solv->decisioncnt_orphan = solv->decisionq.count;
+      if (solv->dupmap_all && solv->installed)
 	{
 	  int installedone = 0;
 
@@ -1997,8 +1999,14 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      if (level < olevel)
 		break;
 	    }
+	  if (level == 0)
+	    break;
 	  if (installedone || i < solv->orphaned.count)
-	    continue;		/* back to main loop */
+	    {
+	      if (level == 0)
+		break;
+	      continue;		/* back to main loop */
+	    }
 	  for (i = 0; i < solv->orphaned.count; i++)
 	    {
 	      p = solv->orphaned.elements[i];
@@ -2011,7 +2019,11 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		break;
 	    }
 	  if (i < solv->orphaned.count)
-	    continue;		/* back to main loop */
+	    {
+	      if (level == 0)
+		break;
+	      continue;		/* back to main loop */
+	    }
 	}
 
      if (solv->solution_callback)
@@ -2042,18 +2054,14 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      assert(why >= 0);
 	      level = setpropagatelearn(solv, level, p, disablerules, why);
 	      if (level == 0)
-		{
-		  queue_free(&dq);
-		  queue_free(&dqs);
-		  return;
-		}
+		break;
 	      continue;
 	    }
 	  /* all branches done, we're finally finished */
 	  break;
 	}
 
-      /* minimization step */
+      /* auto-minimization step */
      if (solv->branches.count)
 	{
 	  int l = 0, lasti = -1, lastl = -1;
@@ -2086,11 +2094,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      olevel = level;
 	      level = setpropagatelearn(solv, level, p, disablerules, why);
 	      if (level == 0)
-		{
-		  queue_free(&dq);
-		  queue_free(&dqs);
-		  return;
-		}
+		break;
 	      continue;		/* back to main loop */
 	    }
 	}
@@ -2103,6 +2107,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   POOL_DEBUG(SAT_DEBUG_STATS, "done solving.\n\n");
   queue_free(&dq);
   queue_free(&dqs);
+  if (level == 0)
+    {
+      /* unsolvable */
+      solv->decisioncnt_weak = solv->decisionq.count;
+      solv->decisioncnt_orphan = solv->decisionq.count;
+    }
 #if 0
   solver_printdecisionq(solv, SAT_DEBUG_RESULT);
 #endif

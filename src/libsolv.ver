@@ -37,8 +37,6 @@ SOLV_1.0 {
 		policy_illegal_vendorchange;
 		policy_is_illegal;
 		pool_add_fileconflicts_deps;
-		pool_add_solvable;
-		pool_add_solvable_block;
 		pool_addfileprovides;
 		pool_addfileprovides_ids;
 		pool_addrelproviders;
@@ -57,7 +55,6 @@ SOLV_1.0 {
 		pool_evrcmp_str;
 		pool_evrmatch;
 		pool_free;
-		pool_free_solvable_block;
 		pool_freeidhashes;
 		pool_freetmpspace;
 		pool_freewhatprovides;
@@ -271,7 +268,6 @@ SOLV_1.0 {
 		solver_printtrivial;
 		solver_printwatches;
 		solver_problem_count;
-		solver_problemruleinfo;
 		solver_problemruleinfo2str;
 		solver_ruleinfo;
 		solver_samerule;

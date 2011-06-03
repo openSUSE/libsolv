@@ -896,11 +896,4 @@ solver_findallproblemrules(Solver *solv, Id problem, Queue *rules)
   findallproblemrules_internal(solv, solv->problems.elements[2 * problem - 2], rules);
 }
 
-/* obsolete function */
-SolverRuleinfo
-solver_problemruleinfo(Solver *solv, Queue *job, Id rid, Id *depp, Id *sourcep, Id *targetp)
-{
-  return solver_ruleinfo(solv, rid, sourcep, targetp, depp);
-}
-
 /* EOF */
