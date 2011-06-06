@@ -207,7 +207,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
       solver_enableproblem(solv, problem[i]);
 
   if (sug < 0)
-    solver_reenablepolicyrules(solv, -(sug + 1));
+    solver_reenablepolicyrules(solv, -sug);
   else if (sug >= solv->updaterules && sug < solv->updaterules_end)
     {
       /* enable feature rule */
@@ -292,7 +292,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 		solver_enablerule(solv, r);	/* enable corresponding feature rule */
 	    }
 	  if (v < 0)
-	    solver_reenablepolicyrules(solv, -(v + 1));
+	    solver_reenablepolicyrules(solv, -v);
 	}
       else
 	{

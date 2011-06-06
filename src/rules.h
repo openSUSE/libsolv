@@ -94,37 +94,41 @@ solver_enablerule(struct _Solver *solv, Rule *r)
     r->d = -r->d - 1;
 }
 
-Rule *solver_addrule(struct _Solver *solv, Id p, Id d);
-void solver_unifyrules(struct _Solver *solv);
-int solver_samerule(struct _Solver *solv, Rule *r1, Rule *r2);
+extern Rule *solver_addrule(struct _Solver *solv, Id p, Id d);
+extern void solver_unifyrules(struct _Solver *solv);
+extern int solver_samerule(struct _Solver *solv, Rule *r1, Rule *r2);
 
 /* rpm rules */
-void solver_addrpmrulesforsolvable(struct _Solver *solv, Solvable *s, Map *m);
-void solver_addrpmrulesforweak(struct _Solver *solv, Map *m);
-void solver_addrpmrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
+extern void solver_addrpmrulesforsolvable(struct _Solver *solv, Solvable *s, Map *m);
+extern void solver_addrpmrulesforweak(struct _Solver *solv, Map *m);
+extern void solver_addrpmrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
 
 /* update/feature rules */
-void solver_addupdaterule(struct _Solver *solv, Solvable *s, int allow_all);
+extern void solver_addupdaterule(struct _Solver *solv, Solvable *s, int allow_all);
 
 /* infarch rules */
-void solver_addinfarchrules(struct _Solver *solv, Map *addedmap);
+extern void solver_addinfarchrules(struct _Solver *solv, Map *addedmap);
 
 /* dup rules */
-void solver_createdupmaps(struct _Solver *solv);
-void solver_freedupmaps(struct _Solver *solv);
-void solver_addduprules(struct _Solver *solv, Map *addedmap);
+extern void solver_createdupmaps(struct _Solver *solv);
+extern void solver_freedupmaps(struct _Solver *solv);
+extern void solver_addduprules(struct _Solver *solv, Map *addedmap);
+
+/* choice rules */
+extern void solver_addchoicerules(struct _Solver *solv);
+extern void solver_disablechoicerules(struct _Solver *solv, Rule *r);
 
 /* policy rule disabling/reenabling */
-void solver_disablepolicyrules(struct _Solver *solv);
-void solver_reenablepolicyrules(struct _Solver *solv, int jobidx);
+extern void solver_disablepolicyrules(struct _Solver *solv);
+extern void solver_reenablepolicyrules(struct _Solver *solv, int jobidx);
 
 /* rule info */
-int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
-SolverRuleinfo solver_ruleinfo(struct _Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
+extern int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
+extern SolverRuleinfo solver_ruleinfo(struct _Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
+extern void solver_ruleliterals(struct _Solver *solv, Id rid, Queue *q);
+extern int  solver_rule2jobidx(struct _Solver *solv, Id rid);
+extern Id   solver_rule2job(struct _Solver *solv, Id rid, Id *whatp);
 
-/* misc functions */
-void solver_addchoicerules(struct _Solver *solv);
-void solver_disablechoicerules(struct _Solver *solv, Rule *r);
 
 #ifdef __cplusplus
 }

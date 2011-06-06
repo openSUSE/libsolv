@@ -275,7 +275,10 @@ SOLV_1.0 {
 		solver_printwatches;
 		solver_problem_count;
 		solver_problemruleinfo2str;
+		solver_rule2job;
+		solver_rule2jobidx;
 		solver_ruleinfo;
+		solver_ruleliterals;
 		solver_samerule;
 		solver_select2str;
 		solver_solution_count;

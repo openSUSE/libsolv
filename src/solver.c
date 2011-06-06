@@ -356,7 +356,7 @@ makeruledecisions(Solver *solv)
 	v = ri;
       solver_disableproblem(solv, v);
       if (v < 0)
-	solver_reenablepolicyrules(solv, -(v + 1));
+	solver_reenablepolicyrules(solv, -v);
     }
 }
 
@@ -1019,7 +1019,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 	solver_disablechoicerules(solv, solv->rules + lastweak);
       solver_disableproblem(solv, v);
       if (v < 0)
-	solver_reenablepolicyrules(solv, -(v + 1));
+	solver_reenablepolicyrules(solv, -v);
       solver_reset(solv);
       return 1;
     }

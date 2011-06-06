@@ -1610,7 +1610,7 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
 
   queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
   queue_init_buffer(&allq, allqbuf, sizeof(allqbuf)/sizeof(*allqbuf));
-  jobtodisablelist(solv, job->elements[jobidx], job->elements[jobidx + 1], &q);
+  jobtodisablelist(solv, job->elements[jobidx - 1], job->elements[jobidx], &q);
   if (!q.count)
     return;
   for (i = solv->jobrules; i < solv->jobrules_end; i++)
@@ -1919,6 +1919,46 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
       return SOLVER_RULE_LEARNT;
     }
   return SOLVER_RULE_UNKNOWN;
+}
+
+void
+solver_ruleliterals(Solver *solv, Id rid, Queue *q)
+{
+  Pool *pool = solv->pool;
+  Id p, *pp;
+  Rule *r;
+
+  queue_empty(q);
+  r = solv->rules + rid;
+  FOR_RULELITERALS(p, pp, r)
+    if (p != -SYSTEMSOLVABLE)
+      queue_push(q, p);
+  if (!q->count)
+    queue_push(q, -SYSTEMSOLVABLE);	/* hmm, better to return an empty result? */
+}
+
+int
+solver_rule2jobidx(Solver *solv, Id rid)
+{
+  if (rid < solv->jobrules || rid >= solv->jobrules_end)
+    return 0;
+  return solv->ruletojob.elements[rid - solv->jobrules] + 1;
+}
+
+Id
+solver_rule2job(Solver *solv, Id rid, Id *whatp)
+{
+  int idx;
+  if (rid < solv->jobrules || rid >= solv->jobrules_end)
+    {
+      if (whatp)
+	*whatp = 0;
+      return 0;
+    }
+  idx = solv->ruletojob.elements[rid - solv->jobrules];
+  if (whatp)
+    *whatp = solv->job.elements[idx + 1];
+  return solv->job.elements[idx];
 }
 
 void
