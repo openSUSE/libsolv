@@ -86,6 +86,9 @@ struct _Solver {
 					 * > 0: level of decision when installed,
 					 * < 0: level of decision when conflict */
 
+  int decisioncnt_update;
+  int decisioncnt_keep;
+  int decisioncnt_resolve;
   int decisioncnt_weak;
   int decisioncnt_orphan;
 

@@ -243,12 +243,18 @@ SOLV_1.0 {
 		solver_create;
 		solver_create_decisions_obsoletesmap;
 		solver_create_state_maps;
+		solver_describe_decision;
+		solver_describe_weakdep_decision;
 		solver_disableproblem;
 		solver_enableproblem;
 		solver_findallproblemrules;
 		solver_findproblemrule;
 		solver_free;
 		solver_freedupmaps;
+		solver_get_decisionblock;
+		solver_get_decisionlevel;
+		solver_get_decisionqueue;
+		solver_get_lastdecisionblocklevel;
 		solver_next_problem;
 		solver_next_solution;
 		solver_next_solutionelement;

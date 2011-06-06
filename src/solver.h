@@ -109,6 +109,9 @@ struct _Solver {
 					 * > 0: level of decision when installed,
 					 * < 0: level of decision when conflict */
 
+  int decisioncnt_update;
+  int decisioncnt_keep;
+  int decisioncnt_resolve;
   int decisioncnt_weak;
   int decisioncnt_orphan;
 
@@ -257,9 +260,30 @@ typedef struct _Solver Solver;
 
 #define SOLVER_SETMASK			0x2f000000
 
+#define SOLVER_REASON_UNRELATED		0
+#define SOLVER_REASON_UNIT_RULE		1
+#define SOLVER_REASON_KEEP_INSTALLED	2
+#define SOLVER_REASON_RESOLVE_JOB	3
+#define SOLVER_REASON_UPDATE_INSTALLED	4
+#define SOLVER_REASON_CLEANDEPS_ERASE	5
+#define SOLVER_REASON_RESOLVE		6
+#define SOLVER_REASON_WEAKDEP		7
+#define SOLVER_REASON_RESOLVE_ORPHAN	8
+
+#define SOLVER_REASON_RECOMMENDED	16
+#define SOLVER_REASON_SUPPLEMENTED	17
+
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern int  solver_solve(Solver *solv, Queue *job);
+
+extern int  solver_get_decisionlevel(Solver *solv, Id p);
+extern void solver_get_decisionqueue(Solver *solv, Queue *decisionq);
+extern int  solver_get_lastdecisionblocklevel(Solver *solv);
+extern void solver_get_decisionblock(Solver *solv, int level, Queue *decisionq);
+extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
+extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
+
 
 extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap);
 extern void solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap);

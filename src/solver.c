@@ -1473,8 +1473,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  systemlevel = level + 1;
 	  if (i < solv->jobrules_end)
 	    continue;
+          solv->decisioncnt_update = solv->decisionq.count;
+          solv->decisioncnt_keep = solv->decisionq.count;
 	}
-
 
       /*
        * installed packages
@@ -1490,6 +1491,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  for (pass = solv->updatemap.size ? 0 : 1; pass < 2; pass++)
 	    {
 	      int passlevel = level;
+	      if (pass == 1)
+		solv->decisioncnt_keep = solv->decisionq.count;
 	      /* start with installedpos, the position that gave us problems last time */
 	      for (i = installedpos, n = installed->start; n < installed->end; i++, n++)
 		{
@@ -1627,6 +1630,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * decide
        */
+      solv->decisioncnt_resolve = solv->decisionq.count;
       POOL_DEBUG(SAT_DEBUG_POLICY, "deciding unresolved rules\n");
       for (i = 1, n = 1; n < solv->nrules; i++, n++)
 	{
@@ -2110,6 +2114,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   if (level == 0)
     {
       /* unsolvable */
+      solv->decisioncnt_update = solv->decisionq.count;
+      solv->decisioncnt_keep = solv->decisionq.count;
+      solv->decisioncnt_resolve = solv->decisionq.count;
       solv->decisioncnt_weak = solv->decisionq.count;
       solv->decisioncnt_orphan = solv->decisionq.count;
     }
@@ -3068,3 +3075,234 @@ solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res)
   map_free(&installedmap);
 }
 
+int
+solver_get_decisionlevel(Solver *solv, Id p)
+{
+  return solv->decisionmap[p];
+}
+
+void
+solver_get_decisionqueue(Solver *solv, Queue *decisionq)
+{
+  queue_free(decisionq);
+  queue_init_clone(decisionq, &solv->decisionq);
+}
+
+int
+solver_get_lastdecisionblocklevel(Solver *solv)
+{
+  Id p;
+  if (solv->decisionq.count == 0)
+    return 0;
+  p = solv->decisionq.elements[solv->decisionq.count - 1];
+  if (p < 0)
+    p = -p;
+  return solv->decisionmap[p] < 0 ? -solv->decisionmap[p] : solv->decisionmap[p];
+}
+
+void
+solver_get_decisionblock(Solver *solv, int level, Queue *decisionq)
+{
+  Id p;
+  int i;
+
+  queue_empty(decisionq);
+  for (i = 0; i < solv->decisionq.count; i++)
+    {
+      p = solv->decisionq.elements[i];
+      if (p < 0)
+	p = -p;
+      if (solv->decisionmap[p] == level || solv->decisionmap[p] == -level)
+        break;
+    }
+  if (i == solv->decisionq.count)
+    return;
+  for (i = 0; i < solv->decisionq.count; i++)
+    {
+      p = solv->decisionq.elements[i];
+      if (p < 0)
+	p = -p;
+      if (solv->decisionmap[p] == level || solv->decisionmap[p] == -level)
+        queue_push(decisionq, p);
+      else
+        break;
+    }
+}
+
+int
+solver_describe_decision(Solver *solv, Id p, Id *infop)
+{
+  int i;
+  Id pp, why;
+  
+  if (infop)
+    *infop = 0;
+  if (!solv->decisionmap[p])
+    return SOLVER_REASON_UNRELATED;
+  pp = solv->decisionmap[p] < 0 ? -p : p;
+  for (i = 0; i < solv->decisionq.count; i++)
+    if (solv->decisionq.elements[i] == pp)
+      break;
+  if (i == solv->decisionq.count)	/* just in case... */
+    return SOLVER_REASON_UNRELATED;
+  why = solv->decisionq_why.elements[i];
+  if (why > 0)
+    {
+      if (infop)
+	*infop = why;
+      return SOLVER_REASON_UNIT_RULE;
+    }
+  why = -why;
+  if (i < solv->decisioncnt_update)
+    {
+      if (i == 0)
+	{
+	  if (infop)
+	    *infop = SYSTEMSOLVABLE;
+	  return SOLVER_REASON_KEEP_INSTALLED;
+	}
+      if (infop)
+	*infop = why;
+      return SOLVER_REASON_RESOLVE_JOB;
+    }
+  if (i < solv->decisioncnt_keep)
+    {
+      if (why == 0 && pp < 0)
+	return SOLVER_REASON_CLEANDEPS_ERASE;
+      if (infop)
+	{
+	  if (why >= solv->updaterules && why < solv->updaterules_end)
+	    *infop = why - solv->updaterules;
+	  else if (why >= solv->featurerules && why < solv->featurerules_end)
+	    *infop = why - solv->featurerules;
+	}
+      return SOLVER_REASON_UPDATE_INSTALLED;
+    }
+  if (i < solv->decisioncnt_resolve)
+    {
+      if (why == 0 && pp < 0)
+	return SOLVER_REASON_CLEANDEPS_ERASE;
+      if (infop)
+	{
+	  if (why >= solv->updaterules && why < solv->updaterules_end)
+	    *infop = why - solv->updaterules;
+	  else if (why >= solv->featurerules && why < solv->featurerules_end)
+	    *infop = why - solv->featurerules;
+	}
+      return SOLVER_REASON_KEEP_INSTALLED;
+    }
+  if (i < solv->decisioncnt_weak)
+    {
+      if (infop)
+	*infop = why;
+      return SOLVER_REASON_RESOLVE;
+    }
+  if (solv->decisionq.count < solv->decisioncnt_orphan)
+    return SOLVER_REASON_WEAKDEP;
+  return SOLVER_REASON_RESOLVE_ORPHAN;
+}
+
+
+void
+solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
+{
+  Pool *pool = solv->pool;
+  int i;
+  int level = solv->decisionmap[p];
+  int decisionno;
+  Solvable *s;
+
+  queue_empty(whyq);
+  if (level < 0)
+    return;	/* huh? */
+  for (decisionno = 0; decisionno < solv->decisionq.count; decisionno++)
+    if (solv->decisionq.elements[decisionno] == p)
+      break;
+  if (decisionno == solv->decisionq.count)
+    return;	/* huh? */
+  if (decisionno < solv->decisioncnt_weak || decisionno >= solv->decisioncnt_orphan)
+    return;	/* huh? */
+
+  /* 1) list all packages that recommend us */
+  for (i = 1; i < pool->nsolvables; i++)
+    {
+      Id *recp, rec, pp2, p2;
+      if (solv->decisionmap[i] < 0 || solv->decisionmap[i] >= level)
+	continue;
+      s = pool->solvables + i;
+      if (!s->recommends)
+	continue;
+      if (solv->ignorealreadyrecommended && s->repo == solv->installed)
+	continue;
+      recp = s->repo->idarraydata + s->recommends;
+      while ((rec = *recp++) != 0)
+	{
+	  int found = 0;
+	  FOR_PROVIDES(p2, pp2, rec)
+	    {
+	      if (p2 == p)
+		found = 1;
+	      else
+		{
+		  /* if p2 is already installed, this recommends is ignored */
+		  if (solv->decisionmap[p2] > 0 && solv->decisionmap[p2] < level)
+		    break;
+		}
+	    }
+	  if (!p2 && found)
+	    {
+	      queue_push(whyq, SOLVER_REASON_RECOMMENDED);
+	      queue_push2(whyq, p2, rec);
+	    }
+	}
+    }
+  /* 2) list all supplements */
+  s = pool->solvables + p;
+  if (s->supplements && level > 0)
+    {
+      Id *supp, sup, pp2, p2;
+      int suppstart;
+      /* this is a hack. to use solver_dep_fulfilled we temporarily clear
+       * everything above our level in the decisionmap */
+      for (i = decisionno; i < solv->decisionq.count; i++ )
+	{
+	  p2 = solv->decisionq.elements[i];
+	  if (p2 > 0)
+	    solv->decisionmap[p2] = -solv->decisionmap[p2];
+	}
+      supp = s->repo->idarraydata + s->supplements;
+      suppstart = whyq->count;
+      while ((sup = *supp++) != 0)
+	if (solver_dep_fulfilled(solv, sup))
+	  {
+	    int found = 0;
+	    /* let's see if this is an easy supp */
+	    FOR_PROVIDES(p2, pp2, sup)
+	      {
+		if (solv->ignorealreadyrecommended && solv->installed)
+		  {
+		    if (pool->solvables[p2].repo == solv->installed)
+		      continue;
+		  }
+	        if (solv->decisionmap[p2] > 0 && solv->decisionmap[p2] < level)
+		  {
+		    queue_push(whyq, SOLVER_REASON_SUPPLEMENTED);
+		    queue_push2(whyq, p2, sup);
+		    found = 1;
+		  }
+	      }
+	    if (!found)
+	      {
+		/* hard case, just note with no package */
+		queue_push(whyq, SOLVER_REASON_SUPPLEMENTED);
+	        queue_push2(whyq, 0, sup);
+	      }
+	  }
+      for (i = decisionno; i < solv->decisionq.count; i++)
+	{
+	  p2 = solv->decisionq.elements[i];
+	  if (p2 > 0)
+	    solv->decisionmap[p2] = -solv->decisionmap[p2];
+	}
+    }
+}
