@@ -293,7 +293,7 @@ static char *headtoevr(RpmHead *h)
       fprintf(stderr, "headtoevr: bad rpm header\n");
       exit(1);
     }
-  for (v = version; *v >= 0 && *v <= '9'; v++)
+  for (v = version; *v >= '0' && *v <= '9'; v++)
     ;
   if (epoch || (v != version && *v == ':'))
     {
