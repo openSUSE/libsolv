@@ -1176,7 +1176,7 @@ void
 dataiterator_set_search(Dataiterator *di, Repo *repo, Id p)
 {
   di->repo = repo;
-  di->repoid = -1;
+  di->repoid = 0;
   di->flags &= ~SEARCH_THISSOLVID;
   di->nparents = 0;
   di->rootlevel = 0;
@@ -1188,7 +1188,7 @@ dataiterator_set_search(Dataiterator *di, Repo *repo, Id p)
     }
   if (!repo)
     {
-      di->repoid = 0;
+      di->repoid = 1;
       di->repo = di->pool->repos[0];
     }
   di->state = di_enterrepo;
@@ -1383,13 +1383,13 @@ dataiterator_step(Dataiterator *di)
 	  /* FALLTHROUGH */
 
 	case di_nextrepo: di_nextrepo:
-	  if (di->repoid >= 0)
+	  if (di->repoid > 0)
 	    {
 	      di->repoid++;
 	      di->repodataid = 0;
-	      if (di->repoid < di->pool->nrepos)
+	      if (di->repoid - 1 < di->pool->nrepos)
 		{
-		  di->repo = di->pool->repos[di->repoid];
+		  di->repo = di->pool->repos[di->repoid - 1];
 	          goto di_enterrepo;
 		}
 	    }
@@ -1676,7 +1676,7 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
 	  di->state = di_bye;
 	  return;
 	}
-      di->repoid = -1;
+      di->repoid = 0;
       di->data = di->repo->repodata + di->pool->pos.repodataid;
       di->repodataid = -1;
       di->solvid = solvid;
@@ -1687,17 +1687,17 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
   if (solvid > 0)
     {
       di->repo = di->pool->solvables[solvid].repo;
-      di->repoid = -1;
+      di->repoid = 0;
     }
-  else if (di->repoid >= 0)
+  else if (di->repoid > 0)
     {
       if (!di->pool->nrepos)
 	{
 	  di->state = di_bye;
 	  return;
 	}
+      di->repoid = 1;
       di->repo = di->pool->repos[0];
-      di->repoid = 0;
     }
   di->repodataid = 0;
   di->solvid = solvid;
@@ -1713,7 +1713,7 @@ dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
   di->kv.parent = 0;
   di->rootlevel = 0;
   di->repo = repo;
-  di->repoid = -1;
+  di->repoid = 0;	/* 0 means stay at repo */
   di->repodataid = 0;
   di->solvid = 0;
   di->flags &= ~SEARCH_THISSOLVID;
