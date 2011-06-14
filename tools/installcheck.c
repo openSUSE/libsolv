@@ -219,7 +219,7 @@ main(int argc, char **argv)
       for (i = j = 0; i < cand.count; i++)
 	{
 	  p = cand.elements[i];
-	  if (solv->decisionmap[p] <= 0)
+	  if (solver_get_decisionlevel(solv, p) <= 0)
 	    {
 	      cand.elements[j++] = p;
 	      continue;

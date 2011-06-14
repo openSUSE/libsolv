@@ -225,7 +225,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       int has_FL = 0;
 
       /* find languages and other info */
-      for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+      FOR_REPODATAS(repo, i, data)
 	{
 	  for (j = 1, key = data->keys + j; j < data->nkeys; j++, key++)
 	    {

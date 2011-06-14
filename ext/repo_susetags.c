@@ -586,7 +586,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
     {
       Repodata *sdata;
       int i;
-      for (i = 0, sdata = repo->repodata; i < repo->nrepodata; i++, sdata++)
+      
+      FOR_REPODATAS(repo, i, sdata)
 	{
 	  int p;
 	  if (!repodata_has_keyname(sdata, SUSETAGS_SHARE_NAME))

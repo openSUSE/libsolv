@@ -69,12 +69,12 @@ struct _Pool {
   Hashmask relhashmask;
 
   struct _Repo **repos;
-  int nrepos;
+  int nrepos;			/* repos allocated */
 
   struct _Repo *installed; 	/* packages considered installed */
 
   Solvable *solvables;
-  int nsolvables;
+  int nsolvables;		/* solvables allocated */
 
   const char **languages;
   int nlanguages;

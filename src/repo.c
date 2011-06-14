@@ -202,7 +202,7 @@ void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
   for (s = repo->pool->solvables + start, i = count; i--; s++)
     s->repo = 0;
   pool_free_solvable_block(repo->pool, start, count, reuseids);
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     if (data->end > repo->end)
       repodata_shrink(data, repo->end);
 }
@@ -841,7 +841,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	}
     }
 
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       if (p < data->start || p >= data->end)
 	continue;
@@ -923,7 +923,7 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
 	  return pool_id2str(pool, pool->solvables[entry].vendor);
 	}
     }
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
@@ -955,7 +955,7 @@ repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound)
 	  return notfound;
 	}
     }
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
@@ -990,7 +990,7 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
 	  return repo->pool->solvables[entry].vendor;
 	}
     }
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
@@ -1044,7 +1044,7 @@ repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q)
 	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].enhances, q);
         }
     }
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
@@ -1073,7 +1073,7 @@ repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
   int i;
   const unsigned char *chk;
 
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
@@ -1103,7 +1103,7 @@ repo_lookup_void(Repo *repo, Id entry, Id keyname)
   int i;
   Id type;
 
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
@@ -1123,7 +1123,7 @@ repo_lookup_type(Repo *repo, Id entry, Id keyname)
   int i;
   Id type;
 
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
 	continue;
@@ -1274,7 +1274,7 @@ repo_internalize(Repo *repo)
   int i;
   Repodata *data;
 
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     if (data->attrs || data->xattrs)
       repodata_internalize(data);
 }
@@ -1285,7 +1285,7 @@ repo_disable_paging(Repo *repo)
   int i;
   Repodata *data;
 
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     repodata_disable_paging(data);
 }
 // EOF

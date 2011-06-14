@@ -139,12 +139,15 @@ void
 toinst(Solver *solv, Repo *repo, Repo *instrepo)
 {
   Pool *pool = solv->pool;
+  Queue q;
   int k;
   Id p;
 
-  for (k = 0; k < solv->decisionq.count; k++)
+  queue_init(&q);
+  solver_get_decisionqueue(solv, &q);
+  for (k = 0; k < q.count; k++)
     {
-      p = solv->decisionq.elements[k];
+      p = q.elements[k];
       if (p < 0 || p == SYSTEMSOLVABLE)
 	continue;
 
@@ -152,6 +155,7 @@ toinst(Solver *solv, Repo *repo, Repo *instrepo)
       /* oh my! */
       pool->solvables[p].repo = instrepo;
     }
+  queue_free(&q);
 }
 
 void
@@ -396,7 +400,7 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
       for (i = 0; i < cand.count; i++)
         {
           p = cand.elements[i];
-          if (p > 0 && solv->decisionmap[p] > 0)
+          if (p > 0 && solver_get_decisionlevel(solv, p) > 0)
             cand.elements[i] = -p;	/* drop candidate */
         }
       solver_free(solv);

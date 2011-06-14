@@ -25,7 +25,7 @@ dump_repodata(Repo *repo)
   if (repo->nrepodata == 0)
     return;
   printf("repo contains %d repodata sections:\n", repo->nrepodata);
-  for (i = 0, data = repo->repodata; i < repo->nrepodata; i++, data++)
+  FOR_REPODATAS(repo, i, data)
     {
       unsigned int j;
       printf("\nrepodata %d has %d keys, %d schemata\n", i + 1, data->nkeys - 1, data->nschemata - 1);

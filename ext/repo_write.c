@@ -1023,8 +1023,8 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   /* start with all KEY_STORAGE_SOLVABLE ids */
 
   n = ID_NUM_INTERNAL;
-  for (i = 0; i < repo->nrepodata; i++)
-    n += repo->repodata[i].nkeys;
+  FOR_REPODATAS(repo, i, data)
+    n += data->nkeys;
   cbdata.keymap = sat_calloc(n, sizeof(Id));
   cbdata.keymapstart = sat_calloc(repo->nrepodata, sizeof(Id));
   repodataused = sat_calloc(repo->nrepodata, 1);
@@ -1073,9 +1073,8 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   dirpool = 0;
   dirpooldata = 0;
   n = ID_NUM_INTERNAL;
-  for (i = 0; i < repo->nrepodata; i++)
+  FOR_REPODATAS(repo, i, data)
     {
-      data = repo->repodata + i;
       cbdata.keymapstart[i] = n;
       cbdata.keymap[n++] = 0;	/* key 0 */
       idused = 0;
@@ -1294,7 +1293,7 @@ for (i = 1; i < target.nkeys; i++)
   cbdata.sp = cbdata.schema;
   /* collect all other data from all repodatas */
   /* XXX: merge arrays of equal keys? */
-  for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
+  FOR_REPODATAS(repo, j, data)
     {
       if (!repodataused[j])
 	continue;
@@ -1390,7 +1389,7 @@ for (i = 1; i < target.nkeys; i++)
 
       if (anyrepodataused)
 	{
-	  for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
+	  FOR_REPODATAS(repo, j, data)
 	    {
 	      if (!repodataused[j])
 		continue;
@@ -1628,7 +1627,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   data_addid(xd, mainschema);
 
 #if 1
-  for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
+  FOR_REPODATAS(repo, j, data)
     {
       if (!repodataused[j])
 	continue;
@@ -1678,7 +1677,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  if (anyrepodataused)
 	    {
 	      cbdata.vstart = -1;
-	      for (j = 0, data = repo->repodata; j < repo->nrepodata; j++, data++)
+	      FOR_REPODATAS(repo, j, data)
 		{
 		  if (!repodataused[j])
 		    continue;

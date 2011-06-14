@@ -281,4 +281,7 @@ void repo_add_poolstr_array(Repo *repo, Id p, Id keyname, const char *str);
 void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);
 
+#define FOR_REPODATAS(repo, rdid, data)	\
+	for (rdid = 0, data = repo->repodata + rdid; rdid < repo->nrepodata; rdid++, data++)
+
 #endif /* LIBSOLV_REPO_H */

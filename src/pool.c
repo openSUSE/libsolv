@@ -980,7 +980,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 	  continue;
 	}
       ndone = 0;
-      for (data = repo->repodata, repodataid = 0; repodataid < repo->nrepodata; repodataid++, data++)
+      FOR_REPODATAS(repo, repodataid, data)
 	{
 	  if (ndone >= repo->nsolvables)
 	    break;
