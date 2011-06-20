@@ -25,13 +25,14 @@ extern void solver_printproblem(Solver *solv, Id v);
 extern void solver_printwatches(Solver *solv, int type);
 extern void solver_printdecisionq(Solver *solv, int type);
 extern void solver_printdecisions(Solver *solv);
-extern void solver_printtransaction(Solver *solv);
 extern void solver_printproblemruleinfo(Solver *solv, Id rule);
 extern void solver_printprobleminfo(Solver *solv, Id problem);
 extern void solver_printcompleteprobleminfo(Solver *solv, Id problem);
 extern void solver_printsolution(Solver *solv, Id problem, Id solution);
 extern void solver_printallsolutions(Solver *solv);
 extern void solver_printtrivial(Solver *solv);
+
+extern void transaction_print(Transaction *trans);
 
 extern const char *solver_select2str(Pool *pool, Id select, Id what);
 extern const char *pool_job2str(Pool *pool, Id how, Id what, int withflags);

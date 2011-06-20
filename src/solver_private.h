@@ -18,8 +18,6 @@ struct _Solver {
   Pool *pool;				/* back pointer to pool */
   Queue job;				/* copy of the job we're solving */
 
-  Transaction trans;			/* calculated transaction */
-
   Repo *installed;			/* copy of pool->installed */
   
   /* list of rules, ordered

@@ -297,6 +297,7 @@ solver_printdecisions(Solver *solv)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
+  Transaction *trans = solver_create_transaction(solv);
   Id p, type;
   int i, j;
   Solvable *s;
@@ -306,11 +307,11 @@ solver_printdecisions(Solver *solv)
   POOL_DEBUG(SAT_DEBUG_RESULT, "transaction:\n");
 
   queue_init(&iq);
-  for (i = 0; i < solv->trans.steps.count; i++)
+  for (i = 0; i < trans->steps.count; i++)
     {
-      p = solv->trans.steps.elements[i];
+      p = trans->steps.elements[i];
       s = pool->solvables + p;
-      type = transaction_type(&solv->trans, p, SOLVER_TRANSACTION_SHOW_ACTIVE|SOLVER_TRANSACTION_SHOW_ALL|SOLVER_TRANSACTION_SHOW_OBSOLETES|SOLVER_TRANSACTION_SHOW_MULTIINSTALL);
+      type = transaction_type(trans, p, SOLVER_TRANSACTION_SHOW_ACTIVE|SOLVER_TRANSACTION_SHOW_ALL|SOLVER_TRANSACTION_SHOW_OBSOLETES|SOLVER_TRANSACTION_SHOW_MULTIINSTALL);
       switch(type)
         {
 	case SOLVER_TRANSACTION_MULTIINSTALL:
@@ -354,7 +355,7 @@ solver_printdecisions(Solver *solv)
 	case SOLVER_TRANSACTION_CHANGE:
 	case SOLVER_TRANSACTION_UPGRADE:
 	case SOLVER_TRANSACTION_OBSOLETES:
-	  transaction_all_obs_pkgs(&solv->trans, p, &iq);
+	  transaction_all_obs_pkgs(trans, p, &iq);
 	  if (iq.count)
 	    {
 	      POOL_DEBUG(SAT_DEBUG_RESULT, "  (obsoletes");
@@ -422,6 +423,7 @@ solver_printdecisions(Solver *solv)
 	}
       POOL_DEBUG(SAT_DEBUG_RESULT, "\n");
     }
+  transaction_free(trans);
 }
 
 static inline
@@ -431,9 +433,8 @@ const char *id2strnone(Pool *pool, Id id)
 }
 
 void
-solver_printtransaction(Solver *solv)
+transaction_print(Transaction *trans)
 {
-  Transaction *trans = &solv->trans;
   Pool *pool = trans->pool;
   Queue classes, pkgs;
   int i, j, mode, l, linel;

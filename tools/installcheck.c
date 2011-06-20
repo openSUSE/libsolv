@@ -213,7 +213,7 @@ main(int argc, char **argv)
 	  queue_push(&job, SOLVER_LOCK|SOLVER_SOLVABLE_ONE_OF);
 	  queue_push(&job, archlock);
 	}
-      solv->dontinstallrecommended = 1;
+      solver_set_flag(solv, SOLVER_FLAG_IGNORE_RECOMMENDED, 1);
       solver_solve(solv, &job);
       /* prune... */
       for (i = j = 0; i < cand.count; i++)
@@ -282,7 +282,7 @@ main(int argc, char **argv)
 	  queue_push(&job, SOLVER_LOCK|SOLVER_SOLVABLE_ONE_OF);
 	  queue_push(&job, archlock);
 	}
-      solv->dontinstallrecommended = 1;
+      solver_set_flag(solv, SOLVER_FLAG_IGNORE_RECOMMENDED, 1);
       problemcount = solver_solve(solv, &job);
       if (problemcount)
 	{

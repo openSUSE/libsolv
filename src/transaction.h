@@ -80,11 +80,11 @@ typedef struct _Transaction {
 /* order flags */
 #define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
 
-extern void transaction_init(Transaction *trans, struct _Pool *pool);
-extern void transaction_init_clone(Transaction *trans, Transaction *srctrans);
+extern Transaction *transaction_create(struct _Pool *pool);
+extern Transaction *transaction_create_decisionq(struct _Pool *pool, Queue *decisionq, Map *noobsmap);
+extern Transaction *transaction_create_clone(Transaction *srctrans);
 extern void transaction_free(Transaction *trans);
 extern void transaction_free_orderdata(Transaction *trans);
-extern void transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap);
 
 /* if p is installed, returns with pkg(s) obsolete p */
 /* if p is not installed, returns with pkg(s) we obsolete */

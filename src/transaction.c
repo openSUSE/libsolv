@@ -627,15 +627,16 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 }
 
 
-void
-transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
+Transaction *
+transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *noobsmap)
 {
-  Pool *pool = trans->pool;
   Repo *installed = pool->installed;
   int i, neednoobs;
   Id p;
   Solvable *s;
+  Transaction *trans;
 
+  trans = transaction_create(pool);
   if (noobsmap && !noobsmap->size)
     noobsmap = 0;	/* ignore empty map */
   queue_empty(&trans->steps);
@@ -683,6 +684,7 @@ transaction_calculate(Transaction *trans, Queue *decisionq, Map *noobsmap)
       if (p > 0 && MAPTST(&trans->transactsmap, p))
         queue_push(&trans->steps, p);
     }
+  return trans;
 }
 
 int
@@ -788,18 +790,18 @@ struct _TransactionOrderdata {
 
 #define EDGEDATA_BLOCK	127
 
-void
-transaction_init(Transaction *trans, Pool *pool)
+Transaction *
+transaction_create(Pool *pool)
 {
-  memset(trans, 0, sizeof(*trans));
+  Transaction *trans = sat_calloc(1, sizeof(*trans));
   trans->pool = pool;
+  return trans;
 }
 
-void
-transaction_init_clone(Transaction *trans, Transaction *srctrans)
+Transaction *
+transaction_create_clone(Transaction *srctrans)
 {
-  memset(trans, 0, sizeof(*trans));
-  trans->pool = srctrans->pool;
+  Transaction *trans = transaction_create(srctrans->pool);
   queue_init_clone(&trans->steps, &srctrans->steps);
   queue_init_clone(&trans->transaction_info, &srctrans->transaction_info);
   if (srctrans->transaction_installed)
@@ -821,6 +823,7 @@ transaction_init_clone(Transaction *trans, Transaction *srctrans)
       memcpy(trans->orderdata->invedgedata, od->invedgedata, od->ninvedgedata * sizeof(Id));
       trans->orderdata->ninvedgedata = od->ninvedgedata;
     }
+  return trans;
 }
 
 void
@@ -832,6 +835,7 @@ transaction_free(Transaction *trans)
   map_free(&trans->transactsmap);
   map_free(&trans->noobsmap);
   transaction_free_orderdata(trans);
+  free(trans);
 }
 
 void

@@ -243,6 +243,7 @@ SOLV_1.0 {
 		solver_create;
 		solver_create_decisions_obsoletesmap;
 		solver_create_state_maps;
+		solver_create_transaction;
 		solver_describe_decision;
 		solver_describe_weakdep_decision;
 		solver_disableproblem;
@@ -254,6 +255,7 @@ SOLV_1.0 {
 		solver_get_decisionblock;
 		solver_get_decisionlevel;
 		solver_get_decisionqueue;
+		solver_get_flag;
 		solver_get_lastdecisionblocklevel;
 		solver_next_problem;
 		solver_next_solution;
@@ -270,7 +272,6 @@ SOLV_1.0 {
 		solver_printruleclass;
 		solver_printruleelement;
 		solver_printsolution;
-		solver_printtransaction;
 		solver_printtrivial;
 		solver_printwatches;
 		solver_problem_count;
@@ -281,6 +282,7 @@ SOLV_1.0 {
 		solver_ruleliterals;
 		solver_samerule;
 		solver_select2str;
+		solver_set_flag;
 		solver_solution_count;
 		solver_solutionelement2str;
 		solver_solutionelement_count;
@@ -301,18 +303,19 @@ SOLV_1.0 {
 		transaction_all_obs_pkgs;
 		transaction_calc_duchanges;
 		transaction_calc_installsizechange;
-		transaction_calculate;
 		transaction_check_order;
 		transaction_classify;
 		transaction_classify_pkgs;
+		transaction_create;
+		transaction_create_clone;
+		transaction_create_decisionq;
 		transaction_free;
 		transaction_free_orderdata;
-		transaction_init;
-		transaction_init_clone;
 		transaction_installedresult;
 		transaction_obs_pkg;
 		transaction_order;
 		transaction_order_add_choices;
+		transaction_print;
 		transaction_type;
 	local:
 		*;

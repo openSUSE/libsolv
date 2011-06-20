@@ -64,13 +64,17 @@ int main()
       Solver *solv = solver_create(pool);
       queue_push2(&job, SOLVER_VERIFY|SOLVER_SOLVABLE_ALL, 0);
 #if 0
-      solv->allowuninstall = 1;
+      solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);
 #endif
       problemcnt = solver_solve(solv, &job);
       if (problemcnt)
         solver_printallsolutions(solv);
       else
-        solver_printtransaction(solv);
+	{
+	  Transaction *trans = solver_create_transaction(solv);
+          transaction_print(trans);
+          transaction_free(trans);
+	}
       queue_free(&job);
       solver_free(solv);
     }

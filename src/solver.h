@@ -41,8 +41,6 @@ struct _Solver {
   Pool *pool;				/* back pointer to pool */
   Queue job;				/* copy of the job we're solving */
 
-  Transaction trans;			/* calculated transaction */
-
   Repo *installed;			/* copy of pool->installed */
   
   /* list of rules, ordered
@@ -273,9 +271,23 @@ typedef struct _Solver Solver;
 #define SOLVER_REASON_RECOMMENDED	16
 #define SOLVER_REASON_SUPPLEMENTED	17
 
+
+#define SOLVER_FLAG_ALLOW_DOWNGRADE		1
+#define SOLVER_FLAG_ALLOW_ARCHCHANGE		2
+#define SOLVER_FLAG_ALLOW_VENDORCHANGE		3
+#define SOLVER_FLAG_ALLOW_UNINSTALL		4
+#define SOLVER_FLAG_NO_UPDATEPROVIDE		5
+#define SOLVER_FLAG_SPLITPROVIDES		6
+#define SOLVER_FLAG_IGNORE_RECOMMENDED		7
+#define SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED	8
+#define SOLVER_FLAG_NO_INFARCHCHECK		9
+
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern int  solver_solve(Solver *solv, Queue *job);
+extern Transaction *solver_create_transaction(Solver *solv);
+extern int solver_set_flag(Solver *solv, int flag, int value);
+extern int solver_get_flag(Solver *solv, int flag);
 
 extern int  solver_get_decisionlevel(Solver *solv, Id p);
 extern void solver_get_decisionqueue(Solver *solv, Queue *decisionq);

@@ -292,7 +292,7 @@ test_all_packages_installable(context_t *c, Id pid)
           queue_push(&job, pool_str2id(pool, "aaa_base", 1));
 
           solv = solver_create(pool);
-          solv->dontinstallrecommended = 0;
+          /* solver_set_flag(solv, SOLVER_FLAG_IGNORE_RECOMMENDED, 1); */
           ++solver_runs;
           if (solver_solve(solv, &job))
             {
@@ -321,7 +321,7 @@ test_all_packages_installable(context_t *c, Id pid)
           queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE);
           queue_push(&job, pid);
           solv = solver_create(pool);
-          /*solv->dontinstallrecommended = 1;*/
+          /* solver_set_flag(solv, SOLVER_FLAG_IGNORE_RECOMMENDED, 1); */
           ++solver_runs;
           if (solver_solve(solv, &job))
             {
@@ -420,7 +420,7 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
       queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE);
       queue_push(&job, pid);
       solv = solver_create(pool);
-      solv->dontinstallrecommended = 1;
+      solver_set_flag(solv, SOLVER_FLAG_IGNORE_RECOMMENDED, 1);
       ++solver_runs;
       if (solver_solve(solv, &job))
         {

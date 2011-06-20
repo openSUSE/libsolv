@@ -1264,7 +1264,6 @@ solver_create(Pool *pool)
   solv->pool = pool;
   solv->installed = pool->installed;
 
-  transaction_init(&solv->trans, pool);
   queue_init(&solv->ruletojob);
   queue_init(&solv->decisionq);
   queue_init(&solv->decisionq_why);
@@ -1302,7 +1301,6 @@ solver_create(Pool *pool)
 void
 solver_free(Solver *solv)
 {
-  transaction_free(&solv->trans);
   queue_free(&solv->job);
   queue_free(&solv->ruletojob);
   queue_free(&solv->decisionq);
@@ -1339,6 +1337,74 @@ solver_free(Solver *solv)
   sat_free(solv->multiversionupdaters);
   sat_free(solv->choicerules_ref);
   sat_free(solv);
+}
+
+int
+solver_get_flag(Solver *solv, int flag)
+{
+  switch (flag)
+  {
+  case SOLVER_FLAG_ALLOW_DOWNGRADE:
+    return solv->allowdowngrade;
+  case SOLVER_FLAG_ALLOW_ARCHCHANGE:
+    return solv->allowarchchange;
+  case SOLVER_FLAG_ALLOW_VENDORCHANGE:
+    return solv->allowvendorchange;
+  case SOLVER_FLAG_ALLOW_UNINSTALL:
+    return solv->allowuninstall;
+  case SOLVER_FLAG_NO_UPDATEPROVIDE:
+    return solv->noupdateprovide;
+  case SOLVER_FLAG_SPLITPROVIDES:
+    return solv->dosplitprovides;
+  case SOLVER_FLAG_IGNORE_RECOMMENDED:
+    return solv->dontinstallrecommended;
+  case SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED:
+    return solv->ignorealreadyrecommended;
+  case SOLVER_FLAG_NO_INFARCHCHECK:
+    return solv->noinfarchcheck;
+  default:
+    break;
+  }
+  return -1;
+}
+
+int
+solver_set_flag(Solver *solv, int flag, int value)
+{
+  int old = solver_get_flag(solv, flag);
+  switch (flag)
+  {
+  case SOLVER_FLAG_ALLOW_DOWNGRADE:
+    solv->allowdowngrade = value;
+    break;
+  case SOLVER_FLAG_ALLOW_ARCHCHANGE:
+    solv->allowarchchange = value;
+    break;
+  case SOLVER_FLAG_ALLOW_VENDORCHANGE:
+    solv->allowvendorchange = value;
+    break;
+  case SOLVER_FLAG_ALLOW_UNINSTALL:
+    solv->allowuninstall = value;
+    break;
+  case SOLVER_FLAG_NO_UPDATEPROVIDE:
+    solv->noupdateprovide = value;
+    break;
+  case SOLVER_FLAG_SPLITPROVIDES:
+    solv->dosplitprovides = value;
+    break;
+  case SOLVER_FLAG_IGNORE_RECOMMENDED:
+    solv->dontinstallrecommended = value;
+    break;
+  case SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED:
+    solv->ignorealreadyrecommended = value;
+    break;
+  case SOLVER_FLAG_NO_INFARCHCHECK:
+    solv->noinfarchcheck = value;
+    break;
+  default:
+    break;
+  }
+  return old;
 }
 
 
@@ -3014,14 +3080,17 @@ solver_solve(Solver *solv, Queue *job)
    */
   solver_prepare_solutions(solv);
 
-  /*
-   * finally prepare transaction info
-   */
-  transaction_calculate(&solv->trans, &solv->decisionq, &solv->noobsoletes);
-
   POOL_DEBUG(SAT_DEBUG_STATS, "final solver statistics: %d problems, %d learned rules, %d unsolvable\n", solv->problems.count / 2, solv->stats_learned, solv->stats_unsolvable);
   POOL_DEBUG(SAT_DEBUG_STATS, "solver_solve took %d ms\n", sat_timems(solve_start));
+
+  /* return number of problems */
   return solv->problems.count ? solv->problems.count / 2 : 0;
+}
+
+Transaction *
+solver_create_transaction(Solver *solv)
+{
+  return transaction_create_decisionq(solv->pool, &solv->decisionq, &solv->noobsoletes);
 }
 
 /***********************************************************************/

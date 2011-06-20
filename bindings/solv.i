@@ -1962,10 +1962,7 @@ rb_eval_string(
   }
   %newobject transaction;
   Transaction *transaction() {
-    Transaction *t;
-    t = sat_calloc(1, sizeof(*t));
-    transaction_init_clone(t, &$self->trans);
-    return t;
+    return solver_create_transaction($self);
   }
 }
 
@@ -1999,7 +1996,6 @@ rb_eval_string(
   static const int SOLVER_TRANSACTION_KEEP_ORDERDATA = SOLVER_TRANSACTION_KEEP_ORDERDATA;
   ~Transaction() {
     transaction_free($self);
-    sat_free($self);
   }
 #ifdef SWIGRUBY
   %rename("isempty?") isempty;
