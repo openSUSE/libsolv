@@ -113,13 +113,15 @@ needid_cmp_need_s(const void *ap, const void *bp, void *dp)
   const NeedId *a = ap;
   const NeedId *b = bp;
   Stringpool *spool = dp;
+  const char *as;
+  const char *bs;
 
   int r;
   r = b->need - a->need;
   if (r)
     return r;
-  const char *as = spool->stringspace + spool->strings[a->map];
-  const char *bs = spool->stringspace + spool->strings[b->map];
+  as = spool->stringspace + spool->strings[a->map];
+  bs = spool->stringspace + spool->strings[b->map];
   return strcmp(as, bs);
 }
 
@@ -428,6 +430,7 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
 {
   int len, i;
   Id lids[64], *sids;
+  Id id, old;
 
   if (!ids)
     return;
@@ -471,7 +474,7 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
   if ((len - i) > 2)
     solv_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
 
-  Id id, old = 0;
+  old = 0;
 
   /* The differencing above produces many runs of ones and twos.  I tried
      fairly elaborate schemes to RLE those, but they give only very mediocre
@@ -1007,6 +1010,10 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   struct extdata *xd;
 
   Id type_constantid = REPOKEY_TYPE_CONSTANTID;
+
+  unsigned char *prefixcomp;
+  unsigned int compsum;
+  char *old_str;
 
 
   memset(&cbdata, 0, sizeof(cbdata));
@@ -1724,9 +1731,9 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   /*
    * calculate prefix encoding of the strings
    */
-  unsigned char *prefixcomp = solv_malloc(nstrings);
-  unsigned int compsum = 0;
-  char *old_str = "";
+  prefixcomp = solv_malloc(nstrings);
+  compsum = 0;
+  old_str = "";
   
   prefixcomp[0] = 0;
   for (i = 1; i < nstrings; i++)

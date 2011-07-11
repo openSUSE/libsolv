@@ -592,6 +592,7 @@ endElement(void *userData, const char *name)
   Solvable *s = pd->solvable;
   Id evr;
   unsigned int t = 0;
+  const char *flavor;
 
   if (pd->depth != pd->statedepth)
     {
@@ -626,7 +627,7 @@ endElement(void *userData, const char *name)
       pd->freshens = 0;
 
       /* see bugzilla bnc#190163 */
-      const char *flavor = findKernelFlavor(pd, s);
+      flavor = findKernelFlavor(pd, s);
       if (flavor) 
 	{
 	  char *cflavor = solv_strdup(flavor);	/* make pointer safe */
@@ -815,6 +816,7 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
   int i, l;
   struct stateswitch *sw;
   unsigned int now;
+  XML_Parser parser;
 
   now = solv_timems(0);
   data = repo_add_repodata(repo, flags);
@@ -842,7 +844,7 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
 
   // set up XML parser
 
-  XML_Parser parser = XML_ParserCreate(NULL);
+  parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);       /* make parserdata available to XML callbacks */
   XML_SetElementHandler(parser, startElement, endElement);
   XML_SetCharacterDataHandler(parser, characterData);

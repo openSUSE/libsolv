@@ -310,8 +310,9 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
     }
   if (attrname)
     {
+      FILE *fp;
       test_separate = 1;
-      FILE *fp = fopen(attrname, "w");
+      fp = fopen(attrname, "w");
       write_info(repo, fp, keyfilter_attr, 0, info, attrname);
       fclose(fp);
       kd.haveexternal = 1;

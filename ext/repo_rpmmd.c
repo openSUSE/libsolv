@@ -641,6 +641,7 @@ startElement(void *userData, const char *name, const char **atts)
   struct stateswitch *sw;
   const char *str;
   Id handle = pd->handle;
+  const char *pkgid;
 
   // fprintf(stderr, "into %s, from %d, depth %d, statedepth %d\n", name, pd->state, pd->depth, pd->statedepth);
 
@@ -704,7 +705,6 @@ startElement(void *userData, const char *name, const char **atts)
          a new solvable but just append the attributes to the existing
          one.
       */
-      const char *pkgid;
       if ((pkgid = find_attr("pkgid", atts)) != NULL)
         {
           // look at the checksum cache
@@ -1146,6 +1146,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   struct stateswitch *sw;
   Repodata *data;
   unsigned int now;
+  XML_Parser parser;
 
   now = solv_timems(0);
   data = repo_add_repodata(repo, flags);
@@ -1198,7 +1199,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
       dataiterator_free(&di);
     }
 
-  XML_Parser parser = XML_ParserCreate(NULL);
+  parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   pd.parser = &parser;
   XML_SetElementHandler(parser, startElement, endElement);

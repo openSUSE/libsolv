@@ -180,9 +180,10 @@ loadcallback (Pool *pool, Repodata *data, void *vdata)
 {
   FILE *fp = 0;
   int r;
+  const char *location;
 
 printf("LOADCALLBACK\n");
-  const char *location = repodata_lookup_str(data, SOLVID_META, REPOSITORY_LOCATION);
+  location = repodata_lookup_str(data, SOLVID_META, REPOSITORY_LOCATION);
 printf("loc %s\n", location);
   if (!location || !with_attr)
     return 0;

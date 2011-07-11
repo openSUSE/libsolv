@@ -2502,8 +2502,9 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	schemaid = 0;
 	for (ida = data->attriddata + val; *ida; ida++)
 	  {
+	    Id *kp;
 	    sp = schema;
-	    Id *kp = data->xattrs[-*ida];
+	    kp = data->xattrs[-*ida];
 	    if (!kp)
 	      continue;
 	    num++;

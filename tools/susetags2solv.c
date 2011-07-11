@@ -67,6 +67,8 @@ main(int argc, char **argv)
   Id defvendor = 0;
   int flags = 0;
   int c;
+  Pool *pool;
+  Repo *repo;
 
   while ((c = getopt(argc, argv, "hn:c:d:b:q:")) >= 0)
     {
@@ -95,8 +97,8 @@ main(int argc, char **argv)
 	  break;
 	}
     }
-  Pool *pool = pool_create();
-  Repo *repo = repo_create(pool, "<susetags>");
+  pool = pool_create();
+  repo = repo_create(pool, "<susetags>");
 
   repo_add_repodata(repo, 0);
 
@@ -170,8 +172,9 @@ main(int argc, char **argv)
 
 	  if (!strcmp(fn, "packages") || !strcmp(fn, "packages.gz"))
 	    {
+	      FILE *fp;
 	      sprintf(fnp, "%s/%s", descrdir, fn);
-	      FILE *fp = solv_xfopen(fnp, 0);
+	      fp = solv_xfopen(fnp, 0);
 	      if (!fp)
 		{
 		  perror(fn);
@@ -182,8 +185,9 @@ main(int argc, char **argv)
 	    }
 	  else if (!strcmp(fn, "packages.DU") || !strcmp(fn, "packages.DU.gz"))
 	    {
+	      FILE *fp;
 	      sprintf(fnp, "%s/%s", descrdir, fn);
-	      FILE *fp = solv_xfopen(fnp, 0);
+	      fp = solv_xfopen(fnp, 0);
 	      if (!fp)
 		{
 		  perror(fn);
@@ -213,6 +217,7 @@ main(int argc, char **argv)
 	    {
 	      char lang[6];
 	      char *p;
+	      FILE *fp;
 	      sprintf(fnp, "%s/%s", descrdir, fn);
 	      p = strrchr(fnp, '.');
 	      if (p && !strcmp(p, ".gz"))
@@ -224,7 +229,7 @@ main(int argc, char **argv)
 		continue;
 	      strcpy(lang, p + 1);
 	      sprintf(fnp, "%s/%s", descrdir, fn);
-	      FILE *fp = solv_xfopen(fnp, 0);
+	      fp = solv_xfopen(fnp, 0);
 	      if (!fp)
 		{
 		  perror(fn);

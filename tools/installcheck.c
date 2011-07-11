@@ -49,6 +49,7 @@ main(int argc, char **argv)
 {
   Pool *pool;
   Solver *solv;
+  Repo *repo;
   Queue job;
   Queue rids;
   Queue cand;
@@ -110,7 +111,7 @@ main(int argc, char **argv)
 	  perror(argv[i]);
 	  exit(1);
 	}
-      Repo *repo = repo_create(pool, argv[i]);
+      repo = repo_create(pool, argv[i]);
 #ifndef DEBIAN
       if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
 	{

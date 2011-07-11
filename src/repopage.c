@@ -21,6 +21,7 @@
 #define _XOPEN_SOURCE 500
 
 #include <sys/types.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,9 +37,9 @@
 
 #define BLOCK_SIZE (65536*1)
 #if BLOCK_SIZE <= 65536
-typedef __uint16_t Ref;
+typedef uint16_t Ref;
 #else
-typedef __uint32_t Ref;
+typedef uint32_t Ref;
 #endif
 
 /*
@@ -95,9 +96,9 @@ compress_buf(const unsigned char *in, unsigned int in_len,
 #define HS (65536)
   Ref htab[HS];
   Ref hnext[BLOCK_SIZE];
+  unsigned int litofs = 0;
   memset(htab, -1, sizeof (htab));
   memset(hnext, -1, sizeof (hnext));
-  unsigned int litofs = 0;
   while (io + 2 < in_len)
     {
       /* Search for a match of the string starting at IN, we have at
@@ -228,8 +229,9 @@ match_done:
 	{
 	  if (litofs)
 	    {
+	      unsigned litlen;
 	      litofs--;
-	      unsigned litlen = io - litofs;
+	      litlen = io - litofs;
 	      /* fprintf(stderr, "lit: %d\n", litlen); */
 	      while (litlen)
 		{
@@ -351,8 +353,9 @@ match_done:
   io = in_len;
   if (litofs)
     {
+      unsigned litlen;
       litofs--;
-      unsigned litlen = io - litofs;
+      litlen = io - litofs;
       /* fprintf(stderr, "lit: %d\n", litlen); */
       while (litlen)
 	{
@@ -608,8 +611,12 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
   /* Now search for "cheap" space in our store.  Space is cheap if it's either
      free (very cheap) or contains pages we search for anyway.  */
 
+  {
   /* Setup cost array.  */
   unsigned int cost[store->ncanmap];
+  unsigned int best_cost;
+  unsigned int best;
+  unsigned int same_cost;
   for (i = 0; i < store->ncanmap; i++)
     {
       unsigned int pnum = store->mapped[i];
@@ -617,8 +624,9 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
         cost[i] = 0;
       else
         {
+	  Attrblobpage *p;
 	  pnum--;
-	  Attrblobpage *p = store->pages + pnum;
+	  p = store->pages + pnum;
 	  assert(p->mapped_at != -1);
 	  if (pnum >= pstart && pnum <= pend)
 	    cost[i] = 1;
@@ -628,9 +636,9 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
     }
 
   /* And search for cheapest space.  */
-  unsigned int best_cost = -1;
-  unsigned int best = 0;
-  unsigned int same_cost = 0;
+  best_cost = -1;
+  best = 0;
+  same_cost = 0;
   for (i = 0; i + pend - pstart < store->ncanmap; i++)
     {
       unsigned int c = cost[i];
@@ -728,6 +736,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
       store->mapped[pnum] = i + 1;
     }
   return store->blob_store + best * REPOPAGE_BLOBSIZE;
+  }
 }
 
 unsigned int

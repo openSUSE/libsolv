@@ -398,6 +398,7 @@ add_code11_product(struct parsedata *pd, FILE *fp)
   char buf[BUFF_SIZE];
   int l;
   struct stat st;
+  XML_Parser parser;
 
   if (!fstat(fileno(fp), &st))
     {
@@ -411,7 +412,7 @@ add_code11_product(struct parsedata *pd, FILE *fp)
       pd->ctime = 0;
     }
 
-  XML_Parser parser = XML_ParserCreate(NULL);
+  parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, pd);
   XML_SetElementHandler(parser, startElement, endElement);
   XML_SetCharacterDataHandler(parser, characterData);
@@ -475,10 +476,11 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
       while ((entry = readdir(dir)))
 	{
 	  int len = strlen(entry->d_name);
+	  FILE *fp;
 	  if (len <= 5 || strcmp(entry->d_name + len - 5, ".prod") != 0)
 	    continue;
 	  fullpath = join2(dirpath, "/", entry->d_name);
-	  FILE *fp = fopen(fullpath, "r");
+	  fp = fopen(fullpath, "r");
 	  if (!fp)
 	    {
 	      perror(fullpath);

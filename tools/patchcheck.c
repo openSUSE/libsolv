@@ -488,6 +488,7 @@ main(int argc, char **argv)
   Id pid, p, pp;
   int tests = 0;
   context_t c;
+  static const char* langs[] = {"en"};
 
   c.install_available = 0;
   c.updatestart = 0;
@@ -499,7 +500,6 @@ main(int argc, char **argv)
   arch = argv[1];
   pool = pool_create();
   pool_setarch(pool, arch);
-  static const char* langs[] = {"en"};
   pool_set_languages(pool, langs, 1);
 
 #if 0
@@ -570,8 +570,9 @@ main(int argc, char **argv)
 
   for (pid = 1; pid < pool->nsolvables; pid++)
     {
+      Solvable *s;
       c.shown = 0;
-      Solvable *s = pool->solvables + pid;
+      s = pool->solvables + pid;
       if (!s->repo)
         continue;
       if (!pool_installable(pool, s))

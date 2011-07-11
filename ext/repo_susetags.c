@@ -120,6 +120,9 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
   Repo *repo = s->repo;
   Pool *pool = repo->pool;
   char *sp[5];
+  Id name;
+  Id evr;
+  Id arch;
 
   if (split(line, sp, 5) != 4)
     {
@@ -127,9 +130,9 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
       exit(1);
     }
 
-  Id name = pool_str2id(pool, sp[0], 1);
-  Id evr = makeevr(pool, join2(sp[1], "-", sp[2]));
-  Id arch = pool_str2id(pool, sp[3], 1);
+  name = pool_str2id(pool, sp[0], 1);
+  evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+  arch = pool_str2id(pool, sp[3], 1);
   /* XXX: could record a dep here, depends on where we want to store the data */
   if (name == s->name)
     repodata_set_void(pd->data, handle, SOLVABLE_SOURCENAME);
@@ -152,17 +155,20 @@ static void
 add_dirline(struct parsedata *pd, char *line)
 {
   char *sp[6];
+  long filesz;
+  long filenum;
+  unsigned dirid;
   if (split(line, sp, 6) != 5)
     return;
   pd->dirs = solv_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
-  long filesz = strtol(sp[1], 0, 0);
+  filesz = strtol(sp[1], 0, 0);
   filesz += strtol(sp[2], 0, 0);
-  long filenum = strtol(sp[3], 0, 0);
+  filenum = strtol(sp[3], 0, 0);
   filenum += strtol(sp[4], 0, 0);
   /* hack: we know that there's room for a / */
   if (*sp[0] != '/')
     *--sp[0] = '/';
-  unsigned dirid = repodata_str2dir(pd->data, sp[0], 1);
+  dirid = repodata_str2dir(pd->data, sp[0], 1);
 #if 0
 fprintf(stderr, "%s -> %d\n", sp[0], dirid);
 #endif

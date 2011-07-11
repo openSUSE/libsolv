@@ -2107,9 +2107,10 @@ solver_addchoicerules(Solver *solv)
 	  MAPSET(&m, p);
       for (i = 0; i < qi.count; i++)
 	{
+	  Rule *ur;
 	  if (!qi.elements[i])
 	    continue;
-	  Rule *ur = solv->rules + solv->updaterules + (qi.elements[i] - pool->installed->start);
+	  ur = solv->rules + solv->updaterules + (qi.elements[i] - pool->installed->start);
 	  if (!ur->p)
 	    ur = solv->rules + solv->featurerules + (qi.elements[i] - pool->installed->start);
 	  if (!ur->p)

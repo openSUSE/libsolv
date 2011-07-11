@@ -609,6 +609,7 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
   int i, l;
   struct stateswitch *sw;
   Repodata *data;
+  XML_Parser parser;
 
   data = repo_add_repodata(repo, flags);
 
@@ -626,7 +627,7 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
   pd.content = malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
-  XML_Parser parser = XML_ParserCreate(NULL);
+  parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
   XML_SetElementHandler(parser, startElement, endElement);
   XML_SetCharacterDataHandler(parser, characterData);

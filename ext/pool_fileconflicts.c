@@ -361,8 +361,9 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   /* unify */
   for (i = j = 0; i < cbdata.lookat.count; i += 2)
     {
+      Id idx;
       hx = cbdata.lookat.elements[i];
-      Id idx = cbdata.lookat.elements[i + 1];
+      idx = cbdata.lookat.elements[i + 1];
       if (j && hx == cbdata.lookat.elements[j - 2] && idx == cbdata.lookat.elements[j - 1])
 	continue;
       cbdata.lookat.elements[j++] = hx;
