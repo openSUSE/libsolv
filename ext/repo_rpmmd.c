@@ -303,7 +303,7 @@ commit_diskusage (struct parsedata *pd, unsigned handle)
   /* Now sort in dirid order.  This ensures that parents come before
      their children.  */
   if (pd->ndirs > 1)
-    sat_sort(pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp, 0);
+    solv_sort(pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp, 0);
   /* Substract leaf numbers from all parents to make the numbers
      non-cumulative.  This must be done post-order (i.e. all leafs
      adjusted before parents).  We ensure this by starting at the end of
@@ -396,7 +396,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(r) + 1;
   if (l > pd->acontent)
     {
-      pd->content = sat_realloc(pd->content, l + 256);
+      pd->content = solv_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content;
@@ -497,7 +497,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
       int l = strlen(k) + 1 + strlen(n) + 1;
       if (l > pd->acontent)
 	{
-	  pd->content = sat_realloc(pd->content, l + 256);
+	  pd->content = solv_realloc(pd->content, l + 256);
 	  pd->acontent = l + 256;
 	}
       sprintf(pd->content, "%s:%s", k, n);
@@ -878,7 +878,7 @@ startElement(void *userData, const char *name, const char **atts)
           filesz = strtol(str, 0, 0);
         if ((str = find_attr("count", atts)) != 0)
           filenum = strtol(str, 0, 0);
-        pd->dirs = sat_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
+        pd->dirs = solv_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
         pd->dirs[pd->ndirs][0] = dirid;
         pd->dirs[pd->ndirs][1] = filesz;
         pd->dirs[pd->ndirs][2] = filenum;
@@ -965,13 +965,13 @@ endElement(void *userData, const char *name)
     case STATE_CHECKSUM:
       {
         Id type, index;
-	type = sat_chksum_str2type(pd->tmpattr);
+	type = solv_chksum_str2type(pd->tmpattr);
 	if (!type)
 	  {
             fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
             exit(1);
 	  }
-        if (strlen(pd->content) != 2 * sat_chksum_len(type))
+        if (strlen(pd->content) != 2 * solv_chksum_len(type))
           {
             fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
             exit(1);
@@ -982,7 +982,7 @@ endElement(void *userData, const char *name)
         index = stringpool_str2id(&pd->cspool, pd->content, 1 /* create it */);
         if (index >= pd->ncscache)
           {
-            pd->cscache = sat_zextend(pd->cscache, pd->ncscache, index + 1 - pd->ncscache, sizeof(Id), 255);
+            pd->cscache = solv_zextend(pd->cscache, pd->ncscache, index + 1 - pd->ncscache, sizeof(Id), 255);
             pd->ncscache = index + 1;
           }
         /* add the checksum to the cache */
@@ -1009,7 +1009,7 @@ endElement(void *userData, const char *name)
 	      if (l > pd->lastdirstrl)
 		{
 		  pd->lastdirstrl = l + 128;
-		  pd->lastdirstr = sat_realloc(pd->lastdirstr, pd->lastdirstrl);
+		  pd->lastdirstr = solv_realloc(pd->lastdirstr, pd->lastdirstrl);
 		}
 	      strcpy(pd->lastdirstr, pd->content);
 	      pd->lastdir = id;
@@ -1114,7 +1114,7 @@ characterData(void *userData, const XML_Char *s, int len)
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
-      pd->content = sat_realloc(pd->content, l + 256);
+      pd->content = solv_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content + pd->lcontent;
@@ -1147,7 +1147,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   Repodata *data;
   unsigned int now;
 
-  now = sat_timems(0);
+  now = solv_timems(0);
   data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
@@ -1162,7 +1162,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
 
   pd.data = data;
 
-  pd.content = sat_malloc(256);
+  pd.content = solv_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
   pd.common.tmp = 0;
@@ -1184,13 +1184,13 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
 	  const char *str;
 	  int index;
 
-	  if (!sat_chksum_len(di.key->type))
+	  if (!solv_chksum_len(di.key->type))
 	    continue;
 	  str = repodata_chk2str(di.data, di.key->type, (const unsigned char *)di.kv.str);
           index = stringpool_str2id(&pd.cspool, str, 1);
 	  if (index >= pd.ncscache)
 	    {
-	      pd.cscache = sat_zextend(pd.cscache, pd.ncscache, index + 1 - pd.ncscache, sizeof(Id), 255);
+	      pd.cscache = solv_zextend(pd.cscache, pd.ncscache, index + 1 - pd.ncscache, sizeof(Id), 255);
 	      pd.ncscache = index + 1;
 	    }
           pd.cscache[index] = di.solvid;
@@ -1208,23 +1208,23 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pool, SAT_FATAL, "repo_rpmmd: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  pool_debug(pool, SOLV_FATAL, "repo_rpmmd: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
 	  exit(1);
 	}
       if (l == 0)
 	break;
     }
   XML_ParserFree(parser);
-  sat_free(pd.content);
-  sat_free(pd.lastdirstr);
+  solv_free(pd.content);
+  solv_free(pd.lastdirstr);
   join_freemem();
   stringpool_free(&pd.cspool);
-  sat_free(pd.cscache);
+  solv_free(pd.cscache);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", sat_timems(now));
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", solv_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
   return 0;
 }

@@ -183,13 +183,13 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
   Queue disabled;
   int disabledcnt;
 
-  IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
     {
-      POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "refine_suggestion start\n");
+      POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "refine_suggestion start\n");
       for (i = 0; problem[i]; i++)
 	{
 	  if (problem[i] == sug)
-	    POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "=> ");
+	    POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "=> ");
 	  solver_printproblem(solv, problem[i]);
 	}
     }
@@ -229,7 +229,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 
       if (!solv->problems.count)
 	{
-	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "no more problems!\n");
+	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "no more problems!\n");
 	  break;		/* great, no more problems */
 	}
       disabledcnt = disabled.count;
@@ -261,14 +261,14 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
       if (disabled.count == disabledcnt)
 	{
 	  /* no solution found, this was an invalid suggestion! */
-	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "no solution found!\n");
+	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "no solution found!\n");
 	  refined->count = 0;
 	  break;
 	}
       if (!njob && nupdate && nfeature)
 	{
 	  /* got only update rules, filter out feature rules */
-	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "throwing away feature rules\n");
+	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "throwing away feature rules\n");
 	  for (i = j = disabledcnt; i < disabled.count; i++)
 	    {
 	      v = disabled.elements[i];
@@ -300,9 +300,9 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 	  /* do not push anything on refine list, as we do not know which solution to choose */
 	  /* thus, the user will get another problem if he selects this solution, where he
            * can choose the right one */
-	  IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+	  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
 	    {
-	      POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "more than one solution found:\n");
+	      POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "more than one solution found:\n");
 	      for (i = disabledcnt; i < disabled.count; i++)
 		solver_printproblem(solv, disabled.elements[i]);
 	    }
@@ -331,7 +331,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
   /* disable problem rules again */
   for (i = 0; problem[i]; i++)
     solver_disableproblem(solv, problem[i]);
-  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "refine_suggestion end\n");
+  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "refine_suggestion end\n");
 }
 
 
@@ -516,7 +516,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
   int recocount;
   unsigned int now;
 
-  now = sat_timems(0);
+  now = solv_timems(0);
   recocount = solv->recommendations.count;
   solv->recommendations.count = 0;	/* so that revert() doesn't mess with it later */
   queue_init(&redoq);
@@ -542,7 +542,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
       queue_push(&problem, v);
     }
   if (problem.count > 1)
-    sat_sort(problem.elements, problem.count, sizeof(Id), problems_sortcmp, &solv->job);
+    solv_sort(problem.elements, problem.count, sizeof(Id), problems_sortcmp, &solv->job);
   queue_push(&problem, 0);	/* mark end for refine_suggestion */
   problem.count--;
 #if 0
@@ -569,14 +569,14 @@ create_solutions(Solver *solv, int probnr, int solidx)
 	  if (!essentialok)
 	    {
 	      /* nothing found, start over */
-	      POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "nothing found, re-run with essentialok = 1\n");
+	      POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "nothing found, re-run with essentialok = 1\n");
 	      essentialok = 1;
 	      i = -1;
 	      continue;
 	    }
 	  /* this is bad, we found no solution */
 	  /* for now just offer a rule */
-	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "nothing found, already did essentialok, fake it\n");
+	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "nothing found, already did essentialok, fake it\n");
 	  queue_push(&solv->solutions, 0);
 	  for (j = 0; j < problem.count; j++)
 	    {
@@ -619,7 +619,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
   /* restore problems */
   queue_free(&solv->problems);
   solv->problems = problems_save;
-  POOL_DEBUG(SAT_DEBUG_STATS, "create_solutions for problem #%d took %d ms\n", probnr, sat_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "create_solutions for problem #%d took %d ms\n", probnr, solv_timems(now));
 }
 
 

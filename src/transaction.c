@@ -89,7 +89,7 @@ transaction_all_obs_pkgs(Transaction *trans, Id p, Queue *pkgs)
 	  }
       /* sort obsoleters */
       if (pkgs->count > 2)
-	sat_sort(pkgs->elements, pkgs->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
+	solv_sort(pkgs->elements, pkgs->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
       for (i = 0; i < pkgs->count; i += 2)
 	pkgs->elements[i / 2] = pkgs->elements[i + 1];
       pkgs->count /= 2;
@@ -466,7 +466,7 @@ transaction_classify(Transaction *trans, int mode, Queue *classes)
     }
   /* now sort all vendor/arch changes */
   if (classes->count > 4)
-    sat_sort(classes->elements, classes->count / 4, 4 * sizeof(Id), classify_cmp, trans);
+    solv_sort(classes->elements, classes->count / 4, 4 * sizeof(Id), classify_cmp, trans);
   /* finally add all classes. put erases last */
   i = SOLVER_TRANSACTION_ERASE;
   if (ntypes[i])
@@ -531,7 +531,7 @@ transaction_classify_pkgs(Transaction *trans, int mode, Id class, Id from, Id to
 	}
     }
   if (pkgs->count > 1)
-    sat_sort(pkgs->elements, pkgs->count, sizeof(Id), classify_cmp_pkgs, trans);
+    solv_sort(pkgs->elements, pkgs->count, sizeof(Id), classify_cmp_pkgs, trans);
 }
 
 static void
@@ -545,7 +545,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
   Solvable *s, *s2;
 
   queue_empty(ti);
-  trans->transaction_installed = sat_free(trans->transaction_installed);
+  trans->transaction_installed = solv_free(trans->transaction_installed);
   if (!installed)
     return;	/* no info needed */
   for (i = 0; i < decisionq->count; i++)
@@ -593,7 +593,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	    }
 	}
     }
-  sat_sort(ti->elements, ti->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
+  solv_sort(ti->elements, ti->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
   /* now unify */
   for (i = j = 0; i < ti->count; i += 2)
     {
@@ -605,7 +605,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
   ti->count = j;
 
   /* create transaction_installed helper */
-  trans->transaction_installed = sat_calloc(installed->end - installed->start, sizeof(Id));
+  trans->transaction_installed = solv_calloc(installed->end - installed->start, sizeof(Id));
   for (i = 0; i < ti->count; i += 2)
     {
       j = ti->elements[i + 1] - installed->start;
@@ -793,7 +793,7 @@ struct _TransactionOrderdata {
 Transaction *
 transaction_create(Pool *pool)
 {
-  Transaction *trans = sat_calloc(1, sizeof(*trans));
+  Transaction *trans = solv_calloc(1, sizeof(*trans));
   trans->pool = pool;
   return trans;
 }
@@ -807,7 +807,7 @@ transaction_create_clone(Transaction *srctrans)
   if (srctrans->transaction_installed)
     {
       Repo *installed = srctrans->pool->installed;
-      trans->transaction_installed = sat_calloc(installed->end - installed->start, sizeof(Id));
+      trans->transaction_installed = solv_calloc(installed->end - installed->start, sizeof(Id));
       memcpy(trans->transaction_installed, srctrans->transaction_installed, (installed->end - installed->start) * sizeof(Id));
     }
   map_init_clone(&trans->transactsmap, &srctrans->transactsmap);
@@ -815,11 +815,11 @@ transaction_create_clone(Transaction *srctrans)
   if (srctrans->orderdata)
     {
       struct _TransactionOrderdata *od = srctrans->orderdata;
-      trans->orderdata = sat_calloc(1, sizeof(*trans->orderdata));
-      trans->orderdata->tes = sat_malloc2(od->ntes, sizeof(*od->tes));
+      trans->orderdata = solv_calloc(1, sizeof(*trans->orderdata));
+      trans->orderdata->tes = solv_malloc2(od->ntes, sizeof(*od->tes));
       memcpy(trans->orderdata->tes, od->tes, od->ntes * sizeof(*od->tes));
       trans->orderdata->ntes = od->ntes;
-      trans->orderdata->invedgedata = sat_malloc2(od->ninvedgedata, sizeof(Id));
+      trans->orderdata->invedgedata = solv_malloc2(od->ninvedgedata, sizeof(Id));
       memcpy(trans->orderdata->invedgedata, od->invedgedata, od->ninvedgedata * sizeof(Id));
       trans->orderdata->ninvedgedata = od->ninvedgedata;
     }
@@ -831,7 +831,7 @@ transaction_free(Transaction *trans)
 {
   queue_free(&trans->steps);
   queue_free(&trans->transaction_info);
-  trans->transaction_installed = sat_free(trans->transaction_installed);
+  trans->transaction_installed = solv_free(trans->transaction_installed);
   map_free(&trans->transactsmap);
   map_free(&trans->noobsmap);
   transaction_free_orderdata(trans);
@@ -844,9 +844,9 @@ transaction_free_orderdata(Transaction *trans)
   if (trans->orderdata)
     {
       struct _TransactionOrderdata *od = trans->orderdata;
-      od->tes = sat_free(od->tes);
-      od->invedgedata = sat_free(od->invedgedata);
-      trans->orderdata = sat_free(trans->orderdata);
+      od->tes = solv_free(od->tes);
+      od->invedgedata = solv_free(od->invedgedata);
+      trans->orderdata = solv_free(trans->orderdata);
     }
 }
 
@@ -891,12 +891,12 @@ addteedge(struct orderdata *od, int from, int to, int type)
       /* printf("tail add %d\n", i - te->edges); */
       if (!i)
 	te->edges = ++i;
-      od->edgedata = sat_extend(od->edgedata, od->nedgedata, 3, sizeof(Id), EDGEDATA_BLOCK);
+      od->edgedata = solv_extend(od->edgedata, od->nedgedata, 3, sizeof(Id), EDGEDATA_BLOCK);
     }
   else
     {
       /* printf("extend %d\n", i - te->edges); */
-      od->edgedata = sat_extend(od->edgedata, od->nedgedata, 3 + (i - te->edges), sizeof(Id), EDGEDATA_BLOCK);
+      od->edgedata = solv_extend(od->edgedata, od->nedgedata, 3 + (i - te->edges), sizeof(Id), EDGEDATA_BLOCK);
       if (i > te->edges)
 	memcpy(od->edgedata + od->nedgedata, od->edgedata + te->edges, sizeof(Id) * (i - te->edges));
       i = od->nedgedata + (i - te->edges);
@@ -1345,17 +1345,17 @@ breakcycle(struct orderdata *od, Id *cycle)
 
   /* cycle recorded, print it */
   if (ddegmin >= TYPE_REQ && (ddegmax & TYPE_PREREQ) != 0)
-    POOL_DEBUG(SAT_DEBUG_STATS, "CRITICAL ");
-  POOL_DEBUG(SAT_DEBUG_STATS, "cycle: --> ");
+    POOL_DEBUG(SOLV_DEBUG_STATS, "CRITICAL ");
+  POOL_DEBUG(SOLV_DEBUG_STATS, "cycle: --> ");
   for (k = 0; cycle[k + 1]; k += 2)
     {
       te = od->tes +  cycle[k];
       if ((od->edgedata[cycle[k + 1] + 1] & TYPE_BROKEN) != 0)
-        POOL_DEBUG(SAT_DEBUG_STATS, "%s ##%x##> ", pool_solvid2str(pool, te->p), od->edgedata[cycle[k + 1] + 1]);
+        POOL_DEBUG(SOLV_DEBUG_STATS, "%s ##%x##> ", pool_solvid2str(pool, te->p), od->edgedata[cycle[k + 1] + 1]);
       else
-        POOL_DEBUG(SAT_DEBUG_STATS, "%s --%x--> ", pool_solvid2str(pool, te->p), od->edgedata[cycle[k + 1] + 1]);
+        POOL_DEBUG(SOLV_DEBUG_STATS, "%s --%x--> ", pool_solvid2str(pool, te->p), od->edgedata[cycle[k + 1] + 1]);
     }
-  POOL_DEBUG(SAT_DEBUG_STATS, "\n");
+  POOL_DEBUG(SOLV_DEBUG_STATS, "\n");
 }
 
 static inline void
@@ -1370,21 +1370,21 @@ dump_tes(struct orderdata *od)
   for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
     {
       Solvable *s = pool->solvables + te->p;
-      POOL_DEBUG(SAT_DEBUG_RESULT, "TE %4d: %c%s\n", i, s->repo == pool->installed ? '-' : '+', pool_solvable2str(pool, s));
+      POOL_DEBUG(SOLV_DEBUG_RESULT, "TE %4d: %c%s\n", i, s->repo == pool->installed ? '-' : '+', pool_solvable2str(pool, s));
       if (s->repo != pool->installed)
         {
 	  queue_empty(&obsq);
 	  transaction_all_obs_pkgs(od->trans, te->p, &obsq);
 	  for (j = 0; j < obsq.count; j++)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "         -%s\n", pool_solvid2str(pool, obsq.elements[j]));
+	    POOL_DEBUG(SOLV_DEBUG_RESULT, "         -%s\n", pool_solvid2str(pool, obsq.elements[j]));
 	}
       for (j = te->edges; od->edgedata[j]; j += 2)
 	{
 	  te2 = od->tes + od->edgedata[j];
 	  if ((od->edgedata[j + 1] & TYPE_BROKEN) == 0)
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "       --%x--> TE %4d: %s\n", od->edgedata[j + 1], od->edgedata[j], pool_solvid2str(pool, te2->p));
+	    POOL_DEBUG(SOLV_DEBUG_RESULT, "       --%x--> TE %4d: %s\n", od->edgedata[j + 1], od->edgedata[j], pool_solvid2str(pool, te2->p));
 	  else
-	    POOL_DEBUG(SAT_DEBUG_RESULT, "       ##%x##> TE %4d: %s\n", od->edgedata[j + 1], od->edgedata[j], pool_solvid2str(pool, te2->p));
+	    POOL_DEBUG(SOLV_DEBUG_RESULT, "       ##%x##> TE %4d: %s\n", od->edgedata[j + 1], od->edgedata[j], pool_solvid2str(pool, te2->p));
 	}
     }
 }
@@ -1556,15 +1556,15 @@ transaction_order(Transaction *trans, int flags)
   int lastmedia;
   Id *temedianr;
 
-  start = now = sat_timems(0);
-  POOL_DEBUG(SAT_DEBUG_STATS, "ordering transaction\n");
+  start = now = solv_timems(0);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "ordering transaction\n");
   /* free old data if present */
   if (trans->orderdata)
     {
       struct _TransactionOrderdata *od = trans->orderdata;
-      od->tes = sat_free(od->tes);
-      od->invedgedata = sat_free(od->invedgedata);
-      trans->orderdata = sat_free(trans->orderdata);
+      od->tes = solv_free(od->tes);
+      od->invedgedata = solv_free(od->invedgedata);
+      trans->orderdata = solv_free(trans->orderdata);
     }
 
   /* create a transaction element for every active component */
@@ -1577,7 +1577,7 @@ transaction_order(Transaction *trans, int flags)
 	continue;
       numte++;
     }
-  POOL_DEBUG(SAT_DEBUG_STATS, "transaction elements: %d\n", numte);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "transaction elements: %d\n", numte);
   if (!numte)
     return;	/* nothing to do... */
 
@@ -1585,8 +1585,8 @@ transaction_order(Transaction *trans, int flags)
   memset(&od, 0, sizeof(od));
   od.trans = trans;
   od.ntes = numte;
-  od.tes = sat_calloc(numte, sizeof(*od.tes));
-  od.edgedata = sat_extend(0, 0, 1, sizeof(Id), EDGEDATA_BLOCK);
+  od.tes = solv_calloc(numte, sizeof(*od.tes));
+  od.edgedata = solv_extend(0, 0, 1, sizeof(Id), EDGEDATA_BLOCK);
   od.edgedata[0] = 0;
   od.nedgedata = 1;
   queue_init(&od.cycles);
@@ -1611,14 +1611,14 @@ transaction_order(Transaction *trans, int flags)
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     for (j = te->edges; od.edgedata[j]; j += 2)
       numedge++;
-  POOL_DEBUG(SAT_DEBUG_STATS, "edges: %d, edge space: %d\n", numedge, od.nedgedata / 2);
-  POOL_DEBUG(SAT_DEBUG_STATS, "edge creation took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "edges: %d, edge space: %d\n", numedge, od.nedgedata / 2);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "edge creation took %d ms\n", solv_timems(now));
 
 #if 0
   dump_tes(&od);
 #endif
   
-  now = sat_timems(0);
+  now = solv_timems(0);
   /* kill all cycles */
   queue_init(&todo);
   for (i = numte - 1; i > 0; i--)
@@ -1696,10 +1696,10 @@ transaction_order(Transaction *trans, int flags)
       /* restart with start of cycle */
       todo.count = cycstart + 1;
     }
-  POOL_DEBUG(SAT_DEBUG_STATS, "cycles broken: %d\n", od.ncycles);
-  POOL_DEBUG(SAT_DEBUG_STATS, "cycle breaking took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "cycles broken: %d\n", od.ncycles);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "cycle breaking took %d ms\n", solv_timems(now));
 
-  now = sat_timems(0);
+  now = solv_timems(0);
   /* now go through all broken cycles and create cycle edges to help
      the ordering */
    for (i = od.cycles.count - 3; i >= 0; i -= 3)
@@ -1712,14 +1712,14 @@ transaction_order(Transaction *trans, int flags)
        if (od.cycles.elements[i + 2] < TYPE_REQ)
          addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
      }
-  POOL_DEBUG(SAT_DEBUG_STATS, "cycle edge creation took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "cycle edge creation took %d ms\n", solv_timems(now));
 
 #if 0
   dump_tes(&od);
 #endif
   /* all edges are finally set up and there are no cycles, now the easy part.
    * Create an ordered transaction */
-  now = sat_timems(0);
+  now = solv_timems(0);
   /* first invert all edges */
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     te->mark = 1;	/* term 0 */
@@ -1738,8 +1738,8 @@ transaction_order(Transaction *trans, int flags)
       te->mark += j;
       j = te->mark;
     }
-  POOL_DEBUG(SAT_DEBUG_STATS, "invedge space: %d\n", j + 1);
-  od.invedgedata = sat_calloc(j + 1, sizeof(Id));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "invedge space: %d\n", j + 1);
+  od.invedgedata = solv_calloc(j + 1, sizeof(Id));
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     {
       for (j = te->edges; od.edgedata[j]; j += 2)
@@ -1751,7 +1751,7 @@ transaction_order(Transaction *trans, int flags)
     }
   for (i = 1, te = od.tes + i; i < numte; i++, te++)
     te->edges = te->mark;	/* edges now points into invedgedata */
-  od.edgedata = sat_free(od.edgedata);
+  od.edgedata = solv_free(od.edgedata);
   od.nedgedata = j + 1;
 
   /* now the final ordering */
@@ -1780,7 +1780,7 @@ transaction_order(Transaction *trans, int flags)
   
   lastrepo = 0;
   lastmedia = 0;
-  temedianr = sat_calloc(numte, sizeof(Id));
+  temedianr = solv_calloc(numte, sizeof(Id));
   for (i = 1; i < numte; i++)
     {
       Solvable *s = pool->solvables + od.tes[i].p;
@@ -1852,7 +1852,7 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 	    }
 	}
     }
-  sat_free(temedianr);
+  solv_free(temedianr);
   queue_free(&todo);
   queue_free(&samerepoq);
   queue_free(&uninstq);
@@ -1864,12 +1864,12 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
   transaction_add_obsoleted(trans);
   assert(tr->count == oldcount);
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "creating new transaction took %d ms\n", sat_timems(now));
-  POOL_DEBUG(SAT_DEBUG_STATS, "transaction ordering took %d ms\n", sat_timems(start));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "creating new transaction took %d ms\n", solv_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "transaction ordering took %d ms\n", solv_timems(start));
 
   if ((flags & SOLVER_TRANSACTION_KEEP_ORDERDATA) != 0)
     {
-      trans->orderdata = sat_calloc(1, sizeof(*trans->orderdata));
+      trans->orderdata = solv_calloc(1, sizeof(*trans->orderdata));
       trans->orderdata->tes = od.tes;
       trans->orderdata->ntes = numte;
       trans->orderdata->invedgedata = od.invedgedata;
@@ -1877,8 +1877,8 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
     }
   else
     {
-      sat_free(od.tes);
-      sat_free(od.invedgedata);
+      solv_free(od.tes);
+      solv_free(od.invedgedata);
     }
 }
 
@@ -2049,7 +2049,7 @@ transaction_check_pkg(Transaction *trans, Id tepkg, Id pkg, Map *ins, Map *seen,
 	    }
 	  if (!good)
 	    {
-	      POOL_DEBUG(SAT_DEBUG_RESULT, "  %c%s: nothing provides %s needed by %c%s\n", pool->solvables[tepkg].repo == pool->installed ? '-' : '+', pool_solvid2str(pool, tepkg), pool_dep2str(pool, req), s->repo == pool->installed ? '-' : '+', pool_solvable2str(pool, s));
+	      POOL_DEBUG(SOLV_DEBUG_RESULT, "  %c%s: nothing provides %s needed by %c%s\n", pool->solvables[tepkg].repo == pool->installed ? '-' : '+', pool_solvid2str(pool, tepkg), pool_dep2str(pool, req), s->repo == pool->installed ? '-' : '+', pool_solvable2str(pool, s));
 	    }
 	}
     }
@@ -2064,7 +2064,7 @@ transaction_check_order(Transaction *trans)
   Map ins, seen;
   int i;
 
-  POOL_DEBUG(SAT_WARN, "\nchecking transaction order...\n");
+  POOL_DEBUG(SOLV_WARN, "\nchecking transaction order...\n");
   map_init(&ins, pool->nsolvables);
   map_init(&seen, pool->nsolvables);
   if (pool->installed)
@@ -2089,5 +2089,5 @@ transaction_check_order(Transaction *trans)
     }
   map_free(&seen);
   map_free(&ins);
-  POOL_DEBUG(SAT_WARN, "transaction order check done.\n");
+  POOL_DEBUG(SOLV_WARN, "transaction order check done.\n");
 }

@@ -16,7 +16,7 @@
 #include "util.h"
 
 void
-sat_oom(size_t num, size_t len)
+solv_oom(size_t num, size_t len)
 {
   if (num)
     fprintf(stderr, "Out of memory allocating %zu*%zu bytes!\n", num, len);
@@ -27,44 +27,44 @@ sat_oom(size_t num, size_t len)
 }
 
 void *
-sat_malloc(size_t len)
+solv_malloc(size_t len)
 {
   void *r = malloc(len ? len : 1);
   if (!r)
-    sat_oom(0, len);
+    solv_oom(0, len);
   return r;
 }
 
 void *
-sat_malloc2(size_t num, size_t len)
+solv_malloc2(size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
-    sat_oom(num, len);
-  return sat_malloc(num * len);
+    solv_oom(num, len);
+  return solv_malloc(num * len);
 }
 
 void *
-sat_realloc(void *old, size_t len)
+solv_realloc(void *old, size_t len)
 {
   if (old == 0)
     old = malloc(len ? len : 1);
   else
     old = realloc(old, len ? len : 1);
   if (!old)
-    sat_oom(0, len);
+    solv_oom(0, len);
   return old;
 }
 
 void *
-sat_realloc2(void *old, size_t num, size_t len)
+solv_realloc2(void *old, size_t num, size_t len)
 {
   if (len && (num * len) / len != num)
-    sat_oom(num, len);
-  return sat_realloc(old, num * len);
+    solv_oom(num, len);
+  return solv_realloc(old, num * len);
 }
 
 void *
-sat_calloc(size_t num, size_t len)
+solv_calloc(size_t num, size_t len)
 {
   void *r;
   if (num == 0 || len == 0)
@@ -72,12 +72,12 @@ sat_calloc(size_t num, size_t len)
   else
     r = calloc(num, len);
   if (!r)
-    sat_oom(num, len);
+    solv_oom(num, len);
   return r;
 }
 
 void *
-sat_free(void *mem)
+solv_free(void *mem)
 {
   if (mem)
     free(mem);
@@ -85,7 +85,7 @@ sat_free(void *mem)
 }
 
 unsigned int
-sat_timems(unsigned int subtract)
+solv_timems(unsigned int subtract)
 {
   struct timeval tv;
   unsigned int r;
@@ -107,7 +107,7 @@ sat_timems(unsigned int subtract)
 
 # if HAVE_QSORT_R || HAVE___QSORT_R
 void
-sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
+solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
 {
 # if HAVE_QSORT_R
   qsort_r(base, nmemb, size, compar, compard);
@@ -124,38 +124,38 @@ sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, cons
 
 #else /* not glibc */
 
-struct sat_sort_data {
+struct solv_sort_data {
   int (*compar)(const void *, const void *, void *);
   void *compard;
 };
 
 static int
-sat_sort_helper(void *compard, const void *a, const void *b)
+solv_sort_helper(void *compard, const void *a, const void *b)
 {
-  struct sat_sort_data *d = compard;
+  struct solv_sort_data *d = compard;
   return (*d->compar)(a, b, d->compard);
 }
 
 void
-sat_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
+solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
 {
-  struct sat_sort_data d;
+  struct solv_sort_data d;
   d.compar = compar;
   d.compard = compard;
-  qsort_r(base, nmemb, size, &d, sat_sort_helper);
+  qsort_r(base, nmemb, size, &d, solv_sort_helper);
 }
 
 #endif
 
 char *
-sat_dupjoin(const char *str1, const char *str2, const char *str3)
+solv_dupjoin(const char *str1, const char *str2, const char *str3)
 {
   int l1, l2, l3;
   char *s, *str;
   l1 = str1 ? strlen(str1) : 0;
   l2 = str2 ? strlen(str2) : 0;
   l3 = str3 ? strlen(str3) : 0;
-  s = str = sat_malloc(l1 + l2 + l3 + 1);
+  s = str = solv_malloc(l1 + l2 + l3 + 1);
   if (l1)
     {
       strcpy(s, str1);
@@ -176,15 +176,15 @@ sat_dupjoin(const char *str1, const char *str2, const char *str3)
 }
 
 char *
-sat_dupappend(const char *str1, const char *str2, const char *str3)
+solv_dupappend(const char *str1, const char *str2, const char *str3)
 {
-  char *str = sat_dupjoin(str1, str2, str3);
-  sat_free((void *)str1);
+  char *str = solv_dupjoin(str1, str2, str3);
+  solv_free((void *)str1);
   return str;
 }
 
 int
-sat_hex2bin(const char **strp, unsigned char *buf, int bufl)
+solv_hex2bin(const char **strp, unsigned char *buf, int bufl)
 {
   const char *str = *strp;
   int i;
@@ -219,7 +219,7 @@ sat_hex2bin(const char **strp, unsigned char *buf, int bufl)
 }
 
 char *
-sat_bin2hex(const unsigned char *buf, int l, char *str)
+solv_bin2hex(const unsigned char *buf, int l, char *str)
 {
   int i;
   for (i = 0; i < l; i++, buf++)

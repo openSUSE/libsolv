@@ -26,7 +26,7 @@
 #include "solver.h"
 #include "solverdebug.h"
 
-#include "sat_xfopen.h"
+#include "solv_xfopen.h"
 
 void
 showproblems(Solver *solv, Solvable *s, Queue *cand, Queue *badguys)
@@ -273,7 +273,7 @@ test_all_packages_installable(context_t *c, Id pid)
 
   queue_init(&job);
 
-  now = sat_timems(0);
+  now = solv_timems(0);
   solver_runs = 0;
 
   conp = s->repo->idarraydata + s->conflicts;
@@ -334,7 +334,7 @@ test_all_packages_installable(context_t *c, Id pid)
     }
 
   if (PERF_DEBUGGING)
-    printf("  test_all_packages_installable took %d ms in %d runs\n", sat_timems(now), solver_runs);
+    printf("  test_all_packages_installable took %d ms in %d runs\n", solv_timems(now), solver_runs);
 }
 
 void
@@ -354,7 +354,7 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
   queue_init(&cand);
   queue_init(&badguys);
 
-  now = sat_timems(0);
+  now = solv_timems(0);
   solver_runs = 0;
 
   /* Test 3: can we upgrade all packages? */
@@ -441,7 +441,7 @@ test_can_upgrade_all_packages(context_t *c, Id pid)
       cand.count = j;
     }
   if (PERF_DEBUGGING)
-    printf("  test_can_upgrade_all_packages took %d ms in %d runs\n", sat_timems(now), solver_runs);
+    printf("  test_can_upgrade_all_packages took %d ms in %d runs\n", solv_timems(now), solver_runs);
 }
 
 void
@@ -527,7 +527,7 @@ main(int argc, char **argv)
       l = strlen(argv[i]);
       if (!strcmp(argv[i], "-"))
         fp = stdin;
-      else if ((fp = sat_xfopen(argv[i], 0)) == 0)
+      else if ((fp = solv_xfopen(argv[i], 0)) == 0)
         {
           perror(argv[i]);
           exit(1);

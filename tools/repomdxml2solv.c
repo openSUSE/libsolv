@@ -78,7 +78,7 @@ doquery(Pool *pool, Repo *repo, const char *query)
 	case REPOKEY_TYPE_MD5:
 	case REPOKEY_TYPE_SHA1:
 	case REPOKEY_TYPE_SHA256:
-	  printf("%s:%s\n", sat_chksum_type2str(di.key->type), repodata_chk2str(di.data, di.key->type, (unsigned char *)di.kv.str));
+	  printf("%s:%s\n", solv_chksum_type2str(di.key->type), repodata_chk2str(di.data, di.key->type, (unsigned char *)di.kv.str));
 	  break;
 	default:
 	  break;

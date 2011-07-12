@@ -145,7 +145,7 @@ solver_unifyrules(Solver *solv)
     return;
 
   /* sort rules first */
-  sat_sort(solv->rules + 1, solv->nrules - 1, sizeof(Rule), unifyrules_sortcmp, solv->pool);
+  solv_sort(solv->rules + 1, solv->nrules - 1, sizeof(Rule), unifyrules_sortcmp, solv->pool);
 
   /* prune rules
    * i = unpruned
@@ -162,16 +162,16 @@ solver_unifyrules(Solver *solv)
     }
 
   /* reduced count from nrules to j rules */
-  POOL_DEBUG(SAT_DEBUG_STATS, "pruned rules from %d to %d\n", solv->nrules, j);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "pruned rules from %d to %d\n", solv->nrules, j);
 
   /* adapt rule buffer */
   solv->nrules = j;
-  solv->rules = sat_extend_resize(solv->rules, solv->nrules, sizeof(Rule), RULES_BLOCK);
+  solv->rules = solv_extend_resize(solv->rules, solv->nrules, sizeof(Rule), RULES_BLOCK);
 
   /*
    * debug: log rule statistics
    */
-  IF_POOLDEBUG (SAT_DEBUG_STATS)
+  IF_POOLDEBUG (SOLV_DEBUG_STATS)
     {
       int binr = 0;
       int lits = 0;
@@ -190,8 +190,8 @@ solver_unifyrules(Solver *solv)
 		lits++;
 	    }
 	}
-      POOL_DEBUG(SAT_DEBUG_STATS, "  binary: %d\n", binr);
-      POOL_DEBUG(SAT_DEBUG_STATS, "  normal: %d, %d literals\n", solv->nrules - 1 - binr, lits);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "  binary: %d\n", binr);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "  normal: %d, %d literals\n", solv->nrules - 1 - binr, lits);
     }
 }
 
@@ -337,7 +337,7 @@ solver_addrule(Solver *solv, Id p, Id d)
    */
 
   /* extend rule buffer */
-  solv->rules = sat_extend(solv->rules, solv->nrules, 1, sizeof(Rule), RULES_BLOCK);
+  solv->rules = solv_extend(solv->rules, solv->nrules, 1, sizeof(Rule), RULES_BLOCK);
   r = solv->rules + solv->nrules++;    /* point to rule space */
 
     /*
@@ -368,10 +368,10 @@ solver_addrule(Solver *solv, Id p, Id d)
   r->n1 = 0;
   r->n2 = 0;
 
-  IF_POOLDEBUG (SAT_DEBUG_RULE_CREATION)
+  IF_POOLDEBUG (SOLV_DEBUG_RULE_CREATION)
     {
-      POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "  Add rule: ");
-      solver_printrule(solv, SAT_DEBUG_RULE_CREATION, r);
+      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "  Add rule: ");
+      solver_printrule(solv, SOLV_DEBUG_RULE_CREATION, r);
     }
 
   return r;
@@ -512,7 +512,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  && s->arch != ARCH_NOSRC
 	  && !pool_installable(pool, s))
 	{
-	  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables));
+	  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables));
 	  addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOT_INSTALLABLE, 0);
 	}
 
@@ -563,7 +563,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  /* didn't find an installed provider: previously broken dependency */
 		  if (!p)
 		    {
-		      POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "ignoring broken requires %s of installed package %s\n", pool_dep2str(pool, req), pool_solvable2str(pool, s));
+		      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "ignoring broken requires %s of installed package %s\n", pool_dep2str(pool, req), pool_solvable2str(pool, s));
 		      continue;
 		    }
 		}
@@ -571,16 +571,16 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (!*dp)
 		{
 		  /* nothing provides req! */
-		  POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables), pool_dep2str(pool, req));
+		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables), pool_dep2str(pool, req));
 		  addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, req);
 		  continue;
 		}
 
-	      IF_POOLDEBUG (SAT_DEBUG_RULE_CREATION)
+	      IF_POOLDEBUG (SOLV_DEBUG_RULE_CREATION)
 	        {
-		  POOL_DEBUG(SAT_DEBUG_RULE_CREATION,"  %s requires %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
+		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION,"  %s requires %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
 		  for (i = 0; dp[i]; i++)
-		    POOL_DEBUG(SAT_DEBUG_RULE_CREATION, "   provided by %s\n", pool_solvid2str(pool, dp[i]));
+		    POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "   provided by %s\n", pool_solvid2str(pool, dp[i]));
 	        }
 
 	      /* add 'requires' dependency */
@@ -948,7 +948,7 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
               (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
 	    {
 	      if (!solv->multiversionupdaters)
-		solv->multiversionupdaters = sat_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
+		solv->multiversionupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
 	      solv->multiversionupdaters[s - pool->solvables - solv->installed->start] = d;
 	    }
 	  if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
@@ -993,10 +993,10 @@ reenableupdaterule(Solver *solv, Id p)
       if (r->d >= 0)
 	return;
       solver_enablerule(solv, r);
-      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+      IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
 	{
-	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-	  solver_printruleclass(solv, SAT_DEBUG_SOLUTIONS, r);
+	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	  solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
 	}
       return;
     }
@@ -1004,10 +1004,10 @@ reenableupdaterule(Solver *solv, Id p)
   if (r->p && r->d < 0)
     {
       solver_enablerule(solv, r);
-      IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+      IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
 	{
-	  POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-	  solver_printruleclass(solv, SAT_DEBUG_SOLUTIONS, r);
+	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	  solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
 	}
     }
 }
@@ -1134,10 +1134,10 @@ reenableinfarchrule(Solver *solv, Id name)
       if (r->p < 0 && r->d < 0 && pool->solvables[-r->p].name == name)
         {
           solver_enablerule(solv, r);
-          IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+          IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
             {
-              POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-              solver_printruleclass(solv, SAT_DEBUG_SOLUTIONS, r);
+              POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+              solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
             }
         }
     }
@@ -1300,10 +1300,10 @@ reenableduprule(Solver *solv, Id name)
       if (r->p < 0 && r->d < 0 && pool->solvables[-r->p].name == name)
 	{
 	  solver_enablerule(solv, r);
-	  IF_POOLDEBUG (SAT_DEBUG_SOLUTIONS)
+	  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
 	    {
-	      POOL_DEBUG(SAT_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-	      solver_printruleclass(solv, SAT_DEBUG_SOLUTIONS, r);
+	      POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	      solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
 	    }
 	}
     }
@@ -1796,7 +1796,7 @@ solver_allruleinfos(Solver *solv, Id rid, Queue *rq)
   /* now sort & unify em */
   if (!rq->count)
     return 0;
-  sat_sort(rq->elements, rq->count / 4, 4 * sizeof(Id), solver_allruleinfos_cmp, 0);
+  solv_sort(rq->elements, rq->count / 4, 4 * sizeof(Id), solver_allruleinfos_cmp, 0);
   /* throw out identical entries */
   for (i = j = 0; i < rq->count; i += 4)
     {
@@ -1979,7 +1979,7 @@ solver_addchoicerules(Solver *solv)
       solv->choicerules_end = solv->nrules;
       return;
     }
-  solv->choicerules_ref = sat_calloc(solv->rpmrules_end, sizeof(Id));
+  solv->choicerules_ref = solv_calloc(solv->rpmrules_end, sizeof(Id));
   queue_init(&q);
   queue_init(&qi);
   map_init(&m, pool->nsolvables);
@@ -1996,7 +1996,7 @@ solver_addchoicerules(Solver *solv)
       r = solv->rules + rid;
       if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 < 0))
 	continue;	/* only look at requires rules */
-      // solver_printrule(solv, SAT_DEBUG_RESULT, r);
+      // solver_printrule(solv, SOLV_DEBUG_RESULT, r);
       queue_empty(&q);
       queue_empty(&qi);
       havechoice = 0;
@@ -2103,7 +2103,7 @@ solver_addchoicerules(Solver *solv)
 	{
 #if 0
 	  printf("skipping choice ");
-	  solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + rid);
+	  solver_printrule(solv, SOLV_DEBUG_RESULT, solv->rules + rid);
 #endif
 	  continue;
 	}
@@ -2113,9 +2113,9 @@ solver_addchoicerules(Solver *solv)
       solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
 #if 0
       printf("OLD ");
-      solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + rid);
+      solver_printrule(solv, SOLV_DEBUG_RESULT, solv->rules + rid);
       printf("WEAK CHOICE ");
-      solver_printrule(solv, SAT_DEBUG_RESULT, solv->rules + solv->nrules - 1);
+      solver_printrule(solv, SOLV_DEBUG_RESULT, solv->rules + solv->nrules - 1);
 #endif
     }
   queue_free(&q);

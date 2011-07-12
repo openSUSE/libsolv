@@ -16,14 +16,14 @@ SET (libsolv_SRCS
     solver.c solverdebug.c repo_solv.c evr.c pool.c
     queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
     transaction.c rules.c problems.c
-    chksum.c md5.c sha1.c sha2.c satversion.c)
+    chksum.c md5.c sha1.c sha2.c solvversion.c)
 
 SET (libsolv_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h
     poolid.h pooltypes.h queue.h solvable.h solver.h solverdebug.h
     repo.h repodata.h repopage.h repo_solv.h util.h
     strpool.h dirpool.h knownid.h transaction.h rules.h problems.h
-    chksum.h ${CMAKE_BINARY_DIR}/src/satversion.h)
+    chksum.h ${CMAKE_BINARY_DIR}/src/solvversion.h)
 
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 SET (CMAKE_SHARED_LINKER_FLAGS "${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver")

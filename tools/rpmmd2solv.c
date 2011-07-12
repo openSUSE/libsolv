@@ -20,7 +20,7 @@
 #include "repo.h"
 #include "repo_rpmmd.h"
 #include "common_write.h"
-#include "sat_xfopen.h"
+#include "solv_xfopen.h"
 
 
 static void
@@ -78,9 +78,9 @@ main(int argc, char **argv)
       int l;
       char *fnp;
       l = strlen(dir) + 128;
-      fnp = sat_malloc(l+1);
+      fnp = solv_malloc(l+1);
       snprintf(fnp, l, "%s/primary.xml.gz", dir);
-      if (!(fp = sat_xfopen(fnp, 0)))
+      if (!(fp = solv_xfopen(fnp, 0)))
 	{
 	  perror(fnp);
 	  exit(1);
@@ -88,7 +88,7 @@ main(int argc, char **argv)
       repo_add_rpmmd(repo, fp, 0, flags);
       fclose(fp);
       snprintf(fnp, l, "%s/diskusagedata.xml.gz", dir);
-      if ((fp = sat_xfopen(fnp, 0)))
+      if ((fp = solv_xfopen(fnp, 0)))
 	{
 	  repo_add_rpmmd(repo, fp, 0, flags);
 	  fclose(fp);
@@ -100,7 +100,7 @@ main(int argc, char **argv)
 	      fprintf(stderr, "-l parameter too long\n");
 	      exit(1);
 	    }
-	  while (!(fp = sat_xfopen(fnp, 0)))
+	  while (!(fp = solv_xfopen(fnp, 0)))
 	    {
 	      fprintf(stderr, "not opened %s\n", fnp);
 	      if (strlen(locale) > 2)
@@ -110,7 +110,7 @@ main(int argc, char **argv)
 		      fprintf(stderr, "-l parameter too long\n");
 		      exit(1);
 		    }
-		  if ((fp = sat_xfopen(fnp, 0)))
+		  if ((fp = solv_xfopen(fnp, 0)))
 		    break;
 		}
 	      perror(fnp);
@@ -120,7 +120,7 @@ main(int argc, char **argv)
 	  repo_add_rpmmd(repo, fp, 0, flags);
 	  fclose(fp);
 	}
-      sat_free(fnp);
+      solv_free(fnp);
     }
   else
     repo_add_rpmmd(repo, stdin, 0, flags);

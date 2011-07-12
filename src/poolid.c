@@ -31,7 +31,7 @@ pool_str2id(Pool *pool, const char *str, int create)
   if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
     {
       /* grow whatprovides array */
-      pool->whatprovides = sat_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      pool->whatprovides = solv_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
       memset(pool->whatprovides + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
     }
   return id;
@@ -45,7 +45,7 @@ pool_strn2id(Pool *pool, const char *str, unsigned int len, int create)
   if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
     {
       /* grow whatprovides array */
-      pool->whatprovides = sat_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      pool->whatprovides = solv_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
       memset(pool->whatprovides + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
     }
   return id;
@@ -69,9 +69,9 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   /* extend hashtable if needed */
   if (pool->nrels * 2 > hashmask)
     {
-      sat_free(pool->relhashtbl);
+      solv_free(pool->relhashtbl);
       pool->relhashmask = hashmask = mkmask(pool->nrels + REL_BLOCK);
-      pool->relhashtbl = hashtbl = sat_calloc(hashmask + 1, sizeof(Id));
+      pool->relhashtbl = hashtbl = solv_calloc(hashmask + 1, sizeof(Id));
       // rehash all rels into new hashtable
       for (i = 1; i < pool->nrels; i++)
 	{
@@ -100,7 +100,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 
   id = pool->nrels++;
   /* extend rel space if needed */
-  pool->rels = sat_extend(pool->rels, id, 1, sizeof(Reldep), REL_BLOCK);
+  pool->rels = solv_extend(pool->rels, id, 1, sizeof(Reldep), REL_BLOCK);
   hashtbl[h] = id;
   ran = pool->rels + id;
   ran->name = name;
@@ -110,7 +110,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   /* extend whatprovides_rel if needed */
   if (pool->whatprovides_rel && (id & WHATPROVIDES_BLOCK) == 0)
     {
-      pool->whatprovides_rel = sat_realloc2(pool->whatprovides_rel, id + (WHATPROVIDES_BLOCK + 1), sizeof(Offset));
+      pool->whatprovides_rel = solv_realloc2(pool->whatprovides_rel, id + (WHATPROVIDES_BLOCK + 1), sizeof(Offset));
       memset(pool->whatprovides_rel + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
     }
   return MAKERELDEP(id);
@@ -275,7 +275,7 @@ pool_shrink_strings(Pool *pool)
 void
 pool_shrink_rels(Pool *pool)
 {
-  pool->rels = sat_extend_resize(pool->rels, pool->nrels, sizeof(Reldep), REL_BLOCK);
+  pool->rels = solv_extend_resize(pool->rels, pool->nrels, sizeof(Reldep), REL_BLOCK);
 }
 
 // reset all hash tables
@@ -284,7 +284,7 @@ void
 pool_freeidhashes(Pool *pool)
 {
   stringpool_freehash(&pool->ss);
-  pool->relhashtbl = sat_free(pool->relhashtbl);
+  pool->relhashtbl = solv_free(pool->relhashtbl);
   pool->relhashmask = 0;
 }
 

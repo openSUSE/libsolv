@@ -159,7 +159,7 @@ static void SHA1_Transform(uint32_t state[5], const uint8_t buffer[64])
 
 
 /* SHA1Init - Initialize new context */
-void sat_SHA1_Init(SHA1_CTX* context)
+void solv_SHA1_Init(SHA1_CTX* context)
 {
     /* SHA1 initialization constants */
     context->state[0] = 0x67452301;
@@ -172,7 +172,7 @@ void sat_SHA1_Init(SHA1_CTX* context)
 
 
 /* Run your data through this. */
-void sat_SHA1_Update(SHA1_CTX* context, const uint8_t* data, const size_t len)
+void solv_SHA1_Update(SHA1_CTX* context, const uint8_t* data, const size_t len)
 {
     size_t i, j;
 
@@ -201,7 +201,7 @@ void sat_SHA1_Update(SHA1_CTX* context, const uint8_t* data, const size_t len)
 
 
 /* Add padding and return the message digest. */
-void sat_SHA1_Final(SHA1_CTX* context, uint8_t digest[SHA1_DIGEST_SIZE])
+void solv_SHA1_Final(SHA1_CTX* context, uint8_t digest[SHA1_DIGEST_SIZE])
 {
     uint32_t i;
     uint8_t  finalcount[8];
@@ -210,11 +210,11 @@ void sat_SHA1_Final(SHA1_CTX* context, uint8_t digest[SHA1_DIGEST_SIZE])
         finalcount[i] = (unsigned char)((context->count[(i >= 4 ? 0 : 1)]
          >> ((3-(i & 3)) * 8) ) & 255);  /* Endian independent */
     }
-    sat_SHA1_Update(context, (uint8_t *)"\200", 1);
+    solv_SHA1_Update(context, (uint8_t *)"\200", 1);
     while ((context->count[0] & 504) != 448) {
-        sat_SHA1_Update(context, (uint8_t *)"\0", 1);
+        solv_SHA1_Update(context, (uint8_t *)"\0", 1);
     }
-    sat_SHA1_Update(context, finalcount, 8);  /* Should cause a SHA1_Transform() */
+    solv_SHA1_Update(context, finalcount, 8);  /* Should cause a SHA1_Transform() */
     for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
         digest[i] = (uint8_t)
          ((context->state[i>>2] >> ((3-(i & 3)) * 8) ) & 255);

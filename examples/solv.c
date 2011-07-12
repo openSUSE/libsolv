@@ -72,7 +72,7 @@
 #include "repo_deltainfoxml.h"
 #include "repo_content.h"
 #include "pool_fileconflicts.h"
-#include "sat_xfopen.h"
+#include "solv_xfopen.h"
 
 #ifdef FEDORA
 # define REPOINFO_PATH "/etc/yum.repos.d"
@@ -120,9 +120,9 @@ yum_substitute(Pool *pool, char *line)
 
   if (!line)
     {
-      sat_free(releaseevr);
+      solv_free(releaseevr);
       releaseevr = 0;
-      sat_free(basearch);
+      solv_free(basearch);
       basearch = 0;
       return 0;
     }
@@ -256,7 +256,7 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	      if (!vp)
 		continue;
 	      *vp = 0;
-	      repoinfos = sat_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
+	      repoinfos = solv_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
 	      cinfo = repoinfos + nrepoinfos++;
 	      memset(cinfo, 0, sizeof(*cinfo));
 	      cinfo->alias = strdup(kp + 1);
@@ -411,11 +411,11 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 	    kp++;
 	  if (!*kp)
 	    continue;
-	  repoinfos = sat_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
+	  repoinfos = solv_extend(repoinfos, nrepoinfos, 1, sizeof(*repoinfos), 15);
 	  cinfo = repoinfos + nrepoinfos++;
 	  memset(cinfo, 0, sizeof(*cinfo));
 	  cinfo->baseurl = strdup(url);
-	  cinfo->alias = sat_dupjoin(url, "/", distro);
+	  cinfo->alias = solv_dupjoin(url, "/", distro);
 	  cinfo->name = strdup(distro);
 	  cinfo->type = TYPE_DEBIAN;
 	  cinfo->enabled = 1;
@@ -434,7 +434,7 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 		kp++;
 	      if (*kp)
 		*kp++ = 0;
-	      cinfo->components = sat_extend(cinfo->components, cinfo->ncomponents, 1, sizeof(*cinfo->components), 15);
+	      cinfo->components = solv_extend(cinfo->components, cinfo->ncomponents, 1, sizeof(*cinfo->components), 15);
 	      cinfo->components[cinfo->ncomponents++] = strdup(compo);
 	    }
 	}
@@ -455,17 +455,17 @@ free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
   for (i = 0; i < nrepoinfos; i++)
     {
       struct repoinfo *cinfo = repoinfos + i;
-      sat_free(cinfo->name);
-      sat_free(cinfo->alias);
-      sat_free(cinfo->path);
-      sat_free(cinfo->metalink);
-      sat_free(cinfo->mirrorlist);
-      sat_free(cinfo->baseurl);
+      solv_free(cinfo->name);
+      solv_free(cinfo->alias);
+      solv_free(cinfo->path);
+      solv_free(cinfo->metalink);
+      solv_free(cinfo->mirrorlist);
+      solv_free(cinfo->baseurl);
       for (j = 0; j < cinfo->ncomponents; j++)
-        sat_free(cinfo->components[j]);
-      sat_free(cinfo->components);
+        solv_free(cinfo->components[j]);
+      solv_free(cinfo->components);
     }
-  sat_free(repoinfos);
+  solv_free(repoinfos);
 }
 
 static inline int
@@ -493,24 +493,24 @@ verify_checksum(int fd, const char *file, const unsigned char *chksum, Id chksum
   void *h;
   int l;
 
-  h = sat_chksum_create(chksumtype);
+  h = solv_chksum_create(chksumtype);
   if (!h)
     {
       printf("%s: unknown checksum type\n", file);
       return 0;
     }
   while ((l = read(fd, buf, sizeof(buf))) > 0)
-    sat_chksum_add(h, buf, l);
+    solv_chksum_add(h, buf, l);
   lseek(fd, 0, SEEK_SET);
   l = 0;
-  sum = sat_chksum_get(h, &l);
+  sum = solv_chksum_get(h, &l);
   if (memcmp(sum, chksum, l))
     {
       printf("%s: checksum mismatch\n", file);
-      sat_chksum_free(h, 0);
+      solv_chksum_free(h, 0);
       return 0;
     }
-  sat_chksum_free(h, 0);
+  solv_chksum_free(h, 0);
   return 1;
 }
 
@@ -524,8 +524,8 @@ findfastest(char **urls, int nurls)
   char portstr[16];
   struct addrinfo hints, *result;;
 
-  fds = sat_calloc(nurls, sizeof(*fds));
-  socks = sat_calloc(nurls, sizeof(*socks));
+  fds = solv_calloc(nurls, sizeof(*fds));
+  socks = solv_calloc(nurls, sizeof(*socks));
   for (i = 0; i < nurls; i++)
     {
       socks[i] = -1;
@@ -666,7 +666,7 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
       if (chksumtypep && !*chksumtypep && !strncmp(bp, "<hash type=\"sha256\">", 20))
 	{
 	  bp += 20;
-	  if (sat_hex2bin((const char **)&bp, chksump, 32) == 32)
+	  if (solv_hex2bin((const char **)&bp, chksump, 32) == 32)
 	    *chksumtypep = REPOKEY_TYPE_SHA256;
 	  continue;
 	}
@@ -682,7 +682,7 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
       *ep = 0;
       if (strncmp(bp, "http", 4))
 	continue;
-      urls = sat_extend(urls, nurls, 1, sizeof(*urls), 15);
+      urls = solv_extend(urls, nurls, 1, sizeof(*urls), 15);
       urls[nurls++] = strdup(bp);
     }
   if (nurls)
@@ -692,8 +692,8 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
       bp = urls[0];
       urls[0] = 0;
       for (i = 0; i < nurls; i++)
-        sat_free(urls[i]);
-      sat_free(urls);
+        solv_free(urls[i]);
+      solv_free(urls);
       ep = strchr(bp, '/');
       if ((ep = strchr(ep + 2, '/')) != 0)
 	{
@@ -723,7 +723,7 @@ findmirrorlisturl(FILE *fp)
       l = strlen(bp);
       while (l > 0 && (bp[l - 1] == ' ' || bp[l - 1] == '\t' || bp[l - 1] == '\n'))
 	bp[--l] = 0;
-      urls = sat_extend(urls, nurls, 1, sizeof(*urls), 15);
+      urls = solv_extend(urls, nurls, 1, sizeof(*urls), 15);
       urls[nurls++] = strdup(bp);
     }
   if (nurls)
@@ -733,8 +733,8 @@ findmirrorlisturl(FILE *fp)
       bp = urls[0];
       urls[0] = 0;
       for (i = 0; i < nurls; i++)
-        sat_free(urls[i]);
-      sat_free(urls);
+        solv_free(urls[i]);
+      solv_free(urls);
       ep = strchr(bp, '/');
       if ((ep = strchr(ep + 2, '/')) != 0)
 	{
@@ -850,7 +850,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       return 0;
     }
   if (uncompress)
-    return sat_xfopen_fd(".gz", fd, "r");
+    return solv_xfopen_fd(".gz", fd, "r");
   fcntl(fd, F_SETFD, FD_CLOEXEC);
   return fdopen(fd, "r");
 }
@@ -964,26 +964,26 @@ void
 calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
 {
   char buf[4096];
-  void *h = sat_chksum_create(chktype);
+  void *h = solv_chksum_create(chktype);
   int l;
 
-  sat_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
+  solv_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
   while ((l = fread(buf, 1, sizeof(buf), fp)) > 0)
-    sat_chksum_add(h, buf, l);
+    solv_chksum_add(h, buf, l);
   rewind(fp);
-  sat_chksum_free(h, out);
+  solv_chksum_free(h, out);
 }
 
 void
 calc_checksum_stat(struct stat *stb, Id chktype, unsigned char *out)
 {
-  void *h = sat_chksum_create(chktype);
-  sat_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
-  sat_chksum_add(h, &stb->st_dev, sizeof(stb->st_dev));
-  sat_chksum_add(h, &stb->st_ino, sizeof(stb->st_ino));
-  sat_chksum_add(h, &stb->st_size, sizeof(stb->st_size));
-  sat_chksum_add(h, &stb->st_mtime, sizeof(stb->st_mtime));
-  sat_chksum_free(h, out);
+  void *h = solv_chksum_create(chktype);
+  solv_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
+  solv_chksum_add(h, &stb->st_dev, sizeof(stb->st_dev));
+  solv_chksum_add(h, &stb->st_ino, sizeof(stb->st_ino));
+  solv_chksum_add(h, &stb->st_size, sizeof(stb->st_size));
+  solv_chksum_add(h, &stb->st_mtime, sizeof(stb->st_mtime));
+  solv_chksum_free(h, out);
 }
 
 void
@@ -1085,7 +1085,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
   cinfo = repo->appdata;
   mkdir(SOLVCACHE_PATH, 0755);
   /* use dupjoin instead of tmpjoin because tmpl must survive repo_write */
-  tmpl = sat_dupjoin(SOLVCACHE_PATH, "/", ".newsolv-XXXXXX");
+  tmpl = solv_dupjoin(SOLVCACHE_PATH, "/", ".newsolv-XXXXXX");
   fd = mkstemp(tmpl);
   if (fd < 0)
     {
@@ -1494,13 +1494,13 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
       if (basearch[0] == 'i' && basearch[1] && !strcmp(basearch + 2, "86"))
 	basearch[1] = '3';
     }
-  binarydir = sat_dupjoin("binary-", basearch, "/");
+  binarydir = solv_dupjoin("binary-", basearch, "/");
   lbinarydir = strlen(binarydir);
   compl = strlen(comp);
   rewind(fp);
   curchksumtype = 0;
   filename = 0;
-  chksum = sat_malloc(32);
+  chksum = solv_malloc(32);
   chksumtype = 0;
   while(fgets(buf, sizeof(buf), fp))
     {
@@ -1559,12 +1559,12 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
 	  int curl;
 	  if (filename && !strcmp(bp, "Packages"))
 	    continue;
-	  curl = sat_chksum_len(curchksumtype);
-	  if (!curl || (chksumtype && sat_chksum_len(chksumtype) > curl))
+	  curl = solv_chksum_len(curchksumtype);
+	  if (!curl || (chksumtype && solv_chksum_len(chksumtype) > curl))
 	    continue;
-          if (sat_hex2bin(&ch, curchksum, sizeof(curchksum)) != curl)
+          if (solv_hex2bin(&ch, curchksum, sizeof(curchksum)) != curl)
 	    continue;
-	  sat_free(filename);
+	  solv_free(filename);
 	  filename = strdup(fn);
 	  chksumtype = curchksumtype;
 	  memcpy(chksum, curchksum, curl);
@@ -1573,13 +1573,13 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
   free(binarydir);
   if (filename)
     {
-      fn = sat_dupjoin("/", filename, 0);
-      sat_free(filename);
-      filename = sat_dupjoin("dists/", cinfo->name, fn);
-      sat_free(fn);
+      fn = solv_dupjoin("/", filename, 0);
+      solv_free(filename);
+      filename = solv_dupjoin("dists/", cinfo->name, fn);
+      solv_free(fn);
     }
   if (!chksumtype)
-    chksum = sat_free(chksum);
+    chksum = solv_free(chksum);
   *chksump = chksum;
   *chksumtypep = chksumtype;
   return filename;
@@ -1832,7 +1832,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
         case TYPE_DEBIAN:
 	  printf("debian repo '%s':", cinfo->alias);
 	  fflush(stdout);
-	  filename = sat_dupjoin("dists/", cinfo->name, "/Release");
+	  filename = solv_dupjoin("dists/", cinfo->name, "/Release");
 	  if ((fpr = curlfopen(cinfo, filename, 0, 0, 0, 0)) == 0)
 	    {
 	      printf(" no Release file, skipped\n");
@@ -1841,12 +1841,12 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      free((char *)filename);
 	      break;
 	    }
-	  sat_free((char *)filename);
+	  solv_free((char *)filename);
 	  if (cinfo->repo_gpgcheck)
 	    {
-	      filename = sat_dupjoin("dists/", cinfo->name, "/Release.gpg");
+	      filename = solv_dupjoin("dists/", cinfo->name, "/Release.gpg");
 	      sigfp = curlfopen(cinfo, filename, 0, 0, 0, 0);
-	      sat_free((char *)filename);
+	      solv_free((char *)filename);
 	      if (!sigfp)
 		{
 		  printf(" unsigned, skipped\n");
@@ -1884,8 +1884,8 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	          repo_add_debpackages(repo, fp, 0);
 		  fclose(fp);
 		}
-	      sat_free((char *)filechksum);
-	      sat_free((char *)filename);
+	      solv_free((char *)filechksum);
+	      solv_free((char *)filename);
 	    }
 	  fclose(fpr);
 	  if (!badchecksum)
@@ -2788,7 +2788,7 @@ main(int argc, char **argv)
 	      exit(1);
 	    }
 	  if (!commandlinepkgs)
-	    commandlinepkgs = sat_calloc(argc, sizeof(Id));
+	    commandlinepkgs = solv_calloc(argc, sizeof(Id));
 	  if (!commandlinerepo)
 	    commandlinerepo = repo_create(pool, "@commandline");
 #ifndef DEBIAN
@@ -2808,7 +2808,7 @@ main(int argc, char **argv)
   pool_addfileprovides_ids(pool, pool->installed, &addedfileprovides);
   if (addedfileprovides && *addedfileprovides)
     rewrite_repos(pool, addedfileprovides);
-  sat_free(addedfileprovides);
+  solv_free(addedfileprovides);
   pool_createwhatprovides(pool);
 
   queue_init(&job);
@@ -2887,7 +2887,7 @@ main(int argc, char **argv)
       queue_free(&job);
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);
-      sat_free(commandlinepkgs);
+      solv_free(commandlinepkgs);
 #ifdef FEDORA
       yum_substitute(pool, 0);
 #endif
@@ -3014,7 +3014,7 @@ rerunsolver:
       queue_free(&job);
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);
-      sat_free(commandlinepkgs);
+      solv_free(commandlinepkgs);
 #ifdef FEDORA
       yum_substitute(pool, 0);
 #endif
@@ -3049,7 +3049,7 @@ rerunsolver:
       queue_free(&job);
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);
-      sat_free(commandlinepkgs);
+      solv_free(commandlinepkgs);
 #ifdef FEDORA
       yum_substitute(pool, 0);
 #endif
@@ -3072,7 +3072,7 @@ rerunsolver:
 	  downloadsize += solvable_lookup_num(s, SOLVABLE_DOWNLOADSIZE, 0);
 	}
       printf("Downloading %d packages, %d K\n", newpkgs, downloadsize);
-      newpkgsfps = sat_calloc(newpkgs, sizeof(*newpkgsfps));
+      newpkgsfps = solv_calloc(newpkgs, sizeof(*newpkgsfps));
       for (i = 0; i < newpkgs; i++)
 	{
 	  unsigned int medianr;
@@ -3191,7 +3191,7 @@ rerunsolver:
 		    }
 		}
 	      dataiterator_free(&di);
-	      sat_free(matchname);
+	      solv_free(matchname);
 	    }
 	  
 	  if (newpkgsfps[i])
@@ -3242,7 +3242,7 @@ rerunsolver:
 	      for (i = 0; i < newpkgs; i++)
 		if (newpkgsfps[i])
 		  fclose(newpkgsfps[i]);
-	      newpkgsfps = sat_free(newpkgsfps);
+	      newpkgsfps = solv_free(newpkgsfps);
 	      solver_free(solv);
 	      pool_add_fileconflicts_deps(pool, &conflicts);
 	      pool_createwhatprovides(pool);	/* Hmm... */
@@ -3314,13 +3314,13 @@ rerunsolver:
   for (i = 0; i < newpkgs; i++)
     if (newpkgsfps[i])
       fclose(newpkgsfps[i]);
-  sat_free(newpkgsfps);
+  solv_free(newpkgsfps);
   queue_free(&checkq);
   solver_free(solv);
   queue_free(&job);
   pool_free(pool);
   free_repoinfos(repoinfos, nrepoinfos);
-  sat_free(commandlinepkgs);
+  solv_free(commandlinepkgs);
 #ifdef FEDORA
   yum_substitute(pool, 0);
 #endif

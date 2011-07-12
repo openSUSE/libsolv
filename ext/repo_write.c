@@ -283,7 +283,7 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
     {
       for (i = len + 1; ids[i]; i++)
 	;
-      sids = sat_malloc2(i, sizeof(Id));
+      sids = solv_malloc2(i, sizeof(Id));
       memcpy(sids, lids, 64 * sizeof(Id));
       for (; ids[len]; len++)
 	{
@@ -303,9 +303,9 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
     if (sids[i] == marker)
       break;
   if (i > 1)
-    sat_sort(sids, i, sizeof(Id), cmp_ids, 0);
+    solv_sort(sids, i, sizeof(Id), cmp_ids, 0);
   if ((len - i) > 2)
-    sat_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
+    solv_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
 
   Id id, old = 0;
 
@@ -345,7 +345,7 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
     id = (id & 63) | ((id & ~63) << 1);
   write_id(fp, id);
   if (sids != lids)
-    sat_free(sids);
+    solv_free(sids);
 }
 #endif
 
@@ -398,7 +398,7 @@ static inline void
 data_addid(struct extdata *xd, Id x)
 {
   unsigned char *dp;
-  xd->buf = sat_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
+  xd->buf = solv_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
   dp = xd->buf + xd->len;
 
   if (x >= (1 << 14))
@@ -447,7 +447,7 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
     {
       for (i = len + 1; ids[i]; i++)
 	;
-      sids = sat_malloc2(i, sizeof(Id));
+      sids = solv_malloc2(i, sizeof(Id));
       memcpy(sids, lids, 64 * sizeof(Id));
       for (; ids[len]; len++)
 	{
@@ -467,9 +467,9 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
     if (sids[i] == marker)
       break;
   if (i > 1)
-    sat_sort(sids, i, sizeof(Id), cmp_ids, 0);
+    solv_sort(sids, i, sizeof(Id), cmp_ids, 0);
   if ((len - i) > 2)
-    sat_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
+    solv_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
 
   Id id, old = 0;
 
@@ -509,13 +509,13 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
     id = (id & 63) | ((id & ~63) << 1);
   data_addid(xd, id);
   if (sids != lids)
-    sat_free(sids);
+    solv_free(sids);
 }
 
 static inline void
 data_addblob(struct extdata *xd, unsigned char *blob, int len)
 {
-  xd->buf = sat_extend(xd->buf, xd->len, len, 1, EXTDATA_BLOCK);
+  xd->buf = solv_extend(xd->buf, xd->len, len, 1, EXTDATA_BLOCK);
   memcpy(xd->buf + xd->len, blob, len);
   xd->len += len;
 }
@@ -541,7 +541,7 @@ putinownpool(struct cbdata *cbdata, Stringpool *ss, Id id)
       int oldoff = cbdata->needid[0].map;
       int newoff = (id + 1 + NEEDED_BLOCK) & ~NEEDED_BLOCK;
       int nrels = cbdata->repo->pool->nrels;
-      cbdata->needid = sat_realloc2(cbdata->needid, newoff + nrels, sizeof(NeedId));
+      cbdata->needid = solv_realloc2(cbdata->needid, newoff + nrels, sizeof(NeedId));
       if (nrels)
 	memmove(cbdata->needid + newoff, cbdata->needid + oldoff, nrels * sizeof(NeedId));
       memset(cbdata->needid + oldoff, 0, (newoff - oldoff) * sizeof(NeedId));
@@ -642,14 +642,14 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
 	      }
 	    cbdata->oldschema = cbdata->schema;
 	    cbdata->oldsp = cbdata->sp;
-	    cbdata->schema = sat_calloc(cbdata->target->nkeys, sizeof(Id));
+	    cbdata->schema = solv_calloc(cbdata->target->nkeys, sizeof(Id));
 	    cbdata->sp = cbdata->schema;
 	  }
 	else if (kv->eof == 1)
 	  {
 	    cbdata->current_sub++;
 	    *cbdata->sp = 0;
-	    cbdata->subschemata = sat_extend(cbdata->subschemata, cbdata->nsubschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
+	    cbdata->subschemata = solv_extend(cbdata->subschemata, cbdata->nsubschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
 	    cbdata->subschemata[cbdata->nsubschemata++] = repodata_schema2id(cbdata->target, cbdata->schema, 1);
 #if 0
 	    fprintf(stderr, "Have schema %d\n", cbdata->subschemata[cbdata->nsubschemata-1]);
@@ -658,7 +658,7 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
 	  }
 	else
 	  {
-	    sat_free(cbdata->schema);
+	    solv_free(cbdata->schema);
 	    cbdata->schema = cbdata->oldschema;
 	    cbdata->sp = cbdata->oldsp;
 	    cbdata->oldsp = cbdata->oldschema = 0;
@@ -677,7 +677,7 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
 	    *sp = 0;
 	    while (sp[-1])
 	      sp--;
-	    cbdata->subschemata = sat_extend(cbdata->subschemata, cbdata->nsubschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
+	    cbdata->subschemata = solv_extend(cbdata->subschemata, cbdata->nsubschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
 	    cbdata->subschemata[cbdata->nsubschemata++] = repodata_schema2id(cbdata->target, sp, 1);
 	    cbdata->sp = kv->eof == 2 ? sp - 1: sp;
 	  }
@@ -1025,9 +1025,9 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   n = ID_NUM_INTERNAL;
   FOR_REPODATAS(repo, i, data)
     n += data->nkeys;
-  cbdata.keymap = sat_calloc(n, sizeof(Id));
-  cbdata.keymapstart = sat_calloc(repo->nrepodata, sizeof(Id));
-  repodataused = sat_calloc(repo->nrepodata, 1);
+  cbdata.keymap = solv_calloc(n, sizeof(Id));
+  cbdata.keymapstart = solv_calloc(repo->nrepodata, sizeof(Id));
+  repodataused = solv_calloc(repo->nrepodata, 1);
 
   clonepool = 0;
   poolusage = 0;
@@ -1226,7 +1226,7 @@ repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       cbdata.owndirpool = dirpool;
     }
   else if (dirpool)
-    cbdata.dirused = sat_calloc(dirpool->ndirs, sizeof(Id));
+    cbdata.dirused = solv_calloc(dirpool->ndirs, sizeof(Id));
 
 
 /********************************************************************/
@@ -1241,7 +1241,7 @@ for (i = 1; i < target.nkeys; i++)
   /* copy keys if requested */
   if (keyarrayp)
     {
-      *keyarrayp = sat_calloc(2 * target.nkeys + 1, sizeof(Id));
+      *keyarrayp = solv_calloc(2 * target.nkeys + 1, sizeof(Id));
       for (i = 1; i < target.nkeys; i++)
 	{
           (*keyarrayp)[2 * i - 2] = target.keys[i].name;
@@ -1285,9 +1285,9 @@ for (i = 1; i < target.nkeys; i++)
   needid[0].map = reloff;
 
   cbdata.needid = needid;
-  cbdata.schema = sat_calloc(target.nkeys, sizeof(Id));
+  cbdata.schema = solv_calloc(target.nkeys, sizeof(Id));
   cbdata.sp = cbdata.schema;
-  cbdata.solvschemata = sat_calloc(repo->nsolvables, sizeof(Id));
+  cbdata.solvschemata = solv_calloc(repo->nsolvables, sizeof(Id));
 
   /* create main schema */
   cbdata.sp = cbdata.schema;
@@ -1430,7 +1430,7 @@ for (i = 1; i < target.nkeys; i++)
 /********************************************************************/
 
   /* remove unused keys */
-  keyused = sat_calloc(target.nkeys, sizeof(Id));
+  keyused = solv_calloc(target.nkeys, sizeof(Id));
   for (i = 1; i < target.schemadatalen; i++)
     keyused[target.schemadata[i]] = 1;
   keyused[0] = 0;
@@ -1464,7 +1464,7 @@ for (i = 1; i < target.nkeys; i++)
   /* update keymap to the new key ids */
   for (i = 0; i < cbdata.nkeymap; i++)
     cbdata.keymap[i] = keyused[cbdata.keymap[i]];
-  keyused = sat_free(keyused);
+  keyused = solv_free(keyused);
 
   /* increment needid of the used keys, they are already mapped to
    * the correct string pool  */
@@ -1481,7 +1481,7 @@ for (i = 1; i < target.nkeys; i++)
   if (dirpool && cbdata.dirused && !cbdata.dirused[0])
     {
       /* no dirs used at all */
-      cbdata.dirused = sat_free(cbdata.dirused);
+      cbdata.dirused = solv_free(cbdata.dirused);
       dirpool = 0;
     }
 
@@ -1534,13 +1534,13 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
     needid[i].map = i;
 
 #if 0
-  sat_sort(needid + 1, spool->nstrings - 1, sizeof(*needid), needid_cmp_need_s, spool);
+  solv_sort(needid + 1, spool->nstrings - 1, sizeof(*needid), needid_cmp_need_s, spool);
 #else
   /* make first entry '' */
   needid[1].need = 1;
-  sat_sort(needid + 2, spool->nstrings - 2, sizeof(*needid), needid_cmp_need_s, spool);
+  solv_sort(needid + 2, spool->nstrings - 2, sizeof(*needid), needid_cmp_need_s, spool);
 #endif
-  sat_sort(needid + reloff, pool->nrels, sizeof(*needid), needid_cmp_need, 0);
+  solv_sort(needid + reloff, pool->nrels, sizeof(*needid), needid_cmp_need, 0);
   /* now needid is in new order, needid[newid].map -> oldid */
 
   /* calculate string space size, also zero out needid[].need */
@@ -1589,14 +1589,14 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       /* (dirpooldata and dirused are 0 if we have our own dirpool) */
       if (cbdata.dirused && !cbdata.dirused[1])
 	cbdata.dirused[1] = 1;	/* always want / entry */
-      dirmap = sat_calloc(dirpool->ndirs, sizeof(Id));
+      dirmap = solv_calloc(dirpool->ndirs, sizeof(Id));
       dirmap[0] = 0;
       ndirmap = traverse_dirs(dirpool, dirmap, 1, dirpool_child(dirpool, 0), cbdata.dirused);
 
       /* (re)create dirused, so that it maps from "old dirid" to "new dirid" */
       /* change dirmap so that it maps from "new dirid" to "new compid" */
       if (!cbdata.dirused)
-	cbdata.dirused = sat_malloc2(dirpool->ndirs, sizeof(Id));
+	cbdata.dirused = solv_malloc2(dirpool->ndirs, sizeof(Id));
       memset(cbdata.dirused, 0, dirpool->ndirs * sizeof(Id));
       for (i = 1; i < ndirmap; i++)
 	{
@@ -1618,7 +1618,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
    * we use extdata[0] for incore data and extdata[keyid] for vertical data
    */
 
-  cbdata.extdata = sat_calloc(target.nkeys, sizeof(struct extdata));
+  cbdata.extdata = solv_calloc(target.nkeys, sizeof(struct extdata));
 
   xd = cbdata.extdata;
   cbdata.current_sub = 0;
@@ -1697,7 +1697,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   assert(cbdata.current_sub == cbdata.nsubschemata);
   if (cbdata.subschemata)
     {
-      cbdata.subschemata = sat_free(cbdata.subschemata);
+      cbdata.subschemata = solv_free(cbdata.subschemata);
       cbdata.nsubschemata = 0;
     }
 
@@ -1724,7 +1724,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   /*
    * calculate prefix encoding of the strings
    */
-  unsigned char *prefixcomp = sat_malloc(nstrings);
+  unsigned char *prefixcomp = solv_malloc(nstrings);
   unsigned int compsum = 0;
   char *old_str = "";
   
@@ -1756,7 +1756,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  write_str(fp, str + prefixcomp[i]);
 	}
     }
-  sat_free(prefixcomp);
+  solv_free(prefixcomp);
 
 #if 0
   /* Build the prefix-encoding of the string pool.  We need to know
@@ -1765,7 +1765,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
      that this actually is an expansion we can't easily reuse the 
      stringspace for this.  The max expansion per string is 1 byte,
      so it will fit into sizeid+nstrings bytes.  */
-  char *prefix = sat_malloc(sizeid + nstrings);
+  char *prefix = solv_malloc(sizeid + nstrings);
   char *pp = prefix;
   char *old_str = "";
   for (i = 1; i < nstrings; i++)
@@ -1796,7 +1796,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  exit(1);
 	}
     }
-  sat_free(prefix);
+  solv_free(prefix);
 #endif
 
   /*
@@ -1820,7 +1820,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       else
         write_id(fp, nstrings - dirmap[i]);
     }
-  sat_free(dirmap);
+  solv_free(dirmap);
 
   /*
    * write keys
@@ -1854,7 +1854,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   write_id(fp, cbdata.extdata[0].len);
   if (cbdata.extdata[0].len)
     write_blob(fp, cbdata.extdata[0].buf, cbdata.extdata[0].len);
-  sat_free(cbdata.extdata[0].buf);
+  solv_free(cbdata.extdata[0].buf);
 
   /* do we have vertical data? */
   for (i = 1; i < target.nkeys; i++)
@@ -1894,19 +1894,19 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
     }
 
   for (i = 1; i < target.nkeys; i++)
-    sat_free(cbdata.extdata[i].buf);
-  sat_free(cbdata.extdata);
+    solv_free(cbdata.extdata[i].buf);
+  solv_free(cbdata.extdata);
 
   repodata_freedata(&target);
 
-  sat_free(needid);
-  sat_free(cbdata.solvschemata);
-  sat_free(cbdata.schema);
+  solv_free(needid);
+  solv_free(cbdata.solvschemata);
+  solv_free(cbdata.schema);
 
-  sat_free(cbdata.keymap);
-  sat_free(cbdata.keymapstart);
-  sat_free(cbdata.dirused);
-  sat_free(repodataused);
+  solv_free(cbdata.keymap);
+  solv_free(cbdata.keymapstart);
+  solv_free(cbdata.dirused);
+  solv_free(repodataused);
   return 0;
 }
 

@@ -184,7 +184,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(r) + 1;
   if (l > pd->acontent)
     {
-      pd->content = sat_realloc(pd->content, l + 256);
+      pd->content = solv_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content;
@@ -333,7 +333,7 @@ startElement(void *userData, const char *name, const char **atts)
       memset(&pd->delta, 0, sizeof(pd->delta));
       *pd->tempstr = 0;
       pd->ltemp = 0;
-      pd->delta.bevr = sat_extend(pd->delta.bevr, pd->delta.nbevr, 1, sizeof(Id), 7);
+      pd->delta.bevr = solv_extend(pd->delta.bevr, pd->delta.nbevr, 1, sizeof(Id), 7);
       pd->delta.bevr[pd->delta.nbevr++] = makeevr_atts(pool, pd, atts);
       break;
     case STATE_FILENAME:
@@ -355,7 +355,7 @@ startElement(void *userData, const char *name, const char **atts)
 	  else if (!strcasecmp(str, "md5"))
 	    pd->delta.filechecksumtype = REPOKEY_TYPE_MD5;
 	  else
-	    pool_debug(pool, SAT_ERROR, "unknown checksum type: '%s'\n", str);
+	    pool_debug(pool, SOLV_ERROR, "unknown checksum type: '%s'\n", str);
 	}
     case STATE_SEQUENCE:
       break;
@@ -408,7 +408,7 @@ endElement(void *userData, const char *name)
 	handle = repodata_new_handle(pd->data);
 	/* we commit all handles later on in one go so that the
          * repodata code doesn't need to realloc every time */
-	pd->handles = sat_extend(pd->handles, pd->nhandles, 1, sizeof(Id), 63);
+	pd->handles = solv_extend(pd->handles, pd->nhandles, 1, sizeof(Id), 63);
         pd->handles[pd->nhandles++] = handle;
 	repodata_set_id(pd->data, handle, DELTA_PACKAGE_NAME, pd->newpkgname);
 	repodata_set_id(pd->data, handle, DELTA_PACKAGE_EVR, pd->newpkgevr);
@@ -472,10 +472,10 @@ endElement(void *userData, const char *name)
 	  }
 
       }
-      pd->delta.filechecksum = sat_free(pd->delta.filechecksum);
-      pd->delta.bevr = sat_free(pd->delta.bevr);
+      pd->delta.filechecksum = solv_free(pd->delta.filechecksum);
+      pd->delta.bevr = solv_free(pd->delta.bevr);
       pd->delta.nbevr = 0;
-      pd->delta.seqnum = sat_free(pd->delta.seqnum);
+      pd->delta.seqnum = solv_free(pd->delta.seqnum);
       break;
     case STATE_FILENAME:
       parse_delta_location(pd, pd->content);
@@ -531,7 +531,7 @@ characterData(void *userData, const XML_Char *s, int len)
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
-      pd->content = sat_realloc(pd->content, l + 256);
+      pd->content = solv_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content + pd->lcontent;
@@ -566,7 +566,7 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
   pd.repo = repo;
   pd.data = data;
 
-  pd.content = sat_malloc(256);
+  pd.content = solv_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
   pd.tempstr = malloc(256);
@@ -582,21 +582,21 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pool, SAT_FATAL, "repo_updateinfoxml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  pool_debug(pool, SOLV_FATAL, "repo_updateinfoxml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
 	  exit(1);
 	}
       if (l == 0)
 	break;
     }
   XML_ParserFree(parser);
-  sat_free(pd.content);
-  sat_free(pd.tempstr);
+  solv_free(pd.content);
+  solv_free(pd.tempstr);
   join_freemem();
 
   /* now commit all handles */
   for (i = 0; i < pd.nhandles; i++)
     repodata_add_flexarray(pd.data, SOLVID_META, REPOSITORY_DELTAINFO, pd.handles[i]);
-  sat_free(pd.handles);
+  solv_free(pd.handles);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

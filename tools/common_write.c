@@ -186,7 +186,7 @@ write_info(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
       for (i = 0; keyarray[i]; i++)
         repodata_add_idarray(info, h, REPOSITORY_KEYS, keyarray[i]);
     }
-  sat_free(keyarray);
+  solv_free(keyarray);
   repodata_set_str(info, h, REPOSITORY_LOCATION, location);
   repodata_add_flexarray(info, SOLVID_META, REPOSITORY_EXTERNAL, h);
 }
@@ -213,7 +213,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       for (i = 0; addedfileprovides[i]; i++)
         repodata_add_idarray(info, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
     }
-  sat_free(addedfileprovides);
+  solv_free(addedfileprovides);
 
   pool_freeidhashes(repo->pool);	/* free some mem */
 
@@ -247,7 +247,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 		  break;
 	      if (k < nlanguages)
 		continue;
-	      languages = sat_realloc2(languages, nlanguages + 1, sizeof(char *));
+	      languages = solv_realloc2(languages, nlanguages + 1, sizeof(char *));
 	      languages[nlanguages++] = strdup(keyname + l);
 	    }
 	}
@@ -304,7 +304,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       fclose(fp);
       for (i = 0; i < nlanguages; i++)
 	free(languages[i]);
-      sat_free(languages);
+      solv_free(languages);
       repodata_free(info);
       return 0;
     }

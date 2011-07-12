@@ -92,7 +92,7 @@ join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
   if (l > pd->tmpl)
     {
       pd->tmpl = l + 256;
-      pd->tmp = sat_realloc(pd->tmp, pd->tmpl);
+      pd->tmp = solv_realloc(pd->tmp, pd->tmpl);
     }
   p = pd->tmp;
   if (s1)
@@ -141,7 +141,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 
 	  if (!rel || !evr)
 	    {
-	      pool_debug(pool, SAT_FATAL, "repo_content: bad relation '%s %s'\n", name, rel);
+	      pool_debug(pool, SOLV_FATAL, "repo_content: bad relation '%s %s'\n", name, rel);
 	      continue;
 	    }
 	  for (flags = 0; flags < 6; flags++)
@@ -149,7 +149,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	      break;
 	  if (flags == 6)
 	    {
-	      pool_debug(pool, SAT_FATAL, "repo_content: unknown relation '%s'\n", rel);
+	      pool_debug(pool, SOLV_FATAL, "repo_content: unknown relation '%s'\n", rel);
 	      continue;
 	    }
 	  id = pool_rel2id(pool, id, pool_str2id(pool, evr, 1), flags + 1, 1);
@@ -223,7 +223,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   Id *otherarchs = 0;
 
   memset(&pd, 0, sizeof(pd));
-  line = sat_malloc(1024);
+  line = solv_malloc(1024);
   aline = 1024;
 
   pd.repo = repo;
@@ -240,7 +240,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
       if (linep - line + 16 > aline)
 	{
 	  aline = linep - line;
-	  line = sat_realloc(line, aline + 512);
+	  line = solv_realloc(line, aline + 512);
 	  linep = line + aline;
 	  aline += 512;
 	}
@@ -272,7 +272,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	  if (istag ("CONTENTSTYLE"))
 	    {
 	      if (contentstyle)
-	        pool_debug(pool, SAT_ERROR, "repo_content: 'CONTENTSTYLE' must be first line of 'content'\n");
+	        pool_debug(pool, SOLV_ERROR, "repo_content: 'CONTENTSTYLE' must be first line of 'content'\n");
 	      contentstyle = atoi(value);
 	      continue;
 	    }
@@ -335,13 +335,13 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		continue;
 	      if (!*value)
 		continue;
-	      type = sat_chksum_str2type(checksumtype);
+	      type = solv_chksum_str2type(checksumtype);
 	      if (!type)
 		{
 		  fprintf(stderr, "Unknown checksum type: %s: %s\n", value, checksumtype);
 		  continue;
 		}
-              l = sat_chksum_len(type);
+              l = solv_chksum_len(type);
 	      if (strlen(checksum) != 2 * l)
 	        {
 		  fprintf(stderr, "Invalid checksum length: %s: for %s\n", value, checksum);
@@ -435,7 +435,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		  s->arch = pool_str2id(pool, arch, 1);
 		  while ((arch = splitword(&value)) != 0)
 		    {
-		       otherarchs = sat_extend(otherarchs, numotherarchs, 1, sizeof(Id), 7);
+		       otherarchs = solv_extend(otherarchs, numotherarchs, 1, sizeof(Id), 7);
 		       otherarchs[numotherarchs++] = pool_str2id(pool, arch, 1);
 		    }
 		}
@@ -485,7 +485,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 #undef istag
 	}
       else
-	pool_debug(pool, SAT_ERROR, "repo_content: malformed line: %s\n", line);
+	pool_debug(pool, SOLV_ERROR, "repo_content: malformed line: %s\n", line);
     }
 
   if (datadir)
@@ -497,7 +497,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 
   if (s && !s->name)
     {
-      pool_debug(pool, SAT_FATAL, "repo_content: 'content' incomplete, no product solvable created!\n");
+      pool_debug(pool, SOLV_FATAL, "repo_content: 'content' incomplete, no product solvable created!\n");
       repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
       s = 0;
     }
@@ -507,8 +507,8 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	s->evr = makeevr(pool, join(&pd, pd.tmpvers, "-", pd.tmprel));
       else
 	s->evr = makeevr(pool, pd.tmpvers);
-      pd.tmpvers = sat_free((void *)pd.tmpvers);
-      pd.tmprel = sat_free((void *)pd.tmprel);
+      pd.tmpvers = solv_free((void *)pd.tmpvers);
+      pd.tmprel = solv_free((void *)pd.tmprel);
 
       if (!s->arch)
 	s->arch = ARCH_NOARCH;
@@ -539,9 +539,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
     }
 
   if (pd.tmp)
-    sat_free(pd.tmp);
-  sat_free(line);
-  sat_free(otherarchs);
+    solv_free(pd.tmp);
+  solv_free(line);
+  solv_free(otherarchs);
   join_freemem();
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

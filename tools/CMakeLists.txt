@@ -1,5 +1,5 @@
 #
-# CMakeLists.txt for sat-solver/tools
+# CMakeLists.txt for tools
 #
 
 ADD_LIBRARY (toolstuff STATIC common_write.c)

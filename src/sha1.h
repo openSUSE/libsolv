@@ -11,6 +11,6 @@ typedef struct {
 
 #define SHA1_DIGEST_SIZE 20
 
-void sat_SHA1_Init(SHA1_CTX* context);
-void sat_SHA1_Update(SHA1_CTX* context, const uint8_t* data, const size_t len);
-void sat_SHA1_Final(SHA1_CTX* context, uint8_t digest[SHA1_DIGEST_SIZE]);
+void solv_SHA1_Init(SHA1_CTX* context);
+void solv_SHA1_Update(SHA1_CTX* context, const uint8_t* data, const size_t len);
+void solv_SHA1_Final(SHA1_CTX* context, uint8_t digest[SHA1_DIGEST_SIZE]);

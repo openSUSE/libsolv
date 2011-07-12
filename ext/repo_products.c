@@ -291,8 +291,8 @@ endElement(void *userData, const char *name)
 	}
       else if (pd->tmpvers)
 	s->evr = makeevr(pd->pool, pd->tmpvers); /* just version, no release */
-      pd->tmpvers = sat_free((void *)pd->tmpvers);
-      pd->tmprel = sat_free((void *)pd->tmprel);
+      pd->tmpvers = solv_free((void *)pd->tmpvers);
+      pd->tmprel = solv_free((void *)pd->tmprel);
       if (!s->arch)
 	s->arch = ARCH_NOARCH;
       if (!s->evr)
@@ -324,14 +324,14 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
-      pd->tmplang = sat_free((void *)pd->tmplang);
+      pd->tmplang = solv_free((void *)pd->tmplang);
       break;
     case STATE_SHORTSUMMARY:
       repodata_set_str(pd->data, pd->handle, PRODUCT_SHORTLABEL, pd->content);
       break;
     case STATE_DESCRIPTION:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), pd->content );
-      pd->tmplang = sat_free((void *)pd->tmplang);
+      pd->tmplang = solv_free((void *)pd->tmplang);
       break;
     case STATE_URL:
       if (pd->tmpurltype)
@@ -339,7 +339,7 @@ endElement(void *userData, const char *name)
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
           repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pd->pool, pd->tmpurltype, 1));
         }
-      pd->tmpurltype = sat_free((void *)pd->tmpurltype);
+      pd->tmpurltype = solv_free((void *)pd->tmpurltype);
       break;
     case STATE_TARGET:
       repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_TARGET, pd->content);
@@ -374,7 +374,7 @@ characterData(void *userData, const XML_Char *s, int len)
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
-      pd->content = sat_realloc(pd->content, l + 256);
+      pd->content = solv_realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
   c = pd->content + pd->lcontent;
@@ -421,8 +421,8 @@ add_code11_product(struct parsedata *pd, FILE *fp)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pd->pool, SAT_ERROR, "%s: %s at line %u:%u\n", pd->filename, XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  pool_debug(pd->pool, SAT_ERROR, "skipping this product\n");
+	  pool_debug(pd->pool, SOLV_ERROR, "%s: %s at line %u:%u\n", pd->filename, XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  pool_debug(pd->pool, SOLV_ERROR, "skipping this product\n");
 	  XML_ParserFree(parser);
 	  return;
 	}
@@ -449,7 +449,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
   pd.pool = repo->pool;
   pd.data = data;
 
-  pd.content = sat_malloc(256);
+  pd.content = solv_malloc(256);
   pd.acontent = 256;
 
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
@@ -491,8 +491,8 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 	}
       closedir(dir);
     }
-  sat_free((void *)pd.tmplang);
-  sat_free(pd.content);
+  solv_free((void *)pd.tmplang);
+  solv_free(pd.content);
   join_freemem();
 
   if (!(flags & REPO_NO_INTERNALIZE))

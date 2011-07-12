@@ -121,7 +121,7 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
   cols = pool->nlanguages + 1;
   if (!pool->languagecache)
     {
-      pool->languagecache = sat_calloc(cols * ID_NUM_INTERNAL, sizeof(Id));
+      pool->languagecache = solv_calloc(cols * ID_NUM_INTERNAL, sizeof(Id));
       pool->languagecacheother = 0;
     }
   if (keyname >= ID_NUM_INTERNAL)
@@ -132,7 +132,7 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
 	  break;
       if (i >= pool->languagecacheother)
 	{
-	  pool->languagecache = sat_realloc2(pool->languagecache, pool->languagecacheother + 1, cols * sizeof(Id));
+	  pool->languagecache = solv_realloc2(pool->languagecache, pool->languagecacheother + 1, cols * sizeof(Id));
 	  row = pool->languagecache + cols * (ID_NUM_INTERNAL + pool->languagecacheother++);
 	  *row = keyname;
 	}
@@ -209,7 +209,7 @@ const char *
 solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep)
 {
   const unsigned char *chk = solvable_lookup_bin_checksum(s, keyname, typep);
-  return chk ? pool_bin2hex(s->repo->pool, chk, sat_chksum_len(*typep)) : 0;
+  return chk ? pool_bin2hex(s->repo->pool, chk, solv_chksum_len(*typep)) : 0;
 }
 
 static inline const char *

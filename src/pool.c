@@ -40,17 +40,17 @@ pool_create(void)
   Pool *pool;
   Solvable *s;
 
-  pool = (Pool *)sat_calloc(1, sizeof(*pool));
+  pool = (Pool *)solv_calloc(1, sizeof(*pool));
 
   stringpool_init (&pool->ss, initpool_data);
 
   /* alloc space for RelDep 0 */
-  pool->rels = sat_extend_resize(0, 1, sizeof(Reldep), REL_BLOCK);
+  pool->rels = solv_extend_resize(0, 1, sizeof(Reldep), REL_BLOCK);
   pool->nrels = 1;
   memset(pool->rels, 0, sizeof(Reldep));
 
   /* alloc space for Solvable 0 and system solvable */
-  pool->solvables = sat_extend_resize(0, 2, sizeof(Solvable), SOLVABLE_BLOCK);
+  pool->solvables = solv_extend_resize(0, 2, sizeof(Solvable), SOLVABLE_BLOCK);
   pool->nsolvables = 2;
   memset(pool->solvables, 0, 2 * sizeof(Solvable));
   s = pool->solvables + SYSTEMSOLVABLE;
@@ -60,7 +60,7 @@ pool_create(void)
 
   queue_init(&pool->vendormap);
 
-  pool->debugmask = SAT_DEBUG_RESULT;	/* FIXME */
+  pool->debugmask = SOLV_DEBUG_RESULT;	/* FIXME */
 #ifdef FEDORA
   pool->obsoleteusescolors = 1;
 #endif
@@ -87,19 +87,19 @@ pool_free(Pool *pool)
   pool_freewhatprovides(pool);
   pool_freeidhashes(pool);
   repo_freeallrepos(pool, 1);
-  sat_free(pool->id2arch);
-  sat_free(pool->solvables);
+  solv_free(pool->id2arch);
+  solv_free(pool->solvables);
   stringpool_free(&pool->ss);
-  sat_free(pool->rels);
+  solv_free(pool->rels);
   pool_setvendorclasses(pool, 0);
   queue_free(&pool->vendormap);
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
-    sat_free(pool->tmpspace.buf[i]);
+    solv_free(pool->tmpspace.buf[i]);
   for (i = 0; i < pool->nlanguages; i++)
     free((char *)pool->languages[i]);
-  sat_free(pool->languages);
-  sat_free(pool->languagecache);
-  sat_free(pool);
+  solv_free(pool->languages);
+  solv_free(pool->languagecache);
+  solv_free(pool);
 }
 
 #ifdef MULTI_SEMANTICS
@@ -113,7 +113,7 @@ pool_setdisttype(Pool *pool, int disttype)
 Id
 pool_add_solvable(Pool *pool)
 {
-  pool->solvables = sat_extend(pool->solvables, pool->nsolvables, 1, sizeof(Solvable), SOLVABLE_BLOCK);
+  pool->solvables = solv_extend(pool->solvables, pool->nsolvables, 1, sizeof(Solvable), SOLVABLE_BLOCK);
   memset(pool->solvables + pool->nsolvables, 0, sizeof(Solvable));
   return pool->nsolvables++;
 }
@@ -124,7 +124,7 @@ pool_add_solvable_block(Pool *pool, int count)
   Id nsolvables = pool->nsolvables;
   if (!count)
     return nsolvables;
-  pool->solvables = sat_extend(pool->solvables, pool->nsolvables, count, sizeof(Solvable), SOLVABLE_BLOCK);
+  pool->solvables = solv_extend(pool->solvables, pool->nsolvables, count, sizeof(Solvable), SOLVABLE_BLOCK);
   memset(pool->solvables + nsolvables, 0, sizeof(Solvable) * count);
   pool->nsolvables += count;
   return nsolvables;
@@ -195,10 +195,10 @@ pool_shrink_whatprovides(Pool *pool)
 
   if (pool->ss.nstrings < 3)
     return;
-  sorted = sat_malloc2(pool->ss.nstrings, sizeof(Id));
+  sorted = solv_malloc2(pool->ss.nstrings, sizeof(Id));
   for (id = 0; id < pool->ss.nstrings; id++)
     sorted[id] = id;
-  sat_sort(sorted + 1, pool->ss.nstrings - 1, sizeof(Id), pool_shrink_whatprovides_sortcmp, pool);
+  solv_sort(sorted + 1, pool->ss.nstrings - 1, sizeof(Id), pool_shrink_whatprovides_sortcmp, pool);
   last = 0;
   lastid = 0;
   for (i = 1; i < pool->ss.nstrings; i++)
@@ -228,7 +228,7 @@ pool_shrink_whatprovides(Pool *pool)
       last = pool->whatprovidesdata + o;
       lastid = id;
     }
-  sat_free(sorted);
+  solv_free(sorted);
   dp = pool->whatprovidesdata + 2;
   for (id = 1; id < pool->ss.nstrings; id++)
     {
@@ -251,12 +251,12 @@ pool_shrink_whatprovides(Pool *pool)
 	;
     }
   o = dp - pool->whatprovidesdata;
-  POOL_DEBUG(SAT_DEBUG_STATS, "shrunk whatprovidesdata from %d to %d\n", pool->whatprovidesdataoff, o);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "shrunk whatprovidesdata from %d to %d\n", pool->whatprovidesdataoff, o);
   if (pool->whatprovidesdataoff == o)
     return;
   r = pool->whatprovidesdataoff - o;
   pool->whatprovidesdataoff = o;
-  pool->whatprovidesdata = sat_realloc(pool->whatprovidesdata, (o + pool->whatprovidesdataleft) * sizeof(Id));
+  pool->whatprovidesdata = solv_realloc(pool->whatprovidesdata, (o + pool->whatprovidesdataleft) * sizeof(Id));
   if (r > pool->whatprovidesdataleft)
     r = pool->whatprovidesdataleft;
   memset(pool->whatprovidesdata + o, 0, r * sizeof(Id));
@@ -282,15 +282,15 @@ pool_createwhatprovides(Pool *pool)
   Repo *installed = pool->installed;
   unsigned int now;
 
-  now = sat_timems(0);
-  POOL_DEBUG(SAT_DEBUG_STATS, "number of solvables: %d\n", pool->nsolvables);
-  POOL_DEBUG(SAT_DEBUG_STATS, "number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
+  now = solv_timems(0);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "number of solvables: %d\n", pool->nsolvables);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
 
   pool_freeidhashes(pool);	/* XXX: should not be here! */
   pool_freewhatprovides(pool);
   num = pool->ss.nstrings;
-  pool->whatprovides = whatprovides = sat_calloc_block(num, sizeof(Offset), WHATPROVIDES_BLOCK);
-  pool->whatprovides_rel = sat_calloc_block(pool->nrels, sizeof(Offset), WHATPROVIDES_BLOCK);
+  pool->whatprovides = whatprovides = solv_calloc_block(num, sizeof(Offset), WHATPROVIDES_BLOCK);
+  pool->whatprovides_rel = solv_calloc_block(pool->nrels, sizeof(Offset), WHATPROVIDES_BLOCK);
 
   /* count providers for each name */
   for (i = pool->nsolvables - 1; i > 0; i--)
@@ -327,17 +327,17 @@ pool_createwhatprovides(Pool *pool)
       np++;			       /* inc # of provider 'slots' for stats */
     }
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "provide ids: %d\n", np);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "provide ids: %d\n", np);
 
   /* reserve some space for relation data */
   extra = 2 * pool->nrels;
   if (extra < 256)
     extra = 256;
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "provide space needed: %d + %d\n", off, extra);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "provide space needed: %d + %d\n", off, extra);
 
   /* alloc space for all providers + extra */
-  whatprovidesdata = sat_calloc(off + extra, sizeof(Id));
+  whatprovidesdata = solv_calloc(off + extra, sizeof(Id));
 
   /* now fill data for all provides */
   for (i = pool->nsolvables - 1; i > 0; i--)
@@ -370,8 +370,8 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
   pool_shrink_whatprovides(pool);
-  POOL_DEBUG(SAT_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (int)(1024/sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (int)(1024/sizeof(Id)));
-  POOL_DEBUG(SAT_DEBUG_STATS, "createwhatprovides took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (int)(1024/sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "createwhatprovides took %d ms\n", solv_timems(now));
 }
 
 /*
@@ -382,9 +382,9 @@ pool_createwhatprovides(Pool *pool)
 void
 pool_freewhatprovides(Pool *pool)
 {
-  pool->whatprovides = sat_free(pool->whatprovides);
-  pool->whatprovides_rel = sat_free(pool->whatprovides_rel);
-  pool->whatprovidesdata = sat_free(pool->whatprovidesdata);
+  pool->whatprovides = solv_free(pool->whatprovides);
+  pool->whatprovides_rel = solv_free(pool->whatprovides_rel);
+  pool->whatprovidesdata = solv_free(pool->whatprovidesdata);
   pool->whatprovidesdataoff = 0;
   pool->whatprovidesdataleft = 0;
 }
@@ -413,8 +413,8 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
   /* extend whatprovidesdata if needed, +1 for ID_NULL-termination */
   if (pool->whatprovidesdataleft < count + 1)
     {
-      POOL_DEBUG(SAT_DEBUG_STATS, "growing provides hash data...\n");
-      pool->whatprovidesdata = sat_realloc(pool->whatprovidesdata, (pool->whatprovidesdataoff + count + 4096) * sizeof(Id));
+      POOL_DEBUG(SOLV_DEBUG_STATS, "growing provides hash data...\n");
+      pool->whatprovidesdata = solv_realloc(pool->whatprovidesdata, (pool->whatprovidesdataoff + count + 4096) * sizeof(Id));
       pool->whatprovidesdataleft = count + 4096;
     }
 
@@ -685,7 +685,7 @@ pool_addrelproviders(Pool *pool, Id d)
     {
       /* simple version comparison relation */
 #if 0
-      POOL_DEBUG(SAT_DEBUG_STATS, "addrelproviders: what provides %s?\n", pool_dep2str(pool, name));
+      POOL_DEBUG(SOLV_DEBUG_STATS, "addrelproviders: what provides %s?\n", pool_dep2str(pool, name));
 #endif
       pp = pool_whatprovides_ptr(pool, name);
       while (ISRELDEP(name))
@@ -740,7 +740,7 @@ pool_addrelproviders(Pool *pool, Id d)
     }
   /* add providers to whatprovides */
 #if 0
-  POOL_DEBUG(SAT_DEBUG_STATS, "addrelproviders: adding %d packages to %d\n", plist.count, d);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "addrelproviders: adding %d packages to %d\n", plist.count, d);
 #endif
   pool->whatprovides_rel[d] = pool_queuetowhatprovides(pool, &plist);
   queue_free(&plist);
@@ -756,7 +756,7 @@ pool_debug(Pool *pool, int type, const char *format, ...)
   va_list args;
   char buf[1024];
 
-  if ((type & (SAT_FATAL|SAT_ERROR)) == 0)
+  if ((type & (SOLV_FATAL|SOLV_ERROR)) == 0)
     {
       if ((pool->debugmask & type) == 0)
 	return;
@@ -764,7 +764,7 @@ pool_debug(Pool *pool, int type, const char *format, ...)
   va_start(args, format);
   if (!pool->debugcallback)
     {
-      if ((type & (SAT_FATAL|SAT_ERROR)) == 0 && !(pool->debugmask & SAT_DEBUG_TO_STDERR))
+      if ((type & (SOLV_FATAL|SOLV_ERROR)) == 0 && !(pool->debugmask & SOLV_DEBUG_TO_STDERR))
         vprintf(format, args);
       else
         vfprintf(stderr, format, args);
@@ -777,16 +777,16 @@ pool_debug(Pool *pool, int type, const char *format, ...)
 void
 pool_setdebuglevel(Pool *pool, int level)
 {
-  int mask = SAT_DEBUG_RESULT;
+  int mask = SOLV_DEBUG_RESULT;
   if (level > 0)
-    mask |= SAT_DEBUG_STATS|SAT_DEBUG_ANALYZE|SAT_DEBUG_UNSOLVABLE|SAT_DEBUG_SOLVER|SAT_DEBUG_TRANSACTION;
+    mask |= SOLV_DEBUG_STATS|SOLV_DEBUG_ANALYZE|SOLV_DEBUG_UNSOLVABLE|SOLV_DEBUG_SOLVER|SOLV_DEBUG_TRANSACTION;
   if (level > 1)
-    mask |= SAT_DEBUG_JOB|SAT_DEBUG_SOLUTIONS|SAT_DEBUG_POLICY;
+    mask |= SOLV_DEBUG_JOB|SOLV_DEBUG_SOLUTIONS|SOLV_DEBUG_POLICY;
   if (level > 2)
-    mask |= SAT_DEBUG_PROPAGATE;
+    mask |= SOLV_DEBUG_PROPAGATE;
   if (level > 3)
-    mask |= SAT_DEBUG_RULE_CREATION;
-  mask |= pool->debugmask & SAT_DEBUG_TO_STDERR;	/* keep bit */
+    mask |= SOLV_DEBUG_RULE_CREATION;
+  mask |= pool->debugmask & SOLV_DEBUG_TO_STDERR;	/* keep bit */
   pool->debugmask = mask;
 }
 
@@ -878,13 +878,13 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       s = pool_id2str(pool, dep);
       if (*s != '/')
 	continue;
-      csf->ids = sat_extend(csf->ids, csf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
-      csf->dirs = sat_extend(csf->dirs, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
-      csf->names = sat_extend(csf->names, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
+      csf->ids = solv_extend(csf->ids, csf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
+      csf->dirs = solv_extend(csf->dirs, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
+      csf->names = solv_extend(csf->names, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
       csf->ids[csf->nfiles] = dep;
       sr = strrchr(s, '/');
       csf->names[csf->nfiles] = strdup(sr + 1);
-      csf->dirs[csf->nfiles] = sat_malloc(sr - s + 1);
+      csf->dirs[csf->nfiles] = solv_malloc(sr - s + 1);
       if (sr != s)
         strncpy(csf->dirs[csf->nfiles], s, sr - s);
       csf->dirs[csf->nfiles][sr - s] = 0;
@@ -962,7 +962,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
   cbd->ids = sf->ids;
   cbd->dirs = sf->dirs;
   cbd->names = sf->names;
-  cbd->dids = sat_realloc2(cbd->dids, sf->nfiles, sizeof(Id));
+  cbd->dids = solv_realloc2(cbd->dids, sf->nfiles, sizeof(Id));
   map_init(&cbd->providedids, pool->ss.nstrings);
 
   repoid = 0;
@@ -1077,7 +1077,7 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
   int i;
   unsigned int now;
 
-  now = sat_timems(0);
+  now = solv_timems(0);
   memset(&sf, 0, sizeof(sf));
   map_init(&sf.seen, pool->ss.nstrings + pool->nrels);
   memset(&isf, 0, sizeof(isf));
@@ -1106,7 +1106,7 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
     }
   map_free(&sf.seen);
   map_free(&isf.seen);
-  POOL_DEBUG(SAT_DEBUG_STATS, "found %d file dependencies, %d installed file dependencies\n", sf.nfiles, isf.nfiles);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "found %d file dependencies, %d installed file dependencies\n", sf.nfiles, isf.nfiles);
   cbd.dids = 0;
   if (idp)
     *idp = 0;
@@ -1114,45 +1114,45 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
     {
 #if 0
       for (i = 0; i < sf.nfiles; i++)
-	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in filelist\n", pool_id2str(pool, sf.ids[i]));
+	POOL_DEBUG(SOLV_DEBUG_STATS, "looking up %s in filelist\n", pool_id2str(pool, sf.ids[i]));
 #endif
       pool_addfileprovides_search(pool, &cbd, &sf, 0);
       if (idp)
 	{
-	  sf.ids = sat_extend(sf.ids, sf.nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
+	  sf.ids = solv_extend(sf.ids, sf.nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
 	  sf.ids[sf.nfiles] = 0;
 	  *idp = sf.ids;
 	  sf.ids = 0;
 	}
-      sat_free(sf.ids);
+      solv_free(sf.ids);
       for (i = 0; i < sf.nfiles; i++)
 	{
-	  sat_free(sf.dirs[i]);
-	  sat_free(sf.names[i]);
+	  solv_free(sf.dirs[i]);
+	  solv_free(sf.names[i]);
 	}
-      sat_free(sf.dirs);
-      sat_free(sf.names);
+      solv_free(sf.dirs);
+      solv_free(sf.names);
     }
   if (isf.nfiles)
     {
 #if 0
       for (i = 0; i < isf.nfiles; i++)
-	POOL_DEBUG(SAT_DEBUG_STATS, "looking up %s in installed filelist\n", pool_id2str(pool, isf.ids[i]));
+	POOL_DEBUG(SOLV_DEBUG_STATS, "looking up %s in installed filelist\n", pool_id2str(pool, isf.ids[i]));
 #endif
       if (installed)
         pool_addfileprovides_search(pool, &cbd, &isf, installed);
-      sat_free(isf.ids);
+      solv_free(isf.ids);
       for (i = 0; i < isf.nfiles; i++)
 	{
-	  sat_free(isf.dirs[i]);
-	  sat_free(isf.names[i]);
+	  solv_free(isf.dirs[i]);
+	  solv_free(isf.names[i]);
 	}
-      sat_free(isf.dirs);
-      sat_free(isf.names);
+      solv_free(isf.dirs);
+      solv_free(isf.names);
     }
-  sat_free(cbd.dids);
+  solv_free(cbd.dids);
   pool_freewhatprovides(pool);	/* as we have added provides */
-  POOL_DEBUG(SAT_DEBUG_STATS, "addfileprovides took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "addfileprovides took %d ms\n", solv_timems(now));
 }
 
 void
@@ -1188,7 +1188,7 @@ pool_set_languages(Pool *pool, const char **languages, int nlanguages)
 {
   int i;
 
-  pool->languagecache = sat_free(pool->languagecache);
+  pool->languagecache = solv_free(pool->languagecache);
   pool->languagecacheother = 0;
   if (pool->nlanguages)
     {
@@ -1199,7 +1199,7 @@ pool_set_languages(Pool *pool, const char **languages, int nlanguages)
   pool->nlanguages = nlanguages;
   if (!nlanguages)
     return;
-  pool->languages = sat_calloc(nlanguages, sizeof(const char **));
+  pool->languages = solv_calloc(nlanguages, sizeof(const char **));
   for (i = 0; i < pool->nlanguages; i++)
     pool->languages[i] = strdup(languages[i]);
 }
@@ -1216,7 +1216,7 @@ pool_id2langid(Pool *pool, Id id, const char *lang, int create)
   n = pool_id2str(pool, id);
   l = strlen(n) + strlen(lang) + 2;
   if (l > sizeof(buf))
-    p = sat_malloc(strlen(n) + strlen(lang) + 2);
+    p = solv_malloc(strlen(n) + strlen(lang) + 2);
   else
     p = buf;
   sprintf(p, "%s:%s", n, lang);
@@ -1234,7 +1234,7 @@ pool_alloctmpspace(Pool *pool, int len)
     return 0;
   if (len > pool->tmpspace.len[n])
     {
-      pool->tmpspace.buf[n] = sat_realloc(pool->tmpspace.buf[n], len + 32);
+      pool->tmpspace.buf[n] = solv_realloc(pool->tmpspace.buf[n], len + 32);
       pool->tmpspace.len[n] = len + 32;
     }
   pool->tmpspace.n = (n + 1) % POOL_TMPSPACEBUF;
@@ -1258,7 +1258,7 @@ pool_alloctmpspace_free(Pool *pool, const char *space, int len)
 	    continue;
 	  if (len > pool->tmpspace.len[n])
 	    {
-	      pool->tmpspace.buf[n] = sat_realloc(pool->tmpspace.buf[n], len + 32);
+	      pool->tmpspace.buf[n] = solv_realloc(pool->tmpspace.buf[n], len + 32);
 	      pool->tmpspace.len[n] = len + 32;
 	    }
           return pool->tmpspace.buf[n];
@@ -1348,7 +1348,7 @@ pool_bin2hex(Pool *pool, const unsigned char *buf, int len)
   if (!len)
     return "";
   s = pool_alloctmpspace(pool, 2 * len + 1);
-  sat_bin2hex(buf, len, s);
+  solv_bin2hex(buf, len, s);
   return s;
 }
 
@@ -1388,9 +1388,9 @@ solver_fill_DU_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyVa
       struct mptree *mptree;
 
       /* create map from dir to mptree */
-      cbd->dirmap = sat_free(cbd->dirmap);
+      cbd->dirmap = solv_free(cbd->dirmap);
       cbd->nmap = 0;
-      dirmap = sat_calloc(data->dirpool.ndirs, sizeof(Id));
+      dirmap = solv_calloc(data->dirpool.ndirs, sizeof(Id));
       mptree = cbd->mptree;
       mp = 0;
       for (dn = 2, dirs = data->dirpool.dirs + dn; dn < data->dirpool.ndirs; dn++)
@@ -1487,7 +1487,7 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
   cbd.nmap = 0;
   cbd.olddata = 0;
 
-  mptree = sat_extend_resize(0, 1, sizeof(struct mptree), MPTREE_BLOCK);
+  mptree = solv_extend_resize(0, 1, sizeof(struct mptree), MPTREE_BLOCK);
 
   /* our root node */
   mptree[0].sibling = 0;
@@ -1528,7 +1528,7 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
 	  if (!i)
 	    {
 	      /* create new node */
-	      mptree = sat_extend(mptree, nmptree, 1, sizeof(struct mptree), MPTREE_BLOCK);
+	      mptree = solv_extend(mptree, nmptree, 1, sizeof(struct mptree), MPTREE_BLOCK);
 	      i = nmptree++;
 	      mptree[i].sibling = mptree[pos].child;
 	      mptree[i].child = 0;
@@ -1600,8 +1600,8 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
     }
   if (ignoredu.map)
     map_free(&ignoredu);
-  sat_free(cbd.dirmap);
-  sat_free(mptree);
+  solv_free(cbd.dirmap);
+  solv_free(mptree);
 }
 
 int
@@ -1707,7 +1707,7 @@ pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pk
   unsigned char *map;
   Solvable *s;
 
-  map = sat_calloc(pool->nsolvables, 1);
+  map = solv_calloc(pool->nsolvables, 1);
   for (p = 1; p < pool->nsolvables; p++)
     {
       if (!MAPTST(installedmap, p))

@@ -559,9 +559,9 @@ void repopagestore_init(Repopagestore *store)
 
 void repopagestore_free(Repopagestore *store)
 {
-  sat_free(store->blob_store);
-  sat_free(store->pages);
-  sat_free(store->mapped);
+  solv_free(store->blob_store);
+  solv_free(store->pages);
+  solv_free(store->mapped);
   if (store->pagefd != -1)
     close(store->pagefd);
 }
@@ -597,9 +597,9 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
       store->ncanmap = pend - pstart + 1;
       if (store->ncanmap < 4)
         store->ncanmap = 4;
-      store->mapped = sat_realloc2(store->mapped, store->ncanmap, sizeof(store->mapped[0]));
+      store->mapped = solv_realloc2(store->mapped, store->ncanmap, sizeof(store->mapped[0]));
       memset(store->mapped + oldcan, 0, (store->ncanmap - oldcan) * sizeof (store->mapped[0]));
-      store->blob_store = sat_realloc2(store->blob_store, store->ncanmap, REPOPAGE_BLOBSIZE);
+      store->blob_store = solv_realloc2(store->blob_store, store->ncanmap, REPOPAGE_BLOBSIZE);
 #ifdef DEBUG_PAGING
       fprintf(stderr, "PAGE: can map %d pages\n", store->ncanmap);
 #endif
@@ -789,11 +789,11 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
   npages = (blobsz + REPOPAGE_BLOBSIZE - 1) / REPOPAGE_BLOBSIZE;
 
   store->num_pages = npages;
-  store->pages = sat_malloc2(npages, sizeof(store->pages[0]));
+  store->pages = solv_malloc2(npages, sizeof(store->pages[0]));
 
   /* If we can't seek on our input we have to slurp in everything.  */
   if (!can_seek)
-    store->blob_store = sat_malloc2(npages, REPOPAGE_BLOBSIZE);
+    store->blob_store = solv_malloc2(npages, REPOPAGE_BLOBSIZE);
   for (i = 0; i < npages; i++)
     {
       unsigned int in_len = read_u32(fp);

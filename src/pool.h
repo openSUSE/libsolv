@@ -19,7 +19,7 @@ extern "C" {
 
 #include <stdio.h>
 
-#include "satversion.h"
+#include "solvversion.h"
 #include "pooltypes.h"
 #include "poolid.h"
 #include "solvable.h"
@@ -139,22 +139,22 @@ struct _Pool {
 # define DISTTYPE_DEB	1
 #endif
 
-#define SAT_FATAL			(1<<0)
-#define SAT_ERROR			(1<<1)
-#define SAT_WARN			(1<<2)
-#define SAT_DEBUG_STATS			(1<<3)
-#define SAT_DEBUG_RULE_CREATION		(1<<4)
-#define SAT_DEBUG_PROPAGATE		(1<<5)
-#define SAT_DEBUG_ANALYZE		(1<<6)
-#define SAT_DEBUG_UNSOLVABLE		(1<<7)
-#define SAT_DEBUG_SOLUTIONS		(1<<8)
-#define SAT_DEBUG_POLICY		(1<<9)
-#define SAT_DEBUG_RESULT		(1<<10)
-#define SAT_DEBUG_JOB			(1<<11)
-#define SAT_DEBUG_SOLVER		(1<<12)
-#define SAT_DEBUG_TRANSACTION		(1<<13)
+#define SOLV_FATAL			(1<<0)
+#define SOLV_ERROR			(1<<1)
+#define SOLV_WARN			(1<<2)
+#define SOLV_DEBUG_STATS		(1<<3)
+#define SOLV_DEBUG_RULE_CREATION	(1<<4)
+#define SOLV_DEBUG_PROPAGATE		(1<<5)
+#define SOLV_DEBUG_ANALYZE		(1<<6)
+#define SOLV_DEBUG_UNSOLVABLE		(1<<7)
+#define SOLV_DEBUG_SOLUTIONS		(1<<8)
+#define SOLV_DEBUG_POLICY		(1<<9)
+#define SOLV_DEBUG_RESULT		(1<<10)
+#define SOLV_DEBUG_JOB			(1<<11)
+#define SOLV_DEBUG_SOLVER		(1<<12)
+#define SOLV_DEBUG_TRANSACTION		(1<<13)
 
-#define SAT_DEBUG_TO_STDERR		(1<<30)
+#define SOLV_DEBUG_TO_STDERR		(1<<30)
 
 //-----------------------------------------------
 

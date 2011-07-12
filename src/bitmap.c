@@ -21,14 +21,14 @@ void
 map_init(Map *m, int n)
 {
   m->size = (n + 7) >> 3;
-  m->map = m->size ? sat_calloc(m->size, 1) : 0;
+  m->map = m->size ? solv_calloc(m->size, 1) : 0;
 }
 
 /* destructor */
 void
 map_free(Map *m)
 {
-  m->map = sat_free(m->map);
+  m->map = solv_free(m->map);
   m->size = 0;
 }
 
@@ -39,7 +39,7 @@ map_init_clone(Map *t, Map *s)
   t->size = s->size;
   if (s->size)
     {
-      t->map = sat_malloc(s->size);
+      t->map = solv_malloc(s->size);
       memcpy(t->map, s->map, s->size);
     }
   else
@@ -53,7 +53,7 @@ map_grow(Map *m, int n)
   n = (n + 7) >> 3;
   if (m->size < n)
     {
-      m->map = sat_realloc(m->map, n);
+      m->map = solv_realloc(m->map, n);
       memset(m->map + m->size, 0, n - m->size);
       m->size = n;
     }

@@ -88,14 +88,14 @@ pool_setvendorclasses(Pool *pool, const char **vendorclasses)
   if (pool->vendorclasses)
     {
       for (v = pool->vendorclasses; v[0] || v[1]; v++)
-	sat_free((void *)*v);
-      pool->vendorclasses = sat_free(pool->vendorclasses);
+	solv_free((void *)*v);
+      pool->vendorclasses = solv_free(pool->vendorclasses);
     }
   if (!vendorclasses || !vendorclasses[0])
     return;
   for (v = vendorclasses; v[0] || v[1]; v++)
     ;
-  pool->vendorclasses = sat_calloc(v - vendorclasses + 2, sizeof(const char *));
+  pool->vendorclasses = solv_calloc(v - vendorclasses + 2, sizeof(const char *));
   for (v = vendorclasses, i = 0; v[0] || v[1]; v++, i++)
     pool->vendorclasses[i] = *v ? strdup(*v) : 0;
   pool->vendorclasses[i++] = 0;

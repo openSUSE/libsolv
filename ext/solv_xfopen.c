@@ -12,7 +12,7 @@
 #include <zlib.h>
 #include <fcntl.h>
 
-#include "sat_xfopen.h"
+#include "solv_xfopen.h"
 
 static ssize_t cookie_gzread(void *cookie, char *buf, size_t nbytes)
 {
@@ -46,7 +46,7 @@ static FILE *mygzfopen(gzFile* gzf)
 }
 
 FILE *
-sat_xfopen(const char *fn, const char *mode)
+solv_xfopen(const char *fn, const char *mode)
 {
   char *suf;
   gzFile *gzf;
@@ -65,7 +65,7 @@ sat_xfopen(const char *fn, const char *mode)
 }
 
 FILE *
-sat_xfopen_fd(const char *fn, int fd, const char *mode)
+solv_xfopen_fd(const char *fn, int fd, const char *mode)
 {
   char *suf;
   gzFile *gzf;

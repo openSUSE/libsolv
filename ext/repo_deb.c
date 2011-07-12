@@ -29,7 +29,7 @@ decompress(unsigned char *in, int inl, int *outlp)
   memset(&strm, 0, sizeof(strm));
   strm.next_in = in;
   strm.avail_in = inl;
-  out = sat_malloc(4096);
+  out = solv_malloc(4096);
   strm.next_out = out;
   strm.avail_out = 4096;
   outl = 0;
@@ -44,7 +44,7 @@ decompress(unsigned char *in, int inl, int *outlp)
       if (strm.avail_out == 0)
 	{
 	  outl += 4096;
-	  out = sat_realloc(out, outl + 4096);
+	  out = solv_realloc(out, outl + 4096);
 	  strm.next_out = out + outl;
 	  strm.avail_out = 4096;
 	}
@@ -278,8 +278,8 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	    s->recommends = makedeps(repo, q, s->recommends, 0);
 	  break;
 	case 'S' << 8 | 'H':
-	  newtype = sat_chksum_str2type(tag);
-	  if (!newtype || sat_chksum_len(newtype) * 2 != strlen(q))
+	  newtype = solv_chksum_str2type(tag);
+	  if (!newtype || solv_chksum_len(newtype) * 2 != strlen(q))
 	    break;
 	  if (!checksumtype || (newtype == REPOKEY_TYPE_SHA1 && checksumtype != REPOKEY_TYPE_SHA256) || newtype == REPOKEY_TYPE_SHA256)
 	    {
@@ -357,7 +357,7 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
   Solvable *s;
 
   data = repo_add_repodata(repo, flags);
-  buf = sat_malloc(4096);
+  buf = solv_malloc(4096);
   bufl = 4096;
   l = 0;
   buf[l] = 0;
@@ -369,7 +369,7 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
 	  int l3;
 	  if (l + 1024 >= bufl)
 	    {
-	      buf = sat_realloc(buf, bufl + 4096);
+	      buf = solv_realloc(buf, bufl + 4096);
 	      bufl += 4096;
 	      p = buf + l;
 	      continue;
@@ -406,7 +406,7 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
       if (!s->name)
 	repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
     }
-  sat_free(buf);
+  solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;
@@ -491,7 +491,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 	  fclose(fp);
           continue;
 	}
-      ctgz = sat_calloc(1, clen + 4);
+      ctgz = solv_calloc(1, clen + 4);
       bp = buf + 8 + 60 + vlen + 60;
       l -= 8 + 60 + vlen + 60;
       if (l > clen)
@@ -503,7 +503,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 	  if (fread(ctgz + l, clen - l, 1, fp) != 1)
 	    {
 	      fprintf(stderr, "%s: unexpected EOF\n", debs[i]);
-	      sat_free(ctgz);
+	      solv_free(ctgz);
 	      fclose(fp);
 	      continue;
 	    }
@@ -512,21 +512,21 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
       gotpkgid = 0;
       if (flags & DEBS_ADD_WITH_PKGID)
 	{
-	  void *handle = sat_chksum_create(REPOKEY_TYPE_MD5);
-	  sat_chksum_add(handle, ctgz, clen);
-	  sat_chksum_free(handle, pkgid);
+	  void *handle = solv_chksum_create(REPOKEY_TYPE_MD5);
+	  solv_chksum_add(handle, ctgz, clen);
+	  solv_chksum_free(handle, pkgid);
 	  gotpkgid = 1;
 	}
       if (ctgz[0] != 0x1f || ctgz[1] != 0x8b)
 	{
 	  fprintf(stderr, "%s: control.tar.gz is not gzipped\n", debs[i]);
-	  sat_free(ctgz);
+	  solv_free(ctgz);
           continue;
 	}
       if (ctgz[2] != 8 || (ctgz[3] & 0xe0) != 0)
 	{
 	  fprintf(stderr, "%s: control.tar.gz is compressed in a strange way\n", debs[i]);
-	  sat_free(ctgz);
+	  solv_free(ctgz);
           continue;
 	}
       bp = ctgz + 4;
@@ -539,7 +539,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 	  if (bp >= ctgz + clen)
 	    {
 	      fprintf(stderr, "%s: corrupt gzip\n", debs[i]);
-	      sat_free(ctgz);
+	      solv_free(ctgz);
 	      continue;
 	    }
 	}
@@ -554,11 +554,11 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
       if (bp >= ctgz + clen)
 	{
 	  fprintf(stderr, "%s: corrupt control.tar.gz\n", debs[i]);
-	  sat_free(ctgz);
+	  solv_free(ctgz);
 	  continue;
 	}
       ctar = decompress(bp, ctgz + clen - bp, &ctarlen);
-      sat_free(ctgz);
+      solv_free(ctgz);
       if (!ctar)
 	{
 	  fprintf(stderr, "%s: corrupt control.tar.gz\n", debs[i]);
@@ -586,7 +586,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 	  continue;
 	}
       memmove(ctar, bp + 512, l2);
-      ctar = sat_realloc(ctar, l2 + 1);
+      ctar = solv_realloc(ctar, l2 + 1);
       ctar[l2] = 0;
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       control2solvable(s, data, (char *)ctar);
@@ -595,7 +595,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
         repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
       if (gotpkgid)
 	repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
-      sat_free(ctar);
+      solv_free(ctar);
     }
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

@@ -21,7 +21,7 @@
 static const char *initpool_data[] = {
 #else
 # define KNOWNID(a, b) a
-enum sat_knownid {
+enum solv_knownid {
 #endif
 
 KNOWNID(ID_NULL,			"<NULL>"),

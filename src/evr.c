@@ -21,12 +21,12 @@
 #if defined(DEBIAN_SEMANTICS) || defined(MULTI_SEMANTICS)
 
 #ifdef MULTI_SEMANTICS
-# define sat_vercmp sat_vercmp_deb
+# define solv_vercmp solv_vercmp_deb
 #endif
 
 /* debian type version compare */
 int
-sat_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
+solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
   int r, c1, c2;
   while (1)
@@ -65,7 +65,7 @@ sat_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 }
 
 #ifdef MULTI_SEMANTICS
-# undef sat_vercmp
+# undef solv_vercmp
 #endif
 
 #endif
@@ -76,7 +76,7 @@ sat_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 /* note: the code assumes that *q1 and *q2 are not alphanumeric! */
 
 int
-sat_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
+solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 {
   int r = 0;
   const char *e1, *e2;
@@ -135,7 +135,7 @@ sat_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 #endif
 
 #if defined(MULTI_SEMANTICS)
-# define sat_vercmp (*(pool->disttype == DISTTYPE_DEB ? &sat_vercmp_deb : &sat_ver##cmp))
+# define solv_vercmp (*(pool->disttype == DISTTYPE_DEB ? &solv_vercmp_deb : &solv_ver##cmp))
 #endif
 
 /* edition (e:v-r) compare */
@@ -172,7 +172,7 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
     s2 = 0;
   if (s1 && s2)
     {
-      r = sat_vercmp(evr1, s1, evr2, s2);
+      r = solv_vercmp(evr1, s1, evr2, s2);
       if (r)
 	return r;
       evr1 = s1 + 1;
@@ -206,7 +206,7 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 
   r = 0;
   if (mode != EVRCMP_MATCH || (evr1 != (r1 ? r1 : s1) && evr2 != (r2 ? r2 : s2)))
-    r = sat_vercmp(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2);
+    r = solv_vercmp(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2);
   if (r)
     return r;
 
@@ -222,7 +222,7 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
   if (r1 && r2)
     {
       if (s1 != ++r1 && s2 != ++r2)
-        r = sat_vercmp(r1, s1, r2, s2);
+        r = solv_vercmp(r1, s1, r2, s2);
     }
   return r;
 }
@@ -253,7 +253,7 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
     {
       if (epoch)
 	{
-	  r = sat_vercmp(evr1, s1, epoch, epoch + strlen(epoch));
+	  r = solv_vercmp(evr1, s1, epoch, epoch + strlen(epoch));
 	  if (r)
 	    return r;
 	}
@@ -271,7 +271,7 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
       r1 = s1;
   if (version)
     {
-      r = sat_vercmp(evr1, r1 ? r1 : s1, version, version + strlen(version));
+      r = solv_vercmp(evr1, r1 ? r1 : s1, version, version + strlen(version));
       if (r)
 	return r;
     }
@@ -279,7 +279,7 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
     {
       if (!r1)
 	return -1;
-      r = sat_vercmp(r1 + 1, s1, release, release + strlen(release));
+      r = solv_vercmp(r1 + 1, s1, release, release + strlen(release));
       if (r)
 	return r;
     }

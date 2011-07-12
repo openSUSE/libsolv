@@ -47,10 +47,10 @@ repodata_initdata(Repodata *data, Repo *repo, int localpool)
   if (localpool)
     stringpool_init_empty(&data->spool);
   /* dirpool_init(&data->dirpool);	just zeros out again */
-  data->keys = sat_calloc(1, sizeof(Repokey));
+  data->keys = solv_calloc(1, sizeof(Repokey));
   data->nkeys = 1;
-  data->schemata = sat_calloc(1, sizeof(Id));
-  data->schemadata = sat_calloc(1, sizeof(Id));
+  data->schemata = solv_calloc(1, sizeof(Id));
+  data->schemadata = solv_calloc(1, sizeof(Id));
   data->nschemata = 1;
   data->schemadatalen = 1;
   repopagestore_init(&data->store);
@@ -61,35 +61,35 @@ repodata_freedata(Repodata *data)
 {
   int i;
 
-  sat_free(data->keys);
+  solv_free(data->keys);
 
-  sat_free(data->schemata);
-  sat_free(data->schemadata);
-  sat_free(data->schematahash);
+  solv_free(data->schemata);
+  solv_free(data->schemadata);
+  solv_free(data->schematahash);
 
   stringpool_free(&data->spool);
   dirpool_free(&data->dirpool);
 
-  sat_free(data->mainschemaoffsets);
-  sat_free(data->incoredata);
-  sat_free(data->incoreoffset);
-  sat_free(data->verticaloffset);
+  solv_free(data->mainschemaoffsets);
+  solv_free(data->incoredata);
+  solv_free(data->incoreoffset);
+  solv_free(data->verticaloffset);
 
   repopagestore_free(&data->store);
 
-  sat_free(data->vincore);
+  solv_free(data->vincore);
 
   if (data->attrs)
     for (i = 0; i < data->end - data->start; i++)
-      sat_free(data->attrs[i]);
-  sat_free(data->attrs);
+      solv_free(data->attrs[i]);
+  solv_free(data->attrs);
   if (data->xattrs)
     for (i = 0; i < data->nxattrs; i++)
-      sat_free(data->xattrs[i]);
-  sat_free(data->xattrs);
+      solv_free(data->xattrs[i]);
+  solv_free(data->xattrs);
 
-  sat_free(data->attrdata);
-  sat_free(data->attriddata);
+  solv_free(data->attrdata);
+  solv_free(data->attriddata);
 }
 
 Repodata *
@@ -98,7 +98,7 @@ repodata_create(Repo *repo, int localpool)
   Repodata *data;
 
   repo->nrepodata++;
-  repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
+  repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
   data = repo->repodata + repo->nrepodata - 1;
   repodata_initdata(data, repo, localpool);
   return data;
@@ -150,11 +150,11 @@ repodata_key2id(Repodata *data, Repokey *key, int create)
       if (!create)
 	return 0;
       /* allocate new key */
-      data->keys = sat_realloc2(data->keys, data->nkeys + 1, sizeof(Repokey));
+      data->keys = solv_realloc2(data->keys, data->nkeys + 1, sizeof(Repokey));
       data->keys[data->nkeys++] = *key;
       if (data->verticaloffset)
         {
-          data->verticaloffset = sat_realloc2(data->verticaloffset, data->nkeys, sizeof(Id));
+          data->verticaloffset = solv_realloc2(data->verticaloffset, data->nkeys, sizeof(Id));
           data->verticaloffset[data->nkeys - 1] = 0;
         }
       data->keybits[(key->name >> 3) & (sizeof(data->keybits) - 1)] |= 1 << (key->name & 7);
@@ -181,7 +181,7 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
     return 0;	/* XXX: allow empty schema? */
   if ((schematahash = data->schematahash) == 0)
     {
-      data->schematahash = schematahash = sat_calloc(256, sizeof(Id));
+      data->schematahash = schematahash = solv_calloc(256, sizeof(Id));
       for (i = 1; i < data->nschemata; i++)
 	{
 	  for (sp = data->schemadata + data->schemata[i], h = 0; *sp; len++)
@@ -189,8 +189,8 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
 	  h &= 255;
 	  schematahash[h] = i;
 	}
-      data->schemadata = sat_extend_resize(data->schemadata, data->schemadatalen, sizeof(Id), SCHEMATADATA_BLOCK);
-      data->schemata = sat_extend_resize(data->schemata, data->nschemata, sizeof(Id), SCHEMATA_BLOCK);
+      data->schemadata = solv_extend_resize(data->schemadata, data->schemadatalen, sizeof(Id), SCHEMATADATA_BLOCK);
+      data->schemata = solv_extend_resize(data->schemata, data->nschemata, sizeof(Id), SCHEMATA_BLOCK);
     }
 
   for (sp = schema, len = 0, h = 0; *sp; len++)
@@ -211,8 +211,8 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
   /* a new one */
   if (!create)
     return 0;
-  data->schemadata = sat_extend(data->schemadata, data->schemadatalen, len, sizeof(Id), SCHEMATADATA_BLOCK);
-  data->schemata = sat_extend(data->schemata, data->nschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
+  data->schemadata = solv_extend(data->schemadata, data->schemadatalen, len, sizeof(Id), SCHEMATADATA_BLOCK);
+  data->schemata = solv_extend(data->schemata, data->nschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
   /* add schema */
   memcpy(data->schemadata + data->schemadatalen, schema, len * sizeof(Id));
   data->schemata[data->nschemata] = data->schemadatalen;
@@ -227,10 +227,10 @@ fprintf(stderr, "schema2id: new schema\n");
 void
 repodata_free_schemahash(Repodata *data)
 {
-  data->schematahash = sat_free(data->schematahash);
+  data->schematahash = solv_free(data->schematahash);
   /* shrink arrays */
-  data->schemata = sat_realloc2(data->schemata, data->nschemata, sizeof(Id));
-  data->schemadata = sat_realloc2(data->schemadata, data->schemadatalen, sizeof(Id));
+  data->schemata = solv_realloc2(data->schemata, data->nschemata, sizeof(Id));
+  data->schemadata = solv_realloc2(data->schemadata, data->schemadatalen, sizeof(Id));
 }
 
 
@@ -977,11 +977,11 @@ datamatcher_init(Datamatcher *ma, const char *match, int flags)
   ma->matchdata = 0;
   if ((flags & SEARCH_STRINGMASK) == SEARCH_REGEX)
     {
-      ma->matchdata = sat_calloc(1, sizeof(regex_t));
+      ma->matchdata = solv_calloc(1, sizeof(regex_t));
       ma->error = regcomp((regex_t *)ma->matchdata, match, REG_EXTENDED | REG_NOSUB | REG_NEWLINE | ((flags & SEARCH_NOCASE) ? REG_ICASE : 0));
       if (ma->error)
 	{
-	  sat_free(ma->matchdata);
+	  solv_free(ma->matchdata);
 	  ma->flags = (flags & ~SEARCH_STRINGMASK) | SEARCH_ERROR;
 	}
     }
@@ -994,7 +994,7 @@ datamatcher_free(Datamatcher *ma)
   if ((ma->flags & SEARCH_STRINGMASK) == SEARCH_REGEX && ma->matchdata)
     {
       regfree(ma->matchdata);
-      ma->matchdata = sat_free(ma->matchdata);
+      ma->matchdata = solv_free(ma->matchdata);
     }
 }
 
@@ -1746,10 +1746,10 @@ repodata_extend(Repodata *data, Id p)
       int new = p - data->end + 1;
       if (data->attrs)
 	{
-	  data->attrs = sat_extend(data->attrs, old, new, sizeof(Id *), REPODATA_BLOCK);
+	  data->attrs = solv_extend(data->attrs, old, new, sizeof(Id *), REPODATA_BLOCK);
 	  memset(data->attrs + old, 0, new * sizeof(Id *));
 	}
-      data->incoreoffset = sat_extend(data->incoreoffset, old, new, sizeof(Id), REPODATA_BLOCK);
+      data->incoreoffset = solv_extend(data->incoreoffset, old, new, sizeof(Id), REPODATA_BLOCK);
       memset(data->incoreoffset + old, 0, new * sizeof(Id));
       data->end = p + 1;
     }
@@ -1759,11 +1759,11 @@ repodata_extend(Repodata *data, Id p)
       int new = data->start - p;
       if (data->attrs)
 	{
-	  data->attrs = sat_extend_resize(data->attrs, old + new, sizeof(Id *), REPODATA_BLOCK);
+	  data->attrs = solv_extend_resize(data->attrs, old + new, sizeof(Id *), REPODATA_BLOCK);
 	  memmove(data->attrs + new, data->attrs, old * sizeof(Id *));
 	  memset(data->attrs, 0, new * sizeof(Id *));
 	}
-      data->incoreoffset = sat_extend_resize(data->incoreoffset, old + new, sizeof(Id), REPODATA_BLOCK);
+      data->incoreoffset = solv_extend_resize(data->incoreoffset, old + new, sizeof(Id), REPODATA_BLOCK);
       memmove(data->incoreoffset + new, data->incoreoffset, old * sizeof(Id));
       memset(data->incoreoffset, 0, new * sizeof(Id));
       data->start = p;
@@ -1783,21 +1783,21 @@ repodata_shrink(Repodata *data, int end)
       if (data->attrs)
 	{
 	  for (i = 0; i < data->end - data->start; i++)
-	    sat_free(data->attrs[i]);
-          data->attrs = sat_free(data->attrs);
+	    solv_free(data->attrs[i]);
+          data->attrs = solv_free(data->attrs);
 	}
-      data->incoreoffset = sat_free(data->incoreoffset);
+      data->incoreoffset = solv_free(data->incoreoffset);
       data->start = data->end = 0;
       return;
     }
   if (data->attrs)
     {
       for (i = end; i < data->end; i++)
-	sat_free(data->attrs[i - data->start]);
-      data->attrs = sat_extend_resize(data->attrs, end - data->start, sizeof(Id *), REPODATA_BLOCK);
+	solv_free(data->attrs[i - data->start]);
+      data->attrs = solv_extend_resize(data->attrs, end - data->start, sizeof(Id *), REPODATA_BLOCK);
     }
   if (data->incoreoffset)
-    data->incoreoffset = sat_extend_resize(data->incoreoffset, end - data->start, sizeof(Id), REPODATA_BLOCK);
+    data->incoreoffset = solv_extend_resize(data->incoreoffset, end - data->start, sizeof(Id), REPODATA_BLOCK);
   data->end = end;
 }
 
@@ -1809,7 +1809,7 @@ repodata_extend_block(Repodata *data, Id start, Id num)
     return;
   if (!data->incoreoffset)
     {
-      data->incoreoffset = sat_calloc_block(num, sizeof(Id), REPODATA_BLOCK);
+      data->incoreoffset = solv_calloc_block(num, sizeof(Id), REPODATA_BLOCK);
       data->start = start;
       data->end = start + num;
       return;
@@ -1832,10 +1832,10 @@ repodata_new_handle(Repodata *data)
 {
   if (!data->nxattrs)
     {
-      data->xattrs = sat_calloc_block(1, sizeof(Id *), REPODATA_BLOCK);
+      data->xattrs = solv_calloc_block(1, sizeof(Id *), REPODATA_BLOCK);
       data->nxattrs = 2;	/* -1: SOLVID_META */
     }
-  data->xattrs = sat_extend(data->xattrs, data->nxattrs, 1, sizeof(Id *), REPODATA_BLOCK);
+  data->xattrs = solv_extend(data->xattrs, data->nxattrs, 1, sizeof(Id *), REPODATA_BLOCK);
   data->xattrs[data->nxattrs] = 0;
   return -(data->nxattrs++);
 }
@@ -1847,7 +1847,7 @@ repodata_get_attrp(Repodata *data, Id handle)
     {
       if (handle == SOLVID_META && !data->xattrs)
 	{
-	  data->xattrs = sat_calloc_block(1, sizeof(Id *), REPODATA_BLOCK);
+	  data->xattrs = solv_calloc_block(1, sizeof(Id *), REPODATA_BLOCK);
           data->nxattrs = 2;
 	}
       return data->xattrs - handle;
@@ -1855,7 +1855,7 @@ repodata_get_attrp(Repodata *data, Id handle)
   if (handle < data->start || handle >= data->end)
     repodata_extend(data, handle);
   if (!data->attrs)
-    data->attrs = sat_calloc_block(data->end - data->start, sizeof(Id *), REPODATA_BLOCK);
+    data->attrs = solv_calloc_block(data->end - data->start, sizeof(Id *), REPODATA_BLOCK);
   return data->attrs + (handle - data->start);
 }
 
@@ -1887,7 +1887,7 @@ repodata_insert_keyid(Repodata *data, Id handle, Id keyid, Id val, int overwrite
         }
       i = pp - ap;
     }
-  ap = sat_extend(ap, i, 3, sizeof(Id), REPODATA_ATTRS_BLOCK);
+  ap = solv_extend(ap, i, 3, sizeof(Id), REPODATA_ATTRS_BLOCK);
   *app = ap;
   pp = ap + i;
   *pp++ = keyid;
@@ -1987,7 +1987,7 @@ repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str)
   key.type = REPOKEY_TYPE_STR;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
+  data->attrdata = solv_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
   repodata_set(data, solvid, &key, data->attrdatalen);
   data->attrdatalen += l;
@@ -2003,7 +2003,7 @@ repodata_set_binary(Repodata *data, Id solvid, Id keyname, void *buf, int len)
   key.type = REPOKEY_TYPE_BINARY;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  data->attrdata = sat_extend(data->attrdata, data->attrdatalen, len + 5, 1, REPODATA_ATTRDATA_BLOCK);
+  data->attrdata = solv_extend(data->attrdata, data->attrdatalen, len + 5, 1, REPODATA_ATTRDATA_BLOCK);
   dp = data->attrdata + data->attrdatalen;
   if (len >= (1 << 14))
     {
@@ -2034,7 +2034,7 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
   if (handle == data->lasthandle && data->keys[data->lastkey].name == keyname && data->keys[data->lastkey].type == keytype && data->attriddatalen == data->lastdatalen)
     {
       /* great! just append the new data */
-      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+      data->attriddata = solv_extend(data->attriddata, data->attriddatalen, entrysize, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
       data->attriddatalen--;	/* overwrite terminating 0  */
       data->lastdatalen += entrysize;
       return;
@@ -2057,7 +2057,7 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
       key.type = keytype;
       key.size = 0;
       key.storage = KEY_STORAGE_INCORE;
-      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+      data->attriddata = solv_extend(data->attriddata, data->attriddatalen, entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
       keyid = repodata_key2id(data, &key, 1);
       repodata_insert_keyid(data, handle, keyid, data->attriddatalen, 1);
       data->lasthandle = handle;
@@ -2071,13 +2071,13 @@ repodata_add_array(Repodata *data, Id handle, Id keyname, Id keytype, int entrys
   if (ida + 1 == data->attriddata + data->attriddatalen)
     {
       /* this was the last entry, just append it */
-      data->attriddata = sat_extend(data->attriddata, data->attriddatalen, entrysize, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+      data->attriddata = solv_extend(data->attriddata, data->attriddatalen, entrysize, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
       data->attriddatalen--;	/* overwrite terminating 0  */
     }
   else
     {
       /* too bad. move to back. */
-      data->attriddata = sat_extend(data->attriddata, data->attriddatalen,  oldsize + entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+      data->attriddata = solv_extend(data->attriddata, data->attriddatalen,  oldsize + entrysize + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
       memcpy(data->attriddata + data->attriddatalen, data->attriddata + pp[1], oldsize * sizeof(Id));
       pp[1] = data->attriddatalen;
       data->attriddatalen += oldsize;
@@ -2094,13 +2094,13 @@ repodata_set_bin_checksum(Repodata *data, Id solvid, Id keyname, Id type,
   Repokey key;
   int l;
 
-  if (!(l = sat_chksum_len(type)))
+  if (!(l = solv_chksum_len(type)))
     return;
   key.name = keyname;
   key.type = type;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
+  data->attrdata = solv_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
   repodata_set(data, solvid, &key, data->attrdatalen);
   data->attrdatalen += l;
@@ -2113,9 +2113,9 @@ repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
   unsigned char buf[64];
   int l;
 
-  if (!(l = sat_chksum_len(type)))
+  if (!(l = solv_chksum_len(type)))
     return;
-  if (l > sizeof(buf) || sat_hex2bin(&str, buf, l) != l)
+  if (l > sizeof(buf) || solv_hex2bin(&str, buf, l) != l)
     return;
   repodata_set_bin_checksum(data, solvid, keyname, type, buf);
 }
@@ -2125,7 +2125,7 @@ repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
 {
   int l;
 
-  if (!(l = sat_chksum_len(type)))
+  if (!(l = solv_chksum_len(type)))
     return "";
   return pool_bin2hex(data->repo->pool, buf, l);
 }
@@ -2222,7 +2222,7 @@ repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   repodata_set(data, solvid, &key, data->attriddatalen);
-  data->attriddata = sat_extend(data->attriddata, data->attriddatalen, q->count + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+  data->attriddata = solv_extend(data->attriddata, data->attriddatalen, q->count + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
   for (i = 0; i < q->count; i++)
     data->attriddata[data->attriddatalen++] = q->elements[i];
   data->attriddata[data->attriddatalen++] = 0;
@@ -2250,7 +2250,7 @@ repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const char *s
 
   assert(dir);
   l = strlen(str) + 1;
-  data->attrdata = sat_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
+  data->attrdata = solv_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
   stroff = data->attrdatalen;
   data->attrdatalen += l;
@@ -2381,7 +2381,7 @@ data_addid(struct extdata *xd, Id x)
 {
   unsigned char *dp;
 
-  xd->buf = sat_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
+  xd->buf = solv_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
   dp = xd->buf + xd->len;
 
   if (x >= (1 << 14))
@@ -2409,7 +2409,7 @@ data_addideof(struct extdata *xd, Id x, int eof)
 static void
 data_addblob(struct extdata *xd, unsigned char *blob, int len)
 {
-  xd->buf = sat_extend(xd->buf, xd->len, len, 1, EXTDATA_BLOCK);
+  xd->buf = solv_extend(xd->buf, xd->len, len, 1, EXTDATA_BLOCK);
   memcpy(xd->buf + xd->len, blob, len);
   xd->len += len;
 }
@@ -2503,7 +2503,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	      schemaid = repodata_schema2id(data, schema, 1);
 	    else if (schemaid != repodata_schema2id(data, schema, 0))
 	      {
-	 	pool_debug(data->repo->pool, SAT_FATAL, "fixarray substructs with different schemas\n");
+	 	pool_debug(data->repo->pool, SOLV_FATAL, "fixarray substructs with different schemas\n");
 		exit(1);
 	      }
 	  }
@@ -2548,7 +2548,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	break;
       }
     default:
-      pool_debug(data->repo->pool, SAT_FATAL, "don't know how to handle type %d\n", key->type);
+      pool_debug(data->repo->pool, SOLV_FATAL, "don't know how to handle type %d\n", key->type);
       exit(1);
     }
   if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
@@ -2586,8 +2586,8 @@ repodata_internalize(Repodata *data)
   solvkey.storage = KEY_STORAGE_INCORE;
   solvkeyid = repodata_key2id(data, &solvkey, data->end != data->start ? 1 : 0);
 
-  schema = sat_malloc2(data->nkeys, sizeof(Id));
-  seen = sat_malloc2(data->nkeys, sizeof(Id));
+  schema = solv_malloc2(data->nkeys, sizeof(Id));
+  seen = solv_malloc2(data->nkeys, sizeof(Id));
 
   /* Merge the data already existing (in data->schemata, ->incoredata and
      friends) with the new attributes in data->attrs[].  */
@@ -2596,7 +2596,7 @@ repodata_internalize(Repodata *data)
   data_addid(&newincore, 0);	/* start data at offset 1 */
 
   data->mainschema = 0;
-  data->mainschemaoffsets = sat_free(data->mainschemaoffsets);
+  data->mainschemaoffsets = solv_free(data->mainschemaoffsets);
 
   /* join entry data */
   /* we start with the meta data, entry -1 */
@@ -2623,7 +2623,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	{
 	  if (seen[*keyp])
 	    {
-	      pool_debug(data->repo->pool, SAT_FATAL, "Inconsistent old data (key occured twice).\n");
+	      pool_debug(data->repo->pool, SOLV_FATAL, "Inconsistent old data (key occured twice).\n");
 	      exit(1);
 	    }
 	  seen[*keyp] = -1;
@@ -2685,7 +2685,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
       if (entry == -1)
 	{
 	  data->mainschema = schemaid;
-	  data->mainschemaoffsets = sat_calloc(sp - schema, sizeof(Id));
+	  data->mainschemaoffsets = solv_calloc(sp - schema, sizeof(Id));
 	}
       keypstart = data->schemadata + data->schemata[schemaid];
       for (keyp = keypstart; *keyp; keyp++)
@@ -2734,34 +2734,34 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	  dp = ndp;
 	}
       if (entry >= 0 && data->attrs && data->attrs[entry])
-	data->attrs[entry] = sat_free(data->attrs[entry]);
+	data->attrs[entry] = solv_free(data->attrs[entry]);
     }
   /* free all xattrs */
   for (entry = 0; entry < data->nxattrs; entry++)
     if (data->xattrs[entry])
-      sat_free(data->xattrs[entry]);
-  data->xattrs = sat_free(data->xattrs);
+      solv_free(data->xattrs[entry]);
+  data->xattrs = solv_free(data->xattrs);
   data->nxattrs = 0;
 
   data->lasthandle = 0;
   data->lastkey = 0;
   data->lastdatalen = 0;
-  sat_free(schema);
-  sat_free(seen);
+  solv_free(schema);
+  solv_free(seen);
   repodata_free_schemahash(data);
 
-  sat_free(data->incoredata);
+  solv_free(data->incoredata);
   data->incoredata = newincore.buf;
   data->incoredatalen = newincore.len;
   data->incoredatafree = 0;
 
-  sat_free(data->vincore);
+  solv_free(data->vincore);
   data->vincore = newvincore.buf;
   data->vincorelen = newvincore.len;
 
-  data->attrs = sat_free(data->attrs);
-  data->attrdata = sat_free(data->attrdata);
-  data->attriddata = sat_free(data->attriddata);
+  data->attrs = solv_free(data->attrs);
+  data->attrdata = solv_free(data->attrdata);
+  data->attriddata = solv_free(data->attriddata);
   data->attrdatalen = 0;
   data->attriddatalen = 0;
 }
@@ -2796,7 +2796,7 @@ repodata_load_stub(Repodata *data)
 
   /* restore tmp space */
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
-    sat_free(pool->tmpspace.buf[i]);
+    solv_free(pool->tmpspace.buf[i]);
   pool->tmpspace = oldtmpspace;
 
   data->state = r ? REPODATA_AVAILABLE : REPODATA_ERROR;
@@ -2828,7 +2828,7 @@ repodata_create_stubs(Repodata *data)
   dataiterator_free(&di);
   if (!cnt)
     return;
-  stubdataids = sat_calloc(cnt, sizeof(*stubdataids));
+  stubdataids = solv_calloc(cnt, sizeof(*stubdataids));
   for (i = 0; i < cnt; i++)
     {
       sdata = repo_add_repodata(repo, 0);
@@ -2900,7 +2900,7 @@ repodata_create_stubs(Repodata *data)
   dataiterator_free(&di);
   for (i = 0; i < cnt; i++)
     repodata_internalize(repo->repodata + stubdataids[i]);
-  sat_free(stubdataids);
+  solv_free(stubdataids);
 }
 
 /*

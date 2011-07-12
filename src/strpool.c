@@ -24,8 +24,8 @@ stringpool_init(Stringpool *ss, const char *strs[])
     totalsize += strlen(strs[count]) + 1;
 
   // alloc appropriate space
-  ss->stringspace = sat_extend_resize(0, totalsize, 1, STRINGSPACE_BLOCK);
-  ss->strings = sat_extend_resize(0, count, sizeof(Offset), STRING_BLOCK);
+  ss->stringspace = solv_extend_resize(0, totalsize, 1, STRINGSPACE_BLOCK);
+  ss->strings = solv_extend_resize(0, count, sizeof(Offset), STRING_BLOCK);
 
   // now copy predefined strings into allocated space
   ss->sstrings = 0;
@@ -41,15 +41,15 @@ stringpool_init(Stringpool *ss, const char *strs[])
 void
 stringpool_free(Stringpool *ss)
 {
-  sat_free(ss->strings);
-  sat_free(ss->stringspace);
-  sat_free(ss->stringhashtbl);
+  solv_free(ss->strings);
+  solv_free(ss->stringspace);
+  solv_free(ss->stringhashtbl);
 }
 
 void
 stringpool_freehash(Stringpool *ss)
 {
-  ss->stringhashtbl = sat_free(ss->stringhashtbl);
+  ss->stringhashtbl = solv_free(ss->stringhashtbl);
   ss->stringhashmask = 0;
 }
 
@@ -68,9 +68,9 @@ void
 stringpool_clone(Stringpool *ss, Stringpool *from)
 {
   memset(ss, 0, sizeof(*ss));
-  ss->strings = sat_extend_resize(0, from->nstrings, sizeof(Offset), STRING_BLOCK);
+  ss->strings = solv_extend_resize(0, from->nstrings, sizeof(Offset), STRING_BLOCK);
   memcpy(ss->strings, from->strings, from->nstrings * sizeof(Offset));
-  ss->stringspace = sat_extend_resize(0, from->sstrings, 1, STRINGSPACE_BLOCK);
+  ss->stringspace = solv_extend_resize(0, from->sstrings, 1, STRINGSPACE_BLOCK);
   memcpy(ss->stringspace, from->stringspace, from->sstrings);
   ss->nstrings = from->nstrings;
   ss->sstrings = from->sstrings;
@@ -98,11 +98,11 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   // expand hashtable if needed
   if (ss->nstrings * 2 > hashmask)
     {
-      sat_free(hashtbl);
+      solv_free(hashtbl);
 
       // realloc hash table
       ss->stringhashmask = hashmask = mkmask(ss->nstrings + STRING_BLOCK);
-      ss->stringhashtbl = hashtbl = (Hashtable)sat_calloc(hashmask + 1, sizeof(Id));
+      ss->stringhashtbl = hashtbl = (Hashtable)solv_calloc(hashmask + 1, sizeof(Id));
 
       // rehash all strings into new hashtable
       for (i = 1; i < ss->nstrings; i++)
@@ -133,11 +133,11 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   id = ss->nstrings++;
   hashtbl[h] = id;
 
-  ss->strings = sat_extend(ss->strings, id, 1, sizeof(Offset), STRING_BLOCK);
+  ss->strings = solv_extend(ss->strings, id, 1, sizeof(Offset), STRING_BLOCK);
   ss->strings[id] = ss->sstrings;	/* we will append to the end */
 
   // append string to stringspace
-  ss->stringspace = sat_extend(ss->stringspace, ss->sstrings, len + 1, 1, STRINGSPACE_BLOCK);
+  ss->stringspace = solv_extend(ss->stringspace, ss->sstrings, len + 1, 1, STRINGSPACE_BLOCK);
   memcpy(ss->stringspace + ss->sstrings, str, len);
   ss->stringspace[ss->sstrings + len] = 0;
   ss->sstrings += len + 1;
@@ -157,6 +157,6 @@ stringpool_str2id(Stringpool *ss, const char *str, int create)
 void
 stringpool_shrink(Stringpool *ss)
 {
-  ss->stringspace = sat_extend_resize(ss->stringspace, ss->sstrings, 1, STRINGSPACE_BLOCK);
-  ss->strings = sat_extend_resize(ss->strings, ss->nstrings, sizeof(Offset), STRING_BLOCK);
+  ss->stringspace = solv_extend_resize(ss->stringspace, ss->sstrings, 1, STRINGSPACE_BLOCK);
+  ss->strings = solv_extend_resize(ss->strings, ss->nstrings, sizeof(Offset), STRING_BLOCK);
 }

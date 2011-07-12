@@ -43,7 +43,7 @@ doublehash(Hashval *map, Hashmask *mapnp)
   Hashmask nn = (mapn + 1) * 2 - 1;
   Hashmask *m;
 
-  m = sat_calloc(nn + 1, 2 * sizeof(Id));
+  m = solv_calloc(nn + 1, 2 * sizeof(Id));
   for (i = 0; i <= mapn; i++)
     {
       hx = map[2 * i];
@@ -61,7 +61,7 @@ doublehash(Hashval *map, Hashmask *mapnp)
       m[2 * h] = hx;
       m[2 * h + 1] = map[2 * i + 1];
     }
-  sat_free(map);
+  solv_free(map);
   *mapnp = nn;
   return m;
 }
@@ -204,7 +204,7 @@ findfileconflicts_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 static inline void
 addfilesspace(struct cbdata *cbdata, unsigned char *data, int len)
 {
-  cbdata->filesspace = sat_extend(cbdata->filesspace, cbdata->filesspacen, len, 1, FILESSPACE_BLOCK);
+  cbdata->filesspace = solv_extend(cbdata->filesspace, cbdata->filesspacen, len, 1, FILESSPACE_BLOCK);
   memcpy(cbdata->filesspace + cbdata->filesspacen, data, len);
   cbdata->filesspacen += len;
 }
@@ -271,9 +271,9 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   if (!pkgs->count)
     return 0;
 
-  now = start = sat_timems(0);
-  POOL_DEBUG(SAT_DEBUG_STATS, "searching for file conflicts\n");
-  POOL_DEBUG(SAT_DEBUG_STATS, "packages: %d, cutoff %d\n", pkgs->count, cutoff);
+  now = start = solv_timems(0);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "searching for file conflicts\n");
+  POOL_DEBUG(SOLV_DEBUG_STATS, "packages: %d, cutoff %d\n", pkgs->count, cutoff);
 
   memset(&cbdata, 0, sizeof(cbdata));
   cbdata.pool = pool;
@@ -292,7 +292,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   cflmapn = (cutoff + 3) * 64;
   while ((cflmapn & (cflmapn - 1)) != 0)
     cflmapn = cflmapn & (cflmapn - 1);
-  cbdata.dirmap = sat_calloc(cflmapn, 2 * sizeof(Id));
+  cbdata.dirmap = solv_calloc(cflmapn, 2 * sizeof(Id));
   cbdata.dirmapn = cflmapn - 1;	/* make it a mask */
   cbdata.create = 1;
   idxmapset = 0;
@@ -309,17 +309,17 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
         idxmapset++;
     }
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "dirmap size: %d used %d\n", cbdata.dirmapn + 1, cbdata.dirmapused);
-  POOL_DEBUG(SAT_DEBUG_STATS, "dirmap memory usage: %d K\n", (cbdata.dirmapn + 1) * 2 * (int)sizeof(Id) / 1024);
-  POOL_DEBUG(SAT_DEBUG_STATS, "dirmap creation took %d ms\n", sat_timems(now));
-  POOL_DEBUG(SAT_DEBUG_STATS, "dir conflicts found: %d, idxmap %d of %d\n", cbdata.dirconflicts, idxmapset, pkgs->count);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap size: %d used %d\n", cbdata.dirmapn + 1, cbdata.dirmapused);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap memory usage: %d K\n", (cbdata.dirmapn + 1) * 2 * (int)sizeof(Id) / 1024);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap creation took %d ms\n", solv_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dir conflicts found: %d, idxmap %d of %d\n", cbdata.dirconflicts, idxmapset, pkgs->count);
 
   /* second pass: scan files */
-  now = sat_timems(0);
+  now = solv_timems(0);
   cflmapn = (cutoff + 3) * 128;
   while ((cflmapn & (cflmapn - 1)) != 0)
     cflmapn = cflmapn & (cflmapn - 1);
-  cbdata.cflmap = sat_calloc(cflmapn, 2 * sizeof(Id));
+  cbdata.cflmap = solv_calloc(cflmapn, 2 * sizeof(Id));
   cbdata.cflmapn = cflmapn - 1;	/* make it a mask */
   cbdata.create = 1;
   for (i = 0; i < pkgs->count; i++)
@@ -335,22 +335,22 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
         rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_NOGHOSTS, findfileconflicts_cb, &cbdata);
     }
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "filemap size: %d used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
-  POOL_DEBUG(SAT_DEBUG_STATS, "filemap memory usage: %d K\n", (cbdata.cflmapn + 1) * 2 * (int)sizeof(Id) / 1024);
-  POOL_DEBUG(SAT_DEBUG_STATS, "filemap creation took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "filemap size: %d used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "filemap memory usage: %d K\n", (cbdata.cflmapn + 1) * 2 * (int)sizeof(Id) / 1024);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "filemap creation took %d ms\n", solv_timems(now));
 
-  cbdata.dirmap = sat_free(cbdata.dirmap);
+  cbdata.dirmap = solv_free(cbdata.dirmap);
   cbdata.dirmapn = 0;
   cbdata.dirmapused = 0;
-  cbdata.cflmap = sat_free(cbdata.cflmap);
+  cbdata.cflmap = solv_free(cbdata.cflmap);
   cbdata.cflmapn = 0;
   cbdata.cflmapused = 0;
   map_free(&cbdata.idxmap);
 
-  now = sat_timems(0);
-  POOL_DEBUG(SAT_DEBUG_STATS, "lookat_dir size: %d\n", cbdata.lookat_dir.count);
+  now = solv_timems(0);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "lookat_dir size: %d\n", cbdata.lookat_dir.count);
   queue_free(&cbdata.lookat_dir);
-  sat_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &cand_sort, pool);
+  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &cand_sort, pool);
   /* unify */
   for (i = j = 0; i < cbdata.lookat.count; i += 2)
     {
@@ -361,7 +361,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       cbdata.lookat.elements[j++] = hx;
       cbdata.lookat.elements[j++] = idx;
     }
-  POOL_DEBUG(SAT_DEBUG_STATS, "candidates: %d\n", cbdata.lookat.count / 2);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "candidates: %d\n", cbdata.lookat.count / 2);
 
   /* third pass: scan candidates */
   for (i = 0; i < cbdata.lookat.count - 2; i += 2)
@@ -378,7 +378,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       if (cbdata.lookat.elements[i + 2] != hx)
 	continue;	/* no package left */
       queue_empty(&cbdata.files);
-      cbdata.filesspace = sat_free(cbdata.filesspace);
+      cbdata.filesspace = solv_free(cbdata.filesspace);
       cbdata.filesspacen = 0;
 
       cbdata.idx = p;
@@ -419,16 +419,16 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
 	      }
 	}
     }
-  cbdata.filesspace = sat_free(cbdata.filesspace);
+  cbdata.filesspace = solv_free(cbdata.filesspace);
   cbdata.filesspacen = 0;
   queue_free(&cbdata.lookat);
   queue_free(&cbdata.files);
-  POOL_DEBUG(SAT_DEBUG_STATS, "candidate check took %d ms\n", sat_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "candidate check took %d ms\n", solv_timems(now));
   if (conflicts->count > 5)
-    sat_sort(conflicts->elements, conflicts->count / 5, 5 * sizeof(Id), conflicts_cmp, pool);
+    solv_sort(conflicts->elements, conflicts->count / 5, 5 * sizeof(Id), conflicts_cmp, pool);
   (*handle_cb)(pool, 0, handle_cbdata);
-  POOL_DEBUG(SAT_DEBUG_STATS, "found %d file conflicts\n", conflicts->count / 5);
-  POOL_DEBUG(SAT_DEBUG_STATS, "file conflict detection took %d ms\n", sat_timems(start));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "found %d file conflicts\n", conflicts->count / 5);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "file conflict detection took %d ms\n", solv_timems(start));
   return conflicts->count;
 }
 

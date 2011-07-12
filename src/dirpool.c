@@ -73,8 +73,8 @@ dirpool_init(Dirpool *dp)
 void
 dirpool_free(Dirpool *dp)
 {
-  sat_free(dp->dirs);
-  sat_free(dp->dirtraverse);
+  solv_free(dp->dirs);
+  solv_free(dp->dirtraverse);
 }
 
 void
@@ -83,8 +83,8 @@ dirpool_make_dirtraverse(Dirpool *dp)
   Id parent, i, *dirtraverse;
   if (!dp->ndirs)
     return;
-  dp->dirs = sat_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
-  dirtraverse = sat_calloc_block(dp->ndirs, sizeof(Id), DIR_BLOCK);
+  dp->dirs = solv_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
+  dirtraverse = solv_calloc_block(dp->ndirs, sizeof(Id), DIR_BLOCK);
   for (parent = 0, i = 0; i < dp->ndirs; i++)
     {
       if (dp->dirs[i] > 0)
@@ -106,7 +106,7 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
       if (!create)
 	return 0;
       dp->ndirs = 2;
-      dp->dirs = sat_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
+      dp->dirs = solv_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
       dp->dirs[0] = 0;
       dp->dirs[1] = 1;	/* "" */
     }
@@ -141,16 +141,16 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
   if (dp->dirs[did] != -parent)
     {
       /* make room for parent entry */
-      dp->dirs = sat_extend(dp->dirs, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
-      dp->dirtraverse = sat_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
+      dp->dirs = solv_extend(dp->dirs, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
+      dp->dirtraverse = solv_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
       /* new parent block, link in */
       dp->dirs[dp->ndirs] = -parent;
       dp->dirtraverse[dp->ndirs] = dp->dirtraverse[parent];
       dp->dirtraverse[parent] = ++dp->ndirs;
     }
   /* make room for new entry */
-  dp->dirs = sat_extend(dp->dirs, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
-  dp->dirtraverse = sat_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
+  dp->dirs = solv_extend(dp->dirs, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
+  dp->dirtraverse = solv_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
   dp->dirs[dp->ndirs] = comp;
   dp->dirtraverse[dp->ndirs] = 0;
   return dp->ndirs++;

@@ -816,7 +816,7 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
   struct stateswitch *sw;
   unsigned int now;
 
-  now = sat_timems(0);
+  now = solv_timems(0);
   data = repo_add_repodata(repo, flags);
   
   /* prepare parsedata */
@@ -853,7 +853,7 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pool, SAT_FATAL, "%s at line %u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser));
+	  pool_debug(pool, SOLV_FATAL, "%s at line %u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser));
 	  exit(1);
 	}
       if (l == 0)
@@ -865,8 +865,8 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_helix took %d ms\n", sat_timems(now));
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_helix took %d ms\n", solv_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
   return 0;
 }

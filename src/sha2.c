@@ -330,7 +330,7 @@ static const char *sha2_hex_digits = "0123456789abcdef";
 
 
 /*** SHA-256: *********************************************************/
-void sat_SHA256_Init(SHA256_CTX* context) {
+void solv_SHA256_Init(SHA256_CTX* context) {
 	if (context == (SHA256_CTX*)0) {
 		return;
 	}
@@ -514,7 +514,7 @@ static void SHA256_Transform(SHA256_CTX* context, const sha2_word32* data) {
 
 #endif /* SHA2_UNROLL_TRANSFORM */
 
-void sat_SHA256_Update(SHA256_CTX* context, const sha2_byte *data, size_t len) {
+void solv_SHA256_Update(SHA256_CTX* context, const sha2_byte *data, size_t len) {
 	unsigned int	freespace, usedspace;
 
 	if (len == 0) {
@@ -562,7 +562,7 @@ void sat_SHA256_Update(SHA256_CTX* context, const sha2_byte *data, size_t len) {
 	usedspace = freespace = 0;
 }
 
-void sat_SHA256_Final(sha2_byte digest[], SHA256_CTX* context) {
+void solv_SHA256_Final(sha2_byte digest[], SHA256_CTX* context) {
 	sha2_word32	*d = (sha2_word32*)digest;
 	unsigned int	usedspace;
 
@@ -625,7 +625,7 @@ void sat_SHA256_Final(sha2_byte digest[], SHA256_CTX* context) {
 	usedspace = 0;
 }
 
-char *sat_SHA256_End(SHA256_CTX* context, char buffer[]) {
+char *solv_SHA256_End(SHA256_CTX* context, char buffer[]) {
 	sha2_byte	digest[SHA256_DIGEST_LENGTH], *d = digest;
 	int		i;
 
@@ -633,7 +633,7 @@ char *sat_SHA256_End(SHA256_CTX* context, char buffer[]) {
 	/* assert(context != (SHA256_CTX*)0); */
 
 	if (buffer != (char*)0) {
-		sat_SHA256_Final(digest, context);
+		solv_SHA256_Final(digest, context);
 
 		for (i = 0; i < SHA256_DIGEST_LENGTH; i++) {
 			*buffer++ = sha2_hex_digits[(*d & 0xf0) >> 4];
@@ -648,17 +648,17 @@ char *sat_SHA256_End(SHA256_CTX* context, char buffer[]) {
 	return buffer;
 }
 
-char* sat_SHA256_Data(const sha2_byte* data, size_t len, char digest[SHA256_DIGEST_STRING_LENGTH]) {
+char* solv_SHA256_Data(const sha2_byte* data, size_t len, char digest[SHA256_DIGEST_STRING_LENGTH]) {
 	SHA256_CTX	context;
 
-	sat_SHA256_Init(&context);
-	sat_SHA256_Update(&context, data, len);
-	return sat_SHA256_End(&context, digest);
+	solv_SHA256_Init(&context);
+	solv_SHA256_Update(&context, data, len);
+	return solv_SHA256_End(&context, digest);
 }
 
 
 /*** SHA-512: *********************************************************/
-void sat_SHA512_Init(SHA512_CTX* context) {
+void solv_SHA512_Init(SHA512_CTX* context) {
 	if (context == (SHA512_CTX*)0) {
 		return;
 	}
@@ -836,7 +836,7 @@ static void SHA512_Transform(SHA512_CTX* context, const sha2_word64* data) {
 
 #endif /* SHA2_UNROLL_TRANSFORM */
 
-void sat_SHA512_Update(SHA512_CTX* context, const sha2_byte *data, size_t len) {
+void solv_SHA512_Update(SHA512_CTX* context, const sha2_byte *data, size_t len) {
 	unsigned int	freespace, usedspace;
 
 	if (len == 0) {
@@ -925,7 +925,7 @@ static void SHA512_Last(SHA512_CTX* context) {
 	SHA512_Transform(context, (sha2_word64*)context->buffer);
 }
 
-void sat_SHA512_Final(sha2_byte digest[], SHA512_CTX* context) {
+void solv_SHA512_Final(sha2_byte digest[], SHA512_CTX* context) {
 	sha2_word64	*d = (sha2_word64*)digest;
 
 	/* Sanity check: */
@@ -954,7 +954,7 @@ void sat_SHA512_Final(sha2_byte digest[], SHA512_CTX* context) {
 	MEMSET_BZERO(context, sizeof(context));
 }
 
-char *sat_SHA512_End(SHA512_CTX* context, char buffer[]) {
+char *solv_SHA512_End(SHA512_CTX* context, char buffer[]) {
 	sha2_byte	digest[SHA512_DIGEST_LENGTH], *d = digest;
 	int		i;
 
@@ -962,7 +962,7 @@ char *sat_SHA512_End(SHA512_CTX* context, char buffer[]) {
 	/* assert(context != (SHA512_CTX*)0); */
 
 	if (buffer != (char*)0) {
-		sat_SHA512_Final(digest, context);
+		solv_SHA512_Final(digest, context);
 
 		for (i = 0; i < SHA512_DIGEST_LENGTH; i++) {
 			*buffer++ = sha2_hex_digits[(*d & 0xf0) >> 4];
@@ -977,17 +977,17 @@ char *sat_SHA512_End(SHA512_CTX* context, char buffer[]) {
 	return buffer;
 }
 
-char* sat_SHA512_Data(const sha2_byte* data, size_t len, char digest[SHA512_DIGEST_STRING_LENGTH]) {
+char* solv_SHA512_Data(const sha2_byte* data, size_t len, char digest[SHA512_DIGEST_STRING_LENGTH]) {
 	SHA512_CTX	context;
 
-	sat_SHA512_Init(&context);
-	sat_SHA512_Update(&context, data, len);
-	return sat_SHA512_End(&context, digest);
+	solv_SHA512_Init(&context);
+	solv_SHA512_Update(&context, data, len);
+	return solv_SHA512_End(&context, digest);
 }
 
 
 /*** SHA-384: *********************************************************/
-void sat_SHA384_Init(SHA384_CTX* context) {
+void solv_SHA384_Init(SHA384_CTX* context) {
 	if (context == (SHA384_CTX*)0) {
 		return;
 	}
@@ -996,11 +996,11 @@ void sat_SHA384_Init(SHA384_CTX* context) {
 	context->bitcount[0] = context->bitcount[1] = 0;
 }
 
-void sat_SHA384_Update(SHA384_CTX* context, const sha2_byte* data, size_t len) {
-	sat_SHA512_Update((SHA512_CTX*)context, data, len);
+void solv_SHA384_Update(SHA384_CTX* context, const sha2_byte* data, size_t len) {
+	solv_SHA512_Update((SHA512_CTX*)context, data, len);
 }
 
-void sat_SHA384_Final(sha2_byte digest[], SHA384_CTX* context) {
+void solv_SHA384_Final(sha2_byte digest[], SHA384_CTX* context) {
 	sha2_word64	*d = (sha2_word64*)digest;
 
 	/* Sanity check: */
@@ -1029,7 +1029,7 @@ void sat_SHA384_Final(sha2_byte digest[], SHA384_CTX* context) {
 	MEMSET_BZERO(context, sizeof(context));
 }
 
-char *sat_SHA384_End(SHA384_CTX* context, char buffer[]) {
+char *solv_SHA384_End(SHA384_CTX* context, char buffer[]) {
 	sha2_byte	digest[SHA384_DIGEST_LENGTH], *d = digest;
 	int		i;
 
@@ -1037,7 +1037,7 @@ char *sat_SHA384_End(SHA384_CTX* context, char buffer[]) {
 	/* assert(context != (SHA384_CTX*)0); */
 
 	if (buffer != (char*)0) {
-		sat_SHA384_Final(digest, context);
+		solv_SHA384_Final(digest, context);
 
 		for (i = 0; i < SHA384_DIGEST_LENGTH; i++) {
 			*buffer++ = sha2_hex_digits[(*d & 0xf0) >> 4];
@@ -1052,10 +1052,10 @@ char *sat_SHA384_End(SHA384_CTX* context, char buffer[]) {
 	return buffer;
 }
 
-char* sat_SHA384_Data(const sha2_byte* data, size_t len, char digest[SHA384_DIGEST_STRING_LENGTH]) {
+char* solv_SHA384_Data(const sha2_byte* data, size_t len, char digest[SHA384_DIGEST_STRING_LENGTH]) {
 	SHA384_CTX	context;
 
-	sat_SHA384_Init(&context);
-	sat_SHA384_Update(&context, data, len);
-	return sat_SHA384_End(&context, digest);
+	solv_SHA384_Init(&context);
+	solv_SHA384_Update(&context, data, len);
+	return solv_SHA384_End(&context, digest);
 }

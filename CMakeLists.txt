@@ -110,7 +110,7 @@ SET (VERSION "${LIBSOLV_MAJOR}.${LIBSOLV_MINOR}.${LIBSOLV_PATCH}")
 
 ADD_DEFINITIONS (-D_FILE_OFFSET_BITS=64)
 ADD_DEFINITIONS (-DVERSION=\\\"${VERSION}\\\")
-CONFIGURE_FILE (src/satversion.h.in src/satversion.h)
+CONFIGURE_FILE (src/solvversion.h.in src/solvversion.h)
 
 SET (CPACK_PACKAGE_DESCRIPTION_SUMMARY "Package dependency solver library")
 SET (CPACK_PACKAGE_VENDOR "SUSE")

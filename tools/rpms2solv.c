@@ -99,7 +99,7 @@ main(int argc, char **argv)
 	      if ((p = strchr(buf, '\n')) != 0)
 		*p = 0;
 	    }
-          rpms = sat_extend(rpms, nrpms, 1, sizeof(char *), 15);
+          rpms = solv_extend(rpms, nrpms, 1, sizeof(char *), 15);
 	  rpms[nrpms++] = strdup(buf);
 	}
       if (fp != stdin)
@@ -107,7 +107,7 @@ main(int argc, char **argv)
     }
   while (optind < argc)
     {
-      rpms = sat_extend(rpms, nrpms, 1, sizeof(char *), 15);
+      rpms = solv_extend(rpms, nrpms, 1, sizeof(char *), 15);
       rpms[nrpms++] = strdup(argv[optind++]);
     }
   repo = repo_create(pool, "rpms2solv");
@@ -116,7 +116,7 @@ main(int argc, char **argv)
   pool_free(pool);
   for (c = 0; c < nrpms; c++)
     free((char *)rpms[c]);
-  sat_free(rpms);
+  solv_free(rpms);
   exit(0);
 }
 

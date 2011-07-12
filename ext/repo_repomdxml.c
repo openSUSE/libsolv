@@ -348,13 +348,13 @@ endElement(void *userData, const char *name)
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
       {
-        Id type = sat_chksum_str2type(pd->tmpattr);
+        Id type = solv_chksum_str2type(pd->tmpattr);
 	if (!type)
 	  {
             fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
             exit(1);
 	  }
-	if (strlen(pd->content) != 2 * sat_chksum_len(type))
+	if (strlen(pd->content) != 2 * solv_chksum_len(type))
 	  {
             fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
             exit(1);
@@ -486,7 +486,7 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pool, SAT_FATAL, "repo_repomdxml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  pool_debug(pool, SOLV_FATAL, "repo_repomdxml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
 	  exit(1);
 	}
       if (l == 0)

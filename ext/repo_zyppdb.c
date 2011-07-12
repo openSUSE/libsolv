@@ -247,7 +247,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
-      pd->tmplang = sat_free((void *)pd->tmplang);
+      pd->tmplang = solv_free((void *)pd->tmplang);
       break;
     case STATE_VENDOR:
       s->vendor = pool_str2id(pd->pool, pd->content, 1);
@@ -312,7 +312,7 @@ add_zyppdb_product(struct parsedata *pd, FILE *fp)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pd->pool, SAT_ERROR, "repo_zyppdb: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  pool_debug(pd->pool, SOLV_ERROR, "repo_zyppdb: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
 	  return;
 	}
       if (l == 0)
@@ -375,7 +375,7 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
     }
   closedir(dir);
 
-  sat_free((void *)pd.tmplang);
+  solv_free((void *)pd.tmplang);
   free(pd.content);
   join_freemem();
   if (!(flags & REPO_NO_INTERNALIZE))

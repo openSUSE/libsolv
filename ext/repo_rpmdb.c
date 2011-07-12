@@ -173,7 +173,7 @@ headint32array(RpmHead *h, int tag, int *cnt)
   if (o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = sat_calloc(i ? i : 1, sizeof(unsigned int));
+  r = solv_calloc(i ? i : 1, sizeof(unsigned int));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 4)
@@ -211,7 +211,7 @@ headint16array(RpmHead *h, int tag, int *cnt)
   if (o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = sat_calloc(i ? i : 1, sizeof(unsigned int));
+  r = solv_calloc(i ? i : 1, sizeof(unsigned int));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 2)
@@ -244,7 +244,7 @@ headstringarray(RpmHead *h, int tag, int *cnt)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  r = sat_calloc(i ? i : 1, sizeof(char *));
+  r = solv_calloc(i ? i : 1, sizeof(char *));
   if (cnt)
     *cnt = i;
   d = h->dp + o;
@@ -255,7 +255,7 @@ headstringarray(RpmHead *h, int tag, int *cnt)
         d += strlen((char *)d) + 1;
       if (d >= h->dp + h->dcnt)
         {
-          sat_free(r);
+          solv_free(r);
           return 0;
         }
     }
@@ -299,12 +299,12 @@ static char *headtoevr(RpmHead *h)
     {
       char epochbuf[11];        /* 32bit decimal will fit in */
       sprintf(epochbuf, "%u", epoch);
-      evr = sat_malloc(strlen(epochbuf) + 1 + strlen(version) + 1 + strlen(release) + 1);
+      evr = solv_malloc(strlen(epochbuf) + 1 + strlen(version) + 1 + strlen(release) + 1);
       sprintf(evr, "%s:%s-%s", epochbuf, version, release);
     }
   else
     {
-      evr = sat_malloc(strlen(version) + 1 + strlen(release) + 1);
+      evr = solv_malloc(strlen(version) + 1 + strlen(release) + 1);
       sprintf(evr, "%s-%s", version, release);
     }
   return evr;
@@ -364,7 +364,7 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
   if (c)
     {
       /* not utf8, assume latin1 */
-      buf = sat_malloc(2 * strlen(str) + 1);
+      buf = solv_malloc(2 * strlen(str) + 1);
       cp = (const unsigned char *)str;
       str = (char *)buf;
       bp = buf;
@@ -383,7 +383,7 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
     }
   repodata_set_str(repodata, handle, tag, str);
   if (buf)
-    sat_free(buf);
+    solv_free(buf);
 }
 
 
@@ -414,13 +414,13 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   v = headstringarray(rpmhead, tagv, &vc);
   if (!v)
     {
-      sat_free(n);
+      solv_free(n);
       return 0;
     }
   f = headint32array(rpmhead, tagf, &fc);
   if (!f)
     {
-      sat_free(n);
+      solv_free(n);
       free(v);
       return 0;
     }
@@ -460,9 +460,9 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
     }
   if (cc == 0)
     {
-      sat_free(n);
-      sat_free(v);
-      sat_free(f);
+      solv_free(n);
+      solv_free(v);
+      solv_free(f);
       return 0;
     }
   cc += haspre;
@@ -509,9 +509,9 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
     }
   *ida++ = 0;
   repo->idarraysize += cc + 1;
-  sat_free(n);
-  sat_free(v);
-  sat_free(f);
+  solv_free(n);
+  solv_free(v);
+  solv_free(f);
   return olddeps;
 }
 
@@ -555,23 +555,23 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
   fsz = headint32array(rpmhead, TAG_FILESIZES, &fszc);
   if (!fsz || fc != fszc)
     {
-      sat_free(fsz);
+      solv_free(fsz);
       return;
     }
   /* stupid rpm records sizes of directories, so we have to check the mode */
   fm = headint16array(rpmhead, TAG_FILEMODES, &fszc);
   if (!fm || fc != fszc)
     {
-      sat_free(fsz);
-      sat_free(fm);
+      solv_free(fsz);
+      solv_free(fm);
       return;
     }
   fino = headint32array(rpmhead, TAG_FILEINODES, &fszc);
   if (!fino || fc != fszc)
     {
-      sat_free(fsz);
-      sat_free(fm);
-      sat_free(fino);
+      solv_free(fsz);
+      solv_free(fm);
+      solv_free(fino);
       return;
     }
   inotestok = 0;
@@ -599,10 +599,10 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
       unsigned int mask, hash, hh;
       if (!fdev || fc != fszc)
 	{
-	  sat_free(fsz);
-	  sat_free(fm);
-	  sat_free(fdev);
-	  sat_free(fino);
+	  solv_free(fsz);
+	  solv_free(fm);
+	  solv_free(fdev);
+	  solv_free(fino);
 	  return;
 	}
       mask = fc;
@@ -610,7 +610,7 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
 	mask = mask & (mask - 1);
       mask <<= 2;
       if (mask > sizeof(inotest)/sizeof(*inotest))
-        fx = sat_calloc(mask, sizeof(unsigned int));
+        fx = solv_calloc(mask, sizeof(unsigned int));
       else
 	{
 	  fx = inotest;
@@ -636,12 +636,12 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
 	    fx[hash] = i + 1;
 	}
       if (fx != inotest)
-        sat_free(fx);
-      sat_free(fdev);
+        solv_free(fx);
+      solv_free(fdev);
     }
-  sat_free(fino);
-  fn = sat_calloc(dc, sizeof(unsigned int));
-  fkb = sat_calloc(dc, sizeof(unsigned int));
+  solv_free(fino);
+  fn = solv_calloc(dc, sizeof(unsigned int));
+  fkb = solv_calloc(dc, sizeof(unsigned int));
   for (i = 0; i < fc; i++)
     {
       if (di[i] >= dc)
@@ -651,8 +651,8 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
 	continue;
       fkb[di[i]] += fsz[i] / 1024 + 1;
     }
-  sat_free(fsz);
-  sat_free(fm);
+  solv_free(fsz);
+  solv_free(fm);
   /* commit */
   handle = s - pool->solvables;
   for (i = 0; i < dc; i++)
@@ -670,8 +670,8 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
         did = repodata_str2dir(data, dn[i], 1);
       repodata_add_dirnumnum(data, handle, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
     }
-  sat_free(fn);
-  sat_free(fkb);
+  solv_free(fn);
+  solv_free(fkb);
 }
 
 /* assumes last processed array is provides! */
@@ -700,14 +700,14 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
   dn = headstringarray(rpmhead, TAG_DIRNAMES, &dnc);
   if (!dn)
     {
-      sat_free(bn);
+      solv_free(bn);
       return olddeps;
     }
   di = headint32array(rpmhead, TAG_DIRINDEXES, &dic);
   if (!di)
     {
-      sat_free(bn);
-      sat_free(dn);
+      solv_free(bn);
+      solv_free(dn);
       return olddeps;
     }
   if (bnc != dic)
@@ -759,7 +759,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
       if (j > fna)
 	{
 	  fna = j + 256;
-	  fn = sat_realloc(fn, fna);
+	  fn = solv_realloc(fn, fna);
 	}
       strcpy(fn, dn[di[i]]);
       strcat(fn, bn[i]);
@@ -783,11 +783,11 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
     }
 #if 0
   if (fn)
-    sat_free(fn);
+    solv_free(fn);
 #endif
-  sat_free(bn);
-  sat_free(dn);
-  sat_free(di);
+  solv_free(bn);
+  solv_free(dn);
+  solv_free(di);
   return olddeps;
 }
 
@@ -980,7 +980,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
 	    }
 	}
     }
-  sat_free(evr);
+  solv_free(evr);
   return 1;
 }
 
@@ -1392,7 +1392,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   int count = 0, done = 0;
   unsigned int now;
 
-  now = sat_timems(0);
+  now = solv_timems(0);
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
 
@@ -1477,7 +1477,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  if (dbdata.size > rpmheadsize)
 	    {
 	      rpmheadsize = dbdata.size + 128;
-	      rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
 	    }
 	  memcpy(buf, dbdata.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
@@ -1507,7 +1507,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	      if (done < count)
 	        done++;
 	      if (done < count && (done - 1) * 100 / count != done * 100 / count)
-	        pool_debug(pool, SAT_ERROR, "%%%% %d\n", done * 100 / count);
+	        pool_debug(pool, SOLV_ERROR, "%%%% %d\n", done * 100 / count);
 	    }
 	}
       if (s)
@@ -1523,10 +1523,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       /* now sort all solvables in the new solvstart..solvend block */
       if (solvend - solvstart > 1)
 	{
-	  pkgids = sat_malloc2(solvend - solvstart, sizeof(Id));
+	  pkgids = solv_malloc2(solvend - solvstart, sizeof(Id));
 	  for (i = solvstart; i < solvend; i++)
 	    pkgids[i - solvstart] = i;
-	  sat_sort(pkgids, solvend - solvstart, sizeof(Id), pkgids_sort_cmp, repo);
+	  solv_sort(pkgids, solvend - solvstart, sizeof(Id), pkgids_sort_cmp, repo);
 	  /* adapt order */
 	  for (i = solvstart; i < solvend; i++)
 	    {
@@ -1536,7 +1536,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	      if (j != i)
 	        swap_solvables(repo, data, i, j);
 	    }
-	  sat_free(pkgids);
+	  solv_free(pkgids);
 	}
     }
   else
@@ -1574,9 +1574,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  dp = dbdata.data;
 	  while(dl >= RPM_INDEX_SIZE)
 	    {
-	      rpmids = sat_extend(rpmids, nrpmids, 1, sizeof(*rpmids), 255);
+	      rpmids = solv_extend(rpmids, nrpmids, 1, sizeof(*rpmids), 255);
 	      rpmids[nrpmids].dbid = db2rpmdbid(dp, byteswapped);
-	      rpmids[nrpmids].name = sat_malloc((int)dbkey.size + 1);
+	      rpmids[nrpmids].name = solv_malloc((int)dbkey.size + 1);
 	      memcpy(rpmids[nrpmids].name, dbkey.data, (int)dbkey.size);
 	      rpmids[nrpmids].name[(int)dbkey.size] = 0;
 	      nrpmids++;
@@ -1589,14 +1589,14 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       db = 0;
 
       /* sort rpmids */
-      sat_sort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp, 0);
+      solv_sort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp, 0);
 
       rpmheadsize = 0;
       rpmhead = 0;
 
       /* create hash from dbid to ref */
       refmask = mkmask(ref->nsolvables);
-      refhash = sat_calloc(refmask + 1, sizeof(Id));
+      refhash = solv_calloc(refmask + 1, sizeof(Id));
       for (i = 0; i < ref->end - ref->start; i++)
 	{
 	  if (!ref->rpmdbid[i])
@@ -1694,7 +1694,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  if (dbdata.size > rpmheadsize)
 	    {
 	      rpmheadsize = dbdata.size + 128;
-	      rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
 	    }
 	  memcpy(buf, dbdata.data, 8);
 	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
@@ -1713,31 +1713,31 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	      if (done < count)
 		done++;
 	      if (done < count && (done - 1) * 100 / count != done * 100 / count)
-		pool_debug(pool, SAT_ERROR, "%%%% %d\n", done * 100 / count);
+		pool_debug(pool, SOLV_ERROR, "%%%% %d\n", done * 100 / count);
 	    }
 	}
 
       if (refhash)
-	sat_free(refhash);
+	solv_free(refhash);
       if (rpmids)
 	{
 	  for (i = 0; i < nrpmids; i++)
-	    sat_free(rpmids[i].name);
-	  sat_free(rpmids);
+	    solv_free(rpmids[i].name);
+	  solv_free(rpmids);
 	}
     }
   if (db)
     db->close(db, 0);
   dbenv->close(dbenv, 0);
   if (rpmhead)
-    sat_free(rpmhead);
+    solv_free(rpmhead);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   if ((flags & RPMDB_REPORT_PROGRESS) != 0)
-    pool_debug(pool, SAT_ERROR, "%%%% 100\n");
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_rpmdb took %d ms\n", sat_timems(now));
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+    pool_debug(pool, SOLV_ERROR, "%%%% 100\n");
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_rpmdb took %d ms\n", solv_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
   return 0;
 }
 
@@ -1787,9 +1787,9 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  continue;
 	}
       if (chksumh)
-	chksumh = sat_chksum_free(chksumh, 0);
+	chksumh = solv_chksum_free(chksumh, 0);
       if (chksumtype)
-	chksumh = sat_chksum_create(chksumtype);
+	chksumh = solv_chksum_create(chksumtype);
       if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
 	{
 	  fprintf(stderr, "%s: not a rpm\n", rpms[i]);
@@ -1797,7 +1797,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  continue;
 	}
       if (chksumh)
-	sat_chksum_add(chksumh, lead, 96 + 16);
+	solv_chksum_add(chksumh, lead, 96 + 16);
       if (lead[78] != 0 || lead[79] != 5)
 	{
 	  fprintf(stderr, "%s: not a V5 header\n", rpms[i]);
@@ -1830,7 +1830,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  if (sigdsize > rpmheadsize)
 	    {
 	      rpmheadsize = sigdsize + 128;
-	      rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
 	    }
 	  if (fread(rpmhead->data, sigdsize, 1, fp) != 1)
 	    {
@@ -1839,7 +1839,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	      continue;
 	    }
 	  if (chksumh)
-	    sat_chksum_add(chksumh, rpmhead->data, sigdsize);
+	    solv_chksum_add(chksumh, rpmhead->data, sigdsize);
 	  rpmhead->cnt = sigcnt;
 	  rpmhead->dcnt = sigdsize - sigcnt * 16;
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -1863,7 +1863,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 		  continue;
 		}
 	      if (chksumh)
-		sat_chksum_add(chksumh, lead, l);
+		solv_chksum_add(chksumh, lead, l);
 	      sigdsize -= l;
 	    }
 	}
@@ -1874,7 +1874,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  continue;
 	}
       if (chksumh)
-	sat_chksum_add(chksumh, lead, 16);
+	solv_chksum_add(chksumh, lead, 16);
       if (getu32(lead) != 0x8eade801)
 	{
 	  fprintf(stderr, "%s: bad header\n", rpms[i]);
@@ -1894,7 +1894,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
       if (l > rpmheadsize)
 	{
 	  rpmheadsize = l + 128;
-	  rpmhead = sat_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	  rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
 	}
       if (fread(rpmhead->data, l, 1, fp) != 1)
 	{
@@ -1903,7 +1903,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  continue;
 	}
       if (chksumh)
-	sat_chksum_add(chksumh, rpmhead->data, l);
+	solv_chksum_add(chksumh, rpmhead->data, l);
       rpmhead->cnt = sigcnt;
       rpmhead->dcnt = sigdsize;
       rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -1922,7 +1922,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	}
       if (chksumh)
 	while ((l = fread(lead, 1, sizeof(lead), fp)) > 0)
-	  sat_chksum_add(chksumh, lead, l);
+	  solv_chksum_add(chksumh, lead, l);
       fclose(fp);
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       rpm2solv(pool, repo, data, s, rpmhead, flags);
@@ -1936,13 +1936,13 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  if (gotpkgid)
 	    repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
 	  if (chksumh)
-	    repodata_set_bin_checksum(data, handle, SOLVABLE_CHECKSUM, chksumtype, sat_chksum_get(chksumh, 0));
+	    repodata_set_bin_checksum(data, handle, SOLVABLE_CHECKSUM, chksumtype, solv_chksum_get(chksumh, 0));
 	}
     }
   if (chksumh)
-    chksumh = sat_chksum_free(chksumh, 0);
+    chksumh = solv_chksum_free(chksumh, 0);
   if (rpmhead)
-    sat_free(rpmhead);
+    solv_free(rpmhead);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;
@@ -2002,30 +2002,30 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
     {
       for (i = 0; i < dcnt; i++)
 	(*cb)(cbdata, dn[i], 0, (char *)0);
-      sat_free(dn);
+      solv_free(dn);
       return;
     }
   bn = headstringarray(rpmhead, TAG_BASENAMES, &cnt);
   if (!bn)
     {
-      sat_free(dn);
+      solv_free(dn);
       return;
     }
   di = headint32array(rpmhead, TAG_DIRINDEXES, &cnt2);
   if (!di || cnt != cnt2)
     {
-      sat_free(di);
-      sat_free(bn);
-      sat_free(dn);
+      solv_free(di);
+      solv_free(bn);
+      solv_free(dn);
       return;
     }
   fm = headint16array(rpmhead, TAG_FILEMODES, &cnt2);
   if (!fm || cnt != cnt2)
     {
-      sat_free(fm);
-      sat_free(di);
-      sat_free(bn);
-      sat_free(dn);
+      solv_free(fm);
+      solv_free(di);
+      solv_free(bn);
+      solv_free(dn);
       return;
     }
   if ((flags & RPM_ITERATE_FILELIST_WITHMD5) != 0)
@@ -2033,11 +2033,11 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
       md = headstringarray(rpmhead, TAG_FILEMD5S, &cnt2);
       if (!md || cnt != cnt2)
 	{
-	  sat_free(md);
-	  sat_free(fm);
-	  sat_free(di);
-	  sat_free(bn);
-	  sat_free(dn);
+	  solv_free(md);
+	  solv_free(fm);
+	  solv_free(di);
+	  solv_free(bn);
+	  solv_free(dn);
 	  return;
 	}
     }
@@ -2046,12 +2046,12 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
       co = headint32array(rpmhead, TAG_FILECOLORS, &cnt2);
       if (!co || cnt != cnt2)
 	{
-	  sat_free(co);
-	  sat_free(md);
-	  sat_free(fm);
-	  sat_free(di);
-	  sat_free(bn);
-	  sat_free(dn);
+	  solv_free(co);
+	  solv_free(md);
+	  solv_free(fm);
+	  solv_free(di);
+	  solv_free(bn);
+	  solv_free(dn);
 	  return;
 	}
     }
@@ -2060,13 +2060,13 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
       ff = headint32array(rpmhead, TAG_FILEFLAGS, &cnt2);
       if (!ff || cnt != cnt2)
 	{
-	  sat_free(ff);
-	  sat_free(co);
-	  sat_free(md);
-	  sat_free(fm);
-	  sat_free(di);
-	  sat_free(bn);
-	  sat_free(dn);
+	  solv_free(ff);
+	  solv_free(co);
+	  solv_free(md);
+	  solv_free(fm);
+	  solv_free(di);
+	  solv_free(bn);
+	  solv_free(dn);
 	  return;
 	}
     }
@@ -2086,7 +2086,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
       if (l > spacen)
 	{
 	  spacen = l + 16;
-	  space = sat_realloc(space, spacen);
+	  space = solv_realloc(space, spacen);
 	}
       if (lastdir != diidx)
 	{
@@ -2105,7 +2105,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 		{
 		  lt = headstringarray(rpmhead, TAG_FILELINKTOS, &cnt2);
 		  if (cnt != cnt2)
-		    lt = sat_free(lt);
+		    lt = solv_free(lt);
 		}
 	      if (lt)
 		{
@@ -2121,15 +2121,15 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	}
       (*cb)(cbdata, space, co ? (fm[i] | co[i] << 24) : fm[i], md5p);
     }
-  sat_free(space);
-  sat_free(lt);
-  sat_free(md);
-  sat_free(fm);
-  sat_free(di);
-  sat_free(bn);
-  sat_free(dn);
-  sat_free(co);
-  sat_free(ff);
+  solv_free(space);
+  solv_free(lt);
+  solv_free(md);
+  solv_free(fm);
+  solv_free(di);
+  solv_free(bn);
+  solv_free(dn);
+  solv_free(co);
+  solv_free(ff);
 }
 
 char *
@@ -2161,7 +2161,7 @@ rpm_query(void *rpmhandle, Id what)
 	arch = "noarch";
       evr = headtoevr(rpmhead);
       l = strlen(name) + 1 + strlen(evr) + 1 + strlen(arch) + 1;
-      r = sat_malloc(l);
+      r = solv_malloc(l);
       sprintf(r, "%s-%s.%s", name, evr, arch);
       free(evr);
       break;
@@ -2254,11 +2254,11 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
       dp = dbdata.data;
       while(dl >= RPM_INDEX_SIZE)
 	{
-	  entries = sat_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
+	  entries = solv_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
 	  entries[nentries].rpmdbid = db2rpmdbid(dp, byteswapped);
 	  entries[nentries].nameoff = namedatal;
 	  nentries++;
-	  namedata = sat_extend(namedata, namedatal, dbkey.size + 1, 1, NAMEDATA_BLOCK);
+	  namedata = solv_extend(namedata, namedatal, dbkey.size + 1, 1, NAMEDATA_BLOCK);
 	  memcpy(namedata + namedatal, dbkey.data, dbkey.size);
 	  namedata[namedatal + dbkey.size] = 0;
 	  namedatal += dbkey.size + 1;
@@ -2285,7 +2285,7 @@ freestate(struct rpm_by_state *state)
     state->db->close(state->db, 0);
   if (state->dbenv)
     state->dbenv->close(state->dbenv, 0);
-  sat_free(state->rpmhead);
+  solv_free(state->rpmhead);
 }
 
 int
@@ -2307,8 +2307,8 @@ rpm_installedrpmdbids(const char *rootdir, const char *index, const char *match,
   if (rpmdbidq)
     for (i = 0; i < nentries; i++)
       queue_push(rpmdbidq, entries[i].rpmdbid);
-  sat_free(entries);
-  sat_free(namedata);
+  solv_free(entries);
+  solv_free(namedata);
   freestate(&state);
   return nentries;
 }
@@ -2326,14 +2326,14 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
     {
       /* close down */
       freestate(state);
-      sat_free(state);
+      solv_free(state);
       *statep = (void *)0;
       return 0;
     }
 
   if (!state)
     {
-      state = sat_calloc(1, sizeof(*state));
+      state = solv_calloc(1, sizeof(*state));
       *statep = state;
     }
   if (!state->dbopened)
@@ -2388,7 +2388,7 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
   if (dbdata.size > state->rpmheadsize)
     {
       state->rpmheadsize = dbdata.size + 128;
-      state->rpmhead = sat_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
     }
   rpmhead = state->rpmhead;
   memcpy(buf, dbdata.data, 8);
@@ -2417,7 +2417,7 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
     return rpm_byrpmdbid(0, 0, statep);
   if (!state)
     {
-      state = sat_calloc(1, sizeof(*state));
+      state = solv_calloc(1, sizeof(*state));
       *statep = state;
     }
   if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
@@ -2479,7 +2479,7 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
   if (l > state->rpmheadsize)
     {
       state->rpmheadsize = l + 128;
-      state->rpmhead = sat_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
     }
   rpmhead = state->rpmhead;
   if (fread(rpmhead->data, l, 1, fp) != 1)
@@ -2514,13 +2514,13 @@ rpm_byrpmh(Header h, void **statep)
   l = sigdsize + sigcnt * 16;
   if (!state)
     {
-      state = sat_calloc(1, sizeof(*state));
+      state = solv_calloc(1, sizeof(*state));
       *statep = state;
     }
   if (l > state->rpmheadsize)
     {
       state->rpmheadsize = l + 128;
-      state->rpmhead = sat_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
     }
   rpmhead = state->rpmhead;
   memcpy(rpmhead->data, uh + 8, l - 8);
@@ -2624,14 +2624,14 @@ unarmor(char *pubkey, int *pktlp)
   if (!p)
     return 0;
   l = p - pubkey;
-  bp = buf = sat_malloc(l * 3 / 4 + 4);
+  bp = buf = solv_malloc(l * 3 / 4 + 4);
   eof = 0;
   while (!eof)
     {
       pubkey = r64dec1(pubkey, &v, &eof);
       if (!pubkey)
 	{
-	  sat_free(buf);
+	  solv_free(buf);
 	  return 0;
 	}
       *bp++ = v >> 16;
@@ -2643,19 +2643,19 @@ unarmor(char *pubkey, int *pktlp)
   bp -= eof;
   if (*pubkey != '=' || (pubkey = r64dec1(pubkey + 1, &v, &eof)) == 0)
     {
-      sat_free(buf);
+      solv_free(buf);
       return 0;
     }
   if (v != crc24(buf, bp - buf))
     {
-      sat_free(buf);
+      solv_free(buf);
       return 0;
     }
   while (*pubkey == ' ' || *pubkey == '\t' || *pubkey == '\n' || *pubkey == '\r')
     pubkey++;
   if (strncmp(pubkey, "-----END PGP PUBLIC KEY BLOCK-----", 34) != 0)
     {
-      sat_free(buf);
+      solv_free(buf);
       return 0;
     }
   *pktlp = bp - buf;
@@ -2728,7 +2728,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	return;
       if (tag == 6)
 	{
-	  pubkey = sat_realloc(pubkey, l);
+	  pubkey = solv_realloc(pubkey, l);
 	  if (l)
 	    memcpy(pubkey, p, l);
 #if 0
@@ -2757,12 +2757,12 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 
 		  ql = ((p[8] << 8 | p[9]) + 7) / 8;
 		  memcpy(keyid, p + 10 + ql - 8, 8);
-		  h = sat_chksum_create(REPOKEY_TYPE_MD5);
-		  sat_chksum_add(h, p + 10, ql);
+		  h = solv_chksum_create(REPOKEY_TYPE_MD5);
+		  solv_chksum_add(h, p + 10, ql);
 		  q = p + 10 + ql;
 		  ql = ((q[0] << 8 | q[1]) + 7) / 8;
-		  sat_chksum_add(h, q + 2, ql);
-		  sat_chksum_free(h, fp);
+		  solv_chksum_add(h, q + 2, ql);
+		  solv_chksum_free(h, fp);
 		  for (i = 0; i < 16; i++)
 		    sprintf(fpx + i * 2, "%02x", fp[i]);
 		  setutf8string(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
@@ -2780,10 +2780,10 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      hdr[0] = 0x99;
 	      hdr[1] = l >> 8;
 	      hdr[2] = l;
-	      h = sat_chksum_create(REPOKEY_TYPE_SHA1);
-	      sat_chksum_add(h, hdr, 3);
-	      sat_chksum_add(h, p, l);
-	      sat_chksum_free(h, fp);
+	      h = solv_chksum_create(REPOKEY_TYPE_SHA1);
+	      solv_chksum_add(h, hdr, 3);
+	      solv_chksum_add(h, p, l);
+	      solv_chksum_free(h, fp);
 	      for (i = 0; i < 20; i++)
 		sprintf(fpx + i * 2, "%02x", fp[i]);
 	      setutf8string(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
@@ -2819,19 +2819,19 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 		htype = REPOKEY_TYPE_SHA256;
 	      if (htype)
 		{
-		  void *h = sat_chksum_create(htype);
+		  void *h = solv_chksum_create(htype);
 		  unsigned char b[3], *cs;
 
 		  b[0] = 0x99;
 		  b[1] = pubkeyl >> 8;
 		  b[2] = pubkeyl;
-		  sat_chksum_add(h, b, 3);
-		  sat_chksum_add(h, pubkey, pubkeyl);
+		  solv_chksum_add(h, b, 3);
+		  solv_chksum_add(h, pubkey, pubkeyl);
 		  if (p[2] >= 0x10 && p[2] <= 0x13)
-		    sat_chksum_add(h, userid, useridl);
-		  sat_chksum_add(h, p + 2, 5);
-		  cs = sat_chksum_get(h, 0);
-		  sat_chksum_free(h, 0);
+		    solv_chksum_add(h, userid, useridl);
+		  solv_chksum_add(h, p + 2, 5);
+		  cs = solv_chksum_get(h, 0);
+		  solv_chksum_free(h, 0);
 		}
 #endif
 	    }
@@ -2931,15 +2931,15 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 		    htype = REPOKEY_TYPE_SHA256;
 		  if (htype && pubkeyl)
 		    {
-		      void *h = sat_chksum_create(htype);
+		      void *h = solv_chksum_create(htype);
 		      unsigned char b[6], *cs;
 		      unsigned int hl;
 
 		      b[0] = 0x99;
 		      b[1] = pubkeyl >> 8;
 		      b[2] = pubkeyl;
-		      sat_chksum_add(h, b, 3);
-		      sat_chksum_add(h, pubkey, pubkeyl);
+		      solv_chksum_add(h, b, 3);
+		      solv_chksum_add(h, pubkey, pubkeyl);
 		      if (p[1] >= 0x10 && p[1] <= 0x13)
 			{
 			  b[0] = 0xb4;
@@ -2947,20 +2947,20 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 			  b[2] = useridl >> 16;
 			  b[3] = useridl >> 8;
 			  b[4] = useridl;
-			  sat_chksum_add(h, b, 5);
-			  sat_chksum_add(h, userid, useridl);
+			  solv_chksum_add(h, b, 5);
+			  solv_chksum_add(h, userid, useridl);
 			}
 		      hl = 6 + (p[4] << 8 | p[5]);
-		      sat_chksum_add(h, p, hl);
+		      solv_chksum_add(h, p, hl);
 		      b[0] = 4;
 		      b[1] = 0xff;
 		      b[2] = hl >> 24;
 		      b[3] = hl >> 16;
 		      b[4] = hl >> 8;
 		      b[5] = hl;
-		      sat_chksum_add(h, b, 6);
-		      cs = sat_chksum_get(h, 0);
-		      sat_chksum_free(h, 0);
+		      solv_chksum_add(h, b, 6);
+		      cs = solv_chksum_get(h, 0);
+		      solv_chksum_free(h, 0);
 		    }
 #endif
 		  if (!memcmp(keyid, issuer, 8))
@@ -2978,7 +2978,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	}
       if (tag == 13)
 	{
-	  userid = sat_realloc(userid, l);
+	  userid = solv_realloc(userid, l);
 	  if (l)
 	    memcpy(userid, p, l);
 #if 0
@@ -2988,8 +2988,8 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
     }
   if (maxex)
     repodata_set_num(data, s - s->repo->pool->solvables, PUBKEY_EXPIRES, maxex);
-  sat_free(pubkey);
-  sat_free(userid);
+  solv_free(pubkey);
+  solv_free(userid);
 }
 
 /* this is private to rpm, but rpm lacks an interface to retrieve
@@ -3052,7 +3052,7 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   if (dig->pubkey.userid)
     setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, dig->pubkey.userid);
   (void)pgpFreeDig(dig);
-  sat_free((void *)pkts);
+  solv_free((void *)pkts);
   return 1;
 }
 
@@ -3092,8 +3092,8 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
 	repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
       repo->rpmdbid[s - pool->solvables - repo->start] = entries[i].rpmdbid;
     }
-  sat_free(entries);
-  sat_free(namedata);
+  solv_free(entries);
+  solv_free(namedata);
   freestate(&state);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
@@ -3125,7 +3125,7 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
 	  if (bufl - l < 4096)
 	    {
 	      bufl += 4096;
-	      buf = sat_realloc(buf, bufl);
+	      buf = solv_realloc(buf, bufl);
 	    }
 	  ll = fread(buf, 1, bufl - l, fp);
 	  if (ll <= 0)
@@ -3137,7 +3137,7 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       pubkey2solvable(s, data, buf);
     }
-  sat_free(buf);
+  solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;

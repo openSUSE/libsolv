@@ -35,7 +35,7 @@ queue_init_clone(Queue *t, Queue *s)
       t->count = t->left = 0;
       return;
     }
-  t->alloc = t->elements = sat_malloc2(s->count + EXTRA_SPACE, sizeof(Id));
+  t->alloc = t->elements = solv_malloc2(s->count + EXTRA_SPACE, sizeof(Id));
   if (s->count)
     memcpy(t->alloc, s->elements, s->count * sizeof(Id));
   t->count = s->count;
@@ -55,7 +55,7 @@ void
 queue_free(Queue *q)
 {
   if (q->alloc)
-    sat_free(q->alloc);
+    solv_free(q->alloc);
   q->alloc = q->elements = 0;
   q->count = q->left = 0;
 }
@@ -65,7 +65,7 @@ queue_alloc_one(Queue *q)
 {
   if (!q->alloc)
     {
-      q->alloc = sat_malloc2(q->count + EXTRA_SPACE, sizeof(Id));
+      q->alloc = solv_malloc2(q->count + EXTRA_SPACE, sizeof(Id));
       if (q->count)
 	memcpy(q->alloc, q->elements, q->count * sizeof(Id));
       q->elements = q->alloc;
@@ -81,7 +81,7 @@ queue_alloc_one(Queue *q)
     }
   else
     {
-      q->elements = q->alloc = sat_realloc2(q->alloc, q->count + EXTRA_SPACE, sizeof(Id));
+      q->elements = q->alloc = solv_realloc2(q->alloc, q->count + EXTRA_SPACE, sizeof(Id));
       q->left = EXTRA_SPACE;
     }
 }
@@ -165,7 +165,7 @@ queue_insertn(Queue *q, int pos, int n)
       if (!q->alloc)
 	queue_alloc_one(q);
       off = q->elements - q->alloc;
-      q->alloc = sat_realloc2(q->alloc, off + q->count + n + EXTRA_SPACE, sizeof(Id));
+      q->alloc = solv_realloc2(q->alloc, off + q->count + n + EXTRA_SPACE, sizeof(Id));
       q->elements = q->alloc + off;
       q->left = n + EXTRA_SPACE;
     }

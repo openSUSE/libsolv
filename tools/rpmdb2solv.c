@@ -152,7 +152,7 @@ main(int argc, char **argv)
 	  int rootlen = strlen(root);
 	  if (strncmp(root, proddir, rootlen))
 	    {
-	      buf = (char *)sat_malloc(rootlen + strlen(proddir) + 2); /* + '/' + \0 */
+	      buf = (char *)solv_malloc(rootlen + strlen(proddir) + 2); /* + '/' + \0 */
 	      strcpy(buf, root);
 	      if (root[rootlen - 1] != '/' && *proddir != '/')
 		buf[rootlen++] = '/';
@@ -161,7 +161,7 @@ main(int argc, char **argv)
 	}
       repo_add_products(repo, buf, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
       if (buf != proddir)
-	sat_free(buf);
+	solv_free(buf);
     }
       
   repodata_internalize(data);

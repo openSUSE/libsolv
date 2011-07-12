@@ -350,7 +350,7 @@ typedef VALUE AppObjectPtr;
 #include "repo_deltainfoxml.h"
 #include "repo_repomdxml.h"
 #include "repo_content.h"
-#include "sat_xfopen.h"
+#include "solv_xfopen.h"
 
 #define true 1
 #define false 1
@@ -562,28 +562,28 @@ typedef struct {
 typedef struct chksum {
 } Chksum;
 
-%rename(xfopen) sat_xfopen;
-%rename(xfopen_fd) sat_xfopen_fd;
-%rename(xfopen_dup) sat_xfopen_dup;
-%rename(xfclose) sat_xfclose;
-%rename(xfileno) sat_xfileno;
+%rename(xfopen) solv_xfopen;
+%rename(xfopen_fd) solv_xfopen_fd;
+%rename(xfopen_dup) solv_xfopen_dup;
+%rename(xfclose) solv_xfclose;
+%rename(xfileno) solv_xfileno;
 
-FILE *sat_xfopen(const char *fn, const char *mode = 0);
-FILE *sat_xfopen_fd(const char *fn, int fd, const char *mode = 0);
-FILE *sat_xfopen_dup(const char *fn, int fd, const char *mode = 0);
-int sat_xfclose(FILE *fp);
-int sat_xfileno(FILE *fp);
+FILE *solv_xfopen(const char *fn, const char *mode = 0);
+FILE *solv_xfopen_fd(const char *fn, int fd, const char *mode = 0);
+FILE *solv_xfopen_dup(const char *fn, int fd, const char *mode = 0);
+int solv_xfclose(FILE *fp);
+int solv_xfileno(FILE *fp);
 
 %{
-  SWIGINTERN int sat_xfclose(FILE *fp) {
+  SWIGINTERN int solv_xfclose(FILE *fp) {
     return fclose(fp);
   }
-  SWIGINTERN int sat_xfileno(FILE *fp) {
+  SWIGINTERN int solv_xfileno(FILE *fp) {
     return fileno(fp);
   }
-  SWIGINTERN FILE *sat_xfopen_dup(const char *fn, int fd, const char *mode) {
+  SWIGINTERN FILE *solv_xfopen_dup(const char *fn, int fd, const char *mode) {
     fd = dup(fd);
-    return fd == -1 ? 0 : sat_xfopen_fd(fn, fd, mode);
+    return fd == -1 ? 0 : solv_xfopen_fd(fn, fd, mode);
   }
 %}
 
@@ -653,7 +653,7 @@ typedef struct {
   static const Id SOLVER_SETMASK = SOLVER_SETMASK;
 
   Job(Pool *pool, int how, Id what) {
-    Job *job = sat_calloc(1, sizeof(*job));
+    Job *job = solv_calloc(1, sizeof(*job));
     job->pool = pool;
     job->how = how;
     job->what = what;
@@ -694,56 +694,56 @@ typedef struct {
 
 %extend Chksum {
   Chksum(Id type) {
-    return (Chksum *)sat_chksum_create(type);
+    return (Chksum *)solv_chksum_create(type);
   }
   Chksum(Id type, const char *hex) {
     unsigned char buf[64];
-    int l = sat_chksum_len(type);
+    int l = solv_chksum_len(type);
     if (!l)
       return 0;
-    if (sat_hex2bin(&hex, buf, sizeof(buf)) != l || hex[0])
+    if (solv_hex2bin(&hex, buf, sizeof(buf)) != l || hex[0])
       return 0;
-    return (Chksum *)sat_chksum_create_from_bin(type, buf);
+    return (Chksum *)solv_chksum_create_from_bin(type, buf);
   }
   ~Chksum() {
-    sat_chksum_free($self, 0);
+    solv_chksum_free($self, 0);
   }
   Id const type;
   %{
   SWIGINTERN Id Chksum_type_get(Chksum *chksum) {
-    return sat_chksum_get_type(chksum);
+    return solv_chksum_get_type(chksum);
   }
   %}
   void add(const char *str) {
-    sat_chksum_add($self, str, strlen((char *)str));
+    solv_chksum_add($self, str, strlen((char *)str));
   }
   void add_fp(FILE *fp) {
     char buf[4096];
     int l;
     while ((l = fread(buf, 1, sizeof(buf), fp)) > 0)
-      sat_chksum_add($self, buf, l);
+      solv_chksum_add($self, buf, l);
     rewind(fp);         /* convenience */
   }
   void add_fd(int fd) {
     char buf[4096];
     int l;
     while ((l = read(fd, buf, sizeof(buf))) > 0)
-      sat_chksum_add($self, buf, l);
+      solv_chksum_add($self, buf, l);
     lseek(fd, 0, 0);    /* convenience */
   }
   void add_stat(const char *filename) {
     struct stat stb;
     if (stat(filename, &stb))
       memset(&stb, 0, sizeof(stb));
-    sat_chksum_add($self, &stb.st_dev, sizeof(stb.st_dev));
-    sat_chksum_add($self, &stb.st_ino, sizeof(stb.st_ino));
-    sat_chksum_add($self, &stb.st_size, sizeof(stb.st_size));
-    sat_chksum_add($self, &stb.st_mtime, sizeof(stb.st_mtime));
+    solv_chksum_add($self, &stb.st_dev, sizeof(stb.st_dev));
+    solv_chksum_add($self, &stb.st_ino, sizeof(stb.st_ino));
+    solv_chksum_add($self, &stb.st_size, sizeof(stb.st_size));
+    solv_chksum_add($self, &stb.st_mtime, sizeof(stb.st_mtime));
   }
   SWIGCDATA raw() {
     int l;
     const unsigned char *b;
-    b = sat_chksum_get($self, &l);
+    b = solv_chksum_get($self, &l);
     return cdata_void((void *)b, l);
   }
   %newobject hex;
@@ -752,9 +752,9 @@ typedef struct {
     const unsigned char *b;
     char *ret, *rp;
 
-    b = sat_chksum_get($self, &l);
-    ret = sat_malloc(2 * l + 1);
-    sat_bin2hex(b, l, ret);
+    b = solv_chksum_get($self, &l);
+    ret = solv_malloc(2 * l + 1);
+    solv_bin2hex(b, l, ret);
     return ret;
   }
 
@@ -763,10 +763,10 @@ typedef struct {
     const unsigned char *b, *bo;
     if (!chk)
       return 0;
-    if (sat_chksum_get_type($self) != sat_chksum_get_type(chk))
+    if (solv_chksum_get_type($self) != solv_chksum_get_type(chk))
       return 0;
-    b = sat_chksum_get($self, &l);
-    bo = sat_chksum_get(chk, 0);
+    b = solv_chksum_get($self, &l);
+    bo = solv_chksum_get(chk, 0);
     return memcmp(b, bo, l) == 0;
   }
   bool __ne__(Chksum *chk) {
@@ -780,17 +780,17 @@ typedef struct {
   const char *__str__() {
     const char *str;
     const char *h = 0;
-    if (sat_chksum_isfinished($self))
+    if (solv_chksum_isfinished($self))
       h = Chksum_hex($self);
-    str = sat_dupjoin(sat_chksum_type2str(sat_chksum_get_type($self)), ":", h ? h : "unfinished");
-    sat_free((void *)h);
+    str = solv_dupjoin(solv_chksum_type2str(solv_chksum_get_type($self)), ":", h ? h : "unfinished");
+    solv_free((void *)h);
     return str;
   }
   %newobject __repr__;
   const char *__repr__() {
     const char *h = Chksum___str__($self);
-    const char *str = sat_dupjoin("<Chksum ", h, ">");
-    sat_free((void *)h);
+    const char *str = solv_dupjoin("<Chksum ", h, ">");
+    solv_free((void *)h);
     return str;
   }
 }
@@ -927,7 +927,7 @@ typedef struct {
   Chksum *lookup_checksum(Id entry, Id keyname) {
     Id type = 0;
     const unsigned char *b = pool_lookup_bin_checksum($self, entry, keyname, &type);
-    return sat_chksum_create_from_bin(type, b);
+    return solv_chksum_create_from_bin(type, b);
   }
 
   %newobject Dataiterator;
@@ -1238,7 +1238,7 @@ typedef struct {
     if ($self->name)
       {
         sprintf(buf, "<Repo #%d ", $self->repoid);
-        return sat_dupjoin(buf, $self->name, ">");
+        return solv_dupjoin(buf, $self->name, ">");
       }
     sprintf(buf, "<Repo #%d>", $self->repoid);
     return strdup(buf);
@@ -1255,19 +1255,19 @@ typedef struct {
   static const int SEARCH_COMPLETE_FILELIST = SEARCH_COMPLETE_FILELIST;
 
   Dataiterator(Pool *pool, Repo *repo, Id p, Id key, const char *match, int flags) {
-    Dataiterator *di = sat_calloc(1, sizeof(*di));
+    Dataiterator *di = solv_calloc(1, sizeof(*di));
     dataiterator_init(di, pool, repo, p, key, match, flags);
     return di;
   }
   ~Dataiterator() {
     dataiterator_free($self);
-    sat_free($self);
+    solv_free($self);
   }
 #if defined(SWIGPYTHON)
   %newobject __iter__;
   Dataiterator *__iter__() {
     Dataiterator *ndi;
-    ndi = sat_calloc(1, sizeof(*ndi));
+    ndi = solv_calloc(1, sizeof(*ndi));
     dataiterator_init_clone(ndi, $self);
     return ndi;
   }
@@ -1291,7 +1291,7 @@ typedef struct {
     if (!dataiterator_step($self)) {
       return 0;
     }
-    ndi = sat_calloc(1, sizeof(*ndi));
+    ndi = solv_calloc(1, sizeof(*ndi));
     dataiterator_init_clone(ndi, $self);
     return ndi;
   }
@@ -1314,7 +1314,7 @@ typedef struct {
 %extend Datamatch {
   ~Datamatch() {
     dataiterator_free($self);
-    sat_free($self);
+    solv_free($self);
   }
   %newobject solvable;
   XSolvable * const solvable;
@@ -1361,7 +1361,7 @@ typedef struct {
 %extend Pool_solvable_iterator {
   Pool_solvable_iterator(Pool *pool) {
     Pool_solvable_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     s->pool = pool;
     return s;
   }
@@ -1369,7 +1369,7 @@ typedef struct {
   %newobject __iter__;
   Pool_solvable_iterator *__iter__() {
     Pool_solvable_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     *s = *$self;
     return s;
   }
@@ -1420,7 +1420,7 @@ typedef struct {
 %extend Pool_repo_iterator {
   Pool_repo_iterator(Pool *pool) {
     Pool_repo_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     s->pool = pool;
     return s;
   }
@@ -1428,7 +1428,7 @@ typedef struct {
   %newobject __iter__;
   Pool_repo_iterator *__iter__() {
     Pool_repo_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     *s = *$self;
     return s;
   }
@@ -1475,7 +1475,7 @@ typedef struct {
 %extend Repo_solvable_iterator {
   Repo_solvable_iterator(Repo *repo) {
     Repo_solvable_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     s->repo = repo;
     return s;
   }
@@ -1483,7 +1483,7 @@ typedef struct {
   %newobject __iter__;
   Repo_solvable_iterator *__iter__() {
     Repo_solvable_iterator *s;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     *s = *$self;
     return s;
   }
@@ -1536,7 +1536,7 @@ typedef struct {
     Dep *s;
     if (!id)
       return 0;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     s->pool = pool;
     s->id = id;
     return s;
@@ -1557,7 +1557,7 @@ typedef struct {
   const char *__repr__() {
     char buf[20];
     sprintf(buf, "<Id #%d ", $self->id);
-    return sat_dupjoin(buf, pool_dep2str($self->pool, $self->id), ">");
+    return solv_dupjoin(buf, pool_dep2str($self->pool, $self->id), ">");
   }
 }
 
@@ -1566,7 +1566,7 @@ typedef struct {
     XSolvable *s;
     if (!id || id >= pool->nsolvables)
       return 0;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     s->pool = pool;
     s->id = id;
     return s;
@@ -1590,7 +1590,7 @@ typedef struct {
   Chksum *lookup_checksum(Id keyname) {
     Id type = 0;
     const unsigned char *b = pool_lookup_bin_checksum($self->pool, $self->id, keyname, &type);
-    return sat_chksum_create_from_bin(type, b);
+    return solv_chksum_create_from_bin(type, b);
   }
   const char *lookup_location(int *OUTPUT) {
     return solvable_get_location($self->pool->solvables + $self->id, OUTPUT);
@@ -1681,14 +1681,14 @@ typedef struct {
   const char *__repr__() {
     char buf[20];
     sprintf(buf, "<Solvable #%d ", $self->id);
-    return sat_dupjoin(buf, pool_solvid2str($self->pool, $self->id), ">");
+    return solv_dupjoin(buf, pool_solvid2str($self->pool, $self->id), ">");
   }
 }
 
 %extend Problem {
   Problem(Solver *solv, Id id) {
     Problem *p;
-    p = sat_calloc(1, sizeof(*p));
+    p = solv_calloc(1, sizeof(*p));
     p->solv = solv;
     p->id = id;
     return p;
@@ -1740,7 +1740,7 @@ typedef struct {
 %extend Solution {
   Solution(Problem *p, Id id) {
     Solution *s;
-    s = sat_calloc(1, sizeof(*s));
+    s = solv_calloc(1, sizeof(*s));
     s->solv = p->solv;
     s->problemid = p->id;
     s->id = id;
@@ -1796,7 +1796,7 @@ typedef struct {
 %extend Solutionelement {
   Solutionelement(Solver *solv, Id problemid, Id solutionid, Id id, Id type, Id p, Id rp) {
     Solutionelement *e;
-    e = sat_calloc(1, sizeof(*e));
+    e = solv_calloc(1, sizeof(*e));
     e->solv = solv;
     e->problemid = problemid;
     e->solutionid = id;
@@ -2072,7 +2072,7 @@ rb_eval_string(
 
 %extend TransactionClass {
   TransactionClass(Transaction *trans, int mode, Id type, int count, Id fromid, Id toid) {
-    TransactionClass *cl = sat_calloc(1, sizeof(*cl));
+    TransactionClass *cl = solv_calloc(1, sizeof(*cl));
     cl->transaction = trans;
     cl->mode = mode;
     cl->type = type;
@@ -2095,7 +2095,7 @@ rb_eval_string(
   XRule(Solver *solv, Id id) {
     if (!id)
       return 0;
-    XRule *xr = sat_calloc(1, sizeof(*xr));
+    XRule *xr = solv_calloc(1, sizeof(*xr));
     xr->solv = solv;
     xr->id = id;
     return xr;
@@ -2130,7 +2130,7 @@ rb_eval_string(
 
 %extend Ruleinfo {
   Ruleinfo(XRule *r, Id type, Id source, Id target, Id dep) {
-    Ruleinfo *ri = sat_calloc(1, sizeof(*ri));
+    Ruleinfo *ri = solv_calloc(1, sizeof(*ri));
     ri->solv = r->solv;
     ri->rid = r->id;
     ri->type = type;
@@ -2156,7 +2156,7 @@ rb_eval_string(
 
 %extend XRepodata {
   XRepodata(Repo *repo, Id id) {
-    XRepodata *xr = sat_calloc(1, sizeof(*xr));
+    XRepodata *xr = solv_calloc(1, sizeof(*xr));
     xr->repo = repo;
     xr->id = id;
     return xr;
@@ -2180,9 +2180,9 @@ rb_eval_string(
     repodata_add_flexarray($self->repo->repodata + $self->id, solvid, keyname, handle);
   }
   void set_checksum(Id solvid, Id keyname, Chksum *chksum) {
-    const unsigned char *buf = sat_chksum_get(chksum, 0);
+    const unsigned char *buf = solv_chksum_get(chksum, 0);
     if (buf)
-      repodata_set_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, sat_chksum_get_type(chksum), buf);
+      repodata_set_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, solv_chksum_get_type(chksum), buf);
   }
   const char *lookup_str(Id solvid, Id keyname) {
     return repodata_lookup_str($self->repo->repodata + $self->id, solvid, keyname);
@@ -2197,7 +2197,7 @@ rb_eval_string(
   Chksum *lookup_checksum(Id solvid, Id keyname) {
     Id type = 0;
     const unsigned char *b = repodata_lookup_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, &type);
-    return sat_chksum_create_from_bin(type, b);
+    return solv_chksum_create_from_bin(type, b);
   }
   void internalize() {
     repodata_internalize($self->repo->repodata + $self->id);

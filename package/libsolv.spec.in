@@ -2,7 +2,7 @@ Name:           libsolv
 Version:        @VERSION@
 Release:        1
 License:        BSD 3-Clause
-Url:            git://gitorious.org/opensuse/sat-solver.git
+Url:            git://gitorious.org/opensuse/libsolv.git
 Source:         libsolv-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++

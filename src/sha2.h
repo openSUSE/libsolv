@@ -67,20 +67,20 @@ typedef SHA512_CTX SHA384_CTX;
 
 
 /*** SHA-256/384/512 Function Prototypes ******************************/
-void sat_SHA256_Init(SHA256_CTX *);
-void sat_SHA256_Update(SHA256_CTX*, const uint8_t*, size_t);
-void sat_SHA256_Final(uint8_t[SHA256_DIGEST_LENGTH], SHA256_CTX*);
-char* sat_SHA256_End(SHA256_CTX*, char[SHA256_DIGEST_STRING_LENGTH]);
-char* sat_SHA256_Data(const uint8_t*, size_t, char[SHA256_DIGEST_STRING_LENGTH]);
+void solv_SHA256_Init(SHA256_CTX *);
+void solv_SHA256_Update(SHA256_CTX*, const uint8_t*, size_t);
+void solv_SHA256_Final(uint8_t[SHA256_DIGEST_LENGTH], SHA256_CTX*);
+char* solv_SHA256_End(SHA256_CTX*, char[SHA256_DIGEST_STRING_LENGTH]);
+char* solv_SHA256_Data(const uint8_t*, size_t, char[SHA256_DIGEST_STRING_LENGTH]);
 
-void sat_SHA384_Init(SHA384_CTX*);
-void sat_SHA384_Update(SHA384_CTX*, const uint8_t*, size_t);
-void sat_SHA384_Final(uint8_t[SHA384_DIGEST_LENGTH], SHA384_CTX*);
-char* sat_SHA384_End(SHA384_CTX*, char[SHA384_DIGEST_STRING_LENGTH]);
-char* sat_SHA384_Data(const uint8_t*, size_t, char[SHA384_DIGEST_STRING_LENGTH]);
+void solv_SHA384_Init(SHA384_CTX*);
+void solv_SHA384_Update(SHA384_CTX*, const uint8_t*, size_t);
+void solv_SHA384_Final(uint8_t[SHA384_DIGEST_LENGTH], SHA384_CTX*);
+char* solv_SHA384_End(SHA384_CTX*, char[SHA384_DIGEST_STRING_LENGTH]);
+char* solv_SHA384_Data(const uint8_t*, size_t, char[SHA384_DIGEST_STRING_LENGTH]);
 
-void sat_SHA512_Init(SHA512_CTX*);
-void sat_SHA512_Update(SHA512_CTX*, const uint8_t*, size_t);
-void sat_SHA512_Final(uint8_t[SHA512_DIGEST_LENGTH], SHA512_CTX*);
-char* sat_SHA512_End(SHA512_CTX*, char[SHA512_DIGEST_STRING_LENGTH]);
-char* sat_SHA512_Data(const uint8_t*, size_t, char[SHA512_DIGEST_STRING_LENGTH]);
+void solv_SHA512_Init(SHA512_CTX*);
+void solv_SHA512_Update(SHA512_CTX*, const uint8_t*, size_t);
+void solv_SHA512_Final(uint8_t[SHA512_DIGEST_LENGTH], SHA512_CTX*);
+char* solv_SHA512_End(SHA512_CTX*, char[SHA512_DIGEST_STRING_LENGTH]);
+char* solv_SHA512_Data(const uint8_t*, size_t, char[SHA512_DIGEST_STRING_LENGTH]);

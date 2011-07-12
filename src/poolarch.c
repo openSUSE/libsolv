@@ -90,8 +90,8 @@ pool_setarchpolicy(Pool *pool, const char *arch)
   Id *id2arch;
   Id id, lastarch;
 
-  pool->id2arch = sat_free(pool->id2arch);
-  pool->id2color = sat_free(pool->id2color);
+  pool->id2arch = solv_free(pool->id2arch);
+  pool->id2color = solv_free(pool->id2color);
   if (!arch)
     {
       pool->lastarch = 0;
@@ -103,7 +103,7 @@ pool_setarchpolicy(Pool *pool, const char *arch)
   id = ARCH_ALL;
 #endif
   lastarch = id + 255;
-  id2arch = sat_calloc(lastarch + 1, sizeof(Id));
+  id2arch = solv_calloc(lastarch + 1, sizeof(Id));
   id2arch[id] = 1;	/* the "noarch" class */
 
   d = 0;
@@ -115,7 +115,7 @@ pool_setarchpolicy(Pool *pool, const char *arch)
 	  id = pool_strn2id(pool, arch, l, 1);
 	  if (id > lastarch)
 	    {
-	      id2arch = sat_realloc2(id2arch, (id + 255 + 1), sizeof(Id));
+	      id2arch = solv_realloc2(id2arch, (id + 255 + 1), sizeof(Id));
 	      memset(id2arch + lastarch + 1, 0, (id + 255 - lastarch) * sizeof(Id));
 	      lastarch = id + 255;
 	    }
@@ -145,7 +145,7 @@ pool_arch2color_slow(Pool *pool, Id arch)
   if (arch > pool->lastarch)
     return ARCHCOLOR_ALL;
   if (!pool->id2color)
-    pool->id2color = sat_calloc(pool->lastarch + 1, 1);
+    pool->id2color = solv_calloc(pool->lastarch + 1, 1);
   s = pool_id2str(pool, arch);
   if (arch == ARCH_NOARCH || arch == ARCH_ALL)
     color = ARCHCOLOR_ALL;

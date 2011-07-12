@@ -30,8 +30,8 @@ SOLV_1.0 {
 		rpm_installedrpmdbids;
 		rpm_iterate_filelist;
 		rpm_query;
-		sat_xfopen;
-		sat_xfopen_fd;
+		solv_xfopen;
+		solv_xfopen_fd;
 	local:
 		*;
 };

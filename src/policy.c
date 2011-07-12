@@ -114,7 +114,7 @@ prune_to_highest_prio_per_name(Pool *pool, Queue *plist)
   Id name;
 
   queue_init(&pq);
-  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
+  solv_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
   queue_push(&pq, plist->elements[0]);
   name = pool->solvables[pq.elements[0]].name;
   for (i = 1, j = 0; i < plist->count; i++)
@@ -359,10 +359,10 @@ prune_to_best_version(Pool *pool, Queue *plist)
 
   if (plist->count < 2)		/* no need to prune for a single entry */
     return;
-  POOL_DEBUG(SAT_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
+  POOL_DEBUG(SOLV_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
 
   /* sort by name first, prefer installed */
-  sat_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
+  solv_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
 
   /* now find best 'per name' */
   best = 0;
@@ -370,7 +370,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
     {
       s = pool->solvables + plist->elements[i];
 
-      POOL_DEBUG(SAT_DEBUG_POLICY, "- %s[%s]\n",
+      POOL_DEBUG(SOLV_DEBUG_POLICY, "- %s[%s]\n",
 		 pool_solvable2str(pool, s),
 		 (pool->installed && s->repo == pool->installed) ? "installed" : "not installed");
 
@@ -580,7 +580,7 @@ policy_create_obsolete_index(Solver *solv)
   if (!installed || installed->start == installed->end)
     return;
   cnt = installed->end - installed->start;
-  solv->obsoletes = obsoletes = sat_calloc(cnt, sizeof(Id));
+  solv->obsoletes = obsoletes = solv_calloc(cnt, sizeof(Id));
   for (i = 1; i < pool->nsolvables; i++)
     {
       s = pool->solvables + i;
@@ -613,8 +613,8 @@ policy_create_obsolete_index(Solver *solv)
         n += obsoletes[i] + 1;
         obsoletes[i] = n;
       }
-  solv->obsoletes_data = obsoletes_data = sat_calloc(n + 1, sizeof(Id));
-  POOL_DEBUG(SAT_DEBUG_STATS, "obsoletes data: %d entries\n", n + 1);
+  solv->obsoletes_data = obsoletes_data = solv_calloc(n + 1, sizeof(Id));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "obsoletes data: %d entries\n", n + 1);
   for (i = pool->nsolvables - 1; i > 0; i--)
     {
       s = pool->solvables + i;

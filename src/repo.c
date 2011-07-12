@@ -41,8 +41,8 @@ repo_create(Pool *pool, const char *name)
   Repo *repo;
 
   pool_freewhatprovides(pool);
-  repo = (Repo *)sat_calloc(1, sizeof(*repo));
-  pool->repos = (Repo **)sat_realloc2(pool->repos, pool->nrepos + 1, sizeof(Repo *));
+  repo = (Repo *)solv_calloc(1, sizeof(*repo));
+  pool->repos = (Repo **)solv_realloc2(pool->repos, pool->nrepos + 1, sizeof(Repo *));
   pool->repos[pool->nrepos++] = repo;
   repo->repoid = pool->nrepos;
   repo->name = name ? strdup(name) : 0;
@@ -59,11 +59,11 @@ repo_freedata(Repo *repo)
   int i;
   for (i = 0; i < repo->nrepodata; i++)
     repodata_freedata(repo->repodata + i);
-  sat_free(repo->repodata);
-  sat_free(repo->idarraydata);
-  sat_free(repo->rpmdbid);
-  sat_free((char *)repo->name);
-  sat_free(repo);
+  solv_free(repo->repodata);
+  solv_free(repo->idarraydata);
+  solv_free(repo->rpmdbid);
+  solv_free((char *)repo->name);
+  solv_free(repo);
 }
 
 /* delete all solvables and repodata blocks from this repo */
@@ -92,13 +92,13 @@ repo_empty(Repo *repo, int reuseids)
   repo->nsolvables = 0;
 
   /* free all data belonging to this repo */
-  repo->idarraydata = sat_free(repo->idarraydata);
+  repo->idarraydata = solv_free(repo->idarraydata);
   repo->idarraysize = 0;
   repo->lastoff = 0;
-  repo->rpmdbid = sat_free(repo->rpmdbid);
+  repo->rpmdbid = solv_free(repo->rpmdbid);
   for (i = 0; i < repo->nrepodata; i++)
     repodata_freedata(repo->repodata + i);
-  sat_free(repo->repodata);
+  solv_free(repo->repodata);
   repo->repodata = 0;
   repo->nrepodata = 0;
 }
@@ -141,7 +141,7 @@ repo_freeallrepos(Pool *pool, int reuseids)
   pool_freewhatprovides(pool);
   for (i = 0; i < pool->nrepos; i++)
     repo_freedata(pool->repos[i]);
-  pool->repos = sat_free(pool->repos);
+  pool->repos = solv_free(pool->repos);
   pool->nrepos = 0;
   /* the first two solvables don't belong to a repo */
   pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
@@ -220,7 +220,7 @@ void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
 void *
 repo_sidedata_create(Repo *repo, size_t size)
 {
-  return sat_calloc_block(repo->end - repo->start, size, REPO_SIDEDATA_BLOCK);
+  return solv_calloc_block(repo->end - repo->start, size, REPO_SIDEDATA_BLOCK);
 }
 
 void *
@@ -230,7 +230,7 @@ repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count)
   if (p < repo->start)
     {
       int d = repo->start - p;
-      b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
+      b = solv_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
       memmove((char *)b + d * size, b, n * size);
       memset(b, 0, d * size);
       n += d;
@@ -238,7 +238,7 @@ repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count)
   if (p + count > repo->end)
     {
       int d = p + count - repo->end;
-      b = sat_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
+      b = solv_extend(b, n, d, size, REPO_SIDEDATA_BLOCK);
       memset((char *)b + n * size, 0, d * size);
     }
   return b;
@@ -263,7 +263,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
   if (!idarray)			       /* alloc idarray if not done yet */
     {
       idarraysize = 1;
-      idarray = sat_extend_resize(0, 1, sizeof(Id), IDARRAY_BLOCK);
+      idarray = solv_extend_resize(0, 1, sizeof(Id), IDARRAY_BLOCK);
       idarray[0] = 0;
       repo->lastoff = 0;
     }
@@ -271,7 +271,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
   if (!olddeps)				/* no deps yet */
     {
       olddeps = idarraysize;
-      idarray = sat_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
+      idarray = solv_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
     }
   else if (olddeps == repo->lastoff)	/* extend at end */
     idarraysize--;
@@ -281,14 +281,14 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
       olddeps = idarraysize;
       for (; idarray[i]; i++)
         {
-	  idarray = sat_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
+	  idarray = solv_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
           idarray[idarraysize++] = idarray[i];
         }
-      idarray = sat_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
+      idarray = solv_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
     }
 
   idarray[idarraysize++] = id;		/* insert Id into array */
-  idarray = sat_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
+  idarray = solv_extend(idarray, idarraysize, 1, sizeof(Id), IDARRAY_BLOCK);
   idarray[idarraysize++] = 0;		/* ensure NULL termination */
 
   repo->idarraydata = idarray;
@@ -400,7 +400,7 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
   if (!repo->idarraysize)	       /* ensure buffer space */
     {
       repo->idarraysize = 1;
-      repo->idarraydata = sat_extend_resize(0, 1 + num, sizeof(Id), IDARRAY_BLOCK);
+      repo->idarraydata = solv_extend_resize(0, 1 + num, sizeof(Id), IDARRAY_BLOCK);
       repo->idarraydata[0] = 0;
       repo->lastoff = 1;
       return 1;
@@ -420,7 +420,7 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
 	;
       count = idend - idstart - 1 + num;	       /* new size */
 
-      repo->idarraydata = sat_extend(repo->idarraydata, repo->idarraysize, count, sizeof(Id), IDARRAY_BLOCK);
+      repo->idarraydata = solv_extend(repo->idarraydata, repo->idarraysize, count, sizeof(Id), IDARRAY_BLOCK);
       /* move old deps to end */
       olddeps = repo->lastoff = repo->idarraysize;
       memcpy(repo->idarraydata + olddeps, idstart, count - num);
@@ -433,7 +433,7 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
     repo->idarraysize--;
 
   /* make room*/
-  repo->idarraydata = sat_extend(repo->idarraydata, repo->idarraysize, num, sizeof(Id), IDARRAY_BLOCK);
+  repo->idarraydata = solv_extend(repo->idarraydata, repo->idarraysize, num, sizeof(Id), IDARRAY_BLOCK);
 
   /* appending or new */
   repo->lastoff = olddeps ? olddeps : repo->idarraysize;
@@ -1093,7 +1093,7 @@ const char *
 repo_lookup_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
 {
   const unsigned char *chk = repo_lookup_bin_checksum(repo, entry, keyname, typep);
-  return chk ? pool_bin2hex(repo->pool, chk, sat_chksum_len(*typep)) : 0;
+  return chk ? pool_bin2hex(repo->pool, chk, solv_chksum_len(*typep)) : 0;
 }
 
 int

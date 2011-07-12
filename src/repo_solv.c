@@ -64,7 +64,7 @@ read_u32(Repodata *data)
       c = getc(data->fp);
       if (c == EOF)
 	{
-	  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+	  pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
 	  data->error = SOLV_ERROR_EOF;
 	  return 0;
 	}
@@ -88,7 +88,7 @@ read_u8(Repodata *data)
   c = getc(data->fp);
   if (c == EOF)
     {
-      pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+      pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
       data->error = SOLV_ERROR_EOF;
       return 0;
     }
@@ -113,7 +113,7 @@ read_id(Repodata *data, Id max)
       c = getc(data->fp);
       if (c == EOF)
 	{
-          pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+          pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
 	  data->error = SOLV_ERROR_EOF;
 	  return 0;
 	}
@@ -122,7 +122,7 @@ read_id(Repodata *data, Id max)
 	  x = (x << 7) | c;
 	  if (max && x >= max)
 	    {
-              pool_debug(mypool, SAT_ERROR, "read_id: id too large (%u/%u)\n", x, max);
+              pool_debug(mypool, SOLV_ERROR, "read_id: id too large (%u/%u)\n", x, max);
 	      data->error = SOLV_ERROR_ID_RANGE;
 	      return 0;
 	    }
@@ -130,7 +130,7 @@ read_id(Repodata *data, Id max)
 	}
       x = (x << 7) ^ c ^ 128;
     }
-  pool_debug(mypool, SAT_ERROR, "read_id: id too long\n");
+  pool_debug(mypool, SOLV_ERROR, "read_id: id too long\n");
   data->error = SOLV_ERROR_CORRUPT;
   return 0;
 }
@@ -149,7 +149,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
       c = getc(data->fp);
       if (c == EOF)
 	{
-	  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+	  pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
 	  data->error = SOLV_ERROR_EOF;
 	  return 0;
 	}
@@ -161,7 +161,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
       x = (x << 6) | (c & 63);
       if (max && x >= max)
 	{
-	  pool_debug(mypool, SAT_ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
+	  pool_debug(mypool, SOLV_ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
 	  data->error = SOLV_ERROR_ID_RANGE;
 	  return 0;
 	}
@@ -169,7 +169,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
 	x = map[x];
       if (store == end)
 	{
-	  pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
+	  pool_debug(mypool, SOLV_ERROR, "read_idarray: array overflow\n");
 	  return 0;
 	}
       *store++ = x;
@@ -179,7 +179,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
 	    return store;
 	  if (store == end)
 	    {
-	      pool_debug(mypool, SAT_ERROR, "read_idarray: array overflow\n");
+	      pool_debug(mypool, SOLV_ERROR, "read_idarray: array overflow\n");
 	      data->error = SOLV_ERROR_OVERFLOW;
 	      return 0;
 	    }
@@ -206,7 +206,7 @@ data_read_id_max(unsigned char *dp, Id *ret, Id *map, int max, int *error)
   dp = data_read_id(dp, &x);
   if (max && x >= max)
     {
-      pool_debug(mypool, SAT_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
+      pool_debug(mypool, SOLV_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
       *error = SOLV_ERROR_ID_RANGE;
       x = 0;
     }
@@ -232,7 +232,7 @@ data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error)
       x = (x << 6) | (c & 63);
       if (max && x >= max)
 	{
-	  pool_debug(mypool, SAT_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
+	  pool_debug(mypool, SOLV_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
 	  *error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
@@ -276,7 +276,7 @@ data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *err
       old = x;
       if (max && x >= max)
 	{
-	  pool_debug(mypool, SAT_ERROR, "data_read_rel_idarray: id too large (%u/%u)\n", x, max);
+	  pool_debug(mypool, SOLV_ERROR, "data_read_rel_idarray: id too large (%u/%u)\n", x, max);
 	  *error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
@@ -307,7 +307,7 @@ incore_add_id(Repodata *data, Id x)
   /* make sure we have at least 5 bytes free */
   if (data->incoredatafree < 5)
     {
-      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK);
+      data->incoredata = solv_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK);
       data->incoredatafree = INCORE_ADD_CHUNK;
     }
   dp = data->incoredata + data->incoredatalen;
@@ -333,7 +333,7 @@ incore_add_blob(Repodata *data, unsigned char *buf, int len)
 {
   if (data->incoredatafree < len)
     {
-      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK + len);
+      data->incoredata = solv_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK + len);
       data->incoredatafree = INCORE_ADD_CHUNK + len;
     }
   memcpy(data->incoredata + data->incoredatalen, buf, len);
@@ -354,7 +354,7 @@ incore_map_idarray(Repodata *data, unsigned char *dp, Id *map, Id max)
       dp = data_read_ideof(dp, &id, &eof);
       if (max && id >= max)
 	{
-	  pool_debug(mypool, SAT_ERROR, "incore_map_idarray: id too large (%u/%u)\n", id, max);
+	  pool_debug(mypool, SOLV_ERROR, "incore_map_idarray: id too large (%u/%u)\n", id, max);
 	  data->error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
@@ -374,7 +374,7 @@ incore_add_u32(Repodata *data, unsigned int x)
   /* make sure we have at least 4 bytes free */
   if (data->incoredatafree < 4)
     {
-      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK);
+      data->incoredata = solv_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK);
       data->incoredatafree = INCORE_ADD_CHUNK;
     }
   dp = data->incoredata + data->incoredatalen;
@@ -394,7 +394,7 @@ incore_add_u8(Repodata *data, unsigned int x)
   /* make sure we have at least 1 byte free */
   if (data->incoredatafree < 1)
     {
-      data->incoredata = sat_realloc(data->incoredata, data->incoredatalen + 1024);
+      data->incoredata = solv_realloc(data->incoredata, data->incoredatalen + 1024);
       data->incoredatafree = 1024;
     }
   dp = data->incoredata + data->incoredatalen;
@@ -456,7 +456,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
   Repodata *parent = 0;
   Repodata data;
 
-  now = sat_timems(0);
+  now = solv_timems(0);
 
   if ((flags & REPO_USE_LOADING) != 0)
     {
@@ -475,7 +475,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 
   if (read_u32(&data) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
     {
-      pool_debug(pool, SAT_ERROR, "not a SOLV file\n");
+      pool_debug(pool, SOLV_ERROR, "not a SOLV file\n");
       return SOLV_ERROR_NOT_SOLV;
     }
   solvversion = read_u32(&data);
@@ -484,7 +484,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       case SOLV_VERSION_8:
 	break;
       default:
-        pool_debug(pool, SAT_ERROR, "unsupported SOLV version\n");
+        pool_debug(pool, SOLV_ERROR, "unsupported SOLV version\n");
         return SOLV_ERROR_UNSUPPORTED;
     }
 
@@ -500,13 +500,13 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 
   if (numdir && numdir < 2)
     {
-      pool_debug(pool, SAT_ERROR, "bad number of dirs\n");
+      pool_debug(pool, SOLV_ERROR, "bad number of dirs\n");
       return SOLV_ERROR_CORRUPT;
     }
 
   if (numrel && (flags & REPO_LOCALPOOL) != 0)
     {
-      pool_debug(pool, SAT_ERROR, "relations are forbidden in a local pool\n");
+      pool_debug(pool, SOLV_ERROR, "relations are forbidden in a local pool\n");
       return SOLV_ERROR_CORRUPT;
     }
   if (parent && numsolv)
@@ -514,13 +514,13 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       /* make sure that we exactly replace the stub repodata */
       if (parent->end - parent->start != numsolv)
 	{
-	  pool_debug(pool, SAT_ERROR, "sub-repository solvable number does not match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
+	  pool_debug(pool, SOLV_ERROR, "sub-repository solvable number does not match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
 	  return SOLV_ERROR_CORRUPT;
 	}
       for (i = 0; i < numsolv; i++)
 	if (pool->solvables[parent->start + i].repo != repo)
 	  {
-	    pool_debug(pool, SAT_ERROR, "main repository contains holes\n");
+	    pool_debug(pool, SOLV_ERROR, "main repository contains holes\n");
 	    return SOLV_ERROR_CORRUPT;
 	  }
     }
@@ -545,16 +545,16 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
     {
       data.localpool = 1;
       spool = &data.spool;
-      spool->stringspace = sat_malloc(7);
+      spool->stringspace = solv_malloc(7);
       strcpy(spool->stringspace, "<NULL>");
       spool->sstrings = 7;
       spool->nstrings = 0;
     }
 
   /* alloc string buffer */
-  spool->stringspace = sat_realloc(spool->stringspace, spool->sstrings + sizeid + 1);
+  spool->stringspace = solv_realloc(spool->stringspace, spool->sstrings + sizeid + 1);
   /* alloc string offsets (Id -> Offset into string space) */
-  spool->strings = sat_realloc2(spool->strings, spool->nstrings + numid, sizeof(Offset));
+  spool->strings = solv_realloc2(spool->strings, spool->nstrings + numid, sizeof(Offset));
 
   strsp = spool->stringspace;
   str = spool->strings;		       /* array of offsets into strsp, indexed by Id */
@@ -571,14 +571,14 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
     {
       if (sizeid && fread(strsp, sizeid, 1, fp) != 1)
 	{
-	  pool_debug(pool, SAT_ERROR, "read error while reading strings\n");
+	  pool_debug(pool, SOLV_ERROR, "read error while reading strings\n");
 	  return SOLV_ERROR_EOF;
 	}
     }
   else
     {
       unsigned int pfsize = read_u32(&data);
-      char *prefix = sat_malloc(pfsize);
+      char *prefix = solv_malloc(pfsize);
       char *pp = prefix;
       char *old_str = 0;
       char *dest = strsp;
@@ -586,8 +586,8 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 
       if (pfsize && fread(prefix, pfsize, 1, fp) != 1)
         {
-	  pool_debug(pool, SAT_ERROR, "read error while reading strings\n");
-	  sat_free(prefix);
+	  pool_debug(pool, SOLV_ERROR, "read error while reading strings\n");
+	  solv_free(prefix);
 	  return SOLV_ERROR_EOF;
 	}
       for (i = 1; i < numid; i++)
@@ -597,8 +597,8 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 	  freesp -= same + len;
 	  if (freesp < 0)
 	    {
-	      pool_debug(pool, SAT_ERROR, "overflow while expanding strings\n");
-	      sat_free(prefix);
+	      pool_debug(pool, SOLV_ERROR, "overflow while expanding strings\n");
+	      solv_free(prefix);
 	      return SOLV_ERROR_OVERFLOW;
 	    }
 	  if (same)
@@ -608,10 +608,10 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 	  old_str = dest;
 	  dest += same + len;
 	}
-      sat_free(prefix);
+      solv_free(prefix);
       if (freesp != 0)
 	{
-	  pool_debug(pool, SAT_ERROR, "expanding strings size mismatch\n");
+	  pool_debug(pool, SOLV_ERROR, "expanding strings size mismatch\n");
 	  return SOLV_ERROR_CORRUPT;
 	}
     }
@@ -627,14 +627,14 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       if (*sp)
 	{
 	  /* we need the '' for directories */
-	  pool_debug(pool, SAT_ERROR, "store strings don't start with ''\n");
+	  pool_debug(pool, SOLV_ERROR, "store strings don't start with ''\n");
 	  return SOLV_ERROR_CORRUPT;
 	}
       for (i = 1; i < spool->nstrings; i++)
 	{
 	  if (sp >= strsp + sizeid)
 	    {
-	      pool_debug(pool, SAT_ERROR, "not enough strings\n");
+	      pool_debug(pool, SOLV_ERROR, "not enough strings\n");
 	      return SOLV_ERROR_OVERFLOW;
 	    }
 	  str[i] = sp - spool->stringspace;
@@ -647,7 +647,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 
       /* alloc id map for name and rel Ids. this maps ids in the solv files
        * to the ids in our pool */
-      idmap = sat_calloc(numid + numrel, sizeof(Id));
+      idmap = solv_calloc(numid + numrel, sizeof(Id));
 
       /*
        * build hashes for all read strings
@@ -657,15 +657,15 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       hashmask = mkmask(spool->nstrings + numid);
 
 #if 0
-      POOL_DEBUG(SAT_DEBUG_STATS, "read %d strings\n", numid);
-      POOL_DEBUG(SAT_DEBUG_STATS, "string hash buckets: %d\n", hashmask + 1);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "read %d strings\n", numid);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "string hash buckets: %d\n", hashmask + 1);
 #endif
 
       /*
        * create hashtable with strings already in pool
        */
 
-      hashtbl = sat_calloc(hashmask + 1, sizeof(Id));
+      hashtbl = solv_calloc(hashmask + 1, sizeof(Id));
       for (i = 1; i < spool->nstrings; i++)  /* leave out our dummy zero id */
 	{
 	  h = strhash(spool->stringspace + spool->strings[i]) & hashmask;
@@ -685,9 +685,9 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 	{
 	  if (sp >= strsp + sizeid)
 	    {
-	      sat_free(hashtbl);
-	      sat_free(idmap);
-	      pool_debug(pool, SAT_ERROR, "not enough strings %d %d\n", i, numid);
+	      solv_free(hashtbl);
+	      solv_free(idmap);
+	      pool_debug(pool, SOLV_ERROR, "not enough strings %d %d\n", i, numid);
 	      return SOLV_ERROR_OVERFLOW;
 	    }
 	  if (!*sp)			       /* empty string */
@@ -724,7 +724,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 	  idmap[i] = id;		       /* repo relative -> pool relative */
 	  sp += l;			       /* next string */
 	}
-      sat_free(hashtbl);
+      solv_free(hashtbl);
     }
   pool_shrink_strings(pool);	       /* vacuum */
 
@@ -739,19 +739,19 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
   if (numrel)
     {
       /* extend rels */
-      pool->rels = sat_realloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
+      pool->rels = solv_realloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
       ran = pool->rels;
 
       hashmask = mkmask(pool->nrels + numrel);
 #if 0
-      POOL_DEBUG(SAT_DEBUG_STATS, "read %d rels\n", numrel);
-      POOL_DEBUG(SAT_DEBUG_STATS, "rel hash buckets: %d\n", hashmask + 1);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "read %d rels\n", numrel);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "rel hash buckets: %d\n", hashmask + 1);
 #endif
       /*
        * prep hash table with already existing RelDeps
        */
       
-      hashtbl = sat_calloc(hashmask + 1, sizeof(Id));
+      hashtbl = solv_calloc(hashmask + 1, sizeof(Id));
       for (i = 1; i < pool->nrels; i++)
 	{
 	  h = relhash(ran[i].name, ran[i].evr, ran[i].flags) & hashmask;
@@ -793,7 +793,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 	    }
 	  idmap[i + numid] = MAKERELDEP(id);   /* fill Id map */
 	}
-      sat_free(hashtbl);
+      solv_free(hashtbl);
       pool_shrink_rels(pool);		/* vacuum */
     }
 
@@ -801,7 +801,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
   /*******  Part 3: Dirs  ***********************************************/
   if (numdir)
     {
-      data.dirpool.dirs = sat_malloc2(numdir, sizeof(Id));
+      data.dirpool.dirs = solv_malloc2(numdir, sizeof(Id));
       data.dirpool.ndirs = numdir;
       data.dirpool.dirs[0] = 0;		/* dir 0: virtual root */
       data.dirpool.dirs[1] = 1;		/* dir 1: / */
@@ -819,7 +819,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 
   /*******  Part 4: Keys  ***********************************************/
 
-  keys = sat_calloc(numkeys, sizeof(*keys));
+  keys = solv_calloc(numkeys, sizeof(*keys));
   /* keys start at 1 */
   for (i = 1; i < numkeys; i++)
     {
@@ -835,7 +835,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
         type = pool_str2id(pool, stringpool_id2str(spool, type), 1);
       if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_FLEXARRAY)
 	{
-	  pool_debug(pool, SAT_ERROR, "unsupported data type '%s'\n", pool_id2str(pool, type));
+	  pool_debug(pool, SOLV_ERROR, "unsupported data type '%s'\n", pool_id2str(pool, type));
 	  data.error = SOLV_ERROR_UNSUPPORTED;
 	  type = REPOKEY_TYPE_VOID;
 	}
@@ -848,14 +848,14 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 	keys[i].storage = KEY_STORAGE_INCORE;
       if (keys[i].storage != KEY_STORAGE_INCORE && keys[i].storage != KEY_STORAGE_VERTICAL_OFFSET)
 	{
-	  pool_debug(pool, SAT_ERROR, "unsupported storage type %d\n", keys[i].storage);
+	  pool_debug(pool, SOLV_ERROR, "unsupported storage type %d\n", keys[i].storage);
 	  data.error = SOLV_ERROR_UNSUPPORTED;
 	}
       if (id >= SOLVABLE_NAME && id <= RPM_RPMDBID)
 	{
 	  if (keys[i].storage != KEY_STORAGE_INCORE)
 	    {
-	      pool_debug(pool, SAT_ERROR, "main solvable data must use incore storage%d\n", keys[i].storage);
+	      pool_debug(pool, SOLV_ERROR, "main solvable data must use incore storage%d\n", keys[i].storage);
 	      data.error = SOLV_ERROR_UNSUPPORTED;
 	    }
 	  keys[i].storage = KEY_STORAGE_SOLVABLE;
@@ -863,7 +863,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
       /* cannot handle rel idarrays in incore/vertical */
       if (type == REPOKEY_TYPE_REL_IDARRAY && keys[i].storage != KEY_STORAGE_SOLVABLE)
 	{
-	  pool_debug(pool, SAT_ERROR, "type REL_IDARRAY only supported for STORAGE_SOLVABLE\n");
+	  pool_debug(pool, SOLV_ERROR, "type REL_IDARRAY only supported for STORAGE_SOLVABLE\n");
 	  data.error = SOLV_ERROR_UNSUPPORTED;
 	}
       if (keys[i].type == REPOKEY_TYPE_CONSTANTID && idmap)
@@ -890,10 +890,10 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
   /*******  Part 5: Schemata ********************************************/
   
   id = read_id(&data, 0);
-  schemadata = sat_calloc(id + 1, sizeof(Id));
+  schemadata = solv_calloc(id + 1, sizeof(Id));
   schemadatap = schemadata + 1;
   schemadataend = schemadatap + id;
-  schemata = sat_calloc(numschemata, sizeof(Id));
+  schemata = solv_calloc(numschemata, sizeof(Id));
   for (i = 1; i < numschemata; i++)
     {
       schemata[i] = schemadatap - schemadata;
@@ -922,7 +922,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
   if (maxsize > allsize)
     maxsize = allsize;
 
-  buf = sat_calloc(maxsize + DATA_READ_CHUNK + 4, 1);	/* 4 extra bytes to detect overflows */
+  buf = solv_calloc(maxsize + DATA_READ_CHUNK + 4, 1);	/* 4 extra bytes to detect overflows */
   bufend = buf;
   dp = buf;
 
@@ -933,7 +933,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
     l = allsize;
   if (!l || fread(buf, l, 1, data.fp) != 1)
     {
-      pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+      pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
       data.error = SOLV_ERROR_EOF;
       id = 0;
     }
@@ -951,7 +951,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
   for (i = 0; keyp[i]; i++)
     ;
   if (i)
-    data.mainschemaoffsets = sat_calloc(i, sizeof(Id));
+    data.mainschemaoffsets = solv_calloc(i, sizeof(Id));
 
   nentries = 0;
   keydepth = 0;
@@ -968,7 +968,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 	    break;
 	  if (left < 0)
 	    {
-	      pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
+	      pool_debug(mypool, SOLV_ERROR, "buffer overrun\n");
 	      data.error = SOLV_ERROR_EOF;
 	      break;
 	    }
@@ -983,7 +983,7 @@ repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
 		l = allsize;
 	      if (l && fread(buf + left, l, 1, data.fp) != 1)
 		{
-		  pool_debug(mypool, SAT_ERROR, "unexpected EOF\n");
+		  pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
 		  data.error = SOLV_ERROR_EOF;
 		  break;
 		}
@@ -1066,13 +1066,13 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	  else if (keys[key].storage == KEY_STORAGE_INCORE)
 	    incore_add_id(&data, did);
 #if 0
-	  POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %s\n", pool_id2str(pool, id), pool_id2str(pool, did));
+	  POOL_DEBUG(SOLV_DEBUG_STATS, "%s -> %s\n", pool_id2str(pool, id), pool_id2str(pool, did));
 #endif
 	  break;
 	case REPOKEY_TYPE_U32:
 	  dp = data_read_u32(dp, &h);
 #if 0
-	  POOL_DEBUG(SAT_DEBUG_STATS, "%s -> %u\n", pool_id2str(pool, id), h);
+	  POOL_DEBUG(SOLV_DEBUG_STATS, "%s -> %u\n", pool_id2str(pool, id), h);
 #endif
 	  if (s && id == RPM_RPMDBID)
 	    {
@@ -1108,7 +1108,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	    dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error, 0);
 	  if (idarraydatap > idarraydataend)
 	    {
-	      pool_debug(pool, SAT_ERROR, "idarray overflow\n");
+	      pool_debug(pool, SOLV_ERROR, "idarray overflow\n");
 	      data.error = SOLV_ERROR_OVERFLOW;
 	      break;
 	    }
@@ -1129,9 +1129,9 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	  else if (id == SOLVABLE_ENHANCES)
 	    s->enhances = ido;
 #if 0
-	  POOL_DEBUG(SAT_DEBUG_STATS, "%s ->\n", pool_id2str(pool, id));
+	  POOL_DEBUG(SOLV_DEBUG_STATS, "%s ->\n", pool_id2str(pool, id));
 	  for (; repo->idarraydata[ido]; ido++)
-	    POOL_DEBUG(SAT_DEBUG_STATS,"  %s\n", pool_dep2str(pool, repo->idarraydata[ido]));
+	    POOL_DEBUG(SOLV_DEBUG_STATS,"  %s\n", pool_dep2str(pool, repo->idarraydata[ido]));
 #endif
 	  break;
 	case REPOKEY_TYPE_FIXARRAY:
@@ -1140,7 +1140,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	    needchunk = 1;
           if (keydepth == sizeof(stack)/sizeof(*stack))
 	    {
-	      pool_debug(pool, SAT_ERROR, "array stack overflow\n");
+	      pool_debug(pool, SOLV_ERROR, "array stack overflow\n");
 	      data.error = SOLV_ERROR_CORRUPT;
 	      break;
 	    }
@@ -1161,13 +1161,13 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	      /* horray! here come the solvables */
 	      if (nentries != numsolv)
 		{
-		  pool_debug(pool, SAT_ERROR, "inconsistent number of solvables: %d %d\n", nentries, numsolv);
+		  pool_debug(pool, SOLV_ERROR, "inconsistent number of solvables: %d %d\n", nentries, numsolv);
 		  data.error = SOLV_ERROR_CORRUPT;
 		  break;
 		}
 	      if (idarraydatap)
 		{
-		  pool_debug(pool, SAT_ERROR, "more than one solvable block\n");
+		  pool_debug(pool, SOLV_ERROR, "more than one solvable block\n");
 		  data.error = SOLV_ERROR_CORRUPT;
 		  break;
 		}
@@ -1202,7 +1202,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	    {
 	      if (!id)
 		{
-		  pool_debug(pool, SAT_ERROR, "illegal fixarray\n");
+		  pool_debug(pool, SOLV_ERROR, "illegal fixarray\n");
 		  data.error = SOLV_ERROR_CORRUPT;
 		}
 	      stack[keydepth - 1] = id;
@@ -1221,18 +1221,18 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 
   if (keydepth)
     {
-      pool_debug(pool, SAT_ERROR, "unexpected EOF, depth = %d\n", keydepth);
+      pool_debug(pool, SOLV_ERROR, "unexpected EOF, depth = %d\n", keydepth);
       data.error = SOLV_ERROR_CORRUPT;
     }
   if (!data.error)
     {
       if (dp > bufend)
         {
-	  pool_debug(mypool, SAT_ERROR, "buffer overrun\n");
+	  pool_debug(mypool, SOLV_ERROR, "buffer overrun\n");
 	  data.error = SOLV_ERROR_EOF;
         }
     }
-  sat_free(buf);
+  solv_free(buf);
 
   if (data.error)
     {
@@ -1241,14 +1241,14 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       /* free id array */
       repo->idarraysize -= size_idarray;
       /* free incore data */
-      data.incoredata = sat_free(data.incoredata);
+      data.incoredata = solv_free(data.incoredata);
       data.incoredatalen = data.incoredatafree = 0;
     }
 
   if (data.incoredatafree)
     {
       /* shrink excess size */
-      data.incoredata = sat_realloc(data.incoredata, data.incoredatalen);
+      data.incoredata = solv_realloc(data.incoredata, data.incoredatalen);
       data.incoredatafree = 0;
     }
 
@@ -1261,7 +1261,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       unsigned int pagesize;
       
       /* we have vertical data, make it available */
-      data.verticaloffset = sat_calloc(numkeys, sizeof(Id));
+      data.verticaloffset = solv_calloc(numkeys, sizeof(Id));
       for (i = 1; i < numkeys; i++)
         if (keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
 	  {
@@ -1277,7 +1277,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       /* no longer needed */
       data.fp = 0;
     }
-  sat_free(idmap);
+  solv_free(idmap);
   mypool = 0;
 
   if (data.error)
@@ -1295,7 +1295,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
   else
     {
       /* make it available as new repodata */
-      repo->repodata = sat_realloc2(repo->repodata, repo->nrepodata + 1, sizeof(data));
+      repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata + 1, sizeof(data));
       repo->repodata[repo->nrepodata++] = data;
     }
 
@@ -1309,9 +1309,9 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	repodata_create_stubs(repo->repodata + (repo->nrepodata - 1));
     }
 
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo_add_solv took %d ms\n", sat_timems(now));
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
-  POOL_DEBUG(SAT_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data.incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_solv took %d ms\n", solv_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data.incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
   return 0;
 }
 
