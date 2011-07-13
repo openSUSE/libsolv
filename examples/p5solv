@@ -3,7 +3,6 @@
 use POSIX;
 use Fcntl;
 use Config::IniFiles;
-use File::FnMatch;
 use Data::Dumper;
 use solv;
 use Devel::Peek;

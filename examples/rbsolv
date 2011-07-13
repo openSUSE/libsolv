@@ -87,7 +87,7 @@ class Repo_generic
     if chksum
       fchksum = Solv::Chksum.new(chksum.type)
       fchksum.add_fd(f.fileno)
-      if !fchksum.matches(chksum)
+      if !fchksum == chksum
 	puts "#{file}: checksum error"
         @incomplete = true if markincomplete
         return nil

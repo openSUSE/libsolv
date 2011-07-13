@@ -150,7 +150,10 @@
     int v;
     int e = SWIG_AsVal_int(*o, &v);
     if (!SWIG_IsOK(e))
-      SWIG_croak("list must contain only integers");
+      {
+        SWIG_Error(SWIG_RuntimeError, "list must contain only integers");
+        SWIG_fail;
+      }
     queue_push(&$1, v);
   }
 }
@@ -328,10 +331,13 @@ typedef VALUE AppObjectPtr;
 %include "typemaps.i"
 
 %{
-#include "stdio.h"
-#include "sys/stat.h"
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "pool.h"
+#include "poolarch.h"
 #include "solver.h"
 #include "policy.h"
 #include "solverdebug.h"
@@ -750,7 +756,7 @@ typedef struct {
   char *hex() {
     int l;
     const unsigned char *b;
-    char *ret, *rp;
+    char *ret;
 
     b = solv_chksum_get($self, &l);
     ret = solv_malloc(2 * l + 1);
@@ -1010,7 +1016,7 @@ typedef struct {
       Datamatcher ma;
       if (!datamatcher_init(&ma, match, flags)) {
         for (id = 1; id < pool->ss.nstrings; id++)
-          if (pool->whatprovides[id] && datamatcher_match(&ma, id2str(pool, id)))
+          if (pool->whatprovides[id] && datamatcher_match(&ma, pool_id2str(pool, id)))
             queue_push(&q, id);
         datamatcher_free(&ma);
       }
@@ -1327,19 +1333,19 @@ typedef struct {
     return $self->key->name;
   }
   const char *key_idstr() {
-    return id2str($self->pool, $self->key->name);
+    return pool_id2str($self->pool, $self->key->name);
   }
   Id type_id() {
     return $self->key->type;
   }
   const char *type_idstr() {
-    return id2str($self->pool, $self->key->type);
+    return pool_id2str($self->pool, $self->key->type);
   }
   Id id() {
      return $self->kv.id;
   }
   const char *idstr() {
-     return id2str($self->pool, $self->kv.id);
+     return pool_id2str($self->pool, $self->kv.id);
   }
   const char *str() {
      return $self->kv.str;
@@ -1389,7 +1395,6 @@ typedef struct {
   %newobject __next__;
   XSolvable *__next__() {
     Pool *pool = $self->pool;
-    XSolvable *s;
     if ($self->id >= pool->nsolvables)
       return 0;
     while (++$self->id < pool->nsolvables)
@@ -1500,7 +1505,6 @@ typedef struct {
   XSolvable *__next__() {
     Repo *repo = $self->repo;
     Pool *pool = repo->pool;
-    XSolvable *s;
     if (repo->start > 0 && $self->id < repo->start)
       $self->id = repo->start - 1;
     if ($self->id >= repo->end)
@@ -1592,7 +1596,7 @@ typedef struct {
     const unsigned char *b = pool_lookup_bin_checksum($self->pool, $self->id, keyname, &type);
     return solv_chksum_create_from_bin(type, b);
   }
-  const char *lookup_location(int *OUTPUT) {
+  const char *lookup_location(unsigned int *OUTPUT) {
     return solvable_get_location($self->pool->solvables + $self->id, OUTPUT);
   }
 #ifdef SWIGRUBY
@@ -1613,7 +1617,7 @@ typedef struct {
   %{
     SWIGINTERN const char *XSolvable_name_get(XSolvable *xs) {
       Pool *pool = xs->pool;
-      return id2str(pool, pool->solvables[xs->id].name);
+      return pool_id2str(pool, pool->solvables[xs->id].name);
     }
   %}
   Id const nameid;
@@ -1626,7 +1630,7 @@ typedef struct {
   %{
     SWIGINTERN const char *XSolvable_evr_get(XSolvable *xs) {
       Pool *pool = xs->pool;
-      return id2str(pool, pool->solvables[xs->id].evr);
+      return pool_id2str(pool, pool->solvables[xs->id].evr);
     }
   %}
   Id const evrid;
@@ -1639,7 +1643,7 @@ typedef struct {
   %{
     SWIGINTERN const char *XSolvable_arch_get(XSolvable *xs) {
       Pool *pool = xs->pool;
-      return id2str(pool, pool->solvables[xs->id].arch);
+      return pool_id2str(pool, pool->solvables[xs->id].arch);
     }
   %}
   Id const archid;
@@ -1652,7 +1656,7 @@ typedef struct {
   %{
     SWIGINTERN const char *XSolvable_vendor_get(XSolvable *xs) {
       Pool *pool = xs->pool;
-      return id2str(pool, pool->solvables[xs->id].vendor);
+      return pool_id2str(pool, pool->solvables[xs->id].vendor);
     }
   %}
   Id const vendorid;
