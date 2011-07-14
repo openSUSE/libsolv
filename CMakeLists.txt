@@ -2,12 +2,14 @@ PROJECT (libsolv)
 
 CMAKE_MINIMUM_REQUIRED (VERSION 2.4)
 
-OPTION(ENABLE_STATIC "Build a static version of the libraries?" OFF)
-OPTION(DISABLE_SHARED "Do not build a shared version of the libraries?" OFF)
+OPTION (ENABLE_STATIC "Build a static version of the libraries?" OFF)
+OPTION (DISABLE_SHARED "Do not build a shared version of the libraries?" OFF)
 
-OPTION(ENABLE_PERL "Build the perl bindings?" OFF)
-OPTION(ENABLE_PYTHON "Build the python bindings?" OFF)
-OPTION(ENABLE_RUBY "Build the ruby bindings?" OFF)
+OPTION (ENABLE_PERL "Build the perl bindings?" OFF)
+OPTION (ENABLE_PYTHON "Build the python bindings?" OFF)
+OPTION (ENABLE_RUBY "Build the ruby bindings?" OFF)
+
+OPTION (USE_VENDORDIRS "Install the bindings in vendor directories?" OFF)
 
 #IF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERISION} GREATER 2.4)
 #ENDIF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERISION} GREATER 2.4)
