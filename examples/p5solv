@@ -123,14 +123,14 @@ sub usecachedrepo {
       return undef if sysread($f, $fextcookie, 32) != 32;
     }
     sysseek($f, 0, Fcntl::SEEK_SET);
-    $f = solv::xfopen_dup(undef, fileno($f));
+    my $fd = solv::xfopen_dup(undef, fileno($f));
     my $flags = $ext ? $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES : 0;
     $flags |= $solv::Repo::REPO_LOCALPOOL if $ext && $ext ne 'DL';
-    if (!$self->{'handle'}->add_solv($f, $flags)) {
-      solv::xfclose($f);
+    if (!$self->{'handle'}->add_solv($fd, $flags)) {
+      solv::xfclose($fd);
       return undef;
     }
-    solv::xfclose($f);
+    solv::xfclose($fd);
     $self->{'cookie'} = $fcookie unless $ext;
     $self->{'extcookie'} = $fextcookie if $fextcookie;
     utime undef, undef, $f if $mark;

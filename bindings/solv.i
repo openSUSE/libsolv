@@ -679,16 +679,15 @@ typedef struct {
     return q;
   }
 
-  const char *str() {
-    return pool_job2str($self->pool, $self->how, $self->what, 0);
-  }
-
   bool __eq__(Job *j) {
     return $self->pool == j->pool && $self->how == j->how && $self->what == j->what;
   }
   bool __ne__(Job *j) {
     return !Job___eq__($self, j);
   }
+#if defined(SWIGPERL)
+  %rename("str") __str__;
+#endif
   const char *__str__() {
     return pool_job2str($self->pool, $self->how, $self->what, 0);
   }
@@ -781,6 +780,9 @@ typedef struct {
 #if defined(SWIGRUBY)
   %rename("to_s") __str__;
   %rename("inspect") __repr__;
+#endif
+#if defined(SWIGPERL)
+  %rename("str") __str__;
 #endif
   %newobject __str__;
   const char *__str__() {
@@ -1230,6 +1232,9 @@ typedef struct {
   bool __ne__(Repo *repo) {
     return $self != repo;
   }
+#if defined(SWIGPERL)
+  %rename("str") __str__;
+#endif
   %newobject __str__;
   const char *__str__() {
     char buf[20];
@@ -1554,6 +1559,9 @@ typedef struct {
   bool __ne__(Dep *s) {
     return !Dep___eq__($self, s);
   }
+#if defined(SWIGPERL)
+  %rename("str") __str__;
+#endif
   const char *__str__() {
     return pool_dep2str($self->pool, $self->id);
   }
@@ -1678,6 +1686,9 @@ typedef struct {
   bool __ne__(XSolvable *s) {
     return !XSolvable___eq__($self, s);
   }
+#if defined(SWIGPERL)
+  %rename("str") __str__;
+#endif
   const char *__str__() {
     return pool_solvid2str($self->pool, $self->id);
   }
