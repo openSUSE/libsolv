@@ -3330,7 +3330,6 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
   if (s->supplements && level > 0)
     {
       Id *supp, sup, pp2, p2;
-      int suppstart;
       /* this is a hack. to use solver_dep_fulfilled we temporarily clear
        * everything above our level in the decisionmap */
       for (i = decisionno; i < solv->decisionq.count; i++ )
@@ -3340,7 +3339,6 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 	    solv->decisionmap[p2] = -solv->decisionmap[p2];
 	}
       supp = s->repo->idarraydata + s->supplements;
-      suppstart = whyq->count;
       while ((sup = *supp++) != 0)
 	if (solver_dep_fulfilled(solv, sup))
 	  {
