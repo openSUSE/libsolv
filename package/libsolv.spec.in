@@ -52,6 +52,7 @@ BuildRequires: ruby ruby-devel
 BuildRequires: swig
 %endif
 %if %{with python_binding}
+%global python_sitearch %(python -c "from distutils.sysconfig import get_python_lib; print get_python_lib(True);")
 BuildRequires: python-devel
 BuildRequires: swig
 %endif
@@ -185,10 +186,12 @@ make %{?jobs:-j %jobs}
 %install
 make DESTDIR=$RPM_BUILD_ROOT install
 %if %{with python_binding}
-pushd $RPM_BUILD_ROOT/%{py_sitedir}
+%if 0%{?suse_version}
+pushd $RPM_BUILD_ROOT/%{python_sitearch}
 python %py_libdir/py_compile.py *.py
 python -O %py_libdir/py_compile.py *.py
 popd
+%endif
 %endif
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
@@ -240,7 +243,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %if %{with python_binding}
 %files -n python-solv
 %defattr(-,root,root)
-%{py_sitedir}/*
+%{python_sitearch}/*
 %endif
 
 %changelog
