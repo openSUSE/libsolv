@@ -1,12 +1,6 @@
 FIND_PACKAGE (PythonLibs)
 FIND_PACKAGE (PythonInterp REQUIRED)
-EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib())" OUTPUT_VARIABLE PYTHON_LIB_DIR)
-
-IF (NOT PYTHON_SITEDIR)
-    SET (PYTHON_SITEDIR ${PYTHON_LIB_DIR})
-ENDIF (NOT PYTHON_SITEDIR)
-
-SET (PYTHON_INSTALL_DIR ${PYTHON_SITEDIR})
+EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib(True))" OUTPUT_VARIABLE PYTHON_INSTALL_DIR)
 
 MESSAGE (STATUS "Python executable: ${PYTHON_EXECUTABLE}")
 MESSAGE (STATUS "Python installation dir: ${PYTHON_INSTALL_DIR}")
