@@ -67,6 +67,7 @@ Authors:
     Michael Matz <matz@suse.de>
     Duncan Mac-Vicar P. <dmacvicar@suse.de>
 
+%if !%{with disable_shared}
 %package -n libsolv@LIBSOLV_SOVERSION@
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
@@ -82,11 +83,14 @@ Authors:
     Michael Matz <matz@suse.de>
     Duncan Mac-Vicar P. <dmacvicar@suse.de>
 
+%endif
 %package devel
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
 Requires:       libsolv-tools = %version
+%if !%{with disable_shared}
 Requires:       libsolv@LIBSOLV_SOVERSION@ = %version
+%endif
 Requires:       rpm-devel
 
 %description devel
@@ -175,12 +179,19 @@ make %{?jobs:-j %jobs}
 
 %install
 make DESTDIR=$RPM_BUILD_ROOT install
+%if %{with python_binding}
+pushd $RPM_BUILD_ROOT/%{py_sitedir}
+python %py_libdir/py_compile.py *.py
+python -O %py_libdir/py_compile.py *.py
+popd
+%endif
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
 
+%if !%{with disable_shared}
 %post -n libsolv@LIBSOLV_SOVERSION@ -p /sbin/ldconfig
 
 %postun -n libsolv@LIBSOLV_SOVERSION@ -p /sbin/ldconfig
@@ -190,6 +201,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %doc LICENSE*
 %_libdir/libsolv.so.*
 %_libdir/libsolvext.so.*
+%endif
 
 %files tools
 %defattr(-,root,root)
