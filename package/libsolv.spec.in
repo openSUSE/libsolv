@@ -136,7 +136,9 @@ Group:          Development/Languages/Ruby
 Ruby bindings for sat solver.
 
 %package -n python-solv
+%if 0{?py_requires}
 %py_requires
+%endif
 Summary:        Python bindings for the libsolv library
 Group:          Development/Languages/Python
 
