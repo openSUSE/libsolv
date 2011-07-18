@@ -41,6 +41,9 @@ BuildRequires:  zlib-devel
 
 %if %{with perl_binding}
 BuildRequires: perl
+%if 0%{?fedora_version}
+BuildRequires: perl-devel
+%endif
 BuildRequires: swig
 %endif
 %if %{with ruby_binding}
