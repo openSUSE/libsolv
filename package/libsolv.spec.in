@@ -47,7 +47,11 @@ BuildRequires: perl-devel
 BuildRequires: swig
 %endif
 %if %{with ruby_binding}
+%if 0%{?fedora_version}
+%global ruby_vendorarch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"]')
+%else
 %global ruby_vendorarch %(ruby -rrbconfig -e 'puts Config::CONFIG["vendorarchdir"]')
+%endif
 BuildRequires: ruby ruby-devel
 BuildRequires: swig
 %endif
