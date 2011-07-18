@@ -45,7 +45,7 @@ BuildRequires: swig
 %endif
 %if %{with ruby_binding}
 %global ruby_vendorarch %(ruby -rrbconfig -e 'puts Config::CONFIG["vendorarchdir"]')
-BuildRequires: ruby-devel
+BuildRequires: ruby ruby-devel
 BuildRequires: swig
 %endif
 %if %{with python_binding}
