@@ -184,7 +184,7 @@ cmake   $CMAKE_FLAGS \
 	%{?with_python_binding:-DENABLE_PYTHON=1} \
 	%{?with_ruby_binding:-DENABLE_RUBY=1} \
 	-DUSE_VENDORDIRS=1 \
-	-DCMAKE_SKIP_RPATH=1 
+	-DCMAKE_SKIP_RPATH=1
 make %{?jobs:-j %jobs}
 
 %install
@@ -211,26 +211,27 @@ rm -rf "$RPM_BUILD_ROOT"
 %files -n libsolv@LIBSOLV_SOVERSION@
 %defattr(-,root,root)
 %doc LICENSE*
-%_libdir/libsolv.so.*
-%_libdir/libsolvext.so.*
+%{_libdir}/libsolv.so.*
+%{_libdir}/libsolvext.so.*
 %endif
 
 %files tools
 %defattr(-,root,root)
-%exclude /usr/bin/helix2solv
-%exclude /usr/bin/solv
-/usr/bin/*
+%exclude %{_bindir}/helix2solv
+%exclude %{_bindir}/solv
+%{_bindir}/*
 
 %files devel
 %defattr(-,root,root)
-%_libdir/libsolv.so
-%_libdir/libsolvext.so
-/usr/include/solv
-/usr/bin/helix2solv
+%{_libdir}/libsolv.so
+%{_libdir}/libsolvext.so
+%{_includedir}/solv
+%{_bindir}/helix2solv
+%{_datadir}/cmake/Modules/*
 
 %files demo
 %defattr(-,root,root)
-/usr/bin/solv
+%{_bindir}/solv
 
 %if %{with perl_binding}
 %files -n perl-solv

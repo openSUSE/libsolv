@@ -37,6 +37,7 @@ SET (BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
 
 # where to look first for cmake modules, before ${CMAKE_ROOT}/Modules/ is checked
 SET (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
+INSTALL( FILES ${CMAKE_MODULE_PATH}/FindLibSolv.cmake DESTINATION ${CMAKE_INSTALL_PREFIX}/share/cmake/Modules )
 
 INCLUDE (${CMAKE_SOURCE_DIR}/VERSION.cmake)
 
