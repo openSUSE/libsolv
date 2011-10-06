@@ -8,8 +8,8 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
 Prefix:         /usr
 
-%bcond_with    enable_static
-%bcond_with    disable_shared
+%bcond_without enable_static
+%bcond_without disable_shared
 %bcond_without perl_binding
 %bcond_without python_binding
 %bcond_without ruby_binding
