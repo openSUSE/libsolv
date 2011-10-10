@@ -223,8 +223,14 @@ rm -rf "$RPM_BUILD_ROOT"
 
 %files devel
 %defattr(-,root,root)
+%if %{with enable_static}
+%{_libdir}/libsolv.a
+%{_libdir}/libsolvext.a
+%endif
+%if !%{with disable_shared}
 %{_libdir}/libsolv.so
 %{_libdir}/libsolvext.so
+%endif
 %{_includedir}/solv
 %{_bindir}/helix2solv
 %{_datadir}/cmake/Modules/*
