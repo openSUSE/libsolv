@@ -18,7 +18,7 @@ Prefix:         /usr
 # force this version on mandriva
 BuildRequires:  libneon0.26-devel
 %endif
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 BuildRequires:  db4-devel
 %endif
 %if 0%{?suse_version}
@@ -41,13 +41,13 @@ BuildRequires:  zlib-devel
 
 %if %{with perl_binding}
 BuildRequires: perl
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 BuildRequires: perl-devel
 %endif
 BuildRequires: swig
 %endif
 %if %{with ruby_binding}
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 %global ruby_vendorarch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"]')
 %else
 %global ruby_vendorarch %(ruby -rrbconfig -e 'puts Config::CONFIG["vendorarchdir"]')
@@ -128,7 +128,7 @@ A new approach to package dependency solving.
 Summary:        Applications demoing the libsolv library
 Group:          System/Management
 Requires:       curl
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 Requires:       gnupg2
 %endif
 %if 0%{?suse_version}
@@ -171,7 +171,7 @@ export CFLAGS="$RPM_OPT_FLAGS"
 export CXXFLAGS="$CFLAGS"
 
 CMAKE_FLAGS=
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 CMAKE_FLAGS="-DFEDORA=1"
 %endif
 
