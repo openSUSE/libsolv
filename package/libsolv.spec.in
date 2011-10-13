@@ -95,6 +95,8 @@ Authors:
 %package devel
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
+Obsoletes:      libsatsolver-devel < 0.18
+Provides:       libsatsolver-devel = 0.18
 Requires:       libsolv-tools = %version
 %if !%{with disable_shared}
 Requires:       libsolv@LIBSOLV_SOVERSION@ = %version
@@ -115,8 +117,8 @@ Authors:
 %package tools
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
-Obsoletes:      libsatsolver <= 0.0.15
-Provides:       libsatsolver = %{version}-%{release}
+Obsoletes:      satsolver-tools < 0.18
+Provides:       satsolver-tools = 0.18
 Requires:       gzip bzip2 coreutils
 
 %description tools
