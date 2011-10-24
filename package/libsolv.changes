@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Oct 24 13:26:18 CEST 2011 - ma@suse.de
+
+- mls fixed package provides/obsoletes, but forgot to write 
+  a changes entry.
+
+-------------------------------------------------------------------
 Tue Oct 18 16:18:39 CEST 2011 - ma@suse.de
 
 - Add arch arvm7tnhl and  armv7thl
