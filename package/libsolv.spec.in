@@ -23,7 +23,6 @@ Url:            git://gitorious.org/opensuse/libsolv.git
 Source:         libsolv-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Group:          Development/Libraries/C and C++
-Prefix:         /usr
 
 %bcond_without enable_static
 %bcond_without disable_shared
@@ -84,14 +83,6 @@ Summary:        A new approach to package dependency solving
 %description
 A new approach to package dependency solving
 
-Authors:
---------
-    Michael Schroeder <mls@suse.de>
-    Klaus Kaempf <kkaempf@suse.de>
-    Stephan Kulow <coolo@suse.de>
-    Michael Matz <matz@suse.de>
-    Duncan Mac-Vicar P. <dmacvicar@suse.de>
-
 %if !%{with disable_shared}
 %package -n libsolv@LIBSOLV_SOVERSION@
 Summary:        A new approach to package dependency solving
@@ -100,20 +91,10 @@ Group:          Development/Libraries/C and C++
 %description -n libsolv@LIBSOLV_SOVERSION@
 A new approach to package dependency solving
 
-Authors:
---------
-    Michael Schroeder <mls@suse.de>
-    Klaus Kaempf <kkaempf@suse.de>
-    Stephan Kulow <coolo@suse.de>
-    Michael Matz <matz@suse.de>
-    Duncan Mac-Vicar P. <dmacvicar@suse.de>
-
 %endif
 %package devel
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
-Obsoletes:      libsatsolver-devel < 0.18
-Provides:       libsatsolver-devel = 0.18
 Requires:       libsolv-tools = %version
 %if !%{with disable_shared}
 Requires:       libsolv@LIBSOLV_SOVERSION@ = %version
@@ -122,14 +103,6 @@ Requires:       rpm-devel
 
 %description devel
 Development files for libsolv, a new approach to package dependency solving
-
-Authors:
---------
-    Michael Schroeder <mls@suse.de>
-    Klaus Kaempf <kkaempf@suse.de>
-    Stephan Kulow <coolo@suse.de>
-    Michael Matz <matz@suse.de>
-    Duncan Mac-Vicar P. <dmacvicar@suse.de>
 
 %package tools
 Summary:        A new approach to package dependency solving
