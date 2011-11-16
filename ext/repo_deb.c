@@ -573,7 +573,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 	  for (j = 124; j < 124 + 12; j++)
 	    if (bp[j] >= '0' && bp[j] <= '7')
 	      l2 = l2 * 8 + (bp[j] - '0');
-	  if (!strcmp((char *)bp, "./control"))
+	  if (!strcmp((char *)bp, "./control") || !strcmp((char *)bp, "control"))
 	    break;
 	  l2 = 512 + ((l2 + 511) & ~511);
 	  l -= l2;
@@ -581,7 +581,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
 	}
       if (l <= 512 || l - 512 - l2 <= 0 || l2 <= 0)
 	{
-	  fprintf(stderr, "%s: control.tar.gz contains no ./control file\n", debs[i]);
+	  fprintf(stderr, "%s: control.tar.gz contains no control file\n", debs[i]);
 	  free(ctar);
 	  continue;
 	}
