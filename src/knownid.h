@@ -146,6 +146,8 @@ KNOWNID(UPDATE_RESTART,			"update:restart"),	/* restart suggested (update stack 
 KNOWNID(UPDATE_RELOGIN,			"update:relogin"),	/* relogin suggested */
 
 KNOWNID(UPDATE_MESSAGE,			"update:message"),	/* informative message */
+KNOWNID(UPDATE_SEVERITY,		"update:severity"),	/* "Important", ...*/
+KNOWNID(UPDATE_RIGHTS,			"update:rights"),	/* copyright */
 
 /* 'content' of patch, usually list of packages */
 KNOWNID(UPDATE_COLLECTION,		"update:collection"),          /*  "name evr arch" */

@@ -27,8 +27,11 @@
  *   <update from="rel-eng@fedoraproject.org" status="stable" type="security" version="1.4">
  *     <id>FEDORA-2007-4594</id>
  *     <title>imlib-1.9.15-6.fc8</title>
+ *     <severity>Important</severity>
  *     <release>Fedora 8</release>
+ *     <rights>Copyright 2007 Company Inc</rights>
  *     <issued date="2007-12-28 16:42:30"/>
+ *     <updated date="2008-03-14 12:00:00"/>
  *     <references>
  *       <reference href="https://bugzilla.redhat.com/show_bug.cgi?id=426091" id="426091" title="CVE-2007-3568 imlib: infinite loop DoS using crafted BMP image" type="bugzilla"/>
  *     </references>
@@ -48,24 +51,27 @@
 
 enum state {
   STATE_START,
-  STATE_UPDATES,      /* 1 */
-  STATE_UPDATE,       /* 2 */
-  STATE_ID,           /* 3 */
-  STATE_TITLE,        /* 4 */
-  STATE_RELEASE,      /* 5 */
-  STATE_ISSUED,       /* 6 */
-  STATE_MESSAGE,      /* 7 */
-  STATE_REFERENCES,   /* 8 */
-  STATE_REFERENCE,    /* 9 */
-  STATE_DESCRIPTION,  /* 10 */
-  STATE_PKGLIST,     /* 11 */
-  STATE_COLLECTION,  /* 12 */
-  STATE_NAME,        /* 13 */
-  STATE_PACKAGE,     /* 14 */
-  STATE_FILENAME,    /* 15 */
-  STATE_REBOOT,      /* 16 */
-  STATE_RESTART,     /* 17 */
-  STATE_RELOGIN,     /* 18 */
+  STATE_UPDATES,
+  STATE_UPDATE,
+  STATE_ID,
+  STATE_TITLE,
+  STATE_RELEASE,
+  STATE_ISSUED,
+  STATE_UPDATED,
+  STATE_MESSAGE,
+  STATE_REFERENCES,
+  STATE_REFERENCE,
+  STATE_DESCRIPTION,
+  STATE_PKGLIST,
+  STATE_COLLECTION,
+  STATE_NAME,
+  STATE_PACKAGE,
+  STATE_FILENAME,
+  STATE_REBOOT,
+  STATE_RESTART,
+  STATE_RELOGIN,
+  STATE_RIGHTS,
+  STATE_SEVERITY,
   NUMSTATES
 };
 
@@ -84,8 +90,11 @@ static struct stateswitch stateswitches[] = {
   { STATE_UPDATES,     "update",          STATE_UPDATE,      0 },
   { STATE_UPDATE,      "id",              STATE_ID,          1 },
   { STATE_UPDATE,      "title",           STATE_TITLE,       1 },
+  { STATE_UPDATE,      "severity",        STATE_SEVERITY,    1 },
+  { STATE_UPDATE,      "rights",          STATE_RIGHTS,      1 },
   { STATE_UPDATE,      "release",         STATE_RELEASE,     1 },
-  { STATE_UPDATE,      "issued",          STATE_ISSUED,      1 },
+  { STATE_UPDATE,      "issued",          STATE_ISSUED,      0 },
+  { STATE_UPDATE,      "updated",         STATE_UPDATED,     0 },
   { STATE_UPDATE,      "description",     STATE_DESCRIPTION, 1 },
   { STATE_UPDATE,      "message",         STATE_MESSAGE    , 1 },
   { STATE_UPDATE,      "references",      STATE_REFERENCES,  0 },
@@ -114,6 +123,7 @@ struct parsedata {
   Repodata *data;
   unsigned int datanum;
   Solvable *solvable;
+  time_t buildtime;
   Id collhandle;
 
   struct stateswitch *swtab[NUMSTATES];
@@ -295,6 +305,7 @@ startElement(void *userData, const char *name, const char **atts)
 	solvable->arch = ARCH_NOARCH;
 	if (type)
 	  repodata_set_str(pd->data, pd->datanum, SOLVABLE_PATCHCATEGORY, type);
+        pd->buildtime = (time_t)0;
       }
       break;
       /* <id>FEDORA-2007-4594</id> */
@@ -309,6 +320,7 @@ startElement(void *userData, const char *name, const char **atts)
       /*  <issued date="2008-03-21 21:36:55"/>
       */
     case STATE_ISSUED:
+    case STATE_UPDATED:
       {
 	const char *date = 0;
 	for (; *atts; atts += 2)
@@ -319,8 +331,8 @@ startElement(void *userData, const char *name, const char **atts)
 	if (date)
 	  {
 	    time_t t = datestr2timestamp(date);
-	    if (t)
-	      repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, t);
+	    if (t && t > pd->buildtime)
+              pd->buildtime = t;
 	  }
       }
       break;
@@ -463,6 +475,11 @@ endElement(void *userData, const char *name)
       break;
     case STATE_UPDATE:
       s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+      if (pd->buildtime)
+	{
+	  repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, pd->buildtime);
+	  pd->buildtime = (time_t)0;
+	}
       break;
     case STATE_ID:
       s->name = pool_str2id(pool, join2("patch", ":", pd->content), 1);
@@ -472,6 +489,12 @@ endElement(void *userData, const char *name)
       while (pd->lcontent > 0 && pd->content[pd->lcontent - 1] == '\n')
         pd->content[--pd->lcontent] = 0;
       repodata_set_str(pd->data, pd->datanum, SOLVABLE_SUMMARY, pd->content);
+      break;
+    case STATE_SEVERITY:
+      repodata_set_poolstr(pd->data, pd->datanum, UPDATE_SEVERITY, pd->content);
+      break;
+    case STATE_RIGHTS:
+      repodata_set_poolstr(pd->data, pd->datanum, UPDATE_RIGHTS, pd->content);
       break;
       /*
        * <release>Fedora 8</release>
