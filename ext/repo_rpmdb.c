@@ -3051,7 +3051,11 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_KEYID, keyid);
   if (dig->pubkey.userid)
     setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, dig->pubkey.userid);
+#ifndef RPM5
   (void)pgpFreeDig(dig);
+#else
+  (void)pgpDigFree(dig);
+#endif
   solv_free((void *)pkts);
   return 1;
 }
