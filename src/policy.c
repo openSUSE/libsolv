@@ -296,25 +296,35 @@ prune_to_best_arch(const Pool *pool, Queue *plist)
     plist->count = j;
 }
 
-/*
- * remove entries from plist that are obsoleted by other entries
- * with different name.
- * plist should be sorted in some way.
- */
-static void
-prune_obsoleted(Pool *pool, Queue *plist)
-{
-  int i, j;
-  Solvable *s;
 
-  /* FIXME maybe also check provides depending on noupdateprovide? */
-  /* FIXME do not prune cycles */
-  for (i = 0; i < plist->count; i++)
+struct trj_data {
+  Pool *pool;
+  Queue *plist;
+  Id *stack;
+  Id nstack;
+  Id *low;
+  Id firstidx;
+  Id idx;
+};
+
+/* This is Tarjan's SCC algorithm, slightly modified */
+static void
+trj_visit(struct trj_data *trj, Id node)
+{
+  Id *low = trj->low;
+  Pool *pool = trj->pool;
+  Queue *plist = trj->plist;
+  Id myidx, stackstart;
+  Solvable *s;
+  int i;
+  Id p, pp, obs, *obsp;
+
+  low[node] = myidx = trj->idx++;
+  trj->stack[(stackstart = trj->nstack++)] = node;
+
+  s = pool->solvables + plist->elements[node];
+  if (s->obsoletes)
     {
-      Id p, pp, obs, *obsp;
-      s = pool->solvables + plist->elements[i];
-      if (!s->obsoletes)
-	continue;
       obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
 	{
@@ -328,21 +338,192 @@ prune_obsoleted(Pool *pool, Queue *plist)
 	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		continue;
 	      /* hmm, expensive. should use hash if plist is big */
-	      for (j = 0; j < plist->count; j++)
+	      for (i = 0; i < plist->count; i++)
 		{
-		  if (i == j)
-		    continue;
-		  if (plist->elements[j] == p)
-		    plist->elements[j] = 0;
+		  if (node != i && plist->elements[i] == p)
+		    {
+		      Id l = low[i];
+		      if (!l)
+			{
+			  if (!ps->obsoletes)
+			    {
+			      /* don't bother */
+			      trj->idx++;
+			      low[i] = -1;
+			      continue;
+			    }
+			  trj_visit(trj, i);
+			  l = low[i];
+			}
+		      if (l < 0)
+			continue;
+		      if (l < trj->firstidx)
+			{
+			  int k;
+			  /* this means we have reached an old SCC found earlier.
+			   * delete it as we obsolete it */
+			  for (k = l; ; k++)
+			    {
+			      if (low[trj->stack[k]] == l)
+				low[trj->stack[k]] = -1;
+			      else
+				break;
+			    }
+			}
+		      else if (l < low[node])
+			low[node] = l;
+		    }
 		}
 	    }
 	}
     }
-  /* delete zeroed out queue entries */
+  if (low[node] == myidx)	/* found a SCC? */
+    {
+      /* we're only interested in SCCs that contain the first node,
+       * as all others are "obsoleted" */
+      if (myidx != trj->firstidx)
+	myidx = -1;
+      for (i = stackstart; i < trj->nstack; i++)
+	low[trj->stack[i]] = myidx;
+      trj->nstack = stackstart;	/* empty stack */
+    }
+}
+  
+/*
+ * remove entries from plist that are obsoleted by other entries
+ * with different name.
+ */
+static void
+prune_obsoleted(Pool *pool, Queue *plist)
+{
+  Id data_buf[2 * 16], *data;
+  struct trj_data trj;
+  int i, j;
+  Solvable *s;
+  
+  if (plist->count <= 16)
+    {
+      memset(data_buf, 0, sizeof(data_buf));
+      data = data_buf;
+    }
+  else
+    data = solv_calloc(plist->count, 2 * sizeof(Id));
+  trj.pool = pool;
+  trj.plist = plist;
+  trj.low = data;
+  trj.idx = 1;
+  trj.stack = data + plist->count - 1;	/* -1 so we can index with idx (which starts with 1) */
+  for (i = 0; i < plist->count; i++)
+    {
+      if (trj.low[i])
+	continue;
+      s = pool->solvables + plist->elements[i];
+      if (s->obsoletes)
+	{
+	  trj.firstidx = trj.nstack = trj.idx;
+          trj_visit(&trj, i);
+	}
+      else
+        {
+          Id myidx = trj.idx++;
+          trj.low[i] = myidx;
+          trj.stack[myidx] = i;
+        }
+    }
   for (i = j = 0; i < plist->count; i++)
-    if (plist->elements[i])
+    if (trj.low[i] >= 0)
       plist->elements[j++] = plist->elements[i];
   plist->count = j;
+  if (data != data_buf)
+    solv_free(data);
+}
+
+/* this is prune_obsoleted special-cased for two elements */
+static void
+prune_obsoleted_2(Pool *pool, Queue *plist)
+{
+  int i;
+  Solvable *s;
+  Id p, pp, obs, *obsp;
+  Id other;
+  int obmap = 0;
+
+  for (i = 0; i < 2; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+      other = plist->elements[1 - i];
+      if (s->obsoletes)
+	{
+	  obsp = s->repo->idarraydata + s->obsoletes;
+	  while ((obs = *obsp++) != 0)
+	    {
+	      FOR_PROVIDES(p, pp, obs)
+		{
+		  Solvable *ps;
+		  if (p != other)
+		    continue;
+		  ps = pool->solvables + p;
+		  if (ps->name == s->name)
+		    continue;
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
+		    continue;
+		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		    continue;
+		  obmap |= 1 << i;
+		  break;
+		}
+	      if (p)
+		break;
+	    }
+	}
+    }
+  if (obmap == 0 || obmap == 3)
+    return;
+  if (obmap == 2)
+    plist->elements[0] = plist->elements[1];
+  plist->count = 1;
+}
+
+/*
+ * bring those elements to the front of the queue that
+ * have a installed solvable with the same name
+ */
+static void
+move_installed_to_front(Pool *pool, Queue *plist)
+{
+  int i, j;
+  Solvable *s;
+  Id p, pp;
+
+  for (i = j = 0; i < plist->count; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+      if (s->repo != pool->installed)
+        {
+          FOR_PROVIDES(p, pp, s->name)
+	    {
+	      Solvable *ps = pool->solvables + p;
+	      if (s->name == ps->name && ps->repo == pool->installed)
+		{
+		  s = ps;
+		  break;
+		}
+	    }
+        }
+      if (s->repo == pool->installed)
+	{
+	  if (i != j)
+	    {
+	      p = plist->elements[i];
+              if (i - j == 1)
+		plist->elements[i] = plist->elements[j];
+	      else
+	        memmove(plist->elements + j + 1, plist->elements + j, (i - j) * sizeof(Id));
+	      plist->elements[j] = p;
+	    }
+	  j++;
+	}
+    }
 }
 
 /*
@@ -400,7 +581,14 @@ prune_to_best_version(Pool *pool, Queue *plist)
   /* we reduced the list to one package per name, now look at
    * package obsoletes */
   if (plist->count > 1)
-    prune_obsoleted(pool, plist);
+    {
+      if (plist->count == 2)
+        prune_obsoleted_2(pool, plist);
+      else
+        prune_obsoleted(pool, plist);
+    }
+  if (plist->count > 1 && pool->installed)
+    move_installed_to_front(pool, plist);
 }
 
 
