@@ -98,7 +98,7 @@ cd "$dir" || exit 1
 
 if test -z "$repotype" ; then
   # autodetect repository type
-  if test -d repodata ; then
+  if test -d repodata -o -f repomd.xml; then
     repotype=rpmmd
   elif test_susetags ; then
     repotype=susetags
@@ -108,7 +108,9 @@ if test -z "$repotype" ; then
 fi
 
 if test "$repotype" = rpmmd ; then
-  cd repodata || exit 2
+  test -d repodata && {
+    cd repodata || exit 2
+  }
 
   primfile=
   primxml=`repomd_findfile primary primary.xml`
