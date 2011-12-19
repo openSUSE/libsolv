@@ -16,6 +16,7 @@
 #include "pooltypes.h"
 #include "pool.h"
 #include "repodata.h"
+#include "hash.h"
 
 
 
@@ -36,12 +37,19 @@ typedef struct _Repo {
 
   Id *idarraydata;		/* array of metadata Ids, solvable dependencies are offsets into this array */
   int idarraysize;
-  Offset lastoff;		/* start of last array in idarraydata */
 
   Repodata *repodata;		/* our stores for non-solvable related data */
   unsigned nrepodata;		/* number of our stores..  */
 
   Id *rpmdbid;			/* solvable side data: rpm database id */
+
+  Offset lastoff;		/* start of last array in idarraydata */
+
+  Hashtable lastidhash;		/* hash to speed up repo_addid_dep */
+  Hashmask lastidhash_mask;
+  int lastidhash_idarraysize;
+  int lastmarker;
+  Offset lastmarkerpos;
 } Repo;
 
 extern Repo *repo_create(Pool *pool, const char *name);

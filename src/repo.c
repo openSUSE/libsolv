@@ -62,6 +62,7 @@ repo_freedata(Repo *repo)
   solv_free(repo->repodata);
   solv_free(repo->idarraydata);
   solv_free(repo->rpmdbid);
+  solv_free(repo->lastidhash);
   solv_free((char *)repo->name);
   solv_free(repo);
 }
@@ -298,13 +299,15 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
   return olddeps;
 }
 
+#define REPO_ADDID_DEP_HASHTHRES	64
+#define REPO_ADDID_DEP_HASHMIN		128
 
 /*
  * add dependency (as Id) to repo, also unifies dependencies
  * olddeps = offset into idarraydata
  * marker= 0 for normal dep
  * marker > 0 add dep after marker
- * marker < 0 add dep after -marker
+ * marker < 0 add dep before -marker
  * returns new start of dependency array
  */
 Offset
@@ -320,24 +323,120 @@ repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker)
       return repo_addid(repo, olddeps, id);
     }
 
+  before = 0;
+  if (marker)
+    {
+      if (marker == id)
+	marker = 0;
+      if (marker < 0)
+	{
+	  marker = -marker;
+	  before = 1;
+	}
+    }
+
+  /* optimization for packages with an excessive amount of provides/requires:
+   * if the number of deps exceed a threshold, we build a hash of the already
+   * seen ids.
+   */
+  if (olddeps == repo->lastoff)
+    {
+      int size = repo->idarraysize - 1 - repo->lastoff;
+      if (size >= REPO_ADDID_DEP_HASHTHRES)
+	{
+	  Hashval h, hh;
+	  Id hid;
+
+	  /* maintain hash and lastmarkerpos */
+	  if (repo->lastidhash_idarraysize != repo->idarraysize || size * 2 > repo->lastidhash_mask || repo->lastmarker != marker)
+	    {
+	      if (size * 2 > repo->lastidhash_mask)
+		{
+		  repo->lastidhash_mask = mkmask(size < REPO_ADDID_DEP_HASHMIN ? REPO_ADDID_DEP_HASHMIN : size);
+		  repo->lastidhash = solv_realloc2(repo->lastidhash, repo->lastidhash_mask + 1, sizeof(Id));
+		}
+	      memset(repo->lastidhash, 0, (repo->lastidhash_mask + 1) * sizeof(Id));
+	      for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != 0; oidp++)
+		{
+		  h = oid & repo->lastidhash_mask;
+		  hh = HASHCHAIN_START;
+		  while (repo->lastidhash[h] != 0)
+		    h = HASHCHAIN_NEXT(h, hh, repo->lastidhash_mask);
+		  repo->lastidhash[h] = oid;
+		  if (marker && oid == marker)
+		    repo->lastmarkerpos = oidp - repo->idarraydata;
+		}
+	      repo->lastmarker = marker;
+	      repo->lastidhash_idarraysize = repo->idarraysize;
+	    }
+
+	  /* check the hash! */
+	  h = id & repo->lastidhash_mask;
+	  hh = HASHCHAIN_START;
+	  while ((hid = repo->lastidhash[h]) != 0 && hid != id)
+	    h = HASHCHAIN_NEXT(h, hh, repo->lastidhash_mask);
+	  /* put new element in hash */
+	  if (!hid)
+	    repo->lastidhash[h] = id;
+	  if (marker && !before && !repo->lastmarkerpos)
+	    {
+	      /* we have to add the marker first */
+	      repo->lastmarkerpos = repo->idarraysize - 1;
+	      olddeps = repo_addid(repo, olddeps, marker);
+	      /* now put marker in hash */
+	      h = marker & repo->lastidhash_mask;
+	      hh = HASHCHAIN_START;
+	      while (repo->lastidhash[h] != 0)
+		h = HASHCHAIN_NEXT(h, hh, repo->lastidhash_mask);
+	      repo->lastidhash[h] = marker;
+	      repo->lastidhash_idarraysize = repo->idarraysize;
+	    }
+	  if (!hid)
+	    {
+	      if (marker && before && repo->lastmarkerpos)
+		{
+		  /* need to add it before the marker */
+		  olddeps = repo_addid(repo, olddeps, 0);	/* dummy to make room */
+		  memmove(repo->idarraydata + repo->lastmarkerpos + 1, repo->idarraydata + repo->lastmarkerpos, repo->idarraysize - repo->lastmarkerpos - 2);
+		  repo->idarraydata[repo->lastmarkerpos++] = id;
+		}
+	      else
+		{
+		  /* just append it to the end */
+		  olddeps = repo_addid(repo, olddeps, id);
+		}
+	      repo->lastidhash_idarraysize = repo->idarraysize;
+	      return olddeps;
+	    }
+	  /* we already have it in the hash */
+	  if (!marker || before)
+	    return olddeps;
+	  /* check if it is in the correct half */
+	  for (oidp = repo->idarraydata + repo->lastmarkerpos + 1; (oid = *oidp) != 0; oidp++)
+	    if (oid == id)
+	      return olddeps;
+	  /* nope, copy it over */
+	  for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != 0; oidp++)
+	    if (oid == id)
+	      break;
+	  if (!oid)
+	    return olddeps;	/* should not happen */
+	  memmove(oidp, oidp + 1, repo->idarraydata + repo->idarraysize - oidp - 2);
+	  repo->idarraydata[repo->idarraysize - 2] = id;
+	  return olddeps;
+	}
+    }
+
   if (!marker)
     {
-      for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != ID_NULL; oidp++)
-	{
-	  if (oid == id)
-	    return olddeps;
-	}
+      for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != 0; oidp++)
+        if (oid == id)
+	  return olddeps;
       return repo_addid(repo, olddeps, id);
     }
 
-  before = 0;
   markerp = 0;
-  if (marker < 0)
-    {
-      before = 1;
-      marker = -marker;
-    }
-  for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != ID_NULL; oidp++)
+  for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != 0; oidp++)
     {
       if (oid == marker)
 	markerp = oidp;
@@ -349,9 +448,9 @@ repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker)
     {
       if (markerp || before)
         return olddeps;
-      /* we found it, but in the wrong half */
+      /* we found it, but in the first half */
       markerp = oidp++;
-      for (; (oid = *oidp) != ID_NULL; oidp++)
+      for (; (oid = *oidp) != 0; oidp++)
         if (oid == marker)
           break;
       if (!oid)
