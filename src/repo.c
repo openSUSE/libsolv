@@ -358,6 +358,8 @@ repo_addid_dep_hash(Repo *repo, Offset olddeps, Id id, Id marker, int size)
   /* put new element in hash */
   if (!hid)
     repo->lastidhash[h] = id;
+  else if (marker == SOLVABLE_FILEMARKER)
+    return olddeps;
   if (marker && !before && !repo->lastmarkerpos)
     {
       /* we have to add the marker first */
@@ -373,6 +375,7 @@ repo_addid_dep_hash(Repo *repo, Offset olddeps, Id id, Id marker, int size)
     }
   if (!hid)
     {
+      /* new entry, insert in correct position */
       if (marker && before && repo->lastmarkerpos)
 	{
 	  /* need to add it before the marker */
@@ -389,7 +392,7 @@ repo_addid_dep_hash(Repo *repo, Offset olddeps, Id id, Id marker, int size)
       return olddeps;
     }
   /* we already have it in the hash */
-  if (!marker || before || marker == SOLVABLE_FILEMARKER)
+  if (!marker || before)
     return olddeps;
   /* check if it is in the correct half */
   for (oidp = repo->idarraydata + repo->lastmarkerpos + 1; (oid = *oidp) != 0; oidp++)
@@ -403,6 +406,7 @@ repo_addid_dep_hash(Repo *repo, Offset olddeps, Id id, Id marker, int size)
     return olddeps;	/* should not happen */
   memmove(oidp, oidp + 1, (repo->idarraydata + repo->idarraysize - oidp - 2) * sizeof(Id));
   repo->idarraydata[repo->idarraysize - 2] = id;
+  repo->lastmarkerpos--;	/* marker has been moved */
   return olddeps;
 }
 
