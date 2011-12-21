@@ -359,7 +359,7 @@ repo_addid_dep_hash(Repo *repo, Offset olddeps, Id id, Id marker, int size)
   /* put new element in hash */
   if (!hid)
     repo->lastidhash[h] = id;
-  else if (marker == SOLVABLE_FILEMARKER)
+  else if (marker == SOLVABLE_FILEMARKER && (!before || !repo->lastmarkerpos))
     return olddeps;
   if (marker && !before && !repo->lastmarkerpos)
     {
@@ -393,7 +393,23 @@ repo_addid_dep_hash(Repo *repo, Offset olddeps, Id id, Id marker, int size)
       return olddeps;
     }
   /* we already have it in the hash */
-  if (!marker || before)
+  if (!marker)
+    return olddeps;
+  if (marker == SOLVABLE_FILEMARKER)
+    {
+      /* check if it is in the wrong half */
+      /* (we already made sure that "before" and "lastmarkerpos" are set, see above) */
+      for (oidp = repo->idarraydata + repo->lastmarkerpos + 1; (oid = *oidp) != 0; oidp++)
+	if (oid == id)
+	  break;
+      if (!oid)
+	return olddeps;
+      /* yes, wrong half. copy it over */
+      memmove(repo->idarraydata + repo->lastmarkerpos + 1, repo->idarraydata + repo->lastmarkerpos, (oidp - (repo->idarraydata + repo->lastmarkerpos)) * sizeof(Id));
+      repo->idarraydata[repo->lastmarkerpos++] = id;
+      return olddeps;
+    }
+  if (before)
     return olddeps;
   /* check if it is in the correct half */
   for (oidp = repo->idarraydata + repo->lastmarkerpos + 1; (oid = *oidp) != 0; oidp++)
@@ -471,7 +487,16 @@ repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker)
 
   if (oid)
     {
-      if (markerp || before || marker == SOLVABLE_FILEMARKER)
+      if (marker == SOLVABLE_FILEMARKER)
+	{
+	  if (!markerp || !before)
+            return olddeps;
+          /* we found it, but in the second half */
+          memmove(markerp + 1, markerp, (oidp - markerp) * sizeof(Id));
+          *markerp = id;
+          return olddeps;
+	}
+      if (markerp || before)
         return olddeps;
       /* we found it, but in the first half */
       markerp = oidp++;
