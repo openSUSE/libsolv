@@ -70,6 +70,7 @@ struct _Pool {
 
   struct _Repo **repos;
   int nrepos;			/* repos allocated */
+  int urepos;			/* repos in use */
 
   struct _Repo *installed; 	/* packages considered installed */
 
@@ -323,10 +324,9 @@ void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
   for (vp = pool_whatprovides(pool, d) ; (v = pool->whatprovidesdata[vp++]) != 0; )
 
 /* loop over all repositories */
-/* note that idx is not the repoid */
-#define FOR_REPOS(idx, r)						\
-  for (idx = 0; idx < pool->nrepos; idx++)				\
-    if ((r = pool->repos[idx]) != 0)
+#define FOR_REPOS(repoid, r)						\
+  for (repoid = 1; repoid < pool->nrepos; repoid++)				\
+    if ((r = pool->repos[repoid]) != 0)
     
 
 #define POOL_DEBUG(type, ...) do {if ((pool->debugmask & (type)) != 0) pool_debug(pool, (type), __VA_ARGS__);} while (0)

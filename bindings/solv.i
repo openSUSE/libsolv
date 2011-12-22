@@ -981,7 +981,7 @@ typedef struct {
   }
 
   Repo *id2repo(Id id) {
-    if (id < 1 || id > $self->nrepos)
+    if (id < 1 || id >= $self->nrepos)
       return 0;
     return pool_id2repo($self, id);
   }
@@ -1456,9 +1456,9 @@ typedef struct {
   %newobject __next__;
   Repo *__next__() {
     Pool *pool = $self->pool;
-    if ($self->id >= pool->nrepos + 1)
+    if ($self->id >= pool->nrepos)
       return 0;
-    while (++$self->id < pool->nrepos + 1) {
+    while (++$self->id < pool->nrepos) {
       Repo *r = pool_id2repo(pool, $self->id);
       if (r)
         return r;
@@ -1475,12 +1475,12 @@ typedef struct {
 #endif
   Repo *__getitem__(Id key) {
     Pool *pool = $self->pool;
-    if (key > 0 && key < pool->nrepos + 1)
+    if (key > 0 && key < pool->nrepos)
       return pool_id2repo(pool, key);
     return 0;
   }
   int __len__() {
-    return $self->pool->nrepos + 1;
+    return $self->pool->nrepos;
   }
 }
 

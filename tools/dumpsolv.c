@@ -278,7 +278,7 @@ int main(int argc, char **argv)
       if (repo_add_solv(repo, stdin))
 	printf("could not read repository\n");
     }
-  if (!pool->nrepos)
+  if (!pool->urepos)
     {
       repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
       if (repo_add_solv(repo, stdin))

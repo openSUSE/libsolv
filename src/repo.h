@@ -83,7 +83,7 @@ static inline const char *repo_name(const Repo *repo)
 
 static inline Repo *pool_id2repo(Pool *pool, Id repoid)
 {
-  return repoid ? pool->repos[repoid - 1] : 0;
+  return repoid < pool->nrepos ? pool->repos[repoid] : 0;
 }
 
 static inline int pool_installable(const Pool *pool, Solvable *s)

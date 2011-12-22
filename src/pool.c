@@ -53,6 +53,8 @@ pool_create(void)
   pool->solvables = solv_extend_resize(0, 2, sizeof(Solvable), SOLVABLE_BLOCK);
   pool->nsolvables = 2;
   memset(pool->solvables, 0, 2 * sizeof(Solvable));
+
+  /* initialize the system solvable */
   s = pool->solvables + SYSTEMSOLVABLE;
   s->name = SYSTEM_SYSTEM;
   s->arch = ARCH_NOARCH;
@@ -108,10 +110,11 @@ pool_freeallrepos(Pool *pool, int reuseids)
   int i;
 
   pool_freewhatprovides(pool);
-  for (i = 0; i < pool->nrepos; i++) 
+  for (i = 1; i < pool->nrepos; i++) 
     repo_freedata(pool->repos[i]);
   pool->repos = solv_free(pool->repos);
   pool->nrepos = 0; 
+  pool->urepos = 0; 
   /* the first two solvables don't belong to a repo */
   pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
 }
@@ -969,7 +972,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
   Map donemap;
   int ndone, incomplete;
 
-  if (!pool->nrepos)
+  if (!pool->urepos)
     return;
 
   cbd->nfiles = sf->nfiles;
@@ -979,14 +982,14 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
   cbd->dids = solv_realloc2(cbd->dids, sf->nfiles, sizeof(Id));
   map_init(&cbd->providedids, pool->ss.nstrings);
 
-  repoid = 0;
-  repo = repoonly ? repoonly : pool->repos[0];
+  repoid = 1;
+  repo = repoonly ? repoonly : pool->repos[repoid];
   map_init(&donemap, pool->nsolvables);
   queue_init(&fileprovidesq);
   provstart = provend = 0;
   for (;;)
     {
-      if (repo->disabled)
+      if (!repo || repo->disabled)
 	{
 	  if (repoonly || ++repoid == pool->nrepos)
 	    break;

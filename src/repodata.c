@@ -1181,7 +1181,7 @@ dataiterator_set_search(Dataiterator *di, Repo *repo, Id p)
   di->nparents = 0;
   di->rootlevel = 0;
   di->repodataid = 0;
-  if (!di->pool->nrepos)
+  if (!di->pool->urepos)
     {
       di->state = di_bye;
       return;
@@ -1189,7 +1189,7 @@ dataiterator_set_search(Dataiterator *di, Repo *repo, Id p)
   if (!repo)
     {
       di->repoid = 1;
-      di->repo = di->pool->repos[0];
+      di->repo = di->pool->repos[di->repoid];
     }
   di->state = di_enterrepo;
   if (p)
@@ -1277,9 +1277,7 @@ dataiterator_step(Dataiterator *di)
       switch (di->state)
 	{
 	case di_enterrepo: di_enterrepo:
-	  if (!di->repo)
-	    goto di_bye;
-	  if (di->repo->disabled && !(di->flags & SEARCH_DISABLED_REPOS))
+	  if (!di->repo || (di->repo->disabled && !(di->flags & SEARCH_DISABLED_REPOS)))
 	    goto di_nextrepo;
 	  if (!(di->flags & SEARCH_THISSOLVID))
 	    {
@@ -1387,9 +1385,9 @@ dataiterator_step(Dataiterator *di)
 	    {
 	      di->repoid++;
 	      di->repodataid = 0;
-	      if (di->repoid - 1 < di->pool->nrepos)
+	      if (di->repoid < di->pool->nrepos)
 		{
-		  di->repo = di->pool->repos[di->repoid - 1];
+		  di->repo = di->pool->repos[di->repoid];
 	          goto di_enterrepo;
 		}
 	    }
@@ -1691,13 +1689,13 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
     }
   else if (di->repoid > 0)
     {
-      if (!di->pool->nrepos)
+      if (!di->pool->urepos)
 	{
 	  di->state = di_bye;
 	  return;
 	}
       di->repoid = 1;
-      di->repo = di->pool->repos[0];
+      di->repo = di->pool->repos[di->repoid];
     }
   di->repodataid = 0;
   di->solvid = solvid;

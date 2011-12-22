@@ -42,9 +42,12 @@ repo_create(Pool *pool, const char *name)
 
   pool_freewhatprovides(pool);
   repo = (Repo *)solv_calloc(1, sizeof(*repo));
+  if (!pool->nrepos)
+    pool->nrepos = 1;	/* start with repoid 1 */
   pool->repos = (Repo **)solv_realloc2(pool->repos, pool->nrepos + 1, sizeof(Repo *));
-  pool->repos[pool->nrepos++] = repo;
-  repo->repoid = pool->nrepos;
+  pool->repos[pool->nrepos] = repo;
+  pool->urepos++;
+  repo->repoid = pool->nrepos++;
   repo->name = name ? solv_strdup(name) : 0;
   repo->pool = pool;
   repo->start = pool->nsolvables;
@@ -118,19 +121,16 @@ repo_free(Repo *repo, int reuseids)
   if (repo == pool->installed)
     pool->installed = 0;
   repo_empty(repo, reuseids);
-  for (i = 0; i < pool->nrepos; i++)	/* find repo in pool */
+  for (i = 1; i < pool->nrepos; i++)	/* find repo in pool */
     if (pool->repos[i] == repo)
       break;
   if (i == pool->nrepos)	       /* repo not in pool, return */
     return;
-  if (i < pool->nrepos - 1)
-    {
-      memmove(pool->repos + i, pool->repos + i + 1, (pool->nrepos - 1 - i) * sizeof(Repo *));
-      /* fix repo ids */
-      for (; i < pool->nrepos - 1; i++)
-	pool->repos[i]->repoid = i + 1;
-    }
-  pool->nrepos--;
+  if (i == pool->nrepos - 1 && reuseids)
+    pool->nrepos--;
+  else
+    pool->repos[i] = 0;
+  pool->urepos--;
   repo_freedata(repo);
 }
 
