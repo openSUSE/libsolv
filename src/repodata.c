@@ -2182,7 +2182,7 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
 	repodata_set_str(data, solvid, SOLVABLE_MEDIADIR, dir);
       else
 	{
-	  char *dir2 = strdup(dir);
+	  char *dir2 = solv_strdup(dir);
 	  dir2[l] = 0;
 	  repodata_set_str(data, solvid, SOLVABLE_MEDIADIR, dir2);
 	  free(dir2);

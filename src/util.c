@@ -84,6 +84,18 @@ solv_free(void *mem)
   return 0;
 }
 
+char *
+solv_strdup(const char *s)
+{
+  char *r;
+  if (!s)
+    return 0;
+  r = strdup(s);
+  if (!r)
+    solv_oom(0, strlen(s));
+  return r;
+}
+
 unsigned int
 solv_timems(unsigned int subtract)
 {

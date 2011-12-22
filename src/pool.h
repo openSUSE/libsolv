@@ -181,14 +181,9 @@ struct _Pool {
 # define __attribute__(x)
 #endif
 
-/**
- * Creates a new pool
- */
 extern Pool *pool_create(void);
-/**
- * Delete a pool
- */
 extern void pool_free(Pool *pool);
+extern void pool_freeallrepos(Pool *pool, int reuseids);
 
 extern void pool_setdebuglevel(Pool *pool, int level);
 #ifdef MULTI_SEMANTICS

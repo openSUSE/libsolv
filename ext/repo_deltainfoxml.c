@@ -226,7 +226,7 @@ static void parse_delta_location( struct parsedata *pd,
 	 name = alsa
 	 evr = 1.0.14-31_31.2
 	 suffix = x86_64.delta.rpm.  */
-      char *real_str = strdup(str);
+      char *real_str = solv_strdup(str);
       char *s = real_str;
       char *s1, *s2;
       s1 = strrchr (s, '/');
@@ -481,7 +481,7 @@ endElement(void *userData, const char *name)
       parse_delta_location(pd, pd->content);
       break;
     case STATE_CHECKSUM:
-      pd->delta.filechecksum = strdup(pd->content);
+      pd->delta.filechecksum = solv_strdup(pd->content);
       break;
     case STATE_SIZE:
       pd->delta.downloadsize = atoi(pd->content);
@@ -509,7 +509,7 @@ endElement(void *userData, const char *name)
 		    }
 		}
 	    }
-	  pd->delta.seqnum = strdup(str);
+	  pd->delta.seqnum = solv_strdup(str);
       }
     default:
       break;

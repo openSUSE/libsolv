@@ -629,7 +629,7 @@ endElement(void *userData, const char *name)
       const char *flavor = findKernelFlavor(pd, s);
       if (flavor) 
 	{
-	  char *cflavor = strdup(flavor);	/* make pointer safe */
+	  char *cflavor = solv_strdup(flavor);	/* make pointer safe */
 
 	  Id npr;
 	  Id pid;

@@ -45,7 +45,7 @@ repo_create(Pool *pool, const char *name)
   pool->repos = (Repo **)solv_realloc2(pool->repos, pool->nrepos + 1, sizeof(Repo *));
   pool->repos[pool->nrepos++] = repo;
   repo->repoid = pool->nrepos;
-  repo->name = name ? strdup(name) : 0;
+  repo->name = name ? solv_strdup(name) : 0;
   repo->pool = pool;
   repo->start = pool->nsolvables;
   repo->end = pool->nsolvables;
@@ -53,7 +53,7 @@ repo_create(Pool *pool, const char *name)
   return repo;
 }
 
-static void
+void
 repo_freedata(Repo *repo)
 {
   int i;
@@ -134,21 +134,8 @@ repo_free(Repo *repo, int reuseids)
   repo_freedata(repo);
 }
 
-void
-repo_freeallrepos(Pool *pool, int reuseids)
-{
-  int i;
-
-  pool_freewhatprovides(pool);
-  for (i = 0; i < pool->nrepos; i++)
-    repo_freedata(pool->repos[i]);
-  pool->repos = solv_free(pool->repos);
-  pool->nrepos = 0;
-  /* the first two solvables don't belong to a repo */
-  pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
-}
-
-Id repo_add_solvable(Repo *repo)
+Id
+repo_add_solvable(Repo *repo)
 {
   Id p = pool_add_solvable(repo->pool);
   if (!repo->start || repo->start == repo->end)
@@ -165,7 +152,8 @@ Id repo_add_solvable(Repo *repo)
   return p;
 }
 
-Id repo_add_solvable_block(Repo *repo, int count)
+Id
+repo_add_solvable_block(Repo *repo, int count)
 {
   Id p;
   Solvable *s; 
@@ -187,12 +175,14 @@ Id repo_add_solvable_block(Repo *repo, int count)
   return p;
 }
 
-void repo_free_solvable(Repo *repo, Id p, int reuseids)
+void
+repo_free_solvable(Repo *repo, Id p, int reuseids)
 {
   repo_free_solvable_block(repo, p, 1, reuseids);
 }
 
-void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
+void
+repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
 {
   Solvable *s;
   Repodata *data;

@@ -297,7 +297,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	        repodata_set_str(data, SOLVID_META, SUSETAGS_DESCRDIR, value);
 	      if (s)
 	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DESCRDIR, value);
-	      descrdir = strdup(value);
+	      descrdir = solv_strdup(value);
 	      continue;
 	    }
 	  if (istag ("DATADIR"))
@@ -308,7 +308,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	        repodata_set_str(data, SOLVID_META, SUSETAGS_DATADIR, value);
 	      if (s)
 	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DATADIR, value);
-	      datadir = strdup(value);
+	      datadir = solv_strdup(value);
 	      continue;
 	    }
 	  if (istag ("VENDOR"))
@@ -319,7 +319,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	        repodata_set_poolstr(data, SOLVID_META, SUSETAGS_DEFAULTVENDOR, value);
 	      if (s)
 		s->vendor = pool_str2id(pool, value, 1);
-	      defvendor = strdup(value);
+	      defvendor = solv_strdup(value);
 	      continue;
 	    }
 
@@ -403,9 +403,9 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	    }
 
 	  if (istag ("VERSION"))
-            pd.tmpvers = strdup(value);
+            pd.tmpvers = solv_strdup(value);
           else if (istag ("RELEASE"))
-            pd.tmprel = strdup(value);
+            pd.tmprel = solv_strdup(value);
 	  else if (code11 && istag ("DISTRIBUTION"))
 	    repodata_set_str(data, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
 	  else if (istag ("UPDATEURLS"))

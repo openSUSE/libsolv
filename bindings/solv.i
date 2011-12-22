@@ -1241,9 +1241,9 @@ typedef struct {
   const char *__str__() {
     char buf[20];
     if ($self->name)
-      return strdup($self->name);
+      return solv_strdup($self->name);
     sprintf(buf, "Repo#%d", $self->repoid);
-    return strdup(buf);
+    return solv_strdup(buf);
   }
   %newobject __repr__;
   const char *__repr__() {
@@ -1254,7 +1254,7 @@ typedef struct {
         return solv_dupjoin(buf, $self->name, ">");
       }
     sprintf(buf, "<Repo #%d>", $self->repoid);
-    return strdup(buf);
+    return solv_strdup(buf);
   }
 }
 
@@ -2141,7 +2141,7 @@ rb_eval_string(
   const char *__repr__() {
     char buf[20];
     sprintf(buf, "<Rule #%d>", $self->id);
-    return strdup(buf);
+    return solv_strdup(buf);
   }
 }
 
@@ -2248,7 +2248,7 @@ rb_eval_string(
   const char *__repr__() {
     char buf[20];
     sprintf(buf, "<Repodata #%d>", $self->id);
-    return strdup(buf);
+    return solv_strdup(buf);
   }
 }
 

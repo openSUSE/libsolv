@@ -415,7 +415,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
 	         realloc the stringspace (and hence invalidate str).  */
 	      fname = sp + 1;
 	      if (strlen(fname) >= 128)
-		fname = strdup(fname);
+		fname = solv_strdup(fname);
 	      else
 		{
 		  memcpy(fname_buf, fname, strlen(fname) + 1);
@@ -423,7 +423,7 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
 		}
 	      if (sp - str >= 128)
 		{
-		  char *sdup = strdup(str);
+		  char *sdup = solv_strdup(str);
 		  sdup[sp - str] = 0;
 		  did = repodata_str2dir(pd->data, sdup, 1);
 		  free(sdup);
@@ -1093,7 +1093,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    set_checksum(&pd, data, handle, SOLVABLE_CHECKSUM, line + 6);
 	    break;
 	  case CTAG('=', 'L', 'a', 'n'):
-	    language = strdup(line + 6);
+	    language = solv_strdup(line + 6);
 	    break;
 
 	  case CTAG('=', 'F', 'l', 's'):

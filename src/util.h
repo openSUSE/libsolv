@@ -26,6 +26,7 @@ extern void *solv_calloc(size_t, size_t);
 extern void *solv_realloc(void *, size_t);
 extern void *solv_realloc2(void *, size_t, size_t);
 extern void *solv_free(void *);
+extern char *solv_strdup(const char *);
 extern void solv_oom(size_t, size_t);
 extern unsigned int solv_timems(unsigned int subtract);
 extern void solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard);

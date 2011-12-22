@@ -97,7 +97,7 @@ pool_setvendorclasses(Pool *pool, const char **vendorclasses)
     ;
   pool->vendorclasses = solv_calloc(v - vendorclasses + 2, sizeof(const char *));
   for (v = vendorclasses, i = 0; v[0] || v[1]; v++, i++)
-    pool->vendorclasses[i] = *v ? strdup(*v) : 0;
+    pool->vendorclasses[i] = *v ? solv_strdup(*v) : 0;
   pool->vendorclasses[i++] = 0;
   pool->vendorclasses[i] = 0;
   queue_empty(&pool->vendormap);

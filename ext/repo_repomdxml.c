@@ -242,7 +242,7 @@ startElement(void *userData, const char *name, const char **atts)
         updstr = find_attr("updates", atts);
         if (updstr)
           {
-            char *value = strdup(updstr);
+            char *value = solv_strdup(updstr);
             char *fvalue = value; /* save the first */
             while (value)
 	      {

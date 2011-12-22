@@ -105,7 +105,7 @@ find_attr(const char *txt, const char **atts, int dup)
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, txt))
-        return dup ? strdup(atts[1]) : atts[1];
+        return dup ? solv_strdup(atts[1]) : atts[1];
     }
   return 0;
 }

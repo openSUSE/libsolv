@@ -86,7 +86,7 @@ pool_free(Pool *pool)
 
   pool_freewhatprovides(pool);
   pool_freeidhashes(pool);
-  repo_freeallrepos(pool, 1);
+  pool_freeallrepos(pool, 1);
   solv_free(pool->id2arch);
   solv_free(pool->solvables);
   stringpool_free(&pool->ss);
@@ -100,6 +100,20 @@ pool_free(Pool *pool)
   solv_free(pool->languages);
   solv_free(pool->languagecache);
   solv_free(pool);
+}
+
+void
+pool_freeallrepos(Pool *pool, int reuseids)
+{
+  int i;
+
+  pool_freewhatprovides(pool);
+  for (i = 0; i < pool->nrepos; i++) 
+    repo_freedata(pool->repos[i]);
+  pool->repos = solv_free(pool->repos);
+  pool->nrepos = 0; 
+  /* the first two solvables don't belong to a repo */
+  pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
 }
 
 #ifdef MULTI_SEMANTICS
@@ -883,7 +897,7 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       csf->names = solv_extend(csf->names, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
       csf->ids[csf->nfiles] = dep;
       sr = strrchr(s, '/');
-      csf->names[csf->nfiles] = strdup(sr + 1);
+      csf->names[csf->nfiles] = solv_strdup(sr + 1);
       csf->dirs[csf->nfiles] = solv_malloc(sr - s + 1);
       if (sr != s)
         strncpy(csf->dirs[csf->nfiles], s, sr - s);
@@ -1201,7 +1215,7 @@ pool_set_languages(Pool *pool, const char **languages, int nlanguages)
     return;
   pool->languages = solv_calloc(nlanguages, sizeof(const char **));
   for (i = 0; i < pool->nlanguages; i++)
-    pool->languages[i] = strdup(languages[i]);
+    pool->languages[i] = solv_strdup(languages[i]);
 }
 
 Id

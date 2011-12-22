@@ -900,7 +900,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
 	    {
 	      /* oh my, found SUSE special author section */
 	      int l = aut - str;
-	      str = strdup(str);
+	      str = solv_strdup(str);
 	      aut = str + l;
 	      str[l] = 0;
 	      while (l > 0 && str[l - 1] == '\n')
@@ -2167,7 +2167,7 @@ rpm_query(void *rpmhandle, Id what)
       break;
     case SOLVABLE_NAME:
       name = headstring(rpmhead, TAG_NAME);
-      r = strdup(name);
+      r = solv_strdup(name);
       break;
     case SOLVABLE_EVR:
       r = headtoevr(rpmhead);

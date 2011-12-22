@@ -55,7 +55,7 @@ typedef struct _Repo {
 extern Repo *repo_create(Pool *pool, const char *name);
 extern void repo_free(Repo *repo, int reuseids);
 extern void repo_empty(Repo *repo, int reuseids);
-extern void repo_freeallrepos(Pool *pool, int reuseids);
+extern void repo_freedata(Repo *repo);
 extern Id repo_add_solvable(Repo *repo);
 extern Id repo_add_solvable_block(Repo *repo, int count);
 extern void repo_free_solvable(Repo *repo, Id p, int reuseids);

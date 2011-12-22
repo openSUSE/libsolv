@@ -145,7 +145,7 @@ find_attr(const char *txt, const char **atts, int dup)
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, txt))
-        return dup ? strdup(atts[1]) : atts[1];
+        return dup ? solv_strdup(atts[1]) : atts[1];
     }
   return 0;
 }
@@ -308,10 +308,10 @@ endElement(void *userData, const char *name)
       s->name = pool_str2id(pd->pool, join2("product", ":", pd->content), 1);
       break;
     case STATE_VERSION:
-      pd->tmpvers = strdup(pd->content);
+      pd->tmpvers = solv_strdup(pd->content);
       break;
     case STATE_RELEASE:
-      pd->tmprel = strdup(pd->content);
+      pd->tmprel = solv_strdup(pd->content);
       break;
     case STATE_ARCH:
       s->arch = pool_str2id(pd->pool, pd->content, 1);

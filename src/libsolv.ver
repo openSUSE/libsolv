@@ -55,6 +55,7 @@ SOLV_1.0 {
 		pool_evrcmp_str;
 		pool_evrmatch;
 		pool_free;
+		pool_freeallrepos;
 		pool_freeidhashes;
 		pool_freetmpspace;
 		pool_freewhatprovides;
@@ -119,7 +120,6 @@ SOLV_1.0 {
 		repo_fix_conflicts;
 		repo_fix_supplements;
 		repo_free;
-		repo_freeallrepos;
 		repo_free_solvable;
 		repo_free_solvable_block;
 		repo_internalize;
@@ -214,6 +214,7 @@ SOLV_1.0 {
 		solv_realloc;
 		solv_realloc2;
 		solv_sort;
+		solv_strdup;
 		solv_timems;
 		solv_vercmp;
 		solv_version;
