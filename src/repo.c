@@ -43,8 +43,12 @@ repo_create(Pool *pool, const char *name)
   pool_freewhatprovides(pool);
   repo = (Repo *)solv_calloc(1, sizeof(*repo));
   if (!pool->nrepos)
-    pool->nrepos = 1;	/* start with repoid 1 */
-  pool->repos = (Repo **)solv_realloc2(pool->repos, pool->nrepos + 1, sizeof(Repo *));
+    {
+      pool->nrepos = 1;	/* start with repoid 1 */
+      pool->repos = (Repo **)solv_calloc(2, sizeof(Repo *));
+    }
+  else
+    pool->repos = (Repo **)solv_realloc2(pool->repos, pool->nrepos + 1, sizeof(Repo *));
   pool->repos[pool->nrepos] = repo;
   pool->urepos++;
   repo->repoid = pool->nrepos++;
