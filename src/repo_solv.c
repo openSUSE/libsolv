@@ -1295,7 +1295,13 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
   else
     {
       /* make it available as new repodata */
-      repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata + 1, sizeof(data));
+      if (!repo->nrepodata)
+	{
+	  repo->nrepodata = 1;
+	  repo->repodata = solv_calloc(2, sizeof(data));
+	}
+      else
+        repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata + 1, sizeof(data));
       repo->repodata[repo->nrepodata++] = data;
     }
 

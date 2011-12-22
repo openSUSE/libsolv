@@ -290,6 +290,6 @@ void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);
 
 #define FOR_REPODATAS(repo, rdid, data)	\
-	for (rdid = 0, data = repo->repodata + rdid; rdid < repo->nrepodata; rdid++, data++)
+	for (rdid = 1, data = repo->repodata + rdid; rdid < repo->nrepodata; rdid++, data++)
 
 #endif /* LIBSOLV_REPO_H */

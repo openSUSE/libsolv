@@ -64,7 +64,7 @@ void
 repo_freedata(Repo *repo)
 {
   int i;
-  for (i = 0; i < repo->nrepodata; i++)
+  for (i = 1; i < repo->nrepodata; i++)
     repodata_freedata(repo->repodata + i);
   solv_free(repo->repodata);
   solv_free(repo->idarraydata);
@@ -104,7 +104,7 @@ repo_empty(Repo *repo, int reuseids)
   repo->idarraysize = 0;
   repo->lastoff = 0;
   repo->rpmdbid = solv_free(repo->rpmdbid);
-  for (i = 0; i < repo->nrepodata; i++)
+  for (i = 1; i < repo->nrepodata; i++)
     repodata_freedata(repo->repodata + i);
   solv_free(repo->repodata);
   repo->repodata = 0;
@@ -1287,7 +1287,7 @@ repo_add_repodata(Repo *repo, int flags)
   int i;
   if ((flags & REPO_USE_LOADING) != 0)
     {
-      for (i = repo->nrepodata - 1; i >= 0; i--)
+      for (i = repo->nrepodata - 1; i > 0; i--)
 	if (repo->repodata[i].state == REPODATA_LOADING)
 	  {
 	    Repodata *data = repo->repodata + i;
@@ -1301,7 +1301,7 @@ repo_add_repodata(Repo *repo, int flags)
     }
   if ((flags & REPO_REUSE_REPODATA) != 0)
     {
-      for (i = repo->nrepodata - 1; i >= 0; i--)
+      for (i = repo->nrepodata - 1; i > 0; i--)
 	if (repo->repodata[i].state != REPODATA_STUB)
 	  return repo->repodata + i;
     }
@@ -1312,7 +1312,7 @@ Repodata *
 repo_last_repodata(Repo *repo)
 {
   int i;
-  for (i = repo->nrepodata - 1; i >= 0; i--)
+  for (i = repo->nrepodata - 1; i > 0; i--)
     if (repo->repodata[i].state != REPODATA_STUB)
       return repo->repodata + i;
   return repo_add_repodata(repo, 0);

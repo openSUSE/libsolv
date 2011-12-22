@@ -97,8 +97,16 @@ repodata_create(Repo *repo, int localpool)
 {
   Repodata *data;
 
-  repo->nrepodata++;
-  repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
+  if (!repo->nrepodata)
+    {
+      repo->nrepodata = 2;	/* start with id 1 */
+      repo->repodata = solv_calloc(repo->nrepodata, sizeof(*data));
+    }
+  else
+    {
+      repo->nrepodata++;
+      repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
+    }
   data = repo->repodata + repo->nrepodata - 1;
   repodata_initdata(data, repo, localpool);
   return data;
@@ -113,6 +121,11 @@ repodata_free(Repodata *data)
   if (i < repo->nrepodata - 1)
     memmove(repo->repodata + i, repo->repodata + i + 1, (repo->nrepodata - 1 - i) * sizeof(Repodata));
   repo->nrepodata--;
+  if (repo->nrepodata == 1)
+    {
+      repo->repodata = solv_free(repo->repodata);
+      repo->nrepodata = 0;
+    }
 }
 
 void
@@ -1180,7 +1193,7 @@ dataiterator_set_search(Dataiterator *di, Repo *repo, Id p)
   di->flags &= ~SEARCH_THISSOLVID;
   di->nparents = 0;
   di->rootlevel = 0;
-  di->repodataid = 0;
+  di->repodataid = 1;
   if (!di->pool->urepos)
     {
       di->state = di_bye;
@@ -1287,9 +1300,9 @@ dataiterator_step(Dataiterator *di)
 	  /* FALLTHROUGH */
 
 	case di_entersolvable: di_entersolvable:
-	  if (di->repodataid >= 0)
+	  if (di->repodataid)
 	    {
-	      di->repodataid = 0;	/* reset repodata iterator */
+	      di->repodataid = 1;	/* reset repodata iterator */
 	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)) && di->nparents - di->rootlevel == di->nkeynames)
 		{
 		  di->key = solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
@@ -1300,13 +1313,13 @@ dataiterator_step(Dataiterator *di)
 	  /* FALLTHROUGH */
 
 	case di_enterrepodata: di_enterrepodata:
-	  if (di->repodataid >= 0)
+	  if (di->repodataid)
 	    {
 	      if (di->repodataid >= di->repo->nrepodata)
 		goto di_nextsolvable;
 	      di->data = di->repo->repodata + di->repodataid;
 	    }
-	  if (di->repodataid >= 0 && di->keyname == SOLVABLE_FILELIST && !dataiterator_filelistcheck(di))
+	  if (di->repodataid && di->keyname == SOLVABLE_FILELIST && !dataiterator_filelistcheck(di))
 	    goto di_nextrepodata;
 	  if (!maybe_load_repodata(di->data, di->keyname))
 	    goto di_nextrepodata;
@@ -1361,7 +1374,7 @@ dataiterator_step(Dataiterator *di)
 	  /* FALLTHROUGH */
 
 	case di_nextrepodata: di_nextrepodata:
-	  if (di->repodataid >= 0 && ++di->repodataid < di->repo->nrepodata)
+	  if (di->repodataid && ++di->repodataid < di->repo->nrepodata)
 	      goto di_enterrepodata;
 	  /* FALLTHROUGH */
 
@@ -1384,7 +1397,7 @@ dataiterator_step(Dataiterator *di)
 	  if (di->repoid > 0)
 	    {
 	      di->repoid++;
-	      di->repodataid = 0;
+	      di->repodataid = 1;
 	      if (di->repoid < di->pool->nrepos)
 		{
 		  di->repo = di->pool->repos[di->repoid];
@@ -1676,7 +1689,7 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
 	}
       di->repoid = 0;
       di->data = di->repo->repodata + di->pool->pos.repodataid;
-      di->repodataid = -1;
+      di->repodataid = 0;
       di->solvid = solvid;
       di->state = di_enterrepo;
       di->flags |= SEARCH_THISSOLVID;
@@ -1697,7 +1710,7 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
       di->repoid = 1;
       di->repo = di->pool->repos[di->repoid];
     }
-  di->repodataid = 0;
+  di->repodataid = 1;
   di->solvid = solvid;
   if (solvid)
     di->flags |= SEARCH_THISSOLVID;
@@ -1712,7 +1725,7 @@ dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
   di->rootlevel = 0;
   di->repo = repo;
   di->repoid = 0;	/* 0 means stay at repo */
-  di->repodataid = 0;
+  di->repodataid = 1;
   di->solvid = 0;
   di->flags &= ~SEARCH_THISSOLVID;
   di->state = di_enterrepo;

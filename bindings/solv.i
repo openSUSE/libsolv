@@ -1164,7 +1164,7 @@ typedef struct {
   # HACK, remove if no longer needed!
   bool write_first_repodata(FILE *fp) {
     int oldnrepodata = $self->nrepodata;
-    $self->nrepodata = 1;
+    $self->nrepodata = oldnrepodata > 2 ? 2 : oldnrepodata;
     repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
     $self->nrepodata = oldnrepodata;
     return 1;
@@ -1217,15 +1217,15 @@ typedef struct {
   }
   XRepodata *first_repodata() {
      int i;
-     if (!$self->nrepodata)
+     if ($self->nrepodata < 2)
        return 0;
      /* make sure all repodatas but the first are extensions */
-     if ($self->repodata[0].loadcallback)
+     if ($self->repodata[1].loadcallback)
         return 0;
-     for (i = 1; i < $self->nrepodata; i++)
+     for (i = 2; i < $self->nrepodata; i++)
        if (!$self->repodata[i].loadcallback)
          return 0;       /* oops, not an extension */
-     return new_XRepodata($self, 0);
+     return new_XRepodata($self, 1);
    }
 
   bool __eq__(Repo *repo) {

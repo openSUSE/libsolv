@@ -1115,7 +1115,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
   else
     {
       int oldnrepodata = repo->nrepodata;
-      repo->nrepodata = 1;	/* XXX: do this right */
+      repo->nrepodata = oldnrepodata > 2 ? 2 : oldnrepodata;	/* XXX: do this right */
       repo_write(repo, fp, repo_write_stdkeyfilter, 0, 0);
       repo->nrepodata = oldnrepodata;
       onepiece = 0;
@@ -2478,7 +2478,7 @@ rewrite_repos(Pool *pool, Id *addedfileprovides)
       if (!repo->nrepodata)
 	continue;
       cinfo = repo->appdata;
-      data = repo->repodata + 0;
+      data = repo->repodata + 1;
       if (data->store.pagefd == -1)
 	continue;
       if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
