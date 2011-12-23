@@ -494,7 +494,7 @@ maybe_load_repodata(Repodata *data, Id keyname)
       if (keyname)
 	{
 	  int i;
-	  for (i = 0; i < data->nkeys; i++)
+	  for (i = 1; i < data->nkeys; i++)
 	    if (keyname == data->keys[i].name)
 	      break;
 	  if (i == data->nkeys)

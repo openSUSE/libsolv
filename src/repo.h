@@ -74,6 +74,11 @@ static inline const char *repo_name(const Repo *repo)
   return repo->name;
 }
 
+static inline Repodata *repo_id2repodata(Repo *repo, Id id)
+{
+  return id ? repo->repodata + id : 0;
+}
+
 #define FOR_REPO_SOLVABLES(r, p, s)						\
   for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\
     if (s->repo == (r))
