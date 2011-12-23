@@ -111,7 +111,8 @@ pool_freeallrepos(Pool *pool, int reuseids)
 
   pool_freewhatprovides(pool);
   for (i = 1; i < pool->nrepos; i++) 
-    repo_freedata(pool->repos[i]);
+    if (pool->repos[i])
+      repo_freedata(pool->repos[i]);
   pool->repos = solv_free(pool->repos);
   pool->nrepos = 0; 
   pool->urepos = 0; 
