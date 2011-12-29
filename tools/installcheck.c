@@ -36,6 +36,8 @@ usage(char** argv)
   printf("Usage:\n%s: <arch> [options..] repo [--nocheck repo]...\n"
          "\t--exclude <pattern>\twhitespace-separated list of (sub-)"
          "packagenames to ignore\n"
+         "\t--withobsoletes\t\tCheck for obsoletes on packages contained in repos\n"
+         "\t--nocheck\t\tDo not warn about all following repos (only use them to fulfill dependencies)\n"
          "\t--withsrc\t\tAlso check dependencies of src.rpm\n\n"
          , argv[0]);
   exit(1);
@@ -58,6 +60,7 @@ main(int argc, char **argv)
   int status = 0;
   int nocheck = 0;
   int withsrc = 0;
+  int obsoletepkgcheck = 0;
 
   exclude_pat = 0;
   archlock = 0;
@@ -77,6 +80,11 @@ main(int argc, char **argv)
 	  withsrc++;
 	  continue;
 	}
+      if (!strcmp(argv[i], "--withobsoletes"))
+        {
+          obsoletepkgcheck++;
+          continue;
+        }
       if (!strcmp(argv[i], "--nocheck"))
 	{
 	  if (!nocheck)
@@ -192,6 +200,38 @@ main(int argc, char **argv)
     {
       archlock = pool_queuetowhatprovides(pool, &archlocks);
     }
+
+
+  if (obsoletepkgcheck)
+    for (i = 0; i < cand.count; i++)
+      {
+        Solvable *s;
+        s = pool->solvables + cand.elements[i];
+
+        if (s->obsoletes)
+          {
+            Id op, opp;
+            Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+
+            while ((obs = *obsp++) != 0)
+              {
+                FOR_PROVIDES(op, opp, obs)
+                  {
+                    if (nocheck && op >= nocheck)
+                      continue;
+
+                    if (!solvable_identical(s, pool_id2solvable(pool, op))
+                        && pool_match_nevr(pool, pool_id2solvable(pool, op), obs))
+                        {
+                          status = 2;
+                          printf("can't install %s:\n", pool_solvid2str(pool, op));
+                          printf("  package is obsoleted by %s\n", pool_solvable2str(pool, s));
+                        }
+                  }
+              }
+          }
+      }
+
   /* prune cand by doing weak installs */
   while (cand.count)
     {
