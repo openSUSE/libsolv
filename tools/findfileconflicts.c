@@ -1,3 +1,6 @@
+/* vim: sw=2 et
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -28,7 +31,7 @@ iterate_handle(Pool *pool, Id p, void *cbdata)
   return rpm_byrpmdbid(rpmdbid, 0, (void **)cbdata);
 }
 
-int main()
+int main(int argc, char **argv)
 {
   Pool *pool;
   Repo *installed;
