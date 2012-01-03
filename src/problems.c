@@ -489,25 +489,30 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 int
 solver_prepare_solutions(Solver *solv)
 {
-  int i, j = 1, idx = 1;  
+  int i, j = 1, idx;
 
   if (!solv->problems.count)
     return 0;
-  queue_push(&solv->solutions, 0); 
-  queue_push(&solv->solutions, -1); /* unrefined */
+  queue_empty(&solv->solutions);
+  queue_push(&solv->solutions, 0);	/* dummy so idx is always nonzero */
+  idx = solv->solutions.count;
+  queue_push(&solv->solutions, -1);	/* unrefined */
+  /* proofidx stays in position, thus we start with 1 */
   for (i = 1; i < solv->problems.count; i++) 
     {   
       Id p = solv->problems.elements[i];
       queue_push(&solv->solutions, p); 
       if (p) 
         continue;
+      /* end of problem reached */
       solv->problems.elements[j++] = idx; 
       if (i + 1 >= solv->problems.count)
         break;
+      /* start another problem */
       solv->problems.elements[j++] = solv->problems.elements[++i];  /* copy proofidx */
       idx = solv->solutions.count;
-      queue_push(&solv->solutions, -1); 
-    }   
+      queue_push(&solv->solutions, -1);	/* unrefined */
+    }
   solv->problems.count = j;  
   return j / 2;
 }
@@ -524,12 +529,9 @@ create_solutions(Solver *solv, int probnr, int solidx)
   Queue problem, solution, problems_save;
   int i, j, nsol;
   int essentialok;
-  int recocount;
   unsigned int now;
 
   now = solv_timems(0);
-  recocount = solv->recommendations.count;
-  solv->recommendations.count = 0;	/* so that revert() doesn't mess with it later */
   queue_init(&redoq);
   /* save decisionq, decisionq_why, decisionmap */
   for (i = 0; i < solv->decisionq.count; i++)
@@ -623,7 +625,6 @@ create_solutions(Solver *solv, int probnr, int solidx)
       queue_push(&solv->decisionq_why, redoq.elements[i + 1]);
       solv->decisionmap[p > 0 ? p : -p] = redoq.elements[i + 2];
     }
-  solv->recommendations.count = recocount;
   queue_free(&redoq);
   /* restore problems */
   queue_free(&solv->problems);

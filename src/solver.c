@@ -833,7 +833,6 @@ solver_reset(Solver *solv)
   solv->decisionq.count = 0;
   solv->recommends_index = -1;
   solv->propagate_index = 0;
-  solv->recommendations.count = 0;
   solv->branches.count = 0;
 
   /* adapt learnt rule status to new set of enabled/disabled rules */
@@ -1065,8 +1064,6 @@ revert(Solver *solv, int level)
       if (solv->decisionmap[vv] <= level && solv->decisionmap[vv] >= -level)
         break;
       POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "reverting decision %d at %d\n", v, solv->decisionmap[vv]);
-      if (v > 0 && solv->recommendations.count && v == solv->recommendations.elements[solv->recommendations.count - 1])
-	solv->recommendations.count--;
       solv->decisionmap[vv] = 0;
       solv->decisionq.count--;
       solv->decisionq_why.count--;
@@ -1949,13 +1946,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
 	      if (dq.count == 1)
 		{
-		  /* simple case, just one package. no need to choose  */
+		  /* simple case, just one package. no need to choose to best version */
 		  p = dq.elements[0];
 		  if (dqs.count)
 		    POOL_DEBUG(SOLV_DEBUG_POLICY, "installing supplemented %s\n", pool_solvid2str(pool, p));
 		  else
 		    POOL_DEBUG(SOLV_DEBUG_POLICY, "installing recommended %s\n", pool_solvid2str(pool, p));
-		  queue_push(&solv->recommendations, p);
 		  level = setpropagatelearn(solv, level, p, 0, 0);
 		  if (level == 0)
 		    break;
@@ -1977,7 +1973,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (solv->decisionmap[p] || !MAPTST(&dqmap, p))
 		    continue;
 		  POOL_DEBUG(SOLV_DEBUG_POLICY, "installing supplemented %s\n", pool_solvid2str(pool, p));
-		  queue_push(&solv->recommendations, p);
 		  olevel = level;
 		  level = setpropagatelearn(solv, level, p, 0, 0);
 		  if (level <= olevel)
@@ -2030,7 +2025,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			}
 		      p = dq.elements[0];
 		      POOL_DEBUG(SOLV_DEBUG_POLICY, "installing recommended %s\n", pool_solvid2str(pool, p));
-		      queue_push(&solv->recommendations, p);
 		      olevel = level;
 		      level = setpropagatelearn(solv, level, p, 0, 0);
 		      if (level <= olevel || solv->decisionq.count < decisioncount)
@@ -2337,7 +2331,7 @@ weaken_solvable_deps(Solver *solv, Id p)
 
 
 static void
-findrecommendedsuggested(Solver *solv)
+solver_findrecommendedsuggested(Solver *solv)
 {
   Pool *pool = solv->pool;
   Queue redoq, disabledq;
@@ -2394,13 +2388,30 @@ findrecommendedsuggested(Solver *solv)
     
   /* if redoq.count == 0 we already found all recommended in the
    * solver run */
-  if (redoq.count || solv->dontinstallrecommended || !solv->dontshowinstalledrecommended || solv->ignorealreadyrecommended)
+  if (1)
     {
       Id rec, *recp, p, pp;
 
       /* create map of all recommened packages */
       solv->recommends_index = -1;
       MAPZERO(&solv->recommendsmap);
+
+      /* put all packages the solver already chose in the map */
+      if (solv->decisioncnt_weak)
+	{
+	  for (i = solv->decisioncnt_weak; i < solv->decisioncnt_orphan; i++)
+	    {
+	      Id why;
+	      why = solv->decisionq_why.elements[i];
+	      if (why)
+		continue;	/* forced by unit rule */
+	      p = solv->decisionq.elements[i];
+	      if (p < 0)
+		continue;
+	      MAPSET(&solv->recommendsmap, p);
+	    }
+	}
+
       for (i = 0; i < solv->decisionq.count; i++)
 	{
 	  p = solv->decisionq.elements[i];
@@ -2448,10 +2459,7 @@ findrecommendedsuggested(Solver *solv)
 	      if (!solver_is_supplementing(solv, s))
 		continue;
 	    }
-	  if (solv->dontinstallrecommended)
-	    queue_push(&solv->recommendations, i);
-	  else
-	    queue_pushunique(&solv->recommendations, i);
+	  queue_push(&solv->recommendations, i);
 	}
       /* we use MODE_SUGGEST here so that repo prio is ignored */
       policy_filter_unwanted(solv, &solv->recommendations, POLICY_MODE_SUGGEST);
@@ -3073,7 +3081,7 @@ solver_solve(Solver *solv, Queue *job)
   /*
    * calculate recommended/suggested packages
    */
-  findrecommendedsuggested(solv);
+  solver_findrecommendedsuggested(solv);
 
   /*
    * prepare solution queue if there were problems
@@ -3143,6 +3151,11 @@ solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res)
   pool_trivial_installable_noobsoletesmap(solv->pool, &installedmap, pkgs, res, solv->noobsoletes.size ? &solv->noobsoletes : 0);
   map_free(&installedmap);
 }
+
+/*-------------------------------------------------------------------
+ * 
+ * decision introspection
+ */
 
 int
 solver_get_decisionlevel(Solver *solv, Id p)
