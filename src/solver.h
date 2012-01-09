@@ -165,9 +165,7 @@ struct _Solver {
   Queue problems;                       /* list of lists of conflicting rules, < 0 for job rules */
   Queue solutions;			/* refined problem storage space */
 
-  Queue recommendations;		/* recommended packages */
-  Queue suggestions;			/* suggested packages */
-  Queue orphaned;			/* orphaned packages */
+  Queue orphaned;			/* orphaned packages (to be removed?) */
 
   int stats_learned;			/* statistic */
   int stats_unsolvable;			/* statistic */
@@ -293,6 +291,10 @@ extern int  solver_get_decisionlevel(Solver *solv, Id p);
 extern void solver_get_decisionqueue(Solver *solv, Queue *decisionq);
 extern int  solver_get_lastdecisionblocklevel(Solver *solv);
 extern void solver_get_decisionblock(Solver *solv, int level, Queue *decisionq);
+
+extern void solver_get_orphaned(Solver *solv, Queue *orphanedq);
+extern void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *suggestionsq, int noselected);
+
 extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
 extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
 

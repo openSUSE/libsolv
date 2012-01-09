@@ -302,6 +302,9 @@ solver_printdecisions(Solver *solv)
   int i, j;
   Solvable *s;
   Queue iq;
+  Queue recommendations;
+  Queue suggestions;
+  Queue orphaned;
 
   POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
   POOL_DEBUG(SOLV_DEBUG_RESULT, "transaction:\n");
@@ -373,13 +376,17 @@ solver_printdecisions(Solver *solv)
 
   POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
 
-  if (solv->recommendations.count)
+  queue_init(&recommendations);
+  queue_init(&suggestions);
+  queue_init(&orphaned);
+  solver_get_recommendations(solv, &recommendations, &suggestions, 0);
+  if (recommendations.count)
     {
       POOL_DEBUG(SOLV_DEBUG_RESULT, "recommended packages:\n");
-      for (i = 0; i < solv->recommendations.count; i++)
+      for (i = 0; i < recommendations.count; i++)
 	{
-	  s = pool->solvables + solv->recommendations.elements[i];
-          if (solv->decisionmap[solv->recommendations.elements[i]] > 0)
+	  s = pool->solvables + recommendations.elements[i];
+          if (solv->decisionmap[recommendations.elements[i]] > 0)
 	    {
 	      if (installed && s->repo == installed)
 	        POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (installed)\n", pool_solvable2str(pool, s));
@@ -392,13 +399,13 @@ solver_printdecisions(Solver *solv)
       POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
     }
 
-  if (solv->suggestions.count)
+  if (suggestions.count)
     {
       POOL_DEBUG(SOLV_DEBUG_RESULT, "suggested packages:\n");
-      for (i = 0; i < solv->suggestions.count; i++)
+      for (i = 0; i < suggestions.count; i++)
 	{
-	  s = pool->solvables + solv->suggestions.elements[i];
-          if (solv->decisionmap[solv->suggestions.elements[i]] > 0)
+	  s = pool->solvables + suggestions.elements[i];
+          if (solv->decisionmap[suggestions.elements[i]] > 0)
 	    {
 	      if (installed && s->repo == installed)
 	        POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (installed)\n", pool_solvable2str(pool, s));
@@ -410,12 +417,12 @@ solver_printdecisions(Solver *solv)
 	}
       POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
     }
-  if (solv->orphaned.count)
+  if (orphaned.count)
     {
       POOL_DEBUG(SOLV_DEBUG_RESULT, "orphaned packages:\n");
-      for (i = 0; i < solv->orphaned.count; i++)
+      for (i = 0; i < orphaned.count; i++)
 	{
-	  s = pool->solvables + solv->orphaned.elements[i];
+	  s = pool->solvables + orphaned.elements[i];
           if (solv->decisionmap[solv->orphaned.elements[i]] > 0)
 	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (kept)\n", pool_solvable2str(pool, s));
 	  else
@@ -423,6 +430,9 @@ solver_printdecisions(Solver *solv)
 	}
       POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
     }
+  queue_free(&recommendations);
+  queue_free(&suggestions);
+  queue_free(&orphaned);
   transaction_free(trans);
 }
 
