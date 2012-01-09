@@ -2917,8 +2917,27 @@ main(int argc, char **argv)
         job.elements[i] |= SOLVER_CLEANDEPS;
     }
 
-  if (mainmode == MODE_DISTUPGRADE && allpkgs && repofilter)
-    queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_REPO, repofilter);
+  if (mainmode == MODE_DISTUPGRADE && allpkgs)
+    {
+      if (repofilter)
+        queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_REPO, repofilter);
+      else
+        queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_ALL, 0);
+    }
+  if (mainmode == MODE_UPDATE && allpkgs)
+    {
+      if (repofilter)
+        queue_push2(&job, SOLVER_UPDATE|SOLVER_SOLVABLE_REPO, repofilter);
+      else
+        queue_push2(&job, SOLVER_UPDATE|SOLVER_SOLVABLE_ALL, 0);
+    }
+  if (mainmode == MODE_VERIFY && allpkgs)
+    {
+      if (repofilter)
+        queue_push2(&job, SOLVER_VERIFY|SOLVER_SOLVABLE_REPO, repofilter);
+      else
+        queue_push2(&job, SOLVER_VERIFY|SOLVER_SOLVABLE_ALL, 0);
+    }
 
   // multiversion test
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae", 1));
@@ -2939,15 +2958,14 @@ rerunsolver:
 
       solv = solver_create(pool);
       solver_set_flag(solv, SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
-      solv->updatesystem = allpkgs && !repofilter && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE);
-      solv->dosplitprovides = solv->updatesystem;
-      solv->fixsystem = allpkgs && !repofilter && mainmode == MODE_VERIFY;
+      if (allpkgs && !repofilter && mainmode == MODE_UPDATE)
+	solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
       if (mainmode == MODE_DISTUPGRADE && allpkgs && !repofilter)
 	{
-	  solv->distupgrade = 1;
           solver_set_flag(solv, SOLVER_FLAG_ALLOW_DOWNGRADE, 1);
           solver_set_flag(solv, SOLVER_FLAG_ALLOW_ARCHCHANGE, 1);
           solver_set_flag(solv, SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
+	  solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
 	}
       if (mainmode == MODE_ERASE || mainmode == MODE_ERASECLEAN)
         solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);	/* don't nag */

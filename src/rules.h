@@ -125,6 +125,7 @@ extern void solver_reenablepolicyrules(struct _Solver *solv, int jobidx);
 /* rule info */
 extern int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
 extern SolverRuleinfo solver_ruleinfo(struct _Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
+extern SolverRuleinfo solver_ruleclass(struct _Solver *solv, Id rid);
 extern void solver_ruleliterals(struct _Solver *solv, Id rid, Queue *q);
 extern int  solver_rule2jobidx(struct _Solver *solv, Id rid);
 extern Id   solver_rule2job(struct _Solver *solv, Id rid, Id *whatp);

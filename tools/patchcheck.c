@@ -565,7 +565,6 @@ main(int argc, char **argv)
   c.instrepo->start = c.repo->start;
   c.instrepo->end = c.repo->end;
   c.instrepo->nsolvables = c.repo->nsolvables;	/* sic! */
-  c.instrepo->lastoff = c.repo->lastoff;	/* sic! */
   pool_set_installed(pool, c.instrepo);
   pool_createwhatprovides(pool);
 

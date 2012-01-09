@@ -3373,7 +3373,7 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 	      }
 	    if (!found)
 	      {
-		/* hard case, just note with no package */
+		/* hard case, just note dependency with no package */
 		queue_push(whyq, SOLVER_REASON_SUPPLEMENTED);
 	        queue_push2(whyq, 0, sup);
 	      }

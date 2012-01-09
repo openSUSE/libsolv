@@ -11,6 +11,8 @@ IF (HAVE___QSORT_R)
   ADD_DEFINITIONS (-DHAVE___QSORT_R=1)
 ENDIF (HAVE___QSORT_R)
 
+ADD_DEFINITIONS (-DLIBSOLV_INTERNAL=1)
+
 SET (libsolv_SRCS
     bitmap.c poolarch.c poolvendor.c poolid.c strpool.c dirpool.c
     solver.c solverdebug.c repo_solv.c evr.c pool.c

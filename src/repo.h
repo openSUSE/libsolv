@@ -43,6 +43,7 @@ typedef struct _Repo {
 
   Id *rpmdbid;			/* solvable side data: rpm database id */
 
+#ifdef LIBSOLV_INTERNAL
   Offset lastoff;		/* start of last array in idarraydata */
 
   Hashtable lastidhash;		/* hash to speed up repo_addid_dep */
@@ -50,6 +51,7 @@ typedef struct _Repo {
   int lastidhash_idarraysize;
   int lastmarker;
   Offset lastmarkerpos;
+#endif /* LIBSOLV_INTERNAL */
 } Repo;
 
 extern Repo *repo_create(Pool *pool, const char *name);

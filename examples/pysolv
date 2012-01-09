@@ -823,10 +823,8 @@ if cmd == 'list' or cmd == 'info':
 
 if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == 'verify':
     if not jobs:
-        if cmd == 'up' or cmd == 'verify':
+        if cmd == 'up' or cmd == 'verify' or cmd == 'dup':
             jobs = [ pool.Job(Job.SOLVER_SOLVABLE_ALL, 0) ]
-        elif cmd == 'dup':
-            pass
         else:
             print "no package matched."
             sys.exit(1)
@@ -850,18 +848,16 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
     solver = None
     while True:
         solver = pool.Solver()
-        solver.ignorealreadyrecommended = True
+	solver.set_flag(Solver.SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
         if cmd == 'erase':
-            solver.allowuninstall = True
-        if cmd == 'dup' and not jobs:
-            solver.distupgrade = True
-            solver.updatesystem = True
-            solver.allowdowngrade = True
-            solver.allowvendorchange = True
-            solver.allowarchchange = True
-            solver.dosplitprovides = True
+	    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
+        if cmd == 'dup' and len(jobs) == 1 and jobs[0].how == (Job.SOLVER_DISTUPGRADE | Job.SOLVER_SOLVABLE_ALL):
+	    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_DOWNGRADE, 1);
+	    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
+	    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_ARCHCHANGE, 1);
+	    solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
         if cmd == 'up' and len(jobs) == 1 and jobs[0].how == (Job.SOLVER_UPDATE | Job.SOLVER_SOLVABLE_ALL):
-            solver.dosplitprovides = True
+	    solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
         problems = solver.solve(jobs)
         if not problems:
             break

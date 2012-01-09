@@ -728,9 +728,9 @@ end
 
 if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == 'verify'
   if jobs.empty?
-    if cmd == 'up' || cmd == 'verify'
+    if cmd == 'up' || cmd == 'verify' || cmd == 'dup'
       jobs = [ pool.Job(Solv::Job::SOLVER_SOLVABLE_ALL, 0) ]
-    elsif cmd != 'dup'
+    else
       abort("no package matched.")
     end
   end
@@ -756,17 +756,15 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
   #pool.set_debuglevel(1)
   while true
     solver = pool.Solver
-    solver.ignorealreadyrecommended = true
-    solver.allowuninstall = true if cmd == 'erase'
-    if cmd == 'dup' && jobs.empty?
-      solver.distupgrade = true
-      solver.updatesystem = true
-      solver.allowdowngrade = true
-      solver.allowvendorchange = true
-      solver.allowarchchange = true
-      solver.dosplitprovides = true
+    solver.set_flag(Solv::Solver::SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1)
+    solver.set_flag(Solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if cmd == 'erase'
+    if cmd == 'up' && jobs.length == 1 && jobs[0].how == (Solv::Job::SOLVER_DISTUPGRADE | Solv::Job::SOLVER_SOLVABLE_ALL)
+      solver.set_flag(Solv::Solver::SOLVER_FLAG_ALLOW_DOWNGRADE, 1)
+      solver.set_flag(Solv::Solver::SOLVER_FLAG_ALLOW_VENDORCHANGE, 1)
+      solver.set_flag(Solv::Solver::SOLVER_FLAG_ALLOW_ARCHCHANGE, 1)
+      solver.set_flag(Solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1)
     elsif cmd == 'up' && jobs.length == 1 && jobs[0].how == (Solv::Job::SOLVER_UPDATE | Solv::Job::SOLVER_SOLVABLE_ALL)
-      solver.dosplitprovides = true
+      solver.set_flag(Solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1)
     end
     problems = solver.solve(jobs)
     break if problems.empty?

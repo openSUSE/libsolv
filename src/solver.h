@@ -30,17 +30,59 @@ extern "C" {
  * Callback definitions in order to "overwrite" the policies by an external application.
  */
  
-typedef void  (*BestSolvableCb) (Pool *pool, Queue *canditates);
+typedef void (*BestSolvableCb) (Pool *pool, Queue *canditates);
 typedef int  (*ArchCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
 typedef int  (*VendorCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
 typedef void (*UpdateCandidateCb) (Pool *pool, Solvable *solvable, Queue *canditates);
 
 
-#if 1
 struct _Solver {
   Pool *pool;				/* back pointer to pool */
   Queue job;				/* copy of the job we're solving */
 
+  int (*solution_callback)(struct _Solver *solv, void *data);
+  void *solution_callback_data;
+
+  /* Callbacks for defining the bahaviour of the solver */
+
+  /* Finding best candidate
+   *
+   * Callback definition:
+   * void  bestSolvable (Pool *pool, Queue *canditates)
+   *     candidates       : List of canditates which has to be sorted by the function call
+   *     return candidates: Sorted list of the candidates(first is the best).
+   */
+  BestSolvableCb bestSolvableCb;
+
+  /* Checking if two solvables has compatible architectures
+   *
+   * Callback definition:
+   *     int  archCheck (Pool *pool, Solvable *solvable1, Solvable *solvable2);
+   *     
+   *     return 0 it the two solvables has compatible architectures
+   */
+  ArchCheckCb archCheckCb;
+
+  /* Checking if two solvables has compatible vendors
+   *
+   * Callback definition:
+   *     int  vendorCheck (Pool *pool, Solvable *solvable1, Solvable *solvable2);
+   *     
+   *     return 0 it the two solvables has compatible architectures
+   */
+  VendorCheckCb vendorCheckCb;
+    
+  /* Evaluate update candidate
+   *
+   * Callback definition:
+   * void UpdateCandidateCb (Pool *pool, Solvable *solvable, Queue *canditates)
+   *     solvable   : for which updates should be search
+   *     candidates : List of candidates (This list depends on other
+   *                  restrictions like architecture and vendor policies too)
+   */
+  UpdateCandidateCb   updateCandidateCb;
+
+#ifdef LIBSOLV_INTERNAL
   Repo *installed;			/* copy of pool->installed */
   
   /* list of rules, ordered
@@ -118,9 +160,6 @@ struct _Solver {
   Queue learnt_pool;
 
   Queue branches;
-  int (*solution_callback)(struct _Solver *solv, void *data);
-  void *solution_callback_data;
-
   int propagate_index;                  /* index into decisionq for non-propagated decisions */
 
   Queue problems;                       /* list of lists of conflicting rules, < 0 for job rules */
@@ -163,44 +202,6 @@ struct _Solver {
 
   int noinfarchcheck;			/* true: do not forbid inferior architectures */
 
-  /* Callbacks for defining the bahaviour of the SAT solver */
-
-  /* Finding best candidate
-   *
-   * Callback definition:
-   * void  bestSolvable (Pool *pool, Queue *canditates)
-   *     candidates       : List of canditates which has to be sorted by the function call
-   *     return candidates: Sorted list of the candidates(first is the best).
-   */
-  BestSolvableCb bestSolvableCb;
-
-  /* Checking if two solvables has compatible architectures
-   *
-   * Callback definition:
-   *     int  archCheck (Pool *pool, Solvable *solvable1, Solvable *solvable2);
-   *     
-   *     return 0 it the two solvables has compatible architectures
-   */
-  ArchCheckCb archCheckCb;
-
-  /* Checking if two solvables has compatible vendors
-   *
-   * Callback definition:
-   *     int  vendorCheck (Pool *pool, Solvable *solvable1, Solvable *solvable2);
-   *     
-   *     return 0 it the two solvables has compatible architectures
-   */
-  VendorCheckCb vendorCheckCb;
-    
-  /* Evaluate update candidate
-   *
-   * Callback definition:
-   * void pdateCandidateCb (Pool *pool, Solvable *solvable, Queue *canditates)
-   *     solvable   : for which updates should be search
-   *     candidates : List of candidates (This list depends on other
-   *                  restrictions like architecture and vendor policies too)
-   */
-  UpdateCandidateCb   updateCandidateCb;
     
   Map dupmap;				/* dup these packages*/
   int dupmap_all;			/* dup all packages */
@@ -212,9 +213,8 @@ struct _Solver {
   Map cleandepsmap;			/* try to drop these packages as of cleandeps erases */
 
   Queue *ruleinfoq;			/* tmp space for solver_ruleinfo() */
+#endif	/* LIBSOLV_INTERNAL */
 };
-
-#endif
 
 typedef struct _Solver Solver;
 

@@ -728,9 +728,9 @@ if ($cmd eq 'list' || $cmd eq 'info') {
 
 if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cmd eq 'verify') {
   if (!@jobs) {
-    if ($cmd eq 'up' || $cmd eq 'verify') {
+    if ($cmd eq 'up' || $cmd eq 'verify' || $cmd eq 'dup') {
       push @jobs, $pool->Job($solv::Job::SOLVER_SOLVABLE_ALL, 0);
-    } elsif ($cmd ne 'dup') {
+    } else {
       die("no package matched.\n");
     }
   }
@@ -754,17 +754,15 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
   my $solver;
   while (1) {
     $solver = $pool->Solver();
-    $solver->{'ignorealreadyrecommended'} = 1;
-    $solver->{'allowuninstall'} = 1 if $cmd eq 'erase';
-    if ($cmd eq 'dup' && !@jobs) {
-      $solver->{'distupgrade'} = 1;
-      $solver->{'updatesystem'} = 1;
-      $solver->{'allowdowngrade'} = 1;
-      $solver->{'allowvendorchange'} = 1;
-      $solver->{'allowarchchange'} = 1;
-      $solver->{'dosplitprovides'} = 1;
-    } elsif ($cmd eq 'up' and @jobs == 1 and $jobs[0]->{'how'} == ($solv::Job::SOLVER_UPDATE | $solv::Job::SOLVER_SOLVABLE_ALL)) {
-      $solver->{'dosplitprovides'} = 1;
+    $solver->set_flag($solv::Solver::SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
+    $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if $cmd eq 'erase';
+    if ($cmd eq 'dup' && @jobs == 1 $jobs[0]->{'how'} == ($solv::Job::SOLVER_DISTUPGRADE | $solv::Job::SOLVER_SOLVABLE_ALL)) {
+      $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_DOWNGRADE, 1);
+      $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_VENDERCHANGE, 1);
+      $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_ARCHCHANGE, 1);
+      $solver->set_flag($solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1);
+    } elsif ($cmd eq 'up' && @jobs == 1 && $jobs[0]->{'how'} == ($solv::Job::SOLVER_UPDATE | $solv::Job::SOLVER_SOLVABLE_ALL)) {
+      $solver->set_flag($solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1);
     }
     my @problems = $solver->solve(\@jobs);
     last unless @problems;

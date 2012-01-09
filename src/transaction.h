@@ -30,12 +30,14 @@ typedef struct _Transaction {
 
   Queue steps;			/* the transaction steps */
 
+#ifdef LIBSOLV_INTERNAL
   Queue transaction_info;
   Id *transaction_installed;
   Map transactsmap;
   Map noobsmap;
 
   struct _TransactionOrderdata *orderdata;
+#endif
 
 } Transaction;
 

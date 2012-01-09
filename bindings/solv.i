@@ -549,20 +549,6 @@ typedef struct _Repo {
 %nodefaultdtor Solver;
 typedef struct {
   Pool * const pool;
-  bool fixsystem;
-  bool allowdowngrade;
-  bool allowarchchange;
-  bool allowvendorchange;
-  bool allowuninstall;
-  bool updatesystem;
-  bool noupdateprovide;
-  bool dosplitprovides;
-  bool dontinstallrecommended;
-  bool ignorealreadyrecommended;
-  bool dontshowinstalledrecommended;
-  bool distupgrade;
-  bool distupgrade_removeunsupported;
-  bool noinfarchcheck;
 } Solver;
 
 typedef struct chksum {
@@ -1728,8 +1714,10 @@ typedef struct {
       {
         for (i = j = 0; i < q.count; i++)
           {
+            SolverRuleinfo rclass;
             probr = q.elements[i];
-            if ((probr >= solv->updaterules && probr < solv->updaterules_end) || (probr >= solv->jobrules && probr < solv->jobrules_end))
+            rclass = solver_ruleclass(solv, probr);
+            if (rclass == SOLVER_RULE_UPDATE || rclass == SOLVER_RULE_JOB)
               continue;
             q.elements[j++] = probr;
           }
@@ -1932,8 +1920,25 @@ typedef struct {
   static const int POLICY_ILLEGAL_ARCHCHANGE = POLICY_ILLEGAL_ARCHCHANGE;
   static const int POLICY_ILLEGAL_VENDORCHANGE = POLICY_ILLEGAL_VENDORCHANGE;
 
+  static const int SOLVER_FLAG_ALLOW_DOWNGRADE = SOLVER_FLAG_ALLOW_DOWNGRADE;
+  static const int SOLVER_FLAG_ALLOW_ARCHCHANGE = SOLVER_FLAG_ALLOW_ARCHCHANGE;
+  static const int SOLVER_FLAG_ALLOW_VENDORCHANGE = SOLVER_FLAG_ALLOW_VENDORCHANGE;
+  static const int SOLVER_FLAG_ALLOW_UNINSTALL = SOLVER_FLAG_ALLOW_UNINSTALL;
+  static const int SOLVER_FLAG_NO_UPDATEPROVIDE = SOLVER_FLAG_NO_UPDATEPROVIDE;
+  static const int SOLVER_FLAG_SPLITPROVIDES = SOLVER_FLAG_SPLITPROVIDES;
+  static const int SOLVER_FLAG_IGNORE_RECOMMENDED = SOLVER_FLAG_IGNORE_RECOMMENDED;
+  static const int SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED = SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED;
+  static const int SOLVER_FLAG_NO_INFARCHCHECK = SOLVER_FLAG_NO_INFARCHCHECK;
+
   ~Solver() {
     solver_free($self);
+  }
+
+  int set_flag(int flag, int value) {
+    return solver_set_flag($self, flag, value);
+  }
+  int get_flag(int flag) {
+    return solver_get_flag($self, flag);
   }
 #if defined(SWIGPYTHON)
   %pythoncode {

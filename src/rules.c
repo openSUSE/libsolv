@@ -1921,6 +1921,30 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
   return SOLVER_RULE_UNKNOWN;
 }
 
+SolverRuleinfo
+solver_ruleclass(Solver *solv, Id rid)
+{
+  if (rid <= 0)
+    return SOLVER_RULE_UNKNOWN;
+  if (rid > 0 && rid < solv->rpmrules_end)
+    return SOLVER_RULE_RPM;
+  if (rid >= solv->jobrules && rid < solv->jobrules_end)
+    return SOLVER_RULE_JOB;
+  if (rid >= solv->updaterules && rid < solv->updaterules_end)
+    return SOLVER_RULE_UPDATE;
+  if (rid >= solv->featurerules && rid < solv->featurerules_end)
+    return SOLVER_RULE_FEATURE;
+  if (rid >= solv->duprules && rid < solv->duprules_end)
+    return SOLVER_RULE_DISTUPGRADE;
+  if (rid >= solv->infarchrules && rid < solv->infarchrules_end)
+    return SOLVER_RULE_INFARCH;
+  if (rid >= solv->choicerules && rid < solv->choicerules_end)
+    return SOLVER_RULE_CHOICE;
+  if (rid >= solv->learntrules)
+    return SOLVER_RULE_LEARNT;
+  return SOLVER_RULE_UNKNOWN;
+}
+
 void
 solver_ruleliterals(Solver *solv, Id rid, Queue *q)
 {
