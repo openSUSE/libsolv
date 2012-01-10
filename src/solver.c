@@ -35,8 +35,13 @@
 
 /*-------------------------------------------------------------------
  * handle split provides
+ *
+ * a splitprovides dep looks like
+ *     namespace:splitprovides(pkg REL_WITH path)
+ * and is only true if pkg is installed and contains the specified path.
+ * we also make sure that pkg is selected for an update, otherwise the
+ * update would always be forced onto the user.
  */
-
 int
 solver_splitprovides(Solver *solv, Id dep)
 {
@@ -45,7 +50,7 @@ solver_splitprovides(Solver *solv, Id dep)
   Reldep *rd;
   Solvable *s;
 
-  if (!solv->dosplitprovides || !solv->installed)
+  if (!solv->dosplitprovides || !solv->installed || (!solv->updatemap_all && !solv->updatemap.size))
     return 0;
   if (!ISRELDEP(dep))
     return 0;
@@ -54,8 +59,11 @@ solver_splitprovides(Solver *solv, Id dep)
     return 0;
   FOR_PROVIDES(p, pp, dep)
     {
+      /* here we have packages that provide the correct name and contain the path,
+       * now do extra filtering */
       s = pool->solvables + p;
-      if (s->repo == solv->installed && s->name == rd->name)
+      if (s->repo == solv->installed && s->name == rd->name &&
+          (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p - solv->installed->start))))
 	return 1;
     }
   return 0;

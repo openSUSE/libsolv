@@ -2958,14 +2958,12 @@ rerunsolver:
 
       solv = solver_create(pool);
       solver_set_flag(solv, SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
-      if (allpkgs && !repofilter && mainmode == MODE_UPDATE)
-	solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
+      solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
       if (mainmode == MODE_DISTUPGRADE && allpkgs && !repofilter)
 	{
           solver_set_flag(solv, SOLVER_FLAG_ALLOW_DOWNGRADE, 1);
           solver_set_flag(solv, SOLVER_FLAG_ALLOW_ARCHCHANGE, 1);
           solver_set_flag(solv, SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
-	  solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
 	}
       if (mainmode == MODE_ERASE || mainmode == MODE_ERASECLEAN)
         solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);	/* don't nag */
