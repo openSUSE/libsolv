@@ -60,11 +60,11 @@ typedef struct _Repodata {
   int error;			/* corrupt solv file */
 
   Repokey *keys;		/* keys, first entry is always zero */
-  unsigned int nkeys;		/* length of keys array */
+  int nkeys;			/* length of keys array */
   unsigned char keybits[32];	/* keyname hash */
 
   Id *schemata;			/* schema -> offset into schemadata */
-  unsigned int nschemata;	/* number of schemata */
+  int nschemata;		/* number of schemata */
   Id *schemadata;		/* schema storage */
   unsigned int schemadatalen;   /* schema storage size */
   Id *schematahash;		/* unification helper */
