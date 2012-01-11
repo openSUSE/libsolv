@@ -918,7 +918,7 @@ addedge(struct orderdata *od, Id from, Id to, int type)
   struct _TransactionElement *te;
   int i;
 
-  // printf("addedge %d %d type %d\n", from, to, type);
+  /* printf("addedge %d %d type %d\n", from, to, type); */
   s = pool->solvables + from;
   if (s->repo == pool->installed && trans->transaction_installed[from - pool->installed->start])
     {

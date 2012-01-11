@@ -37,7 +37,7 @@ extern "C" {
 /* how many strings to maintain (round robin) */
 #define POOL_TMPSPACEBUF 16
 
-//-----------------------------------------------
+/*----------------------------------------------- */
 
 struct _Repo;
 struct _Repodata;
@@ -157,7 +157,7 @@ struct _Pool {
 
 #define SOLV_DEBUG_TO_STDERR		(1<<30)
 
-//-----------------------------------------------
+/* ----------------------------------------------- */
 
 
 /* mark dependencies with relation by setting bit31 */

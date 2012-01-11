@@ -90,8 +90,8 @@ static unsigned int
 compress_buf(const unsigned char *in, unsigned int in_len,
 	      unsigned char *out, unsigned int out_len)
 {
-  unsigned int oo = 0;		//out-offset
-  unsigned int io = 0;		//in-offset
+  unsigned int oo = 0;		/* out-offset */
+  unsigned int io = 0;		/* in-offset */
 #define HS (65536)
   Ref htab[HS];
   Ref hnext[BLOCK_SIZE];
@@ -125,8 +125,8 @@ compress_buf(const unsigned char *in, unsigned int in_len,
 	}
       for (; try != -1 && tries < 12; tries++)
 	{
-	  //assert(mlen >= 2);
-	  //assert(io + mlen < in_len);
+	  /* assert(mlen >= 2); */
+	  /* assert(io + mlen < in_len); */
 	  /* Try a match starting from [io] with the strings at [try].
 	     That's only sensible if TRY actually is before IO (can happen
 	     with uninit hash table).  If we have a previous match already
@@ -230,7 +230,7 @@ match_done:
 	    {
 	      litofs--;
 	      unsigned litlen = io - litofs;
-	      //fprintf(stderr, "lit: %d\n", litlen);
+	      /* fprintf(stderr, "lit: %d\n", litlen); */
 	      while (litlen)
 		{
 		  unsigned int easy_sz;
@@ -277,7 +277,7 @@ match_done:
 	      litofs = 0;
 	    }
 
-	  //fprintf(stderr, "ref: %d @ %d\n", mlen, mofs);
+	  /* fprintf(stderr, "ref: %d @ %d\n", mlen, mofs); */
 
 	  if (mlen >= 2 && mlen <= 9 && mofs < 1024)
 	    {
@@ -353,7 +353,7 @@ match_done:
     {
       litofs--;
       unsigned litlen = io - litofs;
-      //fprintf(stderr, "lit: %d\n", litlen);
+      /* fprintf(stderr, "lit: %d\n", litlen); */
       while (litlen)
 	{
 	  unsigned int easy_sz;
@@ -424,22 +424,22 @@ unchecked_decompress_buf(const unsigned char *in, unsigned int in_len,
 	case 2: case 3:
 	case 4: case 5:
 	case 6: case 7:
-	  //a 0LLLLLLL
-	  //fprintf (stderr, "lit: 1\n");
+	  /* a 0LLLLLLL */
+	  /* fprintf (stderr, "lit: 1\n"); */
 	  *out++ = first;
 	  continue;
 	case 8: case 9:
-	  //b 100lllll <l+1 bytes>
+	  /* b 100lllll <l+1 bytes> */
 	  {
 	    unsigned int l = first & 31;
-	    //fprintf (stderr, "lit: %d\n", l);
+	    /* fprintf (stderr, "lit: %d\n", l); */
 	    do
 	      *out++ = *in++;
 	    while (l--);
 	    continue;
 	  }
 	case 10: case 11:
-	  //c 101oolll <8o>
+	  /* c 101oolll <8o> */
 	  {
 	    o = first & (3 << 3);
 	    o = (o << 5) | *in++;
@@ -447,14 +447,14 @@ unchecked_decompress_buf(const unsigned char *in, unsigned int in_len,
 	    break;
 	  }
 	case 12: case 13:
-	  //d 110lllll <8o>
+	  /* d 110lllll <8o> */
 	  {
 	    o = *in++;
 	    first = (first & 31) + 10;
 	    break;
 	  }
 	case 14:
-	  // e 1110llll <8o> <8o>
+	  /* e 1110llll <8o> <8o> */
 	  {
 	    o = in[0] | (in[1] << 8);
 	    in += 2;
@@ -463,9 +463,9 @@ unchecked_decompress_buf(const unsigned char *in, unsigned int in_len,
 	    break;
 	  }
 	case 15:
-	  //f1 1111llll <8o> <8o> <8l>
-	  //f2 11110lll <8o> <8o> <8l>
-	  // g 11111lll <8o> <8o> <8o> <8l>
+	  /* f1 1111llll <8o> <8o> <8l> */
+	  /* f2 11110lll <8o> <8o> <8l> */
+	  /* g 11111lll <8o> <8o> <8o> <8l> */
 	  {
 	    first = first & 15;
 	    if (first >= 8)
@@ -483,7 +483,7 @@ unchecked_decompress_buf(const unsigned char *in, unsigned int in_len,
 	    break;
 	  }
 	}
-      //fprintf(stderr, "ref: %d @ %d\n", first, o);
+      /* fprintf(stderr, "ref: %d @ %d\n", first, o); */
       o++;
       o = -o;
 #if 0

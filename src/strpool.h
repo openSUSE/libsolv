@@ -15,13 +15,13 @@
 
 struct _Stringpool
 {
-  Offset *strings;            // table of offsets into stringspace, indexed by Id: Id -> Offset
-  int nstrings;               // number of unique strings in stringspace
-  char *stringspace;          // space for all unique strings: stringspace + Offset = string
-  Offset sstrings;            // next free pos in stringspace
+  Offset *strings;            /* table of offsets into stringspace, indexed by Id: Id -> Offset */
+  int nstrings;               /* number of ids in strings table */
+  char *stringspace;          /* space for all unique strings: stringspace + Offset = string */
+  Offset sstrings;            /* size of used stringspace */
 
-  Hashtable stringhashtbl;    // hash table: (string ->) Hash -> Id
-  Hashmask stringhashmask;    // modulo value for hash table (size of table - 1)
+  Hashtable stringhashtbl;    /* hash table: (string ->) Hash -> Id */
+  Hashmask stringhashmask;    /* modulo value for hash table (size of table - 1) */
 };
 
 void stringpool_init(Stringpool *ss, const char *strs[]);

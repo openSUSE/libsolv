@@ -44,10 +44,10 @@ typedef struct _Stringpool Stringpool;
 struct _Pool;
 typedef struct _Pool Pool;
 
-// identifier for string values
+/* identifier for string values */
 typedef int Id;		/* must be signed!, since negative Id is used in solver rules to denote negation */
 
-// offset value, e.g. used to 'point' into the stringspace
+/* offset value, e.g. used to 'point' into the stringspace */
 typedef unsigned int Offset;
 
 #endif /* LIBSOLV_POOLTYPES_H */

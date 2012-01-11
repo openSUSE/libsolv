@@ -229,7 +229,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
   if (plist->count - ninst < 2)
     return;
 
-  /* prune to suggested/enhanced*/
+  /* prune to suggested/enhanced */
   ninst = 0;
   for (i = j = 0; i < plist->count; i++)
     {
@@ -521,6 +521,8 @@ move_installed_to_front(Pool *pool, Queue *plist)
 	        memmove(plist->elements + j + 1, plist->elements + j, (i - j) * sizeof(Id));
 	      plist->elements[j] = p;
 	    }
+	  else if (j + 2 == plist->count)
+	    break;	/* no need to check last element if all prev ones are installed */
 	  j++;
 	}
     }
@@ -611,7 +613,7 @@ prune_best_arch_name_version(const Solver *solv, Pool *pool, Queue *plist)
 }
 
 /* installed packages involed in a dup operation can only be kept
-* if they are identical to a non-installed one */
+ * if they are identical to a non-installed one */
 static void
 prune_installed_dup_packages(Solver *solv, Queue *plist)
 {

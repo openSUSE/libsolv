@@ -2020,7 +2020,7 @@ solver_addchoicerules(Solver *solv)
       r = solv->rules + rid;
       if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 < 0))
 	continue;	/* only look at requires rules */
-      // solver_printrule(solv, SOLV_DEBUG_RESULT, r);
+      /* solver_printrule(solv, SOLV_DEBUG_RESULT, r); */
       queue_empty(&q);
       queue_empty(&qi);
       havechoice = 0;

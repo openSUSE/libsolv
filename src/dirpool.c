@@ -26,7 +26,7 @@
  *   dirs[id] <= 0 : -(parent directory id)
  *
  * Directories with the same parent are stored as
- * multiple blocks. We need multiple blocks, because
+ * multiple blocks. We need multiple blocks because
  * we cannot insert entries into old blocks, as that
  * would shift the ids of already used directories.
  * Each block starts with (-parent_dirid) and contains
@@ -37,7 +37,7 @@
  * There is also the aux "dirtraverse" array, which
  * is created on demand to speed things up a bit.
  * if dirs[id] > 0, dirtravers[id] points to the first
- * entry in the last block with parent id
+ * entry in the last block with parent id.
  * if dirs[id] <= 0, dirtravers[id] points to the entry
  * in the previous block with the same parent.
  * (Thus it acts as a linked list that starts at the
@@ -45,21 +45,21 @@
  * parent.)
  *
  *  id    dirs[id]  dirtraverse[id]
- *   0     0           8       [block#0 no parent]
+ *   0     0           8       [no parent, block#0]
  *   1    ""           3
- *   2    -1                   [block#0 parent 1, /]
+ *   2    -1                   [parent 1, /, block #0]
  *   3    "usr"       12
- *   4    -3                   [block#0 parent 3, /usr]
+ *   4    -3                   [parent 3, /usr, block #0]
  *   5    "bin"
  *   6    "lib"
- *   7     0           1       [block#1 no parent]
+ *   7     0           1       [no parent, block#1]
  *   8    "foo"       10
- *   9    -8                   [block#0 parent 8, foo]
+ *   9    -8                   [parent 8, foo, block #0]
  *  10    "bar"
- *  11    -3           5       [block#1 parent 3, /usr]
+ *  11    -3           5       [parent 3, /usr, block #1]
  *  12    "games"
  *   
- * to find all children of dirid 3, "/usr", follow the
+ * to find all children of dirid 3 ("/usr"), follow the
  * dirtraverse link to 12 -> "games". Then follow the
  * dirtraverse link of this block to 5 -> "bin", "lib"
  */

@@ -585,6 +585,11 @@ repo_reserve_ids(Repo *repo, Offset olddeps, int num)
 }
 
 
+/***********************************************************************/
+
+/*
+ * some SUSE specific fixups, should go into a separate file
+ */
 
 Offset
 repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset freshens)
@@ -622,13 +627,8 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 		      continue;
 		    }
 		  *p++ = 0;
-#if 0
-		  strncpy(dep - 9, "language:", 9);
-		  idl = pool_str2id(pool, dep - 9, 1);
-#else
 		  idl = pool_str2id(pool, dep, 1);
 		  idl = pool_rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
-#endif
 		  if (id)
 		    id = pool_rel2id(pool, id, idl, REL_OR, 1);
 		  else
@@ -640,13 +640,8 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	 	  for (p = dep; *p && *p != ')'; p++)
 		    ;
 		  *p = 0;
-#if 0
-		  strncpy(dep - 9, "language:", 9);
-		  idl = pool_str2id(pool, dep - 9, 1);
-#else
 		  idl = pool_str2id(pool, dep, 1);
 		  idl = pool_rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
-#endif
 		  if (id)
 		    id = pool_rel2id(pool, id, idl, REL_OR, 1);
 		  else
@@ -753,7 +748,7 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
   if (freshens && repo->idarraydata[freshens])
     {
       Id idsupp = 0, idfresh = 0;
-      if (!supplements)
+      if (!supplements || !repo->idarraydata[supplements])
 	return freshens;
       for (i = supplements; repo->idarraydata[i]; i++)
         {
@@ -806,6 +801,8 @@ repo_fix_conflicts(Repo *repo, Offset conflicts)
     }
   return conflicts;
 }
+
+/***********************************************************************/
 
 struct matchdata
 {
@@ -1431,7 +1428,7 @@ repo_disable_paging(Repo *repo)
   FOR_REPODATAS(repo, i, data)
     repodata_disable_paging(data);
 }
-// EOF
+
 /*
 vim:cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-0.5s:tw=78:cindent:sw=4:
 */

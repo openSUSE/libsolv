@@ -19,15 +19,15 @@ stringpool_init(Stringpool *ss, const char *strs[])
   unsigned count;
 
   memset(ss, 0, sizeof(*ss));
-  // count number and total size of predefined strings
+  /* count number and total size of predefined strings */
   for (count = 0; strs[count]; count++)
     totalsize += strlen(strs[count]) + 1;
 
-  // alloc appropriate space
+  /* alloc appropriate space */
   ss->stringspace = solv_extend_resize(0, totalsize, 1, STRINGSPACE_BLOCK);
   ss->strings = solv_extend_resize(0, count, sizeof(Offset), STRING_BLOCK);
 
-  // now copy predefined strings into allocated space
+  /* now copy predefined strings into allocated space */
   ss->sstrings = 0;
   for (count = 0; strs[count]; count++)
     {
@@ -86,7 +86,6 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   Id id;
   Hashtable hashtbl;
 
-  // check string
   if (!str)
     return STRID_NULL;
   if (!len)
@@ -95,48 +94,47 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   hashmask = ss->stringhashmask;
   hashtbl = ss->stringhashtbl;
 
-  // expand hashtable if needed
+  /* expand hashtable if needed */
   if (ss->nstrings * 2 > hashmask)
     {
       solv_free(hashtbl);
 
-      // realloc hash table
+      /* realloc hash table */
       ss->stringhashmask = hashmask = mkmask(ss->nstrings + STRING_BLOCK);
       ss->stringhashtbl = hashtbl = (Hashtable)solv_calloc(hashmask + 1, sizeof(Id));
 
-      // rehash all strings into new hashtable
+      /* rehash all strings into new hashtable */
       for (i = 1; i < ss->nstrings; i++)
 	{
 	  h = strhash(ss->stringspace + ss->strings[i]) & hashmask;
 	  hh = HASHCHAIN_START;
-	  while (hashtbl[h] != 0)  // follow overflow chain
+	  while (hashtbl[h] != 0)
 	    h = HASHCHAIN_NEXT(h, hh, hashmask);
 	  hashtbl[h] = i;
 	}
     }
 
-  // compute hash and check for match
+  /* compute hash and check for match */
   h = strnhash(str, len) & hashmask;
   hh = HASHCHAIN_START;
-  while ((id = hashtbl[h]) != 0)  // follow hash overflow chain
+  while ((id = hashtbl[h]) != 0)
     {
-      // break if string already hashed
       if(!memcmp(ss->stringspace + ss->strings[id], str, len)
          && ss->stringspace[ss->strings[id] + len] == 0)
 	break;
       h = HASHCHAIN_NEXT(h, hh, hashmask);
     }
-  if (id || !create)    // exit here if string found
+  if (id || !create)    /* exit here if string found */
     return id;
 
-  // generate next id and save in table
+  /* generate next id and save in table */
   id = ss->nstrings++;
   hashtbl[h] = id;
 
   ss->strings = solv_extend(ss->strings, id, 1, sizeof(Offset), STRING_BLOCK);
   ss->strings[id] = ss->sstrings;	/* we will append to the end */
 
-  // append string to stringspace
+  /* append string to stringspace */
   ss->stringspace = solv_extend(ss->stringspace, ss->sstrings, len + 1, 1, STRINGSPACE_BLOCK);
   memcpy(ss->stringspace + ss->sstrings, str, len);
   ss->stringspace[ss->sstrings + len] = 0;

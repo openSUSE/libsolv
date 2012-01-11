@@ -155,6 +155,7 @@ pool_arch2color_slow(Pool *pool, Id arch)
     color = ARCHCOLOR_64;
   else
     color = ARCHCOLOR_32;
+  pool->id2color[arch] = color;
   return color;
 }
 

@@ -72,7 +72,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
       solv_free(pool->relhashtbl);
       pool->relhashmask = hashmask = mkmask(pool->nrels + REL_BLOCK);
       pool->relhashtbl = hashtbl = solv_calloc(hashmask + 1, sizeof(Id));
-      // rehash all rels into new hashtable
+      /* rehash all rels into new hashtable */
       for (i = 1; i < pool->nrels; i++)
 	{
 	  h = relhash(ran[i].name, ran[i].evr, ran[i].flags) & hashmask;
@@ -117,9 +117,9 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 }
 
 
-// Id -> String
-// for rels (returns name only) and strings
-// 
+/* Id -> String
+ * for rels (returns name only) and strings
+ */ 
 const char *
 pool_id2str(const Pool *pool, Id id)
 {
@@ -153,7 +153,7 @@ static const char *rels[] = {
 };
 
 
-// get operator for RelId
+/* get operator for RelId */
 const char *
 pool_id2rel(const Pool *pool, Id id)
 {
@@ -185,8 +185,7 @@ pool_id2rel(const Pool *pool, Id id)
 }
 
 
-// get e:v.r for Id
-// 
+/* get e:v.r for Id */
 const char *
 pool_id2evr(const Pool *pool, Id id)
 {
@@ -278,8 +277,7 @@ pool_shrink_rels(Pool *pool)
   pool->rels = solv_extend_resize(pool->rels, pool->nrels, sizeof(Reldep), REL_BLOCK);
 }
 
-// reset all hash tables
-// 
+/* free all hash tables */
 void
 pool_freeidhashes(Pool *pool)
 {
@@ -288,4 +286,4 @@ pool_freeidhashes(Pool *pool)
   pool->relhashmask = 0;
 }
 
-// EOF
+/* EOF */
