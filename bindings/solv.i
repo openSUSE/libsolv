@@ -1871,11 +1871,15 @@ typedef struct {
       return new_XSolvable(e->solv->pool, e->rp);
     }
     SWIGINTERN int Solutionelement_jobidx_get(Solutionelement *e) {
+      if (e->type != SOLVER_SOLUTION_JOB)
+        return -1;
       return (e->p - 1) / 2;
     }
   %}
   %newobject Job;
   Job *Job() {
+    if ($self->type == SOLVER_SOLUTION_JOB)
+      return new_Job($self->solv->pool, SOLVER_NOOP, 0);
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE, $self->p);
     if ($self->type == SOLVER_SOLUTION_REPLACE || $self->type == SOLVER_SOLUTION_REPLACE_DOWNGRADE || $self->type == SOLVER_SOLUTION_REPLACE_ARCHCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)

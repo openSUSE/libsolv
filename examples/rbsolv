@@ -790,11 +790,11 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
       abort if sol == 'q'
       solution = solutions[sol.to_i - 1]
       for element in solution.elements
+        newjob = element.Job()
         if element.type == Solv::Solver::SOLVER_SOLUTION_JOB
-          jobs[element.jobidx] = pool.Job(Solv::Job::SOLVER_NOOP, 0)
+          jobs[element.jobidx] = newjob
 	else
-          newjob = element.Job()
-          jobs.push(newjob) if newjob && !jobs.find {|j| j.how == newjob.how && j.what == newjob.what}
+          jobs.push(newjob) if newjob && !jobs.include?(newjob)
 	end
       end
     end

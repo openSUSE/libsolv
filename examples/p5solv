@@ -772,29 +772,8 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
       my @solutions = $problem->solutions();
       for my $solution (@solutions) {
 	print "  Solution $solution->{'id'}:\n";
-	for my $element ($solution->elements()) {
-	  my $etype = $element->{'type'};
-	  if ($etype == $solv::Solver::SOLVER_SOLUTION_JOB) {
-	    print "  - do not ask to ".$jobs[$element->{'jobidx'}]->str()."\n";
-	  } elsif ($etype == $solv::Solver::SOLVER_SOLUTION_INFARCH) {
-	    if ($element->{'solvable'}->isinstalled()) {
-	      print "  - keep ".$element->{'solvable'}->str()." despite the inferior architecture\n";
-	    } else {
-	      print "  - install ".$element->{'solvable'}->str()." despite the inferior architecture\n";
-	    }
-	  } elsif ($etype == $solv::Solver::SOLVER_SOLUTION_DISTUPGRADE) {
-	    if ($element->{'solvable'}->isinstalled()) {
-	      print "  - keep obsolete ".$element->{'solvable'}->str()."\n";
-	    } else {
-	      print "  - install ".$element->{'solvable'}->str()." from excluded repository\n";
-	    }
-	  } elsif ($etype == $solv::Solver::SOLVER_SOLUTION_REPLACE) {
-	    print "  - allow replacement of ".$element->{'solvable'}->str()." with ".$element->{'replacement'}->str()."\n";
-	  } elsif ($etype == $solv::Solver::SOLVER_SOLUTION_ERASE) {
-	    print "  - allow deinstallation of ".$element->{'solvable'}->str()."\n";
-	  } else {
-	    print "  - allow something else\n";
-	  }
+	for my $element ($solution->elements(1)) {
+	  print "  - ".$element->str()."\n";
         }
         print "\n";
       }
@@ -809,11 +788,10 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
       exit(1) if $sol eq 'q';
       my $solution = $solutions[$sol - 1];
       for my $element ($solution->elements()) {
-        my $etype = $element->{'type'};
-        if ($etype == $solv::Solver::SOLVER_SOLUTION_JOB) {
-	  $jobs[$element->{'jobidx'}] = $pool->Job($solv::Job::SOLVER_NOOP, 0);
+        my $newjob = $element->Job();
+        if ($element->{'type'} == $solv::Solver::SOLVER_SOLUTION_JOB) {
+	  $jobs[$element->{'jobidx'}] = $newjob;
         } else {
-	  my $newjob = $element->Job();
 	  push @jobs, $newjob if $newjob && !grep {$_ == $newjob} @jobs;
 	}
       }

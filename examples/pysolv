@@ -848,14 +848,14 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
     solver = None
     while True:
         solver = pool.Solver()
-	solver.set_flag(Solver.SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
-	solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
+        solver.set_flag(Solver.SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
+        solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
         if cmd == 'erase':
-	    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
+            solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
         if cmd == 'dup' and len(jobs) == 1 and jobs[0].how == (Job.SOLVER_DISTUPGRADE | Job.SOLVER_SOLVABLE_ALL):
-	    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_DOWNGRADE, 1);
-	    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
-	    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_ARCHCHANGE, 1);
+            solver.set_flag(Solver.SOLVER_FLAG_ALLOW_DOWNGRADE, 1);
+            solver.set_flag(Solver.SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
+            solver.set_flag(Solver.SOLVER_FLAG_ALLOW_ARCHCHANGE, 1);
         problems = solver.solve(jobs)
         if not problems:
             break
@@ -867,36 +867,9 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
             solutions = problem.solutions()
             for solution in solutions:
                 print "  Solution %d:" % solution.id
-                elements = solution.elements()
+                elements = solution.elements(True)
                 for element in elements:
-                    etype = element.type
-                    if etype == Solver.SOLVER_SOLUTION_JOB:
-                        print "  - do not ask to", jobs[element.jobidx]
-                    elif etype == Solver.SOLVER_SOLUTION_INFARCH:
-                        if element.solvable.isinstalled():
-                            print "  - keep %s despite the inferior architecture" % element.solvable
-                        else:
-                            print "  - install %s despite the inferior architecture" % element.solvable
-                    elif etype == Solver.SOLVER_SOLUTION_DISTUPGRADE:
-                        if element.solvable.isinstalled():
-                            print "  - keep obsolete %s" % element.solvable
-                        else:
-                            print "  - install %s from excluded repository" % element.solvable
-                    elif etype == Solver.SOLVER_SOLUTION_REPLACE:
-                        illegal = element.illegalreplace()
-                        if illegal & solver.POLICY_ILLEGAL_DOWNGRADE:
-                            print "  - allow downgrade of %s to %s" % (element.solvable, element.replacement)
-                        if illegal & solver.POLICY_ILLEGAL_ARCHCHANGE:
-                            print "  - allow architecture change of %s to %s" % (element.solvable, element.replacement)
-                        if illegal & solver.POLICY_ILLEGAL_VENDORCHANGE:
-                            if element.replacement.vendorid:
-                                print "  - allow vendor change from '%s' (%s) to '%s' (%s)" % (element.solvable.vendor, element.solvable, element.replacement.vendor, element.replacement)
-                            else:
-                                print "  - allow vendor change from '%s' (%s) to no vendor (%s)" % (element.solvable.vendor, element.solvable, element.replacement)
-                        if illegal == 0:
-                            print "  - allow replacement of %s with %s" % (element.solvable, element.replacement)
-                    elif etype == Solver.SOLVER_SOLUTION_ERASE:
-                        print "  - allow deinstallation of %s" % element.solvable
+                    print "  - %s" % element.str
                 print
             sol = ''
             while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
@@ -909,11 +882,10 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
                 sys.exit(1)
             solution = solutions[int(sol) - 1]
             for element in solution.elements():
-                etype = element.type
-                if etype == Solver.SOLVER_SOLUTION_JOB:
-                    jobs[element.jobidx] = pool.Job(Job.SOLVER_NOOP, 0)
+                newjob = element.Job()
+                if element.type == Solver.SOLVER_SOLUTION_JOB:
+                    jobs[element.jobidx] = newjob
                 else:
-                    newjob = element.Job()
                     if newjob and newjob not in jobs:
                         jobs.append(newjob)
                         
