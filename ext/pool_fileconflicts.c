@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2009-2012, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
 #include <stdio.h>
 #include <sys/stat.h>
 

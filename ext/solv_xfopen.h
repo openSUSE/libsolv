@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2009-2012, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
 #ifndef SOLV_XFOPEN_H
 #define SOLV_XFOPEN_H
 

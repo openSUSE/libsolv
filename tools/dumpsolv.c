@@ -341,16 +341,16 @@ int main(int argc, char **argv)
   printf ("\nSearchresults:\n");
   Dataiterator di;
   dataiterator_init(&di, pool, 0, 0, 0, "3", SEARCH_SUB | SEARCH_SUBSTRING | SEARCH_FILES);
-  //int count = 0;
+  /* int count = 0; */
   while (dataiterator_step(&di))
     {
       printf("%d:", di.solvid);
       dump_attr(repo, di.data, di.key, &di.kv);
       /*if (di.solvid == 4 && count++ == 0)
 	dataiterator_jump_to_solvable(&di, pool->solvables + 3);*/
-      //dataiterator_skip_attribute(&di);
-      //dataiterator_skip_solvable(&di);
-      //dataiterator_skip_repo(&di);
+      /* dataiterator_skip_attribute(&di); */
+      /* dataiterator_skip_solvable(&di); */
+      /* dataiterator_skip_repo(&di); */
     }
 #endif
   pool_free(pool);
