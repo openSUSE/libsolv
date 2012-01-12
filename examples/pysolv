@@ -869,7 +869,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
                 print "  Solution %d:" % solution.id
                 elements = solution.elements(True)
                 for element in elements:
-                    print "  - %s" % element.str
+                    print "  - %s" % element.str()
                 print
             sol = ''
             while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):

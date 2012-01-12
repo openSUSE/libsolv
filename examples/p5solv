@@ -757,7 +757,7 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
     $solver->set_flag($solv::Solver::SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
     $solver->set_flag($solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1);
     $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if $cmd eq 'erase';
-    if ($cmd eq 'dup' && @jobs == 1 $jobs[0]->{'how'} == ($solv::Job::SOLVER_DISTUPGRADE | $solv::Job::SOLVER_SOLVABLE_ALL)) {
+    if ($cmd eq 'dup' && @jobs == 1 && $jobs[0]->{'how'} == ($solv::Job::SOLVER_DISTUPGRADE | $solv::Job::SOLVER_SOLVABLE_ALL)) {
       $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_DOWNGRADE, 1);
       $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_VENDERCHANGE, 1);
       $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_ARCHCHANGE, 1);
