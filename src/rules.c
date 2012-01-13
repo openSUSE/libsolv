@@ -849,7 +849,7 @@ finddistupgradepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
   Pool *pool = solv->pool;
   int i;
 
-  policy_findupdatepackages(solv, s, qs, allow_all);
+  policy_findupdatepackages(solv, s, qs, allow_all ? allow_all : 2);
   if (!qs->count)
     {
       if (allow_all)

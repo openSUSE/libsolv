@@ -852,10 +852,6 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
         solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
         if cmd == 'erase':
             solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
-        if cmd == 'dup' and len(jobs) == 1 and jobs[0].how == (Job.SOLVER_DISTUPGRADE | Job.SOLVER_SOLVABLE_ALL):
-            solver.set_flag(Solver.SOLVER_FLAG_ALLOW_DOWNGRADE, 1);
-            solver.set_flag(Solver.SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
-            solver.set_flag(Solver.SOLVER_FLAG_ALLOW_ARCHCHANGE, 1);
         problems = solver.solve(jobs)
         if not problems:
             break

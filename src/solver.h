@@ -198,6 +198,9 @@ struct _Solver {
   Map dupmap;				/* dup these packages*/
   int dupmap_all;			/* dup all packages */
   Map dupinvolvedmap;			/* packages involved in dup process */
+  int dup_allowdowngrade;		/* dup mode: allow to downgrade installed solvable */
+  int dup_allowarchchange;		/* dup mode: allow to change architecture of installed solvables */
+  int dup_allowvendorchange;		/* dup mode: allow to change vendor of installed solvables */
 
   Map droporphanedmap;			/* packages to drop in dup mode */
   int droporphanedmap_all;

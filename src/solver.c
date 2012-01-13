@@ -1269,6 +1269,10 @@ solver_create(Pool *pool)
   solv->pool = pool;
   solv->installed = pool->installed;
 
+  solv->dup_allowdowngrade = 1;
+  solv->dup_allowarchchange = 1;
+  solv->dup_allowvendorchange = 1;
+
   queue_init(&solv->ruletojob);
   queue_init(&solv->decisionq);
   queue_init(&solv->decisionq_why);

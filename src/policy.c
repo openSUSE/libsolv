@@ -732,17 +732,18 @@ policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
 {
   Pool *pool = solv->pool;
   int ret = 0;
-  if (!(ignore & POLICY_ILLEGAL_DOWNGRADE) && !solv->allowdowngrade)
+  int duppkg = solv->dupmap_all ? 1 : 0;
+  if (!(ignore & POLICY_ILLEGAL_DOWNGRADE) && !(duppkg ? solv->dup_allowdowngrade : solv->allowdowngrade))
     {
       if (is->name == s->name && pool_evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE) > 0)
 	ret |= POLICY_ILLEGAL_DOWNGRADE;
     }
-  if (!(ignore & POLICY_ILLEGAL_ARCHCHANGE) && !solv->allowarchchange)
+  if (!(ignore & POLICY_ILLEGAL_ARCHCHANGE) && !(duppkg ? solv->dup_allowarchchange : !solv->allowarchchange))
     {
       if (is->arch != s->arch && policy_illegal_archchange(solv, is, s))
 	ret |= POLICY_ILLEGAL_ARCHCHANGE;
     }
-  if (!(ignore & POLICY_ILLEGAL_VENDORCHANGE) && !solv->allowvendorchange)
+  if (!(ignore & POLICY_ILLEGAL_VENDORCHANGE) && !(duppkg ? solv->dup_allowvendorchange : !solv->allowvendorchange))
     {
       if (is->vendor != s->vendor && policy_illegal_vendorchange(solv, is, s))
 	ret |= POLICY_ILLEGAL_VENDORCHANGE;
@@ -840,6 +841,7 @@ policy_create_obsolete_index(Solver *solv)
  * s: installed solvable to be updated
  * qs: [out] queue to hold Ids of candidates
  * allow_all: 0 = dont allow downgrades, 1 = allow all candidates
+ *            2 = dup mode
  * 
  */
 void
@@ -851,6 +853,15 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
   Id obs, *obsp;
   Solvable *ps;
   int haveprovobs = 0;
+  int allowdowngrade = allow_all ? 1 : solv->allowdowngrade;
+  int allowarchchange = allow_all ? 1 : solv->allowarchchange;
+  int allowvendorchange = allow_all ? 1 : solv->allowvendorchange;
+  if (allow_all == 2)
+    {
+      allowdowngrade = solv->dup_allowdowngrade;
+      allowarchchange = solv->dup_allowarchchange;
+      allowvendorchange = solv->dup_allowvendorchange;
+    }
 
   queue_empty(qs);
 
@@ -872,7 +883,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       ps = pool->solvables + p;
       if (s->name == ps->name)	/* name match */
 	{
-	  if (!allow_all && !solv->allowdowngrade && pool_evrcmp(pool, s->evr, ps->evr, EVRCMP_COMPARE) > 0)
+	  if (!allowdowngrade && pool_evrcmp(pool, s->evr, ps->evr, EVRCMP_COMPARE) > 0)
 	    continue;
 	}
       else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
@@ -902,9 +913,9 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	}
       else
         continue;
-      if (!allow_all && !solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
+      if (!allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
 	continue;
-      if (!allow_all && !solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
+      if (!allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
 	continue;
       queue_push(qs, p);
     }
@@ -918,9 +929,9 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       for (opp = solv->obsoletes_data + solv->obsoletes[n - solv->installed->start]; (p = *opp++) != 0;)
 	{
 	  ps = pool->solvables + p;
-	  if (!allow_all && !solv->allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
+	  if (!allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
 	    continue;
-	  if (!allow_all && !solv->allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
+	  if (!allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
 	    continue;
 	  queue_push(qs, p);
 	}
