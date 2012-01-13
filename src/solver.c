@@ -2392,8 +2392,7 @@ solver_solve(Solver *solv, Queue *job)
 
   /* log solver options */
   POOL_DEBUG(SOLV_DEBUG_STATS, "solver started\n");
-  POOL_DEBUG(SOLV_DEBUG_STATS, "fixsystem=%d updatesystem=%d dosplitprovides=%d, noupdateprovide=%d noinfarchcheck=%d\n", solv->fixsystem, solv->updatesystem, solv->dosplitprovides, solv->noupdateprovide, solv->noinfarchcheck);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "distupgrade=%d distupgrade_removeunsupported=%d\n", solv->distupgrade, solv->distupgrade_removeunsupported);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dosplitprovides=%d, noupdateprovide=%d noinfarchcheck=%d\n", solv->dosplitprovides, solv->noupdateprovide, solv->noinfarchcheck);
   POOL_DEBUG(SOLV_DEBUG_STATS, "allowuninstall=%d, allowdowngrade=%d, allowarchchange=%d, allowvendorchange=%d\n", solv->allowuninstall, solv->allowdowngrade, solv->allowarchchange, solv->allowvendorchange);
   POOL_DEBUG(SOLV_DEBUG_STATS, "promoteepoch=%d, allowselfconflicts=%d\n", pool->promoteepoch, pool->allowselfconflicts);
   POOL_DEBUG(SOLV_DEBUG_STATS, "obsoleteusesprovides=%d, implicitobsoleteusesprovides=%d, obsoleteusescolors=%d\n", pool->obsoleteusesprovides, pool->implicitobsoleteusesprovides, pool->obsoleteusescolors);
@@ -2409,12 +2408,6 @@ solver_solve(Solver *solv, Queue *job)
   /* remember job */
   queue_free(&solv->job);
   queue_init_clone(&solv->job, job);
-
-  /* initialize with legacy values */
-  solv->fixmap_all = solv->fixsystem;
-  solv->updatemap_all = solv->updatesystem;
-  solv->droporphanedmap_all = solv->distupgrade_removeunsupported;
-  solv->dupmap_all = solv->distupgrade;
 
   /*
    * create basic rule set of all involved packages

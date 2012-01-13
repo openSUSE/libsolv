@@ -182,22 +182,16 @@ struct _Solver {
    * Solver configuration
    *-------------------------------------------------------------------------------------------------------------*/
 
-  int fixsystem;			/* repair errors in rpm dependency graph */
   int allowdowngrade;			/* allow to downgrade installed solvable */
   int allowarchchange;			/* allow to change architecture of installed solvables */
   int allowvendorchange;		/* allow to change vendor of installed solvables */
   int allowuninstall;			/* allow removal of installed solvables */
-  int updatesystem;			/* update all packages to the newest version */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
   int ignorealreadyrecommended;		/* true: ignore recommended packages that were already recommended by the installed packages */
   int dontshowinstalledrecommended;	/* true: do not show recommended packages that are already installed */
   
-  /* distupgrade also needs updatesystem and dosplitprovides */
-  int distupgrade;
-  int distupgrade_removeunsupported;
-
   int noinfarchcheck;			/* true: do not forbid inferior architectures */
 
     
