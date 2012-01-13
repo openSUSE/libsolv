@@ -464,6 +464,7 @@ typedef Dataiterator Datamatch;
 #endif
 
 typedef int Id;
+typedef unsigned int Offset;
 
 %include "knownid.h"
 
@@ -1088,6 +1089,11 @@ typedef struct {
   bool add_solv(FILE *fp, int flags = 0) {
     return repo_add_solv_flags($self, fp, flags) == 0;
   }
+
+  Id add_solvable() {
+    return repo_add_solvable($self);
+  }
+
   bool add_products(const char *proddir, int flags = 0) {
     repo_add_products($self, proddir, 0, flags);
     return 1;
@@ -1154,6 +1160,10 @@ typedef struct {
     repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
     $self->nrepodata = oldnrepodata;
     return 1;
+  }
+
+  Offset addid_dep(Offset olddeps, Id id, Id marker) {
+    return repo_addid_dep($self, olddeps, id, marker);
   }
 
   %newobject Dataiterator;
@@ -1609,54 +1619,82 @@ typedef struct {
     return pool->installed && pool_id2solvable(pool, $self->id)->repo == pool->installed;
   }
 
-  const char * const name;
+  const char *name;
   %{
+    SWIGINTERN void XSolvable_name_set(XSolvable *xs, const char *name) {
+      Pool *pool = xs->pool;
+      pool->solvables[xs->id].name = pool_str2id(pool, name, /*create=*/1);
+    }
     SWIGINTERN const char *XSolvable_name_get(XSolvable *xs) {
       Pool *pool = xs->pool;
       return pool_id2str(pool, pool->solvables[xs->id].name);
     }
   %}
-  Id const nameid;
+  Id nameid;
   %{
+    SWIGINTERN void XSolvable_nameid_set(XSolvable *xs, Id nameid) {
+      xs->pool->solvables[xs->id].name = nameid;
+    }
     SWIGINTERN Id XSolvable_nameid_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].name;
     }
   %}
-  const char * const evr;
+  const char *evr;
   %{
+    SWIGINTERN void XSolvable_evr_set(XSolvable *xs, const char *evr) {
+      Pool *pool = xs->pool;
+      pool->solvables[xs->id].evr = pool_str2id(pool, evr, /*create=*/1);
+    }
     SWIGINTERN const char *XSolvable_evr_get(XSolvable *xs) {
       Pool *pool = xs->pool;
       return pool_id2str(pool, pool->solvables[xs->id].evr);
     }
   %}
-  Id const evrid;
+  Id evrid;
   %{
+    SWIGINTERN void XSolvable_evrid_set(XSolvable *xs, Id evrid) {
+      xs->pool->solvables[xs->id].evr = evrid;
+    }
     SWIGINTERN Id XSolvable_evrid_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].evr;
     }
   %}
-  const char * const arch;
+  const char *arch;
   %{
+    SWIGINTERN void XSolvable_arch_set(XSolvable *xs, const char *arch) {
+      Pool *pool = xs->pool;
+      pool->solvables[xs->id].arch = pool_str2id(pool, arch, /*create=*/1);
+    }
     SWIGINTERN const char *XSolvable_arch_get(XSolvable *xs) {
       Pool *pool = xs->pool;
       return pool_id2str(pool, pool->solvables[xs->id].arch);
     }
   %}
-  Id const archid;
+  Id archid;
   %{
+    SWIGINTERN void XSolvable_archid_set(XSolvable *xs, Id archid) {
+      xs->pool->solvables[xs->id].arch = archid;
+    }
     SWIGINTERN Id XSolvable_archid_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].arch;
     }
   %}
-  const char * const vendor;
+  const char *vendor;
   %{
+    SWIGINTERN void XSolvable_vendor_set(XSolvable *xs, const char *vendor) {
+      Pool *pool = xs->pool;
+      pool->solvables[xs->id].vendor = pool_str2id(pool, vendor, /*create=*/1);
+    }
     SWIGINTERN const char *XSolvable_vendor_get(XSolvable *xs) {
       Pool *pool = xs->pool;
       return pool_id2str(pool, pool->solvables[xs->id].vendor);
     }
   %}
-  Id const vendorid;
+  Id vendorid;
   %{
+    SWIGINTERN void XSolvable_vendorid_set(XSolvable *xs, Id vendorid) {
+      xs->pool->solvables[xs->id].vendor = vendorid;
+    }
     SWIGINTERN Id XSolvable_vendorid_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].vendor;
     }
@@ -1665,6 +1703,86 @@ typedef struct {
   %{
     SWIGINTERN Repo *XSolvable_repo_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].repo;
+    }
+  %}
+
+  Offset provides;
+  %{
+    SWIGINTERN void XSolvable_provides_set(XSolvable *xs, Offset provides) {
+      xs->pool->solvables[xs->id].provides = provides;
+    }
+    SWIGINTERN Id XSolvable_provides_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].provides;
+    }
+  %}
+
+  Offset obsoletes;
+  %{
+    SWIGINTERN void XSolvable_obsoletes_set(XSolvable *xs, Offset obsoletes) {
+      xs->pool->solvables[xs->id].obsoletes = obsoletes;
+    }
+    SWIGINTERN Id XSolvable_obsoletes_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].obsoletes;
+    }
+  %}
+
+  Offset conflicts;
+  %{
+    SWIGINTERN void XSolvable_conflicts_set(XSolvable *xs, Offset conflicts) {
+      xs->pool->solvables[xs->id].conflicts = conflicts;
+    }
+    SWIGINTERN Id XSolvable_conflicts_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].conflicts;
+    }
+  %}
+
+  Offset requires;
+  %{
+    SWIGINTERN void XSolvable_requires_set(XSolvable *xs, Offset requires) {
+      xs->pool->solvables[xs->id].requires = requires;
+    }
+    SWIGINTERN Id XSolvable_requires_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].requires;
+    }
+  %}
+
+  Offset recommends;
+  %{
+    SWIGINTERN void XSolvable_recommends_set(XSolvable *xs, Offset recommends) {
+      xs->pool->solvables[xs->id].recommends = recommends;
+    }
+    SWIGINTERN Id XSolvable_recommends_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].recommends;
+    }
+  %}
+
+  Offset suggests;
+  %{
+    SWIGINTERN void XSolvable_suggests_set(XSolvable *xs, Offset suggests) {
+      xs->pool->solvables[xs->id].suggests = suggests;
+    }
+    SWIGINTERN Id XSolvable_suggests_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].suggests;
+    }
+  %}
+
+  Offset supplements;
+  %{
+    SWIGINTERN void XSolvable_supplements_set(XSolvable *xs, Offset supplements) {
+      xs->pool->solvables[xs->id].supplements = supplements;
+    }
+    SWIGINTERN Id XSolvable_supplements_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].supplements;
+    }
+  %}
+
+  Offset enhances;
+  %{
+    SWIGINTERN void XSolvable_enhances_set(XSolvable *xs, Offset enhances) {
+      xs->pool->solvables[xs->id].enhances = enhances;
+    }
+    SWIGINTERN Id XSolvable_enhances_get(XSolvable *xs) {
+      return xs->pool->solvables[xs->id].enhances;
     }
   %}
 
