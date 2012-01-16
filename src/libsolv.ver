@@ -106,6 +106,8 @@ SOLV_1.0 {
 		queue_insert;
 		queue_insert2;
 		queue_insertn;
+		repo_add_deparray;
+		repo_add_idarray;
 		repo_add_poolstr_array;
 		repo_add_repodata;
 		repo_add_solv;
@@ -126,6 +128,7 @@ SOLV_1.0 {
 		repo_last_repodata;
 		repo_lookup_bin_checksum;
 		repo_lookup_checksum;
+		repo_lookup_deparray;
 		repo_lookup_id;
 		repo_lookup_idarray;
 		repo_lookup_num;
@@ -135,7 +138,9 @@ SOLV_1.0 {
 		repo_matchvalue;
 		repo_reserve_ids;
 		repo_search;
+		repo_set_deparray;
 		repo_set_id;
+		repo_set_idarray;
 		repo_set_num;
 		repo_set_poolstr;
 		repo_set_str;

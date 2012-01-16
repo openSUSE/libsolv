@@ -1206,6 +1206,36 @@ repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q)
   return 0;
 }
 
+int
+repo_lookup_deparray(Repo *repo, Id entry, Id keyname, Queue *q, Id marker)
+{
+  int r = repo_lookup_idarray(repo, entry, keyname, q);
+  if (r && marker)
+    {
+      int i;
+      if (marker < 0)
+	{
+	  marker = -marker;
+	  for (i = 0; i < q->count; i++)
+	    if (q->elements[i] == marker)
+	      {
+		queue_truncate(q, i);
+		return r;
+	      }
+	}
+      else
+	{
+	  for (i = 0; i < q->count; i++)
+	    if (q->elements[i] == marker)
+	      {
+		queue_deleten(q, 0, i + 1);
+		return r;
+	      }
+	}
+    }
+  return r;
+}
+
 const unsigned char *
 repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
 {
@@ -1406,6 +1436,134 @@ repo_add_poolstr_array(Repo *repo, Id p, Id keyname, const char *str)
 {
   Repodata *data = repo_last_repodata(repo);
   repodata_add_poolstr_array(data, p, keyname, str);
+}
+
+void
+repo_add_deparray(Repo *repo, Id p, Id keyname, Id dep, Id marker)
+{
+  Repodata *data;
+  if (p >= 0)
+    {
+      Solvable *s = repo->pool->solvables + p;
+      switch (keyname)
+	{
+	case SOLVABLE_PROVIDES:
+	  s->provides = repo_addid_dep(repo, s->provides, dep, marker);
+	  return;
+	case SOLVABLE_OBSOLETES:
+	  s->obsoletes = repo_addid_dep(repo, s->obsoletes, dep, marker);
+	  return;
+	case SOLVABLE_CONFLICTS:
+	  s->conflicts = repo_addid_dep(repo, s->conflicts, dep, marker);
+	  return;
+	case SOLVABLE_REQUIRES:
+	  s->requires = repo_addid_dep(repo, s->requires, dep, marker);
+	  return;
+	case SOLVABLE_RECOMMENDS:
+	  s->recommends = repo_addid_dep(repo, s->recommends, dep, marker);
+	  return;
+	case SOLVABLE_SUGGESTS:
+	  s->suggests = repo_addid_dep(repo, s->suggests, dep, marker);
+	  return;
+	case SOLVABLE_SUPPLEMENTS:
+	  s->supplements = repo_addid_dep(repo, s->supplements, dep, marker);
+	  return;
+	case SOLVABLE_ENHANCES:
+	  s->enhances = repo_addid_dep(repo, s->enhances, dep, marker);
+	  return;
+	}
+    }
+  data = repo_last_repodata(repo);
+  repodata_add_idarray(data, p, keyname, dep);
+}
+
+void
+repo_add_idarray(Repo *repo, Id p, Id keyname, Id id)
+{
+  repo_add_deparray(repo, p, keyname, id, 0);
+}
+
+static Offset
+repo_set_idarray_solvable(Repo *repo, Queue *q)
+{
+  Offset o = 0;
+  int i;
+  for (i = 0; i < q->count; i++)
+    repo_addid_dep(repo, o, q->elements[i], 0);
+  return o;
+}
+
+void
+repo_set_deparray(Repo *repo, Id p, Id keyname, Queue *q, Id marker)
+{
+  Repodata *data;
+  if (marker)
+    {
+      /* complex case, splice old and new arrays */
+      int i;
+      Queue q2;
+      queue_init(&q2);
+      repo_lookup_deparray(repo, p, keyname, &q2, -marker);
+      if (marker > 0)
+	{
+	  if (q->count)
+	    {
+	      queue_push(&q2, marker);
+	      for (i = 0; i < q->count; i++)
+		queue_push(&q2, q->elements[i]);
+	    }
+	}
+      else
+	{
+	  if (q2.count)
+	    queue_insert(&q2, 0, -marker);
+	  queue_insertn(&q2, 0, q->count);
+	  for (i = 0; i < q->count; i++)
+	   q2.elements[i] = q->elements[i];
+	}
+      repo_set_deparray(repo, p, keyname, &q2, 0);
+      queue_free(&q2);
+      return;
+    }
+  if (p >= 0)
+    {
+      Solvable *s = repo->pool->solvables + p;
+      switch (keyname)
+	{
+	case SOLVABLE_PROVIDES:
+	  s->provides = repo_set_idarray_solvable(repo, q);
+	  return;
+	case SOLVABLE_OBSOLETES:
+	  s->obsoletes = repo_set_idarray_solvable(repo, q);
+	  return;
+	case SOLVABLE_CONFLICTS:
+	  s->conflicts = repo_set_idarray_solvable(repo, q);
+	  return;
+	case SOLVABLE_REQUIRES:
+	  s->requires = repo_set_idarray_solvable(repo, q);
+	  return;
+	case SOLVABLE_RECOMMENDS:
+	  s->recommends = repo_set_idarray_solvable(repo, q);
+	  return;
+	case SOLVABLE_SUGGESTS:
+	  s->suggests = repo_set_idarray_solvable(repo, q);
+	  return;
+	case SOLVABLE_SUPPLEMENTS:
+	  s->supplements = repo_set_idarray_solvable(repo, q);
+	  return;
+	case SOLVABLE_ENHANCES:
+	  s->enhances = repo_set_idarray_solvable(repo, q);
+	  return;
+	}
+    }
+  data = repo_last_repodata(repo);
+  repodata_set_idarray(data, p, keyname, q);
+}
+
+void
+repo_set_idarray(Repo *repo, Id p, Id keyname, Queue *q)
+{
+  repo_set_deparray(repo, p, keyname, q, 0);
 }
 
 void

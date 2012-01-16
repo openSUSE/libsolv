@@ -178,6 +178,7 @@ const char *repo_lookup_str(Repo *repo, Id entry, Id keyname);
 unsigned int repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound);
 Id repo_lookup_id(Repo *repo, Id entry, Id keyname);
 int repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q);
+int repo_lookup_deparray(Repo *repo, Id entry, Id keyname, Queue *q, Id marker);
 int repo_lookup_void(Repo *repo, Id entry, Id keyname);
 const char *repo_lookup_checksum(Repo *repo, Id entry, Id keyname, Id *typep);
 const unsigned char *repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep);
@@ -293,6 +294,11 @@ void repo_set_num(Repo *repo, Id p, Id keyname, unsigned int num);
 void repo_set_str(Repo *repo, Id p, Id keyname, const char *str);
 void repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str);
 void repo_add_poolstr_array(Repo *repo, Id p, Id keyname, const char *str);
+void repo_add_idarray(Repo *repo, Id p, Id keyname, Id id);
+void repo_add_deparray(Repo *repo, Id p, Id keyname, Id dep, Id marker);
+void repo_set_idarray(Repo *repo, Id p, Id keyname, Queue *q);
+void repo_set_deparray(Repo *repo, Id p, Id keyname, Queue *q, Id marker);
+ 
 void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);
 
