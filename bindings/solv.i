@@ -464,7 +464,6 @@ typedef Dataiterator Datamatch;
 #endif
 
 typedef int Id;
-typedef unsigned int Offset;
 
 %include "knownid.h"
 
@@ -890,6 +889,10 @@ typedef struct {
   Id str2id(const char *str, bool create=1) {
     return pool_str2id($self, str, create);
   }
+  Dep *Dep(const char *str, bool create=1) {
+    Id id = pool_str2id($self, str, create);
+    return new_Dep($self, id);
+  }
   const char *id2str(Id id) {
     return pool_id2str($self, id);
   }
@@ -1160,10 +1163,6 @@ typedef struct {
     repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
     $self->nrepodata = oldnrepodata;
     return 1;
-  }
-
-  Offset addid_dep(Offset olddeps, Id id, Id marker) {
-    return repo_addid_dep($self, olddeps, id, marker);
   }
 
   %newobject Dataiterator;
@@ -1623,7 +1622,7 @@ typedef struct {
   %{
     SWIGINTERN void XSolvable_name_set(XSolvable *xs, const char *name) {
       Pool *pool = xs->pool;
-      pool->solvables[xs->id].name = pool_str2id(pool, name, /*create=*/1);
+      pool->solvables[xs->id].name = pool_str2id(pool, name, 1);
     }
     SWIGINTERN const char *XSolvable_name_get(XSolvable *xs) {
       Pool *pool = xs->pool;
@@ -1643,7 +1642,7 @@ typedef struct {
   %{
     SWIGINTERN void XSolvable_evr_set(XSolvable *xs, const char *evr) {
       Pool *pool = xs->pool;
-      pool->solvables[xs->id].evr = pool_str2id(pool, evr, /*create=*/1);
+      pool->solvables[xs->id].evr = pool_str2id(pool, evr, 1);
     }
     SWIGINTERN const char *XSolvable_evr_get(XSolvable *xs) {
       Pool *pool = xs->pool;
@@ -1663,7 +1662,7 @@ typedef struct {
   %{
     SWIGINTERN void XSolvable_arch_set(XSolvable *xs, const char *arch) {
       Pool *pool = xs->pool;
-      pool->solvables[xs->id].arch = pool_str2id(pool, arch, /*create=*/1);
+      pool->solvables[xs->id].arch = pool_str2id(pool, arch, 1);
     }
     SWIGINTERN const char *XSolvable_arch_get(XSolvable *xs) {
       Pool *pool = xs->pool;
@@ -1683,7 +1682,7 @@ typedef struct {
   %{
     SWIGINTERN void XSolvable_vendor_set(XSolvable *xs, const char *vendor) {
       Pool *pool = xs->pool;
-      pool->solvables[xs->id].vendor = pool_str2id(pool, vendor, /*create=*/1);
+      pool->solvables[xs->id].vendor = pool_str2id(pool, vendor, 1);
     }
     SWIGINTERN const char *XSolvable_vendor_get(XSolvable *xs) {
       Pool *pool = xs->pool;
@@ -1706,85 +1705,70 @@ typedef struct {
     }
   %}
 
-  Offset provides;
-  %{
-    SWIGINTERN void XSolvable_provides_set(XSolvable *xs, Offset provides) {
-      xs->pool->solvables[xs->id].provides = provides;
-    }
-    SWIGINTERN Id XSolvable_provides_get(XSolvable *xs) {
-      return xs->pool->solvables[xs->id].provides;
-    }
-  %}
-
-  Offset obsoletes;
-  %{
-    SWIGINTERN void XSolvable_obsoletes_set(XSolvable *xs, Offset obsoletes) {
-      xs->pool->solvables[xs->id].obsoletes = obsoletes;
-    }
-    SWIGINTERN Id XSolvable_obsoletes_get(XSolvable *xs) {
-      return xs->pool->solvables[xs->id].obsoletes;
-    }
-  %}
-
-  Offset conflicts;
-  %{
-    SWIGINTERN void XSolvable_conflicts_set(XSolvable *xs, Offset conflicts) {
-      xs->pool->solvables[xs->id].conflicts = conflicts;
-    }
-    SWIGINTERN Id XSolvable_conflicts_get(XSolvable *xs) {
-      return xs->pool->solvables[xs->id].conflicts;
-    }
-  %}
-
-  Offset requires;
-  %{
-    SWIGINTERN void XSolvable_requires_set(XSolvable *xs, Offset requires) {
-      xs->pool->solvables[xs->id].requires = requires;
-    }
-    SWIGINTERN Id XSolvable_requires_get(XSolvable *xs) {
-      return xs->pool->solvables[xs->id].requires;
-    }
-  %}
-
-  Offset recommends;
-  %{
-    SWIGINTERN void XSolvable_recommends_set(XSolvable *xs, Offset recommends) {
-      xs->pool->solvables[xs->id].recommends = recommends;
-    }
-    SWIGINTERN Id XSolvable_recommends_get(XSolvable *xs) {
-      return xs->pool->solvables[xs->id].recommends;
-    }
-  %}
-
-  Offset suggests;
-  %{
-    SWIGINTERN void XSolvable_suggests_set(XSolvable *xs, Offset suggests) {
-      xs->pool->solvables[xs->id].suggests = suggests;
-    }
-    SWIGINTERN Id XSolvable_suggests_get(XSolvable *xs) {
-      return xs->pool->solvables[xs->id].suggests;
-    }
-  %}
-
-  Offset supplements;
-  %{
-    SWIGINTERN void XSolvable_supplements_set(XSolvable *xs, Offset supplements) {
-      xs->pool->solvables[xs->id].supplements = supplements;
-    }
-    SWIGINTERN Id XSolvable_supplements_get(XSolvable *xs) {
-      return xs->pool->solvables[xs->id].supplements;
-    }
-  %}
-
-  Offset enhances;
-  %{
-    SWIGINTERN void XSolvable_enhances_set(XSolvable *xs, Offset enhances) {
-      xs->pool->solvables[xs->id].enhances = enhances;
-    }
-    SWIGINTERN Id XSolvable_enhances_get(XSolvable *xs) {
-      return xs->pool->solvables[xs->id].enhances;
-    }
-  %}
+  void add_provides(Dep *dep, Id marker = -SOLVABLE_FILEMARKER) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->provides = repo_addid_dep(s->repo, s->provides, dep->id, marker);
+  }
+  void add_providesid(Id id, Id marker = -SOLVABLE_FILEMARKER) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->provides = repo_addid_dep(s->repo, s->provides, id, marker);
+  }
+  void add_obsoletes(Dep *dep) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->obsoletes = repo_addid_dep(s->repo, s->obsoletes, dep->id, 0);
+  }
+  void add_obsoletesid(Id id) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->obsoletes = repo_addid_dep(s->repo, s->obsoletes, id, 0);
+  }
+  void add_conflicts(Dep *dep) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->conflicts = repo_addid_dep(s->repo, s->conflicts, dep->id, 0);
+  }
+  void add_conflictsid(Id id) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->conflicts = repo_addid_dep(s->repo, s->conflicts, id, 0);
+  }
+  void add_requires(Dep *dep, Id marker = -SOLVABLE_PREREQMARKER) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->requires = repo_addid_dep(s->repo, s->requires, dep->id, marker);
+  }
+  void add_requiresid(Id id, Id marker = -SOLVABLE_PREREQMARKER) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->requires = repo_addid_dep(s->repo, s->requires, id, marker);
+  }
+  void add_recommends(Dep *dep) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->recommends = repo_addid_dep(s->repo, s->recommends, dep->id, 0);
+  }
+  void add_recommendsid(Id id) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->recommends = repo_addid_dep(s->repo, s->recommends, id, 0);
+  }
+  void add_suggests(Dep *dep) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->suggests = repo_addid_dep(s->repo, s->suggests, dep->id, 0);
+  }
+  void add_suggestsid(Id id) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->suggests = repo_addid_dep(s->repo, s->suggests, id, 0);
+  }
+  void add_supplements(Dep *dep) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->supplements = repo_addid_dep(s->repo, s->supplements, dep->id, 0);
+  }
+  void add_supplementsid(Id id) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->supplements = repo_addid_dep(s->repo, s->supplements, id, 0);
+  }
+  void add_enhances(Dep *dep) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->enhances = repo_addid_dep(s->repo, s->enhances, dep->id, 0);
+  }
+  void add_enhancesid(Id id) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    s->enhances = repo_addid_dep(s->repo, s->enhances, id, 0);
+  }
 
   bool __eq__(XSolvable *s) {
     return $self->pool == s->pool && $self->id == s->id;
