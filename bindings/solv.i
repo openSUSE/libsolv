@@ -1093,8 +1093,9 @@ typedef struct {
     return repo_add_solv_flags($self, fp, flags) == 0;
   }
 
-  Id add_solvable() {
-    return repo_add_solvable($self);
+  XSolvable *add_solvable() {
+    Id solvid = repo_add_solvable($self);
+    return new_XSolvable($self->pool, solvid);
   }
 
   bool add_products(const char *proddir, int flags = 0) {
