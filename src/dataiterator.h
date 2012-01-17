@@ -59,13 +59,36 @@ typedef struct _KeyValue {
 /* dataiterator internal */
 #define SEARCH_THISSOLVID		(1<<31)
 
+/*
+ * Datamatcher: match a string against a query
+ */
 typedef struct _Datamatcher {
-  int flags;
-  const char *match;
-  void *matchdata;
+  int flags;		/* see matcher flags above */
+  const char *match;	/* the query string */
+  void *matchdata;	/* e.g. compiled regexp */
   int error;
 } Datamatcher;
 
+int  datamatcher_init(Datamatcher *ma, const char *match, int flags);
+void datamatcher_free(Datamatcher *ma);
+int  datamatcher_match(Datamatcher *ma, const char *str);
+
+
+/*
+ * Dataiterator
+ * 
+ * Iterator like interface to 'search' functionality
+ * 
+ * Dataiterator is per-pool, additional filters can be applied
+ * to limit the search domain. See dataiterator_init below.
+ * 
+ * Use these like:
+ *    Dataiterator di;
+ *    dataiterator_init(&di, repo->pool, repo, 0, 0, "bla", SEARCH_SUBSTRING);
+ *    while (dataiterator_step(&di))
+ *      dosomething(di.solvid, di.key, di.kv);
+ *    dataiterator_free(&di);
+ */
 typedef struct _Dataiterator
 {
   int state;
@@ -108,25 +131,6 @@ typedef struct _Dataiterator
 
 } Dataiterator;
 
-int  datamatcher_init(Datamatcher *ma, const char *match, int flags);
-void datamatcher_free(Datamatcher *ma);
-int  datamatcher_match(Datamatcher *ma, const char *str);
-
-/*
- * Dataiterator
- * 
- * Iterator like interface to 'search' functionality
- * 
- * Dataiterator is per-pool, additional filters can be applied
- * to limit the search domain. See dataiterator_init below.
- * 
- * Use these like:
- *    Dataiterator di;
- *    dataiterator_init(&di, repo->pool, repo, 0, 0, "bla", SEARCH_SUBSTRING);
- *    while (dataiterator_step(&di))
- *      dosomething(di.solvid, di.key, di.kv);
- *    dataiterator_free(&di);
- */
 
 /*
  * Initialize dataiterator
