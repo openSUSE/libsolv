@@ -29,9 +29,9 @@ struct _KeyValue;
 
 typedef struct _Repokey {
   Id name;
-  Id type;               /* REPOKEY_TYPE_xxx */
+  Id type;			/* REPOKEY_TYPE_xxx */
   unsigned int size;
-  unsigned int storage; /* KEY_STORAGE_xxx */
+  unsigned int storage;		/* KEY_STORAGE_xxx */
 } Repokey;
 
 #define KEY_STORAGE_DROPPED             0
