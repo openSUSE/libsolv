@@ -1,3 +1,13 @@
+/*
+ * Copyright (c) 2007-2012, Novell Inc.
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
+ */
+
+#ifndef LIBSOLV_CHKSUM_H
+#define LIBSOLV_CHKSUM_H
+
 #include "pool.h"
 
 void *solv_chksum_create(Id type);
@@ -24,3 +34,5 @@ static inline int solv_chksum_len(Id type)
       return 0;
     }
 }
+
+#endif /* LIBSOLV_CHKSUM_H */

@@ -10,8 +10,8 @@
  *
  */
 
-#ifndef LIBSOLV_SOLVER_P_H
-#define LIBSOLV_SOLVER_P_H
+#ifndef LIBSOLV_SOLVER_PRIVATE_H
+#define LIBSOLV_SOLVER_PRIVATE_H
 
 extern void solver_run_sat(Solver *solv, int disablerules, int doweak);
 extern void solver_reset(Solver *solv);
@@ -73,4 +73,4 @@ solver_is_enhancing(Solver *solv, Solvable *s)
   return 0;
 }
 
-#endif /* LIBSOLV_SOLVER_P_H */
+#endif /* LIBSOLV_SOLVER_PRIVATE_H */
