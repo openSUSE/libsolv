@@ -1065,8 +1065,7 @@ typedef struct {
   static const int REPO_USE_LOADING = REPO_USE_LOADING;
   static const int REPO_EXTEND_SOLVABLES = REPO_EXTEND_SOLVABLES;
   static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS;       /* repo_solv */
-  static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES; /* repo_susetags */
-  static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS ; /* repo_solv */
+  static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES;     /* repo_susetags */
 
   void free(bool reuseids = 0) {
     repo_free($self, reuseids);
