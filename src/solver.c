@@ -497,11 +497,8 @@ addwatches_rule(Solver *solv, Rule *r)
  *
  * make decision and propagate to all rules
  * 
- * Evaluate each term affected by the decision (linked through watches)
- * If we find unit rules we make new decisions based on them
- * 
- * Everything's fixed there, it's just finding rules that are
- * unit.
+ * Evaluate each term affected by the decision (linked through watches).
+ * If we find unit rules we make new decisions based on them.
  * 
  * return : 0 = everything is OK
  *          rule = conflict found in this rule
@@ -647,9 +644,9 @@ propagate(Solver *solv, int level)
 		
 	    } /* not binary */
 	    
-            /*
-	     * unit clause found, set literal other_watch to TRUE
-	     */
+          /*
+	   * unit clause found, set literal other_watch to TRUE
+	   */
 
 	  if (DECISIONMAP_FALSE(other_watch))	   /* check if literal is FALSE */
 	    return r;  		                   /* eek, a conflict! */
@@ -820,7 +817,7 @@ l1retry:
  * 
  * solver_reset
  * 
- * reset the solver decisions to right after the rpm rules.
+ * reset all solver decisions
  * called after rules have been enabled/disabled
  */
 
@@ -855,6 +852,8 @@ solver_reset(Solver *solv)
 /*-------------------------------------------------------------------
  * 
  * analyze_unsolvable_rule
+ *
+ * recursion helper used by analyze_unsolvable
  */
 
 static void
@@ -915,6 +914,18 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
 /*-------------------------------------------------------------------
  * 
  * analyze_unsolvable
+ *
+ * We know that the problem is not solvable. Record all involved
+ * rules (i.e. the "proof") into solv->learnt_pool.
+ * Record the learnt pool index and all non-rpm rules into
+ * solv->problems. (Our solutions to fix the problems are to
+ * disable those rules.)
+ *
+ * If the proof contains at least one weak rule, we disable the
+ * last of them.
+ *
+ * Otherwise we return 0 if disablerules is not set or disable
+ * _all_ of the problem rules and return 1.
  *
  * return: 1 - disabled some rules, try again
  *         0 - hopeless
@@ -1038,7 +1049,8 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       solv->problems.elements[oldproblemcount] = oldlearntpoolcount;
     }
 
-  if (disablerules)
+  /* + 2: index + trailing zero */
+  if (disablerules && oldproblemcount + 2 < solv->problems.count)
     {
       for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
         solver_disableproblem(solv, solv->problems.elements[i]);
