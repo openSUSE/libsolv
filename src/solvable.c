@@ -36,6 +36,14 @@ pool_solvable2str(Pool *pool, Solvable *s)
 }
 
 Id
+solvable_lookup_type(Solvable *s, Id keyname)
+{
+  if (!s->repo)
+    return 0;
+  return repo_lookup_type(s->repo, s - s->repo->pool->solvables, keyname);
+}
+
+Id
 solvable_lookup_id(Solvable *s, Id keyname)
 {
   if (!s->repo)
@@ -52,6 +60,17 @@ solvable_lookup_idarray(Solvable *s, Id keyname, Queue *q)
       return 0;
     }
   return repo_lookup_idarray(s->repo, s - s->repo->pool->solvables, keyname, q);
+}
+
+int
+solvable_lookup_deparray(Solvable *s, Id keyname, Queue *q, Id marker)
+{
+  if (!s->repo)
+    {
+      queue_empty(q);
+      return 0;
+    }
+  return repo_lookup_deparray(s->repo, s - s->repo->pool->solvables, keyname, q, marker);
 }
 
 const char *
@@ -562,3 +581,59 @@ solvable_selfprovidedep(Solvable *s)
     }
   return pool_rel2id(pool, s->name, s->evr, REL_EQ, 1);
 }
+
+/* setter functions, simply call the repo variants */
+void
+solvable_set_id(Solvable *s, Id keyname, Id id)
+{
+  repo_set_num(s->repo, s - s->repo->pool->solvables, keyname, id);
+}
+
+void
+solvable_set_num(Solvable *s, Id keyname, unsigned int num)
+{
+  repo_set_num(s->repo, s - s->repo->pool->solvables, keyname, num);
+}
+
+void
+solvable_set_str(Solvable *s, Id keyname, const char *str)
+{
+  repo_set_str(s->repo, s - s->repo->pool->solvables, keyname, str);
+}
+
+void
+solvable_set_poolstr(Solvable *s, Id keyname, const char *str)
+{
+  repo_set_poolstr(s->repo, s - s->repo->pool->solvables, keyname, str);
+}
+
+void
+solvable_add_poolstr_array(Solvable *s, Id keyname, const char *str)
+{
+  repo_add_poolstr_array(s->repo, s - s->repo->pool->solvables, keyname, str);
+}
+
+void
+solvable_add_idarray(Solvable *s, Id keyname, Id id)
+{
+  repo_add_idarray(s->repo, s - s->repo->pool->solvables, keyname, id);
+}
+
+void
+solvable_add_deparray(Solvable *s, Id keyname, Id dep, Id marker)
+{
+  repo_add_deparray(s->repo, s - s->repo->pool->solvables, keyname, dep, marker);
+}
+
+void
+solvable_set_idarray(Solvable *s, Id keyname, Queue *q)
+{
+  repo_set_idarray(s->repo, s - s->repo->pool->solvables, keyname, q);
+}
+
+void
+solvable_set_deparray(Solvable *s, Id keyname, Queue *q, Id marker)
+{
+  repo_set_deparray(s->repo, s - s->repo->pool->solvables, keyname, q, marker);
+}
+

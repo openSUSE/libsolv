@@ -227,20 +227,6 @@ static inline const char *pool_solvid2str(Pool *pool, Id p)
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
 Id pool_id2langid(Pool *pool, Id id, const char *lang, int create);
 
-Id solvable_lookup_id(Solvable *s, Id keyname);
-unsigned int solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound);
-const char *solvable_lookup_str(Solvable *s, Id keyname);
-const char *solvable_lookup_str_poollang(Solvable *s, Id keyname);
-const char *solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase);
-int solvable_lookup_bool(Solvable *s, Id keyname);
-int solvable_lookup_void(Solvable *s, Id keyname);
-char * solvable_get_location(Solvable *s, unsigned int *medianrp);
-const unsigned char *solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep);
-const char *solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep);
-int solvable_lookup_idarray(Solvable *s, Id keyname, Queue *q);
-int solvable_identical(Solvable *s1, Solvable *s2);
-Id solvable_selfprovidedep(Solvable *s);
-
 int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap);
 int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed);
 int solvable_trivial_installable_queue(Solvable *s, Queue *installed);
