@@ -1319,6 +1319,38 @@ typedef struct {
   }
 }
 
+%extend Datapos {
+  Id lookup_id(Id keyname) {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    Id r;
+    pool->pos = *$self;
+    r = pool_lookup_id(pool, SOLVID_POS, keyname);
+    pool->pos = oldpos;
+    return r;
+  }
+  const char *lookup_str(Id keyname) {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    const char *r;
+    pool->pos = *$self;
+    r = pool_lookup_str(pool, SOLVID_POS, keyname);
+    pool->pos = oldpos;
+    return r;
+  }
+  %newobject lookup_checksum;
+  Chksum *lookup_checksum(Id keyname) {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    Id type = 0;
+    const unsigned char *b;
+    pool->pos = *$self;
+    b = pool_lookup_bin_checksum(pool, SOLVID_POS, keyname, &type);
+    pool->pos = oldpos;
+    return solv_chksum_create_from_bin(type, b);
+  }
+}
+
 %extend Datamatch {
   ~Datamatch() {
     dataiterator_free($self);
@@ -1357,6 +1389,26 @@ typedef struct {
   }
   int num2() {
      return $self->kv.num2;
+  }
+  %newobject pos;
+  Datapos *pos() {
+    Pool *pool = $self->pool;
+    Datapos *pos, oldpos = pool->pos;
+    dataiterator_setpos($self);
+    pos = solv_calloc(1, sizeof(*pos));
+    *pos = pool->pos;
+    pool->pos = oldpos;
+    return pos;
+  }
+  %newobject parentpos;
+  Datapos *parentpos() {
+    Pool *pool = $self->pool;
+    Datapos *pos, oldpos = pool->pos;
+    dataiterator_setpos_parent($self);
+    pos = solv_calloc(1, sizeof(*pos));
+    *pos = pool->pos;
+    pool->pos = oldpos;
+    return pos;
   }
   void setpos() {
     dataiterator_setpos($self);
@@ -1600,6 +1652,38 @@ typedef struct {
     Id type = 0;
     const unsigned char *b = pool_lookup_bin_checksum($self->pool, $self->id, keyname, &type);
     return solv_chksum_create_from_bin(type, b);
+  }
+  Queue lookup_idarray(Id keyname, Id marker = 1) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    Queue r;
+    queue_init(&r);
+    if (marker == 1) {
+      if (keyname == SOLVABLE_PROVIDES)
+        marker = -SOLVABLE_FILEMARKER;
+      else if (keyname == SOLVABLE_REQUIRES)
+        marker = -SOLVABLE_PREREQMARKER;
+      else
+        marker = 0;
+    }
+    solvable_lookup_deparray(s, keyname, &r, marker);
+    return r;
+  }
+  %typemap(out) Queue lookup_deparray Queue2Array(Dep *, 1, new_Dep(arg1->pool, id));
+  %newobject lookup_deparray;
+  Queue lookup_deparray(Id keyname, Id marker = 1) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    Queue r;
+    queue_init(&r);
+    if (marker == 1) {
+      if (keyname == SOLVABLE_PROVIDES)
+        marker = -SOLVABLE_FILEMARKER;
+      else if (keyname == SOLVABLE_REQUIRES)
+        marker = -SOLVABLE_PREREQMARKER;
+      else
+        marker = 0;
+    }
+    solvable_lookup_deparray(s, keyname, &r, marker);
+    return r;
   }
   const char *lookup_location(unsigned int *OUTPUT) {
     return solvable_get_location($self->pool->solvables + $self->id, OUTPUT);

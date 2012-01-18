@@ -220,10 +220,10 @@ class Repo_rpmmd < Repo_generic
     di = @handle.Dataiterator(Solv::SOLVID_META, Solv::REPOSITORY_REPOMD_TYPE, what, Solv::Dataiterator::SEARCH_STRING)
     di.prepend_keyname(Solv::REPOSITORY_REPOMD)
     for d in di
-      d.setpos_parent()
-      filename = d.pool.lookup_str(Solv::SOLVID_POS, Solv::REPOSITORY_REPOMD_LOCATION)
+      dp = d.parentpos()
+      filename = dp.lookup_str(Solv::REPOSITORY_REPOMD_LOCATION)
       next unless filename
-      checksum = d.pool.lookup_checksum(Solv::SOLVID_POS, Solv::REPOSITORY_REPOMD_CHECKSUM)
+      checksum = dp.lookup_checksum(Solv::REPOSITORY_REPOMD_CHECKSUM)
       if !checksum
 	puts "no #{filename} checksum!"
 	return nil, nil
@@ -337,8 +337,8 @@ class Repo_susetags < Repo_generic
     di = @handle.Dataiterator(Solv::SOLVID_META, Solv::SUSETAGS_FILE_NAME, what, Solv::Dataiterator::SEARCH_STRING)
     di.prepend_keyname(Solv::SUSETAGS_FILE)
     for d in di
-      d.setpos_parent()
-      checksum = d.pool.lookup_checksum(Solv::SOLVID_POS, Solv::SUSETAGS_FILE_CHECKSUM)
+      dp = d.parentpos()
+      checksum = dp.lookup_checksum(Solv::SUSETAGS_FILE_CHECKSUM)
       return what, checksum
     end
     return nil, nil

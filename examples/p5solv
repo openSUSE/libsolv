@@ -201,10 +201,10 @@ sub find {
   my $di = $self->{'handle'}->Dataiterator($solv::SOLVID_META, $solv::REPOSITORY_REPOMD_TYPE, $what, $solv::Dataiterator::SEARCH_STRING);
   $di->prepend_keyname($solv::REPOSITORY_REPOMD);
   for my $d (@$di) {
-    $d->setpos_parent();
-    my $filename = $d->{'pool'}->lookup_str($solv::SOLVID_POS, $solv::REPOSITORY_REPOMD_LOCATION);
+    my $dp = $d->parentpos();
+    my $filename = $dp->lookup_str($solv::REPOSITORY_REPOMD_LOCATION);
     next unless $filename;
-    my $chksum = $d->{'pool'}->lookup_checksum($solv::SOLVID_POS, $solv::REPOSITORY_REPOMD_CHECKSUM);
+    my $chksum = $dp->lookup_checksum($solv::REPOSITORY_REPOMD_CHECKSUM);
     if (!$chksum) {
       print "no $filename file checksum!\n";
       return (undef, undef);
@@ -326,8 +326,8 @@ sub find {
   my $di = $self->{'handle'}->Dataiterator($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME, $what, $solv::Dataiterator::SEARCH_STRING);
   $di->prepend_keyname($solv::SUSETAGS_FILE);
   for my $d (@$di) {
-    $d->setpos_parent();
-    my $chksum = $d->{'pool'}->lookup_checksum($solv::SOLVID_POS, $solv::SUSETAGS_FILE_CHECKSUM);
+    my $dp = $d->parentpos();
+    my $chksum = $dp->lookup_checksum($solv::SUSETAGS_FILE_CHECKSUM);
     return ($what, $chksum);
   }
   return (undef, undef);
