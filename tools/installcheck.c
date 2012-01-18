@@ -20,10 +20,13 @@
 #include "pool.h"
 #include "poolarch.h"
 #include "repo_solv.h"
-#ifndef DEBIAN
+#ifdef ENABLE_SUSEREPO
 #include "repo_susetags.h"
+#endif
+#ifdef ENABLE_RPMMD
 #include "repo_rpmmd.h"
-#else
+#endif
+#ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
 #endif
 #include "solver.h"
@@ -112,8 +115,11 @@ main(int argc, char **argv)
 	  exit(1);
 	}
       repo = repo_create(pool, argv[i]);
-#ifndef DEBIAN
-      if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
+      if (0)
+        {
+        }
+#ifdef ENABLE_SUSEREPO
+      else if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
 	{
 	  repo_add_susetags(repo, fp, 0, 0, 0);
 	}
@@ -121,12 +127,15 @@ main(int argc, char **argv)
 	{
 	  repo_add_susetags(repo, fp, 0, 0, 0);
 	}
+#endif
+#ifdef ENABLE_RPMMD
       else if (l >= 14 && !strcmp(argv[i] + l - 14, "primary.xml.gz"))
 	{
 	  repo_add_rpmmd(repo, fp, 0, 0);
 	}
-#else
-      if (l >= 8 && !strcmp(argv[i] + l - 8, "Packages"))
+#endif
+#ifdef ENABLE_DEBIAN
+      else if (l >= 8 && !strcmp(argv[i] + l - 8, "Packages"))
 	{
 	  repo_add_debpackages(repo, fp, 0);
 	}

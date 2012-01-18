@@ -59,19 +59,24 @@
 #include "repo_solv.h"
 
 #include "repo_write.h"
-#ifndef DEBIAN
+#ifdef ENABLE_RPMDB
 #include "repo_rpmdb.h"
-#else
+#include "pool_fileconflicts.h"
+#endif
+#ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
 #endif
-#include "repo_products.h"
+#ifdef ENABLE_RPMMD
 #include "repo_rpmmd.h"
-#include "repo_susetags.h"
 #include "repo_repomdxml.h"
 #include "repo_updateinfoxml.h"
 #include "repo_deltainfoxml.h"
+#endif
+#ifdef ENABLE_SUSEREPO
+#include "repo_products.h"
+#include "repo_susetags.h"
 #include "repo_content.h"
-#include "pool_fileconflicts.h"
+#endif
 #include "solv_xfopen.h"
 
 #ifdef FEDORA
@@ -1201,7 +1206,7 @@ static Pool *
 read_sigs()
 {
   Pool *sigpool = pool_create();
-#ifndef DEBIAN
+#ifdef ENABLE_RPMDB
   Repo *repo = repo_create(sigpool, "rpmdbkeys");
   repo_add_rpmdb_pubkeys(repo, 0, 0);
 #endif
@@ -1209,6 +1214,7 @@ read_sigs()
 }
 
 
+#ifdef ENABLE_RPMMD
 /* repomd helpers */
 
 static inline const char *
@@ -1311,7 +1317,10 @@ repomd_load_ext(Repo *repo, Repodata *data)
   return 1;
 }
 
+#endif
 
+
+#ifdef ENABLE_SUSEREPO
 /* susetags helpers */
 
 static inline const char *
@@ -1448,6 +1457,7 @@ susetags_load_ext(Repo *repo, Repodata *data)
   writecachedrepo(repo, data, ext, cinfo->extcookie);
   return 1;
 }
+#endif
 
 
 
@@ -1457,16 +1467,20 @@ int
 load_stub(Pool *pool, Repodata *data, void *dp)
 {
   struct repoinfo *cinfo = data->repo->appdata;
+#ifdef ENABLE_SUSEREPO
   if (cinfo->type == TYPE_SUSETAGS)
     return susetags_load_ext(data->repo, data);
+#endif
+#ifdef ENABLE_RPMMD
   if (cinfo->type == TYPE_RPMMD)
     return repomd_load_ext(data->repo, data);
+#endif
   return 0;
 }
 
 static unsigned char installedcookie[32];
 
-#ifdef DEBIAN
+#ifdef ENABLE_DEBIAN
 
 const char *
 debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsigned char **chksump, Id *chksumtypep)
@@ -1562,7 +1576,7 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
 	  curl = solv_chksum_len(curchksumtype);
 	  if (!curl || (chksumtype && solv_chksum_len(chksumtype) > curl))
 	    continue;
-          if (solv_hex2bin(&ch, curchksum, sizeof(curchksum)) != curl)
+          if (solv_hex2bin((const char **)&ch, curchksum, sizeof(curchksum)) != curl)
 	    continue;
 	  solv_free(filename);
 	  filename = strdup(fn);
@@ -1604,17 +1618,18 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   Repodata *data;
   int badchecksum;
   int dorefresh;
-#ifdef DEBIAN
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
   FILE *fpr;
   int j;
 #endif
 
   repo = repo_create(pool, "@System");
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
   printf("rpm database:");
   if (stat("/var/lib/rpm/Packages", &stb))
     memset(&stb, 0, sizeof(&stb));
-#else
+#endif
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
   printf("dpgk database:");
   if (stat("/var/lib/dpkg/status", &stb))
     memset(&stb, 0, sizeof(&stb));
@@ -1624,16 +1639,16 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
     printf(" cached\n");
   else
     {
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
       FILE *ofp;
       int done = 0;
 #endif
       printf(" reading\n");
 
-#ifdef PRODUCTS_PATH
+#if defined(ENABLE_SUSEREPO) && defined(PRODUCTS_PATH)
       repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
 #endif
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
       if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
 	{
 	  Repo *ref = repo_create(pool, "@System.old");
@@ -1648,7 +1663,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       if (!done)
         repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
 #else
+# if defined(ENABLE_DEBIAN) && defined(DEBIAN)
         repo_add_debdb(repo, 0, REPO_REUSE_REPODATA);
+# endif
 #endif
       writecachedrepo(repo, 0, 0, installedcookie);
     }
@@ -1680,6 +1697,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       badchecksum = 0;
       switch (cinfo->type)
 	{
+#ifdef ENABLE_RPMMD
         case TYPE_RPMMD:
 	  printf("rpmmd repo '%s':", cinfo->alias);
 	  fflush(stdout);
@@ -1745,7 +1763,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
+#endif
 
+#ifdef ENABLE_SUSEREPO
         case TYPE_SUSETAGS:
 	  printf("susetags repo '%s':", cinfo->alias);
 	  fflush(stdout);
@@ -1827,8 +1847,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
+#endif
 
-#ifdef DEBIAN
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
         case TYPE_DEBIAN:
 	  printf("debian repo '%s':", cinfo->alias);
 	  fflush(stdout);
@@ -2263,7 +2284,7 @@ yesno(const char *str)
     }
 }
 
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
 
 struct fcstate {
   FILE **newpkgsfps;
@@ -2347,7 +2368,7 @@ runrpm(const char *arg, const char *name, int dupfd3)
 
 #endif
 
-#ifdef DEBIAN
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
 
 void
 rundpkg(const char *arg, const char *name, int dupfd3)
@@ -2791,11 +2812,18 @@ main(int argc, char **argv)
 	    commandlinepkgs = solv_calloc(argc, sizeof(Id));
 	  if (!commandlinerepo)
 	    commandlinerepo = repo_create(pool, "@commandline");
-#ifndef DEBIAN
+	  p = 0;
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
 	  p = repo_add_rpm(commandlinerepo, (const char *)argv[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
-#else
+#endif
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
 	  p = repo_add_deb(commandlinerepo, (const char *)argv[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
 #endif
+	  if (!p)
+	    {
+	      fprintf(stderr, "could not add '%s'\n", argv[i]);
+	      exit(1);
+	    }
 	  commandlinepkgs[i] = p;
 	}
       if (commandlinerepo)
@@ -2948,7 +2976,7 @@ main(int argc, char **argv)
   addsoftlocks(pool, &job);
 #endif
 
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
 rerunsolver:
 #endif
   for (;;)
@@ -3228,7 +3256,7 @@ rerunsolver:
       putchar('\n');
     }
 
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
   if (newpkgs)
     {
       Queue conflicts;
@@ -3267,7 +3295,7 @@ rerunsolver:
   transaction_order(trans, 0);
   for (i = 0; i < trans->steps.count; i++)
     {
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
       const char *evr, *evrp, *nvra;
 #endif
       Solvable *s;
@@ -3281,7 +3309,7 @@ rerunsolver:
 	{
 	case SOLVER_TRANSACTION_ERASE:
 	  printf("erase %s\n", pool_solvid2str(pool, p));
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
 	  if (!s->repo->rpmdbid || !s->repo->rpmdbid[p - s->repo->start])
 	    continue;
 	  /* strip epoch from evr */
@@ -3293,7 +3321,8 @@ rerunsolver:
 	  nvra = pool_tmpjoin(pool, pool_id2str(pool, s->name), "-", evr);
 	  nvra = pool_tmpappend(pool, nvra, ".", pool_id2str(pool, s->arch));
 	  runrpm("-e", nvra, -1);	/* too bad that --querybynumber doesn't work */
-#else
+#endif
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
 	  rundpkg("--remove", pool_id2str(pool, s->name), 0);
 #endif
 	  break;
@@ -3308,9 +3337,10 @@ rerunsolver:
 	    continue;
 	  rewind(fp);
 	  lseek(fileno(fp), 0, SEEK_SET);
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
 	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp));
-#else
+#endif
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
 	  rundpkg("--install", "/dev/fd/3", fileno(fp));
 #endif
 	  fclose(fp);

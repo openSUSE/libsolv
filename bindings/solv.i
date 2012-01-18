@@ -344,18 +344,24 @@ typedef VALUE AppObjectPtr;
 #include "repo_solv.h"
 #include "chksum.h"
 
-#ifndef DEBIAN
+#include "repo_write.h"
+#ifdef ENABLE_RPMDB
 #include "repo_rpmdb.h"
 #endif
+#ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
+#endif
+#ifdef ENABLE_RPMMD
 #include "repo_rpmmd.h"
-#include "repo_write.h"
-#include "repo_products.h"
-#include "repo_susetags.h"
 #include "repo_updateinfoxml.h"
 #include "repo_deltainfoxml.h"
 #include "repo_repomdxml.h"
+#endif
+#ifdef ENABLE_SUSEREPO
+#include "repo_products.h"
+#include "repo_susetags.h"
 #include "repo_content.h"
+#endif
 #include "solv_xfopen.h"
 
 #define true 1
@@ -1065,7 +1071,9 @@ typedef struct {
   static const int REPO_USE_LOADING = REPO_USE_LOADING;
   static const int REPO_EXTEND_SOLVABLES = REPO_EXTEND_SOLVABLES;
   static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS;       /* repo_solv */
+#ifdef ENABLE_SUSETAGS
   static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES;     /* repo_susetags */
+#endif
 
   void free(bool reuseids = 0) {
     repo_free($self, reuseids);
@@ -1097,15 +1105,7 @@ typedef struct {
     return new_XSolvable($self->pool, solvid);
   }
 
-  bool add_products(const char *proddir, int flags = 0) {
-    repo_add_products($self, proddir, 0, flags);
-    return 1;
-  }
-  bool add_rpmmd(FILE *fp, const char *language, int flags = 0) {
-    repo_add_rpmmd($self, fp, language, flags);
-    return 1;
-  }
-#ifndef DEBIAN
+#ifdef ENABLE_RPMDB
   bool add_rpmdb(Repo *ref, int flags = 0) {
     repo_add_rpmdb($self, ref, 0, flags);
     return 1;
@@ -1114,23 +1114,13 @@ typedef struct {
     return repo_add_rpm($self, name, flags);
   }
 #endif
-  bool add_debdb(int flags = 0) {
-    repo_add_debdb($self, 0, flags);
-    return 1;
-  }
-  Id add_deb(const char *name, int flags = 0) {
-    return repo_add_deb($self, name, flags);
-  }
-  bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0) {
-    repo_add_susetags($self, fp, defvendor, language, flags);
+#ifdef ENABLE_RPMMD
+  bool add_rpmmd(FILE *fp, const char *language, int flags = 0) {
+    repo_add_rpmmd($self, fp, language, flags);
     return 1;
   }
   bool add_repomdxml(FILE *fp, int flags = 0) {
     repo_add_repomdxml($self, fp, flags);
-    return 1;
-  }
-  bool add_content(FILE *fp, int flags = 0) {
-    repo_add_content($self, fp, flags);
     return 1;
   }
   bool add_updateinfoxml(FILE *fp, int flags = 0) {
@@ -1141,6 +1131,30 @@ typedef struct {
     repo_add_deltainfoxml($self, fp, flags);
     return 1;
   }
+#endif
+#ifdef ENABLE_DEBIAN
+  bool add_debdb(int flags = 0) {
+    repo_add_debdb($self, 0, flags);
+    return 1;
+  }
+  Id add_deb(const char *name, int flags = 0) {
+    return repo_add_deb($self, name, flags);
+  }
+#endif
+#ifdef ENABLE_SUSEREPO
+  bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0) {
+    repo_add_susetags($self, fp, defvendor, language, flags);
+    return 1;
+  }
+  bool add_content(FILE *fp, int flags = 0) {
+    repo_add_content($self, fp, flags);
+    return 1;
+  }
+  bool add_products(const char *proddir, int flags = 0) {
+    repo_add_products($self, proddir, 0, flags);
+    return 1;
+  }
+#endif
   void internalize() {
     repo_internalize($self);
   }

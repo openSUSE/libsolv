@@ -20,9 +20,13 @@
 #include "evr.h"
 #include "poolarch.h"
 #include "repo_solv.h"
+#ifdef ENABLE_SUSEREPO
 #include "repo_susetags.h"
+#endif
+#ifdef ENABLE_RPMMD
 #include "repo_updateinfoxml.h"
 #include "repo_rpmmd.h"
+#endif
 #include "solver.h"
 #include "solverdebug.h"
 
@@ -532,7 +536,11 @@ main(int argc, char **argv)
           perror(argv[i]);
           exit(1);
         }
-      if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
+      if (0)
+	{
+	}
+#ifdef ENABLE_SUSEREPO
+      else if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
         {
           repo_add_susetags(c.repo, fp, 0, 0, 0);
         }
@@ -540,6 +548,8 @@ main(int argc, char **argv)
         {
           repo_add_susetags(c.repo, fp, 0, 0, 0);
         }
+#endif
+#ifdef ENABLE_RPMMD
       else if (l >= 14 && !strcmp(argv[i] + l - 14, "primary.xml.gz"))
         {
           repo_add_rpmmd(c.repo, fp, 0, 0);
@@ -548,6 +558,7 @@ main(int argc, char **argv)
 	{
           repo_add_updateinfoxml(c.repo, fp, 0);
 	}
+#endif
       else if (repo_add_solv(c.repo, fp))
         {
           fprintf(stderr, "could not add repo %s\n", argv[i]);

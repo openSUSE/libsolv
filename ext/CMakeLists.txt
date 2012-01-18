@@ -1,18 +1,47 @@
 SET (libsolvext_SRCS
-    repo_content.c repo_deltainfoxml.c repo_helix.c repo_products.c
-    repo_releasefile_products.c repo_repomdxml.c repo_rpmmd.c
-    repo_susetags.c repo_updateinfoxml.c repo_write.c repo_zyppdb.c
-    repo_deb.c solv_xfopen.c)
-IF (NOT DEBIAN)
-SET (libsolvext_SRCS ${libsolvext_SRCS}
-    pool_fileconflicts.c repo_rpmdb.c)
-ENDIF (NOT DEBIAN)
+    repo_write.c solv_xfopen.c)
 
 SET (libsolvext_HEADERS
-    pool_fileconflicts.h repo_content.h repo_deltainfoxml.h repo_helix.h repo_products.h
-    repo_releasefile_products.h repo_repomdxml.h repo_rpmdb.h repo_rpmmd.h
-    repo_susetags.h repo_updateinfoxml.h repo_write.h repo_zyppdb.h
-    tools_util.h repo_deb.h solv_xfopen.h)
+    repo_write.h tools_util.h solv_xfopen.h)
+
+IF (ENABLE_RPMDB)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+        pool_fileconflicts.c repo_rpmdb.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+        pool_fileconflicts.h repo_rpmdb.h)
+ENDIF (ENABLE_RPMDB)
+
+IF (ENABLE_RPMMD)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_repomdxml.c repo_rpmmd.c
+	repo_deltainfoxml.c repo_updateinfoxml.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_repomdxml.h repo_rpmmd.h
+	repo_deltainfoxml.h repo_updateinfoxml.h)
+ENDIF (ENABLE_RPMMD)
+
+IF (ENABLE_SUSEREPO)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_content.c repo_products.c repo_releasefile_products.c
+	repo_susetags.c repo_zyppdb.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_content.h repo_products.h repo_releasefile_products.h
+	repo_susetags.h repo_zyppdb.h)
+ENDIF (ENABLE_SUSEREPO)
+
+IF (ENABLE_DEBIAN)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_deb.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_deb.h)
+ENDIF (ENABLE_DEBIAN)
+	
+IF (ENABLE_HELIXREPO)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_helix.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_helix.h)
+ENDIF (ENABLE_HELIXREPO)
 
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 SET (CMAKE_SHARED_LINKER_FLAGS "${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/ext/libsolvext.ver")
