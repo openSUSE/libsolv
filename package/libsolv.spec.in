@@ -169,7 +169,7 @@ cmake   $CMAKE_FLAGS \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DLIB=%{_lib} \
 	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
-	-DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	%{?with_enable_static:-DENABLE_STATIC=1} \
 	%{?with_disable_shared:-DDISABLE_SHARED=1} \
 	%{?with_perl_binding:-DENABLE_PERL=1} \
