@@ -58,7 +58,9 @@ main(int argc, char **argv)
   const char *root = 0;
   const char *basefile = 0;
   const char *refname = 0;
+#ifdef ENABLE_SUSEREPO
   char *proddir = 0;
+#endif
   char *outfile = 0;
 
   /*
@@ -84,7 +86,9 @@ main(int argc, char **argv)
 	percent = 1;
 	break;
       case 'p':
+#ifdef ENABLE_SUSEREPO
 	proddir = optarg;
+#endif
 	break;
       case 'x':
         extrapool = 1;
@@ -143,6 +147,7 @@ main(int argc, char **argv)
   if (!nopacks)
     repo_add_rpmdb(repo, ref, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0));
 
+#ifdef ENABLE_SUSEREPO
   if (proddir && *proddir)
     {
       char *buf = proddir;
@@ -163,7 +168,7 @@ main(int argc, char **argv)
       if (buf != proddir)
 	solv_free(buf);
     }
-      
+#endif
   repodata_internalize(data);
 
   if (ref)
