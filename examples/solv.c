@@ -1611,8 +1611,10 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   const char *filename;
   const unsigned char *filechksum;
   Id filechksumtype;
+#ifdef ENABLE_SUSEREPO
   const char *descrdir;
   int defvendor;
+#endif
   struct stat stb;
   Pool *sigpool = 0;
   Repodata *data;
