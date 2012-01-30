@@ -93,7 +93,7 @@ class repo_generic(dict):
     def load_if_changed(self):
         return False
 
-    def load_ext(repodata):
+    def load_ext(self, repodata):
         return False
 
     def setfromurls(self, urls):
