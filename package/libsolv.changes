@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Wed Feb  1 14:06:59 CET 2012 - mls@suse.de
+
+- add cleandeps support for install/update
+- check for cleandeps mistakes (untested)
+
+-------------------------------------------------------------------
+Fri Jan 27 14:10:34 CET 2012 - mls@suse.de
+
+- make repo type code selection modular
+- add more solvable_ functions
+- add dependency getter/setter code to bindings
+- cleanup dup handling
+- hide more internals
+
+-------------------------------------------------------------------
 Mon Oct 24 13:26:18 CEST 2011 - ma@suse.de
 
 - mls fixed package provides/obsoletes, but forgot to write 

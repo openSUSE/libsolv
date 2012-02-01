@@ -208,6 +208,9 @@ struct _Solver {
   Map cleandepsmap;			/* try to drop these packages as of cleandeps erases */
 
   Queue *ruleinfoq;			/* tmp space for solver_ruleinfo() */
+
+  Queue *cleandeps_updatepkgs;		/* packages we update in cleandeps mode */
+  Queue *cleandeps_mistakes;		/* mistakes we made */
 #endif	/* LIBSOLV_INTERNAL */
 };
 

@@ -530,6 +530,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
   int i, j, nsol;
   int essentialok;
   unsigned int now;
+  int oldmistakes = solv->cleandeps_mistakes ? solv->cleandeps_mistakes->count : 0;
 
   now = solv_timems(0);
   queue_init(&redoq);
@@ -629,6 +630,18 @@ create_solutions(Solver *solv, int probnr, int solidx)
   /* restore problems */
   queue_free(&solv->problems);
   solv->problems = problems_save;
+
+  if (solv->cleandeps_mistakes)
+    {
+      if (oldmistakes)
+	queue_truncate(solv->cleandeps_mistakes, oldmistakes);
+      else
+	{
+	  queue_free(solv->cleandeps_mistakes);
+	  solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
+	}
+    }
+    
   POOL_DEBUG(SOLV_DEBUG_STATS, "create_solutions for problem #%d took %d ms\n", probnr, solv_timems(now));
 }
 
@@ -872,6 +885,7 @@ solver_findproblemrule(Solver *solv, Id problem)
   if (jobr)
     return jobr;	/* a user request */
   assert(0);
+  return 0;
 }
 
 /*-------------------------------------------------------------------*/

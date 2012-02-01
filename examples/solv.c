@@ -2585,7 +2585,6 @@ select_patches(Pool *pool, Queue *job)
 #define MODE_INFO        7
 #define MODE_REPOLIST    8
 #define MODE_SEARCH	 9
-#define MODE_ERASECLEAN  10
 
 void
 usage(int r)
@@ -2625,6 +2624,7 @@ main(int argc, char **argv)
   FILE **newpkgsfps;
   Id *addedfileprovides = 0;
   Id repofilter = 0;
+  int cleandeps = 0;
 
   argc--;
   argv++;
@@ -2643,11 +2643,6 @@ main(int argc, char **argv)
   else if (!strcmp(argv[0], "erase") || !strcmp(argv[0], "rm"))
     {
       mainmode = MODE_ERASE;
-      mode = SOLVER_ERASE;
-    }
-  else if (!strcmp(argv[0], "eraseclean") || !strcmp(argv[0], "rmclean"))
-    {
-      mainmode = MODE_ERASECLEAN;
       mode = SOLVER_ERASE;
     }
   else if (!strcmp(argv[0], "list"))
@@ -2687,6 +2682,13 @@ main(int argc, char **argv)
     }
   else
     usage(1);
+
+  if (argc > 1 && !strcmp(argv[1], "--clean"))
+    {
+      cleandeps = 1;
+      argc--;
+      argv++;
+    }
 
   pool = pool_create();
 
@@ -2939,11 +2941,13 @@ main(int argc, char **argv)
 	  if (!p)
 	    {
 	      job.elements[i] |= SOLVER_INSTALL;
+	      if (cleandeps)
+		job.elements[i] |= SOLVER_CLEANDEPS;
 	      continue;
 	    }
 	}
       job.elements[i] |= mode;
-      if (mainmode == MODE_ERASECLEAN)
+      if (cleandeps)
         job.elements[i] |= SOLVER_CLEANDEPS;
     }
 
@@ -2989,7 +2993,7 @@ rerunsolver:
       solv = solver_create(pool);
       solver_set_flag(solv, SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
       solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
-      if (mainmode == MODE_ERASE || mainmode == MODE_ERASECLEAN)
+      if (mainmode == MODE_ERASE)
         solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);	/* don't nag */
 
       if (!solver_solve(solv, &job))

@@ -1332,6 +1332,16 @@ solver_free(Solver *solv)
   queue_free(&solv->branches);
   queue_free(&solv->weakruleq);
   queue_free(&solv->ruleassertions);
+  if (solv->cleandeps_updatepkgs)
+    {
+      queue_free(solv->cleandeps_updatepkgs);
+      solv->cleandeps_updatepkgs = solv_free(solv->cleandeps_updatepkgs);
+    }
+  if (solv->cleandeps_mistakes)
+    {
+      queue_free(solv->cleandeps_mistakes);
+      solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
+    }
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -1424,6 +1434,62 @@ solver_set_flag(Solver *solv, int flag, int value)
   return old;
 }
 
+int
+cleandeps_check_mistakes(Solver *solv, int level)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  Id p, *dp;
+  int i;
+  int mademistake = 0;
+
+  if (!solv->cleandepsmap.size)
+    return level;
+  /* check for mistakes */
+  for (i = solv->installed->start; i < solv->installed->end; i++)
+    {
+      if (!MAPTST(&solv->cleandepsmap, i - solv->installed->start))
+	continue;
+      r = solv->rules + solv->featurerules + (i - solv->installed->start);
+      /* a mistake is when the featurerule is true but the updaterule is false */
+      if (r->p)
+	{
+	  FOR_RULELITERALS(p, dp, r)
+	    if (p > 0 && solv->decisionmap[p] > 0)
+	      break;
+	  if (p)
+	    {
+	      r = solv->rules + solv->updaterules + (i - solv->installed->start);
+	      if (!r->p)
+		continue;
+	      FOR_RULELITERALS(p, dp, r)
+		if (p > 0 && solv->decisionmap[p] > 0)
+		  break;
+	      if (!p)
+		{
+		  POOL_DEBUG(SOLV_DEBUG_SOLVER, "cleandeps mistake: ");
+		  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, r);
+		  POOL_DEBUG(SOLV_DEBUG_SOLVER, "feature rule: ");
+		  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, solv->rules + solv->featurerules + (i - solv->installed->start));
+		  if (!solv->cleandeps_mistakes)
+		    {
+		      solv->cleandeps_mistakes = solv_calloc(1, sizeof(Queue));
+		      queue_init(solv->cleandeps_mistakes);
+		    }
+		  queue_push(solv->cleandeps_mistakes, i);
+		  MAPCLR(&solv->cleandepsmap, i - solv->installed->start);
+		  mademistake = 1;
+		}
+	    }
+	}
+    }
+  if (mademistake)
+    {
+      level = 1;
+      revert(solv, level);
+    }
+  return level;
+}
 
 /*-------------------------------------------------------------------
  * 
@@ -2072,19 +2138,17 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      p = solv->orphaned.elements[i];
 	      if (solv->decisionmap[p])
 		continue;	/* already decided */
-	      olevel = level;
 	      if (solv->droporphanedmap_all)
 		continue;
 	      if (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))
 		continue;
 	      POOL_DEBUG(SOLV_DEBUG_SOLVER, "keeping orphaned %s\n", pool_solvid2str(pool, p));
+	      olevel = level;
 	      level = setpropagatelearn(solv, level, p, 0, 0);
 	      installedone = 1;
 	      if (level < olevel)
 		break;
 	    }
-	  if (level == 0)
-	    break;
 	  if (installedone || i < solv->orphaned.count)
 	    {
 	      if (level == 0)
@@ -2108,6 +2172,14 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		break;
 	      continue;		/* back to main loop */
 	    }
+	}
+
+     if (solv->installed && solv->cleandepsmap.size)
+	{
+	  olevel = level;
+	  level = cleandeps_check_mistakes(solv, level);
+	  if (level < olevel)
+	    continue;
 	}
 
      if (solv->solution_callback)
@@ -2673,6 +2745,11 @@ solver_solve(Solver *solv, Queue *job)
    */
 
   solv->jobrules = solv->nrules;
+  if (solv->cleandeps_updatepkgs)
+    {
+      queue_free(solv->cleandeps_updatepkgs);
+      solv->cleandeps_updatepkgs = solv_free(solv->cleandeps_updatepkgs);
+    }
   for (i = 0; i < job->count; i += 2)
     {
       oldnrules = solv->nrules;
@@ -2685,6 +2762,8 @@ solver_solve(Solver *solv, Queue *job)
 	{
 	case SOLVER_INSTALL:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %sinstall %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
+	  if ((how & SOLVER_CLEANDEPS) != 0 && !solv->cleandepsmap.size && installed)
+	    map_grow(&solv->cleandepsmap, installed->end - installed->start);
 	  if (select == SOLVER_SOLVABLE)
 	    {
 	      p = what;
@@ -2707,9 +2786,9 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_ERASE:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %s%serase %s\n", weak ? "weak " : "", how & SOLVER_CLEANDEPS ? "clean deps " : "", solver_select2str(pool, select, what));
-	  if ((how & SOLVER_CLEANDEPS) != 0 && !solv->cleandepsmap.size && solv->installed)
-	    map_grow(&solv->cleandepsmap, solv->installed->end - solv->installed->start);
-          if (select == SOLVER_SOLVABLE && solv->installed && pool->solvables[what].repo == solv->installed)
+	  if ((how & SOLVER_CLEANDEPS) != 0 && !solv->cleandepsmap.size && installed)
+	    map_grow(&solv->cleandepsmap, installed->end - installed->start);
+          if (select == SOLVER_SOLVABLE && installed && pool->solvables[what].repo == installed)
 	    {
 	      /* special case for "erase a specific solvable": we also
                * erase all other solvables with that name, so that they
@@ -2724,7 +2803,7 @@ solver_solve(Solver *solv, Queue *job)
 		  if (s->name != name)
 		    continue;
 		  /* keep other versions installed */
-		  if (s->repo == solv->installed)
+		  if (s->repo == installed)
 		    continue;
 		  /* keep installcandidates of other jobs */
 		  if (MAPTST(&installcandidatemap, p))
@@ -2737,6 +2816,23 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 
 	case SOLVER_UPDATE:
+          if ((how & SOLVER_CLEANDEPS) != 0 && installed)
+	    {
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  if (s->repo != installed)
+		    continue;
+		  if (!solv->cleandeps_updatepkgs)
+		    {
+		      solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
+		      queue_init(solv->cleandeps_updatepkgs);
+		    }
+		  queue_pushunique(solv->cleandeps_updatepkgs, p);
+		  if (!solv->cleandepsmap.size)
+		    map_grow(&solv->cleandepsmap, installed->end - installed->start);
+		}
+	    }
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %supdate %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  break;
 	case SOLVER_VERIFY:
@@ -2870,6 +2966,13 @@ solver_solve(Solver *solv, Queue *job)
   /* make initial decisions based on assertion rules */
   makeruledecisions(solv);
   POOL_DEBUG(SOLV_DEBUG_SOLVER, "problems so far: %d\n", solv->problems.count);
+
+  /* no mistakes */
+  if (solv->cleandeps_mistakes)
+    {    
+      queue_free(solv->cleandeps_mistakes);
+      solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
+    }    
 
   /*
    * ********************************************
