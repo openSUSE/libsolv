@@ -1,0 +1,95 @@
+/** \page policies Policies in sat-solver
+
+\section policiesdef Definition
+
+Policies are assumptions (decisions) in the code not reasoned by
+the dependency semantics.
+
+
+\section policies-motivation Motivation
+
+There are local policies, looking at a small set of packages during
+solving.
+Examples:
+- Prefer better architecture (i586/i686) over better version ?
+
+
+There are global policies, looking at the complete transaction after
+solving is complete.
+
+Examples:
+- Choose 'best' transaction.
+  - The smallest one - looking at the number of package changes ?
+  - The smallest one - looking at the download size ?
+  - The biggest one - looking at package versions ?
+
+Global policies are currently not supported at all.
+
+
+Generally, policies help the solver to choose from multiple
+possibilities. In most cases, this can be represented as a filter
+operation working on a list of candidates and filtering out unwanted
+ones - ideally resulting in a single candidate.
+
+
+\section policiesrecog Recognized policies
+
+These are the policies we currently know of (which should be exposed
+via the policy layer)
+
+- Version downgrade
+  Is a version downgrade allowed ?
+  - explicit, by user request
+  - implicit, by dependencies
+  
+- Uninstall
+  Should the solver try to uninstall packages in order to
+  satisfy dependencies ?
+  
+- Vendor change
+  Can the package vendor change during an update
+  (i.e. replace an OpenSUSE package with a 'packman' one or vice versa)
+
+- Architecture change
+  Can the architecture change during an update
+  (i586 <-> i686, to/from noarch)
+
+- Repository priority
+
+- Order for solving open dependencies
+  Look at requires before conflicts ?
+  
+
+\section policiesgenfilter Generic filter
+
+The generic function is 'choose among multiple candidates' by
+- architecture
+- repository
+- vendor
+- version
+- download size
+- install size
+- transaction size (-> global policy)
+  - number of installed/updated/removed packages
+  - number of bytes downloaded
+  - best overall versions
+
+
+\section policiesengineimpl Policy engine implementation
+
+The policy engine should support policies in a generic way.
+
+Some policies might be quite complex, it should be possible to build up
+a policy chain - passing a result back to the default engine after
+applying a specific filter.
+
+Helper functions can help implementing policies, e.g.
+- filter list
+- order list
+
+
+\section policiesapi Policy engine API
+
+- to be defined -
+
+*/

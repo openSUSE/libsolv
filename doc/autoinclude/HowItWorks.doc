@@ -1,0 +1,233 @@
+/** \page howitworkspage How the SAT solver works
+
+\section theory Theory
+
+CNF - Conjunktive Normal Form
+
+Boolean expression of the form (x|y) & (-a|b|c) & ...
+ a,b,c,x,y are LITERALS
+ There a positive literals (x,y) and negative literals (-a, -b)
+ Terms in parentheses are CLAUSES
+
+Goal: Make the whole expression TRUE
+
+Useful shortcuts:
+- If a positive literal goes TRUE within a clause, the whole clause is TRUE
+- If a negative literal goes FALSE within a clause, the whole clause is TRUE
+
+\section datastruct Data structure
+
+\code
+  Id p;                 /* first literal in rule */
+  Id d;                 /* Id offset into 'list of providers */
+                        /* terminated by 0' as used by whatprovides; pool->whatprovides + d */
+                        /* in case of binary rules, d == 0, w1 == p, w2 == other literal */
+                        /* in case of disabled rules: ~d, aka -d - 1 */
+  Id w1, w2;            /* watches, literals not-yet-decided */
+                        /* if !w2, assertion, not rule */
+  Id n1, n2;            /* next rules in linked list, corresponding to w1,w2 */
+
+
+    r->n1 = solv->watches[nsolvables + r->w1];
+    solv->watches[nsolvables + r->w1] = r - solv->rules;
+	    
+    r->n2 = solv->watches[nsolvables + r->w2];
+    solv->watches[nsolvables + r->w2] = r - solv->rules;
+\endcode			 
+
+\code
+ * Assertion
+ *  keepinstalled (A), install 
+   p=A, d=0, w1=p, w2=0
+ *  uninstallable (-A), remove
+   p=-A, d=0, w1=p, w2=0
+ *
+ * Binary rules:
+ *   (A|B)
+   p=A, d=0, w1=p, w2=B
+ *   (-A|B)
+   p=-A, d=0, w1=p, w2=B
+ *
+ * A requires B : !A | provider1(B) | provider2(B)
+   p=-A, d=<whatprovides_offset>, w1=, w2=
+ 
+ * B updates A : A | provider1(B) | provider2(B)
+   p=A, d=<whatprovides_offset>, w1=, w2=
+ 
+ *
+ * A conflicts B : (!A | !provider1(B)) & (!A | !provider2(B)) ...
+   p=-A, d=-B1, w1=, w2=
+   p=-A, d=-B2, w1=, w2=
+   p=-A, d=-B3, w1=, w2=
+   ...
+ *
+ * 'not' is encoded as a negative Id
+ *
+
+Action        | p  | d       | w1    | w2
+--------------+----+---------+-------+--------
+Assert A      | A  | 0       | A     | 0
+Assert -A     |-A  | 0       |-A     | 0
+Binary A,B    | A  | 0       | A     | B
+Binary -A,B   |-A  | 0       |-A     | B
+A requires B  |-A  | prov(B) |-A     | whatprovidesdata(B)
+B updates A   | A  | prov(B) | A     | whatprovidesdata(B)
+A conflicts B |-A  | -B      |-A     |-B
+
+addrule(p, d)
+\endcode
+
+
+\code
+/*
+* add rule
+*  p = direct literal; always < 0 for installed rpm rules
+*  d, if < 0 direct literal, if > 0 offset into whatprovides, if == 0 rule is assertion (look at p only)
+*
+*
+* A requires b, b provided by B1,B2,B3 => (-A|B1|B2|B3)
+*
+* p < 0 : pkg id of A
+* d > 0 : Offset in whatprovidesdata (list of providers of b)
+*
+* A conflicts b, b provided by B1,B2,B3 => (-A|-B1), (-A|-B2), (-A|-B3)
+* p < 0 : pkg id of A
+* d < 0 : Id of solvable (e.g. B1)
+*
+* d == 0: unary rule, assertion => (A) or (-A)
+*
+*   Install:    p > 0, d = 0   (A)             user requested install
+*   Remove:     p < 0, d = 0   (-A)            user requested remove
+*   Requires:   p < 0, d > 0   (-A|B1|B2|...)  d: <list of providers for requirement of p>
+*   Updates:    p > 0, d > 0   (A|B1|B2|...)   d: <list of updates for solvable p>
+*   Conflicts:  p < 0, d < 0   (-A|-B1),(-A|-B2),...         either p (conflict issuer) or d (conflict provider) (binary rule)
+*   Obsoletes:  p < 0, d < 0   (-A|-B1),(-A|-B2),...     A: uninstalled, Bx = provider of obsoletes
+*   Learnt:     p > 0, d < 0   (A|-B)
+*   No-op:      p = 0, d = 0   (null)          (used as policy rule placeholder)
+*   install one of:  p =-SYS, d > 0
+*
+*   resulting watches:
+*   ------------------
+*   Direct assertion (no watch needed)( if d <0 ) --> d = 0, w1 = p, w2 = 0
+*   Binary rule: p = first literal, d = 0, w2 = second literal, w1 = p
+*   every other : w1 = p, w2 = whatprovidesdata[d];
+*   Disabled rule: d < 0, w1 = 0
+*
+*   always returns a rule for non-rpm rules
+*/
+\endcode
+     
+enablerule:
+  if (d < 0): d = -d - 1
+disablerule
+  if (d >= 0): d = -d - 1
+
+
+\subsection watches Watches
+
+Watches are usually on literals that are not FALSE (either TRUE or UNDEF)
+Execept: If one watch is on a TRUE (set first), the other can be on a
+  FALSE (set later). This is useful on a backtrack.
+
+Watches 'link' rules involving the same literal
+Only for n-ary (n >= 2) rules, not for assertions
+
+
+Watches start at solv->watches[nsolvables]
+
+watches[nsolvables+s] == rule installing s (aka A, B, C,... in CNF clause)
+watches[nsolvables-s] == rule removing s (aka -A, -B, -C, ... in CNF clause)
+
+'watches trigger when literal goes false'
+
+watches[A] = rule involving A
+             rule->n1 = next rule involving A
+watches[B] = rule involving B
+             rule->n2 = next rule involving B
+
+
+\subsection propag Propagation
+
+This distributes decisions among affected rules and checks that rules
+evaluate to 'true'.
+
+Since rules are in CNF (conjunctive normal form), it is sufficient for
+one sub-term (x or y in x|y) to become 'true'.
+
+The interesting case is a 'false' sub-term (x or y in x|y) because
+this requires the 'other' side to become true.
+
+
+\subsection iterat Iterating over installed
+
+The pool marks the minimum and maximum Id of installed solvables.
+There might be other (non-installed) solvables in-between.
+
+\section algo Algorithm
+
+- set up rules for installed packages
+if (installed)
+  foreach(installed): addrpmrulesforsolvable
+    convert dependencies of solvable into rules
+    run through the complete graph of dependencies spawned the solvable
+  foreach(installed): addrpmrulesforupdaters
+    add rules to allow updates: A | upates(A)
+
+- set up rules for solvables mentioned in job
+  foreach (install request)
+    addrpmrulesforsolvable
+  foreach (update request)
+    addrpmrulesforupdaters
+  /* dont look at removals */
+  
+- addrpmrulesforweak
+   if suggests: add dependency rule
+   else if freshens: add dependency rule
+   else if enhances: add dependency rule
+
+- add feature rules
+
+- add update rules
+
+- add job rules
+
+During solving, we only look at those rules affected by the job or a
+decision. By use of the linked-list rooted at 'watches', the solver is
+able to wade through all the rules and pick the right ones.
+
+And only those have to evaluate to 'true' during propagation.
+
+\subsection solving Actual solving works as follows
+
+- ensure the SYSTEM solvable gets installed
+- look through the job rules for 'unit' rules
+  (i.e. rules directly installing/removing a solvable)
+
+- These two define the 'initial decisions' which now get propagated
+- propagation either results in other decisions (i.e. one sub-term
+  false requires the other one to become true) or 'free' literals
+  (which are decided by policy heuristics)
+
+- The solver has a 'decisionq' which record decisions (> 0 for
+  'install', < 0 for 'remove')
+  Every decision has an 'index' (== position in decisionq)
+  There are two 'pointers'
+  - decisionq.count == total number of made decision
+  - propagate_index == number of already propagated decisions
+  
+  Decisions are also recorded in decisionmap, indexed by the solvable
+  Id. This is a fast access to decisions (instead of searching in the
+  queue)
+  
+  And there is 'decisionq_why', indexed by the decision number (level)
+  returning the rule leading to the decision.
+
+  propagate() now tries to advance propagate_index to decisionq.count
+  in order to propagate all decisions to all (affected) rules.
+  propagate() also ensures that decisions are consistent (else its a
+  solver conflict) and all affected rules evaluate to 'true'.
+  
+  When rules are reduced to 'unit' (only one undecided literal, all
+  others 'false'), the last literal must be decided to 'true'.
+
+*/
