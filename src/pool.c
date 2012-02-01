@@ -1086,21 +1086,24 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 }
 
 void
-pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
+pool_addfileprovides_queue(Pool *pool, Queue *idq)
 {
   Solvable *s;
-  Repo *repo;
+  Repo *installed, *repo;
   struct searchfiles sf, isf, *isfp;
   struct addfileprovides_cbdata cbd;
   int i;
   unsigned int now;
 
+  installed = pool->installed;
   now = solv_timems(0);
   memset(&sf, 0, sizeof(sf));
   map_init(&sf.seen, pool->ss.nstrings + pool->nrels);
   memset(&isf, 0, sizeof(isf));
   map_init(&isf.seen, pool->ss.nstrings + pool->nrels);
 
+  if (idq)
+    queue_empty(idq);
   isfp = installed ? &isf : 0;
   for (i = 1, s = pool->solvables + i; i < pool->nsolvables; i++, s++)
     {
@@ -1126,8 +1129,6 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
   map_free(&isf.seen);
   POOL_DEBUG(SOLV_DEBUG_STATS, "found %d file dependencies, %d installed file dependencies\n", sf.nfiles, isf.nfiles);
   cbd.dids = 0;
-  if (idp)
-    *idp = 0;
   if (sf.nfiles)
     {
 #if 0
@@ -1135,13 +1136,9 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
 	POOL_DEBUG(SOLV_DEBUG_STATS, "looking up %s in filelist\n", pool_id2str(pool, sf.ids[i]));
 #endif
       pool_addfileprovides_search(pool, &cbd, &sf, 0);
-      if (idp)
-	{
-	  sf.ids = solv_extend(sf.ids, sf.nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
-	  sf.ids[sf.nfiles] = 0;
-	  *idp = sf.ids;
-	  sf.ids = 0;
-	}
+      if (idq)
+        for (i = 0; i < sf.nfiles; i++)
+	  queue_push(idq, sf.ids[i]);
       solv_free(sf.ids);
       for (i = 0; i < sf.nfiles; i++)
 	{
@@ -1176,7 +1173,7 @@ pool_addfileprovides_ids(Pool *pool, Repo *installed, Id **idp)
 void
 pool_addfileprovides(Pool *pool)
 {
-  pool_addfileprovides_ids(pool, pool->installed, 0);
+  pool_addfileprovides_queue(pool, 0);
 }
 
 void

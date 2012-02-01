@@ -946,15 +946,10 @@ typedef struct {
   void addfileprovides() {
     pool_addfileprovides($self);
   }
-  Queue addfileprovides_ids() {
+  Queue addfileprovides_queue() {
     Queue r;
-    Id *addedfileprovides = 0;
     queue_init(&r);
-    pool_addfileprovides_ids($self, $self->installed, &addedfileprovides);
-    if (addedfileprovides) {
-      for (; *addedfileprovides; addedfileprovides++)
-        queue_push(&r, *addedfileprovides);
-    }
+    pool_addfileprovides_queue($self, &r);
     return r;
   }
   void createwhatprovides() {

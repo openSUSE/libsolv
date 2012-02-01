@@ -200,20 +200,20 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
   char **languages = 0;
   int nlanguages = 0;
   int i, j, k, l;
-  Id *addedfileprovides = 0;
   struct keyfilter_data kd;
+  Queue addedfileprovides;
 
   memset(&kd, 0, sizeof(kd));
   info = repo_add_repodata(repo, 0);
   repodata_set_str(info, SOLVID_META, REPOSITORY_TOOLVERSION, LIBSOLV_TOOLVERSION);
-  pool_addfileprovides_ids(repo->pool, 0, &addedfileprovides);
-  if (addedfileprovides && *addedfileprovides)
+  queue_init(&addedfileprovides);
+  pool_addfileprovides_queue(repo->pool, &addedfileprovides);
+  if (addedfileprovides.count)
     {
       kd.haveaddedfileprovides = 1;
-      for (i = 0; addedfileprovides[i]; i++)
-        repodata_add_idarray(info, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[i]);
+      repodata_set_idarray(info, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &addedfileprovides);
     }
-  solv_free(addedfileprovides);
+  queue_free(&addedfileprovides);
 
   pool_freeidhashes(repo->pool);	/* free some mem */
 

@@ -778,7 +778,7 @@ if cmd == 'list' or cmd == 'info' or cmd == 'install':
     if cmdlinerepo:
         cmdlinerepo.handle.internalize()
 
-addedprovides = pool.addfileprovides_ids()
+addedprovides = pool.addfileprovides_queue()
 if addedprovides:
     sysrepo.updateaddedprovides(addedprovides)
     for repo in repos:

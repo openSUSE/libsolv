@@ -687,7 +687,7 @@ if cmd == 'search'
   exit
 end
 
-addedprovides = pool.addfileprovides_ids()
+addedprovides = pool.addfileprovides_queue()
 if !addedprovides.empty?
   sysrepo.updateaddedprovides(addedprovides)
   for repo in repos

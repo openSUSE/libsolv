@@ -2481,20 +2481,19 @@ addsoftlocks(Pool *pool, Queue *job)
 
 
 void
-rewrite_repos(Pool *pool, Id *addedfileprovides)
+rewrite_repos(Pool *pool, Queue *addedfileprovides)
 {
   Repo *repo;
   Repodata *data;
   Map providedids;
   Queue fileprovidesq;
-  Id id;
-  int i, j, n, nprovidedids;
+  int i, j, n;
   struct repoinfo *cinfo;
 
   map_init(&providedids, pool->ss.nstrings);
   queue_init(&fileprovidesq);
-  for (nprovidedids = 0; (id = addedfileprovides[nprovidedids]) != 0; nprovidedids++)
-    MAPSET(&providedids, id);
+  for (i = 0; i < addedfileprovides->count; i++)
+    MAPSET(&providedids, addedfileprovides->elements[i]);
   FOR_REPOS(i, repo)
     {
       /* make sure this repo has just one main repodata */
@@ -2510,12 +2509,10 @@ rewrite_repos(Pool *pool, Id *addedfileprovides)
 	  for (j = 0; j < fileprovidesq.count; j++)
 	    if (MAPTST(&providedids, fileprovidesq.elements[j]))
 	      n++;
-	  if (n == nprovidedids)
+	  if (n == addedfileprovides->count)
 	    continue;	/* nothing new added */
 	}
-      /* oh my! */
-      for (j = 0; addedfileprovides[j]; j++)
-	repodata_add_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides[j]);
+      repodata_set_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides);
       repodata_internalize(data);
       writecachedrepo(repo, data, 0, cinfo ? cinfo->cookie : installedcookie);
     }
@@ -2622,7 +2619,7 @@ main(int argc, char **argv)
   char inbuf[128], *ip;
   int allpkgs = 0;
   FILE **newpkgsfps;
-  Id *addedfileprovides = 0;
+  Queue addedfileprovides;
   Id repofilter = 0;
   int cleandeps = 0;
 
@@ -2836,11 +2833,11 @@ main(int argc, char **argv)
 
   // FOR_REPOS(i, repo)
   //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
-  addedfileprovides = 0;
-  pool_addfileprovides_ids(pool, pool->installed, &addedfileprovides);
-  if (addedfileprovides && *addedfileprovides)
-    rewrite_repos(pool, addedfileprovides);
-  solv_free(addedfileprovides);
+  queue_init(&addedfileprovides);
+  pool_addfileprovides_queue(pool, &addedfileprovides);
+  if (addedfileprovides.count)
+    rewrite_repos(pool, &addedfileprovides);
+  queue_free(&addedfileprovides);
   pool_createwhatprovides(pool);
 
   queue_init(&job);

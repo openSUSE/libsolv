@@ -38,7 +38,7 @@ SOLV_1.0 {
 		policy_is_illegal;
 		pool_add_fileconflicts_deps;
 		pool_addfileprovides;
-		pool_addfileprovides_ids;
+		pool_addfileprovides_queue;
 		pool_addrelproviders;
 		pool_alloctmpspace;
 		pool_arch2color_slow;

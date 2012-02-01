@@ -694,7 +694,7 @@ if ($cmd eq 'search') {
   exit(0);
 }
 
-my @addedprovides =  $pool->addfileprovides_ids();
+my @addedprovides = $pool->addfileprovides_queue();
 $pool->createwhatprovides();
 
 my @jobs;
