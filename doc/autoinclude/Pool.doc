@@ -1,0 +1,137 @@
+/** \page poolpage The Pool
+
+\section pool-intro Pool Introduction
+
+The pool contains all information required for dependency solving.
+
+- names
+  'foo', 'bar', 'baz'
+- reldeps
+  'foo > 1.0', 'bar == 42.17-33'
+- solvables
+  name-epoch:version-release.arch + dependencies
+
+Main purpose of the pool is efficient storage of data in
+terms of memory consumption and access time.
+
+
+The pool is created by reading one or more 'sources', metadata
+repositories. The rpmdb (installed software) is passed explicit
+to the solver.
+
+\subsection pool-string Strings
+
+\li names are stored as strings
+\li all string data is kept in hashtable
+\li strings in the hashtable are unique
+\li strings are represented as 'Id'
+\li string comparison is done by Id comparison
+
+Pool has 'void *stringspace' pointing to allocated memory
+Pool has 'off_t strings[Id]', giving an offset into 'stringspace' for
+each Id
+  
+Buffers are allocated in blocks
+
+STRING_BLOCK		the hashtable for strings is resized in these steps
+STRINGSPACE_BLOCK	increments size for string buffer
+
+
+\subsubsection pool-normal-strings Normal strings
+
+  stringspace + strings[id]
+
+\subsubsection pool-rel-strings Rel expressions
+
+  stringspace + strings[Reldep->name]
+
+Rel Ids have the 31st bit set
+
+\subsection string-to-id String -> Id
+
+\see str2id
+
+\subsection id-to-string Id -> String
+
+\see id2str
+
+\subsection pool-string-edition Edition
+
+The edition is the combination of epoch (e), version (v) and
+release (r) and used for comparing package 'ages' (usually
+named versions)
+
+The string representation of an edition is 
+\code
+'<e>:<v>-<r>'
+\endcode
+
+An empty epoch is considered zero (0)
+An empty version is considered ?
+An empty release is considered ?
+
+
+\section pool-comparing-editions Comparing editions
+
+The following comparison rules apply
+
+\code
+  if (e1 != e2)
+    return e1 < e2;
+  else if (v1 != v2)
+    return v1 < v2;
+  else
+    return r1 < r2;
+\endcode
+
+Names can have editions and compared against editions.
+
+In comparisons, empty values within the edition are
+treated as 'any'
+
+Example:
+
+\li A:  name == 1.0
+\li B:  name >= 1:2.3-4
+
+A name without any edition is said to provide 'all editions'.
+
+'name-1.0-42' matches A, 'name-1:1.0' does not.
+
+
+\section pool-reldeps RelDeps
+
+A relation is the tuple (name, operator, edition) used to
+express dependencies on ranges.
+
+
+\section pool-solvable Solvable
+
+A solvable contains all package information required for
+dependency solving.
+
+Solvables as referenced by Id, pointing into 'pool.solvables'.
+There are 'pool.nsolvables-1' number of solvables.
+
+There is no solvable with Id 0, this Id is reserved and serves
+as an 'end' indicator in lists of solvables.
+
+\section pool-string-vs-rels Strings vs. Relations
+
+Relations (i.e. <name><flag><evr>) and Strings (<name>) are encoded as
+Ids. Relations have the 32th bit set.
+The pool contains a relation dictionary next to the string dictionary.
+
+Here's an example
+
+String dict:
+2 -> bash
+3 -> zlib
+4 -> 1.2.3
+
+Relation dict:
+1 -> 3 >= 4      (i.e. zlib >= 1.2.3)
+
+Some package provides: 2, 0x80000001 (i.e. bash, zlib >= 1.2.3)
+
+*/

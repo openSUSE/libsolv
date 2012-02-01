@@ -1,0 +1,349 @@
+/** \page about-attrs All about attributes
+
+\section attr-why Why attributes ?
+
+The .solv files contain Solvables, as defined in src/solvable.h
+These are the basic objects for the solver, containing name,
+architecture, evr (epoch-version-release), vendor and dependencies.
+
+However, a (RPM) package has many more properties. Like summary,
+description, license, package group, etc.
+All theses properties are not needed for dependency resolution and
+hence are stored outside of Solvables.
+
+Sat-solver provides the 'Attribute Store' for these properties,
+internally called 'repodata'. See src/repodata.h
+
+
+\section attr-what What are attributes ?
+
+An attribute is a quadruple containing
+
+ - solvable (to which this attribute belongs)
+ - name (describing the content, like 'solvable:description')
+ - type (like 'number' or 'string')
+ - value (according to the type)
+ 
+
+\section attr-how How to set attributes ?
+
+\subsection attr-how-solvable You need a Solvable
+
+  Attributes belong to a solvable. So you need a solvable first. And
+  solvables belong to a repo which belongs to a pool.
+
+\code
+    /* create a pool */
+    Pool *pool = pool_create();
+    
+    /* create a repo */
+    Repo *repo = repo_create(pool, "demo");
+    
+    /* create a solvable */
+    Id s = repo_add_solvable(repo);
+\endcode
+
+\subsection attr-how-create You need to create the attribute store
+
+  By default .solv files don't contain additional attributes. So you
+  have to add the attribute store to the repository:
+
+\code
+    Repodata *data = repo_add_repodata(repo, 0);
+\endcode
+
+  The second parameter indicates a 'local pool' for storing strings.
+  By default, strings are stored in the Pool. Setting the second
+  parameter to non-zero will store attribute string values separate
+  from the Pool.
+
+  [Q: Whats the technical reason for the local pool?]
+
+
+\subsection attr-how-space You need space for the attributes
+
+  Space for the attribute store must be explicitly requested. Not for
+  every attribute but you have to signal that a solvable has
+  attributes.
+
+  First you compute the datanum:
+
+\code
+    Solvable *solvable = pool_id2solvable(pool, s);
+    Id datanum = (solvable - pool->solvables) - repo->start;
+\endcode
+
+  datanum is the reference from the attribute store back to the
+  solvable.
+
+  As you can see, the datanum is basically the offset of the solvable
+  within the repo. Remember that the attributes are per-repository (as
+  is the solvable. When calling 'repodata_*' function, use the datanum
+  to represent the solvable.
+
+  Extending the store is done with repodata_extend():
+
+\code
+    repodata_extend(data, solvable - pool->solvables);
+\endcode
+
+  [Q: The offset passed to repodata_extend is per-pool. All other
+      repodata functions are per-repo. Why ?]
+
+
+\subsection attr-how-set Set attributes
+
+  Now you can set attributes. You do this with repodata_set_*()
+  passing the store (data), the solvable reference (datanum), the name
+  of the solvable and the value.
+
+  See src/repodata.h for a complete list of all the repodata_set_*()
+  functions.
+
+  Attributes are named and in good sat-solver tradition, everything is
+  an Id.
+
+\code
+    Id attr_name = str2id(pool, "name_of_attribute", 1);
+\endcode
+
+  See knownid.h for predefined attribute names.
+
+
+\subsubsection attr-how-set-bool Setting a boolean attribute
+
+  A boolean attribute derives is value from its presence. So you don't
+  pass an explicit true/false value but call repodata_set_void() if
+  the attribute is 'true'.
+
+\code
+    repodata_set_void(data, datanum, attr_name);
+\endcode
+
+\subsubsection attr-how-set-num Setting a numeric attribute
+
+  Storing a numeric value is done with repodata_set_num, passing an
+  unsinged integer:
+
+    unsigned int value = 123456;
+    repodata_set_num(data, datanum, attr_name, value);
+
+
+\subsubsection attr-how-set-str Setting a string attribute
+
+  Strings are 'const char' pointers and set like:
+  
+\code
+    const char *s = "This is a string";
+    repodata_set_str(data, datanum, attr_name, s);
+\endcode
+
+  If the same string is used multiple times as an attribute value, its
+  more efficient to store it once and use its Id.
+  
+
+\subsubsection attr-how-set-id Setting an Id attribute
+
+\code
+    Id id = str2id(pool, "value_of_attribute", 1);
+    repodata_set_id(data, datanum, attr_name, id);
+\endcode
+
+\subsubsection attr-how-set-const Setting a constant attribute
+
+  A constant attribute shares a single value across all instances of
+  the attribute.
+
+  A constant can either be of numeric (unsigned int) type
+
+\code
+    repodata_set_constant(data, datanum, attr_name, 12345);
+\endcode
+
+  or an Id:
+
+\code  
+    Id id = str2id(pool, "constant string", 1);
+    repodata_set_constant(data, datanum, attr_name, id);
+\endcode
+
+\subsubsection attr-how-set-array Arrays
+
+  Sometimes an attribute doesn't have a single value, but a varying
+  number of values. Here arrays come in handy.
+  
+  The attribute store knows about two types of arrays. Arrays of Ids
+  and arrays of strings.
+
+  You fill an array by multiple calls to (array of Ids)
+  
+\code
+    repodata_add_idarray(data, datanum, attr_name, id)
+\endcode
+
+  or
+
+\code
+    repodata_add_poolstr_array(data, datanum, attr_name, "value")
+\endcode
+
+  Every call will add the value to the end of the array.
+  
+  
+  [Q: can I mix Id and char* in one array ?]
+
+
+\subsubsection attr-how-set-other Other data types
+
+  See repodata.h, there are
+  - checksum
+  - bin_checksum
+  - dirnumnum
+  - dirstr
+
+
+\subsubsection attr-how-set-struct Structural attribute types
+
+  Structural attribute types are (currently) not supported.
+
+
+\subsection attr-how-write-solv Writing the .solv file
+
+  Before writing out a .solv file, you need to internalize the
+  attribute store so it gets stored together with the solvables.
+
+    repodata_internalize(data);
+
+  Thats black MM magic. Don't ask.
+
+
+\subsection attr-how-read-attr Reading attributes
+
+  Reading attribute values isn't that easy because of the way they're
+  stored internally. The storage optimization prevents a direct-access
+  method, so you need to search for the value matching a specific
+  solvable and attribute name.
+
+  Hence the read functions are called 'repodata_lookup_*()' and only
+  exist for some attribute types, namely boolean (void), numeric,
+  string, Id and bin_checksum.
+
+  The preparation steps are similar to writing, you need a pool, a
+  repository and the solvable reference.
+
+\code
+    /* create a pool */
+    Pool *pool = pool_create();
+    
+    /* create a repo */
+    Repo *repo = repo_create(pool, "demo");
+    
+    Solvable *s;
+
+    /*
+     * now populate the repo
+     * either from a .solv file: repo_add_solv(Repo *, FILE *);
+     * or from the RPM database: repo_add_rpmdb(Repo *, NULL, "/");
+     *
+     * and retrieve a Solvable s
+     *
+     */
+\endcode
+
+\subsection attr-how-read-known Reading known attributes
+
+  For the standard attribute names as listed in knownid.h, the easiest
+  way to retrieve values it through repo_lookup_*() (as opposed to
+  repodata_lookup_*())
+
+\code
+    /* get the summary attribute */
+    const char *summary = repo_lookup_str(s, SOLVABLE_SUMMARY);
+
+    /* get the buildtime attribute */
+    unsigned int buildtime = repo_lookup_num(s, SOLVABLE_BUILDTIME);
+\endcode
+
+  Both lookup functions return 0 if the attribute isn't set.
+
+  The downside of these simple access functions it that you have to
+  know the type of the attribute you're going to retrieve.
+
+
+\subsection attr-how-lookup-generic Generic attribute lookup
+
+  The function repo_lookup() provides a generic way to access
+  attribute values. It is passed a solvable, an attribute name (as Id)
+  and a callback function.
+
+  repo_lookup then tries to retrieve the attribute value and returns
+  non-zero on success.
+
+\code
+    Id attr_name = str2id(pool, "name_of_attribute", 0);
+\endcode
+
+  You can also use predefined Ids from knownid.h
+  Pay attention to the last parameter to the str2id call. It was 1
+  when setting the attribute buts its 0 when reading.
+  
+  This is just a short-path to check for existance of an attribute
+  (name). Passing 0 to str2id means 'do not create if not existing
+  before'. So if attr_name is assigned 0 (ID_NULL) in this call, this
+  attribute is not defined within the pool.
+
+\code
+  if(repo_lookup(s, attr_name, callback_function, (void *)callback_data) {
+    /* attribute found */
+  }
+
+  If the solvable s has the attribute attr_name defined, the
+  callback_function is called passing callback_data.
+
+  This function is defined as
+
+    int callback_function( void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv )
+\endcode
+
+  with
+  
+  cbdata: the callback_data from the call to repo_lookup
+  s: the solvable from the call to repo_lookup
+  data: the attribute store associated with the repo
+  key: the attribute name (key->name, an Id) and type (key->type, a REPOKEY_TYPE_*)
+  kv: the attribute value (depending on the key->type)
+  
+  within the callback_function, you usually look at the key->type and
+  access the value according to the type:
+
+\code  
+    switch(key->type)
+    {
+      case REPOKEY_TYPE_VOID: /* just existance */
+      ...
+      break;
+      case REPOKEY_TYPE_NUM:  /* value is in kv->num */
+      ...
+      break;
+      case REPOKEY_TYPE_STR:  /* value is in kv->str */
+      ...
+      break;
+      
+      /* ... */
+    }
+    return 1;
+\endcode
+
+  Returning non-zero from the callback_function will end the lookup,
+  signalling you've found what you were looking for.
+
+
+\subsection attr-how-about-attr-name About attribute names
+
+  You are free to choose any name for the attributes. However, when
+  dealing with (RPM) packages, there are a lot of standard attributes
+  in use. src/knownid.h defines most of them, e.g. SOLVABLE_SUMMARY (a
+  string) or SOLVABLE_BUILDTIME (a number). Use the predefined
+  attribute names whenever applicable.
+
+*/

@@ -1,0 +1,7 @@
+/** \page codeconvpage Code Conventions
+
+\subsection codedoc Code Documentation
+
+- Use doxygen tags only in the pages, not in the source code. There keep just standard comments.
+
+*/

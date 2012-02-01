@@ -1,0 +1,78 @@
+/** \page future Future Plan and Open issues
+
+\section plan-arch-hand Architecture handling
+- Ensure 'best' architecture is choosen on fresh install [DONE]
+- Ensure update keeps architecture [DONE]
+- Ensure dist-upgrade chooses 'best' architecture
+   
+\section plan-log Logging
+-  Improve logging so solver decisions are comprehensible
+   
+\section plan-wd weak dependencies [DONE]
+-  to support 'recommends'
+-  mark rules as 'weak' so trackback on assignment conflict can
+-  disable such rules and continue
+   
+\section plan-rd reverse dependencies [DONE]
+- essentialfor, supplements
+- will be almost for free when weak rules are implemented
+- still rules have to be marked 'reverse' for logging and proposal
+- correctness
+   
+\section plan-syntax Syntax
+- Define syntax for 'boolean expression' capability
+- How to express and, or, not within a .spec file ?
+- See 'extended reldeps' below
+   
+\section plan-ls Locale supplements [DONE]
+- support local(de), locale(de,at,ch) and locale(<package>:de)
+- eventually extend 'package' to reldep, e.g. locale(package > 5.3-2:de)
+   
+\section plan-sup Modalias supplements [DONE]
+- support modalias(<modalias-regexp>) and modalias(<package>:<modalias-regexp>)
+- eventually extend 'package' to reldep, e.g. modalias(package >5.3-2:<modalias-regexp>)
+
+\section plan-ar Architecture rules
+- architecture-specific dependencies
+   
+\section plan-locks Locks [NOT A SOLVER ISSUE]
+- ability to keep packages at a specific version
+- ability to prevent installation of specific packages / reldep
+
+\section plan-ext-rd Extended reldeps [DONE IN PART]
+- Boolean AND, OR
+- Compare architecture
+- Compare namespace
+   
+\section plan-dep-syn Syntax of dependencies [DONE]
+
+- Two types of conjunctions:
+
+    - "a>5 AND b>5"  => a and b can be provided by different solvables
+    - "a>5 WITH b>5" => 'and' operation but a and b are provided by same
+                         solvable. (the 'with' operator is a naming
+			 proposal)
+
+\section plan-bool-exp Boolean expressions
+
+- Full range of boolean operators (AND, OR, NOT) and conditionals (IF/THEN/ELSE) for dependencies.
+
+\section plan-src-prio Source priorities [DONE IN PART]
+- Prefer solvables from specific sources
+
+\section split-provides Split-Provides
+- Support for package splits, renames
+
+\section plan-better-sol-prop better solution proposals
+- if transactions are unsolvable, offer understandable proposals what to change to make the transaction solvable.
+
+\section plan-multiple-sol Multiple solutions
+- compute all possible solutions and rank them
+
+\section plan-sol-rank Solution ranking
+- configurable solution ranking
+- best sources, newest packages, smallest download size, 
+- smallest install size, lowest number of installs, lowest number of
+- updates, lowest number of removals, prefer most popular packages, prefer vendor,
+
+*/

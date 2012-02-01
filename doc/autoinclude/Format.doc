@@ -1,0 +1,111 @@
+/** \page formatpage Solv file format
+
+Metadata information is stored as '.solv' files
+
+These files have the following format:
+
+\section formatv0 V0 format
+ 
+\code
+  MAGIC: 'SOLV'
+  U32:   0
+ 
+  -- sizes --
+ 
+  U32:   NUMID                       /* number of Ids (names) */
+  U32:   NUMREL                      /* number of RelDeps (dependencies) */
+  U32:   NUMSOLV                     /* number of Solvables (packages) */
+  
+  -- string data --
+  U32:   SIZEID                      /* total size of string buffer */
+   U8*:   DICT (SIZE SIZEID)         /* (raw) string buffer */
+  
+  -- reldep data --
+   U8*:   RELDICT                    /* Buffer for RandDeps (Id,Id,u8) */
+ 
+  -- source data --                  /* apparently unused */
+  
+  U32:   NUMSRCDATA
+   U8 :   TYPE                        /* TYPE_ID, TYPE_U32, TYPE_STR */
+   ID :   DATAID
+   ID | U32 | U8*
+  
+  -- solvables --
+ 
+  U32:   NUMSOLVDATA
+   U8 :   TYPE
+   ID :   DATAID
+   U32:   NUM/SIZE
+  
+  U8*: BITS
+  U8*: DATA
+
+
+V6 format
+=========
+
+  MAGIC: 'SOLV'
+  U32:   6
+
+  U32:   NUMID                       /* number of Ids (names) */
+  U32:   NUMREL                      /* number of RelDeps (dependencies) */
+  U32:   NUMDIR                      /* number of directories */
+  U32:   NUMITEM                     /* number of items (packages) */
+  U32:   NUMKEYS
+  U32:   NUMSCHEMATA                 /* number of schemata */
+  U32:   NUMINFO
+  U32:   FLAGS			     /* solv file flags */
+                        4:PREFIX_POOL
+
+  -- string data --
+  ID:    SIZEID                      /* total size of string buffer */
+   U8*:  DICT (SIZE SIZEID)          /* (raw) string buffer */
+
+  -- reldep data --
+   U8*:  RELDICT                     /* Buffer for RandDeps (Id,Id,u8) */
+
+  -- directory data --
+   U8*:  DIRDICT                     /* Buffer for dirs (Id,Id) */
+
+  -- key data --
+  NUMKEYS *
+    ID: name
+    ID: type
+    ID: expanded num/size
+
+  -- schemata data --
+  ID: expanded schemata size
+  NUMSCHEMATA *
+    IDARRAY* keys
+
+  -- file information --
+  ID maxinfolen  (IF NUMINFO)
+  ID allinfolen  (IF NUMINFO)
+  NUMINFO *
+    ID schema
+    U8 *data
+
+  -- item data --
+  ID maxitemlen  (IF NUMITEM)
+  ID allitemlen  (IF NUMITEM)
+  NUMITEM *
+    ID schema
+    U8* data
+
+  -- paged vertical data --
+  U32 pagesize
+  NPAGES *
+    U32 len * 2 + compressedflag
+    U8* data
+
+\endcode
+
+key sizes for storage types:
+
+\code
+KEY_STORAGE_VERTICAL_OFFSET: packed size
+KEY_STORAGE_INCORE: packed size
+KEY_STORAGE_SOLVABLE: unpacked size
+\endcode
+
+*/
