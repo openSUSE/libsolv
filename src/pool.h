@@ -177,6 +177,7 @@ struct _Pool {
 #define REL_NAMESPACE	19
 #define REL_ARCH	20
 #define REL_FILECONFLICT	21
+#define REL_COND	22
 
 #if !defined(__GNUC__) && !defined(__attribute__)
 # define __attribute__(x)

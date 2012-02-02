@@ -14,6 +14,7 @@ OPTION (USE_VENDORDIRS "Install the bindings in vendor directories?" OFF)
 OPTION (ENABLE_RPMDB "Build with rpm database support?" OFF)
 OPTION (ENABLE_RPMMD "Build with rpmmd repository support?" OFF)
 OPTION (ENABLE_SUSEREPO "Build with suse repository support?" OFF)
+OPTION (ENABLE_COMPS "Build with fedora comps support?" OFF)
 OPTION (ENABLE_HELIXREPO "Build with helix repository support?" OFF)
 OPTION (ENABLE_DEBIAN "Build with debian database/repository support?" OFF)
 
@@ -128,7 +129,7 @@ TEST_BIG_ENDIAN (WORDS_BIGENDIAN)
 
 # should create config.h with #cmakedefine instead...
 FOREACH (VAR HAVE_STRCHRNUL HAVE_FOPENCOOKIE HAVE_FUNOPEN WORDS_BIGENDIAN
-  ENABLE_RPMDB ENABLE_RPMMD ENABLE_SUSEREPO ENABLE_HELIXREPO ENABLE_DEBIAN)
+  ENABLE_RPMDB ENABLE_RPMMD ENABLE_SUSEREPO ENABLE_COMPS ENABLE_HELIXREPO ENABLE_DEBIAN)
   IF(${VAR})
     ADD_DEFINITIONS (-D${VAR}=1)
   ENDIF (${VAR})

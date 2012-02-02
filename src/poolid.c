@@ -178,6 +178,8 @@ pool_id2rel(const Pool *pool, Id id)
       return ".";
     case REL_FILECONFLICT:
       return " FILECONFLICT ";
+    case REL_COND:
+      return " IF ";
     default:
       break;
     }

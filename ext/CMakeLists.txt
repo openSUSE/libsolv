@@ -29,6 +29,13 @@ IF (ENABLE_SUSEREPO)
 	repo_susetags.h repo_zyppdb.h)
 ENDIF (ENABLE_SUSEREPO)
 
+IF (ENABLE_COMPS)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_comps.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_comps.h)
+ENDIF (ENABLE_COMPS)
+
 IF (ENABLE_DEBIAN)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repo_deb.c)

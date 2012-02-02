@@ -55,6 +55,13 @@ TARGET_LINK_LIBRARIES (susetags2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRA
 SET (tools_list ${tools_list} susetags2solv)
 ENDIF (ENABLE_SUSEREPO)
 
+IF (ENABLE_COMPS)
+ADD_EXECUTABLE (comps2solv comps2solv.c)
+TARGET_LINK_LIBRARIES (comps2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+SET (tools_list ${tools_list} comps2solv)
+ENDIF (ENABLE_COMPS)
+
 ADD_EXECUTABLE (installcheck installcheck.c)
 TARGET_LINK_LIBRARIES (installcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
 
