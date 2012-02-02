@@ -1,7 +1,7 @@
 #
 # spec file for package libsolv
 #
-# Copyright (c) 2011 SUSE LINUX Products GmbH, Nuernberg, Germany.
+# Copyright (c) 2012 SUSE LINUX Products GmbH, Nuernberg, Germany.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -17,12 +17,10 @@
 
 Name:           libsolv
 Version:        @VERSION@
-Release:        1
-License:        BSD 3-Clause
+Release:        0
 Url:            git://gitorious.org/opensuse/libsolv.git
 Source:         libsolv-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
-Group:          Development/Libraries/C and C++
 
 %bcond_without enable_static
 %bcond_without disable_shared
@@ -52,15 +50,17 @@ BuildRequires:  fdupes
 %else
 BuildRequires:  expat-devel
 %endif
-BuildRequires:  cmake rpm-devel gcc-c++
+BuildRequires:  cmake
+BuildRequires:  gcc-c++
+BuildRequires:  rpm-devel
 BuildRequires:  zlib-devel
 
 %if %{with perl_binding}
-BuildRequires: perl
+BuildRequires:  perl
 %if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
-BuildRequires: perl-devel
+BuildRequires:  perl-devel
 %endif
-BuildRequires: swig
+BuildRequires:  swig
 %endif
 %if %{with ruby_binding}
 %if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
@@ -68,17 +68,19 @@ BuildRequires: swig
 %else
 %global ruby_vendorarch %(ruby -rrbconfig -e 'puts Config::CONFIG["vendorarchdir"]')
 %endif
-BuildRequires: ruby ruby-devel
-BuildRequires: swig
+BuildRequires:  ruby
+BuildRequires:  ruby-devel
+BuildRequires:  swig
 %endif
 %if %{with python_binding}
 %global python_sitearch %(python -c "from distutils.sysconfig import get_python_lib; print get_python_lib(True);")
-BuildRequires: python-devel
-BuildRequires: swig
+BuildRequires:  python-devel
+BuildRequires:  swig
 %endif
 
 Summary:        A new approach to package dependency solving
-
+License:        BSD-3-Clause
+Group:          Development/Libraries/C and C++
 
 %description
 A new approach to package dependency solving
