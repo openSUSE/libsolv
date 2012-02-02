@@ -2259,6 +2259,21 @@ solver_disablechoicerules(Solver *solv, Rule *r)
 
 #undef CLEANDEPSDEBUG
 
+/*
+ * This functions collects all packages that are looked at
+ * when a dependency is checked. We need it to "pin" installed
+ * packages when removing a supplemented package in createcleandepsmap.
+ * Here's an not uncommon example:
+ *   A contains "Supplements: packageand(B, C)"
+ *   B contains "Requires: A"
+ * Now if we remove C, the supplements is no longer true,
+ * thus we also remove A. Without the dep_pkgcheck function, we
+ * would now also remove B, but this is wrong, as adding back
+ * C doesn't make the supplements true again. Thus we "pin" B
+ * when we remove A.
+ * There's probably a better way to do this, but I haven't come
+ * up with it yet ;)
+ */
 static inline void
 dep_pkgcheck(Solver *solv, Id dep, Map *m, Queue *q)
 {
@@ -2287,7 +2302,26 @@ dep_pkgcheck(Solver *solv, Id dep, Map *m, Queue *q)
       queue_push(q, p);
 }
 
-static void solver_createcleandepsmap(Solver *solv)
+/*
+ * Find all installed packages that are no longer
+ * needed regarding the current solver job.
+ *
+ * The algorithm is:
+ * - remove pass: remove all packages that could have
+ *   been dragged in by the obsoleted packages.
+ *   i.e. if package A is obsolete and contains "Requires: B",
+ *   also remove B, as installing A will have pulled in B.
+ *   after this pass, we have a set of still installed packages
+ *   with broken dependencies.
+ * - add back pass:
+ *   now add back all packages that the still installed packages
+ *   require.
+ *
+ * The cleandeps packages are the packages removed in the first
+ * pass and not added back in the second pass.
+ */
+static void
+solver_createcleandepsmap(Solver *solv)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
@@ -2422,7 +2456,7 @@ static void solver_createcleandepsmap(Solver *solv)
     }
 
 #ifdef CLEANDEPSDEBUG
-  printf("HELLO PASS\n");
+  printf("REMOVE PASS\n");
 #endif
   for (;;)
     {
@@ -2450,6 +2484,7 @@ static void solver_createcleandepsmap(Solver *solv)
 		      {
 		        /* no longer supplemented, also erase */
 			int iqcount = iq.count;
+			/* pin packages, see comment above dep_pkgcheck */
 			dep_pkgcheck(solv, sup, &im, &iq);
 			for (i = iqcount; i < iq.count; i++)
 			  {
@@ -2478,7 +2513,7 @@ static void solver_createcleandepsmap(Solver *solv)
 	continue;
       MAPCLR(&im, ip);
 #ifdef CLEANDEPSDEBUG
-      printf("hello %s\n", pool_solvable2str(pool, s));
+      printf("removing %s\n", pool_solvable2str(pool, s));
 #endif
       if (s->requires)
 	{
@@ -2540,7 +2575,7 @@ static void solver_createcleandepsmap(Solver *solv)
   for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
     {
       r = solv->rules + rid;
-      if (r->p >= 0 || r->d != 0)
+      if (r->p >= 0 || r->d != 0 || r->w2 != 0)
 	continue;	/* disabled or not erase */
       p = -r->p;
       MAPCLR(&im, p);
@@ -2574,7 +2609,7 @@ static void solver_createcleandepsmap(Solver *solv)
     }
 
 #ifdef CLEANDEPSDEBUG
-  printf("BYE PASS\n");
+  printf("ADDBACK PASS\n");
 #endif
   for (;;)
     {
@@ -2611,7 +2646,7 @@ static void solver_createcleandepsmap(Solver *solv)
       ip = queue_shift(&iq);
       s = pool->solvables + ip;
 #ifdef CLEANDEPSDEBUG
-      printf("bye %s\n", pool_solvable2str(pool, s));
+      printf("adding back %s\n", pool_solvable2str(pool, s));
 #endif
       if (s->requires)
 	{
