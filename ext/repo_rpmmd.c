@@ -232,7 +232,9 @@ static struct stateswitch stateswitches[] = {
 #define CSREALLOC_STEP 1024
 
 struct parsedata {
-  struct parsedata_common common;
+  Pool *pool;
+  Repo *repo;
+  Repodata *data;
   char *kind;
   int depth;
   enum state state;
@@ -247,18 +249,13 @@ struct parsedata {
   enum state sbtab[NUMSTATES];
   /* temporal to store attribute tag language */
   const char *tmplang;
-  const char *capkind;
-  // used to store tmp attributes
-  // while the tag ends
-  const char *tmpattr;
-  Repodata *data;
+  Id chksumtype;
   Id handle;
   XML_Parser *parser;
   Id (*dirs)[3]; // dirid, size, nfiles
   int ndirs;
-  Id langcache[ID_NUM_INTERNAL];
-  /** system language */
-  const char *language;
+  const char *language;			/* default language */
+  Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
 
   Id lastdir;
   char *lastdirstr;
@@ -275,15 +272,18 @@ struct parsedata {
 static Id
 langtag(struct parsedata *pd, Id tag, const char *language)
 {
-  if (!language)	/* fall back to default if not specified */
-    language = pd->language;
-  if (language && (!language[0] || !strcmp(language, "en")))
-    language = 0;
-  if (!language || tag >= ID_NUM_INTERNAL)
-    return pool_id2langid(pd->common.repo->pool, tag, language, 1);
-  return pool_id2langid(pd->common.repo->pool, tag, language, 1);
+  if (language)
+    {
+      if (!language[0] || !strcmp(language, "en"))
+	return tag;
+      return pool_id2langid(pd->pool, tag, language, 1);
+    }
+  if (!pd->language)
+    return tag;
+  if (tag >= ID_NUM_INTERNAL)
+    return pool_id2langid(pd->pool, tag, pd->language, 1);
   if (!pd->langcache[tag])
-    pd->langcache[tag] = pool_id2langid(pd->common.repo->pool, tag, language, 1);
+    pd->langcache[tag] = pool_id2langid(pd->pool, tag, pd->language, 1);
   return pd->langcache[tag];
 }
 
@@ -520,7 +520,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 #if 0
   fprintf(stderr, "new dep %s%s%s\n", pool_id2str(pool, d), id2rel(pool, d), id2evr(pool, d));
 #endif
-  return repo_addid_dep(pd->common.repo, olddeps, id, marker);
+  return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
 
 
@@ -636,7 +636,7 @@ startElement(void *userData, const char *name, const char **atts)
 {
   //fprintf(stderr,"+tag: %s\n", name);
   struct parsedata *pd = userData;
-  Pool *pool = pd->common.pool;
+  Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
   const char *str;
@@ -719,7 +719,7 @@ startElement(void *userData, const char *name, const char **atts)
        else
         {
           /* this is a new package */
-          pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->common.repo));
+          pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
           pd->freshens = 0;
         }
       pd->handle = pd->solvable - pool->solvables;
@@ -789,10 +789,10 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_SUMMARY:
     case STATE_CATEGORY:
     case STATE_DESCRIPTION:
-      pd->tmplang = find_attr("lang", atts);
+      pd->tmplang = solv_strdup(find_attr("lang", atts));
       break;
     case STATE_USERVISIBLE:
-      repodata_set_void(pd->data, handle, SOLVABLE_ISVISIBLE );
+      repodata_set_void(pd->data, handle, SOLVABLE_ISVISIBLE);
       break;
     case STATE_INCLUDESENTRY:
       {
@@ -814,7 +814,15 @@ startElement(void *userData, const char *name, const char **atts)
 	repodata_set_location(pd->data, handle, 0, 0, str);
       break;
     case STATE_CHECKSUM:
-      pd->tmpattr = find_attr("type", atts);
+      {
+	const char *tmp = find_attr("type", atts);
+	pd->chksumtype = tmp && *tmp ? solv_chksum_str2type(tmp) : 0;
+        if (!pd->chksumtype)
+	  {
+	    fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), tmp ? tmp: "NULL");
+            exit(1);
+	  }
+      }
       break;
     case STATE_TIME:
       {
@@ -902,9 +910,9 @@ endElement(void *userData, const char *name)
 {
   //fprintf(stderr,"-tag: %s\n", name);
   struct parsedata *pd = userData;
-  Pool *pool = pd->common.pool;
+  Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
-  Repo *repo = pd->common.repo;
+  Repo *repo = pd->repo;
   Id handle = pd->handle;
   Id id;
   char *p;
@@ -964,19 +972,14 @@ endElement(void *userData, const char *name)
       break;
     case STATE_CHECKSUM:
       {
-        Id type, index;
-	type = solv_chksum_str2type(pd->tmpattr);
-	if (!type)
-	  {
-            fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
-            exit(1);
-	  }
-        if (strlen(pd->content) != 2 * solv_chksum_len(type))
+        Id index;
+	
+        if (strlen(pd->content) != 2 * solv_chksum_len(pd->chksumtype))
           {
-            fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
+            fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
             exit(1);
           }
-        repodata_set_checksum(pd->data, handle, SOLVABLE_CHECKSUM, type, pd->content);
+        repodata_set_checksum(pd->data, handle, SOLVABLE_CHECKSUM, pd->chksumtype, pd->content);
         /* we save the checksum to solvable id relationship for extended
            metadata */
         index = stringpool_str2id(&pd->cspool, pd->content, 1 /* create it */);
@@ -1026,12 +1029,15 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
+      pd->tmplang = solv_free((char *)pd->tmplang);
       break;
     case STATE_DESCRIPTION:
       set_description_author(pd->data, handle, pd->content, pd);
+      pd->tmplang = solv_free((char *)pd->tmplang);
       break;
     case STATE_CATEGORY:
       repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_CATEGORY, pd->tmplang), pd->content);
+      pd->tmplang = solv_free((char *)pd->tmplang);
       break;
     case STATE_DISTRIBUTION:
         repodata_set_poolstr(pd->data, handle, SOLVABLE_DISTRIBUTION, pd->content);
@@ -1075,6 +1081,7 @@ endElement(void *userData, const char *name)
     case STATE_EULA:
       if (pd->content[0])
 	repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->tmplang), pd->content);
+      pd->tmplang = solv_free((char *)pd->tmplang);
       break;
     case STATE_KEYWORD:
       if (pd->content[0])
@@ -1158,18 +1165,15 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
         pd.swtab[sw->from] = sw;
       pd.sbtab[sw->to] = sw->from;
     }
-  pd.common.pool = pool;
-  pd.common.repo = repo;
-
+  pd.pool = pool;
+  pd.repo = repo;
   pd.data = data;
 
   pd.content = solv_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
-  pd.common.tmp = 0;
-  pd.common.tmpl = 0;
   pd.kind = 0;
-  pd.language = language;
+  pd.language = language && *language && strcmp(language, "en") != 0 ? language : 0;
 
   /* initialize the string pool where we will store
      the package checksums we know about, to get an Id

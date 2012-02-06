@@ -1226,7 +1226,7 @@ pool_id2langid(Pool *pool, Id id, const char *lang, int create)
   char buf[256], *p;
   int l;
 
-  if (!lang)
+  if (!lang || !*lang)
     return id;
   n = pool_id2str(pool, id);
   l = strlen(n) + strlen(lang) + 2;

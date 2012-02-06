@@ -24,18 +24,21 @@ struct datashare {
   Id evr;
   Id arch;
 };
+
 struct parsedata {
-  char *kind;
+  Pool *pool;
   Repo *repo;
   Repodata *data;
+  char *kind;
   int flags;
-  struct parsedata_common common;
   int last_found_source;
   struct datashare *share_with;
   int nshare;
-  Id (*dirs)[3]; // dirid, size, nfiles
+  Id (*dirs)[3];			/* dirid, size, nfiles */
   int ndirs;
-  Id langcache[ID_NUM_INTERNAL];
+ 
+  char *language;			/* the default language */
+  Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
   int lineno;
 };
 
@@ -52,13 +55,14 @@ static char *flagtab[] = {
 static Id
 langtag(struct parsedata *pd, Id tag, const char *language)
 {
-  if (language && !language[0])
-    language = 0;
-  if (!language || tag >= ID_NUM_INTERNAL)
+  if (language && *language)
     return pool_id2langid(pd->repo->pool, tag, language, 1);
-  return pool_id2langid(pd->repo->pool, tag, language, 1);
+  if (!pd->language)
+    return tag;
+  if (tag >= ID_NUM_INTERNAL)
+    return pool_id2langid(pd->repo->pool, tag, pd->language, 1);
   if (!pd->langcache[tag])
-    pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, language, 1);
+    pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, pd->language, 1);
   return pd->langcache[tag];
 }
 
@@ -578,10 +582,11 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   line = malloc(1024);
   aline = 1024;
 
-  pd.repo = pd.common.repo = repo;
+  pd.pool = pool;
+  pd.repo = repo;
   pd.data = data;
-  pd.common.pool = pool;
   pd.flags = flags;
+  pd.language = language && *language ? solv_strdup(language) : 0;
 
   linep = line;
   s = 0;
@@ -723,19 +728,21 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	continue;
       if (! (line[0] && line[1] && line[2] && line[3] && (line[4] == ':' || line[4] == '.')))
         continue;
+      line_lang[0] = 0;
       if (line[4] == '.')
         {
           char *endlang;
           endlang = strchr(line + 5, ':');
           if (endlang)
             {
+	      int langsize = endlang - (line + 5);
               keylen = endlang - line - 1;
-              strncpy(line_lang, line + 5, 5);
-              line_lang[endlang - line - 5] = 0;
+	      if (langsize > 5)
+		langsize = 5;
+              strncpy(line_lang, line + 5, langsize);
+              line_lang[langsize] = 0;
             }
         }
-      else
-        line_lang[0] = 0;
       tag = tag_from_string(line);
 
       if (indelta)
@@ -1015,19 +1022,19 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    repodata_set_str(data, handle, SOLVABLE_AUTHORS, line + 6);
 	    continue;
           case CTAG('=', 'S', 'u', 'm'):
-            repodata_set_str(data, handle, langtag(&pd, SOLVABLE_SUMMARY, language ? language : line_lang), line + 3 + keylen );
+            repodata_set_str(data, handle, langtag(&pd, SOLVABLE_SUMMARY, line_lang), line + 3 + keylen);
             continue;
           case CTAG('=', 'D', 'e', 's'):
-	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_DESCRIPTION, language ? language : line_lang), line + 3 + keylen );
+	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_DESCRIPTION, line_lang), line + 3 + keylen);
 	    continue;
           case CTAG('=', 'E', 'u', 'l'):
-	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_EULA, language), line + 6);
+	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_EULA, line_lang), line + 6);
 	    continue;
           case CTAG('=', 'I', 'n', 's'):
-	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_MESSAGEINS, language), line + 6);
+	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_MESSAGEINS, line_lang), line + 6);
 	    continue;
           case CTAG('=', 'D', 'e', 'l'):
-	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_MESSAGEDEL, language), line + 6);
+	    repodata_set_str(data, handle, langtag(&pd, SOLVABLE_MESSAGEDEL, line_lang), line + 6);
 	    continue;
           case CTAG('=', 'V', 'i', 's'):
 	    {
@@ -1035,7 +1042,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      unsigned k;
 	      k = atoi(line + 6);
 	      if (k || !strcasecmp(line + 6, "true"))
-	        repodata_set_void(data, handle, SOLVABLE_ISVISIBLE );
+	        repodata_set_void(data, handle, SOLVABLE_ISVISIBLE);
 	    }
 	    continue;
           case CTAG('=', 'S', 'h', 'r'):
@@ -1099,7 +1106,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    set_checksum(&pd, data, handle, SOLVABLE_CHECKSUM, line + 6);
 	    break;
 	  case CTAG('=', 'L', 'a', 'n'):
-	    language = solv_strdup(line + 6);
+	    pd.language = solv_free(pd.language);
+	    if (line[6])
+	      pd.language = solv_strdup(line + 6);
 	    break;
 
 	  case CTAG('=', 'F', 'l', 's'):
@@ -1209,8 +1218,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 
-  if (pd.common.tmp)
-    free(pd.common.tmp);
+  solv_free(pd.language);
   free(line);
   join_freemem();
   return 0;

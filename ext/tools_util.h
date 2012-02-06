@@ -16,13 +16,6 @@
 static char *_join_tmp;
 static int _join_tmpl;
 
-struct parsedata_common {
-  char *tmp;
-  int tmpl;
-  Pool *pool;
-  Repo *repo;
-};
-
 static inline Id
 makeevr(Pool *pool, const char *s)
 {

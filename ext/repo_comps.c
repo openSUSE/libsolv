@@ -116,8 +116,6 @@ struct parsedata {
 
   Solvable *solvable;
   Id handle;
-
-  Id langcache[ID_NUM_INTERNAL];
 };
 
 
@@ -140,23 +138,6 @@ find_attr(const char *txt, const char **atts, int dup)
         return dup ? solv_strdup(atts[1]) : atts[1];
     }
   return 0;
-}
-
-
-/*
- * create localized tag
- */
-
-static Id
-langtag(struct parsedata *pd, Id tag, const char *language)
-{
-  if (language && !language[0])
-    language = 0;
-  if (!language || tag >= ID_NUM_INTERNAL || 1)
-    return pool_id2langid(pd->repo->pool, tag, language, 1);
-  if (!pd->langcache[tag])
-    pd->langcache[tag] = pool_id2langid(pd->repo->pool, tag, language, 1);
-  return pd->langcache[tag];
 }
 
 
@@ -287,13 +268,13 @@ endElement(void *userData, const char *name)
 
     case STATE_NAME:
     case STATE_CNAME:
-      repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
+      repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_SUMMARY, pd->tmplang, 1), pd->content);
       pd->tmplang = solv_free((void *)pd->tmplang);
       break;
 
     case STATE_DESCRIPTION:
     case STATE_CDESCRIPTION:
-      repodata_set_str(pd->data, pd->handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), pd->content);
+      repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_DESCRIPTION, pd->tmplang, 1), pd->content);
       pd->tmplang = solv_free((void *)pd->tmplang);
       break;
 

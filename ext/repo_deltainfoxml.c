@@ -18,6 +18,7 @@
 
 #include "pool.h"
 #include "repo.h"
+#include "chksum.h"
 #include "repo_updateinfoxml.h"
 
 #define DISABLE_SPLIT
@@ -319,14 +320,10 @@ startElement(void *userData, const char *name, const char **atts)
       break;
     case STATE_NEWPACKAGE:
       if ((str = find_attr("name", atts)) != 0)
-	{
-	  pd->newpkgname = pool_str2id(pool, str, 1);
-	}
+	pd->newpkgname = pool_str2id(pool, str, 1);
       pd->newpkgevr = makeevr_atts(pool, pd, atts);
       if ((str = find_attr("arch", atts)) != 0)
-	{
-	  pd->newpkgarch = pool_str2id(pool, str, 1);
-	}
+	pd->newpkgarch = pool_str2id(pool, str, 1);
       break;
 
     case STATE_DELTA:
@@ -348,13 +345,8 @@ startElement(void *userData, const char *name, const char **atts)
       pd->delta.filechecksumtype = REPOKEY_TYPE_SHA1;
       if ((str = find_attr("type", atts)) != 0)
 	{
-	  if (!strcasecmp(str, "sha"))
-	    pd->delta.filechecksumtype = REPOKEY_TYPE_SHA1;
-	  else if (!strcasecmp(str, "sha256"))
-	    pd->delta.filechecksumtype = REPOKEY_TYPE_SHA256;
-	  else if (!strcasecmp(str, "md5"))
-	    pd->delta.filechecksumtype = REPOKEY_TYPE_MD5;
-	  else
+	  pd->delta.filechecksumtype = solv_chksum_str2type(str);
+	  if (!pd->delta.filechecksumtype)
 	    pool_debug(pool, SOLV_ERROR, "unknown checksum type: '%s'\n", str);
 	}
     case STATE_SEQUENCE:

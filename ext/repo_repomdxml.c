@@ -176,7 +176,7 @@ struct parsedata {
   /* repo data handle */
   Id rdhandle;
 
-  const char *tmpattr;
+  Id chksumtype;
 };
 
 /*
@@ -303,7 +303,15 @@ startElement(void *userData, const char *name, const char **atts)
       }
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
-      pd->tmpattr= find_attr("type", atts);
+      {
+        const char *type= find_attr("type", atts);
+        pd->chksumtype = type && *type ? solv_chksum_str2type(type) : 0;
+	if (!pd->chksumtype)
+	  {
+            fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), type ? type : "NULL");
+            exit(1);
+	  }
+      }
       break;
     default:
       break;
@@ -347,21 +355,13 @@ endElement(void *userData, const char *name)
 
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
-      {
-        Id type = solv_chksum_str2type(pd->tmpattr);
-	if (!type)
-	  {
-            fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
-            exit(1);
-	  }
-	if (strlen(pd->content) != 2 * solv_chksum_len(type))
-	  {
-            fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), pd->tmpattr);
-            exit(1);
-	  }
-        repodata_set_checksum(pd->data, pd->rdhandle, pd->state == STATE_CHECKSUM ? REPOSITORY_REPOMD_CHECKSUM : REPOSITORY_REPOMD_OPENCHECKSUM, type, pd->content);
-        break;
-      }
+      if (strlen(pd->content) != 2 * solv_chksum_len(pd->chksumtype))
+	{
+	  fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
+	  exit(1);
+	}
+      repodata_set_checksum(pd->data, pd->rdhandle, pd->state == STATE_CHECKSUM ? REPOSITORY_REPOMD_CHECKSUM : REPOSITORY_REPOMD_OPENCHECKSUM, pd->chksumtype, pd->content);
+      break;
 
     case STATE_TIMESTAMP:
       {
