@@ -125,6 +125,7 @@ struct parsedata {
   Solvable *solvable;
   time_t buildtime;
   Id collhandle;
+  struct joindata jd;
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
@@ -482,7 +483,7 @@ endElement(void *userData, const char *name)
 	}
       break;
     case STATE_ID:
-      s->name = pool_str2id(pool, join2("patch", ":", pd->content), 1);
+      s->name = pool_str2id(pool, join2(&pd->jd, "patch", ":", pd->content), 1);
       break;
       /* <title>imlib-1.9.15-6.fc8</title> */
     case STATE_TITLE:
@@ -644,7 +645,7 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
     }
   XML_ParserFree(parser);
   free(pd.content);
-  join_freemem();
+  join_freemem(&pd.jd);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

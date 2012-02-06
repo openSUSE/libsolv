@@ -21,9 +21,6 @@
 #include "chksum.h"
 #include "repo_updateinfoxml.h"
 
-#define DISABLE_SPLIT
-#include "tools_util.h"
-
 /* #define DUMPOUT 1 */
 
 /*
@@ -584,7 +581,6 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
   XML_ParserFree(parser);
   solv_free(pd.content);
   solv_free(pd.tempstr);
-  join_freemem();
 
   /* now commit all handles */
   for (i = 0; i < pd.nhandles; i++)

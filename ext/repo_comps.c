@@ -94,6 +94,9 @@ static struct stateswitch stateswitches[] = {
 };
 
 struct parsedata {
+  Pool *pool;
+  Repo *repo;
+  Repodata *data;
   const char *filename;
   const char *basename;
   int depth;
@@ -103,12 +106,10 @@ struct parsedata {
   int lcontent;
   int acontent;
   int docontent;
-  Pool *pool;
-  Repo *repo;
-  Repodata *data;
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
+  struct joindata jd;
 
   const char *tmplang;
   Id reqtype;
@@ -263,7 +264,7 @@ endElement(void *userData, const char *name)
 
     case STATE_ID:
     case STATE_CID:
-      s->name = pool_str2id(pd->pool, join2("pattern", ":", pd->content), 1);
+      s->name = pool_str2id(pd->pool, join2(&pd->jd, "pattern", ":", pd->content), 1);
       break;
 
     case STATE_NAME:
@@ -286,7 +287,7 @@ endElement(void *userData, const char *name)
       break;
 
     case STATE_GROUPID:
-      id = pool_str2id(pd->pool, join2("pattern", ":", pd->content), 1);
+      id = pool_str2id(pd->pool, join2(&pd->jd, "pattern", ":", pd->content), 1);
       s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
       break;
 
@@ -389,7 +390,7 @@ repo_add_comps(Repo *repo, FILE *fp, int flags)
 
   solv_free((void *)pd.tmplang);
   solv_free(pd.content);
-  join_freemem();
+  join_freemem(&pd.jd);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

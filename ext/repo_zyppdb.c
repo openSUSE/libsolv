@@ -79,6 +79,7 @@ struct parsedata {
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
+  struct joindata jd;
 
   const char *tmplang;
 
@@ -173,7 +174,7 @@ startElement(void *userData, const char *name, const char **atts)
 	const char *ver = find_attr("ver", atts, 0);
 	const char *rel = find_attr("rel", atts, 0);
 	/* const char *epoch = find_attr("epoch", atts, 1); ignored */
-	s->evr = makeevr(pd->pool, join2(ver, "-", rel));
+	s->evr = makeevr(pd->pool, join2(&pd->jd, ver, "-", rel));
       }
       break;
       /* <summary lang="xy">... */
@@ -219,7 +220,7 @@ endElement(void *userData, const char *name)
       pd->solvable = 0;
       break;
     case STATE_NAME:
-      s->name = pool_str2id(pd->pool, join2("product", ":", pd->content), 1);
+      s->name = pool_str2id(pd->pool, join2(&pd->jd, "product", ":", pd->content), 1);
       break;
     case STATE_ARCH:
       s->arch = pool_str2id(pd->pool, pd->content, 1);
@@ -342,7 +343,7 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
 	{
 	  if (strlen(entry->d_name) < 3)
 	    continue;	/* skip '.' and '..' */
-	  fullpath = join2(dirpath, "/", entry->d_name);
+	  fullpath = join2(&pd.jd, dirpath, "/", entry->d_name);
 	  if ((fp = fopen(fullpath, "r")) == 0)
 	    {
 	      perror(fullpath);
@@ -356,7 +357,7 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
 
   solv_free((void *)pd.tmplang);
   free(pd.content);
-  join_freemem();
+  join_freemem(&pd.jd);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 }

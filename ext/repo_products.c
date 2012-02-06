@@ -109,6 +109,7 @@ struct parsedata {
 
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
+  struct joindata jd;
 
   const char *tmplang;
 
@@ -264,7 +265,7 @@ endElement(void *userData, const char *name)
       if (pd->tmprel)
 	{
 	  if (pd->tmpvers)
-	    s->evr = makeevr(pd->pool, join2(pd->tmpvers, "-", pd->tmprel));
+	    s->evr = makeevr(pd->pool, join2(&pd->jd, pd->tmpvers, "-", pd->tmprel));
 	  else
 	    {
 	      fprintf(stderr, "Seen <release> but no <version>\n");
@@ -286,7 +287,7 @@ endElement(void *userData, const char *name)
       s->vendor = pool_str2id(pd->pool, pd->content, 1);
       break;
     case STATE_NAME:
-      s->name = pool_str2id(pd->pool, join2("product", ":", pd->content), 1);
+      s->name = pool_str2id(pd->pool, join2(&pd->jd, "product", ":", pd->content), 1);
       break;
     case STATE_VERSION:
       pd->tmpvers = solv_strdup(pd->content);
@@ -449,7 +450,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
       char *fullpath;
 
       /* check for <productsdir>/baseproduct on code11 and remember its target inode */
-      if (stat(join2(dirpath, "/", "baseproduct"), &st) == 0) /* follow symlink */
+      if (stat(join2(&pd.jd, dirpath, "/", "baseproduct"), &st) == 0) /* follow symlink */
 	pd.baseproduct = st.st_ino;
       else
 	pd.baseproduct = 0;
@@ -460,7 +461,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 	  FILE *fp;
 	  if (len <= 5 || strcmp(entry->d_name + len - 5, ".prod") != 0)
 	    continue;
-	  fullpath = join2(dirpath, "/", entry->d_name);
+	  fullpath = join2(&pd.jd, dirpath, "/", entry->d_name);
 	  fp = fopen(fullpath, "r");
 	  if (!fp)
 	    {
@@ -476,7 +477,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
     }
   solv_free((void *)pd.tmplang);
   solv_free(pd.content);
-  join_freemem();
+  join_freemem(&pd.jd);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
@@ -500,44 +501,48 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 void
 repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
 {
-  const char *fullpath;
+  char *fullpath;
   DIR *dir;
 
-  dir = opendir(proddir);
-  if (dir)
+  if (proddir)
     {
-      /* assume code11 stype products */
-      closedir(dir);
-      repo_add_code11_products(repo, proddir, flags);
-      return;
+      dir = opendir(proddir);
+      if (dir)
+	{
+	  /* assume code11 stype products */
+	  closedir(dir);
+	  repo_add_code11_products(repo, proddir, flags);
+	  return;
+	}
     }
 
-  /* code11 didn't work, try old zyppdb */
-  fullpath = root ? join2(root, "", "/var/lib/zypp/db/products") : "/var/lib/zypp/db/products";
+  /* code11 didn't work, try old code10 zyppdb */
+  fullpath = solv_dupjoin(root ? root : 0, "/var/lib/zypp/db/products", 0);
   dir = opendir(fullpath);
   if (dir)
     {
       closedir(dir);
       /* assume code10 style products */
       repo_add_zyppdb_products(repo, fullpath, flags);
-      join_freemem();
+      solv_free(fullpath);
       return;
     }
+  solv_free(fullpath);
 
-  /* code11 didn't work, try -release files parsing */
-  fullpath = root ? join2(root, "", "/etc") : "/etc";
+  /* code10/11 didn't work, try -release files parsing */
+  fullpath = solv_dupjoin(root ? root : 0, "/etc", 0);
   dir = opendir(fullpath);
   if (dir)
     {
       closedir(dir);
       repo_add_releasefile_products(repo, fullpath, flags);
-      join_freemem();
+      solv_free(fullpath);
       return;
     }
 
   /* no luck. print an error message in case the root argument is wrong */
   perror(fullpath);
-  join_freemem();
+  solv_free(fullpath);
 
   /* the least we can do... */
   if (!(flags & REPO_NO_INTERNALIZE) && (flags & REPO_REUSE_REPODATA) != 0)

@@ -28,6 +28,7 @@
 #include "chksum.h"
 #include "repo_content.h"
 #define DISABLE_SPLIT
+#define DISABLE_JOIN2
 #include "tools_util.h"
 
 /* split off a word, return null terminated pointer to it.
@@ -542,7 +543,6 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
     solv_free(pd.tmp);
   solv_free(line);
   solv_free(otherarchs);
-  join_freemem();
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;

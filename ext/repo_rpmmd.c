@@ -247,6 +247,7 @@ struct parsedata {
   Offset freshens;
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
+  struct joindata jd;
   /* temporal to store attribute tag language */
   const char *tmplang;
   Id chksumtype;
@@ -798,14 +799,14 @@ startElement(void *userData, const char *name, const char **atts)
       {
 	const char *tmp = find_attr("pattern", atts);
 	if (tmp)
-	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_INCLUDES, join2("pattern", ":", tmp));
+	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", tmp));
       }
       break;
     case STATE_EXTENDSENTRY:
       {
 	const char *tmp = find_attr("pattern", atts);
 	if (tmp)
-	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, join2("pattern", ":", tmp));
+	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", tmp));
       }
       break;
     case STATE_LOCATION:
@@ -940,7 +941,7 @@ endElement(void *userData, const char *name)
     {
     case STATE_SOLVABLE:
       if (pd->kind && !s->name) /* add namespace in case of NULL name */
-        s->name = pool_str2id(pool, join2(pd->kind, ":", ""), 1);
+        s->name = pool_str2id(pool, join2(&pd->jd, pd->kind, ":", 0), 1);
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (!s->evr)
@@ -954,7 +955,7 @@ endElement(void *userData, const char *name)
       break;
     case STATE_NAME:
       if (pd->kind)
-        s->name = pool_str2id(pool, join2(pd->kind, ":", pd->content), 1);
+        s->name = pool_str2id(pool, join2(&pd->jd, pd->kind, ":", pd->content), 1);
       else
         s->name = pool_str2id(pool, pd->content, 1);
       break;
@@ -1222,7 +1223,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   XML_ParserFree(parser);
   solv_free(pd.content);
   solv_free(pd.lastdirstr);
-  join_freemem();
+  join_freemem(&pd.jd);
   stringpool_free(&pd.cspool);
   solv_free(pd.cscache);
 

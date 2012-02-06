@@ -36,7 +36,7 @@ struct parsedata {
   int nshare;
   Id (*dirs)[3];			/* dirid, size, nfiles */
   int ndirs;
- 
+  struct joindata jd;
   char *language;			/* the default language */
   Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
   int lineno;
@@ -92,7 +92,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
           exit(1);
         }
       if (kind)
-        id = pool_str2id(pool, join2(kind, ":", sp[0]), 1);
+        id = pool_str2id(pool, join2(&pd->jd, kind, ":", sp[0]), 1);
       else
         id = pool_str2id(pool, sp[0], 1);
       if (i == 3)
@@ -135,7 +135,7 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
     }
 
   name = pool_str2id(pool, sp[0], 1);
-  evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+  evr = makeevr(pool, join2(&pd->jd, sp[1], "-", sp[2]));
   arch = pool_str2id(pool, sp[3], 1);
   /* XXX: could record a dep here, depends on where we want to store the data */
   if (name == s->name)
@@ -762,7 +762,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	        if (split(line + 5, sp, 5) != 5)
 		  continue;
 		repodata_set_id(data, handle, DELTA_SEQ_NAME, pool_str2id(pool, sp[0], 1));
-		evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+		evr = makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2]));
 		repodata_set_id(data, handle, DELTA_SEQ_EVR, evr);
 		/* repodata_set_id(data, handle, DELTA_SEQ_ARCH, pool_str2id(pool, sp[3], 1)); */
 		repodata_set_str(data, handle, DELTA_SEQ_NUM, sp[4]);
@@ -818,7 +818,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    }
 	  handle = repodata_new_handle(data);
 	  repodata_set_id(data, handle, DELTA_PACKAGE_NAME, pool_str2id(pool, sp[0], 1));
-	  repodata_set_id(data, handle, DELTA_PACKAGE_EVR, makeevr(pool, join2(sp[1], "-", sp[2])));
+	  repodata_set_id(data, handle, DELTA_PACKAGE_EVR, makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2])));
 	  repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, pool_str2id(pool, sp[3], 1));
 	  repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DELTAINFO, handle);
 	  indelta = 1;
@@ -859,10 +859,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      Id name, evr, arch;
 	      /* we don't use the create flag here as a simple pre-check for existance */
 	      if (pd.kind)
-		name = pool_str2id(pool, join2(pd.kind, ":", sp[0]), 0);
+		name = pool_str2id(pool, join2(&pd.jd, pd.kind, ":", sp[0]), 0);
 	      else
 		name = pool_str2id(pool, sp[0], 0);
-	      evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+	      evr = makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2]));
 	      arch = pool_str2id(pool, sp[3], 0);
 	      if (name && arch)
 		{
@@ -884,10 +884,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      /* normal operation. create a new solvable. */
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
 	      if (pd.kind)
-		s->name = pool_str2id(pool, join2(pd.kind, ":", sp[0]), 1);
+		s->name = pool_str2id(pool, join2(&pd.jd, pd.kind, ":", sp[0]), 1);
 	      else
 		s->name = pool_str2id(pool, sp[0], 1);
-	      s->evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+	      s->evr = makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2]));
 	      s->arch = pool_str2id(pool, sp[3], 1);
 	      s->vendor = defvendor;
 	      createdpkgs = 1;
@@ -1054,7 +1054,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		  exit(1);
 		}
 	      name = pool_str2id(pool, sp[0], 1);
-	      evr = makeevr(pool, join2(sp[1], "-", sp[2]));
+	      evr = makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2]));
 	      arch = pool_str2id(pool, sp[3], 1);
 	      if (last_found_pack >= pd.nshare)
 		{
@@ -1097,10 +1097,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    repodata_set_str(data, handle, SOLVABLE_ICON, line + 6);
 	    break;
 	  case CTAG('=', 'E', 'x', 't'):
-	    repodata_add_poolstr_array(data, handle, SOLVABLE_EXTENDS, join2("pattern", ":", line + 6));
+	    repodata_add_poolstr_array(data, handle, SOLVABLE_EXTENDS, join2(&pd.jd, "pattern", ":", line + 6));
 	    break;
 	  case CTAG('=', 'I', 'n', 'c'):
-	    repodata_add_poolstr_array(data, handle, SOLVABLE_INCLUDES, join2("pattern", ":", line + 6));
+	    repodata_add_poolstr_array(data, handle, SOLVABLE_INCLUDES, join2(&pd.jd, "pattern", ":", line + 6));
 	    break;
 	  case CTAG('=', 'C', 'k', 's'):
 	    set_checksum(&pd, data, handle, SOLVABLE_CHECKSUM, line + 6);
@@ -1220,6 +1220,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 
   solv_free(pd.language);
   free(line);
-  join_freemem();
+  join_freemem(&pd.jd);
   return 0;
 }

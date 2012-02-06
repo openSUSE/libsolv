@@ -29,9 +29,15 @@
 
 #define BUFF_SIZE 8192
 
+struct parsedata {
+  Repo *repo;
+  struct joindata jd;
+};
+
 static void
-add_releasefile_product(Repo *repo, FILE *fp)
+add_releasefile_product(struct parsedata *pd, FILE *fp)
 {
+  Repo *repo = pd->repo;
   Pool *pool = repo->pool;
   char buf[BUFF_SIZE];
   Id name = 0;
@@ -66,7 +72,7 @@ add_releasefile_product(Repo *repo, FILE *fp)
 		 && (*ptr1 == ' ' || isdigit(*ptr1) || *ptr1 == '.'))
 	    --ptr1;
 	  *(++ptr1) = 0;
-	  name = pool_str2id(pool, join2("product", ":", buf), 1);
+	  name = pool_str2id(pool, join2(&pd->jd, "product", ":", buf), 1);
 
 	  if (ptr)
 	    {
@@ -117,11 +123,14 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
   struct dirent *entry;
   FILE *fp;
   char *fullpath;
+  struct parsedata pd;
 
   dir = opendir(dirpath);
   if (!dir)
     return 0;
 
+  memset(&pd, 0, sizeof(pd));
+  pd.repo = repo;
   while ((entry = readdir(dir)))
     {
       int len = strlen(entry->d_name);
@@ -130,18 +139,18 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
 	  /* skip /etc/lsb-release, thats not a product per-se */
 	  if (strcmp(entry->d_name, "lsb-release") == 0)
 	    continue;
-	  fullpath = join2(dirpath, "/", entry->d_name);
+	  fullpath = join2(&pd.jd, dirpath, "/", entry->d_name);
 	  if ((fp = fopen(fullpath, "r")) == 0)
 	    {
 	      perror(fullpath);
 	      continue;
 	    }
-	  add_releasefile_product(repo, fp);
+	  add_releasefile_product(&pd, fp);
 	  fclose(fp);
 	}
     }
   closedir(dir);
-  join_freemem();
+  join_freemem(&pd.jd);
 
   if (!(flags & REPO_NO_INTERNALIZE) && (flags & REPO_REUSE_REPODATA) != 0)
     repodata_internalize(repo_last_repodata(repo));

@@ -13,9 +13,6 @@
 #ifndef LIBSOLV_TOOLS_UTIL_H
 #define LIBSOLV_TOOLS_UTIL_H
 
-static char *_join_tmp;
-static int _join_tmpl;
-
 static inline Id
 makeevr(Pool *pool, const char *s)
 {
@@ -49,9 +46,16 @@ split(char *l, char **sp, int m)
 }
 #endif
 
+#ifndef DISABLE_JOIN2
+
+struct joindata {
+  char *tmp;
+  int tmpl;
+};
+
 /* this join does not depend on parsedata */
 static char *
-join2(const char *s1, const char *s2, const char *s3)
+join2(struct joindata *jd, const char *s1, const char *s2, const char *s3)
 {
   int l = 1;
   char *p;
@@ -62,15 +66,12 @@ join2(const char *s1, const char *s2, const char *s3)
     l += strlen(s2);
   if (s3)
     l += strlen(s3);
-  if (l > _join_tmpl)
+  if (l > jd->tmpl)
     {
-      _join_tmpl = l + 256;
-      if (!_join_tmp)
-        _join_tmp = malloc(_join_tmpl);
-      else
-        _join_tmp = realloc(_join_tmp, _join_tmpl);
+      jd->tmpl = l + 256;
+      jd->tmp = solv_realloc(jd->tmp, jd->tmpl);
     }
-  p = _join_tmp;
+  p = jd->tmp;
   if (s1)
     {
       strcpy(p, s1);
@@ -87,24 +88,18 @@ join2(const char *s1, const char *s2, const char *s3)
       p += strlen(s3);
     }
   *p = 0;
-  return _join_tmp;
+  return jd->tmp;
 }
 
 static inline void
-join_freemem(void)
+join_freemem(struct joindata *jd)
 {
-  if (_join_tmp)
-    free(_join_tmp);
-  _join_tmp = 0;
-  _join_tmpl = 0;
+  if (jd->tmp)
+    free(jd->tmp);
+  jd->tmp = 0;
+  jd->tmpl = 0;
 }
 
-/* util function to set a translated string */
-static inline void repodata_set_tstr(Repodata *data, Id handle, const char *attrname, const char *lang, const char *str)
-{
-  Id attrid;
-  attrid = pool_str2id(data->repo->pool, join2(attrname, ":", lang), 1);
-  repodata_set_str(data, handle, attrid, str);
-}
+#endif
 
 #endif /* LIBSOLV_TOOLS_UTIL_H */
