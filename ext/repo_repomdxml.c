@@ -300,6 +300,7 @@ startElement(void *userData, const char *name, const char **atts)
         const char *href = find_attr("href", atts);
 	if (href)
           repodata_set_str(pd->data, pd->rdhandle, REPOSITORY_REPOMD_LOCATION, href);
+        break;
       }
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
@@ -311,8 +312,8 @@ startElement(void *userData, const char *name, const char **atts)
             fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), type ? type : "NULL");
             exit(1);
 	  }
+        break;
       }
-      break;
     default:
       break;
     }
