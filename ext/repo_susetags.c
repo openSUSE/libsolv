@@ -1107,6 +1107,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    break;
 	  case CTAG('=', 'L', 'a', 'n'):
 	    pd.language = solv_free(pd.language);
+	    memset(pd.langcache, 0, sizeof(pd.langcache));
 	    if (line[6])
 	      pd.language = solv_strdup(line + 6);
 	    break;
