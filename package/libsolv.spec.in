@@ -111,7 +111,7 @@ Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
-Requires:       gzip bzip2 coreutils
+Requires:       gzip bzip2 coreutils findutils
 
 %description tools
 A new approach to package dependency solving.
