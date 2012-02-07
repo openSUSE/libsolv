@@ -199,11 +199,8 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_CNAME:
     case STATE_DESCRIPTION:
     case STATE_CDESCRIPTION:
-      {
-	const char *lang = find_attr("xml:lang", atts);
-	pd->tmplang = lang ? join2(&pd->jd, lang, 0, 0) : 0;
-	break;
-      }
+      pd->tmplang = join_dup(&pd->jd, find_attr("xml:lang", atts));
+      break;
 
     case STATE_PACKAGEREQ:
       {

@@ -91,6 +91,12 @@ join2(struct joindata *jd, const char *s1, const char *s2, const char *s3)
   return jd->tmp;
 }
 
+static inline char *
+join_dup(struct joindata *jd, const char *s)
+{
+  return s ? join2(jd, s, 0, 0) : 0;
+}
+
 static inline void
 join_freemem(struct joindata *jd)
 {

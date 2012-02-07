@@ -790,11 +790,8 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_SUMMARY:
     case STATE_CATEGORY:
     case STATE_DESCRIPTION:
-      {
-	const char *lang = find_attr("lang", atts);
-	pd->tmplang = lang ? join2(&pd->jd, lang, 0, 0) : 0;
-	break;
-      }
+      pd->tmplang = join_dup(&pd->jd, find_attr("lang", atts));
+      break;
     case STATE_USERVISIBLE:
       repodata_set_void(pd->data, handle, SOLVABLE_ISVISIBLE);
       break;

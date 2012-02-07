@@ -178,10 +178,7 @@ startElement(void *userData, const char *name, const char **atts)
       break;
       /* <summary lang="xy">... */
     case STATE_SUMMARY:
-      {
-	const char *lang = find_attr("lang", atts);
-        pd->tmplang = lang ? join2(&pd->jd, lang, 0, 0) : 0;
-      }
+      pd->tmplang = join_dup(&pd->jd, find_attr("lang", atts));
       break;
     default:
       break;

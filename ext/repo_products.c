@@ -213,11 +213,8 @@ startElement(void *userData, const char *name, const char **atts)
       /* <summary lang="xy">... */
     case STATE_SUMMARY:
     case STATE_DESCRIPTION:
-      {
-	const char *lang = find_attr("lang", atts);
-	pd->tmplang = lang ? join2(&pd->jd, lang, 0, 0) : 0;
-	break;
-      }
+      pd->tmplang = join_dup(&pd->jd, find_attr("lang", atts));
+      break;
     case STATE_URL:
       pd->urltype = pool_str2id(pd->pool, find_attr("name", atts), 1);
       break;
