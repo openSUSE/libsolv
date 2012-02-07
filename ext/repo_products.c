@@ -115,7 +115,7 @@ struct parsedata {
 
   const char *tmpvers;
   const char *tmprel;
-  const char *tmpurltype;
+  Id urltype;
 
   unsigned int ctime;
 
@@ -133,18 +133,17 @@ struct parsedata {
  * find value for xml attribute
  * I: txt, name of attribute
  * I: atts, list of key/value attributes
- * I: dup, strdup it
  * O: pointer to value of matching key, or NULL
  *
  */
 
 static inline const char *
-find_attr(const char *txt, const char **atts, int dup)
+find_attr(const char *txt, const char **atts)
 {
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, txt))
-        return dup ? solv_strdup(atts[1]) : atts[1];
+        return atts[1];
     }
   return 0;
 }
@@ -201,7 +200,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_PRODUCT:
       /* parse 'schemeversion' and store in global variable */
       {
-        const char * scheme = find_attr("schemeversion", atts, 0);
+        const char * scheme = find_attr("schemeversion", atts);
         pd->productscheme = (scheme && *scheme) ? atoi(scheme) : -1;
       }
       if (!s)
@@ -213,13 +212,14 @@ startElement(void *userData, const char *name, const char **atts)
 
       /* <summary lang="xy">... */
     case STATE_SUMMARY:
-      pd->tmplang = find_attr("lang", atts, 1);
-      break;
     case STATE_DESCRIPTION:
-      pd->tmplang = find_attr("lang", atts, 1);
-      break;
+      {
+	const char *lang = find_attr("lang", atts);
+	pd->tmplang = lang ? join2(&pd->jd, lang, 0, 0) : 0;
+	break;
+      }
     case STATE_URL:
-      pd->tmpurltype = find_attr("name", atts, 1);
+      pd->urltype = pool_str2id(pd->pool, find_attr("name", atts), 1);
       break;
     default:
       break;
@@ -306,22 +306,19 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_SUMMARY, pd->tmplang, 1), pd->content);
-      pd->tmplang = solv_free((void *)pd->tmplang);
       break;
     case STATE_SHORTSUMMARY:
       repodata_set_str(pd->data, pd->handle, PRODUCT_SHORTLABEL, pd->content);
       break;
     case STATE_DESCRIPTION:
       repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_DESCRIPTION, pd->tmplang, 1), pd->content);
-      pd->tmplang = solv_free((void *)pd->tmplang);
       break;
     case STATE_URL:
-      if (pd->tmpurltype)
+      if (pd->urltype)
         {
           repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pd->pool, pd->tmpurltype, 1));
+          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pd->urltype);
         }
-      pd->tmpurltype = solv_free((void *)pd->tmpurltype);
       break;
     case STATE_TARGET:
       repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_TARGET, pd->content);
@@ -475,7 +472,6 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 	}
       closedir(dir);
     }
-  solv_free((void *)pd.tmplang);
   solv_free(pd.content);
   join_freemem(&pd.jd);
 

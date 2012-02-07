@@ -93,18 +93,17 @@ struct parsedata {
  * find value for xml attribute
  * I: txt, name of attribute
  * I: atts, list of key/value attributes
- * I: dup, strdup it
  * O: pointer to value of matching key, or NULL
  *
  */
 
 static inline const char *
-find_attr(const char *txt, const char **atts, int dup)
+find_attr(const char *txt, const char **atts)
 {
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, txt))
-        return dup ? solv_strdup(atts[1]) : atts[1];
+        return atts[1];
     }
   return 0;
 }
@@ -161,7 +160,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_PRODUCT:
       {
 	/* parse 'type' */
-	const char *type = find_attr("type", atts, 0);
+	const char *type = find_attr("type", atts);
 	s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 	repodata_extend(pd->data, s - pool->solvables);
 	pd->handle = s - pool->solvables;
@@ -171,15 +170,18 @@ startElement(void *userData, const char *name, const char **atts)
       break;
     case STATE_VERSION:
       {
-	const char *ver = find_attr("ver", atts, 0);
-	const char *rel = find_attr("rel", atts, 0);
-	/* const char *epoch = find_attr("epoch", atts, 1); ignored */
+	const char *ver = find_attr("ver", atts);
+	const char *rel = find_attr("rel", atts);
+	/* const char *epoch = find_attr("epoch", atts); ignored */
 	s->evr = makeevr(pd->pool, join2(&pd->jd, ver, "-", rel));
       }
       break;
       /* <summary lang="xy">... */
     case STATE_SUMMARY:
-      pd->tmplang = find_attr("lang", atts, 1);
+      {
+	const char *lang = find_attr("lang", atts);
+        pd->tmplang = lang ? join2(&pd->jd, lang, 0, 0) : 0;
+      }
       break;
     default:
       break;
@@ -227,7 +229,6 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_SUMMARY, pd->tmplang, 1), pd->content);
-      pd->tmplang = solv_free((void *)pd->tmplang);
       break;
     case STATE_VENDOR:
       s->vendor = pool_str2id(pd->pool, pd->content, 1);
@@ -355,7 +356,6 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
     }
   closedir(dir);
 
-  solv_free((void *)pd.tmplang);
   free(pd.content);
   join_freemem(&pd.jd);
   if (!(flags & REPO_NO_INTERNALIZE))

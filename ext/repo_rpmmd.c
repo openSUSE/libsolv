@@ -790,8 +790,11 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_SUMMARY:
     case STATE_CATEGORY:
     case STATE_DESCRIPTION:
-      pd->tmplang = solv_strdup(find_attr("lang", atts));
-      break;
+      {
+	const char *lang = find_attr("lang", atts);
+	pd->tmplang = lang ? join2(&pd->jd, lang, 0, 0) : 0;
+	break;
+      }
     case STATE_USERVISIBLE:
       repodata_set_void(pd->data, handle, SOLVABLE_ISVISIBLE);
       break;
@@ -800,15 +803,15 @@ startElement(void *userData, const char *name, const char **atts)
 	const char *tmp = find_attr("pattern", atts);
 	if (tmp)
 	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", tmp));
+        break;
       }
-      break;
     case STATE_EXTENDSENTRY:
       {
 	const char *tmp = find_attr("pattern", atts);
 	if (tmp)
 	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", tmp));
+        break;
       }
-      break;
     case STATE_LOCATION:
       str = find_attr("href", atts);
       if (str)
@@ -1030,15 +1033,12 @@ endElement(void *userData, const char *name)
       break;
     case STATE_SUMMARY:
       repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
-      pd->tmplang = solv_free((char *)pd->tmplang);
       break;
     case STATE_DESCRIPTION:
       set_description_author(pd->data, handle, pd->content, pd);
-      pd->tmplang = solv_free((char *)pd->tmplang);
       break;
     case STATE_CATEGORY:
       repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_CATEGORY, pd->tmplang), pd->content);
-      pd->tmplang = solv_free((char *)pd->tmplang);
       break;
     case STATE_DISTRIBUTION:
         repodata_set_poolstr(pd->data, handle, SOLVABLE_DISTRIBUTION, pd->content);
@@ -1082,7 +1082,6 @@ endElement(void *userData, const char *name)
     case STATE_EULA:
       if (pd->content[0])
 	repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->tmplang), pd->content);
-      pd->tmplang = solv_free((char *)pd->tmplang);
       break;
     case STATE_KEYWORD:
       if (pd->content[0])

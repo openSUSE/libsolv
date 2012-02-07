@@ -125,18 +125,17 @@ struct parsedata {
  * find value for xml attribute
  * I: txt, name of attribute
  * I: atts, list of key/value attributes
- * I: dup, strdup it
  * O: pointer to value of matching key, or NULL
  *
  */
 
 static inline const char *
-find_attr(const char *txt, const char **atts, int dup)
+find_attr(const char *txt, const char **atts)
 {
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, txt))
-        return dup ? solv_strdup(atts[1]) : atts[1];
+        return atts[1];
     }
   return 0;
 }
@@ -200,17 +199,20 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_CNAME:
     case STATE_DESCRIPTION:
     case STATE_CDESCRIPTION:
-      pd->tmplang = find_attr("xml:lang", atts, 1);
-      break;
+      {
+	const char *lang = find_attr("xml:lang", atts);
+	pd->tmplang = lang ? join2(&pd->jd, lang, 0, 0) : 0;
+	break;
+      }
 
     case STATE_PACKAGEREQ:
       {
-	const char *type = find_attr("type", atts, 0);
+	const char *type = find_attr("type", atts);
 	pd->condreq = 0;
 	pd->reqtype = SOLVABLE_RECOMMENDS;
 	if (type && !strcmp(type, "conditional"))
 	  {
-	    const char *requires = find_attr("requires", atts, 0);
+	    const char *requires = find_attr("requires", atts);
 	    if (requires && *requires)
 	      pd->condreq = pool_str2id(pool, requires, 1);
 	  }
@@ -270,13 +272,11 @@ endElement(void *userData, const char *name)
     case STATE_NAME:
     case STATE_CNAME:
       repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_SUMMARY, pd->tmplang, 1), pd->content);
-      pd->tmplang = solv_free((void *)pd->tmplang);
       break;
 
     case STATE_DESCRIPTION:
     case STATE_CDESCRIPTION:
       repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_DESCRIPTION, pd->tmplang, 1), pd->content);
-      pd->tmplang = solv_free((void *)pd->tmplang);
       break;
 
     case STATE_PACKAGEREQ:
@@ -388,7 +388,6 @@ repo_add_comps(Repo *repo, FILE *fp, int flags)
     }
   XML_ParserFree(parser);
 
-  solv_free((void *)pd.tmplang);
   solv_free(pd.content);
   join_freemem(&pd.jd);
 
