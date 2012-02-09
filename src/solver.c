@@ -2788,17 +2788,26 @@ solver_solve(Solver *solv, Queue *job)
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %s%serase %s\n", weak ? "weak " : "", how & SOLVER_CLEANDEPS ? "clean deps " : "", solver_select2str(pool, select, what));
 	  if ((how & SOLVER_CLEANDEPS) != 0 && !solv->cleandepsmap.size && installed)
 	    map_grow(&solv->cleandepsmap, installed->end - installed->start);
-          if (select == SOLVER_SOLVABLE && installed && pool->solvables[what].repo == installed)
+	  name = (select == SOLVER_SOLVABLE || (select == SOLVER_SOLVABLE_NAME && ISRELDEP(what))) ? 0 : -1;
+	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
-	      /* special case for "erase a specific solvable": we also
-               * erase all other solvables with that name, so that they
-               * don't get picked up as replacement */
-	      /* XXX: look also at packages that obsolete this package? */
-	      name = pool->solvables[what].name;
+	      s = pool->solvables + p;
+	      if (installed && s->repo == installed)
+		name = !name ? s->name : -1;
+	      solver_addjobrule(solv, -p, 0, i, weak);
+	    }
+	  /* special case for "erase a specific solvable": we also
+	   * erase all other solvables with that name, so that they
+	   * don't get picked up as replacement.
+	   * name is > 0 if exactly one installed solvable matched.
+	   */
+	  /* XXX: look also at packages that obsolete this package? */
+	  if (name > 0)
+	    {
+	      int j, k;
+	      k = solv->nrules;
 	      FOR_PROVIDES(p, pp, name)
 		{
-		  if (p == what)
-		    continue;
 		  s = pool->solvables + p;
 		  if (s->name != name)
 		    continue;
@@ -2808,11 +2817,14 @@ solver_solve(Solver *solv, Queue *job)
 		  /* keep installcandidates of other jobs */
 		  if (MAPTST(&installcandidatemap, p))
 		    continue;
-		  solver_addjobrule(solv, -p, 0, i, weak);	/* remove by id */
+		  /* don't add the same rule twice */
+		  for (j = oldnrules; j < k; j++)
+		    if (solv->rules[j].p == -p)
+		      break;
+		  if (j == k)
+		    solver_addjobrule(solv, -p, 0, i, weak);	/* remove by id */
 		}
 	    }
-	  FOR_JOB_SELECT(p, pp, select, what)
-	    solver_addjobrule(solv, -p, 0, i, weak);
 	  break;
 
 	case SOLVER_UPDATE:
