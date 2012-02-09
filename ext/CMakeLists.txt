@@ -1,8 +1,8 @@
 SET (libsolvext_SRCS
-    repo_write.c solv_xfopen.c)
+    repo_write.c solv_xfopen.c testcase.c)
 
 SET (libsolvext_HEADERS
-    repo_write.h tools_util.h solv_xfopen.h)
+    repo_write.h tools_util.h solv_xfopen.h testcase.h)
 
 IF (ENABLE_RPMDB)
     SET (libsolvext_SRCS ${libsolvext_SRCS}

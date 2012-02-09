@@ -33,6 +33,12 @@ SOLV_1.0 {
 		rpm_query;
 		solv_xfopen;
 		solv_xfopen_fd;
+		testcase_job2str;
+		testcase_solvid2str;
+		testcase_str2dep;
+		testcase_str2job;
+		testcase_str2repo;
+		testcase_write_susetags;
 	local:
 		*;
 };
