@@ -12,5 +12,6 @@
 
 Id pool_vendor2mask(Pool *pool, Id vendor);
 void pool_setvendorclasses(Pool *pool, const char **vendorclasses);
+void pool_addvendorclass(Pool *pool, const char **vendorclass);
 
 #endif /* LIBSOLV_POOLVENDOR_H */

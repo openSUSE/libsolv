@@ -33,6 +33,7 @@ Id solver_next_problem(struct _Solver *solv, Id problem);
 unsigned int solver_solution_count(struct _Solver *solv, Id problem);
 Id solver_next_solution(struct _Solver *solv, Id problem, Id solution);
 unsigned int solver_solutionelement_count(struct _Solver *solv, Id problem, Id solution);
+Id solver_solutionelement_internalid(struct _Solver *solv, Id problem, Id solution);
 Id solver_next_solutionelement(struct _Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
 
 void solver_take_solutionelement(struct _Solver *solv, Id p, Id rp, Queue *job);

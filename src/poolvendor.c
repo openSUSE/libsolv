@@ -103,3 +103,27 @@ pool_setvendorclasses(Pool *pool, const char **vendorclasses)
   queue_empty(&pool->vendormap);
 }
 
+void
+pool_addvendorclass(Pool *pool, const char **vendorclass)
+{
+  int i, j;
+
+  if (!vendorclass || !vendorclass[0])
+    return;
+  for (j = 1; vendorclass[j]; j++)
+    ;
+  i = 0;
+  if (pool->vendorclasses)
+    {
+      for (i = 0; pool->vendorclasses[i] || pool->vendorclasses[i + 1]; i++)
+	;
+      if (i)
+        i++;
+    }
+  pool->vendorclasses = solv_realloc2(pool->vendorclasses, i + j + 2, sizeof(const char *));
+  for (j = 0; vendorclass[j]; j++)
+    pool->vendorclasses[i++] = solv_strdup(vendorclass[j]);
+  pool->vendorclasses[i++] = 0;
+  pool->vendorclasses[i] = 0;
+  queue_empty(&pool->vendormap);
+}

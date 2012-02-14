@@ -68,9 +68,7 @@ pool_create(void)
 #endif
 #ifdef DEBIAN 
   pool->allowselfconflicts = 1;
-# ifdef MULTI_SEMANTICS
   pool->disttype = DISTTYPE_DEB;
-# endif
 #endif
 #ifdef RPM5
   pool->obsoleteusesprovides = 1;
@@ -727,17 +725,9 @@ pool_addrelproviders(Pool *pool, Id d)
 	    {
 	      if (pid == name)
 		{
-#if defined(MULTI_SEMANTICS)
 		  if (pool->disttype == DISTTYPE_DEB)
-		    continue;
-		  else
-		    break;
-#elif defined(DEBIAN_SEMANTICS)
-		  continue;		/* unversioned provides can
-				 	 * never match versioned deps */
-#else
-		  break;		/* yes, provides all versions */
-#endif
+		    continue;		/* unversioned provides can never match versioned deps */
+		  break;
 		}
 	      if (!ISRELDEP(pid))
 		continue;		/* wrong provides name */

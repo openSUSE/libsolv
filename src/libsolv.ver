@@ -40,6 +40,7 @@ SOLV_1.0 {
 		pool_addfileprovides;
 		pool_addfileprovides_queue;
 		pool_addrelproviders;
+		pool_addvendorclass;
 		pool_alloctmpspace;
 		pool_arch2color_slow;
 		pool_bin2hex;
@@ -306,6 +307,7 @@ SOLV_1.0 {
 		solver_solution_count;
 		solver_solutionelement2str;
 		solver_solutionelement_count;
+		solver_solutionelement_internalid;
 		solver_solve;
 		solver_take_solution;
 		solver_take_solutionelement;

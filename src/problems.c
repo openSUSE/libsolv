@@ -608,6 +608,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
       solv->solutions.elements[solstart] = (solv->solutions.count - (solstart + 1)) / 2;
       queue_push(&solv->solutions, 0);	/* add end marker */
       queue_push(&solv->solutions, 0);	/* add end marker */
+      queue_push(&solv->solutions, problem.elements[i]);	/* just for bookkeeping */
       solv->solutions.elements[solidx + 1 + nsol++] = solstart;
     }
   solv->solutions.elements[solidx + 1 + nsol] = 0;	/* end marker */
@@ -686,6 +687,14 @@ solver_solutionelement_count(Solver *solv, Id problem, Id solution)
   Id solidx = solv->problems.elements[problem * 2 - 1];
   solidx = solv->solutions.elements[solidx + solution];
   return solv->solutions.elements[solidx];
+}
+
+Id
+solver_solutionelement_internalid(Solver *solv, Id problem, Id solution)
+{
+  Id solidx = solv->problems.elements[problem * 2 - 1];
+  solidx = solv->solutions.elements[solidx + solution];
+  return solv->solutions.elements[solidx + 2 * solv->solutions.elements[solidx] + 3];
 }
 
 

@@ -82,17 +82,16 @@ struct _Pool {
   Id *languagecache;
   int languagecacheother;
 
-  /* flags to tell the library how the installed rpm works */
+  /* package manager type, deb/rpm */
+  int disttype;
+
+  /* flags to tell the library how the installed package manager works */
   int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */
   int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
   int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
   int obsoleteusescolors;	/* true: obsoletes check arch color */
   int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
   int allowselfconflicts;	/* true: packages which conflict with itself are installable */
-
-#ifdef MULTI_SEMANTICS
-  int disttype;
-#endif
 
   Id *id2arch;			/* map arch ids to scores */
   unsigned char *id2color;	/* map arch ids to colors */
@@ -116,6 +115,7 @@ struct _Pool {
      bitmap for solving.  If zero, consider all solvables.  */
   Map *considered;
 
+  /* callback for REL_NAMESPACE dependencies handled by the application  */
   Id (*nscallback)(struct _Pool *, void *data, Id name, Id evr);
   void *nscallbackdata;
 
@@ -135,10 +135,8 @@ struct _Pool {
   Datapos pos;
 };
 
-#ifdef MULTI_SEMANTICS
-# define DISTTYPE_RPM	0
-# define DISTTYPE_DEB	1
-#endif
+#define DISTTYPE_RPM	0
+#define DISTTYPE_DEB	1
 
 #define SOLV_FATAL			(1<<0)
 #define SOLV_ERROR			(1<<1)
