@@ -19,27 +19,35 @@ static ssize_t cookie_gzread(void *cookie, char *buf, size_t nbytes)
   return gzread((gzFile *)cookie, buf, nbytes);
 }
 
+static ssize_t cookie_gzwrite(void *cookie, const char *buf, size_t nbytes)
+{
+  return gzwrite((gzFile *)cookie, buf, nbytes);
+}
+
 static int
 cookie_gzclose(void *cookie)
 {
   return gzclose((gzFile *)cookie);
 }
 
-static FILE *mygzfopen(gzFile* gzf)
+static FILE *mygzfopen(gzFile* gzf, const char *mode)
 {
 #ifdef HAVE_FUNOPEN
   return funopen(
-      gzf, (int (*)(void *, char *, int))cookie_gzread,
-      (int (*)(void *, const char *, int))NULL, /* writefn */
+      gzf, (int (*)(void *, char *, int))(*mode == 'r' ? cookie_gzread : NULL), /* readfn */
+      (int (*)(void *, const char *, int))(*mode == 'w' ? cookie_gzwrite : NULL), /* writefn */
       (fpos_t (*)(void *, fpos_t, int))NULL, /* seekfn */
       cookie_gzclose
       );
 #elif defined(HAVE_FOPENCOOKIE)
   cookie_io_functions_t cio;
   memset(&cio, 0, sizeof(cio));
-  cio.read = cookie_gzread;
+  if (*mode == 'r')
+    cio.read = cookie_gzread;
+  else if (*mode == 'w')
+    cio.write = cookie_gzwrite;
   cio.close = cookie_gzclose;
-  return  fopencookie(gzf, "r", cio);
+  return  fopencookie(gzf, *mode == 'w' ? "w" : "r", cio);
 #else
 # error Need to implement custom I/O
 #endif
@@ -61,7 +69,7 @@ solv_xfopen(const char *fn, const char *mode)
   gzf = gzopen(fn, mode);
   if (!gzf)
     return 0;
-  return mygzfopen(gzf);
+  return mygzfopen(gzf, mode);
 }
 
 FILE *
@@ -94,6 +102,6 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
   gzf = gzdopen(fd, mode);
   if (!gzf)
     return 0;
-  return mygzfopen(gzf);
+  return mygzfopen(gzf, mode);
 }
 
