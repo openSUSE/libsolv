@@ -25,6 +25,12 @@
 #include "testcase.h"
 #include "solv_xfopen.h"
 
+#ifndef ENABLE_SUSEREPO
+# define DISABLE_JOIN2
+# include "tools_util.h"
+#else
+# include "repo_susetags.h"
+#endif
 
 static struct job2str {
   Id job;
@@ -57,6 +63,18 @@ static struct jobflags2str {
   { SOLVER_SETVENDOR, "setvendor" },
   { SOLVER_SETREPO,   "setrepo" },
   { SOLVER_NOAUTOSET, "noautoset" },
+  { 0, 0 }
+};
+
+static struct resultflags2str {
+  Id flag;
+  const char *str;
+} resultflags2str[] = {
+  { TESTCASE_RESULT_TRANSACTION,	"transaction" },
+  { TESTCASE_RESULT_PROBLEMS,		"problems" },
+  { TESTCASE_RESULT_ORPHANED,		"orphaned" },
+  { TESTCASE_RESULT_RECOMMENDED,	"recommended" },
+  { TESTCASE_RESULT_UNNEEDED,		"unneeded" },
   { 0, 0 }
 };
 
@@ -209,7 +227,7 @@ pool_isknownarch(Pool *pool, Id id)
     return 0;
   if (id == ARCH_SRC || id == ARCH_NOSRC || id == ARCH_NOARCH)
     return 1;
-  if (pool->id2arch && (id > pool->lastarch || !pool->id2arch[id]))
+  if (!pool->id2arch || (id > pool->lastarch || !pool->id2arch[id]))
     return 0;
   return 1;
 }
@@ -233,8 +251,16 @@ testcase_str2dep(Pool *pool, char *s)
     s++;
   n = s;
   while (*s && *s != ' ' && *s != '\t' && *s != '<' && *s != '=' && *s != '>')
-    s++;
-  if ((a = strchr(n, '.')) != 0 && a + 1 < s)
+    {
+      if (*s == '(')
+	{
+	  while (*s && *s != ')')
+	    s++;
+	}
+      else
+        s++;
+    }
+  if ((a = strchr(n, '.')) != 0 && a + 1 < s && s[-1] != ')')
     {
       Id archid = pool_strn2id(pool, a + 1, s - (a + 1), 0);
       if (pool_isknownarch(pool, archid))
@@ -791,11 +817,6 @@ testcase_write_susetags(Repo *repo, FILE *fp)
   const char *evr;
   const char *arch;
   const char *release;
-#if 0
-  const char *chksum;
-  Id chksumtype, type;
-  unsigned int medianr;
-#endif
   const char *tmp;
   unsigned int ti;
 
@@ -808,15 +829,10 @@ testcase_write_susetags(Repo *repo, FILE *fp)
       release = strrchr(evr, '-');
       if (!release)
 	release = evr + strlen(evr);
-      fprintf(fp, "=Pkg: %s %.*s %s %s\n", name, release - evr, evr, *release && release[1] ? release + 1 : "0", arch);
+      fprintf(fp, "=Pkg: %s %.*s %s %s\n", name, release - evr, evr, *release && release[1] ? release + 1 : "-", arch);
       tmp = solvable_lookup_str(s, SOLVABLE_SUMMARY);
       if (tmp)
         fprintf(fp, "=Sum: %s\n", tmp);
-#if 0
-      chksum = solvable_lookup_checksum(s, SOLVABLE_CHECKSUM, &chksumtype);
-      if (chksum)
-	fprintf(fp, "=Cks: %s %s\n", solv_chksum_type2str(chksumtype), chksum);
-#endif
       writedeps(repo, fp, "Req:", SOLVABLE_REQUIRES, s, s->requires);
       writedeps(repo, fp, "Prv:", SOLVABLE_PROVIDES, s, s->provides);
       writedeps(repo, fp, "Obs:", SOLVABLE_OBSOLETES, s, s->obsoletes);
@@ -825,53 +841,190 @@ testcase_write_susetags(Repo *repo, FILE *fp)
       writedeps(repo, fp, "Sup:", SOLVABLE_SUPPLEMENTS, s, s->supplements);
       writedeps(repo, fp, "Sug:", SOLVABLE_SUGGESTS, s, s->suggests);
       writedeps(repo, fp, "Enh:", SOLVABLE_ENHANCES, s, s->enhances);
-#if 0
-      tmp = solvable_lookup_str(s, SOLVABLE_GROUP);
-      if (tmp)
-	fprintf(fp, "=Grp: %s\n", tmp);
-      tmp = solvable_lookup_str(s, SOLVABLE_LICENSE);
-      if (tmp)
-	fprintf(fp, "=Lic: %s\n", tmp);
-#endif
       if (s->vendor)
 	fprintf(fp, "=Vnd: %s\n", pool_id2str(pool, s->vendor));
-#if 0
-      type = solvable_lookup_type(s, SOLVABLE_SOURCENAME);
-      if (type)
-	{
-	  if (type != REPOKEY_TYPE_VOID)
-	    name = solvable_lookup_str(s, SOLVABLE_SOURCENAME);
-	  type = solvable_lookup_type(s, SOLVABLE_SOURCEEVR);
-	  if (type)
-	    {
-	      if (type != REPOKEY_TYPE_VOID)
-		evr = solvable_lookup_str(s, SOLVABLE_SOURCEEVR);
-	      release = strrchr(evr, '-');
-	      if (!release)
-		release = evr + strlen(evr);
-	      fprintf(fp, "=Src: %s %.*s %s %s\n", name, release - evr, evr, *release && release[1] ? release + 1 : "0", solvable_lookup_str(s, SOLVABLE_SOURCEARCH));
-	    }
-	}
-#endif
       ti = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
       if (ti)
 	fprintf(fp, "=Tim: %u\n", ti);
-#if 0
-      tmp = solvable_get_location(s, &medianr);
-      if (tmp)
-	{
-	  const char *base = strrchr(tmp, '/');
-	  if (!base)
-            fprintf(fp, "=Loc: %d %s\n", medianr, tmp);
-	  else if (strlen(arch) == base - tmp && !strncmp(tmp, arch, base - tmp))
-            fprintf(fp, "=Loc: %d %s\n", medianr, base + 1);
-	  else
-            fprintf(fp, "=Loc: %d %s %.*s\n", medianr, base + 1, base - tmp, tmp);
-	}
-#endif
     }
   return 0;
 }
+
+#ifndef ENABLE_SUSEREPO
+
+static inline Offset
+adddep(Repo *repo, Offset olddeps, char *str, Id marker)
+{
+  Id id = *str == '/' ? pool_str2id(repo->pool, str, 1) : testcase_str2dep(repo->pool, str);
+  return repo_addid_dep(repo, olddeps, id, marker);
+}
+
+static void
+finish_solvable(Pool *pool, Repodata *data, Solvable *s)
+{
+  /* move file provides to filelist */
+  if (s->provides)
+    {
+      Id *p, *lastreal, did;
+      lastreal = s->repo->idarraydata + s->provides;
+      for (p = lastreal; *p; p++)
+        if (ISRELDEP(*p))
+	  lastreal = p + 1;
+      for (p = lastreal; *p; p++)
+	if ((pool_id2str(pool, *p))[0] != '/')
+	  lastreal = p + 1;
+      for (p = lastreal; *p; p++)
+	{
+	  char *str = pool_tmpjoin(pool, pool_id2str(pool, *p), 0, 0);
+	  char *sp = strrchr(str, '/');
+	  *sp++ = 0;
+	  did = repodata_str2dir(data, str, 1);
+	  if (!did)
+	    did = repodata_str2dir(data, "/", 1);
+	  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, did, sp);
+	  *p = 0;
+	}
+    }
+  if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+    s->provides = repo_addid_dep(s->repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  s->supplements = repo_fix_supplements(s->repo, s->provides, s->supplements, 0);
+  s->conflicts = repo_fix_conflicts(s->repo, s->conflicts);
+}
+
+/* stripped down version of susetags parser used for testcases */
+int
+testcase_add_susetags(Repo *repo, FILE *fp, int flags)
+{
+  Pool *pool = repo->pool;
+  char *line, *linep;
+  int aline;
+  int tag;
+  Repodata *data;
+  Solvable *s;
+  char *sp[5];
+  unsigned int t;
+  int intag;
+
+  data = repo_add_repodata(repo, flags);
+  s = 0;
+  intag = 0;
+
+  aline = 1024;
+  line = solv_malloc(aline);
+  linep = line;
+  for (;;)
+    {
+      if (linep - line + 16 > aline)
+	{
+	  aline = linep - line;
+	  line = solv_realloc(line, aline + 512);
+	  linep = line + aline;
+	  aline += 512;
+	}
+      if (!fgets(linep, aline - (linep - line), fp))
+	break;
+      linep += strlen(linep);
+      if (linep == line || linep[-1] != '\n')
+	continue;
+      *--linep = 0;
+      linep = line + intag;
+      if (intag)
+	{
+	  if (line[intag] == '-' && !strncmp(line + 1, line + intag + 1, intag - 2))
+	    {
+	      intag = 0;
+	      linep = line;
+	      continue;
+	    }
+	}
+      else if (line[0] == '+' && line[1] && line[1] != ':')
+	{
+	  char *tagend = strchr(line, ':');
+	  if (!tagend)
+	    continue;
+	  line[0] = '=';
+	  tagend[1] = ' ';
+	  intag = tagend + 2 - line;
+	  linep = line + intag;
+	  continue;
+	}
+      if (*line != '=' || !line[1] || !line[2] || !line[3] || line[4] != ':')
+	continue;
+      tag = line[1] << 16 | line[2] << 8 | line[3];
+      switch(tag)
+        {
+	case 'P' << 16 | 'k' << 8 | 'g':
+	  if (s)
+	    finish_solvable(pool, data, s);
+	  if (split(line + 5, sp, 5) != 4)
+	    break;
+	  s = pool_id2solvable(pool, repo_add_solvable(repo));
+	  s->name = pool_str2id(pool, sp[0], 1);
+	  /* join back version and release */
+	  if (sp[2] && !(sp[2][0] == '-' && !sp[2][1]))
+	    sp[2][-1] = '-';
+	  s->evr = makeevr(pool, sp[1]);
+	  s->arch = pool_str2id(pool, sp[3], 1);
+	  break;
+	case 'S' << 16 | 'u' << 8 | 'm':
+	  repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, line + 6);
+	  break;
+	case 'V' << 16 | 'n' << 8 | 'd':
+	  s->vendor = pool_str2id(pool, line + 6, 1);
+	  break;
+	case 'T' << 16 | 'i' << 8 | 'm':
+	  t = atoi(line + 6);
+	  if (t)
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_BUILDTIME, t);
+	  break;
+	case 'R' << 16 | 'e' << 8 | 'q':
+	  s->requires = adddep(repo, s->requires, line + 6, -SOLVABLE_PREREQMARKER);
+	  break;
+	case 'P' << 16 | 'r' << 8 | 'q':
+	  s->requires = adddep(repo, s->requires, line + 6, SOLVABLE_PREREQMARKER);
+	  break;
+	case 'P' << 16 | 'r' << 8 | 'v':
+	  s->provides = adddep(repo, s->provides, line + 6, 0);
+	  break;
+	case 'O' << 16 | 'b' << 8 | 's':
+	  s->obsoletes = adddep(repo, s->obsoletes, line + 6, 0);
+	  break;
+	case 'C' << 16 | 'o' << 8 | 'n':
+	  s->conflicts = adddep(repo, s->conflicts, line + 6, 0);
+	  break;
+	case 'R' << 16 | 'e' << 8 | 'c':
+	  s->recommends = adddep(repo, s->recommends, line + 6, 0);
+	  break;
+	case 'S' << 16 | 'u' << 8 | 'p':
+	  s->supplements = adddep(repo, s->supplements, line + 6, 0);
+	  break;
+	case 'S' << 16 | 'u' << 8 | 'g':
+	  s->suggests = adddep(repo, s->suggests, line + 6, 0);
+	  break;
+	case 'E' << 16 | 'n' << 8 | 'h':
+	  s->enhances = adddep(repo, s->enhances, line + 6, 0);
+	  break;
+        default:
+	  break;
+        }
+    }
+  if (s)
+    finish_solvable(pool, data, s);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+  solv_free(line);
+  return 0;
+}
+
+#else
+
+int
+testcase_add_susetags(Repo *repo, FILE *fp, int flags)
+{
+  return repo_add_susetags(repo, fp, 0, 0, flags);
+}
+
+#endif
 
 const char *
 testcase_getsolverflags(Solver *solv)
@@ -1038,77 +1191,120 @@ static struct class2str {
 };
 
 char *
-testcase_solverresult(Solver *solv)
+testcase_solverresult(Solver *solv, int resultflags)
 {
   Pool *pool = solv->pool;
-  Transaction *trans;
-  Queue q;
   int i, j;
   Id p, op;
   const char *s;
-  char *probprefix, *solprefix, *result;
-  int problem, solution, element;
-  int pcnt, scnt;
+  char *result;
   Strqueue sq;
 
   strqueue_init(&sq);
-  trans = solver_create_transaction(solv);
-  queue_init(&q);
-  for (i = 0; class2str[i].str; i++)
+  if ((resultflags & TESTCASE_RESULT_TRANSACTION) != 0)
     {
-      queue_empty(&q);
-      transaction_classify_pkgs(trans, 0, class2str[i].class, 0, 0, &q);
-      for (j = 0; j < q.count; j++)
+      Transaction *trans = solver_create_transaction(solv);
+      Queue q;
+
+      queue_init(&q);
+      for (i = 0; class2str[i].str; i++)
 	{
-	  p = q.elements[j];
-          op = 0;
-	  if (pool->installed && pool->solvables[p].repo == pool->installed)
-	    op = transaction_obs_pkg(trans, p);
-	  s = pool_tmpjoin(pool, class2str[i].str, " ", testcase_solvid2str(pool, p));
-	  if (op)
-	    s = pool_tmpjoin(pool, s, " ", testcase_solvid2str(pool, op));
-	  strqueue_push(&sq, s);
-	}
-    }
-  queue_free(&q);
-  transaction_free(trans);
-  pcnt = solver_problem_count(solv);
-  for (problem = 1; problem <= pcnt; problem++)
-    {
-      Id rid, from, to, dep;
-      SolverRuleinfo rinfo;
-      rid = solver_findproblemrule(solv, problem);
-      s = testcase_problemid(solv, problem);
-      probprefix = solv_dupjoin("problem ", s, 0);
-      rinfo = solver_ruleinfo(solv, rid, &from, &to, &dep);
-      s = pool_tmpjoin(pool, probprefix, " info ", solver_problemruleinfo2str(solv, rinfo, from, to, dep));
-      strqueue_push(&sq, s);
-      scnt = solver_solution_count(solv, problem);
-      for (solution = 1; solution <= scnt; solution++)
-	{
-	  s = testcase_solutionid(solv, problem, solution);
-	  solprefix = solv_dupjoin(probprefix, " solution ", s);
-	  element = 0;
-	  while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &op)) != 0)
+	  queue_empty(&q);
+	  transaction_classify_pkgs(trans, 0, class2str[i].class, 0, 0, &q);
+	  for (j = 0; j < q.count; j++)
 	    {
-	      if (p == SOLVER_SOLUTION_JOB)
-		s = pool_tmpjoin(pool, solprefix, " deljob ", testcase_job2str(pool, solv->job.elements[op - 1], solv->job.elements[op]));
-	      else if (p > 0 && op == 0)
-	        s = pool_tmpjoin(pool, solprefix, " erase ", testcase_solvid2str(pool, p));
-	      else if (p > 0 && op > 0)
-		{
-	          s = pool_tmpjoin(pool, solprefix, " replace ", testcase_solvid2str(pool, p));
-	          s = pool_tmpappend(pool, s, " ", testcase_solvid2str(pool, op));
-		}
-	      else if (p < 0 && op > 0)
-	        s = pool_tmpjoin(pool, solprefix, " allow ", testcase_solvid2str(pool, op));
-	      else
-	        s = pool_tmpjoin(pool, solprefix, " unknown", 0);
+	      p = q.elements[j];
+	      op = 0;
+	      if (pool->installed && pool->solvables[p].repo == pool->installed)
+		op = transaction_obs_pkg(trans, p);
+	      s = pool_tmpjoin(pool, class2str[i].str, " ", testcase_solvid2str(pool, p));
+	      if (op)
+		s = pool_tmpjoin(pool, s, " ", testcase_solvid2str(pool, op));
 	      strqueue_push(&sq, s);
 	    }
-	  solv_free(solprefix);
 	}
-      solv_free(probprefix);
+      queue_free(&q);
+      transaction_free(trans);
+    }
+  if ((resultflags & TESTCASE_RESULT_PROBLEMS) != 0)
+    {
+      char *probprefix, *solprefix;
+      int problem, solution, element;
+      int pcnt, scnt;
+
+      pcnt = solver_problem_count(solv);
+      for (problem = 1; problem <= pcnt; problem++)
+	{
+	  Id rid, from, to, dep;
+	  SolverRuleinfo rinfo;
+	  rid = solver_findproblemrule(solv, problem);
+	  s = testcase_problemid(solv, problem);
+	  probprefix = solv_dupjoin("problem ", s, 0);
+	  rinfo = solver_ruleinfo(solv, rid, &from, &to, &dep);
+	  s = pool_tmpjoin(pool, probprefix, " info ", solver_problemruleinfo2str(solv, rinfo, from, to, dep));
+	  strqueue_push(&sq, s);
+	  scnt = solver_solution_count(solv, problem);
+	  for (solution = 1; solution <= scnt; solution++)
+	    {
+	      s = testcase_solutionid(solv, problem, solution);
+	      solprefix = solv_dupjoin(probprefix, " solution ", s);
+	      element = 0;
+	      while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &op)) != 0)
+		{
+		  if (p == SOLVER_SOLUTION_JOB)
+		    s = pool_tmpjoin(pool, solprefix, " deljob ", testcase_job2str(pool, solv->job.elements[op - 1], solv->job.elements[op]));
+		  else if (p > 0 && op == 0)
+		    s = pool_tmpjoin(pool, solprefix, " erase ", testcase_solvid2str(pool, p));
+		  else if (p > 0 && op > 0)
+		    {
+		      s = pool_tmpjoin(pool, solprefix, " replace ", testcase_solvid2str(pool, p));
+		      s = pool_tmpappend(pool, s, " ", testcase_solvid2str(pool, op));
+		    }
+		  else if (p < 0 && op > 0)
+		    s = pool_tmpjoin(pool, solprefix, " allow ", testcase_solvid2str(pool, op));
+		  else
+		    s = pool_tmpjoin(pool, solprefix, " unknown", 0);
+		  strqueue_push(&sq, s);
+		}
+	      solv_free(solprefix);
+	    }
+	  solv_free(probprefix);
+	}
+    }
+
+  if ((resultflags & TESTCASE_RESULT_ORPHANED) != 0)
+    {
+      Queue q;
+
+      queue_init(&q);
+      solver_get_orphaned(solv, &q);
+      for (i = 0; i < q.count; i++)
+	{
+	  s = pool_tmpjoin(pool, "orphaned ", testcase_solvid2str(pool, q.elements[i]), 0);
+	  strqueue_push(&sq, s);
+	}
+      queue_free(&q);
+    }
+
+  if ((resultflags & TESTCASE_RESULT_RECOMMENDED) != 0)
+    {
+      Queue qr, qs;
+
+      queue_init(&qr);
+      queue_init(&qs);
+      solver_get_recommendations(solv, &qr, &qs, 0);
+      for (i = 0; i < qr.count; i++)
+	{
+	  s = pool_tmpjoin(pool, "recommended ", testcase_solvid2str(pool, qr.elements[i]), 0);
+	  strqueue_push(&sq, s);
+	}
+      for (i = 0; i < qs.count; i++)
+	{
+	  s = pool_tmpjoin(pool, "suggested ", testcase_solvid2str(pool, qs.elements[i]), 0);
+	  strqueue_push(&sq, s);
+	}
+      queue_free(&qr);
+      queue_free(&qs);
     }
 
   strqueue_sort(&sq);
@@ -1119,7 +1315,7 @@ testcase_solverresult(Solver *solv)
 
 
 int
-testcase_write(Solver *solv, char *dir, int withresult)
+testcase_write(Solver *solv, char *dir, int resultflags)
 {
   Pool *pool = solv->pool;
   Repo *repo;
@@ -1233,7 +1429,7 @@ testcase_write(Solver *solv, char *dir, int withresult)
       strqueue_push(&sq, cmd);
     }
 
-  if (withresult)
+  if (resultflags)
     {
       char *result;
       out = pool_tmpjoin(pool, dir, "/", "solver.result");
@@ -1243,7 +1439,7 @@ testcase_write(Solver *solv, char *dir, int withresult)
 	  strqueue_free(&sq);
 	  return 0;
 	}
-      result = testcase_solverresult(solv);
+      result = testcase_solverresult(solv, resultflags);
       if (fwrite(result, strlen(result), 1, fp) != 1)
 	{
 	  pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
@@ -1258,7 +1454,11 @@ testcase_write(Solver *solv, char *dir, int withresult)
 	  strqueue_free(&sq);
 	  return 0;
 	}
-      cmd = pool_tmpjoin(pool, "result ", "solver.result", 0);
+      cmd = 0;
+      for (i = 0; resultflags2str[i].str; i++)
+	if ((resultflags & resultflags2str[i].flag) != 0)
+	  cmd = pool_tmpappend(pool, cmd, cmd ? "," : 0, resultflags2str[i].str);
+      cmd = pool_tmpjoin(pool, "result ", cmd ? cmd : "?", " solver.result");
       strqueue_push(&sq, cmd);
     }
 
@@ -1288,7 +1488,7 @@ testcase_write(Solver *solv, char *dir, int withresult)
 }
 
 Solver *
-testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp)
+testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, int *resultflagsp)
 {
   Solver *solv;
   char *buf, *bufp;
@@ -1377,7 +1577,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp)
 	    }
 	  else if (!strcmp(pieces[3], "susetags"))
 	    {
-	      repo_add_susetags(repo, rfp, 0, 0, 0);
+	      testcase_add_susetags(repo, rfp, 0);
 	      fclose(rfp);
 	    }
 	  else
@@ -1469,7 +1669,26 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp)
 	{
 	  FILE *rfp;
 	  const char *rdata;
-	  rdata = pool_tmpjoin(pool, testcasedir, pieces[1], 0);
+	  int resultflags = 0;
+          char *s = pieces[1];
+	  int i;
+	  while (s)
+	    {
+	      char *se = strchr(s, ',');
+	      if (se)
+		*se++ = 0;
+	      for (i = 0; resultflags2str[i].str; i++)
+		if (!strcmp(s, resultflags2str[i].str))
+		  {
+		    resultflags |= resultflags2str[i].flag;
+		    break;
+		  }
+	      if (!resultflags2str[i].str)
+	        pool_debug(pool, SOLV_ERROR, "result: unknown flag '%s'\n", s);
+	      s = se;
+	    }
+
+	  rdata = pool_tmpjoin(pool, testcasedir, pieces[2], 0);
 	  if (!strcmp(pieces[1], "<inline>"))
 	    rfp = fp;
 	  else
@@ -1542,6 +1761,8 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp)
 		*resultp = result;
 	      else
 		solv_free(result);
+	      if (resultflagsp)
+		*resultflagsp = resultflags;
 	    }
 	}
       else
