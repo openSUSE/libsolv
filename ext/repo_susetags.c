@@ -540,6 +540,14 @@ lookup_shared_id(Repodata *data, Id p, Id keyname, Id voidid, int uninternalized
   return 0;
 }
 
+static inline Id
+toevr(Pool *pool, struct parsedata *pd, const char *version, const char *release)
+{
+  return makeevr(pool, !release || (release[0] == '-' && !release[1]) ?
+	version : join2(&pd->jd, version, "-", release));
+}
+
+
 /*
  * parse susetags
  *
@@ -579,7 +587,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
-  line = malloc(1024);
+  line = solv_malloc(1024);
   aline = 1024;
 
   pd.pool = pool;
@@ -644,7 +652,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
       if (linep - line + 16 > aline)              /* (re-)alloc buffer */
 	{
 	  aline = linep - line;
-	  line = realloc(line, aline + 512);
+	  line = solv_realloc(line, aline + 512);
 	  linep = line + aline;
 	  aline += 512;
 	}
@@ -762,7 +770,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	        if (split(line + 5, sp, 5) != 5)
 		  continue;
 		repodata_set_id(data, handle, DELTA_SEQ_NAME, pool_str2id(pool, sp[0], 1));
-		evr = makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2]));
+		evr = toevr(pool, &pd, sp[1], sp[2]);
 		repodata_set_id(data, handle, DELTA_SEQ_EVR, evr);
 		/* repodata_set_id(data, handle, DELTA_SEQ_ARCH, pool_str2id(pool, sp[3], 1)); */
 		repodata_set_str(data, handle, DELTA_SEQ_NUM, sp[4]);
@@ -818,7 +826,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    }
 	  handle = repodata_new_handle(data);
 	  repodata_set_id(data, handle, DELTA_PACKAGE_NAME, pool_str2id(pool, sp[0], 1));
-	  repodata_set_id(data, handle, DELTA_PACKAGE_EVR, makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2])));
+	  repodata_set_id(data, handle, DELTA_PACKAGE_EVR, toevr(pool, &pd, sp[1], sp[2]));
 	  repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, pool_str2id(pool, sp[3], 1));
 	  repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DELTAINFO, handle);
 	  indelta = 1;
@@ -862,7 +870,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		name = pool_str2id(pool, join2(&pd.jd, pd.kind, ":", sp[0]), 0);
 	      else
 		name = pool_str2id(pool, sp[0], 0);
-	      evr = makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2]));
+	      evr = toevr(pool, &pd, sp[1], sp[2]);
 	      arch = pool_str2id(pool, sp[3], 0);
 	      if (name && arch)
 		{
@@ -887,7 +895,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		s->name = pool_str2id(pool, join2(&pd.jd, pd.kind, ":", sp[0]), 1);
 	      else
 		s->name = pool_str2id(pool, sp[0], 1);
-	      s->evr = makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2]));
+	      s->evr = toevr(pool, &pd, sp[1], sp[2]);
 	      s->arch = pool_str2id(pool, sp[3], 1);
 	      s->vendor = defvendor;
 	      createdpkgs = 1;
@@ -1054,7 +1062,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		  exit(1);
 		}
 	      name = pool_str2id(pool, sp[0], 1);
-	      evr = makeevr(pool, join2(&pd.jd, sp[1], "-", sp[2]));
+	      evr = toevr(pool, &pd, sp[1], sp[2]);
 	      arch = pool_str2id(pool, sp[3], 1);
 	      if (last_found_pack >= pd.nshare)
 		{
@@ -1220,7 +1228,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
     repodata_internalize(data);
 
   solv_free(pd.language);
-  free(line);
+  solv_free(line);
   join_freemem(&pd.jd);
   return 0;
 }
