@@ -88,6 +88,7 @@ pool_free(Pool *pool)
   pool_freeidhashes(pool);
   pool_freeallrepos(pool, 1);
   solv_free(pool->id2arch);
+  solv_free(pool->id2color);
   solv_free(pool->solvables);
   stringpool_free(&pool->ss);
   solv_free(pool->rels);

@@ -1123,7 +1123,7 @@ enum {
   di_entersolvablekey
 };
 
-/* see repo.h for documentation */
+/* see dataiterator.h for documentation */
 int
 dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, const char *match, int flags)
 {

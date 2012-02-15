@@ -1451,8 +1451,8 @@ for (i = 1; i < target.nkeys; i++)
 	  target.keys[n] = target.keys[i];
 	  if (keyarrayp)
 	    {
-	      *keyarrayp[2 * n - 2] = *keyarrayp[2 * i - 2];
-	      *keyarrayp[2 * n - 1] = *keyarrayp[2 * i - 1];
+	      (*keyarrayp)[2 * n - 2] = (*keyarrayp)[2 * i - 2];
+	      (*keyarrayp)[2 * n - 1] = (*keyarrayp)[2 * i - 1];
 	    }
 	}
       n++;
@@ -1461,8 +1461,8 @@ for (i = 1; i < target.nkeys; i++)
   if (keyarrayp)
     {
       /* terminate array */
-      *keyarrayp[2 * n - 2] = 0;
-      *keyarrayp[2 * n - 1] = 0;
+      (*keyarrayp)[2 * n - 2] = 0;
+      (*keyarrayp)[2 * n - 1] = 0;
     }
 
   /* update schema data to the new key ids */
