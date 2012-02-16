@@ -263,7 +263,7 @@ endElement(void *userData, const char *name)
 
     case STATE_ID:
     case STATE_CID:
-      s->name = pool_str2id(pd->pool, join2(&pd->jd, "pattern", ":", pd->content), 1);
+      s->name = pool_str2id(pd->pool, join2(&pd->jd, pd->state == STATE_ID ? "group" : "category", ":", pd->content), 1);
       break;
 
     case STATE_NAME:
@@ -284,7 +284,7 @@ endElement(void *userData, const char *name)
       break;
 
     case STATE_GROUPID:
-      id = pool_str2id(pd->pool, join2(&pd->jd, "pattern", ":", pd->content), 1);
+      id = pool_str2id(pd->pool, join2(&pd->jd, "group", ":", pd->content), 1);
       s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
       break;
 
