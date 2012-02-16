@@ -707,7 +707,7 @@ writedeps(Repo *repo, FILE *fp, const char *tag, Id key, Solvable *s, Offset off
 	}
       if (key == SOLVABLE_PROVIDES && id == SOLVABLE_FILEMARKER)
 	{
-	  prvdp = dp + 1;
+	  prvdp = dp;
 	  continue;
 	}
       idstr = pool_dep2str(pool, id);
@@ -860,29 +860,23 @@ adddep(Repo *repo, Offset olddeps, char *str, Id marker)
 }
 
 static void
-finish_solvable(Pool *pool, Repodata *data, Solvable *s)
+finish_solvable(Pool *pool, Repodata *data, Solvable *s, char *filelist, int nfilelist)
 {
-  /* move file provides to filelist */
-  if (s->provides)
+  if (nfilelist)
     {
-      Id *p, *lastreal, did;
-      lastreal = s->repo->idarraydata + s->provides;
-      for (p = lastreal; *p; p++)
-        if (ISRELDEP(*p))
-	  lastreal = p + 1;
-      for (p = lastreal; *p; p++)
-	if ((pool_id2str(pool, *p))[0] != '/')
-	  lastreal = p + 1;
-      for (p = lastreal; *p; p++)
+      int l;
+      Id did; 
+      for (l = 0; l < nfilelist; l += strlen(filelist + l) + 1) 
 	{
-	  char *str = pool_tmpjoin(pool, pool_id2str(pool, *p), 0, 0);
-	  char *sp = strrchr(str, '/');
-	  *sp++ = 0;
-	  did = repodata_str2dir(data, str, 1);
+	  char *p = strrchr(filelist + l, '/');
+	  if (!p) 
+	    continue;
+	  *p++ = 0; 
+	  did = repodata_str2dir(data, filelist + l, 1);
+	  p[-1] = '/'; 
 	  if (!did)
 	    did = repodata_str2dir(data, "/", 1);
-	  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, did, sp);
-	  *p = 0;
+	  repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, p);
 	}
     }
   if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
@@ -904,6 +898,9 @@ testcase_add_susetags(Repo *repo, FILE *fp, int flags)
   char *sp[5];
   unsigned int t;
   int intag;
+  char *filelist = 0;
+  int afilelist = 0;
+  int nfilelist = 0;
 
   data = repo_add_repodata(repo, flags);
   s = 0;
@@ -955,7 +952,8 @@ testcase_add_susetags(Repo *repo, FILE *fp, int flags)
         {
 	case 'P' << 16 | 'k' << 8 | 'g':
 	  if (s)
-	    finish_solvable(pool, data, s);
+	    finish_solvable(pool, data, s, filelist, nfilelist);
+	  nfilelist = 0;
 	  if (split(line + 5, sp, 5) != 4)
 	    break;
 	  s = pool_id2solvable(pool, repo_add_solvable(repo));
@@ -984,6 +982,25 @@ testcase_add_susetags(Repo *repo, FILE *fp, int flags)
 	  s->requires = adddep(repo, s->requires, line + 6, SOLVABLE_PREREQMARKER);
 	  break;
 	case 'P' << 16 | 'r' << 8 | 'v':
+	  if (line[6] == '/')
+	    {
+	      int l = strlen(line + 6) + 1;
+	      if (nfilelist + l > afilelist)
+		{
+		  afilelist = nfilelist + l + 512;
+		  filelist = solv_realloc(filelist, afilelist);
+		}
+	      memcpy(filelist + nfilelist, line + 6, l);
+	      nfilelist += l;
+	      break;
+	    }
+	  if (nfilelist)
+	    {
+	      int l;
+	      for (l = 0; l < nfilelist; l += strlen(filelist + l) + 1)
+                s->provides = repo_addid_dep(repo, s->provides, pool_str2id(pool, filelist + l, 1), 0);
+              nfilelist = 0;
+	    }
 	  s->provides = adddep(repo, s->provides, line + 6, 0);
 	  break;
 	case 'O' << 16 | 'b' << 8 | 's':
@@ -1009,10 +1026,11 @@ testcase_add_susetags(Repo *repo, FILE *fp, int flags)
         }
     }
   if (s)
-    finish_solvable(pool, data, s);
+    finish_solvable(pool, data, s, filelist, nfilelist);
+  solv_free(line);
+  solv_free(filelist);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-  solv_free(line);
   return 0;
 }
 

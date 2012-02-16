@@ -40,6 +40,9 @@ struct parsedata {
   char *language;			/* the default language */
   Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
   int lineno;
+  char *filelist;
+  int afilelist;			/* allocated */
+  int nfilelist;			/* used */
 };
 
 static char *flagtab[] = {
@@ -396,65 +399,24 @@ finish_solvable(struct parsedata *pd, Solvable *s, Id handle, Offset freshens)
 {
   Pool *pool = pd->repo->pool;
 
-#if 1
-  /* move file provides to filelist */
-  /* relies on the fact that rpm inserts self-provides at the end */
-  if (s->provides && (pd->flags & REPO_EXTEND_SOLVABLES) == 0)
+  if (pd->nfilelist)
     {
-      Id *p, *lastreal, did;
-      const char *str, *sp;
-      lastreal = pd->repo->idarraydata + s->provides;
-      for (p = lastreal; *p; p++)
-	if (ISRELDEP(*p))
-	  lastreal = p + 1;
-      for (p = lastreal; *p; p++)
-	{
-	  str = pool_id2str(pool, *p);
-	  if (*str != '/')
-	    lastreal = p + 1;
+      int l;
+      Id did;
+      for (l = 0; l < pd->nfilelist; l += strlen(pd->filelist + l) + 1)
+        {
+	  char *p = strrchr(pd->filelist + l, '/');
+	  if (!p)
+	    continue;
+	  *p++ = 0;
+	  did = repodata_str2dir(pd->data, pd->filelist + l, 1);
+	  p[-1] = '/';
+	  if (!did)
+	    did = repodata_str2dir(pd->data, "/", 1);
+	  repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, did, p);
 	}
-      if (*lastreal)
-	{
-	  for (p = lastreal; *p; p++)
-	    {
-	      char fname_buf[128];
-	      const char *fname;
-	      str = pool_id2str(pool, *p);
-	      sp = strrchr(str, '/');
-	      /* Need to copy filename now, before we add string that could
-	         realloc the stringspace (and hence invalidate str).  */
-	      fname = sp + 1;
-	      if (strlen(fname) >= 128)
-		fname = solv_strdup(fname);
-	      else
-		{
-		  memcpy(fname_buf, fname, strlen(fname) + 1);
-		  fname = fname_buf;
-		}
-	      if (sp - str >= 128)
-		{
-		  char *sdup = solv_strdup(str);
-		  sdup[sp - str] = 0;
-		  did = repodata_str2dir(pd->data, sdup, 1);
-		  free(sdup);
-		}
-	      else
-		{
-		  char sdup[128];
-		  strncpy(sdup, str, sp - str);
-		  sdup[sp - str] = 0;
-		  did = repodata_str2dir(pd->data, sdup, 1);
-		}
-	      if (!did)
-		did = repodata_str2dir(pd->data, "/", 1);
-	      repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, did, fname);
-	      if (fname != fname_buf)
-		free((char*)fname);
-	      *p = 0;
-	    }
-	}
+      pd->nfilelist = 0;
     }
-#endif
   /* A self provide, except for source packages.  This is harmless
      to do twice (in case we see the same package twice).  */
   if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
@@ -918,6 +880,26 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
       switch (tag)
         {
 	  case CTAG('=', 'P', 'r', 'v'):                                        /* provides */
+	    if (line[6] == '/')
+	      {
+		/* probably a filelist entry. stash it away for now */
+		int l = strlen(line + 6) + 1;
+		if (pd.nfilelist + l > pd.afilelist)
+		  {
+		    pd.afilelist = pd.nfilelist + l + 512;
+		    pd.filelist = solv_realloc(pd.filelist, pd.afilelist);
+		  }
+		memcpy(pd.filelist + pd.nfilelist, line + 6, l);
+		pd.nfilelist += l;
+		break;
+	      }
+	    if (pd.nfilelist)
+	      {
+		int l;
+		for (l = 0; l < pd.nfilelist; l += strlen(pd.filelist + l) + 1)
+		  s->provides = repo_addid_dep(pd.repo, s->provides, pool_str2id(pool, pd.filelist + l, 1), 0);
+		pd.nfilelist = 0;
+	      }
 	    s->provides = adddep(pool, &pd, s->provides, line, 0, pd.kind);
 	    continue;
 	  case CTAG('=', 'R', 'e', 'q'):                                        /* requires */
@@ -1124,6 +1106,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    {
 	      char *p = strrchr(line + 6, '/');
 	      Id did;
+	      /* strip trailing slash */
 	      if (p && p != line + 6 && !p[1])
 		{
 		  *p = 0;
@@ -1168,6 +1151,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 
   if (s)
     finish_solvable(&pd, s, handle, freshens);
+  solv_free(pd.filelist);
 
   /* Shared attributes
    *  (e.g. multiple binaries built from same source)
