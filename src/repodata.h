@@ -57,9 +57,6 @@ typedef struct _Repodata {
   int start;			/* start of solvables this repodata is valid for */
   int end;			/* last solvable + 1 of this repodata */
 
-  FILE *fp;			/* file pointer of solv file */
-  int error;			/* corrupt solv file */
-
   Repokey *keys;		/* keys, first entry is always zero */
   int nkeys;			/* length of keys array */
   unsigned char keybits[32];	/* keyname hash */
@@ -67,8 +64,6 @@ typedef struct _Repodata {
   Id *schemata;			/* schema -> offset into schemadata */
   int nschemata;		/* number of schemata */
   Id *schemadata;		/* schema storage */
-  unsigned int schemadatalen;   /* schema storage size */
-  Id *schematahash;		/* unification helper */
 
   Stringpool spool;		/* local string pool */
   int localpool;		/* is local string pool used */
@@ -76,6 +71,11 @@ typedef struct _Repodata {
   Dirpool dirpool;		/* local dir pool */
 
 #ifdef LIBSOLV_INTERNAL
+  FILE *fp;			/* file pointer of solv file */
+  int error;			/* corrupt solv file */
+
+  unsigned int schemadatalen;   /* schema storage size */
+  Id *schematahash;		/* unification helper */
 
   unsigned char *incoredata;	/* in-core data */
   unsigned int incoredatalen;	/* in-core data used */
@@ -107,7 +107,6 @@ typedef struct _Repodata {
   Id lasthandle;
   Id lastkey;
   Id lastdatalen;
-
 #endif
 
 } Repodata;
