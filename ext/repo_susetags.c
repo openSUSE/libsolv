@@ -483,22 +483,8 @@ lookup_shared_id(Repodata *data, Id p, Id keyname, Id voidid, int uninternalized
       if (r)
 	return r;
     }
-  if (uninternalized && data->attrs)
-    {
-      Id *ap = data->attrs[p - data->start];
-      if (ap)
-	{
-	  for (; *ap; ap += 2)
-	    {
-	      if (data->keys[*ap].name != keyname)
-		continue;
-	      if (data->keys[*ap].type == REPOKEY_TYPE_VOID)
-	        return voidid;
-	      if (data->keys[*ap].type == REPOKEY_TYPE_ID)
-	        return ap[1];
-	    }
-	}
-    }
+  if (uninternalized)
+    return repodata_lookup_id_uninternalized(data, p, keyname, voidid);
   return 0;
 }
 

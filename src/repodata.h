@@ -41,6 +41,7 @@ typedef struct _Repokey {
 
 
 typedef struct _Repodata {
+  Id repodataid;		/* our id */
   struct _Repo *repo;		/* back pointer to repo */
 
 #define REPODATA_AVAILABLE	0
@@ -74,6 +75,8 @@ typedef struct _Repodata {
 
   Dirpool dirpool;		/* local dir pool */
 
+#ifdef LIBSOLV_INTERNAL
+
   unsigned char *incoredata;	/* in-core data */
   unsigned int incoredatalen;	/* in-core data used */
   unsigned int incoredatafree;	/* free data len */
@@ -105,6 +108,8 @@ typedef struct _Repodata {
   Id lastkey;
   Id lastdatalen;
 
+#endif
+
 } Repodata;
 
 #define SOLVID_META		-1
@@ -118,7 +123,6 @@ typedef struct _Repodata {
 void repodata_initdata(Repodata *data, struct _Repo *repo, int localpool);
 void repodata_freedata(Repodata *data);
 
-Repodata *repodata_create(struct _Repo *repo, int localpool);
 void repodata_free(Repodata *data);
 void repodata_empty(Repodata *data, int localpool);
 
@@ -251,11 +255,12 @@ void repodata_delete(Repodata *data, Id solvid, Id keyname);
 void repodata_delete_uninternalized(Repodata *data, Id solvid, Id keyname);
 
 /* 
- merge attributes from one solvable to another
+ merge/swap attributes from one solvable to another
  works only if the data is not yet internalized
 */
 void repodata_merge_attrs(Repodata *data, Id dest, Id src);
 void repodata_merge_some_attrs(Repodata *data, Id dest, Id src, Map *keyidmap, int overwrite);
+void repodata_swap_attrs(Repodata *data, Id dest, Id src);
 
 void repodata_create_stubs(Repodata *data);
 void repodata_join(Repodata *data, Id joinkey);
@@ -272,5 +277,9 @@ Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
 const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
 void repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, const char *file);
+Id repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid);
+
+/* stats */
+unsigned int repodata_memused(Repodata *data);
 
 #endif /* LIBSOLV_REPODATA_H */

@@ -314,6 +314,11 @@ void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
     if ((r = pool->repos[repoid]) != 0)
     
 
+#ifdef ENABLE_COMPS
+#define ISCONDDEP(id) (ISRELDEP(id) && (GETRELDEP(pool, id))->flags == REL_COND)
+#define MODIFYCONDDEP(id, tst) do { Reldep *condrd = GETRELDEP(pool, id); Id condp, condpp; FOR_PROVIDES(condrd->evr, condp, condpp) if (tst) break; id = condp ? condrd->name : 0;} while(0)
+#endif
+
 #define POOL_DEBUG(type, ...) do {if ((pool->debugmask & (type)) != 0) pool_debug(pool, (type), __VA_ARGS__);} while (0)
 #define IF_POOLDEBUG(type) if ((pool->debugmask & (type)) != 0)
 

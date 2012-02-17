@@ -808,7 +808,7 @@ typedef struct {
 #if defined(SWIGPYTHON)
   %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
-    XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
+    XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
     PyObject *args = Py_BuildValue("(O)", SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0));
     PyObject *result = PyEval_CallObject((PyObject *)d, args);
     int ecode = 0;
@@ -837,7 +837,7 @@ typedef struct {
     int count;
     int ret = 0;
     dSP;
-    XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
+    XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
 
     ENTER;
     SAVETMPS;
@@ -866,7 +866,7 @@ typedef struct {
 #if defined(SWIGRUBY)
 %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
-    XRepodata *xd = new_XRepodata(data->repo, data - data->repo->repodata);
+    XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
     VALUE callable = (VALUE)d;
     VALUE rd = SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0);
     VALUE res = rb_funcall(callable, rb_intern("call"), 1, rd);
@@ -1198,14 +1198,14 @@ typedef struct {
 
   XRepodata *add_repodata(int flags = 0) {
     Repodata *rd = repo_add_repodata($self, flags);
-    return new_XRepodata($self, rd - $self->repodata);
+    return new_XRepodata($self, rd->repodataid);
   }
 
   void create_stubs() {
     Repodata *data;
     if (!$self->nrepodata)
       return;
-    data = $self->repodata  + ($self->nrepodata - 1);
+    data = repo_id2repodata($self, $self->nrepodata - 1);
     if (data->state != REPODATA_STUB)
       repodata_create_stubs(data);
   }
@@ -1220,17 +1220,22 @@ typedef struct {
     return 1;
   }
   XRepodata *first_repodata() {
-     int i;
-     if ($self->nrepodata < 2)
+    Repodata *data;
+    int i;
+    if ($self->nrepodata < 2)
+      return 0;
+    /* make sure all repodatas but the first are extensions */
+    data = repo_id2repodata($self, 1);
+    if (data->loadcallback)
        return 0;
-     /* make sure all repodatas but the first are extensions */
-     if ($self->repodata[1].loadcallback)
-        return 0;
-     for (i = 2; i < $self->nrepodata; i++)
-       if (!$self->repodata[i].loadcallback)
-         return 0;       /* oops, not an extension */
-     return new_XRepodata($self, 1);
-   }
+    for (i = 2; i < $self->nrepodata; i++)
+      {
+        data = repo_id2repodata($self, i);
+        if (!data->loadcallback)
+          return 0;       /* oops, not an extension */
+      }
+    return new_XRepodata($self, 1);
+  }
 
   bool __eq__(Repo *repo) {
     return $self == repo;
@@ -2383,54 +2388,54 @@ rb_eval_string(
     return xr;
   }
   Id new_handle() {
-    return repodata_new_handle($self->repo->repodata + $self->id);
+    return repodata_new_handle(repo_id2repodata($self->repo, $self->id));
   }
   void set_id(Id solvid, Id keyname, Id id) {
-    repodata_set_id($self->repo->repodata + $self->id, solvid, keyname, id);
+    repodata_set_id(repo_id2repodata($self->repo, $self->id), solvid, keyname, id);
   }
   void set_str(Id solvid, Id keyname, const char *str) {
-    repodata_set_str($self->repo->repodata + $self->id, solvid, keyname, str);
+    repodata_set_str(repo_id2repodata($self->repo, $self->id), solvid, keyname, str);
   }
   void set_poolstr(Id solvid, Id keyname, const char *str) {
-    repodata_set_poolstr($self->repo->repodata + $self->id, solvid, keyname, str);
+    repodata_set_poolstr(repo_id2repodata($self->repo, $self->id), solvid, keyname, str);
   }
   void add_idarray(Id solvid, Id keyname, Id id) {
-    repodata_add_idarray($self->repo->repodata + $self->id, solvid, keyname, id);
+    repodata_add_idarray(repo_id2repodata($self->repo, $self->id), solvid, keyname, id);
   }
   void add_flexarray(Id solvid, Id keyname, Id handle) {
-    repodata_add_flexarray($self->repo->repodata + $self->id, solvid, keyname, handle);
+    repodata_add_flexarray(repo_id2repodata($self->repo, $self->id), solvid, keyname, handle);
   }
   void set_checksum(Id solvid, Id keyname, Chksum *chksum) {
     const unsigned char *buf = solv_chksum_get(chksum, 0);
     if (buf)
-      repodata_set_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, solv_chksum_get_type(chksum), buf);
+      repodata_set_bin_checksum(repo_id2repodata($self->repo, $self->id), solvid, keyname, solv_chksum_get_type(chksum), buf);
   }
   const char *lookup_str(Id solvid, Id keyname) {
-    return repodata_lookup_str($self->repo->repodata + $self->id, solvid, keyname);
+    return repodata_lookup_str(repo_id2repodata($self->repo, $self->id), solvid, keyname);
   }
   Queue lookup_idarray(Id solvid, Id keyname) {
     Queue r;
     queue_init(&r);
-    repodata_lookup_idarray($self->repo->repodata + $self->id, solvid, keyname, &r);
+    repodata_lookup_idarray(repo_id2repodata($self->repo, $self->id), solvid, keyname, &r);
     return r;
   }
   %newobject lookup_checksum;
   Chksum *lookup_checksum(Id solvid, Id keyname) {
     Id type = 0;
-    const unsigned char *b = repodata_lookup_bin_checksum($self->repo->repodata + $self->id, solvid, keyname, &type);
+    const unsigned char *b = repodata_lookup_bin_checksum(repo_id2repodata($self->repo, $self->id), solvid, keyname, &type);
     return solv_chksum_create_from_bin(type, b);
   }
   void internalize() {
-    repodata_internalize($self->repo->repodata + $self->id);
+    repodata_internalize(repo_id2repodata($self->repo, $self->id));
   }
   void create_stubs() {
-    repodata_create_stubs($self->repo->repodata + $self->id);
+    repodata_create_stubs(repo_id2repodata($self->repo, $self->id));
   }
   void write(FILE *fp) {
-    repodata_write($self->repo->repodata + $self->id, fp, repo_write_stdkeyfilter, 0);
+    repodata_write(repo_id2repodata($self->repo, $self->id), fp, repo_write_stdkeyfilter, 0);
   }
   bool add_solv(FILE *fp, int flags = 0) {
-    Repodata *data = $self->repo->repodata + $self->id;
+    Repodata *data = repo_id2repodata($self->repo, $self->id);
     int r, oldstate = data->state;
     data->state = REPODATA_LOADING;
     r = repo_add_solv_flags(data->repo, fp, flags | REPO_USE_LOADING);
@@ -2439,7 +2444,7 @@ rb_eval_string(
     return r;
   }
   void extend_to_repo() {
-    Repodata *data = $self->repo->repodata + $self->id;
+    Repodata *data = repo_id2repodata($self->repo, $self->id);
     repodata_extend_block(data, data->repo->start, data->repo->end - data->repo->start);
   }
   bool __eq__(XRepodata *xr) {

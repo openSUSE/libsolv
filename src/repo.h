@@ -39,12 +39,12 @@ typedef struct _Repo {
   Id *idarraydata;		/* array of metadata Ids, solvable dependencies are offsets into this array */
   int idarraysize;
 
-  Repodata *repodata;		/* our stores for non-solvable related data */
   unsigned nrepodata;		/* number of our stores..  */
 
   Id *rpmdbid;			/* solvable side data: rpm database id */
 
 #ifdef LIBSOLV_INTERNAL
+  Repodata *repodata;		/* our stores for non-solvable related data */
   Offset lastoff;		/* start of last array in idarraydata */
 
   Hashtable lastidhash;		/* hash to speed up repo_addid_dep */
@@ -76,12 +76,6 @@ static inline const char *repo_name(const Repo *repo)
 {
   return repo->name;
 }
-
-static inline Repodata *repo_id2repodata(Repo *repo, Id id)
-{
-  return id ? repo->repodata + id : 0;
-}
-
 
 /* those two functions are here because they need the Repo definition */
 
@@ -121,6 +115,7 @@ static inline int pool_installable(const Pool *pool, Solvable *s)
 #define REPO_EXTEND_SOLVABLES		(1 << 4)
 
 Repodata *repo_add_repodata(Repo *repo, int flags);
+Repodata *repo_id2repodata(Repo *repo, Id id);
 Repodata *repo_last_repodata(Repo *repo);
 
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
@@ -155,7 +150,12 @@ void repo_disable_paging(Repo *repo);
   for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\
     if (s->repo == (r))
 
+#ifdef LIBSOLV_INTERNAL
 #define FOR_REPODATAS(repo, rdid, data)	\
 	for (rdid = 1, data = repo->repodata + rdid; rdid < repo->nrepodata; rdid++, data++)
+#else
+#define FOR_REPODATAS(repo, rdid, data)	\
+	for (rdid = 1; rdid < repo->nrepodata && (data = repo_id2repodata(repo, rdid)); rdid++)
+#endif
 
 #endif /* LIBSOLV_REPO_H */

@@ -1227,6 +1227,6 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
     repodata_internalize(data);
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", repodata_memused(data)/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
   return 0;
 }

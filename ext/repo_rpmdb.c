@@ -1230,12 +1230,8 @@ swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
       repo->rpmdbid[pb - repo->start] = tmpid;
     }
   /* only works if nothing is already internalized! */
-  if (data && data->attrs)
-    {
-      Id *tmpattrs = data->attrs[pa - data->start];
-      data->attrs[pa - data->start] = data->attrs[pb - data->start];
-      data->attrs[pb - data->start] = tmpattrs;
-    }
+  if (data)
+    repodata_swap_attrs(data, pa, pb);
 }
 
 
@@ -1737,7 +1733,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
     pool_debug(pool, SOLV_ERROR, "%%%% 100\n");
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_rpmdb took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", data->incoredatalen/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", repodata_memused(data)/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
   return 0;
 }
 

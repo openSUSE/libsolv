@@ -22,9 +22,6 @@ SOLV_1.0 {
 		repo_add_susetags;
 		repo_add_updateinfoxml;
 		repo_add_zyppdb_products;
-		repo_write;
-		repo_write_stdkeyfilter;
-		repodata_write;
 		rpm_byfp;
 		rpm_byrpmdbid;
 		rpm_byrpmh;

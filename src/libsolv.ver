@@ -125,6 +125,7 @@ SOLV_1.0 {
 		repo_free;
 		repo_free_solvable;
 		repo_free_solvable_block;
+		repo_id2repodata;
 		repo_internalize;
 		repo_last_repodata;
 		repo_lookup_bin_checksum;
@@ -146,6 +147,8 @@ SOLV_1.0 {
 		repo_set_poolstr;
 		repo_set_str;
 		repo_sidedata_create;
+		repo_write;
+		repo_write_stdkeyfilter;
 		repodata_add_dirnumnum;
 		repodata_add_dirstr;
 		repodata_add_fixarray;
@@ -153,7 +156,6 @@ SOLV_1.0 {
 		repodata_add_idarray;
 		repodata_add_poolstr_array;
 		repodata_chk2str;
-		repodata_create;
 		repodata_create_stubs;
 		repodata_delete;
 		repodata_delete_uninternalized;
@@ -172,11 +174,13 @@ SOLV_1.0 {
 		repodata_localize_id;
 		repodata_lookup_bin_checksum;
 		repodata_lookup_id;
+		repodata_lookup_id_uninternalized;
 		repodata_lookup_idarray;
 		repodata_lookup_num;
 		repodata_lookup_str;
 		repodata_lookup_type;
 		repodata_lookup_void;
+		repodata_memused;
 		repodata_merge_attrs;
 		repodata_merge_some_attrs;
 		repodata_new_handle;
@@ -198,6 +202,8 @@ SOLV_1.0 {
 		repodata_shrink;
 		repodata_str2dir;
 		repodata_stringify;
+		repodata_swap_attrs;
+		repodata_write;
 		repopagestore_compress_page;
 		solv_bin2hex;
 		solv_calloc;

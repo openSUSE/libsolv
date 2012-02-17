@@ -2496,13 +2496,20 @@ rewrite_repos(Pool *pool, Queue *addedfileprovides)
     MAPSET(&providedids, addedfileprovides->elements[i]);
   FOR_REPOS(i, repo)
     {
-      /* make sure this repo has just one main repodata */
-      if (!repo->nrepodata)
+      /* make sure all repodatas but the first are extensions */
+      if (repo->nrepodata < 2)
 	continue;
-      cinfo = repo->appdata;
-      data = repo->repodata + 1;
-      if (data->store.pagefd == -1)
-	continue;
+      data = repo_id2repodata(repo, 1);
+      if (data->loadcallback)
+        continue;
+      for (j = 2; j < repo->nrepodata; j++)
+	{
+	  Repodata *edata = repo_id2repodata(repo, j);
+	  if (!data->loadcallback)
+	    break;
+	}
+      if (j < repo->nrepodata)
+	continue;	/* found a non-externsion repodata, can't rewrite  */
       if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
 	{
 	  n = 0;
@@ -2514,6 +2521,7 @@ rewrite_repos(Pool *pool, Queue *addedfileprovides)
 	}
       repodata_set_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides);
       repodata_internalize(data);
+      cinfo = repo->appdata;
       writecachedrepo(repo, data, 0, cinfo ? cinfo->cookie : installedcookie);
     }
   queue_free(&fileprovidesq);

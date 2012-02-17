@@ -42,6 +42,7 @@ void
 repodata_initdata(Repodata *data, Repo *repo, int localpool)
 {
   memset(data, 0, sizeof (*data));
+  data->repodataid = data - repo->repodata;
   data->repo = repo;
   data->localpool = localpool;
   if (localpool)
@@ -92,34 +93,21 @@ repodata_freedata(Repodata *data)
   solv_free(data->attriddata);
 }
 
-Repodata *
-repodata_create(Repo *repo, int localpool)
-{
-  Repodata *data;
-
-  if (!repo->nrepodata)
-    {
-      repo->nrepodata = 2;	/* start with id 1 */
-      repo->repodata = solv_calloc(repo->nrepodata, sizeof(*data));
-    }
-  else
-    {
-      repo->nrepodata++;
-      repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
-    }
-  data = repo->repodata + repo->nrepodata - 1;
-  repodata_initdata(data, repo, localpool);
-  return data;
-}
-
 void
 repodata_free(Repodata *data)
 {
   Repo *repo = data->repo;
   int i = data - repo->repodata;
+  if (i == 0)
+    return;
   repodata_freedata(data);
   if (i < repo->nrepodata - 1)
-    memmove(repo->repodata + i, repo->repodata + i + 1, (repo->nrepodata - 1 - i) * sizeof(Repodata));
+    {
+      /* whoa! this changes the repodataids! */
+      memmove(repo->repodata + i, repo->repodata + i + 1, (repo->nrepodata - 1 - i) * sizeof(Repodata));
+      for (; i < repo->nrepodata - 1; i++)
+	repo->repodata[i].repodataid = i;
+    }
   repo->nrepodata--;
   if (repo->nrepodata == 1)
     {
@@ -721,6 +709,28 @@ repodata_localize_id(Repodata *data, Id id, int create)
   if (!id || !data || !data->localpool)
     return id;
   return stringpool_str2id(&data->spool, pool_id2str(data->repo->pool, id), create);
+}
+
+Id
+repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid)
+{
+  Id *ap;
+  if (!data->attrs)
+    return 0;
+  ap = data->attrs[solvid - data->start];
+  if (!ap)
+    return 0;
+  for (; *ap; ap += 2)
+    {
+      if (data->keys[*ap].name != keyname)
+	continue;
+      if (data->keys[*ap].type == REPOKEY_TYPE_VOID)
+	return voidid;
+      if (data->keys[*ap].type == REPOKEY_TYPE_ID)
+	return ap[1];
+      return 0;
+    }
+  return 0;
 }
 
 
@@ -2356,7 +2366,7 @@ void
 repodata_merge_attrs(Repodata *data, Id dest, Id src)
 {
   Id *keyp;
-  if (dest == src || !(keyp = data->attrs[src - data->start]))
+  if (dest == src || data->attrs || !(keyp = data->attrs[src - data->start]))
     return;
   for (; *keyp; keyp += 2)
     repodata_insert_keyid(data, dest, keyp[0], keyp[1], 0);
@@ -2367,13 +2377,24 @@ void
 repodata_merge_some_attrs(Repodata *data, Id dest, Id src, Map *keyidmap, int overwrite)
 {
   Id *keyp;
-  if (dest == src || !(keyp = data->attrs[src - data->start]))
+  if (dest == src || !data->attrs || !(keyp = data->attrs[src - data->start]))
     return;
   for (; *keyp; keyp += 2)
     if (!keyidmap || MAPTST(keyidmap, keyp[0]))
       repodata_insert_keyid(data, dest, keyp[0], keyp[1], overwrite);
 }
 
+/* swap (uninternalized) attrs from src and dest */
+void
+repodata_swap_attrs(Repodata *data, Id dest, Id src)
+{
+  Id *tmpattrs;
+  if (!data->attrs || dest == src)
+    return;
+  tmpattrs = data->attrs[dest - data->start];
+  data->attrs[dest - data->start] = data->attrs[src - data->start];
+  data->attrs[src - data->start] = tmpattrs;
+}
 
 
 /**********************************************************************/
@@ -2913,6 +2934,12 @@ repodata_create_stubs(Repodata *data)
   for (i = 0; i < cnt; i++)
     repodata_internalize(repo->repodata + stubdataids[i]);
   solv_free(stubdataids);
+}
+
+unsigned int
+repodata_memused(Repodata *data)
+{
+  return data->incoredatalen + data->vincorelen;
 }
 
 /*

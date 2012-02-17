@@ -1311,6 +1311,7 @@ repo_lookup_type(Repo *repo, Id entry, Id keyname)
 Repodata *
 repo_add_repodata(Repo *repo, int flags)
 {
+  Repodata *data;
   int i;
   if ((flags & REPO_USE_LOADING) != 0)
     {
@@ -1332,7 +1333,25 @@ repo_add_repodata(Repo *repo, int flags)
 	if (repo->repodata[i].state != REPODATA_STUB)
 	  return repo->repodata + i;
     }
-  return repodata_create(repo, (flags & REPO_LOCALPOOL) ? 1 : 0);
+  if (!repo->nrepodata)
+    {    
+      repo->nrepodata = 2;      /* start with id 1 */
+      repo->repodata = solv_calloc(repo->nrepodata, sizeof(*data));
+    }    
+  else 
+    {    
+      repo->nrepodata++;
+      repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
+    }    
+  data = repo->repodata + repo->nrepodata - 1; 
+  repodata_initdata(data, repo, (flags & REPO_LOCALPOOL) ? 1 : 0);
+  return data;
+}
+
+Repodata *
+repo_id2repodata(Repo *repo, Id id)
+{
+  return id ? repo->repodata + id : 0;
 }
 
 Repodata *

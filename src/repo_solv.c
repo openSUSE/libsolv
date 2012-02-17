@@ -1290,6 +1290,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
     {
       /* overwrite stub repodata */
       repodata_freedata(parent);
+      data.repodataid = parent->repodataid;
       *parent = data;
     }
   else
@@ -1302,6 +1303,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	}
       else
         repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata + 1, sizeof(data));
+      data.repodataid = repo->nrepodata;
       repo->repodata[repo->nrepodata++] = data;
     }
 
