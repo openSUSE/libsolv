@@ -2505,7 +2505,7 @@ rewrite_repos(Pool *pool, Queue *addedfileprovides)
       for (j = 2; j < repo->nrepodata; j++)
 	{
 	  Repodata *edata = repo_id2repodata(repo, j);
-	  if (!data->loadcallback)
+	  if (!edata->loadcallback)
 	    break;
 	}
       if (j < repo->nrepodata)
