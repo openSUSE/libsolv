@@ -65,8 +65,6 @@ struct _Pool {
 
   Reldep *rels;			/* table of rels: Id -> Reldep */
   int nrels;			/* number of unique rels */
-  Hashtable relhashtbl;		/* hashtable: (name,evr,op)Hash -> Id */
-  Hashmask relhashmask;
 
   struct _Repo **repos;
   int nrepos;			/* repos allocated */
@@ -79,8 +77,6 @@ struct _Pool {
 
   const char **languages;
   int nlanguages;
-  Id *languagecache;
-  int languagecacheother;
 
   /* package manager type, deb/rpm */
   int disttype;
@@ -102,7 +98,7 @@ struct _Pool {
 
   /* providers data, as two-step indirect list
    * whatprovides[Id] -> Offset into whatprovidesdata for name
-   * whatprovidesdata[Offset] -> ID_NULL-terminated list of solvables providing Id
+   * whatprovidesdata[Offset] -> 0-terminated list of solvables providing Id
    */
   Offset *whatprovides;		/* Offset to providers of a specific name, Id -> Offset  */
   Offset *whatprovides_rel;	/* Offset to providers of a specific relation, Id -> Offset  */
@@ -119,9 +115,6 @@ struct _Pool {
   Id (*nscallback)(struct _Pool *, void *data, Id name, Id evr);
   void *nscallbackdata;
 
-  /* our tmp space string space */
-  struct _Pool_tmpspace tmpspace;
-
   /* debug mask and callback */
   int  debugmask;
   void (*debugcallback)(struct _Pool *, void *data, int type, const char *str);
@@ -133,6 +126,19 @@ struct _Pool {
 
   /* search position */
   Datapos pos;
+
+#ifdef LIBSOLV_INTERNAL
+  /* hash for rel unification */
+  Hashtable relhashtbl;		/* hashtable: (name,evr,op)Hash -> Id */
+  Hashmask relhashmask;
+
+  Id *languagecache;
+  int languagecacheother;
+
+  /* our tmp space string space */
+  struct _Pool_tmpspace tmpspace;
+#endif
+
 };
 
 #define DISTTYPE_RPM	0

@@ -214,6 +214,7 @@ SOLV_1.0 {
 		solv_chksum_get;
 		solv_chksum_get_type;
 		solv_chksum_isfinished;
+		solv_chksum_len;
 		solv_chksum_str2type;
 		solv_chksum_type2str;
 		solv_dupappend;

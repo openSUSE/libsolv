@@ -54,6 +54,22 @@ solv_chksum_create(Id type)
   return 0;
 }
 
+int
+solv_chksum_len(Id type)
+{
+  switch (type)
+    {   
+    case REPOKEY_TYPE_MD5:
+      return 16; 
+    case REPOKEY_TYPE_SHA1:
+      return 20; 
+    case REPOKEY_TYPE_SHA256:
+      return 32; 
+    default:
+      return 0;
+    }   
+}
+
 void *
 solv_chksum_create_from_bin(Id type, const unsigned char *buf)
 {

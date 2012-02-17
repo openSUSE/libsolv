@@ -19,20 +19,6 @@ const unsigned char *solv_chksum_get(void *handle, int *lenp);
 void *solv_chksum_free(void *handle, unsigned char *cp);
 const char *solv_chksum_type2str(Id type);
 Id solv_chksum_str2type(const char *str);
-
-static inline int solv_chksum_len(Id type)
-{
-  switch (type)
-    {
-    case REPOKEY_TYPE_MD5:
-      return 16;
-    case REPOKEY_TYPE_SHA1:
-      return 20;
-    case REPOKEY_TYPE_SHA256:
-      return 32;
-    default:
-      return 0;
-    }
-}
+int solv_chksum_len(Id type);
 
 #endif /* LIBSOLV_CHKSUM_H */
