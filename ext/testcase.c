@@ -1029,6 +1029,7 @@ testcase_add_susetags(Repo *repo, FILE *fp, int flags)
     finish_solvable(pool, data, s, filelist, nfilelist);
   solv_free(line);
   solv_free(filelist);
+  repodata_free_dircache(data);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;

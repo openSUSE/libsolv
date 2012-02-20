@@ -1222,6 +1222,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   join_freemem(&pd.jd);
   stringpool_free(&pd.cspool);
   solv_free(pd.cscache);
+  repodata_free_dircache(data);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

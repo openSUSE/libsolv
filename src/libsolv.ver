@@ -165,6 +165,7 @@ SOLV_1.0 {
 		repodata_extend;
 		repodata_extend_block;
 		repodata_free;
+		repodata_free_dircache;
 		repodata_free_schemahash;
 		repodata_freedata;
 		repodata_globalize_id;

@@ -1194,6 +1194,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
     }
 
   solv_free(joinhash);
+  repodata_free_dircache(data);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 

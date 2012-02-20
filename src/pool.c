@@ -936,6 +936,7 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 	  if (did)
 	    MAPSET(&cbd->useddirs, did);
 	}
+      repodata_free_dircache(data);
     }
   if (value->id >= data->dirpool.ndirs || !MAPTST(&cbd->useddirs, value->id))
     return 0;

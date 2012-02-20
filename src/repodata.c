@@ -91,6 +91,8 @@ repodata_freedata(Repodata *data)
 
   solv_free(data->attrdata);
   solv_free(data->attriddata);
+
+  solv_free(data->dircache);
 }
 
 void
@@ -247,13 +249,27 @@ static inline const char *strchrnul(const char *str, char x)
 }
 #endif
 
+#define DIRCACHE_SIZE 41	/* < 1k */
+
+#ifdef DIRCACHE_SIZE
+struct dircache {
+  Id ids[DIRCACHE_SIZE];
+  char str[(DIRCACHE_SIZE * (DIRCACHE_SIZE - 1)) / 2];
+};
+#endif
+
 Id
 repodata_str2dir(Repodata *data, const char *dir, int create)
 {
   Id id, parent;
+#ifdef DIRCACHE_SIZE
+  const char *dirs;
+#endif
   const char *dire;
 
   parent = 0;
+  if (!*dir)
+    return 0;
   while (*dir == '/' && dir[1] == '/')
     dir++;
   if (*dir == '/' && !dir[1])
@@ -262,6 +278,31 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
         return 1;
       return dirpool_add_dir(&data->dirpool, 0, 1, create);
     }
+#ifdef DIRCACHE_SIZE
+  dirs = dir;
+  if (data->dircache)
+    {
+      int l;
+      struct dircache *dircache = data->dircache;
+      l = strlen(dir);
+      while (l > 0)
+	{
+	  if (l < DIRCACHE_SIZE && dircache->ids[l] && !memcmp(dircache->str + l * (l - 1) / 2, dir, l))
+	    {
+	      parent = dircache->ids[l];
+	      dir += l;
+	      if (!*dir)
+		return parent;
+	      while (*dir == '/')
+		dir++;
+	      break;
+	    }
+	  while (--l)
+	    if (dir[l] == '/')
+	      break;
+	}
+    }
+#endif
   while (*dir)
     {
       dire = strchrnul(dir, '/');
@@ -274,6 +315,19 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
       parent = dirpool_add_dir(&data->dirpool, parent, id, create);
       if (!parent)
 	return 0;
+#ifdef DIRCACHE_SIZE
+      if (!data->dircache)
+	data->dircache = solv_calloc(1, sizeof(struct dircache));
+      if (data->dircache)
+	{
+	  int l = dire - dirs;
+	  if (l < DIRCACHE_SIZE)
+	    {
+	      data->dircache->ids[l] = parent;
+	      memcpy(data->dircache->str + l * (l - 1) / 2, dirs, l);
+	    }
+	}
+#endif
       if (!*dire)
 	break;
       dir = dire + 1;
@@ -281,6 +335,12 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
 	dir++;
     }
   return parent;
+}
+
+void
+repodata_free_dircache(Repodata *data)
+{
+  data->dircache = solv_free(data->dircache);
 }
 
 const char *

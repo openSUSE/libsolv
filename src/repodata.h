@@ -39,6 +39,9 @@ typedef struct _Repokey {
 #define KEY_STORAGE_INCORE              2
 #define KEY_STORAGE_VERTICAL_OFFSET     3
 
+#ifdef LIBSOLV_INTERNAL
+struct dircache;
+#endif
 
 typedef struct _Repodata {
   Id repodataid;		/* our id */
@@ -107,6 +110,9 @@ typedef struct _Repodata {
   Id lasthandle;
   Id lastkey;
   Id lastdatalen;
+
+  /* directory cache to speed up repodata_str2dir */
+  struct dircache *dircache;
 #endif
 
 } Repodata;
@@ -242,6 +248,7 @@ void repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
 /* directory (for package file list) */
 void repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2);
 void repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const char *str);
+void repodata_free_dircache(Repodata *data);
 
 
 /* Arrays */
