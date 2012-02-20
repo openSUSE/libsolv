@@ -273,6 +273,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   unsigned int now, start;
   void *handle;
   Id p;
+  int obsoleteusescolors = pool_get_flag(pool, POOL_FLAG_OBSOLETEUSESCOLORS);
 
   queue_empty(conflicts);
   if (!pkgs->count)
@@ -379,7 +380,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       int iterflags;
 
       iterflags = RPM_ITERATE_FILELIST_WITHMD5 | RPM_ITERATE_FILELIST_NOGHOSTS;
-      if (pool->obsoleteusescolors)
+      if (obsoleteusescolors)
 	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
       p = pkgs->elements[pidx];
       hx = cbdata.lookat.elements[i];
@@ -417,7 +418,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
 		  continue;	/* different file names */
 		if (!strcmp(fsi, fsj))
 		  continue;	/* md5 sum matches */
-		if (pool->obsoleteusescolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
+		if (obsoleteusescolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
 		  continue;	/* colors do not conflict */
 		queue_push(conflicts, pool_str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii] + 34, 1));
 		queue_push(conflicts, p);

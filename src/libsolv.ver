@@ -60,6 +60,7 @@ SOLV_1.0 {
 		pool_freeidhashes;
 		pool_freetmpspace;
 		pool_freewhatprovides;
+		pool_get_flag;
 		pool_id2evr;
 		pool_id2langid;
 		pool_id2rel;
@@ -76,6 +77,7 @@ SOLV_1.0 {
 		pool_queuetowhatprovides;
 		pool_rel2id;
 		pool_search;
+		pool_set_flag;
 		pool_set_installed;
 		pool_set_languages;
 		pool_setarch;

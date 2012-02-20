@@ -81,14 +81,6 @@ struct _Pool {
   /* package manager type, deb/rpm */
   int disttype;
 
-  /* flags to tell the library how the installed package manager works */
-  int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */
-  int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
-  int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
-  int obsoleteusescolors;	/* true: obsoletes check arch color */
-  int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
-  int allowselfconflicts;	/* true: packages which conflict with itself are installable */
-
   Id *id2arch;			/* map arch ids to scores */
   unsigned char *id2color;	/* map arch ids to colors */
   Id lastarch;			/* last valid entry in id2arch/id2color */
@@ -128,6 +120,14 @@ struct _Pool {
   Datapos pos;
 
 #ifdef LIBSOLV_INTERNAL
+  /* flags to tell the library how the installed package manager works */
+  int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */
+  int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
+  int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
+  int obsoleteusescolors;	/* true: obsoletes check arch color */
+  int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
+  int allowselfconflicts;	/* true: packages which conflict with itself are installable */
+
   /* hash for rel unification */
   Hashtable relhashtbl;		/* hashtable: (name,evr,op)Hash -> Id */
   Hashmask relhashmask;
@@ -160,6 +160,13 @@ struct _Pool {
 #define SOLV_DEBUG_TRANSACTION		(1<<13)
 
 #define SOLV_DEBUG_TO_STDERR		(1<<30)
+
+#define POOL_FLAG_PROMOTEEPOCH				1
+#define POOL_FLAG_ALLOWSELFCONFLICTS			2
+#define POOL_FLAG_OBSOLETEUSESPROVIDES			3
+#define POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES		4
+#define POOL_FLAG_OBSOLETEUSESCOLORS			5
+#define POOL_FLAG_NOINSTALLEDOBSOLETES			6
 
 /* ----------------------------------------------- */
 
@@ -195,6 +202,8 @@ extern void pool_setdebuglevel(Pool *pool, int level);
 #ifdef MULTI_SEMANTICS
 extern void pool_setdisttype(Pool *pool, int disttype);
 #endif
+extern int  pool_set_flag(Pool *pool, int flag, int value);
+extern int  pool_get_flag(Pool *pool, int flag);
 extern void pool_setvendorclasses(Pool *pool, const char **vendorclasses);
 
 extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));

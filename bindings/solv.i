@@ -805,6 +805,12 @@ typedef struct {
   void set_debuglevel(int level) {
     pool_setdebuglevel($self, level);
   }
+  int set_flag(int flag, int value) {
+    return pool_set_flag($self, flag, value);
+  }
+  int get_flag(int flag) {
+    return pool_get_flag($self, flag);
+  }
 #if defined(SWIGPYTHON)
   %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
