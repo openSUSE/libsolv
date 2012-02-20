@@ -876,7 +876,7 @@ finish_solvable(Pool *pool, Repodata *data, Solvable *s, char *filelist, int nfi
 	  p[-1] = '/'; 
 	  if (!did)
 	    did = repodata_str2dir(data, "/", 1);
-	  repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, p);
+	  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, did, p);
 	}
     }
   if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
