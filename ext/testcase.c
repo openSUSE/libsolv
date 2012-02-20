@@ -1525,7 +1525,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
       return 0;
     }
   testcasedir = solv_strdup(testcase);
-  if ((s = strchr(testcasedir, '/')) != 0)
+  if ((s = strrchr(testcasedir, '/')) != 0)
     s[1] = 0;
   else
     *testcasedir = 0;
@@ -1708,7 +1708,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	    }
 
 	  rdata = pool_tmpjoin(pool, testcasedir, pieces[2], 0);
-	  if (!strcmp(pieces[1], "<inline>"))
+	  if (!strcmp(pieces[2], "<inline>"))
 	    rfp = fp;
 	  else
             rfp = fopen(rdata, "r");
