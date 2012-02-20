@@ -23,7 +23,7 @@ SET (libsolv_SRCS
 SET (libsolv_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h
     poolid.h pooltypes.h queue.h solvable.h solver.h solverdebug.h
-    repo.h repodata.h repopage.h repo_solv.h repo_write.h util.h
+    repo.h repodata.h repo_solv.h repo_write.h util.h
     strpool.h dirpool.h knownid.h transaction.h rules.h problems.h
     chksum.h dataiterator.h ${CMAKE_BINARY_DIR}/src/solvversion.h)
 
