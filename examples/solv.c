@@ -1206,7 +1206,7 @@ static Pool *
 read_sigs()
 {
   Pool *sigpool = pool_create();
-#ifdef ENABLE_RPMDB
+#if defined(ENABLE_RPMDB_PUBKEYS)
   Repo *repo = repo_create(sigpool, "rpmdbkeys");
   repo_add_rpmdb_pubkeys(repo, 0, 0);
 #endif

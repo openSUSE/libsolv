@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2007-2012, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -2528,6 +2528,8 @@ rpm_byrpmh(Header h, void **statep)
 }
 
 
+#ifdef ENABLE_RPM_PUBKEY
+
 static char *
 r64dec1(char *p, unsigned int *vp, int *eofp)
 {
@@ -3142,3 +3144,5 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
     repodata_internalize(data);
   return 0;
 }
+
+#endif /* ENABLE_RPM_PUBKEY */
