@@ -164,7 +164,7 @@ add_dirline(struct parsedata *pd, char *line)
   char *sp[6];
   long filesz;
   long filenum;
-  unsigned dirid;
+  Id dirid;
   if (split(line, sp, 6) != 5)
     return;
   pd->dirs = solv_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
@@ -294,7 +294,7 @@ id3_cmp(const void *v1, const void *v2, void *dp)
 static void
 commit_diskusage(struct parsedata *pd, Id handle)
 {
-  unsigned i;
+  int i;
   Dirpool *dp = &pd->data->dirpool;
   /* Now sort in dirid order.  This ensures that parents come before
      their children.  */
@@ -306,14 +306,14 @@ commit_diskusage(struct parsedata *pd, Id handle)
      the array moving to the start, hence seeing leafs before parents.  */
   for (i = pd->ndirs; i--;)
     {
-      unsigned p = dirpool_parent(dp, pd->dirs[i][0]);
-      unsigned j = i;
+      Id p = dirpool_parent(dp, pd->dirs[i][0]);
+      int j = i;
       for (; p; p = dirpool_parent(dp, p))
         {
           for (; j--;)
 	    if (pd->dirs[j][0] == p)
 	      break;
-	  if (j < pd->ndirs)
+	  if (j >= 0)
 	    {
 	      if (pd->dirs[j][1] < pd->dirs[i][1])
 	        pd->dirs[j][1] = 0;
@@ -1015,7 +1015,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
           case CTAG('=', 'V', 'i', 's'):
 	    {
 	      /* Accept numbers and textual bools.  */
-	      unsigned k;
+	      int k;
 	      k = atoi(line + 6);
 	      if (k || !strcasecmp(line + 6, "true"))
 	        repodata_set_void(data, handle, SOLVABLE_ISVISIBLE);
@@ -1168,7 +1168,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
       last_found = 0;
       for (i = 0; i < pd.nshare; i++)
 	{
-	  unsigned n, nn;
+	  unsigned int n, nn;
 	  Solvable *found = 0;
           if (!pd.share_with[i].name)
 	    continue;

@@ -297,9 +297,9 @@ id3_cmp (const void *v1, const void *v2, void *dp)
 }
 
 static void
-commit_diskusage (struct parsedata *pd, unsigned handle)
+commit_diskusage (struct parsedata *pd, Id handle)
 {
-  unsigned i;
+  int i;
   Dirpool *dp = &pd->data->dirpool;
   /* Now sort in dirid order.  This ensures that parents come before
      their children.  */
@@ -311,14 +311,14 @@ commit_diskusage (struct parsedata *pd, unsigned handle)
      the array moving to the start, hence seeing leafs before parents.  */
   for (i = pd->ndirs; i--;)
     {
-      unsigned p = dirpool_parent(dp, pd->dirs[i][0]);
-      unsigned j = i;
+      Id p = dirpool_parent(dp, pd->dirs[i][0]);
+      int j = i;
       for (; p; p = dirpool_parent(dp, p))
         {
           for (; j--;)
 	    if (pd->dirs[j][0] == p)
 	      break;
-	  if (j < pd->ndirs)
+	  if (j >= 0)
 	    {
 	      if (pd->dirs[j][1] < pd->dirs[i][1])
 	        pd->dirs[j][1] = 0;
@@ -874,7 +874,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_DIR:
       {
         long filesz = 0, filenum = 0;
-        unsigned dirid;
+        Id dirid;
         if ((str = find_attr("name", atts)) != 0)
           dirid = repodata_str2dir(pd->data, str, 1);
         else
