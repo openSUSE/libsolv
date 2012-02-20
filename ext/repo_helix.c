@@ -11,6 +11,13 @@
  * Parse 'helix' XML representation
  * and create 'repo'
  * 
+ * A bit of history: "Helix Code" was the name of the company that
+ * wrote Red Carpet. The company was later renamed to Ximian.
+ * The Red Carpet solver was merged into the ZYPP project, the
+ * library used both by ZENworks and YaST for package management.
+ * Red Carpet came with solver testcases in it's own repository
+ * format, the 'helix' format.
+ *
  */
 
 #include <sys/types.h>
