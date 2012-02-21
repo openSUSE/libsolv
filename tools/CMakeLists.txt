@@ -10,7 +10,7 @@ IF (ENABLE_RPMDB)
 SET (SYSTEM_LIBRARIES ${RPMDB_LIBRARY} ${SYSTEM_LIBRARIES})
 ENDIF (ENABLE_RPMDB)
 
-SET (tools_list mergesolv dumpsolv installcheck)
+SET (tools_list mergesolv dumpsolv installcheck testsolv)
 
 IF (ENABLE_RPMDB)
 ADD_EXECUTABLE (rpmdb2solv rpmdb2solv.c)
@@ -73,6 +73,9 @@ TARGET_LINK_LIBRARIES (dumpsolv libsolv)
 
 ADD_EXECUTABLE (mergesolv mergesolv.c )
 TARGET_LINK_LIBRARIES (mergesolv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+ADD_EXECUTABLE (testsolv testsolv.c)
+TARGET_LINK_LIBRARIES (testsolv libsolvext libsolv ${SYSTEM_LIBRARIES})
 
 INSTALL (TARGETS ${tools_list} DESTINATION ${BIN_INSTALL_DIR})
 
