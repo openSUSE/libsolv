@@ -1,4 +1,4 @@
-FOREACH(tcdir testcases libsolv_zypptestcases)
+FOREACH(tcdir testcases libsolv-zypptestcases)
     IF(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${tcdir}")
         FILE(GLOB dirs "${CMAKE_CURRENT_SOURCE_DIR}/${tcdir}/*")
         FOREACH(dir ${dirs})
