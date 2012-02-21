@@ -106,8 +106,13 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
               break;
           if (flags == 6)
             {
-	      pool_debug(pool, SOLV_FATAL, "susetags: unknown relation in %d: '%s'\n", pd->lineno, sp[1]);
-              exit(1);
+	      if (!strcmp(sp[1], "<>"))
+		flags = 4;
+	      else
+		{
+		  pool_debug(pool, SOLV_FATAL, "susetags: unknown relation in %d: '%s'\n", pd->lineno, sp[1]);
+		  exit(1);
+		}
             }
           id = pool_rel2id(pool, id, evrid, flags + 1, 1);
         }

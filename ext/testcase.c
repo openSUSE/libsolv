@@ -315,7 +315,7 @@ testcase_repoid2str(Pool *pool, Id repoid)
   else
     {
       char buf[20];
-      sprintf(buf, "@#%d", repoid);
+      sprintf(buf, "#%d", repoid);
       return pool_tmpjoin(pool, buf, 0, 0);
     }
 }
@@ -1229,7 +1229,7 @@ testcase_solverresult(Solver *solv, int resultflags)
       for (i = 0; class2str[i].str; i++)
 	{
 	  queue_empty(&q);
-	  transaction_classify_pkgs(trans, 0, class2str[i].class, 0, 0, &q);
+	  transaction_classify_pkgs(trans, SOLVER_TRANSACTION_KEEP_PSEUDO, class2str[i].class, 0, 0, &q);
 	  for (j = 0; j < q.count; j++)
 	    {
 	      p = q.elements[j];
@@ -1589,20 +1589,23 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	    }
           repo->priority = prio;
           repo->subpriority = subprio;
-	  rdata = pool_tmpjoin(pool, testcasedir, pieces[4], 0);
-          if ((rfp = solv_xfopen(rdata, "r")) == 0)
+	  if (strcmp(pieces[3], "empty") != 0)
 	    {
-	      pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", rdata);
-	    }
-	  else if (!strcmp(pieces[3], "susetags"))
-	    {
-	      testcase_add_susetags(repo, rfp, 0);
-	      fclose(rfp);
-	    }
-	  else
-	    {
-	      fclose(rfp);
-	      pool_debug(pool, SOLV_ERROR, "testcase_read: unknown repo type for repo '%s'\n", repo->name);
+	      rdata = pool_tmpjoin(pool, testcasedir, pieces[4], 0);
+	      if ((rfp = solv_xfopen(rdata, "r")) == 0)
+		{
+		  pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", rdata);
+		}
+	      else if (!strcmp(pieces[3], "susetags"))
+		{
+		  testcase_add_susetags(repo, rfp, 0);
+		  fclose(rfp);
+		}
+	      else
+		{
+		  fclose(rfp);
+		  pool_debug(pool, SOLV_ERROR, "testcase_read: unknown repo type for repo '%s'\n", repo->name);
+		}
 	    }
 	}
       else if (!strcmp(pieces[0], "system") && npieces >= 3)

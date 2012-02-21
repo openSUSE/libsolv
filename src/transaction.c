@@ -205,16 +205,18 @@ transaction_type(Transaction *trans, Id p, int mode)
   Queue oq, rq;
   Id type, q;
   int i, j, ref = 0;
-  const char *n;
 
   if (!s->repo)
     return SOLVER_TRANSACTION_IGNORE;
 
-  n = pool_id2str(pool, s->name);
-  if (!strncmp(n, "patch:", 6))
-    return SOLVER_TRANSACTION_IGNORE;
-  if (!strncmp(n, "pattern:", 8))
-    return SOLVER_TRANSACTION_IGNORE;
+  if (!(mode & SOLVER_TRANSACTION_KEEP_PSEUDO))
+    {
+      const char *n = pool_id2str(pool, s->name);
+      if (!strncmp(n, "patch:", 6))
+	return SOLVER_TRANSACTION_IGNORE;
+      if (!strncmp(n, "pattern:", 8))
+	return SOLVER_TRANSACTION_IGNORE;
+    }
 
   type = transaction_base_type(trans, p);
 

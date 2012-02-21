@@ -166,6 +166,8 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
       s1 = evr1;
       s2 = evr2;
     }
+
+  /* compare the epoch */
   if (s1 == evr1 || *s1 != ':')
     s1 = 0;
   if (s2 == evr2 || *s2 != ':')
@@ -197,6 +199,8 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 	return -1;
       evr2 = s2 + 1;
     }
+
+  /* same epoch, now split into version/release */
   for (s1 = evr1, r1 = 0; *s1; s1++)
     if (*s1 == '-')
       r1 = s1;

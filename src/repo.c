@@ -714,6 +714,13 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 		      dep = p + 1;
 		      continue;
 		    }
+		  /* argh, allow pattern: prefix. sigh */
+		  if (p - dep == 7 && !strncmp(dep, "pattern", 7))
+		    {
+		      p = strchr(p + 1, ':');
+		      if (!p)
+			break;
+		    }
 		  *p++ = 0;
 		  idp = pool_str2id(pool, dep, 1);
 		  if (id)
