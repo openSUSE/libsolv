@@ -1787,6 +1787,10 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 		*resultflagsp = resultflags;
 	    }
 	}
+      else if (!strcmp(pieces[0], "nextjob") && npieces == 1)
+	{
+	  break;
+	}
       else
 	{
 	  pool_debug(pool, SOLV_ERROR, "testcase_read: cannot parse command '%s'\n", pieces[0]);
