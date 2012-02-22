@@ -635,7 +635,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  if (dontfix && pool->solvables[p].repo == installed)
 		    continue;
 		  /* p == n: self conflict */
-		  if (p == n && !pool->allowselfconflicts)
+		  if (p == n && pool->forbidselfconflicts)
 		    {
 		      if (ISRELDEP(con))
 			{

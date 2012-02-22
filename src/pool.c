@@ -63,9 +63,6 @@ pool_create(void)
   queue_init(&pool->vendormap);
 
   pool->debugmask = SOLV_DEBUG_RESULT;	/* FIXME */
-#ifndef RPM5
-  pool->allowselfconflicts = 1;
-#endif
 #ifdef FEDORA
   pool->obsoleteusescolors = 1;
 #endif
@@ -73,6 +70,7 @@ pool_create(void)
   pool->disttype = DISTTYPE_DEB;
 #endif
 #ifdef RPM5
+  pool->forbidselfconflicts = 1;
   pool->obsoleteusesprovides = 1;
   pool->implicitobsoleteusesprovides = 1;
 #endif
@@ -136,8 +134,8 @@ pool_get_flag(Pool *pool, int flag)
     {
     case POOL_FLAG_PROMOTEEPOCH:
       return pool->promoteepoch;
-    case POOL_FLAG_ALLOWSELFCONFLICTS:
-      return pool->allowselfconflicts;
+    case POOL_FLAG_FORBIDSELFCONFLICTS:
+      return pool->forbidselfconflicts;
     case POOL_FLAG_OBSOLETEUSESPROVIDES:
       return pool->obsoleteusesprovides;
     case POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES:
@@ -161,8 +159,8 @@ pool_set_flag(Pool *pool, int flag, int value)
     case POOL_FLAG_PROMOTEEPOCH:
       pool->promoteepoch = value;
       break;
-    case POOL_FLAG_ALLOWSELFCONFLICTS:
-      pool->allowselfconflicts = value;
+    case POOL_FLAG_FORBIDSELFCONFLICTS:
+      pool->forbidselfconflicts = value;
       break;
     case POOL_FLAG_OBSOLETEUSESPROVIDES:
       pool->obsoleteusesprovides = value;

@@ -126,7 +126,7 @@ struct _Pool {
   int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
   int obsoleteusescolors;	/* true: obsoletes check arch color */
   int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
-  int allowselfconflicts;	/* true: packages which conflict with itself are installable */
+  int forbidselfconflicts;	/* true: packages which conflict with itself are not installable */
 
   /* hash for rel unification */
   Hashtable relhashtbl;		/* hashtable: (name,evr,op)Hash -> Id */
@@ -162,7 +162,7 @@ struct _Pool {
 #define SOLV_DEBUG_TO_STDERR		(1<<30)
 
 #define POOL_FLAG_PROMOTEEPOCH				1
-#define POOL_FLAG_ALLOWSELFCONFLICTS			2
+#define POOL_FLAG_FORBIDSELFCONFLICTS			2
 #define POOL_FLAG_OBSOLETEUSESPROVIDES			3
 #define POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES		4
 #define POOL_FLAG_OBSOLETEUSESCOLORS			5
