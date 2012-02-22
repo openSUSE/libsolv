@@ -11,7 +11,7 @@ fi
 ex=0
 for tc in $(find $dir -name \*.t) ; do
   if ! $cmd $tc > /dev/null ; then
-    echo "${tc#$dir} failed"
+    echo "failed test: ${tc#$dir/}"
     ex=1
   fi
 done
