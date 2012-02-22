@@ -95,6 +95,20 @@ static struct solverflags2str {
   { 0, 0, 0 }
 };
 
+static struct poolflags2str {
+  Id flag;
+  const char *str;
+  int def;
+} poolflags2str[] = {
+  { POOL_FLAG_PROMOTEEPOCH,                 "promoteepoch", 0 },
+  { POOL_FLAG_FORBIDSELFCONFLICTS,          "forbidselfconflicts", 0 },
+  { POOL_FLAG_OBSOLETEUSESPROVIDES,         "obsoleteusesprovides", 0 },
+  { POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES, "implicitobsoleteusesprovides", 0 },
+  { POOL_FLAG_OBSOLETEUSESCOLORS,           "obsoleteusescolors", 0 },
+  { POOL_FLAG_NOINSTALLEDOBSOLETES,         "noinstalledobsoletes", 0 },
+  { 0, 0, 0 }
+};
+
 
 typedef struct strqueue {
   char **str;
@@ -186,6 +200,8 @@ static void
 strqueue_split(Strqueue *q, const char *s)
 {
   const char *p;
+  if (!s)
+    return;
   while ((p = strchr(s, '\n')) != 0)
     {
       q->str = solv_extend(q->str, q->nstr, 1, sizeof(*q->str), STRQUEUE_BLOCK);
@@ -1046,6 +1062,62 @@ testcase_add_susetags(Repo *repo, FILE *fp, int flags)
 #endif
 
 const char *
+testcase_getpoolflags(Pool *pool)
+{
+  const char *str = 0;
+  int i, v;
+  for (i = 0; poolflags2str[i].str; i++)
+    {
+      v = pool_get_flag(pool, poolflags2str[i].flag);
+      if (v == poolflags2str[i].def)
+	continue;
+      str = pool_tmpappend(pool, str, v ? " " : " !", poolflags2str[i].str);
+    }
+  return str ? str + 1 : "";
+}
+
+int
+testcase_setpoolflags(Pool *pool, const char *str)
+{
+  const char *p = str, *s;
+  int i, v;
+  for (;;)
+    {
+      while (*p == ' ' || *p == '\t' || *p == ',')
+	p++;
+      v = 1;
+      if (*p == '!')
+	{
+	  p++;
+	  v = 0;
+	}
+      if (!*p)
+	break;
+      s = p;
+      while (*p && *p != ' ' && *p != '\t' && *p != ',')
+	p++;
+      for (i = 0; poolflags2str[i].str; i++)
+	if (!strncmp(poolflags2str[i].str, s, p - s) && poolflags2str[i].str[p - s] == 0)
+	  break;
+      if (!poolflags2str[i].str)
+	{
+	  pool_debug(pool, SOLV_ERROR, "setpoolflags: unknown flag '%.*s'\n", p - s, s);
+	  return 0;
+	}
+      pool_set_flag(pool, poolflags2str[i].flag, v);
+    }
+  return 1;
+}
+
+void
+testcase_resetpoolflags(Pool *pool)
+{
+  int i;
+  for (i = 0; poolflags2str[i].str; i++)
+    pool_set_flag(pool, poolflags2str[i].flag, poolflags2str[i].def);
+}
+
+const char *
 testcase_getsolverflags(Solver *solv)
 {
   Pool *pool = solv->pool;
@@ -1334,7 +1406,7 @@ testcase_solverresult(Solver *solv, int resultflags)
 
 
 int
-testcase_write(Solver *solv, char *dir, int resultflags)
+testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasename, const char *resultname)
 {
   Pool *pool = solv->pool;
   Repo *repo;
@@ -1345,6 +1417,11 @@ testcase_write(Solver *solv, char *dir, int resultflags)
   Strqueue sq;
   char *cmd, *out;
   const char *s;
+
+  if (!testcasename)
+    testcasename = "testcase.t";
+  if (!resultname)
+    resultname = "solver.result";
 
   if (mkdir(dir, 0777) && errno != EEXIST)
     {
@@ -1397,6 +1474,12 @@ testcase_write(Solver *solv, char *dir, int resultflags)
   if (pool->installed)
     cmd = pool_tmpappend(pool, cmd, " ", testcase_repoid2str(pool, pool->installed->repoid));
   strqueue_push(&sq, cmd);
+  s = testcase_getpoolflags(solv->pool);
+  if (*s)
+    {
+      cmd = pool_tmpjoin(pool, "poolflags ", s, 0);
+      strqueue_push(&sq, cmd);
+    }
 
   if (pool->vendorclasses)
     {
@@ -1451,45 +1534,63 @@ testcase_write(Solver *solv, char *dir, int resultflags)
   if (resultflags)
     {
       char *result;
-      out = pool_tmpjoin(pool, dir, "/", "solver.result");
-      if (!(fp = fopen(out, "w")))
-	{
-	  pool_debug(solv->pool, SOLV_ERROR, "testcase_write: could not open '%s' for writing\n", out);
-	  strqueue_free(&sq);
-	  return 0;
-	}
-      result = testcase_solverresult(solv, resultflags);
-      if (fwrite(result, strlen(result), 1, fp) != 1)
-	{
-	  pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
-	  solv_free(result);
-	  strqueue_free(&sq);
-	  return 0;
-	}
-      solv_free(result);
-      if (fclose(fp))
-	{
-	  pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
-	  strqueue_free(&sq);
-	  return 0;
-	}
       cmd = 0;
       for (i = 0; resultflags2str[i].str; i++)
 	if ((resultflags & resultflags2str[i].flag) != 0)
 	  cmd = pool_tmpappend(pool, cmd, cmd ? "," : 0, resultflags2str[i].str);
-      cmd = pool_tmpjoin(pool, "result ", cmd ? cmd : "?", " solver.result");
+      cmd = pool_tmpjoin(pool, "result ", cmd ? cmd : "?", 0);
+      cmd = pool_tmpappend(pool, cmd, " ", resultname);
       strqueue_push(&sq, cmd);
+      result = testcase_solverresult(solv, resultflags);
+      if (!strcmp(resultname, "<inline>"))
+	{
+	  int i;
+	  Strqueue rsq;
+	  strqueue_init(&rsq);
+	  strqueue_split(&rsq, result);
+	  for (i = 0; i < rsq.nstr; i++)
+	    {
+	      cmd = pool_tmpjoin(pool, "#>", rsq.str[i], 0);
+	      strqueue_push(&sq, cmd);
+	    }
+	  strqueue_free(&rsq);
+	}
+      else
+	{
+	  out = pool_tmpjoin(pool, dir, "/", resultname);
+	  if (!(fp = fopen(out, "w")))
+	    {
+	      pool_debug(solv->pool, SOLV_ERROR, "testcase_write: could not open '%s' for writing\n", out);
+	      solv_free(result);
+	      strqueue_free(&sq);
+	      return 0;
+	    }
+	  if (result && *result && fwrite(result, strlen(result), 1, fp) != 1)
+	    {
+	      pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
+	      solv_free(result);
+	      strqueue_free(&sq);
+	      return 0;
+	    }
+	  if (fclose(fp))
+	    {
+	      pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
+	      strqueue_free(&sq);
+	      return 0;
+	    }
+	}
+      solv_free(result);
     }
 
   cmd = strqueue_join(&sq);
-  out = pool_tmpjoin(pool, dir, "/", "testcase.t");
+  out = pool_tmpjoin(pool, dir, "/", testcasename);
   if (!(fp = fopen(out, "w")))
     {
       pool_debug(solv->pool, SOLV_ERROR, "testcase_write: could not open '%s' for writing\n", out);
       strqueue_free(&sq);
       return 0;
     }
-  if (fwrite(cmd, strlen(cmd), 1, fp) != 1)
+  if (*cmd && fwrite(cmd, strlen(cmd), 1, fp) != 1)
     {
       pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
       strqueue_free(&sq);
@@ -1518,6 +1619,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
   int npieces = 0;
   int prepared = 0;
   int closefp = !fp;
+  int poolflagsreset = 0;
 
   if (!fp && !(fp = fopen(testcase, "r")))
     {
@@ -1582,6 +1684,11 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	  const char *rdata;
 
 	  prepared = 0;
+          if (!poolflagsreset)
+	    {
+	      poolflagsreset = 1;
+	      testcase_resetpoolflags(pool);	/* hmm */
+	    }
 	  if (sscanf(pieces[2], "%d.%d", &prio, &subprio) != 2)
 	    {
 	      subprio = 0;
@@ -1676,6 +1783,17 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	      queue_free(&q);
 	    }
 	}
+      else if (!strcmp(pieces[0], "poolflags"))
+        {
+	  int i;
+          if (!poolflagsreset)
+	    {
+	      poolflagsreset = 1;
+	      testcase_resetpoolflags(pool);	/* hmm */
+	    }
+	  for (i = 1; i < npieces; i++)
+	    testcase_setpoolflags(pool, pieces[i]);
+        }
       else if (!strcmp(pieces[0], "solverflags") && npieces > 1)
         {
 	  int i;
