@@ -546,15 +546,26 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
   if (!pool_match_nevr(pool, s, name))
     return 0;
   if (evr == s->evr)
-    return flags & 2 ? 1 : 0;
+    return (flags & REL_EQ) ? 1 : 0;
   if (!flags)
     return 0;
   if (flags == 7)
     return 1;
-  if (flags != 2 && flags != 5)
-    flags ^= 5;
-  if ((flags & (1 << (1 + pool_evrcmp(pool, s->evr, evr, EVRCMP_DEPCMP)))) != 0)
-    return 1;
+  switch (pool_evrcmp(pool, s->evr, evr, EVRCMP_DEPCMP))
+    {
+    case -2:
+      return 1;
+    case -1:
+      return (flags & REL_LT) ? 1 : 0;
+    case 0:
+      return (flags & REL_EQ) ? 1 : 0;
+    case 1:
+      return (flags & REL_GT) ? 1 : 0;
+    case 2:
+      return (flags & REL_EQ) ? 1 : 0;
+    default:
+      break;
+    }
   return 0;
 }
 
@@ -566,18 +577,24 @@ pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
     return 0;
   if (flags == 7 || pflags == 7)
     return 1;		/* rel provides every version */
-  if ((pflags & flags & 5) != 0)
+  if ((pflags & flags & (REL_LT | REL_GT)) != 0)
     return 1;		/* both rels show in the same direction */
   if (pevr == evr)
+    return (flags & pflags & REL_EQ) ? 1 : 0;
+  switch (pool_evrcmp(pool, pevr, evr, EVRCMP_DEPCMP))
     {
-      if ((pflags & flags & 2) != 0)
-	return 1;	/* both have '=', match */
-    }
-  else
-    {
-      int f = flags == 5 ? 5 : flags == 2 ? pflags : (flags ^ 5) & (pflags | 5);
-      if ((f & (1 << (1 + pool_evrcmp(pool, pevr, evr, EVRCMP_DEPCMP)))) != 0)
-	return 1;
+    case -2:
+      return (pflags & REL_EQ) ? 1 : 0;
+    case -1:
+      return (flags & REL_LT) || (pflags & REL_GT) ? 1 : 0;
+    case 0:
+      return (flags & pflags & REL_EQ) ? 1 : 0;
+    case 1:
+      return (flags & REL_GT) || (pflags & REL_LT) ? 1 : 0;
+    case 2:
+      return (flags & REL_EQ) ? 1 : 0;
+    default:
+      break;
     }
   return 0;
 }

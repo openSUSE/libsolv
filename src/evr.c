@@ -225,8 +225,15 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
     return 0;
   if (r1 && r2)
     {
-      if (s1 != ++r1 && s2 != ++r2)
+      if (mode != EVRCMP_MATCH || (s1 != ++r1 && s2 != ++r2))
         r = solv_vercmp(r1, s1, r2, s2);
+    }
+  else if (mode == EVRCMP_MATCH_RELEASE)
+    {
+      if (!r1 && r2)
+	return -2;
+      if (r1 && !r2)
+	return 2;
     }
   return r;
 }
