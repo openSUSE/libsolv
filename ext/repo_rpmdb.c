@@ -2528,7 +2528,7 @@ rpm_byrpmh(Header h, void **statep)
 }
 
 
-#ifdef ENABLE_RPM_PUBKEY
+#ifdef ENABLE_RPMDB_PUBKEY
 
 static char *
 r64dec1(char *p, unsigned int *vp, int *eofp)
@@ -3145,4 +3145,4 @@ repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
   return 0;
 }
 
-#endif /* ENABLE_RPM_PUBKEY */
+#endif /* ENABLE_RPMDB_PUBKEY */
