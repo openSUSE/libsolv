@@ -2357,6 +2357,37 @@ solver_createcleandepsmap(Solver *solv)
 	      MAPSET(&userinstalled, p - installed->start);
 	}
     }
+
+  /* also add visible patterns to userinstalled for openSUSE */
+  if (1)
+    {
+      Dataiterator di;
+      dataiterator_init(&di, pool, 0, 0, SOLVABLE_ISVISIBLE, 0, 0);
+      while (dataiterator_step(&di))
+	{
+	  Id *dp;
+	  if (di.solvid <= 0)
+	    continue;
+	  s = pool->solvables + di.solvid;
+	  if (!s->requires)
+	    continue;
+	  if (!pool_installable(pool, s))
+	    continue;
+	  if (strncmp(pool_id2str(pool, s->name), "pattern:", 8) != 0)
+	    continue;
+	  dp = s->repo->idarraydata + s->requires;
+	  for (dp = s->repo->idarraydata + s->requires; *dp; dp++)
+	    FOR_PROVIDES(p, pp, *dp)
+	      if (pool->solvables[p].repo == installed)
+		{
+		  if (strncmp(pool_id2str(pool, pool->solvables[p].name), "pattern", 7) != 0)
+		    continue;
+		  MAPSET(&userinstalled, p - installed->start);
+	    }
+	}
+      dataiterator_free(&di);
+    }
+  
   /* add all positive elements (e.g. locks) to "userinstalled" */
   for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
     {
