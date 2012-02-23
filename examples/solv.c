@@ -1206,7 +1206,7 @@ static Pool *
 read_sigs()
 {
   Pool *sigpool = pool_create();
-#if defined(ENABLE_RPMDB_PUBKEYS)
+#if defined(ENABLE_RPMDB_PUBKEY)
   Repo *repo = repo_create(sigpool, "rpmdbkeys");
   repo_add_rpmdb_pubkeys(repo, 0, 0);
 #endif
@@ -1838,6 +1838,30 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
 		{
 		  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|REPO_REUSE_REPODATA|REPO_EXTEND_SOLVABLES);
+		  fclose(fp);
+		}
+	    }
+	  filename = susetags_find(repo, "patterns", &filechksum, &filechksumtype);
+	  if (filename)
+	    {
+	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+		{
+		  char pbuf[256];
+		  while (fgets(pbuf, sizeof(pbuf), fp))
+		    {
+		      int l = strlen(pbuf);
+		      FILE *fp2;
+		      if (l && pbuf[l - 1] == '\n')
+			pbuf[--l] = 0;
+		      if (!*pbuf || *pbuf == '.' || strchr(pbuf, '/') != 0)
+			continue;
+		      filename = susetags_find(repo, pbuf, &filechksum, &filechksumtype);
+		      if (filename && (fp2 = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+			{
+			  repo_add_susetags(repo, fp2, defvendor, 0, REPO_NO_INTERNALIZE);
+			  fclose(fp2);
+			}
+		    }
 		  fclose(fp);
 		}
 	    }
