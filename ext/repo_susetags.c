@@ -457,7 +457,7 @@ joinhash_init(Repo *repo, Hashmask *hmp)
 }
 
 static Solvable *
-joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, Id name, Id evr, Id arch)
+joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, Id name, Id evr, Id arch, Id start)
 {
   Hashval h, hh;
 
@@ -468,7 +468,7 @@ joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, Id name, Id evr, Id arch)
   while (ht[h])
     {
       Solvable *s = repo->pool->solvables + ht[h];
-      if (s->name == name && s->evr == evr && s->arch == arch)
+      if (ht[h] >= start && s->name == name && s->evr == evr && s->arch == arch)
 	return s;
       h = HASHCHAIN_NEXT(h, hh, hm);
     }
@@ -523,6 +523,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   int indesc = 0;
   int indelta = 0;
   int last_found_pack = 0;
+  Id first_new_pkg = 0;
   char *sp[5];
   struct parsedata pd;
   Repodata *data = 0;
@@ -827,15 +828,17 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      arch = pool_str2id(pool, sp[3], 0);
 	      if (name && arch)
 		{
-		  if (repo->start + last_found_pack + 1 < repo->end)
+		  Id start = (flags & REPO_EXTEND_SOLVABLES) ? 0 : first_new_pkg;
+		  if (repo->start + last_found_pack + 1 >= start && repo->start + last_found_pack + 1 < repo->end)
 		    {
 		      s = pool->solvables + repo->start + last_found_pack + 1;
 		      if (s->repo != repo || s->name != name || s->evr != evr || s->arch != arch)
 			s = 0;
 		    }
 		  if (!s)
-		    s = joinhash_lookup(repo, joinhash, joinhashm, name, evr, arch);
+		    s = joinhash_lookup(repo, joinhash, joinhashm, name, evr, arch, start);
 		}
+	      /* do not create new packages in EXTEND_SOLVABLES mode */
 	      if (!s && (flags & REPO_EXTEND_SOLVABLES) != 0)
 		continue;
 	      /* fallthrough to package creation */
@@ -851,6 +854,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      s->evr = toevr(pool, &pd, sp[1], sp[2]);
 	      s->arch = pool_str2id(pool, sp[3], 1);
 	      s->vendor = defvendor;
+	      if (!first_new_pkg)
+	        first_new_pkg = s - pool->solvables;
 	      createdpkgs = 1;
 	    }
 	  last_found_pack = (s - pool->solvables) - repo->start;
