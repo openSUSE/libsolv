@@ -221,7 +221,7 @@ IF (ENABLE_PERL OR ENABLE_PYTHON OR ENABLE_RUBY)
 ENDIF (ENABLE_PERL OR ENABLE_PYTHON OR ENABLE_RUBY)
 ADD_SUBDIRECTORY (examples)
 
-MESSAGE (STATUS "version: ${VERSION}")
+MESSAGE (STATUS "Version: ${VERSION}")
 
 ####################################################################
 # RPM SPEC                                                         #
