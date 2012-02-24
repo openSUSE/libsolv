@@ -1385,8 +1385,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->dosplitprovides;
   case SOLVER_FLAG_IGNORE_RECOMMENDED:
     return solv->dontinstallrecommended;
-  case SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED:
-    return solv->ignorealreadyrecommended;
+  case SOLVER_FLAG_ADD_ALREADY_RECOMMENDED:
+    return solv->addalreadyrecommended;
   case SOLVER_FLAG_NO_INFARCHCHECK:
     return solv->noinfarchcheck;
   default:
@@ -1422,8 +1422,8 @@ solver_set_flag(Solver *solv, int flag, int value)
   case SOLVER_FLAG_IGNORE_RECOMMENDED:
     solv->dontinstallrecommended = value;
     break;
-  case SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED:
-    solv->ignorealreadyrecommended = value;
+  case SOLVER_FLAG_ADD_ALREADY_RECOMMENDED:
+    solv->addalreadyrecommended = value;
     break;
   case SOLVER_FLAG_NO_INFARCHCHECK:
     solv->noinfarchcheck = value;
@@ -1884,7 +1884,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  /* installed, check for recommends */
 		  Id *recp, rec, pp, p;
 		  s = pool->solvables + i;
-		  if (solv->ignorealreadyrecommended && s->repo == solv->installed)
+		  if (!solv->addalreadyrecommended && s->repo == solv->installed)
 		    continue;
 		  /* XXX need to special case AND ? */
 		  if (s->recommends)
@@ -1960,7 +1960,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 
           /* filter out all already supplemented packages if requested */
-          if (solv->ignorealreadyrecommended && dqs.count)
+          if (!solv->addalreadyrecommended && dqs.count)
 	    {
 	      /* turn off all new packages */
 	      for (i = 0; i < solv->decisionq.count; i++)
@@ -2082,7 +2082,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (p < 0)
 		    continue;
 		  s = pool->solvables + p;
-		  if (!s->repo || (solv->ignorealreadyrecommended && s->repo == solv->installed))
+		  if (!s->repo || (!solv->addalreadyrecommended && s->repo == solv->installed))
 		    continue;
 		  if (!s->recommends)
 		    continue;
@@ -2484,7 +2484,7 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SOLV_DEBUG_STATS, "allowuninstall=%d, allowdowngrade=%d, allowarchchange=%d, allowvendorchange=%d\n", solv->allowuninstall, solv->allowdowngrade, solv->allowarchchange, solv->allowvendorchange);
   POOL_DEBUG(SOLV_DEBUG_STATS, "promoteepoch=%d, forbidselfconflicts=%d\n", pool->promoteepoch, pool->forbidselfconflicts);
   POOL_DEBUG(SOLV_DEBUG_STATS, "obsoleteusesprovides=%d, implicitobsoleteusesprovides=%d, obsoleteusescolors=%d\n", pool->obsoleteusesprovides, pool->implicitobsoleteusesprovides, pool->obsoleteusescolors);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "dontinstallrecommended=%d, ignorealreadyrecommended=%d\n", solv->dontinstallrecommended, solv->ignorealreadyrecommended);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dontinstallrecommended=%d, addalreadyrecommended=%d\n", solv->dontinstallrecommended, solv->addalreadyrecommended);
 
   /* create whatprovides if not already there */
   if (!pool->whatprovides)
@@ -3445,7 +3445,7 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
       s = pool->solvables + i;
       if (!s->recommends)
 	continue;
-      if (solv->ignorealreadyrecommended && s->repo == solv->installed)
+      if (!solv->addalreadyrecommended && s->repo == solv->installed)
 	continue;
       recp = s->repo->idarraydata + s->recommends;
       while ((rec = *recp++) != 0)
@@ -3490,7 +3490,7 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 	    /* let's see if this is an easy supp */
 	    FOR_PROVIDES(p2, pp2, sup)
 	      {
-		if (solv->ignorealreadyrecommended && solv->installed)
+		if (!solv->addalreadyrecommended && solv->installed)
 		  {
 		    if (pool->solvables[p2].repo == solv->installed)
 		      continue;

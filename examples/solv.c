@@ -3020,7 +3020,6 @@ rerunsolver:
       int pcnt, scnt;
 
       solv = solver_create(pool);
-      solver_set_flag(solv, SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
       solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
       if (mainmode == MODE_ERASE)
         solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);	/* don't nag */

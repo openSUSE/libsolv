@@ -189,7 +189,7 @@ struct _Solver {
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
-  int ignorealreadyrecommended;		/* true: ignore recommended packages that were already recommended by the installed packages */
+  int addalreadyrecommended;		/* true: also install recommended packages that were already recommended by the installed packages */
   int dontshowinstalledrecommended;	/* true: do not show recommended packages that are already installed */
   
   int noinfarchcheck;			/* true: do not forbid inferior architectures */
@@ -277,7 +277,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_NO_UPDATEPROVIDE		5
 #define SOLVER_FLAG_SPLITPROVIDES		6
 #define SOLVER_FLAG_IGNORE_RECOMMENDED		7
-#define SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED	8
+#define SOLVER_FLAG_ADD_ALREADY_RECOMMENDED	8
 #define SOLVER_FLAG_NO_INFARCHCHECK		9
 
 extern Solver *solver_create(Pool *pool);

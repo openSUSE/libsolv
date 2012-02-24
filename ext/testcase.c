@@ -90,7 +90,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_NO_UPDATEPROVIDE,           "noupdateprovide", 0 },
   { SOLVER_FLAG_SPLITPROVIDES,              "splitprovides", 0 },
   { SOLVER_FLAG_IGNORE_RECOMMENDED,         "ignorerecommended", 0 },
-  { SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, "ignorealreadyrecommended", 0 },
+  { SOLVER_FLAG_ADD_ALREADY_RECOMMENDED,    "addalreadyrecommended", 0 },
   { SOLVER_FLAG_NO_INFARCHCHECK,            "noinfarchcheck", 0 },
   { 0, 0, 0 }
 };

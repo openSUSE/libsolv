@@ -848,7 +848,6 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
     solver = None
     while True:
         solver = pool.Solver()
-        solver.set_flag(Solver.SOLVER_FLAG_IGNORE_ALREADY_RECOMMENDED, 1);
         solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
         if cmd == 'erase':
             solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
