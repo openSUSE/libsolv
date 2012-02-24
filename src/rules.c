@@ -2158,6 +2158,49 @@ solver_disablechoicerules(Solver *solv, Rule *r)
     }
 }
 
+/*
+ * This functions collects all packages that are looked at
+ * when a dependency is checked. We need it to "pin" installed
+ * packages when removing a supplemented package in createcleandepsmap.
+ * Here's an not uncommon example:
+ *   A contains "Supplements: packageand(B, C)"
+ *   B contains "Requires: A"
+ * Now if we remove C, the supplements is no longer true,
+ * thus we also remove A. Without the dep_pkgcheck function, we
+ * would now also remove B, but this is wrong, as adding back
+ * C doesn't make the supplements true again. Thus we "pin" B
+ * when we remove A.
+ * There's probably a better way to do this, but I haven't come
+ * up with it yet ;)
+ */
+static inline void
+dep_pkgcheck(Solver *solv, Id dep, Map *m, Queue *q)
+{
+  Pool *pool = solv->pool;
+  Id p, pp;
+
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags >= 8)
+	{
+	  if (rd->flags == REL_AND)
+	    {
+	      dep_pkgcheck(solv, rd->name, m, q);
+	      dep_pkgcheck(solv, rd->evr, m, q);
+	      return;
+	    }
+	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+	    return;
+	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+	    return;
+	}
+    }
+  FOR_PROVIDES(p, pp, dep)
+    if (MAPTST(m, p))
+      queue_push(q, p);
+}
+
 static void solver_createcleandepsmap(Solver *solv)
 {
   Pool *pool = solv->pool;
@@ -2192,6 +2235,37 @@ static void solver_createcleandepsmap(Solver *solv)
 	      MAPSET(&userinstalled, p - installed->start);
 	}
     }
+
+  /* also add visible patterns to userinstalled for openSUSE */
+  if (1)
+    {
+      Dataiterator di;
+      dataiterator_init(&di, pool, 0, 0, SOLVABLE_ISVISIBLE, 0, 0);
+      while (dataiterator_step(&di))
+	{
+	  Id *dp;
+	  if (di.solvid <= 0)
+	    continue;
+	  s = pool->solvables + di.solvid;
+	  if (!s->requires)
+	    continue;
+	  if (!pool_installable(pool, s))
+	    continue;
+	  if (strncmp(pool_id2str(pool, s->name), "pattern:", 8) != 0)
+	    continue;
+	  dp = s->repo->idarraydata + s->requires;
+	  for (dp = s->repo->idarraydata + s->requires; *dp; dp++)
+	    FOR_PROVIDES(p, pp, *dp)
+	      if (pool->solvables[p].repo == installed)
+		{
+		  if (strncmp(pool_id2str(pool, pool->solvables[p].name), "pattern", 7) != 0)
+		    continue;
+		  MAPSET(&userinstalled, p - installed->start);
+		}
+	}
+      dataiterator_free(&di);
+    }
+
   /* add all positive elements (e.g. locks) to "userinstalled" */
   for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
     {
@@ -2224,8 +2298,53 @@ static void solver_createcleandepsmap(Solver *solv)
       MAPSET(&im, p);
     }
 
-  while (iq.count)
+  for (;;)
     {
+      if (!iq.count)
+	{
+	  /* supplements pass */
+	  for (ip = solv->installed->start; ip < solv->installed->end; ip++)
+	    {
+	      if (!MAPTST(&installedm, ip))
+		continue;
+	      s = pool->solvables + ip;
+	      if (!s->supplements)
+		continue;
+	      if (!MAPTST(&im, ip))
+		continue;
+	      supp = s->repo->idarraydata + s->supplements;
+	      while ((sup = *supp++) != 0)
+		if (dep_possible(solv, sup, &im))
+		  break;
+	      if (!sup)
+		{
+		  supp = s->repo->idarraydata + s->supplements;
+		  while ((sup = *supp++) != 0)
+		    {
+		      if (dep_possible(solv, sup, &installedm))
+			{
+			  /* no longer supplemented, also erase */
+			  int iqcount = iq.count;
+			  /* pin packages, see comment above dep_pkgcheck */
+			  dep_pkgcheck(solv, sup, &im, &iq);
+			  for (i = iqcount; i < iq.count; i++)
+			    {
+			      Id pqp = iq.elements[i];
+			      if (pool->solvables[pqp].repo == installed)
+				MAPSET(&userinstalled, pqp - installed->start);
+			    }
+			  queue_truncate(&iq, iqcount);
+#ifdef CLEANDEPSDEBUG
+			  printf("%s supplemented\n", pool_solvid2str(pool, ip));
+#endif
+			  queue_push(&iq, ip);
+			}
+		    }
+		}
+	    }
+	  if (!iq.count)
+	    break;
+	}
       ip = queue_shift(&iq);
       s = pool->solvables + ip;
       if (!MAPTST(&im, ip))
@@ -2291,32 +2410,6 @@ static void solver_createcleandepsmap(Solver *solv)
 		}
 	    }
 	}
-      if (!iq.count)
-	{
-	  /* supplements pass */
-	  for (ip = solv->installed->start; ip < solv->installed->end; ip++)
-	    {
-	      if (!MAPTST(&installedm, ip))
-		continue;
-	      s = pool->solvables + ip;
-	      if (!s->supplements)
-		continue;
-	      if (!MAPTST(&im, ip))
-		continue;
-	      supp = s->repo->idarraydata + s->supplements;
-	      while ((sup = *supp++) != 0)
-		if (!dep_possible(solv, sup, &im) && dep_possible(solv, sup, &installedm))
-		  break;
-	      /* no longer supplemented, also erase */
-	      if (sup)
-		{
-#ifdef CLEANDEPSDEBUG
-		  printf("%s supplemented\n", pool_solvid2str(pool, ip));
-#endif
-		  queue_push(&iq, ip);
-		}
-	    }
-	}
     }
 
   /* turn userinstalled into remove set for pruning */
@@ -2356,8 +2449,38 @@ static void solver_createcleandepsmap(Solver *solv)
             queue_push(&iq, what);
 	}
     }
-  while (iq.count)
+  for (;;)
     {
+      if (!iq.count)
+	{
+	  /* supplements pass */
+	  for (ip = installed->start; ip < installed->end; ip++)
+	    {
+	      if (!MAPTST(&installedm, ip))
+		continue;
+	      if (MAPTST(&userinstalled, ip - installed->start))
+	        continue;
+	      s = pool->solvables + ip;
+	      if (!s->supplements)
+		continue;
+	      if (MAPTST(&im, ip))
+		continue;
+	      supp = s->repo->idarraydata + s->supplements;
+	      while ((sup = *supp++) != 0)
+		if (dep_possible(solv, sup, &im))
+		  break;
+	      if (sup)
+		{
+#ifdef CLEANDEPSDEBUG
+		  printf("%s supplemented\n", pool_solvid2str(pool, ip));
+#endif
+		  MAPSET(&im, ip);
+		  queue_push(&iq, ip);
+		}
+	    }
+	  if (!iq.count)
+	    break;
+	}
       ip = queue_shift(&iq);
       s = pool->solvables + ip;
 #ifdef CLEANDEPSDEBUG
@@ -2404,34 +2527,6 @@ static void solver_createcleandepsmap(Solver *solv)
 		      MAPSET(&im, p);
 		      queue_push(&iq, p);
 		    }
-		}
-	    }
-	}
-      if (!iq.count)
-	{
-	  /* supplements pass */
-	  for (ip = installed->start; ip < installed->end; ip++)
-	    {
-	      if (!MAPTST(&installedm, ip))
-		continue;
-	      if (MAPTST(&userinstalled, ip - installed->start))
-	        continue;
-	      s = pool->solvables + ip;
-	      if (!s->supplements)
-		continue;
-	      if (MAPTST(&im, ip) || !MAPTST(&installedm, ip))
-		continue;
-	      supp = s->repo->idarraydata + s->supplements;
-	      while ((sup = *supp++) != 0)
-		if (dep_possible(solv, sup, &im))
-		  break;
-	      if (sup)
-		{
-#ifdef CLEANDEPSDEBUG
-		  printf("%s supplemented\n", pool_solvid2str(pool, ip));
-#endif
-		  MAPSET(&im, ip);
-		  queue_push(&iq, ip);
 		}
 	    }
 	}
