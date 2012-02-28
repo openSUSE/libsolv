@@ -2728,9 +2728,6 @@ main(int argc, char **argv)
   }
 #endif
 
-#ifdef FEDORA
-  pool->obsoleteusescolors = 1;
-#endif
   pool_setloadcallback(pool, load_stub, 0);
   pool->nscallback = nscallback;
   // pool_setdebuglevel(pool, 2);
