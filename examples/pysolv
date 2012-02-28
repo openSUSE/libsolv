@@ -725,7 +725,7 @@ if cmd == 'se':
 
 # read all repo configs
 repos = []
-for reposdir in ["/etc/zypp/repos.d"]:
+for reposdir in ["/etc/zypp/repos.d", "/etc/yum.repos.d"]:
     if not os.path.isdir(reposdir):
         continue
     for reponame in sorted(glob.glob('%s/*.repo' % reposdir)):
