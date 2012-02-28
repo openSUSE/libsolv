@@ -7,7 +7,7 @@ MESSAGE (STATUS "Python installation dir: ${PYTHON_INSTALL_DIR}")
 
 ADD_CUSTOM_COMMAND (
     OUTPUT solv_python.c
-    COMMAND ${SWIG_EXECUTABLE} -python -I${CMAKE_SOURCE_DIR}/src -o solv_python.c ${CMAKE_SOURCE_DIR}/bindings/solv.i
+    COMMAND ${SWIG_EXECUTABLE} -python ${SWIG_DEFS} -I${CMAKE_SOURCE_DIR}/src -o solv_python.c ${CMAKE_SOURCE_DIR}/bindings/solv.i
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS ${CMAKE_SOURCE_DIR}/bindings/solv.i
 )

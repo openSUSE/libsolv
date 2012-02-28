@@ -17,7 +17,7 @@ MESSAGE (STATUS "Perl installation dir: ${PERL_INSTALL_DIR}")
 
 ADD_CUSTOM_COMMAND (
     OUTPUT solv_perl.c
-    COMMAND ${SWIG_EXECUTABLE} -perl -I${CMAKE_SOURCE_DIR}/src -o solv_perl.c ${CMAKE_SOURCE_DIR}/bindings/solv.i
+    COMMAND ${SWIG_EXECUTABLE} -perl ${SWIG_DEFS} -I${CMAKE_SOURCE_DIR}/src -o solv_perl.c ${CMAKE_SOURCE_DIR}/bindings/solv.i
     COMMAND sed -i -e "s/SvTYPE(tsv) == SVt_PVHV/SvTYPE(tsv) == SVt_PVHV || SvTYPE(tsv) == SVt_PVAV/" solv_perl.c
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS ${CMAKE_SOURCE_DIR}/bindings/solv.i
