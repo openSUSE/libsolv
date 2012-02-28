@@ -287,6 +287,7 @@ SOLV_1.0 {
 		solver_get_lastdecisionblocklevel;
 		solver_get_orphaned;
 		solver_get_recommendations;
+		solver_get_unneeded;
 		solver_next_problem;
 		solver_next_solution;
 		solver_next_solutionelement;

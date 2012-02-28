@@ -294,6 +294,7 @@ extern void solver_get_decisionblock(Solver *solv, int level, Queue *decisionq);
 
 extern void solver_get_orphaned(Solver *solv, Queue *orphanedq);
 extern void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *suggestionsq, int noselected);
+extern void solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered);
 
 extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
 extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);

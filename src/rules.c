@@ -30,7 +30,7 @@
 #define RULES_BLOCK 63
 
 static void addrpmruleinfo(Solver *solv, Id p, Id d, int type, Id dep);
-static void solver_createcleandepsmap(Solver *solv);
+static void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded);
 
 /*-------------------------------------------------------------------
  * Check if dependency is possible
@@ -1643,7 +1643,7 @@ solver_disablepolicyrules(Solver *solv)
     }
   if (solv->cleandepsmap.size)
     {
-      solver_createcleandepsmap(solv);
+      solver_createcleandepsmap(solv, &solv->cleandepsmap, 0);
       for (i = solv->installed->start; i < solv->installed->end; i++)
 	if (MAPTST(&solv->cleandepsmap, i - solv->installed->start))
 	  queue_push2(&allq, DISABLE_UPDATE, i);
@@ -1700,7 +1700,7 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
     }
   if (solv->cleandepsmap.size)
     {
-      solver_createcleandepsmap(solv);
+      solver_createcleandepsmap(solv, &solv->cleandepsmap, 0);
       for (i = solv->installed->start; i < solv->installed->end; i++)
 	if (MAPTST(&solv->cleandepsmap, i - solv->installed->start))
 	  queue_push2(&allq, DISABLE_UPDATE, i);
@@ -2298,7 +2298,7 @@ dep_pkgcheck(Solver *solv, Id dep, Map *m, Queue *q)
 	}
     }
   FOR_PROVIDES(p, pp, dep)
-    if (MAPTST(m, p))
+    if (!m || MAPTST(m, p))
       queue_push(q, p);
 }
 
@@ -2319,9 +2319,13 @@ dep_pkgcheck(Solver *solv, Id dep, Map *m, Queue *q)
  *
  * The cleandeps packages are the packages removed in the first
  * pass and not added back in the second pass.
+ *
+ * If we search for unneeded packages (unneeded is true), we
+ * simply remove all packages except the userinstalled ones in
+ * the first pass.
  */
 static void
-solver_createcleandepsmap(Solver *solv)
+solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
@@ -2337,12 +2341,12 @@ solver_createcleandepsmap(Solver *solv)
   Queue iq;
   int i;
 
-  if (installed->end == installed->start)
+  map_empty(cleandepsmap);
+  if (!installed || installed->end == installed->start)
     return;
   map_init(&userinstalled, installed->end - installed->start);
   map_init(&im, pool->nsolvables);
   map_init(&installedm, pool->nsolvables);
-  map_empty(&solv->cleandepsmap);
   queue_init(&iq);
 
   for (i = 0; i < job->count; i += 2)
@@ -2387,6 +2391,26 @@ solver_createcleandepsmap(Solver *solv)
 	}
       dataiterator_free(&di);
     }
+  if (1)
+    {
+      /* all products and their buddies are userinstalled */
+      for (p = installed->start; p < installed->end; p++)
+	{
+	  Solvable *s = pool->solvables + p;
+	  if (s->repo != installed)
+	    continue;
+	  if (!strncmp("product:", pool_id2str(pool, s->name), 8))
+	    {
+	      MAPSET(&userinstalled, p - installed->start);
+	      if (pool->nscallback)
+		{
+		  Id buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, p);
+		  if (buddy >= installed->start && buddy < installed->end && pool->solvables[buddy].repo == installed)
+		    MAPSET(&userinstalled, buddy);
+		}
+	    }
+	}
+    }
   
   /* add all positive elements (e.g. locks) to "userinstalled" */
   for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
@@ -2414,6 +2438,8 @@ solver_createcleandepsmap(Solver *solv)
 	  if (pool->solvables[p].repo != installed)
 	    continue;
 	  MAPCLR(&userinstalled, p - installed->start);
+	  if (unneeded)
+	    continue;
 	  i = solv->ruletojob.elements[rid - solv->jobrules];
 	  how = job->elements[i];
 	  if ((how & (SOLVER_JOBMASK|SOLVER_CLEANDEPS)) == (SOLVER_ERASE|SOLVER_CLEANDEPS))
@@ -2421,6 +2447,8 @@ solver_createcleandepsmap(Solver *solv)
 	}
       else if (r->p > 0)
 	{
+	  if (unneeded)
+	    continue;
 	  i = solv->ruletojob.elements[rid - solv->jobrules];
 	  if ((job->elements[i] & SOLVER_CLEANDEPS) == SOLVER_CLEANDEPS)
 	    {
@@ -2474,25 +2502,37 @@ solver_createcleandepsmap(Solver *solv)
 	    }
 	}
     }
-  if (solv->cleandeps_updatepkgs)
-    for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
-      queue_push(&iq, solv->cleandeps_updatepkgs->elements[i]);
+
+  if (!unneeded)
+    {
+      if (solv->cleandeps_updatepkgs)
+	for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
+	  queue_push(&iq, solv->cleandeps_updatepkgs->elements[i]);
+    }
+
+  if (unneeded)
+    queue_empty(&iq);	/* just in case... */
 
   for (p = installed->start; p < installed->end; p++)
     {
       if (pool->solvables[p].repo != installed)
 	continue;
       MAPSET(&installedm, p);
+      if (unneeded && !MAPTST(&userinstalled, p - installed->start))
+	continue;
       MAPSET(&im, p);
     }
 
 #ifdef CLEANDEPSDEBUG
   printf("REMOVE PASS\n");
 #endif
+
   for (;;)
     {
       if (!iq.count)
 	{
+	  if (unneeded)
+	    break;
 	  /* supplements pass */
 	  for (ip = solv->installed->start; ip < solv->installed->end; ip++)
 	    {
@@ -2737,12 +2777,359 @@ solver_createcleandepsmap(Solver *solv)
       if (pool->solvables[p].repo != installed)
 	continue;
       if (!MAPTST(&im, p))
-        MAPSET(&solv->cleandepsmap, p - installed->start);
+        MAPSET(cleandepsmap, p - installed->start);
     }
   map_free(&im);
   map_free(&installedm);
   map_free(&userinstalled);
 }
 
+
+struct trj_data {
+  Queue *edges;
+  Id *stack;
+  Id nstack;
+  Id *low;
+  Id firstidx;
+  Id idx;
+};
+
+/* Tarjan's SCC algorithm, see policy.c for comments ;) */
+static void
+trj_visit(struct trj_data *trj, Id node)
+{
+  Id *low = trj->low;
+  Queue *edges = trj->edges;
+  Id myidx, stackstart;
+  int i;
+
+  low[node] = myidx = trj->idx++;
+  trj->stack[(stackstart = trj->nstack++)] = node;
+  if (edges->elements[node])
+    {
+      for (i = edges->elements[node]; edges->elements[i]; i++)
+	{
+	  Id nnode = edges->elements[i];
+	  Id l = low[nnode];
+	  if (!l)
+	    {
+	      if (!edges->elements[nnode])
+		{
+		  trj->idx++;
+		  low[nnode] = -1;
+		  continue;
+		}
+	      trj_visit(trj, nnode);
+	      l = low[i];
+	    }
+	  if (l < 0)
+	    continue;
+	  if (l < trj->firstidx)
+	    {
+	      int k;
+	      for (k = l; ; k++)
+		if (low[trj->stack[k]] == l)
+		  low[trj->stack[k]] = -1;
+		else
+		  break;
+	    }
+	  else if (l < low[node])
+	    low[node] = l;
+	}
+    }
+  if (low[node] == myidx)
+    {
+      if (myidx != trj->firstidx)
+	myidx = -1;
+      for (i = stackstart; i < trj->nstack; i++)
+	low[trj->stack[i]] = myidx;
+      trj->nstack = stackstart;
+    }
+}
+
+static void
+unneeded_filter_reverse(Solver *solv, Queue *unneededq)
+{
+  Pool *pool = solv->pool;
+  struct trj_data trj;
+  Queue edges;
+  int i, j, count = unneededq->count;
+
+  /* leave first element zero to make things easier */
+  /* also add trailing zero */
+  queue_init(&edges);
+  queue_insertn(&edges, 0, 1 + count + count + 1);
+  for (i = 0; i < count; i++)
+    {
+      Solvable *s = pool->solvables + unneededq->elements[i];
+      edges.elements[i + 1] = edges.count;
+      if (s->requires)
+	{
+	  Id p, pp, *dp;
+	  for (dp = s->repo->idarraydata + s->requires; *dp; dp++)
+	    FOR_PROVIDES(p, pp, *dp)
+	      {
+		Solvable *sp = pool->solvables + p;
+		if (sp->repo != solv->installed)
+		  continue;
+		if (p == unneededq->elements[i])
+		  continue;
+		for (j = 0; j < count; j++)
+		  if (p == unneededq->elements[j])
+		    break;
+		if (j < count && edges.elements[edges.count - 1] != j + 1)
+		  {
+		    queue_push(&edges, j + 1);
+		    edges.elements[1 + count + j]++;	/* count number of edges going to j */
+		  }
+	      }
+	}
+      queue_push(&edges, 0);
+    }
+  /* invert edges */
+  for (i = 0; i < count; i++)
+    {
+      j = edges.elements[1 + count + i];
+      if (!j)
+	continue;
+      queue_insertn(&edges, edges.count, j + 1);
+      edges.elements[1 + count + i] = edges.count - 1;
+    }
+  for (i = 0; i < count; i++)
+    {
+      for (j = edges.elements[i + 1]; edges.elements[j]; j++)
+	{
+	  int k = edges.elements[j];
+	  edges.elements[--edges.elements[count + k]] = i + 1;
+	}
+    }
+  /* delete forward edge block */
+  queue_deleten(&edges, 1, count);
+  for (i = 0; i < count; i++)
+    if (edges.elements[i + 1])
+      edges.elements[i + 1] -= count;
+
+  /* now run SCC again */
+  trj.edges = &edges;
+  trj.low = solv_calloc(count + 1, 2 * sizeof(Id));
+  trj.idx = 1;
+  trj.stack = trj.low + count;
+  for (i = 1; i <= count; i++)
+    {
+      if (trj.low[i])
+	continue;
+      if (edges.elements[i])
+	{
+	  trj.firstidx = trj.nstack = trj.idx;
+	  trj_visit(&trj, i);
+	}
+      else
+	{
+	  Id myidx = trj.idx++;
+	  trj.low[i] = myidx;
+	  trj.stack[myidx] = i;
+	}
+    }
+
+  /* finally prune to remaining SCCs */
+  for (i = j = 0; i < count; i++)
+    if (trj.low[i + 1] > 0)
+      unneededq->elements[j++] = unneededq->elements[i];
+  queue_truncate(unneededq, j);
+
+  /* free mem */
+  queue_free(&edges);
+  solv_free(trj.low);
+}
+
+void
+solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
+{
+  Repo *installed = solv->installed;
+  int i;
+  Map cleandepsmap;
+  struct trj_data trj;
+
+  queue_empty(unneededq);
+  if (!installed || installed->end == installed->start)
+    return;
+  map_init(&cleandepsmap, installed->end - installed->start);
+  solver_createcleandepsmap(solv, &cleandepsmap, 1);
+  for (i = installed->start; i < installed->end; i++)
+    if (MAPTST(&cleandepsmap, i - installed->start))
+      queue_push(unneededq, i);
+  if (filtered && unneededq->count > 1)
+    {
+      Pool *pool = solv->pool;
+      Queue edges;
+      Queue iq;
+      Map installedm;
+      int count = unneededq->count;
+
+      queue_init(&edges);
+      map_init(&installedm, pool->nsolvables);
+      for (i = installed->start; i < installed->end; i++)
+	if (pool->solvables[i].repo == installed)
+	  MAPSET(&installedm, i);
+
+      /* leave first element zero to make things easier */
+      /* also add trailing zero */
+      queue_insertn(&edges, 0, count + 1 + 1);
+
+      /* first requires and recommends */
+      for (i = 0; i < count; i++)
+	{
+	  Solvable *s = pool->solvables + unneededq->elements[i];
+	  int pass;
+
+	  edges.elements[i + 1] = edges.count;
+	  for (pass = 0; pass < 2; pass++)
+	    {
+	      unsigned int off = pass == 0 ? s->requires : s->recommends;
+	      if (off)
+		{
+		  Id p, pp, *dp;
+		  int j;
+		  for (dp = s->repo->idarraydata + off; *dp; dp++)
+		    FOR_PROVIDES(p, pp, *dp)
+		      {
+			Solvable *sp = pool->solvables + p;
+			if (p == unneededq->elements[i] || sp->repo != installed || !MAPTST(&cleandepsmap, p - installed->start))
+			  continue;
+			for (j = 0; j < count; j++)
+			  if (p == unneededq->elements[j])
+			    break;
+			if (j < count && edges.elements[edges.count - 1] != j + 1)
+			  queue_push(&edges, j + 1);
+		      }
+		}
+	    }
+	  queue_push(&edges, 0);
+	}
+
+#if 0
+      printf("requires + recommends\n");
+      for (i = 0; i < count; i++)
+	{
+	  int j;
+	  printf("  %s:\n", pool_solvid2str(pool, unneededq->elements[i]));
+	  for (j = edges.elements[i + 1]; edges.elements[j]; j++)
+	    printf("    - %s\n", pool_solvid2str(pool, unneededq->elements[edges.elements[j] - 1]));
+	}
+#endif
+
+      /* then add supplements */
+      queue_init(&iq);
+      for (i = 0; i < count; i++)
+	{
+	  Solvable *s = pool->solvables + unneededq->elements[i];
+	  if (s->supplements)
+	    {
+	      Id *dp;
+	      int j, k;
+	      for (dp = s->repo->idarraydata + s->supplements; *dp; dp++)
+		if (dep_possible(solv, *dp, &installedm))
+		  {
+		    queue_empty(&iq);
+		    dep_pkgcheck(solv, *dp, 0, &iq);
+		    for (k = 0; k < iq.count; k++)
+		      {
+			Id p = iq.elements[k];
+			Solvable *sp = pool->solvables + p;
+			if (p == unneededq->elements[i] || sp->repo != installed || !MAPTST(&cleandepsmap, p - installed->start))
+			  continue;
+			for (j = 0; j < count; j++)
+			  if (p == unneededq->elements[j])
+			    break;
+			/* now add edge from j + 1 to i + 1 */
+			queue_insert(&edges, edges.elements[j + 1], i + 1);
+			/* addapt following edge pointers */
+			for (k = j + 2; k < count + 2; k++)
+			  edges.elements[k]++;
+		      }
+		  }
+	    }
+	}
+      map_free(&installedm);
+#if 0
+      /* print result */
+      printf("+ supplements\n");
+      for (i = 0; i < count; i++)
+	{
+	  int j;
+	  printf("  %s:\n", pool_solvid2str(pool, unneededq->elements[i]));
+	  for (j = edges.elements[i + 1]; edges.elements[j]; j++)
+	    printf("    - %s\n", pool_solvid2str(pool, unneededq->elements[edges.elements[j] - 1]));
+	}
+#endif
+
+      /* make nodes with no edges have 0 in the edge pointer */
+      for (i = 0; i < count; i++)
+	if (!edges.elements[edges.elements[i + 1]])
+	  edges.elements[i + 1] = 0;
+
+      /* now run SCC algo */
+      trj.edges = &edges;
+      /* we use +2 instead of +1 to make sure that the stack end
+       * contains a zero. this makes sure that SCC traversing
+       * below stays in the allocated area */
+      trj.low = solv_calloc(count + 2, 2 * sizeof(Id));
+      trj.idx = 1;
+      trj.stack = trj.low + count;
+      for (i = 1; i <= count; i++)
+	{
+	  if (trj.low[i])
+	    continue;
+	  if (edges.elements[i])
+	    {
+	      trj.firstidx = trj.nstack = trj.idx;
+	      trj_visit(&trj, i);
+	    }
+	  else
+	    {
+	      Id myidx = trj.idx++;
+	      trj.low[i] = myidx;
+	      trj.stack[myidx] = i;
+	    }
+	}
+
+      /* go through every found SCC */
+      map_empty(&cleandepsmap);
+      for (i = 1; i <= count; i++)
+	{
+	  Id l = trj.low[i];
+	  if (l > 0)
+	    {
+	      int k;
+	      queue_empty(&iq);
+	      for (k = l; ; k++)
+		if (trj.low[trj.stack[k]] == l)
+		  {
+		    queue_push(&iq, unneededq->elements[trj.stack[k] - 1]);
+		    trj.low[trj.stack[k]] = -1;
+		  }
+		else
+		  break;
+	      /* collected the SCC in iq.
+	       * If we have more then one element do reverse filtering
+               * with just the inverted requires. The idea is that the
+               * packages were dragged in via recommends/supplements and
+               * require the main package. */
+	      if (iq.count > 1)
+		unneeded_filter_reverse(solv, &iq);
+	      for (k = 0; k < iq.count; k++)
+		MAPSET(&cleandepsmap, iq.elements[k] - installed->start);
+	    }
+	}
+      queue_free(&iq);
+      solv_free(trj.low);
+      queue_free(&edges);
+      queue_empty(unneededq);
+      for (i = installed->start; i < installed->end; i++)
+	if (MAPTST(&cleandepsmap, i - installed->start))
+	  queue_push(unneededq, i);
+    }
+  map_free(&cleandepsmap);
+}
 
 /* EOF */
