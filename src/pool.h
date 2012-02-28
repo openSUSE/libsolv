@@ -119,7 +119,6 @@ struct _Pool {
   /* search position */
   Datapos pos;
 
-#ifdef LIBSOLV_INTERNAL
   /* flags to tell the library how the installed package manager works */
   int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */
   int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
@@ -128,6 +127,7 @@ struct _Pool {
   int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
   int forbidselfconflicts;	/* true: packages which conflict with itself are not installable */
 
+#ifdef LIBSOLV_INTERNAL
   /* hash for rel unification */
   Hashtable relhashtbl;		/* hashtable: (name,evr,op)Hash -> Id */
   Hashmask relhashmask;

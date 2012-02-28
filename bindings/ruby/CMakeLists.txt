@@ -11,7 +11,7 @@ MESSAGE (STATUS "Ruby installation dir: ${RUBY_INSTALL_DIR}")
 
 ADD_CUSTOM_COMMAND (
     OUTPUT solv_ruby.c
-    COMMAND ${SWIG_EXECUTABLE} -ruby -I${CMAKE_SOURCE_DIR}/src -o solv_ruby.c ${CMAKE_SOURCE_DIR}/bindings/solv.i
+    COMMAND ${SWIG_EXECUTABLE} -ruby ${SWIG_DEFS} -I${CMAKE_SOURCE_DIR}/src -o solv_ruby.c ${CMAKE_SOURCE_DIR}/bindings/solv.i
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS ${CMAKE_SOURCE_DIR}/bindings/solv.i
 )
