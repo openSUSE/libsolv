@@ -1819,7 +1819,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	  for (i = 1; i < npieces; i++)
 	    testcase_setsolverflags(solv, pieces[i]);
         }
-      else if (!strcmp(pieces[0], "result") && npieces > 1)
+      else if (!strcmp(pieces[0], "result") && npieces > 2)
 	{
 	  FILE *rfp;
 	  const char *rdata;
