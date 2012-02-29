@@ -1478,6 +1478,7 @@ cleandeps_check_mistakes(Solver *solv, int level)
 		    }
 		  queue_push(solv->cleandeps_mistakes, i);
 		  MAPCLR(&solv->cleandepsmap, i - solv->installed->start);
+		  solver_reenablepolicyrules_cleandeps(solv, i);
 		  mademistake = 1;
 		}
 	    }
@@ -1486,7 +1487,7 @@ cleandeps_check_mistakes(Solver *solv, int level)
   if (mademistake)
     {
       level = 1;
-      revert(solv, level);
+      solver_reset(solv);
     }
   return level;
 }

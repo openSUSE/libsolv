@@ -1730,6 +1730,38 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
   queue_free(&q);
 }
 
+/* we just removed a package from the cleandeps map, now reenable all policy rules that were
+ * disabled because of this */
+void
+solver_reenablepolicyrules_cleandeps(Solver *solv, Id pkg)
+{
+  Queue *job = &solv->job;
+  int i, j;
+  Queue allq;
+  Rule *r;
+  Id lastjob = -1;
+  Id allqbuf[128];
+
+  queue_init_buffer(&allq, allqbuf, sizeof(allqbuf)/sizeof(*allqbuf));
+  for (i = solv->jobrules; i < solv->jobrules_end; i++)
+    {
+      r = solv->rules + i;
+      if (r->d < 0)	/* disabled? */
+	continue;
+      j = solv->ruletojob.elements[i - solv->jobrules];
+      if (j == lastjob)
+	continue;
+      lastjob = j;
+      jobtodisablelist(solv, job->elements[j], job->elements[j + 1], &allq);
+    }
+  for (i = 0; i < allq.count; i += 2)
+    if (allq.elements[i] == DISABLE_UPDATE && allq.elements[i + 1] == pkg)
+      break;
+  if (i == allq.count)
+    reenableupdaterule(solv, pkg);
+  queue_free(&allq);
+}
+
 
 /***********************************************************************
  ***

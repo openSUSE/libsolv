@@ -121,6 +121,7 @@ extern void solver_disablechoicerules(struct _Solver *solv, Rule *r);
 /* policy rule disabling/reenabling */
 extern void solver_disablepolicyrules(struct _Solver *solv);
 extern void solver_reenablepolicyrules(struct _Solver *solv, int jobidx);
+extern void solver_reenablepolicyrules_cleandeps(struct _Solver *solv, Id pkg);
 
 /* rule info */
 extern int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
