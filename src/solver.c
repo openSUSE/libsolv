@@ -1444,7 +1444,7 @@ cleandeps_check_mistakes(Solver *solv, int level)
   int mademistake = 0;
 
   if (!solv->cleandepsmap.size)
-    return level;
+    return 0;
   /* check for mistakes */
   for (i = solv->installed->start; i < solv->installed->end; i++)
     {
@@ -1485,11 +1485,8 @@ cleandeps_check_mistakes(Solver *solv, int level)
 	}
     }
   if (mademistake)
-    {
-      level = 1;
-      solver_reset(solv);
-    }
-  return level;
+    solver_reset(solv);
+  return mademistake;
 }
 
 /*-------------------------------------------------------------------
@@ -2177,10 +2174,11 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
      if (solv->installed && solv->cleandepsmap.size)
 	{
-	  olevel = level;
-	  level = cleandeps_check_mistakes(solv, level);
-	  if (level < olevel)
-	    continue;
+	  if (cleandeps_check_mistakes(solv, level))
+	    {
+	      level = 1;	/* restart from scratch */
+	      continue;
+	    }
 	}
 
      if (solv->solution_callback)
