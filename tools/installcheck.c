@@ -144,7 +144,7 @@ main(int argc, char **argv)
 	  repo_add_debpackages(repo, fp, 0);
 	}
 #endif
-      else if (repo_add_solv(repo, fp))
+      else if (repo_add_solv(repo, fp, 0))
 	{
 	  fprintf(stderr, "could not add repo %s\n", argv[i]);
 	  exit(1);

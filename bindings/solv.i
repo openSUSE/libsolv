@@ -1093,12 +1093,12 @@ typedef struct {
     int r;
     if (!fp)
       return 0;
-    r = repo_add_solv_flags($self, fp, flags);
+    r = repo_add_solv($self, fp, flags);
     fclose(fp);
     return r == 0;
   }
   bool add_solv(FILE *fp, int flags = 0) {
-    return repo_add_solv_flags($self, fp, flags) == 0;
+    return repo_add_solv($self, fp, flags) == 0;
   }
 
   XSolvable *add_solvable() {
@@ -2444,7 +2444,7 @@ rb_eval_string(
     Repodata *data = repo_id2repodata($self->repo, $self->id);
     int r, oldstate = data->state;
     data->state = REPODATA_LOADING;
-    r = repo_add_solv_flags(data->repo, fp, flags | REPO_USE_LOADING);
+    r = repo_add_solv(data->repo, fp, flags | REPO_USE_LOADING);
     if (r || data->state == REPODATA_LOADING)
       data->state = oldstate;
     return r;

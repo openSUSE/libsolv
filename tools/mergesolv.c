@@ -49,7 +49,7 @@ loadcallback (Pool *pool, Repodata *data, void *vdata)
       perror(location);
       return 0;
     }
-  r = repo_add_solv_flags(data->repo, fp, REPO_USE_LOADING|REPO_LOCALPOOL);
+  r = repo_add_solv(data->repo, fp, REPO_USE_LOADING|REPO_LOCALPOOL);
   fclose(fp);
   return r ? 0 : 1;
 }
@@ -94,7 +94,7 @@ main(int argc, char **argv)
 	  perror(argv[optind]);
 	  exit(1);
 	}
-      repo_add_solv(repo, fp);
+      repo_add_solv(repo, fp, 0);
       fclose(fp);
     }
   tool_write(repo, basefile, 0);

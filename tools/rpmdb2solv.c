@@ -128,7 +128,7 @@ main(int argc, char **argv)
 	  else
 	    refpool = pool;
 	  ref = repo_create(refpool, "ref");
-	  repo_add_solv(ref, fp);
+	  repo_add_solv(ref, fp, 0);
 	  repo_disable_paging(ref);
 	  fclose(fp);
 	}

@@ -194,7 +194,7 @@ printf("loc %s\n", location);
       perror(location);
       return 0;
     }
-  r = repo_add_solv_flags(data->repo, fp, REPO_USE_LOADING|REPO_LOCALPOOL);
+  r = repo_add_solv(data->repo, fp, REPO_USE_LOADING|REPO_LOCALPOOL);
   fclose(fp);
   return !r ? 1 : 0;
 }
@@ -276,13 +276,13 @@ int main(int argc, char **argv)
 	  exit(1);
 	}
       repo = repo_create(pool, argv[optind]);
-      if (repo_add_solv(repo, stdin))
+      if (repo_add_solv(repo, stdin, 0))
 	printf("could not read repository\n");
     }
   if (!pool->urepos)
     {
       repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
-      if (repo_add_solv(repo, stdin))
+      if (repo_add_solv(repo, stdin, 0))
 	printf("could not read repository\n");
     }
   printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);

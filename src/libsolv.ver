@@ -114,7 +114,6 @@ SOLV_1.0 {
 		repo_add_poolstr_array;
 		repo_add_repodata;
 		repo_add_solv;
-		repo_add_solv_flags;
 		repo_add_solvable;
 		repo_add_solvable_block;
 		repo_addid;

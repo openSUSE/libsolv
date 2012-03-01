@@ -559,7 +559,7 @@ main(int argc, char **argv)
           repo_add_updateinfoxml(c.repo, fp, 0);
 	}
 #endif
-      else if (repo_add_solv(c.repo, fp))
+      else if (repo_add_solv(c.repo, fp, 0))
         {
           fprintf(stderr, "could not add repo %s\n", argv[i]);
           exit(1);

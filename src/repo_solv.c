@@ -414,7 +414,7 @@ incore_add_u8(Repodata *data, unsigned int x)
  */
 
 int
-repo_add_solv_flags(Repo *repo, FILE *fp, int flags)
+repo_add_solv(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   int i, l;
@@ -1323,8 +1323,3 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
   return 0;
 }
 
-int
-repo_add_solv(Repo *repo, FILE *fp)
-{
-  return repo_add_solv_flags(repo, fp, 0);
-}

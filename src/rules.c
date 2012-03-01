@@ -2419,7 +2419,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		  if (strncmp(pool_id2str(pool, pool->solvables[p].name), "pattern", 7) != 0)
 		    continue;
 		  MAPSET(&userinstalled, p - installed->start);
-	    }
+		}
 	}
       dataiterator_free(&di);
     }

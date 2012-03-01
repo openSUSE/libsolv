@@ -19,6 +19,7 @@
 #include "poolvendor.h"
 #include "repo.h"
 #include "repo_susetags.h"
+#include "repo_solv.h"
 #include "solver.h"
 #include "solverdebug.h"
 #include "chksum.h"
@@ -1720,6 +1721,11 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	      else if (!strcmp(pieces[3], "susetags"))
 		{
 		  testcase_add_susetags(repo, rfp, 0);
+		  fclose(rfp);
+		}
+	      else if (!strcmp(pieces[3], "solv"))
+		{
+		  repo_add_solv(repo, rfp, 0);
 		  fclose(rfp);
 		}
 	      else

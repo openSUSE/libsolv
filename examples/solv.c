@@ -1062,7 +1062,7 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
         flags |= REPO_LOCALPOOL;	/* no local pool for DL so that we can compare IDs */
     }
 
-  if (repo_add_solv_flags(repo, fp, flags))
+  if (repo_add_solv(repo, fp, flags))
     {
       fclose(fp);
       return 0;
@@ -1176,7 +1176,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 	    {
 	      /* main repo */
 	      repo_empty(repo, 1);
-	      if (repo_add_solv_flags(repo, fp, SOLV_ADD_NO_STUBS))
+	      if (repo_add_solv(repo, fp, SOLV_ADD_NO_STUBS))
 		{
 		  /* oops, no way to recover from here */
 		  fprintf(stderr, "internal error\n");
@@ -1190,7 +1190,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 	      repodata_extend_block(info, repo->start, repo->end - repo->start);
 	      info->state = REPODATA_LOADING;
 	      /* no need for LOCALPOOL as pool already contains ids */
-	      repo_add_solv_flags(repo, fp, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+	      repo_add_solv(repo, fp, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
 	      info->state = REPODATA_AVAILABLE;	/* in case the load failed */
 	    }
 	  fclose(fp);
@@ -1654,7 +1654,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
 	{
 	  Repo *ref = repo_create(pool, "@System.old");
-	  if (!repo_add_solv(ref, ofp))
+	  if (!repo_add_solv(ref, ofp, 0))
 	    {
 	      repo_add_rpmdb(repo, ref, 0, REPO_REUSE_REPODATA);
 	      done = 1;
