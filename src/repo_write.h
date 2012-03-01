@@ -16,8 +16,9 @@
 #include <stdio.h>
 
 #include "repo.h"
+#include "queue.h"
 
-extern int repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp);
+extern int repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq);
 extern int repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata);
 
 extern int repodata_write(Repodata *data , FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata);

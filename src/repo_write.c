@@ -975,7 +975,7 @@ repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata)
  * 5) write everything to disk
  */
 int
-repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Id **keyarrayp)
+repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq)
 {
   Pool *pool = repo->pool;
   int i, j, n;
@@ -1250,14 +1250,11 @@ for (i = 1; i < target.nkeys; i++)
 #endif
 
   /* copy keys if requested */
-  if (keyarrayp)
+  if (keyq)
     {
-      *keyarrayp = solv_calloc(2 * target.nkeys + 1, sizeof(Id));
+      queue_empty(keyq);
       for (i = 1; i < target.nkeys; i++)
-	{
-          (*keyarrayp)[2 * i - 2] = target.keys[i].name;
-          (*keyarrayp)[2 * i - 1] = target.keys[i].type;
-	}
+	queue_push2(keyq, target.keys[i].name, target.keys[i].type);
     }
 
   if (poolusage > 1)
@@ -1453,21 +1450,17 @@ for (i = 1; i < target.nkeys; i++)
       if (i != n)
 	{
 	  target.keys[n] = target.keys[i];
-	  if (keyarrayp)
+	  if (keyq)
 	    {
-	      (*keyarrayp)[2 * n - 2] = (*keyarrayp)[2 * i - 2];
-	      (*keyarrayp)[2 * n - 1] = (*keyarrayp)[2 * i - 1];
+	      keyq->elements[2 * n - 2] = keyq->elements[2 * i - 2];
+	      keyq->elements[2 * n - 1] = keyq->elements[2 * i - 1];
 	    }
 	}
       n++;
     }
   target.nkeys = n;
-  if (keyarrayp)
-    {
-      /* terminate array */
-      (*keyarrayp)[2 * n - 2] = 0;
-      (*keyarrayp)[2 * n - 1] = 0;
-    }
+  if (keyq)
+    queue_truncate(keyq, 2 * n - 2);
 
   /* update schema data to the new key ids */
   for (i = 1; i < target.schemadatalen; i++)

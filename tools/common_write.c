@@ -176,17 +176,15 @@ keyfilter_other(Repo *repo, Repokey *key, void *kfdata)
 static void
 write_info(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Repodata *info, const char *location)
 {
-  Id h, *keyarray = 0;
-  int i;
+  Id h;
+  Queue keyq;
 
-  repo_write(repo, fp, keyfilter, kfdata, &keyarray);
+  queue_init(&keyq);
+  repo_write(repo, fp, keyfilter, kfdata, &keyq);
   h = repodata_new_handle(info);
-  if (keyarray)
-    {
-      for (i = 0; keyarray[i]; i++)
-        repodata_add_idarray(info, h, REPOSITORY_KEYS, keyarray[i]);
-    }
-  solv_free(keyarray);
+  if (keyq.count)
+    repodata_set_idarray(info, h, REPOSITORY_KEYS, &keyq);
+  queue_free(&keyq);
   repodata_set_str(info, h, REPOSITORY_LOCATION, location);
   repodata_add_flexarray(info, SOLVID_META, REPOSITORY_EXTERNAL, h);
 }
