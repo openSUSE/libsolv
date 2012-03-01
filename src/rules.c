@@ -2575,6 +2575,8 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		continue;
 	      if (!MAPTST(&im, ip))
 		continue;
+	      if (MAPTST(&userinstalled, ip - installed->start))
+		continue;
 	      supp = s->repo->idarraydata + s->supplements;
 	      while ((sup = *supp++) != 0)
 		if (dep_possible(solv, sup, &im))
