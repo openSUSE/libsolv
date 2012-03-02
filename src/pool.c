@@ -1149,7 +1149,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 }
 
 void
-pool_addfileprovides_queue(Pool *pool, Queue *idq)
+pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
 {
   Solvable *s;
   Repo *installed, *repo;
@@ -1167,6 +1167,8 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq)
 
   if (idq)
     queue_empty(idq);
+  if (idqinst)
+    queue_empty(idqinst);
   isfp = installed ? &isf : 0;
   for (i = 1, s = pool->solvables + i; i < pool->nsolvables; i++, s++)
     {
@@ -1202,6 +1204,9 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq)
       if (idq)
         for (i = 0; i < sf.nfiles; i++)
 	  queue_push(idq, sf.ids[i]);
+      if (idqinst)
+        for (i = 0; i < sf.nfiles; i++)
+	  queue_push(idqinst, sf.ids[i]);
       solv_free(sf.ids);
       for (i = 0; i < sf.nfiles; i++)
 	{
@@ -1219,6 +1224,9 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq)
 #endif
       if (installed)
         pool_addfileprovides_search(pool, &cbd, &isf, installed);
+      if (installed && idqinst)
+        for (i = 0; i < isf.nfiles; i++)
+	  queue_pushunique(idqinst, isf.ids[i]);
       solv_free(isf.ids);
       for (i = 0; i < isf.nfiles; i++)
 	{
@@ -1236,7 +1244,7 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq)
 void
 pool_addfileprovides(Pool *pool)
 {
-  pool_addfileprovides_queue(pool, 0);
+  pool_addfileprovides_queue(pool, 0, 0);
 }
 
 void

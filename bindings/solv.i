@@ -955,7 +955,7 @@ typedef struct {
   Queue addfileprovides_queue() {
     Queue r;
     queue_init(&r);
-    pool_addfileprovides_queue($self, &r);
+    pool_addfileprovides_queue($self, &r, 0);
     return r;
   }
   void createwhatprovides() {

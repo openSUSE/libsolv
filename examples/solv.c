@@ -2505,7 +2505,7 @@ addsoftlocks(Pool *pool, Queue *job)
 
 
 void
-rewrite_repos(Pool *pool, Queue *addedfileprovides)
+rewrite_repos(Pool *pool, Queue *addedfileprovides, Queue *addedfileprovides_inst)
 {
   Repo *repo;
   Repodata *data;
@@ -2536,14 +2536,30 @@ rewrite_repos(Pool *pool, Queue *addedfileprovides)
 	continue;	/* found a non-externsion repodata, can't rewrite  */
       if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
 	{
+	  if (repo == pool->installed && addedfileprovides_inst)
+	    {
+	      for (j = 0; j < addedfileprovides->count; j++)
+		MAPCLR(&providedids, addedfileprovides->elements[j]);
+	      for (j = 0; j < addedfileprovides_inst->count; j++)
+		MAPSET(&providedids, addedfileprovides_inst->elements[j]);
+	    }
 	  n = 0;
 	  for (j = 0; j < fileprovidesq.count; j++)
 	    if (MAPTST(&providedids, fileprovidesq.elements[j]))
 	      n++;
-	  if (n == addedfileprovides->count)
+	  if (repo == pool->installed && addedfileprovides_inst)
+	    {
+	      for (j = 0; j < addedfileprovides_inst->count; j++)
+		MAPCLR(&providedids, addedfileprovides_inst->elements[j]);
+	      for (j = 0; j < addedfileprovides->count; j++)
+		MAPSET(&providedids, addedfileprovides->elements[j]);
+	      if (n == addedfileprovides_inst->count)
+		continue;	/* nothing new added */
+	    }
+	  else if (n == addedfileprovides->count)
 	    continue;	/* nothing new added */
 	}
-      repodata_set_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, addedfileprovides);
+      repodata_set_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, repo == pool->installed && addedfileprovides_inst ? addedfileprovides_inst : addedfileprovides);
       repodata_internalize(data);
       cinfo = repo->appdata;
       writecachedrepo(repo, data, 0, cinfo ? cinfo->cookie : installedcookie);
@@ -2652,6 +2668,7 @@ main(int argc, char **argv)
   int allpkgs = 0;
   FILE **newpkgsfps;
   Queue addedfileprovides;
+  Queue addedfileprovides_inst;
   Id repofilter = 0;
   int cleandeps = 0;
 
@@ -2863,10 +2880,12 @@ main(int argc, char **argv)
   // FOR_REPOS(i, repo)
   //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
   queue_init(&addedfileprovides);
-  pool_addfileprovides_queue(pool, &addedfileprovides);
-  if (addedfileprovides.count)
-    rewrite_repos(pool, &addedfileprovides);
+  queue_init(&addedfileprovides_inst);
+  pool_addfileprovides_queue(pool, &addedfileprovides, &addedfileprovides_inst);
+  if (addedfileprovides.count || addedfileprovides_inst.count)
+    rewrite_repos(pool, &addedfileprovides, &addedfileprovides_inst);
   queue_free(&addedfileprovides);
+  queue_free(&addedfileprovides_inst);
   pool_createwhatprovides(pool);
 
   queue_init(&job);

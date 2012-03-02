@@ -205,7 +205,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
   info = repo_add_repodata(repo, 0);
   repodata_set_str(info, SOLVID_META, REPOSITORY_TOOLVERSION, LIBSOLV_TOOLVERSION);
   queue_init(&addedfileprovides);
-  pool_addfileprovides_queue(repo->pool, &addedfileprovides);
+  pool_addfileprovides_queue(repo->pool, &addedfileprovides, 0);
   if (addedfileprovides.count)
     {
       kd.haveaddedfileprovides = 1;
