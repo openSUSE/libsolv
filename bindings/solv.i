@@ -1169,13 +1169,13 @@ typedef struct {
     return repo_lookup_num($self, entry, keyname, notfound);
   }
   void write(FILE *fp) {
-    repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
+    repo_write($self, fp);
   }
   # HACK, remove if no longer needed!
   bool write_first_repodata(FILE *fp) {
     int oldnrepodata = $self->nrepodata;
     $self->nrepodata = oldnrepodata > 2 ? 2 : oldnrepodata;
-    repo_write($self, fp, repo_write_stdkeyfilter, 0, 0);
+    repo_write($self, fp);
     $self->nrepodata = oldnrepodata;
     return 1;
   }
@@ -2438,7 +2438,7 @@ rb_eval_string(
     repodata_create_stubs(repo_id2repodata($self->repo, $self->id));
   }
   void write(FILE *fp) {
-    repodata_write(repo_id2repodata($self->repo, $self->id), fp, repo_write_stdkeyfilter, 0);
+    repodata_write(repo_id2repodata($self->repo, $self->id), fp);
   }
   bool add_solv(FILE *fp, int flags = 0) {
     Repodata *data = repo_id2repodata($self->repo, $self->id);

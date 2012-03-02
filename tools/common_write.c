@@ -180,7 +180,7 @@ write_info(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   Queue keyq;
 
   queue_init(&keyq);
-  repo_write(repo, fp, keyfilter, kfdata, &keyq);
+  repo_write_filtered(repo, fp, keyfilter, kfdata, &keyq);
   h = repodata_new_handle(info);
   if (keyq.count)
     repodata_set_idarray(info, h, REPOSITORY_KEYS, &keyq);
@@ -298,7 +298,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       kd.languages = languages;
       kd.nlanguages = nlanguages;
       repodata_internalize(info);
-      repo_write(repo, fp, keyfilter_other, &kd, 0);
+      repo_write_filtered(repo, fp, keyfilter_other, &kd, 0);
       fclose(fp);
       for (i = 0; i < nlanguages; i++)
 	free(languages[i]);
@@ -316,7 +316,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       kd.haveexternal = 1;
     }
   repodata_internalize(info);
-  repo_write(repo, stdout, keyfilter_solv, &kd, 0);
+  repo_write_filtered(repo, stdout, keyfilter_solv, &kd, 0);
   repodata_free(info);
   return 0;
 }

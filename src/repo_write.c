@@ -975,7 +975,7 @@ repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata)
  * 5) write everything to disk
  */
 int
-repo_write(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq)
+repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq)
 {
   Pool *pool = repo->pool;
   int i, j, n;
@@ -1936,12 +1936,24 @@ repodata_write_keyfilter(Repo *repo, Repokey *key, void *kfdata)
 }
 
 int
-repodata_write(Repodata *data, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata)
+repodata_write_filtered(Repodata *data, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq)
 {
   struct repodata_write_data wd;
 
   wd.keyfilter = keyfilter;
   wd.kfdata = kfdata;
   wd.repodataid = data->repodataid;
-  return repo_write(data->repo, fp, repodata_write_keyfilter, &wd, 0);
+  return repo_write_filtered(data->repo, fp, repodata_write_keyfilter, &wd, keyq);
+}
+
+int
+repodata_write(Repodata *data, FILE *fp)
+{
+  return repodata_write_filtered(data, fp, repo_write_stdkeyfilter, 0, 0);
+}
+
+int
+repo_write(Repo *repo, FILE *fp)
+{
+  return repo_write_filtered(repo, fp, repo_write_stdkeyfilter, 0, 0);
 }

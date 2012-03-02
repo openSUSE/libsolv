@@ -1114,14 +1114,14 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
     onepiece = 0;
 
   if (!info)
-    repo_write(repo, fp, repo_write_stdkeyfilter, 0, 0);
+    repo_write(repo, fp);
   else if (repoext)
-    repodata_write(info, fp, repo_write_stdkeyfilter, 0);
+    repodata_write(info, fp);
   else
     {
       int oldnrepodata = repo->nrepodata;
       repo->nrepodata = oldnrepodata > 2 ? 2 : oldnrepodata;	/* XXX: do this right */
-      repo_write(repo, fp, repo_write_stdkeyfilter, 0, 0);
+      repo_write(repo, fp);
       repo->nrepodata = oldnrepodata;
       onepiece = 0;
     }

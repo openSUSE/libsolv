@@ -149,6 +149,7 @@ SOLV_1.0 {
 		repo_set_str;
 		repo_sidedata_create;
 		repo_write;
+		repo_write_filtered;
 		repo_write_stdkeyfilter;
 		repodata_add_dirnumnum;
 		repodata_add_dirstr;
@@ -206,6 +207,7 @@ SOLV_1.0 {
 		repodata_stringify;
 		repodata_swap_attrs;
 		repodata_write;
+		repodata_write_filtered;
 		repopagestore_compress_page;
 		solv_bin2hex;
 		solv_calloc;
