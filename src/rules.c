@@ -2265,6 +2265,26 @@ static void solver_createcleandepsmap(Solver *solv)
 	}
       dataiterator_free(&di);
     }
+  if (1)
+    {    
+      /* all products and their buddies are userinstalled */
+      for (p = installed->start; p < installed->end; p++) 
+	{
+	  Solvable *s = pool->solvables + p; 
+	  if (s->repo != installed)
+	    continue;
+	  if (!strncmp("product:", pool_id2str(pool, s->name), 8))
+	    {
+	      MAPSET(&userinstalled, p - installed->start);
+	      if (pool->nscallback)
+		{
+		  Id buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, p);
+		  if (buddy >= installed->start && buddy < installed->end && pool->solvables[buddy].repo == installed)
+		    MAPSET(&userinstalled, buddy);
+		}
+	    }
+	}
+    }    
 
   /* add all positive elements (e.g. locks) to "userinstalled" */
   for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
