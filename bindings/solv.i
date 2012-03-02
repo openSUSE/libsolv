@@ -299,7 +299,7 @@ SWIG_Perl_NewArrayObj(SWIG_MAYBE_PERL_OBJECT void *ptr, swig_type_info *t, int f
 #if defined(SWIGPYTHON)
 typedef PyObject *AppObjectPtr;
 %typemap(out) AppObjectPtr {
-  $result = $1;
+  $result = $1 ? $1 : Py_None;
   Py_INCREF($result);
 }
 #endif
