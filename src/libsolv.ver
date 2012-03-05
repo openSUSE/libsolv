@@ -320,6 +320,7 @@ SOLV_1.0 {
 		solver_solutionelement2str;
 		solver_solutionelement_count;
 		solver_solutionelement_internalid;
+		solver_solutionelement_extrajobflags;
 		solver_solve;
 		solver_take_solution;
 		solver_take_solutionelement;

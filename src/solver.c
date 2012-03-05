@@ -103,6 +103,66 @@ solver_dep_installed(Solver *solv, Id dep)
 }
 
 
+static Id
+autouninstall(Solver *solv, Id *problem)
+{
+  Pool *pool = solv->pool;
+  int i;
+  int lastfeature = 0, lastupdate = 0;
+  Id v;
+  Id extraflags = -1;
+
+  for (i = 0; (v = problem[i]) != 0; i++)
+    {
+      if (v < 0)
+	extraflags &= solv->job.elements[-v - 1];
+      if (v >= solv->featurerules && v < solv->featurerules_end)
+	if (v > lastfeature)
+	  lastfeature = v;
+      if (v >= solv->updaterules && v < solv->updaterules_end)
+	{
+	  /* check if identical to feature rule */
+	  Id p = solv->rules[v].p;
+	  if (p <= 0)
+	    continue;
+	  Rule *r = solv->rules + solv->featurerules + (p - solv->installed->start);
+	  if (!r->p)
+	    {
+	      /* update rule == feature rule */
+	      if (v > lastfeature)
+		lastfeature = v;
+	      continue;
+	    }
+	  if (v > lastupdate)
+	    lastupdate = v;
+	}
+    }
+  if (!lastupdate && !lastfeature)
+    return 0;
+  v = lastupdate ? lastupdate : lastfeature;
+  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "allowuninstall disabling ");
+  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + v);
+  solver_disableproblem(solv, v);
+  if (extraflags != -1 && (extraflags & SOLVER_CLEANDEPS) != 0 && solv->cleandepsmap.size)
+    {
+      /* add the package to the updatepkgs list, this will automatically turn
+       * on cleandeps mode */
+      Id p = solv->rules[v].p;
+      if (!solv->cleandeps_updatepkgs)
+	{
+	  solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
+	  queue_init(solv->cleandeps_updatepkgs);
+	}
+      if (p > 0)
+	{
+	  int oldupdatepkgscnt = solv->cleandeps_updatepkgs->count;
+          queue_pushunique(solv->cleandeps_updatepkgs, p);
+	  if (solv->cleandeps_updatepkgs->count != oldupdatepkgscnt)
+	    solver_disablepolicyrules(solv);
+	}
+    }
+  return v;
+}
 
 /************************************************************************/
 
@@ -122,6 +182,7 @@ makeruledecisions(Solver *solv)
   Id v, vv;
   int decisionstart;
   int record_proof = 1;
+  int oldproblemcount;
 
   /* The system solvable is always installed first */
   assert(solv->decisionq.count == 0);
@@ -129,6 +190,7 @@ makeruledecisions(Solver *solv)
   queue_push(&solv->decisionq_why, 0);
   solv->decisionmap[SYSTEMSOLVABLE] = 1;	/* installed at level '1' */
 
+  /* note that the ruleassertions queue is ordered */
   decisionstart = solv->decisionq.count;
   for (ii = 0; ii < solv->ruleassertions.count; ii++)
     {
@@ -146,9 +208,6 @@ makeruledecisions(Solver *solv)
 	
       if (!solv->decisionmap[vv])          /* if not yet decided */
 	{
-	    /*
-	     * decide !
-	     */
 	  queue_push(&solv->decisionq, v);
 	  queue_push(&solv->decisionq_why, r - solv->rules);
 	  solv->decisionmap[vv] = v > 0 ? 1 : -1;
@@ -162,22 +221,22 @@ makeruledecisions(Solver *solv)
 	    }
 	  continue;
 	}
-	/*
-	 * check previous decision: is it sane ?
-	 */
-	
+
+      /*
+       * check against previous decision: is there a conflict ?
+       */
       if (v > 0 && solv->decisionmap[vv] > 0)    /* ok to install */
 	continue;
       if (v < 0 && solv->decisionmap[vv] < 0)    /* ok to remove */
 	continue;
 	
-        /*
-	 * found a conflict!
-	 * 
-	 * The rule (r) we're currently processing says something
-	 * different (v = r->p) than a previous decision (decisionmap[abs(v)])
-	 * on this literal
-	 */
+      /*
+       * found a conflict!
+       * 
+       * The rule (r) we're currently processing says something
+       * different (v = r->p) than a previous decision (decisionmap[abs(v)])
+       * on this literal
+       */
 	
       if (ri >= solv->learntrules)
 	{
@@ -197,14 +256,13 @@ makeruledecisions(Solver *solv)
 	if (solv->decisionq.elements[i] == -v)
 	  break;
       assert(i < solv->decisionq.count);         /* assert that we found it */
+      oldproblemcount = solv->problems.count;
 	
       /*
        * conflict with system solvable ?
        */
-	
       if (v == -SYSTEMSOLVABLE)
 	{
-	  /* conflict with system solvable */
 	  if (record_proof)
 	    {
 	      queue_push(&solv->problems, solv->learnt_pool.count);
@@ -220,6 +278,8 @@ makeruledecisions(Solver *solv)
 	    v = ri;
 	  queue_push(&solv->problems, v);
 	  queue_push(&solv->problems, 0);
+	  if (solv->allowuninstall && v >= solv->featurerules && v < solv->updaterules_end)
+	    solv->problems.count = oldproblemcount;
 	  solver_disableproblem(solv, v);
 	  continue;
 	}
@@ -229,10 +289,8 @@ makeruledecisions(Solver *solv)
       /*
        * conflict with an rpm rule ?
        */
-
       if (solv->decisionq_why.elements[i] < solv->rpmrules_end)
 	{
-	  /* conflict with rpm rule assertion */
 	  if (record_proof)
 	    {
 	      queue_push(&solv->problems, solv->learnt_pool.count);
@@ -250,6 +308,8 @@ makeruledecisions(Solver *solv)
 	    v = ri;
 	  queue_push(&solv->problems, v);
 	  queue_push(&solv->problems, 0);
+	  if (solv->allowuninstall && v >= solv->featurerules && v < solv->updaterules_end)
+	    solv->problems.count = oldproblemcount;
 	  solver_disableproblem(solv, v);
 	  continue;
 	}
@@ -271,11 +331,10 @@ makeruledecisions(Solver *solv)
 
       POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflicting update/job assertions over literal %d\n", vv);
 
-        /*
-	 * push all of our rules (can only be feature or job rules)
-	 * asserting this literal on the problem stack
-	 */
-	
+      /*
+       * push all of our rules (can only be feature or job rules)
+       * asserting this literal on the problem stack
+       */
       for (i = solv->featurerules, rr = solv->rules + i; i < solv->learntrules; i++, rr++)
 	{
 	  if (rr->d < 0                          /* disabled */
@@ -288,18 +347,20 @@ makeruledecisions(Solver *solv)
 	    continue;
 	    
 	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
-	    
           solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + i);
 	    
 	  v = i;
-	    /* is is a job rule ? */
 	  if (i >= solv->jobrules && i < solv->jobrules_end)
 	    v = -(solv->ruletojob.elements[i - solv->jobrules] + 1);
-	    
 	  queue_push(&solv->problems, v);
-	  solver_disableproblem(solv, v);
 	}
       queue_push(&solv->problems, 0);
+
+      if (solv->allowuninstall && (v = autouninstall(solv, solv->problems.elements + oldproblemcount + 1)) != 0)
+	solv->problems.count = oldproblemcount;
+
+      for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
+        solver_disableproblem(solv, solv->problems.elements[i]);
 
       /*
        * start over
@@ -1023,7 +1084,6 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 
   if (lastweak)
     {
-      Id v;
       /* disable last weak rule */
       solv->problems.count = oldproblemcount;
       solv->learnt_pool.count = oldlearntpoolcount;
@@ -1038,6 +1098,14 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       solver_disableproblem(solv, v);
       if (v < 0)
 	solver_reenablepolicyrules(solv, -v);
+      solver_reset(solv);
+      return 1;
+    }
+
+  if (solv->allowuninstall && (v = autouninstall(solv, solv->problems.elements + oldproblemcount + 1)) != 0)
+    {
+      solv->problems.count = oldproblemcount;
+      solv->learnt_pool.count = oldlearntpoolcount;
       solver_reset(solv);
       return 1;
     }
@@ -2710,28 +2778,9 @@ solver_solve(Solver *solv, Queue *job)
 	      continue;
 	    }
 	  if (!solver_samerule(solv, r, sr))
-	    {
-	      /* identical rule, kill unneeded one */
-	      if (solv->allowuninstall)
-		{
-		  /* keep feature rule, make it weak */
-		  memset(r, 0, sizeof(*r));
-		  queue_push(&solv->weakruleq, sr - solv->rules);
-		}
-	      else
-		{
-		  /* keep update rule */
-		  memset(sr, 0, sizeof(*sr));
-		}
-	    }
-	  else if (solv->allowuninstall)
-	    {
-	      /* make both feature and update rule weak */
-	      queue_push(&solv->weakruleq, r - solv->rules);
-	      queue_push(&solv->weakruleq, sr - solv->rules);
-	    }
+	    memset(sr, 0, sizeof(*sr));		/* delete unneeded feature rule */
 	  else
-	    solver_disablerule(solv, sr);
+	    solver_disablerule(solv, sr);	/* disable feature rule */
 	}
       /* consistency check: we added a rule for _every_ installed solvable */
       assert(solv->nrules - solv->updaterules == installed->end - installed->start);

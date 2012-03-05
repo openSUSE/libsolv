@@ -531,6 +531,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
   int essentialok;
   unsigned int now;
   int oldmistakes = solv->cleandeps_mistakes ? solv->cleandeps_mistakes->count : 0;
+  Id extraflags = -1;
 
   now = solv_timems(0);
   queue_init(&redoq);
@@ -554,7 +555,11 @@ create_solutions(Solver *solv, int probnr, int solidx)
       if (!v)
 	break;
       queue_push(&problem, v);
+      if (v < 0)
+	extraflags &= solv->job.elements[-v - 1];
     }
+  if (extraflags == -1)
+    extraflags = 0;
   if (problem.count > 1)
     solv_sort(problem.elements, problem.count, sizeof(Id), problems_sortcmp, &solv->job);
   queue_push(&problem, 0);	/* mark end for refine_suggestion */
@@ -609,6 +614,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
       queue_push(&solv->solutions, 0);	/* add end marker */
       queue_push(&solv->solutions, 0);	/* add end marker */
       queue_push(&solv->solutions, problem.elements[i]);	/* just for bookkeeping */
+      queue_push(&solv->solutions, extraflags & SOLVER_CLEANDEPS);	/* our extraflags */
       solv->solutions.elements[solidx + 1 + nsol++] = solstart;
     }
   solv->solutions.elements[solidx + 1 + nsol] = 0;	/* end marker */
@@ -697,6 +703,14 @@ solver_solutionelement_internalid(Solver *solv, Id problem, Id solution)
   return solv->solutions.elements[solidx + 2 * solv->solutions.elements[solidx] + 3];
 }
 
+Id
+solver_solutionelement_extrajobflags(Solver *solv, Id problem, Id solution)
+{
+  Id solidx = solv->problems.elements[problem * 2 - 1];
+  solidx = solv->solutions.elements[solidx + solution];
+  return solv->solutions.elements[solidx + 2 * solv->solutions.elements[solidx] + 4];
+}
+
 
 /*
  *  return the next item of the proposed solution
@@ -738,7 +752,7 @@ solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, I
 }
 
 void
-solver_take_solutionelement(Solver *solv, Id p, Id rp, Queue *job)
+solver_take_solutionelement(Solver *solv, Id p, Id rp, Id extrajobflags, Queue *job)
 {
   int i;
 
@@ -751,11 +765,11 @@ solver_take_solutionelement(Solver *solv, Id p, Id rp, Queue *job)
   if (rp <= 0 && p <= 0)
     return;	/* just in case */
   if (rp > 0)
-    p = SOLVER_INSTALL|SOLVER_SOLVABLE;
+    p = SOLVER_INSTALL|SOLVER_SOLVABLE|extrajobflags;
   else
     {
       rp = p;
-      p = SOLVER_ERASE|SOLVER_SOLVABLE;
+      p = SOLVER_ERASE|SOLVER_SOLVABLE|extrajobflags;
     }
   for (i = 0; i < job->count; i += 2)
     if (job->elements[i] == p && job->elements[i + 1] == rp)
@@ -767,8 +781,9 @@ void
 solver_take_solution(Solver *solv, Id problem, Id solution, Queue *job)
 {
   Id p, rp, element = 0;
+  Id extrajobflags = solver_solutionelement_extrajobflags(solv, problem, solution);
   while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
-    solver_take_solutionelement(solv, p, rp, job);
+    solver_take_solutionelement(solv, p, rp, extrajobflags, job);
 }
 
 

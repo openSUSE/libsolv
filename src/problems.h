@@ -34,9 +34,10 @@ unsigned int solver_solution_count(struct _Solver *solv, Id problem);
 Id solver_next_solution(struct _Solver *solv, Id problem, Id solution);
 unsigned int solver_solutionelement_count(struct _Solver *solv, Id problem, Id solution);
 Id solver_solutionelement_internalid(struct _Solver *solv, Id problem, Id solution);
+Id solver_solutionelement_extrajobflags(struct _Solver *solv, Id problem, Id solution);
 Id solver_next_solutionelement(struct _Solver *solv, Id problem, Id solution, Id element, Id *p, Id *rp);
 
-void solver_take_solutionelement(struct _Solver *solv, Id p, Id rp, Queue *job);
+void solver_take_solutionelement(struct _Solver *solv, Id p, Id rp, Id extrajobflags, Queue *job);
 void solver_take_solution(struct _Solver *solv, Id problem, Id solution, Queue *job);
 
 Id solver_findproblemrule(struct _Solver *solv, Id problem);

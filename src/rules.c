@@ -2545,6 +2545,15 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   if (unneeded)
     queue_empty(&iq);	/* just in case... */
 
+  /* clear userinstalled bit for the packages we really want to delete/update */
+  for (i = 0; i < iq.count; i++)
+    {
+      p = iq.elements[i];
+      if (pool->solvables[p].repo != installed)
+	continue;
+      MAPCLR(&userinstalled, p - installed->start);
+    }
+
   for (p = installed->start; p < installed->end; p++)
     {
       if (pool->solvables[p].repo != installed)
