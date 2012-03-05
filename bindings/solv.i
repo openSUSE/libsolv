@@ -2084,14 +2084,15 @@ typedef struct {
   %}
   %newobject Job;
   Job *Job() {
+    Id extraflags = solver_solutionelement_extrajobflags($self->solv, $self->problemid, $self->solutionid);
     if ($self->type == SOLVER_SOLUTION_JOB)
       return new_Job($self->solv->pool, SOLVER_NOOP, 0);
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE)
-      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE, $self->p);
+      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->p);
     if ($self->type == SOLVER_SOLUTION_REPLACE || $self->type == SOLVER_SOLUTION_REPLACE_DOWNGRADE || $self->type == SOLVER_SOLUTION_REPLACE_ARCHCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)
-      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE, $self->rp);
+      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->rp);
     if ($self->type == SOLVER_SOLUTION_ERASE)
-      return new_Job($self->solv->pool, SOLVER_ERASE|SOLVER_SOLVABLE, $self->p);
+      return new_Job($self->solv->pool, SOLVER_ERASE|SOLVER_SOLVABLE|extraflags, $self->p);
     return 0;
   }
 }
