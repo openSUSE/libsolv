@@ -94,6 +94,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_START,       "channel",         STATE_CHANNEL, 0 },
   { STATE_CHANNEL,     "subchannel",      STATE_SUBCHANNEL, 0 },
   { STATE_SUBCHANNEL,  "package",         STATE_PACKAGE, 0 },
+  { STATE_SUBCHANNEL,  "srcpackage",      STATE_PACKAGE, 0 },
   { STATE_SUBCHANNEL,  "selection",       STATE_PACKAGE, 0 },
   { STATE_SUBCHANNEL,  "pattern",         STATE_PACKAGE, 0 },
   { STATE_SUBCHANNEL,  "atom",            STATE_PACKAGE, 0 },
@@ -618,6 +619,8 @@ endElement(void *userData, const char *name)
     {
 
     case STATE_PACKAGE:		       /* package complete */
+      if (name[0] == 's' && name[1] == 'r' && name[2] == 'c' && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+	s->arch = ARCH_SRC;
       if (!s->arch)                    /* default to "noarch" */
 	s->arch = ARCH_NOARCH;
 
