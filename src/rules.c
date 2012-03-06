@@ -1179,6 +1179,8 @@ solver_createdupmaps(Solver *solv)
 	  repo = pool_id2repo(pool, what);
 	  FOR_REPO_SOLVABLES(repo, p, s)
 	    {
+	      if (repo != solv->installed && !pool_installable(pool, s))
+		continue;
 	      MAPSET(&solv->dupmap, p);
 	      FOR_PROVIDES(pi, pp, s->name)
 		{
