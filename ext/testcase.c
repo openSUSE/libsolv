@@ -26,12 +26,8 @@
 #include "testcase.h"
 #include "solv_xfopen.h"
 
-#ifndef ENABLE_SUSEREPO
-# define DISABLE_JOIN2
-# include "tools_util.h"
-#else
-# include "repo_susetags.h"
-#endif
+#define DISABLE_JOIN2
+#include "tools_util.h"
 
 static struct job2str {
   Id job;
@@ -867,8 +863,6 @@ testcase_write_susetags(Repo *repo, FILE *fp)
   return 0;
 }
 
-#ifndef ENABLE_SUSEREPO
-
 static inline Offset
 adddep(Repo *repo, Offset olddeps, char *str, Id marker)
 {
@@ -1051,16 +1045,6 @@ testcase_add_susetags(Repo *repo, FILE *fp, int flags)
     repodata_internalize(data);
   return 0;
 }
-
-#else
-
-int
-testcase_add_susetags(Repo *repo, FILE *fp, int flags)
-{
-  return repo_add_susetags(repo, fp, 0, 0, flags);
-}
-
-#endif
 
 const char *
 testcase_getpoolflags(Pool *pool)
