@@ -3098,6 +3098,7 @@ rerunsolver:
   if (!trans->steps.count)
     {
       printf("Nothing to do.\n");
+      transaction_free(trans);
       solver_free(solv);
       queue_free(&job);
       pool_free(pool);
@@ -3133,6 +3134,7 @@ rerunsolver:
   if (!yesno("OK to continue (y/n)? "))
     {
       printf("Abort.\n");
+      transaction_free(trans);
       solver_free(solv);
       queue_free(&job);
       pool_free(pool);
@@ -3406,6 +3408,7 @@ rerunsolver:
       fclose(newpkgsfps[i]);
   solv_free(newpkgsfps);
   queue_free(&checkq);
+  transaction_free(trans);
   solver_free(solv);
   queue_free(&job);
   pool_free(pool);
