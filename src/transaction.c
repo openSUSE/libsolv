@@ -1882,6 +1882,8 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
       solv_free(od.tes);
       solv_free(od.invedgedata);
     }
+  queue_free(&od.cycles);
+  queue_free(&od.cyclesdata);
 }
 
 
