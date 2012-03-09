@@ -59,4 +59,16 @@ map_grow(Map *m, int n)
     }
 }
 
+/* bitwise-ands same-sized maps t and s, stores the result in t. */
+void
+map_and(Map *t, Map *s)
+{
+    unsigned char *ti, *si, *end;
+    ti = t->map;
+    si = s->map;
+    end = ti + t->size;
+    while (ti < end)
+	*ti++ &= *si++;
+}
+
 /* EOF */
