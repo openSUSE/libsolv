@@ -293,7 +293,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 	{
 	  /* just one suggestion, add it to refined list */
 	  v = disabled.elements[disabledcnt];
-	  if (!nfeature)
+	  if (!nfeature && v != sug)
 	    queue_push(refined, v);	/* do not record feature rules */
 	  solver_disableproblem(solv, v);
 	  if (v >= solv->updaterules && v < solv->updaterules_end)
