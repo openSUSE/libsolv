@@ -26,6 +26,7 @@ SOLV_1.0 {
 		dirpool_free;
 		dirpool_init;
 		dirpool_make_dirtraverse;
+		map_and;
 		map_free;
 		map_grow;
 		map_init;

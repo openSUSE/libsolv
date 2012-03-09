@@ -21,6 +21,8 @@ typedef struct _Map {
 } Map;
 
 #define MAPZERO(m) (memset((m)->map, 0, (m)->size))
+/* set all bits */
+#define MAPSETALL(m) (memset((m)->map, 0xff, (m)->size))
 /* set bit */
 #define MAPSET(m, n) ((m)->map[(n) >> 3] |= 1 << ((n) & 7))
 /* clear bit */
@@ -32,6 +34,7 @@ extern void map_init(Map *m, int n);
 extern void map_init_clone(Map *t, Map *s);
 extern void map_grow(Map *m, int n);
 extern void map_free(Map *m);
+extern void map_and(Map *t, Map *s);
 
 static inline void map_empty(Map *m)
 {
