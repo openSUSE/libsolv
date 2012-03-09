@@ -167,270 +167,6 @@ autouninstall(Solver *solv, Id *problem)
 /************************************************************************/
 
 /*
- * make assertion rules into decisions
- * 
- * Go through rules and add direct assertions to the decisionqueue.
- * If we find a conflict, disable rules and add them to problem queue.
- */
-
-static void
-makeruledecisions(Solver *solv)
-{
-  Pool *pool = solv->pool;
-  int i, ri, ii;
-  Rule *r, *rr;
-  Id v, vv;
-  int decisionstart;
-  int record_proof = 1;
-  int oldproblemcount;
-
-  /* The system solvable is always installed first */
-  assert(solv->decisionq.count == 0);
-  queue_push(&solv->decisionq, SYSTEMSOLVABLE);
-  queue_push(&solv->decisionq_why, 0);
-  solv->decisionmap[SYSTEMSOLVABLE] = 1;	/* installed at level '1' */
-
-  /* note that the ruleassertions queue is ordered */
-  decisionstart = solv->decisionq.count;
-  for (ii = 0; ii < solv->ruleassertions.count; ii++)
-    {
-      ri = solv->ruleassertions.elements[ii];
-      r = solv->rules + ri;
-	
-      if (r->d < 0 || !r->p || r->w2)	/* disabled, dummy or no assertion */
-	continue;
-      /* do weak rules in phase 2 */
-      if (ri < solv->learntrules && MAPTST(&solv->weakrulemap, ri))
-	continue;
-	
-      v = r->p;
-      vv = v > 0 ? v : -v;
-	
-      if (!solv->decisionmap[vv])          /* if not yet decided */
-	{
-	  queue_push(&solv->decisionq, v);
-	  queue_push(&solv->decisionq_why, r - solv->rules);
-	  solv->decisionmap[vv] = v > 0 ? 1 : -1;
-	  IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
-	    {
-	      Solvable *s = solv->pool->solvables + vv;
-	      if (v < 0)
-		POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "conflicting %s (assertion)\n", pool_solvable2str(solv->pool, s));
-	      else
-		POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "installing  %s (assertion)\n", pool_solvable2str(solv->pool, s));
-	    }
-	  continue;
-	}
-
-      /*
-       * check against previous decision: is there a conflict ?
-       */
-      if (v > 0 && solv->decisionmap[vv] > 0)    /* ok to install */
-	continue;
-      if (v < 0 && solv->decisionmap[vv] < 0)    /* ok to remove */
-	continue;
-	
-      /*
-       * found a conflict!
-       * 
-       * The rule (r) we're currently processing says something
-       * different (v = r->p) than a previous decision (decisionmap[abs(v)])
-       * on this literal
-       */
-	
-      if (ri >= solv->learntrules)
-	{
-	  /* conflict with a learnt rule */
-	  /* can happen when packages cannot be installed for
-           * multiple reasons. */
-          /* we disable the learnt rule in this case */
-	  solver_disablerule(solv, r);
-	  continue;
-	}
-	
-        /*
-	 * find the decision which is the "opposite" of the rule
-	 */
-	
-      for (i = 0; i < solv->decisionq.count; i++)
-	if (solv->decisionq.elements[i] == -v)
-	  break;
-      assert(i < solv->decisionq.count);         /* assert that we found it */
-      oldproblemcount = solv->problems.count;
-	
-      /*
-       * conflict with system solvable ?
-       */
-      if (v == -SYSTEMSOLVABLE)
-	{
-	  if (record_proof)
-	    {
-	      queue_push(&solv->problems, solv->learnt_pool.count);
-	      queue_push(&solv->learnt_pool, ri);
-	      queue_push(&solv->learnt_pool, 0);
-	    }
-	  else
-	    queue_push(&solv->problems, 0);
-	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
-	  if  (ri >= solv->jobrules && ri < solv->jobrules_end)
-	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
-	  else
-	    v = ri;
-	  queue_push(&solv->problems, v);
-	  queue_push(&solv->problems, 0);
-	  if (solv->allowuninstall && v >= solv->featurerules && v < solv->updaterules_end)
-	    solv->problems.count = oldproblemcount;
-	  solver_disableproblem(solv, v);
-	  continue;
-	}
-
-      assert(solv->decisionq_why.elements[i] > 0);
-
-      /*
-       * conflict with an rpm rule ?
-       */
-      if (solv->decisionq_why.elements[i] < solv->rpmrules_end)
-	{
-	  if (record_proof)
-	    {
-	      queue_push(&solv->problems, solv->learnt_pool.count);
-	      queue_push(&solv->learnt_pool, ri);
-	      queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
-	      queue_push(&solv->learnt_pool, 0);
-	    }
-	  else
-	    queue_push(&solv->problems, 0);
-	  assert(v > 0 || v == -SYSTEMSOLVABLE);
-	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with rpm rule, disabling rule #%d\n", ri);
-	  if (ri >= solv->jobrules && ri < solv->jobrules_end)
-	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
-	  else
-	    v = ri;
-	  queue_push(&solv->problems, v);
-	  queue_push(&solv->problems, 0);
-	  if (solv->allowuninstall && v >= solv->featurerules && v < solv->updaterules_end)
-	    solv->problems.count = oldproblemcount;
-	  solver_disableproblem(solv, v);
-	  continue;
-	}
-
-      /*
-       * conflict with another job or update/feature rule
-       */
-	
-      /* record proof */
-      if (record_proof)
-	{
-	  queue_push(&solv->problems, solv->learnt_pool.count);
-	  queue_push(&solv->learnt_pool, ri);
-	  queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
-	  queue_push(&solv->learnt_pool, 0);
-	}
-      else
-	queue_push(&solv->problems, 0);
-
-      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflicting update/job assertions over literal %d\n", vv);
-
-      /*
-       * push all of our rules (can only be feature or job rules)
-       * asserting this literal on the problem stack
-       */
-      for (i = solv->featurerules, rr = solv->rules + i; i < solv->learntrules; i++, rr++)
-	{
-	  if (rr->d < 0                          /* disabled */
-	      || rr->w2)                         /*  or no assertion */
-	    continue;
-	  if (rr->p != vv                        /* not affecting the literal */
-	      && rr->p != -vv)
-	    continue;
-	  if (MAPTST(&solv->weakrulemap, i))     /* weak: silently ignore */
-	    continue;
-	    
-	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
-          solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + i);
-	    
-	  v = i;
-	  if (i >= solv->jobrules && i < solv->jobrules_end)
-	    v = -(solv->ruletojob.elements[i - solv->jobrules] + 1);
-	  queue_push(&solv->problems, v);
-	}
-      queue_push(&solv->problems, 0);
-
-      if (solv->allowuninstall && (v = autouninstall(solv, solv->problems.elements + oldproblemcount + 1)) != 0)
-	solv->problems.count = oldproblemcount;
-
-      for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
-        solver_disableproblem(solv, solv->problems.elements[i]);
-
-      /*
-       * start over
-       * (back up from decisions)
-       */
-      while (solv->decisionq.count > decisionstart)
-	{
-	  v = solv->decisionq.elements[--solv->decisionq.count];
-	  --solv->decisionq_why.count;
-	  vv = v > 0 ? v : -v;
-	  solv->decisionmap[vv] = 0;
-	}
-      ii = -1; /* restarts loop at 0 */
-    }
-
-  /*
-   * phase 2: now do the weak assertions
-   */
-  for (ii = 0; ii < solv->ruleassertions.count; ii++)
-    {
-      ri = solv->ruleassertions.elements[ii];
-      r = solv->rules + ri;
-      if (r->d < 0 || r->w2)	                 /* disabled or no assertion */
-	continue;
-      if (ri >= solv->learntrules || !MAPTST(&solv->weakrulemap, ri))       /* skip non-weak */
-	continue;
-      v = r->p;
-      vv = v > 0 ? v : -v;
-      /*
-       * decide !
-       * (if not yet decided)
-       */
-      if (!solv->decisionmap[vv])
-	{
-	  queue_push(&solv->decisionq, v);
-	  queue_push(&solv->decisionq_why, r - solv->rules);
-	  solv->decisionmap[vv] = v > 0 ? 1 : -1;
-	  IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
-	    {
-	      Solvable *s = solv->pool->solvables + vv;
-	      if (v < 0)
-		POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "conflicting %s (weak assertion)\n", pool_solvable2str(solv->pool, s));
-	      else
-		POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "installing  %s (weak assertion)\n", pool_solvable2str(solv->pool, s));
-	    }
-	  continue;
-	}
-      /*
-       * previously decided, sane ?
-       */
-      if (v > 0 && solv->decisionmap[vv] > 0)
-	continue;
-      if (v < 0 && solv->decisionmap[vv] < 0)
-	continue;
-	
-      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "assertion conflict, but I am weak, disabling ");
-      solver_printrule(solv, SOLV_DEBUG_UNSOLVABLE, r);
-
-      if (ri >= solv->jobrules && ri < solv->jobrules_end)
-	v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
-      else
-	v = ri;
-      solver_disableproblem(solv, v);
-      if (v < 0)
-	solver_reenablepolicyrules(solv, -v);
-    }
-}
-
-
-/*-------------------------------------------------------------------
  * enable/disable learnt rules 
  *
  * we have enabled or disabled some of our rules. We now reenable all
@@ -474,6 +210,281 @@ enabledisablelearntrules(Solver *solv)
 	    }
           solver_enablerule(solv, r);
 	}
+    }
+}
+
+
+/*
+ * make assertion rules into decisions
+ * 
+ * Go through rules and add direct assertions to the decisionqueue.
+ * If we find a conflict, disable rules and add them to problem queue.
+ */
+
+static void
+makeruledecisions(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  int i, ri, ii;
+  Rule *r, *rr;
+  Id v, vv;
+  int decisionstart;
+  int record_proof = 1;
+  int oldproblemcount;
+  int havedisabled = 0;
+
+  /* The system solvable is always installed first */
+  assert(solv->decisionq.count == 0);
+  queue_push(&solv->decisionq, SYSTEMSOLVABLE);
+  queue_push(&solv->decisionq_why, 0);
+  solv->decisionmap[SYSTEMSOLVABLE] = 1;	/* installed at level '1' */
+
+  decisionstart = solv->decisionq.count;
+  for (;;)
+    {
+      /* if we needed to re-run, back up decisions to decisionstart */
+      while (solv->decisionq.count > decisionstart)
+	{
+	  v = solv->decisionq.elements[--solv->decisionq.count];
+	  --solv->decisionq_why.count;
+	  vv = v > 0 ? v : -v;
+	  solv->decisionmap[vv] = 0;
+	}
+
+      /* note that the ruleassertions queue is ordered */
+      for (ii = 0; ii < solv->ruleassertions.count; ii++)
+	{
+	  ri = solv->ruleassertions.elements[ii];
+	  r = solv->rules + ri;
+	    
+          if (havedisabled && ri >= solv->learntrules)
+	    {
+	      /* just started with learnt rule assertions. If we have disabled
+               * some rules, adapt the learnt rule status */
+	      enabledisablelearntrules(solv);
+	      havedisabled = 0;
+	    }
+	    
+	  if (r->d < 0 || !r->p || r->w2)	/* disabled, dummy or no assertion */
+	    continue;
+
+	  /* do weak rules in phase 2 */
+	  if (ri < solv->learntrules && MAPTST(&solv->weakrulemap, ri))
+	    continue;
+
+	  v = r->p;
+	  vv = v > 0 ? v : -v;
+	    
+	  if (!solv->decisionmap[vv])          /* if not yet decided */
+	    {
+	      queue_push(&solv->decisionq, v);
+	      queue_push(&solv->decisionq_why, r - solv->rules);
+	      solv->decisionmap[vv] = v > 0 ? 1 : -1;
+	      IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
+		{
+		  Solvable *s = solv->pool->solvables + vv;
+		  if (v < 0)
+		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "conflicting %s (assertion)\n", pool_solvable2str(solv->pool, s));
+		  else
+		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "installing  %s (assertion)\n", pool_solvable2str(solv->pool, s));
+		}
+	      continue;
+	    }
+
+	  /* check against previous decision: is there a conflict? */
+	  if (v > 0 && solv->decisionmap[vv] > 0)    /* ok to install */
+	    continue;
+	  if (v < 0 && solv->decisionmap[vv] < 0)    /* ok to remove */
+	    continue;
+	    
+	  /*
+	   * found a conflict!
+	   * 
+	   * The rule (r) we're currently processing says something
+	   * different (v = r->p) than a previous decision (decisionmap[abs(v)])
+	   * on this literal
+	   */
+	    
+	  if (ri >= solv->learntrules)
+	    {
+	      /* conflict with a learnt rule */
+	      /* can happen when packages cannot be installed for multiple reasons. */
+	      /* we disable the learnt rule in this case */
+	      /* (XXX: we should really call analyze_unsolvable_rule here!) */
+	      solver_disablerule(solv, r);
+	      continue;
+	    }
+	    
+	  /*
+	   * find the decision which is the "opposite" of the rule
+	   */
+	  for (i = 0; i < solv->decisionq.count; i++)
+	    if (solv->decisionq.elements[i] == -v)
+	      break;
+	  assert(i < solv->decisionq.count);         /* assert that we found it */
+	  oldproblemcount = solv->problems.count;
+	    
+	  /*
+	   * conflict with system solvable ?
+	   */
+	  if (v == -SYSTEMSOLVABLE)
+	    {
+	      if (record_proof)
+		{
+		  queue_push(&solv->problems, solv->learnt_pool.count);
+		  queue_push(&solv->learnt_pool, ri);
+		  queue_push(&solv->learnt_pool, 0);
+		}
+	      else
+		queue_push(&solv->problems, 0);
+	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
+	      if  (ri >= solv->jobrules && ri < solv->jobrules_end)
+		v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	      else
+		v = ri;
+	      queue_push(&solv->problems, v);
+	      queue_push(&solv->problems, 0);
+	      if (solv->allowuninstall && v >= solv->featurerules && v < solv->updaterules_end)
+		solv->problems.count = oldproblemcount;
+	      solver_disableproblem(solv, v);
+	      havedisabled = 1;
+	      break;	/* start over */
+	    }
+
+	  assert(solv->decisionq_why.elements[i] > 0);
+
+	  /*
+	   * conflict with an rpm rule ?
+	   */
+	  if (solv->decisionq_why.elements[i] < solv->rpmrules_end)
+	    {
+	      if (record_proof)
+		{
+		  queue_push(&solv->problems, solv->learnt_pool.count);
+		  queue_push(&solv->learnt_pool, ri);
+		  queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
+		  queue_push(&solv->learnt_pool, 0);
+		}
+	      else
+		queue_push(&solv->problems, 0);
+	      assert(v > 0 || v == -SYSTEMSOLVABLE);
+	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with rpm rule, disabling rule #%d\n", ri);
+	      if (ri >= solv->jobrules && ri < solv->jobrules_end)
+		v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	      else
+		v = ri;
+	      queue_push(&solv->problems, v);
+	      queue_push(&solv->problems, 0);
+	      if (solv->allowuninstall && v >= solv->featurerules && v < solv->updaterules_end)
+		solv->problems.count = oldproblemcount;
+	      solver_disableproblem(solv, v);
+	      havedisabled = 1;
+	      break;	/* start over */
+	    }
+
+	  /*
+	   * conflict with another job or update/feature rule
+	   */
+	    
+	  /* record proof */
+	  if (record_proof)
+	    {
+	      queue_push(&solv->problems, solv->learnt_pool.count);
+	      queue_push(&solv->learnt_pool, ri);
+	      queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
+	      queue_push(&solv->learnt_pool, 0);
+	    }
+	  else
+	    queue_push(&solv->problems, 0);
+
+	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflicting update/job assertions over literal %d\n", vv);
+
+	  /*
+	   * push all of our rules (can only be feature or job rules)
+	   * asserting this literal on the problem stack
+	   */
+	  for (i = solv->featurerules, rr = solv->rules + i; i < solv->learntrules; i++, rr++)
+	    {
+	      if (rr->d < 0                          /* disabled */
+		  || rr->w2)                         /*  or no assertion */
+		continue;
+	      if (rr->p != vv                        /* not affecting the literal */
+		  && rr->p != -vv)
+		continue;
+	      if (MAPTST(&solv->weakrulemap, i))     /* weak: silently ignore */
+		continue;
+		
+	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
+	      solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + i);
+		
+	      v = i;
+	      if (i >= solv->jobrules && i < solv->jobrules_end)
+		v = -(solv->ruletojob.elements[i - solv->jobrules] + 1);
+	      queue_push(&solv->problems, v);
+	    }
+	  queue_push(&solv->problems, 0);
+
+	  if (solv->allowuninstall && (v = autouninstall(solv, solv->problems.elements + oldproblemcount + 1)) != 0)
+	    solv->problems.count = oldproblemcount;
+
+	  for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
+	    solver_disableproblem(solv, solv->problems.elements[i]);
+	  havedisabled = 1;
+	  break;	/* start over */
+	}
+      if (ii < solv->ruleassertions.count)
+	continue;
+
+      /*
+       * phase 2: now do the weak assertions
+       */
+      for (ii = 0; ii < solv->ruleassertions.count; ii++)
+	{
+	  ri = solv->ruleassertions.elements[ii];
+	  r = solv->rules + ri;
+	  if (r->d < 0 || r->w2)	                 /* disabled or no assertion */
+	    continue;
+	  if (ri >= solv->learntrules || !MAPTST(&solv->weakrulemap, ri))       /* skip non-weak */
+	    continue;
+	  v = r->p;
+	  vv = v > 0 ? v : -v;
+
+	  if (!solv->decisionmap[vv])          /* if not yet decided */
+	    {
+	      queue_push(&solv->decisionq, v);
+	      queue_push(&solv->decisionq_why, r - solv->rules);
+	      solv->decisionmap[vv] = v > 0 ? 1 : -1;
+	      IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
+		{
+		  Solvable *s = solv->pool->solvables + vv;
+		  if (v < 0)
+		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "conflicting %s (weak assertion)\n", pool_solvable2str(solv->pool, s));
+		  else
+		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "installing  %s (weak assertion)\n", pool_solvable2str(solv->pool, s));
+		}
+	      continue;
+	    }
+	  /* check against previous decision: is there a conflict? */
+	  if (v > 0 && solv->decisionmap[vv] > 0)
+	    continue;
+	  if (v < 0 && solv->decisionmap[vv] < 0)
+	    continue;
+	    
+	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "assertion conflict, but I am weak, disabling ");
+	  solver_printrule(solv, SOLV_DEBUG_UNSOLVABLE, r);
+
+	  if (ri >= solv->jobrules && ri < solv->jobrules_end)
+	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	  else
+	    v = ri;
+	  solver_disableproblem(solv, v);
+	  if (v < 0)
+	    solver_reenablepolicyrules(solv, -v);
+	  havedisabled = 1;
+	  break;	/* start over */
+	}
+      if (ii == solv->ruleassertions.count)
+	break;	/* finished! */
     }
 }
 
