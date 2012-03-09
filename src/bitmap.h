@@ -44,7 +44,7 @@ static inline void map_set(Map *m, int n)
 {
   MAPSET(m, n);
 }
-static inline int map_setall(Map *m)
+static inline void map_setall(Map *m)
 {
   MAPSETALL(m);
 }
