@@ -795,14 +795,14 @@ pool_addrelproviders(Pool *pool, Id d)
 	  pidp = s->repo->idarraydata + s->provides;
 	  while ((pid = *pidp++) != 0)
 	    {
-	      if (pid == name)
+	      if (!ISRELDEP(pid))
 		{
+		  if (pid != name)
+		    continue;		/* wrong provides name */
 		  if (pool->disttype == DISTTYPE_DEB)
 		    continue;		/* unversioned provides can never match versioned deps */
 		  break;
 		}
-	      if (!ISRELDEP(pid))
-		continue;		/* wrong provides name */
 	      prd = GETRELDEP(pool, pid);
 	      if (prd->name != name)
 		continue;		/* wrong provides name */
