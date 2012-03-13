@@ -842,7 +842,7 @@ testcase_write_susetags(Repo *repo, FILE *fp)
       release = strrchr(evr, '-');
       if (!release)
 	release = evr + strlen(evr);
-      fprintf(fp, "=Pkg: %s %.*s %s %s\n", name, release - evr, evr, *release && release[1] ? release + 1 : "-", arch);
+      fprintf(fp, "=Pkg: %s %.*s %s %s\n", name, (int)(release - evr), evr, *release && release[1] ? release + 1 : "-", arch);
       tmp = solvable_lookup_str(s, SOLVABLE_SUMMARY);
       if (tmp)
         fprintf(fp, "=Sum: %s\n", tmp);
@@ -1086,7 +1086,7 @@ testcase_setpoolflags(Pool *pool, const char *str)
 	  break;
       if (!poolflags2str[i].str)
 	{
-	  pool_debug(pool, SOLV_ERROR, "setpoolflags: unknown flag '%.*s'\n", p - s, s);
+	  pool_debug(pool, SOLV_ERROR, "setpoolflags: unknown flag '%.*s'\n", (int)(p - s), s);
 	  return 0;
 	}
       pool_set_flag(pool, poolflags2str[i].flag, v);
@@ -1143,7 +1143,7 @@ testcase_setsolverflags(Solver *solv, const char *str)
 	  break;
       if (!solverflags2str[i].str)
 	{
-	  pool_debug(solv->pool, SOLV_ERROR, "setsolverflags: unknown flag '%.*s'\n", p - s, s);
+	  pool_debug(solv->pool, SOLV_ERROR, "setsolverflags: unknown flag '%.*s'\n", (int)(p - s), s);
 	  return 0;
 	}
       solver_set_flag(solv, solverflags2str[i].flag, v);
