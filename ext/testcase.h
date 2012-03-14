@@ -7,6 +7,7 @@
 
 #include "pool.h"
 #include "repo.h"
+#include "solver.h"
 
 #define TESTCASE_RESULT_TRANSACTION	(1 << 0)
 #define TESTCASE_RESULT_PROBLEMS	(1 << 1)
