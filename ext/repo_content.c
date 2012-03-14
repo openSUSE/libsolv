@@ -408,7 +408,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
           else if (istag ("RELEASE"))
             pd.tmprel = solv_strdup(value);
 	  else if (code11 && istag ("DISTRIBUTION"))
-	    repodata_set_str(data, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
+	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
 	  else if (istag ("UPDATEURLS"))
 	    add_multiple_urls(data, handle, value, pool_str2id(pool, "update", 1));
 	  else if (istag ("EXTRAURLS"))
