@@ -235,10 +235,6 @@ pool_shrink_whatprovides_sortcmp(const void *ap, const void *bp, void *dp)
   ob = pool->whatprovides[*(Id *)bp];
   if (oa == ob)
     return *(Id *)ap - *(Id *)bp;
-  if (!oa)
-    return -1;
-  if (!ob)
-    return 1;
   da = pool->whatprovidesdata + oa;
   db = pool->whatprovidesdata + ob;
   while (*db)
@@ -258,7 +254,7 @@ pool_shrink_whatprovides_sortcmp(const void *ap, const void *bp, void *dp)
 static void
 pool_shrink_whatprovides(Pool *pool)
 {
-  Id i, id;
+  Id i, n, id;
   Id *sorted;
   Id lastid, *last, *dp, *lp;
   Offset o;
@@ -267,17 +263,17 @@ pool_shrink_whatprovides(Pool *pool)
   if (pool->ss.nstrings < 3)
     return;
   sorted = solv_malloc2(pool->ss.nstrings, sizeof(Id));
-  for (id = 0; id < pool->ss.nstrings; id++)
-    sorted[id] = id;
-  solv_sort(sorted + 1, pool->ss.nstrings - 1, sizeof(Id), pool_shrink_whatprovides_sortcmp, pool);
+  for (i = id = 0; id < pool->ss.nstrings; id++)
+    if (pool->whatprovides[id] && pool->whatprovides[id] != 1)
+      sorted[i++] = id;
+  n = i;
+  solv_sort(sorted, n, sizeof(Id), pool_shrink_whatprovides_sortcmp, pool);
   last = 0;
   lastid = 0;
-  for (i = 1; i < pool->ss.nstrings; i++)
+  for (i = 0; i < n; i++)
     {
       id = sorted[i];
       o = pool->whatprovides[id];
-      if (o == 0 || o == 1)
-	continue;
       dp = pool->whatprovidesdata + o;
       if (last)
 	{
