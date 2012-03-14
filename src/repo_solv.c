@@ -204,7 +204,7 @@ data_read_id_max(unsigned char *dp, Id *ret, Id *map, int max, int *error)
 {
   Id x;
   dp = data_read_id(dp, &x);
-  if (max && x >= max)
+  if (x < 0 || (max && x >= max))
     {
       pool_debug(mypool, SOLV_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
       *error = SOLV_ERROR_ID_RANGE;
@@ -301,8 +301,9 @@ data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *err
 #define DATA_READ_CHUNK 8192
 
 static void
-incore_add_id(Repodata *data, Id x)
+incore_add_id(Repodata *data, Id sx)
 {
+  unsigned int x = (unsigned int)sx;
   unsigned char *dp;
   /* make sure we have at least 5 bytes free */
   if (data->incoredatafree < 5)
@@ -311,8 +312,6 @@ incore_add_id(Repodata *data, Id x)
       data->incoredatafree = INCORE_ADD_CHUNK;
     }
   dp = data->incoredata + data->incoredatalen;
-  if (x < 0)
-    abort();
   if (x >= (1 << 14))
     {
       if (x >= (1 << 28))
@@ -352,13 +351,15 @@ incore_map_idarray(Repodata *data, unsigned char *dp, Id *map, Id max)
       Id id;
       int eof;
       dp = data_read_ideof(dp, &id, &eof);
-      if (max && id >= max)
+      if (id < 0 || (max && id >= max))
 	{
 	  pool_debug(mypool, SOLV_ERROR, "incore_map_idarray: id too large (%u/%u)\n", id, max);
 	  data->error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
       id = map[id];
+      if (id < 0)
+	abort();	/* for now */
       if (id >= 64)
 	id = (id & 63) | ((id & ~63) << 1);
       incore_add_id(data, eof ? id : id | 64);
@@ -863,9 +864,16 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       /* cannot handle rel idarrays in incore/vertical */
       if (type == REPOKEY_TYPE_REL_IDARRAY && keys[i].storage != KEY_STORAGE_SOLVABLE)
 	{
-	  pool_debug(pool, SOLV_ERROR, "type REL_IDARRAY only supported for STORAGE_SOLVABLE\n");
+	  pool_debug(pool, SOLV_ERROR, "type REL_IDARRAY is only supported for STORAGE_SOLVABLE\n");
 	  data.error = SOLV_ERROR_UNSUPPORTED;
 	}
+      /* cannot handle mapped ids in vertical */
+      if (!(flags & REPO_LOCALPOOL) && keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET && (type == REPOKEY_TYPE_ID || type == REPOKEY_TYPE_IDARRAY))
+	{
+	  pool_debug(pool, SOLV_ERROR, "mapped ids are not supported for STORAGE_VERTICAL_OFFSET\n");
+	  data.error = SOLV_ERROR_UNSUPPORTED;
+	}
+ 
       if (keys[i].type == REPOKEY_TYPE_CONSTANTID && idmap)
 	keys[i].size = idmap[keys[i].size];
 #if 0
@@ -1147,7 +1155,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	  stack[keydepth++] = nentries;
 	  stack[keydepth++] = keyp - schemadata;
 	  stack[keydepth++] = 0;
-	  dp = data_read_id(dp, &nentries);
+	  dp = data_read_id_max(dp, &nentries, 0, 0, &data.error);
 	  incore_add_id(&data, nentries);
 	  if (!nentries)
 	    {
