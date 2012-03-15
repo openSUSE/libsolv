@@ -72,7 +72,7 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
       if (data && data->localpool)
 	kv->str = stringpool_id2str(&data->spool, kv->id);
       else
-        kv->str = pool_id2str(repo->pool, kv->id);
+	kv->str = pool_dep2str(repo->pool, kv->id);
       printf("%s: %s\n", keyname, kv->str);
       break;
     case REPOKEY_TYPE_CONSTANTID:
@@ -100,7 +100,7 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
     case REPOKEY_TYPE_U32:
     case REPOKEY_TYPE_NUM:
     case REPOKEY_TYPE_CONSTANT:
-      printf("%s: %d\n", keyname, kv->num);
+      printf("%s: %u\n", keyname, kv->num);
       break;
     case REPOKEY_TYPE_BINARY:
       if (kv->num)
