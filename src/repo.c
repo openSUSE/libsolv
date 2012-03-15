@@ -838,7 +838,9 @@ repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValu
 }
 
 
-static Repokey solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
+/* list of all keys we store in the solvable */
+/* also used in the dataiterator code in repodata.c */
+Repokey repo_solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
   { SOLVABLE_NAME,        REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
   { SOLVABLE_ARCH,        REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
   { SOLVABLE_EVR,         REPOKEY_TYPE_ID, 0, KEY_STORAGE_SOLVABLE },
@@ -864,7 +866,7 @@ domatch_idarray(Solvable *s, Id keyname, struct matchdata *md, Id *ida)
     {
       kv.id = *ida;
       kv.eof = ida[1] ? 0 : 1;
-      repo_matchvalue(md, s, 0, solvablekeys + (keyname - SOLVABLE_NAME), &kv);
+      repo_matchvalue(md, s, 0, repo_solvablekeys + (keyname - SOLVABLE_NAME), &kv);
       kv.entry++;
     }
 }
@@ -906,7 +908,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	    if (s->name)
 	      {
 		kv.id = s->name;
-		repo_matchvalue(md, s, 0, solvablekeys + 0, &kv);
+		repo_matchvalue(md, s, 0, repo_solvablekeys + 0, &kv);
 	      }
 	    if (keyname || md->stop > SEARCH_NEXT_KEY)
 	      return;
@@ -914,7 +916,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	    if (s->arch)
 	      {
 		kv.id = s->arch;
-		repo_matchvalue(md, s, 0, solvablekeys + 1, &kv);
+		repo_matchvalue(md, s, 0, repo_solvablekeys + 1, &kv);
 	      }
 	    if (keyname || md->stop > SEARCH_NEXT_KEY)
 	      return;
@@ -922,7 +924,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	    if (s->evr)
 	      {
 		kv.id = s->evr;
-		repo_matchvalue(md, s, 0, solvablekeys + 2, &kv);
+		repo_matchvalue(md, s, 0, repo_solvablekeys + 2, &kv);
 	      }
 	    if (keyname || md->stop > SEARCH_NEXT_KEY)
 	      return;
@@ -930,7 +932,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	    if (s->vendor)
 	      {
 		kv.id = s->vendor;
-		repo_matchvalue(md, s, 0, solvablekeys + 3, &kv);
+		repo_matchvalue(md, s, 0, repo_solvablekeys + 3, &kv);
 	      }
 	    if (keyname || md->stop > SEARCH_NEXT_KEY)
 	      return;
@@ -978,7 +980,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	    if (repo->rpmdbid)
 	      {
 		kv.num = repo->rpmdbid[p - repo->start];
-		repo_matchvalue(md, s, 0, solvablekeys + (RPM_RPMDBID - SOLVABLE_NAME), &kv);
+		repo_matchvalue(md, s, 0, repo_solvablekeys + (RPM_RPMDBID - SOLVABLE_NAME), &kv);
 	      }
 	    if (keyname || md->stop > SEARCH_NEXT_KEY)
 	      return;
