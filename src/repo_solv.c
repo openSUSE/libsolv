@@ -368,6 +368,7 @@ incore_map_idarray(Repodata *data, unsigned char *dp, Id *map, Id max)
     }
 }
 
+#if 0
 static void
 incore_add_u32(Repodata *data, unsigned int x)
 {
@@ -387,7 +388,6 @@ incore_add_u32(Repodata *data, unsigned int x)
   data->incoredatalen += 4;
 }
 
-#if 0
 static void
 incore_add_u8(Repodata *data, unsigned int x)
 {
@@ -1077,20 +1077,6 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	  POOL_DEBUG(SOLV_DEBUG_STATS, "%s -> %s\n", pool_id2str(pool, id), pool_id2str(pool, did));
 #endif
 	  break;
-	case REPOKEY_TYPE_U32:
-	  dp = data_read_u32(dp, &h);
-#if 0
-	  POOL_DEBUG(SOLV_DEBUG_STATS, "%s -> %u\n", pool_id2str(pool, id), h);
-#endif
-	  if (s && id == RPM_RPMDBID)
-	    {
-	      if (!repo->rpmdbid)
-		repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
-	      repo->rpmdbid[(s - pool->solvables) - repo->start] = h;
-	    }
-	  else if (keys[key].storage == KEY_STORAGE_INCORE)
-	    incore_add_u32(&data, h);
-	  break;
 	case REPOKEY_TYPE_IDARRAY:
 	case REPOKEY_TYPE_REL_IDARRAY:
 	  if (!s || id < INTERESTED_START || id > INTERESTED_END)
@@ -1218,6 +1204,17 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	  keyp = schemadata + schemata[id];
 	  break;
 	default:
+	  if (id == RPM_RPMDBID && s && (keys[key].type == REPOKEY_TYPE_U32 || keys[key].type == REPOKEY_TYPE_NUM))
+	    {
+	      if (keys[key].type == REPOKEY_TYPE_U32)
+	        dp = data_read_u32(dp, (unsigned int *)&id);
+	      else
+	        dp = data_read_id_max(dp, &id, 0, 0, &data.error);
+	      if (!repo->rpmdbid)
+		repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
+	      repo->rpmdbid[(s - pool->solvables) - repo->start] = id;
+	      break;
+	    }
 	  dps = dp;
 	  dp = data_skip(dp, keys[key].type);
 	  if (keys[key].storage == KEY_STORAGE_INCORE)
