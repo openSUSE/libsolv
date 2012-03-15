@@ -105,6 +105,8 @@ typedef struct _Repodata {
   unsigned int attrdatalen;	/* its len */
   Id *attriddata;		/* their id space */
   unsigned int attriddatalen;	/* its len */
+  unsigned long long *attrnum64data;	/* their 64bit num data space */
+  unsigned int attrnum64datalen;	/* its len */
 
   /* array cache to speed up repodata_add functions*/
   Id lasthandle;

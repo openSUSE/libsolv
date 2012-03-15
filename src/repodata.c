@@ -91,6 +91,7 @@ repodata_freedata(Repodata *data)
 
   solv_free(data->attrdata);
   solv_free(data->attriddata);
+  solv_free(data->attrnum64data);
 
   solv_free(data->dircache);
 }
@@ -1188,9 +1189,9 @@ enum {
   di_entersub,
   di_leavesub,
 
-  di_nextsolvableattr,
   di_nextsolvablekey,
-  di_entersolvablekey
+  di_entersolvablekey,
+  di_nextsolvableattr
 };
 
 /* see dataiterator.h for documentation */
@@ -1544,16 +1545,6 @@ dataiterator_step(Dataiterator *di)
 
         /* special solvable attr handling follows */
 
-	case di_nextsolvableattr:
-	  di->kv.id = *di->idp++;
-          di->kv.entry++;
-	  if (!*di->idp)
-	    {
-	      di->kv.eof = 1;
-	      di->state = di_nextsolvablekey;
-	    }
-	  break;
-
 	case di_nextsolvablekey: di_nextsolvablekey:
 	  if (di->keyname || di->key->name == RPM_RPMDBID)
 	    goto di_enterrepodata;
@@ -1562,19 +1553,31 @@ dataiterator_step(Dataiterator *di)
 
 	case di_entersolvablekey: di_entersolvablekey:
 	  di->idp = solvabledata_fetch(di->pool->solvables + di->solvid, &di->kv, di->key->name);
-	  if (!di->idp || !di->idp[0])
+	  if (!di->idp || !*di->idp)
 	    goto di_nextsolvablekey;
-	  di->kv.id = di->idp[0];
-	  di->kv.num = di->idp[0];
-	  di->idp++;
-	  if (!di->kv.eof && !di->idp[0])
-	    di->kv.eof = 1;
-	  di->kv.entry = 0;
 	  if (di->kv.eof)
-	    di->state = di_nextsolvablekey;
-	  else
-	    di->state = di_nextsolvableattr;
+	    {
+	      /* not an array */
+	      di->kv.id = *di->idp;
+	      di->kv.num = *di->idp;	/* for rpmdbid */
+	      di->kv.entry = 0;
+	      di->state = di_nextsolvablekey;
+	      break;
+	    }
+	  di->kv.entry = -1;
+	  /* FALLTHROUGH */
+
+	case di_nextsolvableattr:
+	  di->state = di_nextsolvableattr;
+	  di->kv.id = *di->idp++;
+	  di->kv.entry++;
+	  if (!*di->idp)
+	    {
+	      di->kv.eof = 1;
+	      di->state = di_nextsolvablekey;
+	    }
 	  break;
+
 	}
 
       if (di->matcher.match)
@@ -1906,6 +1909,7 @@ repodata_extend_block(Repodata *data, Id start, Id num)
 #define REPODATA_ATTRS_BLOCK 31
 #define REPODATA_ATTRDATA_BLOCK 1023
 #define REPODATA_ATTRIDDATA_BLOCK 63
+#define REPODATA_ATTRNUM64DATA_BLOCK 15
 
 
 Id
@@ -2005,6 +2009,12 @@ repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned int num)
   key.type = REPOKEY_TYPE_NUM;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
+  if (num >= 0x80000000)
+    {
+      data->attrnum64data = solv_extend(data->attrnum64data, data->attrnum64datalen, 1, sizeof(unsigned long long), REPODATA_ATTRNUM64DATA_BLOCK);
+      data->attrnum64data[data->attrnum64datalen] = num;
+      num = 0x80000000 | data->attrnum64datalen++;
+    }
   repodata_set(data, solvid, &key, (Id)num);
 }
 
@@ -2080,6 +2090,8 @@ repodata_set_binary(Repodata *data, Id solvid, Id keyname, void *buf, int len)
   Repokey key;
   unsigned char *dp;
 
+  if (len < 0)
+    return;
   key.name = keyname;
   key.type = REPOKEY_TYPE_BINARY;
   key.size = 0;
@@ -2469,9 +2481,10 @@ struct extdata {
 };
 
 static void
-data_addid(struct extdata *xd, Id x)
+data_addid(struct extdata *xd, Id sx)
 {
   unsigned char *dp;
+  unsigned int x = (unsigned int)sx;
 
   xd->buf = solv_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
   dp = xd->buf + xd->len;
@@ -2491,8 +2504,27 @@ data_addid(struct extdata *xd, Id x)
 }
 
 static void
+data_addid64(struct extdata *xd, unsigned long long x)
+{
+  if (x >= 0x100000000)
+    {
+      if ((x >> 35) != 0)
+	{
+	  data_addid(xd, (Id)(x >> 35));
+	  xd->buf[xd->len - 1] |= 128;
+	}
+      data_addid(xd, (Id)((unsigned int)x | 0x80000000));
+      xd->buf[xd->len - 5] = (x >> 28) | 128;
+    }
+  else
+    data_addid(xd, (Id)x);
+}
+
+static void
 data_addideof(struct extdata *xd, Id x, int eof)
 {
+  if (x < 0)
+    abort();	/* XXX: not yet */
   if (x >= 64)
     x = (x & 63) | ((x & ~63) << 1);
   data_addid(xd, (eof ? x : x | 64));
@@ -2545,8 +2577,14 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
     case REPOKEY_TYPE_SHA256:
       data_addblob(xd, data->attrdata + val, SIZEOF_SHA256);
       break;
-    case REPOKEY_TYPE_ID:
     case REPOKEY_TYPE_NUM:
+      if (val & 0x80000000)
+	{
+	  data_addid64(xd, data->attrnum64data[val ^ 0x80000000]);
+	  break;
+	}
+      /* FALLTHROUGH */
+    case REPOKEY_TYPE_ID:
     case REPOKEY_TYPE_DIR:
       data_addid(xd, val);
       break;
@@ -2855,8 +2893,10 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
   data->attrs = solv_free(data->attrs);
   data->attrdata = solv_free(data->attrdata);
   data->attriddata = solv_free(data->attriddata);
+  data->attrnum64data = solv_free(data->attrnum64data);
   data->attrdatalen = 0;
   data->attriddatalen = 0;
+  data->attrnum64datalen = 0;
 }
 
 void

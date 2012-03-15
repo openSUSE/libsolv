@@ -397,8 +397,9 @@ struct cbdata {
 #define EXTDATA_BLOCK 4095
 
 static inline void
-data_addid(struct extdata *xd, Id x)
+data_addid(struct extdata *xd, Id sx)
 {
+  unsigned int x = (unsigned int)sx;
   unsigned char *dp;
   xd->buf = solv_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
   dp = xd->buf + xd->len;
