@@ -426,6 +426,24 @@ data_addideof(struct extdata *xd, Id x, int eof)
   data_addid(xd, (eof ? x: x | 64));
 }
 
+static void 
+data_addid64(struct extdata *xd, unsigned int x, unsigned int hx)
+{
+  if (hx)
+    {    
+      if (hx > 7)
+        {
+          data_addid(xd, (Id)(hx >> 3));
+          xd->buf[xd->len - 1] |= 128; 
+	  hx &= 7;
+        }
+      data_addid(xd, (Id)(x | 0x80000000));
+      xd->buf[xd->len - 5] = (x >> 28) | (hx << 4) | 128; 
+    }
+  else 
+    data_addid(xd, (Id)x);
+}
+
 static void
 data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marker)
 {
@@ -786,7 +804,7 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	data_addblob(xd, v, 4);
 	break;
       case REPOKEY_TYPE_NUM:
-	data_addid(xd, kv->num);
+	data_addid64(xd, kv->num, kv->num2);
 	break;
       case REPOKEY_TYPE_DIR:
 	id = kv->id;

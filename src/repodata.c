@@ -692,9 +692,9 @@ repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value)
       || key->type == REPOKEY_TYPE_U32
       || key->type == REPOKEY_TYPE_CONSTANT)
     {
-      kv.num = 0;
+      kv.num = kv.num2 = 0;
       dp = data_fetch(dp, &kv, key);
-      *value = kv.num;
+      *value = kv.num2 ? ~(unsigned int)0 : kv.num;
       return 1;
     }
   return 0;
@@ -1470,7 +1470,7 @@ dataiterator_step(Dataiterator *di)
 	case di_enterarray: di_enterarray:
 	  if (di->key->name == REPOSITORY_SOLVABLES)
 	    goto di_nextkey;
-	  di->ddp = data_read_id(di->ddp, &di->kv.num);
+	  di->ddp = data_read_id(di->ddp, (Id *)&di->kv.num);
 	  di->kv.eof = 0;
 	  di->kv.entry = -1;
 	  /* FALLTHROUGH */

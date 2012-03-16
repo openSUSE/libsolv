@@ -21,14 +21,16 @@ struct _Repo;
 typedef struct _KeyValue {
   Id id;
   const char *str;
-  int num;
-  int num2;
+  unsigned int num;
+  unsigned int num2;
 
   int entry;	/* array entry, starts with 0 */
   int eof;	/* last entry reached */
 
   struct _KeyValue *parent;
 } KeyValue;
+
+#define SOLV_KV_NUM64(kv) (((unsigned long long)((kv)->num2)) << 32 | (kv)->num)
 
 /* search matcher flags */
 #define SEARCH_STRINGMASK		15

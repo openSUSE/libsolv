@@ -23,7 +23,41 @@ data_read_id(unsigned char *dp, Id *idp)
           *idp = (x << 7) ^ c;
           return dp;
         }
-      x = (x << 7) ^ c ^ 128;
+      x = (x << 7) ^ (c ^ 128);
+    }
+}
+
+static inline unsigned char *
+data_read_num64(unsigned char *dp, unsigned int *low, unsigned int *high)
+{
+  unsigned int x = 0;
+  unsigned long long int xx;
+  unsigned char c;
+  int n;
+
+  *high = 0;
+  for (n = 4; n-- > 0;)
+    {
+      c = *dp++;
+      if (!(c & 0x80))
+	{
+	  *low = (x << 7) ^ c;
+	  return dp;
+	}
+      x = (x << 7) ^ (c ^ 128);
+    }
+  xx = x;
+  for (;;)
+    {
+      c = *dp++;
+      if (!(c & 0x80))
+	{
+	  xx = (xx << 7) ^ c;
+	  *low = xx;
+	  *high = xx >> 32;
+	  return dp;
+	}
+      xx = (xx << 7) ^ (c ^ 128);
     }
 }
 
@@ -69,6 +103,7 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
     case REPOKEY_TYPE_VOID:
       return dp;
     case REPOKEY_TYPE_CONSTANT:
+      kv->num2 = 0;
       kv->num = key->size;
       return dp;
     case REPOKEY_TYPE_CONSTANTID:
@@ -81,9 +116,10 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
     case REPOKEY_TYPE_DIR:
       return data_read_id(dp, &kv->id);
     case REPOKEY_TYPE_NUM:
-      return data_read_id(dp, &kv->num);
+      return data_read_num64(dp, &kv->num, &kv->num2);
     case REPOKEY_TYPE_U32:
-      return data_read_u32(dp, (unsigned int *)&kv->num);
+      kv->num2 = 0;
+      return data_read_u32(dp, &kv->num);
     case REPOKEY_TYPE_MD5:
       kv->str = (const char *)dp;
       return dp + SIZEOF_MD5;
@@ -94,7 +130,7 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA256;
     case REPOKEY_TYPE_BINARY:
-      dp = data_read_id(dp, &kv->num);
+      dp = data_read_id(dp, (Id *)&kv->num);
       kv->str = (const char *)dp;
       return dp + kv->num;
     case REPOKEY_TYPE_IDARRAY:
@@ -105,13 +141,13 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       return dp + strlen(kv->str) + 1;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       dp = data_read_id(dp, &kv->id);
-      dp = data_read_id(dp, &kv->num);
-      return data_read_ideof(dp, &kv->num2, &kv->eof);
+      dp = data_read_id(dp, (Id *)&kv->num);
+      return data_read_ideof(dp, (Id *)&kv->num2, &kv->eof);
     case REPOKEY_TYPE_FIXARRAY:
-      dp = data_read_id(dp, &kv->num);
+      dp = data_read_id(dp, (Id *)&kv->num);
       return data_read_id(dp, &kv->id);
     case REPOKEY_TYPE_FLEXARRAY:
-      return data_read_id(dp, &kv->num);
+      return data_read_id(dp, (Id *)&kv->num);
     default:
       return 0;
     }
@@ -153,8 +189,8 @@ data_skip(unsigned char *dp, int type)
       return dp + 1;
     case REPOKEY_TYPE_BINARY:
       {
-	Id len;
-	dp = data_read_id(dp, &len);
+	unsigned int len;
+	dp = data_read_id(dp, (Id *)&len);
 	return dp + len;
       }
     case REPOKEY_TYPE_DIRSTRARRAY:
@@ -237,6 +273,12 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
       while ((*dp) != 0)
         dp++;
       return dp + 1;
+    case REPOKEY_TYPE_BINARY:
+      {
+	unsigned int len;
+	dp = data_read_id(dp, (Id *)&len);
+	return dp + len;
+      }
     case REPOKEY_TYPE_DIRSTRARRAY:
       for (;;)
         {

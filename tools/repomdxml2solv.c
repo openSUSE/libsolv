@@ -73,7 +73,8 @@ doquery(Pool *pool, Repo *repo, const char *query)
 	  printf("%s\n", di.kv.str);
 	  break;
 	case REPOKEY_TYPE_NUM:
-	  printf("%d\n", di.kv.num);
+	case REPOKEY_TYPE_CONSTANT:
+	  printf("%llu\n", SOLV_KV_NUM64(&di.kv));
 	  break;
 	case REPOKEY_TYPE_MD5:
 	case REPOKEY_TYPE_SHA1:

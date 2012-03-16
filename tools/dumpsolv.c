@@ -98,20 +98,22 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
       printf("%s: (void)\n", keyname);
       break;
     case REPOKEY_TYPE_U32:
-    case REPOKEY_TYPE_NUM:
     case REPOKEY_TYPE_CONSTANT:
       printf("%s: %u\n", keyname, kv->num);
       break;
+    case REPOKEY_TYPE_NUM:
+      printf("%s: %llu\n", keyname, SOLV_KV_NUM64(kv));
+      break;
     case REPOKEY_TYPE_BINARY:
       if (kv->num)
-        printf("%s: %02x..%02x len %d\n", keyname, (unsigned char)kv->str[0], (unsigned char)kv->str[kv->num - 1], kv->num);
+        printf("%s: %02x..%02x len %u\n", keyname, (unsigned char)kv->str[0], (unsigned char)kv->str[kv->num - 1], kv->num);
       else
         printf("%s: len 0\n", keyname);
       break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       if (!kv->entry)
         printf("%s:\n%*s", keyname, indent, "");
-      printf("  %s %d %d\n", repodata_dir2str(data, kv->id, 0), kv->num, kv->num2);
+      printf("  %s %u %u\n", repodata_dir2str(data, kv->id, 0), kv->num, kv->num2);
       break;
     case REPOKEY_TYPE_DIRSTRARRAY:
       if (!kv->entry)
