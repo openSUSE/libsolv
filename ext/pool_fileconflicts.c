@@ -230,7 +230,7 @@ findfileconflicts2_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
   strncpy(md5padded, md5, 32);
   md5padded[32] = 0;
   md5padded[33] = fmode >> 24;
-  // printf("%d, hx %x -> %s   %d %s\n", cbdata->idx, hx, fn, fmode, md5);
+  /* printf("%d, hx %x -> %s   %d %s\n", cbdata->idx, hx, fn, fmode, md5); */
   queue_push(&cbdata->files, cbdata->filesspacen);
   addfilesspace(cbdata, (unsigned char *)md5padded, 34);
   addfilesspace(cbdata, (unsigned char *)fn, strlen(fn) + 1);

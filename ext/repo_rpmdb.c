@@ -2789,18 +2789,18 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 #if 0
 	      Id htype = 0;
 #endif
-	      // printf("V3 signature packet\n");
+	      /* printf("V3 signature packet\n"); */
 	      if (l < 17)
 		continue;
 	      if (p[2] != 0x10 && p[2] != 0x11 && p[2] != 0x12 && p[2] != 0x13 && p[2] != 0x1f)
 		continue;
 	      if (!memcmp(keyid, p + 6, 8))
 		{
-		  // printf("SELF SIG\n");
+		  /* printf("SELF SIG\n"); */
 		}
 	      else
 		{
-		  // printf("OTHER SIG\n");
+		  /* printf("OTHER SIG\n"); */
 		}
 #if 0
 	      if (p[16] == 1)
@@ -2837,7 +2837,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 #endif
 	      unsigned char issuer[8];
 
-	      // printf("V4 signature packet\n");
+	      /* printf("V4 signature packet\n"); */
 	      if (l < 6)
 		continue;
 	      if (p[1] != 0x10 && p[1] != 0x11 && p[1] != 0x12 && p[1] != 0x13 && p[1] != 0x1f)
@@ -2893,7 +2893,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 			  break;
 			}
 		      x = q[0] & 127;
-		      // printf("%d SIGSUB %d %d\n", j, x, sl);
+		      /* printf("%d SIGSUB %d %d\n", j, x, sl); */
 		      if (x == 16 && sl == 9 && !haveissuer)
 			{
 			  memcpy(issuer, q + 1, 8);
@@ -2957,13 +2957,13 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 #endif
 		  if (!memcmp(keyid, issuer, 8))
 		    {
-		      // printf("SELF SIG cr %d ex %d\n", cr, ex);
+		      /* printf("SELF SIG cr %d ex %d\n", cr, ex); */
 		      if (ex > maxex)
 			maxex = ex;
 		    }
 		  else
 		    {
-		      // printf("OTHER SIG cr %d ex %d\n", cr, ex);
+		      /* printf("OTHER SIG cr %d ex %d\n", cr, ex); */
 		    }
 		}
 	    }

@@ -29,21 +29,19 @@
 #include "util.h"
 #define DISABLE_SPLIT
 #include "tools_util.h"
-#include "repo_content.h"
+#include "repo_zyppdb.h"
 
-
-//#define DUMPOUT 0
 
 enum state {
-  STATE_START,           // 0
-  STATE_PRODUCT,         // 1
-  STATE_NAME,            // 2
-  STATE_VERSION,         // 3
-  STATE_ARCH,            // 4
-  STATE_SUMMARY,         // 5
-  STATE_VENDOR,          // 6
-  STATE_INSTALLTIME,     // 7
-  NUMSTATES              // 0
+  STATE_START,
+  STATE_PRODUCT,
+  STATE_NAME,
+  STATE_VERSION,
+  STATE_ARCH,
+  STATE_SUMMARY,
+  STATE_VENDOR,
+  STATE_INSTALLTIME,
+  NUMSTATES
 };
 
 struct stateswitch {
@@ -306,7 +304,7 @@ add_zyppdb_product(struct parsedata *pd, FILE *fp)
  * parse each one as a product
  */
 
-void
+int
 repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
 {
   int i;
@@ -357,6 +355,7 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
   join_freemem(&pd.jd);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }
 
 /* EOF */

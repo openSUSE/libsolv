@@ -19,9 +19,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "chksum.h"
-#include "repo_updateinfoxml.h"
-
-//#define DUMPOUT 0
+#include "repo_repomdxml.h"
 
 /*
 <repomd>
@@ -450,7 +448,7 @@ characterData(void *userData, const XML_Char *s, int len)
 
 #define BUFF_SIZE 8192
 
-void
+int
 repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
@@ -500,6 +498,7 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
     repodata_internalize(data);
 
   free(pd.content);
+  return 0;
 }
 
 /* EOF */

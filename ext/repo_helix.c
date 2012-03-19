@@ -144,29 +144,29 @@ static struct stateswitch stateswitches[] = {
  */
 
 typedef struct _parsedata {
-  // XML parser data
+  /* XML parser data */
   int depth;
-  enum state state;	// current state
+  enum state state;	/* current state */
   int statedepth;
-  char *content;	// buffer for content of node
-  int lcontent;		// actual length of current content
-  int acontent;		// actual buffer size
-  int docontent;	// handle content
+  char *content;	/* buffer for content of node */
+  int lcontent;		/* actual length of current content */
+  int acontent;		/* actual buffer size */
+  int docontent;	/* handle content */
 
-  // repo data
-  Pool *pool;		// current pool
-  Repo *repo;		// current repo
-  Repodata *data;       // current repo data
-  Solvable *solvable;	// current solvable
-  Offset freshens;	// current freshens vector
+  /* repo data */
+  Pool *pool;		/* current pool */
+  Repo *repo;		/* current repo */
+  Repodata *data;       /* current repo data */
+  Solvable *solvable;	/* current solvable */
+  Offset freshens;	/* current freshens vector */
 
-  // package data
-  int  epoch;		// epoch (as offset into evrspace)
-  int  version;		// version (as offset into evrspace)
-  int  release;		// release (as offset into evrspace)
-  char *evrspace;	// buffer for evr
-  int  aevrspace;	// actual buffer space
-  int  levrspace;	// actual evr length
+  /* package data */
+  int  epoch;		/* epoch (as offset into evrspace) */
+  int  version;		/* version (as offset into evrspace) */
+  int  release;		/* release (as offset into evrspace) */
+  char *evrspace;	/* buffer for evr */
+  int  aevrspace;	/* actual buffer space */
+  int  levrspace;	/* actual evr length */
   char *kind;
 
   struct stateswitch *swtab[NUMSTATES];
@@ -177,7 +177,7 @@ typedef struct _parsedata {
 /*------------------------------------------------------------------*/
 /* E:V-R handling */
 
-// create Id from epoch:version-release
+/* create Id from epoch:version-release */
 
 static Id
 evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
@@ -185,38 +185,38 @@ evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
   char *c;
   int l;
 
-  // treat explitcit 0 as NULL
+  /* treat explitcit 0 as NULL */
   if (e && !strcmp(e, "0"))
     e = NULL;
 
   if (v && !e)
     {
       const char *v2;
-      // scan version for ":"
-      for (v2 = v; *v2 >= '0' && *v2 <= '9'; v2++)	// skip leading digits
+      /* scan version for ":" */
+      for (v2 = v; *v2 >= '0' && *v2 <= '9'; v2++)	/* skip leading digits */
         ;
-      // if version contains ":", set epoch to "0"
+      /* if version contains ":", set epoch to "0" */
       if (v2 > v && *v2 == ':')
 	e = "0";
     }
   
-  // compute length of Id string
-  l = 1;  // for the \0
+  /* compute length of Id string */
+  l = 1;  /* for the \0 */
   if (e)
-    l += strlen(e) + 1;  // e:
+    l += strlen(e) + 1;  /* e: */
   if (v)
-    l += strlen(v);      // v
+    l += strlen(v);      /* v */
   if (r)
-    l += strlen(r) + 1;  // -r
+    l += strlen(r) + 1;  /* -r */
 
-  // extend content if not sufficient
+  /* extend content if not sufficient */
   if (l > pd->acontent)
     {
       pd->content = (char *)realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
 
-  // copy e-v-r to content
+  /* copy e-v-r to content */
   c = pd->content;
   if (e)
     {
@@ -236,22 +236,22 @@ evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
       c += strlen(c);
     }
   *c = 0;
-  // if nothing inserted, return Id 0
+  /* if nothing inserted, return Id 0 */
   if (!*pd->content)
     return ID_NULL;
 #if 0
   fprintf(stderr, "evr: %s\n", pd->content);
 #endif
-  // intern and create
+  /* intern and create */
   return pool_str2id(pool, pd->content, 1);
 }
 
 
-// create e:v-r from attributes
-// atts is array of name,value pairs, NULL at end
-//   even index into atts is name
-//   odd index is value
-//
+/* create e:v-r from attributes
+ * atts is array of name,value pairs, NULL at end
+ *   even index into atts is name
+ *   odd index is value
+ */
 static Id
 evr_atts2id(Pool *pool, Parsedata *pd, const char **atts)
 {
@@ -424,14 +424,14 @@ startElement(void *userData, const char *name, const char **atts)
       return;
     }
   
-  // set new state
+  /* set new state */
   pd->state = sw->to;
 
   pd->docontent = sw->docontent;
   pd->statedepth = pd->depth;
 
-  // start with empty content
-  // (will collect data until end element
+  /* start with empty content */
+  /* (will collect data until end element) */
   pd->lcontent = 0;
   *pd->content = 0;
 
@@ -605,7 +605,7 @@ endElement(void *userData, const char *name)
   if (pd->depth != pd->statedepth)
     {
       pd->depth--;
-      // printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+      /* printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth); */
       return;
     }
 
@@ -770,7 +770,7 @@ endElement(void *userData, const char *name)
     }
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
-  // printf("back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+  /* printf("back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth); */
 }
 
 
@@ -787,18 +787,18 @@ characterData(void *userData, const XML_Char *s, int len)
   int l;
   char *c;
 
-  // check if current nodes content is interesting
+  /* check if current nodes content is interesting */
   if (!pd->docontent)
     return;
 
-  // adapt content buffer
+  /* adapt content buffer */
   l = pd->lcontent + len + 1;
   if (l > pd->acontent)
     {
       pd->content = (char *)realloc(pd->content, l + 256);
       pd->acontent = l + 256;
     }
-  // append new content to buffer
+  /* append new content to buffer */
   c = pd->content + pd->lcontent;
   pd->lcontent += len;
   while (len-- > 0)
@@ -852,14 +852,14 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
   pd.levrspace = 1;
   pd.data = data;
 
-  // set up XML parser
+  /* set up XML parser */
 
   parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);       /* make parserdata available to XML callbacks */
   XML_SetElementHandler(parser, startElement, endElement);
   XML_SetCharacterDataHandler(parser, characterData);
 
-  // read/parse XML file
+  /* read/parse XML file */
   for (;;)
     {
       l = fread(buf, 1, sizeof(buf), fp);

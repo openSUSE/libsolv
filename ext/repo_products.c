@@ -31,34 +31,33 @@
 #include "tools_util.h"
 #include "repo_content.h"
 #include "repo_zyppdb.h"
+#include "repo_products.h"
 #include "repo_releasefile_products.h"
 
 
-//#define DUMPOUT 0
-
 enum state {
-  STATE_START,           // 0
-  STATE_PRODUCT,         // 1
-  STATE_VENDOR,          // 2
-  STATE_NAME,            // 3
-  STATE_VERSION,         // 4
-  STATE_RELEASE,         // 5
-  STATE_ARCH,            // 6
-  STATE_SUMMARY,         // 7
+  STATE_START,
+  STATE_PRODUCT,
+  STATE_VENDOR,
+  STATE_NAME,
+  STATE_VERSION,
+  STATE_RELEASE,
+  STATE_ARCH,
+  STATE_SUMMARY,
   STATE_SHORTSUMMARY,
-  STATE_DESCRIPTION,     // 8
-  STATE_UPDATEREPOKEY,   // 9 should go away
-  STATE_CPEID,         // 9
-  STATE_URLS,            // 10
-  STATE_URL,             // 11
-  STATE_RUNTIMECONFIG,   // 12
-  STATE_LINGUAS,         // 13
-  STATE_LANG,            // 14
-  STATE_REGISTER,        // 15
-  STATE_TARGET,          // 16
-  STATE_REGRELEASE,      // 18
-  STATE_PRODUCTLINE,     // 19
-  NUMSTATES              // 0
+  STATE_DESCRIPTION,
+  STATE_UPDATEREPOKEY,
+  STATE_CPEID,
+  STATE_URLS,
+  STATE_URL,
+  STATE_RUNTIMECONFIG,
+  STATE_LINGUAS,
+  STATE_LANG,
+  STATE_REGISTER,
+  STATE_TARGET,
+  STATE_REGRELEASE,
+  STATE_PRODUCTLINE,
+  NUMSTATES
 };
 
 struct stateswitch {
@@ -162,7 +161,7 @@ startElement(void *userData, const char *name, const char **atts)
   struct stateswitch *sw;
 
 #if 0
-      fprintf(stderr, "start: [%d]%s\n", pd->state, name);
+  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
     {
@@ -231,7 +230,7 @@ endElement(void *userData, const char *name)
   Solvable *s = pd->solvable;
 
 #if 0
-      fprintf(stderr, "end: [%d]%s\n", pd->state, name);
+  fprintf(stderr, "end: [%d]%s\n", pd->state, name);
 #endif
   if (pd->depth != pd->statedepth)
     {
@@ -410,7 +409,7 @@ add_code11_product(struct parsedata *pd, FILE *fp)
 }
 
 
-void
+int
 repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 {
   Repodata *data;
@@ -474,6 +473,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }
 
 
@@ -491,11 +491,12 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 
 /* Oh joy! Three parsers for the price of one! */
 
-void
+int
 repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
 {
   char *fullpath;
   DIR *dir;
+  int ret;
 
   if (proddir)
     {
@@ -504,8 +505,7 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
 	{
 	  /* assume code11 stype products */
 	  closedir(dir);
-	  repo_add_code11_products(repo, proddir, flags);
-	  return;
+	  return repo_add_code11_products(repo, proddir, flags);
 	}
     }
 
@@ -516,9 +516,9 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
     {
       closedir(dir);
       /* assume code10 style products */
-      repo_add_zyppdb_products(repo, fullpath, flags);
+      ret = repo_add_zyppdb_products(repo, fullpath, flags);
       solv_free(fullpath);
-      return;
+      return ret;
     }
   solv_free(fullpath);
 
@@ -528,9 +528,9 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
   if (dir)
     {
       closedir(dir);
-      repo_add_releasefile_products(repo, fullpath, flags);
+      ret = repo_add_releasefile_products(repo, fullpath, flags);
       solv_free(fullpath);
-      return;
+      return ret;
     }
 
   /* no luck. print an error message in case the root argument is wrong */
@@ -540,6 +540,7 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
   /* the least we can do... */
   if (!(flags & REPO_NO_INTERNALIZE) && (flags & REPO_REUSE_REPODATA) != 0)
     repodata_internalize(repo_last_repodata(repo));
+  return 0;
 }
 
 /* EOF */

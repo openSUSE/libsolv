@@ -30,7 +30,7 @@ enum state {
   STATE_ARCH,
   STATE_VERSION,
 
-  // package rpm-md
+  /* package rpm-md */
   STATE_LOCATION,
   STATE_CHECKSUM,
   STATE_RPM_GROUP,
@@ -64,7 +64,7 @@ enum state {
   STATE_AFFECTSPKG,
   STATE_REBOOTNEEDED,
 
-  // pattern attributes
+  /* pattern attributes */
   STATE_CATEGORY, /* pattern and patches */
   STATE_ORDER,
   STATE_INCLUDES,
@@ -79,8 +79,8 @@ enum state {
 
   /* product */
   STATE_SHORTNAME,
-  STATE_DISTNAME, // obsolete
-  STATE_DISTEDITION, // obsolete
+  STATE_DISTNAME, /* obsolete */
+  STATE_DISTEDITION, /* obsolete */
   STATE_SOURCE,
   STATE_TYPE,
   STATE_RELNOTESURL,
@@ -114,7 +114,7 @@ enum state {
 
   STATE_FILE,
 
-  // general
+  /* general */
   NUMSTATES
 };
 
@@ -145,7 +145,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
   { STATE_SOLVABLE,    "version",         STATE_VERSION, 0 },
 
-  // package attributes rpm-md
+  /* package attributes rpm-md */
   { STATE_SOLVABLE,    "location",        STATE_LOCATION, 0 },
   { STATE_SOLVABLE,    "checksum",        STATE_CHECKSUM, 1 },
 
@@ -156,8 +156,6 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "distribution",    STATE_DISTRIBUTION, 1 },
   { STATE_SOLVABLE,    "url",             STATE_URL,          1 },
   { STATE_SOLVABLE,    "packager",        STATE_PACKAGER,     1 },
-  //{ STATE_SOLVABLE,    "???",         STATE_INSNOTIFY, 1 },
-  //{ STATE_SOLVABLE,    "??",     STATE_DELNOTIFY, 1 },
   { STATE_SOLVABLE,    "vendor",          STATE_VENDOR,       1 },
   { STATE_SOLVABLE,    "size",            STATE_SIZE,         0 },
   { STATE_SOLVABLE,    "archive-size",    STATE_DOWNLOADSIZE, 1 },
@@ -170,7 +168,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,    "keyword",         STATE_KEYWORD,      1 },
   { STATE_SOLVABLE,    "diskusage",       STATE_DISKUSAGE,    0 },
 
-  // pattern attribute
+  /* pattern attribute */
   { STATE_SOLVABLE,    "script",          STATE_SCRIPT,        1 },
   { STATE_SOLVABLE,    "icon",            STATE_ICON,          1 },
   { STATE_SOLVABLE,    "uservisible",     STATE_USERVISIBLE,   1 },
@@ -253,7 +251,7 @@ struct parsedata {
   Id chksumtype;
   Id handle;
   XML_Parser *parser;
-  Id (*dirs)[3]; // dirid, size, nfiles
+  Id (*dirs)[3]; /* dirid, size, nfiles */
   int ndirs;
   const char *language;			/* default language */
   Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
@@ -635,7 +633,6 @@ set_sourcerpm(Repodata *data, Solvable *s, Id handle, char *sourcerpm)
 static void XMLCALL
 startElement(void *userData, const char *name, const char **atts)
 {
-  //fprintf(stderr,"+tag: %s\n", name);
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
@@ -644,7 +641,7 @@ startElement(void *userData, const char *name, const char **atts)
   Id handle = pd->handle;
   const char *pkgid;
 
-  // fprintf(stderr, "into %s, from %d, depth %d, statedepth %d\n", name, pd->state, pd->depth, pd->statedepth);
+  /* fprintf(stderr, "into %s, from %d, depth %d, statedepth %d\n", name, pd->state, pd->depth, pd->statedepth); */
 
   if (pd->depth != pd->statedepth)
     {
@@ -656,8 +653,10 @@ startElement(void *userData, const char *name, const char **atts)
     return;
   if (pd->state == STATE_START && !strcmp(name, "products"))
     return;
-  //if (pd->state == STATE_START && !strcmp(name, "metadata"))
-  //  return;
+#if 0
+  if (pd->state == STATE_START && !strcmp(name, "metadata"))
+    return;
+#endif
   if (pd->state == STATE_SOLVABLE && !strcmp(name, "format"))
     return;
 
@@ -708,7 +707,7 @@ startElement(void *userData, const char *name, const char **atts)
       */
       if ((pkgid = find_attr("pkgid", atts)) != NULL)
         {
-          // look at the checksum cache
+          /* look at the checksum cache */
           Id index = stringpool_str2id(&pd->cspool, pkgid, 0);
           if (!index || index >= pd->ncscache || !pd->cscache[index])
 	    {
@@ -909,7 +908,6 @@ startElement(void *userData, const char *name, const char **atts)
 static void XMLCALL
 endElement(void *userData, const char *name)
 {
-  //fprintf(stderr,"-tag: %s\n", name);
   struct parsedata *pd = userData;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
@@ -921,7 +919,7 @@ endElement(void *userData, const char *name)
   if (pd->depth != pd->statedepth)
     {
       pd->depth--;
-      // printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+      /* printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth); */
       return;
     }
 
@@ -930,8 +928,10 @@ endElement(void *userData, const char *name)
     return;
   if (pd->state == STATE_START && !strcmp(name, "products"))
     return;
-  //if (pd->state == STATE_START && !strcmp(name, "metadata"))
-  //  return;
+#if 0
+  if (pd->state == STATE_START && !strcmp(name, "metadata"))
+    return;
+#endif
   if (pd->state == STATE_SOLVABLE && !strcmp(name, "format"))
     return;
 
@@ -1096,7 +1096,7 @@ endElement(void *userData, const char *name)
     }
   pd->state = pd->sbtab[pd->state];
   pd->docontent = 0;
-  // fprintf(stderr, "back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth);
+  /* fprintf(stderr, "back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth); */
 }
 
 
