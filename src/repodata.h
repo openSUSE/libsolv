@@ -18,7 +18,10 @@
 #include "pooltypes.h"
 #include "pool.h"
 #include "dirpool.h"
+
+#ifdef LIBSOLV_INTERNAL
 #include "repopage.h"
+#endif
 
 #define SIZEOF_MD5	16
 #define SIZEOF_SHA1	20
