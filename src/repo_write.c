@@ -7,12 +7,12 @@
 
 /*
  * repo_write.c
- * 
+ *
  * Write Repo data out to a file in solv format
- * 
- * See doc/README.format for a description 
+ *
+ * See doc/README.format for a description
  * of the binary file format
- * 
+ *
  */
 
 #include <sys/types.h>
@@ -43,9 +43,9 @@ typedef struct needid {
  * increment need Id
  * idarray: array of Ids, ID_NULL terminated
  * needid: array of Id->NeedId
- * 
+ *
  * return size of array (including trailing zero)
- * 
+ *
  */
 
 static void
@@ -92,7 +92,7 @@ incneedidarray(Pool *pool, Id *idarray, NeedId *needid)
 
 
 /*
- * 
+ *
  */
 
 static int
@@ -401,6 +401,7 @@ data_addid(struct extdata *xd, Id sx)
 {
   unsigned int x = (unsigned int)sx;
   unsigned char *dp;
+
   xd->buf = solv_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
   dp = xd->buf + xd->len;
 
@@ -419,28 +420,43 @@ data_addid(struct extdata *xd, Id sx)
 }
 
 static inline void
-data_addideof(struct extdata *xd, Id x, int eof)
+data_addideof(struct extdata *xd, Id sx, int eof)
 {
-  if (x >= 64)
-    x = (x & 63) | ((x & ~63) << 1);
-  data_addid(xd, (eof ? x: x | 64));
+  unsigned int x = (unsigned int)sx;
+  unsigned char *dp;
+
+  xd->buf = solv_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
+  dp = xd->buf + xd->len;
+
+  if (x >= (1 << 13))
+    {
+      if (x >= (1 << 27))
+        *dp++ = (x >> 27) | 128;
+      if (x >= (1 << 20))
+        *dp++ = (x >> 20) | 128;
+      *dp++ = (x >> 13) | 128;
+    }
+  if (x >= (1 << 6))
+    *dp++ = (x >> 6) | 128;
+  *dp++ = eof ? (x & 63) : (x & 63) | 64;
+  xd->len = dp - xd->buf;
 }
 
-static void 
+static void
 data_addid64(struct extdata *xd, unsigned int x, unsigned int hx)
 {
   if (hx)
-    {    
+    {
       if (hx > 7)
         {
           data_addid(xd, (Id)(hx >> 3));
-          xd->buf[xd->len - 1] |= 128; 
+          xd->buf[xd->len - 1] |= 128;
 	  hx &= 7;
         }
       data_addid(xd, (Id)(x | 0x80000000));
-      xd->buf[xd->len - 5] = (x >> 28) | (hx << 4) | 128; 
+      xd->buf[xd->len - 5] = (x >> 28) | (hx << 4) | 128;
     }
-  else 
+  else
     data_addid(xd, (Id)x);
 }
 
@@ -518,18 +534,14 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
 	}
       /* XXX If difference is zero we have multiple equal elements,
 	 we might want to skip writing them out.  */
-      if (id >= 64)
-	id = (id & 63) | ((id & ~63) << 1);
-      data_addid(xd, id | 64);
+      data_addideof(xd, id, 0);
     }
   id = sids[i];
   if (id == marker)
     id = 0;
   else
     id = id - old + 1;
-  if (id >= 64)
-    id = (id & 63) | ((id & ~63) << 1);
-  data_addid(xd, id);
+  data_addideof(xd, id, 1);
   if (sids != lids)
     solv_free(sids);
 }
@@ -752,7 +764,7 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
   rm = cbdata->keymap[cbdata->keymapstart[data->repodataid] + (key - data->keys)];
   if (!rm)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
-  
+
   if (cbdata->target->keys[rm].storage == KEY_STORAGE_VERTICAL_OFFSET)
     {
       xd = cbdata->extdata + rm;	/* vertical buffer */
@@ -1014,7 +1026,7 @@ repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *
   unsigned char *repodataused;
   int anyrepodataused = 0;
   int anysolvableused = 0;
-  
+
   struct cbdata cbdata;
   int clonepool;
   Repokey *key;
@@ -1750,7 +1762,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   prefixcomp = solv_malloc(nstrings);
   compsum = 0;
   old_str = "";
-  
+
   prefixcomp[0] = 0;
   for (i = 1; i < nstrings; i++)
     {
@@ -1785,7 +1797,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   /* Build the prefix-encoding of the string pool.  We need to know
      the size of that before writing it to the file, so we have to
      build a separate buffer for that.  As it's temporarily possible
-     that this actually is an expansion we can't easily reuse the 
+     that this actually is an expansion we can't easily reuse the
      stringspace for this.  The max expansion per string is 1 byte,
      so it will fit into sizeid+nstrings bytes.  */
   char *prefix = solv_malloc(sizeid + nstrings);

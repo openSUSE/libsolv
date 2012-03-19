@@ -328,6 +328,33 @@ incore_add_id(Repodata *data, Id sx)
 }
 
 static void
+incore_add_ideof(Repodata *data, Id sx, int eof)
+{
+  unsigned int x = (unsigned int)sx;
+  unsigned char *dp;
+  /* make sure we have at least 5 bytes free */
+  if (data->incoredatafree < 5)
+    {
+      data->incoredata = solv_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK);
+      data->incoredatafree = INCORE_ADD_CHUNK;
+    }
+  dp = data->incoredata + data->incoredatalen;
+  if (x >= (1 << 13))
+    {
+      if (x >= (1 << 27))
+	*dp++ = (x >> 27) | 128;
+      if (x >= (1 << 20))
+	*dp++ = (x >> 20) | 128;
+      *dp++ = (x >> 13) | 128;
+    }
+  if (x >= (1 << 6))
+    *dp++ = (x >> 6) | 128;
+  *dp++ = eof ? (x & 63) : (x & 63) | 64;
+  data->incoredatafree -= dp - (data->incoredata + data->incoredatalen);
+  data->incoredatalen = dp - data->incoredata;
+}
+
+static void
 incore_add_blob(Repodata *data, unsigned char *buf, int len)
 {
   if (data->incoredatafree < len)
@@ -358,11 +385,7 @@ incore_map_idarray(Repodata *data, unsigned char *dp, Id *map, Id max)
 	  break;
 	}
       id = map[id];
-      if (id < 0)
-	abort();	/* for now */
-      if (id >= 64)
-	id = (id & 63) | ((id & ~63) << 1);
-      incore_add_id(data, eof ? id : id | 64);
+      incore_add_ideof(data, id, eof);
       if (eof)
 	break;
     }
@@ -1086,7 +1109,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	      if (keys[key].storage != KEY_STORAGE_INCORE)
 		break;
 	      if (idmap)
-		incore_map_idarray(&data, dps, idmap, numid);
+		incore_map_idarray(&data, dps, idmap, numid + numrel);
 	      else
 		incore_add_blob(&data, dps, dp - dps);
 	      break;

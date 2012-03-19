@@ -1546,6 +1546,7 @@ dataiterator_step(Dataiterator *di)
 	      /* not an array */
 	      di->kv.id = *di->idp;
 	      di->kv.num = *di->idp;	/* for rpmdbid */
+	      di->kv.num2 = 0;		/* for rpmdbid */
 	      di->kv.entry = 0;
 	      di->state = di_nextsolvablekey;
 	      break;
@@ -2469,8 +2470,8 @@ struct extdata {
 static void
 data_addid(struct extdata *xd, Id sx)
 {
-  unsigned char *dp;
   unsigned int x = (unsigned int)sx;
+  unsigned char *dp;
 
   xd->buf = solv_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
   dp = xd->buf + xd->len;
@@ -2507,13 +2508,26 @@ data_addid64(struct extdata *xd, unsigned long long x)
 }
 
 static void
-data_addideof(struct extdata *xd, Id x, int eof)
+data_addideof(struct extdata *xd, Id sx, int eof)
 {
-  if (x < 0)
-    abort();	/* XXX: not yet */
-  if (x >= 64)
-    x = (x & 63) | ((x & ~63) << 1);
-  data_addid(xd, (eof ? x : x | 64));
+  unsigned int x = (unsigned int)sx;
+  unsigned char *dp;
+
+  xd->buf = solv_extend(xd->buf, xd->len, 5, 1, EXTDATA_BLOCK);
+  dp = xd->buf + xd->len;
+
+  if (x >= (1 << 13))
+    {
+      if (x >= (1 << 27))
+        *dp++ = (x >> 27) | 128;
+      if (x >= (1 << 20))
+        *dp++ = (x >> 20) | 128;
+      *dp++ = (x >> 13) | 128;
+    }
+  if (x >= (1 << 6))
+    *dp++ = (x >> 6) | 128;
+  *dp++ = eof ? (x & 63) : (x & 63) | 64;
+  xd->len = dp - xd->buf;
 }
 
 static void
@@ -3008,7 +3022,7 @@ repodata_create_stubs(Repodata *data)
 	      xkey.name = xkeyname;
               xkey.type = di.kv.id;
               xkey.storage = KEY_STORAGE_INCORE;
-              xkey.size = 0; 
+              xkey.size = 0;
               repodata_key2id(sdata, &xkey, 1);
               xkeyname = 0;
 	    }

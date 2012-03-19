@@ -13,8 +13,35 @@
 static inline unsigned char *
 data_read_id(unsigned char *dp, Id *idp)
 {
-  Id x = 0;
+  Id x;
   unsigned char c;
+  if (!(dp[0] & 0x80))
+    {
+      *idp = dp[0];
+      return dp + 1;
+    }
+  if (!(dp[1] & 0x80))
+    {
+      *idp = dp[0] << 7 ^ dp[1] ^ 0x4000;
+      return dp + 2;
+    }
+  if (!(dp[2] & 0x80))
+    {
+      *idp = dp[0] << 14 ^ dp[1] << 7 ^ dp[2] ^ 0x204000;
+      return dp + 3;
+    }
+  if (!(dp[3] & 0x80))
+    {
+      *idp = dp[0] << 21 ^ dp[1] << 14 ^ dp[2] << 7 ^ dp[3] ^ 0x10204000;
+      return dp + 4;
+    }
+  x = dp[0] << 28 ^ dp[1] << 21 ^ dp[2] << 14 ^ dp[3] << 7 ^ dp[4] ^ 0x10204000;
+  if (!(dp[4] & 0x80))
+    {
+      *idp = x;
+      return dp + 5;
+    }
+  dp += 5;
   for (;;)
     {
       c = *dp++;
@@ -30,34 +57,49 @@ data_read_id(unsigned char *dp, Id *idp)
 static inline unsigned char *
 data_read_num64(unsigned char *dp, unsigned int *low, unsigned int *high)
 {
-  unsigned int x = 0;
-  unsigned long long int xx;
+  unsigned long long int x;
   unsigned char c;
-  int n;
 
   *high = 0;
-  for (n = 4; n-- > 0;)
+  if (!(dp[0] & 0x80))
     {
-      c = *dp++;
-      if (!(c & 0x80))
-	{
-	  *low = (x << 7) ^ c;
-	  return dp;
-	}
-      x = (x << 7) ^ (c ^ 128);
+      *low = dp[0];
+      return dp + 1;
     }
-  xx = x;
+  if (!(dp[1] & 0x80))
+    {
+      *low = dp[0] << 7 ^ dp[1] ^ 0x4000;
+      return dp + 2;
+    }
+  if (!(dp[2] & 0x80))
+    {
+      *low = dp[0] << 14 ^ dp[1] << 7 ^ dp[2] ^ 0x204000;
+      return dp + 3;
+    }
+  if (!(dp[3] & 0x80))
+    {
+      *low = dp[0] << 21 ^ dp[1] << 14 ^ dp[2] << 7 ^ dp[3] ^ 0x10204000;
+      return dp + 4;
+    }
+  if (!(dp[4] & 0x80))
+    {
+      *low = dp[0] << 28 ^ dp[1] << 21 ^ dp[2] << 14 ^ dp[3] << 7 ^ dp[4] ^ 0x10204000;
+      *high = (dp[0] ^ 0x80) >> 4;
+      return dp + 5;
+    }
+  x = (unsigned long long)(dp[0] ^ 0x80) << 28 ^ (unsigned int)(dp[1] << 21 ^ dp[2] << 14 ^ dp[3] << 7 ^ dp[4] ^ 0x10204000);
+  dp += 5;
   for (;;)
     {
       c = *dp++;
       if (!(c & 0x80))
 	{
-	  xx = (xx << 7) ^ c;
-	  *low = xx;
-	  *high = xx >> 32;
+	  x = (x << 7) ^ c;
+	  *low = x;
+	  *high = x >> 32;
 	  return dp;
 	}
-      xx = (xx << 7) ^ (c ^ 128);
+      x = (x << 7) ^ (c ^ 128);
     }
 }
 
