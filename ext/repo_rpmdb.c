@@ -1083,12 +1083,13 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
   Stringpool *fromspool = fromdata->localpool ? &fromdata->spool : &frompool->ss;
 
   keyname = key->name;
-  if (keyname >= ID_NUM_INTERNAL)
+  if (keyname >= ID_NUM_INTERNAL && pool != frompool)
     keyname = pool_str2id(pool, pool_id2str(frompool, keyname), 1);
   switch(key->type)
     {
     case REPOKEY_TYPE_ID:
     case REPOKEY_TYPE_CONSTANTID:
+    case REPOKEY_TYPE_IDARRAY:	/* used for triggers */
       id = kv->id;
       assert(!data->localpool);	/* implement me! */
       if (pool != frompool || fromdata->localpool)
@@ -1100,8 +1101,10 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
 	}
       if (key->type == REPOKEY_TYPE_ID)
         repodata_set_id(data, handle, keyname, id);
-      else
+      else if (key->type == REPOKEY_TYPE_CONSTANTID)
         repodata_set_constantid(data, handle, keyname, id);
+      else
+        repodata_add_idarray(data, handle, keyname, id);
       break;
     case REPOKEY_TYPE_STR:
       repodata_set_str(data, handle, keyname, kv->str);
@@ -1126,15 +1129,6 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       assert(!data->localpool);	/* implement me! */
       id = copydir(pool, data, fromspool, fromdata, id, cbdata->dircache);
       repodata_add_dirstr(data, handle, keyname, id, kv->str);
-      break;
-    case REPOKEY_TYPE_IDARRAY:	/* used for triggers */
-      id = kv->id;
-      assert(!data->localpool);	/* implement me! */
-      if (ISRELDEP(id))
-	break;		/* can't do those at the moment */
-      if (pool != frompool || fromdata->localpool)
-	id = pool_str2id(pool, stringpool_id2str(fromspool, id), 1);
-      repodata_add_idarray(data, handle, keyname, id);
       break;
     default:
       break;
