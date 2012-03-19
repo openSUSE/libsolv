@@ -853,7 +853,7 @@ Repokey repo_solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1] = {
   { SOLVABLE_SUGGESTS,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
   { SOLVABLE_SUPPLEMENTS, REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
   { SOLVABLE_ENHANCES,    REPOKEY_TYPE_IDARRAY, 0, KEY_STORAGE_SOLVABLE },
-  { RPM_RPMDBID,          REPOKEY_TYPE_U32, 0, KEY_STORAGE_SOLVABLE },
+  { RPM_RPMDBID,          REPOKEY_TYPE_NUM, 0, KEY_STORAGE_SOLVABLE },
 };
 
 static void
@@ -980,6 +980,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	    if (repo->rpmdbid)
 	      {
 		kv.num = repo->rpmdbid[p - repo->start];
+		kv.num2 = 0;
 		repo_matchvalue(md, s, 0, repo_solvablekeys + (RPM_RPMDBID - SOLVABLE_NAME), &kv);
 	      }
 	    if (keyname || md->stop > SEARCH_NEXT_KEY)

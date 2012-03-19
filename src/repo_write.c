@@ -1072,7 +1072,7 @@ repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *
       else if (i < RPM_RPMDBID)
         keyd.type = REPOKEY_TYPE_REL_IDARRAY;
       else
-        keyd.type = REPOKEY_TYPE_U32;
+        keyd.type = REPOKEY_TYPE_NUM;
       keyd.size = 0;
       keyd.storage = KEY_STORAGE_SOLVABLE;
       if (keyfilter)
@@ -1696,7 +1696,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  if (s->enhances && cbdata.keymap[SOLVABLE_ENHANCES])
 	    data_addidarray_sort(xd, pool, needid, idarraydata + s->enhances, 0);
 	  if (repo->rpmdbid && cbdata.keymap[RPM_RPMDBID])
-	    data_addu32(xd, repo->rpmdbid[i - repo->start]);
+	    data_addid(xd, repo->rpmdbid[i - repo->start]);
 	  if (anyrepodataused)
 	    {
 	      cbdata.vstart = -1;
