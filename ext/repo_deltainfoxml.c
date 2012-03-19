@@ -19,9 +19,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "chksum.h"
-#include "repo_updateinfoxml.h"
-
-/* #define DUMPOUT 1 */
+#include "repo_deltainfoxml.h"
 
 /*
  * <deltainfo>
@@ -106,12 +104,9 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
-  
+
   struct stateswitch *swtab[NUMSTATES];
   enum state sbtab[NUMSTATES];
-  char *tempstr;
-  int ltemp;
-  int atemp;
   struct deltarpm delta;
   Id newpkgevr;
   Id newpkgname;
@@ -212,8 +207,8 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return pool_str2id(pool, pd->content, 1);
 }
 
-static void parse_delta_location( struct parsedata *pd, 
-                                  const char* str )
+static void
+parse_delta_location(struct parsedata *pd, const char* str)
 {
   Pool *pool = pd->pool;
   if (str)
@@ -251,7 +246,7 @@ static void parse_delta_location( struct parsedata *pd,
 	    }
 	  if (*s1 == '.')
 	    *s1++ = 0;
-	  pd->delta.locsuffix = pool_str2id(pool, s1, 1); 
+	  pd->delta.locsuffix = pool_str2id(pool, s1, 1);
 	}
       /* Last '-'.  */
       s1 = strrchr (s, '-');
@@ -273,7 +268,7 @@ static void parse_delta_location( struct parsedata *pd,
       free(real_str);
     }
 }
-                                 
+
 static void XMLCALL
 startElement(void *userData, const char *name, const char **atts)
 {
@@ -325,8 +320,6 @@ startElement(void *userData, const char *name, const char **atts)
 
     case STATE_DELTA:
       memset(&pd->delta, 0, sizeof(pd->delta));
-      *pd->tempstr = 0;
-      pd->ltemp = 0;
       pd->delta.bevr = solv_extend(pd->delta.bevr, pd->delta.nbevr, 1, sizeof(Id), 7);
       pd->delta.bevr[pd->delta.nbevr++] = makeevr_atts(pool, pd, atts);
       break;
@@ -346,6 +339,7 @@ startElement(void *userData, const char *name, const char **atts)
 	  if (!pd->delta.filechecksumtype)
 	    pool_debug(pool, SOLV_ERROR, "unknown checksum type: '%s'\n", str);
 	}
+      break;
     case STATE_SEQUENCE:
       break;
     default:
@@ -386,14 +380,7 @@ endElement(void *userData, const char *name)
 	/* read all data for a deltarpm. commit into attributes */
 	Id handle;
 	struct deltarpm *d = &pd->delta;
-#ifdef DUMPOUT
-	int i;
-#endif
 
-#ifdef DUMPOUT
-
-	fprintf (stderr, "found deltarpm for %s:\n", id2str(pool, pd->newpkgname));
-#endif
 	handle = repodata_new_handle(pd->data);
 	/* we commit all handles later on in one go so that the
          * repodata code doesn't need to realloc every time */
@@ -410,56 +397,14 @@ endElement(void *userData, const char *name)
 	  repodata_set_num(pd->data, handle, DELTA_DOWNLOADSIZE, (d->downloadsize + 1023) / 1024);
 	if (d->filechecksum)
 	  repodata_set_checksum(pd->data, handle, DELTA_CHECKSUM, d->filechecksumtype, d->filechecksum);
-#ifdef DUMPOUT
-	fprintf (stderr, "   loc: %s %s %s %s\n", id2str(pool, d->locdir),
-		 id2str(pool, d->locname), id2str(pool, d->locevr),
-		 id2str(pool, d->locsuffix));
-	fprintf (stderr, "  size: %d down\n", d->downloadsize);
-	fprintf (stderr, "  chek: %s\n", d->filechecksum);
-#endif
-
 	if (d->seqnum)
 	  {
-#ifdef DUMPOUT
-	    fprintf (stderr, "  base: %s\n",
-		     id2str(pool, d->bevr[0]));
-	    fprintf (stderr, "            seq: %s\n",
-		     id2str(pool, d->seqname));
-	    fprintf (stderr, "                 %s\n",
-		     id2str(pool, d->seqevr));
-	    fprintf (stderr, "                 %s\n",
-		     d->seqnum);
-#endif
 	    repodata_set_id(pd->data, handle, DELTA_BASE_EVR, d->bevr[0]);
 	    repodata_set_id(pd->data, handle, DELTA_SEQ_NAME, d->seqname);
 	    repodata_set_id(pd->data, handle, DELTA_SEQ_EVR, d->seqevr);
 	    /* should store as binary blob! */
 	    repodata_set_str(pd->data, handle, DELTA_SEQ_NUM, d->seqnum);
-
-#ifdef DUMPOUT
-	    fprintf(stderr, "OK\n");
-#endif
-
-#ifdef DUMPOUT              
-	    if (d->seqevr != d->bevr[0])
-	      fprintf (stderr, "XXXXX evr\n");
-	    /* Name of package ("xxxx") should match the sequence info
-	       name.  */
-	    if (strcmp(id2str(pool, d->seqname), id2str(pool, pd->newpkgname)))
-	      fprintf (stderr, "XXXXX name\n");
-#endif
 	  }
-	else
-	  {
-
-#ifdef DUMPOUT                          
-	    fprintf (stderr, "  base:");
-	    for (i = 0; i < d->nbevr; i++)
-	      fprintf (stderr, " %s", id2str(pool, d->bevr[i]));
-	    fprintf (stderr, "\n");
-#endif
-	  }
-
       }
       pd->delta.filechecksum = solv_free(pd->delta.filechecksum);
       pd->delta.bevr = solv_free(pd->delta.bevr);
@@ -532,7 +477,7 @@ characterData(void *userData, const XML_Char *s, int len)
 
 #define BUFF_SIZE 8192
 
-void
+int
 repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
@@ -559,9 +504,6 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
   pd.content = solv_malloc(256);
   pd.acontent = 256;
   pd.lcontent = 0;
-  pd.tempstr = malloc(256);
-  pd.atemp = 256;
-  pd.ltemp = 0;
 
   parser = XML_ParserCreate(NULL);
   XML_SetUserData(parser, &pd);
@@ -580,7 +522,6 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
     }
   XML_ParserFree(parser);
   solv_free(pd.content);
-  solv_free(pd.tempstr);
 
   /* now commit all handles */
   for (i = 0; i < pd.nhandles; i++)
@@ -589,6 +530,7 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  return 0;
 }
 
 /* EOF */
