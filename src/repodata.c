@@ -2592,7 +2592,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
       {
 	Id len;
 	unsigned char *dp = data_read_id(data->attrdata + val, &len);
-	dp += len;
+	dp += (unsigned int)len;
 	data_addblob(xd, data->attrdata + val, dp - (data->attrdata + val));
       }
       break;
