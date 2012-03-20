@@ -420,6 +420,9 @@ transaction_classify(Transaction *trans, int mode, Queue *classes)
       ntypes[type]++;
       if (!pool->installed || s->repo != pool->installed)
 	continue;
+      /* don't report vendor/arch changes if we were mapped to erase. */
+      if (type == SOLVER_TRANSACTION_ERASE)
+	continue;
       /* look at arch/vendor changes */
       q = transaction_obs_pkg(trans, p);
       if (!q)
