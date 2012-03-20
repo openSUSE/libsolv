@@ -211,7 +211,9 @@ rm -rf "$RPM_BUILD_ROOT"
 
 %files tools
 %defattr(-,root,root)
+%if 0%{?suse_version}
 %exclude %{_bindir}/helix2solv
+%endif
 %exclude %{_bindir}/solv
 %{_bindir}/*
 
@@ -226,7 +228,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/libsolvext.so
 %endif
 %{_includedir}/solv
+%if 0%{?suse_version}
 %{_bindir}/helix2solv
+%endif
 %{_datadir}/cmake/Modules/*
 
 %files demo
