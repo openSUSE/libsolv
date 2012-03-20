@@ -55,12 +55,12 @@
 typedef struct _SHA256_CTX {
 	uint32_t	state[8];
 	uint64_t	bitcount;
-	uint8_t	buffer[SHA256_BLOCK_LENGTH];
+	uint32_t        buffer[SHA256_BLOCK_LENGTH/4];
 } SHA256_CTX;
 typedef struct _SHA512_CTX {
 	uint64_t	state[8];
 	uint64_t	bitcount[2];
-	uint8_t	buffer[SHA512_BLOCK_LENGTH];
+	uint64_t	buffer[SHA512_BLOCK_LENGTH/8];
 } SHA512_CTX;
 
 typedef SHA512_CTX SHA384_CTX;

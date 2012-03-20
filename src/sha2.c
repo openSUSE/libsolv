@@ -334,7 +334,7 @@ void solv_SHA256_Init(SHA256_CTX* context) {
 		return;
 	}
 	MEMCPY_BCOPY(context->state, sha256_initial_hash_value, SHA256_DIGEST_LENGTH);
-	MEMSET_BZERO(context->buffer, SHA256_BLOCK_LENGTH);
+	MEMSET_BZERO((char *)context->buffer, SHA256_BLOCK_LENGTH);
 	context->bitcount = 0;
 }
 
@@ -380,7 +380,7 @@ static void SHA256_Transform(SHA256_CTX* context, const sha2_word32* data) {
 	sha2_word32	T1, *W256;
 	int		j;
 
-	W256 = (sha2_word32*)context->buffer;
+	W256 = context->buffer;
 
 	/* Initialize registers with the prev. intermediate value */
 	a = context->state[0];
@@ -438,7 +438,7 @@ static void SHA256_Transform(SHA256_CTX* context, const sha2_word32* data) {
 	sha2_word32	T1, T2, *W256;
 	int		j;
 
-	W256 = (sha2_word32*)context->buffer;
+	W256 = context->buffer;
 
 	/* Initialize registers with the prev. intermediate value */
 	a = context->state[0];
@@ -531,14 +531,14 @@ void solv_SHA256_Update(SHA256_CTX* context, const sha2_byte *data, size_t len) 
 
 		if (len >= freespace) {
 			/* Fill the buffer completely and process it */
-			MEMCPY_BCOPY(&context->buffer[usedspace], data, freespace);
+			MEMCPY_BCOPY(&((char *)context->buffer)[usedspace], data, freespace);
 			context->bitcount += freespace << 3;
 			len -= freespace;
 			data += freespace;
-			SHA256_Transform(context, (sha2_word32*)context->buffer);
+			SHA256_Transform(context, context->buffer);
 		} else {
 			/* The buffer is not yet full */
-			MEMCPY_BCOPY(&context->buffer[usedspace], data, len);
+			MEMCPY_BCOPY(&((char *)context->buffer)[usedspace], data, len);
 			context->bitcount += len << 3;
 			/* Clean up: */
 			usedspace = freespace = 0;
@@ -554,7 +554,7 @@ void solv_SHA256_Update(SHA256_CTX* context, const sha2_byte *data, size_t len) 
 	}
 	if (len > 0) {
 		/* There's left-overs, so save 'em */
-		MEMCPY_BCOPY(context->buffer, data, len);
+		MEMCPY_BCOPY((char *)context->buffer, data, len);
 		context->bitcount += len << 3;
 	}
 	/* Clean up: */
@@ -577,33 +577,33 @@ void solv_SHA256_Final(sha2_byte digest[], SHA256_CTX* context) {
 #endif
 		if (usedspace > 0) {
 			/* Begin padding with a 1 bit: */
-			context->buffer[usedspace++] = 0x80;
+			((char *)context->buffer)[usedspace++] = 0x80;
 
 			if (usedspace <= SHA256_SHORT_BLOCK_LENGTH) {
 				/* Set-up for the last transform: */
-				MEMSET_BZERO(&context->buffer[usedspace], SHA256_SHORT_BLOCK_LENGTH - usedspace);
+				MEMSET_BZERO(&((char *)context->buffer)[usedspace], SHA256_SHORT_BLOCK_LENGTH - usedspace);
 			} else {
 				if (usedspace < SHA256_BLOCK_LENGTH) {
-					MEMSET_BZERO(&context->buffer[usedspace], SHA256_BLOCK_LENGTH - usedspace);
+					MEMSET_BZERO(&((char *)context->buffer)[usedspace], SHA256_BLOCK_LENGTH - usedspace);
 				}
 				/* Do second-to-last transform: */
-				SHA256_Transform(context, (sha2_word32*)context->buffer);
+				SHA256_Transform(context, context->buffer);
 
 				/* And set-up for the last transform: */
-				MEMSET_BZERO(context->buffer, SHA256_SHORT_BLOCK_LENGTH);
+				MEMSET_BZERO((char *)context->buffer, SHA256_SHORT_BLOCK_LENGTH);
 			}
 		} else {
 			/* Set-up for the last transform: */
-			MEMSET_BZERO(context->buffer, SHA256_SHORT_BLOCK_LENGTH);
+			MEMSET_BZERO((char *)context->buffer, SHA256_SHORT_BLOCK_LENGTH);
 
 			/* Begin padding with a 1 bit: */
-			*context->buffer = 0x80;
+			*((char *)context->buffer) = 0x80;
 		}
 		/* Set the bit count: */
-		*(sha2_word64*)&context->buffer[SHA256_SHORT_BLOCK_LENGTH] = context->bitcount;
+		MEMCPY_BCOPY(&((char *)context->buffer)[SHA256_SHORT_BLOCK_LENGTH], (char *)(&context->bitcount), 8);
 
 		/* Final transform: */
-		SHA256_Transform(context, (sha2_word32*)context->buffer);
+		SHA256_Transform(context, context->buffer);
 
 #ifndef WORDS_BIGENDIAN
 		{
@@ -662,7 +662,7 @@ void solv_SHA512_Init(SHA512_CTX* context) {
 		return;
 	}
 	MEMCPY_BCOPY(context->state, sha512_initial_hash_value, SHA512_DIGEST_LENGTH);
-	MEMSET_BZERO(context->buffer, SHA512_BLOCK_LENGTH);
+	MEMSET_BZERO((char *)context->buffer, SHA512_BLOCK_LENGTH);
 	context->bitcount[0] = context->bitcount[1] =  0;
 }
 
@@ -704,7 +704,7 @@ void solv_SHA512_Init(SHA512_CTX* context) {
 
 static void SHA512_Transform(SHA512_CTX* context, const sha2_word64* data) {
 	sha2_word64	a, b, c, d, e, f, g, h, s0, s1;
-	sha2_word64	T1, *W512 = (sha2_word64*)context->buffer;
+	sha2_word64	T1, *W512 = context->buffer;
 	int		j;
 
 	/* Initialize registers with the prev. intermediate value */
@@ -759,7 +759,7 @@ static void SHA512_Transform(SHA512_CTX* context, const sha2_word64* data) {
 
 static void SHA512_Transform(SHA512_CTX* context, const sha2_word64* data) {
 	sha2_word64	a, b, c, d, e, f, g, h, s0, s1;
-	sha2_word64	T1, T2, *W512 = (sha2_word64*)context->buffer;
+	sha2_word64	T1, T2, *W512 = context->buffer;
 	int		j;
 
 	/* Initialize registers with the prev. intermediate value */
@@ -853,14 +853,14 @@ void solv_SHA512_Update(SHA512_CTX* context, const sha2_byte *data, size_t len) 
 
 		if (len >= freespace) {
 			/* Fill the buffer completely and process it */
-			MEMCPY_BCOPY(&context->buffer[usedspace], data, freespace);
+			MEMCPY_BCOPY(&((char *)context->buffer)[usedspace], data, freespace);
 			ADDINC128(context->bitcount, freespace << 3);
 			len -= freespace;
 			data += freespace;
-			SHA512_Transform(context, (sha2_word64*)context->buffer);
+			SHA512_Transform(context, context->buffer);
 		} else {
 			/* The buffer is not yet full */
-			MEMCPY_BCOPY(&context->buffer[usedspace], data, len);
+			MEMCPY_BCOPY(&((char *)context->buffer)[usedspace], data, len);
 			ADDINC128(context->bitcount, len << 3);
 			/* Clean up: */
 			usedspace = freespace = 0;
@@ -876,7 +876,7 @@ void solv_SHA512_Update(SHA512_CTX* context, const sha2_byte *data, size_t len) 
 	}
 	if (len > 0) {
 		/* There's left-overs, so save 'em */
-		MEMCPY_BCOPY(context->buffer, data, len);
+		MEMCPY_BCOPY((char *)context->buffer, data, len);
 		ADDINC128(context->bitcount, len << 3);
 	}
 	/* Clean up: */
@@ -894,34 +894,34 @@ static void SHA512_Last(SHA512_CTX* context) {
 #endif
 	if (usedspace > 0) {
 		/* Begin padding with a 1 bit: */
-		context->buffer[usedspace++] = 0x80;
+		((char *)context->buffer)[usedspace++] = 0x80;
 
 		if (usedspace <= SHA512_SHORT_BLOCK_LENGTH) {
 			/* Set-up for the last transform: */
-			MEMSET_BZERO(&context->buffer[usedspace], SHA512_SHORT_BLOCK_LENGTH - usedspace);
+			MEMSET_BZERO(&((char *)context->buffer)[usedspace], SHA512_SHORT_BLOCK_LENGTH - usedspace);
 		} else {
 			if (usedspace < SHA512_BLOCK_LENGTH) {
-				MEMSET_BZERO(&context->buffer[usedspace], SHA512_BLOCK_LENGTH - usedspace);
+				MEMSET_BZERO(&((char *)context->buffer)[usedspace], SHA512_BLOCK_LENGTH - usedspace);
 			}
 			/* Do second-to-last transform: */
-			SHA512_Transform(context, (sha2_word64*)context->buffer);
+			SHA512_Transform(context, context->buffer);
 
 			/* And set-up for the last transform: */
-			MEMSET_BZERO(context->buffer, SHA512_BLOCK_LENGTH - 2);
+			MEMSET_BZERO((char *)context->buffer, SHA512_BLOCK_LENGTH - 2);
 		}
 	} else {
 		/* Prepare for final transform: */
-		MEMSET_BZERO(context->buffer, SHA512_SHORT_BLOCK_LENGTH);
+		MEMSET_BZERO((char *)context->buffer, SHA512_SHORT_BLOCK_LENGTH);
 
 		/* Begin padding with a 1 bit: */
-		*context->buffer = 0x80;
+		*((char *)context->buffer) = 0x80;
 	}
 	/* Store the length of input data (in bits): */
-	*(sha2_word64*)&context->buffer[SHA512_SHORT_BLOCK_LENGTH] = context->bitcount[1];
-	*(sha2_word64*)&context->buffer[SHA512_SHORT_BLOCK_LENGTH+8] = context->bitcount[0];
+        MEMCPY_BCOPY(&((char *)context->buffer)[SHA512_SHORT_BLOCK_LENGTH], (char *)(&context->bitcount[1]), 8);
+        MEMCPY_BCOPY(&((char *)context->buffer)[SHA512_SHORT_BLOCK_LENGTH + 8], (char *)(&context->bitcount[0]), 8);
 
 	/* Final transform: */
-	SHA512_Transform(context, (sha2_word64*)context->buffer);
+	SHA512_Transform(context, context->buffer);
 }
 
 void solv_SHA512_Final(sha2_byte digest[], SHA512_CTX* context) {
@@ -991,7 +991,7 @@ void solv_SHA384_Init(SHA384_CTX* context) {
 		return;
 	}
 	MEMCPY_BCOPY(context->state, sha384_initial_hash_value, SHA512_DIGEST_LENGTH);
-	MEMSET_BZERO(context->buffer, SHA384_BLOCK_LENGTH);
+	MEMSET_BZERO((char *)context->buffer, SHA384_BLOCK_LENGTH);
 	context->bitcount[0] = context->bitcount[1] = 0;
 }
 
