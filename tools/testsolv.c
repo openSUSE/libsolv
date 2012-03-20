@@ -96,7 +96,7 @@ main(int argc, char **argv)
 			    {
 			      char *p2 = strchr(p, '\n');
 			      p2 = p2 ? p2 + 1 : p + strlen(p);
-			      printf("#>%.*s", p2 - p, p);
+			      printf("#>%.*s", (int)(p2 - p), p);
 			      p = p2;
 			    }
 			}
