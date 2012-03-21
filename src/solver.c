@@ -2714,7 +2714,7 @@ solver_solve(Solver *solv, Queue *job)
   solver_unifyrules(solv);                          /* remove duplicate rpm rules */
   solv->rpmrules_end = solv->nrules;              /* mark end of rpm rules */
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "rpm rule memory usage: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "rpm rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
   POOL_DEBUG(SOLV_DEBUG_STATS, "rpm rule creation took %d ms\n", solv_timems(now));
 
   /* create dup maps if needed. We need the maps early to create our
@@ -3010,6 +3010,7 @@ solver_solve(Solver *solv, Queue *job)
   queue_free(&q);
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "%d rpm rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules\n", solv->rpmrules_end - 1, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */
   map_init(&solv->weakrulemap, solv->nrules);

@@ -350,8 +350,11 @@ pool_createwhatprovides(Pool *pool)
   unsigned int now;
 
   now = solv_timems(0);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "number of solvables: %d\n", pool->nsolvables);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "number of solvables: %d, memory used: %d K\n", pool->nsolvables, pool->nsolvables * (int)sizeof(Solvable) / 1024);
   POOL_DEBUG(SOLV_DEBUG_STATS, "number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "string memory used: %d K array + %d K data,  rel memory used: %d K array\n", pool->ss.nstrings / (1024 / (int)sizeof(Id)), pool->ss.sstrings / 1024, pool->nrels * (int)sizeof(Reldep) / 1024);
+  if (pool->ss.stringhashmask || pool->relhashmask)
+    POOL_DEBUG(SOLV_DEBUG_STATS, "string hash memory: %d K, rel hash memory : %d K\n", (pool->ss.stringhashmask + 1) / (int)(1024/sizeof(Id)), (pool->relhashmask + 1) / (int)(1024/sizeof(Id)));
 
   pool_freeidhashes(pool);	/* XXX: should not be here! */
   pool_freewhatprovides(pool);
