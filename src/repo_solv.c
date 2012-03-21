@@ -8,11 +8,7 @@
 /*
  * repo_solv.c
  * 
- * Read the binary dump of a Repo and create a Repo * from it
- * 
- *  See
- *   Repo *pool_addrepo_solv(Pool *pool, FILE *fp)
- * below
+ * Add a repo in solv format
  * 
  */
 
@@ -29,6 +25,8 @@
 #include "repopack.h"
 #include "repopage.h"
 
+#include "poolid_private.h"	/* WHATPROVIDES_BLOCK */
+
 #define INTERESTED_START	SOLVABLE_NAME
 #define INTERESTED_END		SOLVABLE_ENHANCES
 
@@ -38,8 +36,6 @@
 #define SOLV_ERROR_ID_RANGE	4
 #define SOLV_ERROR_OVERFLOW	5
 #define SOLV_ERROR_CORRUPT	6
-
-static Pool *mypool;		/* for pool_debug... */
 
 
 
@@ -64,7 +60,7 @@ read_u32(Repodata *data)
       c = getc(data->fp);
       if (c == EOF)
 	{
-	  pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
+	  pool_debug(data->repo->pool, SOLV_ERROR, "unexpected EOF\n");
 	  data->error = SOLV_ERROR_EOF;
 	  return 0;
 	}
@@ -88,7 +84,7 @@ read_u8(Repodata *data)
   c = getc(data->fp);
   if (c == EOF)
     {
-      pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
+      pool_debug(data->repo->pool, SOLV_ERROR, "unexpected EOF\n");
       data->error = SOLV_ERROR_EOF;
       return 0;
     }
@@ -113,7 +109,7 @@ read_id(Repodata *data, Id max)
       c = getc(data->fp);
       if (c == EOF)
 	{
-          pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
+          pool_debug(data->repo->pool, SOLV_ERROR, "unexpected EOF\n");
 	  data->error = SOLV_ERROR_EOF;
 	  return 0;
 	}
@@ -122,7 +118,7 @@ read_id(Repodata *data, Id max)
 	  x = (x << 7) | c;
 	  if (max && x >= max)
 	    {
-              pool_debug(mypool, SOLV_ERROR, "read_id: id too large (%u/%u)\n", x, max);
+              pool_debug(data->repo->pool, SOLV_ERROR, "read_id: id too large (%u/%u)\n", x, max);
 	      data->error = SOLV_ERROR_ID_RANGE;
 	      return 0;
 	    }
@@ -130,7 +126,7 @@ read_id(Repodata *data, Id max)
 	}
       x = (x << 7) ^ c ^ 128;
     }
-  pool_debug(mypool, SOLV_ERROR, "read_id: id too long\n");
+  pool_debug(data->repo->pool, SOLV_ERROR, "read_id: id too long\n");
   data->error = SOLV_ERROR_CORRUPT;
   return 0;
 }
@@ -149,7 +145,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
       c = getc(data->fp);
       if (c == EOF)
 	{
-	  pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
+	  pool_debug(data->repo->pool, SOLV_ERROR, "unexpected EOF\n");
 	  data->error = SOLV_ERROR_EOF;
 	  return 0;
 	}
@@ -161,7 +157,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
       x = (x << 6) | (c & 63);
       if (max && x >= max)
 	{
-	  pool_debug(mypool, SOLV_ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
+	  pool_debug(data->repo->pool, SOLV_ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
 	  data->error = SOLV_ERROR_ID_RANGE;
 	  return 0;
 	}
@@ -169,7 +165,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
 	x = map[x];
       if (store == end)
 	{
-	  pool_debug(mypool, SOLV_ERROR, "read_idarray: array overflow\n");
+	  pool_debug(data->repo->pool, SOLV_ERROR, "read_idarray: array overflow\n");
 	  return 0;
 	}
       *store++ = x;
@@ -179,7 +175,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
 	    return store;
 	  if (store == end)
 	    {
-	      pool_debug(mypool, SOLV_ERROR, "read_idarray: array overflow\n");
+	      pool_debug(data->repo->pool, SOLV_ERROR, "read_idarray: array overflow\n");
 	      data->error = SOLV_ERROR_OVERFLOW;
 	      return 0;
 	    }
@@ -200,14 +196,14 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
  */
 
 static inline unsigned char *
-data_read_id_max(unsigned char *dp, Id *ret, Id *map, int max, int *error)
+data_read_id_max(unsigned char *dp, Id *ret, Id *map, int max, Repodata *data)
 {
   Id x;
   dp = data_read_id(dp, &x);
   if (x < 0 || (max && x >= max))
     {
-      pool_debug(mypool, SOLV_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
-      *error = SOLV_ERROR_ID_RANGE;
+      pool_debug(data->repo->pool, SOLV_ERROR, "data_read_id_max: id too large (%u/%u)\n", x, max);
+      data->error = SOLV_ERROR_ID_RANGE;
       x = 0;
     }
   *ret = map ? map[x] : x;
@@ -215,7 +211,7 @@ data_read_id_max(unsigned char *dp, Id *ret, Id *map, int max, int *error)
 }
 
 static unsigned char *
-data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error)
+data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, Repodata *data)
 {
   Id *store = *storep;
   unsigned int x = 0;
@@ -232,8 +228,8 @@ data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error)
       x = (x << 6) | (c & 63);
       if (max && x >= max)
 	{
-	  pool_debug(mypool, SOLV_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
-	  *error = SOLV_ERROR_ID_RANGE;
+	  pool_debug(data->repo->pool, SOLV_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
+	  data->error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
       *store++ = x;
@@ -247,7 +243,7 @@ data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error)
 }
 
 static unsigned char *
-data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *error, Id marker)
+data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, Repodata *data, Id marker)
 {
   Id *store = *storep;
   Id old = 0;
@@ -276,8 +272,8 @@ data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, int *err
       old = x;
       if (max && x >= max)
 	{
-	  pool_debug(mypool, SOLV_ERROR, "data_read_rel_idarray: id too large (%u/%u)\n", x, max);
-	  *error = SOLV_ERROR_ID_RANGE;
+	  pool_debug(data->repo->pool, SOLV_ERROR, "data_read_rel_idarray: id too large (%u/%u)\n", x, max);
+	  data->error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
       *store++ = map ? map[x] : x;
@@ -380,7 +376,7 @@ incore_map_idarray(Repodata *data, unsigned char *dp, Id *map, Id max)
       dp = data_read_ideof(dp, &id, &eof);
       if (id < 0 || (max && id >= max))
 	{
-	  pool_debug(mypool, SOLV_ERROR, "incore_map_idarray: id too large (%u/%u)\n", id, max);
+	  pool_debug(data->repo->pool, SOLV_ERROR, "incore_map_idarray: id too large (%u/%u)\n", id, max);
 	  data->error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
@@ -474,6 +470,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   int keydepth;
   int needchunk;	/* need a new chunk of data */
   unsigned int now;
+  int oldnstrings = pool->ss.nstrings;
+  int oldnrels = pool->nrels;
 
   struct _Stringpool *spool;
 
@@ -494,8 +492,6 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   data.repo = repo;
   data.fp = fp;
   repopagestore_init(&data.store);
-
-  mypool = pool;
 
   if (read_u32(&data) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
     {
@@ -562,11 +558,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
    */
 
   if (!(flags & REPO_LOCALPOOL))
-    {
-      spool = &pool->ss;
-      if (pool->whatprovides)
-	pool_freewhatprovides(pool);
-    }
+    spool = &pool->ss;
   else
     {
       data.localpool = 1;
@@ -834,6 +826,22 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       pool_shrink_rels(pool);		/* vacuum */
     }
 
+  /* if we added ids/rels, make room in our whatprovide arrays */
+  if (!(flags & REPO_LOCALPOOL))
+    {
+      if (pool->whatprovides && oldnstrings != pool->ss.nstrings)
+	{
+	  int newlen = (pool->ss.nstrings + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK;
+	  pool->whatprovides = solv_realloc2(pool->whatprovides, newlen, sizeof(Offset));
+	  memset(pool->whatprovides + oldnstrings, 0, (newlen - oldnstrings) * sizeof(Offset));
+	}
+      if (pool->whatprovides_rel && oldnrels != pool->nrels)
+	{
+	  int newlen = (pool->nrels + WHATPROVIDES_BLOCK) & ~WHATPROVIDES_BLOCK;
+	  pool->whatprovides_rel = solv_realloc2(pool->whatprovides_rel, newlen, sizeof(Offset));
+	  memset(pool->whatprovides_rel + oldnrels, 0, (newlen - oldnrels) * sizeof(Offset));
+	}
+    }
 
   /*******  Part 3: Dirs  ***********************************************/
   if (numdir)
@@ -977,7 +985,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     l = allsize;
   if (!l || fread(buf, l, 1, data.fp) != 1)
     {
-      pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
+      pool_debug(pool, SOLV_ERROR, "unexpected EOF\n");
       data.error = SOLV_ERROR_EOF;
       id = 0;
     }
@@ -985,7 +993,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     {
       bufend = buf + l;
       allsize -= l;
-      dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
+      dp = data_read_id_max(dp, &id, 0, numschemata, &data);
     }
 
   incore_add_id(&data, 0);	/* XXX? */
@@ -1012,7 +1020,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	    break;
 	  if (left < 0)
 	    {
-	      pool_debug(mypool, SOLV_ERROR, "buffer overrun\n");
+	      pool_debug(pool, SOLV_ERROR, "buffer overrun\n");
 	      data.error = SOLV_ERROR_EOF;
 	      break;
 	    }
@@ -1027,7 +1035,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 		l = allsize;
 	      if (l && fread(buf + left, l, 1, data.fp) != 1)
 		{
-		  pool_debug(mypool, SOLV_ERROR, "unexpected EOF\n");
+		  pool_debug(pool, SOLV_ERROR, "unexpected EOF\n");
 		  data.error = SOLV_ERROR_EOF;
 		  break;
 		}
@@ -1060,7 +1068,7 @@ printf("key %d at %d\n", key, (int)(keyp - 1 - schemadata));
 	      id = stack[keydepth - 1];
 	      if (!id)
 		{
-		  dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
+		  dp = data_read_id_max(dp, &id, 0, numschemata, &data);
 		  incore_add_id(&data, id);
 		}
 	      keyp = schemadata + schemata[id];
@@ -1098,7 +1106,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       switch (keys[key].type)
 	{
 	case REPOKEY_TYPE_ID:
-	  dp = data_read_id_max(dp, &did, idmap, numid + numrel, &data.error);
+	  dp = data_read_id_max(dp, &did, idmap, numid + numrel, &data);
 	  if (s && id == SOLVABLE_NAME)
 	    s->name = did; 
 	  else if (s && id == SOLVABLE_ARCH)
@@ -1129,13 +1137,13 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	    }
 	  ido = idarraydatap - repo->idarraydata;
 	  if (keys[key].type == REPOKEY_TYPE_IDARRAY)
-	    dp = data_read_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error);
+	    dp = data_read_idarray(dp, &idarraydatap, idmap, numid + numrel, &data);
 	  else if (id == SOLVABLE_REQUIRES)
-	    dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error, SOLVABLE_PREREQMARKER);
+	    dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data, SOLVABLE_PREREQMARKER);
 	  else if (id == SOLVABLE_PROVIDES)
-	    dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error, SOLVABLE_FILEMARKER);
+	    dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data, SOLVABLE_FILEMARKER);
 	  else
-	    dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data.error, 0);
+	    dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data, 0);
 	  if (idarraydatap > idarraydataend)
 	    {
 	      pool_debug(pool, SOLV_ERROR, "idarray overflow\n");
@@ -1177,7 +1185,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	  stack[keydepth++] = nentries;
 	  stack[keydepth++] = keyp - schemadata;
 	  stack[keydepth++] = 0;
-	  dp = data_read_id_max(dp, &nentries, 0, 0, &data.error);
+	  dp = data_read_id_max(dp, &nentries, 0, 0, &data);
 	  incore_add_id(&data, nentries);
 	  if (!nentries)
 	    {
@@ -1226,7 +1234,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 		data.incoreoffset[(s - pool->solvables) - data.start] = data.incoredatalen;
 	    }
 	  nentries--;
-	  dp = data_read_id_max(dp, &id, 0, numschemata, &data.error);
+	  dp = data_read_id_max(dp, &id, 0, numschemata, &data);
 	  incore_add_id(&data, id);
 	  if (keys[key].type == REPOKEY_TYPE_FIXARRAY)
 	    {
@@ -1245,7 +1253,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	      if (keys[key].type == REPOKEY_TYPE_U32)
 	        dp = data_read_u32(dp, (unsigned int *)&id);
 	      else
-	        dp = data_read_id_max(dp, &id, 0, 0, &data.error);
+	        dp = data_read_id_max(dp, &id, 0, 0, &data);
 	      if (!repo->rpmdbid)
 		repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 	      repo->rpmdbid[(s - pool->solvables) - repo->start] = id;
@@ -1269,7 +1277,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
     {
       if (dp > bufend)
         {
-	  pool_debug(mypool, SOLV_ERROR, "buffer overrun\n");
+	  pool_debug(pool, SOLV_ERROR, "buffer overrun\n");
 	  data.error = SOLV_ERROR_EOF;
         }
     }
@@ -1319,7 +1327,6 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       data.fp = 0;
     }
   solv_free(idmap);
-  mypool = 0;
 
   if (data.error)
     {
