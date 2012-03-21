@@ -3009,7 +3009,7 @@ solver_solve(Solver *solv, Queue *job)
   map_free(&installcandidatemap);
   queue_free(&q);
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "%d rpm rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules\n", solv->rpmrules_end - 1, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "%d rpm rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules\n", solv->rpmrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules);
   POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */
