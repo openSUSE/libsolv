@@ -2438,24 +2438,26 @@ static Id
 nscallback(Pool *pool, void *data, Id name, Id evr)
 {
   if (name == NAMESPACE_PRODUCTBUDDY)
-    {    
+    {
       /* SUSE specific hack: each product has an associated rpm */
-      Solvable *s = pool->solvables + evr; 
-      Id p, pp, cap; 
-      
+      Solvable *s = pool->solvables + evr;
+      Id p, pp, cap;
+      Id bestp = 0;
+
       cap = pool_str2id(pool, pool_tmpjoin(pool, "product(", pool_id2str(pool, s->name) + 8, ")"), 0);
       if (!cap)
         return 0;
       cap = pool_rel2id(pool, cap, s->evr, REL_EQ, 0);
       if (!cap)
         return 0;
-      FOR_PROVIDES(p, pp, cap) 
+      FOR_PROVIDES(p, pp, cap)
         {
-          Solvable *ps = pool->solvables + p; 
+          Solvable *ps = pool->solvables + p;
           if (ps->repo == s->repo && ps->arch == s->arch)
-            break;
+            if (!bestp || pool_evrcmp(pool, pool->solvables[bestp].evr, ps->evr, EVRCMP_COMPARE) < 0)
+	      bestp = p;
         }
-      return p;
+      return bestp;
     }
   return 0;
 }
@@ -2573,10 +2575,12 @@ select_patches(Pool *pool, Queue *job)
 {
   Id p, pp;
   int pruneyou = 0;
-  Map installedmap;
+  Map installedmap, noobsmap;
   Solvable *s;
 
+  map_init(&noobsmap, 0);
   map_init(&installedmap, pool->nsolvables);
+  solver_calculate_noobsmap(pool, job, &noobsmap);
   if (pool->installed)
     FOR_REPO_SOLVABLES(pool->installed, p, s)
       MAPSET(&installedmap, p);
@@ -2605,7 +2609,7 @@ select_patches(Pool *pool, Queue *job)
       type = solvable_lookup_str(s, SOLVABLE_PATCHCATEGORY);
       if (type && !strcmp(type, "optional"))
 	continue;
-      r = solvable_trivial_installable_map(s, &installedmap, 0);
+      r = solvable_trivial_installable_map(s, &installedmap, 0, &noobsmap);
       if (r == -1)
 	continue;
       if (solvable_lookup_bool(s, UPDATE_RESTART) && r == 0)
@@ -2618,6 +2622,7 @@ select_patches(Pool *pool, Queue *job)
       queue_push2(job, SOLVER_SOLVABLE, p);
     }
   map_free(&installedmap);
+  map_free(&noobsmap);
 }
 
 #define MODE_LIST        0
@@ -3283,7 +3288,7 @@ rerunsolver:
 	      dataiterator_free(&di);
 	      solv_free(matchname);
 	    }
-	  
+
 	  if (newpkgsfps[i])
 	    {
 	      putchar('d');

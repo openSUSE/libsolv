@@ -302,13 +302,37 @@ static inline Id dep2name(Pool *pool, Id dep)
   return dep;
 }
 
-static inline int providedbyinstalled(Pool *pool, Map *installed, Id dep)
+static int providedbyinstalled_multiversion(Pool *pool, Map *installed, Id n, Id con) 
+{
+  Id p, pp;
+  Solvable *sn = pool->solvables + n; 
+
+  FOR_PROVIDES(p, pp, sn->name)
+    {    
+      Solvable *s = pool->solvables + p; 
+      if (s->name != sn->name || s->arch != sn->arch)
+        continue;
+      if (!MAPTST(installed, p))
+        continue;
+      if (pool_match_nevr(pool, pool->solvables + p, con))
+        continue;
+      return 1;         /* found installed package that doesn't conflict */
+    }    
+  return 0;
+}
+
+static inline int providedbyinstalled(Pool *pool, Map *installed, Id dep, int ispatch, Map *noobsoletesmap)
 {
   Id p, pp;
   FOR_PROVIDES(p, pp, dep)
     {
       if (p == SYSTEMSOLVABLE)
 	return -1;
+      if (ispatch && !pool_match_nevr(pool, pool->solvables + p, dep))
+	continue;
+      if (ispatch && noobsoletesmap && noobsoletesmap->size && MAPTST(noobsoletesmap, p) && ISRELDEP(dep))
+	if (providedbyinstalled_multiversion(pool, installed, p, dep))
+	  continue;
       if (MAPTST(installed, p))
 	return 1;
     }
@@ -332,14 +356,13 @@ static inline int providedbyinstalled(Pool *pool, Map *installed, Id dep)
  * -1: solvable is installable, but doesn't constrain any installed packages
  */
 int
-solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap)
+solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap, Map *noobsoletesmap)
 {
   Pool *pool = s->repo->pool;
   Solvable *s2;
-  Id p, pp, *dp;
+  Id p, *dp;
   Id *reqp, req;
   Id *conp, con;
-  Id *obsp, obs;
   int r, interesting = 0;
 
   if (conflictsmap && MAPTST(conflictsmap, s - pool->solvables))
@@ -351,7 +374,7 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
 	{
 	  if (req == SOLVABLE_PREREQMARKER)
 	    continue;
-          r = providedbyinstalled(pool, installedmap, req);
+          r = providedbyinstalled(pool, installedmap, req, 0, 0);
 	  if (!r)
 	    return 0;
 	  if (r > 0)
@@ -360,33 +383,40 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
     }
   if (s->conflicts)
     {
+      int ispatch = 0;
+
+      if (!strncmp("patch:", pool_id2str(pool, s->name), 6))
+	ispatch = 1;
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
 	{
-	  if (providedbyinstalled(pool, installedmap, con))
+	  if (providedbyinstalled(pool, installedmap, con, ispatch, noobsoletesmap))
 	    return 0;
 	  if (!interesting && ISRELDEP(con))
 	    {
               con = dep2name(pool, con);
-	      if (providedbyinstalled(pool, installedmap, con))
+	      if (providedbyinstalled(pool, installedmap, con, ispatch, noobsoletesmap))
 		interesting = 1;
 	    }
 	}
     }
+#if 0
   if (s->repo)
     {
+      Id *obsp, obs;
       Repo *installed = 0;
       if (s->obsoletes && s->repo != installed)
 	{
 	  obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
 	    {
-	      if (providedbyinstalled(pool, installedmap, obs))
+	      if (providedbyinstalled(pool, installedmap, obs, 0, 0))
 		return 0;
 	    }
 	}
       if (s->repo != installed)
 	{
+	  Id pp;
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
 	      s2 = pool->solvables + p;
@@ -395,6 +425,7 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
 	    }
 	}
     }
+#endif
   if (!conflictsmap)
     {
       int i;
@@ -426,7 +457,7 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
  * by a queue.
  */
 int
-solvable_trivial_installable_queue(Solvable *s, Queue *installed)
+solvable_trivial_installable_queue(Solvable *s, Queue *installed, Map *noobsoletesmap)
 {
   Pool *pool = s->repo->pool;
   int i;
@@ -441,7 +472,7 @@ solvable_trivial_installable_queue(Solvable *s, Queue *installed)
       if (p > 0)		/* makes it work with decisionq */
 	MAPSET(&installedmap, p);
     }
-  r = solvable_trivial_installable_map(s, &installedmap, 0);
+  r = solvable_trivial_installable_map(s, &installedmap, 0, noobsoletesmap);
   map_free(&installedmap);
   return r;
 }
@@ -452,7 +483,7 @@ solvable_trivial_installable_queue(Solvable *s, Queue *installed)
  * by a repo containing the installed solvables.
  */
 int
-solvable_trivial_installable_repo(Solvable *s, Repo *installed)
+solvable_trivial_installable_repo(Solvable *s, Repo *installed, Map *noobsoletesmap)
 {
   Pool *pool = s->repo->pool;
   Id p;
@@ -463,7 +494,7 @@ solvable_trivial_installable_repo(Solvable *s, Repo *installed)
   map_init(&installedmap, pool->nsolvables);
   FOR_REPO_SOLVABLES(installed, p, s2)
     MAPSET(&installedmap, p);
-  r = solvable_trivial_installable_map(s, &installedmap, 0);
+  r = solvable_trivial_installable_map(s, &installedmap, 0, noobsoletesmap);
   map_free(&installedmap);
   return r;
 }

@@ -241,9 +241,9 @@ static inline const char *pool_solvid2str(Pool *pool, Id p)
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
 Id pool_id2langid(Pool *pool, Id id, const char *lang, int create);
 
-int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap);
-int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed);
-int solvable_trivial_installable_queue(Solvable *s, Queue *installed);
+int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap, Map *noobsoletesmap);
+int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed, Map *noobsoletesmap);
+int solvable_trivial_installable_queue(Solvable *s, Queue *installed, Map *noobsoletesmap);
 
 void pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
 
