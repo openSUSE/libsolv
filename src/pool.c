@@ -73,6 +73,7 @@ pool_create(void)
   pool->forbidselfconflicts = 1;
   pool->obsoleteusesprovides = 1;
   pool->implicitobsoleteusesprovides = 1;
+  pool->havedistepoch = 1;
 #endif
   return pool;
 }
