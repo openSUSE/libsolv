@@ -50,6 +50,13 @@ IF (ENABLE_HELIXREPO)
 	repo_helix.h)
 ENDIF (ENABLE_HELIXREPO)
 
+IF (ENABLE_MDKREPO)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_mdk.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_mdk.h)
+ENDIF (ENABLE_MDKREPO)
+
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 SET (CMAKE_SHARED_LINKER_FLAGS "${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/ext/libsolvext.ver")
 

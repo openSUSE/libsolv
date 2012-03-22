@@ -62,6 +62,13 @@ TARGET_LINK_LIBRARIES (comps2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIE
 SET (tools_list ${tools_list} comps2solv)
 ENDIF (ENABLE_COMPS)
 
+IF (ENABLE_MDKREPO)
+ADD_EXECUTABLE (mdk2solv mdk2solv.c)
+TARGET_LINK_LIBRARIES (mdk2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+SET (tools_list ${tools_list} mdk2solv)
+ENDIF (ENABLE_MDKREPO)
+
 ADD_EXECUTABLE (installcheck installcheck.c)
 TARGET_LINK_LIBRARIES (installcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
 
