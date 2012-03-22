@@ -121,6 +121,7 @@
 
 #ifdef RPM5
 # define RPM_INDEX_SIZE 4
+# define TAG_DISTEPOCH		1218
 #else
 # define RPM_INDEX_SIZE 8
 #endif
@@ -284,6 +285,9 @@ static char *headtoevr(RpmHead *h)
   char *version, *v;
   char *release;
   char *evr;
+#ifdef TAG_DISTEPOCH
+  char *distepoch;
+#endif
 
   version  = headstring(h, TAG_VERSION);
   release  = headstring(h, TAG_RELEASE);
@@ -307,6 +311,16 @@ static char *headtoevr(RpmHead *h)
       evr = solv_malloc(strlen(version) + 1 + strlen(release) + 1);
       sprintf(evr, "%s-%s", version, release);
     }
+#ifdef TAG_DISTEPOCH
+  distepoch = headstring(h, TAG_DISTEPOCH);
+  if (distepoch && *distepoch)
+    {
+      int l = strlen(evr);
+      evr = solv_realloc(evr, l + strlen(distepoch) + 2);
+      evr[l++] = ':';
+      strcpy(evr + l, distepoch);
+    }
+#endif
   return evr;
 }
 
