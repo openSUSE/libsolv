@@ -225,8 +225,27 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
     return 0;
   if (r1 && r2)
     {
-      if (mode != EVRCMP_MATCH || (s1 != ++r1 && s2 != ++r2))
-        r = solv_vercmp(r1, s1, r2, s2);
+      r1++;
+      r2++;
+      if (mode != EVRCMP_MATCH || (s1 != r1 && s2 != r2))
+	{
+	  if (pool->havedistepoch)
+	    {
+	      const char *d1, *d2;
+	      for (d1 = r1; d1 < s1; d1++)
+		if (*d1 == ':')
+		  break;
+	      for (d2 = r2; d2 < s2; d2++)
+		if (*d2 == ':')
+		  break;
+	      /* XXX: promote just in one direction? */
+              r = solv_vercmp(r1, d1 ? d1 : s1, r2, d2 ? d2 : s2);
+	      if (r == 0 && d1 < s1 && d2 < s2)
+                r = solv_vercmp(d1 + 1, s1, d2 + 1, s2);
+	    }
+	  else
+            r = solv_vercmp(r1, s1, r2, s2);
+	}
     }
   else if (mode == EVRCMP_MATCH_RELEASE)
     {

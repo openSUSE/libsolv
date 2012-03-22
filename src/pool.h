@@ -122,6 +122,7 @@ struct _Pool {
 #ifdef LIBSOLV_INTERNAL
   /* flags to tell the library how the installed package manager works */
   int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */
+  int havedistepoch;		/* true: thr release part in the evr may contain a distepoch suffix */
   int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
   int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
   int obsoleteusescolors;	/* true: obsoletes check arch color */
@@ -167,6 +168,7 @@ struct _Pool {
 #define POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES		4
 #define POOL_FLAG_OBSOLETEUSESCOLORS			5
 #define POOL_FLAG_NOINSTALLEDOBSOLETES			6
+#define POOL_FLAG_HAVEDISTEPOCH				7
 
 /* ----------------------------------------------- */
 
