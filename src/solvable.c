@@ -26,12 +26,28 @@ const char *
 pool_solvable2str(Pool *pool, Solvable *s)
 {
   const char *n, *e, *a;
+  int nl, el, al;
   char *p;
   n = pool_id2str(pool, s->name);
   e = pool_id2str(pool, s->evr);
+  /* XXX: may want to skip the epoch here */
   a = pool_id2str(pool, s->arch);
-  p = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3);
-  sprintf(p, "%s-%s.%s", n, e, a);
+  nl = strlen(n);
+  el = strlen(e);
+  al = strlen(a);
+  if (pool->havedistepoch)
+    {
+      /* strip the distepoch from the evr */
+      const char *de = strrchr(e, '-');
+      if (de && (de = strchr(de, ':')) != 0)
+	el = de - e;
+    }
+  p = pool_alloctmpspace(pool, nl + el + al + 3);
+  strcpy(p, n);
+  p[nl] = '-';
+  strncpy(p + nl + 1, e, el);
+  p[nl + 1 + el] = '.';
+  strcpy(p + nl + 1 + el + 1, a);
   return p;
 }
 
