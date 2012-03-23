@@ -145,6 +145,8 @@ pool_get_flag(Pool *pool, int flag)
       return pool->obsoleteusescolors;
     case POOL_FLAG_NOINSTALLEDOBSOLETES:
       return pool->noinstalledobsoletes;
+    case POOL_FLAG_HAVEDISTEPOCH:
+      return pool->havedistepoch;
     default:
       break;
     }
@@ -174,6 +176,9 @@ pool_set_flag(Pool *pool, int flag, int value)
       break;
     case POOL_FLAG_NOINSTALLEDOBSOLETES:
       pool->noinstalledobsoletes = value;
+      break;
+    case POOL_FLAG_HAVEDISTEPOCH:
+      pool->havedistepoch = value;
       break;
     default:
       break;
