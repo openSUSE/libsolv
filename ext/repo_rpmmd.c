@@ -578,7 +578,7 @@ set_description_author(Repodata *data, Id handle, char *str, struct parsedata *p
  */
 
 static void
-set_sourcerpm(Repodata *data, Solvable *s, Id handle, char *sourcerpm)
+set_sourcerpm(Repodata *data, Solvable *s, Id handle, const char *sourcerpm)
 {
   const char *p, *sevr, *sarch, *name, *evr;
   Pool *pool;

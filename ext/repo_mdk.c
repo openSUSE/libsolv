@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <expat.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -248,6 +249,348 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
       repo_free_solvable_block(s->repo, s - pool->solvables, 1, 1);
     }
   solv_free(buf);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+  return 0;
+}
+
+enum state {
+  STATE_START,
+  STATE_MEDIA_INFO,
+  STATE_INFO,
+  NUMSTATES
+};
+
+struct stateswitch {
+  enum state from;
+  char *ename;
+  enum state to;
+  int docontent;
+};
+
+/* must be sorted by first column */
+static struct stateswitch stateswitches[] = {
+  { STATE_START, "media_info", STATE_MEDIA_INFO, 0 },
+  { STATE_MEDIA_INFO, "info", STATE_INFO, 1 },
+  { NUMSTATES }
+};
+
+struct parsedata {
+  Pool *pool;
+  Repo *repo;
+  Repodata *data;
+  int depth;
+  enum state state;
+  int statedepth;
+  char *content;
+  int lcontent;
+  int acontent;
+  int docontent;
+  struct stateswitch *swtab[NUMSTATES];
+  enum state sbtab[NUMSTATES];
+  Solvable *solvable;
+  Hashtable joinhash;
+  Hashmask joinhashmask;
+};
+
+static inline const char *
+find_attr(const char *txt, const char **atts)
+{
+  for (; *atts; atts += 2)
+    {
+      if (!strcmp(*atts, txt))
+        return atts[1];
+    }
+  return 0;
+}
+
+static Hashtable
+joinhash_init(Repo *repo, Hashmask *hmp)
+{
+  Hashmask hm = mkmask(repo->nsolvables);
+  Hashtable ht = solv_calloc(hm + 1, sizeof(*ht));
+  Hashval h, hh;
+  Solvable *s;
+  int i;
+
+  FOR_REPO_SOLVABLES(repo, i, s)
+    {
+      hh = HASHCHAIN_START;
+      h = s->name & hm;
+      while (ht[h])
+        h = HASHCHAIN_NEXT(h, hh, hm);
+      ht[h] = i;
+    }
+  *hmp = hm;
+  return ht;
+}
+
+static Solvable *
+joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, const char *fn, const char *distepoch)
+{
+  Hashval h, hh;
+  const char *p, *vrstart, *vrend;
+  Id name, arch;
+
+  if (!fn || !*fn)
+    return 0;
+  if (distepoch && !*distepoch)
+    distepoch = 0;
+  p = fn + strlen(fn);
+  while (--p > fn)
+    if (*p == '.')
+      break;
+  if (p == fn)
+    return 0;
+  arch = pool_str2id(repo->pool, p + 1, 0);
+  if (!arch)
+    return 0;
+  if (distepoch)
+    {
+      while (--p > fn)
+        if (*p == '-')
+          break;
+      if (p == fn)
+	return 0;
+    }
+  vrend = p;
+  while (--p > fn)
+    if (*p == '-')
+      break;
+  if (p == fn)
+    return 0;
+  while (--p > fn)
+    if (*p == '-')
+      break;
+  if (p == fn)
+    return 0;
+  vrstart = p + 1;
+  name = pool_strn2id(repo->pool, fn, p - fn, 0);
+  if (!name)
+    return 0;
+  hh = HASHCHAIN_START;
+  h = name & hm;
+  while (ht[h])
+    {
+      Solvable *s = repo->pool->solvables + ht[h];
+      if (s->name == name && s->arch == arch)
+	{
+	  /* too bad we don't know the epoch... */
+	  const char *evr = pool_id2str(repo->pool, s->evr);
+	  for (p = evr; *p >= '0' && *p <= '9'; p++)
+	    ;
+	  if (p > evr && *p == ':')
+	    evr = p + 1;
+	  if (distepoch)
+	    {
+              if (!strncmp(evr, vrstart, vrend - vrstart) && evr[vrend - vrstart] == ':' && !strcmp(distepoch, evr + (vrend - vrstart + 1)))
+	        return s;
+	    }
+          else if (!strncmp(evr, vrstart, vrend - vrstart) && evr[vrend - vrstart] == 0)
+	    return s;
+	}
+      h = HASHCHAIN_NEXT(h, hh, hm);
+    }
+  return 0;
+}
+
+static void
+set_sourcerpm(Repodata *data, Solvable *s, Id handle, const char *sourcerpm)
+{
+  const char *p, *sevr, *sarch, *name, *evr;
+  Pool *pool;
+
+  p = strrchr(sourcerpm, '.');
+  if (!p || strcmp(p, ".rpm") != 0)
+    return;
+  p--;
+  while (p > sourcerpm && *p != '.')
+    p--;
+  if (*p != '.' || p == sourcerpm)
+    return;
+  sarch = p-- + 1;
+  while (p > sourcerpm && *p != '-')
+    p--;
+  if (*p != '-' || p == sourcerpm)
+    return;
+  p--;
+  while (p > sourcerpm && *p != '-')
+    p--;
+  if (*p != '-' || p == sourcerpm)
+    return;
+  sevr = p + 1;
+  pool = s->repo->pool;
+  if (!strcmp(sarch, "src.rpm"))
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_SRC);
+  else if (!strcmp(sarch, "nosrc.rpm"))
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
+  else
+    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, pool_strn2id(pool, sarch, strlen(sarch) - 4, 1));
+  evr = pool_id2str(pool, s->evr);
+  if (evr && !strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
+    repodata_set_void(data, handle, SOLVABLE_SOURCEEVR);
+  else
+    repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, pool_strn2id(pool, sevr, sarch - sevr - 1, 1));
+  name = pool_id2str(pool, s->name);
+  if (name && !strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
+    repodata_set_void(data, handle, SOLVABLE_SOURCENAME);
+  else
+    repodata_set_id(data, handle, SOLVABLE_SOURCENAME, pool_strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
+}
+
+
+static void XMLCALL
+startElement(void *userData, const char *name, const char **atts)
+{
+  struct parsedata *pd = userData;
+  Pool *pool = pd->pool;
+  struct stateswitch *sw;
+
+  if (pd->depth != pd->statedepth)
+    {
+      pd->depth++;
+      return;
+    }
+  pd->depth++;
+  if (!pd->swtab[pd->state])
+    return;
+  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)
+    if (!strcmp(sw->ename, name))
+      break;
+  if (sw->from != pd->state)
+    return;
+  pd->state = sw->to;
+  pd->docontent = sw->docontent;
+  pd->statedepth = pd->depth;
+  pd->lcontent = 0;
+  *pd->content = 0;
+  switch (pd->state)
+    {
+    case STATE_INFO:
+      {
+	const char *fn = find_attr("fn", atts);
+	const char *distepoch = find_attr("distepoch", atts);
+	const char *str;
+	pd->solvable = joinhash_lookup(pd->repo, pd->joinhash, pd->joinhashmask, fn, distepoch);
+	if (!pd->solvable)
+	  break;
+	str = find_attr("url", atts);
+	if (str && *str)
+	  repodata_set_str(pd->data, pd->solvable - pool->solvables, SOLVABLE_URL, str);
+	str = find_attr("license", atts);
+	if (str && *str)
+	  repodata_set_poolstr(pd->data, pd->solvable - pool->solvables, SOLVABLE_LICENSE, str);
+	str = find_attr("sourcerpm", atts);
+	if (str && *str)
+	  set_sourcerpm(pd->data, pd->solvable, pd->solvable - pool->solvables, str);
+        break;
+      }
+    default:
+      break;
+    }
+}
+
+static void XMLCALL
+endElement(void *userData, const char *name)
+{
+  struct parsedata *pd = userData;
+  Solvable *s = pd->solvable;
+  if (pd->depth != pd->statedepth)
+    {
+      pd->depth--;
+      return;
+    }
+  pd->depth--;
+  pd->statedepth--;
+  switch (pd->state)
+    {
+    case STATE_INFO:
+      if (s && *pd->content)
+        repodata_set_str(pd->data, s - pd->pool->solvables, SOLVABLE_DESCRIPTION, pd->content);
+      break;
+    default:
+      break;
+    }
+  pd->state = pd->sbtab[pd->state];
+  pd->docontent = 0;
+}
+
+static void XMLCALL
+characterData(void *userData, const XML_Char *s, int len)
+{
+  struct parsedata *pd = userData;
+  int l;
+  char *c;
+  if (!pd->docontent)
+    return;
+  l = pd->lcontent + len + 1;
+  if (l > pd->acontent)
+    {
+      pd->content = solv_realloc(pd->content, l + 256);
+      pd->acontent = l + 256;
+    }
+  c = pd->content + pd->lcontent;
+  pd->lcontent += len;
+  while (len-- > 0)
+    *c++ = *s++;
+  *c = 0;
+}
+
+#define BUFF_SIZE 8192
+
+int
+repo_add_mdk_info(Repo *repo, FILE *fp, int flags)
+{
+  Repodata *data;
+  struct parsedata pd;
+  char buf[BUFF_SIZE];
+  int i, l;
+  struct stateswitch *sw;
+  XML_Parser parser;
+
+  if (!(flags & REPO_EXTEND_SOLVABLES))
+    {
+      pool_debug(repo->pool, SOLV_ERROR, "repo_add_mdk_info: can only extend existing solvables\n");
+      return -1;
+    }
+
+  data = repo_add_repodata(repo, flags);
+
+  memset(&pd, 0, sizeof(pd));
+  pd.repo = repo;
+  pd.pool = repo->pool;
+  pd.data = data;
+
+  pd.content = solv_malloc(256);
+  pd.acontent = 256;
+
+  pd.joinhash = joinhash_init(repo, &pd.joinhashmask);
+
+  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
+    {
+      if (!pd.swtab[sw->from])
+        pd.swtab[sw->from] = sw;
+      pd.sbtab[sw->to] = sw->from;
+    }
+
+  parser = XML_ParserCreate(NULL);
+  XML_SetUserData(parser, &pd);
+  XML_SetElementHandler(parser, startElement, endElement);
+  XML_SetCharacterDataHandler(parser, characterData);
+  for (;;)
+    {
+      l = fread(buf, 1, sizeof(buf), fp);
+      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
+        {
+          pool_debug(pd.pool, SOLV_ERROR, "%s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+          break;
+        }
+      if (l == 0)
+        break;
+    }
+  XML_ParserFree(parser);
+  solv_free(pd.content);
+  solv_free(pd.joinhash);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;

@@ -11,6 +11,7 @@ SOLV_1.0 {
 		repo_add_deltainfoxml;
 		repo_add_helix;
 		repo_add_mdk;
+		repo_add_mdk_info;
 		repo_add_products;
 		repo_add_pubkeys;
 		repo_add_releasefile_products;
