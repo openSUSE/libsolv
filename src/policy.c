@@ -748,6 +748,11 @@ policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
       if (is->vendor != s->vendor && policy_illegal_vendorchange(solv, is, s))
 	ret |= POLICY_ILLEGAL_VENDORCHANGE;
     }
+  if (!(ignore & POLICY_ILLEGAL_NAMECHANGE) && !(duppkg ? solv->dup_allownamechange : !solv->allownamechange))
+    {
+      if (is->name != s->name)
+	ret |= POLICY_ILLEGAL_NAMECHANGE;
+    }
   return ret;
 }
 
@@ -854,11 +859,13 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
   Solvable *ps;
   int haveprovobs = 0;
   int allowdowngrade = allow_all ? 1 : solv->allowdowngrade;
+  int allownamechange = allow_all ? 1 : solv->allownamechange;
   int allowarchchange = allow_all ? 1 : solv->allowarchchange;
   int allowvendorchange = allow_all ? 1 : solv->allowvendorchange;
   if (allow_all == 2)
     {
       allowdowngrade = solv->dup_allowdowngrade;
+      allownamechange = solv->dup_allownamechange;
       allowarchchange = solv->dup_allowarchchange;
       allowvendorchange = solv->dup_allowvendorchange;
     }
@@ -886,6 +893,8 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	  if (!allowdowngrade && pool_evrcmp(pool, s->evr, ps->evr, EVRCMP_COMPARE) > 0)
 	    continue;
 	}
+      else if (!allownamechange)
+	continue;
       else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
 	{
 	  obsp = ps->repo->idarraydata + ps->obsoletes;
@@ -919,6 +928,8 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	continue;
       queue_push(qs, p);
     }
+  if (!allownamechange)
+    return;
   /* if we have found some valid candidates and noupdateprovide is not set, we're
      done. otherwise we fallback to all obsoletes */
   if (!solv->noupdateprovide && haveprovobs)

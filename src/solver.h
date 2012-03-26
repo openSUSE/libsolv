@@ -183,6 +183,7 @@ struct _Solver {
    *-------------------------------------------------------------------------------------------------------------*/
 
   int allowdowngrade;			/* allow to downgrade installed solvable */
+  int allownamechange;			/* allow to change name of installed solvables */
   int allowarchchange;			/* allow to change architecture of installed solvables */
   int allowvendorchange;		/* allow to change vendor of installed solvables */
   int allowuninstall;			/* allow removal of installed solvables */
@@ -199,6 +200,7 @@ struct _Solver {
   int dupmap_all;			/* dup all packages */
   Map dupinvolvedmap;			/* packages involved in dup process */
   int dup_allowdowngrade;		/* dup mode: allow to downgrade installed solvable */
+  int dup_allownamechange;		/* dup mode: allow to change name of installed solvable */
   int dup_allowarchchange;		/* dup mode: allow to change architecture of installed solvables */
   int dup_allowvendorchange;		/* dup mode: allow to change vendor of installed solvables */
 
@@ -253,8 +255,9 @@ typedef struct _Solver Solver;
 #define SOLVER_SETVENDOR		0x08000000
 #define SOLVER_SETREPO			0x10000000
 #define SOLVER_NOAUTOSET		0x20000000
+#define SOLVER_SETNAME			0x40000000
 
-#define SOLVER_SETMASK			0x2f000000
+#define SOLVER_SETMASK			0x7f000000
 
 #define SOLVER_REASON_UNRELATED		0
 #define SOLVER_REASON_UNIT_RULE		1
@@ -279,6 +282,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_IGNORE_RECOMMENDED		7
 #define SOLVER_FLAG_ADD_ALREADY_RECOMMENDED	8
 #define SOLVER_FLAG_NO_INFARCHCHECK		9
+#define SOLVER_FLAG_ALLOW_NAMECHANGE		10
 
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);

@@ -20,6 +20,7 @@
 #define POLICY_ILLEGAL_DOWNGRADE	1
 #define POLICY_ILLEGAL_ARCHCHANGE	2
 #define POLICY_ILLEGAL_VENDORCHANGE	4
+#define POLICY_ILLEGAL_NAMECHANGE	8
 
 extern void policy_filter_unwanted(Solver *solv, Queue *plist, int mode);
 extern int  policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2);

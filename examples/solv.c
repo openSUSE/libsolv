@@ -2127,14 +2127,17 @@ limitrepo(Pool *pool, Id repofilter, Queue *job)
       if (mq.count)
 	{
 	  /* here we assume that repo == vendor, so we also set SOLVER_SETVENDOR */
+	  Id flags = (job->elements[i] & SOLVER_SETMASK) | SOLVER_SETVENDOR | SOLVER_SETREPO;
+	  if ((job->elements[i] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_NAME)
+	    flags |= SOLVER_SETNAME;
 	  if (mq.count == 1)
 	    {
-	      job->elements[j] = SOLVER_SOLVABLE | (job->elements[i] & SOLVER_SETMASK) | SOLVER_SETVENDOR | SOLVER_SETREPO | SOLVER_NOAUTOSET;
+	      job->elements[j] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET | flags;
 	      job->elements[j + 1] = mq.elements[0];
 	    }
 	  else
 	    {
-	      job->elements[j] = SOLVER_SOLVABLE_ONE_OF | (job->elements[i] & SOLVER_SETMASK) | SOLVER_SETVENDOR | SOLVER_SETREPO;
+	      job->elements[j] = SOLVER_SOLVABLE_ONE_OF | flags;
 	      job->elements[j + 1] = pool_queuetowhatprovides(pool, &mq);
 	    }
 	  j += 2;

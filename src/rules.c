@@ -1455,8 +1455,10 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       if (!(set & SOLVER_NOAUTOSET))
 	{
 	  /* automatically add set bits by analysing the job */
+	  if (select == SOLVER_SOLVABLE_NAME)
+	    set |= SOLVER_SETNAME;
 	  if (select == SOLVER_SOLVABLE)
-	    set |= SOLVER_SETARCH | SOLVER_SETVENDOR | SOLVER_SETREPO | SOLVER_SETEVR;
+	    set |= SOLVER_SETNAME | SOLVER_SETARCH | SOLVER_SETVENDOR | SOLVER_SETREPO | SOLVER_SETEVR;
 	  else if ((select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES) && ISRELDEP(what))
 	    {
 	      Reldep *rd = GETRELDEP(pool, what);
@@ -1582,6 +1584,8 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	      s = pool->solvables + p;
 	      if ((set & SOLVER_SETEVR) != 0)
 		illegal |= POLICY_ILLEGAL_DOWNGRADE;	/* ignore */
+	      if ((set & SOLVER_SETNAME) != 0)
+		illegal |= POLICY_ILLEGAL_NAMECHANGE;	/* ignore */
 	      if ((set & SOLVER_SETARCH) != 0)
 		illegal |= POLICY_ILLEGAL_ARCHCHANGE;	/* ignore */
 	      if ((set & SOLVER_SETVENDOR) != 0)

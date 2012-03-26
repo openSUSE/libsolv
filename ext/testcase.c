@@ -81,6 +81,7 @@ static struct solverflags2str {
   int def;
 } solverflags2str[] = {
   { SOLVER_FLAG_ALLOW_DOWNGRADE,            "allowdowngrade", 0 },
+  { SOLVER_FLAG_ALLOW_NAMECHANGE,           "allownamechange", 1 },
   { SOLVER_FLAG_ALLOW_ARCHCHANGE,           "allowarchchange", 0 },
   { SOLVER_FLAG_ALLOW_VENDORCHANGE,         "allowvendorchange", 0 },
   { SOLVER_FLAG_ALLOW_UNINSTALL,            "allowuninstall", 0 },

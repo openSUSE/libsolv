@@ -711,6 +711,8 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	      int illegal = policy_is_illegal(solv, s, sd, 0);
 	      if ((illegal & POLICY_ILLEGAL_DOWNGRADE) != 0)
 		POOL_DEBUG(SOLV_DEBUG_RESULT, "  - allow downgrade of %s to %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, sd));
+	      if ((illegal & POLICY_ILLEGAL_NAMECHANGE) != 0)
+		POOL_DEBUG(SOLV_DEBUG_RESULT, "  - allow name change of %s to %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, sd));
 	      if ((illegal & POLICY_ILLEGAL_ARCHCHANGE) != 0)
 		POOL_DEBUG(SOLV_DEBUG_RESULT, "  - allow architecture change of %s to %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, sd));
 	      if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0)
@@ -1024,6 +1026,11 @@ policy_illegal2str(Solver *solv, int illegal, Solvable *s, Solvable *rs)
   if (illegal == POLICY_ILLEGAL_DOWNGRADE)
     {
       str = pool_tmpjoin(pool, "downgrade of ", pool_solvable2str(pool, s), 0);
+      return pool_tmpappend(pool, str, " to ", pool_solvable2str(pool, rs));
+    }
+  if (illegal == POLICY_ILLEGAL_NAMECHANGE)
+    {
+      str = pool_tmpjoin(pool, "name change of ", pool_solvable2str(pool, s), 0);
       return pool_tmpappend(pool, str, " to ", pool_solvable2str(pool, rs));
     }
   if (illegal == POLICY_ILLEGAL_ARCHCHANGE)
