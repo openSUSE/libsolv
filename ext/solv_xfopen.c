@@ -75,7 +75,7 @@ static inline FILE *mygzfdopen(int fd, const char *mode)
 }
 
 
-#ifdef ENABLE_XZ_COMPRESSION
+#ifdef ENABLE_LZMA_COMPRESSION
 
 #include <lzma.h>
 
@@ -249,7 +249,7 @@ static inline FILE *mylzfdopen(int fd, const char *mode)
   return cookieopen(lzf, mode, lzread, lzwrite, lzclose);
 }
 
-#endif /* ENABLE_XZ_COMPRESSION */
+#endif /* ENABLE_LZMA_COMPRESSION */
 
 
 FILE *
@@ -264,7 +264,7 @@ solv_xfopen(const char *fn, const char *mode)
   suf = strrchr(fn, '.');
   if (suf && !strcmp(suf, ".gz"))
     return mygzfopen(fn, mode);
-#ifdef ENABLE_XZ_COMPRESSION
+#ifdef ENABLE_LZMA_COMPRESSION
   if (suf && !strcmp(suf, ".xz"))
     return myxzfopen(fn, mode);
   if (suf && !strcmp(suf, ".lzma"))
@@ -299,7 +299,7 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
     }
   if (suf && !strcmp(suf, ".gz"))
     return mygzfdopen(fd, mode);
-#ifdef ENABLE_XZ_COMPRESSION
+#ifdef ENABLE_LZMA_COMPRESSION
   if (suf && !strcmp(suf, ".xz"))
     return myxzfdopen(fd, mode);
   if (suf && !strcmp(suf, ".lzma"))
