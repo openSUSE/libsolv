@@ -80,148 +80,164 @@ static inline FILE *mygzfdopen(int fd, const char *mode)
 #include <lzma.h>
 
 typedef struct lzfile {
-    unsigned char buf[1 << 15];
-    lzma_stream strm;
-    FILE *file;
-    int encoding;
-    int eof;
+  unsigned char buf[1 << 15];
+  lzma_stream strm;
+  FILE *file;
+  int encoding;
+  int eof;
 } LZFILE;
 
 static LZFILE *lzopen(const char *path, const char *mode, int fd, int xz)
 {
-    int level = 7;      /* Use XZ's default compression level if unspecified */
-    int encoding = 0;
-    FILE *fp;
-    LZFILE *lzfile;
-    lzma_ret ret;
-    lzma_stream init_strm = LZMA_STREAM_INIT;
+  int level = 7;
+  int encoding = 0;
+  FILE *fp;
+  LZFILE *lzfile;
+  lzma_ret ret;
+  lzma_stream init_strm = LZMA_STREAM_INIT;
 
-    if (!path && fd < 0)
-	return 0;
-    for (; *mode; mode++) {
-	if (*mode == 'w')
-	    encoding = 1;
-	else if (*mode == 'r')
-	    encoding = 0;
-	else if (*mode >= '1' && *mode <= '9')
-	    level = *mode - '0';
+  if (!path && fd < 0)
+    return 0;
+  for (; *mode; mode++)
+    {
+      if (*mode == 'w')
+	encoding = 1;
+      else if (*mode == 'r')
+	encoding = 0;
+      else if (*mode >= '1' && *mode <= '9')
+	level = *mode - '0';
     }
-    if (fd != -1)
-	fp = fdopen(fd, encoding ? "w" : "r");
-    else
-	fp = fopen(path, encoding ? "w" : "r");
-    if (!fp)
-	return 0;
-    lzfile = calloc(1, sizeof(*lzfile));
-    if (!lzfile)
-	return 0;
-    lzfile->file = fp;
-    lzfile->encoding = encoding;
-    lzfile->eof = 0;
-    lzfile->strm = init_strm;
-    if (encoding) {
-	if (xz) {
-	    ret = lzma_easy_encoder(&lzfile->strm, level, LZMA_CHECK_SHA256);
-	} else {
-	    lzma_options_lzma options;
-	    lzma_lzma_preset(&options, level);
-	    ret = lzma_alone_encoder(&lzfile->strm, &options);
+  if (fd != -1)
+    fp = fdopen(fd, encoding ? "w" : "r");
+  else
+    fp = fopen(path, encoding ? "w" : "r");
+  if (!fp)
+    return 0;
+  lzfile = calloc(1, sizeof(*lzfile));
+  if (!lzfile)
+    {
+      fclose(fp);
+      return 0;
+    }
+  lzfile->file = fp;
+  lzfile->encoding = encoding;
+  lzfile->eof = 0;
+  lzfile->strm = init_strm;
+  if (encoding)
+    {
+      if (xz)
+	ret = lzma_easy_encoder(&lzfile->strm, level, LZMA_CHECK_SHA256);
+      else
+	{
+	  lzma_options_lzma options;
+	  lzma_lzma_preset(&options, level);
+	  ret = lzma_alone_encoder(&lzfile->strm, &options);
 	}
-    } else {    /* lzma_easy_decoder_memusage(level) is not ready yet, use hardcoded limit for now */
-	ret = lzma_auto_decoder(&lzfile->strm, 100<<20, 0);
     }
-    if (ret != LZMA_OK) {
-	fclose(fp);
-	free(lzfile);
-	return 0;
+  else
+    {
+      /* lzma_easy_decoder_memusage(level) is not ready yet, use hardcoded limit for now */
+      ret = lzma_auto_decoder(&lzfile->strm, 100 << 20, 0);
     }
-    return lzfile;
+  if (ret != LZMA_OK)
+    {
+      fclose(fp);
+      free(lzfile);
+      return 0;
+    }
+  return lzfile;
 }
 
 static int lzclose(void *cookie)
 {
-    LZFILE *lzfile = cookie;
-    lzma_ret ret;
-    size_t n;
-    int rc;
+  LZFILE *lzfile = cookie;
+  lzma_ret ret;
+  size_t n;
+  int rc;
 
-    if (!lzfile)
-	return -1;
-    if (lzfile->encoding) {
-	for (;;) {
-	    lzfile->strm.avail_out = sizeof(lzfile->buf);
-	    lzfile->strm.next_out = lzfile->buf;
-	    ret = lzma_code(&lzfile->strm, LZMA_FINISH);
-	    if (ret != LZMA_OK && ret != LZMA_STREAM_END)
-		return -1;
-	    n = sizeof(lzfile->buf) - lzfile->strm.avail_out;
-	    if (n && fwrite(lzfile->buf, 1, n, lzfile->file) != n)
-		return -1;
-	    if (ret == LZMA_STREAM_END)
-		break;
+  if (!lzfile)
+    return -1;
+  if (lzfile->encoding)
+    {
+      for (;;)
+	{
+	  lzfile->strm.avail_out = sizeof(lzfile->buf);
+	  lzfile->strm.next_out = lzfile->buf;
+	  ret = lzma_code(&lzfile->strm, LZMA_FINISH);
+	  if (ret != LZMA_OK && ret != LZMA_STREAM_END)
+	    return -1;
+	  n = sizeof(lzfile->buf) - lzfile->strm.avail_out;
+	  if (n && fwrite(lzfile->buf, 1, n, lzfile->file) != n)
+	    return -1;
+	  if (ret == LZMA_STREAM_END)
+	    break;
 	}
     }
-    lzma_end(&lzfile->strm);
-    rc = fclose(lzfile->file);
-    free(lzfile);
-    return rc;
+  lzma_end(&lzfile->strm);
+  rc = fclose(lzfile->file);
+  free(lzfile);
+  return rc;
 }
 
 static ssize_t lzread(void *cookie, char *buf, size_t len)
 {
-    LZFILE *lzfile = cookie;
-    lzma_ret ret;
-    int eof = 0;
+  LZFILE *lzfile = cookie;
+  lzma_ret ret;
+  int eof = 0;
 
-    if (!lzfile || lzfile->encoding)
-      return -1;
-    if (lzfile->eof)
-      return 0;
-    lzfile->strm.next_out = (unsigned char *)buf;
-    lzfile->strm.avail_out = len;
-    for (;;) {
-	if (!lzfile->strm.avail_in) {
-	    lzfile->strm.next_in = lzfile->buf;
-	    lzfile->strm.avail_in = fread(lzfile->buf, 1, sizeof(lzfile->buf), lzfile->file);
-	    if (!lzfile->strm.avail_in)
-		eof = 1;
+  if (!lzfile || lzfile->encoding)
+    return -1;
+  if (lzfile->eof)
+    return 0;
+  lzfile->strm.next_out = (unsigned char *)buf;
+  lzfile->strm.avail_out = len;
+  for (;;)
+    {
+      if (!lzfile->strm.avail_in)
+	{
+	  lzfile->strm.next_in = lzfile->buf;
+	  lzfile->strm.avail_in = fread(lzfile->buf, 1, sizeof(lzfile->buf), lzfile->file);
+	  if (!lzfile->strm.avail_in)
+	    eof = 1;
 	}
-	ret = lzma_code(&lzfile->strm, LZMA_RUN);
-	if (ret == LZMA_STREAM_END) {
-	    lzfile->eof = 1;
-	    return len - lzfile->strm.avail_out;
+      ret = lzma_code(&lzfile->strm, LZMA_RUN);
+      if (ret == LZMA_STREAM_END)
+	{
+	  lzfile->eof = 1;
+	  return len - lzfile->strm.avail_out;
 	}
-	if (ret != LZMA_OK)
-	    return -1;
-	if (!lzfile->strm.avail_out)
-	    return len;
-	if (eof)
-	    return -1;
-      }
+      if (ret != LZMA_OK)
+	return -1;
+      if (!lzfile->strm.avail_out)
+	return len;
+      if (eof)
+	return -1;
+    }
 }
 
 static ssize_t lzwrite(void *cookie, const char *buf, size_t len)
 {
-    LZFILE *lzfile = cookie;
-    lzma_ret ret;
-    size_t n;
-    if (!lzfile || !lzfile->encoding)
+  LZFILE *lzfile = cookie;
+  lzma_ret ret;
+  size_t n;
+  if (!lzfile || !lzfile->encoding)
+    return -1;
+  if (!len)
+    return 0;
+  lzfile->strm.next_in = (unsigned char *)buf;
+  lzfile->strm.avail_in = len;
+  for (;;)
+    {
+      lzfile->strm.next_out = lzfile->buf;
+      lzfile->strm.avail_out = sizeof(lzfile->buf);
+      ret = lzma_code(&lzfile->strm, LZMA_RUN);
+      if (ret != LZMA_OK)
 	return -1;
-    if (!len)
-	return 0;
-    lzfile->strm.next_in = (unsigned char *)buf;
-    lzfile->strm.avail_in = len;
-    for (;;) {
-	lzfile->strm.next_out = lzfile->buf;
-	lzfile->strm.avail_out = sizeof(lzfile->buf);
-	ret = lzma_code(&lzfile->strm, LZMA_RUN);
-	if (ret != LZMA_OK)
-	    return -1;
-	n = sizeof(lzfile->buf) - lzfile->strm.avail_out;
-	if (n && fwrite(lzfile->buf, 1, n, lzfile->file) != n)
-	    return -1;
-	if (!lzfile->strm.avail_in)
-	    return len;
+      n = sizeof(lzfile->buf) - lzfile->strm.avail_out;
+      if (n && fwrite(lzfile->buf, 1, n, lzfile->file) != n)
+	return -1;
+      if (!lzfile->strm.avail_in)
+	return len;
     }
 }
 
