@@ -79,6 +79,8 @@ static inline FILE *mygzfdopen(int fd, const char *mode)
 
 #include <lzma.h>
 
+/* lzma code written by me in 2008 for rpm's rpmio.c */
+
 typedef struct lzfile {
   unsigned char buf[1 << 15];
   lzma_stream strm;
@@ -87,14 +89,22 @@ typedef struct lzfile {
   int eof;
 } LZFILE;
 
-static LZFILE *lzopen(const char *path, const char *mode, int fd, int xz)
+static inline lzma_ret setup_alone_encoder(lzma_stream *strm, int level)
+{
+  lzma_options_lzma options;
+  lzma_lzma_preset(&options, level);
+  return lzma_alone_encoder(strm, &options);
+}
+
+static lzma_stream stream_init = LZMA_STREAM_INIT;
+
+static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
 {
   int level = 7;
   int encoding = 0;
   FILE *fp;
   LZFILE *lzfile;
   lzma_ret ret;
-  lzma_stream init_strm = LZMA_STREAM_INIT;
 
   if (!path && fd < 0)
     return 0;
@@ -122,23 +132,16 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int xz)
   lzfile->file = fp;
   lzfile->encoding = encoding;
   lzfile->eof = 0;
-  lzfile->strm = init_strm;
+  lzfile->strm = stream_init;
   if (encoding)
     {
-      if (xz)
+      if (isxz)
 	ret = lzma_easy_encoder(&lzfile->strm, level, LZMA_CHECK_SHA256);
       else
-	{
-	  lzma_options_lzma options;
-	  lzma_lzma_preset(&options, level);
-	  ret = lzma_alone_encoder(&lzfile->strm, &options);
-	}
+	ret = setup_alone_encoder(&lzfile->strm, level);
     }
   else
-    {
-      /* lzma_easy_decoder_memusage(level) is not ready yet, use hardcoded limit for now */
-      ret = lzma_auto_decoder(&lzfile->strm, 100 << 20, 0);
-    }
+    ret = lzma_auto_decoder(&lzfile->strm, 100 << 20, 0);
   if (ret != LZMA_OK)
     {
       fclose(fp);
@@ -292,6 +295,7 @@ solv_xfopen(const char *fn, const char *mode)
 FILE *
 solv_xfopen_fd(const char *fn, int fd, const char *mode)
 {
+  const char *simplemode = mode;
   char *suf;
 
   suf = fn ? strrchr(fn, '.') : 0;
@@ -302,24 +306,22 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
 	return 0;
       fl &= O_RDONLY|O_WRONLY|O_RDWR;
       if (fl == O_WRONLY)
-	mode = "w";
+	mode = simplemode = "w";
       else if (fl == O_RDWR)
 	{
-	  if (!suf || strcmp(suf, ".gz") != 0)
-	    mode = "r+";
-	  else
-	    mode = "r";
+	  mode = "r+";
+	  simplemode = "r";
 	}
       else
-	mode = "r";
+	mode = simplemode = "r";
     }
   if (suf && !strcmp(suf, ".gz"))
-    return mygzfdopen(fd, mode);
+    return mygzfdopen(fd, simplemode);
 #ifdef ENABLE_LZMA_COMPRESSION
   if (suf && !strcmp(suf, ".xz"))
-    return myxzfdopen(fd, mode);
+    return myxzfdopen(fd, simplemode);
   if (suf && !strcmp(suf, ".lzma"))
-    return mylzfdopen(fd, mode);
+    return mylzfdopen(fd, simplemode);
 #endif
   return fdopen(fd, mode);
 }
