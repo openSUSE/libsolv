@@ -66,19 +66,19 @@ map_and(Map *t, Map *s)
     unsigned char *ti, *si, *end;
     ti = t->map;
     si = s->map;
-    end = ti + t->size;
+    end = ti + (t->size < s->size ? t->size : s->size);
     while (ti < end)
 	*ti++ &= *si++;
 }
 
-/* like map_and but negates value in s first, i.e. t & ~s */
+/* remove all set bits in s from t. */
 void
-map_and_not(Map *t, Map *s)
+map_subtract(Map *t, Map *s)
 {
     unsigned char *ti, *si, *end;
     ti = t->map;
     si = s->map;
-    end = ti + t->size;
+    end = ti + (t->size < s->size ? t->size : s->size);
     while (ti < end)
 	*ti++ &= ~*si++;
 }
