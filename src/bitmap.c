@@ -71,4 +71,16 @@ map_and(Map *t, Map *s)
 	*ti++ &= *si++;
 }
 
+/* like map_and but negates value in s first, i.e. t & ~s */
+void
+map_and_not(Map *t, Map *s)
+{
+    unsigned char *ti, *si, *end;
+    ti = t->map;
+    si = s->map;
+    end = ti + t->size;
+    while (ti < end)
+	*ti++ &= ~*si++;
+}
+
 /* EOF */
