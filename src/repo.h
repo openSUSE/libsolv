@@ -124,7 +124,7 @@ void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*c
 Id repo_lookup_type(Repo *repo, Id entry, Id keyname);
 const char *repo_lookup_str(Repo *repo, Id entry, Id keyname);
 /* returns the integer value of the attribute, or notfound if not found */
-unsigned int repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound);
+unsigned long long repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned long long notfound);
 Id repo_lookup_id(Repo *repo, Id entry, Id keyname);
 int repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q);
 int repo_lookup_deparray(Repo *repo, Id entry, Id keyname, Queue *q, Id marker);
@@ -133,7 +133,7 @@ const char *repo_lookup_checksum(Repo *repo, Id entry, Id keyname, Id *typep);
 const unsigned char *repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep);
 
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
-void repo_set_num(Repo *repo, Id p, Id keyname, unsigned int num);
+void repo_set_num(Repo *repo, Id p, Id keyname, unsigned long long num);
 void repo_set_str(Repo *repo, Id p, Id keyname, const char *str);
 void repo_set_poolstr(Repo *repo, Id p, Id keyname, const char *str);
 void repo_add_poolstr_array(Repo *repo, Id p, Id keyname, const char *str);

@@ -81,8 +81,8 @@ struct deltarpm {
   Id locname;
   Id locevr;
   Id locsuffix;
-  unsigned buildtime;
-  unsigned downloadsize, archivesize;
+  unsigned int buildtime;
+  unsigned long long downloadsize;
   char *filechecksum;
   int filechecksumtype;
   /* Baseversion.  deltarpm only has one. */
@@ -394,7 +394,7 @@ endElement(void *userData, const char *name)
 	repodata_set_id(pd->data, handle, DELTA_LOCATION_EVR, d->locevr);
 	repodata_set_id(pd->data, handle, DELTA_LOCATION_SUFFIX, d->locsuffix);
 	if (d->downloadsize)
-	  repodata_set_num(pd->data, handle, DELTA_DOWNLOADSIZE, (d->downloadsize + 1023) / 1024);
+	  repodata_set_num(pd->data, handle, DELTA_DOWNLOADSIZE, d->downloadsize);
 	if (d->filechecksum)
 	  repodata_set_checksum(pd->data, handle, DELTA_CHECKSUM, d->filechecksumtype, d->filechecksum);
 	if (d->seqnum)
@@ -418,7 +418,7 @@ endElement(void *userData, const char *name)
       pd->delta.filechecksum = solv_strdup(pd->content);
       break;
     case STATE_SIZE:
-      pd->delta.downloadsize = atoi(pd->content);
+      pd->delta.downloadsize = strtoull(pd->content, 0, 10);
       break;
     case STATE_SEQUENCE:
       if ((str = pd->content))

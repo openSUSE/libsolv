@@ -747,7 +747,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      }
 	    case CTAG('=', 'S', 'i', 'z'):
 	      if (split(line + 6, sp, 3) == 2)
-		repodata_set_num(data, handle, DELTA_DOWNLOADSIZE, (unsigned int)(atoi(sp[0]) + 1023) / 1024);
+		repodata_set_num(data, handle, DELTA_DOWNLOADSIZE, strtoull(sp[0], 0, 10));
 	      continue;
 	    case CTAG('=', 'P', 'k', 'g'):
 	    case CTAG('=', 'P', 'a', 't'):
@@ -990,8 +990,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
           case CTAG('=', 'S', 'i', 'z'):
 	    if (split(line + 6, sp, 3) == 2)
 	      {
-		repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)(atoi(sp[0]) + 1023) / 1024);
-		repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, (unsigned int)(atoi(sp[1]) + 1023) / 1024);
+		repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, strtoull(sp[0], 0, 10));
+		repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, strtoull(sp[1], 0, 10));
 	      }
 	    continue;
           case CTAG('=', 'T', 'i', 'm'):

@@ -312,7 +312,7 @@ void pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queu
 
 const char *pool_lookup_str(Pool *pool, Id entry, Id keyname);
 Id pool_lookup_id(Pool *pool, Id entry, Id keyname);
-unsigned int pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned int notfound);
+unsigned long long pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned long long notfound);
 int pool_lookup_void(Pool *pool, Id entry, Id keyname);
 const unsigned char *pool_lookup_bin_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
 const char *pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep);

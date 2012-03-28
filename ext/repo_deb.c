@@ -252,7 +252,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	case 'I' << 8 | 'N':
 	  if (!strcasecmp(tag, "installed-size"))
-	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, atoi(q));
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(q, 0, 10) << 10);
 	  break;
 	case 'M' << 8 | 'D':
 	  if (!strcasecmp(tag, "md5sum") && !checksumtype && strlen(q) == 16 * 2)
@@ -592,7 +592,7 @@ repo_add_debs(Repo *repo, const char **debs, int ndebs, int flags)
       control2solvable(s, data, (char *)ctar);
       repodata_set_location(data, s - pool->solvables, 0, 0, debs[i]);
       if (S_ISREG(stb.st_mode))
-        repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
+        repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
       if (gotpkgid)
 	repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
       solv_free(ctar);

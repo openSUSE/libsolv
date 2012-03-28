@@ -969,7 +969,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
         repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, u32);
       u32 = headint32(rpmhead, TAG_SIZE);
       if (u32)
-        repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, (u32 + 1023) / 1024);
+        repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, u32);
       if (sourcerpm)
 	addsourcerpm(pool, data, handle, sourcerpm, name, evr);
       if ((flags & RPM_ADD_TRIGGERS) != 0)
@@ -1127,7 +1127,7 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       repodata_set_void(data, handle, keyname);
       break;
     case REPOKEY_TYPE_NUM:
-      repodata_set_num(data, handle, keyname, kv->num);
+      repodata_set_num(data, handle, keyname, SOLV_KV_NUM64(kv));
       break;
     case REPOKEY_TYPE_CONSTANT:
       repodata_set_constant(data, handle, keyname, kv->num);
@@ -1935,7 +1935,7 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
 	  Id handle = s - pool->solvables;
 	  repodata_set_location(data, handle, 0, 0, rpms[i]);
 	  if (S_ISREG(stb.st_mode))
-	    repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned int)((stb.st_size + 1023) / 1024));
+	    repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
 	  repodata_set_num(data, handle, SOLVABLE_HEADEREND, headerend);
 	  if (gotpkgid)
 	    repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);

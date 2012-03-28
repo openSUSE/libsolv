@@ -200,12 +200,22 @@ solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase)
   return solvable_lookup_str(s, keyname);
 }
 
-unsigned int
-solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound)
+unsigned long long
+solvable_lookup_num(Solvable *s, Id keyname, unsigned long long notfound)
 {
   if (!s->repo)
     return notfound;
   return repo_lookup_num(s->repo, s - s->repo->pool->solvables, keyname, notfound);
+}
+
+unsigned int
+solvable_lookup_sizek(Solvable *s, Id keyname, unsigned int notfound)
+{
+  unsigned long long size;
+  if (!s->repo)
+    return notfound;
+  size = solvable_lookup_num(s, keyname, (unsigned long long)notfound << 10);
+  return (unsigned int)((size + 1023) >> 10);
 }
 
 int
@@ -633,11 +643,11 @@ solvable_selfprovidedep(Solvable *s)
 void
 solvable_set_id(Solvable *s, Id keyname, Id id)
 {
-  repo_set_num(s->repo, s - s->repo->pool->solvables, keyname, id);
+  repo_set_id(s->repo, s - s->repo->pool->solvables, keyname, id);
 }
 
 void
-solvable_set_num(Solvable *s, Id keyname, unsigned int num)
+solvable_set_num(Solvable *s, Id keyname, unsigned long long num)
 {
   repo_set_num(s->repo, s - s->repo->pool->solvables, keyname, num);
 }

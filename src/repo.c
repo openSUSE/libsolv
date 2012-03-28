@@ -1089,12 +1089,12 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
 }
 
 
-unsigned int
-repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned int notfound)
+unsigned long long
+repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned long long notfound)
 {
   Repodata *data;
   int i;
-  unsigned int value;
+  unsigned long long value;
 
   if (entry >= 0)
     {
@@ -1403,7 +1403,7 @@ repo_set_id(Repo *repo, Id p, Id keyname, Id id)
 }
 
 void
-repo_set_num(Repo *repo, Id p, Id keyname, unsigned int num)
+repo_set_num(Repo *repo, Id p, Id keyname, unsigned long long num)
 {
   Repodata *data;
   if (p >= 0)

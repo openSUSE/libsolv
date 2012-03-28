@@ -45,7 +45,8 @@ typedef struct _Solvable {
 /* lookup functions */
 Id solvable_lookup_type(Solvable *s, Id keyname);
 Id solvable_lookup_id(Solvable *s, Id keyname);
-unsigned int solvable_lookup_num(Solvable *s, Id keyname, unsigned int notfound);
+unsigned long long solvable_lookup_num(Solvable *s, Id keyname, unsigned long long notfound);
+unsigned int solvable_lookup_sizek(Solvable *s, Id keyname, unsigned int notfound);
 const char *solvable_lookup_str(Solvable *s, Id keyname);
 const char *solvable_lookup_str_poollang(Solvable *s, Id keyname);
 const char *solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase);
@@ -59,7 +60,7 @@ int solvable_lookup_deparray(Solvable *s, Id keyname, Queue *q, Id marker);
 
 /* setter functions */
 void solvable_set_id(Solvable *s, Id keyname, Id id);
-void solvable_set_num(Solvable *s, Id keyname, unsigned int num);
+void solvable_set_num(Solvable *s, Id keyname, unsigned long long num);
 void solvable_set_str(Solvable *s, Id keyname, const char *str);
 void solvable_set_poolstr(Solvable *s, Id keyname, const char *str);
 void solvable_add_poolstr_array(Solvable *s, Id keyname, const char *str);

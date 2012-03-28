@@ -324,6 +324,23 @@ incore_add_id(Repodata *data, Id sx)
 }
 
 static void
+incore_add_sizek(Repodata *data, unsigned int sx)
+{
+  if (sx < (1 << 22))
+    incore_add_id(data, (Id)(sx << 10));
+  else
+    {
+      if ((sx >> 25) != 0)
+	{
+	  incore_add_id(data, (Id)(sx >> 25));
+	  data->incoredata[data->incoredatalen - 1] |= 128;
+	}
+      incore_add_id(data, (Id)((sx << 10) | 0x80000000));
+      data->incoredata[data->incoredatalen - 5] = (sx >> 18) | 128;
+    }
+}
+
+static void
 incore_add_ideof(Repodata *data, Id sx, int eof)
 {
   unsigned int x = (unsigned int)sx;
@@ -1247,6 +1264,16 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	    }
 	  keyp = schemadata + schemata[id];
 	  break;
+	case REPOKEY_TYPE_NUM:
+	  if (!(solvflags & SOLV_FLAG_SIZE_BYTES) && keys[key].storage == KEY_STORAGE_INCORE &&
+		(id == SOLVABLE_INSTALLSIZE || id == SOLVABLE_DOWNLOADSIZE || id == DELTA_DOWNLOADSIZE))
+	    {
+	      /* old solv file with sizes in kilos. transcode. */
+	      dp = data_read_id(dp, &id);
+	      incore_add_sizek(&data, (unsigned int)id);
+	      break;
+	    }
+	  /* FALLTHROUGH */
 	default:
 	  if (id == RPM_RPMDBID && s && (keys[key].type == REPOKEY_TYPE_U32 || keys[key].type == REPOKEY_TYPE_NUM))
 	    {

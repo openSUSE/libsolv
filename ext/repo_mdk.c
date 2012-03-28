@@ -114,10 +114,7 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
       if (!s)
 	s = pool_id2solvable(pool, repo_add_solvable(repo));
       if (!strncmp(buf + 1, "filesize@", 9))
-	{
-	  unsigned long filesize = strtoul(buf + 10, 0, 10);
-	  repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned int)((filesize + 1023) / 1024));
-	}
+	repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, strtoull(buf + 10, 0, 10));
       else if (!strncmp(buf + 1, "summary@", 8))
 	repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, buf + 9);
       else if (!strncmp(buf + 1, "provides@", 9))
@@ -144,7 +141,6 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 	      if ((sizestr = strchr(epochstr, '@')) != 0)
 		{
 		  char *groupstr;
-		  unsigned long size;
 		  *sizestr++ = 0;
 		  if ((groupstr = strchr(sizestr, '@')) != 0)
 		    {
@@ -155,8 +151,7 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 		      if (*groupstr)
 			repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_GROUP, groupstr);
 		    }
-		  size = strtoul(sizestr, 0, 10);
-		  repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, (unsigned int)((size + 1023) / 1024));
+		  repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(sizestr, 0, 10));
 		}
 	    }
           filename = pool_tmpjoin(pool, nvra, ".rpm", 0);

@@ -3167,7 +3167,7 @@ rerunsolver:
 
 	  p = checkq.elements[i];
 	  s = pool_id2solvable(pool, p);
-	  downloadsize += solvable_lookup_num(s, SOLVABLE_DOWNLOADSIZE, 0);
+	  downloadsize += solvable_lookup_sizek(s, SOLVABLE_DOWNLOADSIZE, 0);
 	}
       printf("Downloading %d packages, %d K\n", newpkgs, downloadsize);
       newpkgsfps = solv_calloc(newpkgs, sizeof(*newpkgsfps));

@@ -1757,6 +1757,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   write_u32(fp, target.nschemata);
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
+  solv_flags |= SOLV_FLAG_SIZE_BYTES;
   write_u32(fp, solv_flags);
 
   /*

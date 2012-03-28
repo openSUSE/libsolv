@@ -834,17 +834,17 @@ startElement(void *userData, const char *name, const char **atts)
       }
     case STATE_SIZE:
       {
-        unsigned int k;
+        unsigned long long k;
         str = find_attr("installed", atts);
-	if (str && (k = atoi(str)) != 0)
-	  repodata_set_num(pd->data, handle, SOLVABLE_INSTALLSIZE, (k + 1023) / 1024);
+	if (str && (k = strtoull(str, 0, 10)) != 0)
+	  repodata_set_num(pd->data, handle, SOLVABLE_INSTALLSIZE, k);
 	/* XXX the "package" attribute gives the size of the rpm file,
 	   i.e. the download size.  Except on packman, there it seems to be
 	   something else entirely, it has a value near to the other two
 	   values, as if the rpm is uncompressed.  */
         str = find_attr("package", atts);
-	if (str && (k = atoi(str)) != 0)
-	  repodata_set_num(pd->data, handle, SOLVABLE_DOWNLOADSIZE, (k + 1023) / 1024);
+	if (str && (k = strtoull(str, 0, 10)) != 0)
+	  repodata_set_num(pd->data, handle, SOLVABLE_DOWNLOADSIZE, k);
         break;
       }
     case STATE_HEADERRANGE:

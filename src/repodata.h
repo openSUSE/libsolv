@@ -201,7 +201,7 @@ int repodata_filelistfilter_matches(Repodata *data, const char *str);
 Id repodata_lookup_type(Repodata *data, Id solvid, Id keyname);
 Id repodata_lookup_id(Repodata *data, Id solvid, Id keyname);
 const char *repodata_lookup_str(Repodata *data, Id solvid, Id keyname);
-int repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value);
+int repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long *value);
 int repodata_lookup_void(Repodata *data, Id solvid, Id keyname);
 const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep);
 int repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
@@ -229,7 +229,7 @@ Id repodata_new_handle(Repodata *data);
 
 /* basic types: void, num, string, Id */
 void repodata_set_void(Repodata *data, Id solvid, Id keyname);
-void repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned int num);
+void repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned long long num);
 void repodata_set_id(Repodata *data, Id solvid, Id keyname, Id id);
 void repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str);
 void repodata_set_binary(Repodata *data, Id solvid, Id keyname, void *buf, int len);

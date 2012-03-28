@@ -678,7 +678,7 @@ repodata_lookup_str(Repodata *data, Id solvid, Id keyname)
 }
 
 int
-repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value)
+repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long *value)
 {
   unsigned char *dp;
   Repokey *key;
@@ -694,7 +694,7 @@ repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned int *value)
     {
       kv.num = kv.num2 = 0;
       dp = data_fetch(dp, &kv, key);
-      *value = kv.num2 ? ~(unsigned int)0 : kv.num;
+      *value = SOLV_KV_NUM64(&kv);
       return 1;
     }
   return 0;
@@ -1989,7 +1989,7 @@ repodata_set_id(Repodata *data, Id solvid, Id keyname, Id id)
 }
 
 void
-repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned int num)
+repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned long long num)
 {
   Repokey key;
   key.name = keyname;
@@ -3000,7 +3000,7 @@ repodata_create_stubs(Repodata *data)
 	  repodata_set_void(sdata, SOLVID_META, di.key->name);
 	  break;
 	case REPOKEY_TYPE_NUM:
-	  repodata_set_num(sdata, SOLVID_META, di.key->name, di.kv.num);
+	  repodata_set_num(sdata, SOLVID_META, di.key->name, SOLV_KV_NUM64(&di.kv));
 	  break;
 	case REPOKEY_TYPE_MD5:
 	case REPOKEY_TYPE_SHA1:

@@ -1165,7 +1165,7 @@ typedef struct {
   Id lookup_id(Id entry, Id keyname) {
     return repo_lookup_id($self, entry, keyname);
   }
-  unsigned int lookup_num(Id entry, Id keyname, unsigned int notfound = 0) {
+  unsigned long long lookup_num(Id entry, Id keyname, unsigned long long notfound = 0) {
     return repo_lookup_num($self, entry, keyname, notfound);
   }
   void write(FILE *fp) {
@@ -1661,7 +1661,7 @@ typedef struct {
   Id lookup_id(Id keyname) {
     return pool_lookup_id($self->pool, $self->id, keyname);
   }
-  unsigned int lookup_num(Id keyname, unsigned int notfound = 0) {
+  unsigned long long lookup_num(Id keyname, unsigned long long notfound = 0) {
     return pool_lookup_num($self->pool, $self->id, keyname, notfound);
   }
   bool lookup_void(Id keyname) {

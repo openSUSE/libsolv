@@ -252,6 +252,7 @@ SOLV_1.0 {
 		solvable_lookup_id;
 		solvable_lookup_idarray;
 		solvable_lookup_num;
+		solvable_lookup_sizek;
 		solvable_lookup_str;
 		solvable_lookup_str_lang;
 		solvable_lookup_str_poollang;

@@ -1709,7 +1709,7 @@ pool_calc_installsizechange(Pool *pool, Map *installedmap)
 	continue;
       if (!MAPTST(installedmap, sp))
 	continue;
-      change += solvable_lookup_num(s, SOLVABLE_INSTALLSIZE, 0);
+      change += solvable_lookup_sizek(s, SOLVABLE_INSTALLSIZE, 0);
     }
   if (oldinstalled)
     {
@@ -1717,7 +1717,7 @@ pool_calc_installsizechange(Pool *pool, Map *installedmap)
 	{
 	  if (MAPTST(installedmap, sp))
 	    continue;
-	  change -= solvable_lookup_num(s, SOLVABLE_INSTALLSIZE, 0);
+	  change -= solvable_lookup_sizek(s, SOLVABLE_INSTALLSIZE, 0);
 	}
     }
   return change;
@@ -1961,12 +1961,12 @@ pool_lookup_id(Pool *pool, Id entry, Id keyname)
   return solvable_lookup_id(pool->solvables + entry, keyname);
 }
 
-unsigned int
-pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned int notfound)
+unsigned long long
+pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned long long notfound)
 {
   if (entry == SOLVID_POS && pool->pos.repo)
     {
-      unsigned int value;
+      unsigned long long value;
       if (repodata_lookup_num(pool->pos.repo->repodata + pool->pos.repodataid, SOLVID_POS, keyname, &value))
 	return value;
       return notfound;
