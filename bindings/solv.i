@@ -362,6 +362,12 @@ typedef VALUE AppObjectPtr;
 #include "repo_susetags.h"
 #include "repo_content.h"
 #endif
+#ifdef ENABLE_MDKREPO
+#include "repo_mdk.h"
+#endif
+#ifdef ENABLE_ARCHREPO
+#include "repo_arch.h"
+#endif
 #include "solv_xfopen.h"
 
 #define true 1
@@ -1154,6 +1160,25 @@ typedef struct {
   bool add_products(const char *proddir, int flags = 0) {
     repo_add_products($self, proddir, 0, flags);
     return 1;
+  }
+#endif
+#ifdef ENABLE_MDKREPO
+  bool add_mdk(FILE *fp, int flags = 0) {
+    repo_add_mdk($self, fp, flags);
+    return 1;
+  }
+  bool add_mdk_info(FILE *fp, int flags = 0) {
+    repo_add_mdk($self, fp, flags);
+    return 1;
+  }
+#endif
+#ifdef ENABLE_ARCHREPO
+  bool add_arch_repo(FILE *fp, int flags = 0) {
+    repo_add_arch_repo($self, fp, flags);
+    return 1;
+  }
+  Id add_arch_pkg(const char *name, int flags = 0) {
+    return repo_add_arch_pkg($self, name, flags);
   }
 #endif
   void internalize() {
