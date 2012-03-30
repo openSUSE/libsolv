@@ -477,6 +477,65 @@ static char *getsentrynl(struct tarhead *th, char *s, int size)
   return 0;
 }
 
+static Hashtable
+joinhash_init(Repo *repo, Hashmask *hmp)
+{
+  Hashmask hm = mkmask(repo->nsolvables);
+  Hashtable ht = solv_calloc(hm + 1, sizeof(*ht));
+  Hashval h, hh;
+  Solvable *s;
+  int i;
+
+  FOR_REPO_SOLVABLES(repo, i, s)
+    {
+      hh = HASHCHAIN_START;
+      h = s->name & hm;
+      while (ht[h])
+        h = HASHCHAIN_NEXT(h, hh, hm);
+      ht[h] = i;
+    }
+  *hmp = hm;
+  return ht;
+}
+
+static Solvable *
+joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, const char *fn)
+{
+  const char *p;
+  Id name, evr;
+  Hashval h, hh;
+
+  if ((p = strrchr(fn, '/')) != 0)
+    fn = p + 1;
+  /* here we assume that the dirname is name-evr */
+  if (!*fn)
+    return 0;
+  for (p = fn + strlen(fn) - 1; p > fn; p--)
+    {
+      while (p > fn && *p != '-')
+	p--;
+      if (p == fn)
+	return 0;
+      name = pool_strn2id(repo->pool, fn, p - fn, 0);
+      if (!name)
+	continue;
+      evr = pool_str2id(repo->pool, p + 1, 0);
+      if (!evr)
+	continue;
+      /* found valid name/evr combination, check hash */
+      hh = HASHCHAIN_START;
+      h = name & hm;
+      while (ht[h])
+	{
+	  Solvable *s = repo->pool->solvables + ht[h];
+	  if (s->name == name && s->evr == evr)
+	    return s;
+	  h = HASHCHAIN_NEXT(h, hh, hm);
+	}
+    }
+  return 0;
+}
+
 int
 repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 {
@@ -489,6 +548,11 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
   char line[4096];
   Solvable *s = 0;
   int havesha256 = 0;
+  Hashtable joinhash = 0;
+  Hashmask joinhashmask = 0;
+
+  if (flags & REPO_EXTEND_SOLVABLES)
+    joinhash = joinhash_init(repo, &joinhashmask);
 
   inittarhead(&th, fp);
   while (gettarhead(&th) > 0)
@@ -500,10 +564,15 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 	  continue;
 	}
       bn = strrchr(th.path, '/');
-      if (!bn || (strcmp(bn + 1, "desc") != 0 && strcmp(bn + 1, "depends") != 0))
+      if (!bn || (strcmp(bn + 1, "desc") != 0 && strcmp(bn + 1, "depends") != 0 && strcmp(bn + 1, "files") != 0))
 	{
           skipentry(&th);
 	  continue;
+	}
+      if ((flags & REPO_EXTEND_SOLVABLES) != 0 && (!strcmp(bn + 1, "desc") || !strcmp(bn + 1, "depends")))
+	{
+          skipentry(&th);
+	  continue;	/* skip those when we're extending */
 	}
       if (!lastdn || (bn - th.path) != lastdnlen || strncmp(lastdn, th.path, lastdnlen) != 0)
 	{
@@ -526,7 +595,18 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 	  solv_free(lastdn);
 	  lastdn = solv_strdup(th.path);
 	  lastdnlen = bn - th.path;
-	  s = pool_id2solvable(pool, repo_add_solvable(repo));
+	  lastdn[lastdnlen] = 0;
+	  if (flags & REPO_EXTEND_SOLVABLES)
+	    {
+	      s = joinhash_lookup(repo, joinhash, joinhashmask, lastdn);
+	      if (!s)
+		{
+		  skipentry(&th);
+		  continue;
+		}
+	    }
+	  else
+	    s = pool_id2solvable(pool, repo_add_solvable(repo));
 	  havesha256 = 0;
 	}
       while (getsentry(&th, line, sizeof(line)))
@@ -643,6 +723,40 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 		  s->suggests = adddep(repo, s->suggests, line);
 		}
 	    }
+	  else if (!strcmp(line, "%FILES%"))
+	    {
+	      while (getsentrynl(&th, line, sizeof(line)) && *line)
+		{
+		  char *p;
+		  Id id;
+		  l = strlen(line);
+		  if (l > 1 && line[l - 1] == '/')
+		    line[--l] = 0;	/* remove trailing slashes */
+		  if ((p = strrchr(line , '/')) != 0)
+		    {
+		      *p++ = 0;
+		      if (line[0] != '/')	/* anchor */
+			{
+			  char tmp = *p;
+			  memmove(line + 1, line, p - 1 - line);
+			  *line = '/';
+			  *p = 0;
+			  id = repodata_str2dir(data, line, 1);
+			  *p = tmp;
+			}
+		      else
+			id = repodata_str2dir(data, line, 1);
+		    }
+		  else
+		    {
+		      p = line;
+		      id = 0;
+		    }
+		  if (!id)
+		    id = repodata_str2dir(data, "/", 1);
+		  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, id, p);
+		}
+	    }
 	  while (*line)
 	    getsentrynl(&th, line, sizeof(line));
 	}
@@ -663,6 +777,7 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 	  s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 	}
     }
+  solv_free(joinhash);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;
