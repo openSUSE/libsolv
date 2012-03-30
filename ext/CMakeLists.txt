@@ -57,6 +57,13 @@ IF (ENABLE_MDKREPO)
 	repo_mdk.h)
 ENDIF (ENABLE_MDKREPO)
 
+IF (ENABLE_ARCHREPO)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_arch.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_arch.h)
+ENDIF (ENABLE_ARCHREPO)
+
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 SET (CMAKE_SHARED_LINKER_FLAGS "${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/ext/libsolvext.ver")
 

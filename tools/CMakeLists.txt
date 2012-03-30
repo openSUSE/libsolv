@@ -69,6 +69,16 @@ TARGET_LINK_LIBRARIES (mdk2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES}
 SET (tools_list ${tools_list} mdk2solv)
 ENDIF (ENABLE_MDKREPO)
 
+IF (ENABLE_ARCHREPO)
+ADD_EXECUTABLE (archpkgs2solv archpkgs2solv.c)
+TARGET_LINK_LIBRARIES (archpkgs2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+ADD_EXECUTABLE (archrepo2solv archrepo2solv.c)
+TARGET_LINK_LIBRARIES (archrepo2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+SET (tools_list ${tools_list} archpkgs2solv archrepo2solv)
+ENDIF (ENABLE_ARCHREPO)
+
 ADD_EXECUTABLE (installcheck installcheck.c)
 TARGET_LINK_LIBRARIES (installcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
 

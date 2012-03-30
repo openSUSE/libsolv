@@ -6,9 +6,9 @@
  */
 
 /*
- * mdk2solv.c
+ * archrepo2solv.c
  *
- * parse Mandriva/Mageie synthesis file
+ * parse archlinux repo file
  *
  * reads from stdin
  * writes to stdout
@@ -24,7 +24,7 @@
 
 #include "pool.h"
 #include "repo.h"
-#include "repo_mdk.h"
+#include "repo_arch.h"
 #include "solv_xfopen.h"
 #include "common_write.h"
 
@@ -33,9 +33,8 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "mdk2solv [-i <infoxml>]\n"
-          "  reads a 'synthesis' repository from <stdin> and writes a .solv file to <stdout>\n"
-          "  -i : info.xml file for extra attributes\n"
+          "archrepo2solv\n"
+          "  reads a repository from <stdin> and writes a .solv file to <stdout>\n"
           "  -h : print help & exit\n"
          );
    exit(status);
@@ -46,18 +45,14 @@ main(int argc, char **argv)
 {
   Pool *pool;
   Repo *repo;
-  char *infofile;
   int c;
 
-  while ((c = getopt(argc, argv, "hi:")) >= 0)
+  while ((c = getopt(argc, argv, "h")) >= 0)
     {
       switch(c)
 	{
 	case 'h':
 	  usage(0);
-	  break;
-	case 'i':
-	  infofile = optarg;
 	  break;
 	default:
 	  usage(1);
@@ -66,19 +61,7 @@ main(int argc, char **argv)
     }
   pool = pool_create();
   repo = repo_create(pool, "<stdin>");
-  repo_add_mdk(repo, stdin, REPO_NO_INTERNALIZE);
-  if (infofile)
-    {
-      FILE *fp = solv_xfopen(infofile, "r");
-      if (!fp)
-	{
-	  perror(infofile);
-	  exit(1);
-	}
-      repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
-      fclose(fp);
-    }
-  repo_internalize(repo);
+  repo_add_arch_repo(repo, stdin, 0);
   tool_write(repo, 0, 0);
   pool_free(pool);
   exit(0);
