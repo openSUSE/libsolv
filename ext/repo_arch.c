@@ -778,6 +778,7 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 	}
     }
   solv_free(joinhash);
+  solv_free(lastdn);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;
