@@ -36,6 +36,7 @@ usage(int status)
           "mdk2solv [-i <infoxml>]\n"
           "  reads a 'synthesis' repository from <stdin> and writes a .solv file to <stdout>\n"
           "  -i : info.xml file for extra attributes\n"
+          "  -f : files.xml file for extra attributes\n"
           "  -h : print help & exit\n"
          );
    exit(status);
@@ -46,10 +47,10 @@ main(int argc, char **argv)
 {
   Pool *pool;
   Repo *repo;
-  char *infofile;
+  char *infofile = 0, *filesfile = 0;
   int c;
 
-  while ((c = getopt(argc, argv, "hi:")) >= 0)
+  while ((c = getopt(argc, argv, "hi:f:")) >= 0)
     {
       switch(c)
 	{
@@ -58,6 +59,9 @@ main(int argc, char **argv)
 	  break;
 	case 'i':
 	  infofile = optarg;
+	  break;
+	case 'f':
+	  filesfile = optarg;
 	  break;
 	default:
 	  usage(1);
@@ -73,6 +77,17 @@ main(int argc, char **argv)
       if (!fp)
 	{
 	  perror(infofile);
+	  exit(1);
+	}
+      repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+      fclose(fp);
+    }
+  if (filesfile)
+    {
+      FILE *fp = solv_xfopen(filesfile, "r");
+      if (!fp)
+	{
+	  perror(filesfile);
 	  exit(1);
 	}
       repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);

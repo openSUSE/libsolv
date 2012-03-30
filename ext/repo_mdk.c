@@ -253,6 +253,7 @@ enum state {
   STATE_START,
   STATE_MEDIA_INFO,
   STATE_INFO,
+  STATE_FILES,
   NUMSTATES
 };
 
@@ -267,6 +268,7 @@ struct stateswitch {
 static struct stateswitch stateswitches[] = {
   { STATE_START, "media_info", STATE_MEDIA_INFO, 0 },
   { STATE_MEDIA_INFO, "info", STATE_INFO, 1 },
+  { STATE_MEDIA_INFO, "files", STATE_FILES, 1 },
   { NUMSTATES }
 };
 
@@ -480,6 +482,13 @@ startElement(void *userData, const char *name, const char **atts)
 	  set_sourcerpm(pd->data, pd->solvable, pd->solvable - pool->solvables, str);
         break;
       }
+    case STATE_FILES:
+      {
+	const char *fn = find_attr("fn", atts);
+	const char *distepoch = find_attr("distepoch", atts);
+	pd->solvable = joinhash_lookup(pd->repo, pd->joinhash, pd->joinhashmask, fn, distepoch);
+        break;
+      }
     default:
       break;
     }
@@ -502,6 +511,35 @@ endElement(void *userData, const char *name)
     case STATE_INFO:
       if (s && *pd->content)
         repodata_set_str(pd->data, s - pd->pool->solvables, SOLVABLE_DESCRIPTION, pd->content);
+      break;
+    case STATE_FILES:
+      if (s && *pd->content)
+	{
+	  char *np, *p, *sl;
+	  for (p = pd->content; p && *p; p = np)
+	    {
+	      Id id;
+	      np = strchr(p, '\n');
+	      if (np)
+		*np++ = 0;
+	      if (!*p)
+		continue;
+	      sl = strrchr(p, '/');
+	      if (sl)
+		{
+		  *sl++ = 0;
+		  id = repodata_str2dir(pd->data, p, 1);
+		}
+	      else
+		{
+		  sl = p;
+		  id = 0;
+		}
+	      if (!id)
+		id = repodata_str2dir(pd->data, "/", 1);
+	      repodata_add_dirstr(pd->data, s - pd->pool->solvables, SOLVABLE_FILELIST, id, sl);
+	    }
+	}
       break;
     default:
       break;
