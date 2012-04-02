@@ -242,6 +242,8 @@ KNOWNID(SUSETAGS_SHARE_NAME,		"susetags:share:name"),
 KNOWNID(SUSETAGS_SHARE_EVR,		"susetags:share:evr"),
 KNOWNID(SUSETAGS_SHARE_ARCH,		"susetags:share:arch"),
 
+KNOWNID(ARCH_ANY,			"any"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

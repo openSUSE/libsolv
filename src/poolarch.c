@@ -149,7 +149,7 @@ pool_arch2color_slow(Pool *pool, Id arch)
   if (!pool->id2color)
     pool->id2color = solv_calloc(pool->lastarch + 1, 1);
   s = pool_id2str(pool, arch);
-  if (arch == ARCH_NOARCH || arch == ARCH_ALL)
+  if (arch == ARCH_NOARCH || arch == ARCH_ALL || arch == ARCH_ANY)
     color = ARCHCOLOR_ALL;
   else if (!strcmp(s, "s390x") || strstr(s, "64"))
     color = ARCHCOLOR_64;

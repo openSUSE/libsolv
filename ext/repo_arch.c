@@ -430,7 +430,7 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
   if (s)
     {
       if (!s->arch)
-	s->arch = ARCH_NOARCH;
+	s->arch = ARCH_ANY;
       if (!s->evr)
 	s->evr = ID_EMPTY;
       s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
@@ -586,7 +586,7 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 	      if (s)
 		{
 		  if (!s->arch)
-		    s->arch = ARCH_NOARCH;
+		    s->arch = ARCH_ANY;
 		  if (!s->evr)
 		    s->evr = ID_EMPTY;
 		  s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
@@ -771,7 +771,7 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
       if (s)
 	{
 	  if (!s->arch)
-	    s->arch = ARCH_NOARCH;
+	    s->arch = ARCH_ANY;
 	  if (!s->evr)
 	    s->evr = ID_EMPTY;
 	  s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
