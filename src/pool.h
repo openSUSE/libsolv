@@ -129,6 +129,8 @@ struct _Pool {
   int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
   int forbidselfconflicts;	/* true: packages which conflict with itself are not installable */
 
+  Id noarchid;			/* ARCH_NOARCH, ARCH_ALL, ARCH_ANY, ... */
+
   /* hash for rel unification */
   Hashtable relhashtbl;		/* hashtable: (name,evr,op)Hash -> Id */
   Hashmask relhashmask;
@@ -144,6 +146,7 @@ struct _Pool {
 
 #define DISTTYPE_RPM	0
 #define DISTTYPE_DEB	1
+#define DISTTYPE_ARCH   2
 
 #define SOLV_FATAL			(1<<0)
 #define SOLV_ERROR			(1<<1)

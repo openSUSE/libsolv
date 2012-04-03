@@ -135,18 +135,10 @@ pool_id2str(const Pool *pool, Id id)
 
 static const char *rels[] = {
   " ! ",
-#ifndef DEBIAN_SEMANTICS
   " > ",
-#else
-  " >> ",
-#endif
   " = ",
   " >= ",
-#ifndef DEBIAN_SEMANTICS
   " < ",
-#else
-  " << ",
-#endif
   " <> ",
   " <= ",
   " <=> "
@@ -163,9 +155,18 @@ pool_id2rel(const Pool *pool, Id id)
   rd = GETRELDEP(pool, id);
   switch (rd->flags)
     {
-    case 0: case 1: case 2: case 3:
-    case 4: case 5: case 6: case 7:
-      return rels[rd->flags & 7];
+    case 0: case 2: case 3:
+    case 5: case 6: case 7:
+      return rels[rd->flags];
+#if !defined(DEBIAN) && !defined(MULTI_SEMANTICS)
+    case 1: case 4:
+      return rels[rd->flags];
+#else
+    case 1:
+      return pool->disttype == DISTTYPE_DEB ? " >> " : rels[rd->flags];
+    case 4:
+      return pool->disttype == DISTTYPE_DEB ? " << " : rels[rd->flags];
+#endif
     case REL_AND:
       return " & ";
     case REL_OR:

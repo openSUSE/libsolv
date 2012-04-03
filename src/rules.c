@@ -1464,15 +1464,16 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	      Reldep *rd = GETRELDEP(pool, what);
 	      if (rd->flags == REL_EQ && select == SOLVER_SOLVABLE_NAME)
 		{
-#if !defined(DEBIAN_SEMANTICS)
-		  const char *evr = pool_id2str(pool, rd->evr);
-		  if (strchr(evr, '-'))
-		    set |= SOLVER_SETEVR;
+		  if (pool->disttype != DISTTYPE_DEB)
+		    {
+		      const char *evr = pool_id2str(pool, rd->evr);
+		      if (strchr(evr, '-'))
+			set |= SOLVER_SETEVR;
+		      else
+			set |= SOLVER_SETEV;
+		    }
 		  else
-		    set |= SOLVER_SETEV;
-#else
-		  set |= SOLVER_SETEVR;
-#endif
+		    set |= SOLVER_SETEVR;
 		}
 	      if (rd->flags <= 7 && ISRELDEP(rd->name))
 		rd = GETRELDEP(pool, rd->name);

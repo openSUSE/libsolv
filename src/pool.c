@@ -54,20 +54,25 @@ pool_create(void)
   pool->nsolvables = 2;
   memset(pool->solvables, 0, 2 * sizeof(Solvable));
 
+  queue_init(&pool->vendormap);
+
+#ifdef DEBIAN 
+  pool->disttype = DISTTYPE_DEB;
+  pool->noarchid = ARCH_ALL;
+#else
+  pool->disttype = DISTTYPE_RPM;
+  pool->noarchid = ARCH_NOARCH;
+#endif
+
   /* initialize the system solvable */
   s = pool->solvables + SYSTEMSOLVABLE;
   s->name = SYSTEM_SYSTEM;
-  s->arch = ARCH_NOARCH;
+  s->arch = pool->noarchid;
   s->evr = ID_EMPTY;
-
-  queue_init(&pool->vendormap);
 
   pool->debugmask = SOLV_DEBUG_RESULT;	/* FIXME */
 #ifdef FEDORA
   pool->obsoleteusescolors = 1;
-#endif
-#ifdef DEBIAN 
-  pool->disttype = DISTTYPE_DEB;
 #endif
 #ifdef RPM5
   pool->forbidselfconflicts = 1;
@@ -125,6 +130,13 @@ void
 pool_setdisttype(Pool *pool, int disttype)
 {
   pool->disttype = disttype;
+  if (disttype == DISTTYPE_RPM)
+    pool->noarchid == ARCH_NOARCH;
+  if (disttype == DISTTYPE_DEB)
+    pool->noarchid == ARCH_ALL;
+  if (disttype == DISTTYPE_ARCH)
+    pool->noarchid == ARCH_ANY;
+  pool->solvables[SYSTEMSOLVABLE].arch = pool->noarchid;
 }
 #endif
 
@@ -511,7 +523,7 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 
 #if defined(MULTI_SEMANTICS)
 # define EVRCMP_DEPCMP (pool->disttype == DISTTYPE_DEB ? EVRCMP_COMPARE : EVRCMP_MATCH_RELEASE)
-#elif defined(DEBIAN_SEMANTICS)
+#elif defined(DEBIAN)
 # define EVRCMP_DEPCMP EVRCMP_COMPARE
 #else
 # define EVRCMP_DEPCMP EVRCMP_MATCH_RELEASE

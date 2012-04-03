@@ -18,15 +18,11 @@
 
 
 
-#if defined(DEBIAN_SEMANTICS) || defined(MULTI_SEMANTICS)
-
-#ifdef MULTI_SEMANTICS
-# define solv_vercmp solv_vercmp_deb
-#endif
+#if defined(DEBIAN) || defined(MULTI_SEMANTICS)
 
 /* debian type version compare */
 int
-solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
+solv_vercmp_deb(const char *s1, const char *q1, const char *s2, const char *q2)
 {
   int r, c1, c2;
   while (1)
@@ -64,19 +60,15 @@ solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
     }
 }
 
-#ifdef MULTI_SEMANTICS
-# undef solv_vercmp
 #endif
 
-#endif
-
-#if !defined(DEBIAN_SEMANTICS) || defined(MULTI_SEMANTICS)
+#if !defined(DEBIAN) || defined(MULTI_SEMANTICS)
 
 /* rpm type version compare */
 /* note: the code assumes that *q1 and *q2 are not alphanumeric! */
 
 int
-solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
+solv_vercmp_rpm(const char *s1, const char *q1, const char *s2, const char *q2)
 {
   int r = 0;
   const char *e1, *e2;
@@ -134,8 +126,26 @@ solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 
 #endif
 
+
+/* 
+ * the solv_vercmp variant your system uses.
+ */
+int
+solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
+{
+#ifdef DEBIAN
+  return solv_vercmp_deb(s1, q1, s2, q2);
+#else
+  return solv_vercmp_rpm(s1, q1, s2, q2);
+#endif
+}
+
 #if defined(MULTI_SEMANTICS)
-# define solv_vercmp (*(pool->disttype == DISTTYPE_DEB ? &solv_vercmp_deb : &solv_ver##cmp))
+# define solv_vercmp (*(pool->disttype == DISTTYPE_DEB ? &solv_vercmp_deb : &solv_ver##cmp_rpm))
+#elif defined(DEBIAN)
+# define solv_vercmp solv_vercmp_deb
+#else
+# define solv_vercmp solv_vercmp_rpm
 #endif
 
 /* edition (e:v-r) compare */

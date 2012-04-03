@@ -99,11 +99,7 @@ pool_setarchpolicy(Pool *pool, const char *arch)
       pool->lastarch = 0;
       return;
     }
-#ifndef DEBIAN_SEMANTICS
-  id = ARCH_NOARCH;
-#else
-  id = ARCH_ALL;
-#endif
+  id = pool->noarchid;
   lastarch = id + 255;
   id2arch = solv_calloc(lastarch + 1, sizeof(Id));
   id2arch[id] = 1;	/* the "noarch" class */
