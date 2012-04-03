@@ -105,6 +105,13 @@
 #define TAG_ENHANCESVERSION	1160
 #define TAG_ENHANCESFLAGS	1161
 
+/* rpm5 tags */
+#define TAG_DISTEPOCH		1218
+
+/* rpm4 tags */
+#define TAG_LONGFILESIZES	5008
+#define TAG_LONGSIZE		5009
+
 #define SIGTAG_SIZE		1000
 #define SIGTAG_PGP		1002	/* RSA signature */
 #define SIGTAG_MD5		1004	/* header+payload md5 checksum */
@@ -121,7 +128,6 @@
 
 #ifdef RPM5
 # define RPM_INDEX_SIZE 4
-# define TAG_DISTEPOCH		1218
 #else
 # define RPM_INDEX_SIZE 8
 #endif
@@ -197,6 +203,23 @@ headint32(RpmHead *h, int tag)
     return 0;
   d = h->dp + o;
   return d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+}
+
+/* returns the first entry of an 64bit integer array */
+static unsigned long long
+headint64(RpmHead *h, int tag)
+{
+  unsigned int i, o;
+  unsigned char *d = headfindtag(h, tag);
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 5)
+    return 0;
+  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  if (i == 0 || o + 8 * i > h->dcnt)
+    return 0;
+  d = h->dp + o;
+  i = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+  return (unsigned long long)i << 32 | (d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
 }
 
 static unsigned int *
@@ -285,9 +308,7 @@ static char *headtoevr(RpmHead *h)
   char *version, *v;
   char *release;
   char *evr;
-#ifdef TAG_DISTEPOCH
   char *distepoch;
-#endif
 
   version  = headstring(h, TAG_VERSION);
   release  = headstring(h, TAG_RELEASE);
@@ -311,7 +332,6 @@ static char *headtoevr(RpmHead *h)
       evr = solv_malloc(strlen(version) + 1 + strlen(release) + 1);
       sprintf(evr, "%s-%s", version, release);
     }
-#ifdef TAG_DISTEPOCH
   distepoch = headstring(h, TAG_DISTEPOCH);
   if (distepoch && *distepoch)
     {
@@ -320,7 +340,6 @@ static char *headtoevr(RpmHead *h)
       evr[l++] = ':';
       strcpy(evr + l, distepoch);
     }
-#endif
   return evr;
 }
 
@@ -566,6 +585,7 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
 
   if (!fc)
     return;
+  /* XXX: use TAG_LONGFILESIZES if available */
   fsz = headint32array(rpmhead, TAG_FILESIZES, &fszc);
   if (!fsz || fc != fszc)
     {
@@ -898,6 +918,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
       Id handle;
       char *str;
       unsigned int u32;
+      unsigned long long u64;
 
       handle = s - pool->solvables;
       str = headstring(rpmhead, TAG_SUMMARY);
@@ -967,9 +988,15 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
       u32 = headint32(rpmhead, TAG_INSTALLTIME);
       if (u32)
         repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, u32);
-      u32 = headint32(rpmhead, TAG_SIZE);
-      if (u32)
-        repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, u32);
+      u64 = headint64(rpmhead, TAG_LONGSIZE);
+      if (u64)
+        repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, u64);
+      else
+	{
+	  u32 = headint32(rpmhead, TAG_SIZE);
+	  if (u32)
+	    repodata_set_num(data, handle, SOLVABLE_INSTALLSIZE, u32);
+	}
       if (sourcerpm)
 	addsourcerpm(pool, data, handle, sourcerpm, name, evr);
       if ((flags & RPM_ADD_TRIGGERS) != 0)
