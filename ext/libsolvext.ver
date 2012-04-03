@@ -1,6 +1,7 @@
 SOLV_1.0 {
 	global:
 		pool_findfileconflicts;
+		repo_add_arch_local;
 		repo_add_arch_pkg;
 		repo_add_arch_repo;
 		repo_add_code11_products;

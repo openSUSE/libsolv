@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -89,6 +90,18 @@ static char *getsentry(struct tarhead *th, char *s, int size)
 	    }
 	}
       th->off = i;
+      if (!th->path)
+	{
+	  /* fake entry */
+	  th->end = fread(th->blk, 1, 512, th->fp);
+	  if (th->end <= 0)
+	    {
+	      th->eof = 1;
+	      return 0;
+	    }
+	  th->off = 0;
+	  continue;
+	}
       if (th->length <= 0)
 	return 0;
       if (readblock(th->fp, th->blk))
@@ -536,20 +549,199 @@ joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, const char *fn)
   return 0;
 }
 
+static void
+adddata(Repodata *data, Solvable *s, struct tarhead *th)
+{
+  Repo *repo = data->repo;
+  Pool *pool = repo->pool;
+  char line[4096];
+  int l;
+  int havesha256 = 0;
+
+  while (getsentry(th, line, sizeof(line)))
+    {
+      l = strlen(line);
+      if (l == 0 || line[l - 1] != '\n')
+	continue;
+      line[--l] = 0;
+      if (l <= 2 || line[0] != '%' || line[l - 1] != '%')
+	continue;
+      if (!strcmp(line, "%FILENAME%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    repodata_set_location(data, s - pool->solvables, 0, 0, line);
+	}
+      else if (!strcmp(line, "%NAME%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    s->name = pool_str2id(pool, line, 1);
+	}
+      else if (!strcmp(line, "%VERSION%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    s->evr = pool_str2id(pool, line, 1);
+	}
+      else if (!strcmp(line, "%DESC%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    {
+	      repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, line);
+	      repodata_set_str(data, s - pool->solvables, SOLVABLE_DESCRIPTION, line);
+	    }
+	}
+      else if (!strcmp(line, "%GROUPS%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_GROUP, line);
+	}
+      else if (!strcmp(line, "%CSIZE%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, strtoull(line, 0, 10));
+	}
+      else if (!strcmp(line, "%ISIZE%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(line, 0, 10));
+	}
+      else if (!strcmp(line, "%MD5SUM%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)) && !havesha256)
+	    repodata_set_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, REPOKEY_TYPE_MD5, line);
+	}
+      else if (!strcmp(line, "%SHA256SUM%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    {
+	      repodata_set_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, REPOKEY_TYPE_SHA256, line);
+	      havesha256 = 1;
+	    }
+	}
+      else if (!strcmp(line, "%URL%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    repodata_set_str(data, s - pool->solvables, SOLVABLE_URL, line);
+	}
+      else if (!strcmp(line, "%LICENSE%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    repodata_set_str(data, s - pool->solvables, SOLVABLE_LICENSE, line);
+	}
+      else if (!strcmp(line, "%ARCH%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    s->arch = pool_str2id(pool, line, 1);
+	}
+      else if (!strcmp(line, "%BUILDDATE%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_BUILDTIME, strtoull(line, 0, 10));
+	}
+      else if (!strcmp(line, "%PACKAGER%"))
+	{
+	  if (getsentrynl(th, line, sizeof(line)))
+	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_PACKAGER, line);
+	}
+      else if (!strcmp(line, "%REPLACES%"))
+	{
+	  while (getsentrynl(th, line, sizeof(line)) && *line)
+	    s->obsoletes = adddep(repo, s->obsoletes, line);
+	}
+      else if (!strcmp(line, "%DEPENDS%"))
+	{
+	  while (getsentrynl(th, line, sizeof(line)) && *line)
+	    s->requires = adddep(repo, s->requires, line);
+	}
+      else if (!strcmp(line, "%CONFLICTS%"))
+	{
+	  while (getsentrynl(th, line, sizeof(line)) && *line)
+	    s->conflicts = adddep(repo, s->conflicts, line);
+	}
+      else if (!strcmp(line, "%PROVIDES%"))
+	{
+	  while (getsentrynl(th, line, sizeof(line)) && *line)
+	    s->provides = adddep(repo, s->provides, line);
+	}
+      else if (!strcmp(line, "%OPTDEPENDS%"))
+	{
+	  while (getsentrynl(th, line, sizeof(line)) && *line)
+	    {
+	      char *p = strchr(line, ':');
+	      if (p && p > line)
+		*p = 0;
+	      s->suggests = adddep(repo, s->suggests, line);
+	    }
+	}
+      else if (!strcmp(line, "%FILES%"))
+	{
+	  while (getsentrynl(th, line, sizeof(line)) && *line)
+	    {
+	      char *p;
+	      Id id;
+	      l = strlen(line);
+	      if (l > 1 && line[l - 1] == '/')
+		line[--l] = 0;	/* remove trailing slashes */
+	      if ((p = strrchr(line , '/')) != 0)
+		{
+		  *p++ = 0;
+		  if (line[0] != '/')	/* anchor */
+		    {
+		      char tmp = *p;
+		      memmove(line + 1, line, p - 1 - line);
+		      *line = '/';
+		      *p = 0;
+		      id = repodata_str2dir(data, line, 1);
+		      *p = tmp;
+		    }
+		  else
+		    id = repodata_str2dir(data, line, 1);
+		}
+	      else
+		{
+		  p = line;
+		  id = 0;
+		}
+	      if (!id)
+		id = repodata_str2dir(data, "/", 1);
+	      repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, id, p);
+	    }
+	}
+      while (*line)
+	getsentrynl(th, line, sizeof(line));
+    }
+}
+
+static void
+finishsolvable(Repo *repo, Solvable *s)
+{
+  Pool *pool = repo->pool;
+  if (!s)
+    return;
+  if (!s->name)
+    {
+      repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+      return;
+    }
+  if (!s->arch)
+    s->arch = ARCH_ANY;
+  if (!s->evr)
+    s->evr = ID_EMPTY;
+  s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+}
+
 int
 repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   Repodata *data;
-  data = repo_add_repodata(repo, flags);
   struct tarhead th;
   char *lastdn = 0;
-  int l, lastdnlen = 0;
-  char line[4096];
+  int lastdnlen = 0;
   Solvable *s = 0;
-  int havesha256 = 0;
   Hashtable joinhash = 0;
   Hashmask joinhashmask = 0;
+
+  data = repo_add_repodata(repo, flags);
 
   if (flags & REPO_EXTEND_SOLVABLES)
     joinhash = joinhash_init(repo, &joinhashmask);
@@ -576,22 +768,7 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 	}
       if (!lastdn || (bn - th.path) != lastdnlen || strncmp(lastdn, th.path, lastdnlen) != 0)
 	{
-	  if (s)
-	    {
-	      if (s && !s->name)
-		{
-		  repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
-		  s = 0;
-		}
-	      if (s)
-		{
-		  if (!s->arch)
-		    s->arch = ARCH_ANY;
-		  if (!s->evr)
-		    s->evr = ID_EMPTY;
-		  s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-		}
-	    }
+	  finishsolvable(repo, s);
 	  solv_free(lastdn);
 	  lastdn = solv_strdup(th.path);
 	  lastdnlen = bn - th.path;
@@ -607,178 +784,61 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
 	    }
 	  else
 	    s = pool_id2solvable(pool, repo_add_solvable(repo));
-	  havesha256 = 0;
 	}
-      while (getsentry(&th, line, sizeof(line)))
-	{
-	  l = strlen(line);
-	  if (l == 0 || line[l - 1] != '\n')
-	    continue;
-	  line[--l] = 0;
-	  if (l <= 2 || line[0] != '%' || line[l - 1] != '%')
-	    continue;
-	  if (!strcmp(line, "%FILENAME%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		repodata_set_location(data, s - pool->solvables, 0, 0, line);
-	    }
-	  else if (!strcmp(line, "%NAME%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		s->name = pool_str2id(pool, line, 1);
-	    }
-	  else if (!strcmp(line, "%VERSION%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		s->evr = pool_str2id(pool, line, 1);
-	    }
-	  else if (!strcmp(line, "%DESC%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		{
-		  repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, line);
-		  repodata_set_str(data, s - pool->solvables, SOLVABLE_DESCRIPTION, line);
-		}
-	    }
-	  else if (!strcmp(line, "%GROUPS%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_GROUP, line);
-	    }
-	  else if (!strcmp(line, "%CSIZE%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-	        repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, strtoull(line, 0, 10));
-	    }
-	  else if (!strcmp(line, "%ISIZE%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-	        repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(line, 0, 10));
-	    }
-	  else if (!strcmp(line, "%MD5SUM%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)) && !havesha256)
-		repodata_set_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, REPOKEY_TYPE_MD5, line);
-	    }
-	  else if (!strcmp(line, "%SHA256SUM%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		{
-		  repodata_set_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, REPOKEY_TYPE_SHA256, line);
-		  havesha256 = 1;
-		}
-	    }
-	  else if (!strcmp(line, "%URL%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		repodata_set_str(data, s - pool->solvables, SOLVABLE_URL, line);
-	    }
-	  else if (!strcmp(line, "%LICENSE%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		repodata_set_str(data, s - pool->solvables, SOLVABLE_LICENSE, line);
-	    }
-	  else if (!strcmp(line, "%ARCH%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		s->arch = pool_str2id(pool, line, 1);
-	    }
-	  else if (!strcmp(line, "%BUILDDATE%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		repodata_set_num(data, s - pool->solvables, SOLVABLE_BUILDTIME, strtoull(line, 0, 10));
-	    }
-	  else if (!strcmp(line, "%PACKAGER%"))
-	    {
-	      if (getsentrynl(&th, line, sizeof(line)))
-		repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_PACKAGER, line);
-	    }
-	  else if (!strcmp(line, "%REPLACES%"))
-	    {
-	      while (getsentrynl(&th, line, sizeof(line)) && *line)
-		s->obsoletes = adddep(repo, s->obsoletes, line);
-	    }
-	  else if (!strcmp(line, "%DEPENDS%"))
-	    {
-	      while (getsentrynl(&th, line, sizeof(line)) && *line)
-		s->requires = adddep(repo, s->requires, line);
-	    }
-	  else if (!strcmp(line, "%CONFLICTS%"))
-	    {
-	      while (getsentrynl(&th, line, sizeof(line)) && *line)
-		s->conflicts = adddep(repo, s->conflicts, line);
-	    }
-	  else if (!strcmp(line, "%PROVIDES%"))
-	    {
-	      while (getsentrynl(&th, line, sizeof(line)) && *line)
-		s->provides = adddep(repo, s->provides, line);
-	    }
-	  else if (!strcmp(line, "%OPTDEPENDS%"))
-	    {
-	      while (getsentrynl(&th, line, sizeof(line)) && *line)
-		{
-		  char *p = strchr(line, ':');
-		  if (p && p > line)
-		    *p = 0;
-		  s->suggests = adddep(repo, s->suggests, line);
-		}
-	    }
-	  else if (!strcmp(line, "%FILES%"))
-	    {
-	      while (getsentrynl(&th, line, sizeof(line)) && *line)
-		{
-		  char *p;
-		  Id id;
-		  l = strlen(line);
-		  if (l > 1 && line[l - 1] == '/')
-		    line[--l] = 0;	/* remove trailing slashes */
-		  if ((p = strrchr(line , '/')) != 0)
-		    {
-		      *p++ = 0;
-		      if (line[0] != '/')	/* anchor */
-			{
-			  char tmp = *p;
-			  memmove(line + 1, line, p - 1 - line);
-			  *line = '/';
-			  *p = 0;
-			  id = repodata_str2dir(data, line, 1);
-			  *p = tmp;
-			}
-		      else
-			id = repodata_str2dir(data, line, 1);
-		    }
-		  else
-		    {
-		      p = line;
-		      id = 0;
-		    }
-		  if (!id)
-		    id = repodata_str2dir(data, "/", 1);
-		  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, id, p);
-		}
-	    }
-	  while (*line)
-	    getsentrynl(&th, line, sizeof(line));
-	}
+      adddata(data, s, &th);
     }
-  if (s)
-    {
-      if (s && !s->name)
-	{
-	  repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
-	  s = 0;
-	}
-      if (s)
-	{
-	  if (!s->arch)
-	    s->arch = ARCH_ANY;
-	  if (!s->evr)
-	    s->evr = ID_EMPTY;
-	  s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-	}
-    }
+  finishsolvable(repo, s);
   solv_free(joinhash);
   solv_free(lastdn);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+  return 0;
+}
+
+int
+repo_add_arch_local(Repo *repo, const char *dir, int flags)
+{
+  Pool *pool = repo->pool;
+  Repodata *data;
+  DIR *dp;
+  struct dirent *de;
+  char *entrydir, *file;
+  FILE *fp;
+  Solvable *s;
+
+  data = repo_add_repodata(repo, flags);
+
+  dp = opendir(dir);
+  if (dp)
+    {
+      while ((de = readdir(dp)) != 0)
+	{
+	  if (!de->d_name[0] || de->d_name[0] == '.')
+	    continue;
+	  entrydir = solv_dupjoin(dir, "/", de->d_name);
+	  file = pool_tmpjoin(repo->pool, entrydir, "/desc", 0);
+	  s = 0;
+	  if ((fp = fopen(file, "r")) != 0)
+	    {
+	      struct tarhead th;
+	      inittarhead(&th, fp);
+	      s = pool_id2solvable(pool, repo_add_solvable(repo));
+	      adddata(data, s, &th);
+	      freetarhead(&th);
+	      fclose(fp);
+	      file = pool_tmpjoin(repo->pool, entrydir, "/files", 0);
+	      if ((fp = fopen(file, "r")) != 0)
+		{
+		  inittarhead(&th, fp);
+		  adddata(data, s, &th);
+		  freetarhead(&th);
+		  fclose(fp);
+		}
+	    }
+	  solv_free(entrydir);
+	}
+      closedir(dp);
+    }
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;
