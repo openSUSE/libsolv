@@ -3233,21 +3233,28 @@ rerunsolver:
 		      const char *seqnum;
 		      const char *seq;
 		      const char *dloc;
+		      const char *archstr;
 		      FILE *fp;
 		      char cmd[128];
 		      int newfd;
+
+		      archstr = pool_id2str(pool, s->arch);
+		      if (strlen(archstr) > 10 || strchr(archstr, '\'') != 0)
+			continue;
 
 		      seqname = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NAME);
 		      seqevr = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_EVR);
 		      seqnum = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NUM);
 		      seq = pool_tmpjoin(pool, seqname, "-", seqevr);
 		      seq = pool_tmpappend(pool, seq, "-", seqnum);
+		      if (strchr(seq, '\'') != 0)
+			continue;
 #ifdef FEDORA
-		      sprintf(cmd, "/usr/bin/applydeltarpm -a %s -c -s ", pool_id2str(pool, s->arch));
+		      sprintf(cmd, "/usr/bin/applydeltarpm -a '%s' -c -s '", archstr);
 #else
-		      sprintf(cmd, "/usr/bin/applydeltarpm -c -s ");
+		      sprintf(cmd, "/usr/bin/applydeltarpm -c -s '");
 #endif
-		      if (system(pool_tmpjoin(pool, cmd, seq, 0)) != 0)
+		      if (system(pool_tmpjoin(pool, cmd, seq, "'")) != 0)
 			continue;	/* didn't match */
 		      /* looks good, download delta */
 		      chksumtype = 0;
@@ -3263,7 +3270,7 @@ rerunsolver:
 		      /* got it, now reconstruct */
 		      newfd = opentmpfile();
 #ifdef FEDORA
-		      sprintf(cmd, "applydeltarpm -a %s /dev/fd/%d /dev/fd/%d", pool_id2str(pool, s->arch), fileno(fp), newfd);
+		      sprintf(cmd, "applydeltarpm -a '%s' /dev/fd/%d /dev/fd/%d", archstr, fileno(fp), newfd);
 #else
 		      sprintf(cmd, "applydeltarpm /dev/fd/%d /dev/fd/%d", fileno(fp), newfd);
 #endif

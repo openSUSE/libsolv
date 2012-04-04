@@ -131,11 +131,11 @@ pool_setdisttype(Pool *pool, int disttype)
 {
   pool->disttype = disttype;
   if (disttype == DISTTYPE_RPM)
-    pool->noarchid == ARCH_NOARCH;
+    pool->noarchid = ARCH_NOARCH;
   if (disttype == DISTTYPE_DEB)
-    pool->noarchid == ARCH_ALL;
+    pool->noarchid = ARCH_ALL;
   if (disttype == DISTTYPE_ARCH)
-    pool->noarchid == ARCH_ANY;
+    pool->noarchid = ARCH_ANY;
   pool->solvables[SYSTEMSOLVABLE].arch = pool->noarchid;
 }
 #endif
