@@ -589,7 +589,7 @@ solver_printproblemruleinfo(Solver *solv, Id probr)
       POOL_DEBUG(SOLV_DEBUG_RESULT, "installed package %s obsoletes %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
-      POOL_DEBUG(SOLV_DEBUG_RESULT, "package %s implicitely obsoletes %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
+      POOL_DEBUG(SOLV_DEBUG_RESULT, "package %s implicitly obsoletes %s provided by %s\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep), pool_solvid2str(pool, target));
       return;
     case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
       POOL_DEBUG(SOLV_DEBUG_RESULT, "package %s requires %s, but none of the providers can be installed\n", pool_solvid2str(pool, source), pool_dep2str(pool, dep));
@@ -966,7 +966,7 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
     case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " implicitely obsoletes ", pool_dep2str(pool, dep));
+      s = pool_tmpappend(pool, s, " implicitly obsoletes ", pool_dep2str(pool, dep));
       return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
     case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " requires ");
