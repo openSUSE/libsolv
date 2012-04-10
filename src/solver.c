@@ -1473,6 +1473,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->addalreadyrecommended;
   case SOLVER_FLAG_NO_INFARCHCHECK:
     return solv->noinfarchcheck;
+  case SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES:
+    return solv->keepexplicitobsoletes;
   default:
     break;
   }
@@ -1514,6 +1516,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_NO_INFARCHCHECK:
     solv->noinfarchcheck = value;
+    break;
+  case SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES:
+    solv->keepexplicitobsoletes = value;
     break;
   default:
     break;

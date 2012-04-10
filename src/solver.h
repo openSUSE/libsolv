@@ -194,6 +194,7 @@ struct _Solver {
   int dontshowinstalledrecommended;	/* true: do not show recommended packages that are already installed */
   
   int noinfarchcheck;			/* true: do not forbid inferior architectures */
+  int keepexplicitobsoletes;		/* true: honor obsoletes during multiinstall */
 
     
   Map dupmap;				/* dup these packages*/
@@ -283,6 +284,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_ADD_ALREADY_RECOMMENDED	8
 #define SOLVER_FLAG_NO_INFARCHCHECK		9
 #define SOLVER_FLAG_ALLOW_NAMECHANGE		10
+#define SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES	11
 
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
