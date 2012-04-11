@@ -480,7 +480,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   Id *schemadata, *schemadatap, *schemadataend;
   Id *schemata, key, *keyp;
   int nentries;
-  int have_xdata;
+  int have_incoredata;
   int maxsize, allsize;
   unsigned char *buf, *bufend, *dp, *dps;
   Id stack[3 * 5];
@@ -495,6 +495,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   Repodata *parent = 0;
   Repodata data;
 
+  int extendstart = 0, extendend = 0;	/* set in case we're extending */
+
   now = solv_timems(0);
 
   if ((flags & REPO_USE_LOADING) != 0)
@@ -503,6 +505,14 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       flags |= REPO_EXTEND_SOLVABLES;
       /* use REPO_REUSE_REPODATA hack so that the old repodata is kept */
       parent = repo_add_repodata(repo, flags | REPO_REUSE_REPODATA);
+      extendstart = parent->start;
+      extendend = parent->end;
+    }
+  else if (flags & REPO_EXTEND_SOLVABLES)
+    {
+      /* extend all solvables of this repo */
+      extendstart = repo->start;
+      extendend = repo->end;
     }
     
   memset(&data, 0, sizeof(data));
@@ -544,18 +554,18 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       pool_debug(pool, SOLV_ERROR, "relations are forbidden in a local pool\n");
       return SOLV_ERROR_CORRUPT;
     }
-  if (parent && numsolv)
+  if ((flags & REPO_EXTEND_SOLVABLES) && numsolv)
     {
       /* make sure that we exactly replace the stub repodata */
-      if (parent->end - parent->start != numsolv)
+      if (extendend - extendstart != numsolv)
 	{
-	  pool_debug(pool, SOLV_ERROR, "sub-repository solvable number does not match main repository (%d - %d)\n", parent->end - parent->start, numsolv);
+	  pool_debug(pool, SOLV_ERROR, "sub-repository solvable number does not match main repository (%d - %d)\n", extendend - extendstart, numsolv);
 	  return SOLV_ERROR_CORRUPT;
 	}
       for (i = 0; i < numsolv; i++)
-	if (pool->solvables[parent->start + i].repo != repo)
+	if (pool->solvables[extendstart + i].repo != repo)
 	  {
-	    pool_debug(pool, SOLV_ERROR, "main repository contains holes\n");
+	    pool_debug(pool, SOLV_ERROR, "main repository contains holes, cannot extend\n");
 	    return SOLV_ERROR_CORRUPT;
 	  }
     }
@@ -943,10 +953,10 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 #endif
     }
 
-  have_xdata = parent ? 1 : 0;
+  have_incoredata = 0;
   for (i = 1; i < numkeys; i++)
     if (keys[i].storage == KEY_STORAGE_INCORE || keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
-      have_xdata = 1;
+      have_incoredata = 1;
 
   data.keys = keys;
   data.nkeys = numkeys;
@@ -1013,8 +1023,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       dp = data_read_id_max(dp, &id, 0, numschemata, &data);
     }
 
-  incore_add_id(&data, 0);	/* XXX? */
-  incore_add_id(&data, id);
+  incore_add_id(&data, 0);	/* so that incoreoffset 0 means schema 0 */
+  incore_add_id(&data, id);	/* main schema id */
   keyp = schemadata + schemata[id];
   data.mainschema = id;
   for (i = 0; keyp[i]; i++)
@@ -1079,7 +1089,7 @@ printf("key %d at %d\n", key, (int)(keyp - 1 - schemadata));
 	      if (s && keydepth == 3)
 		{
 		  s++;	/* next solvable */
-	          if (have_xdata)
+	          if (have_incoredata)
 		    data.incoreoffset[(s - pool->solvables) - data.start] = data.incoredatalen;
 		}
 	      id = stack[keydepth - 1];
@@ -1226,8 +1236,8 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 		  data.error = SOLV_ERROR_CORRUPT;
 		  break;
 		}
-	      if (parent)
-		s = pool_id2solvable(pool, parent->start);
+	      if ((flags & REPO_EXTEND_SOLVABLES) != 0)
+		s = pool_id2solvable(pool, extendstart);
 	      else
 		s = pool_id2solvable(pool, repo_add_solvable_block(repo, numsolv));
 	      data.start = s - pool->solvables;
@@ -1247,7 +1257,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	      repo->idarraysize += size_idarray;
 	      idarraydataend = idarraydatap + size_idarray;
 	      repo->lastoff = 0;
-	      if (have_xdata)
+	      if (have_incoredata)
 		data.incoreoffset[(s - pool->solvables) - data.start] = data.incoredatalen;
 	    }
 	  nentries--;
