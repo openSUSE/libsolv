@@ -1473,6 +1473,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->addalreadyrecommended;
   case SOLVER_FLAG_NO_INFARCHCHECK:
     return solv->noinfarchcheck;
+  case SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES:
+    return solv->keepexplicitobsoletes;
   default:
     break;
   }
@@ -1514,6 +1516,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_NO_INFARCHCHECK:
     solv->noinfarchcheck = value;
+    break;
+  case SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES:
+    solv->keepexplicitobsoletes = value;
     break;
   default:
     break;
@@ -2566,7 +2571,7 @@ solver_solve(Solver *solv, Queue *job)
 
   /* log solver options */
   POOL_DEBUG(SOLV_DEBUG_STATS, "solver started\n");
-  POOL_DEBUG(SOLV_DEBUG_STATS, "dosplitprovides=%d, noupdateprovide=%d noinfarchcheck=%d\n", solv->dosplitprovides, solv->noupdateprovide, solv->noinfarchcheck);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dosplitprovides=%d, noupdateprovide=%d, noinfarchcheck=%d\n", solv->dosplitprovides, solv->noupdateprovide, solv->noinfarchcheck);
   POOL_DEBUG(SOLV_DEBUG_STATS, "allowuninstall=%d, allowdowngrade=%d, allownamechange=%d, allowarchchange=%d, allowvendorchange=%d\n", solv->allowuninstall, solv->allowdowngrade, solv->allownamechange, solv->allowarchchange, solv->allowvendorchange);
   POOL_DEBUG(SOLV_DEBUG_STATS, "promoteepoch=%d, forbidselfconflicts=%d\n", pool->promoteepoch, pool->forbidselfconflicts);
   POOL_DEBUG(SOLV_DEBUG_STATS, "obsoleteusesprovides=%d, implicitobsoleteusesprovides=%d, obsoleteusescolors=%d\n", pool->obsoleteusesprovides, pool->implicitobsoleteusesprovides, pool->obsoleteusescolors);
