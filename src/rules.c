@@ -665,7 +665,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	{
 	  int noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, n);
 	  int isinstalled = (installed && s->repo == installed);
-	  if (s->obsoletes && !noobs)
+	  if (s->obsoletes && (!noobs || solv->keepexplicitobsoletes))
 	    {
 	      obsp = s->repo->idarraydata + s->obsoletes;
 	      /* foreach obsoletes */
