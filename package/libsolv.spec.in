@@ -166,6 +166,9 @@ CMAKE_FLAGS=
 %if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 CMAKE_FLAGS="-DFEDORA=1"
 %endif
+%if 0%{?suse_version}
+CMAKE_FLAGS="-DSUSE=1"
+%endif
 
 cmake   $CMAKE_FLAGS \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \

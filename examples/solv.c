@@ -81,7 +81,8 @@
 
 #ifdef FEDORA
 # define REPOINFO_PATH "/etc/yum.repos.d"
-#else
+#endif
+#ifdef SUSE
 # define REPOINFO_PATH "/etc/zypp/repos.d"
 # define PRODUCTS_PATH "/etc/products.d"
 # define SOFTLOCKS_PATH "/var/lib/zypp/SoftLocks"
@@ -196,6 +197,7 @@ yum_substitute(Pool *pool, char *line)
 #define TYPE_PLAINDIR	3
 #define TYPE_DEBIAN     4
 
+#ifndef NOSYSTEM
 static int
 read_repoinfos_sort(const void *ap, const void *bp)
 {
@@ -203,12 +205,14 @@ read_repoinfos_sort(const void *ap, const void *bp)
   const struct repoinfo *b = bp;
   return strcmp(a->alias, b->alias);
 }
+#endif
 
-#ifndef DEBIAN
+#if defined(SUSE) || defined(FEDORA)
 
 struct repoinfo *
-read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
+read_repoinfos(Pool *pool, int *nrepoinfosp)
 {
+  const char *reposdir = REPOINFO_PATH;
   char buf[4096];
   char buf2[4096], *kp, *vp, *kpe;
   DIR *dir;
@@ -337,10 +341,12 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
   return repoinfos;
 }
 
-#else
+#endif
+
+#ifdef DEBIAN
 
 struct repoinfo *
-read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
+read_repoinfos(Pool *pool, int *nrepoinfosp)
 {
   FILE *fp;
   char buf[4096];
@@ -452,6 +458,16 @@ read_repoinfos(Pool *pool, const char *reposdir, int *nrepoinfosp)
 }
 
 #endif
+
+#ifdef NOSYSTEM
+struct repoinfo *
+read_repoinfos(Pool *pool, int *nrepoinfosp)
+{
+  *nrepoinfosp = 0;
+  return 0;
+}
+#endif
+
 
 void
 free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
@@ -1620,13 +1636,13 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   Repodata *data;
   int badchecksum;
   int dorefresh;
-#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
+#if defined(ENABLE_DEBIAN)
   FILE *fpr;
   int j;
 #endif
 
   repo = repo_create(pool, "@System");
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
   printf("rpm database:");
   if (stat("/var/lib/rpm/Packages", &stb))
     memset(&stb, 0, sizeof(&stb));
@@ -1636,21 +1652,25 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   if (stat("/var/lib/dpkg/status", &stb))
     memset(&stb, 0, sizeof(&stb));
 #endif
+#ifdef NOSYSTEM
+  printf("no installed database:");
+  memset(&stb, 0, sizeof(&stb));
+#endif
   calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, installedcookie);
   if (usecachedrepo(repo, 0, installedcookie, 0))
     printf(" cached\n");
   else
     {
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
       FILE *ofp;
       int done = 0;
 #endif
       printf(" reading\n");
 
-#if defined(ENABLE_SUSEREPO) && defined(PRODUCTS_PATH)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
+# if defined(ENABLE_SUSEREPO) && defined(PRODUCTS_PATH)
       repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
-#endif
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+# endif
       if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
 	{
 	  Repo *ref = repo_create(pool, "@System.old");
@@ -1664,10 +1684,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	}
       if (!done)
         repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
-#else
-# if defined(ENABLE_DEBIAN) && defined(DEBIAN)
-        repo_add_debdb(repo, 0, REPO_REUSE_REPODATA);
-# endif
+#endif
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
+      repo_add_debdb(repo, 0, REPO_REUSE_REPODATA);
 #endif
       writecachedrepo(repo, 0, 0, installedcookie);
     }
@@ -1875,7 +1894,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  break;
 #endif
 
-#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
+#if defined(ENABLE_DEBIAN)
         case TYPE_DEBIAN:
 	  printf("debian repo '%s':", cinfo->alias);
 	  fflush(stdout);
@@ -2313,7 +2332,7 @@ yesno(const char *str)
     }
 }
 
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 
 struct fcstate {
   FILE **newpkgsfps;
@@ -2757,7 +2776,7 @@ main(int argc, char **argv)
   pool->nscallback = nscallback;
   // pool_setdebuglevel(pool, 2);
   setarch(pool);
-  repoinfos = read_repoinfos(pool, REPOINFO_PATH, &nrepoinfos);
+  repoinfos = read_repoinfos(pool, &nrepoinfos);
 
   if (mainmode == MODE_REPOLIST)
     {
@@ -2851,10 +2870,11 @@ main(int argc, char **argv)
 	{
 	  int l;
           l = strlen(argv[i]);
-#ifndef DEBIAN
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 	  if (l <= 4 || strcmp(argv[i] + l - 4, ".rpm"))
 	    continue;
-#else
+#endif
+#if defined(ENABLE_DEBIAN) && defined(DEBIAN)
 	  if (l <= 4 || strcmp(argv[i] + l - 4, ".deb"))
 	    continue;
 #endif
@@ -2868,7 +2888,7 @@ main(int argc, char **argv)
 	  if (!commandlinerepo)
 	    commandlinerepo = repo_create(pool, "@commandline");
 	  p = 0;
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 	  p = repo_add_rpm(commandlinerepo, (const char *)argv[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
@@ -3035,7 +3055,7 @@ main(int argc, char **argv)
   addsoftlocks(pool, &job);
 #endif
 
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 rerunsolver:
 #endif
   for (;;)
@@ -3121,7 +3141,7 @@ rerunsolver:
   printf("Transaction summary:\n\n");
   transaction_print(trans);
 
-#if !defined(FEDORA) && !defined(DEBIAN)
+#if defined(SUSE)
   if (1)
     {
       DUChanges duc[4];
@@ -3323,7 +3343,7 @@ rerunsolver:
       putchar('\n');
     }
 
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
   if (newpkgs)
     {
       Queue conflicts;
@@ -3362,7 +3382,7 @@ rerunsolver:
   transaction_order(trans, 0);
   for (i = 0; i < trans->steps.count; i++)
     {
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
       const char *evr, *evrp, *nvra;
 #endif
       Solvable *s;
@@ -3376,7 +3396,7 @@ rerunsolver:
 	{
 	case SOLVER_TRANSACTION_ERASE:
 	  printf("erase %s\n", pool_solvid2str(pool, p));
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 	  if (!s->repo->rpmdbid || !s->repo->rpmdbid[p - s->repo->start])
 	    continue;
 	  /* strip epoch from evr */
@@ -3404,7 +3424,7 @@ rerunsolver:
 	    continue;
 	  rewind(fp);
 	  lseek(fileno(fp), 0, SEEK_SET);
-#if defined(ENABLE_RPMDB) && !defined(DEBIAN)
+#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp));
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)

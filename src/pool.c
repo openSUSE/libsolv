@@ -56,9 +56,12 @@ pool_create(void)
 
   queue_init(&pool->vendormap);
 
-#ifdef DEBIAN 
+#if defined(DEBIAN)
   pool->disttype = DISTTYPE_DEB;
   pool->noarchid = ARCH_ALL;
+#elif defined(ARCHLINUX)
+  pool->disttype = DISTTYPE_ARCH;
+  pool->noarchid = ARCH_ANY;
 #else
   pool->disttype = DISTTYPE_RPM;
   pool->noarchid = ARCH_NOARCH;
