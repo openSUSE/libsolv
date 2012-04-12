@@ -1327,7 +1327,8 @@ reenableduprule(Solver *solv, Id name)
 
 /* 
  * add all installed packages that package p obsoletes to Queue q.
- * Package p is not installed and not in oobs map.
+ * Package p is not installed. Also, we know that if
+ * solv->keepexplicitobsoletes is not set, p is not in the noobs map.
  * Entries may get added multiple times.
  */
 static void
@@ -1340,18 +1341,20 @@ add_obsoletes(Solver *solv, Id p, Queue *q)
   Id obs, *obsp;
   Id lastp2 = 0;
 
-  /* we already know: p is not installed, p is not noobs */
-  FOR_PROVIDES(p2, pp2, s->name)
+  if (!solv->keepexplicitobsoletes || !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p)))
     {
-      Solvable *ps = pool->solvables + p2;
-      if (ps->repo != installed)
-	continue;
-      if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
-	continue;
-      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps)) 
-	continue;
-      queue_push(q, p2);
-      lastp2 = p2;
+      FOR_PROVIDES(p2, pp2, s->name)
+	{
+	  Solvable *ps = pool->solvables + p2;
+	  if (ps->repo != installed)
+	    continue;
+	  if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
+	    continue;
+	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps)) 
+	    continue;
+	  queue_push(q, p2);
+	  lastp2 = p2;
+	}
     }
   if (!s->obsoletes)
     return;
@@ -1535,7 +1538,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	{
 	  if (pool->solvables[p].repo == installed)
 	    j = p;
-	  else if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p))
+	  else if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p) && !solv->keepexplicitobsoletes)
 	    return;
 	  i++;
 	}
@@ -2499,7 +2502,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	      if (r->d == 0 && r->w2 == 0 && pool->solvables[r->p].repo == installed)
 		continue;
 	      /* noobs is bad */
-	      if (solv->noobsoletes.size)
+	      if (solv->noobsoletes.size && !solv->keepexplicitobsoletes)
 		{
 		  FOR_RULELITERALS(p, jp, r)
 		    if (MAPTST(&solv->noobsoletes, p))
