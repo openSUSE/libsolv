@@ -241,7 +241,7 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
   if (s)
     {
       pool_debug(pool, SOLV_ERROR, "unclosed package at EOF\n");
-      repo_free_solvable_block(s->repo, s - pool->solvables, 1, 1);
+      repo_free_solvable(s->repo, s - pool->solvables, 1);
     }
   solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))

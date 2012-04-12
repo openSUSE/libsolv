@@ -1544,7 +1544,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       if (s)
 	{
 	  /* oops, could not reuse. free it instead */
-          repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+          repo_free_solvable(repo, s - pool->solvables, 1);
 	  solvend--;
 	  s = 0;
 	}

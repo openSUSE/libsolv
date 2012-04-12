@@ -437,7 +437,7 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
   fclose(fp);
   if (s && !s->name)
     {
-      repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+      repo_free_solvable(repo, s - pool->solvables, 1);
       s = 0;
     }
   if (s)
@@ -719,7 +719,7 @@ finishsolvable(Repo *repo, Solvable *s)
     return;
   if (!s->name)
     {
-      repo_free_solvable_block(repo, s - pool->solvables, 1, 1);
+      repo_free_solvable(repo, s - pool->solvables, 1);
       return;
     }
   if (!s->arch)
