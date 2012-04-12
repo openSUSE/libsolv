@@ -198,8 +198,24 @@ repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
     s->repo = 0;
   pool_free_solvable_block(repo->pool, start, count, reuseids);
   FOR_REPODATAS(repo, i, data)
-    if (data->end > repo->end)
-      repodata_shrink(data, repo->end);
+    {
+      int dstart, dend;
+      if (data->end > repo->end)
+        repodata_shrink(data, repo->end);
+      dstart = data->start > start ? data->start : start;
+      dend = data->end < start + count ? data->end : start + count;
+      if (dstart < dend)
+	{
+	  if (data->attrs)
+	    {
+	      int j;
+	      for (j = dstart; j < dend; j++)	
+		data->attrs[j - data->start] = solv_free(data->attrs[j - data->start]);
+	    }
+	  if (data->incoreoffset)
+	    memset(data->incoreoffset + (dstart - data->start), 0, (dend - dstart) * sizeof(Id));
+	}
+    }
 }
 
 
