@@ -14,6 +14,7 @@
 #include <fcntl.h>
 
 #include "solv_xfopen.h"
+#include "util.h"
 
 
 static FILE *cookieopen(void *cookie, const char *mode,
@@ -326,3 +327,79 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
   return fdopen(fd, mode);
 }
 
+struct bufcookie {
+  char **bufp;
+  size_t *buflp;
+  char *freemem;
+  size_t bufl_int;
+};
+
+static ssize_t cookie_bufread(void *cookie, char *buf, size_t nbytes)
+{
+  struct bufcookie *bc = cookie;
+  size_t n = *bc->buflp > nbytes ? nbytes : *bc->buflp;
+  if (n)
+    {
+      memcpy(buf, *bc->bufp, n);
+      *bc->bufp += n;
+      *bc->buflp -= n;
+    }
+  return n;
+}
+
+static ssize_t cookie_bufwrite(void *cookie, const char *buf, size_t nbytes)
+{
+  struct bufcookie *bc = cookie;
+  int n = nbytes > 0x40000000 ? 0x40000000 : nbytes;
+  if (n)
+    {
+      *bc->bufp = solv_extend(*bc->bufp, *bc->buflp, n + 1, 1, 4095);
+      memcpy(*bc->bufp, buf, n);
+      (*bc->bufp)[n] = 0;	/* zero-terminate */
+      *bc->buflp += n;
+    }
+  return n;
+}
+
+static int cookie_bufclose(void *cookie)
+{
+  struct bufcookie *bc = cookie;
+  if (bc->freemem)
+    solv_free(bc->freemem);
+  solv_free(bc);
+  return 0;
+}
+
+FILE *
+solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
+{
+  struct bufcookie *bc;
+  FILE *fp;
+  if (*mode != 'r' && *mode != 'w')
+    return 0;
+  bc = solv_calloc(1, sizeof(*bc));
+  bc->freemem = 0;
+  bc->bufp = bufp;
+  if (!buflp)
+    {
+      bc->bufl_int = *mode == 'w' ? 0 : strlen(*bufp);
+      buflp = &bc->bufl_int;
+    }
+  bc->buflp = buflp;
+  if (*mode == 'w')
+    {
+      *bc->bufp = solv_extend(0, 0, 1, 1, 4095);	/* always zero-terminate */
+      (*bc->bufp)[0] = 0;
+      *bc->buflp = 0;
+    }
+  fp = cookieopen(bc, mode, cookie_bufread, cookie_bufwrite, cookie_bufclose);
+  if (!strcmp(mode, "rf"))	/* auto-free */
+    bc->freemem = *bufp;
+  if (!fp)
+    {
+      *bc->bufp = solv_free(*bc->bufp);
+      *bc->buflp = 0;
+      cookie_bufclose(bc);
+    }
+  return fp;
+}

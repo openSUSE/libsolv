@@ -578,6 +578,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
   if (npieces < 3)
     {
       pool_debug(pool, SOLV_ERROR, "str2job: bad line '%s'\n", str);
+      solv_free(pieces);
       return 0;
     }
 
@@ -587,6 +588,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
   if (!job2str[i].str)
     {
       pool_debug(pool, SOLV_ERROR, "str2job: unknown job '%s'\n", str);
+      solv_free(pieces);
       return 0;
     }
   job = job2str[i].job;
@@ -610,6 +612,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
 	      if (!jobflags2str[i].str)
 		{
 		  pool_debug(pool, SOLV_ERROR, "str2job: unknown jobflags in '%s'\n", str);
+		  solv_free(pieces);
 		  return 0;
 		}
 	      job |= jobflags2str[i].flag;
@@ -622,6 +625,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
       if (npieces != 3)
 	{
 	  pool_debug(pool, SOLV_ERROR, "str2job: bad pkg selector in '%s'\n", str);
+	  solv_free(pieces);
 	  return 0;
 	}
       job |= SOLVER_SOLVABLE;
@@ -629,6 +633,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
       if (!what)
 	{
 	  pool_debug(pool, SOLV_ERROR, "str2job: unknown package '%s'\n", pieces[2]);
+	  solv_free(pieces);
 	  return 0;
 	}
     }
@@ -659,6 +664,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
 		{
 		  pool_debug(pool, SOLV_ERROR, "str2job: unknown package '%s'\n", pieces[i]);
 		  queue_free(&q);
+		  solv_free(pieces);
 		  return 0;
 		}
 	      queue_push(&q, p);
@@ -673,12 +679,14 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
       if (npieces != 3)
 	{
 	  pool_debug(pool, SOLV_ERROR, "str2job: bad line '%s'\n", str);
+	  solv_free(pieces);
 	  return 0;
 	}
       repo = testcase_str2repo(pool, pieces[2]);
       if (!repo)
 	{
 	  pool_debug(pool, SOLV_ERROR, "str2job: unknown repo '%s'\n", pieces[2]);
+	  solv_free(pieces);
 	  return 0;
 	}
       job |= SOLVER_SOLVABLE_REPO;
@@ -689,6 +697,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
       if (npieces != 3 && strcmp(pieces[2], "packages") != 0)
 	{
 	  pool_debug(pool, SOLV_ERROR, "str2job: bad line '%s'\n", str);
+	  solv_free(pieces);
 	  return 0;
 	}
       job |= SOLVER_SOLVABLE_ALL;
@@ -697,9 +706,11 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
   else
     {
       pool_debug(pool, SOLV_ERROR, "str2job: unknown selection in '%s'\n", str);
+      solv_free(pieces);
       return 0;
     }
   *whatp = what;
+  solv_free(pieces);
   return job;
 }
 
@@ -1613,6 +1624,89 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
   return 1;
 }
 
+static char *
+read_inline_file(FILE *fp, char **bufp, char **bufpp, int *buflp)
+{
+  char *result = solv_malloc(1024);
+  char *rp = result;
+  int resultl = 1024;
+  
+  for (;;)
+    {
+      size_t rl;
+      if (rp - result + 256 >= resultl)
+	{
+	  resultl = rp - result;
+	  result = solv_realloc(result, resultl + 1024);
+	  rp = result + resultl;
+	  resultl += 1024;
+	}
+      if (!fgets(rp, resultl - (rp - result), fp))
+	*rp = 0;
+      rl = strlen(rp);
+      if (rl && (rp == result || rp[-1] == '\n'))
+	{
+	  if (rl > 1 && rp[0] == '#' && rp[1] == '>')
+	    {
+	      memmove(rp, rp + 2, rl - 2);
+	      rl -= 2;
+	    }
+	  else
+	    {
+	      while (rl + 16 > *buflp)
+		{
+		  *bufp = solv_realloc(*bufp, *buflp + 512);
+		  *buflp += 512;
+		}
+	      memmove(*bufp, rp, rl);
+	      if ((*bufp)[rl - 1] == '\n')
+		{
+		  ungetc('\n', fp);
+		  rl--;
+		}
+	      (*bufp)[rl] = 0;
+	      (*bufpp) = *bufp + rl;
+	      rl = 0;
+	    }
+	}
+      if (rl <= 0)
+	{
+	  *rp = 0;
+	  break;
+	}
+      rp += rl;
+    }
+  return result;
+}
+
+static char *
+read_file(FILE *fp)
+{
+  char *result = solv_malloc(1024);
+  char *rp = result;
+  int resultl = 1024;
+  
+  for (;;)
+    {
+      size_t rl;
+      if (rp - result + 256 >= resultl)
+	{
+	  resultl = rp - result;
+	  result = solv_realloc(result, resultl + 1024);
+	  rp = result + resultl;
+	  resultl += 1024;
+	}
+      rl = fread(rp, 1, resultl - (rp - result), fp);
+      if (rl <= 0)
+	{
+	  *rp = 0;
+	  break;
+	}
+      rp += rl;
+    }
+  return result;
+}
+
 Solver *
 testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, int *resultflagsp)
 {
@@ -1704,17 +1798,28 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
           repo->subpriority = subprio;
 	  if (strcmp(pieces[3], "empty") != 0)
 	    {
-	      rdata = pool_tmpjoin(pool, testcasedir, pieces[4], 0);
-	      if ((rfp = solv_xfopen(rdata, "r")) == 0)
+	      const char *repotype = pool_tmpjoin(pool, pieces[3], 0, 0);	/* gets overwritten in <inline> case */
+	      if (!strcmp(pieces[4], "<inline>"))
+		{
+		  char *idata = read_inline_file(fp, &buf, &bufp, &bufl);
+		  rdata = "<inline>";
+		  rfp = solv_xfopen_buf(rdata, &idata, 0, "rf");
+		}
+	      else
+		{
+		  rdata = pool_tmpjoin(pool, testcasedir, pieces[4], 0);
+		  rfp = solv_xfopen(rdata, "r");
+		}
+	      if (!rfp)
 		{
 		  pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", rdata);
 		}
-	      else if (!strcmp(pieces[3], "susetags"))
+	      else if (!strcmp(repotype, "susetags"))
 		{
 		  testcase_add_susetags(repo, rfp, 0);
 		  fclose(rfp);
 		}
-	      else if (!strcmp(pieces[3], "solv"))
+	      else if (!strcmp(repotype, "solv"))
 		{
 		  repo_add_solv(repo, rfp, 0);
 		  fclose(rfp);
@@ -1818,8 +1923,8 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
         }
       else if (!strcmp(pieces[0], "result") && npieces > 2)
 	{
-	  FILE *rfp;
 	  const char *rdata;
+	  char *result = 0;
 	  int resultflags = 0;
           char *s = pieces[1];
 	  int i;
@@ -1841,80 +1946,24 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 
 	  rdata = pool_tmpjoin(pool, testcasedir, pieces[2], 0);
 	  if (!strcmp(pieces[2], "<inline>"))
-	    rfp = fp;
-	  else
-            rfp = fopen(rdata, "r");
-          if (!rfp)
-	    {
-	      pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", rdata);
-	    }
+	    result = read_inline_file(fp, &buf, &bufp, &bufl);
 	  else
 	    {
-	      /* slurp it in... */
-	      char *result = solv_malloc(1024);
-	      char *rp = result;
-	      int resultl = 1024;
-	      for (;;)
-		{
-		  size_t rl;
-		  if (rp - result + 256 >= resultl)
-		    {
-		      resultl = rp - result;
-		      result = solv_realloc(result, resultl + 1024);
-		      rp = result + resultl;
-		      resultl += 1024;
-		    }
-		  if (fp == rfp)
-		    {
-		      if (!fgets(rp, resultl - (rp - result), fp))
-			rl = 0;
-		      else
-			{
-		          rl = strlen(rp);
-			  if (rl && (rp == result || rp[-1] == '\n'))
-			    {
-			      if (rl > 1 && rp[0] == '#' && rp[1] == '>')
-				{
-				  memmove(rp, rp + 2, rl - 2);
-				  rl -= 2;
-				}
-			      else
-				{
-				  while (rl + 16 > bufl)
-				    {
-				      buf = solv_realloc(buf, bufl + 512);
-				      bufl += 512;
-				    }
-				  memmove(buf, rp, rl);
-				  if (buf[rl - 1] == '\n')
-				    {
-				      ungetc('\n', fp);
-				      rl--;
-				    }
-				  bufp = buf + rl;
-				  rl = 0;
-				}
-			    }
-			}
-		    }
-		  else
-		    rl = fread(rp, 1, resultl - (rp - result), rfp);
-		  if (rl <= 0)
-		    {
-		      *rp = 0;
-		      break;
-		    }
-		  rp += rl;
-		}
-	      if (rfp != fp)
-	        fclose(rfp);
-	      if (resultp)
-		*resultp = result;
+              FILE *rfp = fopen(rdata, "r");
+	      if (!rfp)
+		pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", rdata);
 	      else
-		solv_free(result);
-	      if (resultflagsp)
-		*resultflagsp = resultflags;
+		{
+		  result = read_file(rfp);
+		  fclose(rfp);
+		}
 	    }
+	  if (resultp)
+	    *resultp = result;
+	  else
+	    solv_free(result);
+	  if (resultflagsp)
+	    *resultflagsp = resultflags;
 	}
       else if (!strcmp(pieces[0], "nextjob") && npieces == 1)
 	{
