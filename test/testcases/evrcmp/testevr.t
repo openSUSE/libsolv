@@ -2,8 +2,8 @@
 # these tests check all dependency match combinations,
 # both with release present and missing
 #
-repo system 0 susetags system.repo
-repo c 0 susetags conflicts.repo
+repo system 0 testtags system.repo
+repo c 0 testtags conflicts.repo
 system i686 rpm system
 solverflags allowuninstall
 job install name CEQ2

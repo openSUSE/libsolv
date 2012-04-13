@@ -1,5 +1,5 @@
-repo system 0 susetags mistake-system.repo
-repo test 0 susetags mistake-packages.repo
+repo system 0 testtags mistake-system.repo
+repo test 0 testtags mistake-packages.repo
 system i686 rpm system
 job install name A = 2 [cleandeps]
 result transaction,problems <inline>

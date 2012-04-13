@@ -18,7 +18,6 @@
 #include "poolarch.h"
 #include "poolvendor.h"
 #include "repo.h"
-#include "repo_susetags.h"
 #include "repo_solv.h"
 #include "solver.h"
 #include "solverdebug.h"
@@ -839,7 +838,7 @@ writedeps(Repo *repo, FILE *fp, const char *tag, Id key, Solvable *s, Offset off
 }
 
 int
-testcase_write_susetags(Repo *repo, FILE *fp)
+testcase_write_testtags(Repo *repo, FILE *fp)
 {
   Pool *pool = repo->pool;
   Solvable *s;
@@ -916,7 +915,7 @@ finish_solvable(Pool *pool, Repodata *data, Solvable *s, char *filelist, int nfi
 
 /* stripped down version of susetags parser used for testcases */
 int
-testcase_add_susetags(Repo *repo, FILE *fp, int flags)
+testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   char *line, *linep;
@@ -1457,7 +1456,7 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
       out = pool_tmpjoin(pool, name, ".repo", ".gz");
       cmd = pool_tmpjoin(pool, "repo ", name, " ");
       cmd = pool_tmpappend(pool, cmd, priobuf, " ");
-      cmd = pool_tmpappend(pool, cmd, "susetags ", out);
+      cmd = pool_tmpappend(pool, cmd, "testtags ", out);
       strqueue_push(&sq, cmd);
       out = pool_tmpjoin(pool, dir, "/", out);
       if (!(fp = solv_xfopen(out, "w")))
@@ -1466,7 +1465,7 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
 	  strqueue_free(&sq);
 	  return 0;
 	}
-      testcase_write_susetags(repo, fp);
+      testcase_write_testtags(repo, fp);
       if (fclose(fp))
 	{
 	  pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
@@ -1814,9 +1813,9 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 		{
 		  pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", rdata);
 		}
-	      else if (!strcmp(repotype, "susetags"))
+	      else if (!strcmp(repotype, "testtags"))
 		{
-		  testcase_add_susetags(repo, rfp, 0);
+		  testcase_add_testtags(repo, rfp, 0);
 		  fclose(rfp);
 		}
 	      else if (!strcmp(repotype, "solv"))
