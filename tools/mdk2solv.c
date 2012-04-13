@@ -70,7 +70,11 @@ main(int argc, char **argv)
     }
   pool = pool_create();
   repo = repo_create(pool, "<stdin>");
-  repo_add_mdk(repo, stdin, REPO_NO_INTERNALIZE);
+  if (repo_add_mdk(repo, stdin, REPO_NO_INTERNALIZE))
+    {
+      fprintf(stderr, "mdk2solv: %s\n", pool_errstr(pool));
+      exit(1);
+    }
   if (infofile)
     {
       FILE *fp = solv_xfopen(infofile, "r");
@@ -79,7 +83,11 @@ main(int argc, char **argv)
 	  perror(infofile);
 	  exit(1);
 	}
-      repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+      if (repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+	{
+	  fprintf(stderr, "mdk2solv: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
       fclose(fp);
     }
   if (filesfile)
@@ -90,7 +98,11 @@ main(int argc, char **argv)
 	  perror(filesfile);
 	  exit(1);
 	}
-      repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+      if (repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+	{
+	  fprintf(stderr, "mdk2solv: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
       fclose(fp);
     }
   repo_internalize(repo);

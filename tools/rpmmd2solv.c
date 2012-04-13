@@ -85,12 +85,20 @@ main(int argc, char **argv)
 	  perror(fnp);
 	  exit(1);
 	}
-      repo_add_rpmmd(repo, fp, 0, flags);
+      if (repo_add_rpmmd(repo, fp, 0, flags))
+	{
+	  fprintf(stderr, "rpmmd2solv: %s: %s\n", fnp, pool_errstr(pool));
+	  exit(1);
+	}
       fclose(fp);
       snprintf(fnp, l, "%s/diskusagedata.xml.gz", dir);
       if ((fp = solv_xfopen(fnp, 0)))
 	{
-	  repo_add_rpmmd(repo, fp, 0, flags);
+	  if (repo_add_rpmmd(repo, fp, 0, flags))
+	    {
+	      fprintf(stderr, "rpmmd2solv: %s: %s\n", fnp, pool_errstr(pool));
+	      exit(1);
+	    }
 	  fclose(fp);
 	}
       if (locale)
@@ -117,13 +125,23 @@ main(int argc, char **argv)
 	      exit(1);
 	    }
 	  fprintf(stderr, "opened %s\n", fnp);
-	  repo_add_rpmmd(repo, fp, 0, flags);
+	  if (repo_add_rpmmd(repo, fp, 0, flags))
+	    {
+	      fprintf(stderr, "rpmmd2solv: %s: %s\n", fnp, pool_errstr(pool));
+	      exit(1);
+	    }
 	  fclose(fp);
 	}
       solv_free(fnp);
     }
   else
-    repo_add_rpmmd(repo, stdin, 0, flags);
+    {
+      if (repo_add_rpmmd(repo, stdin, 0, flags))
+	{
+	  fprintf(stderr, "rpmmd2solv: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
+    }
   tool_write(repo, basefile, attrname);
   pool_free(pool);
   exit(0);

@@ -77,7 +77,7 @@ main(int argc, char **argv)
   for (i = 2; i < argc; i++)
     {
       FILE *fp;
-      int l;
+      int r, l;
 
       if (!strcmp(argv[i], "--withsrc"))
 	{
@@ -115,38 +115,41 @@ main(int argc, char **argv)
 	  exit(1);
 	}
       repo = repo_create(pool, argv[i]);
+      r = 0;
       if (0)
         {
         }
 #ifdef ENABLE_SUSEREPO
       else if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
 	{
-	  repo_add_susetags(repo, fp, 0, 0, 0);
+	  r = repo_add_susetags(repo, fp, 0, 0, 0);
 	}
       else if (l >= 11 && !strcmp(argv[i] + l - 11, "packages.gz"))
 	{
-	  repo_add_susetags(repo, fp, 0, 0, 0);
+	  r = repo_add_susetags(repo, fp, 0, 0, 0);
 	}
 #endif
 #ifdef ENABLE_RPMMD
       else if (l >= 14 && !strcmp(argv[i] + l - 14, "primary.xml.gz"))
 	{
-	  repo_add_rpmmd(repo, fp, 0, 0);
+	  r = repo_add_rpmmd(repo, fp, 0, 0);
 	}
 #endif
 #ifdef ENABLE_DEBIAN
       else if (l >= 8 && !strcmp(argv[i] + l - 8, "Packages"))
 	{
-	  repo_add_debpackages(repo, fp, 0);
+	  r = repo_add_debpackages(repo, fp, 0);
 	}
       else if (l >= 11 && !strcmp(argv[i] + l - 11, "Packages.gz"))
 	{
-	  repo_add_debpackages(repo, fp, 0);
+	  r = repo_add_debpackages(repo, fp, 0);
 	}
 #endif
-      else if (repo_add_solv(repo, fp, 0))
+      else
+	r = repo_add_solv(repo, fp, 0);
+      if (r)
 	{
-	  fprintf(stderr, "could not add repo %s\n", argv[i]);
+	  fprintf(stderr, "could not add repo %s: %s\n", argv[i], pool_errstr(pool));
 	  exit(1);
 	}
       if (fp != stdin)

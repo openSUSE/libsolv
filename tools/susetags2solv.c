@@ -110,7 +110,11 @@ main(int argc, char **argv)
 	  perror(contentfile);
 	  exit(1);
 	}
-      repo_add_content(repo, fp, REPO_REUSE_REPODATA);
+      if (repo_add_content(repo, fp, REPO_REUSE_REPODATA))
+	{
+	  fprintf(stderr, "susetags2solv: %s: %s\n", contentfile, pool_errstr(pool));
+	  exit(1);
+	}
       defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
       fclose(fp);
     }
@@ -180,7 +184,11 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, defvendor, 0, flags | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+	      if (repo_add_susetags(repo, fp, defvendor, 0, flags | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+		{
+		  fprintf(stderr, "susetags2solv: %s: %s\n", fnp, pool_errstr(pool));
+		  exit(1);
+		}
 	      fclose(fp);
 	    }
 	  else if (!strcmp(fn, "packages.DU") || !strcmp(fn, "packages.DU.gz"))
@@ -193,7 +201,11 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, defvendor, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+	      if (repo_add_susetags(repo, fp, defvendor, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+		{
+		  fprintf(stderr, "susetags2solv: %s: %s\n", fnp, pool_errstr(pool));
+		  exit(1);
+		}
 	      fclose(fp);
  	    }
 	  else if (!strcmp(fn, "packages.FL") || !strcmp(fn, "packages.FL.gz"))
@@ -206,7 +218,11 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, defvendor, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+	      if (repo_add_susetags(repo, fp, defvendor, 0, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+		{
+		  fprintf(stderr, "susetags2solv: %s: %s\n", fnp, pool_errstr(pool));
+		  exit(1);
+		}
 	      fclose(fp);
 #else
 	      /* ignore for now. reactivate when filters work */
@@ -235,7 +251,11 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      repo_add_susetags(repo, fp, defvendor, lang, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+	      if (repo_add_susetags(repo, fp, defvendor, lang, flags | SUSETAGS_EXTEND | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+		{
+		  fprintf(stderr, "susetags2solv: %s: %s\n", fnp, pool_errstr(pool));
+		  exit(1);
+		}
 	      fclose(fp);
 	    }
 	}
@@ -246,8 +266,14 @@ main(int argc, char **argv)
       repo_internalize(repo);
     }
   else
-    /* read data from stdin */
-    repo_add_susetags(repo, stdin, defvendor, 0, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+    {
+      /* read data from stdin */
+      if (repo_add_susetags(repo, stdin, defvendor, 0, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+	{
+	  fprintf(stderr, "susetags2solv: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
+    }
   repo_internalize(repo);
 
   if (query)

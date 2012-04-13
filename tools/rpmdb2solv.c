@@ -51,7 +51,6 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo, *ref = 0;
   Repodata *data;
-  Pool *refpool;
   int c, percent = 0;
   int extrapool = 0;
   int nopacks = 0;
@@ -123,13 +122,19 @@ main(int argc, char **argv)
         }
       else
 	{
-	  if (extrapool)
-	    refpool = pool_create();
+	  Pool *refpool = extrapool ? pool_create() : 0;
+	  ref = repo_create(refpool ? refpool : pool, "ref");
+	  if (repo_add_solv(ref, fp, 0) != 0)
+	    {
+	      fprintf(stderr, "%s: %s\n", refname, pool_errstr(ref->pool));
+	      if (ref->pool != pool)
+		pool_free(ref->pool);
+	      else
+		repo_free(ref, 1);
+	      ref = 0;
+	    }
 	  else
-	    refpool = pool;
-	  ref = repo_create(refpool, "ref");
-	  repo_add_solv(ref, fp, 0);
-	  repo_disable_paging(ref);
+	    repo_disable_paging(ref);
 	  fclose(fp);
 	}
     }
@@ -145,7 +150,13 @@ main(int argc, char **argv)
   data = repo_add_repodata(repo, 0);
 
   if (!nopacks)
-    repo_add_rpmdb(repo, ref, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0));
+    {
+      if (repo_add_rpmdb(repo, ref, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0)))
+	{
+	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
+    }
 
 #ifdef ENABLE_SUSEREPO
   if (proddir && *proddir)
@@ -164,7 +175,11 @@ main(int argc, char **argv)
 	      strcpy(buf + rootlen, proddir);
 	    }
 	}
-      repo_add_products(repo, buf, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+      if (repo_add_products(repo, buf, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+	{
+	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
       if (buf != proddir)
 	solv_free(buf);
     }

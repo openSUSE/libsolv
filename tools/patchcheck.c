@@ -486,7 +486,7 @@ main(int argc, char **argv)
 {
   char *arch, *mypatch;
   const char *pname;
-  int l;
+  int l, r;
   FILE *fp;
   int i;
   Id pid, p, pp;
@@ -536,32 +536,35 @@ main(int argc, char **argv)
           perror(argv[i]);
           exit(1);
         }
+      r = 0;
       if (0)
 	{
 	}
 #ifdef ENABLE_SUSEREPO
       else if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
         {
-          repo_add_susetags(c.repo, fp, 0, 0, 0);
+          r = repo_add_susetags(c.repo, fp, 0, 0, 0);
         }
       else if (l >= 11 && !strcmp(argv[i] + l - 11, "packages.gz"))
         {
-          repo_add_susetags(c.repo, fp, 0, 0, 0);
+          r = repo_add_susetags(c.repo, fp, 0, 0, 0);
         }
 #endif
 #ifdef ENABLE_RPMMD
       else if (l >= 14 && !strcmp(argv[i] + l - 14, "primary.xml.gz"))
         {
-          repo_add_rpmmd(c.repo, fp, 0, 0);
+          r = repo_add_rpmmd(c.repo, fp, 0, 0);
         }
       else if (l >= 17 && !strcmp(argv[i] + l - 17, "updateinfo.xml.gz"))
 	{
-          repo_add_updateinfoxml(c.repo, fp, 0);
+          r = repo_add_updateinfoxml(c.repo, fp, 0);
 	}
 #endif
-      else if (repo_add_solv(c.repo, fp, 0))
+      else
+	r = repo_add_solv(c.repo, fp, 0);
+      if (r)
         {
-          fprintf(stderr, "could not add repo %s\n", argv[i]);
+          fprintf(stderr, "could not add repo %s: %s\n", argv[i], pool_errstr(pool));
           exit(1);
         }
       if (fp != stdin)

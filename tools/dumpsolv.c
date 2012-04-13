@@ -279,13 +279,13 @@ int main(int argc, char **argv)
 	}
       repo = repo_create(pool, argv[optind]);
       if (repo_add_solv(repo, stdin, 0))
-	printf("could not read repository\n");
+	printf("could not read repository: %s\n", pool_errstr(pool));
     }
   if (!pool->urepos)
     {
       repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
       if (repo_add_solv(repo, stdin, 0))
-	printf("could not read repository\n");
+	printf("could not read repository: %s\n", pool_errstr(pool));
     }
   printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);
 

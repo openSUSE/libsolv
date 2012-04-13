@@ -94,7 +94,11 @@ main(int argc, char **argv)
 	  perror(argv[optind]);
 	  exit(1);
 	}
-      repo_add_solv(repo, fp, 0);
+      if (repo_add_solv(repo, fp, 0))
+	{
+	  fprintf(stderr, "repo %s: %s\n", argv[optind], pool_errstr(pool));
+	  exit(1);
+	}
       fclose(fp);
     }
   tool_write(repo, basefile, 0);

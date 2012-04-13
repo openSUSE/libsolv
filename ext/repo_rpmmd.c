@@ -230,6 +230,7 @@ static struct stateswitch stateswitches[] = {
 #define CSREALLOC_STEP 1024
 
 struct parsedata {
+  int ret;
   Pool *pool;
   Repo *repo;
   Repodata *data;
@@ -678,6 +679,10 @@ startElement(void *userData, const char *name, const char **atts)
   pd->statedepth = pd->depth;
   pd->lcontent = 0;
   *pd->content = 0;
+
+  if (!s && pd->state != STATE_SOLVABLE)
+    return;
+
   switch(pd->state)
     {
     case STATE_SOLVABLE:
@@ -711,8 +716,10 @@ startElement(void *userData, const char *name, const char **atts)
           Id index = stringpool_str2id(&pd->cspool, pkgid, 0);
           if (!index || index >= pd->ncscache || !pd->cscache[index])
 	    {
-              fprintf(stderr, "error, the repository specifies extra information about package with checksum '%s', which does not exist in the repository.\n", pkgid);
-              exit(1);
+              pool_debug(pool, SOLV_WARN, "the repository specifies extra information about package with checksum '%s', which does not exist in the repository.\n", pkgid);
+	      pd->solvable = 0;
+	      pd->handle = 0;
+	      break;
 	    }
 	  pd->solvable = pool_id2solvable(pool, pd->cscache[index]);
         }
@@ -818,12 +825,9 @@ startElement(void *userData, const char *name, const char **atts)
 	const char *tmp = find_attr("type", atts);
 	pd->chksumtype = tmp && *tmp ? solv_chksum_str2type(tmp) : 0;
         if (!pd->chksumtype)
-	  {
-	    fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), tmp ? tmp: "NULL");
-            exit(1);
-	  }
+	  pd->ret = pool_error(pool, -1, "line %d: unknown checksum type: %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), tmp ? tmp: "NULL");
+        break;
       }
-      break;
     case STATE_TIME:
       {
         unsigned int t;
@@ -853,6 +857,7 @@ startElement(void *userData, const char *name, const char **atts)
         str = find_attr("end", atts);
 	if (str && (end = atoi(str)) != 0)
 	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
+	break;
       }
       /*
         <diskusage>
@@ -867,7 +872,7 @@ startElement(void *userData, const char *name, const char **atts)
       */
     case STATE_DISKUSAGE:
       {
-        /* Really, do nothing, wat for <dir> tag */
+        /* Really, do nothing, wait for <dir> tag */
         break;
       }
     case STATE_DIR:
@@ -878,8 +883,7 @@ startElement(void *userData, const char *name, const char **atts)
           dirid = repodata_str2dir(pd->data, str, 1);
         else
           {
-            fprintf( stderr, "<dir .../> tag without 'name' attribute, atts = %p, *atts = %p\n",
-                    (void *)atts, *atts);
+	    pd->ret = pool_error(pool, -1, "<dir .../> tag without 'name' attribute");
             break;
           }
         if ((str = find_attr("size", atts)) != 0)
@@ -937,6 +941,15 @@ endElement(void *userData, const char *name)
 
   pd->depth--;
   pd->statedepth--;
+
+
+  if (!s)
+    {
+      pd->state = pd->sbtab[pd->state];
+      pd->docontent = 0;
+      return;
+    }
+
   switch (pd->state)
     {
     case STATE_SOLVABLE:
@@ -952,6 +965,7 @@ endElement(void *userData, const char *name)
       s->conflicts = repo_fix_conflicts(repo, s->conflicts);
       pd->freshens = 0;
       pd->kind = 0;
+      pd->solvable = s = 0;
       break;
     case STATE_NAME:
       if (pd->kind)
@@ -975,10 +989,12 @@ endElement(void *userData, const char *name)
       {
         Id index;
 	
+	if (!pd->chksumtype)
+	  break;
         if (strlen(pd->content) != 2 * solv_chksum_len(pd->chksumtype))
           {
-            fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
-            exit(1);
+	    pd->ret = pool_error(pool, -1, "line %d: invalid checksum length for %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
+	    break;
           }
         repodata_set_checksum(pd->data, handle, SOLVABLE_CHECKSUM, pd->chksumtype, pd->content);
         /* we save the checksum to solvable id relationship for extended
@@ -1210,8 +1226,8 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pool, SOLV_FATAL, "repo_rpmmd: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  exit(1);
+	  pd.ret = pool_error(pool, -1, "repo_rpmmd: %s at line %u:%u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  break;
 	}
       if (l == 0)
 	break;
@@ -1229,5 +1245,5 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", repodata_memused(data)/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
-  return 0;
+  return pd.ret;
 }

@@ -54,6 +54,8 @@ SOLV_1.0 {
 		pool_createwhatprovides;
 		pool_debug;
 		pool_dep2str;
+		pool_error;
+		pool_errstr;
 		pool_evrcmp;
 		pool_evrcmp_str;
 		pool_evrmatch;

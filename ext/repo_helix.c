@@ -144,6 +144,7 @@ static struct stateswitch stateswitches[] = {
  */
 
 typedef struct _parsedata {
+  int ret;
   /* XML parser data */
   int depth;
   enum state state;	/* current state */
@@ -865,8 +866,8 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pool, SOLV_FATAL, "%s at line %u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser));
-	  exit(1);
+	  pd.ret = pool_error(pool, -1, "%s at line %u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser));
+	  break;
 	}
       if (l == 0)
 	break;
@@ -880,5 +881,5 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_helix took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", repodata_memused(data)/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
-  return 0;
+  return pd.ret;
 }

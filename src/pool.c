@@ -109,6 +109,7 @@ pool_free(Pool *pool)
     free((char *)pool->languages[i]);
   solv_free(pool->languages);
   solv_free(pool->languagecache);
+  solv_free(pool->errstr);
   solv_free(pool);
 }
 
@@ -871,7 +872,48 @@ pool_debug(Pool *pool, int type, const char *format, ...)
       return;
     }
   vsnprintf(buf, sizeof(buf), format, args);
+  va_end(args);
   pool->debugcallback(pool, pool->debugcallbackdata, type, buf);
+}
+
+int
+pool_error(Pool *pool, int ret, const char *format, ...)
+{
+  va_list args;
+  int l;
+  va_start(args, format);
+  if (!pool->errstr)
+    {
+      pool->errstra = 1024;
+      pool->errstr = solv_malloc(pool->errstra);
+    }
+  if (!*format)
+    {
+      *pool->errstr = 0;
+      l = 0;
+    }
+  else
+    l = vsnprintf(pool->errstr, pool->errstra, format, args);
+  va_end(args);
+  if (l >= 0 && l + 1 > pool->errstra)
+    {
+      pool->errstra = l + 256;
+      pool->errstr = solv_realloc(pool->errstr, pool->errstra);
+      va_start(args, format);
+      l = vsnprintf(pool->errstr, pool->errstra, format, args);
+      va_end(args);
+    }
+  if (l < 0)
+    strcpy(pool->errstr, "unknown error");
+  if (pool->debugmask & SOLV_ERROR)
+    pool_debug(pool, SOLV_ERROR, "%s\n", pool->errstr);
+  return ret;
+}
+
+char *
+pool_errstr(Pool *pool)
+{
+  return pool->errstr ? pool->errstr : "no error";
 }
 
 void
@@ -879,7 +921,7 @@ pool_setdebuglevel(Pool *pool, int level)
 {
   int mask = SOLV_DEBUG_RESULT;
   if (level > 0)
-    mask |= SOLV_DEBUG_STATS|SOLV_DEBUG_ANALYZE|SOLV_DEBUG_UNSOLVABLE|SOLV_DEBUG_SOLVER|SOLV_DEBUG_TRANSACTION;
+    mask |= SOLV_DEBUG_STATS|SOLV_DEBUG_ANALYZE|SOLV_DEBUG_UNSOLVABLE|SOLV_DEBUG_SOLVER|SOLV_DEBUG_TRANSACTION|SOLV_ERROR;
   if (level > 1)
     mask |= SOLV_DEBUG_JOB|SOLV_DEBUG_SOLUTIONS|SOLV_DEBUG_POLICY;
   if (level > 2)

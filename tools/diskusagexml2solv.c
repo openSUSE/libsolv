@@ -54,7 +54,11 @@ main(int argc, char **argv)
 	  break;
 	}
     }
-  repo_add_diskusagexml(repo, stdin, flags);
+  if (repo_add_diskusagexml(repo, stdin, flags))
+    {
+      fprintf(stderr, "diskusagexml2solv: %s\n", pool_errstr(pool));
+      exit(1);
+    }
   tool_write(repo, 0, attrname);
   pool_free(pool);
   exit(0);

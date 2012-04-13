@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <stdint.h>
+#include <errno.h>
 
 #include <rpm/rpmio.h>
 #include <rpm/rpmpgp.h>
@@ -316,7 +317,7 @@ static char *headtoevr(RpmHead *h)
   if (!version || !release)
     {
       fprintf(stderr, "headtoevr: bad rpm header\n");
-      exit(1);
+      return 0;
     }
   for (v = version; *v >= '0' && *v <= '9'; v++)
     ;
@@ -460,7 +461,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   if (nc != vc || nc != fc)
     {
       fprintf(stderr, "bad dependency entries\n");
-      exit(1);
+      return 0;
     }
 
   cc = nc;
@@ -747,7 +748,7 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
   if (bnc != dic)
     {
       fprintf(stderr, "bad filelist\n");
-      exit(1);
+      return olddeps;
     }
 
   if (data)
@@ -879,7 +880,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   if (!s->name)
     {
       fprintf(stderr, "package has no name\n");
-      exit(1);
+      return 0;
     }
   sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
   if (sourcerpm)
@@ -1369,17 +1370,17 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
   if (db_create(&db, dbenv, 0))
     {
       perror("db_create");
-      exit(1);
+      return 0;
     }
   if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
     {
       perror("db->open Name index");
-      exit(1);
+      return 0;
     }
   if (db->cursor(db, NULL, &dbc, 0))
     {
       perror("db->cursor");
-      exit(1);
+      return 0;
     }
   while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
     count += dbdata.size / RPM_INDEX_SIZE;
@@ -1436,14 +1437,15 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
     ref = 0;
 
   if (!(dbenv = opendbenv(rootdir)))
-    exit(1);
+    {
+      return pool_error(pool, -1, "repo_add_rpmdb: opendbenv failed");
+    }
 
   /* XXX: should get ro lock of Packages database! */
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
   if (stat(dbpath, &packagesstat))
     {
-      perror(dbpath);
-      exit(1);
+      return pool_error(pool, -1, "repo_add_rpmdb: %s: %s", dbpath, strerror(errno));
     }
   mkrpmdbcookie(&packagesstat, newcookie);
   repodata_set_bin_checksum(data, SOLVID_META, REPOSITORY_RPMDBCOOKIE, REPOKEY_TYPE_SHA256, newcookie);
@@ -1459,23 +1461,28 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	count = count_headers(rootdir, dbenv);
       if (db_create(&db, dbenv, 0))
 	{
-	  perror("db_create");
-	  exit(1);
+	  pool_error(pool, -1, "repo_add_rpmdb: db_create: %s", strerror(errno));
+	  dbenv->close(dbenv, 0);
+	  return -1;
 	}
       if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 	{
-	  perror("db->open Packages index");
-	  exit(1);
+	  pool_error(pool, -1, "repo_add_rpmdb: db->open Packages index failed: %s", strerror(errno));
+	  db->close(db, 0);
+	  dbenv->close(dbenv, 0);
+	  return -1;
 	}
       if (db->get_byteswapped(db, &byteswapped))
 	{
-	  perror("db->get_byteswapped");
-	  exit(1);
+	  db->close(db, 0);
+	  dbenv->close(dbenv, 0);
+	  return pool_error(pool, -1, "repo_add_rpmdb: db->get_byteswapped failed");
 	}
       if (db->cursor(db, NULL, &dbc, 0))
 	{
-	  perror("db->cursor");
-	  exit(1);
+	  db->close(db, 0);
+	  dbenv->close(dbenv, 0);
+	  return pool_error(pool, -1, "repo_add_rpmdb: db->cursor failed");
 	}
       rpmheadsize = 0;
       rpmhead = 0;
@@ -1494,16 +1501,20 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
           if (dbkey.size != 4)
 	    {
-	      fprintf(stderr, "corrupt Packages database (key size)\n");
-	      exit(1);
+	      dbc->c_close(dbc);
+	      db->close(db, 0);
+	      dbenv->close(dbenv, 0);
+	      return pool_error(pool, -1, "corrupt Packages database (key size)");
 	    }
 	  dbid = db2rpmdbid(dbkey.data, byteswapped);
 	  if (dbid == 0)		/* the join key */
 	    continue;
 	  if (dbdata.size < 8)
 	    {
-	      fprintf(stderr, "corrupt rpm database (size %u)\n", dbdata.size);
-	      exit(1);
+	      dbc->c_close(dbc);
+	      db->close(db, 0);
+	      dbenv->close(dbenv, 0);
+	      return pool_error(pool, -1, "corrupt rpm database (size %u)\n", dbdata.size);
 	    }
 	  if (dbdata.size > rpmheadsize)
 	    {
@@ -1515,8 +1526,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
 	  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
 	    {
-	      fprintf(stderr, "corrupt rpm database (data size)\n");
-	      exit(1);
+	      dbc->c_close(dbc);
+	      db->close(db, 0);
+	      dbenv->close(dbenv, 0);
+	      return pool_error(pool, -1, "corrupt rpm database (data size)\n");
 	    }
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -1577,23 +1590,28 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
       memset(dircache, 0, sizeof(dircache));
       if (db_create(&db, dbenv, 0))
 	{
-	  perror("db_create");
-	  exit(1);
+	  pool_error(pool, -1, "repo_add_rpmdb: db_create: %s", strerror(errno));
+	  dbenv->close(dbenv, 0);
+	  return -1;
 	}
       if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 	{
-	  perror("db->open Name index");
-	  exit(1);
+	  pool_error(pool, -1, "repo_add_rpmdb: db->open Name index failed: %s", strerror(errno));
+	  db->close(db, 0);
+	  dbenv->close(dbenv, 0);
+	  return -1;
 	}
       if (db->get_byteswapped(db, &byteswapped))
 	{
-	  perror("db->get_byteswapped");
-	  exit(1);
+	  db->close(db, 0);
+	  dbenv->close(dbenv, 0);
+	  return pool_error(pool, -1, "repo_add_rpmdb: db->get_byteswapped failed");
 	}
       if (db->cursor(db, NULL, &dbc, 0))
 	{
-	  perror("db->cursor");
-	  exit(1);
+	  db->close(db, 0);
+	  dbenv->close(dbenv, 0);
+	  return pool_error(pool, -1, "repo_add_rpmdb: db->cursor failed");
 	}
       nrpmids = 0;
       rpmids = 0;
@@ -1691,18 +1709,22 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	    {
 	      if (db_create(&db, dbenv, 0))
 		{
-		  perror("db_create");
-		  exit(1);
+		  pool_error(pool, -1, "repo_add_rpmdb: db_create: %s", strerror(errno));
+		  dbenv->close(dbenv, 0);
+		  return -1;
 		}
 	      if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 		{
-		  perror("db->open var/lib/rpm/Packages");
-		  exit(1);
+		  pool_error(pool, -1, "repo_add_rpmdb: db->open Packages index failed: %s", strerror(errno));
+		  db->close(db, 0);
+		  dbenv->close(dbenv, 0);
+		  return -1;
 		}
 	      if (db->get_byteswapped(db, &byteswapped))
 		{
-		  perror("db->get_byteswapped");
-		  exit(1);
+		  db->close(db, 0);
+		  dbenv->close(dbenv, 0);
+		  return pool_error(pool, -1, "repo_add_rpmdb: db->get_byteswapped failed");
 		}
 	    }
           rpmdbid2db(buf, rp->dbid, byteswapped);
@@ -1712,15 +1734,15 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  dbdata.size = 0;
 	  if (db->get(db, NULL, &dbkey, &dbdata, 0))
 	    {
-	      perror("db->get");
-	      fprintf(stderr, "corrupt rpm database, key %d not found\n", dbid);
-	      fprintf(stderr, "please run 'rpm --rebuilddb' to recreate the database index files\n");
-	      exit(1);
+	      db->close(db, 0);
+	      dbenv->close(dbenv, 0);
+	      return pool_error(pool, -1, "inconsistent rpm database, key %d not found. run 'rpm --rebuilddb' to fix.", dbid);
 	    }
 	  if (dbdata.size < 8)
 	    {
-	      fprintf(stderr, "corrupt rpm database (size)\n");
-	      exit(1);
+	      db->close(db, 0);
+	      dbenv->close(dbenv, 0);
+	      return pool_error(pool, -1, "corrupt Packages database (size)");
 	    }
 	  if (dbdata.size > rpmheadsize)
 	    {
@@ -1732,8 +1754,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
 	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
 	  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
 	    {
-	      fprintf(stderr, "corrupt rpm database (data size)\n");
-	      exit(1);
+	      db->close(db, 0);
+	      dbenv->close(dbenv, 0);
+	      return pool_error(pool, -1, "corrupt Packages database (data size)");
 	    }
 	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
 	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -2191,6 +2214,8 @@ rpm_query(void *rpmhandle, Id what)
       if (!arch)
 	arch = "noarch";
       evr = headtoevr(rpmhead);
+      if (!evr)
+	break;
       l = strlen(name) + 1 + strlen(evr) + 1 + strlen(arch) + 1;
       r = solv_malloc(l);
       sprintf(r, "%s-%s.%s", name, evr, arch);

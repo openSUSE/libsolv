@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <errno.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -420,10 +421,7 @@ repo_add_debdb(Repo *repo, const char *rootdir, int flags)
   if (rootdir)
     path = pool_tmpjoin(repo->pool, rootdir, path, 0);
   if ((fp = fopen(path, "r")) == 0)
-    {
-      perror(path);
-      exit(1);
-    }
+    return pool_error(repo->pool, -1, "%s: %s", path, strerror(errno));
   repo_add_debpackages(repo, fp, flags);
   fclose(fp);
   return 0;

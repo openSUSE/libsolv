@@ -94,6 +94,7 @@ struct deltarpm {
 };
 
 struct parsedata {
+  int ret;
   int depth;
   enum state state;
   int statedepth;
@@ -296,7 +297,6 @@ startElement(void *userData, const char *name, const char **atts)
     {
 #if 0
       fprintf(stderr, "into unknown: [%d]%s (from: %d)\n", sw->to, name, sw->from);
-      exit( 1 );
 #endif
       return;
     }
@@ -514,8 +514,8 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pool, SOLV_FATAL, "repo_updateinfoxml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  exit(1);
+	  pd.ret = pool_error(pool, -1, "repo_updateinfoxml: %s at line %u:%u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  break;
 	}
       if (l == 0)
 	break;
@@ -524,13 +524,14 @@ repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
   solv_free(pd.content);
 
   /* now commit all handles */
-  for (i = 0; i < pd.nhandles; i++)
-    repodata_add_flexarray(pd.data, SOLVID_META, REPOSITORY_DELTAINFO, pd.handles[i]);
+  if (!pd.ret)
+    for (i = 0; i < pd.nhandles; i++)
+      repodata_add_flexarray(pd.data, SOLVID_META, REPOSITORY_DELTAINFO, pd.handles[i]);
   solv_free(pd.handles);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-  return 0;
+  return pd.ret;
 }
 
 /* EOF */

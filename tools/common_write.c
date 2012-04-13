@@ -180,7 +180,11 @@ write_info(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   Queue keyq;
 
   queue_init(&keyq);
-  repo_write_filtered(repo, fp, keyfilter, kfdata, &keyq);
+  if (repo_write_filtered(repo, fp, keyfilter, kfdata, &keyq) != 0)
+    {
+      fprintf(stderr, "repo_write failed\n");
+      exit(1);
+    }
   h = repodata_new_handle(info);
   if (keyq.count)
     repodata_set_idarray(info, h, REPOSITORY_KEYS, &keyq);
@@ -298,8 +302,16 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       kd.languages = languages;
       kd.nlanguages = nlanguages;
       repodata_internalize(info);
-      repo_write_filtered(repo, fp, keyfilter_other, &kd, 0);
-      fclose(fp);
+      if (repo_write_filtered(repo, fp, keyfilter_other, &kd, 0) != 0)
+	{
+	  fprintf(stderr, "repo_write failed\n");
+	  exit(1);
+	}
+      if (fclose(fp) != 0)
+	{
+	  perror("fclose");
+	  exit(1);
+	}
       for (i = 0; i < nlanguages; i++)
 	free(languages[i]);
       solv_free(languages);
@@ -316,7 +328,11 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       kd.haveexternal = 1;
     }
   repodata_internalize(info);
-  repo_write_filtered(repo, stdout, keyfilter_solv, &kd, 0);
+  if (repo_write_filtered(repo, stdout, keyfilter_solv, &kd, 0) != 0)
+    {
+      fprintf(stderr, "repo_write failed\n");
+      exit(1);
+    }
   repodata_free(info);
   return 0;
 }

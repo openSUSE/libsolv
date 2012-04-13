@@ -140,6 +140,9 @@ struct _Pool {
 
   /* our tmp space string space */
   struct _Pool_tmpspace tmpspace;
+
+  char *errstr;			/* last error string */
+  int errstra;			/* allocated space for errstr */
 #endif
 
 };
@@ -224,6 +227,9 @@ extern char *pool_tmpappend(Pool *pool, const char *str1, const char *str2, cons
 extern const char *pool_bin2hex(Pool *pool, const unsigned char *buf, int len);
 
 extern void pool_set_installed(Pool *pool, struct _Repo *repo);
+
+extern int  pool_error(Pool *pool, int ret, const char *format, ...) __attribute__((format(printf, 3, 4)));
+extern char *pool_errstr(Pool *pool);
 
 /**
  * Solvable management

@@ -1299,6 +1299,7 @@ repomd_load_ext(Repo *repo, Repodata *data)
   struct repoinfo *cinfo;
   const unsigned char *filechksum;
   Id filechksumtype;
+  int r;
 
   cinfo = repo->appdata;
   repomdtype = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_TYPE);
@@ -1325,10 +1326,15 @@ repomd_load_ext(Repo *repo, Repodata *data)
   if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
     return 0;
   if (!strcmp(ext, "FL"))
-    repo_add_rpmmd(repo, fp, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+    r = repo_add_rpmmd(repo, fp, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
   else if (!strcmp(ext, "DL"))
-    repo_add_deltainfoxml(repo, fp, REPO_USE_LOADING);
+    r = repo_add_deltainfoxml(repo, fp, REPO_USE_LOADING);
   fclose(fp);
+  if (r)
+    {
+      printf("%s\n", pool_errstr(repo->pool));
+      return 0;
+    }
   writecachedrepo(repo, data, ext, cinfo->extcookie);
   return 1;
 }
@@ -1468,7 +1474,12 @@ susetags_load_ext(Repo *repo, Repodata *data)
   filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
   if ((fp = curlfopen(cinfo, pool_tmpjoin(repo->pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
     return 0;
-  repo_add_susetags(repo, fp, defvendor, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+  if (repo_add_susetags(repo, fp, defvendor, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES))
+    {
+      fclose(fp);
+      printf("%s\n", pool_errstr(repo->pool));
+      return 0;
+    }
   fclose(fp);
   writecachedrepo(repo, data, ext, cinfo->extcookie);
   return 1;
@@ -1669,24 +1680,42 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 # if defined(ENABLE_SUSEREPO) && defined(PRODUCTS_PATH)
-      repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE);
+      if (repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE))
+	{
+	  fprintf(stderr, "product reading failed: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
 # endif
       if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
 	{
 	  Repo *ref = repo_create(pool, "@System.old");
 	  if (!repo_add_solv(ref, ofp, 0))
 	    {
-	      repo_add_rpmdb(repo, ref, 0, REPO_REUSE_REPODATA);
+	      if (repo_add_rpmdb(repo, ref, 0, REPO_REUSE_REPODATA))
+		{
+		  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
+		  exit(1);
+		}
 	      done = 1;
 	    }
 	  fclose(ofp);
 	  repo_free(ref, 1);
 	}
       if (!done)
-        repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA);
+	{
+	  if (repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA))
+	    {
+	      fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
+	      exit(1);
+	    }
+	}
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
-      repo_add_debdb(repo, 0, REPO_REUSE_REPODATA);
+      if (repo_add_debdb(repo, 0, REPO_REUSE_REPODATA))
+	{
+	  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
 #endif
       writecachedrepo(repo, 0, 0, installedcookie);
     }
@@ -1756,13 +1785,22 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 		}
 	      fclose(sigfp);
 	    }
-	  repo_add_repomdxml(repo, fp, 0);
+	  if (repo_add_repomdxml(repo, fp, 0))
+	    {
+	      printf("repomd.xml: %s\n", pool_errstr(pool));
+	      fclose(fp);
+	      break;	/* hopeless */
+	    }
 	  fclose(fp);
 	  printf(" fetching\n");
 	  filename = repomd_find(repo, "primary", &filechksum, &filechksumtype);
 	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
 	    {
-	      repo_add_rpmmd(repo, fp, 0, 0);
+	      if (repo_add_rpmmd(repo, fp, 0, 0))
+		{
+	          printf("primary: %s\n", pool_errstr(pool));
+		  badchecksum = 1;
+		}
 	      fclose(fp);
 	    }
 	  if (badchecksum)
@@ -1771,7 +1809,11 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  filename = repomd_find(repo, "updateinfo", &filechksum, &filechksumtype);
 	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
 	    {
-	      repo_add_updateinfoxml(repo, fp, 0);
+	      if (repo_add_updateinfoxml(repo, fp, 0))
+		{
+	          printf("updateinfo: %s\n", pool_errstr(pool));
+		  badchecksum = 1;
+		}
 	      fclose(fp);
 	    }
 
@@ -1829,7 +1871,12 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 		  fclose(sigfp);
 		}
 	    }
-	  repo_add_content(repo, fp, 0);
+	  if (repo_add_content(repo, fp, 0))
+	    {
+	      printf("content: %s\n", pool_errstr(pool));
+	      fclose(fp);
+	      break;	/* hopeless */
+	    }
 	  fclose(fp);
 	  defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
 	  descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
@@ -1846,7 +1893,12 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  printf(" fetching\n");
 	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) == 0)
 	    break;	/* hopeless */
-	  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|SUSETAGS_RECORD_SHARES);
+	  if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|SUSETAGS_RECORD_SHARES))
+	    {
+	      printf("packages: %s\n", pool_errstr(pool));
+	      fclose(fp);
+	      break;	/* hopeless */
+	    }
 	  fclose(fp);
 	  /* add default language */
 	  filename = susetags_find(repo, "packages.en.gz", &filechksum, &filechksumtype);
@@ -1856,7 +1908,11 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    {
 	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
 		{
-		  repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|REPO_REUSE_REPODATA|REPO_EXTEND_SOLVABLES);
+		  if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|REPO_REUSE_REPODATA|REPO_EXTEND_SOLVABLES))
+		    {
+		      printf("packages.en: %s\n", pool_errstr(pool));
+		      badchecksum = 1;
+		    }
 		  fclose(fp);
 		}
 	    }
@@ -1877,7 +1933,11 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 		      filename = susetags_find(repo, pbuf, &filechksum, &filechksumtype);
 		      if (filename && (fp2 = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
 			{
-			  repo_add_susetags(repo, fp2, defvendor, 0, REPO_NO_INTERNALIZE);
+			  if (repo_add_susetags(repo, fp2, defvendor, 0, REPO_NO_INTERNALIZE))
+			    {
+			      printf("%s: %s\n", pbuf, pool_errstr(pool));
+			      badchecksum = 1;
+			    }
 			  fclose(fp2);
 			}
 		    }
@@ -1947,7 +2007,11 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 		}
 	      if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
 		{
-	          repo_add_debpackages(repo, fp, 0);
+	          if (repo_add_debpackages(repo, fp, 0))
+		    {
+		      printf("component %s: %s\n", cinfo->components[j], pool_errstr(pool));
+		      badchecksum = 1;
+		    }
 		  fclose(fp);
 		}
 	      solv_free((char *)filechksum);

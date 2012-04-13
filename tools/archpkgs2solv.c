@@ -117,7 +117,11 @@ main(int argc, char **argv)
   repo = repo_create(pool, "archpkgs2solv");
   repo_add_repodata(repo, 0);
   for (i = 0; i < npkgs; i++)
-    repo_add_arch_pkg(repo, pkgs[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|flags);
+    if (repo_add_arch_pkg(repo, pkgs[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|flags) != 0)
+      {
+	fprintf(stderr, "archpkgs2solv: %s\n", pool_errstr(pool));
+	exit(1);
+      }
   repo_internalize(repo);
   tool_write(repo, basefile, 0);
   pool_free(pool);

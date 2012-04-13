@@ -111,7 +111,11 @@ main(int argc, char **argv)
       rpms[nrpms++] = strdup(argv[optind++]);
     }
   repo = repo_create(pool, "rpms2solv");
-  repo_add_rpms(repo, rpms, nrpms, 0);
+  if (repo_add_rpms(repo, rpms, nrpms, 0))
+    {
+      fprintf(stderr, "rpms2solv: %s\n", pool_errstr(pool));
+      exit(1);
+    }
   tool_write(repo, basefile, 0);
   pool_free(pool);
   for (c = 0; c < nrpms; c++)

@@ -150,6 +150,7 @@ static struct stateswitch stateswitches[] = {
 
 
 struct parsedata {
+  int ret;
   int depth;
   enum state state;
   int statedepth;
@@ -306,10 +307,7 @@ startElement(void *userData, const char *name, const char **atts)
         const char *type= find_attr("type", atts);
         pd->chksumtype = type && *type ? solv_chksum_str2type(type) : 0;
 	if (!pd->chksumtype)
-	  {
-            fprintf(stderr, "Unknown checksum type: %d: %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), type ? type : "NULL");
-            exit(1);
-	  }
+          pd->ret = pool_error(pd->pool, -1, "line %d: unknown checksum type: %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), type ? type : "NULL");
         break;
       }
     default:
@@ -354,12 +352,12 @@ endElement(void *userData, const char *name)
 
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
+      if (!pd->chksumtype)
+	break;
       if (strlen(pd->content) != 2 * solv_chksum_len(pd->chksumtype))
-	{
-	  fprintf(stderr, "Invalid checksum length: %d: for %s\n", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
-	  exit(1);
-	}
-      repodata_set_checksum(pd->data, pd->rdhandle, pd->state == STATE_CHECKSUM ? REPOSITORY_REPOMD_CHECKSUM : REPOSITORY_REPOMD_OPENCHECKSUM, pd->chksumtype, pd->content);
+        pd->ret = pool_error(pd->pool, -1, "line %d: invalid checksum length for %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
+      else
+        repodata_set_checksum(pd->data, pd->rdhandle, pd->state == STATE_CHECKSUM ? REPOSITORY_REPOMD_CHECKSUM : REPOSITORY_REPOMD_OPENCHECKSUM, pd->chksumtype, pd->content);
       break;
 
     case STATE_TIMESTAMP:
@@ -486,8 +484,8 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-	  pool_debug(pool, SOLV_FATAL, "repo_repomdxml: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  exit(1);
+	  pd.ret = pool_error(pool, -1, "repo_repomdxml: %s at line %u:%u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  break;
 	}
       if (l == 0)
 	break;
@@ -498,7 +496,7 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
     repodata_internalize(data);
 
   free(pd.content);
-  return 0;
+  return pd.ret;
 }
 
 /* EOF */

@@ -60,8 +60,7 @@ read_u32(Repodata *data)
       c = getc(data->fp);
       if (c == EOF)
 	{
-	  pool_debug(data->repo->pool, SOLV_ERROR, "unexpected EOF\n");
-	  data->error = SOLV_ERROR_EOF;
+	  data->error = pool_error(data->repo->pool, SOLV_ERROR_EOF, "unexpected EOF");
 	  return 0;
 	}
       x = (x << 8) | c;
@@ -84,8 +83,7 @@ read_u8(Repodata *data)
   c = getc(data->fp);
   if (c == EOF)
     {
-      pool_debug(data->repo->pool, SOLV_ERROR, "unexpected EOF\n");
-      data->error = SOLV_ERROR_EOF;
+      data->error = pool_error(data->repo->pool, SOLV_ERROR_EOF, "unexpected EOF");
       return 0;
     }
   return c;
@@ -109,8 +107,7 @@ read_id(Repodata *data, Id max)
       c = getc(data->fp);
       if (c == EOF)
 	{
-          pool_debug(data->repo->pool, SOLV_ERROR, "unexpected EOF\n");
-	  data->error = SOLV_ERROR_EOF;
+	  data->error = pool_error(data->repo->pool, SOLV_ERROR_EOF, "unexpected EOF");
 	  return 0;
 	}
       if (!(c & 128))
@@ -118,16 +115,14 @@ read_id(Repodata *data, Id max)
 	  x = (x << 7) | c;
 	  if (max && x >= max)
 	    {
-              pool_debug(data->repo->pool, SOLV_ERROR, "read_id: id too large (%u/%u)\n", x, max);
-	      data->error = SOLV_ERROR_ID_RANGE;
+	      data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "read_id: id too large (%u/%u)", x, max);
 	      return 0;
 	    }
 	  return x;
 	}
       x = (x << 7) ^ c ^ 128;
     }
-  pool_debug(data->repo->pool, SOLV_ERROR, "read_id: id too long\n");
-  data->error = SOLV_ERROR_CORRUPT;
+  data->error = pool_error(data->repo->pool, SOLV_ERROR_CORRUPT, "read_id: id too long");
   return 0;
 }
 
@@ -145,8 +140,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
       c = getc(data->fp);
       if (c == EOF)
 	{
-	  pool_debug(data->repo->pool, SOLV_ERROR, "unexpected EOF\n");
-	  data->error = SOLV_ERROR_EOF;
+	  data->error = pool_error(data->repo->pool, SOLV_ERROR_EOF, "unexpected EOF");
 	  return 0;
 	}
       if ((c & 128) != 0)
@@ -157,15 +151,14 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
       x = (x << 6) | (c & 63);
       if (max && x >= max)
 	{
-	  pool_debug(data->repo->pool, SOLV_ERROR, "read_idarray: id too large (%u/%u)\n", x, max);
-	  data->error = SOLV_ERROR_ID_RANGE;
+	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "read_idarray: id too large (%u/%u)", x, max);
 	  return 0;
 	}
       if (map)
 	x = map[x];
       if (store == end)
 	{
-	  pool_debug(data->repo->pool, SOLV_ERROR, "read_idarray: array overflow\n");
+	  data->error = pool_error(data->repo->pool, SOLV_ERROR_OVERFLOW, "read_idarray: array overflow");
 	  return 0;
 	}
       *store++ = x;
@@ -175,8 +168,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
 	    return store;
 	  if (store == end)
 	    {
-	      pool_debug(data->repo->pool, SOLV_ERROR, "read_idarray: array overflow\n");
-	      data->error = SOLV_ERROR_OVERFLOW;
+	      data->error = pool_error(data->repo->pool, SOLV_ERROR_OVERFLOW, "read_idarray: array overflow");
 	      return 0;
 	    }
 	  *store++ = 0;
@@ -202,8 +194,7 @@ data_read_id_max(unsigned char *dp, Id *ret, Id *map, int max, Repodata *data)
   dp = data_read_id(dp, &x);
   if (x < 0 || (max && x >= max))
     {
-      pool_debug(data->repo->pool, SOLV_ERROR, "data_read_id_max: id too large (%u/%u)\n", x, max);
-      data->error = SOLV_ERROR_ID_RANGE;
+      data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "data_read_id_max: id too large (%u/%u)", x, max);
       x = 0;
     }
   *ret = map ? map[x] : x;
@@ -228,7 +219,7 @@ data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, Repodata *da
       x = (x << 6) | (c & 63);
       if (max && x >= max)
 	{
-	  pool_debug(data->repo->pool, SOLV_ERROR, "data_read_idarray: id too large (%u/%u)\n", x, max);
+	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "data_read_idarray: id too large (%u/%u)", x, max);
 	  data->error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
@@ -272,8 +263,7 @@ data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, Repodata
       old = x;
       if (max && x >= max)
 	{
-	  pool_debug(data->repo->pool, SOLV_ERROR, "data_read_rel_idarray: id too large (%u/%u)\n", x, max);
-	  data->error = SOLV_ERROR_ID_RANGE;
+	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "data_read_rel_idarray: id too large (%u/%u)", x, max);
 	  break;
 	}
       *store++ = map ? map[x] : x;
@@ -393,8 +383,7 @@ incore_map_idarray(Repodata *data, unsigned char *dp, Id *map, Id max)
       dp = data_read_ideof(dp, &id, &eof);
       if (id < 0 || (max && id >= max))
 	{
-	  pool_debug(data->repo->pool, SOLV_ERROR, "incore_map_idarray: id too large (%u/%u)\n", id, max);
-	  data->error = SOLV_ERROR_ID_RANGE;
+	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "incore_map_idarray: id too large (%u/%u)", id, max);
 	  break;
 	}
       id = map[id];
@@ -521,18 +510,14 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   repopagestore_init(&data.store);
 
   if (read_u32(&data) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
-    {
-      pool_debug(pool, SOLV_ERROR, "not a SOLV file\n");
-      return SOLV_ERROR_NOT_SOLV;
-    }
+     return pool_error(pool, SOLV_ERROR_NOT_SOLV, "not a SOLV file");
   solvversion = read_u32(&data);
   switch (solvversion)
     {
       case SOLV_VERSION_8:
 	break;
       default:
-        pool_debug(pool, SOLV_ERROR, "unsupported SOLV version\n");
-        return SOLV_ERROR_UNSUPPORTED;
+        return pool_error(pool, SOLV_ERROR_UNSUPPORTED, "unsupported SOLV version");
     }
 
   numid = read_u32(&data);
@@ -544,30 +529,18 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   solvflags = read_u32(&data);
 
   if (numdir && numdir < 2)
-    {
-      pool_debug(pool, SOLV_ERROR, "bad number of dirs\n");
-      return SOLV_ERROR_CORRUPT;
-    }
+    return pool_error(pool, SOLV_ERROR_CORRUPT, "bad number of dirs");
 
   if (numrel && (flags & REPO_LOCALPOOL) != 0)
-    {
-      pool_debug(pool, SOLV_ERROR, "relations are forbidden in a local pool\n");
-      return SOLV_ERROR_CORRUPT;
-    }
+    return pool_error(pool, SOLV_ERROR_CORRUPT, "relations are forbidden in a local pool");
   if ((flags & REPO_EXTEND_SOLVABLES) && numsolv)
     {
       /* make sure that we exactly replace the stub repodata */
       if (extendend - extendstart != numsolv)
-	{
-	  pool_debug(pool, SOLV_ERROR, "sub-repository solvable number does not match main repository (%d - %d)\n", extendend - extendstart, numsolv);
-	  return SOLV_ERROR_CORRUPT;
-	}
+	return pool_error(pool, SOLV_ERROR_CORRUPT, "sub-repository solvable number does not match main repository (%d - %d)", extendend - extendstart, numsolv);
       for (i = 0; i < numsolv; i++)
 	if (pool->solvables[extendstart + i].repo != repo)
-	  {
-	    pool_debug(pool, SOLV_ERROR, "main repository contains holes, cannot extend\n");
-	    return SOLV_ERROR_CORRUPT;
-	  }
+	  return pool_error(pool, SOLV_ERROR_CORRUPT, "main repository contains holes, cannot extend");
     }
 
   /*******  Part 1: string IDs  *****************************************/
@@ -615,10 +588,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   if ((solvflags & SOLV_FLAG_PREFIX_POOL) == 0)
     {
       if (sizeid && fread(strsp, sizeid, 1, fp) != 1)
-	{
-	  pool_debug(pool, SOLV_ERROR, "read error while reading strings\n");
-	  return SOLV_ERROR_EOF;
-	}
+        return pool_error(pool, SOLV_ERROR_EOF, "read error while reading strings");
     }
   else
     {
@@ -631,9 +601,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 
       if (pfsize && fread(prefix, pfsize, 1, fp) != 1)
         {
-	  pool_debug(pool, SOLV_ERROR, "read error while reading strings\n");
 	  solv_free(prefix);
-	  return SOLV_ERROR_EOF;
+          return pool_error(pool, SOLV_ERROR_EOF, "read error while reading strings");
 	}
       for (i = 1; i < numid; i++)
         {
@@ -642,9 +611,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	  freesp -= same + len;
 	  if (freesp < 0)
 	    {
-	      pool_debug(pool, SOLV_ERROR, "overflow while expanding strings\n");
 	      solv_free(prefix);
-	      return SOLV_ERROR_OVERFLOW;
+	      return pool_error(pool, SOLV_ERROR_OVERFLOW, "overflow while expanding strings");
 	    }
 	  if (same)
 	    memcpy(dest, old_str, same);
@@ -655,10 +623,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	}
       solv_free(prefix);
       if (freesp != 0)
-	{
-	  pool_debug(pool, SOLV_ERROR, "expanding strings size mismatch\n");
-	  return SOLV_ERROR_CORRUPT;
-	}
+	return pool_error(pool, SOLV_ERROR_CORRUPT, "expanding strings size mismatch");
     }
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
@@ -672,16 +637,12 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       if (*sp)
 	{
 	  /* we need the '' for directories */
-	  pool_debug(pool, SOLV_ERROR, "store strings don't start with ''\n");
-	  return SOLV_ERROR_CORRUPT;
+	  return pool_error(pool, SOLV_ERROR_CORRUPT, "store strings don't start with an empty string");
 	}
       for (i = 1; i < spool->nstrings; i++)
 	{
 	  if (sp >= strsp + sizeid)
-	    {
-	      pool_debug(pool, SOLV_ERROR, "not enough strings\n");
-	      return SOLV_ERROR_OVERFLOW;
-	    }
+	    return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings");
 	  str[i] = sp - spool->stringspace;
 	  sp += strlen(sp) + 1;
 	}
@@ -729,8 +690,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	    {
 	      solv_free(hashtbl);
 	      solv_free(idmap);
-	      pool_debug(pool, SOLV_ERROR, "not enough strings %d %d\n", i, numid);
-	      return SOLV_ERROR_OVERFLOW;
+	      return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings %d %d", i, numid);
 	    }
 	  if (!*sp)			       /* empty string */
 	    {
@@ -907,8 +867,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
         type = pool_str2id(pool, stringpool_id2str(spool, type), 1);
       if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_FLEXARRAY)
 	{
-	  pool_debug(pool, SOLV_ERROR, "unsupported data type '%s'\n", pool_id2str(pool, type));
-	  data.error = SOLV_ERROR_UNSUPPORTED;
+	  data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "unsupported data type '%s'", pool_id2str(pool, type));
 	  type = REPOKEY_TYPE_VOID;
 	}
       keys[i].name = id;
@@ -919,31 +878,19 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       if (keys[i].storage == KEY_STORAGE_SOLVABLE)
 	keys[i].storage = KEY_STORAGE_INCORE;
       if (keys[i].storage != KEY_STORAGE_INCORE && keys[i].storage != KEY_STORAGE_VERTICAL_OFFSET)
-	{
-	  pool_debug(pool, SOLV_ERROR, "unsupported storage type %d\n", keys[i].storage);
-	  data.error = SOLV_ERROR_UNSUPPORTED;
-	}
+	data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "unsupported storage type %d", keys[i].storage);
       if (id >= SOLVABLE_NAME && id <= RPM_RPMDBID)
 	{
 	  if (keys[i].storage != KEY_STORAGE_INCORE)
-	    {
-	      pool_debug(pool, SOLV_ERROR, "main solvable data must use incore storage%d\n", keys[i].storage);
-	      data.error = SOLV_ERROR_UNSUPPORTED;
-	    }
+	    data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "main solvable data must use incore storage %d", keys[i].storage);
 	  keys[i].storage = KEY_STORAGE_SOLVABLE;
 	}
       /* cannot handle rel idarrays in incore/vertical */
       if (type == REPOKEY_TYPE_REL_IDARRAY && keys[i].storage != KEY_STORAGE_SOLVABLE)
-	{
-	  pool_debug(pool, SOLV_ERROR, "type REL_IDARRAY is only supported for STORAGE_SOLVABLE\n");
-	  data.error = SOLV_ERROR_UNSUPPORTED;
-	}
+	data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "type REL_IDARRAY is only supported for STORAGE_SOLVABLE");
       /* cannot handle mapped ids in vertical */
       if (!(flags & REPO_LOCALPOOL) && keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET && (type == REPOKEY_TYPE_ID || type == REPOKEY_TYPE_IDARRAY))
-	{
-	  pool_debug(pool, SOLV_ERROR, "mapped ids are not supported for STORAGE_VERTICAL_OFFSET\n");
-	  data.error = SOLV_ERROR_UNSUPPORTED;
-	}
+	data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "mapped ids are not supported for STORAGE_VERTICAL_OFFSET");
  
       if (keys[i].type == REPOKEY_TYPE_CONSTANTID && idmap)
 	keys[i].size = idmap[keys[i].size];
@@ -1012,8 +959,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     l = allsize;
   if (!l || fread(buf, l, 1, data.fp) != 1)
     {
-      pool_debug(pool, SOLV_ERROR, "unexpected EOF\n");
-      data.error = SOLV_ERROR_EOF;
+      data.error = pool_error(pool, SOLV_ERROR_EOF, "unexpected EOF");
       id = 0;
     }
   else
@@ -1047,8 +993,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	    break;
 	  if (left < 0)
 	    {
-	      pool_debug(pool, SOLV_ERROR, "buffer overrun\n");
-	      data.error = SOLV_ERROR_EOF;
+              data.error = pool_error(pool, SOLV_ERROR_EOF, "buffer overrun");
 	      break;
 	    }
 	  if (left < maxsize)
@@ -1062,8 +1007,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 		l = allsize;
 	      if (l && fread(buf + left, l, 1, data.fp) != 1)
 		{
-		  pool_debug(pool, SOLV_ERROR, "unexpected EOF\n");
-		  data.error = SOLV_ERROR_EOF;
+		  data.error = pool_error(pool, SOLV_ERROR_EOF, "unexpected EOF");
 		  break;
 		}
 	      allsize -= l;
@@ -1173,8 +1117,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	    dp = data_read_rel_idarray(dp, &idarraydatap, idmap, numid + numrel, &data, 0);
 	  if (idarraydatap > idarraydataend)
 	    {
-	      pool_debug(pool, SOLV_ERROR, "idarray overflow\n");
-	      data.error = SOLV_ERROR_OVERFLOW;
+	      data.error = pool_error(pool, SOLV_ERROR_OVERFLOW, "idarray overflow");
 	      break;
 	    }
 	  if (id == SOLVABLE_PROVIDES)
@@ -1205,8 +1148,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	    needchunk = 1;
           if (keydepth == sizeof(stack)/sizeof(*stack))
 	    {
-	      pool_debug(pool, SOLV_ERROR, "array stack overflow\n");
-	      data.error = SOLV_ERROR_CORRUPT;
+	      data.error = pool_error(pool, SOLV_ERROR_OVERFLOW, "array stack overflow");
 	      break;
 	    }
 	  stack[keydepth++] = nentries;
@@ -1226,14 +1168,12 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	      /* horray! here come the solvables */
 	      if (nentries != numsolv)
 		{
-		  pool_debug(pool, SOLV_ERROR, "inconsistent number of solvables: %d %d\n", nentries, numsolv);
-		  data.error = SOLV_ERROR_CORRUPT;
+		  data.error = pool_error(pool, SOLV_ERROR_CORRUPT, "inconsistent number of solvables: %d %d", nentries, numsolv);
 		  break;
 		}
 	      if (idarraydatap)
 		{
-		  pool_debug(pool, SOLV_ERROR, "more than one solvable block\n");
-		  data.error = SOLV_ERROR_CORRUPT;
+		  data.error = pool_error(pool, SOLV_ERROR_CORRUPT, "more than one solvable block");
 		  break;
 		}
 	      if ((flags & REPO_EXTEND_SOLVABLES) != 0)
@@ -1266,10 +1206,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	  if (keys[key].type == REPOKEY_TYPE_FIXARRAY)
 	    {
 	      if (!id)
-		{
-		  pool_debug(pool, SOLV_ERROR, "illegal fixarray\n");
-		  data.error = SOLV_ERROR_CORRUPT;
-		}
+		data.error = pool_error(pool, SOLV_ERROR_CORRUPT, "illegal fixarray");
 	      stack[keydepth - 1] = id;
 	    }
 	  keyp = schemadata + schemata[id];
@@ -1306,17 +1243,11 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
   /* should shrink idarraydata again */
 
   if (keydepth)
-    {
-      pool_debug(pool, SOLV_ERROR, "unexpected EOF, depth = %d\n", keydepth);
-      data.error = SOLV_ERROR_CORRUPT;
-    }
+    data.error = pool_error(pool, SOLV_ERROR_EOF, "unexpected EOF, depth = %d", keydepth);
   if (!data.error)
     {
       if (dp > bufend)
-        {
-	  pool_debug(pool, SOLV_ERROR, "buffer overrun\n");
-	  data.error = SOLV_ERROR_EOF;
-        }
+	data.error = pool_error(pool, SOLV_ERROR_EOF, "buffer overrun");
     }
   solv_free(buf);
 
@@ -1357,6 +1288,10 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       data.lastverticaloffset = fileoffset;
       pagesize = read_u32(&data);
       data.error = repopagestore_read_or_setup_pages(&data.store, data.fp, pagesize, fileoffset);
+      if (data.error == SOLV_ERROR_EOF)
+        pool_error(pool, data.error, "repopagestore setup: unexpected EOF");
+      else if (data.error)
+        pool_error(pool, data.error, "repopagestore setup failed");
     }
   else
     {

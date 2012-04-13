@@ -112,7 +112,11 @@ main(int argc, char **argv)
           break;
         }
     }
-  repo_add_repomdxml(repo, stdin, flags);
+  if (repo_add_repomdxml(repo, stdin, flags))
+    {
+      fprintf(stderr, "repomdxml2solv: %s\n", pool_errstr(pool));
+      exit(1);
+    }
   if (query)
     doquery(pool, repo, query);
   else

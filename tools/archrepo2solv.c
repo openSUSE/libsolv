@@ -46,7 +46,7 @@ main(int argc, char **argv)
 {
   Pool *pool;
   Repo *repo;
-  int c;
+  int c, ret;
   const char *localdb = 0;
 
   while ((c = getopt(argc, argv, "hl:")) >= 0)
@@ -67,9 +67,14 @@ main(int argc, char **argv)
   pool = pool_create();
   repo = repo_create(pool, "<stdin>");
   if (localdb)
-    repo_add_arch_local(repo, localdb, 0);
+    ret = repo_add_arch_local(repo, localdb, 0);
   else
-    repo_add_arch_repo(repo, stdin, 0);
+    ret = repo_add_arch_repo(repo, stdin, 0);
+  if (ret)
+    {
+      fprintf(stderr, "archrepo2solv: %s\n", pool_errstr(pool));
+      exit(1);
+    }
   tool_write(repo, 0, 0);
   pool_free(pool);
   exit(0);
