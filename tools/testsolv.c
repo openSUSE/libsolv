@@ -150,6 +150,7 @@ main(int argc, char **argv)
 	  solver_free(solv);
 	}
       pool_free(pool);
+      fclose(fp);
     }
   exit(ex);
 }
