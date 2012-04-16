@@ -213,6 +213,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   char *defvendor = 0;
 
   int i = 0;
+  int res = 0;
 
   /* architectures
      we use the first architecture in BASEARCHS or noarch
@@ -339,13 +340,15 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      type = solv_chksum_str2type(checksumtype);
 	      if (!type)
 		{
-		  fprintf(stderr, "Unknown checksum type: %s: %s\n", value, checksumtype);
+		  pool_error(pool, -1, "%s: unknown checksum type '%s'", value, checksumtype);
+		  res = 1;
 		  continue;
 		}
               l = solv_chksum_len(type);
 	      if (strlen(checksum) != 2 * l)
 	        {
-		  fprintf(stderr, "Invalid checksum length: %s: for %s\n", value, checksum);
+		  pool_error(pool, -1, "%s: invalid checksum length for %s", value, checksumtype);
+		  res = 1;
 		  continue;
 	        }
 	      fh = repodata_new_handle(data);
@@ -545,5 +548,5 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   solv_free(otherarchs);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-  return 0;
+  return res;
 }

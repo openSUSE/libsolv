@@ -193,7 +193,7 @@ write_info(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
   repodata_add_flexarray(info, SOLVID_META, REPOSITORY_EXTERNAL, h);
 }
 
-int
+void
 tool_write(Repo *repo, const char *basename, const char *attrname)
 {
   Repodata *data;
@@ -316,7 +316,6 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	free(languages[i]);
       solv_free(languages);
       repodata_free(info);
-      return 0;
     }
   if (attrname)
     {
@@ -334,5 +333,4 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       exit(1);
     }
   repodata_free(info);
-  return 0;
 }

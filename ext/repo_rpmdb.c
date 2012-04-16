@@ -1803,10 +1803,10 @@ getu32(const unsigned char *dp)
 }
 
 
-int
-repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
+Id
+repo_add_rpm(Repo *repo, const char *rpm, int flags)
 {
-  int i, sigdsize, sigcnt, l;
+  int sigdsize, sigcnt, l;
   Pool *pool = repo->pool;
   Solvable *s;
   RpmHead *rpmhead = 0;
@@ -1828,189 +1828,178 @@ repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags)
     chksumtype = REPOKEY_TYPE_SHA256;
   else if ((flags & RPM_ADD_WITH_SHA1SUM) != 0)
     chksumtype = REPOKEY_TYPE_SHA1;
-  for (i = 0; i < nrpms; i++)
+
+  if ((fp = fopen(rpm, "r")) == 0)
     {
-      if ((fp = fopen(rpms[i], "r")) == 0)
-	{
-	  perror(rpms[i]);
-	  continue;
-	}
-      if (fstat(fileno(fp), &stb))
-	{
-	  perror("stat");
-	  continue;
-	}
-      if (chksumh)
-	chksumh = solv_chksum_free(chksumh, 0);
-      if (chksumtype)
-	chksumh = solv_chksum_create(chksumtype);
-      if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
-	{
-	  fprintf(stderr, "%s: not a rpm\n", rpms[i]);
-	  fclose(fp);
-	  continue;
-	}
-      if (chksumh)
-	solv_chksum_add(chksumh, lead, 96 + 16);
-      if (lead[78] != 0 || lead[79] != 5)
-	{
-	  fprintf(stderr, "%s: not a V5 header\n", rpms[i]);
-	  fclose(fp);
-	  continue;
-	}
-      if (getu32(lead + 96) != 0x8eade801)
-	{
-	  fprintf(stderr, "%s: bad signature header\n", rpms[i]);
-	  fclose(fp);
-	  continue;
-	}
-      sigcnt = getu32(lead + 96 + 8);
-      sigdsize = getu32(lead + 96 + 12);
-      if (sigcnt >= 0x4000000 || sigdsize >= 0x40000000)
-	{
-	  fprintf(stderr, "%s: bad signature header\n", rpms[i]);
-	  fclose(fp);
-	  continue;
-	}
-      sigdsize += sigcnt * 16;
-      sigdsize = (sigdsize + 7) & ~7;
-      headerstart = 96 + 16 + sigdsize;
-      gotpkgid = 0;
-      if ((flags & RPM_ADD_WITH_PKGID) != 0)
-	{
-	  unsigned char *chksum;
-	  unsigned int chksumsize;
-	  /* extract pkgid from the signature header */
-	  if (sigdsize > rpmheadsize)
-	    {
-	      rpmheadsize = sigdsize + 128;
-	      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
-	    }
-	  if (fread(rpmhead->data, sigdsize, 1, fp) != 1)
-	    {
-	      fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
-	      fclose(fp);
-	      continue;
-	    }
-	  if (chksumh)
-	    solv_chksum_add(chksumh, rpmhead->data, sigdsize);
-	  rpmhead->cnt = sigcnt;
-	  rpmhead->dcnt = sigdsize - sigcnt * 16;
-	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-	  chksum = headbinary(rpmhead, SIGTAG_MD5, &chksumsize);
-	  if (chksum && chksumsize == 16)
-	    {
-	      gotpkgid = 1;
-	      memcpy(pkgid, chksum, 16);
-	    }
-	}
-      else
-	{
-	  /* just skip the signature header */
-	  while (sigdsize)
-	    {
-	      l = sigdsize > 4096 ? 4096 : sigdsize;
-	      if (fread(lead, l, 1, fp) != 1)
-		{
-		  fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
-		  fclose(fp);
-		  continue;
-		}
-	      if (chksumh)
-		solv_chksum_add(chksumh, lead, l);
-	      sigdsize -= l;
-	    }
-	}
-      if (fread(lead, 16, 1, fp) != 1)
-	{
-	  fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
-	  fclose(fp);
-	  continue;
-	}
-      if (chksumh)
-	solv_chksum_add(chksumh, lead, 16);
-      if (getu32(lead) != 0x8eade801)
-	{
-	  fprintf(stderr, "%s: bad header\n", rpms[i]);
-	  fclose(fp);
-	  continue;
-	}
-      sigcnt = getu32(lead + 8);
-      sigdsize = getu32(lead + 12);
-      if (sigcnt >= 0x4000000 || sigdsize >= 0x40000000)
-	{
-	  fprintf(stderr, "%s: bad header\n", rpms[i]);
-	  fclose(fp);
-	  continue;
-	}
-      l = sigdsize + sigcnt * 16;
-      headerend = headerstart + 16 + l;
-      if (l > rpmheadsize)
-	{
-	  rpmheadsize = l + 128;
-	  rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
-	}
-      if (fread(rpmhead->data, l, 1, fp) != 1)
-	{
-	  fprintf(stderr, "%s: unexpected EOF\n", rpms[i]);
-	  fclose(fp);
-	  continue;
-	}
-      if (chksumh)
-	solv_chksum_add(chksumh, rpmhead->data, l);
-      rpmhead->cnt = sigcnt;
-      rpmhead->dcnt = sigdsize;
-      rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-      if (headexists(rpmhead, TAG_PATCHESNAME))
-	{
-	  /* this is a patch rpm, ignore */
-	  fclose(fp);
-	  continue;
-	}
-      payloadformat = headstring(rpmhead, TAG_PAYLOADFORMAT);
-      if (payloadformat && !strcmp(payloadformat, "drpm"))
-	{
-	  /* this is a delta rpm */
-	  fclose(fp);
-	  continue;
-	}
-      if (chksumh)
-	while ((l = fread(lead, 1, sizeof(lead), fp)) > 0)
-	  solv_chksum_add(chksumh, lead, l);
+      pool_error(pool, -1, "%s: %s", rpm, strerror(errno));
+      return 0;
+    }
+  if (fstat(fileno(fp), &stb))
+    {
+      pool_error(pool, -1, "fstat: %s", strerror(errno));
       fclose(fp);
-      s = pool_id2solvable(pool, repo_add_solvable(repo));
-      rpm2solv(pool, repo, data, s, rpmhead, flags);
-      if (data)
-	{
-	  Id handle = s - pool->solvables;
-	  repodata_set_location(data, handle, 0, 0, rpms[i]);
-	  if (S_ISREG(stb.st_mode))
-	    repodata_set_num(data, handle, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
-	  repodata_set_num(data, handle, SOLVABLE_HEADEREND, headerend);
-	  if (gotpkgid)
-	    repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
-	  if (chksumh)
-	    repodata_set_bin_checksum(data, handle, SOLVABLE_CHECKSUM, chksumtype, solv_chksum_get(chksumh, 0));
-	}
+      return 0;
+    }
+  if (chksumtype)
+    chksumh = solv_chksum_create(chksumtype);
+  if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
+    {
+      pool_error(pool, -1, "%s: not a rpm", rpm);
+      fclose(fp);
+      return 0;
     }
   if (chksumh)
-    chksumh = solv_chksum_free(chksumh, 0);
+    solv_chksum_add(chksumh, lead, 96 + 16);
+  if (lead[78] != 0 || lead[79] != 5)
+    {
+      pool_error(pool, -1, "%s: not a rpm v5 header", rpm);
+      fclose(fp);
+      return 0;
+    }
+  if (getu32(lead + 96) != 0x8eade801)
+    {
+      pool_error(pool, -1, "%s: bad signature header", rpm);
+      fclose(fp);
+      return 0;
+    }
+  sigcnt = getu32(lead + 96 + 8);
+  sigdsize = getu32(lead + 96 + 12);
+  if (sigcnt >= 0x100000 || sigdsize >= 0x100000)
+    {
+      pool_error(pool, -1, "%s: bad signature header", rpm);
+      fclose(fp);
+      return 0;
+    }
+  sigdsize += sigcnt * 16;
+  sigdsize = (sigdsize + 7) & ~7;
+  headerstart = 96 + 16 + sigdsize;
+  gotpkgid = 0;
+  if ((flags & RPM_ADD_WITH_PKGID) != 0)
+    {
+      unsigned char *chksum;
+      unsigned int chksumsize;
+      /* extract pkgid from the signature header */
+      if (sigdsize > rpmheadsize)
+	{
+	  rpmheadsize = sigdsize + 128;
+	  rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+	}
+      if (fread(rpmhead->data, sigdsize, 1, fp) != 1)
+	{
+	  pool_error(pool, -1, "%s: unexpected EOF", rpm);
+	  fclose(fp);
+	  return 0;
+	}
+      if (chksumh)
+	solv_chksum_add(chksumh, rpmhead->data, sigdsize);
+      rpmhead->cnt = sigcnt;
+      rpmhead->dcnt = sigdsize - sigcnt * 16;
+      rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+      chksum = headbinary(rpmhead, SIGTAG_MD5, &chksumsize);
+      if (chksum && chksumsize == 16)
+	{
+	  gotpkgid = 1;
+	  memcpy(pkgid, chksum, 16);
+	}
+    }
+  else
+    {
+      /* just skip the signature header */
+      while (sigdsize)
+	{
+	  l = sigdsize > 4096 ? 4096 : sigdsize;
+	  if (fread(lead, l, 1, fp) != 1)
+	    {
+	      pool_error(pool, -1, "%s: unexpected EOF", rpm);
+	      fclose(fp);
+	      return 0;
+	    }
+	  if (chksumh)
+	    solv_chksum_add(chksumh, lead, l);
+	  sigdsize -= l;
+	}
+    }
+  if (fread(lead, 16, 1, fp) != 1)
+    {
+      pool_error(pool, -1, "%s: unexpected EOF", rpm);
+      fclose(fp);
+      return 0;
+    }
+  if (chksumh)
+    solv_chksum_add(chksumh, lead, 16);
+  if (getu32(lead) != 0x8eade801)
+    {
+      pool_error(pool, -1, "%s: bad header", rpm);
+      fclose(fp);
+      return 0;
+    }
+  sigcnt = getu32(lead + 8);
+  sigdsize = getu32(lead + 12);
+  if (sigcnt >= 0x100000 || sigdsize >= 0x800000)
+    {
+      pool_error(pool, -1, "%s: bad header", rpm);
+      fclose(fp);
+      return 0;
+    }
+  l = sigdsize + sigcnt * 16;
+  headerend = headerstart + 16 + l;
+  if (l > rpmheadsize)
+    {
+      rpmheadsize = l + 128;
+      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
+    }
+  if (fread(rpmhead->data, l, 1, fp) != 1)
+    {
+      pool_error(pool, -1, "%s: unexpected EOF", rpm);
+      fclose(fp);
+      return 0;
+    }
+  if (chksumh)
+    solv_chksum_add(chksumh, rpmhead->data, l);
+  rpmhead->cnt = sigcnt;
+  rpmhead->dcnt = sigdsize;
+  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+  if (headexists(rpmhead, TAG_PATCHESNAME))
+    {
+      /* this is a patch rpm, ignore */
+      pool_error(pool, -1, "%s: is patch rpm", rpm);
+      fclose(fp);
+      return 0;
+    }
+  payloadformat = headstring(rpmhead, TAG_PAYLOADFORMAT);
+  if (payloadformat && !strcmp(payloadformat, "drpm"))
+    {
+      /* this is a delta rpm */
+      pool_error(pool, -1, "%s: is delta rpm", rpm);
+      fclose(fp);
+      return 0;
+    }
+  if (chksumh)
+    while ((l = fread(lead, 1, sizeof(lead), fp)) > 0)
+      solv_chksum_add(chksumh, lead, l);
+  fclose(fp);
+  s = pool_id2solvable(pool, repo_add_solvable(repo));
+  if (!rpm2solv(pool, repo, data, s, rpmhead, flags))
+    {
+      repo_free_solvable(repo, s - pool->solvables, 1);
+      return 0;
+    }
+  repodata_set_location(data, s - pool->solvables, 0, 0, rpm);
+  if (S_ISREG(stb.st_mode))
+    repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
+  repodata_set_num(data, s - pool->solvables, SOLVABLE_HEADEREND, headerend);
+  if (gotpkgid)
+    repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
+  if (chksumh)
+    {
+      repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, chksumtype, solv_chksum_get(chksumh, 0));
+      chksumh = solv_chksum_free(chksumh, 0);
+    }
   if (rpmhead)
     solv_free(rpmhead);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-  return 0;
-}
-
-Id
-repo_add_rpm(Repo *repo, const char *rpm, int flags)
-{
-  int end = repo->end;
-  repo_add_rpms(repo, &rpm, 1, flags);
-  if (end == repo->end)
-    return 0;
-  else
-    return repo->end - 1;
+  return s - pool->solvables;
 }
 
 static inline void
@@ -2493,7 +2482,7 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
     }
   sigcnt = getu32(lead + 96 + 8);
   sigdsize = getu32(lead + 96 + 12);
-  if (sigcnt >= 0x4000000 || sigdsize >= 0x40000000)
+  if (sigcnt >= 0x100000 || sigdsize >= 0x100000)
     {
       fprintf(stderr, "%s: bad signature header\n", name);
       return 0;
@@ -2524,7 +2513,7 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
     }
   sigcnt = getu32(lead + 8);
   sigdsize = getu32(lead + 12);
-  if (sigcnt >= 0x4000000 || sigdsize >= 0x40000000)
+  if (sigcnt >= 0x100000 || sigdsize >= 0x800000)
     {
       fprintf(stderr, "%s: bad header\n", name);
       fclose(fp);
@@ -3162,47 +3151,55 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
   return 0;
 }
 
-int
-repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags)
+Id
+repo_add_pubkey(Repo *repo, const char *key, int flags)
 {
   Pool *pool = repo->pool;
   Repodata *data;
   Solvable *s;
   char *buf;
-  int i, bufl, l, ll;
+  int bufl, l, ll;
   FILE *fp;
 
   data = repo_add_repodata(repo, flags);
   buf = 0;
   bufl = 0;
-  for (i = 0; i < nkeys; i++)
+  if ((fp = fopen(key, "r")) == 0)
     {
-      if ((fp = fopen(keys[i], "r")) == 0)
+      pool_error(pool, -1, "%s: %s", key, strerror(errno));
+      return 0;
+    }
+  for (l = 0; ;)
+    {
+      if (bufl - l < 4096)
 	{
-	  perror(keys[i]);
-	  continue;
+	  bufl += 4096;
+	  buf = solv_realloc(buf, bufl);
 	}
-      for (l = 0; ;)
+      ll = fread(buf, 1, bufl - l, fp);
+      if (ll < 0)
 	{
-	  if (bufl - l < 4096)
-	    {
-	      bufl += 4096;
-	      buf = solv_realloc(buf, bufl);
-	    }
-	  ll = fread(buf, 1, bufl - l, fp);
-	  if (ll <= 0)
-	    break;
-	  l += ll;
+	  fclose(fp);
+	  pool_error(pool, -1, "%s: %s", key, strerror(errno));
+	  return 0;
 	}
-      buf[l] = 0;
-      fclose(fp);
-      s = pool_id2solvable(pool, repo_add_solvable(repo));
-      pubkey2solvable(s, data, buf);
+      if (ll == 0)
+	break;
+      l += ll;
+    }
+  buf[l] = 0;
+  fclose(fp);
+  s = pool_id2solvable(pool, repo_add_solvable(repo));
+  if (!pubkey2solvable(s, data, buf))
+    {
+      repo_free_solvable(repo, s - pool->solvables, 1);
+      solv_free(buf);
+      return 0;
     }
   solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-  return 0;
+  return s - pool->solvables;
 }
 
 #endif /* ENABLE_RPMDB_PUBKEY */

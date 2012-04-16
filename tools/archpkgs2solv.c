@@ -52,7 +52,7 @@ main(int argc, char **argv)
   const char **pkgs = 0;
   char *manifest = 0;
   int manifest0 = 0;
-  int i, c, npkgs = 0;
+  int i, c, res, npkgs = 0;
   Pool *pool = pool_create();
   Repo *repo;
   FILE *fp;
@@ -116,11 +116,12 @@ main(int argc, char **argv)
     }
   repo = repo_create(pool, "archpkgs2solv");
   repo_add_repodata(repo, 0);
+  res = 0;
   for (i = 0; i < npkgs; i++)
     if (repo_add_arch_pkg(repo, pkgs[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|flags) != 0)
       {
 	fprintf(stderr, "archpkgs2solv: %s\n", pool_errstr(pool));
-	exit(1);
+	res = 1;
       }
   repo_internalize(repo);
   tool_write(repo, basefile, 0);
@@ -128,6 +129,6 @@ main(int argc, char **argv)
   for (c = 0; c < npkgs; c++)
     solv_free((char *)pkgs[c]);
   solv_free(pkgs);
-  exit(0);
+  exit(res);
 }
 

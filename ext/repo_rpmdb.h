@@ -11,10 +11,9 @@
 struct headerToken_s;
 
 extern int repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags);
-extern int repo_add_rpms(Repo *repo, const char **rpms, int nrpms, int flags);
 extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
 extern int repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags);
-extern int repo_add_pubkeys(Repo *repo, const char **keys, int nkeys, int flags);
+extern Id repo_add_pubkey(Repo *repo, const char *key, int flags);
 
 #define RPMDB_REPORT_PROGRESS	(1 << 8)
 #define RPM_ADD_WITH_PKGID	(1 << 9)
