@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 
 #include "pool.h"
 #include "util.h"
@@ -136,15 +137,17 @@ needid_cmp_need_s(const void *ap, const void *bp, void *dp)
  */
 
 static void
-write_u32(FILE *fp, unsigned int x)
+write_u32(Repodata *data, unsigned int x)
 {
+  FILE *fp = data->fp;
+  if (data->error)
+    return;
   if (putc(x >> 24, fp) == EOF ||
       putc(x >> 16, fp) == EOF ||
       putc(x >> 8, fp) == EOF ||
       putc(x, fp) == EOF)
     {
-      perror("write error u32");
-      exit(1);
+      data->error = pool_error(data->repo->pool, -1, "write error u32: %s", strerror(errno));
     }
 }
 
@@ -154,12 +157,13 @@ write_u32(FILE *fp, unsigned int x)
  */
 
 static void
-write_u8(FILE *fp, unsigned int x)
+write_u8(Repodata *data, unsigned int x)
 {
-  if (putc(x, fp) == EOF)
+  if (data->error)
+    return;
+  if (putc(x, data->fp) == EOF)
     {
-      perror("write error u8");
-      exit(1);
+      data->error = pool_error(data->repo->pool, -1, "write error u8: %s", strerror(errno));
     }
 }
 
@@ -168,12 +172,13 @@ write_u8(FILE *fp, unsigned int x)
  */
 
 static void
-write_blob(FILE *fp, void *data, int len)
+write_blob(Repodata *data, void *blob, int len)
 {
-  if (len && fwrite(data, len, 1, fp) != 1)
+  if (data->error)
+    return;
+  if (len && fwrite(blob, len, 1, data->fp) != 1)
     {
-      perror("write error blob");
-      exit(1);
+      data->error = pool_error(data->repo->pool, -1, "write error blob: %s", strerror(errno));
     }
 }
 
@@ -182,8 +187,11 @@ write_blob(FILE *fp, void *data, int len)
  */
 
 static void
-write_id(FILE *fp, Id x)
+write_id(Repodata *data, Id x)
 {
+  FILE *fp = data->fp;
+  if (data->error)
+    return;
   if (x >= (1 << 14))
     {
       if (x >= (1 << 28))
@@ -196,28 +204,28 @@ write_id(FILE *fp, Id x)
     putc((x >> 7) | 128, fp);
   if (putc(x & 127, fp) == EOF)
     {
-      perror("write error id");
-      exit(1);
+      data->error = pool_error(data->repo->pool, -1, "write error id: %s", strerror(errno));
     }
 }
 
 static inline void
-write_id_eof(FILE *fp, Id x, int eof)
+write_id_eof(Repodata *data, Id x, int eof)
 {
   if (x >= 64)
     x = (x & 63) | ((x & ~63) << 1);
-  write_id(fp, x | (eof ? 0 : 64));
+  write_id(data, x | (eof ? 0 : 64));
 }
 
 
 
 static inline void
-write_str(FILE *fp, const char *str)
+write_str(Repodata *data, const char *str)
 {
-  if (fputs(str, fp) == EOF || putc(0, fp) == EOF)
+  if (data->error)
+    return;
+  if (fputs(str, data->fp) == EOF || putc(0, data->fp) == EOF)
     {
-      perror("write error str");
-      exit(1);
+      data->error = pool_error(data->repo->pool, -1, "write error str: %s", strerror(errno));
     }
 }
 
@@ -226,14 +234,14 @@ write_str(FILE *fp, const char *str)
  */
 
 static void
-write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
+write_idarray(Repodata *data, Pool *pool, NeedId *needid, Id *ids)
 {
   Id id;
   if (!ids)
     return;
   if (!*ids)
     {
-      write_u8(fp, 0);
+      write_u8(data, 0);
       return;
     }
   for (;;)
@@ -245,10 +253,10 @@ write_idarray(FILE *fp, Pool *pool, NeedId *needid, Id *ids)
 	id = (id & 63) | ((id & ~63) << 1);
       if (!*ids)
 	{
-	  write_id(fp, id);
+	  write_id(data, id);
 	  return;
 	}
-      write_id(fp, id | 64);
+      write_id(data, id | 64);
     }
 }
 
@@ -262,7 +270,7 @@ cmp_ids(const void *pa, const void *pb, void *dp)
 
 #if 0
 static void
-write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
+write_idarray_sort(Repodata *data, Pool *pool, NeedId *needid, Id *ids, Id marker)
 {
   int len, i;
   Id lids[64], *sids;
@@ -271,7 +279,7 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
     return;
   if (!*ids)
     {
-      write_u8(fp, 0);
+      write_u8(data, 0);
       return;
     }
   for (len = 0; len < 64 && ids[len]; len++)
@@ -336,7 +344,7 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
 	 we might want to skip writing them out.  */
       if (id >= 64)
 	id = (id & 63) | ((id & ~63) << 1);
-      write_id(fp, id | 64);
+      write_id(data, id | 64);
     }
   id = sids[i];
   if (id == marker)
@@ -345,7 +353,7 @@ write_idarray_sort(FILE *fp, Pool *pool, NeedId *needid, Id *ids, Id marker)
     id = id - old + 1;
   if (id >= 64)
     id = (id & 63) | ((id & ~63) << 1);
-  write_id(fp, id);
+  write_id(data, id);
   if (sids != lids)
     solv_free(sids);
 }
@@ -673,8 +681,8 @@ repo_write_collect_needed(struct cbdata *cbdata, Repo *repo, Repodata *data, Rep
 	  {
 	    if (cbdata->oldschema)
 	      {
-		fprintf(stderr, "nested structs not yet implemented\n");
-		exit(1);
+		cbdata->target->error = pool_error(cbdata->repo->pool, -1, "nested fixarray structs not yet implemented");
+		return SEARCH_NEXT_KEY;
 	      }
 	    cbdata->oldschema = cbdata->schema;
 	    cbdata->oldsp = cbdata->sp;
@@ -877,8 +885,8 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
 	  }
 	break;
       default:
-	fprintf(stderr, "unknown type for %d: %d\n", key->name, key->type);
-	exit(1);
+	cbdata->target->error = pool_error(cbdata->repo->pool, -1, "unknown type for %d: %d\n", key->name, key->type);
+	break;
     }
   if (cbdata->target->keys[rm].storage == KEY_STORAGE_VERTICAL_OFFSET && kv->eof)
     {
@@ -936,7 +944,7 @@ traverse_dirs(Dirpool *dp, Id *dirmap, Id n, Id dir, Id *used)
 }
 
 static void
-write_compressed_page(FILE *fp, unsigned char *page, int len)
+write_compressed_page(Repodata *data, unsigned char *page, int len)
 {
   int clen;
   unsigned char cpage[REPOPAGE_BLOBSIZE];
@@ -944,13 +952,13 @@ write_compressed_page(FILE *fp, unsigned char *page, int len)
   clen = repopagestore_compress_page(page, len, cpage, len - 1);
   if (!clen)
     {
-      write_u32(fp, len * 2);
-      write_blob(fp, page, len);
+      write_u32(data, len * 2);
+      write_blob(data, page, len);
     }
   else
     {
-      write_u32(fp, clen * 2 + 1);
-      write_blob(fp, cpage, clen);
+      write_u32(data, clen * 2 + 1);
+      write_blob(data, cpage, clen);
     }
 }
 
@@ -1741,24 +1749,26 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 
 /********************************************************************/
 
+  target.fp = fp;
+
   /* write header */
 
   /* write file header */
-  write_u32(fp, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
-  write_u32(fp, SOLV_VERSION_8);
+  write_u32(&target, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
+  write_u32(&target, SOLV_VERSION_8);
 
 
   /* write counts */
-  write_u32(fp, nstrings);
-  write_u32(fp, nrels);
-  write_u32(fp, ndirmap);
-  write_u32(fp, anysolvableused ? repo->nsolvables : 0);
-  write_u32(fp, target.nkeys);
-  write_u32(fp, target.nschemata);
+  write_u32(&target, nstrings);
+  write_u32(&target, nrels);
+  write_u32(&target, ndirmap);
+  write_u32(&target, anysolvableused ? repo->nsolvables : 0);
+  write_u32(&target, target.nkeys);
+  write_u32(&target, target.nschemata);
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
   solv_flags |= SOLV_FLAG_SIZE_BYTES;
-  write_u32(fp, solv_flags);
+  write_u32(&target, solv_flags);
 
   /*
    * calculate prefix encoding of the strings
@@ -1783,16 +1793,16 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   /*
    * write strings
    */
-  write_u32(fp, sizeid);
+  write_u32(&target, sizeid);
   /* we save compsum bytes but need 1 extra byte for every string */
-  write_u32(fp, sizeid + (nstrings ? nstrings - 1 : 0) - compsum);
+  write_u32(&target, sizeid + (nstrings ? nstrings - 1 : 0) - compsum);
   if (sizeid + (nstrings ? nstrings - 1 : 0) != compsum)
     {
       for (i = 1; i < nstrings; i++)
 	{
 	  char *str = spool->stringspace + spool->strings[needid[i].map];
-	  write_u8(fp, prefixcomp[i]);
-	  write_str(fp, str + prefixcomp[i]);
+	  write_u8(&target, prefixcomp[i]);
+	  write_str(&target, str + prefixcomp[i]);
 	}
     }
   solv_free(prefixcomp);
@@ -1825,16 +1835,9 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   /*
    * write strings
    */
-  write_u32(fp, sizeid);
-  write_u32(fp, pp - prefix);
-  if (pp != prefix)
-    {
-      if (fwrite(prefix, pp - prefix, 1, fp) != 1)
-	{
-	  perror("write error prefix");
-	  exit(1);
-	}
-    }
+  write_u32(&target, sizeid);
+  write_u32(&target, pp - prefix);
+  write_blob(&target, prefix, pp - prefix);
   solv_free(prefix);
 #endif
 
@@ -1844,9 +1847,9 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   for (i = 0; i < nrels; i++)
     {
       ran = pool->rels + (needid[reloff + i].map - reloff);
-      write_id(fp, needid[ISRELDEP(ran->name) ? RELOFF(ran->name) : ran->name].need);
-      write_id(fp, needid[ISRELDEP(ran->evr) ? RELOFF(ran->evr) : ran->evr].need);
-      write_u8(fp, ran->flags);
+      write_id(&target, needid[ISRELDEP(ran->name) ? RELOFF(ran->name) : ran->name].need);
+      write_id(&target, needid[ISRELDEP(ran->evr) ? RELOFF(ran->evr) : ran->evr].need);
+      write_u8(&target, ran->flags);
     }
 
   /*
@@ -1855,9 +1858,9 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   for (i = 2; i < ndirmap; i++)
     {
       if (dirmap[i] > 0)
-        write_id(fp, dirmap[i]);
+        write_id(&target, dirmap[i]);
       else
-        write_id(fp, nstrings - dirmap[i]);
+        write_id(&target, nstrings - dirmap[i]);
     }
   solv_free(dirmap);
 
@@ -1866,33 +1869,33 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
    */
   for (i = 1; i < target.nkeys; i++)
     {
-      write_id(fp, needid[target.keys[i].name].need);
-      write_id(fp, needid[target.keys[i].type].need);
+      write_id(&target, needid[target.keys[i].name].need);
+      write_id(&target, needid[target.keys[i].type].need);
       if (target.keys[i].storage != KEY_STORAGE_VERTICAL_OFFSET)
 	{
 	  if (target.keys[i].type == type_constantid)
-            write_id(fp, needid[target.keys[i].size].need);
+            write_id(&target, needid[target.keys[i].size].need);
 	  else
-            write_id(fp, target.keys[i].size);
+            write_id(&target, target.keys[i].size);
 	}
       else
-        write_id(fp, cbdata.extdata[i].len);
-      write_id(fp, target.keys[i].storage);
+        write_id(&target, cbdata.extdata[i].len);
+      write_id(&target, target.keys[i].storage);
     }
 
   /*
    * write schemata
    */
-  write_id(fp, target.schemadatalen);	/* XXX -1? */
+  write_id(&target, target.schemadatalen);	/* XXX -1? */
   for (i = 1; i < target.nschemata; i++)
-    write_idarray(fp, pool, 0, repodata_id2schema(&target, i));
+    write_idarray(&target, pool, 0, repodata_id2schema(&target, i));
 
 /********************************************************************/
 
-  write_id(fp, cbdata.maxdata);
-  write_id(fp, cbdata.extdata[0].len);
+  write_id(&target, cbdata.maxdata);
+  write_id(&target, cbdata.extdata[0].len);
   if (cbdata.extdata[0].len)
-    write_blob(fp, cbdata.extdata[0].buf, cbdata.extdata[0].len);
+    write_blob(&target, cbdata.extdata[0].buf, cbdata.extdata[0].len);
   solv_free(cbdata.extdata[0].buf);
 
   /* do we have vertical data? */
@@ -1905,7 +1908,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
       unsigned char *dp, vpage[REPOPAGE_BLOBSIZE];
       int l, ll, lpage = 0;
 
-      write_u32(fp, REPOPAGE_BLOBSIZE);
+      write_u32(&target, REPOPAGE_BLOBSIZE);
       for (i = 1; i < target.nkeys; i++)
 	{
 	  if (!cbdata.extdata[i].len)
@@ -1923,19 +1926,20 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	      l -= ll;
 	      if (lpage == REPOPAGE_BLOBSIZE)
 		{
-		  write_compressed_page(fp, vpage, lpage);
+		  write_compressed_page(&target, vpage, lpage);
 		  lpage = 0;
 		}
 	    }
 	}
       if (lpage)
-	write_compressed_page(fp, vpage, lpage);
+	write_compressed_page(&target, vpage, lpage);
     }
 
   for (i = 1; i < target.nkeys; i++)
     solv_free(cbdata.extdata[i].buf);
   solv_free(cbdata.extdata);
 
+  target.fp = 0;
   repodata_freedata(&target);
 
   solv_free(needid);
@@ -1946,7 +1950,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   solv_free(cbdata.keymapstart);
   solv_free(cbdata.dirused);
   solv_free(repodataused);
-  return 0;
+  return target.error;
 }
 
 struct repodata_write_data {
