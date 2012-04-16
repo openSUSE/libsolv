@@ -118,7 +118,7 @@ main(int argc, char **argv)
   repo_add_repodata(repo, 0);
   res = 0;
   for (i = 0; i < npkgs; i++)
-    if (repo_add_arch_pkg(repo, pkgs[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|flags) != 0)
+    if (repo_add_arch_pkg(repo, pkgs[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|flags) == 0)
       {
 	fprintf(stderr, "archpkgs2solv: %s\n", pool_errstr(pool));
 	res = 1;

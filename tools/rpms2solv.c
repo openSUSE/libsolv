@@ -55,7 +55,6 @@ main(int argc, char **argv)
   int c, i, res, nrpms = 0;
   Pool *pool = pool_create();
   Repo *repo;
-  Repodata *data;
   FILE *fp;
   char buf[4096], *p;
   const char *basefile = 0;
@@ -116,7 +115,7 @@ main(int argc, char **argv)
   res = 0;
   for (i = 0; i < nrpms; i++)
     {
-      if (repo_add_rpm(repo, rpms[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE))
+      if (repo_add_rpm(repo, rpms[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE) == 0)
 	{
 	  fprintf(stderr, "rpms2solv: %s\n", pool_errstr(pool));
 	  res = 1;
