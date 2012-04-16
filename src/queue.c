@@ -188,3 +188,19 @@ queue_deleten(Queue *q, int pos, int n)
   q->left += n;
   q->count -= n;
 }
+
+/* allocate room for n more elements */
+void
+queue_prealloc(Queue *q, int n)
+{
+  int off;
+  if (n <= 0 || q->left >= n)
+    return;
+  if (!q->alloc)
+    queue_alloc_one(q);
+  off = q->elements - q->alloc;
+  q->alloc = solv_realloc2(q->alloc, off + q->count + n + EXTRA_SPACE, sizeof(Id));
+  q->elements = q->alloc + off;
+  q->left = n + EXTRA_SPACE;
+}
+

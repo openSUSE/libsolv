@@ -114,5 +114,6 @@ extern void queue_insertn(Queue *q, int pos, int n);
 extern void queue_delete(Queue *q, int pos);
 extern void queue_delete2(Queue *q, int pos);
 extern void queue_deleten(Queue *q, int pos, int n);
+extern void queue_prealloc(Queue *q, int n);
 
 #endif /* LIBSOLV_QUEUE_H */

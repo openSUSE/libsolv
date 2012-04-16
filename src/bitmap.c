@@ -59,7 +59,7 @@ map_grow(Map *m, int n)
     }
 }
 
-/* bitwise-ands same-sized maps t and s, stores the result in t. */
+/* bitwise-ands maps t and s, stores the result in t. */
 void
 map_and(Map *t, Map *s)
 {
@@ -69,6 +69,20 @@ map_and(Map *t, Map *s)
     end = ti + (t->size < s->size ? t->size : s->size);
     while (ti < end)
 	*ti++ &= *si++;
+}
+
+/* bitwise-ors maps t and s, stores the result in t. */
+void
+map_or(Map *t, Map *s)
+{
+    unsigned char *ti, *si, *end;
+    if (t->size < s->size)
+      map_grow(t, s->size << 3);
+    ti = t->map;
+    si = s->map;
+    end = ti + (t->size < s->size ? t->size : s->size);
+    while (ti < end)
+	*ti++ |= *si++;
 }
 
 /* remove all set bits in s from t. */

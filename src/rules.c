@@ -2926,9 +2926,7 @@ solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
 
       nrequires = solv_calloc(count, sizeof(Id));
       queue_init(&edges);
-      /* pre-size */
-      queue_insertn(&edges, 0, count * 4 + 10);
-      queue_empty(&edges);
+      queue_prealloc(&edges, count * 4 + 10);	/* pre-size */
 
       /*
        * Go through the solvables in the nodes queue and create edges for

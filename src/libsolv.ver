@@ -32,6 +32,7 @@ SOLV_1.0 {
 		map_grow;
 		map_init;
 		map_init_clone;
+		map_or;
 		policy_filter_unwanted;
 		policy_findupdatepackages;
 		policy_illegal2str;
@@ -113,6 +114,7 @@ SOLV_1.0 {
 		queue_insert;
 		queue_insert2;
 		queue_insertn;
+		queue_prealloc;
 		repo_add_deparray;
 		repo_add_idarray;
 		repo_add_poolstr_array;
