@@ -35,7 +35,7 @@ SOLV_1.0 {
 		rpm_query;
 		solv_xfopen;
 		solv_xfopen_fd;
-		testcase_add_susetags;
+		testcase_add_testtags;
 		testcase_job2str;
 		testcase_solvid2str;
 		testcase_str2dep;
@@ -45,7 +45,7 @@ SOLV_1.0 {
 		testcase_resultdiff;
 		testcase_solverresult;
 		testcase_write;
-		testcase_write_susetags;
+		testcase_write_testtags;
 	local:
 		*;
 };
