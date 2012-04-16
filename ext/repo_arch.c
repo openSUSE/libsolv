@@ -344,18 +344,18 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
   data = repo_add_repodata(repo, flags);
   if ((fd = open(fn, O_RDONLY, 0)) < 0)
     {
-      pool_debug(pool, SOLV_ERROR, "repo_add_arch_pkg: %s: %s\n", fn, strerror(errno));
+      pool_error(pool, -1, "%s: %s", fn, strerror(errno));
       return 0;
     }
   if (fstat(fd, &stb))
     {
-      pool_debug(pool, SOLV_ERROR, "repo_add_arch_pkg: %s: fstat failed\n", fn);
+      pool_error(pool, -1, "%s: fstat: %s", fn, strerror(errno));
       close(fd);
       return 0;
     }
   if (!(fp = solv_xfopen_fd(fn, fd, "r")))
     {
-      pool_debug(pool, SOLV_ERROR, "repo_add_arch_pkg: %s: fdopen failed\n", fn);
+      pool_error(pool, -1, "%s: fdopen failed", fn);
       close(fd);
       return 0;
     }
@@ -435,8 +435,16 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
     }
   freetarhead(&th);
   fclose(fp);
+  if (!s)
+    {
+      pool_error(pool, -1, "%s: not an arch package", fn);
+      if (pkgidhandle)
+	solv_chksum_free(pkgidhandle, 0);
+      return 0;
+    }
   if (s && !s->name)
     {
+      pool_error(pool, -1, "%s: package has no name", fn);
       repo_free_solvable(repo, s - pool->solvables, 1);
       s = 0;
     }
