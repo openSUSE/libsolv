@@ -3,13 +3,25 @@ algorihtm.
 
 This code is based on two major, but independent, blocks:
 
-1. Using a dictionary approach to store and retrieve package
-   and dependency information.
+ 1. Using a dictionary approach to store and retrieve package
+    and dependency information.
 
-2. Using satisfiability, a well known and researched topic, for
-   resolving package dependencies.
+ 2. Using satisfiability, a well known and researched topic, for
+    resolving package dependencies.
 
 Google for 'sat solver' to get links to the theory behind it.
+
+Supported package formats:
+  - rpm/rpm5
+  - deb
+  - arch linux
+
+Supported repository formats:
+  - rpmmd (primary, filelists, comps, deltainfo/presto, updateinfo)
+  - susetags, suse product formats
+  - mandriva/mageia (synthesis, info, files)
+  - arch linux
+  - red carpet helix format
 
 Requires: cmake 2.4.x
 
