@@ -1,4 +1,18 @@
 -------------------------------------------------------------------
+Mon Apr 23 15:52:26 CEST 2012 - mls@suse.de
+
+- added testcase framework
+- add solver_get_unneeded() to get a list of no longer needed
+  installed packages
+- changed duprule generation to ignore uninstallable packages [bnc#750485]
+- fix memory leaks
+- speed up whatprovides generation
+- support 64bit nums, return files sizes in bytes
+- return errors instead of calling exit()
+- support tilde in rpm version comparison [bnc#466994]
+- 0.1.0
+
+-------------------------------------------------------------------
 Tue Feb  7 16:33:10 CET 2012 - mls@suse.de
 
 - add findutils to the requires of libsolv-tools [bnc#743634]
