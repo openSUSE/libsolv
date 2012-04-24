@@ -308,6 +308,14 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
     }
   if (mode == EVRCMP_COMPARE_EVONLY)
     return 0;
+  if (mode == EVRCMP_MATCH_RELEASE)
+    {
+      /* rpm treats empty releases as missing, i.e "foo = 4-" is the same as "foo = 4" */
+      if (r1 && r1 + 1 == s1)
+	r1 = 0;
+      if (r2 && r2 + 1 == s2)
+	r2 = 0;
+    }
   if (r1 && r2)
     {
       r1++;
@@ -324,9 +332,9 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 		if (*d2 == ':')
 		  break;
 	      /* XXX: promote just in one direction? */
-              r = solv_vercmp(r1, d1 ? d1 : s1, r2, d2 ? d2 : s2);
+	      r = solv_vercmp(r1, d1 ? d1 : s1, r2, d2 ? d2 : s2);
 	      if (r == 0 && d1 < s1 && d2 < s2)
-                r = solv_vercmp(d1 + 1, s1, d2 + 1, s2);
+		r = solv_vercmp(d1 + 1, s1, d2 + 1, s2);
 	    }
 	  else
             r = solv_vercmp(r1, s1, r2, s2);
