@@ -548,7 +548,7 @@ typedef struct {
 
 %nodefaultctor Repo;
 %nodefaultdtor Repo;
-typedef struct _Repo {
+typedef struct {
   Pool * const pool;
   const char * const name;
   int priority;
@@ -563,7 +563,7 @@ typedef struct {
   Pool * const pool;
 } Solver;
 
-typedef struct chksum {
+typedef struct {
 } Chksum;
 
 %rename(xfopen) solv_xfopen;
@@ -1078,7 +1078,7 @@ typedef struct {
   static const int REPO_USE_LOADING = REPO_USE_LOADING;
   static const int REPO_EXTEND_SOLVABLES = REPO_EXTEND_SOLVABLES;
   static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS;       /* repo_solv */
-#ifdef ENABLE_SUSETAGS
+#ifdef ENABLE_SUSEREPO
   static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES;     /* repo_susetags */
 #endif
 
@@ -1561,7 +1561,7 @@ typedef struct {
   void each() {
     Repo *n;
     while ((n = Pool_repo_iterator___next__($self)) != 0) {
-      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p__Repo, SWIG_POINTER_OWN | 0));
+      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p_Repo, SWIG_POINTER_OWN | 0));
     }
   }
 #endif
