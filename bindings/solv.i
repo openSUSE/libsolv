@@ -143,9 +143,9 @@
   int size, i;
   VALUE *o;
   queue_init(&$1);
-  size = RARRAY($input)->len;
+  size = RARRAY_LEN($input);
   i = 0;
-  o = RARRAY($input)->ptr;
+  o = RARRAY_PTR($input);
   for (i = 0; i < size; i++, o++) {
     int v;
     int e = SWIG_AsVal_int(*o, &v);
@@ -369,6 +369,14 @@ typedef VALUE AppObjectPtr;
 #include "repo_arch.h"
 #endif
 #include "solv_xfopen.h"
+
+/* for old ruby versions */
+#ifndef RARRAY_PTR
+#define RARRAY_PTR(ary) (RARRAY(ary)->ptr)
+#endif
+#ifndef RARRAY_LEN
+#define RARRAY_LEN(ary) (RARRAY(ary)->len)
+#endif
 
 #define true 1
 #define false 1
