@@ -843,7 +843,8 @@ typedef struct {
   %}
   void set_loadcallback(PyObject *callable) {
     if ($self->loadcallback == loadcallback) {
-      Py_DECREF($self->loadcallbackdata);
+      PyObject *obj = $self->loadcallbackdata;
+      Py_DECREF(obj);
     }
     if (callable) {
       Py_INCREF(callable);
