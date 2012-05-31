@@ -50,28 +50,28 @@ static FILE *cookieopen(void *cookie, const char *mode,
 
 static ssize_t cookie_gzread(void *cookie, char *buf, size_t nbytes)
 {
-  return gzread((gzFile *)cookie, buf, nbytes);
+  return gzread((gzFile)cookie, buf, nbytes);
 }
 
 static ssize_t cookie_gzwrite(void *cookie, const char *buf, size_t nbytes)
 {
-  return gzwrite((gzFile *)cookie, buf, nbytes);
+  return gzwrite((gzFile)cookie, buf, nbytes);
 }
 
 static int cookie_gzclose(void *cookie)
 {
-  return gzclose((gzFile *)cookie);
+  return gzclose((gzFile)cookie);
 }
 
 static inline FILE *mygzfopen(const char *fn, const char *mode)
 {
-  gzFile *gzf = gzopen(fn, mode);
+  gzFile gzf = gzopen(fn, mode);
   return cookieopen(gzf, mode, cookie_gzread, cookie_gzwrite, cookie_gzclose);
 }
 
 static inline FILE *mygzfdopen(int fd, const char *mode)
 {
-  gzFile *gzf = gzdopen(fd, mode);
+  gzFile gzf = gzdopen(fd, mode);
   return cookieopen(gzf, mode, cookie_gzread, cookie_gzwrite, cookie_gzclose);
 }
 
