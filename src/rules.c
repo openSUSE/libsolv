@@ -2448,7 +2448,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		{
 		  Id buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, p);
 		  if (buddy >= installed->start && buddy < installed->end && pool->solvables[buddy].repo == installed)
-		    MAPSET(&userinstalled, buddy);
+		    MAPSET(&userinstalled, buddy - installed->start);
 		}
 	    }
 	}
