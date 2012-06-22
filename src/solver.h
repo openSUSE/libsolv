@@ -316,7 +316,6 @@ void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
 int solver_calc_installsizechange(Solver *solv);
 void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
 
-void solver_find_involved(Solver *solv, Queue *installedq, Solvable *s, Queue *q);
 
 /* iterate over all literals of a rule */
 /* WARNING: loop body must not relocate whatprovidesdata, e.g. by

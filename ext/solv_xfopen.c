@@ -75,6 +75,42 @@ static inline FILE *mygzfdopen(int fd, const char *mode)
   return cookieopen(gzf, mode, cookie_gzread, cookie_gzwrite, cookie_gzclose);
 }
 
+#ifdef ENABLE_BZIP2_COMPRESSION
+
+#include <bzlib.h>
+
+/* bzip2 compression */
+
+static ssize_t cookie_bzread(void *cookie, char *buf, size_t nbytes)
+{
+  return BZ2_bzread((BZFILE *)cookie, buf, nbytes);
+}
+
+static ssize_t cookie_bzwrite(void *cookie, const char *buf, size_t nbytes)
+{
+  return BZ2_bzwrite((BZFILE *)cookie, (char *)buf, nbytes);
+}
+
+static int cookie_bzclose(void *cookie)
+{
+  BZ2_bzclose((BZFILE *)cookie);
+  return 0;
+}
+
+static inline FILE *mybzfopen(const char *fn, const char *mode)
+{
+  BZFILE *bzf = BZ2_bzopen(fn, mode);
+  return cookieopen(bzf, mode, cookie_bzread, cookie_bzwrite, cookie_bzclose);
+}
+
+static inline FILE *mybzfdopen(int fd, const char *mode)
+{
+  BZFILE *bzf = BZ2_bzdopen(fd, mode);
+  return cookieopen(bzf, mode, cookie_bzread, cookie_bzwrite, cookie_bzclose);
+}
+
+#endif
+
 
 #ifdef ENABLE_LZMA_COMPRESSION
 
@@ -290,6 +326,10 @@ solv_xfopen(const char *fn, const char *mode)
   if (suf && !strcmp(suf, ".lzma"))
     return mylzfopen(fn, mode);
 #endif
+#ifdef ENABLE_BZIP2_COMPRESSION
+  if (suf && !strcmp(suf, ".bz2"))
+    return mybzfopen(fn, mode);
+#endif
   return fopen(fn, mode);
 }
 
@@ -323,6 +363,10 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
     return myxzfdopen(fd, simplemode);
   if (suf && !strcmp(suf, ".lzma"))
     return mylzfdopen(fd, simplemode);
+#endif
+#ifdef ENABLE_BZIP2_COMPRESSION
+  if (suf && !strcmp(suf, ".bz2"))
+    return mybzfdopen(fd, simplemode);
 #endif
   return fdopen(fd, mode);
 }

@@ -64,6 +64,13 @@ IF (ENABLE_ARCHREPO)
 	repo_arch.h)
 ENDIF (ENABLE_ARCHREPO)
 
+IF (ENABLE_CUDFREPO)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_cudf.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_cudf.h)
+ENDIF (ENABLE_CUDFREPO)
+
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 SET (CMAKE_SHARED_LINKER_FLAGS "${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/ext/libsolvext.ver")
 
