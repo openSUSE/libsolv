@@ -108,6 +108,15 @@ static struct poolflags2str {
   { 0, 0, 0 }
 };
 
+static struct disttype2str {
+  Id type;
+  const char *str;
+} disttype2str[] = {
+  { DISTTYPE_RPM, "rpm" },
+  { DISTTYPE_DEB, "deb" },
+  { DISTTYPE_ARCH, "arch" },
+  { 0, 0 },
+};
 
 typedef struct strqueue {
   char **str;
@@ -1475,7 +1484,7 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
     }
   /* hmm, this is not optimal... we currently search for the lowest score */
   lowscore = 0;
-  arch = ARCH_NOARCH;
+  arch = pool->solvables[SYSTEMSOLVABLE].arch;
   for (i = 0; i < pool->lastarch; i++)
     {
       if (pool->id2arch[i] == 1 && !lowscore)
@@ -1486,7 +1495,11 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
 	  lowscore = pool->id2arch[i];
 	}
     }
-  cmd = pool_tmpjoin(pool, "system ", pool_id2str(pool, arch), pool->disttype == DISTTYPE_DEB ? " deb" : " rpm");
+  cmd = pool_tmpjoin(pool, "system ", pool->lastarch ? pool_id2str(pool, arch) : "unset", 0);
+  for (i = 0; disttype2str[i].str != 0; i++)
+    if (pool->disttype == disttype2str[i].type)
+      break;
+  pool_tmpappend(pool, cmd, " ", disttype2str[i].str ? disttype2str[i].str : "unknown");
   if (pool->installed)
     cmd = pool_tmpappend(pool, cmd, " ", testcase_repoid2str(pool, pool->installed->repoid));
   strqueue_push(&sq, cmd);
@@ -1832,8 +1845,25 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	}
       else if (!strcmp(pieces[0], "system") && npieces >= 3)
 	{
+	  int i;
 	  prepared = 0;
-	  pool_setarch(pool, pieces[1]);
+	  if (strcmp(pieces[1], "unset") != 0)
+	    pool_setarch(pool, pieces[1]);
+	  else
+	    pool_setarch(pool, 0);
+	  for (i = 0; disttype2str[i].str != 0; i++)
+	    if (!strcmp(disttype2str[i].str, pieces[2]))
+	      break;
+	  if (!disttype2str[i].str)
+	    pool_debug(pool, SOLV_ERROR, "testcase_read: system: unknown disttype '%s'\n", pieces[2]);
+	  else if (pool->disttype != disttype2str[i].type)
+	    {
+#ifdef MULTI_SEMANTICS
+	      pool_setdisttype(pool, disttype2str[i].type);
+#else
+	      pool_debug(pool, SOLV_ERROR, "testcase_read: system: cannot change disttype to '%s'\n", pieces[2]);
+#endif
+	    }
 	  if (npieces > 3)
 	    {
 	      Repo *repo = testcase_str2repo(pool, pieces[3]);
