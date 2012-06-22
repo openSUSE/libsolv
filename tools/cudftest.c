@@ -98,6 +98,9 @@ main(int argc, char **argv)
 
   solv = solver_create(pool);
   solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);
+  /* solver_set_flag(solv, SOLVER_FLAG_IGNORE_RECOMMENDED, 1); */
+
+  queue_push2(&job, SOLVER_VERIFY, SOLVER_SOLVABLE_ALL);
   if (solver_solve(solv, &job) != 0)
     {
       int problem;

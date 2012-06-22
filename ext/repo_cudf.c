@@ -348,6 +348,11 @@ repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags)
 	      s->name = pool_str2id(pool, p, 1);
 	      continue;
 	    }
+	  if (!strcmp(buf, "provides"))
+	    {
+	      s->provides = makedeps(s->repo, p, s->provides, 0);
+	      continue;
+	    }
 	  break;
 	case 'r':
 	  if (!strcmp(buf, "depends"))
