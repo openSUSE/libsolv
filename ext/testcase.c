@@ -1542,8 +1542,9 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
 	  Reldep *rd = pool->rels + rid;
 	  if (rd->flags != REL_NAMESPACE || rd->name == NAMESPACE_OTHERPROVIDERS)
 	    continue;
-	  /* check if we evaluated it, also skip empty results */
-	  if (!(d = pool->whatprovides_rel[rid]) || !pool->whatprovidesdata[d])
+	  /* evaluate all namespace ids, skip empty results */
+	  d = pool_whatprovides(pool, MAKERELDEP(rid));
+	  if (!d || !pool->whatprovidesdata[d])
 	    continue;
 	  cmd = pool_tmpjoin(pool, "namespace ", pool_id2str(pool, rd->name), "(");
 	  cmd = pool_tmpappend(pool, cmd, pool_id2str(pool, rd->evr), ")");
