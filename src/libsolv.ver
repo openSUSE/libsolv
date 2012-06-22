@@ -90,6 +90,7 @@ SOLV_1.0 {
 		pool_setdebugcallback;
 		pool_setdebuglevel;
 		pool_setdebugmask;
+		pool_setdisttype;
 		pool_setloadcallback;
 		pool_setvendorclasses;
 		pool_shrink_rels;
