@@ -1848,10 +1848,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	{
 	  int i;
 	  prepared = 0;
-	  if (strcmp(pieces[1], "unset") != 0)
-	    pool_setarch(pool, pieces[1]);
-	  else
-	    pool_setarch(pool, 0);
+	  /* must set the disttype before the arch */
 	  for (i = 0; disttype2str[i].str != 0; i++)
 	    if (!strcmp(disttype2str[i].str, pieces[2]))
 	      break;
@@ -1865,6 +1862,10 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	      pool_debug(pool, SOLV_ERROR, "testcase_read: system: cannot change disttype to '%s'\n", pieces[2]);
 #endif
 	    }
+	  if (strcmp(pieces[1], "unset") != 0)
+	    pool_setarch(pool, pieces[1]);
+	  else
+	    pool_setarch(pool, 0);
 	  if (npieces > 3)
 	    {
 	      Repo *repo = testcase_str2repo(pool, pieces[3]);
