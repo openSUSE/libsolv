@@ -60,7 +60,10 @@ main(int argc, char **argv)
   char *arch, *exclude_pat;
   int i, j;
   Id p;
-  Id rpmid, rpmarch, rpmrel, archlock;
+  Id rpmarch, rpmrel, archlock;
+#ifndef DEBIAN
+  Id rpmid;
+#endif
   int status = 0;
   int nocheck = 0;
   int withsrc = 0;
@@ -157,10 +160,10 @@ main(int argc, char **argv)
     }
   pool_addfileprovides(pool);
   pool_createwhatprovides(pool);
+#ifndef DEBIAN
   rpmid = pool_str2id(pool, "rpm", 0);
   rpmarch = pool_str2id(pool, arch, 0);
   rpmrel = 0;
-#ifndef DEBIAN
   if (rpmid && rpmarch)
     {
       for (p = 1; p < pool->nsolvables; p++)
@@ -172,6 +175,8 @@ main(int argc, char **argv)
       if (p < pool->nsolvables)
         rpmrel = pool_rel2id(pool, rpmid, rpmarch, REL_ARCH, 1);
     }
+#else
+  rpmrel = rpmarch = 0;
 #endif
   
   queue_init(&job);

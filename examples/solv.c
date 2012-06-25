@@ -1494,15 +1494,19 @@ int
 load_stub(Pool *pool, Repodata *data, void *dp)
 {
   struct repoinfo *cinfo = data->repo->appdata;
+  switch (cinfo->type)
+    {
 #ifdef ENABLE_SUSEREPO
-  if (cinfo->type == TYPE_SUSETAGS)
-    return susetags_load_ext(data->repo, data);
+    case TYPE_SUSETAGS:
+      return susetags_load_ext(data->repo, data);
 #endif
 #ifdef ENABLE_RPMMD
-  if (cinfo->type == TYPE_RPMMD)
-    return repomd_load_ext(data->repo, data);
+    case TYPE_RPMMD:
+      return repomd_load_ext(data->repo, data);
 #endif
-  return 0;
+    default:
+      return 0;
+    }
 }
 
 static unsigned char installedcookie[32];
@@ -1644,7 +1648,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 #endif
   struct stat stb;
   Pool *sigpool = 0;
+#if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD)
   Repodata *data;
+#endif
   int badchecksum;
   int dorefresh;
 #if defined(ENABLE_DEBIAN)
