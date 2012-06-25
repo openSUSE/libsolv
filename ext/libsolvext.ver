@@ -7,6 +7,7 @@ SOLV_1.0 {
 		repo_add_code11_products;
 		repo_add_content;
 		repo_add_comps;
+		repo_add_cudf;
 		repo_add_deb;
 		repo_add_debdb;
 		repo_add_debpackages;

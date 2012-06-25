@@ -281,7 +281,7 @@ repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags)
 	      Id id, *idp;
 	      Offset off = makedeps(xrepo, p, 0, 0);
 	      for (idp = xrepo->idarraydata + off; (id = *idp) != 0; idp++)
-		queue_push2(job, SOLVER_UPDATE|SOLVER_SOLVABLE_PROVIDES, id);
+		queue_push2(job, SOLVER_INSTALL|SOLVER_ORUPDATE|SOLVER_SOLVABLE_PROVIDES, id);
 	    }
 	  continue;
 	}

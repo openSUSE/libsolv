@@ -68,7 +68,7 @@ main(int argc, char **argv)
     }
   if (argc < 2)
     {
-      fprintf(stderr, "Usage: cudftest <cudfin> [cudfout]");
+      fprintf(stderr, "Usage: cudftest <cudfin> [cudfout]\n");
       exit(1);
     }
   cudfin = argv[1];
