@@ -249,6 +249,15 @@ typedef struct _Solver Solver;
 #define SOLVER_WEAK			0x010000
 #define SOLVER_ESSENTIAL		0x020000
 #define SOLVER_CLEANDEPS                0x040000
+/* ORUPDATE makes SOLVER_INSTALL not prune to installed
+ * packages, thus updating installed packages */
+#define SOLVER_ORUPDATE			0x080000
+/* FORCEBEST makes the solver insist on best packages, so
+ * you will get problem reported if the best package is
+ * not installable. This can be used with INSTALL, UPDATE
+ * and DISTUPGRADE */
+/* Also, it's not implemented yet ;) */
+#define SOLVER_FORCEBEST		0x100000
 
 #define SOLVER_SETEV			0x01000000
 #define SOLVER_SETEVR			0x02000000

@@ -53,6 +53,8 @@ static struct jobflags2str {
   { SOLVER_WEAK,      "weak" },
   { SOLVER_ESSENTIAL, "essential" },
   { SOLVER_CLEANDEPS, "cleandeps" },
+  { SOLVER_ORUPDATE,  "orupdate" },
+  { SOLVER_FORCEBEST, "forcebest" },
   { SOLVER_SETEV,     "setev" },
   { SOLVER_SETEVR,    "setevr" },
   { SOLVER_SETARCH,   "setarch" },

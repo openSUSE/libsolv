@@ -1681,7 +1681,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      if (l || !dq.count)
 		continue;
 	      /* prune to installed if not updating */
-	      if (dq.count > 1 && solv->installed && !solv->updatemap_all)
+	      if (dq.count > 1 && solv->installed && !solv->updatemap_all &&
+		  !(solv->job.elements[solv->ruletojob.elements[i - solv->jobrules]] & SOLVER_ORUPDATE))
 		{
 		  int j, k;
 		  for (j = k = 0; j < dq.count; j++)
