@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Mon Jun 25 13:40:58 CEST 2012 - mls@suse.de
+
+- fix typo in repodata_merge_attrs [bnc#767510]
+
+-------------------------------------------------------------------
 Wed May 30 14:46:48 CEST 2012 - mls@suse.de
 
 - fix build for older suse versions
