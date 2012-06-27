@@ -51,8 +51,6 @@
 /* 4: fixed triggers */
 #define RPMDB_COOKIE_VERSION 4
 
-#define	TAG_SIGBASE		256
-#define TAG_SHA1HEADER		TAG_SIGBASE+13
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
 #define TAG_RELEASE		1002
@@ -114,6 +112,11 @@
 /* rpm4 tags */
 #define TAG_LONGFILESIZES	5008
 #define TAG_LONGSIZE		5009
+
+/* signature tags */
+#define	TAG_SIGBASE		256
+#define TAG_SIGMD5		(TAG_SIGBASE + 5)
+#define TAG_SHA1HEADER		(TAG_SIGBASE + 13)
 
 #define SIGTAG_SIZE		1000
 #define SIGTAG_PGP		1002	/* RSA signature */
@@ -985,6 +988,14 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
       str = headstring(rpmhead, TAG_PACKAGER);
       if (str)
 	repodata_set_poolstr(data, handle, SOLVABLE_PACKAGER, str);
+      if ((flags & RPM_ADD_WITH_PKGID) != 0)
+	{
+	  unsigned char *chksum;
+	  unsigned int chksumsize;
+	  chksum = headbinary(rpmhead, TAG_SIGMD5, &chksumsize);
+	  if (chksum && chksumsize == 16)
+	    repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, chksum);
+	}
       if ((flags & RPM_ADD_WITH_HDRID) != 0)
 	{
 	  str = headstring(rpmhead, TAG_SHA1HEADER);
@@ -1828,9 +1839,12 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   struct stat stb;
   Repodata *data;
   unsigned char pkgid[16];
-  int gotpkgid;
+  unsigned char leadsigid[16];
+  unsigned char hdrid[32];
+  int pkgidtype, leadsigidtype, hdridtype;
   Id chksumtype = 0;
   void *chksumh = 0;
+  void *leadsigchksumh = 0;
 
   data = repo_add_repodata(repo, flags);
 
@@ -1852,6 +1866,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   if (chksumtype)
     chksumh = solv_chksum_create(chksumtype);
+  if ((flags & RPM_ADD_WITH_LEADSIGID) != 0)
+    leadsigchksumh = solv_chksum_create(REPOKEY_TYPE_MD5);
   if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
     {
       pool_error(pool, -1, "%s: not a rpm", rpm);
@@ -1860,6 +1876,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   if (chksumh)
     solv_chksum_add(chksumh, lead, 96 + 16);
+  if (leadsigchksumh)
+    solv_chksum_add(leadsigchksumh, lead, 96 + 16);
   if (lead[78] != 0 || lead[79] != 5)
     {
       pool_error(pool, -1, "%s: not a rpm v5 header", rpm);
@@ -1883,12 +1901,10 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   sigdsize += sigcnt * 16;
   sigdsize = (sigdsize + 7) & ~7;
   headerstart = 96 + 16 + sigdsize;
-  gotpkgid = 0;
-  if ((flags & RPM_ADD_WITH_PKGID) != 0)
+  pkgidtype = leadsigidtype = hdridtype = 0;
+  if ((flags & (RPM_ADD_WITH_PKGID | RPM_ADD_WITH_HDRID)) != 0)
     {
-      unsigned char *chksum;
-      unsigned int chksumsize;
-      /* extract pkgid from the signature header */
+      /* extract pkgid or hdrid from the signature header */
       if (sigdsize > rpmheadsize)
 	{
 	  rpmheadsize = sigdsize + 128;
@@ -1902,14 +1918,35 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	}
       if (chksumh)
 	solv_chksum_add(chksumh, rpmhead->data, sigdsize);
+      if (leadsigchksumh)
+	solv_chksum_add(leadsigchksumh, rpmhead->data, sigdsize);
       rpmhead->cnt = sigcnt;
       rpmhead->dcnt = sigdsize - sigcnt * 16;
       rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-      chksum = headbinary(rpmhead, SIGTAG_MD5, &chksumsize);
-      if (chksum && chksumsize == 16)
+      if ((flags & RPM_ADD_WITH_PKGID) != 0)
 	{
-	  gotpkgid = 1;
-	  memcpy(pkgid, chksum, 16);
+	  unsigned char *chksum;
+	  unsigned int chksumsize;
+	  chksum = headbinary(rpmhead, SIGTAG_MD5, &chksumsize);
+	  if (chksum && chksumsize == 16)
+	    {
+	      pkgidtype = REPOKEY_TYPE_MD5;
+	      memcpy(pkgid, chksum, 16);
+	    }
+	}
+      if ((flags & RPM_ADD_WITH_HDRID) != 0)
+	{
+	  const char *str = headstring(rpmhead, TAG_SHA1HEADER);
+	  if (str && strlen(str) == 40)
+	    {
+	      if (solv_hex2bin(&str, hdrid, 20) == 20)
+	        hdridtype = REPOKEY_TYPE_SHA1;
+	    }
+	  else if (str && strlen(str) == 64)
+	    {
+	      if (solv_hex2bin(&str, hdrid, 32) == 32)
+	        hdridtype = REPOKEY_TYPE_SHA256;
+	    }
 	}
     }
   else
@@ -1926,8 +1963,15 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	    }
 	  if (chksumh)
 	    solv_chksum_add(chksumh, lead, l);
+	  if (leadsigchksumh)
+	    solv_chksum_add(leadsigchksumh, lead, l);
 	  sigdsize -= l;
 	}
+    }
+  if (leadsigchksumh)
+    {
+      leadsigchksumh = solv_chksum_free(leadsigchksumh, leadsigid);
+      leadsigidtype = REPOKEY_TYPE_MD5;
     }
   if (fread(lead, 16, 1, fp) != 1)
     {
@@ -1974,6 +2018,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       /* this is a patch rpm, ignore */
       pool_error(pool, -1, "%s: is patch rpm", rpm);
       fclose(fp);
+      solv_chksum_free(chksumh, 0);
+      solv_free(rpmhead);
       return 0;
     }
   payloadformat = headstring(rpmhead, TAG_PAYLOADFORMAT);
@@ -1982,6 +2028,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       /* this is a delta rpm */
       pool_error(pool, -1, "%s: is delta rpm", rpm);
       fclose(fp);
+      solv_chksum_free(chksumh, 0);
+      solv_free(rpmhead);
       return 0;
     }
   if (chksumh)
@@ -1989,17 +2037,23 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       solv_chksum_add(chksumh, lead, l);
   fclose(fp);
   s = pool_id2solvable(pool, repo_add_solvable(repo));
-  if (!rpm2solv(pool, repo, data, s, rpmhead, flags))
+  if (!rpm2solv(pool, repo, data, s, rpmhead, flags & ~(RPM_ADD_WITH_HDRID | RPM_ADD_WITH_PKGID)))
     {
       repo_free_solvable(repo, s - pool->solvables, 1);
+      solv_chksum_free(chksumh, 0);
+      solv_free(rpmhead);
       return 0;
     }
   repodata_set_location(data, s - pool->solvables, 0, 0, rpm);
   if (S_ISREG(stb.st_mode))
     repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
   repodata_set_num(data, s - pool->solvables, SOLVABLE_HEADEREND, headerend);
-  if (gotpkgid)
-    repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
+  if (pkgidtype)
+    repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_PKGID, pkgidtype, pkgid);
+  if (hdridtype)
+    repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_HDRID, hdridtype, hdrid);
+  if (leadsigidtype)
+    repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_LEADSIGID, leadsigidtype, leadsigid);
   if (chksumh)
     {
       repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, chksumtype, solv_chksum_get(chksumh, 0));
