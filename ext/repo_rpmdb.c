@@ -988,8 +988,10 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
       if ((flags & RPM_ADD_WITH_HDRID) != 0)
 	{
 	  str = headstring(rpmhead, TAG_SHA1HEADER);
-	  if (str)
-	    repodata_set_poolstr(data, handle, SOLVABLE_HDRID, str);
+	  if (str && strlen(str) == 40)
+	    repodata_set_checksum(data, handle, SOLVABLE_HDRID, REPOKEY_TYPE_SHA1, str);
+	  else if (str && strlen(str) == 64)
+	    repodata_set_checksum(data, handle, SOLVABLE_HDRID, REPOKEY_TYPE_SHA256, str);
 	}
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
