@@ -1289,28 +1289,6 @@ const char *
 repo_lookup_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
 {
   const unsigned char *chk = repo_lookup_bin_checksum(repo, entry, keyname, typep);
-  if (!chk && (keyname == SOLVABLE_PKGID || keyname == SOLVABLE_HDRID || keyname == SOLVABLE_LEADSIGID))
-    {
-      const char *s = repo_lookup_str(repo, entry, keyname);
-      if (!s)
-	return 0;
-      if (strlen(s) == 32)
-	{
-	  *typep = REPOKEY_TYPE_MD5;
-	  return s;
-	}
-      if (strlen(s) == 40)
-	{
-	  *typep = REPOKEY_TYPE_SHA1;
-	  return s;
-	}
-      if (strlen(s) == 64)
-	{
-	  *typep = REPOKEY_TYPE_SHA256;
-	  return s;
-	}
-      return 0;
-    }
   return chk ? pool_bin2hex(repo->pool, chk, solv_chksum_len(*typep)) : 0;
 }
 
