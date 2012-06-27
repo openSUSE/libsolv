@@ -87,6 +87,8 @@ main(int argc, char **argv)
   repo = repo_create(pool, "repo");
   queue_init(&job);
   repo_add_cudf(repo, installed, fp, &job, 0);
+  fclose(fp);
+
   pool_createwhatprovides(pool);
 
   /* debug */
