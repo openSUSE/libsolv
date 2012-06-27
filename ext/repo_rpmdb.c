@@ -51,6 +51,8 @@
 /* 4: fixed triggers */
 #define RPMDB_COOKIE_VERSION 4
 
+#define	TAG_SIGBASE		256
+#define TAG_SHA1HEADER		TAG_SIGBASE+13
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
 #define TAG_RELEASE		1002
@@ -983,6 +985,12 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
       str = headstring(rpmhead, TAG_PACKAGER);
       if (str)
 	repodata_set_poolstr(data, handle, SOLVABLE_PACKAGER, str);
+      if ((flags & RPM_ADD_WITH_HDRID) != 0)
+	{
+	  str = headstring(rpmhead, TAG_SHA1HEADER);
+	  if (str)
+	    repodata_set_poolstr(data, handle, SOLVABLE_HDRID, str);
+	}
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
         repodata_set_num(data, handle, SOLVABLE_BUILDTIME, u32);
