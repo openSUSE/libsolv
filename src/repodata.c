@@ -728,6 +728,8 @@ repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep)
   dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
     return 0;
+  if (!(key->type == REPOKEY_TYPE_MD5 || key->type == REPOKEY_TYPE_SHA1 || key->type == REPOKEY_TYPE_SHA256))
+    return 0;
   *typep = key->type;
   return dp;
 }
