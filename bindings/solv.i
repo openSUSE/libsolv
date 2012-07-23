@@ -331,6 +331,7 @@ typedef VALUE AppObjectPtr;
 %include "typemaps.i"
 
 %{
+#include <stdbool.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -378,9 +379,6 @@ typedef VALUE AppObjectPtr;
 #define RARRAY_LEN(ary) (RARRAY(ary)->len)
 #endif
 
-#define true 1
-#define false 1
-
 #define SOLVER_SOLUTION_ERASE                   -100
 #define SOLVER_SOLUTION_REPLACE                 -101
 #define SOLVER_SOLUTION_REPLACE_DOWNGRADE       -102
@@ -388,7 +386,6 @@ typedef VALUE AppObjectPtr;
 #define SOLVER_SOLUTION_REPLACE_VENDORCHANGE    -104
 
 typedef struct chksum Chksum;
-typedef int bool;
 typedef void *AppObjectPtr;
 
 typedef struct {
