@@ -1299,7 +1299,7 @@ repomd_load_ext(Repo *repo, Repodata *data)
   struct repoinfo *cinfo;
   const unsigned char *filechksum;
   Id filechksumtype;
-  int r;
+  int r = 0;
 
   cinfo = repo->appdata;
   repomdtype = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_TYPE);
