@@ -337,6 +337,11 @@ typedef VALUE AppObjectPtr;
 #include <sys/types.h>
 #include <unistd.h>
 
+/* argh, swig undefs bool for perl */
+#ifndef bool
+typedef int bool;
+#endif
+
 #include "pool.h"
 #include "poolarch.h"
 #include "solver.h"
