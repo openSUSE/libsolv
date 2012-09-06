@@ -256,7 +256,7 @@ static int gettarhead(struct tarhead *th)
 	      memcpy(prefix, th->blk + 345, 155);
 	      prefix[155] = 0;
 	      l = strlen(prefix);
-	      if (prefix[l - 1] == '/')
+	      if (l && prefix[l - 1] == '/')
 		prefix[l - 1] = 0;
 	      th->path = solv_dupjoin(prefix, "/", path);
 	    }
