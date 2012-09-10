@@ -441,8 +441,8 @@ solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
     bc->freemem = *bufp;
   if (!fp)
     {
-      *bc->bufp = solv_free(*bc->bufp);
-      *bc->buflp = 0;
+      if (*mode == 'w')
+	*bc->bufp = solv_free(*bc->bufp);
       cookie_bufclose(bc);
     }
   return fp;
