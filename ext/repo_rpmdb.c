@@ -83,13 +83,13 @@
 #define TAG_CONFLICTFLAGS	1053
 #define TAG_CONFLICTNAME	1054
 #define TAG_CONFLICTVERSION	1055
-#define TAG_RPMVERSION		1064
 #define TAG_TRIGGERNAME		1066
 #define TAG_TRIGGERVERSION	1067
 #define TAG_TRIGGERFLAGS	1068
 #define TAG_OBSOLETENAME	1090
 #define TAG_FILEDEVICES		1095
 #define TAG_FILEINODES		1096
+#define TAG_SOURCEPACKAGE	1106
 #define TAG_PROVIDEFLAGS	1112
 #define TAG_PROVIDEVERSION	1113
 #define TAG_OBSOLETEFLAGS	1114
@@ -879,7 +879,6 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   char *name;
   char *evr;
   char *sourcerpm;
-  int forcebinary = rpmhead->forcebinary;
 
   name = headstring(rpmhead, TAG_NAME);
   if (!strcmp(name, "gpg-pubkey"))
@@ -891,13 +890,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
       return 0;
     }
   sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
-  if (!sourcerpm && forcebinary)
-    {
-      char *rpmversion = headstring(rpmhead, TAG_RPMVERSION);
-      if (rpmversion && *rpmversion == '5')
-	forcebinary = 0;
-    }
-  if (sourcerpm || forcebinary)
+  if (sourcerpm || (rpmhead->forcebinary && !headexists(rpmhead, TAG_SOURCEPACKAGE)))
     s->arch = pool_str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
   else
     {
@@ -2260,7 +2253,6 @@ rpm_query(void *rpmhandle, Id what)
   const char *name, *arch, *sourcerpm;
   char *evr, *r;
   int l;
-  int forcebinary;
 
   RpmHead *rpmhead = rpmhandle;
   r = 0;
@@ -2271,14 +2263,7 @@ rpm_query(void *rpmhandle, Id what)
       if (!name)
 	name = "";
       sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
-      forcebinary = rpmhead->forcebinary;
-      if (!sourcerpm && forcebinary)
-	{
-	  char *rpmversion = headstring(rpmhead, TAG_RPMVERSION);
-	  if (rpmversion && *rpmversion == '5')
-	    forcebinary = 0;
-	}
-      if (sourcerpm || forcebinary)
+      if (sourcerpm || (rpmhead->forcebinary && !headexists(rpmhead, TAG_SOURCEPACKAGE)))
 	arch = headstring(rpmhead, TAG_ARCH);
       else
 	{
