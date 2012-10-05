@@ -1257,6 +1257,7 @@ repo_lookup_deparray(Repo *repo, Id entry, Id keyname, Queue *q, Id marker)
 		queue_deleten(q, 0, i + 1);
 		return r;
 	      }
+	  queue_empty(q);
 	}
     }
   return r;
