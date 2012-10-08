@@ -265,7 +265,7 @@ evrid2vrstr(Pool *pool, Id evrid)
     return evr;
   for (p = evr; *p >= '0' && *p <= '9'; p++)
     ;
-  return p != evr && *p == ':' ? p + 1 : evr;
+  return p != evr && *p == ':' && p[1] ? p + 1 : evr;
 }
 
 const char *
@@ -334,18 +334,7 @@ solvable_lookup_sourcepkg(Solvable *s)
     return 0;
   archid = solvable_lookup_id(s, SOLVABLE_SOURCEARCH);
   if (solvable_lookup_void(s, SOLVABLE_SOURCEEVR))
-    {
-      evr = pool_id2str(pool, s->evr);
-      if (evr && (archid == ARCH_SRC || archid == ARCH_NOSRC))
-	{
-	  /* assume rpm, strip epoch */
-	  const char *p;
-	  for (p = evr; *p >= '0' && *p <= '9'; p++)
-	    ;
-	  if (*p == ':' && p[1])
-	    evr = p + 1;
-	}
-    }
+    evr = evrid2vrstr(pool, s->evr);
   else
     evr = solvable_lookup_str(s, SOLVABLE_SOURCEEVR);
   if (archid == ARCH_SRC || archid == ARCH_NOSRC)

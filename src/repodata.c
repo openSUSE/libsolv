@@ -2221,7 +2221,7 @@ evrid2vrstr(Pool *pool, Id evrid)
     return evr;
   for (p = evr; *p >= '0' && *p <= '9'; p++)
     ;
-  return p != evr && *p == ':' ? p + 1 : evr;
+  return p != evr && *p == ':' && p[1] ? p + 1 : evr;
 }
 
 void
@@ -2331,16 +2331,7 @@ repodata_set_sourcepkg(Repodata *data, Id solvid, const char *sourcepkg)
   else
     repodata_set_id(data, solvid, SOLVABLE_SOURCENAME, pool_strn2id(pool, sourcepkg, sevr - sourcepkg - 1, 1));
 
-  evr = pool_id2str(pool, s->evr);
-  if (evr)
-    {
-      /* strip epoch */
-      const char *pp;
-      for (pp = evr; *pp >= '0' && *pp <= '9'; pp++)
-        ;
-      if (*pp == ':' && pp[1])
-        evr = pp + 1;
-    }
+  evr = evrid2vrstr(pool, s->evr);
   if (evr && !strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
     repodata_set_void(data, solvid, SOLVABLE_SOURCEEVR);
   else

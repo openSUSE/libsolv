@@ -152,7 +152,7 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
       const char *p;
       for (p = sevr; *p >= '0' && *p <= '9'; p++)
 	;
-      if (*p == ':' && p[1])
+      if (p != sevr && *p == ':' && p[1])
 	sevr = p;
     }
   if (name == s->name)
