@@ -550,7 +550,8 @@ class repo_system(repo_generic):
             print "cached"
             return True
         print "reading"
-        self.handle.add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
+	if hasattr(self.handle.__class__, 'add_products'):
+	    self.handle.add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
         self.handle.add_rpmdb(None, Repo.REPO_REUSE_REPODATA)
         self.writecachedrepo(None)
         return True
