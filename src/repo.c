@@ -1236,7 +1236,7 @@ int
 repo_lookup_deparray(Repo *repo, Id entry, Id keyname, Queue *q, Id marker)
 {
   int r = repo_lookup_idarray(repo, entry, keyname, q);
-  if (r && marker)
+  if (r && marker && q->count)
     {
       int i;
       if (marker < 0)

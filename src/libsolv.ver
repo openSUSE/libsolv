@@ -206,6 +206,7 @@ SOLV_1.0 {
 		repodata_set_location;
 		repodata_set_num;
 		repodata_set_poolstr;
+		repodata_set_sourcepkg;
 		repodata_set_str;
 		repodata_set_void;
 		repodata_setpos_kv;
@@ -261,6 +262,7 @@ SOLV_1.0 {
 		solvable_lookup_idarray;
 		solvable_lookup_num;
 		solvable_lookup_sizek;
+		solvable_lookup_sourcepkg;
 		solvable_lookup_str;
 		solvable_lookup_str_lang;
 		solvable_lookup_str_poollang;

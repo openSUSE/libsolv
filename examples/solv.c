@@ -3264,7 +3264,7 @@ rerunsolver:
       for (i = 0; i < newpkgs; i++)
 	{
 	  unsigned int medianr;
-	  char *loc;
+	  const char *loc;
 	  Solvable *s;
 	  struct repoinfo *cinfo;
 	  const unsigned char *chksum;

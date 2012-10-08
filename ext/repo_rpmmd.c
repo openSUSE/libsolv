@@ -573,55 +573,6 @@ set_description_author(Repodata *data, Id handle, char *str, struct parsedata *p
 }
 
 
-/*
- * set_sourcerpm
- *
- */
-
-static void
-set_sourcerpm(Repodata *data, Solvable *s, Id handle, const char *sourcerpm)
-{
-  const char *p, *sevr, *sarch, *name, *evr;
-  Pool *pool;
-
-  p = strrchr(sourcerpm, '.');
-  if (!p || strcmp(p, ".rpm") != 0)
-    return;
-  p--;
-  while (p > sourcerpm && *p != '.')
-    p--;
-  if (*p != '.' || p == sourcerpm)
-    return;
-  sarch = p-- + 1;
-  while (p > sourcerpm && *p != '-')
-    p--;
-  if (*p != '-' || p == sourcerpm)
-    return;
-  p--;
-  while (p > sourcerpm && *p != '-')
-    p--;
-  if (*p != '-' || p == sourcerpm)
-    return;
-  sevr = p + 1;
-  pool = s->repo->pool;
-  if (!strcmp(sarch, "src.rpm"))
-    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_SRC);
-  else if (!strcmp(sarch, "nosrc.rpm"))
-    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, ARCH_NOSRC);
-  else
-    repodata_set_constantid(data, handle, SOLVABLE_SOURCEARCH, pool_strn2id(pool, sarch, strlen(sarch) - 4, 1));
-  evr = pool_id2str(pool, s->evr);
-  if (evr && !strncmp(sevr, evr, sarch - sevr - 1) && evr[sarch - sevr - 1] == 0)
-    repodata_set_void(data, handle, SOLVABLE_SOURCEEVR);
-  else
-    repodata_set_id(data, handle, SOLVABLE_SOURCEEVR, pool_strn2id(pool, sevr, sarch - sevr - 1, 1));
-  name = pool_id2str(pool, s->name);
-  if (name && !strncmp(sourcerpm, name, sevr - sourcerpm - 1) && name[sevr - sourcerpm - 1] == 0)
-    repodata_set_void(data, handle, SOLVABLE_SOURCENAME);
-  else
-    repodata_set_id(data, handle, SOLVABLE_SOURCENAME, pool_strn2id(pool, sourcerpm, sevr - sourcerpm - 1, 1));
-}
-
 /*-----------------------------------------------*/
 /* XML callbacks */
 
@@ -1065,7 +1016,8 @@ endElement(void *userData, const char *name)
 	repodata_set_poolstr(pd->data, handle, SOLVABLE_PACKAGER, pd->content);
       break;
     case STATE_SOURCERPM:
-      set_sourcerpm(pd->data, s, handle, pd->content);
+      if (pd->content[0])
+	repodata_set_sourcepkg(pd->data, handle, pd->content);
       break;
     case STATE_RELNOTESURL:
       if (pd->content[0])

@@ -130,12 +130,11 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 static void
 add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
 {
-  Repo *repo = s->repo;
-  Pool *pool = repo->pool;
+  Pool *pool = s->repo->pool;
   char *sp[5];
   Id name;
-  Id evr;
   Id arch;
+  const char *evr, *sevr;
 
   if (split(line, sp, 5) != 4)
     {
@@ -144,17 +143,26 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
     }
 
   name = pool_str2id(pool, sp[0], 1);
-  evr = makeevr(pool, join2(&pd->jd, sp[1], "-", sp[2]));
-  arch = pool_str2id(pool, sp[3], 1);
-  /* XXX: could record a dep here, depends on where we want to store the data */
+  arch = pool_str2id(pool, sp[3], 1);	/* do this before id2str */
+  evr = join2(&pd->jd, sp[1], "-", sp[2]);
+  sevr = pool_id2str(pool, s->evr);
+  if (sevr)
+    {
+      /* strip epoch */
+      const char *p;
+      for (p = sevr; *p >= '0' && *p <= '9'; p++)
+	;
+      if (*p == ':' && p[1])
+	sevr = p;
+    }
   if (name == s->name)
     repodata_set_void(pd->data, handle, SOLVABLE_SOURCENAME);
   else
     repodata_set_id(pd->data, handle, SOLVABLE_SOURCENAME, name);
-  if (evr == s->evr)
+  if (sevr && !strcmp(sevr, evr))
     repodata_set_void(pd->data, handle, SOLVABLE_SOURCEEVR);
   else
-    repodata_set_id(pd->data, handle, SOLVABLE_SOURCEEVR, evr);
+    repodata_set_id(pd->data, handle, SOLVABLE_SOURCEEVR, pool_str2id(pool, evr, 1));
   repodata_set_constantid(pd->data, handle, SOLVABLE_SOURCEARCH, arch);
 }
 

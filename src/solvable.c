@@ -268,7 +268,7 @@ evrid2vrstr(Pool *pool, Id evrid)
   return p != evr && *p == ':' ? p + 1 : evr;
 }
 
-char *
+const char *
 solvable_get_location(Solvable *s, unsigned int *medianrp)
 {
   Pool *pool;
@@ -315,6 +315,50 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
     }
   return loc;
 }
+
+const char *
+solvable_lookup_sourcepkg(Solvable *s)
+{
+  Pool *pool;
+  const char *evr, *name;
+  Id archid;
+
+  if (!s->repo)
+    return 0;
+  pool = s->repo->pool;
+  if (solvable_lookup_void(s, SOLVABLE_SOURCENAME))
+    name = pool_id2str(pool, s->name);
+  else
+    name = solvable_lookup_str(s, SOLVABLE_SOURCENAME);
+  if (!name)
+    return 0;
+  archid = solvable_lookup_id(s, SOLVABLE_SOURCEARCH);
+  if (solvable_lookup_void(s, SOLVABLE_SOURCEEVR))
+    {
+      evr = pool_id2str(pool, s->evr);
+      if (evr && (archid == ARCH_SRC || archid == ARCH_NOSRC))
+	{
+	  /* assume rpm, strip epoch */
+	  const char *p;
+	  for (p = evr; *p >= '0' && *p <= '9'; p++)
+	    ;
+	  if (*p == ':' && p[1])
+	    evr = p + 1;
+	}
+    }
+  else
+    evr = solvable_lookup_str(s, SOLVABLE_SOURCEEVR);
+  if (archid == ARCH_SRC || archid == ARCH_NOSRC)
+    {
+      char *str;
+      str = pool_tmpjoin(pool, name, evr ? "-" : 0, evr);
+      str = pool_tmpappend(pool, str, ".", pool_id2str(pool, archid));
+      return pool_tmpappend(pool, str, ".rpm", 0);
+    }
+  else 
+    return name;	/* FIXME */
+}
+
 
 /*****************************************************************************/
 
