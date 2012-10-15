@@ -2034,6 +2034,39 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   return s - pool->solvables;
 }
 
+Id
+repo_add_rpm_handle(Repo *repo, void *rpmhandle, int flags)
+{
+  Pool *pool = repo->pool;
+  Repodata *data;
+  RpmHead *rpmhead = rpmhandle;
+  Solvable *s;
+  char *payloadformat;
+
+  data = repo_add_repodata(repo, flags);
+  if (headexists(rpmhead, TAG_PATCHESNAME))
+    {
+      pool_error(pool, -1, "is a patch rpm");
+      return 0;
+    }
+  payloadformat = headstring(rpmhead, TAG_PAYLOADFORMAT);
+  if (payloadformat && !strcmp(payloadformat, "drpm"))
+    {
+      /* this is a delta rpm */
+      pool_error(pool, -1, "is a delta rpm");
+      return 0;
+    }
+  s = pool_id2solvable(pool, repo_add_solvable(repo));
+  if (!rpm2solv(pool, repo, data, s, rpmhead, flags))
+    {
+      repo_free_solvable(repo, s - pool->solvables, 1);
+      return 0;
+    }
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+  return s - pool->solvables;
+}
+
 static inline void
 linkhash(const char *lt, char *hash)
 {
@@ -2575,6 +2608,8 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
   return rpmhead;
 }
 
+#ifdef ENABLE_RPMDB_BYRPMHEADER
+
 void *
 rpm_byrpmh(Header h, void **statep)
 {
@@ -2612,6 +2647,8 @@ rpm_byrpmh(Header h, void **statep)
   rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
   return rpmhead;
 }
+
+#endif
 
 
 #ifdef ENABLE_RPMDB_PUBKEY

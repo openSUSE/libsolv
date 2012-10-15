@@ -20,6 +20,7 @@ SOLV_1.0 {
 		repo_add_releasefile_products;
 		repo_add_repomdxml;
 		repo_add_rpm;
+		repo_add_rpm_handle;
 		repo_add_rpmdb;
 		repo_add_rpmdb_pubkeys;
 		repo_add_rpmmd;
