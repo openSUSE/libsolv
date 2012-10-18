@@ -41,6 +41,7 @@ data_read_id(unsigned char *dp, Id *idp)
       *idp = x;
       return dp + 5;
     }
+  x ^= 80;
   dp += 5;
   for (;;)
     {
@@ -87,7 +88,7 @@ data_read_num64(unsigned char *dp, unsigned int *low, unsigned int *high)
       *high = (dp[0] ^ 0x80) >> 4;
       return dp + 5;
     }
-  x = (unsigned long long)(dp[0] ^ 0x80) << 28 ^ (unsigned int)(dp[1] << 21 ^ dp[2] << 14 ^ dp[3] << 7 ^ dp[4] ^ 0x10204000);
+  x = (unsigned long long)(dp[0] ^ 0x80) << 28 ^ (unsigned int)(dp[1] << 21 ^ dp[2] << 14 ^ dp[3] << 7 ^ dp[4] ^ 0x10204080);
   dp += 5;
   for (;;)
     {
