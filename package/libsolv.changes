@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Thu Oct 18 16:58:10 CEST 2012 - mls@suse.de
+
+- fix susetags parser, it ignored the filelist of the last
+  solvable 
+- fix encoding of large values
+- bump version to 0.2.0
+
+-------------------------------------------------------------------
 Mon Jun 25 13:40:58 CEST 2012 - mls@suse.de
 
 - fix typo in repodata_merge_attrs [bnc#767510]
