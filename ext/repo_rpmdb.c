@@ -32,10 +32,10 @@
 #include <rpm/rpmdb.h>
 
 #ifndef DB_CREATE
-# ifdef FEDORA
-#  include <db.h>
-# else
+# if defined(SUSE) || defined(HAVE_RPM_DB_H)
 #  include <rpm/db.h>
+# else
+#  include <db.h>
 # endif
 #endif
 
