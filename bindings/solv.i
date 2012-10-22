@@ -1128,6 +1128,12 @@ typedef struct {
     repo_add_rpmdb($self, ref, 0, flags);
     return 1;
   }
+  
+  bool add_rpmdb_root(Repo *ref, const char *root, int flags = 0) {
+    repo_add_rpmdb($self, ref, root, flags);
+    return 1;
+  }
+  
   Id add_rpm(const char *name, int flags = 0) {
     return repo_add_rpm($self, name, flags);
   }
