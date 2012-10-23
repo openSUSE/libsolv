@@ -753,32 +753,26 @@ startElement(void *userData, const char *name, const char **atts)
       repodata_set_void(pd->data, handle, SOLVABLE_ISVISIBLE);
       break;
     case STATE_INCLUDESENTRY:
-      {
-	const char *tmp = find_attr("pattern", atts);
-	if (tmp)
-	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", tmp));
-        break;
-      }
+      str = find_attr("pattern", atts);
+      if (str)
+	repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", str));
+      break;
     case STATE_EXTENDSENTRY:
-      {
-	const char *tmp = find_attr("pattern", atts);
-	if (tmp)
-	  repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", tmp));
-        break;
-      }
+      str = find_attr("pattern", atts);
+      if (str)
+	repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", str));
+      break;
     case STATE_LOCATION:
       str = find_attr("href", atts);
       if (str)
 	repodata_set_location(pd->data, handle, 0, 0, str);
       break;
     case STATE_CHECKSUM:
-      {
-	const char *tmp = find_attr("type", atts);
-	pd->chksumtype = tmp && *tmp ? solv_chksum_str2type(tmp) : 0;
-        if (!pd->chksumtype)
-	  pd->ret = pool_error(pool, -1, "line %d: unknown checksum type: %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), tmp ? tmp: "NULL");
-        break;
-      }
+      str = find_attr("type", atts);
+      pd->chksumtype = str && *str ? solv_chksum_str2type(str) : 0;
+      if (!pd->chksumtype)
+	pd->ret = pool_error(pool, -1, "line %d: unknown checksum type: %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), str ? str : "NULL");
+      break;
     case STATE_TIME:
       {
         unsigned int t;
@@ -788,20 +782,11 @@ startElement(void *userData, const char *name, const char **atts)
 	break;
       }
     case STATE_SIZE:
-      {
-        unsigned long long k;
-        str = find_attr("installed", atts);
-	if (str && (k = strtoull(str, 0, 10)) != 0)
-	  repodata_set_num(pd->data, handle, SOLVABLE_INSTALLSIZE, k);
-	/* XXX the "package" attribute gives the size of the rpm file,
-	   i.e. the download size.  Except on packman, there it seems to be
-	   something else entirely, it has a value near to the other two
-	   values, as if the rpm is uncompressed.  */
-        str = find_attr("package", atts);
-	if (str && (k = strtoull(str, 0, 10)) != 0)
-	  repodata_set_num(pd->data, handle, SOLVABLE_DOWNLOADSIZE, k);
-        break;
-      }
+      if ((str = find_attr("installed", atts)) != 0)
+	repodata_set_num(pd->data, handle, SOLVABLE_INSTALLSIZE, strtoull(str, 0, 10));
+      if ((str = find_attr("package", atts)) != 0)
+	repodata_set_num(pd->data, handle, SOLVABLE_DOWNLOADSIZE, strtoull(str, 0, 10));
+      break;
     case STATE_HEADERRANGE:
       {
         unsigned int end;

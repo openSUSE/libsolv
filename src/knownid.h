@@ -244,6 +244,8 @@ KNOWNID(SUSETAGS_SHARE_ARCH,		"susetags:share:arch"),
 
 KNOWNID(ARCH_ANY,			"any"),
 
+KNOWNID(REPOSITORY_REPOMD_SIZE,		"repository:repomd:size"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

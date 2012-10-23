@@ -106,6 +106,7 @@ enum state {
   STATE_CHECKSUM,
   STATE_TIMESTAMP,
   STATE_OPENCHECKSUM,
+  STATE_SIZE,
   NUMSTATES
 };
 
@@ -144,7 +145,8 @@ static struct stateswitch stateswitches[] = {
   { STATE_DATA,        "location",        STATE_LOCATION, 0 },
   { STATE_DATA,        "checksum",        STATE_CHECKSUM, 1 },
   { STATE_DATA,        "timestamp",       STATE_TIMESTAMP, 1 },
-  { STATE_DATA,        "open-checksum",    STATE_OPENCHECKSUM, 1 },
+  { STATE_DATA,        "open-checksum",   STATE_OPENCHECKSUM, 1 },
+  { STATE_DATA,        "size",            STATE_SIZE, 1 },
   { NUMSTATES }
 };
 
@@ -232,7 +234,6 @@ startElement(void *userData, const char *name, const char **atts)
 
   switch(pd->state)
     {
-    case STATE_START: break;
     case STATE_REPOMD:
       {
         const char *updstr;
@@ -256,12 +257,6 @@ startElement(void *userData, const char *name, const char **atts)
           }
           break;
         }
-    case STATE_SUSEINFO: break;
-    case STATE_EXPIRE: break;
-    case STATE_KEYWORDS: break;
-    case STATE_KEYWORD: break;
-    case STATE_CONTENT: break;
-    case STATE_REVISION: break;
     case STATE_DISTRO:
       {
         /* this is extra metadata about the product this repository
@@ -338,7 +333,6 @@ endElement(void *userData, const char *name)
   pd->statedepth--;
   switch (pd->state)
     {
-    case STATE_START: break;
     case STATE_REPOMD:
       if (pd->timestamp > 0)
         repodata_set_num(pd->data, SOLVID_META, REPOSITORY_TIMESTAMP, pd->timestamp);
@@ -348,7 +342,6 @@ endElement(void *userData, const char *name)
         repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_REPOMD, pd->rdhandle);
       pd->rdhandle = 0;
       break;
-    case STATE_LOCATION: break;
 
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
@@ -384,34 +377,35 @@ endElement(void *userData, const char *name)
       /* repomd.xml content and suseinfo.xml keywords are equivalent */
     case STATE_CONTENT:
     case STATE_KEYWORD:
-      if (pd->content)
+      if (*pd->content)
 	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_KEYWORDS, pd->content);
       break;
     case STATE_REVISION:
-      if (pd->content)
+      if (*pd->content)
 	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REVISION, pd->content);
       break;
     case STATE_DISTRO:
       /* distro tag is used in repomd.xml to say the product this repo is
          made for */
-      if (pd->content)
+      if (*pd->content)
         repodata_set_str(pd->data, pd->rphandle, REPOSITORY_PRODUCT_LABEL, pd->content);
       repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_DISTROS, pd->rphandle);
       break;
     case STATE_UPDATES:
-      /* distro tag is used in suseinfo.xml to say the repo updates a product
+      /* updates tag is used in suseinfo.xml to say the repo updates a product
          however it s not yet a tag standarized for repomd.xml */
-      if (pd->content)
+      if (*pd->content)
         repodata_set_str(pd->data, pd->ruhandle, REPOSITORY_PRODUCT_LABEL, pd->content);
       repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_UPDATES, pd->ruhandle);
       break;
     case STATE_REPO:
-      if (pd->content)
+      if (*pd->content)
 	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REPOID, pd->content);
       break;
-    case STATE_SUSEINFO: break;
-    case STATE_KEYWORDS: break;
-    case NUMSTATES: break;
+    case STATE_SIZE:
+      if (*pd->content)
+	repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_SIZE, strtoull(pd->content, 0, 10));
+      break;
     default:
       break;
     }

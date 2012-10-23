@@ -324,7 +324,7 @@ endElement(void *userData, const char *name)
       repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_RELEASE, pd->content);
       break;
     case STATE_CPEID:
-      if (pd->content)
+      if (*pd->content)
         repodata_set_str(pd->data, pd->handle, SOLVABLE_CPEID, pd->content);
     default:
       break;
