@@ -682,22 +682,28 @@ repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long *v
 {
   unsigned char *dp;
   Repokey *key;
-  KeyValue kv;
+  unsigned int high, low;
 
   *value = 0;
   dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
     return 0;
-  if (key->type == REPOKEY_TYPE_NUM
-      || key->type == REPOKEY_TYPE_U32
-      || key->type == REPOKEY_TYPE_CONSTANT)
+  switch (key->type)
     {
-      kv.num = kv.num2 = 0;
-      dp = data_fetch(dp, &kv, key);
-      *value = SOLV_KV_NUM64(&kv);
+    case REPOKEY_TYPE_NUM:
+      data_read_num64(dp, &low, &high);
+      *value = (unsigned long long)high << 32 | low;
       return 1;
+    case REPOKEY_TYPE_U32:
+      data_read_u32(dp, &low);
+      *value = low;
+      return 1;
+    case REPOKEY_TYPE_CONSTANT:
+      *value = key->size;
+      return 1;
+    default:
+      return 0;
     }
-  return 0;
 }
 
 int
