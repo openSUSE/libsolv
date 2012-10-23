@@ -966,7 +966,7 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
 
 #else
 
-int
+static int
 checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
 {
   char cmd[256];
@@ -982,6 +982,39 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
 }
 
 #endif
+
+static Pool *
+read_sigs()
+{
+  Pool *sigpool = pool_create();
+#if defined(ENABLE_RPMDB_PUBKEY)
+  Repo *repo = repo_create(sigpool, "rpmdbkeys");
+  repo_add_rpmdb_pubkeys(repo, 0);
+#endif
+  return sigpool;
+}
+
+static int
+downloadchecksig(struct repoinfo *cinfo, FILE *fp, const char *sigurl, Pool **sigpool)
+{
+  FILE *sigfp;
+  sigfp = curlfopen(cinfo, sigurl, 0, 0, 0, 0);
+  if (!sigfp)
+    {
+      printf(" unsigned, skipped\n");
+      return 0;
+    }
+  if (!*sigpool)
+    *sigpool = read_sigs();
+  if (!checksig(*sigpool, fp, sigfp))
+    {
+      printf(" checksig failed, skipped\n");
+      fclose(sigfp);
+      return 0;
+    }
+  fclose(sigfp);
+  return 1;
+}
 
 #define CHKSUM_IDENT "1.1"
 
@@ -1219,18 +1252,6 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
   if (!rename(tmpl, calccachepath(repo, repoext)))
     unlink(tmpl);
   free(tmpl);
-}
-
-
-static Pool *
-read_sigs()
-{
-  Pool *sigpool = pool_create();
-#if defined(ENABLE_RPMDB_PUBKEY)
-  Repo *repo = repo_create(sigpool, "rpmdbkeys");
-  repo_add_rpmdb_pubkeys(repo, 0);
-#endif
-  return sigpool;
 }
 
 
@@ -1642,7 +1663,6 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   struct repoinfo *cinfo;
   int i;
   FILE *fp;
-  FILE *sigfp;
   const char *filename;
   const unsigned char *filechksum;
   Id filechksumtype;
@@ -1769,25 +1789,10 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
               fclose(fp);
 	      break;
 	    }
-	  if (cinfo->repo_gpgcheck)
+	  if (cinfo->repo_gpgcheck && !downloadchecksig(cinfo, fp, "repodata/repomd.xml.asc", &sigpool))
 	    {
-	      sigfp = curlfopen(cinfo, "repodata/repomd.xml.asc", 0, 0, 0, 0);
-	      if (!sigfp)
-		{
-		  printf(" unsigned, skipped\n");
-		  fclose(fp);
-		  break;
-		}
-	      if (!sigpool)
-		sigpool = read_sigs();
-	      if (!checksig(sigpool, fp, sigfp))
-		{
-		  printf(" checksig failed, skipped\n");
-		  fclose(sigfp);
-		  fclose(fp);
-		  break;
-		}
-	      fclose(sigfp);
+	      fclose(fp);
+	      break;
 	    }
 	  if (repo_add_repomdxml(repo, fp, 0))
 	    {
@@ -1852,28 +1857,10 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      fclose(fp);
 	      break;
 	    }
-	  if (cinfo->repo_gpgcheck)
+	  if (cinfo->repo_gpgcheck && !downloadchecksig(cinfo, fp, "content.asc", &sigpool))
 	    {
-	      sigfp = curlfopen(cinfo, "content.asc", 0, 0, 0, 0);
-	      if (!sigfp)
-		{
-		  printf(" unsigned, skipped\n");
-		  fclose(fp);
-		  break;
-		}
-	      if (sigfp)
-		{
-		  if (!sigpool)
-		    sigpool = read_sigs();
-		  if (!checksig(sigpool, fp, sigfp))
-		    {
-		      printf(" checksig failed, skipped\n");
-		      fclose(sigfp);
-		      fclose(fp);
-		      break;
-		    }
-		  fclose(sigfp);
-		}
+	      fclose(fp);
+	      break;
 	    }
 	  if (repo_add_content(repo, fp, 0))
 	    {
@@ -1975,24 +1962,13 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  if (cinfo->repo_gpgcheck)
 	    {
 	      filename = solv_dupjoin("dists/", cinfo->name, "/Release.gpg");
-	      sigfp = curlfopen(cinfo, filename, 0, 0, 0, 0);
+	      if (!downloadchecksig(cinfo, fp, filename, &sigpool))
+		{
+		  fclose(fpr);
+		  solv_free((char *)filename);
+		  break;
+		}
 	      solv_free((char *)filename);
-	      if (!sigfp)
-		{
-		  printf(" unsigned, skipped\n");
-		  fclose(fpr);
-		  break;
-		}
-	      if (!sigpool)
-		sigpool = read_sigs();
-	      if (!checksig(sigpool, fpr, sigfp))
-		{
-		  printf(" checksig failed, skipped\n");
-		  fclose(sigfp);
-		  fclose(fpr);
-		  break;
-		}
-	      fclose(sigfp);
 	    }
 	  calc_checksum_fp(fpr, REPOKEY_TYPE_SHA256, cinfo->cookie);
 	  if (usecachedrepo(repo, 0, cinfo->cookie, 1))
