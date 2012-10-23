@@ -1715,7 +1715,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
         repo_free(ref, 1);
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
-      if (repo_add_debdb(repo, 0, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR) && !rootdir)
+      if (repo_add_debdb(repo, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))
 	{
 	  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
 	  exit(1);
