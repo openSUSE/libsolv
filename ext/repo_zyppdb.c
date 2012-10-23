@@ -332,6 +332,8 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
       pd.sbtab[sw->to] = sw->from;
     }
 
+  if (flags & REPO_USE_ROOTDIR)
+    dirpath = pool_prepend_rootdir(repo->pool, dirpath);
   dir = opendir(dirpath);
   if (dir)
     {
@@ -353,6 +355,8 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
 
   free(pd.content);
   join_freemem(&pd.jd);
+  if (flags & REPO_USE_ROOTDIR)
+    solv_free((char *)dirpath);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;

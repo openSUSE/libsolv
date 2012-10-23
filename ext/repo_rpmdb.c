@@ -1345,7 +1345,7 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
   DBT dbkey;
   DBT dbdata;
 
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", rootdir);
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", rootdir ? rootdir : "");
   if (stat(dbpath, &statbuf))
     return 0;
   memset(&dbkey, 0, sizeof(dbkey));
@@ -1378,7 +1378,7 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
  */
 
 int
-repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
+repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 {
   Pool *pool = repo->pool;
   unsigned char buf[16];
@@ -1406,26 +1406,26 @@ repo_add_rpmdb(Repo *repo, Repo *ref, const char *rootdir, int flags)
   Repodata *data;
   int count = 0, done = 0;
   unsigned int now;
+  const char *rootdir = 0;
 
   now = solv_timems(0);
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
-
-  if (!rootdir)
-    rootdir = "";
 
   data = repo_add_repodata(repo, flags);
 
   if (ref && !(ref->nsolvables && ref->rpmdbid))
     ref = 0;
 
+  if (flags & REPO_USE_ROOTDIR)
+    rootdir = pool_get_rootdir(pool);
   if (!(dbenv = opendbenv(rootdir)))
     {
       return pool_error(pool, -1, "repo_add_rpmdb: opendbenv failed");
     }
 
   /* XXX: should get ro lock of Packages database! */
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir);
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir ? rootdir : "");
   if (stat(dbpath, &packagesstat))
     {
       return pool_error(pool, -1, "repo_add_rpmdb: %s: %s", dbpath, strerror(errno));
@@ -1818,7 +1818,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   else if ((flags & RPM_ADD_WITH_SHA1SUM) != 0)
     chksumtype = REPOKEY_TYPE_SHA1;
 
-  if ((fp = fopen(rpm, "r")) == 0)
+  if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, rpm) : rpm, "r")) == 0)
     {
       pool_error(pool, -1, "%s: %s", rpm, strerror(errno));
       return 0;
@@ -3182,7 +3182,7 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
 }
 
 int
-repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
+repo_add_rpmdb_pubkeys(Repo *repo, int flags)
 {
   Pool *pool = repo->pool;
   struct rpm_by_state state;
@@ -3192,8 +3192,11 @@ repo_add_rpmdb_pubkeys(Repo *repo, const char *rootdir, int flags)
   unsigned int u32;
   Repodata *data;
   Solvable *s;
+  const char *rootdir = 0;
 
   data = repo_add_repodata(repo, flags);
+  if (flags & REPO_USE_ROOTDIR)
+    rootdir = pool_get_rootdir(pool);
 
   memset(&state, 0, sizeof(state));
   if (!(state.dbenv = opendbenv(rootdir)))
@@ -3238,7 +3241,7 @@ repo_add_pubkey(Repo *repo, const char *key, int flags)
   data = repo_add_repodata(repo, flags);
   buf = 0;
   bufl = 0;
-  if ((fp = fopen(key, "r")) == 0)
+  if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, key) : key, "r")) == 0)
     {
       pool_error(pool, -1, "%s: %s", key, strerror(errno));
       return 0;

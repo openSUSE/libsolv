@@ -140,14 +140,15 @@ yum_substitute(Pool *pool, char *line)
 	  if (!releaseevr)
 	    {
 	      Queue q;
+	      const char *rootdir = pool_get_rootdir(pool);
 	
 	      queue_init(&q);
-	      rpm_installedrpmdbids(0, "Providename", "redhat-release", &q);
+	      rpm_installedrpmdbids(rootdir, "Providename", "redhat-release", &q);
 	      if (q.count)
 		{
 		  void *handle, *state = 0;
 		  char *p;
-		  handle = rpm_byrpmdbid(q.elements[0], 0, &state);
+		  handle = rpm_byrpmdbid(q.elements[0], rootdir, &state);
 		  releaseevr = rpm_query(handle, SOLVABLE_EVR);
 		  rpm_byrpmdbid(0, 0, &state);
 		  if ((p = strchr(releaseevr, '-')) != 0)
@@ -155,7 +156,10 @@ yum_substitute(Pool *pool, char *line)
 		}
 	      queue_free(&q);
 	      if (!releaseevr)
-		releaseevr = strdup("?");
+		{
+		  fprintf(stderr, "no installed package provides 'redhat-release', cannot determine $releasever\n");
+		  exit(1);
+		}
 	    }
 	  *p2 = 0;
 	  p = pool_tmpjoin(pool, line, releaseevr, p2 + 11);
@@ -1224,7 +1228,7 @@ read_sigs()
   Pool *sigpool = pool_create();
 #if defined(ENABLE_RPMDB_PUBKEY)
   Repo *repo = repo_create(sigpool, "rpmdbkeys");
-  repo_add_rpmdb_pubkeys(repo, 0, 0);
+  repo_add_rpmdb_pubkeys(repo, 0);
 #endif
   return sigpool;
 }
@@ -1661,12 +1665,12 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   repo = repo_create(pool, "@System");
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
   printf("rpm database:");
-  if (stat("/var/lib/rpm/Packages", &stb))
+  if (stat(pool_prepend_rootdir_tmp(pool, "/var/lib/rpm/Packages"), &stb))
     memset(&stb, 0, sizeof(&stb));
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
   printf("dpgk database:");
-  if (stat("/var/lib/dpkg/status", &stb))
+  if (stat(pool_prepend_rootdir_tmp(pool, "/var/lib/dpkg/status"), &stb))
     memset(&stb, 0, sizeof(&stb));
 #endif
 #ifdef NOSYSTEM
@@ -1680,13 +1684,13 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
     {
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
       FILE *ofp;
-      int done = 0;
+      Repo *ref = 0;
 #endif
       printf(" reading\n");
 
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 # if defined(ENABLE_SUSEREPO) && defined(PRODUCTS_PATH)
-      if (repo_add_products(repo, PRODUCTS_PATH, 0, REPO_NO_INTERNALIZE))
+      if (repo_add_products(repo, PRODUCTS_PATH, REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
 	{
 	  fprintf(stderr, "product reading failed: %s\n", pool_errstr(pool));
 	  exit(1);
@@ -1694,30 +1698,24 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 # endif
       if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
 	{
-	  Repo *ref = repo_create(pool, "@System.old");
-	  if (!repo_add_solv(ref, ofp, 0))
+	  ref = repo_create(pool, "@System.old");
+	  if (repo_add_solv(ref, ofp, 0))
 	    {
-	      if (repo_add_rpmdb(repo, ref, 0, REPO_REUSE_REPODATA))
-		{
-		  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
-		  exit(1);
-		}
-	      done = 1;
+	      repo_free(ref, 1);
+	      ref = 0;
 	    }
 	  fclose(ofp);
-	  repo_free(ref, 1);
 	}
-      if (!done)
+      if (repo_add_rpmdb(repo, ref, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))
 	{
-	  if (repo_add_rpmdb(repo, 0, 0, REPO_REUSE_REPODATA))
-	    {
-	      fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
-	      exit(1);
-	    }
+	  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
+	  exit(1);
 	}
+      if (ref)
+        repo_free(ref, 1);
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
-      if (repo_add_debdb(repo, 0, REPO_REUSE_REPODATA))
+      if (repo_add_debdb(repo, 0, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR) && !rootdir)
 	{
 	  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
 	  exit(1);
@@ -2449,7 +2447,7 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
 
 
 void
-runrpm(const char *arg, const char *name, int dupfd3)
+runrpm(const char *arg, const char *name, int dupfd3, const char *rootdir)
 {
   pid_t pid;
   int status;
@@ -2461,6 +2459,8 @@ runrpm(const char *arg, const char *name, int dupfd3)
     }
   if (pid == 0)
     {
+      if (!rootdir)
+	rootdir = "/";
       if (dupfd3 != -1 && dupfd3 != 3)
 	{
 	  dup2(dupfd3, 3);
@@ -2469,9 +2469,9 @@ runrpm(const char *arg, const char *name, int dupfd3)
       if (dupfd3 != -1)
 	fcntl(3, F_SETFD, 0);	/* clear CLOEXEC */
       if (strcmp(arg, "-e") == 0)
-        execlp("rpm", "rpm", arg, "--nodeps", "--nodigest", "--nosignature", name, (char *)0);
+        execlp("rpm", "rpm", arg, "--nodeps", "--nodigest", "--nosignature", "--root", rootdir, name, (char *)0);
       else
-        execlp("rpm", "rpm", arg, "--force", "--nodeps", "--nodigest", "--nosignature", name, (char *)0);
+        execlp("rpm", "rpm", arg, "--force", "--nodeps", "--nodigest", "--nosignature", "--root", rootdir, name, (char *)0);
       perror("rpm");
       _exit(0);
     }
@@ -2489,7 +2489,7 @@ runrpm(const char *arg, const char *name, int dupfd3)
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
 
 void
-rundpkg(const char *arg, const char *name, int dupfd3)
+rundpkg(const char *arg, const char *name, int dupfd3, const char *rootdir)
 {
   pid_t pid;
   int status;
@@ -2501,6 +2501,8 @@ rundpkg(const char *arg, const char *name, int dupfd3)
     }
   if (pid == 0)
     {
+      if (!rootdir)
+	rootdir = "/";
       if (dupfd3 != -1 && dupfd3 != 3)
 	{
 	  dup2(dupfd3, 3);
@@ -2509,9 +2511,9 @@ rundpkg(const char *arg, const char *name, int dupfd3)
       if (dupfd3 != -1)
 	fcntl(3, F_SETFD, 0);	/* clear CLOEXEC */
       if (strcmp(arg, "--install") == 0)
-        execlp("dpkg", "dpkg", "--install", "--force", "all", name, (char *)0);
+        execlp("dpkg", "dpkg", "--install", "--root", rootdir, "--force", "all", name, (char *)0);
       else
-        execlp("dpkg", "dpkg", "--remove", "--force", "all", name, (char *)0);
+        execlp("dpkg", "dpkg", "--remove", "--root", rootdir, "--force", "all", name, (char *)0);
       perror("dpkg");
       _exit(0);
     }
@@ -2768,6 +2770,7 @@ main(int argc, char **argv)
   Queue addedfileprovides_inst;
   Id repofilter = 0;
   int cleandeps = 0;
+  char *rootdir = 0;
 
   argc--;
   argv++;
@@ -2826,14 +2829,27 @@ main(int argc, char **argv)
   else
     usage(1);
 
-  if (argc > 1 && !strcmp(argv[1], "--clean"))
+  for (;;)
     {
-      cleandeps = 1;
-      argc--;
-      argv++;
+      if (argc > 2 && !strcmp(argv[1], "--root"))
+	{
+	  rootdir = argv[2];
+	  argc -= 2;
+	  argv += 2;
+	}
+
+      else if (argc > 1 && !strcmp(argv[1], "--clean"))
+	{
+	  cleandeps = 1;
+	  argc--;
+	  argv++;
+	}
+      else
+	break;
     }
 
   pool = pool_create();
+  pool_set_rootdir(pool, rootdir);
 
 #if 0
   {
@@ -3477,10 +3493,10 @@ rerunsolver:
 	    evr = evrp + 1;
 	  nvra = pool_tmpjoin(pool, pool_id2str(pool, s->name), "-", evr);
 	  nvra = pool_tmpappend(pool, nvra, ".", pool_id2str(pool, s->arch));
-	  runrpm("-e", nvra, -1);	/* too bad that --querybynumber doesn't work */
+	  runrpm("-e", nvra, -1, rootdir);	/* too bad that --querybynumber doesn't work */
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
-	  rundpkg("--remove", pool_id2str(pool, s->name), 0);
+	  rundpkg("--remove", pool_id2str(pool, s->name), 0, rootdir);
 #endif
 	  break;
 	case SOLVER_TRANSACTION_INSTALL:
@@ -3495,10 +3511,10 @@ rerunsolver:
 	  rewind(fp);
 	  lseek(fileno(fp), 0, SEEK_SET);
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
-	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp));
+	  runrpm(type == SOLVER_TRANSACTION_MULTIINSTALL ? "-i" : "-U", "/dev/fd/3", fileno(fp), rootdir);
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
-	  rundpkg("--install", "/dev/fd/3", fileno(fp));
+	  rundpkg("--install", "/dev/fd/3", fileno(fp), rootdir);
 #endif
 	  fclose(fp);
 	  newpkgsfps[j] = 0;

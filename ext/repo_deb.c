@@ -414,12 +414,12 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
 }
 
 int
-repo_add_debdb(Repo *repo, const char *rootdir, int flags)
+repo_add_debdb(Repo *repo, int flags)
 {
   FILE *fp;
   const char *path = "/var/lib/dpkg/status";
-  if (rootdir)
-    path = pool_tmpjoin(repo->pool, rootdir, path, 0);
+  if (flags & REPO_USE_ROOTDIR)
+    path = pool_prepend_rootdir_tmp(repo->pool, path);
   if ((fp = fopen(path, "r")) == 0)
     return pool_error(repo->pool, -1, "%s: %s", path, strerror(errno));
   repo_add_debpackages(repo, fp, flags);
@@ -443,7 +443,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
   struct stat stb;
 
   data = repo_add_repodata(repo, flags);
-  if ((fp = fopen(deb, "r")) == 0)
+  if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, deb) : deb, "r")) == 0)
     {
       pool_error(pool, -1, "%s: %s", deb, strerror(errno));
       return 0;

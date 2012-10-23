@@ -113,7 +113,7 @@ main(int argc, char **argv)
   if (optind < argc)
     refname = argv[optind];
 
-  if (refname)
+  if (refname && !nopacks)
     {
       FILE *fp;
       if ((fp = fopen(refname, "r")) == NULL)
@@ -146,12 +146,15 @@ main(int argc, char **argv)
    * write .solv
    */
 
+  if (root && *root)
+    pool_set_rootdir(pool, root);
+
   repo = repo_create(pool, "installed");
   data = repo_add_repodata(repo, 0);
 
   if (!nopacks)
     {
-      if (repo_add_rpmdb(repo, ref, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0)))
+      if (repo_add_rpmdb(repo, ref, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0)))
 	{
 	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
 	  exit(1);
@@ -161,27 +164,21 @@ main(int argc, char **argv)
 #ifdef ENABLE_SUSEREPO
   if (proddir && *proddir)
     {
-      char *buf = proddir;
-      /* if <root> given, not '/', and proddir does not start with <root> */
       if (root && *root)
 	{
 	  int rootlen = strlen(root);
-	  if (strncmp(root, proddir, rootlen))
+	  if (!strncmp(root, proddir, rootlen))
 	    {
-	      buf = (char *)solv_malloc(rootlen + strlen(proddir) + 2); /* + '/' + \0 */
-	      strcpy(buf, root);
-	      if (root[rootlen - 1] != '/' && *proddir != '/')
-		buf[rootlen++] = '/';
-	      strcpy(buf + rootlen, proddir);
+	      proddir += rootlen;
+	      if (*proddir != '/' && proddir[-1] == '/')
+		proddir--;
 	    }
 	}
-      if (repo_add_products(repo, buf, root, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+      if (repo_add_products(repo, proddir, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
 	{
 	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
 	  exit(1);
 	}
-      if (buf != proddir)
-	solv_free(buf);
     }
 #endif
   repodata_internalize(data);

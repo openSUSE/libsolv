@@ -110,6 +110,7 @@ pool_free(Pool *pool)
   solv_free(pool->languages);
   solv_free(pool->languagecache);
   solv_free(pool->errstr);
+  solv_free(pool->rootdir);
   solv_free(pool);
 }
 
@@ -2096,6 +2097,39 @@ pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts)
     }
   if (!hadhashes)
     pool_freeidhashes(pool);
+}
+
+char *
+pool_prepend_rootdir(Pool *pool, const char *path)
+{
+  if (!path)
+    return 0;
+  if (!pool->rootdir)
+    return solv_strdup(path);
+  return solv_dupjoin(pool->rootdir, "/", *path == '/' ? path + 1 : path);
+}
+
+const char *
+pool_prepend_rootdir_tmp(Pool *pool, const char *path)
+{
+  if (!path)
+    return 0;
+  if (!pool->rootdir)
+    return path;
+  return pool_tmpjoin(pool, pool->rootdir, "/", *path == '/' ? path + 1 : path);
+}
+
+void
+pool_set_rootdir(Pool *pool, const char *rootdir)
+{
+  solv_free(pool->rootdir);
+  pool->rootdir = solv_strdup(rootdir);
+}
+
+const char *
+pool_get_rootdir(Pool *pool)
+{
+  return pool->rootdir;
 }
 
 /* EOF */

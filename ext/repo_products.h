@@ -6,4 +6,4 @@
  */
 
 extern int repo_add_code11_products(Repo *repo, const char *dirpath, int flags);
-extern int repo_add_products(Repo *repo, const char *proddir, const char *root, int flags);
+extern int repo_add_products(Repo *repo, const char *proddir, int flags);

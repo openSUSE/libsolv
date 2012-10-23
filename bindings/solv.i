@@ -827,6 +827,12 @@ typedef struct {
   int get_flag(int flag) {
     return pool_get_flag($self, flag);
   }
+  void set_rootdir(const char *rootdir) {
+    pool_set_rootdir($self, rootdir);
+  }
+  const char *get_rootdir(int flag) {
+    return pool_get_rootdir($self);
+  }
 #if defined(SWIGPYTHON)
   %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
@@ -1088,6 +1094,7 @@ typedef struct {
   static const int REPO_LOCALPOOL = REPO_LOCALPOOL;
   static const int REPO_USE_LOADING = REPO_USE_LOADING;
   static const int REPO_EXTEND_SOLVABLES = REPO_EXTEND_SOLVABLES;
+  static const int REPO_USE_ROOTDIR  = REPO_USE_ROOTDIR;
   static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS;       /* repo_solv */
 #ifdef ENABLE_SUSEREPO
   static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES;     /* repo_susetags */
@@ -1125,41 +1132,29 @@ typedef struct {
 
 #ifdef ENABLE_RPMDB
   bool add_rpmdb(Repo *ref, int flags = 0) {
-    repo_add_rpmdb($self, ref, 0, flags);
-    return 1;
+    return repo_add_rpmdb($self, ref, flags);
   }
-  
-  bool add_rpmdb_root(Repo *ref, const char *root, int flags = 0) {
-    repo_add_rpmdb($self, ref, root, flags);
-    return 1;
-  }
-  
   Id add_rpm(const char *name, int flags = 0) {
     return repo_add_rpm($self, name, flags);
   }
 #endif
 #ifdef ENABLE_RPMMD
   bool add_rpmmd(FILE *fp, const char *language, int flags = 0) {
-    repo_add_rpmmd($self, fp, language, flags);
-    return 1;
+    return repo_add_rpmmd($self, fp, language, flags);
   }
   bool add_repomdxml(FILE *fp, int flags = 0) {
-    repo_add_repomdxml($self, fp, flags);
-    return 1;
+    return repo_add_repomdxml($self, fp, flags);
   }
   bool add_updateinfoxml(FILE *fp, int flags = 0) {
-    repo_add_updateinfoxml($self, fp, flags);
-    return 1;
+    return repo_add_updateinfoxml($self, fp, flags);
   }
   bool add_deltainfoxml(FILE *fp, int flags = 0) {
-    repo_add_deltainfoxml($self, fp, flags);
-    return 1;
+    return repo_add_deltainfoxml($self, fp, flags);
   }
 #endif
 #ifdef ENABLE_DEBIAN
   bool add_debdb(int flags = 0) {
-    repo_add_debdb($self, 0, flags);
-    return 1;
+    return repo_add_debdb($self, flags);
   }
   Id add_deb(const char *name, int flags = 0) {
     return repo_add_deb($self, name, flags);
@@ -1167,32 +1162,26 @@ typedef struct {
 #endif
 #ifdef ENABLE_SUSEREPO
   bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0) {
-    repo_add_susetags($self, fp, defvendor, language, flags);
-    return 1;
+    return repo_add_susetags($self, fp, defvendor, language, flags);
   }
   bool add_content(FILE *fp, int flags = 0) {
-    repo_add_content($self, fp, flags);
-    return 1;
+    return repo_add_content($self, fp, flags);
   }
   bool add_products(const char *proddir, int flags = 0) {
-    repo_add_products($self, proddir, 0, flags);
-    return 1;
+    return repo_add_products($self, proddir, flags);
   }
 #endif
 #ifdef ENABLE_MDKREPO
   bool add_mdk(FILE *fp, int flags = 0) {
-    repo_add_mdk($self, fp, flags);
-    return 1;
+    return repo_add_mdk($self, fp, flags);
   }
   bool add_mdk_info(FILE *fp, int flags = 0) {
-    repo_add_mdk($self, fp, flags);
-    return 1;
+    return repo_add_mdk($self, fp, flags);
   }
 #endif
 #ifdef ENABLE_ARCHREPO
   bool add_arch_repo(FILE *fp, int flags = 0) {
-    repo_add_arch_repo($self, fp, flags);
-    return 1;
+    return repo_add_arch_repo($self, fp, flags);
   }
   Id add_arch_pkg(const char *name, int flags = 0) {
     return repo_add_arch_pkg($self, name, flags);

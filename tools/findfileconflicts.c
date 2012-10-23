@@ -45,7 +45,7 @@ int main(int argc, char **argv)
   pool_setdebuglevel(pool, 1);
   installed = repo_create(pool, "@System");
   pool_set_installed(pool, installed);
-  if (repo_add_rpmdb(installed, 0, 0, 0))
+  if (repo_add_rpmdb(installed, 0, 0))
     {
       fprintf(stderr, "findfileconflicts: %s\n", pool_errstr(pool));
       exit(1);

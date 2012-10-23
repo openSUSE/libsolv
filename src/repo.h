@@ -113,6 +113,7 @@ static inline int pool_installable(const Pool *pool, Solvable *s)
 #define REPO_LOCALPOOL			(1 << 2)
 #define REPO_USE_LOADING		(1 << 3)
 #define REPO_EXTEND_SOLVABLES		(1 << 4)
+#define REPO_USE_ROOTDIR		(1 << 5)
 
 Repodata *repo_add_repodata(Repo *repo, int flags);
 Repodata *repo_id2repodata(Repo *repo, Id id);

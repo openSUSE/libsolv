@@ -125,9 +125,17 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
   char *fullpath;
   struct parsedata pd;
 
+  if (!dirpath)
+    dirpath = "/etc";
+  if (flags & REPO_USE_ROOTDIR)
+    dirpath = pool_prepend_rootdir(repo->pool, dirpath);
   dir = opendir(dirpath);
   if (!dir)
-    return 0;
+    {
+      if (flags & REPO_USE_ROOTDIR)
+        solv_free((char *)dirpath);
+      return 0;
+    }
 
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;
@@ -151,6 +159,8 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
     }
   closedir(dir);
   join_freemem(&pd.jd);
+  if (flags & REPO_USE_ROOTDIR)
+    solv_free((char *)dirpath);
 
   if (!(flags & REPO_NO_INTERNALIZE) && (flags & REPO_REUSE_REPODATA) != 0)
     repodata_internalize(repo_last_repodata(repo));

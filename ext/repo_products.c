@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -435,6 +436,8 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
       pd.sbtab[sw->to] = sw->from;
     }
 
+  if (flags & REPO_USE_ROOTDIR)
+    dirpath = pool_prepend_rootdir(repo->pool, dirpath);
   dir = opendir(dirpath);
   if (dir)
     {
@@ -470,6 +473,8 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
     }
   solv_free(pd.content);
   join_freemem(&pd.jd);
+  if (flags & REPO_USE_ROOTDIR)
+    solv_free((char *)dirpath);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
@@ -492,15 +497,14 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 /* Oh joy! Three parsers for the price of one! */
 
 int
-repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
+repo_add_products(Repo *repo, const char *proddir, int flags)
 {
-  char *fullpath;
+  const char *fullpath;
   DIR *dir;
-  int ret;
 
   if (proddir)
     {
-      dir = opendir(proddir);
+      dir = opendir(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(repo->pool, proddir) : proddir);
       if (dir)
 	{
 	  /* assume code11 stype products */
@@ -510,32 +514,37 @@ repo_add_products(Repo *repo, const char *proddir, const char *root, int flags)
     }
 
   /* code11 didn't work, try old code10 zyppdb */
-  fullpath = solv_dupjoin(root ? root : 0, "/var/lib/zypp/db/products", 0);
+  fullpath = "/var/lib/zypp/db/products";
+  if (flags & REPO_USE_ROOTDIR)
+    fullpath = pool_prepend_rootdir_tmp(repo->pool, fullpath);
   dir = opendir(fullpath);
   if (dir)
     {
       closedir(dir);
       /* assume code10 style products */
-      ret = repo_add_zyppdb_products(repo, fullpath, flags);
-      solv_free(fullpath);
-      return ret;
+      return repo_add_zyppdb_products(repo, "/var/lib/zypp/db/products", flags);
     }
-  solv_free(fullpath);
 
   /* code10/11 didn't work, try -release files parsing */
-  fullpath = solv_dupjoin(root ? root : 0, "/etc", 0);
+  fullpath = "/etc";
+  if (flags & REPO_USE_ROOTDIR)
+    fullpath = pool_prepend_rootdir_tmp(repo->pool, fullpath);
   dir = opendir(fullpath);
   if (dir)
     {
       closedir(dir);
-      ret = repo_add_releasefile_products(repo, fullpath, flags);
-      solv_free(fullpath);
-      return ret;
+      return repo_add_releasefile_products(repo, "/etc", flags);
     }
 
-  /* no luck. print an error message in case the root argument is wrong */
-  perror(fullpath);
-  solv_free(fullpath);
+  /* no luck. check if the rootdir exists */
+  fullpath = pool_get_rootdir(repo->pool);
+  if (fullpath && *fullpath)
+    {
+      dir = opendir(fullpath);
+      if (!dir)
+	return pool_error(repo->pool, -1, "%s: %s", fullpath, strerror(errno));
+      closedir(dir);
+    }
 
   /* the least we can do... */
   if (!(flags & REPO_NO_INTERNALIZE) && (flags & REPO_REUSE_REPODATA) != 0)

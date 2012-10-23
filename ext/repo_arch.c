@@ -342,7 +342,7 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
   void *pkgidhandle = 0;
 
   data = repo_add_repodata(repo, flags);
-  if ((fd = open(fn, O_RDONLY, 0)) < 0)
+  if ((fd = open(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, fn) : fn, O_RDONLY, 0)) < 0)
     {
       pool_error(pool, -1, "%s: %s", fn, strerror(errno));
       return 0;
@@ -816,6 +816,8 @@ repo_add_arch_local(Repo *repo, const char *dir, int flags)
 
   data = repo_add_repodata(repo, flags);
 
+  if (flags & REPO_USE_ROOTDIR)
+    dir = pool_prepend_rootdir(pool, dir);
   dp = opendir(dir);
   if (dp)
     {
@@ -849,6 +851,8 @@ repo_add_arch_local(Repo *repo, const char *dir, int flags)
     }
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  if (flags & REPO_USE_ROOTDIR)
+    solv_free(dir);
   return 0;
 }
 

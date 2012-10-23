@@ -143,6 +143,9 @@ struct _Pool {
 
   char *errstr;			/* last error string */
   int errstra;			/* allocated space for errstr */
+
+  char *rootdir;
+
 #endif
 
 };
@@ -230,6 +233,11 @@ extern void pool_set_installed(Pool *pool, struct _Repo *repo);
 
 extern int  pool_error(Pool *pool, int ret, const char *format, ...) __attribute__((format(printf, 3, 4)));
 extern char *pool_errstr(Pool *pool);
+
+extern void pool_set_rootdir(Pool *pool, const char *rootdir);
+extern const char *pool_get_rootdir(Pool *pool);
+extern char *pool_prepend_rootdir(Pool *pool, const char *dir);
+extern const char *pool_prepend_rootdir_tmp(Pool *pool, const char *dir);
 
 /**
  * Solvable management
