@@ -775,13 +775,13 @@ findmirrorlisturl(FILE *fp)
 static inline int
 iscompressed(const char *name)
 {
-  int l = strlen(name);
-  return l > 3 && !strcmp(name + l - 3, ".gz") ? 1 : 0;
+  return solv_xfopen_iscompressed(name) != 0;
 }
 
 FILE *
 curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype, int *badchecksump)
 {
+  FILE *fp;
   pid_t pid;
   int fd, l;
   int status;
@@ -794,8 +794,8 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
         return 0;
       if (file != cinfo->metalink && file != cinfo->mirrorlist)
 	{
-	  FILE *fp = curlfopen(cinfo, cinfo->metalink ? cinfo->metalink : cinfo->mirrorlist, 0, 0, 0, 0);
 	  unsigned char mlchksum[32];
+	  fp = curlfopen(cinfo, cinfo->metalink ? cinfo->metalink : cinfo->mirrorlist, 0, 0, 0, 0);
 	  Id mlchksumtype = 0;
 	  if (!fp)
 	    return 0;
@@ -874,10 +874,24 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       close(fd);
       return 0;
     }
-  if (uncompress)
-    return solv_xfopen_fd(".gz", fd, "r");
   fcntl(fd, F_SETFD, FD_CLOEXEC);
-  return fdopen(fd, "r");
+  if (uncompress)
+    {
+      if (solv_xfopen_iscompressed(file) < 0)
+	{
+	  printf("%s: unsupported compression\n", file);
+	  if (badchecksump)
+	    *badchecksump = 1;
+	  close(fd);
+	  return 0;
+	}
+      fp = solv_xfopen_fd(file, fd, "r");
+    }
+  else
+    fp = fdopen(fd, "r");
+  if (!fp)
+    close(fd);
+  return fp;
 }
 
 #ifndef DEBIAN

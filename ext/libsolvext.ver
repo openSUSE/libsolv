@@ -34,7 +34,9 @@ SOLV_1.0 {
 		rpm_iterate_filelist;
 		rpm_query;
 		solv_xfopen;
+		solv_xfopen_buf;
 		solv_xfopen_fd;
+		solv_xfopen_iscompressed;
 		testcase_add_testtags;
 		testcase_job2str;
 		testcase_solvid2str;

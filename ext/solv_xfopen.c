@@ -325,10 +325,18 @@ solv_xfopen(const char *fn, const char *mode)
     return myxzfopen(fn, mode);
   if (suf && !strcmp(suf, ".lzma"))
     return mylzfopen(fn, mode);
+#else
+  if (suf && !strcmp(suf, ".xz"))
+    return 0;
+  if (suf && !strcmp(suf, ".lzma"))
+    return 0;
 #endif
 #ifdef ENABLE_BZIP2_COMPRESSION
   if (suf && !strcmp(suf, ".bz2"))
     return mybzfopen(fn, mode);
+#else
+  if (suf && !strcmp(suf, ".bz2"))
+    return 0;
 #endif
   return fopen(fn, mode);
 }
@@ -363,12 +371,43 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
     return myxzfdopen(fd, simplemode);
   if (suf && !strcmp(suf, ".lzma"))
     return mylzfdopen(fd, simplemode);
+#else
+  if (suf && !strcmp(suf, ".xz"))
+    return 0;
+  if (suf && !strcmp(suf, ".lzma"))
+    return 0;
 #endif
 #ifdef ENABLE_BZIP2_COMPRESSION
   if (suf && !strcmp(suf, ".bz2"))
     return mybzfdopen(fd, simplemode);
+#else
+  if (suf && !strcmp(suf, ".bz2"))
+    return 0;
 #endif
   return fdopen(fd, mode);
+}
+
+int
+solv_xfopen_iscompressed(const char *fn)
+{
+  const char *suf = fn ? strrchr(fn, '.') : 0;
+  if (!suf)
+    return 0;
+  if (!strcmp(suf, ".gz"))
+    return 1;
+  if (!strcmp(suf, ".xz") || !strcmp(suf, ".lzma"))
+#ifdef ENABLE_LZMA_COMPRESSION
+    return 1;
+#else
+    return -1;
+#endif
+  if (!strcmp(suf, ".bz2"))
+#ifdef ENABLE_BZIP2_COMPRESSION
+    return 1;
+#else
+    return -1;
+#endif
+  return 0;
 }
 
 struct bufcookie {
