@@ -51,8 +51,8 @@ class Repo_generic
     dorefresh = autorefresh?
     if dorefresh
       begin
-        s = File.stat(cachepath)
-        dorefresh = false if s && Time.now - s.mtime < @attribs['metadata_expire'].to_i
+	s = File.stat(cachepath)
+	dorefresh = false if s && Time.now - s.mtime < @attribs['metadata_expire'].to_i
       rescue SystemCallError
       end
     end
@@ -85,16 +85,16 @@ class Repo_generic
     return nil if f.stat.size == 0 && (st || !chksum)
     if !st
 	puts "#{file}: download error #{$? >> 8}"
-        @incomplete = true if markincomplete
-        return nil
+	@incomplete = true if markincomplete
+	return nil
     end
     if chksum
       fchksum = Solv::Chksum.new(chksum.type)
       fchksum.add_fd(f.fileno)
       if !fchksum == chksum
 	puts "#{file}: checksum error"
-        @incomplete = true if markincomplete
-        return nil
+	@incomplete = true if markincomplete
+	return nil
       end
     end
     if uncompress
@@ -120,24 +120,24 @@ class Repo_generic
       return false if fcookie.length != 32
       return false if cookie && fcookie != cookie
       if !ext && @type != 'system'
-        f.sysseek(-32 * 2, IO::SEEK_END)
-        fextcookie = f.sysread(32)
-        return false if fextcookie.length != 32
+	f.sysseek(-32 * 2, IO::SEEK_END)
+	fextcookie = f.sysread(32)
+	return false if fextcookie.length != 32
       end
       f.sysseek(0, IO::SEEK_SET)
       f = Solv::xfopen_dup('', f.fileno)
       flags = ext ? Solv::Repo::REPO_USE_LOADING|Solv::Repo::REPO_EXTEND_SOLVABLES : 0
       flags |= Solv::Repo::REPO_LOCALPOOL if ext && ext != 'DL'
       if ! @handle.add_solv(f, flags)
-        Solv::xfclose(f)
-        return false
+	Solv::xfclose(f)
+	return false
       end
       Solv::xfclose(f)
       @cookie = fcookie unless ext
       @extcookie = fextcookie if !ext && @type != 'system'
       now = Time.now
       begin
-        File::utime(now, now, repopath) if mark
+	File::utime(now, now, repopath) if mark
       rescue SystemCallError
       end
       return true
@@ -177,8 +177,8 @@ class Repo_generic
       Solv::xfclose(sf)
       f.sysseek(0, IO::SEEK_END)
       if @type != 'system' && !ext
-        genextcookie(f) unless @extcookie
-        f.syswrite(@extcookie)
+	genextcookie(f) unless @extcookie
+	f.syswrite(@extcookie)
       end
       f.syswrite(ext ? @extcookie : @cookie)
       f.close(false)
@@ -259,8 +259,8 @@ class Repo_rpmmd < Repo_generic
     if filename
       f = download(filename, true, filechksum, true)
       if f
-        @handle.add_rpmmd(f, nil, 0)
-        Solv::xfclose(f)
+	@handle.add_rpmmd(f, nil, 0)
+	Solv::xfclose(f)
       end
       return false if @incomplete
     end
@@ -268,8 +268,8 @@ class Repo_rpmmd < Repo_generic
     if filename
       f = download(filename, true, filechksum, true)
       if f
-        @handle.add_updateinfoxml(f, 0)
-        Solv::xfclose(f)
+	@handle.add_updateinfoxml(f, 0)
+	Solv::xfclose(f)
       end
     end
     add_exts()
@@ -374,17 +374,17 @@ class Repo_susetags < Repo_generic
     if filename
       f = download("#{descrdir}/#{filename}", true, filechksum, true)
       if f
-        @handle.add_susetags(f, defvendorid, nil, Solv::Repo::REPO_NO_INTERNALIZE|Solv::Repo::SUSETAGS_RECORD_SHARES)
-        Solv::xfclose(f)
+	@handle.add_susetags(f, defvendorid, nil, Solv::Repo::REPO_NO_INTERNALIZE|Solv::Repo::SUSETAGS_RECORD_SHARES)
+	Solv::xfclose(f)
 	(filename, filechksum) = find('packages.en.gz')
 	(filename, filechksum) = find('packages.en') unless filename
-        if filename
-          f = download("#{descrdir}/#{filename}", true, filechksum, true)
-          if f
-            @handle.add_susetags(f, defvendorid, nil, Solv::Repo::REPO_NO_INTERNALIZE|Solv::Repo::REPO_REUSE_REPODATA|Solv::Repo::REPO_EXTEND_SOLVABLES)
-            Solv::xfclose(f)
-          end
-        end
+	if filename
+	  f = download("#{descrdir}/#{filename}", true, filechksum, true)
+	  if f
+	    @handle.add_susetags(f, defvendorid, nil, Solv::Repo::REPO_NO_INTERNALIZE|Solv::Repo::REPO_REUSE_REPODATA|Solv::Repo::REPO_EXTEND_SOLVABLES)
+	    Solv::xfclose(f)
+	  end
+	end
 	@handle.internalize()
       end
     end
@@ -419,8 +419,8 @@ class Repo_susetags < Repo_generic
       repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_DIRSTRARRAY)
     else
       @@langtags.sort.each do |langid, langtype|
-        repodata.add_idarray(h, Solv::REPOSITORY_KEYS, @handle.pool.id2langid(langid, ext, true))
-        repodata.add_idarray(h, Solv::REPOSITORY_KEYS, langtype)
+	repodata.add_idarray(h, Solv::REPOSITORY_KEYS, @handle.pool.id2langid(langid, ext, true))
+	repodata.add_idarray(h, Solv::REPOSITORY_KEYS, langtype)
       end
     end
     repodata.add_flexarray(Solv::SOLVID_META, Solv::REPOSITORY_EXTERNAL, h)
@@ -520,11 +520,11 @@ for reposdir in reposdirs do
       repoattr = { 'alias' => ali, 'enabled' => 0, 'priority' => 99, 'autorefresh' => 1, 'type' => 'rpm-md', 'metadata_expire' => 900}
       repoattr.update(cfg[ali])
       if repoattr['type'] == 'rpm-md'
-        repo = Repo_rpmmd.new(ali, 'repomd', repoattr)
+	repo = Repo_rpmmd.new(ali, 'repomd', repoattr)
       elsif repoattr['type'] == 'yast2'
-        repo = Repo_susetags.new(ali, 'susetags', repoattr)
+	repo = Repo_susetags.new(ali, 'susetags', repoattr)
       else
-        repo = Repo_unknown.new(ali, 'unknown', repoattr)
+	repo = Repo_unknown.new(ali, 'unknown', repoattr)
       end
       repos.push(repo)
     end
@@ -595,20 +595,20 @@ if cmd == 'list' || cmd == 'info'
   abort("no package matched.") if jobs.empty?
     for job in jobs
       for s in job.solvables()
-        if cmd == 'info'
+	if cmd == 'info'
 	  puts "Name:        #{s.str}"
-          puts "Repo:        #{s.repo.name}"
-          puts "Summary:     #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
-          str = s.lookup_str(Solv::SOLVABLE_URL)
-          puts "Url:         #{str}" if str
-          str = s.lookup_str(Solv::SOLVABLE_LICENSE)
-          puts "License:     #{str}" if str
-          puts "Description:\n#{s.lookup_str(Solv::SOLVABLE_DESCRIPTION)}"
-          puts
-        else
+	  puts "Repo:        #{s.repo.name}"
+	  puts "Summary:     #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
+	  str = s.lookup_str(Solv::SOLVABLE_URL)
+	  puts "Url:         #{str}" if str
+	  str = s.lookup_str(Solv::SOLVABLE_LICENSE)
+	  puts "License:     #{str}" if str
+	  puts "Description:\n#{s.lookup_str(Solv::SOLVABLE_DESCRIPTION)}"
+	  puts
+	else
 	  puts "  - #{s.str} [#{s.repo.name}]"
 	  puts "    #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
-        end
+	end
       end
     end
   exit
@@ -619,9 +619,9 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
   for job in jobs
     if cmd == 'up'
       if job.how == Solv::Job::SOLVER_SOLVABLE_ALL || job.solvables.any? {|s| s.isinstalled?}
-        job.how |= Solv::Job::SOLVER_UPDATE
+	job.how |= Solv::Job::SOLVER_UPDATE
       else
-        job.how |= Solv::Job::SOLVER_INSTALL
+	job.how |= Solv::Job::SOLVER_INSTALL
       end
     elsif cmd == 'install'
       job.how |= Solv::Job::SOLVER_INSTALL
@@ -656,21 +656,21 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
       end
       sol = nil
       while true
-        print "Please choose a solution: "
-        STDOUT.flush
-        sol = STDIN.gets.strip
-        break if sol == 's' || sol == 'q'
-        break if sol =~ /^\d+$/ && sol.to_i >= 1 && sol.to_i <= solutions.length
+	print "Please choose a solution: "
+	STDOUT.flush
+	sol = STDIN.gets.strip
+	break if sol == 's' || sol == 'q'
+	break if sol =~ /^\d+$/ && sol.to_i >= 1 && sol.to_i <= solutions.length
       end
       next if sol == 's'
       abort if sol == 'q'
       solution = solutions[sol.to_i - 1]
       for element in solution.elements
-        newjob = element.Job()
-        if element.type == Solv::Solver::SOLVER_SOLUTION_JOB
-          jobs[element.jobidx] = newjob
+	newjob = element.Job()
+	if element.type == Solv::Solver::SOLVER_SOLUTION_JOB
+	  jobs[element.jobidx] = newjob
 	else
-          jobs.push(newjob) if newjob && !jobs.include?(newjob)
+	  jobs.push(newjob) if newjob && !jobs.include?(newjob)
 	end
       end
     end

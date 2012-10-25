@@ -345,7 +345,7 @@ class repo_repomd(repo_generic):
         di = self.handle.Dataiterator(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, Dataiterator.SEARCH_STRING)
         di.prepend_keyname(solv.REPOSITORY_REPOMD)
         for d in di:
-	    dp = d.parentpos()
+            dp = d.parentpos()
             filename = dp.lookup_str(solv.REPOSITORY_REPOMD_LOCATION)
             chksum = dp.lookup_checksum(solv.REPOSITORY_REPOMD_CHECKSUM)
             if filename and not chksum:
@@ -550,8 +550,8 @@ class repo_system(repo_generic):
             print "cached"
             return True
         print "reading"
-	if hasattr(self.handle.__class__, 'add_products'):
-	    self.handle.add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
+        if hasattr(self.handle.__class__, 'add_products'):
+            self.handle.add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
         self.handle.add_rpmdb(None, Repo.REPO_REUSE_REPODATA)
         self.writecachedrepo(None)
         return True
@@ -633,15 +633,15 @@ for repo in repos:
 repolimiter = None
 if options.repos:
     for reponame in options.repos:
-	mrepos = [ repo for repo in repos if repo.name == reponame ]
-	if not mrepos:
-	    print "no repository matches '%s'" % reponame
-	    sys.exit(1)
-	repo = mrepos[0]
-	if hasattr(repo, 'handle'):
-	    if not repolimiter:
-		repolimiter = pool.Selection()
-	    repolimiter.addsimple(Job.SOLVER_SOLVABLE_REPO, repo.handle.id)
+        mrepos = [ repo for repo in repos if repo.name == reponame ]
+        if not mrepos:
+            print "no repository matches '%s'" % reponame
+            sys.exit(1)
+        repo = mrepos[0]
+        if hasattr(repo, 'handle'):
+            if not repolimiter:
+                repolimiter = pool.Selection()
+            repolimiter.addsimple(Job.SOLVER_SOLVABLE_REPO, repo.handle.id)
 
 if cmd == 'search':
     matches = {}
@@ -678,28 +678,28 @@ for arg in args:
     if cmdlinerepo and arg in cmdlinerepo['packages']:
         jobs.append(pool.Job(Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
     else:
-	flags = Selection.SELECTION_NAME|Selection.SELECTION_PROVIDES|Selection.SELECTION_GLOB
-	if len(arg) and arg[0] == '/':
-	    flags |= Selection.SELECTION_FILELIST
-	    if cmd == 'erase':
-		flags |= Selection.SELECTION_INSTALLED_ONLY
-	sel = pool.select(arg, flags)
-	if repolimiter:
-	   sel.limit(repolimiter)
+        flags = Selection.SELECTION_NAME|Selection.SELECTION_PROVIDES|Selection.SELECTION_GLOB
+        if len(arg) and arg[0] == '/':
+            flags |= Selection.SELECTION_FILELIST
+            if cmd == 'erase':
+                flags |= Selection.SELECTION_INSTALLED_ONLY
+        sel = pool.select(arg, flags)
+        if repolimiter:
+           sel.limit(repolimiter)
         if sel.isempty():
-	    sel = pool.select(arg, flags | Selection.SELECTION_NOCASE)
-	    if repolimiter:
-	       sel.limit(repolimiter)
-	    if not sel.isempty():
-		print "[ignoring case for '%s']" % arg
+            sel = pool.select(arg, flags | Selection.SELECTION_NOCASE)
+            if repolimiter:
+               sel.limit(repolimiter)
+            if not sel.isempty():
+                print "[ignoring case for '%s']" % arg
         if sel.isempty():
-	    print "nothing matches '%s'" % arg
+            print "nothing matches '%s'" % arg
             sys.exit(1)
-	if sel.flags() & Selection.SELECTION_FILELIST:
-	    print "[using file list match for '%s']" % arg
-	if sel.flags() & Selection.SELECTION_PROVIDES:
-	    print "[using capability match for '%s']" % arg
-	jobs += sel.jobs(0)
+        if sel.flags() & Selection.SELECTION_FILELIST:
+            print "[using file list match for '%s']" % arg
+        if sel.flags() & Selection.SELECTION_PROVIDES:
+            print "[using capability match for '%s']" % arg
+        jobs += sel.jobs(0)
 
 if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repolimiter):
     sel = pool.Selection()
@@ -733,8 +733,8 @@ if cmd == 'list' or cmd == 'info':
 
 if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == 'verify':
     if not jobs:
-	print "no package matched."
-	sys.exit(1)
+        print "no package matched."
+        sys.exit(1)
     for job in jobs:
         if cmd == 'up':
             # up magic: use install instead of update if no installed package matches
