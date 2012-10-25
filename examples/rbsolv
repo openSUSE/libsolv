@@ -21,6 +21,10 @@ class Repo_generic
     return @attribs['autorefresh'].to_i != 0
   end
 
+  def id
+    return @handle ? @handle.id : 0
+  end
+
   def calc_cookie_fp(f)
     chksum = Solv::Chksum.new(Solv::REPOKEY_TYPE_SHA256)
     chksum.add_fp(f)
@@ -493,146 +497,6 @@ class Repo_system < Repo_generic
   end
 end
 
-
-def validarch?(pool, arch)
-  return false unless arch && arch != ''
-  id = pool.str2id(arch, false)
-  return id != 0 && pool.isknownarch?(id)
-end
-
-def depglob(pool, name, globname, globdep)
-  id = pool.str2id(name, false)
-  if id != 0
-    match = false
-    providers = pool.whatprovides(id)
-    if globname && providers.find {|s| s.nameid == id }
-      return [ pool.Job(Solv::Job::SOLVER_SOLVABLE_NAME, id) ]
-    end
-    if !providers.empty?
-      puts "[using capability match for '#{name}']" if globname && globdep
-      return [ pool.Job(Solv::Job::SOLVER_SOLVABLE_PROVIDES, id) ]
-    end
-  end
-  return [] unless name =~ /[\[*?]/
-  if globname
-    idmatches = {}
-    for d in pool.Dataiterator(0, Solv::SOLVABLE_NAME, name, Solv::Dataiterator::SEARCH_GLOB)
-      s = d.solvable
-      idmatches[s.nameid] = 1 if s.installable?
-    end
-    if !idmatches.empty?
-      return idmatches.keys.sort.collect { |id| pool.Job(Solv::Job::SOLVER_SOLVABLE_NAME, id) }
-    end
-  end
-  if globdep
-    idmatches = pool.matchprovidingids(name, Solv::Dataiterator::SEARCH_GLOB)
-    if !idmatches.empty?
-      puts "[using capability match for '#{name}']"
-      return idmatches.sort.collect { |id| pool.Job(Solv::Job::SOLVER_SOLVABLE_PROVIDES, id) }
-    end
-  end
-  return []
-end
-
-def limitjobs(pool, jobs, flags, evrstr)
-  njobs = []
-  evr = pool.str2id(evrstr)
-  for j in jobs
-    how = j.how
-    sel = how & Solv::Job::SOLVER_SELECTMASK
-    what = pool.rel2id(j.what, evr, flags)
-    if flags == Solv::REL_ARCH
-      how |= Solv::Job::SOLVER_SETARCH
-    elsif flags == Solv::REL_EQ && sel == Solv::Job::SOLVER_SOLVABLE_NAME
-      how |= evrstr.include?(?-) ? Solv::Job::SOLVER_SETEVR : Solv::Job::SOLVER_SETEV
-    end
-    njobs << pool.Job(how, what)
-  end
-  return njobs
-end
-
-def limitjobs_evrarch(pool, jobs, flags, evrstr)
-  if evrstr =~ /^(.+)\.(.+?)$/ && validarch?(pool, $2)
-    evrstr = $1
-    jobs = limitjobs(pool, jobs, Solv::REL_ARCH, $2)
-  end
-  return limitjobs(pool, jobs, flags, evrstr)
-end
-
-def mkjobs_rel(pool, cmd, name, rel, evr)
-  flags = 0
-  flags |= Solv::REL_LT if rel.include?(?<)
-  flags |= Solv::REL_EQ if rel.include?(?=)
-  flags |= Solv::REL_GT if rel.include?(?>)
-  jobs = depglob(pool, name, true, true)
-  return limitjobs(pool, jobs, flags, evr) unless jobs.empty?
-  if (name =~ /^(.+)\.(.+?)$/) && validarch?(pool, $2)
-    arch = $2
-    jobs = depglob(pool, name, true, true)
-    return [] if jobs.empty?
-    jobs = limitjobs(pool, jobs, Solv::REL_ARCH, arch)
-    return limitjobs(pool, jobs, flags, evr)
-  end
-  return []
-end
-
-def mkjobs_nevra(pool, cmd, arg)
-  jobs = depglob(pool, arg, true, true)
-  return jobs unless jobs.empty?
-  if ((arg =~ /^(.+)\.(.+?)$/) && validarch?(pool, $2))
-    arch = $2
-    jobs = depglob(pool, $1, true, true)
-    return limitjobs(pool, jobs, Solv::REL_ARCH, arch) unless jobs.empty?
-  end
-  if (arg =~ /^(.+)-(.+?)$/)
-    evr = $2
-    jobs = depglob(pool, $1, true, false)
-    return limitjobs_evrarch(pool, jobs, Solv::REL_EQ, evr) unless jobs.empty?
-  end
-  if (arg =~ /^(.+)-(.+?-.+?)$/)
-    evr = $2
-    jobs = depglob(pool, $1, true, false)
-    return limitjobs_evrarch(pool, jobs, Solv::REL_EQ, evr) unless jobs.empty?
-  end
-  return []
-end
-
-def mkjobs_filelist(pool, cmd, arg)
-  type = Solv::Dataiterator::SEARCH_STRING
-  type = Solv::Dataiterator::SEARCH_GLOB if arg =~ /[\[*?]/
-  if cmd == 'erase'
-    di = pool.installed.Dataiterator(0, Solv::SOLVABLE_FILELIST, arg, type | Solv::Dataiterator::SEARCH_FILES|Solv::Dataiterator::SEARCH_COMPLETE_FILELIST)
-  else
-    di = pool.Dataiterator(0, Solv::SOLVABLE_FILELIST, arg, type | Solv::Dataiterator::SEARCH_FILES|Solv::Dataiterator::SEARCH_COMPLETE_FILELIST)
-  end
-  matches = []
-  for d in di
-    s = d.solvable
-    next unless s && s.installable?
-    matches.push(s.id)
-    di.skip_solvable()
-  end
-  return [] if matches.empty?
-  puts "[using file list match for '#{arg}']"
-  if matches.length > 1
-    return [ pool.Job(Solv::Job::SOLVER_SOLVABLE_ONE_OF, pool.towhatprovides(matches)) ]
-  else
-    return [ pool.Job(Solv::Job::SOLVER_SOLVABLE | Solv::Job::SOLVER_NOAUTOSET, matches[0]) ]
-  end
-end
-
-def mkjobs(pool, cmd, arg)
-  if arg =~ /^\//
-    jobs = mkjobs_filelist(pool, cmd, arg)
-    return jobs unless jobs.empty?
-  end
-  if (arg =~ /^(.+?)\s*([<=>]+)\s*(.+?)$/)
-    return mkjobs_rel(pool, cmd, $1, $2, $3)
-  else
-    return mkjobs_nevra(pool, cmd, arg)
-  end
-end
-
 args = ARGV
 cmd = args.shift
 cmd = 'list' if cmd == 'li'
@@ -642,7 +506,13 @@ cmd = 'verify' if cmd == 've'
 cmd = 'search' if cmd == 'se'
 
 repos = []
-for reposdir in [ '/etc/zypp/repos.d' ] do
+reposdirs = []
+if FileTest.directory?('/etc/zypp/repos.d')
+  reposdirs = [ '/etc/zypp/repos.d' ]
+else
+  reposdirs = [ '/etc/yum/repos.d' ]
+end
+for reposdir in reposdirs do
   next unless FileTest.directory?(reposdir)
   for reponame in Dir["#{reposdir}/*.repo"].sort do
     cfg = IniFile.new(reponame)
@@ -700,9 +570,25 @@ pool.createwhatprovides()
 
 jobs = []
 for arg in args
-  njobs = mkjobs(pool, cmd, ARGV[0])
-  abort("nothing matches '#{arg}'") if njobs.empty?
-  jobs += njobs
+  flags = Solv::Selection::SELECTION_NAME | Solv::Selection::SELECTION_PROVIDES|Solv::Selection::SELECTION_GLOB
+  if arg =~ /^\//
+    flags |= Solv::Selection::SELECTION_FILELIST
+    flags |= Solv::Selection::SELECTION_INSTALLED_ONLY if cmd == 'erase'
+  end
+  sel = pool.select(arg, flags)
+  if sel.isempty?
+    sel = pool.select(arg, flags |  Solv::Selection::SELECTION_NOCASE)
+    puts "[ignoring case for '#{arg}']" unless sel.isempty?
+  end
+  puts "[using file list match for '#{arg}']" if sel.flags & Solv::Selection::SELECTION_FILELIST != 0
+  puts "[using capability match for '#{arg}']" if sel.flags & Solv::Selection::SELECTION_PROVIDES != 0
+  jobs += sel.jobs(0)
+end
+
+if jobs.empty? && (cmd == 'up' || cmd == 'dup' || cmd == 'verify')
+  sel = pool.Selection()
+  sel.addsimple(Solv::Job::SOLVER_SOLVABLE_ALL, 0)
+  jobs += sel.jobs(0)
 end
 
 if cmd == 'list' || cmd == 'info'
@@ -729,13 +615,7 @@ if cmd == 'list' || cmd == 'info'
 end
 
 if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == 'verify'
-  if jobs.empty?
-    if cmd == 'up' || cmd == 'verify' || cmd == 'dup'
-      jobs = [ pool.Job(Solv::Job::SOLVER_SOLVABLE_ALL, 0) ]
-    else
-      abort("no package matched.")
-    end
-  end
+  abort("no package matched.") if jobs.empty?
   for job in jobs
     if cmd == 'up'
       if job.how == Solv::Job::SOLVER_SOLVABLE_ALL || job.solvables.any? {|s| s.isinstalled?}

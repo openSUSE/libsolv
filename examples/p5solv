@@ -486,155 +486,6 @@ sub load {
 
 package main;
 
-sub validarch {
-  my ($pool, $arch) = @_;
-  return undef unless $arch;
-  my $id = $pool->str2id($arch, 0);
-  return $id && $pool->isknownarch($id) ? 1 : undef;
-}
-
-sub depglob {
-  my ($pool, $name, $globname, $globdep) = @_;
-  my $id = $pool->str2id($name, 0);
-  if ($id) {
-    my $match;
-    for my $s ($pool->whatprovides($id)) {
-      return $pool->Job($solv::Job::SOLVER_SOLVABLE_NAME, $id) if $globname && $s->{'nameid'} == $id;
-      $match = 1;
-    }
-    if ($match) {
-      print "[using capability match for '$name']\n" if $globname && $globdep;
-      return $pool->Job($solv::Job::SOLVER_SOLVABLE_PROVIDES, $id);
-    }
-  }
-  return unless $name =~ /[[*?]/;
-  if ($globname) {
-    my %idmatches;
-    for my $d (@{$pool->Dataiterator(0, $solv::SOLVABLE_NAME, $name, $solv::Dataiterator::SEARCH_GLOB)}) {
-      my $s = $d->{'solvable'};
-      $idmatches{$s->{'nameid'}} = 1 if $s->installable();
-    }
-    if (%idmatches) {
-      return map {$pool->Job($solv::Job::SOLVER_SOLVABLE_NAME, $_)} sort(keys %idmatches);
-    }
-  }
-  if ($globdep) {
-    my @idmatches = $pool->matchprovidingids($name, $solv::Dataiterator::SEARCH_GLOB);
-    if (@idmatches) {
-      print "[using capability match for '$name']\n";
-      return map {$pool->Job($solv::Job::SOLVER_SOLVABLE_PROVIDES, $_)} sort(@idmatches);
-    }
-  }
-  return;
-}
-
-sub limitjobs {
-  my ($pool, $jobs, $flags, $evrstr) = @_;
-  my @jobs;
-  my $evr = $pool->str2id($evrstr);
-  for my $j (@$jobs) {
-    my $how = $j->{'how'};
-    my $sel = $how & $solv::Job::SOLVER_SELECTMASK;
-    my $what = $pool->rel2id($j->{'what'}, $evr, $flags);
-    if ($flags == $solv::REL_ARCH) {
-      $how |= $solv::Job::SOLVER_SETARCH;
-    } elsif ($flags == $solv::REL_EQ && $sel == $solv::Job::SOLVER_SOLVABLE_NAME) {
-      $how |= $evrstr =~ /-/ ? $solv::Job::SOLVER_SETEVR : $solv::Job::SOLVER_SETEV;
-    }
-    push @jobs, $pool->Job($how, $what);
-  }
-  return @jobs;
-}
-
-sub limitjobs_evrarch {
-  my ($pool, $jobs, $flags, $evrstr) = @_;
-  if ($evrstr =~ /^(.+)\.(.+?)$/ && validarch($pool, $2)) {
-    $evrstr = $1;
-    $jobs = [ limitjobs($pool, $jobs, $solv::REL_ARCH, $2) ];
-  }
-  return limitjobs($pool, $jobs, $flags, $evrstr);
-}
-
-sub mkjobs_rel {
-  my ($pool, $cmd, $name, $rel, $evr) = @_;
-  my $flags = 0;
-  $flags |= $solv::REL_LT if $rel =~ /</;
-  $flags |= $solv::REL_EQ if $rel =~ /=/;
-  $flags |= $solv::REL_GT if $rel =~ />/;
-  my @jobs = depglob($pool, $name, 1, 1);
-  return limitjobs($pool, \@jobs, $flags, $evr) if @jobs;
-  if (($name =~ /^(.+)\.(.+?)$/s) && validarch($pool, $2)) {
-    my $arch = $2;
-    @jobs = depglob($pool, $1, 1, 1);
-    if (@jobs) {
-      @jobs = limitjobs($pool, \@jobs, $solv::REL_ARCH, $arch);
-      return limitjobs($pool, \@jobs, $flags, $evr);
-    }
-  }
-  return ();
-}
-
-sub mkjobs_nevra {
-  my ($pool, $cmd, $arg) = @_;
-  my @jobs = depglob($pool, $arg, 1, 1);
-  return @jobs if @jobs;
-  if (($arg =~ /^(.+)\.(.+?)$/s) && validarch($pool, $2)) {
-    my $arch = $2;
-    @jobs = depglob($pool, $1, 1, 1);
-    return limitjobs($pool, \@jobs, $solv::REL_ARCH, $arch) if @jobs;
-  }
-  if ($arg =~ /^(.+)-(.+?)$/s) {
-    my $evr = $2;
-    @jobs = depglob($pool, $1, 1, 0);
-    return limitjobs_evrarch($pool, \@jobs, $solv::REL_EQ, $evr) if @jobs;
-  }
-  if ($arg =~ /^(.+)-(.+?-.+?)$/s) {
-    my $evr = $2;
-    @jobs = depglob($pool, $1, 1, 0);
-    return limitjobs_evrarch($pool, \@jobs, $solv::REL_EQ, $evr) if @jobs;
-  }
-  return ();
-}
-
-sub mkjobs_filelist {
-  my ($pool, $cmd, $arg) = @_;
-  my $type = ($arg =~ /[[*?]/) ? $solv::Dataiterator::SEARCH_GLOB : $solv::Dataiterator::SEARCH_STRING;
-  $type |= $solv::Dataiterator::SEARCH_FILES | $solv::Dataiterator::SEARCH_COMPLETE_FILELIST;
-  my $di;
-  if ($cmd eq 'erase') {
-    $di = $pool->{'installed'}->Dataiterator(0, $solv::SOLVABLE_FILELIST, $arg, $type);
-  } else {
-    $di = $pool->Dataiterator(0, $solv::SOLVABLE_FILELIST, $arg, $type);
-  }
-  my @matches;
-  for my $d (@$di) {
-    my $s = $d->{'solvable'};
-    next unless $s && $s->installable();
-    push @matches, $s->{'id'};
-    $di->skip_solvable();
-  }
-  return () unless @matches;
-  print "[using file list match for '$arg']\n";
-  if (@matches > 1) {
-    return $pool->Job($solv::Job::SOLVER_SOLVABLE_ONE_OF, $pool->towhatprovides(\@matches));
-  } else {
-    return $pool->Job($solv::Job::SOLVER_SOLVABLE | $solv::Job::SOLVER_NOAUTOSET, $matches[0]);
-  }
-}
-
-sub mkjobs {
-  my ($pool, $cmd, $arg) = @_;
-  if ($arg && $arg =~ /^\//) {
-    my @jobs = mkjobs_filelist($pool, $cmd, $arg);
-    return @jobs if @jobs;
-  }
-  if ($arg =~ /^(.+?)\s*([<=>]+)\s*(.+?)$/s) {
-    return mkjobs_rel($pool, $cmd, $1, $2, $3);
-  } else {
-    return mkjobs_nevra($pool, $cmd, $arg);
-  }
-}
-
 sub load_stub {
   my ($repodata) = @_;
   my $repo = $repodata->{'repo'}->{'appdata'};
@@ -650,7 +501,13 @@ $cmd = 'verify' if $cmd eq 've';
 $cmd = 'search' if $cmd eq 'se';
 
 my @repos;
-for my $reposdir ('/etc/zypp/repos.d') {
+my @reposdirs;
+if (-d '/etc/zypp/repos.d') {
+  @reposdirs = ( '/etc/zypp/repos.d' );
+} else {
+  @reposdirs = ( '/etc/yum/repos.d' );
+}
+for my $reposdir (@reposdirs) {
   next unless -d $reposdir;
   next unless opendir(DIR, $reposdir);
   for my $reponame (sort(grep {/\.repo$/} readdir(DIR))) {
@@ -701,9 +558,25 @@ $pool->createwhatprovides();
 
 my @jobs;
 for my $arg (@ARGV) {
-  my @njobs = mkjobs($pool, $cmd, $arg);
-  die("nothing matches '$arg'\n") unless @njobs;
-  push @jobs, @njobs;
+  my $flags = $solv::Selection::SELECTION_NAME | $solv::Selection::SELECTION_PROVIDES | $solv::Selection::SELECTION_GLOB;
+  if ($arg =~ /^\//) {
+    $flags |= $solv::Selection::SELECTION_FILELIST;
+    $flags |= $solv::Selection::SELECTION_INSTALLED_ONLY if $cmd eq 'erase';
+  }
+  my $sel = $pool->select($arg, $flags);
+  if ($sel->isempty()) {
+    $sel = $pool->select($arg, $flags | $solv::Selection::SELECTION_NOCASE);
+    print "[ignoring case for '$arg']\n" unless $sel->isempty();
+  }
+  die("nothing matches '$arg'\n") if $sel->isempty();
+  print "[using file list match for '$arg']\n" if $sel->flags() & $solv::Selection::SELECTION_FILELIST;
+  print "[using capability match for '$arg']\n" if $sel->flags() & $solv::Selection::SELECTION_PROVIDES;
+  push @jobs, $sel->jobs(0);
+}
+if (!@jobs && ($cmd eq 'up' || $cmd eq 'dup' || $cmd eq 'verify')) {
+  my $sel = $pool->Selection();
+  $sel->addsimple($solv::Job::SOLVER_SOLVABLE_ALL, 0);
+  push @jobs, $sel->jobs(0);
 }
 
 if ($cmd eq 'list' || $cmd eq 'info') {
@@ -729,13 +602,7 @@ if ($cmd eq 'list' || $cmd eq 'info') {
 }
 
 if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cmd eq 'verify') {
-  if (!@jobs) {
-    if ($cmd eq 'up' || $cmd eq 'verify' || $cmd eq 'dup') {
-      push @jobs, $pool->Job($solv::Job::SOLVER_SOLVABLE_ALL, 0);
-    } else {
-      die("no package matched.\n");
-    }
-  }
+  die("no package matched.\n") unless @jobs;
   for my $job (@jobs) {
     if ($cmd eq 'up') {
       if ($job->{'how'} == $solv::Job::SOLVER_SOLVABLE_ALL || grep {$_->isinstalled()} $job->solvables()) {

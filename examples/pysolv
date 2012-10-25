@@ -38,7 +38,7 @@ import time
 import subprocess
 import rpm
 from stat import *
-from solv import Pool, Repo, Dataiterator, Job, Solver, Transaction
+from solv import Pool, Repo, Dataiterator, Job, Solver, Transaction, Selection
 from iniparse import INIConfig
 from optparse import OptionParser
 
@@ -287,7 +287,7 @@ class repo_generic(dict):
     def updateaddedprovides(self, addedprovides):
         if 'incomplete' in self:
             return 
-        if 'handle' not in self:
+        if not hasattr(self, 'handle'):
             return 
         if self.handle.isempty():
             return
@@ -562,141 +562,6 @@ class repo_cmdline(repo_generic):
         self.handle.appdata = self 
         return True
 
-def validarch(pool, arch):
-    if not arch:
-        return False
-    id = pool.str2id(arch, False)
-    if not id:
-        return False
-    return pool.isknownarch(id)
-
-def limitjobs(pool, jobs, flags, evrstr):
-    njobs = []
-    evr = pool.str2id(evrstr)
-    for j in jobs:
-        how = j.how
-        sel = how & Job.SOLVER_SELECTMASK
-        what = pool.rel2id(j.what, evr, flags)
-        if flags == solv.REL_ARCH:
-            how |= Job.SOLVER_SETARCH
-        elif flags == solv.REL_EQ and sel == Job.SOLVER_SOLVABLE_NAME:
-            if evrstr.find('-') >= 0:
-                how |= Job.SOLVER_SETEVR
-            else:
-                how |= Job.SOLVER_SETEV
-        njobs.append(pool.Job(how, what))
-    return njobs
-
-def limitjobs_evrarch(pool, jobs, flags, evrstr):
-    m = re.match(r'(.+)\.(.+?)$', evrstr)
-    if m and validarch(pool, m.group(2)):
-        jobs = limitjobs(pool, jobs, solv.REL_ARCH, m.group(2))
-        evrstr = m.group(1)
-    return limitjobs(pool, jobs, flags, evrstr)
-
-def mkjobs_filelist(pool, cmd, arg):
-    if re.search(r'[[*?]', arg):
-        type = Dataiterator.SEARCH_GLOB
-    else:
-        type = Dataiterator.SEARCH_STRING
-    if cmd == 'erase':
-        di = pool.installed.Dataiterator(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
-    else:
-        di = pool.Dataiterator(0, solv.SOLVABLE_FILELIST, arg, type | Dataiterator.SEARCH_FILES|Dataiterator.SEARCH_COMPLETE_FILELIST)
-    matches = []
-    for d in di:
-        s = d.solvable
-        if s and s.installable():
-            matches.append(s.id)
-            di.skip_solvable()  # one match is enough
-    if matches:
-        print "[using file list match for '%s']" % arg
-        if len(matches) > 1:
-            return [ pool.Job(Job.SOLVER_SOLVABLE_ONE_OF, pool.towhatprovides(matches)) ]
-        else:
-            return [ pool.Job(Job.SOLVER_SOLVABLE | Job.SOLVER_NOAUTOSET, matches[0]) ]
-    return []
-
-def mkjobs_rel(pool, cmd, name, rel, evr):
-    flags = 0
-    if rel.find('<') >= 0: flags |= solv.REL_LT
-    if rel.find('=') >= 0: flags |= solv.REL_EQ 
-    if rel.find('>') >= 0: flags |= solv.REL_GT
-    jobs = depglob(pool, name, True, True)
-    if jobs:
-        return limitjobs(pool, jobs, flags, evr)
-    m = re.match(r'(.+)\.(.+?)$', name)
-    if m and validarch(pool, m.group(2)):
-        jobs = depglob(pool, m.group(1), True, True)
-        if jobs:
-            jobs = limitjobs(pool, jobs, solv.REL_ARCH, m.group(2))
-            return limitjobs(pool, jobs, flags, evr)
-    return []
-
-def mkjobs_nevra(pool, cmd, arg):
-    jobs = depglob(pool, arg, True, True)
-    if jobs:
-        return jobs
-    m = re.match(r'(.+)\.(.+?)$', arg)
-    if m and validarch(pool, m.group(2)):
-        jobs = depglob(pool, m.group(1), True, True)
-        if jobs:
-            return limitjobs(pool, jobs, solv.REL_ARCH, m.group(2))
-    m = re.match(r'(.+)-(.+?)$', arg)
-    if m:
-        jobs = depglob(pool, m.group(1), True, False)
-        if jobs:
-            return limitjobs_evrarch(pool, jobs, solv.REL_EQ, m.group(2))
-    m = re.match(r'(.+)-(.+?-.+?)$', arg)
-    if m:
-        jobs = depglob(pool, m.group(1), True, False)
-        if jobs:
-            return limitjobs_evrarch(pool, jobs, solv.REL_EQ, m.group(2))
-    return []
-
-def mkjobs(pool, cmd, arg):
-    if len(arg) and arg[0] == '/':
-        jobs = mkjobs_filelist(pool, cmd, arg)
-        if jobs:
-            return jobs
-    m = re.match(r'(.+?)\s*([<=>]+)\s*(.+?)$', arg)
-    if m:
-        return mkjobs_rel(pool, cmd, m.group(1), m.group(2), m.group(3))
-    else:
-        return mkjobs_nevra(pool, cmd, arg)
-            
-def depglob(pool, name, globname, globdep):
-    id = pool.str2id(name, False)
-    if id:
-        match = False
-        for s in pool.whatprovides(id):
-            if globname and s.nameid == id:
-                return [ pool.Job(Job.SOLVER_SOLVABLE_NAME, id) ]
-            match = True
-        if match:
-            if globname and globdep:
-                print "[using capability match for '%s']" % name
-            return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) ]
-    if not re.search(r'[[*?]', name):
-        return []
-    if globname:
-        # try name glob
-        idmatches = {}
-        for d in pool.Dataiterator(0, solv.SOLVABLE_NAME, name, Dataiterator.SEARCH_GLOB):
-            s = d.solvable
-            if s.installable():
-                idmatches[s.nameid] = True
-        if idmatches:
-            return [ pool.Job(Job.SOLVER_SOLVABLE_NAME, id) for id in sorted(idmatches.keys()) ]
-    if globdep:
-        # try dependency glob
-        idmatches = pool.matchprovidingids(name, Dataiterator.SEARCH_GLOB)
-        if idmatches:
-            print "[using capability match for '%s']" % name
-            return [ pool.Job(Job.SOLVER_SOLVABLE_PROVIDES, id) for id in sorted(idmatches) ]
-    return []
-    
-
 def load_stub(repodata):
     repo = repodata.repo.appdata
     if repo:
@@ -705,6 +570,7 @@ def load_stub(repodata):
 
 
 parser = OptionParser(usage="usage: solv.py [options] COMMAND")
+parser.add_option('-r', '--repo', action="append", type="string", dest="repos")
 (options, args) = parser.parse_args()
 if not args:
     parser.print_help(sys.stderr)
@@ -726,6 +592,12 @@ if cmd == 'se':
 
 # read all repo configs
 repos = []
+reposdirs = []
+if os.path.isdir("/etc/zypp/repos.d"):
+  reposdirs = [ "/etc/zypp/repos.d" ]
+else:
+  reposdirs = [ "/etc/yum/repos.d" ]
+
 for reposdir in ["/etc/zypp/repos.d"]:
     if not os.path.isdir(reposdir):
         continue
@@ -758,6 +630,19 @@ for repo in repos:
     if int(repo['enabled']):
         repo.load(pool)
     
+repolimiter = None
+if options.repos:
+    for reponame in options.repos:
+	mrepos = [ repo for repo in repos if repo.name == reponame ]
+	if not mrepos:
+	    print "no repository matches '%s'" % reponame
+	    sys.exit(1)
+	repo = mrepos[0]
+	if hasattr(repo, 'handle'):
+	    if not repolimiter:
+		repolimiter = pool.Selection()
+	    repolimiter.addsimple(Job.SOLVER_SOLVABLE_REPO, repo.handle.id)
+
 if cmd == 'search':
     matches = {}
     di = pool.Dataiterator(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
@@ -793,11 +678,35 @@ for arg in args:
     if cmdlinerepo and arg in cmdlinerepo['packages']:
         jobs.append(pool.Job(Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
     else:
-        njobs = mkjobs(pool, cmd, arg)
-        if not njobs:
-            print "nothing matches '%s'" % arg
+	flags = Selection.SELECTION_NAME|Selection.SELECTION_PROVIDES|Selection.SELECTION_GLOB
+	if len(arg) and arg[0] == '/':
+	    flags |= Selection.SELECTION_FILELIST
+	    if cmd == 'erase':
+		flags |= Selection.SELECTION_INSTALLED_ONLY
+	sel = pool.select(arg, flags)
+	if repolimiter:
+	   sel.limit(repolimiter)
+        if sel.isempty():
+	    sel = pool.select(arg, flags | Selection.SELECTION_NOCASE)
+	    if repolimiter:
+	       sel.limit(repolimiter)
+	    if not sel.isempty():
+		print "[ignoring case for '%s']" % arg
+        if sel.isempty():
+	    print "nothing matches '%s'" % arg
             sys.exit(1)
-        jobs += njobs
+	if sel.flags() & Selection.SELECTION_FILELIST:
+	    print "[using file list match for '%s']" % arg
+	if sel.flags() & Selection.SELECTION_PROVIDES:
+	    print "[using capability match for '%s']" % arg
+	jobs += sel.jobs(0)
+
+if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repolimiter):
+    sel = pool.Selection()
+    sel.addsimple(Job.SOLVER_SOLVABLE_ALL, 0)
+    if repolimiter:
+       sel.limit(repolimiter)
+    jobs += sel.jobs(0)
 
 if cmd == 'list' or cmd == 'info':
     if not jobs:
@@ -824,11 +733,8 @@ if cmd == 'list' or cmd == 'info':
 
 if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == 'verify':
     if not jobs:
-        if cmd == 'up' or cmd == 'verify' or cmd == 'dup':
-            jobs = [ pool.Job(Job.SOLVER_SOLVABLE_ALL, 0) ]
-        else:
-            print "no package matched."
-            sys.exit(1)
+	print "no package matched."
+	sys.exit(1)
     for job in jobs:
         if cmd == 'up':
             # up magic: use install instead of update if no installed package matches

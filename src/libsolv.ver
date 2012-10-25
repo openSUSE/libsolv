@@ -221,6 +221,9 @@ SOLV_1.0 {
 		repodata_write;
 		repodata_write_filtered;
 		repopagestore_compress_page;
+		selection_add;
+		selection_limit;
+		selection_make;
 		solv_bin2hex;
 		solv_calloc;
 		solv_chksum_add;

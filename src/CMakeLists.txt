@@ -18,12 +18,12 @@ SET (libsolv_SRCS
     solver.c solverdebug.c repo_solv.c repo_write.c evr.c pool.c
     queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
     transaction.c rules.c problems.c
-    chksum.c md5.c sha1.c sha2.c solvversion.c)
+    chksum.c md5.c sha1.c sha2.c solvversion.c selection.c)
 
 SET (libsolv_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h
     poolid.h pooltypes.h queue.h solvable.h solver.h solverdebug.h
-    repo.h repodata.h repo_solv.h repo_write.h util.h
+    repo.h repodata.h repo_solv.h repo_write.h util.h selection.h
     strpool.h dirpool.h knownid.h transaction.h rules.h problems.h
     chksum.h dataiterator.h ${CMAKE_BINARY_DIR}/src/solvversion.h)
 

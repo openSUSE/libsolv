@@ -57,6 +57,7 @@
 #include "solverdebug.h"
 #include "chksum.h"
 #include "repo_solv.h"
+#include "selection.h"
 
 #include "repo_write.h"
 #ifdef ENABLE_RPMDB
@@ -2028,341 +2029,6 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
     pool_free(sigpool);
 }
 
-
-int
-str2archid(Pool *pool, char *arch)
-{
-  Id id;
-  if (!*arch)
-    return 0;
-  id = pool_str2id(pool, arch, 0);
-  if (id == ARCH_SRC || id == ARCH_NOSRC || id == ARCH_NOARCH)
-    return id;
-  if (pool->id2arch && (id > pool->lastarch || !pool->id2arch[id]))
-    return 0;
-  return id;
-}
-
-
-#define DEPGLOB_NAME     1
-#define DEPGLOB_DEP      2
-#define DEPGLOB_NAMEDEP  3
-
-int
-depglob(Pool *pool, char *name, Queue *job, int what)
-{
-  Id p, pp;
-  Id id = pool_str2id(pool, name, 0);
-  int i, match = 0;
-
-  if (id)
-    {
-      FOR_PROVIDES(p, pp, id)
-	{
-	  Solvable *s = pool->solvables + p;
-	  match = 1;
-	  if (s->name == id && (what & DEPGLOB_NAME) != 0)
-	    {
-	      queue_push2(job, SOLVER_SOLVABLE_NAME, id);
-	      return 1;
-	    }
-	}
-      if (match)
-	{
-	  if (what == DEPGLOB_NAMEDEP)
-	    printf("[using capability match for '%s']\n", name);
-	  queue_push2(job, SOLVER_SOLVABLE_PROVIDES, id);
-	  return 1;
-	}
-    }
-
-  if (strpbrk(name, "[*?") == 0)
-    return 0;
-
-  if ((what & DEPGLOB_NAME) != 0)
-    {
-      /* looks like a name glob. hard work. */
-      for (p = 1; p < pool->nsolvables; p++)
-	{
-	  Solvable *s = pool->solvables + p;
-	  if (!s->repo || !pool_installable(pool, s))
-	    continue;
-	  id = s->name;
-	  if (fnmatch(name, pool_id2str(pool, id), 0) == 0)
-	    {
-	      for (i = 0; i < job->count; i += 2)
-		if (job->elements[i] == SOLVER_SOLVABLE_NAME && job->elements[i + 1] == id)
-		  break;
-	      if (i == job->count)
-		queue_push2(job, SOLVER_SOLVABLE_NAME, id);
-	      match = 1;
-	    }
-	}
-      if (match)
-	return 1;
-    }
-  if ((what & DEPGLOB_DEP))
-    {
-      /* looks like a dep glob. really hard work. */
-      for (id = 1; id < pool->ss.nstrings; id++)
-	{
-	  if (!pool->whatprovides[id])
-	    continue;
-	  if (fnmatch(name, pool_id2str(pool, id), 0) == 0)
-	    {
-	      if (!match && what == DEPGLOB_NAMEDEP)
-		printf("[using capability match for '%s']\n", name);
-	      for (i = 0; i < job->count; i += 2)
-		if (job->elements[i] == SOLVER_SOLVABLE_PROVIDES && job->elements[i + 1] == id)
-		  break;
-	      if (i == job->count)
-		queue_push2(job, SOLVER_SOLVABLE_PROVIDES, id);
-	      match = 1;
-	    }
-	}
-      if (match)
-	return 1;
-    }
-  return 0;
-}
-
-int
-limitrelation(Pool *pool, Queue *job, int flags, Id evr)
-{
-  int i, j;
-  Id p, pp;
-  for (i = j = 0; i < job->count; i += 2)
-    {
-      Id select = job->elements[i] & SOLVER_SELECTMASK;
-      if (select != SOLVER_SOLVABLE_NAME && select != SOLVER_SOLVABLE_PROVIDES)
-	{
-	  fprintf(stderr, "limitrelation only works on name/provides jobs\n");
-	  exit(1);
-	}
-      job->elements[i + 1] = pool_rel2id(pool, job->elements[i + 1], evr, flags, 1);
-      if (flags == REL_ARCH)
-	job->elements[i] |= SOLVER_SETARCH;
-      if (flags == REL_EQ && select == SOLVER_SOLVABLE_NAME && job->elements[i])
-	{
-#ifndef DEBIAN
-	  const char *evrstr = pool_id2str(pool, evr);
-	  if (!strchr(evrstr, '-'))
-	    job->elements[i] |= SOLVER_SETEV;
-	  else
-#endif
-	    job->elements[i] |= SOLVER_SETEVR;
-	}
-      /* make sure we still have matches */
-      FOR_JOB_SELECT(p, pp, job->elements[i], job->elements[i + 1])
-	break;
-      if (p)
-	{
-	  job->elements[j] = job->elements[i];
-	  job->elements[j + 1] = job->elements[i + 1];
-	  j += 2;
-	}
-    }
-  queue_truncate(job, j);
-  return j / 2;
-}
-
-int
-limitrelation_arch(Pool *pool, Queue *job, int flags, char *evr)
-{
-  char *r;
-  Id archid;
-  if ((r = strrchr(evr, '.')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
-    {
-      *r = 0;
-      limitrelation(pool, job, REL_ARCH, archid);
-      limitrelation(pool, job, flags, pool_str2id(pool, evr, 1));
-      *r = '.';
-    }
-  else
-    limitrelation(pool, job, flags, pool_str2id(pool, evr, 1));
-  return job->count / 2;
-}
-
-int
-limitrepo(Pool *pool, Id repofilter, Queue *job)
-{
-  Queue mq;
-  Id p, pp;
-  int i, j;
-  Solvable *s;
-
-  queue_init(&mq);
-  for (i = j = 0; i < job->count; i += 2)
-    {
-      queue_empty(&mq);
-      FOR_JOB_SELECT(p, pp, job->elements[i], job->elements[i + 1])
-	{
-	  s = pool_id2solvable(pool, p);
-	  if (s->repo && s->repo->repoid == repofilter)
-	     queue_push(&mq, p);
-	}
-      if (mq.count)
-	{
-	  /* here we assume that repo == vendor, so we also set SOLVER_SETVENDOR */
-	  Id flags = (job->elements[i] & SOLVER_SETMASK) | SOLVER_SETVENDOR | SOLVER_SETREPO;
-	  if ((job->elements[i] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_NAME)
-	    flags |= SOLVER_SETNAME;
-	  if (mq.count == 1)
-	    {
-	      job->elements[j] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET | flags;
-	      job->elements[j + 1] = mq.elements[0];
-	    }
-	  else
-	    {
-	      job->elements[j] = SOLVER_SOLVABLE_ONE_OF | flags;
-	      job->elements[j + 1] = pool_queuetowhatprovides(pool, &mq);
-	    }
-	  j += 2;
-	}
-    }
-  queue_truncate(job, j);
-  queue_free(&mq);
-  return j / 2;
-}
-
-int
-mkselect(Pool *pool, int mode, char *name, Queue *job)
-{
-  char *r, *r2;
-  Id archid;
-
-  if (*name == '/')
-    {
-      Dataiterator di;
-      int type = strpbrk(name, "[*?") == 0 ? SEARCH_STRING : SEARCH_GLOB;
-      Queue q;
-      queue_init(&q);
-      dataiterator_init(&di, pool, mode == SOLVER_ERASE ? pool->installed : 0, 0, SOLVABLE_FILELIST, name, type|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
-      while (dataiterator_step(&di))
-	{
-	  Solvable *s = pool->solvables + di.solvid;
-	  if (!s->repo || !pool_installable(pool, s))
-	    continue;
-	  queue_push(&q, di.solvid);
-	  dataiterator_skip_solvable(&di);
-	}
-      dataiterator_free(&di);
-      if (q.count)
-	{
-	  printf("[using file list match for '%s']\n", name);
-	  if (q.count > 1)
-	    queue_push2(job, SOLVER_SOLVABLE_ONE_OF, pool_queuetowhatprovides(pool, &q));
-	  else
-	    queue_push2(job, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, q.elements[0]);
-	  queue_free(&q);
-	  return job->count / 2;
-	}
-    }
-  if ((r = strpbrk(name, "<=>")) != 0)
-    {
-      /* relation case, support:
-       * depglob rel
-       * depglob.arch rel
-       */
-      int rflags = 0;
-      int nend = r - name;
-      char oldnend;
-      for (; *r; r++)
-	{
-	  if (*r == '<')
-	    rflags |= REL_LT;
-	  else if (*r == '=')
-	    rflags |= REL_EQ;
-	  else if (*r == '>')
-	    rflags |= REL_GT;
-	  else
-	    break;
-	}
-      while (*r && *r == ' ' && *r == '\t')
-	r++;
-      while (nend && (name[nend - 1] == ' ' || name[nend -1 ] == '\t'))
-	nend--;
-      if (!*name || !*r)
-	{
-	  fprintf(stderr, "bad relation\n");
-	  exit(1);
-	}
-      oldnend = name[nend];
-      name[nend] = 0;
-      if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
-	{
-	  name[nend] = oldnend;
-	  limitrelation(pool, job, rflags, pool_str2id(pool, r, 1));
-	  return job->count / 2;
-	}
-      if ((r2 = strrchr(name, '.')) != 0 && r2[1] && (archid = str2archid(pool, r2 + 1)) != 0)
-	{
-	  *r2 = 0;
-	  if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
-	    {
-	      name[nend] = oldnend;
-	      *r2 = '.';
-	      limitrelation(pool, job, REL_ARCH, archid);
-	      limitrelation(pool, job, rflags, pool_str2id(pool, r, 1));
-	      return job->count / 2;
-	    }
-	  *r2 = '.';
-	}
-      name[nend] = oldnend;
-    }
-  else
-    {
-      /* no relation case, support:
-       * depglob
-       * depglob.arch
-       * nameglob-version
-       * nameglob-version.arch
-       * nameglob-version-release
-       * nameglob-version-release.arch
-       */
-      if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
-	return job->count / 2;
-      if ((r = strrchr(name, '.')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
-	{
-	  *r = 0;
-	  if (depglob(pool, name, job, DEPGLOB_NAMEDEP))
-	    {
-	      *r = '.';
-	      limitrelation(pool, job, REL_ARCH, archid);
-	      return job->count / 2;
-	    }
-	  *r = '.';
-	}
-      if ((r = strrchr(name, '-')) != 0)
-	{
-	  *r = 0;
-	  if (depglob(pool, name, job, DEPGLOB_NAME))
-	    {
-	      /* have just the version */
-	      limitrelation_arch(pool, job, REL_EQ, r + 1);
-	      *r = '-';
-	      return job->count / 2;
-	    }
-	  if ((r2 = strrchr(name, '-')) != 0)
-	    {
-	      *r = '-';
-	      *r2 = 0;
-	      r = r2;
-	      if (depglob(pool, name, job, DEPGLOB_NAME))
-		{
-		  /* have version-release */
-		  limitrelation_arch(pool, job, REL_EQ, r + 1);
-		  *r = '-';
-		  return job->count / 2;
-		}
-	    }
-	  *r = '-';
-	}
-    }
-  return 0;
-}
-
-
 int
 yesno(const char *str)
 {
@@ -2754,11 +2420,10 @@ main(int argc, char **argv)
   Solver *solv = 0;
   Transaction *trans;
   char inbuf[128], *ip;
-  int allpkgs = 0;
   FILE **newpkgsfps;
   Queue addedfileprovides;
   Queue addedfileprovides_inst;
-  Id repofilter = 0;
+  Queue repofilter;
   int cleandeps = 0;
   char *rootdir = 0;
 
@@ -2869,9 +2534,11 @@ main(int argc, char **argv)
 
   read_repos(pool, repoinfos, nrepoinfos);
 
-  if (argc > 2 && !strcmp(argv[1], "-r"))
+  queue_init(&repofilter);
+  while (argc > 2 && !strcmp(argv[1], "-r"))
     {
       const char *rname = argv[2], *rp;
+      Id repoid = 0;
       for (rp = rname; *rp; rp++)
 	if (*rp <= '0' || *rp >= '9')
 	  break;
@@ -2885,7 +2552,7 @@ main(int argc, char **argv)
 	      if (!cinfo->enabled)
 		continue;
 	      if (--rnum == 0)
-	        repofilter = cinfo->repo->repoid;
+	        repoid = cinfo->repo->repoid;
 	    }
 	}
       else
@@ -2895,14 +2562,15 @@ main(int argc, char **argv)
 	  FOR_REPOS(i, repo)
 	    {
 	      if (!strcasecmp(rname, repo->name))
-		repofilter = repo->repoid;
+		repoid = repo->repoid;
 	    }
 	}
-      if (!repofilter)
+      if (!repoid)
 	{
 	  fprintf(stderr, "%s: no such repo\n", rname);
 	  exit(1);
 	}
+      queue_push2(&repofilter, SOLVER_SOLVABLE_REPO, repoid);
       argc -= 2;
       argv += 2;
     }
@@ -2996,7 +2664,7 @@ main(int argc, char **argv)
   for (i = 1; i < argc; i++)
     {
       Queue job2;
-      int j;
+      int j, flags, rflags;
 
       if (commandlinepkgs && commandlinepkgs[i])
 	{
@@ -3004,29 +2672,48 @@ main(int argc, char **argv)
 	  continue;
 	}
       queue_init(&job2);
-      if (!mkselect(pool, mode, argv[i], &job2))
+      flags = SELECTION_NAME|SELECTION_PROVIDES|SELECTION_GLOB;
+      if (argv[i][0] == '/')
+	flags |= SELECTION_FILELIST | (mode == MODE_ERASE ? SELECTION_INSTALLED_ONLY : 0);
+      rflags = selection_make(pool, &job2, argv[i], flags);
+      if (repofilter.count)
+	selection_limit(pool, &job2, &repofilter);
+      if (!job2.count)
+	{
+	  flags |= SELECTION_NOCASE;
+          rflags = selection_make(pool, &job2, argv[i], flags);
+	  if (repofilter.count)
+	    selection_limit(pool, &job2, &repofilter);
+	  if (job2.count)
+	    printf("[ignoring case for '%s']\n", argv[i]);
+	}
+      if (!job2.count)
 	{
 	  fprintf(stderr, "nothing matches '%s'\n", argv[i]);
 	  exit(1);
 	}
-      if (repofilter && !limitrepo(pool, repofilter, &job2))
-        {
-	  fprintf(stderr, "nothing in repo matches '%s'\n", argv[i]);
-	  exit(1);
-        }
+      if (rflags & SELECTION_FILELIST)
+        printf("[using file list match for '%s']\n", argv[i]);
+      if (rflags & SELECTION_PROVIDES)
+	printf("[using capability match for '%s']\n", argv[i]);
       for (j = 0; j < job2.count; j++)
 	queue_push(&job, job2.elements[j]);
       queue_free(&job2);
     }
 
-  if (!job.count && mainmode != MODE_UPDATE && mainmode != MODE_DISTUPGRADE && mainmode != MODE_VERIFY && mainmode != MODE_PATCH)
+  if (!job.count && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE || mainmode == MODE_VERIFY || repofilter.count))
+    {
+      queue_push2(&job, SOLVER_SOLVABLE_ALL, 0);
+      if (repofilter.count)
+	selection_limit(pool, &job, &repofilter);
+    }
+  queue_free(&repofilter);
+
+  if (!job.count && MODE_PATCH)
     {
       printf("no package matched\n");
       exit(1);
     }
-
-  if (!job.count)
-    allpkgs = 1;
 
   if (mainmode == MODE_LIST || mainmode == MODE_INFO)
     {
@@ -3098,28 +2785,6 @@ main(int argc, char **argv)
       job.elements[i] |= mode;
       if (cleandeps)
         job.elements[i] |= SOLVER_CLEANDEPS;
-    }
-
-  if (mainmode == MODE_DISTUPGRADE && allpkgs)
-    {
-      if (repofilter)
-        queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_REPO, repofilter);
-      else
-        queue_push2(&job, SOLVER_DISTUPGRADE|SOLVER_SOLVABLE_ALL, 0);
-    }
-  if (mainmode == MODE_UPDATE && allpkgs)
-    {
-      if (repofilter)
-        queue_push2(&job, SOLVER_UPDATE|SOLVER_SOLVABLE_REPO, repofilter);
-      else
-        queue_push2(&job, SOLVER_UPDATE|SOLVER_SOLVABLE_ALL, 0);
-    }
-  if (mainmode == MODE_VERIFY && allpkgs)
-    {
-      if (repofilter)
-        queue_push2(&job, SOLVER_VERIFY|SOLVER_SOLVABLE_REPO, repofilter);
-      else
-        queue_push2(&job, SOLVER_VERIFY|SOLVER_SOLVABLE_ALL, 0);
     }
 
   // multiversion test

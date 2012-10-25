@@ -1994,8 +1994,13 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*top = solv->job.elements[jidx];
       if (depp)
 	*depp = solv->job.elements[jidx + 1];
-      if ((r->d == 0 || r->d == -1) && r->w2 == 0 && r->p == -SYSTEMSOLVABLE && (solv->job.elements[jidx] & SOLVER_SELECTMASK) != SOLVER_SOLVABLE_ONE_OF)
-	return SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
+      if ((r->d == 0 || r->d == -1) && r->w2 == 0 && r->p == -SYSTEMSOLVABLE)
+	{
+	  if ((solv->job.elements[jidx] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_NAME)
+	    return SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
+	  if ((solv->job.elements[jidx] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_PROVIDES)
+	    return SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
+	}
       return SOLVER_RULE_JOB;
     }
   if (rid >= solv->updaterules && rid < solv->updaterules_end)

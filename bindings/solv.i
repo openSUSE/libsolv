@@ -349,6 +349,7 @@ typedef int bool;
 #include "solverdebug.h"
 #include "repo_solv.h"
 #include "chksum.h"
+#include "selection.h"
 
 #include "repo_write.h"
 #ifdef ENABLE_RPMDB
@@ -474,6 +475,12 @@ typedef struct {
   Id toid;
 } TransactionClass;
 
+typedef struct {
+  Pool *pool;
+  Queue q;
+  int flags;
+} Selection;
+
 typedef Dataiterator Datamatch;
 
 %}
@@ -497,6 +504,10 @@ typedef int Id;
 %constant int REL_GT;
 %constant int REL_LT;
 %constant int REL_ARCH;
+
+typedef struct {
+  Pool* const pool;
+} Selection;
 
 typedef struct {
   Pool* const pool;
@@ -682,8 +693,25 @@ typedef struct {
     Queue q;
     queue_init(&q);
     how = $self->how & SOLVER_SELECTMASK;
-    FOR_JOB_SELECT(p, pp, how, $self->what)
-      queue_push(&q, p);
+    if (how == SOLVER_SOLVABLE_ALL)
+      {
+        for (p = 2; p < pool->nsolvables; p++)
+          if (pool->solvables[p].repo)
+            queue_push(&q, p);
+      }
+    else if (how == SOLVER_SOLVABLE_REPO)
+      {
+        Repo *repo = pool_id2repo(pool, $self->what);
+        Solvable *s;
+        if (repo)
+          FOR_REPO_SOLVABLES(repo, p, s)
+            queue_push(&q, p);
+      }
+    else
+      {
+        FOR_JOB_SELECT(p, pp, how, $self->what)
+          queue_push(&q, p);
+      }
     return q;
   }
 
@@ -702,6 +730,78 @@ typedef struct {
   const char *__repr__() {
     const char *str = pool_job2str($self->pool, $self->how, $self->what, ~0);
     return pool_tmpjoin($self->pool, "<Job ", str, ">");
+  }
+}
+
+%extend Selection {
+  static const Id SELECTION_NAME = SELECTION_NAME;
+  static const Id SELECTION_PROVIDES = SELECTION_PROVIDES;
+  static const Id SELECTION_FILELIST = SELECTION_FILELIST;
+  static const Id SELECTION_GLOB = SELECTION_GLOB;
+  static const Id SELECTION_NOCASE = SELECTION_NOCASE;
+  static const Id SELECTION_INSTALLED_ONLY = SELECTION_INSTALLED_ONLY;
+  static const Id SELECTION_FLAT = SELECTION_FLAT;
+
+  Selection(Pool *pool) {
+    Selection *s;
+    s = solv_calloc(1, sizeof(*s));
+    s->pool = pool;
+    return s;
+  }
+
+  ~Selection() {
+    queue_free(&$self->q);
+    solv_free($self);
+  }
+  int flags() {
+    return $self->flags;
+  }
+  void make(const char *name, int flags) {
+    $self->flags = selection_make($self->pool, &$self->q, name, flags);
+  }
+#ifdef SWIGRUBY
+  %rename("isempty?") isempty;
+#endif
+  bool isempty() {
+    return $self->q.count == 0;
+  }
+  void limit(Selection *lsel) {
+    if ($self->pool != lsel->pool)
+      queue_empty(&$self->q);
+    else
+      selection_limit($self->pool, &$self->q, &lsel->q);
+  }
+  void add(Selection *lsel) {
+    if ($self->pool == lsel->pool)
+      {
+        selection_add($self->pool, &$self->q, &lsel->q);
+        $self->flags |= lsel->flags;
+      }
+  }
+  void addsimple(Id how, Id what) {
+    queue_push2(&$self->q, how, what);
+  }
+  %typemap(out) Queue jobs Queue2Array(Job *, 2, new_Job(arg1->pool, id, idp[1]));
+  %newobject jobs;
+  Queue jobs(int flags) {
+    Queue q;
+    int i;
+    queue_init_clone(&q, &$self->q);
+    for (i = 0; i < q.count; i += 2)
+      q.elements[i] |= flags;
+    return q;
+  }
+
+#if defined(SWIGPERL)
+  %rename("str") __str__;
+#endif
+  const char *__str__() {
+    char *s;
+    int i;
+    s = pool_tmpjoin($self->pool, 0, 0, 0);
+    for (i = 0; i < $self->q.count; i += 2)
+      s = pool_tmpappend($self->pool, s, " | ", solver_select2str($self->pool, $self->q.elements[i] & SOLVER_SELECTMASK, $self->q.elements[i + 1]));
+    return *s ? s + 3 : s;
   }
 }
 
@@ -1085,6 +1185,17 @@ typedef struct {
   %newobject Solver;
   Solver *Solver() {
     return solver_create($self);
+  }
+
+  %newobject Selection;
+  Selection *Selection() {
+    return new_Selection($self);
+  }
+  %newobject select;
+  Selection *select(const char *name, int flags) {
+    Selection *sel = new_Selection($self);
+    sel->flags = selection_make($self, &sel->q, name, flags);
+    return sel;
   }
 }
 
