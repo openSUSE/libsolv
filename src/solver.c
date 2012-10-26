@@ -2529,6 +2529,19 @@ solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap)
       select = how & SOLVER_SELECTMASK;
       if (!noobsmap->size)
 	map_grow(noobsmap, pool->nsolvables);
+      if (select == SOLVER_SOLVABLE_ALL)
+	{
+	  FOR_POOL_SOLVABLES(p)
+	    MAPSET(noobsmap, p);
+	}
+      else if (select == SOLVER_SOLVABLE_REPO)
+	{
+	  Solvable *s;
+	  Repo *repo = pool_id2repo(pool, what);
+	  if (repo)
+	    FOR_REPO_SOLVABLES(repo, p, s)
+	      MAPSET(noobsmap, p);
+	}
       FOR_JOB_SELECT(p, pp, select, what)
         MAPSET(noobsmap, p);
     }
@@ -2620,7 +2633,7 @@ solver_solve(Solver *solv, Queue *job)
 	  switch (how & SOLVER_JOBMASK)
 	    {
 	    case SOLVER_VERIFY:
-	      if (select == SOLVER_SOLVABLE_ALL)
+	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && solv->installed && what == solv->installed->repoid))
 	        solv->fixmap_all = 1;
 	      FOR_JOB_SELECT(p, pp, select, what)
 		{
@@ -2633,7 +2646,7 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	      break;
 	    case SOLVER_UPDATE:
-	      if (select == SOLVER_SOLVABLE_ALL)
+	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && solv->installed && what == solv->installed->repoid))
 		solv->updatemap_all = 1;
 	      FOR_JOB_SELECT(p, pp, select, what)
 		{
@@ -2861,7 +2874,20 @@ solver_solve(Solver *solv, Queue *job)
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %s%serase %s\n", weak ? "weak " : "", how & SOLVER_CLEANDEPS ? "clean deps " : "", solver_select2str(pool, select, what));
 	  if ((how & SOLVER_CLEANDEPS) != 0 && !solv->cleandepsmap.size && installed)
 	    map_grow(&solv->cleandepsmap, installed->end - installed->start);
+	  /* specific solvable: by id or by nevra */
 	  name = (select == SOLVER_SOLVABLE || (select == SOLVER_SOLVABLE_NAME && ISRELDEP(what))) ? 0 : -1;
+	  if (select == SOLVER_SOLVABLE_ALL)	/* hmmm ;) */
+	    {
+	      FOR_POOL_SOLVABLES(p)
+	        solver_addjobrule(solv, -p, 0, i, weak);
+	    }
+	  else if (select == SOLVER_SOLVABLE_REPO)
+	    {
+	      Repo *repo = pool_id2repo(pool, what);
+	      if (repo)
+		FOR_REPO_SOLVABLES(repo, p, s)
+		  solver_addjobrule(solv, -p, 0, i, weak);
+	    }
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
 	      s = pool->solvables + p;
@@ -2903,6 +2929,20 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_UPDATE:
           if ((how & SOLVER_CLEANDEPS) != 0 && installed)
 	    {
+	      if (how == SOLVER_SOLVABLE_ALL || (how == SOLVER_SOLVABLE_REPO && what == installed->repoid))
+		{
+		  FOR_REPO_SOLVABLES(installed, p, s)
+		    {
+		      if (!solv->cleandeps_updatepkgs)
+			{
+			  solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
+			  queue_init(solv->cleandeps_updatepkgs);
+			}
+		      queue_pushunique(solv->cleandeps_updatepkgs, p);
+		      if (!solv->cleandepsmap.size)
+			map_grow(&solv->cleandepsmap, installed->end - installed->start);
+		    }
+		}
 	      FOR_JOB_SELECT(p, pp, select, what)
 		{
 		  s = pool->solvables + p;
@@ -2935,18 +2975,27 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_LOCK:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %slock %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
-	  FOR_JOB_SELECT(p, pp, select, what)
+	  if (select == SOLVER_SOLVABLE_ALL)
 	    {
-	      s = pool->solvables + p;
-	      solver_addjobrule(solv, installed && s->repo == installed ? p : -p, 0, i, weak);
+	      FOR_POOL_SOLVABLES(p)
+	        solver_addjobrule(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, i, weak);
 	    }
+          else if (select == SOLVER_SOLVABLE_REPO)
+	    {
+	      Repo *repo = pool_id2repo(pool, what);
+	      if (repo)
+	        FOR_REPO_SOLVABLES(repo, p, s)
+	          solver_addjobrule(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, i, weak);
+	    }
+	  FOR_JOB_SELECT(p, pp, select, what)
+	    solver_addjobrule(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, i, weak);
 	  break;
 	case SOLVER_DISTUPGRADE:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: distupgrade %s\n", solver_select2str(pool, select, what));
 	  break;
 	case SOLVER_DROP_ORPHANED:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: drop orphaned %s\n", solver_select2str(pool, select, what));
-	  if (select == SOLVER_SOLVABLE_ALL)
+	  if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
 	    solv->droporphanedmap_all = 1;
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
@@ -3600,9 +3649,8 @@ pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what)
   queue_empty(pkgs);
   if (how == SOLVER_SOLVABLE_ALL)
     {
-      for (p = 2; p < pool->nsolvables; p++)
-	if (pool->solvables[p].repo)
-	  queue_push(pkgs, p);
+      FOR_POOL_SOLVABLES(p)
+        queue_push(pkgs, p);
     }
   else if (how == SOLVER_SOLVABLE_REPO)
     {

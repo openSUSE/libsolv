@@ -344,9 +344,16 @@ void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
 
 /* loop over all repositories */
 #define FOR_REPOS(repoid, r)						\
-  for (repoid = 1; repoid < pool->nrepos; repoid++)				\
-    if ((r = pool->repos[repoid]) != 0)
-    
+  for (repoid = 1; repoid < pool->nrepos; repoid++)			\
+    if ((r = pool->repos[repoid]) == 0)					\
+      continue;								\
+    else
+
+#define FOR_POOL_SOLVABLES(p)						\
+  for (p = 2; p < pool->nsolvables; p++)				\
+    if (pool->solvables[p].repo == 0)					\
+      continue;								\
+    else
 
 #ifdef ENABLE_COMPS
 #define ISCONDDEP(id) (ISRELDEP(id) && (GETRELDEP(pool, id))->flags == REL_COND)

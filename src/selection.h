@@ -24,7 +24,7 @@
 #define SELECTION_FLAT			(1 << 10)
 #define SELECTION_NOCASE		(1 << 11)
 
-extern int selection_make(Pool *pool, Queue *selection, const char *name, int flags);
+extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
 extern void selection_limit(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_solvables(Pool *pool, Queue *selection, Queue *pkgs);

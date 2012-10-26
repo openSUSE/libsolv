@@ -87,9 +87,8 @@ selection_solvables(Pool *pool, Queue *selection, Queue *pkgs)
       Id select = selection->elements[i] & SOLVER_SELECTMASK;
       if (select == SOLVER_SOLVABLE_ALL)
 	{
-	  for (p = 2; p < pool->nsolvables; p++)
-	    if (pool->solvables[p].repo)
-	      queue_push(pkgs, p);
+	  FOR_POOL_SOLVABLES(p)
+	    queue_push(pkgs, p);
 	}
       if (select == SOLVER_SOLVABLE_REPO)
 	{
@@ -534,11 +533,13 @@ selection_limit(Pool *pool, Queue *sel1, Queue *sel2)
       miss = 0;
       if (select == SOLVER_SOLVABLE_ALL)
 	{
-	  for (p = 2; p < pool->nsolvables; p++)
-	    if (map_tst(&m2, p))
-	      queue_push(&q1, p);
-	    else
-	      miss = 1;
+	  FOR_POOL_SOLVABLES(p)
+	    {
+	      if (map_tst(&m2, p))
+	        queue_push(&q1, p);
+	      else
+	        miss = 1;
+	    }
 	}
       else if (select == SOLVER_SOLVABLE_REPO)
 	{
