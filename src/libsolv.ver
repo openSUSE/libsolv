@@ -71,6 +71,7 @@ SOLV_1.0 {
 		pool_id2langid;
 		pool_id2rel;
 		pool_id2str;
+		pool_job2solvables;
 		pool_job2str;
 		pool_lookup_bin_checksum;
 		pool_lookup_checksum;
@@ -224,6 +225,7 @@ SOLV_1.0 {
 		selection_add;
 		selection_limit;
 		selection_make;
+		selection_solvables;
 		solv_bin2hex;
 		solv_calloc;
 		solv_chksum_add;

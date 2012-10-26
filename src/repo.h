@@ -149,7 +149,9 @@ void repo_disable_paging(Repo *repo);
 /* iterator macros */
 #define FOR_REPO_SOLVABLES(r, p, s)						\
   for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\
-    if (s->repo == (r))
+    if (s->repo != (r))								\
+      continue;									\
+    else
 
 #ifdef LIBSOLV_INTERNAL
 #define FOR_REPODATAS(repo, rdid, data)	\

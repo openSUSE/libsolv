@@ -2718,12 +2718,16 @@ main(int argc, char **argv)
   if (mainmode == MODE_LIST || mainmode == MODE_INFO)
     {
       /* list mode, no solver needed */
+      Queue q;
+      queue_init(&q);
       for (i = 0; i < job.count; i += 2)
 	{
-	  Id how = job.elements[i] & SOLVER_SELECTMASK;
-	  FOR_JOB_SELECT(p, pp, how, job.elements[i + 1])
+	  int j;
+	  queue_empty(&q);
+	  pool_job2solvables(pool, &q, job.elements[i], job.elements[i + 1]);
+	  for (j = 0; j < q.count; j++)
 	    {
-	      Solvable *s = pool_id2solvable(pool, p);
+	      Solvable *s = pool_id2solvable(pool, q.elements[j]);
 	      if (mainmode == MODE_INFO)
 		{
 		  const char *str;
@@ -2752,6 +2756,7 @@ main(int argc, char **argv)
 		}
 	    }
 	}
+      queue_free(&q);
       queue_free(&job);
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);

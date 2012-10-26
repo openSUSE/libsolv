@@ -325,6 +325,7 @@ void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
 int solver_calc_installsizechange(Solver *solv);
 void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
 
+void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
 
 /* iterate over all literals of a rule */
 /* WARNING: loop body must not relocate whatprovidesdata, e.g. by
@@ -334,6 +335,9 @@ void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
          dp = !l ? &r->w2 : pool->whatprovidesdata + l,		\
          l = r->p; l; l = (dp != &r->w2 + 1 ? *dp++ : 0))
 
+/* XXX: this currently doesn't work correctly for SOLVER_SOLVABLE_REPO and
+   SOLVER_SOLVABLE_ALL */
+
 /* iterate over all packages selected by a job */
 #define FOR_JOB_SELECT(p, pp, select, what)					\
     if (select == SOLVER_SOLVABLE_REPO || select == SOLVER_SOLVABLE_ALL)	\
@@ -341,8 +345,12 @@ void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
     else for (pp = (select == SOLVER_SOLVABLE ? 0 :				\
                select == SOLVER_SOLVABLE_ONE_OF ? what : 			\
                pool_whatprovides(pool, what)),					\
-         p = (select == SOLVER_SOLVABLE ? what : pool->whatprovidesdata[pp++]) ; p ; p = pool->whatprovidesdata[pp++]) \
-      if (select != SOLVER_SOLVABLE_NAME || pool_match_nevr(pool, pool->solvables + p, what))
+         p = (select == SOLVER_SOLVABLE ? what : pool->whatprovidesdata[pp++]); \
+					 p ; p = pool->whatprovidesdata[pp++])	\
+      if (select == SOLVER_SOLVABLE_NAME && 					\
+			pool_match_nevr(pool, pool->solvables + p, what) == 0)	\
+	continue;								\
+      else
 
 #ifdef __cplusplus
 }

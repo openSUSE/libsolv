@@ -3591,3 +3591,31 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 	}
     }
 }
+
+void
+pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what)
+{
+  Id p, pp;
+  how &= SOLVER_SELECTMASK;
+  queue_empty(pkgs);
+  if (how == SOLVER_SOLVABLE_ALL)
+    {
+      for (p = 2; p < pool->nsolvables; p++)
+	if (pool->solvables[p].repo)
+	  queue_push(pkgs, p);
+    }
+  else if (how == SOLVER_SOLVABLE_REPO)
+    {
+      Repo *repo = pool_id2repo(pool, what);
+      Solvable *s;
+      if (repo)
+	FOR_REPO_SOLVABLES(repo, p, s)
+	  queue_push(pkgs, p);
+    }
+  else
+    {
+      FOR_JOB_SELECT(p, pp, how, what)
+	queue_push(pkgs, p);
+    }
+}
+

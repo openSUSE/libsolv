@@ -71,29 +71,25 @@ selection_prune(Pool *pool, Queue *selection)
 
 
 static int
-selection_flatten_sortcmp(const void *ap, const void *bp, void *dp)
+selection_solvables_sortcmp(const void *ap, const void *bp, void *dp)
 {
   return *(const Id *)ap - *(const Id *)bp;
 }
 
-static void
-selection_flatten(Pool *pool, Queue *selection)
+void
+selection_solvables(Pool *pool, Queue *selection, Queue *pkgs)
 {
-  Queue q;
   int i, j;
   Id p, pp, lastid;
-  if (selection->count <= 1)
-    return;
-  queue_init(&q);
+  queue_empty(pkgs);
   for (i = 0; i < selection->count; i += 2)
     {
       Id select = selection->elements[i] & SOLVER_SELECTMASK;
       if (select == SOLVER_SOLVABLE_ALL)
 	{
-	  selection->elements[0] = selection->elements[i];
-	  selection->elements[1] = selection->elements[i + 1];
-	  queue_truncate(selection, 2);
-	  return;
+	  for (p = 2; p < pool->nsolvables; p++)
+	    if (pool->solvables[p].repo)
+	      queue_push(pkgs, p);
 	}
       if (select == SOLVER_SOLVABLE_REPO)
 	{
@@ -101,28 +97,46 @@ selection_flatten(Pool *pool, Queue *selection)
 	  Repo *repo = pool_id2repo(pool, selection->elements[i + 1]);
 	  if (repo)
 	    FOR_REPO_SOLVABLES(repo, p, s)
-	      queue_push(&q, p);
+	      queue_push(pkgs, p);
 	}
       else
 	{
 	  FOR_JOB_SELECT(p, pp, select, selection->elements[i + 1])
-	    queue_push(&q, p);
+	    queue_push(pkgs, p);
 	}
     }
+  if (pkgs->count < 2)
+    return;
+  /* sort and unify */
+  solv_sort(pkgs->elements, pkgs->count, sizeof(Id), selection_solvables_sortcmp, NULL);
+  lastid = pkgs->elements[0];
+  for (i = j = 1; i < pkgs->count; i++)
+    if (pkgs->elements[i] != lastid)
+      pkgs->elements[j++] = lastid = pkgs->elements[i];
+  queue_truncate(pkgs, j);
+}
+
+static void
+selection_flatten(Pool *pool, Queue *selection)
+{
+  Queue q;
+  int i;
+  if (selection->count <= 1)
+    return;
+  for (i = 0; i < selection->count; i += 2)
+    if ((selection->elements[i] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_ALL)
+      {
+	selection->elements[0] = selection->elements[i];
+	selection->elements[1] = selection->elements[i + 1];
+	queue_truncate(selection, 2);
+	return;
+      }
+  queue_init(&q);
+  selection_solvables(pool, selection, &q);
   if (!q.count)
     {
       queue_empty(selection);
       return;
-    }
-  if (q.count > 1)
-    {
-      /* sort and unify */
-      solv_sort(q.elements, q.count, sizeof(Id), selection_flatten_sortcmp, NULL);
-      lastid = q.elements[0];
-      for (i = j = 1; i < q.count; i++)
-	if (q.elements[i] != lastid)
-	  q.elements[j++] = lastid = q.elements[i];
-      queue_truncate(&q, j);
     }
   queue_truncate(selection, 2);
   if (q.count > 1)

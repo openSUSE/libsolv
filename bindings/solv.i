@@ -688,30 +688,9 @@ typedef struct {
   %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
   %newobject solvables;
   Queue solvables() {
-    Pool *pool = $self->pool;
-    Id p, pp, how;
     Queue q;
     queue_init(&q);
-    how = $self->how & SOLVER_SELECTMASK;
-    if (how == SOLVER_SOLVABLE_ALL)
-      {
-        for (p = 2; p < pool->nsolvables; p++)
-          if (pool->solvables[p].repo)
-            queue_push(&q, p);
-      }
-    else if (how == SOLVER_SOLVABLE_REPO)
-      {
-        Repo *repo = pool_id2repo(pool, $self->what);
-        Solvable *s;
-        if (repo)
-          FOR_REPO_SOLVABLES(repo, p, s)
-            queue_push(&q, p);
-      }
-    else
-      {
-        FOR_JOB_SELECT(p, pp, how, $self->what)
-          queue_push(&q, p);
-      }
+    pool_job2solvables($self->pool, &q, $self->how, $self->what);
     return q;
   }
 
@@ -789,6 +768,15 @@ typedef struct {
     queue_init_clone(&q, &$self->q);
     for (i = 0; i < q.count; i += 2)
       q.elements[i] |= flags;
+    return q;
+  }
+
+  %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject solvables;
+  Queue solvables() {
+    Queue q;
+    queue_init(&q);
+    selection_solvables($self->pool, &q, &$self->q);
     return q;
   }
 
