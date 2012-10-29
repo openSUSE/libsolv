@@ -75,12 +75,11 @@ class repo_generic(dict):
         self.handle = pool.add_repo(self.name)
         self.handle.appdata = self
         self.handle.priority = 99 - self['priority']
-        if self['autorefresh']:
-            dorefresh = True
+        dorefresh = bool(int(self['autorefresh']))
         if dorefresh:
             try:
                 st = os.stat(self.cachepath())
-                if time.time() - st[ST_MTIME] < self['metadata_expire']:
+                if self['metadata_expire'] == -1 or time.time() - st[ST_MTIME] < self['metadata_expire']:
                     dorefresh = False
             except OSError, e:
                 pass

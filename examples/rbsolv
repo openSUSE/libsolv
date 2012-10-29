@@ -52,7 +52,7 @@ class Repo_generic
     if dorefresh
       begin
 	s = File.stat(cachepath)
-	dorefresh = false if s && Time.now - s.mtime < @attribs['metadata_expire'].to_i
+	dorefresh = false if s && (@attribs['metadata_expire'].to_i == -1 || Time.now - s.mtime < @attribs['metadata_expire'].to_i)
       rescue SystemCallError
       end
     end
