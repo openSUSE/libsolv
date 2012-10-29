@@ -151,7 +151,7 @@ selection_flatten(Pool *pool, Queue *selection)
 }
 
 static void
-selection_limit_rel(Pool *pool, Queue *selection, Id flags, Id evr)
+selection_limit_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 {
   int i, j;
   for (i = j = 0; i < selection->count; i += 2)
@@ -159,15 +159,15 @@ selection_limit_rel(Pool *pool, Queue *selection, Id flags, Id evr)
       Id select = selection->elements[i] & SOLVER_SELECTMASK;
       if (select != SOLVER_SOLVABLE_NAME && select != SOLVER_SOLVABLE_PROVIDES)
 	continue;	/* actually internal error */
-      selection->elements[i + 1] = pool_rel2id(pool, selection->elements[i + 1], evr, flags, 1);
-      if (flags == REL_ARCH)
+      selection->elements[i + 1] = pool_rel2id(pool, selection->elements[i + 1], relevr, relflags, 1);
+      if (relflags == REL_ARCH)
         selection->elements[i] |= SOLVER_SETARCH;
-      if (flags == REL_EQ && select == SOLVER_SOLVABLE_NAME && selection->elements[i])
+      if (relflags == REL_EQ && select == SOLVER_SOLVABLE_NAME && selection->elements[i])
         {
 	  if (pool->disttype == DISTTYPE_DEB)
             selection->elements[i] |= SOLVER_SETEVR;	/* debian can't match version only like rpm */
 	  else
-	    selection->elements[i] |= strchr(pool_id2str(pool, evr), '-') != 0 ? SOLVER_SETEVR : SOLVER_SETEV;
+	    selection->elements[i] |= strchr(pool_id2str(pool, relevr), '-') != 0 ? SOLVER_SETEVR : SOLVER_SETEV;
         }
     }
   selection_prune(pool, selection);
@@ -421,7 +421,7 @@ selection_nevra(Pool *pool, Queue *selection, const char *name, int flags)
 	  *r2 = 0;	/* split off */
           selection_limit_rel(pool, selection, REL_ARCH, archid);
 	}
-      selection_limit_rel(pool, selection, flags, pool_str2id(pool, r, 1));
+      selection_limit_rel(pool, selection, REL_EQ, pool_str2id(pool, r, 1));
       solv_free(rname);
       return ret;
     }

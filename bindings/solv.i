@@ -784,9 +784,8 @@ typedef struct {
   %rename("str") __str__;
 #endif
   const char *__str__() {
-    char *s;
     int i;
-    s = pool_tmpjoin($self->pool, 0, 0, 0);
+    char *s = pool_tmpjoin($self->pool, 0, 0, 0);
     for (i = 0; i < $self->q.count; i += 2)
       s = pool_tmpappend($self->pool, s, " | ", solver_select2str($self->pool, $self->q.elements[i] & SOLVER_SELECTMASK, $self->q.elements[i + 1]));
     return *s ? s + 3 : s;
