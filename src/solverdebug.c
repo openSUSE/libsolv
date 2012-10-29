@@ -934,7 +934,7 @@ pool_selection2str(Pool *pool, Queue *selection, Id flagmask)
   const char *s2;
   int i;
   s = pool_tmpjoin(pool, 0, 0, 0);
-  for (i = 0; i < selection->count; i++)
+  for (i = 0; i < selection->count; i += 2)
     {
       Id how = selection->elements[i];
       if (*s)
