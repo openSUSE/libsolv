@@ -641,7 +641,7 @@ if options.repos:
         if hasattr(repo, 'handle'):
             if not repolimiter:
                 repolimiter = pool.Selection()
-            repolimiter.addsimple(Job.SOLVER_SOLVABLE_REPO, repo.handle.id)
+            repolimiter.addsimple(Job.SOLVER_SOLVABLE_REPO|Job.SOLVER_SETREPO|Job.SOLVER_SETVENDOR, repo.handle.id)
 
 if cmd == 'search':
     matches = {}

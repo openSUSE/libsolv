@@ -2570,7 +2570,8 @@ main(int argc, char **argv)
 	  fprintf(stderr, "%s: no such repo\n", rname);
 	  exit(1);
 	}
-      queue_push2(&repofilter, SOLVER_SOLVABLE_REPO, repoid);
+      /* SETVENDOR is actually wrong but useful */
+      queue_push2(&repofilter, SOLVER_SOLVABLE_REPO | SOLVER_SETREPO | SOLVER_SETVENDOR, repoid);
       argc -= 2;
       argv += 2;
     }

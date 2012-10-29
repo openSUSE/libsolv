@@ -947,6 +947,7 @@ pool_selection2str(Pool *pool, Queue *selection, Id flagmask)
 	{
 	  int o = strlen(s);
 	  s = pool_tmpappend(pool, s, " ", 0);
+	  if (how & SOLVER_SETEV)
 	    s = pool_tmpappend(pool, s, ",setev", 0);
 	  if (how & SOLVER_SETEVR)
 	    s = pool_tmpappend(pool, s, ",setevr", 0);
