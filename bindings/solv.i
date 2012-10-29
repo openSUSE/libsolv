@@ -840,6 +840,15 @@ typedef struct {
     solv_chksum_add($self, &stb.st_size, sizeof(stb.st_size));
     solv_chksum_add($self, &stb.st_mtime, sizeof(stb.st_mtime));
   }
+  void add_fstat(int fd) {
+    struct stat stb;
+    if (fstat(fd, &stb))
+      memset(&stb, 0, sizeof(stb));
+    solv_chksum_add($self, &stb.st_dev, sizeof(stb.st_dev));
+    solv_chksum_add($self, &stb.st_ino, sizeof(stb.st_ino));
+    solv_chksum_add($self, &stb.st_size, sizeof(stb.st_size));
+    solv_chksum_add($self, &stb.st_mtime, sizeof(stb.st_mtime));
+  }
   SWIGCDATA raw() {
     int l;
     const unsigned char *b;

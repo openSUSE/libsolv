@@ -1048,10 +1048,12 @@ calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
 }
 
 void
-calc_checksum_stat(struct stat *stb, Id chktype, unsigned char *out)
+calc_checksum_stat(struct stat *stb, Id chktype, unsigned *cookie, unsigned char *out)
 {
   void *h = solv_chksum_create(chktype);
   solv_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
+  if (cookie)
+    solv_chksum_add(h, cookie, 32);
   solv_chksum_add(h, &stb->st_dev, sizeof(stb->st_dev));
   solv_chksum_add(h, &stb->st_ino, sizeof(stb->st_ino));
   solv_chksum_add(h, &stb->st_size, sizeof(stb->st_size));
@@ -1202,13 +1204,8 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 	  /* we just need some unique ID */
 	  struct stat stb;
 	  if (!fstat(fileno(fp), &stb))
-	    {
-	      int i;
-
-	      calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->extcookie);
-	      for (i = 0; i < 32; i++)
-		cinfo->extcookie[i] ^= cookie[i];
-	    }
+	    memset(&stb, 0, sizeof(stb));
+	  calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cookie, cinfo->extcookie);
 	  if (cinfo->extcookie[0] == 0)
 	    cinfo->extcookie[0] = 1;
 	}
@@ -1712,7 +1709,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   printf("no installed database:");
   memset(&stb, 0, sizeof(&stb));
 #endif
-  calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, installedcookie);
+  calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, 0, installedcookie);
   if (usecachedrepo(repo, 0, installedcookie, 0))
     printf(" cached\n");
   else

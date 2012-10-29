@@ -27,6 +27,7 @@ class Repo_generic
 
   def calc_cookie_fp(f)
     chksum = Solv::Chksum.new(Solv::REPOKEY_TYPE_SHA256)
+    chksum.add("1.1")
     chksum.add_fp(f)
     return chksum.raw
   end
@@ -36,6 +37,16 @@ class Repo_generic
     chksum.add("1.1")
     chksum.add_stat(filename)
     return chksum.raw
+  end
+
+  def calc_cookie_ext(f, cookie)
+    chksum = Solv::Chksum.new(Solv::REPOKEY_TYPE_SHA256)
+    chksum.add("1.1")
+    chksum.add(cookie)
+    chksum.add_fstat(f.fileno) if f
+    extcookie = chksum.raw()
+    extcookie[0] = 1 if extcookie[0] == 0
+    return extcookie
   end
 
   def cachepath(ext = nil)
@@ -147,20 +158,6 @@ class Repo_generic
     return true
   end
 
-  def genextcookie(f)
-    chksum = Solv::Chksum.new(Solv::REPOKEY_TYPE_SHA256)
-    chksum.add(@cookie)
-    if f
-      s = f.stat()
-      chksum.add(s.dev.to_s)
-      chksum.add(s.ino.to_s)
-      chksum.add(s.size.to_s)
-      chksum.add(s.mtime.to_s)
-    end
-    @extcookie = chksum.raw()
-    @extcookie[0] = 1 if @extcookie[0] == 0
-  end
-
   def writecachedrepo(ext, info = nil)
     begin
       Dir::mkdir("/var/cache/solv", 0755) unless FileTest.directory?("/var/cache/solv")
@@ -177,7 +174,7 @@ class Repo_generic
       Solv::xfclose(sf)
       f.sysseek(0, IO::SEEK_END)
       if @type != 'system' && !ext
-	genextcookie(f) unless @extcookie
+	@extcookie = calc_cookie_ext(f, @cookie) unless @extcookie
 	f.syswrite(@extcookie)
       end
       f.syswrite(ext ? @extcookie : @cookie)
