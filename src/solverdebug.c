@@ -801,6 +801,7 @@ solver_select2str(Pool *pool, Id select, Id what)
 {
   const char *s;
   char *b;
+  select &= SOLVER_SELECTMASK;
   if (select == SOLVER_SOLVABLE)
     return pool_solvid2str(pool, what);
   if (select == SOLVER_SOLVABLE_NAME)
@@ -897,7 +898,8 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       break;
     }
   s = pool_tmpjoin(pool, strstart, solver_select2str(pool, select, what), strend);
-  if ((how & flagmask & ~(SOLVER_SELECTMASK|SOLVER_JOBMASK)) == 0)
+  how &= flagmask;
+  if ((how & ~(SOLVER_SELECTMASK|SOLVER_JOBMASK)) == 0)
     return s;
   o = strlen(s);
   s = pool_tmpappend(pool, s, " ", 0);
@@ -923,6 +925,46 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
     s = pool_tmpappend(pool, s, ",?", 0);
   s[o + 1] = '[';
   return pool_tmpappend(pool, s, "]", 0);
+}
+
+const char *
+pool_selection2str(Pool *pool, Queue *selection, Id flagmask)
+{
+  char *s;
+  const char *s2;
+  int i;
+  s = pool_tmpjoin(pool, 0, 0, 0);
+  for (i = 0; i < selection->count; i++)
+    {
+      Id how = selection->elements[i];
+      if (*s)
+	s = pool_tmpappend(pool, s, " | ", 0);
+      s2 = solver_select2str(pool, how & SOLVER_SELECTMASK, selection->elements[i + 1]);
+      s = pool_tmpappend(pool, s, s2, 0);
+      pool_freetmpspace(pool, s2);
+      how &= flagmask & SOLVER_SETMASK;
+      if (how)
+	{
+	  int o = strlen(s);
+	  s = pool_tmpappend(pool, s, " ", 0);
+	    s = pool_tmpappend(pool, s, ",setev", 0);
+	  if (how & SOLVER_SETEVR)
+	    s = pool_tmpappend(pool, s, ",setevr", 0);
+	  if (how & SOLVER_SETARCH)
+	    s = pool_tmpappend(pool, s, ",setarch", 0);
+	  if (how & SOLVER_SETVENDOR)
+	    s = pool_tmpappend(pool, s, ",setvendor", 0);
+	  if (how & SOLVER_SETREPO)
+	    s = pool_tmpappend(pool, s, ",setrepo", 0);
+	  if (how & SOLVER_NOAUTOSET)
+	    s = pool_tmpappend(pool, s, ",noautoset", 0);
+	  if (s[o + 1] != ',')
+	    s = pool_tmpappend(pool, s, ",?", 0);
+	  s[o + 1] = '[';
+	  s = pool_tmpappend(pool, s, "]", 0);
+	}
+    }
+  return s;
 }
 
 const char *
