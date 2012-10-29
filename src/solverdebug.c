@@ -938,7 +938,7 @@ pool_selection2str(Pool *pool, Queue *selection, Id flagmask)
     {
       Id how = selection->elements[i];
       if (*s)
-	s = pool_tmpappend(pool, s, " | ", 0);
+	s = pool_tmpappend(pool, s, " + ", 0);
       s2 = solver_select2str(pool, how & SOLVER_SELECTMASK, selection->elements[i + 1]);
       s = pool_tmpappend(pool, s, s2, 0);
       pool_freetmpspace(pool, s2);
