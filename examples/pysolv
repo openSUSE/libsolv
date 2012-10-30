@@ -45,36 +45,35 @@ from optparse import OptionParser
 #import gc
 #gc.set_debug(gc.DEBUG_LEAK)
 
-def calc_cookie_file(filename):
-    chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
-    chksum.add("1.1")
-    chksum.add_stat(filename)
-    return chksum.raw()
-
-def calc_cookie_fp(fp):
-    chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
-    chksum.add("1.1");
-    chksum.add_fp(fp)
-    return chksum.raw()
-
-def calc_cookie_ext(f, cookie):
-    chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
-    chksum.add("1.1");
-    chksum.add(cookie)
-    if f:
-	chksum.add_fstat(f.fileno())
-    extcookie = chksum.raw()
-    # compatibility to c code
-    if ord(extcookie[0]) == 0:
-	extcookie[0] = chr(1)
-    return extcookie
-
 class repo_generic(dict):
     def __init__(self, name, type, attribs = {}):
         for k in attribs:
             self[k] = attribs[k]
         self.name = name
         self.type = type
+
+    def calc_cookie_file(self, filename):
+        chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
+        chksum.add("1.1")
+        chksum.add_stat(filename)
+        return chksum.raw()
+
+    def calc_cookie_fp(self, fp):
+        chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
+        chksum.add("1.1");
+        chksum.add_fp(fp)
+        return chksum.raw()
+
+    def calc_cookie_ext(self, f, cookie):
+        chksum = solv.Chksum(solv.REPOKEY_TYPE_SHA256)
+        chksum.add("1.1");
+        chksum.add(cookie)
+        chksum.add_fstat(f.fileno())
+        extcookie = chksum.raw()
+        # compatibility to c code
+        if ord(extcookie[0]) == 0:
+            extcookie[0] = chr(1)
+        return extcookie
 
     def cachepath(self, ext = None):
         path = re.sub(r'^\.', '_', self.name)
@@ -253,7 +252,7 @@ class repo_generic(dict):
                 self.handle.write_first_repodata(f)
             if self.type != 'system' and not ext:
                 if 'extcookie' not in self:
-		    self['extcookie'] = calc_cookie_ext(f, self['cookie'])
+                    self['extcookie'] = self.calc_cookie_ext(f, self['cookie'])
                 f.write(self['extcookie'])
             if not ext:
                 f.write(self['cookie'])
@@ -299,6 +298,9 @@ class repo_generic(dict):
             repodata.internalize()
             self.writecachedrepo(None, repodata)
 
+    def packagespath(self):
+        return ''
+
 class repo_repomd(repo_generic):
     def load_if_changed(self):
         print "rpmmd repo '%s':" % self.name,
@@ -309,7 +311,7 @@ class repo_repomd(repo_generic):
             self.handle.free(True)
             del self.handle
             return False
-        self['cookie'] = calc_cookie_fp(f)
+        self['cookie'] = self.calc_cookie_fp(f)
         if self.usecachedrepo(None, True):
             print "cached"
             solv.xfclose(f)
@@ -415,7 +417,7 @@ class repo_susetags(repo_generic):
             self.handle.free(True)
             del self.handle
             return False
-        self['cookie'] = calc_cookie_fp(f)
+        self['cookie'] = self.calc_cookie_fp(f)
         if self.usecachedrepo(None, True):
             print "cached"
             solv.xfclose(f)
@@ -531,6 +533,12 @@ class repo_susetags(repo_generic):
         self.writecachedrepo(ext, repodata)
         return True
 
+    def packagespath(self):
+        datadir = repo.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DATADIR)
+        if not datadir:
+            datadir = 'suse'
+        return datadir + '/'
+
 class repo_unknown(repo_generic):
     def load(self, pool):
         print "unsupported repo '%s': skipped" % self.name
@@ -542,7 +550,7 @@ class repo_system(repo_generic):
         self.handle.appdata = self
         pool.installed = self.handle
         print "rpm database:",
-        self['cookie'] = calc_cookie_file("/var/lib/rpm/Packages")
+        self['cookie'] = self.calc_cookie_file("/var/lib/rpm/Packages")
         if self.usecachedrepo(None):
             print "cached"
             return True
@@ -888,12 +896,8 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
                     sys.stdout.flush()
                     continue
                         
-            if repo.type == 'susetags':
-                datadir = repo.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DATADIR)
-                if not datadir:
-                    datadir = 'suse'
-                location = datadir + '/' + location
             chksum = p.lookup_checksum(solv.SOLVABLE_CHECKSUM)
+            location = repo.packagespath() + location
             f = repo.download(location, False, chksum)
             if not f:
                 sys.exit("\n%s: %s not found in repository" % (repo.name, location))

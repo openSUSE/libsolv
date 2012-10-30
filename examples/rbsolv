@@ -43,7 +43,7 @@ class Repo_generic
     chksum = Solv::Chksum.new(Solv::REPOKEY_TYPE_SHA256)
     chksum.add("1.1")
     chksum.add(cookie)
-    chksum.add_fstat(f.fileno) if f
+    chksum.add_fstat(f.fileno)
     extcookie = chksum.raw()
     extcookie[0] = 1 if extcookie[0] == 0
     return extcookie
@@ -113,12 +113,6 @@ class Repo_generic
     else
       return Solv::xfopen_dup('', f.fileno)
     end
-  end
-
-  def download_location(location, chksum)
-    f = download(location, false, chksum)
-    abort("\n#{@name}: #{location} not found in repository\n") unless f
-    return f
   end
 
   def usecachedrepo(ext, mark = false)
@@ -212,6 +206,10 @@ class Repo_generic
     end
     repodata.internalize()
     writecachedrepo(nil, repodata)
+  end
+
+  def packagespath()
+    return ''
   end
 end
 
@@ -458,12 +456,11 @@ class Repo_susetags < Repo_generic
     return true
   end
 
-  def download_location(location, chksum)
+  def packagespath()
     datadir = @handle.lookup_str(Solv::SOLVID_META, Solv::SUSETAGS_DATADIR)
     datadir = "suse" unless datadir
-    super("#{datadir}/#{location}", chksum)
+    return datadir + '/'
   end
-
 end
 
 class Repo_unknown < Repo_generic
@@ -728,8 +725,10 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
       repo = p.repo.appdata
       location, medianr = p.lookup_location()
       next unless location
+      location = repo.packagespath + location
       chksum = p.lookup_checksum(Solv::SOLVABLE_CHECKSUM)
-      f = repo.download_location(location, chksum)
+      f = repo.download(location, false, chksum)
+      abort("\n#{@name}: #{location} not found in repository\n") unless f
       newpkgsfp[p.id] = f
       print "."
       STDOUT.flush()

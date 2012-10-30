@@ -41,7 +41,7 @@ sub calc_cookie_ext {
   my $chksum = solv::Chksum->new($solv::REPOKEY_TYPE_SHA256);
   $chksum->add("1.1");
   $chksum->add($cookie);
-  $chksum->add_fstat(fileno($f)) if $f;
+  $chksum->add_fstat(fileno($f));
   my $extcookie = $chksum->raw();
   substr($extcookie, 0, 1) = chr(1) if ord(substr($extcookie, 0, 1)) == 0;
   return $extcookie;
@@ -189,6 +189,11 @@ sub writecachedrepo {
     }
   }
   rename($tmpname, $self->cachepath($ext));
+}
+
+sub packagespath {
+  my ($self) = @_;
+  return '';
 }
 
 package Repo::rpmmd;
@@ -446,6 +451,11 @@ sub load_if_changed {
   $self->writecachedrepo() unless $self->{'incomplete'};
   $self->{'handle'}->create_stubs();
   return undef;
+}
+
+sub packagespath {
+  my ($self) = @_;
+  return ($self->{'handle'}->lookup_str($solv::SOLVID_META, $solv::SUSETAGS_DATADIR) || 'suse') . '/';
 }
 
 package Repo::unknown;
@@ -714,9 +724,7 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
       my $repo = $p->{'repo'}->{'appdata'};
       my ($location, $medianr) = $p->lookup_location();
       next unless $location;
-      if ($repo->{'type'} eq 'susetags') {
-	$location = ($repo->{'handle'}->lookup_str($solv::SOLVID_META, $solv::SUSETAGS_DATADIR) || 'suse') ."/$location";
-      }
+      $location = $repo->packagespath() . $location;
       my $chksum = $p->lookup_checksum($solv::SOLVABLE_CHECKSUM);
       my $f = $repo->download($location, 0, $chksum);
       die("\n$repo->{'alias'}: $location not found in repository\n") unless $f;
