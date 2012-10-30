@@ -776,7 +776,7 @@ typedef struct {
   Queue solvables() {
     Queue q;
     queue_init(&q);
-    selection_solvables($self->pool, &q, &$self->q);
+    selection_solvables($self->pool, &$self->q, &q);
     return q;
   }
 
