@@ -881,6 +881,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
                     if not chksum:
                         continue
                     dloc = dp.lookup_str(solv.DELTA_LOCATION_DIR) + '/' + dp.lookup_str(solv.DELTA_LOCATION_NAME) + '-' + dp.lookup_str(solv.DELTA_LOCATION_EVR) + '.' + dp.lookup_str(solv.DELTA_LOCATION_SUFFIX)
+                    dloc = repo.packagespath() + dloc
                     f = repo.download(dloc, False, chksum)
                     if not f:
                         continue

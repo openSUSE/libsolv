@@ -1048,7 +1048,7 @@ calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
 }
 
 void
-calc_checksum_stat(struct stat *stb, Id chktype, unsigned *cookie, unsigned char *out)
+calc_checksum_stat(struct stat *stb, Id chktype, unsigned char *cookie, unsigned char *out)
 {
   void *h = solv_chksum_create(chktype);
   solv_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
@@ -3029,6 +3029,11 @@ rerunsolver:
 		      dloc = pool_tmpappend(pool, dloc, "/", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_NAME));
 		      dloc = pool_tmpappend(pool, dloc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_EVR));
 		      dloc = pool_tmpappend(pool, dloc, ".", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
+		      if (cinfo->type == TYPE_SUSETAGS)
+			{
+			  const char *datadir = repo_lookup_str(cinfo->repo, SOLVID_META, SUSETAGS_DATADIR);
+			  dloc = pool_tmpjoin(pool, datadir ? datadir : "suse", "/", dloc);
+			}
 		      if ((fp = curlfopen(cinfo, dloc, 0, chksum, chksumtype, 0)) == 0)
 			continue;
 		      /* got it, now reconstruct */
