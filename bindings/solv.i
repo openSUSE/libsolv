@@ -1811,15 +1811,15 @@ typedef struct {
     const unsigned char *b = pool_lookup_bin_checksum($self->pool, $self->id, keyname, &type);
     return solv_chksum_create_from_bin(type, b);
   }
-  Queue lookup_idarray(Id keyname, Id marker = 1) {
+  Queue lookup_idarray(Id keyname, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
     Queue r;
     queue_init(&r);
-    if (marker == 1) {
+    if (marker == -1 || marker == 1) {
       if (keyname == SOLVABLE_PROVIDES)
-        marker = -SOLVABLE_FILEMARKER;
+        marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
       else if (keyname == SOLVABLE_REQUIRES)
-        marker = -SOLVABLE_PREREQMARKER;
+        marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
       else
         marker = 0;
     }
@@ -1828,15 +1828,15 @@ typedef struct {
   }
   %typemap(out) Queue lookup_deparray Queue2Array(Dep *, 1, new_Dep(arg1->pool, id));
   %newobject lookup_deparray;
-  Queue lookup_deparray(Id keyname, Id marker = 1) {
+  Queue lookup_deparray(Id keyname, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
     Queue r;
     queue_init(&r);
-    if (marker == 1) {
+    if (marker == -1 || marker == 1) {
       if (keyname == SOLVABLE_PROVIDES)
-        marker = -SOLVABLE_FILEMARKER;
+        marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
       else if (keyname == SOLVABLE_REQUIRES)
-        marker = -SOLVABLE_PREREQMARKER;
+        marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
       else
         marker = 0;
     }
@@ -1947,12 +1947,16 @@ typedef struct {
     }
   %}
 
-  void add_provides(Dep *dep, Id marker = -SOLVABLE_FILEMARKER) {
+  void add_provides(Dep *dep, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
+    if (marker == -1 || marker == 1)
+      marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
     s->provides = repo_addid_dep(s->repo, s->provides, dep->id, marker);
   }
-  void add_providesid(Id id, Id marker = -SOLVABLE_FILEMARKER) {
+  void add_providesid(Id id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
+    if (marker == -1 || marker == 1)
+      marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
     s->provides = repo_addid_dep(s->repo, s->provides, id, marker);
   }
   void add_obsoletes(Dep *dep) {
@@ -1971,12 +1975,16 @@ typedef struct {
     Solvable *s = $self->pool->solvables + $self->id;
     s->conflicts = repo_addid_dep(s->repo, s->conflicts, id, 0);
   }
-  void add_requires(Dep *dep, Id marker = -SOLVABLE_PREREQMARKER) {
+  void add_requires(Dep *dep, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
+    if (marker == -1 || marker == 1)
+      marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
     s->requires = repo_addid_dep(s->repo, s->requires, dep->id, marker);
   }
-  void add_requiresid(Id id, Id marker = -SOLVABLE_PREREQMARKER) {
+  void add_requiresid(Id id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
+    if (marker == -1 || marker == 1)
+      marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
     s->requires = repo_addid_dep(s->repo, s->requires, id, marker);
   }
   void add_recommends(Dep *dep) {
