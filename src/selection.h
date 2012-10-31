@@ -24,6 +24,8 @@
 #define SELECTION_FLAT			(1 << 10)
 #define SELECTION_NOCASE		(1 << 11)
 
+#define SELECTION_MAYBESRC		(1 << 12)	/* somewhat internal */
+
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
 extern void selection_limit(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);

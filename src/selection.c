@@ -192,6 +192,32 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
       id = pool_str2id(pool, name, 0);
       if (id)
 	{
+	  if ((flags & SELECTION_MAYBESRC) != 0 && (flags & SELECTION_NAME) != 0)
+	    {
+	      /* src rpms don't have provides, so we must check every solvable */
+	      FOR_PROVIDES(p, pp, id)	/* try fast path first */
+		{
+		  Solvable *s = pool->solvables + p;
+		  if (s->name == id)
+		    {
+		      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+			continue;
+		      queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
+		      return SELECTION_NAME;
+		    }
+		}
+	      FOR_POOL_SOLVABLES(p)	/* slow path */
+		{
+		  Solvable *s = pool->solvables + p;
+		  if (s->name == id && (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC))
+		    {
+		      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+			continue;	/* just in case... src rpms can't be installed */
+		      queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
+		      return SELECTION_NAME;
+		    }
+		}
+	    }
 	  FOR_PROVIDES(p, pp, id)
 	    {
 	      Solvable *s = pool->solvables + p;
@@ -236,11 +262,12 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
   if ((flags & SELECTION_NAME) != 0)
     {
       /* looks like a name glob. hard work. */
-      for (p = 1; p < pool->nsolvables; p++)
+      FOR_POOL_SOLVABLES(p)
         {
           Solvable *s = pool->solvables + p;
-          if (!s->repo || !pool_installable(pool, s))
-            continue;
+          if (!pool_installable(pool, s))
+	    if (!(flags & SELECTION_MAYBESRC) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
+              continue;
 	  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
 	    continue;
           id = s->name;
@@ -298,6 +325,8 @@ selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags
     {
       char *rname = solv_strdup(name);
       rname[r - name] = 0;
+      if (archid == ARCH_SRC || archid == ARCH_NOSRC)
+	flags |= SELECTION_MAYBESRC;
       if ((ret = selection_depglob(pool, selection, rname, flags)) != 0)
 	{
 	  selection_limit_rel(pool, selection, REL_ARCH, archid);
@@ -431,6 +460,13 @@ selection_nevra(Pool *pool, Queue *selection, const char *name, int flags)
   rname = solv_strdup(name);	/* so we can modify it */
   r = rname + (r - name);
   *r = 0; 
+
+  /* split off potential arch part from version */
+  if ((r2 = strrchr(r + 1, '.')) != 0 && r2[1] && (archid = str2archid(pool, r2 + 1)) != 0)
+    *r2 = 0;	/* found valid arch, split it off */
+  if (archid == ARCH_SRC || archid == ARCH_NOSRC)
+    flags |= SELECTION_MAYBESRC;
+
   /* try with just the version */
   if ((ret = selection_depglob(pool, selection, rname, flags)) == 0)
     {
@@ -449,15 +485,9 @@ selection_nevra(Pool *pool, Queue *selection, const char *name, int flags)
 	  return 0;
 	}
     }
-  /* we now know the name, check if we need to split of the arch */
-  r++;
-  if ((r2 = strrchr(r, '.')) != 0 && r2[1] && (archid = str2archid(pool, r2 + 1)) != 0)
-    {
-      /* found valid arch, split it off */
-      *r2 = 0;
-      selection_limit_rel(pool, selection, REL_ARCH, archid);
-    }
-  selection_limit_rel(pool, selection, REL_EQ, pool_str2id(pool, r, 1));
+  if (archid)
+    selection_limit_rel(pool, selection, REL_ARCH, archid);
+  selection_limit_rel(pool, selection, REL_EQ, pool_str2id(pool, r + 1, 1));
   solv_free(rname);
   return ret;
 }
