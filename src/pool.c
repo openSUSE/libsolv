@@ -550,7 +550,10 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
 	{
 	case REL_ARCH:
 	  if (s->arch != evr)
-	    return 0;
+	    {
+	      if (evr != ARCH_SRC || s->arch != ARCH_NOSRC)
+	        return 0;
+	    }
 	  return pool_match_nevr(pool, s, name);
 	case REL_OR:
 	  if (pool_match_nevr(pool, s, name))
@@ -741,12 +744,14 @@ pool_addrelproviders(Pool *pool, Id d)
 	   * we have to iterate over the solvables as src packages do not
 	   * provide anything, thus they are not indexed in our
 	   * whatprovides hash */
-	  if (evr == ARCH_SRC)
+	  if (evr == ARCH_SRC || evr == ARCH_NOSRC)
 	    {
 	      Solvable *s;
 	      for (p = 1, s = pool->solvables + p; p < pool->nsolvables; p++, s++)
 		{
-		  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+		  if (!s->repo)
+		    continue;
+		  if (s->arch != evr && s->arch != ARCH_NOSRC)
 		    continue;
 		  if (pool_match_nevr(pool, s, name))
 		    queue_push(&plist, p);
