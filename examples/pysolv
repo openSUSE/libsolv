@@ -112,11 +112,10 @@ class repo_generic(dict):
         self['baseurl'] = url
 
     def setfrommetalink(self, metalink):
-        nf = self.download(metalink, False, None)
-        if not nf:
+        f = self.download(metalink, False, None)
+        if not f:
             return None
-        f = os.fdopen(os.dup(solv.xfileno(nf)), 'r')
-        solv.xfclose(nf)
+        f = os.fdopen(f.dup(), 'r')
         urls = []
         chksum = None
         for l in f.readlines():
@@ -134,11 +133,10 @@ class repo_generic(dict):
         return chksum
         
     def setfrommirrorlist(self, mirrorlist):
-        nf = self.download(mirrorlist, False, None)
-        if not nf:
+        f = self.download(mirrorlist, False, None)
+        if not f:
             return
-        f = os.fdopen(os.dup(solv.xfileno(nf)), 'r')
-        solv.xfclose(nf)
+        f = os.fdopen(f.dup(), 'r')
         urls = []
         for l in f.readline():
             l = l.strip()
@@ -191,8 +189,8 @@ class repo_generic(dict):
                     self['incomplete'] = True
                 return None
         if uncompress:
-            return solv.xfopen_fd(file, os.dup(f.fileno()))
-        return solv.xfopen_fd(None, os.dup(f.fileno()))
+            return solv.xfopen_fd(file, f.fileno())
+        return solv.xfopen_fd(None, f.fileno())
 
     def usecachedrepo(self, ext, mark=False):
         try: 
@@ -273,7 +271,6 @@ class repo_generic(dict):
                     info.extend_to_repo()
                     # LOCALPOOL does not help as pool already contains all ids
                     info.add_solv(nf, Repo.REPO_EXTEND_SOLVABLES)
-                solv.xfclose(nf)
             os.rename(tmpname, self.cachepath(ext))
         except IOError, e:
             if tmpname:
@@ -315,17 +312,14 @@ class repo_repomd(repo_generic):
         self['cookie'] = self.calc_cookie_fp(f)
         if self.usecachedrepo(None, True):
             print "cached"
-            solv.xfclose(f)
             return True
         self.handle.add_repomdxml(f, 0)
-        solv.xfclose(f)
         print "fetching"
         (filename, filechksum) = self.find('primary')
         if filename:
             f = self.download(filename, True, filechksum, True)
             if f:
                 self.handle.add_rpmmd(f, None, 0)
-                solv.xfclose(f)
             if 'incomplete' in self:
                 return False # hopeless, need good primary
         (filename, filechksum) = self.find('updateinfo')
@@ -333,7 +327,6 @@ class repo_repomd(repo_generic):
             f = self.download(filename, True, filechksum, True)
             if f:
                 self.handle.add_updateinfoxml(f, 0)
-                solv.xfclose(f)
         self.add_exts()
         self.writecachedrepo(None)
         # must be called after writing the repo
@@ -403,7 +396,6 @@ class repo_repomd(repo_generic):
             self.handle.add_rpmmd(f, 'FL', Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
         elif ext == 'DL':
             self.handle.add_deltainfoxml(f, Repo.REPO_USE_LOADING)
-        solv.xfclose(f)
         self.writecachedrepo(ext, repodata)
         return True
 
@@ -422,10 +414,8 @@ class repo_susetags(repo_generic):
         self['cookie'] = self.calc_cookie_fp(f)
         if self.usecachedrepo(None, True):
             print "cached"
-            solv.xfclose(f)
             return True
         self.handle.add_content(f, 0)
-        solv.xfclose(f)
         print "fetching"
         defvendorid = self.handle.lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
         descrdir = self.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
@@ -438,7 +428,6 @@ class repo_susetags(repo_generic):
             f = self.download(descrdir + '/' + filename, True, filechksum, True)
             if f:
                 self.handle.add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.SUSETAGS_RECORD_SHARES)
-                solv.xfclose(f)
                 (filename, filechksum) = self.find('packages.en.gz')
                 if not filename:
                     (filename, filechksum) = self.find('packages.en')
@@ -446,7 +435,6 @@ class repo_susetags(repo_generic):
                     f = self.download(descrdir + '/' + filename, True, filechksum, True)
                     if f:
                         self.handle.add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.REPO_REUSE_REPODATA|Repo.REPO_EXTEND_SOLVABLES)
-                        solv.xfclose(f)
                 self.handle.internalize()
         self.add_exts()
         self.writecachedrepo(None)
@@ -530,7 +518,6 @@ class repo_susetags(repo_generic):
         if not f:
             return False
         self.handle.add_susetags(f, defvendorid, ext, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
-        solv.xfclose(f)
         self.writecachedrepo(ext, repodata)
         return True
 
@@ -887,11 +874,11 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
                     if not f:
                         continue
                     nf = tempfile.TemporaryFile()
-                    nf = os.dup(nf.fileno())
-                    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, "/dev/fd/%d" % solv.xfileno(f), "/dev/fd/%d" % nf])
-                    solv.xfclose(f)
+                    nf = os.dup(nf.fileno())   # get rid of CLOEXEC
+                    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, "/dev/fd/%d" % f.fileno(), "/dev/fd/%d" % nf])
                     os.lseek(nf, 0, os.SEEK_SET)
                     newpkgsfp[p.id] = solv.xfopen_fd("", nf)
+                    os.close(nf)
                     break
                 if p.id in newpkgsfp:
                     sys.stdout.write("d")

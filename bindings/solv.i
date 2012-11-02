@@ -338,6 +338,13 @@ typedef VALUE AppObjectPtr;
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifdef __GLIBC__
+/* glibc's way of closing the file without freeing the file pointer */
+extern int _IO_file_close_it(FILE *);
+#else
+#define _IO_file_close_it(fp) 0
+#endif
+
 /* argh, swig undefs bool for perl */
 #ifndef bool
 typedef int bool;
@@ -589,24 +596,19 @@ typedef struct {
 } Chksum;
 
 %rename(xfopen) solv_xfopen;
-%rename(xfopen_fd) solv_xfopen_fd;
-%rename(xfopen_dup) solv_xfopen_dup;
-%rename(xfclose) solv_xfclose;
-%rename(xfileno) solv_xfileno;
+%rename(xfopen_fd) solv_xfopen_dup;
+
+%nodefaultctor FILE;
+typedef struct {
+} FILE;
+
+%newobject solv_xfopen;
+%newobject solv_xfopen_dup;
 
 FILE *solv_xfopen(const char *fn, const char *mode = 0);
-FILE *solv_xfopen_fd(const char *fn, int fd, const char *mode = 0);
 FILE *solv_xfopen_dup(const char *fn, int fd, const char *mode = 0);
-int solv_xfclose(FILE *fp);
-int solv_xfileno(FILE *fp);
 
 %{
-  SWIGINTERN int solv_xfclose(FILE *fp) {
-    return fclose(fp);
-  }
-  SWIGINTERN int solv_xfileno(FILE *fp) {
-    return fileno(fp);
-  }
   SWIGINTERN FILE *solv_xfopen_dup(const char *fn, int fd, const char *mode) {
     fd = dup(fd);
     return fd == -1 ? 0 : solv_xfopen_fd(fn, fd, mode);
@@ -646,6 +648,26 @@ typedef struct {
   int const count;
 } TransactionClass;
 
+%extend FILE {
+  ~FILE() {
+    fclose($self);
+  }
+  int fileno() {
+    return fileno($self);
+  }
+  int dup() {
+    return dup(fileno($self));
+  }
+  bool flush() {
+    return fflush($self) == 0;
+  }
+  bool close() {
+    bool ret;
+    ret = fflush($self) == 0;
+    _IO_file_close_it($self);
+    return ret;
+  }
+}
 
 %extend Job {
   static const Id SOLVER_SOLVABLE = SOLVER_SOLVABLE;

@@ -104,11 +104,14 @@ class Repo_generic
 	return nil
       end
     end
+    rf = nil
     if uncompress
-      return Solv::xfopen_dup(file, f.fileno)
+      rf = Solv::xfopen_fd(file, f.fileno)
     else
-      return Solv::xfopen_dup('', f.fileno)
+      rf = Solv::xfopen_fd('', f.fileno)
     end
+    f.close
+    return rf
   end
 
   def usecachedrepo(ext, mark = false)
@@ -126,14 +129,15 @@ class Repo_generic
 	return false if fextcookie.length != 32
       end
       f.sysseek(0, IO::SEEK_SET)
-      f = Solv::xfopen_dup('', f.fileno)
+      nf = Solv::xfopen_fd('', f.fileno)
+      f.close
       flags = ext ? Solv::Repo::REPO_USE_LOADING|Solv::Repo::REPO_EXTEND_SOLVABLES : 0
       flags |= Solv::Repo::REPO_LOCALPOOL if ext && ext != 'DL'
-      if ! @handle.add_solv(f, flags)
-	Solv::xfclose(f)
+      if ! @handle.add_solv(nf, flags)
+	nf.close
 	return false
       end
-      Solv::xfclose(f)
+      nf.close()
       @cookie = fcookie unless ext
       @extcookie = fextcookie if !ext && @type != 'system'
       now = Time.now
@@ -154,7 +158,7 @@ class Repo_generic
       Dir::mkdir("/var/cache/solv", 0755) unless FileTest.directory?("/var/cache/solv")
       f =  Tempfile.new('.newsolv-', '/var/cache/solv')
       f.chmod(0444)
-      sf = Solv::xfopen_dup('', f.fileno)
+      sf = Solv::xfopen_fd('', f.fileno)
       if !info
 	@handle.write(sf)
       elsif ext
@@ -162,14 +166,14 @@ class Repo_generic
       else
 	@handle.write_first_repodata(sf)
       end
-      Solv::xfclose(sf)
+      sf.close
       f.sysseek(0, IO::SEEK_END)
       if @type != 'system' && !ext
 	@extcookie = calc_cookie_ext(f, @cookie) unless @extcookie
 	f.syswrite(@extcookie)
       end
       f.syswrite(ext ? @extcookie : @cookie)
-      f.close(false)
+      f.close
       if @handle.iscontiguous?
 	sf = Solv::xfopen(f.path)
 	if sf
@@ -180,7 +184,7 @@ class Repo_generic
 	    info.extend_to_repo()
 	    info.add_solv(sf, Solv::Repo::REPO_EXTEND_SOLVABLES)
 	  end
-	  Solv::xfclose(sf)
+	  sf.close
 	end
       end
       File.rename(f.path, cachepath(ext))
@@ -242,18 +246,18 @@ class Repo_rpmmd < Repo_generic
     @cookie = calc_cookie_fp(f)
     if usecachedrepo(nil, true)
       puts "cached"
-      Solv.xfclose(f)
+      f.close
       return true
     end
     @handle.add_repomdxml(f, 0)
-    Solv::xfclose(f)
+    f.close
     puts "fetching"
     filename, filechksum = find('primary')
     if filename
       f = download(filename, true, filechksum, true)
       if f
 	@handle.add_rpmmd(f, nil, 0)
-	Solv::xfclose(f)
+	f.close
       end
       return false if @incomplete
     end
@@ -262,7 +266,7 @@ class Repo_rpmmd < Repo_generic
       f = download(filename, true, filechksum, true)
       if f
 	@handle.add_updateinfoxml(f, 0)
-	Solv::xfclose(f)
+	f.close
       end
     end
     add_exts()
@@ -321,7 +325,7 @@ class Repo_rpmmd < Repo_generic
     elsif ext == 'DL'
       @handle.add_deltainfoxml(f, Solv::Repo::REPO_USE_LOADING)
     end
-    Solv::xfclose(f)
+    f.close
     writecachedrepo(ext, repodata)
     return true
   end
@@ -354,11 +358,11 @@ class Repo_susetags < Repo_generic
     @cookie = calc_cookie_fp(f)
     if usecachedrepo(nil, true)
       puts "cached"
-      Solv.xfclose(f)
+      f.close
       return true
     end
     @handle.add_content(f, 0)
-    Solv::xfclose(f)
+    f.close
     puts "fetching"
     defvendorid = @handle.lookup_id(Solv::SOLVID_META, Solv::SUSETAGS_DEFAULTVENDOR)
     descrdir = @handle.lookup_str(Solv::SOLVID_META, Solv::SUSETAGS_DESCRDIR)
@@ -369,14 +373,14 @@ class Repo_susetags < Repo_generic
       f = download("#{descrdir}/#{filename}", true, filechksum, true)
       if f
 	@handle.add_susetags(f, defvendorid, nil, Solv::Repo::REPO_NO_INTERNALIZE|Solv::Repo::SUSETAGS_RECORD_SHARES)
-	Solv::xfclose(f)
+	f.close
 	(filename, filechksum) = find('packages.en.gz')
 	(filename, filechksum) = find('packages.en') unless filename
 	if filename
 	  f = download("#{descrdir}/#{filename}", true, filechksum, true)
 	  if f
 	    @handle.add_susetags(f, defvendorid, nil, Solv::Repo::REPO_NO_INTERNALIZE|Solv::Repo::REPO_REUSE_REPODATA|Solv::Repo::REPO_EXTEND_SOLVABLES)
-	    Solv::xfclose(f)
+	    f.close
 	  end
 	end
 	@handle.internalize()
@@ -450,7 +454,7 @@ class Repo_susetags < Repo_generic
     f = download("#{descrdir}/#{filename}", true, filechksum)
     return false unless f
     @handle.add_susetags(f, defvendorid, ext, Solv::Repo::REPO_USE_LOADING|Solv::Repo::REPO_EXTEND_SOLVABLES)
-    Solv::xfclose(f)
+    f.close
     writecachedrepo(ext, repodata)
     return true
   end
@@ -747,8 +751,8 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
       f = newpkgsfp.delete(p.id)
       next unless f
       mode = steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i'
-      system('rpm', mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/#{Solv::xfileno(f).to_s}") || abort("rpm failed: #{$? >> 8}")
-      solv::xfclose(f)
+      system('rpm', mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/#{f.fileno().to_s}") || abort("rpm failed: #{$? >> 8}")
+      f.close
     end
   end
 end
