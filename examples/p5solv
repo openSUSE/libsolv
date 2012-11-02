@@ -153,6 +153,7 @@ sub usecachedrepo {
 
 sub writecachedrepo {
   my ($self, $ext, $info) = @_;
+  return if $self->{'incomplete'} && !$ext;
   mkdir("/var/cache/solv", 0755) unless -d "/var/cache/solv";
   my ($f, $tmpname);
   eval {
@@ -315,7 +316,7 @@ sub load_if_changed {
     }
   }
   $self->add_exts();
-  $self->writecachedrepo() unless $self->{'incomplete'};
+  $self->writecachedrepo();
   $self->{'handle'}->create_stubs();
   return 1;
 }
@@ -448,7 +449,7 @@ sub load_if_changed {
     }
   }
   $self->add_exts();
-  $self->writecachedrepo() unless $self->{'incomplete'};
+  $self->writecachedrepo();
   $self->{'handle'}->create_stubs();
   return undef;
 }

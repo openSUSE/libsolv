@@ -238,6 +238,8 @@ class repo_generic(dict):
         return True
 
     def writecachedrepo(self, ext, info=None):
+        if not ext and 'incomplete' in self:
+	    return
         try:
             if not os.path.isdir("/var/cache/solv"):
                 os.mkdir("/var/cache/solv", 0755)
@@ -334,8 +336,7 @@ class repo_repomd(repo_generic):
                 self.handle.add_updateinfoxml(f, 0)
                 solv.xfclose(f)
         self.add_exts()
-        if 'incomplete' not in self:
-            self.writecachedrepo(None)
+	self.writecachedrepo(None)
         # must be called after writing the repo
         self.handle.create_stubs()
         return True
@@ -447,8 +448,7 @@ class repo_susetags(repo_generic):
                         solv.xfclose(f)
                 self.handle.internalize()
         self.add_exts()
-        if 'incomplete' not in self:
-            self.writecachedrepo(None)
+	self.writecachedrepo(None)
         # must be called after writing the repo
         self.handle.create_stubs()
         return True
@@ -603,7 +603,7 @@ if os.path.isdir("/etc/zypp/repos.d"):
 else:
   reposdirs = [ "/etc/yum/repos.d" ]
 
-for reposdir in ["/etc/zypp/repos.d"]:
+for reposdir in reposdirs:
     if not os.path.isdir(reposdir):
         continue
     for reponame in sorted(glob.glob('%s/*.repo' % reposdir)):

@@ -153,6 +153,7 @@ class Repo_generic
   end
 
   def writecachedrepo(ext, info = nil)
+    return if @incomplete && !ext
     begin
       Dir::mkdir("/var/cache/solv", 0755) unless FileTest.directory?("/var/cache/solv")
       f =  Tempfile.new('.newsolv-', '/var/cache/solv')
@@ -268,7 +269,7 @@ class Repo_rpmmd < Repo_generic
       end
     end
     add_exts()
-    writecachedrepo(nil) unless @incomplete
+    writecachedrepo(nil)
     @handle.create_stubs()
     return true
   end
@@ -384,7 +385,7 @@ class Repo_susetags < Repo_generic
       end
     end
     add_exts()
-    writecachedrepo(nil) unless @incomplete
+    writecachedrepo(nil)
     @handle.create_stubs()
     return true
   end
