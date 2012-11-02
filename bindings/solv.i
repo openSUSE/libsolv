@@ -720,7 +720,8 @@ typedef struct {
   static const Id SELECTION_NOCASE = SELECTION_NOCASE;
   static const Id SELECTION_INSTALLED_ONLY = SELECTION_INSTALLED_ONLY;
   static const Id SELECTION_FLAT = SELECTION_FLAT;
-  static const Id SELECTION_SOURCE = SELECTION_SOURCE;
+  static const Id SELECTION_SOURCE_ONLY = SELECTION_SOURCE_ONLY;
+  static const Id SELECTION_WITH_SOURCE = SELECTION_WITH_SOURCE;
 
   Selection(Pool *pool) {
     Selection *s;

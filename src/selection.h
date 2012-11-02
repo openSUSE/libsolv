@@ -23,7 +23,8 @@
 #define SELECTION_GLOB			(1 << 9)
 #define SELECTION_FLAT			(1 << 10)
 #define SELECTION_NOCASE		(1 << 11)
-#define SELECTION_SOURCE		(1 << 12)
+#define SELECTION_SOURCE_ONLY		(1 << 12)
+#define SELECTION_WITH_SOURCE		(1 << 13)
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
 extern void selection_limit(Pool *pool, Queue *sel1, Queue *sel2);

@@ -2671,6 +2671,8 @@ main(int argc, char **argv)
 	}
       queue_init(&job2);
       flags = SELECTION_NAME|SELECTION_PROVIDES|SELECTION_GLOB;
+      if (mode == MODE_LIST)
+	flags |= SELECTION_WITH_SOURCE;
       if (argv[i][0] == '/')
 	flags |= SELECTION_FILELIST | (mode == MODE_ERASE ? SELECTION_INSTALLED_ONLY : 0);
       rflags = selection_make(pool, &job2, argv[i], flags);
