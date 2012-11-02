@@ -525,9 +525,7 @@ for reposdir in reposdirs do
 end
 
 pool = Solv::Pool.new()
-# require 'sys/uname' ; sysarch = Sys::Uname.machine
-sysarch = `uname -p`.strip
-pool.setarch(sysarch)
+pool.setarch()
 
 pool.set_loadcallback { |repodata|
   repo = repodata.repo.appdata

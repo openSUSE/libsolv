@@ -334,6 +334,7 @@ typedef VALUE AppObjectPtr;
 #include <stdbool.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -1038,7 +1039,15 @@ typedef struct {
   Id id2langid(Id id, const char *lang, bool create=1) {
     return pool_id2langid($self, id, lang, create);
   }
-  void setarch(const char *arch) {
+  void setarch(const char *arch = 0) {
+    struct utsname un;
+    if (!arch) {
+      if (uname(&un)) {
+        perror("uname");
+        return;
+      }
+      arch = un.machine;
+    }
     pool_setarch($self, arch);
   }
   Repo *add_repo(const char *name) {

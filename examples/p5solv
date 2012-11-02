@@ -539,7 +539,7 @@ for my $reposdir (@reposdirs) {
 }
 
 my $pool = solv::Pool->new();
-$pool->setarch((POSIX::uname())[4]);
+$pool->setarch();
 $pool->set_loadcallback(\&load_stub);
 
 my $sysrepo = Repo::system->new('@System', 'system');

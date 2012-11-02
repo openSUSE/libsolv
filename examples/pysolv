@@ -626,7 +626,7 @@ for reposdir in reposdirs:
             repos.append(repo)
 
 pool = solv.Pool()
-pool.setarch(os.uname()[4])
+pool.setarch()
 pool.set_loadcallback(load_stub)
 
 # now load all enabled repos into the pool
