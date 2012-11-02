@@ -71,10 +71,6 @@ sub load {
     print "repo: '$self->{'alias'}' cached\n";
     return 1;
   }
-  return $self->load_if_changed();
-}
-
-sub load_if_changed {
   return 0;
 }
 
@@ -278,8 +274,9 @@ sub load_ext {
   return 1;
 }
 
-sub load_if_changed {
-  my ($self) = @_;
+sub load {
+  my ($self, $pool) = @_;
+  return 1 if $self->Repo::generic::load($pool);
   print "rpmmd repo '$self->{'alias'}': ";
   STDOUT->flush();
   my $f = $self->download("repodata/repomd.xml");
@@ -407,8 +404,9 @@ sub load_ext {
   return 1;
 }
 
-sub load_if_changed {
-  my ($self) = @_;
+sub load {
+  my ($self, $pool) = @_;
+  return 1 if $self->Repo::generic::load($pool);
   print "susetags repo '$self->{'alias'}': ";
   STDOUT->flush();
   my $f = $self->download("content");

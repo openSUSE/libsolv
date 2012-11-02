@@ -99,9 +99,6 @@ class repo_generic(dict):
         if not dorefresh and self.usecachedrepo(None):
             print "repo: '%s': cached" % self.name
             return True
-        return self.load_if_changed()
-
-    def load_if_changed(self):
         return False
 
     def load_ext(self, repodata):
@@ -198,10 +195,6 @@ class repo_generic(dict):
         return solv.xfopen_fd(None, os.dup(f.fileno()))
 
     def usecachedrepo(self, ext, mark=False):
-        if not ext:
-            cookie = self['cookie']
-        else:
-            cookie = self['extcookie']
         try: 
             repopath = self.cachepath(ext)
             f = open(repopath, 'r')
@@ -209,6 +202,10 @@ class repo_generic(dict):
             fcookie = f.read(32)
             if len(fcookie) != 32:
                 return False
+            if not ext:
+                cookie = self['cookie']
+            else:
+                cookie = self['extcookie']
             if cookie and fcookie != cookie:
                 return False
             if self.type != 'system' and not ext:
@@ -239,7 +236,7 @@ class repo_generic(dict):
 
     def writecachedrepo(self, ext, info=None):
         if not ext and 'incomplete' in self:
-	    return
+            return
         try:
             if not os.path.isdir("/var/cache/solv"):
                 os.mkdir("/var/cache/solv", 0755)
@@ -304,7 +301,9 @@ class repo_generic(dict):
         return ''
 
 class repo_repomd(repo_generic):
-    def load_if_changed(self):
+    def load(self, pool):
+        if super(repo_repomd, self).load(pool):
+            return True
         print "rpmmd repo '%s':" % self.name,
         sys.stdout.flush()
         f = self.download("repodata/repomd.xml", False, None, None)
@@ -336,7 +335,7 @@ class repo_repomd(repo_generic):
                 self.handle.add_updateinfoxml(f, 0)
                 solv.xfclose(f)
         self.add_exts()
-	self.writecachedrepo(None)
+        self.writecachedrepo(None)
         # must be called after writing the repo
         self.handle.create_stubs()
         return True
@@ -409,7 +408,9 @@ class repo_repomd(repo_generic):
         return True
 
 class repo_susetags(repo_generic):
-    def load_if_changed(self):
+    def load(self, pool):
+        if super(repo_susetags, self).load(pool):
+            return True
         print "susetags repo '%s':" % self.name,
         sys.stdout.flush()
         f = self.download("content", False, None, None)
@@ -448,7 +449,7 @@ class repo_susetags(repo_generic):
                         solv.xfclose(f)
                 self.handle.internalize()
         self.add_exts()
-	self.writecachedrepo(None)
+        self.writecachedrepo(None)
         # must be called after writing the repo
         self.handle.create_stubs()
         return True

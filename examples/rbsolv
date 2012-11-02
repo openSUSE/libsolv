@@ -72,14 +72,10 @@ class Repo_generic
       puts "repo: '#{@name}' cached"
       return true
     end
-    return load_if_changed()
-  end
-
-  def load_ext(repodata)
     return false
   end
 
-  def load_if_changed
+  def load_ext(repodata)
     return false
   end
 
@@ -233,7 +229,8 @@ class Repo_rpmmd < Repo_generic
     return nil, nil
   end
 
-  def load_if_changed
+  def load(pool)
+    return true if super(pool)
     print "rpmmd repo '#{@name}: "
     f = download("repodata/repomd.xml", false, nil, nil)
     if !f
@@ -344,7 +341,8 @@ class Repo_susetags < Repo_generic
     return nil, nil
   end
 
-  def load_if_changed
+  def load(pool)
+    return true if super(pool)
     print "susetags repo '#{@name}: "
     f = download("content", false, nil, nil)
     if !f
