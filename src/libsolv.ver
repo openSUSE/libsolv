@@ -75,6 +75,7 @@ SOLV_1.0 {
 		pool_job2str;
 		pool_lookup_bin_checksum;
 		pool_lookup_checksum;
+		pool_lookup_deltalocation;
 		pool_lookup_id;
 		pool_lookup_num;
 		pool_lookup_str;
@@ -270,6 +271,7 @@ SOLV_1.0 {
 		solvable_lookup_deparray;
 		solvable_lookup_id;
 		solvable_lookup_idarray;
+		solvable_lookup_location;
 		solvable_lookup_num;
 		solvable_lookup_sizek;
 		solvable_lookup_sourcepkg;

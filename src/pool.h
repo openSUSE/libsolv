@@ -333,6 +333,7 @@ unsigned long long pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned lo
 int pool_lookup_void(Pool *pool, Id entry, Id keyname);
 const unsigned char *pool_lookup_bin_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
 const char *pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
+const char *pool_lookup_deltalocation(Pool *pool, Id entry);
 
 void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
 

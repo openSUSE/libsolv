@@ -1509,6 +1509,28 @@ typedef struct {
     pool->pos = oldpos;
     return solv_chksum_create_from_bin(type, b);
   }
+  const char *lookup_deltaseq() {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    const char *seq;
+    pool->pos = *$self;
+    seq = pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NAME);
+    if (seq) {
+      seq = pool_tmpjoin(pool, seq, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_EVR));
+      seq = pool_tmpappend(pool, seq, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NUM));
+    }
+    pool->pos = oldpos;
+    return seq;
+  }
+  const char *lookup_deltalocation() {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    const char *loc;
+    pool->pos = *$self;
+    loc = pool_lookup_deltalocation(pool, SOLVID_POS);
+    pool->pos = oldpos;
+    return loc;
+  }
 }
 
 %extend Datamatch {
@@ -1846,7 +1868,7 @@ typedef struct {
     return r;
   }
   const char *lookup_location(unsigned int *OUTPUT) {
-    return solvable_get_location($self->pool->solvables + $self->id, OUTPUT);
+    return solvable_lookup_location($self->pool->solvables + $self->id, OUTPUT);
   }
 #ifdef SWIGRUBY
   %rename("installable?") installable;

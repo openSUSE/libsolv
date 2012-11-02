@@ -2072,6 +2072,19 @@ pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep)
   return solvable_lookup_checksum(pool->solvables + entry, keyname, typep);
 }
 
+const char *
+pool_lookup_deltalocation(Pool *pool, Id entry)
+{
+  const char *loc;
+  if (entry != SOLVID_POS)
+    return 0;
+  loc = pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_DIR);
+  loc = pool_tmpjoin(pool, loc, loc ? "/" : 0, pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_NAME));
+  loc = pool_tmpappend(pool, loc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_EVR));
+  loc = pool_tmpappend(pool, loc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
+  return loc;
+}
+
 void
 pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts)
 {

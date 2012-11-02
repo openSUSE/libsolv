@@ -2951,7 +2951,7 @@ rerunsolver:
 	  s = pool_id2solvable(pool, p);
 	  if (s->repo == commandlinerepo)
 	    {
-	      loc = solvable_get_location(s, &medianr);
+	      loc = solvable_lookup_location(s, &medianr);
 	      if (!(newpkgsfps[i] = fopen(loc, "r")))
 		{
 		  perror(loc);
@@ -2966,7 +2966,7 @@ rerunsolver:
 	      printf("%s: no repository information\n", s->repo->name);
 	      exit(1);
 	    }
-	  loc = solvable_get_location(s, &medianr);
+	  loc = solvable_lookup_location(s, &medianr);
 	  if (!loc)
 	     continue;
 
@@ -3027,10 +3027,9 @@ rerunsolver:
 		      chksum = pool_lookup_bin_checksum(pool, SOLVID_POS, DELTA_CHECKSUM, &chksumtype);
 		      if (!chksumtype)
 			continue;	/* no way! */
-		      dloc = pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_DIR);
-		      dloc = pool_tmpappend(pool, dloc, "/", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_NAME));
-		      dloc = pool_tmpappend(pool, dloc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_EVR));
-		      dloc = pool_tmpappend(pool, dloc, ".", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
+		      dloc = pool_lookup_deltalocation(pool, SOLVID_POS);
+		      if (!dloc)
+			continue;
 		      if (cinfo->type == TYPE_SUSETAGS)
 			{
 			  const char *datadir = repo_lookup_str(cinfo->repo, SOLVID_META, SUSETAGS_DATADIR);

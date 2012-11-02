@@ -269,7 +269,7 @@ evrid2vrstr(Pool *pool, Id evrid)
 }
 
 const char *
-solvable_get_location(Solvable *s, unsigned int *medianrp)
+solvable_lookup_location(Solvable *s, unsigned int *medianrp)
 {
   Pool *pool;
   int l = 0;
@@ -314,6 +314,12 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
 	strcpy(loc, mediafile);
     }
   return loc;
+}
+
+const char *
+solvable_get_location(Solvable *s, unsigned int *medianrp)
+{
+  return solvable_lookup_location(s, medianrp);
 }
 
 const char *

@@ -874,14 +874,14 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
                             candidate = installedp
                     if not candidate:
                         continue
-                    seq = dp.lookup_str(solv.DELTA_SEQ_NAME) + '-' + dp.lookup_str(solv.DELTA_SEQ_EVR) + '-' + dp.lookup_str(solv.DELTA_SEQ_NUM)
+                    seq = dp.lookup_deltaseq()
                     st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, '-c', '-s', seq])
                     if st:
                         continue
                     chksum = dp.lookup_checksum(solv.DELTA_CHECKSUM)
                     if not chksum:
                         continue
-                    dloc = dp.lookup_str(solv.DELTA_LOCATION_DIR) + '/' + dp.lookup_str(solv.DELTA_LOCATION_NAME) + '-' + dp.lookup_str(solv.DELTA_LOCATION_EVR) + '.' + dp.lookup_str(solv.DELTA_LOCATION_SUFFIX)
+                    dloc = dp.lookup_deltalocation()
                     dloc = repo.packagespath() + dloc
                     f = repo.download(dloc, False, chksum)
                     if not f:
