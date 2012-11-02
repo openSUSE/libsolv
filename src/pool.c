@@ -2081,7 +2081,7 @@ pool_lookup_deltalocation(Pool *pool, Id entry)
   loc = pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_DIR);
   loc = pool_tmpjoin(pool, loc, loc ? "/" : 0, pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_NAME));
   loc = pool_tmpappend(pool, loc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_EVR));
-  loc = pool_tmpappend(pool, loc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
+  loc = pool_tmpappend(pool, loc, ".", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
   return loc;
 }
 
