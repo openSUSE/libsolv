@@ -2101,6 +2101,7 @@ typedef struct {
     }
   %}
 
+  /* old interface, please use the generic add_deparray instead */
   void add_provides(DepId id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
     if (marker == -1 || marker == 1)
@@ -2136,6 +2137,19 @@ typedef struct {
   void add_enhances(DepId id) {
     Solvable *s = $self->pool->solvables + $self->id;
     s->enhances = repo_addid_dep(s->repo, s->enhances, id, 0);
+  }
+
+  void add_deparray(Id keyname, DepId id, Id marker = -1) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    if (marker == -1 || marker == 1) {
+      if (keyname == SOLVABLE_PROVIDES)
+        marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
+      else if (keyname == SOLVABLE_REQUIRES)
+        marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
+      else
+        marker = 0;
+    }
+    solvable_add_deparray(s, keyname, id, marker);
   }
 
   bool __eq__(XSolvable *s) {
@@ -2669,7 +2683,7 @@ rb_eval_string(
   Id new_handle() {
     return repodata_new_handle(repo_id2repodata($self->repo, $self->id));
   }
-  void set_id(Id solvid, Id keyname, Id id) {
+  void set_id(Id solvid, Id keyname, DepId id) {
     repodata_set_id(repo_id2repodata($self->repo, $self->id), solvid, keyname, id);
   }
   void set_str(Id solvid, Id keyname, const char *str) {
@@ -2678,7 +2692,7 @@ rb_eval_string(
   void set_poolstr(Id solvid, Id keyname, const char *str) {
     repodata_set_poolstr(repo_id2repodata($self->repo, $self->id), solvid, keyname, str);
   }
-  void add_idarray(Id solvid, Id keyname, Id id) {
+  void add_idarray(Id solvid, Id keyname, DepId id) {
     repodata_add_idarray(repo_id2repodata($self->repo, $self->id), solvid, keyname, id);
   }
   void add_flexarray(Id solvid, Id keyname, Id handle) {
