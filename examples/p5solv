@@ -676,9 +676,9 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
     } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
       print "$c->{'count'} upgraded packages:\n";
     } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
-      printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $pool->id2str($c->{'fromid'}), $pool->id2str($c->{'toid'});
+      printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $c->fromdep()->str(), $c->todep()->str();
     } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
-      printf "$c->{'count'} arch changes from '%s' to '%s':\n", $pool->id2str($c->{'fromid'}), $pool->id2str($c->{'toid'});
+      printf "$c->{'count'} arch changes from '%s' to '%s':\n", $c->fromdep()->str(), $c->todep()->str();
     } else {
       next;
     }

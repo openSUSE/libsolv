@@ -359,9 +359,38 @@ SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
 
 }
 
+
+%fragment("SWIG_AsValDepId","header") {
+
+SWIGINTERN int
+#ifdef SWIGRUBY
+SWIG_AsValDepId(VALUE obj, int *val) {
+#else
+SWIG_AsValDepId(void *obj, int *val) {
+#endif
+  static swig_type_info* desc = 0;
+  void *vptr = 0; 
+  int ecode;
+  if (!desc) desc = SWIG_TypeQuery("Dep *");
+  ecode = SWIG_AsVal_int(obj, val);
+  if (SWIG_IsOK(ecode))
+    return ecode;
+  if ((SWIG_ConvertPtr(obj, &vptr, desc, 0)) == SWIG_OK) {
+    if (val)
+      *val = ((Dep *)vptr)->id;
+    return SWIG_OK;
+  }
+  return SWIG_TypeError;
+}
+
+}
+
+
+
 %include "typemaps.i"
 
 %typemaps_asval(%checkcode(POINTER), SWIG_AsValSolvFpPtr, "SWIG_AsValSolvFpPtr", FILE*);
+%typemaps_asval(%checkcode(INT32), SWIG_AsValDepId, "SWIG_AsValDepId", DepId);
 
 
 %{
@@ -428,6 +457,7 @@ typedef int bool;
 
 typedef struct chksum Chksum;
 typedef void *AppObjectPtr;
+typedef Id DepId;
 
 typedef struct {
   Pool *pool;
@@ -2071,75 +2101,39 @@ typedef struct {
     }
   %}
 
-  void add_provides(Dep *dep, Id marker = -1) {
-    Solvable *s = $self->pool->solvables + $self->id;
-    if (marker == -1 || marker == 1)
-      marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
-    s->provides = repo_addid_dep(s->repo, s->provides, dep->id, marker);
-  }
-  void add_providesid(Id id, Id marker = -1) {
+  void add_provides(DepId id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
     if (marker == -1 || marker == 1)
       marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
     s->provides = repo_addid_dep(s->repo, s->provides, id, marker);
   }
-  void add_obsoletes(Dep *dep) {
-    Solvable *s = $self->pool->solvables + $self->id;
-    s->obsoletes = repo_addid_dep(s->repo, s->obsoletes, dep->id, 0);
-  }
-  void add_obsoletesid(Id id) {
+  void add_obsoletes(DepId id) {
     Solvable *s = $self->pool->solvables + $self->id;
     s->obsoletes = repo_addid_dep(s->repo, s->obsoletes, id, 0);
   }
-  void add_conflicts(Dep *dep) {
-    Solvable *s = $self->pool->solvables + $self->id;
-    s->conflicts = repo_addid_dep(s->repo, s->conflicts, dep->id, 0);
-  }
-  void add_conflictsid(Id id) {
+  void add_conflicts(DepId id) {
     Solvable *s = $self->pool->solvables + $self->id;
     s->conflicts = repo_addid_dep(s->repo, s->conflicts, id, 0);
   }
-  void add_requires(Dep *dep, Id marker = -1) {
-    Solvable *s = $self->pool->solvables + $self->id;
-    if (marker == -1 || marker == 1)
-      marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
-    s->requires = repo_addid_dep(s->repo, s->requires, dep->id, marker);
-  }
-  void add_requiresid(Id id, Id marker = -1) {
+  void add_requires(DepId id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
     if (marker == -1 || marker == 1)
       marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
     s->requires = repo_addid_dep(s->repo, s->requires, id, marker);
   }
-  void add_recommends(Dep *dep) {
-    Solvable *s = $self->pool->solvables + $self->id;
-    s->recommends = repo_addid_dep(s->repo, s->recommends, dep->id, 0);
-  }
-  void add_recommendsid(Id id) {
+  void add_recommends(DepId id) {
     Solvable *s = $self->pool->solvables + $self->id;
     s->recommends = repo_addid_dep(s->repo, s->recommends, id, 0);
   }
-  void add_suggests(Dep *dep) {
-    Solvable *s = $self->pool->solvables + $self->id;
-    s->suggests = repo_addid_dep(s->repo, s->suggests, dep->id, 0);
-  }
-  void add_suggestsid(Id id) {
+  void add_suggests(DepId id) {
     Solvable *s = $self->pool->solvables + $self->id;
     s->suggests = repo_addid_dep(s->repo, s->suggests, id, 0);
   }
-  void add_supplements(Dep *dep) {
-    Solvable *s = $self->pool->solvables + $self->id;
-    s->supplements = repo_addid_dep(s->repo, s->supplements, dep->id, 0);
-  }
-  void add_supplementsid(Id id) {
+  void add_supplements(DepId id) {
     Solvable *s = $self->pool->solvables + $self->id;
     s->supplements = repo_addid_dep(s->repo, s->supplements, id, 0);
   }
-  void add_enhances(Dep *dep) {
-    Solvable *s = $self->pool->solvables + $self->id;
-    s->enhances = repo_addid_dep(s->repo, s->enhances, dep->id, 0);
-  }
-  void add_enhancesid(Id id) {
+  void add_enhances(DepId id) {
     Solvable *s = $self->pool->solvables + $self->id;
     s->enhances = repo_addid_dep(s->repo, s->enhances, id, 0);
   }
@@ -2591,6 +2585,14 @@ rb_eval_string(
     queue_init(&q);
     transaction_classify_pkgs($self->transaction, $self->mode, $self->type, $self->fromid, $self->toid, &q);
     return q;
+  }
+  %newobject fromdep;
+  Dep *fromdep() {
+    return new_Dep($self->transaction->pool, $self->fromid);
+  }
+  %newobject todep;
+  Dep *todep() {
+    return new_Dep($self->transaction->pool, $self->toid);
   }
 }
 

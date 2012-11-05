@@ -807,9 +807,9 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
         elif cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED:
             print "%d upgraded packages:" % cl.count
         elif cl.type == Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
-            print "%d vendor changes from '%s' to '%s':" % (cl.count, pool.id2str(cl.fromid), pool.id2str(cl.toid))
+            print "%d vendor changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
         elif cl.type == Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
-            print "%d arch changes from '%s' to '%s':" % (cl.count, pool.id2str(cl.fromid), pool.id2str(cl.toid))
+            print "%d arch changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
         else:
             continue
         for p in cl.solvables():

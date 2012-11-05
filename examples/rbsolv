@@ -691,9 +691,9 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
     elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_UPGRADED
       puts "#{cl.count} upgraded packages:"
     elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE
-      puts "#{cl.count} vendor changes from '#{pool.id2str(cl.fromid)}' to '#{pool.id2str(cl.toid)}':"
+      puts "#{cl.count} vendor changes from '#{cl.fromdep}' to '#{cl.todep}':"
     elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE
-      puts "#{cl.count} arch changes from '#{pool.id2str(cl.fromid)}' to '#{pool.id2str(cl.toid)}':"
+      puts "#{cl.count} arch changes from '#{cl.fromdep}' to '#{cl.todep}':"
     else
       next
     end
