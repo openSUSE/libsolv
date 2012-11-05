@@ -295,7 +295,6 @@ SWIG_Perl_NewArrayObj(SWIG_MAYBE_PERL_OBJECT void *ptr, swig_type_info *t, int f
 #endif
 
 
-
 #if defined(SWIGPYTHON)
 typedef PyObject *AppObjectPtr;
 %typemap(out) AppObjectPtr {
@@ -325,10 +324,45 @@ typedef VALUE AppObjectPtr;
 
 
 %include "cdata.i"
-#ifndef SWIGPERL
+#ifdef SWIGPYTHON
 %include "file.i"
+#else
+%fragment("SWIG_AsValFilePtr","header") {}
 #endif
+
+
+%fragment("SWIG_AsValSolvFpPtr","header", fragment="SWIG_AsValFilePtr") {
+
+SWIGINTERN int
+#ifdef SWIGRUBY
+SWIG_AsValSolvFpPtr(VALUE obj, FILE **val) {
+#else
+SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
+#endif
+  static swig_type_info* desc = 0;
+  void *vptr = 0;
+  int ecode;
+
+  if (!desc) desc = SWIG_TypeQuery("SolvFp *");
+  if ((SWIG_ConvertPtr(obj, &vptr, desc, 0)) == SWIG_OK) {
+    if (val)
+      *val = ((SolvFp *)vptr)->fp;
+    return SWIG_OK;
+  }
+#ifdef SWIGPYTHON
+  ecode = SWIG_AsValFilePtr(obj, val);
+  if (ecode == SWIG_OK)
+    return ecode;
+#endif
+  return SWIG_TypeError;
+}
+
+}
+
 %include "typemaps.i"
+
+%typemaps_asval(%checkcode(POINTER), SWIG_AsValSolvFpPtr, "SWIG_AsValSolvFpPtr", FILE*);
+
 
 %{
 #include <stdbool.h>
@@ -337,13 +371,6 @@ typedef VALUE AppObjectPtr;
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#ifdef __GLIBC__
-/* glibc's way of closing the file without freeing the file pointer */
-extern int _IO_file_close_it(FILE *);
-#else
-#define _IO_file_close_it(fp) 0
-#endif
 
 /* argh, swig undefs bool for perl */
 #ifndef bool
@@ -489,6 +516,10 @@ typedef struct {
   int flags;
 } Selection;
 
+typedef struct {
+  FILE *fp;
+} SolvFp;
+
 typedef Dataiterator Datamatch;
 
 %}
@@ -596,23 +627,40 @@ typedef struct {
 typedef struct {
 } Chksum;
 
-%rename(xfopen) solv_xfopen;
-%rename(xfopen_fd) solv_xfopen_dup;
+%rename(xfopen) solvfp_xfopen;
+%rename(xfopen_fd) solvfp_xfopen_fd;
 
-%nodefaultctor FILE;
+%nodefaultctor SolvFp;
 typedef struct {
-} FILE;
+} SolvFp;
 
-%newobject solv_xfopen;
-%newobject solv_xfopen_dup;
+%newobject solvfp_xfopen;
+%newobject solvfp_xfopen_fd;
 
-FILE *solv_xfopen(const char *fn, const char *mode = 0);
-FILE *solv_xfopen_dup(const char *fn, int fd, const char *mode = 0);
+SolvFp *solvfp_xfopen(const char *fn, const char *mode = 0);
+SolvFp *solvfp_xfopen_fd(const char *fn, int fd, const char *mode = 0);
 
 %{
-  SWIGINTERN FILE *solv_xfopen_dup(const char *fn, int fd, const char *mode) {
+  SWIGINTERN SolvFp *solvfp_xfopen_fd(const char *fn, int fd, const char *mode) {
+    SolvFp *sfp;
+    FILE *fp;
     fd = dup(fd);
-    return fd == -1 ? 0 : solv_xfopen_fd(fn, fd, mode);
+    fp = fd == -1 ? 0 : solv_xfopen_fd(fn, fd, mode);
+    if (!fp)
+      return 0;
+    sfp = solv_calloc(1, sizeof(SolvFp));
+    sfp->fp = fp;
+    return sfp;
+  }
+  SWIGINTERN SolvFp *solvfp_xfopen(const char *fn, const char *mode) {
+    SolvFp *sfp;
+    FILE *fp;
+    fp = solv_xfopen(fn, mode);
+    if (!fp)
+      return 0;
+    sfp = solv_calloc(1, sizeof(SolvFp));
+    sfp->fp = fp;
+    return sfp;
   }
 %}
 
@@ -649,23 +697,29 @@ typedef struct {
   int const count;
 } TransactionClass;
 
-%extend FILE {
-  ~FILE() {
-    fclose($self);
+%extend SolvFp {
+  ~SolvFp() {
+    if ($self->fp)
+      fclose($self->fp);
+    free($self);
   }
   int fileno() {
-    return fileno($self);
+    return $self->fp ? fileno($self->fp) : -1;
   }
   int dup() {
-    return dup(fileno($self));
+    return $self->fp ? dup(fileno($self->fp)) : -1;
   }
   bool flush() {
-    return fflush($self) == 0;
+    if (!$self->fp)
+      return 1;
+    return fflush($self->fp) == 0;
   }
   bool close() {
     bool ret;
-    ret = fflush($self) == 0;
-    _IO_file_close_it($self);
+    if (!$self->fp)
+      return 1;
+    ret = fclose($self->fp) == 0;
+    $self->fp = 0;
     return ret;
   }
 }
