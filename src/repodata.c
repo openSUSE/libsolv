@@ -1593,6 +1593,11 @@ dataiterator_step(Dataiterator *di)
 	  if (!datamatcher_match(&di->matcher, di->kv.str))
 	    continue;
 	}
+      else
+	{
+	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && (di->flags & SEARCH_FILES) != 0)
+	    repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags);
+	}
       /* found something! */
       return 1;
     }

@@ -522,6 +522,10 @@ typedef struct {
   Id const id;
 } Dep;
 
+# put before pool/repo so we can access the constructor
+%nodefaultdtor Dataiterator;
+typedef struct {} Dataiterator;
+
 typedef struct {
   Pool* const pool;
   Id const id;
@@ -543,9 +547,6 @@ typedef struct {
   Id const id;
 } XRepodata;
 
-# put before pool/repo so we can access the constructor
-%nodefaultdtor Dataiterator;
-typedef struct {} Dataiterator;
 typedef struct {} Pool_solvable_iterator;
 typedef struct {} Pool_repo_iterator;
 typedef struct {} Repo_solvable_iterator;
@@ -1446,6 +1447,8 @@ typedef struct {
 
 %extend Dataiterator {
   static const int SEARCH_STRING = SEARCH_STRING;
+  static const int SEARCH_STRINGSTART = SEARCH_STRINGSTART;
+  static const int SEARCH_STRINGEND = SEARCH_STRINGEND;
   static const int SEARCH_SUBSTRING = SEARCH_SUBSTRING;
   static const int SEARCH_GLOB = SEARCH_GLOB;
   static const int SEARCH_REGEX = SEARCH_REGEX;
@@ -1628,6 +1631,14 @@ typedef struct {
   }
   void setpos_parent() {
     dataiterator_setpos_parent($self);
+  }
+#if defined(SWIGPERL)
+  %rename("str") __str__;
+#endif
+  const char *__str__() {
+    if (!repodata_stringify($self->pool, $self->data, $self->key, &$self->kv, $self->flags))
+      return "";
+    return $self->kv.str;
   }
 }
 
@@ -1900,6 +1911,10 @@ typedef struct {
   }
   const char *lookup_location(unsigned int *OUTPUT) {
     return solvable_lookup_location($self->pool->solvables + $self->id, OUTPUT);
+  }
+  %newobject Dataiterator;
+  Dataiterator *Dataiterator(Id key, const char *match, int flags) {
+    return new_Dataiterator($self->pool, 0, $self->id, key, match, flags);
   }
 #ifdef SWIGRUBY
   %rename("installable?") installable;
