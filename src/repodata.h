@@ -288,6 +288,7 @@ Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
 const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
 void repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, const char *file);
+void repodata_set_deltalocation(Repodata *data, Id handle, int medianr, const char *dir, const char *file);
 void repodata_set_sourcepkg(Repodata *data, Id solvid, const char *sourcepkg);
 Id repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid);
 

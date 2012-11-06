@@ -223,67 +223,6 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
   repodata_set_checksum(data, handle, keyname, type, sp[1]);
 }
 
-static void
-set_delta_location(Repodata *data, Id handle, int medianr, char *dir, char *file)
-{
-  Pool *pool = data->repo->pool;
-  int l = 0; 
-  char *p, *op;
-
-  if (!dir)
-    {    
-      if ((dir = strrchr(file, '/')) != 0)
-        {
-          l = dir - file;
-          dir = file;
-          file = dir + l + 1; 
-          if (!l) 
-            l++;
-        }
-    }    
-  else 
-    l = strlen(dir);
-  if (l >= 2 && dir[0] == '.' && dir[1] == '/' && (l == 2 || dir[2] != '/'))
-    {    
-      dir += 2;
-      l -= 2;
-    }    
-  if (l == 1 && dir[0] == '.') 
-    l = 0; 
-  if (dir && l)
-    repodata_set_id(data, handle, DELTA_LOCATION_DIR, pool_strn2id(pool, dir, l, 1));
-  if ((p = strrchr(file, '.')) != 0)
-    {
-      *p = 0;
-      if ((op = strrchr(file, '.')) != 0)
-	{
-	  *p = '.';
-	  p = op;
-	  *p = 0;
-	  if (!strcmp(p + 1, "delta.rpm") && (op = strrchr(file, '.')) != 0)
-	    {
-	      *p = '.';
-	      p = op;
-	      *p = 0;
-	    }
-	}
-      repodata_set_id(data, handle, DELTA_LOCATION_SUFFIX, pool_str2id(pool, p + 1, 1));
-    }
-  if ((p = strrchr(file, '-')) != 0)
-    {
-      *p = 0;
-      if ((op = strrchr(file, '-')) != 0)
-	{
-	  *p = '-';
-	  p = op;
-	  *p = 0;
-	}
-      repodata_set_id(data, handle, DELTA_LOCATION_EVR, pool_str2id(pool, p + 1, 1));
-    }
-  repodata_set_id(data, handle, DELTA_LOCATION_NAME, pool_str2id(pool, file, 1));
-}
-
-
 
 /*
  * id3_cmp
@@ -755,7 +694,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		    pd.ret = pool_error(pool, -1, "susetags: line %d: bad location line '%s'\n", pd.lineno, line);
 		    continue;
 		  }
-		set_delta_location(data, handle, atoi(sp[0]), i == 3 ? sp[2] : 0, sp[1]);
+		repodata_set_deltalocation(data, handle, atoi(sp[0]), i == 3 ? sp[2] : 0, sp[1]);
 		continue;
 	      }
 	    case CTAG('=', 'S', 'i', 'z'):

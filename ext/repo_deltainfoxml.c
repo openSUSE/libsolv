@@ -77,10 +77,7 @@ static struct stateswitch stateswitches[] = {
 
 /* Cumulated info about the current deltarpm or patchrpm */
 struct deltarpm {
-  Id locdir;
-  Id locname;
-  Id locevr;
-  Id locsuffix;
+  char *location;
   unsigned int buildtime;
   unsigned long long downloadsize;
   char *filechecksum;
@@ -208,68 +205,6 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return pool_str2id(pool, pd->content, 1);
 }
 
-static void
-parse_delta_location(struct parsedata *pd, const char* str)
-{
-  Pool *pool = pd->pool;
-  if (str)
-    {
-      /* Separate the filename into its different parts.
-	 rpm/x86_64/alsa-1.0.14-31_31.2.x86_64.delta.rpm
-	 --> dir = rpm/x86_64
-	 name = alsa
-	 evr = 1.0.14-31_31.2
-	 suffix = x86_64.delta.rpm.  */
-      char *real_str = solv_strdup(str);
-      char *s = real_str;
-      char *s1, *s2;
-      s1 = strrchr (s, '/');
-      if (s1)
-	{
-	  pd->delta.locdir = pool_strn2id(pool, s, s1 - s, 1);
-	  s = s1 + 1;
-	}
-      /* Guess suffix.  */
-      s1 = strrchr (s, '.');
-      if (s1)
-	{
-	  for (s2 = s1 - 1; s2 > s; s2--)
-	    if (*s2 == '.')
-	      break;
-	  if (!strcmp (s2, ".delta.rpm") || !strcmp (s2, ".patch.rpm"))
-	    {
-	      s1 = s2;
-	      /* We accept one more item as suffix.  */
-	      for (s2 = s1 - 1; s2 > s; s2--)
-		if (*s2 == '.')
-		  break;
-	      s1 = s2;
-	    }
-	  if (*s1 == '.')
-	    *s1++ = 0;
-	  pd->delta.locsuffix = pool_str2id(pool, s1, 1);
-	}
-      /* Last '-'.  */
-      s1 = strrchr (s, '-');
-      if (s1)
-	{
-	  /* Second to last '-'.  */
-	  for (s2 = s1 - 1; s2 > s; s2--)
-	    if (*s2 == '-')
-	      break;
-	}
-      else
-	s2 = 0;
-      if (s2 > s && *s2 == '-')
-	{
-	  *s2++ = 0;
-	  pd->delta.locevr = pool_str2id(pool, s2, 1);
-	}
-      pd->delta.locname = pool_str2id(pool, s, 1);
-      free(real_str);
-    }
-}
-
 static void XMLCALL
 startElement(void *userData, const char *name, const char **atts)
 {
@@ -326,7 +261,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_FILENAME:
       break;
     case STATE_LOCATION:
-      parse_delta_location(pd, find_attr("href", atts));
+      pd->delta.location = solv_strdup(find_attr("href", atts));
       break;
     case STATE_SIZE:
       break;
@@ -389,10 +324,8 @@ endElement(void *userData, const char *name)
 	repodata_set_id(pd->data, handle, DELTA_PACKAGE_NAME, pd->newpkgname);
 	repodata_set_id(pd->data, handle, DELTA_PACKAGE_EVR, pd->newpkgevr);
 	repodata_set_id(pd->data, handle, DELTA_PACKAGE_ARCH, pd->newpkgarch);
-	repodata_set_id(pd->data, handle, DELTA_LOCATION_NAME, d->locname);
-	repodata_set_id(pd->data, handle, DELTA_LOCATION_DIR, d->locdir);
-	repodata_set_id(pd->data, handle, DELTA_LOCATION_EVR, d->locevr);
-	repodata_set_id(pd->data, handle, DELTA_LOCATION_SUFFIX, d->locsuffix);
+	if (d->location)
+	  repodata_set_deltalocation(pd->data, handle, 0, 0, d->location);
 	if (d->downloadsize)
 	  repodata_set_num(pd->data, handle, DELTA_DOWNLOADSIZE, d->downloadsize);
 	if (d->filechecksum)
@@ -410,9 +343,10 @@ endElement(void *userData, const char *name)
       pd->delta.bevr = solv_free(pd->delta.bevr);
       pd->delta.nbevr = 0;
       pd->delta.seqnum = solv_free(pd->delta.seqnum);
+      pd->delta.location = solv_free(pd->delta.location);
       break;
     case STATE_FILENAME:
-      parse_delta_location(pd, pd->content);
+      pd->delta.location = solv_strdup(pd->content);
       break;
     case STATE_CHECKSUM:
       pd->delta.filechecksum = solv_strdup(pd->content);
