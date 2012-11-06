@@ -2449,7 +2449,7 @@ repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
 }
 
 void
-repodata_delete_uninternalized(Repodata *data, Id solvid, Id keyname)
+repodata_set_deleted_uninternalized(Repodata *data, Id solvid, Id keyname)
 {
   Id *pp, *ap, **app;
   app = repodata_get_attrp(data, solvid);
@@ -2475,7 +2475,7 @@ repodata_delete_uninternalized(Repodata *data, Id solvid, Id keyname)
 
 /* XXX: does not work correctly, needs fix in iterators! */
 void
-repodata_delete(Repodata *data, Id solvid, Id keyname)
+repodata_set_deleted(Repodata *data, Id solvid, Id keyname)
 {
   Repokey key;
   key.name = keyname;

@@ -70,6 +70,7 @@ void solvable_add_idarray(Solvable *s, Id keyname, Id id);
 void solvable_add_deparray(Solvable *s, Id keyname, Id dep, Id marker);
 void solvable_set_idarray(Solvable *s, Id keyname, Queue *q);
 void solvable_set_deparray(Solvable *s, Id keyname, Queue *q, Id marker);
+void solvable_set_deleted(Solvable *s, Id keyname);
 
 int solvable_identical(Solvable *s1, Solvable *s2);
 Id solvable_selfprovidedep(Solvable *s); 

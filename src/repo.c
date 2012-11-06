@@ -1613,6 +1613,62 @@ repo_set_idarray(Repo *repo, Id p, Id keyname, Queue *q)
 }
 
 void
+repo_set_deleted(Repo *repo, Id p, Id keyname)
+{
+  Repodata *data;
+  if (p >= 0)
+    {
+      Solvable *s = repo->pool->solvables + p;
+      switch (keyname)
+	{
+	case SOLVABLE_NAME:
+	  s->name = 0;
+	  return;
+	case SOLVABLE_ARCH:
+	  s->arch = 0;
+	  return;
+	case SOLVABLE_EVR:
+	  s->evr = 0;
+	  return;
+	case SOLVABLE_VENDOR:
+	  s->vendor = 0;
+	  return;
+        case RPM_RPMDBID:
+	  if (repo->rpmdbid)
+	    repo->rpmdbid[p] = 0;
+	  return;
+	case SOLVABLE_PROVIDES:
+	  s->provides = 0;
+	  return;
+	case SOLVABLE_OBSOLETES:
+	  s->obsoletes = 0;
+	  return;
+	case SOLVABLE_CONFLICTS:
+	  s->conflicts = 0;
+	  return;
+	case SOLVABLE_REQUIRES:
+	  s->requires = 0;
+	  return;
+	case SOLVABLE_RECOMMENDS:
+	  s->recommends = 0;
+	  return;
+	case SOLVABLE_SUGGESTS:
+	  s->suggests = 0;
+	  return;
+	case SOLVABLE_SUPPLEMENTS:
+	  s->supplements = 0;
+	case SOLVABLE_ENHANCES:
+	  s->enhances = 0;
+	  return;
+	default:
+	  break;
+	}
+    }
+  data = repo_last_repodata(repo);
+  repodata_set_deleted(data, p, keyname);
+}
+
+void
 repo_internalize(Repo *repo)
 {
   int i;

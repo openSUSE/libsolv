@@ -142,6 +142,7 @@ void repo_add_idarray(Repo *repo, Id p, Id keyname, Id id);
 void repo_add_deparray(Repo *repo, Id p, Id keyname, Id dep, Id marker);
 void repo_set_idarray(Repo *repo, Id p, Id keyname, Queue *q);
 void repo_set_deparray(Repo *repo, Id p, Id keyname, Queue *q, Id marker);
+void repo_set_deleted(Repo *repo, Id p, Id keyname);
  
 void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);

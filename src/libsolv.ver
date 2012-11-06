@@ -155,6 +155,7 @@ SOLV_1.0 {
 		repo_matchvalue;
 		repo_reserve_ids;
 		repo_search;
+		repo_set_deleted;
 		repo_set_deparray;
 		repo_set_id;
 		repo_set_idarray;
@@ -173,8 +174,6 @@ SOLV_1.0 {
 		repodata_add_poolstr_array;
 		repodata_chk2str;
 		repodata_create_stubs;
-		repodata_delete;
-		repodata_delete_uninternalized;
 		repodata_dir2str;
 		repodata_disable_paging;
 		repodata_empty;
@@ -208,6 +207,8 @@ SOLV_1.0 {
 		repodata_set_checksum;
 		repodata_set_constant;
 		repodata_set_constantid;
+		repodata_set_deleted;
+		repodata_set_deleted_uninternalized;
 		repodata_set_id;
 		repodata_set_idarray;
 		repodata_set_location;
@@ -281,6 +282,7 @@ SOLV_1.0 {
 		solvable_lookup_type;
 		solvable_lookup_void;
 		solvable_selfprovidedep;
+		solvable_set_deleted;
 		solvable_set_deparray;
 		solvable_set_id;
 		solvable_set_idarray;

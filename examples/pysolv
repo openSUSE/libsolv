@@ -931,7 +931,7 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
             # argh, p is just the name of the package
             if p in erasenamehelper:
                 p = erasenamehelper[p]
-                print "erase", p
+            print "erase", p
     runproblems = ts.run(runCallback, '')
     if runproblems:
         print runproblems

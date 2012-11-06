@@ -733,3 +733,8 @@ solvable_set_deparray(Solvable *s, Id keyname, Queue *q, Id marker)
   repo_set_deparray(s->repo, s - s->repo->pool->solvables, keyname, q, marker);
 }
 
+void
+solvable_set_deleted(Solvable *s, Id keyname)
+{
+  repo_set_deleted(s->repo, s - s->repo->pool->solvables, keyname);
+}
