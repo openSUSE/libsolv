@@ -274,7 +274,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	case 'R' << 8 | 'E':
 	  if (!strcasecmp(tag, "replaces"))
-	    s->obsoletes = makedeps(repo, q, s->conflicts, 0);
+	    s->obsoletes = makedeps(repo, q, s->obsoletes, 0);
 	  else if (!strcasecmp(tag, "recommends"))
 	    s->recommends = makedeps(repo, q, s->recommends, 0);
 	  break;
@@ -329,22 +329,30 @@ control2solvable(Solvable *s, Repodata *data, char *control)
   if (s->obsoletes)
     {
       /* obsoletes only count when the packages also conflict */
+      /* XXX: should not transcode here */
       int i, j, k;
-      Id d;
+      Id d, cid;
       for (i = j = s->obsoletes; (d = repo->idarraydata[i]) != 0; i++)
 	{
-	  if (s->conflicts)
+	  if (!s->conflicts)
+	    continue;
+	  for (k = s->conflicts; (cid = repo->idarraydata[k]) != 0; k++)
 	    {
-	      for (k = s->conflicts; repo->idarraydata[k] != 0; k++)
-		if (repo->idarraydata[k] == d)
-		  break;
-	      if (repo->idarraydata[k])
+	      if (repo->idarraydata[k] == cid)
+		break;
+	      if (ISRELDEP(cid))
 		{
-		  repo->idarraydata[j++] = d;
+		  Reldep *rd = GETRELDEP(pool, cid);
+		  if (rd->flags < 8 && rd->name == d)
+		    break;	/* specialize obsoletes */
 		}
 	    }
+	  if (cid)
+	    repo->idarraydata[j++] = cid;
 	}
       repo->idarraydata[j] = 0;
+      if (j == s->obsoletes)
+	s->obsoletes = 0;
     }
 }
 
