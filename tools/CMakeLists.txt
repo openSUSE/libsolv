@@ -68,6 +68,13 @@ TARGET_LINK_LIBRARIES (comps2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIE
 SET (tools_list ${tools_list} comps2solv)
 ENDIF (ENABLE_COMPS)
 
+IF (ENABLE_DEBIAN)
+ADD_EXECUTABLE (deb2solv deb2solv.c)
+TARGET_LINK_LIBRARIES (deb2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+SET (tools_list ${tools_list} deb2solv)
+ENDIF (ENABLE_DEBIAN)
+
 IF (ENABLE_MDKREPO)
 ADD_EXECUTABLE (mdk2solv mdk2solv.c)
 TARGET_LINK_LIBRARIES (mdk2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
