@@ -1429,7 +1429,7 @@ repo_set_num(Repo *repo, Id p, Id keyname, unsigned long long num)
 	{
 	  if (!repo->rpmdbid)
 	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
-	  repo->rpmdbid[p] = num;
+	  repo->rpmdbid[p - repo->start] = num;
 	  return;
 	}
     }
@@ -1635,7 +1635,7 @@ repo_unset(Repo *repo, Id p, Id keyname)
 	  return;
         case RPM_RPMDBID:
 	  if (repo->rpmdbid)
-	    repo->rpmdbid[p] = 0;
+	    repo->rpmdbid[p - repo->start] = 0;
 	  return;
 	case SOLVABLE_PROVIDES:
 	  s->provides = 0;
