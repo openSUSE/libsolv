@@ -2235,6 +2235,31 @@ evrid2vrstr(Pool *pool, Id evrid)
   return p != evr && *p == ':' && p[1] ? p + 1 : evr;
 }
 
+static inline void
+repodata_set_poolstrn(Repodata *data, Id solvid, Id keyname, const char *str, int l)
+{
+  Id id;
+  if (data->localpool)
+    id = stringpool_strn2id(&data->spool, str, l, 1);
+  else
+    id = pool_strn2id(data->repo->pool, str, l, 1);
+  repodata_set_id(data, solvid, keyname, id);
+}
+
+static inline void
+repodata_set_strn(Repodata *data, Id solvid, Id keyname, const char *str, int l)
+{
+  if (!str[l])
+    repodata_set_str(data, solvid, keyname, str);
+  else
+    {
+      char *s = solv_strdup(str);
+      s[l] = 0;
+      repodata_set_str(data, solvid, keyname, s);
+      free(s);
+    }
+}
+
 void
 repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, const char *file)
 {
@@ -2271,15 +2296,8 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
       str = pool_id2str(pool, s->arch);
       if (!strncmp(dir, str, l) && !str[l])
 	repodata_set_void(data, solvid, SOLVABLE_MEDIADIR);
-      else if (!dir[l])
-	repodata_set_str(data, solvid, SOLVABLE_MEDIADIR, dir);
       else
-	{
-	  char *dir2 = solv_strdup(dir);
-	  dir2[l] = 0;
-	  repodata_set_str(data, solvid, SOLVABLE_MEDIADIR, dir2);
-	  free(dir2);
-	}
+	repodata_set_strn(data, solvid, SOLVABLE_MEDIADIR, dir, l);
     }
   fp = file;
   str = pool_id2str(pool, s->name);
@@ -2302,16 +2320,6 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
 	}
     }
   repodata_set_str(data, solvid, SOLVABLE_MEDIAFILE, file);
-}
-
-static inline void repodata_set_poolstrn(Repodata *data, Id solvid, Id keyname, const char *str, int l)
-{
-  Id id;
-  if (data->localpool)
-    id = stringpool_strn2id(&data->spool, str, l, 1);
-  else
-    id = pool_strn2id(data->repo->pool, str, l, 1);
-  repodata_set_id(data, solvid, keyname, id);
 }
 
 /* XXX: medianr is currently not stored */
