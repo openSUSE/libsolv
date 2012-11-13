@@ -595,7 +595,8 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
   ctar[l2] = 0;
   s = pool_id2solvable(pool, repo_add_solvable(repo));
   control2solvable(s, data, (char *)ctar);
-  repodata_set_location(data, s - pool->solvables, 0, 0, deb);
+  if (!(flags & REPO_NO_LOCATION))
+    repodata_set_location(data, s - pool->solvables, 0, 0, deb);
   if (S_ISREG(stb.st_mode))
     repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
   if (gotpkgid)

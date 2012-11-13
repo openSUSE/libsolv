@@ -155,7 +155,6 @@ SOLV_1.0 {
 		repo_matchvalue;
 		repo_reserve_ids;
 		repo_search;
-		repo_set_deleted;
 		repo_set_deparray;
 		repo_set_id;
 		repo_set_idarray;
@@ -163,6 +162,7 @@ SOLV_1.0 {
 		repo_set_poolstr;
 		repo_set_str;
 		repo_sidedata_create;
+		repo_unset;
 		repo_write;
 		repo_write_filtered;
 		repo_write_stdkeyfilter;
@@ -207,8 +207,6 @@ SOLV_1.0 {
 		repodata_set_checksum;
 		repodata_set_constant;
 		repodata_set_constantid;
-		repodata_set_deleted;
-		repodata_set_deleted_uninternalized;
 		repodata_set_deltalocation;
 		repodata_set_id;
 		repodata_set_idarray;
@@ -223,6 +221,8 @@ SOLV_1.0 {
 		repodata_str2dir;
 		repodata_stringify;
 		repodata_swap_attrs;
+		repodata_unset;
+		repodata_unset_uninternalized;
 		repodata_write;
 		repodata_write_filtered;
 		repopagestore_compress_page;
@@ -283,7 +283,6 @@ SOLV_1.0 {
 		solvable_lookup_type;
 		solvable_lookup_void;
 		solvable_selfprovidedep;
-		solvable_set_deleted;
 		solvable_set_deparray;
 		solvable_set_id;
 		solvable_set_idarray;
@@ -293,6 +292,7 @@ SOLV_1.0 {
 		solvable_trivial_installable_map;
 		solvable_trivial_installable_queue;
 		solvable_trivial_installable_repo;
+		solvable_unset;
 		solver_allruleinfos;
 		solver_calc_duchanges;
 		solver_calc_installsizechange;

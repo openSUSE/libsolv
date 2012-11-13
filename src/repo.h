@@ -114,6 +114,7 @@ static inline int pool_installable(const Pool *pool, Solvable *s)
 #define REPO_USE_LOADING		(1 << 3)
 #define REPO_EXTEND_SOLVABLES		(1 << 4)
 #define REPO_USE_ROOTDIR		(1 << 5)
+#define REPO_NO_LOCATION		(1 << 6)
 
 Repodata *repo_add_repodata(Repo *repo, int flags);
 Repodata *repo_id2repodata(Repo *repo, Id id);
@@ -142,7 +143,7 @@ void repo_add_idarray(Repo *repo, Id p, Id keyname, Id id);
 void repo_add_deparray(Repo *repo, Id p, Id keyname, Id dep, Id marker);
 void repo_set_idarray(Repo *repo, Id p, Id keyname, Queue *q);
 void repo_set_deparray(Repo *repo, Id p, Id keyname, Queue *q, Id marker);
-void repo_set_deleted(Repo *repo, Id p, Id keyname);
+void repo_unset(Repo *repo, Id p, Id keyname);
  
 void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);

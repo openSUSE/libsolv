@@ -262,8 +262,8 @@ void repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname, const cha
 void repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 
-void repodata_set_deleted(Repodata *data, Id solvid, Id keyname);
-void repodata_set_deleted_uninternalized(Repodata *data, Id solvid, Id keyname);
+void repodata_unset(Repodata *data, Id solvid, Id keyname);
+void repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname);
 
 /* 
  merge/swap attributes from one solvable to another

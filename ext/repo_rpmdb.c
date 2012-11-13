@@ -2012,7 +2012,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       solv_free(rpmhead);
       return 0;
     }
-  repodata_set_location(data, s - pool->solvables, 0, 0, rpm);
+  if (!(flags & REPO_NO_LOCATION))
+    repodata_set_location(data, s - pool->solvables, 0, 0, rpm);
   if (S_ISREG(stb.st_mode))
     repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
   repodata_set_num(data, s - pool->solvables, SOLVABLE_HEADEREND, headerend);

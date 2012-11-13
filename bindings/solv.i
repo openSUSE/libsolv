@@ -1319,7 +1319,8 @@ typedef struct {
   static const int REPO_LOCALPOOL = REPO_LOCALPOOL;
   static const int REPO_USE_LOADING = REPO_USE_LOADING;
   static const int REPO_EXTEND_SOLVABLES = REPO_EXTEND_SOLVABLES;
-  static const int REPO_USE_ROOTDIR  = REPO_USE_ROOTDIR;
+  static const int REPO_USE_ROOTDIR = REPO_USE_ROOTDIR;
+  static const int REPO_NO_LOCATION = REPO_NO_LOCATION;
   static const int SOLV_ADD_NO_STUBS = SOLV_ADD_NO_STUBS;       /* repo_solv */
 #ifdef ENABLE_SUSEREPO
   static const int SUSETAGS_RECORD_SHARES = SUSETAGS_RECORD_SHARES;     /* repo_susetags */

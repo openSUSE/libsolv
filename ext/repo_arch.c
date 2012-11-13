@@ -455,8 +455,10 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
       if (!s->evr)
 	s->evr = ID_EMPTY;
       s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      repodata_set_location(data, s - pool->solvables, 0, 0, fn);
-      repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
+      if (!(flags & REPO_NO_LOCATION))
+	repodata_set_location(data, s - pool->solvables, 0, 0, fn);
+      if (S_ISREG(stb.st_mode))
+        repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
       if (pkgidhandle)
 	{
 	  unsigned char pkgid[16];
@@ -852,7 +854,7 @@ repo_add_arch_local(Repo *repo, const char *dir, int flags)
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   if (flags & REPO_USE_ROOTDIR)
-    solv_free(dir);
+    solv_free((char *)dir);
   return 0;
 }
 

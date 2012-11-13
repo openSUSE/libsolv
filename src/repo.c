@@ -1613,7 +1613,7 @@ repo_set_idarray(Repo *repo, Id p, Id keyname, Queue *q)
 }
 
 void
-repo_set_deleted(Repo *repo, Id p, Id keyname)
+repo_unset(Repo *repo, Id p, Id keyname)
 {
   Repodata *data;
   if (p >= 0)
@@ -1665,7 +1665,7 @@ repo_set_deleted(Repo *repo, Id p, Id keyname)
 	}
     }
   data = repo_last_repodata(repo);
-  repodata_set_deleted(data, p, keyname);
+  repodata_unset(data, p, keyname);
 }
 
 void
