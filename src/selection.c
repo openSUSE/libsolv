@@ -20,6 +20,7 @@
 
 #include "selection.h"
 #include "solver.h"
+#include "evr.h"
 
 
 static int
@@ -535,6 +536,82 @@ selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
   return 0;
 }
 
+#if defined(MULTI_SEMANTICS)
+# define EVRCMP_DEPCMP (pool->disttype == DISTTYPE_DEB ? EVRCMP_COMPARE : EVRCMP_MATCH_RELEASE)
+#elif defined(DEBIAN)
+# define EVRCMP_DEPCMP EVRCMP_COMPARE
+#else
+# define EVRCMP_DEPCMP EVRCMP_MATCH_RELEASE
+#endif
+
+/* magic epoch promotion code, works only for SELECTION_NAME selections */
+static void
+selection_limit_evr(Pool *pool, Queue *selection, char *evr)
+{
+  int i, j;
+  for (i = j = 0; i < selection->count; i += 2)
+    {
+      Id select = selection->elements[i] & SOLVER_SELECTMASK;
+      Id id = selection->elements[i + 1];
+      Id p, pp;
+      Queue tmpq;
+      Id tmpqb[2];
+      const char *highest = 0;
+      int highestlen = 0;
+
+      FOR_JOB_SELECT(p, pp, select, id)
+	{
+	  Solvable *s = pool->solvables + p;
+	  const char *sevr = pool_id2str(pool, s->evr);
+	  const char *sp;
+	  for (sp = sevr; *sp >= '0' && *sp <= '9'; sp++)
+	    ;
+	  if (sp == sevr || *sp != ':')
+	    continue;
+	  /* found epoch, compare vr */
+	  if (strcmp(sp + 1, evr) != 0)
+	    {
+	      int r = pool_evrcmp_str(pool, sp + 1, evr, EVRCMP_DEPCMP);
+	      if (r == -1 || r == 1)
+		continue;	/* no match */
+	    }
+	  if (highest)
+	    {
+	      if (highestlen == sp - sevr && !strncmp(highest, sevr, highestlen))
+		continue;
+	      if (pool_evrcmp_str(pool, sevr, highest, EVRCMP_COMPARE) <= 0)
+		continue;
+	    }
+	  highest = sevr;
+	  highestlen = sp - sevr;
+	}
+      if (highest)
+	{
+	  /* found epoch, prepend */
+	  char *evrx = solv_malloc(strlen(evr) + highestlen + 2);
+	  strncpy(evrx, highest, highestlen + 1);
+	  strcpy(evrx + highestlen + 1, evr);
+	  id = pool_str2id(pool, evrx, 1);
+	  solv_free(evrx);
+	}
+      else
+	id = pool_str2id(pool, evr, 1);
+      queue_init_buffer(&tmpq, tmpqb, sizeof(tmpqb)/sizeof(*tmpqb));
+      queue_push2(&tmpq, selection->elements[i], selection->elements[i + 1]);
+      selection_limit_rel(pool, &tmpq, REL_EQ, id);
+      if (!tmpq.count)
+	{
+	  queue_free(&tmpq);
+	  continue;		/* oops, no match */
+	}
+      selection->elements[j] = tmpq.elements[0];
+      selection->elements[j + 1] = tmpq.elements[1];
+      queue_free(&tmpq);
+      j += 2;
+    }
+  queue_truncate(selection, j);
+}
+
 static int
 selection_nevra(Pool *pool, Queue *selection, const char *name, int flags)
 {
@@ -606,7 +683,7 @@ selection_nevra(Pool *pool, Queue *selection, const char *name, int flags)
     }
   if (archid)
     selection_limit_rel(pool, selection, REL_ARCH, archid);
-  selection_limit_rel(pool, selection, REL_EQ, pool_str2id(pool, r + 1, 1));
+  selection_limit_evr(pool, selection, r + 1);	/* magic epoch promotion */
   solv_free(rname);
   return ret;
 }
