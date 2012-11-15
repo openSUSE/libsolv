@@ -549,16 +549,20 @@ static void
 selection_limit_evr(Pool *pool, Queue *selection, char *evr)
 {
   int i, j;
+  Queue q;
+  Id qbuf[10];
+
+  queue_init(&q);
+  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
   for (i = j = 0; i < selection->count; i += 2)
     {
       Id select = selection->elements[i] & SOLVER_SELECTMASK;
       Id id = selection->elements[i + 1];
       Id p, pp;
-      Queue tmpq;
-      Id tmpqb[2];
-      const char *highest = 0;
-      int highestlen = 0;
+      const char *lastepoch = 0;
+      int lastepochlen = 0;
 
+      queue_empty(&q);
       FOR_JOB_SELECT(p, pp, select, id)
 	{
 	  Solvable *s = pool->solvables + p;
@@ -566,50 +570,62 @@ selection_limit_evr(Pool *pool, Queue *selection, char *evr)
 	  const char *sp;
 	  for (sp = sevr; *sp >= '0' && *sp <= '9'; sp++)
 	    ;
-	  if (sp == sevr || *sp != ':')
-	    continue;
-	  /* found epoch, compare vr */
-	  if (strcmp(sp + 1, evr) != 0)
+	  if (*sp != ':')
+	    sp = sevr;
+	  /* compare vr part */
+	  if (strcmp(evr, sp != sevr ? sp + 1 : sevr) != 0)
 	    {
-	      int r = pool_evrcmp_str(pool, sp + 1, evr, EVRCMP_DEPCMP);
+	      int r = pool_evrcmp_str(pool, sp != sevr ? sp + 1 : sevr, evr, EVRCMP_DEPCMP);
 	      if (r == -1 || r == 1)
-		continue;	/* no match */
+		continue;	/* solvable does not match vr */
 	    }
-	  if (highest)
+	  queue_push(&q, p);
+	  if (sp > sevr)
 	    {
-	      if (highestlen == sp - sevr && !strncmp(highest, sevr, highestlen))
-		continue;
-	      if (pool_evrcmp_str(pool, sevr, highest, EVRCMP_COMPARE) <= 0)
-		continue;
+	      while (sevr < sp && *sevr == '0')	/* normalize */
+		sevr++;
 	    }
-	  highest = sevr;
-	  highestlen = sp - sevr;
+	  if (!lastepoch)
+	    {
+	      lastepoch = sevr;
+	      lastepochlen = sp - sevr;
+	    }
+	  else if (lastepochlen != sp - sevr || strncmp(lastepoch, sevr, lastepochlen) != 0)
+	    lastepochlen = -1;	/* multiple different epochs */
 	}
-      if (highest)
+      if (!lastepoch || lastepochlen == 0)
+	id = pool_str2id(pool, evr, 1);		/* no match at all or zero epoch */
+      else if (lastepochlen >= 0)
 	{
-	  /* found epoch, prepend */
-	  char *evrx = solv_malloc(strlen(evr) + highestlen + 2);
-	  strncpy(evrx, highest, highestlen + 1);
-	  strcpy(evrx + highestlen + 1, evr);
+	  /* found exactly one epoch, simlpy prepend */
+	  char *evrx = solv_malloc(strlen(evr) + lastepochlen + 2);
+	  strncpy(evrx, lastepoch, lastepochlen + 1);
+	  strcpy(evrx + lastepochlen + 1, evr);
 	  id = pool_str2id(pool, evrx, 1);
 	  solv_free(evrx);
 	}
       else
-	id = pool_str2id(pool, evr, 1);
-      queue_init_buffer(&tmpq, tmpqb, sizeof(tmpqb)/sizeof(*tmpqb));
-      queue_push2(&tmpq, selection->elements[i], selection->elements[i + 1]);
-      selection_limit_rel(pool, &tmpq, REL_EQ, id);
-      if (!tmpq.count)
 	{
-	  queue_free(&tmpq);
+	  /* multiple epochs in multiple solvables, convert to listy of solvables */
+	  selection->elements[j] = (selection->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE_ONE_OF;
+	  selection->elements[j + 1] = pool_queuetowhatprovides(pool, &q);
+	  j += 2;
+	  continue;
+	}
+      queue_empty(&q);
+      queue_push2(&q, selection->elements[i], selection->elements[i + 1]);
+      selection_limit_rel(pool, &q, REL_EQ, id);
+      if (!q.count)
+	{
+	  queue_free(&q);
 	  continue;		/* oops, no match */
 	}
-      selection->elements[j] = tmpq.elements[0];
-      selection->elements[j + 1] = tmpq.elements[1];
-      queue_free(&tmpq);
+      selection->elements[j] = q.elements[0];
+      selection->elements[j + 1] = q.elements[1];
       j += 2;
     }
   queue_truncate(selection, j);
+  queue_free(&q);
 }
 
 static int
