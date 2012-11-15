@@ -2773,21 +2773,9 @@ main(int argc, char **argv)
   // add mode
   for (i = 0; i < job.count; i += 2)
     {
-      if (mode == SOLVER_UPDATE)
-	{
-	  /* make update of not installed packages an install */
-	  FOR_JOB_SELECT(p, pp, job.elements[i], job.elements[i + 1])
-	    if (pool->installed && pool->solvables[p].repo == pool->installed)
-	      break;
-	  if (!p)
-	    {
-	      job.elements[i] |= SOLVER_INSTALL;
-	      if (cleandeps)
-		job.elements[i] |= SOLVER_CLEANDEPS;
-	      continue;
-	    }
-	}
       job.elements[i] |= mode;
+      if (mode == SOLVER_UPDATE && pool_isemptyupdatejob(pool, job.elements[i], job.elements[i + 1]))
+	job.elements[i] ^= SOLVER_UPDATE ^ SOLVER_INSTALL;
       if (cleandeps)
         job.elements[i] |= SOLVER_CLEANDEPS;
     }

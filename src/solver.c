@@ -23,6 +23,7 @@
 #include "pool.h"
 #include "util.h"
 #include "policy.h"
+#include "poolarch.h"
 #include "solverdebug.h"
 
 #define RULES_BLOCK 63
@@ -1424,6 +1425,11 @@ solver_free(Solver *solv)
       queue_free(solv->cleandeps_mistakes);
       solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
     }
+  if (solv->update_targets)
+    {
+      queue_free(solv->update_targets);
+      solv->update_targets = solv_free(solv->update_targets);
+    }
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -1579,6 +1585,24 @@ cleandeps_check_mistakes(Solver *solv, int level)
   if (mademistake)
     solver_reset(solv);
   return mademistake;
+}
+
+static void
+prune_to_update_targets(Solver *solv, Id *cp, Queue *q)
+{
+  int i, j;
+  Id p, *cp2;
+  for (i = j = 0; i < q->count; i++)
+    {
+      p = q->elements[i];
+      for (cp2 = cp; *cp2; cp2++)
+	if (*cp2 == p)
+	  {
+	    q->elements[j++] = p;
+	    break;
+	  }
+    }
+  queue_truncate(q, j);
 }
 
 /*-------------------------------------------------------------------
@@ -1773,17 +1797,22 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			  while ((p = pool->whatprovidesdata[d++]) != 0)
 			    if (solv->decisionmap[p] >= 0)
 			      queue_push(&dq, p);
-			  policy_filter_unwanted(solv, &dq, POLICY_MODE_CHOOSE);
-			  p = dq.elements[0];
-			  if (p != i && solv->decisionmap[p] == 0)
+			  if (dq.count && solv->update_targets && solv->update_targets->elements[i - installed->start])
+			    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], &dq);
+			  if (dq.count)
 			    {
-			      rr = solv->rules + solv->featurerules + (i - solv->installed->start);
-			      if (!rr->p)		/* update rule == feature rule? */
-				rr = rr - solv->featurerules + solv->updaterules;
-			      dq.count = 1;
+			      policy_filter_unwanted(solv, &dq, POLICY_MODE_CHOOSE);
+			      p = dq.elements[0];
+			      if (p != i && solv->decisionmap[p] == 0)
+				{
+				  rr = solv->rules + solv->featurerules + (i - solv->installed->start);
+				  if (!rr->p)		/* update rule == feature rule? */
+				    rr = rr - solv->featurerules + solv->updaterules;
+				  dq.count = 1;
+				}
+			      else
+				dq.count = 0;
 			    }
-			  else
-			    dq.count = 0;
 			}
 		      else
 			{
@@ -1800,6 +1829,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			    }
 			}
 		    }
+		  if (dq.count && solv->update_targets && solv->update_targets->elements[i - installed->start])
+		    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], &dq);
 		  /* install best version */
 		  if (dq.count)
 		    {
@@ -2559,6 +2590,92 @@ solver_addjobrule(Solver *solv, Id p, Id d, Id job, int weak)
     queue_push(&solv->weakruleq, solv->nrules - 1);
 }
 
+static void
+add_update_target(Solver *solv, Id p)
+{
+  Pool *pool = solv->pool;
+  Solvable *s = pool->solvables + p;
+  Repo *installed = solv->installed;
+  Id pi, pip;
+  if (!solv->update_targets)
+    {
+      solv->update_targets = solv_calloc(1, sizeof(Queue));
+      queue_init(solv->update_targets);
+    }
+  FOR_PROVIDES(pi, pip, s->name)
+    {
+      Solvable *si = pool->solvables + pi;
+      if (si->name != s->name || si->repo != installed)
+	continue;
+      queue_push2(solv->update_targets, pi, p);
+    }
+  if (s->obsoletes)
+    {
+      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(pi, pip, obs) 
+	    {
+	      Solvable *si = pool->solvables + pi;
+	      if (si->repo != installed)
+		continue;
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, si, obs))
+		continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, si))
+		continue;
+	      queue_push2(solv->update_targets, pi, p);
+	    }
+	}
+    }
+}
+
+static int
+transform_update_targets_sortfn(const void *ap, const void *bp, void *dp)
+{
+  const Id *a = ap;
+  const Id *b = bp;
+  if (a[0] - b[0])
+    return a[0] - b[0];
+  return a[1] - b[1];
+}
+
+static void
+transform_update_targets(Solver *solv)
+{
+  Repo *installed = solv->installed;
+  Queue *update_targets = solv->update_targets;
+  int i, j;
+  Id p, lastp;
+
+  if (!update_targets->count)
+    {
+      queue_free(update_targets);
+      solv->update_targets = solv_free(update_targets);
+      return;
+    }
+  if (update_targets->count > 2)
+    solv_sort(update_targets->elements, update_targets->count >> 1, 2 * sizeof(Id), transform_update_targets_sortfn, solv);
+  queue_insertn(update_targets, 0, installed->end - installed->start);
+  lastp = 0;
+  for (i = j = installed->end - installed->start; i < update_targets->count; i += 2)
+    {
+      p = update_targets->elements[i];
+      if (p != lastp)
+	{
+	  if (!solv->updatemap.size)
+	    map_grow(&solv->updatemap, installed->end - installed->start);
+	  MAPSET(&solv->updatemap, p - installed->start);
+	  update_targets->elements[j++] = 0;
+	  update_targets->elements[p - installed->start] = j;
+	  lastp = p;
+	}
+      update_targets->elements[j++] = update_targets->elements[i + 1];
+    }
+  queue_truncate(update_targets, j);
+  queue_push(update_targets, 0);
+}
+
+
 /*
  *
  * solve job queue
@@ -2602,6 +2719,11 @@ solver_solve(Solver *solv, Queue *job)
   queue_free(&solv->job);
   queue_init_clone(&solv->job, job);
 
+  if (solv->update_targets)
+    {
+      queue_free(solv->update_targets);
+      solv->update_targets = solv_free(solv->update_targets);
+    }
   /*
    * create basic rule set of all involved packages
    * use addedmap bitmap to make sure we don't create rules twice
@@ -2633,35 +2755,57 @@ solver_solve(Solver *solv, Queue *job)
 	  switch (how & SOLVER_JOBMASK)
 	    {
 	    case SOLVER_VERIFY:
-	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && solv->installed && what == solv->installed->repoid))
+	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
 	        solv->fixmap_all = 1;
 	      FOR_JOB_SELECT(p, pp, select, what)
 		{
 		  s = pool->solvables + p;
-		  if (!solv->installed || s->repo != solv->installed)
+		  if (s->repo != installed)
 		    continue;
 		  if (!solv->fixmap.size)
-		    map_grow(&solv->fixmap, solv->installed->end - solv->installed->start);
-		  MAPSET(&solv->fixmap, p - solv->installed->start);
+		    map_grow(&solv->fixmap, installed->end - installed->start);
+		  MAPSET(&solv->fixmap, p - installed->start);
 		}
 	      break;
 	    case SOLVER_UPDATE:
-	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && solv->installed && what == solv->installed->repoid))
+	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
 		solv->updatemap_all = 1;
-	      FOR_JOB_SELECT(p, pp, select, what)
+	      else if (select == SOLVER_SOLVABLE_REPO && what != installed->repoid)
 		{
-		  s = pool->solvables + p;
-		  if (!solv->installed || s->repo != solv->installed)
-		    continue;
-		  if (!solv->updatemap.size)
-		    map_grow(&solv->updatemap, solv->installed->end - solv->installed->start);
-		  MAPSET(&solv->updatemap, p - solv->installed->start);
+		  Repo *repo = pool_id2repo(pool, what);
+		  if (!repo)
+		    break;
+		  /* targeted update */
+		  FOR_REPO_SOLVABLES(repo, p, s)
+		    add_update_target(solv, p);
+		}
+	      else
+		{
+		  int targeted = 1;
+		  FOR_JOB_SELECT(p, pp, select, what)
+		    {
+		      s = pool->solvables + p;
+		      if (s->repo != installed)
+			continue;
+		      if (!solv->updatemap.size)
+			map_grow(&solv->updatemap, installed->end - installed->start);
+		      MAPSET(&solv->updatemap, p - installed->start);
+		      targeted = 0;
+		    }
+		  if (targeted)
+		    {
+		      FOR_JOB_SELECT(p, pp, select, what)
+			add_update_target(solv, p);
+		    }
 		}
 	      break;
 	    default:
 	      break;
 	    }
 	}
+
+      if (solv->update_targets)
+	transform_update_targets(solv);
 
       oldnrules = solv->nrules;
       FOR_REPO_SOLVABLES(installed, p, s)
@@ -3667,3 +3811,45 @@ pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what)
     }
 }
 
+int
+pool_isemptyupdatejob(Pool *pool, Id how, Id what)
+{
+  Id p, pp, pi, pip;
+  Id select = how & SOLVER_SELECTMASK;
+  if ((how & SOLVER_JOBMASK) != SOLVER_UPDATE)
+    return 0;
+  if (select == SOLVER_SOLVABLE_ALL || select == SOLVER_SOLVABLE_REPO)
+    return 0;
+  if (!pool->installed)
+    return 1;
+  FOR_JOB_SELECT(p, pp, select, what)
+    if (pool->solvables[p].repo == pool->installed)
+      return 0;
+  /* hard work */
+  FOR_JOB_SELECT(p, pp, select, what)
+    {
+      Solvable *s = pool->solvables + p;
+      FOR_PROVIDES(pi, pip, s->name)
+	if (pool->solvables[pi].name == s->name && pool->solvables[pi].repo == pool->installed)
+	  return 0;
+      if (s->obsoletes)
+	{
+	  Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+	  while ((obs = *obsp++) != 0)
+	    {
+	      FOR_PROVIDES(pi, pip, obs) 
+		{
+		  Solvable *si = pool->solvables + pi;
+		  if (si->repo != pool->installed)
+		    continue;
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, si, obs))
+		    continue;
+		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, si))
+		    continue;
+		  return 0;
+		}
+	    }
+	}
+    }
+  return 1;
+}

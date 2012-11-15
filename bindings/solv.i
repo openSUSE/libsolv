@@ -801,6 +801,12 @@ typedef struct {
     pool_job2solvables($self->pool, &q, $self->how, $self->what);
     return q;
   }
+#ifdef SWIGRUBY
+  %rename("isemptyupdate?") isemptyupdate;
+#endif
+  bool isemptyupdate() {
+    return pool_isemptyupdatejob($self->pool, $self->how, $self->what);
+  }
 
   bool __eq__(Job *j) {
     return $self->pool == j->pool && $self->how == j->how && $self->what == j->what;

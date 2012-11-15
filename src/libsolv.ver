@@ -71,6 +71,7 @@ SOLV_1.0 {
 		pool_id2langid;
 		pool_id2rel;
 		pool_id2str;
+		pool_isemptyupdatejob;
 		pool_job2solvables;
 		pool_job2str;
 		pool_lookup_bin_checksum;

@@ -214,6 +214,8 @@ struct _Solver {
 
   Queue *cleandeps_updatepkgs;		/* packages we update in cleandeps mode */
   Queue *cleandeps_mistakes;		/* mistakes we made */
+
+  Queue *update_targets;		/* update to specific packages */
 #endif	/* LIBSOLV_INTERNAL */
 };
 
@@ -326,6 +328,7 @@ int solver_calc_installsizechange(Solver *solv);
 void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
 
 void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
+int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
 
 /* iterate over all literals of a rule */
 /* WARNING: loop body must not relocate whatprovidesdata, e.g. by
