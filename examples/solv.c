@@ -2471,7 +2471,7 @@ main(int argc, char **argv)
   else if (!strcmp(argv[0], "dist-upgrade") || !strcmp(argv[0], "dup"))
     {
       mainmode = MODE_DISTUPGRADE;
-      mode = SOLVER_UPDATE;
+      mode = SOLVER_DISTUPGRADE;
     }
   else if (!strcmp(argv[0], "repos") || !strcmp(argv[0], "repolist") || !strcmp(argv[0], "lr"))
     {
