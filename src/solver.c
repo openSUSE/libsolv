@@ -2605,9 +2605,12 @@ add_update_target(Solver *solv, Id p)
   FOR_PROVIDES(pi, pip, s->name)
     {
       Solvable *si = pool->solvables + pi;
-      if (si->name != s->name || si->repo != installed)
+      if (si->repo != installed || si->name != s->name)
 	continue;
       queue_push2(solv->update_targets, pi, p);
+      /* check if it's ok to keep the installed package */
+      if (s->evr == si->evr && solvable_identical(s, si))
+        queue_push2(solv->update_targets, pi, pi);
     }
   if (s->obsoletes)
     {
@@ -2619,6 +2622,8 @@ add_update_target(Solver *solv, Id p)
 	      Solvable *si = pool->solvables + pi;
 	      if (si->repo != installed)
 		continue;
+	      if (si->name == s->name)
+		continue;	/* already handled above */
 	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, si, obs))
 		continue;
 	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, si))
@@ -3834,8 +3839,12 @@ pool_isemptyupdatejob(Pool *pool, Id how, Id what)
     {
       Solvable *s = pool->solvables + p;
       FOR_PROVIDES(pi, pip, s->name)
-	if (pool->solvables[pi].name == s->name && pool->solvables[pi].repo == pool->installed)
+	{
+	  Solvable *si = pool->solvables + pi;
+	  if (si->repo != pool->installed || si->name != s->name)
+	    continue;
 	  return 0;
+	}
       if (s->obsoletes)
 	{
 	  Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
