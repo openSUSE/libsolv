@@ -2645,7 +2645,7 @@ transform_update_targets(Solver *solv)
   Repo *installed = solv->installed;
   Queue *update_targets = solv->update_targets;
   int i, j;
-  Id p, lastp;
+  Id p, q, lastp, lastq;
 
   if (!update_targets->count)
     {
@@ -2656,23 +2656,27 @@ transform_update_targets(Solver *solv)
   if (update_targets->count > 2)
     solv_sort(update_targets->elements, update_targets->count >> 1, 2 * sizeof(Id), transform_update_targets_sortfn, solv);
   queue_insertn(update_targets, 0, installed->end - installed->start);
-  lastp = 0;
+  lastp = lastq = 0;
   for (i = j = installed->end - installed->start; i < update_targets->count; i += 2)
     {
-      p = update_targets->elements[i];
-      if (p != lastp)
+      if ((p = update_targets->elements[i]) != lastp)
 	{
 	  if (!solv->updatemap.size)
 	    map_grow(&solv->updatemap, installed->end - installed->start);
 	  MAPSET(&solv->updatemap, p - installed->start);
-	  update_targets->elements[j++] = 0;
-	  update_targets->elements[p - installed->start] = j;
+	  update_targets->elements[j++] = 0;			/* finish old set */
+	  update_targets->elements[p - installed->start] = j;	/* start new set */
 	  lastp = p;
+	  lastq = 0;
 	}
-      update_targets->elements[j++] = update_targets->elements[i + 1];
+      if ((q = update_targets->elements[i + 1]) != lastq)
+	{
+          update_targets->elements[j++] = q;
+	  lastq = q;
+	}
     }
   queue_truncate(update_targets, j);
-  queue_push(update_targets, 0);
+  queue_push(update_targets, 0);	/* finish last set */
 }
 
 
