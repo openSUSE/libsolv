@@ -153,7 +153,7 @@ class Repo_generic
   end
 
   def writecachedrepo(ext, info = nil)
-    return if @incomplete && !ext
+    return if @incomplete
     begin
       Dir::mkdir("/var/cache/solv", 0755) unless FileTest.directory?("/var/cache/solv")
       f =  Tempfile.new('.newsolv-', '/var/cache/solv')

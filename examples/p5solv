@@ -147,7 +147,7 @@ sub usecachedrepo {
 
 sub writecachedrepo {
   my ($self, $ext, $info) = @_;
-  return if $self->{'incomplete'} && !$ext;
+  return if $self->{'incomplete'};
   mkdir("/var/cache/solv", 0755) unless -d "/var/cache/solv";
   my ($f, $tmpname);
   eval {

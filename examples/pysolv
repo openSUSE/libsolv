@@ -233,7 +233,7 @@ class repo_generic(dict):
         return True
 
     def writecachedrepo(self, ext, info=None):
-        if not ext and 'incomplete' in self:
+        if 'incomplete' in self:
             return
         try:
             if not os.path.isdir("/var/cache/solv"):

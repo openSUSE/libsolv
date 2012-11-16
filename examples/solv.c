@@ -115,6 +115,7 @@ struct repoinfo {
 
   unsigned char cookie[32];
   unsigned char extcookie[32];
+  int incomplete;
 };
 
 #ifdef FEDORA
@@ -780,7 +781,7 @@ iscompressed(const char *name)
 }
 
 FILE *
-curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype, int *badchecksump)
+curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsigned char *chksum, Id chksumtype, int markincomplete)
 {
   FILE *fp;
   pid_t pid;
@@ -820,7 +821,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
 	      chksumtype = mlchksumtype;
 	      chksum = mlchksum;
 	    }
-	  return curlfopen(cinfo, file, uncompress, chksum, chksumtype, badchecksump);
+	  return curlfopen(cinfo, file, uncompress, chksum, chksumtype, markincomplete);
 	}
       snprintf(url, sizeof(url), "%s", file);
     }
@@ -863,15 +864,15 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
   if (status)
     {
       printf("%s: download error %d\n", file, status >> 8 ? status >> 8 : status);
-      if (badchecksump)
-	*badchecksump = 1;
+      if (markincomplete)
+	cinfo->incomplete = 1;
       close(fd);
       return 0;
     }
   if (chksumtype && !verify_checksum(fd, file, chksum, chksumtype))
     {
-      if (badchecksump)
-	*badchecksump = 1;
+      if (markincomplete)
+	cinfo->incomplete = 1;
       close(fd);
       return 0;
     }
@@ -881,8 +882,8 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       if (solv_xfopen_iscompressed(file) < 0)
 	{
 	  printf("%s: unsupported compression\n", file);
-	  if (badchecksump)
-	    *badchecksump = 1;
+	  if (markincomplete)
+	    cinfo->incomplete = 1;
 	  close(fd);
 	  return 0;
 	}
@@ -1158,6 +1159,8 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
   int onepiece;
 
   cinfo = repo->appdata;
+  if (cinfo && cinfo->incomplete)
+    return;
   mkdir(SOLVCACHE_PATH, 0755);
   /* use dupjoin instead of tmpjoin because tmpl must survive repo_write */
   tmpl = solv_dupjoin(SOLVCACHE_PATH, "/", ".newsolv-XXXXXX");
@@ -1687,7 +1690,6 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 #if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD)
   Repodata *data;
 #endif
-  int badchecksum;
   int dorefresh;
 #if defined(ENABLE_DEBIAN)
   FILE *fpr;
@@ -1780,7 +1782,6 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  printf(" cached\n");
 	  continue;
 	}
-      badchecksum = 0;
       switch (cinfo->type)
 	{
 #ifdef ENABLE_RPMMD
@@ -1815,25 +1816,25 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  fclose(fp);
 	  printf(" fetching\n");
 	  filename = repomd_find(repo, "primary", &filechksum, &filechksumtype);
-	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 1)) != 0)
 	    {
 	      if (repo_add_rpmmd(repo, fp, 0, 0))
 		{
 	          printf("primary: %s\n", pool_errstr(pool));
-		  badchecksum = 1;
+		  cinfo->incomplete = 1;
 		}
 	      fclose(fp);
 	    }
-	  if (badchecksum)
+	  if (cinfo->incomplete)
 	    break;	/* hopeless */
 
 	  filename = repomd_find(repo, "updateinfo", &filechksum, &filechksumtype);
-	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 1)) != 0)
 	    {
 	      if (repo_add_updateinfoxml(repo, fp, 0))
 		{
 	          printf("updateinfo: %s\n", pool_errstr(pool));
-		  badchecksum = 1;
+		  cinfo->incomplete = 1;
 		}
 	      fclose(fp);
 	    }
@@ -1843,7 +1844,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    repomd_add_ext(repo, data, "prestodelta");
 	  repomd_add_ext(repo, data, "filelists");
 	  repodata_internalize(data);
-	  if (!badchecksum)
+	  if (!cinfo->incomplete)
 	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
@@ -1894,12 +1895,13 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      break;
 	    }
 	  printf(" fetching\n");
-	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) == 0)
+	  if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 1)) == 0)
 	    break;	/* hopeless */
 	  if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|SUSETAGS_RECORD_SHARES))
 	    {
 	      printf("packages: %s\n", pool_errstr(pool));
 	      fclose(fp);
+	      cinfo->incomplete = 1;
 	      break;	/* hopeless */
 	    }
 	  fclose(fp);
@@ -1909,12 +1911,12 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	    filename = susetags_find(repo, "packages.en", &filechksum, &filechksumtype);
 	  if (filename)
 	    {
-	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 1)) != 0)
 		{
 		  if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|REPO_REUSE_REPODATA|REPO_EXTEND_SOLVABLES))
 		    {
 		      printf("packages.en: %s\n", pool_errstr(pool));
-		      badchecksum = 1;
+		      cinfo->incomplete = 1;
 		    }
 		  fclose(fp);
 		}
@@ -1922,7 +1924,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  filename = susetags_find(repo, "patterns", &filechksum, &filechksumtype);
 	  if (filename)
 	    {
-	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+	      if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 1)) != 0)
 		{
 		  char pbuf[256];
 		  while (fgets(pbuf, sizeof(pbuf), fp))
@@ -1934,12 +1936,12 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 		      if (!*pbuf || *pbuf == '.' || strchr(pbuf, '/') != 0)
 			continue;
 		      filename = susetags_find(repo, pbuf, &filechksum, &filechksumtype);
-		      if (filename && (fp2 = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+		      if (filename && (fp2 = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 1)) != 0)
 			{
 			  if (repo_add_susetags(repo, fp2, defvendor, 0, REPO_NO_INTERNALIZE))
 			    {
 			      printf("%s: %s\n", pbuf, pool_errstr(pool));
-			      badchecksum = 1;
+			      cinfo->incomplete = 1;
 			    }
 			  fclose(fp2);
 			}
@@ -1951,7 +1953,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  data = repo_add_repodata(repo, 0);
 	  susetags_add_ext(repo, data);
 	  repodata_internalize(data);
-	  if (!badchecksum)
+	  if (!cinfo->incomplete)
 	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  repodata_create_stubs(repo_last_repodata(repo));
 	  break;
@@ -1997,12 +1999,12 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 		  printf("[component %s not found]\n", cinfo->components[j]);
 		  continue;
 		}
-	      if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, &badchecksum)) != 0)
+	      if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 1)) != 0)
 		{
 	          if (repo_add_debpackages(repo, fp, 0))
 		    {
 		      printf("component %s: %s\n", cinfo->components[j], pool_errstr(pool));
-		      badchecksum = 1;
+		      cinfo->incomplete = 1;
 		    }
 		  fclose(fp);
 		}
@@ -2010,7 +2012,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      solv_free((char *)filename);
 	    }
 	  fclose(fpr);
-	  if (!badchecksum)
+	  if (!cinfo->incomplete)
 	    writecachedrepo(repo, 0, 0, cinfo->cookie);
 	  break;
 #endif
@@ -2272,6 +2274,9 @@ rewrite_repos(Pool *pool, Queue *addedfileprovides, Queue *addedfileprovides_ins
       /* make sure all repodatas but the first are extensions */
       if (repo->nrepodata < 2)
 	continue;
+      cinfo = repo->appdata;
+      if (cinfo && cinfo->incomplete)
+	continue;
       data = repo_id2repodata(repo, 1);
       if (data->loadcallback)
         continue;
@@ -2310,7 +2315,6 @@ rewrite_repos(Pool *pool, Queue *addedfileprovides, Queue *addedfileprovides_ins
 	}
       repodata_set_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, repo == pool->installed && addedfileprovides_inst ? addedfileprovides_inst : addedfileprovides);
       repodata_internalize(data);
-      cinfo = repo->appdata;
       writecachedrepo(repo, data, 0, cinfo ? cinfo->cookie : installedcookie);
     }
   queue_free(&fileprovidesq);
