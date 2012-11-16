@@ -733,17 +733,17 @@ policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
       if (is->name == s->name && pool_evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE) > 0)
 	ret |= POLICY_ILLEGAL_DOWNGRADE;
     }
-  if (!(ignore & POLICY_ILLEGAL_ARCHCHANGE) && !(duppkg ? solv->dup_allowarchchange : !solv->allowarchchange))
+  if (!(ignore & POLICY_ILLEGAL_ARCHCHANGE) && !(duppkg ? solv->dup_allowarchchange : solv->allowarchchange))
     {
       if (is->arch != s->arch && policy_illegal_archchange(solv, is, s))
 	ret |= POLICY_ILLEGAL_ARCHCHANGE;
     }
-  if (!(ignore & POLICY_ILLEGAL_VENDORCHANGE) && !(duppkg ? solv->dup_allowvendorchange : !solv->allowvendorchange))
+  if (!(ignore & POLICY_ILLEGAL_VENDORCHANGE) && !(duppkg ? solv->dup_allowvendorchange : solv->allowvendorchange))
     {
       if (is->vendor != s->vendor && policy_illegal_vendorchange(solv, is, s))
 	ret |= POLICY_ILLEGAL_VENDORCHANGE;
     }
-  if (!(ignore & POLICY_ILLEGAL_NAMECHANGE) && !(duppkg ? solv->dup_allownamechange : !solv->allownamechange))
+  if (!(ignore & POLICY_ILLEGAL_NAMECHANGE) && !(duppkg ? solv->dup_allownamechange : solv->allownamechange))
     {
       if (is->name != s->name)
 	ret |= POLICY_ILLEGAL_NAMECHANGE;
