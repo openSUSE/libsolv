@@ -2426,6 +2426,7 @@ main(int argc, char **argv)
   Queue addedfileprovides_inst;
   Queue repofilter;
   int cleandeps = 0;
+  int forcebest = 0;
   char *rootdir = 0;
 
   argc--;
@@ -2497,6 +2498,12 @@ main(int argc, char **argv)
       else if (argc > 1 && !strcmp(argv[1], "--clean"))
 	{
 	  cleandeps = 1;
+	  argc--;
+	  argv++;
+	}
+      else if (argc > 1 && !strcmp(argv[1], "--best"))
+	{
+	  forcebest = 1;
 	  argc--;
 	  argv++;
 	}
@@ -2782,6 +2789,8 @@ main(int argc, char **argv)
 	job.elements[i] ^= SOLVER_UPDATE ^ SOLVER_INSTALL;
       if (cleandeps)
         job.elements[i] |= SOLVER_CLEANDEPS;
+      if (forcebest)
+        job.elements[i] |= SOLVER_FORCEBEST;
     }
 
   // multiversion test
@@ -2805,6 +2814,7 @@ rerunsolver:
       solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
       if (mainmode == MODE_ERASE)
         solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);	/* don't nag */
+      solver_set_flag(solv, SOLVER_FLAG_BEST_OBEY_POLICY, 1);
 
       if (!solver_solve(solv, &job))
 	break;
