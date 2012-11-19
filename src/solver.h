@@ -113,6 +113,10 @@ struct _Solver {
   Id duprules;				/* dist upgrade rules */
   Id duprules_end;
     
+  Id bestrules;				/* rules from SOLVER_FORCEBEST */
+  Id bestrules_end;
+  Id *bestrules_pkg;
+
   Id choicerules;			/* choice rules (always weak) */
   Id choicerules_end;
   Id *choicerules_ref;
@@ -125,6 +129,9 @@ struct _Solver {
 
   Map updatemap;			/* bring these installed packages to the newest version */
   int updatemap_all;			/* bring all packages to the newest version */
+
+  Map bestupdatemap;			/* create best rule for those packages */
+  int bestupdatemap_all;		/* bring all packages to the newest version */
 
   Map fixmap;				/* fix these packages */
   int fixmap_all;			/* fix all packages */
@@ -195,6 +202,7 @@ struct _Solver {
   
   int noinfarchcheck;			/* true: do not forbid inferior architectures */
   int keepexplicitobsoletes;		/* true: honor obsoletes during multiinstall */
+  int bestobeypolicy;			/* true: stay in policy with the best rules */
 
     
   Map dupmap;				/* dup these packages*/
@@ -296,6 +304,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_NO_INFARCHCHECK		9
 #define SOLVER_FLAG_ALLOW_NAMECHANGE		10
 #define SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES	11
+#define SOLVER_FLAG_BEST_OBEY_POLICY		12
 
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);

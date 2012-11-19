@@ -1438,6 +1438,7 @@ solver_free(Solver *solv)
   map_free(&solv->noobsoletes);
 
   map_free(&solv->updatemap);
+  map_free(&solv->bestupdatemap);
   map_free(&solv->fixmap);
   map_free(&solv->dupmap);
   map_free(&solv->dupinvolvedmap);
@@ -1451,6 +1452,7 @@ solver_free(Solver *solv)
   solv_free(solv->obsoletes_data);
   solv_free(solv->multiversionupdaters);
   solv_free(solv->choicerules_ref);
+  solv_free(solv->bestrules_pkg);
   solv_free(solv);
 }
 
@@ -1481,6 +1483,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->noinfarchcheck;
   case SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES:
     return solv->keepexplicitobsoletes;
+  case SOLVER_FLAG_BEST_OBEY_POLICY:
+    return solv->bestobeypolicy;
   default:
     break;
   }
@@ -1525,6 +1529,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES:
     solv->keepexplicitobsoletes = value;
+    break;
+  case SOLVER_FLAG_BEST_OBEY_POLICY:
+    solv->bestobeypolicy = value;
     break;
   default:
     break;
@@ -2591,7 +2598,7 @@ solver_addjobrule(Solver *solv, Id p, Id d, Id job, int weak)
 }
 
 static void
-add_update_target(Solver *solv, Id p)
+add_update_target(Solver *solv, Id p, Id how)
 {
   Pool *pool = solv->pool;
   Solvable *s = pool->solvables + p;
@@ -2607,6 +2614,12 @@ add_update_target(Solver *solv, Id p)
       Solvable *si = pool->solvables + pi;
       if (si->repo != installed || si->name != s->name)
 	continue;
+      if (how & SOLVER_FORCEBEST)
+	{
+	  if (!solv->bestupdatemap.size)
+	    map_grow(&solv->bestupdatemap, installed->end - installed->start);
+	  MAPSET(&solv->bestupdatemap, pi - installed->start);
+	}
       queue_push2(solv->update_targets, pi, p);
       /* check if it's ok to keep the installed package */
       if (s->evr == si->evr && solvable_identical(s, si))
@@ -2628,6 +2641,12 @@ add_update_target(Solver *solv, Id p)
 		continue;
 	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, si))
 		continue;
+	      if (how & SOLVER_FORCEBEST)
+		{
+		  if (!solv->bestupdatemap.size)
+		    map_grow(&solv->bestupdatemap, installed->end - installed->start);
+		  MAPSET(&solv->bestupdatemap, pi - installed->start);
+		}
 	      queue_push2(solv->update_targets, pi, p);
 	    }
 	}
@@ -2706,6 +2725,7 @@ solver_solve(Solver *solv, Queue *job)
   Rule *r;
   int now, solve_start;
   int hasdupjob = 0;
+  int hasbestinstalljob = 0;
 
   solve_start = solv_timems(0);
 
@@ -2778,7 +2798,11 @@ solver_solve(Solver *solv, Queue *job)
 	      break;
 	    case SOLVER_UPDATE:
 	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
-		solv->updatemap_all = 1;
+		{
+		  solv->updatemap_all = 1;
+		  if (how & SOLVER_FORCEBEST)
+		    solv->bestupdatemap_all = 1;
+		}
 	      else if (select == SOLVER_SOLVABLE_REPO && what != installed->repoid)
 		{
 		  Repo *repo = pool_id2repo(pool, what);
@@ -2786,7 +2810,7 @@ solver_solve(Solver *solv, Queue *job)
 		    break;
 		  /* targeted update */
 		  FOR_REPO_SOLVABLES(repo, p, s)
-		    add_update_target(solv, p);
+		    add_update_target(solv, p, how);
 		}
 	      else
 		{
@@ -2799,12 +2823,18 @@ solver_solve(Solver *solv, Queue *job)
 		      if (!solv->updatemap.size)
 			map_grow(&solv->updatemap, installed->end - installed->start);
 		      MAPSET(&solv->updatemap, p - installed->start);
+		      if (how & SOLVER_FORCEBEST)
+			{
+			  if (!solv->bestupdatemap.size)
+			    map_grow(&solv->bestupdatemap, installed->end - installed->start);
+			  MAPSET(&solv->bestupdatemap, p - installed->start);
+			}
 		      targeted = 0;
 		    }
 		  if (targeted)
 		    {
 		      FOR_JOB_SELECT(p, pp, select, what)
-			add_update_target(solv, p);
+			add_update_target(solv, p, how);
 		    }
 		}
 	      break;
@@ -2852,6 +2882,8 @@ solver_solve(Solver *solv, Queue *job)
 	    {
 	      solv->dupmap_all = 1;
 	      solv->updatemap_all = 1;
+	      if (how & SOLVER_FORCEBEST)
+		solv->bestupdatemap_all = 1;
 	    }
 	  if (!solv->dupmap_all)
 	    hasdupjob = 1;
@@ -3022,6 +3054,8 @@ solver_solve(Solver *solv, Queue *job)
 	      d = !q.count ? 0 : pool_queuetowhatprovides(pool, &q);	/* internalize */
 	    }
 	  solver_addjobrule(solv, p, d, i, weak);
+          if (how & SOLVER_FORCEBEST)
+	    hasbestinstalljob = 1;
 	  break;
 	case SOLVER_ERASE:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %s%serase %s\n", weak ? "weak " : "", how & SOLVER_CLEANDEPS ? "clean deps " : "", solver_select2str(pool, select, what));
@@ -3210,11 +3244,21 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->duprules = solv->duprules_end = solv->nrules;
 
+  if (solv->bestupdatemap_all || solv->bestupdatemap.size || hasbestinstalljob)
+    solver_addbestrules(solv, hasbestinstalljob);
+  else
+    solv->bestrules = solv->bestrules_end = solv->nrules;
+
   if (1)
     solver_addchoicerules(solv);
   else
     solv->choicerules = solv->choicerules_end = solv->nrules;
 
+  if (0)
+    {
+      for (i = solv->featurerules; i < solv->nrules; i++)
+        solver_printruleclass(solv, SOLV_DEBUG_RESULT, solv->rules + i);
+    }
   /* all rules created
    * --------------------------------------------------------------
    * prepare for solving
@@ -3225,7 +3269,7 @@ solver_solve(Solver *solv, Queue *job)
   map_free(&installcandidatemap);
   queue_free(&q);
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "%d rpm rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules\n", solv->rpmrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "%d rpm rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules\n", solv->rpmrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules, solv->bestrules_end - solv->bestrules);
   POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */

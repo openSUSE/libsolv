@@ -434,14 +434,11 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
       Id p, *dp, rp = 0;
       Rule *rr;
 
-      assert(why >= solv->updaterules && why < solv->updaterules_end);
       /* check if this is a false positive, i.e. the update rule is fulfilled */
       rr = solv->rules + why;
       FOR_RULELITERALS(p, dp, rr)
 	if (p > 0 && solv->decisionmap[p] > 0)
-	  break;
-      if (p)
-	return;		/* false alarm */
+	  return;	/* false alarm */
 
       p = solv->installed->start + (why - solv->updaterules);
       rr = solv->rules + solv->featurerules + (why - solv->updaterules);
@@ -478,6 +475,51 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	}
       queue_push(solutionq, p);
       queue_push(solutionq, rp);
+      return;
+    }
+  if (why >= solv->bestrules && why < solv->bestrules_end)
+    {
+      int mvrp;
+      Id p, *dp, rp = 0;
+      Rule *rr;
+      /* check false positive */
+      rr = solv->rules + why;
+      FOR_RULELITERALS(p, dp, rr)
+	if (p > 0 && solv->decisionmap[p] > 0)
+	  return;	/* false alarm */
+      /* check update/feature rule */
+      p = solv->bestrules_pkg[why - solv->bestrules];
+      if (p < 0)
+	{
+	  /* install job */
+	  queue_push(solutionq, 0);
+	  queue_push(solutionq, solv->ruletojob.elements[-p - solv->jobrules] + 1);
+	  return;
+	}
+      rr = solv->rules + solv->featurerules + (p - solv->installed->start);
+      if (!rr->p)
+	rr = solv->rules + solv->updaterules + (p - solv->installed->start);
+      mvrp = 0;		/* multi-version replacement */
+      FOR_RULELITERALS(rp, dp, rr)
+	if (rp > 0 && solv->decisionmap[rp] > 0)
+	  {
+	    mvrp = rp;
+	    if (!(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, rp)))
+	      break;
+	  }
+      if (!rp && mvrp)
+	{
+	  queue_push(solutionq, SOLVER_SOLUTION_BEST);	/* split, see above */
+	  queue_push(solutionq, mvrp);
+	  queue_push(solutionq, p);
+	  queue_push(solutionq, 0);
+	  return;
+	}
+      if (rp)
+	{
+	  queue_push(solutionq, SOLVER_SOLUTION_BEST);
+	  queue_push(solutionq, rp);
+	}
       return;
     }
 }
@@ -722,6 +764,8 @@ solver_solutionelement_extrajobflags(Solver *solv, Id problem, Id solution)
  *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
  *    SOLVER_SOLUTION_DISTUPGRADE   pkgid
  *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
+ *    SOLVER_SOLUTION_BEST          pkgid
+ *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
  *    SOLVER_SOLUTION_JOB           jobidx
  *    -> remove job (jobidx - 1, jobidx) from job queue
  *    pkgid (> 0)                   0
@@ -823,7 +867,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
       assert(rid > 0);
       if (rid >= solv->learntrules)
 	findproblemrule_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], &lreqr, &lconr, &lsysr, &ljobr);
-      else if ((rid >= solv->jobrules && rid < solv->jobrules_end) || (rid >= solv->infarchrules && rid < solv->infarchrules_end) || (rid >= solv->duprules && rid < solv->duprules_end))
+      else if ((rid >= solv->jobrules && rid < solv->jobrules_end) || (rid >= solv->infarchrules && rid < solv->infarchrules_end) || (rid >= solv->duprules && rid < solv->duprules_end) || (rid >= solv->bestrules && rid < solv->bestrules_end))
 	{
 	  if (!*jobrp)
 	    *jobrp = rid;

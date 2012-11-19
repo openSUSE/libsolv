@@ -65,7 +65,8 @@ typedef enum {
   SOLVER_RULE_DISTUPGRADE = 0x500,
   SOLVER_RULE_INFARCH = 0x600,
   SOLVER_RULE_CHOICE = 0x700,
-  SOLVER_RULE_LEARNT = 0x800
+  SOLVER_RULE_LEARNT = 0x800,
+  SOLVER_RULE_BEST = 0x900
 } SolverRuleinfo;
 
 #define SOLVER_RULE_TYPEMASK    0xff00
@@ -117,6 +118,9 @@ extern void solver_addduprules(struct _Solver *solv, Map *addedmap);
 /* choice rules */
 extern void solver_addchoicerules(struct _Solver *solv);
 extern void solver_disablechoicerules(struct _Solver *solv, Rule *r);
+
+/* best rules */
+extern void solver_addbestrules(struct _Solver *solv, int havebestinstalljobs);
 
 /* policy rule disabling/reenabling */
 extern void solver_disablepolicyrules(struct _Solver *solv);

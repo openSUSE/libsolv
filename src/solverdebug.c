@@ -206,6 +206,8 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
       POOL_DEBUG(type, "WEAK ");
   if (solv->learntrules && p >= solv->learntrules)
     POOL_DEBUG(type, "LEARNT ");
+  else if (p >= solv->bestrules && p < solv->bestrules_end)
+    POOL_DEBUG(type, "BEST ");
   else if (p >= solv->choicerules && p < solv->choicerules_end)
     POOL_DEBUG(type, "CHOICE ");
   else if (p >= solv->infarchrules && p < solv->infarchrules_end)
@@ -601,6 +603,7 @@ solver_printproblemruleinfo(Solver *solv, Id probr)
     case SOLVER_RULE_FEATURE:
     case SOLVER_RULE_LEARNT:
     case SOLVER_RULE_CHOICE:
+    case SOLVER_RULE_BEST:
       POOL_DEBUG(SOLV_DEBUG_RESULT, "bad rule type\n");
       return;
     }
@@ -700,6 +703,14 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
 	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  - keep obsolete %s\n", pool_solvable2str(pool, s));
 	  else
 	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  - install %s from excluded repository\n", pool_solvable2str(pool, s));
+	}
+      else if (p == SOLVER_SOLUTION_BEST)
+	{
+	  s = pool->solvables + rp;
+	  if (solv->installed && s->repo == solv->installed)
+	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  - keep old %s\n", pool_solvable2str(pool, s));
+	  else
+	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  - install %s despite the old version\n", pool_solvable2str(pool, s));
 	}
       else
 	{
@@ -1047,6 +1058,14 @@ solver_solutionelement2str(Solver *solv, Id p, Id rp)
         return pool_tmpjoin(pool, "keep obsolete ", pool_solvable2str(pool, s), 0);
       else
         return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " from excluded repository");
+    }
+  else if (p == SOLVER_SOLUTION_BEST)
+    {
+      Solvable *s = pool->solvables + rp;
+      if (solv->installed && s->repo == solv->installed)
+        return pool_tmpjoin(pool, "keep old ", pool_solvable2str(pool, s), 0);
+      else
+        return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " despite the old version");
     }
   else if (p > 0 && rp == 0)
     return pool_tmpjoin(pool, "allow deinstallation of ", pool_solvid2str(pool, p), 0);

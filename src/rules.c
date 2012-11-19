@@ -958,6 +958,13 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	    }
 	  qs.count = j;
 	}
+      else if (p != -SYSTEMSOLVABLE)
+	{
+	  /* could fallthrough, but then we would do pool_queuetowhatprovides twice */
+	  queue_free(&qs);
+	  solver_addrule(solv, p, d);	/* allow update of s */
+	  return;
+	}
     }
   if (qs.count && p == -SYSTEMSOLVABLE)
     p = queue_shift(&qs);
@@ -978,6 +985,14 @@ disableupdaterule(Solver *solv, Id p)
   r = solv->rules + solv->featurerules + (p - solv->installed->start);
   if (r->p && r->d >= 0)
     solver_disablerule(solv, r);
+  if (solv->bestrules_pkg)
+    {
+      int i, ni;
+      ni = solv->bestrules_end - solv->bestrules;
+      for (i = 0; i < ni; i++)
+	if (solv->bestrules_pkg[i] == p)
+	  solver_disablerule(solv, solv->rules + solv->bestrules + i);
+    }
 }
 
 static inline void 
@@ -990,25 +1005,36 @@ reenableupdaterule(Solver *solv, Id p)
   r = solv->rules + solv->updaterules + (p - solv->installed->start);
   if (r->p)
     {    
-      if (r->d >= 0)
-	return;
-      solver_enablerule(solv, r);
-      IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+      if (r->d > 0)
 	{
-	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-	  solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
+	  solver_enablerule(solv, r);
+	  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+	    {
+	      POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	      solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
+	    }
 	}
-      return;
     }
-  r = solv->rules + solv->featurerules + (p - solv->installed->start);
-  if (r->p && r->d < 0)
+  else
     {
-      solver_enablerule(solv, r);
-      IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+      r = solv->rules + solv->featurerules + (p - solv->installed->start);
+      if (r->p && r->d < 0)
 	{
-	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
-	  solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
+	  solver_enablerule(solv, r);
+	  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+	    {
+	      POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	      solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
+	    }
 	}
+    }
+  if (solv->bestrules_pkg)
+    {
+      int i, ni;
+      ni = solv->bestrules_end - solv->bestrules;
+      for (i = 0; i < ni; i++)
+	if (solv->bestrules_pkg[i] == p)
+	  solver_enablerule(solv, solv->rules + solv->bestrules + i);
     }
 }
 
@@ -1159,6 +1185,7 @@ solver_createdupmaps(Solver *solv)
   Queue *job = &solv->job;
   Pool *pool = solv->pool;
   Repo *repo;
+  Repo *installed = solv->installed;
   Id select, how, what, p, pi, pp, pip, obs, *obsp;
   Solvable *s, *ps;
   int i;
@@ -1177,10 +1204,10 @@ solver_createdupmaps(Solver *solv)
 	    {
 	      int haveinstalled;
 	      p = 0;
-	      if (solv->installed)
+	      if (installed)
 		{
 		  FOR_JOB_SELECT(p, pp, select, what)
-		    if (pool->solvables[p].repo == solv->installed)
+		    if (pool->solvables[p].repo == installed)
 		      break;
 		}
 	      haveinstalled = p != 0;
@@ -1189,9 +1216,9 @@ solver_createdupmaps(Solver *solv)
 		  Solvable *s = pool->solvables + p;
 		  if (!s->repo)
 		    continue;
-		  if (haveinstalled && s->repo != solv->installed)
+		  if (haveinstalled && s->repo != installed)
 		    continue;
-		  if (s->repo != solv->installed && !pool_installable(pool, s))
+		  if (s->repo != installed && !pool_installable(pool, s))
 		    continue;
 		  MAPSET(&solv->dupinvolvedmap, p);
 		  if (!haveinstalled)
@@ -1202,18 +1229,24 @@ solver_createdupmaps(Solver *solv)
 		      if (ps->name != s->name)
 			continue;
 		      MAPSET(&solv->dupinvolvedmap, pi);
-		      if (haveinstalled && ps->repo != solv->installed)
+		      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+			{
+			  if (!solv->bestupdatemap.size)
+			    map_grow(&solv->bestupdatemap, installed->end - installed->start);
+			  MAPSET(&solv->bestupdatemap, pi - installed->start);
+			}
+		      if (haveinstalled && ps->repo != installed)
 		        MAPSET(&solv->dupmap, pi);
 		    }
 		  if (haveinstalled)
 		    {
-		      if (solv->obsoletes && solv->obsoletes[p - solv->installed->start])
+		      if (solv->obsoletes && solv->obsoletes[p - installed->start])
 			{
 			  Id *opp;
-			  for (opp = solv->obsoletes_data + solv->obsoletes[p - solv->installed->start]; (pi = *opp++) != 0;)
+			  for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (pi = *opp++) != 0;)
 			    {
 			      ps = pool->solvables + pi;
-			      if (ps->repo == solv->installed)
+			      if (ps->repo == installed)
 				continue;
 			      MAPSET(&solv->dupinvolvedmap, pi);
 			      MAPSET(&solv->dupmap, pi);
@@ -1228,12 +1261,18 @@ solver_createdupmaps(Solver *solv)
 			{
 			  FOR_PROVIDES(pi, pp, obs)
 			    {
-			      Solvable *pis = pool->solvables + pi;
-			      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pis, obs))
+			      Solvable *ps = pool->solvables + pi;
+			      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
 				continue;
-			      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, pis))
+			      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 				continue;
 			      MAPSET(&solv->dupinvolvedmap, pi);
+			      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+				{
+				  if (!solv->bestupdatemap.size)
+				    map_grow(&solv->bestupdatemap, installed->end - installed->start);
+				  MAPSET(&solv->bestupdatemap, pi - installed->start);
+				}
 			    }
 			}
 		    }
@@ -1245,7 +1284,7 @@ solver_createdupmaps(Solver *solv)
 	  repo = pool_id2repo(pool, what);
 	  FOR_REPO_SOLVABLES(repo, p, s)
 	    {
-	      if (repo != solv->installed && !pool_installable(pool, s))
+	      if (repo != installed && !pool_installable(pool, s))
 		continue;
 	      MAPSET(&solv->dupmap, p);
 	      FOR_PROVIDES(pi, pip, s->name)
@@ -1254,6 +1293,12 @@ solver_createdupmaps(Solver *solv)
 		  if (ps->name != s->name)
 		    continue;
 		  MAPSET(&solv->dupinvolvedmap, pi);
+		  if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+		    {
+		      if (!solv->bestupdatemap.size)
+			map_grow(&solv->bestupdatemap, installed->end - installed->start);
+		      MAPSET(&solv->bestupdatemap, pi - installed->start);
+		    }
 		}
 	      if (s->obsoletes)
 		{
@@ -1263,12 +1308,18 @@ solver_createdupmaps(Solver *solv)
 		    {
 		      FOR_PROVIDES(pi, pp, obs)
 			{
-			  Solvable *pis = pool->solvables + pi;
-			  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pis, obs))
+			  Solvable *ps = pool->solvables + pi;
+			  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
 			    continue;
-			  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, pis))
+			  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 			    continue;
 		          MAPSET(&solv->dupinvolvedmap, pi);
+			  if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+			    {
+			      if (!solv->bestupdatemap.size)
+				map_grow(&solv->bestupdatemap, installed->end - installed->start);
+			      MAPSET(&solv->bestupdatemap, pi - installed->start);
+			    }
 			}
 		    }
 		}
@@ -2102,6 +2153,10 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*depp = pool->solvables[-r->p].name;
       return SOLVER_RULE_INFARCH;
     }
+  if (rid >= solv->bestrules && rid < solv->bestrules_end)
+    {
+      return SOLVER_RULE_BEST;
+    }
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     {
       return SOLVER_RULE_CHOICE;
@@ -2130,6 +2185,8 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_DISTUPGRADE;
   if (rid >= solv->infarchrules && rid < solv->infarchrules_end)
     return SOLVER_RULE_INFARCH;
+  if (rid >= solv->bestrules && rid < solv->bestrules_end)
+    return SOLVER_RULE_BEST;
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
   if (rid >= solv->learntrules)
@@ -2373,6 +2430,129 @@ solver_disablechoicerules(Solver *solv, Rule *r)
       if (p)
 	solver_disablerule(solv, r);
     }
+}
+
+void
+solver_addbestrules(Solver *solv, int havebestinstalljobs)
+{
+  Pool *pool = solv->pool;
+  Id p;
+  Solvable *s;
+  Repo *installed = solv->installed;
+  Queue q, q2;
+  Rule *r;
+  Queue r2pkg;
+  int i, oldcnt;
+
+  solv->bestrules = solv->nrules;
+  if (!installed)
+    {
+      solv->bestrules_end = solv->nrules;
+      return;
+    }
+  queue_init(&q);
+  queue_init(&q2);
+  queue_init(&r2pkg);
+
+  if (havebestinstalljobs)
+    {
+      for (i = 0; i < solv->job.count; i += 2)
+	{
+	  if ((solv->job.elements[i] & (SOLVER_JOBMASK | SOLVER_FORCEBEST)) == (SOLVER_INSTALL | SOLVER_FORCEBEST))
+	    {
+	      int j;
+	      Id p2, *pp2;
+	      for (j = 0; j < solv->ruletojob.count; j++)
+		if (solv->ruletojob.elements[j] == i)
+		  break;
+	      if (j == solv->ruletojob.count)
+		continue;
+	      r = solv->rules + solv->jobrules + j;
+	      queue_empty(&q);
+	      FOR_RULELITERALS(p2, pp2, r)
+		if (p2 > 0)
+		  queue_push(&q, p2);
+	      if (!q.count)
+		continue;	/* orphaned */
+	      /* select best packages, just look at prio and version */
+	      oldcnt = q.count;
+	      policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
+	      if (q.count == oldcnt)
+		continue;	/* nothing filtered */
+	      p2 = queue_shift(&q);
+	      solver_addrule(solv, p2, q.count ? pool_queuetowhatprovides(pool, &q) : 0);
+	      queue_push(&r2pkg, -(solv->jobrules + j));
+	    }
+	}
+    }
+
+  if (solv->bestupdatemap_all || solv->bestupdatemap.size)
+    {
+      FOR_REPO_SOLVABLES(installed, p, s)
+	{
+	  Id d, p2, *pp2;
+	  if (!solv->updatemap_all && (!solv->updatemap.size || !MAPTST(&solv->updatemap, p - installed->start)))
+	    continue;
+	  if (!solv->bestupdatemap_all && (!solv->bestupdatemap.size || !MAPTST(&solv->bestupdatemap, p - installed->start)))
+	    continue;
+	  queue_empty(&q);
+	  if (solv->bestobeypolicy)
+	    r = solv->rules + solv->updaterules + (p - installed->start);
+	  else
+	    {
+	      r = solv->rules + solv->featurerules + (p - installed->start);
+	      if (!r->p)	/* identical to update rule? */
+		r = solv->rules + solv->updaterules + (p - installed->start);
+	    }
+	  if (solv->multiversionupdaters && (d = solv->multiversionupdaters[p - installed->start]) != 0 && r == solv->rules + solv->updaterules + (p - installed->start))
+	    {
+	      /* need to check multiversionupdaters */
+	      if (r->p == p)	/* be careful with the dup case */
+		queue_push(&q, p);
+	      while ((p2 = pool->whatprovidesdata[d++]) != 0)
+		queue_push(&q, p2);
+	    }
+	  else
+	    {
+	      FOR_RULELITERALS(p2, pp2, r)
+		if (p2 > 0)
+		  queue_push(&q, p2);
+	    }
+	  /* select best packages, just look at prio and version */
+	  oldcnt = q.count;
+	  policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
+	  if (!q.count)
+	    continue;	/* orphaned */
+	  if (solv->bestobeypolicy)
+	    {
+	      /* also filter the best of the feature rule packages and add them */
+	      r = solv->rules + solv->featurerules + (p - installed->start);
+	      if (r->p)
+		{
+		  int j;
+		  queue_empty(&q2);
+		  FOR_RULELITERALS(p2, pp2, r)
+		    if (p2 > 0)
+		      queue_push(&q2, p2);
+		  policy_filter_unwanted(solv, &q2, POLICY_MODE_RECOMMEND);
+		  for (j = 0; j < q2.count; j++)
+		    queue_pushunique(&q, q2.elements[j]);
+		}
+	    }
+	  p2 = queue_shift(&q);
+	  solver_addrule(solv, p2, q.count ? pool_queuetowhatprovides(pool, &q) : 0);
+	  queue_push(&r2pkg, p);
+	}
+    }
+  if (r2pkg.count)
+    {
+      solv->bestrules_pkg = solv_calloc(r2pkg.count, sizeof(Id));
+      memcpy(solv->bestrules_pkg, r2pkg.elements, r2pkg.count * sizeof(Id));
+    }
+  solv->bestrules_end = solv->nrules;
+  queue_free(&q);
+  queue_free(&q2);
+  queue_free(&r2pkg);
 }
 
 #undef CLEANDEPSDEBUG
