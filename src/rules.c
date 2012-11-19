@@ -1005,7 +1005,7 @@ reenableupdaterule(Solver *solv, Id p)
   r = solv->rules + solv->updaterules + (p - solv->installed->start);
   if (r->p)
     {    
-      if (r->d > 0)
+      if (r->d < 0)
 	{
 	  solver_enablerule(solv, r);
 	  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
