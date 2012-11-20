@@ -1385,6 +1385,8 @@ solver_addduprules(Solver *solv, Map *addedmap)
 		    }
 		  if (!ip)
 		    solver_addrule(solv, -p, 0);	/* no match, sorry */
+		  else
+		    MAPSET(&solv->dupmap, p);		/* for best rules processing */
 		}
 	    }
 	  else if (!MAPTST(&solv->dupmap, p))
@@ -2432,6 +2434,37 @@ solver_disablechoicerules(Solver *solv, Rule *r)
     }
 }
 
+static void
+prune_to_update_targets(Solver *solv, Id *cp, Queue *q)
+{
+  int i, j;
+  Id p, *cp2; 
+  for (i = j = 0; i < q->count; i++)
+    {  
+      p = q->elements[i];
+      for (cp2 = cp; *cp2; cp2++)
+        if (*cp2 == p)
+          {
+            q->elements[j++] = p;
+            break;
+          }
+    }
+  queue_truncate(q, j);
+}
+
+static void
+prune_to_dup_packages(Solver *solv, Id p, Queue *q)
+{
+  int i, j;
+  for (i = j = 0; i < q->count; i++)
+    {
+      Id p = q->elements[i];
+      if (MAPTST(&solv->dupmap, p))
+	q->elements[j++] = p;
+    }
+  queue_truncate(q, j);
+}
+
 void
 solver_addbestrules(Solver *solv, int havebestinstalljobs)
 {
@@ -2518,8 +2551,11 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		if (p2 > 0)
 		  queue_push(&q, p2);
 	    }
+	  if (solv->update_targets && solv->update_targets->elements[p - installed->start])
+	    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[p - installed->start], &q);
+	  if (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
+	    prune_to_dup_packages(solv, p, &q);
 	  /* select best packages, just look at prio and version */
-	  oldcnt = q.count;
 	  policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
 	  if (!q.count)
 	    continue;	/* orphaned */
@@ -2534,6 +2570,10 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		  FOR_RULELITERALS(p2, pp2, r)
 		    if (p2 > 0)
 		      queue_push(&q2, p2);
+		  if (solv->update_targets && solv->update_targets->elements[p - installed->start])
+		    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[p - installed->start], &q2);
+		  if (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
+		    prune_to_dup_packages(solv, p, &q);
 		  policy_filter_unwanted(solv, &q2, POLICY_MODE_RECOMMEND);
 		  for (j = 0; j < q2.count; j++)
 		    queue_pushunique(&q, q2.elements[j]);

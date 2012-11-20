@@ -441,9 +441,6 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	  return;	/* false alarm */
 
       p = solv->installed->start + (why - solv->updaterules);
-      rr = solv->rules + solv->featurerules + (why - solv->updaterules);
-      if (!rr->p)
-	rr = solv->rules + why;
       if (solv->dupmap_all && solv->rules[why].p != p && solv->decisionmap[p] > 0)
 	{
 	  /* distupgrade case, allow to keep old package */
@@ -453,6 +450,9 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	}
       if (solv->decisionmap[p] > 0)
 	return;		/* false alarm, turned out we can keep the package */
+      rr = solv->rules + solv->featurerules + (why - solv->updaterules);
+      if (!rr->p)
+	rr = solv->rules + why;
       if (rr->w2)
 	{
 	  int mvrp = 0;		/* multi-version replacement */
@@ -496,12 +496,19 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	  queue_push(solutionq, solv->ruletojob.elements[-p - solv->jobrules] + 1);
 	  return;
 	}
+      if (solv->decisionmap[p] > 0)
+	{
+	  /* disable best rule by keeping the old package */
+	  queue_push(solutionq, SOLVER_SOLUTION_BEST);
+	  queue_push(solutionq, p);
+	  return;
+	}
       rr = solv->rules + solv->featurerules + (p - solv->installed->start);
       if (!rr->p)
 	rr = solv->rules + solv->updaterules + (p - solv->installed->start);
       mvrp = 0;		/* multi-version replacement */
       FOR_RULELITERALS(rp, dp, rr)
-	if (rp > 0 && solv->decisionmap[rp] > 0)
+	if (rp > 0 && solv->decisionmap[rp] > 0 && pool->solvables[rp].repo != solv->installed)
 	  {
 	    mvrp = rp;
 	    if (!(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, rp)))

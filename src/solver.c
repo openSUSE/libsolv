@@ -3237,10 +3237,7 @@ solver_solve(Solver *solv, Queue *job)
     solv->infarchrules = solv->infarchrules_end = solv->nrules;
 
   if (hasdupjob)
-    {
-      solver_addduprules(solv, &addedmap);
-      solver_freedupmaps(solv);	/* no longer needed */
-    }
+    solver_addduprules(solv, &addedmap);
   else
     solv->duprules = solv->duprules_end = solv->nrules;
 
@@ -3248,6 +3245,9 @@ solver_solve(Solver *solv, Queue *job)
     solver_addbestrules(solv, hasbestinstalljob);
   else
     solv->bestrules = solv->bestrules_end = solv->nrules;
+
+  if (hasdupjob)
+    solver_freedupmaps(solv);	/* no longer needed */
 
   if (1)
     solver_addchoicerules(solv);
