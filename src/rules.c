@@ -2247,6 +2247,8 @@ solver_addchoicerules(Solver *solv)
   Id p, d, *pp;
   Id p2, pp2;
   Solvable *s, *s2;
+  Id lastaddedp, lastaddedd;
+  int lastaddedcnt;
 
   solv->choicerules = solv->nrules;
   if (!pool->installed)
@@ -2266,6 +2268,9 @@ solver_addchoicerules(Solver *solv)
   for (rid = solv->duprules, r = solv->rules + rid; rid < solv->duprules_end; rid++, r++)
     if (r->p < 0 && !r->w2 && (r->d == 0 || r->d == -1))
       MAPSET(&mneg, -r->p);
+  lastaddedp = 0;
+  lastaddedd = 0;
+  lastaddedcnt = 0;
   for (rid = 1; rid < solv->rpmrules_end ; rid++)
     {
       r = solv->rules + rid;
@@ -2383,10 +2388,24 @@ solver_addchoicerules(Solver *solv)
 #endif
 	  continue;
 	}
+
+      /* don't add identical rules */
+      if (lastaddedp == r->p && lastaddedcnt == q.count)
+	{
+	  for (i = 0; i < q.count; i++)
+	    if (q.elements[i] != pool->whatprovidesdata[lastaddedd + i])
+	      break;
+	  if (i == q.count)
+	    continue;	/* already added that one */
+	}
+
       d = q.count ? pool_queuetowhatprovides(pool, &q) : 0;
       solver_addrule(solv, r->p, d);
       queue_push(&solv->weakruleq, solv->nrules - 1);
       solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
+      lastaddedp = r->p;
+      lastaddedd = d;
+      lastaddedcnt = q.count;
 #if 0
       printf("OLD ");
       solver_printrule(solv, SOLV_DEBUG_RESULT, solv->rules + rid);
