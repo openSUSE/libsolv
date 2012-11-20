@@ -3000,7 +3000,7 @@ solver_solve(Solver *solv, Queue *job)
 	      assert(solv->dupmap_all && !sr->p);
 	      continue;
 	    }
-	  if (!solver_samerule(solv, r, sr))
+	  if (!solver_rulecmp(solv, r, sr))
 	    memset(sr, 0, sizeof(*sr));		/* delete unneeded feature rule */
 	  else
 	    solver_disablerule(solv, sr);	/* disable feature rule */

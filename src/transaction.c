@@ -575,8 +575,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	    continue;
 	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
 	    continue;
-	  queue_push(ti, p);
-	  queue_push(ti, p2);
+	  queue_push2(ti, p, p2);
 	}
       if (s->obsoletes && !noobs)
 	{
@@ -592,24 +591,27 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 		    continue;
 		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
 		    continue;
-		  queue_push(ti, p);
-		  queue_push(ti, p2);
+		  queue_push2(ti, p, p2);
 		}
 	    }
 	}
     }
-  solv_sort(ti->elements, ti->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
-  /* now unify */
-  for (i = j = 0; i < ti->count; i += 2)
+  if (ti->count > 2)
     {
-      if (j && ti->elements[i] == ti->elements[j - 2] && ti->elements[i + 1] == ti->elements[j - 1])
-	continue;
-      ti->elements[j++] = ti->elements[i];
-      ti->elements[j++] = ti->elements[i + 1];
+      /* sort and unify */
+      solv_sort(ti->elements, ti->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
+      for (i = j = 2; i < ti->count; i += 2)
+	{
+	  if (ti->elements[i] == ti->elements[j - 2] && ti->elements[i + 1] == ti->elements[j - 1])
+	    continue;
+	  ti->elements[j++] = ti->elements[i];
+	  ti->elements[j++] = ti->elements[i + 1];
+	}
+      queue_truncate(ti, j);
     }
-  ti->count = j;
 
   /* create transaction_installed helper */
+  /*   entry > 0: exactly one obsoleter, entry < 0: multiple obsoleters, -entry is "best" */
   trans->transaction_installed = solv_calloc(installed->end - installed->start, sizeof(Id));
   for (i = 0; i < ti->count; i += 2)
     {
@@ -618,7 +620,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	trans->transaction_installed[j] = ti->elements[i];
       else
 	{
-	  /* more than one package obsoletes us. compare */
+	  /* more than one package obsoletes us. compare to find "best" */
 	  Id q[4];
 	  if (trans->transaction_installed[j] > 0)
 	    trans->transaction_installed[j] = -trans->transaction_installed[j];

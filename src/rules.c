@@ -122,7 +122,7 @@ unifyrules_sortcmp(const void *ap, const void *bp, void *dp)
 }
 
 int
-solver_samerule(Solver *solv, Rule *r1, Rule *r2)
+solver_rulecmp(Solver *solv, Rule *r1, Rule *r2)
 {
   return unifyrules_sortcmp(r1, r2, solv->pool);
 }

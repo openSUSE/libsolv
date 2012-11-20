@@ -342,7 +342,7 @@ SOLV_1.0 {
 		solver_ruleclass;
 		solver_ruleinfo;
 		solver_ruleliterals;
-		solver_samerule;
+		solver_rulecmp;
 		solver_select2str;
 		solver_set_flag;
 		solver_solution_count;
