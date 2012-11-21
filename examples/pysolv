@@ -730,11 +730,10 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
         sys.exit(1)
     for job in jobs:
         if cmd == 'up':
+            job.how |= Job.SOLVER_UPDATE
             # up magic: use install instead of update if no installed package matches
-            if job.how == Job.SOLVER_SOLVABLE_ALL or filter(lambda s: s.isinstalled(), job.solvables()):
-                job.how |= Job.SOLVER_UPDATE
-            else:
-                job.how |= Job.SOLVER_INSTALL
+            if job.isemptyupdate():
+                job.how ^= Job.SOLVER_UPDATE ^ Job.SOLVER_INSTALL
         elif cmd == 'install':
             job.how |= Job.SOLVER_INSTALL
         elif cmd == 'erase':

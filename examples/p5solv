@@ -600,11 +600,8 @@ if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cm
   die("no package matched.\n") unless @jobs;
   for my $job (@jobs) {
     if ($cmd eq 'up') {
-      if ($job->{'how'} == $solv::Job::SOLVER_SOLVABLE_ALL || grep {$_->isinstalled()} $job->solvables()) {
-	$job->{'how'} |= $solv::Job::SOLVER_UPDATE;
-      } else {
-	$job->{'how'} |= $solv::Job::SOLVER_INSTALL;
-      }
+      $job->{'how'} |= $solv::Job::SOLVER_UPDATE;
+      $job->{'how'} ^= $solv::Job::SOLVER_UPDATE ^ $solv::Job::SOLVER_INSTALL if $job->isemptyupdate();
     } elsif ($cmd eq 'install') {
 	$job->{'how'} |= $solv::Job::SOLVER_INSTALL;
     } elsif ($cmd eq 'erase') {

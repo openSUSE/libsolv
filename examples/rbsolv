@@ -613,11 +613,8 @@ if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == '
   abort("no package matched.") if jobs.empty?
   for job in jobs
     if cmd == 'up'
-      if job.how == Solv::Job::SOLVER_SOLVABLE_ALL || job.solvables.any? {|s| s.isinstalled?}
-	job.how |= Solv::Job::SOLVER_UPDATE
-      else
-	job.how |= Solv::Job::SOLVER_INSTALL
-      end
+      job.how |= Solv::Job::SOLVER_UPDATE
+      job.how ^= Solv::Job::SOLVER_UPDATE ^ Solv::Job::SOLVER_INSTALL if job.isemptyupdate?
     elsif cmd == 'install'
       job.how |= Solv::Job::SOLVER_INSTALL
     elsif cmd == 'erase'
