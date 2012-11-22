@@ -566,7 +566,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       spool->stringspace = solv_malloc(7);
       strcpy(spool->stringspace, "<NULL>");
       spool->sstrings = 7;
-      spool->nstrings = 0;
+      spool->nstrings = numid < 2 ? 2 - numid : 0;	/* make sure we have at least id 0 and 1 */
     }
 
   /* alloc string buffer */
@@ -632,8 +632,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     {
       /* no shared pool, thus no idmap and no unification */
       idmap = 0;
-      spool->nstrings = numid;
-      str[0] = 0;
+      spool->nstrings = numid >= 2 ? numid : 2;	/* make sure we have at least id 0 and 1 */
+      str[0] = 0;	/* <NULL> */
       if (*sp)
 	{
 	  /* we need the '' for directories */
@@ -641,7 +641,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	}
       for (i = 1; i < spool->nstrings; i++)
 	{
-	  if (sp >= strsp + sizeid)
+	  if (sp >= strsp + sizeid && numid >= 2)
 	    return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings");
 	  str[i] = sp - spool->stringspace;
 	  sp += strlen(sp) + 1;
@@ -732,7 +732,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	  spool->stringhashmask = 0;
 	}
     }
-  pool_shrink_strings(pool);	       /* vacuum */
+  stringpool_shrink(spool);		/* vacuum */
 
   
   /*******  Part 2: Relation IDs  ***************************************/
