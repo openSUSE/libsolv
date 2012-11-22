@@ -1060,10 +1060,6 @@ repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *
 
   Id type_constantid = REPOKEY_TYPE_CONSTANTID;
 
-  unsigned char *prefixcomp;
-  unsigned int compsum;
-  char *old_str;
-
 
   memset(&cbdata, 0, sizeof(cbdata));
   cbdata.repo = repo;
@@ -1773,76 +1769,47 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   solv_flags |= SOLV_FLAG_SIZE_BYTES;
   write_u32(&target, solv_flags);
 
-  /*
-   * calculate prefix encoding of the strings
-   */
-  prefixcomp = solv_malloc(nstrings);
-  compsum = 0;
-  old_str = "";
-
-  prefixcomp[0] = 0;
-  for (i = 1; i < nstrings; i++)
+  if (nstrings)
     {
-      char *str = spool->stringspace + spool->strings[needid[i].map];
-      int same;
-      for (same = 0; same < 255; same++)
-	if (!old_str[same] || old_str[same] != str[same])
-	  break;
-      prefixcomp[i] = same;
-      compsum += same;
-      old_str = str;
-    }
+      /*
+       * calculate prefix encoding of the strings
+       */
+      unsigned char *prefixcomp = solv_malloc(nstrings);
+      unsigned int compsum = 0;
+      char *old_str = "";
 
-  /*
-   * write strings
-   */
-  write_u32(&target, sizeid);
-  /* we save compsum bytes but need 1 extra byte for every string */
-  write_u32(&target, sizeid + (nstrings ? nstrings - 1 : 0) - compsum);
-  if (sizeid + (nstrings ? nstrings - 1 : 0) != compsum)
-    {
+      prefixcomp[0] = 0;
+      for (i = 1; i < nstrings; i++)
+	{
+	  char *str = spool->stringspace + spool->strings[needid[i].map];
+	  int same;
+	  for (same = 0; same < 255; same++)
+	    if (!old_str[same] || old_str[same] != str[same])
+	      break;
+	  prefixcomp[i] = same;
+	  compsum += same;
+	  old_str = str;
+	}
+
+      /*
+       * write strings
+       */
+      write_u32(&target, sizeid);
+      /* we save compsum bytes but need 1 extra byte for every string */
+      write_u32(&target, sizeid + nstrings - 1 - compsum);
       for (i = 1; i < nstrings; i++)
 	{
 	  char *str = spool->stringspace + spool->strings[needid[i].map];
 	  write_u8(&target, prefixcomp[i]);
 	  write_str(&target, str + prefixcomp[i]);
 	}
+      solv_free(prefixcomp);
     }
-  solv_free(prefixcomp);
-
-#if 0
-  /* Build the prefix-encoding of the string pool.  We need to know
-     the size of that before writing it to the file, so we have to
-     build a separate buffer for that.  As it's temporarily possible
-     that this actually is an expansion we can't easily reuse the
-     stringspace for this.  The max expansion per string is 1 byte,
-     so it will fit into sizeid+nstrings bytes.  */
-  char *prefix = solv_malloc(sizeid + nstrings);
-  char *pp = prefix;
-  char *old_str = "";
-  for (i = 1; i < nstrings; i++)
+  else
     {
-      char *str = spool->stringspace + spool->strings[needid[i].map];
-      int same;
-      size_t len;
-      for (same = 0; same < 255; same++)
-	if (!old_str[same] || !str[same] || old_str[same] != str[same])
-	  break;
-      *pp++ = same;
-      len = strlen(str + same) + 1;
-      memcpy(pp, str + same, len);
-      pp += len;
-      old_str = str;
+      write_u32(&target, 0);
+      write_u32(&target, 0);
     }
-
-  /*
-   * write strings
-   */
-  write_u32(&target, sizeid);
-  write_u32(&target, pp - prefix);
-  write_blob(&target, prefix, pp - prefix);
-  solv_free(prefix);
-#endif
 
   /*
    * write RelDeps

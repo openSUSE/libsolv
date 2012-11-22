@@ -245,7 +245,7 @@ transaction_type(Transaction *trans, Id p, int mode)
         type = SOLVER_TRANSACTION_REINSTALL;
     }
 
-  if ((mode & SOLVER_TRANSACTION_CHANGE_IS_REINSTALL))
+  if ((mode & SOLVER_TRANSACTION_CHANGE_IS_REINSTALL) != 0)
     {
       /* application wants to make no difference between change
        * and reinstall */
