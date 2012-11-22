@@ -195,20 +195,23 @@ selection_limit_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 		}
 	    }
 	  queue_free(&q);
-	  continue;
 	}
-      if (select != SOLVER_SOLVABLE_NAME && select != SOLVER_SOLVABLE_PROVIDES)
-	continue;	/* actually internal error */
-      if (relflags == REL_ARCH && (relevr == ARCH_SRC || relevr == ARCH_NOSRC) && ISRELDEP(id))
+      else if (select == SOLVER_SOLVABLE_NAME && select == SOLVER_SOLVABLE_PROVIDES)
 	{
-	  Reldep *rd = GETRELDEP(pool, id);
-	  if (rd->flags == REL_ARCH && rd->evr == ARCH_SRC)
-	    id = rd->name;
+	  /* don't stack src reldeps */
+	  if (relflags == REL_ARCH && (relevr == ARCH_SRC || relevr == ARCH_NOSRC) && ISRELDEP(id))
+	    {
+	      Reldep *rd = GETRELDEP(pool, id);
+	      if (rd->flags == REL_ARCH && rd->evr == ARCH_SRC)
+		id = rd->name;
+	    }
+	  selection->elements[i + 1] = pool_rel2id(pool, id, relevr, relflags, 1);
 	}
-      selection->elements[i + 1] = pool_rel2id(pool, id, relevr, relflags, 1);
+      else
+	continue;	/* actually internal error */
       if (relflags == REL_ARCH)
         selection->elements[i] |= SOLVER_SETARCH;
-      if (relflags == REL_EQ && select == SOLVER_SOLVABLE_NAME && selection->elements[i])
+      if (relflags == REL_EQ && select != SOLVER_SOLVABLE_PROVIDES)
         {
 	  if (pool->disttype == DISTTYPE_DEB)
             selection->elements[i] |= SOLVER_SETEVR;	/* debian can't match version only like rpm */
@@ -243,7 +246,7 @@ selection_addsrc(Pool *pool, Queue *selection, int flags)
 	    continue;
 	  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	    havesrc = 1;
-	  else if (!pool_installable(pool, s))
+	  else if (s->repo != pool->installed && !pool_installable(pool, s))
 	    continue;
 	  queue_push(&q, p);
 	}
@@ -373,7 +376,7 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
       FOR_POOL_SOLVABLES(p)
         {
           Solvable *s = pool->solvables + p;
-          if (!pool_installable(pool, s))
+          if (s->repo != pool->installed && !pool_installable(pool, s))
 	    if (!(flags & SELECTION_SOURCE_ONLY) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
               continue;
 	  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
@@ -435,7 +438,7 @@ selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags
 
   if ((ret = selection_depglob(pool, selection, name, flags)) != 0)
     return ret;
-  /* check if theres an .arch suffix */
+  /* check if there is an .arch suffix */
   if ((r = strrchr(name, '.')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
     {
       char *rname = solv_strdup(name);
@@ -470,7 +473,7 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
       Solvable *s = pool->solvables + di.solvid;
       if (!s->repo)
 	continue;
-      if (!pool_installable(pool, s))
+      if (s->repo != pool->installed && !pool_installable(pool, s))
 	if (!(flags & SELECTION_SOURCE_ONLY) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
 	  continue;
       if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)

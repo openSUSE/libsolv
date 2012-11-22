@@ -773,8 +773,10 @@ solver_addrpmrulesforweak(Solver *solv, Map *m)
 	continue;
 
       s = pool->solvables + i;
-      if (!pool_installable(pool, s))		/* only look at installable ones */
+      if (!s->repo)
 	continue;
+      if (s->repo != pool->installed && !pool_installable(pool, s))
+	continue;	/* only look at installable ones */
 
       sup = 0;
       if (s->supplements)
@@ -2733,9 +2735,9 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  if (di.solvid <= 0)
 	    continue;
 	  s = pool->solvables + di.solvid;
-	  if (!s->requires)
+	  if (!s->repo || !s->requires)
 	    continue;
-	  if (!pool_installable(pool, s))
+	  if (s->repo != installed && !pool_installable(pool, s))
 	    continue;
 	  if (strncmp(pool_id2str(pool, s->name), "pattern:", 8) != 0)
 	    continue;
