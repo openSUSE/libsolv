@@ -1976,7 +1976,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  if (cinfo->repo_gpgcheck)
 	    {
 	      filename = solv_dupjoin("dists/", cinfo->name, "/Release.gpg");
-	      if (!downloadchecksig(cinfo, fp, filename, &sigpool))
+	      if (!downloadchecksig(cinfo, fpr, filename, &sigpool))
 		{
 		  fclose(fpr);
 		  solv_free((char *)filename);
