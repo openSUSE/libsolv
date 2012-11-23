@@ -545,7 +545,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 
   /*******  Part 1: string IDs  *****************************************/
 
-  sizeid = read_u32(&data);	       /* size of string+Id space */
+  sizeid = read_u32(&data);	       /* size of string space */
 
   /*
    * read strings and Ids
@@ -558,33 +558,39 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
    */
 
   if (!(flags & REPO_LOCALPOOL))
-    spool = &pool->ss;
+    {
+      spool = &pool->ss;
+      /* alloc max needed string buffer and string pointers, will shrink again later */
+#if 0
+      spool->stringspace = solv_realloc(spool->stringspace, spool->sstrings + sizeid + 1); 
+      spool->strings = solv_realloc2(spool->strings, spool->nstrings + numid, sizeof(Offset));
+#else
+      spool->sstrings += sizeid + 1;
+      spool->nstrings += numid;
+      stringpool_shrink(spool);		/* we misuse stringpool_shrink so that the correct BLOCK factor is used */
+      spool->sstrings -= sizeid + 1;
+      spool->nstrings -= numid;
+#endif
+    }
   else
     {
       data.localpool = 1;
       spool = &data.spool;
-      spool->stringspace = solv_malloc(7);
+      spool->sstrings = 7 + sizeid + 1;
+      spool->nstrings = numid < 2 ? 2 : numid;
+      stringpool_shrink(spool);		/* we misuse stringpool_shrink to alloc the stringpool in the correct size */
       strcpy(spool->stringspace, "<NULL>");
       spool->sstrings = 7;
-      spool->nstrings = numid < 2 ? 2 - numid : 0;	/* make sure we have at least id 0 and 1 */
+      spool->nstrings = 1;
+      spool->strings[0] = 0;	/* <NULL> */
     }
-
-  /* alloc string buffer */
-  spool->stringspace = solv_realloc(spool->stringspace, spool->sstrings + sizeid + 1);
-  /* alloc string offsets (Id -> Offset into string space) */
-  spool->strings = solv_realloc2(spool->strings, spool->nstrings + numid, sizeof(Offset));
-
-  strsp = spool->stringspace;
-  str = spool->strings;		       /* array of offsets into strsp, indexed by Id */
-
-  /* point to _BEHIND_ already allocated string/Id space */
-  strsp += spool->sstrings;
 
 
   /*
-   * read new repo at end of pool
+   * read string data and append to old string space
    */
   
+  strsp = spool->stringspace + spool->sstrings;	/* append new entries */
   if ((solvflags & SOLV_FLAG_PREFIX_POOL) == 0)
     {
       if (sizeid && fread(strsp, sizeid, 1, fp) != 1)
@@ -628,15 +634,16 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
 
+  /* now merge */
+  str = spool->strings;			/* array of offsets into strsp, indexed by Id */
   if ((flags & REPO_LOCALPOOL) != 0)
     {
-      /* no shared pool, thus no idmap and no unification */
+      /* no shared pool, thus no idmap and no unification needed */
       idmap = 0;
-      spool->nstrings = numid >= 2 ? numid : 2;	/* make sure we have at least id 0 and 1 */
-      str[0] = 0;	/* <NULL> */
+      spool->nstrings = numid < 2 ? 2 : numid;	/* make sure we have at least id 0 and 1 */
       if (*sp)
 	{
-	  /* we need the '' for directories */
+	  /* we need id 1 to be '' for directories */
 	  return pool_error(pool, SOLV_ERROR_CORRUPT, "store strings don't start with an empty string");
 	}
       for (i = 1; i < spool->nstrings; i++)
@@ -731,8 +738,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	  spool->stringhashtbl = solv_free(spool->stringhashtbl);
 	  spool->stringhashmask = 0;
 	}
+      stringpool_shrink(spool);		/* vacuum */
     }
-  stringpool_shrink(spool);		/* vacuum */
 
   
   /*******  Part 2: Relation IDs  ***************************************/
