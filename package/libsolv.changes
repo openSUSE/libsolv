@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Fri Nov 23 13:57:19 CET 2012 - mls@suse.de
+
+- support targeted up/dup
+- support best rules to enforce the installation of the best package
+- implement selection class to ease package selection
+- fix obsolete handling for debian packages
+- add pool_lookup_deltalocation helper
+- bump version to 0.2.1
+
+-------------------------------------------------------------------
 Thu Oct 18 16:58:10 CEST 2012 - mls@suse.de
 
 - fix susetags parser, it ignored the filelist of the last
