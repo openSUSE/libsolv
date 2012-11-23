@@ -1647,12 +1647,12 @@ typedef struct {
     pool->pos = oldpos;
     return seq;
   }
-  const char *lookup_deltalocation() {
+  const char *lookup_deltalocation(unsigned int *OUTPUT) {
     Pool *pool = $self->repo->pool;
     Datapos oldpos = pool->pos;
     const char *loc;
     pool->pos = *$self;
-    loc = pool_lookup_deltalocation(pool, SOLVID_POS);
+    loc = pool_lookup_deltalocation(pool, SOLVID_POS, OUTPUT);
     pool->pos = oldpos;
     return loc;
   }

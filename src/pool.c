@@ -2073,15 +2073,17 @@ pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep)
 }
 
 const char *
-pool_lookup_deltalocation(Pool *pool, Id entry)
+pool_lookup_deltalocation(Pool *pool, Id entry, unsigned int *medianrp)
 {
   const char *loc;
+  if (medianrp)
+    *medianrp = 0;
   if (entry != SOLVID_POS)
     return 0;
-  loc = pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_DIR);
-  loc = pool_tmpjoin(pool, loc, loc ? "/" : 0, pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_NAME));
-  loc = pool_tmpappend(pool, loc, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_EVR));
-  loc = pool_tmpappend(pool, loc, ".", pool_lookup_str(pool, SOLVID_POS, DELTA_LOCATION_SUFFIX));
+  loc = pool_lookup_str(pool, entry, DELTA_LOCATION_DIR);
+  loc = pool_tmpjoin(pool, loc, loc ? "/" : 0, pool_lookup_str(pool, entry, DELTA_LOCATION_NAME));
+  loc = pool_tmpappend(pool, loc, "-", pool_lookup_str(pool, entry, DELTA_LOCATION_EVR));
+  loc = pool_tmpappend(pool, loc, ".", pool_lookup_str(pool, entry, DELTA_LOCATION_SUFFIX));
   return loc;
 }
 

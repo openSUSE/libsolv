@@ -282,7 +282,7 @@ solvable_lookup_location(Solvable *s, unsigned int *medianrp)
     return 0;
   pool = s->repo->pool;
   if (medianrp)
-    *medianrp = solvable_lookup_num(s, SOLVABLE_MEDIANR, 1);
+    *medianrp = solvable_lookup_num(s, SOLVABLE_MEDIANR, 0);
   if (solvable_lookup_void(s, SOLVABLE_MEDIADIR))
     mediadir = pool_id2str(pool, s->arch);
   else
@@ -319,7 +319,10 @@ solvable_lookup_location(Solvable *s, unsigned int *medianrp)
 const char *
 solvable_get_location(Solvable *s, unsigned int *medianrp)
 {
-  return solvable_lookup_location(s, medianrp);
+  const char *loc = solvable_lookup_location(s, medianrp);
+  if (medianrp && *medianrp == 0)
+    *medianrp = 1;	/* compat, to be removed */
+  return loc;
 }
 
 const char *

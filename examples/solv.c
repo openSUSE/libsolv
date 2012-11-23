@@ -3029,7 +3029,7 @@ rerunsolver:
 		      chksum = pool_lookup_bin_checksum(pool, SOLVID_POS, DELTA_CHECKSUM, &chksumtype);
 		      if (!chksumtype)
 			continue;	/* no way! */
-		      dloc = pool_lookup_deltalocation(pool, SOLVID_POS);
+		      dloc = pool_lookup_deltalocation(pool, SOLVID_POS, 0);
 		      if (!dloc)
 			continue;
 		      if (cinfo->type == TYPE_SUSETAGS)
