@@ -269,8 +269,10 @@ class repo_generic(dict):
                     # need to extend to repo boundaries, as this is how
                     # info.write() has written the data
                     info.extend_to_repo()
-                    # LOCALPOOL does not help as pool already contains all ids
-                    info.add_solv(nf, Repo.REPO_EXTEND_SOLVABLES)
+                    flags = Repo.REPO_EXTEND_SOLVABLES
+                    if ext != 'DL':
+                        flags |= Repo.REPO_LOCALPOOL
+                    info.add_solv(nf, flags)
             os.rename(tmpname, self.cachepath(ext))
         except IOError, e:
             if tmpname:
@@ -393,7 +395,7 @@ class repo_repomd(repo_generic):
         if not f:
             return False
         if ext == 'FL':
-            self.handle.add_rpmmd(f, 'FL', Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+            self.handle.add_rpmmd(f, 'FL', Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES|Repo.REPO_LOCALPOOL)
         elif ext == 'DL':
             self.handle.add_deltainfoxml(f, Repo.REPO_USE_LOADING)
         self.writecachedrepo(ext, repodata)
@@ -517,7 +519,10 @@ class repo_susetags(repo_generic):
         f = self.download(descrdir + '/' + filename, True, filechksum)
         if not f:
             return False
-        self.handle.add_susetags(f, defvendorid, ext, Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES)
+        flags = Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES
+        if ext != 'DL':
+            flags |= Repo.REPO_LOCALPOOL
+        self.handle.add_susetags(f, defvendorid, ext, flags)
         self.writecachedrepo(ext, repodata)
         return True
 

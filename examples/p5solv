@@ -178,7 +178,9 @@ sub writecachedrepo {
 	die("internal error, cannot reload solv file\n") unless $self->{'handle'}->add_solv($f, $solv::Repo::SOLV_ADD_NO_STUBS);
       } else {
 	$info->extend_to_repo();
-	$info->add_solv($f, $solv::Repo::REPO_EXTEND_SOLVABLES);
+	my $flags = $solv::Repo::REPO_EXTEND_SOLVABLES;
+	$flags |= $solv::Repo::REPO_LOCALPOOL if $ext ne 'DL';
+	$info->add_solv($f, $flags);
       }
     }
   }
@@ -262,8 +264,8 @@ sub load_ext {
   my $f = $self->download($filename, 1, $filechksum);
   return 0 unless $f;
   if ($ext eq 'FL') {
-    $self->{'handle'}->add_rpmmd($f, 'FL', $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES);
-  } elsif ($ext eq 'FL') {
+    $self->{'handle'}->add_rpmmd($f, 'FL', $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES|$solv::Repo::REPO_LOCALPOOL);
+  } elsif ($ext eq 'DL') {
     $self->{'handle'}->add_deltainfoxml($f, $solv::Repo::REPO_USE_LOADING);
   }
   $self->writecachedrepo($ext, $repodata);
@@ -390,7 +392,9 @@ sub load_ext {
   my $filechksum = $repodata->lookup_checksum($solv::SOLVID_META, $solv::SUSETAGS_FILE_CHECKSUM);
   my $f = $self->download("$descrdir/$filename", 1, $filechksum);
   return 0 unless $f;
-  $self->{'handle'}->add_susetags($f, $defvendorid, $ext, $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES);
+  my $flags = $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES;
+  $flags |= $solv::Repo::REPO_LOCALPOOL if $ext ne 'DL';
+  $self->{'handle'}->add_susetags($f, $defvendorid, $ext, $flags);
   $self->writecachedrepo($ext, $repodata);
   return 1;
 }

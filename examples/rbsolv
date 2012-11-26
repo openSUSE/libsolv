@@ -182,7 +182,9 @@ class Repo_generic
 	    abort("internal error, cannot reload solv file") unless @handle.add_solv(sf, Solv::Repo::SOLV_ADD_NO_STUBS)
 	  else
 	    info.extend_to_repo()
-	    info.add_solv(sf, Solv::Repo::REPO_EXTEND_SOLVABLES)
+	    flags = Solv::Repo::REPO_EXTEND_SOLVABLES
+	    flags |= Solv::Repo::REPO_LOCALPOOL if ext != 'DL'
+	    info.add_solv(sf, flags)
 	  end
 	  sf.close
 	end
@@ -321,7 +323,7 @@ class Repo_rpmmd < Repo_generic
     f = download(filename, true, filechksum)
     return false unless f
     if ext == 'FL'
-      @handle.add_rpmmd(f, 'FL', Solv::Repo::REPO_USE_LOADING|Solv::Repo::REPO_EXTEND_SOLVABLES)
+      @handle.add_rpmmd(f, 'FL', Solv::Repo::REPO_USE_LOADING|Solv::Repo::REPO_EXTEND_SOLVABLES|Solv::Repo::REPO_LOCALPOOL)
     elsif ext == 'DL'
       @handle.add_deltainfoxml(f, Solv::Repo::REPO_USE_LOADING)
     end
@@ -453,7 +455,9 @@ class Repo_susetags < Repo_generic
     filechksum = repodata.lookup_checksum(Solv::SOLVID_META, Solv::SUSETAGS_FILE_CHECKSUM)
     f = download("#{descrdir}/#{filename}", true, filechksum)
     return false unless f
-    @handle.add_susetags(f, defvendorid, ext, Solv::Repo::REPO_USE_LOADING|Solv::Repo::REPO_EXTEND_SOLVABLES)
+    flags = Solv::Repo::REPO_USE_LOADING|Solv::Repo::REPO_EXTEND_SOLVABLES
+    flags |= Solv::Repo::REPO_LOCALPOOL if ext != 'DL'
+    @handle.add_susetags(f, defvendorid, ext, flags)
     f.close
     writecachedrepo(ext, repodata)
     return true

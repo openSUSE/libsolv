@@ -1253,12 +1253,14 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 	    }
 	  else
 	    {
+	      int flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
 	      /* make sure repodata contains complete repo */
 	      /* (this is how repodata_write saves it) */
 	      repodata_extend_block(info, repo->start, repo->end - repo->start);
 	      info->state = REPODATA_LOADING;
-	      /* no need for LOCALPOOL as pool already contains ids */
-	      repo_add_solv(repo, fp, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+	      if (strcmp(repoext, "DL") != 0)
+		flags |= REPO_LOCALPOOL;
+	      repo_add_solv(repo, fp, flags);
 	      info->state = REPODATA_AVAILABLE;	/* in case the load failed */
 	    }
 	  fclose(fp);
@@ -1366,7 +1368,7 @@ repomd_load_ext(Repo *repo, Repodata *data)
   if ((fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
     return 0;
   if (!strcmp(ext, "FL"))
-    r = repo_add_rpmmd(repo, fp, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES);
+    r = repo_add_rpmmd(repo, fp, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES|REPO_LOCALPOOL);
   else if (!strcmp(ext, "DL"))
     r = repo_add_deltainfoxml(repo, fp, REPO_USE_LOADING);
   fclose(fp);
@@ -1486,6 +1488,7 @@ susetags_load_ext(Repo *repo, Repodata *data)
   struct repoinfo *cinfo;
   const unsigned char *filechksum;
   Id filechksumtype;
+  int flags;
 
   cinfo = repo->appdata;
   filename = repodata_lookup_str(data, SOLVID_META, SUSETAGS_FILE_NAME);
@@ -1514,7 +1517,10 @@ susetags_load_ext(Repo *repo, Repodata *data)
   filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
   if ((fp = curlfopen(cinfo, pool_tmpjoin(repo->pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 0)) == 0)
     return 0;
-  if (repo_add_susetags(repo, fp, defvendor, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES))
+  flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
+  if (strcmp(ext, "DL") != 0)
+    flags |= REPO_LOCALPOOL;
+  if (repo_add_susetags(repo, fp, defvendor, ext, flags))
     {
       fclose(fp);
       printf("%s\n", pool_errstr(repo->pool));
