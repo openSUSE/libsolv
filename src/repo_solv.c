@@ -576,9 +576,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     {
       data.localpool = 1;
       spool = &data.spool;
-      spool->sstrings = 7 + sizeid + 1;
-      spool->nstrings = numid < 2 ? 2 : numid;
-      stringpool_shrink(spool);		/* we misuse stringpool_shrink to alloc the stringpool in the correct size */
+      spool->stringspace = solv_malloc(7 + sizeid + 1); 
+      spool->strings = solv_malloc2(numid < 2 ?  2 : numid, sizeof(Offset));
       strcpy(spool->stringspace, "<NULL>");
       spool->sstrings = 7;
       spool->nstrings = 1;
@@ -657,6 +656,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     }
   else
     {
+      Offset oldsstrings = spool->sstrings;
+
       /* alloc id map for name and rel Ids. this maps ids in the solv files
        * to the ids in our pool */
       idmap = solv_calloc(numid + numrel, sizeof(Id));
@@ -695,8 +696,10 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	{
 	  if (sp >= strsp + sizeid)
 	    {
-	      solv_free(hashtbl);
 	      solv_free(idmap);
+	      spool->nstrings = oldnstrings;
+	      spool->sstrings = oldsstrings;
+	      stringpool_freehash(spool);
 	      return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings %d %d", i, numid);
 	    }
 	  if (!*sp)			       /* empty string */

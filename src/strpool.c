@@ -81,7 +81,7 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
 {
   Hashval h;
   unsigned int hh;
-  Hashmask hashmask;
+  Hashmask hashmask, oldhashmask;
   int i;
   Id id;
   Hashtable hashtbl;
@@ -91,7 +91,7 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   if (!len)
     return STRID_EMPTY;
 
-  hashmask = ss->stringhashmask;
+  hashmask = oldhashmask = ss->stringhashmask;
   hashtbl = ss->stringhashtbl;
 
   /* expand hashtable if needed */
@@ -126,6 +126,16 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
     }
   if (id || !create)    /* exit here if string found */
     return id;
+
+  /* this should be a test for a flag that tells us if the 
+   * correct blocking is used, but adding a flag would break
+   * the ABI. So we use the existance of the hash area as
+   * indication instead */
+  if (!oldhashmask)
+    {
+      ss->stringspace = solv_extend_resize(ss->stringspace, ss->sstrings + len + 1, 1, STRINGSPACE_BLOCK);
+      ss->strings = solv_extend_resize(ss->strings, ss->nstrings + 1, sizeof(Offset), STRING_BLOCK);
+    }
 
   /* generate next id and save in table */
   id = ss->nstrings++;
