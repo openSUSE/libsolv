@@ -100,8 +100,8 @@
 #
 %typemap(out) Queue {
   int i;
-  if (argvi + $1.count + 1>= items) {
-    EXTEND(sp, items - (argvi + $1.count + 1) + 1);
+  if (argvi + $1.count + 1 >= items) {
+    EXTEND(sp, (argvi + $1.count + 1) - items + 1);
   }
   for (i = 0; i < $1.count; i++)
     ST(argvi++) = SvREFCNT_inc(SWIG_From_int($1.elements[i]));
@@ -113,7 +113,7 @@
   int cnt = $1.count / step;
   Id *idp = $1.elements;
   if (argvi + cnt + 1 >= items) {
-    EXTEND(sp, items - (argvi + cnt + 1) + 1);
+    EXTEND(sp, (argvi + cnt + 1) - items + 1);
   }
   for (i = 0; i < cnt; i++, idp += step)
     {
