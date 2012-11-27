@@ -578,7 +578,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 /* Make sure all pages from PSTART to PEND (inclusive) are loaded,
    and are consecutive.  Return a pointer to the mapping of PSTART.  */
   unsigned char buf[REPOPAGE_BLOBSIZE];
-  unsigned int i;
+  unsigned int i, best;
 
   /* Quick check in case all pages are there already and consecutive.  */
   for (i = pstart; i <= pend; i++)
@@ -592,6 +592,10 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 
   if (store->pagefd == -1)
     return 0;
+
+#ifdef DEBUG_PAGING
+  fprintf(stderr, "PAGE: want %d pages starting at %d\n", pend - pstart + 1, pstart);
+#endif
 
   /* Ensure that we can map the numbers of pages we need at all.  */
   if (pend - pstart + 1 > store->ncanmap)
@@ -612,57 +616,58 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
      free (very cheap) or contains pages we search for anyway.  */
 
   {
-  /* Setup cost array.  */
-  unsigned int cost[store->ncanmap];
-  unsigned int best_cost;
-  unsigned int best;
-  unsigned int same_cost;
-  for (i = 0; i < store->ncanmap; i++)
-    {
-      unsigned int pnum = store->mapped[i];
-      if (pnum == 0)
-        cost[i] = 0;
-      else
-        {
-	  Attrblobpage *p;
-	  pnum--;
-	  p = store->pages + pnum;
-	  assert(p->mapped_at != -1);
-	  if (pnum >= pstart && pnum <= pend)
-	    cost[i] = 1;
-	  else
-	    cost[i] = 3;
-	}
-    }
+    unsigned int best_cost = -1;
+    unsigned int same_cost = 0;
+    unsigned int cost = 0;
+    int ii;
 
-  /* And search for cheapest space.  */
-  best_cost = -1;
-  best = 0;
-  same_cost = 0;
-  for (i = 0; i + pend - pstart < store->ncanmap; i++)
-    {
-      unsigned int c = cost[i];
-      unsigned int j;
-      for (j = 0; j < pend - pstart + 1; j++)
-        c += cost[i+j];
-      if (c < best_cost)
-        best_cost = c, best = i;
-      else if (c == best_cost)
-        same_cost++;
-      /* A null cost won't become better.  */
-      if (c == 0)
-        break;
-    }
-  /* If all places have the same cost we would thrash on slot 0.  Avoid
-     this by doing a round-robin strategy in this case.  */
-  if (same_cost == store->ncanmap - pend + pstart - 1)
-    best = store->rr_counter++ % (store->ncanmap - pend + pstart);
+    best = 0;
+    for (i = 0, ii = -(pend - pstart); i < store->ncanmap; i++, ii++)
+      {
+	unsigned int pnum = store->mapped[i];
+	if (pnum)
+	  {
+	    Attrblobpage *p = store->pages + --pnum;
+	    assert(p->mapped_at != -1);
+	    cost += pnum >= pstart && pnum <= pend ? 1 : 3;
+	  }
+	if (ii < 0)
+	  continue;	/* still need to accummulate cost */
+	if (cost < best_cost)
+	  best_cost = cost, best = ii;
+	else if (cost == best_cost)
+	  same_cost++;
+	if (!cost)
+	  break;	/* it won't get any better */
+	/* now remove the cost of page ii again */
+	if (i == ii)
+	  {
+	    cost = 0;
+	    continue;
+	  }
+	pnum = store->mapped[ii];
+	if (pnum)
+	  {
+	    Attrblobpage *p = store->pages + --pnum;
+	    assert(p->mapped_at != -1);
+	    cost -= pnum >= pstart && pnum <= pend ? 1 : 3;
+	  }
+      }
+
+#ifdef DEBUG_PAGING
+    fprintf(stderr, "PAGE: best %d at cost %d, same %d\n", best, best_cost, same_cost);
+#endif
+
+    /* If all places have the same cost we would thrash on slot 0.  Avoid
+       this by doing a round-robin strategy in this case.  */
+    if (same_cost == store->ncanmap - pend + pstart - 1)
+      best = store->rr_counter++ % (store->ncanmap - pend + pstart);
+  }
 
   /* So we want to map our pages from [best] to [best+pend-pstart].
      Use a very simple strategy, which doesn't make the best use of
      our resources, but works.  Throw away all pages in that range
-     (even ours) then copy around ours (in case they were outside the 
-     range) or read them in.  */
+     (even ours) then copy around ours or read them in.  */
   for (i = best; i < best + pend - pstart + 1; i++)
     {
       unsigned int pnum = store->mapped[i];
@@ -671,13 +676,26 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	     no need to evict it.  */
           && pnum != pstart + i - best)
 	{
+	  Attrblobpage *p;
 	  /* Evict this page.  */
 #ifdef DEBUG_PAGING
 	  fprintf(stderr, "PAGE: evict page %d from %d\n", pnum, i);
 #endif
-	  cost[i] = 0;
 	  store->mapped[i] = 0;
 	  store->pages[pnum].mapped_at = -1;
+	  /* check if we can copy the correct content */
+	  p = store->pages + (pstart + i - best);
+	  if (p->mapped_at != -1 && p->mapped_at != i * REPOPAGE_BLOBSIZE)
+	    {
+	      void *dest = store->blob_store + i * REPOPAGE_BLOBSIZE;
+#ifdef DEBUG_PAGING
+	      fprintf(stderr, "PAGECOPY: %d from %d to %d\n", pstart + i - best, p->mapped_at / REPOPAGE_BLOBSIZE, i);
+#endif
+	      memcpy(dest, store->blob_store + p->mapped_at, REPOPAGE_BLOBSIZE);
+	      store->mapped[p->mapped_at / REPOPAGE_BLOBSIZE] = 0;
+	      p->mapped_at = i * REPOPAGE_BLOBSIZE;
+	      store->mapped[i] = pstart + i - best + 1;
+	    }
 	}
     }
 
@@ -692,7 +710,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  if (p->mapped_at != pnum * REPOPAGE_BLOBSIZE)
 	    {
 #ifdef DEBUG_PAGING
-	      fprintf(stderr, "PAGECOPY: %d to %d\n", i, pnum);
+	      fprintf(stderr, "PAGECOPY: %d from %d to %d\n", i, p->mapped_at / REPOPAGE_BLOBSIZE, pnum);
 #endif
 	      /* Still mapped somewhere else, so just copy it from there.  */
 	      memcpy(dest, store->blob_store + p->mapped_at, REPOPAGE_BLOBSIZE);
@@ -736,7 +754,6 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
       store->mapped[pnum] = i + 1;
     }
   return store->blob_store + best * REPOPAGE_BLOBSIZE;
-  }
 }
 
 unsigned int
