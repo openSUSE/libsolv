@@ -642,12 +642,15 @@ if options.repos:
             repolimiter.add_raw(Job.SOLVER_SOLVABLE_REPO|Job.SOLVER_SETREPO|Job.SOLVER_SETVENDOR, repo.handle.id)
 
 if cmd == 'search':
-    matches = {}
+    pool.createwhatprovides()
+    sel = pool.Selection()
     di = pool.Dataiterator(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
     for d in di:
-        matches[d.solvid] = True
-    for solvid in sorted(matches.keys()):
-        print " - %s [%s]: %s" % (pool.solvid2str(solvid), pool.solvables[solvid].repo.name, pool.lookup_str(solvid, solv.SOLVABLE_SUMMARY))
+	sel.add_raw(Job.SOLVER_SOLVABLE, d.solvid)
+    if repolimiter:
+       sel.limit(repolimiter)
+    for s in sel.solvables():
+        print " - %s [%s]: %s" % (s, s.repo.name, s.lookup_str(solv.SOLVABLE_SUMMARY))
     sys.exit(0)
 
 cmdlinerepo = None

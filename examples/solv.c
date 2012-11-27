@@ -2591,34 +2591,38 @@ main(int argc, char **argv)
     }
   if (mainmode == MODE_SEARCH)
     {
+      Queue sel, q;
       Dataiterator di;
-      Map m;
       if (argc != 2)
 	usage(1);
-      map_init(&m, pool->nsolvables);
+      pool_createwhatprovides(pool);
+      queue_init(&sel);
       dataiterator_init(&di, pool, 0, 0, 0, argv[1], SEARCH_SUBSTRING|SEARCH_NOCASE);
       dataiterator_set_keyname(&di, SOLVABLE_NAME);
       dataiterator_set_search(&di, 0, 0);
       while (dataiterator_step(&di))
-	MAPSET(&m, di.solvid);
+	queue_push2(&sel, SOLVER_SOLVABLE, di.solvid);
       dataiterator_set_keyname(&di, SOLVABLE_SUMMARY);
       dataiterator_set_search(&di, 0, 0);
       while (dataiterator_step(&di))
-	MAPSET(&m, di.solvid);
+	queue_push2(&sel, SOLVER_SOLVABLE, di.solvid);
       dataiterator_set_keyname(&di, SOLVABLE_DESCRIPTION);
       dataiterator_set_search(&di, 0, 0);
       while (dataiterator_step(&di))
-	MAPSET(&m, di.solvid);
+	queue_push2(&sel, SOLVER_SOLVABLE, di.solvid);
       dataiterator_free(&di);
-
-      for (p = 1; p < pool->nsolvables; p++)
+      if (repofilter.count)
+	selection_limit(pool, &sel, &repofilter);
+	
+      queue_init(&q);
+      selection_solvables(pool, &sel, &q);
+      queue_free(&sel);
+      for (i = 0; i < q.count; i++)
 	{
-	  Solvable *s = pool_id2solvable(pool, p);
-	  if (!MAPTST(&m, p))
-	    continue;
-	  printf("  - %s: %s\n", pool_solvable2str(pool, s), solvable_lookup_str(s, SOLVABLE_SUMMARY));
+	  Solvable *s = pool_id2solvable(pool, q.elements[i]);
+	  printf("  - %s [%s]: %s\n", pool_solvable2str(pool, s), s->repo->name, solvable_lookup_str(s, SOLVABLE_SUMMARY));
 	}
-      map_free(&m);
+      queue_free(&q);
       exit(0);
     }
 
