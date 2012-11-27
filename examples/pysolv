@@ -646,7 +646,7 @@ if cmd == 'search':
     sel = pool.Selection()
     di = pool.Dataiterator(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
     for d in di:
-	sel.add_raw(Job.SOLVER_SOLVABLE, d.solvid)
+        sel.add_raw(Job.SOLVER_SOLVABLE, d.solvid)
     if repolimiter:
        sel.limit(repolimiter)
     for s in sel.solvables():
@@ -916,13 +916,13 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
             ts.addErase(rpmdbid)
         elif type == Transaction.SOLVER_TRANSACTION_INSTALL:
             f = newpkgsfp[p.id]
-            h = ts.hdrFromFdno(solv.xfileno(f))
-            os.lseek(solv.xfileno(f), 0, os.SEEK_SET)
+            h = ts.hdrFromFdno(f.fileno())
+            os.lseek(f.fileno(), 0, os.SEEK_SET)
             ts.addInstall(h, p, 'u')
         elif type == Transaction.SOLVER_TRANSACTION_MULTIINSTALL:
             f = newpkgsfp[p.id]
-            h = ts.hdrFromFdno(solv.xfileno(f))
-            os.lseek(solv.xfileno(f), 0, os.SEEK_SET)
+            h = ts.hdrFromFdno(f.fileno())
+            os.lseek(f.fileno(), 0, os.SEEK_SET)
             ts.addInstall(h, p, 'i')
     checkproblems = ts.check()
     if checkproblems:
@@ -931,14 +931,14 @@ if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == '
     ts.order()
     def runCallback(reason, amount, total, p, d):
         if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
-            return solv.xfileno(newpkgsfp[p.id])
+            return newpkgsfp[p.id].fileno()
         if reason == rpm.RPMCALLBACK_INST_START:
             print "install", p
         if reason == rpm.RPMCALLBACK_UNINST_START:
             # argh, p is just the name of the package
             if p in erasenamehelper:
                 p = erasenamehelper[p]
-            print "erase", p
+                print "erase", p
     runproblems = ts.run(runCallback, '')
     if runproblems:
         print runproblems
