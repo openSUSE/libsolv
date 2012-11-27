@@ -1544,7 +1544,7 @@ cleandeps_check_mistakes(Solver *solv, int level)
 {
   Pool *pool = solv->pool;
   Rule *r;
-  Id p, *dp;
+  Id p, pp;
   int i;
   int mademistake = 0;
 
@@ -1557,37 +1557,34 @@ cleandeps_check_mistakes(Solver *solv, int level)
 	continue;
       r = solv->rules + solv->featurerules + (i - solv->installed->start);
       /* a mistake is when the featurerule is true but the updaterule is false */
-      if (r->p)
+      if (!r->p)
+	continue;
+      FOR_RULELITERALS(p, pp, r)
+	if (p > 0 && solv->decisionmap[p] > 0)
+	  break;
+      if (!p)
+	continue;	/* feature rule is not true */
+      r = solv->rules + solv->updaterules + (i - solv->installed->start);
+      if (!r->p)
+	continue;
+      FOR_RULELITERALS(p, pp, r)
+	if (p > 0 && solv->decisionmap[p] > 0)
+	  break;
+      if (p)
+	continue;	/* update rule is true */
+      POOL_DEBUG(SOLV_DEBUG_SOLVER, "cleandeps mistake: ");
+      solver_printruleclass(solv, SOLV_DEBUG_SOLVER, r);
+      POOL_DEBUG(SOLV_DEBUG_SOLVER, "feature rule: ");
+      solver_printruleclass(solv, SOLV_DEBUG_SOLVER, solv->rules + solv->featurerules + (i - solv->installed->start));
+      if (!solv->cleandeps_mistakes)
 	{
-	  FOR_RULELITERALS(p, dp, r)
-	    if (p > 0 && solv->decisionmap[p] > 0)
-	      break;
-	  if (p)
-	    {
-	      r = solv->rules + solv->updaterules + (i - solv->installed->start);
-	      if (!r->p)
-		continue;
-	      FOR_RULELITERALS(p, dp, r)
-		if (p > 0 && solv->decisionmap[p] > 0)
-		  break;
-	      if (!p)
-		{
-		  POOL_DEBUG(SOLV_DEBUG_SOLVER, "cleandeps mistake: ");
-		  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, r);
-		  POOL_DEBUG(SOLV_DEBUG_SOLVER, "feature rule: ");
-		  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, solv->rules + solv->featurerules + (i - solv->installed->start));
-		  if (!solv->cleandeps_mistakes)
-		    {
-		      solv->cleandeps_mistakes = solv_calloc(1, sizeof(Queue));
-		      queue_init(solv->cleandeps_mistakes);
-		    }
-		  queue_push(solv->cleandeps_mistakes, i);
-		  MAPCLR(&solv->cleandepsmap, i - solv->installed->start);
-		  solver_reenablepolicyrules_cleandeps(solv, i);
-		  mademistake = 1;
-		}
-	    }
+	  solv->cleandeps_mistakes = solv_calloc(1, sizeof(Queue));
+	  queue_init(solv->cleandeps_mistakes);
 	}
+      queue_push(solv->cleandeps_mistakes, i);
+      MAPCLR(&solv->cleandepsmap, i - solv->installed->start);
+      solver_reenablepolicyrules_cleandeps(solv, i);
+      mademistake = 1;
     }
   if (mademistake)
     solver_reset(solv);
@@ -1631,7 +1628,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   int i, j, n;
   Solvable *s;
   Pool *pool = solv->pool;
-  Id p, *dp;
+  Id p, pp, *dp;
   int minimizationsteps;
   int installedpos = solv->installed ? solv->installed->start : 0;
 
@@ -1694,7 +1691,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      if (r->d < 0)		/* ignore disabled rules */
 		continue;
 	      queue_empty(&dq);
-	      FOR_RULELITERALS(l, dp, r)
+	      FOR_RULELITERALS(l, pp, r)
 		{
 		  if (l < 0)
 		    {
@@ -1824,7 +1821,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      else
 			{
 			  /* update to best package */
-			  FOR_RULELITERALS(p, dp, rr)
+			  FOR_RULELITERALS(p, pp, rr)
 			    {
 			      if (solv->decisionmap[p] > 0)
 				{

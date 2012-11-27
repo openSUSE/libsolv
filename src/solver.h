@@ -266,7 +266,6 @@ typedef struct _Solver Solver;
  * you will get problem reported if the best package is
  * not installable. This can be used with INSTALL, UPDATE
  * and DISTUPGRADE */
-/* Also, it's not implemented yet ;) */
 #define SOLVER_FORCEBEST		0x100000
 
 #define SOLVER_SETEV			0x01000000
@@ -340,12 +339,13 @@ void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
 int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
 
 /* iterate over all literals of a rule */
-/* WARNING: loop body must not relocate whatprovidesdata, e.g. by
- * looking up the providers of a dependency */
-#define FOR_RULELITERALS(l, dp, r)				\
-    for (l = r->d < 0 ? -r->d - 1 : r->d,			\
-         dp = !l ? &r->w2 : pool->whatprovidesdata + l,		\
-         l = r->p; l; l = (dp != &r->w2 + 1 ? *dp++ : 0))
+#define FOR_RULELITERALS(l, pp, r)				\
+    for (pp = r->d < 0 ? -r->d - 1 : r->d,			\
+         l = r->p; l; l = (pp <= 0 ? (pp-- ? 0 : r->w2) :	\
+         pool->whatprovidesdata[pp++]))
+
+
+
 
 /* XXX: this currently doesn't work correctly for SOLVER_SOLVABLE_REPO and
    SOLVER_SOLVABLE_ALL */

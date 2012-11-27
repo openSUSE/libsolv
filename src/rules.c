@@ -2202,7 +2202,7 @@ void
 solver_ruleliterals(Solver *solv, Id rid, Queue *q)
 {
   Pool *pool = solv->pool;
-  Id p, *pp;
+  Id p, pp;
   Rule *r;
 
   queue_empty(q);
@@ -2246,7 +2246,7 @@ solver_addchoicerules(Solver *solv)
   Rule *r;
   Queue q, qi;
   int i, j, rid, havechoice;
-  Id p, d, *pp;
+  Id p, d, pp;
   Id p2, pp2;
   Solvable *s, *s2;
   Id lastaddedp, lastaddedd;
@@ -2428,7 +2428,7 @@ solver_addchoicerules(Solver *solv)
 void
 solver_disablechoicerules(Solver *solv, Rule *r)
 {
-  Id rid, p, *pp;
+  Id rid, p, pp;
   Pool *pool = solv->pool;
   Map m;
   Rule *or;
@@ -2515,7 +2515,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	  if ((solv->job.elements[i] & (SOLVER_JOBMASK | SOLVER_FORCEBEST)) == (SOLVER_INSTALL | SOLVER_FORCEBEST))
 	    {
 	      int j;
-	      Id p2, *pp2;
+	      Id p2, pp2;
 	      for (j = 0; j < solv->ruletojob.count; j++)
 		if (solv->ruletojob.elements[j] == i)
 		  break;
@@ -2544,7 +2544,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
     {
       FOR_REPO_SOLVABLES(installed, p, s)
 	{
-	  Id d, p2, *pp2;
+	  Id d, p2, pp2;
 	  if (!solv->updatemap_all && (!solv->updatemap.size || !MAPTST(&solv->updatemap, p - installed->start)))
 	    continue;
 	  if (!solv->bestupdatemap_all && (!solv->bestupdatemap.size || !MAPTST(&solv->bestupdatemap, p - installed->start)))
@@ -2694,7 +2694,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   Map installedm;
   Rule *r;
   Id rid, how, what, select;
-  Id p, pp, ip, *jp;
+  Id p, pp, ip, jp;
   Id req, *reqp, sup, *supp;
   Solvable *s;
   Queue iq;

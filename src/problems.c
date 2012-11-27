@@ -431,12 +431,12 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
   if (why >= solv->updaterules && why < solv->updaterules_end)
     {
       /* update rule, find replacement package */
-      Id p, *dp, rp = 0;
+      Id p, pp, rp = 0;
       Rule *rr;
 
       /* check if this is a false positive, i.e. the update rule is fulfilled */
       rr = solv->rules + why;
-      FOR_RULELITERALS(p, dp, rr)
+      FOR_RULELITERALS(p, pp, rr)
 	if (p > 0 && solv->decisionmap[p] > 0)
 	  return;	/* false alarm */
 
@@ -456,7 +456,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
       if (rr->w2)
 	{
 	  int mvrp = 0;		/* multi-version replacement */
-	  FOR_RULELITERALS(rp, dp, rr)
+	  FOR_RULELITERALS(rp, pp, rr)
 	    {
 	      if (rp > 0 && solv->decisionmap[rp] > 0 && pool->solvables[rp].repo != solv->installed)
 		{
@@ -480,11 +480,11 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
   if (why >= solv->bestrules && why < solv->bestrules_end)
     {
       int mvrp;
-      Id p, *dp, rp = 0;
+      Id p, pp, rp = 0;
       Rule *rr;
       /* check false positive */
       rr = solv->rules + why;
-      FOR_RULELITERALS(p, dp, rr)
+      FOR_RULELITERALS(p, pp, rr)
 	if (p > 0 && solv->decisionmap[p] > 0)
 	  return;	/* false alarm */
       /* check update/feature rule */
@@ -507,7 +507,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
       if (!rr->p)
 	rr = solv->rules + solv->updaterules + (p - solv->installed->start);
       mvrp = 0;		/* multi-version replacement */
-      FOR_RULELITERALS(rp, dp, rr)
+      FOR_RULELITERALS(rp, pp, rr)
 	if (rp > 0 && solv->decisionmap[rp] > 0 && pool->solvables[rp].repo != solv->installed)
 	  {
 	    mvrp = rp;
