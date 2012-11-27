@@ -586,7 +586,7 @@ end
 
 if jobs.empty? && (cmd == 'up' || cmd == 'dup' || cmd == 'verify')
   sel = pool.Selection()
-  sel.addsimple(Solv::Job::SOLVER_SOLVABLE_ALL, 0)
+  sel.add_raw(Solv::Job::SOLVER_SOLVABLE_ALL, 0)
   jobs += sel.jobs(0)
 end
 

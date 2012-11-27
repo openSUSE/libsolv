@@ -873,7 +873,7 @@ typedef struct {
         $self->flags |= lsel->flags;
       }
   }
-  void addsimple(Id how, Id what) {
+  void add_raw(Id how, Id what) {
     queue_push2(&$self->q, how, what);
   }
   %typemap(out) Queue jobs Queue2Array(Job *, 2, new_Job(arg1->pool, id, idp[1]));

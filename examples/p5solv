@@ -574,7 +574,7 @@ for my $arg (@ARGV) {
 }
 if (!@jobs && ($cmd eq 'up' || $cmd eq 'dup' || $cmd eq 'verify')) {
   my $sel = $pool->Selection();
-  $sel->addsimple($solv::Job::SOLVER_SOLVABLE_ALL, 0);
+  $sel->add_raw($solv::Job::SOLVER_SOLVABLE_ALL, 0);
   push @jobs, $sel->jobs(0);
 }
 

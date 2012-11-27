@@ -639,7 +639,7 @@ if options.repos:
         if hasattr(repo, 'handle'):
             if not repolimiter:
                 repolimiter = pool.Selection()
-            repolimiter.addsimple(Job.SOLVER_SOLVABLE_REPO|Job.SOLVER_SETREPO|Job.SOLVER_SETVENDOR, repo.handle.id)
+            repolimiter.add_raw(Job.SOLVER_SOLVABLE_REPO|Job.SOLVER_SETREPO|Job.SOLVER_SETVENDOR, repo.handle.id)
 
 if cmd == 'search':
     matches = {}
@@ -701,7 +701,7 @@ for arg in args:
 
 if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repolimiter):
     sel = pool.Selection()
-    sel.addsimple(Job.SOLVER_SOLVABLE_ALL, 0)
+    sel.add_raw(Job.SOLVER_SOLVABLE_ALL, 0)
     if repolimiter:
        sel.limit(repolimiter)
     jobs += sel.jobs(0)
