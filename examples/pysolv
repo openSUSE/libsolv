@@ -576,17 +576,20 @@ if not args:
 
 cmd = args[0]
 args = args[1:]
-if cmd == 'li':
-    cmd = 'list'
-if cmd == 'in':
-    cmd = 'install'
-if cmd == 'rm':
-    cmd = 'erase'
-if cmd == 've':
-    cmd = 'verify'
-if cmd == 'se':
-    cmd = 'search'
 
+cmdabbrev = {'li': 'list', 'in': 'install', 'rm': 'erase', 've': 'verify', 'se': 'search'}
+if cmd in cmdabbrev:
+    cmd = cmdabbrev[cmd]
+
+cmdactionmap = {
+  'install': Job.SOLVER_INSTALL,
+  'erase':   Job.SOLVER_ERASE,
+  'up':      Job.SOLVER_UPDATE,
+  'dup':     Job.SOLVER_DISTUPGRADE,
+  'verify':  Job.SOLVER_VERIFY,
+  'list':    0,
+  'info':    0
+}
 
 # read all repo configs
 repos = []
@@ -653,6 +656,10 @@ if cmd == 'search':
         print " - %s [%s]: %s" % (s, s.repo.name, s.lookup_str(solv.SOLVABLE_SUMMARY))
     sys.exit(0)
 
+if cmd not in cmdactionmap:
+    print "unknown command", cmd
+    sys.exit(1)
+
 cmdlinerepo = None
 if cmd == 'list' or cmd == 'info' or cmd == 'install':
     for arg in args:
@@ -700,19 +707,20 @@ for arg in args:
             print "[using file list match for '%s']" % arg
         if sel.flags() & Selection.SELECTION_PROVIDES:
             print "[using capability match for '%s']" % arg
-        jobs += sel.jobs(0)
+        jobs += sel.jobs(cmdactionmap[cmd])
 
 if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repolimiter):
     sel = pool.Selection()
     sel.add_raw(Job.SOLVER_SOLVABLE_ALL, 0)
     if repolimiter:
        sel.limit(repolimiter)
-    jobs += sel.jobs(0)
+    jobs += sel.jobs(cmdactionmap[cmd])
+
+if not jobs:
+    print "no package matched."
+    sys.exit(1)
 
 if cmd == 'list' or cmd == 'info':
-    if not jobs:
-        print "no package matched."
-        sys.exit(1)
     for job in jobs:
         for s in job.solvables():
             if cmd == 'info':
@@ -732,220 +740,203 @@ if cmd == 'list' or cmd == 'info':
                 print "    %s" % s.lookup_str(solv.SOLVABLE_SUMMARY)
     sys.exit(0)
 
-if cmd == 'install' or cmd == 'erase' or cmd == 'up' or cmd == 'dup' or cmd == 'verify':
-    if not jobs:
-        print "no package matched."
-        sys.exit(1)
-    for job in jobs:
-        if cmd == 'up':
-            job.how |= Job.SOLVER_UPDATE
-            # up magic: use install instead of update if no installed package matches
-            if job.isemptyupdate():
-                job.how ^= Job.SOLVER_UPDATE ^ Job.SOLVER_INSTALL
-        elif cmd == 'install':
-            job.how |= Job.SOLVER_INSTALL
-        elif cmd == 'erase':
-            job.how |= Job.SOLVER_ERASE
-        elif cmd == 'dup':
-            job.how |= Job.SOLVER_DISTUPGRADE
-        elif cmd == 'verify':
-            job.how |= Job.SOLVER_VERIFY
+# up magic: use install instead of update if no installed package matches
+for job in jobs:
+    if cmd == 'up' and job.isemptyupdate():
+        job.how ^= Job.SOLVER_UPDATE ^ Job.SOLVER_INSTALL
 
-    #pool.set_debuglevel(2)
-    solver = None
-    while True:
-        solver = pool.Solver()
-        solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
-        if cmd == 'erase':
-            solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
-        problems = solver.solve(jobs)
-        if not problems:
-            break
-        for problem in problems:
-            print "Problem %d:" % problem.id
-            r = problem.findproblemrule()
-            ri = r.info()
-            print ri.problemstr()
-            solutions = problem.solutions()
-            for solution in solutions:
-                print "  Solution %d:" % solution.id
-                elements = solution.elements(True)
-                for element in elements:
-                    print "  - %s" % element.str()
-                print
-            sol = ''
-            while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
-                sys.stdout.write("Please choose a solution: ")
-                sys.stdout.flush()
-                sol = sys.stdin.readline().strip()
-            if sol == 's':
-                continue        # skip problem
-            if sol == 'q':
-                sys.exit(1)
-            solution = solutions[int(sol) - 1]
-            for element in solution.elements():
-                newjob = element.Job()
-                if element.type == Solver.SOLVER_SOLUTION_JOB:
-                    jobs[element.jobidx] = newjob
-                else:
-                    if newjob and newjob not in jobs:
-                        jobs.append(newjob)
-                        
-    # no problems, show transaction
-    trans = solver.transaction()
-    del solver
-    if trans.isempty():
-        print "Nothing to do."
-        sys.exit(0)
-    print
-    print "Transaction summary:"
-    print
-    for cl in trans.classify():
-        if cl.type == Transaction.SOLVER_TRANSACTION_ERASE:
-            print "%d erased packages:" % cl.count
-        elif cl.type == Transaction.SOLVER_TRANSACTION_INSTALL:
-            print "%d installed packages:" % cl.count
-        elif cl.type == Transaction.SOLVER_TRANSACTION_REINSTALLED:
-            print "%d reinstalled packages:" % cl.count
-        elif cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
-            print "%d downgraded packages:" % cl.count
-        elif cl.type == Transaction.SOLVER_TRANSACTION_CHANGED:
-            print "%d changed packages:" % cl.count
-        elif cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED:
-            print "%d upgraded packages:" % cl.count
-        elif cl.type == Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
-            print "%d vendor changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
-        elif cl.type == Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
-            print "%d arch changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
-        else:
-            continue
-        for p in cl.solvables():
-            if cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED or cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
-                op = trans.othersolvable(p)
-                print "  - %s -> %s" % (p, op)
-            else:
-                print "  - %s" % p
-        print
-    print "install size change: %d K" % trans.calc_installsizechange()
-    print
-    
-    while True:
-        sys.stdout.write("OK to continue (y/n)? ")
-        sys.stdout.flush()
-        yn = sys.stdin.readline().strip()
-        if yn == 'y': break
-        if yn == 'n': sys.exit(1)
-    newpkgs = trans.newpackages()
-    newpkgsfp = {}
-    if newpkgs:
-        downloadsize = 0
-        for p in newpkgs:
-            downloadsize += p.lookup_num(solv.SOLVABLE_DOWNLOADSIZE)
-        print "Downloading %d packages, %d K" % (len(newpkgs), downloadsize)
-        for p in newpkgs:
-            repo = p.repo.appdata
-            location, medianr = p.lookup_location()
-            if not location:
-                continue
-            if repo.type == 'commandline':
-                f = solv.xfopen(location)
-                if not f:
-                    sys.exit("\n%s: %s not found" % location)
-                newpkgsfp[p.id] = f
-                continue
-            if not sysrepo.handle.isempty() and os.access('/usr/bin/applydeltarpm', os.X_OK):
-                pname = p.name
-                di = p.repo.Dataiterator(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
-                di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
-                for d in di:
-                    dp = d.parentpos()
-                    if dp.lookup_id(solv.DELTA_PACKAGE_EVR) != p.evrid or dp.lookup_id(solv.DELTA_PACKAGE_ARCH) != p.archid:
-                        continue
-                    baseevrid = dp.lookup_id(solv.DELTA_BASE_EVR)
-                    candidate = None
-                    for installedp in pool.whatprovides(p.nameid):
-                        if installedp.isinstalled() and installedp.nameid == p.nameid and installedp.archid == p.archid and installedp.evrid == baseevrid:
-                            candidate = installedp
-                    if not candidate:
-                        continue
-                    seq = dp.lookup_deltaseq()
-                    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, '-c', '-s', seq])
-                    if st:
-                        continue
-                    chksum = dp.lookup_checksum(solv.DELTA_CHECKSUM)
-                    if not chksum:
-                        continue
-                    dloc, dmedianr = dp.lookup_deltalocation()
-                    dloc = repo.packagespath() + dloc
-                    f = repo.download(dloc, False, chksum)
-                    if not f:
-                        continue
-                    nf = tempfile.TemporaryFile()
-                    nf = os.dup(nf.fileno())   # get rid of CLOEXEC
-                    st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, "/dev/fd/%d" % f.fileno(), "/dev/fd/%d" % nf])
-                    os.lseek(nf, 0, os.SEEK_SET)
-                    newpkgsfp[p.id] = solv.xfopen_fd("", nf)
-                    os.close(nf)
-                    break
-                if p.id in newpkgsfp:
-                    sys.stdout.write("d")
-                    sys.stdout.flush()
-                    continue
-                        
-            chksum = p.lookup_checksum(solv.SOLVABLE_CHECKSUM)
-            location = repo.packagespath() + location
-            f = repo.download(location, False, chksum)
-            if not f:
-                sys.exit("\n%s: %s not found in repository" % (repo.name, location))
-            newpkgsfp[p.id] = f
-            sys.stdout.write(".")
+#pool.set_debuglevel(2)
+solver = None
+while True:
+    solver = pool.Solver()
+    solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
+    if cmd == 'erase':
+        solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
+    problems = solver.solve(jobs)
+    if not problems:
+        break
+    for problem in problems:
+        print "Problem %d:" % problem.id
+        r = problem.findproblemrule()
+        ri = r.info()
+        print ri.problemstr()
+        solutions = problem.solutions()
+        for solution in solutions:
+            print "  Solution %d:" % solution.id
+            elements = solution.elements(True)
+            for element in elements:
+                print "  - %s" % element.str()
+            print
+        sol = ''
+        while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
+            sys.stdout.write("Please choose a solution: ")
             sys.stdout.flush()
-        print
-    print "Committing transaction:"
-    print
-    ts = rpm.TransactionSet('/')
-    ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
-    erasenamehelper = {}
-    for p in trans.steps():
-        type = trans.steptype(p, Transaction.SOLVER_TRANSACTION_RPM_ONLY)
-        if type == Transaction.SOLVER_TRANSACTION_ERASE:
-            rpmdbid = p.lookup_num(solv.RPM_RPMDBID)
-            erasenamehelper[p.name] = p
-            if not rpmdbid:
-                sys.exit("\ninternal error: installed package %s has no rpmdbid\n" % p)
-            ts.addErase(rpmdbid)
-        elif type == Transaction.SOLVER_TRANSACTION_INSTALL:
-            f = newpkgsfp[p.id]
-            h = ts.hdrFromFdno(f.fileno())
-            os.lseek(f.fileno(), 0, os.SEEK_SET)
-            ts.addInstall(h, p, 'u')
-        elif type == Transaction.SOLVER_TRANSACTION_MULTIINSTALL:
-            f = newpkgsfp[p.id]
-            h = ts.hdrFromFdno(f.fileno())
-            os.lseek(f.fileno(), 0, os.SEEK_SET)
-            ts.addInstall(h, p, 'i')
-    checkproblems = ts.check()
-    if checkproblems:
-        print checkproblems
-        sys.exit("Sorry.")
-    ts.order()
-    def runCallback(reason, amount, total, p, d):
-        if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
-            return newpkgsfp[p.id].fileno()
-        if reason == rpm.RPMCALLBACK_INST_START:
-            print "install", p
-        if reason == rpm.RPMCALLBACK_UNINST_START:
-            # argh, p is just the name of the package
-            if p in erasenamehelper:
-                p = erasenamehelper[p]
-                print "erase", p
-    runproblems = ts.run(runCallback, '')
-    if runproblems:
-        print runproblems
-        sys.exit(1)
+            sol = sys.stdin.readline().strip()
+        if sol == 's':
+            continue        # skip problem
+        if sol == 'q':
+            sys.exit(1)
+        solution = solutions[int(sol) - 1]
+        for element in solution.elements():
+            newjob = element.Job()
+            if element.type == Solver.SOLVER_SOLUTION_JOB:
+                jobs[element.jobidx] = newjob
+            else:
+                if newjob and newjob not in jobs:
+                    jobs.append(newjob)
+                    
+# no problems, show transaction
+trans = solver.transaction()
+del solver
+if trans.isempty():
+    print "Nothing to do."
     sys.exit(0)
+print
+print "Transaction summary:"
+print
+for cl in trans.classify():
+    if cl.type == Transaction.SOLVER_TRANSACTION_ERASE:
+        print "%d erased packages:" % cl.count
+    elif cl.type == Transaction.SOLVER_TRANSACTION_INSTALL:
+        print "%d installed packages:" % cl.count
+    elif cl.type == Transaction.SOLVER_TRANSACTION_REINSTALLED:
+        print "%d reinstalled packages:" % cl.count
+    elif cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+        print "%d downgraded packages:" % cl.count
+    elif cl.type == Transaction.SOLVER_TRANSACTION_CHANGED:
+        print "%d changed packages:" % cl.count
+    elif cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED:
+        print "%d upgraded packages:" % cl.count
+    elif cl.type == Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
+        print "%d vendor changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
+    elif cl.type == Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
+        print "%d arch changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
+    else:
+        continue
+    for p in cl.solvables():
+        if cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED or cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+            op = trans.othersolvable(p)
+            print "  - %s -> %s" % (p, op)
+        else:
+            print "  - %s" % p
+    print
+print "install size change: %d K" % trans.calc_installsizechange()
+print
 
-print "unknown command", cmd
-sys.exit(1)
+while True:
+    sys.stdout.write("OK to continue (y/n)? ")
+    sys.stdout.flush()
+    yn = sys.stdin.readline().strip()
+    if yn == 'y': break
+    if yn == 'n': sys.exit(1)
+newpkgs = trans.newpackages()
+newpkgsfp = {}
+if newpkgs:
+    downloadsize = 0
+    for p in newpkgs:
+        downloadsize += p.lookup_num(solv.SOLVABLE_DOWNLOADSIZE)
+    print "Downloading %d packages, %d K" % (len(newpkgs), downloadsize)
+    for p in newpkgs:
+        repo = p.repo.appdata
+        location, medianr = p.lookup_location()
+        if not location:
+            continue
+        if repo.type == 'commandline':
+            f = solv.xfopen(location)
+            if not f:
+                sys.exit("\n%s: %s not found" % location)
+            newpkgsfp[p.id] = f
+            continue
+        if not sysrepo.handle.isempty() and os.access('/usr/bin/applydeltarpm', os.X_OK):
+            pname = p.name
+            di = p.repo.Dataiterator(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
+            di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
+            for d in di:
+                dp = d.parentpos()
+                if dp.lookup_id(solv.DELTA_PACKAGE_EVR) != p.evrid or dp.lookup_id(solv.DELTA_PACKAGE_ARCH) != p.archid:
+                    continue
+                baseevrid = dp.lookup_id(solv.DELTA_BASE_EVR)
+                candidate = None
+                for installedp in pool.whatprovides(p.nameid):
+                    if installedp.isinstalled() and installedp.nameid == p.nameid and installedp.archid == p.archid and installedp.evrid == baseevrid:
+                        candidate = installedp
+                if not candidate:
+                    continue
+                seq = dp.lookup_deltaseq()
+                st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, '-c', '-s', seq])
+                if st:
+                    continue
+                chksum = dp.lookup_checksum(solv.DELTA_CHECKSUM)
+                if not chksum:
+                    continue
+                dloc, dmedianr = dp.lookup_deltalocation()
+                dloc = repo.packagespath() + dloc
+                f = repo.download(dloc, False, chksum)
+                if not f:
+                    continue
+                nf = tempfile.TemporaryFile()
+                nf = os.dup(nf.fileno())   # get rid of CLOEXEC
+                st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, "/dev/fd/%d" % f.fileno(), "/dev/fd/%d" % nf])
+                os.lseek(nf, 0, os.SEEK_SET)
+                newpkgsfp[p.id] = solv.xfopen_fd("", nf)
+                os.close(nf)
+                break
+            if p.id in newpkgsfp:
+                sys.stdout.write("d")
+                sys.stdout.flush()
+                continue
+                    
+        chksum = p.lookup_checksum(solv.SOLVABLE_CHECKSUM)
+        location = repo.packagespath() + location
+        f = repo.download(location, False, chksum)
+        if not f:
+            sys.exit("\n%s: %s not found in repository" % (repo.name, location))
+        newpkgsfp[p.id] = f
+        sys.stdout.write(".")
+        sys.stdout.flush()
+    print
+print "Committing transaction:"
+print
+ts = rpm.TransactionSet('/')
+ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
+erasenamehelper = {}
+for p in trans.steps():
+    type = trans.steptype(p, Transaction.SOLVER_TRANSACTION_RPM_ONLY)
+    if type == Transaction.SOLVER_TRANSACTION_ERASE:
+        rpmdbid = p.lookup_num(solv.RPM_RPMDBID)
+        erasenamehelper[p.name] = p
+        if not rpmdbid:
+            sys.exit("\ninternal error: installed package %s has no rpmdbid\n" % p)
+        ts.addErase(rpmdbid)
+    elif type == Transaction.SOLVER_TRANSACTION_INSTALL:
+        f = newpkgsfp[p.id]
+        h = ts.hdrFromFdno(f.fileno())
+        os.lseek(f.fileno(), 0, os.SEEK_SET)
+        ts.addInstall(h, p, 'u')
+    elif type == Transaction.SOLVER_TRANSACTION_MULTIINSTALL:
+        f = newpkgsfp[p.id]
+        h = ts.hdrFromFdno(f.fileno())
+        os.lseek(f.fileno(), 0, os.SEEK_SET)
+        ts.addInstall(h, p, 'i')
+checkproblems = ts.check()
+if checkproblems:
+    print checkproblems
+    sys.exit("Sorry.")
+ts.order()
+def runCallback(reason, amount, total, p, d):
+    if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
+        return newpkgsfp[p.id].fileno()
+    if reason == rpm.RPMCALLBACK_INST_START:
+        print "install", p
+    if reason == rpm.RPMCALLBACK_UNINST_START:
+        # argh, p is just the name of the package
+        if p in erasenamehelper:
+            p = erasenamehelper[p]
+            print "erase", p
+runproblems = ts.run(runCallback, '')
+if runproblems:
+    print runproblems
+    sys.exit(1)
+sys.exit(0)
 
 # vim: sw=4 et

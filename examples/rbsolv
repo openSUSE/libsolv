@@ -500,11 +500,20 @@ end
 
 args = ARGV
 cmd = args.shift
-cmd = 'list' if cmd == 'li'
-cmd = 'install' if cmd == 'in'
-cmd = 'erase' if cmd == 'rm'
-cmd = 'verify' if cmd == 've'
-cmd = 'search' if cmd == 'se'
+
+cmdabbrev = { 'li' => 'list', 'in' => 'install', 'rm' => 'erase',
+              've' => 'verify', 'se' => 'search' }
+cmd = cmdabbrev[cmd] if cmdabbrev.has_key?(cmd)
+
+cmdactionmap = { 
+  'install' => Solv::Job::SOLVER_INSTALL,
+  'erase'   => Solv::Job::SOLVER_ERASE,
+  'up'      => Solv::Job::SOLVER_UPDATE,
+  'dup'     => Solv::Job::SOLVER_DISTUPGRADE,
+  'verify'  => Solv::Job::SOLVER_VERIFY,
+  'list'    => 0,  
+  'info'    => 0,
+}
 
 repos = []
 reposdirs = []
@@ -547,16 +556,18 @@ for repo in repos
 end
 
 if cmd == 'search'
-  matches = {}
+  pool.createwhatprovides()
+  sel = pool.Selection
   for di in pool.Dataiterator(0, Solv::SOLVABLE_NAME, args[0], Solv::Dataiterator::SEARCH_SUBSTRING | Solv::Dataiterator::SEARCH_NOCASE)
-    matches[di.solvid] = true
+    sel.add_raw(Solv::Job::SOLVER_SOLVABLE, di.solvid)
   end
-  for solvid in matches.keys.sort
-    s = pool.solvables[solvid]
-    puts "- #{s.str} [#{s.repo.name}]"
+  for s in sel.solvables
+    puts "- #{s.str} [#{s.repo.name}]: #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
   end
   exit
 end
+
+abort("unknown command '#{cmd}'\n") unless cmdactionmap.has_key?(cmd)
 
 addedprovides = pool.addfileprovides_queue()
 if !addedprovides.empty?
@@ -581,179 +592,171 @@ for arg in args
   end
   puts "[using file list match for '#{arg}']" if sel.flags & Solv::Selection::SELECTION_FILELIST != 0
   puts "[using capability match for '#{arg}']" if sel.flags & Solv::Selection::SELECTION_PROVIDES != 0
-  jobs += sel.jobs(0)
+  jobs += sel.jobs(cmdactionmap[cmd])
 end
 
 if jobs.empty? && (cmd == 'up' || cmd == 'dup' || cmd == 'verify')
   sel = pool.Selection()
   sel.add_raw(Solv::Job::SOLVER_SOLVABLE_ALL, 0)
-  jobs += sel.jobs(0)
+  jobs += sel.jobs(cmdactionmap[cmd])
 end
 
+abort("no package matched.") if jobs.empty?
+
 if cmd == 'list' || cmd == 'info'
-  abort("no package matched.") if jobs.empty?
-    for job in jobs
-      for s in job.solvables()
-	if cmd == 'info'
-	  puts "Name:        #{s.str}"
-	  puts "Repo:        #{s.repo.name}"
-	  puts "Summary:     #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
-	  str = s.lookup_str(Solv::SOLVABLE_URL)
-	  puts "Url:         #{str}" if str
-	  str = s.lookup_str(Solv::SOLVABLE_LICENSE)
-	  puts "License:     #{str}" if str
-	  puts "Description:\n#{s.lookup_str(Solv::SOLVABLE_DESCRIPTION)}"
-	  puts
-	else
-	  puts "  - #{s.str} [#{s.repo.name}]"
-	  puts "    #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
-	end
+  for job in jobs
+    for s in job.solvables()
+      if cmd == 'info'
+	puts "Name:        #{s.str}"
+	puts "Repo:        #{s.repo.name}"
+	puts "Summary:     #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
+	str = s.lookup_str(Solv::SOLVABLE_URL)
+	puts "Url:         #{str}" if str
+	str = s.lookup_str(Solv::SOLVABLE_LICENSE)
+	puts "License:     #{str}" if str
+	puts "Description:\n#{s.lookup_str(Solv::SOLVABLE_DESCRIPTION)}"
+	puts
+      else
+	puts "  - #{s.str} [#{s.repo.name}]"
+	puts "    #{s.lookup_str(Solv::SOLVABLE_SUMMARY)}"
       end
     end
+  end
   exit
 end
 
-if cmd == 'install' || cmd == 'erase' || cmd == 'up' || cmd == 'dup' || cmd == 'verify'
-  abort("no package matched.") if jobs.empty?
-  for job in jobs
-    if cmd == 'up'
-      job.how |= Solv::Job::SOLVER_UPDATE
-      job.how ^= Solv::Job::SOLVER_UPDATE ^ Solv::Job::SOLVER_INSTALL if job.isemptyupdate?
-    elsif cmd == 'install'
-      job.how |= Solv::Job::SOLVER_INSTALL
-    elsif cmd == 'erase'
-      job.how |= Solv::Job::SOLVER_ERASE
-    elsif cmd == 'dup'
-      job.how |= Solv::Job::SOLVER_DISTUPGRADE
-    elsif cmd == 'verify'
-      job.how |= Solv::Job::SOLVER_VERIFY
-    end
-  end
+for job in jobs
+  job.how ^= Solv::Job::SOLVER_UPDATE ^ Solv::Job::SOLVER_INSTALL if cmd == 'up' and job.isemptyupdate?
+end
 
-  solver = nil
-  #pool.set_debuglevel(1)
-  while true
-    solver = pool.Solver
-    solver.set_flag(Solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1)
-    solver.set_flag(Solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if cmd == 'erase'
-    problems = solver.solve(jobs)
-    break if problems.empty?
-    for problem in problems
-      puts "Problem #{problem.id}:"
-      puts problem.findproblemrule.info.problemstr
-      solutions = problem.solutions
-      for solution in solutions
-	puts "  Solution #{solution.id}:"
-	elements = solution.elements(true)
-	for element in elements
-	  puts "  - #{element.str}"
-	end
-	puts
+solver = nil
+#pool.set_debuglevel(1)
+while true
+  solver = pool.Solver
+  solver.set_flag(Solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1)
+  solver.set_flag(Solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if cmd == 'erase'
+  problems = solver.solve(jobs)
+  break if problems.empty?
+  for problem in problems
+    puts "Problem #{problem.id}:"
+    puts problem.findproblemrule.info.problemstr
+    solutions = problem.solutions
+    for solution in solutions
+      puts "  Solution #{solution.id}:"
+      elements = solution.elements(true)
+      for element in elements
+	puts "  - #{element.str}"
       end
-      sol = nil
-      while true
-	print "Please choose a solution: "
-	STDOUT.flush
-	sol = STDIN.gets.strip
-	break if sol == 's' || sol == 'q'
-	break if sol =~ /^\d+$/ && sol.to_i >= 1 && sol.to_i <= solutions.length
-      end
-      next if sol == 's'
-      abort if sol == 'q'
-      solution = solutions[sol.to_i - 1]
-      for element in solution.elements
-	newjob = element.Job()
-	if element.type == Solv::Solver::SOLVER_SOLUTION_JOB
-	  jobs[element.jobidx] = newjob
-	else
-	  jobs.push(newjob) if newjob && !jobs.include?(newjob)
-	end
-      end
+      puts
     end
-  end
-  trans = solver.transaction
-  solver = nil
-  if trans.isempty?
-    puts "Nothing to do."
-    exit
-  end
-  puts "\nTransaction summary:\n"
-  for cl in trans.classify()
-    if cl.type == Solv::Transaction::SOLVER_TRANSACTION_ERASE
-      puts "#{cl.count} erased packages:"
-    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_INSTALL
-      puts "#{cl.count} installed packages:"
-    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_REINSTALLED
-      puts "#{cl.count} reinstalled packages:"
-    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED
-      puts "#{cl.count} downgraded packages:"
-    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_CHANGED
-      puts "#{cl.count} changed packages:"
-    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_UPGRADED
-      puts "#{cl.count} upgraded packages:"
-    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE
-      puts "#{cl.count} vendor changes from '#{cl.fromdep}' to '#{cl.todep}':"
-    elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE
-      puts "#{cl.count} arch changes from '#{cl.fromdep}' to '#{cl.todep}':"
-    else
-      next
+    sol = nil
+    while true
+      print "Please choose a solution: "
+      STDOUT.flush
+      sol = STDIN.gets.strip
+      break if sol == 's' || sol == 'q'
+      break if sol =~ /^\d+$/ && sol.to_i >= 1 && sol.to_i <= solutions.length
     end
-    for p in cl.solvables
-      if cl.type == Solv::Transaction::SOLVER_TRANSACTION_UPGRADED || cl.type == Solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED
-	puts "  - #{p.str} -> #{trans.othersolvable(p).str}"
+    next if sol == 's'
+    abort if sol == 'q'
+    solution = solutions[sol.to_i - 1]
+    for element in solution.elements
+      newjob = element.Job()
+      if element.type == Solv::Solver::SOLVER_SOLUTION_JOB
+	jobs[element.jobidx] = newjob
       else
-	puts "  - #{p.str}"
+	jobs.push(newjob) if newjob && !jobs.include?(newjob)
       end
     end
-    puts
   end
-  puts "install size change: #{trans.calc_installsizechange()} K\n\n"
-  while true:
-    print("OK to continue (y/n)? ")
-    STDOUT.flush
-    yn = STDIN.gets.strip
-    break if yn == 'y'
-    abort if yn == 'n'
+end
+
+trans = solver.transaction
+solver = nil
+if trans.isempty?
+  puts "Nothing to do."
+  exit
+end
+
+puts "\nTransaction summary:\n"
+for cl in trans.classify()
+  if cl.type == Solv::Transaction::SOLVER_TRANSACTION_ERASE
+    puts "#{cl.count} erased packages:"
+  elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_INSTALL
+    puts "#{cl.count} installed packages:"
+  elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_REINSTALLED
+    puts "#{cl.count} reinstalled packages:"
+  elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED
+    puts "#{cl.count} downgraded packages:"
+  elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_CHANGED
+    puts "#{cl.count} changed packages:"
+  elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_UPGRADED
+    puts "#{cl.count} upgraded packages:"
+  elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE
+    puts "#{cl.count} vendor changes from '#{cl.fromdep}' to '#{cl.todep}':"
+  elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE
+    puts "#{cl.count} arch changes from '#{cl.fromdep}' to '#{cl.todep}':"
+  else
+    next
   end
-  newpkgs = trans.newpackages()
-  newpkgsfp = {}
-  if !newpkgs.empty?
-    downloadsize = 0
-    for p in newpkgs
-      downloadsize += p.lookup_num(Solv::SOLVABLE_DOWNLOADSIZE)
+  for p in cl.solvables
+    if cl.type == Solv::Transaction::SOLVER_TRANSACTION_UPGRADED || cl.type == Solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED
+      puts "  - #{p.str} -> #{trans.othersolvable(p).str}"
+    else
+      puts "  - #{p.str}"
     end
-    puts "Downloading #{newpkgs.length} packages, #{downloadsize} K"
-    for p in newpkgs
-      repo = p.repo.appdata
-      location, medianr = p.lookup_location()
-      next unless location
-      location = repo.packagespath + location
-      chksum = p.lookup_checksum(Solv::SOLVABLE_CHECKSUM)
-      f = repo.download(location, false, chksum)
-      abort("\n#{@name}: #{location} not found in repository\n") unless f
-      newpkgsfp[p.id] = f
-      print "."
-      STDOUT.flush()
-    end
-    puts
   end
-  puts "Committing transaction:"
   puts
-  trans.order(0)
-  for p in trans.steps
-    steptype = trans.steptype(p, Solv::Transaction::SOLVER_TRANSACTION_RPM_ONLY)
-    if steptype == Solv::Transaction::SOLVER_TRANSACTION_ERASE
-      puts "erase #{p.str}"
-      next unless p.lookup_num(Solv::RPM_RPMDBID)
-      evr = p.evr.sub(/^[0-9]+:/, '')
-      system('rpm', '-e', '--nodeps', '--nodigest', '--nosignature', "#{p.name}-#{evr}.#{p.arch}") || abort("rpm failed: #{$? >> 8}") 
-    elsif (steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL || steptype == Solv::Transaction::SOLVER_TRANSACTION_MULTIINSTALL)
-      puts "install #{p.str}"
-      f = newpkgsfp.delete(p.id)
-      next unless f
-      mode = steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i'
-      system('rpm', mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/#{f.fileno().to_s}") || abort("rpm failed: #{$? >> 8}")
-      f.close
-    end
+end
+puts "install size change: #{trans.calc_installsizechange()} K\n\n"
+
+while true:
+  print("OK to continue (y/n)? ")
+  STDOUT.flush
+  yn = STDIN.gets.strip
+  break if yn == 'y'
+  abort if yn == 'n'
+end
+
+newpkgs = trans.newpackages()
+newpkgsfp = {}
+if !newpkgs.empty?
+  downloadsize = 0
+  for p in newpkgs
+    downloadsize += p.lookup_num(Solv::SOLVABLE_DOWNLOADSIZE)
+  end
+  puts "Downloading #{newpkgs.length} packages, #{downloadsize} K"
+  for p in newpkgs
+    repo = p.repo.appdata
+    location, medianr = p.lookup_location()
+    next unless location
+    location = repo.packagespath + location
+    chksum = p.lookup_checksum(Solv::SOLVABLE_CHECKSUM)
+    f = repo.download(location, false, chksum)
+    abort("\n#{@name}: #{location} not found in repository\n") unless f
+    newpkgsfp[p.id] = f
+    print "."
+    STDOUT.flush()
+  end
+  puts
+end
+
+puts "Committing transaction:"
+puts
+trans.order(0)
+for p in trans.steps
+  steptype = trans.steptype(p, Solv::Transaction::SOLVER_TRANSACTION_RPM_ONLY)
+  if steptype == Solv::Transaction::SOLVER_TRANSACTION_ERASE
+    puts "erase #{p.str}"
+    next unless p.lookup_num(Solv::RPM_RPMDBID)
+    evr = p.evr.sub(/^[0-9]+:/, '')
+    system('rpm', '-e', '--nodeps', '--nodigest', '--nosignature', "#{p.name}-#{evr}.#{p.arch}") || abort("rpm failed: #{$? >> 8}") 
+  elsif (steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL || steptype == Solv::Transaction::SOLVER_TRANSACTION_MULTIINSTALL)
+    puts "install #{p.str}"
+    f = newpkgsfp.delete(p.id)
+    next unless f
+    mode = steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i'
+    system('rpm', mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/#{f.fileno().to_s}") || abort("rpm failed: #{$? >> 8}")
+    f.close
   end
 end

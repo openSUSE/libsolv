@@ -493,11 +493,19 @@ sub load_stub {
 
 die("Usage: p5solv COMMAND [ARGS]\n") unless @ARGV;
 my $cmd = shift @ARGV;
-$cmd = 'list' if $cmd eq 'li';
-$cmd = 'install' if $cmd eq 'in';
-$cmd = 'erase' if $cmd eq 'rm';
-$cmd = 'verify' if $cmd eq 've';
-$cmd = 'search' if $cmd eq 'se';
+my %cmdabbrev = ( 'li' => 'list', 'in' => 'install', 'rm' => 'erase',
+                  've' => 'verify', 'se' => 'search' );
+$cmd = $cmdabbrev{$cmd} if $cmdabbrev{$cmd};
+
+my %cmdactionmap = (
+  'install' => $solv::Job::SOLVER_INSTALL,
+  'erase'   => $solv::Job::SOLVER_ERASE,
+  'up'      => $solv::Job::SOLVER_UPDATE,
+  'dup'     => $solv::Job::SOLVER_DISTUPGRADE,
+  'verify'  => $solv::Job::SOLVER_VERIFY,
+  'list'    => 0,  
+  'info'    => 0,
+);
 
 my @repos;
 my @reposdirs;
@@ -540,17 +548,19 @@ for my $repo (@repos) {
 }
 
 if ($cmd eq 'search') {
-  my %matches;
+  $pool->createwhatprovides();
+  my $sel = $pool->Selection();
   my $di = $pool->Dataiterator(0, $solv::SOLVABLE_NAME, $ARGV[0], $solv::Dataiterator::SEARCH_SUBSTRING | $solv::Dataiterator::SEARCH_NOCASE);
   for my $d (@$di) {
-    $matches{$d->{'solvid'}} = 1;
+    $sel->add_raw($solv::Job::SOLVER_SOLVABLE, $d->{'solvid'});
   }
-  for my $solvid (sort keys %matches) {
-    my $s = $pool->{'solvables'}->[$solvid];
-    print "- ".$s->str()." [$s->{'repo'}->{'name'}] ".$s->lookup_str($solv::SOLVABLE_SUMMARY)."\n";
+  for my $s ($sel->solvables()) {
+    print "- ".$s->str()." [$s->{'repo'}->{'name'}]: ".$s->lookup_str($solv::SOLVABLE_SUMMARY)."\n";
   }
   exit(0);
 }
+
+die("unknown command '$cmd'\n") unless defined $cmdactionmap{$cmd};
 
 my @addedprovides = $pool->addfileprovides_queue();
 $pool->createwhatprovides();
@@ -570,16 +580,18 @@ for my $arg (@ARGV) {
   die("nothing matches '$arg'\n") if $sel->isempty();
   print "[using file list match for '$arg']\n" if $sel->flags() & $solv::Selection::SELECTION_FILELIST;
   print "[using capability match for '$arg']\n" if $sel->flags() & $solv::Selection::SELECTION_PROVIDES;
-  push @jobs, $sel->jobs(0);
+  push @jobs, $sel->jobs($cmdactionmap{$cmd});
 }
+
 if (!@jobs && ($cmd eq 'up' || $cmd eq 'dup' || $cmd eq 'verify')) {
   my $sel = $pool->Selection();
   $sel->add_raw($solv::Job::SOLVER_SOLVABLE_ALL, 0);
-  push @jobs, $sel->jobs(0);
+  push @jobs, $sel->jobs($cmdactionmap{$cmd});
 }
 
+die("no package matched.\n") unless @jobs;
+
 if ($cmd eq 'list' || $cmd eq 'info') {
-  die("no package matched.\n") unless @jobs;
   for my $job (@jobs) {
     for my $s ($job->solvables()) {
       if ($cmd eq 'info') {
@@ -600,144 +612,137 @@ if ($cmd eq 'list' || $cmd eq 'info') {
   exit 0;
 }
 
-if ($cmd eq 'install' || $cmd eq 'erase' || $cmd eq 'up' || $cmd eq 'dup' || $cmd eq 'verify') {
-  die("no package matched.\n") unless @jobs;
-  for my $job (@jobs) {
-    if ($cmd eq 'up') {
-      $job->{'how'} |= $solv::Job::SOLVER_UPDATE;
-      $job->{'how'} ^= $solv::Job::SOLVER_UPDATE ^ $solv::Job::SOLVER_INSTALL if $job->isemptyupdate();
-    } elsif ($cmd eq 'install') {
-	$job->{'how'} |= $solv::Job::SOLVER_INSTALL;
-    } elsif ($cmd eq 'erase') {
-	$job->{'how'} |= $solv::Job::SOLVER_ERASE;
-    } elsif ($cmd eq 'dup') {
-	$job->{'how'} |= $solv::Job::SOLVER_DISTUPGRADE;
-    } elsif ($cmd eq 'verify') {
-	$job->{'how'} |= $solv::Job::SOLVER_VERIFY;
-    }
-  }
-  my $solver;
-  while (1) {
-    $solver = $pool->Solver();
-    $solver->set_flag($solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1);
-    $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if $cmd eq 'erase';
-    my @problems = $solver->solve(\@jobs);
-    last unless @problems;
-    for my $problem (@problems) {
-      print "Problem $problem->{'id'}/".@problems.":\n";
-      my $r = $problem->findproblemrule();
-      my $ri = $r->info();
-      print $ri->problemstr()."\n";
-      my @solutions = $problem->solutions();
-      for my $solution (@solutions) {
-	print "  Solution $solution->{'id'}:\n";
-	for my $element ($solution->elements(1)) {
-	  print "  - ".$element->str()."\n";
-	}
-	print "\n";
+# up magic, turn into install if nothing matches
+for my $job (@jobs) {
+  $job->{'how'} ^= $solv::Job::SOLVER_UPDATE ^ $solv::Job::SOLVER_INSTALL if $cmd eq 'up' && $job->isemptyupdate();
+}
+
+my $solver;
+while (1) {
+  $solver = $pool->Solver();
+  $solver->set_flag($solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1);
+  $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if $cmd eq 'erase';
+  my @problems = $solver->solve(\@jobs);
+  last unless @problems;
+  for my $problem (@problems) {
+    print "Problem $problem->{'id'}/".@problems.":\n";
+    my $r = $problem->findproblemrule();
+    my $ri = $r->info();
+    print $ri->problemstr()."\n";
+    my @solutions = $problem->solutions();
+    for my $solution (@solutions) {
+      print "  Solution $solution->{'id'}:\n";
+      for my $element ($solution->elements(1)) {
+	print "  - ".$element->str()."\n";
       }
-      my $sol;
-      while (1) {
-	print "Please choose a solution: ";
-	$sol = <STDIN>;
-	chomp $sol;
-	last if $sol eq 's' || $sol eq 'q' || ($sol =~ /^\d+$/ && $sol >= 1 && $sol <= @solutions);
-      }
-      next if $sol eq 's';
-      exit(1) if $sol eq 'q';
-      my $solution = $solutions[$sol - 1];
-      for my $element ($solution->elements()) {
-	my $newjob = $element->Job();
-	if ($element->{'type'} == $solv::Solver::SOLVER_SOLUTION_JOB) {
-	  $jobs[$element->{'jobidx'}] = $newjob;
-	} else {
-	  push @jobs, $newjob if $newjob && !grep {$_ == $newjob} @jobs;
-	}
-      }
+      print "\n";
     }
-  }
-  my $trans = $solver->transaction();
-  undef $solver;
-  if ($trans->isempty()) {
-    print "Nothing to do.\n";
-    exit 0;
-  }
-  print "\nTransaction summary:\n\n";
-  for my $c ($trans->classify()) {
-    if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
-      print "$c->{'count'} erased packages:\n";
-    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_INSTALL) {
-      print "$c->{'count'} installed packages:\n";
-    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_REINSTALLED) {
-      print "$c->{'count'} reinstalled packages:\n";
-    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
-      print "$c->{'count'} downgraded packages:\n";
-    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_CHANGED) {
-      print "$c->{'count'} changed packages:\n";
-    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
-      print "$c->{'count'} upgraded packages:\n";
-    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
-      printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $c->fromdep()->str(), $c->todep()->str();
-    } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
-      printf "$c->{'count'} arch changes from '%s' to '%s':\n", $c->fromdep()->str(), $c->todep()->str();
-    } else {
-      next;
+    my $sol;
+    while (1) {
+      print "Please choose a solution: ";
+      $sol = <STDIN>;
+      chomp $sol;
+      last if $sol eq 's' || $sol eq 'q' || ($sol =~ /^\d+$/ && $sol >= 1 && $sol <= @solutions);
     }
-    for my $p ($c->solvables()) {
-      if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED || $c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
-	my $other = $trans->othersolvable($p);
-	printf "  - %s -> %s\n", $p->str(), $other->str();
+    next if $sol eq 's';
+    exit(1) if $sol eq 'q';
+    my $solution = $solutions[$sol - 1];
+    for my $element ($solution->elements()) {
+      my $newjob = $element->Job();
+      if ($element->{'type'} == $solv::Solver::SOLVER_SOLUTION_JOB) {
+	$jobs[$element->{'jobidx'}] = $newjob;
       } else {
-	printf "  - %s\n", $p->str();
+	push @jobs, $newjob if $newjob && !grep {$_ == $newjob} @jobs;
       }
     }
-    print "\n";
   }
-  printf "install size change: %d K\n\n", $trans->calc_installsizechange();
-  while (1) {
-    print("OK to continue (y/n)? ");
-    my $yn = <STDIN>;
-    chomp $yn;
-    last if $yn eq 'y';
-    exit(1) if $yn eq 'n';
+}
+
+my $trans = $solver->transaction();
+undef $solver;
+if ($trans->isempty()) {
+  print "Nothing to do.\n";
+  exit 0;
+}
+
+print "\nTransaction summary:\n\n";
+for my $c ($trans->classify()) {
+  if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
+    print "$c->{'count'} erased packages:\n";
+  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_INSTALL) {
+    print "$c->{'count'} installed packages:\n";
+  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_REINSTALLED) {
+    print "$c->{'count'} reinstalled packages:\n";
+  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
+    print "$c->{'count'} downgraded packages:\n";
+  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_CHANGED) {
+    print "$c->{'count'} changed packages:\n";
+  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
+    print "$c->{'count'} upgraded packages:\n";
+  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
+    printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $c->fromdep()->str(), $c->todep()->str();
+  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
+    printf "$c->{'count'} arch changes from '%s' to '%s':\n", $c->fromdep()->str(), $c->todep()->str();
+  } else {
+    next;
   }
-  my @newpkgs = $trans->newpackages();
-  my %newpkgsfps;
-  if (@newpkgs) {
-    my $downloadsize = 0;
-    $downloadsize += $_->lookup_num($solv::SOLVABLE_DOWNLOADSIZE) for @newpkgs;
-    printf "Downloading %d packages, %d K\n", scalar(@newpkgs), $downloadsize;
-    for my $p (@newpkgs) {
-      my $repo = $p->{'repo'}->{'appdata'};
-      my ($location, $medianr) = $p->lookup_location();
-      next unless $location;
-      $location = $repo->packagespath() . $location;
-      my $chksum = $p->lookup_checksum($solv::SOLVABLE_CHECKSUM);
-      my $f = $repo->download($location, 0, $chksum);
-      die("\n$repo->{'alias'}: $location not found in repository\n") unless $f;
-      $newpkgsfps{$p->{'id'}} = $f;
-      print ".";
-      STDOUT->flush();
+  for my $p ($c->solvables()) {
+    if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED || $c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
+      my $other = $trans->othersolvable($p);
+      printf "  - %s -> %s\n", $p->str(), $other->str();
+    } else {
+      printf "  - %s\n", $p->str();
     }
-    print "\n";
   }
-  print "Committing transaction:\n\n";
-  $trans->order(0);
-  for my $p ($trans->steps()) {
-    my $steptype = $trans->steptype($p, $solv::Transaction::SOLVER_TRANSACTION_RPM_ONLY);
-    if ($steptype == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
-      print "erase ".$p->str()."\n";
-      next unless $p->lookup_num($solv::RPM_RPMDBID);
-      my $evr = $p->{'evr'};
-      $evr =~ s/^[0-9]+://;	# strip epoch
-      system('rpm', '-e', '--nodeps', '--nodigest', '--nosignature', "$p->{'name'}-$evr.$p->{'arch'}") && die("rpm failed: $?\n");
-    } elsif ($steptype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL || $steptype == $solv::Transaction::SOLVER_TRANSACTION_MULTIINSTALL) {
-      print "install ".$p->str()."\n";
-      my $f = $newpkgsfps{$p->{'id'}};
-      my $mode = $steptype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i';
-      system('rpm', $mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/".$f->fileno()) && die("rpm failed: $?\n");
-      delete $newpkgsfps{$p->{'id'}};
-    }
+  print "\n";
+}
+printf "install size change: %d K\n\n", $trans->calc_installsizechange();
+
+while (1) {
+  print("OK to continue (y/n)? ");
+  my $yn = <STDIN>;
+  chomp $yn;
+  last if $yn eq 'y';
+  exit(1) if $yn eq 'n';
+}
+
+my @newpkgs = $trans->newpackages();
+my %newpkgsfps;
+if (@newpkgs) {
+  my $downloadsize = 0;
+  $downloadsize += $_->lookup_num($solv::SOLVABLE_DOWNLOADSIZE) for @newpkgs;
+  printf "Downloading %d packages, %d K\n", scalar(@newpkgs), $downloadsize;
+  for my $p (@newpkgs) {
+    my $repo = $p->{'repo'}->{'appdata'};
+    my ($location, $medianr) = $p->lookup_location();
+    next unless $location;
+    $location = $repo->packagespath() . $location;
+    my $chksum = $p->lookup_checksum($solv::SOLVABLE_CHECKSUM);
+    my $f = $repo->download($location, 0, $chksum);
+    die("\n$repo->{'alias'}: $location not found in repository\n") unless $f;
+    $newpkgsfps{$p->{'id'}} = $f;
+    print ".";
+    STDOUT->flush();
+  }
+  print "\n";
+}
+
+print "Committing transaction:\n\n";
+$trans->order(0);
+for my $p ($trans->steps()) {
+  my $steptype = $trans->steptype($p, $solv::Transaction::SOLVER_TRANSACTION_RPM_ONLY);
+  if ($steptype == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
+    print "erase ".$p->str()."\n";
+    next unless $p->lookup_num($solv::RPM_RPMDBID);
+    my $evr = $p->{'evr'};
+    $evr =~ s/^[0-9]+://;	# strip epoch
+    system('rpm', '-e', '--nodeps', '--nodigest', '--nosignature', "$p->{'name'}-$evr.$p->{'arch'}") && die("rpm failed: $?\n");
+  } elsif ($steptype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL || $steptype == $solv::Transaction::SOLVER_TRANSACTION_MULTIINSTALL) {
+    print "install ".$p->str()."\n";
+    my $f = $newpkgsfps{$p->{'id'}};
+    my $mode = $steptype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i';
+    system('rpm', $mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/".$f->fileno()) && die("rpm failed: $?\n");
+    delete $newpkgsfps{$p->{'id'}};
   }
 }
 
