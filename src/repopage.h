@@ -34,8 +34,8 @@ typedef struct _Repopagestore {
 
   Attrblobpage *file_pages;
 
-  /* mapped[i] is zero if nothing is mapped at logical page I,
-   otherwise it contains the pagenumber plus one (of the mapped page).  */
+  /* mapped[i] is -1 if nothing is mapped at logical page I,
+   otherwise it contains the page number (of the mapped page).  */
   unsigned int *mapped;
   unsigned int nmapped;
   unsigned int rr_counter;

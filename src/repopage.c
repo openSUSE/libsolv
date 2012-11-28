@@ -591,13 +591,13 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
   else
     {
       /* Quick check in case all pages are already mapped and consecutive.  */
-      for (i = pstart; i <= pend; i++)
-	if (store->mapped_at[i] == -1
-	    || (i > pstart
-		&& store->mapped_at[i]
-		   != store->mapped_at[i-1] + REPOPAGE_BLOBSIZE))
+      for (pnum = pstart; pnum <= pend; pnum++)
+	if (store->mapped_at[pnum] == -1
+	    || (pnum > pstart
+		&& store->mapped_at[pnum]
+		   != store->mapped_at[pnum-1] + REPOPAGE_BLOBSIZE))
 	  break;
-      if (i > pend)
+      if (pnum > pend)
 	return store->blob_store + store->mapped_at[pstart];
     }
 
@@ -616,7 +616,8 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
       if (store->nmapped < 4)
         store->nmapped = 4;
       store->mapped = solv_realloc2(store->mapped, store->nmapped, sizeof(store->mapped[0]));
-      memset(store->mapped + oldcan, 0, (store->nmapped - oldcan) * sizeof (store->mapped[0]));
+      for (i = oldcan; i < store->nmapped; i++)
+	store->mapped[i] = -1;
       store->blob_store = solv_realloc2(store->blob_store, store->nmapped, REPOPAGE_BLOBSIZE);
 #ifdef DEBUG_PAGING
       fprintf(stderr, "PAGE: can map %d pages\n", store->nmapped);
@@ -652,15 +653,15 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
     {
       unsigned int pnum_mapped_at;
       unsigned int oldpnum = store->mapped[i];
-      if (oldpnum)
+      if (oldpnum != -1)
 	{
-	  if (--oldpnum == pnum)
+	  if (oldpnum == pnum)
 	    continue;	/* already have the correct page */
 	  /* Evict this page.  */
 #ifdef DEBUG_PAGING
 	  fprintf(stderr, "PAGE: evict page %d from %d\n", oldpnum, i);
 #endif
-	  store->mapped[i] = 0;
+	  store->mapped[i] = -1;
 	  store->mapped_at[oldpnum] = -1;
 	}
       /* check if we can copy the correct content (before it gets evicted) */
@@ -672,8 +673,8 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  fprintf(stderr, "PAGECOPY: %d from %d to %d\n", pnum, pnum_mapped_at / REPOPAGE_BLOBSIZE, i);
 #endif
 	  memcpy(dest, store->blob_store + pnum_mapped_at, REPOPAGE_BLOBSIZE);
-	  store->mapped[pnum_mapped_at / REPOPAGE_BLOBSIZE] = 0;	/* slot is now empty */
-	  store->mapped[i] = pnum + 1;
+	  store->mapped[pnum_mapped_at / REPOPAGE_BLOBSIZE] = -1;
+	  store->mapped[i] = pnum;
 	  store->mapped_at[pnum] = i * REPOPAGE_BLOBSIZE;
 	}
     }
@@ -692,7 +693,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 #endif
 	      /* Still mapped somewhere else, so just copy it from there.  */
 	      memcpy(dest, store->blob_store + pnum_mapped_at, REPOPAGE_BLOBSIZE);
-	      store->mapped[pnum_mapped_at / REPOPAGE_BLOBSIZE] = 0;
+	      store->mapped[pnum_mapped_at / REPOPAGE_BLOBSIZE] = -1;
 	    }
 	}
       else
@@ -729,7 +730,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 #endif
 	}
       store->mapped_at[pnum] = i * REPOPAGE_BLOBSIZE;
-      store->mapped[i] = pnum + 1;
+      store->mapped[i] = pnum;
     }
   return store->blob_store + best * REPOPAGE_BLOBSIZE;
 }
