@@ -1061,6 +1061,28 @@ datamatcher_init(Datamatcher *ma, const char *match, int flags)
 	  ma->flags = (flags & ~SEARCH_STRINGMASK) | SEARCH_ERROR;
 	}
     }
+  if ((flags & SEARCH_FILES) != 0 && match)
+    {
+      /* prepare basename check */
+      if ((flags & SEARCH_STRINGMASK) == SEARCH_STRING)
+	{
+	  const char *p = strrchr(match, '/');
+	  ma->matchdata = (void *)(p ? p + 1 : match);
+	}
+      else if ((flags & SEARCH_STRINGMASK) == SEARCH_STRINGEND)
+	{
+	  const char *p = strrchr(match, '/');
+	  ma->matchdata = (void *)(p ? p + 1 : 0);
+	}
+      else if ((flags & SEARCH_STRINGMASK) == SEARCH_GLOB)
+	{
+	  const char *p;
+	  for (p = match + strlen(match) - 1; p >= match; p--)
+	    if (*p == '[' || *p == ']' || *p == '*' || *p == '?' || *p == '/')
+	      break;
+	  ma->matchdata = (void *)(p + 1);
+	}
+    }
   return ma->error;
 }
 
@@ -1070,8 +1092,9 @@ datamatcher_free(Datamatcher *ma)
   if ((ma->flags & SEARCH_STRINGMASK) == SEARCH_REGEX && ma->matchdata)
     {
       regfree(ma->matchdata);
-      ma->matchdata = solv_free(ma->matchdata);
+      solv_free(ma->matchdata);
     }
+  ma->matchdata = 0;
 }
 
 int
@@ -1143,6 +1166,49 @@ datamatcher_match(Datamatcher *ma, const char *str)
       return 0;
     }
   return 1;
+}
+
+/* check if the matcher can match the provides basename */
+
+static int
+datamatcher_checkbasename(Datamatcher *ma, const char *basename)
+{
+  int l;
+  const char *match = ma->match;
+  switch (ma->flags & SEARCH_STRINGMASK)
+    {
+    case SEARCH_STRING:
+      match = ma->matchdata;
+      break;
+    case SEARCH_STRINGEND:
+      if (ma->matchdata)
+	{
+	  match = ma->matchdata;	/* have slash */
+	  break;
+	}
+      l = strlen(basename) - strlen(match);
+      if (l < 0)
+	return 0;
+      basename += l;
+      break;
+    case SEARCH_GLOB:
+      match = ma->matchdata;
+      if (!match)
+	return 1;
+      l = strlen(basename) - strlen(match);
+      if (l < 0)
+	return 0;
+      basename += l;
+      break;
+    default:
+      return 1;	/* maybe matches */
+    }
+  if (!match)
+    return 1;
+  if ((ma->flags & SEARCH_NOCASE) != 0)
+    return !strcasecmp(match, basename);
+  else
+    return !strcmp(match, basename);
 }
 
 int
@@ -1578,12 +1644,9 @@ dataiterator_step(Dataiterator *di)
       if (di->matcher.match)
 	{
 	  /* simple pre-check so that we don't need to stringify */
-	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && di->matcher.match && (di->matcher.flags & (SEARCH_FILES|SEARCH_NOCASE|SEARCH_STRINGMASK)) == (SEARCH_FILES|SEARCH_STRING))
-	    {
-	      int l = strlen(di->matcher.match) - strlen(di->kv.str);
-	      if (l < 0 || strcmp(di->matcher.match + l, di->kv.str))
-		continue;
-	    }
+	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && (di->matcher.flags & SEARCH_FILES) != 0)
+	    if (!datamatcher_checkbasename(&di->matcher, di->kv.str))
+	      continue;
 	  if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags))
 	    {
 	      if (di->keyname && (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY))
