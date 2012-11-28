@@ -562,11 +562,13 @@ void repopagestore_init(Repopagestore *store)
 
 void repopagestore_free(Repopagestore *store)
 {
-  solv_free(store->blob_store);
-  solv_free(store->pages);
-  solv_free(store->mapped);
+  store->blob_store = solv_free(store->blob_store);
+  store->file_pages = solv_free(store->file_pages);
+  store->mapped_at = solv_free(store->mapped_at);
+  store->mapped = solv_free(store->mapped);
   if (store->pagefd != -1)
     close(store->pagefd);
+  store->pagefd = -1;
 }
 
 
@@ -578,29 +580,29 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 /* Make sure all pages from PSTART to PEND (inclusive) are loaded,
    and are consecutive.  Return a pointer to the mapping of PSTART.  */
   unsigned char buf[REPOPAGE_BLOBSIZE];
-  unsigned int i, best;
+  unsigned int i, best, pnum;
 
   if (pstart == pend)
     {
       /* Quick check in case the requested page is already mapped */
-      if (store->pages[pstart].mapped_at != -1)
-	return store->blob_store + store->pages[pstart].mapped_at;
+      if (store->mapped_at[pstart] != -1)
+	return store->blob_store + store->mapped_at[pstart];
     }
   else
     {
       /* Quick check in case all pages are already mapped and consecutive.  */
       for (i = pstart; i <= pend; i++)
-	if (store->pages[i].mapped_at == -1
+	if (store->mapped_at[i] == -1
 	    || (i > pstart
-		&& store->pages[i].mapped_at
-		   != store->pages[i-1].mapped_at + REPOPAGE_BLOBSIZE))
+		&& store->mapped_at[i]
+		   != store->mapped_at[i-1] + REPOPAGE_BLOBSIZE))
 	  break;
       if (i > pend)
-	return store->blob_store + store->pages[pstart].mapped_at;
+	return store->blob_store + store->mapped_at[pstart];
     }
 
-  if (store->pagefd == -1)
-    return 0;
+  if (store->pagefd == -1 || !store->file_pages)
+    return 0;	/* no backing file */
 
 #ifdef DEBUG_PAGING
   fprintf(stderr, "PAGE: want %d pages starting at %d\n", pend - pstart + 1, pstart);
@@ -621,17 +623,17 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 #endif
     }
 
-  if (store->pages[pstart].mapped_at != -1)
+  if (store->mapped_at[pstart] != -1)
     {
       /* assume forward search */
-      best = store->pages[pstart].mapped_at / REPOPAGE_BLOBSIZE;
+      best = store->mapped_at[pstart] / REPOPAGE_BLOBSIZE;
       if (best + (pend - pstart) >= store->nmapped)
 	best = 0;
     }
-  else if (store->pages[pend].mapped_at != -1)
+  else if (store->mapped_at[pend] != -1)
     {
       /* assume backward search */
-      best = store->pages[pend].mapped_at / REPOPAGE_BLOBSIZE;
+      best = store->mapped_at[pend] / REPOPAGE_BLOBSIZE;
       if (best < pend - pstart)
 	best = store->nmapped - 1;
       best -= pend - pstart;
@@ -646,62 +648,61 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
      Use a very simple strategy, which doesn't make the best use of
      our resources, but works.  Throw away all pages in that range
      (even ours) then copy around ours or read them in.  */
-  for (i = best; i < best + pend - pstart + 1; i++)
+  for (i = best, pnum = pstart; pnum <= pend; i++, pnum++)
     {
-      unsigned int pnum = store->mapped[i];
-      if (pnum--
-          /* If this page is exactly at the right place already,
-	     no need to evict it.  */
-          && pnum != pstart + i - best)
+      unsigned int pnum_mapped_at;
+      unsigned int oldpnum = store->mapped[i];
+      if (oldpnum)
 	{
-	  Attrblobpage *p;
+	  if (--oldpnum == pnum)
+	    continue;	/* already have the correct page */
 	  /* Evict this page.  */
 #ifdef DEBUG_PAGING
-	  fprintf(stderr, "PAGE: evict page %d from %d\n", pnum, i);
+	  fprintf(stderr, "PAGE: evict page %d from %d\n", oldpnum, i);
 #endif
 	  store->mapped[i] = 0;
-	  store->pages[pnum].mapped_at = -1;
-	  /* check if we can copy the correct content */
-	  p = store->pages + (pstart + i - best);
-	  if (p->mapped_at != -1 && p->mapped_at != i * REPOPAGE_BLOBSIZE)
-	    {
-	      void *dest = store->blob_store + i * REPOPAGE_BLOBSIZE;
+	  store->mapped_at[oldpnum] = -1;
+	}
+      /* check if we can copy the correct content (before it gets evicted) */
+      pnum_mapped_at = store->mapped_at[pnum];
+      if (pnum_mapped_at != -1 && pnum_mapped_at != i * REPOPAGE_BLOBSIZE)
+	{
+	  void *dest = store->blob_store + i * REPOPAGE_BLOBSIZE;
 #ifdef DEBUG_PAGING
-	      fprintf(stderr, "PAGECOPY: %d from %d to %d\n", pstart + i - best, p->mapped_at / REPOPAGE_BLOBSIZE, i);
+	  fprintf(stderr, "PAGECOPY: %d from %d to %d\n", pnum, pnum_mapped_at / REPOPAGE_BLOBSIZE, i);
 #endif
-	      memcpy(dest, store->blob_store + p->mapped_at, REPOPAGE_BLOBSIZE);
-	      store->mapped[p->mapped_at / REPOPAGE_BLOBSIZE] = 0;
-	      p->mapped_at = i * REPOPAGE_BLOBSIZE;
-	      store->mapped[i] = pstart + i - best + 1;
-	    }
+	  memcpy(dest, store->blob_store + pnum_mapped_at, REPOPAGE_BLOBSIZE);
+	  store->mapped[pnum_mapped_at / REPOPAGE_BLOBSIZE] = 0;	/* slot is now empty */
+	  store->mapped[i] = pnum + 1;
+	  store->mapped_at[pnum] = i * REPOPAGE_BLOBSIZE;
 	}
     }
 
-  /* Everything is free now.  Read in the pages we want.  */
-  for (i = pstart; i <= pend; i++)
+  /* Everything is free now.  Read in or copy the pages we want.  */
+  for (i = best, pnum = pstart; pnum <= pend; i++, pnum++)
     {
-      Attrblobpage *p = store->pages + i;
-      unsigned int pnum = i - pstart + best;
-      void *dest = store->blob_store + pnum * REPOPAGE_BLOBSIZE;
-      if (p->mapped_at != -1)
+      void *dest = store->blob_store + i * REPOPAGE_BLOBSIZE;
+      if (store->mapped_at[pnum] != -1)
         {
-	  if (p->mapped_at != pnum * REPOPAGE_BLOBSIZE)
+          unsigned int pnum_mapped_at = store->mapped_at[pnum];
+	  if (pnum_mapped_at != i * REPOPAGE_BLOBSIZE)
 	    {
 #ifdef DEBUG_PAGING
-	      fprintf(stderr, "PAGECOPY: %d from %d to %d\n", i, p->mapped_at / REPOPAGE_BLOBSIZE, pnum);
+	      fprintf(stderr, "PAGECOPY: %d from %d to %d\n", pnum, pnum_mapped_at / REPOPAGE_BLOBSIZE, i);
 #endif
 	      /* Still mapped somewhere else, so just copy it from there.  */
-	      memcpy(dest, store->blob_store + p->mapped_at, REPOPAGE_BLOBSIZE);
-	      store->mapped[p->mapped_at / REPOPAGE_BLOBSIZE] = 0;
+	      memcpy(dest, store->blob_store + pnum_mapped_at, REPOPAGE_BLOBSIZE);
+	      store->mapped[pnum_mapped_at / REPOPAGE_BLOBSIZE] = 0;
 	    }
 	}
       else
         {
+	  Attrblobpage *p = store->file_pages + pnum;
 	  unsigned int in_len = p->page_size;
 	  unsigned int compressed = in_len & 1;
 	  in_len >>= 1;
 #ifdef DEBUG_PAGING
-	  fprintf(stderr, "PAGEIN: %d to %d", i, pnum);
+	  fprintf(stderr, "PAGEIN: %d to %d", pnum, i);
 #endif
           if (pread(store->pagefd, compressed ? buf : dest, in_len, store->file_offset + p->page_offset) != in_len)
 	    {
@@ -712,7 +713,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	    {
 	      unsigned int out_len;
 	      out_len = unchecked_decompress_buf(buf, in_len, dest, REPOPAGE_BLOBSIZE);
-	      if (out_len != REPOPAGE_BLOBSIZE && i < store->num_pages - 1)
+	      if (out_len != REPOPAGE_BLOBSIZE && pnum < store->num_pages - 1)
 	        {
 #ifdef DEBUG_PAGING
 	          fprintf(stderr, "can't decompress\n");
@@ -727,8 +728,8 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  fprintf(stderr, "\n");
 #endif
 	}
-      p->mapped_at = pnum * REPOPAGE_BLOBSIZE;
-      store->mapped[pnum] = i + 1;
+      store->mapped_at[pnum] = i * REPOPAGE_BLOBSIZE;
+      store->mapped[i] = pnum + 1;
     }
   return store->blob_store + best * REPOPAGE_BLOBSIZE;
 }
@@ -792,15 +793,18 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
   npages = (blobsz + REPOPAGE_BLOBSIZE - 1) / REPOPAGE_BLOBSIZE;
 
   store->num_pages = npages;
-  store->pages = solv_malloc2(npages, sizeof(store->pages[0]));
+  store->mapped_at = solv_malloc2(npages, sizeof(*store->mapped_at));
 
-  /* If we can't seek on our input we have to slurp in everything.  */
-  if (!can_seek)
+  /* If we can't seek on our input we have to slurp in everything.
+   * Otherwise set up file_pages containing offest/length of the
+   * pages */
+  if (can_seek)
+    store->file_pages = solv_malloc2(npages, sizeof(*store->file_pages));
+  else
     store->blob_store = solv_malloc2(npages, REPOPAGE_BLOBSIZE);
   cur_page_ofs = 0;
   for (i = 0; i < npages; i++)
     {
-      Attrblobpage *p = store->pages + i;
       unsigned int in_len = read_u32(fp);
       unsigned int compressed = in_len & 1;
       in_len >>= 1;
@@ -810,8 +814,9 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
 #endif
       if (can_seek)
         {
+	  Attrblobpage *p = store->file_pages + i;
           cur_page_ofs += 4;
-	  p->mapped_at = -1;
+          store->mapped_at[i] = -1;	/* not mapped yet */
 	  p->page_offset = cur_page_ofs;
 	  p->page_size = in_len * 2 + compressed;
 	  if (fseek(fp, in_len, SEEK_CUR) < 0)
@@ -828,9 +833,7 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
         {
 	  unsigned int out_len;
 	  void *dest = store->blob_store + i * REPOPAGE_BLOBSIZE;
-          p->mapped_at = i * REPOPAGE_BLOBSIZE;
-	  p->page_offset = 0;
-	  p->page_size = 0;
+          store->mapped_at[i] = i * REPOPAGE_BLOBSIZE;
 	  /* We can't seek, so suck everything in.  */
 	  if (fread(compressed ? buf : dest, in_len, 1, fp) != 1)
 	    {
