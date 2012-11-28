@@ -17,15 +17,17 @@ typedef struct _Attrblobpage
      store->blob_store.  The size of the mapping is REPOPAGE_BLOBSIZE
      except for the last page.  */
   unsigned int mapped_at;
-  long file_offset;
-  /* file_size == 0 means the page is not backed by some file storage.
+
+  /* page_size == 0 means the page is not backed by some file storage.
      Otherwise it is L*2+(compressed ? 1 : 0), with L being the data
      length.  */
-  long file_size;
+  unsigned int page_offset;
+  unsigned int page_size;
 } Attrblobpage;
 
 typedef struct _Repopagestore {
-  int pagefd;	/* file descriptor we're paging from */
+  int pagefd;		/* file descriptor we're paging from */
+  long file_offset;	/* pages in file start here */
 
   unsigned char *blob_store;
   Attrblobpage *pages;
@@ -34,7 +36,7 @@ typedef struct _Repopagestore {
   /* mapped[i] is zero if nothing is mapped at logical page I,
    otherwise it contains the pagenumber plus one (of the mapped page).  */
   unsigned int *mapped;
-  unsigned int nmapped, ncanmap;
+  unsigned int nmapped;
   unsigned int rr_counter;
 } Repopagestore;
 

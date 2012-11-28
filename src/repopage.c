@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2011, Novell Inc.
+ * Copyright (c) 2007-2012, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -580,15 +580,24 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
   unsigned char buf[REPOPAGE_BLOBSIZE];
   unsigned int i, best;
 
-  /* Quick check in case all pages are there already and consecutive.  */
-  for (i = pstart; i <= pend; i++)
-    if (store->pages[i].mapped_at == -1
-        || (i > pstart
-	    && store->pages[i].mapped_at
-	       != store->pages[i-1].mapped_at + REPOPAGE_BLOBSIZE))
-      break;
-  if (i > pend)
-    return store->blob_store + store->pages[pstart].mapped_at;
+  if (pstart == pend)
+    {
+      /* Quick check in case the requested page is already mapped */
+      if (store->pages[pstart].mapped_at != -1)
+	return store->blob_store + store->pages[pstart].mapped_at;
+    }
+  else
+    {
+      /* Quick check in case all pages are already mapped and consecutive.  */
+      for (i = pstart; i <= pend; i++)
+	if (store->pages[i].mapped_at == -1
+	    || (i > pstart
+		&& store->pages[i].mapped_at
+		   != store->pages[i-1].mapped_at + REPOPAGE_BLOBSIZE))
+	  break;
+      if (i > pend)
+	return store->blob_store + store->pages[pstart].mapped_at;
+    }
 
   if (store->pagefd == -1)
     return 0;
@@ -598,71 +607,40 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 #endif
 
   /* Ensure that we can map the numbers of pages we need at all.  */
-  if (pend - pstart + 1 > store->ncanmap)
+  if (pend - pstart + 1 > store->nmapped)
     {
-      unsigned int oldcan = store->ncanmap;
-      store->ncanmap = pend - pstart + 1;
-      if (store->ncanmap < 4)
-        store->ncanmap = 4;
-      store->mapped = solv_realloc2(store->mapped, store->ncanmap, sizeof(store->mapped[0]));
-      memset(store->mapped + oldcan, 0, (store->ncanmap - oldcan) * sizeof (store->mapped[0]));
-      store->blob_store = solv_realloc2(store->blob_store, store->ncanmap, REPOPAGE_BLOBSIZE);
+      unsigned int oldcan = store->nmapped;
+      store->nmapped = pend - pstart + 1;
+      if (store->nmapped < 4)
+        store->nmapped = 4;
+      store->mapped = solv_realloc2(store->mapped, store->nmapped, sizeof(store->mapped[0]));
+      memset(store->mapped + oldcan, 0, (store->nmapped - oldcan) * sizeof (store->mapped[0]));
+      store->blob_store = solv_realloc2(store->blob_store, store->nmapped, REPOPAGE_BLOBSIZE);
 #ifdef DEBUG_PAGING
-      fprintf(stderr, "PAGE: can map %d pages\n", store->ncanmap);
+      fprintf(stderr, "PAGE: can map %d pages\n", store->nmapped);
 #endif
     }
 
-  /* Now search for "cheap" space in our store.  Space is cheap if it's either
-     free (very cheap) or contains pages we search for anyway.  */
-
-  {
-    unsigned int best_cost = -1;
-    unsigned int same_cost = 0;
-    unsigned int cost = 0;
-    int ii;
-
-    best = 0;
-    for (i = 0, ii = -(pend - pstart); i < store->ncanmap; i++, ii++)
-      {
-	unsigned int pnum = store->mapped[i];
-	if (pnum)
-	  {
-	    Attrblobpage *p = store->pages + --pnum;
-	    assert(p->mapped_at != -1);
-	    cost += pnum >= pstart && pnum <= pend ? 1 : 3;
-	  }
-	if (ii < 0)
-	  continue;	/* still need to accummulate cost */
-	if (cost < best_cost)
-	  best_cost = cost, best = ii;
-	else if (cost == best_cost)
-	  same_cost++;
-	if (!cost)
-	  break;	/* it won't get any better */
-	/* now remove the cost of page ii again */
-	if (i == ii)
-	  {
-	    cost = 0;
-	    continue;
-	  }
-	pnum = store->mapped[ii];
-	if (pnum)
-	  {
-	    Attrblobpage *p = store->pages + --pnum;
-	    assert(p->mapped_at != -1);
-	    cost -= pnum >= pstart && pnum <= pend ? 1 : 3;
-	  }
-      }
-
-#ifdef DEBUG_PAGING
-    fprintf(stderr, "PAGE: best %d at cost %d, same %d\n", best, best_cost, same_cost);
-#endif
-
-    /* If all places have the same cost we would thrash on slot 0.  Avoid
-       this by doing a round-robin strategy in this case.  */
-    if (same_cost == store->ncanmap - pend + pstart - 1)
-      best = store->rr_counter++ % (store->ncanmap - pend + pstart);
-  }
+  if (store->pages[pstart].mapped_at != -1)
+    {
+      /* assume forward search */
+      best = store->pages[pstart].mapped_at / REPOPAGE_BLOBSIZE;
+      if (best + (pend - pstart) >= store->nmapped)
+	best = 0;
+    }
+  else if (store->pages[pend].mapped_at != -1)
+    {
+      /* assume backward search */
+      best = store->pages[pend].mapped_at / REPOPAGE_BLOBSIZE;
+      if (best < pend - pstart)
+	best = store->nmapped - 1;
+      best -= pend - pstart;
+    }
+  else
+    {
+      /* choose some "random" location to avoid thrashing */
+      best = (pstart + store->rr_counter++) % (store->nmapped - pend + pstart);
+    }
 
   /* So we want to map our pages from [best] to [best+pend-pstart].
      Use a very simple strategy, which doesn't make the best use of
@@ -719,13 +697,13 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	}
       else
         {
-	  unsigned int in_len = p->file_size;
+	  unsigned int in_len = p->page_size;
 	  unsigned int compressed = in_len & 1;
 	  in_len >>= 1;
 #ifdef DEBUG_PAGING
 	  fprintf(stderr, "PAGEIN: %d to %d", i, pnum);
 #endif
-          if (pread(store->pagefd, compressed ? buf : dest, in_len, p->file_offset) != in_len)
+          if (pread(store->pagefd, compressed ? buf : dest, in_len, store->file_offset + p->page_offset) != in_len)
 	    {
 	      perror("mapping pread");
 	      return 0;
@@ -733,8 +711,7 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  if (compressed)
 	    {
 	      unsigned int out_len;
-	      out_len = unchecked_decompress_buf(buf, in_len,
-						  dest, REPOPAGE_BLOBSIZE);
+	      out_len = unchecked_decompress_buf(buf, in_len, dest, REPOPAGE_BLOBSIZE);
 	      if (out_len != REPOPAGE_BLOBSIZE && i < store->num_pages - 1)
 	        {
 #ifdef DEBUG_PAGING
@@ -790,7 +767,7 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
   unsigned int npages;
   unsigned int i;
   unsigned int can_seek;
-  long cur_file_ofs;
+  unsigned int cur_page_ofs;
   unsigned char buf[REPOPAGE_BLOBSIZE];
 
   if (pagesz != REPOPAGE_BLOBSIZE)
@@ -799,7 +776,7 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
       return SOLV_ERROR_CORRUPT;
     }
   can_seek = 1;
-  if ((cur_file_ofs = ftell(fp)) < 0)
+  if ((store->file_offset = ftell(fp)) < 0)
     can_seek = 0;
   clearerr(fp);
   if (can_seek)
@@ -820,11 +797,12 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
   /* If we can't seek on our input we have to slurp in everything.  */
   if (!can_seek)
     store->blob_store = solv_malloc2(npages, REPOPAGE_BLOBSIZE);
+  cur_page_ofs = 0;
   for (i = 0; i < npages; i++)
     {
+      Attrblobpage *p = store->pages + i;
       unsigned int in_len = read_u32(fp);
       unsigned int compressed = in_len & 1;
-      Attrblobpage *p = store->pages + i;
       in_len >>= 1;
 #ifdef DEBUG_PAGING
       fprintf(stderr, "page %d: len %d (%scompressed)\n",
@@ -832,10 +810,10 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
 #endif
       if (can_seek)
         {
-          cur_file_ofs += 4;
+          cur_page_ofs += 4;
 	  p->mapped_at = -1;
-	  p->file_offset = cur_file_ofs;
-	  p->file_size = in_len * 2 + compressed;
+	  p->page_offset = cur_page_ofs;
+	  p->page_size = in_len * 2 + compressed;
 	  if (fseek(fp, in_len, SEEK_CUR) < 0)
 	    {
 	      /* We can't fall back to non-seeking behaviour as we already
@@ -844,15 +822,15 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
 	      store->pagefd = -1;
 	      return SOLV_ERROR_EOF;
 	    }
-	  cur_file_ofs += in_len;
+	  cur_page_ofs += in_len;
 	}
       else
         {
 	  unsigned int out_len;
 	  void *dest = store->blob_store + i * REPOPAGE_BLOBSIZE;
           p->mapped_at = i * REPOPAGE_BLOBSIZE;
-	  p->file_offset = 0;
-	  p->file_size = 0;
+	  p->page_offset = 0;
+	  p->page_size = 0;
 	  /* We can't seek, so suck everything in.  */
 	  if (fread(compressed ? buf : dest, in_len, 1, fp) != 1)
 	    {
