@@ -1064,15 +1064,10 @@ datamatcher_init(Datamatcher *ma, const char *match, int flags)
   if ((flags & SEARCH_FILES) != 0 && match)
     {
       /* prepare basename check */
-      if ((flags & SEARCH_STRINGMASK) == SEARCH_STRING)
+      if ((flags & SEARCH_STRINGMASK) == SEARCH_STRING || (flags & SEARCH_STRINGMASK) == SEARCH_STRINGEND)
 	{
 	  const char *p = strrchr(match, '/');
 	  ma->matchdata = (void *)(p ? p + 1 : match);
-	}
-      else if ((flags & SEARCH_STRINGMASK) == SEARCH_STRINGEND)
-	{
-	  const char *p = strrchr(match, '/');
-	  ma->matchdata = (void *)(p ? p + 1 : 0);
 	}
       else if ((flags & SEARCH_STRINGMASK) == SEARCH_GLOB)
 	{
@@ -1105,96 +1100,55 @@ datamatcher_match(Datamatcher *ma, const char *str)
     {
     case SEARCH_SUBSTRING:
       if (ma->flags & SEARCH_NOCASE)
-	{
-	  if (!strcasestr(str, ma->match))
-	    return 0;
-	}
+	return strcasestr(str, ma->match) != 0;
       else
-	{
-	  if (!strstr(str, ma->match))
-	    return 0;
-	}
-      break;
+	return strstr(str, ma->match) != 0;
     case SEARCH_STRING:
       if (ma->flags & SEARCH_NOCASE)
-	{
-	  if (strcasecmp(ma->match, str))
-	    return 0;
-	}
+	return !strcasecmp(ma->match, str);
       else
-	{
-	  if (strcmp(ma->match, str))
-	    return 0;
-	}
-      break;
+	return !strcmp(ma->match, str);
     case SEARCH_STRINGSTART:
       if (ma->flags & SEARCH_NOCASE)
-	{
-	  if (strncasecmp(ma->match, str, strlen(ma->match)))
-	    return 0;
-	}
+        return !strncasecmp(ma->match, str, strlen(ma->match));
       else
-	{
-	  if (strncmp(ma->match, str, strlen(ma->match)))
-	    return 0;
-	}
-      break;
+        return !strncmp(ma->match, str, strlen(ma->match));
     case SEARCH_STRINGEND:
       l = strlen(str) - strlen(ma->match);
       if (l < 0)
 	return 0;
       if (ma->flags & SEARCH_NOCASE)
-	{
-	  if (strcasecmp(ma->match, str + l))
-	    return 0;
-	}
+	return !strcasecmp(ma->match, str + l);
       else
-	{
-	  if (strcmp(ma->match, str + l))
-	    return 0;
-	}
-      break;
+	return !strcmp(ma->match, str + l);
     case SEARCH_GLOB:
-      if (fnmatch(ma->match, str, (ma->flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0))
-	return 0;
-      break;
+      return !fnmatch(ma->match, str, (ma->flags & SEARCH_NOCASE) ? FNM_CASEFOLD : 0);
     case SEARCH_REGEX:
-      if (regexec((const regex_t *)ma->matchdata, str, 0, NULL, 0))
-	return 0;
-      break;
+      return !regexec((const regex_t *)ma->matchdata, str, 0, NULL, 0);
     default:
       return 0;
     }
-  return 1;
 }
 
 /* check if the matcher can match the provides basename */
 
-static int
+int
 datamatcher_checkbasename(Datamatcher *ma, const char *basename)
 {
   int l;
-  const char *match = ma->match;
+  const char *match = ma->matchdata;
+  if (!match)
+    return 1;
   switch (ma->flags & SEARCH_STRINGMASK)
     {
     case SEARCH_STRING:
-      match = ma->matchdata;
       break;
     case SEARCH_STRINGEND:
-      if (ma->matchdata)
-	{
-	  match = ma->matchdata;	/* have slash */
-	  break;
-	}
-      l = strlen(basename) - strlen(match);
-      if (l < 0)
-	return 0;
-      basename += l;
-      break;
+      if (match != ma->match)
+	break;		/* had slash, do exact match on basename */
+      /* FALLTHROUGH */
     case SEARCH_GLOB:
-      match = ma->matchdata;
-      if (!match)
-	return 1;
+      /* check if the basename ends with match */
       l = strlen(basename) - strlen(match);
       if (l < 0)
 	return 0;
@@ -1203,8 +1157,6 @@ datamatcher_checkbasename(Datamatcher *ma, const char *basename)
     default:
       return 1;	/* maybe matches */
     }
-  if (!match)
-    return 1;
   if ((ma->flags & SEARCH_NOCASE) != 0)
     return !strcasecmp(match, basename);
   else

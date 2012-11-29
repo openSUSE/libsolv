@@ -74,6 +74,7 @@ typedef struct _Datamatcher {
 int  datamatcher_init(Datamatcher *ma, const char *match, int flags);
 void datamatcher_free(Datamatcher *ma);
 int  datamatcher_match(Datamatcher *ma, const char *str);
+int  datamatcher_checkbasename(Datamatcher *ma, const char *str);
 
 
 /*
