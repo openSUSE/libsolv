@@ -593,7 +593,10 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   if ((solvflags & SOLV_FLAG_PREFIX_POOL) == 0)
     {
       if (sizeid && fread(strsp, sizeid, 1, fp) != 1)
-        return pool_error(pool, SOLV_ERROR_EOF, "read error while reading strings");
+	{
+	  repodata_freedata(&data);
+	  return pool_error(pool, SOLV_ERROR_EOF, "read error while reading strings");
+	}
     }
   else
     {
@@ -605,9 +608,10 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       int freesp = sizeid;
 
       if (pfsize && fread(prefix, pfsize, 1, fp) != 1)
-        {
+	{
 	  solv_free(prefix);
-          return pool_error(pool, SOLV_ERROR_EOF, "read error while reading strings");
+	  repodata_freedata(&data);
+	  return pool_error(pool, SOLV_ERROR_EOF, "read error while reading strings");
 	}
       for (i = 1; i < numid; i++)
         {
@@ -617,6 +621,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	  if (freesp < 0)
 	    {
 	      solv_free(prefix);
+	      repodata_freedata(&data);
 	      return pool_error(pool, SOLV_ERROR_OVERFLOW, "overflow while expanding strings");
 	    }
 	  if (same)
@@ -628,7 +633,10 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	}
       solv_free(prefix);
       if (freesp != 0)
-	return pool_error(pool, SOLV_ERROR_CORRUPT, "expanding strings size mismatch");
+	{
+	  repodata_freedata(&data);
+	  return pool_error(pool, SOLV_ERROR_CORRUPT, "expanding strings size mismatch");
+	}
     }
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
   sp = strsp;
@@ -643,12 +651,16 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       if (*sp)
 	{
 	  /* we need id 1 to be '' for directories */
+	  repodata_freedata(&data);
 	  return pool_error(pool, SOLV_ERROR_CORRUPT, "store strings don't start with an empty string");
 	}
       for (i = 1; i < spool->nstrings; i++)
 	{
 	  if (sp >= strsp + sizeid && numid >= 2)
-	    return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings");
+	    {
+	      repodata_freedata(&data);
+	      return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings");
+	    }
 	  str[i] = sp - spool->stringspace;
 	  sp += strlen(sp) + 1;
 	}
@@ -700,6 +712,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	      spool->nstrings = oldnstrings;
 	      spool->sstrings = oldsstrings;
 	      stringpool_freehash(spool);
+	      repodata_freedata(&data);
 	      return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings %d %d", i, numid);
 	    }
 	  if (!*sp)			       /* empty string */
@@ -1278,6 +1291,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       data.incoredata = solv_realloc(data.incoredata, data.incoredatalen);
       data.incoredatafree = 0;
     }
+  solv_free(idmap);
 
   for (i = 1; i < numkeys; i++)
     if (keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
@@ -1297,23 +1311,22 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	  }
       data.lastverticaloffset = fileoffset;
       pagesize = read_u32(&data);
-      data.error = repopagestore_read_or_setup_pages(&data.store, data.fp, pagesize, fileoffset);
-      if (data.error == SOLV_ERROR_EOF)
-        pool_error(pool, data.error, "repopagestore setup: unexpected EOF");
-      else if (data.error)
-        pool_error(pool, data.error, "repopagestore setup failed");
+      if (!data.error)
+	{
+	  data.error = repopagestore_read_or_setup_pages(&data.store, data.fp, pagesize, fileoffset);
+	  if (data.error == SOLV_ERROR_EOF)
+	    pool_error(pool, data.error, "repopagestore setup: unexpected EOF");
+	  else if (data.error)
+	    pool_error(pool, data.error, "repopagestore setup failed");
+	}
     }
-  else
-    {
-      /* no longer needed */
-      data.fp = 0;
-    }
-  solv_free(idmap);
+  data.fp = 0; /* no longer needed */
 
   if (data.error)
     {
-      /* XXX: free repodata? */
-      return data.error;
+      i = data.error;
+      repodata_freedata(&data);
+      return i;
     }
 
   if (parent)
