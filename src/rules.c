@@ -1241,22 +1241,20 @@ solver_createdupmaps(Solver *solv)
 		      if (!targeted && ps->repo != installed)
 		        MAPSET(&solv->dupmap, pi);
 		    }
-		  if (!targeted)
+		  if (s->repo == installed && solv->obsoletes && solv->obsoletes[p - installed->start])
 		    {
-		      if (solv->obsoletes && solv->obsoletes[p - installed->start])
+		      Id *opp;
+		      for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (pi = *opp++) != 0;)
 			{
-			  Id *opp;
-			  for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (pi = *opp++) != 0;)
-			    {
-			      ps = pool->solvables + pi;
-			      if (ps->repo == installed)
-				continue;
-			      MAPSET(&solv->dupinvolvedmap, pi);
-			      MAPSET(&solv->dupmap, pi);
-			    }
+			  ps = pool->solvables + pi;
+			  if (ps->repo == installed)
+			    continue;
+			  MAPSET(&solv->dupinvolvedmap, pi);
+			  if (!targeted)
+			    MAPSET(&solv->dupmap, pi);
 			}
 		    }
-		  else if (s->obsoletes)
+		  if (targeted && s->obsoletes)
 		    {
 		      /* XXX: check obsoletes/provides combination */
 		      obsp = s->repo->idarraydata + s->obsoletes;
@@ -1312,22 +1310,20 @@ solver_createdupmaps(Solver *solv)
 		  if (!targeted && ps->repo != installed)
 		    MAPSET(&solv->dupmap, pi);
 		}
-	      if (!targeted)
+	      if (s->repo == installed && solv->obsoletes && solv->obsoletes[p - installed->start])
 		{
-		  if (repo == installed && solv->obsoletes && solv->obsoletes[p - installed->start])
+		  Id *opp;
+		  for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (pi = *opp++) != 0;)
 		    {
-		      Id *opp;
-		      for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (pi = *opp++) != 0;)
-			{
-			  ps = pool->solvables + pi;
-			  if (ps->repo == installed)
-			    continue;
-			  MAPSET(&solv->dupinvolvedmap, pi);
-			  MAPSET(&solv->dupmap, pi);
-			}
+		      ps = pool->solvables + pi;
+		      if (ps->repo == installed)
+			continue;
+		      MAPSET(&solv->dupinvolvedmap, pi);
+		      if (!targeted)
+		        MAPSET(&solv->dupmap, pi);
 		    }
 		}
-	      else if (s->obsoletes)
+	      if (targeted && s->obsoletes)
 		{
 		  /* XXX: check obsoletes/provides combination */
 		  obsp = s->repo->idarraydata + s->obsoletes;
