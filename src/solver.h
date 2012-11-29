@@ -203,6 +203,7 @@ struct _Solver {
   int noinfarchcheck;			/* true: do not forbid inferior architectures */
   int keepexplicitobsoletes;		/* true: honor obsoletes during multiinstall */
   int bestobeypolicy;			/* true: stay in policy with the best rules */
+  int noautotarget;			/* true: do not assume targeted for up/dup jobs that contain no installed solvable */
 
     
   Map dupmap;				/* dup these packages*/
@@ -267,6 +268,12 @@ typedef struct _Solver Solver;
  * not installable. This can be used with INSTALL, UPDATE
  * and DISTUPGRADE */
 #define SOLVER_FORCEBEST		0x100000
+/* TARGETED is used in up/dup jobs to make the solver
+ * treat the specified selection as target packages.
+ * It is automatically assumed if the selection does not
+ * contain an "installed" package unless the
+ * NO_AUTOTARGET solver flag is set */
+#define SOLVER_TARGETED			0x200000
 
 #define SOLVER_SETEV			0x01000000
 #define SOLVER_SETEVR			0x02000000
@@ -304,6 +311,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_ALLOW_NAMECHANGE		10
 #define SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES	11
 #define SOLVER_FLAG_BEST_OBEY_POLICY		12
+#define SOLVER_FLAG_NO_AUTOTARGET		13
 
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);

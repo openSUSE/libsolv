@@ -1485,6 +1485,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->keepexplicitobsoletes;
   case SOLVER_FLAG_BEST_OBEY_POLICY:
     return solv->bestobeypolicy;
+  case SOLVER_FLAG_NO_AUTOTARGET:
+    return solv->noautotarget;
   default:
     break;
   }
@@ -1532,6 +1534,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_BEST_OBEY_POLICY:
     solv->bestobeypolicy = value;
+    break;
+  case SOLVER_FLAG_NO_AUTOTARGET:
+    solv->noautotarget = value;
     break;
   default:
     break;
@@ -2606,6 +2611,11 @@ add_update_target(Solver *solv, Id p, Id how)
       solv->update_targets = solv_calloc(1, sizeof(Queue));
       queue_init(solv->update_targets);
     }
+  if (s->repo == installed)
+    {
+      queue_push2(solv->update_targets, p, p);
+      return;
+    }
   FOR_PROVIDES(pi, pip, s->name)
     {
       Solvable *si = pool->solvables + pi;
@@ -2794,16 +2804,25 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	      break;
 	    case SOLVER_UPDATE:
-	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
+	      if (select == SOLVER_SOLVABLE_ALL)
 		{
 		  solv->updatemap_all = 1;
 		  if (how & SOLVER_FORCEBEST)
 		    solv->bestupdatemap_all = 1;
 		}
-	      else if (select == SOLVER_SOLVABLE_REPO && what != installed->repoid)
+	      else if (select == SOLVER_SOLVABLE_REPO)
 		{
 		  Repo *repo = pool_id2repo(pool, what);
 		  if (!repo)
+		    break;
+		  if (repo == installed && !(how & SOLVER_TARGETED))
+		    {
+		      solv->updatemap_all = 1;
+		      if (how & SOLVER_FORCEBEST)
+			solv->bestupdatemap_all = 1;
+		      break;
+		    }
+		  if (solv->noautotarget && !(how & SOLVER_TARGETED))
 		    break;
 		  /* targeted update */
 		  FOR_REPO_SOLVABLES(repo, p, s)
@@ -2811,28 +2830,30 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	      else
 		{
-		  int targeted = 1;
-		  FOR_JOB_SELECT(p, pp, select, what)
+		  if (!(how & SOLVER_TARGETED))
 		    {
-		      s = pool->solvables + p;
-		      if (s->repo != installed)
-			continue;
-		      if (!solv->updatemap.size)
-			map_grow(&solv->updatemap, installed->end - installed->start);
-		      MAPSET(&solv->updatemap, p - installed->start);
-		      if (how & SOLVER_FORCEBEST)
-			{
-			  if (!solv->bestupdatemap.size)
-			    map_grow(&solv->bestupdatemap, installed->end - installed->start);
-			  MAPSET(&solv->bestupdatemap, p - installed->start);
-			}
-		      targeted = 0;
-		    }
-		  if (targeted)
-		    {
+		      int targeted = 1;
 		      FOR_JOB_SELECT(p, pp, select, what)
-			add_update_target(solv, p, how);
+			{
+			  s = pool->solvables + p;
+			  if (s->repo != installed)
+			    continue;
+			  if (!solv->updatemap.size)
+			    map_grow(&solv->updatemap, installed->end - installed->start);
+			  MAPSET(&solv->updatemap, p - installed->start);
+			  if (how & SOLVER_FORCEBEST)
+			    {
+			      if (!solv->bestupdatemap.size)
+				map_grow(&solv->bestupdatemap, installed->end - installed->start);
+			      MAPSET(&solv->bestupdatemap, p - installed->start);
+			    }
+			  targeted = 0;
+			}
+		      if (!targeted || solv->noautotarget)
+			break;
 		    }
+		  FOR_JOB_SELECT(p, pp, select, what)
+		    add_update_target(solv, p, how);
 		}
 	      break;
 	    default:
