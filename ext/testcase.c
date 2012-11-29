@@ -93,6 +93,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_NO_INFARCHCHECK,            "noinfarchcheck", 0 },
   { SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES,    "keepexplicitobsoletes", 0 },
   { SOLVER_FLAG_BEST_OBEY_POLICY,           "bestobeypolicy", 0 },
+  { SOLVER_FLAG_NO_AUTOTARGET,              "noautotarget", 0 },
   { 0, 0, 0 }
 };
 
@@ -115,8 +116,8 @@ static struct disttype2str {
   Id type;
   const char *str;
 } disttype2str[] = {
-  { DISTTYPE_RPM, "rpm" },
-  { DISTTYPE_DEB, "deb" },
+  { DISTTYPE_RPM,  "rpm" },
+  { DISTTYPE_DEB,  "deb" },
   { DISTTYPE_ARCH, "arch" },
   { 0, 0 },
 };
