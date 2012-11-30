@@ -1198,7 +1198,7 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
       if (ps->name != s->name)
 	continue;
       MAPSET(&solv->dupinvolvedmap, pi);
-      if (ps->repo == installed && solv->obsoletes && solv->obsoletes[pi - installed->start])
+      if (targeted && ps->repo == installed && solv->obsoletes && solv->obsoletes[pi - installed->start])
 	{
 	  Id *opp, pi2;
 	  for (opp = solv->obsoletes_data + solv->obsoletes[pi - installed->start]; (pi2 = *opp++) != 0;)
@@ -1241,7 +1241,7 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 		continue;
 	      MAPSET(&solv->dupinvolvedmap, pi);
-	      if (ps->repo == installed && solv->obsoletes && solv->obsoletes[pi - installed->start])
+	      if (targeted && ps->repo == installed && solv->obsoletes && solv->obsoletes[pi - installed->start])
 		{
 		  Id *opp, pi2;
 		  for (opp = solv->obsoletes_data + solv->obsoletes[pi - installed->start]; (pi2 = *opp++) != 0;)
