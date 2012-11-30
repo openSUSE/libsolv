@@ -1181,15 +1181,92 @@ reenableinfarchrule(Solver *solv, Id name)
  ***
  ***/
 
+static inline void
+solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
+{
+  Pool *pool = solv->pool;
+  Solvable *ps, *s = pool->solvables + p;
+  Repo *installed = solv->installed;
+  Id pi, pip, obs, *obsp;
+
+  MAPSET(&solv->dupinvolvedmap, p);
+  if (targeted)
+    MAPSET(&solv->dupmap, p);
+  FOR_PROVIDES(pi, pip, s->name)
+    {
+      ps = pool->solvables + pi;
+      if (ps->name != s->name)
+	continue;
+      MAPSET(&solv->dupinvolvedmap, pi);
+      if (ps->repo == installed && solv->obsoletes && solv->obsoletes[pi - installed->start])
+	{
+	  Id *opp, pi2;
+	  for (opp = solv->obsoletes_data + solv->obsoletes[pi - installed->start]; (pi2 = *opp++) != 0;)
+	    if (pool->solvables[pi2].repo != installed)
+	      MAPSET(&solv->dupinvolvedmap, pi2);
+	}
+      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+	{
+	  if (!solv->bestupdatemap.size)
+	    map_grow(&solv->bestupdatemap, installed->end - installed->start);
+	  MAPSET(&solv->bestupdatemap, pi - installed->start);
+	}
+      if (!targeted && ps->repo != installed)
+	MAPSET(&solv->dupmap, pi);
+    }
+  if (s->repo == installed && solv->obsoletes && solv->obsoletes[p - installed->start])
+    {
+      Id *opp;
+      for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (pi = *opp++) != 0;)
+	{
+	  ps = pool->solvables + pi;
+	  if (ps->repo == installed)
+	    continue;
+	  MAPSET(&solv->dupinvolvedmap, pi);
+	  if (!targeted)
+	    MAPSET(&solv->dupmap, pi);
+	}
+    }
+  if (targeted && s->repo != installed && s->obsoletes)
+    {
+      /* XXX: check obsoletes/provides combination */
+      obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(pi, pip, obs)
+	    {
+	      Solvable *ps = pool->solvables + pi;
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
+		continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		continue;
+	      MAPSET(&solv->dupinvolvedmap, pi);
+	      if (ps->repo == installed && solv->obsoletes && solv->obsoletes[pi - installed->start])
+		{
+		  Id *opp, pi2;
+		  for (opp = solv->obsoletes_data + solv->obsoletes[pi - installed->start]; (pi2 = *opp++) != 0;)
+		    if (pool->solvables[pi2].repo != installed)
+		      MAPSET(&solv->dupinvolvedmap, pi2);
+		}
+	      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+		{
+		  if (!solv->bestupdatemap.size)
+		    map_grow(&solv->bestupdatemap, installed->end - installed->start);
+		  MAPSET(&solv->bestupdatemap, pi - installed->start);
+		}
+	    }
+	}
+    }
+}
+
 void
 solver_createdupmaps(Solver *solv)
 {
   Queue *job = &solv->job;
   Pool *pool = solv->pool;
-  Repo *repo;
   Repo *installed = solv->installed;
-  Id select, how, what, p, pi, pp, pip, obs, *obsp;
-  Solvable *s, *ps;
+  Id select, how, what, p, pp;
+  Solvable *s;
   int i, targeted;
 
   map_init(&solv->dupmap, pool->nsolvables);
@@ -1202,7 +1279,25 @@ solver_createdupmaps(Solver *solv)
       switch (how & SOLVER_JOBMASK)
 	{
 	case SOLVER_DISTUPGRADE:
-	  if (select != SOLVER_SOLVABLE_REPO)
+	  if (select == SOLVER_SOLVABLE_REPO)
+	    {
+	      Repo *repo;
+	      if (what <= 0 || what > pool->nrepos)
+		break;
+	      repo = pool_id2repo(pool, what);
+	      if (!repo)
+		break;
+	      if (repo != installed && !(how & SOLVER_TARGETED) && solv->noautotarget)
+		break;
+	      targeted = repo != installed || (how & SOLVER_TARGETED) != 0;
+	      FOR_REPO_SOLVABLES(repo, p, s)
+		{
+		  if (repo != installed && !pool_installable(pool, s))
+		    continue;
+		  solver_addtodupmaps(solv, p, how, targeted);
+		}
+	    }
+	  else
 	    {
 	      targeted = how & SOLVER_TARGETED ? 1 : 0;
 	      if (installed && !targeted && !solv->noautotarget)
@@ -1219,132 +1314,11 @@ solver_createdupmaps(Solver *solv)
 		  Solvable *s = pool->solvables + p;
 		  if (!s->repo)
 		    continue;
-		  if (!targeted && s->repo != installed)
+		  if (s->repo != installed && !targeted)
 		    continue;
 		  if (s->repo != installed && !pool_installable(pool, s))
 		    continue;
-		  MAPSET(&solv->dupinvolvedmap, p);
-		  if (targeted)
-		    MAPSET(&solv->dupmap, p);
-		  FOR_PROVIDES(pi, pip, s->name)
-		    {
-		      ps = pool->solvables + pi;
-		      if (ps->name != s->name)
-			continue;
-		      MAPSET(&solv->dupinvolvedmap, pi);
-		      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
-			{
-			  if (!solv->bestupdatemap.size)
-			    map_grow(&solv->bestupdatemap, installed->end - installed->start);
-			  MAPSET(&solv->bestupdatemap, pi - installed->start);
-			}
-		      if (!targeted && ps->repo != installed)
-		        MAPSET(&solv->dupmap, pi);
-		    }
-		  if (s->repo == installed && solv->obsoletes && solv->obsoletes[p - installed->start])
-		    {
-		      Id *opp;
-		      for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (pi = *opp++) != 0;)
-			{
-			  ps = pool->solvables + pi;
-			  if (ps->repo == installed)
-			    continue;
-			  MAPSET(&solv->dupinvolvedmap, pi);
-			  if (!targeted)
-			    MAPSET(&solv->dupmap, pi);
-			}
-		    }
-		  if (targeted && s->obsoletes)
-		    {
-		      /* XXX: check obsoletes/provides combination */
-		      obsp = s->repo->idarraydata + s->obsoletes;
-		      while ((obs = *obsp++) != 0)
-			{
-			  FOR_PROVIDES(pi, pp, obs)
-			    {
-			      Solvable *ps = pool->solvables + pi;
-			      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
-				continue;
-			      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
-				continue;
-			      MAPSET(&solv->dupinvolvedmap, pi);
-			      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
-				{
-				  if (!solv->bestupdatemap.size)
-				    map_grow(&solv->bestupdatemap, installed->end - installed->start);
-				  MAPSET(&solv->bestupdatemap, pi - installed->start);
-				}
-			    }
-			}
-		    }
-		}
-	      break;
-	    }
-	  if (what <= 0 || what > pool->nrepos)
-	    break;
-	  repo = pool_id2repo(pool, what);
-	  if (!repo)
-	    break;
-	  if (repo != installed && !(how & SOLVER_TARGETED) && solv->noautotarget)
-	    break;
-	  targeted = repo != installed || (how & SOLVER_TARGETED) != 0;
-	  FOR_REPO_SOLVABLES(repo, p, s)
-	    {
-	      if (repo != installed && !pool_installable(pool, s))
-		continue;
-	      MAPSET(&solv->dupinvolvedmap, p);
-	      if (targeted)
-	        MAPSET(&solv->dupmap, p);
-	      FOR_PROVIDES(pi, pip, s->name)
-		{
-		  ps = pool->solvables + pi;
-		  if (ps->name != s->name)
-		    continue;
-		  MAPSET(&solv->dupinvolvedmap, pi);
-		  if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
-		    {
-		      if (!solv->bestupdatemap.size)
-			map_grow(&solv->bestupdatemap, installed->end - installed->start);
-		      MAPSET(&solv->bestupdatemap, pi - installed->start);
-		    }
-		  if (!targeted && ps->repo != installed)
-		    MAPSET(&solv->dupmap, pi);
-		}
-	      if (s->repo == installed && solv->obsoletes && solv->obsoletes[p - installed->start])
-		{
-		  Id *opp;
-		  for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (pi = *opp++) != 0;)
-		    {
-		      ps = pool->solvables + pi;
-		      if (ps->repo == installed)
-			continue;
-		      MAPSET(&solv->dupinvolvedmap, pi);
-		      if (!targeted)
-		        MAPSET(&solv->dupmap, pi);
-		    }
-		}
-	      if (targeted && s->obsoletes)
-		{
-		  /* XXX: check obsoletes/provides combination */
-		  obsp = s->repo->idarraydata + s->obsoletes;
-		  while ((obs = *obsp++) != 0)
-		    {
-		      FOR_PROVIDES(pi, pp, obs)
-			{
-			  Solvable *ps = pool->solvables + pi;
-			  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
-			    continue;
-			  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
-			    continue;
-		          MAPSET(&solv->dupinvolvedmap, pi);
-			  if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
-			    {
-			      if (!solv->bestupdatemap.size)
-				map_grow(&solv->bestupdatemap, installed->end - installed->start);
-			      MAPSET(&solv->bestupdatemap, pi - installed->start);
-			    }
-			}
-		    }
+		  solver_addtodupmaps(solv, p, how, targeted);
 		}
 	    }
 	  break;
