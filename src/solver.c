@@ -1868,8 +1868,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      olevel = level;
 		      if (solv->cleandepsmap.size && MAPTST(&solv->cleandepsmap, i - installed->start))
 			{
+#if 0
 			  POOL_DEBUG(SOLV_DEBUG_POLICY, "cleandeps erasing %s\n", pool_solvid2str(pool, i));
 			  level = setpropagatelearn(solv, level, -i, disablerules, 0);
+#else
+			  continue;
+#endif
 			}
 		      else
 			{
@@ -1979,6 +1983,20 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	   * the rule is unit */
 	  assert(dq.count > 1);
 
+	  /* prune to cleandeps packages */
+	  if (solv->cleandepsmap.size && solv->installed)
+	    {
+	      Repo *installed = solv->installed;
+	      for (j = 0; j < dq.count; j++)
+		if (pool->solvables[dq.elements[j]].repo == installed && MAPTST(&solv->cleandepsmap, dq.elements[j] - installed->start))
+		  break;
+	      if (j < dq.count)
+		{
+		  dq.elements[0] = dq.elements[j];
+		  queue_truncate(&dq, 1);
+		}
+	    }
+
 	  olevel = level;
 	  level = selectandinstall(solv, level, &dq, disablerules, r - solv->rules);
 	  if (level == 0)
@@ -1997,6 +2015,27 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	}
 
       /* at this point we have a consistent system. now do the extras... */
+
+      /* first decide leftover cleandeps packages */
+      if (solv->cleandepsmap.size && solv->installed)
+	{
+	  for (p = solv->installed->start; p < solv->installed->end; p++)
+	    {
+	      s = pool->solvables + p;
+	      if (s->repo != solv->installed)
+		continue;
+	      if (solv->decisionmap[p] == 0 && MAPTST(&solv->cleandepsmap, p - solv->installed->start))
+		{
+		  POOL_DEBUG(SOLV_DEBUG_POLICY, "cleandeps erasing %s\n", pool_solvid2str(pool, p));
+		  olevel = level;
+		  level = setpropagatelearn(solv, level, -p, 0, 0);
+		  if (level < olevel)
+		    break;
+		}
+	    }
+	  if (p < solv->installed->end)
+	    continue;
+	}
 
       solv->decisioncnt_weak = solv->decisionq.count;
       if (doweak)
@@ -2310,6 +2349,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  if (cleandeps_check_mistakes(solv, level))
 	    {
 	      level = 1;	/* restart from scratch */
+	      systemlevel = level + 1;
 	      continue;
 	    }
 	}
