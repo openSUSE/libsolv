@@ -585,7 +585,7 @@ selection_limit_evr(Pool *pool, Queue *selection, char *evr)
 	  queue_push(&q, p);
 	  if (sp > sevr)
 	    {
-	      while (sevr < sp && *sevr == '0')	/* normalize */
+	      while (sevr < sp && *sevr == '0')	/* normalize epoch */
 		sevr++;
 	    }
 	  if (!lastepoch)
@@ -600,7 +600,7 @@ selection_limit_evr(Pool *pool, Queue *selection, char *evr)
 	id = pool_str2id(pool, evr, 1);		/* no match at all or zero epoch */
       else if (lastepochlen >= 0)
 	{
-	  /* found exactly one epoch, simlpy prepend */
+	  /* found exactly one epoch, simply prepend */
 	  char *evrx = solv_malloc(strlen(evr) + lastepochlen + 2);
 	  strncpy(evrx, lastepoch, lastepochlen + 1);
 	  strcpy(evrx + lastepochlen + 1, evr);
@@ -609,7 +609,7 @@ selection_limit_evr(Pool *pool, Queue *selection, char *evr)
 	}
       else
 	{
-	  /* multiple epochs in multiple solvables, convert to listy of solvables */
+	  /* multiple epochs in multiple solvables, convert to list of solvables */
 	  selection->elements[j] = (selection->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE_ONE_OF;
 	  selection->elements[j + 1] = pool_queuetowhatprovides(pool, &q);
 	  j += 2;
@@ -619,10 +619,7 @@ selection_limit_evr(Pool *pool, Queue *selection, char *evr)
       queue_push2(&q, selection->elements[i], selection->elements[i + 1]);
       selection_limit_rel(pool, &q, REL_EQ, id);
       if (!q.count)
-	{
-	  queue_free(&q);
-	  continue;		/* oops, no match */
-	}
+        continue;		/* oops, no match */
       selection->elements[j] = q.elements[0];
       selection->elements[j + 1] = q.elements[1];
       j += 2;
