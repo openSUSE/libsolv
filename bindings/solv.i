@@ -777,11 +777,14 @@ typedef struct {
   static const Id SOLVER_WEAK = SOLVER_WEAK;
   static const Id SOLVER_ESSENTIAL = SOLVER_ESSENTIAL;
   static const Id SOLVER_CLEANDEPS = SOLVER_CLEANDEPS;
+  static const Id SOLVER_FORCEBEST = SOLVER_FORCEBEST;
+  static const Id SOLVER_TARGETED = SOLVER_TARGETED;
   static const Id SOLVER_SETEV = SOLVER_SETEV;
   static const Id SOLVER_SETEVR = SOLVER_SETEVR;
   static const Id SOLVER_SETARCH = SOLVER_SETARCH;
   static const Id SOLVER_SETVENDOR = SOLVER_SETVENDOR;
   static const Id SOLVER_SETREPO = SOLVER_SETREPO;
+  static const Id SOLVER_SETNAME = SOLVER_SETNAME;
   static const Id SOLVER_NOAUTOSET = SOLVER_NOAUTOSET;
   static const Id SOLVER_SETMASK = SOLVER_SETMASK;
 
@@ -2372,7 +2375,7 @@ typedef struct {
     Id extraflags = solver_solutionelement_extrajobflags($self->solv, $self->problemid, $self->solutionid);
     if ($self->type == SOLVER_SOLUTION_JOB)
       return new_Job($self->solv->pool, SOLVER_NOOP, 0);
-    if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE)
+    if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE || $self->type == SOLVER_SOLUTION_BEST)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->p);
     if ($self->type == SOLVER_SOLUTION_REPLACE || $self->type == SOLVER_SOLUTION_REPLACE_DOWNGRADE || $self->type == SOLVER_SOLUTION_REPLACE_ARCHCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->rp);
@@ -2406,6 +2409,7 @@ typedef struct {
   static const int SOLVER_SOLUTION_JOB = SOLVER_SOLUTION_JOB;
   static const int SOLVER_SOLUTION_INFARCH = SOLVER_SOLUTION_INFARCH;
   static const int SOLVER_SOLUTION_DISTUPGRADE = SOLVER_SOLUTION_DISTUPGRADE;
+  static const int SOLVER_SOLUTION_BEST = SOLVER_SOLUTION_BEST;
   static const int SOLVER_SOLUTION_ERASE = SOLVER_SOLUTION_ERASE;
   static const int SOLVER_SOLUTION_REPLACE = SOLVER_SOLUTION_REPLACE;
   static const int SOLVER_SOLUTION_REPLACE_DOWNGRADE = SOLVER_SOLUTION_REPLACE_DOWNGRADE;

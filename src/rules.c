@@ -1181,6 +1181,17 @@ reenableinfarchrule(Solver *solv, Id name)
  ***
  ***/
 
+static inline void 
+add_cleandeps_package(Solver *solv, Id p)
+{
+  if (!solv->cleandeps_updatepkgs)
+    {    
+      solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
+      queue_init(solv->cleandeps_updatepkgs);
+    }    
+  queue_pushunique(solv->cleandeps_updatepkgs, p); 
+}
+
 static inline void
 solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 {
@@ -1211,6 +1222,8 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 	    map_grow(&solv->bestupdatemap, installed->end - installed->start);
 	  MAPSET(&solv->bestupdatemap, pi - installed->start);
 	}
+      if (ps->repo == installed && (how & SOLVER_CLEANDEPS) != 0)
+	add_cleandeps_package(solv, pi);
       if (!targeted && ps->repo != installed)
 	MAPSET(&solv->dupmap, pi);
     }
@@ -1254,6 +1267,8 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 		    map_grow(&solv->bestupdatemap, installed->end - installed->start);
 		  MAPSET(&solv->bestupdatemap, pi - installed->start);
 		}
+	      if (ps->repo == installed && (how & SOLVER_CLEANDEPS) != 0)
+		add_cleandeps_package(solv, pi);
 	    }
 	}
     }
@@ -2692,7 +2707,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   Id p, pp, ip, jp;
   Id req, *reqp, sup, *supp;
   Solvable *s;
-  Queue iq;
+  Queue iq, iqcopy;
   int i;
 
   map_empty(cleandepsmap);
@@ -2787,9 +2802,9 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
     {
       r = solv->rules + rid;
-      if (r->d < 0)
+      if (r->d < 0)				/* disabled? */
 	continue;
-      if (r->d == 0 && r->p < 0 && r->w2 == 0)
+      if (r->d == 0 && r->p < 0 && r->w2 == 0)	/* negative assertion (erase job)? */
 	{
 	  p = -r->p;
 	  if (pool->solvables[p].repo != installed)
@@ -2802,7 +2817,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  if ((how & (SOLVER_JOBMASK|SOLVER_CLEANDEPS)) == (SOLVER_ERASE|SOLVER_CLEANDEPS))
 	    queue_push(&iq, p);
 	}
-      else if (r->p > 0)
+      else if (r->p > 0)			/* install job */
 	{
 	  if (unneeded)
 	    continue;
@@ -2859,6 +2874,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	    }
 	}
     }
+  queue_init_clone(&iqcopy, &iq);
 
   if (!unneeded)
     {
@@ -3134,12 +3150,17 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
     }
     
   queue_free(&iq);
+  /* make sure the updatepkgs and mistakes are not in the cleandeps map */
   if (solv->cleandeps_updatepkgs)
     for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
       MAPSET(&im, solv->cleandeps_updatepkgs->elements[i]);
   if (solv->cleandeps_mistakes)
     for (i = 0; i < solv->cleandeps_mistakes->count; i++)
       MAPSET(&im, solv->cleandeps_mistakes->elements[i]);
+  /* also remove original iq packages */
+  for (i = 0; i < iqcopy.count; i++)
+    MAPSET(&im, iqcopy.elements[i]);
+  queue_free(&iqcopy);
   for (p = installed->start; p < installed->end; p++)
     {
       if (pool->solvables[p].repo != installed)
@@ -3150,6 +3171,12 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   map_free(&im);
   map_free(&installedm);
   map_free(&userinstalled);
+#ifdef CLEANDEPSDEBUG
+  printf("=== final cleandeps map:\n");
+  for (p = installed->start; p < installed->end; p++)
+    if (MAPTST(cleandepsmap, p - installed->start))
+      printf("  - %s\n", pool_solvid2str(pool, p));
+#endif
 }
 
 

@@ -568,7 +568,9 @@ def load_stub(repodata):
 
 
 parser = OptionParser(usage="usage: solv.py [options] COMMAND")
-parser.add_option('-r', '--repo', action="append", type="string", dest="repos")
+parser.add_option('-r', '--repo', action="append", type="string", dest="repos", help="limit to specified repositories")
+parser.add_option('--best', action="store_true", dest="best", help="force installation/update to best packages")
+parser.add_option('--clean', action="store_true", dest="clean", help="delete no longer needed packages")
 (options, args) = parser.parse_args()
 if not args:
     parser.print_help(sys.stderr)
@@ -744,6 +746,10 @@ if cmd == 'list' or cmd == 'info':
 for job in jobs:
     if cmd == 'up' and job.isemptyupdate():
         job.how ^= Job.SOLVER_UPDATE ^ Job.SOLVER_INSTALL
+    if options.best:
+        job.how |= Job.SOLVER_FORCEBEST
+    if options.clean:
+        job.how |= Job.SOLVER_CLEANDEPS
 
 #pool.set_debuglevel(2)
 solver = None

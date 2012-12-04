@@ -2639,6 +2639,17 @@ solver_addjobrule(Solver *solv, Id p, Id d, Id job, int weak)
     queue_push(&solv->weakruleq, solv->nrules - 1);
 }
 
+static inline void
+add_cleandeps_package(Solver *solv, Id p)
+{
+  if (!solv->cleandeps_updatepkgs)
+    {
+      solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
+      queue_init(solv->cleandeps_updatepkgs);
+    }
+  queue_pushunique(solv->cleandeps_updatepkgs, p);
+}
+
 static void
 add_update_target(Solver *solv, Id p, Id how)
 {
@@ -2667,6 +2678,8 @@ add_update_target(Solver *solv, Id p, Id how)
 	    map_grow(&solv->bestupdatemap, installed->end - installed->start);
 	  MAPSET(&solv->bestupdatemap, pi - installed->start);
 	}
+      if (how & SOLVER_CLEANDEPS)
+	add_cleandeps_package(solv, pi);
       queue_push2(solv->update_targets, pi, p);
       /* check if it's ok to keep the installed package */
       if (s->evr == si->evr && solvable_identical(s, si))
@@ -2694,6 +2707,8 @@ add_update_target(Solver *solv, Id p, Id how)
 		    map_grow(&solv->bestupdatemap, installed->end - installed->start);
 		  MAPSET(&solv->bestupdatemap, pi - installed->start);
 		}
+	      if (how & SOLVER_CLEANDEPS)
+		add_cleandeps_package(solv, pi);
 	      queue_push2(solv->update_targets, pi, p);
 	    }
 	}
@@ -2795,11 +2810,18 @@ solver_solve(Solver *solv, Queue *job)
   queue_free(&solv->job);
   queue_init_clone(&solv->job, job);
 
+  /* free old stuff */
   if (solv->update_targets)
     {
       queue_free(solv->update_targets);
       solv->update_targets = solv_free(solv->update_targets);
     }
+  if (solv->cleandeps_updatepkgs)
+    {
+      queue_free(solv->cleandeps_updatepkgs);
+      solv->cleandeps_updatepkgs = solv_free(solv->cleandeps_updatepkgs);
+    }
+
   /*
    * create basic rule set of all involved packages
    * use addedmap bitmap to make sure we don't create rules twice
@@ -2849,6 +2871,11 @@ solver_solve(Solver *solv, Queue *job)
 		  solv->updatemap_all = 1;
 		  if (how & SOLVER_FORCEBEST)
 		    solv->bestupdatemap_all = 1;
+		  if (how & SOLVER_CLEANDEPS)
+		    {
+		      FOR_REPO_SOLVABLES(installed, p, s)
+			add_cleandeps_package(solv, p);
+		    }
 		}
 	      else if (select == SOLVER_SOLVABLE_REPO)
 		{
@@ -2860,6 +2887,11 @@ solver_solve(Solver *solv, Queue *job)
 		      solv->updatemap_all = 1;
 		      if (how & SOLVER_FORCEBEST)
 			solv->bestupdatemap_all = 1;
+		      if (how & SOLVER_CLEANDEPS)
+			{
+			  FOR_REPO_SOLVABLES(installed, p, s)
+			    add_cleandeps_package(solv, p);
+			}
 		      break;
 		    }
 		  if (solv->noautotarget && !(how & SOLVER_TARGETED))
@@ -2887,6 +2919,8 @@ solver_solve(Solver *solv, Queue *job)
 				map_grow(&solv->bestupdatemap, installed->end - installed->start);
 			      MAPSET(&solv->bestupdatemap, p - installed->start);
 			    }
+			  if (how & SOLVER_CLEANDEPS)
+			    add_cleandeps_package(solv, p);
 			  targeted = 0;
 			}
 		      if (!targeted || solv->noautotarget)
@@ -3074,11 +3108,6 @@ solver_solve(Solver *solv, Queue *job)
    */
 
   solv->jobrules = solv->nrules;
-  if (solv->cleandeps_updatepkgs)
-    {
-      queue_free(solv->cleandeps_updatepkgs);
-      solv->cleandeps_updatepkgs = solv_free(solv->cleandeps_updatepkgs);
-    }
   for (i = 0; i < job->count; i += 2)
     {
       oldnrules = solv->nrules;
@@ -3172,37 +3201,6 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 
 	case SOLVER_UPDATE:
-          if ((how & SOLVER_CLEANDEPS) != 0 && installed)
-	    {
-	      if (how == SOLVER_SOLVABLE_ALL || (how == SOLVER_SOLVABLE_REPO && what == installed->repoid))
-		{
-		  FOR_REPO_SOLVABLES(installed, p, s)
-		    {
-		      if (!solv->cleandeps_updatepkgs)
-			{
-			  solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
-			  queue_init(solv->cleandeps_updatepkgs);
-			}
-		      queue_pushunique(solv->cleandeps_updatepkgs, p);
-		      if (!solv->cleandepsmap.size)
-			map_grow(&solv->cleandepsmap, installed->end - installed->start);
-		    }
-		}
-	      FOR_JOB_SELECT(p, pp, select, what)
-		{
-		  s = pool->solvables + p;
-		  if (s->repo != installed)
-		    continue;
-		  if (!solv->cleandeps_updatepkgs)
-		    {
-		      solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
-		      queue_init(solv->cleandeps_updatepkgs);
-		    }
-		  queue_pushunique(solv->cleandeps_updatepkgs, p);
-		  if (!solv->cleandepsmap.size)
-		    map_grow(&solv->cleandepsmap, installed->end - installed->start);
-		}
-	    }
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %supdate %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  break;
 	case SOLVER_VERIFY:
@@ -3338,6 +3336,16 @@ solver_solve(Solver *solv, Queue *job)
       MAPSET(&solv->weakrulemap, p);
     }
 
+  /* enable cleandepsmap creation if we have updatepkgs */
+  if (solv->cleandeps_updatepkgs && !solv->cleandepsmap.size)
+    map_grow(&solv->cleandepsmap, installed->end - installed->start);
+  /* no mistakes */
+  if (solv->cleandeps_mistakes)
+    {    
+      queue_free(solv->cleandeps_mistakes);
+      solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
+    }    
+
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
 
@@ -3356,13 +3364,6 @@ solver_solve(Solver *solv, Queue *job)
   /* make initial decisions based on assertion rules */
   makeruledecisions(solv);
   POOL_DEBUG(SOLV_DEBUG_SOLVER, "problems so far: %d\n", solv->problems.count);
-
-  /* no mistakes */
-  if (solv->cleandeps_mistakes)
-    {    
-      queue_free(solv->cleandeps_mistakes);
-      solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
-    }    
 
   /*
    * ********************************************
