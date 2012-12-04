@@ -8,6 +8,18 @@
 #include "solverdebug.h"
 #include "testcase.h"
 
+static struct resultflags2str {
+  Id flag;
+  const char *str;
+} resultflags2str[] = {
+  { TESTCASE_RESULT_TRANSACTION,        "transaction" },
+  { TESTCASE_RESULT_PROBLEMS,           "problems" },
+  { TESTCASE_RESULT_ORPHANED,           "orphaned" },
+  { TESTCASE_RESULT_RECOMMENDED,        "recommended" },
+  { TESTCASE_RESULT_UNNEEDED,           "unneeded" },
+  { 0, 0 }
+};
+
 static void
 usage(ex)
 {
@@ -91,10 +103,22 @@ main(int argc, char **argv)
 		    {
 		      if (writeresult > 1)
 			{
-			  char *p = myresult;
+			  const char *p;
+			  int i;
+			  
+			  printf("result ");
+			  p = "%s";
+			  for (i = 0; resultflags2str[i].str; i++)
+			    if ((resultflags & resultflags2str[i].flag) != 0)
+			      {
+			        printf(p, resultflags2str[i].str);
+			        p = ",%s";
+			      }
+			  printf(" <inline>\n");
+			  p = myresult;
 			  while (*p)
 			    {
-			      char *p2 = strchr(p, '\n');
+			      const char *p2 = strchr(p, '\n');
 			      p2 = p2 ? p2 + 1 : p + strlen(p);
 			      printf("#>%.*s", (int)(p2 - p), p);
 			      p = p2;
