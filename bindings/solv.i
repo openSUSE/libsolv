@@ -1317,6 +1317,12 @@ typedef struct {
   Selection *Selection() {
     return new_Selection($self);
   }
+  %newobject Selection_all;
+  Selection *Selection_all(int setflags=0) {
+    Selection *sel = new_Selection($self);
+    queue_push2(&sel->q, SOLVER_SOLVABLE_ALL | setflags, 0);
+    return sel;
+  }
   %newobject select;
   Selection *select(const char *name, int flags) {
     Selection *sel = new_Selection($self);
@@ -1510,6 +1516,14 @@ typedef struct {
           return 0;       /* oops, not an extension */
       }
     return new_XRepodata($self, 1);
+  }
+
+  %newobject Selection;
+  Selection *Selection(int setflags=0) {
+    Selection *sel = new_Selection($self->pool);
+    setflags |= SOLVER_SETREPO;
+    queue_push2(&sel->q, SOLVER_SOLVABLE_REPO | setflags, $self->repoid);
+    return sel;
   }
 
   bool __eq__(Repo *repo) {
@@ -1920,6 +1934,40 @@ typedef struct {
     s->id = id;
     return s;
   }
+  %newobject Rel;
+  Dep *Rel(int flags, DepId evrid, bool create=1) {
+    Id id = pool_rel2id($self->pool, $self->id, evrid, flags, create);
+    if (!id)
+      return 0;
+    return new_Dep($self->pool, id);
+  }
+  %newobject Selection_name;
+  Selection *Selection_name(int setflags=0) {
+    Selection *sel = new_Selection($self->pool);
+    if (ISRELDEP($self->id)) {
+      Reldep *rd = GETRELDEP($self->pool, $self->id);
+      if (rd->flags == REL_EQ) {
+        setflags |= $self->pool->disttype == DISTTYPE_DEB || strchr(pool_id2str($self->pool, rd->evr), '-') != 0 ? SOLVER_SETEVR : SOLVER_SETEV;
+        if (ISRELDEP(rd->name))
+          rd = GETRELDEP($self->pool, rd->name);
+      }
+      if (rd->flags == REL_ARCH)
+        setflags |= SOLVER_SETARCH;
+    }
+    queue_push2(&sel->q, SOLVER_SOLVABLE_NAME | setflags, $self->id);
+    return sel;
+  }
+  %newobject Selection_provides;
+  Selection *Selection_provides(int setflags=0) {
+    Selection *sel = new_Selection($self->pool);
+    if (ISRELDEP($self->id)) {
+      Reldep *rd = GETRELDEP($self->pool, $self->id);
+      if (rd->flags == REL_ARCH)
+        setflags |= SOLVER_SETARCH;
+    }
+    queue_push2(&sel->q, SOLVER_SOLVABLE_PROVIDES | setflags, $self->id);
+    return sel;
+  }
   const char *str() {
     return pool_dep2str($self->pool, $self->id);
   }
@@ -2163,6 +2211,13 @@ typedef struct {
         marker = 0;
     }
     solvable_add_deparray(s, keyname, id, marker);
+  }
+
+  %newobject Selection;
+  Selection *Selection(int setflags=0) {
+    Selection *sel = new_Selection($self->pool);
+    queue_push2(&sel->q, SOLVER_SOLVABLE | setflags, $self->id);
+    return sel;
   }
 
   bool __eq__(XSolvable *s) {

@@ -644,7 +644,7 @@ if options.repos:
         if hasattr(repo, 'handle'):
             if not repofilter:
                 repofilter = pool.Selection()
-            repofilter.add_raw(Job.SOLVER_SOLVABLE_REPO|Job.SOLVER_SETREPO|Job.SOLVER_SETVENDOR, repo.handle.id)
+            repofilter.add(repo.handle.Selection(Job.SOLVER_SETVENDOR))
 
 if cmd == 'search':
     pool.createwhatprovides()
@@ -713,8 +713,7 @@ for arg in args:
         jobs += sel.jobs(cmdactionmap[cmd])
 
 if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repofilter):
-    sel = pool.Selection()
-    sel.add_raw(Job.SOLVER_SOLVABLE_ALL, 0)
+    sel = pool.Selection_all()
     if repofilter:
        sel.filter(repofilter)
     jobs += sel.jobs(cmdactionmap[cmd])
