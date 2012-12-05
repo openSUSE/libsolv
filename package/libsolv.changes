@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Wed Dec  5 14:37:39 CET 2012 - mls@suse.de
+
+- many Selection improvements
+- fix perl binding memory issue
+- improve file list matching
+- support targeted up/dup with cleandeps
+- bump version to 0.2.2
+
+-------------------------------------------------------------------
 Fri Nov 23 13:57:19 CET 2012 - mls@suse.de
 
 - support targeted up/dup
