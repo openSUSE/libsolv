@@ -1,23 +1,12 @@
 repo system 0 testtags <inline>
 #>=Pkg: D 1 1 noarch
 #>=Vnd: foo
-#>+Prv:
-#>D = 1-1
-#>-Prv:
-#>+Con:
-#>A = 3-1
-#>-Con:
+#>=Con: A = 3-1
 repo available 0 testtags <inline>
 #>=Pkg: A 2 1 noarch
 #>=Vnd: foo
-#>+Prv:
-#>A = 2-1
-#>-Prv:
 #>=Pkg: A 3 1 noarch
 #>=Vnd: bar
-#>+Prv:
-#>A = 3-1
-#>-Prv:
 system i686 rpm system
 
 job install name A [forcebest]

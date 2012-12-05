@@ -1,46 +1,16 @@
 repo system 0 testtags <inline>
 #>=Pkg: A 1 1 noarch
-#>+Prv:
-#>A = 1-1 
-#>-Prv:
 #>=Pkg: D 1 1 noarch
-#>+Prv:
-#>D = 1-1 
-#>-Prv:
 #>=Pkg: Z 1 1 noarch
-#>+Prv:
-#>Z = 1-1 
-#>-Prv:
-#>+Con:
-#>D = 2-1 
-#>-Con:
+#>=Con: D = 2-1 
 repo available 0 testtags <inline>
 #>=Pkg: A 2 1 noarch
-#>+Prv:
-#>A = 2-1 
-#>-Prv:
 #>=Pkg: B 1 0 noarch
-#>+Prv:
-#>B = 1-0 
-#>-Prv:
-#>+Obs:
-#>A
-#>-Obs:
+#>=Obs: A
 #>=Pkg: C 1 0 noarch
-#>+Prv:
-#>C = 1-0 
-#>-Prv:
-#>+Obs:
-#>A = 1-1 
-#>-Obs:
+#>=Obs: A = 1-1 
 #>=Pkg: D 2 1 noarch
-#>+Prv:
-#>D = 2-1 
-#>-Prv:
 #>=Pkg: D 3 1 noarch
-#>+Prv:
-#>D = 3-1 
-#>-Prv:
 system i686 rpm system
 
 # first check untargeted
