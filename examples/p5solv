@@ -568,6 +568,7 @@ $pool->createwhatprovides();
 my @jobs;
 for my $arg (@ARGV) {
   my $flags = $solv::Selection::SELECTION_NAME | $solv::Selection::SELECTION_PROVIDES | $solv::Selection::SELECTION_GLOB;
+  $flags |= $solv::Selection::SELECTION_CANON | $solv::Selection::SELECTION_DOTARCH | $solv::Selection::SELECTION_REL;
   if ($arg =~ /^\//) {
     $flags |= $solv::Selection::SELECTION_FILELIST;
     $flags |= $solv::Selection::SELECTION_INSTALLED_ONLY if $cmd eq 'erase';

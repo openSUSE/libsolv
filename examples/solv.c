@@ -2612,7 +2612,7 @@ main(int argc, char **argv)
 	queue_push2(&sel, SOLVER_SOLVABLE, di.solvid);
       dataiterator_free(&di);
       if (repofilter.count)
-	selection_limit(pool, &sel, &repofilter);
+	selection_filter(pool, &sel, &repofilter);
 	
       queue_init(&q);
       selection_solvables(pool, &sel, &q);
@@ -2692,19 +2692,20 @@ main(int argc, char **argv)
 	}
       queue_init(&job2);
       flags = SELECTION_NAME|SELECTION_PROVIDES|SELECTION_GLOB;
+      flags |= SELECTION_CANON|SELECTION_DOTARCH|SELECTION_REL;
       if (mode == MODE_LIST)
 	flags |= SELECTION_WITH_SOURCE;
       if (argv[i][0] == '/')
 	flags |= SELECTION_FILELIST | (mode == MODE_ERASE ? SELECTION_INSTALLED_ONLY : 0);
       rflags = selection_make(pool, &job2, argv[i], flags);
       if (repofilter.count)
-	selection_limit(pool, &job2, &repofilter);
+	selection_filter(pool, &job2, &repofilter);
       if (!job2.count)
 	{
 	  flags |= SELECTION_NOCASE;
           rflags = selection_make(pool, &job2, argv[i], flags);
 	  if (repofilter.count)
-	    selection_limit(pool, &job2, &repofilter);
+	    selection_filter(pool, &job2, &repofilter);
 	  if (job2.count)
 	    printf("[ignoring case for '%s']\n", argv[i]);
 	}
@@ -2726,7 +2727,7 @@ main(int argc, char **argv)
     {
       queue_push2(&job, SOLVER_SOLVABLE_ALL, 0);
       if (repofilter.count)
-	selection_limit(pool, &job, &repofilter);
+	selection_filter(pool, &job, &repofilter);
     }
   queue_free(&repofilter);
 

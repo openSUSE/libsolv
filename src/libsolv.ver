@@ -228,7 +228,7 @@ SOLV_1.0 {
 		repodata_write_filtered;
 		repopagestore_compress_page;
 		selection_add;
-		selection_limit;
+		selection_filter;
 		selection_make;
 		selection_solvables;
 		solv_bin2hex;

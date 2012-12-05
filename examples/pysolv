@@ -633,7 +633,7 @@ for repo in repos:
     if int(repo['enabled']):
         repo.load(pool)
     
-repolimiter = None
+repofilter = None
 if options.repos:
     for reponame in options.repos:
         mrepos = [ repo for repo in repos if repo.name == reponame ]
@@ -642,9 +642,9 @@ if options.repos:
             sys.exit(1)
         repo = mrepos[0]
         if hasattr(repo, 'handle'):
-            if not repolimiter:
-                repolimiter = pool.Selection()
-            repolimiter.add_raw(Job.SOLVER_SOLVABLE_REPO|Job.SOLVER_SETREPO|Job.SOLVER_SETVENDOR, repo.handle.id)
+            if not repofilter:
+                repofilter = pool.Selection()
+            repofilter.add_raw(Job.SOLVER_SOLVABLE_REPO|Job.SOLVER_SETREPO|Job.SOLVER_SETVENDOR, repo.handle.id)
 
 if cmd == 'search':
     pool.createwhatprovides()
@@ -652,8 +652,8 @@ if cmd == 'search':
     di = pool.Dataiterator(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
     for d in di:
         sel.add_raw(Job.SOLVER_SOLVABLE, d.solvid)
-    if repolimiter:
-       sel.limit(repolimiter)
+    if repofilter:
+       sel.filter(repofilter)
     for s in sel.solvables():
         print " - %s [%s]: %s" % (s, s.repo.name, s.lookup_str(solv.SOLVABLE_SUMMARY))
     sys.exit(0)
@@ -689,17 +689,18 @@ for arg in args:
         jobs.append(pool.Job(Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
     else:
         flags = Selection.SELECTION_NAME|Selection.SELECTION_PROVIDES|Selection.SELECTION_GLOB
+	flags |= Selection.SELECTION_CANON|Selection.SELECTION_DOTARCH|Selection.SELECTION_REL
         if len(arg) and arg[0] == '/':
             flags |= Selection.SELECTION_FILELIST
             if cmd == 'erase':
                 flags |= Selection.SELECTION_INSTALLED_ONLY
         sel = pool.select(arg, flags)
-        if repolimiter:
-           sel.limit(repolimiter)
+        if repofilter:
+           sel.filter(repofilter)
         if sel.isempty():
             sel = pool.select(arg, flags | Selection.SELECTION_NOCASE)
-            if repolimiter:
-               sel.limit(repolimiter)
+            if repofilter:
+               sel.filter(repofilter)
             if not sel.isempty():
                 print "[ignoring case for '%s']" % arg
         if sel.isempty():
@@ -711,11 +712,11 @@ for arg in args:
             print "[using capability match for '%s']" % arg
         jobs += sel.jobs(cmdactionmap[cmd])
 
-if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repolimiter):
+if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repofilter):
     sel = pool.Selection()
     sel.add_raw(Job.SOLVER_SOLVABLE_ALL, 0)
-    if repolimiter:
-       sel.limit(repolimiter)
+    if repofilter:
+       sel.filter(repofilter)
     jobs += sel.jobs(cmdactionmap[cmd])
 
 if not jobs:

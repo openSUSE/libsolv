@@ -152,7 +152,7 @@ selection_flatten(Pool *pool, Queue *selection)
 }
 
 static void
-selection_limit_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
+selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 {
   int i;
   for (i = 0; i < selection->count; i += 2)
@@ -358,7 +358,7 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
   if (doglob && (flags & SELECTION_NOCASE) != 0)
     globflags = FNM_CASEFOLD;
 
-#if 0	/* doesn't work with selection_limit_rel yet */
+#if 0	/* doesn't work with selection_filter_rel yet */
   if (doglob && !strcmp(name, "*") && (flags & SELECTION_FLAT) != 0)
     {
       /* can't do this for SELECTION_PROVIDES, as src rpms don't provide anything */
@@ -438,6 +438,8 @@ selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags
 
   if ((ret = selection_depglob(pool, selection, name, flags)) != 0)
     return ret;
+  if (!(flags & SELECTION_DOTARCH))
+    return 0;
   /* check if there is an .arch suffix */
   if ((r = strrchr(name, '.')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
     {
@@ -447,9 +449,9 @@ selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags
 	flags |= SELECTION_SOURCE_ONLY;
       if ((ret = selection_depglob(pool, selection, rname, flags)) != 0)
 	{
-	  selection_limit_rel(pool, selection, REL_ARCH, archid);
+	  selection_filter_rel(pool, selection, REL_ARCH, archid);
 	  solv_free(rname);
-	  return ret;
+	  return ret | SELECTION_DOTARCH;
 	}
       solv_free(rname);
     }
@@ -531,9 +533,9 @@ selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
   if ((ret = selection_depglob_arch(pool, selection, rname, flags)) != 0)
     {
       if (rflags)
-	selection_limit_rel(pool, selection, rflags, pool_str2id(pool, r, 1));
+	selection_filter_rel(pool, selection, rflags, pool_str2id(pool, r, 1));
       solv_free(rname);
-      return ret;
+      return ret | SELECTION_REL;
     }
   solv_free(rname);
   return 0;
@@ -549,7 +551,7 @@ selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
 
 /* magic epoch promotion code, works only for SELECTION_NAME selections */
 static void
-selection_limit_evr(Pool *pool, Queue *selection, char *evr)
+selection_filter_evr(Pool *pool, Queue *selection, char *evr)
 {
   int i, j;
   Queue q;
@@ -617,7 +619,7 @@ selection_limit_evr(Pool *pool, Queue *selection, char *evr)
 	}
       queue_empty(&q);
       queue_push2(&q, selection->elements[i], selection->elements[i + 1]);
-      selection_limit_rel(pool, &q, REL_EQ, id);
+      selection_filter_rel(pool, &q, REL_EQ, id);
       if (!q.count)
         continue;		/* oops, no match */
       selection->elements[j] = q.elements[0];
@@ -628,8 +630,9 @@ selection_limit_evr(Pool *pool, Queue *selection, char *evr)
   queue_free(&q);
 }
 
+/* match the "canonical" name of the package */
 static int
-selection_nevra(Pool *pool, Queue *selection, const char *name, int flags)
+selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
 {
   char *rname, *r, *r2;
   Id archid = 0;
@@ -660,11 +663,11 @@ selection_nevra(Pool *pool, Queue *selection, const char *name, int flags)
       if ((r2 = strchr(r, '_')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
 	{
 	  *r2 = 0;	/* split off */
-          selection_limit_rel(pool, selection, REL_ARCH, archid);
+          selection_filter_rel(pool, selection, REL_ARCH, archid);
 	}
-      selection_limit_rel(pool, selection, REL_EQ, pool_str2id(pool, r, 1));
+      selection_filter_rel(pool, selection, REL_EQ, pool_str2id(pool, r, 1));
       solv_free(rname);
-      return ret;
+      return ret | SELECTION_CANON;
     }
 
   if ((r = strrchr(name, '-')) == 0)
@@ -698,10 +701,10 @@ selection_nevra(Pool *pool, Queue *selection, const char *name, int flags)
 	}
     }
   if (archid)
-    selection_limit_rel(pool, selection, REL_ARCH, archid);
-  selection_limit_evr(pool, selection, r + 1);	/* magic epoch promotion */
+    selection_filter_rel(pool, selection, REL_ARCH, archid);
+  selection_filter_evr(pool, selection, r + 1);	/* magic epoch promotion */
   solv_free(rname);
-  return ret;
+  return ret | SELECTION_CANON;
 }
 
 int
@@ -713,19 +716,20 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
   queue_empty(selection);
   if (*name == '/' && (flags & SELECTION_FILELIST))
     ret = selection_filelist(pool, selection, name, flags);
-  if (!ret && (r = strpbrk(name, "<=>")) != 0)
+  if (!ret && (flags & SELECTION_REL) != 0 && (r = strpbrk(name, "<=>")) != 0)
     ret = selection_rel(pool, selection, name, flags);
   if (!ret)
     ret = selection_depglob_arch(pool, selection, name, flags);
-  if (!ret && (flags & SELECTION_NAME) != 0)
-    ret = selection_nevra(pool, selection, name, flags);
+  if (!ret && (flags & SELECTION_CANON) != 0)
+    ret = selection_canon(pool, selection, name, flags);
+
   if (ret && (flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
   return ret;
 }
 
 void
-selection_limit(Pool *pool, Queue *sel1, Queue *sel2)
+selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
 {
   int i, j, miss;
   Id p, pp;

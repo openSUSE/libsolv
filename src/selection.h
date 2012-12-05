@@ -18,6 +18,9 @@
 #define SELECTION_NAME			(1 << 0)
 #define SELECTION_PROVIDES		(1 << 1)
 #define SELECTION_FILELIST		(1 << 2)
+#define SELECTION_CANON			(1 << 3)
+#define SELECTION_DOTARCH		(1 << 4)
+#define SELECTION_REL			(1 << 5)
 
 #define SELECTION_INSTALLED_ONLY	(1 << 8)
 #define SELECTION_GLOB			(1 << 9)
@@ -27,7 +30,7 @@
 #define SELECTION_WITH_SOURCE		(1 << 13)
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
-extern void selection_limit(Pool *pool, Queue *sel1, Queue *sel2);
+extern void selection_filter(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_solvables(Pool *pool, Queue *selection, Queue *pkgs);
 

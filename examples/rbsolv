@@ -581,6 +581,7 @@ pool.createwhatprovides()
 jobs = []
 for arg in args
   flags = Solv::Selection::SELECTION_NAME | Solv::Selection::SELECTION_PROVIDES|Solv::Selection::SELECTION_GLOB
+  flags |= Solv::Selection::SELECTION_CANON | Solv::Selection::SELECTION_DOTARCH | Solv::Selection::SELECTION_REL
   if arg =~ /^\//
     flags |= Solv::Selection::SELECTION_FILELIST
     flags |= Solv::Selection::SELECTION_INSTALLED_ONLY if cmd == 'erase'

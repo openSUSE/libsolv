@@ -833,10 +833,13 @@ typedef struct {
   static const Id SELECTION_NAME = SELECTION_NAME;
   static const Id SELECTION_PROVIDES = SELECTION_PROVIDES;
   static const Id SELECTION_FILELIST = SELECTION_FILELIST;
-  static const Id SELECTION_GLOB = SELECTION_GLOB;
-  static const Id SELECTION_NOCASE = SELECTION_NOCASE;
+  static const Id SELECTION_CANON = SELECTION_CANON;
+  static const Id SELECTION_DOTARCH = SELECTION_DOTARCH;
+  static const Id SELECTION_REL = SELECTION_REL;
   static const Id SELECTION_INSTALLED_ONLY = SELECTION_INSTALLED_ONLY;
+  static const Id SELECTION_GLOB = SELECTION_GLOB;
   static const Id SELECTION_FLAT = SELECTION_FLAT;
+  static const Id SELECTION_NOCASE = SELECTION_NOCASE;
   static const Id SELECTION_SOURCE_ONLY = SELECTION_SOURCE_ONLY;
   static const Id SELECTION_WITH_SOURCE = SELECTION_WITH_SOURCE;
 
@@ -863,11 +866,11 @@ typedef struct {
   bool isempty() {
     return $self->q.count == 0;
   }
-  void limit(Selection *lsel) {
+  void filter(Selection *lsel) {
     if ($self->pool != lsel->pool)
       queue_empty(&$self->q);
     else
-      selection_limit($self->pool, &$self->q, &lsel->q);
+      selection_filter($self->pool, &$self->q, &lsel->q);
   }
   void add(Selection *lsel) {
     if ($self->pool == lsel->pool)
