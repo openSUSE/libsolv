@@ -2834,7 +2834,7 @@ rerunsolver:
       for (problem = 1; problem <= pcnt; problem++)
 	{
 	  int take = 0;
-	  printf("Problem %d:\n", problem);
+	  printf("Problem %d/%d:\n", problem, pcnt);
 	  solver_printprobleminfo(solv, problem);
 	  printf("\n");
 	  scnt = solver_solution_count(solv, problem);

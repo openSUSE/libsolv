@@ -762,7 +762,7 @@ while True:
     if not problems:
         break
     for problem in problems:
-        print "Problem %d:" % problem.id
+        print "Problem %d/%d:" % (problem.id, len(problems))
         r = problem.findproblemrule()
         ri = r.info()
         print ri.problemstr()

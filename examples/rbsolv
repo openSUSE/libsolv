@@ -638,7 +638,7 @@ while true
   problems = solver.solve(jobs)
   break if problems.empty?
   for problem in problems
-    puts "Problem #{problem.id}:"
+    puts "Problem #{problem.id}/#{problems.count}:"
     puts problem.findproblemrule.info.problemstr
     solutions = problem.solutions
     for solution in solutions
