@@ -467,7 +467,9 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
     }
   if (nc != vc || nc != fc)
     {
-      fprintf(stderr, "bad dependency entries\n");
+      char *pkgname = rpm_query(rpmhead, 0);
+      fprintf(stderr, "bad dependency entries for %s: %d %d %d\n", pkgname ? pkgname : "<NULL>", nc, vc, fc);
+      solv_free(pkgname);
       return 0;
     }
 
@@ -2269,12 +2271,10 @@ rpm_query(void *rpmhandle, Id what)
       if (!arch)
 	arch = "noarch";
       evr = headtoevr(rpmhead);
-      if (!evr)
-	break;
-      l = strlen(name) + 1 + strlen(evr) + 1 + strlen(arch) + 1;
+      l = strlen(name) + 1 + strlen(evr ? evr : "") + 1 + strlen(arch) + 1;
       r = solv_malloc(l);
-      sprintf(r, "%s-%s.%s", name, evr, arch);
-      free(evr);
+      sprintf(r, "%s-%s.%s", name, evr ? evr : "", arch);
+      solv_free(evr);
       break;
     case SOLVABLE_NAME:
       name = headstring(rpmhead, TAG_NAME);
