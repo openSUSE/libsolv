@@ -93,6 +93,7 @@ showproblems(Solver *solv, Solvable *s, Queue *cand, Queue *badguys)
 		      }
 		  break;
 		case SOLVER_RULE_JOB:
+		case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
 		  break;
 		case SOLVER_RULE_RPM:
 		  printf("  some dependency problem\n");

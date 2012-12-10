@@ -225,6 +225,8 @@ struct _Solver {
   Queue *cleandeps_mistakes;		/* mistakes we made */
 
   Queue *update_targets;		/* update to specific packages */
+
+  Queue *installsuppdepq;		/* deps from the install namespace provides hack */
 #endif	/* LIBSOLV_INTERNAL */
 };
 

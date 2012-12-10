@@ -2214,6 +2214,19 @@ nscallback(Pool *pool, void *data, Id name, Id evr)
         }
       return bestp;
     }
+#if 0
+  if (name == NAMESPACE_LANGUAGE)
+    {
+      if (!strcmp(pool_id2str(pool, evr), "ja"))
+	return 1;
+      if (!strcmp(pool_id2str(pool, evr), "de"))
+	return 1;
+      if (!strcmp(pool_id2str(pool, evr), "en"))
+	return 1;
+      if (!strcmp(pool_id2str(pool, evr), "en_US"))
+	return 1;
+    }
+#endif
   return 0;
 }
 
@@ -2808,6 +2821,10 @@ main(int argc, char **argv)
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae", 1));
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-base", 1));
   // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-extra", 1));
+#if 0
+  queue_push2(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, NAMESPACE_LANGUAGE, 0, REL_NAMESPACE, 1));
+  queue_push2(&job, SOLVER_ERASE|SOLVER_CLEANDEPS|SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, NAMESPACE_LANGUAGE, 0, REL_NAMESPACE, 1));
+#endif
 
 #ifdef SOFTLOCKS_PATH
   addsoftlocks(pool, &job);

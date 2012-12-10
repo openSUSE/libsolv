@@ -35,8 +35,8 @@ static void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unnee
 /*-------------------------------------------------------------------
  * Check if dependency is possible
  * 
- * mirrors solver_dep_fulfilled but uses map m instead of the decisionmap
- * used in solver_addrpmrulesforweak and solver_createcleandepsmap
+ * mirrors solver_dep_fulfilled but uses map m instead of the decisionmap.
+ * used in solver_addrpmrulesforweak and solver_createcleandepsmap.
  */
 
 static inline int
@@ -2132,10 +2132,14 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*depp = solv->job.elements[jidx + 1];
       if ((r->d == 0 || r->d == -1) && r->w2 == 0 && r->p == -SYSTEMSOLVABLE)
 	{
-	  if ((solv->job.elements[jidx] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_NAME)
+	  if ((solv->job.elements[jidx] & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_INSTALL|SOLVER_SOLVABLE_NAME))
 	    return SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
-	  if ((solv->job.elements[jidx] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_PROVIDES)
+	  if ((solv->job.elements[jidx] & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES))
 	    return SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
+	  if ((solv->job.elements[jidx] & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_ERASE|SOLVER_SOLVABLE_NAME))
+	    return SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM;
+	  if ((solv->job.elements[jidx] & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_ERASE|SOLVER_SOLVABLE_PROVIDES))
+	    return SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM;
 	}
       return SOLVER_RULE_JOB;
     }
@@ -2671,6 +2675,59 @@ dep_pkgcheck(Solver *solv, Id dep, Map *m, Queue *q)
       queue_push(q, p);
 }
 
+static int
+check_xsupp(Solver *solv, Queue *depq, Id dep)
+{
+  Pool *pool = solv->pool;
+  Id p, pp;
+
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags >= 8)
+	{
+	  if (rd->flags == REL_AND)
+	    {
+	      if (!check_xsupp(solv, depq, rd->name))
+		return 0;
+	      return check_xsupp(solv, depq, rd->evr);
+	    }
+	  if (rd->flags == REL_OR)
+	    {
+	      if (check_xsupp(solv, depq, rd->name))
+		return 1;
+	      return check_xsupp(solv, depq, rd->evr);
+	    }
+	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+	    return solver_splitprovides(solv, rd->evr);
+	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+	    return solver_dep_installed(solv, rd->evr);
+	}
+      if (depq && rd->flags == REL_NAMESPACE)
+	{
+	  int i;
+	  for (i = 0; i < depq->count; i++)
+	    if (depq->elements[i] == dep || depq->elements[i] == rd->name)
+	     return 1;
+	}
+    }
+  FOR_PROVIDES(p, pp, dep)
+    if (p == SYSTEMSOLVABLE || pool->solvables[p].repo == solv->installed)
+      return 1;
+  return 0;
+}
+
+static inline int
+queue_contains(Queue *q, Id id)
+{
+  int i;
+  for (i = 0; i < q->count; i++)
+    if (q->elements[i] == id)
+      return 1;
+  return 0;
+}
+
+
 /*
  * Find all installed packages that are no longer
  * needed regarding the current solver job.
@@ -2707,7 +2764,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   Id p, pp, ip, jp;
   Id req, *reqp, sup, *supp;
   Solvable *s;
-  Queue iq, iqcopy;
+  Queue iq, iqcopy, xsuppq;
   int i;
 
   map_empty(cleandepsmap);
@@ -2717,6 +2774,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   map_init(&im, pool->nsolvables);
   map_init(&installedm, pool->nsolvables);
   queue_init(&iq);
+  queue_init(&xsuppq);
 
   for (i = 0; i < job->count; i += 2)
     {
@@ -2732,6 +2790,50 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	    if (pool->solvables[p].repo == installed)
 	      MAPSET(&userinstalled, p - installed->start);
 	}
+      if ((how & (SOLVER_JOBMASK | SOLVER_SELECTMASK)) == (SOLVER_ERASE | SOLVER_SOLVABLE_PROVIDES))
+	{
+	  what = job->elements[i + 1];
+	  if (ISRELDEP(what))
+	    {
+	      Reldep *rd = GETRELDEP(pool, what);
+	      if (rd->flags != REL_NAMESPACE)
+		continue;
+	      if (rd->evr == 0)
+		{
+		  queue_pushunique(&iq, rd->name);
+		  continue;
+		}
+	      FOR_PROVIDES(p, pp, what)
+		if (p)
+		  break;
+	      if (p)
+		continue;
+	      queue_pushunique(&iq, what);
+	    }
+	}
+    }
+
+  /* have special namespace cleandeps erases */
+  if (iq.count)
+    {
+      for (ip = solv->installed->start; ip < solv->installed->end; ip++)
+	{
+	  s = pool->solvables + ip;
+	  if (s->repo != installed)
+	    continue;
+	  if (!s->supplements)
+	    continue;
+	  supp = s->repo->idarraydata + s->supplements;
+	  while ((sup = *supp++) != 0)
+	    if (check_xsupp(solv, &iq, sup) && !check_xsupp(solv, 0, sup))
+	      {
+#ifdef CLEANDEPSDEBUG
+		printf("xsupp %s from %s\n", pool_dep2str(pool, sup), pool_solvid2str(pool, ip));
+#endif
+	        queue_pushunique(&xsuppq, sup);
+	      }
+	}
+      queue_empty(&iq);
     }
 
   /* also add visible patterns to userinstalled for openSUSE */
@@ -2904,6 +3006,8 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	continue;
       MAPSET(&im, p);
     }
+  MAPSET(&installedm, SYSTEMSOLVABLE);
+  MAPSET(&im, SYSTEMSOLVABLE);
 
 #ifdef CLEANDEPSDEBUG
   printf("REMOVE PASS\n");
@@ -2916,7 +3020,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  if (unneeded)
 	    break;
 	  /* supplements pass */
-	  for (ip = solv->installed->start; ip < solv->installed->end; ip++)
+	  for (ip = installed->start; ip < installed->end; ip++)
 	    {
 	      if (!MAPTST(&installedm, ip))
 		continue;
@@ -2935,7 +3039,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		{
 		  supp = s->repo->idarraydata + s->supplements;
 		  while ((sup = *supp++) != 0)
-		    if (dep_possible(solv, sup, &installedm))
+		    if (dep_possible(solv, sup, &installedm) || (xsuppq.count && queue_contains(&xsuppq, sup)))
 		      {
 		        /* no longer supplemented, also erase */
 			int iqcount = iq.count;
@@ -2949,14 +3053,14 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 			  }
 			queue_truncate(&iq, iqcount);
 #ifdef CLEANDEPSDEBUG
-		        printf("%s supplemented\n", pool_solvid2str(pool, ip));
+		        printf("%s supplemented [%s]\n", pool_solvid2str(pool, ip), pool_dep2str(pool, sup));
 #endif
 		        queue_push(&iq, ip);
 		      }
 		}
 	    }
 	  if (!iq.count)
-	    break;
+	    break;	/* no supplementing package found, we're done */
 	}
       ip = queue_shift(&iq);
       s = pool->solvables + ip;
@@ -2988,7 +3092,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 #endif
 	      FOR_PROVIDES(p, pp, req)
 		{
-		  if (MAPTST(&im, p))
+		  if (p != SYSTEMSOLVABLE && MAPTST(&im, p))
 		    {
 #ifdef CLEANDEPSDEBUG
 		      printf("%s requires %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
@@ -3013,7 +3117,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 #endif
 	      FOR_PROVIDES(p, pp, req)
 		{
-		  if (MAPTST(&im, p))
+		  if (p != SYSTEMSOLVABLE && MAPTST(&im, p))
 		    {
 #ifdef CLEANDEPSDEBUG
 		      printf("%s recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
@@ -3037,6 +3141,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
       if (pool->solvables[p].repo == installed)
         MAPSET(&userinstalled, p - installed->start);
     }
+  MAPSET(&im, SYSTEMSOLVABLE);	/* in case we cleared it above */
   for (p = installed->start; p < installed->end; p++)
     if (MAPTST(&im, p))
       queue_push(&iq, p);
@@ -3109,6 +3214,11 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  while ((req = *reqp++) != 0)
 	    {
 	      FOR_PROVIDES(p, pp, req)
+		if (MAPTST(&im, p))
+		  break;
+	      if (p)
+		continue;
+	      FOR_PROVIDES(p, pp, req)
 		{
 		  if (!MAPTST(&im, p) && MAPTST(&installedm, p))
 		    {
@@ -3130,6 +3240,11 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  reqp = s->repo->idarraydata + s->recommends;
 	  while ((req = *reqp++) != 0)
 	    {
+	      FOR_PROVIDES(p, pp, req)
+		if (MAPTST(&im, p))
+		  break;
+	      if (p)
+		continue;
 	      FOR_PROVIDES(p, pp, req)
 		{
 		  if (!MAPTST(&im, p) && MAPTST(&installedm, p))
@@ -3171,6 +3286,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   map_free(&im);
   map_free(&installedm);
   map_free(&userinstalled);
+  queue_free(&xsuppq);
 #ifdef CLEANDEPSDEBUG
   printf("=== final cleandeps map:\n");
   for (p = installed->start; p < installed->end; p++)

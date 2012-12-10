@@ -103,6 +103,64 @@ solver_dep_installed(Solver *solv, Id dep)
   return 0;
 }
 
+/* mirrors solver_dep_installed, but returns 2 if a
+ * dependency listed in solv->installsuppdepq was involved */
+static int
+solver_check_installsuppdepq_dep(Solver *solv, Id dep)
+{
+  Pool *pool = solv->pool;
+  Id p, pp;
+  Queue *q;
+
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags == REL_AND)
+        {
+	  int r2, r1 = solver_check_installsuppdepq_dep(solv, rd->name);
+          if (!r1)
+            return 0;
+	  r2 = solver_check_installsuppdepq_dep(solv, rd->evr);
+	  if (!r2)
+	    return 0;
+          return r1 == 2 || r2 == 2 ? 2 : 1;
+        }
+      if (rd->flags == REL_OR)
+	{
+	  int r2, r1 = solver_check_installsuppdepq_dep(solv, rd->name);
+	  r2 = solver_check_installsuppdepq_dep(solv, rd->evr);
+	  if (!r1 && !r2)
+	    return 0;
+          return r1 == 2 || r2 == 2 ? 2 : 1;
+	}
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+        return solver_splitprovides(solv, rd->evr);
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
+        return solver_dep_installed(solv, rd->evr);
+      if (rd->flags == REL_NAMESPACE && (q = solv->installsuppdepq) != 0)
+	{
+	  int i;
+	  for (i = 0; i < q->count; i++)
+	    if (q->elements[i] == dep || q->elements[i] == rd->name)
+	      return 2;
+	}
+    }
+  FOR_PROVIDES(p, pp, dep)
+    if (solv->decisionmap[p] > 0)
+      return 1;
+  return 0;
+}
+
+static int
+solver_check_installsuppdepq(Solver *solv, Solvable *s)
+{
+  Id sup, *supp;
+  supp = s->repo->idarraydata + s->supplements;
+  while ((sup = *supp++) != 0)
+    if (solver_check_installsuppdepq_dep(solv, sup) == 2)
+      return 1;
+  return 0;
+}
 
 static Id
 autouninstall(Solver *solv, Id *problem)
@@ -1430,6 +1488,11 @@ solver_free(Solver *solv)
       queue_free(solv->update_targets);
       solv->update_targets = solv_free(solv->update_targets);
     }
+  if (solv->installsuppdepq)
+    {
+      queue_free(solv->installsuppdepq);
+      solv->installsuppdepq = solv_free(solv->installsuppdepq);
+    }
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -2150,6 +2213,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (!s->supplements)
 		    continue;
 		  if (!solver_is_supplementing(solv, s))
+		    dqs.elements[j++] = p;
+		  else if (s->supplements && solv->installsuppdepq && solver_check_installsuppdepq(solv, s))
 		    dqs.elements[j++] = p;
 		}
 	      dqs.count = j;
@@ -3139,6 +3204,21 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	      p = queue_shift(&q);	/* get first candidate */
 	      d = !q.count ? 0 : pool_queuetowhatprovides(pool, &q);	/* internalize */
+	    }
+	  /* force install of namespace supplements hack */
+	  if (select == SOLVER_SOLVABLE_PROVIDES && !d && (p == SYSTEMSOLVABLE || p == -SYSTEMSOLVABLE) && ISRELDEP(what))
+	    {
+	      Reldep *rd = GETRELDEP(pool, what);
+	      if (rd->flags == REL_NAMESPACE)
+		{
+		  p = SYSTEMSOLVABLE;
+		  if (!solv->installsuppdepq)
+		    {
+		      solv->installsuppdepq = solv_calloc(1, sizeof(Queue));
+		      queue_init(solv->installsuppdepq);
+		    }
+		  queue_pushunique(solv->installsuppdepq, rd->evr == 0 ? rd->name : what);
+		}
 	    }
 	  solver_addjobrule(solv, p, d, i, weak);
           if (how & SOLVER_FORCEBEST)

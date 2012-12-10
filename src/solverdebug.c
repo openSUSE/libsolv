@@ -569,6 +569,9 @@ solver_printproblemruleinfo(Solver *solv, Id probr)
     case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
       POOL_DEBUG(SOLV_DEBUG_RESULT, "nothing provides requested %s\n", pool_dep2str(pool, dep));
       return;
+    case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
+      POOL_DEBUG(SOLV_DEBUG_RESULT, "%s is provided by the system\n", pool_dep2str(pool, dep));
+      return;
     case SOLVER_RULE_RPM:
       POOL_DEBUG(SOLV_DEBUG_RESULT, "some dependency problem\n");
       return;
@@ -996,6 +999,8 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       return "conflicting requests";
     case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
       return pool_tmpjoin(pool, "nothing provides requested ", pool_dep2str(pool, dep), 0);
+    case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
+      return pool_tmpjoin(pool, pool_dep2str(pool, dep), " is provided by the system", 0);
     case SOLVER_RULE_RPM:
       return "some dependency problem";
     case SOLVER_RULE_RPM_NOT_INSTALLABLE:
