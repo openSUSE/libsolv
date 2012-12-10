@@ -450,26 +450,19 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 
   strong = flags & (MAKEDEPS_FILTER_STRONG|MAKEDEPS_FILTER_WEAK);
   n = headstringarray(rpmhead, tagn, &nc);
-  if (!n)
+  if (!n || !nc)
     return 0;
+  vc = fc = 0;
   v = headstringarray(rpmhead, tagv, &vc);
-  if (!v)
-    {
-      solv_free(n);
-      return 0;
-    }
   f = headint32array(rpmhead, tagf, &fc);
-  if (!f)
-    {
-      solv_free(n);
-      free(v);
-      return 0;
-    }
-  if (nc != vc || nc != fc)
+  if (!v || !f || nc != vc || nc != fc)
     {
       char *pkgname = rpm_query(rpmhead, 0);
       fprintf(stderr, "bad dependency entries for %s: %d %d %d\n", pkgname ? pkgname : "<NULL>", nc, vc, fc);
       solv_free(pkgname);
+      solv_free(n);
+      solv_free(v);
+      solv_free(f);
       return 0;
     }
 
