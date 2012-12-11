@@ -657,7 +657,25 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
       for (sp = pieces[2]; sp < pieces[npieces - 1]; sp++)
 	if (*sp == 0)
 	  *sp = ' ';
-      what = testcase_str2dep(pool, pieces[2]);
+      what = 0;
+      if (pieces[1][0] == 'p' && strncmp(pieces[2], "namespace:", 10) == 0)
+	{
+	  char *spe = strchr(pieces[2], '(');
+	  int l = strlen(pieces[2]);
+	  if (spe && pieces[2][l - 1] == ')')
+	    {
+	      /* special namespace provides */
+	      if (strcmp(spe, "(<NULL>)") != 0)
+		{
+		  pieces[2][l - 1] = 0;
+		  what = testcase_str2dep(pool, spe + 1);
+		  pieces[2][l - 1] = ')';
+		}
+	      what = pool_rel2id(pool, pool_strn2id(pool, pieces[2], spe - pieces[2], 1), what, REL_NAMESPACE, 1);
+	    }
+	}
+      if (!what)
+        what = testcase_str2dep(pool, pieces[2]);
       if (pieces[1][0] == 'n')
 	job |= SOLVER_SOLVABLE_NAME;
       else
