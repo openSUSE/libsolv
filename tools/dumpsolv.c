@@ -24,11 +24,11 @@ dump_repodata(Repo *repo)
   Repodata *data;
   if (repo->nrepodata == 0)
     return;
-  printf("repo contains %d repodata sections:\n", repo->nrepodata);
+  printf("repo contains %d repodata sections:\n", repo->nrepodata - 1);
   FOR_REPODATAS(repo, i, data)
     {
       unsigned int j;
-      printf("\nrepodata %d has %d keys, %d schemata\n", i + 1, data->nkeys - 1, data->nschemata - 1);
+      printf("\nrepodata %d has %d keys, %d schemata\n", i, data->nkeys - 1, data->nschemata - 1);
       for (j = 1; j < data->nkeys; j++)
         printf("  %s (type %s size %d storage %d)\n", pool_id2str(repo->pool, data->keys[j].name), pool_id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
       if (data->localpool)
@@ -178,18 +178,16 @@ dump_some_attrs(Repo *repo, Solvable *s)
 
 
 static int
-loadcallback (Pool *pool, Repodata *data, void *vdata)
+loadcallback(Pool *pool, Repodata *data, void *vdata)
 {
   FILE *fp = 0;
   int r;
   const char *location;
 
-printf("LOADCALLBACK\n");
   location = repodata_lookup_str(data, SOLVID_META, REPOSITORY_LOCATION);
-printf("loc %s\n", location);
   if (!location || !with_attr)
     return 0;
-  fprintf (stderr, "Loading SOLV file %s\n", location);
+  fprintf (stderr, "[Loading SOLV file %s]\n", location);
   fp = fopen (location, "r");
   if (!fp)
     {
