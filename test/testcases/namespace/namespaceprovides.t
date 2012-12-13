@@ -10,8 +10,21 @@ repo test 0 testtags <inline>
 #>=Pkg: C-en 1 1 noarch
 #>=Prv: locale(C:en)
 system i686 rpm system
-namespace namespace:language(de) @SYSTEM
 
+# first test an empty job
+namespace namespace:language(de) @SYSTEM
+result transaction,problems <inline>
+
+# then test addalreadyrecommended
+nextjob
+namespace namespace:language(de) @SYSTEM
+solverflags addalreadyrecommended
+result transaction,problems <inline>
+#>install A-1-1.noarch@test
+#>install C-de-1-1.noarch@test
+
+nextjob
+namespace namespace:language(de) @SYSTEM
 job install provides namespace:language(de)
 result transaction,problems <inline>
 #>install A-1-1.noarch@test
@@ -24,7 +37,6 @@ result transaction,problems <inline>
 #>erase B-1-1.noarch@system
 
 nextjob
-namespace namespace:language(de) @SYSTEM
 namespace namespace:language(de) @SYSTEM
 job install provides namespace:language(<NULL>)
 result transaction,problems <inline>
