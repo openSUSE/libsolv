@@ -1,4 +1,8 @@
-repo system 0 testtags assert-system.repo
+repo system 0 testtags <inline>
+#>=Pkg: A 1 1 x86_64
+#>=Prv: AA
+#>=Pkg: B 1 1 x86_64
+#>=Prv: AA
 system x86_64 rpm system
 job erase provides AA [weak]
 job install pkg B-1-1.x86_64@system
