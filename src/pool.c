@@ -287,7 +287,7 @@ pool_shrink_whatprovides(Pool *pool)
     return;
   sorted = solv_malloc2(pool->ss.nstrings, sizeof(Id));
   for (i = id = 0; id < pool->ss.nstrings; id++)
-    if (pool->whatprovides[id] && pool->whatprovides[id] != 1)
+    if (pool->whatprovides[id] >= 4)
       sorted[i++] = id;
   n = i;
   solv_sort(sorted, n, sizeof(Id), pool_shrink_whatprovides_sortcmp, pool);
@@ -319,11 +319,11 @@ pool_shrink_whatprovides(Pool *pool)
       lastid = id;
     }
   solv_free(sorted);
-  dp = pool->whatprovidesdata + 2;
+  dp = pool->whatprovidesdata + 4;
   for (id = 1; id < pool->ss.nstrings; id++)
     {
       o = pool->whatprovides[id];
-      if (o == 0 || o == 1)
+      if (!o)
 	continue;
       if ((Id)o < 0)
 	{
@@ -333,6 +333,8 @@ pool_shrink_whatprovides(Pool *pool)
 	  pool->whatprovides[id] = pool->whatprovides[i];
 	  continue;
 	}
+      if (o < 4)
+	continue;
       lp = pool->whatprovidesdata + o;
       if (lp < dp)
 	abort();
@@ -408,7 +410,7 @@ pool_createwhatprovides(Pool *pool)
 	}
     }
 
-  off = 2;	/* first entry is undef, second is empty list */
+  off = 4;	/* first entry is undef, second is empty list, third is system solvable  */
   np = 0;			       /* number of names provided */
   for (i = 0, idp = whatprovides; i < num; i++, idp++)
     {
@@ -431,6 +433,7 @@ pool_createwhatprovides(Pool *pool)
 
   /* alloc space for all providers + extra */
   whatprovidesdata = solv_calloc(off + extra, sizeof(Id));
+  whatprovidesdata[2] = SYSTEMSOLVABLE;
 
   /* now fill data for all provides */
   for (i = pool->nsolvables - 1; i > 0; i--)
@@ -502,6 +505,8 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 
   if (count == 0)		       /* queue empty -> 1 */
     return 1;
+  if (count == 1 && q->elements[0] == SYSTEMSOLVABLE)
+    return 2;
 
   /* extend whatprovidesdata if needed, +1 for ID_NULL-termination */
   if (pool->whatprovidesdataleft < count + 1)
