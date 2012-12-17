@@ -491,10 +491,9 @@ pool_freewhatprovides(Pool *pool)
 /*
  * pool_queuetowhatprovides  - add queue contents to whatprovidesdata
  * 
- * on-demand filling of provider information
- * move queue data into whatprovidesdata
- * q: queue of Ids
- * returns: Offset into whatprovides
+ * used for whatprovides, jobs, learnt rules, selections
+ * input: q: queue of Ids
+ * returns: Offset into whatprovidesdata
  *
  */
 Id
@@ -508,7 +507,7 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
   if (count == 1 && q->elements[0] == SYSTEMSOLVABLE)
     return 2;
 
-  /* extend whatprovidesdata if needed, +1 for ID_NULL-termination */
+  /* extend whatprovidesdata if needed, +1 for 0-termination */
   if (pool->whatprovidesdataleft < count + 1)
     {
       POOL_DEBUG(SOLV_DEBUG_STATS, "growing provides hash data...\n");
@@ -520,9 +519,9 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
   off = pool->whatprovidesdataoff;
   memcpy(pool->whatprovidesdata + pool->whatprovidesdataoff, q->elements, count * sizeof(Id));
 
-  /* adapt count and ID_NULL-terminate */
+  /* adapt count and 0-terminate */
   pool->whatprovidesdataoff += count;
-  pool->whatprovidesdata[pool->whatprovidesdataoff++] = ID_NULL;
+  pool->whatprovidesdata[pool->whatprovidesdataoff++] = 0;
   pool->whatprovidesdataleft -= count + 1;
 
   return (Id)off;

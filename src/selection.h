@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2012, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
