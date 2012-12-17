@@ -844,7 +844,7 @@ solver_take_solution(Solver *solv, Id problem, Id solution, Queue *job)
  */
 
 static void
-findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, Id *jobrp)
+findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, Id *jobrp, Map *rseen)
 {
   Id rid, d;
   Id lreqr, lconr, lsysr, ljobr;
@@ -873,7 +873,12 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
     {
       assert(rid > 0);
       if (rid >= solv->learntrules)
-	findproblemrule_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], &lreqr, &lconr, &lsysr, &ljobr);
+	{
+	  if (MAPTST(rseen, rid - solv->learntrules))
+	    continue;
+	  MAPSET(rseen, rid - solv->learntrules);
+	  findproblemrule_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], &lreqr, &lconr, &lsysr, &ljobr, rseen);
+	}
       else if ((rid >= solv->jobrules && rid < solv->jobrules_end) || (rid >= solv->infarchrules && rid < solv->infarchrules_end) || (rid >= solv->duprules && rid < solv->duprules_end) || (rid >= solv->bestrules && rid < solv->bestrules_end))
 	{
 	  if (!*jobrp)
@@ -949,8 +954,11 @@ solver_findproblemrule(Solver *solv, Id problem)
 {
   Id reqr, conr, sysr, jobr;
   Id idx = solv->problems.elements[2 * problem - 2];
+  Map rseen;
   reqr = conr = sysr = jobr = 0;
-  findproblemrule_internal(solv, idx, &reqr, &conr, &sysr, &jobr);
+  map_init(&rseen, solv->learntrules ? solv->nrules - solv->learntrules : 0);
+  findproblemrule_internal(solv, idx, &reqr, &conr, &sysr, &jobr, &rseen);
+  map_free(&rseen);
   if (reqr)
     return reqr;	/* some requires */
   if (conr)
@@ -966,14 +974,17 @@ solver_findproblemrule(Solver *solv, Id problem)
 /*-------------------------------------------------------------------*/
 
 static void
-findallproblemrules_internal(Solver *solv, Id idx, Queue *rules)
+findallproblemrules_internal(Solver *solv, Id idx, Queue *rules, Map *rseen)
 {
   Id rid;
   while ((rid = solv->learnt_pool.elements[idx++]) != 0)
     {
       if (rid >= solv->learntrules)
         {
-	  findallproblemrules_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], rules);
+	  if (MAPTST(rseen, rid - solv->learntrules))
+	    continue;
+	  MAPSET(rseen, rid - solv->learntrules);
+	  findallproblemrules_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], rules, rseen);
           continue;
 	}
       queue_pushunique(rules, rid);
@@ -991,8 +1002,11 @@ findallproblemrules_internal(Solver *solv, Id idx, Queue *rules)
 void
 solver_findallproblemrules(Solver *solv, Id problem, Queue *rules)
 {
+  Map rseen;
   queue_empty(rules);
-  findallproblemrules_internal(solv, solv->problems.elements[2 * problem - 2], rules);
+  map_init(&rseen, solv->learntrules ? solv->nrules - solv->learntrules : 0);
+  findallproblemrules_internal(solv, solv->problems.elements[2 * problem - 2], rules, &rseen);
+  map_free(&rseen);
 }
 
 /* EOF */
