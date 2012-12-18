@@ -63,11 +63,7 @@ BuildRequires:  perl-devel
 BuildRequires:  swig
 %endif
 %if %{with ruby_binding}
-%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
-%global ruby_vendorarch %(ruby -rrbconfig -e 'puts Config::CONFIG["sitearchdir"]')
-%else
-%global ruby_vendorarch %(ruby -rrbconfig -e 'puts Config::CONFIG["vendorarchdir"]')
-%endif
+%global ruby_vendorarch %(ruby  -r rbconfig -e "puts Config::CONFIG['vendorarchdir'].nil? ? Config::CONFIG['sitearchdir'] : Config::CONFIG['vendorarchdir']")
 BuildRequires:  ruby
 BuildRequires:  ruby-devel
 BuildRequires:  swig
