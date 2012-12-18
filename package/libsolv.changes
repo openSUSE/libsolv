@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Tue Dec 18 19:20:19 CET 2012 - mls@suse.de
+
+- fix potential access to freed memory
+- improve find_problemrule speed
+- add support for special namespaceprovides jobs
+- bump version to 0.2.3
+
+-------------------------------------------------------------------
 Wed Dec  5 14:37:39 CET 2012 - mls@suse.de
 
 - many Selection improvements
