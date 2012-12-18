@@ -2414,14 +2414,15 @@ solver_addchoicerules(Solver *solv)
 	  if (i == q.count)
 	    continue;	/* already added that one */
 	}
-
       d = q.count ? pool_queuetowhatprovides(pool, &q) : 0;
-      solver_addrule(solv, r->p, d);
-      queue_push(&solv->weakruleq, solv->nrules - 1);
-      solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
+
       lastaddedp = r->p;
       lastaddedd = d;
       lastaddedcnt = q.count;
+
+      solver_addrule(solv, r->p, d);
+      queue_push(&solv->weakruleq, solv->nrules - 1);
+      solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
 #if 0
       printf("OLD ");
       solver_printrule(solv, SOLV_DEBUG_RESULT, solv->rules + rid);
