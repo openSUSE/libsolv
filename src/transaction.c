@@ -77,22 +77,20 @@ transaction_all_obs_pkgs(Transaction *trans, Id p, Queue *pkgs)
 	return;
       if (q > 0)
 	{
+	  /* only a single obsoleting package */
 	  queue_push(pkgs, q);
 	  return;
 	}
       /* find which packages obsolete us */
       for (i = 0; i < ti->count; i += 2)
 	if (ti->elements[i + 1] == p)
-	  {
-	    queue_push(pkgs, p);
-	    queue_push(pkgs, ti->elements[i]);
-	  }
+	  queue_push2(pkgs, p, ti->elements[i]);
       /* sort obsoleters */
       if (pkgs->count > 2)
 	solv_sort(pkgs->elements, pkgs->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
       for (i = 0; i < pkgs->count; i += 2)
 	pkgs->elements[i / 2] = pkgs->elements[i + 1];
-      pkgs->count /= 2;
+      queue_truncate(pkgs, pkgs->count / 2);
     }
   else
     {
@@ -112,8 +110,8 @@ transaction_obs_pkg(Transaction *trans, Id p)
 {
   Pool *pool = trans->pool;
   Solvable *s = pool->solvables + p;
-  Queue ti;
-  Id tibuf[5];
+  Queue *ti;
+  int i;
 
   if (p <= 0 || !s->repo)
     return 0;
@@ -122,11 +120,11 @@ transaction_obs_pkg(Transaction *trans, Id p)
       p = trans->transaction_installed[p - pool->installed->start];
       return p < 0 ? -p : p;
     }
-  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
-  transaction_all_obs_pkgs(trans, p, &ti);
-  p = ti.count ? ti.elements[0] : 0;
-  queue_free(&ti);
-  return p;
+  ti = &trans->transaction_info;
+  for (i = 0; i < ti->count; i += 2)
+    if (ti->elements[i] == p)
+      return ti->elements[i + 1];
+  return 0;
 }
 
 
@@ -209,6 +207,7 @@ transaction_type(Transaction *trans, Id p, int mode)
   if (!s->repo)
     return SOLVER_TRANSACTION_IGNORE;
 
+  /* XXX: SUSE only? */
   if (!(mode & SOLVER_TRANSACTION_KEEP_PSEUDO))
     {
       const char *n = pool_id2str(pool, s->name);
