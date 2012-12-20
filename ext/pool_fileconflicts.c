@@ -152,7 +152,7 @@ findfileconflicts_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
     return;
   dhx = strnhash(fn, dp + 1 - fn);
   if (!dhx)
-    dhx = 1 + dp + 1 - fn;
+    dhx = dp + 1 - fn + 1;	/* mirrors the "if (!hx) hx = strlen(fn) + 1" in finddirs_cb */
 #if 1
   if (!isindirmap(cbdata, dhx))
     return;

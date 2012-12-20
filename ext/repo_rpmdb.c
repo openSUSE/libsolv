@@ -720,6 +720,8 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
   unsigned int *di;
   int bnc, dnc, dic;
   int i;
+  Id lastdid = 0;
+  int lastdii = -1;
 #ifdef USE_FILEFILTER
   int j;
   struct filefilter *ff;
@@ -804,18 +806,22 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
 #endif
       if (data)
 	{
-	  Id handle, did;
+	  Id did;
 	  char *b = bn[i];
 
-	  handle = s - pool->solvables;
-	  did = repodata_str2dir(data, dn[di[i]], 1);
-	  if (!did)
+	  if (di[i] == lastdii)
+	    did = lastdid;
+	  else
 	    {
-	      did = repodata_str2dir(data, "/", 1);
-	      if (b && b[0] == '/')
-		b++;	/* work around rpm bug */
+	      did = repodata_str2dir(data, dn[di[i]], 1);
+	      if (!did)
+	        did = repodata_str2dir(data, "/", 1);
+	      lastdid = did;
+	      lastdii = di[i];
 	    }
-	  repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, b);
+	  if (b && *b == '/')	/* work around rpm bug */
+	    b++;
+	  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, did, b);
 	}
     }
 #if 0
