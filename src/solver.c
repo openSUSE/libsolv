@@ -2874,6 +2874,13 @@ solver_solve(Solver *solv, Queue *job)
   /* remember job */
   queue_free(&solv->job);
   queue_init_clone(&solv->job, job);
+  solv->pooljobcnt = pool->pooljobs.count;
+  if (pool->pooljobs.count)
+    {
+      queue_insertn(&solv->job, 0, pool->pooljobs.count);
+      memcpy(solv->job.elements, pool->pooljobs.elements, pool->pooljobs.count * sizeof(Id));
+    }
+  job = &solv->job;
 
   /* free old stuff */
   if (solv->update_targets)
@@ -3177,6 +3184,8 @@ solver_solve(Solver *solv, Queue *job)
     {
       oldnrules = solv->nrules;
 
+      if (i && i == solv->pooljobcnt)
+        POOL_DEBUG(SOLV_DEBUG_JOB, "end of pool jobs\n");
       how = job->elements[i];
       what = job->elements[i + 1];
       weak = how & SOLVER_WEAK;
@@ -3346,10 +3355,10 @@ solver_solve(Solver *solv, Queue *job)
 	{
 	  int j;
 	  if (solv->nrules == oldnrules)
-	    POOL_DEBUG(SOLV_DEBUG_JOB, " - no rule created\n");
+	    POOL_DEBUG(SOLV_DEBUG_JOB, "  - no rule created\n");
 	  for (j = oldnrules; j < solv->nrules; j++)
 	    {
-	      POOL_DEBUG(SOLV_DEBUG_JOB, " - job ");
+	      POOL_DEBUG(SOLV_DEBUG_JOB, "  - job ");
 	      solver_printrule(solv, SOLV_DEBUG_JOB, solv->rules + j);
 	    }
 	}

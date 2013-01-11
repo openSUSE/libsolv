@@ -260,7 +260,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 		nupdate++;
 	      else
 		{
-		  if (!essentialok && (solv->job.elements[-v -1] & SOLVER_ESSENTIAL) != 0)
+		  if (!essentialok && (solv->job.elements[-v - 1] & SOLVER_ESSENTIAL) != 0)
 		    continue;	/* not that one! */
 		  njob++;
 		}
@@ -382,8 +382,17 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
   Pool *pool = solv->pool;
   if (why < 0)
     {
-      queue_push(solutionq, 0);
-      queue_push(solutionq, -why);
+      why = -why;
+      if (why < solv->pooljobcnt)
+	{
+	  queue_push(solutionq, SOLVER_SOLUTION_POOLJOB);
+	  queue_push(solutionq, why);
+	}
+      else
+	{
+	  queue_push(solutionq, SOLVER_SOLUTION_JOB);
+	  queue_push(solutionq, why - solv->pooljobcnt);
+	}
       return;
     }
   if (why >= solv->infarchrules && why < solv->infarchrules_end)
@@ -775,6 +784,8 @@ solver_solutionelement_extrajobflags(Solver *solv, Id problem, Id solution)
  *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
  *    SOLVER_SOLUTION_JOB           jobidx
  *    -> remove job (jobidx - 1, jobidx) from job queue
+ *    SOLVER_SOLUTION_POOLJOB       jobidx
+ *    -> remove job (jobidx - 1, jobidx) from pool job queue
  *    pkgid (> 0)                   0
  *    -> add (SOLVER_ERASE|SOLVER_SOLVABLE, p) to the job
  *    pkgid (> 0)                   pkgid (> 0)
@@ -807,6 +818,12 @@ solver_take_solutionelement(Solver *solv, Id p, Id rp, Id extrajobflags, Queue *
 {
   int i;
 
+  if (p == SOLVER_SOLUTION_POOLJOB)
+    {
+      solv->pool->pooljobs.elements[rp - 1] = SOLVER_NOOP;
+      solv->pool->pooljobs.elements[rp] = 0;
+      return;
+    }
   if (p == SOLVER_SOLUTION_JOB)
     {
       job->elements[rp - 1] = SOLVER_NOOP;

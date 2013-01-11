@@ -82,6 +82,8 @@ struct _Solver {
    */
   UpdateCandidateCb   updateCandidateCb;
 
+  int pooljobcnt;		/* number of pooljob entries in job queue */
+
 #ifdef LIBSOLV_INTERNAL
   Repo *installed;			/* copy of pool->installed */
   

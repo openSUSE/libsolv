@@ -1329,6 +1329,49 @@ typedef struct {
     sel->flags = selection_make($self, &sel->q, name, flags);
     return sel;
   }
+
+  void setpooljobs_helper(Queue jobs) {
+    queue_free(&$self->pooljobs);
+    queue_init_clone(&$self->pooljobs, &jobs);
+  }
+  %typemap(out) Queue getpooljobs Queue2Array(Job *, 2, new_Job(arg1, id, idp[1]));
+  %newobject getpooljobs;
+  Queue getpooljobs() {
+    Queue q;
+    queue_init_clone(&q, &$self->pooljobs);
+    return q;
+  }
+
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def setpooljobs(self, jobs):
+      j = []
+      for job in jobs: j += [job.how, job.what]
+      self.setpooljobs_helper(j)
+  }
+#endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Solver::setpooljobs {
+      my ($self, $jobs) = @_;
+      my @j = map {($_->{'how'}, $_->{'what'})} @$jobs;
+      return $self->setpooljobs_helper(\@j);
+    }
+  }
+#endif
+#if defined(SWIGRUBY)
+%init %{
+rb_eval_string(
+    "class Solv::Pool\n"
+    "  def setpooljobs(jobs)\n"
+    "    jl = []\n"
+    "    jobs.each do |j| ; jl << j.how << j.what ; end\n"
+    "    setpooljobs_helper(jl)\n"
+    "  end\n"
+    "end\n"
+  );
+%}
+#endif
 }
 
 %extend Repo {
@@ -2466,6 +2509,7 @@ typedef struct {
   static const int SOLVER_RULE_LEARNT = SOLVER_RULE_LEARNT;
 
   static const int SOLVER_SOLUTION_JOB = SOLVER_SOLUTION_JOB;
+  static const int SOLVER_SOLUTION_POOLJOB = SOLVER_SOLUTION_POOLJOB;
   static const int SOLVER_SOLUTION_INFARCH = SOLVER_SOLUTION_INFARCH;
   static const int SOLVER_SOLUTION_DISTUPGRADE = SOLVER_SOLUTION_DISTUPGRADE;
   static const int SOLVER_SOLUTION_BEST = SOLVER_SOLUTION_BEST;

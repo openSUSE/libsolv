@@ -656,9 +656,11 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
   element = 0;
   while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
     {
-      if (p == SOLVER_SOLUTION_JOB)
+      if (p == SOLVER_SOLUTION_JOB || p == SOLVER_SOLUTION_POOLJOB)
 	{
 	  /* job, rp is index into job queue */
+	  if (p == SOLVER_SOLUTION_JOB)
+	    rp += solv->pooljobcnt;
 	  how = solv->job.elements[rp - 1];
 	  what = solv->job.elements[rp];
 	  select = how & SOLVER_SELECTMASK;
@@ -1042,10 +1044,13 @@ const char *
 solver_solutionelement2str(Solver *solv, Id p, Id rp)
 {
   Pool *pool = solv->pool;
-  if (p == SOLVER_SOLUTION_JOB)
+  if (p == SOLVER_SOLUTION_JOB || p == SOLVER_SOLUTION_POOLJOB)
     {
-      Id how = solv->job.elements[rp - 1];
-      Id what = solv->job.elements[rp];
+      Id how, what;
+      if (p == SOLVER_SOLUTION_JOB)
+	rp += solv->pooljobcnt;
+      how = solv->job.elements[rp - 1];
+      what = solv->job.elements[rp];
       return pool_tmpjoin(pool, "do not ask to ", pool_job2str(pool, how, what, 0), 0);
     }
   else if (p == SOLVER_SOLUTION_INFARCH)

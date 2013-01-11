@@ -24,6 +24,7 @@ struct _Solver;
 #define SOLVER_SOLUTION_DISTUPGRADE     (-1)
 #define SOLVER_SOLUTION_INFARCH         (-2)
 #define SOLVER_SOLUTION_BEST            (-3)
+#define SOLVER_SOLUTION_POOLJOB         (-4)
 
 void solver_disableproblem(struct _Solver *solv, Id v);
 void solver_enableproblem(struct _Solver *solv, Id v);

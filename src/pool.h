@@ -119,6 +119,8 @@ struct _Pool {
   /* search position */
   Datapos pos;
 
+  Queue pooljobs;		/* fixed jobs, like USERINSTALLED/NOOBSOLETES */
+
 #ifdef LIBSOLV_INTERNAL
   /* flags to tell the library how the installed package manager works */
   int promoteepoch;		/* true: missing epoch is replaced by epoch of dependency   */

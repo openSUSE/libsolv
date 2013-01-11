@@ -103,6 +103,7 @@ pool_free(Pool *pool)
   solv_free(pool->rels);
   pool_setvendorclasses(pool, 0);
   queue_free(&pool->vendormap);
+  queue_free(&pool->pooljobs);
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
     solv_free(pool->tmpspace.buf[i]);
   for (i = 0; i < pool->nlanguages; i++)
