@@ -20,6 +20,8 @@
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#include "policy.h"
+#include "poolvendor.h"
 #include "chksum.h"
 
 const char *
@@ -459,7 +461,11 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
       while ((con = *conp++) != 0)
 	{
 	  if (providedbyinstalled(pool, installedmap, con, ispatch, noobsoletesmap))
-	    return 0;
+	    {
+	      if (ispatch && solvable_is_irrelevant_patch(s, installedmap, 0))
+		return -1;
+	      return 0;
+	    }
 	  if (!interesting && ISRELDEP(con))
 	    {
               con = dep2name(pool, con);
@@ -467,6 +473,8 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
 		interesting = 1;
 	    }
 	}
+      if (ispatch && interesting && solvable_is_irrelevant_patch(s, installedmap, 0))
+	interesting = 0;
     }
 #if 0
   if (s->repo)
@@ -567,6 +575,76 @@ solvable_trivial_installable_repo(Solvable *s, Repo *installed, Map *noobsoletes
   return r;
 }
 
+
+/* check if this patch is relevant according to the vendor. To bad that patches
+ * don't have a vendor, so we need to do some careful repo testing. */
+int
+solvable_is_irrelevant_patch(Solvable *s, Map *installedmap, Solver *solv)
+{
+  Pool *pool = s->repo->pool;
+  Id con, *conp;
+  int hadpatchpackage = 0;
+
+  if (!s->conflicts)
+    return 0;
+  conp = s->repo->idarraydata + s->conflicts;
+  while ((con = *conp++) != 0)
+    {
+      Reldep *rd;
+      Id p, pp, p2, pp2;
+      if (!ISRELDEP(con))
+	continue;
+      rd = GETRELDEP(pool, con);
+      if (rd->flags != REL_LT)
+	continue;
+      FOR_PROVIDES(p, pp, con)
+	{
+	  Solvable *si;
+	  if (!MAPTST(installedmap, p))
+	    continue;
+	  si = pool->solvables + p;
+	  if (!pool_match_nevr(pool, si, con))
+	    continue;
+	  FOR_PROVIDES(p2, pp2, rd->name)
+	    {
+	      Solvable *s2 = pool->solvables + p2;
+	      if (!pool_match_nevr(pool, s2, rd->name))
+		continue;
+	      if (pool_match_nevr(pool, s2, con))
+		continue;	/* does not fulfill patch */
+	      if (s2->repo == s->repo)
+		{
+		  hadpatchpackage = 1;
+		  /* ok, we have a package from the patch repo that solves the conflict. check vendor */
+		  if (si->vendor == s2->vendor)
+		    return 0;
+		  /* FIXME: solv is only needed for the vendorchange callback */
+		  if (solv)
+		    {
+		      if (!policy_illegal_vendorchange(solv, si, s2))
+			return 0;
+		    }
+		  else
+		    {
+		      Id v1 = si->vendor ? si->vendor : ID_EMPTY;
+		      Id v2 = s2->vendor ? s2->vendor : ID_EMPTY;
+		      if (v1 == v2)
+			return 0;
+		      v1 = pool_vendor2mask(pool, v1);
+		      v2 = pool_vendor2mask(pool, v2);
+		      if ((v1 & v2) != 0)
+			return 0;
+		    }
+		  /* vendor change was illegal, ignore conflict */
+		}
+	    }
+	}
+    }
+  /* if we didn't find a patchpackage don't claim that the patch is irrelevant */
+  if (!hadpatchpackage)
+    return 0;
+  return 1;
+}
 
 /*****************************************************************************/
 

@@ -3745,9 +3745,18 @@ solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap)
 void
 solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res)
 {
+  Pool *pool = solv->pool;
   Map installedmap;
-  pool_create_state_maps(solv->pool,  &solv->decisionq, &installedmap, 0);
-  pool_trivial_installable_noobsoletesmap(solv->pool, &installedmap, pkgs, res, solv->noobsoletes.size ? &solv->noobsoletes : 0);
+  int i;
+  pool_create_state_maps(pool,  &solv->decisionq, &installedmap, 0);
+  pool_trivial_installable_noobsoletesmap(pool, &installedmap, pkgs, res, solv->noobsoletes.size ? &solv->noobsoletes : 0);
+  for (i = 0; i < res->count; i++)
+    if (res->elements[i] != -1)
+      {
+	Solvable *s = pool->solvables + pkgs->elements[i];
+	if (!strncmp("patch:", pool_id2str(pool, s->name), 6) && solvable_is_irrelevant_patch(s, &installedmap, solv))
+	  res->elements[i] = -1;
+      }
   map_free(&installedmap);
 }
 
