@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Mon Jan 14 16:01:04 CET 2013 - mls@suse.de
+
+- trivial_installable: check vendor of affected package to see if
+  a patch should be ignored [bnc#736100]
+- fix trivial installable requires handling
+- bump version to 0.2.4
+
+-------------------------------------------------------------------
 Tue Dec 18 19:20:19 CET 2012 - mls@suse.de
 
 - fix potential access to freed memory
