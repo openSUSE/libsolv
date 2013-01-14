@@ -2744,7 +2744,7 @@ main(int argc, char **argv)
     }
   queue_free(&repofilter);
 
-  if (!job.count && MODE_PATCH)
+  if (!job.count && mainmode != MODE_PATCH)
     {
       printf("no package matched\n");
       exit(1);
