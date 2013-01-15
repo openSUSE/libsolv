@@ -84,6 +84,19 @@ static inline Repo *pool_id2repo(Pool *pool, Id repoid)
   return repoid < pool->nrepos ? pool->repos[repoid] : 0;
 }
 
+static inline int pool_disabled_solvable(const Pool *pool, Solvable *s)
+{
+  if (s->repo && s->repo->disabled)
+    return 1;
+  if (pool->considered)
+    { 
+      Id id = s - pool->solvables;
+      if (!MAPTST(pool->considered, id))
+	return 1;
+    }
+  return 0;
+}
+
 static inline int pool_installable(const Pool *pool, Solvable *s)
 {
   if (!s->arch || s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)

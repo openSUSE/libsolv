@@ -758,6 +758,8 @@ pool_addrelproviders(Pool *pool, Id d)
 		    continue;
 		  if (s->arch != evr && s->arch != ARCH_NOSRC)
 		    continue;
+		  if (pool_disabled_solvable(pool, s))
+		    continue;
 		  if (pool_match_nevr(pool, s, name))
 		    queue_push(&plist, p);
 		}

@@ -507,13 +507,15 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  dontfix = 1;			/* dont care about broken rpm deps */
         }
 
-      if (!dontfix
-	  && s->arch != ARCH_SRC
-	  && s->arch != ARCH_NOSRC
-	  && !pool_installable(pool, s))
+      if (!dontfix)
 	{
-	  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables));
-	  addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOT_INSTALLABLE, 0);
+	  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC
+		? pool_disabled_solvable(pool, s) 
+		: !pool_installable(pool, s))
+	    {
+	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables));
+	      addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOT_INSTALLABLE, 0);
+	    }
 	}
 
       /* yet another SUSE hack, sigh */

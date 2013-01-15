@@ -245,7 +245,11 @@ selection_addsrc(Pool *pool, Queue *selection, int flags)
 	  if (s->name != name)
 	    continue;
 	  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	    havesrc = 1;
+	    {
+	      if (pool_disabled_solvable(pool, s))
+		continue;
+	      havesrc = 1;
+	    }
 	  else if (s->repo != pool->installed && !pool_installable(pool, s))
 	    continue;
 	  queue_push(&q, p);
@@ -316,6 +320,8 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
 		    {
 		      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
 			continue;	/* just in case... src rpms can't be installed */
+		      if (pool_disabled_solvable(pool, s))
+			continue;
 		      if ((flags & SELECTION_SOURCE_ONLY) != 0)
 		        id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
 		      queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
@@ -377,8 +383,12 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
         {
           Solvable *s = pool->solvables + p;
           if (s->repo != pool->installed && !pool_installable(pool, s))
-	    if (!(flags & SELECTION_SOURCE_ONLY) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
-              continue;
+	    {
+	      if (!(flags & SELECTION_SOURCE_ONLY) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
+                continue;
+	      if (pool_disabled_solvable(pool, s))
+		continue;
+	    }
 	  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
 	    continue;
           id = s->name;
@@ -476,8 +486,12 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
       if (!s->repo)
 	continue;
       if (s->repo != pool->installed && !pool_installable(pool, s))
-	if (!(flags & SELECTION_SOURCE_ONLY) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
-	  continue;
+	{
+	  if (!(flags & SELECTION_SOURCE_ONLY) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
+	    continue;
+	  if (pool_disabled_solvable(pool, s))
+	    continue;
+	}
       if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
 	continue;
       queue_push(&q, di.solvid);
