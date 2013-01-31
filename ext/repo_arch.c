@@ -196,14 +196,14 @@ static int gettarhead(struct tarhead *th)
 	    char *data, *pp;
 	    if (length < 1 || length >= 1024 * 1024)
 	      return -1;
-	    l = length;
-	    data = pp = solv_malloc(l + 512);
-	    for (; l > 0; l -= 512, pp += 512)
+	    data = pp = solv_malloc(length + 512);
+	    for (l = length; l > 0; l -= 512, pp += 512)
 	      if (readblock(th->fp, (unsigned char *)pp))
 	        {
 		  solv_free(data);
 		  return -1;
 	        }
+	    data[length] = 0;
 	    type = 3;		/* extension */
 	    if (th->blk[156] == 'L')
 	      {
@@ -216,7 +216,6 @@ static int gettarhead(struct tarhead *th)
 	    while (length > 0)
 	      {
 		int ll = 0;
-		int l;
 		for (l = 0; l < length && pp[l] >= '0' && pp[l] <= '9'; l++)
 		  ll = ll * 10 + (pp[l] - '0');
 		if (l == length || pp[l] != ' ' || ll < 1 || ll > length || pp[ll - 1] != '\n')

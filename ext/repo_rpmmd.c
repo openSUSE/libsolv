@@ -224,11 +224,6 @@ static struct stateswitch stateswitches[] = {
   { NUMSTATES}
 };
 
-/* maxmum initial size of
-   the checksum cache */
-#define MAX_CSCACHE 32768
-#define CSREALLOC_STEP 1024
-
 struct parsedata {
   int ret;
   Pool *pool;
