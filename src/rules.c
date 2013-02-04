@@ -1841,6 +1841,8 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
   jobtodisablelist(solv, job->elements[jobidx - 1], job->elements[jobidx], &q);
   if (!q.count)
     return;
+  if (job->count > 64)
+    queue_prealloc(&allq, job->count * 2);
   for (i = solv->jobrules; i < solv->jobrules_end; i++)
     {
       r = solv->rules + i;

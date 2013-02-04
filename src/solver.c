@@ -965,11 +965,11 @@ solver_reset(Solver *solv)
       v = solv->decisionq.elements[i];
       solv->decisionmap[v > 0 ? v : -v] = 0;
     }
-  solv->decisionq_why.count = 0;
-  solv->decisionq.count = 0;
+  queue_empty(&solv->decisionq_why);
+  queue_empty(&solv->decisionq);
   solv->recommends_index = -1;
   solv->propagate_index = 0;
-  solv->branches.count = 0;
+  queue_empty(&solv->branches);
 
   /* adapt learnt rule status to new set of enabled/disabled rules */
   enabledisablelearntrules(solv);
