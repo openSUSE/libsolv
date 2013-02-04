@@ -229,6 +229,8 @@ struct _Solver {
   Queue *update_targets;		/* update to specific packages */
 
   Queue *installsuppdepq;		/* deps from the install namespace provides hack */
+
+  Queue addedmap_deduceq;		/* deduce addedmap from rpm rules */
 #endif	/* LIBSOLV_INTERNAL */
 };
 

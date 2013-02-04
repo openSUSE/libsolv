@@ -99,6 +99,7 @@ solver_enablerule(struct _Solver *solv, Rule *r)
 extern Rule *solver_addrule(struct _Solver *solv, Id p, Id d);
 extern void solver_unifyrules(struct _Solver *solv);
 extern int solver_rulecmp(struct _Solver *solv, Rule *r1, Rule *r2);
+extern void solver_shrinkrules(struct _Solver *solv, int nrules);
 
 /* rpm rules */
 extern void solver_addrpmrulesforsolvable(struct _Solver *solv, Solvable *s, Map *m);

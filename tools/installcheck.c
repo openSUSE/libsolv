@@ -250,10 +250,11 @@ main(int argc, char **argv)
           }
       }
 
+  solv = solver_create(pool);
+
   /* prune cand by doing weak installs */
   while (cand.count)
     {
-      solv = solver_create(pool);
       queue_empty(&job);
       for (i = 0; i < cand.count; i++)
 	{
@@ -326,7 +327,6 @@ main(int argc, char **argv)
             continue;
         }
       s = pool->solvables + p;
-      solv = solver_create(pool);
       queue_empty(&job);
       queue_push(&job, SOLVER_INSTALL|SOLVER_SOLVABLE);
       queue_push(&job, p);
@@ -442,7 +442,7 @@ main(int argc, char **argv)
 	    }
 	}
 #endif
-      solver_free(solv);
     }
+  solver_free(solv);
   exit(status);
 }

@@ -377,6 +377,12 @@ solver_addrule(Solver *solv, Id p, Id d)
   return r;
 }
 
+void
+solver_shrinkrules(Solver *solv, int nrules)
+{
+  solv->nrules = nrules;
+  solv->rules = solv_extend_resize(solv->rules, solv->nrules, sizeof(Rule), RULES_BLOCK);
+}
 
 /******************************************************************************
  ***

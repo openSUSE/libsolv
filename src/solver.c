@@ -1436,6 +1436,7 @@ solver_create(Pool *pool)
   queue_init(&solv->branches);
   queue_init(&solv->weakruleq);
   queue_init(&solv->ruleassertions);
+  queue_init(&solv->addedmap_deduceq);
 
   queue_push(&solv->learnt_pool, 0);	/* so that 0 does not describe a proof */
 
@@ -1473,6 +1474,7 @@ solver_free(Solver *solv)
   queue_free(&solv->branches);
   queue_free(&solv->weakruleq);
   queue_free(&solv->ruleassertions);
+  queue_free(&solv->addedmap_deduceq);
   if (solv->cleandeps_updatepkgs)
     {
       queue_free(solv->cleandeps_updatepkgs);
@@ -2831,6 +2833,74 @@ transform_update_targets(Solver *solv)
 }
 
 
+static void
+addedmap2deduceq(Solver *solv, Map *addedmap)
+{
+  Pool *pool = solv->pool;
+  int i, j;
+  Id p;
+  Rule *r;
+
+  queue_empty(&solv->addedmap_deduceq);
+  for (i = 2, j = solv->rpmrules_end - 1; i < pool->nsolvables && j > 0; j--)
+    {
+      r = solv->rules + j;
+      if (r->p >= 0)
+	continue;
+      if ((r->d == 0 || r->d == -1) && r->w2 < 0)
+	continue;
+      p = -r->p;
+      if (!MAPTST(addedmap, p))
+	{
+	  /* should never happen, but... */
+	  if (!solv->addedmap_deduceq.count || solv->addedmap_deduceq.elements[solv->addedmap_deduceq.count - 1] != -p)
+            queue_push(&solv->addedmap_deduceq, -p);
+	  continue;
+	}
+      for (; i < p; i++)
+        if (MAPTST(addedmap, i))
+          queue_push(&solv->addedmap_deduceq, i);
+      if (i == p)
+        i++;
+    }
+  for (; i < pool->nsolvables; i++)
+    if (MAPTST(addedmap, i))
+      queue_push(&solv->addedmap_deduceq, i);
+  j = 0;
+  for (i = 2; i < pool->nsolvables; i++)
+    if (MAPTST(addedmap, i))
+      j++;
+}
+
+static void 
+deduceq2addedmap(Solver *solv, Map *addedmap)
+{
+  int j;
+  Id p;
+  Rule *r;
+  for (j = solv->rpmrules_end - 1; j > 0; j--)
+    {
+      r = solv->rules + j;
+      if (r->d < 0 && r->p)
+	solver_enablerule(solv, r);
+      if (r->p >= 0)
+	continue;
+      if ((r->d == 0 || r->d == -1) && r->w2 < 0)
+	continue;
+      p = -r->p;
+      MAPSET(addedmap, p);
+    }
+  for (j = 0; j < solv->addedmap_deduceq.count; j++)
+    {
+      p = solv->addedmap_deduceq.elements[j];
+      if (p > 0)
+	MAPSET(addedmap, p);
+      else
+	MAPCLR(addedmap, p);
+    }
+}
+
+
 /*
  *
  * solve job queue
@@ -2843,7 +2913,7 @@ solver_solve(Solver *solv, Queue *job)
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
   int i;
-  int oldnrules;
+  int oldnrules, initialnrules;
   Map addedmap;		       /* '1' == have rpm-rules for solvable */
   Map installcandidatemap;
   Id how, what, select, name, weak, p, pp, d;
@@ -2893,6 +2963,83 @@ solver_solve(Solver *solv, Queue *job)
       queue_free(solv->cleandeps_updatepkgs);
       solv->cleandeps_updatepkgs = solv_free(solv->cleandeps_updatepkgs);
     }
+  queue_empty(&solv->ruleassertions);
+  solv->bestrules_pkg = solv_free(solv->bestrules_pkg);
+  solv->choicerules_ref = solv_free(solv->choicerules_ref);
+  if (solv->noupdate.size)
+    map_empty(&solv->noupdate);
+  if (solv->noobsoletes.size)
+    {
+      map_free(&solv->noobsoletes);
+      map_init(&solv->noobsoletes, 0);
+    }
+  solv->updatemap_all = 0;
+  if (solv->updatemap.size)
+    {
+      map_free(&solv->updatemap);
+      map_init(&solv->updatemap, 0);
+    }
+  solv->bestupdatemap_all = 0;
+  if (solv->bestupdatemap.size)
+    {
+      map_free(&solv->bestupdatemap);
+      map_init(&solv->bestupdatemap, 0);
+    }
+  solv->fixmap_all = 0;
+  if (solv->fixmap.size)
+    {
+      map_free(&solv->fixmap);
+      map_init(&solv->fixmap, 0);
+    }
+  solv->dupmap_all = 0;
+  if (solv->dupmap.size)
+    {
+      map_free(&solv->dupmap);
+      map_init(&solv->dupmap, 0);
+    }
+  if (solv->dupinvolvedmap.size)
+    {
+      map_free(&solv->dupinvolvedmap);
+      map_init(&solv->dupinvolvedmap, 0);
+    }
+  solv->droporphanedmap_all = 0;
+  if (solv->droporphanedmap.size)
+    {
+      map_free(&solv->droporphanedmap);
+      map_init(&solv->droporphanedmap, 0);
+    }
+  if (solv->cleandepsmap.size)
+    {
+      map_free(&solv->cleandepsmap);
+      map_init(&solv->cleandepsmap, 0);
+    }
+  
+  queue_empty(&solv->weakruleq);
+  solv->watches = solv_free(solv->watches);
+  queue_empty(&solv->ruletojob);
+  if (solv->decisionq.count)
+    memset(solv->decisionmap, 0, pool->nsolvables * sizeof(Id));
+  queue_empty(&solv->decisionq);
+  queue_empty(&solv->decisionq_why);
+  solv->decisioncnt_update = solv->decisioncnt_keep = solv->decisioncnt_resolve = solv->decisioncnt_weak = solv->decisioncnt_orphan = 0;
+  queue_empty(&solv->learnt_why);
+  queue_empty(&solv->learnt_pool);
+  queue_empty(&solv->branches);
+  solv->propagate_index = 0;
+  queue_empty(&solv->problems);
+  queue_empty(&solv->solutions);
+  queue_empty(&solv->orphaned);
+  solv->stats_learned = solv->stats_unsolvable = 0;
+  if (solv->recommends_index)
+    {
+      map_empty(&solv->recommendsmap);
+      map_empty(&solv->suggestsmap);
+      solv->recommends_index = 0;
+    }
+  solv->obsoletes = solv_free(solv->obsoletes);
+  solv->obsoletes_data = solv_free(solv->obsoletes_data);
+  solv->multiversionupdaters = solv_free(solv->multiversionupdaters);
+  
 
   /*
    * create basic rule set of all involved packages
@@ -2914,6 +3061,14 @@ solver_solve(Solver *solv, Queue *job)
    * so called: rpm rules
    *
    */
+  initialnrules = solv->rpmrules_end ? solv->rpmrules_end : 1;
+  if (initialnrules > 1)
+    deduceq2addedmap(solv, &addedmap);
+  if (solv->nrules != initialnrules)
+    solver_shrinkrules(solv, initialnrules);
+  solv->nrules = initialnrules;
+  solv->rpmrules_end = 0;
+  
   if (installed)
     {
       /* check for update/verify jobs as they need to be known early */
@@ -3087,8 +3242,12 @@ solver_solve(Solver *solv, Queue *job)
       POOL_DEBUG(SOLV_DEBUG_STATS, "%d of %d installable solvables considered for solving\n", possible, installable);
     }
 
-  solver_unifyrules(solv);                          /* remove duplicate rpm rules */
-  solv->rpmrules_end = solv->nrules;              /* mark end of rpm rules */
+  if (solv->nrules > initialnrules)
+    solver_unifyrules(solv);			/* remove duplicate rpm rules */
+  solv->rpmrules_end = solv->nrules;		/* mark end of rpm rules */
+
+  if (solv->nrules > initialnrules)
+    addedmap2deduceq(solv, &addedmap);		/* so that we can recreate the addedmap */
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "rpm rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
   POOL_DEBUG(SOLV_DEBUG_STATS, "rpm rule creation took %d ms\n", solv_timems(now));
