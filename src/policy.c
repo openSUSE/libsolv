@@ -768,6 +768,8 @@ policy_create_obsolete_index(Solver *solv)
   Id p, pp, obs, *obsp, *obsoletes, *obsoletes_data;
   int i, n, cnt;
 
+  solv->obsoletes = solv_free(solv->obsoletes);
+  solv->obsoletes_data = solv_free(solv->obsoletes_data);
   if (!installed || installed->start == installed->end)
     return;
   cnt = installed->end - installed->start;

@@ -3036,8 +3036,6 @@ solver_solve(Solver *solv, Queue *job)
       map_empty(&solv->suggestsmap);
       solv->recommends_index = 0;
     }
-  solv->obsoletes = solv_free(solv->obsoletes);
-  solv->obsoletes_data = solv_free(solv->obsoletes_data);
   solv->multiversionupdaters = solv_free(solv->multiversionupdaters);
   
 
