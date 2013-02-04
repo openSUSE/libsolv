@@ -689,7 +689,7 @@ for arg in args:
         jobs.append(pool.Job(Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
     else:
         flags = Selection.SELECTION_NAME|Selection.SELECTION_PROVIDES|Selection.SELECTION_GLOB
-	flags |= Selection.SELECTION_CANON|Selection.SELECTION_DOTARCH|Selection.SELECTION_REL
+        flags |= Selection.SELECTION_CANON|Selection.SELECTION_DOTARCH|Selection.SELECTION_REL
         if len(arg) and arg[0] == '/':
             flags |= Selection.SELECTION_FILELIST
             if cmd == 'erase':
@@ -752,12 +752,12 @@ for job in jobs:
         job.how |= Job.SOLVER_CLEANDEPS
 
 #pool.set_debuglevel(2)
-solver = None
+solver = pool.Solver()
+solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
+if cmd == 'erase':
+    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
+
 while True:
-    solver = pool.Solver()
-    solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
-    if cmd == 'erase':
-        solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
     problems = solver.solve(jobs)
     if not problems:
         break

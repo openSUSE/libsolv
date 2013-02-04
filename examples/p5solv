@@ -617,11 +617,11 @@ for my $job (@jobs) {
   $job->{'how'} ^= $solv::Job::SOLVER_UPDATE ^ $solv::Job::SOLVER_INSTALL if $cmd eq 'up' && $job->isemptyupdate();
 }
 
-my $solver;
+my $solver = $pool->Solver();
+$solver->set_flag($solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1);
+$solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if $cmd eq 'erase';
+
 while (1) {
-  $solver = $pool->Solver();
-  $solver->set_flag($solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1);
-  $solver->set_flag($solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if $cmd eq 'erase';
   my @problems = $solver->solve(\@jobs);
   last unless @problems;
   for my $problem (@problems) {

@@ -629,12 +629,12 @@ for job in jobs
   job.how ^= Solv::Job::SOLVER_UPDATE ^ Solv::Job::SOLVER_INSTALL if cmd == 'up' and job.isemptyupdate?
 end
 
-solver = nil
+solver = pool.Solver
+solver.set_flag(Solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1)
+solver.set_flag(Solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if cmd == 'erase'
 #pool.set_debuglevel(1)
+
 while true
-  solver = pool.Solver
-  solver.set_flag(Solv::Solver::SOLVER_FLAG_SPLITPROVIDES, 1)
-  solver.set_flag(Solv::Solver::SOLVER_FLAG_ALLOW_UNINSTALL, 1) if cmd == 'erase'
   problems = solver.solve(jobs)
   break if problems.empty?
   for problem in problems

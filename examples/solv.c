@@ -2833,16 +2833,16 @@ main(int argc, char **argv)
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 rerunsolver:
 #endif
+  solv = solver_create(pool);
+  solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
+  if (mainmode == MODE_ERASE)
+    solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);	/* don't nag */
+  solver_set_flag(solv, SOLVER_FLAG_BEST_OBEY_POLICY, 1);
+
   for (;;)
     {
       Id problem, solution;
       int pcnt, scnt;
-
-      solv = solver_create(pool);
-      solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
-      if (mainmode == MODE_ERASE)
-        solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);	/* don't nag */
-      solver_set_flag(solv, SOLVER_FLAG_BEST_OBEY_POLICY, 1);
 
       if (!solver_solve(solv, &job))
 	break;
@@ -2894,8 +2894,6 @@ rerunsolver:
 	    continue;
 	  solver_take_solution(solv, problem, take, &job);
 	}
-      solver_free(solv);
-      solv = 0;
     }
 
   trans = solver_create_transaction(solv);
@@ -3149,8 +3147,8 @@ rerunsolver:
 		  fclose(newpkgsfps[i]);
 	      newpkgsfps = solv_free(newpkgsfps);
 	      solver_free(solv);
+	      solv = 0;
 	      pool_add_fileconflicts_deps(pool, &conflicts);
-	      pool_createwhatprovides(pool);	/* Hmm... */
 	      goto rerunsolver;
 	    }
 	}
