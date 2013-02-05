@@ -1830,19 +1830,46 @@ void
 solver_reenablepolicyrules(Solver *solv, int jobidx)
 {
   Queue *job = &solv->job;
-  int i, j;
+  int i, j, k, ai;
   Queue q, allq;
   Rule *r;
   Id lastjob = -1;
-  Id qbuf[32], allqbuf[128];
+  Id qbuf[32], allqbuf[32];
 
   queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
-  queue_init_buffer(&allq, allqbuf, sizeof(allqbuf)/sizeof(*allqbuf));
   jobtodisablelist(solv, job->elements[jobidx - 1], job->elements[jobidx], &q);
   if (!q.count)
-    return;
-  if (job->count > 64)
-    queue_prealloc(&allq, job->count * 2);
+    {
+      queue_free(&q);
+      return;
+    }
+  /* now remove everything from q that is disabled by other jobs */
+
+  /* first remove cleandeps packages, they count as DISABLE_UPDATE */
+  if (solv->cleandepsmap.size)
+    {
+      solver_createcleandepsmap(solv, &solv->cleandepsmap, 0);
+      for (j = k = 0; j < q.count; j += 2)
+	{
+	  if (q.elements[j] == DISABLE_UPDATE)
+	    {
+	      Id p = q.elements[j + 1];
+	      if (p >= solv->installed->start && p < solv->installed->end && MAPTST(&solv->cleandepsmap, p - solv->installed->start))
+		continue;	/* remove element from q */
+	    }
+	  q.elements[k++] = q.elements[j];
+	  q.elements[k++] = q.elements[j + 1];
+	}
+      q.count = k;
+      if (!q.count)
+	{
+	  queue_free(&q);
+	  return;
+	}
+    }
+
+  /* now go through the disable list of all other jobs */
+  queue_init_buffer(&allq, allqbuf, sizeof(allqbuf)/sizeof(*allqbuf));
   for (i = solv->jobrules; i < solv->jobrules_end; i++)
     {
       r = solv->rules + i;
@@ -1853,22 +1880,35 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
 	continue;
       lastjob = j;
       jobtodisablelist(solv, job->elements[j], job->elements[j + 1], &allq);
+      if (!allq.count)
+	continue;
+      /* remove all elements in allq from q */
+      for (j = k = 0; j < q.count; j += 2)
+	{
+	  Id type = q.elements[j], arg = q.elements[j + 1];
+	  for (ai = 0; ai < allq.count; ai += 2)
+	    if (allq.elements[ai] == type && allq.elements[ai + 1] == arg)
+	      break;
+	  if (ai < allq.count)
+	    continue;	/* found it in allq, remove element from q */
+	  q.elements[k++] = q.elements[j];
+	  q.elements[k++] = q.elements[j + 1];
+	}
+      q.count = k;
+      if (!q.count)
+	{
+	  queue_free(&q);
+	  queue_free(&allq);
+	  return;
+	}
+      queue_empty(&allq);
     }
-  if (solv->cleandepsmap.size)
-    {
-      solver_createcleandepsmap(solv, &solv->cleandepsmap, 0);
-      for (i = solv->installed->start; i < solv->installed->end; i++)
-	if (MAPTST(&solv->cleandepsmap, i - solv->installed->start))
-	  queue_push2(&allq, DISABLE_UPDATE, i);
-    }
+  queue_free(&allq);
+
+  /* now re-enable anything that's left in q */
   for (j = 0; j < q.count; j += 2)
     {
       Id type = q.elements[j], arg = q.elements[j + 1];
-      for (i = 0; i < allq.count; i += 2)
-	if (allq.elements[i] == type && allq.elements[i + 1] == arg)
-	  break;
-      if (i < allq.count)
-	continue;	/* still disabled */
       switch(type)
 	{
 	case DISABLE_UPDATE:
@@ -1882,7 +1922,6 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
 	  break;
 	}
     }
-  queue_free(&allq);
   queue_free(&q);
 }
 
