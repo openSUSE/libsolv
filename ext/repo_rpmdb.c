@@ -1792,7 +1792,7 @@ getu32(const unsigned char *dp)
 Id
 repo_add_rpm(Repo *repo, const char *rpm, int flags)
 {
-  int sigdsize, sigcnt, l;
+  unsigned int sigdsize, sigcnt, l;
   Pool *pool = repo->pool;
   Solvable *s;
   RpmHead *rpmhead = 0;
@@ -1957,7 +1957,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   sigcnt = getu32(lead + 8);
   sigdsize = getu32(lead + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x800000)
+  if (sigcnt >= 0x100000 || sigdsize >= 0x2000000)
     {
       pool_error(pool, -1, "%s: bad header", rpm);
       fclose(fp);
@@ -2521,7 +2521,7 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
   struct rpm_by_state *state = *statep;
   /* int headerstart, headerend; */
   RpmHead *rpmhead;
-  int sigdsize, sigcnt, l;
+  unsigned int sigdsize, sigcnt, l;
   unsigned char lead[4096];
   int forcebinary = 0;
 
@@ -2581,7 +2581,7 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
     }
   sigcnt = getu32(lead + 8);
   sigdsize = getu32(lead + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x800000)
+  if (sigcnt >= 0x100000 || sigdsize >= 0x2000000)
     {
       fprintf(stderr, "%s: bad header\n", name);
       fclose(fp);
@@ -2615,7 +2615,7 @@ rpm_byrpmh(Header h, void **statep)
 {
   struct rpm_by_state *state = *statep;
   const unsigned char *uh;
-  int sigdsize, sigcnt, l;
+  unsigned int sigdsize, sigcnt, l;
   RpmHead *rpmhead;
 
 #ifndef RPM5
