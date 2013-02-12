@@ -737,7 +737,8 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
     ret = selection_depglob_arch(pool, selection, name, flags);
   if (!ret && (flags & SELECTION_CANON) != 0)
     ret = selection_canon(pool, selection, name, flags);
-
+  if (ret && !selection->count)
+    ret = 0;	/* no match -> always return zero */
   if (ret && (flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
   return ret;
