@@ -155,6 +155,7 @@ static void
 selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 {
   int i;
+
   for (i = 0; i < selection->count; i += 2)
     {
       Id select = selection->elements[i] & SOLVER_SELECTMASK;
@@ -196,7 +197,7 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 	    }
 	  queue_free(&q);
 	}
-      else if (select == SOLVER_SOLVABLE_NAME && select == SOLVER_SOLVABLE_PROVIDES)
+      else if (select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES)
 	{
 	  /* don't stack src reldeps */
 	  if (relflags == REL_ARCH && (relevr == ARCH_SRC || relevr == ARCH_NOSRC) && ISRELDEP(id))
