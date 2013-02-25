@@ -248,7 +248,7 @@ KNOWNID(REPOSITORY_REPOMD_SIZE,		"repository:repomd:size"),
 KNOWNID(SOLVABLE_CHANGELOG,		"solvable:changelog"),
 KNOWNID(SOLVABLE_CHANGELOG_AUTHOR,	"solvable:changelog:author"),
 KNOWNID(SOLVABLE_CHANGELOG_TIME,	"solvable:changelog:time"),
-KNOWNID(SOLVABLE_CHANGELOG_DESCRIPTION,	"solvable:changelog:description"),
+KNOWNID(SOLVABLE_CHANGELOG_TEXT,	"solvable:changelog:text"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 

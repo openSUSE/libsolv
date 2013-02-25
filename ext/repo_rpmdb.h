@@ -24,6 +24,7 @@ extern Id repo_add_pubkey(Repo *repo, const char *key, int flags);
 #define RPM_ADD_TRIGGERS	(1 << 14)
 #define RPM_ADD_WITH_HDRID	(1 << 15)
 #define RPM_ADD_WITH_LEADSIGID	(1 << 16)
+#define RPM_ADD_WITH_CHANGELOG  (1 << 17)
 
 #define RPM_ITERATE_FILELIST_ONLYDIRS	(1 << 0)
 #define RPM_ITERATE_FILELIST_WITHMD5	(1 << 1)

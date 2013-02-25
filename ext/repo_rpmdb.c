@@ -86,6 +86,9 @@
 #define TAG_TRIGGERNAME		1066
 #define TAG_TRIGGERVERSION	1067
 #define TAG_TRIGGERFLAGS	1068
+#define TAG_CHANGELOGTIME	1080
+#define TAG_CHANGELOGNAME	1081
+#define TAG_CHANGELOGTEXT	1082
 #define TAG_OBSOLETENAME	1090
 #define TAG_FILEDEVICES		1095
 #define TAG_FILEINODES		1096
@@ -834,6 +837,46 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
   return olddeps;
 }
 
+static void
+addchangelog(Repodata *data, Id handle, RpmHead *rpmhead)
+{
+  char **cn;
+  char **cx;
+  unsigned int *ct;
+  int i, cnc, cxc, ctc;
+  Queue hq;
+
+  ct = headint32array(rpmhead, TAG_CHANGELOGTIME, &ctc);
+  cx = headstringarray(rpmhead, TAG_CHANGELOGTEXT, &cxc);
+  cn = headstringarray(rpmhead, TAG_CHANGELOGNAME, &cnc);
+  if (!ct || !cx || !cn || !ctc || ctc != cxc || ctc != cnc)
+    {
+      solv_free(ct);
+      solv_free(cx);
+      solv_free(cn);
+      return;
+    }
+  queue_init(&hq);
+  for (i = 0; i < ctc; i++)
+    {
+      Id h = repodata_new_handle(data);
+      if (ct[i])
+        repodata_set_num(data, h, SOLVABLE_CHANGELOG_TIME, ct[i]);
+      if (cn[i])
+        repodata_set_str(data, h, SOLVABLE_CHANGELOG_AUTHOR, cn[i]);
+      if (cx[i])
+        repodata_set_str(data, h, SOLVABLE_CHANGELOG_TEXT, cx[i]);
+      queue_push(&hq, h);
+    }
+  for (i = 0; i < hq.count; i++)
+    repodata_add_flexarray(data, handle, SOLVABLE_CHANGELOG, hq.elements[i]);
+  queue_free(&hq);
+  solv_free(ct);
+  solv_free(cx);
+  solv_free(cn);
+}
+
+
 static int
 rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, int flags)
 {
@@ -1005,6 +1048,8 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
 	      lastid = id;
 	    }
 	}
+      if ((flags & RPM_ADD_WITH_CHANGELOG) != 0)
+	addchangelog(data, handle, rpmhead);
     }
   solv_free(evr);
   return 1;
@@ -1095,6 +1140,7 @@ copydir_complex(Pool *pool, Repodata *data, Stringpool *fromspool, Repodata *fro
 struct solvable_copy_cbdata {
   Repodata *data;
   Id handle;
+  Id subhandle;
   Id *dircache;
 };
 
@@ -1156,6 +1202,22 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       id = copydir(pool, data, fromspool, fromdata, id, cbdata->dircache);
       repodata_add_dirstr(data, handle, keyname, id, kv->str);
       break;
+    case REPOKEY_TYPE_FLEXARRAY:
+      if (kv->eof == 2)
+	{
+	  assert(cbdata->subhandle);
+	  cbdata->handle = cbdata->subhandle;
+	  cbdata->subhandle = 0;
+	  break;
+	}
+      if (!kv->entry)
+        {
+	  assert(!cbdata->subhandle);
+	  cbdata->subhandle = cbdata->handle;
+	}
+      cbdata->handle = repodata_new_handle(data);
+      repodata_add_flexarray(data, cbdata->subhandle, keyname, cbdata->handle);
+      break;
     default:
       break;
     }
@@ -1203,8 +1265,9 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
     return;
   cbdata.data = data;
   cbdata.handle = s - pool->solvables;
+  cbdata.subhandle = 0;
   cbdata.dircache = dircache;
-  repo_search(fromrepo, (r - fromrepo->pool->solvables), 0, 0, SEARCH_NO_STORAGE_SOLVABLE, solvable_copy_cb, &cbdata);
+  repo_search(fromrepo, (r - fromrepo->pool->solvables), 0, 0, SEARCH_NO_STORAGE_SOLVABLE | SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
 }
 
 /* used to sort entries returned in some database order */

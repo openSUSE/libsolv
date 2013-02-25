@@ -1053,7 +1053,7 @@ endElement(void *userData, const char *name)
         repodata_set_str(pd->data, pd->handle, SOLVABLE_ORDER, pd->content);
       break;
     case STATE_CHANGELOG:
-      repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_DESCRIPTION, pd->content);
+      repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_TEXT, pd->content);
       repodata_add_flexarray(pd->data, pd->handle, SOLVABLE_CHANGELOG, pd->changelog_handle);
       pd->changelog_handle = 0;
       break;
