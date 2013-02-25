@@ -245,6 +245,10 @@ KNOWNID(SUSETAGS_SHARE_ARCH,		"susetags:share:arch"),
 KNOWNID(ARCH_ANY,			"any"),
 
 KNOWNID(REPOSITORY_REPOMD_SIZE,		"repository:repomd:size"),
+KNOWNID(SOLVABLE_CHANGELOG,		"solvable:changelog"),
+KNOWNID(SOLVABLE_CHANGELOG_AUTHOR,	"solvable:changelog:author"),
+KNOWNID(SOLVABLE_CHANGELOG_TIME,	"solvable:changelog:time"),
+KNOWNID(SOLVABLE_CHANGELOG_DESCRIPTION,	"solvable:changelog:description"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 

@@ -114,6 +114,8 @@ enum state {
 
   STATE_FILE,
 
+  STATE_CHANGELOG,
+
   /* general */
   NUMSTATES
 };
@@ -203,6 +205,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SOLVABLE,      "rpm:sourcerpm",   STATE_SOURCERPM,    1 },
   { STATE_SOLVABLE,      "rpm:header-range", STATE_HEADERRANGE, 0 },
   { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
+  { STATE_SOLVABLE,      "changelog",       STATE_CHANGELOG, 1 },
 
    /* extended Novell/SUSE diskusage attributes (susedata.xml) */
   { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
@@ -255,6 +258,8 @@ struct parsedata {
   Id lastdir;
   char *lastdirstr;
   int lastdirstrl;
+
+  Id changelog_handle;
 
   /** Hash to maps checksums to solv */
   Stringpool cspool;
@@ -828,6 +833,13 @@ startElement(void *userData, const char *name, const char **atts)
         pd->ndirs++;
         break;
       }
+    case STATE_CHANGELOG:
+      pd->changelog_handle = repodata_new_handle(pd->data);
+      if ((str = find_attr("date", atts)) != 0)
+	repodata_set_num(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_TIME, strtoull(str, 0, 10));
+      if ((str = find_attr("author", atts)) != 0)
+	repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_AUTHOR, str);
+      break;
     default:
       break;
     }
@@ -1039,6 +1051,12 @@ endElement(void *userData, const char *name)
     case STATE_ORDER:
       if (pd->content[0])
         repodata_set_str(pd->data, pd->handle, SOLVABLE_ORDER, pd->content);
+      break;
+    case STATE_CHANGELOG:
+      repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_DESCRIPTION, pd->content);
+      repodata_add_flexarray(pd->data, pd->handle, SOLVABLE_CHANGELOG, pd->changelog_handle);
+      pd->changelog_handle = 0;
+      break;
     default:
       break;
     }
