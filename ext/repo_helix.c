@@ -629,7 +629,7 @@ endElement(void *userData, const char *name)
         s->evr = evr2id(pool, pd,
                         pd->epoch   ? pd->evrspace + pd->epoch   : 0,
                         pd->version ? pd->evrspace + pd->version : 0,
-                        pd->release ? pd->evrspace + pd->release : 0);
+                        pd->release ? pd->evrspace + pd->release : "");
       /* ensure self-provides */
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
