@@ -121,7 +121,7 @@ selection_flatten(Pool *pool, Queue *selection)
 {
   Queue q;
   int i;
-  if (selection->count <= 1)
+  if (selection->count <= 2)
     return;
   for (i = 0; i < selection->count; i += 2)
     if ((selection->elements[i] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_ALL)
