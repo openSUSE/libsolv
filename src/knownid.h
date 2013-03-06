@@ -58,6 +58,7 @@ KNOWNID(ARCH_SRC,			"src"),
 KNOWNID(ARCH_NOSRC,			"nosrc"),
 KNOWNID(ARCH_NOARCH,			"noarch"),
 KNOWNID(ARCH_ALL,			"all"),
+KNOWNID(ARCH_ANY,			"any"),
 
 KNOWNID(REPOSITORY_SOLVABLES,		"repository:solvables"),
 KNOWNID(REPOSITORY_DELTAINFO,		"repository:deltainfo"),
@@ -133,6 +134,11 @@ KNOWNID(SOLVABLE_LEADSIGID,		"solvable:leadsigid"),  /* leadsigid: md5sum over l
 
 KNOWNID(SOLVABLE_PATCHCATEGORY,		"solvable:patchcategory"),
 KNOWNID(SOLVABLE_HEADEREND,		"solvable:headerend"),
+KNOWNID(SOLVABLE_CHANGELOG,		"solvable:changelog"),
+KNOWNID(SOLVABLE_CHANGELOG_AUTHOR,	"solvable:changelog:author"),
+KNOWNID(SOLVABLE_CHANGELOG_TIME,	"solvable:changelog:time"),
+KNOWNID(SOLVABLE_CHANGELOG_TEXT,	"solvable:changelog:text"),
+
 
 /* stuff for solvables of type pattern */
 KNOWNID(SOLVABLE_CATEGORY,		"solvable:category"),
@@ -184,6 +190,10 @@ KNOWNID(SUSETAGS_FILE,			"susetags:file"),
 KNOWNID(SUSETAGS_FILE_NAME,		"susetags:file:name"),
 KNOWNID(SUSETAGS_FILE_TYPE,		"susetags:file:type"),
 KNOWNID(SUSETAGS_FILE_CHECKSUM,		"susetags:file:checksum"),
+KNOWNID(SUSETAGS_SHARE_NAME,		"susetags:share:name"),
+KNOWNID(SUSETAGS_SHARE_EVR,		"susetags:share:evr"),
+KNOWNID(SUSETAGS_SHARE_ARCH,		"susetags:share:arch"),
+
 
 /* timestamp then the repository was generated */
 KNOWNID(REPOSITORY_TIMESTAMP,		"repository:timestamp"),
@@ -200,11 +210,13 @@ KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),
 KNOWNID(REPOSITORY_DISTROS,		"repository:distros"),
 KNOWNID(REPOSITORY_PRODUCT_LABEL,       "repository:product:label"),
 KNOWNID(REPOSITORY_PRODUCT_CPEID,	"repository:product:cpeid"),
+KNOWNID(REPOSITORY_REPOID,		"repository:repoid"),	/* obsolete? */
 
 /* keyword (tags) for this repository */
 KNOWNID(REPOSITORY_KEYWORDS,		"repository:keywords"),
 /* revision of the repository. arbitrary string */
 KNOWNID(REPOSITORY_REVISION,		"repository:revision"),
+KNOWNID(REPOSITORY_TOOLVERSION,		"repository:toolversion"),
 
 KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
 KNOWNID(DELTA_PACKAGE_EVR,		"delta:pkgevr"),
@@ -229,26 +241,12 @@ KNOWNID(REPOSITORY_REPOMD_LOCATION,	"repository:repomd:location"),
 KNOWNID(REPOSITORY_REPOMD_TIMESTAMP,	"repository:repomd:timestamp"),
 KNOWNID(REPOSITORY_REPOMD_CHECKSUM,	"repository:repomd:checksum"),
 KNOWNID(REPOSITORY_REPOMD_OPENCHECKSUM,	"repository:repomd:openchecksum"),
+KNOWNID(REPOSITORY_REPOMD_SIZE,		"repository:repomd:size"),
 
 KNOWNID(PUBKEY_KEYID,		        "pubkey:keyid"),
 KNOWNID(PUBKEY_FINGERPRINT,	        "pubkey:fingerprint"),
 KNOWNID(PUBKEY_EXPIRES,		        "pubkey:expires"),
 KNOWNID(PUBKEY_SIGNATURES,	        "pubkey:signatures"),
-
-KNOWNID(REPOSITORY_TOOLVERSION,		"repository:toolversion"),
-KNOWNID(REPOSITORY_REPOID,		"repository:repoid"),
-
-KNOWNID(SUSETAGS_SHARE_NAME,		"susetags:share:name"),
-KNOWNID(SUSETAGS_SHARE_EVR,		"susetags:share:evr"),
-KNOWNID(SUSETAGS_SHARE_ARCH,		"susetags:share:arch"),
-
-KNOWNID(ARCH_ANY,			"any"),
-
-KNOWNID(REPOSITORY_REPOMD_SIZE,		"repository:repomd:size"),
-KNOWNID(SOLVABLE_CHANGELOG,		"solvable:changelog"),
-KNOWNID(SOLVABLE_CHANGELOG_AUTHOR,	"solvable:changelog:author"),
-KNOWNID(SOLVABLE_CHANGELOG_TIME,	"solvable:changelog:time"),
-KNOWNID(SOLVABLE_CHANGELOG_TEXT,	"solvable:changelog:text"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
