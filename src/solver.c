@@ -3911,7 +3911,7 @@ solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res)
     if (res->elements[i] != -1)
       {
 	Solvable *s = pool->solvables + pkgs->elements[i];
-	if (!strncmp("patch:", pool_id2str(pool, s->name), 6) && solvable_is_irrelevant_patch(s, &installedmap, solv))
+	if (!strncmp("patch:", pool_id2str(pool, s->name), 6) && solvable_is_irrelevant_patch(s, &installedmap))
 	  res->elements[i] = -1;
       }
   map_free(&installedmap);

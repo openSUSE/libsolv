@@ -266,8 +266,7 @@ Id pool_id2langid(Pool *pool, Id id, const char *lang, int create);
 int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap, Map *noobsoletesmap);
 int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed, Map *noobsoletesmap);
 int solvable_trivial_installable_queue(Solvable *s, Queue *installed, Map *noobsoletesmap);
-struct _Solver; /* argh, needed for vendorchange callback FIXME */
-int solvable_is_irrelevant_patch(Solvable *s, Map *installedmap, struct _Solver *solv);
+int solvable_is_irrelevant_patch(Solvable *s, Map *installedmap);
 
 void pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
 

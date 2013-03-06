@@ -462,7 +462,7 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
 	{
 	  if (providedbyinstalled(pool, installedmap, con, ispatch, noobsoletesmap))
 	    {
-	      if (ispatch && solvable_is_irrelevant_patch(s, installedmap, 0))
+	      if (ispatch && solvable_is_irrelevant_patch(s, installedmap))
 		return -1;
 	      return 0;
 	    }
@@ -473,7 +473,7 @@ solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsm
 		interesting = 1;
 	    }
 	}
-      if (ispatch && interesting && solvable_is_irrelevant_patch(s, installedmap, 0))
+      if (ispatch && interesting && solvable_is_irrelevant_patch(s, installedmap))
 	interesting = 0;
     }
 #if 0
@@ -575,11 +575,33 @@ solvable_trivial_installable_repo(Solvable *s, Repo *installed, Map *noobsoletes
   return r;
 }
 
+/* FIXME: this mirrors policy_illegal_vendorchange */
+static int
+pool_illegal_vendorchange(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  Id v1, v2; 
+  Id vendormask1, vendormask2;
+
+  if (pool->custom_vendorcheck)
+    return pool->custom_vendorcheck(pool, s1, s2);
+  /* treat a missing vendor as empty string */
+  v1 = s1->vendor ? s1->vendor : ID_EMPTY;
+  v2 = s2->vendor ? s2->vendor : ID_EMPTY;
+  if (v1 == v2) 
+    return 0;
+  vendormask1 = pool_vendor2mask(pool, v1);
+  if (!vendormask1)
+    return 1;   /* can't match */
+  vendormask2 = pool_vendor2mask(pool, v2);
+  if ((vendormask1 & vendormask2) != 0)
+    return 0;
+  return 1;     /* no class matches */
+}
 
 /* check if this patch is relevant according to the vendor. To bad that patches
  * don't have a vendor, so we need to do some careful repo testing. */
 int
-solvable_is_irrelevant_patch(Solvable *s, Map *installedmap, Solver *solv)
+solvable_is_irrelevant_patch(Solvable *s, Map *installedmap)
 {
   Pool *pool = s->repo->pool;
   Id con, *conp;
@@ -618,23 +640,8 @@ solvable_is_irrelevant_patch(Solvable *s, Map *installedmap, Solver *solv)
 		  /* ok, we have a package from the patch repo that solves the conflict. check vendor */
 		  if (si->vendor == s2->vendor)
 		    return 0;
-		  /* FIXME: solv is only needed for the vendorchange callback */
-		  if (solv)
-		    {
-		      if (!policy_illegal_vendorchange(solv, si, s2))
-			return 0;
-		    }
-		  else
-		    {
-		      Id v1 = si->vendor ? si->vendor : ID_EMPTY;
-		      Id v2 = s2->vendor ? s2->vendor : ID_EMPTY;
-		      if (v1 == v2)
-			return 0;
-		      v1 = pool_vendor2mask(pool, v1);
-		      v2 = pool_vendor2mask(pool, v2);
-		      if ((v1 & v2) != 0)
-			return 0;
-		    }
+		  if (!pool_illegal_vendorchange(pool, si, s2))
+		    return 0;
 		  /* vendor change was illegal, ignore conflict */
 		}
 	    }
