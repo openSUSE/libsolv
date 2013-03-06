@@ -26,15 +26,6 @@ extern "C" {
 #include "rules.h"
 #include "problems.h"
 
-/*
- * Callback definitions in order to "overwrite" the policies by an external application.
- */
- 
-typedef void (*BestSolvableCb) (Pool *pool, Queue *canditates);
-typedef int  (*ArchCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
-typedef int  (*VendorCheckCb) (Pool *pool, Solvable *solvable1, Solvable *solvable2);
-typedef void (*UpdateCandidateCb) (Pool *pool, Solvable *solvable, Queue *canditates);
-
 
 struct _Solver {
   Pool *pool;				/* back pointer to pool */
@@ -43,46 +34,7 @@ struct _Solver {
   int (*solution_callback)(struct _Solver *solv, void *data);
   void *solution_callback_data;
 
-  /* Callbacks for defining the bahaviour of the solver */
-
-  /* Finding best candidate
-   *
-   * Callback definition:
-   * void  bestSolvable (Pool *pool, Queue *canditates)
-   *     candidates       : List of canditates which has to be sorted by the function call
-   *     return candidates: Sorted list of the candidates(first is the best).
-   */
-  BestSolvableCb bestSolvableCb;
-
-  /* Checking if two solvables has compatible architectures
-   *
-   * Callback definition:
-   *     int  archCheck (Pool *pool, Solvable *solvable1, Solvable *solvable2);
-   *     
-   *     return 0 it the two solvables has compatible architectures
-   */
-  ArchCheckCb archCheckCb;
-
-  /* Checking if two solvables has compatible vendors
-   *
-   * Callback definition:
-   *     int  vendorCheck (Pool *pool, Solvable *solvable1, Solvable *solvable2);
-   *     
-   *     return 0 it the two solvables has compatible architectures
-   */
-  VendorCheckCb vendorCheckCb;
-    
-  /* Evaluate update candidate
-   *
-   * Callback definition:
-   * void UpdateCandidateCb (Pool *pool, Solvable *solvable, Queue *canditates)
-   *     solvable   : for which updates should be search
-   *     candidates : List of candidates (This list depends on other
-   *                  restrictions like architecture and vendor policies too)
-   */
-  UpdateCandidateCb   updateCandidateCb;
-
-  int pooljobcnt;		/* number of pooljob entries in job queue */
+  int pooljobcnt;			/* number of pooljob entries in job queue */
 
 #ifdef LIBSOLV_INTERNAL
   Repo *installed;			/* copy of pool->installed */

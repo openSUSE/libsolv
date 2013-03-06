@@ -90,6 +90,7 @@ SOLV_1.0 {
 		pool_rel2id;
 		pool_search;
 		pool_selection2str;
+		pool_set_custom_vendorcheck;
 		pool_set_flag;
 		pool_set_installed;
 		pool_set_languages;

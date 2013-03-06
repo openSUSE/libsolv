@@ -2199,4 +2199,11 @@ pool_get_rootdir(Pool *pool)
   return pool->rootdir;
 }
 
+/* only used in libzypp */
+void
+pool_set_custom_vendorcheck(Pool *pool, int (*vendorcheck)(Pool *, Solvable *, Solvable *))
+{
+  pool->custom_vendorcheck = vendorcheck;
+}
+
 /* EOF */
