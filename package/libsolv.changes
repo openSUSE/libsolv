@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Wed Mar  6 16:55:57 CET 2013 - mls@suse.de
+
+- fix dataiterator returning random data in some cases
+- add changelog parser
+- fix nasty bug in selection_filter_rel
+- allow re-run of an existing solver
+- bump version to 0.3.0
+
+-------------------------------------------------------------------
 Mon Jan 14 16:01:04 CET 2013 - mls@suse.de
 
 - trivial_installable: check vendor of affected package to see if
