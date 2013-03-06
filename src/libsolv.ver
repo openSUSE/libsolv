@@ -19,6 +19,7 @@ SOLV_1.0 {
 		dataiterator_skip_repo;
 		dataiterator_skip_solvable;
 		dataiterator_step;
+		dataiterator_strdup;
 		datamatcher_free;
 		datamatcher_init;
 		datamatcher_match;

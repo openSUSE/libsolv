@@ -474,7 +474,7 @@ static unsigned char *
 get_vertical_data(Repodata *data, Repokey *key, Id off, Id len)
 {
   unsigned char *dp;
-  if (!len)
+  if (len <= 0)
     return 0;
   if (off >= data->lastverticaloffset)
     {
@@ -489,6 +489,7 @@ get_vertical_data(Repodata *data, Repokey *key, Id off, Id len)
   off += data->verticaloffset[key - data->keys];
   /* fprintf(stderr, "key %d page %d\n", key->name, off / REPOPAGE_BLOBSIZE); */
   dp = repopagestore_load_page_range(&data->store, off / REPOPAGE_BLOBSIZE, (off + len - 1) / REPOPAGE_BLOBSIZE);
+  data->storestate++;
   if (dp)
     dp += off % REPOPAGE_BLOBSIZE;
   return dp;
@@ -834,19 +835,21 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
     case REPOKEY_TYPE_DIRSTRARRAY:
       if (!(flags & SEARCH_FILES))
 	return 1;	/* match just the basename */
+      if (kv->num)
+	return 1;	/* already stringified */
       /* Put the full filename into kv->str.  */
       kv->str = repodata_dir2str(data, kv->id, kv->str);
-      /* And to compensate for that put the "empty" directory into
-	 kv->id, so that later calls to repodata_dir2str on this data
-	 come up with the same filename again.  */
-      kv->id = 0;
+      kv->num = 1;	/* mark stringification */
       return 1;
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
     case REPOKEY_TYPE_SHA256:
       if (!(flags & SEARCH_CHECKSUMS))
 	return 0;	/* skip em */
+      if (kv->num)
+	return 1;	/* already stringified */
       kv->str = repodata_chk2str(data, key->type, (const unsigned char *)kv->str);
+      kv->num = 1;	/* mark stringification */
       return 1;
     default:
       return 0;
@@ -1235,6 +1238,19 @@ void
 dataiterator_init_clone(Dataiterator *di, Dataiterator *from)
 {
   *di = *from;
+  if (di->dupstr)
+    {
+      if (di->dupstr == di->kv.str)
+	{
+	  di->dupstr = solv_malloc(di->dupstrn);
+	  memcpy(di->dupstr, from->dupstr, di->dupstrn);
+	}
+      else
+	{
+	  di->dupstr = 0;
+	  di->dupstrn = 0;
+	}
+    }
   memset(&di->matcher, 0, sizeof(di->matcher));
   if (from->matcher.match)
     datamatcher_init(&di->matcher, from->matcher.match, from->matcher.flags);
@@ -1319,6 +1335,8 @@ dataiterator_free(Dataiterator *di)
 {
   if (di->matcher.match)
     datamatcher_free(&di->matcher);
+  if (di->dupstr)
+    solv_free(di->dupstr);
 }
 
 static inline unsigned char *
@@ -1366,6 +1384,15 @@ dataiterator_step(Dataiterator *di)
 {
   Id schema;
 
+  if (di->state == di_nextattr && di->key->storage == KEY_STORAGE_VERTICAL_OFFSET && di->vert_ddp && di->vert_storestate != di->data->storestate) {
+    unsigned int ddpoff = di->ddp - di->vert_ddp;
+    di->vert_off += ddpoff;
+    di->vert_len -= ddpoff;
+    di->ddp = di->vert_ddp = get_vertical_data(di->data, di->key, di->vert_off, di->vert_len);
+    di->vert_storestate = di->data->storestate;
+    if (!di->ddp)
+      di->state = di_nextkey;
+  }
   for (;;)
     {
       switch (di->state)
@@ -1429,7 +1456,27 @@ dataiterator_step(Dataiterator *di)
 	case di_enterkey: di_enterkey:
 	  di->kv.entry = -1;
 	  di->key = di->data->keys + *di->keyp;
-	  di->ddp = get_data(di->data, di->key, &di->dp, di->keyp[1] && (!di->keyname || (di->flags & SEARCH_SUB) != 0) ? 1 : 0);
+	  if (!di->dp)
+	    goto di_nextkey;
+	  /* this is get_data() modified to store vert_ data */
+	  if (di->key->storage == KEY_STORAGE_VERTICAL_OFFSET)
+	    {
+	      Id off, len;
+	      di->dp = data_read_id(di->dp, &off);
+	      di->dp = data_read_id(di->dp, &len);
+	      di->vert_ddp = di->ddp = get_vertical_data(di->data, di->key, off, len);
+	      di->vert_off = off;
+	      di->vert_len = len;
+	      di->vert_storestate = di->data->storestate;
+	    }
+	  else if (di->key->storage == KEY_STORAGE_INCORE)
+	    {
+	      di->ddp = di->dp;
+	      if (di->keyp[1] && (!di->keyname || (di->flags & SEARCH_SUB) != 0))
+		di->dp = data_skip_key(di->data, di->dp, di->key);
+	    }
+	  else
+	    di->ddp = 0;
 	  if (!di->ddp)
 	    goto di_nextkey;
           if (di->key->type == REPOKEY_TYPE_DELETED)
@@ -1683,6 +1730,14 @@ dataiterator_clonepos(Dataiterator *di, Dataiterator *from)
 	di->parents[i].kv.parent = &di->parents[i - 1].kv;
       di->kv.parent = &di->parents[di->nparents - 1].kv;
     }
+  di->dupstr = 0;
+  di->dupstrn = 0;
+  if (from->dupstr && from->dupstr == from->kv.str)
+    {
+      di->dupstrn = from->dupstrn;
+      di->dupstr = solv_malloc(from->dupstrn);
+      memcpy(di->dupstr, from->dupstr, di->dupstrn);
+    }
 }
 
 void
@@ -1827,6 +1882,60 @@ dataiterator_match(Dataiterator *di, Datamatcher *ma)
   if (!ma)
     return 1;
   return datamatcher_match(ma, di->kv.str);
+}
+
+void
+dataiterator_strdup(Dataiterator *di)
+{
+  int l = -1;
+
+  if (!di->kv.str || di->kv.str == di->dupstr)
+    return;
+  switch (di->key->type)
+    {
+    case REPOKEY_TYPE_MD5:
+    case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA256:
+    case REPOKEY_TYPE_DIRSTRARRAY:
+      if (di->kv.num)	/* was it stringified into tmp space? */
+        l = strlen(di->kv.str) + 1;
+      break;
+    default:
+      break;
+    }
+  if (l < 0 && di->key->storage == KEY_STORAGE_VERTICAL_OFFSET)
+    {
+      switch (di->key->type)
+	{
+	case REPOKEY_TYPE_STR:
+	case REPOKEY_TYPE_DIRSTRARRAY:
+	  l = strlen(di->kv.str) + 1;
+	  break;
+	case REPOKEY_TYPE_MD5:
+	  l = SIZEOF_MD5;
+	  break;
+	case REPOKEY_TYPE_SHA1:
+	  l = SIZEOF_SHA1;
+	  break;
+	case REPOKEY_TYPE_SHA256:
+	  l = SIZEOF_SHA256;
+	  break;
+	case REPOKEY_TYPE_BINARY:
+	  l = di->kv.num;
+	  break;
+	}
+    }
+  if (l >= 0)
+    {
+      if (!di->dupstrn || di->dupstrn < l)
+	{
+	  di->dupstrn = l + 16;
+	  di->dupstr = solv_realloc(di->dupstr, di->dupstrn);
+	}
+      if (l)
+        memcpy(di->dupstr, di->kv.str, l);
+      di->kv.str = di->dupstr;
+    }
 }
 
 /************************************************************************
@@ -3071,7 +3180,10 @@ void
 repodata_disable_paging(Repodata *data)
 {
   if (maybe_load_repodata(data, 0))
-    repopagestore_disable_paging(&data->store);
+    {
+      repopagestore_disable_paging(&data->store);
+      data->storestate++;
+    }
 }
 
 static void

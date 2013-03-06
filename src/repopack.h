@@ -164,12 +164,15 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       kv->num2 = 0;
       return data_read_u32(dp, &kv->num);
     case REPOKEY_TYPE_MD5:
+      kv->num = 0;	/* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_MD5;
     case REPOKEY_TYPE_SHA1:
+      kv->num = 0;	/* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA1;
     case REPOKEY_TYPE_SHA256:
+      kv->num = 0;	/* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA256;
     case REPOKEY_TYPE_BINARY:
@@ -180,6 +183,7 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       return data_read_ideof(dp, &kv->id, &kv->eof);
     case REPOKEY_TYPE_DIRSTRARRAY:
       dp = data_read_ideof(dp, &kv->id, &kv->eof);
+      kv->num = 0;	/* not stringified yet */
       kv->str = (const char *)dp;
       return dp + strlen(kv->str) + 1;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:

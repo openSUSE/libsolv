@@ -1649,6 +1649,7 @@ rb_eval_string(
     }
     ndi = solv_calloc(1, sizeof(*ndi));
     dataiterator_init_clone(ndi, $self);
+    dataiterator_strdup(ndi);
     return ndi;
   }
 #ifdef SWIGRUBY

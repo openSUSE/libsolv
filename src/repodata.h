@@ -96,6 +96,7 @@ typedef struct _Repodata {
   Id lastverticaloffset;	/* end of verticals */
 
   Repopagestore store;		/* our page store */
+  Id storestate;		/* incremented every time the store might change */
 
   unsigned char *vincore;	/* internal vertical data */
   unsigned int vincorelen;	/* data size */

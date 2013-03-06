@@ -132,6 +132,16 @@ typedef struct _Dataiterator
   } parents[3];
   int nparents;
 
+  /* vertical data */
+  unsigned char *vert_ddp;
+  Id vert_off;
+  Id vert_len;
+  Id vert_storestate;
+
+  /* strdup data */
+  char *dupstr;
+  int dupstrn;
+
 } Dataiterator;
 
 
@@ -165,6 +175,7 @@ void dataiterator_jump_to_repo(Dataiterator *di, struct _Repo *repo);
 void dataiterator_entersub(Dataiterator *di);
 void dataiterator_clonepos(Dataiterator *di, Dataiterator *from);
 void dataiterator_seek(Dataiterator *di, int whence);
+void dataiterator_strdup(Dataiterator *di);
 
 #define DI_SEEK_STAY    (1 << 16)
 #define DI_SEEK_CHILD   1
