@@ -46,10 +46,16 @@ pool_solvable2str(Pool *pool, Solvable *s)
     }
   p = pool_alloctmpspace(pool, nl + el + al + 3);
   strcpy(p, n);
-  p[nl] = '-';
-  strncpy(p + nl + 1, e, el);
-  p[nl + 1 + el] = '.';
-  strcpy(p + nl + 1 + el + 1, a);
+  if (el)
+    {
+      p[nl++] = '-';
+      strncpy(p + nl, e, el);
+    }
+  if (al)
+    {
+      p[nl + el] = '.';
+      strcpy(p + nl + el + 1, a);
+    }
   return p;
 }
 
