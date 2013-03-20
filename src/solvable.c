@@ -28,7 +28,7 @@ const char *
 pool_solvable2str(Pool *pool, Solvable *s)
 {
   const char *n, *e, *a;
-  int nl, el, al;
+  int nl, el, al, extra_chars;
   char *p;
   n = pool_id2str(pool, s->name);
   e = pool_id2str(pool, s->evr);
@@ -42,14 +42,25 @@ pool_solvable2str(Pool *pool, Solvable *s)
       /* strip the distepoch from the evr */
       const char *de = strrchr(e, '-');
       if (de && (de = strchr(de, ':')) != 0)
-	el = de - e;
+        el = de - e;
     }
-  p = pool_alloctmpspace(pool, nl + el + al + 3);
+
+  if (el != 0)
+    extra_chars = 3;
+  else
+    extra_chars = 2;
+
+  p = pool_alloctmpspace(pool, nl + el + al + extra_chars);
   strcpy(p, n);
-  p[nl] = '-';
-  strncpy(p + nl + 1, e, el);
-  p[nl + 1 + el] = '.';
-  strcpy(p + nl + 1 + el + 1, a);
+  if (el != 0) {
+    p[nl] = '-';
+    strncpy(p + nl + 1, e, el);
+    p[nl + 1 + el] = '.';
+    strcpy(p + nl + 1 + el + 1, a);
+  } else {
+    p[nl] = '.';
+    strcpy(p + nl + 1, a);
+  }
   return p;
 }
 
