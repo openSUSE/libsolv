@@ -2197,6 +2197,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
           /* filter out all already supplemented packages if requested */
           if (!solv->addalreadyrecommended && dqs.count)
 	    {
+	      int dosplitprovides_old = solv->dosplitprovides;
 	      /* turn off all new packages */
 	      for (i = 0; i < solv->decisionq.count; i++)
 		{
@@ -2207,6 +2208,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (s->repo && s->repo != solv->installed)
 		    solv->decisionmap[p] = -solv->decisionmap[p];
 		}
+	      solv->dosplitprovides = 0;
 	      /* filter out old supplements */
 	      for (i = j = 0; i < dqs.count; i++)
 		{
@@ -2216,7 +2218,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (!solver_is_supplementing(solv, s))
 		    dqs.elements[j++] = p;
-		  else if (s->supplements && solv->installsuppdepq && solver_check_installsuppdepq(solv, s))
+		  else if (solv->installsuppdepq && solver_check_installsuppdepq(solv, s))
 		    dqs.elements[j++] = p;
 		}
 	      dqs.count = j;
@@ -2230,6 +2232,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (s->repo && s->repo != solv->installed)
 		    solv->decisionmap[p] = -solv->decisionmap[p];
 		}
+	      solv->dosplitprovides = dosplitprovides_old;
 	    }
 
 	  /* multiversion doesn't mix well with supplements.
