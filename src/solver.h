@@ -79,7 +79,7 @@ struct _Solver {
 
   Map noupdate;				/* don't try to update these
                                            installed solvables */
-  Map noobsoletes;			/* ignore obsoletes for these (multiinstall) */
+  Map multiversion;			/* ignore obsoletes for these (multiinstall) */
 
   Map updatemap;			/* bring these installed packages to the newest version */
   int updatemap_all;			/* bring all packages to the newest version */
@@ -206,7 +206,7 @@ typedef struct _Solver Solver;
 #define SOLVER_ERASE         		0x0200
 #define SOLVER_UPDATE			0x0300
 #define SOLVER_WEAKENDEPS      		0x0400
-#define SOLVER_NOOBSOLETES   		0x0500
+#define SOLVER_MULTIVERSION		0x0500
 #define SOLVER_LOCK			0x0600
 #define SOLVER_DISTUPGRADE		0x0700
 #define SOLVER_VERIFY			0x0800
@@ -242,6 +242,9 @@ typedef struct _Solver Solver;
 #define SOLVER_SETNAME			0x40000000
 
 #define SOLVER_SETMASK			0x7f000000
+
+/* legacy */
+#define SOLVER_NOOBSOLETES 		SOLVER_MULTIVERSION
 
 #define SOLVER_REASON_UNRELATED		0
 #define SOLVER_REASON_UNIT_RULE		1
@@ -291,7 +294,8 @@ extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
 extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
 
 
-extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap);
+extern void solver_calculate_multiversionmap(Pool *pool, Queue *job, Map *multiversionmap);
+extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *multiversionmap);	/* obsolete */
 extern void solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap);
 
 /* XXX: why is this not static? */

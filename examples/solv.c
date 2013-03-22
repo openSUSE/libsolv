@@ -2345,12 +2345,12 @@ select_patches(Pool *pool, Queue *job)
 {
   Id p, pp;
   int pruneyou = 0;
-  Map installedmap, noobsmap;
+  Map installedmap, multiversionmap;
   Solvable *s;
 
-  map_init(&noobsmap, 0);
+  map_init(&multiversionmap, 0);
   map_init(&installedmap, pool->nsolvables);
-  solver_calculate_noobsmap(pool, job, &noobsmap);
+  solver_calculate_multiversionmap(pool, job, &multiversionmap);
   if (pool->installed)
     FOR_REPO_SOLVABLES(pool->installed, p, s)
       MAPSET(&installedmap, p);
@@ -2379,7 +2379,7 @@ select_patches(Pool *pool, Queue *job)
       type = solvable_lookup_str(s, SOLVABLE_PATCHCATEGORY);
       if (type && !strcmp(type, "optional"))
 	continue;
-      r = solvable_trivial_installable_map(s, &installedmap, 0, &noobsmap);
+      r = solvable_trivial_installable_map(s, &installedmap, 0, &multiversionmap);
       if (r == -1)
 	continue;
       if (solvable_lookup_bool(s, UPDATE_RESTART) && r == 0)
@@ -2392,7 +2392,7 @@ select_patches(Pool *pool, Queue *job)
       queue_push2(job, SOLVER_SOLVABLE, p);
     }
   map_free(&installedmap);
-  map_free(&noobsmap);
+  map_free(&multiversionmap);
 }
 
 #define MODE_LIST        0
@@ -2818,9 +2818,9 @@ main(int argc, char **argv)
     }
 
   // multiversion test
-  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae", 1));
-  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-base", 1));
-  // queue_push2(&job, SOLVER_NOOBSOLETES|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-extra", 1));
+  // queue_push2(&job, SOLVER_MULTIVERSION|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae", 1));
+  // queue_push2(&job, SOLVER_MULTIVERSION|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-base", 1));
+  // queue_push2(&job, SOLVER_MULTIVERSION|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-extra", 1));
 #if 0
   queue_push2(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, NAMESPACE_LANGUAGE, 0, REL_NAMESPACE, 1));
   queue_push2(&job, SOLVER_ERASE|SOLVER_CLEANDEPS|SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, NAMESPACE_LANGUAGE, 0, REL_NAMESPACE, 1));
@@ -2835,6 +2835,9 @@ rerunsolver:
 #endif
   solv = solver_create(pool);
   solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
+#ifdef FEDORA
+  solver_set_flag(solv, SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
+#endif
   if (mainmode == MODE_ERASE)
     solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);	/* don't nag */
   solver_set_flag(solv, SOLVER_FLAG_BEST_OBEY_POLICY, 1);

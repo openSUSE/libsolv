@@ -1500,7 +1500,7 @@ solver_free(Solver *solv)
   map_free(&solv->suggestsmap);
   map_free(&solv->noupdate);
   map_free(&solv->weakrulemap);
-  map_free(&solv->noobsoletes);
+  map_free(&solv->multiversion);
 
   map_free(&solv->updatemap);
   map_free(&solv->bestupdatemap);
@@ -1863,7 +1863,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  queue_empty(&dq);
 		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || rr->p != i))
 		    {
-		      if (solv->noobsoletes.size && solv->multiversionupdaters
+		      if (solv->multiversion.size && solv->multiversionupdaters
 			     && (d = solv->multiversionupdaters[i - installed->start]) != 0)
 			{
 			  /* special multiversion handling, make sure best version is chosen */
@@ -2175,7 +2175,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (solv->decisionmap[p] <= 0)
 		    continue;
-		  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p))
+		  if (solv->multiversion.size && MAPTST(&solv->multiversion, p))
 		    continue;
 		  obsp = s->repo->idarraydata + s->obsoletes;
 		  /* foreach obsoletes */
@@ -2238,12 +2238,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  /* multiversion doesn't mix well with supplements.
 	   * filter supplemented packages where we already decided
 	   * to install a different version (see bnc#501088) */
-          if (dqs.count && solv->noobsoletes.size)
+          if (dqs.count && solv->multiversion.size)
 	    {
 	      for (i = j = 0; i < dqs.count; i++)
 		{
 		  p = dqs.elements[i];
-		  if (MAPTST(&solv->noobsoletes, p))
+		  if (MAPTST(&solv->multiversion, p))
 		    {
 		      Id p2, pp2;
 		      s = pool->solvables + p;
@@ -2665,7 +2665,7 @@ weaken_solvable_deps(Solver *solv, Id p)
 
 
 void
-solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap)
+solver_calculate_multiversionmap(Pool *pool, Queue *job, Map *multiversionmap)
 {
   int i;
   Id how, what, select;
@@ -2673,16 +2673,16 @@ solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap)
   for (i = 0; i < job->count; i += 2)
     {
       how = job->elements[i];
-      if ((how & SOLVER_JOBMASK) != SOLVER_NOOBSOLETES)
+      if ((how & SOLVER_JOBMASK) != SOLVER_MULTIVERSION)
 	continue;
       what = job->elements[i + 1];
       select = how & SOLVER_SELECTMASK;
-      if (!noobsmap->size)
-	map_grow(noobsmap, pool->nsolvables);
+      if (!multiversionmap->size)
+	map_grow(multiversionmap, pool->nsolvables);
       if (select == SOLVER_SOLVABLE_ALL)
 	{
 	  FOR_POOL_SOLVABLES(p)
-	    MAPSET(noobsmap, p);
+	    MAPSET(multiversionmap, p);
 	}
       else if (select == SOLVER_SOLVABLE_REPO)
 	{
@@ -2690,11 +2690,17 @@ solver_calculate_noobsmap(Pool *pool, Queue *job, Map *noobsmap)
 	  Repo *repo = pool_id2repo(pool, what);
 	  if (repo)
 	    FOR_REPO_SOLVABLES(repo, p, s)
-	      MAPSET(noobsmap, p);
+	      MAPSET(multiversionmap, p);
 	}
       FOR_JOB_SELECT(p, pp, select, what)
-        MAPSET(noobsmap, p);
+        MAPSET(multiversionmap, p);
     }
+}
+
+void
+solver_calculate_noobsmap(Pool *pool, Queue *job, Map *multiversionmap)
+{
+  solver_calculate_multiversionmap(pool, job, multiversionmap);
 }
 
 /*
@@ -2971,10 +2977,10 @@ solver_solve(Solver *solv, Queue *job)
   solv->choicerules_ref = solv_free(solv->choicerules_ref);
   if (solv->noupdate.size)
     map_empty(&solv->noupdate);
-  if (solv->noobsoletes.size)
+  if (solv->multiversion.size)
     {
-      map_free(&solv->noobsoletes);
-      map_init(&solv->noobsoletes, 0);
+      map_free(&solv->multiversion);
+      map_init(&solv->multiversion, 0);
     }
   solv->updatemap_all = 0;
   if (solv->updatemap.size)
@@ -3047,8 +3053,8 @@ solver_solve(Solver *solv, Queue *job)
    * use addedmap bitmap to make sure we don't create rules twice
    */
 
-  /* create noobsolete map if needed */
-  solver_calculate_noobsmap(pool, job, &solv->noobsoletes);
+  /* create multiversion map if needed */
+  solver_calculate_multiversionmap(pool, job, &solv->multiversion);
 
   map_init(&addedmap, pool->nsolvables);
   MAPSET(&addedmap, SYSTEMSOLVABLE);
@@ -3462,8 +3468,8 @@ solver_solve(Solver *solv, Queue *job)
 	  s = pool->solvables + what;
 	  weaken_solvable_deps(solv, what);
 	  break;
-	case SOLVER_NOOBSOLETES:
-	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %sno obsolete %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
+	case SOLVER_MULTIVERSION:
+	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %smultiversion %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
 	  break;
 	case SOLVER_LOCK:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %slock %s\n", weak ? "weak " : "", solver_select2str(pool, select, what));
@@ -3639,7 +3645,7 @@ solver_solve(Solver *solv, Queue *job)
 Transaction *
 solver_create_transaction(Solver *solv)
 {
-  return transaction_create_decisionq(solv->pool, &solv->decisionq, &solv->noobsoletes);
+  return transaction_create_decisionq(solv->pool, &solv->decisionq, &solv->multiversion);
 }
 
 void solver_get_orphaned(Solver *solv, Queue *orphanedq)
@@ -3671,7 +3677,7 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
 	    continue;
 	  if (solv->decisionmap[p] <= 0)
 	    continue;
-	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p))
+	  if (solv->multiversion.size && MAPTST(&solv->multiversion, p))
 	    continue;
 	  obsp = s->repo->idarraydata + s->obsoletes;
 	  /* foreach obsoletes */
@@ -3909,7 +3915,7 @@ solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res)
   Map installedmap;
   int i;
   pool_create_state_maps(pool,  &solv->decisionq, &installedmap, 0);
-  pool_trivial_installable_noobsoletesmap(pool, &installedmap, pkgs, res, solv->noobsoletes.size ? &solv->noobsoletes : 0);
+  pool_trivial_installable_multiversionmap(pool, &installedmap, pkgs, res, solv->multiversion.size ? &solv->multiversion : 0);
   for (i = 0; i < res->count; i++)
     if (res->elements[i] != -1)
       {

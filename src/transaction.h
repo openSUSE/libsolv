@@ -34,7 +34,7 @@ typedef struct _Transaction {
   Queue transaction_info;
   Id *transaction_installed;
   Map transactsmap;
-  Map noobsmap;
+  Map multiversionmap;
 
   struct _TransactionOrderdata *orderdata;
 #endif
@@ -85,7 +85,7 @@ typedef struct _Transaction {
 #define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
 
 extern Transaction *transaction_create(struct _Pool *pool);
-extern Transaction *transaction_create_decisionq(struct _Pool *pool, Queue *decisionq, Map *noobsmap);
+extern Transaction *transaction_create_decisionq(struct _Pool *pool, Queue *decisionq, Map *multiversionmap);
 extern Transaction *transaction_create_clone(Transaction *srctrans);
 extern void transaction_free(Transaction *trans);
 extern void transaction_free_orderdata(Transaction *trans);

@@ -470,7 +470,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	      if (rp > 0 && solv->decisionmap[rp] > 0 && pool->solvables[rp].repo != solv->installed)
 		{
 		  mvrp = rp;
-		  if (!(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, rp)))
+		  if (!(solv->multiversion.size && MAPTST(&solv->multiversion, rp)))
 		    break;
 		}
 	    }
@@ -520,7 +520,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	if (rp > 0 && solv->decisionmap[rp] > 0 && pool->solvables[rp].repo != solv->installed)
 	  {
 	    mvrp = rp;
-	    if (!(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, rp)))
+	    if (!(solv->multiversion.size && MAPTST(&solv->multiversion, rp)))
 	      break;
 	  }
       if (!rp && mvrp)

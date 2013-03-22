@@ -413,7 +413,7 @@ makemultiversionconflict(Solver *solv, Id n, Id con)
       s = pool->solvables + p;
       if (s->name != sn->name || s->arch != sn->arch)
 	continue;
-      if (!MAPTST(&solv->noobsoletes, p))
+      if (!MAPTST(&solv->multiversion, p))
 	continue;
       if (pool_match_nevr(pool, pool->solvables + p, con))
 	continue;
@@ -653,9 +653,9 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 			}
 		      p = 0;	/* make it a negative assertion, aka 'uninstallable' */
 		    }
-		  if (p && ispatch && solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p) && ISRELDEP(con))
+		  if (p && ispatch && solv->multiversion.size && MAPTST(&solv->multiversion, p) && ISRELDEP(con))
 		    {
-		      /* our patch conflicts with a noobsoletes (aka multiversion) package */
+		      /* our patch conflicts with a multiversion package */
 		      p = -makemultiversionconflict(solv, p, con);
 		    }
                  /* rule: -n|-p: either solvable _or_ provider of conflict */
@@ -671,9 +671,9 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
        */
       if ((!installed || s->repo != installed) || !pool->noinstalledobsoletes)
 	{
-	  int noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, n);
+	  int multi = solv->multiversion.size && MAPTST(&solv->multiversion, n);
 	  int isinstalled = (installed && s->repo == installed);
-	  if (s->obsoletes && (!noobs || solv->keepexplicitobsoletes))
+	  if (s->obsoletes && (!multi || solv->keepexplicitobsoletes))
 	    {
 	      obsp = s->repo->idarraydata + s->obsoletes;
 	      /* foreach obsoletes */
@@ -715,7 +715,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		    continue;
 		  /* we still obsolete packages with same nevra, like rpm does */
 		  /* (actually, rpm mixes those packages. yuck...) */
-		  if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
+		  if (multi && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
 		    continue;
 		  if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
 		    continue;
@@ -935,15 +935,15 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
   if (!allow_all && !solv->dupmap_all && solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
     addduppackages(solv, s, &qs);
 
-  if (!allow_all && qs.count && solv->noobsoletes.size)
+  if (!allow_all && qs.count && solv->multiversion.size)
     {
       int i, j;
 
       d = pool_queuetowhatprovides(pool, &qs);
-      /* filter out all noobsoletes packages as they don't update */
+      /* filter out all multiversion packages as they don't update */
       for (i = j = 0; i < qs.count; i++)
 	{
-	  if (MAPTST(&solv->noobsoletes, qs.elements[i]))
+	  if (MAPTST(&solv->multiversion, qs.elements[i]))
 	    {
 	      /* it's ok if they have same nevra */
 	      Solvable *ps = pool->solvables + qs.elements[i];
@@ -1467,7 +1467,7 @@ reenableduprule(Solver *solv, Id name)
 /* 
  * add all installed packages that package p obsoletes to Queue q.
  * Package p is not installed. Also, we know that if
- * solv->keepexplicitobsoletes is not set, p is not in the noobs map.
+ * solv->keepexplicitobsoletes is not set, p is not in the multiversion map.
  * Entries may get added multiple times.
  */
 static void
@@ -1480,7 +1480,7 @@ add_obsoletes(Solver *solv, Id p, Queue *q)
   Id obs, *obsp;
   Id lastp2 = 0;
 
-  if (!solv->keepexplicitobsoletes || !(solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p)))
+  if (!solv->keepexplicitobsoletes || !(solv->multiversion.size && MAPTST(&solv->multiversion, p)))
     {
       FOR_PROVIDES(p2, pp2, s->name)
 	{
@@ -1673,13 +1673,13 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	return;
       /* now the hard part: disable some update rules */
 
-      /* first check if we have noobs or installed packages in the job */
+      /* first check if we have multiversion or installed packages in the job */
       i = j = 0;
       FOR_JOB_SELECT(p, pp, select, what)
 	{
 	  if (pool->solvables[p].repo == installed)
 	    j = p;
-	  else if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, p) && !solv->keepexplicitobsoletes)
+	  else if (solv->multiversion.size && MAPTST(&solv->multiversion, p) && !solv->keepexplicitobsoletes)
 	    return;
 	  i++;
 	}
@@ -2983,11 +2983,11 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	      /* just one installed literal */
 	      if (r->d == 0 && r->w2 == 0 && pool->solvables[r->p].repo == installed)
 		continue;
-	      /* noobs is bad */
-	      if (solv->noobsoletes.size && !solv->keepexplicitobsoletes)
+	      /* multiversion is bad */
+	      if (solv->multiversion.size && !solv->keepexplicitobsoletes)
 		{
 		  FOR_RULELITERALS(p, jp, r)
-		    if (MAPTST(&solv->noobsoletes, p))
+		    if (MAPTST(&solv->multiversion, p))
 		      break;
 		  if (p)
 		    continue;

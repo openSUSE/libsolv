@@ -56,7 +56,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
       for (i = 0; i < solv->decisionq.count; i++)
 	{
 	  Id pp, n;
-	  int noobs;
+	  int multi;
 
 	  n = solv->decisionq.elements[i];
 	  if (n < 0)
@@ -66,11 +66,11 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	  s = pool->solvables + n;
 	  if (s->repo == installed)		/* obsoletes don't count for already installed packages */
 	    continue;
-	  noobs = solv->noobsoletes.size && MAPTST(&solv->noobsoletes, n);
+	  multi = solv->multiversion.size && MAPTST(&solv->multiversion, n);
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
 	      Solvable *ps = pool->solvables + p;
-	      if (noobs && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
+	      if (multi && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
 		continue;
 	      if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
 		continue;
@@ -98,7 +98,7 @@ solver_create_decisions_obsoletesmap(Solver *solv)
 	    continue;
 	  if (!s->obsoletes)
 	    continue;
-	  if (solv->noobsoletes.size && MAPTST(&solv->noobsoletes, n))
+	  if (solv->multiversion.size && MAPTST(&solv->multiversion, n))
 	    continue;
 	  obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
@@ -891,7 +891,7 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
     case SOLVER_WEAKENDEPS:
       strstart = "weaken deps of ";
       break;
-    case SOLVER_NOOBSOLETES:
+    case SOLVER_MULTIVERSION:
       strstart = "multi version ";
       break;
     case SOLVER_LOCK:

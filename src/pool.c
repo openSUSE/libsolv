@@ -1829,7 +1829,7 @@ static int providedbyinstalled_multiversion(Pool *pool, unsigned char *map, Id n
   return 0;
 }
 
-static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, int ispatch, Map *noobsoletesmap)
+static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, int ispatch, Map *multiversionmap)
 {
   Id p, pp;
   int r = 0;
@@ -1839,7 +1839,7 @@ static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, in
         return 1;	/* always boring, as never constraining */
       if (ispatch && !pool_match_nevr(pool, pool->solvables + p, dep))
 	continue;
-      if (ispatch && noobsoletesmap && noobsoletesmap->size && MAPTST(noobsoletesmap, p) && ISRELDEP(dep))
+      if (ispatch && multiversionmap && multiversionmap->size && MAPTST(multiversionmap, p) && ISRELDEP(dep))
 	if (providedbyinstalled_multiversion(pool, map, p, dep))
 	  continue;
       if ((map[p] & 9) == 9)
@@ -1861,7 +1861,7 @@ static inline int providedbyinstalled(Pool *pool, unsigned char *map, Id dep, in
  */
 
 void
-pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res, Map *noobsoletesmap)
+pool_trivial_installable_multiversionmap(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res, Map *multiversionmap)
 {
   int i, r, m, did;
   Id p, *dp, con, *conp, req, *reqp;
@@ -1935,7 +1935,7 @@ pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pk
 	  conp = s->repo->idarraydata + s->conflicts;
 	  while ((con = *conp++) != 0)
 	    {
-	      if ((providedbyinstalled(pool, map, con, ispatch, noobsoletesmap) & 1) != 0)
+	      if ((providedbyinstalled(pool, map, con, ispatch, multiversionmap) & 1) != 0)
 		{
 		  map[p] = 2;
 		  did = 0;
@@ -1944,7 +1944,7 @@ pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pk
 	      if ((m == 1 || m == 17) && ISRELDEP(con))
 		{
 		  con = dep2name(pool, con);
-		  if ((providedbyinstalled(pool, map, con, ispatch, noobsoletesmap) & 1) != 0)
+		  if ((providedbyinstalled(pool, map, con, ispatch, multiversionmap) & 1) != 0)
 		    m = 9;
 		}
 	    }
@@ -2008,7 +2008,7 @@ pool_trivial_installable_noobsoletesmap(Pool *pool, Map *installedmap, Queue *pk
 void
 pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res)
 {
-  pool_trivial_installable_noobsoletesmap(pool, installedmap, pkgs, res, 0);
+  pool_trivial_installable_multiversionmap(pool, installedmap, pkgs, res, 0);
 }
 
 const char *

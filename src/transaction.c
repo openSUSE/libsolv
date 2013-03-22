@@ -165,8 +165,8 @@ transaction_base_type(Transaction *trans, Id p)
     }
   else
     {
-      int noobs = trans->noobsmap.size && MAPTST(&trans->noobsmap, p);
-      if (noobs)
+      int multi = trans->multiversionmap.size && MAPTST(&trans->multiversionmap, p);
+      if (multi)
 	return p2 ? SOLVER_TRANSACTION_MULTIREINSTALL : SOLVER_TRANSACTION_MULTIINSTALL;
       if (!p2)
 	return SOLVER_TRANSACTION_INSTALL;
@@ -544,7 +544,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
   Pool *pool = trans->pool;
   Queue *ti = &trans->transaction_info;
   Repo *installed = pool->installed;
-  int i, j, noobs;
+  int i, j, multi;
   Id p, p2, pp2;
   Solvable *s, *s2;
 
@@ -560,7 +560,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
       s = pool->solvables + p;
       if (!s->repo || s->repo == installed)
 	continue;
-      noobs = trans->noobsmap.size && MAPTST(&trans->noobsmap, p);
+      multi = trans->multiversionmap.size && MAPTST(&trans->multiversionmap, p);
       FOR_PROVIDES(p2, pp2, s->name)
 	{
 	  if (!MAPTST(&trans->transactsmap, p2))
@@ -568,7 +568,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	  s2 = pool->solvables + p2;
 	  if (s2->repo != installed)
 	    continue;
-	  if (noobs && (s->name != s2->name || s->evr != s2->evr || s->arch != s2->arch))
+	  if (multi && (s->name != s2->name || s->evr != s2->evr || s->arch != s2->arch))
 	    continue;
 	  if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
 	    continue;
@@ -576,7 +576,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	    continue;
 	  queue_push2(ti, p, p2);
 	}
-      if (s->obsoletes && !noobs)
+      if (s->obsoletes && !multi)
 	{
 	  Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
@@ -634,20 +634,20 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 
 
 Transaction *
-transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *noobsmap)
+transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
 {
   Repo *installed = pool->installed;
-  int i, neednoobs;
+  int i, needmulti;
   Id p;
   Solvable *s;
   Transaction *trans;
 
   trans = transaction_create(pool);
-  if (noobsmap && !noobsmap->size)
-    noobsmap = 0;	/* ignore empty map */
+  if (multiversionmap && !multiversionmap->size)
+    multiversionmap = 0;	/* ignore empty map */
   queue_empty(&trans->steps);
   map_init(&trans->transactsmap, pool->nsolvables);
-  neednoobs = 0;
+  needmulti = 0;
   for (i = 0; i < decisionq->count; i++)
     {
       p = decisionq->elements[i];
@@ -666,13 +666,13 @@ transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *noobsmap)
 	    continue;
 #endif
 	  MAPSET(&trans->transactsmap, p);
-	  if (noobsmap && MAPTST(noobsmap, p))
-	    neednoobs = 1;
+	  if (multiversionmap && MAPTST(multiversionmap, p))
+	    needmulti = 1;
 	}
     }
   MAPCLR(&trans->transactsmap, SYSTEMSOLVABLE);
-  if (neednoobs)
-    map_init_clone(&trans->noobsmap, noobsmap);
+  if (needmulti)
+    map_init_clone(&trans->multiversionmap, multiversionmap);
 
   create_transaction_info(trans, decisionq);
 
@@ -817,7 +817,7 @@ transaction_create_clone(Transaction *srctrans)
       memcpy(trans->transaction_installed, srctrans->transaction_installed, (installed->end - installed->start) * sizeof(Id));
     }
   map_init_clone(&trans->transactsmap, &srctrans->transactsmap);
-  map_init_clone(&trans->noobsmap, &srctrans->noobsmap);
+  map_init_clone(&trans->multiversionmap, &srctrans->multiversionmap);
   if (srctrans->orderdata)
     {
       struct _TransactionOrderdata *od = srctrans->orderdata;
@@ -839,7 +839,7 @@ transaction_free(Transaction *trans)
   queue_free(&trans->transaction_info);
   trans->transaction_installed = solv_free(trans->transaction_installed);
   map_free(&trans->transactsmap);
-  map_free(&trans->noobsmap);
+  map_free(&trans->multiversionmap);
   transaction_free_orderdata(trans);
   free(trans);
 }

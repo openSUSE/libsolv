@@ -38,7 +38,8 @@ static struct job2str {
   { SOLVER_ERASE,         "erase" },
   { SOLVER_UPDATE,        "update" },
   { SOLVER_WEAKENDEPS,    "weakendeps" },
-  { SOLVER_NOOBSOLETES,   "noobsoletes" },
+  { SOLVER_MULTIVERSION,  "multiversion" },
+  { SOLVER_MULTIVERSION,  "noobsoletes" },	/* old name */
   { SOLVER_LOCK,          "lock" },
   { SOLVER_DISTUPGRADE,   "distupgrade" },
   { SOLVER_VERIFY,        "verify" },

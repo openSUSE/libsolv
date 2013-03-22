@@ -111,7 +111,7 @@ SOLV_1.0 {
 		pool_tmpappend;
 		pool_tmpjoin;
 		pool_trivial_installable;
-		pool_trivial_installable_noobsoletesmap;
+		pool_trivial_installable_multiversionmap;
 		pool_vendor2mask;
 		queue_alloc_one;
 		queue_alloc_one_head;
@@ -299,6 +299,7 @@ SOLV_1.0 {
 		solver_allruleinfos;
 		solver_calc_duchanges;
 		solver_calc_installsizechange;
+		solver_calculate_multiversionmap;
 		solver_calculate_noobsmap;
 		solver_create;
 		solver_create_decisions_obsoletesmap;
