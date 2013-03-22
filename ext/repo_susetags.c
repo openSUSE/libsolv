@@ -1091,11 +1091,13 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    break;
 
 	  default:
+#if 0
 	    pool_debug(pool, SOLV_WARN, "susetags: unknown line: %d: %s\n", pd.lineno, line);
+#endif
 	    break;
 	}
 
-    } /* for(;;) */
+    }
 
   if (s)
     finish_solvable(&pd, s, freshens);
