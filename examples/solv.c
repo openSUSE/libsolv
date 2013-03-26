@@ -1706,16 +1706,16 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
   printf("rpm database:");
   if (stat(pool_prepend_rootdir_tmp(pool, "/var/lib/rpm/Packages"), &stb))
-    memset(&stb, 0, sizeof(&stb));
+    memset(&stb, 0, sizeof(stb));
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
   printf("dpgk database:");
   if (stat(pool_prepend_rootdir_tmp(pool, "/var/lib/dpkg/status"), &stb))
-    memset(&stb, 0, sizeof(&stb));
+    memset(&stb, 0, sizeof(stb));
 #endif
 #ifdef NOSYSTEM
   printf("no installed database:");
-  memset(&stb, 0, sizeof(&stb));
+  memset(&stb, 0, sizeof(stb));
 #endif
   calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, 0, installedcookie);
   if (usecachedrepo(repo, 0, installedcookie, 0))
