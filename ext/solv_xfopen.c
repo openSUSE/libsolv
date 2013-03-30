@@ -32,14 +32,16 @@ static FILE *cookieopen(void *cookie, const char *mode,
       cclose
       );
 #elif defined(HAVE_FOPENCOOKIE)
-  cookie_io_functions_t cio;
-  memset(&cio, 0, sizeof(cio));
-  if (*mode == 'r')
-    cio.read = cread;
-  else if (*mode == 'w')
-    cio.write = cwrite;
-  cio.close = cclose;
-  return  fopencookie(cookie, *mode == 'w' ? "w" : "r", cio);
+  {
+    cookie_io_functions_t cio;
+    memset(&cio, 0, sizeof(cio));
+    if (*mode == 'r')
+      cio.read = cread;
+    else if (*mode == 'w')
+      cio.write = cwrite;
+    cio.close = cclose;
+    return  fopencookie(cookie, *mode == 'w' ? "w" : "r", cio);
+  }
 #else
 # error Need to implement custom I/O
 #endif
