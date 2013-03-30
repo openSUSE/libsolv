@@ -1145,7 +1145,7 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
       memcpy(cinfo->extcookie, myextcookie, sizeof(myextcookie));
     }
   if (mark)
-    futimes(fileno(fp), 0);	/* try to set modification time */
+    futimens(fileno(fp), 0);	/* try to set modification time */
   fclose(fp);
   return 1;
 }
