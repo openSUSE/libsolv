@@ -611,6 +611,19 @@ pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
     return 1;		/* both rels show in the same direction */
   if (pevr == evr)
     return (flags & pflags & REL_EQ) ? 1 : 0;
+  if (ISRELDEP(pevr))
+    {
+      Reldep *range = GETRELDEP(pool, pevr);
+      if (range->flags != REL_COMPAT)
+        return 0;	/* unsupported */
+      /* range->name is the backwards compatibility version, range->evr the
+         actual version. If flags are '>=' or '>', we match the compatibility
+         version as well, otherwise only the actual version. */
+      if (!(flags & REL_GT) || (flags & REL_LT))
+        return pool_match_flags_evr(pool, REL_EQ, range->evr, flags, evr);
+      return pool_match_flags_evr(pool, REL_LT | REL_EQ, range->evr, flags, evr) && 
+        pool_match_flags_evr(pool, REL_GT | REL_EQ, range->name, REL_EQ, evr);
+    }
   switch (pool_evrcmp(pool, pevr, evr, EVRCMP_DEPCMP))
     {
     case -2:
