@@ -16,6 +16,10 @@
 #include "pooltypes.h"
 #include "hash.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*-----------------------------------------------
  * Ids with relation
  */
@@ -37,5 +41,9 @@ extern const char *pool_dep2str(Pool *pool, Id); /* might alloc tmpspace */
 extern void pool_shrink_strings(Pool *pool);
 extern void pool_shrink_rels(Pool *pool);
 extern void pool_freeidhashes(Pool *pool);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_POOLID_H */

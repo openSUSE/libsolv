@@ -10,6 +10,10 @@
 #include "pooltypes.h"
 #include "hash.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define STRID_NULL  0
 #define STRID_EMPTY 1
 
@@ -41,5 +45,9 @@ stringpool_id2str(Stringpool *ss, Id id)
 {
   return ss->stringspace + ss->strings[id];
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

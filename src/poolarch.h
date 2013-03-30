@@ -10,6 +10,10 @@
 
 #include "pool.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern void pool_setarch(Pool *, const char *);
 extern void pool_setarchpolicy(Pool *, const char *);
 extern unsigned char pool_arch2color_slow(Pool *pool, Id arch);
@@ -35,5 +39,9 @@ static inline int pool_colormatch(Pool *pool, Solvable *s1, Solvable *s2)
     return 1;
   return 0;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_POOLARCH_H */

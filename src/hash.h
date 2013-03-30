@@ -15,6 +15,10 @@
 
 #include "pooltypes.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* value of a hash */
 typedef unsigned int Hashval;
 /* mask for hash, used as modulo operator to ensure 'wrapping' of hash
@@ -84,5 +88,9 @@ mkmask(unsigned int num)
     num &= num - 1;
   return num * 2 - 1;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_HASH_H */

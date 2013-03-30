@@ -16,6 +16,10 @@
 #include "pooltypes.h"
 #include "pool.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct _Repo;
 
 typedef struct _KeyValue {
@@ -181,5 +185,9 @@ void dataiterator_strdup(Dataiterator *di);
 #define DI_SEEK_CHILD   1
 #define DI_SEEK_PARENT  2
 #define DI_SEEK_REWIND  3
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_DATAITERATOR_H */

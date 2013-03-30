@@ -13,10 +13,6 @@
 #ifndef LIBSOLV_SOLVER_H
 #define LIBSOLV_SOLVER_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "pooltypes.h"
 #include "pool.h"
 #include "repo.h"
@@ -26,6 +22,9 @@ extern "C" {
 #include "rules.h"
 #include "problems.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct _Solver {
   Pool *pool;				/* back pointer to pool */

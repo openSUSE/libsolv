@@ -19,7 +19,9 @@
 #include "dataiterator.h"
 #include "hash.h"
 
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct _Repo {
   const char *name;		/* name pointer */
@@ -174,6 +176,10 @@ void repo_disable_paging(Repo *repo);
 #else
 #define FOR_REPODATAS(repo, rdid, data)	\
 	for (rdid = 1; rdid < repo->nrepodata && (data = repo_id2repodata(repo, rdid)); rdid++)
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* LIBSOLV_REPO_H */

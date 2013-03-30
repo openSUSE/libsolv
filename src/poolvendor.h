@@ -10,8 +10,16 @@
 
 #include "pool.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 Id pool_vendor2mask(Pool *pool, Id vendor);
 void pool_setvendorclasses(Pool *pool, const char **vendorclasses);
 void pool_addvendorclass(Pool *pool, const char **vendorclass);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_POOLVENDOR_H */

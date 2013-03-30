@@ -15,6 +15,10 @@
 
 #include "pooltypes.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct _Queue {
   Id *elements;		/* pointer to elements */
   int count;		/* current number of elements in queue */
@@ -115,5 +119,9 @@ extern void queue_delete(Queue *q, int pos);
 extern void queue_delete2(Queue *q, int pos);
 extern void queue_deleten(Queue *q, int pos, int n);
 extern void queue_prealloc(Queue *q, int n);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_QUEUE_H */

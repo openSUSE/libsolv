@@ -10,6 +10,10 @@
 
 #include "pool.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void *solv_chksum_create(Id type);
 void *solv_chksum_create_from_bin(Id type, const unsigned char *buf);
 void solv_chksum_add(void *handle, const void *data, int len);
@@ -20,5 +24,9 @@ void *solv_chksum_free(void *handle, unsigned char *cp);
 const char *solv_chksum_type2str(Id type);
 Id solv_chksum_str2type(const char *str);
 int solv_chksum_len(Id type);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_CHKSUM_H */

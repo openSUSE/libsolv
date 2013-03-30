@@ -12,6 +12,10 @@
 
 #include "solver.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define POLICY_MODE_CHOOSE	0
 #define POLICY_MODE_RECOMMEND	1
 #define POLICY_MODE_SUGGEST	2
@@ -30,3 +34,6 @@ extern void policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int 
 
 extern void policy_create_obsolete_index(Solver *solv);
 
+#ifdef __cplusplus
+}
+#endif

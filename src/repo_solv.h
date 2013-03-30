@@ -13,14 +13,14 @@
 #ifndef LIBSOLV_REPO_SOLVE_H
 #define LIBSOLV_REPO_SOLVE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdio.h>
 
 #include "pool.h"
 #include "repo.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 extern int repo_add_solv(Repo *repo, FILE *fp, int flags);
 

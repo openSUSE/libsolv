@@ -13,13 +13,13 @@
 #ifndef LIBSOLV_TRANSACTION_H
 #define LIBSOLV_TRANSACTION_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "pooltypes.h"
 #include "queue.h"
 #include "bitmap.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct _Pool;
 struct _DUChanges;
