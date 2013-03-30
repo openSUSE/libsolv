@@ -11,6 +11,7 @@
  * version compare
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include "evr.h"
@@ -197,7 +198,100 @@ solv_vercmp_rpm_notilde(const char *s1, const char *q1, const char *s2, const ch
 
 #endif
 
+#if defined(HAIKU)
 
+static int
+solv_cmp_version_part_haiku(const char *s1, const char *q1, const char *s2,
+  const char *q2)
+{
+  while (s1 < q1 && s2 < q2)
+    {
+      int cmp, len1, len2;
+      const char *part1 = s1, *part2 = s2;
+
+      /* compare non-number part */
+      while (s1 < q1 && !isdigit(*s1))
+        s1++;
+      while (s2 < q2 && !isdigit(*s2))
+        s2++;
+
+      if (part1 != s1)
+        {
+          if (part2 == s2)
+            return 1;
+
+          len1 = s1 - part1;
+          len2 = s2 - part2;
+          cmp = strncmp(part1, part2, len1 < len2 ? len1 : len2);
+          if (cmp != 0)
+            return cmp;
+          if (len1 != len2)
+            return len1 - len2;
+       }
+      else if (part2 != s2)
+        return -1;
+
+      /* compare number part */
+      part1 = s1;
+      part2 = s2;
+
+      while (s1 < q1 && isdigit(*s1))
+        s1++;
+      while (s2 < q2 && isdigit(*s2))
+        s2++;
+
+      while (part1 + 1 < s1 && *part1 == '0')
+        part1++;
+      while (part2 + 1 < s1 && *part2 == '0')
+        part2++;
+
+      len1 = s1 - part1;
+      len2 = s2 - part2;
+      if (len1 != len2)
+        return len1 - len2;
+      if (len1 == 0)
+        return 0;
+
+      cmp = strncmp(part1, part2, len1);
+      if (cmp != 0)
+       return cmp;
+    }
+
+  return s1 < q1 ? 1 : s2 < q2 ? -1 : 0;
+}
+
+int
+solv_vercmp_haiku(const char *s1, const char *q1, const char *s2, const char *q2)
+{
+  const char *pre1 = s1;
+  const char *pre2 = s2;
+  int cmp;
+
+  /* find pre-release separator */
+  while (pre1 != q1 && *pre1 != '/')
+    pre1++;
+  while (pre2 != q2 && *pre2 != '/')
+    pre2++;
+
+  /* compare main versions */
+  cmp = solv_cmp_version_part_haiku(s1, pre1, s2, pre2);
+  if (cmp != 0)
+    return cmp < 0 ? -1 : 1; /* must return -1, 0, or 1 */
+
+  /* main versions are equal -- compare pre-release (none is greatest) */
+  if (pre1 == q1)
+    return pre2 == q2 ? 0 : 1;
+  if (pre2 == q2)
+    return -1;
+
+  return solv_cmp_version_part_haiku(pre1 + 1, q1, pre2 + 1, q2);
+  cmp = solv_cmp_version_part_haiku(pre1 + 1, q1, pre2 + 1, q2);
+  return cmp == 0 ? 0 : cmp < 0 ? -1 : 1; /* must return -1, 0, or 1 */
+}
+
+#endif /* HAIKU */
+ 
+ 
 /* 
  * the solv_vercmp variant your system uses.
  */
@@ -208,6 +302,8 @@ solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
   return solv_vercmp_deb(s1, q1, s2, q2);
 #elif defined(ARCHLINUX)
   return solv_vercmp_rpm_notilde(s1, q1, s2, q2);
+#elif defined(HAIKU)
+  return solv_vercmp_haiku(s1, q1, s2, q2);
 #else
   return solv_vercmp_rpm(s1, q1, s2, q2);
 #endif
