@@ -12,6 +12,10 @@ SOLV_1.0 {
 		repo_add_debdb;
 		repo_add_debpackages;
 		repo_add_deltainfoxml;
+		repo_add_haiku_installed_packages;
+		repo_add_haiku_package;
+		repo_add_haiku_package_info;
+		repo_add_haiku_packages;
 		repo_add_helix;
 		repo_add_mdk;
 		repo_add_mdk_info;
