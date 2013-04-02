@@ -13,10 +13,6 @@
 #ifndef LIBSOLV_POOL_H
 #define LIBSOLV_POOL_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdio.h>
 
 #include "solvversion.h"
@@ -29,6 +25,10 @@ extern "C" {
 
 /* well known ids */
 #include "knownid.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* well known solvable */
 #define SYSTEMSOLVABLE		1

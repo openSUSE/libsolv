@@ -11,6 +11,10 @@
 #include "pooltypes.h"
 #include "util.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct _Dirpool {
   Id *dirs;
   int ndirs;
@@ -73,5 +77,9 @@ dirpool_compid(Dirpool *dp, Id did)
 {
   return dp->dirs[did];
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_DIRPOOL_H */

@@ -182,9 +182,10 @@ autouninstall(Solver *solv, Id *problem)
 	{
 	  /* check if identical to feature rule */
 	  Id p = solv->rules[v].p;
+	  Rule *r;
 	  if (p <= 0)
 	    continue;
-	  Rule *r = solv->rules + solv->featurerules + (p - solv->installed->start);
+	  r = solv->rules + solv->featurerules + (p - solv->installed->start);
 	  if (!r->p)
 	    {
 	      /* update rule == feature rule */

@@ -15,6 +15,10 @@
 
 #include "pool.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SELECTION_NAME			(1 << 0)
 #define SELECTION_PROVIDES		(1 << 1)
 #define SELECTION_FILELIST		(1 << 2)
@@ -33,5 +37,9 @@ extern int  selection_make(Pool *pool, Queue *selection, const char *name, int f
 extern void selection_filter(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_solvables(Pool *pool, Queue *selection, Queue *pkgs);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

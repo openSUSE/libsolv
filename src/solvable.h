@@ -18,6 +18,10 @@
 #include "pooltypes.h"
 #include "queue.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct _Repo;
 
 typedef struct _Solvable {
@@ -74,5 +78,9 @@ void solvable_unset(Solvable *s, Id keyname);
 
 int solvable_identical(Solvable *s1, Solvable *s2);
 Id solvable_selfprovidedep(Solvable *s); 
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_SOLVABLE_H */

@@ -15,6 +15,10 @@
 
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct _Map {
   unsigned char *map;
   int size;
@@ -58,5 +62,9 @@ static inline int map_tst(Map *m, int n)
 {
   return MAPTST(m, n);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_BITMAP_H */

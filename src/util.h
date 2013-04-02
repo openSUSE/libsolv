@@ -16,6 +16,10 @@
 #include <stddef.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * malloc
  * exits with error message on error
@@ -82,4 +86,9 @@ static inline void *solv_calloc_block(size_t len, size_t size, size_t block)
   memset(buf, 0, ((len + block) & ~block) * size);
   return buf;
 }
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* LIBSOLV_UTIL_H */
