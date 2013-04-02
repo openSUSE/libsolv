@@ -22,26 +22,27 @@ static FILE *cookieopen(void *cookie, const char *mode,
 	ssize_t (*cwrite)(void *, const char *, size_t), 
 	int (*cclose)(void *))
 {
+#ifdef HAVE_FUNOPEN
   if (!cookie)
     return 0;
-#ifdef HAVE_FUNOPEN
   return funopen(cookie, 
-      (int (*)(void *, char *, int))(*mode == 'r' ? cread: NULL),/* readfn */
-      (int (*)(void *, const char *, int))(*mode == 'w' ? cwrite : NULL), /* writefn */
-      (fpos_t (*)(void *, fpos_t, int))NULL, /* seekfn */
+      (int (*)(void *, char *, int))(*mode == 'r' ? cread : NULL),		/* readfn */
+      (int (*)(void *, const char *, int))(*mode == 'w' ? cwrite : NULL),	/* writefn */
+      (fpos_t (*)(void *, fpos_t, int))NULL,					/* seekfn */
       cclose
       );
 #elif defined(HAVE_FOPENCOOKIE)
-  {
-    cookie_io_functions_t cio;
-    memset(&cio, 0, sizeof(cio));
-    if (*mode == 'r')
-      cio.read = cread;
-    else if (*mode == 'w')
-      cio.write = cwrite;
-    cio.close = cclose;
-    return  fopencookie(cookie, *mode == 'w' ? "w" : "r", cio);
-  }
+  cookie_io_functions_t cio;
+
+  if (!cookie)
+    return 0;
+  memset(&cio, 0, sizeof(cio));
+  if (*mode == 'r')
+    cio.read = cread;
+  else if (*mode == 'w')
+    cio.write = cwrite;
+  cio.close = cclose;
+  return  fopencookie(cookie, *mode == 'w' ? "w" : "r", cio);
 #else
 # error Need to implement custom I/O
 #endif
