@@ -23,6 +23,10 @@
 #include "repopage.h"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SIZEOF_MD5	16
 #define SIZEOF_SHA1	20
 #define SIZEOF_SHA256	32
@@ -295,5 +299,9 @@ Id repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id v
 
 /* stats */
 unsigned int repodata_memused(Repodata *data);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LIBSOLV_REPODATA_H */

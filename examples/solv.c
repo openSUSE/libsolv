@@ -797,8 +797,9 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       if (file != cinfo->metalink && file != cinfo->mirrorlist)
 	{
 	  unsigned char mlchksum[32];
+	  Id mlchksumtype;
 	  fp = curlfopen(cinfo, cinfo->metalink ? cinfo->metalink : cinfo->mirrorlist, 0, 0, 0, 0);
-	  Id mlchksumtype = 0;
+	  mlchksumtype = 0;
 	  if (!fp)
 	    return 0;
 	  if (cinfo->metalink)
@@ -1144,7 +1145,7 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
       memcpy(cinfo->extcookie, myextcookie, sizeof(myextcookie));
     }
   if (mark)
-    futimes(fileno(fp), 0);	/* try to set modification time */
+    futimens(fileno(fp), 0);	/* try to set modification time */
   fclose(fp);
   return 1;
 }
@@ -3169,10 +3170,11 @@ rerunsolver:
       Solvable *s;
       int j;
       FILE *fp;
+      Id type;
 
       p = trans->steps.elements[i];
       s = pool_id2solvable(pool, p);
-      Id type = transaction_type(trans, p, SOLVER_TRANSACTION_RPM_ONLY);
+      type = transaction_type(trans, p, SOLVER_TRANSACTION_RPM_ONLY);
       switch(type)
 	{
 	case SOLVER_TRANSACTION_ERASE:

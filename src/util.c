@@ -115,13 +115,12 @@ solv_timems(unsigned int subtract)
 
    see also: http://sources.redhat.com/ml/libc-alpha/2008-12/msg00003.html
  */
-#if defined(__GLIBC__)
+#if defined(__GLIBC__) && (defined(HAVE_QSORT_R) || defined(HAVE___QSORT_R))
 
-# if HAVE_QSORT_R || HAVE___QSORT_R
 void
 solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
 {
-# if HAVE_QSORT_R
+# if defined(HAVE_QSORT_R)
   qsort_r(base, nmemb, size, compar, compard);
 # else
   /* backported for SLE10-SP2 */
@@ -129,12 +128,8 @@ solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, con
 # endif
 
 }
-#else /* qsort_r or __qsort_r on glibc */
-/* use own version of qsort if none available */
-#include "qsort_r.c"
-#endif
 
-#else /* not glibc */
+#elif defined(HAVE_QSORT_R) /* not glibc, but has qsort_r() */
 
 struct solv_sort_data {
   int (*compar)(const void *, const void *, void *);
@@ -157,6 +152,9 @@ solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, con
   qsort_r(base, nmemb, size, &d, solv_sort_helper);
 }
 
+#else /* not glibc and no qsort_r() */
+/* use own version of qsort if none available */
+#include "qsort_r.c"
 #endif
 
 char *
