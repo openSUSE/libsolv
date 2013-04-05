@@ -2899,9 +2899,10 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	    }
 	  else if (x == 255)
 	    {
-	      if (pl <= 4)
+	      /* sanity: p[0] must be zero */
+	      if (pl <= 4 || p[0] != 0)
 		return;
-	      l = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
+	      l = p[1] << 16 | p[2] << 8 | p[3];
 	      p += 4;
 	      pl -= 4;
 	    }
@@ -2949,7 +2950,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 		  solv_chksum_free(h, fp);
 		  for (i = 0; i < 16; i++)
 		    sprintf(fpx + i * 2, "%02x", fp[i]);
-		  setutf8string(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
+		  repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
 		}
 	    }
 	  else if (p[0] == 4)
@@ -2970,7 +2971,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      solv_chksum_free(h, fp);
 	      for (i = 0; i < 20; i++)
 		sprintf(fpx + i * 2, "%02x", fp[i]);
-	      setutf8string(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
+	      repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
 	      memcpy(keyid, fp + 12, 8);
 	    }
 	}
@@ -3060,12 +3061,12 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 			sl = x;
 		      else if (x == 255)
 			{
-			  if (ql < 4)
+			  if (ql < 4 || q[0] != 0)
 			    {
 			      q = 0;
 			      break;
 			    }
-			  sl = q[0] << 24 | q[1] << 16 | q[2] << 8 | q[3];
+			  sl = q[1] << 16 | q[2] << 8 | q[3];
 			  q += 4;
 			  ql -= 4;
 			}
