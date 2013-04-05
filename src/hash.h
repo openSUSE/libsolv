@@ -21,9 +21,6 @@ extern "C" {
 
 /* value of a hash */
 typedef unsigned int Hashval;
-/* mask for hash, used as modulo operator to ensure 'wrapping' of hash
-   values -> hash table */
-typedef unsigned int Hashmask;
 
 /* inside the hash table, Ids are stored. Hash maps: string -> hash -> Id */
 typedef Id *Hashtable;
@@ -80,7 +77,7 @@ relhash(Id name, Id evr, int flags)
  * 
  * used for Hashtable 'modulo' operation
  */ 
-static inline Hashmask
+static inline Hashval
 mkmask(unsigned int num)
 {
   num *= 2;

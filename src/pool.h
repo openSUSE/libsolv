@@ -135,7 +135,7 @@ struct _Pool {
 
   /* hash for rel unification */
   Hashtable relhashtbl;		/* hashtable: (name,evr,op)Hash -> Id */
-  Hashmask relhashmask;
+  Hashval relhashmask;
 
   Id *languagecache;
   int languagecacheother;

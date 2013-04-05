@@ -21,12 +21,12 @@ struct cbdata {
   Queue lookat;
   Queue lookat_dir;
 
-  Hashval *cflmap;
-  Hashmask cflmapn;
+  Hashtable cflmap;
+  Hashval cflmapn;
   unsigned int cflmapused;
 
-  Hashval *dirmap;
-  Hashmask dirmapn;
+  Hashtable dirmap;
+  Hashval dirmapn;
   unsigned int dirmapused;
   int dirconflicts;
 
@@ -42,13 +42,13 @@ struct cbdata {
 
 #define FILESSPACE_BLOCK 255
 
-static Hashval *
-doublehash(Hashval *map, Hashmask *mapnp)
+static Hashtable
+growhash(Hashtable map, Hashval *mapnp)
 {
-  Hashmask mapn = *mapnp;
-  Hashmask i, hx, qx, h, hh;
-  Hashmask nn = (mapn + 1) * 2 - 1;
-  Hashmask *m;
+  Hashval mapn = *mapnp;
+  Hashval i, hx, qx, h, hh;
+  Hashval nn = (mapn + 1) * 2 - 1;
+  Hashtable m;
 
   m = solv_calloc(nn + 1, 2 * sizeof(Id));
   for (i = 0; i <= mapn; i++)
@@ -77,7 +77,7 @@ static void
 finddirs_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 {
   struct cbdata *cbdata = cbdatav;
-  Hashmask h, hh, hx, qx;
+  Hashval h, hh, hx, qx;
   Hashval idx = cbdata->idx;
 
   hx = strhash(fn);
@@ -103,7 +103,7 @@ finddirs_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
       cbdata->dirmap[2 * h + 1] = idx;
       cbdata->dirmapused++;
       if (cbdata->dirmapused * 2 > cbdata->dirmapn)
-	cbdata->dirmap = doublehash(cbdata->dirmap, &cbdata->dirmapn);
+	cbdata->dirmap = growhash(cbdata->dirmap, &cbdata->dirmapn);
       return;
     }
   if (cbdata->dirmap[2 * h + 1] == idx)
@@ -119,9 +119,9 @@ finddirs_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 }
 
 static inline int
-isindirmap(struct cbdata *cbdata, Hashmask hx)
+isindirmap(struct cbdata *cbdata, Hashval hx)
 {
-  Hashmask h, hh, qx;
+  Hashval h, hh, qx;
 
   h = hx & cbdata->dirmapn;
   hh = HASHCHAIN_START;
@@ -143,7 +143,7 @@ findfileconflicts_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
   int isdir = S_ISDIR(fmode);
   char *dp;
   Hashval idx, qidx;
-  Hashmask qx, h, hx, hh, dhx;
+  Hashval qx, h, hx, hh, dhx;
 
   idx = cbdata->idx;
 
@@ -182,7 +182,7 @@ findfileconflicts_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
       cbdata->cflmap[2 * h + 1] = (isdir ? ~idx : idx);
       cbdata->cflmapused++;
       if (cbdata->cflmapused * 2 > cbdata->cflmapn)
-	cbdata->cflmap = doublehash(cbdata->cflmap, &cbdata->cflmapn);
+	cbdata->cflmap = growhash(cbdata->cflmap, &cbdata->cflmapn);
       return;
     }
   qidx = cbdata->cflmap[2 * h + 1];
@@ -317,7 +317,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
         idxmapset++;
     }
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap size: %d used %d\n", cbdata.dirmapn + 1, cbdata.dirmapused);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap size: %d, used %d\n", cbdata.dirmapn + 1, cbdata.dirmapused);
   POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap memory usage: %d K\n", (cbdata.dirmapn + 1) * 2 * (int)sizeof(Id) / 1024);
   POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap creation took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "dir conflicts found: %d, idxmap %d of %d\n", cbdata.dirconflicts, idxmapset, pkgs->count);
@@ -343,7 +343,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
         rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_NOGHOSTS, findfileconflicts_cb, &cbdata);
     }
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "filemap size: %d used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "filemap size: %d, used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
   POOL_DEBUG(SOLV_DEBUG_STATS, "filemap memory usage: %d K\n", (cbdata.cflmapn + 1) * 2 * (int)sizeof(Id) / 1024);
   POOL_DEBUG(SOLV_DEBUG_STATS, "filemap creation took %d ms\n", solv_timems(now));
 

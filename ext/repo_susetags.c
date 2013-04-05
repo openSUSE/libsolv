@@ -385,9 +385,9 @@ finish_solvable(struct parsedata *pd, Solvable *s, Offset freshens)
 }
 
 static Hashtable
-joinhash_init(Repo *repo, Hashmask *hmp)
+joinhash_init(Repo *repo, Hashval *hmp)
 {
-  Hashmask hm = mkmask(repo->nsolvables);
+  Hashval hm = mkmask(repo->nsolvables);
   Hashtable ht = solv_calloc(hm + 1, sizeof(*ht));
   Hashval h, hh;
   Solvable *s;
@@ -406,7 +406,7 @@ joinhash_init(Repo *repo, Hashmask *hmp)
 }
 
 static Solvable *
-joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, Id name, Id evr, Id arch, Id start)
+joinhash_lookup(Repo *repo, Hashtable ht, Hashval hm, Id name, Id evr, Id arch, Id start)
 {
   Hashval h, hh;
 
@@ -478,7 +478,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   Repodata *data = 0;
   Id handle = 0;
   Hashtable joinhash = 0;
-  Hashmask joinhashm = 0;
+  Hashval joinhashm = 0;
   int createdpkgs = 0;
 
   if ((flags & (SUSETAGS_EXTEND|REPO_EXTEND_SOLVABLES)) != 0 && repo->nrepodata)

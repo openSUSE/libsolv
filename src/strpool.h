@@ -25,7 +25,7 @@ struct _Stringpool
   Offset sstrings;            /* size of used stringspace */
 
   Hashtable stringhashtbl;    /* hash table: (string ->) Hash -> Id */
-  Hashmask stringhashmask;    /* modulo value for hash table (size of table - 1) */
+  Hashval stringhashmask;     /* modulo value for hash table (size of table - 1) */
 };
 
 void stringpool_init(Stringpool *ss, const char *strs[]);

@@ -79,9 +79,7 @@ stringpool_clone(Stringpool *ss, Stringpool *from)
 Id
 stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create)
 {
-  Hashval h;
-  unsigned int hh;
-  Hashmask hashmask, oldhashmask;
+  Hashval h, hh, hashmask, oldhashmask;
   int i;
   Id id;
   Hashtable hashtbl;

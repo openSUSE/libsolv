@@ -50,7 +50,7 @@ typedef struct _Repo {
   Offset lastoff;		/* start of last array in idarraydata */
 
   Hashtable lastidhash;		/* hash to speed up repo_addid_dep */
-  Hashmask lastidhash_mask;
+  Hashval lastidhash_mask;
   int lastidhash_idarraysize;
   int lastmarker;
   Offset lastmarkerpos;

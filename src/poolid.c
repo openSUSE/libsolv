@@ -54,9 +54,7 @@ pool_strn2id(Pool *pool, const char *str, unsigned int len, int create)
 Id
 pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 {
-  Hashval h;
-  unsigned int hh;
-  Hashmask hashmask;
+  Hashval h, hh, hashmask;
   int i;
   Id id;
   Hashtable hashtbl;

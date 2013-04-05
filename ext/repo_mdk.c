@@ -287,7 +287,7 @@ struct parsedata {
   enum state sbtab[NUMSTATES];
   Solvable *solvable;
   Hashtable joinhash;
-  Hashmask joinhashmask;
+  Hashval joinhashmask;
 };
 
 static inline const char *
@@ -302,9 +302,9 @@ find_attr(const char *txt, const char **atts)
 }
 
 static Hashtable
-joinhash_init(Repo *repo, Hashmask *hmp)
+joinhash_init(Repo *repo, Hashval *hmp)
 {
-  Hashmask hm = mkmask(repo->nsolvables);
+  Hashval hm = mkmask(repo->nsolvables);
   Hashtable ht = solv_calloc(hm + 1, sizeof(*ht));
   Hashval h, hh;
   Solvable *s;
@@ -323,7 +323,7 @@ joinhash_init(Repo *repo, Hashmask *hmp)
 }
 
 static Solvable *
-joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, const char *fn, const char *distepoch)
+joinhash_lookup(Repo *repo, Hashtable ht, Hashval hm, const char *fn, const char *distepoch)
 {
   Hashval h, hh;
   const char *p, *vrstart, *vrend;

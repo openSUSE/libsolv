@@ -500,9 +500,9 @@ static char *getsentrynl(struct tarhead *th, char *s, int size)
 }
 
 static Hashtable
-joinhash_init(Repo *repo, Hashmask *hmp)
+joinhash_init(Repo *repo, Hashval *hmp)
 {
-  Hashmask hm = mkmask(repo->nsolvables);
+  Hashval hm = mkmask(repo->nsolvables);
   Hashtable ht = solv_calloc(hm + 1, sizeof(*ht));
   Hashval h, hh;
   Solvable *s;
@@ -521,7 +521,7 @@ joinhash_init(Repo *repo, Hashmask *hmp)
 }
 
 static Solvable *
-joinhash_lookup(Repo *repo, Hashtable ht, Hashmask hm, const char *fn)
+joinhash_lookup(Repo *repo, Hashtable ht, Hashval hm, const char *fn)
 {
   const char *p;
   Id name, evr;
@@ -748,7 +748,7 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
   int lastdnlen = 0;
   Solvable *s = 0;
   Hashtable joinhash = 0;
-  Hashmask joinhashmask = 0;
+  Hashval joinhashmask = 0;
 
   data = repo_add_repodata(repo, flags);
 

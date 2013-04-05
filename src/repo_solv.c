@@ -453,9 +453,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   char *sp;			       /* pointer into string space */
   Id *idmap;			       /* map of repo Ids to pool Ids */
   Id id, type;
-  unsigned int hashmask, h;
-  int hh;
-  Id *hashtbl;
+  Hashval hashmask, h, hh;
+  Hashtable hashtbl;
   Id name, evr, did;
   int relflags;
   Reldep *ran;
