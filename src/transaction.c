@@ -1957,7 +1957,7 @@ transaction_add_obsoleted(Transaction *trans)
     return;
   /* make room */
   steps = &trans->steps;
-  queue_insertn(steps, 0, max);
+  queue_insertn(steps, 0, max, 0);
 
   /* now add em */
   map_init(&done, installed->end - installed->start);

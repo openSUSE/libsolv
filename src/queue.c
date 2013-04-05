@@ -153,7 +153,7 @@ queue_delete2(Queue *q, int pos)
 }
 
 void
-queue_insertn(Queue *q, int pos, int n)
+queue_insertn(Queue *q, int pos, int n, Id *elements)
 {
   if (n <= 0)
     return;
@@ -171,7 +171,10 @@ queue_insertn(Queue *q, int pos, int n)
     }
   if (pos < q->count)
     memmove(q->elements + pos + n, q->elements + pos, (q->count - pos) * sizeof(Id));
-  memset(q->elements + pos, 0, n * sizeof(Id));
+  if (elements)
+    memcpy(q->elements + pos, elements, n * sizeof(Id));
+  else
+    memset(q->elements + pos, 0, n * sizeof(Id));
   q->left -= n;
   q->count += n;
 }

@@ -114,7 +114,7 @@ extern void queue_free(Queue *q);
 
 extern void queue_insert(Queue *q, int pos, Id id);
 extern void queue_insert2(Queue *q, int pos, Id id1, Id id2);
-extern void queue_insertn(Queue *q, int pos, int n);
+extern void queue_insertn(Queue *q, int pos, int n, Id *elements);
 extern void queue_delete(Queue *q, int pos);
 extern void queue_delete2(Queue *q, int pos);
 extern void queue_deleten(Queue *q, int pos, int n);

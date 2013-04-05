@@ -3538,7 +3538,7 @@ solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
        */
       /* leave first element zero to make things easier */
       /* also add trailing zero */
-      queue_insertn(&edges, 0, 1 + count + 1);
+      queue_insertn(&edges, 0, 1 + count + 1, 0);
 
       /* first requires and recommends */
       for (i = 0; i < count; i++)

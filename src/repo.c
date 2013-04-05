@@ -1566,9 +1566,7 @@ repo_set_deparray(Repo *repo, Id p, Id keyname, Queue *q, Id marker)
 	{
 	  if (q2.count)
 	    queue_insert(&q2, 0, -marker);
-	  queue_insertn(&q2, 0, q->count);
-	  for (i = 0; i < q->count; i++)
-	   q2.elements[i] = q->elements[i];
+	  queue_insertn(&q2, 0, q->count, q->elements);
 	}
       repo_set_deparray(repo, p, keyname, &q2, 0);
       queue_free(&q2);

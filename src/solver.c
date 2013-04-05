@@ -2818,7 +2818,7 @@ transform_update_targets(Solver *solv)
     }
   if (update_targets->count > 2)
     solv_sort(update_targets->elements, update_targets->count >> 1, 2 * sizeof(Id), transform_update_targets_sortfn, solv);
-  queue_insertn(update_targets, 0, installed->end - installed->start);
+  queue_insertn(update_targets, 0, installed->end - installed->start, 0);
   lastp = lastq = 0;
   for (i = j = installed->end - installed->start; i < update_targets->count; i += 2)
     {
@@ -2956,10 +2956,7 @@ solver_solve(Solver *solv, Queue *job)
   queue_init_clone(&solv->job, job);
   solv->pooljobcnt = pool->pooljobs.count;
   if (pool->pooljobs.count)
-    {
-      queue_insertn(&solv->job, 0, pool->pooljobs.count);
-      memcpy(solv->job.elements, pool->pooljobs.elements, pool->pooljobs.count * sizeof(Id));
-    }
+    queue_insertn(&solv->job, 0, pool->pooljobs.count, pool->pooljobs.elements);
   job = &solv->job;
 
   /* free old stuff */
