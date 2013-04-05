@@ -2331,6 +2331,22 @@ solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m)
   return i;
 }
 
+static inline void
+queue_removeelement(Queue *q, Id el)
+{
+  int i, j;
+  for (i = 0; i < q->count; i++)
+    if (q->elements[i] == el)
+      break;
+  if (i < q->count)
+    {
+      for (j = i++; i < q->count; i++)
+	if (q->elements[i] != el)
+	  q->elements[j++] = q->elements[i];
+      queue_truncate(q, j);
+    }
+}
+
 void
 solver_addchoicerules(Solver *solv)
 {
@@ -2476,12 +2492,7 @@ solver_addchoicerules(Solver *solv)
 	  if (solver_choicerulecheck(solv, p2, r, &m))
 	    {
 	      /* oops, remove element p from q */
-	      int k, l;
-	      p = qi.elements[i + 1];
-	      for (k = l = 0; k < q.count; k++)
-		if (q.elements[k] != p)
-		  q.elements[l++] = q.elements[k];
-	      queue_truncate(&q, l);
+	      queue_removeelement(&q, qi.elements[i + 1]);
 	      continue;
 	    }
 	  qi.elements[j++] = p2;
