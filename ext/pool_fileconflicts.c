@@ -18,8 +18,8 @@ struct cbdata {
   Pool *pool;
   int create;
 
-  Queue lookat;
-  Queue lookat_dir;
+  Queue lookat;		/* conflict candidates */
+  Queue lookat_dir;	/* not yet conflicting directories */
 
   Hashtable cflmap;
   Hashval cflmapn;
@@ -32,8 +32,8 @@ struct cbdata {
 
   Map idxmap;
 
-  Hashval idx;
-  unsigned int hx;
+  Id idx;	/* index of package we're looking at */
+  Id hx;	/* used in findfileconflicts2_cb, limit to files matching hx */
 
   Queue files;
   unsigned char *filesspace;
@@ -46,30 +46,31 @@ static Hashtable
 growhash(Hashtable map, Hashval *mapnp)
 {
   Hashval mapn = *mapnp;
-  Hashval i, hx, qx, h, hh;
-  Hashval nn = (mapn + 1) * 2 - 1;
+  Hashval newn = (mapn + 1) * 2 - 1;
+  Hashval i, h, hh;
   Hashtable m;
+  Id hx, qx;
 
-  m = solv_calloc(nn + 1, 2 * sizeof(Id));
+  m = solv_calloc(newn + 1, 2 * sizeof(Id));
   for (i = 0; i <= mapn; i++)
     {
       hx = map[2 * i];
       if (!hx)
 	continue;
-      h = hx & nn;
+      h = hx & newn;
       hh = HASHCHAIN_START;
       for (;;)
 	{
 	  qx = m[2 * h];
 	  if (!qx)
 	    break;
-	  h = HASHCHAIN_NEXT(h, hh, nn);
+	  h = HASHCHAIN_NEXT(h, hh, newn);
 	}
       m[2 * h] = hx;
       m[2 * h + 1] = map[2 * i + 1];
     }
   solv_free(map);
-  *mapnp = nn;
+  *mapnp = newn;
   return m;
 }
 
@@ -77,8 +78,9 @@ static void
 finddirs_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 {
   struct cbdata *cbdata = cbdatav;
-  Hashval h, hh, hx, qx;
-  Hashval idx = cbdata->idx;
+  Hashval h, hh;
+  Id hx, qx;
+  Id oidx, idx = cbdata->idx;
 
   hx = strhash(fn);
   if (!hx)
@@ -106,12 +108,13 @@ finddirs_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 	cbdata->dirmap = growhash(cbdata->dirmap, &cbdata->dirmapn);
       return;
     }
-  if (cbdata->dirmap[2 * h + 1] == idx)
+  oidx = cbdata->dirmap[2 * h + 1];
+  if (oidx == idx)
     return;
-  /* found a conflict, this dir is used in multiple packages */
-  if (cbdata->dirmap[2 * h + 1] != -1)
+  /* found a conflict, this dir may be used in multiple packages */
+  if (oidx != -1)
     {
-      MAPSET(&cbdata->idxmap, cbdata->dirmap[2 * h + 1]);
+      MAPSET(&cbdata->idxmap, oidx);
       cbdata->dirmap[2 * h + 1] = -1;
       cbdata->dirconflicts++;
     }
@@ -119,9 +122,10 @@ finddirs_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 }
 
 static inline int
-isindirmap(struct cbdata *cbdata, Hashval hx)
+isindirmap(struct cbdata *cbdata, Id hx)
 {
-  Hashval h, hh, qx;
+  Hashval h, hh;
+  Id qx;
 
   h = hx & cbdata->dirmapn;
   hh = HASHCHAIN_START;
@@ -142,8 +146,9 @@ findfileconflicts_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
   struct cbdata *cbdata = cbdatav;
   int isdir = S_ISDIR(fmode);
   char *dp;
-  Hashval idx, qidx;
-  Hashval qx, h, hx, hh, dhx;
+  Id idx, oidx;
+  Id hx, qx;
+  Hashval h, hh, dhx;
 
   idx = cbdata->idx;
 
@@ -151,13 +156,11 @@ findfileconflicts_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
   if (!dp)
     return;
   dhx = strnhash(fn, dp + 1 - fn);
-  if (!dhx)
-    dhx = dp + 1 - fn + 1;	/* mirrors the "if (!hx) hx = strlen(fn) + 1" in finddirs_cb */
 #if 1
-  if (!isindirmap(cbdata, dhx))
+  /* this mirrors the "if (!hx) hx = strlen(fn) + 1" in finddirs_cb */
+  if (!isindirmap(cbdata, dhx ? dhx : dp + 1 - fn + 1))
     return;
 #endif
-
   hx = strhash_cont(dp + 1, dhx);
   if (!hx)
     hx = strlen(fn) + 1;
@@ -185,26 +188,27 @@ findfileconflicts_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 	cbdata->cflmap = growhash(cbdata->cflmap, &cbdata->cflmapn);
       return;
     }
-  qidx = cbdata->cflmap[2 * h + 1];
-  if ((int)qidx < 0)
+  oidx = cbdata->cflmap[2 * h + 1];
+  if (oidx < 0)
     {
       int i;
-      qidx = ~qidx;
       if (isdir)
 	{
-	  /* delay the conflict */
-          queue_push2(&cbdata->lookat_dir, hx, qidx);
+	  /* both are directories. delay the conflict, keep oidx in slot */
           queue_push2(&cbdata->lookat_dir, hx, idx);
 	  return;
 	}
-      cbdata->cflmap[2 * h + 1] = qidx;
+      oidx = ~oidx;
+      /* now have file, had directories before. */
+      cbdata->cflmap[2 * h + 1] = oidx;	/* make it a file */
+      /* dump all delayed directory hits for hx */
       for (i = 0; i < cbdata->lookat_dir.count; i += 2)
 	if (cbdata->lookat_dir.elements[i] == hx)
 	  queue_push2(&cbdata->lookat, hx, cbdata->lookat_dir.elements[i + 1]);
     }
-  if (qidx == idx)
+  else if (oidx == idx)
     return;	/* no conflicts with ourself, please */
-  queue_push2(&cbdata->lookat, hx, qidx);
+  queue_push2(&cbdata->lookat, hx, oidx);
   queue_push2(&cbdata->lookat, hx, idx);
 }
 
@@ -220,12 +224,12 @@ static void
 findfileconflicts2_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
 {
   struct cbdata *cbdata = cbdatav;
-  unsigned int hx = strhash(fn);
+  Hashval hx = strhash(fn);
   char md5padded[34];
 
   if (!hx)
     hx = strlen(fn) + 1;
-  if (hx != cbdata->hx)
+  if ((Id)hx != cbdata->hx)
     return;
   strncpy(md5padded, md5, 32);
   md5padded[32] = 0;
@@ -236,18 +240,17 @@ findfileconflicts2_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
   addfilesspace(cbdata, (unsigned char *)fn, strlen(fn) + 1);
 }
 
-static int cand_sort(const void *ap, const void *bp, void *dp)
+static int lookat_sort(const void *ap, const void *bp, void *dp)
 {
   const Id *a = ap;
   const Id *b = bp;
-
-  unsigned int ax = (unsigned int)a[0];
-  unsigned int bx = (unsigned int)b[0];
-  if (ax < bx)
+  unsigned int ahx = (unsigned int)a[0];	/* a[0] can be < 0 */
+  unsigned int bhx = (unsigned int)b[0];
+  if (ahx < bhx)
     return -1;
-  if (ax > bx)
+  if (ahx > bhx)
     return 1;
-  return (a[1] < 0 ? -a[1] : a[1]) - (b[1] < 0 ? -b[1] : b[1]);
+  return a[1] - b[1];
 }
 
 static int conflicts_cmp(const void *ap, const void *bp, void *dp)
@@ -255,11 +258,11 @@ static int conflicts_cmp(const void *ap, const void *bp, void *dp)
   Pool *pool = dp;
   const Id *a = ap;
   const Id *b = bp;
-  if (a[0] != b[0])
+  if (a[0] != b[0])	/* filename */
     return strcmp(pool_id2str(pool, a[0]), pool_id2str(pool, b[0]));
-  if (a[1] != b[1])
+  if (a[1] != b[1])	/* idx1 */
     return a[1] - b[1];
-  if (a[3] != b[3])
+  if (a[3] != b[3])	/* idx2 */
     return a[3] - b[3];
   return 0;
 }
@@ -268,7 +271,6 @@ int
 pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, void *(*handle_cb)(Pool *, Id, void *) , void *handle_cbdata)
 {
   int i, j, cflmapn, idxmapset;
-  unsigned int hx;
   struct cbdata cbdata;
   unsigned int now, start;
   void *handle;
@@ -358,32 +360,33 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   now = solv_timems(0);
   POOL_DEBUG(SOLV_DEBUG_STATS, "lookat_dir size: %d\n", cbdata.lookat_dir.count);
   queue_free(&cbdata.lookat_dir);
-  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &cand_sort, pool);
-  /* unify */
+
+  /* sort and unify */
+  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &lookat_sort, pool);
   for (i = j = 0; i < cbdata.lookat.count; i += 2)
     {
-      Id idx;
-      hx = cbdata.lookat.elements[i];
-      idx = cbdata.lookat.elements[i + 1];
+      Id hx = cbdata.lookat.elements[i];
+      Id idx = cbdata.lookat.elements[i + 1];
       if (j && hx == cbdata.lookat.elements[j - 2] && idx == cbdata.lookat.elements[j - 1])
 	continue;
       cbdata.lookat.elements[j++] = hx;
       cbdata.lookat.elements[j++] = idx;
     }
+  queue_truncate(&cbdata.lookat, j);
   POOL_DEBUG(SOLV_DEBUG_STATS, "candidates: %d\n", cbdata.lookat.count / 2);
 
   /* third pass: scan candidates */
   for (i = 0; i < cbdata.lookat.count - 2; i += 2)
     {
       int pend, ii, jj;
-      int pidx = cbdata.lookat.elements[i + 1];
       int iterflags;
+      Id hx = cbdata.lookat.elements[i];
+      Id pidx = cbdata.lookat.elements[i + 1];
 
       iterflags = RPM_ITERATE_FILELIST_WITHMD5 | RPM_ITERATE_FILELIST_NOGHOSTS;
       if (obsoleteusescolors)
 	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
       p = pkgs->elements[pidx];
-      hx = cbdata.lookat.elements[i];
       if (cbdata.lookat.elements[i + 2] != hx)
 	continue;	/* no package left */
       queue_empty(&cbdata.files);
@@ -400,7 +403,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       pend = cbdata.files.count;
       for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j++)
 	{
-	  int qidx = cbdata.lookat.elements[j + 1];
+	  Id qidx = cbdata.lookat.elements[j + 1];
 	  Id q = pkgs->elements[qidx];
 	  if (pidx >= cutoff && qidx >= cutoff)
 	    continue;	/* no conflicts between packages with idx >= cutoff */
