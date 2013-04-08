@@ -2142,12 +2142,12 @@ pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts)
 
   if (!conflicts->count)
     return;
-  for (i = 0; i < conflicts->count; i += 5)
+  for (i = 0; i < conflicts->count; i += 6)
     {
       fn = conflicts->elements[i];
       p = conflicts->elements[i + 1];
       md5 = conflicts->elements[i + 2];
-      q = conflicts->elements[i + 3];
+      q = conflicts->elements[i + 4];
       id = pool_rel2id(pool, fn, md5, REL_FILECONFLICT, 1);
       s = pool->solvables + p;
       if (!s->repo)

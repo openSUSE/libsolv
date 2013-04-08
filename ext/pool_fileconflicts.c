@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2012, Novell Inc.
+ * Copyright (c) 2009-2013, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -240,30 +240,30 @@ findfileconflicts2_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
   addfilesspace(cbdata, (unsigned char *)fn, strlen(fn) + 1);
 }
 
-static int lookat_sort(const void *ap, const void *bp, void *dp)
+static int
+lookat_cmp(const void *ap, const void *bp, void *dp)
 {
   const Id *a = ap;
   const Id *b = bp;
   unsigned int ahx = (unsigned int)a[0];	/* a[0] can be < 0 */
   unsigned int bhx = (unsigned int)b[0];
-  if (ahx < bhx)
-    return -1;
-  if (ahx > bhx)
-    return 1;
-  return a[1] - b[1];
+  return ahx < bhx ? -1 : ahx > bhx ? 1 : a[1] - b[1];
 }
 
-static int conflicts_cmp(const void *ap, const void *bp, void *dp)
+static int
+conflicts_cmp(const void *ap, const void *bp, void *dp)
 {
   Pool *pool = dp;
   const Id *a = ap;
   const Id *b = bp;
-  if (a[0] != b[0])	/* filename */
+  if (a[0] != b[0])	/* filename1 */
     return strcmp(pool_id2str(pool, a[0]), pool_id2str(pool, b[0]));
-  if (a[1] != b[1])	/* idx1 */
+  if (a[3] != b[3])	/* filename2 */
+    return strcmp(pool_id2str(pool, a[3]), pool_id2str(pool, b[3]));
+  if (a[1] != b[1])	/* pkgid1 */
     return a[1] - b[1];
-  if (a[3] != b[3])	/* idx2 */
-    return a[3] - b[3];
+  if (a[4] != b[4])	/* pkgid2 */
+    return a[4] - b[4];
   return 0;
 }
 
@@ -362,7 +362,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   queue_free(&cbdata.lookat_dir);
 
   /* sort and unify */
-  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &lookat_sort, pool);
+  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &lookat_cmp, pool);
   for (i = j = 0; i < cbdata.lookat.count; i += 2)
     {
       Id hx = cbdata.lookat.elements[i];
@@ -401,7 +401,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
 
       pend = cbdata.files.count;
-      for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j++)
+      for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j += 2)
 	{
 	  Id qidx = cbdata.lookat.elements[j + 1];
 	  Id q = pkgs->elements[qidx];
@@ -423,12 +423,14 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
 		  continue;	/* md5 sum matches */
 		if (obsoleteusescolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
 		  continue;	/* colors do not conflict */
-		queue_push(conflicts, pool_str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii] + 34, 1));
+		queue_push(conflicts, pool_str2id(pool, fsi + 34, 1));
 		queue_push(conflicts, p);
-		queue_push(conflicts, pool_str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[ii], 1));
+		queue_push(conflicts, pool_str2id(pool, fsi, 1));
+		queue_push(conflicts, pool_str2id(pool, fsj + 34, 1));
 		queue_push(conflicts, q);
-		queue_push(conflicts, pool_str2id(pool, (char *)cbdata.filesspace + cbdata.files.elements[jj], 1));
+		queue_push(conflicts, pool_str2id(pool, fsj, 1));
 	      }
+	  queue_truncate(&cbdata.files, pend);
 	}
     }
   cbdata.filesspace = solv_free(cbdata.filesspace);
@@ -436,10 +438,10 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   queue_free(&cbdata.lookat);
   queue_free(&cbdata.files);
   POOL_DEBUG(SOLV_DEBUG_STATS, "candidate check took %d ms\n", solv_timems(now));
-  if (conflicts->count > 5)
-    solv_sort(conflicts->elements, conflicts->count / 5, 5 * sizeof(Id), conflicts_cmp, pool);
+  if (conflicts->count > 6)
+    solv_sort(conflicts->elements, conflicts->count / 6, 6 * sizeof(Id), conflicts_cmp, pool);
   (*handle_cb)(pool, 0, handle_cbdata);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "found %d file conflicts\n", conflicts->count / 5);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "found %d file conflicts\n", conflicts->count / 6);
   POOL_DEBUG(SOLV_DEBUG_STATS, "file conflict detection took %d ms\n", solv_timems(start));
   return conflicts->count;
 }

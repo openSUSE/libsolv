@@ -56,8 +56,8 @@ int main(int argc, char **argv)
     queue_push(&todo, p);
   pool_findfileconflicts(pool, &todo, 0, &conflicts, &iterate_handle, (void *)&state);
   queue_free(&todo);
-  for (i = 0; i < conflicts.count; i += 5)
-    printf("%s: %s[%s] %s[%s]\n", pool_id2str(pool, conflicts.elements[i]), pool_solvid2str(pool, conflicts.elements[i + 1]), pool_id2str(pool, conflicts.elements[i + 2]), pool_solvid2str(pool, conflicts.elements[i + 3]), pool_id2str(pool, conflicts.elements[i + 4]));
+  for (i = 0; i < conflicts.count; i += 6)
+    printf("%s: %s[%s] %s[%s]\n", pool_id2str(pool, conflicts.elements[i]), pool_solvid2str(pool, conflicts.elements[i + 1]), pool_id2str(pool, conflicts.elements[i + 2]), pool_solvid2str(pool, conflicts.elements[i + 4]), pool_id2str(pool, conflicts.elements[i + 5]));
   if (conflicts.count)
     {
       Queue job;

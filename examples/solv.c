@@ -3141,8 +3141,8 @@ rerunsolver:
       if (conflicts.count)
 	{
 	  printf("\n");
-	  for (i = 0; i < conflicts.count; i += 5)
-	    printf("file %s of package %s conflicts with package %s\n", pool_id2str(pool, conflicts.elements[i]), pool_solvid2str(pool, conflicts.elements[i + 1]), pool_solvid2str(pool, conflicts.elements[i + 3]));
+	  for (i = 0; i < conflicts.count; i += 6)
+	    printf("file %s of package %s conflicts with package %s\n", pool_id2str(pool, conflicts.elements[i]), pool_solvid2str(pool, conflicts.elements[i + 1]), pool_solvid2str(pool, conflicts.elements[i + 4]));
 	  printf("\n");
 	  if (yesno("Re-run solver (y/n/q)? "))
 	    {
