@@ -2533,18 +2533,16 @@ rpm_state_free(void *state)
 int
 rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queue *rpmdbidq)
 {
-  struct rpm_by_state *state = rpmstate;
   struct rpmdbentry *entries;
   int nentries, i;
 
-  if (!index)
-    index = "Name";
+  entries = getinstalledrpmdbids(rpmstate, index ? index : "Name", match, &nentries, 0);
   if (rpmdbidq)
-    queue_empty(rpmdbidq);
-  entries = getinstalledrpmdbids(state, index, match, &nentries, 0);
-  if (rpmdbidq)
-    for (i = 0; i < nentries; i++)
-      queue_push(rpmdbidq, entries[i].rpmdbid);
+    {
+      queue_empty(rpmdbidq);
+      for (i = 0; i < nentries; i++)
+        queue_push(rpmdbidq, entries[i].rpmdbid);
+    }
   solv_free(entries);
   return nentries;
 }
@@ -3189,7 +3187,9 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 struct pgpDigParams_s {
     const char * userid;
     const unsigned char * hash;
+#ifndef HAVE_PGPDIGGETPARAMS
     const char * params[4];
+#endif
     unsigned char tag;
     unsigned char version;               /*!< version number. */
     unsigned char time[4];               /*!< time that the key was created. */
@@ -3202,10 +3202,12 @@ struct pgpDigParams_s {
     unsigned char saved;
 };
 
+#ifndef HAVE_PGPDIGGETPARAMS
 struct pgpDig_s {
     struct pgpDigParams_s signature;
     struct pgpDigParams_s pubkey;
 };
+#endif
 
 static int
 pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
@@ -3217,6 +3219,7 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   pgpDig dig = 0;
   char keyid[16 + 1];
   char evrbuf[8 + 1 + 8 + 1];
+  struct pgpDigParams_s *digpubkey;
 
   pkts = unarmor(pubkey, &pktsl);
   if (!pkts)
@@ -3231,8 +3234,15 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   dig = pgpDigNew(RPMVSF_DEFAULT, 0);
 #endif
   (void) pgpPrtPkts(pkts, pktsl, dig, 0);
-  btime = dig->pubkey.time[0] << 24 | dig->pubkey.time[1] << 16 | dig->pubkey.time[2] << 8 | dig->pubkey.signid[3];
-  sprintf(evrbuf, "%02x%02x%02x%02x-%02x%02x%02x%02x", dig->pubkey.signid[4], dig->pubkey.signid[5], dig->pubkey.signid[6], dig->pubkey.signid[7], dig->pubkey.time[0], dig->pubkey.time[1], dig->pubkey.time[2], dig->pubkey.time[3]);
+
+#ifdef HAVE_PGPDIGGETPARAMS
+  digpubkey = pgpDigGetParams(dig, PGPTAG_PUBLIC_KEY);
+#else
+  digpubkey = &dig->pubkey;
+#endif
+  btime = digpubkey->time[0] << 24 | digpubkey->time[1] << 16 | digpubkey->time[2] << 8 | digpubkey->signid[3];
+  sprintf(evrbuf, "%02x%02x%02x%02x-%02x%02x%02x%02x", digpubkey->signid[4], digpubkey->signid[5], digpubkey->signid[6], digpubkey->signid[7], digpubkey->time[0], digpubkey->time[1], digpubkey->time[2], digpubkey->time[3]);
+
   repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, btime);
 
   s->name = pool_str2id(pool, "gpg-pubkey", 1);
