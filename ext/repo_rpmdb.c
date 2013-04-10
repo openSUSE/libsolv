@@ -3164,10 +3164,10 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   s->evr = pool_str2id(pool, evrbuf, 1);
   s->arch = 1;
   for (i = 0; i < 8; i++)
-    sprintf(keyid + 2 * i, "%02x", dig->pubkey.signid[i]);
+    sprintf(keyid + 2 * i, "%02x", digpubkey->signid[i]);
   repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_KEYID, keyid);
-  if (dig->pubkey.userid)
-    setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, dig->pubkey.userid);
+  if (digpubkey->userid)
+    setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, digpubkey->userid);
 #ifndef RPM5
   (void)pgpFreeDig(dig);
 #else
