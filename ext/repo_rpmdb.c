@@ -1492,7 +1492,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir ? rootdir : "");
   if (stat(dbpath, &packagesstat))
     {
-      return pool_error(pool, -1, "repo_add_rpmdb: %s: %s", dbpath, strerror(errno));
+      pool_error(pool, -1, "repo_add_rpmdb: %s: %s", dbpath, strerror(errno));
+      dbenv->close(dbenv, 0);
+      return -1;
     }
   mkrpmdbcookie(&packagesstat, newcookie);
   repodata_set_bin_checksum(data, SOLVID_META, REPOSITORY_RPMDBCOOKIE, REPOKEY_TYPE_SHA256, newcookie);
@@ -2379,6 +2381,7 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
   DBT dbdata;
   unsigned char *dp;
   int dl;
+  Id nameoff;
 
   char *namedata = 0;
   int namedatal = 0;
@@ -2425,16 +2428,20 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
 	continue;
       dl = dbdata.size;
       dp = dbdata.data;
-      while(dl >= RPM_INDEX_SIZE)
+      nameoff = namedatal;
+      if (namedatap)
 	{
-	  entries = solv_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
-	  entries[nentries].rpmdbid = db2rpmdbid(dp, byteswapped);
-	  entries[nentries].nameoff = namedatal;
-	  nentries++;
 	  namedata = solv_extend(namedata, namedatal, dbkey.size + 1, 1, NAMEDATA_BLOCK);
 	  memcpy(namedata + namedatal, dbkey.data, dbkey.size);
 	  namedata[namedatal + dbkey.size] = 0;
 	  namedatal += dbkey.size + 1;
+	}
+      while(dl >= RPM_INDEX_SIZE)
+	{
+	  entries = solv_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
+	  entries[nentries].rpmdbid = db2rpmdbid(dp, byteswapped);
+	  entries[nentries].nameoff = nameoff;
+	  nentries++;
 	  dp += RPM_INDEX_SIZE;
 	  dl -= RPM_INDEX_SIZE;
 	}
@@ -2444,8 +2451,47 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
   dbc->c_close(dbc);
   db->close(db, 0);
   *nentriesp = nentries;
-  *namedatap = namedata;
+  if (namedatap)
+    *namedatap = namedata;
   return entries;
+}
+
+static int
+openpkgdb(struct rpm_by_state *state, const char *rootdir)
+{
+  if (state->dbopened)
+    return state->dbopened > 0 ? 1 : 0;
+  state->dbopened = -1;
+  if (!state->dbenv && !(state->dbenv = opendbenv(rootdir)))
+    return 0;
+  if (db_create(&state->db, state->dbenv, 0))
+    {
+      perror("db_create");
+      state->db = 0;
+      state->dbenv->close(state->dbenv, 0);
+      state->dbenv = 0;
+      return 0;
+    }
+  if (state->db->open(state->db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
+    {
+      perror("db->open var/lib/rpm/Packages");
+      state->db->close(state->db, 0);
+      state->db = 0;
+      state->dbenv->close(state->dbenv, 0);
+      state->dbenv = 0;
+      return 0;
+    }
+  if (state->db->get_byteswapped(state->db, &state->byteswapped))
+    {
+      perror("db->get_byteswapped");
+      state->db->close(state->db, 0);
+      state->db = 0;
+      state->dbenv->close(state->dbenv, 0);
+      state->dbenv = 0;
+      return 0;
+    }
+  state->dbopened = 1;
+  return 1;
 }
 
 static void
@@ -2509,38 +2555,8 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
       state = solv_calloc(1, sizeof(*state));
       *statep = state;
     }
-  if (!state->dbopened)
-    {
-      state->dbopened = 1;
-      if (!state->dbenv && !(state->dbenv = opendbenv(rootdir)))
-	return 0;
-      if (db_create(&state->db, state->dbenv, 0))
-	{
-	  perror("db_create");
-	  state->db = 0;
-	  state->dbenv->close(state->dbenv, 0);
-	  state->dbenv = 0;
-	  return 0;
-	}
-      if (state->db->open(state->db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
-	{
-	  perror("db->open var/lib/rpm/Packages");
-	  state->db->close(state->db, 0);
-	  state->db = 0;
-	  state->dbenv->close(state->dbenv, 0);
-	  state->dbenv = 0;
-	  return 0;
-	}
-      if (state->db->get_byteswapped(state->db, &state->byteswapped))
-	{
-	  perror("db->get_byteswapped");
-	  state->db->close(state->db, 0);
-	  state->db = 0;
-	  state->dbenv->close(state->dbenv, 0);
-	  state->dbenv = 0;
-	  return 0;
-	}
-    }
+  if (!state->dbopened && !openpkgdb(state, rootdir))
+    return 0;
   rpmdbid2db(buf, rpmdbid, state->byteswapped);
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
