@@ -33,6 +33,8 @@ SOLV_1.0 {
 		rpm_installedrpmdbids;
 		rpm_iterate_filelist;
 		rpm_query;
+		rpm_state_create;
+		rpm_state_free;
 		solv_xfopen;
 		solv_xfopen_buf;
 		solv_xfopen_fd;

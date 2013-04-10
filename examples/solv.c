@@ -141,21 +141,22 @@ yum_substitute(Pool *pool, char *line)
 	{
 	  if (!releaseevr)
 	    {
+	      void *rpmstate;
 	      Queue q;
-	      const char *rootdir = pool_get_rootdir(pool);
 	
 	      queue_init(&q);
-	      rpm_installedrpmdbids(rootdir, "Providename", "redhat-release", &q);
+	      rpmstate = rpm_state_create(pool_get_rootdir(pool));
+	      rpm_installedrpmdbids(rpmstate, "Providename", "redhat-release", &q);
 	      if (q.count)
 		{
-		  void *handle, *state = 0;
+		  void *handle;
 		  char *p;
-		  handle = rpm_byrpmdbid(q.elements[0], rootdir, &state);
-		  releaseevr = rpm_query(handle, SOLVABLE_EVR);
-		  rpm_byrpmdbid(0, 0, &state);
-		  if ((p = strchr(releaseevr, '-')) != 0)
+		  handle = rpm_byrpmdbid(rpmstate, q.elements[0]);
+		  releaseevr = handle ? rpm_query(handle, SOLVABLE_EVR) : 0;
+		  if (releaseevr && (p = strchr(releaseevr, '-')) != 0)
 		    *p = 0;
 		}
+	      rpm_state_free(rpmstate);
 	      queue_free(&q);
 	      if (!releaseevr)
 		{
@@ -2063,7 +2064,7 @@ struct fcstate {
   FILE **newpkgsfps;
   Queue *checkq;
   int newpkgscnt;
-  void *rpmdbstate;
+  void *rpmstate;
 };
 
 static void *
@@ -2075,11 +2076,6 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
   int i;
   FILE *fp;
 
-  if (!p)
-    {
-      rpm_byrpmdbid(0, 0, &fcstate->rpmdbstate);
-      return 0;
-    }
   s = pool_id2solvable(pool, p);
   if (pool->installed && s->repo == pool->installed)
     {
@@ -2088,7 +2084,7 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
       rpmdbid = s->repo->rpmdbid[p - s->repo->start];
       if (!rpmdbid)
 	return 0;
-       return rpm_byrpmdbid(rpmdbid, 0, &fcstate->rpmdbstate);
+       return rpm_byrpmdbid(fcstate->rpmstate, rpmdbid);
     }
   for (i = 0; i < fcstate->newpkgscnt; i++)
     if (fcstate->checkq->elements[i] == p)
@@ -2099,7 +2095,7 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
   if (!fp)
     return 0;
   rewind(fp);
-  return rpm_byfp(fp, pool_solvable2str(pool, s), &fcstate->rpmdbstate);
+  return rpm_byfp(fcstate->rpmstate, fp, pool_solvable2str(pool, s));
 }
 
 
@@ -3175,11 +3171,12 @@ rerunsolver:
 
       printf("Searching for file conflicts\n");
       queue_init(&conflicts);
-      fcstate.rpmdbstate = 0;
+      fcstate.rpmstate = rpm_state_create(rootdir);
       fcstate.newpkgscnt = newpkgs;
       fcstate.checkq = &checkq;
       fcstate.newpkgsfps = newpkgsfps;
       pool_findfileconflicts(pool, &checkq, newpkgs, &conflicts, &fileconflict_cb, &fcstate);
+      fcstate.rpmstate = rpm_state_free(fcstate.rpmstate);
       if (conflicts.count)
 	{
 	  printf("\n");

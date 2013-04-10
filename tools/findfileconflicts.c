@@ -18,17 +18,12 @@ iterate_handle(Pool *pool, Id p, void *cbdata)
   Solvable *s = pool->solvables + p;
   Id rpmdbid;
   
-  if (!p)
-    {
-      rpm_byrpmdbid(0, 0, (void **)cbdata);
-      return 0;
-    }
   if (!s->repo->rpmdbid)
     return 0;
   rpmdbid = s->repo->rpmdbid[p - s->repo->start];
   if (!rpmdbid)
     return 0;
-  return rpm_byrpmdbid(rpmdbid, 0, (void **)cbdata);
+  return rpm_byrpmdbid(cbdata, rpmdbid);
 }
 
 int main(int argc, char **argv)
@@ -54,7 +49,9 @@ int main(int argc, char **argv)
   queue_init(&conflicts);
   FOR_REPO_SOLVABLES(installed, p, s)
     queue_push(&todo, p);
-  pool_findfileconflicts(pool, &todo, 0, &conflicts, &iterate_handle, (void *)&state);
+  state = rpm_state_create(0);
+  pool_findfileconflicts(pool, &todo, 0, &conflicts, &iterate_handle, state);
+  rpm_state_free(state);
   queue_free(&todo);
   for (i = 0; i < conflicts.count; i += 6)
     printf("%s: %s[%s] %s[%s]\n", pool_id2str(pool, conflicts.elements[i]), pool_solvid2str(pool, conflicts.elements[i + 1]), pool_id2str(pool, conflicts.elements[i + 2]), pool_solvid2str(pool, conflicts.elements[i + 4]), pool_id2str(pool, conflicts.elements[i + 5]));

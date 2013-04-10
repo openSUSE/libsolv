@@ -2357,6 +2357,7 @@ struct rpm_by_state {
   int rpmheadsize;
 
   int dbopened;
+  char *rootdir;
   DB_ENV *dbenv;
   DB *db;
   int byteswapped;
@@ -2389,8 +2390,11 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
   int nentries = 0;
 
   *nentriesp = 0;
-  *namedatap = 0;
+  if (namedatap)
+    *namedatap = 0;
 
+  if (!state->dbenv && !(state->dbenv = opendbenv(state->rootdir)))
+    return 0;
   dbenv = state->dbenv;
   if (db_create(&db, dbenv, 0))
     {
@@ -2500,6 +2504,8 @@ freestate(struct rpm_by_state *state)
   /* close down */
   if (!state)
     return;
+  if (state->rootdir)
+    solv_free(state->rootdir);
   if (state->db)
     state->db->close(state->db, 0);
   if (state->dbenv)
@@ -2507,55 +2513,52 @@ freestate(struct rpm_by_state *state)
   solv_free(state->rpmhead);
 }
 
-int
-rpm_installedrpmdbids(const char *rootdir, const char *index, const char *match, Queue *rpmdbidq)
+void *
+rpm_state_create(const char *rootdir)
 {
-  struct rpm_by_state state;
+  struct rpm_by_state *state;
+  state = solv_calloc(1, sizeof(*state));
+  if (rootdir)
+    state->rootdir = solv_strdup(rootdir);
+  return state;
+}
+
+void *
+rpm_state_free(void *state)
+{
+  freestate(state);
+  return solv_free(state);
+}
+
+int
+rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queue *rpmdbidq)
+{
+  struct rpm_by_state *state = rpmstate;
   struct rpmdbentry *entries;
   int nentries, i;
-  char *namedata;
 
   if (!index)
     index = "Name";
   if (rpmdbidq)
     queue_empty(rpmdbidq);
-  memset(&state, 0, sizeof(state));
-  if (!(state.dbenv = opendbenv(rootdir)))
-    return 0;
-  entries = getinstalledrpmdbids(&state, index, match, &nentries, &namedata);
+  entries = getinstalledrpmdbids(state, index, match, &nentries, 0);
   if (rpmdbidq)
     for (i = 0; i < nentries; i++)
       queue_push(rpmdbidq, entries[i].rpmdbid);
   solv_free(entries);
-  solv_free(namedata);
-  freestate(&state);
   return nentries;
 }
 
 void *
-rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
+rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
 {
-  struct rpm_by_state *state = *statep;
+  struct rpm_by_state *state = rpmstate;
   unsigned char buf[16];
   DBT dbkey;
   DBT dbdata;
   RpmHead *rpmhead;
 
-  if (!rpmdbid)
-    {
-      /* close down */
-      freestate(state);
-      solv_free(state);
-      *statep = (void *)0;
-      return 0;
-    }
-
-  if (!state)
-    {
-      state = solv_calloc(1, sizeof(*state));
-      *statep = state;
-    }
-  if (!state->dbopened && !openpkgdb(state, rootdir))
+  if (!state->dbopened && !openpkgdb(state, state->rootdir))
     return 0;
   rpmdbid2db(buf, rpmdbid, state->byteswapped);
   memset(&dbkey, 0, sizeof(dbkey));
@@ -2595,22 +2598,15 @@ rpm_byrpmdbid(Id rpmdbid, const char *rootdir, void **statep)
 }
 
 void *
-rpm_byfp(FILE *fp, const char *name, void **statep)
+rpm_byfp(void *rpmstate, FILE *fp, const char *name)
 {
-  struct rpm_by_state *state = *statep;
+  struct rpm_by_state *state = rpmstate;
   /* int headerstart, headerend; */
   RpmHead *rpmhead;
   unsigned int sigdsize, sigcnt, l;
   unsigned char lead[4096];
   int forcebinary = 0;
 
-  if (!fp)
-    return rpm_byrpmdbid(0, 0, statep);
-  if (!state)
-    {
-      state = solv_calloc(1, sizeof(*state));
-      *statep = state;
-    }
   if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
     {
       fprintf(stderr, "%s: not a rpm\n", name);
@@ -2690,9 +2686,9 @@ rpm_byfp(FILE *fp, const char *name, void **statep)
 #ifdef ENABLE_RPMDB_BYRPMHEADER
 
 void *
-rpm_byrpmh(Header h, void **statep)
+rpm_byrpmh(void *rpmstate, Header h)
 {
-  struct rpm_by_state *state = *statep;
+  struct rpm_by_state *state = rpmstate;
   const unsigned char *uh;
   unsigned int sigdsize, sigcnt, l;
   RpmHead *rpmhead;
@@ -2707,11 +2703,6 @@ rpm_byrpmh(Header h, void **statep)
   sigcnt = getu32(uh);
   sigdsize = getu32(uh + 4);
   l = sigdsize + sigcnt * 16;
-  if (!state)
-    {
-      state = solv_calloc(1, sizeof(*state));
-      *statep = state;
-    }
   if (l > state->rpmheadsize)
     {
       state->rpmheadsize = l + 128;
@@ -3268,7 +3259,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
   struct rpm_by_state state;
   struct rpmdbentry *entries;
   int nentries, i;
-  char *namedata, *str;
+  char *str;
   unsigned int u32;
   Repodata *data;
   Solvable *s;
@@ -3281,11 +3272,10 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
   memset(&state, 0, sizeof(state));
   if (!(state.dbenv = opendbenv(rootdir)))
     return 0;
-  entries = getinstalledrpmdbids(&state, "Name", "gpg-pubkey", &nentries, &namedata);
+  entries = getinstalledrpmdbids(&state, "Name", "gpg-pubkey", &nentries, 0);
   for (i = 0 ; i < nentries; i++)
     {
-      void *statep = &state;
-      RpmHead *rpmhead = rpm_byrpmdbid(entries[i].rpmdbid, rootdir, &statep);
+      RpmHead *rpmhead = rpm_byrpmdbid(&state, entries[i].rpmdbid);
       if (!rpmhead)
 	continue;
       str = headstring(rpmhead, TAG_DESCRIPTION);
@@ -3301,7 +3291,6 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
       repo->rpmdbid[s - pool->solvables - repo->start] = entries[i].rpmdbid;
     }
   solv_free(entries);
-  solv_free(namedata);
   freestate(&state);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
