@@ -32,6 +32,9 @@ struct cbdata {
 
   Map idxmap;
 
+  unsigned int lastdiridx;	/* last diridx we have seen */
+  unsigned int lastdirhash;	/* strhash of last dir we have seen */
+
   Id idx;	/* index of package we're looking at */
   Id hx;	/* used in findfileconflicts2_cb, limit to files matching hx */
 
@@ -75,7 +78,7 @@ growhash(Hashtable map, Hashval *mapnp)
 }
 
 static void
-finddirs_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
+finddirs_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
 {
   struct cbdata *cbdata = cbdatav;
   Hashval h, hh;
@@ -141,27 +144,32 @@ isindirmap(struct cbdata *cbdata, Id hx)
 }
 
 static void
-findfileconflicts_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
+findfileconflicts_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
 {
   struct cbdata *cbdata = cbdatav;
-  int isdir = S_ISDIR(fmode);
-  char *dp;
+  int isdir = S_ISDIR(info->mode);
+  const char *dp;
   Id idx, oidx;
   Id hx, qx;
   Hashval h, hh, dhx;
 
   idx = cbdata->idx;
 
-  dp = strrchr(fn, '/');
-  if (!dp)
+  if (!info->dirlen)
     return;
-  dhx = strnhash(fn, dp + 1 - fn);
+  dp = fn + info->dirlen;
+  if (info->diridx != cbdata->lastdiridx)
+    {
+      cbdata->lastdiridx = info->diridx;
+      cbdata->lastdirhash = strnhash(fn, dp - fn);
+    }
+  dhx = cbdata->lastdirhash;
 #if 1
   /* this mirrors the "if (!hx) hx = strlen(fn) + 1" in finddirs_cb */
-  if (!isindirmap(cbdata, dhx ? dhx : dp + 1 - fn + 1))
+  if (!isindirmap(cbdata, dhx ? dhx : dp - fn + 1))
     return;
 #endif
-  hx = strhash_cont(dp + 1, dhx);
+  hx = strhash_cont(dp, dhx);
   if (!hx)
     hx = strlen(fn) + 1;
 
@@ -221,19 +229,30 @@ addfilesspace(struct cbdata *cbdata, unsigned char *data, int len)
 }
 
 static void
-findfileconflicts2_cb(void *cbdatav, const char *fn, int fmode, const char *md5)
+findfileconflicts2_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
 {
   struct cbdata *cbdata = cbdatav;
-  Hashval hx = strhash(fn);
+  Hashval hx;
+  const char *dp;
   char md5padded[34];
 
+  if (!info->dirlen)
+    return;
+  dp = fn + info->dirlen;
+  if (info->diridx != cbdata->lastdiridx)
+    {
+      cbdata->lastdiridx = info->diridx;
+      cbdata->lastdirhash = strnhash(fn, dp - fn);
+    }
+  hx = cbdata->lastdirhash;
+  hx = strhash_cont(dp, hx);
   if (!hx)
     hx = strlen(fn) + 1;
   if ((Id)hx != cbdata->hx)
     return;
-  strncpy(md5padded, md5, 32);
+  strncpy(md5padded, info->digest, 32);
   md5padded[32] = 0;
-  md5padded[33] = fmode >> 24;
+  md5padded[33] = info->color;
   /* printf("%d, hx %x -> %s   %d %s\n", cbdata->idx, hx, fn, fmode, md5); */
   queue_push(&cbdata->files, cbdata->filesspacen);
   addfilesspace(cbdata, (unsigned char *)md5padded, 34);
@@ -341,8 +360,10 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       if (i == cutoff)
 	cbdata.create = 0;
       handle = (*handle_cb)(pool, p, handle_cbdata);
-      if (handle)
-        rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_NOGHOSTS, findfileconflicts_cb, &cbdata);
+      if (!handle)
+	continue;
+      cbdata.lastdiridx = -1;
+      rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_NOGHOSTS, findfileconflicts_cb, &cbdata);
     }
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "filemap size: %d, used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
@@ -398,6 +419,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       handle = (*handle_cb)(pool, p, handle_cbdata);
       if (!handle)
 	continue;
+      cbdata.lastdiridx = -1;
       rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
 
       pend = cbdata.files.count;
@@ -411,6 +433,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
 	  handle = (*handle_cb)(pool, q, handle_cbdata);
 	  if (!handle)
 	    continue;
+	  cbdata.lastdiridx = -1;
 	  rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
           for (ii = 0; ii < pend; ii++)
 	    for (jj = pend; jj < cbdata.files.count; jj++)

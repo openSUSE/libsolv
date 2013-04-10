@@ -2056,14 +2056,11 @@ linkhash(const char *lt, char *hash)
   l = strlen(lt);
   while ((c = *str++) != 0)
     r += (r << 3) + c;
-  sprintf(hash, "%08x", r);
-  sprintf(hash + 8, "%08x", l);
-  sprintf(hash + 16, "%08x", 0);
-  sprintf(hash + 24, "%08x", 0);
+  sprintf(hash, "%08x%08x%08x%08x", r, l, 0, 0);
 }
 
 void
-rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, int, const char *), void *cbdata)
+rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, struct filelistinfo *), void *cbdata)
 {
   RpmHead *rpmhead = rpmhandle;
   char **bn;
@@ -2080,7 +2077,8 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   int i, l1, l;
   char *space = 0;
   int spacen = 0;
-  char md5[33], *md5p = 0;
+  char md5[33];
+  struct filelistinfo info;
 
   dn = headstringarray(rpmhead, TAG_DIRNAMES, &dcnt);
   if (!dn)
@@ -2088,7 +2086,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   if ((flags & RPM_ITERATE_FILELIST_ONLYDIRS) != 0)
     {
       for (i = 0; i < dcnt; i++)
-	(*cb)(cbdata, dn[i], 0, (char *)0);
+	(*cb)(cbdata, dn[i], 0);
       solv_free(dn);
       return;
     }
@@ -2159,6 +2157,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
     }
   lastdir = dcnt;
   lastdirl = 0;
+  memset(&info, 0, sizeof(info));
   for (i = 0; i < cnt; i++)
     {
       if (ff && (ff[i] & FILEFLAG_GHOST) != 0)
@@ -2167,8 +2166,6 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
       if (diidx >= dcnt)
 	continue;
       l1 = lastdir == diidx ? lastdirl : strlen(dn[diidx]);
-      if (l1 == 0)
-	continue;
       l = l1 + strlen(bn[i]) + 1;
       if (l > spacen)
 	{
@@ -2182,12 +2179,16 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	  lastdirl = l1;
 	}
       strcpy(space + l1, bn[i]);
+      info.diridx = diidx;
+      info.dirlen = l1;
+      if (fm)
+        info.mode = fm[i];
       if (md)
 	{
-	  md5p = md[i];
-	  if (S_ISLNK(fm[i]))
+	  info.digest = md[i];
+	  if (fm && S_ISLNK(fm[i]))
 	    {
-	      md5p = 0;
+	      info.digest = 0;
 	      if (!lt)
 		{
 		  lt = headstringarray(rpmhead, TAG_FILELINKTOS, &cnt2);
@@ -2197,16 +2198,18 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	      if (lt)
 		{
 		  linkhash(lt[i], md5);
-		  md5p = md5;
+		  info.digest = md5;
 		}
 	    }
-	  if (!md5p)
+	  if (!info.digest)
 	    {
 	      sprintf(md5, "%08x%08x%08x%08x", (fm[i] >> 12) & 65535, 0, 0, 0);
-	      md5p = md5;
+	      info.digest = md5;
 	    }
 	}
-      (*cb)(cbdata, space, co ? (fm[i] | co[i] << 24) : fm[i], md5p);
+      if (co)
+	info.color = co[i];
+      (*cb)(cbdata, space, &info);
     }
   solv_free(space);
   solv_free(lt);

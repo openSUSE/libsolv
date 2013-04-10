@@ -44,6 +44,15 @@ extern void *rpm_byfp(void *rpmstate, FILE *fp, const char *name);
 extern void *rpm_byrpmh(void *rpmstate, struct headerToken_s *h);
 
 /* operations on a rpm header handle */
+
+struct filelistinfo {
+  unsigned int dirlen;
+  unsigned int diridx;
+  const char *digest;
+  unsigned int mode;
+  unsigned int color;
+};
+
 extern char *rpm_query(void *rpmhandle, Id what);
-extern void rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, int, const char *), void *cbdata);
+extern void rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, struct filelistinfo *), void *cbdata);
 extern Id   repo_add_rpm_handle(Repo *repo, void *rpmhandle, int flags);
