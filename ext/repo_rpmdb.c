@@ -555,36 +555,10 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 }
 
 
-#ifdef USE_FILEFILTER
-
-#define FILEFILTER_EXACT    0
-#define FILEFILTER_STARTS   1
-#define FILEFILTER_CONTAINS 2
-
-struct filefilter {
-  int dirmatch;
-  char *dir;
-  char *base;
-};
-
-static struct filefilter filefilters[] = {
-  { FILEFILTER_CONTAINS, "/bin/", 0},
-  { FILEFILTER_CONTAINS, "/sbin/", 0},
-  { FILEFILTER_CONTAINS, "/lib/", 0},
-  { FILEFILTER_CONTAINS, "/lib64/", 0},
-  { FILEFILTER_CONTAINS, "/etc/", 0},
-  { FILEFILTER_STARTS, "/usr/games/", 0},
-  { FILEFILTER_EXACT, "/usr/share/dict/", "words"},
-  { FILEFILTER_STARTS, "/usr/share/", "magic.mime"},
-  { FILEFILTER_STARTS, "/opt/gnome/games/", 0},
-};
-
-#endif
-
 static void
-adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dc)
+adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dc)
 {
-  Id handle, did;
+  Id did;
   int i, fszc;
   unsigned int *fkb, *fn, *fsz, *fm, *fino;
   unsigned int inotest[256], inotestok;
@@ -694,13 +668,13 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
   solv_free(fsz);
   solv_free(fm);
   /* commit */
-  handle = s - pool->solvables;
   for (i = 0; i < dc; i++)
     {
       if (!fn[i])
 	continue;
       if (!*dn[i])
 	{
+	  Solvable *s = data->repo->pool->solvables + handle;
           if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	    did = repodata_str2dir(data, "/usr/src", 1);
 	  else
@@ -714,9 +688,8 @@ adddudata(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead,
   solv_free(fkb);
 }
 
-/* assumes last processed array is provides! */
-static unsigned int
-addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, unsigned int olddeps)
+static void
+addfilelist(Repodata *data, Id handle, RpmHead *rpmhead)
 {
   char **bn;
   char **dn;
@@ -725,116 +698,55 @@ addfileprovides(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rp
   int i;
   Id lastdid = 0;
   int lastdii = -1;
-#ifdef USE_FILEFILTER
-  int j;
-  struct filefilter *ff;
-#endif
-#if 0
-  char *fn = 0;
-  int fna = 0;
-#endif
 
   if (!data)
-    return olddeps;
+    return;
   bn = headstringarray(rpmhead, TAG_BASENAMES, &bnc);
   if (!bn)
-    return olddeps;
+    return;
   dn = headstringarray(rpmhead, TAG_DIRNAMES, &dnc);
   if (!dn)
     {
       solv_free(bn);
-      return olddeps;
+      return;
     }
   di = headint32array(rpmhead, TAG_DIRINDEXES, &dic);
   if (!di)
     {
       solv_free(bn);
       solv_free(dn);
-      return olddeps;
+      return;
     }
   if (bnc != dic)
     {
       fprintf(stderr, "bad filelist\n");
-      return olddeps;
+      return;
     }
 
-  if (data)
-    adddudata(pool, repo, data, s, rpmhead, dn, di, bnc, dnc);
+  adddudata(data, handle, rpmhead, dn, di, bnc, dnc);
 
   for (i = 0; i < bnc; i++)
     {
-#ifdef USE_FILEFILTER
-      ff = filefilters;
-      for (j = 0; j < sizeof(filefilters)/sizeof(*filefilters); j++, ff++)
-	{
-	  if (ff->dir)
-	    {
-	      switch (ff->dirmatch)
-		{
-		case FILEFILTER_STARTS:
-		  if (strncmp(dn[di[i]], ff->dir, strlen(ff->dir)))
-		    continue;
-		  break;
-		case FILEFILTER_CONTAINS:
-		  if (!strstr(dn[di[i]], ff->dir))
-		    continue;
-		  break;
-		case FILEFILTER_EXACT:
-		default:
-		  if (strcmp(dn[di[i]], ff->dir))
-		    continue;
-		  break;
-		}
-	    }
-	  if (ff->base)
-	    {
-	      if (strcmp(bn[i], ff->base))
-		continue;
-	    }
-	  break;
-	}
-      if (j == sizeof(filefilters)/sizeof(*filefilters))
-	continue;
-#endif
-#if 0
-      j = strlen(bn[i]) + strlen(dn[di[i]]) + 1;
-      if (j > fna)
-	{
-	  fna = j + 256;
-	  fn = solv_realloc(fn, fna);
-	}
-      strcpy(fn, dn[di[i]]);
-      strcat(fn, bn[i]);
-      olddeps = repo_addid_dep(repo, olddeps, pool_str2id(pool, fn, 1), SOLVABLE_FILEMARKER);
-#endif
-      if (data)
-	{
-	  Id did;
-	  char *b = bn[i];
+      Id did;
+      char *b = bn[i];
 
-	  if (di[i] == lastdii)
-	    did = lastdid;
-	  else
-	    {
-	      did = repodata_str2dir(data, dn[di[i]], 1);
-	      if (!did)
-	        did = repodata_str2dir(data, "/", 1);
-	      lastdid = did;
-	      lastdii = di[i];
-	    }
-	  if (b && *b == '/')	/* work around rpm bug */
-	    b++;
-	  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, did, b);
+      if (di[i] == lastdii)
+	did = lastdid;
+      else
+	{
+	  did = repodata_str2dir(data, dn[di[i]], 1);
+	  if (!did)
+	    did = repodata_str2dir(data, "/", 1);
+	  lastdid = did;
+	  lastdii = di[i];
 	}
+      if (b && *b == '/')	/* work around rpm bug */
+	b++;
+      repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, b);
     }
-#if 0
-  if (fn)
-    solv_free(fn);
-#endif
   solv_free(bn);
   solv_free(dn);
   solv_free(di);
-  return olddeps;
 }
 
 static void
@@ -910,8 +822,6 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   s->vendor = pool_str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
-  if ((flags & RPM_ADD_NO_FILELIST) == 0)
-    s->provides = addfileprovides(pool, repo, data, s, rpmhead, s->provides);
   if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, (flags & RPM_ADD_NO_RPMLIBREQS) ? MAKEDEPS_NO_RPMLIB : 0);
@@ -1048,6 +958,8 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
 	      lastid = id;
 	    }
 	}
+      if ((flags & RPM_ADD_NO_FILELIST) == 0)
+	addfilelist(data, handle, rpmhead);
       if ((flags & RPM_ADD_WITH_CHANGELOG) != 0)
 	addchangelog(data, handle, rpmhead);
     }
