@@ -10,6 +10,8 @@
 
 #include "pool.h"
 
-extern int pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, void *(*handle_cb)(Pool *, Id, void *) , void *handle_cbdata);
+extern int pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, int flags, void *(*handle_cb)(Pool *, Id, void *) , void *handle_cbdata);
+
+#define FINDFILECONFLICTS_USESOLVABLEFILELIST	(1 << 0)
 
 #endif

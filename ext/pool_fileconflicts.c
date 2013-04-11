@@ -260,7 +260,7 @@ findfileconflicts2_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
 }
 
 static int
-lookat_cmp(const void *ap, const void *bp, void *dp)
+lookat_hx_cmp(const void *ap, const void *bp, void *dp)
 {
   const Id *a = ap;
   const Id *b = bp;
@@ -286,13 +286,79 @@ conflicts_cmp(const void *ap, const void *bp, void *dp)
   return 0;
 }
 
+static void
+iterate_solvable_dirs(Pool *pool, Id p, void (*cb)(void *, const char *, struct filelistinfo *), void *cbdata)
+{
+  Repodata *lastdata = 0;
+  Id lastdirid = -1;
+  Dataiterator di;
+
+  dataiterator_init(&di, pool, 0, p, SOLVABLE_FILELIST, 0, SEARCH_COMPLETE_FILELIST);
+  while (dataiterator_step(&di))
+    {
+      if (di.data == lastdata && di.kv.id == lastdirid)
+	continue;
+      lastdata = di.data;
+      lastdirid = di.kv.id;
+      cb(cbdata, repodata_dir2str(di.data, di.kv.id, ""), 0);
+    }
+  dataiterator_free(&di);
+}
+
+#if 0
+static void
+iterate_solvable_files(Pool *pool, Id p, void (*cb)(void *, const char *, struct filelistinfo *), void *cbdata)
+{
+  Dataiterator di;
+  char *space = 0;
+  int spacen = 0;
+  Repodata *lastdata = 0;
+  Id lastdirid = -1;
+  int dirl = 0, l;
+  struct filelistinfo info;
+  const char *tmpdir = 0;
+  unsigned int diridx;
+
+  dataiterator_init(&di, pool, 0, p, SOLVABLE_FILELIST, 0, SEARCH_COMPLETE_FILELIST);
+  memset(&info, 0, sizeof(info));
+  while (dataiterator_step(&di))
+    {
+      if (di.data != lastdata || di.kv.id != lastdirid)
+	{
+	  lastdata = di.data;
+	  lastdirid = di.kv.id;
+	  tmpdir = repodata_dir2str(di.data, di.kv.id, "");
+	  dirl = strlen(tmpdir);
+	  info.diridx++;
+	  info.dirlen = dirl;
+	}
+      l = dirl + strlen(di.kv.str) + 1;
+      if (l > spacen)
+	{
+	  spacen = l + 16;
+	  space = solv_realloc(space, spacen);
+	}
+      if (tmpdir)
+	{
+	  strcpy(space, tmpdir);
+	  tmpdir = 0;
+	}
+      strcpy(space + dirl, di.kv.str);
+      cb(cbdata, space, &info);
+    }
+  dataiterator_free(&di);
+  solv_free(space);
+}
+#endif
+
 int
-pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, void *(*handle_cb)(Pool *, Id, void *) , void *handle_cbdata)
+pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, int flags, void *(*handle_cb)(Pool *, Id, void *) , void *handle_cbdata)
 {
   int i, j, cflmapn, idxmapset;
   struct cbdata cbdata;
   unsigned int now, start;
   void *handle;
+  Repo *installed = pool->installed;
   Id p;
   int obsoleteusescolors = pool_get_flag(pool, POOL_FLAG_OBSOLETEUSESCOLORS);
 
@@ -331,9 +397,20 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       cbdata.idx = i;
       if (i == cutoff)
 	cbdata.create = 0;
+      if ((flags & FINDFILECONFLICTS_USESOLVABLEFILELIST) != 0 && installed)
+	{
+	  if (p >= installed->start && p < installed->end && pool->solvables[p].repo == installed)
+	    {
+	      iterate_solvable_dirs(pool, p, finddirs_cb, &cbdata);
+	      if (MAPTST(&cbdata.idxmap, i))
+		idxmapset++;
+	      continue;
+	    }
+	}
       handle = (*handle_cb)(pool, p, handle_cbdata);
-      if (handle)
-        rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_ONLYDIRS, finddirs_cb, &cbdata);
+      if (!handle)
+	continue;
+      rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_ONLYDIRS, finddirs_cb, &cbdata);
       if (MAPTST(&cbdata.idxmap, i))
         idxmapset++;
     }
@@ -359,6 +436,8 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       cbdata.idx = i;
       if (i == cutoff)
 	cbdata.create = 0;
+      /* can't use FINDFILECONFLICTS_USESOLVABLEFILELIST because we have to know if
+       * the file is a directory or not */
       handle = (*handle_cb)(pool, p, handle_cbdata);
       if (!handle)
 	continue;
@@ -383,7 +462,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
   queue_free(&cbdata.lookat_dir);
 
   /* sort and unify */
-  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &lookat_cmp, pool);
+  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &lookat_hx_cmp, pool);
   for (i = j = 0; i < cbdata.lookat.count; i += 2)
     {
       Id hx = cbdata.lookat.elements[i];
@@ -407,13 +486,13 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       iterflags = RPM_ITERATE_FILELIST_WITHMD5 | RPM_ITERATE_FILELIST_NOGHOSTS;
       if (obsoleteusescolors)
 	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
-      p = pkgs->elements[pidx];
       if (cbdata.lookat.elements[i + 2] != hx)
 	continue;	/* no package left */
       queue_empty(&cbdata.files);
       cbdata.filesspace = solv_free(cbdata.filesspace);
       cbdata.filesspacen = 0;
 
+      p = pkgs->elements[pidx];
       cbdata.idx = p;
       cbdata.hx = cbdata.lookat.elements[i];
       handle = (*handle_cb)(pool, p, handle_cbdata);
@@ -425,10 +504,10 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, vo
       pend = cbdata.files.count;
       for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j += 2)
 	{
-	  Id qidx = cbdata.lookat.elements[j + 1];
-	  Id q = pkgs->elements[qidx];
+	  Id q, qidx = cbdata.lookat.elements[j + 1];
 	  if (pidx >= cutoff && qidx >= cutoff)
 	    continue;	/* no conflicts between packages with idx >= cutoff */
+	  q = pkgs->elements[qidx];
 	  cbdata.idx = q;
 	  handle = (*handle_cb)(pool, q, handle_cbdata);
 	  if (!handle)

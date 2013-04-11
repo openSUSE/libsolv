@@ -50,7 +50,7 @@ int main(int argc, char **argv)
   FOR_REPO_SOLVABLES(installed, p, s)
     queue_push(&todo, p);
   state = rpm_state_create(0);
-  pool_findfileconflicts(pool, &todo, 0, &conflicts, &iterate_handle, state);
+  pool_findfileconflicts(pool, &todo, 0, &conflicts, FINDFILECONFLICTS_USESOLVABLEFILELIST, &iterate_handle, state);
   rpm_state_free(state);
   queue_free(&todo);
   for (i = 0; i < conflicts.count; i += 6)
