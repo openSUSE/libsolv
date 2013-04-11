@@ -260,10 +260,21 @@ findfileconflicts2_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
 }
 
 static int
+lookat_idx_cmp(const void *ap, const void *bp, void *dp)
+{
+  const Id *a = ap, *b = bp;
+  unsigned int ahx, bhx;
+  if (a[1] - b[1] != 0)
+    return a[1] - b[1];
+  ahx = (unsigned int)a[0];	/* a[0] can be < 0 */
+  bhx = (unsigned int)b[0];
+  return ahx < bhx ? -1 : ahx > bhx ? 1 : 0;
+}
+
+static int
 lookat_hx_cmp(const void *ap, const void *bp, void *dp)
 {
-  const Id *a = ap;
-  const Id *b = bp;
+  const Id *a = ap, *b = bp;
   unsigned int ahx = (unsigned int)a[0];	/* a[0] can be < 0 */
   unsigned int bhx = (unsigned int)b[0];
   return ahx < bhx ? -1 : ahx > bhx ? 1 : a[1] - b[1];
@@ -374,7 +385,6 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   cbdata.pool = pool;
   queue_init(&cbdata.lookat);
   queue_init(&cbdata.lookat_dir);
-  queue_init(&cbdata.files);
   map_init(&cbdata.idxmap, pkgs->count);
 
   if (cutoff <= 0)
@@ -462,7 +472,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   queue_free(&cbdata.lookat_dir);
 
   /* sort and unify */
-  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &lookat_hx_cmp, pool);
+  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &lookat_idx_cmp, pool);
   for (i = j = 0; i < cbdata.lookat.count; i += 2)
     {
       Id hx = cbdata.lookat.elements[i];
@@ -475,47 +485,54 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   queue_truncate(&cbdata.lookat, j);
   POOL_DEBUG(SOLV_DEBUG_STATS, "candidates: %d\n", cbdata.lookat.count / 2);
 
-  /* third pass: scan candidates */
-  for (i = 0; i < cbdata.lookat.count - 2; i += 2)
+  /* third pass: collect file info for all files that match a hx */
+  queue_init(&cbdata.files);
+  for (i = 0; i < cbdata.lookat.count; i += 2)
     {
-      int pend, ii, jj;
-      int iterflags;
-      Id hx = cbdata.lookat.elements[i];
-      Id pidx = cbdata.lookat.elements[i + 1];
-
-      iterflags = RPM_ITERATE_FILELIST_WITHMD5 | RPM_ITERATE_FILELIST_NOGHOSTS;
+      Id idx = cbdata.lookat.elements[i + 1];
+      int iterflags = RPM_ITERATE_FILELIST_WITHMD5 | RPM_ITERATE_FILELIST_NOGHOSTS;
       if (obsoleteusescolors)
 	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
-      if (cbdata.lookat.elements[i + 2] != hx)
-	continue;	/* no package left */
-      queue_empty(&cbdata.files);
-      cbdata.filesspace = solv_free(cbdata.filesspace);
-      cbdata.filesspacen = 0;
-
-      p = pkgs->elements[pidx];
-      cbdata.idx = p;
-      cbdata.hx = cbdata.lookat.elements[i];
+      p = pkgs->elements[idx];
       handle = (*handle_cb)(pool, p, handle_cbdata);
       if (!handle)
 	continue;
-      cbdata.lastdiridx = -1;
-      rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
-
-      pend = cbdata.files.count;
-      for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j += 2)
+      for (;; i += 2)
 	{
-	  Id q, qidx = cbdata.lookat.elements[j + 1];
-	  if (pidx >= cutoff && qidx >= cutoff)
-	    continue;	/* no conflicts between packages with idx >= cutoff */
-	  q = pkgs->elements[qidx];
-	  cbdata.idx = q;
-	  handle = (*handle_cb)(pool, q, handle_cbdata);
-	  if (!handle)
-	    continue;
+	  int start = cbdata.files.count;
+	  queue_push(&cbdata.files, idx);
+	  queue_push(&cbdata.files, 0);
+	  cbdata.idx = idx;
+	  cbdata.hx = cbdata.lookat.elements[i];
 	  cbdata.lastdiridx = -1;
 	  rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
-          for (ii = 0; ii < pend; ii++)
-	    for (jj = pend; jj < cbdata.files.count; jj++)
+	  cbdata.files.elements[start + 1] = cbdata.files.count;
+	  cbdata.lookat.elements[i + 1] = start;
+	  if (i + 2 >= cbdata.lookat.count || cbdata.lookat.elements[i + 3] != idx)
+	    break;
+	}
+    }
+
+  /* forth pass: for each hx we have, compare all matching files against all other matching files */
+  solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 2, sizeof(Id) * 2, &lookat_hx_cmp, pool);
+  for (i = 0; i < cbdata.lookat.count - 2; i += 2)
+    {
+      Id hx = cbdata.lookat.elements[i];
+      Id pstart = cbdata.lookat.elements[i + 1];
+      Id pidx = cbdata.files.elements[pstart];
+      Id pend = cbdata.files.elements[pstart + 1];
+      if (cbdata.lookat.elements[i + 2] != hx)
+	continue;	/* no package left */
+      for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j += 2)
+	{
+	  Id qstart = cbdata.lookat.elements[j + 1];
+	  Id qidx = cbdata.files.elements[qstart];
+	  Id qend = cbdata.files.elements[qstart + 1];
+	  int ii, jj;
+	  if (pidx >= cutoff && qidx >= cutoff)
+	    continue;	/* no conflicts between packages with idx >= cutoff */
+          for (ii = pstart + 2; ii < pend; ii++)
+	    for (jj = qstart + 2; jj < qend; jj++)
 	      {
 		char *fsi = (char *)cbdata.filesspace + cbdata.files.elements[ii];
 		char *fsj = (char *)cbdata.filesspace + cbdata.files.elements[jj];
@@ -526,20 +543,20 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 		if (obsoleteusescolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
 		  continue;	/* colors do not conflict */
 		queue_push(conflicts, pool_str2id(pool, fsi + 34, 1));
-		queue_push(conflicts, p);
+		queue_push(conflicts, pkgs->elements[pidx]);
 		queue_push(conflicts, pool_str2id(pool, fsi, 1));
 		queue_push(conflicts, pool_str2id(pool, fsj + 34, 1));
-		queue_push(conflicts, q);
+		queue_push(conflicts, pkgs->elements[qidx]);
 		queue_push(conflicts, pool_str2id(pool, fsj, 1));
 	      }
-	  queue_truncate(&cbdata.files, pend);
 	}
     }
+  POOL_DEBUG(SOLV_DEBUG_STATS, "filespace size: %d K\n", cbdata.filesspacen / 1024);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "candidate check took %d ms\n", solv_timems(now));
   cbdata.filesspace = solv_free(cbdata.filesspace);
   cbdata.filesspacen = 0;
   queue_free(&cbdata.lookat);
   queue_free(&cbdata.files);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "candidate check took %d ms\n", solv_timems(now));
   if (conflicts->count > 6)
     solv_sort(conflicts->elements, conflicts->count / 6, 6 * sizeof(Id), conflicts_cmp, pool);
   POOL_DEBUG(SOLV_DEBUG_STATS, "found %d file conflicts\n", conflicts->count / 6);
