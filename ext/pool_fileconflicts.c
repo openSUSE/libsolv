@@ -495,19 +495,18 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
       p = pkgs->elements[idx];
       handle = (*handle_cb)(pool, p, handle_cbdata);
-      if (!handle)
-	continue;
       for (;; i += 2)
 	{
-	  int start = cbdata.files.count;
+	  int fstart = cbdata.files.count;
 	  queue_push(&cbdata.files, idx);
 	  queue_push(&cbdata.files, 0);
 	  cbdata.idx = idx;
 	  cbdata.hx = cbdata.lookat.elements[i];
 	  cbdata.lastdiridx = -1;
-	  rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
-	  cbdata.files.elements[start + 1] = cbdata.files.count;
-	  cbdata.lookat.elements[i + 1] = start;
+	  if (handle)
+	    rpm_iterate_filelist(handle, iterflags, findfileconflicts2_cb, &cbdata);
+	  cbdata.files.elements[fstart + 1] = cbdata.files.count;
+	  cbdata.lookat.elements[i + 1] = fstart;
 	  if (i + 2 >= cbdata.lookat.count || cbdata.lookat.elements[i + 3] != idx)
 	    break;
 	}
@@ -522,7 +521,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
       Id pidx = cbdata.files.elements[pstart];
       Id pend = cbdata.files.elements[pstart + 1];
       if (cbdata.lookat.elements[i + 2] != hx)
-	continue;	/* no package left */
+	continue;	/* no package left with that hx */
       for (j = i + 2; j < cbdata.lookat.count && cbdata.lookat.elements[j] == hx; j += 2)
 	{
 	  Id qstart = cbdata.lookat.elements[j + 1];
