@@ -362,8 +362,8 @@ unifywithstat(struct cbdata *cbdata, Id diroff, int dirl)
       if (qx == hx)
 	{
 	  Id off = cbdata->statmap[2 * h + 1];
-	  const char *dp = (const char *)cbdata->filesspace + cbdata->norq.elements[off];
-	  if (!memcmp(dp, (const char *)statdata, 16))
+	  char *dp = (char *)cbdata->filesspace + cbdata->norq.elements[off];
+	  if (!memcmp(dp, statdata, 16))
 	    return cbdata->norq.elements[off + 1];
 	}
       h = HASHCHAIN_NEXT(h, hh, cbdata->statmapn);
@@ -404,31 +404,38 @@ unifywithcanon(struct cbdata *cbdata, Id diroff, int dirl)
     if (cbdata->filesspace[diroff + i] == '/')
       break;
   i++;				/* include trailing / */
+
+  /* normalize dirname */
   dirnameid = normalizedir(cbdata, (char *)cbdata->filesspace + diroff, i, strnhash((char *)cbdata->filesspace + diroff, i), 1);
   if (dirnameid == -1)
-    return diroff;		/* some cyclic link */
+    return diroff;		/* hit "in progress" marker, some cyclic link */
+
+  /* sanity check result */
   if (cbdata->filesspace[dirnameid] != '/')
     return diroff;		/* hmm */
   l = strlen((char *)cbdata->filesspace + dirnameid);
   if (l && cbdata->filesspace[dirnameid + l - 1] != '/')
-    return diroff;
-  /* special handling for '.', '..', '' */
+    return diroff;		/* hmm */
+
+  /* special handling for "." and ".." basename */
   if (cbdata->filesspace[diroff + i] == '.')
     {
       if (dirl - i == 1)
 	return dirnameid;
       if (dirl - i == 2 && cbdata->filesspace[diroff + i + 1] == '.')
 	{
-	  dirl = strlen((char *)cbdata->filesspace + dirnameid);
-	  if (dirl <= 2)
-	    return dirnameid;
-	  for (i = dirl - 2; i > 0; i--)
-	    if (cbdata->filesspace[diroff + i] == '/')
+	  if (l <= 2)
+	    return dirnameid;	/* we hit our root */
+	  for (i = l - 2; i > 0; i--)
+	    if (cbdata->filesspace[dirnameid + i] == '/')
 	      break;
-	  dirnameid = normalizedir(cbdata, (char *)cbdata->filesspace + dirnameid, i + 1, strnhash((char *)cbdata->filesspace + dirnameid, i + 1), 1);
+	  i++;	/* include trailing / */
+	  dirnameid = normalizedir(cbdata, (char *)cbdata->filesspace + dirnameid, i, strnhash((char *)cbdata->filesspace + dirnameid, i), 1);
 	  return dirnameid == -1 ? diroff : dirnameid;
 	}
     }
+
+  /* append basename to normalized dirname */
   if (cbdata->rootdirl + l + dirl - i + 1 > cbdata->canonspacen)
     {
       cbdata->canonspacen = cbdata->rootdirl + l + dirl - i + 20;
@@ -438,15 +445,16 @@ unifywithcanon(struct cbdata *cbdata, Id diroff, int dirl)
   strcpy(cbdata->canonspace + cbdata->rootdirl, (char *)cbdata->filesspace + dirnameid);
   strncpy(cbdata->canonspace + cbdata->rootdirl + l, (char *)cbdata->filesspace + diroff + i, dirl - i);
   cbdata->canonspace[cbdata->rootdirl + l + dirl - i] = 0;
-  cbdata->statsmade++;
+
 #if 0
   printf("stat()ing %s\n", cbdata->canonspace);
 #endif
+  cbdata->statsmade++;
   if (lstat(cbdata->canonspace, &stb))
     return diroff;		/* hmm */
   if (!S_ISLNK(stb.st_mode))
     {
-      /* not a symlink, have canon entry */
+      /* not a symlink, have new canon entry */
       diroff = addfilesspace(cbdata, l + dirl - i + 2);
       strcpy((char *)cbdata->filesspace + diroff, cbdata->canonspace + cbdata->rootdirl);
       l += dirl - i;
@@ -456,32 +464,33 @@ unifywithcanon(struct cbdata *cbdata, Id diroff, int dirl)
 	  cbdata->filesspace[diroff + l++] = '/';
 	  cbdata->filesspace[diroff + l] = 0;
 	}
+      /* call normalizedir on new entry for unification purposes */
       dirnameid = normalizedir(cbdata, (char *)cbdata->filesspace + diroff, l, strnhash((char *)cbdata->filesspace + diroff, l), 1);
       return dirnameid == -1 ? diroff : dirnameid;
     }
   /* oh no, a symlink! follow */
-  if (cbdata->rootdirl + l + dirl - i + stb.st_size + 2 > cbdata->canonspacen)
+  lo = cbdata->rootdirl + l + dirl - i + 1;
+  if (lo + stb.st_size + 2 > cbdata->canonspacen)
     {
-      cbdata->canonspacen = cbdata->rootdirl + l + dirl - i + stb.st_size + 20;
+      cbdata->canonspacen = lo + stb.st_size + 20;
       cbdata->canonspace = solv_realloc(cbdata->canonspace, cbdata->canonspacen);
     }
-  lo = cbdata->rootdirl + l + dirl - i + 1;
   ll = readlink(cbdata->canonspace, cbdata->canonspace + lo, stb.st_size);
   if (ll < 0 || ll > stb.st_size)
     return diroff;		/* hmm */
   if (ll == 0)
-    return dirnameid;
+    return dirnameid;		/* empty means current dir */
   if (cbdata->canonspace[lo + ll - 1] != '/')
     cbdata->canonspace[lo + ll++] = '/';	/* add trailing / */
-  cbdata->canonspace[lo + ll] = 0;
+  cbdata->canonspace[lo + ll] = 0;		/* zero terminate */
   if (cbdata->canonspace[lo] != '/')
     {
-      /* relative link, concatenate */
+      /* relative link, concatenate to dirname */
       memmove(cbdata->canonspace + cbdata->rootdirl + l, cbdata->canonspace + lo, ll + 1);
       lo = cbdata->rootdirl;
       ll += l;
     }
-  dirnameid = normalizedir(cbdata, (char *)cbdata->canonspace + lo, ll, strnhash((char *)cbdata->canonspace + lo, ll), 1);
+  dirnameid = normalizedir(cbdata, cbdata->canonspace + lo, ll, strnhash(cbdata->canonspace + lo, ll), 1);
   return dirnameid == -1 ? diroff : dirnameid;
 }
 
@@ -510,7 +519,7 @@ normalizedir(struct cbdata *cbdata, const char *dir, int dirl, Id hx, int create
       if (qx == hx)
 	{
 	  Id off = cbdata->normap[2 * h + 1];
-	  const char *dp = (const char *)cbdata->filesspace + cbdata->norq.elements[off];
+	  char *dp = (char *)cbdata->filesspace + cbdata->norq.elements[off];
 	  if (!strncmp(dp, dir, dirl) && dp[dirl] == 0)
 	    return cbdata->norq.elements[off + 1];
 	}
@@ -532,22 +541,21 @@ normalizedir(struct cbdata *cbdata, const char *dir, int dirl, Id hx, int create
     memcpy(cbdata->filesspace + nspaceoff, dir, dirl);
   cbdata->filesspace[nspaceoff + dirl] = 0;
   mycnt = cbdata->norq.count;
-  queue_push2(&cbdata->norq, nspaceoff, -1);
+  queue_push2(&cbdata->norq, nspaceoff, -1);	/* -1: in progress */
   cbdata->normap[2 * h] = hx;
-  cbdata->normap[2 * h + 1] = cbdata->norq.count - 2;
+  cbdata->normap[2 * h + 1] = mycnt;
+  if (++cbdata->normapused * 2 > cbdata->normapn)
+    cbdata->normap = growhash(cbdata->normap, &cbdata->normapn);
   /* unify */
   if (cbdata->usestat)
     nspaceoff = unifywithstat(cbdata, nspaceoff, dirl);
   else
     nspaceoff = unifywithcanon(cbdata, nspaceoff, dirl);
-  /* update */
-  cbdata->norq.elements[mycnt + 1] = nspaceoff;
+  cbdata->norq.elements[mycnt + 1] = nspaceoff;	/* patch in result */
 #if 0
   if (!cbdata->usestat)
     printf("%s normalized to %d: %s\n", cbdata->filesspace + cbdata->norq.elements[mycnt], nspaceoff, cbdata->filesspace + nspaceoff);
 #endif
-  if (++cbdata->normapused * 2 > cbdata->normapn)
-    cbdata->normap = growhash(cbdata->normap, &cbdata->normapn);
   return nspaceoff;
 }
 
