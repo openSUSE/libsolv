@@ -1038,13 +1038,13 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 		char *fsj = (char *)cbdata.filesspace + cbdata.files.elements[jj];
 		if (cbdata.aliases)
 		  {
-		    /* compare just the basenames, the dirs match */
+		    /* compare just the basenames, the dirs match because of the dirid */
 		    char *bsi = strrchr(fsi + 34, '/');
 		    char *bsj = strrchr(fsj + 34, '/');
-		    if ((!bsi || !bsj) && bsi != bsj)
+		    if (!bsi || !bsj)
 		      continue;
 		    if (strcmp(bsi, bsj))
-		      continue;	/* different file names */
+		      continue;	/* different base names */
 		  }
 		else
 		  {
@@ -1052,7 +1052,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 		      continue;	/* different file names */
 		  }
 		if (!strcmp(fsi, fsj))
-		  continue;	/* md5 sum matches */
+		  continue;	/* file digests match, no conflict */
 		if (obsoleteusescolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
 		  continue;	/* colors do not conflict */
 		queue_push(conflicts, pool_str2id(pool, fsi + 34, 1));
@@ -1075,6 +1075,6 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   POOL_DEBUG(SOLV_DEBUG_STATS, "found %d file conflicts\n", conflicts->count / 6);
   POOL_DEBUG(SOLV_DEBUG_STATS, "file conflict detection took %d ms\n", solv_timems(start));
 
-  return conflicts->count;
+  return conflicts->count / 6;
 }
 
