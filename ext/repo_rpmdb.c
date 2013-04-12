@@ -2471,7 +2471,7 @@ rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
   DBT dbdata;
   RpmHead *rpmhead;
 
-  if (!state->dbopened && !openpkgdb(state, state->rootdir))
+  if (state->dbopened != 1 && !openpkgdb(state, state->rootdir))
     return 0;
   rpmdbid2db(buf, rpmdbid, state->byteswapped);
   memset(&dbkey, 0, sizeof(dbkey));
