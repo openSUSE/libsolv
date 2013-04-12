@@ -3175,7 +3175,7 @@ rerunsolver:
       fcstate.newpkgscnt = newpkgs;
       fcstate.checkq = &checkq;
       fcstate.newpkgsfps = newpkgsfps;
-      pool_findfileconflicts(pool, &checkq, newpkgs, &conflicts, &fileconflict_cb, &fcstate);
+      pool_findfileconflicts(pool, &checkq, newpkgs, &conflicts, FINDFILECONFLICTS_USE_SOLVABLEFILELIST | FINDFILECONFLICTS_CHECK_DIRALIASING | FINDFILECONFLICTS_USE_ROOTDIR, &fileconflict_cb, &fcstate);
       fcstate.rpmstate = rpm_state_free(fcstate.rpmstate);
       if (conflicts.count)
 	{
