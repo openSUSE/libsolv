@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <expat.h>
+#include <errno.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -344,7 +345,7 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
 	  fullpath = join2(&pd.jd, dirpath, "/", entry->d_name);
 	  if ((fp = fopen(fullpath, "r")) == 0)
 	    {
-	      perror(fullpath);
+	      pool_error(repo->pool, 0, "%s: %s", fullpath, strerror(errno));
 	      continue;
 	    }
 	  add_zyppdb_product(&pd, fp);

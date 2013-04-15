@@ -384,7 +384,7 @@ add_code11_product(struct parsedata *pd, FILE *fp)
   else
     {
       pd->currentproduct = pd->baseproduct + 1; /* make it != baseproduct if stat fails */
-      perror("fstat");
+      pool_error(pd->pool, 0, "fstat: %s", strerror(errno));
       pd->ctime = 0;
     }
 
@@ -461,7 +461,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 	  fp = fopen(fullpath, "r");
 	  if (!fp)
 	    {
-	      perror(fullpath);
+	      pool_error(repo->pool, 0, "%s: %s", fullpath, strerror(errno));
 	      continue;
 	    }
 	  pd.filename = fullpath;
