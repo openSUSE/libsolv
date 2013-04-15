@@ -399,6 +399,7 @@ unifywithcanon(struct cbdata *cbdata, Id diroff, int dirl)
     dirl--;
   if (!dirl)
     return diroff;
+
   /* find dirname */
   for (i = dirl - 1; i > 0; i--)
     if (cbdata->filesspace[diroff + i] == '/')
@@ -450,11 +451,9 @@ unifywithcanon(struct cbdata *cbdata, Id diroff, int dirl)
   printf("stat()ing %s\n", cbdata->canonspace);
 #endif
   cbdata->statsmade++;
-  if (lstat(cbdata->canonspace, &stb))
-    return diroff;		/* hmm */
-  if (!S_ISLNK(stb.st_mode))
+  if (lstat(cbdata->canonspace, &stb) != 0 || !S_ISLNK(stb.st_mode))
     {
-      /* not a symlink, have new canon entry */
+      /* not a symlink or stat failed, have new canon entry */
       diroff = addfilesspace(cbdata, l + dirl - i + 2);
       strcpy((char *)cbdata->filesspace + diroff, cbdata->canonspace + cbdata->rootdirl);
       l += dirl - i;
@@ -729,8 +728,8 @@ iterate_solvable_dirs(Pool *pool, Id p, void (*cb)(void *, const char *, struct 
   dataiterator_free(&di);
 }
 
-/* before calling the expensive findfileconflicts_basename_cb we check if any of
- * the basenames match. This only makes sense when cbdata->create is off.
+/* before calling the expensive findfileconflicts_cb we check if any of
+ * the files match. This only makes sense when cbdata->create is off.
  */
 static int
 precheck_solvable_files(struct cbdata *cbdata, Pool *pool, Id p)
@@ -739,13 +738,40 @@ precheck_solvable_files(struct cbdata *cbdata, Pool *pool, Id p)
   Id hx, qx;
   Hashval h, hh;
   int found = 0;
+  int aliases = cbdata->aliases;
+  unsigned int lastdirid = -1;
+  Hashval lastdirhash = 0;
+  int lastdirlen = 0;
+  int checkthisdir = 0;
 
   dataiterator_init(&di, pool, 0, p, SOLVABLE_FILELIST, 0, SEARCH_COMPLETE_FILELIST);
   while (dataiterator_step(&di))
     {
-      hx = strhash(di.kv.str);
-      if (!hx)
-	hx = strlen(di.kv.str) + 1;
+      if (aliases)
+	{
+	  /* hash just the basename */
+	  hx = strhash(di.kv.str);
+	  if (!hx)
+	    hx = strlen(di.kv.str) + 1;
+	}
+      else
+	{
+	  /* hash the full path */
+	  if (di.kv.id != lastdirid)
+	    {
+	      const char *dir;
+	      lastdirid = di.kv.id;
+	      dir = repodata_dir2str(di.data, lastdirid, "");
+	      lastdirlen = strlen(dir);
+	      lastdirhash = strhash(dir);
+	      checkthisdir =  isindirmap(cbdata, lastdirhash ? lastdirhash : lastdirlen + 1);
+	    }
+	  if (!checkthisdir)
+	    continue;
+	  hx = strhash_cont(di.kv.str, lastdirhash);
+	  if (!hx)
+	    hx = lastdirlen + strlen(di.kv.str) + 1;
+	}
       h = hx & cbdata->cflmapn;
       hh = HASHCHAIN_START;
       for (;;)
@@ -822,10 +848,10 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
       idxmapset = 0;
       for (i = 0; i < pkgs->count; i++)
 	{
-	  p = pkgs->elements[i];
-	  cbdata.idx = i;
 	  if (i == cutoff)
 	    cbdata.create = 0;
+	  cbdata.idx = i;
+	  p = pkgs->elements[i];
 	  if ((flags & FINDFILECONFLICTS_USE_SOLVABLEFILELIST) != 0 && installed)
 	    {
 	      if (p >= installed->start && p < installed->end && pool->solvables[p].repo == installed)
@@ -859,13 +885,13 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   cbdata.create = 1;
   for (i = 0; i < pkgs->count; i++)
     {
-      if (!cbdata.aliases && !MAPTST(&cbdata.idxmap, i))
-	continue;
-      p = pkgs->elements[i];
-      cbdata.idx = i;
       if (i == cutoff)
 	cbdata.create = 0;
-      if (cbdata.aliases && !cbdata.create && FINDFILECONFLICTS_USE_SOLVABLEFILELIST)
+      if (!cbdata.aliases && !MAPTST(&cbdata.idxmap, i))
+	continue;
+      cbdata.idx = i;
+      p = pkgs->elements[i];
+      if (!cbdata.create && (flags & FINDFILECONFLICTS_USE_SOLVABLEFILELIST) != 0 && installed)
 	{
 	  if (p >= installed->start && p < installed->end && pool->solvables[p].repo == installed)
 	    if (!precheck_solvable_files(&cbdata, pool, p))
