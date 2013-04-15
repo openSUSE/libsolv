@@ -12,8 +12,6 @@ struct headerToken_s;
 
 extern int repo_add_rpmdb(Repo *repo, Repo *ref, int flags);
 extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
-extern int repo_add_rpmdb_pubkeys(Repo *repo, int flags);
-extern Id repo_add_pubkey(Repo *repo, const char *key, int flags);
 
 #define RPMDB_REPORT_PROGRESS	(1 << 8)
 #define RPM_ADD_WITH_PKGID	(1 << 9)
@@ -54,5 +52,6 @@ struct filelistinfo {
 };
 
 extern char *rpm_query(void *rpmhandle, Id what);
+extern unsigned long long rpm_query_num(void *rpmhandle, Id what, unsigned long long notfound);
 extern void rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, struct filelistinfo *), void *cbdata);
 extern Id   repo_add_rpm_handle(Repo *repo, void *rpmhandle, int flags);

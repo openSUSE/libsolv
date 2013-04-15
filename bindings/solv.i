@@ -419,6 +419,9 @@ typedef int bool;
 #ifdef ENABLE_RPMDB
 #include "repo_rpmdb.h"
 #endif
+#ifdef ENABLE_RPMDB_PUBKEYS
+#include "repo_rpmdb_pubkey.h"
+#endif
 #ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
 #endif
@@ -1423,6 +1426,14 @@ rb_eval_string(
   }
   Id add_rpm(const char *name, int flags = 0) {
     return repo_add_rpm($self, name, flags);
+  }
+#endif
+#ifdef ENABLE_RPMDB_PUBKEYS
+  bool add_rpmdb_pubkeys(int flags = 0) {
+    return repo_add_rpmdb_pubkeys($self, flags);
+  }
+  Id add_pubkey(const char *key, int flags = 0) {
+    return repo_add_pubkey($self, key, flags);
   }
 #endif
 #ifdef ENABLE_RPMMD

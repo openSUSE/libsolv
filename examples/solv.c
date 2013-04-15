@@ -64,6 +64,9 @@
 #include "repo_rpmdb.h"
 #include "pool_fileconflicts.h"
 #endif
+#ifdef ENABLE_RPMDB_PUBKEY
+#include "repo_rpmdb_pubkey.h"
+#endif
 #ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
 #endif
