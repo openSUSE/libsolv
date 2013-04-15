@@ -461,7 +461,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   if (!v || !f || nc != vc || nc != fc)
     {
       char *pkgname = rpm_query(rpmhead, 0);
-      fprintf(stderr, "bad dependency entries for %s: %d %d %d\n", pkgname ? pkgname : "<NULL>", nc, vc, fc);
+      pool_error(pool, 0, "bad dependency entries for %s: %d %d %d", pkgname ? pkgname : "<NULL>", nc, vc, fc);
       solv_free(pkgname);
       solv_free(n);
       solv_free(v);
@@ -719,7 +719,7 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead)
     }
   if (bnc != dic)
     {
-      fprintf(stderr, "bad filelist\n");
+      pool_error(data->repo->pool, 0, "bad filelist");
       return;
     }
 
@@ -799,7 +799,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   name = headstring(rpmhead, TAG_NAME);
   if (!name)
     {
-      fprintf(stderr, "package has no name\n");
+      pool_error(pool, 0, "package has no name");
       return 0;
     }
   if (!strcmp(name, "gpg-pubkey"))
@@ -1273,7 +1273,7 @@ mkrpmdbcookie(struct stat *st, unsigned char *cookie)
 
 /* should look in /usr/lib/rpm/macros instead, but we want speed... */
 static DB_ENV *
-opendbenv(const char *rootdir)
+opendbenv(Pool *pool, const char *rootdir)
 {
   char dbpath[PATH_MAX];
   DB_ENV *dbenv = 0;
@@ -1281,7 +1281,7 @@ opendbenv(const char *rootdir)
 
   if (db_env_create(&dbenv, 0))
     {
-      perror("db_env_create");
+      pool_error(pool, 0, "db_env_create: %s", strerror(errno));
       return 0;
     }
 #if defined(FEDORA) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
@@ -1302,7 +1302,7 @@ opendbenv(const char *rootdir)
     }
   if (r)
     {
-      perror("dbenv open");
+      pool_error(pool, 0, "dbenv->open: %s", strerror(errno));
       dbenv->close(dbenv, 0);
       return 0;
     }
@@ -1311,7 +1311,7 @@ opendbenv(const char *rootdir)
 
 
 static int
-count_headers(const char *rootdir, DB_ENV *dbenv)
+count_headers(Pool *pool, const char *rootdir, DB_ENV *dbenv)
 {
   char dbpath[PATH_MAX];
   struct stat statbuf;
@@ -1328,17 +1328,19 @@ count_headers(const char *rootdir, DB_ENV *dbenv)
   memset(&dbdata, 0, sizeof(dbdata));
   if (db_create(&db, dbenv, 0))
     {
-      perror("db_create");
+      pool_error(pool, 0, "db_create: %s", strerror(errno));
       return 0;
     }
   if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
     {
-      perror("db->open Name index");
+      pool_error(pool, 0, "db->open Name: %s", strerror(errno));
+      db->close(db, 0);
       return 0;
     }
   if (db->cursor(db, NULL, &dbc, 0))
     {
-      perror("db->cursor");
+      db->close(db, 0);
+      pool_error(pool, 0, "db->cursor: %s", strerror(errno));
       return 0;
     }
   while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
@@ -1395,7 +1397,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 
   if (flags & REPO_USE_ROOTDIR)
     rootdir = pool_get_rootdir(pool);
-  if (!(dbenv = opendbenv(rootdir)))
+  if (!(dbenv = opendbenv(pool, rootdir)))
     {
       return pool_error(pool, -1, "repo_add_rpmdb: opendbenv failed");
     }
@@ -1419,7 +1421,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       int solvstart = 0, solvend = 0;
 
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
-	count = count_headers(rootdir, dbenv);
+	count = count_headers(pool, rootdir, dbenv);
       if (db_create(&db, dbenv, 0))
 	{
 	  pool_error(pool, -1, "repo_add_rpmdb: db_create: %s", strerror(errno));
@@ -2309,29 +2311,29 @@ getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *
   if (namedatap)
     *namedatap = 0;
 
-  if (!state->dbenv && !(state->dbenv = opendbenv(state->rootdir)))
+  if (!state->dbenv && !(state->dbenv = opendbenv(state->pool, state->rootdir)))
     return 0;
   dbenv = state->dbenv;
   if (db_create(&db, dbenv, 0))
     {
-      perror("db_create");
+      pool_error(state->pool, 0, "db_create: %s", strerror(errno));
       return 0;
     }
   if (db->open(db, 0, index, 0, DB_UNKNOWN, DB_RDONLY, 0664))
     {
-      perror("db->open index");
+      pool_error(state->pool, 0, "db->open %s: %s", index, strerror(errno));
       db->close(db, 0);
       return 0;
     }
   if (db->get_byteswapped(db, &byteswapped))
     {
-      perror("db->get_byteswapped");
+      pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
       db->close(db, 0);
       return 0;
     }
   if (db->cursor(db, NULL, &dbc, 0))
     {
-      perror("db->cursor");
+      pool_error(state->pool, 0, "db->cursor: %s", strerror(errno));
       db->close(db, 0);
       return 0;
     }
@@ -2382,11 +2384,11 @@ openpkgdb(struct rpm_by_state *state, const char *rootdir)
   if (state->dbopened)
     return state->dbopened > 0 ? 1 : 0;
   state->dbopened = -1;
-  if (!state->dbenv && !(state->dbenv = opendbenv(rootdir)))
+  if (!state->dbenv && !(state->dbenv = opendbenv(state->pool, rootdir)))
     return 0;
   if (db_create(&state->db, state->dbenv, 0))
     {
-      perror("db_create");
+      pool_error(state->pool, 0, "db_create: %s", strerror(errno));
       state->db = 0;
       state->dbenv->close(state->dbenv, 0);
       state->dbenv = 0;
@@ -2394,7 +2396,7 @@ openpkgdb(struct rpm_by_state *state, const char *rootdir)
     }
   if (state->db->open(state->db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
     {
-      perror("db->open var/lib/rpm/Packages");
+      pool_error(state->pool, 0, "db->open Packages: %s", strerror(errno));
       state->db->close(state->db, 0);
       state->db = 0;
       state->dbenv->close(state->dbenv, 0);
@@ -2403,7 +2405,7 @@ openpkgdb(struct rpm_by_state *state, const char *rootdir)
     }
   if (state->db->get_byteswapped(state->db, &state->byteswapped))
     {
-      perror("db->get_byteswapped");
+      pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
       state->db->close(state->db, 0);
       state->db = 0;
       state->dbenv->close(state->dbenv, 0);
@@ -2484,12 +2486,12 @@ rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
   dbdata.size = 0;
   if (state->db->get(state->db, NULL, &dbkey, &dbdata, 0))
     {
-      perror("db->get");
+      pool_error(state->pool, 0, "db->get: %s", strerror(errno));
       return 0;
     }
   if (dbdata.size < 8)
     {
-      fprintf(stderr, "corrupt rpm database (size)\n");
+      pool_error(state->pool, 0, "corrupt rpm database (size)");
       return 0;
     }
   if (dbdata.size > state->rpmheadsize)
@@ -2504,7 +2506,7 @@ rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
   rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
   if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
     {
-      fprintf(stderr, "corrupt rpm database (data size)\n");
+      pool_error(state->pool, 0, "corrupt rpm database (data size)");
       return 0;
     }
   memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
@@ -2524,25 +2526,25 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
 
   if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
     {
-      fprintf(stderr, "%s: not a rpm\n", name);
+      pool_error(state->pool, 0, "%s: not a rpm", name);
       return 0;
     }
   forcebinary = lead[6] != 0 || lead[7] != 1;
   if (lead[78] != 0 || lead[79] != 5)
     {
-      fprintf(stderr, "%s: not a V5 header\n", name);
+      pool_error(state->pool, 0, "%s: not a V5 header", name);
       return 0;
     }
   if (getu32(lead + 96) != 0x8eade801)
     {
-      fprintf(stderr, "%s: bad signature header\n", name);
+      pool_error(state->pool, 0, "%s: bad signature header", name);
       return 0;
     }
   sigcnt = getu32(lead + 96 + 8);
   sigdsize = getu32(lead + 96 + 12);
   if (sigcnt >= 0x100000 || sigdsize >= 0x100000)
     {
-      fprintf(stderr, "%s: bad signature header\n", name);
+      pool_error(state->pool, 0, "%s: bad signature header", name);
       return 0;
     }
   sigdsize += sigcnt * 16;
@@ -2553,28 +2555,26 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
       l = sigdsize > 4096 ? 4096 : sigdsize;
       if (fread(lead, l, 1, fp) != 1)
 	{
-	  fprintf(stderr, "%s: unexpected EOF\n", name);
+	  pool_error(state->pool, 0, "%s: unexpected EOF", name);
 	  return 0;
 	}
       sigdsize -= l;
     }
   if (fread(lead, 16, 1, fp) != 1)
     {
-      fprintf(stderr, "%s: unexpected EOF\n", name);
+      pool_error(state->pool, 0, "%s: unexpected EOF", name);
       return 0;
     }
   if (getu32(lead) != 0x8eade801)
     {
-      fprintf(stderr, "%s: bad header\n", name);
-      fclose(fp);
+      pool_error(state->pool, 0, "%s: bad header", name);
       return 0;
     }
   sigcnt = getu32(lead + 8);
   sigdsize = getu32(lead + 12);
   if (sigcnt >= 0x100000 || sigdsize >= 0x2000000)
     {
-      fprintf(stderr, "%s: bad header\n", name);
-      fclose(fp);
+      pool_error(state->pool, 0, "%s: bad header", name);
       return 0;
     }
   l = sigdsize + sigcnt * 16;
@@ -2587,8 +2587,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
   rpmhead = state->rpmhead;
   if (fread(rpmhead->data, l, 1, fp) != 1)
     {
-      fprintf(stderr, "%s: unexpected EOF\n", name);
-      fclose(fp);
+      pool_error(state->pool, 0, "%s: unexpected EOF", name);
       return 0;
     }
   rpmhead->forcebinary = forcebinary;
@@ -3198,7 +3197,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
 
   memset(&state, 0, sizeof(state));
   state.pool = pool;
-  if (!(state.dbenv = opendbenv(rootdir)))
+  if (!(state.dbenv = opendbenv(pool, rootdir)))
     return 0;
   entries = getinstalledrpmdbids(&state, "Name", "gpg-pubkey", &nentries, 0);
   for (i = 0 ; i < nentries; i++)

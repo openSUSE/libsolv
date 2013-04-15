@@ -2084,7 +2084,7 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
       rpmdbid = s->repo->rpmdbid[p - s->repo->start];
       if (!rpmdbid)
 	return 0;
-       return rpm_byrpmdbid(fcstate->rpmstate, rpmdbid);
+      return rpm_byrpmdbid(fcstate->rpmstate, rpmdbid);
     }
   for (i = 0; i < fcstate->newpkgscnt; i++)
     if (fcstate->checkq->elements[i] == p)

@@ -17,13 +17,17 @@ iterate_handle(Pool *pool, Id p, void *cbdata)
 {
   Solvable *s = pool->solvables + p;
   Id rpmdbid;
+  void *handle;
   
   if (!s->repo->rpmdbid)
     return 0;
   rpmdbid = s->repo->rpmdbid[p - s->repo->start];
   if (!rpmdbid)
     return 0;
-  return rpm_byrpmdbid(cbdata, rpmdbid);
+  handle = rpm_byrpmdbid(cbdata, rpmdbid);
+  if (!handle)
+    fprintf(stderr, "rpm_byrpmdbid: %s\n", pool_errstr(pool));
+  return handle;
 }
 
 int main(int argc, char **argv)
