@@ -142,10 +142,6 @@
 # define RPM_INDEX_SIZE 8
 #endif
 
-struct rpmid {
-  unsigned int dbid;
-  char *name;
-};
 
 typedef struct rpmhead {
   int cnt;
@@ -967,6 +963,398 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   return 1;
 }
 
+
+/******************************************************************/
+/*  Rpm Database stuff
+ */
+
+struct rpmdbstate {
+  Pool *pool; 
+  char *rootdir;
+
+  RpmHead *rpmhead;	/* header storage space */
+  int rpmheadsize;
+
+  int dbopened;
+  DB_ENV *dbenv;	/* database environment */
+  DB *db;		/* packages database */
+  int byteswapped;	/* endianess of packages database */
+};
+
+struct rpmdbentry {
+  Id rpmdbid;
+  Id nameoff;
+};
+
+#define ENTRIES_BLOCK 255
+#define NAMEDATA_BLOCK 1023
+
+
+static inline Id db2rpmdbid(unsigned char *db, int byteswapped)
+{
+#ifdef RPM5
+  return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
+#else
+# if defined(WORDS_BIGENDIAN)
+  if (!byteswapped)
+# else
+  if (byteswapped)
+# endif
+    return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
+  else
+    return db[3] << 24 | db[2] << 16 | db[1] << 8 | db[0];
+#endif
+}
+
+static inline void rpmdbid2db(unsigned char *db, Id id, int byteswapped)
+{
+#ifdef RPM5
+  db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
+#else
+# if defined(WORDS_BIGENDIAN)
+  if (!byteswapped)
+# else
+  if (byteswapped)
+# endif
+    db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
+  else
+    db[3] = id >> 24, db[2] = id >> 16, db[1] = id >> 8, db[0] = id;
+#endif
+}
+
+/* should look in /usr/lib/rpm/macros instead, but we want speed... */
+static int
+opendbenv(struct rpmdbstate *state, const char *rootdir)
+{
+  char dbpath[PATH_MAX];
+  DB_ENV *dbenv = 0;
+  int r;
+
+  if (db_env_create(&dbenv, 0))
+    return pool_error(state->pool, 0, "db_env_create: %s", strerror(errno));
+#if defined(FEDORA) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
+  dbenv->set_thread_count(dbenv, 8);
+#endif
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
+  if (access(dbpath, W_OK) == -1)
+    {
+      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
+    }
+  else
+    {
+#ifdef FEDORA
+      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0644);
+#else
+      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
+#endif
+    }
+  if (r)
+    {
+      pool_error(state->pool, 0, "dbenv->open: %s", strerror(errno));
+      dbenv->close(dbenv, 0);
+      return 0;
+    }
+  state->dbenv = dbenv;
+  return 1;
+}
+
+static int
+openpkgdb(struct rpmdbstate *state)
+{
+  if (state->dbopened)
+    return state->dbopened > 0 ? 1 : 0;
+  state->dbopened = -1;
+  if (!state->dbenv && !opendbenv(state, state->rootdir))
+    return 0;
+  if (db_create(&state->db, state->dbenv, 0))
+    {
+      pool_error(state->pool, 0, "db_create: %s", strerror(errno));
+      state->db = 0;
+      state->dbenv->close(state->dbenv, 0);
+      state->dbenv = 0;
+      return 0;
+    }
+  if (state->db->open(state->db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
+    {
+      pool_error(state->pool, 0, "db->open Packages: %s", strerror(errno));
+      state->db->close(state->db, 0);
+      state->db = 0;
+      state->dbenv->close(state->dbenv, 0);
+      state->dbenv = 0;
+      return 0;
+    }
+  if (state->db->get_byteswapped(state->db, &state->byteswapped))
+    {
+      pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
+      state->db->close(state->db, 0);
+      state->db = 0;
+      state->dbenv->close(state->dbenv, 0);
+      state->dbenv = 0;
+      return 0;
+    }
+  state->dbopened = 1;
+  return 1;
+}
+
+/* get the rpmdbids of all installed packages from the Name index database.
+ * This is much faster then querying the big Packages database */
+static struct rpmdbentry *
+getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *match, int *nentriesp, char **namedatap)
+{
+  DB_ENV *dbenv = 0;
+  DB *db = 0;
+  DBC *dbc = 0;
+  int byteswapped;
+  DBT dbkey;
+  DBT dbdata;
+  unsigned char *dp;
+  int dl;
+  Id nameoff;
+
+  char *namedata = 0;
+  int namedatal = 0;
+  struct rpmdbentry *entries = 0;
+  int nentries = 0;
+
+  *nentriesp = 0;
+  if (namedatap)
+    *namedatap = 0;
+
+  if (!state->dbenv && !opendbenv(state, state->rootdir))
+    return 0;
+  dbenv = state->dbenv;
+  if (db_create(&db, dbenv, 0))
+    {
+      pool_error(state->pool, 0, "db_create: %s", strerror(errno));
+      return 0;
+    }
+  if (db->open(db, 0, index, 0, DB_UNKNOWN, DB_RDONLY, 0664))
+    {
+      pool_error(state->pool, 0, "db->open %s: %s", index, strerror(errno));
+      db->close(db, 0);
+      return 0;
+    }
+  if (db->get_byteswapped(db, &byteswapped))
+    {
+      pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
+      db->close(db, 0);
+      return 0;
+    }
+  if (db->cursor(db, NULL, &dbc, 0))
+    {
+      pool_error(state->pool, 0, "db->cursor: %s", strerror(errno));
+      db->close(db, 0);
+      return 0;
+    }
+  memset(&dbkey, 0, sizeof(dbkey));
+  memset(&dbdata, 0, sizeof(dbdata));
+  if (match)
+    {
+      dbkey.data = (void *)match;
+      dbkey.size = strlen(match);
+    }
+  while (dbc->c_get(dbc, &dbkey, &dbdata, match ? DB_SET : DB_NEXT) == 0)
+    {
+      if (!match && dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
+	continue;
+      dl = dbdata.size;
+      dp = dbdata.data;
+      nameoff = namedatal;
+      if (namedatap)
+	{
+	  namedata = solv_extend(namedata, namedatal, dbkey.size + 1, 1, NAMEDATA_BLOCK);
+	  memcpy(namedata + namedatal, dbkey.data, dbkey.size);
+	  namedata[namedatal + dbkey.size] = 0;
+	  namedatal += dbkey.size + 1;
+	}
+      while(dl >= RPM_INDEX_SIZE)
+	{
+	  entries = solv_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
+	  entries[nentries].rpmdbid = db2rpmdbid(dp, byteswapped);
+	  entries[nentries].nameoff = nameoff;
+	  nentries++;
+	  dp += RPM_INDEX_SIZE;
+	  dl -= RPM_INDEX_SIZE;
+	}
+      if (match)
+	break;
+    }
+  dbc->c_close(dbc);
+  db->close(db, 0);
+  /* make sure that enteries is != 0 if there was no error */
+  if (!entries)
+    entries = solv_extend(entries, 1, 1, sizeof(*entries), ENTRIES_BLOCK);
+  *nentriesp = nentries;
+  if (namedatap)
+    *namedatap = namedata;
+  return entries;
+}
+
+/* retrive header by rpmdbid */
+static int
+getrpmdbid(struct rpmdbstate *state, Id rpmdbid)
+{
+  unsigned char buf[16];
+  DBT dbkey;
+  DBT dbdata;
+  RpmHead *rpmhead;
+
+  if (!rpmdbid)
+    {
+      pool_error(state->pool, 0, "illegal rpmdbid");
+      return -1;
+    }
+  if (state->dbopened != 1 && !openpkgdb(state))
+    return -1;
+  rpmdbid2db(buf, rpmdbid, state->byteswapped);
+  memset(&dbkey, 0, sizeof(dbkey));
+  memset(&dbdata, 0, sizeof(dbdata));
+  dbkey.data = buf;
+  dbkey.size = 4;
+  dbdata.data = 0;
+  dbdata.size = 0;
+  if (state->db->get(state->db, NULL, &dbkey, &dbdata, 0))
+    return 0;
+  if (dbdata.size < 8)
+    {
+      pool_error(state->pool, 0, "corrupt rpm database (size)");
+      return -1;
+    }
+  if (dbdata.size > state->rpmheadsize)
+    {
+      state->rpmheadsize = dbdata.size + 128;
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
+    }
+  rpmhead = state->rpmhead;
+  memcpy(buf, dbdata.data, 8);
+  rpmhead->forcebinary = 1;
+  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
+  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
+  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
+    {
+      pool_error(state->pool, 0, "corrupt rpm database (data size)");
+      return -1;
+    }
+  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
+  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+  return 1;
+}
+
+/* retrive header by berkeleydb cursor */
+static Id
+getrpmcursor(struct rpmdbstate *state, DBC *dbc)
+{
+  unsigned char buf[16];
+  DBT dbkey;
+  DBT dbdata;
+  RpmHead *rpmhead;
+  Id dbid;
+
+  memset(&dbkey, 0, sizeof(dbkey));
+  memset(&dbdata, 0, sizeof(dbdata));
+  while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
+    {
+      if (dbkey.size != 4)
+	return pool_error(state->pool, -1, "corrupt Packages database (key size)");
+      dbid = db2rpmdbid(dbkey.data, state->byteswapped);
+      if (dbid == 0)		/* the join key */
+	continue;
+      if (dbdata.size < 8)
+	return pool_error(state->pool, -1, "corrupt rpm database (size %u)\n", dbdata.size);
+      if (dbdata.size > state->rpmheadsize)
+	{
+	  state->rpmheadsize = dbdata.size + 128;
+	  state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
+	}
+      rpmhead = state->rpmhead;
+      memcpy(buf, dbdata.data, 8);
+      rpmhead->forcebinary = 1;
+      rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
+      rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
+      if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
+	return pool_error(state->pool, -1, "corrupt rpm database (data size)\n");
+      memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
+      rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+      return dbid;
+    }
+  return 0;
+}
+
+static void
+freestate(struct rpmdbstate *state)
+{
+  /* close down */
+  if (!state)
+    return;
+  if (state->rootdir)
+    solv_free(state->rootdir);
+  if (state->db)
+    state->db->close(state->db, 0);
+  if (state->dbenv)
+    state->dbenv->close(state->dbenv, 0);
+  solv_free(state->rpmhead);
+}
+
+void *
+rpm_state_create(Pool *pool, const char *rootdir)
+{
+  struct rpmdbstate *state;
+  state = solv_calloc(1, sizeof(*state));
+  state->pool = pool;
+  if (rootdir)
+    state->rootdir = solv_strdup(rootdir);
+  return state;
+}
+
+void *
+rpm_state_free(void *state)
+{
+  freestate(state);
+  return solv_free(state);
+}
+
+static int
+count_headers(Pool *pool, const char *rootdir, DB_ENV *dbenv)
+{
+  char dbpath[PATH_MAX];
+  struct stat statbuf;
+  DB *db = 0;
+  DBC *dbc = 0;
+  int count = 0;
+  DBT dbkey;
+  DBT dbdata;
+
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", rootdir ? rootdir : "");
+  if (stat(dbpath, &statbuf))
+    return 0;
+  memset(&dbkey, 0, sizeof(dbkey));
+  memset(&dbdata, 0, sizeof(dbdata));
+  if (db_create(&db, dbenv, 0))
+    {
+      pool_error(pool, 0, "db_create: %s", strerror(errno));
+      return 0;
+    }
+  if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
+    {
+      pool_error(pool, 0, "db->open Name: %s", strerror(errno));
+      db->close(db, 0);
+      return 0;
+    }
+  if (db->cursor(db, NULL, &dbc, 0))
+    {
+      db->close(db, 0);
+      pool_error(pool, 0, "db->cursor: %s", strerror(errno));
+      return 0;
+    }
+  while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
+    count += dbdata.size / RPM_INDEX_SIZE;
+  dbc->c_close(dbc);
+  db->close(db, 0);
+  return count;
+}
+
+/******************************************************************/
+
 static Id
 copyreldep(Pool *pool, Pool *frompool, Id id)
 {
@@ -1182,16 +1570,17 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
   repo_search(fromrepo, (r - fromrepo->pool->solvables), 0, 0, SEARCH_NO_STORAGE_SOLVABLE | SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
 }
 
-/* used to sort entries returned in some database order */
+/* used to sort entries by package name that got returned in some database order */
 static int
 rpmids_sort_cmp(const void *va, const void *vb, void *dp)
 {
-  struct rpmid const *a = va, *b = vb;
+  struct rpmdbentry const *a = va, *b = vb;
+  char *namedata = dp;
   int r;
-  r = strcmp(a->name, b->name);
+  r = strcmp(namedata + a->nameoff, namedata + b->nameoff);
   if (r)
     return r;
-  return a->dbid - b->dbid;
+  return a->rpmdbid - b->rpmdbid;
 }
 
 static int
@@ -1229,39 +1618,6 @@ swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
     repodata_swap_attrs(data, pa, pb);
 }
 
-
-static inline Id db2rpmdbid(unsigned char *db, int byteswapped)
-{
-#ifdef RPM5
-  return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
-#else
-# if defined(WORDS_BIGENDIAN)
-  if (!byteswapped)
-# else
-  if (byteswapped)
-# endif
-    return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
-  else
-    return db[3] << 24 | db[2] << 16 | db[1] << 8 | db[0];
-#endif
-}
-
-static inline void rpmdbid2db(unsigned char *db, Id id, int byteswapped)
-{
-#ifdef RPM5
-  db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
-#else
-# if defined(WORDS_BIGENDIAN)
-  if (!byteswapped)
-# else
-  if (byteswapped)
-# endif
-    db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
-  else
-    db[3] = id >> 24, db[2] = id >> 16, db[1] = id >> 8, db[0] = id;
-#endif
-}
-
 static void
 mkrpmdbcookie(struct stat *st, unsigned char *cookie)
 {
@@ -1269,85 +1625,6 @@ mkrpmdbcookie(struct stat *st, unsigned char *cookie)
   cookie[3] = RPMDB_COOKIE_VERSION;
   memcpy(cookie + 16, &st->st_ino, sizeof(st->st_ino));
   memcpy(cookie + 24, &st->st_dev, sizeof(st->st_dev));
-}
-
-/* should look in /usr/lib/rpm/macros instead, but we want speed... */
-static DB_ENV *
-opendbenv(Pool *pool, const char *rootdir)
-{
-  char dbpath[PATH_MAX];
-  DB_ENV *dbenv = 0;
-  int r;
-
-  if (db_env_create(&dbenv, 0))
-    {
-      pool_error(pool, 0, "db_env_create: %s", strerror(errno));
-      return 0;
-    }
-#if defined(FEDORA) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
-  dbenv->set_thread_count(dbenv, 8);
-#endif
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
-  if (access(dbpath, W_OK) == -1)
-    {
-      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
-    }
-  else
-    {
-#ifdef FEDORA
-      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0644);
-#else
-      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
-#endif
-    }
-  if (r)
-    {
-      pool_error(pool, 0, "dbenv->open: %s", strerror(errno));
-      dbenv->close(dbenv, 0);
-      return 0;
-    }
-  return dbenv;
-}
-
-
-static int
-count_headers(Pool *pool, const char *rootdir, DB_ENV *dbenv)
-{
-  char dbpath[PATH_MAX];
-  struct stat statbuf;
-  DB *db = 0;
-  DBC *dbc = 0;
-  int count = 0;
-  DBT dbkey;
-  DBT dbdata;
-
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", rootdir ? rootdir : "");
-  if (stat(dbpath, &statbuf))
-    return 0;
-  memset(&dbkey, 0, sizeof(dbkey));
-  memset(&dbdata, 0, sizeof(dbdata));
-  if (db_create(&db, dbenv, 0))
-    {
-      pool_error(pool, 0, "db_create: %s", strerror(errno));
-      return 0;
-    }
-  if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
-    {
-      pool_error(pool, 0, "db->open Name: %s", strerror(errno));
-      db->close(db, 0);
-      return 0;
-    }
-  if (db->cursor(db, NULL, &dbc, 0))
-    {
-      db->close(db, 0);
-      pool_error(pool, 0, "db->cursor: %s", strerror(errno));
-      return 0;
-    }
-  while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
-    count += dbdata.size / RPM_INDEX_SIZE;
-  dbc->c_close(dbc);
-  db->close(db, 0);
-  return count;
 }
 
 /*
@@ -1359,36 +1636,22 @@ int
 repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 {
   Pool *pool = repo->pool;
-  unsigned char buf[16];
-  DB *db = 0;
-  DBC *dbc = 0;
-  int byteswapped;
-  unsigned int dbid;
-  unsigned char *dp;
-  int dl, nrpmids;
-  struct rpmid *rpmids, *rp;
-  int i;
-  int rpmheadsize;
-  RpmHead *rpmhead;
-  Solvable *s;
-  Id id, *refhash;
-  unsigned int refmask, h;
   char dbpath[PATH_MAX];
-  DB_ENV *dbenv = 0;
-  DBT dbkey;
-  DBT dbdata;
   struct stat packagesstat;
   unsigned char newcookie[32];
   const unsigned char *oldcookie = 0;
   Id oldcookietype = 0;
   Repodata *data;
   int count = 0, done = 0;
-  unsigned int now;
   const char *rootdir = 0;
+  struct rpmdbstate state;
+  int i;
+  Solvable *s;
+  unsigned int now;
 
   now = solv_timems(0);
-  memset(&dbkey, 0, sizeof(dbkey));
-  memset(&dbdata, 0, sizeof(dbdata));
+  memset(&state, 0, sizeof(state));
+  state.pool = pool;
 
   data = repo_add_repodata(repo, flags);
 
@@ -1397,17 +1660,15 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 
   if (flags & REPO_USE_ROOTDIR)
     rootdir = pool_get_rootdir(pool);
-  if (!(dbenv = opendbenv(pool, rootdir)))
-    {
-      return pool_error(pool, -1, "opendbenv failed");
-    }
+  if (!opendbenv(&state, rootdir))
+    return -1;
 
   /* XXX: should get ro lock of Packages database! */
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir ? rootdir : "");
   if (stat(dbpath, &packagesstat))
     {
       pool_error(pool, -1, "%s: %s", dbpath, strerror(errno));
-      dbenv->close(dbenv, 0);
+      freestate(&state);
       return -1;
     }
   mkrpmdbcookie(&packagesstat, newcookie);
@@ -1417,42 +1678,32 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     oldcookie = repo_lookup_bin_checksum(ref, SOLVID_META, REPOSITORY_RPMDBCOOKIE, &oldcookietype);
   if (!ref || !oldcookie || oldcookietype != REPOKEY_TYPE_SHA256 || memcmp(oldcookie, newcookie, 32) != 0)
     {
-      Id *pkgids;
       int solvstart = 0, solvend = 0;
+      Id dbid;
+      DBC *dbc = 0;
 
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
-	count = count_headers(pool, rootdir, dbenv);
-      if (db_create(&db, dbenv, 0))
+	count = count_headers(pool, rootdir, state.dbenv);
+      if (!openpkgdb(&state))
 	{
-	  pool_error(pool, -1, "db_create: %s", strerror(errno));
-	  dbenv->close(dbenv, 0);
+	  freestate(&state);
 	  return -1;
 	}
-      if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
+      if (state.db->cursor(state.db, NULL, &dbc, 0))
 	{
-	  pool_error(pool, -1, "db->open Packages index failed: %s", strerror(errno));
-	  db->close(db, 0);
-	  dbenv->close(dbenv, 0);
-	  return -1;
-	}
-      if (db->get_byteswapped(db, &byteswapped))
-	{
-	  db->close(db, 0);
-	  dbenv->close(dbenv, 0);
-	  return pool_error(pool, -1, "db->get_byteswapped failed");
-	}
-      if (db->cursor(db, NULL, &dbc, 0))
-	{
-	  db->close(db, 0);
-	  dbenv->close(dbenv, 0);
+	  freestate(&state);
 	  return pool_error(pool, -1, "db->cursor failed");
 	}
-      rpmheadsize = 0;
-      rpmhead = 0;
       i = 0;
       s = 0;
-      while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
+      while ((dbid = getrpmcursor(&state, dbc)) != 0)
 	{
+	  if (dbid == -1)
+	    {
+	      dbc->c_close(dbc);
+	      freestate(&state);
+	      return -1;
+	    }
 	  if (!s)
 	    {
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
@@ -1462,43 +1713,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	    }
 	  if (!repo->rpmdbid)
 	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
-          if (dbkey.size != 4)
-	    {
-	      dbc->c_close(dbc);
-	      db->close(db, 0);
-	      dbenv->close(dbenv, 0);
-	      return pool_error(pool, -1, "corrupt Packages database (key size)");
-	    }
-	  dbid = db2rpmdbid(dbkey.data, byteswapped);
-	  if (dbid == 0)		/* the join key */
-	    continue;
-	  if (dbdata.size < 8)
-	    {
-	      dbc->c_close(dbc);
-	      db->close(db, 0);
-	      dbenv->close(dbenv, 0);
-	      return pool_error(pool, -1, "corrupt rpm database (size %u)\n", dbdata.size);
-	    }
-	  if (dbdata.size > rpmheadsize)
-	    {
-	      rpmheadsize = dbdata.size + 128;
-	      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
-	    }
-	  memcpy(buf, dbdata.data, 8);
-	  rpmhead->forcebinary = 1;
-	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
-	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-	  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
-	    {
-	      dbc->c_close(dbc);
-	      db->close(db, 0);
-	      dbenv->close(dbenv, 0);
-	      return pool_error(pool, -1, "corrupt rpm database (data size)\n");
-	    }
-	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
-	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
 	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
-	  if (rpm2solv(pool, repo, data, s, rpmhead, flags | RPM_ADD_TRIGGERS))
+	  if (rpm2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS))
 	    {
 	      i++;
 	      s = 0;
@@ -1518,6 +1734,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	        pool_debug(pool, SOLV_ERROR, "%%%% %d\n", done * 100 / count);
 	    }
 	}
+      dbc->c_close(dbc);
       if (s)
 	{
 	  /* oops, could not reuse. free it instead */
@@ -1525,13 +1742,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	  solvend--;
 	  s = 0;
 	}
-      dbc->c_close(dbc);
-      db->close(db, 0);
-      db = 0;
       /* now sort all solvables in the new solvstart..solvend block */
       if (solvend - solvstart > 1)
 	{
-	  pkgids = solv_malloc2(solvend - solvstart, sizeof(Id));
+	  Id *pkgids = solv_malloc2(solvend - solvstart, sizeof(Id));
 	  for (i = solvstart; i < solvend; i++)
 	    pkgids[i - solvstart] = i;
 	  solv_sort(pkgids, solvend - solvstart, sizeof(Id), pkgids_sort_cmp, repo);
@@ -1550,62 +1764,26 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
   else
     {
       Id dircache[COPYDIR_DIRCACHE_SIZE];		/* see copydir */
+      struct rpmdbentry *entries = 0, *rp;
+      int nentries = 0;
+      char *namedata = 0;
+      unsigned int refmask, h;
+      Id id, *refhash;
+      int res;
 
       memset(dircache, 0, sizeof(dircache));
-      if (db_create(&db, dbenv, 0))
+
+      /* get ids of installed rpms */
+      entries = getinstalledrpmdbids(&state, "Name", 0, &nentries, &namedata);
+      if (!entries)
 	{
-	  pool_error(pool, -1, "db_create: %s", strerror(errno));
-	  dbenv->close(dbenv, 0);
+	  freestate(&state);
 	  return -1;
 	}
-      if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
-	{
-	  pool_error(pool, -1, "db->open Name index failed: %s", strerror(errno));
-	  db->close(db, 0);
-	  dbenv->close(dbenv, 0);
-	  return -1;
-	}
-      if (db->get_byteswapped(db, &byteswapped))
-	{
-	  db->close(db, 0);
-	  dbenv->close(dbenv, 0);
-	  return pool_error(pool, -1, "db->get_byteswapped failed");
-	}
-      if (db->cursor(db, NULL, &dbc, 0))
-	{
-	  db->close(db, 0);
-	  dbenv->close(dbenv, 0);
-	  return pool_error(pool, -1, "db->cursor failed");
-	}
-      nrpmids = 0;
-      rpmids = 0;
-      while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
-	{
-	  if (dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
-	    continue;
-	  dl = dbdata.size;
-	  dp = dbdata.data;
-	  while(dl >= RPM_INDEX_SIZE)
-	    {
-	      rpmids = solv_extend(rpmids, nrpmids, 1, sizeof(*rpmids), 255);
-	      rpmids[nrpmids].dbid = db2rpmdbid(dp, byteswapped);
-	      rpmids[nrpmids].name = solv_malloc((int)dbkey.size + 1);
-	      memcpy(rpmids[nrpmids].name, dbkey.data, (int)dbkey.size);
-	      rpmids[nrpmids].name[(int)dbkey.size] = 0;
-	      nrpmids++;
-	      dp += RPM_INDEX_SIZE;
-	      dl -= RPM_INDEX_SIZE;
-	    }
-	}
-      dbc->c_close(dbc);
-      db->close(db, 0);
-      db = 0;
 
-      /* sort rpmids */
-      solv_sort(rpmids, nrpmids, sizeof(*rpmids), rpmids_sort_cmp, 0);
-
-      rpmheadsize = 0;
-      rpmhead = 0;
+      /* sort by name */
+      if (nentries > 1)
+        solv_sort(entries, nentries, sizeof(*entries), rpmids_sort_cmp, namedata);
 
       /* create hash from dbid to ref */
       refmask = mkmask(ref->nsolvables);
@@ -1623,11 +1801,11 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       /* count the misses, they will cost us time */
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
         {
-	  for (i = 0, rp = rpmids; i < nrpmids; i++, rp++)
+	  for (i = 0, rp = entries; i < nentries; i++, rp++)
 	    {
-	      dbid = rp->dbid;
 	      if (refhash)
 		{
+		  Id dbid = rp->rpmdbid;
 		  h = dbid & refmask;
 		  while ((id = refhash[h]))
 		    {
@@ -1642,14 +1820,14 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	    }
         }
 
-      s = pool_id2solvable(pool, repo_add_solvable_block(repo, nrpmids));
+      s = pool_id2solvable(pool, repo_add_solvable_block(repo, nentries));
       if (!repo->rpmdbid)
         repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 
-      for (i = 0, rp = rpmids; i < nrpmids; i++, rp++, s++)
+      for (i = 0, rp = entries; i < nentries; i++, rp++, s++)
 	{
-	  dbid = rp->dbid;
-	  repo->rpmdbid[(s - pool->solvables) - repo->start] = rp->dbid;
+	  Id dbid = rp->rpmdbid;
+	  repo->rpmdbid[(s - pool->solvables) - repo->start] = rp->rpmdbid;
 	  if (refhash)
 	    {
 	      h = dbid & refmask;
@@ -1669,64 +1847,18 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 		    }
 		}
 	    }
-	  if (!db)
+	  res = getrpmdbid(&state, dbid);
+	  if (res <= 0)
 	    {
-	      if (db_create(&db, dbenv, 0))
-		{
-		  pool_error(pool, -1, "db_create: %s", strerror(errno));
-		  dbenv->close(dbenv, 0);
-		  return -1;
-		}
-	      if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
-		{
-		  pool_error(pool, -1, "db->open Packages index failed: %s", strerror(errno));
-		  db->close(db, 0);
-		  dbenv->close(dbenv, 0);
-		  return -1;
-		}
-	      if (db->get_byteswapped(db, &byteswapped))
-		{
-		  db->close(db, 0);
-		  dbenv->close(dbenv, 0);
-		  return pool_error(pool, -1, "db->get_byteswapped failed");
-		}
+	      if (!res)
+	        return pool_error(pool, -1, "inconsistent rpm database, key %d not found. run 'rpm --rebuilddb' to fix.", dbid);
+	      freestate(&state);
+	      solv_free(entries);
+	      solv_free(namedata);
+	      solv_free(refhash);
+	      return -1;
 	    }
-          rpmdbid2db(buf, rp->dbid, byteswapped);
-	  dbkey.data = buf;
-	  dbkey.size = 4;
-	  dbdata.data = 0;
-	  dbdata.size = 0;
-	  if (db->get(db, NULL, &dbkey, &dbdata, 0))
-	    {
-	      db->close(db, 0);
-	      dbenv->close(dbenv, 0);
-	      return pool_error(pool, -1, "inconsistent rpm database, key %d not found. run 'rpm --rebuilddb' to fix.", dbid);
-	    }
-	  if (dbdata.size < 8)
-	    {
-	      db->close(db, 0);
-	      dbenv->close(dbenv, 0);
-	      return pool_error(pool, -1, "corrupt Packages database (size)");
-	    }
-	  if (dbdata.size > rpmheadsize)
-	    {
-	      rpmheadsize = dbdata.size + 128;
-	      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
-	    }
-	  memcpy(buf, dbdata.data, 8);
-	  rpmhead->forcebinary = 1;
-	  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
-	  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-	  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
-	    {
-	      db->close(db, 0);
-	      dbenv->close(dbenv, 0);
-	      return pool_error(pool, -1, "corrupt Packages database (data size)");
-	    }
-	  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
-	  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-
-	  rpm2solv(pool, repo, data, s, rpmhead, flags | RPM_ADD_TRIGGERS);
+	  rpm2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS);
 	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	    {
 	      if (done < count)
@@ -1736,20 +1868,12 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	    }
 	}
 
-      if (refhash)
-	solv_free(refhash);
-      if (rpmids)
-	{
-	  for (i = 0; i < nrpmids; i++)
-	    solv_free(rpmids[i].name);
-	  solv_free(rpmids);
-	}
+      solv_free(entries);
+      solv_free(namedata);
+      solv_free(refhash);
     }
-  if (db)
-    db->close(db, 0);
-  dbenv->close(dbenv, 0);
-  if (rpmhead)
-    solv_free(rpmhead);
+
+  freestate(&state);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   if ((flags & RPMDB_REPORT_PROGRESS) != 0)
@@ -2268,187 +2392,6 @@ rpm_query(void *rpmhandle, Id what)
   return r;
 }
 
-
-struct rpm_by_state {
-  Pool *pool; 
-  RpmHead *rpmhead;
-  int rpmheadsize;
-
-  int dbopened;
-  char *rootdir;
-  DB_ENV *dbenv;
-  DB *db;
-  int byteswapped;
-};
-
-struct rpmdbentry {
-  Id rpmdbid;
-  Id nameoff;
-};
-
-#define ENTRIES_BLOCK 255
-#define NAMEDATA_BLOCK 1023
-
-static struct rpmdbentry *
-getinstalledrpmdbids(struct rpm_by_state *state, const char *index, const char *match, int *nentriesp, char **namedatap)
-{
-  DB_ENV *dbenv = 0;
-  DB *db = 0;
-  DBC *dbc = 0;
-  int byteswapped;
-  DBT dbkey;
-  DBT dbdata;
-  unsigned char *dp;
-  int dl;
-  Id nameoff;
-
-  char *namedata = 0;
-  int namedatal = 0;
-  struct rpmdbentry *entries = 0;
-  int nentries = 0;
-
-  *nentriesp = 0;
-  if (namedatap)
-    *namedatap = 0;
-
-  if (!state->dbenv && !(state->dbenv = opendbenv(state->pool, state->rootdir)))
-    return 0;
-  dbenv = state->dbenv;
-  if (db_create(&db, dbenv, 0))
-    {
-      pool_error(state->pool, 0, "db_create: %s", strerror(errno));
-      return 0;
-    }
-  if (db->open(db, 0, index, 0, DB_UNKNOWN, DB_RDONLY, 0664))
-    {
-      pool_error(state->pool, 0, "db->open %s: %s", index, strerror(errno));
-      db->close(db, 0);
-      return 0;
-    }
-  if (db->get_byteswapped(db, &byteswapped))
-    {
-      pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
-      db->close(db, 0);
-      return 0;
-    }
-  if (db->cursor(db, NULL, &dbc, 0))
-    {
-      pool_error(state->pool, 0, "db->cursor: %s", strerror(errno));
-      db->close(db, 0);
-      return 0;
-    }
-  memset(&dbkey, 0, sizeof(dbkey));
-  memset(&dbdata, 0, sizeof(dbdata));
-  if (match)
-    {
-      dbkey.data = (void *)match;
-      dbkey.size = strlen(match);
-    }
-  while (dbc->c_get(dbc, &dbkey, &dbdata, match ? DB_SET : DB_NEXT) == 0)
-    {
-      if (!match && dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
-	continue;
-      dl = dbdata.size;
-      dp = dbdata.data;
-      nameoff = namedatal;
-      if (namedatap)
-	{
-	  namedata = solv_extend(namedata, namedatal, dbkey.size + 1, 1, NAMEDATA_BLOCK);
-	  memcpy(namedata + namedatal, dbkey.data, dbkey.size);
-	  namedata[namedatal + dbkey.size] = 0;
-	  namedatal += dbkey.size + 1;
-	}
-      while(dl >= RPM_INDEX_SIZE)
-	{
-	  entries = solv_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
-	  entries[nentries].rpmdbid = db2rpmdbid(dp, byteswapped);
-	  entries[nentries].nameoff = nameoff;
-	  nentries++;
-	  dp += RPM_INDEX_SIZE;
-	  dl -= RPM_INDEX_SIZE;
-	}
-      if (match)
-	break;
-    }
-  dbc->c_close(dbc);
-  db->close(db, 0);
-  *nentriesp = nentries;
-  if (namedatap)
-    *namedatap = namedata;
-  return entries;
-}
-
-static int
-openpkgdb(struct rpm_by_state *state, const char *rootdir)
-{
-  if (state->dbopened)
-    return state->dbopened > 0 ? 1 : 0;
-  state->dbopened = -1;
-  if (!state->dbenv && !(state->dbenv = opendbenv(state->pool, rootdir)))
-    return 0;
-  if (db_create(&state->db, state->dbenv, 0))
-    {
-      pool_error(state->pool, 0, "db_create: %s", strerror(errno));
-      state->db = 0;
-      state->dbenv->close(state->dbenv, 0);
-      state->dbenv = 0;
-      return 0;
-    }
-  if (state->db->open(state->db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
-    {
-      pool_error(state->pool, 0, "db->open Packages: %s", strerror(errno));
-      state->db->close(state->db, 0);
-      state->db = 0;
-      state->dbenv->close(state->dbenv, 0);
-      state->dbenv = 0;
-      return 0;
-    }
-  if (state->db->get_byteswapped(state->db, &state->byteswapped))
-    {
-      pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
-      state->db->close(state->db, 0);
-      state->db = 0;
-      state->dbenv->close(state->dbenv, 0);
-      state->dbenv = 0;
-      return 0;
-    }
-  state->dbopened = 1;
-  return 1;
-}
-
-static void
-freestate(struct rpm_by_state *state)
-{
-  /* close down */
-  if (!state)
-    return;
-  if (state->rootdir)
-    solv_free(state->rootdir);
-  if (state->db)
-    state->db->close(state->db, 0);
-  if (state->dbenv)
-    state->dbenv->close(state->dbenv, 0);
-  solv_free(state->rpmhead);
-}
-
-void *
-rpm_state_create(Pool *pool, const char *rootdir)
-{
-  struct rpm_by_state *state;
-  state = solv_calloc(1, sizeof(*state));
-  state->pool = pool;
-  if (rootdir)
-    state->rootdir = solv_strdup(rootdir);
-  return state;
-}
-
-void *
-rpm_state_free(void *state)
-{
-  freestate(state);
-  return solv_free(state);
-}
-
 int
 rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queue *rpmdbidq)
 {
@@ -2469,55 +2412,19 @@ rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queu
 void *
 rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
 {
-  struct rpm_by_state *state = rpmstate;
-  unsigned char buf[16];
-  DBT dbkey;
-  DBT dbdata;
-  RpmHead *rpmhead;
+  struct rpmdbstate *state = rpmstate;
+  int r;
 
-  if (state->dbopened != 1 && !openpkgdb(state, state->rootdir))
-    return 0;
-  rpmdbid2db(buf, rpmdbid, state->byteswapped);
-  memset(&dbkey, 0, sizeof(dbkey));
-  memset(&dbdata, 0, sizeof(dbdata));
-  dbkey.data = buf;
-  dbkey.size = 4;
-  dbdata.data = 0;
-  dbdata.size = 0;
-  if (state->db->get(state->db, NULL, &dbkey, &dbdata, 0))
-    {
-      pool_error(state->pool, 0, "db->get: %s", strerror(errno));
-      return 0;
-    }
-  if (dbdata.size < 8)
-    {
-      pool_error(state->pool, 0, "corrupt rpm database (size)");
-      return 0;
-    }
-  if (dbdata.size > state->rpmheadsize)
-    {
-      state->rpmheadsize = dbdata.size + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
-    }
-  rpmhead = state->rpmhead;
-  memcpy(buf, dbdata.data, 8);
-  rpmhead->forcebinary = 1;
-  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
-  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
-    {
-      pool_error(state->pool, 0, "corrupt rpm database (data size)");
-      return 0;
-    }
-  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-  return rpmhead;
+  r = getrpmdbid(state, rpmdbid);
+  if (!r)
+    pool_error(state->pool, 0, "header #%d not in database", rpmdbid);
+  return r <= 0 ? 0 : state->rpmhead;
 }
 
 void *
 rpm_byfp(void *rpmstate, FILE *fp, const char *name)
 {
-  struct rpm_by_state *state = rpmstate;
+  struct rpmdbstate *state = rpmstate;
   /* int headerstart, headerend; */
   RpmHead *rpmhead;
   unsigned int sigdsize, sigcnt, l;
@@ -2602,7 +2509,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
 void *
 rpm_byrpmh(void *rpmstate, Header h)
 {
-  struct rpm_by_state *state = rpmstate;
+  struct rpmdbstate *state = rpmstate;
   const unsigned char *uh;
   unsigned int sigdsize, sigcnt, l;
   RpmHead *rpmhead;
@@ -3182,7 +3089,7 @@ int
 repo_add_rpmdb_pubkeys(Repo *repo, int flags)
 {
   Pool *pool = repo->pool;
-  struct rpm_by_state state;
+  struct rpmdbstate state;
   struct rpmdbentry *entries;
   int nentries, i;
   char *str;
@@ -3197,7 +3104,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
 
   memset(&state, 0, sizeof(state));
   state.pool = pool;
-  if (!(state.dbenv = opendbenv(pool, rootdir)))
+  if (!opendbenv(&state, rootdir))
     return 0;
   entries = getinstalledrpmdbids(&state, "Name", "gpg-pubkey", &nentries, 0);
   for (i = 0 ; i < nentries; i++)
