@@ -743,6 +743,7 @@ precheck_solvable_files(struct cbdata *cbdata, Pool *pool, Id p)
   Hashval lastdirhash = 0;
   int lastdirlen = 0;
   int checkthisdir = 0;
+  Repodata *lastrepodata = 0;
 
   dataiterator_init(&di, pool, 0, p, SOLVABLE_FILELIST, 0, SEARCH_COMPLETE_FILELIST);
   while (dataiterator_step(&di))
@@ -757,11 +758,12 @@ precheck_solvable_files(struct cbdata *cbdata, Pool *pool, Id p)
       else
 	{
 	  /* hash the full path */
-	  if (di.kv.id != lastdirid)
+	  if (di.data != lastrepodata || di.kv.id != lastdirid)
 	    {
 	      const char *dir;
+	      lastrepodata = di.data;
 	      lastdirid = di.kv.id;
-	      dir = repodata_dir2str(di.data, lastdirid, "");
+	      dir = repodata_dir2str(lastrepodata, lastdirid, "");
 	      lastdirlen = strlen(dir);
 	      lastdirhash = strhash(dir);
 	      checkthisdir =  isindirmap(cbdata, lastdirhash ? lastdirhash : lastdirlen + 1);
