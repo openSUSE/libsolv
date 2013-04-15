@@ -1399,14 +1399,14 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     rootdir = pool_get_rootdir(pool);
   if (!(dbenv = opendbenv(pool, rootdir)))
     {
-      return pool_error(pool, -1, "repo_add_rpmdb: opendbenv failed");
+      return pool_error(pool, -1, "opendbenv failed");
     }
 
   /* XXX: should get ro lock of Packages database! */
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir ? rootdir : "");
   if (stat(dbpath, &packagesstat))
     {
-      pool_error(pool, -1, "repo_add_rpmdb: %s: %s", dbpath, strerror(errno));
+      pool_error(pool, -1, "%s: %s", dbpath, strerror(errno));
       dbenv->close(dbenv, 0);
       return -1;
     }
@@ -1424,13 +1424,13 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	count = count_headers(pool, rootdir, dbenv);
       if (db_create(&db, dbenv, 0))
 	{
-	  pool_error(pool, -1, "repo_add_rpmdb: db_create: %s", strerror(errno));
+	  pool_error(pool, -1, "db_create: %s", strerror(errno));
 	  dbenv->close(dbenv, 0);
 	  return -1;
 	}
       if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 	{
-	  pool_error(pool, -1, "repo_add_rpmdb: db->open Packages index failed: %s", strerror(errno));
+	  pool_error(pool, -1, "db->open Packages index failed: %s", strerror(errno));
 	  db->close(db, 0);
 	  dbenv->close(dbenv, 0);
 	  return -1;
@@ -1439,13 +1439,13 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	{
 	  db->close(db, 0);
 	  dbenv->close(dbenv, 0);
-	  return pool_error(pool, -1, "repo_add_rpmdb: db->get_byteswapped failed");
+	  return pool_error(pool, -1, "db->get_byteswapped failed");
 	}
       if (db->cursor(db, NULL, &dbc, 0))
 	{
 	  db->close(db, 0);
 	  dbenv->close(dbenv, 0);
-	  return pool_error(pool, -1, "repo_add_rpmdb: db->cursor failed");
+	  return pool_error(pool, -1, "db->cursor failed");
 	}
       rpmheadsize = 0;
       rpmhead = 0;
@@ -1554,13 +1554,13 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       memset(dircache, 0, sizeof(dircache));
       if (db_create(&db, dbenv, 0))
 	{
-	  pool_error(pool, -1, "repo_add_rpmdb: db_create: %s", strerror(errno));
+	  pool_error(pool, -1, "db_create: %s", strerror(errno));
 	  dbenv->close(dbenv, 0);
 	  return -1;
 	}
       if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 	{
-	  pool_error(pool, -1, "repo_add_rpmdb: db->open Name index failed: %s", strerror(errno));
+	  pool_error(pool, -1, "db->open Name index failed: %s", strerror(errno));
 	  db->close(db, 0);
 	  dbenv->close(dbenv, 0);
 	  return -1;
@@ -1569,13 +1569,13 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	{
 	  db->close(db, 0);
 	  dbenv->close(dbenv, 0);
-	  return pool_error(pool, -1, "repo_add_rpmdb: db->get_byteswapped failed");
+	  return pool_error(pool, -1, "db->get_byteswapped failed");
 	}
       if (db->cursor(db, NULL, &dbc, 0))
 	{
 	  db->close(db, 0);
 	  dbenv->close(dbenv, 0);
-	  return pool_error(pool, -1, "repo_add_rpmdb: db->cursor failed");
+	  return pool_error(pool, -1, "db->cursor failed");
 	}
       nrpmids = 0;
       rpmids = 0;
@@ -1673,13 +1673,13 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	    {
 	      if (db_create(&db, dbenv, 0))
 		{
-		  pool_error(pool, -1, "repo_add_rpmdb: db_create: %s", strerror(errno));
+		  pool_error(pool, -1, "db_create: %s", strerror(errno));
 		  dbenv->close(dbenv, 0);
 		  return -1;
 		}
 	      if (db->open(db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
 		{
-		  pool_error(pool, -1, "repo_add_rpmdb: db->open Packages index failed: %s", strerror(errno));
+		  pool_error(pool, -1, "db->open Packages index failed: %s", strerror(errno));
 		  db->close(db, 0);
 		  dbenv->close(dbenv, 0);
 		  return -1;
@@ -1688,7 +1688,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 		{
 		  db->close(db, 0);
 		  dbenv->close(dbenv, 0);
-		  return pool_error(pool, -1, "repo_add_rpmdb: db->get_byteswapped failed");
+		  return pool_error(pool, -1, "db->get_byteswapped failed");
 		}
 	    }
           rpmdbid2db(buf, rp->dbid, byteswapped);
