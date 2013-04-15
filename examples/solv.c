@@ -145,7 +145,7 @@ yum_substitute(Pool *pool, char *line)
 	      Queue q;
 	
 	      queue_init(&q);
-	      rpmstate = rpm_state_create(pool_get_rootdir(pool));
+	      rpmstate = rpm_state_create(pool, pool_get_rootdir(pool));
 	      rpm_installedrpmdbids(rpmstate, "Providename", "redhat-release", &q);
 	      if (q.count)
 		{
@@ -3171,7 +3171,7 @@ rerunsolver:
 
       printf("Searching for file conflicts\n");
       queue_init(&conflicts);
-      fcstate.rpmstate = rpm_state_create(rootdir);
+      fcstate.rpmstate = rpm_state_create(pool, rootdir);
       fcstate.newpkgscnt = newpkgs;
       fcstate.checkq = &checkq;
       fcstate.newpkgsfps = newpkgsfps;

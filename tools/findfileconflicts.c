@@ -54,7 +54,7 @@ int main(int argc, char **argv)
   queue_init(&conflicts);
   FOR_REPO_SOLVABLES(installed, p, s)
     queue_push(&todo, p);
-  state = rpm_state_create(pool_get_rootdir(pool));
+  state = rpm_state_create(pool, pool_get_rootdir(pool));
   pool_findfileconflicts(pool, &todo, 0, &conflicts, FINDFILECONFLICTS_USE_SOLVABLEFILELIST | FINDFILECONFLICTS_CHECK_DIRALIASING | FINDFILECONFLICTS_USE_ROOTDIR, &iterate_handle, state);
   rpm_state_free(state);
   queue_free(&todo);

@@ -32,7 +32,7 @@ extern Id repo_add_pubkey(Repo *repo, const char *key, int flags);
 #define RPM_ITERATE_FILELIST_NOGHOSTS	(1 << 3)
 
 /* create and free internal state, rootdir is the rootdir of the rpm database */
-extern void *rpm_state_create(const char *rootdir);
+extern void *rpm_state_create(Pool *pool, const char *rootdir);
 extern void *rpm_state_free(void *rpmstate);
 
 /* return all matching rpmdbids */

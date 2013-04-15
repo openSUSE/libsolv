@@ -2268,6 +2268,7 @@ rpm_query(void *rpmhandle, Id what)
 
 
 struct rpm_by_state {
+  Pool *pool; 
   RpmHead *rpmhead;
   int rpmheadsize;
 
@@ -2429,10 +2430,11 @@ freestate(struct rpm_by_state *state)
 }
 
 void *
-rpm_state_create(const char *rootdir)
+rpm_state_create(Pool *pool, const char *rootdir)
 {
   struct rpm_by_state *state;
   state = solv_calloc(1, sizeof(*state));
+  state->pool = pool;
   if (rootdir)
     state->rootdir = solv_strdup(rootdir);
   return state;
@@ -3195,6 +3197,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
     rootdir = pool_get_rootdir(pool);
 
   memset(&state, 0, sizeof(state));
+  state.pool = pool;
   if (!(state.dbenv = opendbenv(rootdir)))
     return 0;
   entries = getinstalledrpmdbids(&state, "Name", "gpg-pubkey", &nentries, 0);
