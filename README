@@ -15,6 +15,7 @@ Supported package formats:
   - rpm/rpm5
   - deb
   - arch linux
+  - haiku
 
 Supported repository formats:
   - rpmmd (primary, filelists, comps, deltainfo/presto, updateinfo)
@@ -22,6 +23,7 @@ Supported repository formats:
   - mandriva/mageia (synthesis, info, files)
   - arch linux
   - red carpet helix format
+  - haiku
 
 Requires: cmake 2.4.x
 
