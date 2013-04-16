@@ -652,13 +652,13 @@ pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
 static int
 pool_match_flags_evr_rel_compat(Pool *pool, Reldep *range, int flags, int evr)
 {
-  /* range->name is the backwards compatibility version, range->evr the
-     actual version. If flags are '>=' or '>', we match the compatibility
-     version as well, otherwise only the actual version. */
+  /* range->name is the actual version, range->evr the backwards compatibility
+     version. If flags are '>=' or '>', we match the compatibility version
+     as well, otherwise only the actual version. */
   if (!(flags & REL_GT) || (flags & REL_LT))
-    return pool_match_flags_evr(pool, REL_EQ, range->evr, flags, evr);
-  return pool_match_flags_evr(pool, REL_LT | REL_EQ, range->evr, flags, evr) &&
-         pool_match_flags_evr(pool, REL_GT | REL_EQ, range->name, REL_EQ, evr);
+    return pool_match_flags_evr(pool, REL_EQ, range->name, flags, evr);
+  return pool_match_flags_evr(pool, REL_LT | REL_EQ, range->name, flags, evr) &&
+         pool_match_flags_evr(pool, REL_GT | REL_EQ, range->evr, REL_EQ, evr);
 }
 #endif
 
