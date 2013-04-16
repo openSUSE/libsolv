@@ -53,7 +53,7 @@ pool_solvable2str(Pool *pool, Solvable *s)
     }
   if (al)
     {
-      p[nl + el] = '.';
+      p[nl + el] = pool->disttype == DISTTYPE_HAIKU ? '-' : '.';
       strcpy(p + nl + el + 1, a);
     }
   return p;
