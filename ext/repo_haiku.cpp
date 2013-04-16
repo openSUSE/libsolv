@@ -56,7 +56,7 @@ static void add_dependency(Repo *repo, Offset &dependencies, const char *name,
 
     if (compatVersion && compatVersion[0] != '\0')
       {
-        versionId = pool_rel2id(pool, versionID, pool_str2id(pool, compatVersion, 1),
+        versionId = pool_rel2id(pool, versionId, pool_str2id(pool, compatVersion, 1),
           REL_COMPAT, 1);
       }
 
