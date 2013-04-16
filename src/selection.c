@@ -523,6 +523,12 @@ selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
   if ((r = strpbrk(rname, "<=>")) != 0)
     {
       int nend = r - rname;
+      if (nend && *r == '=' && r[-1] == '!')
+	{
+	  nend--;
+	  r++;
+	  rflags = REL_LT|REL_GT;
+	}
       for (; *r; r++)
         {
           if (*r == '<')
@@ -676,6 +682,29 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
 	}
       /* is there a vaild arch? */
       if ((r2 = strchr(r, '_')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
+	{
+	  *r2 = 0;	/* split off */
+          selection_filter_rel(pool, selection, REL_ARCH, archid);
+	}
+      selection_filter_rel(pool, selection, REL_EQ, pool_str2id(pool, r, 1));
+      solv_free(rname);
+      return ret | SELECTION_CANON;
+    }
+
+  if (pool->disttype == DISTTYPE_HAIKU)
+    {
+      if ((r = strchr(name, '-')) == 0)
+	return 0;
+      rname = solv_strdup(name);	/* so we can modify it */
+      r = rname + (r - name);
+      *r++ = 0;
+      if ((ret = selection_depglob(pool, selection, rname, flags)) == 0)
+	{
+	  solv_free(rname);
+	  return 0;
+	}
+      /* is there a vaild arch? */
+      if ((r2 = strchr(r, '-')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
 	{
 	  *r2 = 0;	/* split off */
           selection_filter_rel(pool, selection, REL_ARCH, archid);
