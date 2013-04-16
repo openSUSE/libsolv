@@ -198,7 +198,7 @@ solv_vercmp_rpm_notilde(const char *s1, const char *q1, const char *s2, const ch
 
 #endif
 
-#if defined(HAIKU)
+#if defined(HAIKU) || defined(MULTI_SEMANTICS)
 
 static int
 solv_cmp_version_part_haiku(const char *s1, const char *q1, const char *s2,
@@ -268,9 +268,9 @@ solv_vercmp_haiku(const char *s1, const char *q1, const char *s2, const char *q2
   int cmp;
 
   /* find pre-release separator */
-  while (pre1 != q1 && *pre1 != '/')
+  while (pre1 != q1 && *pre1 != '-')
     pre1++;
-  while (pre2 != q2 && *pre2 != '/')
+  while (pre2 != q2 && *pre2 != '-')
     pre2++;
 
   /* compare main versions */
@@ -285,8 +285,6 @@ solv_vercmp_haiku(const char *s1, const char *q1, const char *s2, const char *q2
     return -1;
 
   return solv_cmp_version_part_haiku(pre1 + 1, q1, pre2 + 1, q2);
-  cmp = solv_cmp_version_part_haiku(pre1 + 1, q1, pre2 + 1, q2);
-  return cmp == 0 ? 0 : cmp < 0 ? -1 : 1; /* must return -1, 0, or 1 */
 }
 
 #endif /* HAIKU */
@@ -310,11 +308,15 @@ solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 }
 
 #if defined(MULTI_SEMANTICS)
-# define solv_vercmp (*(pool->disttype == DISTTYPE_DEB ? &solv_vercmp_deb : &solv_ver##cmp_rpm))
+# define solv_vercmp (*(pool->disttype == DISTTYPE_DEB ? &solv_vercmp_deb : \
+                        pool->disttype == DISTTYPE_HAIKU ? solv_vercmp_haiku : \
+                        &solv_ver##cmp_rpm))
 #elif defined(DEBIAN)
 # define solv_vercmp solv_vercmp_deb
 #elif defined(ARCHLINUX)
 # define solv_vercmp solv_vercmp_rpm_notilde
+#elif defined(HAIKU)
+# define solv_vercmp solv_vercmp_haiku
 #else
 # define solv_vercmp solv_vercmp_rpm
 #endif

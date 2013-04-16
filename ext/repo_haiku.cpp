@@ -32,10 +32,9 @@ static BString haiku_version_to_string(const BPackageVersion &version)
         string << '.' << version.Micro();
     }
 
-  // append pre-release -- separate it with '/' to keep pool_evrcmp_str() happy
-  // (it expects only the release to be separated by '-')
+  // append pre-release
   if (!version.PreRelease().IsEmpty())
-    string << '/' << version.PreRelease();
+    string << '-' << version.PreRelease();
 
   // append revision
   if (version.Revision() != 0)
@@ -59,7 +58,6 @@ static void add_dependency(Repo *repo, Offset &dependencies, const char *name,
       {
         versionId = pool_rel2id(pool, pool_str2id(pool, compatVersion, 1),
           versionId, REL_COMPAT, 1);
-        versionId = MAKERELDEP(versionId);
       }
 
     dependency = pool_rel2id(pool, dependency, versionId, flags, 1);
@@ -152,7 +150,7 @@ static Id add_package_info_to_repo(Repo *repo, Repodata *repoData,
   name << packageInfo.Name();
   solvable->name = pool_str2id(pool, name, 1);
   if (packageInfo.Architecture() == B_PACKAGE_ARCHITECTURE_ANY)
-    solvable->arch = ARCH_NOARCH;
+    solvable->arch = ARCH_ANY;
   else
     solvable->arch = pool_str2id(pool,
       BPackageInfo::kArchitectureNames[packageInfo.Architecture()], 1);

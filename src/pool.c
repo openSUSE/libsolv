@@ -62,6 +62,10 @@ pool_create(void)
 #elif defined(ARCHLINUX)
   pool->disttype = DISTTYPE_ARCH;
   pool->noarchid = ARCH_ANY;
+#elif defined(HAIKU)
+  pool->disttype = DISTTYPE_HAIKU;
+  pool->noarchid = ARCH_ANY;
+  pool->obsoleteusesprovides = 1;
 #else
   pool->disttype = DISTTYPE_RPM;
   pool->noarchid = ARCH_NOARCH;
@@ -141,6 +145,8 @@ pool_setdisttype(Pool *pool, int disttype)
   if (disttype == DISTTYPE_DEB)
     pool->noarchid = ARCH_ALL;
   if (disttype == DISTTYPE_ARCH)
+    pool->noarchid = ARCH_ANY;
+  if (disttype == DISTTYPE_HAIKU)
     pool->noarchid = ARCH_ANY;
   pool->solvables[SYSTEMSOLVABLE].arch = pool->noarchid;
 }
@@ -599,6 +605,11 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
   return 0;
 }
 
+#if defined(HAIKU) || defined(MULTI_SEMANTICS)
+/* forward declaration */
+static int pool_match_flags_evr_rel_compat(Pool *pool, Reldep *range, int flags, int evr);
+#endif
+
 /* match (flags, evr) against provider (pflags, pevr) */
 static inline int
 pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
@@ -611,19 +622,14 @@ pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
     return 1;		/* both rels show in the same direction */
   if (pevr == evr)
     return (flags & pflags & REL_EQ) ? 1 : 0;
+#if defined(HAIKU) || defined(MULTI_SEMANTICS)
   if (ISRELDEP(pevr))
     {
-      Reldep *range = GETRELDEP(pool, pevr);
-      if (range->flags != REL_COMPAT)
-        return 0;	/* unsupported */
-      /* range->name is the backwards compatibility version, range->evr the
-         actual version. If flags are '>=' or '>', we match the compatibility
-         version as well, otherwise only the actual version. */
-      if (!(flags & REL_GT) || (flags & REL_LT))
-        return pool_match_flags_evr(pool, REL_EQ, range->evr, flags, evr);
-      return pool_match_flags_evr(pool, REL_LT | REL_EQ, range->evr, flags, evr) && 
-        pool_match_flags_evr(pool, REL_GT | REL_EQ, range->name, REL_EQ, evr);
+      Reldep *rd = GETRELDEP(pool, pevr);
+      if (rd->flags == REL_COMPAT)
+	return pool_match_flags_evr_rel_compat(pool, rd, flags, evr);
     }
+#endif
   switch (pool_evrcmp(pool, pevr, evr, EVRCMP_DEPCMP))
     {
     case -2:
@@ -641,6 +647,20 @@ pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
     }
   return 0;
 }
+
+#if defined(HAIKU) || defined(MULTI_SEMANTICS)
+static int
+pool_match_flags_evr_rel_compat(Pool *pool, Reldep *range, int flags, int evr)
+{
+  /* range->name is the backwards compatibility version, range->evr the
+     actual version. If flags are '>=' or '>', we match the compatibility
+     version as well, otherwise only the actual version. */
+  if (!(flags & REL_GT) || (flags & REL_LT))
+    return pool_match_flags_evr(pool, REL_EQ, range->evr, flags, evr);
+  return pool_match_flags_evr(pool, REL_LT | REL_EQ, range->evr, flags, evr) &&
+         pool_match_flags_evr(pool, REL_GT | REL_EQ, range->name, REL_EQ, evr);
+}
+#endif
 
 /* match two dependencies (d1 = provider) */
 

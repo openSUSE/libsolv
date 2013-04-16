@@ -154,16 +154,23 @@ pool_id2rel(const Pool *pool, Id id)
   switch (rd->flags)
     {
     case 0: case 2: case 3:
-    case 5: case 6: case 7:
-      return rels[rd->flags];
+    case 6: case 7:
 #if !defined(DEBIAN) && !defined(MULTI_SEMANTICS)
     case 1: case 4:
+#endif
+#if !defined(HAIKU) && !defined(MULTI_SEMANTICS)
+    case 5:
+#endif
       return rels[rd->flags];
-#else
+#if defined(DEBIAN) || defined(MULTI_SEMANTICS)
     case 1:
       return pool->disttype == DISTTYPE_DEB ? " >> " : rels[rd->flags];
     case 4:
       return pool->disttype == DISTTYPE_DEB ? " << " : rels[rd->flags];
+#endif
+#if defined(HAIKU) || defined(MULTI_SEMANTICS)
+    case 5:
+      return pool->disttype == DISTTYPE_HAIKU ? " != " : rels[rd->flags];
 #endif
     case REL_AND:
       return " & ";
@@ -179,6 +186,8 @@ pool_id2rel(const Pool *pool, Id id)
       return " FILECONFLICT ";
     case REL_COND:
       return " IF ";
+    case REL_COMPAT:
+      return " compat >= ";
     default:
       break;
     }

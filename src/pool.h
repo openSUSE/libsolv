@@ -155,6 +155,7 @@ struct _Pool {
 #define DISTTYPE_RPM	0
 #define DISTTYPE_DEB	1
 #define DISTTYPE_ARCH   2
+#define DISTTYPE_HAIKU  3
 
 #define SOLV_FATAL			(1<<0)
 #define SOLV_ERROR			(1<<1)

@@ -259,6 +259,7 @@ SOLV_1.0 {
 		solv_timems;
 		solv_vercmp;
 		solv_vercmp_deb;
+		solv_vercmp_haiku;
 		solv_vercmp_rpm;
 		solv_vercmp_rpm_notilde;
 		solv_version;
