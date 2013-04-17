@@ -372,13 +372,13 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
 	    {
               /* check for overlong sequences */
               if ((c & 0x820823e0) == 0x80000000)
-                c = 0xfdffffff;
+                break;
               else if ((c & 0x020821f0) == 0x02000000)
-                c = 0xfff7ffff;
+                break;
               else if ((c & 0x000820f8) == 0x00080000)
-                c = 0xffffd000;
+                break;
               else if ((c & 0x0000207c) == 0x00002000)
-                c = 0xffffff70;
+                break;
             }
         }
       else
