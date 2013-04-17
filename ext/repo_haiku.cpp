@@ -22,9 +22,8 @@ static BString haiku_version_to_string(const BPackageVersion &version)
   if (version.InitCheck() != B_OK)
     return BString();
 
-  // compose ":<major>.<minor>.<micro>" (empty epoch)
-  BString string(":");
-  string << version.Major();
+  // compose "<major>.<minor>.<micro>" (empty epoch)
+  BString string(version.Major());
   if (!version.Minor().IsEmpty())
     {
       string << '.' << version.Minor();
