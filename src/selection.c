@@ -218,7 +218,7 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
             selection->elements[i] |= SOLVER_SETEVR;	/* debian can't match version only like rpm */
 	  else
 	    {
-	      const char *rel =  strchr(pool_id2str(pool, relevr), '-');
+	      const char *rel =  strrchr(pool_id2str(pool, relevr), '-');
 	      if (rel && pool->disttype == DISTTYPE_HAIKU && (rel[1] < '0' || rel[1] > '9'))
 		rel = 0;
 	      selection->elements[i] |= rel ? SOLVER_SETEVR : SOLVER_SETEV;
