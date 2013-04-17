@@ -1608,11 +1608,10 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		{
 		  if (pool->disttype != DISTTYPE_DEB)
 		    {
-		      const char *evr = pool_id2str(pool, rd->evr);
-		      if (strchr(evr, '-'))
-			set |= SOLVER_SETEVR;
-		      else
-			set |= SOLVER_SETEV;
+		      const char *rel = strchr(pool_id2str(pool, rd->evr), '-');
+		      if (rel && pool->disttype == DISTTYPE_HAIKU && (rel[1] < '0' || rel[1] > '9'))
+			rel = 0;
+		      set |= rel ? SOLVER_SETEVR : SOLVER_SETEV;
 		    }
 		  else
 		    set |= SOLVER_SETEVR;
