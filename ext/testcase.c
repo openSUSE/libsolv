@@ -981,6 +981,9 @@ testcase_write_testtags(Repo *repo, FILE *fp)
       evr = pool_id2str(pool, s->evr);
       arch = pool_id2str(pool, s->arch);
       release = strrchr(evr, '-');
+      /* haikus releases start numeric */
+      if (release && pool->disttype == DISTTYPE_HAIKU && (release[1] < '0' || release[1] > '9'))
+	release = evr + strlen(evr);
       if (!release)
 	release = evr + strlen(evr);
       fprintf(fp, "=Pkg: %s %.*s %s %s\n", name, (int)(release - evr), evr, *release && release[1] ? release + 1 : "-", arch);

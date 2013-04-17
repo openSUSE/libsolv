@@ -390,7 +390,14 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
   for (s2 = evr2, r2 = 0; *s2; s2++)
     if (*s2 == '-')
       r2 = s2;
-
+  if (pool->disttype == DISTTYPE_HAIKU)
+    {
+      /* make sure it's really a release, releases always are numeric */
+      if (r1 && (r1[1] < '0' || r1[1] > '9'))
+	r1 = 0;
+      if (r2 && (r2[1] < '0' || r2[1] > '9'))
+	r2 = 0;
+    }
   r = 0;
   if (mode != EVRCMP_MATCH || (evr1 != (r1 ? r1 : s1) && evr2 != (r2 ? r2 : s2)))
     r = solv_vercmp(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2);
@@ -490,6 +497,12 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
   for (s1 = evr1, r1 = 0; *s1; s1++)
     if (*s1 == '-')
       r1 = s1;
+  if (pool->disttype == DISTTYPE_HAIKU)
+    {
+      /* make sure it's really a release, releases always are numeric */
+      if (r1 && (r1[1] < '0' || r1[1] > '9'))
+	r1 = 0;
+    }
   if (version)
     {
       r = solv_vercmp(evr1, r1 ? r1 : s1, version, version + strlen(version));
