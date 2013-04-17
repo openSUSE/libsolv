@@ -686,7 +686,7 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
 	  return 0;
 	}
       /* is there a vaild arch? */
-      if ((r2 = strchr(r, '_')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
+      if ((r2 = strrchr(r, '_')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
 	{
 	  *r2 = 0;	/* split off */
           selection_filter_rel(pool, selection, REL_ARCH, archid);
@@ -709,7 +709,7 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
 	  return 0;
 	}
       /* is there a vaild arch? */
-      if ((r2 = strchr(r, '-')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
+      if ((r2 = strrchr(r, '-')) != 0 && r[1] && (archid = str2archid(pool, r + 1)) != 0)
 	{
 	  *r2 = 0;	/* split off */
           selection_filter_rel(pool, selection, REL_ARCH, archid);
