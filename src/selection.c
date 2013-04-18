@@ -803,7 +803,11 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
     {
       Id select = sel2->elements[i] & SOLVER_SELECTMASK;
       if (select == SOLVER_SOLVABLE_ALL)
-	return;
+	{
+	  queue_free(&q1);
+	  map_free(&m2);
+	  return;
+	}
       if (select == SOLVER_SOLVABLE_REPO)
 	{
 	  Solvable *s;
@@ -878,6 +882,8 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
       j += 2;
     }
   queue_truncate(sel1, j);
+  queue_free(&q1);
+  map_free(&m2);
 }
 
 void
