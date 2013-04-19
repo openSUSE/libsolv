@@ -251,9 +251,9 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
   int x, tag, l;
   unsigned char keyid[8];
   unsigned int kcr = 0, maxex = 0;
+#if 0
   unsigned char *pubkey = 0;
   unsigned char *userid = 0;
-#if 0
   int pubkeyl = 0;
   int useridl = 0;
 #endif
@@ -312,14 +312,14 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	return;
       if (tag == 6)
 	{
+#if 0
 	  pubkey = solv_realloc(pubkey, l);
 	  if (l)
 	    memcpy(pubkey, p, l);
-#if 0
 	  pubkeyl = l;
 #endif
 	  kcr = 0;
-	  if (p[0] == 3)
+	  if (p[0] == 3 && l >= 10)
 	    {
 	      unsigned int ex;
 	      void *h;
@@ -334,25 +334,32 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      memset(keyid, 0, 8);
 	      if (p[7] == 1)	/* RSA */
 		{
-		  int i, ql;
+		  int i, ql, ql2;
 		  unsigned char fp[16];
 		  char fpx[32 + 1];
 		  unsigned char *q;
 
-		  ql = ((p[8] << 8 | p[9]) + 7) / 8;
-		  memcpy(keyid, p + 10 + ql - 8, 8);
-		  h = solv_chksum_create(REPOKEY_TYPE_MD5);
-		  solv_chksum_add(h, p + 10, ql);
-		  q = p + 10 + ql;
-		  ql = ((q[0] << 8 | q[1]) + 7) / 8;
-		  solv_chksum_add(h, q + 2, ql);
-		  solv_chksum_free(h, fp);
-		  for (i = 0; i < 16; i++)
-		    sprintf(fpx + i * 2, "%02x", fp[i]);
-		  repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
+		  ql = ((p[8] << 8 | p[9]) + 7) / 8;	/* length of public modulus */
+		  if (ql >= 8 && 10 + ql + 2 <= l)
+		    {
+		      memcpy(keyid, p + 10 + ql - 8, 8);	/* keyid is last 64 bits of public modulus */
+		      q = p + 10 + ql;
+		      ql2 = ((q[0] << 8 | q[1]) + 7) / 8;	/* length of encryption exponent */
+		      if (10 + ql + 2 + ql2 <= l)
+			{
+			  /* fingerprint is the md5 over the two MPI bodies */
+			  h = solv_chksum_create(REPOKEY_TYPE_MD5);
+			  solv_chksum_add(h, p + 10, ql);
+			  solv_chksum_add(h, q + 2, ql2);
+			  solv_chksum_free(h, fp);
+			  for (i = 0; i < 16; i++)
+			    sprintf(fpx + i * 2, "%02x", fp[i]);
+			  repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
+			}
+		    }
 		}
 	    }
-	  else if (p[0] == 4)
+	  else if (p[0] == 4 && l >= 6)
 	    {
 	      int i;
 	      void *h;
@@ -364,6 +371,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      hdr[0] = 0x99;
 	      hdr[1] = l >> 8;
 	      hdr[2] = l;
+	      /* fingerprint is the sha1 over the packet */
 	      h = solv_chksum_create(REPOKEY_TYPE_SHA1);
 	      solv_chksum_add(h, hdr, 3);
 	      solv_chksum_add(h, p, l);
@@ -371,7 +379,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      for (i = 0; i < 20; i++)
 		sprintf(fpx + i * 2, "%02x", fp[i]);
 	      repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
-	      memcpy(keyid, fp + 12, 8);
+	      memcpy(keyid, fp + 12, 8);	/* keyid is last 64 bits of fingerprint */
 	    }
 	}
       if (tag == 2)
@@ -454,6 +462,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 		  while (ql)
 		    {
 		      int sl;
+		      /* decode sub-packet length */
 		      x = *q++;
 		      ql--;
 		      if (x < 192)
@@ -560,20 +569,22 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 		}
 	    }
 	}
+#if 0
       if (tag == 13)
 	{
 	  userid = solv_realloc(userid, l);
 	  if (l)
 	    memcpy(userid, p, l);
-#if 0
 	  useridl = l;
-#endif
 	}
+#endif
     }
   if (maxex)
     repodata_set_num(data, s - s->repo->pool->solvables, PUBKEY_EXPIRES, maxex);
+#if 0
   solv_free(pubkey);
   solv_free(userid);
+#endif
 }
 
 /* this is private to rpm, but rpm lacks an interface to retrieve
