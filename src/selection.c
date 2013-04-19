@@ -219,8 +219,6 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 	  else
 	    {
 	      const char *rel =  strrchr(pool_id2str(pool, relevr), '-');
-	      if (rel && pool->disttype == DISTTYPE_HAIKU && (rel[1] < '0' || rel[1] > '9'))
-		rel = 0;
 	      selection->elements[i] |= rel ? SOLVER_SETEVR : SOLVER_SETEV;
 	    }
         }
@@ -805,7 +803,11 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
     {
       Id select = sel2->elements[i] & SOLVER_SELECTMASK;
       if (select == SOLVER_SOLVABLE_ALL)
-	return;
+	{
+	  queue_free(&q1);
+	  map_free(&m2);
+	  return;
+	}
       if (select == SOLVER_SOLVABLE_REPO)
 	{
 	  Solvable *s;
@@ -880,6 +882,8 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
       j += 2;
     }
   queue_truncate(sel1, j);
+  queue_free(&q1);
+  map_free(&m2);
 }
 
 void

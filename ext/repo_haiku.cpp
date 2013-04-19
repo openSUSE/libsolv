@@ -17,31 +17,6 @@
 using namespace BPackageKit;
 using namespace BPackageKit::BHPKG;
 
-static BString haiku_version_to_string(const BPackageVersion &version)
-{
-  if (version.InitCheck() != B_OK)
-    return BString();
-
-  // compose "<major>.<minor>.<micro>" (empty epoch)
-  BString string(version.Major());
-  if (!version.Minor().IsEmpty())
-    {
-      string << '.' << version.Minor();
-      if (!version.Micro().IsEmpty())
-        string << '.' << version.Micro();
-    }
-
-  // append pre-release
-  if (!version.PreRelease().IsEmpty())
-    string << '-' << version.PreRelease();
-
-  // append revision
-  if (version.Revision() != 0)
-    string << '-' << version.Revision();
-
-  return string;
-}
-
 static void add_dependency(Repo *repo, Offset &dependencies, const char *name,
   const char *version, int flags, const char* compatVersion = NULL)
 {
@@ -68,7 +43,7 @@ static void add_dependency(Repo *repo, Offset &dependencies, const char *name,
 static void add_dependency(Repo *repo, Offset &dependencies, const char *name,
   const BPackageVersion &version, int flags)
 {
-  add_dependency(repo, dependencies, name, haiku_version_to_string(version),
+  add_dependency(repo, dependencies, name, version.ToString(),
     flags);
 }
 
@@ -78,8 +53,8 @@ static void add_resolvables(Repo *repo, Offset &dependencies,
   for (int32 i = 0; BPackageResolvable *resolvable = resolvables.ItemAt(i); i++)
     {
       add_dependency(repo, dependencies, resolvable->Name(),
-        haiku_version_to_string(resolvable->Version()), REL_EQ,
-        haiku_version_to_string(resolvable->CompatibleVersion()));
+        resolvable->Version().ToString(), REL_EQ,
+        resolvable->CompatibleVersion().ToString());
     }
 }
 
@@ -153,8 +128,7 @@ static Id add_package_info_to_repo(Repo *repo, Repodata *repoData,
   else
     solvable->arch = pool_str2id(pool,
       BPackageInfo::kArchitectureNames[packageInfo.Architecture()], 1);
-  solvable->evr = pool_str2id(pool,
-    haiku_version_to_string(packageInfo.Version()), 1);
+  solvable->evr = pool_str2id(pool, packageInfo.Version().ToString(), 1);
   solvable->vendor = pool_str2id(pool, packageInfo.Vendor(), 1);
   repodata_set_str(repoData, solvable - pool->solvables, SOLVABLE_SUMMARY,
     packageInfo.Summary());
