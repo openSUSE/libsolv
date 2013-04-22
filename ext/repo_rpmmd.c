@@ -518,7 +518,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
   else
     id = name;
 #if 0
-  fprintf(stderr, "new dep %s%s%s\n", pool_id2str(pool, d), id2rel(pool, d), id2evr(pool, d));
+  fprintf(stderr, "new dep %s\n", pool_dep2str(pool, id));
 #endif
   return repo_addid_dep(pd->repo, olddeps, id, marker);
 }

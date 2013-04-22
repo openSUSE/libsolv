@@ -121,12 +121,10 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 const char *
 pool_id2str(const Pool *pool, Id id)
 {
-  if (ISRELDEP(id))
+  while (ISRELDEP(id))
     {
       Reldep *rd = GETRELDEP(pool, id);
-      if (ISRELDEP(rd->name))
-	return "REL";
-      return pool->ss.stringspace + pool->ss.strings[rd->name];
+      id = rd->name;
     }
   return pool->ss.stringspace + pool->ss.strings[id];
 }
