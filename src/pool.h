@@ -225,6 +225,9 @@ extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribut
 extern void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata);
 extern void pool_setdebugmask(Pool *pool, int mask);
 extern void pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata);
+extern void pool_setnamespacecallback(Pool *pool, Id (*cb)(struct _Pool *, void *, Id, Id), void *nscbdata);
+extern void pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr);
+
 extern void pool_set_custom_vendorcheck(Pool *pool, int (*vendorcheck)(struct _Pool *, Solvable *, Solvable *));
 
 

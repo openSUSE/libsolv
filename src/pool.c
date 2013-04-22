@@ -895,6 +895,27 @@ pool_addrelproviders(Pool *pool, Id d)
   return pool->whatprovides_rel[d];
 }
 
+void
+pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr)
+{
+  int nrels = pool->nrels;
+  Id d;
+  Reldep *rd;
+
+  if (!pool->whatprovides_rel)
+    return;
+  for (d = 1, rd = pool->rels + d; d < nrels; d++, rd++)
+    {
+      if (rd->flags != REL_NAMESPACE || rd->name == NAMESPACE_OTHERPROVIDERS)
+	continue;
+      if (ns && rd->name != ns)
+	continue;
+      if (evr && rd->evr != evr)
+	continue;
+      pool->whatprovides_rel[d] = 0;
+    }
+}
+
 /*************************************************************************/
 
 void
@@ -993,6 +1014,12 @@ void pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata
 {
   pool->loadcallback = cb;
   pool->loadcallbackdata = loadcbdata;
+}
+
+void pool_setnamespacecallback(Pool *pool, Id (*cb)(struct _Pool *, void *, Id, Id), void *nscbdata)
+{
+  pool->nscallback = cb;
+  pool->nscallbackdata = nscbdata;
 }
 
 /*************************************************************************/

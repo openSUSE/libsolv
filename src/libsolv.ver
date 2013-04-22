@@ -61,6 +61,7 @@ SOLV_1.0 {
 		pool_evrcmp;
 		pool_evrcmp_str;
 		pool_evrmatch;
+		pool_flush_namespaceproviders;
 		pool_free;
 		pool_freeallrepos;
 		pool_freeidhashes;
@@ -102,6 +103,7 @@ SOLV_1.0 {
 		pool_setdebugmask;
 		pool_setdisttype;
 		pool_setloadcallback;
+		pool_setnamespacecallback;
 		pool_setvendorclasses;
 		pool_shrink_rels;
 		pool_shrink_strings;
