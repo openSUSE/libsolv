@@ -135,7 +135,7 @@ Group:          Development/Languages/Ruby
 Ruby bindings for sat solver.
 
 %package -n python-solv
-%if 0%{?py_requires:1}
+%if 0%{?py_requires:1} && %{with python_binding}
 %py_requires
 %endif
 Summary:        Python bindings for the libsolv library
@@ -192,8 +192,10 @@ python -O %py_libdir/py_compile.py *.py
 popd
 %endif
 %endif
+%if %{with disable_shared}
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
+%endif
 
 %clean
 rm -rf "$RPM_BUILD_ROOT"
