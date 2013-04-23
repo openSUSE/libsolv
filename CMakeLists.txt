@@ -97,6 +97,7 @@ IF (MANDRIVA)
 MESSAGE (STATUS "Building for Mandriva/Mageia")
 ADD_DEFINITIONS (-DMANDRIVA)
 SET (ENABLE_MDKREPO ON)
+SET (ENABLE_RPMDB ON)
 SET (have_system ${have_system}x)
 ENDIF (MANDRIVA)
 
