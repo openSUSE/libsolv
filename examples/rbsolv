@@ -492,7 +492,7 @@ class Repo_system < Repo_generic
     if @handle.respond_to? :add_products
       @handle.add_products("/etc/products.d", Solv::Repo::REPO_NO_INTERNALIZE)
     end
-    @handle.add_rpmdb(nil, Solv::Repo::REPO_REUSE_REPODATA)
+    @handle.add_rpmdb(Solv::Repo::REPO_REUSE_REPODATA)
     writecachedrepo(nil)
     return true
   end

@@ -1421,8 +1421,8 @@ rb_eval_string(
   }
 
 #ifdef ENABLE_RPMDB
-  bool add_rpmdb(Repo *ref, int flags = 0) {
-    return repo_add_rpmdb($self, ref, flags);
+  bool add_rpmdb(int flags = 0) {
+    return repo_add_rpmdb($self, 0, flags);
   }
   Id add_rpm(const char *name, int flags = 0) {
     return repo_add_rpm($self, name, flags);

@@ -478,7 +478,7 @@ sub load {
   if (defined(&solv::Repo::add_products)) {
     $self->{'handle'}->add_products("/etc/products.d", $solv::Repo::REPO_NO_INTERNALIZE);
   }
-  $self->{'handle'}->add_rpmdb(undef, $solv::Repo::REPO_REUSE_REPODATA);
+  $self->{'handle'}->add_rpmdb($solv::Repo::REPO_REUSE_REPODATA);
   $self->writecachedrepo();
   return 1;
 }
