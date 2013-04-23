@@ -1424,6 +1424,9 @@ rb_eval_string(
   bool add_rpmdb(int flags = 0) {
     return repo_add_rpmdb($self, 0, flags);
   }
+  bool add_rpmdb_reffp(FILE *reffp, int flags = 0) {
+    return repo_add_rpmdb_reffp($self, reffp, flags);
+  }
   Id add_rpm(const char *name, int flags = 0) {
     return repo_add_rpm($self, name, flags);
   }
