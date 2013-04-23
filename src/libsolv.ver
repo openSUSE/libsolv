@@ -227,6 +227,7 @@ SOLV_1.0 {
 		repodata_str2dir;
 		repodata_stringify;
 		repodata_swap_attrs;
+		repodata_translate_id;
 		repodata_unset;
 		repodata_unset_uninternalized;
 		repodata_write;

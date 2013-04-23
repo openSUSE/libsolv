@@ -782,6 +782,23 @@ repodata_localize_id(Repodata *data, Id id, int create)
 }
 
 Id
+repodata_translate_id(Repodata *data, Repodata *fromdata, Id id, int create)
+{
+  if (!id || !data || !fromdata)
+    return id;
+  if (!data->localpool || !fromdata->localpool)
+    {
+      if (fromdata->localpool)
+	id = repodata_globalize_id(fromdata, id, create);
+      if (data->localpool)
+	id = repodata_localize_id(data, id, create);
+      return id;
+    }
+  /* localpool is set in both data and fromdata */
+  return stringpool_str2id(&data->spool, stringpool_id2str(&fromdata->spool, id), create);
+}
+
+Id
 repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid)
 {
   Id *ap;

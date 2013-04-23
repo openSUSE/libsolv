@@ -1396,8 +1396,8 @@ copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cach
   Id compid = dirpool_compid(&fromdata->dirpool, did);
   if (parent)
     parent = copydir(pool, data, fromdata, parent, cache);
-  if (fromdata->localpool)
-    compid = repodata_globalize_id(fromdata, compid, 1);
+  if (data->localpool || fromdata->localpool)
+    compid = repodata_translate_id(data, fromdata, compid, 1);
   compid = dirpool_add_dir(&data->dirpool, parent, compid, 1);
   if (cache)
     {
@@ -1430,9 +1430,8 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
     case REPOKEY_TYPE_CONSTANTID:
     case REPOKEY_TYPE_IDARRAY:	/* used for triggers */
       id = kv->id;
-      if (fromdata->localpool)
-	id = repodata_globalize_id(fromdata, id, 1);
-      assert(!data->localpool);	/* implement me! */
+      if (data->localpool || fromdata->localpool)
+	id = repodata_translate_id(data, fromdata, id, 1);
       if (key->type == REPOKEY_TYPE_ID)
         repodata_set_id(data, handle, keyname, id);
       else if (key->type == REPOKEY_TYPE_CONSTANTID)
@@ -1455,13 +1454,11 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       id = kv->id;
       id = copydir(pool, data, fromdata, id, cbdata->dircache);
-      assert(!data->localpool);	/* implement me! */
       repodata_add_dirnumnum(data, handle, keyname, id, kv->num, kv->num2);
       break;
     case REPOKEY_TYPE_DIRSTRARRAY:
       id = kv->id;
       id = copydir(pool, data, fromdata, id, cbdata->dircache);
-      assert(!data->localpool);	/* implement me! */
       repodata_add_dirstr(data, handle, keyname, id, kv->str);
       break;
     case REPOKEY_TYPE_FLEXARRAY:
