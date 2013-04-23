@@ -218,6 +218,54 @@ repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
     }
 }
 
+/* specialized version of repo_add_solvable_block that inserts the new solvable
+ * block before the indicated repo, which gets relocated.
+ * used in repo_add_rpmdb
+ */
+Id
+repo_add_solvable_block_before(Repo *repo, int count, Repo *beforerepo)
+{
+  Pool *pool = repo->pool;
+  Id p;
+  Solvable *s;
+  Repodata *data;
+  int i;
+
+  if (!count || !beforerepo || beforerepo->end != pool->nsolvables || beforerepo->start == beforerepo->end)
+    return repo_add_solvable_block(repo, count);
+  p = beforerepo->start;
+  /* make sure all solvables belong to beforerepo */
+  for (i = p, s = pool->solvables + i; i < beforerepo->end; i++, s++)
+    if (s->repo && s->repo != beforerepo)
+      return repo_add_solvable_block(repo, count);
+  /* now move beforerepo to back */
+  pool_add_solvable_block(pool, count);	/* must return beforerepo->end! */
+  memmove(pool->solvables + p + count, pool->solvables + p, (beforerepo->end - p) * sizeof(Solvable));
+  memset(pool->solvables + p, 0, sizeof(Solvable) * count);
+  /* adapt repodata */
+  FOR_REPODATAS(beforerepo, i, data)
+    {
+      if (data->start < p)
+	continue;
+      data->start += count;
+      data->end += count;
+    }
+  beforerepo->start += count;
+  beforerepo->end += count;
+  /* we now have count free solvables at id p */
+  /* warning: sidedata must be extended before adapting start/end */
+  if (repo->rpmdbid)
+    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, count);
+  if (p < repo->start)
+    repo->start = p;
+  if (p + count > repo->end)
+    repo->end = p + count;
+  repo->nsolvables += count;
+  for (s = pool->solvables + p; count--; s++)
+    s->repo = repo;
+  return p;
+}
+
 
 /* repository sidedata is solvable data allocated on demand.
  * It is used for data that is normally not present

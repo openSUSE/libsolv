@@ -11,6 +11,7 @@
 struct headerToken_s;
 
 extern int repo_add_rpmdb(Repo *repo, Repo *ref, int flags);
+extern int repo_add_rpmdb_reffp(Repo *repo, FILE *reffp, int flags);
 extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
 
 #define RPMDB_REPORT_PROGRESS	(1 << 8)
@@ -22,7 +23,9 @@ extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
 #define RPM_ADD_TRIGGERS	(1 << 14)
 #define RPM_ADD_WITH_HDRID	(1 << 15)
 #define RPM_ADD_WITH_LEADSIGID	(1 << 16)
-#define RPM_ADD_WITH_CHANGELOG  (1 << 17)
+#define RPM_ADD_WITH_CHANGELOG	(1 << 17)
+
+#define RPMDB_EMPTY_REFREPO	(1 << 30)	/* internal */
 
 #define RPM_ITERATE_FILELIST_ONLYDIRS	(1 << 0)
 #define RPM_ITERATE_FILELIST_WITHMD5	(1 << 1)

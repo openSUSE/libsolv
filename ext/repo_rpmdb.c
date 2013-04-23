@@ -46,6 +46,7 @@
 #include "queue.h"
 #include "chksum.h"
 #include "repo_rpmdb.h"
+#include "repo_solv.h"
 
 /* 3: added triggers */
 /* 4: fixed triggers */
@@ -1355,29 +1356,12 @@ count_headers(Pool *pool, const char *rootdir, DB_ENV *dbenv)
 
 /******************************************************************/
 
-static Id
-copyreldep(Pool *pool, Pool *frompool, Id id)
-{
-  Reldep *rd = GETRELDEP(frompool, id);
-  Id name = rd->name, evr = rd->evr;
-  if (ISRELDEP(name))
-    name = copyreldep(pool, frompool, name);
-  else
-    name = pool_str2id(pool, pool_id2str(frompool, name), 1);
-  if (ISRELDEP(evr))
-    evr = copyreldep(pool, frompool, evr);
-  else
-    evr = pool_str2id(pool, pool_id2str(frompool, evr), 1);
-  return pool_rel2id(pool, name, evr, rd->flags, 1);
-}
-
 static Offset
 copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
 {
   int cc;
-  Id id, *ida, *from;
+  Id *ida, *from;
   Offset ido;
-  Pool *frompool = fromrepo->pool;
 
   if (!fromoff)
     return 0;
@@ -1388,46 +1372,32 @@ copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
     return 0;
   ido = repo_reserve_ids(repo, 0, cc);
   ida = repo->idarraydata + ido;
-  if (frompool && pool != frompool)
-    {
-      while (*from)
-	{
-	  id = *from++;
-	  if (ISRELDEP(id))
-	    id = copyreldep(pool, frompool, id);
-	  else
-	    id = pool_str2id(pool, pool_id2str(frompool, id), 1);
-	  *ida++ = id;
-	}
-      *ida = 0;
-    }
-  else
-    memcpy(ida, from, (cc + 1) * sizeof(Id));
+  memcpy(ida, from, (cc + 1) * sizeof(Id));
   repo->idarraysize += cc + 1;
   return ido;
 }
 
 #define COPYDIR_DIRCACHE_SIZE 512
 
-static Id copydir_complex(Pool *pool, Repodata *data, Stringpool *fromspool, Repodata *fromdata, Id did, Id *cache);
+static Id copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache);
 
 static inline Id
-copydir(Pool *pool, Repodata *data, Stringpool *fromspool, Repodata *fromdata, Id did, Id *cache)
+copydir(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
 {
   if (cache && cache[did & 255] == did)
     return cache[(did & 255) + 256];
-  return copydir_complex(pool, data, fromspool, fromdata, did, cache);
+  return copydir_complex(pool, data, fromdata, did, cache);
 }
 
 static Id
-copydir_complex(Pool *pool, Repodata *data, Stringpool *fromspool, Repodata *fromdata, Id did, Id *cache)
+copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
 {
   Id parent = dirpool_parent(&fromdata->dirpool, did);
   Id compid = dirpool_compid(&fromdata->dirpool, did);
   if (parent)
-    parent = copydir(pool, data, fromspool, fromdata, parent, cache);
-  if (fromspool != &pool->ss)
-    compid = pool_str2id(pool, stringpool_id2str(fromspool, compid), 1);
+    parent = copydir(pool, data, fromdata, parent, cache);
+  if (fromdata->localpool)
+    compid = repodata_globalize_id(fromdata, compid, 1);
   compid = dirpool_add_dir(&data->dirpool, parent, compid, 1);
   if (cache)
     {
@@ -1451,26 +1421,18 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
   Id id, keyname;
   Repodata *data = cbdata->data;
   Id handle = cbdata->handle;
-  Pool *pool = data->repo->pool, *frompool = fromdata->repo->pool;
-  Stringpool *fromspool = fromdata->localpool ? &fromdata->spool : &frompool->ss;
+  Pool *pool = data->repo->pool;
 
   keyname = key->name;
-  if (keyname >= ID_NUM_INTERNAL && pool != frompool)
-    keyname = pool_str2id(pool, pool_id2str(frompool, keyname), 1);
   switch(key->type)
     {
     case REPOKEY_TYPE_ID:
     case REPOKEY_TYPE_CONSTANTID:
     case REPOKEY_TYPE_IDARRAY:	/* used for triggers */
       id = kv->id;
+      if (fromdata->localpool)
+	id = repodata_globalize_id(fromdata, id, 1);
       assert(!data->localpool);	/* implement me! */
-      if (pool != frompool || fromdata->localpool)
-	{
-	  if (ISRELDEP(id))
-	    id = copyreldep(pool, frompool, id);
-	  else
-	    id = pool_str2id(pool, stringpool_id2str(fromspool, id), 1);
-	}
       if (key->type == REPOKEY_TYPE_ID)
         repodata_set_id(data, handle, keyname, id);
       else if (key->type == REPOKEY_TYPE_CONSTANTID)
@@ -1492,14 +1454,14 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       id = kv->id;
+      id = copydir(pool, data, fromdata, id, cbdata->dircache);
       assert(!data->localpool);	/* implement me! */
-      id = copydir(pool, data, fromspool, fromdata, id, cbdata->dircache);
       repodata_add_dirnumnum(data, handle, keyname, id, kv->num, kv->num2);
       break;
     case REPOKEY_TYPE_DIRSTRARRAY:
       id = kv->id;
+      id = copydir(pool, data, fromdata, id, cbdata->dircache);
       assert(!data->localpool);	/* implement me! */
-      id = copydir(pool, data, fromspool, fromdata, id, cbdata->dircache);
       repodata_add_dirstr(data, handle, keyname, id, kv->str);
       break;
     case REPOKEY_TYPE_FLEXARRAY:
@@ -1528,29 +1490,15 @@ static void
 solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
 {
   Repo *repo = s->repo;
-  Repo *fromrepo = r->repo;
   Pool *pool = repo->pool;
+  Repo *fromrepo = r->repo;
   struct solvable_copy_cbdata cbdata;
 
   /* copy solvable data */
-  if (pool == fromrepo->pool)
-    {
-      s->name = r->name;
-      s->evr = r->evr;
-      s->arch = r->arch;
-      s->vendor = r->vendor;
-    }
-  else
-    {
-      if (r->name)
-	s->name = pool_str2id(pool, pool_id2str(fromrepo->pool, r->name), 1);
-      if (r->evr)
-	s->evr = pool_str2id(pool, pool_id2str(fromrepo->pool, r->evr), 1);
-      if (r->arch)
-	s->arch = pool_str2id(pool, pool_id2str(fromrepo->pool, r->arch), 1);
-      if (r->vendor)
-	s->vendor = pool_str2id(pool, pool_id2str(fromrepo->pool, r->vendor), 1);
-    }
+  s->name = r->name;
+  s->evr = r->evr;
+  s->arch = r->arch;
+  s->vendor = r->vendor;
   s->provides = copydeps(pool, repo, r->provides, fromrepo);
   s->requires = copydeps(pool, repo, r->requires, fromrepo);
   s->conflicts = copydeps(pool, repo, r->conflicts, fromrepo);
@@ -1655,8 +1603,12 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 
   data = repo_add_repodata(repo, flags);
 
-  if (ref && !(ref->nsolvables && ref->rpmdbid))
-    ref = 0;
+  if (ref && !(ref->nsolvables && ref->rpmdbid && ref->pool == repo->pool))
+    {
+      if ((flags & RPMDB_EMPTY_REFREPO) != 0)
+	repo_empty(ref, 1);
+      ref = 0;
+    }
 
   if (flags & REPO_USE_ROOTDIR)
     rootdir = pool_get_rootdir(pool);
@@ -1682,6 +1634,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       Id dbid;
       DBC *dbc = 0;
 
+      if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
+	repo_empty(ref, 1);	/* get it out of the way */
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	count = count_headers(pool, rootdir, state.dbenv);
       if (!openpkgdb(&state))
@@ -1820,7 +1774,10 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	    }
         }
 
-      s = pool_id2solvable(pool, repo_add_solvable_block(repo, nentries));
+      if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
+        s = pool_id2solvable(pool, repo_add_solvable_block_before(repo, nentries, ref));
+      else
+        s = pool_id2solvable(pool, repo_add_solvable_block(repo, nentries));
       if (!repo->rpmdbid)
         repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 
@@ -1871,6 +1828,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       solv_free(entries);
       solv_free(namedata);
       solv_free(refhash);
+      if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
+	repo_empty(ref, 1);
     }
 
   freestate(&state);
@@ -1884,6 +1843,32 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
   return 0;
 }
 
+int
+repo_add_rpmdb_reffp(Repo *repo, FILE *fp, int flags)
+{
+  int res;
+  Repo *ref = 0;
+
+  if (!fp)
+    return repo_add_rpmdb(repo, 0, flags);
+  ref = repo_create(repo->pool, "add_rpmdb_reffp");
+  if (repo_add_solv(ref, fp, 0) != 0)
+    {
+      repo_free(ref, 1);
+      ref = 0;
+    }
+  if (ref && ref->start == ref->end)
+    {
+      repo_free(ref, 1);
+      ref = 0;
+    }
+  if (ref)
+    repo_disable_paging(ref);
+  res = repo_add_rpmdb(repo, ref, flags | RPMDB_EMPTY_REFREPO);
+  if (ref)
+    repo_free(ref, 1);
+  return res;
+}
 
 static inline unsigned int
 getu32(const unsigned char *dp)

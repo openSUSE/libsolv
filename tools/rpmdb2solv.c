@@ -36,9 +36,8 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-	  "rpmdb2solv [-n] [-x] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
+	  "rpmdb2solv [-n] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
 	  " -n : No packages, do not read rpmdb, useful to only parse products\n"
-	  " -x : use extrapool\n"
 	  " -b <basefile> : Write .solv to <basefile>.solv instead of stdout\n"
 	  " -p <productsdir> : Scan <productsdir> for .prod files, representing installed products\n"
 	  " -r <root> : Prefix rpmdb path and <productsdir> with <root>\n"
@@ -51,11 +50,11 @@ usage(int status)
 int
 main(int argc, char **argv)
 {
+  FILE *reffp = 0;
   Pool *pool = pool_create();
-  Repo *repo, *ref = 0;
+  Repo *repo;
   Repodata *data;
   int c, percent = 0;
-  int extrapool = 0;
   int nopacks = 0;
   const char *root = 0;
   const char *basefile = 0;
@@ -96,7 +95,6 @@ main(int argc, char **argv)
 #endif
 	break;
       case 'x':
-        extrapool = 1;
         break;
       case 'o':
         outfile = optarg;
@@ -127,28 +125,8 @@ main(int argc, char **argv)
 
   if (refname && !nopacks)
     {
-      FILE *fp;
-      if ((fp = fopen(refname, "r")) == NULL)
-        {
-          perror(refname);
-        }
-      else
-	{
-	  Pool *refpool = extrapool ? pool_create() : 0;
-	  ref = repo_create(refpool ? refpool : pool, "ref");
-	  if (repo_add_solv(ref, fp, 0) != 0)
-	    {
-	      fprintf(stderr, "%s: %s\n", refname, pool_errstr(ref->pool));
-	      if (ref->pool != pool)
-		pool_free(ref->pool);
-	      else
-		repo_free(ref, 1);
-	      ref = 0;
-	    }
-	  else
-	    repo_disable_paging(ref);
-	  fclose(fp);
-	}
+      if ((reffp = fopen(refname, "r")) == NULL)
+        perror(refname);
     }
 
   /*
@@ -166,7 +144,7 @@ main(int argc, char **argv)
 
   if (!nopacks)
     {
-      if (repo_add_rpmdb(repo, ref, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0)))
+      if (repo_add_rpmdb_reffp(repo, reffp, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0)))
 	{
 	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
 	  exit(1);
@@ -205,14 +183,8 @@ main(int argc, char **argv)
 #endif
   repodata_internalize(data);
 
-  if (ref)
-    {
-      if (ref->pool != pool)
-	pool_free(ref->pool);
-      else
-	repo_free(ref, 1);
-      ref = 0;
-    }
+  if (reffp)
+    fclose(reffp);
 
   tool_write(repo, basefile, 0);
   pool_free(pool);

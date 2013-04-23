@@ -135,6 +135,7 @@ SOLV_1.0 {
 		repo_add_solv;
 		repo_add_solvable;
 		repo_add_solvable_block;
+		repo_add_solvable_block_before;
 		repo_addid;
 		repo_addid_dep;
 		repo_create;

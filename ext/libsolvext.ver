@@ -27,6 +27,7 @@ SOLV_1.0 {
 		repo_add_rpm_handle;
 		repo_add_rpmdb;
 		repo_add_rpmdb_pubkeys;
+		repo_add_rpmdb_reffp;
 		repo_add_rpmmd;
 		repo_add_susetags;
 		repo_add_updateinfoxml;

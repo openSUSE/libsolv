@@ -1723,8 +1723,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   else
     {
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
-      FILE *ofp;
-      Repo *ref = 0;
+      FILE *ofp = 0;
 #endif
       printf(" reading\n");
 
@@ -1736,23 +1735,14 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  exit(1);
 	}
 # endif
-      if ((ofp = fopen(calccachepath(repo, 0), "r")) != 0)
-	{
-	  ref = repo_create(pool, "@System.old");
-	  if (repo_add_solv(ref, ofp, 0))
-	    {
-	      repo_free(ref, 1);
-	      ref = 0;
-	    }
-	  fclose(ofp);
-	}
-      if (repo_add_rpmdb(repo, ref, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))
+      ofp = fopen(calccachepath(repo, 0), "r");
+      if (repo_add_rpmdb_reffp(repo, ofp, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))
 	{
 	  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
 	  exit(1);
 	}
-      if (ref)
-        repo_free(ref, 1);
+      if (ofp)
+        fclose(ofp);
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
       if (repo_add_debdb(repo, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))

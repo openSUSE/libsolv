@@ -67,6 +67,7 @@ extern void repo_free_solvable(Repo *repo, Id p, int reuseids);
 extern void repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids);
 extern void *repo_sidedata_create(Repo *repo, size_t size);
 extern void *repo_sidedata_extend(Repo *repo, void *b, size_t size, Id p, int count);
+extern Id repo_add_solvable_block_before(Repo *repo, int count, Repo *beforerepo);
 
 extern Offset repo_addid(Repo *repo, Offset olddeps, Id id);
 extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker);
