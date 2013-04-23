@@ -27,6 +27,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 %bcond_without perl_binding
 %bcond_without python_binding
 %bcond_without ruby_binding
+%bcond_with zypp
 
 %if 0%{?mandriva_version}
 # force this version on mandriva
@@ -176,6 +177,7 @@ cmake   $CMAKE_FLAGS \
 	%{?with_perl_binding:-DENABLE_PERL=1} \
 	%{?with_python_binding:-DENABLE_PYTHON=1} \
 	%{?with_ruby_binding:-DENABLE_RUBY=1} \
+	%{?with_zypp:-DENABLE_SUSEREPO=1 -DENABLE_HELIXREPO=1} \
 	-DUSE_VENDORDIRS=1 \
 	-DCMAKE_SKIP_RPATH=1
 make %{?jobs:-j %jobs}
