@@ -1486,6 +1486,7 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
 static void
 solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
 {
+  int p, i;
   Repo *repo = s->repo;
   Pool *pool = repo->pool;
   Repo *fromrepo = r->repo;
@@ -1512,7 +1513,17 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
   cbdata.handle = s - pool->solvables;
   cbdata.subhandle = 0;
   cbdata.dircache = dircache;
-  repo_search(fromrepo, (r - fromrepo->pool->solvables), 0, 0, SEARCH_NO_STORAGE_SOLVABLE | SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
+  p = r - fromrepo->pool->solvables;
+#if 0
+  repo_search(fromrepo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE | SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
+#else
+  FOR_REPODATAS(fromrepo, i, data)
+    {
+      if (p < data->start || p >= data->end)
+	continue;
+      repodata_search(data, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
+    }
+#endif
 }
 
 /* used to sort entries by package name that got returned in some database order */
