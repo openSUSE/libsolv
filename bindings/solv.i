@@ -457,6 +457,7 @@ typedef int bool;
 #define SOLVER_SOLUTION_REPLACE_DOWNGRADE       -102
 #define SOLVER_SOLUTION_REPLACE_ARCHCHANGE      -103
 #define SOLVER_SOLUTION_REPLACE_VENDORCHANGE    -104
+#define SOLVER_SOLUTION_REPLACE_NAMECHANGE      -105
 
 typedef struct chksum Chksum;
 typedef void *AppObjectPtr;
@@ -2398,6 +2399,10 @@ rb_eval_string(
               queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_VENDORCHANGE);
               queue_push2(&q, p, rp);
             }
+            if ((illegal & POLICY_ILLEGAL_NAMECHANGE) != 0) {
+              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_NAMECHANGE);
+              queue_push2(&q, p, rp);
+            }
             continue;
           }
         }
@@ -2424,6 +2429,7 @@ rb_eval_string(
   const char *str() {
     Id p = $self->type;
     Id rp = $self->p;
+    int illegal = 0;
     if (p == SOLVER_SOLUTION_ERASE)
       {
         p = rp;
@@ -2435,11 +2441,15 @@ rb_eval_string(
         rp = $self->rp;
       }
     else if (p == SOLVER_SOLUTION_REPLACE_DOWNGRADE)
-      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, POLICY_ILLEGAL_DOWNGRADE, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
+      illegal = POLICY_ILLEGAL_DOWNGRADE;
     else if (p == SOLVER_SOLUTION_REPLACE_ARCHCHANGE)
-      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, POLICY_ILLEGAL_ARCHCHANGE, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
+      illegal = POLICY_ILLEGAL_ARCHCHANGE;
     else if (p == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)
-      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, POLICY_ILLEGAL_VENDORCHANGE, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
+      illegal = POLICY_ILLEGAL_VENDORCHANGE;
+    else if (p == SOLVER_SOLUTION_REPLACE_NAMECHANGE)
+      illegal = POLICY_ILLEGAL_NAMECHANGE;
+    if (illegal)
+      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, illegal, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
     return solver_solutionelement2str($self->solv, p, rp);
   }
   %newobject replaceelements;
@@ -2459,6 +2469,8 @@ rb_eval_string(
       queue_push(&q, SOLVER_SOLUTION_REPLACE_ARCHCHANGE);
     if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0)
       queue_push(&q, SOLVER_SOLUTION_REPLACE_VENDORCHANGE);
+    if ((illegal & POLICY_ILLEGAL_NAMECHANGE) != 0)
+      queue_push(&q, SOLVER_SOLUTION_REPLACE_NAMECHANGE);
     if (!q.count)
       queue_push(&q, $self->type);
     return q;
@@ -2493,7 +2505,7 @@ rb_eval_string(
       return new_Job($self->solv->pool, SOLVER_NOOP, 0);
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE || $self->type == SOLVER_SOLUTION_BEST)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->p);
-    if ($self->type == SOLVER_SOLUTION_REPLACE || $self->type == SOLVER_SOLUTION_REPLACE_DOWNGRADE || $self->type == SOLVER_SOLUTION_REPLACE_ARCHCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)
+    if ($self->type == SOLVER_SOLUTION_REPLACE || $self->type == SOLVER_SOLUTION_REPLACE_DOWNGRADE || $self->type == SOLVER_SOLUTION_REPLACE_ARCHCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_VENDORCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_NAMECHANGE)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->rp);
     if ($self->type == SOLVER_SOLUTION_ERASE)
       return new_Job($self->solv->pool, SOLVER_ERASE|SOLVER_SOLVABLE|extraflags, $self->p);
@@ -2533,14 +2545,17 @@ rb_eval_string(
   static const int SOLVER_SOLUTION_REPLACE_DOWNGRADE = SOLVER_SOLUTION_REPLACE_DOWNGRADE;
   static const int SOLVER_SOLUTION_REPLACE_ARCHCHANGE = SOLVER_SOLUTION_REPLACE_ARCHCHANGE;
   static const int SOLVER_SOLUTION_REPLACE_VENDORCHANGE = SOLVER_SOLUTION_REPLACE_VENDORCHANGE;
+  static const int SOLVER_SOLUTION_REPLACE_NAMECHANGE = SOLVER_SOLUTION_REPLACE_NAMECHANGE;
 
   static const int POLICY_ILLEGAL_DOWNGRADE = POLICY_ILLEGAL_DOWNGRADE;
   static const int POLICY_ILLEGAL_ARCHCHANGE = POLICY_ILLEGAL_ARCHCHANGE;
   static const int POLICY_ILLEGAL_VENDORCHANGE = POLICY_ILLEGAL_VENDORCHANGE;
+  static const int POLICY_ILLEGAL_NAMECHANGE = POLICY_ILLEGAL_NAMECHANGE;
 
   static const int SOLVER_FLAG_ALLOW_DOWNGRADE = SOLVER_FLAG_ALLOW_DOWNGRADE;
   static const int SOLVER_FLAG_ALLOW_ARCHCHANGE = SOLVER_FLAG_ALLOW_ARCHCHANGE;
   static const int SOLVER_FLAG_ALLOW_VENDORCHANGE = SOLVER_FLAG_ALLOW_VENDORCHANGE;
+  static const int SOLVER_FLAG_ALLOW_NAMECHANGE = SOLVER_FLAG_ALLOW_NAMECHANGE;
   static const int SOLVER_FLAG_ALLOW_UNINSTALL = SOLVER_FLAG_ALLOW_UNINSTALL;
   static const int SOLVER_FLAG_NO_UPDATEPROVIDE = SOLVER_FLAG_NO_UPDATEPROVIDE;
   static const int SOLVER_FLAG_SPLITPROVIDES = SOLVER_FLAG_SPLITPROVIDES;
