@@ -21,7 +21,6 @@
 extern "C" {
 #endif
 
-extern Id *solver_create_decisions_obsoletesmap(Solver *solv);
 extern void solver_printruleelement(Solver *solv, int type, Rule *r, Id v);
 extern void solver_printrule(Solver *solv, int type, Rule *r);
 extern void solver_printruleclass(Solver *solv, int type, Rule *r);

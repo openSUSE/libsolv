@@ -307,7 +307,6 @@ SOLV_1.0 {
 		solver_calculate_multiversionmap;
 		solver_calculate_noobsmap;
 		solver_create;
-		solver_create_decisions_obsoletesmap;
 		solver_create_state_maps;
 		solver_create_transaction;
 		solver_describe_decision;

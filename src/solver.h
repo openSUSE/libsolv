@@ -297,9 +297,6 @@ extern void solver_calculate_multiversionmap(Pool *pool, Queue *job, Map *multiv
 extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *multiversionmap);	/* obsolete */
 extern void solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap);
 
-/* XXX: why is this not static? */
-extern Id *solver_create_decisions_obsoletesmap(Solver *solv);
-
 extern void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
 extern int solver_calc_installsizechange(Solver *solv);
 extern void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
