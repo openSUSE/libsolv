@@ -455,7 +455,7 @@ transaction_print(Transaction *trans)
 
   queue_init(&classes);
   queue_init(&pkgs);
-  mode = 0;
+  mode = SOLVER_TRANSACTION_SHOW_OBSOLETES | SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE;
   transaction_classify(trans, mode, &classes);
   for (i = 0; i < classes.count; i += 4)
     {
