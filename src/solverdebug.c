@@ -288,6 +288,7 @@ solver_printdecisions(Solver *solv)
   queue_init(&suggestions);
   queue_init(&orphaned);
   solver_get_recommendations(solv, &recommendations, &suggestions, 0);
+  solver_get_orphaned(solv, &orphaned);
   if (recommendations.count)
     {
       POOL_DEBUG(SOLV_DEBUG_RESULT, "recommended packages:\n");
