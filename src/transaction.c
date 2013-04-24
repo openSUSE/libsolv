@@ -260,15 +260,19 @@ transaction_type(Transaction *trans, Id p, int mode)
   if (s->repo == pool->installed && (mode & SOLVER_TRANSACTION_SHOW_ACTIVE) == 0)
     {
       /* erase element and we're showing the passive side */
-      if ((mode & SOLVER_TRANSACTION_SHOW_OBSOLETES) == 0 && type == SOLVER_TRANSACTION_OBSOLETED)
+      if (type == SOLVER_TRANSACTION_OBSOLETED && (mode & SOLVER_TRANSACTION_SHOW_OBSOLETES) == 0)
 	type = SOLVER_TRANSACTION_ERASE;
+      if (type == SOLVER_TRANSACTION_OBSOLETED && (mode & SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE) != 0)
+	type = SOLVER_TRANSACTION_UPGRADED;
       return type;
     }
   if (s->repo != pool->installed && (mode & SOLVER_TRANSACTION_SHOW_ACTIVE) != 0)
     {
       /* install element and we're showing the active side */
-      if ((mode & SOLVER_TRANSACTION_SHOW_OBSOLETES) == 0 && type == SOLVER_TRANSACTION_OBSOLETES)
+      if (type == SOLVER_TRANSACTION_OBSOLETES && (mode & SOLVER_TRANSACTION_SHOW_OBSOLETES) == 0)
 	type = SOLVER_TRANSACTION_INSTALL;
+      if (type == SOLVER_TRANSACTION_OBSOLETES && (mode & SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE) != 0)
+	type = SOLVER_TRANSACTION_UPGRADE;
       return type;
     }
 

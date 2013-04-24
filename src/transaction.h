@@ -77,6 +77,8 @@ typedef struct _Transaction {
 
 #define SOLVER_TRANSACTION_KEEP_PSEUDO		(1 << 8)
 
+#define SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE  (1 << 9)
+
 /* extra classifications */
 #define SOLVER_TRANSACTION_ARCHCHANGE		0x100
 #define SOLVER_TRANSACTION_VENDORCHANGE		0x101

@@ -679,7 +679,7 @@ if trans.isempty?
 end
 
 puts "\nTransaction summary:\n"
-for cl in trans.classify()
+for cl in trans.classify(Solv::Transaction::SOLVER_TRANSACTION_SHOW_OBSOLETES | Solv::Transaction::SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE)
   if cl.type == Solv::Transaction::SOLVER_TRANSACTION_ERASE
     puts "#{cl.count} erased packages:"
   elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_INSTALL
@@ -715,7 +715,7 @@ while true:
   STDOUT.flush
   yn = STDIN.gets.strip
   break if yn == 'y'
-  abort if yn == 'n'
+  abort if yn == 'n' || yn == 'q'
 end
 
 newpkgs = trans.newpackages()

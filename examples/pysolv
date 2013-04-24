@@ -800,7 +800,7 @@ if trans.isempty():
 print
 print "Transaction summary:"
 print
-for cl in trans.classify():
+for cl in trans.classify(Transaction.SOLVER_TRANSACTION_SHOW_OBSOLETES | Transaction.SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE):
     if cl.type == Transaction.SOLVER_TRANSACTION_ERASE:
         print "%d erased packages:" % cl.count
     elif cl.type == Transaction.SOLVER_TRANSACTION_INSTALL:
@@ -834,7 +834,7 @@ while True:
     sys.stdout.flush()
     yn = sys.stdin.readline().strip()
     if yn == 'y': break
-    if yn == 'n': sys.exit(1)
+    if yn == 'n' or yn == 'q': sys.exit(1)
 newpkgs = trans.newpackages()
 newpkgsfp = {}
 if newpkgs:

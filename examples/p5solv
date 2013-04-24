@@ -666,7 +666,7 @@ if ($trans->isempty()) {
 }
 
 print "\nTransaction summary:\n\n";
-for my $c ($trans->classify()) {
+for my $c ($trans->classify($solv::Transaction::SOLVER_TRANSACTION_SHOW_OBSOLETES|$solv::Transaction::SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE)) {
   if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
     print "$c->{'count'} erased packages:\n";
   } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_INSTALL) {
@@ -703,7 +703,7 @@ while (1) {
   my $yn = <STDIN>;
   chomp $yn;
   last if $yn eq 'y';
-  exit(1) if $yn eq 'n';
+  exit(1) if $yn eq 'n' || $yn eq 'q';
 }
 
 my @newpkgs = $trans->newpackages();
