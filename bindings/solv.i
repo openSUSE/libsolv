@@ -346,7 +346,7 @@ SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
   if (!desc) desc = SWIG_TypeQuery("SolvFp *");
   if ((SWIG_ConvertPtr(obj, &vptr, desc, 0)) == SWIG_OK) {
     if (val)
-      *val = ((SolvFp *)vptr)->fp;
+      *val = vptr ? ((SolvFp *)vptr)->fp : 0;
     return SWIG_OK;
   }
 #ifdef SWIGPYTHON
@@ -377,7 +377,7 @@ SWIG_AsValDepId(void *obj, int *val) {
     return ecode;
   if ((SWIG_ConvertPtr(obj, &vptr, desc, 0)) == SWIG_OK) {
     if (val)
-      *val = ((Dep *)vptr)->id;
+      *val = vptr ? ((Dep *)vptr)->id : 0;
     return SWIG_OK;
   }
   return SWIG_TypeError;
