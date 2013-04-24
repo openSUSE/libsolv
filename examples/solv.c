@@ -2599,7 +2599,7 @@ main(int argc, char **argv)
       mainmode = MODE_ERASE;
       mode = SOLVER_ERASE;
     }
-  else if (!strcmp(argv[0], "list"))
+  else if (!strcmp(argv[0], "list") || !strcmp(argv[0], "ls"))
     {
       mainmode = MODE_LIST;
       mode = 0;
