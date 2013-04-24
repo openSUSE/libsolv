@@ -930,3 +930,38 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
     }
 }
 
+const char *
+policy_illegal2str(Solver *solv, int illegal, Solvable *s, Solvable *rs)
+{
+  Pool *pool = solv->pool;
+  const char *str;
+  if (illegal == POLICY_ILLEGAL_DOWNGRADE)
+    {
+      str = pool_tmpjoin(pool, "downgrade of ", pool_solvable2str(pool, s), 0);
+      return pool_tmpappend(pool, str, " to ", pool_solvable2str(pool, rs));
+    }
+  if (illegal == POLICY_ILLEGAL_NAMECHANGE)
+    {
+      str = pool_tmpjoin(pool, "name change of ", pool_solvable2str(pool, s), 0);
+      return pool_tmpappend(pool, str, " to ", pool_solvable2str(pool, rs));
+    }
+  if (illegal == POLICY_ILLEGAL_ARCHCHANGE)
+    {
+      str = pool_tmpjoin(pool, "architecture change of ", pool_solvable2str(pool, s), 0);
+      return pool_tmpappend(pool, str, " to ", pool_solvable2str(pool, rs));
+    }
+  if (illegal == POLICY_ILLEGAL_VENDORCHANGE)
+    {
+      str = pool_tmpjoin(pool, "vendor change from '", pool_id2str(pool, s->vendor), "' (");
+      if (rs->vendor)
+	{
+          str = pool_tmpappend(pool, str, pool_solvable2str(pool, s), ") to '");
+          str = pool_tmpappend(pool, str, pool_id2str(pool, rs->vendor), "' (");
+	}
+      else
+        str = pool_tmpappend(pool, str, pool_solvable2str(pool, s), ") to no vendor (");
+      return pool_tmpappend(pool, str, pool_solvable2str(pool, rs), ")");
+    }
+  return "unknown illegal change";
+}
+

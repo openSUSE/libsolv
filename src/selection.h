@@ -38,6 +38,8 @@ extern void selection_filter(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_solvables(Pool *pool, Queue *selection, Queue *pkgs);
 
+extern const char *pool_selection2str(Pool *pool, Queue *selection, Id flagmask);
+
 #ifdef __cplusplus
 }
 #endif

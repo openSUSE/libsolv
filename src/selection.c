@@ -543,7 +543,7 @@ selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
           else
             break;
         }
-      while (*r && *r == ' ' && *r == '\t')
+      while (*r && (*r == ' ' || *r == '\t'))
         r++;
       while (nend && (rname[nend - 1] == ' ' || rname[nend -1 ] == '\t'))
         nend--;
@@ -892,5 +892,46 @@ selection_add(Pool *pool, Queue *sel1, Queue *sel2)
   int i;
   for (i = 0; i < sel2->count; i++)
     queue_push(sel1, sel2->elements[i]);
+}
+
+const char *
+pool_selection2str(Pool *pool, Queue *selection, Id flagmask)
+{
+  char *s;
+  const char *s2;
+  int i;
+  s = pool_tmpjoin(pool, 0, 0, 0);
+  for (i = 0; i < selection->count; i += 2)
+    {
+      Id how = selection->elements[i];
+      if (*s)
+	s = pool_tmpappend(pool, s, " + ", 0);
+      s2 = solver_select2str(pool, how & SOLVER_SELECTMASK, selection->elements[i + 1]);
+      s = pool_tmpappend(pool, s, s2, 0);
+      pool_freetmpspace(pool, s2);
+      how &= flagmask & SOLVER_SETMASK;
+      if (how)
+	{
+	  int o = strlen(s);
+	  s = pool_tmpappend(pool, s, " ", 0);
+	  if (how & SOLVER_SETEV)
+	    s = pool_tmpappend(pool, s, ",setev", 0);
+	  if (how & SOLVER_SETEVR)
+	    s = pool_tmpappend(pool, s, ",setevr", 0);
+	  if (how & SOLVER_SETARCH)
+	    s = pool_tmpappend(pool, s, ",setarch", 0);
+	  if (how & SOLVER_SETVENDOR)
+	    s = pool_tmpappend(pool, s, ",setvendor", 0);
+	  if (how & SOLVER_SETREPO)
+	    s = pool_tmpappend(pool, s, ",setrepo", 0);
+	  if (how & SOLVER_NOAUTOSET)
+	    s = pool_tmpappend(pool, s, ",noautoset", 0);
+	  if (s[o + 1] != ',')
+	    s = pool_tmpappend(pool, s, ",?", 0);
+	  s[o + 1] = '[';
+	  s = pool_tmpappend(pool, s, "]", 0);
+	}
+    }
+  return s;
 }
 

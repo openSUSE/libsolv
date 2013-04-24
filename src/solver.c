@@ -4231,3 +4231,135 @@ pool_isemptyupdatejob(Pool *pool, Id how, Id what)
     }
   return 1;
 }
+
+const char *
+solver_select2str(Pool *pool, Id select, Id what)
+{
+  const char *s;
+  char *b;
+  select &= SOLVER_SELECTMASK;
+  if (select == SOLVER_SOLVABLE)
+    return pool_solvid2str(pool, what);
+  if (select == SOLVER_SOLVABLE_NAME)
+    return pool_dep2str(pool, what);
+  if (select == SOLVER_SOLVABLE_PROVIDES)
+    {
+      s = pool_dep2str(pool, what);
+      b = pool_alloctmpspace(pool, 11 + strlen(s));
+      sprintf(b, "providing %s", s);
+      return b;
+    }
+  if (select == SOLVER_SOLVABLE_ONE_OF)
+    {
+      Id p;
+      b = 0;
+      while ((p = pool->whatprovidesdata[what++]) != 0)
+	{
+	  s = pool_solvid2str(pool, p);
+	  if (b)
+	    b = pool_tmpappend(pool, b, ", ", s);
+	  else
+	    b = pool_tmpjoin(pool, s, 0, 0);
+	  pool_freetmpspace(pool, s);
+	}
+      return b ? b : "nothing";
+    }
+  if (select == SOLVER_SOLVABLE_REPO)
+    {
+      b = pool_alloctmpspace(pool, 20);
+      sprintf(b, "repo #%d", what);
+      return b;
+    }
+  if (select == SOLVER_SOLVABLE_ALL)
+    return "all packages";
+  return "unknown job select";
+}
+
+const char *
+pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
+{
+  Id select = how & SOLVER_SELECTMASK;
+  const char *strstart = 0, *strend = 0;
+  char *s;
+  int o;
+
+  switch (how & SOLVER_JOBMASK)
+    {
+    case SOLVER_NOOP:
+      return "do nothing";
+    case SOLVER_INSTALL:
+      if (select == SOLVER_SOLVABLE && pool->installed && pool->solvables[what].repo == pool->installed)
+	strstart = "keep ", strend = "installed";
+      else if (select == SOLVER_SOLVABLE || select == SOLVER_SOLVABLE_NAME)
+	strstart = "install ";
+      else if (select == SOLVER_SOLVABLE_PROVIDES)
+	strstart = "install a package ";
+      else
+	strstart = "install one of ";
+      break;
+    case SOLVER_ERASE:
+      if (select == SOLVER_SOLVABLE && !(pool->installed && pool->solvables[what].repo == pool->installed))
+	strstart = "keep ", strend = "unstalled";
+      else if (select == SOLVER_SOLVABLE_PROVIDES)
+	strstart = "deinstall all packages ";
+      else
+	strstart = "deinstall ";
+      break;
+    case SOLVER_UPDATE:
+      strstart = "update ";
+      break;
+    case SOLVER_WEAKENDEPS:
+      strstart = "weaken deps of ";
+      break;
+    case SOLVER_MULTIVERSION:
+      strstart = "multi version ";
+      break;
+    case SOLVER_LOCK:
+      strstart = "update ";
+      break;
+    case SOLVER_DISTUPGRADE:
+      strstart = "dist upgrade ";
+      break;
+    case SOLVER_VERIFY:
+      strstart = "verify ";
+      break;
+    case SOLVER_DROP_ORPHANED:
+      strstart = "deinstall ", strend = "if orphaned";
+      break;
+    case SOLVER_USERINSTALLED:
+      strstart = "regard ", strend = "as userinstalled";
+      break;
+    default:
+      strstart = "unknown job ";
+      break;
+    }
+  s = pool_tmpjoin(pool, strstart, solver_select2str(pool, select, what), strend);
+  how &= flagmask;
+  if ((how & ~(SOLVER_SELECTMASK|SOLVER_JOBMASK)) == 0)
+    return s;
+  o = strlen(s);
+  s = pool_tmpappend(pool, s, " ", 0);
+  if (how & SOLVER_WEAK)
+    s = pool_tmpappend(pool, s, ",weak", 0);
+  if (how & SOLVER_ESSENTIAL)
+    s = pool_tmpappend(pool, s, ",essential", 0);
+  if (how & SOLVER_CLEANDEPS)
+    s = pool_tmpappend(pool, s, ",cleandeps", 0);
+  if (how & SOLVER_SETEV)
+    s = pool_tmpappend(pool, s, ",setev", 0);
+  if (how & SOLVER_SETEVR)
+    s = pool_tmpappend(pool, s, ",setevr", 0);
+  if (how & SOLVER_SETARCH)
+    s = pool_tmpappend(pool, s, ",setarch", 0);
+  if (how & SOLVER_SETVENDOR)
+    s = pool_tmpappend(pool, s, ",setvendor", 0);
+  if (how & SOLVER_SETREPO)
+    s = pool_tmpappend(pool, s, ",setrepo", 0);
+  if (how & SOLVER_NOAUTOSET)
+    s = pool_tmpappend(pool, s, ",noautoset", 0);
+  if (s[o + 1] != ',')
+    s = pool_tmpappend(pool, s, ",?", 0);
+  s[o + 1] = '[';
+  return pool_tmpappend(pool, s, "]", 0);
+}
+

@@ -298,14 +298,17 @@ extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *multiversionm
 extern void solver_create_state_maps(Solver *solv, Map *installedmap, Map *conflictsmap);
 
 /* XXX: why is this not static? */
-Id *solver_create_decisions_obsoletesmap(Solver *solv);
+extern Id *solver_create_decisions_obsoletesmap(Solver *solv);
 
-void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
-int solver_calc_installsizechange(Solver *solv);
-void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
+extern void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
+extern int solver_calc_installsizechange(Solver *solv);
+extern void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
 
-void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
-int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
+extern void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
+extern int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
+
+extern const char *solver_select2str(Pool *pool, Id select, Id what);
+extern const char *pool_job2str(Pool *pool, Id how, Id what, Id flagmask);
 
 /* iterate over all literals of a rule */
 #define FOR_RULELITERALS(l, pp, r)				\

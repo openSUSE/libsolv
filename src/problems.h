@@ -13,6 +13,8 @@
 #ifndef LIBSOLV_PROBLEMS_H
 #define LIBSOLV_PROBLEMS_H
 
+#include "rules.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,6 +46,9 @@ void solver_take_solution(struct _Solver *solv, Id problem, Id solution, Queue *
 
 Id solver_findproblemrule(struct _Solver *solv, Id problem);
 void solver_findallproblemrules(struct _Solver *solv, Id problem, Queue *rules);
+
+extern const char *solver_problemruleinfo2str(struct _Solver *solv, SolverRuleinfo type, Id source, Id target, Id dep);
+extern const char *solver_solutionelement2str(struct _Solver *solv, Id p, Id rp);
 
 #ifdef __cplusplus
 }
