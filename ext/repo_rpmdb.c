@@ -148,7 +148,7 @@ typedef struct rpmhead {
   int cnt;
   int dcnt;
   unsigned char *dp;
-  int forcebinary;		/* sigh */
+  int forcebinary;		/* sigh, see rh#478907 */
   unsigned char data[1];
 } RpmHead;
 
@@ -211,6 +211,31 @@ headint32(RpmHead *h, int tag)
     return 0;
   d = h->dp + o;
   return d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+}
+
+static unsigned long long *
+headint64array(RpmHead *h, int tag, int *cnt)
+{
+  unsigned int i, o;
+  unsigned long long *r;
+  unsigned char *d = headfindtag(h, tag);
+
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 5)
+    return 0;
+  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  if (o + 8 * i > h->dcnt)
+    return 0;
+  d = h->dp + o;
+  r = solv_calloc(i ? i : 1, sizeof(unsigned long long));
+  if (cnt)
+    *cnt = i;
+  for (o = 0; o < i; o++, d += 8)
+    {
+      unsigned int x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+      r[o] = (unsigned long long)x << 32 | (d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+    }
+  return r;
 }
 
 /* returns the first entry of an 64bit integer array */
@@ -558,17 +583,34 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
   Id did;
   int i, fszc;
   unsigned int *fkb, *fn, *fsz, *fm, *fino;
+  unsigned long long *fsz64;
   unsigned int inotest[256], inotestok;
 
   if (!fc)
     return;
-  /* XXX: use TAG_LONGFILESIZES if available */
-  fsz = headint32array(rpmhead, TAG_FILESIZES, &fszc);
-  if (!fsz || fc != fszc)
+  if ((fsz64 = headint64array(rpmhead, TAG_LONGFILESIZES, &fszc)) != 0)
+    {
+      /* convert to kbyte */
+      fsz = solv_malloc2(fszc, sizeof(*fsz));
+      for (i = 0; i < fszc; i++)
+        fsz[i] = fsz64[i] ? fsz64[i] / 1024 + 1 : 0;
+      solv_free(fsz64);
+    }
+  else if ((fsz = headint32array(rpmhead, TAG_FILESIZES, &fszc)) != 0)
+    {
+      /* convert to kbyte */
+      for (i = 0; i < fszc; i++)
+        if (fsz[i])
+	  fsz[i] = fsz[i] / 1024 + 1;
+    }
+  else
+    return;
+  if (fc != fszc)
     {
       solv_free(fsz);
       return;
     }
+
   /* stupid rpm records sizes of directories, so we have to check the mode */
   fm = headint16array(rpmhead, TAG_FILEMODES, &fszc);
   if (!fm || fc != fszc)
@@ -585,15 +627,18 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
       solv_free(fino);
       return;
     }
+
+  /* kill hardlinked entries */
   inotestok = 0;
   if (fc < sizeof(inotest))
     {
+      /* quick test just hashing the inode numbers */
       memset(inotest, 0, sizeof(inotest));
       for (i = 0; i < fc; i++)
 	{
 	  int off, bit;
 	  if (fsz[i] == 0 || !S_ISREG(fm[i]))
-	    continue;
+	    continue;	/* does not matter */
 	  off = (fino[i] >> 5) & (sizeof(inotest)/sizeof(*inotest) - 1);
 	  bit = 1 << (fino[i] & 31);
 	  if ((inotest[off] & bit) != 0)
@@ -601,10 +646,11 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
 	  inotest[off] |= bit;
 	}
       if (i == fc)
-	inotestok = 1;
+	inotestok = 1;	/* no conflict found */
     }
   if (!inotestok)
     {
+      /* hardlinked files are possible, check ino/dev pairs */
       unsigned int *fdev = headint32array(rpmhead, TAG_FILEDEVICES, &fszc);
       unsigned int *fx, j;
       unsigned int mask, hash, hh;
@@ -651,6 +697,8 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
       solv_free(fdev);
     }
   solv_free(fino);
+
+  /* sum up inode count and kbytes for each directory */
   fn = solv_calloc(dc, sizeof(unsigned int));
   fkb = solv_calloc(dc, sizeof(unsigned int));
   for (i = 0; i < fc; i++)
@@ -660,7 +708,7 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
       fn[di[i]]++;
       if (fsz[i] == 0 || !S_ISREG(fm[i]))
 	continue;
-      fkb[di[i]] += fsz[i] / 1024 + 1;
+      fkb[di[i]] += fsz[i];
     }
   solv_free(fsz);
   solv_free(fm);
