@@ -46,6 +46,7 @@ obsq_sortcmp(const void *ap, const void *bp, void *dp)
   obs = pool->solvables + ob;
   if (oas->name != obs->name)
     {
+      /* bring "same name" obsoleters (i.e. upgraders) to front */
       if (oas->name == s->name)
         return -1;
       if (obs->name == s->name)
@@ -165,9 +166,19 @@ transaction_base_type(Transaction *trans, Id p)
     }
   else
     {
+      /* install or multiinstall */
       int multi = trans->multiversionmap.size && MAPTST(&trans->multiversionmap, p);
       if (multi)
-	return p2 ? SOLVER_TRANSACTION_MULTIREINSTALL : SOLVER_TRANSACTION_MULTIINSTALL;
+	{
+	  if (p2)
+	    {
+	      s = pool->solvables + p;
+	      s2 = pool->solvables + p2;
+	      if (s->name == s2->name && s->arch == s2->arch && s->evr == s2->evr)
+		return SOLVER_TRANSACTION_MULTIREINSTALL;
+	    }
+	  return SOLVER_TRANSACTION_MULTIINSTALL;
+	}
       if (!p2)
 	return SOLVER_TRANSACTION_INSTALL;
       s = pool->solvables + p;
@@ -580,7 +591,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	    continue;
 	  queue_push2(ti, p, p2);
 	}
-      if (s->obsoletes && !multi)
+      if (s->obsoletes && (!multi || !pool->noobsoletesmultiversion))
 	{
 	  Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)

@@ -82,6 +82,7 @@ pool_create(void)
   pool->obsoleteusescolors = 1;
 #endif
 #ifdef RPM5
+  pool->noobsoletesmultiversion = 1;
   pool->forbidselfconflicts = 1;
   pool->obsoleteusesprovides = 1;
   pool->implicitobsoleteusesprovides = 1;
@@ -171,6 +172,8 @@ pool_get_flag(Pool *pool, int flag)
       return pool->noinstalledobsoletes;
     case POOL_FLAG_HAVEDISTEPOCH:
       return pool->havedistepoch;
+    case POOL_FLAG_NOOBSOLETESMULTIVERSION:
+      return pool->noobsoletesmultiversion;
     default:
       break;
     }
@@ -203,6 +206,9 @@ pool_set_flag(Pool *pool, int flag, int value)
       break;
     case POOL_FLAG_HAVEDISTEPOCH:
       pool->havedistepoch = value;
+      break;
+    case POOL_FLAG_NOOBSOLETESMULTIVERSION:
+      pool->noobsoletesmultiversion = value;
       break;
     default:
       break;

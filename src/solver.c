@@ -1427,6 +1427,8 @@ solver_create(Pool *pool)
   solv->dup_allowarchchange = 1;
   solv->dup_allowvendorchange = 1;
 
+  solv->keepexplicitobsoletes = pool->noobsoletesmultiversion ? 0 : 1;
+
   queue_init(&solv->ruletojob);
   queue_init(&solv->decisionq);
   queue_init(&solv->decisionq_why);

@@ -130,6 +130,7 @@ struct _Pool {
   int obsoleteusescolors;	/* true: obsoletes check arch color */
   int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
   int forbidselfconflicts;	/* true: packages which conflict with itself are not installable */
+  int noobsoletesmultiversion;	/* true: obsoletes are ignored for multiversion installs */
 
   Id noarchid;			/* ARCH_NOARCH, ARCH_ALL, ARCH_ANY, ... */
 
@@ -181,6 +182,7 @@ struct _Pool {
 #define POOL_FLAG_OBSOLETEUSESCOLORS			5
 #define POOL_FLAG_NOINSTALLEDOBSOLETES			6
 #define POOL_FLAG_HAVEDISTEPOCH				7
+#define POOL_FLAG_NOOBSOLETESMULTIVERSION		8
 
 /* ----------------------------------------------- */
 
