@@ -92,7 +92,7 @@ ADD_EXECUTABLE (patchcheck patchcheck.c)
 TARGET_LINK_LIBRARIES (patchcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
 
 ADD_EXECUTABLE (dumpsolv dumpsolv.c )
-TARGET_LINK_LIBRARIES (dumpsolv libsolv)
+TARGET_LINK_LIBRARIES (dumpsolv libsolv ${JANSSON_LIBRARIES})
 
 ADD_EXECUTABLE (mergesolv mergesolv.c )
 TARGET_LINK_LIBRARIES (mergesolv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
