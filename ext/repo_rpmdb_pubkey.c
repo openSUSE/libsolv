@@ -102,7 +102,7 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
 	  if (c >= 0xc0)
 	    {
 	      *bp++ = 0xc3;
-	      c ^= 0x80;
+	      c ^= 0xc0 ^ 0x80;
 	    }
 	  else if (c >= 0x80)
 	    *bp++ = 0xc2;
