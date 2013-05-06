@@ -295,33 +295,39 @@ dump_repodata_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVa
 }
 
 static void
-dump_repodata(Repo *repo, struct cbdata *cbdata)
+dump_repodata(Repo *repo)
 {
   unsigned int i;
   Repodata *data;
   if (repo->nrepodata == 0)
     return;
-  if (!dump_json)
-    printf("repo contains %d repodata sections:\n", repo->nrepodata - 1);
-  cbdata->baseindent = 6;
+  printf("repo contains %d repodata sections:\n", repo->nrepodata - 1);
   FOR_REPODATAS(repo, i, data)
     {
       unsigned int j;
-      if (!dump_json)
-	{
-	  printf("\nrepodata %d has %d keys, %d schemata\n", i, data->nkeys - 1, data->nschemata - 1);
-	  for (j = 1; j < data->nkeys; j++)
-	    printf("  %s (type %s size %d storage %d)\n", pool_id2str(repo->pool, data->keys[j].name), pool_id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
-	  if (data->localpool)
-	    printf("  localpool has %d strings, size is %d\n", data->spool.nstrings, data->spool.sstrings);
-	  if (data->dirpool.ndirs)
-	    printf("  localpool has %d directories\n", data->dirpool.ndirs);
-	  printf("\n");
-	}
-      repodata_search(data, SOLVID_META, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB, dump_repodata_cb, cbdata);
+      printf("\nrepodata %d has %d keys, %d schemata\n", i, data->nkeys - 1, data->nschemata - 1);
+      for (j = 1; j < data->nkeys; j++)
+	printf("  %s (type %s size %d storage %d)\n", pool_id2str(repo->pool, data->keys[j].name), pool_id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
+      if (data->localpool)
+	printf("  localpool has %d strings, size is %d\n", data->spool.nstrings, data->spool.sstrings);
+      if (data->dirpool.ndirs)
+	printf("  localpool has %d directories\n", data->dirpool.ndirs);
+      printf("\n");
+      repodata_search(data, SOLVID_META, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB, dump_repodata_cb, 0);
     }
-  if (!dump_json)
-    printf("\n");
+  printf("\n");
+}
+
+static void
+dump_repodata_json(Repo *repo, struct cbdata *cbdata)
+{
+  unsigned int i;
+  Repodata *data;
+  if (repo->nrepodata == 0)
+    return;
+  cbdata->baseindent = 6;
+  FOR_REPODATAS(repo, i, data)
+    repodata_search(data, SOLVID_META, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB, dump_repodata_cb, cbdata);
 }
 
 /*
@@ -333,9 +339,10 @@ dump_solvable(Repo *repo, Id p, struct cbdata *cbdata)
 {
   Dataiterator di;
   dataiterator_init(&di, repo->pool, repo, p, 0, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB);
-  if (cbdata->first)
+  if (cbdata && cbdata->first)
     cbdata->first[0] = 0;
-  cbdata->baseindent = 10;
+  if (cbdata)
+    cbdata->baseindent = 10;
   while (dataiterator_step(&di))
     {
       if (!dump_json)
@@ -343,6 +350,7 @@ dump_solvable(Repo *repo, Id p, struct cbdata *cbdata)
       else
         dump_attr_json(repo, di.data, di.key, &di.kv, cbdata);
     }
+  dataiterator_free(&di);
 }
 
 static int
@@ -385,10 +393,7 @@ int main(int argc, char **argv)
   Pool *pool;
   int c, i, j, n;
   Solvable *s;
-  int openrepo = 0;
-  struct cbdata cbdata;
   
-  memset(&cbdata, 0, sizeof(cbdata));
   pool = pool_create();
   pool_setloadcallback(pool, loadcallback, 0);
 
@@ -437,71 +442,65 @@ int main(int argc, char **argv)
 	  exit(1);
 	}
     }
-  if (!dump_json)
-    printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);
 
   if (dump_json)
     {
+      int openrepo = 0;
+      struct cbdata cbdata;
+
+      memset(&cbdata, 0, sizeof(cbdata));
       printf("{\n");
       printf("  \"repositories\": [\n");
-    }
-  n = 0;
-  FOR_REPOS(j, repo)
-    {
-      int open = 0;
-      if (dump_json)
+      FOR_REPOS(j, repo)
 	{
+	  int open = 0;
+
 	  if (openrepo)
 	    printf("\n    },");
 	  printf("    {\n");
 	  openrepo = 1;
 	  if (cbdata.first)
 	    cbdata.first[0] = 0;
-	}
-      dump_repodata(repo, &cbdata);
-      if (!dump_json)
-	{
-	  printf("repo %d contains %d solvables\n", j, repo->nsolvables);
-	  printf("repo start: %d end: %d\n", repo->start, repo->end);
-	}
-      else
-        {
+	  dump_repodata_json(repo, &cbdata);
 	  if (cbdata.first[0])
 	    printf(",\n");
-          printf("      \"solvables\": [\n");
-	}
-      FOR_REPO_SOLVABLES(repo, i, s)
-	{
-	  n++;
-	  if (!dump_json)
-	    {
-	      printf("\n");
-	      printf("solvable %d (%d):\n", n, i);
-	    }
-	  else
+	  printf("      \"solvables\": [\n");
+	  FOR_REPO_SOLVABLES(repo, i, s)
 	    {
 	      if (open)
-	        printf("\n        },\n");
+		printf("\n        },\n");
 	      printf("        {\n");
 	      open = 1;
+	      dump_solvable(repo, i, &cbdata);
 	    }
-	  dump_solvable(repo, i, &cbdata);
-	}
-      if (dump_json)
-	{
 	  if (open)
 	    printf("\n        }\n");
 	  printf("      ]\n");
 	}
-    }
-  if (dump_json)
-    {
       if (openrepo)
 	printf("    }\n");
       printf("  ]\n");
       printf("}\n");
+      solv_free(cbdata.first);
+    }
+  else
+    {
+      printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);
+      n = 0;
+      FOR_REPOS(j, repo)
+	{
+	  dump_repodata(repo);
+	  printf("repo %d contains %d solvables\n", j, repo->nsolvables);
+	  printf("repo start: %d end: %d\n", repo->start, repo->end);
+	  FOR_REPO_SOLVABLES(repo, i, s)
+	    {
+	      n++;
+	      printf("\n");
+	      printf("solvable %d (%d):\n", n, i);
+	      dump_solvable(repo, i, 0);
+	    }
+	}
     }
   pool_free(pool);
-  solv_free(cbdata.first);
   exit(0);
 }
