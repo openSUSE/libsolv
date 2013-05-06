@@ -253,14 +253,17 @@ SOLV_1.0 {
 		solv_dupjoin;
 		solv_free;
 		solv_hex2bin;
+		solv_latin1toutf8;
 		solv_malloc;
 		solv_malloc2;
 		solv_oom;
 		solv_realloc;
 		solv_realloc2;
+		solv_replacebadutf8;
 		solv_sort;
 		solv_strdup;
 		solv_timems;
+		solv_validutf8;
 		solv_vercmp;
 		solv_vercmp_deb;
 		solv_vercmp_haiku;

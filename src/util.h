@@ -38,6 +38,9 @@ extern char *solv_dupjoin(const char *str1, const char *str2, const char *str3);
 extern char *solv_dupappend(const char *str1, const char *str2, const char *str3);
 extern int solv_hex2bin(const char **strp, unsigned char *buf, int bufl);
 extern char *solv_bin2hex(const unsigned char *buf, int l, char *str);
+extern size_t solv_validutf8(const char *buf);
+extern char *solv_latin1toutf8(const char *buf);
+extern char *solv_replacebadutf8(const char *buf);
 
 
 static inline void *solv_extend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)

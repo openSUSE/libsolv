@@ -380,76 +380,14 @@ static char *headtoevr(RpmHead *h)
 static void
 setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
 {
-  const unsigned char *cp;
-  int state = 0;
-  int c;
-  unsigned char *buf = 0, *bp;
-
-  /* check if it's already utf8, code taken from screen ;-) */
-  cp = (const unsigned char *)str;
-  while ((c = *cp++) != 0)
+  if (str[solv_validutf8(str)])
     {
-      if (state)
-	{
-          if ((c & 0xc0) != 0x80)
-            break; /* encoding error */
-          c = (c & 0x3f) | (state << 6);
-          if (!(state & 0x40000000))
-	    {
-              /* check for overlong sequences */
-              if ((c & 0x820823e0) == 0x80000000)
-                break;
-              else if ((c & 0x020821f0) == 0x02000000)
-                break;
-              else if ((c & 0x000820f8) == 0x00080000)
-                break;
-              else if ((c & 0x0000207c) == 0x00002000)
-                break;
-            }
-        }
-      else
-	{
-          /* new sequence */
-          if (c >= 0xfe)
-            break;
-          else if (c >= 0xfc)
-            c = (c & 0x01) | 0xbffffffc;    /* 5 bytes to follow */
-          else if (c >= 0xf8)
-            c = (c & 0x03) | 0xbfffff00;    /* 4 */
-          else if (c >= 0xf0)
-            c = (c & 0x07) | 0xbfffc000;    /* 3 */
-          else if (c >= 0xe0)
-            c = (c & 0x0f) | 0xbff00000;    /* 2 */
-          else if (c >= 0xc2)
-            c = (c & 0x1f) | 0xfc000000;    /* 1 */
-          else if (c >= 0x80)
-            break;
-        }
-      state = (c & 0x80000000) ? c : 0;
+      char *ustr = solv_latin1toutf8(str);	/* not utf8, assume latin1 */
+      repodata_set_str(repodata, handle, tag, ustr);
+      solv_free(ustr);
     }
-  if (c)
-    {
-      /* not utf8, assume latin1 */
-      buf = solv_malloc(2 * strlen(str) + 1);
-      cp = (const unsigned char *)str;
-      str = (char *)buf;
-      bp = buf;
-      while ((c = *cp++) != 0)
-	{
-	  if (c >= 0xc0)
-	    {
-	      *bp++ = 0xc3;
-	      c ^= 0xc0 ^ 0x80;
-	    }
-	  else if (c >= 0x80)
-	    *bp++ = 0xc2;
-	  *bp++ = c;
-	}
-      *bp++ = 0;
-    }
-  repodata_set_str(repodata, handle, tag, str);
-  if (buf)
-    solv_free(buf);
+  else
+    repodata_set_str(repodata, handle, tag, str);
 }
 
 
@@ -820,9 +758,9 @@ addchangelog(Repodata *data, Id handle, RpmHead *rpmhead)
       if (ct[i])
         repodata_set_num(data, h, SOLVABLE_CHANGELOG_TIME, ct[i]);
       if (cn[i])
-        repodata_set_str(data, h, SOLVABLE_CHANGELOG_AUTHOR, cn[i]);
+        setutf8string(data, h, SOLVABLE_CHANGELOG_AUTHOR, cn[i]);
       if (cx[i])
-        repodata_set_str(data, h, SOLVABLE_CHANGELOG_TEXT, cx[i]);
+        setutf8string(data, h, SOLVABLE_CHANGELOG_TEXT, cx[i]);
       queue_push(&hq, h);
     }
   for (i = 0; i < hq.count; i++)
