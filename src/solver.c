@@ -3374,7 +3374,9 @@ solver_solve(Solver *solv, Queue *job)
 		queue_push(&q, p);
 	      if (!q.count)
 		{
-		  /* no candidate found, make this an impossible rule */
+		  if (select == SOLVER_SOLVABLE_ONE_OF)
+		    break;	/* ignore empty installs */
+		  /* no candidate found or unsupported, make this an impossible rule */
 		  queue_push(&q, -SYSTEMSOLVABLE);
 		}
 	      p = queue_shift(&q);	/* get first candidate */

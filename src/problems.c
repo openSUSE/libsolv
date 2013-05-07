@@ -1041,8 +1041,12 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       return pool_tmpjoin(pool, "problem with installed package ", pool_solvid2str(pool, source), 0);
     case SOLVER_RULE_JOB:
       return "conflicting requests";
+    case SOLVER_RULE_JOB_UNSUPPORTED:
+      return "unsupported request";
     case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
       return pool_tmpjoin(pool, "nothing provides requested ", pool_dep2str(pool, dep), 0);
+    case SOLVER_RULE_JOB_UNKNOWN_PACKAGE:
+      return pool_tmpjoin(pool, "package ", pool_dep2str(pool, dep), " does not exist");
     case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
       return pool_tmpjoin(pool, pool_dep2str(pool, dep), " is provided by the system", 0);
     case SOLVER_RULE_RPM:

@@ -2178,14 +2178,16 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*depp = solv->job.elements[jidx + 1];
       if ((r->d == 0 || r->d == -1) && r->w2 == 0 && r->p == -SYSTEMSOLVABLE)
 	{
-	  if ((solv->job.elements[jidx] & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_INSTALL|SOLVER_SOLVABLE_NAME))
+	  Id how = solv->job.elements[jidx];
+	  if ((how & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_INSTALL|SOLVER_SOLVABLE_NAME))
+	    return SOLVER_RULE_JOB_UNKNOWN_PACKAGE;
+	  if ((how & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES))
 	    return SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
-	  if ((solv->job.elements[jidx] & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES))
-	    return SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
-	  if ((solv->job.elements[jidx] & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_ERASE|SOLVER_SOLVABLE_NAME))
+	  if ((how & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_ERASE|SOLVER_SOLVABLE_NAME))
 	    return SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM;
-	  if ((solv->job.elements[jidx] & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_ERASE|SOLVER_SOLVABLE_PROVIDES))
+	  if ((how & (SOLVER_JOBMASK|SOLVER_SELECTMASK)) == (SOLVER_ERASE|SOLVER_SOLVABLE_PROVIDES))
 	    return SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM;
+	  return SOLVER_RULE_JOB_UNSUPPORTED;
 	}
       return SOLVER_RULE_JOB;
     }
