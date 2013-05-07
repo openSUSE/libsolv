@@ -94,6 +94,8 @@ showproblems(Solver *solv, Solvable *s, Queue *cand, Queue *badguys)
 		  break;
 		case SOLVER_RULE_JOB:
 		case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
+		case SOLVER_RULE_JOB_UNKNOWN_PACKAGE:
+		case SOLVER_RULE_JOB_UNSUPPORTED:
 		  break;
 		case SOLVER_RULE_RPM:
 		  printf("  some dependency problem\n");
