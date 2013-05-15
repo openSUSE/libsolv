@@ -38,7 +38,6 @@ import time
 import subprocess
 import rpm
 from stat import *
-from solv import Pool, Repo, Dataiterator, Job, Solver, Transaction, Selection
 from iniparse import INIConfig
 from optparse import OptionParser
 
@@ -214,9 +213,9 @@ class repo_generic(dict):
             f.seek(0)
             flags = 0
             if ext:
-                flags = Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES
+                flags = solv.Repo.REPO_USE_LOADING|solv.Repo.REPO_EXTEND_SOLVABLES
                 if ext != 'DL':
-                    flags |= Repo.REPO_LOCALPOOL
+                    flags |= solv.Repo.REPO_LOCALPOOL
             if not self.handle.add_solv(f, flags):
                 return False
             if self.type != 'system' and not ext:
@@ -262,16 +261,16 @@ class repo_generic(dict):
                 if not ext:
                     # main repo
                     self.handle.empty()
-                    if not self.handle.add_solv(nf, Repo.SOLV_ADD_NO_STUBS):
+                    if not self.handle.add_solv(nf, solv.Repo.SOLV_ADD_NO_STUBS):
                         sys.exit("internal error, cannot reload solv file")
                 else:
                     # extension repodata
                     # need to extend to repo boundaries, as this is how
                     # info.write() has written the data
                     info.extend_to_repo()
-                    flags = Repo.REPO_EXTEND_SOLVABLES
+                    flags = solv.Repo.REPO_EXTEND_SOLVABLES
                     if ext != 'DL':
-                        flags |= Repo.REPO_LOCALPOOL
+                        flags |= solv.Repo.REPO_LOCALPOOL
                     info.add_solv(nf, flags)
             os.rename(tmpname, self.cachepath(ext))
         except IOError, e:
@@ -336,7 +335,7 @@ class repo_repomd(repo_generic):
         return True
 
     def find(self, what):
-        di = self.handle.Dataiterator(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, Dataiterator.SEARCH_STRING)
+        di = self.handle.Dataiterator(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, solv.Dataiterator.SEARCH_STRING)
         di.prepend_keyname(solv.REPOSITORY_REPOMD)
         for d in di:
             dp = d.parentpos()
@@ -395,9 +394,9 @@ class repo_repomd(repo_generic):
         if not f:
             return False
         if ext == 'FL':
-            self.handle.add_rpmmd(f, 'FL', Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES|Repo.REPO_LOCALPOOL)
+            self.handle.add_rpmmd(f, 'FL', solv.Repo.REPO_USE_LOADING|solv.Repo.REPO_EXTEND_SOLVABLES|solv.Repo.REPO_LOCALPOOL)
         elif ext == 'DL':
-            self.handle.add_deltainfoxml(f, Repo.REPO_USE_LOADING)
+            self.handle.add_deltainfoxml(f, solv.Repo.REPO_USE_LOADING)
         self.writecachedrepo(ext, repodata)
         return True
 
@@ -429,14 +428,14 @@ class repo_susetags(repo_generic):
         if filename:
             f = self.download(descrdir + '/' + filename, True, filechksum, True)
             if f:
-                self.handle.add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.SUSETAGS_RECORD_SHARES)
+                self.handle.add_susetags(f, defvendorid, None, solv.Repo.REPO_NO_INTERNALIZE|solv.Repo.SUSETAGS_RECORD_SHARES)
                 (filename, filechksum) = self.find('packages.en.gz')
                 if not filename:
                     (filename, filechksum) = self.find('packages.en')
                 if filename:
                     f = self.download(descrdir + '/' + filename, True, filechksum, True)
                     if f:
-                        self.handle.add_susetags(f, defvendorid, None, Repo.REPO_NO_INTERNALIZE|Repo.REPO_REUSE_REPODATA|Repo.REPO_EXTEND_SOLVABLES)
+                        self.handle.add_susetags(f, defvendorid, None, solv.Repo.REPO_NO_INTERNALIZE|solv.Repo.REPO_REUSE_REPODATA|solv.Repo.REPO_EXTEND_SOLVABLES)
                 self.handle.internalize()
         self.add_exts()
         self.writecachedrepo(None)
@@ -445,7 +444,7 @@ class repo_susetags(repo_generic):
         return True
 
     def find(self, what):
-        di = self.handle.Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, Dataiterator.SEARCH_STRING)
+        di = self.handle.Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, solv.Dataiterator.SEARCH_STRING)
         di.prepend_keyname(solv.SUSETAGS_FILE)
         for d in di:
             dp = d.parentpos()
@@ -519,9 +518,9 @@ class repo_susetags(repo_generic):
         f = self.download(descrdir + '/' + filename, True, filechksum)
         if not f:
             return False
-        flags = Repo.REPO_USE_LOADING|Repo.REPO_EXTEND_SOLVABLES
+        flags = solv.Repo.REPO_USE_LOADING|solv.Repo.REPO_EXTEND_SOLVABLES
         if ext != 'DL':
-            flags |= Repo.REPO_LOCALPOOL
+            flags |= solv.Repo.REPO_LOCALPOOL
         self.handle.add_susetags(f, defvendorid, ext, flags)
         self.writecachedrepo(ext, repodata)
         return True
@@ -549,9 +548,9 @@ class repo_system(repo_generic):
             return True
         print "reading"
         if hasattr(self.handle.__class__, 'add_products'):
-            self.handle.add_products("/etc/products.d", Repo.REPO_NO_INTERNALIZE)
+            self.handle.add_products("/etc/products.d", solv.Repo.REPO_NO_INTERNALIZE)
         f = solv.xfopen(self.cachepath())
-        self.handle.add_rpmdb_reffp(f, Repo.REPO_REUSE_REPODATA)
+        self.handle.add_rpmdb_reffp(f, solv.Repo.REPO_REUSE_REPODATA)
         self.writecachedrepo(None)
         return True
 
@@ -585,11 +584,11 @@ if cmd in cmdabbrev:
     cmd = cmdabbrev[cmd]
 
 cmdactionmap = {
-  'install': Job.SOLVER_INSTALL,
-  'erase':   Job.SOLVER_ERASE,
-  'up':      Job.SOLVER_UPDATE,
-  'dup':     Job.SOLVER_DISTUPGRADE,
-  'verify':  Job.SOLVER_VERIFY,
+  'install': solv.Job.SOLVER_INSTALL,
+  'erase':   solv.Job.SOLVER_ERASE,
+  'up':      solv.Job.SOLVER_UPDATE,
+  'dup':     solv.Job.SOLVER_DISTUPGRADE,
+  'verify':  solv.Job.SOLVER_VERIFY,
   'list':    0,
   'info':    0
 }
@@ -645,14 +644,14 @@ if options.repos:
         if hasattr(repo, 'handle'):
             if not repofilter:
                 repofilter = pool.Selection()
-            repofilter.add(repo.handle.Selection(Job.SOLVER_SETVENDOR))
+            repofilter.add(repo.handle.Selection(solv.Job.SOLVER_SETVENDOR))
 
 if cmd == 'search':
     pool.createwhatprovides()
     sel = pool.Selection()
-    di = pool.Dataiterator(0, solv.SOLVABLE_NAME, args[0], Dataiterator.SEARCH_SUBSTRING|Dataiterator.SEARCH_NOCASE)
+    di = pool.Dataiterator(0, solv.SOLVABLE_NAME, args[0], solv.Dataiterator.SEARCH_SUBSTRING|solv.Dataiterator.SEARCH_NOCASE)
     for d in di:
-        sel.add_raw(Job.SOLVER_SOLVABLE, d.solvid)
+        sel.add_raw(solv.Job.SOLVER_SOLVABLE, d.solvid)
     if repofilter:
        sel.filter(repofilter)
     for s in sel.solvables():
@@ -671,7 +670,7 @@ if cmd == 'list' or cmd == 'info' or cmd == 'install':
                 cmdlinerepo = repo_cmdline('@commandline', 'cmdline')
                 cmdlinerepo.load(pool)
                 cmdlinerepo['packages'] = {}
-            cmdlinerepo['packages'][arg] = cmdlinerepo.handle.add_rpm(arg, Repo.REPO_REUSE_REPODATA|Repo.REPO_NO_INTERNALIZE)
+            cmdlinerepo['packages'][arg] = cmdlinerepo.handle.add_rpm(arg, solv.Repo.REPO_REUSE_REPODATA|solv.Repo.REPO_NO_INTERNALIZE)
     if cmdlinerepo:
         cmdlinerepo.handle.internalize()
 
@@ -687,19 +686,19 @@ pool.createwhatprovides()
 jobs = []
 for arg in args:
     if cmdlinerepo and arg in cmdlinerepo['packages']:
-        jobs.append(pool.Job(Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
+        jobs.append(pool.Job(solv.Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
     else:
-        flags = Selection.SELECTION_NAME|Selection.SELECTION_PROVIDES|Selection.SELECTION_GLOB
-        flags |= Selection.SELECTION_CANON|Selection.SELECTION_DOTARCH|Selection.SELECTION_REL
+        flags = solv.Selection.SELECTION_NAME|solv.Selection.SELECTION_PROVIDES|solv.Selection.SELECTION_GLOB
+        flags |= solv.Selection.SELECTION_CANON|solv.Selection.SELECTION_DOTARCH|solv.Selection.SELECTION_REL
         if len(arg) and arg[0] == '/':
-            flags |= Selection.SELECTION_FILELIST
+            flags |= solv.Selection.SELECTION_FILELIST
             if cmd == 'erase':
-                flags |= Selection.SELECTION_INSTALLED_ONLY
+                flags |= solv.Selection.SELECTION_INSTALLED_ONLY
         sel = pool.select(arg, flags)
         if repofilter:
            sel.filter(repofilter)
         if sel.isempty():
-            sel = pool.select(arg, flags | Selection.SELECTION_NOCASE)
+            sel = pool.select(arg, flags | solv.Selection.SELECTION_NOCASE)
             if repofilter:
                sel.filter(repofilter)
             if not sel.isempty():
@@ -707,9 +706,9 @@ for arg in args:
         if sel.isempty():
             print "nothing matches '%s'" % arg
             sys.exit(1)
-        if sel.flags() & Selection.SELECTION_FILELIST:
+        if sel.flags() & solv.Selection.SELECTION_FILELIST:
             print "[using file list match for '%s']" % arg
-        if sel.flags() & Selection.SELECTION_PROVIDES:
+        if sel.flags() & solv.Selection.SELECTION_PROVIDES:
             print "[using capability match for '%s']" % arg
         jobs += sel.jobs(cmdactionmap[cmd])
 
@@ -746,17 +745,17 @@ if cmd == 'list' or cmd == 'info':
 # up magic: use install instead of update if no installed package matches
 for job in jobs:
     if cmd == 'up' and job.isemptyupdate():
-        job.how ^= Job.SOLVER_UPDATE ^ Job.SOLVER_INSTALL
+        job.how ^= solv.Job.SOLVER_UPDATE ^ solv.Job.SOLVER_INSTALL
     if options.best:
-        job.how |= Job.SOLVER_FORCEBEST
+        job.how |= solv.Job.SOLVER_FORCEBEST
     if options.clean:
-        job.how |= Job.SOLVER_CLEANDEPS
+        job.how |= solv.Job.SOLVER_CLEANDEPS
 
 #pool.set_debuglevel(2)
 solver = pool.Solver()
-solver.set_flag(Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
+solver.set_flag(solv.Solver.SOLVER_FLAG_SPLITPROVIDES, 1);
 if cmd == 'erase':
-    solver.set_flag(Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
+    solver.set_flag(solv.Solver.SOLVER_FLAG_ALLOW_UNINSTALL, 1);
 
 while True:
     problems = solver.solve(jobs)
@@ -786,7 +785,7 @@ while True:
         solution = solutions[int(sol) - 1]
         for element in solution.elements():
             newjob = element.Job()
-            if element.type == Solver.SOLVER_SOLUTION_JOB:
+            if element.type == solv.Solver.SOLVER_SOLUTION_JOB:
                 jobs[element.jobidx] = newjob
             else:
                 if newjob and newjob not in jobs:
@@ -801,27 +800,27 @@ if trans.isempty():
 print
 print "Transaction summary:"
 print
-for cl in trans.classify(Transaction.SOLVER_TRANSACTION_SHOW_OBSOLETES | Transaction.SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE):
-    if cl.type == Transaction.SOLVER_TRANSACTION_ERASE:
+for cl in trans.classify(solv.Transaction.SOLVER_TRANSACTION_SHOW_OBSOLETES | solv.Transaction.SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE):
+    if cl.type == solv.Transaction.SOLVER_TRANSACTION_ERASE:
         print "%d erased packages:" % cl.count
-    elif cl.type == Transaction.SOLVER_TRANSACTION_INSTALL:
+    elif cl.type == solv.Transaction.SOLVER_TRANSACTION_INSTALL:
         print "%d installed packages:" % cl.count
-    elif cl.type == Transaction.SOLVER_TRANSACTION_REINSTALLED:
+    elif cl.type == solv.Transaction.SOLVER_TRANSACTION_REINSTALLED:
         print "%d reinstalled packages:" % cl.count
-    elif cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+    elif cl.type == solv.Transaction.SOLVER_TRANSACTION_DOWNGRADED:
         print "%d downgraded packages:" % cl.count
-    elif cl.type == Transaction.SOLVER_TRANSACTION_CHANGED:
+    elif cl.type == solv.Transaction.SOLVER_TRANSACTION_CHANGED:
         print "%d changed packages:" % cl.count
-    elif cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED:
+    elif cl.type == solv.Transaction.SOLVER_TRANSACTION_UPGRADED:
         print "%d upgraded packages:" % cl.count
-    elif cl.type == Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
+    elif cl.type == solv.Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
         print "%d vendor changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
-    elif cl.type == Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
+    elif cl.type == solv.Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
         print "%d arch changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
     else:
         continue
     for p in cl.solvables():
-        if cl.type == Transaction.SOLVER_TRANSACTION_UPGRADED or cl.type == Transaction.SOLVER_TRANSACTION_DOWNGRADED:
+        if cl.type == solv.Transaction.SOLVER_TRANSACTION_UPGRADED or cl.type == solv.Transaction.SOLVER_TRANSACTION_DOWNGRADED:
             op = trans.othersolvable(p)
             print "  - %s -> %s" % (p, op)
         else:
@@ -856,7 +855,7 @@ if newpkgs:
             continue
         if not sysrepo.handle.isempty() and os.access('/usr/bin/applydeltarpm', os.X_OK):
             pname = p.name
-            di = p.repo.Dataiterator(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, Dataiterator.SEARCH_STRING)
+            di = p.repo.Dataiterator(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, solv.Dataiterator.SEARCH_STRING)
             di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
             for d in di:
                 dp = d.parentpos()
@@ -908,19 +907,19 @@ ts = rpm.TransactionSet('/')
 ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
 erasenamehelper = {}
 for p in trans.steps():
-    type = trans.steptype(p, Transaction.SOLVER_TRANSACTION_RPM_ONLY)
-    if type == Transaction.SOLVER_TRANSACTION_ERASE:
+    type = trans.steptype(p, solv.Transaction.SOLVER_TRANSACTION_RPM_ONLY)
+    if type == solv.Transaction.SOLVER_TRANSACTION_ERASE:
         rpmdbid = p.lookup_num(solv.RPM_RPMDBID)
         erasenamehelper[p.name] = p
         if not rpmdbid:
             sys.exit("\ninternal error: installed package %s has no rpmdbid\n" % p)
         ts.addErase(rpmdbid)
-    elif type == Transaction.SOLVER_TRANSACTION_INSTALL:
+    elif type == solv.Transaction.SOLVER_TRANSACTION_INSTALL:
         f = newpkgsfp[p.id]
         h = ts.hdrFromFdno(f.fileno())
         os.lseek(f.fileno(), 0, os.SEEK_SET)
         ts.addInstall(h, p, 'u')
-    elif type == Transaction.SOLVER_TRANSACTION_MULTIINSTALL:
+    elif type == solv.Transaction.SOLVER_TRANSACTION_MULTIINSTALL:
         f = newpkgsfp[p.id]
         h = ts.hdrFromFdno(f.fileno())
         os.lseek(f.fileno(), 0, os.SEEK_SET)
