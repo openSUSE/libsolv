@@ -1830,9 +1830,10 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  for (pass = solv->updatemap.size ? 0 : 1; pass < 2; pass++)
 	    {
 	      int passlevel = level;
+	      Id *multiversionupdaters = solv->multiversion.size ? solv->multiversionupdaters : 0;
 	      if (pass == 1)
 		solv->decisioncnt_keep = solv->decisionq.count;
-	      /* start with installedpos, the position that gave us problems last time */
+	      /* start with installedpos, the position that gave us problems the last time */
 	      for (i = installedpos, n = installed->start; n < installed->end; i++, n++)
 		{
 		  Rule *rr;
@@ -1844,8 +1845,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (s->repo != installed)
 		    continue;
 
-		  if (solv->decisionmap[i] > 0)
-		    continue;
+		  if (solv->decisionmap[i] > 0 && (!multiversionupdaters || !multiversionupdaters[i - installed->start]))
+		    continue;		/* already decided */
 		  if (!pass && solv->updatemap.size && !MAPTST(&solv->updatemap, i - installed->start))
 		    continue;		/* updates first */
 		  r = solv->rules + solv->updaterules + (i - installed->start);
@@ -1857,18 +1858,17 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (!rr->p)
 		    continue;		/* orpaned package */
 
-		  /* XXX: noupdate check is probably no longer needed, as all jobs should
-		   * already be satisfied */
-		  /* Actually we currently still need it because of erase jobs */
-		  /* if noupdate is set we do not look at update candidates */
+		  /* check if we should update this package to the latest version
+		   * noupdate is set for erase jobs, in that case we want to deinstall
+		   * the installed package and not replace it with a newer version */
 		  queue_empty(&dq);
 		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || rr->p != i))
 		    {
-		      if (solv->multiversion.size && solv->multiversionupdaters
-			     && (d = solv->multiversionupdaters[i - installed->start]) != 0)
+		      if (multiversionupdaters && (d = multiversionupdaters[i - installed->start]) != 0)
 			{
 			  /* special multiversion handling, make sure best version is chosen */
-			  queue_push(&dq, i);
+			  if (rr->p == i && solv->decisionmap[i] >= 0)
+			    queue_push(&dq, i);
 			  while ((p = pool->whatprovidesdata[d++]) != 0)
 			    if (solv->decisionmap[p] >= 0)
 			      queue_push(&dq, p);
@@ -1891,7 +1891,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			}
 		      else
 			{
-			  /* update to best package */
+			  /* update to best package of the update rule */
 			  FOR_RULELITERALS(p, pp, rr)
 			    {
 			      if (solv->decisionmap[p] > 0)
