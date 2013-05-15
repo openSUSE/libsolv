@@ -945,8 +945,15 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	{
 	  if (MAPTST(&solv->multiversion, qs.elements[i]))
 	    {
-	      /* it's ok if they have same nevra */
 	      Solvable *ps = pool->solvables + qs.elements[i];
+	      /* if keepexplicitobsoletes is set and the name is different,
+	       * we assume that there is an obsoletes. XXX: not 100% correct */
+	      if (solv->keepexplicitobsoletes && ps->name != s->name)
+		{
+		  qs.elements[j++] = qs.elements[i];
+		  continue;
+		}
+	      /* it's ok if they have same nevra */
 	      if (ps->name != s->name || ps->evr != s->evr || ps->arch != s->arch)
 		continue;
 	    }
