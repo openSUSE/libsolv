@@ -1182,7 +1182,7 @@ typedef struct {
   Id lookup_id(Id entry, Id keyname) {
     return pool_lookup_id($self, entry, keyname);
   }
-  unsigned int lookup_num(Id entry, Id keyname, unsigned int notfound = 0) {
+  unsigned long long lookup_num(Id entry, Id keyname, unsigned long long notfound = 0) {
     return pool_lookup_num($self, entry, keyname, notfound);
   }
   bool lookup_void(Id entry, Id keyname) {
@@ -1284,7 +1284,7 @@ typedef struct {
 
   %typemap(out) Queue whatprovides Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
   %newobject whatprovides;
-  Queue whatprovides(Id dep) {
+  Queue whatprovides(DepId dep) {
     Pool *pool = $self;
     Queue q;
     Id p, pp;
@@ -1301,7 +1301,7 @@ typedef struct {
 #ifdef SWIGRUBY
   %rename("isknownarch?") isknownarch;
 #endif
-  bool isknownarch(Id id) {
+  bool isknownarch(DepId id) {
     Pool *pool = $self;
     if (!id || id == ID_EMPTY)
       return 0;
