@@ -1,0 +1,1924 @@
+'\" t
+.\"     Title: libsolv-bindings
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
+.\"      Date: 05/16/2013
+.\"    Manual: LIBSOLV
+.\"    Source: libsolv
+.\"  Language: English
+.\"
+.TH "LIBSOLV\-BINDINGS" "3" "05/16/2013" "libsolv" "LIBSOLV"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+libsolv-bindings \- access libsolv from perl/python/ruby
+.SH "DESCRIPTION"
+.sp
+bla bla bla
+.SH "THE POOL"
+.sp
+The pool is libsolv\(cqs central resource manager\&. A pool consists of Solvables, Repositories, Dependencies, each indexed by Ids\&.
+.SS "CLASS METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *Pool()\fR
+my \fI$pool\fR \fB= solv::Pool\->new()\fR;
+\fIpool\fR \fB= solv\&.Pool()\fR
+\fIpool\fR \fB= Solv::Pool\&.new()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a new pool instance\&. In most cases you just need one pool\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid *appdata;\fR                  /* read/write */
+\fI$pool\fR\fB\->{\*(Aqappdata\*(Aq}\fR
+\fIpool\fR\fB\&.appdata\fR
+\fIpool\fR\fB\&.appdata\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Application specific data that may be used in any way by the code using the pool\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable solvables[];\fR           /* read only */
+my \fI$solvable\fR \fB=\fR \fI$pool\fR\fB\->{\*(Aqsolvables\*(Aq}\->[\fR\fI$solvid\fR\fB]\fR;
+\fIsolvable\fR \fB=\fR \fIpool\fR\fB\&.solvables[\fR\fIsolvid\fR\fB]\fR
+\fIsolvable\fR \fB=\fR \fIpool\fR\fB\&.solvables[\fR\fIsolvid\fR\fB]\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Look up a Solvable by its id\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepo repos[];\fR                   /* read only */
+my \fI$repo\fR \fB=\fR \fI$pool\fR\fB\->{\*(Aqrepos\*(Aq}\->[\fR\fI$repoid\fR\fB]\fR;
+\fIrepo\fR \fB=\fR \fIpool\fR\fB\&.repos[\fR\fIrepoid\fR\fB]\fR
+\fIrepo\fR \fB=\fR \fIpool\fR\fB\&.repos[\fR\fIrepoid\fR\fB]\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Look up a Repository by its id\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepo *installed;\fR                /* read/write */
+\fI$pool\fR\fB\->{\*(Aqinstalled\*(Aq} =\fR \fI$repo\fR;
+\fIpool\fR\fB\&.installed =\fR \fIrepo\fR
+\fIpool\fR\fB\&.installed =\fR \fIrepo\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Define which repository contains all the installed packages\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid free()\fR
+\fI$pool\fR\fB\->free()\fR;
+\fIpool\fR\fB\&.free()\fR
+\fIpool\fR\fB\&.free()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Free a pool\&. This is currently done with a method instead of relying on reference counting or garbage collection because it\(cqs hard to track every reference to a pool\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid setdebuglevel(int\fR \fIlevel\fR\fB)\fR
+\fI$pool\fR\fB\->setdebuglevel(\fR\fI$level\fR\fB)\fR;
+\fIpool\fR\fB\&.setdebuglevel(\fR\fIlevel\fR\fB)\fR
+\fIpool\fR\fB\&.setdebuglevel(\fR\fIlevel\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Set the debug level\&. A value of zero means no debug output, the higher the value, the more output is generated\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint set_flag(int\fR \fIflag\fR\fB, int\fR \fIvalue\fR\fB)\fR
+my \fI$oldvalue\fR \fB=\fR \fI$pool\fR\fB\->set_flag(\fR\fI$flag\fR\fB,\fR \fI$value\fR\fB)\fR;
+\fIoldvalue\fR \fB=\fR \fIpool\fR\fB\&.set_flag(\fR\fIflag\fR\fB,\fR \fIvalue\fR\fB)\fR
+\fIoldvalue\fR \fB=\fR \fIpool\fR\fB\&.set_flag(\fR\fIflag\fR\fB,\fR \fIvalue\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint get_flag(int\fR \fIflag\fR\fB)\fR
+my \fI$value\fR \fB=\fR \fI$pool\fR\fB\->get_flag(\fR\fI$flag\fR\fB)\fR;
+\fIvalue\fR \fB=\fR \fIpool\fR\fB\&.get_flag(\fR\fIflag\fR\fB)\fR
+\fIvalue\fR \fB=\fR \fIpool\fR\fB\&.get_flag(\fR\fIflag\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Set/get a pool specific flag\&. The flags define how the system works, e\&.g\&. how the package manager treats obsoletes\&. The default flags should be sane for most applications, but in some cases you may want to tweak a flag, for example if you want to solv package dependencies for some other system than yours\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_rootdir(const char *\fR\fIrootdir\fR\fB)\fR
+\fI$pool\fR\fB\->set_rootdir(\fR\fIrootdir\fR\fB)\fR;
+\fIpool\fR\fB\&.set_rootdir(\fR\fIrootdir\fR\fB)\fR
+\fIpool\fR\fB\&.set_rootdir(\fR\fIrootdir\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *get_rootdir()\fR
+my \fI$rootdir\fR \fB=\fR \fI$pool\fR\fB\->get_rootdir()\fR;
+\fIrootdir\fR \fB=\fR \fIpool\fR\fB\&.get_rootdir()\fR
+\fIrootdir\fR \fB=\fR \fIpool\fR\fB\&.get_rootdir()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Set/get the rootdir to use\&. This is useful if you want package management to work only in some directory, for example if you want to setup a chroot jail\&. Note that the rootdir will only be prepended to file paths if the \fBREPO_USE_ROOTDIR\fR flag is used\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid setarch(const char *\fR\fIarch\fR \fB= 0)\fR
+\fI$pool\fR\fB\->setarch()\fR;
+\fIpool\fR\fB\&.setarch()\fR
+\fIpool\fR\fB\&.setarch()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Set the architecture for your system\&. The architecture is used to determine which packages are installable\&. It defaults to the result of \(lquname \-m\(rq\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepo *add_repo(const char *\fR\fIname\fR\fB)\fR
+\fI$repo\fR \fB=\fR \fI$pool\fR\fB\->add_repo(\fR\fI$name\fR\fB)\fR;
+\fIrepo\fR \fB=\fR \fIpool\fR\fB\&.add_repo(\fR\fIname\fR\fB)\fR
+\fIrepo\fR \fB=\fR \fIpool\fR\fB\&.add_repo(\fR\fIname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a Repository with the specified name to the pool\&. The reposiory is empty on creation, use the repository methods to populate it with packages\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepoiterator *repos_iter()\fR
+\fBfor my\fR \fI$repo\fR \fB(\fR\fI@\fR\fB{\fR\fI$pool\fR\fB\->repos_iter()})\fR
+\fBfor\fR \fIrepo\fR \fBin\fR \fIpool\fR\fB\&.repos_iter():\fR
+\fBfor\fR \fIrepo\fR \fBin\fR \fIpool\fR\fB\&.repos_iter()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterate over the existing repositories\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvableiterator *solvables_iter()\fR
+\fBfor my\fR \fI$solvable\fR \fB(\fR\fI@\fR\fB{\fR\fI$pool\fR\fB\->solvables_iter()})\fR
+\fBfor\fR \fIsolvable\fR \fBin\fR \fIpool\fR\fB\&.solvables_iter():\fR
+\fBfor\fR \fIsolvable\fR \fBin\fR \fIpool\fR\fB\&.solvables_iter()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterate over the existing solvables\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *Dep(const char *\fR\fIstr\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+my \fI$dep\fR \fB=\fR \fI$pool\fR\fB\->Dep(\fR\fI$string\fR\fB)\fR;
+\fIdep\fR \fB=\fR \fIpool\fR\fB\&.Dep(\fR\fIstring\fR\fB)\fR
+\fIdep\fR \fB=\fR \fIpool\fR\fB\&.Dep(\fR\fIstring\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create an object describing a string or dependency\&. If the string is currently not in the pool and \fIcreate\fR is false, \fBundef\fR/\fBNone\fR/\fBnil\fR is returned\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid addfileprovides()\fR
+\fI$pool\fR\fB\->addfileprovides()\fR;
+\fIpool\fR\fB\&.addfileprovides()\fR
+\fIpool\fR\fB\&.addfileprovides()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBQueue addfileprovides_queue()\fR
+my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->addfileprovides_queue()\fR;
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.addfileprovides_queue()\fR
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.addfileprovides_queue()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Some package managers like rpm allow dependencies on files contained in other packages\&. To allow libsolv to deal with those dependencies in an efficient way, you need to call the addfileprovides method after creating and reading all repositories\&. This method will scan all dependency for file names and than scan all packages for matching files\&. If a filename has been matched, it will be added to the provides list of the corresponding package\&. The addfileprovides_queue variant works the same way but returns an array containing all file dependencies\&. This information can be stored with the repository to speed up the next usage of the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid createwhatprovides()\fR
+\fI$pool\fR\fB\->createwhatprovides()\fR;
+\fIpool\fR\fB\&.createwhatprovides()\fR
+\fIpool\fR\fB\&.createwhatprovides()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create the internal \(lqwhatprovides\(rq hash over all of the provides of all packages\&. This method must be called before doing any lookups on provides\&. It\(cqs encuraged to do it right after all repos are set up, usually right after the call to addfileprovides()\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBQueue whatprovides(DepId\fR \fIdep\fR\fB)\fR
+my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatprovides(\fR\fI$dep\fR\fB)\fR;
+\fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatprovides(\fR\fIdep\fR\fB)\fR
+\fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatprovides(\fR\fIdep\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all solvables that provide the specified dependency\&. You can use either a Dep object or an simple Id as argument\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBQueue matchprovidingids(const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->matchprovidingids(\fR\fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.matchprovidingids(\fR\fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.matchprovidingids(\fR\fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Search the names of all provides and return the ones matching the specified string\&. See the Dataiterator class for the allowed flags\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId towhatprovides(Queue\fR \fIids\fR\fB)\fR
+my \fI$offset\fR \fB=\fR \fI$pool\fR\fB\->towhatprovides(\e\fR\fI@ids\fR\fB)\fR;
+\fIoffset\fR \fB=\fR \fIpool\fR\fB\&.towhatprovides(\fR\fIids\fR\fB)\fR
+\fIoffset\fR \fB=\fR \fIpool\fR\fB\&.towhatprovides(\fR\fIids\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+\(lqInternalize\(rq an array containing Ids\&. The returned value can be used to create solver jobs working on a specific set of packages\&. See the Solver class for more information\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool isknownarch(DepId\fR \fIid\fR\fB)\fR
+my \fI$bool\fR \fB=\fR \fI$pool\fR\fB\->isknownarch(\fR\fI$id\fR\fB)\fR;
+\fIbool\fR \fB=\fR \fIpool\fR\fB\&.isknownarch(\fR\fIid\fR\fB)\fR
+\fIbool\fR \fB=\fR \fIpool\fR\fB\&.isknownarch?(\fR\fIid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return true if the specified Id describs a known architecture\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *Solver()\fR
+my \fI$solver\fR \fB=\fR \fI$pool\fR\fB\->Solver()\fR;
+\fIsolver\fR \fB=\fR \fIpool\fR\fB\&.Solver()\fR
+\fIsolver\fR \fB=\fR \fIpool\fR\fB\&.Solver()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a new solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *Job(int\fR \fIhow\fR\fB, Id\fR \fIwhat\fR\fB)\fR
+my \fI$job\fR \fB=\fR \fI$pool\fR\fB\->Job(\fR\fI$how\fR\fB,\fR \fI$what\fR\fB)\fR;
+\fIjob\fR \fB=\fR \fIpool\fR\fB\&.Job(\fR\fIhow\fR\fB,\fR \fIwhat\fR\fB)\fR
+\fIjob\fR \fB=\fR \fIpool\fR\fB\&.Job(\fR\fIhow\fR\fB,\fR \fIwhat\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a new Job object\&. Kind of low level, in most cases you would use a Selection or Dep job constructor instead\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection *Selection()\fR
+my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->Selection()\fR;
+\fIsel\fR \fB=\fR \fIpool\fR\fB\&.Selection()\fR
+\fIsel\fR \fB=\fR \fIpool\fR\fB\&.Selection()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create an empty selection\&. Useful as a starting point for merging other selections\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection *Selection_all()\fR
+my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->Selection_all()\fR;
+\fIsel\fR \fB=\fR \fIpool\fR\fB\&.Selection_all()\fR
+\fIsel\fR \fB=\fR \fIpool\fR\fB\&.Selection_all()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a selection containing all packages\&. Useful as starting point for intersecting other selections or for update/distupgrade jobs\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection *select(const char *\fR\fIname\fR\fB, int\fR \fIflags\fR\fB)\fR
+my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->select(\fR\fI$name\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIsel\fR \fB=\fR \fIpool\fR\fB\&.select(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIsel\fR \fB=\fR \fIpool\fR\fB\&.select(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a selection by matching packages against the specified string\&. See the Selection class for a list of flags and how to create solver jobs from a selection\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid setpooljobs(Jobs *\fR\fIjobs\fR\fB)\fR
+\fI$pool\fR\fB\->setpooljobs(\e\fR\fI@jobs\fR\fB)\fR;
+\fIpool\fR\fB\&.setpooljobs(\fR\fIjobs\fR\fB)\fR
+\fIpool\fR\fB\&.setpooljobs(\fR\fIjobs\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBJobs *getpooljobs()\fR
+\fI@jobs\fR \fB=\fR \fI$pool\fR\fB\->getpooljobs()\fR;
+\fIjobs\fR \fB=\fR \fIpool\fR\fB\&.getpooljobs()\fR
+\fIjobs\fR \fB=\fR \fIpool\fR\fB\&.getpooljobs()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Get/Set fixed jobs stored in the pool\&. Those jobs are automatically appended to all solver jobs, they are meant for fixed configurations like which packages can be multiversion installed, which packages were userinstalled or must not be erased\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_loadcallback(Callable *\fR\fIcallback\fR\fB)\fR
+\fI$pool\fR\fB\->setloadcallback(\e\fR\fI&callbackfunction\fR\fB)\fR;
+\fIpool\fR\fB\&.setloadcallback(\fR\fIcallbackfunction\fR\fB)\fR
+\fIpool\fR\fB\&.setloadcallback { |\fR\fIrepodata\fR\fB| \&.\&.\&. }\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Set the callback function called when repository metadata needs to be loaded on demand\&. To make use of this feature, you need to create repodata stubs that tell the library which data is available but not loaded\&. If later on the data needs to be accessed, the callback function is called with a repodata argument\&. You can then load the data (maybe fetching it first from an remote server)\&. The callback should return true if the data has been made available\&.
+.SS "DATA RETRIEVAL METHODS"
+.sp
+In the following functions, the \fIkeyname\fR argument describes what to retrive\&. For the standard cases you can use the available Id constants\&. For example,
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB$solv::SOLVABLE_SUMMARY\fR
+\fBsolv\&.SOLVABLE_SUMMARY\fR
+\fBSolv::SOLVABLE_SUMMARY\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+selects the \(lqSummary\(rq entry of a solvable\&. The \fIsolvid\fR argument selects the desired solvable by Id\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *lookup_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$string\fR \fB=\fR \fI$pool\fR\fB\->lookup_str(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIstring\fR \fB=\fR \fIpool\fR\fB\&.lookup_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIstring\fR \fB=\fR \fIpool\fR\fB\&.lookup_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId lookup_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$id\fR \fB=\fR \fI$pool\fR\fB\->lookup_id(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIid\fR \fB=\fR \fIpool\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIid\fR \fB=\fR \fIpool\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned int lookup_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned int\fR \fInotfound\fR \fB= 0)\fR
+my \fI$num\fR \fB=\fR \fI$pool\fR\fB\->lookup_num(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fInum\fR \fB=\fR \fIpool\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fInum\fR \fB=\fR \fIpool\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool lookup_void(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$bool\fR \fB=\fR \fI$pool\fR\fB\->lookup_void(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIbool\fR \fB=\fR \fIpool\fR\fB\&.lookup_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIbool\fR \fB=\fR \fIpool\fR\fB\&.lookup_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBChksum *lookup_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$chksum\fR \fB=\fR \fI$pool\fR\fB\->lookup_checksum(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIchksum\fR \fB=\fR \fIpool\fR\fB\&.lookup_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIchksum\fR \fB=\fR \fIpool\fR\fB\&.lookup_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Lookup functions\&. Return the data element stored in the specified solvable\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDataiterator *Dataiterator(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+my \fI$di\fR \fB=\fR \fI$pool\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor my\fR \fI$d\fR \fB(\fR\fI@$di\fR\fB)\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR\fB:\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterate over the matching data elements\&. See the Dataiterator class for more information\&.
+.SS "ID METHODS"
+.sp
+The following methods deal with Ids, i\&.e\&. integers representing objects in the pool\&. They are considered \(lqlow level\(rq, in most cases you would not use them but instead the object orientated methods\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepo *id2repo(Id\fR \fIid\fR\fB)\fR
+\fI$repo\fR \fB=\fR \fI$pool\fR\fB\->id2repo(\fR\fI$id\fR\fB)\fR;
+\fIrepo\fR \fB=\fR \fIpool\fR\fB\&.id2repo(\fR\fIid\fR\fB)\fR
+\fIrepo\fR \fB=\fR \fIpool\fR\fB\&.id2repo(\fR\fIid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Lookup an existing Repository by id\&. You can also do this by using the \fBrepos\fR attribute\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *id2solvable(Id\fR \fIid\fR\fB)\fR
+\fI$solvable\fR \fB=\fR \fI$pool\fR\fB\->id2solvable(\fR\fI$id\fR\fB)\fR;
+\fIsolvable\fR \fB=\fR \fIpool\fR\fB\&.id2solvable(\fR\fIid\fR\fB)\fR
+\fIsolvable\fR \fB=\fR \fIpool\fR\fB\&.id2solvable(\fR\fIid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Lookup an existing Repository by id\&. You can also do this by using the \fBsolvables\fR attribute\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *solvid2str(Id\fR \fIid\fR\fB)\fR
+my \fI$str\fR \fB=\fR \fI$pool\fR\fB\->solvid2str(\fR\fI$id\fR\fB)\fR;
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvid2str(\fR\fIid\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvid2str(\fR\fIid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the Solvable with the specified id\&. The string consists of the name, version, and architecture of the Solvable\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId str2id(const char *\fR\fIstr\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+my \fI$id\fR \fB=\fR \fIpool\fR\fB\->str2id(\fR\fI$string\fR\fB)\fR;
+\fIid\fR \fB=\fR \fIpool\fR\fB\&.str2id(\fR\fIstring\fR\fB)\fR
+\fIid\fR \fB=\fR \fIpool\fR\fB\&.str2id(\fR\fIstring\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *id2str(Id\fR \fIid\fR\fB)\fR
+\fI$string\fR \fB=\fR \fIpool\fR\fB\->id2str(\fR\fI$id\fR\fB)\fR;
+\fIstring\fR \fB=\fR \fIpool\fR\fB\&.id2str(\fR\fIid\fR\fB)\fR
+\fIstring\fR \fB=\fR \fIpool\fR\fB\&.id2str(\fR\fIid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Convert a string into an Id and back\&. If the string is currently not in the pool and \fIcreate\fR is false, zero is returned\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId rel2id(Id\fR \fIname\fR\fB, Id\fR \fIevr\fR\fB, int\fR \fIflags\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+my \fI$id\fR \fB=\fR \fIpool\fR\fB\->rel2id(\fR\fI$nameid\fR\fB,\fR \fI$evrid\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIid\fR \fB=\fR \fIpool\fR\fB\&.rel2id(\fR\fInameid\fR\fB,\fR \fIevrid\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIid\fR \fB=\fR \fIpool\fR\fB\&.rel2id(\fR\fInameid\fR\fB,\fR \fIevrid\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a \(lqrelational\(rq dependency\&. Such dependencies consist of a name part, the \fIflags\fR describing the relation, and a version part\&. The flags are:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB$solv::REL_EQ | $solv::REL_GT | $solv::REL_LT\fR
+\fBsolv\&.REL_EQ | solv\&.REL_GT | solv\&.REL_LT\fR
+\fBSolv::REL_EQ | Solv::REL_GT | Solv::REL_LT\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Thus, if you want a \(lq<=\(rq relation, you would use \fBREL_LT | REL_EQ\fR\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id2langid(Id\fR \fIid\fR\fB, const char *\fR\fIlang\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+my \fI$id\fR \fB=\fR \fI$pool\fR\fB\->id2langid(\fR\fI$id\fR\fB,\fR \fI$language\fR\fB)\fR;
+\fIid\fR \fB=\fR \fIpool\fR\fB\&.id2langid(\fR\fIid\fR\fB,\fR \fIlanguage\fR\fB)\fR
+\fIid\fR \fB=\fR \fIpool\fR\fB\&.id2langid(\fR\fIid\fR\fB,\fR \fIlanguage\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a language specific Id from some other id\&. This function simply converts the id into a string, appends a dot and the specified language to the string and converts the result back into an Id\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *dep2str(Id\fR \fIid\fR\fB)\fR
+\fI$string\fR \fB=\fR \fIpool\fR\fB\->dep2str(\fR\fI$id\fR\fB)\fR;
+\fIstring\fR \fB=\fR \fIpool\fR\fB\&.dep2str(\fR\fIid\fR\fB)\fR
+\fIstring\fR \fB=\fR \fIpool\fR\fB\&.dep2str(\fR\fIid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Convert a dependency id into a string\&. If the id is just a string, this function has the same effect as id2str()\&. For relational dependencies, the result is the correct \(lqname relation evr\(rq string\&.
+.SH "THE DEPENDENCY CLASS"
+.sp
+The dependency class is an object orientated way to work with strings and dependencies\&. Internally, dependencies are represented as Ids, i\&.e\&. simple numbers\&. Dependency objects can be constructed by using the Pool\(cqs Dep() method\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *pool;\fR             /* read only */
+\fI$dep\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fIdep\fR\fB\&.pool\fR
+\fIdep\fR\fB\&.pool\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back reference to the pool this dependency belongs to\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id;\fR          /* read only */
+\fI$dep\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fIdep\fR\fB\&.id\fR
+\fIdep\fR\fB\&.id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of this dependency\&.
+.SH "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *Rel(int\fR \fIflags\fR\fB, DepId\fR \fIevrid\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+my \fI$reldep\fR \fB=\fR \fI$dep\fR\fB\->Rel(\fR\fI$flags\fR\fB,\fR \fI$evrdep\fR\fB)\fR;
+\fIreldep\fR \fB=\fR \fIdep\fR\fB\&.Rel(\fR\fIflags\fR\fB,\fR \fIevrdep\fR\fB)\fR
+\fIreldep\fR \fB=\fR \fIdep\fR\fB\&.Rel(\fR\fIflags\fR\fB,\fR \fIevrdep\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a relational dependency from to string dependencies and a flags argument\&. See the pool\(cqs rel2id method for a description of the flags\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection *Selection_name(int\fR \fIsetflags\fR \fB= 0)\fR
+my \fI$sel\fR \fB=\fR \fI$dep\fR\fB\->Selection_name()\fR;
+\fIsel\fR \fB=\fR \fIdep\fR\fB\&.Selection_name()\fR
+\fIsel\fR \fB=\fR \fIdep\fR\fB\&.Selection_name()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a Selection from a dependency\&. The selection consists of all packages that have a name equal to the dependency\&. If the dependency is of a relational type, the packages version must also fulfill the dependency\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection *Selection_provides(int\fR \fIsetflags\fR \fB= 0)\fR
+my \fI$sel\fR \fB=\fR \fI$dep\fR\fB\->Selection_provides()\fR;
+\fIsel\fR \fB=\fR \fIdep\fR\fB\&.Selection_provides()\fR
+\fIsel\fR \fB=\fR \fIdep\fR\fB\&.Selection_provides()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a Selection from a dependency\&. The selection consists of all packages that have at least one provides matching the dependency\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *str()\fR
+my \fI$str\fR \fB=\fR \fI$dep\fR\fB\->str()\fR;
+\fIstr\fR \fB=\fR \fI$dep\fR\fB\&.str()\fR
+\fIstr\fR \fB=\fR \fI$dep\fR\fB\&.str()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the dependency\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB= "\fR\fI$dep\fR\fB"\fR;
+\fIstr\fR \fB= str(\fR\fIdep\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIdep\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Same as calling the str() method\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<comparisons ==, !=>\fR
+\fBif (\fR\fI$dep1\fR \fB==\fR \fI$dep2\fR\fB)\fR
+\fBif\fR \fIdep1\fR \fB==\fR \fIdep2\fR\fB:\fR
+\fBif\fR \fIdep1\fR \fB==\fR \fIdep2\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The dependencies are equal if they are part of the same pool and have the same ids\&.
+.SH "THE REPOSITORY CLASS"
+.sp
+A Repository describes a group of packages, normally comming from the same source\&. Repositories are created by the Pool\(cqs add_repo() method\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *pool;\fR                     /* read only */
+\fI$repo\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fIrepo\fR\fB\&.pool\fR
+\fIrepo\fR\fB\&.pool\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back reference to the pool this dependency belongs to\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id;\fR                          /* read only */
+\fI$repo\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fIrepo\fR\fB\&.id\fR
+\fIrepo\fR\fB\&.id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the id of the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *name;\fR               /* read/write */
+\fI$repo\fR\fB\->{\*(Aqname\*(Aq}\fR
+\fIrepo\fR\fB\&.name\fR
+\fIrepo\fR\fB\&.name\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The repositories name\&. To libsolv, the name is just a string with no specific meaning\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint prioprity;\fR                  /* read/write */
+\fI$repo\fR\fB\->{\*(Aqpriority\*(Aq}\fR
+\fIrepo\fR\fB\&.priority\fR
+\fIrepo\fR\fB\&.priority\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The priority of the repository\&. A higher number means that packages of this repository will be chosen over other repositories, even if they have a greater package version\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint subprioprity;\fR               /* read/write */
+\fI$repo\fR\fB\->{\*(Aqsubpriority\*(Aq}\fR
+\fIrepo\fR\fB\&.subpriority\fR
+\fIrepo\fR\fB\&.subpriority\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The sub\-priority of the repository\&. This value is compared when the priorities of two repositories are the same\&. It is useful to make the library prefer on\-disk repositories to remote ones\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint nsolvables;\fR                 /* read only */
+\fI$repo\fR\fB\->{\*(Aqnsolvables\*(Aq}\fR
+\fIrepo\fR\fB\&.nsolvables\fR
+\fIrepo\fR\fB\&.nsolvables\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The number of solvables in this repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid *appdata;\fR                  /* read/write */
+\fI$repo\fR\fB\->{\*(Aqappdata\*(Aq}\fR
+\fIrepo\fR\fB\&.appdata\fR
+\fIrepo\fR\fB\&.appdata\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Application specific data that may be used in any way by the code using the repository\&.
+.SS "CONSTANTS"
+.PP
+\fBREPO_REUSE_REPODATA\fR
+.RS 4
+Reuse the last repository data aera (\(lqrepodata\(rq) instead of creating a new one\&.
+.RE
+.PP
+\fBREPO_NO_INTERNALIZE\fR
+.RS 4
+Do not internalize the added repository data\&. This is useful if you plan to add more data because internalization is a costly operation\&.
+.RE
+.PP
+\fBREPO_LOCALPOOL\fR
+.RS 4
+Use the repodata\(cqs pool for Id storage instead of the global pool\&. Useful if you don\(cqt want to pollute the global pool with many unneeded ids, like when storing the filelist\&.
+.RE
+.PP
+\fBREPO_USE_LOADING\fR
+.RS 4
+Use the repodata that is currently being loaded instead of creating a new one\&. This only makes sense if used in a load callback\&.
+.RE
+.PP
+\fBREPO_EXTEND_SOLVABLES\fR
+.RS 4
+Do not create new solvables for the new data, but match existing solvables and add the data to them\&. Repository metadata is often split into multiple parts, with one primary file describing all packages and other parts holding information that is normally not needed, like the changelog\&.
+.RE
+.PP
+\fBREPO_USE_ROOTDIR\fR
+.RS 4
+Prepend the pool\(cqs rootdir to the path when doing file operations\&.
+.RE
+.PP
+\fBREPO_NO_LOCATION\fR
+.RS 4
+Do not add a location element to the solvables\&. Useful if the solvables are not in the final position, so you can add the correct location later in your code\&.
+.RE
+.PP
+\fBSOLV_ADD_NO_STUBS\fR
+.RS 4
+Do not create stubs for repository parts that can be downloaded on demand\&.
+.RE
+.PP
+\fBSUSETAGS_RECORD_SHARES\fR
+.RS 4
+This is specific to the add_susetags() method\&. Susetags allows to refer to already read packages to save disk space\&. If this data sharing needs to work over multiple calls to add_susetags, you need to specify this flag so that the share information is made available to subsequent calls\&.
+.RE
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid free(bool\fR \fIreuseids\fR \fB= 0)\fR
+\fI$repo\fR\fB\->free()\fR;
+\fIrepo\fR\fB\&.free()\fR
+\fIrepo\fR\fB\&.free()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Free the repository and all solvables it contains\&. If \fIreuseids\fR is set to true, the solvable ids and the repository id may be reused by the library when added new solvables\&. Thus you should leave it false if you are not sure that somebody holds a reference\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid empty(bool\fR \fIreuseids\fR \fB= 0)\fR
+\fI$repo\fR\fB\->empty()\fR;
+\fIrepo\fR\fB\&.empty()\fR
+\fIrepo\fR\fB\&.empty()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Free all the solvables in a repository\&. The repository will be empty after this call\&. See the free() method for the meaning of \fIreuseids\fR\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool isempty()\fR
+\fI$repo\fR\fB\->isempty()\fR
+\fIrepo\fR\fB\&.empty()\fR
+\fIrepo\fR\fB\&.empty?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return true if there are no solvables in this repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid internalize()\fR
+\fI$repo\fR\fB\->internalize()\fR;
+\fIrepo\fR\fB\&.internalize()\fR
+\fIrepo\fR\fB\&.internalize()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Internalize added data\&. Data must be internalized before it is available to the lookup and data iterator functions\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool write(FILE *\fR\fIfp\fR\fB)\fR
+\fI$repo\fR\fB\->write(\fR\fI$fp\fR\fB)\fR
+\fIrepo\fR\fB\&.write(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.write(\fR\fIfp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Write a repo as a \(lqsolv\(rq file\&. These files can be read very fast and thus are a good way to cache repository data\&. Returns false if there was some error writing the file\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvableiterator *solvables_iter()\fR
+\fBfor my\fR \fI$solvable\fR \fB(\fR\fI@\fR\fB{\fR\fI$repo\fR\fB\->solvables_iter()})\fR
+\fBfor\fR \fIsolvable\fR \fBin\fR \fIrepo\fR\fB\&.solvables_iter():\fR
+\fBfor\fR \fIsolvable\fR \fBin\fR \fIrepo\fR\fB\&.solvables_iter()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterate over all solvables in a repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepodata *add_repodata(int\fR \fIflags\fR \fB= 0)\fR
+my \fI$repodata\fR \fB=\fR \fI$repo\fR\fB\->add_repodata()\fR;
+\fIrepodata\fR \fB=\fR \fIrepo\fR\fB\&.add_repodata()\fR
+\fIrepodata\fR \fB=\fR \fIrepo\fR\fB\&.add_repodata()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a new repodata area to the repository\&. This is normally automatically done by the repo_add methods, so you need this method only in very rare circumstances\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid create_stubs()\fR
+\fI$repo\fR\fB\->create_stubs()\fR;
+\fIrepo\fR\fB\&.create_stubs()\fR
+\fIrepo\fR\fB\&.create_stubs()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Calls the create_stubs() repodata method for the last repodata of the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool iscontiguous()\fR
+\fI$repo\fR\fB\->iscontiguous()\fR
+\fIrepo\fR\fB\&.iscontiguous()\fR
+\fIrepo\fR\fB\&.iscontiguous?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return true if the solvables of this repository are all in a single block with no holes, i\&.e\&. they have consecutive ids\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepodata *first_repodata()\fR
+my \fI$repodata\fR \fB=\fR \fI$repo\fR\fB\->first_repodata()\fR;
+\fIrepodata\fR \fB=\fR \fIrepo\fR\fB\&.first_repodata()\fR
+\fIrepodata\fR \fB=\fR \fIrepo\fR\fB\&.first_repodata()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Checks if all repodatas but the first repodata are extensions, and return the first repodata if this is the case\&. Useful if you want to do a store/retrive sequence on the repository to reduce the memory using and enable paging, as this does not work if the rpository contains multiple non\-extension repodata areas\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection *Selection(int\fR \fIsetflags\fR \fB= 0)\fR
+my \fI$sel\fR \fB=\fR \fI$repo\fR\fB\->Selection()\fR;
+\fIsel\fR \fB=\fR \fIrepo\fR\fB\&.Selection()\fR
+\fIsel\fR \fB=\fR \fIrepo\fR\fB\&.Selection()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a Selection consisting of all packages in the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDataiterator *Dataiterator(Id\fR \fIp\fR\fB, Id\fR \fIkey\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+my \fI$di\fR \fB=\fR \fI$repo\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor my\fR \fI$d\fR \fB(\fR\fI@$di\fR\fB)\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR\fB:\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterate over the matching data elements in this repository\&. See the Dataiterator class for more information\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB= "\fR\fI$repo\fR\fB"\fR;
+\fIstr\fR \fB= str(\fR\fIrepo\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIrepo\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the name of the repository, or "Repo#<id>" if no name is set\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<comparisons ==, !=>\fR
+\fBif (\fR\fI$repo1\fR \fB==\fR \fI$repo2\fR\fB)\fR
+\fBif\fR \fIrepo1\fR \fB==\fR \fIrepo2\fR\fB:\fR
+\fBif\fR \fIrepo1\fR \fB==\fR \fIrepo2\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Two repositories are equal if they belong to the same pool and have the same id\&.
+.SS "LOOKUP FUNCTIONS"
+.sp
+Those functions can be used to retrieve information from a repository\&. For Package data lookups the methods in the Solvable class are prefered, so you probably only need this funcions to lookup repository meta information with \fBSOLVID_META\fR\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *lookup_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$str\fR \fB=\fR \fI$repo\fR\fB\->lookup_str(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIstr\fR \fB=\fR \fIrepo\fR\fB\&.lookup_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIrepo\fR\fB\&.lookup_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Lookup a string from the \fIkeyname\fR entry specified with \fIsolvid\fR\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId lookup_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$id\fR \fB=\fR \fI$repo\fR\fB\->lookup_id(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIid\fR \fB=\fR \fIrepo\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIid\fR \fB=\fR \fIrepo\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Lookup an Id from the \fIkeyname\fR entry specified with \fIsolvid\fR\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned long long lookup_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInotfound\fR \fB= 0)\fR
+my \fI$num\fR \fB=\fR \fI$repo\fR\fB\->lookup_num(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fInum\fR \fB=\fR \fIrepo\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fInum\fR \fB=\fR \fIrepo\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Lookup a number from the \fIkeyname\fR entry specified with \fIsolvid\fR\&.
+.SS "DATA ADD METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *add_solvable()\fR
+\fI$repo\fR\fB\->add_solvable()\fR;
+\fIrepo\fR\fB\&.add_solvable()\fR
+\fIrepo\fR\fB\&.add_solvable()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a single empty solvable to the repository\&. Returns a Solvable object, see the Solvable class for more information\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_solv(const char *\fR\fIname\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_solv(\fR\fI$name\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_solv(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIrepo\fR\fB\&.add_solv(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_solv(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_solv(\fR\fI$fp\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_solv(\fR\fIfp\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIrepo\fR\fB\&.add_solv(\fR\fIfp\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Read a \(lqsolv\(rq file and add its contents to the repository\&. These files can be written with the write() method and are normally used as fast cache for repository metadata\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_rpmdb(int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_rpmdb(\fR\fI$flags\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_rpmdb(\fR\fIflags\fR\fB)\fR
+\fIrepo\fR\fB\&.add_rpmdb(\fR\fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_rpmdb_reffp(FILE *\fR\fIreffp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_rpmdb_reffp(\fR\fI$reffp\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_rpmdb_reffp(\fR\fI$reffp\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIrepo\fR\fB\&.add_rpmdb_reffp(\fR\fI$reffp\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the contents of the rpm database to the repository\&. If a solv file containing an old version of the database is available, it can be passed as reffp to speed up reading\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_rpm(const char *\fR\fIname\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_rpm(\fR\fI$name\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_rpm(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIrepo\fR\fB\&.add_rpm(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the metadata of a single rpm package to the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_rpmdb_pubkeys(int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_rpmdb_pubkeys()\fR;
+\fIrepo\fR\fB\&.add_rpmdb_pubkeys()\fR
+\fIrepo\fR\fB\&.add_rpmdb_pubkeys()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add all pubkeys contained in the rpm database to the repository\&. Note that newer rpm versions also allow to store the pubkeys in some directory instead of the rpm database\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_pubkey(const char *\fR\fIkeyfile\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_pubkey(\fR\fI$keyfile\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_pubkey(\fR\fI$keyfile\fR\fB)\fR
+\fIrepo\fR\fB\&.add_pubkey(\fR\fI$keyfile\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a pubkey from a file to the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_rpmmd(FILE *\fR\fIfp\fR\fB, const char *\fR\fIlanguage\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_rpmmd(\fR\fI$fp\fR\fB,\fR \fI$language\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_rpmmd(\fR\fIfp\fR\fB,\fR \fIlanguage\fR\fB)\fR
+\fIrepo\fR\fB\&.add_rpmmd(\fR\fIfp\fR\fB,\fR \fIlanguage\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add metadata stored in the "rpm\-md" format (i\&.e\&. from files in the \(lqrepodata\(rq directory) to a repository\&. Supported files are "primary", "filelists", "other", "suseinfo"\&. Do not forget to specify the \fBREPO_EXTEND_SOLVABLES\fR for extension files like "filelists" and "other"\&. Use the \fIlanguage\fR parameter if you have language extension files, otherwise simply use a \fBundef\fR/\fBNone\fR/\fBnil\fR parameter\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_repomdxml(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_repomdxml(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_repomdxml(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_repomdxml(\fR\fIfp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the repomd\&.xml meta description from the "rpm\-md" format to the repository\&. This file contains information about the repository like keywords, and also a list of all database files with checksums\&. The data is added the the "meta" section of the repository, i\&.e\&. no package gets created\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_updateinfoxml(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_updateinfoxml(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_updateinfoxml(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_updateinfoxml(\fR\fIfp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the updateinfo\&.xml file containing available maintenance updates to the repository\&. All updates are created as special packages that have a "patch:" prefix in their name\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_deltainfoxml(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_deltainfoxml(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_deltainfoxml(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_deltainfoxml(\fR\fIfp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the deltainfo\&.xml file (also called prestodelta\&.xml) containing available delta\-rpms to the repository\&. The data is added to the "meta" section, i\&.e\&. no package gets created\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_debdb(int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_debdb()\fR;
+\fIrepo\fR\fB\&.add_debdb()\fR
+\fIrepo\fR\fB\&.add_debdb()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the contents of the debian installed package database to the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_debpackages(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_debpackages(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_debpackages(\fR\fI$fp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_debpackages(\fR\fI$fp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the contents of the debian repository metadata (the "packages" file) to the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_deb(const char *\fR\fIfilename\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_deb(\fR\fI$filename\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_deb(\fR\fIfilename\fR\fB)\fR
+\fIrepo\fR\fB\&.add_deb(\fR\fIfilename\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the metadata of a single deb package to the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_mdk(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_mdk(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_mdk(\fR\fI$fp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_mdk(\fR\fI$fp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the contents of the mageia/mandriva repository metadata (the "synthesis\&.hdlist" file) to the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_mdk_info(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_mdk(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_mdk(\fR\fI$fp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_mdk(\fR\fI$fp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Extend the packages from the synthesis file with the info\&.xml and files\&.xml data\&. Do not forget to specify \fBREPO_EXTEND_SOLVABLES\fR\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_arch_repo(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_arch_repo(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_arch_repo(\fR\fI$fp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_arch_repo(\fR\fI$fp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the contents of the archlinux repository metadata (the "\&.db\&.tar" file) to the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_arch_local(const char *\fR\fIdir\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_arch_local(\fR\fI$dir\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_arch_local(\fR\fI$dir\fR\fB)\fR
+\fIrepo\fR\fB\&.add_arch_local(\fR\fI$dir\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the contents of the archlinux installed package database to the repository\&. The \fIdir\fR parameter is usually set to "/var/lib/pacman/local"\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_content(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_content(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_content(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_content(\fR\fIfp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the \(lqcontent\(rq meta description from the susetags format to the repository\&. This file contains information about the repository like keywords, and also a list of all database files with checksums\&. The data is added the the "meta" section of the repository, i\&.e\&. no package gets created\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_susetags(FILE *\fR\fIfp\fR\fB, Id\fR \fIdefvendor\fR\fB, const char *\fR\fIlanguage\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_susetags(\fR\fI$fp\fR\fB,\fR \fI$defvendor\fR\fB,\fR \fI$language\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_susetags(\fR\fIfp\fR\fB,\fR \fIdefvendor\fR\fB,\fR \fIlanguage\fR\fB)\fR
+\fIrepo\fR\fB\&.add_susetags(\fR\fIfp\fR\fB,\fR \fIdefvendor\fR\fB,\fR \fIlanguage\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add repository metadata in the susetags format to the repository\&. Like with add_rpmmd, you can specify a language if you have language extension files\&. The \fIdefvendor\fR parameter provides a default vendor for packages with missing vendors, it is usually provided in the content file\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_products(const char *\fR\fIdir\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+\fI$repo\fR\fB\->add_products(\fR\fI$dir\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_products(\fR\fIdir\fR\fB)\fR
+\fIrepo\fR\fB\&.add_products(\fR\fIdir\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the installed SUSE products database to the repository\&. The \fIdir\fR parameter is usually "/etc/products\&.d"\&.
+.SH "THE SOLVABLE CLASS"
+.sp
+xxx
+.SH "THE DATAITERATOR CLASS"
+.sp
+xxx
+.SH "THE SELECTION CLASS"
+.sp
+xxx
+.SH "THE JOB CLASS"
+.sp
+xxx
+.SH "THE SOLVER CLASS"
+.sp
+xxx
+.SH "THE TRANSACTION CLASS"
+.sp
+xxx
+.SH "CHECKSUMS"
+.sp
+Checksums (also called hashes) are used to make sure that downloaded data is not corrupt and also as a fingerprint mechanism to check if data has changed\&.
+.SS "CLASS METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBChksum *Chksum(Id\fR \fItype\fR\fB)\fR
+my \fI$chksum\fR \fB= solv\&.Chksum\->new(\fR\fI$type\fR\fB)\fR;
+\fIchksum\fR \fB= solv\&.Chksum(\fR\fItype\fR\fB)\fR
+\fIchksum\fR \fB= solv\&.Chksum\&.new(\fR\fItype\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a checksum object\&. Currently the following types are supported:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBREPOKEY_TYPE_MD5\fR
+\fBREPOKEY_TYPE_SHA1\fR
+\fBREPOKEY_TYPE_SHA256\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+These keys are constants in the \fBsolv\fR class\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBChksum *Chksum(Id\fR \fItype\fR\fB, const char *\fR\fIhex\fR\fB)\fR
+my \fI$chksum\fR \fB= solv\&.Chksum\->new(\fR\fI$type\fR\fB,\fR \fI$hex\fR\fB)\fR;
+\fIchksum\fR \fB= solv\&.Chksum(\fR\fItype\fR\fB,\fR \fIhex\fR\fB)\fR
+\fIchksum\fR \fB= solv\&.Chksum\&.new(\fR\fItype\fR\fB,\fR \fIhex\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create an already finalized checksum object\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId type;\fR                        /* read only */
+\fI$chksum\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fIchksum\fR\fB\&.type\fR
+\fIchksum\fR\fB\&.type\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the type of the checksum object\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add(const char *\fR\fIstr\fR\fB)\fR
+\fI$chksum\fR\fB\->add(\fR\fI$str\fR\fB)\fR;
+\fIchksum\fR\fB\&.add(\fR\fIstr\fR\fB)\fR
+\fIchksum\fR\fB\&.add(\fR\fIstr\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a string to the checksum\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add_fp(FILE *\fR\fIfp\fR\fB)\fR
+\fI$chksum\fR\fB\->add_fp(\fR\fI$file\fR\fB)\fR;
+\fIchksum\fR\fB\&.add_fp(\fR\fIfile\fR\fB)\fR
+\fIchksum\fR\fB\&.add_fp(\fR\fIfile\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add the contents of a file to the checksum\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add_stat(const char *\fR\fIfilename\fR\fB)\fR
+\fI$chksum\fR\fB\->add_stat(\fR\fI$filename\fR\fB)\fR;
+\fIchksum\fR\fB\&.add_stat(\fR\fIfilename\fR\fB)\fR
+\fIchksum\fR\fB\&.add_stat(\fR\fIfilename\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Stat the file and add the dev/ino/size/mtime member to the checksum\&. If the stat fails, the members are zeroed\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add_fstat(int\fR \fIfd\fR\fB)\fR
+\fI$chksum\fR\fB\->add_fstat(\fR\fI$fd\fR\fB)\fR;
+\fIchksum\fR\fB\&.add_fstat(\fR\fIfd\fR\fB)\fR
+\fIchksum\fR\fB\&.add_fstat(\fR\fIfd\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Same as add_stat, but instead of the filename a file descriptor is used\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned char *raw()\fR
+my \fI$raw\fR \fB=\fR \fI$chksum\fR\fB\->raw()\fR;
+\fIraw\fR \fB=\fR \fIchksum\fR\fB\&.raw()\fR
+\fIraw\fR \fB=\fR \fIchksum\fR\fB\&.raw()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Finalize the checksum and return the result as raw bytes\&. This means that the result can contain zero bytes or unprintable characters\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned char *hex()\fR
+my \fI$raw\fR \fB=\fR \fI$chksum\fR\fB\->hex()\fR;
+\fIraw\fR \fB=\fR \fIchksum\fR\fB\&.hex()\fR
+\fIraw\fR \fB=\fR \fIchksum\fR\fB\&.hex()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Finalize the checksum and return the result as hex string\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<comparisons ==, !=>\fR
+\fBif (\fR\fI$chksum1\fR \fB==\fR \fI$chksum2\fR\fB)\fR
+\fBif\fR \fIchksum1\fR \fB==\fR \fIchksum2\fR\fB:\fR
+\fBif\fR \fIchksum1\fR \fB==\fR \fIchksum2\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Checksums are equal if they are of the same type and the finalized results are the same\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB= "\fR\fI$chksum\fR\fB"\fR;
+\fIstr\fR \fB= str(\fR\fIchksum\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIchksum\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+If the checksum is finished, the checksum is returned as "<type>:<hex>" string\&. Otherwise "<type>:unfinished" is returned\&.
+.SH "FILE MANAGEMENT"
+.sp
+This functions were added because libsolv uses standard \fBFILE\fR pointers to read/write files, but languages like perl have their own implementation of files\&. The libsolv functions also support decompression and compression, the algorithm is selected by looking at the file name extension\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBFILE *xfopen(char *\fR\fIfn\fR\fB, char *\fR\fImode\fR \fB= "r")\fR
+my \fI$file\fR \fB= solv::xfopen(\fR\fI$path\fR\fB)\fR;
+\fIfile\fR \fB= solv\&.xfopen(\fR\fIpath\fR\fB)\fR
+\fIfile\fR \fB= Solv::xfopen(\fR\fIpath\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Open a file at the specified path\&. The mode argument is passed on to the stdio library\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBFILE *xfopen_fd(char *\fR\fIfn\fR\fB, int\fR \fIfileno\fR\fB)\fR
+my \fI$file\fR \fB= solv::xfopen_fd(\fR\fI$path\fR\fB,\fR \fI$fileno\fR\fB)\fR;
+\fIfile\fR \fB= solv\&.xfopen_fd(\fR\fIpath\fR\fB,\fR \fIfileno\fR\fB)\fR
+\fIfile\fR \fB= Solv::xfopen_fd(\fR\fIpath\fR\fB,\fR \fIfileno\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a file handle from the specified file descriptor\&. The path argument is only used to select the correct (de\-)compression algorithm, use an empty path if you want to make sure to read/write raw data\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint fileno()\fR
+my \fI$fileno\fR \fB=\fR \fI$file\fR\fB\->fileno()\fR;
+\fIfileno\fR \fB=\fR \fIfile\fR\fB\&.fileno()\fR
+\fIfileno\fR \fB=\fR \fIfile\fR\fB\&.fileno()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return file file descriptor of the file\&. If the file is not open, \-1 is returned\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint dup()\fR
+my \fI$fileno\fR \fB=\fR \fI$file\fR\fB\->dup()\fR;
+\fIfileno\fR \fB=\fR \fIfile\fR\fB\&.dup()\fR
+\fIfileno\fR \fB=\fR \fIfile\fR\fB\&.dup()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a copy of the descriptor of the file\&. If the file is not open, \-1 is returned\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool flush()\fR
+\fI$file\fR\fB\->flush()\fR;
+\fIfile\fR\fB\&.flush()\fR
+\fIfile\fR\fB\&.flush()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Flush the file\&. Returns false if there was an error\&. Flushing a closed file always returns true\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool close()\fR
+\fI$file\fR\fB\->close()\fR;
+\fIfile\fR\fB\&.close()\fR
+\fIfile\fR\fB\&.close()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Close the file\&. This is needed for languages like Ruby, that do not destruct objects right after they are no longer referenced\&. In that case, it is good style to close open files so that the file descriptors are freed right away\&. Returns false if there was an error\&.
+.SH "THE REPODATACLASS"
+.sp
+xxx
+.SH "AUTHOR"
+.sp
+Michael Schroeder <mls@suse\&.de>
