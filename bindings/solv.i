@@ -1423,10 +1423,10 @@ rb_eval_string(
 
 #ifdef ENABLE_RPMDB
   bool add_rpmdb(int flags = 0) {
-    return repo_add_rpmdb($self, 0, flags);
+    return repo_add_rpmdb($self, 0, flags) == 0;
   }
   bool add_rpmdb_reffp(FILE *reffp, int flags = 0) {
-    return repo_add_rpmdb_reffp($self, reffp, flags);
+    return repo_add_rpmdb_reffp($self, reffp, flags) == 0;
   }
   Id add_rpm(const char *name, int flags = 0) {
     return repo_add_rpm($self, name, flags);
@@ -1434,7 +1434,7 @@ rb_eval_string(
 #endif
 #ifdef ENABLE_RPMDB_PUBKEYS
   bool add_rpmdb_pubkeys(int flags = 0) {
-    return repo_add_rpmdb_pubkeys($self, flags);
+    return repo_add_rpmdb_pubkeys($self, flags) == 0;
   }
   Id add_pubkey(const char *key, int flags = 0) {
     return repo_add_pubkey($self, key, flags);
@@ -1442,21 +1442,24 @@ rb_eval_string(
 #endif
 #ifdef ENABLE_RPMMD
   bool add_rpmmd(FILE *fp, const char *language, int flags = 0) {
-    return repo_add_rpmmd($self, fp, language, flags);
+    return repo_add_rpmmd($self, fp, language, flags) == 0;
   }
   bool add_repomdxml(FILE *fp, int flags = 0) {
-    return repo_add_repomdxml($self, fp, flags);
+    return repo_add_repomdxml($self, fp, flags) == 0;
   }
   bool add_updateinfoxml(FILE *fp, int flags = 0) {
-    return repo_add_updateinfoxml($self, fp, flags);
+    return repo_add_updateinfoxml($self, fp, flags) == 0;
   }
   bool add_deltainfoxml(FILE *fp, int flags = 0) {
-    return repo_add_deltainfoxml($self, fp, flags);
+    return repo_add_deltainfoxml($self, fp, flags) == 0;
   }
 #endif
 #ifdef ENABLE_DEBIAN
   bool add_debdb(int flags = 0) {
-    return repo_add_debdb($self, flags);
+    return repo_add_debdb($self, flags) == 0;
+  }
+  bool add_debpackages(FILE *fp, int flags = 0) {
+    return repo_add_debpackages($self, fp, flags) == 0;
   }
   Id add_deb(const char *name, int flags = 0) {
     return repo_add_deb($self, name, flags);
@@ -1464,26 +1467,29 @@ rb_eval_string(
 #endif
 #ifdef ENABLE_SUSEREPO
   bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0) {
-    return repo_add_susetags($self, fp, defvendor, language, flags);
+    return repo_add_susetags($self, fp, defvendor, language, flags) == 0;
   }
   bool add_content(FILE *fp, int flags = 0) {
-    return repo_add_content($self, fp, flags);
+    return repo_add_content($self, fp, flags) == 0;
   }
   bool add_products(const char *proddir, int flags = 0) {
-    return repo_add_products($self, proddir, flags);
+    return repo_add_products($self, proddir, flags) == 0;
   }
 #endif
 #ifdef ENABLE_MDKREPO
   bool add_mdk(FILE *fp, int flags = 0) {
-    return repo_add_mdk($self, fp, flags);
+    return repo_add_mdk($self, fp, flags) == 0;
   }
   bool add_mdk_info(FILE *fp, int flags = 0) {
-    return repo_add_mdk($self, fp, flags);
+    return repo_add_mdk_info($self, fp, flags) == 0;
   }
 #endif
 #ifdef ENABLE_ARCHREPO
   bool add_arch_repo(FILE *fp, int flags = 0) {
-    return repo_add_arch_repo($self, fp, flags);
+    return repo_add_arch_repo($self, fp, flags) == 0;
+  }
+  bool add_arch_local(const char *dir, int flags = 0) {
+    return repo_add_arch_local($self, dir, flags) == 0;
   }
   Id add_arch_pkg(const char *name, int flags = 0) {
     return repo_add_arch_pkg($self, name, flags);
@@ -1501,16 +1507,17 @@ rb_eval_string(
   unsigned long long lookup_num(Id entry, Id keyname, unsigned long long notfound = 0) {
     return repo_lookup_num($self, entry, keyname, notfound);
   }
-  void write(FILE *fp) {
-    repo_write($self, fp);
+  bool write(FILE *fp) {
+    return repo_write($self, fp) == 0;
   }
   # HACK, remove if no longer needed!
   bool write_first_repodata(FILE *fp) {
     int oldnrepodata = $self->nrepodata;
+    int res;
     $self->nrepodata = oldnrepodata > 2 ? 2 : oldnrepodata;
-    repo_write($self, fp);
+    res = repo_write($self, fp);
     $self->nrepodata = oldnrepodata;
-    return 1;
+    return res == 0;
   }
 
   %newobject Dataiterator;
@@ -2869,8 +2876,8 @@ rb_eval_string(
   void create_stubs() {
     repodata_create_stubs(repo_id2repodata($self->repo, $self->id));
   }
-  void write(FILE *fp) {
-    repodata_write(repo_id2repodata($self->repo, $self->id), fp);
+  bool write(FILE *fp) {
+    return repodata_write(repo_id2repodata($self->repo, $self->id), fp) == 0;
   }
   bool add_solv(FILE *fp, int flags = 0) {
     Repodata *data = repo_id2repodata($self->repo, $self->id);
