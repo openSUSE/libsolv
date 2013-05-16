@@ -1647,9 +1647,9 @@ Checksums (also called hashes) are used to make sure that downloaded data is not
 .\}
 .nf
 \fBChksum *Chksum(Id\fR \fItype\fR\fB)\fR
-my \fI$chksum\fR \fB= solv\&.Chksum\->new(\fR\fI$type\fR\fB)\fR;
+my \fI$chksum\fR \fB= solv::Chksum\->new(\fR\fI$type\fR\fB)\fR;
 \fIchksum\fR \fB= solv\&.Chksum(\fR\fItype\fR\fB)\fR
-\fIchksum\fR \fB= solv\&.Chksum\&.new(\fR\fItype\fR\fB)\fR
+\fIchksum\fR \fB= Solv::Chksum\&.new(\fR\fItype\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1676,9 +1676,9 @@ These keys are constants in the \fBsolv\fR class\&.
 .\}
 .nf
 \fBChksum *Chksum(Id\fR \fItype\fR\fB, const char *\fR\fIhex\fR\fB)\fR
-my \fI$chksum\fR \fB= solv\&.Chksum\->new(\fR\fI$type\fR\fB,\fR \fI$hex\fR\fB)\fR;
+my \fI$chksum\fR \fB= solv::Chksum\->new(\fR\fI$type\fR\fB,\fR \fI$hex\fR\fB)\fR;
 \fIchksum\fR \fB= solv\&.Chksum(\fR\fItype\fR\fB,\fR \fIhex\fR\fB)\fR
-\fIchksum\fR \fB= solv\&.Chksum\&.new(\fR\fItype\fR\fB,\fR \fIhex\fR\fB)\fR
+\fIchksum\fR \fB= Solv::Chksum\&.new(\fR\fItype\fR\fB,\fR \fIhex\fR\fB)\fR
 .fi
 .if n \{\
 .RE

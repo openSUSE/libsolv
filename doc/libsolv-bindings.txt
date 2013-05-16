@@ -981,9 +981,9 @@ mechanism to check if data has changed.
 === CLASS METHODS ===
 
 	Chksum *Chksum(Id type)
-	my $chksum = solv.Chksum->new($type);
+	my $chksum = solv::Chksum->new($type);
 	chksum = solv.Chksum(type)
-	chksum = solv.Chksum.new(type)
+	chksum = Solv::Chksum.new(type)
 
 Create a checksum object. Currently the following types
 are supported:
@@ -995,9 +995,9 @@ are supported:
 These keys are constants in the *solv* class.
 
 	Chksum *Chksum(Id type, const char *hex)
-	my $chksum = solv.Chksum->new($type, $hex);
+	my $chksum = solv::Chksum->new($type, $hex);
 	chksum = solv.Chksum(type, hex)
-	chksum = solv.Chksum.new(type, hex)
+	chksum = Solv::Chksum.new(type, hex)
 
 Create an already finalized checksum object.
 
