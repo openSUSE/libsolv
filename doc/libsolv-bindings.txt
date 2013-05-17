@@ -15,9 +15,8 @@ bla bla bla
 THE POOL
 --------
 
-The pool is libsolv's central resource manager. A pool
-consists of Solvables, Repositories, Dependencies, each
-indexed by Ids.
+The pool is libsolv's central resource manager. A pool consists of Solvables,
+Repositories, Dependencies, each indexed by Ids.
 
 === CLASS METHODS ===
 
@@ -36,8 +35,8 @@ one pool.
 	pool.appdata
 	pool.appdata
 
-Application specific data that may be used in any way by the
-code using the pool.
+Application specific data that may be used in any way by the code using the
+pool.
 
 	Solvable solvables[];		/* read only */
 	my $solvable = $pool->{'solvables'}->[$solvid];
@@ -58,8 +57,7 @@ Look up a Repository by its id.
 	pool.installed = repo
 	pool.installed = repo
 
-Define which repository contains all the installed
-packages.
+Define which repository contains all the installed packages.
 
 === METHODS ===
 
@@ -68,18 +66,17 @@ packages.
 	pool.free()
 	pool.free()
 
-Free a pool. This is currently done with a method
-instead of relying on reference counting or garbage
-collection because it's hard to track every reference
-to a pool.
-	
+Free a pool. This is currently done with a method instead of relying on
+reference counting or garbage collection because it's hard to track every
+reference to a pool.
+
 	void setdebuglevel(int level)
 	$pool->setdebuglevel($level);
 	pool.setdebuglevel(level)
 	pool.setdebuglevel(level)
 
-Set the debug level. A value of zero means no debug output,
-the higher the value, the more output is generated.
+Set the debug level. A value of zero means no debug output, the higher the
+value, the more output is generated.
 
 	int set_flag(int flag, int value)
 	my $oldvalue = $pool->set_flag($flag, $value);
@@ -91,12 +88,10 @@ the higher the value, the more output is generated.
 	value = pool.get_flag(flag)
 	value = pool.get_flag(flag)
 
-Set/get a pool specific flag. The flags define how the
-system works, e.g. how the package manager treats
-obsoletes. The default flags should be sane for most
-applications, but in some cases you may want to tweak
-a flag, for example if you want to solv package
-dependencies for some other system than yours.
+Set/get a pool specific flag. The flags define how the system works, e.g. how
+the package manager treats obsoletes. The default flags should be sane for most
+applications, but in some cases you may want to tweak a flag, for example if
+you want to solv package dependencies for some other system than yours.
 
 	void set_rootdir(const char *rootdir)
 	$pool->set_rootdir(rootdir);
@@ -108,29 +103,26 @@ dependencies for some other system than yours.
 	rootdir = pool.get_rootdir()
 	rootdir = pool.get_rootdir()
 
-Set/get the rootdir to use. This is useful if you want
-package management to work only in some directory, for
-example if you want to setup a chroot jail. Note that
-the rootdir will only be prepended to file paths if
-the *REPO_USE_ROOTDIR* flag is used.
+Set/get the rootdir to use. This is useful if you want package management
+to work only in some directory, for example if you want to setup a chroot
+jail. Note that the rootdir will only be prepended to file paths if the
+*REPO_USE_ROOTDIR* flag is used.
 
 	void setarch(const char *arch = 0)
 	$pool->setarch();
 	pool.setarch()
 	pool.setarch()
 
-Set the architecture for your system. The architecture
-is used to determine which packages are installable. It
-defaults to the result of ``uname -m''.
+Set the architecture for your system. The architecture is used to determine
+which packages are installable. It defaults to the result of ``uname -m''.
 
 	Repo *add_repo(const char *name)
 	$repo = $pool->add_repo($name);
 	repo = pool.add_repo(name)
 	repo = pool.add_repo(name)
 
-Add a Repository with the specified name to the pool.
-The reposiory is empty on creation, use the repository
-methods to populate it with packages.
+Add a Repository with the specified name to the pool. The reposiory is empty
+on creation, use the repository methods to populate it with packages.
 
 	Repoiterator *repos_iter()
 	for my $repo (@{$pool->repos_iter()})
@@ -151,9 +143,8 @@ Iterate over the existing solvables.
 	dep = pool.Dep(string)
 	dep = pool.Dep(string)
 
-Create an object describing a string or dependency.
-If the string is currently not in the pool and
-_create_ is false, *undef*/*None*/*nil* is returned.
+Create an object describing a string or dependency. If the string is currently
+not in the pool and _create_ is false, *undef*/*None*/*nil* is returned.
 
 	void addfileprovides()
 	$pool->addfileprovides();
@@ -165,68 +156,57 @@ _create_ is false, *undef*/*None*/*nil* is returned.
 	ids = pool.addfileprovides_queue()
 	ids = pool.addfileprovides_queue()
 
-Some package managers like rpm allow dependencies on
-files contained in other packages. To allow libsolv
-to deal with those dependencies in an efficient way,
-you need to call the addfileprovides method after
-creating and reading all repositories. This method
-will scan all dependency for file names and than
-scan all packages for matching files. If a filename
-has been matched, it will be added to the provides
-list of the corresponding package.
-The addfileprovides_queue variant works the same
-way but returns an array containing all file
-dependencies. This information can be stored
-with the repository to speed up the next usage of
-the repository.
+Some package managers like rpm allow dependencies on files contained in other
+packages. To allow libsolv to deal with those dependencies in an efficient way,
+you need to call the addfileprovides method after creating and reading all
+repositories. This method will scan all dependency for file names and than scan
+all packages for matching files. If a filename has been matched, it will be
+added to the provides list of the corresponding package. The
+addfileprovides_queue variant works the same way but returns an array
+containing all file dependencies. This information can be stored with the
+repository to speed up the next usage of the repository.
 
 	void createwhatprovides()
 	$pool->createwhatprovides();
 	pool.createwhatprovides()
 	pool.createwhatprovides()
 
-Create the internal ``whatprovides'' hash over all
-of the provides of all packages. This method must
-be called before doing any lookups on provides.
-It's encuraged to do it right after all repos
-are set up, usually right after the call to
-addfileprovides().
+Create the internal ``whatprovides'' hash over all of the provides of all
+packages. This method must be called before doing any lookups on provides.
+It's encuraged to do it right after all repos are set up, usually right after
+the call to addfileprovides().
 
 	Queue whatprovides(DepId dep)
 	my @solvables = $pool->whatprovides($dep);
 	solvables = pool.whatprovides(dep)
 	solvables = pool.whatprovides(dep)
 
-Return all solvables that provide the specified
-dependency. You can use either a Dep object or
-an simple Id as argument.
+Return all solvables that provide the specified dependency. You can use either
+a Dep object or an simple Id as argument.
 
 	Queue matchprovidingids(const char *match, int flags)
 	my @ids = $pool->matchprovidingids($match, $flags);
 	ids = pool.matchprovidingids(match, flags)
 	ids = pool.matchprovidingids(match, flags)
 
-Search the names of all provides and return the ones
-matching the specified string. See the Dataiterator class
-for the allowed flags.
+Search the names of all provides and return the ones matching the specified
+string. See the Dataiterator class for the allowed flags.
 
 	Id towhatprovides(Queue ids)
 	my $offset = $pool->towhatprovides(\@ids);
 	offset = pool.towhatprovides(ids)
 	offset = pool.towhatprovides(ids)
 
-``Internalize'' an array containing Ids. The returned
-value can be used to create solver jobs working on
-a specific set of packages. See the Solver class for
-more information.
+``Internalize'' an array containing Ids. The returned value can be used to
+create solver jobs working on a specific set of packages. See the Solver class
+for more information.
 
 	bool isknownarch(DepId id)
 	my $bool = $pool->isknownarch($id);
 	bool = pool.isknownarch(id)
 	bool = pool.isknownarch?(id)
 
-Return true if the specified Id describs a known
-architecture.
+Return true if the specified Id describs a known architecture.
 
 	Solver *Solver()
 	my $solver = $pool->Solver();
@@ -240,35 +220,33 @@ Create a new solver object.
 	job = pool.Job(how, what)
 	job = pool.Job(how, what)
 
-Create a new Job object. Kind of low level, in most cases
-you would use a Selection or Dep job constructor instead.
+Create a new Job object. Kind of low level, in most cases you would use a
+Selection or Dep job constructor instead.
 
 	Selection *Selection()
 	my $sel = $pool->Selection();
 	sel = pool.Selection()
 	sel = pool.Selection()
 
-Create an empty selection. Useful as a starting point for
-merging other selections.
+Create an empty selection. Useful as a starting point for merging other
+selections.
 
 	Selection *Selection_all()
 	my $sel = $pool->Selection_all();
 	sel = pool.Selection_all()
 	sel = pool.Selection_all()
 	
-Create a selection containing all packages. Useful as
-starting point for intersecting other selections or
-for update/distupgrade jobs.
+Create a selection containing all packages. Useful as starting point for
+intersecting other selections or for update/distupgrade jobs.
 
 	Selection *select(const char *name, int flags)
 	my $sel = $pool->select($name, $flags);
 	sel = pool.select(name, flags)
 	sel = pool.select(name, flags)
 
-Create a selection by matching packages against the
-specified string. See the Selection class for a
-list of flags and how to create solver jobs from
-a selection.
+Create a selection by matching packages against the specified string. See the
+Selection class for a list of flags and how to create solver jobs from a
+selection.
 
 	void setpooljobs(Jobs *jobs)
 	$pool->setpooljobs(\@jobs);
@@ -280,41 +258,34 @@ a selection.
 	jobs = pool.getpooljobs()
 	jobs = pool.getpooljobs()
 
-Get/Set fixed jobs stored in the pool. Those jobs
-are automatically appended to all solver jobs, they
-are meant for fixed configurations like which
-packages can be multiversion installed, which packages
-were userinstalled or must not be erased.
+Get/Set fixed jobs stored in the pool. Those jobs are automatically appended to
+all solver jobs, they are meant for fixed configurations like which packages
+can be multiversion installed, which packages were userinstalled or must not be
+erased.
 
 	void set_loadcallback(Callable *callback)
 	$pool->setloadcallback(\&callbackfunction);
 	pool.setloadcallback(callbackfunction)
 	pool.setloadcallback { |repodata| ... }
 
-Set the callback function called when repository
-metadata needs to be loaded on demand. To make use
-of this feature, you need to create repodata stubs
-that tell the library which data is available but
-not loaded. If later on the data needs to be
-accessed, the callback function is called with a
-repodata argument. You can then load the data
-(maybe fetching it first from an remote server).
-The callback should return true if the data has
-been made available.
+Set the callback function called when repository metadata needs to be loaded on
+demand. To make use of this feature, you need to create repodata stubs that
+tell the library which data is available but not loaded. If later on the data
+needs to be accessed, the callback function is called with a repodata argument.
+You can then load the data (maybe fetching it first from an remote server).
+The callback should return true if the data has been made available.
 
 === DATA RETRIEVAL METHODS ===
 
-In the following functions, the _keyname_ argument
-describes what to retrive. For the standard cases you
-can use the available Id constants. For example,
+In the following functions, the _keyname_ argument describes what to retrive.
+For the standard cases you can use the available Id constants. For example,
 
 	$solv::SOLVABLE_SUMMARY
 	solv.SOLVABLE_SUMMARY
 	Solv::SOLVABLE_SUMMARY
 
-selects the ``Summary'' entry of a solvable. The
-_solvid_ argument selects the desired solvable by
-Id.
+selects the ``Summary'' entry of a solvable. The _solvid_ argument selects the
+desired solvable by Id.
 
 	const char *lookup_str(Id solvid, Id keyname)
 	my $string = $pool->lookup_str($solvid, $keyname);
@@ -341,8 +312,8 @@ Id.
 	chksum = pool.lookup_checksum(solvid, keyname)
 	chksum = pool.lookup_checksum(solvid, keyname)
 
-Lookup functions. Return the data element stored in the
-specified solvable.
+Lookup functions. Return the data element stored in the specified solvable.
+You should probably use the methods of the Solvable class instead.
 
 	Dataiterator *Dataiterator(Id solvid, Id keyname, const char *match, int flags)
 	my $di = $pool->Dataiterator($solvid, $keyname, $match, $flags);
@@ -353,14 +324,13 @@ specified solvable.
 	for d in di:
 	for d in di
 
-Iterate over the matching data elements. See the Dataiterator class for
-more information.
+Iterate over the matching data elements. See the Dataiterator class for more
+information.
 
 === ID METHODS ===
 
-The following methods deal with Ids, i.e. integers
-representing objects in the pool. They are considered
-``low level'', in most cases you would not use them
+The following methods deal with Ids, i.e. integers representing objects in the
+pool. They are considered ``low level'', in most cases you would not use them
 but instead the object orientated methods.
 
 	Repo *id2repo(Id id)
@@ -368,25 +338,24 @@ but instead the object orientated methods.
 	repo = pool.id2repo(id)
 	repo = pool.id2repo(id)
 
-Lookup an existing Repository by id. You can also do
-this by using the *repos* attribute.
+Lookup an existing Repository by id. You can also do this by using the *repos*
+attribute.
 
 	Solvable *id2solvable(Id id)
 	$solvable = $pool->id2solvable($id);
 	solvable = pool.id2solvable(id)
 	solvable = pool.id2solvable(id)
 
-Lookup an existing Repository by id. You can also do
-this by using the *solvables* attribute.
+Lookup an existing Repository by id. You can also do this by using the
+*solvables* attribute.
 
 	const char *solvid2str(Id id)
 	my $str = $pool->solvid2str($id);
 	str = pool.solvid2str(id)
 	str = pool.solvid2str(id)
 
-Return a string describing the Solvable with the specified
-id. The string consists of the name, version, and architecture
-of the Solvable.
+Return a string describing the Solvable with the specified id. The string
+consists of the name, version, and architecture of the Solvable.
 
 	Id str2id(const char *str, bool create=1)
 	my $id = pool->str2id($string);
@@ -398,53 +367,47 @@ of the Solvable.
 	string = pool.id2str(id)
 	string = pool.id2str(id)
 
-Convert a string into an Id and back. If the string is
-currently not in the pool and _create_ is false,
-zero is returned.
+Convert a string into an Id and back. If the string is currently not in the
+pool and _create_ is false, zero is returned.
 
 	Id rel2id(Id name, Id evr, int flags, bool create=1)
 	my $id = pool->rel2id($nameid, $evrid, $flags);
 	id = pool.rel2id(nameid, evrid, flags)
 	id = pool.rel2id(nameid, evrid, flags)
 
-Create a ``relational'' dependency. Such dependencies
-consist of a name part, the _flags_ describing the
-relation, and a version part. The flags are:
+Create a ``relational'' dependency. Such dependencies consist of a name part,
+the _flags_ describing the relation, and a version part. The flags are:
 
 	$solv::REL_EQ | $solv::REL_GT | $solv::REL_LT
 	solv.REL_EQ | solv.REL_GT | solv.REL_LT
 	Solv::REL_EQ | Solv::REL_GT | Solv::REL_LT
 
-Thus, if you want a ``\<='' relation, you would use
-*REL_LT | REL_EQ*.
+Thus, if you want a ``\<='' relation, you would use *REL_LT | REL_EQ*.
 
 	Id id2langid(Id id, const char *lang, bool create=1)
 	my $id = $pool->id2langid($id, $language);
 	id = pool.id2langid(id, language)
 	id = pool.id2langid(id, language)
 
-Create a language specific Id from some other id. This
-function simply converts the id into a string, appends
-a dot and the specified language to the string and
-converts the result back into an Id.
+Create a language specific Id from some other id. This function simply converts
+the id into a string, appends a dot and the specified language to the string
+and converts the result back into an Id.
 
 	const char *dep2str(Id id)
 	$string = pool->dep2str($id);
 	string = pool.dep2str(id)
 	string = pool.dep2str(id)
 
-Convert a dependency id into a string. If the id
-is just a string, this function has the same effect
-as id2str(). For relational dependencies, the result
-is the correct ``name relation evr'' string.
+Convert a dependency id into a string. If the id is just a string, this
+function has the same effect as id2str(). For relational dependencies, the
+result is the correct ``name relation evr'' string.
 
 
 THE DEPENDENCY CLASS
 --------------------
-The dependency class is an object orientated way to work with
-strings and dependencies. Internally, dependencies are
-represented as Ids, i.e. simple numbers. Dependency
-objects can be constructed by using the Pool's Dep()
+The dependency class is an object orientated way to work with strings and
+dependencies. Internally, dependencies are represented as Ids, i.e. simple
+numbers. Dependency objects can be constructed by using the Pool's Dep()
 method.
 
 === ATTRIBUTES ===
@@ -470,28 +433,25 @@ The id of this dependency.
 	reldep = dep.Rel(flags, evrdep)
 	reldep = dep.Rel(flags, evrdep)
 
-Create a relational dependency from to string dependencies
-and a flags argument. See the pool's rel2id method for a
-description of the flags.
+Create a relational dependency from to string dependencies and a flags
+argument. See the pool's rel2id method for a description of the flags.
 
 	Selection *Selection_name(int setflags = 0)
 	my $sel = $dep->Selection_name();
 	sel = dep.Selection_name()
 	sel = dep.Selection_name()
 
-Create a Selection from a dependency. The selection
-consists of all packages that have a name equal to the
-dependency. If the dependency is of a relational type,
-the packages version must also fulfill the dependency.
+Create a Selection from a dependency. The selection consists of all packages
+that have a name equal to the dependency. If the dependency is of a relational
+type, the packages version must also fulfill the dependency.
 
 	Selection *Selection_provides(int setflags = 0)
 	my $sel = $dep->Selection_provides();
 	sel = dep.Selection_provides()
 	sel = dep.Selection_provides()
 
-Create a Selection from a dependency. The selection
-consists of all packages that have at least one provides
-matching the dependency.
+Create a Selection from a dependency. The selection consists of all packages
+that have at least one provides matching the dependency.
 
 	const char *str()
 	my $str = $dep->str();
@@ -507,19 +467,18 @@ Return a string describing the dependency.
 
 Same as calling the str() method.
 
-	<comparisons ==, !=>
+	<equality>
 	if ($dep1 == $dep2)
 	if dep1 == dep2:
 	if dep1 == dep2
 
-The dependencies are equal if they are part of the
-same pool and have the same ids.
+The dependencies are equal if they are part of the same pool and have the same
+ids.
 
 THE REPOSITORY CLASS
 --------------------
-A Repository describes a group of packages, normally comming from
-the same source. Repositories are created by the Pool's add_repo()
-method.
+A Repository describes a group of packages, normally comming from the same
+source. Repositories are created by the Pool's add_repo() method.
 
 === ATTRIBUTES ===
 
@@ -542,26 +501,26 @@ Return the id of the repository.
 	repo.name
 	repo.name
 	
-The repositories name. To libsolv, the name is just a string
-with no specific meaning.
+The repositories name. To libsolv, the name is just a string with no specific
+meaning.
 
 	int prioprity;			/* read/write */
 	$repo->{'priority'}
 	repo.priority
 	repo.priority
 
-The priority of the repository. A higher number means that
-packages of this repository will be chosen over other
-repositories, even if they have a greater package version.
+The priority of the repository. A higher number means that packages of this
+repository will be chosen over other repositories, even if they have a greater
+package version.
 
 	int subprioprity;		/* read/write */
 	$repo->{'subpriority'}
 	repo.subpriority
 	repo.subpriority
 
-The sub-priority of the repository. This value is compared when
-the priorities of two repositories are the same. It is useful
-to make the library prefer on-disk repositories to remote ones.
+The sub-priority of the repository. This value is compared when the priorities
+of two repositories are the same. It is useful to make the library prefer
+on-disk repositories to remote ones.
 
 	int nsolvables;			/* read only */
 	$repo->{'nsolvables'}
@@ -575,8 +534,17 @@ The number of solvables in this repository.
 	repo.appdata
 	repo.appdata
 
-Application specific data that may be used in any way by the
-code using the repository.
+Application specific data that may be used in any way by the code using the
+repository.
+
+	Datapos *meta;			/* read only */
+	$repo->{'meta'}
+	repo.meta
+	repo.meta
+
+Return a Datapos object of the repodata's metadata. You can use the lookup
+methods of the Datapos class to lookup metadata attributes, like the repository
+timestamp.
 
 === CONSTANTS ===
 
@@ -627,17 +595,18 @@ code using the repository.
 	repo.free()
 	repo.free()
 
-Free the repository and all solvables it contains. If _reuseids_ is set to true, the
-solvable ids and the repository id may be reused by the library when added new solvables.
-Thus you should leave it false if you are not sure that somebody holds a reference.
+Free the repository and all solvables it contains. If _reuseids_ is set to
+true, the solvable ids and the repository id may be reused by the library when
+added new solvables. Thus you should leave it false if you are not sure that
+somebody holds a reference.
 
 	void empty(bool reuseids = 0)
 	$repo->empty();
 	repo.empty()
 	repo.empty()
 
-Free all the solvables in a repository. The repository will be empty after this call.
-See the free() method for the meaning of _reuseids_.
+Free all the solvables in a repository. The repository will be empty after this
+call. See the free() method for the meaning of _reuseids_.
 
 	bool isempty()
 	$repo->isempty()
@@ -692,19 +661,19 @@ repository.
 	repo.iscontiguous()
 	repo.iscontiguous?
 
-Return true if the solvables of this repository are all in a single
-block with no holes, i.e. they have consecutive ids.
+Return true if the solvables of this repository are all in a single block with
+no holes, i.e. they have consecutive ids.
 
 	Repodata *first_repodata()
 	my $repodata = $repo->first_repodata();
 	repodata = repo.first_repodata()
 	repodata = repo.first_repodata()
 
-Checks if all repodatas but the first repodata are extensions, and return
-the first repodata if this is the case. Useful if you want to do a
-store/retrive sequence on the repository to reduce the memory using and
-enable paging, as this does not work if the rpository contains multiple
-non-extension repodata areas.
+Checks if all repodatas but the first repodata are extensions, and return the
+first repodata if this is the case. Useful if you want to do a store/retrive
+sequence on the repository to reduce the memory using and enable paging, as
+this does not work if the rpository contains multiple non-extension repodata
+areas.
 
 	Selection *Selection(int setflags = 0)
 	my $sel = $repo->Selection();
@@ -732,39 +701,12 @@ Dataiterator class for more information.
 
 Return the name of the repository, or "Repo#<id>" if no name is set.
 
-	<comparisons ==, !=>
+	<equality>
 	if ($repo1 == $repo2)
 	if repo1 == repo2:
 	if repo1 == repo2
 
 Two repositories are equal if they belong to the same pool and have the same id.
-
-=== LOOKUP FUNCTIONS ===
-Those functions can be used to retrieve information from a repository. For
-Package data lookups the methods in the Solvable class are prefered, so
-you probably only need this funcions to lookup repository meta information
-with *SOLVID_META*.
-
-	const char *lookup_str(Id solvid, Id keyname)
-	my $str = $repo->lookup_str($solvid, $keyname);
-	str = repo.lookup_str(solvid, keyname)
-	str = repo.lookup_str(solvid, keyname)
-
-Lookup a string from the _keyname_ entry specified with _solvid_.
-
-	Id lookup_id(Id solvid, Id keyname)
-	my $id = $repo->lookup_id($solvid, $keyname);
-	id = repo.lookup_id(solvid, keyname)
-	id = repo.lookup_id(solvid, keyname)
-
-Lookup an Id from the _keyname_ entry specified with _solvid_.
-
-	unsigned long long lookup_num(Id solvid, Id keyname, unsigned long long notfound = 0)
-	my $num = $repo->lookup_num($solvid, $keyname);
-	num = repo.lookup_num(solvid, keyname)
-	num = repo.lookup_num(solvid, keyname)
-
-Lookup a number from the _keyname_ entry specified with _solvid_.
 
 === DATA ADD METHODS ===
 
@@ -773,8 +715,8 @@ Lookup a number from the _keyname_ entry specified with _solvid_.
 	repo.add_solvable()
 	repo.add_solvable()
 
-Add a single empty solvable to the repository. Returns a Solvable object, see the
-Solvable class for more information.
+Add a single empty solvable to the repository. Returns a Solvable object, see
+the Solvable class for more information.
 
 	bool add_solv(const char *name, int flags = 0)
 	$repo->add_solv($name, $flags);
@@ -786,9 +728,9 @@ Solvable class for more information.
 	repo.add_solv(fp, flags)
 	repo.add_solv(fp, flags)
 
-Read a ``solv'' file and add its contents to the repository. These
-files can be written with the write() method and are normally
-used as fast cache for repository metadata.
+Read a ``solv'' file and add its contents to the repository. These files can be
+written with the write() method and are normally used as fast cache for
+repository metadata.
 
 	bool add_rpmdb(int flags = 0)
 	$repo->add_rpmdb($flags);
@@ -801,8 +743,8 @@ used as fast cache for repository metadata.
 	repo.add_rpmdb_reffp($reffp, flags)
 
 Add the contents of the rpm database to the repository. If a solv file
-containing an old version of the database is available, it can be
-passed as reffp to speed up reading.
+containing an old version of the database is available, it can be passed as
+reffp to speed up reading.
 
 	bool add_rpm(const char *name, int flags = 0)
 	$repo->add_rpm($name, $flags);
@@ -833,10 +775,11 @@ Add a pubkey from a file to the repository.
 	repo.add_rpmmd(fp, language)
 
 Add metadata stored in the "rpm-md" format (i.e. from files in the ``repodata''
-directory) to a repository. Supported files are "primary", "filelists", "other",
-"suseinfo". Do not forget to specify the *REPO_EXTEND_SOLVABLES* for extension
-files like "filelists" and "other". Use the _language_ parameter if you have
-language extension files, otherwise simply use a *undef*/*None*/*nil* parameter.
+directory) to a repository. Supported files are "primary", "filelists",
+"other", "suseinfo". Do not forget to specify the *REPO_EXTEND_SOLVABLES* for
+extension files like "filelists" and "other". Use the _language_ parameter if
+you have language extension files, otherwise simply use a *undef*/*None*/*nil*
+parameter.
 
 	bool add_repomdxml(FILE *fp, int flags = 0)
 	$repo->add_repomdxml($fp);
@@ -844,8 +787,8 @@ language extension files, otherwise simply use a *undef*/*None*/*nil* parameter.
 	repo.add_repomdxml(fp)
 
 Add the repomd.xml meta description from the "rpm-md" format to the repository.
-This file contains information about the repository like keywords, and also
-a list of all database files with checksums. The data is added the the "meta"
+This file contains information about the repository like keywords, and also a
+list of all database files with checksums. The data is added the the "meta"
 section of the repository, i.e. no package gets created.
 
 	bool add_updateinfoxml(FILE *fp, int flags = 0)
@@ -893,24 +836,24 @@ Add the metadata of a single deb package to the repository.
 	repo.add_mdk($fp)
 	repo.add_mdk($fp)
 
-Add the contents of the mageia/mandriva repository metadata (the "synthesis.hdlist" file)
-to the repository.
+Add the contents of the mageia/mandriva repository metadata (the
+"synthesis.hdlist" file) to the repository.
 
 	bool add_mdk_info(FILE *fp, int flags = 0)
 	$repo->add_mdk($fp);
 	repo.add_mdk($fp)
 	repo.add_mdk($fp)
 
-Extend the packages from the synthesis file with the info.xml and files.xml data. Do
-not forget to specify *REPO_EXTEND_SOLVABLES*.
+Extend the packages from the synthesis file with the info.xml and files.xml
+data. Do not forget to specify *REPO_EXTEND_SOLVABLES*.
 
 	bool add_arch_repo(FILE *fp, int flags = 0)
 	$repo->add_arch_repo($fp);
 	repo.add_arch_repo($fp)
 	repo.add_arch_repo($fp)
 
-Add the contents of the archlinux repository metadata (the ".db.tar" file) to the
-repository.
+Add the contents of the archlinux repository metadata (the ".db.tar" file) to
+the repository.
 
 	bool add_arch_local(const char *dir, int flags = 0)
 	$repo->add_arch_local($dir);
@@ -945,8 +888,8 @@ vendors, it is usually provided in the content file.
 	repo.add_products(dir)
 	repo.add_products(dir)
 
-Add the installed SUSE products database to the repository. The _dir_ parameter is
-usually "/etc/products.d".
+Add the installed SUSE products database to the repository. The _dir_ parameter
+is usually "/etc/products.d".
 
 THE SOLVABLE CLASS
 ------------------
@@ -974,9 +917,8 @@ xxx
 
 CHECKSUMS
 ---------
-Checksums (also called hashes) are used to make sure that
-downloaded data is not corrupt and also as a fingerprint
-mechanism to check if data has changed.
+Checksums (also called hashes) are used to make sure that downloaded data is
+not corrupt and also as a fingerprint mechanism to check if data has changed.
 
 === CLASS METHODS ===
 
@@ -985,8 +927,7 @@ mechanism to check if data has changed.
 	chksum = solv.Chksum(type)
 	chksum = Solv::Chksum.new(type)
 
-Create a checksum object. Currently the following types
-are supported:
+Create a checksum object. Currently the following types are supported:
 
 	REPOKEY_TYPE_MD5
 	REPOKEY_TYPE_SHA1
@@ -1031,25 +972,23 @@ Add the contents of a file to the checksum.
 	chksum.add_stat(filename)
 	chksum.add_stat(filename)
 
-Stat the file and add the dev/ino/size/mtime member to the
-checksum. If the stat fails, the members are zeroed.
+Stat the file and add the dev/ino/size/mtime member to the checksum. If the
+stat fails, the members are zeroed.
 
 	void add_fstat(int fd)
 	$chksum->add_fstat($fd);
 	chksum.add_fstat(fd)
 	chksum.add_fstat(fd)
 
-Same as add_stat, but instead of the filename a file
-descriptor is used.
+Same as add_stat, but instead of the filename a file descriptor is used.
 
 	unsigned char *raw()
 	my $raw = $chksum->raw();
 	raw = chksum.raw()
 	raw = chksum.raw()
 
-Finalize the checksum and return the result as raw bytes. This
-means that the result can contain zero bytes or
-unprintable characters.
+Finalize the checksum and return the result as raw bytes. This means that the
+result can contain zero bytes or unprintable characters.
 
 	unsigned char *hex()
 	my $raw = $chksum->hex();
@@ -1058,50 +997,46 @@ unprintable characters.
 
 Finalize the checksum and return the result as hex string.
 
-	<comparisons ==, !=>
+	<equality>
 	if ($chksum1 == $chksum2)
 	if chksum1 == chksum2:
 	if chksum1 == chksum2
 
-Checksums are equal if they are of the same type and the
-finalized results are the same.
+Checksums are equal if they are of the same type and the finalized results are
+the same.
 
 	<stringification>
 	my $str = "$chksum";
 	str = str(chksum)
 	str = chksum.to_s
 
-If the checksum is finished, the checksum is returned
-as "<type>:<hex>" string. Otherwise "<type>:unfinished"
-is returned.
+If the checksum is finished, the checksum is returned as "<type>:<hex>" string.
+Otherwise "<type>:unfinished" is returned.
 
 
 FILE MANAGEMENT
 ---------------
-This functions were added because libsolv uses standard
-*FILE* pointers to read/write files, but languages like
-perl have their own implementation of files. The
-libsolv functions also support decompression and
-compression, the algorithm is selected by looking at
-the file name extension.
+This functions were added because libsolv uses standard *FILE* pointers to
+read/write files, but languages like perl have their own implementation of
+files. The libsolv functions also support decompression and compression, the
+algorithm is selected by looking at the file name extension.
 
 	FILE *xfopen(char *fn, char *mode = "r")
 	my $file = solv::xfopen($path);
 	file = solv.xfopen(path)
 	file = Solv::xfopen(path)
 
-Open a file at the specified path. The `mode` argument is
-passed on to the stdio library.
+Open a file at the specified path. The `mode` argument is passed on to the
+stdio library.
 
 	FILE *xfopen_fd(char *fn, int fileno)
 	my $file = solv::xfopen_fd($path, $fileno);
 	file = solv.xfopen_fd(path, fileno)
 	file = Solv::xfopen_fd(path, fileno)
 
-Create a file handle from the specified file descriptor.
-The path argument is only used to select the correct
-(de-)compression algorithm, use an empty path if you want
-to make sure to read/write raw data.
+Create a file handle from the specified file descriptor. The path argument is
+only used to select the correct (de-)compression algorithm, use an empty path
+if you want to make sure to read/write raw data.
 
 === METHODS ===
 
@@ -1110,35 +1045,34 @@ to make sure to read/write raw data.
 	fileno = file.fileno()
 	fileno = file.fileno()
 
-Return file file descriptor of the file. If the file is not
-open, `-1` is returned.
+Return file file descriptor of the file. If the file is not open, `-1` is
+returned.
 
 	int dup()
 	my $fileno = $file->dup();
 	fileno = file.dup()
 	fileno = file.dup()
 
-Return a copy of the descriptor of the file. If the file is not
-open, `-1` is returned.
+Return a copy of the descriptor of the file. If the file is not open, `-1` is
+returned.
 
 	bool flush()
 	$file->flush();
 	file.flush()
 	file.flush()
 
-Flush the file. Returns false if there was an error. Flushing a
-closed file always returns true.
+Flush the file. Returns false if there was an error. Flushing a closed file
+always returns true.
 
 	bool close()
 	$file->close();
 	file.close()
 	file.close()
 
-Close the file. This is needed for languages like Ruby, that do
-not destruct objects right after they are no longer referenced.
-In that case, it is good style to close open files so that
-the file descriptors are freed right away. Returns false if
-there was an error.
+Close the file. This is needed for languages like Ruby, that do not destruct
+objects right after they are no longer referenced. In that case, it is good
+style to close open files so that the file descriptors are freed right away.
+Returns false if there was an error.
 
 THE REPODATACLASS
 -----------------

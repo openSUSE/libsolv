@@ -2,12 +2,12 @@
 .\"     Title: libsolv-bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 05/16/2013
+.\"      Date: 05/17/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "05/16/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "05/17/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -578,7 +578,7 @@ my \fI$chksum\fR \fB=\fR \fI$pool\fR\fB\->lookup_checksum(\fR\fI$solvid\fR\fB,\f
 .RE
 .\}
 .sp
-Lookup functions\&. Return the data element stored in the specified solvable\&.
+Lookup functions\&. Return the data element stored in the specified solvable\&. You should probably use the methods of the Solvable class instead\&.
 .sp
 .if n \{\
 .RS 4
@@ -856,7 +856,7 @@ Same as calling the str() method\&.
 .RS 4
 .\}
 .nf
-\fB<comparisons ==, !=>\fR
+\fB<equality>\fR
 \fBif (\fR\fI$dep1\fR \fB==\fR \fI$dep2\fR\fB)\fR
 \fBif\fR \fIdep1\fR \fB==\fR \fIdep2\fR\fB:\fR
 \fBif\fR \fIdep1\fR \fB==\fR \fIdep2\fR
@@ -975,6 +975,21 @@ The number of solvables in this repository\&.
 .\}
 .sp
 Application specific data that may be used in any way by the code using the repository\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDatapos *meta;\fR                  /* read only */
+\fI$repo\fR\fB\->{\*(Aqmeta\*(Aq}\fR
+\fIrepo\fR\fB\&.meta\fR
+\fIrepo\fR\fB\&.meta\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a Datapos object of the repodata\(cqs metadata\&. You can use the lookup methods of the Datapos class to lookup metadata attributes, like the repository timestamp\&.
 .SS "CONSTANTS"
 .PP
 \fBREPO_REUSE_REPODATA\fR
@@ -1234,7 +1249,7 @@ Return the name of the repository, or "Repo#<id>" if no name is set\&.
 .RS 4
 .\}
 .nf
-\fB<comparisons ==, !=>\fR
+\fB<equality>\fR
 \fBif (\fR\fI$repo1\fR \fB==\fR \fI$repo2\fR\fB)\fR
 \fBif\fR \fIrepo1\fR \fB==\fR \fIrepo2\fR\fB:\fR
 \fBif\fR \fIrepo1\fR \fB==\fR \fIrepo2\fR
@@ -1244,54 +1259,6 @@ Return the name of the repository, or "Repo#<id>" if no name is set\&.
 .\}
 .sp
 Two repositories are equal if they belong to the same pool and have the same id\&.
-.SS "LOOKUP FUNCTIONS"
-.sp
-Those functions can be used to retrieve information from a repository\&. For Package data lookups the methods in the Solvable class are prefered, so you probably only need this funcions to lookup repository meta information with \fBSOLVID_META\fR\&.
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-\fBconst char *lookup_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
-my \fI$str\fR \fB=\fR \fI$repo\fR\fB\->lookup_str(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
-\fIstr\fR \fB=\fR \fIrepo\fR\fB\&.lookup_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
-\fIstr\fR \fB=\fR \fIrepo\fR\fB\&.lookup_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-Lookup a string from the \fIkeyname\fR entry specified with \fIsolvid\fR\&.
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-\fBId lookup_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
-my \fI$id\fR \fB=\fR \fI$repo\fR\fB\->lookup_id(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
-\fIid\fR \fB=\fR \fIrepo\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
-\fIid\fR \fB=\fR \fIrepo\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-Lookup an Id from the \fIkeyname\fR entry specified with \fIsolvid\fR\&.
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-\fBunsigned long long lookup_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInotfound\fR \fB= 0)\fR
-my \fI$num\fR \fB=\fR \fI$repo\fR\fB\->lookup_num(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
-\fInum\fR \fB=\fR \fIrepo\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
-\fInum\fR \fB=\fR \fIrepo\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-Lookup a number from the \fIkeyname\fR entry specified with \fIsolvid\fR\&.
 .SS "DATA ADD METHODS"
 .sp
 .if n \{\
@@ -1797,7 +1764,7 @@ Finalize the checksum and return the result as hex string\&.
 .RS 4
 .\}
 .nf
-\fB<comparisons ==, !=>\fR
+\fB<equality>\fR
 \fBif (\fR\fI$chksum1\fR \fB==\fR \fI$chksum2\fR\fB)\fR
 \fBif\fR \fIchksum1\fR \fB==\fR \fIchksum2\fR\fB:\fR
 \fBif\fR \fIchksum1\fR \fB==\fR \fIchksum2\fR
