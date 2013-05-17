@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri May 17 18:14:14 CEST 2013 - mls@suse.de
+
+- fix multiversion updating that was broken when the installed package
+  was no longer available in a repository [bnc#820444]
+- bump version to 0.1.2
+
+-------------------------------------------------------------------
 Thu Oct 18 16:55:36 CEST 2012 - mls@suse.de
 
 - fix susetags parser, it ignored the filelist of the last
