@@ -366,8 +366,8 @@ class Repo_susetags < Repo_generic
     @handle.add_content(f, 0)
     f.close
     puts "fetching"
-    defvendorid = @handle.lookup_id(Solv::SOLVID_META, Solv::SUSETAGS_DEFAULTVENDOR)
-    descrdir = @handle.lookup_str(Solv::SOLVID_META, Solv::SUSETAGS_DESCRDIR)
+    defvendorid = @handle.meta.lookup_id(Solv::SUSETAGS_DEFAULTVENDOR)
+    descrdir = @handle.meta.lookup_str(Solv::SUSETAGS_DESCRDIR)
     descrdir = "suse/setup/descr" unless descrdir
     (filename, filechksum) = find('packages.gz')
     (filename, filechksum) = find('packages') unless filename
@@ -449,8 +449,8 @@ class Repo_susetags < Repo_generic
       return true
     end
     puts "fetching]\n"
-    defvendorid = @handle.lookup_id(Solv::SOLVID_META, Solv::SUSETAGS_DEFAULTVENDOR)
-    descrdir = @handle.lookup_str(Solv::SOLVID_META, Solv::SUSETAGS_DESCRDIR)
+    defvendorid = @handle.meta.lookup_id(Solv::SUSETAGS_DEFAULTVENDOR)
+    descrdir = @handle.meta.lookup_str(Solv::SUSETAGS_DESCRDIR)
     descrdir = "suse/setup/descr" unless descrdir
     filechksum = repodata.lookup_checksum(Solv::SOLVID_META, Solv::SUSETAGS_FILE_CHECKSUM)
     f = download("#{descrdir}/#{filename}", true, filechksum)
@@ -464,7 +464,7 @@ class Repo_susetags < Repo_generic
   end
 
   def packagespath()
-    datadir = @handle.lookup_str(Solv::SOLVID_META, Solv::SUSETAGS_DATADIR)
+    datadir = @handle.meta.lookup_str(Solv::SUSETAGS_DATADIR)
     datadir = "suse" unless datadir
     return datadir + '/'
   end

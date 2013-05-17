@@ -1235,6 +1235,7 @@ typedef struct {
       return 0;
     return pool_id2repo($self, id);
   }
+
   %newobject repos;
   Pool_repo_iterator * const repos;
   %{
@@ -1498,15 +1499,6 @@ rb_eval_string(
   void internalize() {
     repo_internalize($self);
   }
-  const char *lookup_str(Id entry, Id keyname) {
-    return repo_lookup_str($self, entry, keyname);
-  }
-  Id lookup_id(Id entry, Id keyname) {
-    return repo_lookup_id($self, entry, keyname);
-  }
-  unsigned long long lookup_num(Id entry, Id keyname, unsigned long long notfound = 0) {
-    return repo_lookup_num($self, entry, keyname, notfound);
-  }
   bool write(FILE *fp) {
     return repo_write($self, fp) == 0;
   }
@@ -1531,12 +1523,24 @@ rb_eval_string(
     return repo->repoid;
   }
   %}
+  %newobject solvables;
   Repo_solvable_iterator * const solvables;
   %{
   SWIGINTERN Repo_solvable_iterator * Repo_solvables_get(Repo *repo) {
     return new_Repo_solvable_iterator(repo);
   }
   %}
+  %newobject meta;
+  Datapos * const meta;
+  %{
+  SWIGINTERN Datapos * Repo_meta_get(Repo *repo) {
+    Datapos *pos = solv_calloc(1, sizeof(*pos));
+    pos->solvid = SOLVID_META;
+    pos->repo = repo;
+    return pos;
+  }
+  %}
+
   %newobject solvables_iter;
   Repo_solvable_iterator *solvables_iter() {
     return new_Repo_solvable_iterator($self);
@@ -1706,6 +1710,24 @@ rb_eval_string(
     const char *r;
     pool->pos = *$self;
     r = pool_lookup_str(pool, SOLVID_POS, keyname);
+    pool->pos = oldpos;
+    return r;
+  }
+  unsigned long long lookup_num(Id keyname, unsigned long long notfound = 0) {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    unsigned long long r;
+    pool->pos = *$self;
+    r = pool_lookup_num(pool, SOLVID_POS, keyname, notfound);
+    pool->pos = oldpos;
+    return r;
+  }
+  bool lookup_void(Id keyname) {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    int r;
+    pool->pos = *$self;
+    r = pool_lookup_void(pool, SOLVID_POS, keyname);
     pool->pos = oldpos;
     return r;
   }

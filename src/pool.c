@@ -2081,7 +2081,7 @@ const char *
 pool_lookup_str(Pool *pool, Id entry, Id keyname)
 {
   if (entry == SOLVID_POS && pool->pos.repo)
-    return repodata_lookup_str(pool->pos.repo->repodata + pool->pos.repodataid, SOLVID_POS, keyname);
+    return repo_lookup_str(pool->pos.repo, pool->pos.repodataid ? entry : pool->pos.solvid, keyname);
   if (entry <= 0)
     return 0;
   return solvable_lookup_str(pool->solvables + entry, keyname);
@@ -2091,11 +2091,7 @@ Id
 pool_lookup_id(Pool *pool, Id entry, Id keyname)
 {
   if (entry == SOLVID_POS && pool->pos.repo)
-    {
-      Repodata *data = pool->pos.repo->repodata + pool->pos.repodataid;
-      Id id = repodata_lookup_id(data, SOLVID_POS, keyname);
-      return data->localpool ? repodata_globalize_id(data, id, 1) : id;
-    }
+    return repo_lookup_id(pool->pos.repo, pool->pos.repodataid ? entry : pool->pos.solvid, keyname);
   if (entry <= 0)
     return 0;
   return solvable_lookup_id(pool->solvables + entry, keyname);
@@ -2105,12 +2101,7 @@ unsigned long long
 pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned long long notfound)
 {
   if (entry == SOLVID_POS && pool->pos.repo)
-    {
-      unsigned long long value;
-      if (repodata_lookup_num(pool->pos.repo->repodata + pool->pos.repodataid, SOLVID_POS, keyname, &value))
-	return value;
-      return notfound;
-    }
+    return repo_lookup_num(pool->pos.repo, pool->pos.repodataid ? entry : pool->pos.solvid, keyname, notfound);
   if (entry <= 0)
     return notfound;
   return solvable_lookup_num(pool->solvables + entry, keyname, notfound);
@@ -2120,7 +2111,7 @@ int
 pool_lookup_void(Pool *pool, Id entry, Id keyname)
 {
   if (entry == SOLVID_POS && pool->pos.repo)
-    return repodata_lookup_void(pool->pos.repo->repodata + pool->pos.repodataid, SOLVID_POS, keyname);
+    return repo_lookup_void(pool->pos.repo, pool->pos.repodataid ? entry : pool->pos.solvid, keyname);
   if (entry <= 0)
     return 0;
   return solvable_lookup_void(pool->solvables + entry, keyname);
@@ -2130,7 +2121,7 @@ const unsigned char *
 pool_lookup_bin_checksum(Pool *pool, Id entry, Id keyname, Id *typep)
 {
   if (entry == SOLVID_POS && pool->pos.repo)
-    return repodata_lookup_bin_checksum(pool->pos.repo->repodata + pool->pos.repodataid, SOLVID_POS, keyname, typep);
+    return repo_lookup_bin_checksum(pool->pos.repo, pool->pos.repodataid ? entry : pool->pos.solvid, keyname, typep);
   if (entry <= 0)
     return 0;
   return solvable_lookup_bin_checksum(pool->solvables + entry, keyname, typep);
@@ -2140,10 +2131,7 @@ const char *
 pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep)
 {
   if (entry == SOLVID_POS && pool->pos.repo)
-    {
-      const unsigned char *chk = repodata_lookup_bin_checksum(pool->pos.repo->repodata + pool->pos.repodataid, SOLVID_POS, keyname, typep);
-      return chk ? repodata_chk2str(pool->pos.repo->repodata + pool->pos.repodataid, *typep, chk) : 0;
-    }
+    return repo_lookup_checksum(pool->pos.repo, pool->pos.repodataid ? entry : pool->pos.solvid, keyname, typep);
   if (entry <= 0)
     return 0;
   return solvable_lookup_checksum(pool->solvables + entry, keyname, typep);

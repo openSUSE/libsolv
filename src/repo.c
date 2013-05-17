@@ -1140,6 +1140,8 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
 	  return pool_id2str(pool, pool->solvables[entry].vendor);
 	}
     }
+  else if (entry == SOLVID_POS && pool->pos.repo == repo && pool->pos.repodataid)
+    return repodata_lookup_str(pool->pos.repo->repodata + pool->pos.repodataid, entry, keyname);
   FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
@@ -1159,6 +1161,7 @@ repo_lookup_str(Repo *repo, Id entry, Id keyname)
 unsigned long long
 repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned long long notfound)
 {
+  Pool *pool = repo->pool;
   Repodata *data;
   int i;
   unsigned long long value;
@@ -1172,6 +1175,8 @@ repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned long long notfound)
 	  return notfound;
 	}
     }
+  else if (entry == SOLVID_POS && pool->pos.repo == repo && pool->pos.repodataid)
+    return repodata_lookup_num(pool->pos.repo->repodata + pool->pos.repodataid, entry, keyname, &value) ? value : notfound;
   FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
@@ -1189,6 +1194,7 @@ repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned long long notfound)
 Id
 repo_lookup_id(Repo *repo, Id entry, Id keyname)
 {
+  Pool *pool = repo->pool;
   Repodata *data;
   int i;
   Id id;
@@ -1206,6 +1212,12 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
 	case SOLVABLE_VENDOR:
 	  return repo->pool->solvables[entry].vendor;
 	}
+    }
+  else if (entry == SOLVID_POS && pool->pos.repo == repo && pool->pos.repodataid)
+    {
+      Repodata *data = pool->pos.repo->repodata + pool->pos.repodataid;
+      Id id = repodata_lookup_id(data, entry, keyname);
+      return data->localpool ? repodata_globalize_id(data, id, 1) : id;
     }
   FOR_REPODATAS(repo, i, data)
     {
@@ -1317,10 +1329,13 @@ repo_lookup_deparray(Repo *repo, Id entry, Id keyname, Queue *q, Id marker)
 const unsigned char *
 repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
 {
+  Pool *pool = repo->pool;
   Repodata *data;
   int i;
   const unsigned char *chk;
 
+  if (entry == SOLVID_POS && pool->pos.repo == repo && pool->pos.repodataid)
+    return repodata_lookup_bin_checksum(pool->pos.repo->repodata + pool->pos.repodataid, entry, keyname, typep);
   FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
@@ -1347,10 +1362,13 @@ repo_lookup_checksum(Repo *repo, Id entry, Id keyname, Id *typep)
 int
 repo_lookup_void(Repo *repo, Id entry, Id keyname)
 {
+  Pool *pool = repo->pool;
   Repodata *data;
   int i;
   Id type;
 
+  if (entry == SOLVID_POS && pool->pos.repo == repo && pool->pos.repodataid)
+    return repodata_lookup_void(pool->pos.repo->repodata + pool->pos.repodataid, entry, keyname);
   FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
@@ -1367,10 +1385,13 @@ repo_lookup_void(Repo *repo, Id entry, Id keyname)
 Id
 repo_lookup_type(Repo *repo, Id entry, Id keyname)
 {
+  Pool *pool = repo->pool;
   Repodata *data;
   int i;
   Id type;
 
+  if (entry == SOLVID_POS && pool->pos.repo == repo && pool->pos.repodataid)
+    return repodata_lookup_type(pool->pos.repo->repodata + pool->pos.repodataid, entry, keyname);
   FOR_REPODATAS(repo, i, data)
     {
       if (entry != SOLVID_META && (entry < data->start || entry >= data->end))

@@ -387,8 +387,8 @@ sub load_ext {
     return 1;
   }
   print "fetching]\n";
-  my $defvendorid = $self->{'handle'}->lookup_id($solv::SOLVID_META, $solv::SUSETAGS_DEFAULTVENDOR);
-  my $descrdir = $self->{'handle'}->lookup_str($solv::SOLVID_META, $solv::SUSETAGS_DESCRDIR) || 'suse/setup/descr'; 
+  my $defvendorid = $self->{'handle'}->{'meta'}->lookup_id($solv::SUSETAGS_DEFAULTVENDOR);
+  my $descrdir = $self->{'handle'}->{'meta'}->lookup_str($solv::SUSETAGS_DESCRDIR) || 'suse/setup/descr'; 
   my $filechksum = $repodata->lookup_checksum($solv::SOLVID_META, $solv::SUSETAGS_FILE_CHECKSUM);
   my $f = $self->download("$descrdir/$filename", 1, $filechksum);
   return 0 unless $f;
@@ -418,8 +418,8 @@ sub load {
   }
   $self->{'handle'}->add_content($f, 0);
   print "fetching\n";
-  my $defvendorid = $self->{'handle'}->lookup_id($solv::SOLVID_META, $solv::SUSETAGS_DEFAULTVENDOR);
-  my $descrdir = $self->{'handle'}->lookup_str($solv::SOLVID_META, $solv::SUSETAGS_DESCRDIR) || 'suse/setup/descr'; 
+  my $defvendorid = $self->{'handle'}->{'meta'}->lookup_id($solv::SUSETAGS_DEFAULTVENDOR);
+  my $descrdir = $self->{'handle'}->{'meta'}->lookup_str($solv::SUSETAGS_DESCRDIR) || 'suse/setup/descr'; 
   my ($filename, $filechksum) = $self->find('packages.gz');
   ($filename, $filechksum) = $self->find('packages') unless $filename;
   if ($filename) {
@@ -445,7 +445,7 @@ sub load {
 
 sub packagespath {
   my ($self) = @_;
-  return ($self->{'handle'}->lookup_str($solv::SOLVID_META, $solv::SUSETAGS_DATADIR) || 'suse') . '/';
+  return ($self->{'handle'}->{'meta'}->lookup_str($solv::SUSETAGS_DATADIR) || 'suse') . '/';
 }
 
 package Repo::unknown;

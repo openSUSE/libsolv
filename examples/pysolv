@@ -418,8 +418,8 @@ class repo_susetags(repo_generic):
             return True
         self.handle.add_content(f, 0)
         print "fetching"
-        defvendorid = self.handle.lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
-        descrdir = self.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
+        defvendorid = self.handle.meta.lookup_id(solv.SUSETAGS_DEFAULTVENDOR)
+        descrdir = self.handle.meta.lookup_str(solv.SUSETAGS_DESCRDIR)
         if not descrdir:
             descrdir = "suse/setup/descr"
         (filename, filechksum) = self.find('packages.gz')
@@ -510,8 +510,8 @@ class repo_susetags(repo_generic):
             return True
         sys.stdout.write("fetching]\n")
         sys.stdout.flush()
-        defvendorid = self.handle.lookup_id(solv.SOLVID_META, solv.SUSETAGS_DEFAULTVENDOR)
-        descrdir = self.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DESCRDIR)
+        defvendorid = self.handle.meta.lookup_id(solv.SUSETAGS_DEFAULTVENDOR)
+        descrdir = self.handle.meta.lookup_str(solv.SUSETAGS_DESCRDIR)
         if not descrdir:
             descrdir = "suse/setup/descr"
         filechksum = repodata.lookup_checksum(solv.SOLVID_META, solv.SUSETAGS_FILE_CHECKSUM)
@@ -526,7 +526,7 @@ class repo_susetags(repo_generic):
         return True
 
     def packagespath(self):
-        datadir = repo.handle.lookup_str(solv.SOLVID_META, solv.SUSETAGS_DATADIR)
+        datadir = repo.handle.meta.lookup_str(solv.SUSETAGS_DATADIR)
         if not datadir:
             datadir = 'suse'
         return datadir + '/'
