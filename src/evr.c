@@ -284,7 +284,8 @@ solv_vercmp_haiku(const char *s1, const char *q1, const char *s2, const char *q2
   if (pre2 == q2)
     return -1;
 
-  return solv_cmp_version_part_haiku(pre1 + 1, q1, pre2 + 1, q2);
+  cmp = solv_cmp_version_part_haiku(pre1 + 1, q1, pre2 + 1, q2);
+  return cmp == 0 ? 0 : cmp < 0 ? -1 : 1; /* must return -1, 0, or 1 */
 }
 
 #endif /* HAIKU */
