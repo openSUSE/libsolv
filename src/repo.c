@@ -1249,6 +1249,7 @@ lookup_idarray_solvable(Repo *repo, Offset off, Queue *q)
 int
 repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q)
 {
+  Pool *pool = repo->pool;
   Repodata *data;
   int i;
   if (entry >= 0)
@@ -1272,6 +1273,19 @@ repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q)
 	case SOLVABLE_ENHANCES:
 	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].enhances, q);
         }
+    }
+  else if (entry == SOLVID_POS && pool->pos.repo == repo && pool->pos.repodataid)
+    {
+      Repodata *data = pool->pos.repo->repodata + pool->pos.repodataid;
+      if (repodata_lookup_idarray(data, entry, keyname, q))
+	{
+	  if (data->localpool)
+	    {
+	      for (i = 0; i < q->count; i++)
+		q->elements[i] = repodata_globalize_id(data, q->elements[i], 1);
+	    }
+	  return 1;
+	}
     }
   FOR_REPODATAS(repo, i, data)
     {

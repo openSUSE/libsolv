@@ -2137,6 +2137,16 @@ pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep)
   return solvable_lookup_checksum(pool->solvables + entry, keyname, typep);
 }
 
+int
+pool_lookup_idarray(Pool *pool, Id entry, Id keyname, Queue *q)
+{
+  if (entry == SOLVID_POS && pool->pos.repo)
+    return repo_lookup_idarray(pool->pos.repo, pool->pos.repodataid ? entry : pool->pos.solvid, keyname, q);
+  if (entry <= 0)
+    return 0;
+  return solvable_lookup_idarray(pool->solvables + entry, keyname, q);
+}
+
 const char *
 pool_lookup_deltalocation(Pool *pool, Id entry, unsigned int *medianrp)
 {

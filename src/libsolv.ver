@@ -80,6 +80,7 @@ SOLV_1.0 {
 		pool_lookup_checksum;
 		pool_lookup_deltalocation;
 		pool_lookup_id;
+		pool_lookup_idarray;
 		pool_lookup_num;
 		pool_lookup_str;
 		pool_lookup_void;
