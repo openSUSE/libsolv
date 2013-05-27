@@ -297,7 +297,7 @@ desired solvable by Id.
 	id = pool.lookup_id(solvid, keyname)
 	id = pool.lookup_id(solvid, keyname)
 
-	unsigned int lookup_num(Id solvid, Id keyname, unsigned int notfound = 0)
+	unsigned long long lookup_num(Id solvid, Id keyname, unsigned long long notfound = 0)
 	my $num = $pool->lookup_num($solvid, $keyname);
 	num = pool.lookup_num(solvid, keyname)
 	num = pool.lookup_num(solvid, keyname)
@@ -306,6 +306,11 @@ desired solvable by Id.
 	my $bool = $pool->lookup_void($solvid, $keyname);
 	bool = pool.lookup_void(solvid, keyname)
 	bool = pool.lookup_void(solvid, keyname)
+
+	Queue lookup_idarray(Id solvid, Id keyname)
+	my @ids = $pool->lookup_idarray($solvid, $keyname);
+	ids = pool.lookup_idarray(solvid, keyname)
+	ids = pool.lookup_idarray(solvid, keyname)
 
 	Chksum *lookup_checksum(Id solvid, Id keyname)
 	my $chksum = $pool->lookup_checksum($solvid, $keyname);
@@ -891,9 +896,190 @@ vendors, it is usually provided in the content file.
 Add the installed SUSE products database to the repository. The _dir_ parameter
 is usually "/etc/products.d".
 
+
 THE SOLVABLE CLASS
 ------------------
-xxx
+A solvable describes all the information of one package. Each solvable belongs to
+one repository, it can be added and filled manually but in most cases solvables
+will get created by the repo_add methods.
+
+=== ATTRIBUTES ===
+
+	Repo *repo;			/* read only */
+	$solvable->{'repo'}
+	solvable.repo
+	solvable.repo
+
+The repository this solvable belongs to.
+
+	Pool *pool;			/* read only */
+	$solvable->{'pool'}
+	solvable.pool
+	solvable.pool
+
+The pool this solvable belongs to, same as the pool of the repo.
+
+	Id id;				/* read only */
+	$solvable->{'id'}
+	solvable.id
+	solvable.id
+
+The specific id of the solvable.
+
+	char *name;			/* read/write */
+	$solvable->{'name'}
+	solvable.name
+	solvable.name
+
+	char *evr;			/* read/write */
+	$solvable->{'evr'}
+	solvable.evr
+	solvable.evr
+
+	char *arch;			/* read/write */
+	$solvable->{'arch'}
+	solvable.arch
+	solvable.arch
+
+	char *vendor;			/* read/write */
+	$solvable->{'vendor'}
+	solvable.vendor
+	solvable.vendor
+
+Easy access to often used attributes of solvables. They are
+internally stored as Ids.
+
+	Id nameid;			/* read/write */
+	$solvable->{'nameid'}
+	solvable.nameid
+	solvable.nameid
+
+	Id evrid;			/* read/write */
+	$solvable->{'evrid'}
+	solvable.evrid
+	solvable.evrid
+
+	Id archid;			/* read/write */
+	$solvable->{'archid'}
+	solvable.archid
+	solvable.archid
+
+	Id vendorid;			/* read/write */
+	$solvable->{'vendorid'}
+	solvable.vendorid
+	solvable.vendorid
+
+Raw interface to the ids. Useful if you want to search for
+a specific id and want to avoid the string compare overhead.
+
+=== METHODS ===
+
+	const char *lookup_str(Id keyname)
+	my $string = $solvable->lookup_str($keyname);
+	string = solvable.lookup_str(keyname)
+	string = solvable.lookup_str(keyname)
+
+	Id lookup_id(Id keyname)
+	my $id = $solvable->lookup_id($keyname);
+	id = solvable.lookup_id(solvid)
+	id = solvable.lookup_id(solvid)
+
+	unsigned long long lookup_num(Id solvid, Id keyname, unsigned long long notfound = 0)
+	my $num = $solvable->lookup_num($keyname);
+	num = solvable.lookup_num(keyname)
+	num = solvable.lookup_num(keyname)
+
+	bool lookup_void(Id keyname)
+	my $bool = $solvable->lookup_void($keyname);
+	bool = solvable.lookup_void(keyname)
+	bool = solvable.lookup_void(keyname)
+
+	Chksum *lookup_checksum(Id keyname)
+	my $chksum = $solvable->lookup_checksum($keyname);
+	chksum = solvable.lookup_checksum(keyname)
+	chksum = solvable.lookup_checksum(keyname)
+
+	Queue lookup_idarray(Id keyname, Id marker = -1)
+	my @ids = $solvable->lookup_idarray($keyname);
+	ids = solvable.lookup_idarray(keyname)
+	ids = solvable.lookup_idarray(keyname)
+
+	Queue lookup_deparray(Id keyname, Id marker = -1)
+	my @deps = $solvable->lookup_deparray($keyname);
+	ids = solvable.lookup_deparray(keyname)
+	ids = solvable.lookup_deparray(keyname)
+	
+Generic lookup methods. Retrieve data stored for the specific keyname.
+The lookup_idarray() method will return an array of Ids, use
+lookup_deparray if you want an array of Dependency objects instead.
+Some Id arrays contain two parts of data divided by a specific marker,
+for example the provides array uses the SOLVABLE_FILEMARKER id to
+store both the ids provided by the package and the ids added by
+the addfileprovides method. The default, -1, translates to the
+correct marker for the keyname and returns the first part of the
+array, use 1 to select the second part or 0 to retrive all ids
+including the marker.
+
+	const char *lookup_location(unsigned int *OUTPUT);
+	my ($location, $medianr) = $solvable->lookup_location();
+	location, medianr = solvable.lookup_location()
+	location, medianr = solvable.lookup_location()
+
+Return a tuple containing the on-media location and an optional
+media number for multi-part repositories (e.g. repositories
+spawning multiple DVDs).
+
+	void add_deparray(Id keyname, DepId id, Id marker = -1);
+	$solvable->add_deparray($keyname, $depid);
+	solvable.add_deparray(keyname, depid)
+	solvable.add_deparray(keyname, depid)
+
+Add a new dependency to the attributes stored in keyname.
+
+	bool installable();
+	$solvable->installable()
+	solvable.installable()
+	solvable.installable?
+
+Return true if the solvable is installable on the system. Solvables
+are not installable if the system does not support their architecture.
+
+	bool isinstalled();
+	$solvable->isinstalled()
+	solvable.isinstalled()
+	solvable.isinstalled?
+
+Return true if the solvable is installed on the system.
+
+	Selection *Selection(int setflags = 0)
+	my $sel = $solvable->Selection();
+	sel = solvable.Selection()
+	sel = solvable.Selection()
+
+Create a Selection containing just the single solvable.
+
+	const char *str()
+	my $str = $solvable->str();
+	str = $solvable.str()
+	str = $solvable.str()
+
+Return a string describing the solvable. The string consists of the name,
+version, and architecture of the Solvable.
+
+	<stringification>
+	my $str = "$solvable";
+	str = str(solvable)
+	str = solvable.to_s
+
+Same as calling the str() method.
+
+	<equality>
+	if ($solvable1 == $solvable2)
+	if solvable1 == solvable2:
+	if solvable1 == solvable2
+
+Two solvables are equal if they are part of the same pool and have the same
+ids.
 
 THE DATAITERATOR CLASS
 ----------------------

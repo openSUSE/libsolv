@@ -2,12 +2,12 @@
 .\"     Title: libsolv-bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 05/17/2013
+.\"      Date: 05/27/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "05/17/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "05/27/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -543,7 +543,7 @@ my \fI$id\fR \fB=\fR \fI$pool\fR\fB\->lookup_id(\fR\fI$solvid\fR\fB,\fR \fI$keyn
 .RS 4
 .\}
 .nf
-\fBunsigned int lookup_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned int\fR \fInotfound\fR \fB= 0)\fR
+\fBunsigned long long lookup_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInotfound\fR \fB= 0)\fR
 my \fI$num\fR \fB=\fR \fI$pool\fR\fB\->lookup_num(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fInum\fR \fB=\fR \fIpool\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 \fInum\fR \fB=\fR \fIpool\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
@@ -560,6 +560,19 @@ my \fI$num\fR \fB=\fR \fI$pool\fR\fB\->lookup_num(\fR\fI$solvid\fR\fB,\fR \fI$ke
 my \fI$bool\fR \fB=\fR \fI$pool\fR\fB\->lookup_void(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fIbool\fR \fB=\fR \fIpool\fR\fB\&.lookup_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 \fIbool\fR \fB=\fR \fIpool\fR\fB\&.lookup_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBQueue lookup_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->lookup_idarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.lookup_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.lookup_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1588,7 +1601,375 @@ Add repository metadata in the susetags format to the repository\&. Like with ad
 Add the installed SUSE products database to the repository\&. The \fIdir\fR parameter is usually "/etc/products\&.d"\&.
 .SH "THE SOLVABLE CLASS"
 .sp
-xxx
+A solvable describes all the information of one package\&. Each solvable belongs to one repository, it can be added and filled manually but in most cases solvables will get created by the repo_add methods\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepo *repo;\fR                     /* read only */
+\fI$solvable\fR\fB\->{\*(Aqrepo\*(Aq}\fR
+\fIsolvable\fR\fB\&.repo\fR
+\fIsolvable\fR\fB\&.repo\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The repository this solvable belongs to\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *pool;\fR                     /* read only */
+\fI$solvable\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fIsolvable\fR\fB\&.pool\fR
+\fIsolvable\fR\fB\&.pool\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The pool this solvable belongs to, same as the pool of the repo\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id;\fR                          /* read only */
+\fI$solvable\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fIsolvable\fR\fB\&.id\fR
+\fIsolvable\fR\fB\&.id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The specific id of the solvable\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBchar *name;\fR                     /* read/write */
+\fI$solvable\fR\fB\->{\*(Aqname\*(Aq}\fR
+\fIsolvable\fR\fB\&.name\fR
+\fIsolvable\fR\fB\&.name\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBchar *evr;\fR                      /* read/write */
+\fI$solvable\fR\fB\->{\*(Aqevr\*(Aq}\fR
+\fIsolvable\fR\fB\&.evr\fR
+\fIsolvable\fR\fB\&.evr\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBchar *arch;\fR                     /* read/write */
+\fI$solvable\fR\fB\->{\*(Aqarch\*(Aq}\fR
+\fIsolvable\fR\fB\&.arch\fR
+\fIsolvable\fR\fB\&.arch\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBchar *vendor;\fR                   /* read/write */
+\fI$solvable\fR\fB\->{\*(Aqvendor\*(Aq}\fR
+\fIsolvable\fR\fB\&.vendor\fR
+\fIsolvable\fR\fB\&.vendor\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Easy access to often used attributes of solvables\&. They are internally stored as Ids\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId nameid;\fR                      /* read/write */
+\fI$solvable\fR\fB\->{\*(Aqnameid\*(Aq}\fR
+\fIsolvable\fR\fB\&.nameid\fR
+\fIsolvable\fR\fB\&.nameid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId evrid;\fR                       /* read/write */
+\fI$solvable\fR\fB\->{\*(Aqevrid\*(Aq}\fR
+\fIsolvable\fR\fB\&.evrid\fR
+\fIsolvable\fR\fB\&.evrid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId archid;\fR                      /* read/write */
+\fI$solvable\fR\fB\->{\*(Aqarchid\*(Aq}\fR
+\fIsolvable\fR\fB\&.archid\fR
+\fIsolvable\fR\fB\&.archid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId vendorid;\fR                    /* read/write */
+\fI$solvable\fR\fB\->{\*(Aqvendorid\*(Aq}\fR
+\fIsolvable\fR\fB\&.vendorid\fR
+\fIsolvable\fR\fB\&.vendorid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Raw interface to the ids\&. Useful if you want to search for a specific id and want to avoid the string compare overhead\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *lookup_str(Id\fR \fIkeyname\fR\fB)\fR
+my \fI$string\fR \fB=\fR \fI$solvable\fR\fB\->lookup_str(\fR\fI$keyname\fR\fB)\fR;
+\fIstring\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_str(\fR\fIkeyname\fR\fB)\fR
+\fIstring\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_str(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId lookup_id(Id\fR \fIkeyname\fR\fB)\fR
+my \fI$id\fR \fB=\fR \fI$solvable\fR\fB\->lookup_id(\fR\fI$keyname\fR\fB)\fR;
+\fIid\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB)\fR
+\fIid\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned long long lookup_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInotfound\fR \fB= 0)\fR
+my \fI$num\fR \fB=\fR \fI$solvable\fR\fB\->lookup_num(\fR\fI$keyname\fR\fB)\fR;
+\fInum\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_num(\fR\fIkeyname\fR\fB)\fR
+\fInum\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_num(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool lookup_void(Id\fR \fIkeyname\fR\fB)\fR
+my \fI$bool\fR \fB=\fR \fI$solvable\fR\fB\->lookup_void(\fR\fI$keyname\fR\fB)\fR;
+\fIbool\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_void(\fR\fIkeyname\fR\fB)\fR
+\fIbool\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_void(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBChksum *lookup_checksum(Id\fR \fIkeyname\fR\fB)\fR
+my \fI$chksum\fR \fB=\fR \fI$solvable\fR\fB\->lookup_checksum(\fR\fI$keyname\fR\fB)\fR;
+\fIchksum\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_checksum(\fR\fIkeyname\fR\fB)\fR
+\fIchksum\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_checksum(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBQueue lookup_idarray(Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+my \fI@ids\fR \fB=\fR \fI$solvable\fR\fB\->lookup_idarray(\fR\fI$keyname\fR\fB)\fR;
+\fIids\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_idarray(\fR\fIkeyname\fR\fB)\fR
+\fIids\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_idarray(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBQueue lookup_deparray(Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+my \fI@deps\fR \fB=\fR \fI$solvable\fR\fB\->lookup_deparray(\fR\fI$keyname\fR\fB)\fR;
+\fIids\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_deparray(\fR\fIkeyname\fR\fB)\fR
+\fIids\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_deparray(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Generic lookup methods\&. Retrieve data stored for the specific keyname\&. The lookup_idarray() method will return an array of Ids, use lookup_deparray if you want an array of Dependency objects instead\&. Some Id arrays contain two parts of data divided by a specific marker, for example the provides array uses the SOLVABLE_FILEMARKER id to store both the ids provided by the package and the ids added by the addfileprovides method\&. The default, \-1, translates to the correct marker for the keyname and returns the first part of the array, use 1 to select the second part or 0 to retrive all ids including the marker\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *lookup_location(unsigned int *\fR\fIOUTPUT\fR\fB)\fR;
+my \fB(\fR\fI$location\fR\fB,\fR \fI$medianr\fR\fB) =\fR \fI$solvable\fR\fB\->lookup_location()\fR;
+\fIlocation\fR\fB,\fR \fImedianr\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_location()\fR
+\fIlocation\fR\fB,\fR \fImedianr\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_location()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a tuple containing the on\-media location and an optional media number for multi\-part repositories (e\&.g\&. repositories spawning multiple DVDs)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add_deparray(Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR;
+\fI$solvable\fR\fB\->add_deparray(\fR\fI$keyname\fR\fB,\fR \fI$depid\fR\fB)\fR;
+\fIsolvable\fR\fB\&.add_deparray(\fR\fIkeyname\fR\fB,\fR \fIdepid\fR\fB)\fR
+\fIsolvable\fR\fB\&.add_deparray(\fR\fIkeyname\fR\fB,\fR \fIdepid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a new dependency to the attributes stored in keyname\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool installable()\fR;
+\fI$solvable\fR\fB\->installable()\fR
+\fIsolvable\fR\fB\&.installable()\fR
+\fIsolvable\fR\fB\&.installable?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return true if the solvable is installable on the system\&. Solvables are not installable if the system does not support their architecture\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool isinstalled()\fR;
+\fI$solvable\fR\fB\->isinstalled()\fR
+\fIsolvable\fR\fB\&.isinstalled()\fR
+\fIsolvable\fR\fB\&.isinstalled?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return true if the solvable is installed on the system\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection *Selection(int\fR \fIsetflags\fR \fB= 0)\fR
+my \fI$sel\fR \fB=\fR \fI$solvable\fR\fB\->Selection()\fR;
+\fIsel\fR \fB=\fR \fIsolvable\fR\fB\&.Selection()\fR
+\fIsel\fR \fB=\fR \fIsolvable\fR\fB\&.Selection()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a Selection containing just the single solvable\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *str()\fR
+my \fI$str\fR \fB=\fR \fI$solvable\fR\fB\->str()\fR;
+\fIstr\fR \fB=\fR \fI$solvable\fR\fB\&.str()\fR
+\fIstr\fR \fB=\fR \fI$solvable\fR\fB\&.str()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the solvable\&. The string consists of the name, version, and architecture of the Solvable\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB= "\fR\fI$solvable\fR\fB"\fR;
+\fIstr\fR \fB= str(\fR\fIsolvable\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIsolvable\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Same as calling the str() method\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<equality>\fR
+\fBif (\fR\fI$solvable1\fR \fB==\fR \fI$solvable2\fR\fB)\fR
+\fBif\fR \fIsolvable1\fR \fB==\fR \fIsolvable2\fR\fB:\fR
+\fBif\fR \fIsolvable1\fR \fB==\fR \fIsolvable2\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Two solvables are equal if they are part of the same pool and have the same ids\&.
 .SH "THE DATAITERATOR CLASS"
 .sp
 xxx
