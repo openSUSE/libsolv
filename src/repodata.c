@@ -568,17 +568,21 @@ solvid2data(Repodata *data, Id solvid, Id *schemap)
   unsigned char *dp = data->incoredata;
   if (!dp)
     return 0;
-  if (solvid == SOLVID_META)	/* META */
-    dp += 1;
-  else if (solvid == SOLVID_POS)	/* META */
+  if (solvid == SOLVID_META)
+    dp += 1;	/* offset of "meta" solvable */
+  else if (solvid == SOLVID_POS)
     {
       Pool *pool = data->repo->pool;
       if (data->repo != pool->pos.repo)
 	return 0;
       if (data != data->repo->repodata + pool->pos.repodataid)
 	return 0;
-      *schemap = pool->pos.schema;
-      return data->incoredata + pool->pos.dp;
+      dp += pool->pos.dp;
+      if (pool->pos.dp != 1)
+        {
+          *schemap = pool->pos.schema;
+          return dp;
+	}
     }
   else
     {
