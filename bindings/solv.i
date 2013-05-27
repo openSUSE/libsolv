@@ -1764,6 +1764,16 @@ rb_eval_string(
     pool->pos = oldpos;
     return loc;
   }
+  Queue lookup_idarray(Id keyname) {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    Queue r;
+    queue_init(&r);
+    pool->pos = *$self;
+    pool_lookup_idarray(pool, SOLVID_POS, keyname, &r);
+    pool->pos = oldpos;
+    return r;
+  }
 }
 
 %extend Datamatch {
