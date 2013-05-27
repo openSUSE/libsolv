@@ -112,6 +112,47 @@ Look up a Repository by its id\&.
 .\}
 .sp
 Define which repository contains all the installed packages\&.
+.SS "CONSTANTS"
+.PP
+\fBPOOL_FLAG_PROMOTEEPOCH\fR
+.RS 4
+Promote the epoch of the providing dependency to the requesting dependency if it does not contain an epoch\&. Used at some time in old rpm versions, modern systems should never need this\&.
+.RE
+.PP
+\fBPOOL_FLAG_FORBIDSELFCONFLICTS\fR
+.RS 4
+Disallow the installation of packages that conflict with themselfs\&. Debian always allowd self\-conflicting packages, rpm used to forbid them but switched to also allowing them recently\&.
+.RE
+.PP
+\fBPOOL_FLAG_OBSOLETEUSESPROVIDES\fR
+.RS 4
+Make obsolete type dependency match against provides instead of just the name and version of packages\&. Very old versions of rpm used the name/version, then it got switched to provides and later switched back again to just name/version\&.
+.RE
+.PP
+\fBPOOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES\fR
+.RS 4
+An implicit obsoletes is the internal mechanism to remove the old package on an update\&. The default is to remove all packages with the same name, rpm\-5 switched to also removing packages providing the same name\&.
+.RE
+.PP
+\fBPOOL_FLAG_OBSOLETEUSESCOLORS\fR
+.RS 4
+Rpm\(cqs multilib implementation (used in RedHat and Fedora) distinguishes between 32bit and 64bit packages (the terminology is that they have a different color)\&. If obsolteusescolors is set, packages with different colors will not obsolete each other\&. This is also true for implicit obsoletes, thus you can install both the 32bit and the 64bit version of a package with the same name\&.
+.RE
+.PP
+\fBPOOL_FLAG_NOINSTALLEDOBSOLETES\fR
+.RS 4
+New versions of rpm consider the obsoletes of installed packages when checking for dependency, thus you may not install a package that is obsoleted by some other installed package, unless you also deinstall the other package\&.
+.RE
+.PP
+\fBPOOL_FLAG_HAVEDISTEPOCH\fR
+.RS 4
+Mandriva added a new field called distepoch that gets checked in version comparison if the epoch/version/release of two packages are the same\&.
+.RE
+.PP
+\fBPOOL_FLAG_NOOBSOLETESMULTIVERSION\fR
+.RS 4
+If a package is installed in multiversionmode, rpm used to ignore both the implicit obsoletes and the obsolete dependency of a package\&. This was changed to ignoring just the implicit obsoletes, thus you may install multiple versions of the same name, but obsoleted packages still get removed\&.
+.RE
 .SS "METHODS"
 .sp
 .if n \{\
