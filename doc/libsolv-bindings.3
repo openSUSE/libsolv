@@ -2,12 +2,12 @@
 .\"     Title: libsolv-bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 05/27/2013
+.\"      Date: 05/28/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "05/27/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "05/28/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -953,7 +953,7 @@ Back reference to the pool this dependency belongs to\&.
 .RE
 .\}
 .sp
-Return the id of the repository\&.
+The id of the repository\&.
 .sp
 .if n \{\
 .RS 4
@@ -1883,8 +1883,8 @@ my \fI@ids\fR \fB=\fR \fI$solvable\fR\fB\->lookup_idarray(\fR\fI$keyname\fR\fB)\
 .nf
 \fBQueue lookup_deparray(Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
 my \fI@deps\fR \fB=\fR \fI$solvable\fR\fB\->lookup_deparray(\fR\fI$keyname\fR\fB)\fR;
-\fIids\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_deparray(\fR\fIkeyname\fR\fB)\fR
-\fIids\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_deparray(\fR\fIkeyname\fR\fB)\fR
+\fIdeps\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_deparray(\fR\fIkeyname\fR\fB)\fR
+\fIdeps\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_deparray(\fR\fIkeyname\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1911,10 +1911,10 @@ Return a tuple containing the on\-media location and an optional media number fo
 .RS 4
 .\}
 .nf
-\fBvoid add_deparray(Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR;
-\fI$solvable\fR\fB\->add_deparray(\fR\fI$keyname\fR\fB,\fR \fI$depid\fR\fB)\fR;
-\fIsolvable\fR\fB\&.add_deparray(\fR\fIkeyname\fR\fB,\fR \fIdepid\fR\fB)\fR
-\fIsolvable\fR\fB\&.add_deparray(\fR\fIkeyname\fR\fB,\fR \fIdepid\fR\fB)\fR
+\fBvoid add_deparray(Id\fR \fIkeyname\fR\fB, DepId\fR \fIdep\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR;
+\fI$solvable\fR\fB\->add_deparray(\fR\fI$keyname\fR\fB,\fR \fI$dep\fR\fB)\fR;
+\fIsolvable\fR\fB\&.add_deparray(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
+\fIsolvable\fR\fB\&.add_deparray(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -2013,7 +2013,343 @@ Same as calling the str() method\&.
 Two solvables are equal if they are part of the same pool and have the same ids\&.
 .SH "THE DATAITERATOR CLASS"
 .sp
-xxx
+Dataiterators can be used to do complex string searches or to iterate over arrays\&. They can be created via the constructors in the Pool, Repo, and Solvable classes\&. The Repo and Solvable constructors will limit the search to the repository or the specific package\&.
+.SS "CONSTANTS"
+.PP
+\fBSEARCH_STRING\fR
+.RS 4
+Return a match if the search string matches the value\&.
+.RE
+.PP
+\fBSEARCH_STRINGSTART\fR
+.RS 4
+Return a match if the value starts with the search string\&.
+.RE
+.PP
+\fBSEARCH_STRINGEND\fR
+.RS 4
+Return a match if the value ends with the search string\&.
+.RE
+.PP
+\fBSEARCH_SUBSTRING\fR
+.RS 4
+Return a match if the search string can be matched somewhere in the value\&.
+.RE
+.PP
+\fBSEARCH_GLOB\fR
+.RS 4
+Do a glob match of the search string against the value\&.
+.RE
+.PP
+\fBSEARCH_REGEX\fR
+.RS 4
+Do a regular expression match of the search string against the value\&.
+.RE
+.PP
+\fBSEARCH_NOCASE\fR
+.RS 4
+Ignore case when matching strings\&. Works for all the above match types\&.
+.RE
+.PP
+\fBSEARCH_FILES\fR
+.RS 4
+Match the complete filenames of the file list, not just the base name\&.
+.RE
+.PP
+\fBSEARCH_COMPLETE_FILELIST\fR
+.RS 4
+When matching the file list, check every file of the package not just the subset from the primary metadata\&.
+.RE
+.PP
+\fBSEARCH_CHECKSUMS\fR
+.RS 4
+Allow the matching of checksum entries\&.
+.RE
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid prepend_keyname(Id\fR \fIkeyname\fR\fB)\fR;
+\fI$di\fR\fB\->prepend_keyname(\fR\fI$keyname\fR\fB)\fR;
+\fIdi\fR\fB\&.prepend_keyname(\fR\fIkeyname\fR\fB)\fR
+\fIdi\fR\fB\&.prepend_keyname(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Do a sub\-search in the array stored in keyname\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid skip_solvable()\fR;
+\fI$di\fR\fB\->kip_solvable()\fR;
+\fIdi\fR\fB\&.skip_solvable()\fR
+\fIdi\fR\fB\&.skip_solvable()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Stop matching the current solvable and advance to the next one\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<iteration>\fR
+\fBfor my\fR \fI$d\fR \fB(\fR\fI@$di\fR\fB)\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR\fB:\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterate through the matches\&. If there is a match, the object in d will be of type Datamatch\&.
+.SH "THE DATAMATCH CLASS"
+.sp
+Objects of this type will be created for every value matched by a dataiterator\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *pool;\fR                             /* read only */
+\fI$d\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fId\fR\fB\&.pool\fR
+\fId\fR\fB\&.pool\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to pool\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepo *repo;\fR                             /* read only */
+\fI$d\fR\fB\->{\*(Aqrepo\*(Aq}\fR
+\fId\fR\fB\&.repo\fR
+\fId\fR\fB\&.repo\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The repository containing the matched object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *solvable;\fR                     /* read only */
+\fI$d\fR\fB\->{\*(Aqsolvable\*(Aq}\fR
+\fId\fR\fB\&.solvable\fR
+\fId\fR\fB\&.solvable\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The solvable containing the value that was matched\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId solvid;\fR                              /* read only */
+\fI$d\fR\fB\->{\*(Aqsolvid\*(Aq}\fR
+\fId\fR\fB\&.solvid\fR
+\fId\fR\fB\&.solvid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of the solvable that matched\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId key_id()\fR;
+\fI$d\fR\fB\->key_id()\fR
+\fId\fR\fB\&.key_id()\fR
+\fId\fR\fB\&.key_id()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *key_idstr()\fR;
+\fI$d\fR\fB\->key_idstr()\fR
+\fId\fR\fB\&.key_idstr()\fR
+\fId\fR\fB\&.key_idstr()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The keyname that matched, either as id or string\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId type_id()\fR;
+\fI$d\fR\fB\->type_id()\fR
+\fId\fR\fB\&.type_id()\fR
+\fId\fR\fB\&.type_id()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *type_idstr()\fR;
+\fI$d\fR\fB\->type_idstr()\fR;
+\fId\fR\fB\&.type_idstr()\fR
+\fId\fR\fB\&.type_idstr()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The key type of the value that was matched, either as id or string\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id()\fR;
+\fI$d\fR\fB\->id()\fR
+\fId\fR\fB\&.id()\fR
+\fId\fR\fB\&.id()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId idstr()\fR;
+\fI$d\fR\fB\->idstr()\fR
+\fId\fR\fB\&.idstr()\fR
+\fId\fR\fB\&.idstr()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The Id of the value that was matched (only valid for id types), either as id or string\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *str()\fR;
+\fI$d\fR\fB\->str()\fR
+\fId\fR\fB\&.str()\fR
+\fId\fR\fB\&.str()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The string value that was matched (only valid for string types)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned long long num()\fR;
+\fI$d\fR\fB\->num()\fR
+\fId\fR\fB\&.num()\fR
+\fId\fR\fB\&.num()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The numeric value that was matched (only valid for numeric types)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned int num2()\fR;
+\fI$d\fR\fB\->num2()\fR
+\fId\fR\fB\&.num2()\fR
+\fId\fR\fB\&.num2()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The secondary numeric value that was matched (only valid for types containing two values)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDatapos *pos()\fR;
+my \fI$pos\fR \fB=\fR \fI$d\fR\fB\->pos()\fR;
+\fIpos\fR \fB=\fR \fId\fR\fB\&.pos()\fR
+\fIpos\fR \fB=\fR \fId\fR\fB\&.pos()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The position object of the current match\&. It can be used to do sub\-searches starting at the match (if it is of an array type)\&. See the Datapos class for more information\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDatapos *parentpos()\fR;
+my \fI$pos\fR \fB=\fR \fI$d\fR\fB\->parentpos()\fR;
+\fIpos\fR \fB=\fR \fId\fR\fB\&.parentpos()\fR
+\fIpos\fR \fB=\fR \fId\fR\fB\&.parentpos()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The position object of the array containing the current match\&. It can be used to do sub\-searches, see the Datapos class for more information\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB= "\fR\fI$d\fR\fB"\fR;
+\fIstr\fR \fB= str(\fR\fId\fR\fB)\fR
+\fIstr\fR \fB=\fR \fId\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the stringification of the matched value\&. Stringification depends on the search flags, for file list entries it will return just the base name unless SEARCH_FILES is used, for checksums it will return an empty string unless SEARCH_CHECKSUMS is used\&. Numeric values are currently stringified to an empty string\&.
 .SH "THE SELECTION CLASS"
 .sp
 xxx
