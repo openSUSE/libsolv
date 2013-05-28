@@ -2352,10 +2352,506 @@ my \fI$str\fR \fB= "\fR\fI$d\fR\fB"\fR;
 Return the stringification of the matched value\&. Stringification depends on the search flags, for file list entries it will return just the base name unless SEARCH_FILES is used, for checksums it will return an empty string unless SEARCH_CHECKSUMS is used\&. Numeric values are currently stringified to an empty string\&.
 .SH "THE SELECTION CLASS"
 .sp
-xxx
+Selections are a way to easily deal with sets of packages\&. There are multiple constructors to create them, the most useful is probably the select() method in the Pool class\&.
+.SS "CONSTANTS"
+.PP
+\fBSELECTION_NAME\fR
+.RS 4
+Create the selection by matching package names
+.RE
+.PP
+\fBSELECTION_PROVIDES\fR
+.RS 4
+Create the selection by matching package provides
+.RE
+.PP
+\fBSELECTION_FILELIST\fR
+.RS 4
+Create the selection by matching package files
+.RE
+.PP
+\fBSELECTION_CANON\fR
+.RS 4
+Create the selection by matching the canonical representation of the package\&. This is normally a combination of the name, the version, and the architecture of a package\&.
+.RE
+.PP
+\fBSELECTION_DOTARCH\fR
+.RS 4
+Allow an \(lq\&.<architecture>\(rq suffix when matching names or provides\&.
+.RE
+.PP
+\fBSELECTION_REL\fR
+.RS 4
+Allow the specification of a relation when matching names or provides, e\&.g\&. "name >= 1\&.2"\&.
+.RE
+.PP
+\fBSELECTION_INSTALLED_ONLY\fR
+.RS 4
+Limit the package search to installed packages\&.
+.RE
+.PP
+\fBSELECTION_SOURCE_ONLY\fR
+.RS 4
+Limit the package search to source packages only\&.
+.RE
+.PP
+\fBSELECTION_WITH_SOURCE\fR
+.RS 4
+Extend the package search to also match source packages\&. The default is only to match binary packages\&.
+.RE
+.PP
+\fBSELECTION_GLOB\fR
+.RS 4
+Allow glob matching for package names, package provides, and file names\&.
+.RE
+.PP
+\fBSELECTION_NOCASE\fR
+.RS 4
+Ignore case when matching package names, package provides, and file names\&.
+.RE
+.PP
+\fBSELECTION_FLAT\fR
+.RS 4
+Return only one selection element describing the selected packages\&. The default is to create multiple elements for all globbed packages\&. Multiple elements are useful if you want to turn the selection into an install job, in that case you want an install job for every globbed package\&.
+.RE
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *pool;\fR                             /* read only */
+\fI$d\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fId\fR\fB\&.pool\fR
+\fId\fR\fB\&.pool\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to pool\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint flags()\fR;
+my \fI$flags\fR \fB=\fR \fI$sel\fR\fB\->flags()\fR;
+\fIflags\fR \fB=\fR \fIsel\fR\fB\&.flags()\fR
+\fIflags\fR \fB=\fR \fIsel\fR\fB\&.flags()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the result flags of the selection\&. The flags are a subset of the ones used when creating the selection, they describe which method was used to get the result\&. For example, if you create the selection with \(lqSELECTION_NAME | SELECTION_PROVIDES\(rq, the resulting flags will either be SELECTION_NAME or SELECTION_PROVIDES depending if there was a package that matched the name or not\&. If there was no match at all, the flags will be zero\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool isempty()\fR;
+\fI$sel\fR\fB\->isempty()\fR
+\fIsel\fR\fB\&.isempty()\fR
+\fIsel\fR\fB\&.isempty?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return true if the selection is empty, i\&.e\&. no package could be matched\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid filter(Selection *\fR\fIother\fR\fB)\fR
+\fI$sel\fR\fB\->filter(\fR\fI$other\fR\fB)\fR;
+\fIsel\fR\fB\&.filter(\fR\fIother\fR\fB)\fR
+\fIsel\fR\fB\&.filter(\fR\fIother\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Intersect two selections\&. Packages will only stay in the selection if there are also included in the other selecting\&. Does an in\-place modification\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add(Selection *\fR\fIother\fR\fB)\fR
+\fI$sel\fR\fB\->add(\fR\fI$other\fR\fB)\fR;
+\fIsel\fR\fB\&.add(\fR\fIother\fR\fB)\fR
+\fIsel\fR\fB\&.add(\fR\fIother\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Build the union of two selections\&. All packages of the other selection will be added to the set of packages of the selection object\&. Does an in\-place modification\&. Note that the selection flags are no longer meaningful after the add operation\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add_raw(Id\fR \fIhow\fR\fB, Id\fR \fIwhat\fR\fB)\fR
+\fI$sel\fR\fB\->add_raw(\fR\fI$how\fR\fB,\fR \fI$what\fR\fB)\fR;
+\fIsel\fR\fB\&.add_raw(\fR\fIhow\fR\fB,\fR \fIwhat\fR\fB)\fR
+\fIsel\fR\fB\&.add_raw(\fR\fIhow\fR\fB,\fR \fIwhat\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a raw element to the selection\&. Check the Job class for information about the how and what parameters\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBJob *jobs(int\fR \fIaction\fR\fB)\fR
+my \fI@jobs\fR \fB=\fR \fI$sel\fR\fB\->jobs(\fR\fI$action\fR\fB)\fR;
+\fIjobs\fR \fB=\fR \fIsel\fR\fB\&.jobs(\fR\fIaction\fR\fB)\fR
+\fIjobs\fR \fB=\fR \fIsel\fR\fB\&.jobs(\fR\fIaction\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Convert a selection into an array of Job objects\&. The action parameter is or\-ed to the \(lqhow\(rq part of the job, it describes the type of job (e\&.g\&. install, erase)\&. See the Job class for the action and action modifier constants\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *solvables()\fR
+my \fI@solvables\fR \fB=\fR \fI$sel\fR\fB\->solvables()\fR;
+\fIsolvables\fR \fB=\fR \fIsel\fR\fB\&.solvables()\fR
+\fIsolvables\fR \fB=\fR \fIsel\fR\fB\&.solvables()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Convert a selection into an array of Solvable objects\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB= "\fR\fI$sel\fR\fB"\fR;
+\fIstr\fR \fB= str(\fR\fIsel\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIsel\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the selection\&.
 .SH "THE JOB CLASS"
 .sp
-xxx
+Jobs are the way to specify to the dependency solver what to do\&. Most of the times jobs will get created by calling the jobs() method on a Selection object, but there is also a Job() constructor in the Pool class\&.
+.SS "CONSTANTS"
+.sp
+Selection constants:
+.PP
+\fBSOLVER_SOLVABLE\fR
+.RS 4
+The \(lqwhat\(rq part is the id of a solvable\&.
+.RE
+.PP
+\fBSOLVER_SOLVABLE_NAME\fR
+.RS 4
+The \(lqwhat\(rq part is the id of a package name\&.
+.RE
+.PP
+\fBSOLVER_SOLVABLE_PROVIDES\fR
+.RS 4
+The \(lqwhat\(rq part is the id of a package provides\&.
+.RE
+.PP
+\fBSOLVER_SOLVABLE_ONE_OF\fR
+.RS 4
+The \(lqwhat\(rq part is an offset into the \(lqwhatprovides\(rq data, created by calling the towhatprovides() pool method\&.
+.RE
+.PP
+\fBSOLVER_SOLVABLE_REPO\fR
+.RS 4
+The \(lqwhat\(rq part is the id of a repository\&.
+.RE
+.PP
+\fBSOLVER_SOLVABLE_ALL\fR
+.RS 4
+The \(lqwhat\(rq part is ignored, all packages are selected\&.
+.RE
+.PP
+\fBSOLVER_SOLVABLE_SELECTMASK\fR
+.RS 4
+A mask containing all the above selection bits\&.
+.RE
+.sp
+Action constants:
+.PP
+\fBSOLVER_NOOP\fR
+.RS 4
+Do nothing\&.
+.RE
+.PP
+\fBSOLVER_INSTALL\fR
+.RS 4
+Install a package of the specified set of packages\&. It tries to install the best matching package (i\&.e\&. the highest version of the packages from the repositories with the highest priority)\&.
+.RE
+.PP
+\fBSOLVER_ERASE\fR
+.RS 4
+Erase all of the packages from the specified set\&. If a package is not installed, erasing it will keep it from getting installed\&.
+.RE
+.PP
+\fBSOLVER_UPDATE\fR
+.RS 4
+Update the matching installed packages to their best version\&. If none of the specified packages are installed, try to update the installed packages to the specified versions\&. See the section about targeted updates about more information\&.
+.RE
+.PP
+\fBSOLVER_WEAKENDEPS\fR
+.RS 4
+Allow to break the dependencies of the matching packages\&. Handle with care\&.
+.RE
+.PP
+\fBSOLVER_MULTIVERSION\fR
+.RS 4
+Mark the matched packages for multiversion install\&. If they get to be installed because of some other job, the installation will keep the old version of the package installed (for rpm by using \(oq`\-i\*(Aq\*(Aq instead of ``\-U\(cq\*(Aq)\&.
+.RE
+.PP
+\fBSOLVER_LOCK\fR
+.RS 4
+Do not change the state of the matched packages, i\&.e\&. when they are installed they stay installed, if not they are not selected for installation\&.
+.RE
+.PP
+\fBSOLVER_DISTUPGRADE\fR
+.RS 4
+Update the matching installed packages to the best version included in one of the repositories\&. After this operation, all come from one of the available repositories except orphaned packages\&. Orphaned packages are packages that have no relation to the packages in the repositories, i\&.e\&. no package in the repositories have the same name or obsolete the orphaned package\&. This action brings the installed packages in sync with the ones in the repository\&. It also turns of arch/vendor/version locking for the affected packages to simulate a fresh installation\&. This means that distupgrade can actually downgrade packages if only lower versions of a package are available in the repositories\&.
+.RE
+.PP
+\fBSOLVER_DROP_ORPHANED\fR
+.RS 4
+Erase all the matching installed packages if they are orphaned\&. This only makes sense if there is a \(lqdistupgrade all packages\(rq job\&. The default is to erase orphaned packages only if they block the installation of other packages\&.
+.RE
+.PP
+\fBSOLVER_VERIFY\fR
+.RS 4
+Fix dependency problems of matching installed packages\&. The default is to ignore dependency problems for installed packages\&.
+.RE
+.PP
+\fBSOLVER_USERINSTALLED\fR
+.RS 4
+The matching installed packages are considered to be installed by a user, thus not installed to fulfil some dependency\&. This is needed input for the calculation of unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set\&.
+.RE
+.PP
+\fBSOLVER_JOBMASK\fR
+.RS 4
+A mask containing all the above action bits\&.
+.RE
+.sp
+Action modifier constants:
+.PP
+\fBSOLVER_WEAK\fR
+.RS 4
+Makes the job a weak job\&. The solver tries to fulfil weak jobs, but does not report a problem if it is not possible to do so\&.
+.RE
+.PP
+\fBSOLVER_ESSENTIAL\fR
+.RS 4
+Makes the job an essential job\&. If there is a problem with the job, the solver will not propose to remove the job as one solution (unless all other solutions are also to remove essential jobs)\&.
+.RE
+.PP
+\fBSOLVER_CLEANDEPS\fR
+.RS 4
+The solver will try to also erase all packages dragged in through dependencies when erasing the package\&. This needs SOLVER_USERINSTALLED jobs to maximize user satisfaction\&.
+.RE
+.PP
+\fBSOLVER_FORCEBEST\fR
+.RS 4
+Insist on the best package for install, update, and distupgrade jobs\&. If this flag is not used, the solver will use the second\-best package if the best package cannot be installed for some reason\&. When this flag is used, the solver will generate a problem instead\&.
+.RE
+.PP
+\fBSOLVER_TARGETED\fR
+.RS 4
+Forces targeted operation update and distupgrade jobs\&. See the section about targeted updates about more information\&.
+.RE
+.sp
+Set constants\&.
+.PP
+\fBSOLVER_SETEV\fR
+.RS 4
+The job specified the exact epoch and version of the package set\&.
+.RE
+.PP
+\fBSOLVER_SETEVR\fR
+.RS 4
+The job specified the exact epoch, version, and release of the package set\&.
+.RE
+.PP
+\fBSOLVER_SETARCH\fR
+.RS 4
+The job specified the exact architecture of the packages from the set\&.
+.RE
+.PP
+\fBSOLVER_SETVENDOR\fR
+.RS 4
+The job specified the exact vendor of the packages from the set\&.
+.RE
+.PP
+\fBSOLVER_SETREPO\fR
+.RS 4
+The job specified the exact repository of the packages from the set\&.
+.RE
+.PP
+\fBSOLVER_SETNAME\fR
+.RS 4
+The job specified the exact name of the packages from the set\&.
+.RE
+.PP
+\fBSOLVER_NOAUTOSET\fR
+.RS 4
+Turn of automatic set flag generation for SOLVER_SOLVABLE jobs\&.
+.RE
+.PP
+\fBSOLVER_SETMASK\fR
+.RS 4
+A mask containing all the above set bits\&.
+.RE
+.sp
+See the section about set bits for more information\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *pool;\fR                             /* read only */
+\fI$job\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fId\fR\fB\&.pool\fR
+\fId\fR\fB\&.pool\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to pool\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId how;\fR                                 /* read/write */
+\fI$job\fR\fB\->{\*(Aqhow\*(Aq}\fR
+\fId\fR\fB\&.how\fR
+\fId\fR\fB\&.how\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Union of the selection, action, action modifier, and set flags\&. The selection part describes the semantics of the \(lqwhat\(rq Id\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId what;\fR                                /* read/write */
+\fI$job\fR\fB\->{\*(Aqwhat\*(Aq}\fR
+\fId\fR\fB\&.what\fR
+\fId\fR\fB\&.what\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Id describing the set of packages, the meaning depends on the selection part of the \(lqhow\(rq attribute\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *solvables()\fR
+my \fI@solvables\fR \fB=\fR \fI$job\fR\fB\->solvables()\fR;
+\fIsolvables\fR \fB=\fR \fIjob\fR\fB\&.solvables()\fR
+\fIsolvables\fR \fB=\fR \fIjob\fR\fB\&.solvables()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the set of solvables of the job as an array of Solvable objects\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool isemptyupdate()\fR;
+\fI$job\fR\fB\->isemptyupdate()\fR
+\fIjob\fR\fB\&.isemptyupdate()\fR
+\fIjob\fR\fB\&.isemptyupdate?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Convenience function to find out if the job describes an update job with no matching packages, i\&.e\&. a job that does nothing\&. Some package managers like \(lqzypper\(rq like to turn those jobs into install jobs, i\&.e\&. an update of a not\-installed package will result into the installation of the package\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB= "\fR\fI$job\fR\fB"\fR;
+\fIstr\fR \fB= str(\fR\fIjob\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIjob\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the job\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<equality>\fR
+\fBif (\fR\fI$job1\fR \fB==\fR \fI$job2\fR\fB)\fR
+\fBif\fR \fIjob1\fR \fB==\fR \fIjob2\fR\fB:\fR
+\fBif\fR \fIjob1\fR \fB==\fR \fIjob2\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Two jobs are equal if they belong to the same pool and both the \(lqhow\(rq and the \(lqwhat\(rq attributes are the same\&.
+.SS "TARGETED UPDATES"
+.sp
+Libsolv has two modes for upgrades and distupgrade: targeted and untargeted\&. Untargeted mode means that the installed packages from the specified set will be updated to the best version\&. Targeted means that packages that can be updated to a package in the specified set will be updated to the best package of the set\&.
+.sp
+Here\(cqs an example to explain the subtle difference\&. Suppose that you have package A installed in version "1\&.1", "A\-1\&.2" is available in one of the repositories and there is also package "B" that obsoletes package A\&.
+.sp
+An untargeted update of "A" will update the installed "A\-1\&.1" to package "B", because that is the newest version (B obsoletes A and is thus newer)\&.
+.sp
+A targeted update of "A" will update "A\-1\&.1" to "A\-1\&.2", as the set of packages contains both "A\-1\&.1" and "A\-1\&.2", and "A\-1\&.2" is the newer one\&.
+.sp
+An untargeted update of "B" will do nothing, as "B" is not installed\&.
+.sp
+An targeted update of "B" will update "A\-1\&.1" to "B"\&.
+.sp
+Note that the default is to do "auto\-targeting", thus if the specified set of packages does not include an installed package, the solver will assume targeted operation even if SOLVER_TARGETED is not used\&. You can turn off auto\-targeting with the SOLVER_FLAG_NO_AUTOTARGET solver option, see the Solver class for details\&.
+.SS "SET BITS"
+.sp
+Set bits specify which parts of the specified packages where specified by the user\&. It is used by the solver when checking if an operation is allowed or not\&. For example, the solver will normally not allow the downgrade of an installed package\&. But it will not report a problem if the SOLVER_SETEVR flag is used, as it then assumes that the user specified the exact version and thus knows what he is doing\&.
+.sp
+So if a package "screen\-1\-1" is installed for the x86_64 architecture and version "2\-1" is only available for the i586 architecture, installing package "screen\-2\&.1" will ask the user for confirmation because of the different architecture\&. When using the Selection class to create jobs the set bits are automatically added, e\&.g\&. selecting \(lqscreen\&.i586\(rq will automatically add SOLVER_SETARCH, and thus no problem will be reported\&.
 .SH "THE SOLVER CLASS"
 .sp
 xxx
@@ -2501,13 +2997,13 @@ my \fI$raw\fR \fB=\fR \fI$chksum\fR\fB\->raw()\fR;
 .RE
 .\}
 .sp
-Finalize the checksum and return the result as raw bytes\&. This means that the result can contain zero bytes or unprintable characters\&.
+Finalize the checksum and return the result as raw bytes\&. This means that the result can contain NUL bytes or unprintable characters\&.
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-\fBunsigned char *hex()\fR
+\fBconst char *hex()\fR
 my \fI$raw\fR \fB=\fR \fI$chksum\fR\fB\->hex()\fR;
 \fIraw\fR \fB=\fR \fIchksum\fR\fB\&.hex()\fR
 \fIraw\fR \fB=\fR \fIchksum\fR\fB\&.hex()\fR

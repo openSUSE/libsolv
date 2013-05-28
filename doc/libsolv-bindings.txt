@@ -1328,13 +1328,395 @@ just the base name unless SEARCH_FILES is used, for checksums
 it will return an empty string unless SEARCH_CHECKSUMS is used.
 Numeric values are currently stringified to an empty string.
 
+
 THE SELECTION CLASS
 -------------------
-xxx
+Selections are a way to easily deal with sets of packages.
+There are multiple constructors to create them, the most useful
+is probably the select() method in the Pool class.
+
+=== CONSTANTS ===
+
+*SELECTION_NAME*::
+  Create the selection by matching package names
+
+*SELECTION_PROVIDES*::
+  Create the selection by matching package provides
+
+*SELECTION_FILELIST*::
+  Create the selection by matching package files
+
+*SELECTION_CANON*::
+  Create the selection by matching the canonical representation
+  of the package. This is normally a combination of the name,
+  the version, and the architecture of a package.
+
+*SELECTION_DOTARCH*::
+  Allow an ``.<architecture>'' suffix when matching names or
+  provides.
+ 
+*SELECTION_REL*::
+  Allow the specification of a relation when matching names
+  or provides, e.g. "name >= 1.2".
+
+*SELECTION_INSTALLED_ONLY*::
+  Limit the package search to installed packages.
+
+*SELECTION_SOURCE_ONLY*::
+  Limit the package search to source packages only.
+
+*SELECTION_WITH_SOURCE*::
+  Extend the package search to also match source packages. The
+  default is only to match binary packages.
+
+*SELECTION_GLOB*::
+  Allow glob matching for package names, package provides, and
+  file names.
+
+*SELECTION_NOCASE*::
+  Ignore case when matching package names, package provides,
+  and file names.
+
+*SELECTION_FLAT*::
+  Return only one selection element describing the selected packages.
+  The default is to create multiple elements for all globbed packages.
+  Multiple elements are useful if you want to turn the selection into
+  an install job, in that case you want an install job for every
+  globbed package.
+
+=== ATTRIBUTES ===
+
+	Pool *pool;				/* read only */
+	$d->{'pool'}
+	d.pool
+	d.pool
+
+Back pointer to pool.
+
+=== METHODS ===
+
+	int flags();
+	my $flags = $sel->flags();
+	flags = sel.flags()
+	flags = sel.flags()
+
+Return the result flags of the selection. The flags are a subset
+of the ones used when creating the selection, they describe which
+method was used to get the result. For example, if you create the
+selection with ``SELECTION_NAME | SELECTION_PROVIDES'', the resulting
+flags will either be SELECTION_NAME or SELECTION_PROVIDES depending
+if there was a package that matched the name or not. If there was
+no match at all, the flags will be zero.
+
+	bool isempty();
+	$sel->isempty()
+	sel.isempty()
+	sel.isempty?
+
+Return true if the selection is empty, i.e. no package could be matched.
+
+	void filter(Selection *other)
+	$sel->filter($other);
+	sel.filter(other)
+	sel.filter(other)
+
+Intersect two selections. Packages will only stay in the selection if there
+are also included in the other selecting. Does an in-place modification.
+
+	void add(Selection *other)
+	$sel->add($other);
+	sel.add(other)
+	sel.add(other)
+
+Build the union of two selections. All packages of the other selection will
+be added to the set of packages of the selection object. Does an in-place
+modification. Note that the selection flags are no longer meaningful after the
+add operation.
+
+	void add_raw(Id how, Id what)
+	$sel->add_raw($how, $what);
+	sel.add_raw(how, what)
+	sel.add_raw(how, what)
+
+Add a raw element to the selection. Check the Job class for information about
+the how and what parameters.
+
+	Job *jobs(int action)
+	my @jobs = $sel->jobs($action);
+	jobs = sel.jobs(action)
+	jobs = sel.jobs(action)
+
+Convert a selection into an array of Job objects. The action parameter is or-ed
+to the ``how'' part of the job, it describes the type of job (e.g. install,
+erase). See the Job class for the action and action modifier constants.
+
+	Solvable *solvables()
+	my @solvables = $sel->solvables();
+	solvables = sel.solvables()
+	solvables = sel.solvables()
+
+Convert a selection into an array of Solvable objects.
+
+	<stringification>
+	my $str = "$sel";
+	str = str(sel)
+	str = sel.to_s
+
+Return a string describing the selection.
 
 THE JOB CLASS
 -------------
-xxx
+Jobs are the way to specify to the dependency solver what to do.
+Most of the times jobs will get created by calling the jobs() method
+on a Selection object, but there is also a Job() constructor in the
+Pool class.
+
+=== CONSTANTS ===
+
+Selection constants:
+
+*SOLVER_SOLVABLE*::
+  The ``what'' part is the id of a solvable.
+
+*SOLVER_SOLVABLE_NAME*::
+  The ``what'' part is the id of a package name.
+
+*SOLVER_SOLVABLE_PROVIDES*::
+  The ``what'' part is the id of a package provides.
+
+*SOLVER_SOLVABLE_ONE_OF*::
+  The ``what'' part is an offset into the ``whatprovides'' data, created
+  by calling the towhatprovides() pool method.
+
+*SOLVER_SOLVABLE_REPO*::
+  The ``what'' part is the id of a repository.
+
+*SOLVER_SOLVABLE_ALL*::
+  The ``what'' part is ignored, all packages are selected.
+
+*SOLVER_SOLVABLE_SELECTMASK*::
+  A mask containing all the above selection bits.
+
+Action constants:
+
+*SOLVER_NOOP*::
+  Do nothing.
+
+*SOLVER_INSTALL*::
+  Install a package of the specified set of packages. It tries to install
+  the best matching package (i.e. the highest version of the packages from
+  the repositories with the highest priority).
+
+*SOLVER_ERASE*::
+  Erase all of the packages from the specified set. If a package is not
+  installed, erasing it will keep it from getting installed.
+
+*SOLVER_UPDATE*::
+  Update the matching installed packages to their best version. If none
+  of the specified packages are installed, try to update the installed
+  packages to the specified versions. See the section about targeted
+  updates about more information.
+  
+*SOLVER_WEAKENDEPS*::
+  Allow to break the dependencies of the matching packages. Handle with care.
+
+*SOLVER_MULTIVERSION*::
+  Mark the matched packages for multiversion install. If they get to be installed
+  because of some other job, the installation will keep the old version of the
+  package installed (for rpm by using ``-i'' instead of ``-U'').
+
+*SOLVER_LOCK*::
+  Do not change the state of the matched packages, i.e. when they are installed
+  they stay installed, if not they are not selected for installation.
+
+*SOLVER_DISTUPGRADE*::
+  Update the matching installed packages to the best version included in one
+  of the repositories. After this operation, all come from one of the available
+  repositories except orphaned packages. Orphaned packages are packages that
+  have no relation to the packages in the repositories, i.e. no package in the
+  repositories have the same name or obsolete the orphaned package.
+  This action brings the installed packages in sync with the ones in the
+  repository. It also turns of arch/vendor/version locking for the affected
+  packages to simulate a fresh installation. This means that distupgrade can
+  actually downgrade packages if only lower versions of a package are available
+  in the repositories.
+
+*SOLVER_DROP_ORPHANED*::
+  Erase all the matching installed packages if they are orphaned. This only makes
+  sense if there is a ``distupgrade all packages'' job. The default is to erase
+  orphaned packages only if they block the installation of other packages.
+
+*SOLVER_VERIFY*::
+  Fix dependency problems of matching installed packages. The default is to ignore
+  dependency problems for installed packages.
+
+*SOLVER_USERINSTALLED*::
+  The matching installed packages are considered to be installed by a user, thus
+  not installed to fulfil some dependency. This is needed input for the calculation
+  of unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set.
+
+*SOLVER_JOBMASK*::
+  A mask containing all the above action bits.
+
+Action modifier constants:
+
+*SOLVER_WEAK*::
+  Makes the job a weak job. The solver tries to fulfil weak jobs, but does not
+  report a problem if it is not possible to do so.
+
+*SOLVER_ESSENTIAL*::
+  Makes the job an essential job. If there is a problem with the job, the solver
+  will not propose to remove the job as one solution (unless all other solutions
+  are also to remove essential jobs).
+
+*SOLVER_CLEANDEPS*::
+  The solver will try to also erase all packages dragged in through dependencies
+  when erasing the package. This needs SOLVER_USERINSTALLED jobs to maximize user
+  satisfaction.
+
+*SOLVER_FORCEBEST*::
+  Insist on the best package for install, update, and distupgrade jobs. If this
+  flag is not used, the solver will use the second-best package if the best
+  package cannot be installed for some reason. When this flag is used, the solver
+  will generate a problem instead.
+
+*SOLVER_TARGETED*::
+  Forces targeted operation update and distupgrade jobs. See the section about
+  targeted updates about more information.
+
+Set constants.
+
+*SOLVER_SETEV*::
+  The job specified the exact epoch and version of the package set.
+
+*SOLVER_SETEVR*::
+  The job specified the exact epoch, version, and release of the package set.
+
+*SOLVER_SETARCH*::
+  The job specified the exact architecture of the packages from the set.
+
+*SOLVER_SETVENDOR*::
+  The job specified the exact vendor of the packages from the set.
+
+*SOLVER_SETREPO*::
+  The job specified the exact repository of the packages from the set.
+
+*SOLVER_SETNAME*::
+  The job specified the exact name of the packages from the set.
+
+*SOLVER_NOAUTOSET*::
+  Turn of automatic set flag generation for SOLVER_SOLVABLE jobs.
+
+*SOLVER_SETMASK*::
+  A mask containing all the above set bits.
+
+See the section about set bits for more information.
+
+=== ATTRIBUTES ===
+
+	Pool *pool;				/* read only */
+	$job->{'pool'}
+	d.pool
+	d.pool
+
+Back pointer to pool.
+
+	Id how;					/* read/write */
+	$job->{'how'}
+	d.how
+	d.how
+
+Union of the selection, action, action modifier, and set flags.
+The selection part describes the semantics of the ``what'' Id.
+
+	Id what;				/* read/write */
+	$job->{'what'}
+	d.what
+	d.what
+
+Id describing the set of packages, the meaning depends on the
+selection part of the ``how'' attribute.
+
+=== METHODS ===
+
+	Solvable *solvables()
+	my @solvables = $job->solvables();
+	solvables = job.solvables()
+	solvables = job.solvables()
+
+Return the set of solvables of the job as an array of Solvable
+objects.
+
+	bool isemptyupdate();
+	$job->isemptyupdate()
+	job.isemptyupdate()
+	job.isemptyupdate?
+
+Convenience function to find out if the job describes an update
+job with no matching packages, i.e. a job that does nothing.
+Some package managers like ``zypper'' like to turn those jobs
+into install jobs, i.e. an update of a not-installed package
+will result into the installation of the package.
+
+	<stringification>
+	my $str = "$job";
+	str = str(job)
+	str = job.to_s
+
+Return a string describing the job.
+
+	<equality>
+	if ($job1 == $job2)
+	if job1 == job2:
+	if job1 == job2
+
+Two jobs are equal if they belong to the same pool and both the
+``how'' and the ``what'' attributes are the same.
+
+=== TARGETED UPDATES ===
+Libsolv has two modes for upgrades and distupgrade: targeted and
+untargeted. Untargeted mode means that the installed packages from
+the specified set will be updated to the best version. Targeted means
+that packages that can be updated to a package in the specified set
+will be updated to the best package of the set.
+
+Here's an example to explain the subtle difference. Suppose that
+you have package A installed in version "1.1", "A-1.2" is available
+in one of the repositories and there is also package "B" that
+obsoletes package A.
+
+An untargeted update of "A" will update the installed "A-1.1" to
+package "B", because that is the newest version (B obsoletes A and
+is thus newer).
+
+A targeted update of "A" will update "A-1.1" to "A-1.2", as the
+set of packages contains both "A-1.1" and "A-1.2", and "A-1.2" is
+the newer one.
+
+An untargeted update of "B" will do nothing, as "B" is not installed.
+
+An targeted update of "B" will update "A-1.1" to "B".
+
+Note that the default is to do "auto-targeting", thus if the specified
+set of packages does not include an installed package, the solver
+will assume targeted operation even if SOLVER_TARGETED is not used.
+You can turn off auto-targeting with the SOLVER_FLAG_NO_AUTOTARGET
+solver option, see the Solver class for details.
+
+=== SET BITS ===
+Set bits specify which parts of the specified packages where specified
+by the user. It is used by the solver when checking if an operation is
+allowed or not. For example, the solver will normally not allow the
+downgrade of an installed package. But it will not report a problem if
+the SOLVER_SETEVR flag is used, as it then assumes that the user specified
+the exact version and thus knows what he is doing.
+
+So if a package "screen-1-1" is installed for the x86_64 architecture and
+version "2-1" is only available for the i586 architecture, installing
+package "screen-2.1" will ask the user for confirmation because of the
+different architecture. When using the Selection class to create jobs
+the set bits are automatically added, e.g. selecting ``screen.i586'' will
+automatically add SOLVER_SETARCH, and thus no problem will be reported.
 
 THE SOLVER CLASS
 ----------------

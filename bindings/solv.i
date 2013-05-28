@@ -861,9 +861,6 @@ typedef struct {
   int flags() {
     return $self->flags;
   }
-  void make(const char *name, int flags) {
-    $self->flags = selection_make($self->pool, &$self->q, name, flags);
-  }
 #ifdef SWIGRUBY
   %rename("isempty?") isempty;
 #endif
@@ -2617,6 +2614,8 @@ rb_eval_string(
   static const int SOLVER_FLAG_IGNORE_RECOMMENDED = SOLVER_FLAG_IGNORE_RECOMMENDED;
   static const int SOLVER_FLAG_ADD_ALREADY_RECOMMENDED = SOLVER_FLAG_ADD_ALREADY_RECOMMENDED;
   static const int SOLVER_FLAG_NO_INFARCHCHECK = SOLVER_FLAG_NO_INFARCHCHECK;
+  static const int SOLVER_FLAG_BEST_OBEY_POLICY = SOLVER_FLAG_BEST_OBEY_POLICY;
+  static const int SOLVER_FLAG_NO_AUTOTARGET = SOLVER_FLAG_NO_AUTOTARGET;
 
   ~Solver() {
     solver_free($self);
