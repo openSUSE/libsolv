@@ -1644,6 +1644,7 @@ rb_eval_string(
   static const int SEARCH_NOCASE = SEARCH_NOCASE;
   static const int SEARCH_FILES = SEARCH_FILES;
   static const int SEARCH_COMPLETE_FILELIST = SEARCH_COMPLETE_FILELIST;
+  static const int SEARCH_CHECKSUMS = SEARCH_CHECKSUMS;
 
   Dataiterator(Pool *pool, Repo *repo, Id p, Id key, const char *match, int flags) {
     Dataiterator *di = solv_calloc(1, sizeof(*di));
@@ -1783,6 +1784,16 @@ rb_eval_string(
     pool->pos = oldpos;
     return r;
   }
+  %newobject Dataiterator;
+  Dataiterator *Dataiterator(Id key, const char *match, int flags) {
+    Pool *pool = $self->repo->pool;
+    Datapos oldpos = pool->pos;
+    Dataiterator *di;
+    pool->pos = *$self;
+    di = new_Dataiterator(pool, 0, SOLVID_POS, key, match, flags);
+    pool->pos = oldpos;
+    return di;
+  }
 }
 
 %extend Datamatch {
@@ -1818,7 +1829,9 @@ rb_eval_string(
   const char *str() {
      return $self->kv.str;
   }
-  int num() {
+  unsigned long long num() {
+     if ($self->key->type == REPOKEY_TYPE_NUM)
+       return SOLV_KV_NUM64(&$self->kv);
      return $self->kv.num;
   }
   int num2() {
@@ -1843,12 +1856,6 @@ rb_eval_string(
     *pos = pool->pos;
     pool->pos = oldpos;
     return pos;
-  }
-  void setpos() {
-    dataiterator_setpos($self);
-  }
-  void setpos_parent() {
-    dataiterator_setpos_parent($self);
   }
 #if defined(SWIGPERL)
   %rename("str") __str__;
