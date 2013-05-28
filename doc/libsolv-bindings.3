@@ -2846,7 +2846,11 @@ An untargeted update of "B" will do nothing, as "B" is not installed\&.
 .sp
 An targeted update of "B" will update "A\-1\&.1" to "B"\&.
 .sp
-Note that the default is to do "auto\-targeting", thus if the specified set of packages does not include an installed package, the solver will assume targeted operation even if SOLVER_TARGETED is not used\&. You can turn off auto\-targeting with the SOLVER_FLAG_NO_AUTOTARGET solver option, see the Solver class for details\&.
+Note that the default is to do "auto\-targeting", thus if the specified set of packages does not include an installed package, the solver will assume targeted operation even if SOLVER_TARGETED is not used\&.
+.sp
+This mostly matches the intent of the user, with one exception: In the example above, an update of "A\-1\&.2" will update "A\-1\&.1" to "A\-1\&.2" (targeted mode), but a second update of "A\-1\&.2" will suddenly update to "B", as untargeted mode is chosen because "A\-1\&.2" is now installed\&.
+.sp
+If you want to have full control over when targeting mode is chosen, turn off auto\-targeting with the SOLVER_FLAG_NO_AUTOTARGET solver option\&. In that case, all updates are considered to be untargeted unless they include the SOLVER_TARGETED flag\&.
 .SS "SET BITS"
 .sp
 Set bits specify which parts of the specified packages where specified by the user\&. It is used by the solver when checking if an operation is allowed or not\&. For example, the solver will normally not allow the downgrade of an installed package\&. But it will not report a problem if the SOLVER_SETEVR flag is used, as it then assumes that the user specified the exact version and thus knows what he is doing\&.
