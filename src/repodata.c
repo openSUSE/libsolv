@@ -1071,7 +1071,7 @@ solvabledata_fetch(Solvable *s, KeyValue *kv, Id keyname)
 int
 datamatcher_init(Datamatcher *ma, const char *match, int flags)
 {
-  ma->match = match;
+  ma->match = match ? solv_strdup(match) : 0;
   ma->flags = flags;
   ma->error = 0;
   ma->matchdata = 0;
@@ -1108,6 +1108,8 @@ datamatcher_init(Datamatcher *ma, const char *match, int flags)
 void
 datamatcher_free(Datamatcher *ma)
 {
+  if (ma->match)
+    ma->match = solv_free((char *)ma->match);
   if ((ma->flags & SEARCH_STRINGMASK) == SEARCH_REGEX && ma->matchdata)
     {
       regfree(ma->matchdata);
