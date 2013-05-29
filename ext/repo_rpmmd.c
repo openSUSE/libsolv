@@ -765,7 +765,12 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_LOCATION:
       str = find_attr("href", atts);
       if (str)
-	repodata_set_location(pd->data, handle, 0, 0, str);
+	{
+	  repodata_set_location(pd->data, handle, 0, 0, str);
+	  str = find_attr("xml:base", atts);
+	  if (str)
+	    repodata_set_poolstr(pd->data, handle, SOLVABLE_MEDIABASE, str);
+	}
       break;
     case STATE_CHECKSUM:
       str = find_attr("type", atts);

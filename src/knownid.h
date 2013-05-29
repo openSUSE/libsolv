@@ -247,6 +247,7 @@ KNOWNID(PUBKEY_KEYID,		        "pubkey:keyid"),
 KNOWNID(PUBKEY_FINGERPRINT,	        "pubkey:fingerprint"),
 KNOWNID(PUBKEY_EXPIRES,		        "pubkey:expires"),
 KNOWNID(PUBKEY_SIGNATURES,	        "pubkey:signatures"),
+KNOWNID(SOLVABLE_MEDIABASE,		"solvable:mediabase"), /* <location xml:base=... > */
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
