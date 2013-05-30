@@ -125,6 +125,8 @@ static Id add_package_info_to_repo(Repo *repo, Repodata *repoData,
   solvable->name = pool_str2id(pool, name, 1);
   if (packageInfo.Architecture() == B_PACKAGE_ARCHITECTURE_ANY)
     solvable->arch = ARCH_ANY;
+  else if (packageInfo.Architecture() == B_PACKAGE_ARCHITECTURE_SOURCE)
+    solvable->arch = ARCH_SRC;
   else
     solvable->arch = pool_str2id(pool,
       BPackageInfo::kArchitectureNames[packageInfo.Architecture()], 1);
