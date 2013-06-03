@@ -2516,7 +2516,7 @@ Add a raw element to the selection\&. Check the Job class for information about 
 .RS 4
 .\}
 .nf
-\fBJob *jobs(int\fR \fIaction\fR\fB)\fR
+\fBJob **jobs(int\fR \fIaction\fR\fB)\fR
 my \fI@jobs\fR \fB=\fR \fI$sel\fR\fB\->jobs(\fR\fI$action\fR\fB)\fR;
 \fIjobs\fR \fB=\fR \fIsel\fR\fB\&.jobs(\fR\fIaction\fR\fB)\fR
 \fIjobs\fR \fB=\fR \fIsel\fR\fB\&.jobs(\fR\fIaction\fR\fB)\fR
@@ -2531,7 +2531,7 @@ Convert a selection into an array of Job objects\&. The action parameter is or\-
 .RS 4
 .\}
 .nf
-\fBSolvable *solvables()\fR
+\fBSolvable **solvables()\fR
 my \fI@solvables\fR \fB=\fR \fI$sel\fR\fB\->solvables()\fR;
 \fIsolvables\fR \fB=\fR \fIsel\fR\fB\&.solvables()\fR
 \fIsolvables\fR \fB=\fR \fIsel\fR\fB\&.solvables()\fR
@@ -2782,7 +2782,7 @@ Id describing the set of packages, the meaning depends on the selection part of 
 .RS 4
 .\}
 .nf
-\fBSolvable *solvables()\fR
+\fBSolvable **solvables()\fR
 my \fI@solvables\fR \fB=\fR \fI$job\fR\fB\->solvables()\fR;
 \fIsolvables\fR \fB=\fR \fIjob\fR\fB\&.solvables()\fR
 \fIsolvables\fR \fB=\fR \fIjob\fR\fB\&.solvables()\fR
@@ -2862,8 +2862,886 @@ Set bits specify which parts of the specified packages where specified by the us
 .sp
 So if a package "screen\-1\-1" is installed for the x86_64 architecture and version "2\-1" is only available for the i586 architecture, installing package "screen\-2\&.1" will ask the user for confirmation because of the different architecture\&. When using the Selection class to create jobs the set bits are automatically added, e\&.g\&. selecting \(lqscreen\&.i586\(rq will automatically add SOLVER_SETARCH, and thus no problem will be reported\&.
 .SH "THE SOLVER CLASS"
+.SS "CONSTANTS"
 .sp
-xxx
+Flags to modify some of the solver\(cqs behaviour:
+.PP
+\fBSOLVER_FLAG_ALLOW_DOWNGRADE\fR
+.RS 4
+Allow the solver to downgrade packages without asking for confirmation (i\&.e\&. reporting a problem)\&.
+.RE
+.PP
+\fBSOLVER_FLAG_ALLOW_ARCHCHANGE\fR
+.RS 4
+Allow the solver to change the architecture of an installed package without asking for confirmation\&. Note that changes to/from noarch are always considered to be allowed\&.
+.RE
+.PP
+\fBSOLVER_FLAG_ALLOW_VENDORCHANGE\fR
+.RS 4
+Allow the solver to change the vendor of an installed package without asking for confirmation\&. Each vendor is part of one or more vendor equivalence classes, normally installed packages may only change their vendor if the new vendor shares at least one equivalence class\&.
+.RE
+.PP
+\fBSOLVER_FLAG_ALLOW_NAMECHANGE\fR
+.RS 4
+Allow the solver to change the name of an installed package, i\&.e\&. install a package with a different name that obsoletes the installed package\&. This option is on by default\&.
+.RE
+.PP
+\fBSOLVER_FLAG_ALLOW_UNINSTALL\fR
+.RS 4
+Allow the solver to deinstall installed packages to fulfil the jobs\&. This flag also includes the above flags\&. You may want to set this flag if you only have SOLVER_ERASE jobs, as in that case it\(cqs better for the user to check the transaction overview instead of approving every single package that needs to be deinstalled\&.
+.RE
+.PP
+\fBSOLVER_FLAG_NO_UPDATEPROVIDE\fR
+.RS 4
+If multiple packages obsolete an installed package, the solver checks the provides of every such package and ignores all packages that do not provide the installed package name\&. Thus, you can have an official update candidate that provides the old name, and other packages that also obsolete the package but are not considered for updating\&. If you cannot use this feature, you can turn it off by setting this flag\&.
+.RE
+.PP
+\fBSOLVER_FLAG_SPLITPROVIDES\fR
+.RS 4
+Make the solver aware of special provides of the form \(lq<packagename>:<path>\(rq used in SUSE systems to support package splits\&.
+.RE
+.PP
+\fBSOLVER_FLAG_IGNORE_RECOMMENDED\fR
+.RS 4
+Do not process optional (aka weak) dependencies\&.
+.RE
+.PP
+\fBSOLVER_FLAG_ADD_ALREADY_RECOMMENDED\fR
+.RS 4
+Install recommened or supplemented packages even if they have no connection to the current transaction\&. You can use this feature to implement a simple way for the user to install new recommended packages that were not available in the past\&.
+.RE
+.PP
+\fBSOLVER_FLAG_NO_INFARCHCHECK\fR
+.RS 4
+Turn off the inferior architecture checking that is normally done by the solver\&. Normally, the solver allows only the installation of packages from the "best" architecture if a package is available for multiple architectures\&.
+.RE
+.PP
+\fBSOLVER_FLAG_BEST_OBEY_POLICY\fR
+.RS 4
+Make the SOLVER_FORCEBEST job option consider only packages that meet the policies for installed packages, i\&.e\&. no downgrades, no architecture change, no vendor change (see the first flags of this section)\&. If the flag is not specified, the solver will enforce the installation of the best package ignoring the installed packages, which may conflict with the set policy\&.
+.RE
+.PP
+\fBSOLVER_FLAG_NO_AUTOTARGET\fR
+.RS 4
+Do not enable auto\-targeting up update and distupgrade jobs\&. See the section on targeted updates for more information\&.
+.RE
+.sp
+Basic rule types:
+.PP
+\fBSOLVER_RULE_UNKNOWN\fR
+.RS 4
+A rule of an unknown class\&. You should never encounter those\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM\fR
+.RS 4
+A package dependency rule, called rpm rule for historical reasons\&.
+.RE
+.PP
+\fBSOLVER_RULE_UPDATE\fR
+.RS 4
+A rule to implement the update policy of installed packages\&. Every installed package has an update rule that consists of the packages that may replace the installed package\&.
+.RE
+.PP
+\fBSOLVER_RULE_FEATURE\fR
+.RS 4
+Feature rules are fallback rules used when a update rule is disabled\&. They include all packages that may replace the installed package ignoring the update policy, i\&.e\&. they contain downgrades, arch changes and so on\&. Without them, the solver would simply deinstall installed packages if their update rule gets disabled\&.
+.RE
+.PP
+\fBSOLVER_RULE_JOB\fR
+.RS 4
+Job rules implement the job given to the solver\&.
+.RE
+.PP
+\fBSOLVER_RULE_DISTUPGRADE\fR
+.RS 4
+This are simple negative assertions that make sure that only packages are kept that are also available in one of the repositories\&.
+.RE
+.PP
+\fBSOLVER_RULE_INFARCH\fR
+.RS 4
+Infarch rules are also negative assertions, they disallow the installation of packages when there are packages of the same name but with a better architecture\&.
+.RE
+.PP
+\fBSOLVER_RULE_CHOICE\fR
+.RS 4
+Choice rules are used to make sure that the solver preferes updating to installing different packages when some dependency is provided by multiple packages with different names\&. The solver may always break choice rules, so you will not see them when a problem is found\&.
+.RE
+.PP
+\fBSOLVER_RULE_LEARNT\fR
+.RS 4
+These rules are generated by the solver to keep it from running into the same problem multiple times when it has to backtrack\&. They are the main reason why a sat solver is faster then other dependency solver implementations\&.
+.RE
+.sp
+Special dependency rule types:
+.PP
+\fBSOLVER_RULE_RPM_NOT_INSTALLABLE\fR
+.RS 4
+This rule was added to prevent the installation of a package of an architecture that does not work on the system\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM_NOTHING_PROVIDES_DEP\fR
+.RS 4
+The package contanis a required dependency which was not provided by any package\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM_PACKAGE_REQUIRES\fR
+.RS 4
+Similar to SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, but in this case some packages provided the dependency but none of them could be installed due to other dependency issues\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM_SELF_CONFLICT\fR
+.RS 4
+The package conflicts with itself\&. This is not allowed by older rpm versions\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM_PACKAGE_CONFLICT\fR
+.RS 4
+To fulfill the dependencies two packages need to be installed, but one of the packages contains a conflict with the other one\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM_SAME_NAME\fR
+.RS 4
+The dependencies can only be fulfilled by multiple versions of a package, but installing multiple versions of the same package is not allowed\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM_PACKAGE_OBSOLETES\fR
+.RS 4
+To fulfill the dependencies two packages need to be installed, but one of the packages obsoletes the other one\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM_IMPLICIT_OBSOLETES\fR
+.RS 4
+To fulfill the dependencies two packages need to be installed, but one of the packages has provides a dependency that is obsoleted by the other one\&. See the POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES flag\&.
+.RE
+.PP
+\fBSOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES\fR
+.RS 4
+To fulfill the dependencies a package needs to be installed that is obsoleted by an installed package\&. See the POOL_FLAG_NOINSTALLEDOBSOLETES flag\&.
+.RE
+.PP
+\fBSOLVER_RULE_JOB_NOTHING_PROVIDES_DEP\fR
+.RS 4
+The user asked for installation of a package providing a specific dependency, but no available package provides it\&.
+.RE
+.PP
+\fBSOLVER_RULE_JOB_UNKNOWN_PACKAGE\fR
+.RS 4
+The user asked for installation of a package with a specific name, but no available package has that name\&.
+.RE
+.PP
+\fBSOLVER_RULE_JOB_PROVIDED_BY_SYSTEM\fR
+.RS 4
+The user asked for the erasure of a dependency that is provided by the system (i\&.e\&. for special hardware or language dependencies), this cannot be done with a job\&.
+.RE
+.PP
+\fBSOLVER_RULE_JOB_UNSUPPORTED\fR
+.RS 4
+The user asked for something that is not yet implemented, e\&.g\&. the installation of all packages at once\&.
+.RE
+.sp
+Policy error constants
+.PP
+\fBPOLICY_ILLEGAL_DOWNGRADE\fR
+.RS 4
+The solver ask for permission before downgrading packages\&.
+.RE
+.PP
+\fBPOLICY_ILLEGAL_ARCHCHANGE\fR
+.RS 4
+The solver ask for permission before changing the architecture of installed packages\&.
+.RE
+.PP
+\fBPOLICY_ILLEGAL_VENDORCHANGE\fR
+.RS 4
+The solver ask for permission before changing the vendor of installed packages\&.
+.RE
+.PP
+\fBPOLICY_ILLEGAL_NAMECHANGE\fR
+.RS 4
+The solver ask for permission before replacing an installed packages with a packge that has a different name\&.
+.RE
+.sp
+Solution element type constants
+.PP
+\fBSOLVER_SOLUTION_JOB\fR
+.RS 4
+The problem can be solved by removing the specified job\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_POOLJOB\fR
+.RS 4
+The problem can be solved by removing the specified job that is defined in the pool\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_INFARCH\fR
+.RS 4
+The problem can be solved by allowing the installation of the specified package with an inferior architecture\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_DISTUPGRADE\fR
+.RS 4
+The problem can be solved by allowing to keep the specified package installed\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_BEST\fR
+.RS 4
+The problem can be solved by allowing to install the specified package that is not the best available package\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_ERASE\fR
+.RS 4
+The problem can be solved by allowing to erase the specified package\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_REPLACE\fR
+.RS 4
+The problem can be solved by allowing to replace the package with some other package\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_REPLACE_DOWNGRADE\fR
+.RS 4
+The problem can be solved by allowing to replace the package with some other package that has a lower version\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_REPLACE_ARCHCHANGE\fR
+.RS 4
+The problem can be solved by allowing to replace the package with some other package that has a different architecture\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_REPLACE_VENDORCHANGE\fR
+.RS 4
+The problem can be solved by allowing to replace the package with some other package that has a different vendor\&.
+.RE
+.PP
+\fBSOLVER_SOLUTION_REPLACE_NAMECHANGE\fR
+.RS 4
+The problem can be solved by allowing to replace the package with some other package that has a different name\&.
+.RE
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *pool;\fR                             /* read only */
+\fI$job\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fId\fR\fB\&.pool\fR
+\fId\fR\fB\&.pool\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to pool\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint set_flag(int\fR \fIflag\fR\fB, int\fR \fIvalue\fR\fB)\fR
+my \fI$oldvalue\fR \fB=\fR \fI$pool\fR\fB\->set_flag(\fR\fI$flag\fR\fB,\fR \fI$value\fR\fB)\fR;
+\fIoldvalue\fR \fB=\fR \fIpool\fR\fB\&.set_flag(\fR\fIflag\fR\fB,\fR \fIvalue\fR\fB)\fR
+\fIoldvalue\fR \fB=\fR \fIpool\fR\fB\&.set_flag(\fR\fIflag\fR\fB,\fR \fIvalue\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint get_flag(int\fR \fIflag\fR\fB)\fR
+my \fI$value\fR \fB=\fR \fI$pool\fR\fB\->get_flag(\fR\fI$flag\fR\fB)\fR;
+\fIvalue\fR \fB=\fR \fIpool\fR\fB\&.get_flag(\fR\fIflag\fR\fB)\fR
+\fIvalue\fR \fB=\fR \fIpool\fR\fB\&.get_flag(\fR\fIflag\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Set/get a solver specific flag\&. The flags define the policies the solver has to obey\&. The flags are explained in the CONSTANTS section of this class\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBProblem **solve(Job *\fR\fIjobs\fR\fB)\fR
+my \fI@problems\fR \fB=\fR \fI$solver\fR\fB\->solve(\e\fR\fI@jobs\fR\fB)\fR;
+\fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
+\fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Solve a problem specified in the job list (plus the jobs defined in the pool)\&. Returns an array of problems that need user interaction, or an empty array if no problems were encountered\&. See the Problem class on how to deal with problems\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBTransaction *transaction()\fR
+my \fI$trans\fR \fB=\fR \fI$solver\fR\fB\->transaction()\fR;
+\fItrans\fR \fB=\fR \fIsolver\fR\fB\&.transaction()\fR
+\fItrans\fR \fB=\fR \fIsolver\fR\fB\&.transaction()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the transaction to implement the calculated package changes\&. A transaction is available even if problems were found, this is useful for interactive user interfaces that show both the job result and the problems\&.
+.SH "THE PROBLEM CLASS"
+.sp
+Problems are the way of the solver to interact with the user\&. You can simply list all problems and terminate your program, but a better way is to present solutions to the user and let him pick the ones he likes\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *solv;\fR                           /* read only */
+\fI$problem\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fIproblem\fR\fB\&.solv\fR
+\fIproblem\fR\fB\&.solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id;\fR                                  /* read only */
+\fI$problem\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fIproblem\fR\fB\&.id\fR
+\fIproblem\fR\fB\&.id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Id of the problem\&. The first problem has Id 1, they are numbered consecutively\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRule *findproblemrule()\fR
+my \fI$probrule\fR \fB=\fR \fI$problem\fR\fB\->findproblemrule()\fR;
+\fIprobrule\fR \fB=\fR \fIproblem\fR\fB\&.findproblemrule()\fR
+\fIprobrule\fR \fB=\fR \fIproblem\fR\fB\&.findproblemrule()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the rule that caused the problem\&. Of cource in most situations there is no single responsible rule, but many rules that interconnect with each created the problem\&. Nevertheless, the solver uses some heuristic approch to find a rule that somewhat describes the problem best to the user\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRule **findallproblemrules(bool\fR \fIunfiltered\fR \fB= 0)\fR
+my \fI@probrules\fR \fB=\fR \fI$problem\fR\fB\->findallproblemrules()\fR;
+\fIprobrules\fR \fB=\fR \fIproblem\fR\fB\&.findallproblemrule()\fR
+\fIprobrules\fR \fB=\fR \fIproblem\fR\fB\&.findallproblemrule()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all rules responsible for the problem\&. The returned set of rules contains all the needed information why there was a problem, but it\(cqs hard to present them to the user in a sensible way\&. The default is to filter out all update and job rules (unless the returned rules only consist of those types)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolutions **solutions()\fR
+my \fI@solutions\fR \fB=\fR \fI$problem\fR\fB\->solutions()\fR;
+\fIsolutions\fR \fB=\fR \fIproblem\fR\fB\&.solutions()\fR
+\fIsolutions\fR \fB=\fR \fIproblem\fR\fB\&.solutions()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return an array containing multiple possible solutions to fix the problem\&. See the solution class for more information\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint solution_count()\fR
+my \fI$cnt\fR \fB=\fR \fI$problem\fR\fB\->solution_count()\fR;
+\fIcnt\fR \fB=\fR \fIproblem\fR\fB\&.solution_count()\fR
+\fIcnt\fR \fB=\fR \fIproblem\fR\fB\&.solution_count()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the number of solutions without creating solution objects\&.
+.SH "THE RULE CLASS"
+.sp
+Rules are the basic block of sat solving\&. Each package dependency gets translated into one or multiple rules\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *solv;\fR                           /* read only */
+\fI$rule\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fIrule\fR\fB\&.solv\fR
+\fIrule\fR\fB\&.solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id;\fR                                  /* read only */
+\fI$rule\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fIrule\fR\fB\&.id\fR
+\fIrule\fR\fB\&.id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of the rule\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint type;\fR                               /* read only */
+\fI$rule\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fIrule\fR\fB\&.type\fR
+\fIrule\fR\fB\&.type\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The basic type of the rule\&. See the constant section of the solver class for the type list\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRuleinfo *info()\fR
+my \fI$ruleinfo\fR \fB=\fR \fI$rule\fR\fB\->info()\fR;
+\fIruleinfo\fR \fB=\fR \fIrule\fR\fB\&.info()\fR
+\fIruleinfo\fR \fB=\fR \fIrule\fR\fB\&.info()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a Ruleinfo object that contains information about why the rule was created\&. But see the allinfos() method below\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRuleinfo **allinfos()\fR
+my \fI@ruleinfos\fR \fB=\fR \fI$rule\fR\fB\->allinfos()\fR;
+\fIruleinfos\fR \fB=\fR \fIrule\fR\fB\&.allinfos()\fR
+\fIruleinfos\fR \fB=\fR \fIrule\fR\fB\&.allinfos()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+As the same dependency rule can get created because of multiple dependencies, one Ruleinfo is not enough to describe the reason\&. Thus the allinfos() method returns an array of all infos about a rule\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<equality>\fR
+\fBif (\fR\fI$rule1\fR \fB==\fR \fI$rule2\fR\fB)\fR
+\fBif\fR \fIrule1\fR \fB==\fR \fIrule2\fR\fB:\fR
+\fBif\fR \fIrule1\fR \fB==\fR \fIrule2\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Two rules are equal if they belong to the same solver and have the same id\&.
+.SH "THE RULEINFO CLASS"
+.sp
+A Ruleinfo describes one reason why a rule was created\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *solv;\fR                           /* read only */
+\fI$ruleinfo\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fIruleinfo\fR\fB\&.solv\fR
+\fIruleinfo\fR\fB\&.solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint type;\fR                               /* read only */
+\fI$ruleinfo\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fIruleinfo\fR\fB\&.type\fR
+\fIruleinfo\fR\fB\&.type\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The type of the ruleinfo\&. See the constant section of the solver class for the rule type list and the special type list\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId dep;\fR                                 /* read only */
+\fI$ruleinfo\fR\fB\->{\*(Aqdep\*(Aq}\fR
+\fIruleinfo\fR\fB\&.dep\fR
+\fIruleinfo\fR\fB\&.dep\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of the dependency leading to the creation of the rule, or zero\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *solvable;\fR                     /* read only */
+\fI$ruleinfo\fR\fB\->{\*(Aqsolvable\*(Aq}\fR
+\fIruleinfo\fR\fB\&.solvable\fR
+\fIruleinfo\fR\fB\&.solvable\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The involved Solvable, e\&.g\&. the one containing the dependency\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *othersolvable;\fR                /* read only */
+\fI$ruleinfo\fR\fB\->{\*(Aqothersolvable\*(Aq}\fR
+\fIruleinfo\fR\fB\&.othersolvable\fR
+\fIruleinfo\fR\fB\&.othersolvable\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The other involved Solvable (if any), e\&.g\&. the one containing providing the dependency for conflicts\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *problemstr()\fR;
+my \fI$str\fR \fB=\fR \fI$ruleinfo\fR\fB\->problemstr()\fR;
+\fIstr\fR \fB=\fR \fIruleinfo\fR\fB\&.problemstr()\fR
+\fIstr\fR \fB=\fR \fIruleinfo\fR\fB\&.problemstr()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+A string describing the ruleinfo from a problem perspective\&. This probably only makes sense if the rule is part of a problem\&.
+.SH "THE SOLUTION CLASS"
+.sp
+A solution solves one specific problem\&. It consists of multiple solution elements that all need to be executed\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *solv;\fR                           /* read only */
+\fI$solution\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fIsolution\fR\fB\&.solv\fR
+\fIsolution\fR\fB\&.solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId problemid;\fR                           /* read only */
+\fI$solution\fR\fB\->{\*(Aqproblemid\*(Aq}\fR
+\fIsolution\fR\fB\&.problemid\fR
+\fIsolution\fR\fB\&.problemid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Id of the problem the solution solves\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id;\fR                                  /* read only */
+\fI$solution\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fIsolution\fR\fB\&.id\fR
+\fIsolution\fR\fB\&.id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Id of the solution\&. The first solution has Id 1, they are numbered consecutively\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolutionelement **elements(bool\fR \fIexpandreplaces\fR \fB= 0)\fR
+my \fI@solutionelements\fR \fB=\fR \fI$solution\fR\fB\->elements()\fR;
+\fIsolutionelements\fR \fB=\fR \fIsolution\fR\fB\&.elements()\fR
+\fIsolutionelements\fR \fB=\fR \fIsolution\fR\fB\&.elements()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return an array containing the elements describing what neeeds to be done to implement the specific solution\&. If expandreplaces is true, elements of type SOLVER_SOLUTION_REPLACE will be replaced by one or more elements replace elements describing the policy mismatches\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint element_count()\fR
+my \fI$cnt\fR \fB=\fR \fI$solution\fR\fB\->solution_count()\fR;
+\fIcnt\fR \fB=\fR \fIsolution\fR\fB\&.element_count()\fR
+\fIcnt\fR \fB=\fR \fIsolution\fR\fB\&.element_count()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the number of solution elements without creating objects\&. Note that the count does not match the number of objects returned by the elements() method of expandreplaces is set to true\&.
+.SH "THE SOLUTIONELEMENT CLASS"
+.sp
+A solution element describes a single action of a solution\&. The action is always either to remove one specific job or to add a new job that installs or erases a single specific package\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *solv;\fR                           /* read only */
+\fI$solutionelement\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fIsolutionelement\fR\fB\&.solv\fR
+\fIsolutionelement\fR\fB\&.solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId problemid;\fR                           /* read only */
+\fI$solutionelement\fR\fB\->{\*(Aqproblemid\*(Aq}\fR
+\fIsolutionelement\fR\fB\&.problemid\fR
+\fIsolutionelement\fR\fB\&.problemid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Id of the problem the element (partly) solves\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId solutionid;\fR                          /* read only */
+\fI$solutionelement\fR\fB\->{\*(Aqsolutionid\*(Aq}\fR
+\fIsolutionelement\fR\fB\&.solutionid\fR
+\fIsolutionelement\fR\fB\&.solutionid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Id of the solution the element is a part of\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id;\fR                                  /* read only */
+\fI$solutionelement\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fIsolutionelement\fR\fB\&.id\fR
+\fIsolutionelement\fR\fB\&.id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Id of the solution element\&. The first element has Id 1, they are numbered consecutively\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId type;\fR                                /* read only */
+\fI$solutionelement\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fIsolutionelement\fR\fB\&.type\fR
+\fIsolutionelement\fR\fB\&.type\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Type of the solution element\&. See the constant section of the solver class for the existing types\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *solvable;\fR                     /* read only */
+\fI$solutionelement\fR\fB\->{\*(Aqsolvable\*(Aq}\fR
+\fIsolutionelement\fR\fB\&.solvable\fR
+\fIsolutionelement\fR\fB\&.solvable\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The installed solvable that needs to be replaced for replacement elements\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *replacement;\fR                  /* read only */
+\fI$solutionelement\fR\fB\->{\*(Aqreplacement\*(Aq}\fR
+\fIsolutionelement\fR\fB\&.replacement\fR
+\fIsolutionelement\fR\fB\&.replacement\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The solvable that needs to be installed to fix the problem\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint jobidx;\fR                             /* read only */
+\fI$solutionelement\fR\fB\->{\*(Aqjobidx\*(Aq}\fR
+\fIsolutionelement\fR\fB\&.jobidx\fR
+\fIsolutionelement\fR\fB\&.jobidx\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The index of the job that needs to be removed to fix the problem, or \-1 if the element is of another type\&. Note that it\(cqs better to change the job to SOLVER_NOOP type so that the numbering of other elements does not get disturbed\&. This method works both for types SOLVER_SOLUTION_JOB and SOLVER_SOLUTION_POOLJOB\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolutionelement **replaceelements()\fR
+my \fI@solutionelements\fR \fB=\fR \fI$solutionelement\fR\fB\->replaceelements()\fR;
+\fIsolutionelements\fR \fB=\fR \fIsolutionelement\fR\fB\&.replaceelements()\fR
+\fIsolutionelements\fR \fB=\fR \fIsolutionelement\fR\fB\&.replaceelements()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+If the solution element is of type SOLVER_SOLUTION_REPLACE, return an array of elements describing the policy mismatches, otherwise return a copy of the element\&. See also the \(lqexpandreplaces\(rq option in the solution\(cqs elements() method\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint illegalreplace()\fR
+my \fI$illegal\fR \fB=\fR \fI$solutionelement\fR\fB\->illegalreplace()\fR;
+\fIillegal\fR \fB=\fR \fIsolutionelement\fR\fB\&.illegalreplace()\fR
+\fIillegal\fR \fB=\fR \fIsolutionelement\fR\fB\&.illegalreplace()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return an integer that contains the policy mismatch bits or\-ed together, or zero if there was no policy mismatch\&. See the policy error constants in the solver class\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBJob *Job()\fR
+my \fI$job\fR \fB=\fR \fI$solutionelement\fR\fB\->Job()\fR;
+\fIillegal\fR \fB=\fR \fIsolutionelement\fR\fB\&.Job()\fR
+\fIillegal\fR \fB=\fR \fIsolutionelement\fR\fB\&.Job()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a job that implements the solution element\&. Add this job to the array of jobs for all elements of type different to SOLVER_SOLUTION_JOB and SOLVER_SOLUTION_POOLJOB\&. For the later two, a SOLVER_NOOB Job is created, you should replace the old job with the new one\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *str()\fR
+my \fI$str\fR \fB=\fR \fI$solutionelement\fR\fB\->str()\fR;
+\fIstr\fR \fB=\fR \fIsolutionelement\fR\fB\&.str()\fR
+\fIstr\fR \fB=\fR \fIsolutionelement\fR\fB\&.str()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+A string describing the change the solution element consists of\&.
 .SH "THE TRANSACTION CLASS"
 .sp
 xxx

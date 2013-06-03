@@ -1448,7 +1448,7 @@ add operation.
 Add a raw element to the selection. Check the Job class for information about
 the how and what parameters.
 
-	Job *jobs(int action)
+	Job **jobs(int action)
 	my @jobs = $sel->jobs($action);
 	jobs = sel.jobs(action)
 	jobs = sel.jobs(action)
@@ -1457,7 +1457,7 @@ Convert a selection into an array of Job objects. The action parameter is or-ed
 to the ``how'' part of the job, it describes the type of job (e.g. install,
 erase). See the Job class for the action and action modifier constants.
 
-	Solvable *solvables()
+	Solvable **solvables()
 	my @solvables = $sel->solvables();
 	solvables = sel.solvables()
 	solvables = sel.solvables()
@@ -1646,7 +1646,7 @@ selection part of the ``how'' attribute.
 
 === METHODS ===
 
-	Solvable *solvables()
+	Solvable **solvables()
 	my @solvables = $job->solvables();
 	solvables = job.solvables()
 	solvables = job.solvables()
@@ -1736,7 +1736,611 @@ automatically add SOLVER_SETARCH, and thus no problem will be reported.
 
 THE SOLVER CLASS
 ----------------
-xxx
+
+=== CONSTANTS ===
+
+Flags to modify some of the solver's behaviour:
+
+*SOLVER_FLAG_ALLOW_DOWNGRADE*::
+  Allow the solver to downgrade packages without asking for confirmation
+  (i.e. reporting a problem).
+
+*SOLVER_FLAG_ALLOW_ARCHCHANGE*::
+  Allow the solver to change the architecture of an installed package
+  without asking for confirmation. Note that changes to/from noarch
+  are always considered to be allowed.
+  
+*SOLVER_FLAG_ALLOW_VENDORCHANGE*::
+  Allow the solver to change the vendor of an installed package
+  without asking for confirmation. Each vendor is part of one or more
+  vendor equivalence classes, normally installed packages may only
+  change their vendor if the new vendor shares at least one equivalence
+  class.
+
+*SOLVER_FLAG_ALLOW_NAMECHANGE*::
+  Allow the solver to change the name of an installed package, i.e.
+  install a package with a different name that obsoletes the installed
+  package. This option is on by default.
+
+*SOLVER_FLAG_ALLOW_UNINSTALL*::
+  Allow the solver to deinstall installed packages to fulfil the jobs.
+  This flag also includes the above flags. You may want to set this
+  flag if you only have SOLVER_ERASE jobs, as in that case it's
+  better for the user to check the transaction overview instead of
+  approving every single package that needs to be deinstalled.
+
+*SOLVER_FLAG_NO_UPDATEPROVIDE*::
+  If multiple packages obsolete an installed package, the solver checks
+  the provides of every such package and ignores all packages that
+  do not provide the installed package name. Thus, you can have an
+  official update candidate that provides the old name, and other
+  packages that also obsolete the package but are not considered for
+  updating. If you cannot use this feature, you can turn it off
+  by setting this flag.
+
+*SOLVER_FLAG_SPLITPROVIDES*::
+  Make the solver aware of special provides of the form
+  ``<packagename>:<path>'' used in SUSE systems to support package
+  splits.
+
+*SOLVER_FLAG_IGNORE_RECOMMENDED*::
+  Do not process optional (aka weak) dependencies.
+
+*SOLVER_FLAG_ADD_ALREADY_RECOMMENDED*::
+  Install recommened or supplemented packages even if they have no
+  connection to the current transaction. You can use this feature
+  to implement a simple way for the user to install new recommended
+  packages that were not available in the past.
+  
+*SOLVER_FLAG_NO_INFARCHCHECK*::
+  Turn off the inferior architecture checking that is normally done
+  by the solver. Normally, the solver allows only the installation
+  of packages from the "best" architecture if a package is available
+  for multiple architectures.
+
+*SOLVER_FLAG_BEST_OBEY_POLICY*::
+  Make the SOLVER_FORCEBEST job option consider only packages that
+  meet the policies for installed packages, i.e. no downgrades,
+  no architecture change, no vendor change (see the first flags
+  of this section). If the flag is not specified, the solver will
+  enforce the installation of the best package ignoring the
+  installed packages, which may conflict with the set policy.
+
+*SOLVER_FLAG_NO_AUTOTARGET*::
+  Do not enable auto-targeting up update and distupgrade jobs. See
+  the section on targeted updates for more information.
+
+Basic rule types:
+
+*SOLVER_RULE_UNKNOWN*::
+  A rule of an unknown class. You should never encounter those.
+
+*SOLVER_RULE_RPM*::
+  A package dependency rule, called rpm rule for historical reasons.
+
+*SOLVER_RULE_UPDATE*::
+  A rule to implement the update policy of installed packages. Every
+  installed package has an update rule that consists of the packages
+  that may replace the installed package.
+
+*SOLVER_RULE_FEATURE*::
+  Feature rules are fallback rules used when a update rule is disabled.
+  They include all packages that may replace the installed package
+  ignoring the update policy, i.e. they contain downgrades, arch
+  changes and so on. Without them, the solver would simply deinstall
+  installed packages if their update rule gets disabled.
+
+*SOLVER_RULE_JOB*::
+  Job rules implement the job given to the solver.
+
+*SOLVER_RULE_DISTUPGRADE*::
+  This are simple negative assertions that make sure that only packages
+  are kept that are also available in one of the repositories.
+
+*SOLVER_RULE_INFARCH*::
+  Infarch rules are also negative assertions, they disallow the installation
+  of packages when there are packages of the same name but with a better
+  architecture.
+
+*SOLVER_RULE_CHOICE*::
+  Choice rules are used to make sure that the solver preferes updating to
+  installing different packages when some dependency is provided by
+  multiple packages with different names. The solver may always break
+  choice rules, so you will not see them when a problem is found.
+
+*SOLVER_RULE_LEARNT*::
+  These rules are generated by the solver to keep it from running into
+  the same problem multiple times when it has to backtrack. They are
+  the main reason why a sat solver is faster then other dependency solver
+  implementations.
+
+Special dependency rule types:
+
+*SOLVER_RULE_RPM_NOT_INSTALLABLE*::
+  This rule was added to prevent the installation of a package of an
+  architecture that does not work on the system.
+
+*SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP*::
+  The package contanis a required dependency which was not provided by
+  any package.
+
+*SOLVER_RULE_RPM_PACKAGE_REQUIRES*::
+  Similar to SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, but in this case
+  some packages provided the dependency but none of them could be
+  installed due to other dependency issues.
+
+*SOLVER_RULE_RPM_SELF_CONFLICT*::
+  The package conflicts with itself. This is not allowed by older rpm
+  versions.
+
+*SOLVER_RULE_RPM_PACKAGE_CONFLICT*::
+  To fulfill the dependencies two packages need to be installed, but
+  one of the packages contains a conflict with the other one.
+
+*SOLVER_RULE_RPM_SAME_NAME*::
+  The dependencies can only be fulfilled by multiple versions of
+  a package, but installing multiple versions of the same package
+  is not allowed.
+
+*SOLVER_RULE_RPM_PACKAGE_OBSOLETES*::
+  To fulfill the dependencies two packages need to be installed, but
+  one of the packages obsoletes the other one.
+
+*SOLVER_RULE_RPM_IMPLICIT_OBSOLETES*::
+  To fulfill the dependencies two packages need to be installed, but
+  one of the packages has provides a dependency that is obsoleted
+  by the other one. See the POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES
+  flag.
+
+*SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES*::
+  To fulfill the dependencies a package needs to be installed that is
+  obsoleted by an installed package. See the POOL_FLAG_NOINSTALLEDOBSOLETES
+  flag.
+
+*SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP*::
+  The user asked for installation of a package providing a specific
+  dependency, but no available package provides it.
+
+*SOLVER_RULE_JOB_UNKNOWN_PACKAGE*::
+  The user asked for installation of a package with a specific name,
+  but no available package has that name.
+
+*SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM*::
+  The user asked for the erasure of a dependency that is provided by the
+  system (i.e. for special hardware or language dependencies), this
+  cannot be done with a job.
+
+*SOLVER_RULE_JOB_UNSUPPORTED*::
+  The user asked for something that is not yet implemented, e.g. the
+  installation of all packages at once.
+
+Policy error constants
+
+*POLICY_ILLEGAL_DOWNGRADE*::
+  The solver ask for permission before downgrading packages.
+
+*POLICY_ILLEGAL_ARCHCHANGE*::
+  The solver ask for permission before changing the architecture of installed
+  packages.
+
+*POLICY_ILLEGAL_VENDORCHANGE*::
+  The solver ask for permission before changing the vendor of installed
+  packages.
+
+*POLICY_ILLEGAL_NAMECHANGE*::
+  The solver ask for permission before replacing an installed packages with
+  a packge that has a different name.
+
+Solution element type constants
+
+*SOLVER_SOLUTION_JOB*::
+  The problem can be solved by removing the specified job.
+
+*SOLVER_SOLUTION_POOLJOB*::
+  The problem can be solved by removing the specified job that is defined in the pool.
+
+*SOLVER_SOLUTION_INFARCH*::
+  The problem can be solved by allowing the installation of the specified package
+  with an inferior architecture.
+
+*SOLVER_SOLUTION_DISTUPGRADE*::
+  The problem can be solved by allowing to keep the specified package installed.
+
+*SOLVER_SOLUTION_BEST*::
+  The problem can be solved by allowing to install the specified package that is
+  not the best available package.
+
+*SOLVER_SOLUTION_ERASE*::
+  The problem can be solved by allowing to erase the specified package.
+
+*SOLVER_SOLUTION_REPLACE*::
+  The problem can be solved by allowing to replace the package with some other
+  package.
+
+*SOLVER_SOLUTION_REPLACE_DOWNGRADE*::
+  The problem can be solved by allowing to replace the package with some other
+  package that has a lower version.
+
+*SOLVER_SOLUTION_REPLACE_ARCHCHANGE*::
+  The problem can be solved by allowing to replace the package with some other
+  package that has a different architecture.
+
+*SOLVER_SOLUTION_REPLACE_VENDORCHANGE*::
+  The problem can be solved by allowing to replace the package with some other
+  package that has a different vendor.
+
+*SOLVER_SOLUTION_REPLACE_NAMECHANGE*::
+  The problem can be solved by allowing to replace the package with some other
+  package that has a different name.
+
+
+=== ATTRIBUTES ===
+
+	Pool *pool;				/* read only */
+	$job->{'pool'}
+	d.pool
+	d.pool
+
+Back pointer to pool.
+
+=== METHODS ===
+
+	int set_flag(int flag, int value)
+	my $oldvalue = $pool->set_flag($flag, $value);
+	oldvalue = pool.set_flag(flag, value)
+	oldvalue = pool.set_flag(flag, value)
+
+	int get_flag(int flag)
+	my $value = $pool->get_flag($flag);
+	value = pool.get_flag(flag)
+	value = pool.get_flag(flag)
+
+Set/get a solver specific flag. The flags define the policies the solver has
+to obey. The flags are explained in the CONSTANTS section of this class.
+
+	Problem **solve(Job *jobs)
+	my @problems = $solver->solve(\@jobs);
+	problems = solver.solve(jobs)
+	problems = solver.solve(jobs)
+
+Solve a problem specified in the job list (plus the jobs defined in the pool).
+Returns an array of problems that need user interaction, or an empty array
+if no problems were encountered. See the Problem class on how to deal with
+problems.
+
+	Transaction *transaction()
+	my $trans = $solver->transaction();
+	trans = solver.transaction()
+	trans = solver.transaction()
+
+Return the transaction to implement the calculated package changes. A transaction
+is available even if problems were found, this is useful for interactive user
+interfaces that show both the job result and the problems.
+
+THE PROBLEM CLASS
+-----------------
+
+Problems are the way of the solver to interact with the user. You can simply list
+all problems and terminate your program, but a better way is to present solutions to
+the user and let him pick the ones he likes.
+
+=== ATTRIBUTES ===
+
+	Solver *solv;				/* read only */
+	$problem->{'solv'}
+	problem.solv
+	problem.solv
+
+Back pointer to solver object.
+
+	Id id;					/* read only */
+	$problem->{'id'}
+	problem.id
+	problem.id
+
+Id of the problem. The first problem has Id 1, they are numbered consecutively.
+
+=== METHODS ===
+
+	Rule *findproblemrule()
+	my $probrule = $problem->findproblemrule();
+	probrule = problem.findproblemrule()
+	probrule = problem.findproblemrule()
+
+Return the rule that caused the problem. Of cource in most situations there is no
+single responsible rule, but many rules that interconnect with each created the
+problem. Nevertheless, the solver uses some heuristic approch to find a rule
+that somewhat describes the problem best to the user.
+
+	Rule **findallproblemrules(bool unfiltered = 0)
+	my @probrules = $problem->findallproblemrules();
+	probrules = problem.findallproblemrule()
+	probrules = problem.findallproblemrule()
+
+Return all rules responsible for the problem. The returned set of rules contains
+all the needed information why there was a problem, but it's hard to present
+them to the user in a sensible way. The default is to filter out all update and
+job rules (unless the returned rules only consist of those types).
+
+	Solutions **solutions()
+	my @solutions = $problem->solutions();
+	solutions = problem.solutions()
+	solutions = problem.solutions()
+
+Return an array containing multiple possible solutions to fix the problem. See
+the solution class for more information.
+
+	int solution_count()
+	my $cnt = $problem->solution_count();
+	cnt = problem.solution_count()
+	cnt = problem.solution_count()
+
+Return the number of solutions without creating solution objects.
+
+THE RULE CLASS
+--------------
+
+Rules are the basic block of sat solving. Each package dependency gets translated
+into one or multiple rules.
+
+=== ATTRIBUTES ===
+
+	Solver *solv;				/* read only */
+	$rule->{'solv'}
+	rule.solv
+	rule.solv
+
+Back pointer to solver object.
+
+	Id id;					/* read only */
+	$rule->{'id'}
+	rule.id
+	rule.id
+
+The id of the rule.
+
+	int type;				/* read only */
+	$rule->{'type'}
+	rule.type
+	rule.type
+
+The basic type of the rule. See the constant section of the solver class for the type list.
+
+=== METHODS ===
+
+	Ruleinfo *info()
+	my $ruleinfo = $rule->info();
+	ruleinfo = rule.info()
+	ruleinfo = rule.info()
+
+Return a Ruleinfo object that contains information about why the rule was created. But
+see the allinfos() method below.
+
+	Ruleinfo **allinfos()
+	my @ruleinfos = $rule->allinfos();
+	ruleinfos = rule.allinfos()
+	ruleinfos = rule.allinfos()
+
+As the same dependency rule can get created because of multiple dependencies, one
+Ruleinfo is not enough to describe the reason. Thus the allinfos() method returns
+an array of all infos about a rule.
+
+	<equality>
+	if ($rule1 == $rule2)
+	if rule1 == rule2:
+	if rule1 == rule2
+
+Two rules are equal if they belong to the same solver and have the same id.
+
+THE RULEINFO CLASS
+------------------
+
+A Ruleinfo describes one reason why a rule was created.
+
+=== ATTRIBUTES ===
+
+	Solver *solv;				/* read only */
+	$ruleinfo->{'solv'}
+	ruleinfo.solv
+	ruleinfo.solv
+
+Back pointer to solver object.
+
+	int type;				/* read only */
+	$ruleinfo->{'type'}
+	ruleinfo.type
+	ruleinfo.type
+
+The type of the ruleinfo. See the constant section of the solver class for the
+rule type list and the special type list.
+
+	Id dep;					/* read only */
+	$ruleinfo->{'dep'}
+	ruleinfo.dep
+	ruleinfo.dep
+
+The id of the dependency leading to the creation of the rule, or zero.
+
+	Solvable *solvable;			/* read only */
+	$ruleinfo->{'solvable'}
+	ruleinfo.solvable
+	ruleinfo.solvable
+
+The involved Solvable, e.g. the one containing the dependency.
+
+	Solvable *othersolvable;		/* read only */
+	$ruleinfo->{'othersolvable'}
+	ruleinfo.othersolvable
+	ruleinfo.othersolvable
+
+The other involved Solvable (if any), e.g. the one containing providing
+the dependency for conflicts.
+
+	const char *problemstr();
+	my $str = $ruleinfo->problemstr();
+	str = ruleinfo.problemstr()
+	str = ruleinfo.problemstr()
+
+A string describing the ruleinfo from a problem perspective. This probably
+only makes sense if the rule is part of a problem.
+
+THE SOLUTION CLASS
+------------------
+
+A solution solves one specific problem. It consists of multiple solution elements
+that all need to be executed.
+
+=== ATTRIBUTES ===
+
+	Solver *solv;				/* read only */
+	$solution->{'solv'}
+	solution.solv
+	solution.solv
+
+Back pointer to solver object.
+
+	Id problemid;				/* read only */
+	$solution->{'problemid'}
+	solution.problemid
+	solution.problemid
+
+Id of the problem the solution solves.
+
+	Id id;					/* read only */
+	$solution->{'id'}
+	solution.id
+	solution.id
+
+Id of the solution. The first solution has Id 1, they are numbered consecutively.
+
+=== METHODS ===
+
+	Solutionelement **elements(bool expandreplaces = 0)
+	my @solutionelements = $solution->elements();
+	solutionelements = solution.elements()
+	solutionelements = solution.elements()
+
+Return an array containing the elements describing what neeeds to be done to
+implement the specific solution. If expandreplaces is true, elements of type
+SOLVER_SOLUTION_REPLACE will be replaced by one or more elements replace
+elements describing the policy mismatches.
+
+	int element_count()
+	my $cnt = $solution->solution_count();
+	cnt = solution.element_count()
+	cnt = solution.element_count()
+
+Return the number of solution elements without creating objects. Note that the
+count does not match the number of objects returned by the elements() method
+of expandreplaces is set to true.
+
+
+THE SOLUTIONELEMENT CLASS
+-------------------------
+
+A solution element describes a single action of a solution. The action is always
+either to remove one specific job or to add a new job that installs or erases
+a single specific package.
+
+=== ATTRIBUTES ===
+
+	Solver *solv;				/* read only */
+	$solutionelement->{'solv'}
+	solutionelement.solv
+	solutionelement.solv
+
+Back pointer to solver object.
+
+	Id problemid;				/* read only */
+	$solutionelement->{'problemid'}
+	solutionelement.problemid
+	solutionelement.problemid
+
+Id of the problem the element (partly) solves.
+
+	Id solutionid;				/* read only */
+	$solutionelement->{'solutionid'}
+	solutionelement.solutionid
+	solutionelement.solutionid
+
+Id of the solution the element is a part of.
+
+	Id id;					/* read only */
+	$solutionelement->{'id'}
+	solutionelement.id
+	solutionelement.id
+
+Id of the solution element. The first element has Id 1, they are numbered consecutively.
+
+	Id type;				/* read only */
+	$solutionelement->{'type'}
+	solutionelement.type
+	solutionelement.type
+
+Type of the solution element. See the constant section of the solver class for the
+existing types.
+
+	Solvable *solvable;			/* read only */
+	$solutionelement->{'solvable'}
+	solutionelement.solvable
+	solutionelement.solvable
+
+The installed solvable that needs to be replaced for replacement elements.
+
+	Solvable *replacement;			/* read only */
+	$solutionelement->{'replacement'}
+	solutionelement.replacement
+	solutionelement.replacement
+
+The solvable that needs to be installed to fix the problem.
+
+	int jobidx;				/* read only */
+	$solutionelement->{'jobidx'}
+	solutionelement.jobidx
+	solutionelement.jobidx
+
+The index of the job that needs to be removed to fix the problem, or -1 if the
+element is of another type. Note that it's better to change the job to SOLVER_NOOP
+type so that the numbering of other elements does not get disturbed. This
+method works both for types SOLVER_SOLUTION_JOB and SOLVER_SOLUTION_POOLJOB.
+
+=== METHODS ===
+
+	Solutionelement **replaceelements()
+	my @solutionelements = $solutionelement->replaceelements();
+	solutionelements = solutionelement.replaceelements()
+	solutionelements = solutionelement.replaceelements()
+
+If the solution element is of type SOLVER_SOLUTION_REPLACE, return an array of
+elements describing the policy mismatches, otherwise return a copy of the
+element. See also the ``expandreplaces'' option in the solution's elements()
+method.
+
+	int illegalreplace()
+	my $illegal = $solutionelement->illegalreplace();
+	illegal = solutionelement.illegalreplace()
+	illegal = solutionelement.illegalreplace()
+
+Return an integer that contains the policy mismatch bits or-ed together, or
+zero if there was no policy mismatch. See the policy error constants in
+the solver class.
+
+	Job *Job()
+	my $job = $solutionelement->Job();
+	illegal = solutionelement.Job()
+	illegal = solutionelement.Job()
+
+Create a job that implements the solution element. Add this job to the array
+of jobs for all elements of type different to SOLVER_SOLUTION_JOB and
+SOLVER_SOLUTION_POOLJOB. For the later two, a SOLVER_NOOB Job is created,
+you should replace the old job with the new one.
+
+	const char *str()
+	my $str = $solutionelement->str();
+	str = solutionelement.str()
+	str = solutionelement.str()
+
+A string describing the change the solution element consists of.
 
 THE TRANSACTION CLASS
 ---------------------
