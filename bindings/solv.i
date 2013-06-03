@@ -1032,7 +1032,7 @@ typedef struct {
 
 %extend Pool {
   static const int POOL_FLAG_PROMOTEEPOCH = POOL_FLAG_PROMOTEEPOCH;
-  static const int POOL_FLAG_FORBIDSELFCONFLICTS =  POOL_FLAG_FORBIDSELFCONFLICTS;
+  static const int POOL_FLAG_FORBIDSELFCONFLICTS = POOL_FLAG_FORBIDSELFCONFLICTS;
   static const int POOL_FLAG_OBSOLETEUSESPROVIDES = POOL_FLAG_OBSOLETEUSESPROVIDES;
   static const int POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES = POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES;
   static const int POOL_FLAG_OBSOLETEUSESCOLORS = POOL_FLAG_OBSOLETEUSESCOLORS;
@@ -2545,7 +2545,7 @@ rb_eval_string(
       return new_XSolvable(e->solv->pool, e->rp);
     }
     SWIGINTERN int Solutionelement_jobidx_get(Solutionelement *e) {
-      if (e->type != SOLVER_SOLUTION_JOB)
+      if (e->type != SOLVER_SOLUTION_JOB && e->type != SOLVER_SOLUTION_POOLJOB)
         return -1;
       return (e->p - 1) / 2;
     }
@@ -2553,7 +2553,7 @@ rb_eval_string(
   %newobject Job;
   Job *Job() {
     Id extraflags = solver_solutionelement_extrajobflags($self->solv, $self->problemid, $self->solutionid);
-    if ($self->type == SOLVER_SOLUTION_JOB)
+    if ($self->type == SOLVER_SOLUTION_JOB || SOLVER_SOLUTION_POOLJOB)
       return new_Job($self->solv->pool, SOLVER_NOOP, 0);
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE || $self->type == SOLVER_SOLUTION_BEST)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->p);
@@ -2582,6 +2582,8 @@ rb_eval_string(
   static const int SOLVER_RULE_JOB = SOLVER_RULE_JOB;
   static const int SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP = SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP;
   static const int SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM = SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM;
+  static const int SOLVER_RULE_JOB_UNKNOWN_PACKAGE = SOLVER_RULE_JOB_UNKNOWN_PACKAGE;
+  static const int SOLVER_RULE_JOB_UNSUPPORTED = SOLVER_RULE_JOB_UNSUPPORTED;
   static const int SOLVER_RULE_DISTUPGRADE = SOLVER_RULE_DISTUPGRADE;
   static const int SOLVER_RULE_INFARCH = SOLVER_RULE_INFARCH;
   static const int SOLVER_RULE_CHOICE = SOLVER_RULE_CHOICE;
@@ -2818,9 +2820,15 @@ rb_eval_string(
     xr->id = id;
     return xr;
   }
+  int const type;
+  %{
+    SWIGINTERN int XRule_type_get(XRule *xr) {
+      return solver_ruleclass(xr->solv, xr->id);
+    }
+  %}
   Ruleinfo *info() {
     Id type, source, target, dep;
-    type =  solver_ruleinfo($self->solv, $self->id, &source, &target, &dep);
+    type = solver_ruleinfo($self->solv, $self->id, &source, &target, &dep);
     return new_Ruleinfo($self, type, source, target, dep);
   }
   %typemap(out) Queue allinfos Queue2Array(Ruleinfo *, 4, new_Ruleinfo(arg1, id, idp[1], idp[2], idp[3]));
