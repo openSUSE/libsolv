@@ -110,6 +110,13 @@ Define which repository contains all the installed packages.
   thus you may install multiple versions of the same name, but
   obsoleted packages still get removed.
 
+*POOL_FLAG_ADDFILEPROVIDESFILTERED*::
+  Make the addfileprovides method only add files from the standard
+  locations (i.e. the ``bin'' and ``etc'' directories). This is
+  useful if you have only few packages that use non-standard file
+  dependencies, but you still wand the fast speed that addfileprovides()
+  generates.
+
 === METHODS ===
 
 	void free()
