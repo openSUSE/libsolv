@@ -421,7 +421,7 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
       /* looks like a dep glob. really hard work. */
       for (id = 1; id < pool->ss.nstrings; id++)
         {
-          if (!pool->whatprovides[id])
+          if (!pool->whatprovides[id] || pool->whatprovides[id] == 1)
             continue;
           if ((doglob ? fnmatch(name, pool_id2str(pool, id), globflags) : strcasecmp(name, pool_id2str(pool, id))) == 0)
             {

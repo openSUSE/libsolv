@@ -2678,6 +2678,7 @@ main(int argc, char **argv)
 #endif
   // pool_setdebuglevel(pool, 2);
   setarch(pool);
+  pool_set_flag(pool, POOL_FLAG_ADDFILEPROVIDESFILTERED, 1);
   repoinfos = read_repoinfos(pool, &nrepoinfos);
 
   if (mainmode == MODE_REPOLIST)
@@ -2821,7 +2822,8 @@ main(int argc, char **argv)
   //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
 
 #if defined(ENABLE_RPMDB)
-  addfileprovides(pool);
+  if (pool->disttype == DISTTYPE_RPM)
+    addfileprovides(pool);
 #endif
   pool_createwhatprovides(pool);
 

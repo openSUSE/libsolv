@@ -55,6 +55,8 @@ pool_create(void)
   memset(pool->solvables, 0, 2 * sizeof(Solvable));
 
   queue_init(&pool->vendormap);
+  queue_init(&pool->pooljobs);
+  queue_init(&pool->lazywhatprovidesq);
 
 #if defined(DEBIAN)
   pool->disttype = DISTTYPE_DEB;
@@ -109,6 +111,7 @@ pool_free(Pool *pool)
   pool_setvendorclasses(pool, 0);
   queue_free(&pool->vendormap);
   queue_free(&pool->pooljobs);
+  queue_free(&pool->lazywhatprovidesq);
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
     solv_free(pool->tmpspace.buf[i]);
   for (i = 0; i < pool->nlanguages; i++)
@@ -174,6 +177,8 @@ pool_get_flag(Pool *pool, int flag)
       return pool->havedistepoch;
     case POOL_FLAG_NOOBSOLETESMULTIVERSION:
       return pool->noobsoletesmultiversion;
+    case POOL_FLAG_ADDFILEPROVIDESFILTERED:
+      return pool->addfileprovidesfiltered;
     default:
       break;
     }
@@ -209,6 +214,9 @@ pool_set_flag(Pool *pool, int flag, int value)
       break;
     case POOL_FLAG_NOOBSOLETESMULTIVERSION:
       pool->noobsoletesmultiversion = value;
+      break;
+    case POOL_FLAG_ADDFILEPROVIDESFILTERED:
+      pool->addfileprovidesfiltered = value;
       break;
     default:
       break;
@@ -428,11 +436,14 @@ pool_createwhatprovides(Pool *pool)
   for (i = 0, idp = whatprovides; i < num; i++, idp++)
     {
       n = *idp;
-      if (!n)			       /* no providers */
-	continue;
-      off += n;			       /* make space for all providers */
-      *idp = off++;		       /* now idp points to terminating zero */
-      np++;			       /* inc # of provider 'slots' for stats */
+      if (!n)				/* no providers */
+	{
+	  *idp = 1;			/* offset for empty list */
+	  continue;
+	}
+      off += n;				/* make space for all providers */
+      *idp = off++;			/* now idp points to terminating zero */
+      np++;				/* inc # of provider 'slots' for stats */
     }
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "provide ids: %d\n", np);
@@ -480,6 +491,28 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovidesdataleft = extra;
   pool_shrink_whatprovides(pool);
   POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (int)(1024/sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (int)(1024/sizeof(Id)));
+
+  queue_empty(&pool->lazywhatprovidesq);
+  if ((!pool->addedfileprovides && pool->disttype == DISTTYPE_RPM) || pool->addedfileprovides == 1)
+    {
+      if (!pool->addedfileprovides)
+	POOL_DEBUG(SOLV_DEBUG_STATS, "WARNING: pool_addfileprovides was not called, this may result in slow operation\n");
+      /* lazyly add file provides */
+      for (i = 1; i < num; i++)
+	{
+	  const char *str = pool->ss.stringspace + pool->ss.strings[i];
+	  if (str[0] != '/')
+	    continue;
+	  if (pool->addedfileprovides == 1 && repodata_filelistfilter_matches(0, str))
+	    continue;
+	  /* setup lazy adding, but remember old value */
+	  if (pool->whatprovides[i] > 1)
+	    queue_push2(&pool->lazywhatprovidesq, i, pool->whatprovides[i]);
+	  pool->whatprovides[i] = 0;
+	}
+      POOL_DEBUG(SOLV_DEBUG_STATS, "lazywhatprovidesq size: %d entries\n", pool->lazywhatprovidesq.count / 2);
+    }
+
   POOL_DEBUG(SOLV_DEBUG_STATS, "createwhatprovides took %d ms\n", solv_timems(now));
 }
 
@@ -697,27 +730,131 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
   return pool_match_flags_evr(pool, rd1->flags, rd1->evr, rd2->flags, rd2->evr);
 }
 
+Id
+pool_searchlazywhatprovidesq(Pool *pool, Id d)
+{
+  int start = 0;
+  int end = pool->lazywhatprovidesq.count;
+  Id *elements;
+  if (!end)
+    return 0;
+  elements = pool->lazywhatprovidesq.elements;
+  while (end - start > 16)
+    {
+      int mid = (start + end) / 2 & ~1;
+      if (elements[mid] == d)
+	return elements[mid + 1];
+      if (elements[mid] < d)
+	start = mid + 2;
+      else
+	end = mid;
+    }
+  for (; start < end; start += 2)
+    if (elements[start] == d)
+      return elements[start + 1];
+  return 0;
+}
+
+/*
+ * addstdproviders
+ * 
+ * lazy populating of the whatprovides array, non relation case
+ */
+static Id
+pool_addstdproviders(Pool *pool, Id d)
+{
+  const char *str;
+  Queue q;
+  Id qbuf[16];
+  Dataiterator di;
+  Id oldoffset;
+
+  if (pool->addedfileprovides == 2)
+    {
+      pool->whatprovides[d] = 1;
+      return 1;
+    }
+  str =  pool->ss.stringspace + pool->ss.strings[d];
+  if (*str != '/')
+    {
+      pool->whatprovides[d] = 1;
+      return 1;
+    }
+  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  dataiterator_init(&di, pool, 0, 0, SOLVABLE_FILELIST, str, SEARCH_STRING|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
+  for (; dataiterator_step(&di); dataiterator_skip_solvable(&di))
+    {
+      Solvable *s = pool->solvables + di.solvid;
+      /* XXX: maybe should add a provides dependency to the solvables
+       * OTOH this is only needed for rel deps that filter the provides,
+       * and those should not use filelist entries */
+      if (s->repo->disabled)
+	continue;
+      if (s->repo != pool->installed && !pool_installable(pool, s))
+	continue;
+      queue_push(&q, di.solvid);
+    }
+  dataiterator_free(&di);
+  oldoffset = pool_searchlazywhatprovidesq(pool, d);
+  if (!q.count)
+    pool->whatprovides[d] = oldoffset ? oldoffset : 1;
+  else
+    {
+      if (oldoffset)
+	{
+	  Id *oo = pool->whatprovidesdata + oldoffset;
+	  int i;
+	  /* unify both queues. easy, as we know both are sorted */
+	  for (i = 0; i < q.count; i++)
+	    {
+	      if (*oo > q.elements[i])
+		continue;
+	      if (*oo < q.elements[i])
+		queue_insert(&q, i, *oo);
+	      oo++;
+	      if (!*oo)
+		break;
+	    }
+	  while (*oo)
+	    queue_push(&q, *oo++);
+	  if (q.count == oo - (pool->whatprovidesdata + oldoffset))
+	    {
+	      /* end result has same size as oldoffset -> no new entries */
+	      queue_free(&q);
+	      pool->whatprovides[d] = oldoffset;
+	      return oldoffset;
+	    }
+	}
+      pool->whatprovides[d] = pool_queuetowhatprovides(pool, &q);
+    }
+  queue_free(&q);
+  return pool->whatprovides[d];
+}
+
+
 /*
  * addrelproviders
  * 
  * add packages fulfilling the relation to whatprovides array
- * no exact providers, do range match
  * 
  */
-
 Id
 pool_addrelproviders(Pool *pool, Id d)
 {
-  Reldep *rd = GETRELDEP(pool, d);
+  Reldep *rd;
   Reldep *prd;
   Queue plist;
   Id buf[16];
-  Id name = rd->name;
-  Id evr = rd->evr;
-  int flags = rd->flags;
+  Id name, evr, flags;
   Id pid, *pidp;
   Id p, *pp;
 
+  if (!ISRELDEP(d))
+    return pool_addstdproviders(pool, d);
+  rd = GETRELDEP(pool, d);
+  name = rd->name;
+  evr = rd->evr;
+  flags = rd->flags;
   d = GETRELID(d);
   queue_init_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
 
@@ -1099,6 +1236,8 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       s = pool_id2str(pool, dep);
       if (*s != '/')
 	continue;
+      if (csf != isf && pool->addedfileprovides == 1 && !repodata_filelistfilter_matches(0, s))
+	continue;	/* skip non-standard locations csf == isf: installed case */
       csf->ids = solv_extend(csf->ids, csf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
       csf->dirs = solv_extend(csf->dirs, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
       csf->names = solv_extend(csf->names, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
@@ -1305,6 +1444,7 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
   map_init(&sf.seen, pool->ss.nstrings + pool->nrels);
   memset(&isf, 0, sizeof(isf));
   map_init(&isf.seen, pool->ss.nstrings + pool->nrels);
+  pool->addedfileprovides = pool->addfileprovidesfiltered ? 1 : 2;
 
   if (idq)
     queue_empty(idq);

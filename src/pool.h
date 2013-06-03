@@ -150,6 +150,10 @@ struct _Pool {
   char *rootdir;
 
   int (*custom_vendorcheck)(struct _Pool *, Solvable *, Solvable *);
+
+  int addfileprovidesfiltered;	/* 1: only use filtered file list for addfileprovides */
+  int addedfileprovides;	/* true: application called addfileprovides */
+  Queue lazywhatprovidesq;	/* queue to store old whatprovides offsets */
 #endif
 };
 
@@ -183,6 +187,7 @@ struct _Pool {
 #define POOL_FLAG_NOINSTALLEDOBSOLETES			6
 #define POOL_FLAG_HAVEDISTEPOCH				7
 #define POOL_FLAG_NOOBSOLETESMULTIVERSION		8
+#define POOL_FLAG_ADDFILEPROVIDESFILTERED		9
 
 /* ----------------------------------------------- */
 
@@ -297,17 +302,23 @@ extern void pool_addfileprovides(Pool *pool);
 extern void pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
+extern Id pool_searchlazywhatprovidesq(Pool *pool, Id d);
 
 extern Id pool_addrelproviders(Pool *pool, Id d);
 
 static inline Id pool_whatprovides(Pool *pool, Id d)
 {
-  Id v;
   if (!ISRELDEP(d))
-    return pool->whatprovides[d];
-  v = GETRELID(d);
-  if (pool->whatprovides_rel[v])
-    return pool->whatprovides_rel[v];
+    {
+      if (pool->whatprovides[d])
+	return pool->whatprovides[d];
+    }
+  else
+    {
+      Id v = GETRELID(d);
+      if (pool->whatprovides_rel[v])
+	return pool->whatprovides_rel[v];
+    }
   return pool_addrelproviders(pool, d);
 }
 

@@ -58,7 +58,18 @@ solver_splitprovides(Solver *solv, Id dep)
   rd = GETRELDEP(pool, dep);
   if (rd->flags != REL_WITH)
     return 0;
-  FOR_PROVIDES(p, pp, dep)
+  /*
+   * things are a bit tricky here if pool->addedprovides == 1, because most split-provides are in
+   * a non-standard location. If we simply call pool_whatprovides, we'll drag in the complete
+   * file list. Instead we rely on pool_addfileprovides ignoring the addfileprovidesfiltered flag
+   * for installed packages and check the lazywhatprovidesq (ignoring the REL_WITH part, but
+   * we filter the package name further down anyway).
+   */
+  if (pool->addedfileprovides == 1 && !ISRELDEP(rd->evr))
+    pp = pool_searchlazywhatprovidesq(pool, rd->evr);
+  else
+    pp = pool_whatprovides(pool, dep);
+  while ((p = pool->whatprovidesdata[pp++]) != 0)
     {
       /* here we have packages that provide the correct name and contain the path,
        * now do extra filtering */
