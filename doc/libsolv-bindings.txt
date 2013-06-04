@@ -2822,9 +2822,228 @@ objects right after they are no longer referenced. In that case, it is good
 style to close open files so that the file descriptors are freed right away.
 Returns false if there was an error.
 
-THE REPODATACLASS
+
+THE REPODATA CLASS
+------------------
+The Repodata stores attrinbutes for packages and the repository itself, each
+repository can have multiple repodata areas. You normally only need to
+directly access them if you implement lazy downloading of repository data.
+Repodata areas are created by calling the repository's add_repodata() method 
+or by using repo_add methods without the REPO_REUSE_REPODATA or REPO_USE_LOADING
+flag.
+
+=== ATTRIBUTES ===
+
+	Repo *repo;			/* read only */
+	$data->{'repo'}
+	data.repo
+	data.repo
+
+Back pointer to repository object.
+
+	Id id;					/* read only */
+	$data->{'id'}
+	data.id
+	data.id
+
+The id of the repodata area. Repodata ids of different repositories overlap.
+
+=== METHODS ====
+
+	internalize();
+	$data->internalize();
+	data.internalize()
+	data.internalize()
+
+Internalize newly added data. The lookup functions will only see the new data
+after it has been internalized.
+
+	bool write(FILE *fp);
+	$data->write($fp);
+	data.write(fp)
+	data.write(fp)
+
+Write the contents of the repodata area as solv file.
+
+	bool add_solv(FILE *fp, int flags = 0);
+	$data->add_solv($fp);
+	data.add_solv(fp)
+	data.add_solv(fp)
+
+Replace a stub repodata object with the data from a solv file. This method
+automatically adds the REPO_USE_LOADING flag. It should only be used from
+a load callback.
+
+	void create_stubs();
+	$data->create_stubs()
+	data.create_stubs()
+	data.create_stubs()
+
+Create stub repodatas from the information stored in the repodata meta
+area.
+
+	void extend_to_repo();
+	$data->extend_to_repo();
+	data.extend_to_repo()
+	data.extend_to_repo()
+
+Extend the repodata so that it has the same size as the repo it belongs to.
+This method is only needed when switching to a just written repodata extension
+to make the repodata match the written extension (which is always of the
+size of the repo).
+
+	<equality>
+	if ($data1 == $data2)
+	if data1 == data2:
+	if data1 == data2
+
+Two repodata objects are equal if they belong to the same repository and have
+the same id.
+
+=== DATA RETRIEVAL METHODS ===
+
+	const char *lookup_str(Id solvid, Id keyname)
+	my $string = $data->lookup_str($solvid, $keyname);
+	string = data.lookup_str(solvid, keyname)
+	string = data.lookup_str(solvid, keyname)
+
+	Id *lookup_idarray(Id solvid, Id keyname)
+	my @ids = $data->lookup_idarray($solvid, $keyname);
+	ids = data.lookup_idarray(solvid, keyname)
+	ids = data.lookup_idarray(solvid, keyname)
+
+	Chksum *lookup_checksum(Id solvid, Id keyname)
+	my $chksum = $data->lookup_checksum($solvid, $keyname);
+	chksum = data.lookup_checksum(solvid, keyname)
+	chksum = data.lookup_checksum(solvid, keyname)
+
+Lookup functions. Return the data element stored in the specified solvable.
+The methods probably only make sense to retrive data from the special
+SOLVID_META solvid that stores repodata meta information.
+
+=== DATA STORAGE METHODS ===
+
+	void set_id(Id solvid, Id keyname, DepId id);
+	$data->set_id($solvid, $keyname, $id);
+	data.set_id(solvid, keyname, id)
+	data.set_id(solvid, keyname, id)
+
+	void set_str(Id solvid, Id keyname, const char *str);
+	$data->set_str($solvid, $keyname, $str);
+	data.set_str(solvid, keyname, str)
+	data.set_str(solvid, keyname, str)
+
+	void set_poolstr(Id solvid, Id keyname, const char *str);
+	$data->set_poolstr($solvid, $keyname, $str);
+	data.set_poolstr(solvid, keyname, str)
+	data.set_poolstr(solvid, keyname, str)
+
+	void set_checksum(Id solvid, Id keyname, Chksum *chksum);
+	$data->set_checksum($solvid, $keyname, $chksum);
+	data.set_checksum(solvid, keyname, chksum)
+	data.set_checksum(solvid, keyname, chksum)
+
+	void add_idarray(Id solvid, Id keyname, DepId id);
+	$data->add_idarray($solvid, $keyname, $id);
+	data.add_idarray(solvid, keyname, id)
+	data.add_idarray(solvid, keyname, id)
+
+	Id new_handle();
+	my $handle = $data->new_handle();
+	handle = data.new_handle()
+	handle = data.new_handle()
+
+	void add_flexarray(Id solvid, Id keyname, Id handle);
+	$data->add_flexarray($solvid, $keyname, $handle);
+	data.add_flexarray(solvid, keyname, handle)
+	data.add_flexarray(solvid, keyname, handle)
+
+Data storage methods. Probably only useful to store data in the special
+SOLVID_META solvid that stores repodata meta information. Note that
+repodata areas can have their own Id pool (see the REPO_LOCALPOOL flag),
+so be careful if you need to store ids. Arrays are created by calling
+the add function for every element. A flexarray is an array of
+sub-structures, call new_handle to create a new structure, use the
+handle as solvid to fill the structure with data and call add_flexarray
+to put the structure in an array.
+
+
+THE DATAPOS CLASS
 -----------------
-xxx
+
+Datapos objects describe a specific position in the repository data area.
+Thus they are only valid until the repository is modified in some way.
+Datapos objects can be created by the pos() and parentpos() methods of
+a Datamatch object or by accesing the ``meta'' attribute of a repository.
+
+=== ATTRIBUTES ===
+
+	Repo *repo;			/* read only */
+	$data->{'repo'}
+	data.repo
+	data.repo
+
+Back pointer to repository object.
+
+=== METHODS ===
+
+	Dataiterator(Id keyname, const char *match, int flags)
+	my $di = $datapos->Dataiterator($keyname, $match, $flags);
+	di = datapos.Dataiterator(keyname, match, flags)
+	di = datapos.Dataiterator(keyname, match, flags)
+
+Create a Dataiterator at the position of the datapos object.
+
+	const char *lookup_deltalocation(unsigned int *OUTPUT);
+	my ($location, $medianr) = $datapos->lookup_deltalocation();
+	location, medianr = datapos.lookup_deltalocation()
+	location, medianr = datapos.lookup_deltalocation()
+
+Return a tuple containing the on-media location and an optional media number
+for a delta rpm. This obviously only works if the data position points to
+structure describing a delta rpm.
+
+	const char *lookup_deltaseq();
+	my $seq = $datapos->lookup_deltaseq();
+	seq = datapos.lookup_deltaseq();
+	seq = datapos.lookup_deltaseq();
+
+Return the delta rpm sequence from the structure describing a delta rpm.
+
+=== DATA RETRIEVAL METHODS ===
+
+	const char *lookup_str(Id keyname)
+	my $string = $datapos->lookup_str($keyname);
+	string = datapos.lookup_str(keyname)
+	string = datapos.lookup_str(keyname)
+
+	Id lookup_id(Id solvid, Id keyname)
+	my $id = $datapos->lookup_id($keyname);
+	id = datapos.lookup_id(keyname)
+	id = datapos.lookup_id(keyname)
+
+	unsigned long long lookup_num(Id keyname, unsigned long long notfound = 0)
+	my $num = $datapos->lookup_num($keyname);
+	num = datapos.lookup_num(keyname)
+	num = datapos.lookup_num(keyname)
+
+	bool lookup_void(Id keyname)
+	my $bool = $datapos->lookup_void($keyname);
+	bool = datapos.lookup_void(keyname)
+	bool = datapos.lookup_void(keyname)
+
+	Queue lookup_idarray(Id keyname)
+	my @ids = $datapos->lookup_idarray($keyname);
+	ids = datapos.lookup_idarray(keyname)
+	ids = datapos.lookup_idarray(keyname)
+
+	Chksum *lookup_checksum(Id keyname)
+	my $chksum = $datapos->lookup_checksum($keyname);
+	chksum = datapos.lookup_checksum(keyname)
+	chksum = datapos.lookup_checksum(keyname)
+
+Lookup functions. Note that the returned Ids are always translated into
+the Ids of the global pool even if the repodata area contains its own pool.
 
 Author
 ------

@@ -4515,9 +4515,413 @@ Flush the file\&. Returns false if there was an error\&. Flushing a closed file 
 .\}
 .sp
 Close the file\&. This is needed for languages like Ruby, that do not destruct objects right after they are no longer referenced\&. In that case, it is good style to close open files so that the file descriptors are freed right away\&. Returns false if there was an error\&.
-.SH "THE REPODATACLASS"
+.SH "THE REPODATA CLASS"
 .sp
-xxx
+The Repodata stores attrinbutes for packages and the repository itself, each repository can have multiple repodata areas\&. You normally only need to directly access them if you implement lazy downloading of repository data\&. Repodata areas are created by calling the repository\(cqs add_repodata() method or by using repo_add methods without the REPO_REUSE_REPODATA or REPO_USE_LOADING flag\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepo *repo;\fR                     /* read only */
+\fI$data\fR\fB\->{\*(Aqrepo\*(Aq}\fR
+\fIdata\fR\fB\&.repo\fR
+\fIdata\fR\fB\&.repo\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to repository object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId id;\fR                                  /* read only */
+\fI$data\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fIdata\fR\fB\&.id\fR
+\fIdata\fR\fB\&.id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of the repodata area\&. Repodata ids of different repositories overlap\&.
+.SS "METHODS ===="
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBinternalize()\fR;
+\fI$data\fR\fB\->internalize()\fR;
+\fIdata\fR\fB\&.internalize()\fR
+\fIdata\fR\fB\&.internalize()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Internalize newly added data\&. The lookup functions will only see the new data after it has been internalized\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool write(FILE *\fR\fIfp\fR\fB)\fR;
+\fI$data\fR\fB\->write(\fR\fI$fp\fR\fB)\fR;
+\fIdata\fR\fB\&.write(\fR\fIfp\fR\fB)\fR
+\fIdata\fR\fB\&.write(\fR\fIfp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Write the contents of the repodata area as solv file\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool add_solv(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR;
+\fI$data\fR\fB\->add_solv(\fR\fI$fp\fR\fB)\fR;
+\fIdata\fR\fB\&.add_solv(\fR\fIfp\fR\fB)\fR
+\fIdata\fR\fB\&.add_solv(\fR\fIfp\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Replace a stub repodata object with the data from a solv file\&. This method automatically adds the REPO_USE_LOADING flag\&. It should only be used from a load callback\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid create_stubs()\fR;
+\fI$data\fR\fB\->create_stubs()\fR
+\fIdata\fR\fB\&.create_stubs()\fR
+\fIdata\fR\fB\&.create_stubs()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create stub repodatas from the information stored in the repodata meta area\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid extend_to_repo()\fR;
+\fI$data\fR\fB\->extend_to_repo()\fR;
+\fIdata\fR\fB\&.extend_to_repo()\fR
+\fIdata\fR\fB\&.extend_to_repo()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Extend the repodata so that it has the same size as the repo it belongs to\&. This method is only needed when switching to a just written repodata extension to make the repodata match the written extension (which is always of the size of the repo)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<equality>\fR
+\fBif (\fR\fI$data1\fR \fB==\fR \fI$data2\fR\fB)\fR
+\fBif\fR \fIdata1\fR \fB==\fR \fIdata2\fR\fB:\fR
+\fBif\fR \fIdata1\fR \fB==\fR \fIdata2\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Two repodata objects are equal if they belong to the same repository and have the same id\&.
+.SS "DATA RETRIEVAL METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *lookup_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$string\fR \fB=\fR \fI$data\fR\fB\->lookup_str(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIstring\fR \fB=\fR \fIdata\fR\fB\&.lookup_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIstring\fR \fB=\fR \fIdata\fR\fB\&.lookup_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId *lookup_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI@ids\fR \fB=\fR \fI$data\fR\fB\->lookup_idarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIids\fR \fB=\fR \fIdata\fR\fB\&.lookup_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIids\fR \fB=\fR \fIdata\fR\fB\&.lookup_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBChksum *lookup_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$chksum\fR \fB=\fR \fI$data\fR\fB\->lookup_checksum(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIchksum\fR \fB=\fR \fIdata\fR\fB\&.lookup_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIchksum\fR \fB=\fR \fIdata\fR\fB\&.lookup_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Lookup functions\&. Return the data element stored in the specified solvable\&. The methods probably only make sense to retrive data from the special SOLVID_META solvid that stores repodata meta information\&.
+.SS "DATA STORAGE METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB)\fR;
+\fI$data\fR\fB\->set_id(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$id\fR\fB)\fR;
+\fIdata\fR\fB\&.set_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
+\fIdata\fR\fB\&.set_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fIstr\fR\fB)\fR;
+\fI$data\fR\fB\->set_str(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$str\fR\fB)\fR;
+\fIdata\fR\fB\&.set_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
+\fIdata\fR\fB\&.set_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_poolstr(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fIstr\fR\fB)\fR;
+\fI$data\fR\fB\->set_poolstr(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$str\fR\fB)\fR;
+\fIdata\fR\fB\&.set_poolstr(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
+\fIdata\fR\fB\&.set_poolstr(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, Chksum *\fR\fIchksum\fR\fB)\fR;
+\fI$data\fR\fB\->set_checksum(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$chksum\fR\fB)\fR;
+\fIdata\fR\fB\&.set_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIchksum\fR\fB)\fR
+\fIdata\fR\fB\&.set_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIchksum\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB)\fR;
+\fI$data\fR\fB\->add_idarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$id\fR\fB)\fR;
+\fIdata\fR\fB\&.add_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
+\fIdata\fR\fB\&.add_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId new_handle()\fR;
+my \fI$handle\fR \fB=\fR \fI$data\fR\fB\->new_handle()\fR;
+\fIhandle\fR \fB=\fR \fIdata\fR\fB\&.new_handle()\fR
+\fIhandle\fR \fB=\fR \fIdata\fR\fB\&.new_handle()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add_flexarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, Id\fR \fIhandle\fR\fB)\fR;
+\fI$data\fR\fB\->add_flexarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$handle\fR\fB)\fR;
+\fIdata\fR\fB\&.add_flexarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIhandle\fR\fB)\fR
+\fIdata\fR\fB\&.add_flexarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIhandle\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Data storage methods\&. Probably only useful to store data in the special SOLVID_META solvid that stores repodata meta information\&. Note that repodata areas can have their own Id pool (see the REPO_LOCALPOOL flag), so be careful if you need to store ids\&. Arrays are created by calling the add function for every element\&. A flexarray is an array of sub\-structures, call new_handle to create a new structure, use the handle as solvid to fill the structure with data and call add_flexarray to put the structure in an array\&.
+.SH "THE DATAPOS CLASS"
+.sp
+Datapos objects describe a specific position in the repository data area\&. Thus they are only valid until the repository is modified in some way\&. Datapos objects can be created by the pos() and parentpos() methods of a Datamatch object or by accesing the \(lqmeta\(rq attribute of a repository\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRepo *repo;\fR                     /* read only */
+\fI$data\fR\fB\->{\*(Aqrepo\*(Aq}\fR
+\fIdata\fR\fB\&.repo\fR
+\fIdata\fR\fB\&.repo\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to repository object\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDataiterator(Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+my \fI$di\fR \fB=\fR \fI$datapos\fR\fB\->Dataiterator(\fR\fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIdi\fR \fB=\fR \fIdatapos\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIdi\fR \fB=\fR \fIdatapos\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a Dataiterator at the position of the datapos object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *lookup_deltalocation(unsigned int *\fR\fIOUTPUT\fR\fB)\fR;
+my \fB(\fR\fI$location\fR\fB,\fR \fI$medianr\fR\fB) =\fR \fI$datapos\fR\fB\->lookup_deltalocation()\fR;
+\fIlocation\fR\fB,\fR \fImedianr\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltalocation()\fR
+\fIlocation\fR\fB,\fR \fImedianr\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltalocation()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a tuple containing the on\-media location and an optional media number for a delta rpm\&. This obviously only works if the data position points to structure describing a delta rpm\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *lookup_deltaseq()\fR;
+my \fI$seq\fR \fB=\fR \fI$datapos\fR\fB\->lookup_deltaseq()\fR;
+\fIseq\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltaseq()\fR;
+\fIseq\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltaseq()\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the delta rpm sequence from the structure describing a delta rpm\&.
+.SS "DATA RETRIEVAL METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *lookup_str(Id\fR \fIkeyname\fR\fB)\fR
+my \fI$string\fR \fB=\fR \fI$datapos\fR\fB\->lookup_str(\fR\fI$keyname\fR\fB)\fR;
+\fIstring\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_str(\fR\fIkeyname\fR\fB)\fR
+\fIstring\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_str(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId lookup_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$id\fR \fB=\fR \fI$datapos\fR\fB\->lookup_id(\fR\fI$keyname\fR\fB)\fR;
+\fIid\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_id(\fR\fIkeyname\fR\fB)\fR
+\fIid\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_id(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned long long lookup_num(Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInotfound\fR \fB= 0)\fR
+my \fI$num\fR \fB=\fR \fI$datapos\fR\fB\->lookup_num(\fR\fI$keyname\fR\fB)\fR;
+\fInum\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_num(\fR\fIkeyname\fR\fB)\fR
+\fInum\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_num(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool lookup_void(Id\fR \fIkeyname\fR\fB)\fR
+my \fI$bool\fR \fB=\fR \fI$datapos\fR\fB\->lookup_void(\fR\fI$keyname\fR\fB)\fR;
+\fIbool\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_void(\fR\fIkeyname\fR\fB)\fR
+\fIbool\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_void(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBQueue lookup_idarray(Id\fR \fIkeyname\fR\fB)\fR
+my \fI@ids\fR \fB=\fR \fI$datapos\fR\fB\->lookup_idarray(\fR\fI$keyname\fR\fB)\fR;
+\fIids\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_idarray(\fR\fIkeyname\fR\fB)\fR
+\fIids\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_idarray(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBChksum *lookup_checksum(Id\fR \fIkeyname\fR\fB)\fR
+my \fI$chksum\fR \fB=\fR \fI$datapos\fR\fB\->lookup_checksum(\fR\fI$keyname\fR\fB)\fR;
+\fIchksum\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_checksum(\fR\fIkeyname\fR\fB)\fR
+\fIchksum\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_checksum(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Lookup functions\&. Note that the returned Ids are always translated into the Ids of the global pool even if the repodata area contains its own pool\&.
 .SH "AUTHOR"
 .sp
 Michael Schroeder <mls@suse\&.de>
