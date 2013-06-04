@@ -3427,7 +3427,7 @@ The type of the ruleinfo\&. See the constant section of the solver class for the
 .RS 4
 .\}
 .nf
-\fBId dep;\fR                                 /* read only */
+\fBDep *dep;\fR                               /* read only */
 \fI$ruleinfo\fR\fB\->{\*(Aqdep\*(Aq}\fR
 \fIruleinfo\fR\fB\&.dep\fR
 \fIruleinfo\fR\fB\&.dep\fR
@@ -3436,7 +3436,22 @@ The type of the ruleinfo\&. See the constant section of the solver class for the
 .RE
 .\}
 .sp
-The id of the dependency leading to the creation of the rule, or zero\&.
+The dependency leading to the creation of the rule\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *dep_id;\fR                            /* read only */
+\fI$ruleinfo\fR\fB\->{\*(Aqdep_id\*(Aq}\fR
+\fIruleinfo\fR\fB\&.dep_id\fR
+\fIruleinfo\fR\fB\&.dep_id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The Id of the dependency leading to the creation of the rule, or zero\&.
 .sp
 .if n \{\
 .RS 4
@@ -4150,6 +4165,36 @@ The number of elements in the class\&.
 .RS 4
 .\}
 .nf
+\fBconst char *\fR\fIfromstr\fR;
+\fI$class\fR\fB\->{\*(Aqfromstr\*(Aq}\fR
+\fIclass\fR\fB\&.fromstr\fR
+\fIclass\fR\fB\&.fromstr\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The old vendor or architecture\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *\fR\fItostr\fR;
+\fI$class\fR\fB\->{\*(Aqtostr\*(Aq}\fR
+\fIclass\fR\fB\&.tostr\fR
+\fIclass\fR\fB\&.tostr\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The new vendor or architecture\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
 \fBId\fR \fIfromid\fR;
 \fI$class\fR\fB\->{\*(Aqfromid\*(Aq}\fR
 \fIclass\fR\fB\&.fromid\fR
@@ -4191,34 +4236,6 @@ my \fI@solvables\fR \fB=\fR \fI$class\fR\fB\->solvables()\fR;
 .\}
 .sp
 Return the solvables for all transaction elements in the class\&.
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-\fBDep *fromdep()\fR;
-my \fI$from\fR \fB=\fR \fI$class\fR\fB\->fromdep()\fR;
-\fIfrom\fR \fB=\fR \fIclass\fR\fB\&.fromdep()\fR;
-\fIfrom\fR \fB=\fR \fIclass\fR\fB\&.fromdep()\fR;
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-\fBDep *todep()\fR;
-my \fI$from\fR \fB=\fR \fI$class\fR\fB\->todep()\fR;
-\fIfrom\fR \fB=\fR \fIclass\fR\fB\&.todep()\fR;
-\fIfrom\fR \fB=\fR \fIclass\fR\fB\&.todep()\fR;
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-The id of the vendor or architecture in Dep object form\&.
 .SH "CHECKSUMS"
 .sp
 Checksums (also called hashes) are used to make sure that downloaded data is not corrupt and also as a fingerprint mechanism to check if data has changed\&.
