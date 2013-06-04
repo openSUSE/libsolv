@@ -3748,8 +3748,477 @@ my \fI$str\fR \fB=\fR \fI$solutionelement\fR\fB\->str()\fR;
 .sp
 A string describing the change the solution element consists of\&.
 .SH "THE TRANSACTION CLASS"
+.SS "CONSTANTS"
 .sp
-xxx
+Transaction element types, both active and passive
+.PP
+\fBSOLVER_TRANSACTION_IGNORE\fR
+.RS 4
+This element does nothing\&. Used to map element types that do not match the view mode\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_INSTALL\fR
+.RS 4
+This element installes a package\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_ERASE\fR
+.RS 4
+This element erases a package\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_MULTIINSTALL\fR
+.RS 4
+This element installs a package with a different version keeping the other versions installed\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_MULTIREINSTALL\fR
+.RS 4
+This element reinstalls a installed package keeping the other versions installed\&.
+.RE
+.sp
+Transaction element types, active view
+.PP
+\fBSOLVER_TRANSACTION_REINSTALL\fR
+.RS 4
+This element re\-installs a package, i\&.e\&. installs the same package again\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_CHANGE\fR
+.RS 4
+This element installs a package with same name, version, architecture but different content\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_UPGRADE\fR
+.RS 4
+This element installs a newer version of an installed package\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_DOWNGRADE\fR
+.RS 4
+This element installs a older version of an installed package\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_OBSOLETES\fR
+.RS 4
+This element installs a package that obsoletes an installed package\&.
+.RE
+.sp
+Transaction element types, passive view
+.PP
+\fBSOLVER_TRANSACTION_REINSTALLED\fR
+.RS 4
+This element re\-installs a package, i\&.e\&. installs the same package again\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_CHANGED\fR
+.RS 4
+This element replaces an installed package with one of the same name, version, architecture but different content\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_UPGRADED\fR
+.RS 4
+This element replaces an installed package with a new version\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_DOWNGRADED\fR
+.RS 4
+This element replaces an installed package with an old version\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_OBSOLETED\fR
+.RS 4
+This element replaces an installed package with a package that obsoletes it\&.
+.RE
+.sp
+Pseudo element types for showing extra information used by classify()
+.PP
+\fBSOLVER_TRANSACTION_ARCHCHANGE\fR
+.RS 4
+This element replaces an installed package with a package of a different architecture\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_VENDORCHANGE\fR
+.RS 4
+This element replaces an installed package with a package of a different vendor\&.
+.RE
+.sp
+Transaction mode flags
+.PP
+\fBSOLVER_TRANSACTION_SHOW_ACTIVE\fR
+.RS 4
+Filter for active view types\&. The default is to return passive view type, i\&.e\&. to show how the installed packages get changed\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_SHOW_OBSOLETES\fR
+.RS 4
+Do not map the obsolete view type into INSTALL/ERASE elements\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_SHOW_ALL\fR
+.RS 4
+If multiple packages replace an installed package, only the best of them is kept as OBSOLETE element, the other ones are mapped to INSTALL/ERASE elements\&. This is because most applications want to show just one package replacing the installed one\&. The SOLVER_TRANSACTION_SHOW_ALL makes the library keep all OBSOLETE elements\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_SHOW_MULTIINSTALL\fR
+.RS 4
+The library maps MULTIINSTALL elements to simple INSTALL elements\&. This flag can be used to disable the mapping\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_CHANGE_IS_REINSTALL\fR
+.RS 4
+Use this flag if you want to map CHANGE elements to the REINSTALL type\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE\fR
+.RS 4
+Use this flag if you want to map OBSOLETE elements to the UPGRADE type\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_MERGE_ARCHCHANGES\fR
+.RS 4
+Do not add extra categories for every architecture change, instead cumulate them in one category\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_MERGE_VENDORCHANGES\fR
+.RS 4
+Do not add extra categories for every vendor change, instead cumulate them in one category\&.
+.RE
+.PP
+\fBSOLVER_TRANSACTION_RPM_ONLY\fR
+.RS 4
+Special view mode that just returns IGNORE, ERASE, INSTALL, MULTIINSTALL elements\&. Useful if you want to find out what to feed to the underlying package manager\&.
+.RE
+.sp
+Transaction order flags
+.PP
+\fBSOLVER_TRANSACTION_KEEP_ORDERDATA\fR
+.RS 4
+Do not throw away the dependency graph used for ordering the transaction\&. This flag is needed if you want to do manual ordering\&.
+.RE
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBPool *pool;\fR                             /* read only */
+\fI$trans\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fItrans\fR\fB\&.pool\fR
+\fItrans\fR\fB\&.pool\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to pool\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool isempty()\fR;
+\fI$trans\fR\fB\->isempty()\fR
+\fItrans\fR\fB\&.isempty()\fR
+\fItrans\fR\fB\&.isempty?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Returns true if the transaction does not do anything, i\&.e\&. has no elements\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable **newpackages()\fR;
+my \fI@newsolvables\fR \fB=\fR \fI$trans\fR\fB\->newpackages()\fR;
+\fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newpackages()\fR
+\fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newpackages()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all packages that are to be installed by the transaction\&. This are the packages that need to be downloaded from the repositories\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable **keptpackages()\fR;
+my \fI@keptsolvables\fR \fB=\fR \fI$trans\fR\fB\->keptpackages()\fR;
+\fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptpackages()\fR
+\fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptpackages()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all installed packages that the transaction will keep installed\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable **steps()\fR;
+my \fI@steps\fR \fB=\fR \fI$trans\fR\fB\->steps()\fR;
+\fIsteps\fR \fB=\fR \fItrans\fR\fB\&.steps()\fR
+\fIsteps\fR \fB=\fR \fItrans\fR\fB\&.steps()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all solvables that need to be installed (if the returned solvable is not already installed) or erased (if the returned solvable is installed)\&. A step is also called a transaction element\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint steptype(Solvable *\fR\fIsolvable\fR\fB, int\fR \fImode\fR\fB)\fR
+my \fI$type\fR \fB=\fR \fI$trans\fR\fB\->steptype(\fR\fI$solvable\fR\fB,\fR \fI$mode\fR\fB)\fR;
+\fItype\fR \fB=\fR \fItrans\fR\fB\&.steptype(\fR\fIsolvable\fR\fB,\fR \fImode\fR\fB)\fR
+\fItype\fR \fB=\fR \fItrans\fR\fB\&.steptype(\fR\fIsolvable\fR\fB,\fR \fImode\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the transaction type of the specified solvable\&. See the CONSTANTS sections for the mode argument flags and the list of returned types\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBTransactionClass **classify(int\fR \fImode\fR \fB= 0)\fR
+my \fI@classes\fR \fB=\fR \fI$trans\fR\fB\->classify()\fR;
+\fIclasses\fR \fB=\fR \fItrans\fR\fB\&.classify()\fR
+\fIclasses\fR \fB=\fR \fItrans\fR\fB\&.classify()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Group the transaction elements into classes so that they can be displayed in a structured way\&. You can use various mapping mode flags to tweak the result to match your preferences, see the mode argument flag in the CONSTANTS section\&. See the TransactionClass class for how to deal with the returned objects\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *othersolvable(Solvable *\fR\fIsolvable\fR\fB)\fR;
+my \fI$other\fR \fB=\fR \fI$trans\fR\fB\->othersolvable(\fR\fI$solvable\fR\fB)\fR;
+\fIother\fR \fB=\fR \fItrans\fR\fB\&.othersolvable(\fR\fIsolvable\fR\fB)\fR
+\fIother\fR \fB=\fR \fItrans\fR\fB\&.othersolvable(\fR\fIsolvable\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the \(lqother\(rq solvable for a given solvable\&. For installed packages the other solvable is the best package with the same name that replaces the installed package, or the best package of the obsoleting packages if the package does not get replaced by one with the same name\&.
+.sp
+For to be installed packages, the \(lqother\(rq solvable is the best installed package with the same name that will be replaced, or the best packages of all the packages that are obsoleted if the new package does not replace a package with the same name\&.
+.sp
+Thus, the \(lqother\(rq solvable is normally the package that is also shown for a given package\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable **allothersolvables(Solvable *\fR\fIsolvable\fR\fB)\fR;
+my \fI@others\fR \fB=\fR \fI$trans\fR\fB\->allothersolvables(\fR\fI$solvable\fR\fB)\fR;
+\fIothers\fR \fB=\fR \fItrans\fR\fB\&.allothersolvables(\fR\fIsolvable\fR\fB)\fR
+\fIothers\fR \fB=\fR \fItrans\fR\fB\&.allothersolvables(\fR\fIsolvable\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+For installed packages, returns all of the packages that replace us\&. For to be installed packages, returns all of the packages that the new package replaces\&. The special \(lqother\(rq solvable is always the first entry of the returned array\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint calc_installsizechange()\fR;
+my \fI$change\fR \fB=\fR \fI$trans\fR\fB\->calc_installsizechange()\fR;
+\fIchange\fR \fB=\fR \fItrans\fR\fB\&.calc_installsizechange()\fR
+\fIchange\fR \fB=\fR \fItrans\fR\fB\&.calc_installsizechange()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the size change of the installed system in kilobytes (kibibytes)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid order(int\fR \fIflags\fR \fB= 0)\fR;
+\fI$trans\fR\fB\->order()\fR;
+\fItrans\fR\fB\&.order()\fR
+\fItrans\fR\fB\&.order()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Order the steps in the transactions so that dependant packages are updated before packages that depend on them\&. For rpm, you can also use rpmlib\(cqs ordering functionality, debian\(cqs dpkg does not provide a way to order a transaction\&.
+.SS "ACTIVE/PASSIVE VIEW"
+.sp
+Active view list what new packages get installed, while passive view shows what happens to the installed packages\&. Most often there\(cqs not much difference between the two modes, but things get interesting of multiple package get replaced by one new package\&. Say you have installed package A\-1\-1 and B\-1\-1, and now install A\-2\-1 with has a new dependency that obsoletes B\&. The transaction elements will be
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+updated   A\-1\-1 (other: A\-2\-1)
+obsoleted B\-1\-1 (other: A\-2\-1)
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+in passive mode, but
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+update A\-2\-1 (other: A\-1\-1)
+erase  B
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+in active mode\&. If the mode containes SOLVER_TRANSACTION_SHOW_ALL, the passive mode list will be unchanged but the active mode list will just contain A\-2\-1\&.
+.SH "THE TRANSACTIONCLASS CLASS"
+.sp
+Objects of this type are returned by the classify() Transaction method\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBTransaction *transaction;\fR               /* read only */
+\fI$class\fR\fB\->{\*(Aqtransaction\*(Aq}\fR
+\fIclass\fR\fB\&.transaction\fR
+\fIclass\fR\fB\&.transaction\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to transaction object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint type;\fR                               /* read only */
+\fI$class\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fIclass\fR\fB\&.type\fR
+\fIclass\fR\fB\&.type\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The type of the transaction elements in the class\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint count;\fR                              /* read only */
+\fI$class\fR\fB\->{\*(Aqcount\*(Aq}\fR
+\fIclass\fR\fB\&.count\fR
+\fIclass\fR\fB\&.count\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The number of elements in the class\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId\fR \fIfromid\fR;
+\fI$class\fR\fB\->{\*(Aqfromid\*(Aq}\fR
+\fIclass\fR\fB\&.fromid\fR
+\fIclass\fR\fB\&.fromid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of the old vendor or architecture\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId\fR \fItoid\fR;
+\fI$class\fR\fB\->{\*(Aqtoid\*(Aq}\fR
+\fIclass\fR\fB\&.toid\fR
+\fIclass\fR\fB\&.toid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of the new vendor or architecture\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid solvables()\fR;
+my \fI@solvables\fR \fB=\fR \fI$class\fR\fB\->solvables()\fR;
+\fIsolvables\fR \fB=\fR \fIclass\fR\fB\&.solvables()\fR
+\fIsolvables\fR \fB=\fR \fIclass\fR\fB\&.solvables()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the solvables for all transaction elements in the class\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *fromdep()\fR;
+my \fI$from\fR \fB=\fR \fI$class\fR\fB\->fromdep()\fR;
+\fIfrom\fR \fB=\fR \fIclass\fR\fB\&.fromdep()\fR;
+\fIfrom\fR \fB=\fR \fIclass\fR\fB\&.fromdep()\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *todep()\fR;
+my \fI$from\fR \fB=\fR \fI$class\fR\fB\->todep()\fR;
+\fIfrom\fR \fB=\fR \fIclass\fR\fB\&.todep()\fR;
+\fIfrom\fR \fB=\fR \fIclass\fR\fB\&.todep()\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of the vendor or architecture in Dep object form\&.
 .SH "CHECKSUMS"
 .sp
 Checksums (also called hashes) are used to make sure that downloaded data is not corrupt and also as a fingerprint mechanism to check if data has changed\&.

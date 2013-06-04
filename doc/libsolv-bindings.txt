@@ -2349,7 +2349,310 @@ A string describing the change the solution element consists of.
 
 THE TRANSACTION CLASS
 ---------------------
-xxx
+
+=== CONSTANTS ===
+
+Transaction element types, both active and passive
+
+*SOLVER_TRANSACTION_IGNORE*::
+  This element does nothing. Used to map element types that do not
+  match the view mode.
+
+*SOLVER_TRANSACTION_INSTALL*::
+  This element installes a package.
+
+*SOLVER_TRANSACTION_ERASE*::
+  This element erases a package.
+
+*SOLVER_TRANSACTION_MULTIINSTALL*::
+  This element installs a package with a different version keeping the
+  other versions installed.
+
+*SOLVER_TRANSACTION_MULTIREINSTALL*::
+  This element reinstalls a installed package keeping the other versions
+  installed.
+
+Transaction element types, active view
+
+*SOLVER_TRANSACTION_REINSTALL*::
+  This element re-installs a package, i.e. installs the same package again.
+
+*SOLVER_TRANSACTION_CHANGE*::
+  This element installs a package with same name, version, architecture but
+  different content.
+
+*SOLVER_TRANSACTION_UPGRADE*::
+  This element installs a newer version of an installed package.
+
+*SOLVER_TRANSACTION_DOWNGRADE*::
+  This element installs a older version of an installed package.
+
+*SOLVER_TRANSACTION_OBSOLETES*::
+  This element installs a package that obsoletes an installed package.
+
+Transaction element types, passive view
+
+*SOLVER_TRANSACTION_REINSTALLED*::
+  This element re-installs a package, i.e. installs the same package again.
+
+*SOLVER_TRANSACTION_CHANGED*::
+  This element replaces an installed package with one of the same name,
+  version, architecture but different content.
+
+*SOLVER_TRANSACTION_UPGRADED*::
+  This element replaces an installed package with a new version.
+
+*SOLVER_TRANSACTION_DOWNGRADED*::
+  This element replaces an installed package with an old version.
+
+*SOLVER_TRANSACTION_OBSOLETED*::
+  This element replaces an installed package with a package that obsoletes
+  it.
+
+Pseudo element types for showing extra information used by classify()
+
+*SOLVER_TRANSACTION_ARCHCHANGE*::
+  This element replaces an installed package with a package of a different
+  architecture.
+
+*SOLVER_TRANSACTION_VENDORCHANGE*::
+  This element replaces an installed package with a package of a different
+  vendor.
+
+Transaction mode flags
+
+*SOLVER_TRANSACTION_SHOW_ACTIVE*::
+  Filter for active view types. The default is to return passive view type,
+  i.e. to show how the installed packages get changed.
+
+*SOLVER_TRANSACTION_SHOW_OBSOLETES*::
+  Do not map the obsolete view type into INSTALL/ERASE elements.
+
+*SOLVER_TRANSACTION_SHOW_ALL*::
+  If multiple packages replace an installed package, only the best of them
+  is kept as OBSOLETE element, the other ones are mapped to INSTALL/ERASE
+  elements. This is because most applications want to show just one package
+  replacing the installed one. The SOLVER_TRANSACTION_SHOW_ALL makes the
+  library keep all OBSOLETE elements.
+
+*SOLVER_TRANSACTION_SHOW_MULTIINSTALL*::
+  The library maps MULTIINSTALL elements to simple INSTALL elements. This
+  flag can be used to disable the mapping.
+
+*SOLVER_TRANSACTION_CHANGE_IS_REINSTALL*::
+  Use this flag if you want to map CHANGE elements to the REINSTALL type.
+
+*SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE*::
+  Use this flag if you want to map OBSOLETE elements to the UPGRADE type.
+
+*SOLVER_TRANSACTION_MERGE_ARCHCHANGES*::
+  Do not add extra categories for every architecture change, instead cumulate
+  them in one category.
+  
+*SOLVER_TRANSACTION_MERGE_VENDORCHANGES*::
+  Do not add extra categories for every vendor change, instead cumulate
+  them in one category.
+
+*SOLVER_TRANSACTION_RPM_ONLY*::
+  Special view mode that just returns IGNORE, ERASE, INSTALL, MULTIINSTALL
+  elements. Useful if you want to find out what to feed to the underlying
+  package manager.
+
+Transaction order flags
+
+*SOLVER_TRANSACTION_KEEP_ORDERDATA*::
+  Do not throw away the dependency graph used for ordering the transaction.
+  This flag is needed if you want to do manual ordering.
+
+=== ATTRIBUTES ===
+
+	Pool *pool;				/* read only */
+	$trans->{'pool'}
+	trans.pool
+	trans.pool
+
+Back pointer to pool.
+
+=== METHODS ===
+
+	bool isempty();
+	$trans->isempty()
+	trans.isempty()
+	trans.isempty?
+
+Returns true if the transaction does not do anything, i.e. has no elements.
+
+	Solvable **newpackages();
+	my @newsolvables = $trans->newpackages();
+	newsolvables = trans.newpackages()
+	newsolvables = trans.newpackages()
+
+Return all packages that are to be installed by the transaction. This are
+the packages that need to be downloaded from the repositories.
+
+	Solvable **keptpackages();
+	my @keptsolvables = $trans->keptpackages();
+	keptsolvables = trans.keptpackages()
+	keptsolvables = trans.keptpackages()
+
+Return all installed packages that the transaction will keep installed.
+
+	Solvable **steps();
+	my @steps = $trans->steps();
+	steps = trans.steps()
+	steps = trans.steps()
+
+Return all solvables that need to be installed (if the returned solvable
+is not already installed) or erased (if the returned solvable is installed).
+A step is also called a transaction element.
+
+	int steptype(Solvable *solvable, int mode)
+	my $type = $trans->steptype($solvable, $mode);
+	type = trans.steptype(solvable, mode)
+	type = trans.steptype(solvable, mode)
+
+Return the transaction type of the specified solvable. See the CONSTANTS
+sections for the mode argument flags and the list of returned types.
+
+	TransactionClass **classify(int mode = 0)
+	my @classes = $trans->classify();
+	classes = trans.classify()
+	classes = trans.classify()
+
+Group the transaction elements into classes so that they can be displayed
+in a structured way. You can use various mapping mode flags to tweak
+the result to match your preferences, see the mode argument flag in
+the CONSTANTS section. See the TransactionClass class for how to deal
+with the returned objects.
+
+	Solvable *othersolvable(Solvable *solvable);
+	my $other = $trans->othersolvable($solvable);
+	other = trans.othersolvable(solvable)
+	other = trans.othersolvable(solvable)
+
+Return the ``other'' solvable for a given solvable. For installed packages
+the other solvable is the best package with the same name that replaces
+the installed package, or the best package of the obsoleting packages if
+the package does not get replaced by one with the same name.
+
+For to be installed packages, the ``other'' solvable is the best installed
+package with the same name that will be replaced, or the best packages
+of all the packages that are obsoleted if the new package does not replace
+a package with the same name.
+
+Thus, the ``other'' solvable is normally the package that is also shown
+for a given package.
+
+	Solvable **allothersolvables(Solvable *solvable);
+	my @others = $trans->allothersolvables($solvable);
+	others = trans.allothersolvables(solvable)
+	others = trans.allothersolvables(solvable)
+
+For installed packages, returns all of the packages that replace us. For to
+be installed packages, returns all of the packages that the new package
+replaces. The special ``other'' solvable is always the first entry of the
+returned array.
+
+	int calc_installsizechange();
+	my $change = $trans->calc_installsizechange();
+	change = trans.calc_installsizechange()
+	change = trans.calc_installsizechange()
+
+Return the size change of the installed system in kilobytes (kibibytes).
+
+	void order(int flags = 0);
+	$trans->order();
+	trans.order()
+	trans.order()
+
+Order the steps in the transactions so that dependant packages are updated
+before packages that depend on them. For rpm, you can also use rpmlib's
+ordering functionality, debian's dpkg does not provide a way to order a
+transaction.
+
+=== ACTIVE/PASSIVE VIEW ===
+
+Active view list what new packages get installed, while passive view shows
+what happens to the installed packages. Most often there's not much
+difference between the two modes, but things get interesting of multiple
+package get replaced by one new package. Say you have installed package
+A-1-1 and B-1-1, and now install A-2-1 with has a new dependency that
+obsoletes B. The transaction elements will be
+
+  updated   A-1-1 (other: A-2-1)
+  obsoleted B-1-1 (other: A-2-1)
+
+in passive mode, but
+
+  update A-2-1 (other: A-1-1)
+  erase  B
+
+in active mode. If the mode containes SOLVER_TRANSACTION_SHOW_ALL, the 
+passive mode list will be unchanged but the active mode list will just
+contain A-2-1.
+
+THE TRANSACTIONCLASS CLASS
+--------------------------
+
+Objects of this type are returned by the classify() Transaction method.
+
+=== ATTRIBUTES ===
+
+	Transaction *transaction;		/* read only */
+	$class->{'transaction'}
+	class.transaction
+	class.transaction
+
+Back pointer to transaction object.
+
+	int type;				/* read only */
+	$class->{'type'}
+	class.type
+	class.type
+
+The type of the transaction elements in the class.
+
+	int count;				/* read only */
+	$class->{'count'}
+	class.count
+	class.count
+
+The number of elements in the class.
+
+	Id fromid;
+	$class->{'fromid'}
+	class.fromid
+	class.fromid
+
+The id of the old vendor or architecture.
+
+	Id toid;
+	$class->{'toid'}
+	class.toid
+	class.toid
+
+The id of the new vendor or architecture.
+
+=== METHODS ===
+
+	void solvables();
+	my @solvables = $class->solvables();
+	solvables = class.solvables()
+	solvables = class.solvables()
+
+Return the solvables for all transaction elements in the class.
+
+	Dep *fromdep();
+	my $from = $class->fromdep();
+	from = class.fromdep();
+	from = class.fromdep();
+
+	Dep *todep();
+	my $from = $class->todep();
+	from = class.todep();
+	from = class.todep();
+
+The id of the vendor or architecture in Dep object form.
 
 CHECKSUMS
 ---------

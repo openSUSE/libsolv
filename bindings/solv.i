@@ -2765,7 +2765,7 @@ rb_eval_string(
   }
 
   %typemap(out) Queue steps Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
-  %newobject steps ;
+  %newobject steps;
   Queue steps() {
     Queue q;
     queue_init_clone(&q, &$self->steps);
@@ -2778,7 +2778,7 @@ rb_eval_string(
   int calc_installsizechange() {
     return transaction_calc_installsizechange($self);
   }
-  void order(int flags) {
+  void order(int flags=0) {
     transaction_order($self, flags);
   }
 }
