@@ -695,9 +695,9 @@ for cl in trans.classify(Solv::Transaction::SOLVER_TRANSACTION_SHOW_OBSOLETES | 
   elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_UPGRADED
     puts "#{cl.count} upgraded packages:"
   elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE
-    puts "#{cl.count} vendor changes from '#{cl.fromdep}' to '#{cl.todep}':"
+    puts "#{cl.count} vendor changes from '#{cl.fromstr}' to '#{cl.tostr}':"
   elsif cl.type == Solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE
-    puts "#{cl.count} arch changes from '#{cl.fromdep}' to '#{cl.todep}':"
+    puts "#{cl.count} arch changes from '#{cl.fromstr}' to '#{cl.tostr}':"
   else
     next
   end
@@ -745,7 +745,7 @@ end
 
 puts "Committing transaction:"
 puts
-trans.order(0)
+trans.order()
 for p in trans.steps
   steptype = trans.steptype(p, Solv::Transaction::SOLVER_TRANSACTION_RPM_ONLY)
   if steptype == Solv::Transaction::SOLVER_TRANSACTION_ERASE

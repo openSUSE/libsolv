@@ -681,9 +681,9 @@ for my $c ($trans->classify($solv::Transaction::SOLVER_TRANSACTION_SHOW_OBSOLETE
   } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
     print "$c->{'count'} upgraded packages:\n";
   } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
-    printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $c->fromdep()->str(), $c->todep()->str();
+    printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $c->{'fromstr'}, $c->{'tostr'};
   } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
-    printf "$c->{'count'} arch changes from '%s' to '%s':\n", $c->fromdep()->str(), $c->todep()->str();
+    printf "$c->{'count'} arch changes from '%s' to '%s':\n", $c->{'fromstr'}->str(), $c->{'tostr'};
   } else {
     next;
   }
@@ -729,7 +729,7 @@ if (@newpkgs) {
 }
 
 print "Committing transaction:\n\n";
-$trans->order(0);
+$trans->order();
 for my $p ($trans->steps()) {
   my $steptype = $trans->steptype($p, $solv::Transaction::SOLVER_TRANSACTION_RPM_ONLY);
   if ($steptype == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {

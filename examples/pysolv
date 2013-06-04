@@ -814,9 +814,9 @@ for cl in trans.classify(solv.Transaction.SOLVER_TRANSACTION_SHOW_OBSOLETES | so
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_UPGRADED:
         print "%d upgraded packages:" % cl.count
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
-        print "%d vendor changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
+        print "%d vendor changes from '%s' to '%s':" % (cl.count, cl.fromstr, cl.tostr)
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
-        print "%d arch changes from '%s' to '%s':" % (cl.count, cl.fromdep(), cl.todep())
+        print "%d arch changes from '%s' to '%s':" % (cl.count, cl.fromstr, cl.tostr)
     else:
         continue
     for p in cl.solvables():

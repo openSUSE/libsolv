@@ -2159,12 +2159,19 @@ Back pointer to solver object.
 The type of the ruleinfo. See the constant section of the solver class for the
 rule type list and the special type list.
 
-	Id dep;					/* read only */
+	Dep *dep;				/* read only */
 	$ruleinfo->{'dep'}
 	ruleinfo.dep
 	ruleinfo.dep
 
-The id of the dependency leading to the creation of the rule, or zero.
+The dependency leading to the creation of the rule.
+
+	Dep *dep_id;				/* read only */
+	$ruleinfo->{'dep_id'}
+	ruleinfo.dep_id
+	ruleinfo.dep_id
+
+The Id of the dependency leading to the creation of the rule, or zero.
 
 	Solvable *solvable;			/* read only */
 	$ruleinfo->{'solvable'}
@@ -2619,6 +2626,20 @@ The type of the transaction elements in the class.
 
 The number of elements in the class.
 
+	const char *fromstr;
+	$class->{'fromstr'}
+	class.fromstr
+	class.fromstr
+
+The old vendor or architecture.
+
+	const char *tostr;
+	$class->{'tostr'}
+	class.tostr
+	class.tostr
+
+The new vendor or architecture.
+
 	Id fromid;
 	$class->{'fromid'}
 	class.fromid
@@ -2641,18 +2662,6 @@ The id of the new vendor or architecture.
 	solvables = class.solvables()
 
 Return the solvables for all transaction elements in the class.
-
-	Dep *fromdep();
-	my $from = $class->fromdep();
-	from = class.fromdep();
-	from = class.fromdep();
-
-	Dep *todep();
-	my $from = $class->todep();
-	from = class.todep();
-	from = class.todep();
-
-The id of the vendor or architecture in Dep object form.
 
 CHECKSUMS
 ---------

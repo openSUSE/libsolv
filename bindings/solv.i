@@ -4,15 +4,6 @@
 # on the generated c code
 #
 
-#
-##if defined(SWIGRUBY)
-#  %rename("to_s") string();
-##endif
-##if defined(SWIGPYTHON)
-#  %rename("__str__") string();
-##endif
-#
-
 %module solv
 
 #ifdef SWIGRUBY
@@ -532,7 +523,7 @@ typedef struct {
   Id type;
   Id source;
   Id target;
-  Id dep;
+  Id dep_id;
 } Ruleinfo;
 
 typedef struct {
@@ -599,7 +590,7 @@ typedef struct {
 typedef struct {
   Solver* const solv;
   Id const type;
-  Id const dep;
+  Id const dep_id;
 } Ruleinfo;
 
 typedef struct {
@@ -2808,14 +2799,16 @@ rb_eval_string(
     transaction_classify_pkgs($self->transaction, $self->mode, $self->type, $self->fromid, $self->toid, &q);
     return q;
   }
-  %newobject fromdep;
-  Dep *fromdep() {
-    return new_Dep($self->transaction->pool, $self->fromid);
-  }
-  %newobject todep;
-  Dep *todep() {
-    return new_Dep($self->transaction->pool, $self->toid);
-  }
+  const char * const fromstr;
+  const char * const tostr;
+  %{
+    SWIGINTERN const char *TransactionClass_fromstr_get(TransactionClass *cl) {
+      return pool_id2str(cl->transaction->pool, cl->fromid);
+    }
+    SWIGINTERN const char *TransactionClass_tostr_get(TransactionClass *cl) {
+      return pool_id2str(cl->transaction->pool, cl->toid);
+    }
+  %}
 }
 
 %extend XRule {
@@ -2863,20 +2856,22 @@ rb_eval_string(
 }
 
 %extend Ruleinfo {
-  Ruleinfo(XRule *r, Id type, Id source, Id target, Id dep) {
+  Ruleinfo(XRule *r, Id type, Id source, Id target, Id dep_id) {
     Ruleinfo *ri = solv_calloc(1, sizeof(*ri));
     ri->solv = r->solv;
     ri->rid = r->id;
     ri->type = type;
     ri->source = source;
     ri->target = target;
-    ri->dep = dep;
+    ri->dep_id = dep_id;
     return ri;
   }
   %newobject solvable;
   XSolvable * const solvable;
   %newobject othersolvable;
   XSolvable * const othersolvable;
+  %newobject dep;
+  Dep * const dep;
   %{
     SWIGINTERN XSolvable *Ruleinfo_solvable_get(Ruleinfo *ri) {
       return new_XSolvable(ri->solv->pool, ri->source);
@@ -2884,9 +2879,12 @@ rb_eval_string(
     SWIGINTERN XSolvable *Ruleinfo_othersolvable_get(Ruleinfo *ri) {
       return new_XSolvable(ri->solv->pool, ri->target);
     }
+    SWIGINTERN Dep *Ruleinfo_dep_get(Ruleinfo *ri) {
+      return new_Dep(ri->solv->pool, ri->dep_id);
+    }
   %}
   const char *problemstr() {
-    return solver_problemruleinfo2str($self->solv, $self->type, $self->source, $self->target, $self->dep);
+    return solver_problemruleinfo2str($self->solv, $self->type, $self->source, $self->target, $self->dep_id);
   }
 }
 
