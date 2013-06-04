@@ -1153,6 +1153,7 @@ typedef struct {
   Id str2id(const char *str, bool create=1) {
     return pool_str2id($self, str, create);
   }
+  %newobject Dep;
   Dep *Dep(const char *str, bool create=1) {
     Id id = pool_str2id($self, str, create);
     return new_Dep($self, id);
@@ -1222,6 +1223,7 @@ typedef struct {
     pool_createwhatprovides($self);
   }
 
+  %newobject id2solvable;
   XSolvable *id2solvable(Id id) {
     return new_XSolvable($self, id);
   }
@@ -1286,6 +1288,7 @@ typedef struct {
     return q;
   }
 
+  %newobject Job;
   Job *Job(int how, Id what) {
     return new_Job($self, how, what);
   }
@@ -1424,6 +1427,7 @@ rb_eval_string(
     return repo_add_solv($self, fp, flags) == 0;
   }
 
+  %newobject add_solvable;
   XSolvable *add_solvable() {
     Id solvid = repo_add_solvable($self);
     return new_XSolvable($self->pool, solvid);
@@ -1553,6 +1557,7 @@ rb_eval_string(
     return new_Repo_solvable_iterator($self);
   }
 
+  %newobject add_repodata;
   XRepodata *add_repodata(int flags = 0) {
     Repodata *rd = repo_add_repodata($self, flags);
     return new_XRepodata($self, rd->repodataid);
@@ -1576,6 +1581,7 @@ rb_eval_string(
         return 0;
     return 1;
   }
+  %newobject first_repodata;
   XRepodata *first_repodata() {
     Repodata *data;
     int i;
@@ -2393,8 +2399,8 @@ rb_eval_string(
   int solution_count() {
     return solver_solution_count($self->solv, $self->id);
   }
-  %newobject solutions;
   %typemap(out) Queue solutions Queue2Array(Solution *, 1, new_Solution(arg1, id));
+  %newobject solutions;
   Queue solutions() {
     Queue q;
     int i, cnt;
@@ -2419,8 +2425,8 @@ rb_eval_string(
     return solver_solutionelement_count($self->solv, $self->problemid, $self->id);
   }
 
-  %newobject elements;
   %typemap(out) Queue elements Queue2Array(Solutionelement *, 4, new_Solutionelement(arg1->solv, arg1->problemid, arg1->id, id, idp[1], idp[2], idp[3]));
+  %newobject elements;
   Queue elements(bool expandreplaces=0) {
     Queue q;
     int i, cnt;
@@ -2505,8 +2511,8 @@ rb_eval_string(
       return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, illegal, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
     return solver_solutionelement2str($self->solv, p, rp);
   }
-  %newobject replaceelements;
   %typemap(out) Queue replaceelements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1->solv, arg1->problemid, arg1->solutionid, arg1->id, id, arg1->p, arg1->rp));
+  %newobject replaceelements;
   Queue replaceelements() {
     Queue q;
     int illegal;
@@ -2723,8 +2729,8 @@ rb_eval_string(
     return new_XSolvable($self->pool, op);
   }
 
-  %newobject allothersolvables;
   %typemap(out) Queue allothersolvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject allothersolvables;
   Queue allothersolvables(XSolvable *s) {
     Queue q;
     queue_init(&q);
@@ -2794,8 +2800,8 @@ rb_eval_string(
     cl->toid = toid;
     return cl;
   }
-  %newobject solvables;
   %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->transaction->pool, id));
+  %newobject solvables;
   Queue solvables() {
     Queue q;
     queue_init(&q);
@@ -2827,6 +2833,7 @@ rb_eval_string(
       return solver_ruleclass(xr->solv, xr->id);
     }
   %}
+  %newobject info;
   Ruleinfo *info() {
     Id type, source, target, dep;
     type = solver_ruleinfo($self->solv, $self->id, &source, &target, &dep);
@@ -2866,7 +2873,9 @@ rb_eval_string(
     ri->dep = dep;
     return ri;
   }
+  %newobject solvable;
   XSolvable * const solvable;
+  %newobject othersolvable;
   XSolvable * const othersolvable;
   %{
     SWIGINTERN XSolvable *Ruleinfo_solvable_get(Ruleinfo *ri) {
