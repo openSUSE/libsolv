@@ -719,7 +719,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		    continue;
 		  if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
 		    continue;
-		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
+		  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
 		    continue;
 		  if (s->name == ps->name)
 		    addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_SAME_NAME, 0);
@@ -1496,7 +1496,7 @@ add_obsoletes(Solver *solv, Id p, Queue *q)
 	    continue;
 	  if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
 	    continue;
-	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps)) 
+	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps)) 
 	    continue;
 	  queue_push(q, p2);
 	  lastp2 = p2;
@@ -2420,7 +2420,7 @@ solver_addchoicerules(Solver *solv)
 		continue;
 	      if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
 	        continue;
-	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+	      if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, s2))
 	        continue;
 	      break;
 	    }

@@ -88,9 +88,14 @@ Define which repository contains all the installed packages.
   distinguishes between 32bit and 64bit packages (the terminology
   is that they have a different color). If obsolteusescolors is
   set, packages with different colors will not obsolete each other.
-  This is also true for implicit obsoletes, thus you can install
-  both the 32bit and the 64bit version of a package with the
-  same name.
+
+*POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS*::
+  Same as POOL_FLAG_OBSOLETEUSESCOLORS, but used to find out if
+  packages of the same name can be installed in parallel. For
+  current Fedora systems, POOL_FLAG_OBSOLETEUSESCOLORS should be
+  false and POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS should be true
+  (this is the default if FEDORA is defined when libsolv is
+  compiled).
 
 *POOL_FLAG_NOINSTALLEDOBSOLETES*::
   New versions of rpm consider the obsoletes of installed packages

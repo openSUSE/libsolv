@@ -2,12 +2,12 @@
 .\"     Title: libsolv-bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/03/2013
+.\"      Date: 06/04/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "06/03/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "06/04/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -136,7 +136,12 @@ An implicit obsoletes is the internal mechanism to remove the old package on an 
 .PP
 \fBPOOL_FLAG_OBSOLETEUSESCOLORS\fR
 .RS 4
-Rpm\(cqs multilib implementation (used in RedHat and Fedora) distinguishes between 32bit and 64bit packages (the terminology is that they have a different color)\&. If obsolteusescolors is set, packages with different colors will not obsolete each other\&. This is also true for implicit obsoletes, thus you can install both the 32bit and the 64bit version of a package with the same name\&.
+Rpm\(cqs multilib implementation (used in RedHat and Fedora) distinguishes between 32bit and 64bit packages (the terminology is that they have a different color)\&. If obsolteusescolors is set, packages with different colors will not obsolete each other\&.
+.RE
+.PP
+\fBPOOL_FLAG_IMPLICITOBSOLETEUSESCOLORS\fR
+.RS 4
+Same as POOL_FLAG_OBSOLETEUSESCOLORS, but used to find out if packages of the same name can be installed in parallel\&. For current Fedora systems, POOL_FLAG_OBSOLETEUSESCOLORS should be false and POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS should be true (this is the default if FEDORA is defined when libsolv is compiled)\&.
 .RE
 .PP
 \fBPOOL_FLAG_NOINSTALLEDOBSOLETES\fR

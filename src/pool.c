@@ -81,7 +81,7 @@ pool_create(void)
 
   pool->debugmask = SOLV_DEBUG_RESULT;	/* FIXME */
 #ifdef FEDORA
-  pool->obsoleteusescolors = 1;
+  pool->implicitobsoleteusescolors = 1;
 #endif
 #ifdef RPM5
   pool->noobsoletesmultiversion = 1;
@@ -171,6 +171,8 @@ pool_get_flag(Pool *pool, int flag)
       return pool->implicitobsoleteusesprovides;
     case POOL_FLAG_OBSOLETEUSESCOLORS:
       return pool->obsoleteusescolors;
+    case POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS:
+      return pool->implicitobsoleteusescolors;
     case POOL_FLAG_NOINSTALLEDOBSOLETES:
       return pool->noinstalledobsoletes;
     case POOL_FLAG_HAVEDISTEPOCH:
@@ -205,6 +207,9 @@ pool_set_flag(Pool *pool, int flag, int value)
       break;
     case POOL_FLAG_OBSOLETEUSESCOLORS:
       pool->obsoleteusescolors = value;
+      break;
+    case POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS:
+      pool->implicitobsoleteusescolors = value;
       break;
     case POOL_FLAG_NOINSTALLEDOBSOLETES:
       pool->noinstalledobsoletes = value;

@@ -587,7 +587,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	    continue;
 	  if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
 	    continue;
-	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, s2))
 	    continue;
 	  queue_push2(ti, p, p2);
 	}

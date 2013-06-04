@@ -128,6 +128,7 @@ struct _Pool {
   int obsoleteusesprovides;	/* true: obsoletes are matched against provides, not names */
   int implicitobsoleteusesprovides;	/* true: implicit obsoletes due to same name are matched against provides, not names */
   int obsoleteusescolors;	/* true: obsoletes check arch color */
+  int implicitobsoleteusescolors;	/* true: implicit obsoletes check arch color */
   int noinstalledobsoletes;	/* true: ignore obsoletes of installed packages */
   int forbidselfconflicts;	/* true: packages which conflict with itself are not installable */
   int noobsoletesmultiversion;	/* true: obsoletes are ignored for multiversion installs */
@@ -188,6 +189,7 @@ struct _Pool {
 #define POOL_FLAG_HAVEDISTEPOCH				7
 #define POOL_FLAG_NOOBSOLETESMULTIVERSION		8
 #define POOL_FLAG_ADDFILEPROVIDESFILTERED		9
+#define POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS		10
 
 /* ----------------------------------------------- */
 

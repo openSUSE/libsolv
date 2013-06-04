@@ -871,6 +871,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       ps = pool->solvables + p;
       if (s->name == ps->name)	/* name match */
 	{
+	  /* XXX: check implicitobsoleteusescolors? */
 	  if (!allowdowngrade && pool_evrcmp(pool, s->evr, ps->evr, EVRCMP_COMPARE) > 0)
 	    continue;
 	}

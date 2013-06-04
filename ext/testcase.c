@@ -110,6 +110,7 @@ static struct poolflags2str {
   { POOL_FLAG_OBSOLETEUSESPROVIDES,         "obsoleteusesprovides", 0 },
   { POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES, "implicitobsoleteusesprovides", 0 },
   { POOL_FLAG_OBSOLETEUSESCOLORS,           "obsoleteusescolors", 0 },
+  { POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS,   "implicitobsoleteusescolors", 0 },
   { POOL_FLAG_NOINSTALLEDOBSOLETES,         "noinstalledobsoletes", 0 },
   { POOL_FLAG_HAVEDISTEPOCH,                "havedistepoch", 0 },
   { POOL_FLAG_NOOBSOLETESMULTIVERSION,      "noobsoletesmultiversion", 0 },
