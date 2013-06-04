@@ -683,7 +683,7 @@ for my $c ($trans->classify($solv::Transaction::SOLVER_TRANSACTION_SHOW_OBSOLETE
   } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
     printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $c->{'fromstr'}, $c->{'tostr'};
   } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
-    printf "$c->{'count'} arch changes from '%s' to '%s':\n", $c->{'fromstr'}->str(), $c->{'tostr'};
+    printf "$c->{'count'} arch changes from '%s' to '%s':\n", $c->{'fromstr'}, $c->{'tostr'};
   } else {
     next;
   }
