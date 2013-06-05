@@ -529,7 +529,7 @@ that have at least one provides matching the dependency.
 Return a string describing the dependency.
 
 	<stringification>
-	my $str = "$dep";
+	my $str = $dep->str;
 	str = str(dep)
 	str = dep.to_s
 
@@ -763,7 +763,7 @@ Iterate over the matching data elements in this repository. See the
 Dataiterator class for more information.
 
 	<stringification>
-	my $str = "$repo";
+	my $str = $repo->str;
 	str = str(repo)
 	str = repo.to_s
 
@@ -1130,7 +1130,7 @@ Return a string describing the solvable. The string consists of the name,
 version, and architecture of the Solvable.
 
 	<stringification>
-	my $str = "$solvable";
+	my $str = $solvable->str;
 	str = str(solvable)
 	str = solvable.to_s
 
@@ -1330,7 +1330,7 @@ It can be used to do sub-searches, see the Datapos class for more
 information.
 
 	<stringification>
-	my $str = "$d";
+	my $str = $d->str;
 	str = str(d)
 	str = d.to_s
 
@@ -1470,7 +1470,7 @@ erase). See the Job class for the action and action modifier constants.
 Convert a selection into an array of Solvable objects.
 
 	<stringification>
-	my $str = "$sel";
+	my $str = $sel->str;
 	str = str(sel)
 	str = sel.to_s
 
@@ -1671,7 +1671,7 @@ into install jobs, i.e. an update of a not-installed package
 will result into the installation of the package.
 
 	<stringification>
-	my $str = "$job";
+	my $str = $job->str;
 	str = str(job)
 	str = job.to_s
 
@@ -2754,7 +2754,7 @@ Checksums are equal if they are of the same type and the finalized results are
 the same.
 
 	<stringification>
-	my $str = "$chksum";
+	my $str = $chksum->str;
 	str = str(chksum)
 	str = chksum.to_s
 
