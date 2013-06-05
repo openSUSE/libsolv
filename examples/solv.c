@@ -1079,10 +1079,19 @@ setarch(Pool *pool)
   pool_setarch(pool, un.machine);
 }
 
+char *userhome;
+
 char *
-calccachepath(Repo *repo, const char *repoext)
+calccachepath(Repo *repo, const char *repoext, int forcesystemloc)
 {
-  char *q, *p = pool_tmpjoin(repo->pool, SOLVCACHE_PATH, "/", repo->name);
+  char *q, *p;
+  int l;
+  if (!forcesystemloc && userhome && getuid())
+    p = pool_tmpjoin(repo->pool, userhome, "/.solvcache/", 0);
+  else
+    p = pool_tmpjoin(repo->pool, SOLVCACHE_PATH, "/", 0);
+  l = strlen(p);
+  p = pool_tmpappend(repo->pool, p, repo->name, 0);
   if (repoext)
     {
       p = pool_tmpappend(repo->pool, p, "_", repoext);
@@ -1090,7 +1099,7 @@ calccachepath(Repo *repo, const char *repoext)
     }
   else
     p = pool_tmpappend(repo->pool, p, ".solv", 0);
-  q = p + strlen(SOLVCACHE_PATH) + 1;
+  q = p + l;
   if (*q == '.')
     *q = '_';
   for (; *q; q++)
@@ -1107,9 +1116,19 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
   unsigned char myextcookie[32];
   struct repoinfo *cinfo;
   int flags;
+  int forcesystemloc;
 
+  forcesystemloc = mark & 2 ? 0 : 1;
+  if (mark < 2 && userhome && getuid())
+    {
+      /* first try home location */
+      int res = usecachedrepo(repo, repoext, cookie, mark | 2);
+      if (res)
+	return res;
+    }
+  mark &= 1;
   cinfo = repo->appdata;
-  if (!(fp = fopen(calccachepath(repo, repoext), "r")))
+  if (!(fp = fopen(calccachepath(repo, repoext, forcesystemloc), "r")))
     return 0;
   if (fseek(fp, -sizeof(mycookie), SEEK_END) || fread(mycookie, sizeof(mycookie), 1, fp) != 1)
     {
@@ -1160,16 +1179,18 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 {
   FILE *fp;
   int i, fd;
-  char *tmpl;
+  char *tmpl, *cachedir;
   struct repoinfo *cinfo;
   int onepiece;
 
   cinfo = repo->appdata;
   if (cinfo && cinfo->incomplete)
     return;
-  mkdir(SOLVCACHE_PATH, 0755);
+  cachedir = userhome && getuid() ? pool_tmpjoin(repo->pool, userhome, "/.solvcache", 0) : SOLVCACHE_PATH;
+  if (access(cachedir, W_OK | X_OK) != 0 && mkdir(cachedir, 0755) == 0)
+    printf("[created %s]\n", cachedir);
   /* use dupjoin instead of tmpjoin because tmpl must survive repo_write */
-  tmpl = solv_dupjoin(SOLVCACHE_PATH, "/", ".newsolv-XXXXXX");
+  tmpl = solv_dupjoin(cachedir, "/", ".newsolv-XXXXXX");
   fd = mkstemp(tmpl);
   if (fd < 0)
     {
@@ -1272,7 +1293,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 	  fclose(fp);
 	}
     }
-  if (!rename(tmpl, calccachepath(repo, repoext)))
+  if (!rename(tmpl, calccachepath(repo, repoext, 0)))
     unlink(tmpl);
   free(tmpl);
 }
@@ -1735,7 +1756,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  exit(1);
 	}
 # endif
-      ofp = fopen(calccachepath(repo, 0), "r");
+      ofp = fopen(calccachepath(repo, 0, 0), "r");
       if (repo_add_rpmdb_reffp(repo, ofp, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))
 	{
 	  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
@@ -1767,7 +1788,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       repo->priority = 99 - cinfo->priority;
 
       dorefresh = cinfo->autorefresh;
-      if (dorefresh && cinfo->metadata_expire && stat(calccachepath(repo, 0), &stb) == 0)
+      if (dorefresh && cinfo->metadata_expire && stat(calccachepath(repo, 0, 0), &stb) == 0)
 	{
 	  if (cinfo->metadata_expire == -1 || time(0) - stb.st_mtime < cinfo->metadata_expire)
 	    dorefresh = 0;
@@ -2580,6 +2601,9 @@ main(int argc, char **argv)
 
   argc--;
   argv++;
+  userhome = getenv("HOME");
+  if (userhome && userhome[0] != '/')
+    userhome = 0;
   if (!argv[0])
     usage(1);
   if (!strcmp(argv[0], "install") || !strcmp(argv[0], "in"))
