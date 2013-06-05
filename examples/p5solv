@@ -64,7 +64,7 @@ sub load {
   my $dorefresh = $self->{autorefresh};
   if ($dorefresh) {
     my @s = stat($self->cachepath());
-    $dorefresh = 0 if @s && ($self->{'metadata_expire'} == -1 || time() - $s[9] < $self->{'metadata_expire'});
+    $dorefresh = 0 if @s && ($self->{metadata_expire} == -1 || time() - $s[9] < $self->{metadata_expire});
   }
   $self->{cookie} = '';
   if (!$dorefresh && $self->usecachedrepo()) {
