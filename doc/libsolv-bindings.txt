@@ -31,7 +31,7 @@ one pool.
 === ATTRIBUTES ===
 
 	void *appdata;			/* read/write */
-	$pool->{'appdata'}
+	$pool->{appdata}
 	pool.appdata
 	pool.appdata
 
@@ -39,21 +39,21 @@ Application specific data that may be used in any way by the code using the
 pool.
 
 	Solvable solvables[];		/* read only */
-	my $solvable = $pool->{'solvables'}->[$solvid];
+	my $solvable = $pool->{solvables}->[$solvid];
 	solvable = pool.solvables[solvid]
 	solvable = pool.solvables[solvid]
 
 Look up a Solvable by its id.
 
 	Repo repos[];			/* read only */
-	my $repo = $pool->{'repos'}->[$repoid];
+	my $repo = $pool->{repos}->[$repoid];
 	repo = pool.repos[repoid]
 	repo = pool.repos[repoid]
 
 Look up a Repository by its id.
 
 	Repo *installed;		/* read/write */
-	$pool->{'installed'} = $repo;
+	$pool->{installed} = $repo;
 	pool.installed = repo
 	pool.installed = repo
 
@@ -481,14 +481,14 @@ method.
 === ATTRIBUTES ===
 
 	Pool *pool;		/* read only */
-	$dep->{'pool'}
+	$dep->{pool}
 	dep.pool
 	dep.pool
 
 Back reference to the pool this dependency belongs to.
 
 	Id id;		/* read only */
-	$dep->{'id'}
+	$dep->{id}
 	dep.id
 	dep.id
 
@@ -551,21 +551,21 @@ source. Repositories are created by the Pool's add_repo() method.
 === ATTRIBUTES ===
 
 	Pool *pool;			/* read only */
-	$repo->{'pool'}
+	$repo->{pool}
 	repo.pool
 	repo.pool
 
 Back reference to the pool this dependency belongs to.
 
 	Id id;				/* read only */
-	$repo->{'id'}
+	$repo->{id}
 	repo.id
 	repo.id
 
 The id of the repository.
 
 	const char *name;		/* read/write */
-	$repo->{'name'}
+	$repo->{name}
 	repo.name
 	repo.name
 	
@@ -573,7 +573,7 @@ The repositories name. To libsolv, the name is just a string with no specific
 meaning.
 
 	int prioprity;			/* read/write */
-	$repo->{'priority'}
+	$repo->{priority}
 	repo.priority
 	repo.priority
 
@@ -582,7 +582,7 @@ repository will be chosen over other repositories, even if they have a greater
 package version.
 
 	int subprioprity;		/* read/write */
-	$repo->{'subpriority'}
+	$repo->{subpriority}
 	repo.subpriority
 	repo.subpriority
 
@@ -591,14 +591,14 @@ of two repositories are the same. It is useful to make the library prefer
 on-disk repositories to remote ones.
 
 	int nsolvables;			/* read only */
-	$repo->{'nsolvables'}
+	$repo->{nsolvables}
 	repo.nsolvables
 	repo.nsolvables
 
 The number of solvables in this repository.
 
 	void *appdata;			/* read/write */
-	$repo->{'appdata'}
+	$repo->{appdata}
 	repo.appdata
 	repo.appdata
 
@@ -606,7 +606,7 @@ Application specific data that may be used in any way by the code using the
 repository.
 
 	Datapos *meta;			/* read only */
-	$repo->{'meta'}
+	$repo->{meta}
 	repo.meta
 	repo.meta
 
@@ -969,43 +969,43 @@ will get created by the repo_add methods.
 === ATTRIBUTES ===
 
 	Repo *repo;			/* read only */
-	$solvable->{'repo'}
+	$solvable->{repo}
 	solvable.repo
 	solvable.repo
 
 The repository this solvable belongs to.
 
 	Pool *pool;			/* read only */
-	$solvable->{'pool'}
+	$solvable->{pool}
 	solvable.pool
 	solvable.pool
 
 The pool this solvable belongs to, same as the pool of the repo.
 
 	Id id;				/* read only */
-	$solvable->{'id'}
+	$solvable->{id}
 	solvable.id
 	solvable.id
 
 The specific id of the solvable.
 
 	char *name;			/* read/write */
-	$solvable->{'name'}
+	$solvable->{name}
 	solvable.name
 	solvable.name
 
 	char *evr;			/* read/write */
-	$solvable->{'evr'}
+	$solvable->{evr}
 	solvable.evr
 	solvable.evr
 
 	char *arch;			/* read/write */
-	$solvable->{'arch'}
+	$solvable->{arch}
 	solvable.arch
 	solvable.arch
 
 	char *vendor;			/* read/write */
-	$solvable->{'vendor'}
+	$solvable->{vendor}
 	solvable.vendor
 	solvable.vendor
 
@@ -1013,22 +1013,22 @@ Easy access to often used attributes of solvables. They are
 internally stored as Ids.
 
 	Id nameid;			/* read/write */
-	$solvable->{'nameid'}
+	$solvable->{nameid}
 	solvable.nameid
 	solvable.nameid
 
 	Id evrid;			/* read/write */
-	$solvable->{'evrid'}
+	$solvable->{evrid}
 	solvable.evrid
 	solvable.evrid
 
 	Id archid;			/* read/write */
-	$solvable->{'archid'}
+	$solvable->{archid}
 	solvable.archid
 	solvable.archid
 
 	Id vendorid;			/* read/write */
-	$solvable->{'vendorid'}
+	$solvable->{vendorid}
 	solvable.vendorid
 	solvable.vendorid
 
@@ -1223,28 +1223,28 @@ by a dataiterator.
 === ATTRIBUTES ===
 
 	Pool *pool;				/* read only */
-	$d->{'pool'}
+	$d->{pool}
 	d.pool
 	d.pool
 
 Back pointer to pool.
 
 	Repo *repo;				/* read only */
-	$d->{'repo'}
+	$d->{repo}
 	d.repo
 	d.repo
 
 The repository containing the matched object.
 
 	Solvable *solvable;			/* read only */
-	$d->{'solvable'}
+	$d->{solvable}
 	d.solvable
 	d.solvable
 
 The solvable containing the value that was matched.
 
 	Id solvid;				/* read only */
-	$d->{'solvid'}
+	$d->{solvid}
 	d.solvid
 	d.solvid
 
@@ -1399,7 +1399,7 @@ is probably the select() method in the Pool class.
 === ATTRIBUTES ===
 
 	Pool *pool;				/* read only */
-	$d->{'pool'}
+	$d->{pool}
 	d.pool
 	d.pool
 
@@ -1627,14 +1627,14 @@ See the section about set bits for more information.
 === ATTRIBUTES ===
 
 	Pool *pool;				/* read only */
-	$job->{'pool'}
+	$job->{pool}
 	d.pool
 	d.pool
 
 Back pointer to pool.
 
 	Id how;					/* read/write */
-	$job->{'how'}
+	$job->{how}
 	d.how
 	d.how
 
@@ -1642,7 +1642,7 @@ Union of the selection, action, action modifier, and set flags.
 The selection part describes the semantics of the ``what'' Id.
 
 	Id what;				/* read/write */
-	$job->{'what'}
+	$job->{what}
 	d.what
 	d.what
 
@@ -1982,7 +1982,7 @@ Solution element type constants
 === ATTRIBUTES ===
 
 	Pool *pool;				/* read only */
-	$job->{'pool'}
+	$job->{pool}
 	d.pool
 	d.pool
 
@@ -2032,14 +2032,14 @@ the user and let him pick the ones he likes.
 === ATTRIBUTES ===
 
 	Solver *solv;				/* read only */
-	$problem->{'solv'}
+	$problem->{solv}
 	problem.solv
 	problem.solv
 
 Back pointer to solver object.
 
 	Id id;					/* read only */
-	$problem->{'id'}
+	$problem->{id}
 	problem.id
 	problem.id
 
@@ -2091,21 +2091,21 @@ into one or multiple rules.
 === ATTRIBUTES ===
 
 	Solver *solv;				/* read only */
-	$rule->{'solv'}
+	$rule->{solv}
 	rule.solv
 	rule.solv
 
 Back pointer to solver object.
 
 	Id id;					/* read only */
-	$rule->{'id'}
+	$rule->{id}
 	rule.id
 	rule.id
 
 The id of the rule.
 
 	int type;				/* read only */
-	$rule->{'type'}
+	$rule->{type}
 	rule.type
 	rule.type
 
@@ -2145,14 +2145,14 @@ A Ruleinfo describes one reason why a rule was created.
 === ATTRIBUTES ===
 
 	Solver *solv;				/* read only */
-	$ruleinfo->{'solv'}
+	$ruleinfo->{solv}
 	ruleinfo.solv
 	ruleinfo.solv
 
 Back pointer to solver object.
 
 	int type;				/* read only */
-	$ruleinfo->{'type'}
+	$ruleinfo->{type}
 	ruleinfo.type
 	ruleinfo.type
 
@@ -2160,7 +2160,7 @@ The type of the ruleinfo. See the constant section of the solver class for the
 rule type list and the special type list.
 
 	Dep *dep;				/* read only */
-	$ruleinfo->{'dep'}
+	$ruleinfo->{dep}
 	ruleinfo.dep
 	ruleinfo.dep
 
@@ -2174,14 +2174,14 @@ The dependency leading to the creation of the rule.
 The Id of the dependency leading to the creation of the rule, or zero.
 
 	Solvable *solvable;			/* read only */
-	$ruleinfo->{'solvable'}
+	$ruleinfo->{solvable}
 	ruleinfo.solvable
 	ruleinfo.solvable
 
 The involved Solvable, e.g. the one containing the dependency.
 
 	Solvable *othersolvable;		/* read only */
-	$ruleinfo->{'othersolvable'}
+	$ruleinfo->{othersolvable}
 	ruleinfo.othersolvable
 	ruleinfo.othersolvable
 
@@ -2205,21 +2205,21 @@ that all need to be executed.
 === ATTRIBUTES ===
 
 	Solver *solv;				/* read only */
-	$solution->{'solv'}
+	$solution->{solv}
 	solution.solv
 	solution.solv
 
 Back pointer to solver object.
 
 	Id problemid;				/* read only */
-	$solution->{'problemid'}
+	$solution->{problemid}
 	solution.problemid
 	solution.problemid
 
 Id of the problem the solution solves.
 
 	Id id;					/* read only */
-	$solution->{'id'}
+	$solution->{id}
 	solution.id
 	solution.id
 
@@ -2257,35 +2257,35 @@ a single specific package.
 === ATTRIBUTES ===
 
 	Solver *solv;				/* read only */
-	$solutionelement->{'solv'}
+	$solutionelement->{solv}
 	solutionelement.solv
 	solutionelement.solv
 
 Back pointer to solver object.
 
 	Id problemid;				/* read only */
-	$solutionelement->{'problemid'}
+	$solutionelement->{problemid}
 	solutionelement.problemid
 	solutionelement.problemid
 
 Id of the problem the element (partly) solves.
 
 	Id solutionid;				/* read only */
-	$solutionelement->{'solutionid'}
+	$solutionelement->{solutionid}
 	solutionelement.solutionid
 	solutionelement.solutionid
 
 Id of the solution the element is a part of.
 
 	Id id;					/* read only */
-	$solutionelement->{'id'}
+	$solutionelement->{id}
 	solutionelement.id
 	solutionelement.id
 
 Id of the solution element. The first element has Id 1, they are numbered consecutively.
 
 	Id type;				/* read only */
-	$solutionelement->{'type'}
+	$solutionelement->{type}
 	solutionelement.type
 	solutionelement.type
 
@@ -2293,21 +2293,21 @@ Type of the solution element. See the constant section of the solver class for t
 existing types.
 
 	Solvable *solvable;			/* read only */
-	$solutionelement->{'solvable'}
+	$solutionelement->{solvable}
 	solutionelement.solvable
 	solutionelement.solvable
 
 The installed solvable that needs to be replaced for replacement elements.
 
 	Solvable *replacement;			/* read only */
-	$solutionelement->{'replacement'}
+	$solutionelement->{replacement}
 	solutionelement.replacement
 	solutionelement.replacement
 
 The solvable that needs to be installed to fix the problem.
 
 	int jobidx;				/* read only */
-	$solutionelement->{'jobidx'}
+	$solutionelement->{jobidx}
 	solutionelement.jobidx
 	solutionelement.jobidx
 
@@ -2474,7 +2474,7 @@ Transaction order flags
 === ATTRIBUTES ===
 
 	Pool *pool;				/* read only */
-	$trans->{'pool'}
+	$trans->{pool}
 	trans.pool
 	trans.pool
 
@@ -2606,49 +2606,49 @@ Objects of this type are returned by the classify() Transaction method.
 === ATTRIBUTES ===
 
 	Transaction *transaction;		/* read only */
-	$class->{'transaction'}
+	$class->{transaction}
 	class.transaction
 	class.transaction
 
 Back pointer to transaction object.
 
 	int type;				/* read only */
-	$class->{'type'}
+	$class->{type}
 	class.type
 	class.type
 
 The type of the transaction elements in the class.
 
 	int count;				/* read only */
-	$class->{'count'}
+	$class->{count}
 	class.count
 	class.count
 
 The number of elements in the class.
 
 	const char *fromstr;
-	$class->{'fromstr'}
+	$class->{fromstr}
 	class.fromstr
 	class.fromstr
 
 The old vendor or architecture.
 
 	const char *tostr;
-	$class->{'tostr'}
+	$class->{tostr}
 	class.tostr
 	class.tostr
 
 The new vendor or architecture.
 
 	Id fromid;
-	$class->{'fromid'}
+	$class->{fromid}
 	class.fromid
 	class.fromid
 
 The id of the old vendor or architecture.
 
 	Id toid;
-	$class->{'toid'}
+	$class->{toid}
 	class.toid
 	class.toid
 
@@ -2693,7 +2693,7 @@ Create an already finalized checksum object.
 === ATTRIBUTES ===
 
 	Id type;			/* read only */
-	$chksum->{'type'}
+	$chksum->{type}
 	chksum.type
 	chksum.type
 
@@ -2835,14 +2835,14 @@ flag.
 === ATTRIBUTES ===
 
 	Repo *repo;			/* read only */
-	$data->{'repo'}
+	$data->{repo}
 	data.repo
 	data.repo
 
 Back pointer to repository object.
 
 	Id id;					/* read only */
-	$data->{'id'}
+	$data->{id}
 	data.id
 	data.id
 
@@ -2979,7 +2979,7 @@ a Datamatch object or by accesing the ``meta'' attribute of a repository.
 === ATTRIBUTES ===
 
 	Repo *repo;			/* read only */
-	$data->{'repo'}
+	$data->{repo}
 	data.repo
 	data.repo
 

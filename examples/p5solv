@@ -15,8 +15,8 @@ package Repo::generic;
 sub new {
   my ($class, $alias, $type, $attr) = @_;
   my $r = { %{$attr || {}} };
-  $r->{'alias'} = $alias;
-  $r->{'type'} = $type;
+  $r->{alias} = $alias;
+  $r->{type} = $type;
   return bless $r, $class;
 }
 
@@ -49,7 +49,7 @@ sub calc_cookie_ext {
 
 sub cachepath {
   my ($self, $ext) = @_;
-  my $path = $self->{'alias'};
+  my $path = $self->{alias};
   $path =~ s/^\./_/s;
   $path .= $ext ? "_$ext.solvx" : '.solv';
   $path =~ s!/!_!gs;
@@ -58,17 +58,17 @@ sub cachepath {
 
 sub load {
   my ($self, $pool) = @_;
-  $self->{'handle'} = $pool->add_repo($self->{'alias'});
-  $self->{'handle'}->{'appdata'} = $self;
-  $self->{'handle'}->{'priority'} = 99 - $self->{'priority'};
-  my $dorefresh = $self->{'autorefresh'};
+  $self->{handle} = $pool->add_repo($self->{alias});
+  $self->{handle}->{appdata} = $self;
+  $self->{handle}->{priority} = 99 - $self->{priority};
+  my $dorefresh = $self->{autorefresh};
   if ($dorefresh) {
     my @s = stat($self->cachepath());
     $dorefresh = 0 if @s && ($self->{'metadata_expire'} == -1 || time() - $s[9] < $self->{'metadata_expire'});
   }
-  $self->{'cookie'} = '';
+  $self->{cookie} = '';
   if (!$dorefresh && $self->usecachedrepo()) {
-    print "repo: '$self->{'alias'}' cached\n";
+    print "repo: '$self->{alias}' cached\n";
     return 1;
   }
   return 0;
@@ -80,11 +80,11 @@ sub load_ext {
 
 sub download {
   my ($self, $file, $uncompress, $chksum, $markincomplete) = @_;
-  if (!$self->{'baseurl'}) {
-    print "$self->{'alias'}: no baseurl\n";
+  if (!$self->{baseurl}) {
+    print "$self->{alias}: no baseurl\n";
     return undef;
   }
-  my $url = $self->{'baseurl'};
+  my $url = $self->{baseurl};
   $url =~ s!/$!!;
   $url .= "/$file";
   open(my $f, '+>', undef) || die;
@@ -96,15 +96,15 @@ sub download {
   POSIX::lseek(fileno($f), 0, POSIX::SEEK_SET);
   if ($st) {
     print "$file: download error #$st\n";
-    $self->{'incomplete'} = 1 if $markincomplete;
+    $self->{incomplete} = 1 if $markincomplete;
     return undef;
   }
   if ($chksum) {
-    my $fchksum = solv::Chksum->new($chksum->{'type'});
+    my $fchksum = solv::Chksum->new($chksum->{type});
     $fchksum->add_fd(fileno($f));
     if ($fchksum != $chksum) {
       print "$file: checksum error\n";
-      $self->{'incomplete'} = 1 if $markincomplete;
+      $self->{incomplete} = 1 if $markincomplete;
       return undef;
     }
   }
@@ -117,7 +117,7 @@ sub download {
 
 sub usecachedrepo {
   my ($self, $ext, $mark) = @_;
-  my $cookie = $ext ? $self->{'extcookie'} : $self->{'cookie'};
+  my $cookie = $ext ? $self->{extcookie} : $self->{cookie};
   my $cachepath = $self->cachepath($ext);
   my $fextcookie;
   if (sysopen(my $f, $cachepath, POSIX::O_RDONLY)) {
@@ -125,7 +125,7 @@ sub usecachedrepo {
     my $fcookie = '';
     return undef if sysread($f, $fcookie, 32) != 32;
     return undef if $cookie && $fcookie ne $cookie;
-    if ($self->{'type'} ne 'system' && !$ext) {
+    if ($self->{type} ne 'system' && !$ext) {
       sysseek($f, -32 * 2, Fcntl::SEEK_END);
       return undef if sysread($f, $fextcookie, 32) != 32;
     }
@@ -133,11 +133,11 @@ sub usecachedrepo {
     my $fd = solv::xfopen_fd(undef, fileno($f));
     my $flags = $ext ? $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES : 0;
     $flags |= $solv::Repo::REPO_LOCALPOOL if $ext && $ext ne 'DL';
-    if (!$self->{'handle'}->add_solv($fd, $flags)) {
+    if (!$self->{handle}->add_solv($fd, $flags)) {
       return undef;
     }
-    $self->{'cookie'} = $fcookie unless $ext;
-    $self->{'extcookie'} = $fextcookie if $fextcookie;
+    $self->{cookie} = $fcookie unless $ext;
+    $self->{extcookie} = $fextcookie if $fextcookie;
     utime undef, undef, $f if $mark;
     return 1;
   }
@@ -146,7 +146,7 @@ sub usecachedrepo {
 
 sub writecachedrepo {
   my ($self, $ext, $info) = @_;
-  return if $self->{'incomplete'};
+  return if $self->{incomplete};
   mkdir("/var/cache/solv", 0755) unless -d "/var/cache/solv";
   my ($f, $tmpname);
   eval {
@@ -156,25 +156,25 @@ sub writecachedrepo {
   chmod 0444, $f;
   my $ff = solv::xfopen_fd(undef, fileno($f));
   if (!$info) {
-    $self->{'handle'}->write($ff);
+    $self->{handle}->write($ff);
   } elsif ($ext) {
     $info->write($ff);
   } else {
-     $self->{'handle'}->write_first_repodata($ff);
+     $self->{handle}->write_first_repodata($ff);
   }
   undef $ff;	# also flushes
-  if ($self->{'type'} ne 'system' && !$ext) {
-    $self->{'extcookie'} ||= $self->calc_cookie_ext($f, $self->{'cookie'});
-    syswrite($f, $self->{'extcookie'});
+  if ($self->{type} ne 'system' && !$ext) {
+    $self->{extcookie} ||= $self->calc_cookie_ext($f, $self->{cookie});
+    syswrite($f, $self->{extcookie});
   }
-  syswrite($f, $ext ? $self->{'extcookie'} : $self->{'cookie'});
+  syswrite($f, $ext ? $self->{extcookie} : $self->{cookie});
   close($f);
-  if ($self->{'handle'}->iscontiguous()) {
+  if ($self->{handle}->iscontiguous()) {
     $f = solv::xfopen($tmpname);
     if ($f) {
       if (!$ext) {
-	$self->{'handle'}->empty();
-	die("internal error, cannot reload solv file\n") unless $self->{'handle'}->add_solv($f, $solv::Repo::SOLV_ADD_NO_STUBS);
+	$self->{handle}->empty();
+	die("internal error, cannot reload solv file\n") unless $self->{handle}->add_solv($f, $solv::Repo::SOLV_ADD_NO_STUBS);
       } else {
 	$info->extend_to_repo();
 	my $flags = $solv::Repo::REPO_EXTEND_SOLVABLES;
@@ -197,7 +197,7 @@ our @ISA = ('Repo::generic');
 
 sub find {
   my ($self, $what) = @_;
-  my $di = $self->{'handle'}->Dataiterator($solv::SOLVID_META, $solv::REPOSITORY_REPOMD_TYPE, $what, $solv::Dataiterator::SEARCH_STRING);
+  my $di = $self->{handle}->Dataiterator($solv::SOLVID_META, $solv::REPOSITORY_REPOMD_TYPE, $what, $solv::Dataiterator::SEARCH_STRING);
   $di->prepend_keyname($solv::REPOSITORY_REPOMD);
   for my $d (@$di) {
     my $dp = $d->parentpos();
@@ -234,7 +234,7 @@ sub add_ext {
 
 sub add_exts {
   my ($self) = @_;
-  my $repodata = $self->{'handle'}->add_repodata(0);
+  my $repodata = $self->{handle}->add_repodata(0);
   $self->add_ext($repodata, 'deltainfo', 'DL');
   $self->add_ext($repodata, 'filelists', 'FL');
   $repodata->internalize();
@@ -251,7 +251,7 @@ sub load_ext {
   } else {
     return 0;
   }
-  print("[$self->{'alias'}:$ext: ");
+  print("[$self->{alias}:$ext: ");
   STDOUT->flush();
   if ($self->usecachedrepo($ext)) {
     print "cached]\n";
@@ -263,9 +263,9 @@ sub load_ext {
   my $f = $self->download($filename, 1, $filechksum);
   return 0 unless $f;
   if ($ext eq 'FL') {
-    $self->{'handle'}->add_rpmmd($f, 'FL', $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES|$solv::Repo::REPO_LOCALPOOL);
+    $self->{handle}->add_rpmmd($f, 'FL', $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES|$solv::Repo::REPO_LOCALPOOL);
   } elsif ($ext eq 'DL') {
-    $self->{'handle'}->add_deltainfoxml($f, $solv::Repo::REPO_USE_LOADING);
+    $self->{handle}->add_deltainfoxml($f, $solv::Repo::REPO_USE_LOADING);
   }
   $self->writecachedrepo($ext, $repodata);
   return 1;
@@ -274,40 +274,40 @@ sub load_ext {
 sub load {
   my ($self, $pool) = @_;
   return 1 if $self->Repo::generic::load($pool);
-  print "rpmmd repo '$self->{'alias'}': ";
+  print "rpmmd repo '$self->{alias}': ";
   STDOUT->flush();
   my $f = $self->download("repodata/repomd.xml");
   if (!$f) {
     print "no repomd.xml file, skipped\n";
-    $self->{'handle'}->free(1);
-    delete $self->{'handle'};
+    $self->{handle}->free(1);
+    delete $self->{handle};
     return undef;
   }
-  $self->{'cookie'} = $self->calc_cookie_fp($f);
+  $self->{cookie} = $self->calc_cookie_fp($f);
   if ($self->usecachedrepo(undef, 1)) {
     print "cached\n";
     return 1;
   }
-  $self->{'handle'}->add_repomdxml($f, 0);
+  $self->{handle}->add_repomdxml($f, 0);
   print "fetching\n";
   my ($filename, $filechksum) = $self->find('primary');
   if ($filename) {
     $f = $self->download($filename, 1, $filechksum, 1);
     if ($f) {
-      $self->{'handle'}->add_rpmmd($f, undef, 0);
+      $self->{handle}->add_rpmmd($f, undef, 0);
     }
-    return undef if $self->{'incomplete'};
+    return undef if $self->{incomplete};
   }
   ($filename, $filechksum) = $self->find('updateinfo');
   if ($filename) {
     $f = $self->download($filename, 1, $filechksum, 1);
     if ($f) {
-      $self->{'handle'}->add_updateinfoxml($f, 0);
+      $self->{handle}->add_updateinfoxml($f, 0);
     }
   }
   $self->add_exts();
   $self->writecachedrepo();
-  $self->{'handle'}->create_stubs();
+  $self->{handle}->create_stubs();
   return 1;
 }
 
@@ -318,7 +318,7 @@ our @ISA = ('Repo::generic');
 sub find {
   my ($self, $what) = @_;
   
-  my $di = $self->{'handle'}->Dataiterator($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME, $what, $solv::Dataiterator::SEARCH_STRING);
+  my $di = $self->{handle}->Dataiterator($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME, $what, $solv::Dataiterator::SEARCH_STRING);
   $di->prepend_keyname($solv::SUSETAGS_FILE);
   for my $d (@$di) {
     my $dp = $d->parentpos();
@@ -354,7 +354,7 @@ sub add_ext {
     $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $solv::REPOKEY_TYPE_DIRSTRARRAY);
   } else {
     for my $langid (sort { $a <=> $b } keys %langtags) {
-      $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $self->{'handle'}->{'pool'}->id2langid($langid, $ext, 1));
+      $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $self->{handle}->{pool}->id2langid($langid, $ext, 1));
       $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $langtags{$langid});
     }
   }
@@ -363,8 +363,8 @@ sub add_ext {
 
 sub add_exts {
   my ($self) = @_;
-  my $repodata = $self->{'handle'}->add_repodata(0);
-  my $di = $self->{'handle'}->Dataiterator($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME, undef, 0);
+  my $repodata = $self->{handle}->add_repodata(0);
+  my $di = $self->{handle}->Dataiterator($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME, undef, 0);
   $di->prepend_keyname($solv::SUSETAGS_FILE);
   for my $d (@$di) {
     my $filename = $d->str();
@@ -379,21 +379,21 @@ sub load_ext {
   my ($self, $repodata) = @_;
   my $filename = $repodata->lookup_str($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME);
   my $ext = substr($filename, 9, 2);
-  print("[$self->{'alias'}:$ext: ");
+  print("[$self->{alias}:$ext: ");
   STDOUT->flush();
   if ($self->usecachedrepo($ext)) {
     print "cached]\n";
     return 1;
   }
   print "fetching]\n";
-  my $defvendorid = $self->{'handle'}->{'meta'}->lookup_id($solv::SUSETAGS_DEFAULTVENDOR);
-  my $descrdir = $self->{'handle'}->{'meta'}->lookup_str($solv::SUSETAGS_DESCRDIR) || 'suse/setup/descr'; 
+  my $defvendorid = $self->{handle}->{meta}->lookup_id($solv::SUSETAGS_DEFAULTVENDOR);
+  my $descrdir = $self->{handle}->{meta}->lookup_str($solv::SUSETAGS_DESCRDIR) || 'suse/setup/descr'; 
   my $filechksum = $repodata->lookup_checksum($solv::SOLVID_META, $solv::SUSETAGS_FILE_CHECKSUM);
   my $f = $self->download("$descrdir/$filename", 1, $filechksum);
   return 0 unless $f;
   my $flags = $solv::Repo::REPO_USE_LOADING|$solv::Repo::REPO_EXTEND_SOLVABLES;
   $flags |= $solv::Repo::REPO_LOCALPOOL if $ext ne 'DL';
-  $self->{'handle'}->add_susetags($f, $defvendorid, $ext, $flags);
+  $self->{handle}->add_susetags($f, $defvendorid, $ext, $flags);
   $self->writecachedrepo($ext, $repodata);
   return 1;
 }
@@ -401,50 +401,50 @@ sub load_ext {
 sub load {
   my ($self, $pool) = @_;
   return 1 if $self->Repo::generic::load($pool);
-  print "susetags repo '$self->{'alias'}': ";
+  print "susetags repo '$self->{alias}': ";
   STDOUT->flush();
   my $f = $self->download("content");
   if (!$f) {
     print "no content file, skipped\n";
-    $self->{'handle'}->free(1);
-    delete $self->{'handle'};
+    $self->{handle}->free(1);
+    delete $self->{handle};
     return undef;
   }
-  $self->{'cookie'} = $self->calc_cookie_fp($f);
+  $self->{cookie} = $self->calc_cookie_fp($f);
   if ($self->usecachedrepo(undef, 1)) {
     print "cached\n";
     return 1;
   }
-  $self->{'handle'}->add_content($f, 0);
+  $self->{handle}->add_content($f, 0);
   print "fetching\n";
-  my $defvendorid = $self->{'handle'}->{'meta'}->lookup_id($solv::SUSETAGS_DEFAULTVENDOR);
-  my $descrdir = $self->{'handle'}->{'meta'}->lookup_str($solv::SUSETAGS_DESCRDIR) || 'suse/setup/descr'; 
+  my $defvendorid = $self->{handle}->{meta}->lookup_id($solv::SUSETAGS_DEFAULTVENDOR);
+  my $descrdir = $self->{handle}->{meta}->lookup_str($solv::SUSETAGS_DESCRDIR) || 'suse/setup/descr'; 
   my ($filename, $filechksum) = $self->find('packages.gz');
   ($filename, $filechksum) = $self->find('packages') unless $filename;
   if ($filename) {
     $f = $self->download("$descrdir/$filename", 1, $filechksum, 1);
     if ($f) {
-      $self->{'handle'}->add_susetags($f, $defvendorid, undef, $solv::Repo::REPO_NO_INTERNALIZE|$solv::Repo::SUSETAGS_RECORD_SHARES);
+      $self->{handle}->add_susetags($f, $defvendorid, undef, $solv::Repo::REPO_NO_INTERNALIZE|$solv::Repo::SUSETAGS_RECORD_SHARES);
       ($filename, $filechksum) = $self->find('packages.en.gz');
       ($filename, $filechksum) = $self->find('packages.en') unless $filename;
       if ($filename) {
 	$f = $self->download("$descrdir/$filename", 1, $filechksum, 1);
 	if ($f) {
-	  $self->{'handle'}->add_susetags($f, $defvendorid, undef, $solv::Repo::REPO_NO_INTERNALIZE|$solv::Repo::REPO_REUSE_REPODATA|$solv::Repo::REPO_EXTEND_SOLVABLES);
+	  $self->{handle}->add_susetags($f, $defvendorid, undef, $solv::Repo::REPO_NO_INTERNALIZE|$solv::Repo::REPO_REUSE_REPODATA|$solv::Repo::REPO_EXTEND_SOLVABLES);
 	}
       }
-      $self->{'handle'}->internalize();
+      $self->{handle}->internalize();
     }
   }
   $self->add_exts();
   $self->writecachedrepo();
-  $self->{'handle'}->create_stubs();
+  $self->{handle}->create_stubs();
   return undef;
 }
 
 sub packagespath {
   my ($self) = @_;
-  return ($self->{'handle'}->{'meta'}->lookup_str($solv::SUSETAGS_DATADIR) || 'suse') . '/';
+  return ($self->{handle}->{meta}->lookup_str($solv::SUSETAGS_DATADIR) || 'suse') . '/';
 }
 
 package Repo::unknown;
@@ -453,7 +453,7 @@ our @ISA = ('Repo::generic');
 
 sub load {
   my ($self) = @_;
-  print "unsupported repo '$self->{'alias'}': skipped\n";
+  print "unsupported repo '$self->{alias}': skipped\n";
   return 0;
 }
 
@@ -464,21 +464,21 @@ our @ISA = ('Repo::generic');
 sub load {
   my ($self, $pool) = @_;
 
-  $self->{'handle'} = $pool->add_repo($self->{'alias'});
-  $self->{'handle'}->{'appdata'} = $self;
-  $pool->{'installed'} = $self->{'handle'};
+  $self->{handle} = $pool->add_repo($self->{alias});
+  $self->{handle}->{appdata} = $self;
+  $pool->{installed} = $self->{handle};
   print "rpm database: ";
-  $self->{'cookie'} = $self->calc_cookie_file('/var/lib/rpm/Packages');
+  $self->{cookie} = $self->calc_cookie_file('/var/lib/rpm/Packages');
   if ($self->usecachedrepo()) {
     print "cached\n";
     return 1;
   }
   print "reading\n";
   if (defined(&solv::Repo::add_products)) {
-    $self->{'handle'}->add_products("/etc/products.d", $solv::Repo::REPO_NO_INTERNALIZE);
+    $self->{handle}->add_products("/etc/products.d", $solv::Repo::REPO_NO_INTERNALIZE);
   }
   my $f = solv::xfopen($self->cachepath());
-  $self->{'handle'}->add_rpmdb_reffp($f, $solv::Repo::REPO_REUSE_REPODATA);
+  $self->{handle}->add_rpmdb_reffp($f, $solv::Repo::REPO_REUSE_REPODATA);
   $self->writecachedrepo();
   return 1;
 }
@@ -487,7 +487,7 @@ package main;
 
 sub load_stub {
   my ($repodata) = @_;
-  my $repo = $repodata->{'repo'}->{'appdata'};
+  my $repo = $repodata->{repo}->{appdata};
   return $repo ? $repo->load_ext($repodata) : 0;
 }
 
@@ -526,9 +526,9 @@ for my $reposdir (@reposdirs) {
 	$repoattr->{$p} = $cfg->val($alias, $p);
       }
       my $repo;
-      if ($repoattr->{'type'} eq 'rpm-md') {
+      if ($repoattr->{type} eq 'rpm-md') {
 	$repo = Repo::rpmmd->new($alias, 'repomd', $repoattr);
-      } elsif ($repoattr->{'type'} eq 'yast2') {
+      } elsif ($repoattr->{type} eq 'yast2') {
 	$repo = Repo::susetags->new($alias, 'susetags', $repoattr);
       } else {
 	$repo = Repo::unknown->new($alias, 'unknown', $repoattr);
@@ -545,7 +545,7 @@ $pool->set_loadcallback(\&load_stub);
 my $sysrepo = Repo::system->new('@System', 'system');
 $sysrepo->load($pool);
 for my $repo (@repos) {
-  $repo->load($pool) if $repo->{'enabled'};
+  $repo->load($pool) if $repo->{enabled};
 }
 
 if ($cmd eq 'search') {
@@ -553,10 +553,10 @@ if ($cmd eq 'search') {
   my $sel = $pool->Selection();
   my $di = $pool->Dataiterator(0, $solv::SOLVABLE_NAME, $ARGV[0], $solv::Dataiterator::SEARCH_SUBSTRING | $solv::Dataiterator::SEARCH_NOCASE);
   for my $d (@$di) {
-    $sel->add_raw($solv::Job::SOLVER_SOLVABLE, $d->{'solvid'});
+    $sel->add_raw($solv::Job::SOLVER_SOLVABLE, $d->{solvid});
   }
   for my $s ($sel->solvables()) {
-    print "- ".$s->str()." [$s->{'repo'}->{'name'}]: ".$s->lookup_str($solv::SOLVABLE_SUMMARY)."\n";
+    print "- ".$s->str()." [$s->{repo}->{name}]: ".$s->lookup_str($solv::SOLVABLE_SUMMARY)."\n";
   }
   exit(0);
 }
@@ -597,7 +597,7 @@ if ($cmd eq 'list' || $cmd eq 'info') {
     for my $s ($job->solvables()) {
       if ($cmd eq 'info') {
 	printf "Name:        %s\n", $s->str();
-	printf "Repo:        %s\n", $s->{'repo'}->{'name'};
+	printf "Repo:        %s\n", $s->{repo}->{name};
 	printf "Summary:     %s\n", $s->lookup_str($solv::SOLVABLE_SUMMARY);
 	my $str = $s->lookup_str($solv::SOLVABLE_URL);
 	printf "Url:         %s\n", $str if $str;
@@ -605,7 +605,7 @@ if ($cmd eq 'list' || $cmd eq 'info') {
 	printf "License:     %s\n", $str if $str;
 	printf "Description:\n%s\n", $s->lookup_str($solv::SOLVABLE_DESCRIPTION);
       } else {
-	printf "  - %s [%s]\n", $s->str(), $s->{'repo'}->{'name'};
+	printf "  - %s [%s]\n", $s->str(), $s->{repo}->{name};
 	printf "    %s\n", $s->lookup_str($solv::SOLVABLE_SUMMARY);
       }
     }
@@ -615,7 +615,7 @@ if ($cmd eq 'list' || $cmd eq 'info') {
 
 # up magic, turn into install if nothing matches
 for my $job (@jobs) {
-  $job->{'how'} ^= $solv::Job::SOLVER_UPDATE ^ $solv::Job::SOLVER_INSTALL if $cmd eq 'up' && $job->isemptyupdate();
+  $job->{how} ^= $solv::Job::SOLVER_UPDATE ^ $solv::Job::SOLVER_INSTALL if $cmd eq 'up' && $job->isemptyupdate();
 }
 
 my $solver = $pool->Solver();
@@ -626,13 +626,13 @@ while (1) {
   my @problems = $solver->solve(\@jobs);
   last unless @problems;
   for my $problem (@problems) {
-    print "Problem $problem->{'id'}/".@problems.":\n";
+    print "Problem $problem->{id}/".@problems.":\n";
     my $r = $problem->findproblemrule();
     my $ri = $r->info();
     print $ri->problemstr()."\n";
     my @solutions = $problem->solutions();
     for my $solution (@solutions) {
-      print "  Solution $solution->{'id'}:\n";
+      print "  Solution $solution->{id}:\n";
       for my $element ($solution->elements(1)) {
 	print "  - ".$element->str()."\n";
       }
@@ -650,8 +650,8 @@ while (1) {
     my $solution = $solutions[$sol - 1];
     for my $element ($solution->elements()) {
       my $newjob = $element->Job();
-      if ($element->{'type'} == $solv::Solver::SOLVER_SOLUTION_JOB) {
-	$jobs[$element->{'jobidx'}] = $newjob;
+      if ($element->{type} == $solv::Solver::SOLVER_SOLUTION_JOB) {
+	$jobs[$element->{jobidx}] = $newjob;
       } else {
 	push @jobs, $newjob if $newjob && !grep {$_ == $newjob} @jobs;
       }
@@ -668,27 +668,27 @@ if ($trans->isempty()) {
 
 print "\nTransaction summary:\n\n";
 for my $c ($trans->classify($solv::Transaction::SOLVER_TRANSACTION_SHOW_OBSOLETES|$solv::Transaction::SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE)) {
-  if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
-    print "$c->{'count'} erased packages:\n";
-  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_INSTALL) {
-    print "$c->{'count'} installed packages:\n";
-  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_REINSTALLED) {
-    print "$c->{'count'} reinstalled packages:\n";
-  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
-    print "$c->{'count'} downgraded packages:\n";
-  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_CHANGED) {
-    print "$c->{'count'} changed packages:\n";
-  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
-    print "$c->{'count'} upgraded packages:\n";
-  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
-    printf "$c->{'count'} vendor changes from '%s' to '%s':\n", $c->{'fromstr'}, $c->{'tostr'};
-  } elsif ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
-    printf "$c->{'count'} arch changes from '%s' to '%s':\n", $c->{'fromstr'}, $c->{'tostr'};
+  if ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
+    print "$c->{count} erased packages:\n";
+  } elsif ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_INSTALL) {
+    print "$c->{count} installed packages:\n";
+  } elsif ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_REINSTALLED) {
+    print "$c->{count} reinstalled packages:\n";
+  } elsif ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
+    print "$c->{count} downgraded packages:\n";
+  } elsif ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_CHANGED) {
+    print "$c->{count} changed packages:\n";
+  } elsif ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED) {
+    print "$c->{count} upgraded packages:\n";
+  } elsif ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_VENDORCHANGE) {
+    printf "$c->{count} vendor changes from '%s' to '%s':\n", $c->{fromstr}, $c->{tostr};
+  } elsif ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_ARCHCHANGE) {
+    printf "$c->{count} arch changes from '%s' to '%s':\n", $c->{fromstr}, $c->{tostr};
   } else {
     next;
   }
   for my $p ($c->solvables()) {
-    if ($c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED || $c->{'type'} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
+    if ($c->{type} == $solv::Transaction::SOLVER_TRANSACTION_UPGRADED || $c->{type} == $solv::Transaction::SOLVER_TRANSACTION_DOWNGRADED) {
       my $other = $trans->othersolvable($p);
       printf "  - %s -> %s\n", $p->str(), $other->str();
     } else {
@@ -714,14 +714,14 @@ if (@newpkgs) {
   $downloadsize += $_->lookup_num($solv::SOLVABLE_DOWNLOADSIZE) for @newpkgs;
   printf "Downloading %d packages, %d K\n", scalar(@newpkgs), $downloadsize;
   for my $p (@newpkgs) {
-    my $repo = $p->{'repo'}->{'appdata'};
+    my $repo = $p->{repo}->{appdata};
     my ($location) = $p->lookup_location();
     next unless $location;
     $location = $repo->packagespath() . $location;
     my $chksum = $p->lookup_checksum($solv::SOLVABLE_CHECKSUM);
     my $f = $repo->download($location, 0, $chksum);
-    die("\n$repo->{'alias'}: $location not found in repository\n") unless $f;
-    $newpkgsfps{$p->{'id'}} = $f;
+    die("\n$repo->{alias}: $location not found in repository\n") unless $f;
+    $newpkgsfps{$p->{id}} = $f;
     print ".";
     STDOUT->flush();
   }
@@ -735,15 +735,15 @@ for my $p ($trans->steps()) {
   if ($steptype == $solv::Transaction::SOLVER_TRANSACTION_ERASE) {
     print "erase ".$p->str()."\n";
     next unless $p->lookup_num($solv::RPM_RPMDBID);
-    my $evr = $p->{'evr'};
+    my $evr = $p->{evr};
     $evr =~ s/^[0-9]+://;	# strip epoch
-    system('rpm', '-e', '--nodeps', '--nodigest', '--nosignature', "$p->{'name'}-$evr.$p->{'arch'}") && die("rpm failed: $?\n");
+    system('rpm', '-e', '--nodeps', '--nodigest', '--nosignature', "$p->{name}-$evr.$p->{arch}") && die("rpm failed: $?\n");
   } elsif ($steptype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL || $steptype == $solv::Transaction::SOLVER_TRANSACTION_MULTIINSTALL) {
     print "install ".$p->str()."\n";
-    my $f = $newpkgsfps{$p->{'id'}};
+    my $f = $newpkgsfps{$p->{id}};
     my $mode = $steptype == $solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i';
     system('rpm', $mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/".$f->fileno()) && die("rpm failed: $?\n");
-    delete $newpkgsfps{$p->{'id'}};
+    delete $newpkgsfps{$p->{id}};
   }
 }
 

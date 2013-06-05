@@ -2,12 +2,12 @@
 .\"     Title: libsolv-bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/04/2013
+.\"      Date: 06/05/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "06/04/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "06/05/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -58,7 +58,7 @@ Create a new pool instance\&. In most cases you just need one pool\&.
 .\}
 .nf
 \fBvoid *appdata;\fR                  /* read/write */
-\fI$pool\fR\fB\->{\*(Aqappdata\*(Aq}\fR
+\fI$pool\fR\fB\->{appdata}\fR
 \fIpool\fR\fB\&.appdata\fR
 \fIpool\fR\fB\&.appdata\fR
 .fi
@@ -73,7 +73,7 @@ Application specific data that may be used in any way by the code using the pool
 .\}
 .nf
 \fBSolvable solvables[];\fR           /* read only */
-my \fI$solvable\fR \fB=\fR \fI$pool\fR\fB\->{\*(Aqsolvables\*(Aq}\->[\fR\fI$solvid\fR\fB]\fR;
+my \fI$solvable\fR \fB=\fR \fI$pool\fR\fB\->{solvables}\->[\fR\fI$solvid\fR\fB]\fR;
 \fIsolvable\fR \fB=\fR \fIpool\fR\fB\&.solvables[\fR\fIsolvid\fR\fB]\fR
 \fIsolvable\fR \fB=\fR \fIpool\fR\fB\&.solvables[\fR\fIsolvid\fR\fB]\fR
 .fi
@@ -88,7 +88,7 @@ Look up a Solvable by its id\&.
 .\}
 .nf
 \fBRepo repos[];\fR                   /* read only */
-my \fI$repo\fR \fB=\fR \fI$pool\fR\fB\->{\*(Aqrepos\*(Aq}\->[\fR\fI$repoid\fR\fB]\fR;
+my \fI$repo\fR \fB=\fR \fI$pool\fR\fB\->{repos}\->[\fR\fI$repoid\fR\fB]\fR;
 \fIrepo\fR \fB=\fR \fIpool\fR\fB\&.repos[\fR\fIrepoid\fR\fB]\fR
 \fIrepo\fR \fB=\fR \fIpool\fR\fB\&.repos[\fR\fIrepoid\fR\fB]\fR
 .fi
@@ -103,7 +103,7 @@ Look up a Repository by its id\&.
 .\}
 .nf
 \fBRepo *installed;\fR                /* read/write */
-\fI$pool\fR\fB\->{\*(Aqinstalled\*(Aq} =\fR \fI$repo\fR;
+\fI$pool\fR\fB\->{installed} =\fR \fI$repo\fR;
 \fIpool\fR\fB\&.installed =\fR \fIrepo\fR
 \fIpool\fR\fB\&.installed =\fR \fIrepo\fR
 .fi
@@ -815,7 +815,7 @@ The dependency class is an object orientated way to work with strings and depend
 .\}
 .nf
 \fBPool *pool;\fR             /* read only */
-\fI$dep\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fI$dep\fR\fB\->{pool}\fR
 \fIdep\fR\fB\&.pool\fR
 \fIdep\fR\fB\&.pool\fR
 .fi
@@ -830,7 +830,7 @@ Back reference to the pool this dependency belongs to\&.
 .\}
 .nf
 \fBId id;\fR          /* read only */
-\fI$dep\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fI$dep\fR\fB\->{id}\fR
 \fIdep\fR\fB\&.id\fR
 \fIdep\fR\fB\&.id\fR
 .fi
@@ -906,7 +906,7 @@ Return a string describing the dependency\&.
 .\}
 .nf
 \fB<stringification>\fR
-my \fI$str\fR \fB= "\fR\fI$dep\fR\fB"\fR;
+my \fI$str\fR \fB=\fR \fI$dep\fR\fB\->str\fR;
 \fIstr\fR \fB= str(\fR\fIdep\fR\fB)\fR
 \fIstr\fR \fB=\fR \fIdep\fR\fB\&.to_s\fR
 .fi
@@ -940,7 +940,7 @@ A Repository describes a group of packages, normally comming from the same sourc
 .\}
 .nf
 \fBPool *pool;\fR                     /* read only */
-\fI$repo\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fI$repo\fR\fB\->{pool}\fR
 \fIrepo\fR\fB\&.pool\fR
 \fIrepo\fR\fB\&.pool\fR
 .fi
@@ -955,7 +955,7 @@ Back reference to the pool this dependency belongs to\&.
 .\}
 .nf
 \fBId id;\fR                          /* read only */
-\fI$repo\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fI$repo\fR\fB\->{id}\fR
 \fIrepo\fR\fB\&.id\fR
 \fIrepo\fR\fB\&.id\fR
 .fi
@@ -970,7 +970,7 @@ The id of the repository\&.
 .\}
 .nf
 \fBconst char *name;\fR               /* read/write */
-\fI$repo\fR\fB\->{\*(Aqname\*(Aq}\fR
+\fI$repo\fR\fB\->{name}\fR
 \fIrepo\fR\fB\&.name\fR
 \fIrepo\fR\fB\&.name\fR
 .fi
@@ -985,7 +985,7 @@ The repositories name\&. To libsolv, the name is just a string with no specific 
 .\}
 .nf
 \fBint prioprity;\fR                  /* read/write */
-\fI$repo\fR\fB\->{\*(Aqpriority\*(Aq}\fR
+\fI$repo\fR\fB\->{priority}\fR
 \fIrepo\fR\fB\&.priority\fR
 \fIrepo\fR\fB\&.priority\fR
 .fi
@@ -1000,7 +1000,7 @@ The priority of the repository\&. A higher number means that packages of this re
 .\}
 .nf
 \fBint subprioprity;\fR               /* read/write */
-\fI$repo\fR\fB\->{\*(Aqsubpriority\*(Aq}\fR
+\fI$repo\fR\fB\->{subpriority}\fR
 \fIrepo\fR\fB\&.subpriority\fR
 \fIrepo\fR\fB\&.subpriority\fR
 .fi
@@ -1015,7 +1015,7 @@ The sub\-priority of the repository\&. This value is compared when the prioritie
 .\}
 .nf
 \fBint nsolvables;\fR                 /* read only */
-\fI$repo\fR\fB\->{\*(Aqnsolvables\*(Aq}\fR
+\fI$repo\fR\fB\->{nsolvables}\fR
 \fIrepo\fR\fB\&.nsolvables\fR
 \fIrepo\fR\fB\&.nsolvables\fR
 .fi
@@ -1030,7 +1030,7 @@ The number of solvables in this repository\&.
 .\}
 .nf
 \fBvoid *appdata;\fR                  /* read/write */
-\fI$repo\fR\fB\->{\*(Aqappdata\*(Aq}\fR
+\fI$repo\fR\fB\->{appdata}\fR
 \fIrepo\fR\fB\&.appdata\fR
 \fIrepo\fR\fB\&.appdata\fR
 .fi
@@ -1045,7 +1045,7 @@ Application specific data that may be used in any way by the code using the repo
 .\}
 .nf
 \fBDatapos *meta;\fR                  /* read only */
-\fI$repo\fR\fB\->{\*(Aqmeta\*(Aq}\fR
+\fI$repo\fR\fB\->{meta}\fR
 \fIrepo\fR\fB\&.meta\fR
 \fIrepo\fR\fB\&.meta\fR
 .fi
@@ -1299,7 +1299,7 @@ Iterate over the matching data elements in this repository\&. See the Dataiterat
 .\}
 .nf
 \fB<stringification>\fR
-my \fI$str\fR \fB= "\fR\fI$repo\fR\fB"\fR;
+my \fI$str\fR \fB=\fR \fI$repo\fR\fB\->str\fR;
 \fIstr\fR \fB= str(\fR\fIrepo\fR\fB)\fR
 \fIstr\fR \fB=\fR \fIrepo\fR\fB\&.to_s\fR
 .fi
@@ -1660,7 +1660,7 @@ A solvable describes all the information of one package\&. Each solvable belongs
 .\}
 .nf
 \fBRepo *repo;\fR                     /* read only */
-\fI$solvable\fR\fB\->{\*(Aqrepo\*(Aq}\fR
+\fI$solvable\fR\fB\->{repo}\fR
 \fIsolvable\fR\fB\&.repo\fR
 \fIsolvable\fR\fB\&.repo\fR
 .fi
@@ -1675,7 +1675,7 @@ The repository this solvable belongs to\&.
 .\}
 .nf
 \fBPool *pool;\fR                     /* read only */
-\fI$solvable\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fI$solvable\fR\fB\->{pool}\fR
 \fIsolvable\fR\fB\&.pool\fR
 \fIsolvable\fR\fB\&.pool\fR
 .fi
@@ -1690,7 +1690,7 @@ The pool this solvable belongs to, same as the pool of the repo\&.
 .\}
 .nf
 \fBId id;\fR                          /* read only */
-\fI$solvable\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fI$solvable\fR\fB\->{id}\fR
 \fIsolvable\fR\fB\&.id\fR
 \fIsolvable\fR\fB\&.id\fR
 .fi
@@ -1705,7 +1705,7 @@ The specific id of the solvable\&.
 .\}
 .nf
 \fBchar *name;\fR                     /* read/write */
-\fI$solvable\fR\fB\->{\*(Aqname\*(Aq}\fR
+\fI$solvable\fR\fB\->{name}\fR
 \fIsolvable\fR\fB\&.name\fR
 \fIsolvable\fR\fB\&.name\fR
 .fi
@@ -1718,7 +1718,7 @@ The specific id of the solvable\&.
 .\}
 .nf
 \fBchar *evr;\fR                      /* read/write */
-\fI$solvable\fR\fB\->{\*(Aqevr\*(Aq}\fR
+\fI$solvable\fR\fB\->{evr}\fR
 \fIsolvable\fR\fB\&.evr\fR
 \fIsolvable\fR\fB\&.evr\fR
 .fi
@@ -1731,7 +1731,7 @@ The specific id of the solvable\&.
 .\}
 .nf
 \fBchar *arch;\fR                     /* read/write */
-\fI$solvable\fR\fB\->{\*(Aqarch\*(Aq}\fR
+\fI$solvable\fR\fB\->{arch}\fR
 \fIsolvable\fR\fB\&.arch\fR
 \fIsolvable\fR\fB\&.arch\fR
 .fi
@@ -1744,7 +1744,7 @@ The specific id of the solvable\&.
 .\}
 .nf
 \fBchar *vendor;\fR                   /* read/write */
-\fI$solvable\fR\fB\->{\*(Aqvendor\*(Aq}\fR
+\fI$solvable\fR\fB\->{vendor}\fR
 \fIsolvable\fR\fB\&.vendor\fR
 \fIsolvable\fR\fB\&.vendor\fR
 .fi
@@ -1759,7 +1759,7 @@ Easy access to often used attributes of solvables\&. They are internally stored 
 .\}
 .nf
 \fBId nameid;\fR                      /* read/write */
-\fI$solvable\fR\fB\->{\*(Aqnameid\*(Aq}\fR
+\fI$solvable\fR\fB\->{nameid}\fR
 \fIsolvable\fR\fB\&.nameid\fR
 \fIsolvable\fR\fB\&.nameid\fR
 .fi
@@ -1772,7 +1772,7 @@ Easy access to often used attributes of solvables\&. They are internally stored 
 .\}
 .nf
 \fBId evrid;\fR                       /* read/write */
-\fI$solvable\fR\fB\->{\*(Aqevrid\*(Aq}\fR
+\fI$solvable\fR\fB\->{evrid}\fR
 \fIsolvable\fR\fB\&.evrid\fR
 \fIsolvable\fR\fB\&.evrid\fR
 .fi
@@ -1785,7 +1785,7 @@ Easy access to often used attributes of solvables\&. They are internally stored 
 .\}
 .nf
 \fBId archid;\fR                      /* read/write */
-\fI$solvable\fR\fB\->{\*(Aqarchid\*(Aq}\fR
+\fI$solvable\fR\fB\->{archid}\fR
 \fIsolvable\fR\fB\&.archid\fR
 \fIsolvable\fR\fB\&.archid\fR
 .fi
@@ -1798,7 +1798,7 @@ Easy access to often used attributes of solvables\&. They are internally stored 
 .\}
 .nf
 \fBId vendorid;\fR                    /* read/write */
-\fI$solvable\fR\fB\->{\*(Aqvendorid\*(Aq}\fR
+\fI$solvable\fR\fB\->{vendorid}\fR
 \fIsolvable\fR\fB\&.vendorid\fR
 \fIsolvable\fR\fB\&.vendorid\fR
 .fi
@@ -1997,7 +1997,7 @@ Return a string describing the solvable\&. The string consists of the name, vers
 .\}
 .nf
 \fB<stringification>\fR
-my \fI$str\fR \fB= "\fR\fI$solvable\fR\fB"\fR;
+my \fI$str\fR \fB=\fR \fI$solvable\fR\fB\->str\fR;
 \fIstr\fR \fB= str(\fR\fIsolvable\fR\fB)\fR
 \fIstr\fR \fB=\fR \fIsolvable\fR\fB\&.to_s\fR
 .fi
@@ -2131,7 +2131,7 @@ Objects of this type will be created for every value matched by a dataiterator\&
 .\}
 .nf
 \fBPool *pool;\fR                             /* read only */
-\fI$d\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fI$d\fR\fB\->{pool}\fR
 \fId\fR\fB\&.pool\fR
 \fId\fR\fB\&.pool\fR
 .fi
@@ -2146,7 +2146,7 @@ Back pointer to pool\&.
 .\}
 .nf
 \fBRepo *repo;\fR                             /* read only */
-\fI$d\fR\fB\->{\*(Aqrepo\*(Aq}\fR
+\fI$d\fR\fB\->{repo}\fR
 \fId\fR\fB\&.repo\fR
 \fId\fR\fB\&.repo\fR
 .fi
@@ -2161,7 +2161,7 @@ The repository containing the matched object\&.
 .\}
 .nf
 \fBSolvable *solvable;\fR                     /* read only */
-\fI$d\fR\fB\->{\*(Aqsolvable\*(Aq}\fR
+\fI$d\fR\fB\->{solvable}\fR
 \fId\fR\fB\&.solvable\fR
 \fId\fR\fB\&.solvable\fR
 .fi
@@ -2176,7 +2176,7 @@ The solvable containing the value that was matched\&.
 .\}
 .nf
 \fBId solvid;\fR                              /* read only */
-\fI$d\fR\fB\->{\*(Aqsolvid\*(Aq}\fR
+\fI$d\fR\fB\->{solvid}\fR
 \fId\fR\fB\&.solvid\fR
 \fId\fR\fB\&.solvid\fR
 .fi
@@ -2351,7 +2351,7 @@ The position object of the array containing the current match\&. It can be used 
 .\}
 .nf
 \fB<stringification>\fR
-my \fI$str\fR \fB= "\fR\fI$d\fR\fB"\fR;
+my \fI$str\fR \fB=\fR \fI$d\fR\fB\->str\fR;
 \fIstr\fR \fB= str(\fR\fId\fR\fB)\fR
 \fIstr\fR \fB=\fR \fId\fR\fB\&.to_s\fR
 .fi
@@ -2431,7 +2431,7 @@ Return only one selection element describing the selected packages\&. The defaul
 .\}
 .nf
 \fBPool *pool;\fR                             /* read only */
-\fI$d\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fI$d\fR\fB\->{pool}\fR
 \fId\fR\fB\&.pool\fR
 \fId\fR\fB\&.pool\fR
 .fi
@@ -2552,7 +2552,7 @@ Convert a selection into an array of Solvable objects\&.
 .\}
 .nf
 \fB<stringification>\fR
-my \fI$str\fR \fB= "\fR\fI$sel\fR\fB"\fR;
+my \fI$str\fR \fB=\fR \fI$sel\fR\fB\->str\fR;
 \fIstr\fR \fB= str(\fR\fIsel\fR\fB)\fR
 \fIstr\fR \fB=\fR \fIsel\fR\fB\&.to_s\fR
 .fi
@@ -2742,7 +2742,7 @@ See the section about set bits for more information\&.
 .\}
 .nf
 \fBPool *pool;\fR                             /* read only */
-\fI$job\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fI$job\fR\fB\->{pool}\fR
 \fId\fR\fB\&.pool\fR
 \fId\fR\fB\&.pool\fR
 .fi
@@ -2757,7 +2757,7 @@ Back pointer to pool\&.
 .\}
 .nf
 \fBId how;\fR                                 /* read/write */
-\fI$job\fR\fB\->{\*(Aqhow\*(Aq}\fR
+\fI$job\fR\fB\->{how}\fR
 \fId\fR\fB\&.how\fR
 \fId\fR\fB\&.how\fR
 .fi
@@ -2772,7 +2772,7 @@ Union of the selection, action, action modifier, and set flags\&. The selection 
 .\}
 .nf
 \fBId what;\fR                                /* read/write */
-\fI$job\fR\fB\->{\*(Aqwhat\*(Aq}\fR
+\fI$job\fR\fB\->{what}\fR
 \fId\fR\fB\&.what\fR
 \fId\fR\fB\&.what\fR
 .fi
@@ -2818,7 +2818,7 @@ Convenience function to find out if the job describes an update job with no matc
 .\}
 .nf
 \fB<stringification>\fR
-my \fI$str\fR \fB= "\fR\fI$job\fR\fB"\fR;
+my \fI$str\fR \fB=\fR \fI$job\fR\fB\->str\fR;
 \fIstr\fR \fB= str(\fR\fIjob\fR\fB)\fR
 \fIstr\fR \fB=\fR \fIjob\fR\fB\&.to_s\fR
 .fi
@@ -3130,7 +3130,7 @@ The problem can be solved by allowing to replace the package with some other pac
 .\}
 .nf
 \fBPool *pool;\fR                             /* read only */
-\fI$job\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fI$job\fR\fB\->{pool}\fR
 \fId\fR\fB\&.pool\fR
 \fId\fR\fB\&.pool\fR
 .fi
@@ -3208,7 +3208,7 @@ Problems are the way of the solver to interact with the user\&. You can simply l
 .\}
 .nf
 \fBSolver *solv;\fR                           /* read only */
-\fI$problem\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fI$problem\fR\fB\->{solv}\fR
 \fIproblem\fR\fB\&.solv\fR
 \fIproblem\fR\fB\&.solv\fR
 .fi
@@ -3223,7 +3223,7 @@ Back pointer to solver object\&.
 .\}
 .nf
 \fBId id;\fR                                  /* read only */
-\fI$problem\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fI$problem\fR\fB\->{id}\fR
 \fIproblem\fR\fB\&.id\fR
 \fIproblem\fR\fB\&.id\fR
 .fi
@@ -3303,7 +3303,7 @@ Rules are the basic block of sat solving\&. Each package dependency gets transla
 .\}
 .nf
 \fBSolver *solv;\fR                           /* read only */
-\fI$rule\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fI$rule\fR\fB\->{solv}\fR
 \fIrule\fR\fB\&.solv\fR
 \fIrule\fR\fB\&.solv\fR
 .fi
@@ -3318,7 +3318,7 @@ Back pointer to solver object\&.
 .\}
 .nf
 \fBId id;\fR                                  /* read only */
-\fI$rule\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fI$rule\fR\fB\->{id}\fR
 \fIrule\fR\fB\&.id\fR
 \fIrule\fR\fB\&.id\fR
 .fi
@@ -3333,7 +3333,7 @@ The id of the rule\&.
 .\}
 .nf
 \fBint type;\fR                               /* read only */
-\fI$rule\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fI$rule\fR\fB\->{type}\fR
 \fIrule\fR\fB\&.type\fR
 \fIrule\fR\fB\&.type\fR
 .fi
@@ -3398,7 +3398,7 @@ A Ruleinfo describes one reason why a rule was created\&.
 .\}
 .nf
 \fBSolver *solv;\fR                           /* read only */
-\fI$ruleinfo\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fI$ruleinfo\fR\fB\->{solv}\fR
 \fIruleinfo\fR\fB\&.solv\fR
 \fIruleinfo\fR\fB\&.solv\fR
 .fi
@@ -3413,7 +3413,7 @@ Back pointer to solver object\&.
 .\}
 .nf
 \fBint type;\fR                               /* read only */
-\fI$ruleinfo\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fI$ruleinfo\fR\fB\->{type}\fR
 \fIruleinfo\fR\fB\&.type\fR
 \fIruleinfo\fR\fB\&.type\fR
 .fi
@@ -3428,7 +3428,7 @@ The type of the ruleinfo\&. See the constant section of the solver class for the
 .\}
 .nf
 \fBDep *dep;\fR                               /* read only */
-\fI$ruleinfo\fR\fB\->{\*(Aqdep\*(Aq}\fR
+\fI$ruleinfo\fR\fB\->{dep}\fR
 \fIruleinfo\fR\fB\&.dep\fR
 \fIruleinfo\fR\fB\&.dep\fR
 .fi
@@ -3458,7 +3458,7 @@ The Id of the dependency leading to the creation of the rule, or zero\&.
 .\}
 .nf
 \fBSolvable *solvable;\fR                     /* read only */
-\fI$ruleinfo\fR\fB\->{\*(Aqsolvable\*(Aq}\fR
+\fI$ruleinfo\fR\fB\->{solvable}\fR
 \fIruleinfo\fR\fB\&.solvable\fR
 \fIruleinfo\fR\fB\&.solvable\fR
 .fi
@@ -3473,7 +3473,7 @@ The involved Solvable, e\&.g\&. the one containing the dependency\&.
 .\}
 .nf
 \fBSolvable *othersolvable;\fR                /* read only */
-\fI$ruleinfo\fR\fB\->{\*(Aqothersolvable\*(Aq}\fR
+\fI$ruleinfo\fR\fB\->{othersolvable}\fR
 \fIruleinfo\fR\fB\&.othersolvable\fR
 \fIruleinfo\fR\fB\&.othersolvable\fR
 .fi
@@ -3507,7 +3507,7 @@ A solution solves one specific problem\&. It consists of multiple solution eleme
 .\}
 .nf
 \fBSolver *solv;\fR                           /* read only */
-\fI$solution\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fI$solution\fR\fB\->{solv}\fR
 \fIsolution\fR\fB\&.solv\fR
 \fIsolution\fR\fB\&.solv\fR
 .fi
@@ -3522,7 +3522,7 @@ Back pointer to solver object\&.
 .\}
 .nf
 \fBId problemid;\fR                           /* read only */
-\fI$solution\fR\fB\->{\*(Aqproblemid\*(Aq}\fR
+\fI$solution\fR\fB\->{problemid}\fR
 \fIsolution\fR\fB\&.problemid\fR
 \fIsolution\fR\fB\&.problemid\fR
 .fi
@@ -3537,7 +3537,7 @@ Id of the problem the solution solves\&.
 .\}
 .nf
 \fBId id;\fR                                  /* read only */
-\fI$solution\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fI$solution\fR\fB\->{id}\fR
 \fIsolution\fR\fB\&.id\fR
 \fIsolution\fR\fB\&.id\fR
 .fi
@@ -3587,7 +3587,7 @@ A solution element describes a single action of a solution\&. The action is alwa
 .\}
 .nf
 \fBSolver *solv;\fR                           /* read only */
-\fI$solutionelement\fR\fB\->{\*(Aqsolv\*(Aq}\fR
+\fI$solutionelement\fR\fB\->{solv}\fR
 \fIsolutionelement\fR\fB\&.solv\fR
 \fIsolutionelement\fR\fB\&.solv\fR
 .fi
@@ -3602,7 +3602,7 @@ Back pointer to solver object\&.
 .\}
 .nf
 \fBId problemid;\fR                           /* read only */
-\fI$solutionelement\fR\fB\->{\*(Aqproblemid\*(Aq}\fR
+\fI$solutionelement\fR\fB\->{problemid}\fR
 \fIsolutionelement\fR\fB\&.problemid\fR
 \fIsolutionelement\fR\fB\&.problemid\fR
 .fi
@@ -3617,7 +3617,7 @@ Id of the problem the element (partly) solves\&.
 .\}
 .nf
 \fBId solutionid;\fR                          /* read only */
-\fI$solutionelement\fR\fB\->{\*(Aqsolutionid\*(Aq}\fR
+\fI$solutionelement\fR\fB\->{solutionid}\fR
 \fIsolutionelement\fR\fB\&.solutionid\fR
 \fIsolutionelement\fR\fB\&.solutionid\fR
 .fi
@@ -3632,7 +3632,7 @@ Id of the solution the element is a part of\&.
 .\}
 .nf
 \fBId id;\fR                                  /* read only */
-\fI$solutionelement\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fI$solutionelement\fR\fB\->{id}\fR
 \fIsolutionelement\fR\fB\&.id\fR
 \fIsolutionelement\fR\fB\&.id\fR
 .fi
@@ -3647,7 +3647,7 @@ Id of the solution element\&. The first element has Id 1, they are numbered cons
 .\}
 .nf
 \fBId type;\fR                                /* read only */
-\fI$solutionelement\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fI$solutionelement\fR\fB\->{type}\fR
 \fIsolutionelement\fR\fB\&.type\fR
 \fIsolutionelement\fR\fB\&.type\fR
 .fi
@@ -3662,7 +3662,7 @@ Type of the solution element\&. See the constant section of the solver class for
 .\}
 .nf
 \fBSolvable *solvable;\fR                     /* read only */
-\fI$solutionelement\fR\fB\->{\*(Aqsolvable\*(Aq}\fR
+\fI$solutionelement\fR\fB\->{solvable}\fR
 \fIsolutionelement\fR\fB\&.solvable\fR
 \fIsolutionelement\fR\fB\&.solvable\fR
 .fi
@@ -3677,7 +3677,7 @@ The installed solvable that needs to be replaced for replacement elements\&.
 .\}
 .nf
 \fBSolvable *replacement;\fR                  /* read only */
-\fI$solutionelement\fR\fB\->{\*(Aqreplacement\*(Aq}\fR
+\fI$solutionelement\fR\fB\->{replacement}\fR
 \fIsolutionelement\fR\fB\&.replacement\fR
 \fIsolutionelement\fR\fB\&.replacement\fR
 .fi
@@ -3692,7 +3692,7 @@ The solvable that needs to be installed to fix the problem\&.
 .\}
 .nf
 \fBint jobidx;\fR                             /* read only */
-\fI$solutionelement\fR\fB\->{\*(Aqjobidx\*(Aq}\fR
+\fI$solutionelement\fR\fB\->{jobidx}\fR
 \fIsolutionelement\fR\fB\&.jobidx\fR
 \fIsolutionelement\fR\fB\&.jobidx\fR
 .fi
@@ -3918,7 +3918,7 @@ Do not throw away the dependency graph used for ordering the transaction\&. This
 .\}
 .nf
 \fBPool *pool;\fR                             /* read only */
-\fI$trans\fR\fB\->{\*(Aqpool\*(Aq}\fR
+\fI$trans\fR\fB\->{pool}\fR
 \fItrans\fR\fB\&.pool\fR
 \fItrans\fR\fB\&.pool\fR
 .fi
@@ -4121,7 +4121,7 @@ Objects of this type are returned by the classify() Transaction method\&.
 .\}
 .nf
 \fBTransaction *transaction;\fR               /* read only */
-\fI$class\fR\fB\->{\*(Aqtransaction\*(Aq}\fR
+\fI$class\fR\fB\->{transaction}\fR
 \fIclass\fR\fB\&.transaction\fR
 \fIclass\fR\fB\&.transaction\fR
 .fi
@@ -4136,7 +4136,7 @@ Back pointer to transaction object\&.
 .\}
 .nf
 \fBint type;\fR                               /* read only */
-\fI$class\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fI$class\fR\fB\->{type}\fR
 \fIclass\fR\fB\&.type\fR
 \fIclass\fR\fB\&.type\fR
 .fi
@@ -4151,7 +4151,7 @@ The type of the transaction elements in the class\&.
 .\}
 .nf
 \fBint count;\fR                              /* read only */
-\fI$class\fR\fB\->{\*(Aqcount\*(Aq}\fR
+\fI$class\fR\fB\->{count}\fR
 \fIclass\fR\fB\&.count\fR
 \fIclass\fR\fB\&.count\fR
 .fi
@@ -4166,7 +4166,7 @@ The number of elements in the class\&.
 .\}
 .nf
 \fBconst char *\fR\fIfromstr\fR;
-\fI$class\fR\fB\->{\*(Aqfromstr\*(Aq}\fR
+\fI$class\fR\fB\->{fromstr}\fR
 \fIclass\fR\fB\&.fromstr\fR
 \fIclass\fR\fB\&.fromstr\fR
 .fi
@@ -4181,7 +4181,7 @@ The old vendor or architecture\&.
 .\}
 .nf
 \fBconst char *\fR\fItostr\fR;
-\fI$class\fR\fB\->{\*(Aqtostr\*(Aq}\fR
+\fI$class\fR\fB\->{tostr}\fR
 \fIclass\fR\fB\&.tostr\fR
 \fIclass\fR\fB\&.tostr\fR
 .fi
@@ -4196,7 +4196,7 @@ The new vendor or architecture\&.
 .\}
 .nf
 \fBId\fR \fIfromid\fR;
-\fI$class\fR\fB\->{\*(Aqfromid\*(Aq}\fR
+\fI$class\fR\fB\->{fromid}\fR
 \fIclass\fR\fB\&.fromid\fR
 \fIclass\fR\fB\&.fromid\fR
 .fi
@@ -4211,7 +4211,7 @@ The id of the old vendor or architecture\&.
 .\}
 .nf
 \fBId\fR \fItoid\fR;
-\fI$class\fR\fB\->{\*(Aqtoid\*(Aq}\fR
+\fI$class\fR\fB\->{toid}\fR
 \fIclass\fR\fB\&.toid\fR
 \fIclass\fR\fB\&.toid\fR
 .fi
@@ -4291,7 +4291,7 @@ Create an already finalized checksum object\&.
 .\}
 .nf
 \fBId type;\fR                        /* read only */
-\fI$chksum\fR\fB\->{\*(Aqtype\*(Aq}\fR
+\fI$chksum\fR\fB\->{type}\fR
 \fIchksum\fR\fB\&.type\fR
 \fIchksum\fR\fB\&.type\fR
 .fi
@@ -4412,7 +4412,7 @@ Checksums are equal if they are of the same type and the finalized results are t
 .\}
 .nf
 \fB<stringification>\fR
-my \fI$str\fR \fB= "\fR\fI$chksum\fR\fB"\fR;
+my \fI$str\fR \fB=\fR \fI$chksum\fR\fB\->str\fR;
 \fIstr\fR \fB= str(\fR\fIchksum\fR\fB)\fR
 \fIstr\fR \fB=\fR \fIchksum\fR\fB\&.to_s\fR
 .fi
@@ -4525,7 +4525,7 @@ The Repodata stores attrinbutes for packages and the repository itself, each rep
 .\}
 .nf
 \fBRepo *repo;\fR                     /* read only */
-\fI$data\fR\fB\->{\*(Aqrepo\*(Aq}\fR
+\fI$data\fR\fB\->{repo}\fR
 \fIdata\fR\fB\&.repo\fR
 \fIdata\fR\fB\&.repo\fR
 .fi
@@ -4540,7 +4540,7 @@ Back pointer to repository object\&.
 .\}
 .nf
 \fBId id;\fR                                  /* read only */
-\fI$data\fR\fB\->{\*(Aqid\*(Aq}\fR
+\fI$data\fR\fB\->{id}\fR
 \fIdata\fR\fB\&.id\fR
 \fIdata\fR\fB\&.id\fR
 .fi
@@ -4786,7 +4786,7 @@ Datapos objects describe a specific position in the repository data area\&. Thus
 .\}
 .nf
 \fBRepo *repo;\fR                     /* read only */
-\fI$data\fR\fB\->{\*(Aqrepo\*(Aq}\fR
+\fI$data\fR\fB\->{repo}\fR
 \fIdata\fR\fB\&.repo\fR
 \fIdata\fR\fB\&.repo\fR
 .fi

@@ -36,6 +36,8 @@ while(<STDIN>) {
     $_ = " $_";
     $_ = "$_ ";
     s/(?<=[^a-zA-Z_\&:\.\'\";])(?!solv\W|Solv\W|Pool\W)([\$\@[a-zA-Z_][a-zA-Z0-9_]*)(?=[^a-zA-Z0-9_\(;\[])(?!::)(?! [^=])/<-S><I>$1<-I><S>/g;
+    # small fixup for perl bare words
+    s/{<-S><I>([a-zA-Z_][a-zA-Z0-9]*)<-I><S>}/{$1}/g;
     # small fixup for callbackfunctions
     s/\\(&amp;[a-zA-Z_]+)/\\<-S><I>$1<-I><S>/;
     # small fixup for stringification
