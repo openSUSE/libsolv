@@ -52,7 +52,7 @@ sub cachepath {
   my $path = $self->{'alias'};
   $path =~ s/^\./_/s;
   $path .= $ext ? "_$ext.solvx" : '.solv';
-  $path =~ s/\//_/gs;
+  $path =~ s!/!_!gs;
   return "/var/cache/solv/$path";
 }
 
@@ -85,11 +85,11 @@ sub download {
     return undef;
   }
   my $url = $self->{'baseurl'};
-  $url =~ s/\/$//;
+  $url =~ s!/$!!;
   $url .= "/$file";
   open(my $f, '+>', undef) || die;
   fcntl($f, Fcntl::F_SETFD, 0);
-  my $st = system('curl', '-f', '-s', '-L', '-o', "/dev/fd/".fileno($f), '--', $url);
+  my $st = system('curl', '-f', '-s', '-L', '-o', "/dev/fd/" . fileno($f), '--', $url);
   if (POSIX::lseek(fileno($f), 0, POSIX::SEEK_END) == 0 && ($st == 0 || !$chksum)) {
     return undef;
   }
@@ -118,7 +118,6 @@ sub download {
 sub usecachedrepo {
   my ($self, $ext, $mark) = @_;
   my $cookie = $ext ? $self->{'extcookie'} : $self->{'cookie'};
-  my $handle = $self->{'handle'};
   my $cachepath = $self->cachepath($ext);
   my $fextcookie;
   if (sysopen(my $f, $cachepath, POSIX::O_RDONLY)) {
@@ -354,7 +353,7 @@ sub add_ext {
     $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $solv::SOLVABLE_FILELIST);
     $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $solv::REPOKEY_TYPE_DIRSTRARRAY);
   } else {
-    for my $langid (sort {$a <=> $b} keys %langtags) {
+    for my $langid (sort { $a <=> $b } keys %langtags) {
       $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $self->{'handle'}->{'pool'}->id2langid($langid, $ext, 1));
       $repodata->add_idarray($handle, $solv::REPOSITORY_KEYS, $langtags{$langid});
     }
@@ -453,7 +452,7 @@ package Repo::unknown;
 our @ISA = ('Repo::generic');
 
 sub load {
-  my ($self, $pool) = @_;
+  my ($self) = @_;
   print "unsupported repo '$self->{'alias'}': skipped\n";
   return 0;
 }
@@ -517,6 +516,7 @@ if (-d '/etc/zypp/repos.d') {
 }
 for my $reposdir (@reposdirs) {
   next unless -d $reposdir;
+  local *DIR;
   next unless opendir(DIR, $reposdir);
   for my $reponame (sort(grep {/\.repo$/} readdir(DIR))) {
     my $cfg = new Config::IniFiles('-file' => "$reposdir/$reponame");
@@ -563,14 +563,14 @@ if ($cmd eq 'search') {
 
 die("unknown command '$cmd'\n") unless defined $cmdactionmap{$cmd};
 
-my @addedprovides = $pool->addfileprovides_queue();
+$pool->addfileprovides();
 $pool->createwhatprovides();
 
 my @jobs;
 for my $arg (@ARGV) {
   my $flags = $solv::Selection::SELECTION_NAME | $solv::Selection::SELECTION_PROVIDES | $solv::Selection::SELECTION_GLOB;
   $flags |= $solv::Selection::SELECTION_CANON | $solv::Selection::SELECTION_DOTARCH | $solv::Selection::SELECTION_REL;
-  if ($arg =~ /^\//) {
+  if ($arg =~ m!^/!) {
     $flags |= $solv::Selection::SELECTION_FILELIST;
     $flags |= $solv::Selection::SELECTION_INSTALLED_ONLY if $cmd eq 'erase';
   }
@@ -715,7 +715,7 @@ if (@newpkgs) {
   printf "Downloading %d packages, %d K\n", scalar(@newpkgs), $downloadsize;
   for my $p (@newpkgs) {
     my $repo = $p->{'repo'}->{'appdata'};
-    my ($location, $medianr) = $p->lookup_location();
+    my ($location) = $p->lookup_location();
     next unless $location;
     $location = $repo->packagespath() . $location;
     my $chksum = $p->lookup_checksum($solv::SOLVABLE_CHECKSUM);
