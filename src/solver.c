@@ -65,7 +65,7 @@ solver_splitprovides(Solver *solv, Id dep)
    * for installed packages and check the lazywhatprovidesq (ignoring the REL_WITH part, but
    * we filter the package name further down anyway).
    */
-  if (pool->addedfileprovides == 1 && !ISRELDEP(rd->evr))
+  if (pool->addedfileprovides == 1 && !ISRELDEP(rd->evr) && !pool->whatprovides[rd->evr])
     pp = pool_searchlazywhatprovidesq(pool, rd->evr);
   else
     pp = pool_whatprovides(pool, dep);
