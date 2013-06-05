@@ -579,7 +579,7 @@ if not args:
 cmd = args[0]
 args = args[1:]
 
-cmdabbrev = {'li': 'list', 'in': 'install', 'rm': 'erase', 've': 'verify', 'se': 'search'}
+cmdabbrev = {'ls': 'list', 'in': 'install', 'rm': 'erase', 've': 'verify', 'se': 'search'}
 if cmd in cmdabbrev:
     cmd = cmdabbrev[cmd]
 

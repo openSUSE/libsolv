@@ -493,7 +493,7 @@ sub load_stub {
 
 die("Usage: p5solv COMMAND [ARGS]\n") unless @ARGV;
 my $cmd = shift @ARGV;
-my %cmdabbrev = ( 'li' => 'list', 'in' => 'install', 'rm' => 'erase',
+my %cmdabbrev = ( 'ls' => 'list', 'in' => 'install', 'rm' => 'erase',
                   've' => 'verify', 'se' => 'search' );
 $cmd = $cmdabbrev{$cmd} if $cmdabbrev{$cmd};
 
@@ -516,9 +516,9 @@ if (-d '/etc/zypp/repos.d') {
 }
 for my $reposdir (@reposdirs) {
   next unless -d $reposdir;
-  local *DIR;
-  next unless opendir(DIR, $reposdir);
-  for my $reponame (sort(grep {/\.repo$/} readdir(DIR))) {
+  my $dir;
+  next unless opendir($dir, $reposdir);
+  for my $reponame (sort(grep {/\.repo$/} readdir($dir))) {
     my $cfg = new Config::IniFiles('-file' => "$reposdir/$reponame");
     for my $alias ($cfg->Sections()) {
       my $repoattr = {'alias' => $alias, 'enabled' => 0, 'priority' => 99, 'autorefresh' => 1, 'type' => 'rpm-md', 'metadata_expire' => 900};

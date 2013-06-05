@@ -503,7 +503,7 @@ end
 args = ARGV
 cmd = args.shift
 
-cmdabbrev = { 'li' => 'list', 'in' => 'install', 'rm' => 'erase',
+cmdabbrev = { 'ls' => 'list', 'in' => 'install', 'rm' => 'erase',
               've' => 'verify', 'se' => 'search' }
 cmd = cmdabbrev[cmd] if cmdabbrev.has_key?(cmd)
 
