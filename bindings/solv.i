@@ -997,7 +997,6 @@ typedef struct {
   }
 #if defined(SWIGRUBY)
   %rename("to_s") __str__;
-  %rename("inspect") __repr__;
 #endif
 #if defined(SWIGPERL)
   %rename("str") __str__;
