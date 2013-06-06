@@ -42,6 +42,8 @@ while(<STDIN>) {
     s/\\(&amp;[a-zA-Z_]+)/\\<-S><I>$1<-I><S>/;
     # small fixup for stringification
     s/\$<-S><I>/<-S><I>\$/g;
+    # small fixup for %d
+    s/%<-S><I>d<-I><S>\\<-S><I>n<-I><S>/%d\\n/;
     # iterators
     s/^ //;
     s/ $//;

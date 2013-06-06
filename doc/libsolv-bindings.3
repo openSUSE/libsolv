@@ -2,12 +2,12 @@
 .\"     Title: libsolv-bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/05/2013
+.\"      Date: 06/06/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "06/05/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "06/06/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,8 +31,348 @@
 libsolv-bindings \- access libsolv from perl/python/ruby
 .SH "DESCRIPTION"
 .sp
-bla bla bla
-.SH "THE POOL"
+Libsolv\(cqs language bindings offer an abstract, object orientated interface to the library\&. The supported languages are currently perl, python, and ruby\&. All example code (except in the specifics sections, of course) lists first the \(lqC\-ish\(rq interface, then the syntax for perl, python, and ruby (in that order)\&.
+.SH "PERL SPECIFICS"
+.sp
+Libsolv\(cqs perl bindings can be loaded with the following statement:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBuse solv\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Objects are either created by calling the new() method on a class or they are returned by calling methods on other objects\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+my \fI$pool\fR \fB= solv::Pool\->new()\fR;
+my \fI$repo\fR \fB=\fR \fI$pool\fR\fB\->add_repo("my_first_repo")\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Swig encapsulates all objects as tied hashes, thus the attributes can be accessed by treating the object as standard hash reference:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fI$pool\fR\fB\->{appdata} = 42\fR;
+\fBprintf "appdata is %d\en",\fR \fI$pool\fR\fB\->{appdata}\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+An special exception to this are iterator objects, they are encapsulated as tied arrays so that it is possible to iterate with a for() statement:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+my \fI$iter\fR \fB=\fR \fI$pool\fR\fB\->solvables_iter()\fR;
+\fBfor my\fR \fI$solvable\fR \fB(\fR\fI@$iter\fR\fB) { \&.\&.\&. }\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+As a downside of this approach, iterator objects can have no attributes\&.
+.sp
+If an array needs to be passwd to a method it is usually done by reference, if a method returns an array it returns it on the stack:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+my \fI@problems\fR \fB=\fR \fI$solver\fR\fB\->solve(\e\fR\fI@jobs\fR\fB)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Due to a bug in swig, stringification does not work for libsolv\(cqs object\&. Instead you have to call the object\(cqs str() method\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBprint\fR \fI$dep\fR\fB\->str() \&. "\e\fR\fIn\fR\fB"\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Swig implements all constants as numeric variables (instead of the more natural constant subs), so don\(cqt forget the leading \(lq$\(rq when accessing a constant\&. Also do not forget to prepend the namespace of the constant:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fI$pool\fR\fB\->set_flag($solv::Pool::POOL_FLAG_OBSOLETEUSESCOLORS, 1)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.SH "PYTHON SPECIFICS"
+.sp
+The python bindings can be loaded with:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBimport solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Objects are either created by calling the constructor method for a class or they are returned by calling methods on other objects\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR \fB= solv\&.Pool()\fR
+\fIrepo\fR \fB=\fR \fIpool\fR\fB\&.add_repo("my_first_repo")\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Attributes can be accessed as usual:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR\fB\&.appdata = 42\fR
+\fBprint "appdata is %\fR\fId\fR\fB" % (\fR\fIpool\fR\fB\&.appdata)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterators also work as expected:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor\fR \fIsolvable\fR \fBin\fR \fIpool\fR\fB\&.solvables_iter():\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Arrays are passed an returned as list objects:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIjobs\fR \fB=\fR \fI[\fR\fB]\fR
+\fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The bindings define stringification for many classes, some also have a \fIrepr\fR method to ease debugging\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBprint\fR \fIdep\fR
+\fBprint repr(\fR\fIrepo\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Constants are attributes of the classes:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR\fB\&.set_flag(solv\&.Pool\&.POOL_FLAG_OBSOLETEUSESCOLORS, 1)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.SH "RUBY SPECIFICS"
+.sp
+The ruby bindings can be loaded with:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBrequire \*(Aqsolv\*(Aq\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Objects are either created by calling the new method on a class or they are returned by calling methods on other objects\&. Note that all classes start with an uppercase letter in ruby, so the class is called \(lqSolv\(rq\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR \fB= Solv::Pool\&.new\fR
+\fIrepo\fR \fB=\fR \fIpool\fR\fB\&.add_repo("my_first_repo")\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Attributes can be accessed as usual:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR\fB\&.appdata = 42\fR
+\fBputs "appdata is #{\fR\fIpool\fR\fB\&.appdata}"\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterators also work as expected:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor\fR \fIsolvable\fR \fBin\fR \fIpool\fR\fB\&.solvables_iter() do \&.\&.\&.\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Arrays are passed an returned as array objects:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIjobs\fR \fB=\fR \fI[\fR\fB]\fR
+\fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Most classes define a to_s method, so objects can be easily stringified\&. Many also define an inspect() method\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBputs\fR \fIdep\fR
+\fBputs\fR \fIrepo\fR\fB\&.inspect\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Constants live in the namespace of the class they belong to:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR\fB\&.set_flag(Solv::Pool::POOL_FLAG_OBSOLETEUSESCOLORS, 1)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Note that boolean methods have an added trailing \(lq?\(rq, to be consistent with other ruby modules:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBputs "empty\fR \fIrepo\fR\fB" if\fR \fIrepo\fR\fB\&.isempty?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.SH "THE SOLV CLASS"
+.sp
+This is the main namespace of the library, you cannot create objects of this type but it contains some useful constants\&.
+.SS "CONSTANTS"
+.sp
+Relational flag constants, the first three can be or\-ed together
+.PP
+\fBREL_LT\fR
+.RS 4
+the \(lqless than\(rq bit
+.RE
+.PP
+\fBREL_EQ\fR
+.RS 4
+the \(lqequals to\(rq bit
+.RE
+.PP
+\fBREL_GT\fR
+.RS 4
+the \(lqgreater then\(rq bit
+.RE
+.PP
+\fBREL_ARCH\fR
+.RS 4
+used for relations that describe an extra architecture filter, the version part of the relation is interpreted as architecture\&.
+.RE
+.sp
+Special Solvable Ids
+.PP
+\fBSOLVID_META\fR
+.RS 4
+Access the meta section of a repository or repodata area\&. This is like an extra Solvable that has the Id SOLVID_META\&.
+.RE
+.PP
+\fBSOLVID_POS\fR
+.RS 4
+Use the data position stored inside of the pool instead of accessing some solvable by Id\&. The bindings have the Datapos objects as an abstraction mechanism, so you do not need this constant\&.
+.RE
+.sp
+Constant string Ids
+.PP
+\fBID_NULL\fR
+.RS 4
+Always zero
+.RE
+.PP
+\fBID_EMPTY\fR
+.RS 4
+Always one, describes the empty string
+.RE
+.PP
+\fBSOLVABLE_NAME\fR
+.RS 4
+The keyname Id of the name of the solvable\&.
+.RE
+.PP
+\fB\&...\fR
+.RS 4
+see the libsolv\-knownid manpage for a list of fixed Ids\&.
+.RE
+.SH "THE POOL CLASS"
 .sp
 The pool is libsolv\(cqs central resource manager\&. A pool consists of Solvables, Repositories, Dependencies, each indexed by Ids\&.
 .SS "CLASS METHODS"
@@ -270,7 +610,7 @@ Set the architecture for your system\&. The architecture is used to determine wh
 .RS 4
 .\}
 .nf
-\fBRepo *add_repo(const char *\fR\fIname\fR\fB)\fR
+\fBRepo add_repo(const char *\fR\fIname\fR\fB)\fR
 \fI$repo\fR \fB=\fR \fI$pool\fR\fB\->add_repo(\fR\fI$name\fR\fB)\fR;
 \fIrepo\fR \fB=\fR \fIpool\fR\fB\&.add_repo(\fR\fIname\fR\fB)\fR
 \fIrepo\fR \fB=\fR \fIpool\fR\fB\&.add_repo(\fR\fIname\fR\fB)\fR
@@ -285,7 +625,7 @@ Add a Repository with the specified name to the pool\&. The reposiory is empty o
 .RS 4
 .\}
 .nf
-\fBRepoiterator *repos_iter()\fR
+\fBRepoiterator repos_iter()\fR
 \fBfor my\fR \fI$repo\fR \fB(\fR\fI@\fR\fB{\fR\fI$pool\fR\fB\->repos_iter()})\fR
 \fBfor\fR \fIrepo\fR \fBin\fR \fIpool\fR\fB\&.repos_iter():\fR
 \fBfor\fR \fIrepo\fR \fBin\fR \fIpool\fR\fB\&.repos_iter()\fR
@@ -300,7 +640,7 @@ Iterate over the existing repositories\&.
 .RS 4
 .\}
 .nf
-\fBSolvableiterator *solvables_iter()\fR
+\fBSolvableiterator solvables_iter()\fR
 \fBfor my\fR \fI$solvable\fR \fB(\fR\fI@\fR\fB{\fR\fI$pool\fR\fB\->solvables_iter()})\fR
 \fBfor\fR \fIsolvable\fR \fBin\fR \fIpool\fR\fB\&.solvables_iter():\fR
 \fBfor\fR \fIsolvable\fR \fBin\fR \fIpool\fR\fB\&.solvables_iter()\fR
@@ -315,7 +655,7 @@ Iterate over the existing solvables\&.
 .RS 4
 .\}
 .nf
-\fBDep *Dep(const char *\fR\fIstr\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+\fBDep Dep(const char *\fR\fIstr\fR\fB, bool\fR \fIcreate\fR \fB= 1)\fR
 my \fI$dep\fR \fB=\fR \fI$pool\fR\fB\->Dep(\fR\fI$string\fR\fB)\fR;
 \fIdep\fR \fB=\fR \fIpool\fR\fB\&.Dep(\fR\fIstring\fR\fB)\fR
 \fIdep\fR \fB=\fR \fIpool\fR\fB\&.Dep(\fR\fIstring\fR\fB)\fR
@@ -343,7 +683,7 @@ Create an object describing a string or dependency\&. If the string is currently
 .RS 4
 .\}
 .nf
-\fBQueue addfileprovides_queue()\fR
+\fBId *addfileprovides_queue()\fR
 my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->addfileprovides_queue()\fR;
 \fIids\fR \fB=\fR \fIpool\fR\fB\&.addfileprovides_queue()\fR
 \fIids\fR \fB=\fR \fIpool\fR\fB\&.addfileprovides_queue()\fR
@@ -352,7 +692,7 @@ my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->addfileprovides_queue()\fR;
 .RE
 .\}
 .sp
-Some package managers like rpm allow dependencies on files contained in other packages\&. To allow libsolv to deal with those dependencies in an efficient way, you need to call the addfileprovides method after creating and reading all repositories\&. This method will scan all dependency for file names and than scan all packages for matching files\&. If a filename has been matched, it will be added to the provides list of the corresponding package\&. The addfileprovides_queue variant works the same way but returns an array containing all file dependencies\&. This information can be stored with the repository to speed up the next usage of the repository\&.
+Some package managers like rpm allow dependencies on files contained in other packages\&. To allow libsolv to deal with those dependencies in an efficient way, you need to call the addfileprovides method after creating and reading all repositories\&. This method will scan all dependency for file names and than scan all packages for matching files\&. If a filename has been matched, it will be added to the provides list of the corresponding package\&. The addfileprovides_queue variant works the same way but returns an array containing all file dependencies\&. This information can be stored in the meta section of the repositories to speed up the next time the repository is loaded and addfileprovides is called\&.
 .sp
 .if n \{\
 .RS 4
@@ -373,7 +713,7 @@ Create the internal \(lqwhatprovides\(rq hash over all of the provides of all pa
 .RS 4
 .\}
 .nf
-\fBQueue whatprovides(DepId\fR \fIdep\fR\fB)\fR
+\fBSolvable *whatprovides(DepId\fR \fIdep\fR\fB)\fR
 my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatprovides(\fR\fI$dep\fR\fB)\fR;
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatprovides(\fR\fIdep\fR\fB)\fR
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatprovides(\fR\fIdep\fR\fB)\fR
@@ -388,7 +728,7 @@ Return all solvables that provide the specified dependency\&. You can use either
 .RS 4
 .\}
 .nf
-\fBQueue matchprovidingids(const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+\fBId *matchprovidingids(const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
 my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->matchprovidingids(\fR\fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIids\fR \fB=\fR \fIpool\fR\fB\&.matchprovidingids(\fR\fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
 \fIids\fR \fB=\fR \fIpool\fR\fB\&.matchprovidingids(\fR\fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -403,7 +743,7 @@ Search the names of all provides and return the ones matching the specified stri
 .RS 4
 .\}
 .nf
-\fBId towhatprovides(Queue\fR \fIids\fR\fB)\fR
+\fBId towhatprovides(Id *\fR\fIids\fR\fB)\fR
 my \fI$offset\fR \fB=\fR \fI$pool\fR\fB\->towhatprovides(\e\fR\fI@ids\fR\fB)\fR;
 \fIoffset\fR \fB=\fR \fIpool\fR\fB\&.towhatprovides(\fR\fIids\fR\fB)\fR
 \fIoffset\fR \fB=\fR \fIpool\fR\fB\&.towhatprovides(\fR\fIids\fR\fB)\fR
@@ -433,7 +773,7 @@ Return true if the specified Id describs a known architecture\&.
 .RS 4
 .\}
 .nf
-\fBSolver *Solver()\fR
+\fBSolver Solver()\fR
 my \fI$solver\fR \fB=\fR \fI$pool\fR\fB\->Solver()\fR;
 \fIsolver\fR \fB=\fR \fIpool\fR\fB\&.Solver()\fR
 \fIsolver\fR \fB=\fR \fIpool\fR\fB\&.Solver()\fR
@@ -448,7 +788,7 @@ Create a new solver object\&.
 .RS 4
 .\}
 .nf
-\fBSolver *Job(int\fR \fIhow\fR\fB, Id\fR \fIwhat\fR\fB)\fR
+\fBJob Job(int\fR \fIhow\fR\fB, Id\fR \fIwhat\fR\fB)\fR
 my \fI$job\fR \fB=\fR \fI$pool\fR\fB\->Job(\fR\fI$how\fR\fB,\fR \fI$what\fR\fB)\fR;
 \fIjob\fR \fB=\fR \fIpool\fR\fB\&.Job(\fR\fIhow\fR\fB,\fR \fIwhat\fR\fB)\fR
 \fIjob\fR \fB=\fR \fIpool\fR\fB\&.Job(\fR\fIhow\fR\fB,\fR \fIwhat\fR\fB)\fR
@@ -463,7 +803,7 @@ Create a new Job object\&. Kind of low level, in most cases you would use a Sele
 .RS 4
 .\}
 .nf
-\fBSelection *Selection()\fR
+\fBSelection Selection()\fR
 my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->Selection()\fR;
 \fIsel\fR \fB=\fR \fIpool\fR\fB\&.Selection()\fR
 \fIsel\fR \fB=\fR \fIpool\fR\fB\&.Selection()\fR
@@ -478,7 +818,7 @@ Create an empty selection\&. Useful as a starting point for merging other select
 .RS 4
 .\}
 .nf
-\fBSelection *Selection_all()\fR
+\fBSelection Selection_all()\fR
 my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->Selection_all()\fR;
 \fIsel\fR \fB=\fR \fIpool\fR\fB\&.Selection_all()\fR
 \fIsel\fR \fB=\fR \fIpool\fR\fB\&.Selection_all()\fR
@@ -493,7 +833,7 @@ Create a selection containing all packages\&. Useful as starting point for inter
 .RS 4
 .\}
 .nf
-\fBSelection *select(const char *\fR\fIname\fR\fB, int\fR \fIflags\fR\fB)\fR
+\fBSelection select(const char *\fR\fIname\fR\fB, int\fR \fIflags\fR\fB)\fR
 my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->select(\fR\fI$name\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIsel\fR \fB=\fR \fIpool\fR\fB\&.select(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
 \fIsel\fR \fB=\fR \fIpool\fR\fB\&.select(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -521,7 +861,7 @@ Create a selection by matching packages against the specified string\&. See the 
 .RS 4
 .\}
 .nf
-\fBJobs *getpooljobs()\fR
+\fBJob *getpooljobs()\fR
 \fI@jobs\fR \fB=\fR \fI$pool\fR\fB\->getpooljobs()\fR;
 \fIjobs\fR \fB=\fR \fIpool\fR\fB\&.getpooljobs()\fR
 \fIjobs\fR \fB=\fR \fIpool\fR\fB\&.getpooljobs()\fR
@@ -620,7 +960,7 @@ my \fI$bool\fR \fB=\fR \fI$pool\fR\fB\->lookup_void(\fR\fI$solvid\fR\fB,\fR \fI$
 .RS 4
 .\}
 .nf
-\fBQueue lookup_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+\fBId *lookup_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
 my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->lookup_idarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fIids\fR \fB=\fR \fIpool\fR\fB\&.lookup_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 \fIids\fR \fB=\fR \fIpool\fR\fB\&.lookup_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
@@ -633,7 +973,7 @@ my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->lookup_idarray(\fR\fI$solvid\fR\fB,\fR \f
 .RS 4
 .\}
 .nf
-\fBChksum *lookup_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+\fBChksum lookup_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
 my \fI$chksum\fR \fB=\fR \fI$pool\fR\fB\->lookup_checksum(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fIchksum\fR \fB=\fR \fIpool\fR\fB\&.lookup_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 \fIchksum\fR \fB=\fR \fIpool\fR\fB\&.lookup_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
@@ -648,7 +988,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBDataiterator *Dataiterator(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+\fBDataiterator Dataiterator(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
 my \fI$di\fR \fB=\fR \fI$pool\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
 \fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -678,7 +1018,7 @@ The following methods deal with Ids, i\&.e\&. integers representing objects in t
 .RS 4
 .\}
 .nf
-\fBRepo *id2repo(Id\fR \fIid\fR\fB)\fR
+\fBRepo id2repo(Id\fR \fIid\fR\fB)\fR
 \fI$repo\fR \fB=\fR \fI$pool\fR\fB\->id2repo(\fR\fI$id\fR\fB)\fR;
 \fIrepo\fR \fB=\fR \fIpool\fR\fB\&.id2repo(\fR\fIid\fR\fB)\fR
 \fIrepo\fR \fB=\fR \fIpool\fR\fB\&.id2repo(\fR\fIid\fR\fB)\fR
@@ -693,7 +1033,7 @@ Lookup an existing Repository by id\&. You can also do this by using the \fBrepo
 .RS 4
 .\}
 .nf
-\fBSolvable *id2solvable(Id\fR \fIid\fR\fB)\fR
+\fBSolvable id2solvable(Id\fR \fIid\fR\fB)\fR
 \fI$solvable\fR \fB=\fR \fI$pool\fR\fB\->id2solvable(\fR\fI$id\fR\fB)\fR;
 \fIsolvable\fR \fB=\fR \fIpool\fR\fB\&.id2solvable(\fR\fIid\fR\fB)\fR
 \fIsolvable\fR \fB=\fR \fIpool\fR\fB\&.id2solvable(\fR\fIid\fR\fB)\fR
@@ -723,7 +1063,7 @@ Return a string describing the Solvable with the specified id\&. The string cons
 .RS 4
 .\}
 .nf
-\fBId str2id(const char *\fR\fIstr\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+\fBId str2id(const char *\fR\fIstr\fR\fB, bool\fR \fIcreate\fR \fB= 1)\fR
 my \fI$id\fR \fB=\fR \fIpool\fR\fB\->str2id(\fR\fI$string\fR\fB)\fR;
 \fIid\fR \fB=\fR \fIpool\fR\fB\&.str2id(\fR\fIstring\fR\fB)\fR
 \fIid\fR \fB=\fR \fIpool\fR\fB\&.str2id(\fR\fIstring\fR\fB)\fR
@@ -751,7 +1091,7 @@ Convert a string into an Id and back\&. If the string is currently not in the po
 .RS 4
 .\}
 .nf
-\fBId rel2id(Id\fR \fIname\fR\fB, Id\fR \fIevr\fR\fB, int\fR \fIflags\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+\fBId rel2id(Id\fR \fIname\fR\fB, Id\fR \fIevr\fR\fB, int\fR \fIflags\fR\fB, bool\fR \fIcreate\fR \fB= 1)\fR
 my \fI$id\fR \fB=\fR \fIpool\fR\fB\->rel2id(\fR\fI$nameid\fR\fB,\fR \fI$evrid\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIid\fR \fB=\fR \fIpool\fR\fB\&.rel2id(\fR\fInameid\fR\fB,\fR \fIevrid\fR\fB,\fR \fIflags\fR\fB)\fR
 \fIid\fR \fB=\fR \fIpool\fR\fB\&.rel2id(\fR\fInameid\fR\fB,\fR \fIevrid\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -780,7 +1120,7 @@ Thus, if you want a \(lq<=\(rq relation, you would use \fBREL_LT | REL_EQ\fR\&.
 .RS 4
 .\}
 .nf
-\fBId id2langid(Id\fR \fIid\fR\fB, const char *\fR\fIlang\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+\fBId id2langid(Id\fR \fIid\fR\fB, const char *\fR\fIlang\fR\fB, bool\fR \fIcreate\fR \fB= 1)\fR
 my \fI$id\fR \fB=\fR \fI$pool\fR\fB\->id2langid(\fR\fI$id\fR\fB,\fR \fI$language\fR\fB)\fR;
 \fIid\fR \fB=\fR \fIpool\fR\fB\&.id2langid(\fR\fIid\fR\fB,\fR \fIlanguage\fR\fB)\fR
 \fIid\fR \fB=\fR \fIpool\fR\fB\&.id2langid(\fR\fIid\fR\fB,\fR \fIlanguage\fR\fB)\fR
@@ -845,7 +1185,7 @@ The id of this dependency\&.
 .RS 4
 .\}
 .nf
-\fBDep *Rel(int\fR \fIflags\fR\fB, DepId\fR \fIevrid\fR\fB, bool\fR \fIcreate\fR\fB=1)\fR
+\fBDep Rel(int\fR \fIflags\fR\fB, DepId\fR \fIevrid\fR\fB, bool\fR \fIcreate\fR \fB= 1)\fR
 my \fI$reldep\fR \fB=\fR \fI$dep\fR\fB\->Rel(\fR\fI$flags\fR\fB,\fR \fI$evrdep\fR\fB)\fR;
 \fIreldep\fR \fB=\fR \fIdep\fR\fB\&.Rel(\fR\fIflags\fR\fB,\fR \fIevrdep\fR\fB)\fR
 \fIreldep\fR \fB=\fR \fIdep\fR\fB\&.Rel(\fR\fIflags\fR\fB,\fR \fIevrdep\fR\fB)\fR
@@ -860,7 +1200,7 @@ Create a relational dependency from to string dependencies and a flags argument\
 .RS 4
 .\}
 .nf
-\fBSelection *Selection_name(int\fR \fIsetflags\fR \fB= 0)\fR
+\fBSelection Selection_name(int\fR \fIsetflags\fR \fB= 0)\fR
 my \fI$sel\fR \fB=\fR \fI$dep\fR\fB\->Selection_name()\fR;
 \fIsel\fR \fB=\fR \fIdep\fR\fB\&.Selection_name()\fR
 \fIsel\fR \fB=\fR \fIdep\fR\fB\&.Selection_name()\fR
@@ -875,7 +1215,7 @@ Create a Selection from a dependency\&. The selection consists of all packages t
 .RS 4
 .\}
 .nf
-\fBSelection *Selection_provides(int\fR \fIsetflags\fR \fB= 0)\fR
+\fBSelection Selection_provides(int\fR \fIsetflags\fR \fB= 0)\fR
 my \fI$sel\fR \fB=\fR \fI$dep\fR\fB\->Selection_provides()\fR;
 \fIsel\fR \fB=\fR \fIdep\fR\fB\&.Selection_provides()\fR
 \fIsel\fR \fB=\fR \fIdep\fR\fB\&.Selection_provides()\fR
@@ -1181,7 +1521,7 @@ Write a repo as a \(lqsolv\(rq file\&. These files can be read very fast and thu
 .RS 4
 .\}
 .nf
-\fBSolvableiterator *solvables_iter()\fR
+\fBSolvableiterator solvables_iter()\fR
 \fBfor my\fR \fI$solvable\fR \fB(\fR\fI@\fR\fB{\fR\fI$repo\fR\fB\->solvables_iter()})\fR
 \fBfor\fR \fIsolvable\fR \fBin\fR \fIrepo\fR\fB\&.solvables_iter():\fR
 \fBfor\fR \fIsolvable\fR \fBin\fR \fIrepo\fR\fB\&.solvables_iter()\fR
@@ -1196,7 +1536,7 @@ Iterate over all solvables in a repository\&.
 .RS 4
 .\}
 .nf
-\fBRepodata *add_repodata(int\fR \fIflags\fR \fB= 0)\fR
+\fBRepodata add_repodata(int\fR \fIflags\fR \fB= 0)\fR
 my \fI$repodata\fR \fB=\fR \fI$repo\fR\fB\->add_repodata()\fR;
 \fIrepodata\fR \fB=\fR \fIrepo\fR\fB\&.add_repodata()\fR
 \fIrepodata\fR \fB=\fR \fIrepo\fR\fB\&.add_repodata()\fR
@@ -1241,7 +1581,7 @@ Return true if the solvables of this repository are all in a single block with n
 .RS 4
 .\}
 .nf
-\fBRepodata *first_repodata()\fR
+\fBRepodata first_repodata()\fR
 my \fI$repodata\fR \fB=\fR \fI$repo\fR\fB\->first_repodata()\fR;
 \fIrepodata\fR \fB=\fR \fIrepo\fR\fB\&.first_repodata()\fR
 \fIrepodata\fR \fB=\fR \fIrepo\fR\fB\&.first_repodata()\fR
@@ -1256,7 +1596,7 @@ Checks if all repodatas but the first repodata are extensions, and return the fi
 .RS 4
 .\}
 .nf
-\fBSelection *Selection(int\fR \fIsetflags\fR \fB= 0)\fR
+\fBSelection Selection(int\fR \fIsetflags\fR \fB= 0)\fR
 my \fI$sel\fR \fB=\fR \fI$repo\fR\fB\->Selection()\fR;
 \fIsel\fR \fB=\fR \fIrepo\fR\fB\&.Selection()\fR
 \fIsel\fR \fB=\fR \fIrepo\fR\fB\&.Selection()\fR
@@ -1271,7 +1611,7 @@ Create a Selection consisting of all packages in the repository\&.
 .RS 4
 .\}
 .nf
-\fBDataiterator *Dataiterator(Id\fR \fIp\fR\fB, Id\fR \fIkey\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+\fBDataiterator Dataiterator(Id\fR \fIp\fR\fB, Id\fR \fIkey\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
 my \fI$di\fR \fB=\fR \fI$repo\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
 \fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -1329,7 +1669,7 @@ Two repositories are equal if they belong to the same pool and have the same id\
 .RS 4
 .\}
 .nf
-\fBSolvable *add_solvable()\fR
+\fBSolvable add_solvable()\fR
 \fI$repo\fR\fB\->add_solvable()\fR;
 \fIrepo\fR\fB\&.add_solvable()\fR
 \fIrepo\fR\fB\&.add_solvable()\fR
@@ -1865,7 +2205,7 @@ my \fI$bool\fR \fB=\fR \fI$solvable\fR\fB\->lookup_void(\fR\fI$keyname\fR\fB)\fR
 .RS 4
 .\}
 .nf
-\fBChksum *lookup_checksum(Id\fR \fIkeyname\fR\fB)\fR
+\fBChksum lookup_checksum(Id\fR \fIkeyname\fR\fB)\fR
 my \fI$chksum\fR \fB=\fR \fI$solvable\fR\fB\->lookup_checksum(\fR\fI$keyname\fR\fB)\fR;
 \fIchksum\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_checksum(\fR\fIkeyname\fR\fB)\fR
 \fIchksum\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_checksum(\fR\fIkeyname\fR\fB)\fR
@@ -1878,7 +2218,7 @@ my \fI$chksum\fR \fB=\fR \fI$solvable\fR\fB\->lookup_checksum(\fR\fI$keyname\fR\
 .RS 4
 .\}
 .nf
-\fBQueue lookup_idarray(Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+\fBId *lookup_idarray(Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
 my \fI@ids\fR \fB=\fR \fI$solvable\fR\fB\->lookup_idarray(\fR\fI$keyname\fR\fB)\fR;
 \fIids\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_idarray(\fR\fIkeyname\fR\fB)\fR
 \fIids\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_idarray(\fR\fIkeyname\fR\fB)\fR
@@ -1891,7 +2231,7 @@ my \fI@ids\fR \fB=\fR \fI$solvable\fR\fB\->lookup_idarray(\fR\fI$keyname\fR\fB)\
 .RS 4
 .\}
 .nf
-\fBQueue lookup_deparray(Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+\fBDep *lookup_deparray(Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
 my \fI@deps\fR \fB=\fR \fI$solvable\fR\fB\->lookup_deparray(\fR\fI$keyname\fR\fB)\fR;
 \fIdeps\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_deparray(\fR\fIkeyname\fR\fB)\fR
 \fIdeps\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_deparray(\fR\fIkeyname\fR\fB)\fR
@@ -1966,7 +2306,7 @@ Return true if the solvable is installed on the system\&.
 .RS 4
 .\}
 .nf
-\fBSelection *Selection(int\fR \fIsetflags\fR \fB= 0)\fR
+\fBSelection Selection(int\fR \fIsetflags\fR \fB= 0)\fR
 my \fI$sel\fR \fB=\fR \fI$solvable\fR\fB\->Selection()\fR;
 \fIsel\fR \fB=\fR \fIsolvable\fR\fB\&.Selection()\fR
 \fIsel\fR \fB=\fR \fIsolvable\fR\fB\&.Selection()\fR
@@ -2320,7 +2660,7 @@ The secondary numeric value that was matched (only valid for types containing tw
 .RS 4
 .\}
 .nf
-\fBDatapos *pos()\fR;
+\fBDatapos pos()\fR;
 my \fI$pos\fR \fB=\fR \fI$d\fR\fB\->pos()\fR;
 \fIpos\fR \fB=\fR \fId\fR\fB\&.pos()\fR
 \fIpos\fR \fB=\fR \fId\fR\fB\&.pos()\fR
@@ -2335,7 +2675,7 @@ The position object of the current match\&. It can be used to do sub\-searches s
 .RS 4
 .\}
 .nf
-\fBDatapos *parentpos()\fR;
+\fBDatapos parentpos()\fR;
 my \fI$pos\fR \fB=\fR \fI$d\fR\fB\->parentpos()\fR;
 \fIpos\fR \fB=\fR \fId\fR\fB\&.parentpos()\fR
 \fIpos\fR \fB=\fR \fId\fR\fB\&.parentpos()\fR
@@ -2521,7 +2861,7 @@ Add a raw element to the selection\&. Check the Job class for information about 
 .RS 4
 .\}
 .nf
-\fBJob **jobs(int\fR \fIaction\fR\fB)\fR
+\fBJob *jobs(int\fR \fIaction\fR\fB)\fR
 my \fI@jobs\fR \fB=\fR \fI$sel\fR\fB\->jobs(\fR\fI$action\fR\fB)\fR;
 \fIjobs\fR \fB=\fR \fIsel\fR\fB\&.jobs(\fR\fIaction\fR\fB)\fR
 \fIjobs\fR \fB=\fR \fIsel\fR\fB\&.jobs(\fR\fIaction\fR\fB)\fR
@@ -2536,7 +2876,7 @@ Convert a selection into an array of Job objects\&. The action parameter is or\-
 .RS 4
 .\}
 .nf
-\fBSolvable **solvables()\fR
+\fBSolvable *solvables()\fR
 my \fI@solvables\fR \fB=\fR \fI$sel\fR\fB\->solvables()\fR;
 \fIsolvables\fR \fB=\fR \fIsel\fR\fB\&.solvables()\fR
 \fIsolvables\fR \fB=\fR \fIsel\fR\fB\&.solvables()\fR
@@ -2787,7 +3127,7 @@ Id describing the set of packages, the meaning depends on the selection part of 
 .RS 4
 .\}
 .nf
-\fBSolvable **solvables()\fR
+\fBSolvable *solvables()\fR
 my \fI@solvables\fR \fB=\fR \fI$job\fR\fB\->solvables()\fR;
 \fIsolvables\fR \fB=\fR \fIjob\fR\fB\&.solvables()\fR
 \fIsolvables\fR \fB=\fR \fIjob\fR\fB\&.solvables()\fR
@@ -2867,6 +3207,8 @@ Set bits specify which parts of the specified packages where specified by the us
 .sp
 So if a package "screen\-1\-1" is installed for the x86_64 architecture and version "2\-1" is only available for the i586 architecture, installing package "screen\-2\&.1" will ask the user for confirmation because of the different architecture\&. When using the Selection class to create jobs the set bits are automatically added, e\&.g\&. selecting \(lqscreen\&.i586\(rq will automatically add SOLVER_SETARCH, and thus no problem will be reported\&.
 .SH "THE SOLVER CLASS"
+.sp
+Dependency solving is what this library is about\&. A solver object is needed for solving to store the result of the solver run\&. The solver object can be used multiple times for different jobs, reusing it allows the solver to re\-use the dependency rules it already computed\&.
 .SS "CONSTANTS"
 .sp
 Flags to modify some of the solver\(cqs behaviour:
@@ -3173,7 +3515,7 @@ Set/get a solver specific flag\&. The flags define the policies the solver has t
 .RS 4
 .\}
 .nf
-\fBProblem **solve(Job *\fR\fIjobs\fR\fB)\fR
+\fBProblem *solve(Job *\fR\fIjobs\fR\fB)\fR
 my \fI@problems\fR \fB=\fR \fI$solver\fR\fB\->solve(\e\fR\fI@jobs\fR\fB)\fR;
 \fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
 \fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
@@ -3188,7 +3530,7 @@ Solve a problem specified in the job list (plus the jobs defined in the pool)\&.
 .RS 4
 .\}
 .nf
-\fBTransaction *transaction()\fR
+\fBTransaction transaction()\fR
 my \fI$trans\fR \fB=\fR \fI$solver\fR\fB\->transaction()\fR;
 \fItrans\fR \fB=\fR \fIsolver\fR\fB\&.transaction()\fR
 \fItrans\fR \fB=\fR \fIsolver\fR\fB\&.transaction()\fR
@@ -3238,7 +3580,7 @@ Id of the problem\&. The first problem has Id 1, they are numbered consecutively
 .RS 4
 .\}
 .nf
-\fBRule *findproblemrule()\fR
+\fBRule findproblemrule()\fR
 my \fI$probrule\fR \fB=\fR \fI$problem\fR\fB\->findproblemrule()\fR;
 \fIprobrule\fR \fB=\fR \fIproblem\fR\fB\&.findproblemrule()\fR
 \fIprobrule\fR \fB=\fR \fIproblem\fR\fB\&.findproblemrule()\fR
@@ -3253,7 +3595,7 @@ Return the rule that caused the problem\&. Of cource in most situations there is
 .RS 4
 .\}
 .nf
-\fBRule **findallproblemrules(bool\fR \fIunfiltered\fR \fB= 0)\fR
+\fBRule *findallproblemrules(bool\fR \fIunfiltered\fR \fB= 0)\fR
 my \fI@probrules\fR \fB=\fR \fI$problem\fR\fB\->findallproblemrules()\fR;
 \fIprobrules\fR \fB=\fR \fIproblem\fR\fB\&.findallproblemrule()\fR
 \fIprobrules\fR \fB=\fR \fIproblem\fR\fB\&.findallproblemrule()\fR
@@ -3268,7 +3610,7 @@ Return all rules responsible for the problem\&. The returned set of rules contai
 .RS 4
 .\}
 .nf
-\fBSolutions **solutions()\fR
+\fBSolution *solutions()\fR
 my \fI@solutions\fR \fB=\fR \fI$problem\fR\fB\->solutions()\fR;
 \fIsolutions\fR \fB=\fR \fIproblem\fR\fB\&.solutions()\fR
 \fIsolutions\fR \fB=\fR \fIproblem\fR\fB\&.solutions()\fR
@@ -3348,7 +3690,7 @@ The basic type of the rule\&. See the constant section of the solver class for t
 .RS 4
 .\}
 .nf
-\fBRuleinfo *info()\fR
+\fBRuleinfo info()\fR
 my \fI$ruleinfo\fR \fB=\fR \fI$rule\fR\fB\->info()\fR;
 \fIruleinfo\fR \fB=\fR \fIrule\fR\fB\&.info()\fR
 \fIruleinfo\fR \fB=\fR \fIrule\fR\fB\&.info()\fR
@@ -3363,7 +3705,7 @@ Return a Ruleinfo object that contains information about why the rule was create
 .RS 4
 .\}
 .nf
-\fBRuleinfo **allinfos()\fR
+\fBRuleinfo *allinfos()\fR
 my \fI@ruleinfos\fR \fB=\fR \fI$rule\fR\fB\->allinfos()\fR;
 \fIruleinfos\fR \fB=\fR \fIrule\fR\fB\&.allinfos()\fR
 \fIruleinfos\fR \fB=\fR \fIrule\fR\fB\&.allinfos()\fR
@@ -3552,7 +3894,7 @@ Id of the solution\&. The first solution has Id 1, they are numbered consecutive
 .RS 4
 .\}
 .nf
-\fBSolutionelement **elements(bool\fR \fIexpandreplaces\fR \fB= 0)\fR
+\fBSolutionelement *elements(bool\fR \fIexpandreplaces\fR \fB= 0)\fR
 my \fI@solutionelements\fR \fB=\fR \fI$solution\fR\fB\->elements()\fR;
 \fIsolutionelements\fR \fB=\fR \fIsolution\fR\fB\&.elements()\fR
 \fIsolutionelements\fR \fB=\fR \fIsolution\fR\fB\&.elements()\fR
@@ -3707,7 +4049,7 @@ The index of the job that needs to be removed to fix the problem, or \-1 if the 
 .RS 4
 .\}
 .nf
-\fBSolutionelement **replaceelements()\fR
+\fBSolutionelement *replaceelements()\fR
 my \fI@solutionelements\fR \fB=\fR \fI$solutionelement\fR\fB\->replaceelements()\fR;
 \fIsolutionelements\fR \fB=\fR \fIsolutionelement\fR\fB\&.replaceelements()\fR
 \fIsolutionelements\fR \fB=\fR \fIsolutionelement\fR\fB\&.replaceelements()\fR
@@ -3737,7 +4079,7 @@ Return an integer that contains the policy mismatch bits or\-ed together, or zer
 .RS 4
 .\}
 .nf
-\fBJob *Job()\fR
+\fBJob Job()\fR
 my \fI$job\fR \fB=\fR \fI$solutionelement\fR\fB\->Job()\fR;
 \fIillegal\fR \fB=\fR \fIsolutionelement\fR\fB\&.Job()\fR
 \fIillegal\fR \fB=\fR \fIsolutionelement\fR\fB\&.Job()\fR
@@ -3763,6 +4105,8 @@ my \fI$str\fR \fB=\fR \fI$solutionelement\fR\fB\->str()\fR;
 .sp
 A string describing the change the solution element consists of\&.
 .SH "THE TRANSACTION CLASS"
+.sp
+Transactions describe the output of a solver run\&. A transaction contains a number of transaction elements, each either the installation of a new package or the removal of an already installed package\&. The Transaction class supports a classify() method that puts the elements into different groups so that a transaction can be presented to the user in a meaningful way\&.
 .SS "CONSTANTS"
 .sp
 Transaction element types, both active and passive
@@ -3948,7 +4292,7 @@ Returns true if the transaction does not do anything, i\&.e\&. has no elements\&
 .RS 4
 .\}
 .nf
-\fBSolvable **newpackages()\fR;
+\fBSolvable *newpackages()\fR;
 my \fI@newsolvables\fR \fB=\fR \fI$trans\fR\fB\->newpackages()\fR;
 \fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newpackages()\fR
 \fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newpackages()\fR
@@ -3963,7 +4307,7 @@ Return all packages that are to be installed by the transaction\&. This are the 
 .RS 4
 .\}
 .nf
-\fBSolvable **keptpackages()\fR;
+\fBSolvable *keptpackages()\fR;
 my \fI@keptsolvables\fR \fB=\fR \fI$trans\fR\fB\->keptpackages()\fR;
 \fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptpackages()\fR
 \fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptpackages()\fR
@@ -3978,7 +4322,7 @@ Return all installed packages that the transaction will keep installed\&.
 .RS 4
 .\}
 .nf
-\fBSolvable **steps()\fR;
+\fBSolvable *steps()\fR;
 my \fI@steps\fR \fB=\fR \fI$trans\fR\fB\->steps()\fR;
 \fIsteps\fR \fB=\fR \fItrans\fR\fB\&.steps()\fR
 \fIsteps\fR \fB=\fR \fItrans\fR\fB\&.steps()\fR
@@ -4008,7 +4352,7 @@ Return the transaction type of the specified solvable\&. See the CONSTANTS secti
 .RS 4
 .\}
 .nf
-\fBTransactionClass **classify(int\fR \fImode\fR \fB= 0)\fR
+\fBTransactionClass *classify(int\fR \fImode\fR \fB= 0)\fR
 my \fI@classes\fR \fB=\fR \fI$trans\fR\fB\->classify()\fR;
 \fIclasses\fR \fB=\fR \fItrans\fR\fB\&.classify()\fR
 \fIclasses\fR \fB=\fR \fItrans\fR\fB\&.classify()\fR
@@ -4023,7 +4367,7 @@ Group the transaction elements into classes so that they can be displayed in a s
 .RS 4
 .\}
 .nf
-\fBSolvable *othersolvable(Solvable *\fR\fIsolvable\fR\fB)\fR;
+\fBSolvable othersolvable(Solvable *\fR\fIsolvable\fR\fB)\fR;
 my \fI$other\fR \fB=\fR \fI$trans\fR\fB\->othersolvable(\fR\fI$solvable\fR\fB)\fR;
 \fIother\fR \fB=\fR \fItrans\fR\fB\&.othersolvable(\fR\fIsolvable\fR\fB)\fR
 \fIother\fR \fB=\fR \fItrans\fR\fB\&.othersolvable(\fR\fIsolvable\fR\fB)\fR
@@ -4042,7 +4386,7 @@ Thus, the \(lqother\(rq solvable is normally the package that is also shown for 
 .RS 4
 .\}
 .nf
-\fBSolvable **allothersolvables(Solvable *\fR\fIsolvable\fR\fB)\fR;
+\fBSolvable *allothersolvables(Solvable *\fR\fIsolvable\fR\fB)\fR;
 my \fI@others\fR \fB=\fR \fI$trans\fR\fB\->allothersolvables(\fR\fI$solvable\fR\fB)\fR;
 \fIothers\fR \fB=\fR \fItrans\fR\fB\&.allothersolvables(\fR\fIsolvable\fR\fB)\fR
 \fIothers\fR \fB=\fR \fItrans\fR\fB\&.allothersolvables(\fR\fIsolvable\fR\fB)\fR
@@ -4245,7 +4589,7 @@ Checksums (also called hashes) are used to make sure that downloaded data is not
 .RS 4
 .\}
 .nf
-\fBChksum *Chksum(Id\fR \fItype\fR\fB)\fR
+\fBChksum Chksum(Id\fR \fItype\fR\fB)\fR
 my \fI$chksum\fR \fB= solv::Chksum\->new(\fR\fI$type\fR\fB)\fR;
 \fIchksum\fR \fB= solv\&.Chksum(\fR\fItype\fR\fB)\fR
 \fIchksum\fR \fB= Solv::Chksum\&.new(\fR\fItype\fR\fB)\fR
@@ -4274,7 +4618,7 @@ These keys are constants in the \fBsolv\fR class\&.
 .RS 4
 .\}
 .nf
-\fBChksum *Chksum(Id\fR \fItype\fR\fB, const char *\fR\fIhex\fR\fB)\fR
+\fBChksum Chksum(Id\fR \fItype\fR\fB, const char *\fR\fIhex\fR\fB)\fR
 my \fI$chksum\fR \fB= solv::Chksum\->new(\fR\fI$type\fR\fB,\fR \fI$hex\fR\fB)\fR;
 \fIchksum\fR \fB= solv\&.Chksum(\fR\fItype\fR\fB,\fR \fIhex\fR\fB)\fR
 \fIchksum\fR \fB= Solv::Chksum\&.new(\fR\fItype\fR\fB,\fR \fIhex\fR\fB)\fR
@@ -4672,7 +5016,7 @@ my \fI@ids\fR \fB=\fR \fI$data\fR\fB\->lookup_idarray(\fR\fI$solvid\fR\fB,\fR \f
 .RS 4
 .\}
 .nf
-\fBChksum *lookup_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+\fBChksum lookup_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
 my \fI$chksum\fR \fB=\fR \fI$data\fR\fB\->lookup_checksum(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fIchksum\fR \fB=\fR \fIdata\fR\fB\&.lookup_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 \fIchksum\fR \fB=\fR \fIdata\fR\fB\&.lookup_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
@@ -4899,7 +5243,7 @@ my \fI$bool\fR \fB=\fR \fI$datapos\fR\fB\->lookup_void(\fR\fI$keyname\fR\fB)\fR;
 .RS 4
 .\}
 .nf
-\fBQueue lookup_idarray(Id\fR \fIkeyname\fR\fB)\fR
+\fBId *lookup_idarray(Id\fR \fIkeyname\fR\fB)\fR
 my \fI@ids\fR \fB=\fR \fI$datapos\fR\fB\->lookup_idarray(\fR\fI$keyname\fR\fB)\fR;
 \fIids\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_idarray(\fR\fIkeyname\fR\fB)\fR
 \fIids\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_idarray(\fR\fIkeyname\fR\fB)\fR
@@ -4912,7 +5256,7 @@ my \fI@ids\fR \fB=\fR \fI$datapos\fR\fB\->lookup_idarray(\fR\fI$keyname\fR\fB)\f
 .RS 4
 .\}
 .nf
-\fBChksum *lookup_checksum(Id\fR \fIkeyname\fR\fB)\fR
+\fBChksum lookup_checksum(Id\fR \fIkeyname\fR\fB)\fR
 my \fI$chksum\fR \fB=\fR \fI$datapos\fR\fB\->lookup_checksum(\fR\fI$keyname\fR\fB)\fR;
 \fIchksum\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_checksum(\fR\fIkeyname\fR\fB)\fR
 \fIchksum\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_checksum(\fR\fIkeyname\fR\fB)\fR

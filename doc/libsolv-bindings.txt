@@ -8,13 +8,189 @@ NAME
 ----
 libsolv-bindings - access libsolv from perl/python/ruby
 
+
 DESCRIPTION
 -----------
-bla bla bla
+Libsolv's language bindings offer an abstract, object orientated interface
+to the library. The supported languages are currently perl, python, and ruby.
+All example code (except in the specifics sections, of course) lists first
+the ``C-ish'' interface, then the syntax for perl, python, and ruby (in that
+order).
 
-THE POOL
---------
 
+PERL SPECIFICS
+--------------
+Libsolv's perl bindings can be loaded with the following statement:
+
+	use solv;
+
+Objects are either created by calling the new() method on a class or they
+are returned by calling methods on other objects.
+
+	my $pool = solv::Pool->new();
+	my $repo = $pool->add_repo("my_first_repo");
+
+Swig encapsulates all objects as tied hashes, thus the attributes can be
+accessed by treating the object as standard hash reference:
+
+	$pool->{appdata} = 42;
+	printf "appdata is %d\n", $pool->{appdata};
+
+An special exception to this are iterator objects, they are encapsulated as
+tied arrays so that it is possible to iterate with a for() statement:
+
+	my $iter = $pool->solvables_iter();
+	for my $solvable (@$iter) { ... };
+
+As a downside of this approach, iterator objects can have no attributes.
+
+If an array needs to be passwd to a method it is usually done by reference,
+if a method returns an array it returns it on the stack:
+
+	my @problems = $solver->solve(\@jobs);
+
+Due to a bug in swig, stringification does not work for libsolv's object.
+Instead you have to call the object's str() method.
+
+	print $dep->str() . "\n";
+
+Swig implements all constants as numeric variables (instead of the more
+natural constant subs), so don't forget the leading ``$'' when accessing a
+constant. Also do not forget to prepend the namespace of the constant:
+
+	$pool->set_flag($solv::Pool::POOL_FLAG_OBSOLETEUSESCOLORS, 1);
+	
+
+PYTHON SPECIFICS
+----------------
+The python bindings can be loaded with:
+
+	import solv
+
+Objects are either created by calling the constructor method for a class or they
+are returned by calling methods on other objects.
+
+	pool = solv.Pool()
+	repo = pool.add_repo("my_first_repo")
+
+Attributes can be accessed as usual:
+
+	pool.appdata = 42
+	print "appdata is %d" % (pool.appdata)
+
+Iterators also work as expected:
+
+	for solvable in pool.solvables_iter():
+
+Arrays are passed an returned as list objects:
+
+	jobs = []
+	problems = solver.solve(jobs)
+
+The bindings define stringification for many classes, some also have a
+__repr__ method to ease debugging.
+
+	print dep
+	print repr(repo)
+
+Constants are attributes of the classes:
+
+	pool.set_flag(solv.Pool.POOL_FLAG_OBSOLETEUSESCOLORS, 1);
+
+
+RUBY SPECIFICS
+--------------
+The ruby bindings can be loaded with:
+
+	require 'solv'
+
+Objects are either created by calling the new method on a class or they
+are returned by calling methods on other objects. Note that all classes start
+with an uppercase letter in ruby, so the class is called ``Solv''.
+
+	pool = Solv::Pool.new
+	repo = pool.add_repo("my_first_repo")
+
+Attributes can be accessed as usual:
+
+	pool.appdata = 42
+	puts "appdata is #{pool.appdata}"
+
+Iterators also work as expected:
+
+	for solvable in pool.solvables_iter() do ...
+
+Arrays are passed an returned as array objects:
+
+	jobs = []
+	problems = solver.solve(jobs)
+
+Most classes define a to_s method, so objects can be easily stringified.
+Many also define an inspect() method.
+
+	puts dep
+	puts repo.inspect
+
+Constants live in the namespace of the class they belong to:
+
+	pool.set_flag(Solv::Pool::POOL_FLAG_OBSOLETEUSESCOLORS, 1);
+
+Note that boolean methods have an added trailing ``?'', to be consistent with
+other ruby modules:
+
+	puts "empty repo" if repo.isempty?
+
+
+THE SOLV CLASS
+--------------
+This is the main namespace of the library, you cannot create objects of this
+type but it contains some useful constants.
+
+=== CONSTANTS ===
+
+Relational flag constants, the first three can be or-ed together
+
+*REL_LT*::
+  the ``less than'' bit
+
+*REL_EQ*::
+  the ``equals to'' bit
+
+*REL_GT*::
+  the ``greater then'' bit
+
+*REL_ARCH*::
+  used for relations that describe an extra architecture filter, the
+  version part of the relation is interpreted as architecture.
+
+Special Solvable Ids
+
+*SOLVID_META*::
+  Access the meta section of a repository or repodata area. This is
+  like an extra Solvable that has the Id SOLVID_META.
+
+*SOLVID_POS*::
+  Use the data position stored inside of the pool instead of accessing
+  some solvable by Id. The bindings have the Datapos objects as an
+  abstraction mechanism, so you do not need this constant.
+
+Constant string Ids
+  
+*ID_NULL*::
+  Always zero
+
+*ID_EMPTY*::
+  Always one, describes the empty string
+
+*SOLVABLE_NAME*::
+  The keyname Id of the name of the solvable.
+
+*...*::
+  see the libsolv-knownid manpage for a list of fixed Ids.
+
+
+THE POOL CLASS
+--------------
 The pool is libsolv's central resource manager. A pool consists of Solvables,
 Repositories, Dependencies, each indexed by Ids.
 
@@ -179,7 +355,7 @@ jail. Note that the rootdir will only be prepended to file paths if the
 Set the architecture for your system. The architecture is used to determine
 which packages are installable. It defaults to the result of ``uname -m''.
 
-	Repo *add_repo(const char *name)
+	Repo add_repo(const char *name)
 	$repo = $pool->add_repo($name);
 	repo = pool.add_repo(name)
 	repo = pool.add_repo(name)
@@ -187,21 +363,21 @@ which packages are installable. It defaults to the result of ``uname -m''.
 Add a Repository with the specified name to the pool. The reposiory is empty
 on creation, use the repository methods to populate it with packages.
 
-	Repoiterator *repos_iter()
+	Repoiterator repos_iter()
 	for my $repo (@{$pool->repos_iter()})
 	for repo in pool.repos_iter():
 	for repo in pool.repos_iter()
 
 Iterate over the existing repositories.
 
-	Solvableiterator *solvables_iter()
+	Solvableiterator solvables_iter()
 	for my $solvable (@{$pool->solvables_iter()})
 	for solvable in pool.solvables_iter():
 	for solvable in pool.solvables_iter()
 
 Iterate over the existing solvables.
 
-	Dep *Dep(const char *str, bool create=1)
+	Dep Dep(const char *str, bool create = 1)
 	my $dep = $pool->Dep($string);
 	dep = pool.Dep(string)
 	dep = pool.Dep(string)
@@ -214,7 +390,7 @@ not in the pool and _create_ is false, *undef*/*None*/*nil* is returned.
 	pool.addfileprovides()
 	pool.addfileprovides()
 
-	Queue addfileprovides_queue()
+	Id *addfileprovides_queue()
 	my @ids = $pool->addfileprovides_queue();
 	ids = pool.addfileprovides_queue()
 	ids = pool.addfileprovides_queue()
@@ -226,8 +402,9 @@ repositories. This method will scan all dependency for file names and than scan
 all packages for matching files. If a filename has been matched, it will be
 added to the provides list of the corresponding package. The
 addfileprovides_queue variant works the same way but returns an array
-containing all file dependencies. This information can be stored with the
-repository to speed up the next usage of the repository.
+containing all file dependencies. This information can be stored in the
+meta section of the repositories to speed up the next time the
+repository is loaded and addfileprovides is called.
 
 	void createwhatprovides()
 	$pool->createwhatprovides();
@@ -239,7 +416,7 @@ packages. This method must be called before doing any lookups on provides.
 It's encuraged to do it right after all repos are set up, usually right after
 the call to addfileprovides().
 
-	Queue whatprovides(DepId dep)
+	Solvable *whatprovides(DepId dep)
 	my @solvables = $pool->whatprovides($dep);
 	solvables = pool.whatprovides(dep)
 	solvables = pool.whatprovides(dep)
@@ -247,7 +424,7 @@ the call to addfileprovides().
 Return all solvables that provide the specified dependency. You can use either
 a Dep object or an simple Id as argument.
 
-	Queue matchprovidingids(const char *match, int flags)
+	Id *matchprovidingids(const char *match, int flags)
 	my @ids = $pool->matchprovidingids($match, $flags);
 	ids = pool.matchprovidingids(match, flags)
 	ids = pool.matchprovidingids(match, flags)
@@ -255,7 +432,7 @@ a Dep object or an simple Id as argument.
 Search the names of all provides and return the ones matching the specified
 string. See the Dataiterator class for the allowed flags.
 
-	Id towhatprovides(Queue ids)
+	Id towhatprovides(Id *ids)
 	my $offset = $pool->towhatprovides(\@ids);
 	offset = pool.towhatprovides(ids)
 	offset = pool.towhatprovides(ids)
@@ -271,14 +448,14 @@ for more information.
 
 Return true if the specified Id describs a known architecture.
 
-	Solver *Solver()
+	Solver Solver()
 	my $solver = $pool->Solver();
 	solver = pool.Solver()
 	solver = pool.Solver()
 
 Create a new solver object.
 
-	Solver *Job(int how, Id what)
+	Job Job(int how, Id what)
 	my $job = $pool->Job($how, $what);
 	job = pool.Job(how, what)
 	job = pool.Job(how, what)
@@ -286,7 +463,7 @@ Create a new solver object.
 Create a new Job object. Kind of low level, in most cases you would use a
 Selection or Dep job constructor instead.
 
-	Selection *Selection()
+	Selection Selection()
 	my $sel = $pool->Selection();
 	sel = pool.Selection()
 	sel = pool.Selection()
@@ -294,7 +471,7 @@ Selection or Dep job constructor instead.
 Create an empty selection. Useful as a starting point for merging other
 selections.
 
-	Selection *Selection_all()
+	Selection Selection_all()
 	my $sel = $pool->Selection_all();
 	sel = pool.Selection_all()
 	sel = pool.Selection_all()
@@ -302,7 +479,7 @@ selections.
 Create a selection containing all packages. Useful as starting point for
 intersecting other selections or for update/distupgrade jobs.
 
-	Selection *select(const char *name, int flags)
+	Selection select(const char *name, int flags)
 	my $sel = $pool->select($name, $flags);
 	sel = pool.select(name, flags)
 	sel = pool.select(name, flags)
@@ -316,7 +493,7 @@ selection.
 	pool.setpooljobs(jobs)
 	pool.setpooljobs(jobs)
 
-	Jobs *getpooljobs()
+	Job *getpooljobs()
 	@jobs = $pool->getpooljobs();
 	jobs = pool.getpooljobs()
 	jobs = pool.getpooljobs()
@@ -370,12 +547,12 @@ desired solvable by Id.
 	bool = pool.lookup_void(solvid, keyname)
 	bool = pool.lookup_void(solvid, keyname)
 
-	Queue lookup_idarray(Id solvid, Id keyname)
+	Id *lookup_idarray(Id solvid, Id keyname)
 	my @ids = $pool->lookup_idarray($solvid, $keyname);
 	ids = pool.lookup_idarray(solvid, keyname)
 	ids = pool.lookup_idarray(solvid, keyname)
 
-	Chksum *lookup_checksum(Id solvid, Id keyname)
+	Chksum lookup_checksum(Id solvid, Id keyname)
 	my $chksum = $pool->lookup_checksum($solvid, $keyname);
 	chksum = pool.lookup_checksum(solvid, keyname)
 	chksum = pool.lookup_checksum(solvid, keyname)
@@ -383,7 +560,7 @@ desired solvable by Id.
 Lookup functions. Return the data element stored in the specified solvable.
 You should probably use the methods of the Solvable class instead.
 
-	Dataiterator *Dataiterator(Id solvid, Id keyname, const char *match, int flags)
+	Dataiterator Dataiterator(Id solvid, Id keyname, const char *match, int flags)
 	my $di = $pool->Dataiterator($solvid, $keyname, $match, $flags);
 	di = pool.Dataiterator(solvid, keyname, match, flags)
 	di = pool.Dataiterator(solvid, keyname, match, flags)
@@ -401,7 +578,7 @@ The following methods deal with Ids, i.e. integers representing objects in the
 pool. They are considered ``low level'', in most cases you would not use them
 but instead the object orientated methods.
 
-	Repo *id2repo(Id id)
+	Repo id2repo(Id id)
 	$repo = $pool->id2repo($id);
 	repo = pool.id2repo(id)
 	repo = pool.id2repo(id)
@@ -409,7 +586,7 @@ but instead the object orientated methods.
 Lookup an existing Repository by id. You can also do this by using the *repos*
 attribute.
 
-	Solvable *id2solvable(Id id)
+	Solvable id2solvable(Id id)
 	$solvable = $pool->id2solvable($id);
 	solvable = pool.id2solvable(id)
 	solvable = pool.id2solvable(id)
@@ -425,7 +602,7 @@ Lookup an existing Repository by id. You can also do this by using the
 Return a string describing the Solvable with the specified id. The string
 consists of the name, version, and architecture of the Solvable.
 
-	Id str2id(const char *str, bool create=1)
+	Id str2id(const char *str, bool create = 1)
 	my $id = pool->str2id($string);
 	id = pool.str2id(string)
 	id = pool.str2id(string)
@@ -438,7 +615,7 @@ consists of the name, version, and architecture of the Solvable.
 Convert a string into an Id and back. If the string is currently not in the
 pool and _create_ is false, zero is returned.
 
-	Id rel2id(Id name, Id evr, int flags, bool create=1)
+	Id rel2id(Id name, Id evr, int flags, bool create = 1)
 	my $id = pool->rel2id($nameid, $evrid, $flags);
 	id = pool.rel2id(nameid, evrid, flags)
 	id = pool.rel2id(nameid, evrid, flags)
@@ -452,7 +629,7 @@ the _flags_ describing the relation, and a version part. The flags are:
 
 Thus, if you want a ``\<='' relation, you would use *REL_LT | REL_EQ*.
 
-	Id id2langid(Id id, const char *lang, bool create=1)
+	Id id2langid(Id id, const char *lang, bool create = 1)
 	my $id = $pool->id2langid($id, $language);
 	id = pool.id2langid(id, language)
 	id = pool.id2langid(id, language)
@@ -496,7 +673,7 @@ The id of this dependency.
 
 == Methods ==
 
-	Dep *Rel(int flags, DepId evrid, bool create=1)
+	Dep Rel(int flags, DepId evrid, bool create = 1)
 	my $reldep = $dep->Rel($flags, $evrdep);
 	reldep = dep.Rel(flags, evrdep)
 	reldep = dep.Rel(flags, evrdep)
@@ -504,7 +681,7 @@ The id of this dependency.
 Create a relational dependency from to string dependencies and a flags
 argument. See the pool's rel2id method for a description of the flags.
 
-	Selection *Selection_name(int setflags = 0)
+	Selection Selection_name(int setflags = 0)
 	my $sel = $dep->Selection_name();
 	sel = dep.Selection_name()
 	sel = dep.Selection_name()
@@ -513,7 +690,7 @@ Create a Selection from a dependency. The selection consists of all packages
 that have a name equal to the dependency. If the dependency is of a relational
 type, the packages version must also fulfill the dependency.
 
-	Selection *Selection_provides(int setflags = 0)
+	Selection Selection_provides(int setflags = 0)
 	my $sel = $dep->Selection_provides();
 	sel = dep.Selection_provides()
 	sel = dep.Selection_provides()
@@ -542,6 +719,7 @@ Same as calling the str() method.
 
 The dependencies are equal if they are part of the same pool and have the same
 ids.
+
 
 THE REPOSITORY CLASS
 --------------------
@@ -700,14 +878,14 @@ Write a repo as a ``solv'' file. These files can be read very fast and thus are
 a good way to cache repository data. Returns false if there was some error
 writing the file.
 
-	Solvableiterator *solvables_iter()
+	Solvableiterator solvables_iter()
 	for my $solvable (@{$repo->solvables_iter()})
 	for solvable in repo.solvables_iter():
 	for solvable in repo.solvables_iter()
 
 Iterate over all solvables in a repository.
 
-	Repodata *add_repodata(int flags = 0)
+	Repodata add_repodata(int flags = 0)
 	my $repodata = $repo->add_repodata();
 	repodata = repo.add_repodata()
 	repodata = repo.add_repodata()
@@ -732,7 +910,7 @@ repository.
 Return true if the solvables of this repository are all in a single block with
 no holes, i.e. they have consecutive ids.
 
-	Repodata *first_repodata()
+	Repodata first_repodata()
 	my $repodata = $repo->first_repodata();
 	repodata = repo.first_repodata()
 	repodata = repo.first_repodata()
@@ -743,14 +921,14 @@ sequence on the repository to reduce the memory using and enable paging, as
 this does not work if the rpository contains multiple non-extension repodata
 areas.
 
-	Selection *Selection(int setflags = 0)
+	Selection Selection(int setflags = 0)
 	my $sel = $repo->Selection();
 	sel = repo.Selection()
 	sel = repo.Selection()
 
 Create a Selection consisting of all packages in the repository.
 
-	Dataiterator *Dataiterator(Id p, Id key, const char *match, int flags)
+	Dataiterator Dataiterator(Id p, Id key, const char *match, int flags)
 	my $di = $repo->Dataiterator($solvid, $keyname, $match, $flags);
 	di = repo.Dataiterator(solvid, keyname, match, flags)
 	di = repo.Dataiterator(solvid, keyname, match, flags)
@@ -778,7 +956,7 @@ Two repositories are equal if they belong to the same pool and have the same id.
 
 === DATA ADD METHODS ===
 
-	Solvable *add_solvable()
+	Solvable add_solvable()
 	$repo->add_solvable();
 	repo.add_solvable()
 	repo.add_solvable()
@@ -962,9 +1140,9 @@ is usually "/etc/products.d".
 
 THE SOLVABLE CLASS
 ------------------
-A solvable describes all the information of one package. Each solvable belongs to
-one repository, it can be added and filled manually but in most cases solvables
-will get created by the repo_add methods.
+A solvable describes all the information of one package. Each solvable
+belongs to one repository, it can be added and filled manually but in
+most cases solvables will get created by the repo_add methods.
 
 === ATTRIBUTES ===
 
@@ -1057,17 +1235,17 @@ a specific id and want to avoid the string compare overhead.
 	bool = solvable.lookup_void(keyname)
 	bool = solvable.lookup_void(keyname)
 
-	Chksum *lookup_checksum(Id keyname)
+	Chksum lookup_checksum(Id keyname)
 	my $chksum = $solvable->lookup_checksum($keyname);
 	chksum = solvable.lookup_checksum(keyname)
 	chksum = solvable.lookup_checksum(keyname)
 
-	Queue lookup_idarray(Id keyname, Id marker = -1)
+	Id *lookup_idarray(Id keyname, Id marker = -1)
 	my @ids = $solvable->lookup_idarray($keyname);
 	ids = solvable.lookup_idarray(keyname)
 	ids = solvable.lookup_idarray(keyname)
 
-	Queue lookup_deparray(Id keyname, Id marker = -1)
+	Dep *lookup_deparray(Id keyname, Id marker = -1)
 	my @deps = $solvable->lookup_deparray($keyname);
 	deps = solvable.lookup_deparray(keyname)
 	deps = solvable.lookup_deparray(keyname)
@@ -1114,7 +1292,7 @@ are not installable if the system does not support their architecture.
 
 Return true if the solvable is installed on the system.
 
-	Selection *Selection(int setflags = 0)
+	Selection Selection(int setflags = 0)
 	my $sel = $solvable->Selection();
 	sel = solvable.Selection()
 	sel = solvable.Selection()
@@ -1144,9 +1322,9 @@ Same as calling the str() method.
 Two solvables are equal if they are part of the same pool and have the same
 ids.
 
+
 THE DATAITERATOR CLASS
 ----------------------
-
 Dataiterators can be used to do complex string searches or
 to iterate over arrays. They can be created via the
 constructors in the Pool, Repo, and Solvable classes. The
@@ -1311,7 +1489,7 @@ The numeric value that was matched (only valid for numeric types).
 The secondary numeric value that was matched (only valid for types
 containing two values).
 
-	Datapos *pos();
+	Datapos pos();
 	my $pos = $d->pos();
 	pos = d.pos()
 	pos = d.pos()
@@ -1320,7 +1498,7 @@ The position object of the current match. It can be used to do
 sub-searches starting at the match (if it is of an array type).
 See the Datapos class for more information.
 
-	Datapos *parentpos();
+	Datapos parentpos();
 	my $pos = $d->parentpos();
 	pos = d.parentpos()
 	pos = d.parentpos()
@@ -1453,7 +1631,7 @@ add operation.
 Add a raw element to the selection. Check the Job class for information about
 the how and what parameters.
 
-	Job **jobs(int action)
+	Job *jobs(int action)
 	my @jobs = $sel->jobs($action);
 	jobs = sel.jobs(action)
 	jobs = sel.jobs(action)
@@ -1462,7 +1640,7 @@ Convert a selection into an array of Job objects. The action parameter is or-ed
 to the ``how'' part of the job, it describes the type of job (e.g. install,
 erase). See the Job class for the action and action modifier constants.
 
-	Solvable **solvables()
+	Solvable *solvables()
 	my @solvables = $sel->solvables();
 	solvables = sel.solvables()
 	solvables = sel.solvables()
@@ -1651,7 +1829,7 @@ selection part of the ``how'' attribute.
 
 === METHODS ===
 
-	Solvable **solvables()
+	Solvable *solvables()
 	my @solvables = $job->solvables();
 	solvables = job.solvables()
 	solvables = job.solvables()
@@ -1741,6 +1919,10 @@ automatically add SOLVER_SETARCH, and thus no problem will be reported.
 
 THE SOLVER CLASS
 ----------------
+Dependency solving is what this library is about. A solver object is needed
+for solving to store the result of the solver run. The solver object can be
+used multiple times for different jobs, reusing it allows the solver to
+re-use the dependency rules it already computed.
 
 === CONSTANTS ===
 
@@ -2003,7 +2185,7 @@ Back pointer to pool.
 Set/get a solver specific flag. The flags define the policies the solver has
 to obey. The flags are explained in the CONSTANTS section of this class.
 
-	Problem **solve(Job *jobs)
+	Problem *solve(Job *jobs)
 	my @problems = $solver->solve(\@jobs);
 	problems = solver.solve(jobs)
 	problems = solver.solve(jobs)
@@ -2013,7 +2195,7 @@ Returns an array of problems that need user interaction, or an empty array
 if no problems were encountered. See the Problem class on how to deal with
 problems.
 
-	Transaction *transaction()
+	Transaction transaction()
 	my $trans = $solver->transaction();
 	trans = solver.transaction()
 	trans = solver.transaction()
@@ -2024,7 +2206,6 @@ interfaces that show both the job result and the problems.
 
 THE PROBLEM CLASS
 -----------------
-
 Problems are the way of the solver to interact with the user. You can simply list
 all problems and terminate your program, but a better way is to present solutions to
 the user and let him pick the ones he likes.
@@ -2047,7 +2228,7 @@ Id of the problem. The first problem has Id 1, they are numbered consecutively.
 
 === METHODS ===
 
-	Rule *findproblemrule()
+	Rule findproblemrule()
 	my $probrule = $problem->findproblemrule();
 	probrule = problem.findproblemrule()
 	probrule = problem.findproblemrule()
@@ -2057,7 +2238,7 @@ single responsible rule, but many rules that interconnect with each created the
 problem. Nevertheless, the solver uses some heuristic approch to find a rule
 that somewhat describes the problem best to the user.
 
-	Rule **findallproblemrules(bool unfiltered = 0)
+	Rule *findallproblemrules(bool unfiltered = 0)
 	my @probrules = $problem->findallproblemrules();
 	probrules = problem.findallproblemrule()
 	probrules = problem.findallproblemrule()
@@ -2067,7 +2248,7 @@ all the needed information why there was a problem, but it's hard to present
 them to the user in a sensible way. The default is to filter out all update and
 job rules (unless the returned rules only consist of those types).
 
-	Solutions **solutions()
+	Solution *solutions()
 	my @solutions = $problem->solutions();
 	solutions = problem.solutions()
 	solutions = problem.solutions()
@@ -2084,7 +2265,6 @@ Return the number of solutions without creating solution objects.
 
 THE RULE CLASS
 --------------
-
 Rules are the basic block of sat solving. Each package dependency gets translated
 into one or multiple rules.
 
@@ -2113,7 +2293,7 @@ The basic type of the rule. See the constant section of the solver class for the
 
 === METHODS ===
 
-	Ruleinfo *info()
+	Ruleinfo info()
 	my $ruleinfo = $rule->info();
 	ruleinfo = rule.info()
 	ruleinfo = rule.info()
@@ -2121,7 +2301,7 @@ The basic type of the rule. See the constant section of the solver class for the
 Return a Ruleinfo object that contains information about why the rule was created. But
 see the allinfos() method below.
 
-	Ruleinfo **allinfos()
+	Ruleinfo *allinfos()
 	my @ruleinfos = $rule->allinfos();
 	ruleinfos = rule.allinfos()
 	ruleinfos = rule.allinfos()
@@ -2139,7 +2319,6 @@ Two rules are equal if they belong to the same solver and have the same id.
 
 THE RULEINFO CLASS
 ------------------
-
 A Ruleinfo describes one reason why a rule was created.
 
 === ATTRIBUTES ===
@@ -2198,7 +2377,6 @@ only makes sense if the rule is part of a problem.
 
 THE SOLUTION CLASS
 ------------------
-
 A solution solves one specific problem. It consists of multiple solution elements
 that all need to be executed.
 
@@ -2227,7 +2405,7 @@ Id of the solution. The first solution has Id 1, they are numbered consecutively
 
 === METHODS ===
 
-	Solutionelement **elements(bool expandreplaces = 0)
+	Solutionelement *elements(bool expandreplaces = 0)
 	my @solutionelements = $solution->elements();
 	solutionelements = solution.elements()
 	solutionelements = solution.elements()
@@ -2249,7 +2427,6 @@ of expandreplaces is set to true.
 
 THE SOLUTIONELEMENT CLASS
 -------------------------
-
 A solution element describes a single action of a solution. The action is always
 either to remove one specific job or to add a new job that installs or erases
 a single specific package.
@@ -2318,7 +2495,7 @@ method works both for types SOLVER_SOLUTION_JOB and SOLVER_SOLUTION_POOLJOB.
 
 === METHODS ===
 
-	Solutionelement **replaceelements()
+	Solutionelement *replaceelements()
 	my @solutionelements = $solutionelement->replaceelements();
 	solutionelements = solutionelement.replaceelements()
 	solutionelements = solutionelement.replaceelements()
@@ -2337,7 +2514,7 @@ Return an integer that contains the policy mismatch bits or-ed together, or
 zero if there was no policy mismatch. See the policy error constants in
 the solver class.
 
-	Job *Job()
+	Job Job()
 	my $job = $solutionelement->Job();
 	illegal = solutionelement.Job()
 	illegal = solutionelement.Job()
@@ -2356,6 +2533,12 @@ A string describing the change the solution element consists of.
 
 THE TRANSACTION CLASS
 ---------------------
+Transactions describe the output of a solver run. A transaction contains
+a number of transaction elements, each either the installation of a new
+package or the removal of an already installed package. The Transaction
+class supports a classify() method that puts the elements into different
+groups so that a transaction can be presented to the user in a meaningful
+way.
 
 === CONSTANTS ===
 
@@ -2489,7 +2672,7 @@ Back pointer to pool.
 
 Returns true if the transaction does not do anything, i.e. has no elements.
 
-	Solvable **newpackages();
+	Solvable *newpackages();
 	my @newsolvables = $trans->newpackages();
 	newsolvables = trans.newpackages()
 	newsolvables = trans.newpackages()
@@ -2497,14 +2680,14 @@ Returns true if the transaction does not do anything, i.e. has no elements.
 Return all packages that are to be installed by the transaction. This are
 the packages that need to be downloaded from the repositories.
 
-	Solvable **keptpackages();
+	Solvable *keptpackages();
 	my @keptsolvables = $trans->keptpackages();
 	keptsolvables = trans.keptpackages()
 	keptsolvables = trans.keptpackages()
 
 Return all installed packages that the transaction will keep installed.
 
-	Solvable **steps();
+	Solvable *steps();
 	my @steps = $trans->steps();
 	steps = trans.steps()
 	steps = trans.steps()
@@ -2521,7 +2704,7 @@ A step is also called a transaction element.
 Return the transaction type of the specified solvable. See the CONSTANTS
 sections for the mode argument flags and the list of returned types.
 
-	TransactionClass **classify(int mode = 0)
+	TransactionClass *classify(int mode = 0)
 	my @classes = $trans->classify();
 	classes = trans.classify()
 	classes = trans.classify()
@@ -2532,7 +2715,7 @@ the result to match your preferences, see the mode argument flag in
 the CONSTANTS section. See the TransactionClass class for how to deal
 with the returned objects.
 
-	Solvable *othersolvable(Solvable *solvable);
+	Solvable othersolvable(Solvable *solvable);
 	my $other = $trans->othersolvable($solvable);
 	other = trans.othersolvable(solvable)
 	other = trans.othersolvable(solvable)
@@ -2550,7 +2733,7 @@ a package with the same name.
 Thus, the ``other'' solvable is normally the package that is also shown
 for a given package.
 
-	Solvable **allothersolvables(Solvable *solvable);
+	Solvable *allothersolvables(Solvable *solvable);
 	my @others = $trans->allothersolvables($solvable);
 	others = trans.allothersolvables(solvable)
 	others = trans.allothersolvables(solvable)
@@ -2600,7 +2783,6 @@ contain A-2-1.
 
 THE TRANSACTIONCLASS CLASS
 --------------------------
-
 Objects of this type are returned by the classify() Transaction method.
 
 === ATTRIBUTES ===
@@ -2670,7 +2852,7 @@ not corrupt and also as a fingerprint mechanism to check if data has changed.
 
 === CLASS METHODS ===
 
-	Chksum *Chksum(Id type)
+	Chksum Chksum(Id type)
 	my $chksum = solv::Chksum->new($type);
 	chksum = solv.Chksum(type)
 	chksum = Solv::Chksum.new(type)
@@ -2683,7 +2865,7 @@ Create a checksum object. Currently the following types are supported:
 
 These keys are constants in the *solv* class.
 
-	Chksum *Chksum(Id type, const char *hex)
+	Chksum Chksum(Id type, const char *hex)
 	my $chksum = solv::Chksum->new($type, $hex);
 	chksum = solv.Chksum(type, hex)
 	chksum = Solv::Chksum.new(type, hex)
@@ -2912,7 +3094,7 @@ the same id.
 	ids = data.lookup_idarray(solvid, keyname)
 	ids = data.lookup_idarray(solvid, keyname)
 
-	Chksum *lookup_checksum(Id solvid, Id keyname)
+	Chksum lookup_checksum(Id solvid, Id keyname)
 	my $chksum = $data->lookup_checksum($solvid, $keyname);
 	chksum = data.lookup_checksum(solvid, keyname)
 	chksum = data.lookup_checksum(solvid, keyname)
@@ -2970,7 +3152,6 @@ to put the structure in an array.
 
 THE DATAPOS CLASS
 -----------------
-
 Datapos objects describe a specific position in the repository data area.
 Thus they are only valid until the repository is modified in some way.
 Datapos objects can be created by the pos() and parentpos() methods of
@@ -3032,12 +3213,12 @@ Return the delta rpm sequence from the structure describing a delta rpm.
 	bool = datapos.lookup_void(keyname)
 	bool = datapos.lookup_void(keyname)
 
-	Queue lookup_idarray(Id keyname)
+	Id *lookup_idarray(Id keyname)
 	my @ids = $datapos->lookup_idarray($keyname);
 	ids = datapos.lookup_idarray(keyname)
 	ids = datapos.lookup_idarray(keyname)
 
-	Chksum *lookup_checksum(Id keyname)
+	Chksum lookup_checksum(Id keyname)
 	my $chksum = $datapos->lookup_checksum($keyname);
 	chksum = datapos.lookup_checksum(keyname)
 	chksum = datapos.lookup_checksum(keyname)
