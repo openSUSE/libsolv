@@ -255,8 +255,8 @@ startElement(void *userData, const char *name, const char **atts)
 	      }
 	    free(fvalue);
           }
-          break;
-        }
+        break;
+      }
     case STATE_DISTRO:
       {
         /* this is extra metadata about the product this repository
