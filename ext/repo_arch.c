@@ -634,7 +634,7 @@ adddata(Repodata *data, Solvable *s, struct tarhead *th)
       else if (!strcmp(line, "%LICENSE%"))
 	{
 	  if (getsentrynl(th, line, sizeof(line)))
-	    repodata_set_str(data, s - pool->solvables, SOLVABLE_LICENSE, line);
+	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_LICENSE, line);
 	}
       else if (!strcmp(line, "%ARCH%"))
 	{
