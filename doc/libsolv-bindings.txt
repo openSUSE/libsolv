@@ -186,7 +186,7 @@ Constant string Ids
   The keyname Id of the name of the solvable.
 
 *...*::
-  see the libsolv-knownid manpage for a list of fixed Ids.
+  see the libsolv-constantids manpage for a list of fixed Ids.
 
 
 THE POOL CLASS
