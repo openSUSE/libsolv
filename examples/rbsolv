@@ -720,7 +720,7 @@ while true:
   abort if yn == 'n' || yn == 'q'
 end
 
-newpkgs = trans.newpackages()
+newpkgs = trans.newsolvables()
 newpkgsfp = {}
 if !newpkgs.empty?
   downloadsize = 0

@@ -2,12 +2,12 @@
 .\"     Title: libsolv-bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/06/2013
+.\"      Date: 06/07/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "06/06/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "06/07/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -4292,10 +4292,10 @@ Returns true if the transaction does not do anything, i\&.e\&. has no elements\&
 .RS 4
 .\}
 .nf
-\fBSolvable *newpackages()\fR;
-my \fI@newsolvables\fR \fB=\fR \fI$trans\fR\fB\->newpackages()\fR;
-\fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newpackages()\fR
-\fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newpackages()\fR
+\fBSolvable *newsolvables()\fR;
+my \fI@newsolvables\fR \fB=\fR \fI$trans\fR\fB\->newsolvables()\fR;
+\fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newsolvables()\fR
+\fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newsolvables()\fR
 .fi
 .if n \{\
 .RE
@@ -4307,10 +4307,10 @@ Return all packages that are to be installed by the transaction\&. This are the 
 .RS 4
 .\}
 .nf
-\fBSolvable *keptpackages()\fR;
-my \fI@keptsolvables\fR \fB=\fR \fI$trans\fR\fB\->keptpackages()\fR;
-\fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptpackages()\fR
-\fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptpackages()\fR
+\fBSolvable *keptsolvables()\fR;
+my \fI@keptsolvables\fR \fB=\fR \fI$trans\fR\fB\->keptsolvables()\fR;
+\fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptsolvables()\fR
+\fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptsolvables()\fR
 .fi
 .if n \{\
 .RE

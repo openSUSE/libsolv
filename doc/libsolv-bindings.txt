@@ -2672,18 +2672,18 @@ Back pointer to pool.
 
 Returns true if the transaction does not do anything, i.e. has no elements.
 
-	Solvable *newpackages();
-	my @newsolvables = $trans->newpackages();
-	newsolvables = trans.newpackages()
-	newsolvables = trans.newpackages()
+	Solvable *newsolvables();
+	my @newsolvables = $trans->newsolvables();
+	newsolvables = trans.newsolvables()
+	newsolvables = trans.newsolvables()
 
 Return all packages that are to be installed by the transaction. This are
 the packages that need to be downloaded from the repositories.
 
-	Solvable *keptpackages();
-	my @keptsolvables = $trans->keptpackages();
-	keptsolvables = trans.keptpackages()
-	keptsolvables = trans.keptpackages()
+	Solvable *keptsolvables();
+	my @keptsolvables = $trans->keptsolvables();
+	keptsolvables = trans.keptsolvables()
+	keptsolvables = trans.keptsolvables()
 
 Return all installed packages that the transaction will keep installed.
 

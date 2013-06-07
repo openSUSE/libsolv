@@ -835,7 +835,7 @@ while True:
     yn = sys.stdin.readline().strip()
     if yn == 'y': break
     if yn == 'n' or yn == 'q': sys.exit(1)
-newpkgs = trans.newpackages()
+newpkgs = trans.newsolvables()
 newpkgsfp = {}
 if newpkgs:
     downloadsize = 0

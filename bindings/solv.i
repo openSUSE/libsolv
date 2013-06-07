@@ -2737,6 +2737,7 @@ rb_eval_string(
     return q;
   }
 
+  # deprecated, use newsolvables instead
   %typemap(out) Queue newpackages Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
   %newobject newpackages;
   Queue newpackages() {
@@ -2748,9 +2749,33 @@ rb_eval_string(
     return q;
   }
 
+  # deprecated, use keptsolvables instead
   %typemap(out) Queue keptpackages Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
   %newobject keptpackages;
   Queue keptpackages() {
+    Queue q;
+    int cut;
+    queue_init(&q);
+    cut = transaction_installedresult(self, &q);
+    if (cut)
+      queue_deleten(&q, 0, cut);
+    return q;
+  }
+
+  %typemap(out) Queue newsolvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject newsolvables;
+  Queue newsolvables() {
+    Queue q;
+    int cut;
+    queue_init(&q);
+    cut = transaction_installedresult(self, &q);
+    queue_truncate(&q, cut);
+    return q;
+  }
+
+  %typemap(out) Queue keptsolvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject keptsolvables;
+  Queue keptsolvables() {
     Queue q;
     int cut;
     queue_init(&q);

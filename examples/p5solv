@@ -707,7 +707,7 @@ while (1) {
   exit(1) if $yn eq 'n' || $yn eq 'q';
 }
 
-my @newpkgs = $trans->newpackages();
+my @newpkgs = $trans->newsolvables();
 my %newpkgsfps;
 if (@newpkgs) {
   my $downloadsize = 0;
