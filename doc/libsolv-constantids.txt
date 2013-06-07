@@ -563,14 +563,15 @@ This attributes contain meta information about the repository.
   in REPOSITORY_UPDATES and REPOSITORY_DISTROS to maximize confusion.
 
 *REPOSITORY_REPOID "repository:repoid"*::
-  An array of Id strings describing this repository.
+  An array of Id strings describing keywords/tags about the repository
+  itself.
 
 *REPOSITORY_KEYWORDS "repository:keywords"*::
-  An array of Id strings describing keywords of this repository.
+  An array of Id strings describing keywords/tags about the content of
+  the repository.
 
 *REPOSITORY_REVISION "repository:revision"*::
-  One or more(?) arbitrary revision strings describing the revision
-  of the repository.
+  An arbitrary string describing the revision of the repository.
 
 *REPOSITORY_TOOLVERSION "repository:toolversion"*::
   Some string describing somewhat the version of libsolv used to create
