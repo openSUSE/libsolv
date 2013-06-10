@@ -235,6 +235,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_bindir}/helix2solv
 %endif
 %{_datadir}/cmake/Modules/*
+%{_mandir}/man?/*
 
 %files demo
 %defattr(-,root,root)
