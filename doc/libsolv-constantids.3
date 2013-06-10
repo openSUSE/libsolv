@@ -2,12 +2,12 @@
 .\"     Title: libsolv-constantids
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/07/2013
+.\"      Date: 06/10/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-CONSTANTIDS" "3" "06/07/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-CONSTANTIDS" "3" "06/10/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -45,7 +45,7 @@ The name of the always installed "system" solvable\&.
 .RE
 .SH "SOLVABLE ATTRIBUTES"
 .sp
-These are Ids for keyname of attributes\&. They can be used in the lookup and storage functions to select the correct attribute in the solvable\&. The describtions below describe the intended semantics of the values stored in the attribute with the keyname\&.
+These are Ids for keyname of attributes\&. They can be used in the lookup and storage functions to select the correct attribute in the solvable\&. The descriptions below describe the intended semantics of the values stored in the attribute with the keyname\&.
 .PP
 \fBSOLVABLE_NAME "solvable:name"\fR
 .RS 4
@@ -149,7 +149,7 @@ list of keyword string IDs used for tagging this package\&.
 .PP
 \fBSOLVABLE_LICENSE "solvable:license"\fR
 .RS 4
-The jicense of this package\&.
+The license of this package\&.
 .RE
 .PP
 \fBSOLVABLE_BUILDTIME "solvable:buildtime"\fR
@@ -305,12 +305,12 @@ The category field for patch solvables\&. Should be named \(lqupdate:category\(r
 .PP
 \fBUPDATE_REBOOT "update:reboot"\fR
 .RS 4
-If this attribute is present the sytem should be rebooted after the update is installed\&.
+If this attribute is present the system should be rebooted after the update is installed\&.
 .RE
 .PP
 \fBUPDATE_RESTART "update:restart"\fR
 .RS 4
-If this attribute is present the software managemer should be run again after the update is installed\&.
+If this attribute is present the software manager should be run again after the update is installed\&.
 .RE
 .PP
 \fBUPDATE_RELOGIN "update:relogin"\fR
@@ -440,12 +440,12 @@ A release string for proudct registering\&.
 .PP
 \fBPUBKEY_KEYID "pubkey:keyid"\fR
 .RS 4
-The keyid of a pubkey, consiting of 8 bytes in hex\&.
+The keyid of a pubkey, consisting of 8 bytes in hex\&.
 .RE
 .PP
 \fBPUBKEY_FINGERPRINT "pubkey:fingerprint"\fR
 .RS 4
-The fingerprint of a pubkey, usualy a sha1sum in hex\&. Old V3 RSA keys use an md5sum instead\&.
+The fingerprint of a pubkey, usually a sha1sum in hex\&. Old V3 RSA keys use an md5sum instead\&.
 .RE
 .PP
 \fBPUBKEY_EXPIRES "pubkey:expires"\fR
@@ -508,7 +508,7 @@ Used for binary packages that contain the package sources\&.
 .PP
 \fBARCH_NOSRC "nosrc"\fR
 .RS 4
-Used for binary packages that contain some of thepackage sources, but not all files (because of restrictions)\&.
+Used for binary packages that contain some of the package sources, but not all files (because of restrictions)\&.
 .RE
 .PP
 \fBARCH_NOARCH "noarch"\fR
@@ -568,7 +568,7 @@ This is a another hack to implement the SUSE product buddy system\&. Please igno
 .PP
 \fBSOLVABLE_PREREQMARKER "solvable:prereqmarker"\fR
 .RS 4
-This marker partitions the normal require dependencies from the prerequires\&. It is not needed for dependency solving, but it is used by the transaction ordering algorthim when a dependency cycle needs to be broken (non\-prereq deps get broken first)\&.
+This marker partitions the normal require dependencies from the prerequires\&. It is not needed for dependency solving, but it is used by the transaction ordering algorithm when a dependency cycle needs to be broken (non\-prereq deps get broken first)\&.
 .RE
 .PP
 \fBSOLVABLE_FILEMARKER "solvable:filemarker"\fR

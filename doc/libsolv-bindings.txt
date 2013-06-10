@@ -44,7 +44,7 @@ tied arrays so that it is possible to iterate with a for() statement:
 
 As a downside of this approach, iterator objects can have no attributes.
 
-If an array needs to be passwd to a method it is usually done by reference,
+If an array needs to be passed to a method it is usually done by reference,
 if a method returns an array it returns it on the stack:
 
 	my @problems = $solver->solve(\@jobs);
@@ -243,8 +243,8 @@ Define which repository contains all the installed packages.
   in old rpm versions, modern systems should never need this.
 
 *POOL_FLAG_FORBIDSELFCONFLICTS*::
-  Disallow the installation of packages that conflict with themselfs.
-  Debian always allowd self-conflicting packages, rpm used to forbid
+  Disallow the installation of packages that conflict with themselves.
+  Debian always allows self-conflicting packages, rpm used to forbid
   them but switched to also allowing them recently.
 
 *POOL_FLAG_OBSOLETEUSESPROVIDES*::
@@ -277,7 +277,7 @@ Define which repository contains all the installed packages.
   New versions of rpm consider the obsoletes of installed packages
   when checking for dependency, thus you may not install a package
   that is obsoleted by some other installed package, unless you
-  also deinstall the other package.
+  also erase the other package.
 
 *POOL_FLAG_HAVEDISTEPOCH*::
   Mandriva added a new field called distepoch that gets checked in
@@ -360,7 +360,7 @@ which packages are installable. It defaults to the result of ``uname -m''.
 	repo = pool.add_repo(name)
 	repo = pool.add_repo(name)
 
-Add a Repository with the specified name to the pool. The reposiory is empty
+Add a Repository with the specified name to the pool. The repository is empty
 on creation, use the repository methods to populate it with packages.
 
 	Repoiterator repos_iter()
@@ -413,7 +413,7 @@ repository is loaded and addfileprovides is called.
 
 Create the internal ``whatprovides'' hash over all of the provides of all
 packages. This method must be called before doing any lookups on provides.
-It's encuraged to do it right after all repos are set up, usually right after
+It's encouraged to do it right after all repos are set up, usually right after
 the call to addfileprovides().
 
 	Solvable *whatprovides(DepId dep)
@@ -446,7 +446,7 @@ for more information.
 	bool = pool.isknownarch(id)
 	bool = pool.isknownarch?(id)
 
-Return true if the specified Id describs a known architecture.
+Return true if the specified Id describes a known architecture.
 
 	Solver Solver()
 	my $solver = $pool->Solver();
@@ -517,7 +517,7 @@ The callback should return true if the data has been made available.
 
 === DATA RETRIEVAL METHODS ===
 
-In the following functions, the _keyname_ argument describes what to retrive.
+In the following functions, the _keyname_ argument describes what to retrieve.
 For the standard cases you can use the available Id constants. For example,
 
 	$solv::SOLVABLE_SUMMARY
@@ -723,7 +723,7 @@ ids.
 
 THE REPOSITORY CLASS
 --------------------
-A Repository describes a group of packages, normally comming from the same
+A Repository describes a group of packages, normally coming from the same
 source. Repositories are created by the Pool's add_repo() method.
 
 === ATTRIBUTES ===
@@ -750,7 +750,7 @@ The id of the repository.
 The repositories name. To libsolv, the name is just a string with no specific
 meaning.
 
-	int prioprity;			/* read/write */
+	int priority;			/* read/write */
 	$repo->{priority}
 	repo.priority
 	repo.priority
@@ -759,7 +759,7 @@ The priority of the repository. A higher number means that packages of this
 repository will be chosen over other repositories, even if they have a greater
 package version.
 
-	int subprioprity;		/* read/write */
+	int subpriority;		/* read/write */
 	$repo->{subpriority}
 	repo.subpriority
 	repo.subpriority
@@ -795,7 +795,7 @@ timestamp.
 === CONSTANTS ===
 
 *REPO_REUSE_REPODATA*::
-  Reuse the last repository data aera (``repodata'') instead of creating a new
+  Reuse the last repository data area (``repodata'') instead of creating a new
   one.
 
 *REPO_NO_INTERNALIZE*::
@@ -916,9 +916,9 @@ no holes, i.e. they have consecutive ids.
 	repodata = repo.first_repodata()
 
 Checks if all repodatas but the first repodata are extensions, and return the
-first repodata if this is the case. Useful if you want to do a store/retrive
+first repodata if this is the case. Useful if you want to do a store/retrieve
 sequence on the repository to reduce the memory using and enable paging, as
-this does not work if the rpository contains multiple non-extension repodata
+this does not work if the repository contains multiple non-extension repodata
 areas.
 
 	Selection Selection(int setflags = 0)
@@ -1258,7 +1258,7 @@ for example the provides array uses the SOLVABLE_FILEMARKER id to
 store both the ids provided by the package and the ids added by
 the addfileprovides method. The default, -1, translates to the
 correct marker for the keyname and returns the first part of the
-array, use 1 to select the second part or 0 to retrive all ids
+array, use 1 to select the second part or 0 to retrieve all ids
 including the marker.
 
 	const char *lookup_location(unsigned int *OUTPUT);
@@ -1742,7 +1742,7 @@ Action constants:
 
 *SOLVER_USERINSTALLED*::
   The matching installed packages are considered to be installed by a user, thus
-  not installed to fulfil some dependency. This is needed input for the calculation
+  not installed to fulfill some dependency. This is needed input for the calculation
   of unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set.
 
 *SOLVER_JOBMASK*::
@@ -1751,7 +1751,7 @@ Action constants:
 Action modifier constants:
 
 *SOLVER_WEAK*::
-  Makes the job a weak job. The solver tries to fulfil weak jobs, but does not
+  Makes the job a weak job. The solver tries to fulfill weak jobs, but does not
   report a problem if it is not possible to do so.
 
 *SOLVER_ESSENTIAL*::
@@ -1926,7 +1926,7 @@ re-use the dependency rules it already computed.
 
 === CONSTANTS ===
 
-Flags to modify some of the solver's behaviour:
+Flags to modify some of the solver's behavior:
 
 *SOLVER_FLAG_ALLOW_DOWNGRADE*::
   Allow the solver to downgrade packages without asking for confirmation
@@ -1950,11 +1950,11 @@ Flags to modify some of the solver's behaviour:
   package. This option is on by default.
 
 *SOLVER_FLAG_ALLOW_UNINSTALL*::
-  Allow the solver to deinstall installed packages to fulfil the jobs.
+  Allow the solver to erase installed packages to fulfill the jobs.
   This flag also includes the above flags. You may want to set this
   flag if you only have SOLVER_ERASE jobs, as in that case it's
   better for the user to check the transaction overview instead of
-  approving every single package that needs to be deinstalled.
+  approving every single package that needs to be erased.
 
 *SOLVER_FLAG_NO_UPDATEPROVIDE*::
   If multiple packages obsolete an installed package, the solver checks
@@ -1974,7 +1974,7 @@ Flags to modify some of the solver's behaviour:
   Do not process optional (aka weak) dependencies.
 
 *SOLVER_FLAG_ADD_ALREADY_RECOMMENDED*::
-  Install recommened or supplemented packages even if they have no
+  Install recommended or supplemented packages even if they have no
   connection to the current transaction. You can use this feature
   to implement a simple way for the user to install new recommended
   packages that were not available in the past.
@@ -2014,7 +2014,7 @@ Basic rule types:
   Feature rules are fallback rules used when a update rule is disabled.
   They include all packages that may replace the installed package
   ignoring the update policy, i.e. they contain downgrades, arch
-  changes and so on. Without them, the solver would simply deinstall
+  changes and so on. Without them, the solver would simply erase
   installed packages if their update rule gets disabled.
 
 *SOLVER_RULE_JOB*::
@@ -2030,7 +2030,7 @@ Basic rule types:
   architecture.
 
 *SOLVER_RULE_CHOICE*::
-  Choice rules are used to make sure that the solver preferes updating to
+  Choice rules are used to make sure that the solver prefers updating to
   installing different packages when some dependency is provided by
   multiple packages with different names. The solver may always break
   choice rules, so you will not see them when a problem is found.
@@ -2048,7 +2048,7 @@ Special dependency rule types:
   architecture that does not work on the system.
 
 *SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP*::
-  The package contanis a required dependency which was not provided by
+  The package contains a required dependency which was not provided by
   any package.
 
 *SOLVER_RULE_RPM_PACKAGE_REQUIRES*::
@@ -2116,7 +2116,7 @@ Policy error constants
 
 *POLICY_ILLEGAL_NAMECHANGE*::
   The solver ask for permission before replacing an installed packages with
-  a packge that has a different name.
+  a package that has a different name.
 
 Solution element type constants
 
@@ -2233,9 +2233,9 @@ Id of the problem. The first problem has Id 1, they are numbered consecutively.
 	probrule = problem.findproblemrule()
 	probrule = problem.findproblemrule()
 
-Return the rule that caused the problem. Of cource in most situations there is no
+Return the rule that caused the problem. Of course in most situations there is no
 single responsible rule, but many rules that interconnect with each created the
-problem. Nevertheless, the solver uses some heuristic approch to find a rule
+problem. Nevertheless, the solver uses some heuristic approach to find a rule
 that somewhat describes the problem best to the user.
 
 	Rule *findallproblemrules(bool unfiltered = 0)
@@ -2410,7 +2410,7 @@ Id of the solution. The first solution has Id 1, they are numbered consecutively
 	solutionelements = solution.elements()
 	solutionelements = solution.elements()
 
-Return an array containing the elements describing what neeeds to be done to
+Return an array containing the elements describing what needs to be done to
 implement the specific solution. If expandreplaces is true, elements of type
 SOLVER_SOLUTION_REPLACE will be replaced by one or more elements replace
 elements describing the policy mismatches.
@@ -2549,7 +2549,7 @@ Transaction element types, both active and passive
   match the view mode.
 
 *SOLVER_TRANSACTION_INSTALL*::
-  This element installes a package.
+  This element installs a package.
 
 *SOLVER_TRANSACTION_ERASE*::
   This element erases a package.
@@ -2777,7 +2777,7 @@ in passive mode, but
   update A-2-1 (other: A-1-1)
   erase  B
 
-in active mode. If the mode containes SOLVER_TRANSACTION_SHOW_ALL, the 
+in active mode. If the mode contains SOLVER_TRANSACTION_SHOW_ALL, the 
 passive mode list will be unchanged but the active mode list will just
 contain A-2-1.
 
@@ -3007,7 +3007,7 @@ Returns false if there was an error.
 
 THE REPODATA CLASS
 ------------------
-The Repodata stores attrinbutes for packages and the repository itself, each
+The Repodata stores attributes for packages and the repository itself, each
 repository can have multiple repodata areas. You normally only need to
 directly access them if you implement lazy downloading of repository data.
 Repodata areas are created by calling the repository's add_repodata() method 
@@ -3100,7 +3100,7 @@ the same id.
 	chksum = data.lookup_checksum(solvid, keyname)
 
 Lookup functions. Return the data element stored in the specified solvable.
-The methods probably only make sense to retrive data from the special
+The methods probably only make sense to retrieve data from the special
 SOLVID_META solvid that stores repodata meta information.
 
 === DATA STORAGE METHODS ===
@@ -3155,7 +3155,7 @@ THE DATAPOS CLASS
 Datapos objects describe a specific position in the repository data area.
 Thus they are only valid until the repository is modified in some way.
 Datapos objects can be created by the pos() and parentpos() methods of
-a Datamatch object or by accesing the ``meta'' attribute of a repository.
+a Datamatch object or by accessing the ``meta'' attribute of a repository.
 
 === ATTRIBUTES ===
 

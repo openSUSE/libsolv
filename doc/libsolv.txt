@@ -12,7 +12,7 @@ DOCUMENTATION
 The libsolv documentation is split into multiple parts:
 
 *libsolv-history*::
-  how the libsolv library came into existance
+  how the libsolv library came into existence
 
 *libsolv-constantids*::
   fixed Ids for often used strings

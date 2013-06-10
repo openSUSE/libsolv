@@ -2,12 +2,12 @@
 .\"     Title: libsolv-bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/07/2013
+.\"      Date: 06/10/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "06/07/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "06/10/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -87,7 +87,7 @@ my \fI$iter\fR \fB=\fR \fI$pool\fR\fB\->solvables_iter()\fR;
 .sp
 As a downside of this approach, iterator objects can have no attributes\&.
 .sp
-If an array needs to be passwd to a method it is usually done by reference, if a method returns an array it returns it on the stack:
+If an array needs to be passed to a method it is usually done by reference, if a method returns an array it returns it on the stack:
 .sp
 .if n \{\
 .RS 4
@@ -461,7 +461,7 @@ Promote the epoch of the providing dependency to the requesting dependency if it
 .PP
 \fBPOOL_FLAG_FORBIDSELFCONFLICTS\fR
 .RS 4
-Disallow the installation of packages that conflict with themselfs\&. Debian always allowd self\-conflicting packages, rpm used to forbid them but switched to also allowing them recently\&.
+Disallow the installation of packages that conflict with themselves\&. Debian always allows self\-conflicting packages, rpm used to forbid them but switched to also allowing them recently\&.
 .RE
 .PP
 \fBPOOL_FLAG_OBSOLETEUSESPROVIDES\fR
@@ -486,7 +486,7 @@ Same as POOL_FLAG_OBSOLETEUSESCOLORS, but used to find out if packages of the sa
 .PP
 \fBPOOL_FLAG_NOINSTALLEDOBSOLETES\fR
 .RS 4
-New versions of rpm consider the obsoletes of installed packages when checking for dependency, thus you may not install a package that is obsoleted by some other installed package, unless you also deinstall the other package\&.
+New versions of rpm consider the obsoletes of installed packages when checking for dependency, thus you may not install a package that is obsoleted by some other installed package, unless you also erase the other package\&.
 .RE
 .PP
 \fBPOOL_FLAG_HAVEDISTEPOCH\fR
@@ -619,7 +619,7 @@ Set the architecture for your system\&. The architecture is used to determine wh
 .RE
 .\}
 .sp
-Add a Repository with the specified name to the pool\&. The reposiory is empty on creation, use the repository methods to populate it with packages\&.
+Add a Repository with the specified name to the pool\&. The repository is empty on creation, use the repository methods to populate it with packages\&.
 .sp
 .if n \{\
 .RS 4
@@ -707,7 +707,7 @@ Some package managers like rpm allow dependencies on files contained in other pa
 .RE
 .\}
 .sp
-Create the internal \(lqwhatprovides\(rq hash over all of the provides of all packages\&. This method must be called before doing any lookups on provides\&. It\(cqs encuraged to do it right after all repos are set up, usually right after the call to addfileprovides()\&.
+Create the internal \(lqwhatprovides\(rq hash over all of the provides of all packages\&. This method must be called before doing any lookups on provides\&. It\(cqs encouraged to do it right after all repos are set up, usually right after the call to addfileprovides()\&.
 .sp
 .if n \{\
 .RS 4
@@ -767,7 +767,7 @@ my \fI$bool\fR \fB=\fR \fI$pool\fR\fB\->isknownarch(\fR\fI$id\fR\fB)\fR;
 .RE
 .\}
 .sp
-Return true if the specified Id describs a known architecture\&.
+Return true if the specified Id describes a known architecture\&.
 .sp
 .if n \{\
 .RS 4
@@ -888,7 +888,7 @@ Get/Set fixed jobs stored in the pool\&. Those jobs are automatically appended t
 Set the callback function called when repository metadata needs to be loaded on demand\&. To make use of this feature, you need to create repodata stubs that tell the library which data is available but not loaded\&. If later on the data needs to be accessed, the callback function is called with a repodata argument\&. You can then load the data (maybe fetching it first from an remote server)\&. The callback should return true if the data has been made available\&.
 .SS "DATA RETRIEVAL METHODS"
 .sp
-In the following functions, the \fIkeyname\fR argument describes what to retrive\&. For the standard cases you can use the available Id constants\&. For example,
+In the following functions, the \fIkeyname\fR argument describes what to retrieve\&. For the standard cases you can use the available Id constants\&. For example,
 .sp
 .if n \{\
 .RS 4
@@ -1272,7 +1272,7 @@ Same as calling the str() method\&.
 The dependencies are equal if they are part of the same pool and have the same ids\&.
 .SH "THE REPOSITORY CLASS"
 .sp
-A Repository describes a group of packages, normally comming from the same source\&. Repositories are created by the Pool\(cqs add_repo() method\&.
+A Repository describes a group of packages, normally coming from the same source\&. Repositories are created by the Pool\(cqs add_repo() method\&.
 .SS "ATTRIBUTES"
 .sp
 .if n \{\
@@ -1324,7 +1324,7 @@ The repositories name\&. To libsolv, the name is just a string with no specific 
 .RS 4
 .\}
 .nf
-\fBint prioprity;\fR                  /* read/write */
+\fBint priority;\fR                   /* read/write */
 \fI$repo\fR\fB\->{priority}\fR
 \fIrepo\fR\fB\&.priority\fR
 \fIrepo\fR\fB\&.priority\fR
@@ -1339,7 +1339,7 @@ The priority of the repository\&. A higher number means that packages of this re
 .RS 4
 .\}
 .nf
-\fBint subprioprity;\fR               /* read/write */
+\fBint subpriority;\fR                /* read/write */
 \fI$repo\fR\fB\->{subpriority}\fR
 \fIrepo\fR\fB\&.subpriority\fR
 \fIrepo\fR\fB\&.subpriority\fR
@@ -1398,7 +1398,7 @@ Return a Datapos object of the repodata\(cqs metadata\&. You can use the lookup 
 .PP
 \fBREPO_REUSE_REPODATA\fR
 .RS 4
-Reuse the last repository data aera (\(lqrepodata\(rq) instead of creating a new one\&.
+Reuse the last repository data area (\(lqrepodata\(rq) instead of creating a new one\&.
 .RE
 .PP
 \fBREPO_NO_INTERNALIZE\fR
@@ -1590,7 +1590,7 @@ my \fI$repodata\fR \fB=\fR \fI$repo\fR\fB\->first_repodata()\fR;
 .RE
 .\}
 .sp
-Checks if all repodatas but the first repodata are extensions, and return the first repodata if this is the case\&. Useful if you want to do a store/retrive sequence on the repository to reduce the memory using and enable paging, as this does not work if the rpository contains multiple non\-extension repodata areas\&.
+Checks if all repodatas but the first repodata are extensions, and return the first repodata if this is the case\&. Useful if you want to do a store/retrieve sequence on the repository to reduce the memory using and enable paging, as this does not work if the repository contains multiple non\-extension repodata areas\&.
 .sp
 .if n \{\
 .RS 4
@@ -2240,7 +2240,7 @@ my \fI@deps\fR \fB=\fR \fI$solvable\fR\fB\->lookup_deparray(\fR\fI$keyname\fR\fB
 .RE
 .\}
 .sp
-Generic lookup methods\&. Retrieve data stored for the specific keyname\&. The lookup_idarray() method will return an array of Ids, use lookup_deparray if you want an array of Dependency objects instead\&. Some Id arrays contain two parts of data divided by a specific marker, for example the provides array uses the SOLVABLE_FILEMARKER id to store both the ids provided by the package and the ids added by the addfileprovides method\&. The default, \-1, translates to the correct marker for the keyname and returns the first part of the array, use 1 to select the second part or 0 to retrive all ids including the marker\&.
+Generic lookup methods\&. Retrieve data stored for the specific keyname\&. The lookup_idarray() method will return an array of Ids, use lookup_deparray if you want an array of Dependency objects instead\&. Some Id arrays contain two parts of data divided by a specific marker, for example the provides array uses the SOLVABLE_FILEMARKER id to store both the ids provided by the package and the ids added by the addfileprovides method\&. The default, \-1, translates to the correct marker for the keyname and returns the first part of the array, use 1 to select the second part or 0 to retrieve all ids including the marker\&.
 .sp
 .if n \{\
 .RS 4
@@ -2997,7 +2997,7 @@ Fix dependency problems of matching installed packages\&. The default is to igno
 .PP
 \fBSOLVER_USERINSTALLED\fR
 .RS 4
-The matching installed packages are considered to be installed by a user, thus not installed to fulfil some dependency\&. This is needed input for the calculation of unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set\&.
+The matching installed packages are considered to be installed by a user, thus not installed to fulfill some dependency\&. This is needed input for the calculation of unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set\&.
 .RE
 .PP
 \fBSOLVER_JOBMASK\fR
@@ -3009,7 +3009,7 @@ Action modifier constants:
 .PP
 \fBSOLVER_WEAK\fR
 .RS 4
-Makes the job a weak job\&. The solver tries to fulfil weak jobs, but does not report a problem if it is not possible to do so\&.
+Makes the job a weak job\&. The solver tries to fulfill weak jobs, but does not report a problem if it is not possible to do so\&.
 .RE
 .PP
 \fBSOLVER_ESSENTIAL\fR
@@ -3211,7 +3211,7 @@ So if a package "screen\-1\-1" is installed for the x86_64 architecture and vers
 Dependency solving is what this library is about\&. A solver object is needed for solving to store the result of the solver run\&. The solver object can be used multiple times for different jobs, reusing it allows the solver to re\-use the dependency rules it already computed\&.
 .SS "CONSTANTS"
 .sp
-Flags to modify some of the solver\(cqs behaviour:
+Flags to modify some of the solver\(cqs behavior:
 .PP
 \fBSOLVER_FLAG_ALLOW_DOWNGRADE\fR
 .RS 4
@@ -3235,7 +3235,7 @@ Allow the solver to change the name of an installed package, i\&.e\&. install a 
 .PP
 \fBSOLVER_FLAG_ALLOW_UNINSTALL\fR
 .RS 4
-Allow the solver to deinstall installed packages to fulfil the jobs\&. This flag also includes the above flags\&. You may want to set this flag if you only have SOLVER_ERASE jobs, as in that case it\(cqs better for the user to check the transaction overview instead of approving every single package that needs to be deinstalled\&.
+Allow the solver to erase installed packages to fulfill the jobs\&. This flag also includes the above flags\&. You may want to set this flag if you only have SOLVER_ERASE jobs, as in that case it\(cqs better for the user to check the transaction overview instead of approving every single package that needs to be erased\&.
 .RE
 .PP
 \fBSOLVER_FLAG_NO_UPDATEPROVIDE\fR
@@ -3255,7 +3255,7 @@ Do not process optional (aka weak) dependencies\&.
 .PP
 \fBSOLVER_FLAG_ADD_ALREADY_RECOMMENDED\fR
 .RS 4
-Install recommened or supplemented packages even if they have no connection to the current transaction\&. You can use this feature to implement a simple way for the user to install new recommended packages that were not available in the past\&.
+Install recommended or supplemented packages even if they have no connection to the current transaction\&. You can use this feature to implement a simple way for the user to install new recommended packages that were not available in the past\&.
 .RE
 .PP
 \fBSOLVER_FLAG_NO_INFARCHCHECK\fR
@@ -3292,7 +3292,7 @@ A rule to implement the update policy of installed packages\&. Every installed p
 .PP
 \fBSOLVER_RULE_FEATURE\fR
 .RS 4
-Feature rules are fallback rules used when a update rule is disabled\&. They include all packages that may replace the installed package ignoring the update policy, i\&.e\&. they contain downgrades, arch changes and so on\&. Without them, the solver would simply deinstall installed packages if their update rule gets disabled\&.
+Feature rules are fallback rules used when a update rule is disabled\&. They include all packages that may replace the installed package ignoring the update policy, i\&.e\&. they contain downgrades, arch changes and so on\&. Without them, the solver would simply erase installed packages if their update rule gets disabled\&.
 .RE
 .PP
 \fBSOLVER_RULE_JOB\fR
@@ -3312,7 +3312,7 @@ Infarch rules are also negative assertions, they disallow the installation of pa
 .PP
 \fBSOLVER_RULE_CHOICE\fR
 .RS 4
-Choice rules are used to make sure that the solver preferes updating to installing different packages when some dependency is provided by multiple packages with different names\&. The solver may always break choice rules, so you will not see them when a problem is found\&.
+Choice rules are used to make sure that the solver prefers updating to installing different packages when some dependency is provided by multiple packages with different names\&. The solver may always break choice rules, so you will not see them when a problem is found\&.
 .RE
 .PP
 \fBSOLVER_RULE_LEARNT\fR
@@ -3329,7 +3329,7 @@ This rule was added to prevent the installation of a package of an architecture 
 .PP
 \fBSOLVER_RULE_RPM_NOTHING_PROVIDES_DEP\fR
 .RS 4
-The package contanis a required dependency which was not provided by any package\&.
+The package contains a required dependency which was not provided by any package\&.
 .RE
 .PP
 \fBSOLVER_RULE_RPM_PACKAGE_REQUIRES\fR
@@ -3406,7 +3406,7 @@ The solver ask for permission before changing the vendor of installed packages\&
 .PP
 \fBPOLICY_ILLEGAL_NAMECHANGE\fR
 .RS 4
-The solver ask for permission before replacing an installed packages with a packge that has a different name\&.
+The solver ask for permission before replacing an installed packages with a package that has a different name\&.
 .RE
 .sp
 Solution element type constants
@@ -3589,7 +3589,7 @@ my \fI$probrule\fR \fB=\fR \fI$problem\fR\fB\->findproblemrule()\fR;
 .RE
 .\}
 .sp
-Return the rule that caused the problem\&. Of cource in most situations there is no single responsible rule, but many rules that interconnect with each created the problem\&. Nevertheless, the solver uses some heuristic approch to find a rule that somewhat describes the problem best to the user\&.
+Return the rule that caused the problem\&. Of course in most situations there is no single responsible rule, but many rules that interconnect with each created the problem\&. Nevertheless, the solver uses some heuristic approach to find a rule that somewhat describes the problem best to the user\&.
 .sp
 .if n \{\
 .RS 4
@@ -3903,7 +3903,7 @@ my \fI@solutionelements\fR \fB=\fR \fI$solution\fR\fB\->elements()\fR;
 .RE
 .\}
 .sp
-Return an array containing the elements describing what neeeds to be done to implement the specific solution\&. If expandreplaces is true, elements of type SOLVER_SOLUTION_REPLACE will be replaced by one or more elements replace elements describing the policy mismatches\&.
+Return an array containing the elements describing what needs to be done to implement the specific solution\&. If expandreplaces is true, elements of type SOLVER_SOLUTION_REPLACE will be replaced by one or more elements replace elements describing the policy mismatches\&.
 .sp
 .if n \{\
 .RS 4
@@ -4118,7 +4118,7 @@ This element does nothing\&. Used to map element types that do not match the vie
 .PP
 \fBSOLVER_TRANSACTION_INSTALL\fR
 .RS 4
-This element installes a package\&.
+This element installs a package\&.
 .RE
 .PP
 \fBSOLVER_TRANSACTION_ERASE\fR
@@ -4454,7 +4454,7 @@ erase  B
 .RE
 .\}
 .sp
-in active mode\&. If the mode containes SOLVER_TRANSACTION_SHOW_ALL, the passive mode list will be unchanged but the active mode list will just contain A\-2\-1\&.
+in active mode\&. If the mode contains SOLVER_TRANSACTION_SHOW_ALL, the passive mode list will be unchanged but the active mode list will just contain A\-2\-1\&.
 .SH "THE TRANSACTIONCLASS CLASS"
 .sp
 Objects of this type are returned by the classify() Transaction method\&.
@@ -4861,7 +4861,7 @@ Flush the file\&. Returns false if there was an error\&. Flushing a closed file 
 Close the file\&. This is needed for languages like Ruby, that do not destruct objects right after they are no longer referenced\&. In that case, it is good style to close open files so that the file descriptors are freed right away\&. Returns false if there was an error\&.
 .SH "THE REPODATA CLASS"
 .sp
-The Repodata stores attrinbutes for packages and the repository itself, each repository can have multiple repodata areas\&. You normally only need to directly access them if you implement lazy downloading of repository data\&. Repodata areas are created by calling the repository\(cqs add_repodata() method or by using repo_add methods without the REPO_REUSE_REPODATA or REPO_USE_LOADING flag\&.
+The Repodata stores attributes for packages and the repository itself, each repository can have multiple repodata areas\&. You normally only need to directly access them if you implement lazy downloading of repository data\&. Repodata areas are created by calling the repository\(cqs add_repodata() method or by using repo_add methods without the REPO_REUSE_REPODATA or REPO_USE_LOADING flag\&.
 .SS "ATTRIBUTES"
 .sp
 .if n \{\
@@ -5025,7 +5025,7 @@ my \fI$chksum\fR \fB=\fR \fI$data\fR\fB\->lookup_checksum(\fR\fI$solvid\fR\fB,\f
 .RE
 .\}
 .sp
-Lookup functions\&. Return the data element stored in the specified solvable\&. The methods probably only make sense to retrive data from the special SOLVID_META solvid that stores repodata meta information\&.
+Lookup functions\&. Return the data element stored in the specified solvable\&. The methods probably only make sense to retrieve data from the special SOLVID_META solvid that stores repodata meta information\&.
 .SS "DATA STORAGE METHODS"
 .sp
 .if n \{\
@@ -5122,7 +5122,7 @@ my \fI$handle\fR \fB=\fR \fI$data\fR\fB\->new_handle()\fR;
 Data storage methods\&. Probably only useful to store data in the special SOLVID_META solvid that stores repodata meta information\&. Note that repodata areas can have their own Id pool (see the REPO_LOCALPOOL flag), so be careful if you need to store ids\&. Arrays are created by calling the add function for every element\&. A flexarray is an array of sub\-structures, call new_handle to create a new structure, use the handle as solvid to fill the structure with data and call add_flexarray to put the structure in an array\&.
 .SH "THE DATAPOS CLASS"
 .sp
-Datapos objects describe a specific position in the repository data area\&. Thus they are only valid until the repository is modified in some way\&. Datapos objects can be created by the pos() and parentpos() methods of a Datamatch object or by accesing the \(lqmeta\(rq attribute of a repository\&.
+Datapos objects describe a specific position in the repository data area\&. Thus they are only valid until the repository is modified in some way\&. Datapos objects can be created by the pos() and parentpos() methods of a Datamatch object or by accessing the \(lqmeta\(rq attribute of a repository\&.
 .SS "ATTRIBUTES"
 .sp
 .if n \{\

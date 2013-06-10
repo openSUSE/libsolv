@@ -33,7 +33,7 @@ SOLVABLE ATTRIBUTES
 -------------------
 These are Ids for keyname of attributes. They can be used in the
 lookup and storage functions to select the correct attribute in the
-solvable. The describtions below describe the intended semantics
+solvable. The descriptions below describe the intended semantics
 of the values stored in the attribute with the keyname.
 
 *SOLVABLE_NAME "solvable:name"*::
@@ -118,7 +118,7 @@ of the values stored in the attribute with the keyname.
   list of keyword string IDs used for tagging this package.
 
 *SOLVABLE_LICENSE "solvable:license"*::
-  The jicense of this package.
+  The license of this package.
 
 *SOLVABLE_BUILDTIME "solvable:buildtime"*::
   The seconds since the unix epoch when the binary package was created.
@@ -237,11 +237,11 @@ SPECIAL SOLVABLEATTRIBUTES
   ``update:category'' instead.
 
 *UPDATE_REBOOT "update:reboot"*::
-  If this attribute is present the sytem should be rebooted after
+  If this attribute is present the system should be rebooted after
   the update is installed.
 
 *UPDATE_RESTART "update:restart"*::
-  If this attribute is present the software managemer should be run
+  If this attribute is present the software manager should be run
   again after the update is installed.  
 
 *UPDATE_RELOGIN "update:relogin"*::
@@ -322,10 +322,10 @@ SPECIAL SOLVABLEATTRIBUTES
   A release string for proudct registering.
 
 *PUBKEY_KEYID "pubkey:keyid"*::
-  The keyid of a pubkey, consiting of 8 bytes in hex.
+  The keyid of a pubkey, consisting of 8 bytes in hex.
 
 *PUBKEY_FINGERPRINT "pubkey:fingerprint"*::
-  The fingerprint of a pubkey, usualy a sha1sum in hex. Old V3 RSA keys
+  The fingerprint of a pubkey, usually a sha1sum in hex. Old V3 RSA keys
   use an md5sum instead.
 
 *PUBKEY_EXPIRES "pubkey:expires"*::
@@ -371,7 +371,7 @@ Predefined architecture values for commonly used architectures.
   Used for binary packages that contain the package sources.
 
 *ARCH_NOSRC "nosrc"*::
-  Used for binary packages that contain some of thepackage sources,
+  Used for binary packages that contain some of the package sources,
   but not all files (because of restrictions).
 
 *ARCH_NOARCH "noarch"*::
@@ -427,7 +427,7 @@ different semantics.
 *SOLVABLE_PREREQMARKER "solvable:prereqmarker"*::
   This marker partitions the normal require dependencies from the
   prerequires. It is not needed for dependency solving, but it is
-  used by the transaction ordering algorthim when a dependency cycle
+  used by the transaction ordering algorithm when a dependency cycle
   needs to be broken (non-prereq deps get broken first).
 
 *SOLVABLE_FILEMARKER "solvable:filemarker"*::

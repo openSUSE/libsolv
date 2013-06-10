@@ -5,7 +5,7 @@ LIBSOLV-HISTORY(3)
 
 NAME
 ----
-libsolv-history - how the libsolv library came into existance
+libsolv-history - how the libsolv library came into existence
 
 HISTORY
 -------
