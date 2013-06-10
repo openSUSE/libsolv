@@ -42,7 +42,7 @@ tied arrays so that it is possible to iterate with a for() statement:
 	my $iter = $pool->solvables_iter();
 	for my $solvable (@$iter) { ... };
 
-As a downside of this approach, iterator objects can have no attributes.
+As a downside of this approach, iterator objects cannot have attributes.
 
 If an array needs to be passed to a method it is usually done by reference,
 if a method returns an array it returns it on the stack:

@@ -46,6 +46,7 @@ ELSE (DEFINED  LIB)
 ENDIF (DEFINED  LIB)
 MESSAGE (STATUS "Libraries will be installed in ${LIB_INSTALL_DIR}")
 SET (BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
+SET (MAN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/man")
 
 ####################################################################
 # CONFIGURATION                                                    #
@@ -296,6 +297,7 @@ IF (ENABLE_PERL OR ENABLE_PYTHON OR ENABLE_RUBY)
     ADD_SUBDIRECTORY (bindings)
 ENDIF (ENABLE_PERL OR ENABLE_PYTHON OR ENABLE_RUBY)
 ADD_SUBDIRECTORY (examples)
+ADD_SUBDIRECTORY (doc)
 
 MESSAGE (STATUS "Version: ${VERSION}")
 
