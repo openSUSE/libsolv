@@ -47,6 +47,9 @@ ENDIF (DEFINED  LIB)
 MESSAGE (STATUS "Libraries will be installed in ${LIB_INSTALL_DIR}")
 SET (BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
 SET (MAN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/man")
+IF (IS_DIRECTORY("${CMAKE_INSTALL_PREFIX}/share/man") AND NOT IS_DIRECTORY("${CMAKE_INSTALL_PREFIX}/man"))
+  SET (MAN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/share/man")
+ENDIF (IS_DIRECTORY("${CMAKE_INSTALL_PREFIX}/share/man") AND NOT IS_DIRECTORY("${CMAKE_INSTALL_PREFIX}/man"))
 
 ####################################################################
 # CONFIGURATION                                                    #
