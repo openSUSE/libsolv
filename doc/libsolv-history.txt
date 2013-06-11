@@ -1,13 +1,13 @@
-LIBSOLV-HISTORY(3)
+Libsolv-History(3)
 ==================
 :man manual: LIBSOLV
 :man source: libsolv
 
-NAME
+Name
 ----
 libsolv-history - how the libsolv library came into existence
 
-HISTORY
+History
 -------
 This project was started in May 2007 when the zypp folks decided to switch
 to a database to speed up installation. As I am not a big fan of databases,
@@ -108,6 +108,6 @@ Matz already played with in a proof of concept implementation showing
 some drastic speed gains. The last traces of the old database code
 were removed in February.
 
-AUTHOR
+Author
 ------
 Michael Schroeder <mls@suse.de>

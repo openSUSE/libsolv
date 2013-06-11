@@ -1,15 +1,15 @@
-LIBSOLV-BINDINGS(3)
+Libsolv-Bindings(3)
 ===================
 :man manual: LIBSOLV
 :man source: libsolv
 
 
-NAME
+Name
 ----
 libsolv-bindings - access libsolv from perl/python/ruby
 
 
-DESCRIPTION
+Description
 -----------
 Libsolv's language bindings offer an abstract, object orientated interface
 to the library. The supported languages are currently perl, python, and ruby.
@@ -18,7 +18,7 @@ the ``C-ish'' interface, then the syntax for perl, python, and ruby (in that
 order).
 
 
-PERL SPECIFICS
+Perl Specifics
 --------------
 Libsolv's perl bindings can be loaded with the following statement:
 
@@ -61,7 +61,7 @@ constant. Also do not forget to prepend the namespace of the constant:
 	$pool->set_flag($solv::Pool::POOL_FLAG_OBSOLETEUSESCOLORS, 1);
 	
 
-PYTHON SPECIFICS
+Python Specifics
 ----------------
 The python bindings can be loaded with:
 
@@ -98,7 +98,7 @@ Constants are attributes of the classes:
 	pool.set_flag(solv.Pool.POOL_FLAG_OBSOLETEUSESCOLORS, 1);
 
 
-RUBY SPECIFICS
+Ruby Specifics
 --------------
 The ruby bindings can be loaded with:
 
@@ -141,7 +141,7 @@ other ruby modules:
 	puts "empty repo" if repo.isempty?
 
 
-THE SOLV CLASS
+The Solv Class
 --------------
 This is the main namespace of the library, you cannot create objects of this
 type but it contains some useful constants.
@@ -189,7 +189,7 @@ Constant string Ids
   see the libsolv-constantids manpage for a list of fixed Ids.
 
 
-THE POOL CLASS
+The Pool Class
 --------------
 The pool is libsolv's central resource manager. A pool consists of Solvables,
 Repositories, Dependencies, each indexed by Ids.
@@ -648,7 +648,7 @@ function has the same effect as id2str(). For relational dependencies, the
 result is the correct ``name relation evr'' string.
 
 
-THE DEPENDENCY CLASS
+The Dependency Class
 --------------------
 The dependency class is an object orientated way to work with strings and
 dependencies. Internally, dependencies are represented as Ids, i.e. simple
@@ -721,7 +721,7 @@ The dependencies are equal if they are part of the same pool and have the same
 ids.
 
 
-THE REPOSITORY CLASS
+The Repository Class
 --------------------
 A Repository describes a group of packages, normally coming from the same
 source. Repositories are created by the Pool's add_repo() method.
@@ -1138,7 +1138,7 @@ Add the installed SUSE products database to the repository. The _dir_ parameter
 is usually "/etc/products.d".
 
 
-THE SOLVABLE CLASS
+The Solvable Class
 ------------------
 A solvable describes all the information of one package. Each solvable
 belongs to one repository, it can be added and filled manually but in
@@ -1323,7 +1323,7 @@ Two solvables are equal if they are part of the same pool and have the same
 ids.
 
 
-THE DATAITERATOR CLASS
+The Dataiterator Class
 ----------------------
 Dataiterators can be used to do complex string searches or
 to iterate over arrays. They can be created via the
@@ -1393,7 +1393,7 @@ one.
 Iterate through the matches. If there is a match, the object
 in d will be of type Datamatch.
 
-THE DATAMATCH CLASS
+The Datamatch Class
 -------------------
 Objects of this type will be created for every value matched
 by a dataiterator.
@@ -1519,7 +1519,7 @@ it will return an empty string unless SEARCH_CHECKSUMS is used.
 Numeric values are currently stringified to an empty string.
 
 
-THE SELECTION CLASS
+The Selection Class
 -------------------
 Selections are a way to easily deal with sets of packages.
 There are multiple constructors to create them, the most useful
@@ -1654,7 +1654,7 @@ Convert a selection into an array of Solvable objects.
 
 Return a string describing the selection.
 
-THE JOB CLASS
+The Job Class
 -------------
 Jobs are the way to specify to the dependency solver what to do.
 Most of the times jobs will get created by calling the jobs() method
@@ -1917,7 +1917,7 @@ different architecture. When using the Selection class to create jobs
 the set bits are automatically added, e.g. selecting ``screen.i586'' will
 automatically add SOLVER_SETARCH, and thus no problem will be reported.
 
-THE SOLVER CLASS
+The Solver Class
 ----------------
 Dependency solving is what this library is about. A solver object is needed
 for solving to store the result of the solver run. The solver object can be
@@ -2204,7 +2204,7 @@ Return the transaction to implement the calculated package changes. A transactio
 is available even if problems were found, this is useful for interactive user
 interfaces that show both the job result and the problems.
 
-THE PROBLEM CLASS
+The Problem Class
 -----------------
 Problems are the way of the solver to interact with the user. You can simply list
 all problems and terminate your program, but a better way is to present solutions to
@@ -2263,7 +2263,7 @@ the solution class for more information.
 
 Return the number of solutions without creating solution objects.
 
-THE RULE CLASS
+The Rule Class
 --------------
 Rules are the basic block of sat solving. Each package dependency gets translated
 into one or multiple rules.
@@ -2317,7 +2317,7 @@ an array of all infos about a rule.
 
 Two rules are equal if they belong to the same solver and have the same id.
 
-THE RULEINFO CLASS
+The Ruleinfo Class
 ------------------
 A Ruleinfo describes one reason why a rule was created.
 
@@ -2375,7 +2375,7 @@ the dependency for conflicts.
 A string describing the ruleinfo from a problem perspective. This probably
 only makes sense if the rule is part of a problem.
 
-THE SOLUTION CLASS
+The Solution Class
 ------------------
 A solution solves one specific problem. It consists of multiple solution elements
 that all need to be executed.
@@ -2425,7 +2425,7 @@ count does not match the number of objects returned by the elements() method
 of expandreplaces is set to true.
 
 
-THE SOLUTIONELEMENT CLASS
+The Solutionelement Class
 -------------------------
 A solution element describes a single action of a solution. The action is always
 either to remove one specific job or to add a new job that installs or erases
@@ -2531,7 +2531,7 @@ you should replace the old job with the new one.
 
 A string describing the change the solution element consists of.
 
-THE TRANSACTION CLASS
+The Transaction Class
 ---------------------
 Transactions describe the output of a solver run. A transaction contains
 a number of transaction elements, each either the installation of a new
@@ -2781,7 +2781,7 @@ in active mode. If the mode contains SOLVER_TRANSACTION_SHOW_ALL, the
 passive mode list will be unchanged but the active mode list will just
 contain A-2-1.
 
-THE TRANSACTIONCLASS CLASS
+The Transactionclass Class
 --------------------------
 Objects of this type are returned by the classify() Transaction method.
 
@@ -2845,7 +2845,7 @@ The id of the new vendor or architecture.
 
 Return the solvables for all transaction elements in the class.
 
-CHECKSUMS
+Checksums
 ---------
 Checksums (also called hashes) are used to make sure that downloaded data is
 not corrupt and also as a fingerprint mechanism to check if data has changed.
@@ -2944,7 +2944,7 @@ If the checksum is finished, the checksum is returned as "<type>:<hex>" string.
 Otherwise "<type>:unfinished" is returned.
 
 
-FILE MANAGEMENT
+File Management
 ---------------
 This functions were added because libsolv uses standard *FILE* pointers to
 read/write files, but languages like perl have their own implementation of
@@ -3005,7 +3005,7 @@ style to close open files so that the file descriptors are freed right away.
 Returns false if there was an error.
 
 
-THE REPODATA CLASS
+The Repodata Class
 ------------------
 The Repodata stores attributes for packages and the repository itself, each
 repository can have multiple repodata areas. You normally only need to
@@ -3150,7 +3150,7 @@ handle as solvid to fill the structure with data and call add_flexarray
 to put the structure in an array.
 
 
-THE DATAPOS CLASS
+The Datapos Class
 -----------------
 Datapos objects describe a specific position in the repository data area.
 Thus they are only valid until the repository is modified in some way.

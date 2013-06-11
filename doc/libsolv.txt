@@ -1,13 +1,13 @@
-LIBSOLV(3)
+Libsolv(3)
 ==========
 :man manual: LIBSOLV
 :man source: libsolv
 
-NAME
+Name
 ----
 libsolv - package dependency solver library using a satisfiability algorithm
 
-DOCUMENTATION
+Documentation
 -------------
 The libsolv documentation is split into multiple parts:
 
@@ -20,7 +20,7 @@ The libsolv documentation is split into multiple parts:
 *libsolv-bindings*::
   access libsolv from perl/python/ruby
 
-AUTHOR
+Author
 ------
 Michael Schroeder <mls@suse.de>
 

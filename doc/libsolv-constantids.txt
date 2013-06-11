@@ -1,15 +1,15 @@
-LIBSOLV-CONSTANTIDS(3)
+Libsolv-Constantids(3)
 ======================
 :man manual: LIBSOLV
 :man source: libsolv
 
 
-NAME
+Name
 ----
 libsolv-constantids - fixed Ids for often used strings
 
 
-DESCRIPTION
+Description
 -----------
 Constant Ids are Ids of strings that are often needed. They are defined
 to ease programming and reduce the number of pool_str2id calls. The
@@ -20,7 +20,7 @@ fixed Ids, but instead references the strings, so solv files can still
 be read when the ABI is broken.
 
 
-SPECIAL STRINGS
+Special Strings
 ---------------
 *ID_EMPTY ""*::
   The empty string. It will always have Id 1.
@@ -29,7 +29,7 @@ SPECIAL STRINGS
   The name of the always installed "system" solvable.
 
 
-SOLVABLE ATTRIBUTES
+Solvable Attributes
 -------------------
 These are Ids for keyname of attributes. They can be used in the
 lookup and storage functions to select the correct attribute in the
@@ -118,7 +118,7 @@ of the values stored in the attribute with the keyname.
   list of keyword string IDs used for tagging this package.
 
 *SOLVABLE_LICENSE "solvable:license"*::
-  The license of this package.
+  The license(s) of this package.
 
 *SOLVABLE_BUILDTIME "solvable:buildtime"*::
   The seconds since the unix epoch when the binary package was created.
@@ -226,8 +226,8 @@ of the values stored in the attribute with the keyname.
   The text of a changelog entry.
 
 
-SPECIAL SOLVABLEATTRIBUTES
---------------------------
+Special Solvable Attributes
+---------------------------
 *RPM_RPMDBID "rpm:dbid"*::
   The rpm database id of this (installed) package. Usually a small
   integer number.
@@ -363,7 +363,7 @@ SPECIAL SOLVABLEATTRIBUTES
   architecture of the solvable used for sharing attributes.
 
 
-SOLVABLE ARCHITECTURES
+Solvable Architectures
 ----------------------
 Predefined architecture values for commonly used architectures.
 
@@ -385,7 +385,7 @@ Predefined architecture values for commonly used architectures.
   and Haiku.
 
 
-DEPENDENCY IDS
+Dependency Ids
 --------------
 Namespaces are special modifiers that change the meaning of a dependency.
 Namespace dependencies are created with the REL_NAMESPACE flag. To make
@@ -435,7 +435,7 @@ different semantics.
   synthetic file provides dependencies added by pool_addfileprovides().
 
 
-DATA TYPES
+Data Types
 ----------
 Each attribute data is stored with a type, so that the lookup functions
 know how to interpret the data. The following types are available:
@@ -507,7 +507,7 @@ know how to interpret the data. The following types are available:
   The data does not exist. Used to mark an attribute that was deleted.
 
 
-REPOSITORY METADATA
+Repository Metadata
 -------------------
 This attributes contain meta information about the repository.
 
@@ -578,7 +578,7 @@ This attributes contain meta information about the repository.
   the solv file.
 
 
-REPOSITORY METADATA FOR SUSETAGS REPOS
+Repository Metadata for Susetags Repos
 --------------------------------------
 Attributes describing repository files in a susetags repository.
 *SUSETAGS_DATADIR "susetags:datadir"*::
@@ -603,7 +603,7 @@ Attributes describing repository files in a susetags repository.
   The file checksum of the resource.
 
 
-REPOSITORY METADATA FOR RPMMD REPOS
+Repository Metadata for RpmMD Repos
 -----------------------------------
 *REPOSITORY_REPOMD "repository:repomd"*::
   An array of file resources of the repository.
@@ -627,7 +627,7 @@ REPOSITORY METADATA FOR RPMMD REPOS
   The size of the resource file.
 
 
-DELTA PACKAGE ATTRIBUTES
+Delta Package Attributes
 ------------------------
 *DELTA_PACKAGE_NAME "delta:pkgname"*::
   The target package name for the delta package. Applying the delta
