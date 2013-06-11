@@ -97,12 +97,36 @@ solvable_lookup_deparray(Solvable *s, Id keyname, Queue *q, Id marker)
   return repo_lookup_deparray(s->repo, s - s->repo->pool->solvables, keyname, q, marker);
 }
 
+static const char *
+solvable_lookup_str_joinarray(Solvable *s, Id keyname)
+{
+  Queue q;
+  Id qbuf[10];
+  char *str = 0;
+
+  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  if (solvable_lookup_idarray(s, keyname, &q) && q.count)
+    {
+      Pool *pool = s->repo->pool;
+      int i;
+      str = pool_tmpjoin(pool, pool_id2str(pool, q.elements[0]), 0, 0);
+      for (i = 1; i < q.count; i++)
+	str = pool_tmpappend(pool, str, ", ", pool_id2str(pool, q.elements[i]));
+    }
+  queue_free(&q);
+  return str;
+}
+
 const char *
 solvable_lookup_str(Solvable *s, Id keyname)
 {
+  const char *str;
   if (!s->repo)
     return 0;
-  return repo_lookup_str(s->repo, s - s->repo->pool->solvables, keyname);
+  str = repo_lookup_str(s->repo, s - s->repo->pool->solvables, keyname);
+  if (!str && (keyname == SOLVABLE_LICENSE || keyname == SOLVABLE_GROUP))
+    str = solvable_lookup_str_joinarray(s, keyname);
+  return str;
 }
 
 static const char *

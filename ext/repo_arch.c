@@ -411,11 +411,11 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
 	  else if (!strncmp(line, "arch = ", 7))
 	    s->arch = pool_str2id(pool, line + 7, 1);
 	  else if (!strncmp(line, "license = ", 10))
-	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_LICENSE, line + 10);
+	    repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_LICENSE, line + 10);
 	  else if (!strncmp(line, "replaces = ", 11))
 	    s->obsoletes = adddep(repo, s->obsoletes, line + 11);
 	  else if (!strncmp(line, "group = ", 8))
-	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_GROUP, line + 8);
+	    repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_GROUP, line + 8);
 	  else if (!strncmp(line, "depend = ", 9))
 	    s->requires = adddep(repo, s->requires, line + 9);
 	  else if (!strncmp(line, "optdepend = ", 12))
@@ -601,7 +601,7 @@ adddata(Repodata *data, Solvable *s, struct tarhead *th)
       else if (!strcmp(line, "%GROUPS%"))
 	{
 	  if (getsentrynl(th, line, sizeof(line)))
-	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_GROUP, line);
+	    repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_GROUP, line);
 	}
       else if (!strcmp(line, "%CSIZE%"))
 	{
@@ -634,7 +634,7 @@ adddata(Repodata *data, Solvable *s, struct tarhead *th)
       else if (!strcmp(line, "%LICENSE%"))
 	{
 	  if (getsentrynl(th, line, sizeof(line)))
-	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_LICENSE, line);
+	    repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_LICENSE, line);
 	}
       else if (!strcmp(line, "%ARCH%"))
 	{
