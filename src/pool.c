@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "pool.h"
+#include "poolvendor.h"
 #include "repo.h"
 #include "poolid.h"
 #include "poolid_private.h"

@@ -332,6 +332,11 @@ testcase_str2dep(Pool *pool, char *s)
   while (*s == ' ' || *s == '\t')
     s++;
   flags = 0;
+  if (*s == '!' && s[1] == '=')	/* support != as synonym for <> */
+    {
+      flags = REL_LT | REL_GT;
+      s += 2;
+    }
   for (;;s++)
     {  
       if (*s == '<')
@@ -2009,10 +2014,12 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	      pool_debug(pool, SOLV_ERROR, "testcase_read: system: cannot change disttype to '%s'\n", pieces[2]);
 #endif
 	    }
-	  if (strcmp(pieces[1], "unset") != 0)
-	    pool_setarch(pool, pieces[1]);
-	  else
+	  if (strcmp(pieces[1], "unset") == 0)
 	    pool_setarch(pool, 0);
+	  else if (pieces[1][0] == ':')
+	    pool_setarchpolicy(pool, pieces[1] + 1);
+	  else
+	    pool_setarch(pool, pieces[1]);
 	  if (npieces > 3)
 	    {
 	      Repo *repo = testcase_str2repo(pool, pieces[3]);

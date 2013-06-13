@@ -2087,7 +2087,7 @@ transaction_check_order(Transaction *trans)
   Map ins, seen;
   int i;
 
-  POOL_DEBUG(SOLV_WARN, "\nchecking transaction order...\n");
+  POOL_DEBUG(SOLV_DEBUG_RESULT, "\nchecking transaction order...\n");
   map_init(&ins, pool->nsolvables);
   map_init(&seen, pool->nsolvables);
   if (pool->installed)
@@ -2112,5 +2112,5 @@ transaction_check_order(Transaction *trans)
     }
   map_free(&seen);
   map_free(&ins);
-  POOL_DEBUG(SOLV_WARN, "transaction order check done.\n");
+  POOL_DEBUG(SOLV_DEBUG_RESULT, "transaction order check done.\n");
 }

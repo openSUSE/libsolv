@@ -51,6 +51,15 @@ prune_to_best_version_sortcmp(const void *ap, const void *bp, void *dp)
       nb = pool_id2str(pool, sb->name);
       return strcmp(na, nb);
     }
+  if (sa->arch != sb->arch)
+    {
+      int aa, ab;
+      aa = (sa->arch <= pool->lastarch) ? pool->id2arch[sa->arch] : 0;
+      ab = (sb->arch <= pool->lastarch) ? pool->id2arch[sb->arch] : 0;
+      if (aa != ab && aa > 1 && ab > 1)
+	return aa - ab;		/* lowest score first */
+    }
+
   /* the same name, bring installed solvables to the front */
   if (pool->installed)
     {

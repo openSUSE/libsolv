@@ -228,7 +228,6 @@ extern void pool_setdisttype(Pool *pool, int disttype);
 #endif
 extern int  pool_set_flag(Pool *pool, int flag, int value);
 extern int  pool_get_flag(Pool *pool, int flag);
-extern void pool_setvendorclasses(Pool *pool, const char **vendorclasses);
 
 extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
 extern void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata);
