@@ -262,7 +262,7 @@ Define which repository contains all the installed packages.
 *POOL_FLAG_OBSOLETEUSESCOLORS*::
   Rpm's multilib implementation (used in RedHat and Fedora)
   distinguishes between 32bit and 64bit packages (the terminology
-  is that they have a different color). If obsolteusescolors is
+  is that they have a different color). If obsoleteusescolors is
   set, packages with different colors will not obsolete each other.
 
 *POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS*::
