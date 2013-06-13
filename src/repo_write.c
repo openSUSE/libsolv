@@ -1007,6 +1007,23 @@ repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata)
 }
 
 /*
+ * return true if the repodata contains the filelist (and just
+ * the filelist). The same code is used in the dataiterator. The way
+ * it is used is completely wrong, of course, as having the filelist
+ * key does not mean it is used for a specific solvable. Nevertheless
+ * it is better to have it than to write broken solv files.
+ */
+static inline int
+is_filelist_extension(Repodata *data)
+{
+  int j;
+  for (j = 1; j < data->nkeys; j++)
+    if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
+      return 0;
+  return 1;
+}
+
+/*
  * Repo
  */
 
@@ -1025,7 +1042,7 @@ int
 repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq)
 {
   Pool *pool = repo->pool;
-  int i, j, n;
+  int i, j, n, lastfilelistn;
   Solvable *s;
   NeedId *needid;
   int nstrings, nrels;
@@ -1127,6 +1144,7 @@ repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *
   dirpool = 0;
   dirpooldata = 0;
   n = ID_NUM_INTERNAL;
+  lastfilelistn = 0;
   FOR_REPODATAS(repo, i, data)
     {
       cbdata.keymapstart[i] = n;
@@ -1216,6 +1234,20 @@ repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *
 	    {
 	      idused = 1;	/* dirs also use ids */
 	      dirused = 1;
+	    }
+	  if (key->type == REPOKEY_TYPE_DIRSTRARRAY && key->name == SOLVABLE_FILELIST)
+	    {
+	      /* is this a file list extension */
+	      if (is_filelist_extension(data))
+		{
+		  /* hmm, we have a file list extension. Kill filelist of other repodata.
+		   * XXX: this is wrong, as the extension does not need to cover all
+		   * solvables of the other repodata */
+		  if (lastfilelistn)
+		    cbdata.keymap[lastfilelistn] = 0;
+		}
+	      else
+		lastfilelistn = n;
 	    }
 	}
       if (idused)
