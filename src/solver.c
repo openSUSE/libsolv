@@ -4360,6 +4360,12 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
     s = pool_tmpappend(pool, s, ",essential", 0);
   if (how & SOLVER_CLEANDEPS)
     s = pool_tmpappend(pool, s, ",cleandeps", 0);
+  if (how & SOLVER_ORUPDATE)
+    s = pool_tmpappend(pool, s, ",orupdate", 0);
+  if (how & SOLVER_FORCEBEST)
+    s = pool_tmpappend(pool, s, ",forcebest", 0);
+  if (how & SOLVER_TARGETED)
+    s = pool_tmpappend(pool, s, ",targeted", 0);
   if (how & SOLVER_SETEV)
     s = pool_tmpappend(pool, s, ",setev", 0);
   if (how & SOLVER_SETEVR)
@@ -4370,6 +4376,8 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
     s = pool_tmpappend(pool, s, ",setvendor", 0);
   if (how & SOLVER_SETREPO)
     s = pool_tmpappend(pool, s, ",setrepo", 0);
+  if (how & SOLVER_SETNAME)
+    s = pool_tmpappend(pool, s, ",setname", 0);
   if (how & SOLVER_NOAUTOSET)
     s = pool_tmpappend(pool, s, ",noautoset", 0);
   if (s[o + 1] != ',')
