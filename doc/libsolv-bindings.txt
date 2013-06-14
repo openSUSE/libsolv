@@ -151,42 +151,42 @@ type but it contains some useful constants.
 Relational flag constants, the first three can be or-ed together
 
 *REL_LT*::
-  the ``less than'' bit
+the ``less than'' bit
 
 *REL_EQ*::
-  the ``equals to'' bit
+the ``equals to'' bit
 
 *REL_GT*::
-  the ``greater then'' bit
+the ``greater then'' bit
 
 *REL_ARCH*::
-  used for relations that describe an extra architecture filter, the
-  version part of the relation is interpreted as architecture.
+used for relations that describe an extra architecture filter, the
+version part of the relation is interpreted as architecture.
 
 Special Solvable Ids
 
 *SOLVID_META*::
-  Access the meta section of a repository or repodata area. This is
-  like an extra Solvable that has the Id SOLVID_META.
+Access the meta section of a repository or repodata area. This is
+like an extra Solvable that has the Id SOLVID_META.
 
 *SOLVID_POS*::
-  Use the data position stored inside of the pool instead of accessing
-  some solvable by Id. The bindings have the Datapos objects as an
-  abstraction mechanism, so you do not need this constant.
+Use the data position stored inside of the pool instead of accessing
+some solvable by Id. The bindings have the Datapos objects as an
+abstraction mechanism, so you do not need this constant.
 
 Constant string Ids
   
 *ID_NULL*::
-  Always zero
+Always zero
 
 *ID_EMPTY*::
-  Always one, describes the empty string
+Always one, describes the empty string
 
 *SOLVABLE_NAME*::
-  The keyname Id of the name of the solvable.
+The keyname Id of the name of the solvable.
 
 *...*::
-  see the libsolv-constantids manpage for a list of fixed Ids.
+see the libsolv-constantids manpage for a list of fixed Ids.
 
 
 The Pool Class
@@ -245,65 +245,64 @@ Return the last error string that was stored in the pool.
 === CONSTANTS ===
 
 *POOL_FLAG_PROMOTEEPOCH*::
-  Promote the epoch of the providing dependency to the requesting
-  dependency if it does not contain an epoch. Used at some time
-  in old rpm versions, modern systems should never need this.
+Promote the epoch of the providing dependency to the requesting
+dependency if it does not contain an epoch. Used at some time
+in old rpm versions, modern systems should never need this.
 
 *POOL_FLAG_FORBIDSELFCONFLICTS*::
-  Disallow the installation of packages that conflict with themselves.
-  Debian always allows self-conflicting packages, rpm used to forbid
-  them but switched to also allowing them recently.
+Disallow the installation of packages that conflict with themselves.
+Debian always allows self-conflicting packages, rpm used to forbid
+them but switched to also allowing them recently.
 
 *POOL_FLAG_OBSOLETEUSESPROVIDES*::
-  Make obsolete type dependency match against provides instead of
-  just the name and version of packages. Very old versions of rpm
-  used the name/version, then it got switched to provides and later
-  switched back again to just name/version.
+Make obsolete type dependency match against provides instead of
+just the name and version of packages. Very old versions of rpm
+used the name/version, then it got switched to provides and later
+switched back again to just name/version.
 
 *POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES*::
-  An implicit obsoletes is the internal mechanism to remove the
-  old package on an update. The default is to remove all packages
-  with the same name, rpm-5 switched to also removing packages
-  providing the same name.
+An implicit obsoletes is the internal mechanism to remove the
+old package on an update. The default is to remove all packages
+with the same name, rpm-5 switched to also removing packages
+providing the same name.
 
 *POOL_FLAG_OBSOLETEUSESCOLORS*::
-  Rpm's multilib implementation (used in RedHat and Fedora)
-  distinguishes between 32bit and 64bit packages (the terminology
-  is that they have a different color). If obsoleteusescolors is
-  set, packages with different colors will not obsolete each other.
+Rpm's multilib implementation (used in RedHat and Fedora)
+distinguishes between 32bit and 64bit packages (the terminology
+is that they have a different color). If obsoleteusescolors is
+set, packages with different colors will not obsolete each other.
 
 *POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS*::
-  Same as POOL_FLAG_OBSOLETEUSESCOLORS, but used to find out if
-  packages of the same name can be installed in parallel. For
-  current Fedora systems, POOL_FLAG_OBSOLETEUSESCOLORS should be
-  false and POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS should be true
-  (this is the default if FEDORA is defined when libsolv is
-  compiled).
+Same as POOL_FLAG_OBSOLETEUSESCOLORS, but used to find out if
+packages of the same name can be installed in parallel. For
+current Fedora systems, POOL_FLAG_OBSOLETEUSESCOLORS should be
+false and POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS should be true
+(this is the default if FEDORA is defined when libsolv is compiled).
 
 *POOL_FLAG_NOINSTALLEDOBSOLETES*::
-  New versions of rpm consider the obsoletes of installed packages
-  when checking for dependency, thus you may not install a package
-  that is obsoleted by some other installed package, unless you
-  also erase the other package.
+New versions of rpm consider the obsoletes of installed packages
+when checking for dependency, thus you may not install a package
+that is obsoleted by some other installed package, unless you
+also erase the other package.
 
 *POOL_FLAG_HAVEDISTEPOCH*::
-  Mandriva added a new field called distepoch that gets checked in
-  version comparison if the epoch/version/release of two packages
-  are the same.
+Mandriva added a new field called distepoch that gets checked in
+version comparison if the epoch/version/release of two packages
+are the same.
 
 *POOL_FLAG_NOOBSOLETESMULTIVERSION*::
-  If a package is installed in multiversionmode, rpm used to ignore
-  both the implicit obsoletes and the obsolete dependency of a
-  package. This was changed to ignoring just the implicit obsoletes,
-  thus you may install multiple versions of the same name, but
-  obsoleted packages still get removed.
+If a package is installed in multiversionmode, rpm used to ignore
+both the implicit obsoletes and the obsolete dependency of a
+package. This was changed to ignoring just the implicit obsoletes,
+thus you may install multiple versions of the same name, but
+obsoleted packages still get removed.
 
 *POOL_FLAG_ADDFILEPROVIDESFILTERED*::
-  Make the addfileprovides method only add files from the standard
-  locations (i.e. the ``bin'' and ``etc'' directories). This is
-  useful if you have only few packages that use non-standard file
-  dependencies, but you still wand the fast speed that addfileprovides()
-  generates.
+Make the addfileprovides method only add files from the standard
+locations (i.e. the ``bin'' and ``etc'' directories). This is
+useful if you have only few packages that use non-standard file
+dependencies, but you still wand the fast speed that addfileprovides()
+generates.
 
 === METHODS ===
 
@@ -802,44 +801,45 @@ timestamp.
 === CONSTANTS ===
 
 *REPO_REUSE_REPODATA*::
-  Reuse the last repository data area (``repodata'') instead of creating a new
-  one.
+Reuse the last repository data area (``repodata'') instead of creating a
+new one.
 
 *REPO_NO_INTERNALIZE*::
-  Do not internalize the added repository data. This is useful if
-  you plan to add more data because internalization is a costly
-  operation.
+Do not internalize the added repository data. This is useful if
+you plan to add more data because internalization is a costly
+operation.
 
 *REPO_LOCALPOOL*::
-  Use the repodata's pool for Id storage instead of the global pool. Useful
-  if you don't want to pollute the global pool with many unneeded ids, like
-  when storing the filelist.
+Use the repodata's pool for Id storage instead of the global pool. Useful
+if you don't want to pollute the global pool with many unneeded ids, like
+when storing the filelist.
 
 *REPO_USE_LOADING*::
-  Use the repodata that is currently being loaded instead of creating a new one.
-  This only makes sense if used in a load callback.
+Use the repodata that is currently being loaded instead of creating a new
+one. This only makes sense if used in a load callback.
 
 *REPO_EXTEND_SOLVABLES*::
-  Do not create new solvables for the new data, but match existing solvables and
-  add the data to them. Repository metadata is often split into multiple parts,
-  with one primary file describing all packages and other parts holding
-  information that is normally not needed, like the changelog.
+Do not create new solvables for the new data, but match existing solvables
+and add the data to them. Repository metadata is often split into multiple
+parts, with one primary file describing all packages and other parts
+holding information that is normally not needed, like the changelog.
 
 *REPO_USE_ROOTDIR*::
-  Prepend the pool's rootdir to the path when doing file operations.
+Prepend the pool's rootdir to the path when doing file operations.
 
 *REPO_NO_LOCATION*::
-  Do not add a location element to the solvables. Useful if the solvables are
-  not in the final position, so you can add the correct location later in your code.
+Do not add a location element to the solvables. Useful if the solvables
+are not in the final position, so you can add the correct location later
+in your code.
 
 *SOLV_ADD_NO_STUBS*::
-  Do not create stubs for repository parts that can be downloaded on demand.
+Do not create stubs for repository parts that can be downloaded on demand.
 
 *SUSETAGS_RECORD_SHARES*::
-  This is specific to the add_susetags() method. Susetags allows to refer to already
-  read packages to save disk space. If this data sharing needs to work over multiple
-  calls to add_susetags, you need to specify this flag so that the share information
-  is made available to subsequent calls.
+This is specific to the add_susetags() method. Susetags allows to refer to
+already read packages to save disk space. If this data sharing needs to
+work over multiple calls to add_susetags, you need to specify this flag so
+that the share information is made available to subsequent calls.
 
 === METHODS ===
 
@@ -1341,39 +1341,35 @@ the repository or the specific package.
 === CONSTANTS ===
 
 *SEARCH_STRING*::
-  Return a match if the search string matches the value.
+Return a match if the search string matches the value.
 
 *SEARCH_STRINGSTART*::
-  Return a match if the value starts with the search string.
+Return a match if the value starts with the search string.
 
 *SEARCH_STRINGEND*::
-  Return a match if the value ends with the search string.
+Return a match if the value ends with the search string.
 
 *SEARCH_SUBSTRING*::
-  Return a match if the search string can be matched somewhere
-  in the value.
+Return a match if the search string can be matched somewhere in the value.
 
 *SEARCH_GLOB*::
-  Do a glob match of the search string against the value.
+Do a glob match of the search string against the value.
 
 *SEARCH_REGEX*::
-  Do a regular expression match of the search string against
-  the value.
+Do a regular expression match of the search string against the value.
 
 *SEARCH_NOCASE*::
-  Ignore case when matching strings. Works for all the above
-  match types.
+Ignore case when matching strings. Works for all the above match types.
 
 *SEARCH_FILES*::
-  Match the complete filenames of the file list, not just the
-  base name.
+Match the complete filenames of the file list, not just the base name.
 
 *SEARCH_COMPLETE_FILELIST*::
-  When matching the file list, check every file of the package
-  not just the subset from the primary metadata.
+When matching the file list, check every file of the package not just the
+subset from the primary metadata.
 
 *SEARCH_CHECKSUMS*::
-  Allow the matching of checksum entries.
+Allow the matching of checksum entries.
 
 === METHODS ===
 
@@ -1535,51 +1531,49 @@ is probably the select() method in the Pool class.
 === CONSTANTS ===
 
 *SELECTION_NAME*::
-  Create the selection by matching package names
+Create the selection by matching package names.
 
 *SELECTION_PROVIDES*::
-  Create the selection by matching package provides
+Create the selection by matching package provides.
 
 *SELECTION_FILELIST*::
-  Create the selection by matching package files
+Create the selection by matching package files.
 
 *SELECTION_CANON*::
-  Create the selection by matching the canonical representation
-  of the package. This is normally a combination of the name,
-  the version, and the architecture of a package.
+Create the selection by matching the canonical representation
+of the package. This is normally a combination of the name,
+the version, and the architecture of a package.
 
 *SELECTION_DOTARCH*::
-  Allow an ``.<architecture>'' suffix when matching names or
-  provides.
+Allow an ``.<architecture>'' suffix when matching names or
+provides.
  
 *SELECTION_REL*::
-  Allow the specification of a relation when matching names
-  or provides, e.g. "name >= 1.2".
+Allow the specification of a relation when matching names
+or provides, e.g. "name >= 1.2".
 
 *SELECTION_INSTALLED_ONLY*::
-  Limit the package search to installed packages.
+Limit the package search to installed packages.
 
 *SELECTION_SOURCE_ONLY*::
-  Limit the package search to source packages only.
+Limit the package search to source packages only.
 
 *SELECTION_WITH_SOURCE*::
-  Extend the package search to also match source packages. The
-  default is only to match binary packages.
+Extend the package search to also match source packages. The default is
+only to match binary packages.
 
 *SELECTION_GLOB*::
-  Allow glob matching for package names, package provides, and
-  file names.
+Allow glob matching for package names, package provides, and file names.
 
 *SELECTION_NOCASE*::
-  Ignore case when matching package names, package provides,
-  and file names.
+Ignore case when matching package names, package provides, and file names.
 
 *SELECTION_FLAT*::
-  Return only one selection element describing the selected packages.
-  The default is to create multiple elements for all globbed packages.
-  Multiple elements are useful if you want to turn the selection into
-  an install job, in that case you want an install job for every
-  globbed package.
+Return only one selection element describing the selected packages.
+The default is to create multiple elements for all globbed packages.
+Multiple elements are useful if you want to turn the selection into
+an install job, in that case you want an install job for every
+globbed package.
 
 === ATTRIBUTES ===
 
@@ -1673,139 +1667,142 @@ Pool class.
 Selection constants:
 
 *SOLVER_SOLVABLE*::
-  The ``what'' part is the id of a solvable.
+The ``what'' part is the id of a solvable.
 
 *SOLVER_SOLVABLE_NAME*::
-  The ``what'' part is the id of a package name.
+The ``what'' part is the id of a package name.
 
 *SOLVER_SOLVABLE_PROVIDES*::
-  The ``what'' part is the id of a package provides.
+The ``what'' part is the id of a package provides.
 
 *SOLVER_SOLVABLE_ONE_OF*::
-  The ``what'' part is an offset into the ``whatprovides'' data, created
-  by calling the towhatprovides() pool method.
+The ``what'' part is an offset into the ``whatprovides'' data, created
+by calling the towhatprovides() pool method.
 
 *SOLVER_SOLVABLE_REPO*::
-  The ``what'' part is the id of a repository.
+The ``what'' part is the id of a repository.
 
 *SOLVER_SOLVABLE_ALL*::
-  The ``what'' part is ignored, all packages are selected.
+The ``what'' part is ignored, all packages are selected.
 
 *SOLVER_SOLVABLE_SELECTMASK*::
-  A mask containing all the above selection bits.
+A mask containing all the above selection bits.
 
 Action constants:
 
 *SOLVER_NOOP*::
-  Do nothing.
+Do nothing.
 
 *SOLVER_INSTALL*::
-  Install a package of the specified set of packages. It tries to install
-  the best matching package (i.e. the highest version of the packages from
-  the repositories with the highest priority).
+Install a package of the specified set of packages. It tries to install
+the best matching package (i.e. the highest version of the packages from
+the repositories with the highest priority).
 
 *SOLVER_ERASE*::
-  Erase all of the packages from the specified set. If a package is not
-  installed, erasing it will keep it from getting installed.
+Erase all of the packages from the specified set. If a package is not
+installed, erasing it will keep it from getting installed.
 
 *SOLVER_UPDATE*::
-  Update the matching installed packages to their best version. If none
-  of the specified packages are installed, try to update the installed
-  packages to the specified versions. See the section about targeted
-  updates about more information.
-  
+Update the matching installed packages to their best version. If none
+of the specified packages are installed, try to update the installed
+packages to the specified versions. See the section about targeted
+updates about more information.
+ 
 *SOLVER_WEAKENDEPS*::
-  Allow to break the dependencies of the matching packages. Handle with care.
+Allow to break the dependencies of the matching packages. Handle with care.
 
 *SOLVER_MULTIVERSION*::
-  Mark the matched packages for multiversion install. If they get to be installed
-  because of some other job, the installation will keep the old version of the
-  package installed (for rpm by using ``-i'' instead of ``-U'').
+Mark the matched packages for multiversion install. If they get to be
+installed because of some other job, the installation will keep the old
+version of the package installed (for rpm this is done by using ``-i''
+instead of ``-U'').
 
 *SOLVER_LOCK*::
-  Do not change the state of the matched packages, i.e. when they are installed
-  they stay installed, if not they are not selected for installation.
+Do not change the state of the matched packages, i.e. when they are
+installed they stay installed, if not they are not selected for
+installation.
 
 *SOLVER_DISTUPGRADE*::
-  Update the matching installed packages to the best version included in one
-  of the repositories. After this operation, all come from one of the available
-  repositories except orphaned packages. Orphaned packages are packages that
-  have no relation to the packages in the repositories, i.e. no package in the
-  repositories have the same name or obsolete the orphaned package.
-  This action brings the installed packages in sync with the ones in the
-  repository. It also turns of arch/vendor/version locking for the affected
-  packages to simulate a fresh installation. This means that distupgrade can
-  actually downgrade packages if only lower versions of a package are available
-  in the repositories.
+Update the matching installed packages to the best version included in one
+of the repositories. After this operation, all come from one of the available
+repositories except orphaned packages. Orphaned packages are packages that
+have no relation to the packages in the repositories, i.e. no package in the
+repositories have the same name or obsolete the orphaned package.
+This action brings the installed packages in sync with the ones in the
+repository. It also turns of arch/vendor/version locking for the affected
+packages to simulate a fresh installation. This means that distupgrade can
+actually downgrade packages if only lower versions of a package are available
+in the repositories.
 
 *SOLVER_DROP_ORPHANED*::
-  Erase all the matching installed packages if they are orphaned. This only makes
-  sense if there is a ``distupgrade all packages'' job. The default is to erase
-  orphaned packages only if they block the installation of other packages.
+Erase all the matching installed packages if they are orphaned. This only makes
+sense if there is a ``distupgrade all packages'' job. The default is to erase
+orphaned packages only if they block the installation of other packages.
 
 *SOLVER_VERIFY*::
-  Fix dependency problems of matching installed packages. The default is to ignore
-  dependency problems for installed packages.
+Fix dependency problems of matching installed packages. The default is to ignore
+dependency problems for installed packages.
 
 *SOLVER_USERINSTALLED*::
-  The matching installed packages are considered to be installed by a user, thus
-  not installed to fulfill some dependency. This is needed input for the calculation
-  of unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set.
+The matching installed packages are considered to be installed by a user,
+thus not installed to fulfill some dependency. This is needed input for
+the calculation of unneeded packages for jobs that have the
+SOLVER_CLEANDEPS flag set.
 
 *SOLVER_JOBMASK*::
-  A mask containing all the above action bits.
+A mask containing all the above action bits.
 
 Action modifier constants:
 
 *SOLVER_WEAK*::
-  Makes the job a weak job. The solver tries to fulfill weak jobs, but does not
-  report a problem if it is not possible to do so.
+Makes the job a weak job. The solver tries to fulfill weak jobs, but does
+not report a problem if it is not possible to do so.
 
 *SOLVER_ESSENTIAL*::
-  Makes the job an essential job. If there is a problem with the job, the solver
-  will not propose to remove the job as one solution (unless all other solutions
-  are also to remove essential jobs).
+Makes the job an essential job. If there is a problem with the job, the
+solver will not propose to remove the job as one solution (unless all
+other solutions are also to remove essential jobs).
 
 *SOLVER_CLEANDEPS*::
-  The solver will try to also erase all packages dragged in through dependencies
-  when erasing the package. This needs SOLVER_USERINSTALLED jobs to maximize user
-  satisfaction.
+The solver will try to also erase all packages dragged in through
+dependencies when erasing the package. This needs SOLVER_USERINSTALLED
+jobs to maximize user satisfaction.
 
 *SOLVER_FORCEBEST*::
-  Insist on the best package for install, update, and distupgrade jobs. If this
-  flag is not used, the solver will use the second-best package if the best
-  package cannot be installed for some reason. When this flag is used, the solver
-  will generate a problem instead.
+Insist on the best package for install, update, and distupgrade jobs. If
+this flag is not used, the solver will use the second-best package if the
+best package cannot be installed for some reason. When this flag is used,
+the solver will generate a problem instead.
 
 *SOLVER_TARGETED*::
-  Forces targeted operation update and distupgrade jobs. See the section about
-  targeted updates about more information.
+Forces targeted operation update and distupgrade jobs. See the section
+about targeted updates about more information.
 
 Set constants.
 
 *SOLVER_SETEV*::
-  The job specified the exact epoch and version of the package set.
+The job specified the exact epoch and version of the package set.
 
 *SOLVER_SETEVR*::
-  The job specified the exact epoch, version, and release of the package set.
+The job specified the exact epoch, version, and release of the package set.
 
 *SOLVER_SETARCH*::
-  The job specified the exact architecture of the packages from the set.
+The job specified the exact architecture of the packages from the set.
 
 *SOLVER_SETVENDOR*::
-  The job specified the exact vendor of the packages from the set.
+The job specified the exact vendor of the packages from the set.
 
 *SOLVER_SETREPO*::
-  The job specified the exact repository of the packages from the set.
+The job specified the exact repository of the packages from the set.
 
 *SOLVER_SETNAME*::
-  The job specified the exact name of the packages from the set.
+The job specified the exact name of the packages from the set.
 
 *SOLVER_NOAUTOSET*::
-  Turn of automatic set flag generation for SOLVER_SOLVABLE jobs.
+Turn of automatic set flag generation for SOLVER_SOLVABLE jobs.
 
 *SOLVER_SETMASK*::
-  A mask containing all the above set bits.
+A mask containing all the above set bits.
 
 See the section about set bits for more information.
 
@@ -1936,236 +1933,238 @@ re-use the dependency rules it already computed.
 Flags to modify some of the solver's behavior:
 
 *SOLVER_FLAG_ALLOW_DOWNGRADE*::
-  Allow the solver to downgrade packages without asking for confirmation
-  (i.e. reporting a problem).
+Allow the solver to downgrade packages without asking for confirmation
+(i.e. reporting a problem).
 
 *SOLVER_FLAG_ALLOW_ARCHCHANGE*::
-  Allow the solver to change the architecture of an installed package
-  without asking for confirmation. Note that changes to/from noarch
-  are always considered to be allowed.
+Allow the solver to change the architecture of an installed package
+without asking for confirmation. Note that changes to/from noarch
+are always considered to be allowed.
   
 *SOLVER_FLAG_ALLOW_VENDORCHANGE*::
-  Allow the solver to change the vendor of an installed package
-  without asking for confirmation. Each vendor is part of one or more
-  vendor equivalence classes, normally installed packages may only
-  change their vendor if the new vendor shares at least one equivalence
-  class.
+Allow the solver to change the vendor of an installed package
+without asking for confirmation. Each vendor is part of one or more
+vendor equivalence classes, normally installed packages may only
+change their vendor if the new vendor shares at least one equivalence
+class.
 
 *SOLVER_FLAG_ALLOW_NAMECHANGE*::
-  Allow the solver to change the name of an installed package, i.e.
-  install a package with a different name that obsoletes the installed
-  package. This option is on by default.
+Allow the solver to change the name of an installed package, i.e.
+install a package with a different name that obsoletes the installed
+package. This option is on by default.
 
 *SOLVER_FLAG_ALLOW_UNINSTALL*::
-  Allow the solver to erase installed packages to fulfill the jobs.
-  This flag also includes the above flags. You may want to set this
-  flag if you only have SOLVER_ERASE jobs, as in that case it's
-  better for the user to check the transaction overview instead of
-  approving every single package that needs to be erased.
+Allow the solver to erase installed packages to fulfill the jobs.
+This flag also includes the above flags. You may want to set this
+flag if you only have SOLVER_ERASE jobs, as in that case it's
+better for the user to check the transaction overview instead of
+approving every single package that needs to be erased.
 
 *SOLVER_FLAG_NO_UPDATEPROVIDE*::
-  If multiple packages obsolete an installed package, the solver checks
-  the provides of every such package and ignores all packages that
-  do not provide the installed package name. Thus, you can have an
-  official update candidate that provides the old name, and other
-  packages that also obsolete the package but are not considered for
-  updating. If you cannot use this feature, you can turn it off
-  by setting this flag.
+If multiple packages obsolete an installed package, the solver checks
+the provides of every such package and ignores all packages that
+do not provide the installed package name. Thus, you can have an
+official update candidate that provides the old name, and other
+packages that also obsolete the package but are not considered for
+updating. If you cannot use this feature, you can turn it off
+by setting this flag.
 
 *SOLVER_FLAG_SPLITPROVIDES*::
-  Make the solver aware of special provides of the form
-  ``<packagename>:<path>'' used in SUSE systems to support package
-  splits.
+Make the solver aware of special provides of the form
+``<packagename>:<path>'' used in SUSE systems to support package
+splits.
 
 *SOLVER_FLAG_IGNORE_RECOMMENDED*::
-  Do not process optional (aka weak) dependencies.
+Do not process optional (aka weak) dependencies.
 
 *SOLVER_FLAG_ADD_ALREADY_RECOMMENDED*::
-  Install recommended or supplemented packages even if they have no
-  connection to the current transaction. You can use this feature
-  to implement a simple way for the user to install new recommended
-  packages that were not available in the past.
+Install recommended or supplemented packages even if they have no
+connection to the current transaction. You can use this feature
+to implement a simple way for the user to install new recommended
+packages that were not available in the past.
   
 *SOLVER_FLAG_NO_INFARCHCHECK*::
-  Turn off the inferior architecture checking that is normally done
-  by the solver. Normally, the solver allows only the installation
-  of packages from the "best" architecture if a package is available
-  for multiple architectures.
+Turn off the inferior architecture checking that is normally done
+by the solver. Normally, the solver allows only the installation
+of packages from the "best" architecture if a package is available
+for multiple architectures.
 
 *SOLVER_FLAG_BEST_OBEY_POLICY*::
-  Make the SOLVER_FORCEBEST job option consider only packages that
-  meet the policies for installed packages, i.e. no downgrades,
-  no architecture change, no vendor change (see the first flags
-  of this section). If the flag is not specified, the solver will
-  enforce the installation of the best package ignoring the
-  installed packages, which may conflict with the set policy.
+Make the SOLVER_FORCEBEST job option consider only packages that
+meet the policies for installed packages, i.e. no downgrades,
+no architecture change, no vendor change (see the first flags
+of this section). If the flag is not specified, the solver will
+enforce the installation of the best package ignoring the
+installed packages, which may conflict with the set policy.
 
 *SOLVER_FLAG_NO_AUTOTARGET*::
-  Do not enable auto-targeting up update and distupgrade jobs. See
-  the section on targeted updates for more information.
+Do not enable auto-targeting up update and distupgrade jobs. See
+the section on targeted updates for more information.
 
 Basic rule types:
 
 *SOLVER_RULE_UNKNOWN*::
-  A rule of an unknown class. You should never encounter those.
+A rule of an unknown class. You should never encounter those.
 
 *SOLVER_RULE_RPM*::
-  A package dependency rule, called rpm rule for historical reasons.
+A package dependency rule, called rpm rule for historical reasons.
 
 *SOLVER_RULE_UPDATE*::
-  A rule to implement the update policy of installed packages. Every
-  installed package has an update rule that consists of the packages
-  that may replace the installed package.
+A rule to implement the update policy of installed packages. Every
+installed package has an update rule that consists of the packages
+that may replace the installed package.
 
 *SOLVER_RULE_FEATURE*::
-  Feature rules are fallback rules used when a update rule is disabled.
-  They include all packages that may replace the installed package
-  ignoring the update policy, i.e. they contain downgrades, arch
-  changes and so on. Without them, the solver would simply erase
-  installed packages if their update rule gets disabled.
+Feature rules are fallback rules used when a update rule is disabled. They
+include all packages that may replace the installed package ignoring the
+update policy, i.e. they contain downgrades, arch changes and so on.
+Without them, the solver would simply erase installed packages if their
+update rule gets disabled.
 
 *SOLVER_RULE_JOB*::
-  Job rules implement the job given to the solver.
+Job rules implement the job given to the solver.
 
 *SOLVER_RULE_DISTUPGRADE*::
-  This are simple negative assertions that make sure that only packages
-  are kept that are also available in one of the repositories.
+This are simple negative assertions that make sure that only packages
+are kept that are also available in one of the repositories.
 
 *SOLVER_RULE_INFARCH*::
-  Infarch rules are also negative assertions, they disallow the installation
-  of packages when there are packages of the same name but with a better
-  architecture.
+Infarch rules are also negative assertions, they disallow the installation
+of packages when there are packages of the same name but with a better
+architecture.
 
 *SOLVER_RULE_CHOICE*::
-  Choice rules are used to make sure that the solver prefers updating to
-  installing different packages when some dependency is provided by
-  multiple packages with different names. The solver may always break
-  choice rules, so you will not see them when a problem is found.
+Choice rules are used to make sure that the solver prefers updating to
+installing different packages when some dependency is provided by
+multiple packages with different names. The solver may always break
+choice rules, so you will not see them when a problem is found.
 
 *SOLVER_RULE_LEARNT*::
-  These rules are generated by the solver to keep it from running into
-  the same problem multiple times when it has to backtrack. They are
-  the main reason why a sat solver is faster then other dependency solver
-  implementations.
+These rules are generated by the solver to keep it from running into
+the same problem multiple times when it has to backtrack. They are
+the main reason why a sat solver is faster then other dependency solver
+implementations.
 
 Special dependency rule types:
 
 *SOLVER_RULE_RPM_NOT_INSTALLABLE*::
-  This rule was added to prevent the installation of a package of an
-  architecture that does not work on the system.
+This rule was added to prevent the installation of a package of an
+architecture that does not work on the system.
 
 *SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP*::
-  The package contains a required dependency which was not provided by
-  any package.
+The package contains a required dependency which was not provided by
+any package.
 
 *SOLVER_RULE_RPM_PACKAGE_REQUIRES*::
-  Similar to SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, but in this case
-  some packages provided the dependency but none of them could be
-  installed due to other dependency issues.
+Similar to SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, but in this case
+some packages provided the dependency but none of them could be
+installed due to other dependency issues.
 
 *SOLVER_RULE_RPM_SELF_CONFLICT*::
-  The package conflicts with itself. This is not allowed by older rpm
-  versions.
+The package conflicts with itself. This is not allowed by older rpm
+versions.
 
 *SOLVER_RULE_RPM_PACKAGE_CONFLICT*::
-  To fulfill the dependencies two packages need to be installed, but
-  one of the packages contains a conflict with the other one.
+To fulfill the dependencies two packages need to be installed, but
+one of the packages contains a conflict with the other one.
 
 *SOLVER_RULE_RPM_SAME_NAME*::
-  The dependencies can only be fulfilled by multiple versions of
-  a package, but installing multiple versions of the same package
-  is not allowed.
+The dependencies can only be fulfilled by multiple versions of
+a package, but installing multiple versions of the same package
+is not allowed.
 
 *SOLVER_RULE_RPM_PACKAGE_OBSOLETES*::
-  To fulfill the dependencies two packages need to be installed, but
-  one of the packages obsoletes the other one.
+To fulfill the dependencies two packages need to be installed, but
+one of the packages obsoletes the other one.
 
 *SOLVER_RULE_RPM_IMPLICIT_OBSOLETES*::
-  To fulfill the dependencies two packages need to be installed, but
-  one of the packages has provides a dependency that is obsoleted
-  by the other one. See the POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES
-  flag.
+To fulfill the dependencies two packages need to be installed, but
+one of the packages has provides a dependency that is obsoleted
+by the other one. See the POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES
+flag.
 
 *SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES*::
-  To fulfill the dependencies a package needs to be installed that is
-  obsoleted by an installed package. See the POOL_FLAG_NOINSTALLEDOBSOLETES
-  flag.
+To fulfill the dependencies a package needs to be installed that is
+obsoleted by an installed package. See the POOL_FLAG_NOINSTALLEDOBSOLETES
+flag.
 
 *SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP*::
-  The user asked for installation of a package providing a specific
-  dependency, but no available package provides it.
+The user asked for installation of a package providing a specific
+dependency, but no available package provides it.
 
 *SOLVER_RULE_JOB_UNKNOWN_PACKAGE*::
-  The user asked for installation of a package with a specific name,
-  but no available package has that name.
+The user asked for installation of a package with a specific name,
+but no available package has that name.
 
 *SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM*::
-  The user asked for the erasure of a dependency that is provided by the
-  system (i.e. for special hardware or language dependencies), this
-  cannot be done with a job.
+The user asked for the erasure of a dependency that is provided by the
+system (i.e. for special hardware or language dependencies), this
+cannot be done with a job.
 
 *SOLVER_RULE_JOB_UNSUPPORTED*::
-  The user asked for something that is not yet implemented, e.g. the
-  installation of all packages at once.
+The user asked for something that is not yet implemented, e.g. the
+installation of all packages at once.
 
 Policy error constants
 
 *POLICY_ILLEGAL_DOWNGRADE*::
-  The solver ask for permission before downgrading packages.
+The solver ask for permission before downgrading packages.
 
 *POLICY_ILLEGAL_ARCHCHANGE*::
-  The solver ask for permission before changing the architecture of installed
-  packages.
+The solver ask for permission before changing the architecture of installed
+packages.
 
 *POLICY_ILLEGAL_VENDORCHANGE*::
-  The solver ask for permission before changing the vendor of installed
-  packages.
+The solver ask for permission before changing the vendor of installed
+packages.
 
 *POLICY_ILLEGAL_NAMECHANGE*::
-  The solver ask for permission before replacing an installed packages with
-  a package that has a different name.
+The solver ask for permission before replacing an installed packages with
+a package that has a different name.
 
 Solution element type constants
 
 *SOLVER_SOLUTION_JOB*::
-  The problem can be solved by removing the specified job.
+The problem can be solved by removing the specified job.
 
 *SOLVER_SOLUTION_POOLJOB*::
-  The problem can be solved by removing the specified job that is defined in the pool.
+The problem can be solved by removing the specified job that is defined
+in the pool.
 
 *SOLVER_SOLUTION_INFARCH*::
-  The problem can be solved by allowing the installation of the specified package
-  with an inferior architecture.
+The problem can be solved by allowing the installation of the specified
+package with an inferior architecture.
 
 *SOLVER_SOLUTION_DISTUPGRADE*::
-  The problem can be solved by allowing to keep the specified package installed.
+The problem can be solved by allowing to keep the specified package
+installed.
 
 *SOLVER_SOLUTION_BEST*::
-  The problem can be solved by allowing to install the specified package that is
-  not the best available package.
+The problem can be solved by allowing to install the specified package
+that is not the best available package.
 
 *SOLVER_SOLUTION_ERASE*::
-  The problem can be solved by allowing to erase the specified package.
+The problem can be solved by allowing to erase the specified package.
 
 *SOLVER_SOLUTION_REPLACE*::
-  The problem can be solved by allowing to replace the package with some other
-  package.
+The problem can be solved by allowing to replace the package with some
+other package.
 
 *SOLVER_SOLUTION_REPLACE_DOWNGRADE*::
-  The problem can be solved by allowing to replace the package with some other
-  package that has a lower version.
+The problem can be solved by allowing to replace the package with some
+other package that has a lower version.
 
 *SOLVER_SOLUTION_REPLACE_ARCHCHANGE*::
-  The problem can be solved by allowing to replace the package with some other
-  package that has a different architecture.
+The problem can be solved by allowing to replace the package with some
+other package that has a different architecture.
 
 *SOLVER_SOLUTION_REPLACE_VENDORCHANGE*::
-  The problem can be solved by allowing to replace the package with some other
-  package that has a different vendor.
+The problem can be solved by allowing to replace the package with some
+other package that has a different vendor.
 
 *SOLVER_SOLUTION_REPLACE_NAMECHANGE*::
-  The problem can be solved by allowing to replace the package with some other
-  package that has a different name.
+The problem can be solved by allowing to replace the package with some
+other package that has a different name.
 
 
 === ATTRIBUTES ===
@@ -2552,114 +2551,114 @@ way.
 Transaction element types, both active and passive
 
 *SOLVER_TRANSACTION_IGNORE*::
-  This element does nothing. Used to map element types that do not
-  match the view mode.
+This element does nothing. Used to map element types that do not match
+the view mode.
 
 *SOLVER_TRANSACTION_INSTALL*::
-  This element installs a package.
+This element installs a package.
 
 *SOLVER_TRANSACTION_ERASE*::
-  This element erases a package.
+This element erases a package.
 
 *SOLVER_TRANSACTION_MULTIINSTALL*::
-  This element installs a package with a different version keeping the
-  other versions installed.
+This element installs a package with a different version keeping the other
+versions installed.
 
 *SOLVER_TRANSACTION_MULTIREINSTALL*::
-  This element reinstalls a installed package keeping the other versions
-  installed.
+This element reinstalls a installed package keeping the other versions
+installed.
 
 Transaction element types, active view
 
 *SOLVER_TRANSACTION_REINSTALL*::
-  This element re-installs a package, i.e. installs the same package again.
+This element re-installs a package, i.e. installs the same package again.
 
 *SOLVER_TRANSACTION_CHANGE*::
-  This element installs a package with same name, version, architecture but
-  different content.
+This element installs a package with same name, version, architecture but
+different content.
 
 *SOLVER_TRANSACTION_UPGRADE*::
-  This element installs a newer version of an installed package.
+This element installs a newer version of an installed package.
 
 *SOLVER_TRANSACTION_DOWNGRADE*::
-  This element installs a older version of an installed package.
+This element installs a older version of an installed package.
 
 *SOLVER_TRANSACTION_OBSOLETES*::
-  This element installs a package that obsoletes an installed package.
+This element installs a package that obsoletes an installed package.
 
 Transaction element types, passive view
 
 *SOLVER_TRANSACTION_REINSTALLED*::
-  This element re-installs a package, i.e. installs the same package again.
+This element re-installs a package, i.e. installs the same package again.
 
 *SOLVER_TRANSACTION_CHANGED*::
-  This element replaces an installed package with one of the same name,
-  version, architecture but different content.
+This element replaces an installed package with one of the same name,
+version, architecture but different content.
 
 *SOLVER_TRANSACTION_UPGRADED*::
-  This element replaces an installed package with a new version.
+This element replaces an installed package with a new version.
 
 *SOLVER_TRANSACTION_DOWNGRADED*::
-  This element replaces an installed package with an old version.
+This element replaces an installed package with an old version.
 
 *SOLVER_TRANSACTION_OBSOLETED*::
-  This element replaces an installed package with a package that obsoletes
-  it.
+This element replaces an installed package with a package that obsoletes
+it.
 
 Pseudo element types for showing extra information used by classify()
 
 *SOLVER_TRANSACTION_ARCHCHANGE*::
-  This element replaces an installed package with a package of a different
-  architecture.
+This element replaces an installed package with a package of a different
+architecture.
 
 *SOLVER_TRANSACTION_VENDORCHANGE*::
-  This element replaces an installed package with a package of a different
-  vendor.
+This element replaces an installed package with a package of a different
+vendor.
 
 Transaction mode flags
 
 *SOLVER_TRANSACTION_SHOW_ACTIVE*::
-  Filter for active view types. The default is to return passive view type,
-  i.e. to show how the installed packages get changed.
+Filter for active view types. The default is to return passive view type,
+i.e. to show how the installed packages get changed.
 
 *SOLVER_TRANSACTION_SHOW_OBSOLETES*::
-  Do not map the obsolete view type into INSTALL/ERASE elements.
+Do not map the obsolete view type into INSTALL/ERASE elements.
 
 *SOLVER_TRANSACTION_SHOW_ALL*::
-  If multiple packages replace an installed package, only the best of them
-  is kept as OBSOLETE element, the other ones are mapped to INSTALL/ERASE
-  elements. This is because most applications want to show just one package
-  replacing the installed one. The SOLVER_TRANSACTION_SHOW_ALL makes the
-  library keep all OBSOLETE elements.
+If multiple packages replace an installed package, only the best of them
+is kept as OBSOLETE element, the other ones are mapped to INSTALL/ERASE
+elements. This is because most applications want to show just one package
+replacing the installed one. The SOLVER_TRANSACTION_SHOW_ALL makes the
+library keep all OBSOLETE elements.
 
 *SOLVER_TRANSACTION_SHOW_MULTIINSTALL*::
-  The library maps MULTIINSTALL elements to simple INSTALL elements. This
-  flag can be used to disable the mapping.
+The library maps MULTIINSTALL elements to simple INSTALL elements. This
+flag can be used to disable the mapping.
 
 *SOLVER_TRANSACTION_CHANGE_IS_REINSTALL*::
-  Use this flag if you want to map CHANGE elements to the REINSTALL type.
+Use this flag if you want to map CHANGE elements to the REINSTALL type.
 
 *SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE*::
-  Use this flag if you want to map OBSOLETE elements to the UPGRADE type.
+Use this flag if you want to map OBSOLETE elements to the UPGRADE type.
 
 *SOLVER_TRANSACTION_MERGE_ARCHCHANGES*::
-  Do not add extra categories for every architecture change, instead cumulate
-  them in one category.
+Do not add extra categories for every architecture change, instead cumulate
+them in one category.
   
 *SOLVER_TRANSACTION_MERGE_VENDORCHANGES*::
-  Do not add extra categories for every vendor change, instead cumulate
-  them in one category.
+Do not add extra categories for every vendor change, instead cumulate
+them in one category.
 
 *SOLVER_TRANSACTION_RPM_ONLY*::
-  Special view mode that just returns IGNORE, ERASE, INSTALL, MULTIINSTALL
-  elements. Useful if you want to find out what to feed to the underlying
-  package manager.
+Special view mode that just returns IGNORE, ERASE, INSTALL, MULTIINSTALL
+elements. Useful if you want to find out what to feed to the underlying
+package manager.
 
 Transaction order flags
 
 *SOLVER_TRANSACTION_KEEP_ORDERDATA*::
-  Do not throw away the dependency graph used for ordering the transaction.
-  This flag is needed if you want to do manual ordering.
+Do not throw away the dependency graph used for ordering the transaction.
+This flag is needed if you want to do manual ordering.
 
 === ATTRIBUTES ===
 

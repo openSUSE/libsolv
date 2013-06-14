@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/13/2013
+.\"      Date: 06/14/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "06/13/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "06/14/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -570,7 +570,7 @@ Represents a \(lq=\(rq relation\&.
 .PP
 \fBREL_GT\fR
 .RS 4
-Represents a \(lq>\(rq relation\&. You can use combinations of REL_GT, REL_EQ and REL_LT or\-ed together to create any relation you like\&.
+Represents a \(lq>\(rq relation\&. You can use combinations of REL_GT, REL_EQ, and REL_LT or\-ed together to create any relation you like\&.
 .RE
 .PP
 \fBREL_AND\fR
@@ -1228,15 +1228,51 @@ The two architectures are freely exchangeable\&. Used to define aliases for arch
 .RE
 .sp
 An example would be \*(Aqx86_64:i686=athlon>i586\*(Aq\&. This means that x86_64 packages can only be replaced by other x86_64 packages, i686 packages can be replaced by i686 and i586 packages (but i686 packages will be preferred) and athlon is another name for the i686 architecture\&.
+.sp
+You can turn off the architecture replacement checks with the Solver\(cqs SOLVER_FLAG_ALLOW_ARCHCHANGE flag\&.
 .SH "VENDOR POLICIES"
 .sp
-bla bla
+Different vendors often compile packages with different features, so Libsolv only replace installed packages of one vendor with packages coming from the same vendor\&. Also, while the version of a package is normally defined by the upstream project, the release part of the version is set by the vendor\(cqs package maintainer, so it\(cqs not meaningful to do version comparisons for packages coming from different vendors\&.
+.sp
+Vendor in this case means the SOLVABLE_VENDOR string stored in each solvable\&. Sometimes a vendor changes names, or multiple vendors form a group that coordinate their package building, so libsolv offers a way to define that a group of vendors are compatible\&. You do that be defining vendor equivalence classes, packages from a vendor from one class may be replaced with packages from all the other vendors in the class\&.
+.sp
+There can be multiple equivalence classes, the set of allowed vendor changes for an installed package is calculated by building the union of all of the equivalence classes the vendor of the installed package is part of\&.
+.sp
+You can turn off the architecture replacement checks with the Solver\(cqs SOLVER_FLAG_ALLOW_VENDORCHANGE flag\&.
 .SH "BOOLEAN DEPENDENCIES"
 .sp
-bla bla
+Boolean Dependencies allow to build complex expressions from simple dependencies\&. While rpm does not support boolean expressions in dependencies and debian only allows an "OR" expression, libsolv allows to arbitrary complex expressions\&. The following basic types are supported:
+.PP
+\fBREL_OR\fR
+.RS 4
+The expression is true if either the first dependency or the second one is true\&. This is useful for package dependencies like \(lqRequires\(rq, where you can specify that either one of the packages need to be installed\&.
+.RE
+.PP
+\fBREL_AND\fR
+.RS 4
+The expression is true if both dependencies are true\&. The packages fulfilling the dependencies may be different, i\&.e\&. \(lqSupplements: perl AND python\(rq is true if both a package providing perl and a package providing python are installed\&. The solver currently only supports REL_AND in Supplements/Enhances dependencies, in other types of dependencies it gets treated as REL_WITH\&.
+.RE
+.PP
+\fBREL_WITH\fR
+.RS 4
+The expression is true if both dependencies are true and are fulfilled by the same package\&. Thus \(lqSupplements: perl AND python\(rq would only be true if a package is installed that provides both dependencies (some kind of multi\-language interpreter)\&.
+.RE
+.PP
+\fBREL_COND\fR
+.RS 4
+The expression is true if the first dependency is true or the second dependency is false\&. Libsolv currently does not support this type of dependency in the solver code\&.
+.RE
+.sp
+Each sub\-dependency of a boolean dependency can in turn be a boolean dependency, so you can chain them to create complex dependencies\&.
 .SH "NAMESPACE DEPENDENCIES"
 .sp
-bla bla
+Namespace dependencies can be used to implement dependencies on attributes external to libsolv\&. An example would be a dependency on the language set by the user\&. This types of dependencies are usually only used for \(lqConflicts\(rq or \(lqSupplements\(rq dependencies, as the underlying package manager does not know how to deal with them\&.
+.sp
+If the library needs to evaluate a namespace dependency, it calls the namespace callback function set in the pool\&. The callback function can return a set of packages that \(lqprovide\(rq the dependency\&. If the dependency is provided by the system, the returned set should consist of just the system solvable (Solvable Id 1)\&.
+.sp
+The returned set of packages must be returned as offset into the whatprovidesdata array\&. You can use the pool_queuetowhatprovides function to convert a queue into such an offset\&. To ease programming the callback function, the return values \(lq0\(rq and \(lq1\(rq are not interpreted as an offset\&. \(lq0\(rq means that no package is in the return set, \(lq1\(rq means that just the system solvable is in the set\&.
+.sp
+The returned set is cached, so that for each namespace dependency the callback is just called once\&. If you need to flush the cache (maybe because the user has selected a different language), use the pool_flush_namespaceproviders() function\&.
 .SH "AUTHOR"
 .sp
 Michael Schroeder <mls@suse\&.de>

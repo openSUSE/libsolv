@@ -22,6 +22,8 @@ The libsolv documentation is split into multiple parts:
 *libsolv-bindings*::
   access libsolv from perl/python/ruby
 
+*libsolv-pool*::
+  libsolv's pool object
 
 Pointer Validity
 ----------------

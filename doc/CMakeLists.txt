@@ -1,6 +1,7 @@
 
 SET (libsolv_MANPAGES
-    libsolv.3 libsolv-bindings.3 libsolv-constantids.3 libsolv-history.3)
+    libsolv.3 libsolv-bindings.3 libsolv-constantids.3 libsolv-history.3
+    libsolv-pool.3)
 
 INSTALL(FILES
     ${libsolv_MANPAGES}
