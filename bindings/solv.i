@@ -1248,12 +1248,16 @@ typedef struct {
   }
 
   Repo *installed;
+  const char * const errstr;
   %{
   SWIGINTERN void Pool_installed_set(Pool *pool, Repo *installed) {
     pool_set_installed(pool, installed);
   }
   Repo *Pool_installed_get(Pool *pool) {
     return pool->installed;
+  }
+  const char *Pool_errstr_get(Pool *pool) {
+    return pool_errstr(pool);
   }
   %}
 
@@ -1430,16 +1434,18 @@ rb_eval_string(
   bool add_rpmdb_reffp(FILE *reffp, int flags = 0) {
     return repo_add_rpmdb_reffp($self, reffp, flags) == 0;
   }
-  Id add_rpm(const char *name, int flags = 0) {
-    return repo_add_rpm($self, name, flags);
+  %newobject add_rpm;
+  XSolvable *add_rpm(const char *name, int flags = 0) {
+    return new_XSolvable($self->pool, repo_add_rpm($self, name, flags));
   }
 #endif
 #ifdef ENABLE_RPMDB_PUBKEYS
   bool add_rpmdb_pubkeys(int flags = 0) {
     return repo_add_rpmdb_pubkeys($self, flags) == 0;
   }
-  Id add_pubkey(const char *key, int flags = 0) {
-    return repo_add_pubkey($self, key, flags);
+  %newobject add_pubkey;
+  XSolvable *add_pubkey(const char *key, int flags = 0) {
+    return new_XSolvable($self->pool, repo_add_pubkey($self, key, flags));
   }
 #endif
 #ifdef ENABLE_RPMMD
@@ -1463,8 +1469,9 @@ rb_eval_string(
   bool add_debpackages(FILE *fp, int flags = 0) {
     return repo_add_debpackages($self, fp, flags) == 0;
   }
-  Id add_deb(const char *name, int flags = 0) {
-    return repo_add_deb($self, name, flags);
+  %newobject add_deb;
+  XSolvable *add_deb(const char *name, int flags = 0) {
+    return new_XSolvable($self->pool, repo_add_deb($self, name, flags));
   }
 #endif
 #ifdef ENABLE_SUSEREPO
@@ -1493,8 +1500,9 @@ rb_eval_string(
   bool add_arch_local(const char *dir, int flags = 0) {
     return repo_add_arch_local($self, dir, flags) == 0;
   }
-  Id add_arch_pkg(const char *name, int flags = 0) {
-    return repo_add_arch_pkg($self, name, flags);
+  %newobject add_arch_pkg;
+  XSolvable *add_arch_pkg(const char *name, int flags = 0) {
+    return new_XSolvable($self->pool, repo_add_arch_pkg($self, name, flags));
   }
 #endif
   void internalize() {

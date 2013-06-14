@@ -235,6 +235,13 @@ Look up a Repository by its id.
 
 Define which repository contains all the installed packages.
 
+	const char *errstr;		/* read only */
+	my $err = $pool->{errstr};
+	err = pool.errstr
+	err = pool.errstr
+
+Return the last error string that was stored in the pool.
+
 === CONSTANTS ===
 
 *POOL_FLAG_PROMOTEEPOCH*::
@@ -965,37 +972,37 @@ Add a single empty solvable to the repository. Returns a Solvable object, see
 the Solvable class for more information.
 
 	bool add_solv(const char *name, int flags = 0)
-	$repo->add_solv($name, $flags);
-	repo.add_solv(name, flags)
-	repo.add_solv(name, flags)
+	$repo->add_solv($name);
+	repo.add_solv(name)
+	repo.add_solv(name)
 
 	bool add_solv(FILE *fp, int flags = 0)
-	$repo->add_solv($fp, $flags);
-	repo.add_solv(fp, flags)
-	repo.add_solv(fp, flags)
+	$repo->add_solv($fp);
+	repo.add_solv(fp)
+	repo.add_solv(fp)
 
 Read a ``solv'' file and add its contents to the repository. These files can be
 written with the write() method and are normally used as fast cache for
 repository metadata.
 
 	bool add_rpmdb(int flags = 0)
-	$repo->add_rpmdb($flags);
-	repo.add_rpmdb(flags)
-	repo.add_rpmdb(flags)
+	$repo->add_rpmdb();
+	repo.add_rpmdb()
+	repo.add_rpmdb()
 
 	bool add_rpmdb_reffp(FILE *reffp, int flags = 0)
-	$repo->add_rpmdb_reffp($reffp, $flags);
-	repo.add_rpmdb_reffp($reffp, flags)
-	repo.add_rpmdb_reffp($reffp, flags)
+	$repo->add_rpmdb_reffp($reffp);
+	repo.add_rpmdb_reffp(reffp)
+	repo.add_rpmdb_reffp(reffp)
 
 Add the contents of the rpm database to the repository. If a solv file
 containing an old version of the database is available, it can be passed as
 reffp to speed up reading.
 
-	bool add_rpm(const char *name, int flags = 0)
-	$repo->add_rpm($name, $flags);
-	repo.add_rpm(name, flags)
-	repo.add_rpm(name, flags)
+	Solvable add_rpm(const char *filename, int flags = 0)
+	my $solvable = $repo->add_rpm($filename);
+	solvable = repo.add_rpm(filename)
+	solvable = repo.add_rpm(filename)
 
 Add the metadata of a single rpm package to the repository.
 
@@ -1008,17 +1015,17 @@ Add all pubkeys contained in the rpm database to the repository. Note that
 newer rpm versions also allow to store the pubkeys in some directory instead
 of the rpm database.
 
-	bool add_pubkey(const char *keyfile, int flags = 0)
-	$repo->add_pubkey($keyfile);
-	repo.add_pubkey($keyfile)
-	repo.add_pubkey($keyfile)
+	Solvable add_pubkey(const char *keyfile, int flags = 0)
+	my $solvable = $repo->add_pubkey($keyfile);
+	solvable = repo.add_pubkey(keyfile)
+	solvable = repo.add_pubkey(keyfile)
 
 Add a pubkey from a file to the repository.
 
 	bool add_rpmmd(FILE *fp, const char *language, int flags = 0)
-	$repo->add_rpmmd($fp, $language);
-	repo.add_rpmmd(fp, language)
-	repo.add_rpmmd(fp, language)
+	$repo->add_rpmmd($fp, undef);
+	repo.add_rpmmd(fp, None)
+	repo.add_rpmmd(fp, nil)
 
 Add metadata stored in the "rpm-md" format (i.e. from files in the ``repodata''
 directory) to a repository. Supported files are "primary", "filelists",
@@ -1070,41 +1077,41 @@ Add the contents of the debian installed package database to the repository.
 Add the contents of the debian repository metadata (the "packages" file)
 to the repository.
 
-	bool add_deb(const char *filename, int flags = 0)
-	$repo->add_deb($filename);
-	repo.add_deb(filename)
-	repo.add_deb(filename)
+	Solvable add_deb(const char *filename, int flags = 0)
+	my $solvable = $repo->add_deb($filename);
+	solvable = repo.add_deb(filename)
+	solvable = repo.add_deb(filename)
 
 Add the metadata of a single deb package to the repository.
 
 	bool add_mdk(FILE *fp, int flags = 0)
 	$repo->add_mdk($fp);
-	repo.add_mdk($fp)
-	repo.add_mdk($fp)
+	repo.add_mdk(fp)
+	repo.add_mdk(fp)
 
 Add the contents of the mageia/mandriva repository metadata (the
 "synthesis.hdlist" file) to the repository.
 
 	bool add_mdk_info(FILE *fp, int flags = 0)
 	$repo->add_mdk($fp);
-	repo.add_mdk($fp)
-	repo.add_mdk($fp)
+	repo.add_mdk(fp)
+	repo.add_mdk(fp)
 
 Extend the packages from the synthesis file with the info.xml and files.xml
 data. Do not forget to specify *REPO_EXTEND_SOLVABLES*.
 
 	bool add_arch_repo(FILE *fp, int flags = 0)
 	$repo->add_arch_repo($fp);
-	repo.add_arch_repo($fp)
-	repo.add_arch_repo($fp)
+	repo.add_arch_repo(fp)
+	repo.add_arch_repo(fp)
 
 Add the contents of the archlinux repository metadata (the ".db.tar" file) to
 the repository.
 
 	bool add_arch_local(const char *dir, int flags = 0)
 	$repo->add_arch_local($dir);
-	repo.add_arch_local($dir)
-	repo.add_arch_local($dir)
+	repo.add_arch_local(dir)
+	repo.add_arch_local(dir)
 
 Add the contents of the archlinux installed package database to the repository.
 The _dir_ parameter is usually set to "/var/lib/pacman/local".

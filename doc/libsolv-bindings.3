@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/13/2013
+.\"      Date: 06/14/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "06/13/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "06/14/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -452,6 +452,21 @@ Look up a Repository by its id\&.
 .\}
 .sp
 Define which repository contains all the installed packages\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *errstr;\fR             /* read only */
+my \fI$err\fR \fB=\fR \fI$pool\fR\fB\->{errstr}\fR;
+\fIerr\fR \fB=\fR \fIpool\fR\fB\&.errstr\fR
+\fIerr\fR \fB=\fR \fIpool\fR\fB\&.errstr\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the last error string that was stored in the pool\&.
 .SS "CONSTANTS"
 .PP
 \fBPOOL_FLAG_PROMOTEEPOCH\fR
@@ -1685,9 +1700,9 @@ Add a single empty solvable to the repository\&. Returns a Solvable object, see 
 .\}
 .nf
 \fBbool add_solv(const char *\fR\fIname\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
-\fI$repo\fR\fB\->add_solv(\fR\fI$name\fR\fB,\fR \fI$flags\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_solv(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
-\fIrepo\fR\fB\&.add_solv(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
+\fI$repo\fR\fB\->add_solv(\fR\fI$name\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_solv(\fR\fIname\fR\fB)\fR
+\fIrepo\fR\fB\&.add_solv(\fR\fIname\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1698,9 +1713,9 @@ Add a single empty solvable to the repository\&. Returns a Solvable object, see 
 .\}
 .nf
 \fBbool add_solv(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
-\fI$repo\fR\fB\->add_solv(\fR\fI$fp\fR\fB,\fR \fI$flags\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_solv(\fR\fIfp\fR\fB,\fR \fIflags\fR\fB)\fR
-\fIrepo\fR\fB\&.add_solv(\fR\fIfp\fR\fB,\fR \fIflags\fR\fB)\fR
+\fI$repo\fR\fB\->add_solv(\fR\fI$fp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_solv(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_solv(\fR\fIfp\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1713,9 +1728,9 @@ Read a \(lqsolv\(rq file and add its contents to the repository\&. These files c
 .\}
 .nf
 \fBbool add_rpmdb(int\fR \fIflags\fR \fB= 0)\fR
-\fI$repo\fR\fB\->add_rpmdb(\fR\fI$flags\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_rpmdb(\fR\fIflags\fR\fB)\fR
-\fIrepo\fR\fB\&.add_rpmdb(\fR\fIflags\fR\fB)\fR
+\fI$repo\fR\fB\->add_rpmdb()\fR;
+\fIrepo\fR\fB\&.add_rpmdb()\fR
+\fIrepo\fR\fB\&.add_rpmdb()\fR
 .fi
 .if n \{\
 .RE
@@ -1726,9 +1741,9 @@ Read a \(lqsolv\(rq file and add its contents to the repository\&. These files c
 .\}
 .nf
 \fBbool add_rpmdb_reffp(FILE *\fR\fIreffp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
-\fI$repo\fR\fB\->add_rpmdb_reffp(\fR\fI$reffp\fR\fB,\fR \fI$flags\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_rpmdb_reffp(\fR\fI$reffp\fR\fB,\fR \fIflags\fR\fB)\fR
-\fIrepo\fR\fB\&.add_rpmdb_reffp(\fR\fI$reffp\fR\fB,\fR \fIflags\fR\fB)\fR
+\fI$repo\fR\fB\->add_rpmdb_reffp(\fR\fI$reffp\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_rpmdb_reffp(\fR\fIreffp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_rpmdb_reffp(\fR\fIreffp\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1740,10 +1755,10 @@ Add the contents of the rpm database to the repository\&. If a solv file contain
 .RS 4
 .\}
 .nf
-\fBbool add_rpm(const char *\fR\fIname\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
-\fI$repo\fR\fB\->add_rpm(\fR\fI$name\fR\fB,\fR \fI$flags\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_rpm(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
-\fIrepo\fR\fB\&.add_rpm(\fR\fIname\fR\fB,\fR \fIflags\fR\fB)\fR
+\fBSolvable add_rpm(const char *\fR\fIfilename\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+my \fI$solvable\fR \fB=\fR \fI$repo\fR\fB\->add_rpm(\fR\fI$filename\fR\fB)\fR;
+\fIsolvable\fR \fB=\fR \fIrepo\fR\fB\&.add_rpm(\fR\fIfilename\fR\fB)\fR
+\fIsolvable\fR \fB=\fR \fIrepo\fR\fB\&.add_rpm(\fR\fIfilename\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1770,10 +1785,10 @@ Add all pubkeys contained in the rpm database to the repository\&. Note that new
 .RS 4
 .\}
 .nf
-\fBbool add_pubkey(const char *\fR\fIkeyfile\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
-\fI$repo\fR\fB\->add_pubkey(\fR\fI$keyfile\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_pubkey(\fR\fI$keyfile\fR\fB)\fR
-\fIrepo\fR\fB\&.add_pubkey(\fR\fI$keyfile\fR\fB)\fR
+\fBSolvable add_pubkey(const char *\fR\fIkeyfile\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+my \fI$solvable\fR \fB=\fR \fI$repo\fR\fB\->add_pubkey(\fR\fI$keyfile\fR\fB)\fR;
+\fIsolvable\fR \fB=\fR \fIrepo\fR\fB\&.add_pubkey(\fR\fIkeyfile\fR\fB)\fR
+\fIsolvable\fR \fB=\fR \fIrepo\fR\fB\&.add_pubkey(\fR\fIkeyfile\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1786,9 +1801,9 @@ Add a pubkey from a file to the repository\&.
 .\}
 .nf
 \fBbool add_rpmmd(FILE *\fR\fIfp\fR\fB, const char *\fR\fIlanguage\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
-\fI$repo\fR\fB\->add_rpmmd(\fR\fI$fp\fR\fB,\fR \fI$language\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_rpmmd(\fR\fIfp\fR\fB,\fR \fIlanguage\fR\fB)\fR
-\fIrepo\fR\fB\&.add_rpmmd(\fR\fIfp\fR\fB,\fR \fIlanguage\fR\fB)\fR
+\fI$repo\fR\fB\->add_rpmmd(\fR\fI$fp\fR\fB,\fR \fIundef\fR\fB)\fR;
+\fIrepo\fR\fB\&.add_rpmmd(\fR\fIfp\fR\fB,\fR \fINone\fR\fB)\fR
+\fIrepo\fR\fB\&.add_rpmmd(\fR\fIfp\fR\fB,\fR \fInil\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1875,10 +1890,10 @@ Add the contents of the debian repository metadata (the "packages" file) to the 
 .RS 4
 .\}
 .nf
-\fBbool add_deb(const char *\fR\fIfilename\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
-\fI$repo\fR\fB\->add_deb(\fR\fI$filename\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_deb(\fR\fIfilename\fR\fB)\fR
-\fIrepo\fR\fB\&.add_deb(\fR\fIfilename\fR\fB)\fR
+\fBSolvable add_deb(const char *\fR\fIfilename\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+my \fI$solvable\fR \fB=\fR \fI$repo\fR\fB\->add_deb(\fR\fI$filename\fR\fB)\fR;
+\fIsolvable\fR \fB=\fR \fIrepo\fR\fB\&.add_deb(\fR\fIfilename\fR\fB)\fR
+\fIsolvable\fR \fB=\fR \fIrepo\fR\fB\&.add_deb(\fR\fIfilename\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1892,8 +1907,8 @@ Add the metadata of a single deb package to the repository\&.
 .nf
 \fBbool add_mdk(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
 \fI$repo\fR\fB\->add_mdk(\fR\fI$fp\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_mdk(\fR\fI$fp\fR\fB)\fR
-\fIrepo\fR\fB\&.add_mdk(\fR\fI$fp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_mdk(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_mdk(\fR\fIfp\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1907,8 +1922,8 @@ Add the contents of the mageia/mandriva repository metadata (the "synthesis\&.hd
 .nf
 \fBbool add_mdk_info(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
 \fI$repo\fR\fB\->add_mdk(\fR\fI$fp\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_mdk(\fR\fI$fp\fR\fB)\fR
-\fIrepo\fR\fB\&.add_mdk(\fR\fI$fp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_mdk(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_mdk(\fR\fIfp\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1922,8 +1937,8 @@ Extend the packages from the synthesis file with the info\&.xml and files\&.xml 
 .nf
 \fBbool add_arch_repo(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
 \fI$repo\fR\fB\->add_arch_repo(\fR\fI$fp\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_arch_repo(\fR\fI$fp\fR\fB)\fR
-\fIrepo\fR\fB\&.add_arch_repo(\fR\fI$fp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_arch_repo(\fR\fIfp\fR\fB)\fR
+\fIrepo\fR\fB\&.add_arch_repo(\fR\fIfp\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1937,8 +1952,8 @@ Add the contents of the archlinux repository metadata (the "\&.db\&.tar" file) t
 .nf
 \fBbool add_arch_local(const char *\fR\fIdir\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
 \fI$repo\fR\fB\->add_arch_local(\fR\fI$dir\fR\fB)\fR;
-\fIrepo\fR\fB\&.add_arch_local(\fR\fI$dir\fR\fB)\fR
-\fIrepo\fR\fB\&.add_arch_local(\fR\fI$dir\fR\fB)\fR
+\fIrepo\fR\fB\&.add_arch_local(\fR\fIdir\fR\fB)\fR
+\fIrepo\fR\fB\&.add_arch_local(\fR\fIdir\fR\fB)\fR
 .fi
 .if n \{\
 .RE

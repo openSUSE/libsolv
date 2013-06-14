@@ -234,6 +234,7 @@ class repo_generic(dict):
     def writecachedrepo(self, ext, info=None):
         if 'incomplete' in self:
             return
+        tmpname = None
         try:
             if not os.path.isdir("/var/cache/solv"):
                 os.mkdir("/var/cache/solv", 0755)
@@ -273,7 +274,7 @@ class repo_generic(dict):
                         flags |= solv.Repo.REPO_LOCALPOOL
                     info.add_solv(nf, flags)
             os.rename(tmpname, self.cachepath(ext))
-        except IOError, e:
+        except (OSError, IOError), e:
             if tmpname:
                 os.unlink(tmpname)
                 
@@ -670,7 +671,11 @@ if cmd == 'list' or cmd == 'info' or cmd == 'install':
                 cmdlinerepo = repo_cmdline('@commandline', 'cmdline')
                 cmdlinerepo.load(pool)
                 cmdlinerepo['packages'] = {}
-            cmdlinerepo['packages'][arg] = cmdlinerepo.handle.add_rpm(arg, solv.Repo.REPO_REUSE_REPODATA|solv.Repo.REPO_NO_INTERNALIZE)
+            s = cmdlinerepo.handle.add_rpm(arg, solv.Repo.REPO_REUSE_REPODATA|solv.Repo.REPO_NO_INTERNALIZE)
+            if not s:
+		print pool.errstr
+		sys.exit(1)
+            cmdlinerepo['packages'][arg] = s
     if cmdlinerepo:
         cmdlinerepo.handle.internalize()
 
@@ -686,7 +691,7 @@ pool.createwhatprovides()
 jobs = []
 for arg in args:
     if cmdlinerepo and arg in cmdlinerepo['packages']:
-        jobs.append(pool.Job(solv.Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg]))
+        jobs.append(pool.Job(solv.Job.SOLVER_SOLVABLE, cmdlinerepo['packages'][arg].id))
     else:
         flags = solv.Selection.SELECTION_NAME|solv.Selection.SELECTION_PROVIDES|solv.Selection.SELECTION_GLOB
         flags |= solv.Selection.SELECTION_CANON|solv.Selection.SELECTION_DOTARCH|solv.Selection.SELECTION_REL
