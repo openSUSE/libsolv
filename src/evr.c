@@ -242,7 +242,7 @@ solv_cmp_version_part_haiku(const char *s1, const char *q1, const char *s2,
 
       while (part1 + 1 < s1 && *part1 == '0')
         part1++;
-      while (part2 + 1 < s1 && *part2 == '0')
+      while (part2 + 1 < s2 && *part2 == '0')
         part2++;
 
       len1 = s1 - part1;
