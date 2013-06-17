@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Mon Jun 17 15:54:44 CEST 2013 - mls@suse.de
+
+- add SOLVER_RULE_JOB_UNSUPPORTED and SOLVER_RULE_JOB_UNKNOWN_PACKAGE
+  for better problem reporting
+- start with library documentation
+- adapt to obsoletes handling of new rpm versions
+
+-------------------------------------------------------------------
 Wed Mar  6 16:55:57 CET 2013 - mls@suse.de
 
 - fix dataiterator returning random data in some cases
