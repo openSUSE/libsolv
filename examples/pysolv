@@ -888,6 +888,9 @@ if newpkgs:
                 nf = tempfile.TemporaryFile()
                 nf = os.dup(nf.fileno())   # get rid of CLOEXEC
                 st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, "/dev/fd/%d" % f.fileno(), "/dev/fd/%d" % nf])
+                if st:
+                    os.close(nf)
+                    continue
                 os.lseek(nf, 0, os.SEEK_SET)
                 newpkgsfp[p.id] = solv.xfopen_fd("", nf)
                 os.close(nf)
