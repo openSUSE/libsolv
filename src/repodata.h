@@ -278,8 +278,7 @@ void repodata_merge_attrs(Repodata *data, Id dest, Id src);
 void repodata_merge_some_attrs(Repodata *data, Id dest, Id src, Map *keyidmap, int overwrite);
 void repodata_swap_attrs(Repodata *data, Id dest, Id src);
 
-void repodata_create_stubs(Repodata *data);
-void repodata_join(Repodata *data, Id joinkey);
+Repodata *repodata_create_stubs(Repodata *data);
 
 /*
  * load all paged data, used to speed up copying in repo_rpmdb

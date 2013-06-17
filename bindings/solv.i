@@ -1567,7 +1567,7 @@ rb_eval_string(
       return;
     data = repo_id2repodata($self, $self->nrepodata - 1);
     if (data->state != REPODATA_STUB)
-      repodata_create_stubs(data);
+      (void)repodata_create_stubs(data);
   }
 #ifdef SWIGRUBY
   %rename("iscontiguous?") iscontiguous;
@@ -2969,7 +2969,9 @@ rb_eval_string(
     repodata_internalize(repo_id2repodata($self->repo, $self->id));
   }
   void create_stubs() {
-    repodata_create_stubs(repo_id2repodata($self->repo, $self->id));
+    Repodata *data = repo_id2repodata($self->repo, $self->id);
+    data = repodata_create_stubs(data);
+    $self->id = data->repodataid;
   }
   bool write(FILE *fp) {
     return repodata_write(repo_id2repodata($self->repo, $self->id), fp) == 0;

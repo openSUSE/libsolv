@@ -3238,7 +3238,35 @@ repodata_load_stub(Repodata *data)
   data->state = r ? REPODATA_AVAILABLE : REPODATA_ERROR;
 }
 
-void
+static inline void
+repodata_add_stubkey(Repodata *data, Id keyname, Id keytype)
+{
+  Repokey xkey;
+
+  xkey.name = keyname;
+  xkey.type = keytype;
+  xkey.storage = KEY_STORAGE_INCORE;
+  xkey.size = 0;
+  repodata_key2id(data, &xkey, 1);
+}
+
+static Repodata *
+repodata_add_stub(Repodata **datap)
+{
+  Repodata *data = *datap;
+  Repo *repo = data->repo;
+  Id repodataid = data - repo->repodata;
+  Repodata *sdata = repo_add_repodata(repo, 0);
+  data = repo->repodata + repodataid;
+  if (data->end > data->start)
+    repodata_extend_block(sdata, data->start, data->end - data->start);
+  sdata->state = REPODATA_STUB;
+  sdata->loadcallback = repodata_load_stub;
+  *datap = data;
+  return sdata;
+}
+
+Repodata *
 repodata_create_stubs(Repodata *data)
 {
   Repo *repo = data->repo;
@@ -3248,38 +3276,26 @@ repodata_create_stubs(Repodata *data)
   Dataiterator di;
   Id xkeyname = 0;
   int i, cnt = 0;
-  int repodataid;
-  int datastart, dataend;
 
-  repodataid = data - repo->repodata;
-  datastart = data->start;
-  dataend = data->end;
   dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_EXTERNAL, 0, 0);
   while (dataiterator_step(&di))
-    {
-      if (di.data - repo->repodata != repodataid)
-	continue;
+    if (di.data == data)
       cnt++;
-    }
   dataiterator_free(&di);
   if (!cnt)
-    return;
+    return data;
   stubdataids = solv_calloc(cnt, sizeof(*stubdataids));
   for (i = 0; i < cnt; i++)
     {
-      sdata = repo_add_repodata(repo, 0);
-      if (dataend > datastart)
-        repodata_extend_block(sdata, datastart, dataend - datastart);
+      sdata = repodata_add_stub(&data);
       stubdataids[i] = sdata - repo->repodata;
-      sdata->state = REPODATA_STUB;
-      sdata->loadcallback = repodata_load_stub;
     }
   i = 0;
   dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_EXTERNAL, 0, 0);
   sdata = 0;
   while (dataiterator_step(&di))
     {
-      if (di.data - repo->repodata != repodataid)
+      if (di.data != data)
 	continue;
       if (di.key->name == REPOSITORY_EXTERNAL && !di.nparents)
 	{
@@ -3314,21 +3330,18 @@ repodata_create_stubs(Repodata *data)
 	  repodata_add_idarray(sdata, SOLVID_META, di.key->name, di.kv.id);
 	  if (di.key->name == REPOSITORY_KEYS)
 	    {
-	      Repokey xkey;
-
 	      if (!xkeyname)
 		{
 		  if (!di.kv.eof)
 		    xkeyname = di.kv.id;
-		  continue;
 		}
-	      xkey.name = xkeyname;
-              xkey.type = di.kv.id;
-              xkey.storage = KEY_STORAGE_INCORE;
-              xkey.size = 0;
-              repodata_key2id(sdata, &xkey, 1);
-              xkeyname = 0;
+	      else
+		{
+		  repodata_add_stubkey(sdata, xkeyname, di.kv.id);
+		  xkeyname = 0;
+		}
 	    }
+	  break;
 	default:
 	  break;
 	}
@@ -3337,6 +3350,7 @@ repodata_create_stubs(Repodata *data)
   for (i = 0; i < cnt; i++)
     repodata_internalize(repo->repodata + stubdataids[i]);
   solv_free(stubdataids);
+  return data;
 }
 
 unsigned int
