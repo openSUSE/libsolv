@@ -5,6 +5,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "solver.h"
+#include "selection.h"
 #include "solverdebug.h"
 #include "testcase.h"
 
@@ -40,9 +41,10 @@ main(int argc, char **argv)
   int multijob = 0;
   int c;
   int ex = 0;
+  const char *list = 0;
   FILE *fp;
 
-  while ((c = getopt(argc, argv, "vrh")) >= 0)
+  while ((c = getopt(argc, argv, "vrhl:")) >= 0)
     {
       switch (c)
       {
@@ -54,6 +56,9 @@ main(int argc, char **argv)
           break;
         case 'h':
 	  usage(0);
+          break;
+        case 'l':
+	  list = optarg;
           break;
         default:
 	  usage(1);
@@ -90,7 +95,24 @@ main(int argc, char **argv)
 
 	  if (multijob)
 	    printf("test %d:\n", multijob++);
-	  if (result || writeresult)
+	  if (list)
+	    {
+	      queue_empty(&job);
+	      selection_make(pool, &job, list, SELECTION_NAME|SELECTION_PROVIDES|SELECTION_FILELIST|SELECTION_CANON|SELECTION_DOTARCH|SELECTION_REL|SELECTION_GLOB|SELECTION_FLAT);
+	      if (!job.elements)
+		printf("No match\n");
+	      else
+		{
+		  Queue q;
+		  int i;
+		  queue_init(&q);
+		  selection_solvables(pool, &job, &q);
+		  for (i = 0; i < q.count; i++)
+		    printf("  - %s\n", testcase_solvid2str(pool, q.elements[i]));
+		  queue_free(&q);
+		}
+	    }
+	  else if (result || writeresult)
 	    {
 	      char *myresult, *resultdiff;
 	      solver_solve(solv, &job);
