@@ -262,16 +262,16 @@ Special Solvable Attributes
   The array containing the package list of the update.
   
 *UPDATE_COLLECTION_NAME "update:collection:name"*::
-  The name of the to be updated package.
+  The name of the updated package.
 
 *UPDATE_COLLECTION_EVR "update:collection:evr"*::
-  The version of the to be updated package.
+  The version of the updated package.
 
 *UPDATE_COLLECTION_ARCH "update:collection:arch"*::
-  The architecture of the to be updated package.
+  The architecture of the updated package.
 
 *UPDATE_COLLECTION_FILENAME "update:collection:filename"*::
-  The file name of the to be updated package.
+  The file name of the updated package.
 
 *UPDATE_REFERENCE "update:reference"*::
   The array containing the reference list of the update.
