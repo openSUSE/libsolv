@@ -656,9 +656,9 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
       if (plist->count > 1 && pool->installed && (solv->dupmap_all || solv->dupinvolvedmap.size))
 	prune_installed_dup_packages(solv, plist);
     }
+  prune_best_arch_name_version(solv, pool, plist);
   if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)
     prune_to_recommended(solv, plist);
-  prune_best_arch_name_version(solv, pool, plist);
 }
 
 
