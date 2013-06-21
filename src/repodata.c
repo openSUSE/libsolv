@@ -1381,6 +1381,25 @@ dataiterator_find_keyname(Dataiterator *di, Id keyname)
   return dp;
 }
 
+static inline int
+is_filelist_extension(Repodata *data)
+{
+  int j;
+  if (!repodata_precheck_keyname(data, SOLVABLE_FILELIST))
+    return 0;
+  for (j = 1; j < data->nkeys; j++)
+    if (data->keys[j].name == SOLVABLE_FILELIST)
+      break;
+  if (j == data->nkeys)
+    return 0;
+  if (data->state != REPODATA_AVAILABLE)
+    return 1;
+  for (j = 1; j < data->nkeys; j++)
+    if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
+      return 0;
+  return 1;
+}
+
 static int
 dataiterator_filelistcheck(Dataiterator *di)
 {
@@ -1392,14 +1411,40 @@ dataiterator_filelistcheck(Dataiterator *di)
     if (!di->matcher.match
        || ((di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_STRING
            && (di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_GLOB)
-       || !repodata_filelistfilter_matches(di->data, di->matcher.match))
+       || !repodata_filelistfilter_matches(data, di->matcher.match))
       needcomplete = 1;
   if (data->state != REPODATA_AVAILABLE)
     return needcomplete ? 1 : 0;
-  for (j = 1; j < data->nkeys; j++)
-    if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
-      break;
-  return j == data->nkeys && !needcomplete ? 0 : 1;
+  if (!needcomplete)
+    {
+      /* we don't need the complete filelist, so ignore all stubs */
+      for (j = 1; j < data->nkeys; j++)
+	if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
+	  return 1;
+      return 0;
+    }
+  else
+    {
+      /* we need the complete filelist. check if we habe a filtered filelist and there's
+       * a extension with the complete filelist later on */
+      for (j = 1; j < data->nkeys; j++)
+	if (data->keys[j].name == SOLVABLE_FILELIST)
+	  break;
+      if (j == data->nkeys)
+	return 0;	/* does not have filelist */
+      for (j = 1; j < data->nkeys; j++)
+	if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
+	  break;
+      if (j == data->nkeys)
+	return 1;	/* this is the externsion */
+      while (data - data->repo->repodata + 1 < data->repo->nrepodata)
+	{
+	  data++;
+	  if (is_filelist_extension(data))
+	    return 0;
+	}
+      return 1;
+    }
 }
 
 int
