@@ -1292,6 +1292,11 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
     }
   solv_free(idmap);
 
+  /* fixup the special idarray type */
+  for (i = 1; i < numkeys; i++)
+    if (keys[i].type == REPOKEY_TYPE_REL_IDARRAY)
+      keys[i].type = REPOKEY_TYPE_IDARRAY;
+
   for (i = 1; i < numkeys; i++)
     if (keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
       break;

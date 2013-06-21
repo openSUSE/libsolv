@@ -757,7 +757,7 @@ repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
   dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
     return 0;
-  if (key->type != REPOKEY_TYPE_IDARRAY && key->type != REPOKEY_TYPE_REL_IDARRAY)
+  if (key->type != REPOKEY_TYPE_IDARRAY)
     return 0;
   for (;;)
     {
