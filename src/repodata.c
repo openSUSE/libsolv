@@ -1388,7 +1388,7 @@ dataiterator_filelistcheck(Dataiterator *di)
   int needcomplete = 0;
   Repodata *data = di->data;
 
-  if ((di->matcher.flags & SEARCH_COMPLETE_FILELIST) != 0)
+  if ((di->flags & SEARCH_COMPLETE_FILELIST) != 0)
     if (!di->matcher.match
        || ((di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_STRING
            && (di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_GLOB)
