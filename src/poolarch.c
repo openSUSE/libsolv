@@ -29,6 +29,7 @@ static const char *archpolicies[] = {
   "s390x",	"s390x:s390",
   "s390",	"s390",
   "ia64",	"ia64:i686:i586:i486:i386",
+  "ppc64p7",	"ppc64p7",
   "ppc64",	"ppc64:ppc",
   "ppc",	"ppc",
   "ppc64p7",	"ppc64p7:ppc64:ppc",
