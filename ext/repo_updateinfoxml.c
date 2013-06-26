@@ -155,18 +155,8 @@ datestr2timestamp(const char *date)
 }
 
 /*
- * if we have seen a <filename>...
- * inside of <package>...
- *
- *
- * If not, we must insert an empty filename to UPDATE_COLLECTION_FILENAME
- * at </package> in order to keep all UPDATE_COLLECTION_* arrays in sync
- */
-
-/*
  * create evr (as Id) from 'epoch', 'version' and 'release' attributes
  */
-
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 {
@@ -296,8 +286,6 @@ startElement(void *userData, const char *name, const char **atts)
 	    else if (!strcmp(*atts, "version"))
 	      version = atts[1];
 	  }
-
-
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 	pd->datanum = pd->solvable - pool->solvables;
 
