@@ -122,7 +122,7 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
-  unsigned int datanum;
+  Id handle;
   Solvable *solvable;
   time_t buildtime;
   Id collhandle;
@@ -287,13 +287,13 @@ startElement(void *userData, const char *name, const char **atts)
 	      version = atts[1];
 	  }
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
-	pd->datanum = pd->solvable - pool->solvables;
+	pd->handle = pd->solvable - pool->solvables;
 
 	solvable->vendor = pool_str2id(pool, from, 1);
 	solvable->evr = pool_str2id(pool, version, 1);
 	solvable->arch = ARCH_NOARCH;
 	if (type)
-	  repodata_set_str(pd->data, pd->datanum, SOLVABLE_PATCHCATEGORY, type);
+	  repodata_set_str(pd->data, pd->handle, SOLVABLE_PATCHCATEGORY, type);
         pd->buildtime = (time_t)0;
       }
       break;
@@ -335,7 +335,7 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_REFERENCE:
       {
         const char *href = 0, *id = 0, *title = 0, *type = 0;
-	Id handle;
+	Id refhandle;
 	for (; *atts; atts += 2)
 	  {
 	    if (!strcmp(*atts, "href"))
@@ -347,16 +347,16 @@ startElement(void *userData, const char *name, const char **atts)
 	    else if (!strcmp(*atts, "type"))
 	      type = atts[1];
 	  }
-	handle = repodata_new_handle(pd->data);
+	refhandle = repodata_new_handle(pd->data);
 	if (href)
-	  repodata_set_str(pd->data, handle, UPDATE_REFERENCE_HREF, href);
+	  repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_HREF, href);
 	if (id)
-	  repodata_set_str(pd->data, handle, UPDATE_REFERENCE_ID, id);
+	  repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_ID, id);
 	if (title)
-	  repodata_set_str(pd->data, handle, UPDATE_REFERENCE_TITLE, title);
+	  repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_TITLE, title);
 	if (type)
-	  repodata_set_poolstr(pd->data, handle, UPDATE_REFERENCE_TYPE, type);
-	repodata_add_flexarray(pd->data, pd->datanum, UPDATE_REFERENCE, handle);
+	  repodata_set_poolstr(pd->data, refhandle, UPDATE_REFERENCE_TYPE, type);
+	repodata_add_flexarray(pd->data, pd->handle, UPDATE_REFERENCE, refhandle);
       }
       break;
       /* <description>This update ...</description> */
@@ -404,14 +404,14 @@ startElement(void *userData, const char *name, const char **atts)
 	    rel_id = pool_rel2id(pool, n, a, REL_ARCH, 1);
 	  }
 	rel_id = pool_rel2id(pool, rel_id, evr, REL_LT, 1);
-
 	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
 
         /* who needs the collection anyway? */
         pd->collhandle = repodata_new_handle(pd->data);
 	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_NAME, n);
 	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_EVR, evr);
-	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
+	if (a)
+	  repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
         break;
       }
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
@@ -466,7 +466,7 @@ endElement(void *userData, const char *name)
       s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (pd->buildtime)
 	{
-	  repodata_set_num(pd->data, pd->datanum, SOLVABLE_BUILDTIME, pd->buildtime);
+	  repodata_set_num(pd->data, pd->handle, SOLVABLE_BUILDTIME, pd->buildtime);
 	  pd->buildtime = (time_t)0;
 	}
       break;
@@ -477,13 +477,13 @@ endElement(void *userData, const char *name)
     case STATE_TITLE:
       while (pd->lcontent > 0 && pd->content[pd->lcontent - 1] == '\n')
         pd->content[--pd->lcontent] = 0;
-      repodata_set_str(pd->data, pd->datanum, SOLVABLE_SUMMARY, pd->content);
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_SUMMARY, pd->content);
       break;
     case STATE_SEVERITY:
-      repodata_set_poolstr(pd->data, pd->datanum, UPDATE_SEVERITY, pd->content);
+      repodata_set_poolstr(pd->data, pd->handle, UPDATE_SEVERITY, pd->content);
       break;
     case STATE_RIGHTS:
-      repodata_set_poolstr(pd->data, pd->datanum, UPDATE_RIGHTS, pd->content);
+      repodata_set_poolstr(pd->data, pd->handle, UPDATE_RIGHTS, pd->content);
       break;
       /*
        * <release>Fedora 8</release>
@@ -500,13 +500,13 @@ endElement(void *userData, const char *name)
        * <description>This update ...</description>
        */
     case STATE_DESCRIPTION:
-      repodata_set_str(pd->data, pd->datanum, SOLVABLE_DESCRIPTION, pd->content);
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_DESCRIPTION, pd->content);
       break;
       /*
        * <message>Warning! ...</message>
        */
     case STATE_MESSAGE:
-      repodata_set_str(pd->data, pd->datanum, UPDATE_MESSAGE, pd->content);
+      repodata_set_str(pd->data, pd->handle, UPDATE_MESSAGE, pd->content);
       break;
     case STATE_PKGLIST:
       break;
@@ -515,7 +515,7 @@ endElement(void *userData, const char *name)
     case STATE_NAME:
       break;
     case STATE_PACKAGE:
-      repodata_add_flexarray(pd->data, pd->datanum, UPDATE_COLLECTION, pd->collhandle);
+      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTION, pd->collhandle);
       pd->collhandle = 0;
       break;
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
@@ -528,7 +528,7 @@ endElement(void *userData, const char *name)
       if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->datanum, UPDATE_REBOOT);
+	  repodata_set_void(pd->data, pd->handle, UPDATE_REBOOT);
 	  repodata_set_void(pd->data, pd->collhandle, UPDATE_REBOOT);
 	}
       break;
@@ -537,7 +537,7 @@ endElement(void *userData, const char *name)
       if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->datanum, UPDATE_RESTART);
+	  repodata_set_void(pd->data, pd->handle, UPDATE_RESTART);
 	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RESTART);
 	}
       break;
@@ -546,7 +546,7 @@ endElement(void *userData, const char *name)
       if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->datanum, UPDATE_RELOGIN);
+	  repodata_set_void(pd->data, pd->handle, UPDATE_RELOGIN);
 	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RELOGIN);
 	}
       break;
