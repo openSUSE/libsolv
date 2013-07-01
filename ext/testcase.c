@@ -340,13 +340,18 @@ testcase_str2dep(Pool *pool, char *s)
   for (;;s++)
     {  
       if (*s == '<')
-        flags |= REL_LT;
+	flags |= REL_LT;
       else if (*s == '=')
-        flags |= REL_EQ;
+	flags |= REL_EQ;
       else if (*s == '>')
-        flags |= REL_GT;
+	flags |= REL_GT;
       else
-        break;
+	break;
+    }
+  if (!flags && *s == 'c' && !strcmp(s, "compat >="))
+    {
+      flags = REL_COMPAT;
+      s += 9;
     }
   if (!flags)
     return id;
