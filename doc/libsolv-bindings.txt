@@ -36,7 +36,7 @@ accessed by treating the object as standard hash reference:
 	$pool->{appdata} = 42;
 	printf "appdata is %d\n", $pool->{appdata};
 
-An special exception to this are iterator objects, they are encapsulated as
+A special exception to this are iterator objects, they are encapsulated as
 tied arrays so that it is possible to iterate with a for() statement:
 
 	my $iter = $pool->solvables_iter();
@@ -49,8 +49,8 @@ if a method returns an array it returns it on the stack:
 
 	my @problems = $solver->solve(\@jobs);
 
-Due to a bug in swig, stringification does not work for libsolv's object.
-Instead you have to call the object's str() method.
+Due to a bug in swig, stringification does not work for libsolv's objects.
+Instead, you have to call the object's str() method.
 
 	print $dep->str() . "\n";
 
@@ -82,7 +82,7 @@ Iterators also work as expected:
 
 	for solvable in pool.solvables_iter():
 
-Arrays are passed an returned as list objects:
+Arrays are passed and returned as list objects:
 
 	jobs = []
 	problems = solver.solve(jobs)
@@ -120,7 +120,7 @@ Iterators also work as expected:
 
 	for solvable in pool.solvables_iter() do ...
 
-Arrays are passed an returned as array objects:
+Arrays are passed and returned as array objects:
 
 	jobs = []
 	problems = solver.solve(jobs)

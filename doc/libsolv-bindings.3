@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 06/14/2013
+.\"      Date: 07/02/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "06/14/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "07/02/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -72,7 +72,7 @@ Swig encapsulates all objects as tied hashes, thus the attributes can be accesse
 .RE
 .\}
 .sp
-An special exception to this are iterator objects, they are encapsulated as tied arrays so that it is possible to iterate with a for() statement:
+A special exception to this are iterator objects, they are encapsulated as tied arrays so that it is possible to iterate with a for() statement:
 .sp
 .if n \{\
 .RS 4
@@ -99,7 +99,7 @@ my \fI@problems\fR \fB=\fR \fI$solver\fR\fB\->solve(\e\fR\fI@jobs\fR\fB)\fR;
 .RE
 .\}
 .sp
-Due to a bug in swig, stringification does not work for libsolv\(cqs object\&. Instead you have to call the object\(cqs str() method\&.
+Due to a bug in swig, stringification does not work for libsolv\(cqs objects\&. Instead, you have to call the object\(cqs str() method\&.
 .sp
 .if n \{\
 .RS 4
@@ -174,7 +174,7 @@ Iterators also work as expected:
 .RE
 .\}
 .sp
-Arrays are passed an returned as list objects:
+Arrays are passed and returned as list objects:
 .sp
 .if n \{\
 .RS 4
@@ -263,7 +263,7 @@ Iterators also work as expected:
 .RE
 .\}
 .sp
-Arrays are passed an returned as array objects:
+Arrays are passed and returned as array objects:
 .sp
 .if n \{\
 .RS 4
