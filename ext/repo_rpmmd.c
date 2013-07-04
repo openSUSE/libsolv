@@ -378,7 +378,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       else if (!strcmp(*atts, "rel"))
 	r = atts[1];
     }
-  if (e && !strcmp(e, "0"))
+  if (e && (!*e || !strcmp(e, "0")))
     e = 0;
   if (v && !e)
     {

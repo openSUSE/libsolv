@@ -187,8 +187,8 @@ evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
   int l;
 
   /* treat explitcit 0 as NULL */
-  if (e && !strcmp(e, "0"))
-    e = NULL;
+  if (e && (!*e || !strcmp(e, "0")))
+    e = 0;
 
   if (v && !e)
     {
