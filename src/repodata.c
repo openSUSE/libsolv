@@ -188,7 +188,7 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
       data->schematahash = schematahash = solv_calloc(256, sizeof(Id));
       for (i = 1; i < data->nschemata; i++)
 	{
-	  for (sp = data->schemadata + data->schemata[i], h = 0; *sp; len++)
+	  for (sp = data->schemadata + data->schemata[i], h = 0; *sp;)
 	    h = h * 7 + *sp++;
 	  h &= 255;
 	  schematahash[h] = i;
