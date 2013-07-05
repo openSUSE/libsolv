@@ -290,7 +290,7 @@ Id
 testcase_str2dep(Pool *pool, char *s)
 {
   char *n, *a;
-  Id id;
+  Id id, evr;
   int flags;
 
   if ((n = strchr(s, '|')) != 0)
@@ -348,11 +348,6 @@ testcase_str2dep(Pool *pool, char *s)
       else
 	break;
     }
-  if (!flags && *s == 'c' && !strcmp(s, "compat >="))
-    {
-      flags = REL_COMPAT;
-      s += 9;
-    }
   if (!flags)
     return id;
   while (*s == ' ' || *s == '\t')
@@ -360,7 +355,18 @@ testcase_str2dep(Pool *pool, char *s)
   n = s;
   while (*s && *s != ' ' && *s != '\t')
     s++;
-  return pool_rel2id(pool, id, pool_strn2id(pool, n, s - n, 1), flags, 1);
+  evr = pool_strn2id(pool, n, s - n, 1);
+  if (*s == ' ' && !strcmp(s, " compat >= "))
+    {
+      s += 11;
+      while (*s == ' ' || *s == '\t')
+	s++;
+      n = s;
+      while (*s && *s != ' ' && *s != '\t')
+	s++;
+      evr = pool_rel2id(pool, evr, pool_strn2id(pool, n, s - n, 1), REL_COMPAT, 1);
+    }
+  return pool_rel2id(pool, id, evr, flags, 1);
 }
 
 const char *
