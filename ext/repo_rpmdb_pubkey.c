@@ -582,7 +582,7 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
 #else
   digpubkey = &dig->pubkey;
 #endif
-  btime = digpubkey->time[0] << 24 | digpubkey->time[1] << 16 | digpubkey->time[2] << 8 | digpubkey->signid[3];
+  btime = digpubkey->time[0] << 24 | digpubkey->time[1] << 16 | digpubkey->time[2] << 8 | digpubkey->time[3];
   sprintf(evrbuf, "%02x%02x%02x%02x-%02x%02x%02x%02x", digpubkey->signid[4], digpubkey->signid[5], digpubkey->signid[6], digpubkey->signid[7], digpubkey->time[0], digpubkey->time[1], digpubkey->time[2], digpubkey->time[3]);
 
   repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, btime);
