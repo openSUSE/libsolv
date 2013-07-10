@@ -115,9 +115,78 @@ prune_to_highest_prio(Pool *pool, Queue *plist)
   plist->count = j;
 }
 
+
+/* installed packages involed in a dup operation can only be kept
+ * if they are identical to a non-installed one */
 static void
-prune_to_highest_prio_per_name(Pool *pool, Queue *plist)
+solver_prune_installed_dup_packages(Solver *solv, Queue *plist)
 {
+  Pool *pool = solv->pool;
+  int i, j, bestprio = 0;
+
+  /* find bestprio (again) */
+  for (i = 0; i < plist->count; i++)
+    {
+      Solvable *s = pool->solvables + plist->elements[i];
+      if (s->repo != pool->installed)
+	{
+	  bestprio = s->repo->priority;
+	  break;
+	}
+    }
+  if (i == plist->count)
+    return;	/* only installed packages, could not find prio */
+  for (i = j = 0; i < plist->count; i++)
+    {
+      Id p = plist->elements[i];
+      Solvable *s = pool->solvables + p;
+      if (s->repo != pool->installed && s->repo->priority < bestprio)
+	continue;
+      if (s->repo == pool->installed && (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))))
+	{
+	  Id p2, pp2;
+	  int keepit = 0;
+	  FOR_PROVIDES(p2, pp2, s->name)
+	    {
+	      Solvable *s2 = pool->solvables + p2;
+	      if (s2->repo == pool->installed || s2->evr != s->evr || s2->repo->priority < bestprio)
+		continue;
+	      if (!solvable_identical(s, s2))
+		continue;
+	      keepit = 1;
+	      if (s2->repo->priority > bestprio)
+		{
+		  /* new max prio! */
+		  bestprio = s2->repo->priority;
+		  j = 0;
+		}
+	    }
+	  if (!keepit)
+	    continue;	/* no identical package found, ignore installed package */
+	}
+      plist->elements[j++] = p;
+    }
+  if (j)
+    plist->count = j;
+}
+
+/*
+ * like prune_to_highest_prio, but calls solver prune_installed_dup_packages
+ * when there are dup packages
+ */
+static inline void
+solver_prune_to_highest_prio(Solver *solv, Queue *plist)
+{
+  prune_to_highest_prio(solv->pool, plist);
+  if (plist->count > 1 && solv->pool->installed && (solv->dupmap_all || solv->dupinvolvedmap.size))
+    solver_prune_installed_dup_packages(solv, plist);
+}
+
+
+static void
+solver_prune_to_highest_prio_per_name(Solver *solv, Queue *plist)
+{
+  Pool *pool = solv->pool;
   Queue pq;
   int i, j, k;
   Id name;
@@ -131,7 +200,7 @@ prune_to_highest_prio_per_name(Pool *pool, Queue *plist)
       if (pool->solvables[plist->elements[i]].name != name)
 	{
 	  if (pq.count > 2)
-	    prune_to_highest_prio(pool, &pq);
+	    solver_prune_to_highest_prio(solv, &pq);
 	  for (k = 0; k < pq.count; k++)
 	    plist->elements[j++] = pq.elements[k];
 	  queue_empty(&pq);
@@ -140,7 +209,7 @@ prune_to_highest_prio_per_name(Pool *pool, Queue *plist)
 	}
     }
   if (pq.count > 2)
-    prune_to_highest_prio(pool, &pq);
+    solver_prune_to_highest_prio(solv, &pq);
   for (k = 0; k < pq.count; k++)
     plist->elements[j++] = pq.elements[k];
   queue_free(&pq);
@@ -603,48 +672,6 @@ prune_to_best_version(Pool *pool, Queue *plist)
 }
 
 
-/* legacy, do not use anymore!
- * (rates arch higher than version, but thats a policy)
- */
-
-static void
-prune_best_arch_name_version(const Solver *solv, Pool *pool, Queue *plist)
-{
-  if (plist->count > 1)
-    prune_to_best_arch(pool, plist);
-  if (plist->count > 1)
-    prune_to_best_version(pool, plist);
-}
-
-/* installed packages involed in a dup operation can only be kept
- * if they are identical to a non-installed one */
-static void
-prune_installed_dup_packages(Solver *solv, Queue *plist)
-{
-  Pool *pool = solv->pool;
-  int i, j, k;
-
-  for (i = j = 0; i < plist->count; i++)
-    {
-      Id p = plist->elements[i];
-      Solvable *s = pool->solvables + p;
-      if (s->repo == pool->installed && (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))))
-	{
-	  for (k = 0; k < plist->count; k++)
-	    {
-	      Solvable *s2 = pool->solvables + plist->elements[k];
-	      if (s2->repo != pool->installed && solvable_identical(s, s2))
-		break;
-	    }
-	  if (k == plist->count)
-	    continue;	/* no identical package found, ignore installed package */
-	}
-      plist->elements[j++] = p;
-    }
-  if (j)
-    plist->count = j;
-}
-
 /*
  *  POLICY_MODE_CHOOSE:     default, do all pruning steps
  *  POLICY_MODE_RECOMMEND:  leave out prune_to_recommended
@@ -657,15 +684,14 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
   if (plist->count > 1)
     {
       if (mode != POLICY_MODE_SUGGEST)
-        prune_to_highest_prio(pool, plist);
+        solver_prune_to_highest_prio(solv, plist);
       else
-        prune_to_highest_prio_per_name(pool, plist);
-      /* installed dup packages need special treatment as prio pruning
-       * does not prune installed packages */
-      if (plist->count > 1 && pool->installed && (solv->dupmap_all || solv->dupinvolvedmap.size))
-	prune_installed_dup_packages(solv, plist);
+        solver_prune_to_highest_prio_per_name(solv, plist);
     }
-  prune_best_arch_name_version(solv, pool, plist);
+  if (plist->count > 1)
+    prune_to_best_arch(pool, plist);
+  if (plist->count > 1)
+    prune_to_best_version(pool, plist);
   if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)
     prune_to_recommended(solv, plist);
 }
