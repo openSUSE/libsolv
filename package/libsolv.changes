@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Thu Jul 11 11:03:41 CEST 2013 - mls@suse.de
+
+- fix multiversion handling in dup mode [bnc#828389]
+- fix memory leaks in the bindings
+- do recommends pruning after selecting the highest versions
+- bump version to 0.3.2
+
+-------------------------------------------------------------------
 Fri May 17 18:05:13 CEST 2013 - mls@suse.de
 
 - fix multiversion updating that was broken when the installed package
