@@ -771,6 +771,49 @@ addchangelog(Repodata *data, Id handle, RpmHead *rpmhead)
   solv_free(cn);
 }
 
+static void 
+set_description_author(Repodata *data, Id handle, char *str)
+{
+  char *aut, *p;
+  for (aut = str; (aut = strchr(aut, '\n')) != 0; aut++)
+    if (!strncmp(aut, "\nAuthors:\n--------\n", 19))
+      break;
+  if (aut)
+    {
+      /* oh my, found SUSE special author section */
+      int l = aut - str;
+      str = solv_strdup(str);
+      aut = str + l;
+      str[l] = 0;
+      while (l > 0 && str[l - 1] == '\n')
+	str[--l] = 0;
+      if (l)
+	setutf8string(data, handle, SOLVABLE_DESCRIPTION, str);
+      p = aut + 19;
+      aut = str;	/* copy over */
+      while (*p == ' ' || *p == '\n')
+	p++;
+      while (*p)
+	{
+	  if (*p == '\n')
+	    {
+	      *aut++ = *p++;
+	      while (*p == ' ')
+		p++;
+	      continue;
+	    }
+	  *aut++ = *p++;
+	}
+      while (aut != str && aut[-1] == '\n')
+	aut--;
+      *aut = 0;
+      if (*str)
+	setutf8string(data, handle, SOLVABLE_AUTHORS, str);
+      free(str);
+    }
+  else if (*str)
+    setutf8string(data, handle, SOLVABLE_DESCRIPTION, str);
+}
 
 static int
 rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, int flags)
@@ -831,47 +874,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
         setutf8string(data, handle, SOLVABLE_SUMMARY, str);
       str = headstring(rpmhead, TAG_DESCRIPTION);
       if (str)
-	{
-	  char *aut, *p;
-	  for (aut = str; (aut = strchr(aut, '\n')) != 0; aut++)
-	    if (!strncmp(aut, "\nAuthors:\n--------\n", 19))
-	      break;
-	  if (aut)
-	    {
-	      /* oh my, found SUSE special author section */
-	      int l = aut - str;
-	      str = solv_strdup(str);
-	      aut = str + l;
-	      str[l] = 0;
-	      while (l > 0 && str[l - 1] == '\n')
-	        str[--l] = 0;
-	      if (l)
-                setutf8string(data, handle, SOLVABLE_DESCRIPTION, str);
-	      p = aut + 19;
-	      aut = str;	/* copy over */
-	      while (*p == ' ' || *p == '\n')
-		p++;
-	      while (*p)
-		{
-		  if (*p == '\n')
-		    {
-		      *aut++ = *p++;
-		      while (*p == ' ')
-			p++;
-		      continue;
-		    }
-		  *aut++ = *p++;
-		}
-	      while (aut != str && aut[-1] == '\n')
-		aut--;
-	      *aut = 0;
-	      if (*str)
-	        setutf8string(data, handle, SOLVABLE_AUTHORS, str);
-	      free(str);
-	    }
-	  else if (*str)
-	    setutf8string(data, handle, SOLVABLE_DESCRIPTION, str);
-	}
+	set_description_author(data, handle, str);
       str = headstring(rpmhead, TAG_GROUP);
       if (str)
         repodata_set_poolstr(data, handle, SOLVABLE_GROUP, str);
