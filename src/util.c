@@ -322,12 +322,37 @@ solv_latin1toutf8(const char *buf)
 }
 
 char *
-solv_replacebadutf8(const char *buf)
+solv_replacebadutf8(const char *buf, int replchar)
 {
   size_t l, nl;
   const char *p;
   char *r = 0, *rp = 0;
+  int repllen, replin;
 
+  if (replchar < 0 || replchar > 0x10ffff)
+    replchar = 0xfffd;
+  if (!replchar)
+    repllen = replin = 0;
+  else if (replchar < 0x80)
+    {
+      repllen = 1;
+      replin = (replchar & 0x40) | 0x80;
+    }
+  else if (replchar < 0x800)
+    {
+      repllen = 2;
+      replin = 0x40;
+    }
+  else if (replchar < 0x10000)
+    {
+      repllen = 3;
+      replin = 0x60;
+    }
+  else
+    {
+      repllen = 4;
+      replin = 0x70;
+    }
   for (;;)
     {
       for (p = buf, nl = 0; *p; )
@@ -342,14 +367,23 @@ solv_replacebadutf8(const char *buf)
 	  p += l;
 	  if (!*p)
 	    break;
-	  /* found a bad char, replace with 0xfffd */
-	  if (rp)
+	  /* found a bad char, replace with replchar */
+	  if (rp && replchar)
 	    {
-	      *rp++ = 0xef;
-	      *rp++ = 0xbf;
-	      *rp++ = 0xbd;
+	      switch (repllen)
+		{
+		case 4:
+		  *rp++ = (replchar >> 18 & 0x3f) | 0x80;
+		case 3:
+		  *rp++ = (replchar >> 12 & 0x3f) | 0x80;
+		case 2:
+		  *rp++ = (replchar >> 6  & 0x3f) | 0x80;
+		default:
+		  *rp++ = (replchar       & 0x3f) | 0x80;
+		}
+	      rp[-repllen] ^= replin;
 	    }
-	  nl += 3;
+	  nl += repllen;
 	  p++;
 	  while ((*(const unsigned char *)p & 0xc0) == 0x80)
 	    p++;

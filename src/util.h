@@ -40,7 +40,7 @@ extern int solv_hex2bin(const char **strp, unsigned char *buf, int bufl);
 extern char *solv_bin2hex(const unsigned char *buf, int l, char *str);
 extern size_t solv_validutf8(const char *buf);
 extern char *solv_latin1toutf8(const char *buf);
-extern char *solv_replacebadutf8(const char *buf);
+extern char *solv_replacebadutf8(const char *buf, int replchar);
 
 
 static inline void *solv_extend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
