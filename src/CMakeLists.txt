@@ -28,7 +28,7 @@ SET (libsolv_HEADERS
     chksum.h dataiterator.h ${CMAKE_BINARY_DIR}/src/solvversion.h)
 
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-SET (CMAKE_SHARED_LINKER_FLAGS "${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver")
+SET (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver")
 
 IF (DISABLE_SHARED)
 ADD_LIBRARY (libsolv STATIC ${libsolv_SRCS})
