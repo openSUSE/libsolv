@@ -18,6 +18,13 @@ IF (ENABLE_RPMDB_PUBKEY)
 	repo_rpmdb_pubkey.h)
 ENDIF (ENABLE_RPMDB_PUBKEY)
 
+IF (ENABLE_PGPVRFY)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	solv_pgpvrfy.c)
+    SET (libsolvext_HEADERS ${libsolvext_SRCS}
+	solv_pgpvrfy.h)
+ENDIF (ENABLE_PGPVRFY)
+
 IF (ENABLE_RPMMD)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repo_repomdxml.c repo_rpmmd.c
