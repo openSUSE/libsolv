@@ -262,6 +262,7 @@ parsesigpacket(struct gpgsig *sig, unsigned char *p, int l, unsigned char *pubke
 	return;
       sig->type = p[1];
       q = p + 4;
+      sig->keyexpires = -1;
       for (j = 0; q && j < 2; j++)
 	{
 	  if (q + 2 > p + l)
@@ -539,8 +540,13 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      if (solv_pgpvrfy(pubdata, pubdatal, sig.sigdata, sig.sigdatal))
 #endif
 		{
-		  if (!maxex && sig.keyexpires)
-		    maxex = sig.keyexpires + kcr;
+		  if (sig.keyexpires && maxex != -1)
+		    {
+		      if (sig.keyexpires == -1)
+			maxex = -1;
+		      else if (sig.keyexpires + kcr > maxex)
+			maxex = sig.keyexpires + kcr;
+		    }
 		  if (sig.created > maxsigcr)
 		    maxsigcr = sig.created;
 		}
@@ -571,7 +577,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
     }
   if (kcr)
     repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, kcr);
-  if (maxex)
+  if (maxex && maxex != -1)
     repodata_set_num(data, s - s->repo->pool->solvables, PUBKEY_EXPIRES, maxex);
   s->name = pool_str2id(s->repo->pool, "gpg-pubkey", 1);
   s->evr = 1;
