@@ -249,6 +249,13 @@ KNOWNID(PUBKEY_EXPIRES,		        "pubkey:expires"),
 KNOWNID(PUBKEY_SIGNATURES,	        "pubkey:signatures"),
 KNOWNID(SOLVABLE_MEDIABASE,		"solvable:mediabase"), /* <location xml:base=... > */
 
+KNOWNID(PUBKEY_DATA,		        "pubkey:data"),
+
+KNOWNID(SIGNATURE_ISSUER,	        "signature:issuer"),
+KNOWNID(SIGNATURE_TIME,	        	"signature:time"),
+KNOWNID(SIGNATURE_EXPIRES,	        "signature:expires"),
+KNOWNID(SIGNATURE_DATA,		        "signature:data"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
