@@ -6,9 +6,9 @@
  */
 
 /*
- * repo_rpmdb_pubkey
+ * repo_pubkey
  *
- * support for pubkeys stored in the rpmdb database
+ * support for pubkey reading
  *
  */
 

@@ -25,8 +25,8 @@
 #include "pool.h"
 #include "repo.h"
 #include "repo_rpmdb.h"
-#ifdef ENABLE_RPMDB_PUBKEY
-#include "repo_rpmdb_pubkey.h"
+#ifdef ENABLE_PUBKEY
+#include "repo_pubkey.h"
 #endif
 #include "repo_products.h"
 #include "repo_solv.h"
@@ -63,7 +63,7 @@ main(int argc, char **argv)
   char *proddir = 0;
 #endif
   char *outfile = 0;
-#ifdef ENABLE_RPMDB_PUBKEY
+#ifdef ENABLE_PUBKEY
   int pubkeys = 0;
 #endif
 
@@ -99,7 +99,7 @@ main(int argc, char **argv)
       case 'o':
         outfile = optarg;
         break;
-#ifdef ENABLE_RPMDB_PUBKEY
+#ifdef ENABLE_PUBKEY
       case 'k':
         nopacks = 1;
         pubkeys = 1;
@@ -150,7 +150,7 @@ main(int argc, char **argv)
 	  exit(1);
 	}
     }
-#ifdef ENABLE_RPMDB_PUBKEY
+#ifdef ENABLE_PUBKEY
   if (pubkeys)
     {
       if (repo_add_rpmdb_pubkeys(repo, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))

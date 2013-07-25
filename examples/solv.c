@@ -64,8 +64,8 @@
 #include "repo_rpmdb.h"
 #include "pool_fileconflicts.h"
 #endif
-#ifdef ENABLE_RPMDB_PUBKEY
-#include "repo_rpmdb_pubkey.h"
+#ifdef ENABLE_PUBKEY
+#include "repo_pubkey.h"
 #endif
 #ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
@@ -1008,7 +1008,7 @@ static Pool *
 read_sigs()
 {
   Pool *sigpool = pool_create();
-#if defined(ENABLE_RPMDB_PUBKEY)
+#if defined(ENABLE_PUBKEY) && defined(ENABLE_RPMDB)
   Repo *repo = repo_create(sigpool, "rpmdbkeys");
   repo_add_rpmdb_pubkeys(repo, 0);
 #endif

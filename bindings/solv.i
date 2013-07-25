@@ -410,8 +410,8 @@ typedef int bool;
 #ifdef ENABLE_RPMDB
 #include "repo_rpmdb.h"
 #endif
-#ifdef ENABLE_RPMDB_PUBKEYS
-#include "repo_rpmdb_pubkey.h"
+#ifdef ENABLE_PUBKEY
+#include "repo_pubkey.h"
 #endif
 #ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
@@ -1439,10 +1439,12 @@ rb_eval_string(
     return new_XSolvable($self->pool, repo_add_rpm($self, name, flags));
   }
 #endif
-#ifdef ENABLE_RPMDB_PUBKEYS
+#ifdef ENABLE_PUBKEY
+#ifdef ENABLE_RPMDB
   bool add_rpmdb_pubkeys(int flags = 0) {
     return repo_add_rpmdb_pubkeys($self, flags) == 0;
   }
+#endif
   %newobject add_pubkey;
   XSolvable *add_pubkey(const char *key, int flags = 0) {
     return new_XSolvable($self->pool, repo_add_pubkey($self, key, flags));
