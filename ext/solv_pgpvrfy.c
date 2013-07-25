@@ -360,6 +360,7 @@ findmpi(unsigned char **mpip, int *mpilp, int maxbits, int *outlen)
   unsigned char *out = 0;
   int bits, l;
 
+  *outlen = 0;
   if (mpil < 2)
     return 0;
   bits = mpi[0] << 8 | mpi[1];
