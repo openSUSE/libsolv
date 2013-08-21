@@ -2318,6 +2318,11 @@ rb_eval_string(
     s->enhances = repo_addid_dep(s->repo, s->enhances, id, 0);
   }
 
+  void unset(Id keyname) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    repo_unset(s->repo, $self->id, keyname);
+  }
+
   void add_deparray(Id keyname, DepId id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
     if (marker == -1 || marker == 1) {

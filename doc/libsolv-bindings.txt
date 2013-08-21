@@ -1284,6 +1284,13 @@ spawning multiple DVDs).
 
 Add a new dependency to the attributes stored in keyname.
 
+	void unset(Id keyname);
+	$solvable->unset($keyname);
+	solvable.unset(keyname)
+	solvable.unset(keyname)
+
+Delete data stored for the specific keyname.
+
 	bool installable();
 	$solvable->installable()
 	solvable.installable()

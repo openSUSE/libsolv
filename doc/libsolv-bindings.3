@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
-.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 07/02/2013
+.\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
+.\"      Date: 08/21/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "07/02/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "08/21/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -2286,6 +2286,21 @@ Return a tuple containing the on\-media location and an optional media number fo
 .\}
 .sp
 Add a new dependency to the attributes stored in keyname\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid unset(Id\fR \fIkeyname\fR\fB)\fR;
+\fI$solvable\fR\fB\->unset(\fR\fI$keyname\fR\fB)\fR;
+\fIsolvable\fR\fB\&.unset(\fR\fIkeyname\fR\fB)\fR
+\fIsolvable\fR\fB\&.unset(\fR\fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Delete data stored for the specific keyname\&.
 .sp
 .if n \{\
 .RS 4
