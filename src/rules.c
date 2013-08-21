@@ -2307,6 +2307,16 @@ solver_rule2job(Solver *solv, Id rid, Id *whatp)
   return solv->job.elements[idx];
 }
 
+Id
+solver_rule2solvable(Solver *solv, Id rid)
+{
+  if (rid >= solv->updaterules && rid < solv->updaterules_end)
+    return rid - solv->updaterules;
+  if (rid >= solv->featurerules && rid < solv->featurerules_end)
+    return rid - solv->featurerules;
+  return 0;
+}
+
 /* check if the newest versions of pi still provides the dependency we're looking for */
 static int
 solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m)

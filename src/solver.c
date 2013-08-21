@@ -4025,11 +4025,7 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
   if (i < solv->decisioncnt_update)
     {
       if (i == 0)
-	{
-	  if (infop)
-	    *infop = SYSTEMSOLVABLE;
-	  return SOLVER_REASON_KEEP_INSTALLED;
-	}
+	return SOLVER_REASON_KEEP_INSTALLED;
       if (infop)
 	*infop = why;
       return SOLVER_REASON_RESOLVE_JOB;
@@ -4039,12 +4035,7 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
       if (why == 0 && pp < 0)
 	return SOLVER_REASON_CLEANDEPS_ERASE;
       if (infop)
-	{
-	  if (why >= solv->updaterules && why < solv->updaterules_end)
-	    *infop = why - solv->updaterules;
-	  else if (why >= solv->featurerules && why < solv->featurerules_end)
-	    *infop = why - solv->featurerules;
-	}
+	*infop = why;
       return SOLVER_REASON_UPDATE_INSTALLED;
     }
   if (i < solv->decisioncnt_resolve)
@@ -4052,12 +4043,7 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
       if (why == 0 && pp < 0)
 	return SOLVER_REASON_CLEANDEPS_ERASE;
       if (infop)
-	{
-	  if (why >= solv->updaterules && why < solv->updaterules_end)
-	    *infop = why - solv->updaterules;
-	  else if (why >= solv->featurerules && why < solv->featurerules_end)
-	    *infop = why - solv->featurerules;
-	}
+	*infop = why;
       return SOLVER_REASON_KEEP_INSTALLED;
     }
   if (i < solv->decisioncnt_weak)
