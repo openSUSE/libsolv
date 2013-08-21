@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Wed Aug 21 14:39:54 CEST 2013 - mls@suse.de
+
+- add describe_decision() and unset() methods to bindings
+- do recommends pruning after selecting the highest versions
+- improve filelist handling
+- be more tolerant about bad xml: an empty epoch attribute means no epoch
+- fix another edge case will dup mode and multiversion packages [bnc#828389]
+- bring installcheck up to speed
+
+-------------------------------------------------------------------
 Mon Jun 17 15:54:44 CEST 2013 - mls@suse.de
 
 - add SOLVER_RULE_JOB_UNSUPPORTED and SOLVER_RULE_JOB_UNKNOWN_PACKAGE
