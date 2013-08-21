@@ -796,7 +796,7 @@ propagate(Solver *solv, int level)
 	    
 	  IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
 	    {
-	      POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "   unit ");
+	      POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "  unit ");
 	      solver_printrule(solv, SOLV_DEBUG_PROPAGATE, r);
 	    }
 
