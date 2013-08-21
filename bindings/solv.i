@@ -380,6 +380,13 @@ SWIG_AsValDepId(void *obj, int *val) {
 
 %include "typemaps.i"
 
+%typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp, int res = SWIG_TMPOBJ) {
+  $1 = &temp;
+}
+%typemap(argout,noblock=1) XRule **OUTPUT {
+  %append_output(SWIG_NewPointerObj((void*)(*$1), SWIGTYPE_p_XRule, SWIG_POINTER_OWN | %newpointer_flags));
+}
+
 %typemaps_asval(%checkcode(POINTER), SWIG_AsValSolvFpPtr, "SWIG_AsValSolvFpPtr", FILE*);
 %typemaps_asval(%checkcode(INT32), SWIG_AsValDepId, "SWIG_AsValDepId", DepId);
 
@@ -2631,6 +2638,18 @@ rb_eval_string(
   static const int SOLVER_FLAG_BEST_OBEY_POLICY = SOLVER_FLAG_BEST_OBEY_POLICY;
   static const int SOLVER_FLAG_NO_AUTOTARGET = SOLVER_FLAG_NO_AUTOTARGET;
 
+  static const int SOLVER_REASON_UNRELATED = SOLVER_REASON_UNRELATED;
+  static const int SOLVER_REASON_UNIT_RULE = SOLVER_REASON_UNIT_RULE;
+  static const int SOLVER_REASON_KEEP_INSTALLED = SOLVER_REASON_KEEP_INSTALLED;
+  static const int SOLVER_REASON_RESOLVE_JOB = SOLVER_REASON_RESOLVE_JOB;
+  static const int SOLVER_REASON_UPDATE_INSTALLED = SOLVER_REASON_UPDATE_INSTALLED;
+  static const int SOLVER_REASON_CLEANDEPS_ERASE = SOLVER_REASON_CLEANDEPS_ERASE;
+  static const int SOLVER_REASON_RESOLVE = SOLVER_REASON_RESOLVE;
+  static const int SOLVER_REASON_WEAKDEP = SOLVER_REASON_WEAKDEP;
+  static const int SOLVER_REASON_RESOLVE_ORPHAN = SOLVER_REASON_RESOLVE_ORPHAN;
+  static const int SOLVER_REASON_RECOMMENDED = SOLVER_REASON_RECOMMENDED;
+  static const int SOLVER_REASON_SUPPLEMENTED = SOLVER_REASON_SUPPLEMENTED;
+
   ~Solver() {
     solver_free($self);
   }
@@ -2686,6 +2705,13 @@ rb_eval_string(
   %newobject transaction;
   Transaction *transaction() {
     return solver_create_transaction($self);
+  }
+
+  int describe_decision(XSolvable *s, XRule **OUTPUT) {
+    int ruleid;
+    int reason = solver_describe_decision($self, s->id, &ruleid);
+    *OUTPUT = new_XRule($self, ruleid);
+    return reason;
   }
 }
 
