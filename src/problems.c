@@ -590,10 +590,15 @@ create_solutions(Solver *solv, int probnr, int solidx)
   unsigned int now;
   int oldmistakes = solv->cleandeps_mistakes ? solv->cleandeps_mistakes->count : 0;
   Id extraflags = -1;
+  int decisioncnt_update;
+  int decisioncnt_keep;
+  int decisioncnt_resolve;
+  int decisioncnt_weak;
+  int decisioncnt_orphan;
 
   now = solv_timems(0);
   queue_init(&redoq);
-  /* save decisionq, decisionq_why, decisionmap */
+  /* save decisionq, decisionq_why, decisionmap, and decisioncnt */
   for (i = 0; i < solv->decisionq.count; i++)
     {
       Id p = solv->decisionq.elements[i];
@@ -601,6 +606,12 @@ create_solutions(Solver *solv, int probnr, int solidx)
       queue_push(&redoq, solv->decisionq_why.elements[i]);
       queue_push(&redoq, solv->decisionmap[p > 0 ? p : -p]);
     }
+  decisioncnt_update = solv->decisioncnt_update;
+  decisioncnt_keep = solv->decisioncnt_keep;
+  decisioncnt_resolve = solv->decisioncnt_resolve;
+  decisioncnt_weak = solv->decisioncnt_weak;
+  decisioncnt_orphan = solv->decisioncnt_orphan;
+
   /* save problems queue */
   problems_save = solv->problems;
   memset(&solv->problems, 0, sizeof(solv->problems));
@@ -692,6 +703,12 @@ create_solutions(Solver *solv, int probnr, int solidx)
       solv->decisionmap[p > 0 ? p : -p] = redoq.elements[i + 2];
     }
   queue_free(&redoq);
+  solv->decisioncnt_update = decisioncnt_update;
+  solv->decisioncnt_keep = decisioncnt_keep;
+  solv->decisioncnt_resolve = decisioncnt_resolve;
+  solv->decisioncnt_weak = decisioncnt_weak;
+  solv->decisioncnt_orphan = decisioncnt_orphan;
+
   /* restore problems */
   queue_free(&solv->problems);
   solv->problems = problems_save;

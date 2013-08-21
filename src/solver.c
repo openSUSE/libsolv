@@ -981,6 +981,7 @@ solver_reset(Solver *solv)
   queue_empty(&solv->decisionq);
   solv->recommends_index = -1;
   solv->propagate_index = 0;
+  solv->decisioncnt_update = solv->decisioncnt_keep = solv->decisioncnt_resolve = solv->decisioncnt_weak = solv->decisioncnt_orphan = 0;
   queue_empty(&solv->branches);
 
   /* adapt learnt rule status to new set of enabled/disabled rules */
@@ -1246,6 +1247,16 @@ revert(Solver *solv, int level)
 	solv->branches.count--;
     }
   solv->recommends_index = -1;
+  if (solv->decisionq.count < solv->decisioncnt_update)
+    solv->decisioncnt_update = 0; 
+  if (solv->decisionq.count < solv->decisioncnt_keep)
+    solv->decisioncnt_keep = 0; 
+  if (solv->decisionq.count < solv->decisioncnt_resolve)
+    solv->decisioncnt_resolve = 0; 
+  if (solv->decisionq.count < solv->decisioncnt_weak)
+    solv->decisioncnt_weak= 0;
+  if (solv->decisionq.count < solv->decisioncnt_orphan)
+    solv->decisioncnt_orphan = 0; 
 }
 
 
@@ -1825,8 +1836,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  systemlevel = level + 1;
 	  if (i < solv->jobrules_end)
 	    continue;
-          solv->decisioncnt_update = solv->decisionq.count;
-          solv->decisioncnt_keep = solv->decisionq.count;
+          if (!solv->decisioncnt_update)
+            solv->decisioncnt_update = solv->decisionq.count;
 	}
 
       /*
@@ -1844,7 +1855,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    {
 	      int passlevel = level;
 	      Id *multiversionupdaters = solv->multiversion.size ? solv->multiversionupdaters : 0;
-	      if (pass == 1)
+	      if (pass == 1 && !solv->decisioncnt_keep)
 		solv->decisioncnt_keep = solv->decisionq.count;
 	      /* start with installedpos, the position that gave us problems the last time */
 	      for (i = installedpos, n = installed->start; n < installed->end; i++, n++)
@@ -1986,6 +1997,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  if (pass < 2)
 	    continue;		/* had trouble, retry */
 	}
+      if (!solv->decisioncnt_keep)
+	solv->decisioncnt_keep = solv->decisionq.count;
 
       if (level < systemlevel)
         systemlevel = level;
@@ -1993,7 +2006,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * decide
        */
-      solv->decisioncnt_resolve = solv->decisionq.count;
+      if (!solv->decisioncnt_resolve)
+        solv->decisioncnt_resolve = solv->decisionq.count;
       POOL_DEBUG(SOLV_DEBUG_POLICY, "deciding unresolved rules\n");
       for (i = 1, n = 1; n < solv->nrules; i++, n++)
 	{
@@ -2116,7 +2130,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    continue;
 	}
 
-      solv->decisioncnt_weak = solv->decisionq.count;
+      if (!solv->decisioncnt_weak)
+        solv->decisioncnt_weak = solv->decisionq.count;
       if (doweak)
 	{
 	  int qcount;
@@ -2380,7 +2395,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 	}
 
-      solv->decisioncnt_orphan = solv->decisionq.count;
+      if (!solv->decisioncnt_orphan)
+        solv->decisioncnt_orphan = solv->decisionq.count;
       if (solv->dupmap_all && solv->installed)
 	{
 	  int installedone = 0;
@@ -3741,7 +3757,7 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
 	      Id why;
 	      why = solv->decisionq_why.elements[i];
 	      if (why)
-		continue;	/* forced by unit rule */
+		continue;	/* forced by unit rule or dep resolving */
 	      p = solv->decisionq.elements[i];
 	      if (p < 0)
 		continue;
@@ -4015,43 +4031,32 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
   if (i == solv->decisionq.count)	/* just in case... */
     return SOLVER_REASON_UNRELATED;
   why = solv->decisionq_why.elements[i];
+  if (infop)
+    *infop = why > 0 ? why : -why;
   if (why > 0)
-    {
-      if (infop)
-	*infop = why;
-      return SOLVER_REASON_UNIT_RULE;
-    }
+    return SOLVER_REASON_UNIT_RULE;
   why = -why;
   if (i < solv->decisioncnt_update)
     {
       if (i == 0)
 	return SOLVER_REASON_KEEP_INSTALLED;
-      if (infop)
-	*infop = why;
       return SOLVER_REASON_RESOLVE_JOB;
     }
   if (i < solv->decisioncnt_keep)
     {
       if (why == 0 && pp < 0)
 	return SOLVER_REASON_CLEANDEPS_ERASE;
-      if (infop)
-	*infop = why;
       return SOLVER_REASON_UPDATE_INSTALLED;
     }
   if (i < solv->decisioncnt_resolve)
     {
       if (why == 0 && pp < 0)
 	return SOLVER_REASON_CLEANDEPS_ERASE;
-      if (infop)
-	*infop = why;
       return SOLVER_REASON_KEEP_INSTALLED;
     }
-  if (i < solv->decisioncnt_weak)
-    {
-      if (infop)
-	*infop = why;
-      return SOLVER_REASON_RESOLVE;
-    }
+  if (why > 0)
+    return SOLVER_REASON_RESOLVE;
+  /* weak or orphaned */
   if (solv->decisionq.count < solv->decisioncnt_orphan)
     return SOLVER_REASON_WEAKDEP;
   return SOLVER_REASON_RESOLVE_ORPHAN;
