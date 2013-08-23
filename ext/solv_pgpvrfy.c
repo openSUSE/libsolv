@@ -50,12 +50,12 @@ static void mpdump(int l, mp_t *a, char *s)
 }
 #endif
 
-/* target[len] = x, target = target % mod */
+/* target[len] = x, target = target % mod
+ * assumes that target < (mod << MP_T_BITS)! */
 static void
 mpdomod(int len, mp_t *target, mp2_t x, mp_t *mod)
 {
   int i, j;
-  /* assumes that x does not overflow, i.e. target is not much bigger than mod! */
   for (i = len - 1; i >= 0; i--)
     {
       x = (x << MP_T_BITS) | target[i];
@@ -121,7 +121,7 @@ mpmult_add_int(int len, mp_t *target, mp_t *src, mp2_t m, mp_t *mod)
   mpdomod(len, target, x, mod);
 }
 
-/* target = target * 2 ^ MP_T_BITS */
+/* target = target << MP_T_BITS */
 static void
 mpshift(int len, mp_t *target, mp_t *mod)
 {
