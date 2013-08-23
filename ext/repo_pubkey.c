@@ -877,7 +877,7 @@ solv_parse_sig(FILE *fp, unsigned char **sigpkgp, int *sigpkglp, char *keyidstr)
 	}
     }
   hl = parsepkgheader(sig, sigl, &tag, &pktl);
-  if (!hl || tag != 2)
+  if (!hl || tag != 2 || !pktl)
     {
       solv_free(sig);
       return 0;
@@ -892,11 +892,11 @@ solv_parse_sig(FILE *fp, unsigned char **sigpkgp, int *sigpkglp, char *keyidstr)
     }
   if (sigpkgp)
     {
-      *sigpkgp = sig + hl;
+      *sigpkgp = solv_malloc(pktl);
+      memcpy(*sigpkgp, sig + hl, pktl);
       *sigpkglp = pktl;
     }
-  else
-    solv_free(sig);
+  solv_free(sig);
   if (keyidstr)
     solv_bin2hex(pgpsig.issuer, 8, keyidstr);
   return htype;
