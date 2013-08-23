@@ -113,7 +113,7 @@ crc24(unsigned char *p, int len)
 }
 
 static unsigned char *
-unarmor(char *pubkey, int *pktlp)
+unarmor(char *pubkey, int *pktlp, char *startstr, char *endstr)
 {
   char *p;
   int l, eof;
@@ -121,7 +121,8 @@ unarmor(char *pubkey, int *pktlp)
   unsigned int v;
 
   *pktlp = 0;
-  while (strncmp(pubkey, "-----BEGIN PGP PUBLIC KEY BLOCK-----", 36) != 0)
+  l = strlen(startstr);
+  while (strncmp(pubkey, startstr, l) != 0)
     {
       pubkey = strchr(pubkey, '\n');
       if (!pubkey)
@@ -176,7 +177,7 @@ unarmor(char *pubkey, int *pktlp)
     }
   while (*pubkey == ' ' || *pubkey == '\t' || *pubkey == '\n' || *pubkey == '\r')
     pubkey++;
-  if (strncmp(pubkey, "-----END PGP PUBLIC KEY BLOCK-----", 34) != 0)
+  if (strncmp(pubkey, endstr, strlen(endstr)) != 0)
     {
       solv_free(buf);
       return 0;
@@ -693,7 +694,7 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   unsigned char *pkts;
   int pktsl;
 
-  pkts = unarmor(pubkey, &pktsl);
+  pkts = unarmor(pubkey, &pktsl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----");
   if (!pkts)
     {
       pool_error(s->repo->pool, 0, "unarmor failure");

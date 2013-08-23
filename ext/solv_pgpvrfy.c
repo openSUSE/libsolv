@@ -377,7 +377,7 @@ findmpi(unsigned char **mpip, int *mpilp, int maxbits, int *outlen)
     return 0;
   bits = mpi[0] << 8 | mpi[1];
   l = 2 + (bits + 7) / 8;
-  if (bits > maxbits || mpil < l)
+  if (bits > maxbits || mpil < l || (bits && !mpi[2]))
     {
       *mpilp = 0;
       return 0;
