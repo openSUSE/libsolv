@@ -769,6 +769,24 @@ repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
   return 1;
 }
 
+const void *
+repodata_lookup_binary(Repodata *data, Id solvid, Id keyname, int *lenp)
+{
+  unsigned char *dp;
+  Repokey *key;
+  Id len;
+
+  dp = find_key_data(data, solvid, keyname, &key);
+  if (!dp || key->type != REPOKEY_TYPE_BINARY)
+    {
+      *lenp = 0;
+      return 0;
+    }
+  dp = data_read_id(dp, &len);
+  *lenp = len;
+  return dp;
+}
+
 Id
 repodata_globalize_id(Repodata *data, Id id, int create)
 {
@@ -3404,6 +3422,3 @@ repodata_memused(Repodata *data)
   return data->incoredatalen + data->vincorelen;
 }
 
-/*
-vim:cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-0.5s:tw=78:cindent:sw=4:
-*/

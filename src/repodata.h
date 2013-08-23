@@ -210,6 +210,7 @@ int repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long lon
 int repodata_lookup_void(Repodata *data, Id solvid, Id keyname);
 const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep);
 int repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
+const void *repodata_lookup_binary(Repodata *data, Id solvid, Id keyname, int *lenp);
 
 
 /*-----

@@ -1419,6 +1419,30 @@ repo_lookup_type(Repo *repo, Id entry, Id keyname)
   return 0;
 }
 
+const void *
+repo_lookup_binary(Repo *repo, Id entry, Id keyname, int *lenp)
+{
+  Pool *pool = repo->pool;
+  Repodata *data;
+  int i;
+  const void *bin;
+
+  if (entry == SOLVID_POS && pool->pos.repo == repo && pool->pos.repodataid)
+    return repodata_lookup_binary(pool->pos.repo->repodata + pool->pos.repodataid, entry, keyname, lenp);
+  FOR_REPODATAS(repo, i, data)
+    {
+      if (entry != SOLVID_META && (entry < data->start || entry >= data->end))
+	continue;
+      if (!repodata_precheck_keyname(data, keyname))
+	continue;
+      bin = repodata_lookup_binary(data, entry, keyname, lenp);
+      if (bin)
+	return bin;
+    }
+  *lenp = 0;
+  return 0;
+}
+
 /***********************************************************************/
 
 Repodata *
@@ -1773,6 +1797,3 @@ repo_disable_paging(Repo *repo)
     repodata_disable_paging(data);
 }
 
-/*
-vim:cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-0.5s:tw=78:cindent:sw=4:
-*/
