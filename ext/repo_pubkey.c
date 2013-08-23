@@ -846,6 +846,11 @@ solv_parse_sig(FILE *fp, unsigned char **sigpkgp, int *sigpkglp, char *keyidstr)
   struct pgpsig pgpsig;
   Id htype;
 
+  if (sigpkgp)
+    {
+      *sigpkgp = 0;
+      *sigpkglp = 0;
+    }
   if ((sig = (unsigned char *)solv_slurp(fp, &sigl)) == 0)
     return 0;
   if (!is_sig_packet(sig, sigl))
