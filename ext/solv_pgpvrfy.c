@@ -345,7 +345,7 @@ mprsa(int nl, mp_t *n, int el, mp_t *e, mp_t *m, mp_t *c)
 
 /* create mp with size tbits from data with size dbits */
 static mp_t *
-mpbuild(unsigned char *d, int dbits, int tbits, int *mplp)
+mpbuild(const unsigned char *d, int dbits, int tbits, int *mplp)
 {
   int l = (tbits + MP_T_BITS - 1) / MP_T_BITS;
   int dl, i;
@@ -365,11 +365,11 @@ mpbuild(unsigned char *d, int dbits, int tbits, int *mplp)
   return out;
 }
 
-static unsigned char *
-findmpi(unsigned char **mpip, int *mpilp, int maxbits, int *outlen)
+static const unsigned char *
+findmpi(const unsigned char **mpip, int *mpilp, int maxbits, int *outlen)
 {
   int mpil = *mpilp;
-  unsigned char *mpi = *mpip;
+  const unsigned char *mpi = *mpip;
   int bits, l;
 
   *outlen = 0;
@@ -389,11 +389,11 @@ findmpi(unsigned char **mpip, int *mpilp, int maxbits, int *outlen)
 }
 
 int
-solv_pgpvrfy(unsigned char *pub, int publ, unsigned char *sig, int sigl)
+solv_pgpvrfy(const unsigned char *pub, int publ, const unsigned char *sig, int sigl)
 {
   int hashl;
   unsigned char *oid = 0;
-  unsigned char *mpi;
+  const unsigned char *mpi;
   int mpil;
   int res = 0;
 
@@ -428,7 +428,8 @@ solv_pgpvrfy(unsigned char *pub, int publ, unsigned char *sig, int sigl)
     {
     case 1:		/* RSA */
       {
-	unsigned char *n, *e, *m, *c;
+	const unsigned char *n, *e, *m;
+	unsigned char *c;
 	int nlen, elen, mlen, clen;
 	mp_t *nx, *ex, *mx, *cx;
 	int nxl, exl;
@@ -467,7 +468,7 @@ solv_pgpvrfy(unsigned char *pub, int publ, unsigned char *sig, int sigl)
       }
     case 17:		/* DSA */
       {
-	unsigned char *p, *q, *g, *y, *r, *s;
+	const unsigned char *p, *q, *g, *y, *r, *s;
 	int plen, qlen, glen, ylen, rlen, slen, hlen;
 	mp_t *px, *qx, *gx, *yx, *rx, *sx, *hx;
 	int pxl, qxl, hxl;

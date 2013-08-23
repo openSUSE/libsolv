@@ -5,5 +5,5 @@
  * for further information
  */
 
-extern int solv_pgpvrfy(unsigned char *pub, int publ, unsigned char *sig, int sigl);
+extern int solv_pgpvrfy(const unsigned char *pub, int publ, const unsigned char *sig, int sigl);
 
