@@ -121,6 +121,8 @@ unarmor(char *pubkey, int *pktlp, char *startstr, char *endstr)
   unsigned int v;
 
   *pktlp = 0;
+  if (!pubkey)
+    return 0;
   l = strlen(startstr);
   while (strncmp(pubkey, startstr, l) != 0)
     {
@@ -186,8 +188,9 @@ unarmor(char *pubkey, int *pktlp, char *startstr, char *endstr)
   return buf;
 }
 
-struct gpgsig {
+struct pgpsig {
   int type;
+  Id hashalgo;
   unsigned char issuer[8];
   int haveissuer;
   unsigned int created;
@@ -195,6 +198,7 @@ struct gpgsig {
   unsigned int keyexpires;
   unsigned char *sigdata;
   int sigdatal;
+  int mpioff;
 };
 
 static Id
@@ -210,65 +214,90 @@ pgphashalgo2type(int algo)
 }
 
 static void
-parsesigpacket(struct gpgsig *sig, unsigned char *p, int l, unsigned char *pubkey, int pubkeyl, unsigned char *userid, int useridl)
+createsigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey, int pubkeyl, unsigned char *userid, int useridl, void *h)
+{
+  int type = sig->type;
+  unsigned char b[6];
+  const unsigned char *cs;
+  int csl;
+
+  if (!sig->mpioff || l <= sig->mpioff)
+    return;
+  if ((type >= 0x10 && type <= 0x13) || type == 0x1f || type == 0x18 || type == 0x20 || type == 0x28)
+    {
+      b[0] = 0x99;
+      b[1] = pubkeyl >> 8;
+      b[2] = pubkeyl;
+      solv_chksum_add(h, b, 3);
+      solv_chksum_add(h, pubkey, pubkeyl);
+    }
+  if ((type >= 0x10 && type <= 0x13))
+    {
+      if (p[0] != 3)
+	{
+	  b[0] = 0xb4;
+	  b[1] = useridl >> 24;
+	  b[2] = useridl >> 16;
+	  b[3] = useridl >> 8;
+	  b[4] = useridl;
+	  solv_chksum_add(h, b, 5);
+	}
+      solv_chksum_add(h, userid, useridl);
+    }
+  /* add trailer */
+  if (p[0] == 3)
+    solv_chksum_add(h, p + 2, 5);
+  else
+    {
+      int hl = 6 + (p[4] << 8 | p[5]);
+      solv_chksum_add(h, p, hl);
+      b[0] = 4;
+      b[1] = 0xff;
+      b[2] = hl >> 24;
+      b[3] = hl >> 16;
+      b[4] = hl >> 8;
+      b[5] = hl;
+      solv_chksum_add(h, b, 6);
+    }
+  cs = solv_chksum_get(h, &csl);
+  if (cs[0] == p[sig->mpioff - 2] && cs[1] == p[sig->mpioff - 1])
+    {
+      int ml = l - sig->mpioff;
+      sig->sigdata = solv_malloc(2 + csl + ml);
+      sig->sigdatal = 2 + csl + ml;
+      sig->sigdata[0] = p[0] == 3 ? p[15] : p[2];
+      sig->sigdata[1] = p[0] == 3 ? p[16] : p[3];
+      memcpy(sig->sigdata + 2, cs, csl);
+      memcpy(sig->sigdata + 2 + csl, p + sig->mpioff, ml);
+    }
+}
+
+static void
+parsesigpacket(struct pgpsig *sig, unsigned char *p, int l)
 {
   sig->type = -1;
   if (p[0] == 3)
     {
-      Id htype = 0;
       /* printf("V3 signature packet\n"); */
       if (l <= 19 || p[1] != 5)
-	return;
-      if (p[2] != 0x10 && p[2] != 0x11 && p[2] != 0x12 && p[2] != 0x13 && p[2] != 0x1f)
 	return;
       sig->type = p[2];
       sig->haveissuer = 1;
       memcpy(sig->issuer, p + 7, 8);
       sig->created = p[3] << 24 | p[4] << 16 | p[5] << 8 | p[6];
-      htype = pgphashalgo2type(p[16]);
-      if (htype && pubkey)
-	{
-	  void *h = solv_chksum_create(htype);
-	  const unsigned char *cs;
-	  unsigned char b[3];
-	  int csl;
-
-	  if ((p[2] >= 0x10 && p[2] <= 0x13) || p[2] == 0x1f || p[2] == 0x18 || p[2] == 0x20 || p[2] == 0x28)
-	    {
-	      b[0] = 0x99;
-	      b[1] = pubkeyl >> 8;
-	      b[2] = pubkeyl;
-	      solv_chksum_add(h, b, 3);
-	      solv_chksum_add(h, pubkey, pubkeyl);
-	    }
-	  if (p[2] >= 0x10 && p[2] <= 0x13)
-	    solv_chksum_add(h, userid, useridl);
-	  solv_chksum_add(h, p + 2, 5);
-	  cs = solv_chksum_get(h, &csl);
-	  if (cs[0] == p[17] && cs[1] == p[18])
-	    {
-	      sig->sigdata = solv_malloc(2 + csl + l - 19);
-	      sig->sigdatal = 2 + csl + l - 19;
-	      sig->sigdata[0] = p[15];
-	      sig->sigdata[1] = p[16];
-	      memcpy(sig->sigdata + 2, cs, csl);
-	      memcpy(sig->sigdata + 2 + csl, p + 19, l - 19);
-	    }
-	  solv_chksum_free(h, 0);
-	}
+      sig->hashalgo = p[16];
+      sig->mpioff = 19;
     }
   else if (p[0] == 4)
     {
       int j, ql, x;
       unsigned char *q;
-      Id htype = 0;
 
       /* printf("V4 signature packet\n"); */
       if (l < 6)
 	return;
-      if (p[1] != 0x10 && p[1] != 0x11 && p[1] != 0x12 && p[1] != 0x13 && p[1] != 0x1f)
-	return;
       sig->type = p[1];
+      sig->hashalgo = p[3];
       q = p + 4;
       sig->keyexpires = -1;
       for (j = 0; q && j < 2; j++)
@@ -336,61 +365,69 @@ parsesigpacket(struct gpgsig *sig, unsigned char *p, int l, unsigned char *pubke
 	      ql -= sl;
 	    }
 	}
-      htype = pgphashalgo2type(p[3]);
-      if (sig->haveissuer && htype && pubkey && q && q - p + 2 < l)
-	{
-	  void *h = solv_chksum_create(htype);
-	  unsigned char b[6];
-	  const unsigned char *cs;
-	  unsigned int hl;
-	  int csl, ml = l - (q - p + 2);
-
-	  if ((p[1] >= 0x10 && p[1] <= 0x13) || p[1] == 0x1f || p[1] == 0x18 || p[1] == 0x20 || p[1] == 0x28)
-	    {
-	      b[0] = 0x99;
-	      b[1] = pubkeyl >> 8;
-	      b[2] = pubkeyl;
-	      solv_chksum_add(h, b, 3);
-	      solv_chksum_add(h, pubkey, pubkeyl);
-	    }
-	  if (p[1] >= 0x10 && p[1] <= 0x13)
-	    {
-	      b[0] = 0xb4;
-	      b[1] = useridl >> 24;
-	      b[2] = useridl >> 16;
-	      b[3] = useridl >> 8;
-	      b[4] = useridl;
-	      solv_chksum_add(h, b, 5);
-	      solv_chksum_add(h, userid, useridl);
-	    }
-	  hl = 6 + (p[4] << 8 | p[5]);
-	  solv_chksum_add(h, p, hl);
-	  b[0] = 4;
-	  b[1] = 0xff;
-	  b[2] = hl >> 24;
-	  b[3] = hl >> 16;
-	  b[4] = hl >> 8;
-	  b[5] = hl;
-	  solv_chksum_add(h, b, 6);
-	  cs = solv_chksum_get(h, &csl);
-	  if (cs[0] == q[0] && cs[1] == q[1])
-	    {
-	      sig->sigdata = solv_malloc(2 + csl + ml);
-	      sig->sigdatal = 2 + csl + ml;
-	      sig->sigdata[0] = p[2];
-	      sig->sigdata[1] = p[3];
-	      memcpy(sig->sigdata + 2, cs, csl);
-	      memcpy(sig->sigdata + 2 + csl, q + 2, ml);
-	    }
-	  solv_chksum_free(h, 0);
-	}
+      if (q && q - p + 2 < l)
+	sig->mpioff = q - p + 2;
     }
 }
+
+static int
+parsepkgheader(unsigned char *p, int pl, int *tagp, int *pktlp)
+{
+  unsigned char *op = p;
+  int x, l;
+
+  if (!pl)
+    return 0;
+  x = *p++;
+  pl--;
+  if (!(x & 128) || pl <= 0)
+    return 0;
+  if ((x & 64) == 0)
+    {
+      *tagp = (x & 0x3c) >> 2;		/* old format */
+      x = 1 << (x & 3);
+      if (x > 4 || pl < x || (x == 4 && p[0]))
+	return 0;
+      pl -= x;
+      for (l = 0; x--;)
+	l = l << 8 | *p++;
+    }
+  else
+    {
+      *tagp = (x & 0x3f);		/* new format */
+      x = *p++;
+      pl--;
+      if (x < 192)
+	l = x;
+      else if (x >= 192 && x < 224)
+	{
+	  if (pl <= 0)
+	    return 0;
+	  l = ((x - 192) << 8) + *p++ + 192;
+	  pl--;
+	}
+      else if (x == 255)
+	{
+	  if (pl <= 4 || p[0] != 0)	/* sanity: p[0] must be zero */
+	    return 0;
+	  l = p[1] << 16 | p[2] << 8 | p[3];
+	  p += 4;
+	  pl -= 4;
+	}
+      else
+	return 0;
+    }
+  if (l > pl)
+    return 0;
+  *pktlp = l;
+  return p - op;
+}
+
 
 static void
 parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 {
-  int x, tag, l;
+  int tag, l;
   unsigned char keyid[8];
   unsigned int kcr = 0, maxex = 0, maxsigcr = 0;
   unsigned char *pubkey = 0;
@@ -402,56 +439,11 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 
   for (; pl; p += l, pl -= l)
     {
-      x = *p++;
-      pl--;
-      if (!(x & 128) || pl <= 0)
-	return;
-      if ((x & 64) == 0)
-	{
-	  /* old format */
-	  tag = (x & 0x3c) >> 2;
-	  x &= 3;
-	  if (x == 3)
-	    return;
-	  l = 1 << x;
-	  if (pl < l)
-	    return;
-	  x = 0;
-	  while (l--)
-	    {
-	      x = x << 8 | *p++;
-	      pl--;
-	    }
-	  l = x;
-	}
-      else
-	{
-	  tag = (x & 0x3f);
-	  x = *p++;
-	  pl--;
-	  if (x < 192)
-	    l = x;
-	  else if (x >= 192 && x < 224)
-	    {
-	      if (pl <= 0)
-		return;
-	      l = ((x - 192) << 8) + *p++ + 192;
-	      pl--;
-	    }
-	  else if (x == 255)
-	    {
-	      /* sanity: p[0] must be zero */
-	      if (pl <= 4 || p[0] != 0)
-		return;
-	      l = p[1] << 16 | p[2] << 8 | p[3];
-	      p += 4;
-	      pl -= 4;
-	    }
-	  else
-	    return;
-	}
-      if (pl < l)
-	return;
+      int hl = parsepkgheader(p, pl, &tag, &l);
+      if (!hl)
+	break;
+      p += hl;
+      pl -= hl;
       if (tag == 6)
 	{
 	  if (pubkey)
@@ -526,15 +518,22 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	}
       if (tag == 2)
 	{
-	  struct gpgsig sig;
+	  struct pgpsig sig;
+	  Id htype;
 	  if (!pubdata)
 	    continue;
 	  memset(&sig, 0, sizeof(sig));
-	  parsesigpacket(&sig, p, l, pubkey, pubkeyl, userid, useridl);
+	  parsesigpacket(&sig, p, l);
 	  if (!sig.haveissuer || !((sig.type >= 0x10 && sig.type <= 0x13) || sig.type == 0x1f))
+	    continue;
+	  if (sig.type >= 0x10 && sig.type <= 0x13 && !userid)
+	    continue;
+	  htype = pgphashalgo2type(sig.hashalgo);
+	  if (htype && sig.mpioff)
 	    {
-	      solv_free(sig.sigdata);
-	      continue;
+	      void *h = solv_chksum_create(htype);
+	      createsigdata(&sig, p, l, pubkey, pubkeyl, userid, useridl, h);
+	      solv_chksum_free(h, 0);
 	    }
 	  if (!memcmp(keyid, sig.issuer, 8))
 	    {
@@ -761,25 +760,14 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
 
 #endif
 
-Id
-repo_add_pubkey(Repo *repo, const char *key, int flags)
+static char *
+solv_slurp(FILE *fp, int *lenp)
 {
-  Pool *pool = repo->pool;
-  Repodata *data;
-  Solvable *s;
-  char *buf;
-  int bufl, l, ll;
-  FILE *fp;
+  int l, ll;
+  char *buf = 0;
+  int bufl = 0;
 
-  data = repo_add_repodata(repo, flags);
-  buf = 0;
-  bufl = 0;
-  if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, key) : key, "r")) == 0)
-    {
-      pool_error(pool, -1, "%s: %s", key, strerror(errno));
-      return 0;
-    }
-  for (l = 0; ;)
+  for (l = 0; ; l += ll)
     {
       if (bufl - l < 4096)
 	{
@@ -789,15 +777,43 @@ repo_add_pubkey(Repo *repo, const char *key, int flags)
       ll = fread(buf + l, 1, bufl - l, fp);
       if (ll < 0)
 	{
-	  fclose(fp);
-	  pool_error(pool, -1, "%s: %s", key, strerror(errno));
-	  return 0;
+	  buf = solv_free(buf);
+	  l = 0;
+	  break;
 	}
       if (ll == 0)
-	break;
-      l += ll;
+	{
+	  buf[l] = 0;	/* always zero-terminate */
+	  break;
+	}
     }
-  buf[l] = 0;
+  if (lenp)
+    *lenp = l;
+  return buf;
+}
+
+Id
+repo_add_pubkey(Repo *repo, const char *key, int flags)
+{
+  Pool *pool = repo->pool;
+  Repodata *data;
+  Solvable *s;
+  char *buf;
+  FILE *fp;
+
+  data = repo_add_repodata(repo, flags);
+  buf = 0;
+  if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, key) : key, "r")) == 0)
+    {
+      pool_error(pool, -1, "%s: %s", key, strerror(errno));
+      return 0;
+    }
+  if ((buf = solv_slurp(fp, 0)) == 0)
+    {
+      pool_error(pool, -1, "%s: %s", key, strerror(errno));
+      fclose(fp);
+      return 0;
+    }
   fclose(fp);
   s = pool_id2solvable(pool, repo_add_solvable(repo));
   if (!pubkey2solvable(s, data, buf))
@@ -811,4 +827,89 @@ repo_add_pubkey(Repo *repo, const char *key, int flags)
     repodata_internalize(data);
   return s - pool->solvables;
 }
+
+static int
+is_sig_packet(unsigned char *sig, int sigl)
+{
+  if (!sigl)
+    return 0;
+  if ((sig[0] & 0x80) == 0 || (sig[0] & 0x40 ? sig[0] & 0x3f : sig[0] >> 2 & 0x0f) != 2)
+    return 0;
+  return 1;
+}
+
+Id
+solv_parse_sig(FILE *fp, unsigned char **sigpkgp, int *sigpkglp, char *keyidstr)
+{
+  unsigned char *sig;
+  int sigl, hl, tag, pktl;
+  struct pgpsig pgpsig;
+  Id htype;
+
+  if ((sig = (unsigned char *)solv_slurp(fp, &sigl)) == 0)
+    return 0;
+  if (!is_sig_packet(sig, sigl))
+    {
+      /* not a raw sig, check armored */
+      unsigned char *nsig;
+      nsig = unarmor((char *)sig, &sigl, "-----BEGIN PGP SIGNATURE-----", "-----END PGP SIGNATURE-----");
+      solv_free(sig);
+      if (!nsig)
+	return 0;
+      sig = nsig;
+      if (!is_sig_packet(sig, sigl))
+	{
+	  solv_free(sig);
+	  return 0;
+	}
+    }
+  hl = parsepkgheader(sig, sigl, &tag, &pktl);
+  if (!hl || tag != 2)
+    {
+      solv_free(sig);
+      return 0;
+    }
+  memset(&pgpsig, 0, sizeof(pgpsig));
+  parsesigpacket(&pgpsig, sig + hl, pktl);
+  htype = pgphashalgo2type(pgpsig.hashalgo);
+  if (pgpsig.type != 0 || !htype)
+    {
+      solv_free(sig);
+      return 0;
+    }
+  if (sigpkgp)
+    {
+      *sigpkgp = sig + hl;
+      *sigpkglp = pktl;
+    }
+  else
+    solv_free(sig);
+  if (keyidstr)
+    solv_bin2hex(pgpsig.issuer, 8, keyidstr);
+  return htype;
+}
+
+#ifdef ENABLE_PGPVRFY
+int
+solv_verify_sig(const unsigned char *pubdata, int pubdatal, unsigned char *sigpkg, int sigpkgl, void *chk)
+{
+  struct pgpsig pgpsig;
+  int res;
+  Id htype;
+
+  memset(&pgpsig, 0, sizeof(pgpsig));
+  parsesigpacket(&pgpsig, sigpkg, sigpkgl);
+  if (pgpsig.type != 0)
+    return 0;
+  htype = pgphashalgo2type(pgpsig.hashalgo);
+  if (htype != solv_chksum_get_type(chk))
+     return 0;	/* wrong hash type? */
+  createsigdata(&pgpsig, sigpkg, sigpkgl, 0, 0, 0, 0, chk);
+  if (!pgpsig.sigdata)
+    return 0;
+  res = solv_pgpvrfy(pubdata, pubdatal, pgpsig.sigdata, pgpsig.sigdatal);
+  solv_free(pgpsig.sigdata);
+  return res;
+}
+#endif
 

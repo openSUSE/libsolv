@@ -41,6 +41,8 @@ SOLV_1.0 {
 		rpm_query_num;
 		rpm_state_create;
 		rpm_state_free;
+		solv_parse_sig;
+		solv_verify_sig;
 		solv_xfopen;
 		solv_xfopen_buf;
 		solv_xfopen_fd;
