@@ -197,6 +197,18 @@ struct gpgsig {
   int sigdatal;
 };
 
+static Id
+pgphashalgo2type(int algo)
+{
+  if (algo == 1)
+    return REPOKEY_TYPE_MD5;
+  if (algo == 2)
+    return REPOKEY_TYPE_SHA1;
+  if (algo == 8)
+    return REPOKEY_TYPE_SHA256;
+  return 0;
+}
+
 static void
 parsesigpacket(struct gpgsig *sig, unsigned char *p, int l, unsigned char *pubkey, int pubkeyl, unsigned char *userid, int useridl)
 {
@@ -213,12 +225,7 @@ parsesigpacket(struct gpgsig *sig, unsigned char *p, int l, unsigned char *pubke
       sig->haveissuer = 1;
       memcpy(sig->issuer, p + 7, 8);
       sig->created = p[3] << 24 | p[4] << 16 | p[5] << 8 | p[6];
-      if (p[16] == 1)
-	htype = REPOKEY_TYPE_MD5;
-      else if (p[16] == 2)
-	htype = REPOKEY_TYPE_SHA1;
-      else if (p[16] == 8)
-	htype = REPOKEY_TYPE_SHA256;
+      htype = pgphashalgo2type(p[16]);
       if (htype && pubkey)
 	{
 	  void *h = solv_chksum_create(htype);
@@ -329,12 +336,7 @@ parsesigpacket(struct gpgsig *sig, unsigned char *p, int l, unsigned char *pubke
 	      ql -= sl;
 	    }
 	}
-      if (p[3] == 1)
-	htype = REPOKEY_TYPE_MD5;
-      else if (p[3] == 2)
-	htype = REPOKEY_TYPE_SHA1;
-      else if (p[3] == 8)
-	htype = REPOKEY_TYPE_SHA256;
+      htype = pgphashalgo2type(p[3]);
       if (sig->haveissuer && htype && pubkey && q && q - p + 2 < l)
 	{
 	  void *h = solv_chksum_create(htype);
