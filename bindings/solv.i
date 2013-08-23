@@ -380,7 +380,7 @@ SWIG_AsValDepId(void *obj, int *val) {
 
 %include "typemaps.i"
 
-%typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp, int res = SWIG_TMPOBJ) {
+%typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp) {
   $1 = &temp;
 }
 %typemap(argout,noblock=1) XRule **OUTPUT {
