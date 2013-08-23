@@ -221,7 +221,7 @@ createsigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey
   const unsigned char *cs;
   int csl;
 
-  if (!sig->mpioff || l <= sig->mpioff)
+  if (sig->mpioff < 2 || l <= sig->mpioff)
     return;
   if ((type >= 0x10 && type <= 0x13) || type == 0x1f || type == 0x18 || type == 0x20 || type == 0x28)
     {
@@ -272,6 +272,37 @@ createsigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey
     }
 }
 
+static inline int
+parsesubpkglength(unsigned char *q, int ql, int *pktlp)
+{
+  int x, sl, hl;
+  /* decode sub-packet length, ql must be > 0 */
+  x = *q++;
+  if (x < 192)
+    {
+      sl = x;
+      hl = 1;
+    }
+  else if (x == 255)
+    {
+      if (ql < 5 || q[0] != 0)
+	return 0;
+      sl = q[1] << 16 | q[2] << 8 | q[3];
+      hl = 5;
+    }
+  else
+    {
+      if (ql < 2)
+	return 0;
+      sl = ((x - 192) << 8) + q[0] + 192;
+      hl = 2;
+    }
+  if (!sl || ql < sl + hl)	/* sub pkg tag is included in length, i.e. sl must not be zero */
+    return 0;
+  *pktlp = sl;
+  return hl;
+}
+
 static void
 parsesigpacket(struct pgpsig *sig, unsigned char *p, int l)
 {
@@ -314,41 +345,18 @@ parsesigpacket(struct pgpsig *sig, unsigned char *p, int l)
 	      q = 0;
 	      break;
 	    }
-	  while (ql)
+	  while (ql > 0)
 	    {
-	      int sl;
-	      /* decode sub-packet length */
-	      x = *q++;
-	      ql--;
-	      if (x < 192)
-		sl = x;
-	      else if (x == 255)
-		{
-		  if (ql < 4 || q[0] != 0)
-		    {
-		      q = 0;
-		      break;
-		    }
-		  sl = q[1] << 16 | q[2] << 8 | q[3];
-		  q += 4;
-		  ql -= 4;
-		}
-	      else
-		{
-		  if (ql < 1)
-		    {
-		      q = 0;
-		      break;
-		    }
-		  sl = ((x - 192) << 8) + *q++ + 192;
-		  ql--;
-		}
-	      if (ql < sl)
+	      int sl, hl;
+	      hl = parsesubpkglength(q, ql, &sl);
+	      if (!hl)
 		{
 		  q = 0;
 		  break;
 		}
-	      x = q[0] & 127;
+	      q += hl;
+	      ql -= hl;
+	      x = q[0] & 127;	/* strip critical bit */
 	      /* printf("%d SIGSUB %d %d\n", j, x, sl); */
 	      if (x == 16 && sl == 9 && !sig->haveissuer)
 		{
