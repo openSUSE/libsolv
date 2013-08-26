@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 void *solv_chksum_create(Id type);
+void *solv_chksum_create_clone(void *handle);
 void *solv_chksum_create_from_bin(Id type, const unsigned char *buf);
 void solv_chksum_add(void *handle, const void *data, int len);
 Id solv_chksum_get_type(void *handle);

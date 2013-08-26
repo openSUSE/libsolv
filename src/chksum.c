@@ -54,6 +54,17 @@ solv_chksum_create(Id type)
   return 0;
 }
 
+void *
+solv_chksum_create_clone(void *handle)
+{
+  struct ctxhandle *h;
+  if (!handle)
+    return 0;
+  h = solv_calloc(1, sizeof(*h));
+  *h = *(struct ctxhandle *)handle;
+  return h;
+}
+
 int
 solv_chksum_len(Id type)
 {
