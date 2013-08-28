@@ -973,7 +973,7 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   lseek(fileno(fp), 0, SEEK_SET);
   possigfp = lseek(fileno(sigfp), 0, SEEK_CUR);
   lseek(fileno(sigfp), 0, SEEK_SET);
-  snprintf(cmd, sizeof(cmd), "gpg -q --homedir %s --verify /dev/fd/%d /dev/fd/%d >/dev/null 2>&1", gpgdir, fileno(sigfp), fileno(fp));
+  snprintf(cmd, sizeof(cmd), "gpgv -q --homedir %s --keyring %s/pubring.gpg /dev/fd/%d /dev/fd/%d >/dev/null 2>&1", gpgdir, gpgdir, fileno(sigfp), fileno(fp));
   fcntl(fileno(fp), F_SETFD, 0);	/* clear CLOEXEC */
   fcntl(fileno(sigfp), F_SETFD, 0);	/* clear CLOEXEC */
   r = system(cmd);
