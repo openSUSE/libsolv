@@ -162,7 +162,7 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
       Id id = selection->elements[i + 1];
       if (select == SOLVER_SOLVABLE || select == SOLVER_SOLVABLE_ONE_OF)
 	{
-	  /* done by selection_addsrc */
+	  /* done by selection_addsrc, currently implies SELECTION_NAME */
 	  Queue q;
 	  Id p, pp;
 	  Id rel = 0, relname = 0;
@@ -224,6 +224,67 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
         }
     }
   selection_prune(pool, selection);
+}
+
+static void
+selection_filter_installed(Pool *pool, Queue *selection)
+{
+  Queue q;
+  int i, j;
+
+  if (!pool->installed)
+    queue_empty(selection);
+  queue_init(&q);
+  for (i = j = 0; i < selection->count; i += 2)
+    {
+      Id select = selection->elements[i] & SOLVER_SELECTMASK;
+      Id id = selection->elements[i + 1];
+      if (select == SOLVER_SOLVABLE_ALL)
+	{
+	  select = SOLVER_SOLVABLE_REPO;
+	  id = pool->installed->repoid;
+	}
+      else if (select == SOLVER_SOLVABLE_REPO)
+	{
+	  if (id != pool->installed->repoid)
+	    select = 0;
+	}
+      else
+	{
+	  int bad = 0;
+	  Id p, pp;
+	  queue_empty(&q);
+	  FOR_JOB_SELECT(p, pp, select, id)
+	    {
+	      if (pool->solvables[p].repo != pool->installed)
+		bad = 1;
+	      else
+		queue_push(&q, p);
+	    }
+	  if (bad || !q.count)
+	    {
+	      if (!q.count)
+		select = 0;
+	      else if (q.count == 1)
+		{
+		  select = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
+		  id = q.elements[0];
+		}
+	      else
+		{
+		  select = SOLVER_SOLVABLE_ONE_OF;
+	          id = pool_queuetowhatprovides(pool, &q);
+		}
+	    }
+	}
+      if (select)
+	{
+	  selection->elements[j++] = select | (selection->elements[i] & ~SOLVER_SELECTMASK);
+	  selection->elements[j++] = id;
+	}
+    }
+  queue_truncate(selection, j);
+  queue_free(&q);
 }
 
 static void
@@ -769,6 +830,8 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
     ret = selection_depglob_arch(pool, selection, name, flags);
   if (!ret && (flags & SELECTION_CANON) != 0)
     ret = selection_canon(pool, selection, name, flags);
+  if (selection->count && (flags & SELECTION_INSTALLED_ONLY) != 0)
+    selection_filter_installed(pool, selection);
   if (ret && !selection->count)
     ret = 0;	/* no match -> always return zero */
   if (ret && (flags & SELECTION_FLAT) != 0)
