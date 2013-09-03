@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Sep  3 16:24:45 CEST 2013 - mls@suse.de
+
+- fix pattern obsoleting real packages [bnc#834376]
+
+-------------------------------------------------------------------
 Thu Jul 11 11:03:41 CEST 2013 - mls@suse.de
 
 - fix multiversion handling in dup mode [bnc#828389]
