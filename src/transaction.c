@@ -267,7 +267,7 @@ transaction_type(Transaction *trans, Id p, int mode)
       if (s->repo == pool->installed)
 	{
 	  /* check if we're obsoleted by pseudos only */
-	  if (obsoleted_by_pseudos_only(trans, pool->solvables - s))
+	  if (obsoleted_by_pseudos_only(trans, s - pool->solvables))
 	    return SOLVER_TRANSACTION_ERASE;
 	  return SOLVER_TRANSACTION_IGNORE;	/* ignore as we're being obsoleted */
 	}
