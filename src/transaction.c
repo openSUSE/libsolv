@@ -212,12 +212,12 @@ obsoleted_by_pseudos_only(Transaction *trans, Id p)
     return 0;
   queue_init(&q);
   transaction_all_obs_pkgs(trans, p, &q);
-  if (!q.count)
-    return 0;
   for (i = 0; i < q.count; i++)
     if (!is_pseudo_package(pool, pool->solvables + q.elements[i]))
-      return 0;
-  return 1;
+      break;
+  i = !q.count || i < q.count ? 0 : 1;
+  queue_free(&q);
+  return i;
 }
 
 /*
