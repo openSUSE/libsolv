@@ -199,6 +199,38 @@ transaction_base_type(Transaction *trans, Id p)
     }
 }
 
+static inline int
+is_pseudo_package(Pool *pool, Solvable *s)
+{
+  const char *n = pool_id2str(pool, s->name);
+  if (!strncmp(n, "patch:", 6))
+    return 1;
+  if (!strncmp(n, "pattern:", 8))
+    return 1;
+  return 0;
+}
+
+static int
+obsoleted_by_pseudos_only(Transaction *trans, Id p)
+{
+  Pool *pool = trans->pool;
+  Queue q;
+  Id op;
+  int i;
+
+  op = transaction_obs_pkg(trans, p);
+  if (op && !is_pseudo_package(pool, pool->solvables + op))
+    return 0;
+  queue_init(&q);
+  transaction_all_obs_pkgs(trans, p, &q);
+  if (!q.count)
+    return 0;
+  for (i = 0; i < q.count; i++)
+    if (!is_pseudo_package(pool, pool->solvables + q.elements[i]))
+      return 0;
+  return 1;
+}
+
 /*
  * return type of transaction element
  *
@@ -219,14 +251,8 @@ transaction_type(Transaction *trans, Id p, int mode)
     return SOLVER_TRANSACTION_IGNORE;
 
   /* XXX: SUSE only? */
-  if (!(mode & SOLVER_TRANSACTION_KEEP_PSEUDO))
-    {
-      const char *n = pool_id2str(pool, s->name);
-      if (!strncmp(n, "patch:", 6))
-	return SOLVER_TRANSACTION_IGNORE;
-      if (!strncmp(n, "pattern:", 8))
-	return SOLVER_TRANSACTION_IGNORE;
-    }
+  if (!(mode & SOLVER_TRANSACTION_KEEP_PSEUDO) && is_pseudo_package(pool, s))
+    return SOLVER_TRANSACTION_IGNORE;
 
   type = transaction_base_type(trans, p);
 
@@ -239,7 +265,12 @@ transaction_type(Transaction *trans, Id p, int mode)
       if (type == SOLVER_TRANSACTION_ERASE || type == SOLVER_TRANSACTION_INSTALL || type == SOLVER_TRANSACTION_MULTIINSTALL)
 	return type;
       if (s->repo == pool->installed)
-	return SOLVER_TRANSACTION_IGNORE;	/* ignore as we're being obsoleted */
+	{
+	  /* check if we're obsoleted by pseudos only */
+	  if (obsoleted_by_pseudos_only(trans, pool->solvables - s))
+	    return SOLVER_TRANSACTION_ERASE;
+	  return SOLVER_TRANSACTION_IGNORE;	/* ignore as we're being obsoleted */
+	}
       if (type == SOLVER_TRANSACTION_MULTIREINSTALL)
 	return SOLVER_TRANSACTION_MULTIINSTALL;
       return SOLVER_TRANSACTION_INSTALL;
