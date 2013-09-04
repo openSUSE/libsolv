@@ -1065,6 +1065,25 @@ pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr)
     }
 }
 
+/* intersect dependencies in keyname with dep, return list of matching packages */
+void
+pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q)
+{
+  Id p;
+
+  queue_empty(q);
+  FOR_POOL_SOLVABLES(p)
+    {
+      Solvable *s = pool->solvables + p;
+      if (s->repo->disabled)
+	continue;
+      if (s->repo != pool->installed && !pool_installable(pool, s))
+	continue;
+      if (solvable_matchesdep(s, keyname, dep))
+	queue_push(q, p);
+    }
+}
+
 /*************************************************************************/
 
 void

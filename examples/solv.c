@@ -2598,6 +2598,7 @@ main(int argc, char **argv)
   int cleandeps = 0;
   int forcebest = 0;
   char *rootdir = 0;
+  char *keyname = 0;
 
   argc--;
   argv++;
@@ -2669,7 +2670,6 @@ main(int argc, char **argv)
 	  argc -= 2;
 	  argv += 2;
 	}
-
       else if (argc > 1 && !strcmp(argv[1], "--clean"))
 	{
 	  cleandeps = 1;
@@ -2681,6 +2681,12 @@ main(int argc, char **argv)
 	  forcebest = 1;
 	  argc--;
 	  argv++;
+	}
+      if (argc > 2 && !strcmp(argv[1], "--keyname"))
+	{
+	  keyname = argv[2];
+	  argc -= 2;
+	  argv += 2;
 	}
       else
 	break;
@@ -2851,6 +2857,8 @@ main(int argc, char **argv)
 #endif
   pool_createwhatprovides(pool);
 
+  if (keyname)
+    keyname = solv_dupjoin("solvable:", keyname, 0);
   queue_init(&job);
   for (i = 1; i < argc; i++)
     {
@@ -2869,13 +2877,19 @@ main(int argc, char **argv)
 	flags |= SELECTION_WITH_SOURCE;
       if (argv[i][0] == '/')
 	flags |= SELECTION_FILELIST | (mode == MODE_ERASE ? SELECTION_INSTALLED_ONLY : 0);
-      rflags = selection_make(pool, &job2, argv[i], flags);
+      if (!keyname)
+        rflags = selection_make(pool, &job2, argv[i], flags);
+      else
+        rflags = selection_make_deps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1));
       if (repofilter.count)
 	selection_filter(pool, &job2, &repofilter);
       if (!job2.count)
 	{
 	  flags |= SELECTION_NOCASE;
-          rflags = selection_make(pool, &job2, argv[i], flags);
+	  if (!keyname)
+            rflags = selection_make(pool, &job2, argv[i], flags);
+	  else
+	    rflags = selection_make_deps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1));
 	  if (repofilter.count)
 	    selection_filter(pool, &job2, &repofilter);
 	  if (job2.count)
@@ -2894,6 +2908,7 @@ main(int argc, char **argv)
 	queue_push(&job, job2.elements[j]);
       queue_free(&job2);
     }
+  keyname = solv_free(keyname);
 
   if (!job.count && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE || mainmode == MODE_VERIFY || repofilter.count))
     {

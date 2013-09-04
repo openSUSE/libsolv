@@ -329,6 +329,8 @@ static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
   return pool->whatprovidesdata + off;
 }
 
+void pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q);
+
 /* search the pool. the following filters are available:
  *   p     - search just this solvable
  *   key   - search only this key

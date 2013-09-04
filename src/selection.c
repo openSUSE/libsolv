@@ -573,6 +573,39 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
   return SELECTION_FILELIST;
 }
 
+static char *
+splitrel(char *rname, char *r, int *rflagsp)
+{
+  int nend = r - rname;
+  int rflags = 0;
+  if (nend && *r == '=' && r[-1] == '!') 
+    {
+      nend--;
+      r++;
+      rflags = REL_LT|REL_GT;
+    }
+  for (; *r; r++) 
+    {
+      if (*r == '<') 
+	rflags |= REL_LT;
+      else if (*r == '=') 
+	rflags |= REL_EQ;
+      else if (*r == '>') 
+	rflags |= REL_GT;
+      else
+	break;
+    }
+  while (*r && (*r == ' ' || *r == '\t'))
+    r++;
+  while (nend && (rname[nend - 1] == ' ' || rname[nend - 1] == '\t'))
+    nend--;
+  if (!*rname || !*r) 
+    return 0;
+  *rflagsp = rflags;
+  rname[nend] = 0; 
+  return r;
+}
+
 static int
 selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
 {
@@ -586,34 +619,11 @@ selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
   rname = solv_strdup(name);
   if ((r = strpbrk(rname, "<=>")) != 0)
     {
-      int nend = r - rname;
-      if (nend && *r == '=' && r[-1] == '!')
+      if ((r = splitrel(rname, r, &rflags)) == 0)
 	{
-	  nend--;
-	  r++;
-	  rflags = REL_LT|REL_GT;
-	}
-      for (; *r; r++)
-        {
-          if (*r == '<')
-            rflags |= REL_LT;
-          else if (*r == '=')
-            rflags |= REL_EQ;
-          else if (*r == '>')
-            rflags |= REL_GT;
-          else
-            break;
-        }
-      while (*r && (*r == ' ' || *r == '\t'))
-        r++;
-      while (nend && (rname[nend - 1] == ' ' || rname[nend -1 ] == '\t'))
-        nend--;
-      if (!*rname || !*r)
-        {
 	  solv_free(rname);
 	  return 0;
-        }
-      rname[nend] = 0;
+	}
     }
   if ((ret = selection_depglob_arch(pool, selection, rname, flags)) != 0)
     {
@@ -837,6 +847,104 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
   if (ret && (flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
   return ret;
+}
+
+static int
+matchdep(Pool *pool, Id id, char *rname, int rflags, char *revr, int flags)
+{
+  if (ISRELDEP(id))
+    {
+      Reldep *rd = GETRELDEP(pool, id);
+      if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_WITH)
+	{
+	  if (matchdep(pool, rd->name, rname, rflags, revr, flags))
+	    return 1;
+	  if (matchdep(pool, rd->evr, rname, rflags, revr, flags))
+	    return 1;
+	  return 0;
+	}
+      if (rd->flags == REL_ARCH)
+	return matchdep(pool, rd->name, rname, rflags, revr, flags);
+      if (!matchdep(pool, rd->name, rname, rflags, revr, flags))
+	return 0;
+      if (rflags)
+	{
+	  /* XXX: need pool_match_flags_evr here */
+	  if (!pool_match_dep(pool, pool_rel2id(pool, rd->name, pool_str2id(pool, revr, 1), rflags, 1), id))
+	    return 0;
+	}
+      return 1;
+    }
+  if (flags & SELECTION_GLOB)
+    {
+      int globflags = (flags & SELECTION_NOCASE) != 0 ? FNM_CASEFOLD : 0;
+      return fnmatch(rname, pool_id2str(pool, id), globflags) == 0 ? 1 : 0;
+    }
+  if (flags & SELECTION_NOCASE)
+    return strcasecmp(rname, pool_id2str(pool, id)) == 0 ? 1 : 0;
+  return strcmp(rname, pool_id2str(pool, id)) == 0 ? 1 : 0;
+}
+
+/*
+ *  select against the dependencies in keyname
+ *  like SELECTION_REL and SELECTION_PROVIDES, but with the
+ *  deps in keyname instead of provides.
+ */
+int
+selection_make_deps(Pool *pool, Queue *selection, const char *name, int flags, int keyname)
+{
+  char *rname, *r;
+  int rflags = 0;
+  Id p;
+  Queue q;
+
+  queue_empty(selection);
+  rname = solv_strdup(name);
+  if ((r = strpbrk(rname, "<=>")) != 0)
+    {
+      if ((r = splitrel(rname, r, &rflags)) == 0)
+	{
+	  solv_free(rname);
+	  return 0;
+	}
+    }
+  if ((flags & SELECTION_GLOB) != 0 && !strpbrk(name, "[*?") != 0)
+    flags &= ~SELECTION_GLOB;
+
+  queue_init(&q);
+  FOR_POOL_SOLVABLES(p)
+    {
+      Solvable *s =  pool->solvables + p;
+      int i;
+
+      if (s->repo != pool->installed && !pool_installable(pool, s))
+	{
+	  if (!(flags & SELECTION_SOURCE_ONLY) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
+	    continue;
+	  if (pool_disabled_solvable(pool, s))
+	    continue;
+	}
+      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+	continue;
+      if ((s->arch == ARCH_SRC || s->arch == ARCH_NOSRC) && !(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
+	continue;
+      queue_empty(&q);
+      repo_lookup_idarray(s->repo, p, keyname, &q);
+      for (i = 0; i < q.count; i++)
+	{
+	  Id id = q.elements[i];
+	  if (matchdep(pool, id, rname, rflags, r, flags))
+	    break;
+	}
+      if (i < q.count)
+	queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, p);
+    }
+  queue_free(&q);
+  if (!selection->count)
+    return 0;
+  if ((flags & SELECTION_FLAT) != 0)
+    selection_flatten(pool, selection);
+  return SELECTION_PROVIDES;
 }
 
 void
