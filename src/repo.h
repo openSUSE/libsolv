@@ -150,6 +150,7 @@ int repo_lookup_void(Repo *repo, Id entry, Id keyname);
 const char *repo_lookup_checksum(Repo *repo, Id entry, Id keyname, Id *typep);
 const unsigned char *repo_lookup_bin_checksum(Repo *repo, Id entry, Id keyname, Id *typep);
 const void *repo_lookup_binary(Repo *repo, Id entry, Id keyname, int *lenp);
+Id solv_depmarker(Id keyname, Id marker);
 
 void repo_set_id(Repo *repo, Id p, Id keyname, Id id);
 void repo_set_num(Repo *repo, Id p, Id keyname, unsigned long long num);

@@ -253,6 +253,7 @@ SOLV_1.0 {
 		solv_chksum_len;
 		solv_chksum_str2type;
 		solv_chksum_type2str;
+		solv_depmarker;
 		solv_dupappend;
 		solv_dupjoin;
 		solv_free;

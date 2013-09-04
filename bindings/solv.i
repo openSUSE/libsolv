@@ -2151,14 +2151,6 @@ rb_eval_string(
     Solvable *s = $self->pool->solvables + $self->id;
     Queue r;
     queue_init(&r);
-    if (marker == -1 || marker == 1) {
-      if (keyname == SOLVABLE_PROVIDES)
-        marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
-      else if (keyname == SOLVABLE_REQUIRES)
-        marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
-      else
-        marker = 0;
-    }
     solvable_lookup_deparray(s, keyname, &r, marker);
     return r;
   }
@@ -2168,14 +2160,6 @@ rb_eval_string(
     Solvable *s = $self->pool->solvables + $self->id;
     Queue r;
     queue_init(&r);
-    if (marker == -1 || marker == 1) {
-      if (keyname == SOLVABLE_PROVIDES)
-        marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
-      else if (keyname == SOLVABLE_REQUIRES)
-        marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
-      else
-        marker = 0;
-    }
     solvable_lookup_deparray(s, keyname, &r, marker);
     return r;
   }
@@ -2290,8 +2274,7 @@ rb_eval_string(
   /* old interface, please use the generic add_deparray instead */
   void add_provides(DepId id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
-    if (marker == -1 || marker == 1)
-      marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
+    marker = solv_depmarker(SOLVABLE_PROVIDES, marker);
     s->provides = repo_addid_dep(s->repo, s->provides, id, marker);
   }
   void add_obsoletes(DepId id) {
@@ -2304,8 +2287,7 @@ rb_eval_string(
   }
   void add_requires(DepId id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
-    if (marker == -1 || marker == 1)
-      marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
+    marker = solv_depmarker(SOLVABLE_REQUIRES, marker);
     s->requires = repo_addid_dep(s->repo, s->requires, id, marker);
   }
   void add_recommends(DepId id) {
@@ -2332,14 +2314,6 @@ rb_eval_string(
 
   void add_deparray(Id keyname, DepId id, Id marker = -1) {
     Solvable *s = $self->pool->solvables + $self->id;
-    if (marker == -1 || marker == 1) {
-      if (keyname == SOLVABLE_PROVIDES)
-        marker = marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
-      else if (keyname == SOLVABLE_REQUIRES)
-        marker = marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
-      else
-        marker = 0;
-    }
     solvable_add_deparray(s, keyname, id, marker);
   }
 

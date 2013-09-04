@@ -590,6 +590,20 @@ repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker)
   return repo_addid(repo, olddeps, id);
 }
 
+/* return standard marker for the keyname dependency.
+ * 1: return positive marker, -1: return negative marker
+ */
+Id
+solv_depmarker(Id keyname, Id marker)
+{
+  if (marker != 1 && marker != -1)
+    return marker;
+  if (keyname == SOLVABLE_PROVIDES)
+    return marker < 0 ? -SOLVABLE_FILEMARKER : SOLVABLE_FILEMARKER;
+  if (keyname == SOLVABLE_REQUIRES)
+    return marker < 0 ? -SOLVABLE_PREREQMARKER : SOLVABLE_PREREQMARKER;
+  return 0;
+}
 
 /*
  * reserve Ids
@@ -598,7 +612,6 @@ repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker)
  *
  * reserved ids will always begin at offset idarraysize
  */
-
 Offset
 repo_reserve_ids(Repo *repo, Offset olddeps, int num)
 {
@@ -1313,7 +1326,11 @@ int
 repo_lookup_deparray(Repo *repo, Id entry, Id keyname, Queue *q, Id marker)
 {
   int r = repo_lookup_idarray(repo, entry, keyname, q);
-  if (r && marker && q->count)
+  if (!r)
+    return 0;
+  if (marker == -1 || marker == 1)
+    marker = solv_depmarker(keyname, marker);
+  if (marker && q->count)
     {
       int i;
       if (marker < 0)
@@ -1598,6 +1615,8 @@ void
 repo_add_deparray(Repo *repo, Id p, Id keyname, Id dep, Id marker)
 {
   Repodata *data;
+  if (marker == -1 || marker == 1)
+    marker = solv_depmarker(keyname, marker);
   if (p >= 0)
     {
       Solvable *s = repo->pool->solvables + p;
@@ -1653,6 +1672,8 @@ void
 repo_set_deparray(Repo *repo, Id p, Id keyname, Queue *q, Id marker)
 {
   Repodata *data;
+  if (marker == -1 || marker == 1)
+    marker = solv_depmarker(keyname, marker);
   if (marker)
     {
       /* complex case, splice old and new arrays */
