@@ -597,7 +597,7 @@ solvid2data(Repodata *data, Id solvid, Id *schemap)
  * data lookup
  */
 
-static inline unsigned char *
+static unsigned char *
 find_key_data(Repodata *data, Id solvid, Id keyname, Repokey **keypp)
 {
   unsigned char *dp;
@@ -620,6 +620,8 @@ find_key_data(Repodata *data, Id solvid, Id keyname, Repokey **keypp)
     return 0;
   if (key->type == REPOKEY_TYPE_VOID || key->type == REPOKEY_TYPE_CONSTANT || key->type == REPOKEY_TYPE_CONSTANTID)
     return dp;	/* no need to forward... */
+  if (key->storage != KEY_STORAGE_INCORE && key->storage != KEY_STORAGE_VERTICAL_OFFSET)
+    return 0;	/* get_data will not work, no need to forward */
   dp = forward_to_key(data, *kp, keyp, dp);
   if (!dp)
     return 0;
@@ -1380,11 +1382,11 @@ dataiterator_free(Dataiterator *di)
     solv_free(di->dupstr);
 }
 
-static inline unsigned char *
+static unsigned char *
 dataiterator_find_keyname(Dataiterator *di, Id keyname)
 {
-  Id *keyp = di->keyp;
-  Repokey *keys = di->data->keys;
+  Id *keyp;
+  Repokey *keys = di->data->keys, *key;
   unsigned char *dp;
 
   for (keyp = di->keyp; *keyp; keyp++)
@@ -1392,6 +1394,11 @@ dataiterator_find_keyname(Dataiterator *di, Id keyname)
       break;
   if (!*keyp)
     return 0;
+  key = keys + *keyp;
+  if (key->type == REPOKEY_TYPE_DELETED)
+    return 0;
+  if (key->storage != KEY_STORAGE_INCORE && key->storage != KEY_STORAGE_VERTICAL_OFFSET)
+    return 0;		/* get_data will not work, no need to forward */
   dp = forward_to_key(di->data, *keyp, di->keyp, di->dp);
   if (!dp)
     return 0;
