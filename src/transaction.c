@@ -629,6 +629,8 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	    {
 	      FOR_PROVIDES(p2, pp2, obs)
 		{
+		  if (!MAPTST(&trans->transactsmap, p2))
+		    continue;
 		  s2 = pool->solvables + p2;
 		  if (s2->repo != installed)
 		    continue;
@@ -2024,6 +2026,8 @@ transaction_add_obsoleted(Transaction *trans)
 	{
 	  p = obsq.elements[k];
 	  assert(p >= installed->start && p < installed->end);
+	  if (!MAPTST(&trans->transactsmap, p))	/* just in case */
+	    continue;
 	  if (MAPTST(&done, p - installed->start))
 	    continue;
 	  MAPSET(&done, p - installed->start);
