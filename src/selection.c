@@ -891,7 +891,7 @@ matchdep(Pool *pool, Id id, char *rname, int rflags, char *revr, int flags)
  *  deps in keyname instead of provides.
  */
 int
-selection_make_deps(Pool *pool, Queue *selection, const char *name, int flags, int keyname)
+selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker)
 {
   char *rname, *r;
   int rflags = 0;
@@ -929,7 +929,7 @@ selection_make_deps(Pool *pool, Queue *selection, const char *name, int flags, i
       if ((s->arch == ARCH_SRC || s->arch == ARCH_NOSRC) && !(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
 	continue;
       queue_empty(&q);
-      repo_lookup_idarray(s->repo, p, keyname, &q);
+      repo_lookup_deparray(s->repo, p, keyname, &q, marker);
       for (i = 0; i < q.count; i++)
 	{
 	  Id id = q.elements[i];

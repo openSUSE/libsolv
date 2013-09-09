@@ -591,6 +591,7 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 #endif
 
 /* check if a package's nevr matches a dependency */
+/* semi-private, called from public pool_match_nevr */
 
 int
 pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
@@ -707,6 +708,13 @@ pool_match_flags_evr_rel_compat(Pool *pool, Reldep *range, int flags, int evr)
 }
 #endif
 
+/* public (i.e. not inlined) version of pool_match_flags_evr */
+int
+pool_intersect_evrs(Pool *pool, int pflags, Id pevr, int flags, int evr)
+{
+  return pool_match_flags_evr(pool, pflags, pevr, flags, evr);
+}
+
 /* match two dependencies (d1 = provider) */
 
 int
@@ -733,7 +741,7 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
   if (!pool_match_dep(pool, rd1->name, rd2->name))
     return 0;
   /* name matches, check flags and evr */
-  return pool_match_flags_evr(pool, rd1->flags, rd1->evr, rd2->flags, rd2->evr);
+  return pool_intersect_evrs(pool, rd1->flags, rd1->evr, rd2->flags, rd2->evr);
 }
 
 Id
@@ -1067,7 +1075,7 @@ pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr)
 
 /* intersect dependencies in keyname with dep, return list of matching packages */
 void
-pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q)
+pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
 {
   Id p;
 
@@ -1079,7 +1087,7 @@ pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q)
 	continue;
       if (s->repo != pool->installed && !pool_installable(pool, s))
 	continue;
-      if (solvable_matchesdep(s, keyname, dep))
+      if (solvable_matchesdep(s, keyname, dep, marker))
 	queue_push(q, p);
     }
 }

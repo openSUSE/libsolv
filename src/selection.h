@@ -34,7 +34,7 @@ extern "C" {
 #define SELECTION_WITH_SOURCE		(1 << 13)
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
-extern int  selection_make_deps(Pool *pool, Queue *selection, const char *name, int flags, int keyname);
+extern int  selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker);
 
 extern void selection_filter(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);

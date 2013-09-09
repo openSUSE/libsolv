@@ -283,8 +283,11 @@ int solvable_is_irrelevant_patch(Solvable *s, Map *installedmap);
 
 void pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
 
-int pool_match_nevr_rel(Pool *pool, Solvable *s, Id d);
+int pool_intersect_evrs(Pool *pool, int pflags, Id pevr, int flags, int evr);
 int pool_match_dep(Pool *pool, Id d1, Id d2);
+
+/* semi private, used in pool_match_nevr */
+int pool_match_nevr_rel(Pool *pool, Solvable *s, Id d);
 
 static inline int pool_match_nevr(Pool *pool, Solvable *s, Id d)
 {
@@ -329,7 +332,7 @@ static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
   return pool->whatprovidesdata + off;
 }
 
-void pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q);
+void pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker);
 
 /* search the pool. the following filters are available:
  *   p     - search just this solvable

@@ -2880,7 +2880,7 @@ main(int argc, char **argv)
       if (!keyname)
         rflags = selection_make(pool, &job2, argv[i], flags);
       else
-        rflags = selection_make_deps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1));
+        rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
       if (repofilter.count)
 	selection_filter(pool, &job2, &repofilter);
       if (!job2.count)
@@ -2889,7 +2889,7 @@ main(int argc, char **argv)
 	  if (!keyname)
             rflags = selection_make(pool, &job2, argv[i], flags);
 	  else
-	    rflags = selection_make_deps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1));
+	    rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
 	  if (repofilter.count)
 	    selection_filter(pool, &job2, &repofilter);
 	  if (job2.count)
@@ -2949,6 +2949,11 @@ main(int argc, char **argv)
 		  str = solvable_lookup_str(s, SOLVABLE_LICENSE);
 		  if (str)
 		    printf("License:     %s\n", str);
+#if 0
+		  str = solvable_lookup_sourcepkg(s);
+		  if (str)
+		    printf("Source:      %s\n", str);
+#endif
 		  printf("Description:\n%s\n", solvable_lookup_str(s, SOLVABLE_DESCRIPTION));
 		  printf("\n");
 		}

@@ -73,6 +73,7 @@ SOLV_1.0 {
 		pool_id2langid;
 		pool_id2rel;
 		pool_id2str;
+		pool_intersect_evrs;
 		pool_isemptyupdatejob;
 		pool_job2solvables;
 		pool_job2str;
@@ -240,7 +241,7 @@ SOLV_1.0 {
 		selection_add;
 		selection_filter;
 		selection_make;
-		selection_make_deps;
+		selection_make_matchdeps;
 		selection_solvables;
 		solv_bin2hex;
 		solv_calloc;

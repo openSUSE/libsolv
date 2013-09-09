@@ -78,7 +78,7 @@ void solvable_unset(Solvable *s, Id keyname);
 
 int solvable_identical(Solvable *s1, Solvable *s2);
 Id solvable_selfprovidedep(Solvable *s); 
-int solvable_matchesdep(Solvable *s, Id keyname, Id dep);
+int solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker);
 
 #ifdef __cplusplus
 }

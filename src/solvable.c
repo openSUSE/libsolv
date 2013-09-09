@@ -859,13 +859,13 @@ solvable_unset(Solvable *s, Id keyname)
 
 /* return true if a dependency intersects dep in the keyname array */
 int
-solvable_matchesdep(Solvable *s, Id keyname, Id dep)
+solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker)
 {
   int i;
   Pool *pool = s->repo->pool;
   Queue q;
   queue_init(&q);
-  solvable_lookup_idarray(s, keyname, &q);
+  solvable_lookup_deparray(s, keyname, &q, marker);
   for (i = 0; i < q.count; i++)
     if (pool_match_dep(pool, q.elements[i], dep))
       break;
