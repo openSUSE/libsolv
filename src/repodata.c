@@ -1284,10 +1284,7 @@ dataiterator_init_clone(Dataiterator *di, Dataiterator *from)
   if (di->dupstr)
     {
       if (di->dupstr == di->kv.str)
-	{
-	  di->dupstr = solv_malloc(di->dupstrn);
-	  memcpy(di->dupstr, from->dupstr, di->dupstrn);
-	}
+        di->dupstr = solv_memdup(di->dupstr, di->dupstrn);
       else
 	{
 	  di->dupstr = 0;
@@ -1828,8 +1825,7 @@ dataiterator_clonepos(Dataiterator *di, Dataiterator *from)
   if (from->dupstr && from->dupstr == from->kv.str)
     {
       di->dupstrn = from->dupstrn;
-      di->dupstr = solv_malloc(from->dupstrn);
-      memcpy(di->dupstr, from->dupstr, di->dupstrn);
+      di->dupstr = solv_memdup(from->dupstr, from->dupstrn);
     }
 }
 

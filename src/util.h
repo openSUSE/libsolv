@@ -90,6 +90,28 @@ static inline void *solv_calloc_block(size_t len, size_t size, size_t block)
   return buf;
 }
 
+static inline void *solv_memdup(void *buf, size_t len)
+{
+  void *newbuf;
+  if (!buf)
+    return 0;
+  newbuf = solv_malloc(len);
+  if (len)
+    memcpy(newbuf, buf, len);
+  return newbuf;
+}
+
+static inline void *solv_memdup2(void *buf, size_t num, size_t len)
+{
+  void *newbuf;
+  if (!buf)
+    return 0;
+  newbuf = solv_malloc2(num, len);
+  if (num)
+    memcpy(newbuf, buf, num * len);
+  return newbuf;
+}
+
 #ifdef __cplusplus
 }
 #endif

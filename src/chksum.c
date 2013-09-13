@@ -57,12 +57,7 @@ solv_chksum_create(Id type)
 void *
 solv_chksum_create_clone(void *handle)
 {
-  struct ctxhandle *h;
-  if (!handle)
-    return 0;
-  h = solv_calloc(1, sizeof(*h));
-  *h = *(struct ctxhandle *)handle;
-  return h;
+  return solv_memdup(handle, sizeof(struct ctxhandle));
 }
 
 int

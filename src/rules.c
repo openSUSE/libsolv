@@ -2777,10 +2777,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	}
     }
   if (r2pkg.count)
-    {
-      solv->bestrules_pkg = solv_calloc(r2pkg.count, sizeof(Id));
-      memcpy(solv->bestrules_pkg, r2pkg.elements, r2pkg.count * sizeof(Id));
-    }
+    solv->bestrules_pkg = solv_memdup2(r2pkg.elements, r2pkg.count, sizeof(Id));
   solv->bestrules_end = solv->nrules;
   queue_free(&q);
   queue_free(&q2);

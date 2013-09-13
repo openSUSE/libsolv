@@ -861,8 +861,7 @@ transaction_create_clone(Transaction *srctrans)
   if (srctrans->transaction_installed)
     {
       Repo *installed = srctrans->pool->installed;
-      trans->transaction_installed = solv_calloc(installed->end - installed->start, sizeof(Id));
-      memcpy(trans->transaction_installed, srctrans->transaction_installed, (installed->end - installed->start) * sizeof(Id));
+      trans->transaction_installed = solv_memdup2(srctrans->transaction_installed, installed->end - installed->start, sizeof(Id));
     }
   map_init_clone(&trans->transactsmap, &srctrans->transactsmap);
   map_init_clone(&trans->multiversionmap, &srctrans->multiversionmap);
@@ -870,11 +869,9 @@ transaction_create_clone(Transaction *srctrans)
     {
       struct _TransactionOrderdata *od = srctrans->orderdata;
       trans->orderdata = solv_calloc(1, sizeof(*trans->orderdata));
-      trans->orderdata->tes = solv_malloc2(od->ntes, sizeof(*od->tes));
-      memcpy(trans->orderdata->tes, od->tes, od->ntes * sizeof(*od->tes));
+      trans->orderdata->tes = solv_memdup2(od->tes, od->ntes, sizeof(*od->tes));
       trans->orderdata->ntes = od->ntes;
-      trans->orderdata->invedgedata = solv_malloc2(od->ninvedgedata, sizeof(Id));
-      memcpy(trans->orderdata->invedgedata, od->invedgedata, od->ninvedgedata * sizeof(Id));
+      trans->orderdata->invedgedata = solv_memdup2(od->invedgedata, od->ninvedgedata, sizeof(Id));
       trans->orderdata->ninvedgedata = od->ninvedgedata;
     }
   return trans;
