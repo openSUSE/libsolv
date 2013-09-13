@@ -357,6 +357,7 @@ SOLV_1.0 {
 		solver_problemruleinfo2str;
 		solver_rule2job;
 		solver_rule2jobidx;
+		solver_rule2rules;
 		solver_rule2solvable;
 		solver_ruleclass;
 		solver_ruleinfo;

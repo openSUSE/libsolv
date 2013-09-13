@@ -2291,6 +2291,7 @@ solver_rule2jobidx(Solver *solv, Id rid)
   return solv->ruletojob.elements[rid - solv->jobrules] + 1;
 }
 
+/* job rule introspection */
 Id
 solver_rule2job(Solver *solv, Id rid, Id *whatp)
 {
@@ -2307,6 +2308,7 @@ solver_rule2job(Solver *solv, Id rid, Id *whatp)
   return solv->job.elements[idx];
 }
 
+/* update/feature rule introspection */
 Id
 solver_rule2solvable(Solver *solv, Id rid)
 {
@@ -2316,6 +2318,47 @@ solver_rule2solvable(Solver *solv, Id rid)
     return rid - solv->featurerules;
   return 0;
 }
+
+static void
+solver_rule2rules_rec(Solver *solv, Id rid, Queue *q, Map *seen)
+{
+  int i;
+  Id rid2;
+
+  if (seen)
+    MAPSET(seen, rid);
+  for (i = solv->learnt_why.elements[rid - solv->learntrules]; (rid2 = solv->learnt_pool.elements[i]) != 0; i++)
+    {
+      if (seen)
+	{
+	  if (MAPTST(seen, rid2))
+	    continue;
+	  if (rid2 >= solv->learntrules)
+	    solver_rule2rules_rec(solv, rid2, q, seen);
+	  continue;
+	}
+      queue_push(q, rid2);
+    }
+}
+
+/* learnt rule introspection */
+void
+solver_rule2rules(Solver *solv, Id rid, Queue *q, int recursive)
+{
+  queue_empty(q);
+  if (rid < solv->learntrules || rid >= solv->nrules)
+    return;
+  if (recursive)
+    {
+      Map seen;
+      map_init(&seen, solv->nrules);
+      solver_rule2rules_rec(solv, rid, q, &seen);
+      map_free(&seen);
+    }
+  else
+    solver_rule2rules_rec(solv, rid, q, 0);
+}
+
 
 /* check if the newest versions of pi still provides the dependency we're looking for */
 static int
