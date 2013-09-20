@@ -2396,6 +2396,17 @@ rb_eval_string(
       queue_push(&q, i);
     return q;
   }
+#if defined(SWIGPERL)
+  %rename("str") __str__;
+#endif
+  const char *__str__() {
+    Id type, source, target, dep;
+    Id r = solver_findproblemrule($self->solv, $self->id);
+    if (!r)
+      return "";
+    type = solver_ruleinfo($self->solv, r, &source, &target, &dep);
+    return solver_problemruleinfo2str($self->solv, type, source, target, dep);
+  }
 }
 
 %extend Solution {

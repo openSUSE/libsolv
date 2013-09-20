@@ -627,9 +627,7 @@ while (1) {
   last unless @problems;
   for my $problem (@problems) {
     print "Problem $problem->{id}/".@problems.":\n";
-    my $r = $problem->findproblemrule();
-    my $ri = $r->info();
-    print $ri->problemstr()."\n";
+    print $problem->str()."\n";
     my @solutions = $problem->solutions();
     for my $solution (@solutions) {
       print "  Solution $solution->{id}:\n";

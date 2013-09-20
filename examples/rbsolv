@@ -527,7 +527,7 @@ end
 for reposdir in reposdirs do
   next unless FileTest.directory?(reposdir)
   for reponame in Dir["#{reposdir}/*.repo"].sort do
-    cfg = IniFile.new(reponame)
+    cfg = IniFile.load(reponame)
     cfg.each_section do |ali|
       repoattr = { 'alias' => ali, 'enabled' => 0, 'priority' => 99, 'autorefresh' => 1, 'type' => 'rpm-md', 'metadata_expire' => 900}
       repoattr.update(cfg[ali])
@@ -641,7 +641,7 @@ while true
   break if problems.empty?
   for problem in problems
     puts "Problem #{problem.id}/#{problems.count}:"
-    puts problem.findproblemrule.info.problemstr
+    puts problem
     solutions = problem.solutions
     for solution in solutions
       puts "  Solution #{solution.id}:"
@@ -712,7 +712,7 @@ for cl in trans.classify(Solv::Transaction::SOLVER_TRANSACTION_SHOW_OBSOLETES | 
 end
 puts "install size change: #{trans.calc_installsizechange()} K\n\n"
 
-while true:
+while true
   print("OK to continue (y/n)? ")
   STDOUT.flush
   yn = STDIN.gets.strip

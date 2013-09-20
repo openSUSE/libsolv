@@ -2276,6 +2276,15 @@ the solution class for more information.
 
 Return the number of solutions without creating solution objects.
 
+	<stringification>
+	my $str = $problem->str;
+	str = str(problem)
+	str = problem.to_s
+
+Return a string describing the problem. This is a convenience function, it is
+a shorthand for calling findproblemrule(), then ruleinfo() on the problem
+rule and problemstr() on the ruleinfo object.
+
 The Rule Class
 --------------
 Rules are the basic block of sat solving. Each package dependency gets translated

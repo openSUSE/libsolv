@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 08/21/2013
+.\"      Date: 09/20/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "08/21/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "09/20/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3665,6 +3665,21 @@ my \fI$cnt\fR \fB=\fR \fI$problem\fR\fB\->solution_count()\fR;
 .\}
 .sp
 Return the number of solutions without creating solution objects\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB=\fR \fI$problem\fR\fB\->str\fR;
+\fIstr\fR \fB= str(\fR\fIproblem\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIproblem\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the problem\&. This is a convenience function, it is a shorthand for calling findproblemrule(), then ruleinfo() on the problem rule and problemstr() on the ruleinfo object\&.
 .SH "THE RULE CLASS"
 .sp
 Rules are the basic block of sat solving\&. Each package dependency gets translated into one or multiple rules\&.
