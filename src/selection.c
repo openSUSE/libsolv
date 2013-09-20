@@ -940,6 +940,7 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
 	queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, p);
     }
   queue_free(&q);
+  solv_free(rname);
   if (!selection->count)
     return 0;
   if ((flags & SELECTION_FLAT) != 0)
