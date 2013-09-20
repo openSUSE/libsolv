@@ -132,7 +132,8 @@
 #define DEP_GREATER		(1 << 2)
 #define DEP_EQUAL		(1 << 3)
 #define DEP_STRONG		(1 << 27)
-#define DEP_PRE			((1 << 6) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12))
+#define DEP_PRE_IN		((1 << 6) | (1 << 9) | (1 << 10))
+#define DEP_PRE_UN		((1 << 6) | (1 << 11) | (1 << 12))
 
 #define FILEFLAG_GHOST		(1 <<  6)
 
@@ -406,7 +407,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   char **n, **v;
   unsigned int *f;
   int i, cc, nc, vc, fc;
-  int haspre;
+  int haspre, premask;
   unsigned int olddeps;
   Id *ida;
   int strong;
@@ -431,6 +432,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 
   cc = nc;
   haspre = 0;	/* add no prereq marker */
+  premask = DEP_PRE_IN | DEP_PRE_UN;
   if (flags)
     {
       /* we do filtering */
@@ -442,7 +444,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	  if ((flags & MAKEDEPS_NO_RPMLIB) != 0)
 	    if (!strncmp(n[i], "rpmlib(", 7))
 	      continue;
-	  if ((f[i] & DEP_PRE) != 0)
+	  if ((f[i] & premask) != 0)
 	    haspre = 1;
 	  cc++;
 	}
@@ -451,7 +453,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
     {
       /* no filtering, just look for the first prereq */
       for (i = 0; i < nc; i++)
-	if ((f[i] & DEP_PRE) != 0)
+	if ((f[i] & premask) != 0)
 	  {
 	    haspre = 1;
 	    break;
@@ -464,7 +466,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
       solv_free(f);
       return 0;
     }
-  cc += haspre;
+  cc += haspre;		/* add slot for the prereq marker */
   olddeps = repo_reserve_ids(repo, 0, cc);
   ida = repo->idarraydata + olddeps;
   for (i = 0; ; i++)
@@ -479,9 +481,9 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	}
       if (strong && (f[i] & DEP_STRONG) != (strong == MAKEDEPS_FILTER_WEAK ? 0 : DEP_STRONG))
 	continue;
-      if (haspre == 1 && (f[i] & DEP_PRE) != 0)
+      if (haspre == 1 && (f[i] & premask) != 0)
 	continue;
-      if (haspre == 2 && (f[i] & DEP_PRE) == 0)
+      if (haspre == 2 && (f[i] & premask) == 0)
 	continue;
       if ((flags & MAKEDEPS_NO_RPMLIB) != 0)
 	if (!strncmp(n[i], "rpmlib(", 7))
@@ -491,11 +493,11 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	  Id name, evr;
 	  int flags = 0;
 	  if ((f[i] & DEP_LESS) != 0)
-	    flags |= 4;
+	    flags |= REL_LT;
 	  if ((f[i] & DEP_EQUAL) != 0)
-	    flags |= 2;
+	    flags |= REL_EQ;
 	  if ((f[i] & DEP_GREATER) != 0)
-	    flags |= 1;
+	    flags |= REL_GT;
 	  name = pool_str2id(pool, n[i], 1);
 	  if (v[i][0] == '0' && v[i][1] == ':' && v[i][2])
 	    evr = pool_str2id(pool, v[i] + 2, 1);

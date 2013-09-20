@@ -1996,6 +1996,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 #if 0
 	      else if (!strcmp(repotype, "helix"))
 		{
+		  extern int repo_add_helix(Repo *repo, FILE *fp, int flags);
 		  repo_add_helix(repo, rfp, 0);
 		  fclose(rfp);
 		}
