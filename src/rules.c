@@ -3338,6 +3338,15 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
       if (pool->solvables[p].repo == installed)
         MAPSET(&userinstalled, p - installed->start);
     }
+  if (!unneeded && solv->cleandeps_updatepkgs)
+    {
+      for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
+	{
+	  p = solv->cleandeps_updatepkgs->elements[i];
+	  if (pool->solvables[p].repo == installed)
+	    MAPSET(&userinstalled, p - installed->start);
+	}
+    }
   MAPSET(&im, SYSTEMSOLVABLE);	/* in case we cleared it above */
   for (p = installed->start; p < installed->end; p++)
     if (MAPTST(&im, p))
