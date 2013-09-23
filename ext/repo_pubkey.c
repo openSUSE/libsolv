@@ -38,6 +38,7 @@
 #include "queue.h"
 #include "chksum.h"
 #include "repo_rpmdb.h"
+#include "repo_pubkey.h"
 #ifdef ENABLE_PGPVRFY
 #include "solv_pgpvrfy.h"
 #endif
