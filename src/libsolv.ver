@@ -353,6 +353,7 @@ SOLV_1.0 {
 		solver_printsolution;
 		solver_printtrivial;
 		solver_printwatches;
+		solver_problem2str;
 		solver_problem_count;
 		solver_problemruleinfo2str;
 		solver_rule2job;

@@ -1103,6 +1103,18 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
     }
 }
 
+/* convenience function */
+const char *
+solver_problem2str(Solver *solv, Id problem)
+{
+  Id type, source, target, dep;
+  Id r = solver_findproblemrule(solv, problem);
+  if (!r)
+    return "no problem rule?";
+  type = solver_ruleinfo(solv, r, &source, &target, &dep);
+  return solver_problemruleinfo2str(solv, type, source, target, dep);
+}
+
 const char *
 solver_solutionelement2str(Solver *solv, Id p, Id rp)
 {
