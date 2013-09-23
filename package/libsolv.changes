@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Mon Sep 23 11:31:28 CEST 2013 - mls@suse.de
+
+- added repodata_lookup_binary
+- fix pattern obsoleting real packages [bnc#834376]
+- add selection_make_matchdeps function to query dependencies
+  other than provides
+- bump version to 0.4.0
+
+-------------------------------------------------------------------
 Wed Aug 21 14:39:54 CEST 2013 - mls@suse.de
 
 - add describe_decision() and unset() methods to bindings
