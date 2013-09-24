@@ -35,14 +35,15 @@ while(<STDIN>) {
   if (!/^[a-zA-Z0-9_]+$/) {
     $_ = " $_";
     $_ = "$_ ";
-    s/(?<=[^a-zA-Z_\&:\.\'\";])(?!solv\W|Solv\W|Pool\W)([\$\@[a-zA-Z_][a-zA-Z0-9_]*)(?=[^a-zA-Z0-9_\(;\[])(?!::)(?! [^=])/<-S><I>$1<-I><S>/g;
-    # small fixup for perl bare words
+    s/(?<=[^a-zA-Z_\&:\.\'\";])(?!solv\W|Solv\W|Pool\W)([\$\@a-zA-Z_][a-zA-Z0-9_]*)(?=[^a-zA-Z0-9_\(;\[])(?!::)(?! [^=])/<-S><I>$1<-I><S>/g;
+    # fixup for perl bare words
     s/{<-S><I>([a-zA-Z_][a-zA-Z0-9]*)<-I><S>}/{$1}/g;
-    # small fixup for callbackfunctions
+    # fixup for callbackfunctions
     s/\\(&amp;[a-zA-Z_]+)/\\<-S><I>$1<-I><S>/;
-    # small fixup for stringification
+    # fixup for stringification
     s/\$<-S><I>/<-S><I>\$/g;
-    # small fixup for %d
+    # fixup for %d
+    s/%<-S><I>d<-I><S>\"/%d\"/;
     s/%<-S><I>d<-I><S>\\<-S><I>n<-I><S>/%d\\n/;
     # iterators
     s/^ //;

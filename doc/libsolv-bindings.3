@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 09/20/2013
+.\"      Date: 09/24/2013
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "09/20/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "09/24/2013" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -156,7 +156,7 @@ Attributes can be accessed as usual:
 .\}
 .nf
 \fIpool\fR\fB\&.appdata = 42\fR
-\fBprint "appdata is %\fR\fId\fR\fB" % (\fR\fIpool\fR\fB\&.appdata)\fR
+\fBprint "appdata is %d" % (\fR\fIpool\fR\fB\&.appdata)\fR
 .fi
 .if n \{\
 .RE
@@ -180,7 +180,7 @@ Arrays are passed and returned as list objects:
 .RS 4
 .\}
 .nf
-\fIjobs\fR \fB=\fR \fI[\fR\fB]\fR
+\fIjobs\fR \fB= []\fR
 \fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
 .fi
 .if n \{\
@@ -269,7 +269,7 @@ Arrays are passed and returned as array objects:
 .RS 4
 .\}
 .nf
-\fIjobs\fR \fB=\fR \fI[\fR\fB]\fR
+\fIjobs\fR \fB= []\fR
 \fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
 .fi
 .if n \{\
