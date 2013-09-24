@@ -3052,7 +3052,7 @@ Back pointer to repository object.
 
 The id of the repodata area. Repodata ids of different repositories overlap.
 
-=== METHODS ====
+=== METHODS ===
 
 	internalize();
 	$data->internalize();
