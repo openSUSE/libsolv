@@ -184,8 +184,6 @@ int repo_add_haiku_installed_packages(Repo *repo, const char *rootdir,
 
   add_installed_packages(repo, repoData,
     B_PACKAGE_INSTALLATION_LOCATION_SYSTEM);
-  add_installed_packages(repo, repoData,
-    B_PACKAGE_INSTALLATION_LOCATION_COMMON);
   add_installed_packages(repo, repoData, B_PACKAGE_INSTALLATION_LOCATION_HOME);
 
   if (!(flags & REPO_NO_INTERNALIZE))
