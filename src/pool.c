@@ -846,6 +846,29 @@ pool_addstdproviders(Pool *pool, Id d)
 }
 
 
+static inline int
+pool_is_kind(Pool *pool, Id name, Id kind)
+{
+  const char *n;
+  if (!kind)
+    return 1;
+  n = pool_id2str(pool, name);
+  if (kind != 1)
+    {
+      const char *kn = pool_id2str(pool, kind);
+      int knl = strlen(kn);
+      return !strncmp(n, kn, knl) && n[knl] == ':' ? 1 : 0;
+    }
+  else
+    {
+      if (*n == ':')
+	return 1;
+      while(*n >= 'a' && *n <= 'z')
+	n++;
+      return *n == ':' ? 0 : 1;
+    }
+}
+
 /*
  * addrelproviders
  * 
@@ -950,7 +973,19 @@ pool_addrelproviders(Pool *pool, Id d)
 		    continue;
 		  if (pool_disabled_solvable(pool, s))
 		    continue;
-		  if (pool_match_nevr(pool, s, name))
+		  if (!name || pool_match_nevr(pool, s, name))
+		    queue_push(&plist, p);
+		}
+	      break;
+	    }
+	  if (!name)
+	    {
+	      FOR_POOL_SOLVABLES(p)
+		{
+		  Solvable *s = pool->solvables + p;
+		  if (s->repo != pool->installed && !pool_installable(pool, s))
+		    continue;
+		  if (s->arch == evr)
 		    queue_push(&plist, p);
 		}
 	      break;
@@ -961,6 +996,31 @@ pool_addrelproviders(Pool *pool, Id d)
 	    {
 	      Solvable *s = pool->solvables + p;
 	      if (s->arch == evr)
+		queue_push(&plist, p);
+	      else
+		wp = 0;
+	    }
+	  break;
+	case REL_KIND:
+	  /* package kind filtering */
+	  if (!name)
+	    {
+	      FOR_POOL_SOLVABLES(p)
+		{
+		  Solvable *s = pool->solvables + p;
+		  if (s->repo != pool->installed && !pool_installable(pool, s))
+		    continue;
+		  if (pool_is_kind(pool, s->name, evr))
+		    queue_push(&plist, p);
+		}
+	      break;
+	    }
+	  wp = pool_whatprovides(pool, name);
+	  pp = pool->whatprovidesdata + wp;
+	  while ((p = *pp++) != 0)
+	    {
+	      Solvable *s = pool->solvables + p;
+	      if (pool_is_kind(pool, s->name, evr))
 		queue_push(&plist, p);
 	      else
 		wp = 0;

@@ -279,7 +279,7 @@ selection_filter_installed(Pool *pool, Queue *selection)
 	}
       if (select)
 	{
-	  selection->elements[j++] = select | (selection->elements[i] & ~SOLVER_SELECTMASK);
+	  selection->elements[j++] = select | (selection->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SETREPO;
 	  selection->elements[j++] = id;
 	}
     }
@@ -335,12 +335,85 @@ selection_addsrc(Pool *pool, Queue *selection, int flags)
   queue_free(&q);
 }
 
+static inline const char *
+skipkind(const char *n)
+{
+  const char *s;
+  for (s = n; *s >= 'a' && *s <= 'z'; s++)
+    ;
+  if (*s == ':' && s != n)
+     return s + 1;
+  return n;
+}
+
+static inline void
+queue_pushunique2(Queue *q, Id id1, Id id2)
+{
+  int i;
+  for (i = 0; i < q->count; i += 2)
+    if (q->elements[i] == id1 && q->elements[i + 1] == id2)
+      return;
+  queue_push2(q, id1, id2);
+}
+
+static int
+selection_depglob_id(Pool *pool, Queue *selection, Id id, int flags)
+{
+  Id p, pp;
+  int match = 0;
+
+  FOR_PROVIDES(p, pp, id)
+    {
+      Solvable *s = pool->solvables + p;
+      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+	continue;
+      match = 1;
+      if (s->name == id && (flags & SELECTION_NAME) != 0)
+	{
+	  if ((flags & SELECTION_SOURCE_ONLY) != 0)
+	    id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
+	  queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
+	  if ((flags & SELECTION_WITH_SOURCE) != 0)
+	    selection_addsrc(pool, selection, flags);
+	  return SELECTION_NAME;
+	}
+    }
+  if ((flags & (SELECTION_SOURCE_ONLY | SELECTION_WITH_SOURCE)) != 0 && (flags & SELECTION_NAME) != 0)
+    {
+      /* src rpms don't have provides, so we must check every solvable */
+      FOR_POOL_SOLVABLES(p)	/* slow path */
+	{
+	  Solvable *s = pool->solvables + p;
+	  if (s->name == id && (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC))
+	    {
+	      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+		continue;	/* just in case... src rpms can't be installed */
+	      if (pool_disabled_solvable(pool, s))
+		continue;
+	      if ((flags & SELECTION_SOURCE_ONLY) != 0)
+		id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
+	      queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
+	      if ((flags & SELECTION_WITH_SOURCE) != 0)
+		selection_addsrc(pool, selection, flags);
+	      return SELECTION_NAME;
+	    }
+	}
+    }
+  if (match && (flags & SELECTION_PROVIDES) != 0)
+    {
+      queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
+      return SELECTION_PROVIDES;
+    }
+  return 0;
+}
+
 static int
 selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
 {
   Id id, p, pp;
-  int i, match = 0;
+  int match = 0;
   int doglob = 0;
+  int nocase = 0;
   int globflags = 0;
 
   if ((flags & SELECTION_SOURCE_ONLY) != 0)
@@ -355,121 +428,56 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
   if ((flags & SELECTION_INSTALLED_ONLY) != 0 && !pool->installed)
     return 0;
 
-  if (!(flags & SELECTION_NOCASE))
+  nocase = flags & SELECTION_NOCASE;
+  if (!nocase && !(flags & SELECTION_SKIP_KIND))
     {
       id = pool_str2id(pool, name, 0);
       if (id)
 	{
-	  if ((flags & (SELECTION_SOURCE_ONLY | SELECTION_WITH_SOURCE)) != 0 && (flags & SELECTION_NAME) != 0)
-	    {
-	      /* src rpms don't have provides, so we must check every solvable */
-	      FOR_PROVIDES(p, pp, id)	/* try fast path first */
-		{
-		  Solvable *s = pool->solvables + p;
-		  if (s->name == id)
-		    {
-		      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
-			continue;
-		      if ((flags & SELECTION_SOURCE_ONLY) != 0)
-		        id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
-		      queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
-		      if ((flags & SELECTION_WITH_SOURCE) != 0)
-			selection_addsrc(pool, selection, flags);
-		      return SELECTION_NAME;
-		    }
-		}
-	      FOR_POOL_SOLVABLES(p)	/* slow path */
-		{
-		  Solvable *s = pool->solvables + p;
-		  if (s->name == id && (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC))
-		    {
-		      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
-			continue;	/* just in case... src rpms can't be installed */
-		      if (pool_disabled_solvable(pool, s))
-			continue;
-		      if ((flags & SELECTION_SOURCE_ONLY) != 0)
-		        id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
-		      queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
-		      if ((flags & SELECTION_WITH_SOURCE) != 0)
-			selection_addsrc(pool, selection, flags);
-		      return SELECTION_NAME;
-		    }
-		}
-	    }
-	  FOR_PROVIDES(p, pp, id)
-	    {
-	      Solvable *s = pool->solvables + p;
-	      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
-		continue;
-	      match = 1;
-	      if (s->name == id && (flags & SELECTION_NAME) != 0)
-		{
-		  if ((flags & SELECTION_SOURCE_ONLY) != 0)
-		    id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
-		  queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
-		  if ((flags & SELECTION_WITH_SOURCE) != 0)
-		    selection_addsrc(pool, selection, flags);
-		  return SELECTION_NAME;
-		}
-	    }
-	  if (match && (flags & SELECTION_PROVIDES) != 0)
-	    {
-	      queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
-	      return SELECTION_PROVIDES;
-	    }
+	  /* the id is know, do the fast id matching using the whatprovides lookup */
+	  int ret = selection_depglob_id(pool, selection, id, flags);
+	  if (ret)
+	    return ret;
 	}
     }
 
   if ((flags & SELECTION_GLOB) != 0 && strpbrk(name, "[*?") != 0)
     doglob = 1;
 
-  if (!doglob && !(flags & SELECTION_NOCASE))
-    return 0;
+  if (!nocase && !(flags & SELECTION_SKIP_KIND) && !doglob)
+    return 0;	/* all done above in depglob_id */
 
-  if (doglob && (flags & SELECTION_NOCASE) != 0)
+  if (doglob && nocase)
     globflags = FNM_CASEFOLD;
-
-#if 0	/* doesn't work with selection_filter_rel yet */
-  if (doglob && !strcmp(name, "*") && (flags & SELECTION_FLAT) != 0)
-    {
-      /* can't do this for SELECTION_PROVIDES, as src rpms don't provide anything */
-      if ((flags & SELECTION_NAME) != 0)
-	{
-	  queue_push2(selection, SOLVER_SOLVABLE_ALL, 0);
-          return SELECTION_NAME;
-	}
-    }
-#endif
 
   if ((flags & SELECTION_NAME) != 0)
     {
       /* looks like a name glob. hard work. */
       FOR_POOL_SOLVABLES(p)
-        {
-          Solvable *s = pool->solvables + p;
-          if (s->repo != pool->installed && !pool_installable(pool, s))
+	{
+	  Solvable *s = pool->solvables + p;
+	  const char *n;
+	  if (s->repo != pool->installed && !pool_installable(pool, s))
 	    {
 	      if (!(flags & SELECTION_SOURCE_ONLY) || (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC))
-                continue;
+		continue;
 	      if (pool_disabled_solvable(pool, s))
 		continue;
 	    }
 	  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
 	    continue;
-          id = s->name;
-          if ((doglob ? fnmatch(name, pool_id2str(pool, id), globflags) : strcasecmp(name, pool_id2str(pool, id))) == 0)
-            {
+	  id = s->name;
+	  n = pool_id2str(pool, id);
+	  if (flags & SELECTION_SKIP_KIND)
+	    n = skipkind(n);
+	  if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
+	    {
 	      if ((flags & SELECTION_SOURCE_ONLY) != 0)
 		id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
-	      /* queue_pushunique2 */
-              for (i = 0; i < selection->count; i += 2)
-                if (selection->elements[i] == SOLVER_SOLVABLE_NAME && selection->elements[i + 1] == id)
-                  break;
-              if (i == selection->count)
-                queue_push2(selection, SOLVER_SOLVABLE_NAME, id);
-              match = 1;
-            }
-        }
+	      queue_pushunique2(selection, SOLVER_SOLVABLE_NAME, id);
+	      match = 1;
+	    }
+	}
       if (match)
 	{
 	  if ((flags & SELECTION_WITH_SOURCE) != 0)
@@ -477,15 +485,18 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
           return SELECTION_NAME;
 	}
     }
+
   if ((flags & SELECTION_PROVIDES))
     {
       /* looks like a dep glob. really hard work. */
       for (id = 1; id < pool->ss.nstrings; id++)
-        {
-          if (!pool->whatprovides[id] || pool->whatprovides[id] == 1)
-            continue;
-          if ((doglob ? fnmatch(name, pool_id2str(pool, id), globflags) : strcasecmp(name, pool_id2str(pool, id))) == 0)
-            {
+	{
+	  const char *n;
+	  if (!pool->whatprovides[id] || pool->whatprovides[id] == 1)
+	    continue;
+	  n = pool_id2str(pool, id);
+	  if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
+	    {
 	      if ((flags & SELECTION_INSTALLED_ONLY) != 0)
 		{
 		  FOR_PROVIDES(p, pp, id)
@@ -495,9 +506,9 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
 		    continue;
 		}
 	      queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
-              match = 1;
-            }
-        }
+	      match = 1;
+	    }
+	}
       if (match)
         return SELECTION_PROVIDES;
     }
@@ -948,11 +959,34 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
   return SELECTION_PROVIDES;
 }
 
+static inline int
+pool_is_kind(Pool *pool, Id name, Id kind)
+{
+  const char *n;
+  if (!kind)
+    return 1;
+  n = pool_id2str(pool, name);
+  if (kind != 1)
+    {    
+      const char *kn = pool_id2str(pool, kind);
+      int knl = strlen(kn);
+      return !strncmp(n, kn, knl) && n[knl] == ':' ? 1 : 0; 
+    }    
+  else 
+    {    
+      if (*n == ':') 
+        return 1;
+      while(*n >= 'a' && *n <= 'z') 
+        n++;
+      return *n == ':' ? 0 : 1; 
+    }    
+}
+
 void
 selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
 {
   int i, j, miss;
-  Id p, pp;
+  Id p, pp, q1filled = 0;
   Queue q1;
   Map m2;
   Id setflags = 0;
@@ -990,6 +1024,38 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
 	}
       else
 	{
+	  if ((select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES) && ISRELDEP(sel2->elements[i + 1]))
+	    {
+	      Reldep *rd = GETRELDEP(pool, sel2->elements[i + 1]);
+	      if (rd->flags == REL_ARCH && rd->name == 0)
+		{
+		  /* special arch filter */
+		  if (!q1filled++)
+		    selection_solvables(pool, sel1, &q1);
+		  for (j = 0; j < q1.count; j++)
+		    {
+		      Id p = q1.elements[j];
+		      Solvable *s = pool->solvables + p;
+		      if (s->arch == rd->evr || (rd->evr == ARCH_SRC && s->arch == ARCH_NOSRC))
+		        map_set(&m2, p);
+		    }
+		  continue;
+		}
+	      else if (rd->flags == REL_KIND && rd->name == 0)
+		{
+		  /* special kind filter */
+		  if (!q1filled++)
+		    selection_solvables(pool, sel1, &q1);
+		  for (j = 0; j < q1.count; j++)
+		    {
+		      Id p = q1.elements[j];
+		      Solvable *s = pool->solvables + p;
+		      if (pool_is_kind(pool, s->name, rd->evr))
+		        map_set(&m2, p);
+		    }
+		  continue;
+		}
+	    }
 	  FOR_JOB_SELECT(p, pp, select, sel2->elements[i + 1])
 	    map_set(&m2, p);
 	}

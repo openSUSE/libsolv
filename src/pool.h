@@ -213,6 +213,7 @@ struct _Pool {
 #define REL_FILECONFLICT	21
 #define REL_COND	22
 #define REL_COMPAT	23
+#define REL_KIND        24	/* for filters only */
 
 #if !defined(__GNUC__) && !defined(__attribute__)
 # define __attribute__(x)

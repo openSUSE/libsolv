@@ -32,6 +32,7 @@ extern "C" {
 #define SELECTION_NOCASE		(1 << 11)
 #define SELECTION_SOURCE_ONLY		(1 << 12)
 #define SELECTION_WITH_SOURCE		(1 << 13)
+#define SELECTION_SKIP_KIND		(1 << 14)
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
 extern int  selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker);

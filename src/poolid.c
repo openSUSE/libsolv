@@ -186,6 +186,8 @@ pool_id2rel(const Pool *pool, Id id)
       return " IF ";
     case REL_COMPAT:
       return " compat >= ";
+    case REL_KIND:
+      return " KIND ";
     default:
       break;
     }
@@ -240,6 +242,15 @@ dep2strcpy(const Pool *pool, char *p, Id id, int oldrel)
 	      strcat(p, ")");
 	      return;
 	    }
+      if (rd->flags == REL_KIND)
+	{
+	  dep2strcpy(pool, p, rd->evr, rd->flags);
+	  p += strlen(p);
+	  *p++ = ':';
+	  id = rd->name;
+	  oldrel = rd->flags;
+	  continue;
+	}
       dep2strcpy(pool, p, rd->name, rd->flags);
       p += strlen(p);
       if (rd->flags == REL_NAMESPACE)
