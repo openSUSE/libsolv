@@ -2595,6 +2595,9 @@ main(int argc, char **argv)
   Transaction *trans;
   FILE **newpkgsfps;
   Queue repofilter;
+  Queue kindfilter;
+  Queue archfilter;
+  int archfilter_src = 0;
   int cleandeps = 0;
   int forcebest = 0;
   char *rootdir = 0;
@@ -2726,47 +2729,83 @@ main(int argc, char **argv)
 
   read_repos(pool, repoinfos, nrepoinfos);
 
-  /* setup repofilter */
+  /* setup filters */
   queue_init(&repofilter);
-  while (argc > 2 && !strcmp(argv[1], "-r"))
+  queue_init(&kindfilter);
+  queue_init(&archfilter);
+  while (argc > 2)
     {
-      const char *rname = argv[2], *rp;
-      Id repoid = 0;
-      for (rp = rname; *rp; rp++)
-	if (*rp <= '0' || *rp >= '9')
-	  break;
-      if (!*rp)
+      if (!strcmp(argv[1], "-r") || !strcmp(argv[1], "--repo"))
 	{
-	  /* repo specified by number */
-	  int rnum = atoi(rname);
-	  for (i = 0; i < nrepoinfos; i++)
+	  const char *rname = argv[2], *rp;
+	  Id repoid = 0;
+	  for (rp = rname; *rp; rp++)
+	    if (*rp <= '0' || *rp >= '9')
+	      break;
+	  if (!*rp)
 	    {
-	      struct repoinfo *cinfo = repoinfos + i;
-	      if (!cinfo->enabled)
-		continue;
-	      if (--rnum == 0)
-	        repoid = cinfo->repo->repoid;
+	      /* repo specified by number */
+	      int rnum = atoi(rname);
+	      for (i = 0; i < nrepoinfos; i++)
+		{
+		  struct repoinfo *cinfo = repoinfos + i;
+		  if (!cinfo->enabled)
+		    continue;
+		  if (--rnum == 0)
+		    repoid = cinfo->repo->repoid;
+		}
 	    }
+	  else
+	    {
+	      /* repo specified by alias */
+	      Repo *repo;
+	      FOR_REPOS(i, repo)
+		{
+		  if (!strcasecmp(rname, repo->name))
+		    repoid = repo->repoid;
+		}
+	    }
+	  if (!repoid)
+	    {
+	      fprintf(stderr, "%s: no such repo\n", rname);
+	      exit(1);
+	    }
+	  /* SETVENDOR is actually wrong but useful */
+	  queue_push2(&repofilter, SOLVER_SOLVABLE_REPO | SOLVER_SETREPO | SOLVER_SETVENDOR, repoid);
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (!strcmp(argv[1], "--arch"))
+	{
+	  if (!strcmp(argv[2], "src") || !strcmp(argv[2], "nosrc")) 
+	    archfilter_src = 1;
+	  queue_push2(&archfilter, SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, 0, pool_str2id(pool, argv[2], 1), REL_ARCH, 1));
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (!strcmp(argv[1], "-t") || !strcmp(argv[1], "--type"))
+	{
+	  const char *kind = argv[2];
+	  if (!strcmp(kind, "srcpackage"))
+	    {
+	      /* hey! should use --arch! */
+	      queue_push2(&archfilter, SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, 0, ARCH_SRC, REL_ARCH, 1));
+	      archfilter_src = 1;
+	      argc -= 2;
+	      argv += 2;
+	      continue;
+	    }
+	  if (!strcmp(kind, "package"))
+	    kind = "";
+	  if (!strcmp(kind, "all"))
+	    queue_push2(&kindfilter, SOLVER_SOLVABLE_ALL, 0);
+	  else
+	    queue_push2(&kindfilter, SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, 0, pool_str2id(pool, kind, 1), REL_KIND, 1));
+	  argc -= 2;
+	  argv += 2;
 	}
       else
-	{
-	  /* repo specified by alias */
-	  Repo *repo;
-	  FOR_REPOS(i, repo)
-	    {
-	      if (!strcasecmp(rname, repo->name))
-		repoid = repo->repoid;
-	    }
-	}
-      if (!repoid)
-	{
-	  fprintf(stderr, "%s: no such repo\n", rname);
-	  exit(1);
-	}
-      /* SETVENDOR is actually wrong but useful */
-      queue_push2(&repofilter, SOLVER_SOLVABLE_REPO | SOLVER_SETREPO | SOLVER_SETVENDOR, repoid);
-      argc -= 2;
-      argv += 2;
+	break;
     }
 
   if (mainmode == MODE_SEARCH)
@@ -2873,7 +2912,9 @@ main(int argc, char **argv)
       queue_init(&job2);
       flags = SELECTION_NAME|SELECTION_PROVIDES|SELECTION_GLOB;
       flags |= SELECTION_CANON|SELECTION_DOTARCH|SELECTION_REL;
-      if (mode == MODE_LIST)
+      if (kindfilter.count)
+	flags |= SELECTION_SKIP_KIND;
+      if (mode == MODE_LIST || archfilter_src)
 	flags |= SELECTION_WITH_SOURCE;
       if (argv[i][0] == '/')
 	flags |= SELECTION_FILELIST | (mode == MODE_ERASE ? SELECTION_INSTALLED_ONLY : 0);
@@ -2883,6 +2924,10 @@ main(int argc, char **argv)
         rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
       if (repofilter.count)
 	selection_filter(pool, &job2, &repofilter);
+      if (archfilter.count)
+	selection_filter(pool, &job2, &archfilter);
+      if (kindfilter.count)
+	selection_filter(pool, &job2, &kindfilter);
       if (!job2.count)
 	{
 	  flags |= SELECTION_NOCASE;
@@ -2892,6 +2937,10 @@ main(int argc, char **argv)
 	    rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
 	  if (repofilter.count)
 	    selection_filter(pool, &job2, &repofilter);
+	  if (archfilter.count)
+	    selection_filter(pool, &job2, &archfilter);
+	  if (kindfilter.count)
+	    selection_filter(pool, &job2, &kindfilter);
 	  if (job2.count)
 	    printf("[ignoring case for '%s']\n", argv[i]);
 	}
@@ -2910,13 +2959,19 @@ main(int argc, char **argv)
     }
   keyname = solv_free(keyname);
 
-  if (!job.count && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE || mainmode == MODE_VERIFY || repofilter.count))
+  if (!job.count && (mainmode == MODE_UPDATE || mainmode == MODE_DISTUPGRADE || mainmode == MODE_VERIFY || repofilter.count || archfilter.count || kindfilter.count))
     {
       queue_push2(&job, SOLVER_SOLVABLE_ALL, 0);
       if (repofilter.count)
 	selection_filter(pool, &job, &repofilter);
+      if (archfilter.count)
+	selection_filter(pool, &job, &archfilter);
+      if (kindfilter.count)
+	selection_filter(pool, &job, &kindfilter);
     }
   queue_free(&repofilter);
+  queue_free(&archfilter);
+  queue_free(&kindfilter);
 
   if (!job.count && mainmode != MODE_PATCH)
     {
