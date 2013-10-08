@@ -14,14 +14,14 @@ ENDIF (ENABLE_RPMDB)
 IF (ENABLE_PUBKEY)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repo_pubkey.c)
-    SET (libsolvext_HEADERS ${libsolvext_SRCS}
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
 	repo_pubkey.h)
 ENDIF (ENABLE_PUBKEY)
 
 IF (ENABLE_PGPVRFY)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	solv_pgpvrfy.c)
-    SET (libsolvext_HEADERS ${libsolvext_SRCS}
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
 	solv_pgpvrfy.h)
 ENDIF (ENABLE_PGPVRFY)
 
@@ -56,7 +56,7 @@ IF (ENABLE_DEBIAN)
     SET (libsolvext_HEADERS ${libsolvext_HEADERS}
 	repo_deb.h)
 ENDIF (ENABLE_DEBIAN)
-	
+
 IF (ENABLE_HELIXREPO)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repo_helix.c)
