@@ -1367,6 +1367,49 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id rul
   return level;
 }
 
+static void
+reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
+{
+  Pool *pool = solv->pool;
+  int i, j, haveone = 0, dqcount = dq->count;
+  Id p;
+  Solvable *s;
+
+  /* at the time we process jobrules the installed packages are not kept yet */
+  /* reorder so that "future-supplemented" packages come first */
+  FOR_REPO_SOLVABLES(solv->installed, p, s)
+    {
+      if (MAPTST(&solv->noupdate, p - solv->installed->start))
+	continue;
+      if (solv->decisionmap[p] == 0)
+	{
+	  solv->decisionmap[p] = level;
+	  haveone = 1;
+	}
+    }
+  if (!haveone)
+    return;
+  for (i = 0; i < dqcount; i++)
+    if (!solver_is_enhancing(solv, pool->solvables + dq->elements[i]))
+      {
+	queue_push(dq, dq->elements[i]);
+	dq->elements[i] = 0;
+      }
+  dqcount = dq->count;
+  for (i = 0; i < dqcount; i++)
+    if (dq->elements[i] && !solver_is_supplementing(solv, pool->solvables + dq->elements[i]))
+      {
+	queue_push(dq, dq->elements[i]);
+	dq->elements[i] = 0;
+      }
+  for (i = j = 0; i < dq->count; i++)
+    if (dq->elements[i])
+      dq->elements[j++] = dq->elements[i];
+  queue_truncate(dq, j);
+  FOR_REPO_SOLVABLES(solv->installed, p, s)
+    if (solv->decisionmap[p] == level)
+      solv->decisionmap[p] = 0;
+}
 
 /*-------------------------------------------------------------------
  * 
@@ -1402,6 +1445,8 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
 	    break;
 	  }
     }
+  if (dq->count > 1 && ruleid >= solv->jobrules && ruleid < solv->jobrules_end && solv->installed)
+    reorder_dq_for_jobrules(solv, level, dq);
   if (dq->count > 1)
     {
       /* multiple candidates, open a branch */
