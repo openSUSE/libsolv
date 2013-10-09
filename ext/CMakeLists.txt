@@ -92,6 +92,13 @@ IF (ENABLE_HAIKU)
 	repo_haiku.h)
 ENDIF (ENABLE_HAIKU)
 
+IF (ENABLE_APPDATA)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_appdata.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_appdata.h)
+ENDIF (ENABLE_APPDATA)
+
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 SET (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/ext/libsolvext.ver")
 

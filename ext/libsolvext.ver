@@ -1,6 +1,8 @@
 SOLV_1.0 {
 	global:
 		pool_findfileconflicts;
+		repo_add_appdata;
+		repo_add_appdata_dir;
 		repo_add_arch_local;
 		repo_add_arch_pkg;
 		repo_add_arch_repo;
