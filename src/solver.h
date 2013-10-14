@@ -182,6 +182,7 @@ struct _Solver {
   Queue *installsuppdepq;		/* deps from the install namespace provides hack */
 
   Queue addedmap_deduceq;		/* deduce addedmap from rpm rules */
+  Id *instbuddy;			/* buddies of installed packages */
 #endif	/* LIBSOLV_INTERNAL */
 };
 

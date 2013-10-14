@@ -1588,6 +1588,7 @@ solver_free(Solver *solv)
   solv_free(solv->multiversionupdaters);
   solv_free(solv->choicerules_ref);
   solv_free(solv->bestrules_pkg);
+  solv_free(solv->instbuddy);
   solv_free(solv);
 }
 
@@ -3299,6 +3300,10 @@ solver_solve(Solver *solv, Queue *job)
   oldnrules = solv->nrules;
   solver_addrpmrulesforweak(solv, &addedmap);
   POOL_DEBUG(SOLV_DEBUG_STATS, "added %d rpm rules because of weak dependencies\n", solv->nrules - oldnrules);
+
+  oldnrules = solv->nrules;
+  solver_addrpmrulesforlinked(solv, &addedmap);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "added %d rpm rules because of linked packages\n", solv->nrules - oldnrules);
 
   /*
    * first pass done, we now have all the rpm rules we need.

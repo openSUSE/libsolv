@@ -106,6 +106,7 @@ extern void solver_shrinkrules(struct _Solver *solv, int nrules);
 /* rpm rules */
 extern void solver_addrpmrulesforsolvable(struct _Solver *solv, Solvable *s, Map *m);
 extern void solver_addrpmrulesforweak(struct _Solver *solv, Map *m);
+extern void solver_addrpmrulesforlinked(struct _Solver *solv, Map *m);
 extern void solver_addrpmrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
 
 /* update/feature rules */
