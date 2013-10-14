@@ -76,6 +76,9 @@
 #include "repo_updateinfoxml.h"
 #include "repo_deltainfoxml.h"
 #endif
+#ifdef ENABLE_APPDATA
+#include "repo_appdata.h"
+#endif
 #ifdef ENABLE_SUSEREPO
 #include "repo_products.h"
 #include "repo_susetags.h"
@@ -90,6 +93,9 @@
 # define REPOINFO_PATH "/etc/zypp/repos.d"
 # define PRODUCTS_PATH "/etc/products.d"
 # define SOFTLOCKS_PATH "/var/lib/zypp/SoftLocks"
+#endif
+#ifdef ENABLE_APPDATA
+# define APPDATA_PATH "/usr/share/appdata"
 #endif
 
 #define SOLVCACHE_PATH "/var/cache/solv"
@@ -1756,6 +1762,13 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  exit(1);
 	}
 # endif
+# if defined(ENABLE_APPDATA)
+      if (repo_add_appdata_dir(repo, APPDATA_PATH, REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
+	{
+	  fprintf(stderr, "appdata reading failed: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
+# endif
       ofp = fopen(calccachepath(repo, 0, 0), "r");
       if (repo_add_rpmdb_reffp(repo, ofp, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))
 	{
@@ -1856,6 +1869,18 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	      fclose(fp);
 	    }
 
+#ifdef ENABLE_APPDATA
+	  filename = repomd_find(repo, "appdata", &filechksum, &filechksumtype);
+	  if (filename && (fp = curlfopen(cinfo, filename, iscompressed(filename), filechksum, filechksumtype, 1)) != 0)
+	    {
+	      if (repo_add_appdata(repo, fp, 0))
+		{
+	          printf("appdata: %s\n", pool_errstr(pool));
+		  cinfo->incomplete = 1;
+		}
+	      fclose(fp);
+	    }
+#endif
 	  data = repo_add_repodata(repo, 0);
 	  if (!repomd_add_ext(repo, data, "deltainfo"))
 	    repomd_add_ext(repo, data, "prestodelta");
@@ -1966,6 +1991,20 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 		  fclose(fp);
 		}
 	    }
+#ifdef ENABLE_APPDATA
+	  filename = susetags_find(repo, "appdata.xml.gz", &filechksum, &filechksumtype);
+          if (!filename)
+	    filename = susetags_find(repo, "appdata.xml", &filechksum, &filechksumtype);
+	  if (filename && (fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), iscompressed(filename), filechksum, filechksumtype, 1)) != 0)
+	    {
+	      if (repo_add_appdata(repo, fp, 0))
+		{
+	          printf("appdata: %s\n", pool_errstr(pool));
+		  cinfo->incomplete = 1;
+		}
+	      fclose(fp);
+	    }
+#endif
           repo_internalize(repo);
 	  data = repo_add_repodata(repo, 0);
 	  susetags_add_ext(repo, data);
@@ -2199,28 +2238,6 @@ rundpkg(const char *arg, const char *name, int dupfd3, const char *rootdir)
 static Id
 nscallback(Pool *pool, void *data, Id name, Id evr)
 {
-  if (name == NAMESPACE_PRODUCTBUDDY)
-    {
-      /* SUSE specific hack: each product has an associated rpm */
-      Solvable *s = pool->solvables + evr;
-      Id p, pp, cap;
-      Id bestp = 0;
-
-      cap = pool_str2id(pool, pool_tmpjoin(pool, "product(", pool_id2str(pool, s->name) + 8, ")"), 0);
-      if (!cap)
-        return 0;
-      cap = pool_rel2id(pool, cap, s->evr, REL_EQ, 0);
-      if (!cap)
-        return 0;
-      FOR_PROVIDES(p, pp, cap)
-        {
-          Solvable *ps = pool->solvables + p;
-          if (ps->repo == s->repo && ps->arch == s->arch)
-            if (!bestp || pool_evrcmp(pool, pool->solvables[bestp].evr, ps->evr, EVRCMP_COMPARE) < 0)
-	      bestp = p;
-        }
-      return bestp;
-    }
 #if 0
   if (name == NAMESPACE_LANGUAGE)
     {
@@ -2602,12 +2619,19 @@ main(int argc, char **argv)
   int forcebest = 0;
   char *rootdir = 0;
   char *keyname = 0;
+  int debuglevel = 0;
 
   argc--;
   argv++;
   userhome = getenv("HOME");
   if (userhome && userhome[0] != '/')
     userhome = 0;
+  while (argc && !strcmp(argv[0], "-d"))
+    {
+      debuglevel++;
+      argc--;
+      argv++;
+    }
   if (!argv[0])
     usage(1);
   if (!strcmp(argv[0], "install") || !strcmp(argv[0], "in"))
@@ -2709,7 +2733,8 @@ main(int argc, char **argv)
 #ifdef SUSE
   pool->nscallback = nscallback;
 #endif
-  // pool_setdebuglevel(pool, 2);
+  if (debuglevel)
+    pool_setdebuglevel(pool, debuglevel);
   setarch(pool);
   pool_set_flag(pool, POOL_FLAG_ADDFILEPROVIDESFILTERED, 1);
   repoinfos = read_repoinfos(pool, &nrepoinfos);
