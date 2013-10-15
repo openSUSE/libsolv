@@ -78,11 +78,6 @@ enum state {
   STATE_INSTALL_TIME,
 
   /* product */
-  STATE_SHORTNAME,
-  STATE_DISTNAME, /* obsolete */
-  STATE_DISTEDITION, /* obsolete */
-  STATE_SOURCE,
-  STATE_TYPE,
   STATE_RELNOTESURL,
   STATE_UPDATEURL,
   STATE_OPTIONALURL,
@@ -184,28 +179,28 @@ static struct stateswitch stateswitches[] = {
   /* product attributes */
   /* note the product type is an attribute */
   { STATE_SOLVABLE,    "release-notes-url", STATE_RELNOTESURL, 1 },
-  { STATE_SOLVABLE,    "update-url",        STATE_UPDATEURL,   1 },
-  { STATE_SOLVABLE,    "optional-url",      STATE_OPTIONALURL, 1 },
-  { STATE_SOLVABLE,    "flag",              STATE_FLAG,        1 },
+  { STATE_SOLVABLE,    "update-url",      STATE_UPDATEURL,   1 },
+  { STATE_SOLVABLE,    "optional-url",    STATE_OPTIONALURL, 1 },
+  { STATE_SOLVABLE,    "flag",            STATE_FLAG,        1 },
 
-  { STATE_SOLVABLE,      "rpm:vendor",      STATE_VENDOR,      1 },
-  { STATE_SOLVABLE,      "rpm:group",       STATE_RPM_GROUP,   1 },
-  { STATE_SOLVABLE,      "rpm:license",     STATE_RPM_LICENSE, 1 },
+  { STATE_SOLVABLE,    "rpm:vendor",      STATE_VENDOR,      1 },
+  { STATE_SOLVABLE,    "rpm:group",       STATE_RPM_GROUP,   1 },
+  { STATE_SOLVABLE,    "rpm:license",     STATE_RPM_LICENSE, 1 },
 
   /* rpm-md dependencies */
-  { STATE_SOLVABLE,      "rpm:provides",    STATE_PROVIDES,     0 },
-  { STATE_SOLVABLE,      "rpm:requires",    STATE_REQUIRES,     0 },
-  { STATE_SOLVABLE,      "rpm:obsoletes",   STATE_OBSOLETES,    0 },
-  { STATE_SOLVABLE,      "rpm:conflicts",   STATE_CONFLICTS,    0 },
-  { STATE_SOLVABLE,      "rpm:recommends",  STATE_RECOMMENDS ,  0 },
-  { STATE_SOLVABLE,      "rpm:supplements", STATE_SUPPLEMENTS,  0 },
-  { STATE_SOLVABLE,      "rpm:suggests",    STATE_SUGGESTS,     0 },
-  { STATE_SOLVABLE,      "rpm:enhances",    STATE_ENHANCES,     0 },
-  { STATE_SOLVABLE,      "rpm:freshens",    STATE_FRESHENS,     0 },
-  { STATE_SOLVABLE,      "rpm:sourcerpm",   STATE_SOURCERPM,    1 },
-  { STATE_SOLVABLE,      "rpm:header-range", STATE_HEADERRANGE, 0 },
-  { STATE_SOLVABLE,      "file",            STATE_FILE, 1 },
-  { STATE_SOLVABLE,      "changelog",       STATE_CHANGELOG, 1 },
+  { STATE_SOLVABLE,    "rpm:provides",    STATE_PROVIDES,     0 },
+  { STATE_SOLVABLE,    "rpm:requires",    STATE_REQUIRES,     0 },
+  { STATE_SOLVABLE,    "rpm:obsoletes",   STATE_OBSOLETES,    0 },
+  { STATE_SOLVABLE,    "rpm:conflicts",   STATE_CONFLICTS,    0 },
+  { STATE_SOLVABLE,    "rpm:recommends",  STATE_RECOMMENDS ,  0 },
+  { STATE_SOLVABLE,    "rpm:supplements", STATE_SUPPLEMENTS,  0 },
+  { STATE_SOLVABLE,    "rpm:suggests",    STATE_SUGGESTS,     0 },
+  { STATE_SOLVABLE,    "rpm:enhances",    STATE_ENHANCES,     0 },
+  { STATE_SOLVABLE,    "rpm:freshens",    STATE_FRESHENS,     0 },
+  { STATE_SOLVABLE,    "rpm:sourcerpm",   STATE_SOURCERPM,    1 },
+  { STATE_SOLVABLE,    "rpm:header-range", STATE_HEADERRANGE, 0 },
+  { STATE_SOLVABLE,    "file",            STATE_FILE, 1 },
+  { STATE_SOLVABLE,    "changelog",       STATE_CHANGELOG, 1 },
 
    /* extended Novell/SUSE diskusage attributes (susedata.xml) */
   { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
@@ -674,13 +669,20 @@ startElement(void *userData, const char *name, const char **atts)
 	    }
 	  pd->solvable = pool_id2solvable(pool, pd->cscache[index]);
         }
-       else
+      else
         {
           /* this is a new package */
           pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
           pd->freshens = 0;
         }
-      pd->handle = pd->solvable - pool->solvables;
+      pd->handle = handle = pd->solvable - pool->solvables;
+      if (pd->kind && pd->kind[1] == 'r')
+	{
+	  /* products can have a type */
+	  const char *type = find_attr("type", atts);
+	  if (type && *type)
+	    repodata_set_str(pd->data, handle, PRODUCT_TYPE, type);
+	}
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -755,12 +757,12 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_INCLUDESENTRY:
       str = find_attr("pattern", atts);
       if (str)
-	repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", str));
+	repodata_add_poolstr_array(pd->data, handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", str));
       break;
     case STATE_EXTENDSENTRY:
       str = find_attr("pattern", atts);
       if (str)
-	repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", str));
+	repodata_add_poolstr_array(pd->data, handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", str));
       break;
     case STATE_LOCATION:
       str = find_attr("href", atts);
@@ -1019,27 +1021,27 @@ endElement(void *userData, const char *name)
     case STATE_RELNOTESURL:
       if (pd->content[0])
         {
-          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pool, "releasenotes", 1));
+          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, pd->content);
+          repodata_add_idarray(pd->data, handle, PRODUCT_URL_TYPE, pool_str2id(pool, "releasenotes", 1));
         }
       break;
     case STATE_UPDATEURL:
       if (pd->content[0])
         {
-          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pool, "update", 1));
+          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, pd->content);
+          repodata_add_idarray(pd->data, handle, PRODUCT_URL_TYPE, pool_str2id(pool, "update", 1));
         }
       break;
     case STATE_OPTIONALURL:
       if (pd->content[0])
         {
-          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
-          repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pool_str2id(pool, "optional", 1));
+          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, pd->content);
+          repodata_add_idarray(pd->data, handle, PRODUCT_URL_TYPE, pool_str2id(pool, "optional", 1));
         }
       break;
     case STATE_FLAG:
       if (pd->content[0])
-          repodata_set_poolstr(pd->data, handle, PRODUCT_FLAGS, pd->content);
+        repodata_add_poolstr_array(pd->data, handle, PRODUCT_FLAGS, pd->content);
       break;
     case STATE_EULA:
       if (pd->content[0])
@@ -1047,19 +1049,19 @@ endElement(void *userData, const char *name)
       break;
     case STATE_KEYWORD:
       if (pd->content[0])
-        repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_KEYWORDS, pd->content);
+        repodata_add_poolstr_array(pd->data, handle, SOLVABLE_KEYWORDS, pd->content);
       break;
     case STATE_DISKUSAGE:
       if (pd->ndirs)
-        commit_diskusage(pd, pd->handle);
+        commit_diskusage(pd, handle);
       break;
     case STATE_ORDER:
       if (pd->content[0])
-        repodata_set_str(pd->data, pd->handle, SOLVABLE_ORDER, pd->content);
+        repodata_set_str(pd->data, handle, SOLVABLE_ORDER, pd->content);
       break;
     case STATE_CHANGELOG:
       repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_TEXT, pd->content);
-      repodata_add_flexarray(pd->data, pd->handle, SOLVABLE_CHANGELOG, pd->changelog_handle);
+      repodata_add_flexarray(pd->data, handle, SOLVABLE_CHANGELOG, pd->changelog_handle);
       pd->changelog_handle = 0;
       break;
     default:
