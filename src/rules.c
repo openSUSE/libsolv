@@ -435,6 +435,8 @@ addrpmrule(Solver *solv, Id p, Id d, int type, Id dep)
     addrpmruleinfo(solv, p, d, type, dep);
 }
 
+#ifdef ENABLE_LINKED_PKGS
+
 static void
 addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m, Queue *workq)
 {
@@ -452,6 +454,13 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
       if (i == qr->count)
 	return;
       queue_push(workq, s - pool->solvables);
+      return;
+    }
+  if (!m && workq)
+    {
+      /* just push required packages on the work queue */
+      for (i = 0; i < qr->count; i++)
+	queue_push(workq, qr->elements[i]);
       return;
     }
 #if 0
@@ -708,6 +717,8 @@ add_package_link(Solver *solv, Solvable *s, Map *m, Queue *workq)
     add_product_link(solv, s, m, workq);
 }
 
+#endif
+
 /*-------------------------------------------------------------------
  * 
  * add (install) rules for solvable
@@ -797,8 +808,10 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	    }
 	}
 
+#ifdef ENABLE_LINKED_PKGS
       /* add pseudo-package <-> real-package links */
       add_package_link(solv, s, m, &workq);
+#endif
 
       /*-----------------------------------------
        * check requires of s
@@ -1019,6 +1032,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   queue_free(&workq);
 }
 
+#ifdef ENABLE_LINKED_PKGS
 void
 solver_addrpmrulesforlinked(Solver *solv, Map *m)
 {
@@ -1052,6 +1066,7 @@ solver_addrpmrulesforlinked(Solver *solv, Map *m)
     }
   queue_free(&workq);
 }
+#endif
 
 /*-------------------------------------------------------------------
  * 
@@ -2382,6 +2397,7 @@ getrpmruleinfos(Solver *solv, Rule *r, Queue *rq)
   /* also try reverse direction for conflicts */
   if ((r->d == 0 || r->d == -1) && r->w2 < 0)
     solver_addrpmrulesforsolvable(solv, pool->solvables - r->w2, 0);
+#ifdef ENABLE_LINKED_PKGS
   /* check linked packages */
   d = 0;
   if ((r->d == 0 || r->d == -1))
@@ -2397,6 +2413,7 @@ getrpmruleinfos(Solver *solv, Rule *r, Queue *rq)
 	break;
       add_package_link(solv, pool->solvables + l, 0, 0);
     }
+#endif
   solv->ruleinfoq = 0;
   queue_shift(rq);
 }
