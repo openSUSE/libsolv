@@ -2388,7 +2388,9 @@ static void
 getrpmruleinfos(Solver *solv, Rule *r, Queue *rq)
 {
   Pool *pool = solv->pool;
+#ifdef ENABLE_LINKED_PKGS
   Id l, d;
+#endif
   if (r->p >= 0)
     return;
   queue_push(rq, r - solv->rules);	/* push the rule we're interested in */
