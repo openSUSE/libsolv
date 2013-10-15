@@ -622,7 +622,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 	    continue;
 	  queue_push2(ti, p, p2);
 	}
-      if (s->obsoletes && (!multi || !pool->noobsoletesmultiversion))
+      if (s->obsoletes && !multi)
 	{
 	  Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
