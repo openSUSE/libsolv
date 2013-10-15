@@ -289,16 +289,16 @@ Special Solvable Attributes
   The title of the reference, e.g. the bug summary.
 
 *PRODUCT_REFERENCEFILE "product:referencefile"*::
-  A reference to another product file.
+  The basename of the product file in the package.
 
 *PRODUCT_SHORTLABEL "product:shortlabel"*::
   A identification string of the product.
 
 *PRODUCT_DISTPRODUCT "product:distproduct"*::
-  A SUSE Code-10 product name.
+  Obsolete, do not use. Was a SUSE Code-10 product name.
 
 *PRODUCT_DISTVERSION "product:distversion"*::
-  A SUSE Code-10 product version.
+  Obsolete, do not use. Was a SUSE Code-10 product version.
 
 *PRODUCT_TYPE "product:type"*::
   The type of the product, e.g. ``base''.
@@ -313,10 +313,10 @@ Special Solvable Attributes
   An array of product flags.
 
 *PRODUCT_PRODUCTLINE "product:productline"*::
-  A product line string.
+  A product line string used for product registering.
 
 *PRODUCT_REGISTER_TARGET "product:regtarget"*::
-  A target for proudct registering.
+  A target for prouduct registering.
 
 *PRODUCT_REGISTER_RELEASE "product:regrelease"*::
   A release string for proudct registering.
@@ -326,7 +326,7 @@ Special Solvable Attributes
 
 *PUBKEY_FINGERPRINT "pubkey:fingerprint"*::
   The fingerprint of a pubkey, usually a sha1sum in hex. Old V3 RSA keys
-  use an md5sum instead.
+  use a md5sum instead.
 
 *PUBKEY_EXPIRES "pubkey:expires"*::
   The seconds since the unix epoch when the pubkey expires.
@@ -345,7 +345,7 @@ Special Solvable Attributes
   A list of other patterns that this pattern extends.
 
 *SOLVABLE_ICON "solvable:icon"*::
-  The icon of a pattern.
+  The icon name of a pattern.
 
 *SOLVABLE_ORDER "solvable:order"*::
   An ordering clue of a pattern.
