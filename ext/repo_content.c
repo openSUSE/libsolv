@@ -444,43 +444,39 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		    }
 		}
             }
+	  if (!code10)
+	    continue;
 
 	  /*
 	   * Every tag below is Code10 only
 	   *
 	   */
 
-	  if (code10 && istag ("DISTPRODUCT"))
-	    /* DISTPRODUCT is for registration and Yast, not for the solver. */
-	    repodata_set_str(data, s - pool->solvables, PRODUCT_DISTPRODUCT, value);
-	  else if (code10 && istag ("DISTVERSION"))
-	    /* DISTVERSION is for registration and Yast, not for the solver. */
-	    repodata_set_str(data, s - pool->solvables, PRODUCT_DISTVERSION, value);
-	  else if (code10 && istag ("ARCH"))
+	  if (istag ("ARCH"))
 	    /* Theoretically we want to have the best arch of the given
 	       modifiers which still is compatible with the system
 	       arch.  We don't know the latter here, though.  */
 	    s->arch = ARCH_NOARCH;
-	  else if (code10 && istag ("PREREQUIRES"))
+	  else if (istag ("PREREQUIRES"))
 	    s->requires = adddep(pool, &pd, s->requires, value, SOLVABLE_PREREQMARKER);
-	  else if (code10 && istag ("REQUIRES"))
+	  else if (istag ("REQUIRES"))
 	    s->requires = adddep(pool, &pd, s->requires, value, -SOLVABLE_PREREQMARKER);
-	  else if (code10 && istag ("PROVIDES"))
+	  else if (istag ("PROVIDES"))
 	    s->provides = adddep(pool, &pd, s->provides, value, 0);
-	  else if (code10 && istag ("CONFLICTS"))
+	  else if (istag ("CONFLICTS"))
 	    s->conflicts = adddep(pool, &pd, s->conflicts, value, 0);
-	  else if (code10 && istag ("OBSOLETES"))
+	  else if (istag ("OBSOLETES"))
 	    s->obsoletes = adddep(pool, &pd, s->obsoletes, value, 0);
-	  else if (code10 && istag ("RECOMMENDS"))
+	  else if (istag ("RECOMMENDS"))
 	    s->recommends = adddep(pool, &pd, s->recommends, value, 0);
-	  else if (code10 && istag ("SUGGESTS"))
+	  else if (istag ("SUGGESTS"))
 	    s->suggests = adddep(pool, &pd, s->suggests, value, 0);
-	  else if (code10 && istag ("SUPPLEMENTS"))
+	  else if (istag ("SUPPLEMENTS"))
 	    s->supplements = adddep(pool, &pd, s->supplements, value, 0);
-	  else if (code10 && istag ("ENHANCES"))
+	  else if (istag ("ENHANCES"))
 	    s->enhances = adddep(pool, &pd, s->enhances, value, 0);
 	  /* FRESHENS doesn't seem to exist.  */
-	  else if (code10 && istag ("TYPE"))
+	  else if (istag ("TYPE"))
 	    repodata_set_str(data, s - pool->solvables, PRODUCT_TYPE, value);
 
 	  /* XXX do something about LINGUAS and ARCH?
