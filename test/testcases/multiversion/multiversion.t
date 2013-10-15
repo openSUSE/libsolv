@@ -10,7 +10,7 @@ solverflags keepexplicitobsoletes
 job multiversion name A
 job install name A = 2
 result transaction,problems <inline>
-#>erase B-1-1.noarch@system A-2-1.noarch@test
+#>erase B-1-1.noarch@system
 #>install A-2-1.noarch@test
 
 nextjob
