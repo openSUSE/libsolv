@@ -170,17 +170,17 @@ KNOWNID(UPDATE_REFERENCE_ID,		"update:reference:id"),		/*  id, e.g. bug number *
 KNOWNID(UPDATE_REFERENCE_TITLE,		"update:reference:title"),	/*  title, e.g. "the bla forz scribs on fuggle" */
 
 /* name */
-KNOWNID(PRODUCT_REFERENCEFILE,		"product:referencefile"),
-KNOWNID(PRODUCT_SHORTLABEL,		"product:shortlabel"),
-KNOWNID(PRODUCT_DISTPRODUCT,		"product:distproduct"),
-KNOWNID(PRODUCT_DISTVERSION,		"product:distversion"),
-KNOWNID(PRODUCT_TYPE,			"product:type"),
+KNOWNID(PRODUCT_REFERENCEFILE,		"product:referencefile"),	/* installed product only */
+KNOWNID(PRODUCT_SHORTLABEL,		"product:shortlabel"),		/* not in repomd? */
+KNOWNID(PRODUCT_DISTPRODUCT,		"product:distproduct"),		/* obsolete */
+KNOWNID(PRODUCT_DISTVERSION,		"product:distversion"),		/* obsolete */
+KNOWNID(PRODUCT_TYPE,			"product:type"),		/* not in repomd? */
 KNOWNID(PRODUCT_URL,			"product:url"),
 KNOWNID(PRODUCT_URL_TYPE,		"product:url:type"),
-KNOWNID(PRODUCT_FLAGS,			"product:flags"),
-KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),
-KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),
-KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),
+KNOWNID(PRODUCT_FLAGS,			"product:flags"),		/* code10 repo flags? obsolete? */
+KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),		/* installed product only */
+KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),		/* installed product only */
+KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),		/* installed product only */
 
 /* argh */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
