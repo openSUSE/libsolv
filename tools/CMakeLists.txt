@@ -88,8 +88,10 @@ ENDIF (ENABLE_CUDFREPO)
 ADD_EXECUTABLE (installcheck installcheck.c)
 TARGET_LINK_LIBRARIES (installcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
 
+IF (SUSE)
 ADD_EXECUTABLE (patchcheck patchcheck.c)
 TARGET_LINK_LIBRARIES (patchcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
+ENDIF (SUSE)
 
 ADD_EXECUTABLE (dumpsolv dumpsolv.c )
 TARGET_LINK_LIBRARIES (dumpsolv libsolv)
