@@ -199,14 +199,44 @@ transaction_base_type(Transaction *trans, Id p)
     }
 }
 
+/* these packages do not get installed by the package manager */
 static inline int
 is_pseudo_package(Pool *pool, Solvable *s)
+{
+  const char *n = pool_id2str(pool, s->name);
+  if (*n == 'p' && !strncmp(n, "patch:", 6))
+    return 1;
+  if (*n == 'p' && !strncmp(n, "pattern:", 8))
+    return 1;
+  if (*n == 'p' && !strncmp(n, "product:", 8))
+    return 1;
+  if (*n == 'a' && !strncmp(n, "application:", 12))
+    return 1;
+  return 0;
+}
+
+/* these packages will never show up installed */
+static inline int
+is_noinst_pseudo_package(Pool *pool, Solvable *s)
 {
   const char *n = pool_id2str(pool, s->name);
   if (!strncmp(n, "patch:", 6))
     return 1;
   if (!strncmp(n, "pattern:", 8))
-    return 1;
+    {
+#if defined(SUSE) && defined(ENABLE_LINKED_PKGS)
+      /* unlike normal patterns, autopatterns *can* be installed (via the package link),
+         so do not filter them */
+      if (s->provides)
+	{
+	  Id prv, *prvp = s->repo->idarraydata + s->provides;
+	  while ((prv = *prvp++) != 0)
+	    if (ISRELDEP(prv) && !strcmp(pool_id2str(pool, prv), "autopattern()"))
+	      return 0;
+	}
+#endif
+      return 1;
+    }
   return 0;
 }
 
@@ -251,7 +281,7 @@ transaction_type(Transaction *trans, Id p, int mode)
     return SOLVER_TRANSACTION_IGNORE;
 
   /* XXX: SUSE only? */
-  if (!(mode & SOLVER_TRANSACTION_KEEP_PSEUDO) && is_pseudo_package(pool, s))
+  if (!(mode & SOLVER_TRANSACTION_KEEP_PSEUDO) && is_noinst_pseudo_package(pool, s))
     return SOLVER_TRANSACTION_IGNORE;
 
   type = transaction_base_type(trans, p);
