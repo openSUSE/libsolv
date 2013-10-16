@@ -2871,7 +2871,7 @@ main(int argc, char **argv)
     }
 
   /* process command line packages */
-  if (mainmode == MODE_LIST || mainmode == MODE_INSTALL)
+  if (mainmode == MODE_LIST || mainmode == MODE_INFO || mainmode == MODE_INSTALL)
     {
       for (i = 1; i < argc; i++)
 	{
@@ -3233,6 +3233,8 @@ rerunsolver:
 	  if (s->repo == commandlinerepo)
 	    {
 	      loc = solvable_lookup_location(s, &medianr);
+	      if (!loc)
+		continue;
 	      if (!(newpkgsfps[i] = fopen(loc, "r")))
 		{
 		  perror(loc);
