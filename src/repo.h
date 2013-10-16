@@ -7,7 +7,7 @@
 
 /*
  * repo.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_REPO_H
@@ -92,7 +92,7 @@ static inline int pool_disabled_solvable(const Pool *pool, Solvable *s)
   if (s->repo && s->repo->disabled)
     return 1;
   if (pool->considered)
-    { 
+    {
       Id id = s - pool->solvables;
       if (!MAPTST(pool->considered, id))
 	return 1;
@@ -109,7 +109,7 @@ static inline int pool_installable(const Pool *pool, Solvable *s)
   if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
     return 0;
   if (pool->considered)
-    { 
+    {
       Id id = s - pool->solvables;
       if (!MAPTST(pool->considered, id))
 	return 0;
@@ -162,7 +162,7 @@ void repo_add_deparray(Repo *repo, Id p, Id keyname, Id dep, Id marker);
 void repo_set_idarray(Repo *repo, Id p, Id keyname, Queue *q);
 void repo_set_deparray(Repo *repo, Id p, Id keyname, Queue *q, Id marker);
 void repo_unset(Repo *repo, Id p, Id keyname);
- 
+
 void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);
 

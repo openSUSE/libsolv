@@ -7,7 +7,7 @@
 
 /*
  * selection.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_SELECTION_H

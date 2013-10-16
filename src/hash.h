@@ -74,9 +74,9 @@ relhash(Id name, Id evr, int flags)
 
 /* compute bitmask for value
  * returns smallest (2^n-1) > 2 * num
- * 
+ *
  * used for Hashtable 'modulo' operation
- */ 
+ */
 static inline Hashval
 mkmask(unsigned int num)
 {

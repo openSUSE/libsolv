@@ -7,13 +7,13 @@
 
 /*
  * repodata.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_REPODATA_H
 #define LIBSOLV_REPODATA_H
 
-#include <stdio.h> 
+#include <stdio.h>
 
 #include "pooltypes.h"
 #include "pool.h"
@@ -271,7 +271,7 @@ void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 void repodata_unset(Repodata *data, Id solvid, Id keyname);
 void repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname);
 
-/* 
+/*
  merge/swap attributes from one solvable to another
  works only if the data is not yet internalized
 */

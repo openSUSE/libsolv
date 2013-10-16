@@ -2802,7 +2802,7 @@ main(int argc, char **argv)
 	}
       else if (!strcmp(argv[1], "--arch"))
 	{
-	  if (!strcmp(argv[2], "src") || !strcmp(argv[2], "nosrc")) 
+	  if (!strcmp(argv[2], "src") || !strcmp(argv[2], "nosrc"))
 	    archfilter_src = 1;
 	  queue_push2(&archfilter, SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, 0, pool_str2id(pool, argv[2], 1), REL_ARCH, 1));
 	  argc -= 2;

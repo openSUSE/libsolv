@@ -116,7 +116,7 @@ void transaction_calc_duchanges(Transaction *trans, struct _DUChanges *mps, int 
 /* order a transaction */
 extern void transaction_order(Transaction *trans, int flags);
 
-/* roll your own order funcion: 
+/* roll your own order funcion:
  * add pkgs free for installation to queue choices after chosen was
  * installed. start with chosen = 0
  * needs an ordered transaction created with SOLVER_TRANSACTION_KEEP_ORDERDATA */

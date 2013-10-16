@@ -7,7 +7,7 @@
 
 /*
  * poolid.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_POOLID_H

@@ -7,7 +7,7 @@
 
 /*
  * pool.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_POOL_H
@@ -49,7 +49,7 @@ typedef struct _Datapos {
   Id solvid;
   Id repodataid;
   Id schema;
-  Id dp; 
+  Id dp;
 } Datapos;
 
 struct _Pool_tmpspace {

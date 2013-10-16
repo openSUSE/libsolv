@@ -190,15 +190,15 @@
 # work around a swig bug
 %{
 #undef SWIG_CALLXS
-#ifdef PERL_OBJECT 
-#  define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(cv,pPerl) 
-#else 
-#  ifndef MULTIPLICITY 
-#    define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(cv) 
-#  else 
-#    define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(PERL_GET_THX, cv) 
-#  endif 
-#endif 
+#ifdef PERL_OBJECT
+#  define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(cv,pPerl)
+#else
+#  ifndef MULTIPLICITY
+#    define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(cv)
+#  else
+#    define SWIG_CALLXS(_name) TOPMARK=MARK-PL_stack_base;_name(PERL_GET_THX, cv)
+#  endif
+#endif
 %}
 
 
@@ -360,7 +360,7 @@ SWIG_AsValDepId(VALUE obj, int *val) {
 SWIG_AsValDepId(void *obj, int *val) {
 #endif
   static swig_type_info* desc = 0;
-  void *vptr = 0; 
+  void *vptr = 0;
   int ecode;
   if (!desc) desc = SWIG_TypeQuery("Dep *");
   ecode = SWIG_AsVal_int(obj, val);

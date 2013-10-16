@@ -7,7 +7,7 @@
 
 /*
  * evr.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_EVR_H

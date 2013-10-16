@@ -7,7 +7,7 @@
 
 /*
  * pooltypes.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_POOLTYPES_H

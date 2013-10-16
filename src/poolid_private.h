@@ -7,7 +7,7 @@
 
 /*
  * poolid_private.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_POOLID_PRIVATE_H

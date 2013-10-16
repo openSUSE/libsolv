@@ -37,7 +37,7 @@ struct _Solver {
 
 #ifdef LIBSOLV_INTERNAL
   Repo *installed;			/* copy of pool->installed */
-  
+
   /* list of rules, ordered
    * rpm rules first, then features, updates, jobs, learnt
    * see start/end offsets below
@@ -48,15 +48,15 @@ struct _Solver {
   Queue ruleassertions;			/* Queue of all assertion rules */
 
   /* start/end offset for rule 'areas' */
-    
+
   Id rpmrules_end;                      /* [Offset] rpm rules end */
-    
+
   Id featurerules;			/* feature rules start/end */
   Id featurerules_end;
-    
+
   Id updaterules;			/* policy rules, e.g. keep packages installed or update. All literals > 0 */
   Id updaterules_end;
-    
+
   Id jobrules;				/* user rules */
   Id jobrules_end;
 
@@ -65,7 +65,7 @@ struct _Solver {
 
   Id duprules;				/* dist upgrade rules */
   Id duprules_end;
-    
+
   Id bestrules;				/* rules from SOLVER_FORCEBEST */
   Id bestrules_end;
   Id *bestrules_pkg;
@@ -152,13 +152,13 @@ struct _Solver {
   int dontinstallrecommended;		/* true: do not install recommended packages */
   int addalreadyrecommended;		/* true: also install recommended packages that were already recommended by the installed packages */
   int dontshowinstalledrecommended;	/* true: do not show recommended packages that are already installed */
-  
+
   int noinfarchcheck;			/* true: do not forbid inferior architectures */
   int keepexplicitobsoletes;		/* true: honor obsoletes during multiinstall */
   int bestobeypolicy;			/* true: stay in policy with the best rules */
   int noautotarget;			/* true: do not assume targeted for up/dup jobs that contain no installed solvable */
 
-    
+
   Map dupmap;				/* dup these packages*/
   int dupmap_all;			/* dup all packages */
   Map dupinvolvedmap;			/* packages involved in dup process */

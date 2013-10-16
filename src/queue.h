@@ -7,7 +7,7 @@
 
 /*
  * queue.h
- * 
+ *
  */
 
 #ifndef LIBSOLV_QUEUE_H
