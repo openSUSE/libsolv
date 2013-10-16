@@ -6,6 +6,7 @@ SOLV_1.0 {
 		repo_add_arch_local;
 		repo_add_arch_pkg;
 		repo_add_arch_repo;
+		repo_add_autopattern;
 		repo_add_code11_products;
 		repo_add_content;
 		repo_add_comps;
