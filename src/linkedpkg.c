@@ -7,6 +7,26 @@
 
 /*
  * linkedpkg.c
+ *
+ * Linked packages are "pseudo" packages that are bound to real packages but
+ * contain different information (name/summary/description). They are normally
+ * somehow generated from the real packages, either when the repositories are
+ * created or automatically from the packages by looking at the provides.
+ *
+ * We currently support:
+ *
+ * application:
+ *   created from AppStream appdata xml in the repository (which is generated
+ *   from files in /usr/share/appdata)
+ *
+ * product:
+ *   created from product data in the repository (which is generated from files
+ *   in /etc/products.d. In the future we may switch to using product()
+ *   provides of packages.
+ * 
+ * pattern:
+ *   created from pattern() provides of packages.
+ *
  */
 
 #include <stdio.h>
