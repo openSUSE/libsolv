@@ -125,7 +125,7 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   if (id || !create)    /* exit here if string found */
     return id;
 
-  /* this should be a test for a flag that tells us if the 
+  /* this should be a test for a flag that tells us if the
    * correct blocking is used, but adding a flag would break
    * the ABI. So we use the existance of the hash area as
    * indication instead */

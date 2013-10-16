@@ -289,9 +289,9 @@ solv_vercmp_haiku(const char *s1, const char *q1, const char *s2, const char *q2
 }
 
 #endif /* HAIKU */
- 
- 
-/* 
+
+
+/*
  * the solv_vercmp variant your system uses.
  */
 int

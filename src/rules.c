@@ -35,7 +35,7 @@ static void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unnee
 
 /*-------------------------------------------------------------------
  * Check if dependency is possible
- * 
+ *
  * mirrors solver_dep_fulfilled but uses map m instead of the decisionmap.
  * used in solver_addrpmrulesforweak and solver_createcleandepsmap.
  */
@@ -219,7 +219,7 @@ hashrule(Solver *solv, Id p, Id d, int n)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  */
 
 /*
@@ -245,7 +245,7 @@ hashrule(Solver *solv, Id p, Id d, int n)
  *   Updates:    p > 0, d > 0   (A|B1|B2|...)   d: <list of updates for solvable p>
  *   Conflicts:  p < 0, d < 0   (-A|-B)         either p (conflict issuer) or d (conflict provider) (binary rule)
  *                                              also used for obsoletes
- *   ?:          p > 0, d < 0   (A|-B)          
+ *   ?:          p > 0, d < 0   (A|-B)
  *   No-op ?:    p = 0, d = 0   (null)          (used as policy rule placeholder)
  *
  *   resulting watches:
@@ -268,7 +268,7 @@ solver_addrule(Solver *solv, Id p, Id d)
   int n = 0;			       /* number of literals in rule - 1
 					  0 = direct assertion (single literal)
 					  1 = binary rule
-					  >1 = 
+					  >1 =
 					*/
 
   /* it often happenes that requires lead to adding the same rpm rule
@@ -285,7 +285,7 @@ solver_addrule(Solver *solv, Id p, Id d)
     /*
      * compute number of literals (n) in rule
      */
-    
+
   if (d < 0)
     {
       /* always a binary rule */
@@ -313,7 +313,7 @@ solver_addrule(Solver *solv, Id p, Id d)
   /*
    * check for duplicate
    */
-    
+
   /* check if the last added rule (r) is exactly the same as what we're looking for. */
   if (r && n == 1 && !r->d && r->p == p && r->w2 == d)
     return r;  /* binary rule */
@@ -344,7 +344,7 @@ solver_addrule(Solver *solv, Id p, Id d)
     /*
      * r = new rule
      */
-    
+
   r->p = p;
   if (n == 0)
     {
@@ -527,20 +527,20 @@ add_package_link(Solver *solv, Solvable *s, Map *m, Queue *workq)
 #endif
 
 /*-------------------------------------------------------------------
- * 
+ *
  * add (install) rules for solvable
- * 
+ *
  * s: Solvable for which to add rules
  * m: m[s] = 1 for solvables which have rules, prevent rule duplication
- * 
+ *
  * Algorithm: 'visit all nodes of a graph'. The graph nodes are
  *  solvables, the edges their dependencies.
  *  Starting from an installed solvable, this will create all rules
  *  representing the graph created by the solvables dependencies.
- * 
+ *
  * for unfulfilled requirements, conflicts, obsoletes,....
  * add a negative assertion for solvables that are not installable
- * 
+ *
  * It will also create rules for all solvables referenced by 's'
  *  i.e. descend to all providers of requirements of 's'
  *
@@ -556,7 +556,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
      And buffer for it. */
   Queue workq;
   Id workqbuf[64];
-    
+
   int i;
     /* if to add rules for broken deps ('rpm -V' functionality)
      * 0 = yes, 1 = no
@@ -607,7 +607,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
       if (!dontfix)
 	{
 	  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC
-		? pool_disabled_solvable(pool, s) 
+		? pool_disabled_solvable(pool, s)
 		: !pool_installable(pool, s))
 	    {
 	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables));
@@ -645,7 +645,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
                    * that are already broken. so if we find one provider
                    * that was already installed, we know that the
                    * dependency was not broken before so we enforce it */
-		 
+
 		  /* check if any of the providers for 'req' is installed */
 		  for (i = 0; (p = dp[i]) != 0; i++)
 		    {
@@ -763,7 +763,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      /* foreach obsoletes */
 	      while ((obs = *obsp++) != 0)
 		{
-		  /* foreach provider of an obsoletes of 's' */ 
+		  /* foreach provider of an obsoletes of 's' */
 		  FOR_PROVIDES(p, pp, obs)
 		    {
 		      Solvable *ps = pool->solvables + p;
@@ -877,7 +877,7 @@ solver_addrpmrulesforlinked(Solver *solv, Map *m)
 #endif
 
 /*-------------------------------------------------------------------
- * 
+ *
  * Add rules for packages possibly selected in by weak dependencies
  *
  * m: already added solvables
@@ -933,9 +933,9 @@ solver_addrpmrulesforweak(Solver *solv, Map *m)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * add package rules for possible updates
- * 
+ *
  * s: solvable
  * m: map of already visited solvables
  * allow_all: 0 = dont allow downgrades, 1 = allow all candidates
@@ -1028,7 +1028,7 @@ addduppackages(Solver *solv, Solvable *s, Queue *qs)
 }
 
 /*-------------------------------------------------------------------
- * 
+ *
  * add rule for update
  *   (A|A1|A2|A3...)  An = update candidates for A
  *
@@ -1109,7 +1109,7 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
   solver_addrule(solv, p, d);	/* allow update of s */
 }
 
-static inline void 
+static inline void
 disableupdaterule(Solver *solv, Id p)
 {
   Rule *r;
@@ -1131,7 +1131,7 @@ disableupdaterule(Solver *solv, Id p)
     }
 }
 
-static inline void 
+static inline void
 reenableupdaterule(Solver *solv, Id p)
 {
   Pool *pool = solv->pool;
@@ -1140,7 +1140,7 @@ reenableupdaterule(Solver *solv, Id p)
   MAPCLR(&solv->noupdate, p - solv->installed->start);
   r = solv->rules + solv->updaterules + (p - solv->installed->start);
   if (r->p)
-    {    
+    {
       if (r->d < 0)
 	{
 	  solver_enablerule(solv, r);
@@ -1315,15 +1315,15 @@ reenableinfarchrule(Solver *solv, Id name)
  ***
  ***/
 
-static inline void 
+static inline void
 add_cleandeps_package(Solver *solv, Id p)
 {
   if (!solv->cleandeps_updatepkgs)
-    {    
+    {
       solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
       queue_init(solv->cleandeps_updatepkgs);
-    }    
-  queue_pushunique(solv->cleandeps_updatepkgs, p); 
+    }
+  queue_pushunique(solv->cleandeps_updatepkgs, p);
 }
 
 static inline void
@@ -1549,21 +1549,21 @@ disableduprule(Solver *solv, Id name)
   Pool *pool = solv->pool;
   Rule *r;
   int i;
-  for (i = solv->duprules, r = solv->rules + i; i < solv->duprules_end; i++, r++) 
-    {    
+  for (i = solv->duprules, r = solv->rules + i; i < solv->duprules_end; i++, r++)
+    {
       if (r->p < 0 && r->d >= 0 && pool->solvables[-r->p].name == name)
 	solver_disablerule(solv, r);
-    }    
+    }
 }
 
-static inline void 
+static inline void
 reenableduprule(Solver *solv, Id name)
 {
   Pool *pool = solv->pool;
   Rule *r;
   int i;
-  for (i = solv->duprules, r = solv->rules + i; i < solv->duprules_end; i++, r++) 
-    {    
+  for (i = solv->duprules, r = solv->rules + i; i < solv->duprules_end; i++, r++)
+    {
       if (r->p < 0 && r->d < 0 && pool->solvables[-r->p].name == name)
 	{
 	  solver_enablerule(solv, r);
@@ -1590,7 +1590,7 @@ reenableduprule(Solver *solv, Id name)
 #define DISABLE_INFARCH	2
 #define DISABLE_DUP	3
 
-/* 
+/*
  * add all installed packages that package p obsoletes to Queue q.
  * Package p is not installed. Also, we know that if
  * solv->keepexplicitobsoletes is not set, p is not in the multiversion map.
@@ -1615,7 +1615,7 @@ add_obsoletes(Solver *solv, Id p, Queue *q)
 	    continue;
 	  if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
 	    continue;
-	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps)) 
+	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
 	    continue;
 	  queue_push(q, p2);
 	  lastp2 = p2;
@@ -1625,14 +1625,14 @@ add_obsoletes(Solver *solv, Id p, Queue *q)
     return;
   obsp = s->repo->idarraydata + s->obsoletes;
   while ((obs = *obsp++) != 0)
-    FOR_PROVIDES(p2, pp2, obs) 
+    FOR_PROVIDES(p2, pp2, obs)
       {
 	Solvable *ps = pool->solvables + p2;
 	if (ps->repo != installed)
 	  continue;
 	if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
 	  continue;
-	if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps)) 
+	if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 	  continue;
 	if (p2 == lastp2)
 	  continue;
@@ -2256,7 +2256,7 @@ solver_allruleinfos(Solver *solv, Id rid, Queue *rq)
     {
       if (j)
 	{
-	  if (rq->elements[i] == rq->elements[j - 4] && 
+	  if (rq->elements[i] == rq->elements[j - 4] &&
 	      rq->elements[i + 1] == rq->elements[j - 3] &&
 	      rq->elements[i + 2] == rq->elements[j - 2] &&
 	      rq->elements[i + 3] == rq->elements[j - 1])
@@ -2816,9 +2816,9 @@ static void
 prune_to_update_targets(Solver *solv, Id *cp, Queue *q)
 {
   int i, j;
-  Id p, *cp2; 
+  Id p, *cp2;
   for (i = j = 0; i < q->count; i++)
-    {  
+    {
       p = q->elements[i];
       for (cp2 = cp; *cp2; cp2++)
         if (*cp2 == p)
@@ -3225,7 +3225,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	    }
 	}
     }
-  
+
   /* add all positive elements (e.g. locks) to "userinstalled" */
   for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
     {
@@ -3612,7 +3612,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	    }
 	}
     }
-    
+
   queue_free(&iq);
   /* make sure the updatepkgs and mistakes are not in the cleandeps map */
   if (solv->cleandeps_updatepkgs)

@@ -58,7 +58,7 @@
  *  10    "bar"
  *  11    -3           5       [parent 3, /usr, block #1]
  *  12    "games"
- *   
+ *
  * to find all children of dirid 3 ("/usr"), follow the
  * dirtraverse link to 12 -> "games". Then follow the
  * dirtraverse link of this block to 5 -> "bin", "lib"

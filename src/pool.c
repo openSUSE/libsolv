@@ -7,7 +7,7 @@
 
 /*
  * pool.c
- * 
+ *
  * The pool contains information about solvables
  * stored optimized for memory consumption and fast retrieval.
  */
@@ -130,12 +130,12 @@ pool_freeallrepos(Pool *pool, int reuseids)
   int i;
 
   pool_freewhatprovides(pool);
-  for (i = 1; i < pool->nrepos; i++) 
+  for (i = 1; i < pool->nrepos; i++)
     if (pool->repos[i])
       repo_freedata(pool->repos[i]);
   pool->repos = solv_free(pool->repos);
-  pool->nrepos = 0; 
-  pool->urepos = 0; 
+  pool->nrepos = 0;
+  pool->urepos = 0;
   /* the first two solvables don't belong to a repo */
   pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
 }
@@ -384,9 +384,9 @@ pool_shrink_whatprovides(Pool *pool)
 
 /*
  * pool_createwhatprovides()
- * 
+ *
  * create hashes over pool of solvables to ease provide lookups
- * 
+ *
  */
 void
 pool_createwhatprovides(Pool *pool)
@@ -542,7 +542,7 @@ pool_freewhatprovides(Pool *pool)
 
 /*
  * pool_queuetowhatprovides  - add queue contents to whatprovidesdata
- * 
+ *
  * used for whatprovides, jobs, learnt rules, selections
  * input: q: queue of Ids
  * returns: Offset into whatprovidesdata
@@ -771,7 +771,7 @@ pool_searchlazywhatprovidesq(Pool *pool, Id d)
 
 /*
  * addstdproviders
- * 
+ *
  * lazy populating of the whatprovides array, non relation case
  */
 static Id
@@ -871,9 +871,9 @@ pool_is_kind(Pool *pool, Id name, Id kind)
 
 /*
  * addrelproviders
- * 
+ *
  * add packages fulfilling the relation to whatprovides array
- * 
+ *
  */
 Id
 pool_addrelproviders(Pool *pool, Id d)
@@ -1956,7 +1956,7 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
   mptree[0].compl = 0;
   mptree[0].mountpoint = -1;
   nmptree = 1;
-  
+
   /* create component tree */
   for (mp = 0; mp < nmps; mp++)
     {
@@ -2098,7 +2098,7 @@ pool_calc_installsizechange(Pool *pool, Map *installedmap)
  *  8: interesting (only true if installed)
  * 16: undecided
  */
- 
+
 static inline Id dep2name(Pool *pool, Id dep)
 {
   while (ISRELDEP(dep))
@@ -2109,14 +2109,14 @@ static inline Id dep2name(Pool *pool, Id dep)
   return dep;
 }
 
-static int providedbyinstalled_multiversion(Pool *pool, unsigned char *map, Id n, Id con) 
+static int providedbyinstalled_multiversion(Pool *pool, unsigned char *map, Id n, Id con)
 {
   Id p, pp;
-  Solvable *sn = pool->solvables + n; 
+  Solvable *sn = pool->solvables + n;
 
   FOR_PROVIDES(p, pp, sn->name)
-    {    
-      Solvable *s = pool->solvables + p; 
+    {
+      Solvable *s = pool->solvables + p;
       if (s->name != sn->name || s->arch != sn->arch)
         continue;
       if ((map[p] & 9) != 9)

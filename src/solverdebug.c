@@ -572,18 +572,18 @@ solver_printtrivial(Solver *solv)
   Pool *pool = solv->pool;
   Queue in, out;
   Id p;
-  const char *n; 
-  Solvable *s; 
+  const char *n;
+  Solvable *s;
   int i;
 
   queue_init(&in);
   for (p = 1, s = pool->solvables + p; p < solv->pool->nsolvables; p++, s++)
-    {   
+    {
       n = pool_id2str(pool, s->name);
       if (strncmp(n, "patch:", 6) != 0 && strncmp(n, "pattern:", 8) != 0)
         continue;
-      queue_push(&in, p); 
-    }   
+      queue_push(&in, p);
+    }
   if (!in.count)
     {
       queue_free(&in);

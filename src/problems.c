@@ -141,9 +141,9 @@ solver_enableproblem(Solver *solv, Id v)
 
 /*-------------------------------------------------------------------
  * enable weak rules
- * 
+ *
  * Reenable all disabled weak rules (marked in weakrulemap)
- * 
+ *
  */
 
 static void
@@ -164,9 +164,9 @@ enableweakrules(Solver *solv)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * refine_suggestion
- * 
+ *
  * at this point, all rules that led to conflicts are disabled.
  * we re-enable all rules of a problem set but rule "sug", then
  * continue to disable more rules until there as again a solution.
@@ -556,14 +556,14 @@ solver_prepare_solutions(Solver *solv)
   idx = solv->solutions.count;
   queue_push(&solv->solutions, -1);	/* unrefined */
   /* proofidx stays in position, thus we start with 1 */
-  for (i = 1; i < solv->problems.count; i++) 
-    {   
+  for (i = 1; i < solv->problems.count; i++)
+    {
       Id p = solv->problems.elements[i];
-      queue_push(&solv->solutions, p); 
-      if (p) 
+      queue_push(&solv->solutions, p);
+      if (p)
         continue;
       /* end of problem reached */
-      solv->problems.elements[j++] = idx; 
+      solv->problems.elements[j++] = idx;
       if (i + 1 >= solv->problems.count)
         break;
       /* start another problem */
@@ -571,7 +571,7 @@ solver_prepare_solutions(Solver *solv)
       idx = solv->solutions.count;
       queue_push(&solv->solutions, -1);	/* unrefined */
     }
-  solv->problems.count = j;  
+  solv->problems.count = j;
   return j / 2;
 }
 
@@ -723,7 +723,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
 	  solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
 	}
     }
-    
+
   POOL_DEBUG(SOLV_DEBUG_STATS, "create_solutions for problem #%d took %d ms\n", probnr, solv_timems(now));
 }
 
@@ -808,7 +808,7 @@ solver_solutionelement_extrajobflags(Solver *solv, Id problem, Id solution)
  *    pkgid (> 0)                   pkgid (> 0)
  *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
  *       (this will replace package p)
- *         
+ *
  * Thus, the solver will either ask the application to remove
  * a specific job from the job queue, or ask to add an install/erase
  * job to it.
@@ -873,7 +873,7 @@ solver_take_solution(Solver *solv, Id problem, Id solution, Queue *job)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * find problem rule
  */
 
@@ -974,7 +974,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
     *sysrp = lsysr;
 }
 
-/* 
+/*
  * find problem rule
  *
  * search for a rule that describes the problem to the

@@ -64,16 +64,16 @@ int
 solv_chksum_len(Id type)
 {
   switch (type)
-    {   
+    {
     case REPOKEY_TYPE_MD5:
-      return 16; 
+      return 16;
     case REPOKEY_TYPE_SHA1:
-      return 20; 
+      return 20;
     case REPOKEY_TYPE_SHA256:
-      return 32; 
+      return 32;
     default:
       return 0;
-    }   
+    }
 }
 
 void *

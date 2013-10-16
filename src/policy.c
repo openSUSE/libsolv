@@ -466,7 +466,7 @@ trj_visit(struct trj_data *trj, Id node)
       trj->nstack = stackstart;	/* empty stack */
     }
 }
-  
+
 /*
  * remove entries from plist that are obsoleted by other entries
  * with different name.
@@ -478,7 +478,7 @@ prune_obsoleted(Pool *pool, Queue *plist)
   struct trj_data trj;
   int i, j;
   Solvable *s;
-  
+
   if (plist->count <= 16)
     {
       memset(data_buf, 0, sizeof(data_buf));
@@ -776,7 +776,7 @@ policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
 }
 
 /*-------------------------------------------------------------------
- * 
+ *
  * create reverse obsoletes map for installed solvables
  *
  * For each installed solvable find which packages with *different* names
@@ -863,12 +863,12 @@ policy_create_obsolete_index(Solver *solv)
 
 /*
  * find update candidates
- * 
+ *
  * s: installed solvable to be updated
  * qs: [out] queue to hold Ids of candidates
  * allow_all: 0 = dont allow downgrades, 1 = allow all candidates
  *            2 = dup mode
- * 
+ *
  */
 void
 policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)

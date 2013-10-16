@@ -45,7 +45,7 @@ typedef uint32_t Ref;
 /*
    The format is tailored for fast decompression (i.e. only byte based),
    and skewed to ASCII content (highest bit often not set):
-   
+
    a 0LLLLLLL
         - self-describing ASCII character hex L
    b 100lllll <l+1 bytes>
@@ -748,15 +748,15 @@ static inline unsigned int
 read_u32(FILE *fp)
 {
   int c, i;
-  unsigned int x = 0; 
+  unsigned int x = 0;
 
-  for (i = 0; i < 4; i++) 
-    {    
+  for (i = 0; i < 4; i++)
+    {
       c = getc(fp);
-      if (c == EOF) 
+      if (c == EOF)
         return 0;
-      x = (x << 8) | c; 
-    }    
+      x = (x << 8) | c;
+    }
   return x;
 }
 

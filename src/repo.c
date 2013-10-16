@@ -146,7 +146,7 @@ repo_add_solvable(Repo *repo)
     repo->start = repo->end = p;
   /* warning: sidedata must be extended before adapting start/end */
   if (repo->rpmdbid)
-    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, 1); 
+    repo->rpmdbid = (Id *)repo_sidedata_extend(repo, repo->rpmdbid, sizeof(Id), p, 1);
   if (p < repo->start)
     repo->start = p;
   if (p + 1 > repo->end)
@@ -160,7 +160,7 @@ Id
 repo_add_solvable_block(Repo *repo, int count)
 {
   Id p;
-  Solvable *s; 
+  Solvable *s;
   if (!count)
     return 0;
   p = pool_add_solvable_block(repo->pool, count);
@@ -360,7 +360,7 @@ repo_addid(Repo *repo, Offset olddeps, Id id)
 #define REPO_ADDID_DEP_HASHTHRES	64
 #define REPO_ADDID_DEP_HASHMIN		128
 
-/* 
+/*
  * Optimization for packages with an excessive amount of provides/requires:
  * if the number of deps exceed a threshold, we build a hash of the already
  * seen ids.
@@ -1488,16 +1488,16 @@ repo_add_repodata(Repo *repo, int flags)
 	  return repo->repodata + i;
     }
   if (!repo->nrepodata)
-    {    
+    {
       repo->nrepodata = 2;      /* start with id 1 */
       repo->repodata = solv_calloc(repo->nrepodata, sizeof(*data));
-    }    
-  else 
-    {    
+    }
+  else
+    {
       repo->nrepodata++;
       repo->repodata = solv_realloc2(repo->repodata, repo->nrepodata, sizeof(*data));
-    }    
-  data = repo->repodata + repo->nrepodata - 1; 
+    }
+  data = repo->repodata + repo->nrepodata - 1;
   repodata_initdata(data, repo, (flags & REPO_LOCALPOOL) ? 1 : 0);
   return data;
 }

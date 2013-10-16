@@ -238,7 +238,7 @@ autouninstall(Solver *solv, Id *problem)
 /************************************************************************/
 
 /*
- * enable/disable learnt rules 
+ * enable/disable learnt rules
  *
  * we have enabled or disabled some of our rules. We now reenable all
  * of our learnt rules except the ones that were learnt from rules that
@@ -287,7 +287,7 @@ enabledisablelearntrules(Solver *solv)
 
 /*
  * make assertion rules into decisions
- * 
+ *
  * Go through rules and add direct assertions to the decisionqueue.
  * If we find a conflict, disable rules and add them to problem queue.
  */
@@ -327,7 +327,7 @@ makeruledecisions(Solver *solv)
 	{
 	  ri = solv->ruleassertions.elements[ii];
 	  r = solv->rules + ri;
-	    
+
           if (havedisabled && ri >= solv->learntrules)
 	    {
 	      /* just started with learnt rule assertions. If we have disabled
@@ -335,7 +335,7 @@ makeruledecisions(Solver *solv)
 	      enabledisablelearntrules(solv);
 	      havedisabled = 0;
 	    }
-	    
+
 	  if (r->d < 0 || !r->p || r->w2)	/* disabled, dummy or no assertion */
 	    continue;
 
@@ -345,7 +345,7 @@ makeruledecisions(Solver *solv)
 
 	  v = r->p;
 	  vv = v > 0 ? v : -v;
-	    
+
 	  if (!solv->decisionmap[vv])          /* if not yet decided */
 	    {
 	      queue_push(&solv->decisionq, v);
@@ -367,15 +367,15 @@ makeruledecisions(Solver *solv)
 	    continue;
 	  if (v < 0 && solv->decisionmap[vv] < 0)    /* ok to remove */
 	    continue;
-	    
+
 	  /*
 	   * found a conflict!
-	   * 
+	   *
 	   * The rule (r) we're currently processing says something
 	   * different (v = r->p) than a previous decision (decisionmap[abs(v)])
 	   * on this literal
 	   */
-	    
+
 	  if (ri >= solv->learntrules)
 	    {
 	      /* conflict with a learnt rule */
@@ -385,7 +385,7 @@ makeruledecisions(Solver *solv)
 	      solver_disablerule(solv, r);
 	      continue;
 	    }
-	    
+
 	  /*
 	   * find the decision which is the "opposite" of the rule
 	   */
@@ -394,7 +394,7 @@ makeruledecisions(Solver *solv)
 	      break;
 	  assert(i < solv->decisionq.count);         /* assert that we found it */
 	  oldproblemcount = solv->problems.count;
-	    
+
 	  /*
 	   * conflict with system solvable ?
 	   */
@@ -456,7 +456,7 @@ makeruledecisions(Solver *solv)
 	  /*
 	   * conflict with another job or update/feature rule
 	   */
-	    
+
 	  /* record proof */
 	  if (record_proof)
 	    {
@@ -540,7 +540,7 @@ makeruledecisions(Solver *solv)
 	    continue;
 	  if (v < 0 && solv->decisionmap[vv] < 0)
 	    continue;
-	    
+
 	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "assertion conflict, but I am weak, disabling ");
 	  solver_printrule(solv, SOLV_DEBUG_UNSOLVABLE, r);
 
@@ -604,7 +604,7 @@ makewatches(Solver *solv)
  *
  * add watches (for a new learned rule)
  * sets up watches for a single rule
- * 
+ *
  * see also makewatches() above.
  */
 
@@ -635,14 +635,14 @@ addwatches_rule(Solver *solv, Rule *r)
 #define DECISIONMAP_UNDEF(p) (decisionmap[(p) > 0 ? (p) : -(p)] == 0)
 
 /*-------------------------------------------------------------------
- * 
+ *
  * propagate
  *
  * make decision and propagate to all rules
- * 
+ *
  * Evaluate each term affected by the decision (linked through watches).
  * If we find unit rules we make new decisions based on them.
- * 
+ *
  * return : 0 = everything is OK
  *          rule = conflict found in this rule
  */
@@ -656,7 +656,7 @@ propagate(Solver *solv, int level)
   Id p, pkg, other_watch;
   Id *dp;
   Id *decisionmap = solv->decisionmap;
-    
+
   Id *watches = solv->watches + pool->nsolvables;   /* place ptr in middle */
 
   POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "----- propagate -----\n");
@@ -697,7 +697,7 @@ propagate(Solver *solv, int level)
 	    }
 
 	    /* 'pkg' was just decided (was set to FALSE)
-	     * 
+	     *
 	     *  now find other literal watch, check clause
 	     *   and advance on linked list
 	     */
@@ -711,8 +711,8 @@ propagate(Solver *solv, int level)
 	      other_watch = r->w1;
 	      next_rp = &r->n2;
 	    }
-	    
-	    /* 
+
+	    /*
 	     * This term is already true (through the other literal)
 	     * so we have nothing to do
 	     */
@@ -721,17 +721,17 @@ propagate(Solver *solv, int level)
 
 	    /*
 	     * The other literal is FALSE or UNDEF
-	     * 
+	     *
 	     */
-	    
+
           if (r->d)
 	    {
 	      /* Not a binary clause, try to move our watch.
-	       * 
+	       *
 	       * Go over all literals and find one that is
 	       *   not other_watch
 	       *   and not FALSE
-	       * 
+	       *
 	       * (TRUE is also ok, in that case the rule is fulfilled)
 	       */
 	      if (r->p                                /* we have a 'p' */
@@ -766,10 +766,10 @@ propagate(Solver *solv, int level)
 		      else
 			POOL_DEBUG(SOLV_DEBUG_PROPAGATE,"    -> move w%d to !%s\n", (pkg == r->w1 ? 1 : 2), pool_solvid2str(pool, -p));
 		    }
-		    
+
 		  *rp = *next_rp;
 		  next_rp = rp;
-		    
+
 		  if (pkg == r->w1)
 		    {
 		      r->w1 = p;
@@ -786,14 +786,14 @@ propagate(Solver *solv, int level)
 	      /* search failed, thus all unwatched literals are FALSE */
 		
 	    } /* not binary */
-	    
+
           /*
 	   * unit clause found, set literal other_watch to TRUE
 	   */
 
 	  if (DECISIONMAP_FALSE(other_watch))	   /* check if literal is FALSE */
 	    return r;  		                   /* eek, a conflict! */
-	    
+
 	  IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
 	    {
 	      POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "  unit ");
@@ -804,7 +804,7 @@ propagate(Solver *solv, int level)
             decisionmap[other_watch] = level;    /* install! */
 	  else
 	    decisionmap[-other_watch] = -level;  /* remove! */
-	    
+
 	  queue_push(&solv->decisionq, other_watch);
 	  queue_push(&solv->decisionq_why, r - solv->rules);
 
@@ -815,11 +815,11 @@ propagate(Solver *solv, int level)
 	      else
 		POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "    -> decided to conflict %s\n", pool_solvid2str(pool, -other_watch));
 	    }
-	    
+
 	} /* foreach rule involving 'pkg' */
 	
     } /* while we have non-decided decisions */
-    
+
   POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "----- propagate end-----\n");
 
   return 0;	/* all is well */
@@ -830,7 +830,7 @@ propagate(Solver *solv, int level)
 /* Analysis */
 
 /*-------------------------------------------------------------------
- * 
+ *
  * analyze
  *   and learn
  */
@@ -957,9 +957,9 @@ l1retry:
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * solver_reset
- * 
+ *
  * reset all solver decisions
  * called after rules have been enabled/disabled
  */
@@ -994,7 +994,7 @@ solver_reset(Solver *solv)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * analyze_unsolvable_rule
  *
  * recursion helper used by analyze_unsolvable
@@ -1056,7 +1056,7 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * analyze_unsolvable
  *
  * We know that the problem is not solvable. Record all involved
@@ -1218,7 +1218,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 /* Decision revert */
 
 /*-------------------------------------------------------------------
- * 
+ *
  * revert
  * revert decisionq to a level
  */
@@ -1248,20 +1248,20 @@ revert(Solver *solv, int level)
     }
   solv->recommends_index = -1;
   if (solv->decisionq.count < solv->decisioncnt_update)
-    solv->decisioncnt_update = 0; 
+    solv->decisioncnt_update = 0;
   if (solv->decisionq.count < solv->decisioncnt_keep)
-    solv->decisioncnt_keep = 0; 
+    solv->decisioncnt_keep = 0;
   if (solv->decisionq.count < solv->decisioncnt_resolve)
-    solv->decisioncnt_resolve = 0; 
+    solv->decisioncnt_resolve = 0;
   if (solv->decisionq.count < solv->decisioncnt_weak)
     solv->decisioncnt_weak= 0;
   if (solv->decisionq.count < solv->decisioncnt_orphan)
-    solv->decisioncnt_orphan = 0; 
+    solv->decisioncnt_orphan = 0;
 }
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * watch2onhighest - put watch2 on literal with highest level
  */
 
@@ -1290,7 +1290,7 @@ watch2onhighest(Solver *solv, Rule *r)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * setpropagatelearn
  *
  * add free decision (solvable to install) to decisionq
@@ -1412,9 +1412,9 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
 }
 
 /*-------------------------------------------------------------------
- * 
+ *
  * select and install
- * 
+ *
  * install best package from the queue. We add an extra package, inst, if
  * provided. See comment in weak install section.
  *
@@ -1467,7 +1467,7 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * solver_create
  * create solver structure
  *
@@ -1525,7 +1525,7 @@ solver_create(Pool *pool)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * solver_free
  */
 
@@ -1751,7 +1751,7 @@ prune_to_update_targets(Solver *solv, Id *cp, Queue *q)
 }
 
 /*-------------------------------------------------------------------
- * 
+ *
  * solver_run_sat
  *
  * all rules have been set up, now actually run the solver
@@ -1801,7 +1801,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
    * if we encounter a problem, we rewind to a safe level and restart
    * with step 1
    */
-   
+
   minimizationsteps = 0;
   for (;;)
     {
@@ -1895,7 +1895,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  int pass;
 
 	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "resolving installed packages\n");
-	  /* we use two passes if we need to update packages 
+	  /* we use two passes if we need to update packages
            * to create a better user experience */
 	  for (pass = solv->updatemap.size ? 0 : 1; pass < 2; pass++)
 	    {
@@ -2597,7 +2597,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * remove disabled conflicts
  *
  * purpose: update the decisionmap after some rules were disabled.
@@ -2842,7 +2842,7 @@ add_update_target(Solver *solv, Id p, Id how)
       Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
       while ((obs = *obsp++) != 0)
 	{
-	  FOR_PROVIDES(pi, pip, obs) 
+	  FOR_PROVIDES(pi, pip, obs)
 	    {
 	      Solvable *si = pool->solvables + pi;
 	      if (si->repo != installed)
@@ -2957,7 +2957,7 @@ addedmap2deduceq(Solver *solv, Map *addedmap)
       j++;
 }
 
-static void 
+static void
 deduceq2addedmap(Solver *solv, Map *addedmap)
 {
   int j;
@@ -3095,7 +3095,7 @@ solver_solve(Solver *solv, Queue *job)
       map_free(&solv->cleandepsmap);
       map_init(&solv->cleandepsmap, 0);
     }
-  
+
   queue_empty(&solv->weakruleq);
   solv->watches = solv_free(solv->watches);
   queue_empty(&solv->ruletojob);
@@ -3119,7 +3119,7 @@ solver_solve(Solver *solv, Queue *job)
       solv->recommends_index = 0;
     }
   solv->multiversionupdaters = solv_free(solv->multiversionupdaters);
-  
+
 
   /*
    * create basic rule set of all involved packages
@@ -3148,7 +3148,7 @@ solver_solve(Solver *solv, Queue *job)
     solver_shrinkrules(solv, initialnrules);
   solv->nrules = initialnrules;
   solv->rpmrules_end = 0;
-  
+
   if (installed)
     {
       /* check for update/verify jobs as they need to be known early */
@@ -3259,7 +3259,7 @@ solver_solve(Solver *solv, Queue *job)
    * create rules for all packages involved in the job
    * (to be installed or removed)
    */
-    
+
   oldnrules = solv->nrules;
   for (i = 0; i < job->count; i += 2)
     {
@@ -3293,7 +3293,7 @@ solver_solve(Solver *solv, Queue *job)
     }
   POOL_DEBUG(SOLV_DEBUG_STATS, "added %d rpm rules for packages involved in a job\n", solv->nrules - oldnrules);
 
-    
+
   /*
    * add rules for suggests, enhances
    */
@@ -3345,16 +3345,16 @@ solver_solve(Solver *solv, Queue *job)
 
   /*
    * create feature rules
-   * 
+   *
    * foreach installed:
    *   create assertion (keep installed, if no update available)
    *   or
    *   create update rule (A|update1(A)|update2(A)|...)
-   * 
+   *
    * those are used later on to keep a version of the installed packages in
    * best effort mode
    */
-    
+
   solv->featurerules = solv->nrules;              /* mark start of feature rules */
   if (installed)
     {
@@ -3375,11 +3375,11 @@ solver_solve(Solver *solv, Queue *job)
 
     /*
      * Add update rules for installed solvables
-     * 
+     *
      * almost identical to feature rules
      * except that downgrades/archchanges/vendorchanges are not allowed
      */
-    
+
   solv->updaterules = solv->nrules;
 
   if (installed)
@@ -3655,7 +3655,7 @@ solver_solve(Solver *solv, Queue *job)
    * --------------------------------------------------------------
    * prepare for solving
    */
-    
+
   /* free unneeded memory */
   map_free(&addedmap);
   map_free(&installcandidatemap);
@@ -3677,10 +3677,10 @@ solver_solve(Solver *solv, Queue *job)
     map_grow(&solv->cleandepsmap, installed->end - installed->start);
   /* no mistakes */
   if (solv->cleandeps_mistakes)
-    {    
+    {
       queue_free(solv->cleandeps_mistakes);
       solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
-    }    
+    }
 
   /* all new rules are learnt after this point */
   solv->learntrules = solv->nrules;
@@ -3706,7 +3706,7 @@ solver_solve(Solver *solv, Queue *job)
    * solve!
    * ********************************************
    */
-    
+
   now = solv_timems(0);
   solver_run_sat(solv, 1, solv->dontinstallrecommended ? 0 : 1);
   POOL_DEBUG(SOLV_DEBUG_STATS, "solver took %d ms\n", solv_timems(now));
@@ -3782,7 +3782,7 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
       solver_disablerule(solv, r);
       goterase++;
     }
-  
+
   if (goterase)
     {
       enabledisablelearntrules(solv);
@@ -3873,7 +3873,7 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
   /*
    * find suggested packages
    */
-    
+
   if (suggestionsq)
     {
       Id sug, *sugp, p, pp;
@@ -3938,7 +3938,7 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
   if (redoq.count)
     undo_removedisabledconflicts(solv, &redoq);
   queue_free(&redoq);
-  
+
   /* undo job rule disabling */
   for (i = 0; i < disabledq.count; i++)
     solver_enablerule(solv, solv->rules + disabledq.elements[i]);
@@ -3951,7 +3951,7 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
 /* disk usage computations */
 
 /*-------------------------------------------------------------------
- * 
+ *
  * calculate DU changes
  */
 
@@ -3967,7 +3967,7 @@ solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps)
 
 
 /*-------------------------------------------------------------------
- * 
+ *
  * calculate changes in install size
  */
 
@@ -4008,7 +4008,7 @@ solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res)
 }
 
 /*-------------------------------------------------------------------
- * 
+ *
  * decision introspection
  */
 
@@ -4071,7 +4071,7 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
 {
   int i;
   Id pp, why;
-  
+
   if (infop)
     *infop = 0;
   if (!solv->decisionmap[p])
@@ -4273,7 +4273,7 @@ pool_isemptyupdatejob(Pool *pool, Id how, Id what)
 	  Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
 	  while ((obs = *obsp++) != 0)
 	    {
-	      FOR_PROVIDES(pi, pip, obs) 
+	      FOR_PROVIDES(pi, pip, obs)
 		{
 		  Solvable *si = pool->solvables + pi;
 		  if (si->repo != pool->installed)

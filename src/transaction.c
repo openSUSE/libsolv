@@ -375,7 +375,7 @@ transaction_type(Transaction *trans, Id p, int mode)
 	    return SOLVER_TRANSACTION_INSTALL;
 	}
     }
-  
+
   /* if there's a match, p will be shown when q
    * is processed */
   if (transaction_obs_pkg(trans, q) == p)
@@ -1188,7 +1188,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		}
 	      if (s2->repo != installed && !MAPTST(&trans->transactsmap, p2))
 		continue;		/* package stays uninstalled */
-	      
+
 	      if (s->repo == installed)
 		{
 		  /* s gets uninstalled */
@@ -1698,7 +1698,7 @@ transaction_order(Transaction *trans, int flags)
 #if 0
   dump_tes(&od);
 #endif
-  
+
   now = solv_timems(0);
   /* kill all cycles */
   queue_init(&todo);
@@ -1858,7 +1858,7 @@ transaction_order(Transaction *trans, int flags)
   queue_empty(tr);
 
   queue_init(&obsq);
-  
+
   lastrepo = 0;
   lastmedia = 0;
   temedianr = solv_calloc(numte, sizeof(Id));

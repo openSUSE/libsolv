@@ -392,7 +392,7 @@ solvable_lookup_sourcepkg(Solvable *s)
       str = pool_tmpappend(pool, str, ".", pool_id2str(pool, archid));
       return pool_tmpappend(pool, str, ".rpm", 0);
     }
-  else 
+  else
     return name;	/* FIXME */
 }
 
@@ -409,14 +409,14 @@ static inline Id dep2name(Pool *pool, Id dep)
   return dep;
 }
 
-static int providedbyinstalled_multiversion(Pool *pool, Map *installed, Id n, Id con) 
+static int providedbyinstalled_multiversion(Pool *pool, Map *installed, Id n, Id con)
 {
   Id p, pp;
-  Solvable *sn = pool->solvables + n; 
+  Solvable *sn = pool->solvables + n;
 
   FOR_PROVIDES(p, pp, sn->name)
-    {    
-      Solvable *s = pool->solvables + p; 
+    {
+      Solvable *s = pool->solvables + p;
       if (s->name != sn->name || s->arch != sn->arch)
         continue;
       if (!MAPTST(installed, p))
@@ -424,7 +424,7 @@ static int providedbyinstalled_multiversion(Pool *pool, Map *installed, Id n, Id
       if (pool_match_nevr(pool, pool->solvables + p, con))
         continue;
       return 1;         /* found installed package that doesn't conflict */
-    }    
+    }
   return 0;
 }
 
@@ -616,7 +616,7 @@ solvable_trivial_installable_repo(Solvable *s, Repo *installed, Map *multiversio
 static int
 pool_illegal_vendorchange(Pool *pool, Solvable *s1, Solvable *s2)
 {
-  Id v1, v2; 
+  Id v1, v2;
   Id vendormask1, vendormask2;
 
   if (pool->custom_vendorcheck)
@@ -624,7 +624,7 @@ pool_illegal_vendorchange(Pool *pool, Solvable *s1, Solvable *s2)
   /* treat a missing vendor as empty string */
   v1 = s1->vendor ? s1->vendor : ID_EMPTY;
   v2 = s2->vendor ? s2->vendor : ID_EMPTY;
-  if (v1 == v2) 
+  if (v1 == v2)
     return 0;
   vendormask1 = pool_vendor2mask(pool, v1);
   if (!vendormask1)
@@ -695,7 +695,7 @@ solvable_is_irrelevant_patch(Solvable *s, Map *installedmap)
 /*
  * Create maps containing the state of each solvable. Input is a "installed" queue,
  * it contains all solvable ids that are considered to be installed.
- * 
+ *
  * The created maps can be used for solvable_trivial_installable_map(),
  * pool_calc_duchanges(), pool_calc_installsizechange().
  *

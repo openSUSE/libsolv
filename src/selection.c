@@ -576,7 +576,7 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
   dataiterator_free(&di);
   if (!q.count)
     return 0;
-  if (q.count > 1) 
+  if (q.count > 1)
     queue_push2(selection, SOLVER_SOLVABLE_ONE_OF, pool_queuetowhatprovides(pool, &q));
   else
     queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, q.elements[0]);
@@ -589,19 +589,19 @@ splitrel(char *rname, char *r, int *rflagsp)
 {
   int nend = r - rname;
   int rflags = 0;
-  if (nend && *r == '=' && r[-1] == '!') 
+  if (nend && *r == '=' && r[-1] == '!')
     {
       nend--;
       r++;
       rflags = REL_LT|REL_GT;
     }
-  for (; *r; r++) 
+  for (; *r; r++)
     {
-      if (*r == '<') 
+      if (*r == '<')
 	rflags |= REL_LT;
-      else if (*r == '=') 
+      else if (*r == '=')
 	rflags |= REL_EQ;
-      else if (*r == '>') 
+      else if (*r == '>')
 	rflags |= REL_GT;
       else
 	break;
@@ -610,10 +610,10 @@ splitrel(char *rname, char *r, int *rflagsp)
     r++;
   while (nend && (rname[nend - 1] == ' ' || rname[nend - 1] == '\t'))
     nend--;
-  if (!*rname || !*r) 
+  if (!*rname || !*r)
     return 0;
   *rflagsp = rflags;
-  rname[nend] = 0; 
+  rname[nend] = 0;
   return r;
 }
 
@@ -622,7 +622,7 @@ selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
 {
   int ret, rflags = 0;
   char *r, *rname;
-  
+
   /* relation case, support:
    * depglob rel
    * depglob.arch rel
@@ -803,7 +803,7 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
     return 0;
   rname = solv_strdup(name);	/* so we can modify it */
   r = rname + (r - name);
-  *r = 0; 
+  *r = 0;
 
   /* split off potential arch part from version */
   if ((r2 = strrchr(r + 1, '.')) != 0 && r2[1] && (archid = str2archid(pool, r2 + 1)) != 0)
@@ -820,8 +820,8 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
 	  solv_free(rname);
 	  return 0;
 	}
-      *r = '-'; 
-      *r2 = 0; 
+      *r = '-';
+      *r2 = 0;
       r = r2;
       if ((ret = selection_depglob(pool, selection, rname, flags)) == 0)
 	{
@@ -967,19 +967,19 @@ pool_is_kind(Pool *pool, Id name, Id kind)
     return 1;
   n = pool_id2str(pool, name);
   if (kind != 1)
-    {    
+    {
       const char *kn = pool_id2str(pool, kind);
       int knl = strlen(kn);
-      return !strncmp(n, kn, knl) && n[knl] == ':' ? 1 : 0; 
-    }    
-  else 
-    {    
-      if (*n == ':') 
+      return !strncmp(n, kn, knl) && n[knl] == ':' ? 1 : 0;
+    }
+  else
+    {
+      if (*n == ':')
         return 1;
-      while(*n >= 'a' && *n <= 'z') 
+      while(*n >= 'a' && *n <= 'z')
         n++;
-      return *n == ':' ? 0 : 1; 
-    }    
+      return *n == ':' ? 0 : 1;
+    }
 }
 
 void
@@ -1107,7 +1107,7 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
 	  sel1->elements[j] = sel1->elements[i] | setflags;
 	  sel1->elements[j + 1] = sel1->elements[i + 1];
 	}
-      else if (q1.count > 1) 
+      else if (q1.count > 1)
 	{
 	  sel1->elements[j] = (sel1->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE_ONE_OF | setflags;
 	  sel1->elements[j + 1] = pool_queuetowhatprovides(pool, &q1);

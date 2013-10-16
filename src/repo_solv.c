@@ -7,9 +7,9 @@
 
 /*
  * repo_solv.c
- * 
+ *
  * Add a repo in solv format
- * 
+ *
  */
 
 
@@ -502,7 +502,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       extendstart = repo->start;
       extendend = repo->end;
     }
-    
+
   memset(&data, 0, sizeof(data));
   data.repo = repo;
   data.fp = fp;
@@ -548,10 +548,10 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 
   /*
    * read strings and Ids
-   * 
+   *
    */
 
-  
+
   /*
    * alloc buffers
    */
@@ -561,7 +561,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       spool = &pool->ss;
       /* alloc max needed string buffer and string pointers, will shrink again later */
 #if 0
-      spool->stringspace = solv_realloc(spool->stringspace, spool->sstrings + sizeid + 1); 
+      spool->stringspace = solv_realloc(spool->stringspace, spool->sstrings + sizeid + 1);
       spool->strings = solv_realloc2(spool->strings, spool->nstrings + numid, sizeof(Offset));
 #else
       spool->sstrings += sizeid + 1;
@@ -575,7 +575,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     {
       data.localpool = 1;
       spool = &data.spool;
-      spool->stringspace = solv_malloc(7 + sizeid + 1); 
+      spool->stringspace = solv_malloc(7 + sizeid + 1);
       spool->strings = solv_malloc2(numid < 2 ?  2 : numid, sizeof(Offset));
       strcpy(spool->stringspace, "<NULL>");
       spool->sstrings = 7;
@@ -587,7 +587,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   /*
    * read string data and append to old string space
    */
-  
+
   strsp = spool->stringspace + spool->sstrings;	/* append new entries */
   if ((solvflags & SOLV_FLAG_PREFIX_POOL) == 0)
     {
@@ -756,14 +756,14 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       stringpool_shrink(spool);		/* vacuum */
     }
 
-  
+
   /*******  Part 2: Relation IDs  ***************************************/
 
   /*
    * read RelDeps
-   * 
+   *
    */
-  
+
   if (numrel)
     {
       /* extend rels */
@@ -913,7 +913,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       /* cannot handle mapped ids in vertical */
       if (!(flags & REPO_LOCALPOOL) && keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET && (type == REPOKEY_TYPE_ID || type == REPOKEY_TYPE_IDARRAY))
 	data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "mapped ids are not supported for STORAGE_VERTICAL_OFFSET");
- 
+
       if (keys[i].type == REPOKEY_TYPE_CONSTANTID && idmap)
 	keys[i].size = idmap[keys[i].size];
 #if 0
@@ -936,7 +936,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     }
 
   /*******  Part 5: Schemata ********************************************/
-  
+
   id = read_id(&data, 0);
   schemadata = solv_calloc(id + 1, sizeof(Id));
   schemadatap = schemadata + 1;
@@ -1101,13 +1101,13 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	case REPOKEY_TYPE_ID:
 	  dp = data_read_id_max(dp, &did, idmap, numid + numrel, &data);
 	  if (s && id == SOLVABLE_NAME)
-	    s->name = did; 
+	    s->name = did;
 	  else if (s && id == SOLVABLE_ARCH)
-	    s->arch = did; 
+	    s->arch = did;
 	  else if (s && id == SOLVABLE_EVR)
-	    s->evr = did; 
+	    s->evr = did;
 	  else if (s && id == SOLVABLE_VENDOR)
-	    s->vendor = did; 
+	    s->vendor = did;
 	  else if (keys[key].storage == KEY_STORAGE_INCORE)
 	    incore_add_id(&data, did);
 #if 0
@@ -1304,7 +1304,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
     {
       Id fileoffset = 0;
       unsigned int pagesize;
-      
+
       /* we have vertical data, make it available */
       data.verticaloffset = solv_calloc(numkeys, sizeof(Id));
       for (i = 1; i < numkeys; i++)

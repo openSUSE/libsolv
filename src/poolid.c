@@ -63,7 +63,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   hashmask = pool->relhashmask;
   hashtbl = pool->relhashtbl;
   ran = pool->rels;
-  
+
   /* extend hashtable if needed */
   if (pool->nrels * 2 > hashmask)
     {
@@ -80,7 +80,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 	  hashtbl[h] = i;
 	}
     }
-  
+
   /* compute hash and check for match */
   h = relhash(name, evr, flags) & hashmask;
   hh = HASHCHAIN_START;
@@ -117,7 +117,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 
 /* Id -> String
  * for rels (returns name only) and strings
- */ 
+ */
 const char *
 pool_id2str(const Pool *pool, Id id)
 {

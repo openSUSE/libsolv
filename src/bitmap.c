@@ -7,7 +7,7 @@
 
 /*
  * bitmap.c
- * 
+ *
  */
 
 #include <stdlib.h>
