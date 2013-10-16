@@ -23,7 +23,7 @@
  *   created from product data in the repository (which is generated from files
  *   in /etc/products.d. In the future we may switch to using product()
  *   provides of packages.
- * 
+ *
  * pattern:
  *   created from pattern() provides of packages.
  *
@@ -82,16 +82,16 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
   FOR_PROVIDES(p, pp, req)
     if (pool->solvables[p].repo == s->repo)
       queue_push(qr, p);
-  if (reqidp)
-    *reqidp = req;
   if (qp)
     {
       FOR_PROVIDES(p, pp, prv)
 	if (pool->solvables[p].repo == s->repo)
 	  queue_push(qp, pp);
-      if (prvidp)
-	*prvidp = req;
     }
+  if (reqidp)
+    *reqidp = req;
+  if (prvidp)
+    *prvidp = prv;
 }
 
 void
@@ -169,7 +169,7 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
 	  dataiterator_free(&di);
 	}
     }
-  else
+  else if (qp)
     {
       /* find qp */
       FOR_PROVIDES(p, pp, s->name)
@@ -236,11 +236,11 @@ find_autopattern_name(Pool *pool, Solvable *s)
     return 0;
   for (prvp = s->repo->idarraydata + s->provides; (prv = *prvp++) != 0; )
     if (ISRELDEP(prv))
-      {   
+      {
         Reldep *rd = GETRELDEP(pool, prv);
         if (rd->flags == REL_EQ && !strcmp(pool_id2str(pool, rd->name), "autopattern()"))
           return strncmp(pool_id2str(pool, rd->evr), "pattern:", 8) != 0 ? rd->evr : 0;
-      }   
+      }
   return 0;
 }
 
