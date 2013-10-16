@@ -43,16 +43,16 @@
 #include "solv_pgpvrfy.h"
 #endif
 
-static void 
+static void
 setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
 {
   if (str[solv_validutf8(str)])
-    {    
+    {
       char *ustr = solv_latin1toutf8(str);	/* not utf8, assume latin1 */
       repodata_set_str(repodata, handle, tag, ustr);
       solv_free(ustr);
-    }    
-  else 
+    }
+  else
     repodata_set_str(repodata, handle, tag, str);
 }
 

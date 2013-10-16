@@ -315,7 +315,7 @@ mpdsa(int pl, mp_t *p, int ql, mp_t *q, mp_t *g, mp_t *y, mp_t *r, mp_t *s, int 
   return 1;
 }
 
-static int 
+static int
 mprsa(int nl, mp_t *n, int el, mp_t *e, mp_t *m, mp_t *c)
 {
   mp_t *tmp;

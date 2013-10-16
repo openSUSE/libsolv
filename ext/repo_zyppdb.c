@@ -316,7 +316,7 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
   DIR *dir;
   FILE *fp;
   Repodata *data;
-  
+
   data = repo_add_repodata(repo, flags);
   memset(&pd, 0, sizeof(pd));
   pd.repo = repo;

@@ -508,7 +508,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
     {
       Repodata *sdata;
       int i;
-      
+
       FOR_REPODATAS(repo, i, sdata)
 	{
 	  int p;
@@ -538,7 +538,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    }
 	}
     }
-  
+
   /*
    * read complete file
    *

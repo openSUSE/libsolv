@@ -294,11 +294,11 @@ testcase_str2dep(Pool *pool, char *s)
   int flags;
 
   if ((n = strchr(s, '|')) != 0)
-    {    
+    {
       id = testcase_str2dep(pool, n + 1);
-      *n = 0; 
+      *n = 0;
       id = pool_rel2id(pool, testcase_str2dep(pool, s), id, REL_OR, 1);
-      *n = '|'; 
+      *n = '|';
       return id;
     }
   while (*s == ' ' || *s == '\t')
@@ -338,7 +338,7 @@ testcase_str2dep(Pool *pool, char *s)
       s += 2;
     }
   for (;;s++)
-    {  
+    {
       if (*s == '<')
 	flags |= REL_LT;
       else if (*s == '=')
@@ -402,8 +402,8 @@ testcase_solvid2str(Pool *pool, Id p)
   n = pool_id2str(pool, s->name);
   e = pool_id2str(pool, s->evr);
   a = pool_id2str(pool, s->arch);
-  str = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3); 
-  sprintf(str, "%s-%s.%s", n, e, a); 
+  str = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3);
+  sprintf(str, "%s-%s.%s", n, e, a);
   if (!s->repo)
     return pool_tmpappend(pool, str, "@", 0);
   if (s->repo->name)
@@ -1036,15 +1036,15 @@ finish_solvable(Pool *pool, Repodata *data, Solvable *s, char *filelist, int nfi
   if (nfilelist)
     {
       int l;
-      Id did; 
-      for (l = 0; l < nfilelist; l += strlen(filelist + l) + 1) 
+      Id did;
+      for (l = 0; l < nfilelist; l += strlen(filelist + l) + 1)
 	{
 	  char *p = strrchr(filelist + l, '/');
-	  if (!p) 
+	  if (!p)
 	    continue;
-	  *p++ = 0; 
+	  *p++ = 0;
 	  did = repodata_str2dir(data, filelist + l, 1);
-	  p[-1] = '/'; 
+	  p[-1] = '/';
 	  if (!did)
 	    did = repodata_str2dir(data, "/", 1);
 	  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, did, p);
@@ -1777,7 +1777,7 @@ read_inline_file(FILE *fp, char **bufp, char **bufpp, int *buflp)
   char *result = solv_malloc(1024);
   char *rp = result;
   int resultl = 1024;
-  
+
   for (;;)
     {
       size_t rl;
@@ -1832,7 +1832,7 @@ read_file(FILE *fp)
   char *result = solv_malloc(1024);
   char *rp = result;
   int resultl = 1024;
-  
+
   for (;;)
     {
       size_t rl;

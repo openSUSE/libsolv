@@ -773,7 +773,7 @@ addchangelog(Repodata *data, Id handle, RpmHead *rpmhead)
   solv_free(cn);
 }
 
-static void 
+static void
 set_description_author(Repodata *data, Id handle, char *str)
 {
   char *aut, *p;
@@ -961,7 +961,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
  */
 
 struct rpmdbstate {
-  Pool *pool; 
+  Pool *pool;
   char *rootdir;
 
   RpmHead *rpmhead;	/* header storage space */

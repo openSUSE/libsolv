@@ -7,10 +7,10 @@
 
 /*
  * repo_helix.c
- * 
+ *
  * Parse 'helix' XML representation
  * and create 'repo'
- * 
+ *
  * A bit of history: "Helix Code" was the name of the company that
  * wrote Red Carpet. The company was later renamed to Ximian.
  * The Red Carpet solver was merged into the ZYPP project, the
@@ -200,7 +200,7 @@ evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
       if (v2 > v && *v2 == ':')
 	e = "0";
     }
-  
+
   /* compute length of Id string */
   l = 1;  /* for the \0 */
   if (e)
@@ -384,7 +384,7 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, Id ma
 /*
  * XML callback
  * <name>
- * 
+ *
  */
 
 static void XMLCALL
@@ -424,7 +424,7 @@ startElement(void *userData, const char *name, const char **atts)
 #endif
       return;
     }
-  
+
   /* set new state */
   pd->state = sw->to;
 
@@ -543,7 +543,7 @@ static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
 {
   Pool *pool = pd->pool;
   Id pid, *pidp;
-  
+
   if (s->provides)
     {
       pidp = pd->repo->idarraydata + s->provides;
@@ -551,7 +551,7 @@ static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
 	{
 	  Reldep *prd;
 	  const char *depname;
-	  
+
 	  if (!ISRELDEP(pid))
 	    continue;               /* wrong provides name */
 	  prd = GETRELDEP(pool, pid);
@@ -571,8 +571,8 @@ static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
 	  if (!ISRELDEP(pid))
 	    {
 	      depname = pool_id2str(pool, pid);
-	    } 
-	  else 
+	    }
+	  else
 	    {
 	      Reldep *prd = GETRELDEP(pool, pid);
 	      depname = pool_id2str(pool, prd->name);
@@ -589,7 +589,7 @@ static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
 /*
  * XML callback
  * </name>
- * 
+ *
  * create Solvable from collected data
  */
 
@@ -639,7 +639,7 @@ endElement(void *userData, const char *name)
 
       /* see bugzilla bnc#190163 */
       flavor = findKernelFlavor(pd, s);
-      if (flavor) 
+      if (flavor)
 	{
 	  char *cflavor = solv_strdup(flavor);	/* make pointer safe */
 
@@ -778,7 +778,7 @@ endElement(void *userData, const char *name)
 /*
  * XML callback
  * character data
- * 
+ *
  */
 
 static void XMLCALL
@@ -814,7 +814,7 @@ characterData(void *userData, const XML_Char *s, int len)
 /*
  * read 'helix' type xml from fp
  * add packages to pool/repo
- * 
+ *
  */
 
 int
@@ -831,7 +831,7 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
 
   now = solv_timems(0);
   data = repo_add_repodata(repo, flags);
-  
+
   /* prepare parsedata */
   memset(&pd, 0, sizeof(pd));
   for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)

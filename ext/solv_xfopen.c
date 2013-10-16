@@ -35,14 +35,14 @@ FILE *fopencookie(void*, const char*, cookie_io_functions_t);
 
 
 static FILE *cookieopen(void *cookie, const char *mode,
-	ssize_t (*cread)(void *, char *, size_t), 
-	ssize_t (*cwrite)(void *, const char *, size_t), 
+	ssize_t (*cread)(void *, char *, size_t),
+	ssize_t (*cwrite)(void *, const char *, size_t),
 	int (*cclose)(void *))
 {
 #ifdef HAVE_FUNOPEN
   if (!cookie)
     return 0;
-  return funopen(cookie, 
+  return funopen(cookie,
       (int (*)(void *, char *, int))(*mode == 'r' ? cread : NULL),		/* readfn */
       (int (*)(void *, const char *, int))(*mode == 'w' ? cwrite : NULL),	/* writefn */
       (fpos_t (*)(void *, fpos_t, int))NULL,					/* seekfn */

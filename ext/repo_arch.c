@@ -306,7 +306,7 @@ adddep(Repo *repo, Offset olddeps, char *line)
     {
       int flags = 0;
       for (;; p++)
-	{  
+	{
 	  if (*p == '<')
 	    flags |= REL_LT;
 	  else if (*p == '=')
