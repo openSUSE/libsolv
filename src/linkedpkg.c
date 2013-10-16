@@ -219,7 +219,7 @@ find_pattern_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
 	{
 	  Solvable *s2 = pool->solvables + p;
 	  if (s2->repo == s->repo && s2->evr == s->evr && s2->vendor == s->vendor)
-	    queue_push(qp, pp);
+	    queue_push(qp, p);
 	}
     }
   if (reqidp)
