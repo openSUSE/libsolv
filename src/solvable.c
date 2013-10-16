@@ -23,6 +23,7 @@
 #include "policy.h"
 #include "poolvendor.h"
 #include "chksum.h"
+#include "linkedpkg.h"
 
 const char *
 pool_solvable2str(Pool *pool, Solvable *s)
@@ -134,7 +135,7 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname, int usebase)
 {
   Pool *pool;
   const char *str, *basestr;
-  Id p, pp;
+  Id p, pp, name;
   Solvable *s2;
   int pass;
 
@@ -151,13 +152,14 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname, int usebase)
    * translation */
   if (!pool->whatprovides)
     return usebase ? basestr : 0;
+  name = s->name;
   /* we do this in two passes, first same vendor, then all other vendors */
   for (pass = 0; pass < 2; pass++)
     {
-      FOR_PROVIDES(p, pp, s->name)
+      FOR_PROVIDES(p, pp, name)
 	{
 	  s2 = pool->solvables + p;
-	  if (s2->name != s->name)
+	  if (s2->name != name)
 	    continue;
 	  if ((s->vendor == s2->vendor) != (pass == 0))
 	    continue;
@@ -168,6 +170,11 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname, int usebase)
 	  if (str)
 	    return str;
 	}
+#ifdef ENABLE_LINKED_PKGS
+      /* autopattern translation magic */
+      if (pass && !strncmp("pattern:", pool_id2str(pool, name), 8) && (name = find_autopattern_name(pool, s)) != 0)
+	pass = -1;
+#endif
     }
   return usebase ? basestr : 0;
 }
