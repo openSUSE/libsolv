@@ -97,25 +97,9 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
 void
 find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Queue *qp)
 {
-  Id n = s - pool->solvables;
   Id p, pp, namerelid;
   char *str;
 
-  if (pool->nscallback)
-    {
-      Id buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, n);
-      if (buddy > 0 && buddy != SYSTEMSOLVABLE && buddy != n && buddy < pool->nsolvables)
-	{
-	  if (reqidp)
-	    *reqidp = solvable_selfprovidedep(pool->solvables + buddy);
-	  queue_push(qr, buddy);
-	  if (prvidp)
-	    *prvidp = solvable_selfprovidedep(s);
-	  if (qp)
-	    queue_push(qp, n);
-	  return;
-	}
-    }
   /* search for project requires */
   namerelid = 0;
   if (s->requires)
