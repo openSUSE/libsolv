@@ -174,10 +174,10 @@ KNOWNID(PRODUCT_REFERENCEFILE,		"product:referencefile"),	/* installed product o
 KNOWNID(PRODUCT_SHORTLABEL,		"product:shortlabel"),		/* not in repomd? */
 KNOWNID(PRODUCT_DISTPRODUCT,		"product:distproduct"),		/* obsolete */
 KNOWNID(PRODUCT_DISTVERSION,		"product:distversion"),		/* obsolete */
-KNOWNID(PRODUCT_TYPE,			"product:type"),		/* not in repomd? */
+KNOWNID(PRODUCT_TYPE,			"product:type"),		/* e.g. 'base' */
 KNOWNID(PRODUCT_URL,			"product:url"),
 KNOWNID(PRODUCT_URL_TYPE,		"product:url:type"),
-KNOWNID(PRODUCT_FLAGS,			"product:flags"),		/* code10 repo flags? obsolete? */
+KNOWNID(PRODUCT_FLAGS,			"product:flags"),		/* e.g. 'update', 'no_you' */
 KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),		/* installed product only */
 KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),		/* installed product only */
 KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),		/* installed product only */
@@ -210,7 +210,7 @@ KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),
 KNOWNID(REPOSITORY_DISTROS,		"repository:distros"),
 KNOWNID(REPOSITORY_PRODUCT_LABEL,       "repository:product:label"),
 KNOWNID(REPOSITORY_PRODUCT_CPEID,	"repository:product:cpeid"),
-KNOWNID(REPOSITORY_REPOID,		"repository:repoid"),	/* obsolete? */
+KNOWNID(REPOSITORY_REPOID,		"repository:repoid"),		/* obsolete? */
 
 /* keyword (tags) for this repository */
 KNOWNID(REPOSITORY_KEYWORDS,		"repository:keywords"),
@@ -233,7 +233,7 @@ KNOWNID(DELTA_SEQ_EVR,			"delta:seqevr"),
 KNOWNID(DELTA_SEQ_NUM,			"delta:seqnum"),
 
 /* XXX: shouldn't use a real ID */
-KNOWNID(NAMESPACE_PRODUCTBUDDY,         "namespace:productbuddy"),
+KNOWNID(NAMESPACE_PRODUCTBUDDY,         "namespace:productbuddy"),	/* obsolete */
 
 KNOWNID(REPOSITORY_REPOMD,		"repository:repomd"),
 KNOWNID(REPOSITORY_REPOMD_TYPE,		"repository:repomd:type"),

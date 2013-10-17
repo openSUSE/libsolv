@@ -445,18 +445,6 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
   int i;
   if (!qr->count)
     return;
-
-  if (m && !MAPTST(m, s - pool->solvables))
-    {
-      /* called from solver_addrpmrulesforlinked */
-      for (i = 0; i < qr->count; i++)
-	if (MAPTST(m, qr->elements[i]))
-	  break;
-      if (i == qr->count)
-	return;
-      queue_push(workq, s - pool->solvables);
-      return;
-    }
 #if 0
   printf("ADDLINKS %s\n -> %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
   for (i = 0; i < qr->count; i++)
@@ -482,12 +470,12 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
 	addrpmrule(solv, qp->elements[0], -qr->elements[i], SOLVER_RULE_RPM_PACKAGE_REQUIRES, prv);
     }
   if (!m)
-    return;
+    return;	/* nothing more to do if called from getrpmruleinfos() */
   for (i = 0; i < qr->count; i++)
-    if (m && !MAPTST(m, qr->elements[i]))
+    if (!MAPTST(m, qr->elements[i]))
       queue_push(workq, qr->elements[i]);
   for (i = 0; i < qp->count; i++)
-    if (m && !MAPTST(m, qp->elements[i]))
+    if (!MAPTST(m, qp->elements[i]))
       queue_push(workq, qp->elements[i]);
   if (solv->installed && s->repo == solv->installed)
     {
@@ -846,11 +834,10 @@ solver_addrpmrulesforlinked(Solver *solv, Map *m)
 {
   Pool *pool = solv->pool;
   Solvable *s;
-  const char *name;
-  int i;
-  Queue workq;
+  int i, j;
+  Queue qr;
 
-  queue_init(&workq);
+  queue_init(&qr);
   for (i = 1; i < pool->nsolvables; i++)
     {
       if (MAPTST(m, i))
@@ -858,21 +845,23 @@ solver_addrpmrulesforlinked(Solver *solv, Map *m)
       s = pool->solvables + i;
       if (!s->repo || s->repo == solv->installed)
 	continue;
-      name = pool_id2str(pool, s->name);
-      if (!strchr(name, ':'))
+      if (!strchr(pool_id2str(pool, s->name), ':'))
 	continue;
       if (!pool_installable(pool, s))
 	continue;
-      add_package_link(solv, s, m, &workq);
-      if (workq.count)
+      find_package_link(pool, s, 0, &qr, 0, 0);
+      if (qr.count)
 	{
-	  int j;
-	  for (j = 0; j < workq.count; j++)
-	    solver_addrpmrulesforsolvable(solv, pool->solvables + workq.elements[j], m);
-	  queue_empty(&workq);
+	  for (j = 0; j < qr.count; j++)
+	    if (MAPTST(m, qr.elements[j]))
+	      {
+	        solver_addrpmrulesforsolvable(solv, s, m);
+	        break;
+	      }
+	  queue_empty(&qr);
 	}
     }
-  queue_free(&workq);
+  queue_free(&qr);
 }
 #endif
 
