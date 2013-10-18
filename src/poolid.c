@@ -180,6 +180,8 @@ pool_id2rel(const Pool *pool, Id id)
       return " NAMESPACE ";	/* actually not used in dep2str */
     case REL_ARCH:
       return ".";
+    case REL_MULTIARCH:
+      return ":";
     case REL_FILECONFLICT:
       return " FILECONFLICT ";
     case REL_COND:

@@ -122,7 +122,14 @@ parseonedep(Pool *pool, char *p)
       while (*p == ' ' || *p == '\t' || *p == '\n')
 	p++;
     }
-  name = pool_strn2id(pool, n, ne - n, 1);
+  if (ne - n > 4 && !strncmp(ne - 4, ":any", 4))
+    {
+      /* multiarch annotation */
+      name = pool_strn2id(pool, n, ne - n - 4, 1);
+      name = pool_rel2id(pool, name, ARCH_ANY, REL_MULTIARCH, 1);
+    }
+  else
+    name = pool_strn2id(pool, n, ne - n, 1);
   if (e)
     {
       evr = pool_strn2id(pool, e, ee - e, 1);

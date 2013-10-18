@@ -621,6 +621,11 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
 	  if (!pool_match_nevr(pool, s, name))
 	    return 0;
 	  return pool_match_nevr(pool, s, evr);
+	case REL_MULTIARCH:
+	  if (evr != ARCH_ANY)
+	    return 0;
+	  /* XXX : need to check for Multi-Arch: allowed! */
+	  return pool_match_nevr(pool, s, name);
 	default:
 	  return 0;
 	}
@@ -1000,6 +1005,12 @@ pool_addrelproviders(Pool *pool, Id d)
 	      else
 		wp = 0;
 	    }
+	  break;
+	case REL_MULTIARCH:
+	  if (evr != ARCH_ANY)
+	    break;
+	  /* XXX : need to check for Multi-Arch: allowed! */
+	  wp = pool_whatprovides(pool, name);
 	  break;
 	case REL_KIND:
 	  /* package kind filtering */
