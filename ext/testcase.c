@@ -325,6 +325,11 @@ testcase_str2dep(Pool *pool, char *s)
       else
         id = pool_strn2id(pool, n, s - n, 1);
     }
+  else if (s - n > 4 && s[-4] == ':' && !strncmp(s - 4, ":any", 4))
+    {
+      id = pool_strn2id(pool, n, s - n - 4, 1);
+      id = pool_rel2id(pool, id, ARCH_ANY, REL_MULTIARCH, 1);
+    }
   else
     id = pool_strn2id(pool, n, s - n, 1);
   if (!*s)
