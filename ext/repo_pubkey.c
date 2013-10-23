@@ -848,17 +848,17 @@ is_sig_packet(unsigned char *sig, int sigl)
 }
 
 Id
-solv_parse_sig(FILE *fp, unsigned char **sigpkgp, int *sigpkglp, char *keyidstr)
+solv_parse_sig(FILE *fp, unsigned char **sigpktp, int *sigpktlp, char *keyidstr)
 {
   unsigned char *sig;
   int sigl, hl, tag, pktl;
   struct pgpsig pgpsig;
   Id htype;
 
-  if (sigpkgp)
+  if (sigpktp)
     {
-      *sigpkgp = 0;
-      *sigpkglp = 0;
+      *sigpktp = 0;
+      *sigpktlp = 0;
     }
   if ((sig = (unsigned char *)solv_slurp(fp, &sigl)) == 0)
     return 0;
@@ -886,16 +886,16 @@ solv_parse_sig(FILE *fp, unsigned char **sigpkgp, int *sigpkglp, char *keyidstr)
   memset(&pgpsig, 0, sizeof(pgpsig));
   parsesigpacket(&pgpsig, sig + hl, pktl);
   htype = pgphashalgo2type(pgpsig.hashalgo);
-  if (pgpsig.type != 0 || !htype)
+  if (pgpsig.type != 0 || !htype || !pgpsig.haveissuer)
     {
       solv_free(sig);
       return 0;
     }
-  if (sigpkgp)
+  if (sigpktp)
     {
-      *sigpkgp = solv_malloc(pktl);
-      memcpy(*sigpkgp, sig + hl, pktl);
-      *sigpkglp = pktl;
+      *sigpktp = solv_malloc(pktl);
+      memcpy(*sigpktp, sig + hl, pktl);
+      *sigpktlp = pktl;
     }
   solv_free(sig);
   if (keyidstr)
@@ -904,26 +904,31 @@ solv_parse_sig(FILE *fp, unsigned char **sigpkgp, int *sigpkglp, char *keyidstr)
 }
 
 #ifdef ENABLE_PGPVRFY
+
 int
-solv_verify_sig(const unsigned char *pubdata, int pubdatal, unsigned char *sigpkg, int sigpkgl, void *chk)
+solv_verify_sig(const unsigned char *pubdata, int pubdatal, unsigned char *sigpkt, int sigpktl, void *chk)
 {
   struct pgpsig pgpsig;
   int res;
   Id htype;
+  void *chk2;
 
   memset(&pgpsig, 0, sizeof(pgpsig));
-  parsesigpacket(&pgpsig, sigpkg, sigpkgl);
+  parsesigpacket(&pgpsig, sigpkt, sigpktl);
   if (pgpsig.type != 0)
     return 0;
   htype = pgphashalgo2type(pgpsig.hashalgo);
   if (htype != solv_chksum_get_type(chk))
      return 0;	/* wrong hash type? */
-  createsigdata(&pgpsig, sigpkg, sigpkgl, 0, 0, 0, 0, chk);
+  chk2 = solv_chksum_create_clone(chk);
+  createsigdata(&pgpsig, sigpkt, sigpktl, 0, 0, 0, 0, chk2);
+  solv_chksum_free(chk2, 0);
   if (!pgpsig.sigdata)
     return 0;
   res = solv_pgpvrfy(pubdata, pubdatal, pgpsig.sigdata, pgpsig.sigdatal);
   solv_free(pgpsig.sigdata);
   return res;
 }
+
 #endif
 
