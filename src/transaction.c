@@ -475,6 +475,24 @@ classify_cmp_pkgs(const void *ap, const void *bp, void *dp)
   return a - b;
 }
 
+static inline void
+queue_push4(Queue *q, Id id1, Id id2, Id id3, Id id4)
+{
+  queue_push(q, id1);
+  queue_push(q, id2);
+  queue_push(q, id3);
+  queue_push(q, id4);
+}
+
+static inline void
+queue_unshift4(Queue *q, Id id1, Id id2, Id id3, Id id4)
+{
+  queue_unshift(q, id4);
+  queue_unshift(q, id3);
+  queue_unshift(q, id2);
+  queue_unshift(q, id1);
+}
+
 void
 transaction_classify(Transaction *trans, int mode, Queue *classes)
 {
@@ -514,12 +532,7 @@ transaction_classify(Transaction *trans, int mode, Queue *classes)
 	    if (classes->elements[j] == SOLVER_TRANSACTION_ARCHCHANGE && classes->elements[j + 2] == v && classes->elements[j + 3] == vq)
 	      break;
 	  if (j == classes->count)
-	    {
-	      queue_push(classes, SOLVER_TRANSACTION_ARCHCHANGE);
-	      queue_push(classes, 1);
-	      queue_push(classes, v);
-	      queue_push(classes, vq);
-	    }
+	    queue_push4(classes, SOLVER_TRANSACTION_ARCHCHANGE, 1, v, vq);
 	  else
 	    classes->elements[j + 1]++;
 	}
@@ -534,12 +547,7 @@ transaction_classify(Transaction *trans, int mode, Queue *classes)
 	    if (classes->elements[j] == SOLVER_TRANSACTION_VENDORCHANGE && classes->elements[j + 2] == v && classes->elements[j + 3] == vq)
 	      break;
 	  if (j == classes->count)
-	    {
-	      queue_push(classes, SOLVER_TRANSACTION_VENDORCHANGE);
-	      queue_push(classes, 1);
-	      queue_push(classes, v);
-	      queue_push(classes, vq);
-	    }
+	    queue_push4(classes, SOLVER_TRANSACTION_VENDORCHANGE, 1, v, vq);
 	  else
 	    classes->elements[j + 1]++;
 	}
@@ -550,22 +558,14 @@ transaction_classify(Transaction *trans, int mode, Queue *classes)
   /* finally add all classes. put erases last */
   i = SOLVER_TRANSACTION_ERASE;
   if (ntypes[i])
-    {
-      queue_unshift(classes, 0);
-      queue_unshift(classes, 0);
-      queue_unshift(classes, ntypes[i]);
-      queue_unshift(classes, i);
-    }
+    queue_unshift4(classes, i, ntypes[i], 0, 0);
   for (i = SOLVER_TRANSACTION_MAXTYPE; i > 0; i--)
     {
       if (!ntypes[i])
 	continue;
       if (i == SOLVER_TRANSACTION_ERASE)
 	continue;
-      queue_unshift(classes, 0);
-      queue_unshift(classes, 0);
-      queue_unshift(classes, ntypes[i]);
-      queue_unshift(classes, i);
+      queue_unshift4(classes, i, ntypes[i], 0, 0);
     }
 }
 
@@ -710,7 +710,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
     }
 }
 
-
+/* create a transaction from the decisionq */
 Transaction *
 transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
 {
@@ -734,15 +734,8 @@ transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
 	continue;
       if (installed && s->repo == installed && p < 0)
 	MAPSET(&trans->transactsmap, -p);
-      if ((!installed || s->repo != installed) && p > 0)
+      if (!(installed && s->repo == installed) && p > 0)
 	{
-#if 0
-	  const char *n = pool_id2str(pool, s->name);
-	  if (!strncmp(n, "patch:", 6))
-	    continue;
-	  if (!strncmp(n, "pattern:", 8))
-	    continue;
-#endif
 	  MAPSET(&trans->transactsmap, p);
 	  if (multiversionmap && MAPTST(multiversionmap, p))
 	    needmulti = 1;
@@ -801,7 +794,7 @@ transaction_installedresult(Transaction *trans, Queue *installedq)
 }
 
 static void
-transaction_create_installedmap(Transaction *trans, Map *installedmap)
+transaction_make_installedmap(Transaction *trans, Map *installedmap)
 {
   Pool *pool = trans->pool;
   Repo *installed = pool->installed;
@@ -831,7 +824,7 @@ transaction_calc_installsizechange(Transaction *trans)
   Map installedmap;
   int change;
 
-  transaction_create_installedmap(trans, &installedmap);
+  transaction_make_installedmap(trans, &installedmap);
   change = pool_calc_installsizechange(trans->pool, &installedmap);
   map_free(&installedmap);
   return change;
@@ -842,7 +835,7 @@ transaction_calc_duchanges(Transaction *trans, DUChanges *mps, int nmps)
 {
   Map installedmap;
 
-  transaction_create_installedmap(trans, &installedmap);
+  transaction_make_installedmap(trans, &installedmap);
   pool_calc_duchanges(trans->pool, &installedmap, mps, nmps);
   map_free(&installedmap);
 }
@@ -1058,48 +1051,6 @@ addedge(struct orderdata *od, Id from, Id to, int type)
   return addteedge(od, i, to, type);
 }
 
-#if 1
-static int
-havechoice(struct orderdata *od, Id p, Id q1, Id q2)
-{
-  Transaction *trans = od->trans;
-  Pool *pool = trans->pool;
-  Id ti1buf[5], ti2buf[5];
-  Queue ti1, ti2;
-  int i, j;
-
-  /* both q1 and q2 are uninstalls. check if their TEs intersect */
-  /* common case: just one TE for both packages */
-#if 0
-  printf("havechoice %d %d %d\n", p, q1, q2);
-#endif
-  if (trans->transaction_installed[q1 - pool->installed->start] == 0)
-    return 1;
-  if (trans->transaction_installed[q2 - pool->installed->start] == 0)
-    return 1;
-  if (trans->transaction_installed[q1 - pool->installed->start] == trans->transaction_installed[q2 - pool->installed->start])
-    return 0;
-  if (trans->transaction_installed[q1 - pool->installed->start] > 0 && trans->transaction_installed[q2 - pool->installed->start] > 0)
-    return 1;
-  queue_init_buffer(&ti1, ti1buf, sizeof(ti1buf)/sizeof(*ti1buf));
-  transaction_all_obs_pkgs(trans, q1, &ti1);
-  queue_init_buffer(&ti2, ti2buf, sizeof(ti2buf)/sizeof(*ti2buf));
-  transaction_all_obs_pkgs(trans, q2, &ti2);
-  for (i = 0; i < ti1.count; i++)
-    for (j = 0; j < ti2.count; j++)
-      if (ti1.elements[i] == ti2.elements[j])
-	{
-	  /* found a common edge */
-	  queue_free(&ti1);
-	  queue_free(&ti2);
-	  return 0;
-	}
-  queue_free(&ti1);
-  queue_free(&ti2);
-  return 1;
-}
-#endif
-
 static inline int
 havescripts(Pool *pool, Id solvid)
 {
@@ -1245,23 +1196,21 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	    continue;
           for (i = 0; i < reqq.count; i++)
 	    {
-	      int choice = 0;
 	      p2 = reqq.elements[i];
 	      if (pool->solvables[p2].repo != installed)
 		{
 		  /* all elements of reqq are installs, thus have different TEs */
-		  choice = reqq.count - 1;
 		  if (pool->solvables[p].repo != installed)
 		    {
 #if 0
-		      printf("add inst->inst edge choice %d (%s -> %s -> %s)\n", choice, pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
+		      printf("add inst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
 #endif
 		      addedge(od, p, p2, pre);
 		    }
 		  else
 		    {
 #if 0
-		      printf("add uninst->inst edge choice %d (%s -> %s -> %s)\n", choice, pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
+		      printf("add uninst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
 #endif
 		      addedge(od, p, p2, pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
 		    }
@@ -1278,18 +1227,8 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		      /* we assume that the obsoletor is good enough to replace p */
 		      continue;
 		    }
-#if 1
-		  choice = 0;
-		  for (j = 0; j < reqq.count; j++)
-		    {
-		      if (i == j)
-			continue;
-		      if (havechoice(od, p, reqq.elements[i], reqq.elements[j]))
-			choice++;
-		    }
-#endif
 #if 0
-		  printf("add uninst->uninst edge choice %d (%s -> %s -> %s)\n", choice, pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
+		  printf("add uninst->uninst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
 #endif
 	          addedge(od, p2, p, pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
 		}
