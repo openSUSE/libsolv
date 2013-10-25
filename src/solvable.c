@@ -51,6 +51,7 @@ pool_solvable2str(Pool *pool, Solvable *s)
     {
       p[nl++] = '-';
       strncpy(p + nl, e, el);
+      p[nl + el] = 0;
     }
   if (al)
     {
