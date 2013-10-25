@@ -222,7 +222,7 @@ createsigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey
   const unsigned char *cs;
   int csl;
 
-  if (sig->mpioff < 2 || l <= sig->mpioff)
+  if (!h || sig->mpioff < 2 || l <= sig->mpioff)
     return;
   if ((type >= 0x10 && type <= 0x13) || type == 0x1f || type == 0x18 || type == 0x20 || type == 0x28)
     {
@@ -847,19 +847,14 @@ is_sig_packet(unsigned char *sig, int sigl)
   return 1;
 }
 
-Id
-solv_parse_sig(FILE *fp, unsigned char **sigpktp, int *sigpktlp, char *keyidstr)
+Solvsig *
+solvsig_create(FILE *fp)
 {
+  Solvsig *ss;
   unsigned char *sig;
   int sigl, hl, tag, pktl;
   struct pgpsig pgpsig;
-  Id htype;
 
-  if (sigpktp)
-    {
-      *sigpktp = 0;
-      *sigpktlp = 0;
-    }
   if ((sig = (unsigned char *)solv_slurp(fp, &sigl)) == 0)
     return 0;
   if (!is_sig_packet(sig, sigl))
@@ -885,22 +880,27 @@ solv_parse_sig(FILE *fp, unsigned char **sigpktp, int *sigpktlp, char *keyidstr)
     }
   memset(&pgpsig, 0, sizeof(pgpsig));
   parsesigpacket(&pgpsig, sig + hl, pktl);
-  htype = pgphashalgo2type(pgpsig.hashalgo);
-  if (pgpsig.type != 0 || !htype || !pgpsig.haveissuer)
+  if (pgpsig.type != 0 || !pgpsig.haveissuer)
     {
       solv_free(sig);
       return 0;
     }
-  if (sigpktp)
-    {
-      *sigpktp = solv_malloc(pktl);
-      memcpy(*sigpktp, sig + hl, pktl);
-      *sigpktlp = pktl;
-    }
+  ss = solv_calloc(1, sizeof(*ss));
+  ss->sigpkt = solv_memdup(sig + hl, pktl);
+  ss->sigpktl = pktl;
   solv_free(sig);
-  if (keyidstr)
-    solv_bin2hex(pgpsig.issuer, 8, keyidstr);
-  return htype;
+  solv_bin2hex(pgpsig.issuer, 8, ss->keyid);
+  ss->htype = pgphashalgo2type(pgpsig.hashalgo);
+  ss->created = pgpsig.created;
+  ss->expires = pgpsig.expires;
+  return ss;
+}
+
+void
+solvsig_free(Solvsig *ss)
+{
+  solv_free(ss->sigpkt);
+  solv_free(ss);
 }
 
 #ifdef ENABLE_PGPVRFY
@@ -918,7 +918,7 @@ solv_verify_sig(const unsigned char *pubdata, int pubdatal, unsigned char *sigpk
   if (pgpsig.type != 0)
     return 0;
   htype = pgphashalgo2type(pgpsig.hashalgo);
-  if (htype != solv_chksum_get_type(chk))
+  if (!htype || htype != solv_chksum_get_type(chk))
      return 0;	/* wrong hash type? */
   chk2 = solv_chksum_create_clone(chk);
   createsigdata(&pgpsig, sigpkt, sigpktl, 0, 0, 0, 0, chk2);
@@ -928,6 +928,53 @@ solv_verify_sig(const unsigned char *pubdata, int pubdatal, unsigned char *sigpk
   res = solv_pgpvrfy(pubdata, pubdatal, pgpsig.sigdata, pgpsig.sigdatal);
   solv_free(pgpsig.sigdata);
   return res;
+}
+
+/* warning: does not check key expiry/revokation, like gpgv or rpm */
+/* returns the Id of the pubkey that verified the signature */
+Id
+repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char *keyid)
+{
+  Id p;
+  Solvable *s;
+
+  if (!sigdata || !keyid)
+    return 0;
+  FOR_REPO_SOLVABLES(repo, p, s)
+    {
+      const char *evr = pool_id2str(s->repo->pool, s->evr);
+      const char *kidstr;
+      const unsigned char *pubdata;
+      int pubdatal;
+
+      if (!evr || strncmp(evr, keyid + 8, 8) != 0)
+       continue;
+      kidstr = solvable_lookup_str(s, PUBKEY_KEYID);
+      if (!kidstr || strcmp(kidstr, keyid) != 0)
+        continue;
+      pubdata = repo_lookup_binary(repo, p, PUBKEY_DATA, &pubdatal);
+      if (solv_pgpvrfy(pubdata, pubdatal, sigdata, sigdatal))
+        return p;
+    }
+  return 0;
+}
+
+Id
+solvsig_verify(Solvsig *ss, Repo *repo, void *chk)
+{
+  struct pgpsig pgpsig;
+  void *chk2;
+  Id p;
+
+  parsesigpacket(&pgpsig, ss->sigpkt, ss->sigpktl);
+  chk2 = solv_chksum_create_clone(chk);
+  createsigdata(&pgpsig, ss->sigpkt, ss->sigpktl, 0, 0, 0, 0, chk2);
+  solv_chksum_free(chk2, 0);
+  if (!pgpsig.sigdata)
+    return 0;
+  p = repo_verify_sigdata(repo, pgpsig.sigdata, pgpsig.sigdatal, ss->keyid);
+  solv_free(pgpsig.sigdata);
+  return p;
 }
 
 #endif

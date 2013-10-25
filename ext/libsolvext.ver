@@ -35,6 +35,7 @@ SOLV_1.0 {
 		repo_add_susetags;
 		repo_add_updateinfoxml;
 		repo_add_zyppdb_products;
+		repo_verify_sigdata;
 		rpm_byfp;
 		rpm_byrpmdbid;
 		rpm_byrpmh;
@@ -44,12 +45,14 @@ SOLV_1.0 {
 		rpm_query_num;
 		rpm_state_create;
 		rpm_state_free;
-		solv_parse_sig;
 		solv_verify_sig;
 		solv_xfopen;
 		solv_xfopen_buf;
 		solv_xfopen_fd;
 		solv_xfopen_iscompressed;
+		solvsig_create;
+		solvsig_free;
+		solvsig_verify;
 		testcase_add_testtags;
 		testcase_job2str;
 		testcase_solvid2str;
