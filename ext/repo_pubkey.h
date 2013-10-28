@@ -7,8 +7,12 @@
 
 #include "repo.h"
 
+#define ADD_KEYDIR_WITH_DOTFILES	(1 << 8)
+
 extern int repo_add_rpmdb_pubkeys(Repo *repo, int flags);
 extern Id repo_add_pubkey(Repo *repo, const char *key, int flags);
+extern int repo_add_keyring(Repo *repo, FILE *fp, int flags);
+extern int repo_add_keydir(Repo *repo, const char *keydir, int flags, const char *suffix);
 
 /* signature parsing */
 typedef struct _solvsig {
@@ -27,5 +31,4 @@ Id solvsig_verify(Solvsig *ss, Repo *repo, void *chk);
 /* raw signature verification */
 int solv_verify_sig(const unsigned char *pubdata, int pubdatal, unsigned char *sigpkt, int sigpktl, void *chk);
 Id repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char *keyid);
-
 

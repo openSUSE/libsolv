@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <errno.h>
+#include <dirent.h>
 
 #include <rpm/rpmio.h>
 #include <rpm/rpmpgp.h>
@@ -100,7 +101,7 @@ r64dec1(char *p, unsigned int *vp, int *eofp)
 static unsigned int
 crc24(unsigned char *p, int len)
 {
-  unsigned int crc = 0xb704ceL;
+  unsigned int crc = 0xb704ce;
   int i;
 
   while (len--)
@@ -108,19 +109,20 @@ crc24(unsigned char *p, int len)
       crc ^= (*p++) << 16;
       for (i = 0; i < 8; i++)
         if ((crc <<= 1) & 0x1000000)
-	  crc ^= 0x1864cfbL;
+	  crc ^= 0x1864cfb;
     }
-  return crc & 0xffffffL;
+  return crc & 0xffffff;
 }
 
-static unsigned char *
-unarmor(char *pubkey, int *pktlp, char *startstr, char *endstr)
+static int
+unarmor(char *pubkey, unsigned char **pktp, int *pktlp, const char *startstr, const char *endstr)
 {
-  char *p;
+  char *p, *pubkeystart = pubkey;
   int l, eof;
   unsigned char *buf, *bp;
   unsigned int v;
 
+  *pktp = 0;
   *pktlp = 0;
   if (!pubkey)
     return 0;
@@ -185,8 +187,51 @@ unarmor(char *pubkey, int *pktlp, char *startstr, char *endstr)
       solv_free(buf);
       return 0;
     }
+  p = strchr(pubkey, '\n');
+  if (!p)
+    p = pubkey + strlen(pubkey);
+  *pktp = buf;
   *pktlp = bp - buf;
-  return buf;
+  return (p ? p + 1 : pubkey + strlen(pubkey)) - pubkeystart;
+}
+
+#define ARMOR_NLAFTER	16
+
+static char *
+armor(unsigned char *pkt, int pktl, const char *startstr, const char *endstr, const char *version)
+{
+  static const char bintoasc[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  char *str = solv_malloc(strlen(startstr) + strlen(endstr) + strlen(version) + (pktl / 3) * 4 + (pktl / (ARMOR_NLAFTER * 3)) + 30);
+  char *p = str;
+  int a, b, c, i;
+  unsigned int v;
+
+  v = crc24(pkt, pktl);
+  sprintf(p, "%s\nVersion: %s\n\n", startstr, version);
+  p += strlen(p);
+  for (i = -1; pktl > 0; pktl -= 3)
+    {
+      if (++i == ARMOR_NLAFTER)
+	{
+	  i = 0;
+	  *p++ = '\n';
+	}
+      a = *pkt++;
+      b = pktl > 1 ? *pkt++ : 0;
+      c = pktl > 2 ? *pkt++ : 0;
+      *p++ = bintoasc[a >> 2];
+      *p++ = bintoasc[(a & 3) << 4 | b >> 4];
+      *p++ = pktl > 1 ? bintoasc[(b & 15) << 2 | c >> 6] : '=';
+      *p++ = pktl > 2 ? bintoasc[c & 63] : '=';
+    }
+  *p++ = '\n';
+  *p++ = '=';
+  *p++ = bintoasc[v >> 18 & 0x3f];
+  *p++ = bintoasc[v >> 12 & 0x3f];
+  *p++ = bintoasc[v >>  6 & 0x3f];
+  *p++ = bintoasc[v       & 0x3f];
+  sprintf(p, "\n%s\n", endstr);
+  return str;
 }
 
 struct pgpsig {
@@ -704,8 +749,7 @@ pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
   unsigned char *pkts;
   int pktsl;
 
-  pkts = unarmor(pubkey, &pktsl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----");
-  if (!pkts)
+  if (!unarmor(pubkey, &pkts, &pktsl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----"))
     {
       pool_error(s->repo->pool, 0, "unarmor failure");
       return 0;
@@ -831,6 +875,8 @@ repo_add_pubkey(Repo *repo, const char *key, int flags)
       solv_free(buf);
       return 0;
     }
+  if (!(flags & REPO_NO_LOCATION))
+    repodata_set_location(data, s - pool->solvables, 0, 0, key);
   solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
@@ -847,6 +893,130 @@ is_sig_packet(unsigned char *sig, int sigl)
   return 1;
 }
 
+static int
+is_pubkey_packet(unsigned char *pkt, int pktl)
+{
+  if (!pktl)
+    return 0;
+  if ((pkt[0] & 0x80) == 0 || (pkt[0] & 0x40 ? pkt[0] & 0x3f : pkt[0] >> 2 & 0x0f) != 6)
+    return 0;
+  return 1;
+}
+
+static void
+add_one_pubkey(Pool *pool, Repo *repo, Repodata *data, unsigned char *pbuf, int pbufl)
+{
+  Solvable *s = pool_id2solvable(pool, repo_add_solvable(repo));
+  char *solvversion = pool_tmpjoin(pool, "libsolv-", LIBSOLV_VERSION_STRING, 0);
+  char *descr = armor(pbuf, pbufl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----", solvversion);
+  setutf8string(data, s - pool->solvables, SOLVABLE_DESCRIPTION, descr);
+  parsekeydata(s, data, pbuf, pbufl);
+#ifdef ENABLE_RPMDB
+  parsekeydata_rpm(s, data, pbuf, pbufl);
+#endif
+}
+
+int
+repo_add_keyring(Repo *repo, FILE *fp, int flags)
+{
+  Pool *pool = repo->pool;
+  Repodata *data;
+  unsigned char *buf, *p, *pbuf;
+  int bufl, l, pl, pbufl;
+
+  data = repo_add_repodata(repo, flags);
+  buf = (unsigned char *)solv_slurp(fp, &bufl);
+  if (buf && !is_pubkey_packet(buf, bufl))
+    {
+      /* assume ascii armored */
+      unsigned char *nbuf = 0, *ubuf;
+      int nl, ubufl;
+      bufl = 0;
+      for (l = 0; (nl = unarmor((char *)buf + l, &ubuf, &ubufl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----")) != 0; l += nl)
+	{
+	  /* found another block. concat. */
+	  nbuf = solv_realloc(nbuf, bufl + ubufl);
+	  if (ubufl)
+	    memcpy(nbuf + bufl, ubuf, ubufl);
+          bufl += ubufl;
+	  solv_free(ubuf);
+	}
+      solv_free(buf);
+      buf = nbuf;
+    }
+  /* now split into pubkey parts, ignoring the packets we don't know */
+  pbuf = 0;
+  pbufl = 0;
+  for (p = buf; bufl; p += pl, bufl -= pl)
+    {
+      int tag;
+      int hl = parsepkgheader(p, bufl, &tag, &pl);
+      if (!hl)
+	break;
+      pl += hl;
+      if (tag == 6)
+	{
+	  /* found new pubkey! flush old */
+	  if (pbufl)
+	    {
+	      add_one_pubkey(pool, repo, data, pbuf, pbufl);
+	      pbuf = solv_free(pbuf);
+	      pbufl = 0;
+	    }
+	}
+      if (tag != 6 && !pbufl)
+	continue;
+      if (tag != 6 && tag != 2 && tag != 13 && tag != 14 && tag != 17)
+	continue;
+      /* we want that packet. concat. */
+      pbuf = solv_realloc(pbuf, pbufl + pl);
+      memcpy(pbuf + pbufl, p, pl);
+      pbufl += pl;
+    }
+  if (pbufl)
+    add_one_pubkey(pool, repo, data, pbuf, pbufl);
+  solv_free(pbuf);
+  solv_free(buf);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+  return 0;
+}
+
+int
+repo_add_keydir(Repo *repo, const char *keydir, int flags, const char *suffix)
+{
+  Pool *pool = repo->pool;
+  Repodata *data;
+  int i, nent, sl;
+  struct dirent **namelist;
+  char *rkeydir;
+
+  data = repo_add_repodata(repo, flags);
+  nent = scandir(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, keydir) : keydir, &namelist, 0, alphasort);
+  if (nent == -1)
+    return pool_error(pool, -1, "%s: %s", keydir, strerror(errno));
+  rkeydir = pool_prepend_rootdir(pool, keydir);
+  sl = suffix ? strlen(suffix) : 0;
+  for (i = 0; i < nent; i++)
+    {
+      const char *dn = namelist[i]->d_name;
+      int l;
+      if (*dn == '.' && !(flags & ADD_KEYDIR_WITH_DOTFILES))
+	continue;
+      l = strlen(dn);
+      if (sl && (l < sl || strcmp(dn + l - sl, suffix) != 0))
+	continue;
+      repo_add_pubkey(repo, pool_tmpjoin(pool, rkeydir, "/", dn), flags);
+    }
+  solv_free(rkeydir);
+  for (i = 0; i < nent; i++)
+    solv_free(namelist[i]);
+  solv_free(namelist);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+  return 0;
+}
+
 Solvsig *
 solvsig_create(FILE *fp)
 {
@@ -861,10 +1031,12 @@ solvsig_create(FILE *fp)
     {
       /* not a raw sig, check armored */
       unsigned char *nsig;
-      nsig = unarmor((char *)sig, &sigl, "-----BEGIN PGP SIGNATURE-----", "-----END PGP SIGNATURE-----");
+      if (!unarmor((char *)sig, &nsig, &sigl, "-----BEGIN PGP SIGNATURE-----", "-----END PGP SIGNATURE-----"))
+	{
+	  solv_free(sig);
+	  return 0;
+	}
       solv_free(sig);
-      if (!nsig)
-	return 0;
       sig = nsig;
       if (!is_sig_packet(sig, sigl))
 	{

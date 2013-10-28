@@ -20,6 +20,8 @@ SOLV_1.0 {
 		repo_add_haiku_package_info;
 		repo_add_haiku_packages;
 		repo_add_helix;
+		repo_add_keydir;
+		repo_add_keyring;
 		repo_add_mdk;
 		repo_add_mdk_info;
 		repo_add_products;
