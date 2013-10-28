@@ -477,35 +477,82 @@ parsepkgheader(unsigned char *p, int pl, int *tagp, int *pktlp)
   return p - op;
 }
 
-
-static void
-parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
+/* parse the first pubkey (possible creating new packages for the subkeys)
+ * returns the number of parsed bytes */
+static int
+parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 {
+  Repo *repo = s->repo;
+  unsigned char *pstart = p;
   int tag, l;
   unsigned char keyid[8];
   unsigned int kcr = 0, maxex = 0, maxsigcr = 0;
   unsigned char *pubkey = 0;
   int pubkeyl = 0;
+  int insubkey = 0;
   unsigned char *userid = 0;
   int useridl = 0;
   unsigned char *pubdata = 0;
   int pubdatal = 0;
 
-  for (; pl; p += l, pl -= l)
+  for (; ; p += l, pl -= l)
     {
       int hl = parsepkgheader(p, pl, &tag, &l);
-      if (!hl)
-	break;
+      if (!hl || (pubkey && (tag == 6 || tag == 14)))
+	{
+	  /* finish old key */
+	  if (kcr)
+	    repodata_set_num(data, s - repo->pool->solvables, SOLVABLE_BUILDTIME, kcr);
+	  if (maxex && maxex != -1)
+	    repodata_set_num(data, s - repo->pool->solvables, PUBKEY_EXPIRES, maxex);
+	  s->name = pool_str2id(s->repo->pool, insubkey ? "gpg-subkey" : "gpg-pubkey", 1);
+	  s->evr = 1;
+	  s->arch = 1;
+	  if (userid && useridl)
+	    {
+	      char *useridstr = solv_malloc(useridl + 1);
+	      memcpy(useridstr, userid, useridl);
+	      useridstr[useridl] = 0;
+	      setutf8string(data, s - repo->pool->solvables, SOLVABLE_SUMMARY, useridstr);
+	      free(useridstr);
+	    }
+	  if (pubdata)
+	    {
+	      char keyidstr[17];
+	      char evr[8 + 1 + 8 + 1];
+	      solv_bin2hex(keyid, 8, keyidstr);
+	      repodata_set_str(data, s - repo->pool->solvables, PUBKEY_KEYID, keyidstr);
+	      /* build rpm-style evr */
+	      strcpy(evr, keyidstr + 8);
+	      sprintf(evr + 8, "-%08x", maxsigcr);
+	      s->evr = pool_str2id(repo->pool, evr, 1);
+	    }
+	  if (pubdata)		/* set data blob */
+	    repodata_set_binary(data, s - repo->pool->solvables, PUBKEY_DATA, pubdata, pubdatal);
+	  if (!pl)
+	    break;
+	  if (!hl)
+	    {
+	      p = 0;	/* parse error */
+	      break;
+	    }
+	  if (tag == 6 || (tag == 14 && !(flags & ADD_WITH_SUBKEYS)))
+	    break;
+	  s = pool_id2solvable(repo->pool, repo_add_solvable(repo));
+	}
       p += hl;
       pl -= hl;
-      if (tag == 6)
+      if (!pubkey && tag != 6)
+	continue;
+      if (tag == 6 || (tag == 14 && (flags & ADD_WITH_SUBKEYS) != 0))		/* Public-Key Packet */
 	{
-	  if (pubkey)
-	    break;	/* one key at a time, please */
-	  pubkey = solv_malloc(l);
-	  if (l)
-	    memcpy(pubkey, p, l);
-	  pubkeyl = l;
+	  if (tag == 6)
+	    {
+	      pubkey = solv_memdup(p, l);
+	      pubkeyl = l;
+	    }
+	  else
+	    insubkey = 1;
 	  if (p[0] == 3 && l >= 10)
 	    {
 	      unsigned int ex;
@@ -570,7 +617,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	      pubdatal = l - 5;
 	    }
 	}
-      if (tag == 2)
+      if (tag == 2)		/* Signature Packet */
 	{
 	  struct pgpsig sig;
 	  Id htype;
@@ -607,7 +654,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 		    maxsigcr = sig.created;
 		}
 	    }
-	  else
+	  else if (flags & ADD_WITH_KEYSIGNATURES)
 	    {
 	      char issuerstr[17];
 	      Id shandle = repodata_new_handle(data);
@@ -623,7 +670,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	    }
 	  solv_free(sig.sigdata);
 	}
-      if (tag == 13)
+      if (tag == 13 && !insubkey)		/* User ID Packet */
 	{
 	  userid = solv_realloc(userid, l);
 	  if (l)
@@ -631,39 +678,9 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl)
 	  useridl = l;
 	}
     }
-  if (kcr)
-    repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, kcr);
-  if (maxex && maxex != -1)
-    repodata_set_num(data, s - s->repo->pool->solvables, PUBKEY_EXPIRES, maxex);
-  s->name = pool_str2id(s->repo->pool, "gpg-pubkey", 1);
-  s->evr = 1;
-  s->arch = 1;
-  if (userid && useridl)
-    {
-      char *useridstr = solv_malloc(useridl + 1);
-      memcpy(useridstr, userid, useridl);
-      useridstr[useridl] = 0;
-      setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, useridstr);
-      free(useridstr);
-    }
-  if (pubdata)
-    {
-      char keyidstr[17];
-      solv_bin2hex(keyid, 8, keyidstr);
-      repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_KEYID, keyidstr);
-    }
-  if (pubdata)
-    {
-      /* build rpm-style evr */
-      char evr[8 + 1 + 8 + 1];
-      solv_bin2hex(keyid + 4, 4, evr);
-      sprintf(evr + 8, "-%08x", maxsigcr);
-      s->evr = pool_str2id(s->repo->pool, evr, 1);
-      /* set data blob */
-      repodata_set_binary(data, s - s->repo->pool->solvables, PUBKEY_DATA, pubdata, pubdatal);
-    }
   solv_free(pubkey);
   solv_free(userid);
+  return p ? p - pstart : 0;
 }
 
 
@@ -744,22 +761,40 @@ parsekeydata_rpm(Solvable *s, Repodata *data, unsigned char *pkts, int pktsl)
 #endif	/* ENABLE_RPMDB */
 
 static int
-pubkey2solvable(Solvable *s, Repodata *data, char *pubkey)
+pubkey2solvable(Pool *pool, Id p, Repodata *data, char *pubkey, int flags)
 {
-  unsigned char *pkts;
-  int pktsl;
+  unsigned char *pkts, *pkts_orig;
+  int pktsl, pl = 0, tag, l, hl;
 
   if (!unarmor(pubkey, &pkts, &pktsl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----"))
     {
-      pool_error(s->repo->pool, 0, "unarmor failure");
+      pool_error(pool, 0, "unarmor failure");
       return 0;
     }
-  setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_DESCRIPTION, pubkey);
-  parsekeydata(s, data, pkts, pktsl);
+  pkts_orig = pkts;
+  tag = 6;
+  while (pktsl)
+    {
+      if (tag == 6)
+	{
+	  setutf8string(data, p, SOLVABLE_DESCRIPTION, pubkey);
+	  pl = parsekeydata(pool->solvables + p, data, pkts, pktsl, flags);
 #ifdef ENABLE_RPMDB
-  parsekeydata_rpm(s, data, pkts, pktsl);
+	  parsekeydata_rpm(pool->solvables + p, data, pkts, pktsl);
 #endif
-  solv_free((void *)pkts);
+	  if (!pl || !(flags & ADD_MULTIPLE_PUBKEYS))
+	    break;
+	}
+      pkts += pl;
+      pktsl -= pl;
+      hl = parsepkgheader(pkts, pktsl, &tag, &l);
+      if (!hl)
+	break;
+      pl = l + hl;
+      if (tag == 6)
+        p = repo_add_solvable(pool->solvables[p].repo);
+    }
+  solv_free((void *)pkts_orig);
   return 1;
 }
 
@@ -773,7 +808,6 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
   int i;
   char *str;
   Repodata *data;
-  Solvable *s;
   const char *rootdir = 0;
   void *state;
 
@@ -785,6 +819,7 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
   rpm_installedrpmdbids(state, "Name", "gpg-pubkey", &q);
   for (i = 0; i < q.count; i++)
     {
+      Id p, p2;
       void *handle;
       unsigned long long itime;
 
@@ -794,15 +829,23 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
       str = rpm_query(handle, SOLVABLE_DESCRIPTION);
       if (!str)
 	continue;
-      s = pool_id2solvable(pool, repo_add_solvable(repo));
-      pubkey2solvable(s, data, str);
+      p = repo_add_solvable(repo);
+      if (!pubkey2solvable(pool, p, data, str, flags))
+	{
+	  solv_free(str);
+	  repo_free_solvable(repo, p, 1);
+	  continue;
+	}
       solv_free(str);
       itime = rpm_query_num(handle, SOLVABLE_INSTALLTIME, 0);
-      if (itime)
-        repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLTIME, itime);
-      if (!repo->rpmdbid)
-	repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
-      repo->rpmdbid[s - pool->solvables - repo->start] = q.elements[i];
+      for (p2 = p; p2 < pool->nsolvables; p2++)
+	{
+	  if (itime)
+	    repodata_set_num(data, p2, SOLVABLE_INSTALLTIME, itime);
+	  if (!repo->rpmdbid)
+	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
+	  repo->rpmdbid[p2 - repo->start] = q.elements[i];
+	}
     }
   queue_free(&q);
   rpm_state_free(state);
@@ -850,7 +893,7 @@ repo_add_pubkey(Repo *repo, const char *key, int flags)
 {
   Pool *pool = repo->pool;
   Repodata *data;
-  Solvable *s;
+  Id p;
   char *buf;
   FILE *fp;
 
@@ -868,19 +911,23 @@ repo_add_pubkey(Repo *repo, const char *key, int flags)
       return 0;
     }
   fclose(fp);
-  s = pool_id2solvable(pool, repo_add_solvable(repo));
-  if (!pubkey2solvable(s, data, buf))
+  p = repo_add_solvable(repo);
+  if (!pubkey2solvable(pool, p, data, buf, flags))
     {
-      repo_free_solvable(repo, s - pool->solvables, 1);
+      repo_free_solvable(repo, p, 1);
       solv_free(buf);
       return 0;
     }
   if (!(flags & REPO_NO_LOCATION))
-    repodata_set_location(data, s - pool->solvables, 0, 0, key);
+    {
+      Id p2;
+      for (p2 = p; p2 < pool->nsolvables; p2++)
+        repodata_set_location(data, p2, 0, 0, key);
+    }
   solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
-  return s - pool->solvables;
+  return p;
 }
 
 static int
@@ -904,15 +951,15 @@ is_pubkey_packet(unsigned char *pkt, int pktl)
 }
 
 static void
-add_one_pubkey(Pool *pool, Repo *repo, Repodata *data, unsigned char *pbuf, int pbufl)
+add_one_pubkey(Pool *pool, Repo *repo, Repodata *data, unsigned char *pbuf, int pbufl, int flags)
 {
-  Solvable *s = pool_id2solvable(pool, repo_add_solvable(repo));
+  Id p = repo_add_solvable(repo);
   char *solvversion = pool_tmpjoin(pool, "libsolv-", LIBSOLV_VERSION_STRING, 0);
   char *descr = armor(pbuf, pbufl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----", solvversion);
-  setutf8string(data, s - pool->solvables, SOLVABLE_DESCRIPTION, descr);
-  parsekeydata(s, data, pbuf, pbufl);
+  setutf8string(data, p, SOLVABLE_DESCRIPTION, descr);
+  parsekeydata(pool->solvables + p, data, pbuf, pbufl, flags);
 #ifdef ENABLE_RPMDB
-  parsekeydata_rpm(s, data, pbuf, pbufl);
+  parsekeydata_rpm(pool->solvables + p, data, pbuf, pbufl);
 #endif
 }
 
@@ -959,7 +1006,7 @@ repo_add_keyring(Repo *repo, FILE *fp, int flags)
 	  /* found new pubkey! flush old */
 	  if (pbufl)
 	    {
-	      add_one_pubkey(pool, repo, data, pbuf, pbufl);
+	      add_one_pubkey(pool, repo, data, pbuf, pbufl, flags);
 	      pbuf = solv_free(pbuf);
 	      pbufl = 0;
 	    }
@@ -974,7 +1021,7 @@ repo_add_keyring(Repo *repo, FILE *fp, int flags)
       pbufl += pl;
     }
   if (pbufl)
-    add_one_pubkey(pool, repo, data, pbuf, pbufl);
+    add_one_pubkey(pool, repo, data, pbuf, pbufl, flags);
   solv_free(pbuf);
   solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))

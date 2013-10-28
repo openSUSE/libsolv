@@ -153,7 +153,7 @@ main(int argc, char **argv)
 #ifdef ENABLE_PUBKEY
   if (pubkeys)
     {
-      if (repo_add_rpmdb_pubkeys(repo, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+      if (repo_add_rpmdb_pubkeys(repo, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | ADD_WITH_KEYSIGNATURES))
 	{
 	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
 	  exit(1);

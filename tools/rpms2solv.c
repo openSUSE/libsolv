@@ -140,7 +140,7 @@ main(int argc, char **argv)
 	      res = 1;
 	      continue;
 	    }
-	  if (repo_add_keyring(repo, fp, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE))
+	  if (repo_add_keyring(repo, fp, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|ADD_WITH_KEYSIGNATURES))
 	    {
 	      fprintf(stderr, "rpms2solv: %s\n", pool_errstr(pool));
 	      res = 1;
@@ -150,7 +150,7 @@ main(int argc, char **argv)
 	}
       if (pubkeys)
         {
-	  if (repo_add_pubkey(repo, rpms[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE) == 0)
+	  if (repo_add_pubkey(repo, rpms[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|ADD_WITH_KEYSIGNATURES) == 0)
 	    {
 	      fprintf(stderr, "rpms2solv: %s\n", pool_errstr(pool));
 	      res = 1;

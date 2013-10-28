@@ -8,6 +8,9 @@
 #include "repo.h"
 
 #define ADD_KEYDIR_WITH_DOTFILES	(1 << 8)
+#define ADD_WITH_SUBKEYS		(1 << 9)
+#define ADD_MULTIPLE_PUBKEYS		(1 << 10)
+#define ADD_WITH_KEYSIGNATURES		(1 << 11)
 
 extern int repo_add_rpmdb_pubkeys(Repo *repo, int flags);
 extern Id repo_add_pubkey(Repo *repo, const char *key, int flags);

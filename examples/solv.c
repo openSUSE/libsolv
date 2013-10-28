@@ -1015,7 +1015,7 @@ read_sigs()
 {
   Pool *sigpool = pool_create();
 #if defined(ENABLE_PUBKEY) && defined(ENABLE_RPMDB)
-  Repo *repo = repo_create(sigpool, "rpmdbkeys");
+  Repo *repo = repo_create(sigpool, "pubkeys");
   repo_add_rpmdb_pubkeys(repo, 0);
 #endif
   return sigpool;
