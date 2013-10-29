@@ -234,6 +234,7 @@ armor(unsigned char *pkt, int pktl, const char *startstr, const char *endstr, co
   return str;
 }
 
+/* internal representation of a signature */
 struct pgpsig {
   int type;
   Id hashalgo;
@@ -259,8 +260,11 @@ pgphashalgo2type(int algo)
   return 0;
 }
 
+/* hash the pubkey/userid data for self-sig verification
+ * hash the final trailer
+ * create a "sigdata" block suitable for a call to solv_pgpverify */
 static void
-createsigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey, int pubkeyl, unsigned char *userid, int useridl, void *h)
+pgpsig_makesigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey, int pubkeyl, unsigned char *userid, int useridl, void *h)
 {
   int type = sig->type;
   unsigned char b[6];
@@ -318,6 +322,10 @@ createsigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey
     }
 }
 
+/* parse the header of a subpacket contained in a signature packet
+ * returns: length of the packet header, 0 if there was an error
+ * *pktlp is set to the packet length, the tag is the first byte.
+ */
 static inline int
 parsesubpkglength(unsigned char *q, int ql, int *pktlp)
 {
@@ -349,9 +357,11 @@ parsesubpkglength(unsigned char *q, int ql, int *pktlp)
   return hl;
 }
 
+/* parse a signature packet, initializing the pgpsig struct */
 static void
-parsesigpacket(struct pgpsig *sig, unsigned char *p, int l)
+pgpsig_init(struct pgpsig *sig, unsigned char *p, int l)
 {
+  memset(sig, 0, sizeof(*sig));
   sig->type = -1;
   if (p[0] == 3)
     {
@@ -424,6 +434,10 @@ parsesigpacket(struct pgpsig *sig, unsigned char *p, int l)
     }
 }
 
+/* parse a pgp packet header
+ * returns: length of the packet header, 0 if there was an error
+ * *tagp and *pktlp is set to the packet tag and the packet length
+ */
 static int
 parsepkgheader(unsigned char *p, int pl, int *tagp, int *pktlp)
 {
@@ -478,9 +492,11 @@ parsepkgheader(unsigned char *p, int pl, int *tagp, int *pktlp)
 }
 
 /* parse the first pubkey (possible creating new packages for the subkeys)
- * returns the number of parsed bytes */
+ * returns the number of parsed bytes.
+ * if flags contains ADD_WITH_SUBKEYS, all subkeys will be added as new
+ * solvables as well */
 static int
-parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
+parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 {
   Repo *repo = s->repo;
   unsigned char *pstart = p;
@@ -538,6 +554,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	    }
 	  if (tag == 6 || (tag == 14 && !(flags & ADD_WITH_SUBKEYS)))
 	    break;
+	  /* create new solvable for subkey */
 	  s = pool_id2solvable(repo->pool, repo_add_solvable(repo));
 	}
       p += hl;
@@ -623,8 +640,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	  Id htype;
 	  if (!pubdata)
 	    continue;
-	  memset(&sig, 0, sizeof(sig));
-	  parsesigpacket(&sig, p, l);
+	  pgpsig_init(&sig, p, l);
 	  if (!sig.haveissuer || !((sig.type >= 0x10 && sig.type <= 0x13) || sig.type == 0x1f))
 	    continue;
 	  if (sig.type >= 0x10 && sig.type <= 0x13 && !userid)
@@ -633,7 +649,7 @@ parsekeydata(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	  if (htype && sig.mpioff)
 	    {
 	      void *h = solv_chksum_create(htype);
-	      createsigdata(&sig, p, l, pubkey, pubkeyl, userid, useridl, h);
+	      pgpsig_makesigdata(&sig, p, l, pubkey, pubkeyl, userid, useridl, h);
 	      solv_chksum_free(h, 0);
 	    }
 	  if (!memcmp(keyid, sig.issuer, 8))
@@ -717,7 +733,7 @@ struct pgpDig_s {
 /* only rpm knows how to do the release calculation, we don't dare
  * to recreate all the bugs in libsolv */
 static void
-parsekeydata_rpm(Solvable *s, Repodata *data, unsigned char *pkts, int pktsl)
+parsepubkey_rpm(Solvable *s, Repodata *data, unsigned char *pkts, int pktsl)
 {
   Pool *pool = s->repo->pool;
   struct pgpDigParams_s *digpubkey;
@@ -760,6 +776,8 @@ parsekeydata_rpm(Solvable *s, Repodata *data, unsigned char *pkts, int pktsl)
 
 #endif	/* ENABLE_RPMDB */
 
+/* parse an ascii armored pubkey
+ * adds multiple pubkeys if ADD_MULTIPLE_PUBKEYS is set */
 static int
 pubkey2solvable(Pool *pool, Id p, Repodata *data, char *pubkey, int flags)
 {
@@ -778,9 +796,9 @@ pubkey2solvable(Pool *pool, Id p, Repodata *data, char *pubkey, int flags)
       if (tag == 6)
 	{
 	  setutf8string(data, p, SOLVABLE_DESCRIPTION, pubkey);
-	  pl = parsekeydata(pool->solvables + p, data, pkts, pktsl, flags);
+	  pl = parsepubkey(pool->solvables + p, data, pkts, pktsl, flags);
 #ifdef ENABLE_RPMDB
-	  parsekeydata_rpm(pool->solvables + p, data, pkts, pktsl);
+	  parsepubkey_rpm(pool->solvables + p, data, pkts, pktsl);
 #endif
 	  if (!pl || !(flags & ADD_MULTIPLE_PUBKEYS))
 	    break;
@@ -889,7 +907,7 @@ solv_slurp(FILE *fp, int *lenp)
 }
 
 Id
-repo_add_pubkey(Repo *repo, const char *key, int flags)
+repo_add_pubkey(Repo *repo, const char *keyfile, int flags)
 {
   Pool *pool = repo->pool;
   Repodata *data;
@@ -899,14 +917,14 @@ repo_add_pubkey(Repo *repo, const char *key, int flags)
 
   data = repo_add_repodata(repo, flags);
   buf = 0;
-  if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, key) : key, "r")) == 0)
+  if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, keyfile) : keyfile, "r")) == 0)
     {
-      pool_error(pool, -1, "%s: %s", key, strerror(errno));
+      pool_error(pool, -1, "%s: %s", keyfile, strerror(errno));
       return 0;
     }
   if ((buf = solv_slurp(fp, 0)) == 0)
     {
-      pool_error(pool, -1, "%s: %s", key, strerror(errno));
+      pool_error(pool, -1, "%s: %s", keyfile, strerror(errno));
       fclose(fp);
       return 0;
     }
@@ -922,7 +940,7 @@ repo_add_pubkey(Repo *repo, const char *key, int flags)
     {
       Id p2;
       for (p2 = p; p2 < pool->nsolvables; p2++)
-        repodata_set_location(data, p2, 0, 0, key);
+        repodata_set_location(data, p2, 0, 0, keyfile);
     }
   solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
@@ -957,9 +975,9 @@ add_one_pubkey(Pool *pool, Repo *repo, Repodata *data, unsigned char *pbuf, int 
   char *solvversion = pool_tmpjoin(pool, "libsolv-", LIBSOLV_VERSION_STRING, 0);
   char *descr = armor(pbuf, pbufl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----", solvversion);
   setutf8string(data, p, SOLVABLE_DESCRIPTION, descr);
-  parsekeydata(pool->solvables + p, data, pbuf, pbufl, flags);
+  parsepubkey(pool->solvables + p, data, pbuf, pbufl, flags);
 #ifdef ENABLE_RPMDB
-  parsekeydata_rpm(pool->solvables + p, data, pbuf, pbufl);
+  parsepubkey_rpm(pool->solvables + p, data, pbuf, pbufl);
 #endif
 }
 
@@ -1097,8 +1115,7 @@ solvsig_create(FILE *fp)
       solv_free(sig);
       return 0;
     }
-  memset(&pgpsig, 0, sizeof(pgpsig));
-  parsesigpacket(&pgpsig, sig + hl, pktl);
+  pgpsig_init(&pgpsig, sig + hl, pktl);
   if (pgpsig.type != 0 || !pgpsig.haveissuer)
     {
       solv_free(sig);
@@ -1132,15 +1149,14 @@ solv_verify_sig(const unsigned char *pubdata, int pubdatal, unsigned char *sigpk
   Id htype;
   void *chk2;
 
-  memset(&pgpsig, 0, sizeof(pgpsig));
-  parsesigpacket(&pgpsig, sigpkt, sigpktl);
+  pgpsig_init(&pgpsig, sigpkt, sigpktl);
   if (pgpsig.type != 0)
     return 0;
   htype = pgphashalgo2type(pgpsig.hashalgo);
   if (!htype || htype != solv_chksum_get_type(chk))
      return 0;	/* wrong hash type? */
   chk2 = solv_chksum_create_clone(chk);
-  createsigdata(&pgpsig, sigpkt, sigpktl, 0, 0, 0, 0, chk2);
+  pgpsig_makesigdata(&pgpsig, sigpkt, sigpktl, 0, 0, 0, 0, chk2);
   solv_chksum_free(chk2, 0);
   if (!pgpsig.sigdata)
     return 0;
@@ -1185,9 +1201,9 @@ solvsig_verify(Solvsig *ss, Repo *repo, void *chk)
   void *chk2;
   Id p;
 
-  parsesigpacket(&pgpsig, ss->sigpkt, ss->sigpktl);
+  pgpsig_init(&pgpsig, ss->sigpkt, ss->sigpktl);
   chk2 = solv_chksum_create_clone(chk);
-  createsigdata(&pgpsig, ss->sigpkt, ss->sigpktl, 0, 0, 0, 0, chk2);
+  pgpsig_makesigdata(&pgpsig, ss->sigpkt, ss->sigpktl, 0, 0, 0, 0, chk2);
   solv_chksum_free(chk2, 0);
   if (!pgpsig.sigdata)
     return 0;

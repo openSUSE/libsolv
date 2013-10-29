@@ -13,7 +13,7 @@
 #define ADD_WITH_KEYSIGNATURES		(1 << 11)
 
 extern int repo_add_rpmdb_pubkeys(Repo *repo, int flags);
-extern Id repo_add_pubkey(Repo *repo, const char *key, int flags);
+extern Id repo_add_pubkey(Repo *repo, const char *keyfile, int flags);
 extern int repo_add_keyring(Repo *repo, FILE *fp, int flags);
 extern int repo_add_keydir(Repo *repo, const char *keydir, int flags, const char *suffix);
 
