@@ -3095,6 +3095,11 @@ solver_solve(Solver *solv, Queue *job)
       map_free(&solv->cleandepsmap);
       map_init(&solv->cleandepsmap, 0);
     }
+  if (solv->weakrulemap.size)
+    {
+      map_free(&solv->weakrulemap);
+      map_init(&solv->weakrulemap, 0);
+    }
 
   queue_empty(&solv->weakruleq);
   solv->watches = solv_free(solv->watches);
