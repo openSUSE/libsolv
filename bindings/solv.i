@@ -659,6 +659,15 @@ typedef struct {
 typedef struct {
 } Chksum;
 
+#ifdef ENABLE_PUBKEY
+typedef struct {
+  Id const htype;
+  unsigned int const created;
+  unsigned int const expires;
+  const char * const keyid;
+} Solvsig;
+#endif
+
 %rename(xfopen) solvfp_xfopen;
 %rename(xfopen_fd) solvfp_xfopen_fd;
 
@@ -1453,8 +1462,14 @@ rb_eval_string(
   }
 #endif
   %newobject add_pubkey;
-  XSolvable *add_pubkey(const char *key, int flags = 0) {
-    return new_XSolvable($self->pool, repo_add_pubkey($self, key, flags));
+  XSolvable *add_pubkey(const char *keyfile, int flags = 0) {
+    return new_XSolvable($self->pool, repo_add_pubkey($self, keyfile, flags));
+  }
+  bool add_keyring(FILE *fp, int flags = 0) {
+    return repo_add_keyring($self, fp, flags);
+  }
+  bool add_keydir(const char *keydir, const char *suffix, int flags = 0) {
+    return repo_add_keydir($self, keydir, suffix, flags);
   }
 #endif
 #ifdef ENABLE_RPMMD
@@ -3016,3 +3031,22 @@ rb_eval_string(
   }
 }
 
+#ifdef ENABLE_PUBKEY
+%extend Solvsig {
+  Solvsig(FILE *fp) {
+    return solvsig_create(fp);
+  }
+  ~Solvsig() {
+    solvsig_free($self);
+  }
+  %newobject Chksum;
+  Chksum *Chksum() {
+    return $self->htype ? (Chksum *)solv_chksum_create($self->htype) : 0;
+  }
+  %newobject verify;
+  XSolvable *verify(Repo *repo, Chksum *chksum) {
+    Id p = solvsig_verify($self, repo, chksum);
+    return new_XSolvable(repo->pool, p);
+  }
+}
+#endif
