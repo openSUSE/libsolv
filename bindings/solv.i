@@ -3043,10 +3043,12 @@ rb_eval_string(
   Chksum *Chksum() {
     return $self->htype ? (Chksum *)solv_chksum_create($self->htype) : 0;
   }
+#ifdef ENABLE_PGPVRFY
   %newobject verify;
   XSolvable *verify(Repo *repo, Chksum *chksum) {
     Id p = solvsig_verify($self, repo, chksum);
     return new_XSolvable(repo->pool, p);
   }
+#endif
 }
 #endif
