@@ -1071,7 +1071,7 @@ repo_add_keydir(Repo *repo, const char *keydir, int flags, const char *suffix)
       l = strlen(dn);
       if (sl && (l < sl || strcmp(dn + l - sl, suffix) != 0))
 	continue;
-      repo_add_pubkey(repo, pool_tmpjoin(pool, rkeydir, "/", dn), flags);
+      repo_add_pubkey(repo, pool_tmpjoin(pool, rkeydir, "/", dn), flags | REPO_REUSE_REPODATA);
     }
   solv_free(rkeydir);
   for (i = 0; i < nent; i++)
@@ -1141,28 +1141,14 @@ solvsig_free(Solvsig *ss)
 
 #ifdef ENABLE_PGPVRFY
 
-int
-solv_verify_sig(const unsigned char *pubdata, int pubdatal, unsigned char *sigpkt, int sigpktl, void *chk)
+static int
+repo_verify_sigdata_cmp(const void *va, const void *vb, void *dp)
 {
-  struct pgpsig pgpsig;
-  int res;
-  Id htype;
-  void *chk2;
-
-  pgpsig_init(&pgpsig, sigpkt, sigpktl);
-  if (pgpsig.type != 0)
-    return 0;
-  htype = pgphashalgo2type(pgpsig.hashalgo);
-  if (!htype || htype != solv_chksum_get_type(chk))
-     return 0;	/* wrong hash type? */
-  chk2 = solv_chksum_create_clone(chk);
-  pgpsig_makesigdata(&pgpsig, sigpkt, sigpktl, 0, 0, 0, 0, chk2);
-  solv_chksum_free(chk2, 0);
-  if (!pgpsig.sigdata)
-    return 0;
-  res = solv_pgpvrfy(pubdata, pubdatal, pgpsig.sigdata, pgpsig.sigdatal);
-  solv_free(pgpsig.sigdata);
-  return res;
+  Pool *pool = dp;
+  Id a = *(Id *)va;
+  Id b = *(Id *)vb;
+  /* cannot use evrcmp, as rpm says '0' > 'a' */
+  return strcmp(pool_id2str(pool, pool->solvables[b].evr), pool_id2str(pool, pool->solvables[a].evr));
 }
 
 /* warning: does not check key expiry/revokation, like gpgv or rpm */
@@ -1172,26 +1158,36 @@ repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char
 {
   Id p;
   Solvable *s;
+  Queue q;
+  int i;
 
   if (!sigdata || !keyid)
     return 0;
+  queue_init(&q);
   FOR_REPO_SOLVABLES(repo, p, s)
     {
       const char *evr = pool_id2str(s->repo->pool, s->evr);
       const char *kidstr;
-      const unsigned char *pubdata;
-      int pubdatal;
 
       if (!evr || strncmp(evr, keyid + 8, 8) != 0)
        continue;
       kidstr = solvable_lookup_str(s, PUBKEY_KEYID);
       if (!kidstr || strcmp(kidstr, keyid) != 0)
         continue;
-      pubdata = repo_lookup_binary(repo, p, PUBKEY_DATA, &pubdatal);
-      if (solv_pgpvrfy(pubdata, pubdatal, sigdata, sigdatal))
-        return p;
+      queue_push(&q, p);
     }
-  return 0;
+  if (q.count > 1)
+    solv_sort(q.elements, q.count, sizeof(Id), repo_verify_sigdata_cmp, repo->pool);
+  for (i = 0; i < q.count; i++)
+    {
+      int pubdatal;
+      const unsigned char *pubdata = repo_lookup_binary(repo, q.elements[i], PUBKEY_DATA, &pubdatal);
+      if (pubdata && solv_pgpvrfy(pubdata, pubdatal, sigdata, sigdatal))
+	break;
+    }
+  p = i < q.count? q.elements[i] : 0;
+  queue_free(&q);
+  return p;
 }
 
 Id
