@@ -15,7 +15,7 @@
 extern int repo_add_rpmdb_pubkeys(Repo *repo, int flags);
 extern Id repo_add_pubkey(Repo *repo, const char *keyfile, int flags);
 extern int repo_add_keyring(Repo *repo, FILE *fp, int flags);
-extern int repo_add_keydir(Repo *repo, const char *keydir, int flags, const char *suffix);
+extern int repo_add_keydir(Repo *repo, const char *keydir, const char *suffix, int flags);
 
 /* signature parsing */
 typedef struct _solvsig {

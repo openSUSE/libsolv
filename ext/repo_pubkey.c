@@ -1048,7 +1048,7 @@ repo_add_keyring(Repo *repo, FILE *fp, int flags)
 }
 
 int
-repo_add_keydir(Repo *repo, const char *keydir, int flags, const char *suffix)
+repo_add_keydir(Repo *repo, const char *keydir, const char *suffix, int flags)
 {
   Pool *pool = repo->pool;
   Repodata *data;
