@@ -502,6 +502,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
   unsigned char *pstart = p;
   int tag, l;
   unsigned char keyid[8];
+  char subkeyofstr[17];
   unsigned int kcr = 0, maxex = 0, maxsigcr = 0;
   unsigned char *pubkey = 0;
   int pubkeyl = 0;
@@ -511,6 +512,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
   unsigned char *pubdata = 0;
   int pubdatal = 0;
 
+  *subkeyofstr = 0;
   for (; ; p += l, pl -= l)
     {
       int hl = parsepkgheader(p, pl, &tag, &l);
@@ -543,6 +545,8 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	      sprintf(evr + 8, "-%08x", maxsigcr);
 	      s->evr = pool_str2id(repo->pool, evr, 1);
 	    }
+	  if (insubkey && *subkeyofstr)
+	    repodata_set_str(data, s - repo->pool->solvables, PUBKEY_SUBKEYOF, subkeyofstr);
 	  if (pubdata)		/* set data blob */
 	    repodata_set_binary(data, s - repo->pool->solvables, PUBKEY_DATA, pubdata, pubdatal);
 	  if (!pl)
@@ -554,6 +558,8 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	    }
 	  if (tag == 6 || (tag == 14 && !(flags & ADD_WITH_SUBKEYS)))
 	    break;
+	  if (tag == 14 && pubdata && !insubkey)
+	    solv_bin2hex(keyid, 8, subkeyofstr);
 	  /* create new solvable for subkey */
 	  s = pool_id2solvable(repo->pool, repo_add_solvable(repo));
 	}
@@ -570,6 +576,8 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	    }
 	  else
 	    insubkey = 1;
+	  pubdata = 0;
+	  pubdatal = 0;
 	  if (p[0] == 3 && l >= 10)
 	    {
 	      unsigned int ex;

@@ -256,6 +256,8 @@ KNOWNID(SIGNATURE_TIME,	        	"signature:time"),
 KNOWNID(SIGNATURE_EXPIRES,	        "signature:expires"),
 KNOWNID(SIGNATURE_DATA,		        "signature:data"),
 
+KNOWNID(PUBKEY_SUBKEYOF,	        "pubkey:subkeyof"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
