@@ -1197,6 +1197,8 @@ solvsig_verify(Solvsig *ss, Repo *repo, void *chk)
   void *chk2;
   Id p;
 
+  if (!chk || solv_chksum_isfinished(chk))
+    return 0;
   pgpsig_init(&pgpsig, ss->sigpkt, ss->sigpktl);
   chk2 = solv_chksum_create_clone(chk);
   pgpsig_makesigdata(&pgpsig, ss->sigpkt, ss->sigpktl, 0, 0, 0, 0, chk2);
