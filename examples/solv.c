@@ -2320,6 +2320,8 @@ rewrite_repos(Pool *pool, Queue *addedfileprovides, Queue *addedfileprovides_ins
       if (repo->nrepodata < 2)
 	continue;
       cinfo = repo->appdata;
+      if (repo != pool->installed && !cinfo)
+	continue;
       if (cinfo && cinfo->incomplete)
 	continue;
       data = repo_id2repodata(repo, 1);
