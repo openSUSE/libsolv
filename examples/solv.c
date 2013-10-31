@@ -1756,21 +1756,21 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
 # if defined(ENABLE_SUSEREPO) && defined(PRODUCTS_PATH)
-      if (repo_add_products(repo, PRODUCTS_PATH, REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
+      if (repo_add_products(repo, PRODUCTS_PATH, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
 	{
 	  fprintf(stderr, "product reading failed: %s\n", pool_errstr(pool));
 	  exit(1);
 	}
 # endif
 # if defined(ENABLE_APPDATA)
-      if (repo_add_appdata_dir(repo, APPDATA_PATH, REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
+      if (repo_add_appdata_dir(repo, APPDATA_PATH, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
 	{
 	  fprintf(stderr, "appdata reading failed: %s\n", pool_errstr(pool));
 	  exit(1);
 	}
 # endif
       ofp = fopen(calccachepath(repo, 0, 0), "r");
-      if (repo_add_rpmdb_reffp(repo, ofp, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))
+      if (repo_add_rpmdb_reffp(repo, ofp, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
 	{
 	  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
 	  exit(1);
@@ -1779,12 +1779,13 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
         fclose(ofp);
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
-      if (repo_add_debdb(repo, REPO_REUSE_REPODATA | REPO_USE_ROOTDIR))
+      if (repo_add_debdb(repo, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
 	{
 	  fprintf(stderr, "installed db: %s\n", pool_errstr(pool));
 	  exit(1);
 	}
 #endif
+      repo_internalize(repo);
       writecachedrepo(repo, 0, 0, installedcookie);
     }
   pool_set_installed(pool, repo);
@@ -2758,9 +2759,15 @@ main(int argc, char **argv)
   queue_init(&repofilter);
   queue_init(&kindfilter);
   queue_init(&archfilter);
-  while (argc > 2)
+  while (argc > 1)
     {
-      if (!strcmp(argv[1], "-r") || !strcmp(argv[1], "--repo"))
+      if (!strcmp(argv[1], "-i"))
+	{
+	  queue_push2(&repofilter, SOLVER_SOLVABLE_REPO | SOLVER_SETREPO, pool->installed->repoid);
+	  argc--;
+	  argv++;
+	}
+      else if (argc > 2 && (!strcmp(argv[1], "-r") || !strcmp(argv[1], "--repo")))
 	{
 	  const char *rname = argv[2], *rp;
 	  Id repoid = 0;
@@ -2800,7 +2807,7 @@ main(int argc, char **argv)
 	  argc -= 2;
 	  argv += 2;
 	}
-      else if (!strcmp(argv[1], "--arch"))
+      else if (argc > 2 && !strcmp(argv[1], "--arch"))
 	{
 	  if (!strcmp(argv[2], "src") || !strcmp(argv[2], "nosrc"))
 	    archfilter_src = 1;
@@ -2808,7 +2815,7 @@ main(int argc, char **argv)
 	  argc -= 2;
 	  argv += 2;
 	}
-      else if (!strcmp(argv[1], "-t") || !strcmp(argv[1], "--type"))
+      else if (argc > 2 && (!strcmp(argv[1], "-t") || !strcmp(argv[1], "--type")))
 	{
 	  const char *kind = argv[2];
 	  if (!strcmp(kind, "srcpackage"))
