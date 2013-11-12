@@ -56,6 +56,7 @@ static const char *archpolicies[] = {
   "sparcv8",	"sparcv8:sparc",
   "sparc",	"sparc",
   "mipsel",	"mipsel",
+  "m68k",	"m68k",
   0
 };
 
