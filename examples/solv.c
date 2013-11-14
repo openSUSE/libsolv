@@ -527,7 +527,7 @@ verify_checksum(int fd, const char *file, const unsigned char *chksum, Id chksum
 {
   char buf[1024];
   const unsigned char *sum;
-  void *h;
+  Chksum *h;
   int l;
 
   h = solv_chksum_create(chksumtype);
@@ -1049,7 +1049,7 @@ void
 calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
 {
   char buf[4096];
-  void *h = solv_chksum_create(chktype);
+  Chksum *h = solv_chksum_create(chktype);
   int l;
 
   solv_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
@@ -1062,7 +1062,7 @@ calc_checksum_fp(FILE *fp, Id chktype, unsigned char *out)
 void
 calc_checksum_stat(struct stat *stb, Id chktype, unsigned char *cookie, unsigned char *out)
 {
-  void *h = solv_chksum_create(chktype);
+  Chksum *h = solv_chksum_create(chktype);
   solv_chksum_add(h, CHKSUM_IDENT, strlen(CHKSUM_IDENT));
   if (cookie)
     solv_chksum_add(h, cookie, 32);

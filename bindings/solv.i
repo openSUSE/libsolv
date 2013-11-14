@@ -457,7 +457,6 @@ typedef int bool;
 #define SOLVER_SOLUTION_REPLACE_VENDORCHANGE    -104
 #define SOLVER_SOLUTION_REPLACE_NAMECHANGE      -105
 
-typedef struct chksum Chksum;
 typedef void *AppObjectPtr;
 typedef Id DepId;
 
@@ -924,7 +923,7 @@ typedef struct {
 
 %extend Chksum {
   Chksum(Id type) {
-    return (Chksum *)solv_chksum_create(type);
+    return solv_chksum_create(type);
   }
   Chksum(Id type, const char *hex) {
     unsigned char buf[64];
@@ -933,15 +932,15 @@ typedef struct {
       return 0;
     if (solv_hex2bin(&hex, buf, sizeof(buf)) != l || hex[0])
       return 0;
-    return (Chksum *)solv_chksum_create_from_bin(type, buf);
+    return solv_chksum_create_from_bin(type, buf);
   }
   ~Chksum() {
     solv_chksum_free($self, 0);
   }
   Id const type;
   %{
-  SWIGINTERN Id Chksum_type_get(Chksum *chksum) {
-    return solv_chksum_get_type(chksum);
+  SWIGINTERN Id Chksum_type_get(Chksum *chk) {
+    return solv_chksum_get_type(chk);
   }
   %}
   void add(const char *str) {

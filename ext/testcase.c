@@ -1330,7 +1330,7 @@ testcase_ruleid(Solver *solv, Id rid)
   Strqueue sq;
   Queue q;
   int i;
-  void *chk;
+  Chksum *chk;
   const unsigned char *md5;
   int md5l;
   const char *s;
@@ -1363,7 +1363,7 @@ testcase_problemid(Solver *solv, Id problem)
 {
   Strqueue sq;
   Queue q;
-  void *chk;
+  Chksum *chk;
   const unsigned char *md5;
   int i, md5l;
   const char *s;
@@ -1390,7 +1390,7 @@ static const char *
 testcase_solutionid(Solver *solv, Id problem, Id solution)
 {
   Id intid;
-  void *chk;
+  Chksum *chk;
   const unsigned char *md5;
   int md5l;
   const char *s;

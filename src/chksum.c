@@ -19,7 +19,7 @@
 #include "sha1.h"
 #include "sha2.h"
 
-struct ctxhandle {
+struct _Chksum {
   Id type;
   int done;
   unsigned char result[64];
@@ -30,34 +30,34 @@ struct ctxhandle {
   } c;
 };
 
-void *
+Chksum *
 solv_chksum_create(Id type)
 {
-  struct ctxhandle *h;
-  h = solv_calloc(1, sizeof(*h));
-  h->type = type;
+  Chksum *chk;
+  chk = solv_calloc(1, sizeof(*chk));
+  chk->type = type;
   switch(type)
     {
     case REPOKEY_TYPE_MD5:
-      solv_MD5_Init(&h->c.md5);
-      return h;
+      solv_MD5_Init(&chk->c.md5);
+      return chk;
     case REPOKEY_TYPE_SHA1:
-      solv_SHA1_Init(&h->c.sha1);
-      return h;
+      solv_SHA1_Init(&chk->c.sha1);
+      return chk;
     case REPOKEY_TYPE_SHA256:
-      solv_SHA256_Init(&h->c.sha256);
-      return h;
+      solv_SHA256_Init(&chk->c.sha256);
+      return chk;
     default:
       break;
     }
-  free(h);
+  free(chk);
   return 0;
 }
 
-void *
-solv_chksum_create_clone(void *handle)
+Chksum *
+solv_chksum_create_clone(Chksum *chk)
 {
-  return solv_memdup(handle, sizeof(struct ctxhandle));
+  return solv_memdup(chk, sizeof(*chk));
 }
 
 int
@@ -76,36 +76,35 @@ solv_chksum_len(Id type)
     }
 }
 
-void *
+Chksum *
 solv_chksum_create_from_bin(Id type, const unsigned char *buf)
 {
-  struct ctxhandle *h;
+  Chksum *chk;
   int l = solv_chksum_len(type);
   if (buf == 0 || l == 0)
     return 0;
-  h = solv_calloc(1, sizeof(*h));
-  h->type = type;
-  h->done = 1;
-  memcpy(h->result, buf, l);
-  return h;
+  chk = solv_calloc(1, sizeof(*chk));
+  chk->type = type;
+  chk->done = 1;
+  memcpy(chk->result, buf, l);
+  return chk;
 }
 
 void
-solv_chksum_add(void *handle, const void *data, int len)
+solv_chksum_add(Chksum *chk, const void *data, int len)
 {
-  struct ctxhandle *h = handle;
-  if (h->done)
+  if (chk->done)
     return;
-  switch(h->type)
+  switch(chk->type)
     {
     case REPOKEY_TYPE_MD5:
-      solv_MD5_Update(&h->c.md5, (void *)data, len);
+      solv_MD5_Update(&chk->c.md5, (void *)data, len);
       return;
     case REPOKEY_TYPE_SHA1:
-      solv_SHA1_Update(&h->c.sha1, data, len);
+      solv_SHA1_Update(&chk->c.sha1, data, len);
       return;
     case REPOKEY_TYPE_SHA256:
-      solv_SHA256_Update(&h->c.sha256, data, len);
+      solv_SHA256_Update(&chk->c.sha256, data, len);
       return;
     default:
       return;
@@ -113,35 +112,34 @@ solv_chksum_add(void *handle, const void *data, int len)
 }
 
 const unsigned char *
-solv_chksum_get(void *handle, int *lenp)
+solv_chksum_get(Chksum *chk, int *lenp)
 {
-  struct ctxhandle *h = handle;
-  if (h->done)
+  if (chk->done)
     {
       if (lenp)
-        *lenp = solv_chksum_len(h->type);
-      return h->result;
+        *lenp = solv_chksum_len(chk->type);
+      return chk->result;
     }
-  switch(h->type)
+  switch(chk->type)
     {
     case REPOKEY_TYPE_MD5:
-      solv_MD5_Final(h->result, &h->c.md5);
-      h->done = 1;
+      solv_MD5_Final(chk->result, &chk->c.md5);
+      chk->done = 1;
       if (lenp)
 	*lenp = 16;
-      return h->result;
+      return chk->result;
     case REPOKEY_TYPE_SHA1:
-      solv_SHA1_Final(&h->c.sha1, h->result);
-      h->done = 1;
+      solv_SHA1_Final(&chk->c.sha1, chk->result);
+      chk->done = 1;
       if (lenp)
 	*lenp = 20;
-      return h->result;
+      return chk->result;
     case REPOKEY_TYPE_SHA256:
-      solv_SHA256_Final(h->result, &h->c.sha256);
-      h->done = 1;
+      solv_SHA256_Final(chk->result, &chk->c.sha256);
+      chk->done = 1;
       if (lenp)
 	*lenp = 32;
-      return h->result;
+      return chk->result;
     default:
       if (lenp)
 	*lenp = 0;
@@ -150,17 +148,15 @@ solv_chksum_get(void *handle, int *lenp)
 }
 
 Id
-solv_chksum_get_type(void *handle)
+solv_chksum_get_type(Chksum *chk)
 {
-  struct ctxhandle *h = handle;
-  return h->type;
+  return chk->type;
 }
 
 int
-solv_chksum_isfinished(void *handle)
+solv_chksum_isfinished(Chksum *chk)
 {
-  struct ctxhandle *h = handle;
-  return h->done != 0;
+  return chk->done != 0;
 }
 
 const char *
@@ -192,17 +188,17 @@ solv_chksum_str2type(const char *str)
 }
 
 void *
-solv_chksum_free(void *handle, unsigned char *cp)
+solv_chksum_free(Chksum *chk, unsigned char *cp)
 {
   if (cp)
     {
       const unsigned char *res;
       int l;
-      res = solv_chksum_get(handle, &l);
+      res = solv_chksum_get(chk, &l);
       if (l && res)
         memcpy(cp, res, l);
     }
-  solv_free(handle);
+  solv_free(chk);
   return 0;
 }
 

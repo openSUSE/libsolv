@@ -264,7 +264,7 @@ pgphashalgo2type(int algo)
  * hash the final trailer
  * create a "sigdata" block suitable for a call to solv_pgpverify */
 static void
-pgpsig_makesigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey, int pubkeyl, unsigned char *userid, int useridl, void *h)
+pgpsig_makesigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey, int pubkeyl, unsigned char *userid, int useridl, Chksum *h)
 {
   int type = sig->type;
   unsigned char b[6];
@@ -581,7 +581,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	  if (p[0] == 3 && l >= 10)
 	    {
 	      unsigned int ex;
-	      void *h;
+	      Chksum *h;
 	      maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
 	      ex = 0;
 	      if (p[5] || p[6])
@@ -621,7 +621,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	    }
 	  else if (p[0] == 4 && l >= 6)
 	    {
-	      void *h;
+	      Chksum *h;
 	      unsigned char hdr[3];
 	      unsigned char fp[20];
 	      char fpx[40 + 1];
@@ -656,7 +656,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	  htype = pgphashalgo2type(sig.hashalgo);
 	  if (htype && sig.mpioff)
 	    {
-	      void *h = solv_chksum_create(htype);
+	      Chksum *h = solv_chksum_create(htype);
 	      pgpsig_makesigdata(&sig, p, l, pubkey, pubkeyl, userid, useridl, h);
 	      solv_chksum_free(h, 0);
 	    }
@@ -1199,7 +1199,7 @@ repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char
 }
 
 Id
-solvsig_verify(Solvsig *ss, Repo *repo, void *chk)
+solvsig_verify(Solvsig *ss, Repo *repo, Chksum *chk)
 {
   struct pgpsig pgpsig;
   void *chk2;

@@ -6,6 +6,7 @@
  */
 
 #include "repo.h"
+#include "chksum.h"
 
 #define ADD_KEYDIR_WITH_DOTFILES	(1 << 8)
 #define ADD_WITH_SUBKEYS		(1 << 9)
@@ -29,7 +30,7 @@ typedef struct _solvsig {
 
 Solvsig *solvsig_create(FILE *fp);
 void solvsig_free(Solvsig *ss);
-Id solvsig_verify(Solvsig *ss, Repo *repo, void *chk);
+Id solvsig_verify(Solvsig *ss, Repo *repo, Chksum *chk);
 
 Id repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char *keyid);
 

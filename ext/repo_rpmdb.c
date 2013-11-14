@@ -1895,8 +1895,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   unsigned char hdrid[32];
   int pkgidtype, leadsigidtype, hdridtype;
   Id chksumtype = 0;
-  void *chksumh = 0;
-  void *leadsigchksumh = 0;
+  Chksum *chksumh = 0;
+  Chksum *leadsigchksumh = 0;
   int forcebinary = 0;
 
   data = repo_add_repodata(repo, flags);

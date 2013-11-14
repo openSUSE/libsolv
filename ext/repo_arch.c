@@ -338,7 +338,7 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
   Solvable *s;
   int l, fd;
   struct stat stb;
-  void *pkgidhandle = 0;
+  Chksum *pkgidchk = 0;
 
   data = repo_add_repodata(repo, flags);
   if ((fd = open(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, fn) : fn, O_RDONLY, 0)) < 0)
@@ -370,14 +370,14 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
       ignoreline = 0;
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       if (flags & ARCH_ADD_WITH_PKGID)
-	pkgidhandle = solv_chksum_create(REPOKEY_TYPE_MD5);
+	pkgidchk = solv_chksum_create(REPOKEY_TYPE_MD5);
       while (getsentry(&th, line, sizeof(line)))
 	{
 	  l = strlen(line);
 	  if (l == 0)
 	    continue;
-	  if (pkgidhandle)
-	    solv_chksum_add(pkgidhandle, line, l);
+	  if (pkgidchk)
+	    solv_chksum_add(pkgidchk, line, l);
 	  if (line[l - 1] != '\n')
 	    {
 	      ignoreline = 1;
@@ -437,8 +437,8 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
   if (!s)
     {
       pool_error(pool, -1, "%s: not an arch package", fn);
-      if (pkgidhandle)
-	solv_chksum_free(pkgidhandle, 0);
+      if (pkgidchk)
+	solv_chksum_free(pkgidchk, 0);
       return 0;
     }
   if (s && !s->name)
@@ -458,16 +458,16 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
 	repodata_set_location(data, s - pool->solvables, 0, 0, fn);
       if (S_ISREG(stb.st_mode))
         repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, (unsigned long long)stb.st_size);
-      if (pkgidhandle)
+      if (pkgidchk)
 	{
 	  unsigned char pkgid[16];
-	  solv_chksum_free(pkgidhandle, pkgid);
+	  solv_chksum_free(pkgidchk, pkgid);
 	  repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, pkgid);
-	  pkgidhandle = 0;
+	  pkgidchk = 0;
 	}
     }
-  if (pkgidhandle)
-    solv_chksum_free(pkgidhandle, 0);
+  if (pkgidchk)
+    solv_chksum_free(pkgidchk, 0);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return s ? s - pool->solvables : 0;

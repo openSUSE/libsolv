@@ -524,9 +524,9 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
   gotpkgid = 0;
   if (flags & DEBS_ADD_WITH_PKGID)
     {
-      void *handle = solv_chksum_create(REPOKEY_TYPE_MD5);
-      solv_chksum_add(handle, ctgz, clen);
-      solv_chksum_free(handle, pkgid);
+      Chksum *chk = solv_chksum_create(REPOKEY_TYPE_MD5);
+      solv_chksum_add(chk, ctgz, clen);
+      solv_chksum_free(chk, pkgid);
       gotpkgid = 1;
     }
   if (ctgz[0] != 0x1f || ctgz[1] != 0x8b)
