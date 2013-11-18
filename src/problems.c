@@ -885,6 +885,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
   Rule *r;
   Id jobassert = 0;
   int i, reqset = 0;	/* 0: unset, 1: installed, 2: jobassert, 3: assert */
+  int conset = 0;	/* 0: unset, 1: installed */
 
   /* find us a jobassert rule */
   for (i = idx; (rid = solv->learnt_pool.elements[i]) != 0; i++)
@@ -930,6 +931,16 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	  d = r->d < 0 ? -r->d - 1 : r->d;
 	  if (!d && r->w2 < 0)
 	    {
+	      /* prefer conflicts of installed packages */
+	      if (solv->installed && !conset)
+		{
+		  if (r->p < 0 && (solv->pool->solvables[-r->p].repo == solv->installed ||
+		                  solv->pool->solvables[-r->w2].repo == solv->installed))
+		    {
+		      *conrp = rid;
+		      conset = 1;
+		    }
+		}
 	      if (!*conrp)
 		*conrp = rid;
 	    }
@@ -993,6 +1004,28 @@ solver_findproblemrule(Solver *solv, Id problem)
   map_init(&rseen, solv->learntrules ? solv->nrules - solv->learntrules : 0);
   findproblemrule_internal(solv, idx, &reqr, &conr, &sysr, &jobr, &rseen);
   map_free(&rseen);
+  /* check if the request is about a not-installed package requiring a installed
+   * package conflicting with the non-installed package. In that case return the conflict */
+  if (reqr && conr && solv->installed && solv->rules[reqr].p < 0 && solv->rules[conr].p < 0 && solv->rules[conr].w2 < 0)
+    {
+      Pool *pool = solv->pool;
+      Solvable *s  = pool->solvables - solv->rules[reqr].p;
+      Solvable *s1 = pool->solvables - solv->rules[conr].p;
+      Solvable *s2 = pool->solvables - solv->rules[conr].w2;
+      Id cp = 0;
+      if (s == s1 && s2->repo == solv->installed)
+	cp = -solv->rules[conr].w2;
+      else if (s == s2 && s1->repo == solv->installed)
+	cp = -solv->rules[conr].p;
+      if (cp && s1->name != s2->name && s->repo != solv->installed)
+	{
+	  Id p, pp;
+	  Rule *r = solv->rules + reqr;
+	  FOR_RULELITERALS(p, pp, r)
+	    if (p == cp)
+	      return conr;
+	}
+    }
   if (reqr)
     return reqr;	/* some requires */
   if (conr)
