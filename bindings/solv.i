@@ -1629,6 +1629,19 @@ rb_eval_string(
     return sel;
   }
 
+#ifdef ENABLE_PUBKEY
+  %newobject find_pubkey;
+  XSolvable *find_pubkey(const char *keyid) {
+    Queue q;
+    Id p;
+    queue_init(&q);
+    repo_find_pubkeys($self, keyid, &q);
+    p = q.count ? q.elements[0] : 0;
+    queue_free(&q);
+    return new_XSolvable($self->pool, p);
+  }
+#endif
+
   bool __eq__(Repo *repo) {
     return $self == repo;
   }

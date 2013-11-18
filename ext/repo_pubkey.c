@@ -1147,10 +1147,8 @@ solvsig_free(Solvsig *ss)
   solv_free(ss);
 }
 
-#ifdef ENABLE_PGPVRFY
-
 static int
-repo_verify_sigdata_cmp(const void *va, const void *vb, void *dp)
+repo_find_pubkeys_cmp(const void *va, const void *vb, void *dp)
 {
   Pool *pool = dp;
   Id a = *(Id *)va;
@@ -1159,33 +1157,45 @@ repo_verify_sigdata_cmp(const void *va, const void *vb, void *dp)
   return strcmp(pool_id2str(pool, pool->solvables[b].evr), pool_id2str(pool, pool->solvables[a].evr));
 }
 
+void
+repo_find_pubkeys(Repo *repo, const char *keyid, Queue *q)
+{
+  Id p;
+  Solvable *s;
+
+  queue_empty(q);
+  if (!keyid)
+    return;
+  queue_init(q);
+  FOR_REPO_SOLVABLES(repo, p, s)
+    {
+      const char *kidstr, *evr = pool_id2str(s->repo->pool, s->evr);
+
+      if (!evr || strncmp(evr, keyid + 8, 8) != 0)
+       continue;
+      kidstr = solvable_lookup_str(s, PUBKEY_KEYID);
+      if (kidstr && !strcmp(kidstr, keyid))
+        queue_push(q, p);
+    }
+  if (q->count > 1)
+    solv_sort(q->elements, q->count, sizeof(Id), repo_find_pubkeys_cmp, repo->pool);
+}
+
+#ifdef ENABLE_PGPVRFY
+
 /* warning: does not check key expiry/revokation, like gpgv or rpm */
 /* returns the Id of the pubkey that verified the signature */
 Id
 repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char *keyid)
 {
   Id p;
-  Solvable *s;
   Queue q;
   int i;
 
   if (!sigdata || !keyid)
     return 0;
   queue_init(&q);
-  FOR_REPO_SOLVABLES(repo, p, s)
-    {
-      const char *evr = pool_id2str(s->repo->pool, s->evr);
-      const char *kidstr;
-
-      if (!evr || strncmp(evr, keyid + 8, 8) != 0)
-       continue;
-      kidstr = solvable_lookup_str(s, PUBKEY_KEYID);
-      if (!kidstr || strcmp(kidstr, keyid) != 0)
-        continue;
-      queue_push(&q, p);
-    }
-  if (q.count > 1)
-    solv_sort(q.elements, q.count, sizeof(Id), repo_verify_sigdata_cmp, repo->pool);
+  repo_find_pubkeys(repo, keyid, &q);
   for (i = 0; i < q.count; i++)
     {
       int pubdatal;
