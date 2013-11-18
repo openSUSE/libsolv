@@ -33,5 +33,6 @@ void solvsig_free(Solvsig *ss);
 Id solvsig_verify(Solvsig *ss, Repo *repo, Chksum *chk);
 
 Id repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char *keyid);
-void repo_find_pubkeys(Repo *repo, const char *keyid, Queue *q);
+Id repo_find_pubkey(Repo *repo, const char *keyid);
+void repo_find_all_pubkeys(Repo *repo, const char *keyid, Queue *q);
 

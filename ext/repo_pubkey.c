@@ -1148,7 +1148,7 @@ solvsig_free(Solvsig *ss)
 }
 
 static int
-repo_find_pubkeys_cmp(const void *va, const void *vb, void *dp)
+repo_find_all_pubkeys_cmp(const void *va, const void *vb, void *dp)
 {
   Pool *pool = dp;
   Id a = *(Id *)va;
@@ -1158,7 +1158,7 @@ repo_find_pubkeys_cmp(const void *va, const void *vb, void *dp)
 }
 
 void
-repo_find_pubkeys(Repo *repo, const char *keyid, Queue *q)
+repo_find_all_pubkeys(Repo *repo, const char *keyid, Queue *q)
 {
   Id p;
   Solvable *s;
@@ -1178,7 +1178,19 @@ repo_find_pubkeys(Repo *repo, const char *keyid, Queue *q)
         queue_push(q, p);
     }
   if (q->count > 1)
-    solv_sort(q->elements, q->count, sizeof(Id), repo_find_pubkeys_cmp, repo->pool);
+    solv_sort(q->elements, q->count, sizeof(Id), repo_find_all_pubkeys_cmp, repo->pool);
+}
+
+Id
+repo_find_pubkey(Repo *repo, const char *keyid)
+{
+  Queue q;
+  Id p;
+  queue_init(&q);
+  repo_find_all_pubkeys(repo, keyid, &q);
+  p = q.count ? q.elements[0] : 0;
+  queue_free(&q);
+  return p;
 }
 
 #ifdef ENABLE_PGPVRFY
@@ -1195,7 +1207,7 @@ repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char
   if (!sigdata || !keyid)
     return 0;
   queue_init(&q);
-  repo_find_pubkeys(repo, keyid, &q);
+  repo_find_all_pubkeys(repo, keyid, &q);
   for (i = 0; i < q.count; i++)
     {
       int pubdatal;

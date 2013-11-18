@@ -1632,13 +1632,7 @@ rb_eval_string(
 #ifdef ENABLE_PUBKEY
   %newobject find_pubkey;
   XSolvable *find_pubkey(const char *keyid) {
-    Queue q;
-    Id p;
-    queue_init(&q);
-    repo_find_pubkeys($self, keyid, &q);
-    p = q.count ? q.elements[0] : 0;
-    queue_free(&q);
-    return new_XSolvable($self->pool, p);
+    return new_XSolvable($self->pool, repo_find_pubkey($self, keyid));
   }
 #endif
 
