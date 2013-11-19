@@ -10,6 +10,31 @@
 %markfunc Pool "mark_Pool";
 #endif
 
+%typemap(in,noblock=1,fragment="SWIG_AsCharPtrAndSize") (const unsigned char *str, int len) (int res, char *buf = 0, size_t size = 0, int alloc = 0) {
+  res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
+  if (!SWIG_IsOK(res)) {
+#if defined(SWIGPYTHON)
+    const void *pybuf = 0;
+    Py_ssize_t pysize = 0;
+    res = PyObject_AsReadBuffer($input, &pybuf, &pysize);
+    if (res < 0) {
+      SWIG_exception_fail(SWIG_ArgError(res), "not a string or buffer");
+    } else {
+      buf = (void *)pybuf;
+      size = pysize;
+    }
+#else
+    %argument_fail(res, "const char *", $symname, $argnum);
+#endif
+  }
+  $1 = (unsigned char *)buf;
+  $2 = size;
+}
+
+%typemap(freearg,noblock=1,match="in") (const unsigned char *str, int len) {
+  if (alloc$argnum == SWIG_NEWOBJ) %delete_array(buf$argnum);
+}
+
 #if defined(SWIGPYTHON)
 %typemap(in) Queue {
   /* Check if is a list */
@@ -63,28 +88,7 @@
 
 %enddef
 
-%typemap(in,noblock=1,fragment="SWIG_AsCharPtrAndSize") (const unsigned char *str, int len) (int res, char *buf = 0, size_t size = 0, int alloc = 0) {
-  res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
-  if (!SWIG_IsOK(res)) {
-    const void *pybuf = 0;
-    Py_ssize_t pysize = 0;
-    res = PyObject_AsReadBuffer($input, &pybuf, &pysize);
-    if (res < 0) {
-      SWIG_exception_fail(SWIG_ArgError(res), "not a string or buffer");
-    } else {
-      buf = (void *)pybuf;
-      size = pysize;
-    }
-  }
-  $1 = (unsigned char *)buf;
-  $2 = size;
-}
-%typemap(freearg,noblock=1,match="in") (const unsigned char *str, int len) {
-  if (alloc$argnum == SWIG_NEWOBJ) %delete_array(buf$argnum);
-}
-
 #endif
-
 
 #if defined(SWIGPERL)
 %typemap(in) Queue {
@@ -334,7 +338,9 @@ typedef VALUE AppObjectPtr;
 #endif
 
 
+#if !defined(SWIGPYTHON)
 %include "cdata.i"
+#endif
 
 #ifdef SWIGPYTHON
 %include "file.i"
@@ -964,15 +970,9 @@ typedef struct {
     return solv_chksum_get_type(chk);
   }
   %}
-#if defined(SWIGPYTHON)
   void add(const unsigned char *str, int len) {
     solv_chksum_add($self, str, len);
   }
-#else
-  void add(const char *str) {
-    solv_chksum_add($self, str, strlen((char *)str));
-  }
-#endif
   void add_fp(FILE *fp) {
     char buf[4096];
     int l;
