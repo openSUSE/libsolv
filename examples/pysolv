@@ -69,9 +69,14 @@ class repo_generic(dict):
         chksum.add(cookie)
         chksum.add_fstat(f.fileno())
         extcookie = chksum.raw()
-        # compatibility to c code
-        if ord(extcookie[0]) == 0:
-            extcookie[0] = chr(1)
+        if sys.version > '3':
+            # compatibility to c code
+            if extcookie[0] == 0:
+                extcookie[0] = 1
+        else:
+            # compatibility to c code
+            if ord(extcookie[0]) == 0:
+                extcookie[0] = chr(1)
         return extcookie
 
     def cachepath(self, ext = None):
@@ -92,11 +97,11 @@ class repo_generic(dict):
                 st = os.stat(self.cachepath())
                 if self['metadata_expire'] == -1 or time.time() - st[ST_MTIME] < self['metadata_expire']:
                     dorefresh = False
-            except OSError, e:
+            except OSError:
                 pass
         self['cookie'] = ''
         if not dorefresh and self.usecachedrepo(None):
-            print "repo: '%s': cached" % self.name
+            print("repo: '%s': cached" % self.name)
             return True
         return False
 
@@ -107,7 +112,7 @@ class repo_generic(dict):
         if not urls:
             return
         url = urls[0]
-        print "[using mirror %s]" % re.sub(r'^(.*?/...*?)/.*$', r'\1', url)
+        print("[using mirror %s]" % re.sub(r'^(.*?/...*?)/.*$', r'\1', url))
         self['baseurl'] = url
 
     def setfrommetalink(self, metalink):
@@ -161,7 +166,7 @@ class repo_generic(dict):
                     url = file
         if not url:
             if 'baseurl' not in self:
-                print "%s: no baseurl" % self.name
+                print("%s: no baseurl" % self.name)
                 return None
             url = re.sub(r'/$', '', self['baseurl']) + '/' + file
         f = tempfile.TemporaryFile()
@@ -170,20 +175,20 @@ class repo_generic(dict):
             return None
         os.lseek(f.fileno(), 0, os.SEEK_SET)
         if st:
-            print "%s: download error %d" % (file, st)
+            print("%s: download error %d" % (file, st))
             if markincomplete:
                 self['incomplete'] = True
             return None
         if chksum:
             fchksum = solv.Chksum(chksum.type)
             if not fchksum:
-                print "%s: unknown checksum type" % file
+                print("%s: unknown checksum type" % file)
                 if markincomplete:
                     self['incomplete'] = True
                 return None
             fchksum.add_fd(f.fileno())
             if fchksum != chksum:
-                print "%s: checksum mismatch" % file
+                print("%s: checksum mismatch" % file)
                 if markincomplete:
                     self['incomplete'] = True
                 return None
@@ -194,7 +199,7 @@ class repo_generic(dict):
     def usecachedrepo(self, ext, mark=False):
         try: 
             repopath = self.cachepath(ext)
-            f = open(repopath, 'r')
+            f = open(repopath, 'rb')
             f.seek(-32, os.SEEK_END)
             fcookie = f.read(32)
             if len(fcookie) != 32:
@@ -211,6 +216,7 @@ class repo_generic(dict):
                 if len(fextcookie) != 32:
                     return False
             f.seek(0)
+            f = solv.xfopen_fd('', f.fileno())
             flags = 0
             if ext:
                 flags = solv.Repo.REPO_USE_LOADING|solv.Repo.REPO_EXTEND_SOLVABLES
@@ -225,9 +231,9 @@ class repo_generic(dict):
                 # no futimes in python?
                 try:
                     os.utime(repopath, None)
-                except Exception, e:
+                except Exception:
                     pass
-        except IOError, e:
+        except IOError:
             return False
         return True
 
@@ -237,25 +243,27 @@ class repo_generic(dict):
         tmpname = None
         try:
             if not os.path.isdir("/var/cache/solv"):
-                os.mkdir("/var/cache/solv", 0755)
+                os.mkdir("/var/cache/solv", 0o755)
             (fd, tmpname) = tempfile.mkstemp(prefix='.newsolv-', dir='/var/cache/solv')
-            os.fchmod(fd, 0444)
-            f = os.fdopen(fd, 'w+')
+            os.fchmod(fd, 0o444)
+            f = os.fdopen(fd, 'wb+')
+            f = solv.xfopen_fd(None, f.fileno())
             if not info:
                 self.handle.write(f)
             elif ext:
                 info.write(f)
             else:       # rewrite_repos case
                 self.handle.write_first_repodata(f)
+            f.flush()
             if self.type != 'system' and not ext:
                 if 'extcookie' not in self:
                     self['extcookie'] = self.calc_cookie_ext(f, self['cookie'])
-                f.write(self['extcookie'])
+                os.write(f.fileno(), self['extcookie'])
             if not ext:
-                f.write(self['cookie'])
+                os.write(f.fileno(), self['cookie'])
             else:
-                f.write(self['extcookie'])
-            f.close()
+                os.write(f.fileno(), self['extcookie'])
+            f.close
             if self.handle.iscontiguous():
                 # switch to saved repo to activate paging and save memory
                 nf = solv.xfopen(tmpname)
@@ -274,10 +282,10 @@ class repo_generic(dict):
                         flags |= solv.Repo.REPO_LOCALPOOL
                     info.add_solv(nf, flags)
             os.rename(tmpname, self.cachepath(ext))
-        except (OSError, IOError), e:
+        except (OSError, IOError):
             if tmpname:
                 os.unlink(tmpname)
-                
+
     def updateaddedprovides(self, addedprovides):
         if 'incomplete' in self:
             return 
@@ -303,20 +311,20 @@ class repo_repomd(repo_generic):
     def load(self, pool):
         if super(repo_repomd, self).load(pool):
             return True
-        print "rpmmd repo '%s':" % self.name,
+        sys.stdout.write("rpmmd repo '%s': " % self.name)
         sys.stdout.flush()
         f = self.download("repodata/repomd.xml", False, None, None)
         if not f:
-            print "no repomd.xml file, skipped"
+            print("no repomd.xml file, skipped")
             self.handle.free(True)
             del self.handle
             return False
         self['cookie'] = self.calc_cookie_fp(f)
         if self.usecachedrepo(None, True):
-            print "cached"
+            print("cached")
             return True
         self.handle.add_repomdxml(f, 0)
-        print "fetching"
+        print("fetching")
         (filename, filechksum) = self.find('primary')
         if filename:
             f = self.download(filename, True, filechksum, True)
@@ -343,7 +351,7 @@ class repo_repomd(repo_generic):
             filename = dp.lookup_str(solv.REPOSITORY_REPOMD_LOCATION)
             chksum = dp.lookup_checksum(solv.REPOSITORY_REPOMD_CHECKSUM)
             if filename and not chksum:
-                print "no %s file checksum!" % filename
+                print("no %s file checksum!" % filename)
                 filename = None
                 chksum = None
             if filename:
@@ -405,20 +413,20 @@ class repo_susetags(repo_generic):
     def load(self, pool):
         if super(repo_susetags, self).load(pool):
             return True
-        print "susetags repo '%s':" % self.name,
+        sys.stdout.write("susetags repo '%s': " % self.name)
         sys.stdout.flush()
         f = self.download("content", False, None, None)
         if not f:
-            print "no content file, skipped"
+            print("no content file, skipped")
             self.handle.free(True)
             del self.handle
             return False
         self['cookie'] = self.calc_cookie_fp(f)
         if self.usecachedrepo(None, True):
-            print "cached"
+            print("cached")
             return True
         self.handle.add_content(f, 0)
-        print "fetching"
+        print("fetching")
         defvendorid = self.handle.meta.lookup_id(solv.SUSETAGS_DEFAULTVENDOR)
         descrdir = self.handle.meta.lookup_str(solv.SUSETAGS_DESCRDIR)
         if not descrdir:
@@ -534,7 +542,7 @@ class repo_susetags(repo_generic):
 
 class repo_unknown(repo_generic):
     def load(self, pool):
-        print "unsupported repo '%s': skipped" % self.name
+        print("unsupported repo '%s': skipped" % self.name)
         return False
 
 class repo_system(repo_generic):
@@ -542,12 +550,12 @@ class repo_system(repo_generic):
         self.handle = pool.add_repo(self.name)
         self.handle.appdata = self
         pool.installed = self.handle
-        print "rpm database:",
+        sys.stdout.write("rpm database: ")
         self['cookie'] = self.calc_cookie_file("/var/lib/rpm/Packages")
         if self.usecachedrepo(None):
-            print "cached"
+            print("cached")
             return True
-        print "reading"
+        print("reading")
         if hasattr(self.handle.__class__, 'add_products'):
             self.handle.add_products("/etc/products.d", solv.Repo.REPO_NO_INTERNALIZE)
         f = solv.xfopen(self.cachepath())
@@ -639,7 +647,7 @@ if options.repos:
     for reponame in options.repos:
         mrepos = [ repo for repo in repos if repo.name == reponame ]
         if not mrepos:
-            print "no repository matches '%s'" % reponame
+            print("no repository matches '%s'" % reponame)
             sys.exit(1)
         repo = mrepos[0]
         if hasattr(repo, 'handle'):
@@ -656,11 +664,11 @@ if cmd == 'search':
     if repofilter:
        sel.filter(repofilter)
     for s in sel.solvables():
-        print " - %s [%s]: %s" % (s, s.repo.name, s.lookup_str(solv.SOLVABLE_SUMMARY))
+        print(" - %s [%s]: %s" % (s, s.repo.name, s.lookup_str(solv.SOLVABLE_SUMMARY)))
     sys.exit(0)
 
 if cmd not in cmdactionmap:
-    print "unknown command", cmd
+    print("unknown command", cmd)
     sys.exit(1)
 
 cmdlinerepo = None
@@ -673,8 +681,8 @@ if cmd == 'list' or cmd == 'info' or cmd == 'install':
                 cmdlinerepo['packages'] = {}
             s = cmdlinerepo.handle.add_rpm(arg, solv.Repo.REPO_REUSE_REPODATA|solv.Repo.REPO_NO_INTERNALIZE)
             if not s:
-		print pool.errstr
-		sys.exit(1)
+                print(pool.errstr)
+                sys.exit(1)
             cmdlinerepo['packages'][arg] = s
     if cmdlinerepo:
         cmdlinerepo.handle.internalize()
@@ -707,14 +715,14 @@ for arg in args:
             if repofilter:
                sel.filter(repofilter)
             if not sel.isempty():
-                print "[ignoring case for '%s']" % arg
+                print("[ignoring case for '%s']" % arg)
         if sel.isempty():
-            print "nothing matches '%s'" % arg
+            print("nothing matches '%s'" % arg)
             sys.exit(1)
         if sel.flags() & solv.Selection.SELECTION_FILELIST:
-            print "[using file list match for '%s']" % arg
+            print("[using file list match for '%s']" % arg)
         if sel.flags() & solv.Selection.SELECTION_PROVIDES:
-            print "[using capability match for '%s']" % arg
+            print("[using capability match for '%s']" % arg)
         jobs += sel.jobs(cmdactionmap[cmd])
 
 if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repofilter):
@@ -724,27 +732,27 @@ if not jobs and (cmd == 'up' or cmd == 'dup' or cmd == 'verify' or repofilter):
     jobs += sel.jobs(cmdactionmap[cmd])
 
 if not jobs:
-    print "no package matched."
+    print("no package matched.")
     sys.exit(1)
 
 if cmd == 'list' or cmd == 'info':
     for job in jobs:
         for s in job.solvables():
             if cmd == 'info':
-                print "Name:        %s" % s
-                print "Repo:        %s" % s.repo
-                print "Summary:     %s" % s.lookup_str(solv.SOLVABLE_SUMMARY)
+                print("Name:        %s" % s)
+                print("Repo:        %s" % s.repo)
+                print("Summary:     %s" % s.lookup_str(solv.SOLVABLE_SUMMARY))
                 str = s.lookup_str(solv.SOLVABLE_URL)
                 if str:
-                    print "Url:         %s" % str
+                    print("Url:         %s" % str)
                 str = s.lookup_str(solv.SOLVABLE_LICENSE)
                 if str:
-                    print "License:     %s" % str
-                print "Description:\n%s" % s.lookup_str(solv.SOLVABLE_DESCRIPTION)
-                print
+                    print("License:     %s" % str)
+                print("Description:\n%s" % s.lookup_str(solv.SOLVABLE_DESCRIPTION))
+                print()
             else:
-                print "  - %s [%s]" % (s, s.repo)
-                print "    %s" % s.lookup_str(solv.SOLVABLE_SUMMARY)
+                print("  - %s [%s]" % (s, s.repo))
+                print("    %s" % s.lookup_str(solv.SOLVABLE_SUMMARY))
     sys.exit(0)
 
 # up magic: use install instead of update if no installed package matches
@@ -767,15 +775,15 @@ while True:
     if not problems:
         break
     for problem in problems:
-        print "Problem %d/%d:" % (problem.id, len(problems))
-        print problem
+        print("Problem %d/%d:" % (problem.id, len(problems)))
+        print(problem)
         solutions = problem.solutions()
         for solution in solutions:
-            print "  Solution %d:" % solution.id
+            print("  Solution %d:" % solution.id)
             elements = solution.elements(True)
             for element in elements:
-                print "  - %s" % element.str()
-            print
+                print("  - %s" % element.str())
+            print()
         sol = ''
         while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
             sys.stdout.write("Please choose a solution: ")
@@ -798,39 +806,39 @@ while True:
 trans = solver.transaction()
 del solver
 if trans.isempty():
-    print "Nothing to do."
+    print("Nothing to do.")
     sys.exit(0)
-print
-print "Transaction summary:"
-print
+print()
+print("Transaction summary:")
+print()
 for cl in trans.classify(solv.Transaction.SOLVER_TRANSACTION_SHOW_OBSOLETES | solv.Transaction.SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE):
     if cl.type == solv.Transaction.SOLVER_TRANSACTION_ERASE:
-        print "%d erased packages:" % cl.count
+        print("%d erased packages:" % cl.count)
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_INSTALL:
-        print "%d installed packages:" % cl.count
+        print("%d installed packages:" % cl.count)
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_REINSTALLED:
-        print "%d reinstalled packages:" % cl.count
+        print("%d reinstalled packages:" % cl.count)
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_DOWNGRADED:
-        print "%d downgraded packages:" % cl.count
+        print("%d downgraded packages:" % cl.count)
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_CHANGED:
-        print "%d changed packages:" % cl.count
+        print("%d changed packages:" % cl.count)
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_UPGRADED:
-        print "%d upgraded packages:" % cl.count
+        print("%d upgraded packages:" % cl.count)
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_VENDORCHANGE:
-        print "%d vendor changes from '%s' to '%s':" % (cl.count, cl.fromstr, cl.tostr)
+        print("%d vendor changes from '%s' to '%s':" % (cl.count, cl.fromstr, cl.tostr))
     elif cl.type == solv.Transaction.SOLVER_TRANSACTION_ARCHCHANGE:
-        print "%d arch changes from '%s' to '%s':" % (cl.count, cl.fromstr, cl.tostr)
+        print("%d arch changes from '%s' to '%s':" % (cl.count, cl.fromstr, cl.tostr))
     else:
         continue
     for p in cl.solvables():
         if cl.type == solv.Transaction.SOLVER_TRANSACTION_UPGRADED or cl.type == solv.Transaction.SOLVER_TRANSACTION_DOWNGRADED:
             op = trans.othersolvable(p)
-            print "  - %s -> %s" % (p, op)
+            print("  - %s -> %s" % (p, op))
         else:
-            print "  - %s" % p
-    print
-print "install size change: %d K" % trans.calc_installsizechange()
-print
+            print("  - %s" % p)
+    print()
+print("install size change: %d K" % trans.calc_installsizechange())
+print()
 
 while True:
     sys.stdout.write("OK to continue (y/n)? ")
@@ -844,7 +852,7 @@ if newpkgs:
     downloadsize = 0
     for p in newpkgs:
         downloadsize += p.lookup_num(solv.SOLVABLE_DOWNLOADSIZE)
-    print "Downloading %d packages, %d K" % (len(newpkgs), downloadsize)
+    print("Downloading %d packages, %d K" % (len(newpkgs), downloadsize))
     for p in newpkgs:
         repo = p.repo.appdata
         location, medianr = p.lookup_location()
@@ -906,9 +914,9 @@ if newpkgs:
         newpkgsfp[p.id] = f
         sys.stdout.write(".")
         sys.stdout.flush()
-    print
-print "Committing transaction:"
-print
+    print()
+print("Committing transaction:")
+print()
 ts = rpm.TransactionSet('/')
 ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
 erasenamehelper = {}
@@ -932,22 +940,22 @@ for p in trans.steps():
         ts.addInstall(h, p, 'i')
 checkproblems = ts.check()
 if checkproblems:
-    print checkproblems
+    print(checkproblems)
     sys.exit("Sorry.")
 ts.order()
 def runCallback(reason, amount, total, p, d):
     if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
         return newpkgsfp[p.id].fileno()
     if reason == rpm.RPMCALLBACK_INST_START:
-        print "install", p
+        print("install", p)
     if reason == rpm.RPMCALLBACK_UNINST_START:
         # argh, p is just the name of the package
         if p in erasenamehelper:
             p = erasenamehelper[p]
-            print "erase", p
+            print("erase", p)
 runproblems = ts.run(runCallback, '')
 if runproblems:
-    print runproblems
+    print(runproblems)
     sys.exit(1)
 sys.exit(0)
 

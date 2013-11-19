@@ -1,3 +1,6 @@
+#SET (PythonLibs_FIND_VERSION 3)
+#SET (PythonInterp_FIND_VERSION 3)
+#SET (${SWIG_FLAGS} ${SWIG_FLAGS} -DPYTHON3=1)
 FIND_PACKAGE (PythonLibs)
 FIND_PACKAGE (PythonInterp REQUIRED)
 EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib(True))" OUTPUT_VARIABLE PYTHON_INSTALL_DIR)

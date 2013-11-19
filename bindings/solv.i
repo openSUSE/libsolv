@@ -63,6 +63,26 @@
 
 %enddef
 
+%typemap(in,noblock=1,fragment="SWIG_AsCharPtrAndSize") (const unsigned char *str, int len) (int res, char *buf = 0, size_t size = 0, int alloc = 0) {
+  res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
+  if (!SWIG_IsOK(res)) {
+    const void *pybuf = 0;
+    Py_ssize_t pysize = 0;
+    res = PyObject_AsReadBuffer($input, &pybuf, &pysize);
+    if (res < 0) {
+      SWIG_exception_fail(SWIG_ArgError(res), "not a string or buffer");
+    } else {
+      buf = (void *)pybuf;
+      size = pysize;
+    }
+  }
+  $1 = (unsigned char *)buf;
+  $2 = size;
+}
+%typemap(freearg,noblock=1,match="in") (const unsigned char *str, int len) {
+  if (alloc$argnum == SWIG_NEWOBJ) %delete_array(buf$argnum);
+}
+
 #endif
 
 
@@ -315,6 +335,7 @@ typedef VALUE AppObjectPtr;
 
 
 %include "cdata.i"
+
 #ifdef SWIGPYTHON
 %include "file.i"
 #else
@@ -943,9 +964,15 @@ typedef struct {
     return solv_chksum_get_type(chk);
   }
   %}
+#if defined(SWIGPYTHON)
+  void add(const unsigned char *str, int len) {
+    solv_chksum_add($self, str, len);
+  }
+#else
   void add(const char *str) {
     solv_chksum_add($self, str, strlen((char *)str));
   }
+#endif
   void add_fp(FILE *fp) {
     char buf[4096];
     int l;
@@ -978,12 +1005,21 @@ typedef struct {
     solv_chksum_add($self, &stb.st_size, sizeof(stb.st_size));
     solv_chksum_add($self, &stb.st_mtime, sizeof(stb.st_mtime));
   }
+#if defined(SWIGPYTHON)
+  PyObject *raw() {
+    int l;
+    const unsigned char *b;
+    b = solv_chksum_get($self, &l);
+    return Py_BuildValue(PY_MAJOR_VERSION < 3 ? "s#" : "y#", b, l);
+  }
+#else
   SWIGCDATA raw() {
     int l;
     const unsigned char *b;
     b = solv_chksum_get($self, &l);
     return cdata_void((void *)b, l);
   }
+#endif
   %newobject hex;
   char *hex() {
     int l;
@@ -1695,7 +1731,9 @@ rb_eval_string(
     dataiterator_init_clone(ndi, $self);
     return ndi;
   }
+#ifndef PYTHON3
   %rename("next") __next__();
+#endif
   %exception __next__ {
     $action
     if (!result) {
@@ -1914,7 +1952,9 @@ rb_eval_string(
     *s = *$self;
     return s;
   }
+#ifndef PYTHON3
   %rename("next") __next__();
+#endif
   %exception __next__ {
     $action
     if (!result) {
@@ -1972,7 +2012,9 @@ rb_eval_string(
     *s = *$self;
     return s;
   }
+#ifndef PYTHON3
   %rename("next") __next__();
+#endif
   %exception __next__ {
     $action
     if (!result) {
@@ -2027,7 +2069,9 @@ rb_eval_string(
     *s = *$self;
     return s;
   }
+#ifndef PYTHON3
   %rename("next") __next__();
+#endif
   %exception __next__ {
     $action
     if (!result) {
