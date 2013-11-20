@@ -10,7 +10,18 @@
 %markfunc Pool "mark_Pool";
 #endif
 
-%typemap(in,noblock=1,fragment="SWIG_AsCharPtrAndSize") (const unsigned char *str, int len) (int res, char *buf = 0, size_t size = 0, int alloc = 0) {
+#
+# binaryblob handling
+#
+
+%{
+typedef struct {
+  const void *data;
+  size_t len;
+} BinaryBlob;
+%}
+
+%typemap(in,noblock=1,fragment="SWIG_AsCharPtrAndSize") (const unsigned char *str, size_t len) (int res, char *buf = 0, size_t size = 0, int alloc = 0) {
   res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
   if (!SWIG_IsOK(res)) {
 #if defined(SWIGPYTHON)
@@ -18,7 +29,7 @@
     Py_ssize_t pysize = 0;
     res = PyObject_AsReadBuffer($input, &pybuf, &pysize);
     if (res < 0) {
-      SWIG_exception_fail(SWIG_ArgError(res), "not a string or buffer");
+      %argument_fail(res, "BinaryBlob", $symname, $argnum);
     } else {
       buf = (void *)pybuf;
       size = pysize;
@@ -33,6 +44,14 @@
 
 %typemap(freearg,noblock=1,match="in") (const unsigned char *str, int len) {
   if (alloc$argnum == SWIG_NEWOBJ) %delete_array(buf$argnum);
+}
+
+%typemap(out,noblock=1,fragment="SWIG_FromCharPtrAndSize") BinaryBlob {
+#if defined(SWIGPYTHON) && defined(PYTHON3)
+  $result = $1.data ? Py_BuildValue("y#", $1.data, $1.len) : SWIG_Py_Void();
+#else
+  $result = SWIG_FromCharPtrAndSize($1.data, $1.len);
+#endif
 }
 
 #if defined(SWIGPYTHON)
@@ -337,10 +356,6 @@ typedef VALUE AppObjectPtr;
 }
 #endif
 
-
-#if !defined(SWIGPYTHON)
-%include "cdata.i"
-#endif
 
 #ifdef SWIGPYTHON
 %include "file.i"
@@ -970,8 +985,8 @@ typedef struct {
     return solv_chksum_get_type(chk);
   }
   %}
-  void add(const unsigned char *str, int len) {
-    solv_chksum_add($self, str, len);
+  void add(const unsigned char *str, size_t len) {
+    solv_chksum_add($self, str, (int)len);
   }
   void add_fp(FILE *fp) {
     char buf[4096];
@@ -1005,21 +1020,15 @@ typedef struct {
     solv_chksum_add($self, &stb.st_size, sizeof(stb.st_size));
     solv_chksum_add($self, &stb.st_mtime, sizeof(stb.st_mtime));
   }
-#if defined(SWIGPYTHON)
-  PyObject *raw() {
+  BinaryBlob raw() {
+    BinaryBlob bl;
     int l;
     const unsigned char *b;
     b = solv_chksum_get($self, &l);
-    return Py_BuildValue(PY_MAJOR_VERSION < 3 ? "s#" : "y#", b, l);
+    bl.data = b;
+    bl.len = l;
+    return bl;
   }
-#else
-  SWIGCDATA raw() {
-    int l;
-    const unsigned char *b;
-    b = solv_chksum_get($self, &l);
-    return cdata_void((void *)b, l);
-  }
-#endif
   %newobject hex;
   char *hex() {
     int l;
@@ -1891,18 +1900,31 @@ rb_eval_string(
     return pool_id2str($self->pool, $self->key->type);
   }
   Id id() {
-     return $self->kv.id;
+   return $self->kv.id;
   }
   const char *idstr() {
-     return pool_id2str($self->pool, $self->kv.id);
+   return pool_id2str($self->pool, $self->kv.id);
   }
   const char *str() {
-     return $self->kv.str;
+   return $self->kv.str;
+  }
+  BinaryBlob binary() {
+    BinaryBlob bl;
+    bl.data = 0;
+    bl.len = 0;
+    if ($self->key->type == REPOKEY_TYPE_BINARY)
+      {
+        bl.data = $self->kv.str;
+        bl.len = $self->kv.num;
+      }
+    else if ((bl.len = solv_chksum_len($self->key->type)) != 0)
+      bl.data = $self->kv.str;
+    return bl;
   }
   unsigned long long num() {
-     if ($self->key->type == REPOKEY_TYPE_NUM)
-       return SOLV_KV_NUM64(&$self->kv);
-     return $self->kv.num;
+   if ($self->key->type == REPOKEY_TYPE_NUM)
+     return SOLV_KV_NUM64(&$self->kv);
+   return $self->kv.num;
   }
   int num2() {
      return $self->kv.num2;

@@ -1,16 +1,20 @@
 #SET (PythonLibs_FIND_VERSION 3)
-#SET (PythonInterp_FIND_VERSION 3)
-#SET (${SWIG_FLAGS} ${SWIG_FLAGS} -DPYTHON3=1)
+
 FIND_PACKAGE (PythonLibs)
+SET (PythonInterp_FIND_VERSION ${PYTHONLIBS_VERSION_STRING})
 FIND_PACKAGE (PythonInterp REQUIRED)
 EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib(True))" OUTPUT_VARIABLE PYTHON_INSTALL_DIR)
+
+IF (${PYTHON_VERSION_MAJOR} GREATER 2)
+    SET (SWIG_PY_FLAGS -DPYTHON3=1)
+ENDIF (${PYTHON_VERSION_MAJOR} GREATER 2)
 
 MESSAGE (STATUS "Python executable: ${PYTHON_EXECUTABLE}")
 MESSAGE (STATUS "Python installation dir: ${PYTHON_INSTALL_DIR}")
 
 ADD_CUSTOM_COMMAND (
     OUTPUT solv_python.c
-    COMMAND ${SWIG_EXECUTABLE} ${SWIG_FLAGS} -python -I${CMAKE_SOURCE_DIR}/src -o solv_python.c ${CMAKE_SOURCE_DIR}/bindings/solv.i
+    COMMAND ${SWIG_EXECUTABLE} ${SWIG_FLAGS} -python ${SWIG_PY_FLAGS} -I${CMAKE_SOURCE_DIR}/src -o solv_python.c ${CMAKE_SOURCE_DIR}/bindings/solv.i
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS ${CMAKE_SOURCE_DIR}/bindings/solv.i
 )
