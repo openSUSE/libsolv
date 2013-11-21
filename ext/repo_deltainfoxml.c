@@ -78,6 +78,7 @@ static struct stateswitch stateswitches[] = {
 /* Cumulated info about the current deltarpm or patchrpm */
 struct deltarpm {
   char *location;
+  char *locbase;
   unsigned int buildtime;
   unsigned long long downloadsize;
   char *filechecksum;
@@ -259,9 +260,13 @@ startElement(void *userData, const char *name, const char **atts)
       pd->delta.bevr[pd->delta.nbevr++] = makeevr_atts(pool, pd, atts);
       break;
     case STATE_FILENAME:
+      if ((str = find_attr("xml:base", atts)))
+        pd->delta.locbase = solv_strdup(str);
       break;
     case STATE_LOCATION:
       pd->delta.location = solv_strdup(find_attr("href", atts));
+      if ((str = find_attr("xml:base", atts)))
+        pd->delta.locbase = solv_strdup(str);
       break;
     case STATE_SIZE:
       break;
@@ -325,7 +330,11 @@ endElement(void *userData, const char *name)
 	repodata_set_id(pd->data, handle, DELTA_PACKAGE_EVR, pd->newpkgevr);
 	repodata_set_id(pd->data, handle, DELTA_PACKAGE_ARCH, pd->newpkgarch);
 	if (d->location)
-	  repodata_set_deltalocation(pd->data, handle, 0, 0, d->location);
+	  {
+	    repodata_set_deltalocation(pd->data, handle, 0, 0, d->location);
+	    if (d->locbase)
+	      repodata_set_poolstr(pd->data, handle, DELTA_LOCATION_BASE, d->locbase);
+	  }
 	if (d->downloadsize)
 	  repodata_set_num(pd->data, handle, DELTA_DOWNLOADSIZE, d->downloadsize);
 	if (d->filechecksum)
@@ -344,6 +353,7 @@ endElement(void *userData, const char *name)
       pd->delta.nbevr = 0;
       pd->delta.seqnum = solv_free(pd->delta.seqnum);
       pd->delta.location = solv_free(pd->delta.location);
+      pd->delta.locbase = solv_free(pd->delta.locbase);
       break;
     case STATE_FILENAME:
       pd->delta.location = solv_strdup(pd->content);
