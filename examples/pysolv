@@ -668,7 +668,7 @@ if cmd == 'search':
     sys.exit(0)
 
 if cmd not in cmdactionmap:
-    print("unknown command", cmd)
+    print("unknown command %s" % cmd)
     sys.exit(1)
 
 cmdlinerepo = None
@@ -749,7 +749,7 @@ if cmd == 'list' or cmd == 'info':
                 if str:
                     print("License:     %s" % str)
                 print("Description:\n%s" % s.lookup_str(solv.SOLVABLE_DESCRIPTION))
-                print()
+                print('')
             else:
                 print("  - %s [%s]" % (s, s.repo))
                 print("    %s" % s.lookup_str(solv.SOLVABLE_SUMMARY))
@@ -783,7 +783,7 @@ while True:
             elements = solution.elements(True)
             for element in elements:
                 print("  - %s" % element.str())
-            print()
+            print('')
         sol = ''
         while not (sol == 's' or sol == 'q' or (sol.isdigit() and int(sol) >= 1 and int(sol) <= len(solutions))):
             sys.stdout.write("Please choose a solution: ")
@@ -808,9 +808,9 @@ del solver
 if trans.isempty():
     print("Nothing to do.")
     sys.exit(0)
-print()
+print('')
 print("Transaction summary:")
-print()
+print('')
 for cl in trans.classify(solv.Transaction.SOLVER_TRANSACTION_SHOW_OBSOLETES | solv.Transaction.SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE):
     if cl.type == solv.Transaction.SOLVER_TRANSACTION_ERASE:
         print("%d erased packages:" % cl.count)
@@ -836,9 +836,9 @@ for cl in trans.classify(solv.Transaction.SOLVER_TRANSACTION_SHOW_OBSOLETES | so
             print("  - %s -> %s" % (p, op))
         else:
             print("  - %s" % p)
-    print()
+    print('')
 print("install size change: %d K" % trans.calc_installsizechange())
-print()
+print('')
 
 while True:
     sys.stdout.write("OK to continue (y/n)? ")
@@ -914,9 +914,9 @@ if newpkgs:
         newpkgsfp[p.id] = f
         sys.stdout.write(".")
         sys.stdout.flush()
-    print()
+    print('')
 print("Committing transaction:")
-print()
+print('')
 ts = rpm.TransactionSet('/')
 ts.setVSFlags(rpm._RPMVSF_NOSIGNATURES)
 erasenamehelper = {}
@@ -947,12 +947,12 @@ def runCallback(reason, amount, total, p, d):
     if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
         return newpkgsfp[p.id].fileno()
     if reason == rpm.RPMCALLBACK_INST_START:
-        print("install", p)
+        print("install %s" % p)
     if reason == rpm.RPMCALLBACK_UNINST_START:
         # argh, p is just the name of the package
         if p in erasenamehelper:
             p = erasenamehelper[p]
-            print("erase", p)
+            print("erase %s" % p)
 runproblems = ts.run(runCallback, '')
 if runproblems:
     print(runproblems)
