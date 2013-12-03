@@ -93,6 +93,13 @@ ADD_EXECUTABLE (patchcheck patchcheck.c)
 TARGET_LINK_LIBRARIES (patchcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
 ENDIF (SUSE)
 
+IF (ENABLE_APPDATA)
+ADD_EXECUTABLE (appdata2solv appdata2solv.c)
+TARGET_LINK_LIBRARIES (appdata2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+SET (tools_list ${tools_list} appdata2solv)
+ENDIF (ENABLE_APPDATA)
+
 ADD_EXECUTABLE (dumpsolv dumpsolv.c )
 TARGET_LINK_LIBRARIES (dumpsolv libsolv)
 

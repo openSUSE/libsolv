@@ -54,6 +54,18 @@ repomd_decompress() {
   esac
 }
 
+susetags_findfile() {
+  if test -s "$1.xz" ; then
+    echo "$1.xz"
+  elif test -s "$1.lzma" ; then
+    echo "$1.lzma"
+  elif test -s "$1.bz2" ; then
+    echo "$1.bz2"
+  elif test -s "$1.gz" ; then
+    echo "$1.gz"
+  fi
+}
+
 susetags_findfile_cat() {
   if test -s "$1.xz" ; then
     xz -dc "$1.xz"
@@ -77,6 +89,7 @@ parser_options=${PARSER_OPTIONS:-}
 
 findopt="-prune"
 repotype=
+addautooption=
 
 while true ; do
   if test "$1" = "-o" ; then
@@ -87,6 +100,9 @@ while true ; do
     # recursive
     findopt=
     repotype=plaindir
+    shift
+  elif test "$1" = "-X" ; then
+    addautooption=-X
     shift
   else
     break
@@ -187,14 +203,29 @@ if test "$repotype" = rpmmd ; then
       repomd_decompress "$deltainfoxml" | deltainfoxml2solv $parser_options > $deltainfofile || exit 4
   fi
 
+  # This contains appdata
+  appdatafile=
+  appdataxml=`repomd_findfile appdata appdata.xml`
+  if test -n "$appdataxml" -a -s "$appdataxml" ; then
+      appdatafile=`mktemp` || exit 3
+      repomd_decompress "$appdataxml" | appdata2solv $parser_options > $appdatafile || exit 4
+  fi
+
   # Now merge primary, patches, updateinfo, and deltainfo
-  mergesolv $repomdfile $suseinfofile $primfile $prodfile $patternfile $updateinfofile $deltainfofile
-  rm -f $repomdfile $suseinfofile $primfile $patternfile $prodfile $updateinfofile $deltainfofile
+  mergesolv $addautooption $repomdfile $suseinfofile $primfile $prodfile $patternfile $updateinfofile $deltainfofile $appdatafile
+  rm -f $repomdfile $suseinfofile $primfile $patternfile $prodfile $updateinfofile $deltainfofile $appdatafile
 
 elif test "$repotype" = susetags ; then
   olddir=`pwd`
   DESCR=$(get_DESCRDIR)
   cd ${DESCR} || exit 2
+  appdatafile=
+  appdataxml=`susetags_findfile appdata.xml`
+  if test -n "$appdataxml" ; then
+      appdatafile=`mktemp` || exit 3
+      repomd_decompress "$appdataxml" | appdata2solv $parser_options > $appdatafile || exit 4
+      parser_options="-M $appdatafile $parser_options"
+  fi
   (
     # First packages
     susetags_findfile_cat packages
@@ -232,10 +263,11 @@ elif test "$repotype" = susetags ; then
       esac
     done
 
-  ) | susetags2solv -c "${olddir}/content" $parser_options || exit 4
+  ) | susetags2solv $addautooption -c "${olddir}/content" $parser_options || exit 4
+  test -n "$appdatafile" && rm -f "$appdatafile"
   cd "$olddir"
 elif test "$repotype" = plaindir ; then
-  find * -name .\* -prune -o $findopt -name \*.delta.rpm -o -name \*.patch.rpm -o -name \*.rpm -a -type f -print0 | rpms2solv -0 -m -
+  find * -name .\* -prune -o $findopt -name \*.delta.rpm -o -name \*.patch.rpm -o -name \*.rpm -a -type f -print0 | rpms2solv $addautooption -0 -m -
 else
   echo "unknown repository type '$repotype'" >&2
   exit 1

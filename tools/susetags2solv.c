@@ -19,6 +19,7 @@
 
 #include "pool.h"
 #include "repo.h"
+#include "repo_solv.h"
 #include "repo_susetags.h"
 #include "repo_content.h"
 #include "common_write.h"
@@ -64,13 +65,14 @@ main(int argc, char **argv)
   const char *descrdir = 0;
   const char *basefile = 0;
   const char *query = 0;
+  const char *mergefile = 0;
   Id defvendor = 0;
   int flags = 0;
   int c;
   Pool *pool;
   Repo *repo;
 
-  while ((c = getopt(argc, argv, "hn:c:d:b:q:")) >= 0)
+  while ((c = getopt(argc, argv, "hn:c:d:b:q:M:")) >= 0)
     {
       switch (c)
 	{
@@ -91,6 +93,9 @@ main(int argc, char **argv)
 	  break;
 	case 'q':
 	  query = optarg;
+	  break;
+	case 'M':
+	  mergefile = optarg;
 	  break;
 	default:
 	  usage(1);
@@ -275,6 +280,21 @@ main(int argc, char **argv)
 	}
     }
   repo_internalize(repo);
+  if (mergefile)
+    {
+      FILE *fp = fopen(mergefile, "r");
+      if (!fp)
+	{
+	  perror(mergefile);
+	  exit(1);
+	}
+      if (repo_add_solv(repo, fp, 0))
+	{
+	  fprintf(stderr, "susetags2solv: %s\n", pool_errstr(pool));
+	  exit(1);
+	}
+      fclose(fp);
+    }
 
   if (query)
     doquery(pool, repo, query);

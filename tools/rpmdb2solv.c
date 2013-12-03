@@ -31,6 +31,13 @@
 #include "repo_products.h"
 #include "repo_solv.h"
 #include "common_write.h"
+#ifdef ENABLE_APPDATA
+#include "repo_appdata.h"
+#endif
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
+
 
 static void
 usage(int status)
@@ -66,12 +73,18 @@ main(int argc, char **argv)
 #ifdef ENABLE_PUBKEY
   int pubkeys = 0;
 #endif
+#ifdef ENABLE_APPDATA
+  int add_appdata = 0;
+#endif
+#ifdef SUSE
+  int add_auto = 0;
+#endif
 
   /*
    * parse arguments
    */
   
-  while ((c = getopt(argc, argv, "Phnkxb:r:p:o:")) >= 0)
+  while ((c = getopt(argc, argv, "APhnkxXb:r:p:o:")) >= 0)
     switch (c)
       {
       case 'h':
@@ -95,7 +108,17 @@ main(int argc, char **argv)
 #endif
 	break;
       case 'x':
-        break;
+        break;	/* extrapool no longer supported */
+      case 'X':
+#ifdef SUSE
+	add_auto = 1;
+#endif
+	break;
+      case 'A':
+#ifdef ENABLE_APPDATA
+	add_appdata = 1;
+#endif
+	break;
       case 'o':
         outfile = optarg;
         break;
@@ -181,10 +204,20 @@ main(int argc, char **argv)
 	}
     }
 #endif
+
+#ifdef ENABLE_APPDATA
+  if (add_appdata)
+    repo_add_appdata_dir(repo, "/usr/share/appdata", REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+#endif
   repodata_internalize(data);
 
   if (reffp)
     fclose(reffp);
+
+#ifdef SUSE
+  if (add_auto)
+    repo_add_autopattern(repo, 0);
+#endif
 
   tool_write(repo, basefile, 0);
   pool_free(pool);

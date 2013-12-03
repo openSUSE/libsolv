@@ -25,6 +25,9 @@
 #include "solv_xfopen.h"
 #endif
 #include "repo_solv.h"
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
 #include "common_write.h"
 
 static char *
@@ -65,8 +68,11 @@ main(int argc, char **argv)
 #ifdef ENABLE_PUBKEY
   int pubkeys = 0;
 #endif
+#ifdef SUSE
+  int add_auto = 0;
+#endif
 
-  while ((c = getopt(argc, argv, "0kKb:m:")) >= 0)
+  while ((c = getopt(argc, argv, "0XkKb:m:")) >= 0)
     {
       switch(c)
 	{
@@ -87,6 +93,11 @@ main(int argc, char **argv)
 	  pubkeys = 2;
 	  break;
 #endif
+	case 'X':
+#ifdef SUSE
+	  add_auto = 1;
+#endif
+	  break;
 	default:
 	  exit(1);
 	}
@@ -165,6 +176,10 @@ main(int argc, char **argv)
 	}
     }
   repo_internalize(repo);
+#ifdef SUSE
+  if (add_auto)
+    repo_add_autopattern(repo, 0);
+#endif
   tool_write(repo, basefile, 0);
   pool_free(pool);
   for (c = 0; c < nrpms; c++)

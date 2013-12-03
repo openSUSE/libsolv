@@ -21,6 +21,9 @@
 
 #include "pool.h"
 #include "repo_solv.h"
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
 #include "common_write.h"
 
 static void
@@ -61,12 +64,15 @@ main(int argc, char **argv)
   Repo *repo;
   const char *basefile = 0;
   int with_attr = 0;
+#ifdef SUSE
+  int add_auto = 0;
+#endif
   int c;
 
   pool = pool_create();
   repo = repo_create(pool, "<mergesolv>");
   
-  while ((c = getopt(argc, argv, "ahb:")) >= 0)
+  while ((c = getopt(argc, argv, "ahb:X")) >= 0)
     {
       switch (c)
       {
@@ -79,7 +85,13 @@ main(int argc, char **argv)
 	case 'b':
 	  basefile = optarg;
 	  break;
+	case 'X':
+#ifdef SUSE
+	  add_auto = 1;
+#endif
+	  break;
 	default:
+	  usage();
 	  exit(1);
       }
     }
@@ -101,6 +113,10 @@ main(int argc, char **argv)
 	}
       fclose(fp);
     }
+#ifdef SUSE
+  if (add_auto)
+    repo_add_autopattern(repo, 0);
+#endif
   tool_write(repo, basefile, 0);
   pool_free(pool);
   return 0;
