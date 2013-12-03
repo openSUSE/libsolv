@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Tue Dec  3 14:30:17 CET 2013 - mls@suse.de
+
+- support appdata parsing and auto-pattern generation in tools
+- adapt to python3
+- tweak findproblemrule heuristic for conflicts
+- add m68k/ppc64le architectures
+- plug weakrulemap memory hole
+- support debian multiarch annotation
+- support product/pattern/application links
+- bump version to 0.4.1
+
+-------------------------------------------------------------------
 Tue Sep 24 11:14:25 CEST 2013 - mls@suse.de
 
 - do not add back cleandeps_updatepkgs packages [bnc#841781]
