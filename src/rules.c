@@ -1181,9 +1181,11 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
   Id p, pp, a, aa, bestarch;
   Solvable *s, *ps, *bests;
   Queue badq, allowedarchs;
+  Queue lsq;
 
   queue_init(&badq);
   queue_init(&allowedarchs);
+  queue_init(&lsq);
   solv->infarchrules = solv->nrules;
   for (i = 1; i < pool->nsolvables; i++)
     {
@@ -1253,9 +1255,26 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
       for (j = 0; j < badq.count; j++)
 	{
 	  p = badq.elements[j];
-	  solver_addrule(solv, -p, 0);
+	  /* lock-step */
+	  if (pool->implicitobsoleteusescolors)
+	    {
+	      Id p2;
+	      queue_empty(&lsq);
+	      FOR_PROVIDES(p2, pp, s->name)
+		{
+		  Solvable *s2 = pool->solvables + p2;
+		  if (p2 == p || s2->name != s->name || s2->evr != pool->solvables[p].evr || s2->arch == pool->solvables[p].arch)
+		    continue;
+		  a = s2->arch;
+		  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
+		  if (a && (a == 1 || a == bestarch))
+		    queue_push(&lsq, p2);
+		}
+	    }
+	  solver_addrule(solv, -p, lsq.count ? pool_queuetowhatprovides(pool, &lsq) : 0);
 	}
     }
+  queue_free(&lsq);
   queue_free(&badq);
   queue_free(&allowedarchs);
   solv->infarchrules_end = solv->nrules;

@@ -3622,6 +3622,7 @@ solver_solve(Solver *solv, Queue *job)
   if (!solv->noinfarchcheck)
     {
       solver_addinfarchrules(solv, &addedmap);
+#if 0
       if (pool->implicitobsoleteusescolors)
 	{
 	  /* currently doesn't work well with infarch rules, so make
@@ -3629,6 +3630,7 @@ solver_solve(Solver *solv, Queue *job)
 	  for (i = solv->infarchrules; i < solv->infarchrules_end; i++)
 	    queue_push(&solv->weakruleq, i);
 	}
+#endif
     }
   else
     solv->infarchrules = solv->infarchrules_end = solv->nrules;
