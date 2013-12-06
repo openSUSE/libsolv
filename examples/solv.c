@@ -84,6 +84,9 @@
 #include "repo_susetags.h"
 #include "repo_content.h"
 #endif
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
 #include "solv_xfopen.h"
 
 #ifdef FEDORA
@@ -2385,6 +2388,17 @@ addfileprovides(Pool *pool)
 
 #endif
 
+#ifdef SUSE
+static void
+add_autopackages(Pool *pool)
+{
+  int i;
+  Repo *repo;
+  FOR_REPOS(i, repo)
+    repo_add_autopattern(repo, 0);
+}
+#endif
+
 #if defined(SUSE) || defined(FEDORA)
 static void
 add_patchjobs(Pool *pool, Queue *job)
@@ -2927,6 +2941,9 @@ main(int argc, char **argv)
 #if defined(ENABLE_RPMDB)
   if (pool->disttype == DISTTYPE_RPM)
     addfileprovides(pool);
+#endif
+#ifdef SUSE
+  add_autopackages(pool);
 #endif
   pool_createwhatprovides(pool);
 
