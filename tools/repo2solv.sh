@@ -204,8 +204,11 @@ if test "$repotype" = rpmmd ; then
   fi
 
   # This contains appdata
+  appdataxml=
   appdatafile=
-  appdataxml=`repomd_findfile appdata appdata.xml`
+  if test -x /usr/bin/appdata2solv ; then
+      appdataxml=`repomd_findfile appdata appdata.xml`
+  fi
   if test -n "$appdataxml" -a -s "$appdataxml" ; then
       appdatafile=`mktemp` || exit 3
       repomd_decompress "$appdataxml" | appdata2solv $parser_options > $appdatafile || exit 4
@@ -219,8 +222,11 @@ elif test "$repotype" = susetags ; then
   olddir=`pwd`
   DESCR=$(get_DESCRDIR)
   cd ${DESCR} || exit 2
+  appdataxml=
   appdatafile=
-  appdataxml=`susetags_findfile appdata.xml`
+  if test -x /usr/bin/appdata2solv ; then
+      appdataxml=`susetags_findfile appdata.xml`
+  fi
   if test -n "$appdataxml" ; then
       appdatafile=`mktemp` || exit 3
       repomd_decompress "$appdataxml" | appdata2solv $parser_options > $appdatafile || exit 4
