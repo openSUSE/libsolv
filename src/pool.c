@@ -1661,12 +1661,9 @@ pool_set_languages(Pool *pool, const char **languages, int nlanguages)
 
   pool->languagecache = solv_free(pool->languagecache);
   pool->languagecacheother = 0;
-  if (pool->nlanguages)
-    {
-      for (i = 0; i < pool->nlanguages; i++)
-	free((char *)pool->languages[i]);
-      free(pool->languages);
-    }
+  for (i = 0; i < pool->nlanguages; i++)
+    free((char *)pool->languages[i]);
+  pool->languages = solv_free(pool->languages);
   pool->nlanguages = nlanguages;
   if (!nlanguages)
     return;
