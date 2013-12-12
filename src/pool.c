@@ -1933,27 +1933,14 @@ propagate_mountpoints(struct mptree *mptree, int pos, Id mountpoint)
 
 #define MPTREE_BLOCK 15
 
-void
-pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
+static struct mptree *
+create_mptree(DUChanges *mps, int nmps)
 {
-  char *p;
-  const char *path, *compstr;
-  struct mptree *mptree;
   int i, nmptree;
+  struct mptree *mptree;
   int pos, compl;
   int mp;
-  struct ducbdata cbd;
-  Solvable *s;
-  Id sp;
-  Map ignoredu;
-  Repo *oldinstalled = pool->installed;
-
-  memset(&ignoredu, 0, sizeof(ignoredu));
-  cbd.mps = mps;
-  cbd.addsub = 0;
-  cbd.dirmap = 0;
-  cbd.nmap = 0;
-  cbd.olddata = 0;
+  const char *p, *path, *compstr;
 
   mptree = solv_extend_resize(0, 1, sizeof(struct mptree), MPTREE_BLOCK);
 
@@ -2023,6 +2010,26 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
     }
 #endif
 
+  return mptree;
+}
+
+void
+pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
+{
+  struct mptree *mptree;
+  struct ducbdata cbd;
+  Solvable *s;
+  int sp;
+  Map ignoredu;
+  Repo *oldinstalled = pool->installed;
+
+  map_init(&ignoredu, 0);
+  mptree = create_mptree(mps, nmps);
+
+  cbd.mps = mps;
+  cbd.dirmap = 0;
+  cbd.nmap = 0;
+  cbd.olddata = 0;
   cbd.mptree = mptree;
   cbd.addsub = 1;
   for (sp = 1, s = pool->solvables + sp; sp < pool->nsolvables; sp++, s++)
@@ -2037,8 +2044,8 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
 	{
 	  Id op, opp;
 	  /* no du data available, ignore data of all installed solvables we obsolete */
-	  if (!ignoredu.map)
-	    map_init(&ignoredu, oldinstalled->end - oldinstalled->start);
+	  if (!ignoredu.size)
+	    map_grow(&ignoredu, oldinstalled->end - oldinstalled->start);
 	  if (s->obsoletes)
 	    {
 	      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
@@ -2066,8 +2073,7 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
 	  repo_search(oldinstalled, sp, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
 	}
     }
-  if (ignoredu.map)
-    map_free(&ignoredu);
+  map_free(&ignoredu);
   solv_free(cbd.dirmap);
   solv_free(mptree);
 }
