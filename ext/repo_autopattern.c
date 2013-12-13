@@ -180,7 +180,14 @@ repo_add_autopattern(Repo *repo, int flags)
 	      langtag = SOLVABLE_CATEGORY;
 	      if (*lang && strcmp(lang, "en") != 0)
 		langtag = pool_id2langid(pool, SOLVABLE_CATEGORY, lang, 1);
-	      repodata_set_str(data, s2 - pool->solvables, langtag, newname);
+	      if (newname[solv_validutf8(newname)] == 0)
+	        repodata_set_str(data, s2 - pool->solvables, langtag, newname);
+	      else
+		{
+		  char *ustr = solv_latin1toutf8(newname);
+	          repodata_set_str(data, s2 - pool->solvables, langtag, ustr);
+		  solv_free(ustr);
+		}
 	    }
 	  else if (!strcmp(pn, "pattern-includes()") && evr)
 	    repodata_add_poolstr_array(data, s2 - pool->solvables, SOLVABLE_INCLUDES, pool_tmpjoin(pool, "pattern:", newname, 0));
