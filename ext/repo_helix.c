@@ -15,7 +15,7 @@
  * wrote Red Carpet. The company was later renamed to Ximian.
  * The Red Carpet solver was merged into the ZYPP project, the
  * library used both by ZENworks and YaST for package management.
- * Red Carpet came with solver testcases in it's own repository
+ * Red Carpet came with solver testcases in its own repository
  * format, the 'helix' format.
  *
  */
