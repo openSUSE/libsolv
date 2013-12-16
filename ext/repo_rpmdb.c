@@ -50,7 +50,8 @@
 
 /* 3: added triggers */
 /* 4: fixed triggers */
-#define RPMDB_COOKIE_VERSION 4
+/* 5: fixed checksum copying */
+#define RPMDB_COOKIE_VERSION 5
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
@@ -1467,6 +1468,11 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
 	}
       cbdata->handle = repodata_new_handle(data);
       repodata_add_flexarray(data, cbdata->subhandle, keyname, cbdata->handle);
+      break;
+    case REPOKEY_TYPE_MD5:
+    case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA256:
+      repodata_set_bin_checksum(data, handle, keyname, key->type, (const unsigned char *)kv->str);
       break;
     default:
       break;
