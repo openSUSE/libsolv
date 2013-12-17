@@ -801,6 +801,21 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	    }
 	}
 
+      if (m && pool->implicitobsoleteusescolors && (s->arch > pool->lastarch || pool->id2arch[s->arch] != 1))
+	{
+	  int a = pool->id2arch[s->arch];
+	  /* check lock-step candidates */
+	  FOR_PROVIDES(p, pp, s->name)
+	    {
+	      Solvable *ps = pool->solvables + p;
+	      if (s->name != ps->name || s->evr != ps->evr || MAPTST(m, p))
+		continue;
+	      if (ps->arch > pool->lastarch || pool->id2arch[ps->arch] == 1 || pool->id2arch[ps->arch] >= a)
+		continue;
+	      queue_push(&workq, p);
+	    }
+	}
+
       /*-----------------------------------------
        * add recommends to the work queue
        */
@@ -1177,6 +1192,7 @@ void
 solver_addinfarchrules(Solver *solv, Map *addedmap)
 {
   Pool *pool = solv->pool;
+  Repo *installed = pool->installed;
   int first, i, j;
   Id p, pp, a, aa, bestarch;
   Solvable *s, *ps, *bests;
@@ -1207,7 +1223,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	    break;
 	  a = ps->arch;
 	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
-	  if (a != 1 && pool->installed && ps->repo == pool->installed)
+	  if (a != 1 && installed && ps->repo == installed)
 	    {
 	      if (!solv->dupmap_all && !(solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
 	        queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
@@ -1221,9 +1237,51 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	}
       if (first)
 	continue;
+
       /* speed up common case where installed package already has best arch */
       if (allowedarchs.count == 1 && bests && allowedarchs.elements[0] == bests->arch)
 	allowedarchs.count--;	/* installed arch is best */
+
+      if (allowedarchs.count && pool->implicitobsoleteusescolors && installed && bestarch)
+	{
+	  /* need an extra pass for lockstep checking: we only allow to keep an inferior arch
+	   * if the corresponding installed package is not lock-stepped */
+	  queue_empty(&allowedarchs);
+	  FOR_PROVIDES(p, pp, s->name)
+	    {
+	      Id p2, pp2;
+	      ps = pool->solvables + p;
+	      if (ps->name != s->name || ps->repo != installed || !MAPTST(addedmap, p))
+		continue;
+	      if (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
+		continue;
+	      a = ps->arch;
+	      a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
+	      if (!a)
+		{
+		  queue_pushunique(&allowedarchs, ps->arch);	/* strange arch, allow */
+		  continue;
+		}
+	      if (a == 1 || ((a ^ bestarch) & 0xffff0000) == 0)
+		continue;
+	      /* have installed package with inferior arch, check if lock-stepped */
+	      FOR_PROVIDES(p2, pp2, s->name)
+		{
+		  Solvable *s2 = pool->solvables + p2;
+		  Id a2;
+		  if (p2 == p || s2->name != s->name || s2->evr != pool->solvables[p].evr || s2->arch == pool->solvables[p].arch)
+		    continue;
+		  a2 = s2->arch;
+		  a2 = (a2 <= pool->lastarch) ? pool->id2arch[a2] : 0;
+		  if (a2 && (a2 == 1 || ((a2 ^ bestarch) & 0xffff0000) == 0))
+		    break;
+		}
+	      if (!p2)
+		queue_pushunique(&allowedarchs, ps->arch);
+	    }
+	}
+
+      /* find all bad packages */
       queue_empty(&badq);
       FOR_PROVIDES(p, pp, s->name)
 	{
@@ -1234,8 +1292,12 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
 	  if (a != 1 && bestarch && ((a ^ bestarch) & 0xffff0000) != 0)
 	    {
-	      if (pool->installed && ps->repo == pool->installed)
-		continue;	/* always ok to keep an installed package */
+	      if (installed && ps->repo == installed)
+		{
+		  if (pool->implicitobsoleteusescolors)
+		    queue_push(&badq, p);		/* special lock-step handling, see below */
+		  continue;	/* always ok to keep an installed package */
+		}
 	      for (j = 0; j < allowedarchs.count; j++)
 		{
 		  aa = allowedarchs.elements[j];
@@ -1249,8 +1311,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		queue_push(&badq, p);
 	    }
 	}
-      if (!badq.count)
-	continue;
+
       /* block all solvables in the badq! */
       for (j = 0; j < badq.count; j++)
 	{
@@ -1259,6 +1320,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  if (pool->implicitobsoleteusescolors)
 	    {
 	      Id p2;
+	      int haveinstalled = 0;
 	      queue_empty(&lsq);
 	      FOR_PROVIDES(p2, pp, s->name)
 		{
@@ -1267,9 +1329,15 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		    continue;
 		  a = s2->arch;
 		  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
-		  if (a && (a == 1 || a == bestarch))
-		    queue_push(&lsq, p2);
+		  if (a && (a == 1 || ((a ^ bestarch) & 0xffff000) == 0))
+		    {
+		      queue_push(&lsq, p2);
+		      if (installed && s2->repo == installed)
+			haveinstalled = 1;
+		    }
 		}
+	      if (installed && pool->solvables[p].repo == installed && !haveinstalled)
+		continue;	/* installed package not in lock-step */
 	    }
 	  solver_addrule(solv, -p, lsq.count ? pool_queuetowhatprovides(pool, &lsq) : 0);
 	}
