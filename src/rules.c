@@ -2959,7 +2959,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		  if (solv->update_targets && solv->update_targets->elements[p - installed->start])
 		    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[p - installed->start], &q2);
 		  if (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
-		    prune_to_dup_packages(solv, p, &q);
+		    prune_to_dup_packages(solv, p, &q2);
 		  policy_filter_unwanted(solv, &q2, POLICY_MODE_RECOMMEND);
 		  for (j = 0; j < q2.count; j++)
 		    queue_pushunique(&q, q2.elements[j]);
