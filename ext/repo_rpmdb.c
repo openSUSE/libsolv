@@ -1813,7 +1813,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	  if (res <= 0)
 	    {
 	      if (!res)
-	        return pool_error(pool, -1, "inconsistent rpm database, key %d not found. run 'rpm --rebuilddb' to fix.", dbid);
+	        pool_error(pool, -1, "inconsistent rpm database, key %d not found. run 'rpm --rebuilddb' to fix.", dbid);
 	      freestate(&state);
 	      solv_free(entries);
 	      solv_free(namedata);
