@@ -1099,7 +1099,7 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
       linep += strlen(linep);
       if (linep == line || linep[-1] != '\n')
 	continue;
-      *--linep = 0;
+      linep[-1] = 0;
       linep = line + intag;
       if (intag)
 	{
@@ -1739,6 +1739,7 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
 	      pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
 	      solv_free(result);
 	      strqueue_free(&sq);
+	      fclose(fp);
 	      return 0;
 	    }
 	  if (fclose(fp))
@@ -1763,6 +1764,7 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
     {
       pool_debug(solv->pool, SOLV_ERROR, "testcase_write: write error\n");
       strqueue_free(&sq);
+      fclose(fp);
       return 0;
     }
   if (fclose(fp))

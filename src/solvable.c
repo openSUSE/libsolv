@@ -404,7 +404,7 @@ static inline Id dep2name(Pool *pool, Id dep)
 {
   while (ISRELDEP(dep))
     {
-      Reldep *rd = rd = GETRELDEP(pool, dep);
+      Reldep *rd = GETRELDEP(pool, dep);
       dep = rd->name;
     }
   return dep;

@@ -177,7 +177,7 @@ finishpackage(Pool *pool, Solvable *s, int keep, Queue *job)
 int
 repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags)
 {
-  Pool *pool = repo->pool;
+  Pool *pool;
   char *buf, *p;
   int bufa, bufl, c;
   Solvable *s;
@@ -190,6 +190,7 @@ repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags)
   xrepo = repo ? repo : installedrepo;
   if (!xrepo)
     return -1;
+  pool = xrepo->pool;
 
   buf = solv_malloc(4096);
   bufa = 4096;

@@ -95,7 +95,9 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
   while (fgets(buf + bufl, bufa - bufl, fp) > 0)
     {
       bufl += strlen(buf + bufl);
-      if (bufl && buf[bufl - 1] != '\n')
+      if (!bufl)
+	continue;
+      if (buf[bufl - 1] != '\n')
 	{
 	  if (bufa - bufl < 256)
 	    {
@@ -104,7 +106,7 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 	    }
 	  continue;
 	}
-      buf[--bufl] = 0;
+      buf[bufl - 1] = 0;
       bufl = 0;
       if (buf[0] != '@')
 	{

@@ -297,7 +297,7 @@ dump_repodata_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVa
 static void
 dump_repodata(Repo *repo)
 {
-  unsigned int i;
+  int i;
   Repodata *data;
   if (repo->nrepodata == 0)
     return;
@@ -321,7 +321,7 @@ dump_repodata(Repo *repo)
 static void
 dump_repodata_json(Repo *repo, struct cbdata *cbdata)
 {
-  unsigned int i;
+  int i;
   Repodata *data;
   if (repo->nrepodata == 0)
     return;
