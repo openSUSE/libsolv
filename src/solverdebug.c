@@ -75,7 +75,7 @@ solver_printrule(Solver *solv, int type, Rule *r)
     POOL_DEBUG(type, "Rule #%d:", (int)(r - solv->rules));
   else
     POOL_DEBUG(type, "Rule:");		       /* r is any rule */
-  if (r && r->d < 0)
+  if (r->d < 0)
     POOL_DEBUG(type, " (disabled)");
   POOL_DEBUG(type, "\n");
   d = r->d < 0 ? -r->d - 1 : r->d;
