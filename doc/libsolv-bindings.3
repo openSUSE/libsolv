@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 09/24/2013
+.\"      Date: 01/09/2014
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "09/24/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "01/09/2014" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -2331,6 +2331,36 @@ Return true if the solvable is installable on the system\&. Solvables are not in
 .\}
 .sp
 Return true if the solvable is installed on the system\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool identical(Solvable *\fR\fIother\fR\fB)\fR
+\fI$solvable\fR\fB\->identical(\fR\fI$other\fR\fB)\fR
+\fI$solvable\fR\fB\&.identical(\fR\fIother\fR\fB)\fR
+\fI$solvable\fR\fB\&.identical?(\fR\fIother\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return true if the two solvables are identical\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint evrcmp(Solvable *\fR\fIother\fR\fB)\fR
+\fI$solvable\fR\fB\->evrcmp(\fR\fIother\fR\fB)\fR
+\fI$solvable\fR\fB\&.evrcmp(\fR\fIother\fR\fB)\fR
+\fI$solvable\fR\fB\&.evrcmp(\fR\fIother\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Returns \-1 if the epoch/version/release of the solvable is less then the one from the other solvable, 1 if it is greater, and 0 if they are equal\&. Note that "equal" does not mean that the evr is identical\&.
 .sp
 .if n \{\
 .RS 4

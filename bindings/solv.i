@@ -448,6 +448,7 @@ typedef int bool;
 
 #include "pool.h"
 #include "poolarch.h"
+#include "evr.h"
 #include "solver.h"
 #include "policy.h"
 #include "solverdebug.h"
@@ -2409,6 +2410,16 @@ rb_eval_string(
     Selection *sel = new_Selection($self->pool);
     queue_push2(&sel->q, SOLVER_SOLVABLE | setflags, $self->id);
     return sel;
+  }
+
+#ifdef SWIGRUBY
+  %rename("identical?") identical;
+#endif
+  bool identical(XSolvable *s2) {
+    return solvable_identical($self->pool->solvables + $self->id, s2->pool->solvables + s2->id);
+  }
+  int evrcmp(XSolvable *s2) {
+    return pool_evrcmp($self->pool, $self->pool->solvables[$self->id].evr, s2->pool->solvables[s2->id].evr, EVRCMP_COMPARE);
   }
 
   bool __eq__(XSolvable *s) {
