@@ -1516,9 +1516,9 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
 #else
   FOR_REPODATAS(fromrepo, i, data)
     {
-      if (p < data->start || p >= data->end)
-	continue;
-      repodata_search(data, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
+      if (p >= data->start && p < data->end)
+        repodata_search(data, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
+      cbdata.dircache = 0;	/* only for first repodata */
     }
 #endif
 }
@@ -1572,12 +1572,24 @@ swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
 }
 
 static void
-mkrpmdbcookie(struct stat *st, unsigned char *cookie)
+mkrpmdbcookie(struct stat *st, unsigned char *cookie, int flags)
 {
+  int f = 0;
   memset(cookie, 0, 32);
   cookie[3] = RPMDB_COOKIE_VERSION;
   memcpy(cookie + 16, &st->st_ino, sizeof(st->st_ino));
   memcpy(cookie + 24, &st->st_dev, sizeof(st->st_dev));
+  if ((flags & RPM_ADD_WITH_PKGID) != 0)
+    f |= 1;
+  if ((flags & RPM_ADD_WITH_HDRID) != 0)
+    f |= 2;
+  if ((flags & RPM_ADD_WITH_CHANGELOG) != 0)
+    f |= 4;
+  if ((flags & RPM_ADD_NO_FILELIST) == 0)
+    f |= 8;
+  if ((flags & RPM_ADD_NO_RPMLIBREQS) != 0)
+    cookie[1] = 1;
+  cookie[0] = f;
 }
 
 /*
@@ -1628,7 +1640,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       freestate(&state);
       return -1;
     }
-  mkrpmdbcookie(&packagesstat, newcookie);
+  mkrpmdbcookie(&packagesstat, newcookie, flags);
   repodata_set_bin_checksum(data, SOLVID_META, REPOSITORY_RPMDBCOOKIE, REPOKEY_TYPE_SHA256, newcookie);
 
   if (ref)
