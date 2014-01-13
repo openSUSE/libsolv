@@ -644,7 +644,7 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
   for (i = 0; i < fc; i++)
     {
       if (di[i] >= dc)
-	continue;
+	continue;	/* corrupt entry */
       fn[di[i]]++;
       if (fsz[i] == 0 || !S_ISREG(fm[i]))
 	continue;
@@ -682,7 +682,7 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead)
   int bnc, dnc, dic;
   int i;
   Id lastdid = 0;
-  int lastdii = -1;
+  unsigned int lastdii = -1;
 
   if (!data)
     return;
@@ -719,6 +719,8 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead)
 	did = lastdid;
       else
 	{
+	  if (di[i] >= dnc)
+	    continue;	/* corrupt entry */
 	  did = repodata_str2dir(data, dn[di[i]], 1);
 	  if (!did)
 	    did = repodata_str2dir(data, "/", 1);
