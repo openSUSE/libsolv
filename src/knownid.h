@@ -15,6 +15,9 @@
  * the ABI!
  */
 
+#ifndef LIBSOLV_KNOWNID_H
+#define LIBSOLV_KNOWNID_H
+
 #undef KNOWNID
 #ifdef KNOWNID_INITIALIZE
 # define KNOWNID(a, b) b
@@ -251,4 +254,7 @@ KNOWNID(ID_NUM_INTERNAL,		0)
 #endif
 
 #undef KNOWNID
+
+#endif
+
 
