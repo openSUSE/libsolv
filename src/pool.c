@@ -30,6 +30,7 @@
 
 #define SOLVABLE_BLOCK	255
 
+#undef LIBSOLV_KNOWNID_H
 #define KNOWNID_INITIALIZE
 #include "knownid.h"
 #undef KNOWNID_INITIALIZE
