@@ -290,6 +290,24 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      repodata_add_poolstr_array(data, SOLVID_META, REPOSITORY_REPOID, value);
 	      continue;
 	    }
+	  if (istag ("DISTRO"))
+	    {
+	      Id dh = repodata_new_handle(data);
+	      char *p;
+	      /* like with createrepo --distro */
+	      if ((p = strchr(value, ',')) != 0)
+		{
+		  *p++ = 0;
+		  if (*value)
+		    repodata_set_poolstr(data, dh, REPOSITORY_PRODUCT_CPEID, value);
+		}
+	      else
+	        p = value;
+	      if (*p)
+		repodata_set_str(data, dh, REPOSITORY_PRODUCT_LABEL, p);
+	      repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DISTROS, dh);
+	      continue;
+	    }
 
 	  if (istag ("DESCRDIR"))
 	    {
