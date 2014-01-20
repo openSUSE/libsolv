@@ -1195,7 +1195,7 @@ repo_find_pubkey(Repo *repo, const char *keyid)
 
 #ifdef ENABLE_PGPVRFY
 
-/* warning: does not check key expiry/revokation, like gpgv or rpm */
+/* warning: does not check key expiry/revokation, same as with gpgv or rpm */
 /* returns the Id of the pubkey that verified the signature */
 Id
 repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char *keyid)
