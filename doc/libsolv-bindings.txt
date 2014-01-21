@@ -2190,6 +2190,47 @@ The problem can be solved by allowing to replace the package with some
 other package that has a different name.
 
 
+Reason constants
+
+*SOLVER_REASON_UNRELATED*::
+The package status did not change as it was not related to any job.
+
+*SOLVER_REASON_UNIT_RULE*::
+The package was installed/erased/kept because of a unit rule, i.e. a rule
+where all literals but one were false.
+
+*SOLVER_REASON_KEEP_INSTALLED*::
+The package was chosen when trying to keep as many packages installed as
+possible.
+
+*SOLVER_REASON_RESOLVE_JOB*::
+The decision happened to fulfill a job rule.
+
+*SOLVER_REASON_UPDATE_INSTALLED*::
+The decision happened to fulfill a package update request.
+
+*SOLVER_REASON_CLEANDEPS_ERASE*::
+The package was erased when cleaning up dependencies from other erased
+packages.
+
+*SOLVER_REASON_RESOLVE*::
+The package was installed to fulfill package dependencies.
+
+*SOLVER_REASON_WEAKDEP*::
+The package was installed because of a weak dependency (Recommends or
+Supplements).
+
+*SOLVER_REASON_RESOLVE_ORPHAN*::
+The decision about the package was made when deciding the fate of orphaned
+packages.
+
+*SOLVER_REASON_RECOMMENDED*::
+This is a special case of SOLVER_REASON_WEAKDEP.
+
+*SOLVER_REASON_SUPPLEMENTED*::
+This is a special case of SOLVER_REASON_WEAKDEP.
+
+
 === ATTRIBUTES ===
 
 	Pool *pool;				/* read only */
@@ -2202,14 +2243,14 @@ Back pointer to pool.
 === METHODS ===
 
 	int set_flag(int flag, int value)
-	my $oldvalue = $pool->set_flag($flag, $value);
-	oldvalue = pool.set_flag(flag, value)
-	oldvalue = pool.set_flag(flag, value)
+	my $oldvalue = $solver->set_flag($flag, $value);
+	oldvalue = solver.set_flag(flag, value)
+	oldvalue = solver.set_flag(flag, value)
 
 	int get_flag(int flag)
-	my $value = $pool->get_flag($flag);
-	value = pool.get_flag(flag)
-	value = pool.get_flag(flag)
+	my $value = $solver->get_flag($flag);
+	value = solver.get_flag(flag)
+	value = solver.get_flag(flag)
 
 Set/get a solver specific flag. The flags define the policies the solver has
 to obey. The flags are explained in the CONSTANTS section of this class.
@@ -2232,6 +2273,14 @@ problems.
 Return the transaction to implement the calculated package changes. A transaction
 is available even if problems were found, this is useful for interactive user
 interfaces that show both the job result and the problems.
+
+	int reason = describe_decision(Solvable *s, Rule *OUTPUT)
+	my ($reason, $rule) = $solver->describe_decision($solvable);
+	(reason, rule) = solver.describe_decision(solvable)
+	(reason, rule) = solver.describe_decision(solvable)
+
+Return the reason why a specific solvable was installed or erased. For most of
+the reasons the rule that triggered the decision is also returned.
 
 The Problem Class
 -----------------

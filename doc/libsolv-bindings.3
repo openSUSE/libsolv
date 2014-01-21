@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 01/09/2014
+.\"      Date: 01/21/2014
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "01/09/2014" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "01/21/2014" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3525,6 +3525,63 @@ The problem can be solved by allowing to replace the package with some other pac
 .RS 4
 The problem can be solved by allowing to replace the package with some other package that has a different name\&.
 .RE
+.sp
+Reason constants
+.PP
+\fBSOLVER_REASON_UNRELATED\fR
+.RS 4
+The package status did not change as it was not related to any job\&.
+.RE
+.PP
+\fBSOLVER_REASON_UNIT_RULE\fR
+.RS 4
+The package was installed/erased/kept because of a unit rule, i\&.e\&. a rule where all literals but one were false\&.
+.RE
+.PP
+\fBSOLVER_REASON_KEEP_INSTALLED\fR
+.RS 4
+The package was chosen when trying to keep as many packages installed as possible\&.
+.RE
+.PP
+\fBSOLVER_REASON_RESOLVE_JOB\fR
+.RS 4
+The decision happened to fulfill a job rule\&.
+.RE
+.PP
+\fBSOLVER_REASON_UPDATE_INSTALLED\fR
+.RS 4
+The decision happened to fulfill a package update request\&.
+.RE
+.PP
+\fBSOLVER_REASON_CLEANDEPS_ERASE\fR
+.RS 4
+The package was erased when cleaning up dependencies from other erased packages\&.
+.RE
+.PP
+\fBSOLVER_REASON_RESOLVE\fR
+.RS 4
+The package was installed to fulfill package dependencies\&.
+.RE
+.PP
+\fBSOLVER_REASON_WEAKDEP\fR
+.RS 4
+The package was installed because of a weak dependency (Recommends or Supplements)\&.
+.RE
+.PP
+\fBSOLVER_REASON_RESOLVE_ORPHAN\fR
+.RS 4
+The decision about the package was made when deciding the fate of orphaned packages\&.
+.RE
+.PP
+\fBSOLVER_REASON_RECOMMENDED\fR
+.RS 4
+This is a special case of SOLVER_REASON_WEAKDEP\&.
+.RE
+.PP
+\fBSOLVER_REASON_SUPPLEMENTED\fR
+.RS 4
+This is a special case of SOLVER_REASON_WEAKDEP\&.
+.RE
 .SS "ATTRIBUTES"
 .sp
 .if n \{\
@@ -3548,9 +3605,9 @@ Back pointer to pool\&.
 .\}
 .nf
 \fBint set_flag(int\fR \fIflag\fR\fB, int\fR \fIvalue\fR\fB)\fR
-my \fI$oldvalue\fR \fB=\fR \fI$pool\fR\fB\->set_flag(\fR\fI$flag\fR\fB,\fR \fI$value\fR\fB)\fR;
-\fIoldvalue\fR \fB=\fR \fIpool\fR\fB\&.set_flag(\fR\fIflag\fR\fB,\fR \fIvalue\fR\fB)\fR
-\fIoldvalue\fR \fB=\fR \fIpool\fR\fB\&.set_flag(\fR\fIflag\fR\fB,\fR \fIvalue\fR\fB)\fR
+my \fI$oldvalue\fR \fB=\fR \fI$solver\fR\fB\->set_flag(\fR\fI$flag\fR\fB,\fR \fI$value\fR\fB)\fR;
+\fIoldvalue\fR \fB=\fR \fIsolver\fR\fB\&.set_flag(\fR\fIflag\fR\fB,\fR \fIvalue\fR\fB)\fR
+\fIoldvalue\fR \fB=\fR \fIsolver\fR\fB\&.set_flag(\fR\fIflag\fR\fB,\fR \fIvalue\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -3561,9 +3618,9 @@ my \fI$oldvalue\fR \fB=\fR \fI$pool\fR\fB\->set_flag(\fR\fI$flag\fR\fB,\fR \fI$v
 .\}
 .nf
 \fBint get_flag(int\fR \fIflag\fR\fB)\fR
-my \fI$value\fR \fB=\fR \fI$pool\fR\fB\->get_flag(\fR\fI$flag\fR\fB)\fR;
-\fIvalue\fR \fB=\fR \fIpool\fR\fB\&.get_flag(\fR\fIflag\fR\fB)\fR
-\fIvalue\fR \fB=\fR \fIpool\fR\fB\&.get_flag(\fR\fIflag\fR\fB)\fR
+my \fI$value\fR \fB=\fR \fI$solver\fR\fB\->get_flag(\fR\fI$flag\fR\fB)\fR;
+\fIvalue\fR \fB=\fR \fIsolver\fR\fB\&.get_flag(\fR\fIflag\fR\fB)\fR
+\fIvalue\fR \fB=\fR \fIsolver\fR\fB\&.get_flag(\fR\fIflag\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -3600,6 +3657,21 @@ my \fI$trans\fR \fB=\fR \fI$solver\fR\fB\->transaction()\fR;
 .\}
 .sp
 Return the transaction to implement the calculated package changes\&. A transaction is available even if problems were found, this is useful for interactive user interfaces that show both the job result and the problems\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint\fR \fIreason\fR \fB= describe_decision(Solvable *\fR\fIs\fR\fB, Rule *\fR\fIOUTPUT\fR\fB)\fR
+my \fB(\fR\fI$reason\fR\fB,\fR \fI$rule\fR\fB) =\fR \fI$solver\fR\fB\->describe_decision(\fR\fI$solvable\fR\fB)\fR;
+\fB(\fR\fIreason\fR\fB,\fR \fIrule\fR\fB) =\fR \fIsolver\fR\fB\&.describe_decision(\fR\fIsolvable\fR\fB)\fR
+\fB(\fR\fIreason\fR\fB,\fR \fIrule\fR\fB) =\fR \fIsolver\fR\fB\&.describe_decision(\fR\fIsolvable\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the reason why a specific solvable was installed or erased\&. For most of the reasons the rule that triggered the decision is also returned\&.
 .SH "THE PROBLEM CLASS"
 .sp
 Problems are the way of the solver to interact with the user\&. You can simply list all problems and terminate your program, but a better way is to present solutions to the user and let him pick the ones he likes\&.
