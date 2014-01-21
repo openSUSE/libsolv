@@ -331,6 +331,12 @@ Special Solvable Attributes
 *PUBKEY_EXPIRES "pubkey:expires"*::
   The seconds since the unix epoch when the pubkey expires.
 
+*PUBKEY_SUBKEYOF "pubkey:subkeyof"*::
+  The keyid of the master pubkey for subkeys.
+
+*PUBKEY_DATA "pubkey:data"*::
+  The MPI data of the pubkey.
+
 *SOLVABLE_ISVISIBLE "solvable:isvisible"*::
   An attribute describing if the package should be listed to the user
   or not. Used for SUSE patterns.
@@ -419,10 +425,6 @@ different semantics.
 *NAMESPACE_OTHERPROVIDERS "namespace:otherproviders"*::
   This is a hack to allow self-conflicting packages. It is not needed
   with current rpm version, so do not use this namespace.
-
-*NAMESPACE_PRODUCTBUDDY "namespace:productbuddy"*::
-  This is a another hack to implement the SUSE product buddy system.
-  Please ignore.
 
 *SOLVABLE_PREREQMARKER "solvable:prereqmarker"*::
   This marker partitions the normal require dependencies from the
@@ -650,6 +652,10 @@ Delta Package Attributes
 
 *DELTA_LOCATION_SUFFIX "delta:locsuffix"*::
   The suffix part of the file name of the delta package.
+
+*DELTA_LOCATION_BASE "delta:locbase"*::
+  This attribute can be used to overwrite the repositories base url for
+  the delta.
 
 *DELTA_DOWNLOADSIZE "delta:downloadsize"*::
   The size of the delta rpm file.

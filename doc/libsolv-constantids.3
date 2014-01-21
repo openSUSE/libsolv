@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Constantids
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 10/15/2013
+.\"      Date: 01/21/2014
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-CONSTANTIDS" "3" "10/15/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-CONSTANTIDS" "3" "01/21/2014" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -453,6 +453,16 @@ The fingerprint of a pubkey, usually a sha1sum in hex\&. Old V3 RSA keys use a m
 The seconds since the unix epoch when the pubkey expires\&.
 .RE
 .PP
+\fBPUBKEY_SUBKEYOF "pubkey:subkeyof"\fR
+.RS 4
+The keyid of the master pubkey for subkeys\&.
+.RE
+.PP
+\fBPUBKEY_DATA "pubkey:data"\fR
+.RS 4
+The MPI data of the pubkey\&.
+.RE
+.PP
 \fBSOLVABLE_ISVISIBLE "solvable:isvisible"\fR
 .RS 4
 An attribute describing if the package should be listed to the user or not\&. Used for SUSE patterns\&.
@@ -559,11 +569,6 @@ The dependency describes a filesystem\&. The callback should return true if the 
 \fBNAMESPACE_OTHERPROVIDERS "namespace:otherproviders"\fR
 .RS 4
 This is a hack to allow self\-conflicting packages\&. It is not needed with current rpm version, so do not use this namespace\&.
-.RE
-.PP
-\fBNAMESPACE_PRODUCTBUDDY "namespace:productbuddy"\fR
-.RS 4
-This is a another hack to implement the SUSE product buddy system\&. Please ignore\&.
 .RE
 .PP
 \fBSOLVABLE_PREREQMARKER "solvable:prereqmarker"\fR
@@ -865,6 +870,11 @@ The version part of the file name of the delta package\&.
 \fBDELTA_LOCATION_SUFFIX "delta:locsuffix"\fR
 .RS 4
 The suffix part of the file name of the delta package\&.
+.RE
+.PP
+\fBDELTA_LOCATION_BASE "delta:locbase"\fR
+.RS 4
+This attribute can be used to overwrite the repositories base url for the delta\&.
 .RE
 .PP
 \fBDELTA_DOWNLOADSIZE "delta:downloadsize"\fR
