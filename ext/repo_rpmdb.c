@@ -1022,11 +1022,12 @@ int
 serialize_dbenv_ops(struct rpmdbstate *state)
 {
   char lpath[PATH_MAX];
-  mode_t oldmask = umask(022);
+  mode_t oldmask;
   int fd;
   struct flock fl;
 
   snprintf(lpath, PATH_MAX, "%s/var/lib/rpm/.dbenv.lock", state->rootdir ? state->rootdir : "");
+  oldmask = umask(022);
   fd = open(lpath, (O_RDWR|O_CREAT), 0644);
   umask(oldmask);
   if (fd < 0)
@@ -1365,8 +1366,9 @@ rpm_state_free(void *state)
 }
 
 static int
-count_headers(Pool *pool, const char *rootdir, DB_ENV *dbenv)
+count_headers(struct rpmdbstate *state)
 {
+  Pool *pool = state->pool;
   char dbpath[PATH_MAX];
   struct stat statbuf;
   DB *db = 0;
@@ -1375,12 +1377,12 @@ count_headers(Pool *pool, const char *rootdir, DB_ENV *dbenv)
   DBT dbkey;
   DBT dbdata;
 
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", rootdir ? rootdir : "");
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", state->rootdir ? state->rootdir : "");
   if (stat(dbpath, &statbuf))
     return 0;
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
-  if (db_create(&db, dbenv, 0))
+  if (db_create(&db, state->dbenv, 0))
     {
       pool_error(pool, 0, "db_create: %s", strerror(errno));
       return 0;
@@ -1674,6 +1676,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
   now = solv_timems(0);
   memset(&state, 0, sizeof(state));
   state.pool = pool;
+  if (flags & REPO_USE_ROOTDIR)
+    state.rootdir = solv_strdup(pool_get_rootdir(pool));
 
   data = repo_add_repodata(repo, flags);
 
@@ -1684,8 +1688,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       ref = 0;
     }
 
-  if (flags & REPO_USE_ROOTDIR)
-    state.rootdir = solv_strdup(pool_get_rootdir(pool));
   if (!opendbenv(&state))
     {
       solv_free(state.rootdir);
@@ -1714,7 +1716,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
 	repo_empty(ref, 1);	/* get it out of the way */
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
-	count = count_headers(pool, state.rootdir, state.dbenv);
+	count = count_headers(&state);
       if (!openpkgdb(&state))
 	{
 	  freestate(&state);
