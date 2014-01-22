@@ -1017,10 +1017,40 @@ static inline void rpmdbid2db(unsigned char *db, Id id, int byteswapped)
 #endif
 }
 
+#ifdef FEDORA
+int
+serialize_dbenv_ops(struct rpmdbstate *state)
+{
+  char lpath[PATH_MAX];
+  mode_t oldmask = umask(022);
+  int fd;
+  struct flock fl;
+
+  snprintf(lpath, PATH_MAX, "%s/var/lib/rpm/.dbenv.lock", state->rootdir ? state->rootdir : "");
+  fd = open(lpath, (O_RDWR|O_CREAT), 0644);
+  umask(oldmask);
+  if (fd < 0)
+    return -1;
+  memset(&fl, 0, sizeof(fl));
+  fl.l_type = F_WRLCK;
+  fl.l_whence = SEEK_SET;
+  for (;;)
+    {
+      if (fcntl(fd, F_SETLKW, &fl) != -1)
+	return fd;
+      if (errno != EINTR)
+	break;
+    }
+  close(fd);
+  return -1;
+}
+#endif
+
 /* should look in /usr/lib/rpm/macros instead, but we want speed... */
 static int
-opendbenv(struct rpmdbstate *state, const char *rootdir)
+opendbenv(struct rpmdbstate *state)
 {
+  const char *rootdir = state->rootdir;
   char dbpath[PATH_MAX];
   DB_ENV *dbenv = 0;
   int r;
@@ -1038,7 +1068,10 @@ opendbenv(struct rpmdbstate *state, const char *rootdir)
   else
     {
 #ifdef FEDORA
+      int serialize_fd = serialize_dbenv_ops(state);
       r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0644);
+      if (serialize_fd >= 0)
+	close(serialize_fd);
 #else
       r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
 #endif
@@ -1053,20 +1086,45 @@ opendbenv(struct rpmdbstate *state, const char *rootdir)
   return 1;
 }
 
+static void
+closedbenv(struct rpmdbstate *state)
+{
+#ifdef FEDORA
+  uint32_t eflags = 0;
+#endif
+
+  if (!state->dbenv)
+    return;
+#ifdef FEDORA
+  (void)state->dbenv->get_open_flags(state->dbenv, &eflags);
+  if (!(eflags & DB_PRIVATE))
+    {
+      int serialize_fd = serialize_dbenv_ops(state);
+      state->dbenv->close(state->dbenv, 0);
+      if (serialize_fd >= 0)
+	close(serialize_fd);
+    }
+  else
+    state->dbenv->close(state->dbenv, 0);
+#else
+  state->dbenv->close(state->dbenv, 0);
+#endif
+  state->dbenv = 0;
+}
+
 static int
 openpkgdb(struct rpmdbstate *state)
 {
   if (state->dbopened)
     return state->dbopened > 0 ? 1 : 0;
   state->dbopened = -1;
-  if (!state->dbenv && !opendbenv(state, state->rootdir))
+  if (!state->dbenv && !opendbenv(state))
     return 0;
   if (db_create(&state->db, state->dbenv, 0))
     {
       pool_error(state->pool, 0, "db_create: %s", strerror(errno));
       state->db = 0;
-      state->dbenv->close(state->dbenv, 0);
-      state->dbenv = 0;
+      closedbenv(state);
       return 0;
     }
   if (state->db->open(state->db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
@@ -1074,8 +1132,7 @@ openpkgdb(struct rpmdbstate *state)
       pool_error(state->pool, 0, "db->open Packages: %s", strerror(errno));
       state->db->close(state->db, 0);
       state->db = 0;
-      state->dbenv->close(state->dbenv, 0);
-      state->dbenv = 0;
+      closedbenv(state);
       return 0;
     }
   if (state->db->get_byteswapped(state->db, &state->byteswapped))
@@ -1083,8 +1140,7 @@ openpkgdb(struct rpmdbstate *state)
       pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
       state->db->close(state->db, 0);
       state->db = 0;
-      state->dbenv->close(state->dbenv, 0);
-      state->dbenv = 0;
+      closedbenv(state);
       return 0;
     }
   state->dbopened = 1;
@@ -1115,7 +1171,7 @@ getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *ma
   if (namedatap)
     *namedatap = 0;
 
-  if (!state->dbenv && !opendbenv(state, state->rootdir))
+  if (!state->dbenv && !opendbenv(state))
     return 0;
   dbenv = state->dbenv;
   if (db_create(&db, dbenv, 0))
@@ -1286,7 +1342,7 @@ freestate(struct rpmdbstate *state)
   if (state->db)
     state->db->close(state->db, 0);
   if (state->dbenv)
-    state->dbenv->close(state->dbenv, 0);
+    closedbenv(state);
   solv_free(state->rpmhead);
 }
 
@@ -1610,7 +1666,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
   Id oldcookietype = 0;
   Repodata *data;
   int count = 0, done = 0;
-  const char *rootdir = 0;
   struct rpmdbstate state;
   int i;
   Solvable *s;
@@ -1630,12 +1685,15 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     }
 
   if (flags & REPO_USE_ROOTDIR)
-    rootdir = pool_get_rootdir(pool);
-  if (!opendbenv(&state, rootdir))
-    return -1;
+    state.rootdir = solv_strdup(pool_get_rootdir(pool));
+  if (!opendbenv(&state))
+    {
+      solv_free(state.rootdir);
+      return -1;
+    }
 
   /* XXX: should get ro lock of Packages database! */
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", rootdir ? rootdir : "");
+  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", state.rootdir ? state.rootdir : "");
   if (stat(dbpath, &packagesstat))
     {
       pool_error(pool, -1, "%s: %s", dbpath, strerror(errno));
@@ -1656,7 +1714,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
 	repo_empty(ref, 1);	/* get it out of the way */
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
-	count = count_headers(pool, rootdir, state.dbenv);
+	count = count_headers(pool, state.rootdir, state.dbenv);
       if (!openpkgdb(&state))
 	{
 	  freestate(&state);
