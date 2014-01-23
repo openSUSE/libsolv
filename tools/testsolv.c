@@ -33,6 +33,7 @@ main(int argc, char **argv)
 {
   Pool *pool;
   Queue job;
+  Queue solq;
   Solver *solv;
   char *result = 0;
   int resultflags = 0;
@@ -43,8 +44,10 @@ main(int argc, char **argv)
   int ex = 0;
   const char *list = 0;
   FILE *fp;
+  const char *p;
 
-  while ((c = getopt(argc, argv, "vrhl:")) >= 0)
+  queue_init(&solq);
+  while ((c = getopt(argc, argv, "vrhl:s:")) >= 0)
     {
       switch (c)
       {
@@ -59,6 +62,12 @@ main(int argc, char **argv)
           break;
         case 'l':
 	  list = optarg;
+          break;
+        case 's':
+	  if ((p = strchr(optarg, ':')))
+	    queue_push2(&solq, atoi(optarg), atoi(p + 1));
+	  else
+	    queue_push2(&solq, 1, atoi(optarg));
           break;
         default:
 	  usage(1);
@@ -78,7 +87,7 @@ main(int argc, char **argv)
 	  perror(argv[optind]);
 	  exit(0);
 	}
-      while(!feof(fp))
+      while (!feof(fp))
 	{
 	  queue_init(&job);
 	  result = 0;
@@ -165,15 +174,43 @@ main(int argc, char **argv)
 	    }
 	  else
 	    {
-	      if (solver_solve(solv, &job))
+	      int pcnt = solver_solve(solv, &job);
+	      if (pcnt && solq.count)
 		{
-		  int problem, solution, pcnt, scnt;
-		  pcnt = solver_problem_count(solv);
+		  int i, taken = 0;
+		  for (i = 0; i < solq.count; i += 2)
+		    {
+		      if (solq.elements[i] > 0 && solq.elements[i] <= pcnt)
+			if (solq.elements[i + 1] > 0 && solq.elements[i + 1] <=  solver_solution_count(solv, solq.elements[i]))
+			  {
+			    printf("problem %d: taking solution %d\n", solq.elements[i], solq.elements[i + 1]);
+			    solver_take_solution(solv, solq.elements[i], solq.elements[i + 1], &job);
+			    taken = 1;
+			  }
+		    }
+		  if (taken)
+		    pcnt = solver_solve(solv, &job);
+		}
+	      if (pcnt)
+		{
+		  int problem, solution, scnt;
 		  printf("Found %d problems:\n", pcnt);
 		  for (problem = 1; problem <= pcnt; problem++)
 		    {
 		      printf("Problem %d:\n", problem);
+#if 1
 		      solver_printprobleminfo(solv, problem);
+#else
+		      {
+			Queue pq;
+			int j;
+			queue_init(&pq);
+			solver_findallproblemrules(solv, problem, &pq);
+			for (j = 0; j < pq.count; j++)
+			  solver_printproblemruleinfo(solv, pq.elements[j]);
+			queue_free(&pq);
+		      }
+#endif
 		      printf("\n");
 		      scnt = solver_solution_count(solv, problem);
 		      for (solution = 1; solution <= scnt; solution++)
@@ -198,5 +235,6 @@ main(int argc, char **argv)
       pool_free(pool);
       fclose(fp);
     }
+  queue_free(&solq);
   exit(ex);
 }
