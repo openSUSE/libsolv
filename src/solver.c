@@ -4354,7 +4354,7 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       return "do nothing";
     case SOLVER_INSTALL:
       if (select == SOLVER_SOLVABLE && pool->installed && pool->solvables[what].repo == pool->installed)
-	strstart = "keep ", strend = "installed";
+	strstart = "keep ", strend = " installed";
       else if (select == SOLVER_SOLVABLE || select == SOLVER_SOLVABLE_NAME)
 	strstart = "install ";
       else if (select == SOLVER_SOLVABLE_PROVIDES)
@@ -4364,7 +4364,7 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       break;
     case SOLVER_ERASE:
       if (select == SOLVER_SOLVABLE && !(pool->installed && pool->solvables[what].repo == pool->installed))
-	strstart = "keep ", strend = "unstalled";
+	strstart = "keep ", strend = " uninstalled";
       else if (select == SOLVER_SOLVABLE_PROVIDES)
 	strstart = "deinstall all packages ";
       else
@@ -4389,10 +4389,10 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       strstart = "verify ";
       break;
     case SOLVER_DROP_ORPHANED:
-      strstart = "deinstall ", strend = "if orphaned";
+      strstart = "deinstall ", strend = " if orphaned";
       break;
     case SOLVER_USERINSTALLED:
-      strstart = "regard ", strend = "as userinstalled";
+      strstart = "regard ", strend = " as userinstalled";
       break;
     default:
       strstart = "unknown job ";
