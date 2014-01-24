@@ -1,7 +1,7 @@
 -------------------------------------------------------------------
 Fri Jan 24 13:50:03 CET 2014 - mls@suse.de
 
-- add -X option to susetags2solv
+- add -X option to susetags2solv [bnc#860271]
 - fix typos in pool_job2str
 - support DISTRO in content parser
 - make addfilelist more resistant against corrupt rpms
