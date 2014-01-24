@@ -22,6 +22,9 @@
 #include "repo_solv.h"
 #include "repo_susetags.h"
 #include "repo_content.h"
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
 #include "common_write.h"
 #include "solv_xfopen.h"
 
@@ -68,11 +71,14 @@ main(int argc, char **argv)
   const char *mergefile = 0;
   Id defvendor = 0;
   int flags = 0;
+#ifdef SUSE
+  int add_auto = 0;
+#endif
   int c;
   Pool *pool;
   Repo *repo;
 
-  while ((c = getopt(argc, argv, "hn:c:d:b:q:M:")) >= 0)
+  while ((c = getopt(argc, argv, "hn:c:d:b:q:M:X")) >= 0)
     {
       switch (c)
 	{
@@ -96,6 +102,11 @@ main(int argc, char **argv)
 	  break;
 	case 'M':
 	  mergefile = optarg;
+	  break;
+	case 'X':
+#ifdef SUSE
+	  add_auto = 1;
+#endif
 	  break;
 	default:
 	  usage(1);
@@ -295,6 +306,10 @@ main(int argc, char **argv)
 	}
       fclose(fp);
     }
+#ifdef SUSE
+  if (add_auto)
+    repo_add_autopattern(repo, 0); 
+#endif
 
   if (query)
     doquery(pool, repo, query);
