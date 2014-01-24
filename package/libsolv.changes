@@ -1,4 +1,18 @@
 -------------------------------------------------------------------
+Fri Jan 24 13:50:03 CET 2014 - mls@suse.de
+
+- add -X option to susetags2solv
+- fix typos in pool_job2str
+- support DISTRO in content parser
+- make addfilelist more resistant against corrupt rpms
+- encode flags into rpmdb cookie
+- add identical and evrcmp methods in bindings
+- copy checksums in repo_add_rpmdb_reffp
+- repo_autopattern: make sure that the category is valid utf8
+- fix double-free if the number of languages is reduced to zero
+- bump version to 0.4.2
+
+-------------------------------------------------------------------
 Mon Dec  9 11:53:06 CET 2013 - mls@suse.de
 
 - make repo2solv.sh work when appdata support is off
