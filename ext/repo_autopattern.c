@@ -335,6 +335,8 @@ repo_add_autopattern(Repo *repo, int flags)
 	    repodata_set_str(data, s2 - pool->solvables, SOLVABLE_CPEID, newname);
 	  else if (!strcmp(pn, "product-flags()") && evr)
 	    repodata_add_poolstr_array(data, s2 - pool->solvables, PRODUCT_FLAGS, newname);
+	  else if (!strcmp(pn, "product-updates-repoid()") && evr)
+	    repodata_add_poolstr_array(data, s2 - pool->solvables, PRODUCT_UPDATES_REPOID, newname);
 	  else if (!strncmp(pn, "product-url(", 12) && evr && pn[12] && pn[13] && strlen(pn + 12) < 32)
 	    {
 	      char type[34];

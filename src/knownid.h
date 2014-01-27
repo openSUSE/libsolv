@@ -263,6 +263,8 @@ KNOWNID(PUBKEY_SUBKEYOF,	        "pubkey:subkeyof"),
 
 KNOWNID(DELTA_LOCATION_BASE,	        "delta:locbase"),	/* <location xml:base=... > */
 
+KNOWNID(PRODUCT_UPDATES_REPOID,	        "product:updates:repoid"),
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

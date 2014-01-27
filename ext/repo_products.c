@@ -58,6 +58,8 @@ enum state {
   STATE_TARGET,
   STATE_REGRELEASE,
   STATE_PRODUCTLINE,
+  STATE_REGUPDATES,
+  STATE_REGUPDREPO,
   NUMSTATES
 };
 
@@ -90,6 +92,8 @@ static struct stateswitch stateswitches[] = {
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
   { STATE_REGISTER,  "target",        STATE_TARGET,        1 },
   { STATE_REGISTER,  "release",       STATE_REGRELEASE,    1 },
+  { STATE_REGISTER,  "updates",       STATE_REGUPDATES,    0 },
+  { STATE_REGUPDATES, "repository",   STATE_REGUPDREPO,    0 },
   { NUMSTATES }
 };
 
@@ -218,6 +222,12 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_URL:
       pd->urltype = pool_str2id(pd->pool, find_attr("name", atts), 1);
       break;
+    case STATE_REGUPDREPO:
+      {
+        const char *repoid = find_attr("repoid", atts);
+	if (repoid && *repoid)
+          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_UPDATES_REPOID, repoid);
+      }
     default:
       break;
     }
