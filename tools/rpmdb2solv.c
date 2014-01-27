@@ -163,6 +163,7 @@ main(int argc, char **argv)
     pool_set_rootdir(pool, root);
 
   repo = repo_create(pool, "installed");
+  pool_set_installed(pool, repo);
   data = repo_add_repodata(repo, 0);
 
   if (!nopacks)
