@@ -73,6 +73,9 @@ repo_add_autopattern(Repo *repo, int flags)
   queue_init(&prdq);
   queue_init(&prdq2);
 
+  if (repo == pool->installed)
+    flags |= ADD_NO_AUTOPRODUCTS;	/* no auto products for installed repos */
+
   pattern_id = pool_str2id(pool, "pattern()", 9);
   product_id = pool_str2id(pool, "product()", 9);
   FOR_REPO_SOLVABLES(repo, p, s)
@@ -226,8 +229,8 @@ repo_add_autopattern(Repo *repo, int flags)
   queue_free(&patq);
   queue_free(&patq2);
 
-  if (repo == pool->installed)
-    queue_empty(&prdq2);	/* no auto products for installed repos */
+  if ((flags & ADD_NO_AUTOPRODUCTS) != 0)
+    queue_empty(&prdq2);
 
   for (i = 0; i < prdq2.count; i += 2)
     {

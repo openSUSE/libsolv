@@ -5,4 +5,6 @@
  * for further information
  */
 
+#define ADD_NO_AUTOPRODUCTS	(1 << 8)
+
 extern int repo_add_autopattern(Repo *repo, int flags);

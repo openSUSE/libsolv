@@ -163,7 +163,6 @@ main(int argc, char **argv)
     pool_set_rootdir(pool, root);
 
   repo = repo_create(pool, "installed");
-  pool_set_installed(pool, repo);
   data = repo_add_repodata(repo, 0);
 
   if (!nopacks)
@@ -217,7 +216,7 @@ main(int argc, char **argv)
 
 #ifdef SUSE
   if (add_auto)
-    repo_add_autopattern(repo, 0);
+    repo_add_autopattern(repo, ADD_NO_AUTOPRODUCTS);
 #endif
 
   tool_write(repo, basefile, 0);
