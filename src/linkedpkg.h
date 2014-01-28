@@ -30,6 +30,7 @@ extern void find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id
 extern void find_pattern_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Queue *qp);
 
 extern Id find_autopattern_name(Pool *pool, Solvable *s);
+extern Id find_autoproduct_name(Pool *pool, Solvable *s);
 
 /* generic */
 extern void find_package_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Queue *qp);

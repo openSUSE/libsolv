@@ -212,6 +212,9 @@ find_pattern_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
     *prvidp = aprel;
 }
 
+/* the following two functions are used in solvable_lookup_str_base to do
+ * translated lookups on the product/pattern packages
+ */
 Id
 find_autopattern_name(Pool *pool, Solvable *s)
 {
@@ -224,6 +227,22 @@ find_autopattern_name(Pool *pool, Solvable *s)
         Reldep *rd = GETRELDEP(pool, prv);
         if (rd->flags == REL_EQ && !strcmp(pool_id2str(pool, rd->name), "autopattern()"))
           return strncmp(pool_id2str(pool, rd->evr), "pattern:", 8) != 0 ? rd->evr : 0;
+      }
+  return 0;
+}
+
+Id
+find_autoproduct_name(Pool *pool, Solvable *s)
+{
+  Id prv, *prvp;
+  if (!s->provides)
+    return 0;
+  for (prvp = s->repo->idarraydata + s->provides; (prv = *prvp++) != 0; )
+    if (ISRELDEP(prv))
+      {
+        Reldep *rd = GETRELDEP(pool, prv);
+        if (rd->flags == REL_EQ && !strcmp(pool_id2str(pool, rd->name), "autoproduct()"))
+          return strncmp(pool_id2str(pool, rd->evr), "product:", 8) != 0 ? rd->evr : 0;
       }
   return 0;
 }

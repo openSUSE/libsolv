@@ -172,9 +172,18 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname, int usebase)
 	    return str;
 	}
 #ifdef ENABLE_LINKED_PKGS
-      /* autopattern translation magic */
-      if (pass && !strncmp("pattern:", pool_id2str(pool, name), 8) && (name = find_autopattern_name(pool, s)) != 0)
-	pass = -1;
+      /* autopattern/product translation magic */
+      if (pass)
+	{
+	  const char *n = pool_id2str(pool, name);
+	  if (*n == 'p')
+	    {
+	      if (!strncmp("pattern:", n, 8) && (name = find_autopattern_name(pool, s)) != 0)
+		pass = -1;
+	      if (!strncmp("product:", n, 8) && (name = find_autoproduct_name(pool, s)) != 0)
+		pass = -1;
+	    }
+	}
 #endif
     }
   return usebase ? basestr : 0;
