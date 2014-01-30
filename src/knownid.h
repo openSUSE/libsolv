@@ -264,6 +264,8 @@ KNOWNID(PUBKEY_SUBKEYOF,	        "pubkey:subkeyof"),
 KNOWNID(DELTA_LOCATION_BASE,	        "delta:locbase"),	/* <location xml:base=... > */
 
 KNOWNID(PRODUCT_UPDATES_REPOID,	        "product:updates:repoid"),
+KNOWNID(PRODUCT_UPDATES,	        "product:updates"),
+KNOWNID(PRODUCT_ENDOFLIFE,	        "product:endoflife"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 

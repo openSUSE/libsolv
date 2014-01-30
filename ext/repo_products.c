@@ -11,6 +11,9 @@
  * for further information
  */
 
+#define _GNU_SOURCE
+#define _XOPEN_SOURCE
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -60,6 +63,7 @@ enum state {
   STATE_PRODUCTLINE,
   STATE_REGUPDATES,
   STATE_REGUPDREPO,
+  STATE_ENDOFLIFE,
   NUMSTATES
 };
 
@@ -88,6 +92,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PRODUCT,   "linguas",       STATE_LINGUAS,       0 },
   { STATE_PRODUCT,   "updaterepokey", STATE_UPDATEREPOKEY, 1 },
   { STATE_PRODUCT,   "cpeid",         STATE_CPEID,         1 },
+  { STATE_PRODUCT,   "endoflife",     STATE_ENDOFLIFE,     1 },
   { STATE_URLS,      "url",           STATE_URL,           1 },
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
   { STATE_REGISTER,  "target",        STATE_TARGET,        1 },
@@ -152,6 +157,29 @@ find_attr(const char *txt, const char **atts)
   return 0;
 }
 
+static time_t
+datestr2timestamp(const char *date)
+{
+  const char *p; 
+  struct tm tm; 
+
+  if (!date || !*date)
+    return 0;
+  for (p = date; *p >= '0' && *p <= '9'; p++)
+    ;   
+  if (!*p)
+    return atoi(date);
+  memset(&tm, 0, sizeof(tm));
+  p = strptime(date, "%F%T", &tm);
+  if (!p)
+    {
+      memset(&tm, 0, sizeof(tm));
+      p = strptime(date, "%F", &tm);
+      if (!p || *p)
+	return 0;
+    }
+  return timegm(&tm);
+}
 
 /*
  * XML callback: startElement
@@ -226,7 +254,12 @@ startElement(void *userData, const char *name, const char **atts)
       {
         const char *repoid = find_attr("repoid", atts);
 	if (repoid && *repoid)
-          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_UPDATES_REPOID, repoid);
+	  {
+	    Id h = repodata_new_handle(pd->data);
+	    repodata_set_str(pd->data, h, PRODUCT_UPDATES_REPOID, repoid);
+	    repodata_add_flexarray(pd->data, pd->handle, PRODUCT_UPDATES, h);
+	  }
+	break;
       }
     default:
       break;
@@ -336,6 +369,15 @@ endElement(void *userData, const char *name)
     case STATE_CPEID:
       if (*pd->content)
         repodata_set_str(pd->data, pd->handle, SOLVABLE_CPEID, pd->content);
+      break;
+    case STATE_ENDOFLIFE:
+      if (*pd->content)
+	{
+	  time_t t = datestr2timestamp(pd->content);
+	  if (t)
+	    repodata_set_num(pd->data, pd->handle, PRODUCT_ENDOFLIFE, (unsigned long long)t);
+	}
+      break;
     default:
       break;
     }

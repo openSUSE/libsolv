@@ -5,6 +5,9 @@
  * for further information
  */
 
+#define _GNU_SOURCE
+#define _XOPEN_SOURCE
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -53,6 +56,30 @@ unescape(char *p)
       *q++ = *p++;
     }
   *q = 0;
+}
+
+static time_t
+datestr2timestamp(const char *date)
+{
+  const char *p; 
+  struct tm tm; 
+
+  if (!date || !*date)
+    return 0;
+  for (p = date; *p >= '0' && *p <= '9'; p++)
+    ;   
+  if (!*p)
+    return atoi(date);
+  memset(&tm, 0, sizeof(tm));
+  p = strptime(date, "%F%T", &tm);
+  if (!p)
+    {   
+      memset(&tm, 0, sizeof(tm));
+      p = strptime(date, "%F", &tm);
+      if (!p || *p) 
+        return 0;
+    }   
+  return timegm(&tm);
 }
 
 int
@@ -339,7 +366,17 @@ repo_add_autopattern(Repo *repo, int flags)
 	  else if (!strcmp(pn, "product-flags()") && evr)
 	    repodata_add_poolstr_array(data, s2 - pool->solvables, PRODUCT_FLAGS, newname);
 	  else if (!strcmp(pn, "product-updates-repoid()") && evr)
-	    repodata_add_poolstr_array(data, s2 - pool->solvables, PRODUCT_UPDATES_REPOID, newname);
+	    {
+	      Id h = repodata_new_handle(data);
+	      repodata_set_str(data, h, PRODUCT_UPDATES_REPOID, newname);
+	      repodata_add_flexarray(data, s2 - pool->solvables, PRODUCT_UPDATES, h);
+	    }
+	  else if (!strcmp(pn, "product-endoflife()") && evr)
+	    {
+	      time_t t = datestr2timestamp(newname);
+	      if (t)
+		repodata_set_num(data, s2 - pool->solvables, PRODUCT_ENDOFLIFE, t);
+	    }
 	  else if (!strncmp(pn, "product-url(", 12) && evr && pn[12] && pn[13] && strlen(pn + 12) < 32)
 	    {
 	      char type[34];
