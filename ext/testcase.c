@@ -125,6 +125,7 @@ static struct disttype2str {
   { DISTTYPE_RPM,  "rpm" },
   { DISTTYPE_DEB,  "deb" },
   { DISTTYPE_ARCH, "arch" },
+  { DISTTYPE_HAIKU, "haiku" },
   { 0, 0 }
 };
 
