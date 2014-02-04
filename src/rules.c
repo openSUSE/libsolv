@@ -1058,6 +1058,29 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
   if (!allow_all && !solv->dupmap_all && solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
     addduppackages(solv, s, &qs);
 
+#ifdef ENABLE_LINKED_PKGS
+  if (solv->instbuddy && solv->instbuddy[s - pool->solvables - solv->installed->start])
+    {
+      const char *name = pool_id2str(pool, s->name);
+      if (strncmp(name, "pattern:", 8) == 0 || strncmp(name, "application:", 12) == 0)
+	{
+	  /* a linked pseudo package. As it is linked, we do not need an update rule */
+	  /* nevertheless we set specialupdaters so we can update */
+	  solver_addrule(solv, 0, 0);
+	  if (!allow_all && qs.count)
+	    {
+	      if (p != -SYSTEMSOLVABLE)
+	        queue_unshift(&qs, p);
+	      if (!solv->specialupdaters)
+		solv->specialupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
+	      solv->specialupdaters[s - pool->solvables - solv->installed->start] = pool_queuetowhatprovides(pool, &qs);
+	    }
+	  queue_free(&qs);
+	  return;
+	}
+    }
+#endif
+
   if (!allow_all && qs.count && solv->multiversion.size)
     {
       int i, j;
@@ -1087,9 +1110,9 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	  if (d && solv->installed && s->repo == solv->installed &&
               (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
 	    {
-	      if (!solv->multiversionupdaters)
-		solv->multiversionupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
-	      solv->multiversionupdaters[s - pool->solvables - solv->installed->start] = d;
+	      if (!solv->specialupdaters)
+		solv->specialupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
+	      solv->specialupdaters[s - pool->solvables - solv->installed->start] = d;
 	    }
 	  if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
 	    {
@@ -1965,8 +1988,10 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	if (pool->solvables[p].repo == installed)
 	  {
 	    queue_push2(q, DISABLE_UPDATE, p);
+#ifdef ENABLE_LINKED_PKGS
 	    if (solv->instbuddy && solv->instbuddy[p - installed->start] > 1)
 	      queue_push2(q, DISABLE_UPDATE, solv->instbuddy[p - installed->start]);
+#endif
 	  }
       return;
     default:
@@ -2991,9 +3016,9 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	      if (!r->p)	/* identical to update rule? */
 		r = solv->rules + solv->updaterules + (p - installed->start);
 	    }
-	  if (solv->multiversionupdaters && (d = solv->multiversionupdaters[p - installed->start]) != 0 && r == solv->rules + solv->updaterules + (p - installed->start))
+	  if (solv->specialupdaters && (d = solv->specialupdaters[p - installed->start]) != 0 && r == solv->rules + solv->updaterules + (p - installed->start))
 	    {
-	      /* need to check multiversionupdaters */
+	      /* need to check specialupdaters */
 	      if (r->p == p)	/* be careful with the dup case */
 		queue_push(&q, p);
 	      while ((p2 = pool->whatprovidesdata[d++]) != 0)

@@ -1585,7 +1585,7 @@ solver_free(Solver *solv)
   solv_free(solv->watches);
   solv_free(solv->obsoletes);
   solv_free(solv->obsoletes_data);
-  solv_free(solv->multiversionupdaters);
+  solv_free(solv->specialupdaters);
   solv_free(solv->choicerules_ref);
   solv_free(solv->bestrules_pkg);
   solv_free(solv->instbuddy);
@@ -1900,7 +1900,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  for (pass = solv->updatemap.size ? 0 : 1; pass < 2; pass++)
 	    {
 	      int passlevel = level;
-	      Id *multiversionupdaters = solv->multiversion.size ? solv->multiversionupdaters : 0;
+	      Id *specialupdaters = solv->specialupdaters;
 	      if (pass == 1 && !solv->decisioncnt_keep)
 		solv->decisioncnt_keep = solv->decisionq.count;
 	      /* start with installedpos, the position that gave us problems the last time */
@@ -1915,7 +1915,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (s->repo != installed)
 		    continue;
 
-		  if (solv->decisionmap[i] > 0 && (!multiversionupdaters || !multiversionupdaters[i - installed->start]))
+		  if (solv->decisionmap[i] > 0 && (!specialupdaters || !specialupdaters[i - installed->start]))
 		    continue;		/* already decided */
 		  if (!pass && solv->updatemap.size && !MAPTST(&solv->updatemap, i - installed->start))
 		    continue;		/* updates first */
@@ -1925,16 +1925,17 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    rr -= solv->installed->end - solv->installed->start;
 		  if (!rr->p)		/* identical to update rule? */
 		    rr = r;
-		  if (!rr->p)
+		  if (!rr->p && (!specialupdaters || !specialupdaters[i - installed->start]))
 		    continue;		/* orpaned package */
 
 		  /* check if we should update this package to the latest version
 		   * noupdate is set for erase jobs, in that case we want to deinstall
-		   * the installed package and not replace it with a newer version */
+		   * the installed package and not replace it with a newer version
+		   * rr->p != i is for dup jobs where the installed package cannot be kept */
 		  queue_empty(&dq);
-		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || rr->p != i))
+		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || (rr->p && rr->p != i)))
 		    {
-		      if (multiversionupdaters && (d = multiversionupdaters[i - installed->start]) != 0)
+		      if (specialupdaters && (d = specialupdaters[i - installed->start]) != 0)
 			{
 			  /* special multiversion handling, make sure best version is chosen */
 			  if (rr->p == i && solv->decisionmap[i] >= 0)
@@ -1944,7 +1945,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			      queue_push(&dq, p);
 			  if (dq.count && solv->update_targets && solv->update_targets->elements[i - installed->start])
 			    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], &dq);
-			  if (dq.count)
+			  if (dq.count && rr->p)
 			    {
 			      policy_filter_unwanted(solv, &dq, POLICY_MODE_CHOOSE);
 			      p = dq.elements[0];
@@ -2153,9 +2154,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  continue;		/* start over */
 	}
 
-      /* at this point we have a consistent system. now do the extras... */
-
-      /* first decide leftover cleandeps packages */
+      /* decide leftover cleandeps packages */
       if (solv->cleandepsmap.size && solv->installed)
 	{
 	  for (p = solv->installed->start; p < solv->installed->end; p++)
@@ -2175,6 +2174,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  if (p < solv->installed->end)
 	    continue;
 	}
+
+      /* at this point we have a consistent system. now do the extras... */
 
       if (!solv->decisioncnt_weak)
         solv->decisioncnt_weak = solv->decisionq.count;
@@ -2490,7 +2491,25 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 	}
 
-     if (solv->installed && solv->cleandepsmap.size)
+     /* one final pass to make sure we decided all installed packages */
+      if (solv->installed)
+	{
+	  for (p = solv->installed->start; p < solv->installed->end; p++)
+	    {
+	      if (solv->decisionmap[p])
+		continue;	/* already decided */
+	      s = pool->solvables + p;
+	      if (s->repo != solv->installed)
+		continue;
+	      POOL_DEBUG(SOLV_DEBUG_SOLVER, "removing unwanted %s\n", pool_solvid2str(pool, p));
+	      olevel = level;
+	      level = setpropagatelearn(solv, level, -p, 0, 0);
+	      if (level < olevel)
+		break;
+	    }
+	}
+
+      if (solv->installed && solv->cleandepsmap.size)
 	{
 	  if (cleandeps_check_mistakes(solv, level))
 	    {
@@ -2500,7 +2519,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 	}
 
-     if (solv->solution_callback)
+      if (solv->solution_callback)
 	{
 	  solv->solution_callback(solv, solv->solution_callback_data);
 	  if (solv->branches.count)
@@ -2536,7 +2555,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	}
 
       /* auto-minimization step */
-     if (solv->branches.count)
+      if (solv->branches.count)
 	{
 	  int l = 0, lasti = -1, lastl = -1;
 	  Id why;
@@ -3123,7 +3142,7 @@ solver_solve(Solver *solv, Queue *job)
       map_empty(&solv->suggestsmap);
       solv->recommends_index = 0;
     }
-  solv->multiversionupdaters = solv_free(solv->multiversionupdaters);
+  solv->specialupdaters = solv_free(solv->specialupdaters);
 
 
   /*
@@ -3411,7 +3430,7 @@ solver_solve(Solver *solv, Queue *job)
 	    queue_push(&solv->orphaned, i);
           if (!r->p)
 	    {
-	      assert(solv->dupmap_all && !sr->p);
+	      /* assert(solv->dupmap_all && !sr->p); */
 	      continue;
 	    }
 	  if (!solver_rulecmp(solv, r, sr))

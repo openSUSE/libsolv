@@ -136,7 +136,7 @@ struct _Solver {
 
   Id *obsoletes;			/* obsoletes for each installed solvable */
   Id *obsoletes_data;			/* data area for obsoletes */
-  Id *multiversionupdaters;		/* updaters for multiversion packages in updatesystem mode */
+  Id *specialupdaters;			/* updaters for packages with a limited update rule */
 
   /*-------------------------------------------------------------------------------------------------------------
    * Solver configuration
