@@ -86,7 +86,7 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
     {
       FOR_PROVIDES(p, pp, prv)
 	if (pool->solvables[p].repo == s->repo)
-	  queue_push(qp, pp);
+	  queue_push(qp, p);
     }
   if (reqidp)
     *reqidp = req;
