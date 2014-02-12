@@ -287,21 +287,14 @@ pool_isknownarch(Pool *pool, Id id)
   return 1;
 }
 
-Id
-testcase_str2dep(Pool *pool, char *s)
+static Id
+testcase_str2dep_simple(Pool *pool, const char **sp)
 {
-  char *n, *a;
+  const char *s = *sp;
+  const char *n, *a;
   Id id, evr;
   int flags;
 
-  if ((n = strchr(s, '|')) != 0)
-    {
-      id = testcase_str2dep(pool, n + 1);
-      *n = 0;
-      id = pool_rel2id(pool, testcase_str2dep(pool, s), id, REL_OR, 1);
-      *n = '|';
-      return id;
-    }
   while (*s == ' ' || *s == '\t')
     s++;
   n = s;
@@ -311,9 +304,9 @@ testcase_str2dep(Pool *pool, char *s)
 	{
 	  while (*s && *s != ')')
 	    s++;
+	  continue;
 	}
-      else
-        s++;
+      s++;
     }
   if ((a = strchr(n, '.')) != 0 && a + 1 < s && s[-1] != ')')
     {
@@ -334,7 +327,10 @@ testcase_str2dep(Pool *pool, char *s)
   else
     id = pool_strn2id(pool, n, s - n, 1);
   if (!*s)
-    return id;
+    {
+      *sp = s;
+      return id;
+    }
   while (*s == ' ' || *s == '\t')
     s++;
   flags = 0;
@@ -355,7 +351,10 @@ testcase_str2dep(Pool *pool, char *s)
 	break;
     }
   if (!flags)
-    return id;
+    {
+      *sp = s;
+      return id;
+    }
   while (*s == ' ' || *s == '\t')
     s++;
   n = s;
@@ -372,7 +371,39 @@ testcase_str2dep(Pool *pool, char *s)
 	s++;
       evr = pool_rel2id(pool, evr, pool_strn2id(pool, n, s - n, 1), REL_COMPAT, 1);
     }
+  *sp = s;
   return pool_rel2id(pool, id, evr, flags, 1);
+}
+
+static Id
+testcase_str2dep_complex(Pool *pool, const char **sp)
+{
+  const char *s = *sp;
+  Id id;
+  id = testcase_str2dep_simple(pool, &s);
+  if (*s == '|')
+    {
+      s++;
+      id = pool_rel2id(pool, id, testcase_str2dep_complex(pool, &s), REL_OR, 1);
+    }
+  else if (*s == '&')
+    {
+      s++;
+      id = pool_rel2id(pool, id, testcase_str2dep_complex(pool, &s), REL_AND, 1);
+    }
+  else if (*s == 'I' && s[1] == 'F' && (s[2] == ' ' || s[2] == '\t'))
+    {
+      s += 2;
+      id = pool_rel2id(pool, id, testcase_str2dep_complex(pool, &s), REL_COND, 1);
+    }
+  *sp = s;
+  return id;
+}
+
+Id
+testcase_str2dep(Pool *pool, const char *s)
+{
+  return testcase_str2dep_complex(pool, &s);
 }
 
 const char *
