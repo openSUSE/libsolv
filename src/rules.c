@@ -50,11 +50,17 @@ dep_possible(Solver *solv, Id dep, Map *m)
     {
       Reldep *rd = GETRELDEP(pool, dep);
       if (rd->flags >= 8)
-	{
-	  if (rd->flags == REL_AND)
+	 {
+	  if (rd->flags == REL_AND || rd->flags == REL_COND)
 	    {
 	      if (!dep_possible(solv, rd->name, m))
 		return 0;
+	      return dep_possible(solv, rd->evr, m);
+	    }
+	  if (rd->flags == REL_OR)
+	    {
+	      if (dep_possible(solv, rd->name, m))
+		return 1;
 	      return dep_possible(solv, rd->evr, m);
 	    }
 	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
@@ -66,6 +72,18 @@ dep_possible(Solver *solv, Id dep, Map *m)
   FOR_PROVIDES(p, pp, dep)
     {
       if (MAPTST(m, p))
+	return 1;
+    }
+  return 0;
+}
+
+static inline int
+is_otherproviders_dep(Pool *pool, Id dep)
+{
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_OTHERPROVIDERS)
 	return 1;
     }
   return 0;
@@ -540,19 +558,11 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
 
-  /* 'work' queue. keeps Ids of solvables we still have to work on.
-     And buffer for it. */
-  Queue workq;
+  Queue workq;	/* list of solvables we still have to work on */
   Id workqbuf[64];
 
   int i;
-    /* if to add rules for broken deps ('rpm -V' functionality)
-     * 0 = yes, 1 = no
-     */
-  int dontfix;
-    /* Id var and pointer for each dependency
-     * (not used in parallel)
-     */
+  int dontfix;		/* ignore dependency errors for installed solvables */
   Id req, *reqp;
   Id con, *conp;
   Id obs, *obsp;
@@ -581,7 +591,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  MAPSET(m, n);			/* mark as visited */
 	}
 
-      s = pool->solvables + n;		/* s = Solvable in question */
+      s = pool->solvables + n;
 
       dontfix = 0;
       if (installed			/* Installed system available */
@@ -598,7 +608,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		? pool_disabled_solvable(pool, s)
 		: !pool_installable(pool, s))
 	    {
-	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables));
+	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvid2str(pool, n), n);
 	      addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOT_INSTALLABLE, 0);
 	    }
 	}
@@ -633,16 +643,12 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
                    * that are already broken. so if we find one provider
                    * that was already installed, we know that the
                    * dependency was not broken before so we enforce it */
-
-		  /* check if any of the providers for 'req' is installed */
 		  for (i = 0; (p = dp[i]) != 0; i++)
-		    {
-		      if (pool->solvables[p].repo == installed)
-			break;		/* provider was installed */
-		    }
-		  /* didn't find an installed provider: previously broken dependency */
+		    if (pool->solvables[p].repo == installed)
+		      break;		/* found installed provider */
 		  if (!p)
 		    {
+		      /* didn't find an installed provider: previously broken dependency */
 		      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "ignoring broken requires %s of installed package %s\n", pool_dep2str(pool, req), pool_solvable2str(pool, s));
 		      continue;
 		    }
@@ -650,8 +656,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 	      if (!*dp)
 		{
-		  /* nothing provides req! */
-		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvable2str(pool, s), (Id)(s - pool->solvables), pool_dep2str(pool, req));
+		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, n), n, pool_dep2str(pool, req));
 		  addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, req);
 		  continue;
 		}
@@ -667,20 +672,13 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
               /* rule: (-requestor|provider1|provider2|...|providerN) */
 	      addrpmrule(solv, -n, dp - pool->whatprovidesdata, SOLVER_RULE_RPM_PACKAGE_REQUIRES, req);
 
-	      /* descend the dependency tree
-	         push all non-visited providers on the work queue */
+	      /* push all non-visited providers on the work queue */
 	      if (m)
-		{
-		  for (; *dp; dp++)
-		    {
-		      if (!MAPTST(m, *dp))
-			queue_push(&workq, *dp);
-		    }
-		}
-
-	    } /* while, requirements of n */
-
-	} /* if, requirements */
+	        for (; *dp; dp++)
+		  if (!MAPTST(m, *dp))
+		    queue_push(&workq, *dp);
+	    }
+	}
 
       /* that's all we check for src packages */
       if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
@@ -714,24 +712,20 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  /* dontfix: dont care about conflicts with already installed packs */
 		  if (dontfix && pool->solvables[p].repo == installed)
 		    continue;
-		  /* p == n: self conflict */
-		  if (p == n && pool->forbidselfconflicts)
+		  if (p == n)		/* p == n: self conflict */
 		    {
-		      if (ISRELDEP(con))
-			{
-			  Reldep *rd = GETRELDEP(pool, con);
-			  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_OTHERPROVIDERS)
-			    continue;
-			}
-		      p = 0;	/* make it a negative assertion, aka 'uninstallable' */
+		      if (!pool->forbidselfconflicts || is_otherproviders_dep(pool, con))
+			continue;
+		      addrpmrule(solv, -n, 0, SOLVER_RULE_RPM_SELF_CONFLICT, con);
+		      continue;
 		    }
-		  if (p && ispatch && solv->multiversion.size && MAPTST(&solv->multiversion, p) && ISRELDEP(con))
+		  if (ispatch && solv->multiversion.size && MAPTST(&solv->multiversion, p) && ISRELDEP(con))
 		    {
 		      /* our patch conflicts with a multiversion package */
 		      p = -makemultiversionconflict(solv, p, con);
 		    }
-                 /* rule: -n|-p: either solvable _or_ provider of conflict */
-		  addrpmrule(solv, -n, -p, p ? SOLVER_RULE_RPM_PACKAGE_CONFLICT : SOLVER_RULE_RPM_SELF_CONFLICT, con);
+                  /* rule: -n|-p: either solvable _or_ provider of conflict */
+		  addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_PACKAGE_CONFLICT, con);
 		}
 	    }
 	}
@@ -2212,7 +2206,7 @@ addrpmruleinfo(Solver *solv, Id p, Id d, int type, Id dep)
       w2 = pool->whatprovidesdata[d];
       d = 0;
     }
-  if (p > 0 && d < 0)		/* this hack is used for buddy deps */
+  if (p > 0 && d < 0)		/* this hack is used for package links and complex deps */
     {
       w2 = p;
       p = d;
@@ -2297,33 +2291,25 @@ static void
 getrpmruleinfos(Solver *solv, Rule *r, Queue *rq)
 {
   Pool *pool = solv->pool;
-#ifdef ENABLE_LINKED_PKGS
-  Id l, d;
-#endif
+  Id l, pp;
   if (r->p >= 0)
     return;
   queue_push(rq, r - solv->rules);	/* push the rule we're interested in */
   solv->ruleinfoq = rq;
-  solver_addrpmrulesforsolvable(solv, pool->solvables - r->p, 0);
-  /* also try reverse direction for conflicts */
-  if ((r->d == 0 || r->d == -1) && r->w2 < 0)
-    solver_addrpmrulesforsolvable(solv, pool->solvables - r->w2, 0);
-#ifdef ENABLE_LINKED_PKGS
-  /* check linked packages */
-  d = 0;
-  if ((r->d == 0 || r->d == -1))
-    l = r->w2;
-  else
+  FOR_RULELITERALS(l, pp, r)
     {
-      d = r->d < 0 ? -r->d - 1 : r->d;
-      l = pool->whatprovidesdata[d++];
-    }
-  for (; l; l = (d ? pool->whatprovidesdata[d++] : 0))
-    {
-      if (l <= 0 || !strchr(pool_id2str(pool, pool->solvables[l].name), ':'))
+      if (l >= 0)
 	break;
-      if (has_package_link(pool, pool->solvables + l))
-        add_package_link(solv, pool->solvables + l, 0, 0);
+      solver_addrpmrulesforsolvable(solv, pool->solvables - l, 0);
+    }
+#ifdef ENABLE_LINKED_PKGS
+  FOR_RULELITERALS(l, pp, r)
+    {
+      if (l < 0 || l != r->p)
+	break;
+      if (!strchr(pool_id2str(pool, pool->solvables[l].name), ':') || !has_package_link(pool, pool->solvables + l))
+	break;
+      add_package_link(solv, pool->solvables + l, 0, 0);
     }
 #endif
   solv->ruleinfoq = 0;
