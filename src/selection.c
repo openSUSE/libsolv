@@ -998,8 +998,11 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
   if (sel1->count == 2 && (sel1->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_ALL)
     {
       /* XXX: not 100% correct, but very useful */
+      p = sel1->elements[0] & ~(SOLVER_SELECTMASK | SOLVER_SETMASK);	/* job & jobflags */
       queue_free(sel1);
       queue_init_clone(sel1, sel2);
+      for (i = 0; i < sel1->count; i += 2)
+        sel1->elements[i] = (sel1->elements[i] & (SOLVER_SELECTMASK | SOLVER_SETMASK)) | p ;
       return;
     }
   queue_init(&q1);
