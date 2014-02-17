@@ -2063,12 +2063,18 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  r = solv->rules + i;
 	  if (r->d < 0)		/* ignore disabled rules */
 	    continue;
-	  queue_empty(&dq);
+	  if (r->p < 0)		/* most common cases first */
+	    {
+	      if (r->d == 0 || solv->decisionmap[-r->p] <= 0)
+		continue;
+	    }
+	  if (dq.count)
+	    queue_empty(&dq);
 	  if (r->d == 0)
 	    {
 	      /* binary or unary rule */
-	      /* need two positive undecided literals */
-	      if (r->p < 0 || r->w2 <= 0)
+	      /* need two positive undecided literals, r->p already checked above */
+	      if (r->w2 <= 0)
 		continue;
 	      if (solv->decisionmap[r->p] || solv->decisionmap[r->w2])
 		continue;
@@ -2082,13 +2088,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
                * no positive literal is installed
 	       * i.e. the rule is not fulfilled and we
                * just need to decide on the positive literals
+	       * (decisionmap[-r->p] for the r->p < 0 case is already checked above)
                */
-	      if (r->p < 0)
-		{
-		  if (solv->decisionmap[-r->p] <= 0)
-		    continue;
-		}
-	      else
+	      if (r->p >= 0)
 		{
 		  if (solv->decisionmap[r->p] > 0)
 		    continue;
