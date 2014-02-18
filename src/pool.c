@@ -880,6 +880,10 @@ pool_is_kind(Pool *pool, Id name, Id kind)
  *
  * add packages fulfilling the relation to whatprovides array
  *
+ * some words about REL_AND and REL_IF: we assume the best case
+ * here, so that you get a "potential" result if you ask for a match.
+ * E.g. if you ask for "whatrequires A" and package X contains
+ * "Requires: A & B", you'll get "X" as an answer.
  */
 Id
 pool_addrelproviders(Pool *pool, Id d)
@@ -909,7 +913,6 @@ pool_addrelproviders(Pool *pool, Id d)
 
       switch (flags)
 	{
-	case REL_AND:
 	case REL_WITH:
 	  wp = pool_whatprovides(pool, name);
 	  pp2 = pool_whatprovides_ptr(pool, evr);
@@ -925,24 +928,43 @@ pool_addrelproviders(Pool *pool, Id d)
 		wp = 0;
 	    }
 	  break;
+
+	case REL_AND:
 	case REL_OR:
 	  wp = pool_whatprovides(pool, name);
-	  pp = pool->whatprovidesdata + wp;
-	  if (!*pp)
+	  if (!pool->whatprovidesdata[wp])
 	    wp = pool_whatprovides(pool, evr);
 	  else
 	    {
-	      int cnt;
-	      while ((p = *pp++) != 0)
-		queue_push(&plist, p);
-	      cnt = plist.count;
-	      pp = pool_whatprovides_ptr(pool, evr);
-	      while ((p = *pp++) != 0)
-		queue_pushunique(&plist, p);
-	      if (plist.count != cnt)
+	      /* sorted merge */
+	      pp2 = pool_whatprovides_ptr(pool, evr);
+	      pp = pool->whatprovidesdata + wp;
+	      while (*pp && *pp2)
+		{
+		  if (*pp < *pp2)
+		    queue_push(&plist, *pp++);
+		  else
+		    {
+		      if (*pp == *pp2)
+			pp++;
+		      queue_push(&plist, *pp2++);
+		    }
+		}
+	      while (*pp)
+	        queue_push(&plist, *pp++);
+	      while (*pp2)
+	        queue_push(&plist, *pp2++);
+	      /* if the number of elements did not change, we can reuse wp */
+	      if (pp - (pool->whatprovidesdata + wp) != plist.count)
 		wp = 0;
 	    }
 	  break;
+
+	case REL_COND:
+	  /* assume the condition is true */
+	  wp = pool_whatprovides(pool, name);
+	  break;
+
 	case REL_NAMESPACE:
 	  if (name == NAMESPACE_OTHERPROVIDERS)
 	    {
