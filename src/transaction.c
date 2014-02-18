@@ -261,13 +261,15 @@ transaction_type(Transaction *trans, Id p, int mode)
 
   if ((mode & SOLVER_TRANSACTION_RPM_ONLY) != 0)
     {
-      /* application wants to know what to feed to rpm */
+      /* application wants to know what to feed to the package manager */
+      if (is_pseudo_package(pool, s))
+	return SOLVER_TRANSACTION_IGNORE;
       if (type == SOLVER_TRANSACTION_ERASE || type == SOLVER_TRANSACTION_INSTALL || type == SOLVER_TRANSACTION_MULTIINSTALL)
 	return type;
       if (s->repo == pool->installed)
 	{
 	  /* check if we're a real package that is obsoleted by pseudos */
-	  if (!is_pseudo_package(pool, s) && obsoleted_by_pseudos_only(trans, s - pool->solvables))
+	  if (obsoleted_by_pseudos_only(trans, s - pool->solvables))
 	    return SOLVER_TRANSACTION_ERASE;
 	  return SOLVER_TRANSACTION_IGNORE;	/* ignore as we're being obsoleted */
 	}
