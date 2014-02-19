@@ -62,7 +62,7 @@
 #define TAG_BUILDTIME		1006
 #define TAG_BUILDHOST		1007
 #define TAG_INSTALLTIME		1008
-#define TAG_SIZE                1009
+#define TAG_SIZE		1009
 #define TAG_DISTRIBUTION	1010
 #define TAG_VENDOR		1011
 #define TAG_LICENSE		1014
@@ -103,14 +103,14 @@
 #define TAG_BASENAMES		1117
 #define TAG_DIRNAMES		1118
 #define TAG_PAYLOADFORMAT	1124
-#define TAG_PATCHESNAME         1133
+#define TAG_PATCHESNAME		1133
 #define TAG_FILECOLORS		1140
-#define TAG_SUGGESTSNAME	1156
-#define TAG_SUGGESTSVERSION	1157
-#define TAG_SUGGESTSFLAGS	1158
-#define TAG_ENHANCESNAME	1159
-#define TAG_ENHANCESVERSION	1160
-#define TAG_ENHANCESFLAGS	1161
+#define TAG_OLDSUGGESTSNAME	1156
+#define TAG_OLDSUGGESTSVERSION	1157
+#define TAG_OLDSUGGESTSFLAGS	1158
+#define TAG_OLDENHANCESNAME	1159
+#define TAG_OLDENHANCESVERSION	1160
+#define TAG_OLDENHANCESFLAGS	1161
 
 /* rpm5 tags */
 #define TAG_DISTEPOCH		1218
@@ -118,6 +118,18 @@
 /* rpm4 tags */
 #define TAG_LONGFILESIZES	5008
 #define TAG_LONGSIZE		5009
+#define TAG_RECOMMENDNAME	5046
+#define TAG_RECOMMENDVERSION	5047
+#define TAG_RECOMMENDFLAGS	5048
+#define TAG_SUGGESTNAME		5049
+#define TAG_SUGGESTVERSION	5050
+#define TAG_SUGGESTFLAGS	5051
+#define TAG_SUPPLEMENTNAME	5052
+#define TAG_SUPPLEMENTVERSION	5053
+#define TAG_SUPPLEMENTFLAGS	5054
+#define TAG_ENHANCENAME		5055
+#define TAG_ENHANCEVERSION	5056
+#define TAG_ENHANCEFLAGS	5057
 
 /* signature tags */
 #define	TAG_SIGBASE		256
@@ -140,9 +152,9 @@
 
 
 #ifdef RPM5
-# define RPM_INDEX_SIZE 4
+# define RPM_INDEX_SIZE 4	/* just the rpmdbid */
 #else
-# define RPM_INDEX_SIZE 8
+# define RPM_INDEX_SIZE 8	/* rpmdbid + array index */
 #endif
 
 
@@ -393,10 +405,6 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
 }
 
 
-#define MAKEDEPS_FILTER_WEAK	(1 << 0)
-#define MAKEDEPS_FILTER_STRONG	(1 << 1)
-#define MAKEDEPS_NO_RPMLIB	(1 << 2)
-
 /*
  * strong: 0: ignore strongness
  *         1: filter to strong
@@ -411,10 +419,42 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   int haspre, premask;
   unsigned int olddeps;
   Id *ida;
-  int strong;
+  int strong = 0;
 
-  strong = flags & (MAKEDEPS_FILTER_STRONG|MAKEDEPS_FILTER_WEAK);
   n = headstringarray(rpmhead, tagn, &nc);
+  if (!n)
+    {
+      switch (tagn)
+	{
+	case TAG_SUGGESTNAME:
+	  tagn = TAG_OLDSUGGESTSNAME;
+	  tagv = TAG_OLDSUGGESTSVERSION;
+	  tagf = TAG_OLDSUGGESTSFLAGS;
+	  strong = -1;
+	  break;
+	case TAG_ENHANCENAME:
+	  tagn = TAG_OLDENHANCESNAME;
+	  tagv = TAG_OLDENHANCESVERSION;
+	  tagf = TAG_OLDENHANCESFLAGS;
+	  strong = -1;
+	  break;
+	case TAG_RECOMMENDNAME:
+	  tagn = TAG_OLDSUGGESTSNAME;
+	  tagv = TAG_OLDSUGGESTSVERSION;
+	  tagf = TAG_OLDSUGGESTSFLAGS;
+	  strong = 1;
+	  break;
+	case TAG_SUPPLEMENTNAME:
+	  tagn = TAG_OLDENHANCESNAME;
+	  tagv = TAG_OLDENHANCESVERSION;
+	  tagf = TAG_OLDENHANCESFLAGS;
+	  strong = 1;
+	  break;
+	default:
+	  return 0;
+	}
+      n = headstringarray(rpmhead, tagn, &nc);
+    }
   if (!n || !nc)
     return 0;
   vc = fc = 0;
@@ -433,16 +473,16 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 
   cc = nc;
   haspre = 0;	/* add no prereq marker */
-  premask = DEP_PRE_IN | DEP_PRE_UN;
-  if (flags)
+  premask = tagn == TAG_REQUIRENAME ? DEP_PRE_IN | DEP_PRE_UN : 0;
+  if ((flags & RPM_ADD_NO_RPMLIBREQS) || strong)
     {
       /* we do filtering */
       cc = 0;
       for (i = 0; i < nc; i++)
 	{
-	  if (strong && (f[i] & DEP_STRONG) != (strong == MAKEDEPS_FILTER_WEAK ? 0 : DEP_STRONG))
+	  if (strong && (f[i] & DEP_STRONG) != (strong < 0 ? 0 : DEP_STRONG))
 	    continue;
-	  if ((flags & MAKEDEPS_NO_RPMLIB) != 0)
+	  if ((flags & RPM_ADD_NO_RPMLIBREQS) != 0)
 	    if (!strncmp(n[i], "rpmlib(", 7))
 	      continue;
 	  if ((f[i] & premask) != 0)
@@ -450,7 +490,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	  cc++;
 	}
     }
-  else if (tagn == TAG_REQUIRENAME)
+  else if (premask)
     {
       /* no filtering, just look for the first prereq */
       for (i = 0; i < nc; i++)
@@ -480,31 +520,34 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	  i = 0;
 	  *ida++ = SOLVABLE_PREREQMARKER;
 	}
-      if (strong && (f[i] & DEP_STRONG) != (strong == MAKEDEPS_FILTER_WEAK ? 0 : DEP_STRONG))
+      if (strong && (f[i] & DEP_STRONG) != (strong < 0 ? 0 : DEP_STRONG))
 	continue;
-      if (haspre == 1 && (f[i] & premask) != 0)
-	continue;
-      if (haspre == 2 && (f[i] & premask) == 0)
-	continue;
-      if ((flags & MAKEDEPS_NO_RPMLIB) != 0)
+      if (haspre)
+	{
+	  if (haspre == 1 && (f[i] & premask) != 0)
+	    continue;
+	  if (haspre == 2 && (f[i] & premask) == 0)
+	    continue;
+	}
+      if ((flags & RPM_ADD_NO_RPMLIBREQS) != 0)
 	if (!strncmp(n[i], "rpmlib(", 7))
 	  continue;
       if (f[i] & (DEP_LESS|DEP_GREATER|DEP_EQUAL))
 	{
 	  Id name, evr;
-	  int flags = 0;
+	  int fl = 0;
 	  if ((f[i] & DEP_LESS) != 0)
-	    flags |= REL_LT;
+	    fl |= REL_LT;
 	  if ((f[i] & DEP_EQUAL) != 0)
-	    flags |= REL_EQ;
+	    fl |= REL_EQ;
 	  if ((f[i] & DEP_GREATER) != 0)
-	    flags |= REL_GT;
+	    fl |= REL_GT;
 	  name = pool_str2id(pool, n[i], 1);
 	  if (v[i][0] == '0' && v[i][1] == ':' && v[i][2])
 	    evr = pool_str2id(pool, v[i] + 2, 1);
 	  else
 	    evr = pool_str2id(pool, v[i], 1);
-	  *ida++ = pool_rel2id(pool, name, evr, flags, 1);
+	  *ida++ = pool_rel2id(pool, name, evr, fl, 1);
 	}
       else
         *ida++ = pool_str2id(pool, n[i], 1);
@@ -855,14 +898,15 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
   if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, (flags & RPM_ADD_NO_RPMLIBREQS) ? MAKEDEPS_NO_RPMLIB : 0);
+  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, flags);
   s->conflicts = makedeps(pool, repo, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0);
   s->obsoletes = makedeps(pool, repo, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0);
 
-  s->recommends = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, MAKEDEPS_FILTER_STRONG);
-  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTSNAME, TAG_SUGGESTSVERSION, TAG_SUGGESTSFLAGS, MAKEDEPS_FILTER_WEAK);
-  s->supplements = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, MAKEDEPS_FILTER_STRONG);
-  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCESNAME, TAG_ENHANCESVERSION, TAG_ENHANCESFLAGS, MAKEDEPS_FILTER_WEAK);
+  s->recommends = makedeps(pool, repo, rpmhead, TAG_RECOMMENDNAME, TAG_RECOMMENDVERSION, TAG_RECOMMENDFLAGS, 0);
+  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTNAME, TAG_SUGGESTVERSION, TAG_SUGGESTFLAGS, 0);
+  s->supplements = makedeps(pool, repo, rpmhead, TAG_SUPPLEMENTNAME, TAG_SUPPLEMENTVERSION, TAG_SUPPLEMENTFLAGS, 0);
+  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCENAME, TAG_ENHANCEVERSION, TAG_ENHANCEFLAGS, 0);
+
   s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
   s->conflicts = repo_fix_conflicts(repo, s->conflicts);
 
