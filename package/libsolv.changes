@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Fri Feb 21 16:23:58 CET 2014 - mls@suse.de
+
+- fix bug in solver_get_unneeded that could lead to an
+  endless loop [bnc#828764]
+- adapt to new rpm tags for weak dependencies
+- fix pseudo packages obsoleting other pseudo packages
+- optimize unfulfilled rule handling a bit
+- bump version to 0.4.5
+
+-------------------------------------------------------------------
 Fri Feb 14 11:03:18 CET 2014 - mls@suse.de
 
 - always keep job/jobflags in selection_filter()
