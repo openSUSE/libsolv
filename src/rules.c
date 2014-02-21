@@ -3905,8 +3905,8 @@ solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
 			/* now add edge from j + 1 to i + 1 */
 			queue_insert(&edges, edges.elements[j + 1] + nrequires[j], i + 1);
 			/* addapt following edge pointers */
-			for (k = j + 2; k < count + 2; k++)
-			  edges.elements[k]++;
+			for (j = j + 2; j < count + 1; j++)
+			  edges.elements[j]++;
 		      }
 		    queue_free(&iq);
 		  }
@@ -3921,7 +3921,7 @@ solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
 	  printf("  %s (%d requires):\n", pool_solvid2str(pool, unneededq->elements[i]), nrequires[i]);
 	  for (j = edges.elements[i + 1]; edges.elements[j]; j++)
 	    printf("    - %s\n", pool_solvid2str(pool, unneededq->elements[edges.elements[j] - 1]));
-    }
+        }
 #endif
       map_free(&installedm);
 
