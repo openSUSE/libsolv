@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Fri Feb 21 17:55:12 CET 2014 - mls@suse.de
+
+- fix bug in solver_get_unneeded that could lead to an
+  endless loop [bnc#828764]
+- fix typos in pool_job2str
+- make addfilelist more resistant against corrupt rpms
+- fix pseudo packages obsoleting other pseudo packages
+- bump version to 0.3.3
+
+-------------------------------------------------------------------
 Tue Sep  3 16:24:45 CEST 2013 - mls@suse.de
 
 - fix pattern obsoleting real packages [bnc#834376]
