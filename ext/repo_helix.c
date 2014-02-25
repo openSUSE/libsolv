@@ -100,6 +100,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_SUBCHANNEL,  "atom",            STATE_PACKAGE, 0 },
   { STATE_SUBCHANNEL,  "patch",           STATE_PACKAGE, 0 },
   { STATE_SUBCHANNEL,  "product",         STATE_PACKAGE, 0 },
+  { STATE_SUBCHANNEL,  "application",     STATE_PACKAGE, 0 },
   { STATE_PACKAGE,     "name",            STATE_NAME, 1 },
   { STATE_PACKAGE,     "vendor",          STATE_VENDOR, 1 },
   { STATE_PACKAGE,     "buildtime",       STATE_BUILDTIME, 1 },
@@ -461,6 +462,8 @@ startElement(void *userData, const char *name, const char **atts)
         pd->kind = "product";
       else if (!strcmp(name, "patch"))
         pd->kind = "patch";
+      else if (!strcmp(name, "application"))
+        pd->kind = "application";
       else
         pd->kind = NULL;	       /* default is package */
       pd->levrspace = 1;
