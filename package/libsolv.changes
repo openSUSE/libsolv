@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Feb 26 15:08:35 CET 2014 - mls@suse.de
+
+- improve appdata.xml parsing [bnc#865293]
+- repo_helix: parse application elements
+- bump version to 0.5.0
+
+-------------------------------------------------------------------
 Fri Feb 21 16:23:58 CET 2014 - mls@suse.de
 
 - fix bug in solver_get_unneeded that could lead to an
