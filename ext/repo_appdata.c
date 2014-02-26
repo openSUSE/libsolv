@@ -95,6 +95,13 @@ struct parsedata {
 
   char *description;
   int licnt;
+  int skip_tag;
+  int skip_tag_d;
+  int skip_tag_li;
+
+  int flags;
+  char *desktop_file;
+  int havesummary;
 };
 
 
@@ -155,12 +162,37 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_APPLICATION:
       s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
       pd->handle = s - pool->solvables;
+      pd->havesummary = 0;
+      break;
+    case STATE_NAME:
+    case STATE_SUMMARY:
+      pd->skip_tag = 0;
+      if (find_attr("xml:lang", atts))
+        pd->skip_tag = 1;
       break;
     case STATE_DESCRIPTION:
+      pd->skip_tag_d = 0;
+      if (find_attr("xml:lang", atts))
+        pd->skip_tag_d = 1;
       pd->description = solv_free(pd->description);
       break;
     case STATE_OL:
+    case STATE_UL:
+      pd->skip_tag = 0;
+      if (find_attr("xml:lang", atts))
+        pd->skip_tag = 1;
       pd->licnt = 0;
+      break;
+    case STATE_P:
+      pd->skip_tag = 0;
+      if (find_attr("xml:lang", atts))
+        pd->skip_tag = 1;
+      break;
+    case STATE_UL_LI:
+    case STATE_OL_LI:
+      pd->skip_tag_li = 0;
+      if (find_attr("xml:lang", atts))
+        pd->skip_tag_li = 1;
       break;
     default:
       break;
@@ -216,6 +248,79 @@ indent(struct parsedata *pd, int il)
     }
 }
 
+static void
+add_missing_tags_from_desktop_file(struct parsedata *pd, Solvable *s, const char *desktop_file)
+{
+  Pool *pool = pd->pool;
+  FILE *fp;
+  const char *filepath;
+  char buf[1024];
+  char *p, *p2, *p3;
+  int inde = 0;
+
+  filepath = pool_tmpjoin(pool, "/usr/share/applications/", desktop_file, 0);
+  if (pd->flags & REPO_USE_ROOTDIR)
+    filepath = pool_prepend_rootdir_tmp(pool, filepath);
+  if (!(fp = fopen(filepath, "r")))
+    return;
+  while (fgets(buf, sizeof(buf), fp) > 0)
+    {
+      int c, l = strlen(buf);
+      if (!l)
+	continue;
+      if (buf[l - 1] != '\n')
+	{
+	  /* ignore overlong lines */
+	  while ((c = getc(fp)) != EOF)
+	    if (c == '\n')
+	      break;
+	  if (c == EOF)
+	    break;
+	  continue;
+	}
+      buf[--l] = 0;
+      while (l && (buf[l - 1] == ' ' || buf[l - 1] == '\t'))
+        buf[--l] = 0;
+      p = buf;
+      while (*p == ' ' || *p == '\t')
+	p++;
+      if (!*p || *p == '#')
+	continue;
+      if (*p == '[')
+	inde = 0;
+      if (!strcmp(p, "[Desktop Entry]"))
+	{
+	  inde = 1;
+	  continue;
+	}
+      if (!inde)
+	continue;
+      p2 = strchr(p, '=');
+      if (!p2 || p2 == p)
+	continue;
+      *p2 = 0;
+      for (p3 = p2 - 1; *p3 == ' ' || *p3 == '\t'; p3--)
+	*p3 = 0;
+      p2++;
+      while (*p2 == ' ' || *p2 == '\t')
+	p2++;
+      if (!*p2)
+	continue;
+      if (!s->name && !strcmp(p, "Name"))
+	s->name = pool_str2id(pool, pool_tmpjoin(pool, "application:", p2, 0), 1);
+      else if (!pd->havesummary && !strcmp(p, "Comment"))
+	{
+	  pd->havesummary = 1;
+	  repodata_set_str(pd->data, pd->handle, SOLVABLE_SUMMARY, p2);
+	}
+      else
+	continue;
+      if (s->name && pd->havesummary)
+	break;	/* our work is done */
+    }
+  fclose(fp);
+}
+
 static void XMLCALL
 endElement(void *userData, const char *name)
 {
@@ -246,25 +351,42 @@ endElement(void *userData, const char *name)
 	s->arch = ARCH_NOARCH;
       if (!s->evr)
 	s->evr = ID_EMPTY;
+      if ((!s->name || !pd->havesummary) && (pd->flags & APPDATA_CHECK_DESKTOP_FILE) != 0 && pd->desktop_file)
+	add_missing_tags_from_desktop_file(pd, s, pd->desktop_file);
+      if (!s->name && pd->desktop_file)
+	{
+          char *name = pool_tmpjoin(pool, "application:", pd->desktop_file, 0);
+	  int l = strlen(name);
+	  if (l > 8 && !strcmp(".desktop", name + l - 8))
+	    l -= 8;
+	  s->name = pool_strn2id(pool, name, l, 1);
+	}
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->solvable = 0;
+      pd->desktop_file = solv_free(pd->desktop_file);
       break;
     case STATE_ID:
+      pd->desktop_file = solv_strdup(pd->content);
       if (pd->lcontent > 8 && !strcmp(".desktop", pd->content + pd->lcontent - 8))
 	pd->content[pd->lcontent - 8] = 0;
-      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "appdata(", pd->content, ")"), 1);
+      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "appdata(", pd->content, ".appdata.xml)"), 1);
       s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
-      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "application-appdata(", pd->content, ")"), 1);
+      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "application-appdata(", pd->content, ".appdata.xml)"), 1);
       s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
       break;
     case STATE_NAME:
+      if (pd->skip_tag)
+	break;
       s->name = pool_str2id(pd->pool, pool_tmpjoin(pool, "application:", pd->content, 0), 1);
       break;
     case STATE_LICENCE:
       repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_LICENSE, pd->content);
       break;
     case STATE_SUMMARY:
+      if (pd->skip_tag)
+	break;
+      pd->havesummary = 1;
       repodata_set_str(pd->data, pd->handle, SOLVABLE_SUMMARY, pd->content);
       break;
     case STATE_URL:
@@ -274,7 +396,7 @@ endElement(void *userData, const char *name)
       repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_GROUP, pd->content);
       break;
     case STATE_DESCRIPTION:
-      if (pd->description)
+      if (pd->description && !pd->skip_tag_d)
 	{
 	  /* strip trailing newlines */
 	  int l = strlen(pd->description);
@@ -284,16 +406,22 @@ endElement(void *userData, const char *name)
 	}
       break;
     case STATE_P:
+      if (pd->skip_tag)
+	break;
       wsstrip(pd);
       pd->description = solv_dupappend(pd->description, pd->content, "\n\n");
       break;
     case STATE_UL_LI:
+      if (pd->skip_tag || pd->skip_tag_li)
+	break;
       wsstrip(pd);
       indent(pd, 4);
       pd->content[2] = '-';
       pd->description = solv_dupappend(pd->description, pd->content, "\n");
       break;
     case STATE_OL_LI:
+      if (pd->skip_tag || pd->skip_tag_li)
+	break;
       wsstrip(pd);
       indent(pd, 4);
       if (++pd->licnt >= 10)
@@ -304,6 +432,8 @@ endElement(void *userData, const char *name)
       break;
     case STATE_UL:
     case STATE_OL:
+      if (pd->skip_tag)
+	break;
       pd->description = solv_dupappend(pd->description, "\n", 0);
       break;
     default:
@@ -358,6 +488,7 @@ repo_add_appdata(Repo *repo, FILE *fp, int flags)
   pd.repo = repo;
   pd.pool = repo->pool;
   pd.data = data;
+  pd.flags = flags;
 
   pd.content = malloc(256);
   pd.acontent = 256;
@@ -391,7 +522,9 @@ repo_add_appdata(Repo *repo, FILE *fp, int flags)
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 
-  free(pd.content);
+  solv_free(pd.content);
+  solv_free(pd.desktop_file);
+  solv_free(pd.description);
   return ret;
 }
 
@@ -427,10 +560,12 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
 	      pool_error(repo->pool, 0, "%s: %s", n, strerror(errno));
 	      continue;
 	    }
-	  repo_add_appdata(repo, fp, flags | REPO_NO_INTERNALIZE | REPO_REUSE_REPODATA);
+	  repo_add_appdata(repo, fp, flags | REPO_NO_INTERNALIZE | REPO_REUSE_REPODATA | APPDATA_CHECK_DESKTOP_FILE);
 	  fclose(fp);
 	}
+      closedir(dir);
     }
+  solv_free(dirpath);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return 0;
