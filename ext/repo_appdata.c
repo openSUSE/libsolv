@@ -368,8 +368,17 @@ endElement(void *userData, const char *name)
       break;
     case STATE_ID:
       pd->desktop_file = solv_strdup(pd->content);
+      /* guess the appdata.xml file name from the id element */
       if (pd->lcontent > 8 && !strcmp(".desktop", pd->content + pd->lcontent - 8))
 	pd->content[pd->lcontent - 8] = 0;
+      else if (pd->lcontent > 4 && !strcmp(".ttf", pd->content + pd->lcontent - 4))
+	pd->content[pd->lcontent - 4] = 0;
+      else if (pd->lcontent > 4 && !strcmp(".otf", pd->content + pd->lcontent - 4))
+	pd->content[pd->lcontent - 4] = 0;
+      else if (pd->lcontent > 4 && !strcmp(".xml", pd->content + pd->lcontent - 4))
+	pd->content[pd->lcontent - 4] = 0;
+      else if (pd->lcontent > 3 && !strcmp(".db", pd->content + pd->lcontent - 3))
+	pd->content[pd->lcontent - 3] = 0;
       id = pool_str2id(pd->pool, pool_tmpjoin(pool, "appdata(", pd->content, ".appdata.xml)"), 1);
       s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
       id = pool_str2id(pd->pool, pool_tmpjoin(pool, "application-appdata(", pd->content, ".appdata.xml)"), 1);
