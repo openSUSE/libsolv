@@ -1752,11 +1752,9 @@ rb_eval_string(
     }
   }
 #endif
-
 #ifdef SWIGPERL
   perliter(solv::Dataiterator)
 #endif
-
   %newobject __next__;
   Datamatch *__next__() {
     Dataiterator *ndi;
@@ -1986,7 +1984,6 @@ rb_eval_string(
     }
   }
 #endif
-
 #ifdef SWIGPERL
   perliter(solv::Pool_solvable_iterator)
 #endif
@@ -2046,6 +2043,9 @@ rb_eval_string(
     }
   }
 #endif
+#ifdef SWIGPERL
+  perliter(solv::Pool_repo_iterator)
+#endif
   %newobject __next__;
   Repo *__next__() {
     Pool *pool = $self->pool;
@@ -2102,6 +2102,9 @@ rb_eval_string(
       return NULL;
     }
   }
+#endif
+#ifdef SWIGPERL
+  perliter(solv::Repo_solvable_iterator)
 #endif
   %newobject __next__;
   XSolvable *__next__() {
