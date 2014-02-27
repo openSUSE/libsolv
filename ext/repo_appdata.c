@@ -62,6 +62,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_START,       "application",   STATE_APPLICATION,   0 },
   { STATE_APPLICATION, "id",            STATE_ID,            1 },
   { STATE_APPLICATION, "licence",       STATE_LICENCE,       1 },
+  { STATE_APPLICATION, "product_license", STATE_LICENCE,       1 },
   { STATE_APPLICATION, "name",          STATE_NAME,          1 },
   { STATE_APPLICATION, "summary",       STATE_SUMMARY,       1 },
   { STATE_APPLICATION, "description",   STATE_DESCRIPTION,   0 },
