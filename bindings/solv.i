@@ -1902,7 +1902,11 @@ rb_eval_string(
    return $self->kv.id;
   }
   const char *idstr() {
-   return pool_id2str($self->pool, $self->kv.id);
+   if ($self->data && ($self->key->type == REPOKEY_TYPE_DIR || $self->key->type == REPOKEY_TYPE_DIRSTRARRAY || $self->key->type == REPOKEY_TYPE_DIRNUMNUMARRAY))
+      return repodata_dir2str($self->data,  $self->kv.id, 0);
+    if ($self->data && $self->data->localpool)
+      return stringpool_id2str(&self->data->spool, $self->kv.id);
+    return pool_id2str($self->pool, $self->kv.id);
   }
   const char *str() {
    return $self->kv.str;
