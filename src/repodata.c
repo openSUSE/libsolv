@@ -1091,7 +1091,8 @@ solvabledata_fetch(Solvable *s, KeyValue *kv, Id keyname)
 int
 datamatcher_init(Datamatcher *ma, const char *match, int flags)
 {
-  ma->match = match ? solv_strdup(match) : 0;
+  match = match ? solv_strdup(match) : 0;
+  ma->match = match;
   ma->flags = flags;
   ma->error = 0;
   ma->matchdata = 0;
