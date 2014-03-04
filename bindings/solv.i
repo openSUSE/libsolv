@@ -1956,9 +1956,10 @@ rb_eval_string(
   %rename("str") __str__;
 #endif
   const char *__str__() {
-    if (!repodata_stringify($self->pool, $self->data, $self->key, &$self->kv, $self->flags))
+    KeyValue kv = $self->kv;
+    if (!repodata_stringify($self->pool, $self->data, $self->key, &kv, SEARCH_FILES | SEARCH_CHECKSUMS))
       return "";
-    return $self->kv.str;
+    return kv.str;
   }
 }
 
