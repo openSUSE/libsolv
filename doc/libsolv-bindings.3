@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 01/21/2014
+.\"      Date: 03/04/2014
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "01/21/2014" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "03/04/2014" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1003,7 +1003,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBDataiterator Dataiterator(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+\fBDataiterator Dataiterator(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
 my \fI$di\fR \fB=\fR \fI$pool\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
 \fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -1626,7 +1626,7 @@ Create a Selection consisting of all packages in the repository\&.
 .RS 4
 .\}
 .nf
-\fBDataiterator Dataiterator(Id\fR \fIp\fR\fB, Id\fR \fIkey\fR\fB, const char *\fR\fImatch\fR\fB, int\fR \fIflags\fR\fB)\fR
+\fBDataiterator Dataiterator(Id\fR \fIp\fR\fB, Id\fR \fIkey\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
 my \fI$di\fR \fB=\fR \fI$repo\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
 \fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -2271,6 +2271,33 @@ my \fB(\fR\fI$location\fR\fB,\fR \fI$medianr\fR\fB) =\fR \fI$solvable\fR\fB\->lo
 .\}
 .sp
 Return a tuple containing the on\-media location and an optional media number for multi\-part repositories (e\&.g\&. repositories spawning multiple DVDs)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDataiterator Dataiterator(Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
+my \fI$di\fR \fB=\fR \fI$solvable\fR\fB\->Dataiterator(\fR\fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIdi\fR \fB=\fR \fIsolvable\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIdi\fR \fB=\fR \fIsolvable\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor my\fR \fI$d\fR \fB(\fR\fI@$di\fR\fB)\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR\fB:\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterate over the matching data elements\&. See the Dataiterator class for more information\&.
 .sp
 .if n \{\
 .RS 4
@@ -5413,6 +5440,33 @@ my \fI$chksum\fR \fB=\fR \fI$datapos\fR\fB\->lookup_checksum(\fR\fI$keyname\fR\f
 .\}
 .sp
 Lookup functions\&. Note that the returned Ids are always translated into the Ids of the global pool even if the repodata area contains its own pool\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDataiterator Dataiterator(Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
+my \fI$di\fR \fB=\fR \fI$datapos\fR\fB\->Dataiterator(\fR\fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIdi\fR \fB=\fR \fIdatapos\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIdi\fR \fB=\fR \fIdatapos\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor my\fR \fI$d\fR \fB(\fR\fI@$di\fR\fB)\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR\fB:\fR
+\fBfor\fR \fId\fR \fBin\fR \fIdi\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterate over the matching data elements\&. See the Dataiterator class for more information\&.
 .SH "AUTHOR"
 .sp
 Michael Schroeder <mls@suse\&.de>

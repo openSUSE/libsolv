@@ -566,7 +566,7 @@ desired solvable by Id.
 Lookup functions. Return the data element stored in the specified solvable.
 You should probably use the methods of the Solvable class instead.
 
-	Dataiterator Dataiterator(Id solvid, Id keyname, const char *match, int flags)
+	Dataiterator Dataiterator(Id solvid, Id keyname, const char *match = 0, int flags = 0)
 	my $di = $pool->Dataiterator($solvid, $keyname, $match, $flags);
 	di = pool.Dataiterator(solvid, keyname, match, flags)
 	di = pool.Dataiterator(solvid, keyname, match, flags)
@@ -935,7 +935,7 @@ areas.
 
 Create a Selection consisting of all packages in the repository.
 
-	Dataiterator Dataiterator(Id p, Id key, const char *match, int flags)
+	Dataiterator Dataiterator(Id p, Id key, const char *match = 0, int flags = 0)
 	my $di = $repo->Dataiterator($solvid, $keyname, $match, $flags);
 	di = repo.Dataiterator(solvid, keyname, match, flags)
 	di = repo.Dataiterator(solvid, keyname, match, flags)
@@ -1276,6 +1276,18 @@ including the marker.
 Return a tuple containing the on-media location and an optional
 media number for multi-part repositories (e.g. repositories
 spawning multiple DVDs).
+
+	Dataiterator Dataiterator(Id keyname, const char *match = 0, int flags = 0)
+	my $di = $solvable->Dataiterator($keyname, $match, $flags);
+	di = solvable.Dataiterator(keyname, match, flags)
+	di = solvable.Dataiterator(keyname, match, flags)
+
+	for my $d (@$di)
+	for d in di:
+	for d in di
+
+Iterate over the matching data elements. See the Dataiterator class for more
+information.
 
 	void add_deparray(Id keyname, DepId dep, Id marker = -1);
 	$solvable->add_deparray($keyname, $dep);
@@ -3312,6 +3324,18 @@ Return the delta rpm sequence from the structure describing a delta rpm.
 
 Lookup functions. Note that the returned Ids are always translated into
 the Ids of the global pool even if the repodata area contains its own pool.
+
+	Dataiterator Dataiterator(Id keyname, const char *match = 0, int flags = 0)
+	my $di = $datapos->Dataiterator($keyname, $match, $flags);
+	di = datapos.Dataiterator(keyname, match, flags)
+	di = datapos.Dataiterator(keyname, match, flags)
+
+	for my $d (@$di)
+	for d in di:
+	for d in di
+
+Iterate over the matching data elements. See the Dataiterator class for more
+information.
 
 Author
 ------

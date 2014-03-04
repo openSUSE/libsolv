@@ -1255,7 +1255,7 @@ typedef struct {
   }
 
   %newobject Dataiterator;
-  Dataiterator *Dataiterator(Id p, Id key, const char *match, int flags) {
+  Dataiterator *Dataiterator(Id p, Id key, const char *match = 0, int flags = 0) {
     return new_Dataiterator($self, 0, p, key, match, flags);
   }
   const char *solvid2str(Id solvid) {
@@ -1591,7 +1591,7 @@ rb_eval_string(
   }
 
   %newobject Dataiterator;
-  Dataiterator *Dataiterator(Id p, Id key, const char *match, int flags) {
+  Dataiterator *Dataiterator(Id p, Id key, const char *match = 0, int flags = 0) {
     return new_Dataiterator($self->pool, $self, p, key, match, flags);
   }
 
@@ -1863,7 +1863,7 @@ rb_eval_string(
     return r;
   }
   %newobject Dataiterator;
-  Dataiterator *Dataiterator(Id key, const char *match, int flags) {
+  Dataiterator *Dataiterator(Id key, const char *match = 0, int flags = 0) {
     Pool *pool = $self->repo->pool;
     Datapos oldpos = pool->pos;
     Dataiterator *di;
@@ -2262,7 +2262,7 @@ rb_eval_string(
     return solvable_lookup_location($self->pool->solvables + $self->id, OUTPUT);
   }
   %newobject Dataiterator;
-  Dataiterator *Dataiterator(Id key, const char *match, int flags) {
+  Dataiterator *Dataiterator(Id key, const char *match = 0, int flags = 0) {
     return new_Dataiterator($self->pool, 0, $self->id, key, match, flags);
   }
 #ifdef SWIGRUBY
