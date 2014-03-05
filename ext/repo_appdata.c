@@ -511,7 +511,12 @@ repo_add_appdata(Repo *repo, FILE *fp, int flags)
       l = fread(buf, 1, sizeof(buf), fp);
       if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
 	{
-          pool_error(pool, -1, "repo_appdata: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  pool_error(pool, -1, "repo_appdata: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
+	  if (pd.solvable)
+	    {
+	      repo_free_solvable(repo, pd.solvable - pd.pool->solvables, 1);
+	      pd.solvable = 0;
+	    }
 	  ret = -1;
 	  break;
 	}
