@@ -25,6 +25,7 @@
 #include "policy.h"
 #include "poolarch.h"
 #include "solverdebug.h"
+#include "cplxdeps.h"
 
 #define RULES_BLOCK 63
 
@@ -1750,6 +1751,132 @@ prune_to_update_targets(Solver *solv, Id *cp, Queue *q)
   queue_truncate(q, j);
 }
 
+#ifdef ENABLE_COMPLEX_DEPS
+
+static void
+add_complex_recommends(Solver *solv, Id rec, Queue *dq, Map *dqmap)
+{
+  Pool *pool = solv->pool;
+  int oldcnt = dq->count;
+  int cutcnt, blkcnt;
+  Id p;
+  int i, j;
+
+  printf("ADD_COMPLEX_RECOMMENDS %s\n", pool_dep2str(pool, rec));
+  i = pool_normalize_complex_dep(pool, rec, dq, CPLXDEPS_EXPAND);
+  if (i == 0 || i == 1)
+    return;
+  cutcnt = dq->count;
+  for (i = oldcnt; i < cutcnt; i++)
+    {
+      blkcnt = dq->count;
+      for (; (p = dq->elements[i]) != 0; i++)
+	{
+	  if (p < 0)
+	    {
+	      if (solv->decisionmap[-p] <= 0)
+		break;
+	      continue;
+	    }
+	  if (solv->decisionmap[p] > 0)
+	    {
+	      queue_truncate(dq, blkcnt);
+	      break;
+	    }
+	  if (dqmap)
+	    {
+	      if (!MAPTST(dqmap, p))
+		continue;
+	    }
+	  else
+	    {
+	      if (solv->decisionmap[p] < 0)
+		continue;
+	      if (solv->dupmap_all && solv->installed && pool->solvables[p].repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
+		continue;
+	    }
+	  queue_push(dq, p);
+	}
+      while (dq->elements[i])
+	i++;
+    }
+  queue_deleten(dq, oldcnt, cutcnt - oldcnt);
+  /* unify */
+  if (dq->count != oldcnt)
+    {
+      for (j = oldcnt; j < dq->count; j++)
+	{
+	  p = dq->elements[j];
+	  for (i = 0; i < j; i++)
+	    if (dq->elements[i] == p)
+	      {
+		dq->elements[j] = 0;
+		break;
+	      }
+	}
+      for (i = j = oldcnt; j < dq->count; j++)
+	if (dq->elements[j])
+	  dq->elements[i++] = dq->elements[j];
+      queue_truncate(dq, i);
+    }
+  printf("RETURN:\n");
+  for (i = oldcnt; i < dq->count; i++)
+    printf("  - %s\n", pool_solvid2str(pool, dq->elements[i]));
+}
+
+static void
+do_complex_recommendations(Solver *solv, Id rec, Map *m, int noselected)
+{
+  Pool *pool = solv->pool;
+  Queue dq;
+  Id p;
+  int i, blk;
+
+  printf("DO_COMPLEX_RECOMMENDATIONS %s\n", pool_dep2str(pool, rec));
+  queue_init(&dq);
+  i = pool_normalize_complex_dep(pool, rec, &dq, CPLXDEPS_EXPAND);
+  if (i == 0 || i == 1)
+    {
+      queue_free(&dq);
+      return;
+    }
+  for (i = 0; i < dq.count; i++)
+    {
+      blk = i;
+      for (; (p = dq.elements[i]) != 0; i++)
+	{
+	  if (p < 0)
+	    {
+	      if (solv->decisionmap[-p] <= 0)
+		break;
+	      continue;
+	    }
+	  if (solv->decisionmap[p] > 0)
+	    {
+	      if (noselected)
+		break;
+	      MAPSET(m, p);
+	      for (i++; (p = dq.elements[i]) != 0; i++)
+		if (p > 0 && solv->decisionmap[p] > 0)
+		  MAPSET(m, p);
+	      p = 1;
+	      break;
+	    }
+	}
+      if (!p)
+	{
+	  for (i = blk; (p = dq.elements[i]) != 0; i++)
+	    if (p > 0)
+	      MAPSET(m, p);
+	}
+      while (dq.elements[i])
+	i++;
+    }
+  queue_free(&dq);
+}
+
+#endif
+
 /*-------------------------------------------------------------------
  *
  * solver_run_sat
@@ -2205,6 +2332,13 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      recp = s->repo->idarraydata + s->recommends;
 		      while ((rec = *recp++) != 0)
 			{
+#ifdef ENABLE_COMPLEX_DEPS
+			  if (pool_is_complex_dep(pool, rec))
+			    {
+			      add_complex_recommends(solv, rec, &dq, 0);
+			      continue;
+			    }
+#endif
 			  qcount = dq.count;
 			  FOR_PROVIDES(p, pp, rec)
 			    {
@@ -2408,6 +2542,11 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  while ((rec = *recp++) != 0)
 		    {
 		      queue_empty(&dq);
+#ifdef ENABLE_COMPLEX_DEPS
+		      if (pool_is_complex_dep(pool, rec))
+			  add_complex_recommends(solv, rec, &dq, &dqmap);
+		      else
+#endif
 		      FOR_PROVIDES(p, pp, rec)
 			{
 			  if (solv->decisionmap[p] > 0)
@@ -2416,7 +2555,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			      break;
 			    }
 			  else if (solv->decisionmap[p] == 0 && MAPTST(&dqmap, p))
-			    queue_pushunique(&dq, p);
+			    queue_push(&dq, p);
 			}
 		      if (!dq.count)
 			continue;
@@ -3856,6 +3995,13 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
 	      recp = s->repo->idarraydata + s->recommends;
 	      while ((rec = *recp++) != 0)
 		{
+#ifdef ENABLE_COMPLEX_DEPS
+		  if (pool_is_complex_dep(pool, rec))
+		    {
+		      do_complex_recommendations(solv, rec, &solv->recommendsmap, noselected);
+		      continue;
+		    }
+#endif
 		  FOR_PROVIDES(p, pp, rec)
 		    if (solv->decisionmap[p] > 0)
 		      break;
@@ -3921,6 +4067,13 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
 	      sugp = s->repo->idarraydata + s->suggests;
 	      while ((sug = *sugp++) != 0)
 		{
+#ifdef ENABLE_COMPLEX_DEPS
+		  if (pool_is_complex_dep(pool, sug))
+		    {
+		      do_complex_recommendations(solv, sug, &solv->suggestsmap, noselected);
+		      continue;
+		    }
+#endif
 		  FOR_PROVIDES(p, pp, sug)
 		    if (solv->decisionmap[p] > 0)
 		      break;

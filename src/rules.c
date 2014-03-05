@@ -27,6 +27,7 @@
 #include "policy.h"
 #include "solverdebug.h"
 #include "linkedpkg.h"
+#include "cplxdeps.h"
 
 #define RULES_BLOCK 63
 
@@ -532,6 +533,165 @@ add_package_link(Solver *solv, Solvable *s, Map *m, Queue *workq)
 
 #endif
 
+#ifdef ENABLE_COMPLEX_DEPS
+
+static void
+add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *workq, Map *m)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  int i, j;
+  Queue bq;
+
+  queue_init(&bq);
+
+  /* CNF expansion for requires, DNF + INVERT expansion for conflicts */
+  i = pool_normalize_complex_dep(pool, dep, &bq, type == SOLVER_RULE_RPM_PACKAGE_REQUIRES ? 0 : (CPLXDEPS_TODNF | CPLXDEPS_EXPAND | CPLXDEPS_INVERT));
+  /* handle special cases */
+  if (i == 0)
+    {
+      if (dontfix)
+	{
+	  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "ignoring broken dependency %s of installed package %s\n", pool_dep2str(pool, dep), pool_solvid2str(pool, p));
+	}
+      else
+	{
+	  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, p), p, pool_dep2str(pool, dep));
+	  addrpmrule(solv, -p, 0, type == SOLVER_RULE_RPM_PACKAGE_REQUIRES ? SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP : type, dep);
+	}
+      queue_free(&bq);
+      return;
+    }
+  if (i == 1)
+    {
+      queue_free(&bq);
+      return;
+    }
+
+  /* go through all blocks and add a rule for each block */
+  for (i = 0; i < bq.count; i++)
+    {
+      if (!bq.elements[i])
+	continue;	/* huh? */
+      if (bq.elements[i] == pool->nsolvables)
+	{
+	  /* conventional requires (cannot be a conflicts as they have been expanded) */
+	  Id *dp = pool->whatprovidesdata + bq.elements[i + 1];
+	  i += 2;
+	  if (dontfix)
+	    {
+	      for (j = 0; dp[j] != 0; j++)
+		if (pool->solvables[dp[j]].repo == installed)
+		  break;		/* provider was installed */
+	      if (!dp[j])
+		{
+		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "ignoring broken requires %s of installed package %s\n", pool_dep2str(pool, dep), pool_solvid2str(pool, p));
+		  continue;
+		}
+	    }
+	  if (!*dp)
+	    {
+	      /* nothing provides req! */
+	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, p), p, pool_dep2str(pool, dep));
+	      addrpmrule(solv, -p, 0, SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, dep);
+	      continue;
+	    }
+	  addrpmrule(solv, -p, dp - pool->whatprovidesdata, SOLVER_RULE_RPM_PACKAGE_REQUIRES, dep);
+	  /* push all non-visited providers on the work queue */
+	  if (m)
+	    for (; *dp; dp++)
+	      if (!MAPTST(m, *dp))
+		queue_push(workq, *dp);
+	  continue;
+	}
+      if (!bq.elements[i + 1])
+	{
+	  Id p2 = bq.elements[i];
+	  /* simple rule with just two literals */
+	  if (dontfix && p2 < 0 && pool->solvables[-p2].repo == installed)
+	    continue;
+	  if (dontfix && p2 > 0 && pool->solvables[p2].repo != installed)
+	    continue;
+	  if (p == p2)
+	    continue;
+	  if (-p == p2)
+	    {
+	      if (type == SOLVER_RULE_RPM_PACKAGE_CONFLICT)
+		{
+		  if (pool->forbidselfconflicts && !is_otherproviders_dep(pool, dep))
+		    addrpmrule(solv, -p, 0, SOLVER_RULE_RPM_SELF_CONFLICT, dep);
+		  continue;
+		}
+	      addrpmrule(solv, -p, 0, type, dep);
+	      continue;
+	    }
+	  if (p2 > 0)
+	    addrpmrule(solv, p2, -p, type, dep);	/* hack so that we don't need pool_queuetowhatprovides */
+	  else
+	    addrpmrule(solv, -p, p2, type, dep);
+	  if (m && p2 > 0 && !MAPTST(m, p2))
+	    queue_push(workq, p2);
+	}
+      else
+	{
+	  Id *qele;
+	  int qcnt;
+
+	  qele = bq.elements + i;
+	  qcnt = i;
+	  while (bq.elements[i])
+	     i++;
+	  qcnt = i - qcnt;
+	  if (dontfix)
+	    {
+	      for (j = 0; j < qcnt; j++)
+		{
+		  if (qele[j] > 0 && pool->solvables[qele[j]].repo == installed)
+		    break;
+		  if (qele[j] < 0 && pool->solvables[-qele[j]].repo != installed)
+		    break;
+		}
+	      if (j == qcnt)
+	        continue;
+	    }
+	  /* add -p to (ordered) rule (overwriting the trailing zero) */
+	  for (j = 0; ; j++)
+	    {
+	      if (j == qcnt || qele[j] > -p)
+		{
+		  if (j < qcnt)
+		    memmove(qele + j + 1, qele + j, (qcnt - j) * sizeof(Id));
+		  qele[j] = -p;
+		  qcnt++;
+		  break;
+		}
+	      if (qele[j] == -p)
+		break;
+	    }
+	  /* check if the rule contains both p and -p */
+	  for (j = 0; j < qcnt; j++)
+	    if (qele[j] == p)
+	      break;
+	  if (j == qcnt)
+	    {
+	      /* hack: create fake queue 'q' so that we can call pool_queuetowhatprovides */
+	      Queue q;
+	      memset(&q, 0, sizeof(q));
+	      q.count = qcnt - 1;
+	      q.elements = qele + 1;
+	      addrpmrule(solv, qele[0], pool_queuetowhatprovides(pool, &q), type, dep);
+	      if (m)
+		for (j = 0; j < qcnt; j++)
+		  if (qele[j] > 0 && !MAPTST(m, qele[j]))
+		    queue_push(workq, qele[j]);
+	    }
+	}
+    }
+  queue_free(&bq);
+}
+
+#endif
+
 /*-------------------------------------------------------------------
  *
  * add (install) rules for solvable
@@ -631,6 +791,15 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
 		continue;
 
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, req))
+		{
+		  /* we have AND/COND deps, normalize */
+		  add_complex_deprules(solv, n, req, SOLVER_RULE_RPM_PACKAGE_REQUIRES, dontfix, &workq, m);
+		  continue;
+		}
+#endif
+
 	      /* find list of solvables providing 'req' */
 	      dp = pool_whatprovides_ptr(pool, req);
 
@@ -704,6 +873,14 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  /* foreach conflicts of 's' */
 	  while ((con = *conp++) != 0)
 	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (!ispatch && pool_is_complex_dep(pool, con))
+		{
+		  /* we have AND/COND deps, normalize */
+		  add_complex_deprules(solv, n, con, SOLVER_RULE_RPM_PACKAGE_CONFLICT, dontfix, &workq, m);
+		  continue;
+		}
+#endif
 	      /* foreach providers of a conflict of 's' */
 	      FOR_PROVIDES(p, pp, con)
 		{
