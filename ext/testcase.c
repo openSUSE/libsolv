@@ -380,7 +380,21 @@ testcase_str2dep_complex(Pool *pool, const char **sp)
 {
   const char *s = *sp;
   Id id;
-  id = testcase_str2dep_simple(pool, &s);
+#ifdef ENABLE_COMPLEX_DEPS
+  while (*s == ' ' || *s == '\t')
+    s++;
+  if (*s == '(')
+    {
+      s++;
+      id = testcase_str2dep_complex(pool, &s);
+      if (*s == ')')
+	s++;
+      while (*s == ' ' || *s == '\t')
+	s++;
+    }
+  else
+#endif
+    id = testcase_str2dep_simple(pool, &s);
   if (*s == '|')
     {
       s++;
@@ -1582,16 +1596,26 @@ testcase_solverresult(Solver *solv, int resultflags)
 
   if ((resultflags & TESTCASE_RESULT_UNNEEDED) != 0)
     {
-      Queue q;
+      Queue q, qf;
 
       queue_init(&q);
+      queue_init(&qf);
       solver_get_unneeded(solv, &q, 0);
-      for (i = 0; i < q.count; i++)
+      solver_get_unneeded(solv, &qf, 1);
+      for (i = j = 0; i < q.count; i++)
 	{
-	  s = pool_tmpjoin(pool, "unneeded ", testcase_solvid2str(pool, q.elements[i]), 0);
+	  /* we rely on qf containing a subset of q in the same order */
+	  if (j < qf.count && q.elements[i] == qf.elements[j])
+	    {
+	      s = pool_tmpjoin(pool, "unneeded_filtered ", testcase_solvid2str(pool, q.elements[i]), 0);
+	      j++;
+	    }
+	  else
+	    s = pool_tmpjoin(pool, "unneeded ", testcase_solvid2str(pool, q.elements[i]), 0);
 	  strqueue_push(&sq, s);
 	}
       queue_free(&q);
+      queue_free(&qf);
     }
 
   strqueue_sort(&sq);
@@ -2162,22 +2186,26 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	  for (i = 1; i < npieces; i++)
 	    testcase_setsolverflags(solv, pieces[i]);
         }
-      else if (!strcmp(pieces[0], "result") && npieces > 2)
+      else if (!strcmp(pieces[0], "result") && npieces > 1)
 	{
 	  char *result = 0;
 	  int resultflags = str2resultflags(pool, pieces[1]);
-	  const char *rdata = pool_tmpjoin(pool, testcasedir, pieces[2], 0);
-	  if (!strcmp(pieces[2], "<inline>"))
-	    result = read_inline_file(fp, &buf, &bufp, &bufl);
-	  else
+	  const char *rdata;
+	  if (npieces > 2)
 	    {
-              FILE *rfp = fopen(rdata, "r");
-	      if (!rfp)
-		pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", rdata);
+	      rdata = pool_tmpjoin(pool, testcasedir, pieces[2], 0);
+	      if (!strcmp(pieces[2], "<inline>"))
+		result = read_inline_file(fp, &buf, &bufp, &bufl);
 	      else
 		{
-		  result = read_file(rfp);
-		  fclose(rfp);
+		  FILE *rfp = fopen(rdata, "r");
+		  if (!rfp)
+		    pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", rdata);
+		  else
+		    {
+		      result = read_file(rfp);
+		      fclose(rfp);
+		    }
 		}
 	    }
 	  if (resultp)
