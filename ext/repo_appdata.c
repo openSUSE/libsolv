@@ -35,6 +35,7 @@ enum state {
   STATE_START,
   STATE_APPLICATION,
   STATE_ID,
+  STATE_PKGNAME,
   STATE_LICENCE,
   STATE_NAME,
   STATE_SUMMARY,
@@ -46,6 +47,8 @@ enum state {
   STATE_OL_LI,
   STATE_URL,
   STATE_GROUP,
+  STATE_KEYWORDS,
+  STATE_KEYWORD,
   NUMSTATES
 };
 
@@ -58,20 +61,23 @@ struct stateswitch {
 
 /* !! must be sorted by first column !! */
 static struct stateswitch stateswitches[] = {
-  { STATE_START,       "applications",  STATE_START,   0 },
+  { STATE_START,       "applications",  STATE_START,         0 },
   { STATE_START,       "application",   STATE_APPLICATION,   0 },
   { STATE_APPLICATION, "id",            STATE_ID,            1 },
-  { STATE_APPLICATION, "product_license", STATE_LICENCE,       1 },
+  { STATE_APPLICATION, "pkgname",       STATE_PKGNAME,       1 },
+  { STATE_APPLICATION, "product_license", STATE_LICENCE,     1 },
   { STATE_APPLICATION, "name",          STATE_NAME,          1 },
   { STATE_APPLICATION, "summary",       STATE_SUMMARY,       1 },
   { STATE_APPLICATION, "description",   STATE_DESCRIPTION,   0 },
   { STATE_APPLICATION, "url",           STATE_URL,           1 },
   { STATE_APPLICATION, "project_group", STATE_GROUP,         1 },
+  { STATE_APPLICATION, "keywords",      STATE_KEYWORDS,      0 },
   { STATE_DESCRIPTION, "p",             STATE_P,             1 },
   { STATE_DESCRIPTION, "ul",            STATE_UL,            0 },
   { STATE_DESCRIPTION, "ol",            STATE_OL,            0 },
   { STATE_UL,          "li",            STATE_UL_LI,         1 },
   { STATE_OL,          "li",            STATE_OL_LI,         1 },
+  { STATE_KEYWORDS,    "keyword",       STATE_KEYWORD,       1 },
   { NUMSTATES }
 };
 
@@ -95,10 +101,7 @@ struct parsedata {
 
   char *description;
   int licnt;
-  int skip_tag;
-  int skip_tag_d;
-  int skip_tag_li;
-
+  int skip_depth;
   int flags;
   char *desktop_file;
   int havesummary;
@@ -157,6 +160,14 @@ startElement(void *userData, const char *name, const char **atts)
   pd->lcontent = 0;
   *pd->content = 0;
 
+  if (!pd->skip_depth && find_attr("xml:lang", atts))
+    pd->skip_depth = pd->depth;
+  if (pd->skip_depth)
+    {
+      pd->docontent = 0;
+      return;
+    }
+
   switch(pd->state)
     {
     case STATE_APPLICATION:
@@ -164,35 +175,12 @@ startElement(void *userData, const char *name, const char **atts)
       pd->handle = s - pool->solvables;
       pd->havesummary = 0;
       break;
-    case STATE_NAME:
-    case STATE_SUMMARY:
-      pd->skip_tag = 0;
-      if (find_attr("xml:lang", atts))
-        pd->skip_tag = 1;
-      break;
     case STATE_DESCRIPTION:
-      pd->skip_tag_d = 0;
-      if (find_attr("xml:lang", atts))
-        pd->skip_tag_d = 1;
       pd->description = solv_free(pd->description);
       break;
     case STATE_OL:
     case STATE_UL:
-      pd->skip_tag = 0;
-      if (find_attr("xml:lang", atts))
-        pd->skip_tag = 1;
       pd->licnt = 0;
-      break;
-    case STATE_P:
-      pd->skip_tag = 0;
-      if (find_attr("xml:lang", atts))
-        pd->skip_tag = 1;
-      break;
-    case STATE_UL_LI:
-    case STATE_OL_LI:
-      pd->skip_tag_li = 0;
-      if (find_attr("xml:lang", atts))
-        pd->skip_tag_li = 1;
       break;
     default:
       break;
@@ -344,6 +332,16 @@ endElement(void *userData, const char *name)
   pd->depth--;
   pd->statedepth--;
 
+  if (pd->skip_depth && pd->depth + 1 >= pd->skip_depth)
+    {
+      if (pd->depth + 1 == pd->skip_depth)
+	pd->skip_depth = 0;
+      pd->state = pd->sbtab[pd->state];
+      pd->docontent = 0;
+      return;
+    }
+  pd->skip_depth = 0;
+
   switch (pd->state)
     {
     case STATE_APPLICATION:
@@ -385,16 +383,12 @@ endElement(void *userData, const char *name)
       s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
       break;
     case STATE_NAME:
-      if (pd->skip_tag)
-	break;
       s->name = pool_str2id(pd->pool, pool_tmpjoin(pool, "application:", pd->content, 0), 1);
       break;
     case STATE_LICENCE:
       repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_LICENSE, pd->content);
       break;
     case STATE_SUMMARY:
-      if (pd->skip_tag)
-	break;
       pd->havesummary = 1;
       repodata_set_str(pd->data, pd->handle, SOLVABLE_SUMMARY, pd->content);
       break;
@@ -405,7 +399,7 @@ endElement(void *userData, const char *name)
       repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_GROUP, pd->content);
       break;
     case STATE_DESCRIPTION:
-      if (pd->description && !pd->skip_tag_d)
+      if (pd->description)
 	{
 	  /* strip trailing newlines */
 	  int l = strlen(pd->description);
@@ -415,22 +409,16 @@ endElement(void *userData, const char *name)
 	}
       break;
     case STATE_P:
-      if (pd->skip_tag)
-	break;
       wsstrip(pd);
       pd->description = solv_dupappend(pd->description, pd->content, "\n\n");
       break;
     case STATE_UL_LI:
-      if (pd->skip_tag || pd->skip_tag_li)
-	break;
       wsstrip(pd);
       indent(pd, 4);
       pd->content[2] = '-';
       pd->description = solv_dupappend(pd->description, pd->content, "\n");
       break;
     case STATE_OL_LI:
-      if (pd->skip_tag || pd->skip_tag_li)
-	break;
       wsstrip(pd);
       indent(pd, 4);
       if (++pd->licnt >= 10)
@@ -441,9 +429,13 @@ endElement(void *userData, const char *name)
       break;
     case STATE_UL:
     case STATE_OL:
-      if (pd->skip_tag)
-	break;
       pd->description = solv_dupappend(pd->description, "\n", 0);
+      break;
+    case STATE_PKGNAME:
+      id = pool_str2id(pd->pool, pd->content, 1);
+      s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
+    case STATE_KEYWORD:
+      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_KEYWORDS, pd->content);
       break;
     default:
       break;
