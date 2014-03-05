@@ -47,18 +47,23 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
   Id req = 0;
   Id prv = 0;
   Id p, pp;
+  Id pkgname = 0;
 
   /* find appdata requires */
   if (s->requires)
     {
+      Id appdataid = 0;
       Id *reqp = s->repo->idarraydata + s->requires;
       while ((req = *reqp++) != 0)            /* go through all requires */
 	{
 	  if (ISRELDEP(req))
 	    continue;
 	  if (!strncmp("appdata(", pool_id2str(pool, req), 8))
-	    break;
+	    appdataid = req;
+	  else
+	    pkgname = req;
 	}
+      req = appdataid;
     }
   if (!req)
     return;
@@ -77,11 +82,19 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
 	}
     }
   if (!prv)
-    return;
+    return;	/* huh, no provides found? */
   /* now link em */
   FOR_PROVIDES(p, pp, req)
     if (pool->solvables[p].repo == s->repo)
-      queue_push(qr, p);
+      if (!pkgname || pool->solvables[p].name == pkgname)
+        queue_push(qr, p);
+  if (!qr->count && pkgname)
+    {
+      /* huh, no matching package? try without pkgname filter */
+      FOR_PROVIDES(p, pp, req)
+	if (pool->solvables[p].repo == s->repo)
+          queue_push(qr, p);
+    }
   if (qp)
     {
       FOR_PROVIDES(p, pp, prv)
