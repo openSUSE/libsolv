@@ -1768,7 +1768,9 @@ add_complex_recommends(Solver *solv, Id rec, Queue *dq, Map *dqmap)
   Id p;
   int i, j;
 
+#if 0
   printf("ADD_COMPLEX_RECOMMENDS %s\n", pool_dep2str(pool, rec));
+#endif
   i = pool_normalize_complex_dep(pool, rec, dq, CPLXDEPS_EXPAND);
   if (i == 0 || i == 1)
     return;
@@ -1825,9 +1827,11 @@ add_complex_recommends(Solver *solv, Id rec, Queue *dq, Map *dqmap)
 	  dq->elements[i++] = dq->elements[j];
       queue_truncate(dq, i);
     }
+#if 0
   printf("RETURN:\n");
   for (i = oldcnt; i < dq->count; i++)
     printf("  - %s\n", pool_solvid2str(pool, dq->elements[i]));
+#endif
 }
 
 static void
@@ -1838,7 +1842,9 @@ do_complex_recommendations(Solver *solv, Id rec, Map *m, int noselected)
   Id p;
   int i, blk;
 
+#if 0
   printf("DO_COMPLEX_RECOMMENDATIONS %s\n", pool_dep2str(pool, rec));
+#endif
   queue_init(&dq);
   i = pool_normalize_complex_dep(pool, rec, &dq, CPLXDEPS_EXPAND);
   if (i == 0 || i == 1)
