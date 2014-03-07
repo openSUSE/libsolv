@@ -133,6 +133,8 @@ struct _Solver {
   Map recommendsmap;			/* recommended packages from decisionmap */
   Map suggestsmap;			/* suggested packages from decisionmap */
   int recommends_index;			/* recommendsmap/suggestsmap is created up to this level */
+  Queue *recommendscplxq;
+  Queue *suggestscplxq;
 
   Id *obsoletes;			/* obsoletes for each installed solvable */
   Id *obsoletes_data;			/* data area for obsoletes */

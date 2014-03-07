@@ -1247,7 +1247,8 @@ revert(Solver *solv, int level)
       while (solv->branches.count && solv->branches.elements[solv->branches.count - 1] >= 0)
 	solv->branches.count--;
     }
-  solv->recommends_index = -1;
+  if (solv->recommends_index > solv->decisionq.count)
+    solv->recommends_index = -1;	/* rebuild recommends/suggests maps */
   if (solv->decisionq.count < solv->decisioncnt_update)
     solv->decisioncnt_update = 0;
   if (solv->decisionq.count < solv->decisioncnt_keep)
@@ -1530,6 +1531,25 @@ solver_create(Pool *pool)
  * solver_free
  */
 
+static inline void
+queuep_free(Queue **qp)
+{
+  if (!*qp)
+    return;
+  queue_free(*qp);
+  *qp = solv_free(*qp);
+}
+
+static inline void
+map_zerosize(Map *m)
+{
+  if (m->size)
+    {
+      map_free(m);
+      map_init(m, 0);
+    }
+}
+
 void
 solver_free(Solver *solv)
 {
@@ -1546,26 +1566,12 @@ solver_free(Solver *solv)
   queue_free(&solv->weakruleq);
   queue_free(&solv->ruleassertions);
   queue_free(&solv->addedmap_deduceq);
-  if (solv->cleandeps_updatepkgs)
-    {
-      queue_free(solv->cleandeps_updatepkgs);
-      solv->cleandeps_updatepkgs = solv_free(solv->cleandeps_updatepkgs);
-    }
-  if (solv->cleandeps_mistakes)
-    {
-      queue_free(solv->cleandeps_mistakes);
-      solv->cleandeps_mistakes = solv_free(solv->cleandeps_mistakes);
-    }
-  if (solv->update_targets)
-    {
-      queue_free(solv->update_targets);
-      solv->update_targets = solv_free(solv->update_targets);
-    }
-  if (solv->installsuppdepq)
-    {
-      queue_free(solv->installsuppdepq);
-      solv->installsuppdepq = solv_free(solv->installsuppdepq);
-    }
+  queuep_free(&solv->cleandeps_updatepkgs);
+  queuep_free(&solv->cleandeps_mistakes);
+  queuep_free(&solv->update_targets);
+  queuep_free(&solv->installsuppdepq);
+  queuep_free(&solv->recommendscplxq);
+  queuep_free(&solv->suggestscplxq);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -3194,73 +3200,28 @@ solver_solve(Solver *solv, Queue *job)
     queue_insertn(&solv->job, 0, pool->pooljobs.count, pool->pooljobs.elements);
   job = &solv->job;
 
-  /* free old stuff */
-  if (solv->update_targets)
-    {
-      queue_free(solv->update_targets);
-      solv->update_targets = solv_free(solv->update_targets);
-    }
-  if (solv->cleandeps_updatepkgs)
-    {
-      queue_free(solv->cleandeps_updatepkgs);
-      solv->cleandeps_updatepkgs = solv_free(solv->cleandeps_updatepkgs);
-    }
+  /* free old stuff in jase we re-run a solver */
+  queuep_free(&solv->update_targets);
+  queuep_free(&solv->cleandeps_updatepkgs);
   queue_empty(&solv->ruleassertions);
   solv->bestrules_pkg = solv_free(solv->bestrules_pkg);
   solv->choicerules_ref = solv_free(solv->choicerules_ref);
   if (solv->noupdate.size)
     map_empty(&solv->noupdate);
-  if (solv->multiversion.size)
-    {
-      map_free(&solv->multiversion);
-      map_init(&solv->multiversion, 0);
-    }
+  map_zerosize(&solv->multiversion);
   solv->updatemap_all = 0;
-  if (solv->updatemap.size)
-    {
-      map_free(&solv->updatemap);
-      map_init(&solv->updatemap, 0);
-    }
+  map_zerosize(&solv->updatemap);
   solv->bestupdatemap_all = 0;
-  if (solv->bestupdatemap.size)
-    {
-      map_free(&solv->bestupdatemap);
-      map_init(&solv->bestupdatemap, 0);
-    }
+  map_zerosize(&solv->bestupdatemap);
   solv->fixmap_all = 0;
-  if (solv->fixmap.size)
-    {
-      map_free(&solv->fixmap);
-      map_init(&solv->fixmap, 0);
-    }
+  map_zerosize(&solv->fixmap);
   solv->dupmap_all = 0;
-  if (solv->dupmap.size)
-    {
-      map_free(&solv->dupmap);
-      map_init(&solv->dupmap, 0);
-    }
-  if (solv->dupinvolvedmap.size)
-    {
-      map_free(&solv->dupinvolvedmap);
-      map_init(&solv->dupinvolvedmap, 0);
-    }
+  map_zerosize(&solv->dupmap);
+  map_zerosize(&solv->dupinvolvedmap);
   solv->droporphanedmap_all = 0;
-  if (solv->droporphanedmap.size)
-    {
-      map_free(&solv->droporphanedmap);
-      map_init(&solv->droporphanedmap, 0);
-    }
-  if (solv->cleandepsmap.size)
-    {
-      map_free(&solv->cleandepsmap);
-      map_init(&solv->cleandepsmap, 0);
-    }
-  if (solv->weakrulemap.size)
-    {
-      map_free(&solv->weakrulemap);
-      map_init(&solv->weakrulemap, 0);
-    }
-
+  map_zerosize(&solv->droporphanedmap);
+  map_zerosize(&solv->cleandepsmap);
+  map_zerosize(&solv->weakrulemap);
   queue_empty(&solv->weakruleq);
   solv->watches = solv_free(solv->watches);
   queue_empty(&solv->ruletojob);
@@ -3281,6 +3242,8 @@ solver_solve(Solver *solv, Queue *job)
     {
       map_empty(&solv->recommendsmap);
       map_empty(&solv->suggestsmap);
+      queuep_free(&solv->recommendscplxq);
+      queuep_free(&solv->suggestscplxq);
       solv->recommends_index = 0;
     }
   solv->specialupdaters = solv_free(solv->specialupdaters);

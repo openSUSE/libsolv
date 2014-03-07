@@ -21,6 +21,7 @@
 #include "policy.h"
 #include "poolvendor.h"
 #include "poolarch.h"
+#include "cplxdeps.h"
 
 
 /*-----------------------------------------------------------------*/
@@ -217,6 +218,119 @@ solver_prune_to_highest_prio_per_name(Solver *solv, Queue *plist)
 }
 
 
+#ifdef ENABLE_COMPLEX_DEPS
+
+static void
+check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
+{
+  Pool *pool = solv->pool;
+  Queue q;
+  queue_init(&q);
+  Id p;
+  int i, qcnt;
+
+#if 0
+  printf("check_complex_dep %s\n", pool_dep2str(pool, dep));
+#endif
+  i = pool_normalize_complex_dep(pool, dep, &q, CPLXDEPS_EXPAND);
+  if (i == 0 || i == 1)
+    {
+      queue_free(&q);
+      return;
+    }
+  qcnt = q.count;
+  for (i = 0; i < qcnt; i++)
+    {
+      for (; (p = q.elements[i]) != 0; i++)
+	{
+	  if (p < 0)
+	    {
+	      if (solv->decisionmap[-p] > 0)
+		continue;
+	      if (solv->decisionmap[-p] < 0)
+		break;
+	      queue_push(&q, -p);
+	    }
+	  if (p > 0 && qcnt == q.count)
+	    MAPSET(m, p);
+	}
+      if (q.elements[i])
+	{
+#if 0
+	  printf("complex dep block cannot be true\n");
+#endif
+	  while (q.elements[i])
+	    i++;
+	  if (qcnt != q.count)
+	    queue_truncate(&q, qcnt);
+	}
+      else if (qcnt != q.count)
+	{
+	  int j, k;
+	  Queue *cq = *cqp;
+#if 0
+	  printf("add new complex dep block\n");
+	  for (j = qcnt; j < q.count; j++)
+	    printf("  - %s\n", pool_solvid2str(pool, q.elements[j]));
+#endif
+	  if (!cq)
+	    {
+	      cq = solv_calloc(1, sizeof(Queue));
+	      queue_init(cq);
+	      *cqp = cq;
+	      queue_insertn(cq, 0, 256, 0);
+	    }
+	  for (j = qcnt; j < q.count; j++)
+	    {
+	      p = q.elements[j];
+	      for (k = 256; k < cq->count; k += 2)
+		if (cq->elements[k + 1] == dep && cq->elements[k] == p)
+		  break;
+	      if (k == cq->count)
+		{
+	          queue_push2(cq, p, dep);
+		  cq->elements[p & 255] |= (1 << (p >> 8 & 31));
+		}
+	    }
+	  queue_truncate(&q, qcnt);
+	}
+    }
+  queue_free(&q);
+}
+
+static void
+recheck_complex_dep(Solver *solv, Id p, Map *m, Queue **cqp)
+{
+  Queue *cq = *cqp;
+  int i;
+#if 0
+  printf("recheck_complex_dep for package %s\n", pool_solvid2str(solv->pool, p));
+#endif
+  for (i = 256; i < cq->count; i += 2)
+    if (cq->elements[i] == p)
+      break;
+  if (i == cq->count)
+    return;	/* false alert */
+  if (solv->decisionmap[p] <= 0)
+    return;	/* just in case... */
+  memset(cq->elements, 0, sizeof(Id) * 256);
+  for (i = 256; i < cq->count; i += 2)
+    if (cq->elements[i] == p)
+      {
+	Id dep = cq->elements[i + 1];
+	queue_deleten(cq, i, 2);
+	i -= 2;
+        check_complex_dep(solv, dep, m, &cq);
+      }
+    else
+      {
+	Id pp = cq->elements[i];
+        cq->elements[pp & 255] |= (1 << (pp >> 8 & 31));
+      }
+}
+
+#endif
+
 /*
  * prune to recommended/suggested packages.
  * does not prune installed packages (they are also somewhat recommended).
@@ -249,6 +363,18 @@ prune_to_recommended(Solver *solv, Queue *plist)
     {
       MAPZERO(&solv->recommendsmap);
       MAPZERO(&solv->suggestsmap);
+#ifdef ENABLE_COMPLEX_DEPS
+      if (solv->recommendscplxq)
+	{
+	  queue_free(solv->recommendscplxq);
+	  solv->recommendscplxq = solv_free(solv->recommendscplxq);
+	}
+      if (solv->suggestscplxq)
+	{
+	  queue_free(solv->suggestscplxq);
+	  solv->suggestscplxq = solv_free(solv->suggestscplxq);
+	}
+#endif
       solv->recommends_index = 0;
     }
   while (solv->recommends_index < solv->decisionq.count)
@@ -257,19 +383,45 @@ prune_to_recommended(Solver *solv, Queue *plist)
       if (p < 0)
 	continue;
       s = pool->solvables + p;
+#ifdef ENABLE_COMPLEX_DEPS
+      if (solv->recommendscplxq && solv->recommendscplxq->elements[p & 255])
+	if (solv->recommendscplxq->elements[p & 255] & (1 << (p >> 8 & 31)))
+	  recheck_complex_dep(solv, p, &solv->recommendsmap, &solv->recommendscplxq);
+      if (solv->suggestscplxq && solv->suggestscplxq->elements[p & 255])
+	if (solv->suggestscplxq->elements[p & 255] & (1 << (p >> 8 & 31)))
+	  recheck_complex_dep(solv, p, &solv->suggestsmap, &solv->suggestscplxq);
+#endif
       if (s->recommends)
 	{
 	  recp = s->repo->idarraydata + s->recommends;
           while ((rec = *recp++) != 0)
-	    FOR_PROVIDES(p, pp, rec)
-	      MAPSET(&solv->recommendsmap, p);
+	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, rec))
+		{
+		  check_complex_dep(solv, rec, &solv->recommendsmap, &solv->recommendscplxq);
+		  continue;
+		}
+#endif
+	      FOR_PROVIDES(p, pp, rec)
+	        MAPSET(&solv->recommendsmap, p);
+	    }
 	}
       if (s->suggests)
 	{
 	  sugp = s->repo->idarraydata + s->suggests;
           while ((sug = *sugp++) != 0)
-	    FOR_PROVIDES(p, pp, sug)
-	      MAPSET(&solv->suggestsmap, p);
+	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, sug))
+		{
+		  check_complex_dep(solv, sug, &solv->suggestsmap, &solv->suggestscplxq);
+		  continue;
+		}
+#endif
+	      FOR_PROVIDES(p, pp, sug)
+	        MAPSET(&solv->suggestsmap, p);
+	    }
 	}
     }
 
