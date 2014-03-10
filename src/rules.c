@@ -3331,6 +3331,97 @@ queue_contains(Queue *q, Id id)
   return 0;
 }
 
+#ifdef ENABLE_COMPLEX_DEPS
+static void
+complex_cleandeps_remove(Pool *pool, Id ip, Id req, Map *im, Map *installedm, Queue *iq)
+{
+  int i;
+  Queue dq;
+  Id p;
+
+  queue_init(&dq);
+  i = pool_normalize_complex_dep(pool, req, &dq, CPLXDEPS_EXPAND);
+  if (i == 0 || i == 1)
+    {
+      queue_free(&dq);
+      return;
+    }
+  for (i = 0; i < dq.count; i++)
+    {
+      for (; (p = dq.elements[i]) != 0; i++)
+	{
+	  if (p < 0)
+	    {
+	      if (!MAPTST(installedm, -p))
+	        break;
+	      continue;
+	    }
+	  if (p != SYSTEMSOLVABLE && MAPTST(im, p))
+	    {
+#ifdef CLEANDEPSDEBUG
+	      printf("%s requires/recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
+#endif
+	      queue_push(iq, p);
+	    }
+	}
+      while (dq.elements[i])
+	i++;
+    }
+  queue_free(&dq);
+}
+
+static void
+complex_cleandeps_addback(Pool *pool, Id ip, Id req, Map *im, Map *installedm, Queue *iq, Map *userinstalled)
+{
+  int i, blk;
+  Queue dq;
+  Id p;
+
+  queue_init(&dq);
+  i = pool_normalize_complex_dep(pool, req, &dq, CPLXDEPS_EXPAND);
+  if (i == 0 || i == 1)
+    {
+      queue_free(&dq);
+      return;
+    }
+  for (i = 0; i < dq.count; i++)
+    {
+      blk = i;
+      for (; (p = dq.elements[i]) != 0; i++)
+	{
+	  if (p < 0)
+	    {
+	      if (!MAPTST(installedm, -p))
+	        break;
+	      continue;
+	    }
+	  if (MAPTST(im, p))
+	    break;
+	}
+      if (!p)
+	{
+	  for (i = blk; (p = dq.elements[i]) != 0; i++)
+	    {
+	      if (p < 0)
+		continue;
+	      if (!MAPTST(installedm, p))
+		continue;
+	      if (p == ip || MAPTST(userinstalled, p - pool->installed->start))
+		continue;
+#ifdef CLEANDEPSDEBUG
+	      printf("%s requires/recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
+#endif
+	      MAPSET(im, p);
+	      queue_push(iq, p);
+	    }
+	}
+      while (dq.elements[i])
+	i++;
+    }
+  queue_free(&dq);
+}
+
+#endif
 
 /*
  * Find all installed packages that are no longer
@@ -3685,14 +3776,12 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)
 		continue;
-#if 0
-	      /* count number of installed packages that match */
-	      count = 0;
-	      FOR_PROVIDES(p, pp, req)
-		if (MAPTST(&installedm, p))
-		  count++;
-	      if (count > 1)
-		continue;
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, req))
+		{
+		  complex_cleandeps_remove(pool, ip, req, &im, &installedm, &iq);
+		  continue;
+		}
 #endif
 	      FOR_PROVIDES(p, pp, req)
 		{
@@ -3711,13 +3800,12 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  reqp = s->repo->idarraydata + s->recommends;
 	  while ((req = *reqp++) != 0)
 	    {
-#if 0
-	      count = 0;
-	      FOR_PROVIDES(p, pp, req)
-		if (MAPTST(&installedm, p))
-		  count++;
-	      if (count > 1)
-		continue;
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, req))
+		{
+		  complex_cleandeps_remove(pool, ip, req, &im, &installedm, &iq);
+		  continue;
+		}
 #endif
 	      FOR_PROVIDES(p, pp, req)
 		{
@@ -3826,6 +3914,13 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  reqp = s->repo->idarraydata + s->requires;
 	  while ((req = *reqp++) != 0)
 	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, req))
+		{
+		  complex_cleandeps_addback(pool, ip, req, &im, &installedm, &iq, &userinstalled);
+		  continue;
+		}
+#endif
 	      FOR_PROVIDES(p, pp, req)
 		if (MAPTST(&im, p))
 		  break;
@@ -3833,7 +3928,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		continue;
 	      FOR_PROVIDES(p, pp, req)
 		{
-		  if (!MAPTST(&im, p) && MAPTST(&installedm, p))
+		  if (MAPTST(&installedm, p))
 		    {
 		      if (p == ip)
 			continue;
@@ -3853,6 +3948,13 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  reqp = s->repo->idarraydata + s->recommends;
 	  while ((req = *reqp++) != 0)
 	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, req))
+		{
+		  complex_cleandeps_addback(pool, ip, req, &im, &installedm, &iq, &userinstalled);
+		  continue;
+		}
+#endif
 	      FOR_PROVIDES(p, pp, req)
 		if (MAPTST(&im, p))
 		  break;
@@ -3860,7 +3962,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		continue;
 	      FOR_PROVIDES(p, pp, req)
 		{
-		  if (!MAPTST(&im, p) && MAPTST(&installedm, p))
+		  if (MAPTST(&installedm, p))
 		    {
 		      if (p == ip)
 			continue;
@@ -3963,6 +4065,47 @@ trj_visit(struct trj_data *trj, Id node)
     }
 }
 
+#ifdef ENABLE_COMPLEX_DEPS
+static void
+complex_unneeded(Pool *pool, Id ip, Id req, Queue *edges, Map *cleandepsmap, Queue *unneededq)
+{
+  int i, j;
+  Queue dq;
+  Id p;
+
+  queue_init(&dq);
+  i = pool_normalize_complex_dep(pool, req, &dq, CPLXDEPS_EXPAND);
+  if (i == 0 || i == 1)
+    {
+      queue_free(&dq);
+      return;
+    }
+  for (i = 0; i < dq.count; i++)
+    {
+      for (; (p = dq.elements[i]) != 0; i++)
+	{
+	  if (p < 0)
+	    {
+	      if (pool->solvables[-p].repo != pool->installed)
+	        break;
+	      continue;
+	    }
+	  if (p == ip || pool->solvables[p].repo != pool->installed || !MAPTST(cleandepsmap, p - pool->installed->start))
+	    continue;
+	  for (j = 0; j < unneededq->count; j++)
+	    if (p == unneededq->elements[j])
+	      {
+		if (edges->elements[edges->count - 1] != j + 1)
+		  queue_push(edges, j + 1);
+	        break;
+	      }
+	}
+      while (dq.elements[i])
+	i++;
+    }
+  queue_free(&dq);
+}
+#endif
 
 void
 solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
@@ -4016,31 +4159,37 @@ solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
       for (i = 0; i < count; i++)
 	{
 	  Solvable *s = pool->solvables + unneededq->elements[i];
-	  edges.elements[i + 1] = edges.count;
+	  int oldcount = edges.count;
+	  edges.elements[i + 1] = oldcount;
 	  for (pass = 0; pass < 2; pass++)
 	    {
-	      int num = 0;
 	      unsigned int off = pass == 0 ? s->requires : s->recommends;
-	      Id p, pp, *dp;
+	      Id p, pp, dep, *dp;
 	      if (off)
-		for (dp = s->repo->idarraydata + off; *dp; dp++)
-		  FOR_PROVIDES(p, pp, *dp)
-		    {
-		      Solvable *sp = pool->solvables + p;
-		      if (s == sp || sp->repo != installed || !MAPTST(&cleandepsmap, p - installed->start))
+		for (dp = s->repo->idarraydata + off; (dep = *dp) != 0; dp++)
+		  {
+#ifdef ENABLE_COMPLEX_DEPS
+		    if (pool_is_complex_dep(pool, dep))
+		      {
+			complex_unneeded(pool, s - pool->solvables, dep, &edges, &cleandepsmap, unneededq);
 			continue;
-		      for (j = 0; j < count; j++)
-			if (p == unneededq->elements[j])
-			  break;
-		      if (j == count)
-			continue;
-		      if (num && edges.elements[edges.count - 1] == j + 1)
-			continue;
-		      queue_push(&edges, j + 1);
-		      num++;
-		    }
-		if (pass == 0)
-		  nrequires[i] = num;
+		      }
+#endif
+		    FOR_PROVIDES(p, pp, dep)
+		      {
+			Solvable *sp = pool->solvables + p;
+			if (s == sp || sp->repo != installed || !MAPTST(&cleandepsmap, p - installed->start))
+			  continue;
+			for (j = 0; j < count; j++)
+			  if (p == unneededq->elements[j])
+			    {
+			      if (edges.elements[edges.count - 1] != j + 1)
+			        queue_push(&edges, j + 1);
+			    }
+		      }
+		  }
+	      if (pass == 0)
+	        nrequires[i] = edges.count - oldcount;
 	    }
 	  queue_push(&edges, 0);
 	}
