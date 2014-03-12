@@ -290,6 +290,11 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	      repodata_add_poolstr_array(data, SOLVID_META, REPOSITORY_REPOID, value);
 	      continue;
 	    }
+	  if (istag ("REPOKEYWORDS"))
+	    {
+	      add_multiple_strings(data, SOLVID_META, REPOSITORY_KEYWORDS, value);
+	      continue;
+	    }
 	  if (istag ("DISTRO"))
 	    {
 	      Id dh = repodata_new_handle(data);
