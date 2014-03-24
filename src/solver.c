@@ -2660,6 +2660,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      if (level < olevel)
 		break;
 	    }
+	  if (p < solv->installed->end)
+	    {
+	      if (level == 0)
+		break;
+	      continue;		/* back to main loop */
+	    }
 	}
 
       if (solv->installed && solv->cleandepsmap.size)
