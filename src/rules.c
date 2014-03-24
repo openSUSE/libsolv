@@ -1225,9 +1225,11 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
   if (solv->dupmap_all)
     p = finddistupgradepackages(solv, s, &qs, allow_all);
   else
-    policy_findupdatepackages(solv, s, &qs, allow_all);
-  if (!allow_all && !solv->dupmap_all && solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
-    addduppackages(solv, s, &qs);
+    {
+      policy_findupdatepackages(solv, s, &qs, allow_all);
+      if (!allow_all && solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
+        addduppackages(solv, s, &qs);
+    }
 
 #ifdef ENABLE_LINKED_PKGS
   if (solv->instbuddy && solv->instbuddy[s - pool->solvables - solv->installed->start])
@@ -1256,48 +1258,54 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
     {
       int i, j;
 
-      d = pool_queuetowhatprovides(pool, &qs);
-      /* filter out all multiversion packages as they don't update */
-      for (i = j = 0; i < qs.count; i++)
+      for (i = 0; i < qs.count; i++)
+	if (MAPTST(&solv->multiversion, qs.elements[i]))
+	  break;
+      if (i < qs.count)
 	{
-	  if (MAPTST(&solv->multiversion, qs.elements[i]))
-	    {
-	      Solvable *ps = pool->solvables + qs.elements[i];
-	      /* if keepexplicitobsoletes is set and the name is different,
-	       * we assume that there is an obsoletes. XXX: not 100% correct */
-	      if (solv->keepexplicitobsoletes && ps->name != s->name)
+	  /* filter out all multiversion packages as they don't update */
+	  d = pool_queuetowhatprovides(pool, &qs);
+	  for (j = i; i < qs.count; i++)
+	     {
+	      if (MAPTST(&solv->multiversion, qs.elements[i]))
 		{
-		  qs.elements[j++] = qs.elements[i];
-		  continue;
+		  Solvable *ps = pool->solvables + qs.elements[i];
+		  /* if keepexplicitobsoletes is set and the name is different,
+		   * we assume that there is an obsoletes. XXX: not 100% correct */
+		  if (solv->keepexplicitobsoletes && ps->name != s->name)
+		    {
+		      qs.elements[j++] = qs.elements[i];
+		      continue;
+		    }
+		  /* it's ok if they have same nevra */
+		  if (ps->name != s->name || ps->evr != s->evr || ps->arch != s->arch)
+		    continue;
 		}
-	      /* it's ok if they have same nevra */
-	      if (ps->name != s->name || ps->evr != s->evr || ps->arch != s->arch)
-		continue;
+	      qs.elements[j++] = qs.elements[i];
 	    }
-	  qs.elements[j++] = qs.elements[i];
-	}
-      if (j < qs.count)
-	{
-	  if (d && solv->installed && s->repo == solv->installed &&
-              (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
+	  if (j < qs.count)
 	    {
-	      if (!solv->specialupdaters)
-		solv->specialupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
-	      solv->specialupdaters[s - pool->solvables - solv->installed->start] = d;
+	      if (d && solv->installed && s->repo == solv->installed &&
+		  (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
+		{
+		  if (!solv->specialupdaters)
+		    solv->specialupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
+		  solv->specialupdaters[s - pool->solvables - solv->installed->start] = d;
+		}
+	      if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
+		{
+		  queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
+		  j = qs.count;
+		}
+	      qs.count = j;
 	    }
-	  if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
+	  else if (p != -SYSTEMSOLVABLE)
 	    {
-	      queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
-	      j = qs.count;
+	      /* could fallthrough, but then we would do pool_queuetowhatprovides twice */
+	      queue_free(&qs);
+	      solver_addrule(solv, p, d);	/* allow update of s */
+	      return;
 	    }
-	  qs.count = j;
-	}
-      else if (p != -SYSTEMSOLVABLE)
-	{
-	  /* could fallthrough, but then we would do pool_queuetowhatprovides twice */
-	  queue_free(&qs);
-	  solver_addrule(solv, p, d);	/* allow update of s */
-	  return;
 	}
     }
   if (qs.count && p == -SYSTEMSOLVABLE)
