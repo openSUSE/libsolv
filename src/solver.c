@@ -1133,7 +1133,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
     {
       v = solv->decisionq.elements[--idx];
       vv = v > 0 ? v : -v;
-      if (!MAPTST(&seen, vv))
+      if (!MAPTST(&seen, vv) || vv == SYSTEMSOLVABLE)
 	continue;
       why = solv->decisionq_why.elements[idx];
       assert(why > 0);
