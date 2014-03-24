@@ -2861,7 +2861,7 @@ solver_addchoicerules(Solver *solv)
   for (rid = 1; rid < solv->rpmrules_end ; rid++)
     {
       r = solv->rules + rid;
-      if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 < 0))
+      if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 <= 0))
 	continue;	/* only look at requires rules */
       /* solver_printrule(solv, SOLV_DEBUG_RESULT, r); */
       queue_empty(&q);
