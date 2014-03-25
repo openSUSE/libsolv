@@ -132,6 +132,9 @@ repo_add_autopattern(Repo *repo, int flags)
 		  continue;
 		if (rd->name == pattern_id)
 		  {
+		    const char *evrstr = pool_id2str(pool, rd->evr);
+		    if (evrstr[0] == '.')
+		      continue;
 		    queue_push2(&patq2, p, rd->evr);
 		    break;
 		  }
