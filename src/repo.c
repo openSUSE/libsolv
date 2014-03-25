@@ -92,11 +92,13 @@ repo_empty(Repo *repo, int reuseids)
 	if (s->repo != repo)
 	  break;
       pool_free_solvable_block(pool, i + 1, repo->end - (i + 1), reuseids);
+      repo->end = i + 1;
     }
   /* zero out (i.e. free) solvables belonging to this repo */
   for (i = repo->start, s = pool->solvables + i; i < repo->end; i++, s++)
     if (s->repo == repo)
       memset(s, 0, sizeof(*s));
+  repo->end = repo->start;
   repo->nsolvables = 0;
 
   /* free all data belonging to this repo */
