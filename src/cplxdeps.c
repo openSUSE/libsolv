@@ -245,6 +245,8 @@ normalize_dep(Pool *pool, Id dep, Queue *bq, int todnf)
   dp = pool_whatprovides(pool, dep);
   if (dp <= 2 || !pool->whatprovidesdata[dp])
     return dp == 2 ? 1 : 0;
+  if (pool->whatprovidesdata[dp] == SYSTEMSOLVABLE)
+    return 1;
   if (todnf)
     {
       for (; pool->whatprovidesdata[dp]; dp++)
