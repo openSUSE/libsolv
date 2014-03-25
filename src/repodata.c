@@ -3063,7 +3063,8 @@ repodata_internalize(Repodata *data)
 {
   Repokey *key, solvkey;
   Id entry, nentry;
-  Id schemaid, *schema, *sp, oldschema, *keyp, *keypstart, *seen;
+  Id schemaid, keyid, *schema, *sp, oldschema, *keyp, *seen;
+  int schemaoffset;
   unsigned char *dp, *ndp;
   int newschema, oldcount;
   struct extdata newincore;
@@ -3185,18 +3186,19 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	  data->mainschema = schemaid;
 	  data->mainschemaoffsets = solv_calloc(sp - schema, sizeof(Id));
 	}
-      keypstart = data->schemadata + data->schemata[schemaid];
-      for (keyp = keypstart; *keyp; keyp++)
+      /* we don't use a pointer to the schemadata here as repodata_serialize_key
+       * may call repodata_schema2id() which might realloc our schemadata */
+      for (schemaoffset = data->schemata[schemaid]; (keyid = data->schemadata[schemaoffset]) != 0; schemaoffset++)
 	{
 	  if (entry == -1)
-	    data->mainschemaoffsets[keyp - keypstart] = newincore.len;
-	  if (*keyp == solvkeyid)
+	    data->mainschemaoffsets[schemaoffset - data->schemata[schemaid]] = newincore.len;
+	  if (keyid == solvkeyid)
 	    {
 	      /* add flexarray entry count */
 	      data_addid(&newincore, data->end - data->start);
 	      break;
 	    }
-	  key = data->keys + *keyp;
+	  key = data->keys + keyid;
 #if 0
 	  fprintf(stderr, "internalize %d(%d):%s:%s\n", entry, entry + data->start, pool_id2str(data->repo->pool, key->name), pool_id2str(data->repo->pool, key->type));
 #endif
@@ -3213,21 +3215,19 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 		ndp = data_skip_key(data, dp, key);
 	      oldcount--;
 	    }
-	  if (seen[*keyp] == -1)
+	  if (seen[keyid] == -1)
 	    {
 	      /* If this key was an old one _and_ was not overwritten with
 		 a different value copy over the old value (we skipped it
 		 above).  */
 	      if (dp != ndp)
 		data_addblob(&newincore, dp, ndp - dp);
-	      seen[*keyp] = 0;
+	      seen[keyid] = 0;
 	    }
-	  else if (seen[*keyp])
+	  else if (seen[keyid])
 	    {
-	      /* Otherwise we have a new value.  Parse it into the internal
-		 form.  */
-	      repodata_serialize_key(data, &newincore, &newvincore,
-				     schema, key, seen[*keyp] - 1);
+	      /* Otherwise we have a new value.  Parse it into the internal form.  */
+	      repodata_serialize_key(data, &newincore, &newvincore, schema, key, seen[keyid] - 1);
 	    }
 	  dp = ndp;
 	}
