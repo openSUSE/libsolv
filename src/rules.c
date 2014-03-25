@@ -261,18 +261,17 @@ hashrule(Solver *solv, Id p, Id d, int n)
  *   Install:    p > 0, d = 0   (A)             user requested install
  *   Remove:     p < 0, d = 0   (-A)            user requested remove (also: uninstallable)
  *   Requires:   p < 0, d > 0   (-A|B1|B2|...)  d: <list of providers for requirement of p>
+ *   Requires:   p > 0, d < 0   (B|-A)		hack to save a whatprovides allocation, gets converted into (-A|B)
  *   Updates:    p > 0, d > 0   (A|B1|B2|...)   d: <list of updates for solvable p>
  *   Conflicts:  p < 0, d < 0   (-A|-B)         either p (conflict issuer) or d (conflict provider) (binary rule)
  *                                              also used for obsoletes
- *   ?:          p > 0, d < 0   (A|-B)
- *   No-op ?:    p = 0, d = 0   (null)          (used as policy rule placeholder)
+ *   No-op ?:    p = 0, d = 0   (null)          (used as placeholder in update/feature rules)
  *
  *   resulting watches:
  *   ------------------
  *   Direct assertion (no watch needed) --> d = 0, w1 = p, w2 = 0
  *   Binary rule: p = first literal, d = 0, w2 = second literal, w1 = p
  *   every other : w1 = p, w2 = whatprovidesdata[d];
- *   Disabled rule: w1 = 0
  *
  *   always returns a rule for non-rpm rules
  */
@@ -287,7 +286,7 @@ solver_addrule(Solver *solv, Id p, Id d)
   int n = 0;			       /* number of literals in rule - 1
 					  0 = direct assertion (single literal)
 					  1 = binary rule
-					  >1 =
+					  >1 = multi-literal rule
 					*/
 
   /* it often happenes that requires lead to adding the same rpm rule
@@ -301,68 +300,61 @@ solver_addrule(Solver *solv, Id p, Id d)
 	return r;
     }
 
-    /*
-     * compute number of literals (n) in rule
-     */
-
+  /* compute number of literals (n) in rule */
   if (d < 0)
     {
-      /* always a binary rule */
+      if (p == -d)
+	return 0;			/* rule is self-fulfilling */
       if (p == d)
-	return 0;		       /* ignore self conflict */
-      n = 1;
+	d = 0;				/* normalize to assertion */
+      else
+        n = 1;				/* binary rule */
     }
   else if (d > 0)
     {
       for (dp = pool->whatprovidesdata + d; *dp; dp++, n++)
 	if (*dp == -p)
 	  return 0;			/* rule is self-fulfilling */
-	
       if (n == 1) 			/* convert to binary rule */
 	d = dp[-1];
     }
 
   if (n == 1 && p > d && !solv->rpmrules_end)
     {
-      /* smallest literal first so we can find dups */
+      /* put smallest literal first so we can find dups */
       n = p; p = d; d = n;             /* p <-> d */
       n = 1;			       /* re-set n, was used as temp var */
     }
 
   /*
-   * check for duplicate
+   * check for duplicate (r is only set if we're adding rpm rules)
    */
-
-  /* check if the last added rule (r) is exactly the same as what we're looking for. */
-  if (r && n == 1 && !r->d && r->p == p && r->w2 == d)
-    return r;  /* binary rule */
-
-    /* have n-ary rule with same first literal, check other literals */
-  if (r && n > 1 && r->d && r->p == p)
+  if (r)
     {
-      /* Rule where d is an offset in whatprovidesdata */
-      Id *dp2;
-      if (d == r->d)
+      /* check if the last added rule (r) is exactly the same as what we're looking for. */
+      if (n == 1 && !r->d && r->p == p && r->w2 == d)
 	return r;
-      dp2 = pool->whatprovidesdata + r->d;
-      for (dp = pool->whatprovidesdata + d; *dp; dp++, dp2++)
-	if (*dp != *dp2)
-	  break;
-      if (*dp == *dp2)
-	return r;
-   }
+      /* have n-ary rule with same first literal, check other literals */
+      if (n > 1 && r->d && r->p == p)
+	{
+	  /* Rule where d is an offset in whatprovidesdata */
+	  Id *dp2;
+	  if (d == r->d)
+	    return r;
+	  dp2 = pool->whatprovidesdata + r->d;
+	  for (dp = pool->whatprovidesdata + d; *dp; dp++, dp2++)
+	    if (*dp != *dp2)
+	      break;
+	  if (*dp == *dp2)
+	    return r;
+	}
+    }
 
   /*
-   * allocate new rule
+   * allocate new rule r
    */
-
-  /* extend rule buffer */
   solv->rules = solv_extend(solv->rules, solv->nrules, 1, sizeof(Rule), RULES_BLOCK);
   r = solv->rules + solv->nrules++;    /* point to rule space */
-
-    /*
-     * r = new rule
-     */
 
   r->p = p;
   if (n == 0)
