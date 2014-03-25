@@ -902,7 +902,7 @@ solver_addrpmrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		      p = -makemultiversionconflict(solv, p, con);
 		    }
                   /* rule: -n|-p: either solvable _or_ provider of conflict */
-		  addrpmrule(solv, -n, -p, SOLVER_RULE_RPM_PACKAGE_CONFLICT, con);
+		  addrpmrule(solv, -n, p == SYSTEMSOLVABLE ? 0 : -p, SOLVER_RULE_RPM_PACKAGE_CONFLICT, con);
 		}
 	    }
 	}
@@ -2434,6 +2434,9 @@ addrpmruleinfo(Solver *solv, Id p, Id d, int type, Id dep)
 	  if (p != op || w2 != ow2)
 	    return;
 	}
+      /* should use a different type instead */
+      if (type == SOLVER_RULE_RPM_PACKAGE_CONFLICT && !w2)
+	w2 = -SYSTEMSOLVABLE;
     }
   /* yep, rule matches. record info */
   queue_push(solv->ruleinfoq, type);
