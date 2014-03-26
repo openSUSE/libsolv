@@ -104,6 +104,8 @@ while true ; do
   elif test "$1" = "-X" ; then
     addautooption=-X
     shift
+  elif test "$1" = "-A" ; then
+    shift
   else
     break
   fi
