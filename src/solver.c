@@ -1630,6 +1630,14 @@ solver_get_flag(Solver *solv, int flag)
     return solv->bestobeypolicy;
   case SOLVER_FLAG_NO_AUTOTARGET:
     return solv->noautotarget;
+  case SOLVER_FLAG_DUP_ALLOW_DOWNGRADE:
+    return solv->dup_allowdowngrade;
+  case SOLVER_FLAG_DUP_ALLOW_NAMECHANGE:
+    return solv->dup_allownamechange;
+  case SOLVER_FLAG_DUP_ALLOW_ARCHCHANGE:
+    return solv->dup_allowarchchange;
+  case SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE:
+    return solv->dup_allowvendorchange;
   default:
     break;
   }
@@ -1680,6 +1688,18 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_NO_AUTOTARGET:
     solv->noautotarget = value;
+    break;
+  case SOLVER_FLAG_DUP_ALLOW_DOWNGRADE:
+    solv->dup_allowdowngrade = value;
+    break;
+  case SOLVER_FLAG_DUP_ALLOW_NAMECHANGE:
+    solv->dup_allownamechange = value;
+    break;
+  case SOLVER_FLAG_DUP_ALLOW_ARCHCHANGE:
+    solv->dup_allowarchchange = value;
+    break;
+  case SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE:
+    solv->dup_allowvendorchange = value;
     break;
   default:
     break;

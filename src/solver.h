@@ -275,6 +275,10 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES	11
 #define SOLVER_FLAG_BEST_OBEY_POLICY		12
 #define SOLVER_FLAG_NO_AUTOTARGET		13
+#define SOLVER_FLAG_DUP_ALLOW_DOWNGRADE		14
+#define SOLVER_FLAG_DUP_ALLOW_ARCHCHANGE	15
+#define SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE	16
+#define SOLVER_FLAG_DUP_ALLOW_NAMECHANGE	17
 
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);

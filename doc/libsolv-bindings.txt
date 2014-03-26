@@ -1764,10 +1764,11 @@ repositories except orphaned packages. Orphaned packages are packages that
 have no relation to the packages in the repositories, i.e. no package in the
 repositories have the same name or obsolete the orphaned package.
 This action brings the installed packages in sync with the ones in the
-repository. It also turns of arch/vendor/version locking for the affected
-packages to simulate a fresh installation. This means that distupgrade can
+repository. By default it also turns of arch/vendor/version locking for the
+affected packages to simulate a fresh installation. This means that distupgrade can
 actually downgrade packages if only lower versions of a package are available
-in the repositories.
+in the repositories. You can tweak this behavior with the SOLVER_FLAG_DUP_
+solver flags.
 
 *SOLVER_DROP_ORPHANED*::
 Erase all the matching installed packages if they are orphaned. This only makes
@@ -1994,6 +1995,18 @@ This flag also includes the above flags. You may want to set this
 flag if you only have SOLVER_ERASE jobs, as in that case it's
 better for the user to check the transaction overview instead of
 approving every single package that needs to be erased.
+
+*SOLVER_FLAG_DUP_ALLOW_DOWNGRADE*::
+Like SOLVER_FLAG_ALLOW_DOWNGRADE, but used in distupgrade mode.
+
+*SOLVER_FLAG_DUP_ALLOW_ARCHCHANGE*::
+Like SOLVER_FLAG_ALLOW_ARCHCHANGE, but used in distupgrade mode.
+
+*SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE*::
+Like SOLVER_FLAG_ALLOW_VENDORCHANGE, but used in distupgrade mode.
+
+*SOLVER_FLAG_DUP_ALLOW_NAMECHANGE*::
+Like SOLVER_FLAG_ALLOW_NAMECHANGE, but used in distupgrade mode.
 
 *SOLVER_FLAG_NO_UPDATEPROVIDE*::
 If multiple packages obsolete an installed package, the solver checks
