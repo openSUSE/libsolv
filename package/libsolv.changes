@@ -1,4 +1,17 @@
 -------------------------------------------------------------------
+Wed Mar 26 15:08:46 CET 2014 - mls@suse.de
+
+- fix handling of packages with no update/feature rule [bnc#870195]
+- fix crash when in internalize() when the schemadata gets
+  reallocated
+- fix access to uninitialized memory in repo_empty()
+- a couple of optimizations
+- support REPOKEYWORDS in content parser
+- bindings: don't let str(Datamatch) change the strings
+- fix basename optimization for STRINGEND
+- bump version to 0.5.1
+
+-------------------------------------------------------------------
 Wed Feb 26 15:08:35 CET 2014 - mls@suse.de
 
 - improve appdata.xml parsing [bnc#865293]
