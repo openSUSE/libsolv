@@ -2064,7 +2064,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    rr -= solv->installed->end - solv->installed->start;
 		  if (!rr->p)		/* identical to update rule? */
 		    rr = r;
-		  if (!rr->p && (!specialupdaters || !specialupdaters[i - installed->start]))
+		  if (!rr->p && !(specialupdaters && specialupdaters[i - installed->start]))
 		    continue;		/* orpaned package */
 
 		  /* check if we should update this package to the latest version
@@ -2074,7 +2074,21 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  queue_empty(&dq);
 		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || (rr->p && rr->p != i)))
 		    {
-		      if (specialupdaters && (d = specialupdaters[i - installed->start]) != 0)
+		      if (!rr->p)
+			{
+			  /* specialupdater with no update/feature rule */
+			  for (d = specialupdaters[i - installed->start]; (p = pool->whatprovidesdata[d++]) != 0; )
+			    {
+			      if (solv->decisionmap[p] > 0)
+			        {
+				  dq.count = 0;
+			          break;
+			        }
+			      if (!solv->decisionmap[p])
+				queue_push(&dq, p);
+			    }
+			}
+		      else if (specialupdaters && (d = specialupdaters[i - installed->start]) != 0)
 			{
 			  /* special multiversion handling, make sure best version is chosen */
 			  if (rr->p == i && solv->decisionmap[i] >= 0)
@@ -2084,7 +2098,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			      queue_push(&dq, p);
 			  if (dq.count && solv->update_targets && solv->update_targets->elements[i - installed->start])
 			    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], &dq);
-			  if (dq.count && rr->p)
+			  if (dq.count)
 			    {
 			      policy_filter_unwanted(solv, &dq, POLICY_MODE_CHOOSE);
 			      p = dq.elements[0];
