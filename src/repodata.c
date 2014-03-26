@@ -3064,7 +3064,7 @@ repodata_internalize(Repodata *data)
   Repokey *key, solvkey;
   Id entry, nentry;
   Id schemaid, keyid, *schema, *sp, oldschema, *keyp, *seen;
-  int schemaoffset;
+  int schemaidx;
   unsigned char *dp, *ndp;
   int newschema, oldcount;
   struct extdata newincore;
@@ -3188,10 +3188,10 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	}
       /* we don't use a pointer to the schemadata here as repodata_serialize_key
        * may call repodata_schema2id() which might realloc our schemadata */
-      for (schemaoffset = data->schemata[schemaid]; (keyid = data->schemadata[schemaoffset]) != 0; schemaoffset++)
+      for (schemaidx = data->schemata[schemaid]; (keyid = data->schemadata[schemaidx]) != 0; schemaidx++)
 	{
 	  if (entry == -1)
-	    data->mainschemaoffsets[schemaoffset - data->schemata[schemaid]] = newincore.len;
+	    data->mainschemaoffsets[schemaidx - data->schemata[schemaid]] = newincore.len;
 	  if (keyid == solvkeyid)
 	    {
 	      /* add flexarray entry count */
