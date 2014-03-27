@@ -133,15 +133,28 @@ repo_add_autopattern(Repo *repo, int flags)
 		if (rd->name == pattern_id)
 		  {
 		    const char *evrstr = pool_id2str(pool, rd->evr);
-		    if (evrstr[0] == '.')
+		    if (evrstr[0] == '.')	/* hack to allow provides that do not create a pattern */
 		      continue;
+		    if (patq2.count && patq2.elements[patq2.count - 2] == p)
+		      {
+			/* hmm, two provides. choose by evrstr */
+			if (strcmp(evrstr, pool_id2str(pool, patq2.elements[patq2.count - 1])) >= 0)
+			  continue;
+			patq2.count -= 2;
+		      }
 		    queue_push2(&patq2, p, rd->evr);
-		    break;
 		  }
 		if (rd->name == product_id)
 		  {
+		    const char *evrstr = pool_id2str(pool, rd->evr);
+		    if (prdq2.count && prdq2.elements[prdq2.count - 2] == p)
+		      {
+			/* hmm, two provides. choose by evrstr */
+			if (strcmp(evrstr, pool_id2str(pool, prdq2.elements[prdq2.count - 1])) >= 0)
+			  continue;
+			prdq2.count -= 2;
+		      }
 		    queue_push2(&prdq2, p, rd->evr);
-		    break;
 		  }
 	      }
 	}
