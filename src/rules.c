@@ -2485,8 +2485,12 @@ getrpmruleinfos(Solver *solv, Rule *r, Queue *rq)
 #ifdef ENABLE_LINKED_PKGS
   FOR_RULELITERALS(l, pp, r)
     {
-      if (l < 0 || l != r->p)
-	break;
+      if (l < 0)
+	{
+	  if (l == r->p)
+	    continue;
+	  break;
+	}
       if (!strchr(pool_id2str(pool, pool->solvables[l].name), ':') || !has_package_link(pool, pool->solvables + l))
 	break;
       add_package_link(solv, pool->solvables + l, 0, 0);
