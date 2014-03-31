@@ -97,6 +97,10 @@ static struct solverflags2str {
   { SOLVER_FLAG_KEEP_EXPLICIT_OBSOLETES,    "keepexplicitobsoletes", 0 },
   { SOLVER_FLAG_BEST_OBEY_POLICY,           "bestobeypolicy", 0 },
   { SOLVER_FLAG_NO_AUTOTARGET,              "noautotarget", 0 },
+  { SOLVER_FLAG_DUP_ALLOW_DOWNGRADE,        "dupallowdowngrade", 1 },
+  { SOLVER_FLAG_DUP_ALLOW_ARCHCHANGE,       "dupallowarchchange", 1 },
+  { SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE,     "dupallowvendorchange", 1 },
+  { SOLVER_FLAG_DUP_ALLOW_NAMECHANGE,       "dupallownamechange", 1 },
   { 0, 0, 0 }
 };
 
