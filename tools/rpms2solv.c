@@ -71,8 +71,9 @@ main(int argc, char **argv)
 #ifdef SUSE
   int add_auto = 0;
 #endif
+  int filtered_filelist = 0;
 
-  while ((c = getopt(argc, argv, "0XkKb:m:")) >= 0)
+  while ((c = getopt(argc, argv, "0XkKb:m:F")) >= 0)
     {
       switch(c)
 	{
@@ -84,6 +85,9 @@ main(int argc, char **argv)
 	  break;
 	case '0':
 	  manifest0 = 1;
+	  break;
+	case 'F':
+	  filtered_filelist = 1;
 	  break;
 #ifdef ENABLE_PUBKEY
 	case 'k':
@@ -169,7 +173,7 @@ main(int argc, char **argv)
 	  continue;
         }
 #endif
-      if (repo_add_rpm(repo, rpms[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE) == 0)
+      if (repo_add_rpm(repo, rpms[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|(filtered_filelist ? RPM_ADD_FILTERED_FILELIST : 0)) == 0)
 	{
 	  fprintf(stderr, "rpms2solv: %s\n", pool_errstr(pool));
 	  res = 1;

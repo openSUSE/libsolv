@@ -717,8 +717,23 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
   solv_free(fkb);
 }
 
+static int
+is_filtered(const char *dir)
+{
+  if (!dir)
+    return 1;
+  /* the dirs always have a trailing / in rpm */
+  if (strstr(dir, "bin/"))
+    return 0;
+  if (!strncmp(dir, "/etc/", 5))
+    return 0;
+  if (!strcmp(dir, "/usr/lib/"))
+    return 2;
+  return 1;
+}
+
 static void
-addfilelist(Repodata *data, Id handle, RpmHead *rpmhead)
+addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
 {
   char **bn;
   char **dn;
@@ -727,6 +742,7 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead)
   int i;
   Id lastdid = 0;
   unsigned int lastdii = -1;
+  int lastfiltered = 0;
 
   if (!data)
     return;
@@ -765,14 +781,25 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead)
 	{
 	  if (di[i] >= dnc)
 	    continue;	/* corrupt entry */
-	  did = repodata_str2dir(data, dn[di[i]], 1);
+	  lastdii = di[i];
+	  if ((flags & RPM_ADD_FILTERED_FILELIST) != 0)
+	    {
+	      lastfiltered = is_filtered(dn[di[i]]);
+	      if (lastfiltered == 1)
+		continue;
+	    }
+	  did = repodata_str2dir(data, dn[lastdii], 1);
 	  if (!did)
 	    did = repodata_str2dir(data, "/", 1);
 	  lastdid = did;
-	  lastdii = di[i];
 	}
       if (b && *b == '/')	/* work around rpm bug */
 	b++;
+      if (lastfiltered)
+	{
+	  if (lastfiltered != 2 || strcmp(b, "sendmail"))
+	    continue;
+	}
       repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, b);
     }
   solv_free(bn);
@@ -994,7 +1021,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
 	    }
 	}
       if ((flags & RPM_ADD_NO_FILELIST) == 0)
-	addfilelist(data, handle, rpmhead);
+	addfilelist(data, handle, rpmhead, flags);
       if ((flags & RPM_ADD_WITH_CHANGELOG) != 0)
 	addchangelog(data, handle, rpmhead);
     }
