@@ -1734,12 +1734,8 @@ rb_eval_string(
     solv_free($self);
   }
 #if defined(SWIGPYTHON)
-  %newobject __iter__;
-  Dataiterator *__iter__() {
-    Dataiterator *ndi;
-    ndi = solv_calloc(1, sizeof(*ndi));
-    dataiterator_init_clone(ndi, $self);
-    return ndi;
+  %pythoncode {
+    def __iter__(self): return self
   }
 #ifndef PYTHON3
   %rename("next") __next__();
@@ -1971,12 +1967,8 @@ rb_eval_string(
     return s;
   }
 #if defined(SWIGPYTHON)
-  %newobject __iter__;
-  Pool_solvable_iterator *__iter__() {
-    Pool_solvable_iterator *s;
-    s = solv_calloc(1, sizeof(*s));
-    *s = *$self;
-    return s;
+  %pythoncode {
+    def __iter__(self): return self
   }
 #ifndef PYTHON3
   %rename("next") __next__();
@@ -2030,12 +2022,8 @@ rb_eval_string(
     return s;
   }
 #if defined(SWIGPYTHON)
-  %newobject __iter__;
-  Pool_repo_iterator *__iter__() {
-    Pool_repo_iterator *s;
-    s = solv_calloc(1, sizeof(*s));
-    *s = *$self;
-    return s;
+  %pythoncode {
+    def __iter__(self): return self
   }
 #ifndef PYTHON3
   %rename("next") __next__();
@@ -2090,12 +2078,8 @@ rb_eval_string(
     return s;
   }
 #if defined(SWIGPYTHON)
-  %newobject __iter__;
-  Repo_solvable_iterator *__iter__() {
-    Repo_solvable_iterator *s;
-    s = solv_calloc(1, sizeof(*s));
-    *s = *$self;
-    return s;
+  %pythoncode {
+    def __iter__(self): return self
   }
 #ifndef PYTHON3
   %rename("next") __next__();
