@@ -4321,7 +4321,7 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       strstart = "multi version ";
       break;
     case SOLVER_LOCK:
-      strstart = "update ";
+      strstart = "lock ";
       break;
     case SOLVER_DISTUPGRADE:
       strstart = "dist upgrade ";
