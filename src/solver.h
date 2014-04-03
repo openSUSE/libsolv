@@ -280,6 +280,9 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE	16
 #define SOLVER_FLAG_DUP_ALLOW_NAMECHANGE	17
 
+#define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead if ids */
+#define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */
+
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern int  solver_solve(Solver *solv, Queue *job);
@@ -295,6 +298,8 @@ extern void solver_get_decisionblock(Solver *solv, int level, Queue *decisionq);
 extern void solver_get_orphaned(Solver *solv, Queue *orphanedq);
 extern void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *suggestionsq, int noselected);
 extern void solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered);
+extern void solver_get_userinstalled(Solver *solv, Queue *q, int flags);
+extern void pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int flags);
 
 extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
 extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
