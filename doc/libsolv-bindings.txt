@@ -566,7 +566,12 @@ desired solvable by Id.
 Lookup functions. Return the data element stored in the specified solvable.
 You should probably use the methods of the Solvable class instead.
 
-	Dataiterator Dataiterator(Id solvid, Id keyname, const char *match = 0, int flags = 0)
+	Dataiterator Dataiterator(Id keyname, const char *match = 0, int flags = 0)
+	my $di = $pool->Dataiterator($keyname, $match, $flags);
+	di = pool.Dataiterator(keyname, match, flags)
+	di = pool.Dataiterator(keyname, match, flags)
+
+	Dataiterator Dataiterator_solvid(Id solvid, Id keyname, const char *match = 0, int flags = 0)
 	my $di = $pool->Dataiterator($solvid, $keyname, $match, $flags);
 	di = pool.Dataiterator(solvid, keyname, match, flags)
 	di = pool.Dataiterator(solvid, keyname, match, flags)
@@ -576,7 +581,8 @@ You should probably use the methods of the Solvable class instead.
 	for d in di
 
 Iterate over the matching data elements. See the Dataiterator class for more
-information.
+information. The Dataiterator method iterates over all solvables in the pool,
+whereas the Dataiterator_solvid only iterates over the specified solvable.
 
 === ID METHODS ===
 
@@ -935,17 +941,24 @@ areas.
 
 Create a Selection consisting of all packages in the repository.
 
-	Dataiterator Dataiterator(Id p, Id key, const char *match = 0, int flags = 0)
-	my $di = $repo->Dataiterator($solvid, $keyname, $match, $flags);
-	di = repo.Dataiterator(solvid, keyname, match, flags)
-	di = repo.Dataiterator(solvid, keyname, match, flags)
+	Dataiterator Dataiterator(Id key, const char *match = 0, int flags = 0)
+	my $di = $repo->Dataiterator($keyname, $match, $flags);
+	di = repo.Dataiterator(keyname, match, flags)
+	di = repo.Dataiterator(keyname, match, flags)
+
+	Dataiterator Dataiterator_meta(Id key, const char *match = 0, int flags = 0)
+	my $di = $repo->Dataiterator_meta($keyname, $match, $flags);
+	di = repo.Dataiterator_meta(keyname, match, flags)
+	di = repo.Dataiterator_meta(keyname, match, flags)
 
 	for my $d (@$di)
 	for d in di:
 	for d in di
 
 Iterate over the matching data elements in this repository. See the
-Dataiterator class for more information.
+Dataiterator class for more information. The Dataiterator() method
+iterates over all solvables in a repository, whereas the Dataiterator_meta
+method only iterates over the repository's meta data.
 
 	<stringification>
 	my $str = $repo->str;
@@ -1466,66 +1479,74 @@ The solvable containing the value that was matched.
 
 The id of the solvable that matched.
 
-=== METHODS ===
+	Id key_id;
+	$d->{key_id}
+	d.key_id
+	d.key_id
 
-	Id key_id();
-	$d->key_id()
-	d.key_id()
-	d.key_id()
-
-	const char *key_idstr();
-	$d->key_idstr()
-	d.key_idstr()
-	d.key_idstr()
+	const char *key_idstr;
+	$d->{key_idstr}
+	d.key_idstr
+	d.key_idstr
 
 The keyname that matched, either as id or string.
 
-	Id type_id();
-	$d->type_id()
-	d.type_id()
-	d.type_id()
+	Id type_id;
+	$d->{type_id}
+	d.type_id
+	d.type_id
 
-	const char *type_idstr();
-	$d->type_idstr();
-	d.type_idstr()
-	d.type_idstr()
+	const char *type_idstr;
+	$d->{type_idstr};
+	d.type_idstr
+	d.type_idstr
 
 The key type of the value that was matched, either as id or string.
 
-	Id id();
-	$d->id()
-	d.id()
-	d.id()
+	Id id;
+	$d->{id}
+	d.id
+	d.id
 
-	Id idstr();
-	$d->idstr()
-	d.idstr()
-	d.idstr()
+	Id idstr;
+	$d->{idstr}
+	d.idstr
+	d.idstr
 
 The Id of the value that was matched (only valid for id types),
 either as id or string.
 
-	const char *str();
-	$d->str()
-	d.str()
-	d.str()
+	const char *str;
+	$d->{str}
+	d.str
+	d.str
 
 The string value that was matched (only valid for string types).
 
-	unsigned long long num();
-	$d->num()
-	d.num()
-	d.num()
+	unsigned long long num;
+	$d->{num}
+	d.num
+	d.num
 
 The numeric value that was matched (only valid for numeric types).
 
-	unsigned int num2();
-	$d->num2()
-	d.num2()
-	d.num2()
+	unsigned int num2;
+	$d->{num2}
+	d.num2
+	d.num2
 
 The secondary numeric value that was matched (only valid for types
 containing two values).
+
+	unsigned int binary;
+	$d->{binary}
+	d.binary
+	d.binary
+
+The value in binary form, useful for checksums and other data
+that cannot be represented as a string.
+
+=== METHODS ===
 
 	Datapos pos();
 	my $pos = $d->pos();
@@ -3038,6 +3059,13 @@ result can contain NUL bytes or unprintable characters.
 	raw = chksum.hex()
 
 Finalize the checksum and return the result as hex string.
+
+	const char *typestr()
+	my $typestr = $chksum->typestr();
+	typestr = chksum.typestr
+	typestr = chksum.typestr
+
+Return the type of the checksum as a string, e.g. "sha256".
 
 	<equality>
 	if ($chksum1 == $chksum2)

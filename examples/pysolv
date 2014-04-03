@@ -344,7 +344,7 @@ class repo_repomd(repo_generic):
         return True
 
     def find(self, what):
-        di = self.handle.Dataiterator(solv.SOLVID_META, solv.REPOSITORY_REPOMD_TYPE, what, solv.Dataiterator.SEARCH_STRING)
+        di = self.handle.Dataiterator_meta(solv.REPOSITORY_REPOMD_TYPE, what, solv.Dataiterator.SEARCH_STRING)
         di.prepend_keyname(solv.REPOSITORY_REPOMD)
         for d in di:
             dp = d.parentpos()
@@ -453,7 +453,7 @@ class repo_susetags(repo_generic):
         return True
 
     def find(self, what):
-        di = self.handle.Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, what, solv.Dataiterator.SEARCH_STRING)
+        di = self.handle.Dataiterator_meta(solv.SUSETAGS_FILE_NAME, what, solv.Dataiterator.SEARCH_STRING)
         di.prepend_keyname(solv.SUSETAGS_FILE)
         for d in di:
             dp = d.parentpos()
@@ -490,10 +490,10 @@ class repo_susetags(repo_generic):
         
     def add_exts(self):
         repodata = self.handle.add_repodata(0)
-        di = self.handle.Dataiterator(solv.SOLVID_META, solv.SUSETAGS_FILE_NAME, None, 0)
+        di = self.handle.Dataiterator_meta(solv.SUSETAGS_FILE_NAME, None, 0)
         di.prepend_keyname(solv.SUSETAGS_FILE)
         for d in di:
-            filename = d.str()
+            filename = d.str
             if not filename:
                 continue
             if filename[0:9] != "packages.":
@@ -658,7 +658,7 @@ if options.repos:
 if cmd == 'search':
     pool.createwhatprovides()
     sel = pool.Selection()
-    di = pool.Dataiterator(0, solv.SOLVABLE_NAME, args[0], solv.Dataiterator.SEARCH_SUBSTRING|solv.Dataiterator.SEARCH_NOCASE)
+    di = pool.Dataiterator(solv.SOLVABLE_NAME, args[0], solv.Dataiterator.SEARCH_SUBSTRING|solv.Dataiterator.SEARCH_NOCASE)
     for d in di:
         sel.add_raw(solv.Job.SOLVER_SOLVABLE, d.solvid)
     if repofilter:

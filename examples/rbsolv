@@ -219,7 +219,7 @@ end
 class Repo_rpmmd < Repo_generic
 
   def find(what)
-    di = @handle.Dataiterator(Solv::SOLVID_META, Solv::REPOSITORY_REPOMD_TYPE, what, Solv::Dataiterator::SEARCH_STRING)
+    di = @handle.Dataiterator_meta(Solv::REPOSITORY_REPOMD_TYPE, what, Solv::Dataiterator::SEARCH_STRING)
     di.prepend_keyname(Solv::REPOSITORY_REPOMD)
     for d in di
       dp = d.parentpos()
@@ -337,7 +337,7 @@ end
 class Repo_susetags < Repo_generic
 
   def find(what)
-    di = @handle.Dataiterator(Solv::SOLVID_META, Solv::SUSETAGS_FILE_NAME, what, Solv::Dataiterator::SEARCH_STRING)
+    di = @handle.Dataiterator_meta(Solv::SUSETAGS_FILE_NAME, what, Solv::Dataiterator::SEARCH_STRING)
     di.prepend_keyname(Solv::SUSETAGS_FILE)
     for d in di
       dp = d.parentpos()
@@ -428,7 +428,7 @@ class Repo_susetags < Repo_generic
 
   def add_exts
     repodata = @handle.add_repodata(0)
-    di = @handle.Dataiterator(Solv::SOLVID_META, Solv::SUSETAGS_FILE_NAME, nil, 0)
+    di = @handle.Dataiterator_meta(Solv::SUSETAGS_FILE_NAME, nil, 0)
     di.prepend_keyname(Solv::SUSETAGS_FILE)
     for d in di
       filename = d.str
@@ -560,7 +560,7 @@ end
 if cmd == 'search'
   pool.createwhatprovides()
   sel = pool.Selection
-  for di in pool.Dataiterator(0, Solv::SOLVABLE_NAME, args[0], Solv::Dataiterator::SEARCH_SUBSTRING | Solv::Dataiterator::SEARCH_NOCASE)
+  for di in pool.Dataiterator(Solv::SOLVABLE_NAME, args[0], Solv::Dataiterator::SEARCH_SUBSTRING | Solv::Dataiterator::SEARCH_NOCASE)
     sel.add_raw(Solv::Job::SOLVER_SOLVABLE, di.solvid)
   end
   for s in sel.solvables

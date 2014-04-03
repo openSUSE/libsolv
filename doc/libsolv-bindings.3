@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 03/26/2014
+.\"      Date: 04/03/2014
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "03/26/2014" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "04/03/2014" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1003,7 +1003,20 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBDataiterator Dataiterator(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
+\fBDataiterator Dataiterator(Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
+my \fI$di\fR \fB=\fR \fI$pool\fR\fB\->Dataiterator(\fR\fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDataiterator Dataiterator_solvid(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
 my \fI$di\fR \fB=\fR \fI$pool\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
 \fIdi\fR \fB=\fR \fIpool\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -1024,7 +1037,7 @@ my \fI$di\fR \fB=\fR \fI$pool\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$k
 .RE
 .\}
 .sp
-Iterate over the matching data elements\&. See the Dataiterator class for more information\&.
+Iterate over the matching data elements\&. See the Dataiterator class for more information\&. The Dataiterator method iterates over all solvables in the pool, whereas the Dataiterator_solvid only iterates over the specified solvable\&.
 .SS "ID METHODS"
 .sp
 The following methods deal with Ids, i\&.e\&. integers representing objects in the pool\&. They are considered \(lqlow level\(rq, in most cases you would not use them but instead the object orientated methods\&.
@@ -1626,10 +1639,23 @@ Create a Selection consisting of all packages in the repository\&.
 .RS 4
 .\}
 .nf
-\fBDataiterator Dataiterator(Id\fR \fIp\fR\fB, Id\fR \fIkey\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
-my \fI$di\fR \fB=\fR \fI$repo\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
-\fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
-\fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fBDataiterator Dataiterator(Id\fR \fIkey\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
+my \fI$di\fR \fB=\fR \fI$repo\fR\fB\->Dataiterator(\fR\fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDataiterator Dataiterator_meta(Id\fR \fIkey\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
+my \fI$di\fR \fB=\fR \fI$repo\fR\fB\->Dataiterator_meta(\fR\fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
+\fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator_meta(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
+\fIdi\fR \fB=\fR \fIrepo\fR\fB\&.Dataiterator_meta(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -1647,7 +1673,7 @@ my \fI$di\fR \fB=\fR \fI$repo\fR\fB\->Dataiterator(\fR\fI$solvid\fR\fB,\fR \fI$k
 .RE
 .\}
 .sp
-Iterate over the matching data elements in this repository\&. See the Dataiterator class for more information\&.
+Iterate over the matching data elements in this repository\&. See the Dataiterator class for more information\&. The Dataiterator() method iterates over all solvables in a repository, whereas the Dataiterator_meta method only iterates over the repository\(cqs meta data\&.
 .sp
 .if n \{\
 .RS 4
@@ -2612,16 +2638,15 @@ The solvable containing the value that was matched\&.
 .\}
 .sp
 The id of the solvable that matched\&.
-.SS "METHODS"
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-\fBId key_id()\fR;
-\fI$d\fR\fB\->key_id()\fR
-\fId\fR\fB\&.key_id()\fR
-\fId\fR\fB\&.key_id()\fR
+\fBId\fR \fIkey_id\fR;
+\fI$d\fR\fB\->{\fR\fIkey_id\fR\fB}\fR
+\fId\fR\fB\&.key_id\fR
+\fId\fR\fB\&.key_id\fR
 .fi
 .if n \{\
 .RE
@@ -2631,10 +2656,10 @@ The id of the solvable that matched\&.
 .RS 4
 .\}
 .nf
-\fBconst char *key_idstr()\fR;
-\fI$d\fR\fB\->key_idstr()\fR
-\fId\fR\fB\&.key_idstr()\fR
-\fId\fR\fB\&.key_idstr()\fR
+\fBconst char *\fR\fIkey_idstr\fR;
+\fI$d\fR\fB\->{\fR\fIkey_idstr\fR\fB}\fR
+\fId\fR\fB\&.key_idstr\fR
+\fId\fR\fB\&.key_idstr\fR
 .fi
 .if n \{\
 .RE
@@ -2646,10 +2671,10 @@ The keyname that matched, either as id or string\&.
 .RS 4
 .\}
 .nf
-\fBId type_id()\fR;
-\fI$d\fR\fB\->type_id()\fR
-\fId\fR\fB\&.type_id()\fR
-\fId\fR\fB\&.type_id()\fR
+\fBId\fR \fItype_id\fR;
+\fI$d\fR\fB\->{\fR\fItype_id\fR\fB}\fR
+\fId\fR\fB\&.type_id\fR
+\fId\fR\fB\&.type_id\fR
 .fi
 .if n \{\
 .RE
@@ -2659,10 +2684,10 @@ The keyname that matched, either as id or string\&.
 .RS 4
 .\}
 .nf
-\fBconst char *type_idstr()\fR;
-\fI$d\fR\fB\->type_idstr()\fR;
-\fId\fR\fB\&.type_idstr()\fR
-\fId\fR\fB\&.type_idstr()\fR
+\fBconst char *\fR\fItype_idstr\fR;
+\fI$d\fR\fB\->{\fR\fItype_idstr\fR\fB}\fR;
+\fId\fR\fB\&.type_idstr\fR
+\fId\fR\fB\&.type_idstr\fR
 .fi
 .if n \{\
 .RE
@@ -2674,10 +2699,10 @@ The key type of the value that was matched, either as id or string\&.
 .RS 4
 .\}
 .nf
-\fBId id()\fR;
-\fI$d\fR\fB\->id()\fR
-\fId\fR\fB\&.id()\fR
-\fId\fR\fB\&.id()\fR
+\fBId\fR \fIid\fR;
+\fI$d\fR\fB\->{id}\fR
+\fId\fR\fB\&.id\fR
+\fId\fR\fB\&.id\fR
 .fi
 .if n \{\
 .RE
@@ -2687,10 +2712,10 @@ The key type of the value that was matched, either as id or string\&.
 .RS 4
 .\}
 .nf
-\fBId idstr()\fR;
-\fI$d\fR\fB\->idstr()\fR
-\fId\fR\fB\&.idstr()\fR
-\fId\fR\fB\&.idstr()\fR
+\fBId\fR \fIidstr\fR;
+\fI$d\fR\fB\->{idstr}\fR
+\fId\fR\fB\&.idstr\fR
+\fId\fR\fB\&.idstr\fR
 .fi
 .if n \{\
 .RE
@@ -2702,10 +2727,10 @@ The Id of the value that was matched (only valid for id types), either as id or 
 .RS 4
 .\}
 .nf
-\fBconst char *str()\fR;
-\fI$d\fR\fB\->str()\fR
-\fId\fR\fB\&.str()\fR
-\fId\fR\fB\&.str()\fR
+\fBconst char *\fR\fIstr\fR;
+\fI$d\fR\fB\->{str}\fR
+\fId\fR\fB\&.str\fR
+\fId\fR\fB\&.str\fR
 .fi
 .if n \{\
 .RE
@@ -2717,10 +2742,10 @@ The string value that was matched (only valid for string types)\&.
 .RS 4
 .\}
 .nf
-\fBunsigned long long num()\fR;
-\fI$d\fR\fB\->num()\fR
-\fId\fR\fB\&.num()\fR
-\fId\fR\fB\&.num()\fR
+\fBunsigned long long\fR \fInum\fR;
+\fI$d\fR\fB\->{num}\fR
+\fId\fR\fB\&.num\fR
+\fId\fR\fB\&.num\fR
 .fi
 .if n \{\
 .RE
@@ -2732,16 +2757,32 @@ The numeric value that was matched (only valid for numeric types)\&.
 .RS 4
 .\}
 .nf
-\fBunsigned int num2()\fR;
-\fI$d\fR\fB\->num2()\fR
-\fId\fR\fB\&.num2()\fR
-\fId\fR\fB\&.num2()\fR
+\fBunsigned int\fR \fInum2\fR;
+\fI$d\fR\fB\->{num2}\fR
+\fId\fR\fB\&.num2\fR
+\fId\fR\fB\&.num2\fR
 .fi
 .if n \{\
 .RE
 .\}
 .sp
 The secondary numeric value that was matched (only valid for types containing two values)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned int\fR \fIbinary\fR;
+\fI$d\fR\fB\->{binary}\fR
+\fId\fR\fB\&.binary\fR
+\fId\fR\fB\&.binary\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The value in binary form, useful for checksums and other data that cannot be represented as a string\&.
+.SS "METHODS"
 .sp
 .if n \{\
 .RS 4
@@ -4929,6 +4970,21 @@ my \fI$raw\fR \fB=\fR \fI$chksum\fR\fB\->hex()\fR;
 .\}
 .sp
 Finalize the checksum and return the result as hex string\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *typestr()\fR
+my \fI$typestr\fR \fB=\fR \fI$chksum\fR\fB\->typestr()\fR;
+\fItypestr\fR \fB=\fR \fIchksum\fR\fB\&.typestr\fR
+\fItypestr\fR \fB=\fR \fIchksum\fR\fB\&.typestr\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the type of the checksum as a string, e\&.g\&. "sha256"\&.
 .sp
 .if n \{\
 .RS 4

@@ -197,7 +197,7 @@ our @ISA = ('Repo::generic');
 
 sub find {
   my ($self, $what) = @_;
-  my $di = $self->{handle}->Dataiterator($solv::SOLVID_META, $solv::REPOSITORY_REPOMD_TYPE, $what, $solv::Dataiterator::SEARCH_STRING);
+  my $di = $self->{handle}->Dataiterator_meta($solv::REPOSITORY_REPOMD_TYPE, $what, $solv::Dataiterator::SEARCH_STRING);
   $di->prepend_keyname($solv::REPOSITORY_REPOMD);
   for my $d (@$di) {
     my $dp = $d->parentpos();
@@ -318,7 +318,7 @@ our @ISA = ('Repo::generic');
 sub find {
   my ($self, $what) = @_;
   
-  my $di = $self->{handle}->Dataiterator($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME, $what, $solv::Dataiterator::SEARCH_STRING);
+  my $di = $self->{handle}->Dataiterator_meta($solv::SUSETAGS_FILE_NAME, $what, $solv::Dataiterator::SEARCH_STRING);
   $di->prepend_keyname($solv::SUSETAGS_FILE);
   for my $d (@$di) {
     my $dp = $d->parentpos();
@@ -364,7 +364,7 @@ sub add_ext {
 sub add_exts {
   my ($self) = @_;
   my $repodata = $self->{handle}->add_repodata(0);
-  my $di = $self->{handle}->Dataiterator($solv::SOLVID_META, $solv::SUSETAGS_FILE_NAME, undef, 0);
+  my $di = $self->{handle}->Dataiterator_meta($solv::SUSETAGS_FILE_NAME, undef, 0);
   $di->prepend_keyname($solv::SUSETAGS_FILE);
   for my $d (@$di) {
     my $filename = $d->str();
@@ -551,7 +551,7 @@ for my $repo (@repos) {
 if ($cmd eq 'search') {
   $pool->createwhatprovides();
   my $sel = $pool->Selection();
-  my $di = $pool->Dataiterator(0, $solv::SOLVABLE_NAME, $ARGV[0], $solv::Dataiterator::SEARCH_SUBSTRING | $solv::Dataiterator::SEARCH_NOCASE);
+  my $di = $pool->Dataiterator($solv::SOLVABLE_NAME, $ARGV[0], $solv::Dataiterator::SEARCH_SUBSTRING | $solv::Dataiterator::SEARCH_NOCASE);
   for my $d (@$di) {
     $sel->add_raw($solv::Job::SOLVER_SOLVABLE, $d->{solvid});
   }

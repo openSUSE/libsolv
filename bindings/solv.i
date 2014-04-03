@@ -51,6 +51,9 @@ typedef struct {
   $result = $1.data ? Py_BuildValue("y#", $1.data, $1.len) : SWIG_Py_Void();
 #else
   $result = SWIG_FromCharPtrAndSize($1.data, $1.len);
+#if defined(SWIGPERL)
+  argvi++;
+#endif
 #endif
 }
 
@@ -1041,6 +1044,9 @@ typedef struct {
     solv_bin2hex(b, l, ret);
     return ret;
   }
+  const char *typestr() {
+    return solv_chksum_type2str(solv_chksum_get_type($self));
+  }
 
   bool __eq__(Chksum *chk) {
     int l;
@@ -1255,7 +1261,11 @@ typedef struct {
   }
 
   %newobject Dataiterator;
-  Dataiterator *Dataiterator(Id p, Id key, const char *match = 0, int flags = 0) {
+  Dataiterator *Dataiterator(Id key, const char *match = 0, int flags = 0) {
+    return new_Dataiterator($self, 0, 0, key, match, flags);
+  }
+  %newobject Dataiterator_solvid;
+  Dataiterator *Dataiterator_solvid(Id p, Id key, const char *match = 0, int flags = 0) {
     return new_Dataiterator($self, 0, p, key, match, flags);
   }
   const char *solvid2str(Id solvid) {
@@ -1591,8 +1601,12 @@ rb_eval_string(
   }
 
   %newobject Dataiterator;
-  Dataiterator *Dataiterator(Id p, Id key, const char *match = 0, int flags = 0) {
-    return new_Dataiterator($self->pool, $self, p, key, match, flags);
+  Dataiterator *Dataiterator(Id key, const char *match = 0, int flags = 0) {
+    return new_Dataiterator($self->pool, $self, 0, key, match, flags);
+  }
+  %newobject Dataiterator_meta;
+  Dataiterator *Dataiterator_meta(Id key, const char *match = 0, int flags = 0) {
+    return new_Dataiterator($self->pool, $self, SOLVID_META, key, match, flags);
   }
 
   Id const id;
@@ -1877,57 +1891,67 @@ rb_eval_string(
   }
   %newobject solvable;
   XSolvable * const solvable;
+  Id const key_id;
+  const char * const key_idstr;
+  Id const type_id;
+  const char * const type_idstr;
+  Id const id;
+  const char * const idstr;
+  const char * const str;
+  BinaryBlob const binary;
+  unsigned long long const num;
+  unsigned int const num2;
   %{
   SWIGINTERN XSolvable *Datamatch_solvable_get(Dataiterator *di) {
     return new_XSolvable(di->pool, di->solvid);
   }
-  %}
-  Id key_id() {
-    return $self->key->name;
+  SWIGINTERN Id Datamatch_key_id_get(Dataiterator *di) {
+    return di->key->name;
   }
-  const char *key_idstr() {
-    return pool_id2str($self->pool, $self->key->name);
+  SWIGINTERN const char *Datamatch_key_idstr_get(Dataiterator *di) {
+    return pool_id2str(di->pool, di->key->name);
   }
-  Id type_id() {
-    return $self->key->type;
+  SWIGINTERN Id Datamatch_type_id_get(Dataiterator *di) {
+    return di->key->type;
   }
-  const char *type_idstr() {
-    return pool_id2str($self->pool, $self->key->type);
+  SWIGINTERN const char *Datamatch_type_idstr_get(Dataiterator *di) {
+    return pool_id2str(di->pool, di->key->type);
   }
-  Id id() {
-   return $self->kv.id;
+  SWIGINTERN Id Datamatch_id_get(Dataiterator *di) {
+    return di->kv.id;
   }
-  const char *idstr() {
-   if ($self->data && ($self->key->type == REPOKEY_TYPE_DIR || $self->key->type == REPOKEY_TYPE_DIRSTRARRAY || $self->key->type == REPOKEY_TYPE_DIRNUMNUMARRAY))
-      return repodata_dir2str($self->data,  $self->kv.id, 0);
-    if ($self->data && $self->data->localpool)
-      return stringpool_id2str(&self->data->spool, $self->kv.id);
-    return pool_id2str($self->pool, $self->kv.id);
+  SWIGINTERN const char *Datamatch_idstr_get(Dataiterator *di) {
+   if (di->data && (di->key->type == REPOKEY_TYPE_DIR || di->key->type == REPOKEY_TYPE_DIRSTRARRAY || di->key->type == REPOKEY_TYPE_DIRNUMNUMARRAY))
+      return repodata_dir2str(di->data,  di->kv.id, 0);
+    if (di->data && di->data->localpool)
+      return stringpool_id2str(&di->data->spool, di->kv.id);
+    return pool_id2str(di->pool, di->kv.id);
   }
-  const char *str() {
-   return $self->kv.str;
+  SWIGINTERN const char * const Datamatch_str_get(Dataiterator *di) {
+    return di->kv.str;
   }
-  BinaryBlob binary() {
+  SWIGINTERN BinaryBlob Datamatch_binary_get(Dataiterator *di) {
     BinaryBlob bl;
     bl.data = 0;
     bl.len = 0;
-    if ($self->key->type == REPOKEY_TYPE_BINARY)
+    if (di->key->type == REPOKEY_TYPE_BINARY)
       {
-        bl.data = $self->kv.str;
-        bl.len = $self->kv.num;
+        bl.data = di->kv.str;
+        bl.len = di->kv.num;
       }
-    else if ((bl.len = solv_chksum_len($self->key->type)) != 0)
-      bl.data = $self->kv.str;
+    else if ((bl.len = solv_chksum_len(di->key->type)) != 0)
+      bl.data = di->kv.str;
     return bl;
   }
-  unsigned long long num() {
-   if ($self->key->type == REPOKEY_TYPE_NUM)
-     return SOLV_KV_NUM64(&$self->kv);
-   return $self->kv.num;
+  SWIGINTERN unsigned long long Datamatch_num_get(Dataiterator *di) {
+   if (di->key->type == REPOKEY_TYPE_NUM)
+     return SOLV_KV_NUM64(&di->kv);
+   return di->kv.num;
   }
-  int num2() {
-     return $self->kv.num2;
+  SWIGINTERN unsigned int Datamatch_num2_get(Dataiterator *di) {
+    return di->kv.num2;
   }
+  %}
   %newobject pos;
   Datapos *pos() {
     Pool *pool = $self->pool;
@@ -1949,7 +1973,11 @@ rb_eval_string(
     return pos;
   }
 #if defined(SWIGPERL)
-  %rename("str") __str__;
+  /* cannot use str here because swig reports a bogus conflict... */
+  %rename("stringify") __str__;
+  %perlcode {
+    *solv::Datamatch::str = *solvc::Datamatch_stringify;
+  }
 #endif
   const char *__str__() {
     KeyValue kv = $self->kv;
