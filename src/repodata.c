@@ -741,8 +741,18 @@ repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep)
   dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
     return 0;
-  if (!(key->type == REPOKEY_TYPE_MD5 || key->type == REPOKEY_TYPE_SHA1 || key->type == REPOKEY_TYPE_SHA256))
-    return 0;
+  switch (key->type)
+    {
+    case REPOKEY_TYPE_MD5:
+    case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA224:
+    case REPOKEY_TYPE_SHA256:
+    case REPOKEY_TYPE_SHA384:
+    case REPOKEY_TYPE_SHA512:
+      break;
+    default:
+      return 0;
+    }
   *typep = key->type;
   return dp;
 }
@@ -884,7 +894,10 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
       return 1;
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA224:
     case REPOKEY_TYPE_SHA256:
+    case REPOKEY_TYPE_SHA384:
+    case REPOKEY_TYPE_SHA512:
       if (!(flags & SEARCH_CHECKSUMS))
 	return 0;	/* skip em */
       if (kv->num)
@@ -1985,7 +1998,10 @@ dataiterator_strdup(Dataiterator *di)
     {
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA224:
     case REPOKEY_TYPE_SHA256:
+    case REPOKEY_TYPE_SHA384:
+    case REPOKEY_TYPE_SHA512:
     case REPOKEY_TYPE_DIRSTRARRAY:
       if (di->kv.num)	/* was it stringified into tmp space? */
         l = strlen(di->kv.str) + 1;
@@ -2007,8 +2023,17 @@ dataiterator_strdup(Dataiterator *di)
 	case REPOKEY_TYPE_SHA1:
 	  l = SIZEOF_SHA1;
 	  break;
+	case REPOKEY_TYPE_SHA224:
+	  l = SIZEOF_SHA224;
+	  break;
 	case REPOKEY_TYPE_SHA256:
 	  l = SIZEOF_SHA256;
+	  break;
+	case REPOKEY_TYPE_SHA384:
+	  l = SIZEOF_SHA384;
+	  break;
+	case REPOKEY_TYPE_SHA512:
+	  l = SIZEOF_SHA512;
 	  break;
 	case REPOKEY_TYPE_BINARY:
 	  l = di->kv.num;
@@ -2941,8 +2966,17 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
     case REPOKEY_TYPE_SHA1:
       data_addblob(xd, data->attrdata + val, SIZEOF_SHA1);
       break;
+    case REPOKEY_TYPE_SHA224:
+      data_addblob(xd, data->attrdata + val, SIZEOF_SHA224);
+      break;
     case REPOKEY_TYPE_SHA256:
       data_addblob(xd, data->attrdata + val, SIZEOF_SHA256);
+      break;
+    case REPOKEY_TYPE_SHA384:
+      data_addblob(xd, data->attrdata + val, SIZEOF_SHA384);
+      break;
+    case REPOKEY_TYPE_SHA512:
+      data_addblob(xd, data->attrdata + val, SIZEOF_SHA512);
       break;
     case REPOKEY_TYPE_NUM:
       if (val & 0x80000000)
@@ -3395,7 +3429,10 @@ repodata_create_stubs(Repodata *data)
 	  break;
 	case REPOKEY_TYPE_MD5:
 	case REPOKEY_TYPE_SHA1:
+	case REPOKEY_TYPE_SHA224:
 	case REPOKEY_TYPE_SHA256:
+	case REPOKEY_TYPE_SHA384:
+	case REPOKEY_TYPE_SHA512:
 	  repodata_set_bin_checksum(sdata, SOLVID_META, di.key->name, di.key->type, (const unsigned char *)di.kv.str);
 	  break;
 	case REPOKEY_TYPE_IDARRAY:

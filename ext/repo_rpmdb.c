@@ -1602,7 +1602,10 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       break;
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA224:
     case REPOKEY_TYPE_SHA256:
+    case REPOKEY_TYPE_SHA384:
+    case REPOKEY_TYPE_SHA512:
       repodata_set_bin_checksum(data, handle, keyname, key->type, (const unsigned char *)kv->str);
       break;
     default:

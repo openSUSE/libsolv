@@ -812,8 +812,17 @@ repo_write_adddata(struct cbdata *cbdata, Repodata *data, Repokey *key, KeyValue
       case REPOKEY_TYPE_SHA1:
 	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA1);
 	break;
+      case REPOKEY_TYPE_SHA224:
+	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA224);
+	break;
       case REPOKEY_TYPE_SHA256:
 	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA256);
+	break;
+      case REPOKEY_TYPE_SHA384:
+	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA384);
+	break;
+      case REPOKEY_TYPE_SHA512:
+	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA512);
 	break;
       case REPOKEY_TYPE_U32:
 	u32 = kv->num;

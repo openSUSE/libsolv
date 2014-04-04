@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2007-2014, Novell Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -50,19 +50,24 @@ KNOWNID(RPM_RPMDBID,			"rpm:dbid"),
 KNOWNID(SOLVABLE_PREREQMARKER,		"solvable:prereqmarker"),
 /* normal provides before this, generated file provides after this */
 KNOWNID(SOLVABLE_FILEMARKER,		"solvable:filemarker"),
+
 KNOWNID(NAMESPACE_INSTALLED,		"namespace:installed"),
 KNOWNID(NAMESPACE_MODALIAS,		"namespace:modalias"),
 KNOWNID(NAMESPACE_SPLITPROVIDES,	"namespace:splitprovides"),
 KNOWNID(NAMESPACE_LANGUAGE,		"namespace:language"),
 KNOWNID(NAMESPACE_FILESYSTEM,		"namespace:filesystem"),
 KNOWNID(NAMESPACE_OTHERPROVIDERS,	"namespace:otherproviders"),
+
 KNOWNID(SYSTEM_SYSTEM,			"system:system"),
+
+/* special solvable architectures */
 KNOWNID(ARCH_SRC,			"src"),
 KNOWNID(ARCH_NOSRC,			"nosrc"),
 KNOWNID(ARCH_NOARCH,			"noarch"),
 KNOWNID(ARCH_ALL,			"all"),
 KNOWNID(ARCH_ANY,			"any"),
 
+/* the meta tags used in solv file storage */
 KNOWNID(REPOSITORY_SOLVABLES,		"repository:solvables"),
 KNOWNID(REPOSITORY_DELTAINFO,		"repository:deltainfo"),
 
@@ -76,12 +81,7 @@ KNOWNID(REPOSITORY_ADDEDFILEPROVIDES,	"repository:addedfileprovides"),
 /* inode of the rpm database for rpm --rebuilddb detection */
 KNOWNID(REPOSITORY_RPMDBCOOKIE,		"repository:rpmdbcookie"),
 
-/* The void type is usable to encode one-valued attributes, they have
-   no associated data.  This is useful to encode values which many solvables
-   have in common, and whose overall set is relatively limited.  A prime
-   example would be the media number.  The actual value is encoded in the
-   SIZE member of the key structure.  Be warned: careless use of this
-   leads to combinatoric explosion of number of schemas.  */
+/* the known data types */
 KNOWNID(REPOKEY_TYPE_VOID,		"repokey:type:void"),
 KNOWNID(REPOKEY_TYPE_CONSTANT,		"repokey:type:constant"),
 KNOWNID(REPOKEY_TYPE_CONSTANTID,	"repokey:type:constantid"),
@@ -97,10 +97,13 @@ KNOWNID(REPOKEY_TYPE_DIRSTRARRAY,	"repokey:type:dirstrarray"),
 KNOWNID(REPOKEY_TYPE_DIRNUMNUMARRAY,	"repokey:type:dirnumnumarray"),
 KNOWNID(REPOKEY_TYPE_MD5,		"repokey:type:md5"),
 KNOWNID(REPOKEY_TYPE_SHA1,		"repokey:type:sha1"),
+KNOWNID(REPOKEY_TYPE_SHA224,		"repokey:type:sha224"),
 KNOWNID(REPOKEY_TYPE_SHA256,		"repokey:type:sha256"),
+KNOWNID(REPOKEY_TYPE_SHA384,		"repokey:type:sha384"),
+KNOWNID(REPOKEY_TYPE_SHA512,		"repokey:type:sha512"),
 KNOWNID(REPOKEY_TYPE_FIXARRAY,		"repokey:type:fixarray"),
 KNOWNID(REPOKEY_TYPE_FLEXARRAY,		"repokey:type:flexarray"),
-KNOWNID(REPOKEY_TYPE_DELETED,		"repokey:type:deleted"),
+KNOWNID(REPOKEY_TYPE_DELETED,		"repokey:type:deleted"),	/* internal only */
 
 KNOWNID(SOLVABLE_SUMMARY,		"solvable:summary"),
 KNOWNID(SOLVABLE_DESCRIPTION,		"solvable:description"),
@@ -124,6 +127,7 @@ KNOWNID(SOLVABLE_INSTALLTIME,		"solvable:installtime"),
 KNOWNID(SOLVABLE_MEDIADIR,		"solvable:mediadir"),
 KNOWNID(SOLVABLE_MEDIAFILE,		"solvable:mediafile"),
 KNOWNID(SOLVABLE_MEDIANR,		"solvable:medianr"),
+KNOWNID(SOLVABLE_MEDIABASE,		"solvable:mediabase"),	/* <location xml:base=... > */
 KNOWNID(SOLVABLE_DOWNLOADSIZE,		"solvable:downloadsize"),
 KNOWNID(SOLVABLE_SOURCEARCH,		"solvable:sourcearch"),
 KNOWNID(SOLVABLE_SOURCENAME,		"solvable:sourcename"),
@@ -142,7 +146,6 @@ KNOWNID(SOLVABLE_CHANGELOG_AUTHOR,	"solvable:changelog:author"),
 KNOWNID(SOLVABLE_CHANGELOG_TIME,	"solvable:changelog:time"),
 KNOWNID(SOLVABLE_CHANGELOG_TEXT,	"solvable:changelog:text"),
 
-
 /* stuff for solvables of type pattern */
 KNOWNID(SOLVABLE_CATEGORY,		"solvable:category"),
 KNOWNID(SOLVABLE_INCLUDES,		"solvable:includes"),
@@ -150,6 +153,7 @@ KNOWNID(SOLVABLE_EXTENDS,		"solvable:extends"),
 KNOWNID(SOLVABLE_ICON,			"solvable:icon"),
 KNOWNID(SOLVABLE_ORDER,			"solvable:order"),
 
+/* extra definitions for updates (i.e. patch: solvables) */
 KNOWNID(UPDATE_REBOOT,			"update:reboot"),	/* reboot suggested (kernel update) */
 KNOWNID(UPDATE_RESTART,			"update:restart"),	/* restart suggested (update stack update) */
 KNOWNID(UPDATE_RELOGIN,			"update:relogin"),	/* relogin suggested */
@@ -172,7 +176,7 @@ KNOWNID(UPDATE_REFERENCE_HREF,		"update:reference:href"),	/*  href, e.g. 'http:/
 KNOWNID(UPDATE_REFERENCE_ID,		"update:reference:id"),		/*  id, e.g. bug number */
 KNOWNID(UPDATE_REFERENCE_TITLE,		"update:reference:title"),	/*  title, e.g. "the bla forz scribs on fuggle" */
 
-/* name */
+/* extra definitions for products */
 KNOWNID(PRODUCT_REFERENCEFILE,		"product:referencefile"),	/* installed product only */
 KNOWNID(PRODUCT_SHORTLABEL,		"product:shortlabel"),		/* not in repomd? */
 KNOWNID(PRODUCT_DISTPRODUCT,		"product:distproduct"),		/* obsolete */
@@ -184,8 +188,11 @@ KNOWNID(PRODUCT_FLAGS,			"product:flags"),		/* e.g. 'update', 'no_you' */
 KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),		/* installed product only */
 KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),		/* installed product only */
 KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),		/* installed product only */
+KNOWNID(PRODUCT_UPDATES_REPOID,	        "product:updates:repoid"),
+KNOWNID(PRODUCT_UPDATES,	        "product:updates"),
+KNOWNID(PRODUCT_ENDOFLIFE,	        "product:endoflife"),
 
-/* argh */
+/* argh, should rename to repository and unify with REPOMD */
 KNOWNID(SUSETAGS_DATADIR,		"susetags:datadir"),
 KNOWNID(SUSETAGS_DESCRDIR,		"susetags:descrdir"),
 KNOWNID(SUSETAGS_DEFAULTVENDOR,		"susetags:defaultvendor"),
@@ -197,24 +204,17 @@ KNOWNID(SUSETAGS_SHARE_NAME,		"susetags:share:name"),
 KNOWNID(SUSETAGS_SHARE_EVR,		"susetags:share:evr"),
 KNOWNID(SUSETAGS_SHARE_ARCH,		"susetags:share:arch"),
 
-
 /* timestamp then the repository was generated */
 KNOWNID(REPOSITORY_TIMESTAMP,		"repository:timestamp"),
-/* hint when the metadata could be outdated
-   w/respect to generated timestamp */
+/* hint when the metadata could be outdated w/respect to generated timestamp */
 KNOWNID(REPOSITORY_EXPIRE,		"repository:expire"),
-
 /* which things does this repo provides updates for, if it does (array) */
-KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),
-/* for the repository:update label and cpeid, use the repository:product
-   sub attributes */
-
+KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),		/* obsolete? */
 /* which products this repository is supposed to be for (array) */
 KNOWNID(REPOSITORY_DISTROS,		"repository:distros"),
 KNOWNID(REPOSITORY_PRODUCT_LABEL,       "repository:product:label"),
 KNOWNID(REPOSITORY_PRODUCT_CPEID,	"repository:product:cpeid"),
 KNOWNID(REPOSITORY_REPOID,		"repository:repoid"),		/* obsolete? */
-
 /* keyword (tags) for this repository */
 KNOWNID(REPOSITORY_KEYWORDS,		"repository:keywords"),
 /* revision of the repository. arbitrary string */
@@ -234,9 +234,7 @@ KNOWNID(DELTA_BASE_EVR,			"delta:baseevr"),
 KNOWNID(DELTA_SEQ_NAME,			"delta:seqname"),
 KNOWNID(DELTA_SEQ_EVR,			"delta:seqevr"),
 KNOWNID(DELTA_SEQ_NUM,			"delta:seqnum"),
-
-/* XXX: shouldn't use a real ID */
-KNOWNID(NAMESPACE_PRODUCTBUDDY,         "namespace:productbuddy"),	/* obsolete */
+KNOWNID(DELTA_LOCATION_BASE,	        "delta:locbase"),	/* <location xml:base=... > */
 
 KNOWNID(REPOSITORY_REPOMD,		"repository:repomd"),
 KNOWNID(REPOSITORY_REPOMD_TYPE,		"repository:repomd:type"),
@@ -250,22 +248,13 @@ KNOWNID(PUBKEY_KEYID,		        "pubkey:keyid"),
 KNOWNID(PUBKEY_FINGERPRINT,	        "pubkey:fingerprint"),
 KNOWNID(PUBKEY_EXPIRES,		        "pubkey:expires"),
 KNOWNID(PUBKEY_SIGNATURES,	        "pubkey:signatures"),
-KNOWNID(SOLVABLE_MEDIABASE,		"solvable:mediabase"), /* <location xml:base=... > */
-
 KNOWNID(PUBKEY_DATA,		        "pubkey:data"),
+KNOWNID(PUBKEY_SUBKEYOF,	        "pubkey:subkeyof"),
 
 KNOWNID(SIGNATURE_ISSUER,	        "signature:issuer"),
 KNOWNID(SIGNATURE_TIME,	        	"signature:time"),
 KNOWNID(SIGNATURE_EXPIRES,	        "signature:expires"),
 KNOWNID(SIGNATURE_DATA,		        "signature:data"),
-
-KNOWNID(PUBKEY_SUBKEYOF,	        "pubkey:subkeyof"),
-
-KNOWNID(DELTA_LOCATION_BASE,	        "delta:locbase"),	/* <location xml:base=... > */
-
-KNOWNID(PRODUCT_UPDATES_REPOID,	        "product:updates:repoid"),
-KNOWNID(PRODUCT_UPDATES,	        "product:updates"),
-KNOWNID(PRODUCT_ENDOFLIFE,	        "product:endoflife"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 

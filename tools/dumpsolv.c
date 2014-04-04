@@ -52,7 +52,10 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
       break;
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA224:
     case REPOKEY_TYPE_SHA256:
+    case REPOKEY_TYPE_SHA384:
+    case REPOKEY_TYPE_SHA512:
       printf("%s: %s (%s)\n", keyname, repodata_chk2str(data, key->type, (unsigned char *)kv->str), pool_id2str(repo->pool, key->type));
       break;
     case REPOKEY_TYPE_VOID:
@@ -223,7 +226,10 @@ dump_attr_json(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv, struct cb
       break;
     case REPOKEY_TYPE_MD5:
     case REPOKEY_TYPE_SHA1:
+    case REPOKEY_TYPE_SHA224:
     case REPOKEY_TYPE_SHA256:
+    case REPOKEY_TYPE_SHA384:
+    case REPOKEY_TYPE_SHA512:
       printf("{\n");
       printf("%*s  \"value\": %s,\n", indent, "", jsonstring(pool, repodata_chk2str(data, key->type, (unsigned char *)kv->str)));
       printf("%*s  \"type\": %s\n", indent, "", jsonstring(pool, pool_id2str(repo->pool, key->type)));

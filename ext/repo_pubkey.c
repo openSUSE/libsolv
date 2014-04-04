@@ -257,6 +257,12 @@ pgphashalgo2type(int algo)
     return REPOKEY_TYPE_SHA1;
   if (algo == 8)
     return REPOKEY_TYPE_SHA256;
+  if (algo == 9)
+    return REPOKEY_TYPE_SHA384;
+  if (algo == 10)
+    return REPOKEY_TYPE_SHA512;
+  if (algo == 11)
+    return REPOKEY_TYPE_SHA224;
   return 0;
 }
 

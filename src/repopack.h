@@ -171,10 +171,22 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       kv->num = 0;	/* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA1;
+    case REPOKEY_TYPE_SHA224:
+      kv->num = 0;	/* not stringified yet */
+      kv->str = (const char *)dp;
+      return dp + SIZEOF_SHA224;
     case REPOKEY_TYPE_SHA256:
       kv->num = 0;	/* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA256;
+    case REPOKEY_TYPE_SHA384:
+      kv->num = 0;	/* not stringified yet */
+      kv->str = (const char *)dp;
+      return dp + SIZEOF_SHA384;
+    case REPOKEY_TYPE_SHA512:
+      kv->num = 0;	/* not stringified yet */
+      kv->str = (const char *)dp;
+      return dp + SIZEOF_SHA512;
     case REPOKEY_TYPE_BINARY:
       dp = data_read_id(dp, (Id *)&kv->num);
       kv->str = (const char *)dp;

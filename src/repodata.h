@@ -29,7 +29,10 @@ extern "C" {
 
 #define SIZEOF_MD5	16
 #define SIZEOF_SHA1	20
+#define SIZEOF_SHA224	28
 #define SIZEOF_SHA256	32
+#define SIZEOF_SHA384	48
+#define SIZEOF_SHA512	64
 
 struct _Repo;
 struct _KeyValue;

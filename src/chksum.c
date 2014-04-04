@@ -26,7 +26,10 @@ struct _Chksum {
   union {
     MD5_CTX md5;
     SHA1_CTX sha1;
+    SHA224_CTX sha224;
     SHA256_CTX sha256;
+    SHA384_CTX sha384;
+    SHA512_CTX sha512;
   } c;
 };
 
@@ -44,8 +47,17 @@ solv_chksum_create(Id type)
     case REPOKEY_TYPE_SHA1:
       solv_SHA1_Init(&chk->c.sha1);
       return chk;
+    case REPOKEY_TYPE_SHA224:
+      solv_SHA224_Init(&chk->c.sha224);
+      return chk;
     case REPOKEY_TYPE_SHA256:
       solv_SHA256_Init(&chk->c.sha256);
+      return chk;
+    case REPOKEY_TYPE_SHA384:
+      solv_SHA384_Init(&chk->c.sha384);
+      return chk;
+    case REPOKEY_TYPE_SHA512:
+      solv_SHA512_Init(&chk->c.sha512);
       return chk;
     default:
       break;
@@ -69,8 +81,14 @@ solv_chksum_len(Id type)
       return 16;
     case REPOKEY_TYPE_SHA1:
       return 20;
+    case REPOKEY_TYPE_SHA224:
+      return 28;
     case REPOKEY_TYPE_SHA256:
       return 32;
+    case REPOKEY_TYPE_SHA384:
+      return 48;
+    case REPOKEY_TYPE_SHA512:
+      return 64;
     default:
       return 0;
     }
@@ -103,8 +121,17 @@ solv_chksum_add(Chksum *chk, const void *data, int len)
     case REPOKEY_TYPE_SHA1:
       solv_SHA1_Update(&chk->c.sha1, data, len);
       return;
+    case REPOKEY_TYPE_SHA224:
+      solv_SHA224_Update(&chk->c.sha224, data, len);
+      return;
     case REPOKEY_TYPE_SHA256:
       solv_SHA256_Update(&chk->c.sha256, data, len);
+      return;
+    case REPOKEY_TYPE_SHA384:
+      solv_SHA384_Update(&chk->c.sha384, data, len);
+      return;
+    case REPOKEY_TYPE_SHA512:
+      solv_SHA512_Update(&chk->c.sha512, data, len);
       return;
     default:
       return;
@@ -134,11 +161,29 @@ solv_chksum_get(Chksum *chk, int *lenp)
       if (lenp)
 	*lenp = 20;
       return chk->result;
+    case REPOKEY_TYPE_SHA224:
+      solv_SHA224_Final(chk->result, &chk->c.sha224);
+      chk->done = 1;
+      if (lenp)
+	*lenp = 28;
+      return chk->result;
     case REPOKEY_TYPE_SHA256:
       solv_SHA256_Final(chk->result, &chk->c.sha256);
       chk->done = 1;
       if (lenp)
 	*lenp = 32;
+      return chk->result;
+    case REPOKEY_TYPE_SHA384:
+      solv_SHA384_Final(chk->result, &chk->c.sha384);
+      chk->done = 1;
+      if (lenp)
+	*lenp = 48;
+      return chk->result;
+    case REPOKEY_TYPE_SHA512:
+      solv_SHA512_Final(chk->result, &chk->c.sha512);
+      chk->done = 1;
+      if (lenp)
+	*lenp = 64;
       return chk->result;
     default:
       if (lenp)
@@ -168,8 +213,14 @@ solv_chksum_type2str(Id type)
       return "md5";
     case REPOKEY_TYPE_SHA1:
       return "sha1";
+    case REPOKEY_TYPE_SHA224:
+      return "sha224";
     case REPOKEY_TYPE_SHA256:
       return "sha256";
+    case REPOKEY_TYPE_SHA384:
+      return "sha384";
+    case REPOKEY_TYPE_SHA512:
+      return "sha512";
     default:
       return 0;
     }
@@ -182,8 +233,14 @@ solv_chksum_str2type(const char *str)
     return REPOKEY_TYPE_MD5;
   if (!strcasecmp(str, "sha") || !strcasecmp(str, "sha1"))
     return REPOKEY_TYPE_SHA1;
+  if (!strcasecmp(str, "sha224"))
+    return REPOKEY_TYPE_SHA224;
   if (!strcasecmp(str, "sha256"))
     return REPOKEY_TYPE_SHA256;
+  if (!strcasecmp(str, "sha384"))
+    return REPOKEY_TYPE_SHA384;
+  if (!strcasecmp(str, "sha512"))
+    return REPOKEY_TYPE_SHA512;
   return 0;
 }
 

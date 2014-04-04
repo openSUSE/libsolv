@@ -3578,12 +3578,14 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  if (!strncmp("product:", pool_id2str(pool, s->name), 8))
 	    {
 	      MAPSET(&userinstalled, p - installed->start);
-	      if (pool->nscallback)
+#ifdef ENABLE_LINKED_PKGS
+	      if (solv->instbuddy && solv->instbuddy[p - installed->start] > 1)
 		{
-		  Id buddy = pool->nscallback(pool, pool->nscallbackdata, NAMESPACE_PRODUCTBUDDY, p);
-		  if (buddy >= installed->start && buddy < installed->end && pool->solvables[buddy].repo == installed)
+		  Id buddy = solv->instbuddy[p - installed->start];
+		  if (buddy >= installed->start && buddy < installed->end)
 		    MAPSET(&userinstalled, buddy - installed->start);
 		}
+#endif
 	    }
 	}
     }
