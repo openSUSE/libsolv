@@ -201,8 +201,10 @@ Repositories, Dependencies, each indexed by Ids.
 	pool = solv.Pool()
 	pool = Solv::Pool.new()
 
-Create a new pool instance. In most cases you just need
-one pool.
+Create a new pool instance. In most cases you just need one pool.
+Note that the returned object "owns" the pool, i.e. if the object is 
+freed, the pool is also freed. You can use the disown method to
+break this ownership relation.
 
 === ATTRIBUTES ===
 
@@ -311,9 +313,18 @@ generates.
 	pool.free()
 	pool.free()
 
-Free a pool. This is currently done with a method instead of relying on
-reference counting or garbage collection because it's hard to track every
-reference to a pool.
+Force a free of the pool. After this call, you must not access any object
+that still references the pool.
+
+	void disown()
+	$pool->disown();
+	pool.disown()
+	pool.disown()
+
+Break the ownership relation betwen the binding object and the pool. After
+this call, the pool will not get freed even if the object goes out of
+scope. This also means that you must manually call the free method to free
+the pool data.
 
 	void setdebuglevel(int level)
 	$pool->setdebuglevel($level);

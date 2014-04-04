@@ -421,7 +421,18 @@ SWIG_AsValDepId(void *obj, int *val) {
 
 }
 
-
+%typemap(out) disown_helper {
+#ifdef SWIGRUBY
+  SWIG_ConvertPtr(self, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
+#endif
+#ifdef SWIGPYTHON
+  SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
+#endif
+#ifdef SWIGPERL
+  SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
+#endif
+  $result = SWIG_From_int((int)(0));
+}
 
 %include "typemaps.i"
 
@@ -598,6 +609,8 @@ typedef struct {
 } SolvFp;
 
 typedef Dataiterator Datamatch;
+
+typedef int disown_helper;
 
 %}
 
@@ -1102,8 +1115,6 @@ typedef struct {
     Pool *pool = pool_create();
     return pool;
   }
-  ~Pool() {
-  }
   void set_debuglevel(int level) {
     pool_setdebuglevel($self, level);
   }
@@ -1203,9 +1214,17 @@ typedef struct {
   }
 #endif
 
-  void free() {
+  ~Pool() {
     Pool_set_loadcallback($self, 0);
     pool_free($self);
+  }
+  disown_helper free() {
+    Pool_set_loadcallback($self, 0);
+    pool_free($self);
+    return 0;
+  }
+  disown_helper disown() {
+    return 0;
   }
   Id str2id(const char *str, bool create=1) {
     return pool_str2id($self, str, create);
