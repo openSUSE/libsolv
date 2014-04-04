@@ -4542,6 +4542,8 @@ solver_get_userinstalled(Solver *solv, Queue *q, int flags)
 	}
       if ((how & SOLVER_JOBMASK) != SOLVER_INSTALL)
 	continue;
+      if ((how & SOLVER_NOTBYUSER) != 0)
+	continue;
       what = solv->job.elements[i + 1];
       select = how & SOLVER_SELECTMASK;
       FOR_JOB_SELECT(p, pp, select, what)

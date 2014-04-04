@@ -848,6 +848,7 @@ typedef struct {
   static const Id SOLVER_CLEANDEPS = SOLVER_CLEANDEPS;
   static const Id SOLVER_FORCEBEST = SOLVER_FORCEBEST;
   static const Id SOLVER_TARGETED = SOLVER_TARGETED;
+  static const Id SOLVER_NOTBYUSER = SOLVER_NOTBYUSER;
   static const Id SOLVER_SETEV = SOLVER_SETEV;
   static const Id SOLVER_SETEVR = SOLVER_SETEVR;
   static const Id SOLVER_SETARCH = SOLVER_SETARCH;
@@ -2692,9 +2693,9 @@ rb_eval_string(
     if ($self->type == SOLVER_SOLUTION_JOB || SOLVER_SOLUTION_POOLJOB)
       return new_Job($self->solv->pool, SOLVER_NOOP, 0);
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE || $self->type == SOLVER_SOLUTION_BEST)
-      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->p);
+      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_NOTBYUSER|extraflags, $self->p);
     if ($self->type == SOLVER_SOLUTION_REPLACE || $self->type == SOLVER_SOLUTION_REPLACE_DOWNGRADE || $self->type == SOLVER_SOLUTION_REPLACE_ARCHCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_VENDORCHANGE || $self->type == SOLVER_SOLUTION_REPLACE_NAMECHANGE)
-      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|extraflags, $self->rp);
+      return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_NOTBYUSER|extraflags, $self->rp);
     if ($self->type == SOLVER_SOLUTION_ERASE)
       return new_Job($self->solv->pool, SOLVER_ERASE|SOLVER_SOLVABLE|extraflags, $self->p);
     return 0;

@@ -850,7 +850,7 @@ solver_take_solutionelement(Solver *solv, Id p, Id rp, Id extrajobflags, Queue *
   if (rp <= 0 && p <= 0)
     return;	/* just in case */
   if (rp > 0)
-    p = SOLVER_INSTALL|SOLVER_SOLVABLE|extrajobflags;
+    p = SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_NOTBYUSER|extrajobflags;
   else
     {
       rp = p;

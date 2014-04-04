@@ -234,6 +234,9 @@ typedef struct _Solver Solver;
  * contain an "installed" package unless the
  * NO_AUTOTARGET solver flag is set */
 #define SOLVER_TARGETED			0x200000
+/* This (SOLVER_INSTALL) job was automatically added
+ * and thus does not the add to the userinstalled packages */
+#define SOLVER_NOTBYUSER		0x400000
 
 #define SOLVER_SETEV			0x01000000
 #define SOLVER_SETEVR			0x02000000
