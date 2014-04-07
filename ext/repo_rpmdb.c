@@ -1600,15 +1600,12 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       cbdata->handle = repodata_new_handle(data);
       repodata_add_flexarray(data, cbdata->subhandle, keyname, cbdata->handle);
       break;
-    case REPOKEY_TYPE_MD5:
-    case REPOKEY_TYPE_SHA1:
-    case REPOKEY_TYPE_SHA224:
-    case REPOKEY_TYPE_SHA256:
-    case REPOKEY_TYPE_SHA384:
-    case REPOKEY_TYPE_SHA512:
-      repodata_set_bin_checksum(data, handle, keyname, key->type, (const unsigned char *)kv->str);
-      break;
     default:
+      if (solv_chksum_len(key->type))
+	{
+	  repodata_set_bin_checksum(data, handle, keyname, key->type, (const unsigned char *)kv->str);
+	  break;
+	}
       break;
     }
   return 0;
