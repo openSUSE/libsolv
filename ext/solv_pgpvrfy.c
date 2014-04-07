@@ -70,6 +70,8 @@ mpdomod(int len, mp_t *target, mp2_t x, mp_t *mod)
       /* reduce */
       mp2_t z = x / ((mp2_t)mod[i] + 1);
       mp2_t n = 0;
+      if ((z >> MP_T_BITS) != 0)
+	z = (mp2_t)1 << MP_T_BITS;	/* just in case... */
       for (j = 0; j < i; j++)
 	{
 	  mp_t n2;
