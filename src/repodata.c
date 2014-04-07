@@ -743,12 +743,7 @@ repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep)
     return 0;
   switch (key->type)
     {
-    case REPOKEY_TYPE_MD5:
-    case REPOKEY_TYPE_SHA1:
-    case REPOKEY_TYPE_SHA224:
-    case REPOKEY_TYPE_SHA256:
-    case REPOKEY_TYPE_SHA384:
-    case REPOKEY_TYPE_SHA512:
+    case_CHKSUM_TYPES:
       break;
     default:
       return 0;
@@ -892,12 +887,7 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
       kv->str = repodata_dir2str(data, kv->id, kv->str);
       kv->num = 1;	/* mark stringification */
       return 1;
-    case REPOKEY_TYPE_MD5:
-    case REPOKEY_TYPE_SHA1:
-    case REPOKEY_TYPE_SHA224:
-    case REPOKEY_TYPE_SHA256:
-    case REPOKEY_TYPE_SHA384:
-    case REPOKEY_TYPE_SHA512:
+    case_CHKSUM_TYPES:
       if (!(flags & SEARCH_CHECKSUMS))
 	return 0;	/* skip em */
       if (kv->num)
@@ -1996,12 +1986,7 @@ dataiterator_strdup(Dataiterator *di)
     return;
   switch (di->key->type)
     {
-    case REPOKEY_TYPE_MD5:
-    case REPOKEY_TYPE_SHA1:
-    case REPOKEY_TYPE_SHA224:
-    case REPOKEY_TYPE_SHA256:
-    case REPOKEY_TYPE_SHA384:
-    case REPOKEY_TYPE_SHA512:
+    case_CHKSUM_TYPES:
     case REPOKEY_TYPE_DIRSTRARRAY:
       if (di->kv.num)	/* was it stringified into tmp space? */
         l = strlen(di->kv.str) + 1;
@@ -2017,23 +2002,8 @@ dataiterator_strdup(Dataiterator *di)
 	case REPOKEY_TYPE_DIRSTRARRAY:
 	  l = strlen(di->kv.str) + 1;
 	  break;
-	case REPOKEY_TYPE_MD5:
-	  l = SIZEOF_MD5;
-	  break;
-	case REPOKEY_TYPE_SHA1:
-	  l = SIZEOF_SHA1;
-	  break;
-	case REPOKEY_TYPE_SHA224:
-	  l = SIZEOF_SHA224;
-	  break;
-	case REPOKEY_TYPE_SHA256:
-	  l = SIZEOF_SHA256;
-	  break;
-	case REPOKEY_TYPE_SHA384:
-	  l = SIZEOF_SHA384;
-	  break;
-	case REPOKEY_TYPE_SHA512:
-	  l = SIZEOF_SHA512;
+	case_CHKSUM_TYPES:
+	  l = solv_chksum_len(di->key->type);
 	  break;
 	case REPOKEY_TYPE_BINARY:
 	  l = di->kv.num;
@@ -3427,12 +3397,7 @@ repodata_create_stubs(Repodata *data)
 	case REPOKEY_TYPE_NUM:
 	  repodata_set_num(sdata, SOLVID_META, di.key->name, SOLV_KV_NUM64(&di.kv));
 	  break;
-	case REPOKEY_TYPE_MD5:
-	case REPOKEY_TYPE_SHA1:
-	case REPOKEY_TYPE_SHA224:
-	case REPOKEY_TYPE_SHA256:
-	case REPOKEY_TYPE_SHA384:
-	case REPOKEY_TYPE_SHA512:
+	case_CHKSUM_TYPES:
 	  repodata_set_bin_checksum(sdata, SOLVID_META, di.key->name, di.key->type, (const unsigned char *)di.kv.str);
 	  break;
 	case REPOKEY_TYPE_IDARRAY:

@@ -76,15 +76,9 @@ doquery(Pool *pool, Repo *repo, const char *query)
 	case REPOKEY_TYPE_CONSTANT:
 	  printf("%llu\n", SOLV_KV_NUM64(&di.kv));
 	  break;
-	case REPOKEY_TYPE_MD5:
-	case REPOKEY_TYPE_SHA1:
-	case REPOKEY_TYPE_SHA224:
-	case REPOKEY_TYPE_SHA256:
-	case REPOKEY_TYPE_SHA384:
-	case REPOKEY_TYPE_SHA512:
-	  printf("%s:%s\n", solv_chksum_type2str(di.key->type), repodata_chk2str(di.data, di.key->type, (unsigned char *)di.kv.str));
-	  break;
 	default:
+	  if (solv_chksum_len(di.key->type))
+	    printf("%s:%s\n", solv_chksum_type2str(di.key->type), repodata_chk2str(di.data, di.key->type, (unsigned char *)di.kv.str));
 	  break;
 	}
     }
