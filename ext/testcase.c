@@ -58,6 +58,7 @@ static struct jobflags2str {
   { SOLVER_ORUPDATE,  "orupdate" },
   { SOLVER_FORCEBEST, "forcebest" },
   { SOLVER_TARGETED,  "targeted" },
+  { SOLVER_NOTBYUSER, "notbyuser" },
   { SOLVER_SETEV,     "setev" },
   { SOLVER_SETEVR,    "setevr" },
   { SOLVER_SETARCH,   "setarch" },
