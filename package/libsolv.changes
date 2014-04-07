@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Mon Apr  7 15:36:07 CEST 2014 - mls@suse.de
+
+- add support for sha224/sha384/sha512
+- add userinstalled helper functions
+- improve dataiterator bindings (in an incompatible way)
+- automatically free pool in bindings
+- bump version to 0.6.0 (ABI + bindings API breakage)
+
+-------------------------------------------------------------------
 Wed Mar 26 15:08:46 CET 2014 - mls@suse.de
 
 - fix handling of packages with no update/feature rule [bnc#870195]
