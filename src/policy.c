@@ -1058,7 +1058,8 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       ps = pool->solvables + p;
       if (s->name == ps->name)	/* name match */
 	{
-	  /* XXX: check implicitobsoleteusescolors? */
+	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
+	    continue;
 	  if (!allowdowngrade && pool_evrcmp(pool, s->evr, ps->evr, EVRCMP_COMPARE) > 0)
 	    continue;
 	}
@@ -1066,6 +1067,11 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	continue;
       else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
 	{
+	  /* check if package ps obsoletes installed package s */
+	  /* implicitobsoleteusescolors is somewhat wrong here, but we nevertheless
+	   * use it to limit our update candidates */
+	  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s, ps))
+	    continue;
 	  obsp = ps->repo->idarraydata + ps->obsoletes;
 	  while ((obs = *obsp++) != 0)	/* for all obsoletes */
 	    {
@@ -1073,8 +1079,6 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 		{
 		  Solvable *ps2 = pool->solvables + p2;
 		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps2, obs))
-		    continue;
-		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps2))
 		    continue;
 		  if (p2 == n)		/* match ! */
 		    break;
@@ -1112,6 +1116,10 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	  if (!allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
 	    continue;
 	  if (!allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
+	    continue;
+	  /* implicitobsoleteusescolors is somewhat wrong here, but we nevertheless
+	   * use it to limit our update candidates */
+	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
 	    continue;
 	  queue_push(qs, p);
 	}
