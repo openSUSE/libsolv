@@ -907,12 +907,13 @@ repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValu
 
   if (md->matcher.match)
     {
+      const char *str;
       if (key->name == SOLVABLE_FILELIST && key->type == REPOKEY_TYPE_DIRSTRARRAY && (md->matcher.flags & SEARCH_FILES) != 0)
 	if (!datamatcher_checkbasename(&md->matcher, kv->str))
 	  return 0;
-      if (!repodata_stringify(md->pool, data, key, kv, md->flags))
+      if (!(str = repodata_stringify(md->pool, data, key, kv, md->flags)))
 	return 0;
-      if (!datamatcher_match(&md->matcher, kv->str))
+      if (!datamatcher_match(&md->matcher, str))
 	return 0;
     }
   md->stop = md->callback(md->callback_data, s, data, key, kv);

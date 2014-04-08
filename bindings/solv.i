@@ -2001,9 +2001,8 @@ rb_eval_string(
 #endif
   const char *__str__() {
     KeyValue kv = $self->kv;
-    if (!repodata_stringify($self->pool, $self->data, $self->key, &kv, SEARCH_FILES | SEARCH_CHECKSUMS))
-      return "";
-    return kv.str;
+    const char *str = repodata_stringify($self->pool, $self->data, $self->key, &kv, SEARCH_FILES | SEARCH_CHECKSUMS);
+    return str ? str : "";
   }
 }
 

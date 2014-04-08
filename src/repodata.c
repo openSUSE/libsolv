@@ -855,7 +855,7 @@ repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id void
  */
 
 
-int
+const char *
 repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int flags)
 {
   switch (key->type)
@@ -875,26 +875,26 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
 	  if (*s == ':' && s > kv->str)
 	    kv->str = s + 1;
 	}
-      return 1;
+      return kv->str;
     case REPOKEY_TYPE_STR:
-      return 1;
+      return kv->str;
     case REPOKEY_TYPE_DIRSTRARRAY:
       if (!(flags & SEARCH_FILES))
-	return 1;	/* match just the basename */
+	return kv->str;	/* match just the basename */
       if (kv->num)
-	return 1;	/* already stringified */
+	return kv->str;	/* already stringified */
       /* Put the full filename into kv->str.  */
       kv->str = repodata_dir2str(data, kv->id, kv->str);
       kv->num = 1;	/* mark stringification */
-      return 1;
+      return kv->str;
     case_CHKSUM_TYPES:
       if (!(flags & SEARCH_CHECKSUMS))
 	return 0;	/* skip em */
       if (kv->num)
-	return 1;	/* already stringified */
+	return kv->str;	/* already stringified */
       kv->str = repodata_chk2str(data, key->type, (const unsigned char *)kv->str);
       kv->num = 1;	/* mark stringification */
-      return 1;
+      return kv->str;
     default:
       return 0;
     }
@@ -1736,17 +1736,18 @@ dataiterator_step(Dataiterator *di)
 
       if (di->matcher.match)
 	{
+	  const char *str;
 	  /* simple pre-check so that we don't need to stringify */
 	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && (di->matcher.flags & SEARCH_FILES) != 0)
 	    if (!datamatcher_checkbasename(&di->matcher, di->kv.str))
 	      continue;
-	  if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags))
+	  if (!(str = repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags)))
 	    {
 	      if (di->keyname && (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY))
 		return 1;
 	      continue;
 	    }
-	  if (!datamatcher_match(&di->matcher, di->kv.str))
+	  if (!datamatcher_match(&di->matcher, str))
 	    continue;
 	}
       else
@@ -1970,11 +1971,10 @@ dataiterator_jump_to_repo(Dataiterator *di, Repo *repo)
 int
 dataiterator_match(Dataiterator *di, Datamatcher *ma)
 {
-  if (!repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags))
+  const char *str;
+  if (!(str = repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags)))
     return 0;
-  if (!ma)
-    return 1;
-  return datamatcher_match(ma, di->kv.str);
+  return ma ? datamatcher_match(ma, str) : 1;
 }
 
 void

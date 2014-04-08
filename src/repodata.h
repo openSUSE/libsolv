@@ -198,9 +198,9 @@ repodata_has_keyname(Repodata *data, Id keyname)
  * Call <callback> for each match */
 void repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
 
-/* Make sure the found KeyValue has the "str" field set. Return false
- * if not possible */
-int repodata_stringify(Pool *pool, Repodata *data, Repokey *key, struct _KeyValue *kv, int flags);
+/* Make sure the found KeyValue has the "str" field set. Return "str"
+ * if valid, NULL if not possible */
+const char *repodata_stringify(Pool *pool, Repodata *data, Repokey *key, struct _KeyValue *kv, int flags);
 
 int repodata_filelistfilter_matches(Repodata *data, const char *str);
 
