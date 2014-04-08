@@ -2902,6 +2902,96 @@ data_addblob(struct extdata *xd, unsigned char *blob, int len)
 
 /*********************************/
 
+/* this is to reduct memory usage when internalizing oversized repos */
+static void
+compact_attrdata(Repodata *data, int entry, int nentry)
+{
+  int i;
+  unsigned int attrdatastart = data->attrdatalen;
+  unsigned int attriddatastart = data->attriddatalen;
+  if (attrdatastart < 1024 * 1024 * 4 && attriddatastart < 1024 * 1024)
+    return;
+  for (i = entry; i < nentry; i++)
+    {
+      Id v, *attrs = data->attrs[i];
+      if (!attrs)
+	continue;
+      for (; *attrs; attrs += 2)
+	{
+	  switch (data->keys[*attrs].type)
+	    {
+	    case REPOKEY_TYPE_STR:
+	    case REPOKEY_TYPE_BINARY:
+	    case_CHKSUM_TYPES:
+	      if (attrs[1] < attrdatastart)
+		 attrdatastart = attrs[1];
+	      break;
+	    case REPOKEY_TYPE_DIRSTRARRAY:
+	      for (v = attrs[1]; data->attriddata[v] ; v += 2)
+		if (data->attriddata[v + 1] < attrdatastart)
+		  attrdatastart = data->attriddata[v + 1];
+	      /* FALLTHROUGH */
+	    case REPOKEY_TYPE_IDARRAY:
+	    case REPOKEY_TYPE_DIRNUMNUMARRAY:
+	      if (attrs[1] < attriddatastart)
+		attriddatastart = attrs[1];
+	      break;
+	    case REPOKEY_TYPE_FIXARRAY:
+	    case REPOKEY_TYPE_FLEXARRAY:
+	      return;
+	    default:
+	      break;
+	    }
+	}
+    }
+#if 0
+  printf("compact_attrdata %d %d\n", entry, nentry);
+  printf("attrdatastart: %d\n", attrdatastart);
+  printf("attriddatastart: %d\n", attriddatastart);
+#endif
+  if (attrdatastart < 1024 * 1024 * 4 && attriddatastart < 1024 * 1024)
+    return;
+  for (i = entry; i < nentry; i++)
+    {
+      Id v, *attrs = data->attrs[i];
+      if (!attrs)
+	continue;
+      for (; *attrs; attrs += 2)
+	{
+	  switch (data->keys[*attrs].type)
+	    {
+	    case REPOKEY_TYPE_STR:
+	    case REPOKEY_TYPE_BINARY:
+	    case_CHKSUM_TYPES:
+	      attrs[1] -= attrdatastart;
+	      break;
+	    case REPOKEY_TYPE_DIRSTRARRAY:
+	      for (v = attrs[1]; data->attriddata[v] ; v += 2)
+		data->attriddata[v + 1] -= attrdatastart;
+	      /* FALLTHROUGH */
+	    case REPOKEY_TYPE_IDARRAY:
+	    case REPOKEY_TYPE_DIRNUMNUMARRAY:
+	      attrs[1] -= attriddatastart;
+	      break;
+	    default:
+	      break;
+	    }
+	}
+    }
+  if (attrdatastart)
+    {
+      data->attrdatalen -= attrdatastart;
+      memmove(data->attrdata, data->attrdata + attrdatastart, data->attrdatalen);
+      data->attrdata = solv_extend_resize(data->attrdata, data->attrdatalen, 1, REPODATA_ATTRDATA_BLOCK);
+    }
+  if (attriddatastart)
+    {
+      data->attriddatalen -= attriddatastart;
+      memmove(data->attriddata, data->attriddata + attriddatastart, data->attriddatalen * sizeof(Id));
+      data->attriddata = solv_extend_resize(data->attriddata, data->attriddatalen, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
+    }
+}
+
 /* internalalize some key into incore/vincore data */
 
 static void
@@ -3078,6 +3168,11 @@ repodata_internalize(Repodata *data)
   if (!data->attrs && !data->xattrs)
     return;
 
+#if 0
+  printf("repodata_internalize %d\n", data->repodataid);
+  printf("  attr data: %d K\n", data->attrdatalen / 1024);
+  printf("  attrid data: %d K\n", data->attriddatalen / (1024 / 4));
+#endif
   newvincore.buf = data->vincore;
   newvincore.len = data->vincorelen;
 
@@ -3235,8 +3330,22 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	  dp = ndp;
 	}
-      if (entry >= 0 && data->attrs && data->attrs[entry])
-	data->attrs[entry] = solv_free(data->attrs[entry]);
+      if (entry >= 0 && data->attrs)
+	{
+	  if (data->attrs[entry])
+	    data->attrs[entry] = solv_free(data->attrs[entry]);
+	  if (entry && entry % 4096 == 0 && data->nxattrs <= 2 && entry + 64 < nentry)
+	    {
+	      compact_attrdata(data, entry + 1, nentry);	/* try to free some memory */
+#if 0
+	      printf("  attr data: %d K\n", data->attrdatalen / 1024);
+	      printf("  attrid data: %d K\n", data->attriddatalen / (1024 / 4));
+	      printf("  incore data: %d K\n", newincore.len / 1024);
+	      printf("  sum: %d K\n", (newincore.len + data->attrdatalen + data->attriddatalen * 4) / 1024);
+	      /* malloc_stats(); */
+#endif
+	    }
+	}
     }
   /* free all xattrs */
   for (entry = 0; entry < data->nxattrs; entry++)
@@ -3268,6 +3377,10 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
   data->attrdatalen = 0;
   data->attriddatalen = 0;
   data->attrnum64datalen = 0;
+#if 0
+  printf("repodata_internalize %d done\n", data->repodataid);
+  printf("  incore data: %d K\n", data->incoredatalen / 1024);
+#endif
 }
 
 void
