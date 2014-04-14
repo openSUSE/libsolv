@@ -1421,10 +1421,8 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   if (value->id >= data->dirpool.ndirs || !MAPTST(&cbd->useddirs, value->id))
     return 0;
   for (i = 0; i < cbd->nfiles; i++)
-    if (cbd->dids[i] != value->id && !strcmp(cbd->names[i], value->str))
-      break;
-  if (i < cbd->nfiles)
-    s->provides = repo_addid_dep(s->repo, s->provides, cbd->ids[i], SOLVABLE_FILEMARKER);
+    if (cbd->dids[i] == value->id && !strcmp(cbd->names[i], value->str))
+      s->provides = repo_addid_dep(s->repo, s->provides, cbd->ids[i], SOLVABLE_FILEMARKER);
   return 0;
 }
 
