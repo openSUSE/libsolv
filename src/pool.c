@@ -1296,8 +1296,6 @@ void pool_setnamespacecallback(Pool *pool, Id (*cb)(struct _Pool *, void *, Id, 
 
 struct searchfiles {
   Id *ids;
-  char **dirs;
-  char **names;
   int nfiles;
   Map seen;
 };
@@ -1308,7 +1306,7 @@ static void
 pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct searchfiles *isf)
 {
   Id dep, sid;
-  const char *s, *sr;
+  const char *s;
   struct searchfiles *csf;
 
   while ((dep = *ida++) != 0)
@@ -1366,16 +1364,7 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       if (csf != isf && pool->addedfileprovides == 1 && !repodata_filelistfilter_matches(0, s))
 	continue;	/* skip non-standard locations csf == isf: installed case */
       csf->ids = solv_extend(csf->ids, csf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
-      csf->dirs = solv_extend(csf->dirs, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
-      csf->names = solv_extend(csf->names, csf->nfiles, 1, sizeof(const char *), SEARCHFILES_BLOCK);
-      csf->ids[csf->nfiles] = dep;
-      sr = strrchr(s, '/');
-      csf->names[csf->nfiles] = solv_strdup(sr + 1);
-      csf->dirs[csf->nfiles] = solv_malloc(sr - s + 1);
-      if (sr != s)
-        strncpy(csf->dirs[csf->nfiles], s, sr - s);
-      csf->dirs[csf->nfiles][sr - s] = 0;
-      csf->nfiles++;
+      csf->ids[csf->nfiles++] = dep;
     }
 }
 
@@ -1401,6 +1390,19 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   if (!cbd->useddirs.size)
     {
       map_init(&cbd->useddirs, data->dirpool.ndirs + 1);
+      if (!cbd->dirs)
+	{
+	  cbd->dirs= solv_malloc2(cbd->nfiles, sizeof(char *));
+	  cbd->names = solv_malloc2(cbd->nfiles, sizeof(char *));
+	  for (i = 0; i < cbd->nfiles; i++)
+	    {
+	      char *s = solv_strdup(pool_id2str(data->repo->pool, cbd->ids[i]));
+	      cbd->dirs[i] = s;
+	      s = strrchr(s, '/');
+	      *s = 0;
+	      cbd->names[i] = s + 1;
+	    }
+	}
       for (i = 0; i < cbd->nfiles; i++)
 	{
 	  Id did;
@@ -1419,15 +1421,10 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
   if (value->id >= data->dirpool.ndirs || !MAPTST(&cbd->useddirs, value->id))
     return 0;
   for (i = 0; i < cbd->nfiles; i++)
-    {
-      if (cbd->dids[i] != value->id)
-	continue;
-      if (!strcmp(cbd->names[i], value->str))
-	break;
-    }
-  if (i == cbd->nfiles)
-    return 0;
-  s->provides = repo_addid_dep(s->repo, s->provides, cbd->ids[i], SOLVABLE_FILEMARKER);
+    if (cbd->dids[i] != value->id && !strcmp(cbd->names[i], value->str))
+      break;
+  if (i < cbd->nfiles)
+    s->provides = repo_addid_dep(s->repo, s->provides, cbd->ids[i], SOLVABLE_FILEMARKER);
   return 0;
 }
 
@@ -1448,8 +1445,8 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
 
   cbd->nfiles = sf->nfiles;
   cbd->ids = sf->ids;
-  cbd->dirs = sf->dirs;
-  cbd->names = sf->names;
+  cbd->dirs = 0;
+  cbd->names = 0;
   cbd->dids = solv_realloc2(cbd->dids, sf->nfiles, sizeof(Id));
   map_init(&cbd->providedids, pool->ss.nstrings);
 
@@ -1553,6 +1550,13 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
   map_free(&donemap);
   queue_free(&fileprovidesq);
   map_free(&cbd->providedids);
+  if (cbd->dirs)
+    {
+      for (i = 0; i < cbd->nfiles; i++)
+	solv_free(cbd->dirs[i]);
+      cbd->dirs = solv_free(cbd->dirs);
+      cbd->names = solv_free(cbd->names);
+    }
 }
 
 void
@@ -1616,13 +1620,6 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
         for (i = 0; i < sf.nfiles; i++)
 	  queue_push(idqinst, sf.ids[i]);
       solv_free(sf.ids);
-      for (i = 0; i < sf.nfiles; i++)
-	{
-	  solv_free(sf.dirs[i]);
-	  solv_free(sf.names[i]);
-	}
-      solv_free(sf.dirs);
-      solv_free(sf.names);
     }
   if (isf.nfiles)
     {
@@ -1636,13 +1633,6 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
         for (i = 0; i < isf.nfiles; i++)
 	  queue_pushunique(idqinst, isf.ids[i]);
       solv_free(isf.ids);
-      for (i = 0; i < isf.nfiles; i++)
-	{
-	  solv_free(isf.dirs[i]);
-	  solv_free(isf.names[i]);
-	}
-      solv_free(isf.dirs);
-      solv_free(isf.names);
     }
   solv_free(cbd.dids);
   pool_freewhatprovides(pool);	/* as we have added provides */
