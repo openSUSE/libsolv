@@ -1392,7 +1392,7 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
       map_init(&cbd->useddirs, data->dirpool.ndirs + 1);
       if (!cbd->dirs)
 	{
-	  cbd->dirs= solv_malloc2(cbd->nfiles, sizeof(char *));
+	  cbd->dirs = solv_malloc2(cbd->nfiles, sizeof(char *));
 	  cbd->names = solv_malloc2(cbd->nfiles, sizeof(char *));
 	  for (i = 0; i < cbd->nfiles; i++)
 	    {
