@@ -1040,6 +1040,8 @@ struct rpmdbstate {
 
   RpmHead *rpmhead;	/* header storage space */
   int rpmheadsize;
+  
+  const char *rpmdb_prefix;
 
   int dbopened;
   DB_ENV *dbenv;	/* database environment */
@@ -1126,14 +1128,24 @@ opendbenv(struct rpmdbstate *state)
   char dbpath[PATH_MAX];
   DB_ENV *dbenv = 0;
   int r;
+  int db_is_ro;
 
   if (db_env_create(&dbenv, 0))
     return pool_error(state->pool, 0, "db_env_create: %s", strerror(errno));
 #if defined(FEDORA) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
   dbenv->set_thread_count(dbenv, 8);
 #endif
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
-  if (access(dbpath, W_OK) == -1)
+  state->rpmdb_prefix = "/usr/share/rpm";
+  db_is_ro = 1;
+  snprintf(dbpath, PATH_MAX, "%s%s", rootdir ? rootdir : "", state->rpmdb_prefix);
+  if (access(dbpath, R_OK) != 0)
+    {
+      state->rpmdb_prefix = "/var/lib/rpm";
+      db_is_ro = 0;
+      snprintf(dbpath, PATH_MAX, "%s%s", rootdir ? rootdir : "", state->rpmdb_prefix);
+    }
+
+  if (db_is_ro || access(dbpath, W_OK) == -1)
     {
       r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
     }
@@ -1448,7 +1460,8 @@ count_headers(struct rpmdbstate *state)
   DBT dbkey;
   DBT dbdata;
 
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", state->rootdir ? state->rootdir : "");
+  snprintf(dbpath, PATH_MAX, "%s%s/Name", state->rootdir ? state->rootdir : "",
+	   state->rpmdb_prefix);
   if (stat(dbpath, &statbuf))
     return 0;
   memset(&dbkey, 0, sizeof(dbkey));
@@ -1766,7 +1779,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     }
 
   /* XXX: should get ro lock of Packages database! */
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", state.rootdir ? state.rootdir : "");
+  snprintf(dbpath, PATH_MAX, "%s%s/Packages", state.rootdir ? state.rootdir : "",
+	   state.rpmdb_prefix);
   if (stat(dbpath, &packagesstat))
     {
       pool_error(pool, -1, "%s: %s", dbpath, strerror(errno));
