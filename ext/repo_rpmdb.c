@@ -1045,6 +1045,7 @@ struct rpmdbstate {
   DB_ENV *dbenv;	/* database environment */
   DB *db;		/* packages database */
   int byteswapped;	/* endianess of packages database */
+  int is_ostree;	/* read-only db that lives in /usr/share/rpm */
 };
 
 struct rpmdbentry {
@@ -1135,6 +1136,10 @@ opendbenv(struct rpmdbstate *state)
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
   if (access(dbpath, W_OK) == -1)
     {
+      snprintf(dbpath, PATH_MAX, "%s/usr/share/rpm/Packages", rootdir ? rootdir : "");
+      if (access(dbpath, R_OK) == 0)
+	state->is_ostree = 1;
+      snprintf(dbpath, PATH_MAX, "%s%s", rootdir ? rootdir : "", state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
       r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
     }
   else
@@ -1448,7 +1453,7 @@ count_headers(struct rpmdbstate *state)
   DBT dbkey;
   DBT dbdata;
 
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Name", state->rootdir ? state->rootdir : "");
+  snprintf(dbpath, PATH_MAX, "%s%s/Name", state->rootdir ? state->rootdir : "", state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
   if (stat(dbpath, &statbuf))
     return 0;
   memset(&dbkey, 0, sizeof(dbkey));
@@ -1766,7 +1771,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     }
 
   /* XXX: should get ro lock of Packages database! */
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm/Packages", state.rootdir ? state.rootdir : "");
+  snprintf(dbpath, PATH_MAX, "%s%s/Packages", state.rootdir ? state.rootdir : "", state.is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
   if (stat(dbpath, &packagesstat))
     {
       pool_error(pool, -1, "%s: %s", dbpath, strerror(errno));
