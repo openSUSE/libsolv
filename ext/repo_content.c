@@ -408,7 +408,6 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		}
 	      /* create new solvable */
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
-	      repodata_extend(data, s - pool->solvables);
 	      handle = s - pool->solvables;
 	      s->name = pool_str2id(pool, join(&pd, "product", ":", value), 1);
 	      if (datadir)
@@ -425,7 +424,6 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	  if (!s)
 	    {
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
-	      repodata_extend(data, s - pool->solvables);
 	      handle = s - pool->solvables;
 	    }
 
@@ -546,7 +544,6 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
       for (i = 0; i < numotherarchs; ++i)
 	{
 	  Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
-	  repodata_extend(data, p - pool->solvables);
 	  p->name = s->name;
 	  p->evr = s->evr;
 	  p->vendor = s->vendor;
