@@ -2102,6 +2102,7 @@ repodata_extend_block(Repodata *data, Id start, Id num)
     return;
   if (!data->incoreoffset)
     {
+      /* this also means that data->attrs is NULL */
       data->incoreoffset = solv_calloc_block(num, sizeof(Id), REPODATA_BLOCK);
       data->start = start;
       data->end = start + num;
@@ -2812,6 +2813,10 @@ repodata_swap_attrs(Repodata *data, Id dest, Id src)
   Id *tmpattrs;
   if (!data->attrs || dest == src)
     return;
+  if (dest < data->start || dest >= data->end)
+    repodata_extend(data, dest);
+  if (src < data->start || src >= data->end)
+    repodata_extend(data, src);
   tmpattrs = data->attrs[dest - data->start];
   data->attrs[dest - data->start] = data->attrs[src - data->start];
   data->attrs[src - data->start] = tmpattrs;
