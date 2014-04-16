@@ -102,6 +102,8 @@ static struct solverflags2str {
   { SOLVER_FLAG_DUP_ALLOW_ARCHCHANGE,       "dupallowarchchange", 1 },
   { SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE,     "dupallowvendorchange", 1 },
   { SOLVER_FLAG_DUP_ALLOW_NAMECHANGE,       "dupallownamechange", 1 },
+  { SOLVER_FLAG_KEEP_ORPHANS,               "keeporphans", 0 },
+  { SOLVER_FLAG_BREAK_ORPHANS,              "breakorphans", 0 },
   { 0, 0, 0 }
 };
 

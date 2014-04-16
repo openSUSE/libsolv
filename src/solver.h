@@ -185,6 +185,8 @@ struct _Solver {
 
   Queue addedmap_deduceq;		/* deduce addedmap from rpm rules */
   Id *instbuddy;			/* buddies of installed packages */
+  int keep_orphans;			/* how to treat orphans */
+  int break_orphans;			/* how to treat orphans */
 #endif	/* LIBSOLV_INTERNAL */
 };
 
@@ -282,6 +284,8 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_DUP_ALLOW_ARCHCHANGE	15
 #define SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE	16
 #define SOLVER_FLAG_DUP_ALLOW_NAMECHANGE	17
+#define SOLVER_FLAG_KEEP_ORPHANS		18
+#define SOLVER_FLAG_BREAK_ORPHANS		19
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead if ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */

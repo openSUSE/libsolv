@@ -1639,6 +1639,10 @@ solver_get_flag(Solver *solv, int flag)
     return solv->dup_allowarchchange;
   case SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE:
     return solv->dup_allowvendorchange;
+  case SOLVER_FLAG_KEEP_ORPHANS:
+    return solv->keep_orphans;
+  case SOLVER_FLAG_BREAK_ORPHANS:
+    return solv->break_orphans;
   default:
     break;
   }
@@ -1701,6 +1705,12 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_DUP_ALLOW_VENDORCHANGE:
     solv->dup_allowvendorchange = value;
+    break;
+  case SOLVER_FLAG_KEEP_ORPHANS:
+    solv->keep_orphans = value;
+    break;
+  case SOLVER_FLAG_BREAK_ORPHANS:
+    solv->break_orphans = value;
     break;
   default:
     break;
@@ -3574,20 +3584,16 @@ solver_solve(Solver *solv, Queue *job)
 	   * check for and remove duplicate
 	   */
 	  r = solv->rules + solv->nrules - 1;           /* r: update rule */
-	  sr = r - (installed->end - installed->start); /* sr: feature rule */
-	  /* it's orphaned if there is no feature rule or the feature rule
-           * consists just of the installed package */
-	  if (!sr->p || (sr->p == i && !sr->d && !sr->w2))
-	    queue_push(&solv->orphaned, i);
           if (!r->p)
-	    {
-	      /* assert(solv->dupmap_all && !sr->p); */
-	      continue;
-	    }
+	    continue;
+	  sr = r - (installed->end - installed->start); /* sr: feature rule */
+	  /* it's also orphaned if the feature rule consists just of the installed package */
+	  if (!solv->dupmap_all && sr->p == i && !sr->d && !sr->w2)
+	    queue_push(&solv->orphaned, i);
 	  if (!solver_rulecmp(solv, r, sr))
 	    memset(sr, 0, sizeof(*sr));		/* delete unneeded feature rule */
 	  else
-	    solver_disablerule(solv, sr);	/* disable feature rule */
+	    solver_disablerule(solv, sr);	/* disable feature rule for now */
 	}
       /* consistency check: we added a rule for _every_ installed solvable */
       assert(solv->nrules - solv->updaterules == installed->end - installed->start);

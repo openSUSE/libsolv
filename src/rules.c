@@ -1246,6 +1246,13 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
     }
 #endif
 
+  if (!allow_all && !p && solv->dupmap_all)
+    {
+      queue_push(&solv->orphaned, s - pool->solvables);		/* an orphaned package */
+      if (solv->keep_orphans)
+	p = s - pool->solvables;
+    }
+
   if (!allow_all && qs.count && solv->multiversion.size)
     {
       int i, j;
@@ -1286,7 +1293,7 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 		}
 	      if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
 		{
-		  queue_push(&solv->orphaned, s - pool->solvables);	/* treat as orphaned */
+		  queue_push(&solv->orphaned, s - pool->solvables);	/* also treat as orphaned */
 		  j = qs.count;
 		}
 	      qs.count = j;
