@@ -62,7 +62,9 @@ struct stateswitch {
 /* !! must be sorted by first column !! */
 static struct stateswitch stateswitches[] = {
   { STATE_START,       "applications",  STATE_START,         0 },
+  { STATE_START,       "components",    STATE_START,         0 },
   { STATE_START,       "application",   STATE_APPLICATION,   0 },
+  { STATE_START,       "component",     STATE_APPLICATION,   0 },
   { STATE_APPLICATION, "id",            STATE_ID,            1 },
   { STATE_APPLICATION, "pkgname",       STATE_PKGNAME,       1 },
   { STATE_APPLICATION, "product_license", STATE_LICENCE,     1 },
