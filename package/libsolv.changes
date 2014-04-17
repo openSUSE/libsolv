@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Thu Apr 17 14:47:42 CEST 2014 - mls@suse.de
+
+- support BREAK_ORPHANS and KEEP_ORPHANS solver flags
+- adapt to AppStream 0.6
+- reduce memory usage in repo_write and repodata_internalize
+- make repodata_stringify return the result string
+- bump version to 0.6.1
+
+-------------------------------------------------------------------
 Mon Apr  7 15:36:07 CEST 2014 - mls@suse.de
 
 - add support for sha224/sha384/sha512
