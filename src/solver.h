@@ -187,6 +187,7 @@ struct _Solver {
   Id *instbuddy;			/* buddies of installed packages */
   int keep_orphans;			/* how to treat orphans */
   int break_orphans;			/* how to treat orphans */
+  Queue *brokenorphanrules;		/* broken rules of orphaned packages */
 #endif	/* LIBSOLV_INTERNAL */
 };
 

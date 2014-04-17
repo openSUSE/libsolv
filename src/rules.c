@@ -4329,4 +4329,96 @@ solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
   map_free(&cleandepsmap);
 }
 
-/* EOF */
+
+void
+solver_breakorphans(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  int i, rid;
+  Map m;
+
+  if (!installed || solv->droporphanedmap_all)
+    return;
+  solv->brokenorphanrules = solv_calloc(1, sizeof(Queue));
+  queue_init(solv->brokenorphanrules);
+  map_init(&m, installed->end - installed->start);
+  for (i = 0; i < solv->orphaned.count; i++)
+    {
+      Id p = solv->orphaned.elements[i];
+      if (pool->solvables[p].repo != installed)
+	continue;
+      if (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - installed->start))
+	continue;
+      MAPSET(&m, p - installed->start);
+    }
+  for (rid = 1; rid < solv->rpmrules_end ; rid++)
+    {
+      Id p, *dp;
+      Rule *r = solv->rules + rid;
+      /* ignore non-deps and simple conflicts */
+      if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 < 0))
+	continue;
+      p = -r->p;
+      if (p < installed->start || p >= installed->end || !MAPTST(&m, p - installed->start))
+	{
+	  /* need to check other literals */
+	  if (r->d == 0 || r->d == -1)
+	    continue;
+	  for (dp = pool->whatprovidesdata + (r->d < 0 ? -r->d - 1 : r->d); *dp < 0; dp++)
+	    {
+	      p = -*dp;
+	      if (p >= installed->start && p < installed->end && MAPTST(&m, p - installed->start))
+		break;
+	    }
+	  if (*dp >= 0)
+	    continue;
+	}
+      /* ok, disable this rule */
+      queue_push(solv->brokenorphanrules, rid);
+      if (r->d >= 0)
+	solver_disablerule(solv, r);
+    }
+  map_free(&m);
+  if (!solv->brokenorphanrules->count)
+    {
+      queue_free(solv->brokenorphanrules);
+      solv->brokenorphanrules = solv_free(solv->brokenorphanrules);
+    }
+}
+
+void
+solver_check_brokenorphanrules(Solver *solv, Queue *dq)
+{
+  Pool *pool = solv->pool;
+  int i;
+  Id l, pp;
+  
+  queue_empty(dq);
+  if (!solv->brokenorphanrules)
+    return;
+  for (i = 0; i < solv->brokenorphanrules->count; i++)
+    {
+      int rid = solv->brokenorphanrules->elements[i];
+      Rule *r = solv->rules + rid;
+      FOR_RULELITERALS(l, pp, r)
+	{
+	  if (l < 0)
+	    {
+	      if (solv->decisionmap[-l] <= 0)
+		break;
+	    }
+	  else
+	    {
+	      if (solv->decisionmap[l] > 0 && pool->solvables[l].repo != solv->installed)
+		break;
+	    }
+	}
+      if (l)
+	continue;
+      FOR_RULELITERALS(l, pp, r)
+        if (l > 0 && solv->decisionmap[l] == 0 && pool->solvables[l].repo != solv->installed)
+	  queue_pushunique(dq, l);
+    }
+}
+

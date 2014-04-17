@@ -160,6 +160,10 @@ enableweakrules(Solver *solv)
 	continue;
       solver_enablerule(solv, r);
     }
+  /* make sure broken orphan rules stay disabled */
+  if (solv->brokenorphanrules)
+    for (i = 0; i < solv->brokenorphanrules->count; i++)
+      solver_disablerule(solv, solv->rules + solv->brokenorphanrules->elements[i]);
 }
 
 

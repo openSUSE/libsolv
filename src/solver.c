@@ -1573,6 +1573,7 @@ solver_free(Solver *solv)
   queuep_free(&solv->installsuppdepq);
   queuep_free(&solv->recommendscplxq);
   queuep_free(&solv->suggestscplxq);
+  queuep_free(&solv->brokenorphanrules);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -2687,6 +2688,26 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		break;
 	      continue;		/* back to main loop */
 	    }
+          if (solv->brokenorphanrules)
+	    {
+	      solver_check_brokenorphanrules(solv, &dq);
+	      if (dq.count)
+		{
+	          policy_filter_unwanted(solv, &dq, POLICY_MODE_CHOOSE);
+		  for (i = 0; i < dq.count; i++)
+		    {
+		      p = dq.elements[i];
+		      POOL_DEBUG(SOLV_DEBUG_POLICY, "installing orphaned dep %s\n", pool_solvid2str(pool, p));
+		      olevel = level;
+		      level = setpropagatelearn(solv, level, p, 0, 0);
+		      if (level < olevel)
+			break;
+		    }
+		  if (level == 0)
+		    break;
+		  continue;
+		}
+	    }
 	}
 
      /* one final pass to make sure we decided all installed packages */
@@ -3303,6 +3324,7 @@ solver_solve(Solver *solv, Queue *job)
       queuep_free(&solv->suggestscplxq);
       solv->recommends_index = 0;
     }
+  queuep_free(&solv->brokenorphanrules);
   solv->specialupdaters = solv_free(solv->specialupdaters);
 
 
@@ -3879,6 +3901,10 @@ solver_solve(Solver *solv, Queue *job)
 
   /* disable update rules that conflict with our job */
   solver_disablepolicyrules(solv);
+
+  /* break orphans if requested */
+  if (solv->dupmap_all && solv->orphaned.count && solv->break_orphans)
+    solver_breakorphans(solv);
 
   /* make initial decisions based on assertion rules */
   makeruledecisions(solv);
