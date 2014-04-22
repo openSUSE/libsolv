@@ -1249,8 +1249,8 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
   if (!allow_all && !p && solv->dupmap_all)
     {
       queue_push(&solv->orphaned, s - pool->solvables);		/* an orphaned package */
-      if (solv->keep_orphans)
-	p = s - pool->solvables;
+      if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, s - pool->solvables - solv->installed->start))))
+	p = s - pool->solvables;	/* keep this orphaned package installed */
     }
 
   if (!allow_all && qs.count && solv->multiversion.size)

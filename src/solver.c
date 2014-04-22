@@ -3359,6 +3359,7 @@ solver_solve(Solver *solv, Queue *job)
   if (installed)
     {
       /* check for update/verify jobs as they need to be known early */
+      /* also setup the droporphaned map, we need it when creating update rules */
       for (i = 0; i < job->count; i += 2)
 	{
 	  how = job->elements[i];
@@ -3442,6 +3443,19 @@ solver_solve(Solver *solv, Queue *job)
 		    }
 		  FOR_JOB_SELECT(p, pp, select, what)
 		    add_update_target(solv, p, how);
+		}
+	      break;
+	    case SOLVER_DROP_ORPHANED:
+	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && what == installed->repoid))
+		solv->droporphanedmap_all = 1;
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  if (s->repo != installed)
+		    continue;
+		  if (!solv->droporphanedmap.size)
+		    map_grow(&solv->droporphanedmap, installed->end - installed->start);
+		  MAPSET(&solv->droporphanedmap, p - installed->start);
 		}
 	      break;
 	    default:
@@ -3777,17 +3791,6 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_DROP_ORPHANED:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: drop orphaned %s\n", solver_select2str(pool, select, what));
-	  if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
-	    solv->droporphanedmap_all = 1;
-	  FOR_JOB_SELECT(p, pp, select, what)
-	    {
-	      s = pool->solvables + p;
-	      if (!installed || s->repo != installed)
-		continue;
-	      if (!solv->droporphanedmap.size)
-		map_grow(&solv->droporphanedmap, installed->end - installed->start);
-	      MAPSET(&solv->droporphanedmap, p - installed->start);
-	    }
 	  break;
 	case SOLVER_USERINSTALLED:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: user installed %s\n", solver_select2str(pool, select, what));
@@ -3796,10 +3799,6 @@ solver_solve(Solver *solv, Queue *job)
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: unknown job\n");
 	  break;
 	}
-	
-	/*
-	 * debug
-	 */
 	
       IF_POOLDEBUG (SOLV_DEBUG_JOB)
 	{
