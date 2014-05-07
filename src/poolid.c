@@ -151,23 +151,25 @@ pool_id2rel(const Pool *pool, Id id)
   rd = GETRELDEP(pool, id);
   switch (rd->flags)
     {
-    case 0: case 2: case 3:
-    case 6: case 7:
+    /* debian special cases < and > */
+    /* haiku special cases <> (maybe we should use != for the others as well */
+    case 0: case REL_EQ: case REL_GT | REL_EQ:
+    case REL_LT | REL_EQ: case REL_LT | REL_EQ | REL_GT:
 #if !defined(DEBIAN) && !defined(MULTI_SEMANTICS)
-    case 1: case 4:
+    case REL_LT: case REL_GT:
 #endif
 #if !defined(HAIKU) && !defined(MULTI_SEMANTICS)
-    case 5:
+    case REL_LT | REL_GT:
 #endif
       return rels[rd->flags];
 #if defined(DEBIAN) || defined(MULTI_SEMANTICS)
-    case 1:
+    case REL_GT:
       return pool->disttype == DISTTYPE_DEB ? " >> " : rels[rd->flags];
-    case 4:
+    case REL_LT:
       return pool->disttype == DISTTYPE_DEB ? " << " : rels[rd->flags];
 #endif
 #if defined(HAIKU) || defined(MULTI_SEMANTICS)
-    case 5:
+    case REL_LT | REL_GT:
       return pool->disttype == DISTTYPE_HAIKU ? " != " : rels[rd->flags];
 #endif
     case REL_AND:
