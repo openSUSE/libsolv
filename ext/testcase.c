@@ -104,6 +104,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_DUP_ALLOW_NAMECHANGE,       "dupallownamechange", 1 },
   { SOLVER_FLAG_KEEP_ORPHANS,               "keeporphans", 0 },
   { SOLVER_FLAG_BREAK_ORPHANS,              "breakorphans", 0 },
+  { SOLVER_FLAG_FOCUS_INSTALLED,            "focusinstalled", 0 },
   { 0, 0, 0 }
 };
 

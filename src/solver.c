@@ -1250,6 +1250,8 @@ revert(Solver *solv, int level)
     }
   if (solv->recommends_index > solv->decisionq.count)
     solv->recommends_index = -1;	/* rebuild recommends/suggests maps */
+  if (solv->decisionq.count < solv->decisioncnt_jobs)
+    solv->decisioncnt_jobs = 0;
   if (solv->decisionq.count < solv->decisioncnt_update)
     solv->decisioncnt_update = 0;
   if (solv->decisionq.count < solv->decisioncnt_keep)
@@ -1448,7 +1450,9 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
 	    break;
 	  }
     }
-  if (dq->count > 1 && ruleid >= solv->jobrules && ruleid < solv->jobrules_end && solv->installed)
+  /* if we're resolving job rules and didn't resolve the installed packages yet,
+   * do some special supplements ordering */
+  if (dq->count > 1 && ruleid >= solv->jobrules && ruleid < solv->jobrules_end && solv->installed && !solv->focus_installed)
     reorder_dq_for_jobrules(solv, level, dq);
   if (dq->count > 1)
     {
@@ -1526,6 +1530,83 @@ solver_create(Pool *pool)
   return solv;
 }
 
+
+static int
+resolve_jobrules(Solver *solv, int level, int disablerules, Queue *dq)
+{
+  Pool *pool = solv->pool;
+  int oldlevel = level;
+  int i, olevel;
+  Rule *r;
+
+  POOL_DEBUG(SOLV_DEBUG_SOLVER, "resolving job rules\n");
+  if (!solv->decisioncnt_jobs)
+    solv->decisioncnt_jobs = solv->decisionq.count;
+  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++)
+    {
+      Id l, pp;
+      if (r->d < 0)		/* ignore disabled rules */
+	continue;
+      queue_empty(dq);
+      FOR_RULELITERALS(l, pp, r)
+	{
+	  if (l < 0)
+	    {
+	      if (solv->decisionmap[-l] <= 0)
+		break;
+	    }
+	  else
+	    {
+	      if (solv->decisionmap[l] > 0)
+		break;
+	      if (solv->decisionmap[l] == 0)
+		queue_push(dq, l);
+	    }
+	}
+      if (l || !dq->count)
+	continue;
+      /* prune to installed if not updating */
+      if (dq->count > 1 && solv->installed && !solv->updatemap_all &&
+	  !(solv->job.elements[solv->ruletojob.elements[i - solv->jobrules]] & SOLVER_ORUPDATE))
+	{
+	  int j, k;
+	  for (j = k = 0; j < dq->count; j++)
+	    {
+	      Solvable *s = pool->solvables + dq->elements[j];
+	      if (s->repo == solv->installed)
+		{
+		  dq->elements[k++] = dq->elements[j];
+		  if (solv->updatemap.size && MAPTST(&solv->updatemap, dq->elements[j] - solv->installed->start))
+		    {
+		      k = 0;	/* package wants to be updated, do not prune */
+		      break;
+		    }
+		}
+	    }
+	  if (k)
+	    dq->count = k;
+	}
+      olevel = level;
+      level = selectandinstall(solv, level, dq, disablerules, i);
+      if (level <= olevel)
+	{
+	  if (level == 0)
+	    return 0;	/* unsolvable */
+	  if (level == olevel)
+	    {
+	      i--;
+	      r--;
+	      continue;	/* try something else */
+	    }
+	  if (level < oldlevel)
+	    return level;
+	  /* redo from start of jobrules */
+	  i = solv->jobrules - 1;
+	  r = solv->rules + i;
+	}
+    }
+  return level;
+}
 
 /*-------------------------------------------------------------------
  *
@@ -1644,6 +1725,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->keep_orphans;
   case SOLVER_FLAG_BREAK_ORPHANS:
     return solv->break_orphans;
+  case SOLVER_FLAG_FOCUS_INSTALLED:
+    return solv->focus_installed;
   default:
     break;
   }
@@ -1712,6 +1795,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_BREAK_ORPHANS:
     solv->break_orphans = value;
+    break;
+  case SOLVER_FLAG_FOCUS_INSTALLED:
+    solv->focus_installed = value;
     break;
   default:
     break;
@@ -1992,74 +2078,27 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	}
 
       /*
-       * resolve jobs first
+       * resolve jobs first (unless focus_installed is set)
        */
-     if (level < systemlevel)
+     if (level < systemlevel && !solv->focus_installed)
 	{
-	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "resolving job rules\n");
-	  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++)
+	  olevel = level;
+	  level = resolve_jobrules(solv, level, disablerules, &dq);
+	  if (level < olevel)
 	    {
-	      Id l;
-	      if (r->d < 0)		/* ignore disabled rules */
-		continue;
-	      queue_empty(&dq);
-	      FOR_RULELITERALS(l, pp, r)
-		{
-		  if (l < 0)
-		    {
-		      if (solv->decisionmap[-l] <= 0)
-			break;
-		    }
-		  else
-		    {
-		      if (solv->decisionmap[l] > 0)
-			break;
-		      if (solv->decisionmap[l] == 0)
-			queue_push(&dq, l);
-		    }
-		}
-	      if (l || !dq.count)
-		continue;
-	      /* prune to installed if not updating */
-	      if (dq.count > 1 && solv->installed && !solv->updatemap_all &&
-		  !(solv->job.elements[solv->ruletojob.elements[i - solv->jobrules]] & SOLVER_ORUPDATE))
-		{
-		  int j, k;
-		  for (j = k = 0; j < dq.count; j++)
-		    {
-		      Solvable *s = pool->solvables + dq.elements[j];
-		      if (s->repo == solv->installed)
-			{
-			  dq.elements[k++] = dq.elements[j];
-			  if (solv->updatemap.size && MAPTST(&solv->updatemap, dq.elements[j] - solv->installed->start))
-			    {
-			      k = 0;	/* package wants to be updated, do not prune */
-			      break;
-			    }
-			}
-		    }
-		  if (k)
-		    dq.count = k;
-		}
-	      olevel = level;
-	      level = selectandinstall(solv, level, &dq, disablerules, i);
 	      if (level == 0)
-		break;
-	      if (level <= olevel)
-		break;
+		break;	/* unsolvable */
+	      continue;
 	    }
-          if (level == 0)
-	    break;	/* unsolvable */
 	  systemlevel = level + 1;
-	  if (i < solv->jobrules_end)
-	    continue;
-          if (!solv->decisioncnt_update)
-            solv->decisioncnt_update = solv->decisionq.count;
 	}
+
 
       /*
        * installed packages
        */
+      if (!solv->decisioncnt_update)
+	solv->decisioncnt_update = solv->decisionq.count;
       if (level < systemlevel && solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
 	{
 	  Repo *installed = solv->installed;
@@ -2231,6 +2270,19 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	}
       if (!solv->decisioncnt_keep)
 	solv->decisioncnt_keep = solv->decisionq.count;
+
+     if (level < systemlevel && solv->focus_installed)
+	{
+	  olevel = level;
+	  level = resolve_jobrules(solv, level, disablerules, &dq);
+	  if (level < olevel)
+	    {
+	      if (level == 0)
+		break;	/* unsolvable */
+	      continue;
+	    }
+	  systemlevel = level + 1;
+	}
 
       if (level < systemlevel)
         systemlevel = level;
@@ -2828,6 +2880,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   if (level == 0)
     {
       /* unsolvable */
+      solv->decisioncnt_jobs = solv->decisionq.count;
       solv->decisioncnt_update = solv->decisionq.count;
       solv->decisioncnt_keep = solv->decisionq.count;
       solv->decisioncnt_resolve = solv->decisionq.count;
@@ -3307,7 +3360,7 @@ solver_solve(Solver *solv, Queue *job)
     memset(solv->decisionmap, 0, pool->nsolvables * sizeof(Id));
   queue_empty(&solv->decisionq);
   queue_empty(&solv->decisionq_why);
-  solv->decisioncnt_update = solv->decisioncnt_keep = solv->decisioncnt_resolve = solv->decisioncnt_weak = solv->decisioncnt_orphan = 0;
+  solv->decisioncnt_jobs = solv->decisioncnt_update = solv->decisioncnt_keep = solv->decisioncnt_resolve = solv->decisioncnt_weak = solv->decisioncnt_orphan = 0;
   queue_empty(&solv->learnt_why);
   queue_empty(&solv->learnt_pool);
   queue_empty(&solv->branches);
@@ -4310,12 +4363,10 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
   if (why > 0)
     return SOLVER_REASON_UNIT_RULE;
   why = -why;
+  if (i == 0)
+    return SOLVER_REASON_KEEP_INSTALLED;	/* the systemsolvable */
   if (i < solv->decisioncnt_update)
-    {
-      if (i == 0)
-	return SOLVER_REASON_KEEP_INSTALLED;
-      return SOLVER_REASON_RESOLVE_JOB;
-    }
+    return SOLVER_REASON_RESOLVE_JOB;
   if (i < solv->decisioncnt_keep)
     {
       if (why == 0 && pp < 0)
@@ -4324,6 +4375,8 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
     }
   if (i < solv->decisioncnt_resolve)
     {
+      if (solv->focus_installed && i >= solv->decisioncnt_jobs)
+	return SOLVER_REASON_RESOLVE_JOB;
       if (why == 0 && pp < 0)
 	return SOLVER_REASON_CLEANDEPS_ERASE;
       return SOLVER_REASON_KEEP_INSTALLED;

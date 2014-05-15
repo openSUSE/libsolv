@@ -109,6 +109,7 @@ struct _Solver {
 					 * > 0: level of decision when installed,
 					 * < 0: level of decision when conflict */
 
+  int decisioncnt_jobs;
   int decisioncnt_update;
   int decisioncnt_keep;
   int decisioncnt_resolve;
@@ -159,7 +160,7 @@ struct _Solver {
   int keepexplicitobsoletes;		/* true: honor obsoletes during multiinstall */
   int bestobeypolicy;			/* true: stay in policy with the best rules */
   int noautotarget;			/* true: do not assume targeted for up/dup jobs that contain no installed solvable */
-
+  int focus_installed;			/* true: resolve update rules first */
 
   Map dupmap;				/* dup these packages*/
   int dupmap_all;			/* dup all packages */
@@ -287,6 +288,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_DUP_ALLOW_NAMECHANGE	17
 #define SOLVER_FLAG_KEEP_ORPHANS		18
 #define SOLVER_FLAG_BREAK_ORPHANS		19
+#define SOLVER_FLAG_FOCUS_INSTALLED		20
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead if ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */

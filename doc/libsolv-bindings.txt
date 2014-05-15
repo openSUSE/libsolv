@@ -2081,6 +2081,21 @@ installed packages, which may conflict with the set policy.
 Do not enable auto-targeting up update and distupgrade jobs. See
 the section on targeted updates for more information.
 
+*SOLVER_FLAG_KEEP_ORPHANS*::
+Do not allow orphaned packages to be deinstalled if they get
+in the way of resolving other packages.
+
+*SOLVER_FLAG_BREAK_ORPHANS*::
+Ignore dependencies of orphaned packages that get in the way
+of resolving non-orphaned ones. Setting the flag might result
+in no longer working packages in case they are orphaned.
+
+*SOLVER_FLAG_FOCUS_INSTALLED*::
+Resolve installed packages before resolving the given job.
+Setting this flag means that the solver will prefer picking
+a package version that fits the other installed packages
+over updating installed packages.
+
 Basic rule types:
 
 *SOLVER_RULE_UNKNOWN*::
