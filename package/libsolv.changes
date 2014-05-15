@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Thu May 15 11:45:12 CEST 2014 - mls@suse.de
+
+- use sed instead of grep to get rid of the <?xml...> line
+  to parse files with no newlines [bnc#876297]
+- fix noobsoletesmultiversion default setting to match
+  rpm's obsolete behaviour [bnc#877983]
+- bump version to 0.4.2
+
+-------------------------------------------------------------------
 Fri Feb 21 18:01:48 CET 2014 - mls@suse.de
 
 - fix bug in solver_get_unneeded that could lead to an
