@@ -130,7 +130,7 @@ if test "$repotype" = rpmmd ; then
 	repomd_decompress "$susedataxml"
      fi
      echo '</rpmmd>'
-    ) | grep -v '\?xml' |  sed '1i\<?xml version="1.0" encoding="UTF-8"?>' | rpmmd2solv $parser_options > $primfile || exit 4
+    ) | sed 's/<?xml[^>]*>//g' | sed '1i\<?xml version="1.0" encoding="UTF-8"?>' | rpmmd2solv $parser_options > $primfile || exit 4
   fi
 
   prodfile=
