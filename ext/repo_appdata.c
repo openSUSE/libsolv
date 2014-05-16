@@ -436,6 +436,7 @@ endElement(void *userData, const char *name)
     case STATE_PKGNAME:
       id = pool_str2id(pd->pool, pd->content, 1);
       s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
+      break;
     case STATE_KEYWORD:
       repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_KEYWORDS, pd->content);
       break;
