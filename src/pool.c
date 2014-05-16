@@ -84,9 +84,6 @@ pool_create(void)
 #ifdef FEDORA
   pool->implicitobsoleteusescolors = 1;
 #endif
-#ifdef SUSE
-  pool->noobsoletesmultiversion = 1;
-#endif
 #ifdef RPM5
   pool->noobsoletesmultiversion = 1;
   pool->forbidselfconflicts = 1;
