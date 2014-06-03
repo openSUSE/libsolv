@@ -4384,7 +4384,7 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
   if (why > 0)
     return SOLVER_REASON_RESOLVE;
   /* weak or orphaned */
-  if (solv->decisionq.count < solv->decisioncnt_orphan)
+  if (i < solv->decisioncnt_orphan)
     return SOLVER_REASON_WEAKDEP;
   return SOLVER_REASON_RESOLVE_ORPHAN;
 }
@@ -4439,7 +4439,7 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 	  if (!p2 && found)
 	    {
 	      queue_push(whyq, SOLVER_REASON_RECOMMENDED);
-	      queue_push2(whyq, p2, rec);
+	      queue_push2(whyq, i, rec);
 	    }
 	}
     }
