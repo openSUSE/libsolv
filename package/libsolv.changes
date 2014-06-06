@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Jun  6 11:37:00 CEST 2014 - ma@suse.de
+
+- Provide PRODUCT_REGISTER_TARGET for available products [bnc#881320]
+- bump version to 0.6.2
+
+-------------------------------------------------------------------
 Thu Apr 17 14:47:42 CEST 2014 - mls@suse.de
 
 - support BREAK_ORPHANS and KEEP_ORPHANS solver flags
