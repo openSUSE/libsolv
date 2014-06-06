@@ -186,7 +186,7 @@ KNOWNID(PRODUCT_URL,			"product:url"),
 KNOWNID(PRODUCT_URL_TYPE,		"product:url:type"),
 KNOWNID(PRODUCT_FLAGS,			"product:flags"),		/* e.g. 'update', 'no_you' */
 KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),		/* installed product only */
-KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),		/* installed product only */
+KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),		/* installed and available product */
 KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),		/* installed product only */
 KNOWNID(PRODUCT_UPDATES_REPOID,	        "product:updates:repoid"),
 KNOWNID(PRODUCT_UPDATES,	        "product:updates"),
