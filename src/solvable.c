@@ -745,19 +745,27 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
 /* Tests if two solvables have identical content. Currently
  * both solvables need to come from the same pool
  */
+
+#warning HOTFIX [Bug 881493] New: zypper dup does always update sles-release
+inline int isProduct(const char *name)
+{ return name && strncmp(name, "product:", 8) == 0; }
+
 int
 solvable_identical(Solvable *s1, Solvable *s2)
 {
   unsigned int bt1, bt2;
   Id rq1, rq2;
   Id *reqp;
-
   if (s1->name != s2->name)
     return 0;
   if (s1->arch != s2->arch)
     return 0;
   if (s1->evr != s2->evr)
     return 0;
+
+  if (isProduct(pool_id2str(s1->repo->pool, s1->name))) // HOTFIX [Bug 881493] end check for products here
+    return 1;
+
   /* map missing vendor to empty string */
   if ((s1->vendor ? s1->vendor : 1) != (s2->vendor ? s2->vendor : 1))
     return 0;
