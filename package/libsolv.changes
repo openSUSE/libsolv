@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Jun 13 08:28:12 CEST 2014 - ma@suse.de
+
+- quick fix for [bnc#881320]
+- bump version to 0.6.3
+
+-------------------------------------------------------------------
 Fri Jun  6 11:37:00 CEST 2014 - ma@suse.de
 
 - Provide PRODUCT_REGISTER_TARGET for available products [bnc#881320]
@@ -183,7 +189,7 @@ Fri Nov 23 13:57:19 CET 2012 - mls@suse.de
 Thu Oct 18 16:58:10 CEST 2012 - mls@suse.de
 
 - fix susetags parser, it ignored the filelist of the last
-  solvable 
+  solvable
 - fix encoding of large values
 - bump version to 0.2.0
 
@@ -241,7 +247,7 @@ Fri Jan 27 14:10:34 CET 2012 - mls@suse.de
 -------------------------------------------------------------------
 Mon Oct 24 13:26:18 CEST 2011 - ma@suse.de
 
-- mls fixed package provides/obsoletes, but forgot to write 
+- mls fixed package provides/obsoletes, but forgot to write
   a changes entry.
 
 -------------------------------------------------------------------
@@ -300,7 +306,7 @@ Mon Sep  6 13:50:02 UTC 2010 - dmacvicar@novell.com
 -------------------------------------------------------------------
 Mon Sep  6 12:38:21 UTC 2010 - dmacvicar@novell.com
 
-- SLE10SP3 also has vendor_ruby 
+- SLE10SP3 also has vendor_ruby
 
 -------------------------------------------------------------------
 Wed Aug 18 14:11:08 UTC 2010 - kkaempf@novell.com
