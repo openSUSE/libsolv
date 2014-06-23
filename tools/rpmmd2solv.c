@@ -19,6 +19,9 @@
 #include "pool.h"
 #include "repo.h"
 #include "repo_rpmmd.h"
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
 #include "common_write.h"
 #include "solv_xfopen.h"
 
@@ -44,11 +47,14 @@ main(int argc, char **argv)
   const char *basefile = 0;
   const char *dir = 0;
   const char *locale = 0;
+#ifdef SUSE
+  int add_auto = 0;
+#endif
   
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
 
-  while ((c = getopt (argc, argv, "hn:b:d:l:")) >= 0)
+  while ((c = getopt (argc, argv, "hn:b:d:l:X")) >= 0)
     {
       switch(c)
 	{
@@ -66,6 +72,11 @@ main(int argc, char **argv)
           break;
 	case 'l':
 	  locale = optarg;
+	  break;
+	case 'X':
+#ifdef SUSE
+	  add_auto = 1;
+#endif
 	  break;
         default:
           usage(1);
@@ -142,6 +153,10 @@ main(int argc, char **argv)
 	  exit(1);
 	}
     }
+#ifdef SUSE
+  if (add_auto)
+    repo_add_autopattern(repo, 0);
+#endif
   tool_write(repo, basefile, attrname);
   pool_free(pool);
   exit(0);

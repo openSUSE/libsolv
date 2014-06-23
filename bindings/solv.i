@@ -497,6 +497,9 @@ typedef int bool;
 #ifdef ENABLE_ARCHREPO
 #include "repo_arch.h"
 #endif
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
 #include "solv_xfopen.h"
 
 /* for old ruby versions */
@@ -1602,6 +1605,11 @@ rb_eval_string(
   %newobject add_arch_pkg;
   XSolvable *add_arch_pkg(const char *name, int flags = 0) {
     return new_XSolvable($self->pool, repo_add_arch_pkg($self, name, flags));
+  }
+#endif
+#ifdef SUSE
+  bool add_autopattern(int flags = 0) {
+    return repo_add_autopattern($self, flags) == 0;
   }
 #endif
   void internalize() {

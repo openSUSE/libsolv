@@ -746,10 +746,6 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
  * both solvables need to come from the same pool
  */
 
-#warning HOTFIX [Bug 881493] New: zypper dup does always update sles-release
-inline int isProduct(const char *name)
-{ return name && strncmp(name, "product:", 8) == 0; }
-
 int
 solvable_identical(Solvable *s1, Solvable *s2)
 {
@@ -763,12 +759,14 @@ solvable_identical(Solvable *s1, Solvable *s2)
   if (s1->evr != s2->evr)
     return 0;
 
-  if (isProduct(pool_id2str(s1->repo->pool, s1->name))) // HOTFIX [Bug 881493] end check for products here
-    return 1;
-
-  /* map missing vendor to empty string */
+  /* check vendor, map missing vendor to empty string */
   if ((s1->vendor ? s1->vendor : 1) != (s2->vendor ? s2->vendor : 1))
-    return 0;
+    {
+      /* workaround for bug 881493 */
+      if (s1->repo && !strncmp(pool_id2str(s1->repo->pool, s1->name), "product:", 8))
+	return 1;
+      return 0;
+    }
 
   /* looking good, try some fancier stuff */
   /* might also look up the package checksum here */
@@ -781,6 +779,9 @@ solvable_identical(Solvable *s1, Solvable *s2)
     }
   else
     {
+      /* workaround for bug 881493 */
+      if (s1->repo && !strncmp(pool_id2str(s1->repo->pool, s1->name), "product:", 8))
+	return 1;
       /* look at requires in a last attempt to find recompiled packages */
       rq1 = rq2 = 0;
       if (s1->requires)
