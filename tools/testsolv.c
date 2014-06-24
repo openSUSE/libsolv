@@ -28,6 +28,37 @@ usage(ex)
   exit(ex);
 }
 
+struct reportsolutiondata {
+  int count;
+  char *result;
+};
+
+static int
+reportsolutioncb(Solver *solv, void *cbdata)
+{
+  struct reportsolutiondata *sd = cbdata;
+  char *res;
+
+  sd->count++;
+  res = testcase_solverresult(solv, TESTCASE_RESULT_TRANSACTION);
+  if (*res)
+    {
+      char prefix[64];
+      char *p2, *p = res;
+      sprintf(prefix, "callback%d:", sd->count);
+      while ((p2 = strchr(p, '\n')) != 0)
+	{
+	  char c = p2[1];
+	  p2[1] = 0;
+	  sd->result = solv_dupappend(sd->result, prefix, p);
+	  p2[1] = c;
+	  p = p2 + 1;
+	}
+    }
+  solv_free(res);
+  return 0;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -40,6 +71,7 @@ main(int argc, char **argv)
   int debuglevel = 0;
   int writeresult = 0;
   int multijob = 0;
+  int rescallback = 0;
   int c;
   int ex = 0;
   const char *list = 0;
@@ -47,7 +79,7 @@ main(int argc, char **argv)
   const char *p;
 
   queue_init(&solq);
-  while ((c = getopt(argc, argv, "vrhl:s:")) >= 0)
+  while ((c = getopt(argc, argv, "vmrhl:s:")) >= 0)
     {
       switch (c)
       {
@@ -56,6 +88,9 @@ main(int argc, char **argv)
           break;
         case 'r':
           writeresult++;
+          break;
+        case 'm':
+          rescallback = 1;
           break;
         case 'h':
 	  usage(0);
@@ -124,10 +159,25 @@ main(int argc, char **argv)
 	  else if (result || writeresult)
 	    {
 	      char *myresult, *resultdiff;
+	      struct reportsolutiondata reportsolutiondata;
+	      memset(&reportsolutiondata, 0, sizeof(reportsolutiondata));
+	      if (rescallback)
+		{
+		  solv->solution_callback = reportsolutioncb;
+		  solv->solution_callback_data = &reportsolutiondata;
+		}
 	      solver_solve(solv, &job);
+	      solv->solution_callback = 0;
+	      solv->solution_callback_data = 0;
 	      if (!resultflags)
 		resultflags = TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS;
 	      myresult = testcase_solverresult(solv, resultflags);
+	      if (rescallback && reportsolutiondata.result)
+		{
+		  reportsolutiondata.result = solv_dupjoin(reportsolutiondata.result, myresult, 0);
+		  solv_free(myresult);
+		  myresult = reportsolutiondata.result;
+		}
 	      if (writeresult)
 		{
 		  if (*myresult)
