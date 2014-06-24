@@ -331,34 +331,14 @@ recheck_complex_dep(Solver *solv, Id p, Map *m, Queue **cqp)
 
 #endif
 
-/*
- * prune to recommended/suggested packages.
- * does not prune installed packages (they are also somewhat recommended).
- */
 
-static void
-prune_to_recommended(Solver *solv, Queue *plist)
+void
+policy_update_recommendsmap(Solver *solv)
 {
   Pool *pool = solv->pool;
-  int i, j, k, ninst;
   Solvable *s;
   Id p, pp, rec, *recp, sug, *sugp;
 
-  ninst = 0;
-  if (pool->installed)
-    {
-      for (i = 0; i < plist->count; i++)
-	{
-	  p = plist->elements[i];
-	  s = pool->solvables + p;
-	  if (pool->installed && s->repo == pool->installed)
-	    ninst++;
-	}
-    }
-  if (plist->count - ninst < 2)
-    return;
-
-  /* update our recommendsmap/suggestsmap */
   if (solv->recommends_index < 0)
     {
       MAPZERO(&solv->recommendsmap);
@@ -424,6 +404,38 @@ prune_to_recommended(Solver *solv, Queue *plist)
 	    }
 	}
     }
+}
+
+/*
+ * prune to recommended/suggested packages.
+ * does not prune installed packages (they are also somewhat recommended).
+ */
+
+static void
+prune_to_recommended(Solver *solv, Queue *plist)
+{
+  Pool *pool = solv->pool;
+  int i, j, k, ninst;
+  Solvable *s;
+  Id p;
+
+  ninst = 0;
+  if (pool->installed)
+    {
+      for (i = 0; i < plist->count; i++)
+	{
+	  p = plist->elements[i];
+	  s = pool->solvables + p;
+	  if (pool->installed && s->repo == pool->installed)
+	    ninst++;
+	}
+    }
+  if (plist->count - ninst < 2)
+    return;
+
+  /* update our recommendsmap/suggestsmap */
+  if (solv->recommends_index < solv->decisionq.count)
+    policy_update_recommendsmap(solv);
 
   /* prune to recommended/supplemented */
   ninst = 0;
