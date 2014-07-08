@@ -496,9 +496,9 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
         solv->instbuddy = solv_calloc(installed->end - installed->start, sizeof(Id));
       if (qr->count == 1)
         solv->instbuddy[s - pool->solvables - installed->start] = qr->elements[0];
-      for (i = 0; i < qp->count; i++)
+      for (i = 0; i < qr->count; i++)
 	{
-	  Id p = qp->elements[i];
+	  Id p = qr->elements[i];
 	  if (pool->solvables[p].repo != installed)
 	    continue;	/* huh? */
 	  if (qp->count > 1 || (solv->instbuddy[p - installed->start] != 0 && solv->instbuddy[p - installed->start] != s - pool->solvables))
