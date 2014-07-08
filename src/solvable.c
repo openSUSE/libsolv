@@ -779,9 +779,13 @@ solvable_identical(Solvable *s1, Solvable *s2)
     }
   else
     {
-      /* workaround for bug 881493 */
-      if (s1->repo && !strncmp(pool_id2str(s1->repo->pool, s1->name), "product:", 8))
-	return 1;
+      if (s1->repo)
+	{
+          /* workaround for bugs 881493 and 885830*/
+	  const char *n = pool_id2str(s1->repo->pool, s1->name);
+	  if (!strncmp(n, "product:", 8) || !strncmp(n, "application:", 12))
+	    return 1;
+	}
       /* look at requires in a last attempt to find recompiled packages */
       rq1 = rq2 = 0;
       if (s1->requires)
