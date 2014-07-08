@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Tue Jul  8 14:13:40 CEST 2014 - mls@suse.de
+
+- expand solver_identical fix to applications [bnc#885830]
+- fix instbuddy generation code
+- improve autominimizing implementation to also look at
+  supplements
+- bump version to 0.6.4
+
+-------------------------------------------------------------------
 Fri Jun 13 08:28:12 CEST 2014 - ma@suse.de
 
 - quick fix for [bnc#881320]
