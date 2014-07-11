@@ -842,7 +842,7 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
   int ret = 0;
 
   queue_empty(selection);
-  if (*name == '/' && (flags & SELECTION_FILELIST))
+  if ((*name == '/' || (*name == '*' && flags & SELECTION_GLOB)) && (flags & SELECTION_FILELIST))
     ret = selection_filelist(pool, selection, name, flags);
   if (!ret && (flags & SELECTION_REL) != 0 && strpbrk(name, "<=>") != 0)
     ret = selection_rel(pool, selection, name, flags);
