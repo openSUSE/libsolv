@@ -551,6 +551,14 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
   Queue q;
   int type;
 
+  /* all files in the file list start with a '/' */
+  if (*name != '/')
+    {
+      if (!(flags & SELECTION_GLOB))
+	return 0;
+      if (*name != '*' && *name != '[' && *name != '?')
+	return 0;
+    }
   type = !(flags & SELECTION_GLOB) || strpbrk(name, "[*?") == 0 ? SEARCH_STRING : SEARCH_GLOB;
   if ((flags & SELECTION_NOCASE) != 0)
     type |= SEARCH_NOCASE;
@@ -842,7 +850,7 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
   int ret = 0;
 
   queue_empty(selection);
-  if (*name == '/' && (flags & SELECTION_FILELIST))
+  if ((flags & SELECTION_FILELIST) != 0)
     ret = selection_filelist(pool, selection, name, flags);
   if (!ret && (flags & SELECTION_REL) != 0 && strpbrk(name, "<=>") != 0)
     ret = selection_rel(pool, selection, name, flags);
