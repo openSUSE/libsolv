@@ -141,8 +141,11 @@ main(int argc, char **argv)
 	    printf("test %d:\n", multijob++);
 	  if (list)
 	    {
+	      int selflags = SELECTION_NAME|SELECTION_PROVIDES|SELECTION_CANON|SELECTION_DOTARCH|SELECTION_REL|SELECTION_GLOB|SELECTION_FLAT;
+	      if (*list == '/')
+		selflags |= SELECTION_FILELIST;
 	      queue_empty(&job);
-	      selection_make(pool, &job, list, SELECTION_NAME|SELECTION_PROVIDES|SELECTION_FILELIST|SELECTION_CANON|SELECTION_DOTARCH|SELECTION_REL|SELECTION_GLOB|SELECTION_FLAT);
+	      selection_make(pool, &job, list, selflags);
 	      if (!job.elements)
 		printf("No match\n");
 	      else
