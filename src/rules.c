@@ -434,8 +434,11 @@ makemultiversionconflict(Solver *solv, Id n, Id con)
       queue_push(&q, p);
     }
   if (q.count == 1)
-    return -n;	/* no other package found, generate normal conflict */
-  return pool_queuetowhatprovides(pool, &q);
+    n = -n;	/* no other package found, generate normal conflict */
+  else
+    n = pool_queuetowhatprovides(pool, &q);
+  queue_free(&q);
+  return n;
 }
 
 static inline void
