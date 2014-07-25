@@ -294,13 +294,13 @@ adddep(Repo *repo, Offset olddeps, char *line)
   char *p;
   Id id;
 
-  while (*line == ' ' && *line == '\t')
+  while (*line == ' ' || *line == '\t')
     line++;
   p = line;
   while (*p && *p != ' ' && *p != '\t' && *p != '<' && *p != '=' && *p != '>')
     p++;
   id = pool_strn2id(pool, line, p - line, 1);
-  while (*p == ' ' && *p == '\t')
+  while (*p == ' ' || *p == '\t')
     p++;
   if (*p == '<' || *p == '=' || *p == '>')
     {
@@ -316,7 +316,7 @@ adddep(Repo *repo, Offset olddeps, char *line)
 	  else
 	    break;
 	}
-      while (*p == ' ' && *p == '\t')
+      while (*p == ' ' || *p == '\t')
         p++;
       line = p;
       while (*p && *p != ' ' && *p != '\t')
