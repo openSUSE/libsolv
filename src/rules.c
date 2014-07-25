@@ -2652,7 +2652,25 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
     }
   if (rid >= solv->bestrules && rid < solv->bestrules_end)
     {
+      if (fromp && solv->bestrules_pkg[rid - solv->bestrules] > 0)
+	*fromp = solv->bestrules_pkg[rid - solv->bestrules];
       return SOLVER_RULE_BEST;
+    }
+  if (rid >= solv->yumobsrules && rid < solv->yumobsrules_end)
+    {
+      if (fromp)
+	*fromp = -r->p;
+      if (top)
+	{
+	  /* first solvable is enough, we just need it for the name */
+	  if (!r->d || r->d == -1)
+	    *top = r->w2;
+	  else
+	    *top = pool->whatprovidesdata[r->d < 0 ? -r->d : r->d];
+	}
+      if (depp)
+	*depp = solv->yumobsrules_info[rid - solv->yumobsrules];
+      return SOLVER_RULE_YUMOBS;
     }
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     {
@@ -2684,6 +2702,8 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_INFARCH;
   if (rid >= solv->bestrules && rid < solv->bestrules_end)
     return SOLVER_RULE_BEST;
+  if (rid >= solv->yumobsrules && rid < solv->yumobsrules_end)
+    return SOLVER_RULE_YUMOBS;
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
   if (rid >= solv->learntrules)
@@ -3249,6 +3269,228 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
   queue_free(&q);
   queue_free(&q2);
   queue_free(&r2pkg);
+}
+
+
+
+
+/* yumobs rule handling */
+
+static void
+find_obsolete_group(Solver *solv, Id obs, Queue *q)
+{
+  Pool *pool = solv->pool;
+  Queue qn;
+  Id p2, pp2, op, *opp, opp2;
+  int i, j, qnc, ncnt;
+
+  queue_empty(q);
+  FOR_PROVIDES(p2, pp2, obs)
+    {
+      Solvable *s2 = pool->solvables + p2;
+      if (s2->repo != pool->installed)
+	continue;
+      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+	continue;
+      /* we obsolete installed package s2 with obs. now find all other packages that have the same dep  */
+      for (opp = solv->obsoletes_data + solv->obsoletes[p2 - solv->installed->start]; (op = *opp++) != 0;)
+	{
+	  Solvable *os = pool->solvables + op;
+	  Id obs2, *obsp2;
+	  if (!os->obsoletes)
+	    continue;
+	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s2, os))
+	    continue;
+	  obsp2 = os->repo->idarraydata + os->obsoletes; 
+	  while ((obs2 = *obsp2++) != 0)
+	    if (obs2 == obs)
+	      break;
+	  if (obs2)
+	    queue_pushunique(q, op);
+	}
+      /* also search packages with the same name */
+      FOR_PROVIDES(op, opp2, s2->name)
+	{
+	  Solvable *os = pool->solvables + op;
+	  Id obs2, *obsp2;
+	  if (os->name != s2->name)
+	    continue;
+	  if (!os->obsoletes)
+	    continue;
+	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s2, os))
+	    continue;
+	  obsp2 = os->repo->idarraydata + os->obsoletes; 
+	  while ((obs2 = *obsp2++) != 0)
+	    if (obs2 == obs)
+	      break;
+	  if (obs2)
+	    queue_pushunique(q, op);
+	}
+    }
+  /* find names so that we can build groups */
+  queue_init_clone(&qn, q);
+  prune_to_best_version(solv->pool, &qn);
+#if 0
+{
+  for (i = 0; i < qn.count; i++)
+    printf(" + %s\n", pool_solvid2str(pool, qn.elements[i]));
+}
+#endif
+  /* filter into name groups */
+  qnc = qn.count;
+  if (qnc == 1)
+    {
+      queue_free(&qn);
+      queue_empty(q);
+      return;
+    }
+  ncnt = 0;
+  for (i = 0; i < qnc; i++)
+    {
+      Id n = pool->solvables[qn.elements[i]].name;
+      int got = 0;
+      for (j = 0; j < q->count; j++)
+	{
+	  Id p = q->elements[j];
+	  if (pool->solvables[p].name == n)
+	    {
+	      queue_push(&qn, p);
+	      got = 1;
+	    }
+	}
+      if (got)
+	{
+	  queue_push(&qn, 0);
+	  ncnt++;
+	}
+    }
+  if (ncnt <= 1)
+    {
+      queue_empty(q);
+    }
+  else
+    {
+      queue_empty(q);
+      queue_insertn(q, 0, qn.count - qnc, qn.elements + qnc);
+    }
+  queue_free(&qn);
+}
+
+void
+solver_addyumobsrules(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Id p, op, *opp;
+  Solvable *s;
+  Queue qo, qq, yumobsinfoq;
+  int i, j, k;
+  unsigned int now;
+
+  solv->yumobsrules = solv->nrules;
+  if (!installed || !solv->obsoletes)
+    {
+      solv->yumobsrules_end = solv->nrules;
+      return;
+    }
+  now = solv_timems(0);
+  queue_init(&qo);
+  FOR_REPO_SOLVABLES(installed, p, s)
+    {
+      if (!solv->obsoletes[p - installed->start])
+	continue;
+#if 0
+printf("checking yumobs for %s\n", pool_solvable2str(pool, s));
+#endif
+      queue_empty(&qo);
+      for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (op = *opp++) != 0;)
+	{
+	  Solvable *os = pool->solvables + op;
+          Id obs, *obsp = os->repo->idarraydata + os->obsoletes;
+	  Id p2, pp2;
+	  while ((obs = *obsp++) != 0)
+	    {
+	      FOR_PROVIDES(p2, pp2, obs)
+		{
+		  Solvable *s2 = pool->solvables + p2;
+		  if (s2->repo != installed)
+		    continue;
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+		    continue;
+		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+		    continue;
+		  queue_pushunique(&qo, obs);
+		  break;
+		}
+	    }
+	}
+    }
+  if (!qo.count)
+    {
+      queue_free(&qo);
+      return;
+    }
+  queue_init(&yumobsinfoq);
+  queue_init(&qq);
+  for (i = 0; i < qo.count; i++)
+    {
+      int group, groupk, groupstart;
+      queue_empty(&qq);
+#if 0
+printf("investigating %s\n", pool_dep2str(pool, qo.elements[i]));
+#endif
+      find_obsolete_group(solv, qo.elements[i], &qq);
+#if 0
+printf("result:\n");
+for (j = 0; j < qq.count; j++)
+  if (qq.elements[j] == 0)
+    printf("---\n");
+  else
+    printf("%s\n", pool_solvid2str(pool, qq.elements[j]));
+#endif
+  
+      if (!qq.count)
+	continue;
+      /* at least two goups, build rules */
+      group = 0;
+      for (j = 0; j < qq.count; j++)
+	{
+	  p = qq.elements[j];
+	  if (!p)
+	    {
+	      group++;
+	      continue;
+	    }
+	  if (pool->solvables[p].repo == installed)
+	    continue;
+	  groupk = 0;
+	  groupstart = 0;
+	  for (k = 0; k < qq.count; k++)
+	    {
+	      Id pk = qq.elements[k];
+	      if (pk)
+		continue;
+	      if (group != groupk && k > groupstart)
+		{
+		  /* add the rule */
+		  Queue qhelper;
+		  memset(&qhelper, 0, sizeof(qhelper));
+		  qhelper.count = k - groupstart;
+		  qhelper.elements = qq.elements + groupstart;
+		  solver_addrule(solv, -p, pool_queuetowhatprovides(pool, &qhelper));
+		  queue_push(&yumobsinfoq, qo.elements[i]);
+		}
+	      groupstart = k + 1;
+	      groupk++;
+	    }
+	}
+    }
+  if (yumobsinfoq.count)
+    solv->yumobsrules_info = solv_memdup2(yumobsinfoq.elements, yumobsinfoq.count, sizeof(Id));
+  queue_free(&yumobsinfoq);
+  queue_free(&qq);
+  solv->yumobsrules_end = solv->nrules;
+  POOL_DEBUG(SOLV_DEBUG_STATS, "yumobs rule creation took %d ms\n", solv_timems(now));
 }
 
 #undef CLEANDEPSDEBUG

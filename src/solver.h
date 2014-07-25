@@ -70,6 +70,10 @@ struct _Solver {
   Id bestrules_end;
   Id *bestrules_pkg;
 
+  Id yumobsrules;			/* rules from yum obsoletes handling */
+  Id yumobsrules_end;
+  Id *yumobsrules_info;			/* the dependency for each rule */
+
   Id choicerules;			/* choice rules (always weak) */
   Id choicerules_end;
   Id *choicerules_ref;
@@ -161,6 +165,7 @@ struct _Solver {
   int bestobeypolicy;			/* true: stay in policy with the best rules */
   int noautotarget;			/* true: do not assume targeted for up/dup jobs that contain no installed solvable */
   int focus_installed;			/* true: resolve update rules first */
+  int do_yum_obsoletes;			/* true: add special yumobs rules */
 
   Map dupmap;				/* dup these packages*/
   int dupmap_all;			/* dup all packages */
@@ -289,6 +294,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_KEEP_ORPHANS		18
 #define SOLVER_FLAG_BREAK_ORPHANS		19
 #define SOLVER_FLAG_FOCUS_INSTALLED		20
+#define SOLVER_FLAG_YUM_OBSOLETES		21
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead if ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */

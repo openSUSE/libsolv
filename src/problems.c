@@ -918,7 +918,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	  MAPSET(rseen, rid - solv->learntrules);
 	  findproblemrule_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], &lreqr, &lconr, &lsysr, &ljobr, rseen);
 	}
-      else if ((rid >= solv->jobrules && rid < solv->jobrules_end) || (rid >= solv->infarchrules && rid < solv->infarchrules_end) || (rid >= solv->duprules && rid < solv->duprules_end) || (rid >= solv->bestrules && rid < solv->bestrules_end))
+      else if ((rid >= solv->jobrules && rid < solv->jobrules_end) || (rid >= solv->infarchrules && rid < solv->infarchrules_end) || (rid >= solv->duprules && rid < solv->duprules_end) || (rid >= solv->bestrules && rid < solv->bestrules_end) || (rid >= solv->yumobsrules && rid <= solv->yumobsrules_end))
 	{
 	  if (!*jobrp)
 	    *jobrp = rid;
@@ -1105,6 +1105,10 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       return pool_tmpjoin(pool, pool_dep2str(pool, dep), " is provided by the system", 0);
     case SOLVER_RULE_RPM:
       return "some dependency problem";
+    case SOLVER_RULE_BEST:
+      if (source > 0)
+        return pool_tmpjoin(pool, "cannot install the best update candidate for package ", pool_solvid2str(pool, source), 0);
+     return "cannot install the best candidate for the job";
     case SOLVER_RULE_RPM_NOT_INSTALLABLE:
       return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is not installable");
     case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
@@ -1135,6 +1139,10 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
     case SOLVER_RULE_RPM_SELF_CONFLICT:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " conflicts with ");
       return pool_tmpappend(pool, s, pool_dep2str(pool, dep), " provided by itself");
+    case SOLVER_RULE_YUMOBS:
+      s = pool_tmpjoin(pool, "both package ", pool_solvid2str(pool, source), " and ");
+      s = pool_tmpjoin(pool, s, pool_solvid2str(pool, target), " obsolete ");
+      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
     default:
       return "bad problem rule type";
     }

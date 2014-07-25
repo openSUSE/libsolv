@@ -126,6 +126,8 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
     POOL_DEBUG(type, "UPDATE ");
   else if (p >= solv->featurerules && p < solv->featurerules_end)
     POOL_DEBUG(type, "FEATURE ");
+  else if (p >= solv->yumobsrules && p < solv->yumobsrules_end)
+    POOL_DEBUG(type, "YUMOBS ");
   solver_printrule(solv, type, r);
 }
 

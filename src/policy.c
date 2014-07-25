@@ -776,7 +776,7 @@ move_installed_to_front(Pool *pool, Queue *plist)
  * sort list of packages (given through plist) by name and evr
  * return result through plist
  */
-static void
+void
 prune_to_best_version(Pool *pool, Queue *plist)
 {
   int i, j;

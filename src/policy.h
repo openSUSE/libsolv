@@ -36,6 +36,9 @@ extern void policy_update_recommendsmap(Solver *solv);
 
 extern void policy_create_obsolete_index(Solver *solv);
 
+/* internal, do not use */
+extern void prune_to_best_version(Pool *pool, Queue *plist);
+
 
 #ifdef __cplusplus
 }

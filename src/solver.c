@@ -1681,6 +1681,7 @@ solver_free(Solver *solv)
   solv_free(solv->specialupdaters);
   solv_free(solv->choicerules_ref);
   solv_free(solv->bestrules_pkg);
+  solv_free(solv->yumobsrules_info);
   solv_free(solv->instbuddy);
   solv_free(solv);
 }
@@ -1730,6 +1731,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->break_orphans;
   case SOLVER_FLAG_FOCUS_INSTALLED:
     return solv->focus_installed;
+  case SOLVER_FLAG_YUM_OBSOLETES:
+    return solv->do_yum_obsoletes;
   default:
     break;
   }
@@ -1801,6 +1804,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_FOCUS_INSTALLED:
     solv->focus_installed = value;
+    break;
+  case SOLVER_FLAG_YUM_OBSOLETES:
+    solv->do_yum_obsoletes = value;
     break;
   default:
     break;
@@ -3401,6 +3407,7 @@ solver_solve(Solver *solv, Queue *job)
   queuep_free(&solv->cleandeps_updatepkgs);
   queue_empty(&solv->ruleassertions);
   solv->bestrules_pkg = solv_free(solv->bestrules_pkg);
+  solv->yumobsrules_info = solv_free(solv->yumobsrules_info);
   solv->choicerules_ref = solv_free(solv->choicerules_ref);
   if (solv->noupdate.size)
     map_empty(&solv->noupdate);
@@ -3962,6 +3969,11 @@ solver_solve(Solver *solv, Queue *job)
 
   if (hasdupjob)
     solver_freedupmaps(solv);	/* no longer needed */
+
+  if (solv->do_yum_obsoletes)
+    solver_addyumobsrules(solv);
+  else
+    solv->yumobsrules = solv->yumobsrules_end = solv->nrules;
 
   if (1)
     solver_addchoicerules(solv);
