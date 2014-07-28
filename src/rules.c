@@ -3489,6 +3489,7 @@ for (j = 0; j < qq.count; j++)
     solv->yumobsrules_info = solv_memdup2(yumobsinfoq.elements, yumobsinfoq.count, sizeof(Id));
   queue_free(&yumobsinfoq);
   queue_free(&qq);
+  queue_free(&qo);
   solv->yumobsrules_end = solv->nrules;
   POOL_DEBUG(SOLV_DEBUG_STATS, "yumobs rule creation took %d ms\n", solv_timems(now));
 }
