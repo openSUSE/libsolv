@@ -1729,6 +1729,18 @@ testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasenam
 	}
     }
 
+  /* dump disabled packages (must come before the namespace/job lines) */
+  if (pool->considered)
+    {
+      Id p;
+      FOR_POOL_SOLVABLES(p)
+	if (!MAPTST(pool->considered, p))
+	  {
+	    cmd = pool_tmpjoin(pool, "disable pkg ", testcase_solvid2str(pool, p), 0);
+	    strqueue_push(&sq, cmd);
+	  }
+    }
+
   s = testcase_getsolverflags(solv);
   if (*s)
     {
@@ -2117,7 +2129,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	{
 	  char *sp;
 	  Id how, what;
-	  if (!prepared)
+	  if (prepared <= 0)
 	    {
 	      pool_addfileprovides(pool);
 	      pool_createwhatprovides(pool);
@@ -2163,7 +2175,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	      for (i = 2; i < npieces; i++)
 		queue_push(&q, testcase_str2solvid(pool, pieces[i]));
 	      /* now do the callback */
-	      if (!prepared)
+	      if (prepared <= 0)
 		{
 		  pool_addfileprovides(pool);
 		  pool_createwhatprovides(pool);
@@ -2227,6 +2239,29 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
       else if (!strcmp(pieces[0], "nextjob") && npieces == 1)
 	{
 	  break;
+	}
+      else if (!strcmp(pieces[0], "disable") && npieces == 3)
+	{
+	  Id p;
+	  if (strcmp(pieces[1], "pkg"))
+	    {
+	      pool_debug(pool, SOLV_ERROR, "testcase_read: bad disable type '%s'\n", pieces[1]);
+	      continue;
+	    }
+	  if (!prepared)
+	    pool_createwhatprovides(pool);
+	  prepared = -1;
+	  if (!pool->considered)
+	    {
+	      pool->considered = solv_calloc(1, sizeof(Map));
+	      map_init(pool->considered, pool->nsolvables);
+	      map_setall(pool->considered);
+	    }
+	  p = testcase_str2solvid(pool, pieces[2]);
+	  if (p)
+	    MAPCLR(pool->considered, p);
+	  else
+	    pool_debug(pool, SOLV_ERROR, "disable: unknown package '%s'\n", pieces[2]);
 	}
       else
 	{
