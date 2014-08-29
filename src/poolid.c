@@ -65,7 +65,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   ran = pool->rels;
 
   /* extend hashtable if needed */
-  if (pool->nrels * 2 > hashmask)
+  if ((Hashval)pool->nrels * 2 > hashmask)
     {
       solv_free(pool->relhashtbl);
       pool->relhashmask = hashmask = mkmask(pool->nrels + REL_BLOCK);

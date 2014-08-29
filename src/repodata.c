@@ -479,11 +479,11 @@ get_vertical_data(Repodata *data, Repokey *key, Id off, Id len)
   if (off >= data->lastverticaloffset)
     {
       off -= data->lastverticaloffset;
-      if (off + len > data->vincorelen)
+      if ((unsigned int)off + len > data->vincorelen)
 	return 0;
       return data->vincore + off;
     }
-  if (off + len > key->size)
+  if ((unsigned int)off + len > key->size)
     return 0;
   /* we now have the offset, go into vertical */
   off += data->verticaloffset[key - data->keys];
@@ -2928,7 +2928,7 @@ compact_attrdata(Repodata *data, int entry, int nentry)
 	    case REPOKEY_TYPE_STR:
 	    case REPOKEY_TYPE_BINARY:
 	    case_CHKSUM_TYPES:
-	      if (attrs[1] < attrdatastart)
+	      if ((unsigned int)attrs[1] < attrdatastart)
 		 attrdatastart = attrs[1];
 	      break;
 	    case REPOKEY_TYPE_DIRSTRARRAY:
@@ -2938,7 +2938,7 @@ compact_attrdata(Repodata *data, int entry, int nentry)
 	      /* FALLTHROUGH */
 	    case REPOKEY_TYPE_IDARRAY:
 	    case REPOKEY_TYPE_DIRNUMNUMARRAY:
-	      if (attrs[1] < attriddatastart)
+	      if ((unsigned int)attrs[1] < attriddatastart)
 		attriddatastart = attrs[1];
 	      break;
 	    case REPOKEY_TYPE_FIXARRAY:

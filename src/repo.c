@@ -388,10 +388,10 @@ repo_addid_dep_hash(Repo *repo, Offset olddeps, Id id, Id marker, int size)
     }
 
   /* maintain hash and lastmarkerpos */
-  if (repo->lastidhash_idarraysize != repo->idarraysize || size * 2 > repo->lastidhash_mask || repo->lastmarker != marker)
+  if (repo->lastidhash_idarraysize != repo->idarraysize || (Hashval)size * 2 > repo->lastidhash_mask || repo->lastmarker != marker)
     {
       repo->lastmarkerpos = 0;
-      if (size * 2 > repo->lastidhash_mask)
+      if (size * 2 > (Hashval)repo->lastidhash_mask)
 	{
 	  repo->lastidhash_mask = mkmask(size < REPO_ADDID_DEP_HASHMIN ? REPO_ADDID_DEP_HASHMIN : size);
 	  repo->lastidhash = solv_realloc2(repo->lastidhash, repo->lastidhash_mask + 1, sizeof(Id));

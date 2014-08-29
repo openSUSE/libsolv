@@ -1568,7 +1568,7 @@ for (i = 1; i < target.nkeys; i++)
 
   /* remove unused keys */
   keyused = solv_calloc(target.nkeys, sizeof(Id));
-  for (i = 1; i < target.schemadatalen; i++)
+  for (i = 1; i < (int)target.schemadatalen; i++)
     keyused[target.schemadata[i]] = 1;
   keyused[0] = 0;
   for (n = i = 1; i < target.nkeys; i++)
@@ -1592,7 +1592,7 @@ for (i = 1; i < target.nkeys; i++)
     queue_truncate(keyq, 2 * n - 2);
 
   /* update schema data to the new key ids */
-  for (i = 1; i < target.schemadatalen; i++)
+  for (i = 1; i < (int)target.schemadatalen; i++)
     target.schemadata[i] = keyused[target.schemadata[i]];
   /* update keymap to the new key ids */
   for (i = 0; i < cbdata.nkeymap; i++)

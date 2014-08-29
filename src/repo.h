@@ -41,7 +41,7 @@ typedef struct _Repo {
   Id *idarraydata;		/* array of metadata Ids, solvable dependencies are offsets into this array */
   int idarraysize;
 
-  unsigned nrepodata;		/* number of our stores..  */
+  int nrepodata;		/* number of our stores..  */
 
   Id *rpmdbid;			/* solvable side data: rpm database id */
 

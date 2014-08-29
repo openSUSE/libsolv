@@ -113,7 +113,7 @@ read_id(Repodata *data, Id max)
       if (!(c & 128))
 	{
 	  x = (x << 7) | c;
-	  if (max && x >= max)
+	  if (max && x >= (unsigned int)max)
 	    {
 	      data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "read_id: id too large (%u/%u)", x, max);
 	      return 0;
@@ -149,7 +149,7 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
 	  continue;
 	}
       x = (x << 6) | (c & 63);
-      if (max && x >= max)
+      if (max && x >= (unsigned int)max)
 	{
 	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "read_idarray: id too large (%u/%u)", x, max);
 	  return 0;
@@ -217,7 +217,7 @@ data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, Repodata *da
 	  continue;
 	}
       x = (x << 6) | (c & 63);
-      if (max && x >= max)
+      if (max && x >= (unsigned int)max)
 	{
 	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "data_read_idarray: id too large (%u/%u)", x, max);
 	  data->error = SOLV_ERROR_ID_RANGE;
@@ -261,7 +261,7 @@ data_read_rel_idarray(unsigned char *dp, Id **storep, Id *map, int max, Repodata
 	}
       x = old + (x - 1);
       old = x;
-      if (max && x >= max)
+      if (max && x >= (unsigned int)max)
 	{
 	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "data_read_rel_idarray: id too large (%u/%u)", x, max);
 	  break;
@@ -360,7 +360,7 @@ incore_add_ideof(Repodata *data, Id sx, int eof)
 static void
 incore_add_blob(Repodata *data, unsigned char *buf, int len)
 {
-  if (data->incoredatafree < len)
+  if (data->incoredatafree < (unsigned int)len)
     {
       data->incoredata = solv_realloc(data->incoredata, data->incoredatalen + INCORE_ADD_CHUNK + len);
       data->incoredatafree = INCORE_ADD_CHUNK + len;
@@ -444,8 +444,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
   int i, l;
-  unsigned int numid, numrel, numdir, numsolv;
-  unsigned int numkeys, numschemata;
+  int numid, numrel, numdir, numsolv;
+  int numkeys, numschemata;
 
   Offset sizeid;
   Offset *str;			       /* map Id -> Offset into string space */
@@ -519,16 +519,26 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
         return pool_error(pool, SOLV_ERROR_UNSUPPORTED, "unsupported SOLV version");
     }
 
-  numid = read_u32(&data);
-  numrel = read_u32(&data);
-  numdir = read_u32(&data);
-  numsolv = read_u32(&data);
-  numkeys = read_u32(&data);
-  numschemata = read_u32(&data);
+  numid = (int)read_u32(&data);
+  numrel = (int)read_u32(&data);
+  numdir = (int)read_u32(&data);
+  numsolv = (int)read_u32(&data);
+  numkeys = (int)read_u32(&data);
+  numschemata = (int)read_u32(&data);
   solvflags = read_u32(&data);
 
-  if (numdir && numdir < 2)
+  if (numid < 0 || numid >= 0x20000000)
+    return pool_error(pool, SOLV_ERROR_CORRUPT, "bad number of ids");
+  if (numrel < 0 || numrel >= 0x20000000)
+    return pool_error(pool, SOLV_ERROR_CORRUPT, "bad number of rels");
+  if (numdir && (numdir < 2 || numdir >= 0x20000000))
     return pool_error(pool, SOLV_ERROR_CORRUPT, "bad number of dirs");
+  if (numsolv < 0 || numsolv >= 0x20000000)
+    return pool_error(pool, SOLV_ERROR_CORRUPT, "bad number of solvables");
+  if (numkeys < 0 || numkeys >= 0x20000000)
+    return pool_error(pool, SOLV_ERROR_CORRUPT, "bad number of keys");
+  if (numschemata < 0 || numschemata >= 0x20000000)
+    return pool_error(pool, SOLV_ERROR_CORRUPT, "bad number of schematas");
 
   if (numrel && (flags & REPO_LOCALPOOL) != 0)
     return pool_error(pool, SOLV_ERROR_CORRUPT, "relations are forbidden in a local pool");

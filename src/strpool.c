@@ -93,7 +93,7 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   hashtbl = ss->stringhashtbl;
 
   /* expand hashtable if needed */
-  if (ss->nstrings * 2 > hashmask)
+  if ((Hashval)ss->nstrings * 2 > hashmask)
     {
       solv_free(hashtbl);
 
