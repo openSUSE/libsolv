@@ -118,7 +118,7 @@ pool_free(Pool *pool)
     solv_free(pool->tmpspace.buf[i]);
   for (i = 0; i < pool->nlanguages; i++)
     free((char *)pool->languages[i]);
-  solv_free(pool->languages);
+  solv_free((void *)pool->languages);
   solv_free(pool->languagecache);
   solv_free(pool->errstr);
   solv_free(pool->rootdir);
@@ -1674,7 +1674,7 @@ pool_set_languages(Pool *pool, const char **languages, int nlanguages)
   pool->languagecacheother = 0;
   for (i = 0; i < pool->nlanguages; i++)
     free((char *)pool->languages[i]);
-  pool->languages = solv_free(pool->languages);
+  pool->languages = solv_free((void *)pool->languages);
   pool->nlanguages = nlanguages;
   if (!nlanguages)
     return;

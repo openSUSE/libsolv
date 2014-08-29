@@ -89,7 +89,7 @@ pool_setvendorclasses(Pool *pool, const char **vendorclasses)
     {
       for (v = pool->vendorclasses; v[0] || v[1]; v++)
 	solv_free((void *)*v);
-      pool->vendorclasses = solv_free(pool->vendorclasses);
+      pool->vendorclasses = solv_free((void *)pool->vendorclasses);
     }
   if (!vendorclasses || !vendorclasses[0])
     return;
@@ -120,7 +120,7 @@ pool_addvendorclass(Pool *pool, const char **vendorclass)
       if (i)
         i++;
     }
-  pool->vendorclasses = solv_realloc2(pool->vendorclasses, i + j + 2, sizeof(const char *));
+  pool->vendorclasses = solv_realloc2((void *)pool->vendorclasses, i + j + 2, sizeof(const char *));
   for (j = 0; vendorclass[j]; j++)
     pool->vendorclasses[i++] = solv_strdup(vendorclass[j]);
   pool->vendorclasses[i++] = 0;
