@@ -1397,6 +1397,15 @@ typedef struct {
     return pool_queuetowhatprovides($self, &q);
   }
 
+  %typemap(out) Queue whatmatchesdep Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
+  %newobject whatmatchesdep;
+  Queue whatmatchesdep(Id keyname, DepId dep, Id marker = -1) {
+    Queue q;
+    queue_init(&q);
+    pool_whatmatchesdep($self, keyname, dep, &q, marker);
+    return q;
+  }
+
 #ifdef SWIGRUBY
   %rename("isknownarch?") isknownarch;
 #endif
