@@ -666,7 +666,7 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
 		  s2 = pool->solvables + p2;
 		  if (s2->repo != installed)
 		    continue;
-		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s2, obs))
 		    continue;
 		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
 		    continue;

@@ -2464,6 +2464,7 @@ showdiskusagechanges(Transaction *trans)
   int i;
 
   /* XXX: use mountpoints here */
+  memset(duc, 0, sizeof(duc));
   duc[0].path = "/";
   duc[1].path = "/usr/share/man";
   duc[2].path = "/sbin";

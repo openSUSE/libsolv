@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Thu Sep 11 17:33:04 CEST 2014 - mls@suse.de
+
+- support DUCHANGES_ONLYADD flag in diskusage calculation
+  [bnc#783100]
+- add whatmatchesdep to bindings
+- support pool->considered in testcases
+- always call selection_filelist if SELECTION_FILELIST is set
+- support yum style obsolete handling for package splits
+- bump version to 0.6.5
+
+-------------------------------------------------------------------
 Tue Jul  8 14:13:40 CEST 2014 - mls@suse.de
 
 - expand solver_identical fix to applications [bnc#885830]
