@@ -346,10 +346,13 @@ void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*c
 void pool_clear_pos(Pool *pool);
 
 
+#define DUCHANGES_ONLYADD	1
+
 typedef struct _DUChanges {
   const char *path;
   int kbytes;
   int files;
+  int flags;
 } DUChanges;
 
 void pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps);

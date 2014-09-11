@@ -1922,7 +1922,7 @@ solver_fill_DU_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyVa
       cbd->mps[mp].kbytes += value->num;
       cbd->mps[mp].files += value->num2;
     }
-  else
+  else if (!(cbd->mps[mp].flags & DUCHANGES_ONLYADD))
     {
       cbd->mps[mp].kbytes -= value->num;
       cbd->mps[mp].files -= value->num2;
@@ -2030,13 +2030,17 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
   struct mptree *mptree;
   struct ducbdata cbd;
   Solvable *s;
-  int sp;
+  int i, sp;
   Map ignoredu;
   Repo *oldinstalled = pool->installed;
+  int haveonlyadd = 0;
 
   map_init(&ignoredu, 0);
   mptree = create_mptree(mps, nmps);
 
+  for (i = 0; i < nmps; i++)
+    if ((mps[i].flags & DUCHANGES_ONLYADD) != 0)
+      haveonlyadd = 1;
   cbd.mps = mps;
   cbd.dirmap = 0;
   cbd.nmap = 0;
@@ -2054,21 +2058,55 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
       if (!cbd.hasdu && oldinstalled)
 	{
 	  Id op, opp;
+	  int didonlyadd = 0;
 	  /* no du data available, ignore data of all installed solvables we obsolete */
 	  if (!ignoredu.size)
 	    map_grow(&ignoredu, oldinstalled->end - oldinstalled->start);
+	  FOR_PROVIDES(op, opp, s->name)
+	    {
+	      Solvable *s2 = pool->solvables + op;
+	      if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
+		continue;
+	      if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, s2))
+		continue;
+	      if (op >= oldinstalled->start && op < oldinstalled->end)
+		{
+		  MAPSET(&ignoredu, op - oldinstalled->start);
+		  if (haveonlyadd && pool->solvables[op].repo == oldinstalled && !didonlyadd)
+		    {
+		      repo_search(oldinstalled, op, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
+		      cbd.addsub = -1;
+		      repo_search(oldinstalled, op, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
+		      cbd.addsub = 1;
+		      didonlyadd = 1;
+		    }
+		}
+	    }
 	  if (s->obsoletes)
 	    {
 	      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
 	      while ((obs = *obsp++) != 0)
 		FOR_PROVIDES(op, opp, obs)
-		  if (op >= oldinstalled->start && op < oldinstalled->end)
-		    MAPSET(&ignoredu, op - oldinstalled->start);
+		  {
+		    Solvable *s2 = pool->solvables + op;
+		    if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s2, obs))
+		      continue;
+		    if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+		      continue;
+		    if (op >= oldinstalled->start && op < oldinstalled->end)
+		      {
+			MAPSET(&ignoredu, op - oldinstalled->start);
+			if (haveonlyadd && pool->solvables[op].repo == oldinstalled && !didonlyadd)
+			  {
+			    repo_search(oldinstalled, op, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
+			    cbd.addsub = -1;
+			    repo_search(oldinstalled, op, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
+			    cbd.addsub = 1;
+			    didonlyadd = 1;
+			  }
+		      }
+		  }
 	    }
-	  FOR_PROVIDES(op, opp, s->name)
-	    if (pool->solvables[op].name == s->name)
-	      if (op >= oldinstalled->start && op < oldinstalled->end)
-		MAPSET(&ignoredu, op - oldinstalled->start);
 	}
     }
   cbd.addsub = -1;
