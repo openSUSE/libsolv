@@ -829,6 +829,8 @@ startElement(void *userData, const char *name, const char **atts)
 	    pd->ret = pool_error(pool, -1, "<dir .../> tag without 'name' attribute");
             break;
           }
+        if (!dirid)
+          dirid = repodata_str2dir(pd->data, "/", 1);
         if ((str = find_attr("size", atts)) != 0)
           filesz = strtol(str, 0, 0);
         if ((str = find_attr("count", atts)) != 0)
