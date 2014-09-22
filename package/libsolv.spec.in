@@ -94,7 +94,6 @@ A new approach to package dependency solving
 %package devel
 Summary:        A new approach to package dependency solving
 Group:          Development/Libraries/C and C++
-Requires:       libsolv-tools = %version
 %if !%{with disable_shared}
 Requires:       libsolv@LIBSOLV_SOVERSION@ = %version
 %endif
