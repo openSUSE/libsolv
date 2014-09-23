@@ -1414,12 +1414,12 @@ freestate(struct rpmdbstate *state)
   /* close down */
   if (!state)
     return;
-  if (state->rootdir)
-    solv_free(state->rootdir);
   if (state->db)
     state->db->close(state->db, 0);
   if (state->dbenv)
     closedbenv(state);
+  if (state->rootdir)
+    solv_free(state->rootdir);
   solv_free(state->rpmhead);
 }
 
