@@ -218,6 +218,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root)
 %if 0%{?suse_version}
 %exclude %{_bindir}/helix2solv
+%exclude %{_mandir}/man1/helix2solv*
 %endif
 %exclude %{_bindir}/solv
 %{_bindir}/*
@@ -236,6 +237,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_includedir}/solv
 %if 0%{?suse_version}
 %{_bindir}/helix2solv
+%{_mandir}/man1/helix2solv*
 %endif
 %{_datadir}/cmake/Modules/*
 %{_mandir}/man3/*

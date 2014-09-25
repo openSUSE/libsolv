@@ -138,7 +138,7 @@ Constants live in the namespace of the class they belong to:
 Note that boolean methods have an added trailing ``?'', to be consistent with
 other ruby modules:
 
-	puts "empty repo" if repo.isempty?
+	puts "empty" if repo.isempty?
 
 
 The Solv Class

@@ -26,8 +26,8 @@ Write the generated solv to 'OUTFILE' instead of standard output.
 Print percentages as packages are being read in. The output
 format is like rpm's --percent option.
 
-*-r* 'ROOT'::
-Use 'ROOT' as root directory.
+*-r* 'ROOTDIR'::
+Use 'ROOTDIR' as root directory.
 
 *-k*::
 Read pubkeys from the rpm database instead of installed packages.

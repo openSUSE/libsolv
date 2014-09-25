@@ -14,6 +14,34 @@ IF (ENABLE_RPMMD)
 SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} repomdxml2solv.1 rpmmd2solv.1 updateinfoxml2solv.1 deltainfoxml2solv.1)
 ENDIF (ENABLE_RPMMD)
 
+IF (ENABLE_HELIXREPO)
+SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} helix2solv.1)
+ENDIF (ENABLE_HELIXREPO)
+
+IF (ENABLE_SUSEREPO)
+SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} susetags2solv.1)
+ENDIF (ENABLE_SUSEREPO)
+
+IF (ENABLE_COMPS)
+SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} comps2solv.1)
+ENDIF (ENABLE_COMPS)
+
+IF (ENABLE_DEBIAN)
+SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} deb2solv.1)
+ENDIF (ENABLE_DEBIAN)
+
+IF (ENABLE_MDKREPO)
+SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} mdk2solv.1)
+ENDIF (ENABLE_MDKREPO)
+
+IF (ENABLE_ARCHREPO)
+SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} archpkgs2solv.1 archrepo2solv.1)
+ENDIF (ENABLE_ARCHREPO)
+
+IF (ENABLE_APPDATA)
+SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} appdata2solv.1)
+ENDIF (ENABLE_APPDATA)
+
 INSTALL(FILES
     ${libsolv_MANPAGES3}
     DESTINATION "${MAN_INSTALL_DIR}/man3")

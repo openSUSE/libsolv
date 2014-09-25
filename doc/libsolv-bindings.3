@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 04/04/2014
+.\"      Date: 09/24/2014
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "04/04/2014" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "09/24/2014" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -307,7 +307,7 @@ Note that boolean methods have an added trailing \(lq?\(rq, to be consistent wit
 .RS 4
 .\}
 .nf
-\fBputs "empty\fR \fIrepo\fR\fB" if\fR \fIrepo\fR\fB\&.isempty?\fR
+\fBputs "empty" if\fR \fIrepo\fR\fB\&.isempty?\fR
 .fi
 .if n \{\
 .RE
@@ -1481,7 +1481,7 @@ Do not create stubs for repository parts that can be downloaded on demand\&.
 .PP
 \fBSUSETAGS_RECORD_SHARES\fR
 .RS 4
-This is specific to the add_susetags() method\&. Susetags allows one to refer to already read packages to save disk space\&. If this data sharing needs to work over multiple calls to add_susetags, you need to specify this flag so that the share information is made available to subsequent calls\&.
+This is specific to the add_susetags() method\&. Susetags allows to refer to already read packages to save disk space\&. If this data sharing needs to work over multiple calls to add_susetags, you need to specify this flag so that the share information is made available to subsequent calls\&.
 .RE
 .SS "METHODS"
 .sp
@@ -3435,6 +3435,21 @@ Make the SOLVER_FORCEBEST job option consider only packages that meet the polici
 .RS 4
 Do not enable auto\-targeting up update and distupgrade jobs\&. See the section on targeted updates for more information\&.
 .RE
+.PP
+\fBSOLVER_FLAG_KEEP_ORPHANS\fR
+.RS 4
+Do not allow orphaned packages to be deinstalled if they get in the way of resolving other packages\&.
+.RE
+.PP
+\fBSOLVER_FLAG_BREAK_ORPHANS\fR
+.RS 4
+Ignore dependencies of orphaned packages that get in the way of resolving non\-orphaned ones\&. Setting the flag might result in no longer working packages in case they are orphaned\&.
+.RE
+.PP
+\fBSOLVER_FLAG_FOCUS_INSTALLED\fR
+.RS 4
+Resolve installed packages before resolving the given job\&. Setting this flag means that the solver will prefer picking a package version that fits the other installed packages over updating installed packages\&.
+.RE
 .sp
 Basic rule types:
 .PP
@@ -4675,7 +4690,7 @@ Return the size change of the installed system in kilobytes (kibibytes)\&.
 .RE
 .\}
 .sp
-Order the steps in the transactions so that dependent packages are updated before packages that depend on them\&. For rpm, you can also use rpmlib\(cqs ordering functionality, debian\(cqs dpkg does not provide a way to order a transaction\&.
+Order the steps in the transactions so that dependant packages are updated before packages that depend on them\&. For rpm, you can also use rpmlib\(cqs ordering functionality, debian\(cqs dpkg does not provide a way to order a transaction\&.
 .SS "ACTIVE/PASSIVE VIEW"
 .sp
 Active view list what new packages get installed, while passive view shows what happens to the installed packages\&. Most often there\(cqs not much difference between the two modes, but things get interesting of multiple package get replaced by one new package\&. Say you have installed package A\-1\-1 and B\-1\-1, and now install A\-2\-1 with has a new dependency that obsoletes B\&. The transaction elements will be
