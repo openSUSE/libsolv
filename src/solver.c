@@ -427,9 +427,9 @@ makeruledecisions(Solver *solv)
 	  assert(solv->decisionq_why.elements[i] > 0);
 
 	  /*
-	   * conflict with an rpm rule ?
+	   * conflict with a pkg rule ?
 	   */
-	  if (solv->decisionq_why.elements[i] < solv->rpmrules_end)
+	  if (solv->decisionq_why.elements[i] < solv->pkgrules_end)
 	    {
 	      if (record_proof)
 		{
@@ -441,7 +441,7 @@ makeruledecisions(Solver *solv)
 	      else
 		queue_push(&solv->problems, 0);
 	      assert(v > 0 || v == -SYSTEMSOLVABLE);
-	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with rpm rule, disabling rule #%d\n", ri);
+	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with pkg rule, disabling rule #%d\n", ri);
 	      if (ri >= solv->jobrules && ri < solv->jobrules_end)
 		v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
 	      else
@@ -583,7 +583,7 @@ makewatches(Solver *solv)
 				       /* lower half for removals, upper half for installs */
   solv->watches = solv_calloc(2 * nsolvables, sizeof(Id));
 #if 1
-  /* do it reverse so rpm rules get triggered first (XXX: obsolete?) */
+  /* do it reverse so pkg rules get triggered first (XXX: obsolete?) */
   for (i = 1, r = solv->rules + solv->nrules - 1; i < solv->nrules; i++, r--)
 #else
   for (i = 1, r = solv->rules + 1; i < solv->nrules; i++, r++)
@@ -1024,8 +1024,8 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
   if (MAPTST(&solv->weakrulemap, why))
     if (!*lastweakp || why > *lastweakp)
       *lastweakp = why;
-  /* do not add rpm rules to problem */
-  if (why < solv->rpmrules_end)
+  /* do not add pkg rules to problem */
+  if (why < solv->pkgrules_end)
     return;
   /* turn rule into problem */
   if (why >= solv->jobrules && why < solv->jobrules_end)
@@ -1063,7 +1063,7 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
  *
  * We know that the problem is not solvable. Record all involved
  * rules (i.e. the "proof") into solv->learnt_pool.
- * Record the learnt pool index and all non-rpm rules into
+ * Record the learnt pool index and all non-pkg rules into
  * solv->problems. (Our solutions to fix the problems are to
  * disable those rules.)
  *
@@ -3093,7 +3093,7 @@ weaken_solvable_deps(Solver *solv, Id p)
   int i;
   Rule *r;
 
-  for (i = 1, r = solv->rules + i; i < solv->rpmrules_end; i++, r++)
+  for (i = 1, r = solv->rules + i; i < solv->pkgrules_end; i++, r++)
     {
       if (r->p != -p)
 	continue;
@@ -3295,7 +3295,7 @@ addedmap2deduceq(Solver *solv, Map *addedmap)
   Rule *r;
 
   queue_empty(&solv->addedmap_deduceq);
-  for (i = 2, j = solv->rpmrules_end - 1; i < pool->nsolvables && j > 0; j--)
+  for (i = 2, j = solv->pkgrules_end - 1; i < pool->nsolvables && j > 0; j--)
     {
       r = solv->rules + j;
       if (r->p >= 0)
@@ -3331,7 +3331,7 @@ deduceq2addedmap(Solver *solv, Map *addedmap)
   int j;
   Id p;
   Rule *r;
-  for (j = solv->rpmrules_end - 1; j > 0; j--)
+  for (j = solv->pkgrules_end - 1; j > 0; j--)
     {
       r = solv->rules + j;
       if (r->d < 0 && r->p)
@@ -3367,7 +3367,7 @@ solver_solve(Solver *solv, Queue *job)
   Repo *installed = solv->installed;
   int i;
   int oldnrules, initialnrules;
-  Map addedmap;		       /* '1' == have rpm-rules for solvable */
+  Map addedmap;		       /* '1' == have pkg-rules for solvable */
   Map installcandidatemap;
   Id how, what, select, name, weak, p, pp, d;
   Queue q;
@@ -3470,16 +3470,16 @@ solver_solve(Solver *solv, Queue *job)
   now = solv_timems(0);
   /*
    * create rules for all package that could be involved with the solving
-   * so called: rpm rules
+   * so called: pkg rules
    *
    */
-  initialnrules = solv->rpmrules_end ? solv->rpmrules_end : 1;
+  initialnrules = solv->pkgrules_end ? solv->pkgrules_end : 1;
   if (initialnrules > 1)
     deduceq2addedmap(solv, &addedmap);
   if (solv->nrules != initialnrules)
     solver_shrinkrules(solv, initialnrules);
   solv->nrules = initialnrules;
-  solv->rpmrules_end = 0;
+  solv->pkgrules_end = 0;
 
   if (installed)
     {
@@ -3593,12 +3593,12 @@ solver_solve(Solver *solv, Queue *job)
 
       oldnrules = solv->nrules;
       FOR_REPO_SOLVABLES(installed, p, s)
-	solver_addrpmrulesforsolvable(solv, s, &addedmap);
-      POOL_DEBUG(SOLV_DEBUG_STATS, "added %d rpm rules for installed solvables\n", solv->nrules - oldnrules);
+	solver_addpkgrulesforsolvable(solv, s, &addedmap);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules for installed solvables\n", solv->nrules - oldnrules);
       oldnrules = solv->nrules;
       FOR_REPO_SOLVABLES(installed, p, s)
-	solver_addrpmrulesforupdaters(solv, s, &addedmap, 1);
-      POOL_DEBUG(SOLV_DEBUG_STATS, "added %d rpm rules for updaters of installed solvables\n", solv->nrules - oldnrules);
+	solver_addpkgrulesforupdaters(solv, s, &addedmap, 1);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules for updaters of installed solvables\n", solv->nrules - oldnrules);
     }
 
   /*
@@ -3619,7 +3619,7 @@ solver_solve(Solver *solv, Queue *job)
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
 	      MAPSET(&installcandidatemap, p);
-	      solver_addrpmrulesforsolvable(solv, pool->solvables + p, &addedmap);
+	      solver_addpkgrulesforsolvable(solv, pool->solvables + p, &addedmap);
 	    }
 	  break;
 	case SOLVER_DISTUPGRADE:
@@ -3637,24 +3637,24 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	}
     }
-  POOL_DEBUG(SOLV_DEBUG_STATS, "added %d rpm rules for packages involved in a job\n", solv->nrules - oldnrules);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules for packages involved in a job\n", solv->nrules - oldnrules);
 
 
   /*
    * add rules for suggests, enhances
    */
   oldnrules = solv->nrules;
-  solver_addrpmrulesforweak(solv, &addedmap);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "added %d rpm rules because of weak dependencies\n", solv->nrules - oldnrules);
+  solver_addpkgrulesforweak(solv, &addedmap);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules because of weak dependencies\n", solv->nrules - oldnrules);
 
 #ifdef ENABLE_LINKED_PKGS
   oldnrules = solv->nrules;
-  solver_addrpmrulesforlinked(solv, &addedmap);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "added %d rpm rules because of linked packages\n", solv->nrules - oldnrules);
+  solver_addpkgrulesforlinked(solv, &addedmap);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules because of linked packages\n", solv->nrules - oldnrules);
 #endif
 
   /*
-   * first pass done, we now have all the rpm rules we need.
+   * first pass done, we now have all the pkg rules we need.
    * unify existing rules before going over all job rules and
    * policy rules.
    * at this point the system is always solvable,
@@ -3675,14 +3675,14 @@ solver_solve(Solver *solv, Queue *job)
     }
 
   if (solv->nrules > initialnrules)
-    solver_unifyrules(solv);			/* remove duplicate rpm rules */
-  solv->rpmrules_end = solv->nrules;		/* mark end of rpm rules */
+    solver_unifyrules(solv);			/* remove duplicate pkg rules */
+  solv->pkgrules_end = solv->nrules;		/* mark end of pkg rules */
 
   if (solv->nrules > initialnrules)
     addedmap2deduceq(solv, &addedmap);		/* so that we can recreate the addedmap */
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "rpm rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "rpm rule creation took %d ms\n", solv_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "pkg rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "pkg rule creation took %d ms\n", solv_timems(now));
 
   /* create dup maps if needed. We need the maps early to create our
    * update rules */
@@ -3995,7 +3995,7 @@ solver_solve(Solver *solv, Queue *job)
   map_free(&installcandidatemap);
   queue_free(&q);
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "%d rpm rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules\n", solv->rpmrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules, solv->bestrules_end - solv->bestrules);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "%d pkg rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules\n", solv->pkgrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules, solv->bestrules_end - solv->bestrules);
   POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */

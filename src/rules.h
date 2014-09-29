@@ -48,16 +48,16 @@ typedef struct _Rule {
 
 typedef enum {
   SOLVER_RULE_UNKNOWN = 0,
-  SOLVER_RULE_RPM = 0x100,
-  SOLVER_RULE_RPM_NOT_INSTALLABLE,
-  SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP,
-  SOLVER_RULE_RPM_PACKAGE_REQUIRES,
-  SOLVER_RULE_RPM_SELF_CONFLICT,
-  SOLVER_RULE_RPM_PACKAGE_CONFLICT,
-  SOLVER_RULE_RPM_SAME_NAME,
-  SOLVER_RULE_RPM_PACKAGE_OBSOLETES,
-  SOLVER_RULE_RPM_IMPLICIT_OBSOLETES,
-  SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES,
+  SOLVER_RULE_PKG = 0x100,
+  SOLVER_RULE_PKG_NOT_INSTALLABLE,
+  SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP,
+  SOLVER_RULE_PKG_REQUIRES,
+  SOLVER_RULE_PKG_SELF_CONFLICT,
+  SOLVER_RULE_PKG_CONFLICTS,
+  SOLVER_RULE_PKG_SAME_NAME,
+  SOLVER_RULE_PKG_OBSOLETES,
+  SOLVER_RULE_PKG_IMPLICIT_OBSOLETES,
+  SOLVER_RULE_PKG_INSTALLED_OBSOLETES,
   SOLVER_RULE_UPDATE = 0x200,
   SOLVER_RULE_FEATURE = 0x300,
   SOLVER_RULE_JOB = 0x400,
@@ -104,11 +104,11 @@ extern void solver_unifyrules(struct _Solver *solv);
 extern int solver_rulecmp(struct _Solver *solv, Rule *r1, Rule *r2);
 extern void solver_shrinkrules(struct _Solver *solv, int nrules);
 
-/* rpm rules */
-extern void solver_addrpmrulesforsolvable(struct _Solver *solv, Solvable *s, Map *m);
-extern void solver_addrpmrulesforweak(struct _Solver *solv, Map *m);
-extern void solver_addrpmrulesforlinked(struct _Solver *solv, Map *m);
-extern void solver_addrpmrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
+/* pkg rules */
+extern void solver_addpkgrulesforsolvable(struct _Solver *solv, Solvable *s, Map *m);
+extern void solver_addpkgrulesforweak(struct _Solver *solv, Map *m);
+extern void solver_addpkgrulesforlinked(struct _Solver *solv, Map *m);
+extern void solver_addpkgrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
 
 /* update/feature rules */
 extern void solver_addupdaterule(struct _Solver *solv, Solvable *s, int allow_all);
@@ -149,6 +149,19 @@ extern void solver_rule2rules(struct _Solver *solv, Id rid, Queue *q, int recurs
 /* orphan handling */
 extern void solver_breakorphans(struct _Solver *solv);
 extern void solver_check_brokenorphanrules(struct _Solver *solv, Queue *dq);
+
+
+/* legacy */
+#define SOLVER_RULE_RPM SOLVER_RULE_PKG
+#define SOLVER_RULE_RPM_NOT_INSTALLABLE SOLVER_RULE_PKG_NOT_INSTALLABLE
+#define SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP
+#define SOLVER_RULE_RPM_PACKAGE_REQUIRES SOLVER_RULE_PKG_REQUIRES
+#define SOLVER_RULE_RPM_SELF_CONFLICT SOLVER_RULE_PKG_SELF_CONFLICT
+#define SOLVER_RULE_RPM_PACKAGE_CONFLICT SOLVER_RULE_PKG_CONFLICTS
+#define SOLVER_RULE_RPM_SAME_NAME SOLVER_RULE_PKG_SAME_NAME
+#define SOLVER_RULE_RPM_PACKAGE_OBSOLETES SOLVER_RULE_PKG_OBSOLETES
+#define SOLVER_RULE_RPM_IMPLICIT_OBSOLETES SOLVER_RULE_PKG_IMPLICIT_OBSOLETES
+#define SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES SOLVER_RULE_PKG_INSTALLED_OBSOLETES
 
 #ifdef __cplusplus
 }

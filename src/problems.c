@@ -930,7 +930,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	}
       else
 	{
-	  assert(rid < solv->rpmrules_end);
+	  assert(rid < solv->pkgrules_end);
 	  r = solv->rules + rid;
 	  d = r->d < 0 ? -r->d - 1 : r->d;
 	  if (!d && r->w2 < 0)
@@ -1103,40 +1103,40 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       return pool_tmpjoin(pool, "package ", pool_dep2str(pool, dep), " does not exist");
     case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
       return pool_tmpjoin(pool, pool_dep2str(pool, dep), " is provided by the system", 0);
-    case SOLVER_RULE_RPM:
+    case SOLVER_RULE_PKG:
       return "some dependency problem";
     case SOLVER_RULE_BEST:
       if (source > 0)
         return pool_tmpjoin(pool, "cannot install the best update candidate for package ", pool_solvid2str(pool, source), 0);
      return "cannot install the best candidate for the job";
-    case SOLVER_RULE_RPM_NOT_INSTALLABLE:
+    case SOLVER_RULE_PKG_NOT_INSTALLABLE:
       return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is not installable");
-    case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
+    case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
       s = pool_tmpjoin(pool, "nothing provides ", pool_dep2str(pool, dep), 0);
       return pool_tmpappend(pool, s, " needed by ", pool_solvid2str(pool, source));
-    case SOLVER_RULE_RPM_SAME_NAME:
+    case SOLVER_RULE_PKG_SAME_NAME:
       s = pool_tmpjoin(pool, "cannot install both ", pool_solvid2str(pool, source), 0);
       return pool_tmpappend(pool, s, " and ", pool_solvid2str(pool, target));
-    case SOLVER_RULE_RPM_PACKAGE_CONFLICT:
+    case SOLVER_RULE_PKG_CONFLICTS:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
       s = pool_tmpappend(pool, s, " conflicts with ", pool_dep2str(pool, dep));
       return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
-    case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
+    case SOLVER_RULE_PKG_OBSOLETES:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
       s = pool_tmpappend(pool, s, " obsoletes ", pool_dep2str(pool, dep));
       return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
-    case SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES:
+    case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
       s = pool_tmpjoin(pool, "installed package ", pool_solvid2str(pool, source), 0);
       s = pool_tmpappend(pool, s, " obsoletes ", pool_dep2str(pool, dep));
       return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
-    case SOLVER_RULE_RPM_IMPLICIT_OBSOLETES:
+    case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
       s = pool_tmpappend(pool, s, " implicitly obsoletes ", pool_dep2str(pool, dep));
       return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
-    case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
+    case SOLVER_RULE_PKG_REQUIRES:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " requires ");
       return pool_tmpappend(pool, s, pool_dep2str(pool, dep), ", but none of the providers can be installed");
-    case SOLVER_RULE_RPM_SELF_CONFLICT:
+    case SOLVER_RULE_PKG_SELF_CONFLICT:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " conflicts with ");
       return pool_tmpappend(pool, s, pool_dep2str(pool, dep), " provided by itself");
     case SOLVER_RULE_YUMOBS:

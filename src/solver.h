@@ -39,7 +39,7 @@ struct _Solver {
   Repo *installed;			/* copy of pool->installed */
 
   /* list of rules, ordered
-   * rpm rules first, then features, updates, jobs, learnt
+   * pkg rules first, then features, updates, jobs, learnt
    * see start/end offsets below
    */
   Rule *rules;				/* all rules */
@@ -49,7 +49,7 @@ struct _Solver {
 
   /* start/end offset for rule 'areas' */
 
-  Id rpmrules_end;                      /* [Offset] rpm rules end */
+  Id pkgrules_end;                      /* [Offset] dep rules end */
 
   Id featurerules;			/* feature rules start/end */
   Id featurerules_end;
@@ -189,7 +189,7 @@ struct _Solver {
 
   Queue *installsuppdepq;		/* deps from the install namespace provides hack */
 
-  Queue addedmap_deduceq;		/* deduce addedmap from rpm rules */
+  Queue addedmap_deduceq;		/* deduce addedmap from pkg rules */
   Id *instbuddy;			/* buddies of installed packages */
   int keep_orphans;			/* how to treat orphans */
   int break_orphans;			/* how to treat orphans */

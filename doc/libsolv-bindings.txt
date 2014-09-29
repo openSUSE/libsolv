@@ -2101,8 +2101,8 @@ Basic rule types:
 *SOLVER_RULE_UNKNOWN*::
 A rule of an unknown class. You should never encounter those.
 
-*SOLVER_RULE_RPM*::
-A package dependency rule, called rpm rule for historical reasons.
+*SOLVER_RULE_PKG*::
+A package dependency rule.
 
 *SOLVER_RULE_UPDATE*::
 A rule to implement the update policy of installed packages. Every
@@ -2142,43 +2142,43 @@ implementations.
 
 Special dependency rule types:
 
-*SOLVER_RULE_RPM_NOT_INSTALLABLE*::
+*SOLVER_RULE_PKG_NOT_INSTALLABLE*::
 This rule was added to prevent the installation of a package of an
 architecture that does not work on the system.
 
-*SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP*::
+*SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP*::
 The package contains a required dependency which was not provided by
 any package.
 
-*SOLVER_RULE_RPM_PACKAGE_REQUIRES*::
-Similar to SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP, but in this case
+*SOLVER_RULE_PKG_REQUIRES*::
+Similar to SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, but in this case
 some packages provided the dependency but none of them could be
 installed due to other dependency issues.
 
-*SOLVER_RULE_RPM_SELF_CONFLICT*::
+*SOLVER_RULE_PKG_SELF_CONFLICT*::
 The package conflicts with itself. This is not allowed by older rpm
 versions.
 
-*SOLVER_RULE_RPM_PACKAGE_CONFLICT*::
+*SOLVER_RULE_PKG_CONFLICTS*::
 To fulfill the dependencies two packages need to be installed, but
 one of the packages contains a conflict with the other one.
 
-*SOLVER_RULE_RPM_SAME_NAME*::
+*SOLVER_RULE_PKG_SAME_NAME*::
 The dependencies can only be fulfilled by multiple versions of
 a package, but installing multiple versions of the same package
 is not allowed.
 
-*SOLVER_RULE_RPM_PACKAGE_OBSOLETES*::
+*SOLVER_RULE_PKG_OBSOLETES*::
 To fulfill the dependencies two packages need to be installed, but
 one of the packages obsoletes the other one.
 
-*SOLVER_RULE_RPM_IMPLICIT_OBSOLETES*::
+*SOLVER_RULE_PKG_IMPLICIT_OBSOLETES*::
 To fulfill the dependencies two packages need to be installed, but
 one of the packages has provides a dependency that is obsoleted
 by the other one. See the POOL_FLAG_IMPLICITOBSOLETEUSESPROVIDES
 flag.
 
-*SOLVER_RULE_RPM_INSTALLEDPKG_OBSOLETES*::
+*SOLVER_RULE_PKG_INSTALLED_OBSOLETES*::
 To fulfill the dependencies a package needs to be installed that is
 obsoleted by an installed package. See the POOL_FLAG_NOINSTALLEDOBSOLETES
 flag.
