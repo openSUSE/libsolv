@@ -1390,7 +1390,7 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
 	continue;
       if (solv->decisionmap[p] == 0)
 	{
-	  solv->decisionmap[p] = level;
+	  solv->decisionmap[p] = level + 1;
 	  haveone = 1;
 	}
     }
@@ -1414,7 +1414,7 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
       dq->elements[j++] = dq->elements[i];
   queue_truncate(dq, j);
   FOR_REPO_SOLVABLES(solv->installed, p, s)
-    if (solv->decisionmap[p] == level)
+    if (solv->decisionmap[p] == level + 1)
       solv->decisionmap[p] = 0;
 }
 
