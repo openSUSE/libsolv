@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Tue Oct  7 14:39:23 CEST 2014 - mls@suse.de
+
+- fix bug in reorder_dq_for_jobrules leading to crashes
+  [bnc#899907]
+- rename rpm rules to pkg rules
+- add manpages for the tools
+- bump version to 0.6.6
+
+-------------------------------------------------------------------
 Thu Sep 11 17:33:04 CEST 2014 - mls@suse.de
 
 - support DUCHANGES_ONLYADD flag in diskusage calculation
