@@ -262,13 +262,14 @@ generates.
 
 
 === Functions ===
-	void pool_setdisttype(Pool *pool, int disttype);
+	int pool_setdisttype(Pool *pool, int disttype);
 
 Set the package type of your system. The disttype is used for example
 to define package comparison semantics. Libsolv's default disttype
 should match the package manager of your system, so you only need to
 use this function if you want to use the library to solve packaging
-problems for different systems.
+problems for different systems. The Function returns the old
+disttype on success, and -1 if the new disttype is not supported.
 
 	int pool_set_flag(Pool *pool, int flag, int value);
 
@@ -813,7 +814,7 @@ Boolean Dependencies
 Boolean Dependencies allow to build complex expressions from simple
 dependencies. While rpm does not support boolean expressions in
 dependencies and debian only allows an "OR" expression, libsolv
-allows to arbitrary complex expressions. The following basic types
+allows arbitrary complex expressions. The following basic types
 are supported:
 
 *REL_OR*::

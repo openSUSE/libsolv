@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 09/20/2013
+.\"      Date: 10/09/2014
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "09/20/2013" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "10/09/2014" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -363,13 +363,13 @@ Make the addfileprovides method only add files from the standard locations (i\&.
 .RS 4
 .\}
 .nf
-\fBvoid pool_setdisttype(Pool *\fR\fIpool\fR\fB, int\fR \fIdisttype\fR\fB)\fR;
+\fBint pool_setdisttype(Pool *\fR\fIpool\fR\fB, int\fR \fIdisttype\fR\fB)\fR;
 .fi
 .if n \{\
 .RE
 .\}
 .sp
-Set the package type of your system\&. The disttype is used for example to define package comparison semantics\&. Libsolv\(cqs default disttype should match the package manager of your system, so you only need to use this function if you want to use the library to solve packaging problems for different systems\&.
+Set the package type of your system\&. The disttype is used for example to define package comparison semantics\&. Libsolv\(cqs default disttype should match the package manager of your system, so you only need to use this function if you want to use the library to solve packaging problems for different systems\&. The Function returns the old disttype on success, and \-1 if the new disttype is not supported\&.
 .sp
 .if n \{\
 .RS 4
@@ -1241,7 +1241,7 @@ There can be multiple equivalence classes, the set of allowed vendor changes for
 You can turn off the architecture replacement checks with the Solver\(cqs SOLVER_FLAG_ALLOW_VENDORCHANGE flag\&.
 .SH "BOOLEAN DEPENDENCIES"
 .sp
-Boolean Dependencies allow to build complex expressions from simple dependencies\&. While rpm does not support boolean expressions in dependencies and debian only allows an "OR" expression, libsolv allows one to arbitrary complex expressions\&. The following basic types are supported:
+Boolean Dependencies allow to build complex expressions from simple dependencies\&. While rpm does not support boolean expressions in dependencies and debian only allows an "OR" expression, libsolv allows arbitrary complex expressions\&. The following basic types are supported:
 .PP
 \fBREL_OR\fR
 .RS 4
