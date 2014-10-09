@@ -225,9 +225,7 @@ extern void pool_free(Pool *pool);
 extern void pool_freeallrepos(Pool *pool, int reuseids);
 
 extern void pool_setdebuglevel(Pool *pool, int level);
-#ifdef MULTI_SEMANTICS
-extern void pool_setdisttype(Pool *pool, int disttype);
-#endif
+extern int  pool_setdisttype(Pool *pool, int disttype);
 extern int  pool_set_flag(Pool *pool, int flag, int value);
 extern int  pool_get_flag(Pool *pool, int flag);
 

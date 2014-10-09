@@ -141,22 +141,33 @@ pool_freeallrepos(Pool *pool, int reuseids)
   pool_free_solvable_block(pool, 2, pool->nsolvables - 2, reuseids);
 }
 
-#ifdef MULTI_SEMANTICS
-void
+int
 pool_setdisttype(Pool *pool, int disttype)
 {
+#ifdef MULTI_SEMANTICS
+  int olddisttype = pool->disttype;
+  switch(disttype)
+    {
+    case DISTTYPE_RPM:
+      pool->noarchid = ARCH_NOARCH;
+      break;
+    case DISTTYPE_DEB:
+      pool->noarchid = ARCH_ALL;
+      break;
+    case DISTTYPE_ARCH:
+    case DISTTYPE_HAIKU:
+      pool->noarchid = ARCH_ANY;
+      break;
+    default:
+      return -1;
+    }
   pool->disttype = disttype;
-  if (disttype == DISTTYPE_RPM)
-    pool->noarchid = ARCH_NOARCH;
-  if (disttype == DISTTYPE_DEB)
-    pool->noarchid = ARCH_ALL;
-  if (disttype == DISTTYPE_ARCH)
-    pool->noarchid = ARCH_ANY;
-  if (disttype == DISTTYPE_HAIKU)
-    pool->noarchid = ARCH_ANY;
   pool->solvables[SYSTEMSOLVABLE].arch = pool->noarchid;
-}
+  return olddisttype;
+#else
+  return pool->disttype == disttype ? disttype : -1;
 #endif
+}
 
 int
 pool_get_flag(Pool *pool, int flag)
