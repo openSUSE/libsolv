@@ -238,6 +238,11 @@ SET (CPACK_SOURCE_PACKAGE_FILE_NAME "${PACKAGE}-${VERSION}")
 SET (CPACK_SOURCE_TOPLEVEL_TAG "Linux-Source:")
 SET (CPACK_TOPLEVEL_TAG "Linux-Source:")
 
+# DEBIANIZATION 
+SET (CPACK_GENERATOR "DEB")
+SET (CPACK_DEBIAN_PACKAGE_MAINTAINER "IPONWEB Packaging <noc@iponweb.net>")
+SET (CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/debian/postrm")
+
 # The following components are regex's to match anywhere (unless anchored)
 # in absolute path + filename to find files or directories to be excluded
 # from source tarball.
