@@ -129,7 +129,6 @@ ENDIF (HAIKU)
 
 IF (${have_system} STREQUAL x)
     MESSAGE (STATUS "Building for no system")
-    ADD_DEFINITIONS (-DNOSYSTEM)
 ENDIF (${have_system} STREQUAL x)
 IF (${have_system} STRGREATER xx)
     MESSAGE (FATAL_ERROR "Can only compile for one system type.")

@@ -216,7 +216,6 @@ yum_substitute(Pool *pool, char *line)
 #define TYPE_PLAINDIR	3
 #define TYPE_DEBIAN     4
 
-#ifndef NOSYSTEM
 static int
 read_repoinfos_sort(const void *ap, const void *bp)
 {
@@ -224,7 +223,6 @@ read_repoinfos_sort(const void *ap, const void *bp)
   const struct repoinfo *b = bp;
   return strcmp(a->alias, b->alias);
 }
-#endif
 
 #if defined(SUSE) || defined(FEDORA)
 
@@ -476,15 +474,6 @@ read_repoinfos(Pool *pool, int *nrepoinfosp)
   return repoinfos;
 }
 
-#endif
-
-#ifdef NOSYSTEM
-struct repoinfo *
-read_repoinfos(Pool *pool, int *nrepoinfosp)
-{
-  *nrepoinfosp = 0;
-  return 0;
-}
 #endif
 
 
@@ -1733,6 +1722,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 #endif
 
   repo = repo_create(pool, "@System");
+  memset(&stb, 0, sizeof(stb));
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA))
   printf("rpm database:");
   if (stat(pool_prepend_rootdir_tmp(pool, "/var/lib/rpm/Packages"), &stb))
@@ -1742,10 +1732,6 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   printf("dpgk database:");
   if (stat(pool_prepend_rootdir_tmp(pool, "/var/lib/dpkg/status"), &stb))
     memset(&stb, 0, sizeof(stb));
-#endif
-#ifdef NOSYSTEM
-  printf("no installed database:");
-  memset(&stb, 0, sizeof(stb));
 #endif
   calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, 0, installedcookie);
   if (usecachedrepo(repo, 0, installedcookie, 0))
