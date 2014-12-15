@@ -588,7 +588,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
 {
   Pool *pool = solv->pool;
   Queue redoq;
-  Queue problem, solution, problems_save;
+  Queue problem, solution, problems_save, branches_save;
   int i, j, nsol;
   int essentialok;
   unsigned int now;
@@ -619,6 +619,10 @@ create_solutions(Solver *solv, int probnr, int solidx)
   /* save problems queue */
   problems_save = solv->problems;
   memset(&solv->problems, 0, sizeof(solv->problems));
+
+  /* save branches queue */
+  branches_save = solv->problems;
+  memset(&solv->branches, 0, sizeof(solv->branches));
 
   /* extract problem from queue */
   queue_init(&problem);
@@ -716,6 +720,10 @@ create_solutions(Solver *solv, int probnr, int solidx)
   /* restore problems */
   queue_free(&solv->problems);
   solv->problems = problems_save;
+
+  /* restore branches */
+  queue_free(&solv->branches);
+  solv->branches = branches_save;
 
   if (solv->cleandeps_mistakes)
     {
