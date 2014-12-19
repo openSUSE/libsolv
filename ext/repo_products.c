@@ -60,6 +60,7 @@ enum state {
   STATE_REGISTER,
   STATE_TARGET,
   STATE_REGRELEASE,
+  STATE_REGFLAVOR,
   STATE_PRODUCTLINE,
   STATE_REGUPDATES,
   STATE_REGUPDREPO,
@@ -97,6 +98,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_LINGUAS,   "lang",          STATE_LANG,          0 },
   { STATE_REGISTER,  "target",        STATE_TARGET,        1 },
   { STATE_REGISTER,  "release",       STATE_REGRELEASE,    1 },
+  { STATE_REGISTER,  "flavor",        STATE_REGFLAVOR,     1 },
   { STATE_REGISTER,  "updates",       STATE_REGUPDATES,    0 },
   { STATE_REGUPDATES, "repository",   STATE_REGUPDREPO,    0 },
   { NUMSTATES }
@@ -365,6 +367,9 @@ endElement(void *userData, const char *name)
       break;
     case STATE_REGRELEASE:
       repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_RELEASE, pd->content);
+      break;
+    case STATE_REGFLAVOR:
+      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_FLAVOR, pd->content);
       break;
     case STATE_CPEID:
       if (*pd->content)

@@ -377,6 +377,8 @@ repo_add_autopattern(Repo *repo, int flags)
 	    repodata_set_str(data, s2 - pool->solvables, PRODUCT_SHORTLABEL, newname);
 	  else if (!strcmp(pn, "product-register-target()") && evr)
 	    repodata_set_str(data, s2 - pool->solvables, PRODUCT_REGISTER_TARGET, newname);
+	  else if (!strcmp(pn, "product-register-flavor()") && evr)
+	    repodata_set_str(data, s2 - pool->solvables, PRODUCT_REGISTER_FLAVOR, newname);
 	  else if (!strcmp(pn, "product-type()") && evr)
 	    repodata_set_str(data, s2 - pool->solvables, PRODUCT_TYPE, newname);
 	  else if (!strcmp(pn, "product-cpeid()") && evr)
