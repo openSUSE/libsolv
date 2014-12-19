@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Dec 19 08:59:27 CET 2014 - ma@suse.de
+
+- add product:regflavor attribute [bnc#896224]
+- bump version to 0.6.7
+
+-------------------------------------------------------------------
 Tue Oct  7 14:39:23 CEST 2014 - mls@suse.de
 
 - fix bug in reorder_dq_for_jobrules leading to crashes
