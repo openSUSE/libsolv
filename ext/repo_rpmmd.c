@@ -19,7 +19,9 @@
 #include "tools_util.h"
 #include "repo_rpmmd.h"
 #include "chksum.h"
-
+#ifdef ENABLE_COMPLEX_DEPS
+#include "pool_parserpmrichdep.h"
+#endif
 
 enum state {
   STATE_START,
@@ -466,7 +468,7 @@ static char *flagtab[] = {
 static unsigned int
 adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts, int isreq)
 {
-  Id id, name, marker;
+  Id id, marker;
   const char *n, *f, *k;
   const char **a;
 
@@ -496,10 +498,18 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 	  pd->acontent = l + 256;
 	}
       sprintf(pd->content, "%s:%s", k, n);
-      name = pool_str2id(pool, pd->content, 1);
+      id = pool_str2id(pool, pd->content, 1);
     }
+#ifdef ENABLE_COMPLEX_DEPS
+  else if (!f && n[0] == '(')
+    {
+      id = pool_parserpmrichdep(pool, n);
+      if (!id)
+	return olddeps;
+    }
+#endif
   else
-    name = pool_str2id(pool, (char *)n, 1);
+    id = pool_str2id(pool, (char *)n, 1);
   if (f)
     {
       Id evr = makeevr_atts(pool, pd, atts);
@@ -508,10 +518,8 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 	if (!strcmp(f, flagtab[flags]))
 	  break;
       flags = flags < 6 ? flags + 1 : 0;
-      id = pool_rel2id(pool, name, evr, flags, 1);
+      id = pool_rel2id(pool, id, evr, flags, 1);
     }
-  else
-    id = name;
 #if 0
   fprintf(stderr, "new dep %s\n", pool_dep2str(pool, id));
 #endif

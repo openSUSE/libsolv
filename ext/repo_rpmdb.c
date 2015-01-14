@@ -47,6 +47,9 @@
 #include "chksum.h"
 #include "repo_rpmdb.h"
 #include "repo_solv.h"
+#ifdef ENABLE_COMPLEX_DEPS
+#include "pool_parserpmrichdep.h"
+#endif
 
 /* 3: added triggers */
 /* 4: fixed triggers */
@@ -147,6 +150,7 @@
 #define DEP_STRONG		(1 << 27)
 #define DEP_PRE_IN		((1 << 6) | (1 << 9) | (1 << 10))
 #define DEP_PRE_UN		((1 << 6) | (1 << 11) | (1 << 12))
+#define DEP_RICH		(1 << 29)
 
 #define FILEFLAG_GHOST		(1 <<  6)
 
@@ -404,7 +408,6 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
     repodata_set_str(repodata, handle, tag, str);
 }
 
-
 /*
  * strong: 0: ignore strongness
  *         1: filter to strong
@@ -512,6 +515,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   ida = repo->idarraydata + olddeps;
   for (i = 0; ; i++)
     {
+      Id id;
       if (i == nc)
 	{
 	  if (haspre != 1)
@@ -532,9 +536,21 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
       if ((flags & RPM_ADD_NO_RPMLIBREQS) != 0)
 	if (!strncmp(n[i], "rpmlib(", 7))
 	  continue;
+#ifdef ENABLE_COMPLEX_DEPS
+      if ((flags & (DEP_RICH | DEP_LESS | DEP_EQUAL | DEP_GREATER)) == DEP_RICH && n[i][0] == '(')
+	{
+	  id = pool_parserpmrichdep(pool, n[i]);
+	  if (id)
+	    *ida++ = id;
+	  else
+	    cc--;
+	  continue;
+	}
+#endif
+      id = pool_str2id(pool, n[i], 1);
       if (f[i] & (DEP_LESS|DEP_GREATER|DEP_EQUAL))
 	{
-	  Id name, evr;
+	  Id evr;
 	  int fl = 0;
 	  if ((f[i] & DEP_LESS) != 0)
 	    fl |= REL_LT;
@@ -542,15 +558,13 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	    fl |= REL_EQ;
 	  if ((f[i] & DEP_GREATER) != 0)
 	    fl |= REL_GT;
-	  name = pool_str2id(pool, n[i], 1);
 	  if (v[i][0] == '0' && v[i][1] == ':' && v[i][2])
 	    evr = pool_str2id(pool, v[i] + 2, 1);
 	  else
 	    evr = pool_str2id(pool, v[i], 1);
-	  *ida++ = pool_rel2id(pool, name, evr, fl, 1);
+	  id = pool_rel2id(pool, id, evr, fl, 1);
 	}
-      else
-        *ida++ = pool_str2id(pool, n[i], 1);
+      *ida++ = id;
     }
   *ida++ = 0;
   repo->idarraysize += cc + 1;

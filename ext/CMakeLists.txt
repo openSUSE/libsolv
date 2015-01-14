@@ -43,6 +43,11 @@ IF (ENABLE_SUSEREPO)
 	repo_susetags.h repo_zyppdb.h)
 ENDIF (ENABLE_SUSEREPO)
 
+IF (ENABLE_COMPLEX_DEPS AND (ENABLE_SUSEREPO OR ENABLE_RPMMD OR ENABLE_RPMDB))
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	pool_parserpmrichdep.c)
+ENDIF (ENABLE_COMPLEX_DEPS AND (ENABLE_SUSEREPO OR ENABLE_RPMMD OR ENABLE_RPMDB))
+
 IF (SUSE)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repo_autopattern.c)

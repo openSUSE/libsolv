@@ -18,6 +18,9 @@
 #include "chksum.h"
 #include "tools_util.h"
 #include "repo_susetags.h"
+#ifdef ENABLE_COMPLEX_DEPS
+#include "pool_parserpmrichdep.h"
+#endif
 
 struct datashare {
   Id name;
@@ -87,6 +90,17 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
       /* A file dependency. Do not try to parse it */
       id = pool_str2id(pool, line + 6, 1);
     }
+#ifdef ENABLE_COMPLEX_DEPS
+  else if (line[6] == '(')
+    {
+      id = pool_parserpmrichdep(pool, line + 6);
+      if (!id)
+	{
+	  pd->ret = pool_error(pool, -1, "susetags: line %d: bad dependency: '%s'\n", pd->lineno, line);
+          return olddeps;
+	}
+    }
+#endif
   else
     {
       i = split(line + 6, sp, 4); /* name, <op>, evr, ? */
