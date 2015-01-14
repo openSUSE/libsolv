@@ -18,7 +18,7 @@
 Name:           libsolv
 Version:        @VERSION@
 Release:        0
-Url:            git://gitorious.org/opensuse/libsolv.git
+Url:            https://github.com/openSUSE/libsolv
 Source:         libsolv-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
