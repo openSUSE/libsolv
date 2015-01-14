@@ -541,7 +541,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
   queue_init(&bq);
 
   /* CNF expansion for requires, DNF + INVERT expansion for conflicts */
-  i = pool_normalize_complex_dep(pool, dep, &bq, type == SOLVER_RULE_DEP_PACKAGE_REQUIRES ? 0 : (CPLXDEPS_TODNF | CPLXDEPS_EXPAND | CPLXDEPS_INVERT));
+  i = pool_normalize_complex_dep(pool, dep, &bq, type == SOLVER_RULE_PKG_REQUIRES ? 0 : (CPLXDEPS_TODNF | CPLXDEPS_EXPAND | CPLXDEPS_INVERT));
   /* handle special cases */
   if (i == 0)
     {
