@@ -1,8 +1,8 @@
-#
-# WARNING: for perl iterator/array support you need to run
-#   sed -i -e 's/SvTYPE(tsv) == SVt_PVHV/SvTYPE(tsv) == SVt_PVHV || SvTYPE(tsv) == SVt_PVAV/'
-# on the generated c code
-#
+/*
+ * WARNING: for perl iterator/array support you need to run
+ *   sed -i -e 's/SvTYPE(tsv) == SVt_PVHV/SvTYPE(tsv) == SVt_PVHV || SvTYPE(tsv) == SVt_PVAV/'
+ * on the generated c code
+ */
 
 %module solv
 
@@ -10,9 +10,9 @@
 %markfunc Pool "mark_Pool";
 #endif
 
-#
-# binaryblob handling
-#
+/*
+ * binaryblob handling
+ */
 
 %{
 typedef struct {
@@ -131,10 +131,10 @@ typedef struct {
     queue_push(&$1, v);
   }
 }
-# AV *o = newAV();
-# av_push(o, SvREFCNT_inc(SWIG_From_int($1.elements[i])));
-# $result = newRV_noinc((SV*)o); argvi++;
-#
+/* AV *o = newAV();
+ * av_push(o, SvREFCNT_inc(SWIG_From_int($1.elements[i])));
+ * $result = newRV_noinc((SV*)o); argvi++;
+ */
 %typemap(out) Queue {
   int i;
   if (argvi + $1.count + 1 >= items) {
@@ -233,7 +233,7 @@ typedef struct {
 
 #if defined(SWIGPERL)
 
-# work around a swig bug
+/* work around a swig bug */
 %{
 #undef SWIG_CALLXS
 #ifdef PERL_OBJECT
@@ -628,7 +628,7 @@ typedef int Id;
 
 %include "knownid.h"
 
-# from repodata.h
+/* from repodata.h */
 %constant Id SOLVID_META;
 %constant Id SOLVID_POS;
 
@@ -646,7 +646,7 @@ typedef struct {
   Id const id;
 } Dep;
 
-# put before pool/repo so we can access the constructor
+/* put before pool/repo so we can access the constructor */
 %nodefaultdtor Dataiterator;
 typedef struct {} Dataiterator;
 
@@ -1627,7 +1627,7 @@ rb_eval_string(
   bool write(FILE *fp) {
     return repo_write($self, fp) == 0;
   }
-  # HACK, remove if no longer needed!
+  /* HACK, remove if no longer needed! */
   bool write_first_repodata(FILE *fp) {
     int oldnrepodata = $self->nrepodata;
     int res;
@@ -2923,7 +2923,7 @@ rb_eval_string(
     return q;
   }
 
-  # deprecated, use newsolvables instead
+  /* deprecated, use newsolvables instead */
   %typemap(out) Queue newpackages Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
   %newobject newpackages;
   Queue newpackages() {
@@ -2935,7 +2935,7 @@ rb_eval_string(
     return q;
   }
 
-  # deprecated, use keptsolvables instead
+  /* deprecated, use keptsolvables instead */
   %typemap(out) Queue keptpackages Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
   %newobject keptpackages;
   Queue keptpackages() {
