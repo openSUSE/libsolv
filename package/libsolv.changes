@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Wed Jan 14 08:58:46 CET 2015 - ma@suse.de
+
+- fixes to build with swig 3.0.3
+- bump version to 0.6.8
+
+-------------------------------------------------------------------
 Fri Dec 19 08:59:27 CET 2014 - ma@suse.de
 
 - add product:regflavor attribute [bnc#896224]
