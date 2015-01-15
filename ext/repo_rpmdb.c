@@ -537,7 +537,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	if (!strncmp(n[i], "rpmlib(", 7))
 	  continue;
 #ifdef ENABLE_COMPLEX_DEPS
-      if ((flags & (DEP_RICH | DEP_LESS | DEP_EQUAL | DEP_GREATER)) == DEP_RICH && n[i][0] == '(')
+      if ((f[i] & (DEP_RICH|DEP_LESS| DEP_EQUAL|DEP_GREATER)) == DEP_RICH && n[i][0] == '(')
 	{
 	  id = pool_parserpmrichdep(pool, n[i]);
 	  if (id)
