@@ -3644,7 +3644,16 @@ solver_solve(Solver *solv, Queue *job)
    * add rules for suggests, enhances
    */
   oldnrules = solv->nrules;
-  solver_addpkgrulesforweak(solv, &addedmap);
+  if (hasdupjob && !solv->updatemap_all && solv->dosplitprovides && solv->installed)
+    {
+      /* solver_splitprovides checks if the package is in the update map, but the update
+       * map is extended for dup jobs. So temporarily set updatemap_all */
+      solv->updatemap_all = 1;
+      solver_addpkgrulesforweak(solv, &addedmap);
+      solv->updatemap_all = 0;
+    }
+  else
+    solver_addpkgrulesforweak(solv, &addedmap);
   POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules because of weak dependencies\n", solv->nrules - oldnrules);
 
 #ifdef ENABLE_LINKED_PKGS
