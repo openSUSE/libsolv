@@ -315,7 +315,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	case 'S' << 8 | 'T':
 	  if (!strcasecmp(tag, "status"))
-	    repodata_set_str(data, s - pool->solvables, DEB_DEBSTATUS, q);
+	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_INSTALLSTATUS, q);
 	  break;
 	case 'S' << 8 | 'U':
 	  if (!strcasecmp(tag, "suggests"))

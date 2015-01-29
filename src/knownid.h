@@ -45,7 +45,6 @@ KNOWNID(SOLVABLE_SUGGESTS,		"solvable:suggests"),
 KNOWNID(SOLVABLE_SUPPLEMENTS,		"solvable:supplements"),
 KNOWNID(SOLVABLE_ENHANCES,		"solvable:enhances"),
 KNOWNID(RPM_RPMDBID,			"rpm:dbid"),
-KNOWNID(DEB_DEBSTATUS,			"deb:status"),
 
 /* normal requires before this, prereqs after this */
 KNOWNID(SOLVABLE_PREREQMARKER,		"solvable:prereqmarker"),
@@ -258,6 +257,8 @@ KNOWNID(SIGNATURE_EXPIRES,	        "signature:expires"),
 KNOWNID(SIGNATURE_DATA,		        "signature:data"),
 
 KNOWNID(PRODUCT_REGISTER_FLAVOR,	"product:regflavor"),		/* installed and available product */
+
+KNOWNID(SOLVABLE_INSTALLSTATUS,		"solvable:installstatus"),	/* debian install status */
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
