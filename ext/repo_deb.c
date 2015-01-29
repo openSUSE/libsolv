@@ -313,6 +313,10 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	      havesource = 1;
 	    }
 	  break;
+	case 'S' << 8 | 'T':
+	  if (!strcasecmp(tag, "status"))
+	    repodata_set_str(data, s - pool->solvables, DEB_DEBSTATUS, q);
+	  break;
 	case 'S' << 8 | 'U':
 	  if (!strcasecmp(tag, "suggests"))
 	    s->suggests = makedeps(repo, q, s->suggests, 0);
