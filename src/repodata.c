@@ -1444,6 +1444,8 @@ dataiterator_filelistcheck(Dataiterator *di)
   if (!needcomplete)
     {
       /* we don't need the complete filelist, so ignore all stubs */
+      if (data->repo->nrepodata == 2)
+	return 1;
       for (j = 1; j < data->nkeys; j++)
 	if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
 	  return 1;
