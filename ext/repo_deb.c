@@ -204,7 +204,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
       if (*p)
         *p++ = 0;
       /* strip trailing space */
-      while (end >= control && *end == ' ' && *end == '\t')
+      while (end >= control && (*end == ' ' || *end == '\t'))
 	*end-- = 0;
       tag = control;
       control = p;
@@ -617,3 +617,87 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
     repodata_internalize(data);
   return s - pool->solvables;
 }
+
+void
+pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q)
+{
+  Id name = 0, arch = 0;
+  int autoinstalled = -1;
+  char *buf, *bp;
+  int x, l, bufl, eof = 0;
+  Id p, pp;
+
+  queue_empty(q);
+  buf = solv_malloc(4096);
+  bufl = 4096;
+  l = 0;
+  while (!eof)
+    {
+      while (bufl - l < 1024)
+	{
+	  bufl += 4096;
+	  if (bufl > 1024 * 64)
+	    break;	/* hmm? */
+	  buf = solv_realloc(buf, bufl);
+	}
+      if (!fgets(buf + l, bufl - l, fp))
+	{
+	  eof = 1;
+	  buf[l] = '\n';
+	  buf[l + 1] = 0;
+	}
+      l = strlen(buf);
+      if (l && buf[l - 1] == '\n')
+	buf[--l] = 0;
+      if (!*buf || eof)
+	{
+	  l = 0;
+	  if (name && autoinstalled > 0)
+	    {
+	      FOR_PROVIDES(p, pp, name)
+		{
+		  Solvable *s = pool->solvables + p;
+		  if (s->name != name)
+		    continue;
+		  if (arch && s->arch != arch)
+		    continue;
+		  queue_push(q, p);
+		}
+	    }
+	  name = arch = 0;
+	  autoinstalled = -1;
+	  continue;
+	}
+      /* strip trailing space */
+      while (l && (buf[l - 1] == ' ' || buf[l - 1] == '\t'))
+	buf[--l] = 0;
+      l = 0;
+
+      bp = strchr(buf, ':');
+      if (!bp || bp - buf < 4)
+	continue;
+      *bp++ = 0;
+      while (*bp == ' ' || *bp == '\t')
+	bp++;
+      x = '@' + (buf[0] & 0x1f);
+      x = (x << 8) + '@' + (buf[1] & 0x1f);
+      switch(x)
+	{
+	case 'P' << 8 | 'A':
+	  if (!strcasecmp(buf, "package"))
+	    name = pool_str2id(pool, bp, 1);
+	  break;
+	case 'A' << 8 | 'R':
+	  if (!strcasecmp(buf, "architecture"))
+	    arch = pool_str2id(pool, bp, 1);
+	  break;
+	case 'A' << 8 | 'U':
+	  if (!strcasecmp(buf, "auto-installed"))
+	    autoinstalled = atoi(bp);
+	  break;
+	default:
+	  break;
+	}
+    }
+}
+
