@@ -229,6 +229,24 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	case 'C' << 8 | 'O':
 	  if (!strcasecmp(tag, "conflicts"))
 	    s->conflicts = makedeps(repo, q, s->conflicts, 0);
+	  else if (!strcasecmp(tag, "conffiles")) {
+	    char *line, *curLine, *filename, *md5;
+            line = curLine = solv_strdup(q);
+            while (curLine && strlen(curLine)) {
+	      char *nextLine = strchr(curLine, '\n');
+	      if (nextLine)
+		*nextLine++ = '\0';
+	      md5 = strchr(curLine, ' ');
+	      if (md5) {
+		*md5++ = '\0';
+		filename = curLine;
+		repodata_add_file_checksum(data, s - pool->solvables, SOLVABLE_DEB_CONFFILES,
+					   filename, md5);
+	      }
+	      curLine = nextLine;
+	    }
+	    solv_free(line);
+	  }
 	  break;
 	case 'D' << 8 | 'E':
 	  if (!strcasecmp(tag, "depends"))

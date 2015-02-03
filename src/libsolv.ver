@@ -179,6 +179,8 @@ SOLV_1.0 {
 		repo_write_stdkeyfilter;
 		repodata_add_dirnumnum;
 		repodata_add_dirstr;
+		repodata_add_file_bin_checksum;
+		repodata_add_file_checksum;
 		repodata_add_fixarray;
 		repodata_add_flexarray;
 		repodata_add_idarray;

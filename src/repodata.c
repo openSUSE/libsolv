@@ -2425,6 +2425,38 @@ repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
   repodata_set_bin_checksum(data, solvid, keyname, type, buf);
 }
 
+void
+repodata_add_file_bin_checksum(Repodata *data, Id solvid, Id keyname, const char* filename,
+			       const unsigned char *chksum)
+{
+  int l;
+  Id filename_p, chksum_p;
+
+  filename_p = pool_str2id(data->repo->pool, filename, 1);
+
+  l = solv_chksum_len(REPOKEY_TYPE_MD5);
+  data->attrdata = solv_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
+  memcpy(data->attrdata + data->attrdatalen, chksum, l);
+  chksum_p = data->attrdatalen;
+  data->attrdatalen += l;
+
+  repodata_add_array(data, solvid, keyname, REPOKEY_TYPE_CONFFILES_ARRAY, 2);
+  data->attriddata[data->attriddatalen++] = filename_p;
+  data->attriddata[data->attriddatalen++] = chksum_p;
+  data->attriddata[data->attriddatalen++] = 0;
+}
+
+void
+repodata_add_file_checksum(Repodata *data, Id solvid, Id keyname, const char* filename,
+			   const char *chksum)
+{
+  unsigned char buf[64];
+  int l;
+  l = solv_chksum_len(REPOKEY_TYPE_MD5);
+  solv_hex2bin(&chksum, buf, l);
+  repodata_add_file_bin_checksum(data, solvid, keyname, filename, buf);
+}
+
 const char *
 repodata_chk2str(Repodata *data, Id type, const unsigned char *buf)
 {
@@ -3081,6 +3113,13 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	{
 	  data_addideof(xd, ida[0], ida[2] ? 0 : 1);
 	  data_addblob(xd, data->attrdata + ida[1], strlen((char *)(data->attrdata + ida[1])) + 1);
+	}
+      break;
+    case REPOKEY_TYPE_CONFFILES_ARRAY:
+      for (ida = data->attriddata + val; *ida; ida += 2)
+	{
+	  data_addideof(xd, ida[0], ida[2] ? 0 : 1);
+	  data_addblob(xd, data->attrdata + ida[1], SIZEOF_MD5);
 	}
       break;
     case REPOKEY_TYPE_FIXARRAY:

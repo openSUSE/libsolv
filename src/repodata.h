@@ -256,6 +256,10 @@ void repodata_set_bin_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 			       const unsigned char *buf);
 void repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 			   const char *str);
+void repodata_add_file_bin_checksum(Repodata *data, Id solvid, Id keyname, const char* filename,
+				    const unsigned char *chksum);
+void repodata_add_file_checksum(Repodata *data, Id solvid, Id keyname, const char* filename,
+				const char *chksum);
 void repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
 
 

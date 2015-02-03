@@ -259,6 +259,8 @@ KNOWNID(SIGNATURE_DATA,		        "signature:data"),
 KNOWNID(PRODUCT_REGISTER_FLAVOR,	"product:regflavor"),		/* installed and available product */
 
 KNOWNID(SOLVABLE_INSTALLSTATUS,		"solvable:installstatus"),	/* debian install status */
+KNOWNID(SOLVABLE_DEB_CONFFILES,		"solvable:deb:conffiles"),
+KNOWNID(REPOKEY_TYPE_CONFFILES_ARRAY,	"repokey:type:conffiles_array"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 

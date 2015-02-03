@@ -198,6 +198,10 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       kv->num = 0;	/* not stringified yet */
       kv->str = (const char *)dp;
       return dp + strlen(kv->str) + 1;
+    case REPOKEY_TYPE_CONFFILES_ARRAY:
+      dp = data_read_ideof(dp, &kv->id, &kv->eof);
+      kv->str = (const char *)dp;
+      return dp + SIZEOF_MD5;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       dp = data_read_id(dp, &kv->id);
       dp = data_read_id(dp, (Id *)&kv->num);
@@ -264,6 +268,16 @@ data_skip(unsigned char *dp, int type)
           if (!(x & 0x40))
             return dp;
         }
+    case REPOKEY_TYPE_CONFFILES_ARRAY:
+      for (;;)
+        {
+          while ((*dp & 0x80) != 0)
+            dp++;
+          x = *dp++;
+          dp += SIZEOF_MD5 + 1;
+          if (!(x & 0x40))
+            return dp;
+       }
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       for (;;)
         {
