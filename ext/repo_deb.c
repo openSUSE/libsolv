@@ -222,6 +222,12 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  if (!strcasecmp(tag, "architecture"))
 	    s->arch = pool_str2id(pool, q, 1);
 	  break;
+	case 'A' << 8 | 'U':
+	  if (!strcasecmp(tag, "auto-installed")) {
+	    int autoinstalled = atoi(q) || !strcasecmp(q, "yes");
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_USERINSTALLED, !autoinstalled);
+	  }
+	  break;
 	case 'B' << 8 | 'R':
 	  if (!strcasecmp(tag, "breaks"))
 	    s->conflicts = makedeps(repo, q, s->conflicts, 0);
@@ -693,7 +699,7 @@ pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q)
 	  break;
 	case 'A' << 8 | 'U':
 	  if (!strcasecmp(buf, "auto-installed"))
-	    autoinstalled = atoi(bp);
+	    autoinstalled = atoi(bp) || !strcasecmp(bp, "yes");
 	  break;
 	default:
 	  break;

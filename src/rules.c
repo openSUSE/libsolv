@@ -3857,6 +3857,15 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  MAPSET(&userinstalled, p - installed->start);
     }
 
+  /* check userinstalled attribute */
+  for (p = installed->start; p < installed->end; p++)
+    {
+      Solvable *s = pool->solvables + p;
+      if (s->repo != installed || !solvable_lookup_bool(s, SOLVABLE_USERINSTALLED))
+	continue;
+      MAPSET(&userinstalled, p - installed->start);
+    }
+
   /* add all cleandeps candidates to iq */
   for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
     {

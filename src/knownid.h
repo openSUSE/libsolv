@@ -259,6 +259,7 @@ KNOWNID(SIGNATURE_DATA,		        "signature:data"),
 KNOWNID(PRODUCT_REGISTER_FLAVOR,	"product:regflavor"),		/* installed and available product */
 
 KNOWNID(SOLVABLE_INSTALLSTATUS,		"solvable:installstatus"),	/* debian install status */
+KNOWNID(SOLVABLE_USERINSTALLED,		"solvable:userinstalled"),
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
