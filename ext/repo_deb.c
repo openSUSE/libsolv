@@ -693,7 +693,7 @@ pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q)
 	  break;
 	case 'A' << 8 | 'U':
 	  if (!strcasecmp(buf, "auto-installed"))
-	    autoinstalled = atoi(bp);
+	    autoinstalled = atoi(bp) || !strcasecmp(bp, "yes");
 	  break;
 	default:
 	  break;
