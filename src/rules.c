@@ -947,6 +947,8 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      FOR_PROVIDES(p, pp, s->name)
 		{
 		  Solvable *ps = pool->solvables + p;
+		  if (MAPTST(&solv->ignore, p))
+		    continue;
 		  if (p == n)
 		    continue;
 		  if (isinstalled && ps->repo != installed)

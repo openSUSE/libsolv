@@ -975,6 +975,8 @@ policy_create_obsolete_index(Solver *solv)
 	  FOR_PROVIDES(p, pp, obs)
 	    {
 	      Solvable *ps = pool->solvables + p;;
+	      if (MAPTST(&solv->ignore, p))
+		continue;
 	      if (ps->repo != installed)
 		continue;
 	      if (ps->name == s->name)

@@ -82,6 +82,8 @@ struct _Solver {
 
   Map noupdate;				/* don't try to update these
                                            installed solvables */
+  Map ignore;				/* ignore these solvables */
+
   Map multiversion;			/* ignore obsoletes for these (multiinstall) */
 
   Map updatemap;			/* bring these installed packages to the newest version */
@@ -223,6 +225,7 @@ typedef struct _Solver Solver;
 #define SOLVER_VERIFY			0x0800
 #define SOLVER_DROP_ORPHANED		0x0900
 #define SOLVER_USERINSTALLED            0x0a00
+#define SOLVER_IGNORE			0x0b00
 
 #define SOLVER_JOBMASK			0xff00
 
