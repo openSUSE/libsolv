@@ -1523,6 +1523,7 @@ solver_create(Pool *pool)
   map_init(&solv->recommendsmap, pool->nsolvables);
   map_init(&solv->suggestsmap, pool->nsolvables);
   map_init(&solv->noupdate, solv->installed ? solv->installed->end - solv->installed->start : 0);
+  map_init(&solv->ignore, pool->nsolvables);
   solv->recommends_index = 0;
 
   solv->decisionmap = (Id *)solv_calloc(pool->nsolvables, sizeof(Id));
@@ -1662,6 +1663,7 @@ solver_free(Solver *solv)
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
   map_free(&solv->noupdate);
+  map_free(&solv->ignore);
   map_free(&solv->weakrulemap);
   map_free(&solv->multiversion);
 
@@ -2133,6 +2135,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  s = pool->solvables + i;
 		  if (s->repo != installed)
 		    continue;
+		  if (MAPTST(&solv->ignore, i))
+		    continue;
 
 		  if (solv->decisionmap[i] > 0 && (!specialupdaters || !specialupdaters[i - installed->start]))
 		    continue;		/* already decided */
@@ -2436,6 +2440,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  queue_empty(&dqs);	/* supplemented packages */
 	  for (i = 1; i < pool->nsolvables; i++)
 	    {
+	      if (MAPTST(&solv->ignore, i))
+		continue;
 	      if (solv->decisionmap[i] < 0)
 		continue;
 	      if (solv->decisionmap[i] > 0)
@@ -2777,6 +2783,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	{
 	  for (p = solv->installed->start; p < solv->installed->end; p++)
 	    {
+	      if (MAPTST(&solv->ignore, p))
+		continue;
 	      if (solv->decisionmap[p])
 		continue;	/* already decided */
 	      s = pool->solvables + p;
@@ -3391,6 +3399,21 @@ solver_solve(Solver *solv, Queue *job)
   if (!pool->whatprovides)
     pool_createwhatprovides(pool);
 
+  if (solv->ignore.size)
+    map_empty(&solv->ignore);
+
+  /* populate ignore map */
+  for (i = 0; i < job->count; i += 2) {
+    how = job->elements[i];
+    what = job->elements[i + 1];
+    select = how & SOLVER_SELECTMASK;
+    if ((how & SOLVER_JOBMASK) == SOLVER_IGNORE) {
+      FOR_JOB_SELECT(p, pp, select, what) {
+	MAPSET(&solv->ignore, p);
+      }
+    }
+  }
+
   /* create obsolete index */
   policy_create_obsolete_index(solv);
 
@@ -3593,11 +3616,13 @@ solver_solve(Solver *solv, Queue *job)
 
       oldnrules = solv->nrules;
       FOR_REPO_SOLVABLES(installed, p, s)
-	solver_addpkgrulesforsolvable(solv, s, &addedmap);
+	if (!MAPTST(&solv->ignore, p))
+	  solver_addpkgrulesforsolvable(solv, s, &addedmap);
       POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules for installed solvables\n", solv->nrules - oldnrules);
       oldnrules = solv->nrules;
       FOR_REPO_SOLVABLES(installed, p, s)
-	solver_addpkgrulesforupdaters(solv, s, &addedmap, 1);
+	if (!MAPTST(&solv->ignore, p))
+	  solver_addpkgrulesforupdaters(solv, s, &addedmap, 1);
       POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules for updaters of installed solvables\n", solv->nrules - oldnrules);
     }
 
@@ -3618,6 +3643,8 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_INSTALL:
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
+	      if (MAPTST(&solv->ignore, p))
+		continue;
 	      MAPSET(&installcandidatemap, p);
 	      solver_addpkgrulesforsolvable(solv, pool->solvables + p, &addedmap);
 	    }
@@ -3716,7 +3743,7 @@ solver_solve(Solver *solv, Queue *job)
       /* foreach possibly installed solvable */
       for (i = installed->start, s = pool->solvables + i; i < installed->end; i++, s++)
 	{
-	  if (s->repo != installed)
+	  if (s->repo != installed || MAPTST(&solv->ignore, i))
 	    {
 	      solver_addrule(solv, 0, 0);	/* create dummy rule */
 	      continue;
@@ -3744,7 +3771,7 @@ solver_solve(Solver *solv, Queue *job)
 	{
 	  Rule *sr;
 
-	  if (s->repo != installed)
+	  if (s->repo != installed || MAPTST(&solv->ignore, i))
 	    {
 	      solver_addrule(solv, 0, 0);	/* create dummy rule */
 	      continue;
@@ -3801,7 +3828,8 @@ solver_solve(Solver *solv, Queue *job)
 	    {
 	      queue_empty(&q);
 	      FOR_JOB_SELECT(p, pp, select, what)
-		queue_push(&q, p);
+		if (!MAPTST(&solv->ignore, p))
+		  queue_push(&q, p);
 	      if (!q.count)
 		{
 		  if (select == SOLVER_SOLVABLE_ONE_OF)
@@ -3928,6 +3956,9 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_USERINSTALLED:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: user installed %s\n", solver_select2str(pool, select, what));
+	  break;
+	case SOLVER_IGNORE:
+	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: ignore %s\n", solver_select2str(pool, select, what));
 	  break;
 	default:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: unknown job\n");
@@ -4991,6 +5022,9 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       break;
     case SOLVER_USERINSTALLED:
       strstart = "regard ", strend = " as userinstalled";
+      break;
+    case SOLVER_IGNORE:
+      strstart = "ignore ";
       break;
     default:
       strstart = "unknown job ";
