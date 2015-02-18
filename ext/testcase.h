@@ -16,6 +16,7 @@
 #define TESTCASE_RESULT_UNNEEDED	(1 << 4)
 
 extern Id testcase_str2dep(Pool *pool, const char *s);
+extern const char *testcase_dep2str(Pool *pool, Id id);
 extern const char *testcase_repoid2str(Pool *pool, Id repoid);
 extern const char *testcase_solvid2str(Pool *pool, Id p);
 extern Repo *testcase_str2repo(Pool *pool, const char *str);
