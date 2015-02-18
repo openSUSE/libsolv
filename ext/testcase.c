@@ -443,6 +443,8 @@ testcase_dep2str_complex(Pool *pool, Id id, int addparens)
 	needparens = 0;	/* chain */
       if (rd->flags == REL_OR && rd2->flags == REL_OR)
 	needparens = 0;	/* chain */
+      if (rd->flags > 0 && rd->flags < 8 && rd2->flags == REL_COMPAT)
+	needparens = 0;	/* chain */
     }
   if (!ISRELDEP(rd->evr))
     s2 = testcase_id2str(pool, rd->evr, 0);
@@ -564,7 +566,7 @@ testcase_str2dep_complex(Pool *pool, const char **sp, int relop)
     {
       while (*s == ' ' || *s == '\t')
 	s++;
-      if (!*s || *s == ')' || relop)
+      if (!*s || *s == ')' || (relop && strncmp(s, "compat >= ", 10) != 0))
 	{
 	  *sp = s;
 	  return id;
