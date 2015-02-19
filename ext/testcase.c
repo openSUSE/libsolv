@@ -406,7 +406,7 @@ testcase_dep2str_complex(Pool *pool, Id id, int addparens)
     {
       Reldep *rd2 = GETRELDEP(pool, rd->name);
       needparens = 1;
-      if (rd->flags > 7 && rd2->flags && rd2->flags <= 7)
+      if (rd->flags > 7 && rd->flags != REL_COMPAT && rd2->flags && rd2->flags <= 7)
 	needparens = 0;
     }
   s = (char *)testcase_dep2str_complex(pool, rd->name, needparens);
