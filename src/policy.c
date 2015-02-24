@@ -406,11 +406,41 @@ policy_update_recommendsmap(Solver *solv)
     }
 }
 
+/* bring suggested/enhanced packages to front
+ * installed packages count as suggested */
+static void
+prefer_suggested(Solver *solv, Queue *plist)
+{
+  Pool *pool = solv->pool;
+  int i, count;
+
+  /* update our recommendsmap/suggestsmap */
+  if (solv->recommends_index < solv->decisionq.count)
+    policy_update_recommendsmap(solv);
+
+  for (i = 0, count = plist->count; i < count; i++)
+    {
+      Id p = plist->elements[i];
+      Solvable *s = pool->solvables + p;
+      if ((pool->installed && s->repo == pool->installed) ||
+          MAPTST(&solv->suggestsmap, p) ||
+          solver_is_enhancing(solv, s))
+	continue;	/* good package */
+      /* bring to back */
+     if (i < plist->count - 1)
+	{
+	  memmove(plist->elements + i, plist->elements + i + 1, (plist->count - 1 - i) * sizeof(Id));
+	  plist->elements[plist->count - 1] = p;
+	}
+      i--;
+      count--;
+    }
+}
+
 /*
  * prune to recommended/suggested packages.
  * does not prune installed packages (they are also somewhat recommended).
  */
-
 static void
 prune_to_recommended(Solver *solv, Queue *plist)
 {
@@ -467,6 +497,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
   if (j)
     plist->count = j;
 
+#if 0
   /* anything left to prune? */
   if (plist->count - ninst < 2)
     return;
@@ -500,6 +531,7 @@ prune_to_recommended(Solver *solv, Queue *plist)
     }
   if (j)
     plist->count = j;
+#endif
 }
 
 static void
@@ -836,6 +868,240 @@ prune_to_best_version(Pool *pool, Queue *plist)
 }
 
 
+static int
+sort_by_name_evr_sortcmp(const void *ap, const void *bp, void *dp)
+{
+  Pool *pool = dp;
+  Id a, *aa = (Id *)ap;
+  Id b, *bb = (Id *)bp;
+  Id r = aa[1] - bb[1];
+  if (r)
+    return r < 0 ? -1 : 1;
+  a = aa[2] < 0 ? -aa[2] : aa[2];
+  b = bb[2] < 0 ? -bb[2] : bb[2];
+  if (pool->disttype != DISTTYPE_DEB)
+    {
+      /* treat release-less versions different */
+      const char *as = pool_id2str(pool, a);
+      const char *bs = pool_id2str(pool, b);
+      if (strchr(as, '-'))
+	{
+	  if (!strchr(bs, '-'))
+	    return -2;
+	}
+      else
+	{
+	  if (strchr(bs, '-'))
+	    return 2;
+	}
+    }
+  r = pool_evrcmp(pool, b, a, EVRCMP_COMPARE);
+  if (!r && (aa[2] < 0 || bb[2] < 0))
+    {
+      if (bb[2] >= 0)
+	return 1;
+      if (aa[2] >= 0)
+	return -1;
+    }
+  if (r)
+    return r < 0 ? -1 : 1;
+  return 0;
+}
+
+/* common end of sort_by_srcversion and sort_by_common_dep */
+static void
+sort_by_name_evr_array(Pool *pool, Queue *plist, int count, int ent)
+{
+  Id lastname;
+  int i, j, bad, havebad;
+  Id *pp, *elements = plist->elements;
+
+  if (ent < 2)
+    {
+      queue_truncate(plist, count);
+      return;
+    }
+  solv_sort(elements + count * 2, ent, sizeof(Id) * 3, sort_by_name_evr_sortcmp, pool);
+  lastname = 0;
+  bad = havebad = 0;
+  for (i = 0, pp = elements + count * 2; i < ent; i++, pp += 3)
+    {
+      if (lastname && pp[1] == lastname)
+	{
+          if (pp[0] != pp[-3] && sort_by_name_evr_sortcmp(pp - 3, pp, pool) == -1)
+	    {
+#if 0
+	      printf("%s - %s: bad %s %s - %s\n", pool_solvid2str(pool, elements[pp[-3]]), pool_solvid2str(pool, elements[pp[0]]), pool_dep2str(pool, lastname), pool_id2str(pool, pp[-1] < 0 ? -pp[-1] : pp[-1]), pool_id2str(pool, pp[2] < 0 ? -pp[2] : pp[2]));
+#endif
+	      bad++;
+	      havebad = 1;
+	    }
+	}
+      else
+	{
+	  bad = 0;
+	  lastname = pp[1];
+	}
+      elements[count + pp[0]] += bad;
+    }
+
+#if 0
+for (i = 0; i < count; i++)
+  printf("%s badness %d\n", pool_solvid2str(pool, elements[i]), elements[count + i]);
+#endif
+
+  if (havebad)
+    {
+      /* simple stable insertion sort */
+      if (pool->installed)
+	for (i = 0; i < count; i++)
+	  if (pool->solvables[elements[i]].repo == pool->installed)
+	    elements[i + count] = 0;
+      for (i = 1; i < count; i++)
+	for (j = i, pp = elements + count + j; j > 0; j--, pp--)
+	  if (pp[-1] > pp[0])
+	    {
+	      Id *pp2 = pp - count;
+	      Id p = pp[-1];
+	      pp[-1] = pp[0];
+	      pp[0] = p;
+	      p = pp2[-1];
+	      pp2[-1] = pp2[0];
+	      pp2[0] = p;
+	    }
+	  else
+	    break;
+    }
+  queue_truncate(plist, count);
+}
+
+#if 0
+static void
+sort_by_srcversion(Pool *pool, Queue *plist)
+{
+  int i, count = plist->count, ent = 0;
+  queue_insertn(plist, count, count, 0);
+  for (i = 0; i < count; i++)
+    {
+      Id name, evr, p = plist->elements[i];
+      Solvable *s = pool->solvables + p;
+      if (solvable_lookup_void(s, SOLVABLE_SOURCENAME))
+	name = s->name;
+      else
+        name = solvable_lookup_id(s, SOLVABLE_SOURCENAME);
+      if (solvable_lookup_void(s, SOLVABLE_SOURCEEVR))
+	evr = s->evr;
+      else
+        evr = solvable_lookup_id(s, SOLVABLE_SOURCEEVR);
+      if (!name || !evr || ISRELDEP(evr))
+	continue;
+      queue_push(plist, i);
+      queue_push2(plist, name, evr);
+      ent++;
+    }
+  sort_by_name_evr_array(pool, plist, count, ent);
+}
+#endif
+
+static void
+sort_by_common_dep(Pool *pool, Queue *plist)
+{
+  int i, count = plist->count, ent = 0;
+  Id id, *dp;
+  queue_insertn(plist, count, count, 0);
+  for (i = 0; i < count; i++)
+    {
+      Id p = plist->elements[i];
+      Solvable *s = pool->solvables + p;
+      if (!s->provides)
+	continue;
+      for (dp = s->repo->idarraydata + s->provides; (id = *dp++) != 0; )
+	{
+	  Reldep *rd;
+	  if (!ISRELDEP(id))
+	    continue;
+	  rd = GETRELDEP(pool, id);
+	  if ((rd->flags == REL_EQ || rd->flags == (REL_EQ | REL_LT) || rd->flags == REL_LT) && !ISRELDEP(rd->evr))
+	    {
+	      if (rd->flags == REL_EQ)
+		{
+		  /* ignore hashes */
+		  const char *s = pool_id2str(pool, rd->evr);
+		  if (strlen(s) >= 4)
+		    {
+		      while ((*s >= 'a' && *s <= 'f') || (*s >= '0' && *s <= '9'))
+			s++;
+		      if (!*s)
+			continue;
+		    }
+		}
+	      queue_push(plist, i);
+	      queue_push2(plist, rd->name, rd->flags == REL_LT ? -rd->evr : rd->evr);
+	      ent++;
+	    }
+	}
+    }
+  sort_by_name_evr_array(pool, plist, count, ent);
+}
+
+/* check if we have an update candidate */
+static void
+dislike_old_versions(Pool *pool, Queue *plist)
+{
+  int i, count = plist->count;
+  Id *elements = plist->elements;
+  int bad = 0;
+
+  for (i = 0; i < count; i++)
+    {
+      Id p = elements[i];
+      Solvable *s = pool->solvables + p;
+      Repo *repo = s->repo;
+      Id q, qq;
+
+      if (!repo || repo == pool->installed)
+	continue;
+      FOR_PROVIDES(q, qq, s->name)
+	{
+	  Solvable *qs = pool->solvables + q;
+	  if (q == p)
+	    continue;
+	  if (s->name != qs->name || s->arch != qs->arch)
+	    continue;
+	  if (repo->priority != qs->repo->priority)
+	    {
+	      if (repo->priority > qs->repo->priority)
+		continue;
+	      elements[i] = -p;
+	      bad = 1;
+	      break;
+	    }
+	  if (pool_evrcmp(pool, qs->evr, s->evr, EVRCMP_COMPARE) > 0)
+	    {
+	      elements[i] = -p;
+	      bad = 1;
+	      break;
+	    }
+	}
+    }
+  if (!bad)
+    return;
+  /* now move negative elements to the back */
+  for (i = 0; i < count; i++)
+    {
+      Id p = elements[i];
+      if (p >= 0)
+	continue;
+      if (i < plist->count - 1)
+	{
+	  memmove(elements + i, elements + i + 1, (plist->count - 1 - i) * sizeof(Id));
+	  elements[plist->count - 1] = -p;
+	}
+      i--;
+      count--;
+    }
+}
+
 /*
  *  POLICY_MODE_CHOOSE:     default, do all pruning steps
  *  POLICY_MODE_RECOMMEND:  leave out prune_to_recommended
@@ -857,7 +1123,19 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
   if (plist->count > 1)
     prune_to_best_version(pool, plist);
   if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)
-    prune_to_recommended(solv, plist);
+    {
+      prune_to_recommended(solv, plist);
+      if (plist->count > 1)
+	{
+	  /* do some fancy reordering */
+#if 0
+	  sort_by_srcversion(pool, plist);
+#endif
+	  dislike_old_versions(pool, plist);
+	  sort_by_common_dep(pool, plist);
+	  prefer_suggested(solv, plist);
+	}
+    }
 }
 
 
