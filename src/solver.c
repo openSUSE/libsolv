@@ -1458,6 +1458,12 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
     reorder_dq_for_jobrules(solv, level, dq);
   if (dq->count > 1)
     {
+      IF_POOLDEBUG (SOLV_DEBUG_POLICY)
+	{
+	  POOL_DEBUG (SOLV_DEBUG_POLICY, "creating a branch:\n");
+	  for (i = 0; i < dq->count; i++)
+	    POOL_DEBUG (SOLV_DEBUG_POLICY, "  - %s\n", pool_solvid2str(pool, dq->elements[i]));
+	}
       /* multiple candidates, open a branch */
       queue_push(&solv->branches, -dq->elements[0]);
       for (i = 1; i < dq->count; i++)
@@ -2681,6 +2687,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      if (dq.count > 1)
 			{
 			  /* multiple candidates, open a branch */
+			  IF_POOLDEBUG (SOLV_DEBUG_POLICY)
+			    {
+			      POOL_DEBUG (SOLV_DEBUG_POLICY, "creating a branch:\n");
+			      for (i = 0; i < dq.count; i++)
+				POOL_DEBUG (SOLV_DEBUG_POLICY, "  - %s\n", pool_solvid2str(pool, dq.elements[i]));
+			    }
 			  queue_push(&solv->branches, -dq.elements[0]);
 			  for (i = 1; i < dq.count; i++)
 			    queue_push(&solv->branches, dq.elements[i]);
