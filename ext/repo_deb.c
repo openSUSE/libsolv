@@ -17,6 +17,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#include "solver.h"	/* for GET_USERINSTALLED_ flags */
 #include "chksum.h"
 #include "repo_deb.h"
 
@@ -619,7 +620,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
 }
 
 void
-pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q)
+pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q, int flags)
 {
   Id name = 0, arch = 0;
   int autoinstalled = -1;
@@ -654,14 +655,19 @@ pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q)
 	  l = 0;
 	  if (name && autoinstalled > 0)
 	    {
-	      FOR_PROVIDES(p, pp, name)
+	      if ((flags & GET_USERINSTALLED_NAMES) != 0)
+		queue_push(q, name);
+	      else
 		{
-		  Solvable *s = pool->solvables + p;
-		  if (s->name != name)
-		    continue;
-		  if (arch && s->arch != arch)
-		    continue;
-		  queue_push(q, p);
+		  FOR_PROVIDES(p, pp, name)
+		    {
+		      Solvable *s = pool->solvables + p;
+		      if (s->name != name)
+			continue;
+		      if (arch && s->arch != arch)
+			continue;
+		      queue_push(q, p);
+		    }
 		}
 	    }
 	  name = arch = 0;
