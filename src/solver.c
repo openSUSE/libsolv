@@ -1418,6 +1418,24 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
       solv->decisionmap[p] = 0;
 }
 
+static void
+createbranch(Solver *solv, int level, Queue *dq)
+{
+  Pool *pool = solv->pool;
+  int i;
+  IF_POOLDEBUG (SOLV_DEBUG_POLICY)
+    {
+      POOL_DEBUG (SOLV_DEBUG_POLICY, "creating a branch:\n");
+      for (i = 0; i < dq->count; i++)
+	POOL_DEBUG (SOLV_DEBUG_POLICY, "  - %s\n", pool_solvid2str(pool, dq->elements[i]));
+    }
+  /* multiple candidates, open a branch */
+  queue_push(&solv->branches, -dq->elements[0]);
+  for (i = 1; i < dq->count; i++)
+    queue_push(&solv->branches, dq->elements[i]);
+      queue_push(&solv->branches, level);
+}
+
 /*-------------------------------------------------------------------
  *
  * select and install
@@ -1434,46 +1452,18 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
 {
   Pool *pool = solv->pool;
   Id p;
-  int i;
 
   if (dq->count > 1)
     policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
-  if (dq->count > 1)
-    {
-      /* XXX: didn't we already do that? */
-      /* XXX: shouldn't we prefer installed packages? */
-      /* XXX: move to policy.c? */
-      /* choose the supplemented one */
-      for (i = 0; i < dq->count; i++)
-	if (solver_is_supplementing(solv, pool->solvables + dq->elements[i]))
-	  {
-	    dq->elements[0] = dq->elements[i];
-	    dq->count = 1;
-	    break;
-	  }
-    }
   /* if we're resolving job rules and didn't resolve the installed packages yet,
    * do some special supplements ordering */
   if (dq->count > 1 && ruleid >= solv->jobrules && ruleid < solv->jobrules_end && solv->installed && !solv->focus_installed)
     reorder_dq_for_jobrules(solv, level, dq);
+  /* if we have multiple candidates we open a branch */
   if (dq->count > 1)
-    {
-      IF_POOLDEBUG (SOLV_DEBUG_POLICY)
-	{
-	  POOL_DEBUG (SOLV_DEBUG_POLICY, "creating a branch:\n");
-	  for (i = 0; i < dq->count; i++)
-	    POOL_DEBUG (SOLV_DEBUG_POLICY, "  - %s\n", pool_solvid2str(pool, dq->elements[i]));
-	}
-      /* multiple candidates, open a branch */
-      queue_push(&solv->branches, -dq->elements[0]);
-      for (i = 1; i < dq->count; i++)
-	queue_push(&solv->branches, dq->elements[i]);
-      queue_push(&solv->branches, level);
-    }
+    createbranch(solv, level, dq);
   p = dq->elements[0];
-
   POOL_DEBUG(SOLV_DEBUG_POLICY, "installing %s\n", pool_solvid2str(pool, p));
-
   return setpropagatelearn(solv, level, p, disablerules, ruleid);
 }
 
@@ -2684,20 +2674,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			}
 		      if (!dq.count)
 			continue;
+		      /* if we have multiple candidates we open a branch */
 		      if (dq.count > 1)
-			{
-			  /* multiple candidates, open a branch */
-			  IF_POOLDEBUG (SOLV_DEBUG_POLICY)
-			    {
-			      POOL_DEBUG (SOLV_DEBUG_POLICY, "creating a branch:\n");
-			      for (i = 0; i < dq.count; i++)
-				POOL_DEBUG (SOLV_DEBUG_POLICY, "  - %s\n", pool_solvid2str(pool, dq.elements[i]));
-			    }
-			  queue_push(&solv->branches, -dq.elements[0]);
-			  for (i = 1; i < dq.count; i++)
-			    queue_push(&solv->branches, dq.elements[i]);
-			  queue_push(&solv->branches, level);
-			}
+			  createbranch(solv, level, &dq);
 		      p = dq.elements[0];
 		      POOL_DEBUG(SOLV_DEBUG_POLICY, "installing recommended %s\n", pool_solvid2str(pool, p));
 		      olevel = level;
