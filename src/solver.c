@@ -1243,13 +1243,7 @@ revert(Solver *solv, int level)
       solv->propagate_index = solv->decisionq.count;
     }
   while (solv->branches.count && solv->branches.elements[solv->branches.count - 1] >= level)
-    {
-      solv->branches.count--;
-      while (solv->branches.count && solv->branches.elements[solv->branches.count - 1] >= 0)
-	solv->branches.count--;
-      while (solv->branches.count && solv->branches.elements[solv->branches.count - 1] < 0)
-	solv->branches.count--;
-    }
+    solv->branches.count -= solv->branches.elements[solv->branches.count - 2];
   if (solv->recommends_index > solv->decisionq.count)
     solv->recommends_index = -1;	/* rebuild recommends/suggests maps */
   if (solv->decisionq.count < solv->decisioncnt_jobs)
@@ -1418,8 +1412,13 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
       solv->decisionmap[p] = 0;
 }
 
+/*-------------------------------------------------------------------
+ *
+ * branch handling
+ */
+
 static void
-createbranch(Solver *solv, int level, Queue *dq)
+createbranch(Solver *solv, int level, Queue *dq, Id p, Id data)
 {
   Pool *pool = solv->pool;
   int i;
@@ -1429,11 +1428,39 @@ createbranch(Solver *solv, int level, Queue *dq)
       for (i = 0; i < dq->count; i++)
 	POOL_DEBUG (SOLV_DEBUG_POLICY, "  - %s\n", pool_solvid2str(pool, dq->elements[i]));
     }
-  /* multiple candidates, open a branch */
   queue_push(&solv->branches, -dq->elements[0]);
   for (i = 1; i < dq->count; i++)
     queue_push(&solv->branches, dq->elements[i]);
-      queue_push(&solv->branches, level);
+  queue_push2(&solv->branches, p, data);
+  queue_push2(&solv->branches, dq->count + 4, level);
+}
+
+static int
+takebranch(Solver *solv, int pos, int end, const char *msg, int disablerules)
+{
+  Pool *pool = solv->pool;
+  int level;
+  Id p, why;
+#if 0
+  {
+    int i;
+    printf("branch group level %d [%d-%d] %d %d:\n", solv->branches.elements[end - 1], start, end, solv->branches.elements[end - 4], solv->branches.elements[end - 3]);
+    for (i = end - solv->branches.elements[end - 2]; i < end - 4; i++)
+      printf("%c %c%s\n", i == pos ? 'x' : ' ', solv->branches.elements[i] >= 0 ? ' ' : '-', pool_solvid2str(pool, solv->branches.elements[i] >= 0 ? solv->branches.elements[i] : -solv->branches.elements[i]));
+  }
+#endif
+  level = solv->branches.elements[end - 1];
+  p = solv->branches.elements[pos];
+  solv->branches.elements[pos] = -p;
+  POOL_DEBUG(SOLV_DEBUG_SOLVER, "%s %d -> %d with %s\n", msg, solv->decisionmap[p], level, pool_solvid2str(pool, p));
+  /* hack: set level to zero so that revert does not remove the branch */
+  solv->branches.elements[end - 1] = 0;
+  revert(solv, level);
+  solv->branches.elements[end - 1] = level;
+  /* hack: revert simply sets the count, so we can still access the reverted elements */
+  why = -solv->decisionq_why.elements[solv->decisionq_why.count];
+  assert(why >= 0);
+  return setpropagatelearn(solv, level, p, disablerules, why);
 }
 
 /*-------------------------------------------------------------------
@@ -1461,7 +1488,7 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
     reorder_dq_for_jobrules(solv, level, dq);
   /* if we have multiple candidates we open a branch */
   if (dq->count > 1)
-    createbranch(solv, level, dq);
+    createbranch(solv, level, dq, 0, ruleid);
   p = dq->elements[0];
   POOL_DEBUG(SOLV_DEBUG_POLICY, "installing %s\n", pool_solvid2str(pool, p));
   return setpropagatelearn(solv, level, p, disablerules, ruleid);
@@ -2674,9 +2701,11 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			}
 		      if (!dq.count)
 			continue;
+		      if (dq.count > 1)
+		        policy_filter_unwanted(solv, &dq, POLICY_MODE_CHOOSE);
 		      /* if we have multiple candidates we open a branch */
 		      if (dq.count > 1)
-			  createbranch(solv, level, &dq);
+			  createbranch(solv, level, &dq, s - pool->solvables, rec);
 		      p = dq.elements[0];
 		      POOL_DEBUG(SOLV_DEBUG_POLICY, "installing recommended %s\n", pool_solvid2str(pool, p));
 		      olevel = level;
@@ -2803,7 +2832,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  if (solv->branches.count)
 	    {
 	      int l, endi = 0;
-	      Id why;
 	      p = l = 0;
 	      for (i = solv->branches.count - 1; i >= 0; i--)
 		{
@@ -2812,6 +2840,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    {
 		      endi = i + 1;
 		      l = p;
+		      i -= 3;	/* skip: p data count */
 		    }
 		  else if (p > 0)
 		    break;
@@ -2822,21 +2851,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		{
 		  while (i > 0 && solv->branches.elements[i - 1] > 0)
 		    i--;
-		  p = solv->branches.elements[i];
-		  solv->branches.elements[i] = -p;
-		  while (i > 0 && solv->branches.elements[i - 1] < 0)
-		    i--;
-		  POOL_DEBUG(SOLV_DEBUG_SOLVER, "branching with %s\n", pool_solvid2str(pool, p));
-		  queue_empty(&dq);
-		  queue_insertn(&dq, 0, endi - i, solv->branches.elements + i);
-		  level = l;
-		  revert(solv, level);
-		  queue_insertn(&solv->branches, solv->branches.count, dq.count, dq.elements);
-		  /* hack: revert simply sets the count, so we can still access the reverted elements */
-		  why = -solv->decisionq_why.elements[solv->decisionq_why.count];
-		  assert(why >= 0);
-		  olevel = level;
-		  level = setpropagatelearn(solv, level, p, disablerules, why);
+		  level = takebranch(solv, i, endi, "branching", disablerules);
 		  if (level == 0)
 		    break;
 		  continue;
@@ -2849,82 +2864,51 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /* auto-minimization step */
       if (solv->branches.count)
 	{
-	  int l = 0, lasti = -1, lastsi = -1, endi = 0;
-	  Id why;
-	  p = l = 0;
+	  int endi, lasti = -1, lastiend = -1;
 	  if (solv->recommends_index < solv->decisionq.count)
 	    policy_update_recommendsmap(solv);
-	  for (i = solv->branches.count - 1; i >= 0; i--)
+	  for (endi = solv->branches.count; endi > 0;)
 	    {
-	      p = solv->branches.elements[i];
-	      if (p > 0 && !l)
+	      int l, lastsi = -1, starti = endi - solv->branches.elements[endi - 2];
+	      l = solv->branches.elements[endi - 1];
+	      for (i = starti; i < endi - 4; i++)
 		{
-		  l = p;
-		  endi = i + 1;
-		  lastsi = -1;
-		}
-	      else if (p > 0)
-		{
+		  p = solv->branches.elements[i];
+		  if (p <= 0)
+		    continue;
 		  if (solv->decisionmap[p] > l + 1)
-		    lasti = i;
-		  else
 		    {
-		      if (MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p))
-			{
-			  lastsi = p;
-			}
+		      lasti = i;
+		      lastiend = endi;
+		      lastsi = -1;
+		      break;
 		    }
+		  if (lastsi < 0 && (MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
+		    lastsi = i;
 		}
-	      else if (p < 0)
+	      if (lastsi >= 0)
 		{
-		  l = 0;
-		  if (lastsi >= 0)
+		  /* we have a recommended package that could not be installed */
+		  /* take it if our current selection is not recommended */
+		  for (i = starti; i < endi - 4; i++)
 		    {
-		      p = -p;
-		      if (solv->decisionmap[p] == l)
+		      p = -solv->branches.elements[i];
+		      if (p <= 0 || solv->decisionmap[p] != l + 1)
+			continue;
+		      if (!(MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
 			{
-			  if (!(MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
-			    lasti = lastsi;
+			  lasti = lastsi;
+			  lastiend = endi;
+			  break;
 			}
 		    }
 		}
+	      endi = starti;
 	    }
 	  if (lasti >= 0)
 	    {
-	      int starti;
-	      /* find start of branch */
-	      for (i = lasti; i && solv->branches.elements[i] >= 0; )
-		i--;
-	      while (i > 0 && solv->branches.elements[i] < 0)
-		i--;
-	      starti = i ? i + 1 : 0;
-#if 0
-	      printf("minimization group level %d [%d-%d]:\n", solv->branches.elements[endi - 1], starti, endi);
-	      for (i = starti; i < endi - 1; i++)
-		printf("%c %c%s\n", i == lasti ? 'x' : ' ', solv->branches.elements[i] >= 0 ? ' ' : '-', pool_solvid2str(pool, solv->branches.elements[i] >= 0 ? solv->branches.elements[i] : -solv->branches.elements[i]));
-#endif
-	      l = solv->branches.elements[endi - 1];
-	      p = solv->branches.elements[lasti];
-	      solv->branches.elements[lasti] = -p;
-	      POOL_DEBUG(SOLV_DEBUG_SOLVER, "minimizing %d -> %d with %s\n", solv->decisionmap[p], l, pool_solvid2str(pool, p));
 	      minimizationsteps++;
-	      queue_empty(&dq);
-	      for (i = starti; i < endi - 1; i++)
-		if (solv->branches.elements[i] < 0)
-		  queue_push(&dq, solv->branches.elements[i]);
-	      for (i = starti; i < endi; i++)
-		if (solv->branches.elements[i] > 0)
-		  queue_push(&dq, solv->branches.elements[i]);
-	      if (dq.elements[dq.count - 2] <= 0)
-		queue_empty(&dq);
-	      level = l;
-	      revert(solv, level);
-	      queue_insertn(&solv->branches, solv->branches.count, dq.count, dq.elements);
-	      /* hack: revert simply sets the count, so we can still access the reverted elements */
-	      why = -solv->decisionq_why.elements[solv->decisionq_why.count];
-	      assert(why >= 0);
-	      olevel = level;
-	      level = setpropagatelearn(solv, level, p, disablerules, why);
+	      level = takebranch(solv, lasti, lastiend, "minimizing", disablerules);
 	      if (level == 0)
 		break;
 	      continue;		/* back to main loop */
