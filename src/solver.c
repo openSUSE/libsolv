@@ -2876,7 +2876,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  p = solv->branches.elements[i];
 		  if (p <= 0)
 		    continue;
-		  if (solv->decisionmap[p] > l + 1)
+		  if (solv->decisionmap[p] > l)
 		    {
 		      lasti = i;
 		      lastiend = endi;
