@@ -299,6 +299,10 @@ typedef struct _Solver Solver;
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead if ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */
 
+#define SOLVER_ALTERNATIVE_TYPE_RULE		1
+#define SOLVER_ALTERNATIVE_TYPE_RECOMMENDS	2
+#define SOLVER_ALTERNATIVE_TYPE_SUGGESTS	3
+
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern int  solver_solve(Solver *solv, Queue *job);
@@ -320,6 +324,8 @@ extern void pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int fl
 extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
 extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
 
+extern int solver_alternatives_count(Solver *solv);
+extern int solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *chosenp, Queue *choices, int *levelp);
 
 extern void solver_calculate_multiversionmap(Pool *pool, Queue *job, Map *multiversionmap);
 extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *multiversionmap);	/* obsolete */

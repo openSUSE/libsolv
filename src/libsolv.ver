@@ -314,6 +314,7 @@ SOLV_1.0 {
 		solvable_trivial_installable_repo;
 		solvable_unset;
 		solver_allruleinfos;
+		solver_alternatives_count;
 		solver_calc_duchanges;
 		solver_calc_installsizechange;
 		solver_calculate_multiversionmap;
@@ -329,6 +330,7 @@ SOLV_1.0 {
 		solver_findproblemrule;
 		solver_free;
 		solver_freedupmaps;
+		solver_get_alternative;
 		solver_get_decisionblock;
 		solver_get_decisionlevel;
 		solver_get_decisionqueue;
@@ -360,6 +362,7 @@ SOLV_1.0 {
 		solver_problemruleinfo2str;
 		solver_rule2job;
 		solver_rule2jobidx;
+		solver_rule2pkgrule;
 		solver_rule2rules;
 		solver_rule2solvable;
 		solver_ruleclass;

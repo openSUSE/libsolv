@@ -77,6 +77,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_ORPHANED,		"orphaned" },
   { TESTCASE_RESULT_RECOMMENDED,	"recommended" },
   { TESTCASE_RESULT_UNNEEDED,		"unneeded" },
+  { TESTCASE_RESULT_ALTERNATIVES,	"alternatives" },
   { 0, 0 }
 };
 
@@ -1624,6 +1625,33 @@ testcase_solutionid(Solver *solv, Id problem, Id solution)
   return s;
 }
 
+static const char *
+testcase_alternativeid(Solver *solv, int type, Id id, Id from)
+{
+  const char *s;
+  Pool *pool = solv->pool;
+  Chksum *chk;
+  const unsigned char *md5;
+  int md5l;
+  chk = solv_chksum_create(REPOKEY_TYPE_MD5);
+  if (type == SOLVER_ALTERNATIVE_TYPE_RECOMMENDS)
+    {
+      s = testcase_solvid2str(pool, from);
+      solv_chksum_add(chk, s, strlen(s) + 1);
+      s = testcase_dep2str(pool, id);
+      solv_chksum_add(chk, s, strlen(s) + 1);
+    }
+  else if (type == SOLVER_ALTERNATIVE_TYPE_RULE)
+    {
+      s = testcase_ruleid(solv, id);
+      solv_chksum_add(chk, s, strlen(s) + 1);
+    }
+  md5 = solv_chksum_get(chk, &md5l);
+  s = pool_bin2hex(pool, md5, 4);
+  chk = solv_chksum_free(chk, 0);
+  return s;
+}
+
 static struct class2str {
   Id class;
   const char *str;
@@ -1779,6 +1807,72 @@ testcase_solverresult(Solver *solv, int resultflags)
 	}
       queue_free(&q);
       queue_free(&qf);
+    }
+  if ((resultflags & TESTCASE_RESULT_ALTERNATIVES) != 0)
+    {
+      char *altprefix;
+      Queue q, rq;
+      int cnt;
+      Id alternative;
+      queue_init(&q);
+      queue_init(&rq);
+      cnt = solver_alternatives_count(solv);
+      for (alternative = 1; alternative <= cnt; alternative++)
+	{
+	  Id id, from, chosen;
+	  char num[20];
+	  int type = solver_get_alternative(solv, alternative, &id, &from, &chosen, &q, 0);
+	  altprefix = solv_dupjoin("alternative ", testcase_alternativeid(solv, type, id, from), " ");
+	  strcpy(num, " 0 ");
+	  if (type == SOLVER_ALTERNATIVE_TYPE_RECOMMENDS)
+	    {
+	      char *s = pool_tmpjoin(pool, altprefix, num, testcase_solvid2str(pool, from));
+	      s = pool_tmpappend(pool, s, " recommends ", testcase_dep2str(pool, id));
+	      strqueue_push(&sq, s);
+	    }
+	  else if (type == SOLVER_ALTERNATIVE_TYPE_RULE)
+	    {
+	      /* map choice rules back to pkg rules */
+	      if (solver_ruleclass(solv, id) == SOLVER_RULE_CHOICE)
+		id = solver_rule2pkgrule(solv, id);
+	      solver_allruleinfos(solv, id, &rq);
+	      for (i = 0; i < rq.count; i += 4)
+		{
+		  int rtype = rq.elements[i];
+		  if ((rtype & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_JOB)
+		    {
+		      const char *js = testcase_job2str(pool, rq.elements[i + 2], rq.elements[i + 3]);
+		      char *s = pool_tmpjoin(pool, altprefix, num, " job ");
+		      s = pool_tmpappend(pool, s, js, 0);
+		      strqueue_push(&sq, s);
+		    }
+		  else if (rtype == SOLVER_RULE_PKG_REQUIRES)
+		    {
+		      char *s = pool_tmpjoin(pool, altprefix, num, testcase_solvid2str(pool, rq.elements[i + 1]));
+		      s = pool_tmpappend(pool, s, " requires ", testcase_dep2str(pool, rq.elements[i + 3]));
+		      strqueue_push(&sq, s);
+		    }
+		}
+	    }
+	  for (i = 0; i < q.count; i++)
+	    {
+	      Id p = q.elements[i];
+	      if (i >= 9)
+	        num[0] = '0' + (i + 1) / 10;
+	      num[1] = '0' + (i + 1) % 10;
+	      if (-p == chosen)
+		s = pool_tmpjoin(pool, altprefix, num, "+ ");
+	      else if (p < 0)
+	        s = pool_tmpjoin(pool, altprefix, num, "- ");
+	      else if (p >= 0)
+	        s = pool_tmpjoin(pool, altprefix, num, "  ");
+	      s = pool_tmpappend(pool, s,  testcase_solvid2str(pool, p < 0 ? -p : p), 0);
+	      strqueue_push(&sq, s);
+	    }
+	  solv_free(altprefix);
+	}
+      queue_free(&q);
+      queue_free(&rq);
     }
 
   strqueue_sort(&sq);

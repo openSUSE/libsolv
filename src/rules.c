@@ -2763,6 +2763,14 @@ solver_rule2solvable(Solver *solv, Id rid)
   return 0;
 }
 
+Id
+solver_rule2pkgrule(Solver *solv, Id rid)
+{
+  if (rid >= solv->choicerules && rid < solv->choicerules_end)
+    return solv->choicerules_ref[rid - solv->choicerules];
+  return 0;
+}
+
 static void
 solver_rule2rules_rec(Solver *solv, Id rid, Queue *q, Map *seen)
 {

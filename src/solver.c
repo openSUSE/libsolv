@@ -4870,6 +4870,54 @@ pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int flags)
     }
 }
 
+int
+solver_alternatives_count(Solver *solv)
+{
+  Id *elements = solv->branches.elements;
+  int res, count;
+  for (res = 0, count = solv->branches.count; count; res++)
+    count -= elements[count - 2];
+  return res;
+}
+
+int
+solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *chosenp, Queue *choices, int *levelp)
+{
+  int cnt = solver_alternatives_count(solv);
+  int count = solv->branches.count;
+  Id *elements = solv->branches.elements;
+  if (choices)
+    queue_empty(choices);
+  if (alternative <= 0 || alternative > cnt)
+    return 0;
+  elements += count;
+  for (; cnt > alternative; cnt--)
+    elements -= elements[-2];
+  if (levelp)
+    *levelp = elements[-1];
+  if (fromp)
+    *fromp = elements[-4];
+  if (idp)
+    *idp = elements[-3];
+  if (chosenp)
+    {
+      int i;
+      *chosenp = 0;
+      for (i = elements[-2]; i > 4; i--)
+	{
+	  Id p = -elements[-i];
+	  if (p > 0 && solv->decisionmap[p] == elements[-1] + 1)
+	    {
+	      *chosenp = p;
+	      break;
+	    }
+	}
+    }
+  if (choices)
+    queue_insertn(choices, 0, elements[-2] - 4, elements - elements[-2]);
+  return elements[-4] ? SOLVER_ALTERNATIVE_TYPE_RECOMMENDS : SOLVER_ALTERNATIVE_TYPE_RULE;
+}
+
 const char *
 solver_select2str(Pool *pool, Id select, Id what)
 {

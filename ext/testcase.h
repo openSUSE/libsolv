@@ -14,6 +14,7 @@
 #define TESTCASE_RESULT_ORPHANED	(1 << 2)
 #define TESTCASE_RESULT_RECOMMENDED	(1 << 3)
 #define TESTCASE_RESULT_UNNEEDED	(1 << 4)
+#define TESTCASE_RESULT_ALTERNATIVES	(1 << 5)
 
 extern Id testcase_str2dep(Pool *pool, const char *s);
 extern const char *testcase_dep2str(Pool *pool, Id id);
