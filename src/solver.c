@@ -1373,6 +1373,7 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
 {
   Pool *pool = solv->pool;
   int i, j, haveone = 0, dqcount = dq->count;
+  int decisionqcount = solv->decisionq.count;
   Id p;
   Solvable *s;
 
@@ -1384,25 +1385,34 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
 	continue;
       if (solv->decisionmap[p] == 0)
 	{
+	  if (s->recommends || s->suggests)
+	    queue_push(&solv->decisionq, p);
 	  solv->decisionmap[p] = level + 1;
 	  haveone = 1;
 	}
     }
   if (!haveone)
     return;
+  policy_update_recommendsmap(solv);
   for (i = 0; i < dqcount; i++)
-    if (!solver_is_enhancing(solv, pool->solvables + dq->elements[i]))
-      {
-	queue_push(dq, dq->elements[i]);
-	dq->elements[i] = 0;
-      }
+    {
+      p = dq->elements[i];
+      if (!(pool->solvables[p].repo == solv->installed || MAPTST(&solv->suggestsmap, p) || solver_is_enhancing(solv, pool->solvables + p)))
+        {
+	  queue_push(dq, p);
+	  dq->elements[i] = 0;
+        }
+    }
   dqcount = dq->count;
   for (i = 0; i < dqcount; i++)
-    if (dq->elements[i] && !solver_is_supplementing(solv, pool->solvables + dq->elements[i]))
-      {
-	queue_push(dq, dq->elements[i]);
-	dq->elements[i] = 0;
-      }
+    {
+      p = dq->elements[i];
+      if (p && !(pool->solvables[p].repo == solv->installed || MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
+        {
+	  queue_push(dq, p);
+	  dq->elements[i] = 0;
+        }
+    }
   for (i = j = 0; i < dq->count; i++)
     if (dq->elements[i])
       dq->elements[j++] = dq->elements[i];
@@ -1410,6 +1420,11 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
   FOR_REPO_SOLVABLES(solv->installed, p, s)
     if (solv->decisionmap[p] == level + 1)
       solv->decisionmap[p] = 0;
+  if (solv->decisionq.count != decisionqcount)
+    {
+      solv->recommends_index = -1;
+      queue_truncate(&solv->decisionq, decisionqcount);
+    }
 }
 
 /*-------------------------------------------------------------------
