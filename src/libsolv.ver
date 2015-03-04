@@ -314,6 +314,7 @@ SOLV_1.0 {
 		solvable_trivial_installable_repo;
 		solvable_unset;
 		solver_allruleinfos;
+		solver_alternative2str;
 		solver_alternatives_count;
 		solver_calc_duchanges;
 		solver_calc_installsizechange;

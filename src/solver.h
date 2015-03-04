@@ -340,6 +340,8 @@ extern int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
 
 extern const char *solver_select2str(Pool *pool, Id select, Id what);
 extern const char *pool_job2str(Pool *pool, Id how, Id what, Id flagmask);
+extern const char *solver_alternative2str(Solver *solv, int type, Id id, Id from);
+
 
 /* iterate over all literals of a rule */
 #define FOR_RULELITERALS(l, pp, r)				\

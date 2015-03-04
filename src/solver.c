@@ -5072,3 +5072,37 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
   return pool_tmpappend(pool, s, "]", 0);
 }
 
+const char *
+solver_alternative2str(Solver *solv, int type, Id id, Id from)
+{
+  Pool *pool = solv->pool;
+  if (type == SOLVER_ALTERNATIVE_TYPE_RECOMMENDS)
+    {
+      const char *s = pool_dep2str(pool, id);
+      return pool_tmpappend(pool, s, ", recommended by ", pool_solvid2str(pool, from));
+    }
+  if (type == SOLVER_ALTERNATIVE_TYPE_RULE)
+    {
+      int rtype;
+      Id depfrom, depto, dep;
+      char buf[64];
+      if (solver_ruleclass(solv, id) == SOLVER_RULE_CHOICE)
+	id = solver_rule2pkgrule(solv, id);
+      rtype = solver_ruleinfo(solv, id, &depfrom, &depto, &dep);
+      if ((rtype & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_JOB)
+	{
+	  if ((depto & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_PROVIDES)
+	    return pool_dep2str(pool, dep);
+	  return solver_select2str(pool, depto & SOLVER_SELECTMASK, dep);
+	}
+      if (rtype == SOLVER_RULE_PKG_REQUIRES)
+	{
+	  const char *s = pool_dep2str(pool, dep);
+	  return pool_tmpappend(pool, s, ", required by ", pool_solvid2str(pool, depfrom));
+	}
+      sprintf(buf, "Rule #%d", id);
+      return pool_tmpjoin(pool, buf, 0, 0);
+    }
+  return "unknown alternative type";
+}
+
