@@ -593,6 +593,17 @@ typedef struct {
 } Ruleinfo;
 
 typedef struct {
+  Solver *solv;
+  Id type;
+  Id rid;
+  Id from_id;
+  Id dep_id;
+  Id chosen_id;
+  Queue choices;
+  int level;
+} Alternative;
+
+typedef struct {
   Transaction *transaction;
   int mode;
   Id type;
@@ -784,6 +795,17 @@ typedef struct {
   Id const id;
   Id const type;
 } Solutionelement;
+
+%nodefaultctor Alternative;
+typedef struct {
+  Solver *const solv;
+  Id const type;
+  Id const rid;
+  Id const from_id;
+  Id const dep_id;
+  Id const chosen_id;
+  int level;
+} Alternative;
 
 %nodefaultctor Transaction;
 %nodefaultdtor Transaction;
@@ -2858,6 +2880,40 @@ rb_eval_string(
     *OUTPUT = new_XRule($self, ruleid);
     return reason;
   }
+
+  int alternatives_count() {
+    return solver_alternatives_count($self);
+  }
+
+  %newobject alternative;
+  Alternative *alternative(Id aid) {
+    Alternative *a = solv_calloc(1, sizeof(*a));
+    a->solv = $self;
+    queue_init(&a->choices);
+    a->type = solver_get_alternative($self, aid, &a->dep_id, &a->from_id, &a->chosen_id, &a->choices, &a->level);
+    if (!a->type) {
+      queue_free(&a->choices);
+      solv_free(a);
+      return 0;
+    }
+    if (a->type == SOLVER_ALTERNATIVE_TYPE_RULE) {
+      a->rid = a->dep_id;
+      a->dep_id = 0;
+    }
+    return a;
+  }
+
+  %typemap(out) Queue all_alternatives Queue2Array(Alternative *, 1, Solver_alternative(arg1, id));
+  %newobject all_alternatives;
+  Queue all_alternatives() {
+    Queue q;
+    int i, cnt;
+    queue_init(&q);
+    cnt = solver_alternatives_count($self);
+    for (i = 1; i <= cnt; i++)
+      queue_push(&q, i);
+    return q;
+  }
 }
 
 %extend Transaction {
@@ -3202,3 +3258,60 @@ rb_eval_string(
 #endif
 }
 #endif
+
+%extend Alternative {
+  static const int SOLVER_ALTERNATIVE_TYPE_RULE = SOLVER_ALTERNATIVE_TYPE_RULE;
+  static const int SOLVER_ALTERNATIVE_TYPE_RECOMMENDS = SOLVER_ALTERNATIVE_TYPE_RECOMMENDS;
+  static const int SOLVER_ALTERNATIVE_TYPE_SUGGESTS = SOLVER_ALTERNATIVE_TYPE_SUGGESTS;
+
+  ~Alternative() {
+    queue_free(&$self->choices);
+    solv_free($self);
+  }
+  %newobject chosen;
+  XSolvable * const chosen;
+  %newobject rule;
+  XRule * const rule;
+  %newobject depsolvable;
+  XSolvable * const depsolvable;
+  %newobject dep;
+  Dep * const dep;
+  %{
+    SWIGINTERN XSolvable *Alternative_chosen_get(Alternative *a) {
+      return new_XSolvable(a->solv->pool, a->chosen_id);
+    }
+    SWIGINTERN XRule *Alternative_rule_get(Alternative *a) {
+      return new_XRule(a->solv, a->rid);
+    }
+    SWIGINTERN XSolvable *Alternative_depsolvable_get(Alternative *a) {
+      return new_XSolvable(a->solv->pool, a->from_id);
+    }
+    SWIGINTERN Dep *Alternative_dep_get(Alternative *a) {
+      return new_Dep(a->solv->pool, a->dep_id);
+    }
+  %}
+
+  Queue choices_raw() {
+    Queue r;
+    queue_init_clone(&r, &$self->choices);
+    return r;
+  }
+
+  %typemap(out) Queue choices Queue2Array(XSolvable *, 1, new_XSolvable(arg1->solv->pool, id));
+  Queue choices() {
+    int i;
+    Queue r;
+    queue_init_clone(&r, &$self->choices);
+    for (i = 0; i < r.count; i++)
+      if (r.elements[i] < 0)
+        r.elements[i] = -r.elements[i];
+    return r;
+  }
+
+#if defined(SWIGPERL)
+  %rename("str") __str__;
+#endif
+  const char *__str__() {
+    return solver_alternative2str($self->solv, $self->type, $self->type == SOLVER_ALTERNATIVE_TYPE_RULE ? $self->rid : $self->dep_id, $self->from_id);
+  }
+}
