@@ -65,7 +65,7 @@ dep_possible(Solver *solv, Id dep, Map *m)
 	      return dep_possible(solv, rd->evr, m);
 	    }
 	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-	    return solver_splitprovides(solv, rd->evr);
+	    return solver_splitprovides(solv, rd->evr, m);
 	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
 	    return solver_dep_installed(solv, rd->evr);
 	}
@@ -3571,7 +3571,11 @@ check_xsupp(Solver *solv, Queue *depq, Id dep)
 	      return check_xsupp(solv, depq, rd->evr);
 	    }
 	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+#if 0
 	    return solver_splitprovides(solv, rd->evr);
+#else
+	    return 0;
+#endif
 	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
 	    return solver_dep_installed(solv, rd->evr);
 	}

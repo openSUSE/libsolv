@@ -44,16 +44,34 @@
  * and is only true if pkg is installed and contains the specified path.
  * we also make sure that pkg is selected for an update, otherwise the
  * update would always be forced onto the user.
+ * Map m is the map used when called from dep_possible.
  */
+
+static int
+solver_is_updating(Solver *solv, Id p)
+{
+  /* check if the update rule is true */
+  Pool *pool = solv->pool;
+  Rule *r;
+  Id l, pp;
+  if (solv->decisionmap[p] >= 0)
+    return 0;	/* old package stayed */
+  r = solv->rules + solv->updaterules + (p - solv->installed->start);
+  FOR_RULELITERALS(l, pp, r)
+    if (l > 0 && l != p && solv->decisionmap[l] > 0)
+      return 1;
+  return 0;
+}
+
 int
-solver_splitprovides(Solver *solv, Id dep)
+solver_splitprovides(Solver *solv, Id dep, Map *m)
 {
   Pool *pool = solv->pool;
   Id p, pp;
   Reldep *rd;
   Solvable *s;
 
-  if (!solv->dosplitprovides || !solv->installed || (!solv->updatemap_all && !solv->updatemap.size))
+  if (!solv->dosplitprovides || !solv->installed)
     return 0;
   if (!ISRELDEP(dep))
     return 0;
@@ -76,8 +94,10 @@ solver_splitprovides(Solver *solv, Id dep)
       /* here we have packages that provide the correct name and contain the path,
        * now do extra filtering */
       s = pool->solvables + p;
-      if (s->repo == solv->installed && s->name == rd->name &&
-          (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p - solv->installed->start))))
+      if (s->repo != solv->installed || s->name != rd->name)
+	continue;
+      /* check if the package is updated. if m is set, we're called from dep_possible */
+      if (m || solver_is_updating(solv, p))
 	return 1;
     }
   return 0;
@@ -147,7 +167,7 @@ solver_check_installsuppdepq_dep(Solver *solv, Id dep)
           return r1 == 2 || r2 == 2 ? 2 : 1;
 	}
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-        return solver_splitprovides(solv, rd->evr);
+        return solver_splitprovides(solv, rd->evr, 0);
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
         return solver_dep_installed(solv, rd->evr);
       if (rd->flags == REL_NAMESPACE && (q = solv->installsuppdepq) != 0)
@@ -2566,7 +2586,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
           /* filter out all already supplemented packages if requested */
           if (!solv->addalreadyrecommended && dqs.count)
 	    {
-	      int dosplitprovides_old = solv->dosplitprovides;
 	      /* turn off all new packages */
 	      for (i = 0; i < solv->decisionq.count; i++)
 		{
@@ -2577,7 +2596,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (s->repo && s->repo != solv->installed)
 		    solv->decisionmap[p] = -solv->decisionmap[p];
 		}
-	      solv->dosplitprovides = 0;
 	      /* filter out old supplements */
 	      for (i = j = 0; i < dqs.count; i++)
 		{
@@ -2601,7 +2619,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (s->repo && s->repo != solv->installed)
 		    solv->decisionmap[p] = -solv->decisionmap[p];
 		}
-	      solv->dosplitprovides = dosplitprovides_old;
 	    }
 
 	  /* multiversion doesn't mix well with supplements.
@@ -3635,13 +3652,7 @@ solver_solve(Solver *solv, Queue *job)
    */
   oldnrules = solv->nrules;
   if (hasdupjob && !solv->updatemap_all && solv->dosplitprovides && solv->installed)
-    {
-      /* solver_splitprovides checks if the package is in the update map, but the update
-       * map is extended for dup jobs. So temporarily set updatemap_all */
-      solv->updatemap_all = 1;
-      solver_addpkgrulesforweak(solv, &addedmap);
-      solv->updatemap_all = 0;
-    }
+    solver_addpkgrulesforweak(solv, &addedmap);
   else
     solver_addpkgrulesforweak(solv, &addedmap);
   POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules because of weak dependencies\n", solv->nrules - oldnrules);
