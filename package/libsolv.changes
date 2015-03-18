@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Mar 18 11:04:34 CET 2015 - mls@suse.de
+
+- fix bug in dislike_old_versions that could lead to a segfault
+  [bnc#922352]
+- bump version to 0.6.10
+
+-------------------------------------------------------------------
 Mon Mar  9 16:42:35 CET 2015 - mls@suse.de
 
 - rework splitprovides handling [bnc#921332]
