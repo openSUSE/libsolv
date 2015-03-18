@@ -1048,16 +1048,15 @@ sort_by_common_dep(Pool *pool, Queue *plist)
 static void
 dislike_old_versions(Pool *pool, Queue *plist)
 {
-  int i, count = plist->count;
-  Id *elements = plist->elements;
-  int bad = 0;
+  int i, count;
 
-  for (i = 0; i < count; i++)
+  for (i = 0, count = plist->count; i < count; i++)
     {
-      Id p = elements[i];
+      Id p = plist->elements[i];
       Solvable *s = pool->solvables + p;
       Repo *repo = s->repo;
       Id q, qq;
+      int bad = 0;
 
       if (!repo || repo == pool->installed)
 	continue;
@@ -1072,30 +1071,22 @@ dislike_old_versions(Pool *pool, Queue *plist)
 	    {
 	      if (repo->priority > qs->repo->priority)
 		continue;
-	      elements[i] = -p;
 	      bad = 1;
 	      break;
 	    }
 	  if (pool_evrcmp(pool, qs->evr, s->evr, EVRCMP_COMPARE) > 0)
 	    {
-	      elements[i] = -p;
 	      bad = 1;
 	      break;
 	    }
 	}
-    }
-  if (!bad)
-    return;
-  /* now move negative elements to the back */
-  for (i = 0; i < count; i++)
-    {
-      Id p = elements[i];
-      if (p >= 0)
+      if (!bad)
 	continue;
+      /* bring to back */
       if (i < plist->count - 1)
 	{
-	  memmove(elements + i, elements + i + 1, (plist->count - 1 - i) * sizeof(Id));
-	  elements[plist->count - 1] = -p;
+	  memmove(plist->elements + i, plist->elements + i + 1, (plist->count - 1 - i) * sizeof(Id));
+	  plist->elements[plist->count - 1] = p;
 	}
       i--;
       count--;
