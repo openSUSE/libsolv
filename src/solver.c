@@ -136,32 +136,32 @@ solver_dep_installed(Solver *solv, Id dep)
   return 0;
 }
 
-/* mirrors solver_dep_installed, but returns 2 if a
- * dependency listed in solv->installsuppdepq was involved */
+/* mirrors solver_dep_fulfilled, but returns 2 if a new package
+ * was involved */
 static int
-solver_check_installsuppdepq_dep(Solver *solv, Id dep)
+solver_dep_fulfilled_alreadyinstalled(Solver *solv, Id dep)
 {
   Pool *pool = solv->pool;
   Id p, pp;
-  Queue *q;
+  int r;
 
   if (ISRELDEP(dep))
     {
       Reldep *rd = GETRELDEP(pool, dep);
       if (rd->flags == REL_AND)
         {
-	  int r2, r1 = solver_check_installsuppdepq_dep(solv, rd->name);
+	  int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
           if (!r1)
             return 0;
-	  r2 = solver_check_installsuppdepq_dep(solv, rd->evr);
+	  r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
 	  if (!r2)
 	    return 0;
           return r1 == 2 || r2 == 2 ? 2 : 1;
         }
       if (rd->flags == REL_OR)
 	{
-	  int r2, r1 = solver_check_installsuppdepq_dep(solv, rd->name);
-	  r2 = solver_check_installsuppdepq_dep(solv, rd->evr);
+	  int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+	  r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
 	  if (!r1 && !r2)
 	    return 0;
           return r1 == 2 || r2 == 2 ? 2 : 1;
@@ -170,27 +170,34 @@ solver_check_installsuppdepq_dep(Solver *solv, Id dep)
         return solver_splitprovides(solv, rd->evr, 0);
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
         return solver_dep_installed(solv, rd->evr);
-      if (rd->flags == REL_NAMESPACE && (q = solv->installsuppdepq) != 0)
+      if (rd->flags == REL_NAMESPACE && solv->installsuppdepq)
 	{
+	  Queue *q = solv->installsuppdepq;
 	  int i;
 	  for (i = 0; i < q->count; i++)
 	    if (q->elements[i] == dep || q->elements[i] == rd->name)
 	      return 2;
 	}
     }
+  r = 0;
   FOR_PROVIDES(p, pp, dep)
     if (solv->decisionmap[p] > 0)
-      return 1;
-  return 0;
+      {
+	Solvable *s = pool->solvables + p;
+	if (s->repo && s->repo != solv->installed)
+	  return 2;
+        r = 1;
+      }
+  return r;
 }
 
 static int
-solver_check_installsuppdepq(Solver *solv, Solvable *s)
+solver_is_supplementing_alreadyinstalled(Solver *solv, Solvable *s)
 {
   Id sup, *supp;
   supp = s->repo->idarraydata + s->supplements;
   while ((sup = *supp++) != 0)
-    if (solver_check_installsuppdepq_dep(solv, sup) == 2)
+    if (solver_dep_fulfilled_alreadyinstalled(solv, sup) == 2)
       return 1;
   return 0;
 }
@@ -2586,39 +2593,15 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
           /* filter out all already supplemented packages if requested */
           if (!solv->addalreadyrecommended && dqs.count)
 	    {
-	      /* turn off all new packages */
-	      for (i = 0; i < solv->decisionq.count; i++)
-		{
-		  p = solv->decisionq.elements[i];
-		  if (p < 0)
-		    continue;
-		  s = pool->solvables + p;
-		  if (s->repo && s->repo != solv->installed)
-		    solv->decisionmap[p] = -solv->decisionmap[p];
-		}
 	      /* filter out old supplements */
 	      for (i = j = 0; i < dqs.count; i++)
 		{
 		  p = dqs.elements[i];
 		  s = pool->solvables + p;
-		  if (!s->supplements)
-		    continue;
-		  if (!solver_is_supplementing(solv, s))
-		    dqs.elements[j++] = p;
-		  else if (solv->installsuppdepq && solver_check_installsuppdepq(solv, s))
+		  if (s->supplements && solver_is_supplementing_alreadyinstalled(solv, s))
 		    dqs.elements[j++] = p;
 		}
 	      dqs.count = j;
-	      /* undo turning off */
-	      for (i = 0; i < solv->decisionq.count; i++)
-		{
-		  p = solv->decisionq.elements[i];
-		  if (p < 0)
-		    continue;
-		  s = pool->solvables + p;
-		  if (s->repo && s->repo != solv->installed)
-		    solv->decisionmap[p] = -solv->decisionmap[p];
-		}
 	    }
 
 	  /* multiversion doesn't mix well with supplements.

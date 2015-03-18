@@ -3783,7 +3783,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   /* have special namespace cleandeps erases */
   if (iq.count)
     {
-      for (ip = solv->installed->start; ip < solv->installed->end; ip++)
+      for (ip = installed->start; ip < installed->end; ip++)
 	{
 	  s = pool->solvables + ip;
 	  if (s->repo != installed)
@@ -3792,7 +3792,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	    continue;
 	  supp = s->repo->idarraydata + s->supplements;
 	  while ((sup = *supp++) != 0)
-	    if (check_xsupp(solv, &iq, sup) && !check_xsupp(solv, 0, sup))
+	    if (ISRELDEP(sup) && check_xsupp(solv, &iq, sup) && !check_xsupp(solv, 0, sup))
 	      {
 #ifdef CLEANDEPSDEBUG
 		printf("xsupp %s from %s\n", pool_dep2str(pool, sup), pool_solvid2str(pool, ip));
