@@ -400,9 +400,6 @@ custom namespaces work you have to implement a namespace callback function.
 The dependency markers partition the dependency array in two parts with
 different semantics.
 
-*NAMESPACE_INSTALLED "namespace:installed"*::
-  The dependency only selects installed packages.
-
 *NAMESPACE_MODALIAS "namespace:modalias"*::
   The dependency is a special modalias dependency that matches installed
   hardware.
