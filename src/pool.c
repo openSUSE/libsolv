@@ -1338,7 +1338,7 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
 	    dep = rd->name;
 	  else if (rd->flags == REL_NAMESPACE)
 	    {
-	      if (rd->name == NAMESPACE_INSTALLED || rd->name == NAMESPACE_SPLITPROVIDES)
+	      if (rd->name == NAMESPACE_SPLITPROVIDES)
 		{
 		  csf = isf;
 		  if (!csf || MAPTST(&csf->seen, sid))

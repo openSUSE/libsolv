@@ -104,38 +104,6 @@ solver_splitprovides(Solver *solv, Id dep, Map *m)
 }
 
 
-/*-------------------------------------------------------------------
- * solver_dep_installed
- */
-
-int
-solver_dep_installed(Solver *solv, Id dep)
-{
-#if 0
-  Pool *pool = solv->pool;
-  Id p, pp;
-
-  if (ISRELDEP(dep))
-    {
-      Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags == REL_AND)
-	{
-	  if (!solver_dep_installed(solv, rd->name))
-	    return 0;
-	  return solver_dep_installed(solv, rd->evr);
-	}
-      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-	return solver_dep_installed(solv, rd->evr);
-    }
-  FOR_PROVIDES(p, pp, dep)
-    {
-      if (p == SYSTEMSOLVABLE || (solv->installed && pool->solvables[p].repo == solv->installed))
-	return 1;
-    }
-#endif
-  return 0;
-}
-
 /* mirrors solver_dep_fulfilled, but returns 2 if a new package
  * was involved */
 static int
@@ -168,8 +136,6 @@ solver_dep_fulfilled_alreadyinstalled(Solver *solv, Id dep)
 	}
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
         return solver_splitprovides(solv, rd->evr, 0);
-      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-        return solver_dep_installed(solv, rd->evr);
       if (rd->flags == REL_NAMESPACE && solv->installsuppdepq)
 	{
 	  Queue *q = solv->installsuppdepq;

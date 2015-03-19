@@ -16,7 +16,6 @@
 extern void solver_run_sat(Solver *solv, int disablerules, int doweak);
 extern void solver_reset(Solver *solv);
 
-extern int solver_dep_installed(Solver *solv, Id dep);
 extern int solver_splitprovides(Solver *solv, Id dep, Map *m);
 
 static inline int
@@ -42,8 +41,6 @@ solver_dep_fulfilled(Solver *solv, Id dep)
 	}
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
         return solver_splitprovides(solv, rd->evr, 0);
-      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-        return solver_dep_installed(solv, rd->evr);
     }
   FOR_PROVIDES(p, pp, dep)
     {

@@ -66,8 +66,6 @@ dep_possible(Solver *solv, Id dep, Map *m)
 	    }
 	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
 	    return solver_splitprovides(solv, rd->evr, m);
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-	    return solver_dep_installed(solv, rd->evr);
 	}
     }
   FOR_PROVIDES(p, pp, dep)
@@ -3538,8 +3536,6 @@ dep_pkgcheck(Solver *solv, Id dep, Map *m, Queue *q)
 	    }
 	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
 	    return;
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-	    return;
 	}
     }
   FOR_PROVIDES(p, pp, dep)
@@ -3576,8 +3572,6 @@ check_xsupp(Solver *solv, Queue *depq, Id dep)
 #else
 	    return 0;
 #endif
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-	    return solver_dep_installed(solv, rd->evr);
 	}
       if (depq && rd->flags == REL_NAMESPACE)
 	{
