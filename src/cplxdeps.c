@@ -68,6 +68,33 @@ expand_simpledeps(Pool *pool, Queue *bq, int start, int split)
   return newsplit;
 }
 
+#ifdef CPLXDEBUG
+static void
+print_depblocks(Pool *pool, Queue *bq, int start)
+{
+  int i;
+
+  for (i = start; i < bq->count; i++)
+    {
+      if (bq->elements[i] == pool->nsolvables)
+	{
+	  Id *dp = pool->whatprovidesdata + bq->elements[++i];
+	  printf(" (");
+	  while (*dp)
+	    printf(" %s", pool_solvid2str(pool, *dp++));
+	  printf(" )");
+	}
+      else if (bq->elements[i] > 0)
+	printf(" %s", pool_solvid2str(pool, bq->elements[i]));
+      else if (bq->elements[i] < 0)
+	printf(" -%s", pool_solvid2str(pool, -bq->elements[i]));
+      else
+	printf(" ||");
+    }
+  printf("\n");
+}
+#endif
+
 /* invert all literals in the blocks. note that this also turns DNF into CNF and vice versa */
 static void
 invert_depblocks(Pool *pool, Queue *bq, int start)
@@ -82,7 +109,7 @@ invert_depblocks(Pool *pool, Queue *bq, int start)
           bq->elements[i] = -bq->elements[i];
 	  continue;
 	}
-      /* end of block reached, reorder */
+      /* end of block reached, reverse */
       if (i - 1 > j)
 	{
 	  int k;
@@ -151,7 +178,7 @@ normalize_dep(Pool *pool, Id dep, Queue *bq, int todnf)
 
 	  /* get blocks of second argument */
 	  bqcnt2 = bq->count;
-	  /* COND is OR with NEG on evr block, so we invert the todnf flag in that case*/
+	  /* COND is OR with NEG on evr block, so we invert the todnf flag in that case */
 	  r = normalize_dep(pool, rd->evr, bq, flags == REL_COND ? todnf ^ 1 : todnf);
 	  if (r == 0)
 	    {
@@ -284,27 +311,7 @@ pool_normalize_complex_dep(Pool *pool, Id dep, Queue *bq, int flags)
   else if (i == 1)
     printf("ALL\n");
   else
-    {
-      for (i = bqcnt; i < bq->count; i++)
-	{
-	  if (bq->elements[i] == pool->nsolvables)
-	    {
-	      Id *dp = pool->whatprovidesdata + bq->elements[++i];
-	      printf(" (");
-	      while (*dp)
-	        printf(" %s", pool_solvid2str(pool, *dp++));
-	      printf(" )");
-	    }
-	  else if (bq->elements[i] > 0)
-	    printf(" %s", pool_solvid2str(pool, bq->elements[i]));
-	  else if (bq->elements[i] < 0)
-	    printf(" -%s", pool_solvid2str(pool, -bq->elements[i]));
-	  else
-	    printf(" ||");
-	}
-      printf("\n");
-      i = -1;
-    }
+    print_depblocks(pool, bq, bqcnt);
 #endif
   return i;
 }

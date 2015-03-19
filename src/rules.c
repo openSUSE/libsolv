@@ -528,6 +528,17 @@ add_package_link(Solver *solv, Solvable *s, Map *m, Queue *workq)
 
 #ifdef ENABLE_COMPLEX_DEPS
 
+static inline Id
+pool_idstowhatprovides(Pool *pool, int count, Id *elements)
+{
+  /* hack: create fake queue 'q' so that we can call pool_queuetowhatprovides */
+  Queue q;
+  memset(&q, 0, sizeof(q));
+  q.count = count;
+  q.elements = elements;
+  return pool_queuetowhatprovides(pool, &q);
+}
+
 static void
 add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *workq, Map *m)
 {
@@ -667,12 +678,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	      break;
 	  if (j == qcnt)
 	    {
-	      /* hack: create fake queue 'q' so that we can call pool_queuetowhatprovides */
-	      Queue q;
-	      memset(&q, 0, sizeof(q));
-	      q.count = qcnt - 1;
-	      q.elements = qele + 1;
-	      addpkgrule(solv, qele[0], pool_queuetowhatprovides(pool, &q), type, dep);
+	      addpkgrule(solv, qele[0], pool_idstowhatprovides(pool, qcnt - 1, qele + 1), type, dep);
 	      if (m)
 		for (j = 0; j < qcnt; j++)
 		  if (qele[j] > 0 && !MAPTST(m, qele[j]))
