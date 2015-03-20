@@ -220,6 +220,11 @@ solver_prune_to_highest_prio_per_name(Solver *solv, Queue *plist)
 
 #ifdef ENABLE_COMPLEX_DEPS
 
+/* simple fixed-size hash for package ids */
+#define CPLXDEPHASH_EMPTY(elements) (memset(elements, 0, sizeof(Id) * 256))
+#define CPLXDEPHASH_SET(elements, p) (elements[(p) & 255] |= (1 << ((p) >> 8 & 31)))
+#define CPLXDEPHASH_TST(elements, p) (elements[(p) & 255] && (elements[(p) & 255] & (1 << ((p) >> 8 & 31))))
+
 static void
 check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
 {
@@ -241,20 +246,17 @@ check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
   qcnt = q.count;
   for (i = 0; i < qcnt; i++)
     {
-      for (; (p = q.elements[i]) != 0; i++)
+      /* we rely on the fact that blocks are ordered here.
+       * if we reach a positive element, we know that we
+       * saw all negative ones */
+      for (; (p = q.elements[i]) < 0; i++)
 	{
-	  if (p < 0)
-	    {
-	      if (solv->decisionmap[-p] > 0)
-		continue;
-	      if (solv->decisionmap[-p] < 0)
-		break;
-	      queue_push(&q, -p);
-	    }
-	  if (p > 0 && qcnt == q.count)
-	    MAPSET(m, p);
+	  if (solv->decisionmap[-p] < 0)
+	    break;
+	  if (solv->decisionmap[-p] == 0)
+	    queue_push(&q, -p);		/* undecided negative literal */
 	}
-      if (q.elements[i])
+      if (p < 0)
 	{
 #if 0
 	  printf("complex dep block cannot be true\n");
@@ -263,33 +265,45 @@ check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
 	    i++;
 	  if (qcnt != q.count)
 	    queue_truncate(&q, qcnt);
+	  continue;
 	}
-      else if (qcnt != q.count)
+      if (qcnt == q.count)
 	{
+	  /* no undecided negative literal, add positive literals to map */
+	  for (; (p = q.elements[i]) != 0; i++)
+	    MAPSET(m, p);
+	}
+      else
+	{
+	  /* at least one undecided literal, postpone */
 	  int j, k;
-	  Queue *cq = *cqp;
+	  Queue *cq;
 #if 0
 	  printf("add new complex dep block\n");
 	  for (j = qcnt; j < q.count; j++)
 	    printf("  - %s\n", pool_solvid2str(pool, q.elements[j]));
 #endif
-	  if (!cq)
+	  while (q.elements[i])
+	    i++;
+	  if (!(cq = *cqp))
 	    {
 	      cq = solv_calloc(1, sizeof(Queue));
 	      queue_init(cq);
+	      queue_insertn(cq, 0, 256, 0);	/* allocate hash area */
 	      *cqp = cq;
-	      queue_insertn(cq, 0, 256, 0);
 	    }
 	  for (j = qcnt; j < q.count; j++)
 	    {
+	      /* check if we already have this (dep, p) entry */
 	      p = q.elements[j];
 	      for (k = 256; k < cq->count; k += 2)
 		if (cq->elements[k + 1] == dep && cq->elements[k] == p)
 		  break;
 	      if (k == cq->count)
 		{
+		  /* a new one. add to cq and hash */
 	          queue_push2(cq, p, dep);
-		  cq->elements[p & 255] |= (1 << (p >> 8 & 31));
+		  CPLXDEPHASH_SET(cq->elements, p);
 		}
 	    }
 	  queue_truncate(&q, qcnt);
@@ -299,13 +313,14 @@ check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
 }
 
 static void
-recheck_complex_dep(Solver *solv, Id p, Map *m, Queue **cqp)
+recheck_complex_deps(Solver *solv, Id p, Map *m, Queue **cqp)
 {
   Queue *cq = *cqp;
   int i;
 #if 0
-  printf("recheck_complex_dep for package %s\n", pool_solvid2str(solv->pool, p));
+  printf("recheck_complex_deps for package %s\n", pool_solvid2str(solv->pool, p));
 #endif
+  /* make sure that we don't have a false hit */
   for (i = 256; i < cq->count; i += 2)
     if (cq->elements[i] == p)
       break;
@@ -313,7 +328,9 @@ recheck_complex_dep(Solver *solv, Id p, Map *m, Queue **cqp)
     return;	/* false alert */
   if (solv->decisionmap[p] <= 0)
     return;	/* just in case... */
-  memset(cq->elements, 0, sizeof(Id) * 256);
+
+  /* rebuild the hash, call check_complex_dep for our package */
+  CPLXDEPHASH_EMPTY(cq->elements);
   for (i = 256; i < cq->count; i += 2)
     if (cq->elements[i] == p)
       {
@@ -325,7 +342,7 @@ recheck_complex_dep(Solver *solv, Id p, Map *m, Queue **cqp)
     else
       {
 	Id pp = cq->elements[i];
-        cq->elements[pp & 255] |= (1 << (pp >> 8 & 31));
+        CPLXDEPHASH_SET(cq->elements, pp);
       }
 }
 
@@ -364,12 +381,11 @@ policy_update_recommendsmap(Solver *solv)
 	continue;
       s = pool->solvables + p;
 #ifdef ENABLE_COMPLEX_DEPS
-      if (solv->recommendscplxq && solv->recommendscplxq->elements[p & 255])
-	if (solv->recommendscplxq->elements[p & 255] & (1 << (p >> 8 & 31)))
-	  recheck_complex_dep(solv, p, &solv->recommendsmap, &solv->recommendscplxq);
-      if (solv->suggestscplxq && solv->suggestscplxq->elements[p & 255])
-	if (solv->suggestscplxq->elements[p & 255] & (1 << (p >> 8 & 31)))
-	  recheck_complex_dep(solv, p, &solv->suggestsmap, &solv->suggestscplxq);
+      /* re-check postponed complex blocks */
+      if (solv->recommendscplxq && CPLXDEPHASH_TST(solv->recommendscplxq->elements, p))
+        recheck_complex_deps(solv, p, &solv->recommendsmap, &solv->recommendscplxq);
+      if (solv->suggestscplxq && CPLXDEPHASH_TST(solv->suggestscplxq->elements, p))
+        recheck_complex_deps(solv, p, &solv->suggestsmap, &solv->suggestscplxq);
 #endif
       if (s->recommends)
 	{
