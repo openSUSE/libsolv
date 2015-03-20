@@ -158,6 +158,15 @@ static struct selflags2str {
   { 0, 0 }
 };
 
+static const char *features[] = {
+#ifdef ENABLE_LINKED_PACKAGES
+  "linked_packages",
+#endif
+#ifdef ENABLE_COMPLEX_DEPS
+  "complex_deps",
+#endif
+  0
+};
 
 typedef struct strqueue {
   char **str;
@@ -2221,6 +2230,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
   int prepared = 0;
   int closefp = !fp;
   int poolflagsreset = 0;
+  int missing_features = 0;
 
   if (!fp && !(fp = fopen(testcase, "r")))
     {
@@ -2511,6 +2521,23 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	  else
 	    pool_debug(pool, SOLV_ERROR, "disable: unknown package '%s'\n", pieces[2]);
 	}
+      else if (!strcmp(pieces[0], "feature"))
+	{
+	  int i, j;
+	  for (i = 1; i < npieces; i++)
+	    {
+	      for (j = 0; features[j]; j++)
+		if (!strcmp(pieces[i], features[j]))
+		  break;
+	      if (!features[j])
+		{
+		  pool_debug(pool, SOLV_ERROR, "testcase_read: missing feature '%s'\n", pieces[i]);
+		  missing_features++;
+		}
+	    }
+	  if (missing_features)
+	    break;
+	}
       else
 	{
 	  pool_debug(pool, SOLV_ERROR, "testcase_read: cannot parse command '%s'\n", pieces[0]);
@@ -2531,6 +2558,13 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
     }
   if (closefp)
     fclose(fp);
+  if (missing_features)
+    {
+      solver_free(solv);
+      solv = 0;
+      if (resultflagsp)
+	*resultflagsp = 77;	/* hack for testsolv */
+    }
   return solv;
 }
 

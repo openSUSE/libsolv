@@ -131,7 +131,7 @@ main(int argc, char **argv)
 	  if (!solv)
 	    {
 	      pool_free(pool);
-	      exit(1);
+	      exit(resultflags == 77 ? 77 : 1);
 	    }
 
 	  if (!multijob && !feof(fp))
