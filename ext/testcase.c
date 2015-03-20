@@ -78,6 +78,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_RECOMMENDED,	"recommended" },
   { TESTCASE_RESULT_UNNEEDED,		"unneeded" },
   { TESTCASE_RESULT_ALTERNATIVES,	"alternatives" },
+  { TESTCASE_RESULT_RULES,		"rules" },
   { 0, 0 }
 };
 
@@ -1882,6 +1883,72 @@ testcase_solverresult(Solver *solv, int resultflags)
 	}
       queue_free(&q);
       queue_free(&rq);
+    }
+  if ((resultflags & TESTCASE_RESULT_RULES) != 0)
+    {
+      /* dump all rules */
+      Id rid;
+      SolverRuleinfo rclass;
+      Queue q;
+      int i;
+
+      queue_init(&q);
+      for (rid = 1; (rclass = solver_ruleclass(solv, rid)) != SOLVER_RULE_UNKNOWN; rid++)
+	{
+	  char *prefix;
+	  switch (rclass)
+	    {
+	    case SOLVER_RULE_PKG:
+	      prefix = "pkg ";
+	      break;
+	    case SOLVER_RULE_UPDATE:
+	      prefix = "update ";
+	      break;
+	    case SOLVER_RULE_FEATURE:
+	      prefix = "feature ";
+	      break;
+	    case SOLVER_RULE_JOB:
+	      prefix = "job ";
+	      break;
+	    case SOLVER_RULE_DISTUPGRADE:
+	      prefix = "distupgrade ";
+	      break;
+	    case SOLVER_RULE_INFARCH:
+	      prefix = "infarch ";
+	      break;
+	    case SOLVER_RULE_CHOICE:
+	      prefix = "choice ";
+	      break;
+	    case SOLVER_RULE_LEARNT:
+	      prefix = "learnt ";
+	      break;
+	    case SOLVER_RULE_BEST:
+	      prefix = "best ";
+	      break;
+	    case SOLVER_RULE_YUMOBS:
+	      prefix = "yumobs ";
+	      break;
+	    default:
+	      prefix = "unknown ";
+	      break;
+	    }
+	  prefix = solv_dupjoin("rule ", prefix, testcase_ruleid(solv, rid));
+	  solver_ruleliterals(solv, rid, &q);
+	  if (rclass == SOLVER_RULE_FEATURE && q.count == 1 && q.elements[0] == -SYSTEMSOLVABLE)
+	    continue;
+	  for (i = 0; i < q.count; i++)
+	    {
+	      Id p = q.elements[i];
+	      const char *s;
+	      if (p < 0)
+		s = pool_tmpjoin(pool, prefix, " -", testcase_solvid2str(pool, -p));
+	      else
+		s = pool_tmpjoin(pool, prefix, "  ", testcase_solvid2str(pool, p));
+	      strqueue_push(&sq, s);
+	    }
+	  solv_free(prefix);
+	}
+      queue_free(&q);
     }
 
   strqueue_sort(&sq);

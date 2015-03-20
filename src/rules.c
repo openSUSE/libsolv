@@ -2710,7 +2710,7 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_YUMOBS;
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
-  if (rid >= solv->learntrules)
+  if (rid >= solv->learntrules && rid < solv->nrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
 }
