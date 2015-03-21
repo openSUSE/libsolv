@@ -256,10 +256,10 @@ check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
 	  if (solv->decisionmap[-p] == 0)
 	    queue_push(&q, -p);		/* undecided negative literal */
 	}
-      if (p < 0)
+      if (p <= 0)
 	{
 #if 0
-	  printf("complex dep block cannot be true\n");
+	  printf("complex dep block cannot be true or no pos literals\n");
 #endif
 	  while (q.elements[i])
 	    i++;
@@ -269,13 +269,13 @@ check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
 	}
       if (qcnt == q.count)
 	{
-	  /* no undecided negative literal, add positive literals to map */
+	  /* all negative literals installed, add positive literals to map */
 	  for (; (p = q.elements[i]) != 0; i++)
 	    MAPSET(m, p);
 	}
       else
 	{
-	  /* at least one undecided literal, postpone */
+	  /* at least one undecided negative literal, postpone */
 	  int j, k;
 	  Queue *cq;
 #if 0
@@ -294,8 +294,8 @@ check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
 	    }
 	  for (j = qcnt; j < q.count; j++)
 	    {
-	      /* check if we already have this (dep, p) entry */
 	      p = q.elements[j];
+	      /* check if we already have this (dep, p) entry */
 	      for (k = 256; k < cq->count; k += 2)
 		if (cq->elements[k + 1] == dep && cq->elements[k] == p)
 		  break;
@@ -316,6 +316,7 @@ static void
 recheck_complex_deps(Solver *solv, Id p, Map *m, Queue **cqp)
 {
   Queue *cq = *cqp;
+  Id pp;
   int i;
 #if 0
   printf("recheck_complex_deps for package %s\n", pool_solvid2str(solv->pool, p));
@@ -332,7 +333,7 @@ recheck_complex_deps(Solver *solv, Id p, Map *m, Queue **cqp)
   /* rebuild the hash, call check_complex_dep for our package */
   CPLXDEPHASH_EMPTY(cq->elements);
   for (i = 256; i < cq->count; i += 2)
-    if (cq->elements[i] == p)
+    if ((pp = cq->elements[i]) == p)
       {
 	Id dep = cq->elements[i + 1];
 	queue_deleten(cq, i, 2);
@@ -340,10 +341,7 @@ recheck_complex_deps(Solver *solv, Id p, Map *m, Queue **cqp)
         check_complex_dep(solv, dep, m, &cq);
       }
     else
-      {
-	Id pp = cq->elements[i];
-        CPLXDEPHASH_SET(cq->elements, pp);
-      }
+      CPLXDEPHASH_SET(cq->elements, pp);
 }
 
 #endif
