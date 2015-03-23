@@ -18,6 +18,9 @@ static struct resultflags2str {
   { TESTCASE_RESULT_ORPHANED,           "orphaned" },
   { TESTCASE_RESULT_RECOMMENDED,        "recommended" },
   { TESTCASE_RESULT_UNNEEDED,           "unneeded" },
+  { TESTCASE_RESULT_ALTERNATIVES,       "alternatives" },
+  { TESTCASE_RESULT_RULES,              "rules" },
+  { TESTCASE_RESULT_GENID,              "genid" },
   { 0, 0 }
 };
 

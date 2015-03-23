@@ -655,7 +655,9 @@ pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q, int flags)
 	  l = 0;
 	  if (name && autoinstalled > 0)
 	    {
-	      if ((flags & GET_USERINSTALLED_NAMES) != 0)
+	      if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+		queue_push2(q, name, arch);
+	      else if ((flags & GET_USERINSTALLED_NAMES) != 0)
 		queue_push(q, name);
 	      else
 		{

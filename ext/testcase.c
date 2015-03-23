@@ -79,6 +79,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_UNNEEDED,		"unneeded" },
   { TESTCASE_RESULT_ALTERNATIVES,	"alternatives" },
   { TESTCASE_RESULT_RULES,		"rules" },
+  { TESTCASE_RESULT_GENID,		"genid" },
   { 0, 0 }
 };
 
@@ -1678,6 +1679,33 @@ static struct class2str {
   { 0, 0 }
 };
 
+static int
+dump_genid(Pool *pool, Strqueue *sq, Id id, int cnt)
+{
+  struct oplist *op;
+  char cntbuf[20];
+  const char *s;
+
+  if (ISRELDEP(id))
+    {
+      Reldep *rd = GETRELDEP(pool, id);
+      for (op = oplist; op->flags; op++)
+	if (rd->flags == op->flags)
+	  break;
+      cnt = dump_genid(pool, sq, rd->name, cnt);
+      cnt = dump_genid(pool, sq, rd->evr, cnt);
+      sprintf(cntbuf, "genid %2d: genid ", cnt++);
+      s = pool_tmpjoin(pool, cntbuf, "op ", op->flags ? op->opname : "unknown");
+    }
+  else
+    {
+      sprintf(cntbuf, "genid %2d: genid ", cnt++);
+      s = pool_tmpjoin(pool, cntbuf, id ? "lit" : "null", id ? pool_id2str(pool, id) : 0);
+    }
+  strqueue_push(sq, s);
+  return cnt;
+}
+
 char *
 testcase_solverresult(Solver *solv, int resultflags)
 {
@@ -1950,7 +1978,24 @@ testcase_solverresult(Solver *solv, int resultflags)
 	}
       queue_free(&q);
     }
-
+  if ((resultflags & TESTCASE_RESULT_GENID) != 0)
+    {
+      for (i = 0 ; i < solv->job.count; i += 2)
+	{
+	  Id id, id2;
+	  if (solv->job.elements[i] != (SOLVER_NOOP | SOLVER_SOLVABLE_PROVIDES))
+	    continue;
+	  id = solv->job.elements[i + 1];
+	  s = testcase_dep2str(pool, id);
+	  strqueue_push(&sq, pool_tmpjoin(pool, "genid dep ", s, 0));
+	  if ((id2 = testcase_str2dep(pool, s)) != id)
+	    {
+	      s = pool_tmpjoin(pool, "genid roundtrip error: ", testcase_dep2str(pool, id2), 0);
+	      strqueue_push(&sq, s);
+	    }
+	  dump_genid(pool, &sq, id, 1);
+	}
+    }
   strqueue_sort(&sq);
   result = strqueue_join(&sq);
   strqueue_free(&sq);
@@ -2298,6 +2343,8 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
   int closefp = !fp;
   int poolflagsreset = 0;
   int missing_features = 0;
+  Id *genid = 0;
+  int ngenid = 0;
 
   if (!fp && !(fp = fopen(testcase, "r")))
     {
@@ -2605,11 +2652,58 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	  if (missing_features)
 	    break;
 	}
+      else if (!strcmp(pieces[0], "genid") && npieces > 1)
+	{
+	  Id id;
+	  /* rejoin */
+	  if (npieces > 2)
+	    {
+	      char *sp;
+	      for (sp = pieces[2]; sp < pieces[npieces - 1]; sp++)
+	        if (*sp == 0)
+	          *sp = ' ';
+	    }
+	  genid = solv_extend(genid, ngenid, 1, sizeof(*genid), 7);
+	  if (!strcmp(pieces[1], "op") && npieces > 2)
+	    {
+	      struct oplist *op;
+	      for (op = oplist; op->flags; op++)
+		if (!strncmp(pieces[2], op->opname, strlen(op->opname)))
+		  break;
+	      if (!op->flags)
+		{
+		  pool_debug(pool, SOLV_ERROR, "testcase_read: genid: unknown op '%s'\n", pieces[2]);
+		  break;
+		}
+	      if (ngenid < 2)
+		{
+		  pool_debug(pool, SOLV_ERROR, "testcase_read: genid: out of stack\n");
+		  break;
+		}
+	      ngenid -= 2;
+	      id = pool_rel2id(pool, genid[ngenid] , genid[ngenid + 1], op->flags, 1);
+	    }
+	  else if (!strcmp(pieces[1], "lit"))
+	    id = pool_str2id(pool, pieces[2], 1);
+	  else if (!strcmp(pieces[1], "null"))
+	    id = 0;
+	  else if (!strcmp(pieces[1], "dep"))
+	    id = testcase_str2dep(pool, pieces[2]);
+	  else
+	    {
+	      pool_debug(pool, SOLV_ERROR, "testcase_read: genid: unknown command '%s'\n", pieces[1]);
+	      break;
+	    }
+	  genid[ngenid++] = id;
+	}
       else
 	{
 	  pool_debug(pool, SOLV_ERROR, "testcase_read: cannot parse command '%s'\n", pieces[0]);
 	}
     }
+  while (job && ngenid > 0)
+    queue_push2(job, SOLVER_NOOP | SOLVER_SOLVABLE_PROVIDES, genid[--ngenid]);
+  genid = solv_free(genid);
   buf = solv_free(buf);
   pieces = solv_free(pieces);
   solv_free(testcasedir);
