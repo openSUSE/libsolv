@@ -333,13 +333,13 @@ testcase_id2str(Pool *pool, Id id, int isname)
 
   /* we need escaping! */
   s2 = s2p = pool_alloctmpspace(pool, strlen(s) + bad * 2 + 1);
-  ss = s;
   if (!strncmp(s, "namespace:", 10))
     {
       strcpy(s2p, "namespace\\3a");
       s2p += 12;
       s += 10;
     }
+  ss = s;
   for (; *ss; ss++)
     {
       *s2p++ = *ss;
@@ -1700,7 +1700,7 @@ dump_genid(Pool *pool, Strqueue *sq, Id id, int cnt)
   else
     {
       sprintf(cntbuf, "genid %2d: genid ", cnt++);
-      s = pool_tmpjoin(pool, cntbuf, id ? "lit" : "null", id ? pool_id2str(pool, id) : 0);
+      s = pool_tmpjoin(pool, cntbuf, id ? "lit " : "null", id ? pool_id2str(pool, id) : 0);
     }
   strqueue_push(sq, s);
   return cnt;
@@ -2684,7 +2684,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	      id = pool_rel2id(pool, genid[ngenid] , genid[ngenid + 1], op->flags, 1);
 	    }
 	  else if (!strcmp(pieces[1], "lit"))
-	    id = pool_str2id(pool, pieces[2], 1);
+	    id = pool_str2id(pool, npieces > 2 ? pieces[2] : "", 1);
 	  else if (!strcmp(pieces[1], "null"))
 	    id = 0;
 	  else if (!strcmp(pieces[1], "dep"))
