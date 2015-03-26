@@ -296,8 +296,9 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_FOCUS_INSTALLED		20
 #define SOLVER_FLAG_YUM_OBSOLETES		21
 
-#define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead if ids */
+#define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */
+#define GET_USERINSTALLED_NAMEARCH		(1 << 2)	/* package/arch tuples instead of ids */
 
 #define SOLVER_ALTERNATIVE_TYPE_RULE		1
 #define SOLVER_ALTERNATIVE_TYPE_RECOMMENDS	2

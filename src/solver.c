@@ -4614,19 +4614,67 @@ get_userinstalled_cmp_names(const void *ap, const void *bp, void *dp)
   return strcmp(pool_id2str(pool, *(Id *)ap), pool_id2str(pool, *(Id *)bp));
 }
 
+static int
+get_userinstalled_cmp_namearch(const void *ap, const void *bp, void *dp)
+{
+  Pool *pool = dp;
+  int r;
+  r = strcmp(pool_id2str(pool, ((Id *)ap)[0]), pool_id2str(pool, ((Id *)bp)[0]));
+  if (r)
+    return r;
+  return strcmp(pool_id2str(pool, ((Id *)ap)[1]), pool_id2str(pool, ((Id *)bp)[1]));
+}
+
 static void
 get_userinstalled_sort_uniq(Pool *pool, Queue *q, int flags)
 {
-  Id lastp = -1;
+  Id lastp = -1, lasta = -1;
   int i, j;
-  if ((flags & GET_USERINSTALLED_NAMES) != 0)
+  if (q->count < ((flags & GET_USERINSTALLED_NAMEARCH) ? 4 : 2))
+    return;
+  if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+    solv_sort(q->elements, q->count / 2, 2 * sizeof(Id), get_userinstalled_cmp_namearch, pool);
+  else if ((flags & GET_USERINSTALLED_NAMES) != 0)
     solv_sort(q->elements, q->count, sizeof(Id), get_userinstalled_cmp_names, pool);
   else
     solv_sort(q->elements, q->count, sizeof(Id), get_userinstalled_cmp, 0);
-  for (i = j = 0; i < q->count; i++)
-    if (q->elements[i] != lastp)
-      q->elements[j++] = lastp = q->elements[i];
+  if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+    {
+      for (i = j = 0; i < q->count; i += 2)
+	if (q->elements[i] != lastp || q->elements[i + 1] != lasta)
+	  {
+	    q->elements[j++] = lastp = q->elements[i];
+	    q->elements[j++] = lasta = q->elements[i + 1];
+	  }
+    }
+  else
+    {
+      for (i = j = 0; i < q->count; i++)
+	if (q->elements[i] != lastp)
+	  q->elements[j++] = lastp = q->elements[i];
+    }
   queue_truncate(q, j);
+}
+
+static void
+namearch2solvables(Pool *pool, Queue *q, Queue *qout, int job)
+{
+  int i;
+  if (!pool->installed)
+    return;
+  for (i = 0; i < q->count; i += 2)
+    {
+      Id p, pp, name = q->elements[i], arch = q->elements[i + 1];
+      FOR_PROVIDES(p, pp, name)
+	{
+	  Solvable *s = pool->solvables + p;
+	  if (s->repo != pool->installed || s->name != name || (arch && s->arch != arch))
+	    continue;
+	  if (job)
+	    queue_push(qout, job);
+	  queue_push(qout, p);
+	}
+    }
 }
 
 void
@@ -4738,8 +4786,20 @@ solver_get_userinstalled(Solver *solv, Queue *q, int flags)
 	}
     }
   map_free(&userinstalled);
-  /* convert to names if asked */
-  if ((flags & GET_USERINSTALLED_NAMES) != 0)
+
+  /* convert to desired output format */
+  if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+    {
+      int qcount = q->count;
+      queue_insertn(q, 0, qcount, 0);
+      for (i = j = 0; i < qcount; i++)
+	{
+	  s = pool->solvables + q->elements[i + qcount];
+	  q->elements[j++] = s->name;
+	  q->elements[j++] = s->arch;
+	}
+    }
+  else if ((flags & GET_USERINSTALLED_NAMES) != 0)
     {
       for (i = 0; i < q->count; i++)
 	{
@@ -4748,9 +4808,9 @@ solver_get_userinstalled(Solver *solv, Queue *q, int flags)
 	}
     }
   /* sort and unify */
-  if (q->count > 1)
-    get_userinstalled_sort_uniq(pool, q, flags);
-  /* invert if asked */
+  get_userinstalled_sort_uniq(pool, q, flags);
+
+  /* invert if asked for */
   if ((flags & GET_USERINSTALLED_INVERTED) != 0)
     {
       /* first generate queue with all installed packages */
@@ -4764,30 +4824,52 @@ solver_get_userinstalled(Solver *solv, Queue *q, int flags)
 	  s = pool->solvables + p;
 	  if (!s->repo)
 	    continue;
-	  if ((flags & GET_USERINSTALLED_NAMES) != 0)
+	  if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+	    queue_push2(&invq, s->name, s->arch);
+	  else if ((flags & GET_USERINSTALLED_NAMES) != 0)
 	    queue_push(&invq, s->name);
 	  else
 	    queue_push(&invq, p);
 	}
       /* push q on invq, just in case... */
       queue_insertn(&invq, invq.count, q->count, q->elements);
-      if (invq.count > 1)
-	get_userinstalled_sort_uniq(pool, &invq, flags);
+      get_userinstalled_sort_uniq(pool, &invq, flags);
       /* subtract queues (easy as they are sorted and invq is a superset of q) */
-      if (q->count)
+      if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
 	{
-	  for (i = j = 0; i < invq.count; i++)
-	    if (invq.elements[i] == q->elements[j])
-	      {
-		invq.elements[i] = 0;
-		if (++j >= q->count)
-		  break;
-	      }
-	  queue_empty(q);
+	  if (q->count)
+	    {
+	      for (i = j = 0; i < invq.count; i += 2)
+		if (invq.elements[i] == q->elements[j] && invq.elements[i + 1] == q->elements[j + 1])
+		  {
+		    invq.elements[i] = invq.elements[i + 1] = 0;
+		    j += 2;
+		    if (j >= q->count)
+		      break;
+		  }
+	      queue_empty(q);
+	    }
+	  for (i = 0; i < invq.count; i += 2)
+	    if (invq.elements[i])
+	      queue_push2(q, invq.elements[i], invq.elements[i + 1]);
 	}
-      for (i = j = 0; i < invq.count; i++)
-	if (invq.elements[i])
-	  queue_push(q, invq.elements[i]);
+      else
+	{
+	  if (q->count)
+	    {
+	      for (i = j = 0; i < invq.count; i++)
+		if (invq.elements[i] == q->elements[j])
+		  {
+		    invq.elements[i] = 0;
+		    if (++j >= q->count)
+		      break;
+		  }
+	      queue_empty(q);
+	    }
+	  for (i = 0; i < invq.count; i++)
+	    if (invq.elements[i])
+	      queue_push(q, invq.elements[i]);
+	}
       queue_free(&invq);
     }
 }
@@ -4797,7 +4879,7 @@ pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int flags)
 {
   int i;
 
-  if (flags & GET_USERINSTALLED_INVERTED)
+  if ((flags & GET_USERINSTALLED_INVERTED) != 0)
     {
       Queue invq;
       Id p, lastid;
@@ -4806,13 +4888,25 @@ pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int flags)
       if (!pool->installed)
 	return;
       queue_init(&invq);
+      if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+	flags &= ~GET_USERINSTALLED_NAMES;	/* just in case */
       FOR_REPO_SOLVABLES(pool->installed, p, s)
 	queue_push(&invq, flags & GET_USERINSTALLED_NAMES ? s->name : p);
-      queue_insertn(&invq, invq.count, q->count, q->elements);
-      if (invq.count > 1)
-        get_userinstalled_sort_uniq(pool, &invq, flags);
-      /* now the fun part, add q again, sort, and remove all dups */
-      queue_insertn(&invq, invq.count, q->count, q->elements);
+      if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+	{
+	  /* for namearch we convert to packages */
+	  namearch2solvables(pool, q, &invq, 0);
+	  get_userinstalled_sort_uniq(pool, &invq, flags);
+	  namearch2solvables(pool, q, &invq, 0);
+	  flags = 0;
+	}
+      else
+	{
+	  queue_insertn(&invq, invq.count, q->count, q->elements);
+	  get_userinstalled_sort_uniq(pool, &invq, flags);
+	  /* now the fun part, add q again, sort, and remove all dups */
+	  queue_insertn(&invq, invq.count, q->count, q->elements);
+	}
       if (invq.count > 1)
 	{
 	  if ((flags & GET_USERINSTALLED_NAMES) != 0)
@@ -4840,8 +4934,13 @@ pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int flags)
     }
   else
     {
-      for (i = 0; i < q->count; i++)
-	queue_push2(job, SOLVER_USERINSTALLED | (flags & GET_USERINSTALLED_NAMES ? SOLVER_SOLVABLE_NAME : SOLVER_SOLVABLE), q->elements[i]);
+      if (flags & GET_USERINSTALLED_NAMEARCH)
+	namearch2solvables(pool, q, job, SOLVER_USERINSTALLED | SOLVER_SOLVABLE);
+      else
+	{
+	  for (i = 0; i < q->count; i++)
+	    queue_push2(job, SOLVER_USERINSTALLED | (flags & GET_USERINSTALLED_NAMES ? SOLVER_SOLVABLE_NAME : SOLVER_SOLVABLE), q->elements[i]);
+	}
     }
 }
 
