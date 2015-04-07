@@ -1360,7 +1360,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	}
       else if (!allownamechange)
 	continue;
-      else if (!solv->noupdateprovide && ps->obsoletes)   /* provides/obsoletes combination ? */
+      else if ((!solv->noupdateprovide || solv->needupdateprovide) && ps->obsoletes)   /* provides/obsoletes combination ? */
 	{
 	  /* check if package ps obsoletes installed package s */
 	  /* implicitobsoleteusescolors is somewhat wrong here, but we nevertheless
@@ -1400,7 +1400,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
     return;
   /* if we have found some valid candidates and noupdateprovide is not set, we're
      done. otherwise we fallback to all obsoletes */
-  if (!solv->noupdateprovide && haveprovobs)
+  if (solv->needupdateprovide || (!solv->noupdateprovide && haveprovobs))
     return;
   if (solv->obsoletes && solv->obsoletes[n - solv->installed->start])
     {

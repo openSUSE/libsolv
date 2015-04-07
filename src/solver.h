@@ -155,6 +155,7 @@ struct _Solver {
   int allowvendorchange;		/* allow to change vendor of installed solvables */
   int allowuninstall;			/* allow removal of installed solvables */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
+  int needupdateprovide;		/* true: update packages must provide old package */
   int dosplitprovides;			/* true: consider legacy split provides */
   int dontinstallrecommended;		/* true: do not install recommended packages */
   int addalreadyrecommended;		/* true: also install recommended packages that were already recommended by the installed packages */
@@ -295,6 +296,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_BREAK_ORPHANS		19
 #define SOLVER_FLAG_FOCUS_INSTALLED		20
 #define SOLVER_FLAG_YUM_OBSOLETES		21
+#define SOLVER_FLAG_NEED_UPDATEPROVIDE		22
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */

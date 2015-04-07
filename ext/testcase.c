@@ -109,6 +109,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_BREAK_ORPHANS,              "breakorphans", 0 },
   { SOLVER_FLAG_FOCUS_INSTALLED,            "focusinstalled", 0 },
   { SOLVER_FLAG_YUM_OBSOLETES,              "yumobsoletes", 0 },
+  { SOLVER_FLAG_NEED_UPDATEPROVIDE,         "needupdateprovide", 0 },
   { 0, 0, 0 }
 };
 

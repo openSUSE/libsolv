@@ -1764,6 +1764,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->focus_installed;
   case SOLVER_FLAG_YUM_OBSOLETES:
     return solv->do_yum_obsoletes;
+  case SOLVER_FLAG_NEED_UPDATEPROVIDE:
+    return solv->needupdateprovide;
   default:
     break;
   }
@@ -1838,6 +1840,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_YUM_OBSOLETES:
     solv->do_yum_obsoletes = value;
+    break;
+  case SOLVER_FLAG_NEED_UPDATEPROVIDE:
+    solv->needupdateprovide = value;
     break;
   default:
     break;
