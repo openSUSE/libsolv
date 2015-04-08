@@ -2071,7 +2071,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   int i, j, n;
   Solvable *s;
   Pool *pool = solv->pool;
-  Id p, pp, *dp;
+  Id p, pp, *dp, postponed;
   int minimizationsteps;
   int installedpos = solv->installed ? solv->installed->start : 0;
 
@@ -2338,8 +2338,17 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       if (!solv->decisioncnt_resolve)
         solv->decisioncnt_resolve = solv->decisionq.count;
       POOL_DEBUG(SOLV_DEBUG_POLICY, "deciding unresolved rules\n");
-      for (i = 1, n = 1; n < solv->nrules; i++, n++)
+      postponed = 0;
+      for (i = 1, n = 1; ; i++, n++)
 	{
+	  if (n >= solv->nrules)
+	    {
+	      if (postponed <= 0)
+		break;
+	      i = postponed;
+	      postponed = -1;
+	      n = 1;
+	    }
 	  if (i == solv->nrules)
 	    i = 1;
 	  r = solv->rules + i;
@@ -2421,6 +2430,17 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		}
 	    }
 
+	  if (dq.count > 1 && postponed >= 0)
+	    {
+	      policy_filter_unwanted(solv, &dq, POLICY_MODE_CHOOSE_NOREORDER);
+	      if (dq.count > 1)
+		{
+		  if (!postponed)
+		    postponed = i;
+		  continue;
+		}
+	    }
+
 	  olevel = level;
 	  level = selectandinstall(solv, level, &dq, disablerules, r - solv->rules);
 	  if (level == 0)
@@ -2431,7 +2451,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  n = 0;
 	}
 
-      if (n != solv->nrules)	/* ran into trouble? */
+      if (n < solv->nrules)	/* ran into trouble? */
 	{
 	  if (level == 0)
 	    break;		/* unsolvable */

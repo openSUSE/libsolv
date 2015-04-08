@@ -891,9 +891,11 @@ sort_by_name_evr_sortcmp(const void *ap, const void *bp, void *dp)
   Id r = aa[1] - bb[1];
   if (r)
     return r < 0 ? -1 : 1;
+  if (aa[2] == bb[2])
+    return 0;
   a = aa[2] < 0 ? -aa[2] : aa[2];
   b = bb[2] < 0 ? -bb[2] : bb[2];
-  if (pool->disttype != DISTTYPE_DEB)
+  if (pool->disttype != DISTTYPE_DEB && a != b)
     {
       /* treat release-less versions different */
       const char *as = pool_id2str(pool, a);
@@ -1127,10 +1129,10 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
     prune_to_best_arch(pool, plist);
   if (plist->count > 1)
     prune_to_best_version(pool, plist);
-  if (plist->count > 1 && mode == POLICY_MODE_CHOOSE)
+  if (plist->count > 1 && (mode == POLICY_MODE_CHOOSE || mode == POLICY_MODE_CHOOSE_NOREORDER))
     {
       prune_to_recommended(solv, plist);
-      if (plist->count > 1)
+      if (plist->count > 1 && mode != POLICY_MODE_CHOOSE_NOREORDER)
 	{
 	  /* do some fancy reordering */
 #if 0
