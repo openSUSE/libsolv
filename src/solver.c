@@ -1052,7 +1052,7 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
 
 /*-------------------------------------------------------------------
  *
- * analyze_unsolvable
+ * analyze_unsolvable (called from setpropagatelearn)
  *
  * We know that the problem is not solvable. Record all involved
  * rules (i.e. the "proof") into solv->learnt_pool.
@@ -1324,7 +1324,11 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id rul
       if (!r)
 	break;
       if (level == 1)
-	return analyze_unsolvable(solv, r, disablerules);
+	{
+	  if (!analyze_unsolvable(solv, r, disablerules))
+	    return 0;
+	  continue;	/* propagate initial decisions */
+	}
       POOL_DEBUG(SOLV_DEBUG_ANALYZE, "conflict with rule #%d\n", (int)(r - solv->rules));
       l = analyze(solv, level, r, &p, &d, &why);	/* learnt rule in p and d */
       assert(l > 0 && l < level);
@@ -1850,7 +1854,7 @@ solver_set_flag(Solver *solv, int flag, int value)
   return old;
 }
 
-int
+static int
 cleandeps_check_mistakes(Solver *solv, int level)
 {
   Pool *pool = solv->pool;
