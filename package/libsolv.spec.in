@@ -64,7 +64,7 @@ BuildRequires:  perl-devel
 BuildRequires:  swig
 %endif
 %if %{with ruby_binding}
-%global ruby_vendorarch %(ruby  -r rbconfig -e "puts Config::CONFIG['vendorarchdir'].nil? ? Config::CONFIG['sitearchdir'] : Config::CONFIG['vendorarchdir']")
+%global ruby_vendorarch %(ruby  -r rbconfig -e "puts RbConfig::CONFIG['vendorarchdir'].nil? ? RbConfig::CONFIG['sitearchdir'] : RbConfig::CONFIG['vendorarchdir']")
 BuildRequires:  ruby
 BuildRequires:  ruby-devel
 BuildRequires:  swig

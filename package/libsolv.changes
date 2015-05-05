@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Sat May  2 11:44:08 UTC 2015 - mrueckert@suse.de
+
+- you really want to use rbconfig there
+
+-------------------------------------------------------------------
 Wed Mar 18 11:04:34 CET 2015 - mls@suse.de
 
 - fix bug in dislike_old_versions that could lead to a segfault
