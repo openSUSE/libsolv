@@ -77,11 +77,9 @@ solv_vercmp_rpm(const char *s1, const char *q1, const char *s2, const char *q2)
 
   for (;;)
     {
-      while (s1 < q1 && !isdigit2(*s1) &&
-          !isalpha2(*s1) && *s1 != '~')
+      while (s1 < q1 && !isalnum2(*s1) && *s1 != '~')
 	s1++;
-      while (s2 < q2 && !isdigit2(*s2) &&
-          !isalpha2(*s2) && *s2 != '~')
+      while (s2 < q2 && !isalnum2(*s2) && *s2 != '~')
 	s2++;
       if (s1 < q1 && *s1 == '~')
         {
@@ -148,11 +146,9 @@ solv_vercmp_rpm_notilde(const char *s1, const char *q1, const char *s2, const ch
 
   while (s1 < q1 && s2 < q2)
     {
-      while (s1 < q1 && !isdigit2(*s1) &&
-          !isalpha2(*s1))
+      while (s1 < q1 && !isalnum2(*s1))
 	s1++;
-      while (s2 < q2 && !isdigit2(*s2) &&
-          !isalpha2(*s2))
+      while (s2 < q2 && !isalnum2(*s2))
 	s2++;
       if (isdigit2(*s1) || isdigit2(*s2))
 	{
