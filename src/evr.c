@@ -16,6 +16,7 @@
 #include <string.h>
 #include "evr.h"
 #include "pool.h"
+#include "ctype2.h"
 
 
 
