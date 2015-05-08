@@ -31,29 +31,29 @@ solv_vercmp_deb(const char *s1, const char *q1, const char *s2, const char *q2)
     {
       c1 = s1 < q1 ? *(const unsigned char *)s1++ : 0;
       c2 = s2 < q2 ? *(const unsigned char *)s2++ : 0;
-      if ((c1 >= '0' && c1 <= '9') && (c2 >= '0' && c2 <= '9'))
+      if (isdigit2(c1) && isdigit2(c2))
 	{
 	  while (c1 == '0')
             c1 = s1 < q1 ? *(const unsigned char *)s1++ : 0;
 	  while (c2 == '0')
             c2 = s2 < q2 ? *(const unsigned char *)s2++ : 0;
 	  r = 0;
-	  while ((c1 >= '0' && c1 <= '9') && (c2 >= '0' && c2 <= '9'))
+	  while (isdigit2(c1) && isdigit2(c2))
 	    {
 	      if (!r)
 		r = c1 - c2;
               c1 = s1 < q1 ? *(const unsigned char *)s1++ : 0;
               c2 = s2 < q2 ? *(const unsigned char *)s2++ : 0;
 	    }
-	  if (c1 >= '0' && c1 <= '9')
+	  if (isdigit2(c1))
 	    return 1;
-	  if (c2 >= '0' && c2 <= '9')
+	  if (isdigit2(c2))
 	    return -1;
 	  if (r)
 	    return r < 0 ? -1 : 1;
 	}
-      c1 = c1 == '~' ? -1 : !c1 || (c1 >= '0' && c1 <= '9') || (c1 >= 'A' && c1 <= 'Z') || (c1 >= 'a' && c1 <= 'z')  ? c1 : c1 + 256;
-      c2 = c2 == '~' ? -1 : !c2 || (c2 >= '0' && c2 <= '9') || (c2 >= 'A' && c2 <= 'Z') || (c2 >= 'a' && c2 <= 'z')  ? c2 : c2 + 256;
+      c1 = c1 == '~' ? -1 : !c1 || isalnum2(c1)  ? c1 : c1 + 256;
+      c2 = c2 == '~' ? -1 : !c2 || isalnum2(c2)  ? c2 : c2 + 256;
       r = c1 - c2;
       if (r)
 	return r < 0 ? -1 : 1;
@@ -77,11 +77,11 @@ solv_vercmp_rpm(const char *s1, const char *q1, const char *s2, const char *q2)
 
   for (;;)
     {
-      while (s1 < q1 && !(*s1 >= '0' && *s1 <= '9') &&
-          !(*s1 >= 'a' && *s1 <= 'z') && !(*s1 >= 'A' && *s1 <= 'Z') && *s1 != '~')
+      while (s1 < q1 && !isdigit2(*s1) &&
+          !isalpha2(*s1) && *s1 != '~')
 	s1++;
-      while (s2 < q2 && !(*s2 >= '0' && *s2 <= '9') &&
-          !(*s2 >= 'a' && *s2 <= 'z') && !(*s2 >= 'A' && *s2 <= 'Z') && *s2 != '~')
+      while (s2 < q2 && !isdigit2(*s2) &&
+          !isalpha2(*s2) && *s2 != '~')
 	s2++;
       if (s1 < q1 && *s1 == '~')
         {
@@ -97,15 +97,15 @@ solv_vercmp_rpm(const char *s1, const char *q1, const char *s2, const char *q2)
 	return 1;
       if (s1 >= q1 || s2 >= q2)
 	break;
-      if ((*s1 >= '0' && *s1 <= '9') || (*s2 >= '0' && *s2 <= '9'))
+      if (isdigit2(*s1) || isdigit2(*s2))
 	{
-	  while (*s1 == '0' && s1[1] >= '0' && s1[1] <= '9')
+	  while (*s1 == '0' && isdigit2(s1[1]))
 	    s1++;
-	  while (*s2 == '0' && s2[1] >= '0' && s2[1] <= '9')
+	  while (*s2 == '0' && isdigit2(s2[1]))
 	    s2++;
-	  for (e1 = s1; *e1 >= '0' && *e1 <= '9'; )
+	  for (e1 = s1; isdigit2(*e1); )
 	    e1++;
-	  for (e2 = s2; *e2 >= '0' && *e2 <= '9'; )
+	  for (e2 = s2; isdigit2(*e2); )
 	    e2++;
 	  r = (e1 - s1) - (e2 - s2);
           if (!r)
@@ -115,9 +115,9 @@ solv_vercmp_rpm(const char *s1, const char *q1, const char *s2, const char *q2)
 	}
       else
 	{
-	  for (e1 = s1; (*e1 >= 'a' && *e1 <= 'z') || (*e1 >= 'A' && *e1 <= 'Z'); )
+	  for (e1 = s1; isalpha2(*e1); )
 	    e1++;
-	  for (e2 = s2; (*e2 >= 'a' && *e2 <= 'z') || (*e2 >= 'A' && *e2 <= 'Z'); )
+	  for (e2 = s2; isalpha2(*e2); )
 	    e2++;
 	  r = (e1 - s1) - (e2 - s2);
           if (r > 0)
@@ -148,21 +148,21 @@ solv_vercmp_rpm_notilde(const char *s1, const char *q1, const char *s2, const ch
 
   while (s1 < q1 && s2 < q2)
     {
-      while (s1 < q1 && !(*s1 >= '0' && *s1 <= '9') &&
-          !(*s1 >= 'a' && *s1 <= 'z') && !(*s1 >= 'A' && *s1 <= 'Z'))
+      while (s1 < q1 && !isdigit2(*s1) &&
+          !isalpha2(*s1))
 	s1++;
-      while (s2 < q2 && !(*s2 >= '0' && *s2 <= '9') &&
-          !(*s2 >= 'a' && *s2 <= 'z') && !(*s2 >= 'A' && *s2 <= 'Z'))
+      while (s2 < q2 && !isdigit2(*s2) &&
+          !isalpha2(*s2))
 	s2++;
-      if ((*s1 >= '0' && *s1 <= '9') || (*s2 >= '0' && *s2 <= '9'))
+      if (isdigit2(*s1) || isdigit2(*s2))
 	{
-	  while (*s1 == '0' && s1[1] >= '0' && s1[1] <= '9')
+	  while (*s1 == '0' && isdigit2(s1[1]))
 	    s1++;
-	  while (*s2 == '0' && s2[1] >= '0' && s2[1] <= '9')
+	  while (*s2 == '0' && isdigit2(s2[1]))
 	    s2++;
-	  for (e1 = s1; *e1 >= '0' && *e1 <= '9'; )
+	  for (e1 = s1; isdigit2(*e1); )
 	    e1++;
-	  for (e2 = s2; *e2 >= '0' && *e2 <= '9'; )
+	  for (e2 = s2; isdigit2(*e2); )
 	    e2++;
 	  r = (e1 - s1) - (e2 - s2);
           if (!r)
@@ -172,9 +172,9 @@ solv_vercmp_rpm_notilde(const char *s1, const char *q1, const char *s2, const ch
 	}
       else
 	{
-	  for (e1 = s1; (*e1 >= 'a' && *e1 <= 'z') || (*e1 >= 'A' && *e1 <= 'Z'); )
+	  for (e1 = s1; isalpha2(*e1); )
 	    e1++;
-	  for (e2 = s2; (*e2 >= 'a' && *e2 <= 'z') || (*e2 >= 'A' && *e2 <= 'Z'); )
+	  for (e2 = s2; isalpha2(*e2); )
 	    e2++;
 	  r = (e1 - s1) - (e2 - s2);
           if (r > 0)
@@ -337,9 +337,9 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 #if 0
   POOL_DEBUG(DEBUG_EVRCMP, "evrcmp %s %s mode=%d\n", evr1, evr2, mode);
 #endif
-  for (s1 = evr1; *s1 >= '0' && *s1 <= '9'; s1++)
+  for (s1 = evr1; isdigit2(*s1); s1++)
     ;
-  for (s2 = evr2; *s2 >= '0' && *s2 <= '9'; s2++)
+  for (s2 = evr2; isdigit2(*s2); s2++)
     ;
   if (mode == EVRCMP_MATCH && (*evr1 == ':' || *evr2 == ':'))
     {
@@ -469,7 +469,7 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
   int r;
 
   evr1 = pool_id2str(pool, evrid);
-  for (s1 = evr1; *s1 >= '0' && *s1 <= '9'; s1++)
+  for (s1 = evr1; isdigit2(*s1); s1++)
     ;
   if (s1 != evr1 && *s1 == ':')
     {
