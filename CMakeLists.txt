@@ -206,6 +206,17 @@ CHECK_FUNCTION_EXISTS (fopencookie HAVE_FOPENCOOKIE)
 CHECK_FUNCTION_EXISTS (funopen HAVE_FUNOPEN)
 TEST_BIG_ENDIAN (WORDS_BIGENDIAN)
 
+INCLUDE (CMakePushCheckState)
+INCLUDE (CheckCCompilerFlag)
+MACRO (check_linker_flag FLAG VAR)
+	cmake_push_check_state(RESET)
+	set(CMAKE_REQUIRED_FLAGS "${FLAG}")
+	check_c_compiler_flag("" "${VAR}")
+	cmake_pop_check_state()
+ENDMACRO (check_linker_flag)
+check_linker_flag("-Wl,--as-needed" HAS_LINKER_AS_NEEDED)
+check_linker_flag("-Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver" HAS_LINKER_VERSION_SCRIPT)
+
 # should create config.h with #cmakedefine instead...
 FOREACH (VAR HAVE_STRCHRNUL HAVE_FOPENCOOKIE HAVE_FUNOPEN WORDS_BIGENDIAN
   HAVE_RPM_DB_H HAVE_PGPDIGGETPARAMS
@@ -307,7 +318,9 @@ ENDIF (ENABLE_RPMDB)
 IF (ENABLE_HAIKU)
 SET (SYSTEM_LIBRARIES ${HAIKU_SYSTEM_LIBRARIES} ${SYSTEM_LIBRARIES})
 ENDIF (ENABLE_HAIKU)
+IF (HAS_LINKER_AS_NEEDED)
 SET (SYSTEM_LIBRARIES "-Wl,--as-needed" ${SYSTEM_LIBRARIES})
+ENDIF (HAS_LINKER_AS_NEEDED)
 
 ADD_SUBDIRECTORY (src)
 ADD_SUBDIRECTORY (ext)
