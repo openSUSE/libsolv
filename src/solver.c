@@ -30,6 +30,7 @@
 
 #define RULES_BLOCK 63
 
+
 /********************************************************************
  *
  * dependency check helpers
@@ -826,19 +827,90 @@ propagate(Solver *solv, int level)
 
 /*-------------------------------------------------------------------
  *
+ * revert
+ * revert decisionq to a level
+ */
+
+static void
+revert(Solver *solv, int level)
+{
+  Pool *pool = solv->pool;
+  Id v, vv;
+  while (solv->decisionq.count)
+    {
+      v = solv->decisionq.elements[solv->decisionq.count - 1];
+      vv = v > 0 ? v : -v;
+      if (solv->decisionmap[vv] <= level && solv->decisionmap[vv] >= -level)
+        break;
+      POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "reverting decision %d at %d\n", v, solv->decisionmap[vv]);
+      solv->decisionmap[vv] = 0;
+      solv->decisionq.count--;
+      solv->decisionq_why.count--;
+      solv->propagate_index = solv->decisionq.count;
+    }
+  while (solv->branches.count && solv->branches.elements[solv->branches.count - 1] >= level)
+    solv->branches.count -= solv->branches.elements[solv->branches.count - 2];
+  if (solv->recommends_index > solv->decisionq.count)
+    solv->recommends_index = -1;	/* rebuild recommends/suggests maps */
+  if (solv->decisionq.count < solv->decisioncnt_jobs)
+    solv->decisioncnt_jobs = 0;
+  if (solv->decisionq.count < solv->decisioncnt_update)
+    solv->decisioncnt_update = 0;
+  if (solv->decisionq.count < solv->decisioncnt_keep)
+    solv->decisioncnt_keep = 0;
+  if (solv->decisionq.count < solv->decisioncnt_resolve)
+    solv->decisioncnt_resolve = 0;
+  if (solv->decisionq.count < solv->decisioncnt_weak)
+    solv->decisioncnt_weak= 0;
+  if (solv->decisionq.count < solv->decisioncnt_orphan)
+    solv->decisioncnt_orphan = 0;
+}
+
+/*-------------------------------------------------------------------
+ *
+ * watch2onhighest - put watch2 on literal with highest level
+ */
+
+static inline void
+watch2onhighest(Solver *solv, Rule *r)
+{
+  int l, wl = 0;
+  Id d, v, *dp;
+
+  d = r->d < 0 ? -r->d - 1 : r->d;
+  if (!d)
+    return;	/* binary rule, both watches are set */
+  dp = solv->pool->whatprovidesdata + d;
+  while ((v = *dp++) != 0)
+    {
+      l = solv->decisionmap[v < 0 ? -v : v];
+      if (l < 0)
+	l = -l;
+      if (l > wl)
+	{
+	  r->w2 = dp[-1];
+	  wl = l;
+	}
+    }
+}
+
+
+/*-------------------------------------------------------------------
+ *
  * analyze
  *   and learn
  */
 
 static int
-analyze(Solver *solv, int level, Rule *c, int *pr, int *dr, int *whyp)
+analyze(Solver *solv, int level, Rule *c, Rule **lrp)
 {
   Pool *pool = solv->pool;
   Queue r;
+  Rule *lr;
   Id r_buf[4];
   int rlevel = 1;
   Map seen;		/* global? */
-  Id d, v, vv, *dp, why;
+  Id p = 0, d, v, vv, *dp, why;
   int l, i, idx;
   int num = 0, l1num = 0;
   int learnt_why = solv->learnt_pool.count;
@@ -906,7 +978,7 @@ l1retry:
 
       if (num && --num == 0)
 	{
-	  *pr = -v;	/* so that v doesn't get lost */
+	  p = -v;	/* so that v doesn't get lost */
 	  if (!l1num)
 	    break;
 	  POOL_DEBUG(SOLV_DEBUG_ANALYZE, "got %d involved level 1 decisions\n", l1num);
@@ -927,27 +999,49 @@ l1retry:
       c = solv->rules + why;
     }
   map_free(&seen);
-
-  if (r.count == 0)
-    *dr = 0;
-  else if (r.count == 1 && r.elements[0] < 0)
-    *dr = r.elements[0];
-  else
-    *dr = pool_queuetowhatprovides(pool, &r);
+  assert(p != 0);
+  assert(rlevel > 0 && rlevel < level);
   IF_POOLDEBUG (SOLV_DEBUG_ANALYZE)
     {
       POOL_DEBUG(SOLV_DEBUG_ANALYZE, "learned rule for level %d (am %d)\n", rlevel, level);
-      solver_printruleelement(solv, SOLV_DEBUG_ANALYZE, 0, *pr);
+      solver_printruleelement(solv, SOLV_DEBUG_ANALYZE, 0, p);
       for (i = 0; i < r.count; i++)
         solver_printruleelement(solv, SOLV_DEBUG_ANALYZE, 0, r.elements[i]);
     }
   /* push end marker on learnt reasons stack */
   queue_push(&solv->learnt_pool, 0);
-  if (whyp)
-    *whyp = learnt_why;
-  queue_free(&r);
   solv->stats_learned++;
-  return rlevel;
+
+  POOL_DEBUG(SOLV_DEBUG_ANALYZE, "reverting decisions (level %d -> %d)\n", level, rlevel);
+  level = rlevel;
+  revert(solv, level);
+  if (r.count < 2)
+    {
+      d = r.count ? r.elements[0] : 0;
+      queue_free(&r);
+      lr = solver_addrule2(solv, p, d);
+    }
+  else
+    {
+      d = pool_queuetowhatprovides(pool, &r);
+      queue_free(&r);
+      lr = solver_addrulen(solv, p, d);
+    }
+  assert(solv->learnt_why.count == (lr - solv->rules) - solv->learntrules);
+  queue_push(&solv->learnt_why, learnt_why);
+  if (lr->w2)
+    {
+      /* needs watches */
+      watch2onhighest(solv, lr);
+      addwatches_rule(solv, lr);
+    }
+  else
+    {
+      /* rule is an assertion */
+      queue_push(&solv->ruleassertions, lr - solv->rules);
+    }
+  *lrp = lr;
+  return level;
 }
 
 
@@ -1209,80 +1303,6 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 }
 
 
-/********************************************************************/
-/* Decision revert */
-
-/*-------------------------------------------------------------------
- *
- * revert
- * revert decisionq to a level
- */
-
-static void
-revert(Solver *solv, int level)
-{
-  Pool *pool = solv->pool;
-  Id v, vv;
-  while (solv->decisionq.count)
-    {
-      v = solv->decisionq.elements[solv->decisionq.count - 1];
-      vv = v > 0 ? v : -v;
-      if (solv->decisionmap[vv] <= level && solv->decisionmap[vv] >= -level)
-        break;
-      POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "reverting decision %d at %d\n", v, solv->decisionmap[vv]);
-      solv->decisionmap[vv] = 0;
-      solv->decisionq.count--;
-      solv->decisionq_why.count--;
-      solv->propagate_index = solv->decisionq.count;
-    }
-  while (solv->branches.count && solv->branches.elements[solv->branches.count - 1] >= level)
-    solv->branches.count -= solv->branches.elements[solv->branches.count - 2];
-  if (solv->recommends_index > solv->decisionq.count)
-    solv->recommends_index = -1;	/* rebuild recommends/suggests maps */
-  if (solv->decisionq.count < solv->decisioncnt_jobs)
-    solv->decisioncnt_jobs = 0;
-  if (solv->decisionq.count < solv->decisioncnt_update)
-    solv->decisioncnt_update = 0;
-  if (solv->decisionq.count < solv->decisioncnt_keep)
-    solv->decisioncnt_keep = 0;
-  if (solv->decisionq.count < solv->decisioncnt_resolve)
-    solv->decisioncnt_resolve = 0;
-  if (solv->decisionq.count < solv->decisioncnt_weak)
-    solv->decisioncnt_weak= 0;
-  if (solv->decisionq.count < solv->decisioncnt_orphan)
-    solv->decisioncnt_orphan = 0;
-}
-
-
-/*-------------------------------------------------------------------
- *
- * watch2onhighest - put watch2 on literal with highest level
- */
-
-static inline void
-watch2onhighest(Solver *solv, Rule *r)
-{
-  int l, wl = 0;
-  Id d, v, *dp;
-
-  d = r->d < 0 ? -r->d - 1 : r->d;
-  if (!d)
-    return;	/* binary rule, both watches are set */
-  dp = solv->pool->whatprovidesdata + d;
-  while ((v = *dp++) != 0)
-    {
-      l = solv->decisionmap[v < 0 ? -v : v];
-      if (l < 0)
-	l = -l;
-      if (l > wl)
-	{
-	  r->w2 = dp[-1];
-	  wl = l;
-	}
-    }
-}
-
-
 /*-------------------------------------------------------------------
  *
  * setpropagatelearn
@@ -1303,9 +1323,7 @@ static int
 setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id ruleid)
 {
   Pool *pool = solv->pool;
-  Rule *r;
-  Id p = 0, d = 0;
-  int l, why;
+  Rule *r, *lr;
 
   assert(ruleid >= 0);
   if (decision)
@@ -1330,36 +1348,18 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id rul
 	  continue;	/* propagate initial decisions */
 	}
       POOL_DEBUG(SOLV_DEBUG_ANALYZE, "conflict with rule #%d\n", (int)(r - solv->rules));
-      l = analyze(solv, level, r, &p, &d, &why);	/* learnt rule in p and d */
-      assert(l > 0 && l < level);
-      POOL_DEBUG(SOLV_DEBUG_ANALYZE, "reverting decisions (level %d -> %d)\n", level, l);
-      level = l;
-      revert(solv, level);
-      r = solver_addrulen(solv, p, d);
-      assert(r);
-      assert(solv->learnt_why.count == (r - solv->rules) - solv->learntrules);
-      queue_push(&solv->learnt_why, why);
-      if (d)
-	{
-	  /* at least 2 literals, needs watches */
-	  watch2onhighest(solv, r);
-	  addwatches_rule(solv, r);
-	}
-      else
-	{
-	  /* learnt rule is an assertion */
-          queue_push(&solv->ruleassertions, r - solv->rules);
-	}
+      level = analyze(solv, level, r, &lr);
       /* the new rule is unit by design */
-      solv->decisionmap[p > 0 ? p : -p] = p > 0 ? level : -level;
-      queue_push(&solv->decisionq, p);
-      queue_push(&solv->decisionq_why, r - solv->rules);
+      decision = lr->p;
+      solv->decisionmap[decision > 0 ? decision : -decision] = decision > 0 ? level : -level;
+      queue_push(&solv->decisionq, decision);
+      queue_push(&solv->decisionq_why, lr - solv->rules);
       IF_POOLDEBUG (SOLV_DEBUG_ANALYZE)
 	{
 	  POOL_DEBUG(SOLV_DEBUG_ANALYZE, "decision: ");
-	  solver_printruleelement(solv, SOLV_DEBUG_ANALYZE, 0, p);
+	  solver_printruleelement(solv, SOLV_DEBUG_ANALYZE, 0, decision);
 	  POOL_DEBUG(SOLV_DEBUG_ANALYZE, "new rule: ");
-	  solver_printrule(solv, SOLV_DEBUG_ANALYZE, r);
+	  solver_printrule(solv, SOLV_DEBUG_ANALYZE, lr);
 	}
     }
   return level;
