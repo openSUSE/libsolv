@@ -306,6 +306,7 @@ extern void pool_addfileprovides(Pool *pool);
 extern void pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst);
 extern void pool_freewhatprovides(Pool *pool);
 extern Id pool_queuetowhatprovides(Pool *pool, Queue *q);
+extern Id pool_ids2whatprovides(Pool *pool, Id *ids, int count);
 extern Id pool_searchlazywhatprovidesq(Pool *pool, Id d);
 
 extern Id pool_addrelproviders(Pool *pool, Id d);

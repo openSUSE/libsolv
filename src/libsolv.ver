@@ -74,6 +74,7 @@ SOLV_1.0 {
 		pool_id2langid;
 		pool_id2rel;
 		pool_id2str;
+		pool_ids2whatprovides;
 		pool_intersect_evrs;
 		pool_isemptyupdatejob;
 		pool_job2solvables;

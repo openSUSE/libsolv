@@ -560,15 +560,15 @@ pool_freewhatprovides(Pool *pool)
  * returns: Offset into whatprovidesdata
  *
  */
+
 Id
-pool_queuetowhatprovides(Pool *pool, Queue *q)
+pool_ids2whatprovides(Pool *pool, Id *ids, int count)
 {
   Offset off;
-  int count = q->count;
 
   if (count == 0)		       /* queue empty -> 1 */
     return 1;
-  if (count == 1 && q->elements[0] == SYSTEMSOLVABLE)
+  if (count == 1 && *ids == SYSTEMSOLVABLE)
     return 2;
 
   /* extend whatprovidesdata if needed, +1 for 0-termination */
@@ -581,7 +581,7 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
 
   /* copy queue to next free slot */
   off = pool->whatprovidesdataoff;
-  memcpy(pool->whatprovidesdata + pool->whatprovidesdataoff, q->elements, count * sizeof(Id));
+  memcpy(pool->whatprovidesdata + pool->whatprovidesdataoff, ids, count * sizeof(Id));
 
   /* adapt count and 0-terminate */
   pool->whatprovidesdataoff += count;
@@ -589,6 +589,17 @@ pool_queuetowhatprovides(Pool *pool, Queue *q)
   pool->whatprovidesdataleft -= count + 1;
 
   return (Id)off;
+}
+
+Id
+pool_queuetowhatprovides(Pool *pool, Queue *q)
+{
+  int count = q->count;
+  if (count == 0)		       /* queue empty -> 1 */
+    return 1;
+  if (count == 1 && q->elements[0] == SYSTEMSOLVABLE)
+    return 2;
+  return pool_ids2whatprovides(pool, q->elements, count);
 }
 
 
