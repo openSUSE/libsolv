@@ -131,11 +131,12 @@ invert_depblocks(Pool *pool, Queue *bq, int start)
  *  -1: at least one block
  */
 static int
-normalize_dep(Pool *pool, Id dep, Queue *bq, int todnf)
+normalize_dep(Pool *pool, Id dep, Queue *bq, int flags)
 {
   int bqcnt = bq->count;
   int bqcnt2;
-  Id dp;
+  int todnf = flags & CPLXDEPS_TODNF ? 1 : 0;
+  Id p, dp;
 
 #ifdef CPLXDEBUG
   printf("normalize_dep %s todnf:%d\n", pool_dep2str(pool, dep), todnf);
@@ -145,58 +146,58 @@ normalize_dep(Pool *pool, Id dep, Queue *bq, int todnf)
       Reldep *rd = GETRELDEP(pool, dep);
       if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_COND)
 	{
-	  int flags = rd->flags;
+	  int rdflags = rd->flags;
 	  int r, mode;
 	  
 	  /* in inverted mode, COND means AND. otherwise it means OR NOT */
-	  if (flags == REL_COND && todnf)
-	    flags = REL_AND;
-	  mode = flags == REL_AND ? 0 : 1;
+	  if (rdflags == REL_COND && todnf)
+	    rdflags = REL_AND;
+	  mode = rdflags == REL_AND ? 0 : 1;
 
 	  /* get blocks of first argument */
-	  r = normalize_dep(pool, rd->name, bq, todnf);
+	  r = normalize_dep(pool, rd->name, bq, flags);
 	  if (r == 0)
 	    {
-	      if (flags == REL_AND)
+	      if (rdflags == REL_AND)
 		return 0;
-	      if (flags == REL_COND)
+	      if (rdflags == REL_COND)
 		{
-		  r = normalize_dep(pool, rd->evr, bq, todnf ^ 1);
+		  r = normalize_dep(pool, rd->evr, bq, flags ^ CPLXDEPS_TODNF);
 		  if (r == 0 || r == 1)
 		    return r == 0 ? 1 : 0;
 		  invert_depblocks(pool, bq, bqcnt);	/* invert block for COND */
 		  return r;
 		}
-	      return normalize_dep(pool, rd->evr, bq, todnf);
+	      return normalize_dep(pool, rd->evr, bq, flags);
 	    }
 	  if (r == 1)
 	    {
-	      if (flags != REL_AND)
+	      if (rdflags != REL_AND)
 		return 1;
-	      return normalize_dep(pool, rd->evr, bq, todnf);
+	      return normalize_dep(pool, rd->evr, bq, flags);
 	    }
 
 	  /* get blocks of second argument */
 	  bqcnt2 = bq->count;
 	  /* COND is OR with NEG on evr block, so we invert the todnf flag in that case */
-	  r = normalize_dep(pool, rd->evr, bq, flags == REL_COND ? todnf ^ 1 : todnf);
+	  r = normalize_dep(pool, rd->evr, bq, rdflags == REL_COND ? (flags ^ CPLXDEPS_TODNF) : flags);
 	  if (r == 0)
 	    {
-	      if (flags == REL_OR)
+	      if (rdflags == REL_OR)
 		return -1;
 	      queue_truncate(bq, bqcnt);
-	      return flags == REL_COND ? 1 : 0;
+	      return rdflags == REL_COND ? 1 : 0;
 	    }
 	  if (r == 1)
 	    {
-	      if (flags == REL_OR)
+	      if (rdflags == REL_OR)
 		{
 		  queue_truncate(bq, bqcnt);
 		  return 1;
 		}
 	      return -1;
 	    }
-	  if (flags == REL_COND)
+	  if (rdflags == REL_COND)
 	    invert_depblocks(pool, bq, bqcnt2);	/* invert 2nd block */
 	  if (mode == todnf)
 	    {
@@ -274,16 +275,29 @@ normalize_dep(Pool *pool, Id dep, Queue *bq, int todnf)
     return dp == 2 ? 1 : 0;
   if (pool->whatprovidesdata[dp] == SYSTEMSOLVABLE)
     return 1;
-  if (todnf)
+  bqcnt = bq->count;
+  if ((flags & CPLXDEPS_NAME) != 0)
     {
-      for (; pool->whatprovidesdata[dp]; dp++)
-	queue_push2(bq, pool->whatprovidesdata[dp], 0);
+      while ((p = pool->whatprovidesdata[dp++]) != 0)
+	{
+	  if (!pool_match_nevr(pool, pool->solvables + p, dep))
+	    continue;
+	  queue_push(bq, p);
+	  if (todnf)
+	    queue_push(bq, 0);
+	}
+    }
+  else if (todnf)
+    {
+      while ((p = pool->whatprovidesdata[dp++]) != 0)
+        queue_push2(bq, p, 0);
     }
   else
-    {
-      queue_push2(bq, pool->nsolvables, dp);	/* not yet expanded marker */
-      queue_push(bq, 0);
-    }
+    queue_push2(bq, pool->nsolvables, dp);	/* not yet expanded marker + offset */
+  if (bq->count == bqcnt)
+    return 0;	/* no provider */
+  if (!todnf)
+    queue_push(bq, 0);	/* finish block */
   return -1;
 }
 
@@ -292,7 +306,7 @@ pool_normalize_complex_dep(Pool *pool, Id dep, Queue *bq, int flags)
 {
   int i, bqcnt = bq->count;
 
-  i = normalize_dep(pool, dep, bq, (flags & CPLXDEPS_TODNF) ? 1 : 0);
+  i = normalize_dep(pool, dep, bq, flags);
   if ((flags & CPLXDEPS_EXPAND) != 0)
     {
       if (i != 0 && i != 1)
