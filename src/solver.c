@@ -3662,10 +3662,7 @@ solver_solve(Solver *solv, Queue *job)
    * add rules for suggests, enhances
    */
   oldnrules = solv->nrules;
-  if (hasdupjob && !solv->updatemap_all && solv->dosplitprovides && solv->installed)
-    solver_addpkgrulesforweak(solv, &addedmap);
-  else
-    solver_addpkgrulesforweak(solv, &addedmap);
+  solver_addpkgrulesforweak(solv, &addedmap);
   POOL_DEBUG(SOLV_DEBUG_STATS, "added %d pkg rules because of weak dependencies\n", solv->nrules - oldnrules);
 
 #ifdef ENABLE_LINKED_PKGS
