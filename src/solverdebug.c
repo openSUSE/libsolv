@@ -108,7 +108,7 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
   Id p = r - solv->rules;
   assert(p >= 0);
   if (p < solv->learntrules)
-    if (MAPTST(&solv->weakrulemap, p))
+    if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, p))
       POOL_DEBUG(type, "WEAK ");
   if (solv->learntrules && p >= solv->learntrules)
     POOL_DEBUG(type, "LEARNT ");

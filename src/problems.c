@@ -152,6 +152,8 @@ enableweakrules(Solver *solv)
   int i;
   Rule *r;
 
+  if (!solv->weakrulemap.size)
+    return;
   for (i = 1, r = solv->rules + i; i < solv->learntrules; i++, r++)
     {
       if (r->d >= 0) /* already enabled? */

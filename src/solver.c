@@ -336,7 +336,7 @@ makeruledecisions(Solver *solv)
 	    continue;
 
 	  /* do weak rules in phase 2 */
-	  if (ri < solv->learntrules && MAPTST(&solv->weakrulemap, ri))
+	  if (ri < solv->learntrules && solv->weakrulemap.size && MAPTST(&solv->weakrulemap, ri))
 	    continue;
 
 	  v = r->p;
@@ -478,7 +478,7 @@ makeruledecisions(Solver *solv)
 	      if (rr->p != vv                        /* not affecting the literal */
 		  && rr->p != -vv)
 		continue;
-	      if (MAPTST(&solv->weakrulemap, i))     /* weak: silently ignore */
+	      if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, i))     /* weak: silently ignore */
 		continue;
 		
 	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
@@ -505,6 +505,8 @@ makeruledecisions(Solver *solv)
       /*
        * phase 2: now do the weak assertions
        */
+      if (!solv->weakrulemap.size)
+	break;				/* no weak rules, no phase 2 */
       for (ii = 0; ii < solv->ruleassertions.count; ii++)
 	{
 	  ri = solv->ruleassertions.elements[ii];
@@ -1108,7 +1110,7 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
 	  analyze_unsolvable_rule(solv, solv->rules + solv->learnt_pool.elements[i], lastweakp, rseen);
       return;
     }
-  if (MAPTST(&solv->weakrulemap, why))
+  if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, why))
     if (!*lastweakp || why > *lastweakp)
       *lastweakp = why;
   /* do not add pkg rules to problem */
@@ -4026,11 +4028,14 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */
-  map_init(&solv->weakrulemap, solv->nrules);
-  for (i = 0; i < solv->weakruleq.count; i++)
+  if (solv->weakruleq.count)
     {
-      p = solv->weakruleq.elements[i];
-      MAPSET(&solv->weakrulemap, p);
+      map_grow(&solv->weakrulemap, solv->nrules);
+      for (i = 0; i < solv->weakruleq.count; i++)
+	{
+	  p = solv->weakruleq.elements[i];
+	  MAPSET(&solv->weakrulemap, p);
+	}
     }
 
   /* enable cleandepsmap creation if we have updatepkgs */
