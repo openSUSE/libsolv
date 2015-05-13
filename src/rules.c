@@ -31,8 +31,7 @@
 
 #define RULES_BLOCK 63
 
-static void addpkgruleinfon(Solver *solv, Id p, Id d, int type, Id dep);
-static void addpkgruleinfo2(Solver *solv, Id p1, Id p2, int type, Id dep);
+static void addpkgruleinfo(Solver *solv, Id p, Id p2, Id d, int type, Id dep);
 static void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded);
 
 /*-------------------------------------------------------------------
@@ -242,27 +241,23 @@ hashrule(Solver *solv, Id p, Id d, int n)
 
 /*
  * add rule
- *  p = direct literal; always < 0 for installed pkg rules
- *  d, if < 0 direct literal, if > 0 offset into whatprovides, if == 0 rule is assertion (look at p only)
- *
  *
  * A requires b, b provided by B1,B2,B3 => (-A|B1|B2|B3)
  *
- * p < 0 : pkg id of A
- * d > 0 : Offset in whatprovidesdata (list of providers of b)
+ * p < 0  : pkg id of A
+ * d > 0  : Offset in whatprovidesdata (list of providers of b)
  *
  * A conflicts b, b provided by B1,B2,B3 => (-A|-B1), (-A|-B2), (-A|-B3)
- * p < 0 : pkg id of A
- * d < 0 : Id of solvable (e.g. B1)
+ * p < 0  : pkg id of A
+ * p2 < 0 : Id of solvable (e.g. B1)
  *
- * d == 0: unary rule, assertion => (A) or (-A)
+ * d == 0, p2 == 0: unary rule, assertion => (A) or (-A)
  *
  *   Install:    p > 0, d = 0   (A)             user requested install
  *   Remove:     p < 0, d = 0   (-A)            user requested remove (also: uninstallable)
  *   Requires:   p < 0, d > 0   (-A|B1|B2|...)  d: <list of providers for requirement of p>
- *   Requires:   p > 0, d < 0   (B|-A)		hack to save a whatprovides allocation, gets converted into (-A|B)
  *   Updates:    p > 0, d > 0   (A|B1|B2|...)   d: <list of updates for solvable p>
- *   Conflicts:  p < 0, d < 0   (-A|-B)         either p (conflict issuer) or d (conflict provider) (binary rule)
+ *   Conflicts:  p < 0, p2 < 0  (-A|-B)         either p (conflict issuer) or d (conflict provider) (binary rule)
  *                                              also used for obsoletes
  *   No-op ?:    p = 0, d = 0   (null)          (used as placeholder in update/feature rules)
  *
@@ -275,54 +270,28 @@ hashrule(Solver *solv, Id p, Id d, int n)
  *   always returns a rule for non-pkg rules
  */
 
-/* add a rule with one or two literals */
 Rule *
-solver_addrule2(Solver *solv, Id p1, Id p2)
+solver_addrule(Solver *solv, Id p, Id p2, Id d)
 {
   Pool *pool = solv->pool;
   Rule *r;
-  if (!solv->pkgrules_end)		/* normalize if we add pkg rules */
+
+  if (d)
     {
-      if (p2 && p1 > p2)
+      assert(!p2 && d > 0);
+      if (!pool->whatprovidesdata[d])
+	d = 0;
+      else if (!pool->whatprovidesdata[d + 1])
 	{
-	  /* switch p1 and p2 */
-	  Id o = p1;
-	  p1 = p2;
-	  p2 = o;
+	  p2 = pool->whatprovidesdata[d];
+	  d = 0;
 	}
-      r = solv->rules + solv->nrules - 1;	/* get the last added rule */
-      if (r->p == p1 && !r->d && r->w2 == p2)
-	return r;
     }
-  solv->rules = solv_extend(solv->rules, solv->nrules, 1, sizeof(Rule), RULES_BLOCK);
-  r = solv->rules + solv->nrules++;    /* point to rule space */
-  r->p = p1;
-  r->d = 0;
-  r->w1 = p1;
-  r->w2 = p2;
-  r->n1 = 0;
-  r->n2 = 0;
-  IF_POOLDEBUG (SOLV_DEBUG_RULE_CREATION)
-    {
-      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "  Add rule: ");
-      solver_printrule(solv, SOLV_DEBUG_RULE_CREATION, r);
-    }
-  return r;
-}
 
-/* add rule with at least 3 literals, d is offset into whatprovides array */
-Rule *
-solver_addrulen(Solver *solv, Id p, Id d)
-{
-  Pool *pool = solv->pool;
-  Rule *r = 0;
-  Id *dp;
-
-  /* check that we have at least 3 literals */
-  if (d < 2 || !pool->whatprovidesdata[d])
-    return solver_addrule2(solv, p, 0);
-  if (!pool->whatprovidesdata[d + 1])
-    return solver_addrule2(solv, p, pool->whatprovidesdata[d]);
+  /* now we have two cases:
+   * 1 or 2 literals:    d = 0, p, p2 contain the literals
+   * 3 or more literals: d > 0, p2 == 0, d is offset into whatprovidesdata
+   */
 
   /* it often happenes that requires lead to adding the same pkg rule
    * multiple times, so we prune those duplicates right away to make
@@ -330,34 +299,48 @@ solver_addrulen(Solver *solv, Id p, Id d)
   if (!solv->pkgrules_end)		/* we add pkg rules */
     {
       r = solv->rules + solv->nrules - 1;
-      if (r->p == p)
+      if (d)
 	{
-	  Id *dp2;
-	  if (r->d == d)
+	  Id *dp;
+	  /* check if rule is identical */
+	  if (r->p == p)
+	    {
+	      Id *dp2;
+	      if (r->d == d)
+		return r;
+	      dp2 = pool->whatprovidesdata + r->d;
+	      for (dp = pool->whatprovidesdata + d; *dp; dp++, dp2++)
+		if (*dp != *dp2)
+		  break;
+	      if (*dp == *dp2)
+		return r;
+	    }
+	  /* check if rule is self-fulfilling */
+	  for (dp = pool->whatprovidesdata + d; *dp; dp++)
+	    if (*dp == -p)
+	      return 0;			/* rule is self-fulfilling */
+	}
+      else
+	{
+	  if (p2 && p > p2)
+	    {
+	      Id o = p;			/* switch p1 and p2 */
+	      p = p2;
+	      p2 = o;
+	    }
+	  if (r->p == p && !r->d && r->w2 == p2)
 	    return r;
-	  dp2 = pool->whatprovidesdata + r->d;
-	  for (dp = pool->whatprovidesdata + d; *dp; dp++, dp2++)
-	    if (*dp != *dp2)
-	      break;
-	  if (*dp == *dp2)
-	    return r;
+	  if (p == -p2)
+	    return 0;			/* rule is self-fulfilling */
 	}
     }
 
-  /* check if rule is self-fulfilling */
-  for (dp = pool->whatprovidesdata + d; *dp; dp++)
-    if (*dp == -p)
-      return 0;			/* rule is self-fulfilling */
-
-  /*
-   * allocate new rule r
-   */
   solv->rules = solv_extend(solv->rules, solv->nrules, 1, sizeof(Rule), RULES_BLOCK);
   r = solv->rules + solv->nrules++;    /* point to rule space */
   r->p = p;
   r->d = d;
   r->w1 = p;
-  r->w2 = pool->whatprovidesdata[d];
+  r->w2 = d ? pool->whatprovidesdata[d] : p2;
   r->n1 = 0;
   r->n2 = 0;
   IF_POOLDEBUG (SOLV_DEBUG_RULE_CREATION)
@@ -365,9 +348,9 @@ solver_addrulen(Solver *solv, Id p, Id d)
       POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "  Add rule: ");
       solver_printrule(solv, SOLV_DEBUG_RULE_CREATION, r);
     }
-
   return r;
 }
+
 
 void
 solver_shrinkrules(Solver *solv, int nrules)
@@ -422,21 +405,12 @@ makemultiversionconflict(Solver *solv, Id n, Id con)
 }
 
 static inline void
-addpkgrulen(Solver *solv, Id p, Id d, int type, Id dep)
+addpkgrule(Solver *solv, Id p, Id p2, Id d, int type, Id dep)
 {
   if (!solv->ruleinfoq)
-    solver_addrulen(solv, p, d);
+    solver_addrule(solv, p, p2, d);
   else
-    addpkgruleinfon(solv, p, d, type, dep);
-}
-
-static inline void
-addpkgrule2(Solver *solv, Id p1, Id p2, int type, Id dep)
-{
-  if (!solv->ruleinfoq)
-    solver_addrule2(solv, p1, p2);
-  else
-    addpkgruleinfo2(solv, p1, p2, type, dep);
+    addpkgruleinfo(solv, p, p2, d, type, dep);
 }
 
 #ifdef ENABLE_LINKED_PKGS
@@ -458,19 +432,19 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
 #endif
 
   if (qr->count == 1)
-    addpkgrule2(solv, -(s - pool->solvables), qr->elements[0], SOLVER_RULE_PKG_REQUIRES, req);
+    addpkgrule(solv, -(s - pool->solvables), qr->elements[0], 0, SOLVER_RULE_PKG_REQUIRES, req);
   else
-    addpkgrulen(solv, -(s - pool->solvables), pool_queuetowhatprovides(pool, qr), SOLVER_RULE_PKG_REQUIRES, req);
+    addpkgrule(solv, -(s - pool->solvables), 0, pool_queuetowhatprovides(pool, qr), SOLVER_RULE_PKG_REQUIRES, req);
   if (qp->count > 1)
     {
       Id d = pool_queuetowhatprovides(pool, qp);
       for (i = 0; i < qr->count; i++)
-	addpkgrulen(solv, -qr->elements[i], d, SOLVER_RULE_PKG_REQUIRES, prv);
+	addpkgrule(solv, -qr->elements[i], 0, d, SOLVER_RULE_PKG_REQUIRES, prv);
     }
   else if (qp->count)
     {
       for (i = 0; i < qr->count; i++)
-	addpkgrule2(solv, -qr->elements[i], qp->elements[0], SOLVER_RULE_PKG_REQUIRES, prv);
+	addpkgrule(solv, -qr->elements[i], qp->elements[0], 0, SOLVER_RULE_PKG_REQUIRES, prv);
     }
   if (!m)
     return;	/* nothing more to do if called from getpkgruleinfos() */
@@ -541,7 +515,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
       else
 	{
 	  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, p), p, pool_dep2str(pool, dep));
-	  addpkgrule2(solv, -p, 0, type == SOLVER_RULE_PKG_REQUIRES ? SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP : type, dep);
+	  addpkgrule(solv, -p, 0, 0, type == SOLVER_RULE_PKG_REQUIRES ? SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP : type, dep);
 	}
       queue_free(&bq);
       return;
@@ -577,10 +551,10 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	    {
 	      /* nothing provides req! */
 	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, p), p, pool_dep2str(pool, dep));
-	      addpkgrule2(solv, -p, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, dep);
+	      addpkgrule(solv, -p, 0, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, dep);
 	      continue;
 	    }
-	  addpkgrulen(solv, -p, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_REQUIRES, dep);
+	  addpkgrule(solv, -p, 0, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_REQUIRES, dep);
 	  /* push all non-visited providers on the work queue */
 	  if (m)
 	    for (; *dp; dp++)
@@ -603,13 +577,13 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	      if (type == SOLVER_RULE_PKG_CONFLICTS)
 		{
 		  if (pool->forbidselfconflicts && !is_otherproviders_dep(pool, dep))
-		    addpkgrule2(solv, -p, 0, SOLVER_RULE_PKG_SELF_CONFLICT, dep);
+		    addpkgrule(solv, -p, 0, 0, SOLVER_RULE_PKG_SELF_CONFLICT, dep);
 		  continue;
 		}
-	      addpkgrule2(solv, -p, 0, type, dep);
+	      addpkgrule(solv, -p, 0, 0, type, dep);
 	      continue;
 	    }
-	  addpkgrule2(solv, -p, p2, type, dep);
+	  addpkgrule(solv, -p, p2, 0, type, dep);
 	  if (m && p2 > 0 && !MAPTST(m, p2))
 	    queue_push(workq, p2);
 	}
@@ -655,7 +629,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	      break;
 	  if (j == qcnt)
 	    {
-	      addpkgrulen(solv, qele[0], pool_ids2whatprovides(pool, qele + 1, qcnt - 1), type, dep);
+	      addpkgrule(solv, qele[0], 0, pool_ids2whatprovides(pool, qele + 1, qcnt - 1), type, dep);
 	      if (m)
 		for (j = 0; j < qcnt; j++)
 		  if (qele[j] > 0 && !MAPTST(m, qele[j]))
@@ -745,7 +719,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		: !pool_installable(pool, s))
 	    {
 	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvid2str(pool, n), n);
-	      addpkgrule2(solv, -n, 0, SOLVER_RULE_PKG_NOT_INSTALLABLE, 0);
+	      addpkgrule(solv, -n, 0, 0, SOLVER_RULE_PKG_NOT_INSTALLABLE, 0);
 	    }
 	}
 
@@ -802,7 +776,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (!*dp)
 		{
 		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, n), n, pool_dep2str(pool, req));
-		  addpkgrule2(solv, -n, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, req);
+		  addpkgrule(solv, -n, 0, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, req);
 		  continue;
 		}
 
@@ -815,7 +789,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 	      /* add 'requires' dependency */
               /* rule: (-requestor|provider1|provider2|...|providerN) */
-	      addpkgrulen(solv, -n, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_REQUIRES, req);
+	      addpkgrule(solv, -n, 0, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_REQUIRES, req);
 
 	      /* push all non-visited providers on the work queue */
 	      if (m)
@@ -869,7 +843,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		    {
 		      if (!pool->forbidselfconflicts || is_otherproviders_dep(pool, con))
 			continue;
-		      addpkgrule2(solv, -n, 0, SOLVER_RULE_PKG_SELF_CONFLICT, con);
+		      addpkgrule(solv, -n, 0, 0, SOLVER_RULE_PKG_SELF_CONFLICT, con);
 		      continue;
 		    }
 		  if (ispatch && solv->multiversion.size && MAPTST(&solv->multiversion, p) && ISRELDEP(con))
@@ -878,14 +852,14 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		      Id d = makemultiversionconflict(solv, p, con);
 		      if (d)
 			{
-			  addpkgrulen(solv, -n, d, SOLVER_RULE_PKG_CONFLICTS, con);
+			  addpkgrule(solv, -n, 0, d, SOLVER_RULE_PKG_CONFLICTS, con);
 			  continue;
 			}
 		    }
 		  if (p == SYSTEMSOLVABLE)
 		    p = 0;
                   /* rule: -n|-p: either solvable _or_ provider of conflict */
-		  addpkgrule2(solv, -n, -p, SOLVER_RULE_PKG_CONFLICTS, con);
+		  addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_CONFLICTS, con);
 		}
 	    }
 	}
@@ -921,9 +895,9 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		      if (p == SYSTEMSOLVABLE)
 			p = 0;
 		      if (!isinstalled)
-			addpkgrule2(solv, -n, -p, SOLVER_RULE_PKG_OBSOLETES, obs);
+			addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_OBSOLETES, obs);
 		      else
-			addpkgrule2(solv, -n, -p, SOLVER_RULE_PKG_INSTALLED_OBSOLETES, obs);
+			addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_INSTALLED_OBSOLETES, obs);
 		    }
 		}
 	    }
@@ -952,9 +926,9 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  if (p == SYSTEMSOLVABLE)
 		    p = 0;
 		  if (s->name == ps->name)
-		    addpkgrule2(solv, -n, -p, SOLVER_RULE_PKG_SAME_NAME, 0);
+		    addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_SAME_NAME, 0);
 		  else
-		    addpkgrule2(solv, -n, -p, SOLVER_RULE_PKG_IMPLICIT_OBSOLETES, s->name);
+		    addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_IMPLICIT_OBSOLETES, s->name);
 		}
 	    }
 	}
@@ -1226,7 +1200,7 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	{
 	  /* a linked pseudo package. As it is linked, we do not need an update rule */
 	  /* nevertheless we set specialupdaters so we can update */
-	  solver_addrule2(solv, 0, 0);
+	  solver_addrule(solv, 0, 0, 0);
 	  if (!allow_all && qs.count)
 	    {
 	      if (p != -SYSTEMSOLVABLE)
@@ -1297,7 +1271,7 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	    {
 	      /* could fallthrough, but then we would do pool_queuetowhatprovides twice */
 	      queue_free(&qs);
-	      solver_addrulen(solv, p, d);	/* allow update of s */
+	      solver_addrule(solv, p, 0, d);	/* allow update of s */
 	      return;
 	    }
 	}
@@ -1308,13 +1282,13 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
     {
       d = pool_queuetowhatprovides(pool, &qs);
       queue_free(&qs);
-      solver_addrulen(solv, p, d);	/* allow update of s */
+      solver_addrule(solv, p, 0, d);	/* allow update of s */
     }
   else
     {
       d = qs.count ? qs.elements[0] : 0;
       queue_free(&qs);
-      solver_addrule2(solv, p, d);	/* allow update of s */
+      solver_addrule(solv, p, d, 0);	/* allow update of s */
     }
 }
 
@@ -1545,9 +1519,9 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		continue;	/* installed package not in lock-step */
 	    }
 	  if (lsq.count < 2)
-	    solver_addrule2(solv, -p, lsq.count ? lsq.elements[0] : 0);
+	    solver_addrule(solv, -p, lsq.count ? lsq.elements[0] : 0, 0);
 	  else
-	    solver_addrulen(solv, -p, pool_queuetowhatprovides(pool, &lsq));
+	    solver_addrule(solv, -p, 0, pool_queuetowhatprovides(pool, &lsq));
 	}
     }
   queue_free(&lsq);
@@ -1814,13 +1788,13 @@ solver_addduprules(Solver *solv, Map *addedmap)
 			break;
 		    }
 		  if (!ip)
-		    solver_addrule2(solv, -p, 0);	/* no match, sorry */
+		    solver_addrule(solv, -p, 0, 0);	/* no match, sorry */
 		  else
 		    MAPSET(&solv->dupmap, p);		/* for best rules processing */
 		}
 	    }
 	  else if (!MAPTST(&solv->dupmap, p))
-	    solver_addrule2(solv, -p, 0);
+	    solver_addrule(solv, -p, 0, 0);
 	}
     }
   solv->duprules_end = solv->nrules;
@@ -2378,74 +2352,69 @@ solver_reenablepolicyrules_cleandeps(Solver *solv, Id pkg)
  ***/
 
 static void
-addpkgruleinfon(Solver *solv, Id p, Id d, int type, Id dep)
+addpkgruleinfo(Solver *solv, Id p, Id p2, Id d, int type, Id dep)
 {
   Pool *pool = solv->pool;
   Rule *r;
-  Id od, w2 = 0;
 
-  /* check that we have at least 3 literals */
-  if (d < 2 || !pool->whatprovidesdata[d])
-    return addpkgruleinfo2(solv, p, 0, type, dep);
-  if (!pool->whatprovidesdata[d + 1])
-    return addpkgruleinfo2(solv, p, pool->whatprovidesdata[d], type, dep);
+  if (d)
+    {
+      assert(!p2 && d > 0);
+      if (!pool->whatprovidesdata[d])
+	d = 0;
+      else if (!pool->whatprovidesdata[d + 1])
+	{
+	  p2 = pool->whatprovidesdata[d];
+	  d = 0;
+	}
+    }
 
   /* check if this creates the rule we're searching for */
   r = solv->rules + solv->ruleinfoq->elements[0];
-  od = r->d < 0 ? -r->d - 1 : r->d;
-  if (p != r->p && !od)
-    return;
-  if (d != od)
+  if (d)
     {
-      Id *dp = pool->whatprovidesdata + d;
-      Id *odp = pool->whatprovidesdata + od;
-      while (*dp)
-	if (*dp++ != *odp++)
-	  return;
-      if (*odp)
+      /* three or more literals */
+      Id od = r->d < 0 ? -r->d - 1 : r->d;
+      if (p != r->p && !od)
 	return;
+      if (d != od)
+	{
+	  Id *dp = pool->whatprovidesdata + d;
+	  Id *odp = pool->whatprovidesdata + od;
+	  while (*dp)
+	    if (*dp++ != *odp++)
+	      return;
+	  if (*odp)
+	    return;
+	}
+      if (p < 0 && pool->whatprovidesdata[d] < 0 && type == SOLVER_RULE_PKG_CONFLICTS)
+	p2 = pool->whatprovidesdata[d];
     }
-  /* handle multiversion conflict rules */
-  if (p < 0 && pool->whatprovidesdata[d] < 0 && type == SOLVER_RULE_PKG_CONFLICTS)
-    w2 = pool->whatprovidesdata[d];
-  /* yep, rule matches. record info */
-  queue_push(solv->ruleinfoq, type);
-  queue_push(solv->ruleinfoq, p < 0 ? -p : 0);
-  queue_push(solv->ruleinfoq, w2 < 0 ? -w2 : 0);
-  queue_push(solv->ruleinfoq, dep);
-}
-
-static void
-addpkgruleinfo2(Solver *solv, Id p1, Id p2, int type, Id dep)
-{
-  Rule *r;
-  Id op1 = p1, op2 = p2;
-
-  /* normalize */
-  if (op2 && op1 > op2)
+  else
     {
-      Id o = op1;
-      op1 = op2;
-      op2 = o;
-    }
-  /* check if this creates the rule we're searching for */
-  r = solv->rules + solv->ruleinfoq->elements[0];
-  if (r->p == op1 && r->w2 == op2 && (!r->d || r->d == -1))
-    {
+      /* one or two literals */
+      Id op = p, op2 = p2;
+      if (op2 && op > op2)	/* normalize */
+	{
+	  Id o = op;
+	  op = op2;
+	  op2 = o;
+	}
+      if (r->p != op || r->w2 != op2 || (r->d && r->d != -1))
+	return;
       if (type == SOLVER_RULE_PKG_CONFLICTS && !p2)
 	p2 = -SYSTEMSOLVABLE;
       if (type == SOLVER_RULE_PKG_SAME_NAME)
 	{
-	  /* we normalize same name order */
-	  p1 = op1;
+	  p = op;	/* we normalize same name order */
 	  p2 = op2;
 	}
-      /* yep, rule matches. record info */
-      queue_push(solv->ruleinfoq, type);
-      queue_push(solv->ruleinfoq, p1 < 0 ? -p1 : 0);
-      queue_push(solv->ruleinfoq, p2 < 0 ? -p2 : 0);
-      queue_push(solv->ruleinfoq, dep);
     }
+  /* yep, rule matches. record info */
+  queue_push(solv->ruleinfoq, type);
+  queue_push(solv->ruleinfoq, p < 0 ? -p : 0);
+  queue_push(solv->ruleinfoq, p2 < 0 ? -p2 : 0);
+  queue_push(solv->ruleinfoq, dep);
 }
 
 static int
@@ -3060,7 +3029,7 @@ solver_addchoicerules(Solver *solv)
       lastaddedd = d;
       lastaddedcnt = q.count;
 
-      solver_addrulen(solv, r->p, d);
+      solver_addrule(solv, r->p, 0, d);
       queue_push(&solv->weakruleq, solv->nrules - 1);
       solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
 #if 0
@@ -3193,9 +3162,9 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		continue;	/* nothing filtered */
 	      p2 = queue_shift(&q);
 	      if (q.count < 2)
-	        solver_addrule2(solv, p2, q.count ? q.elements[0] : 0);
+	        solver_addrule(solv, p2, q.count ? q.elements[0] : 0, 0);
 	      else
-	        solver_addrulen(solv, p2, pool_queuetowhatprovides(pool, &q));
+	        solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
 	      queue_push(&r2pkg, -(solv->jobrules + j));
 	    }
 	}
@@ -3263,9 +3232,9 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	    }
 	  p2 = queue_shift(&q);
 	  if (q.count < 2)
-	    solver_addrule2(solv, p2, q.count ? q.elements[0] : 0);
+	    solver_addrule(solv, p2, q.count ? q.elements[0] : 0, 0);
 	  else
-	    solver_addrulen(solv, p2, pool_queuetowhatprovides(pool, &q));
+	    solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
 	  queue_push(&r2pkg, p);
 	}
     }
@@ -3480,9 +3449,9 @@ for (j = 0; j < qq.count; j++)
 		{
 		  /* add the rule */
 		  if (k - groupstart == 1)
-		    solver_addrule2(solv, -p, qq.elements[groupstart]);
+		    solver_addrule(solv, -p, qq.elements[groupstart], 0);
 		  else
-		    solver_addrulen(solv, -p, pool_ids2whatprovides(pool, qq.elements + groupstart, k - groupstart));
+		    solver_addrule(solv, -p, 0, pool_ids2whatprovides(pool, qq.elements + groupstart, k - groupstart));
 		  queue_push(&yumobsinfoq, qo.elements[i]);
 		}
 	      groupstart = k + 1;

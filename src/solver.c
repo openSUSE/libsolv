@@ -1019,13 +1019,13 @@ l1retry:
     {
       d = r.count ? r.elements[0] : 0;
       queue_free(&r);
-      lr = solver_addrule2(solv, p, d);
+      lr = solver_addrule(solv, p, d, 0);
     }
   else
     {
       d = pool_queuetowhatprovides(pool, &r);
       queue_free(&r);
-      lr = solver_addrulen(solv, p, d);
+      lr = solver_addrule(solv, p, 0, d);
     }
   assert(solv->learnt_why.count == (lr - solv->rules) - solv->learntrules);
   queue_push(&solv->learnt_why, learnt_why);
@@ -3136,18 +3136,9 @@ solver_calculate_noobsmap(Pool *pool, Queue *job, Map *multiversionmap)
  * add a rule created by a job, record job number and weak flag
  */
 static inline void
-solver_addjobrule2(Solver *solv, Id p1, Id p2, Id job, int weak)
+solver_addjobrule(Solver *solv, Id p, Id p2, Id d, Id job, int weak)
 {
-  solver_addrule2(solv, p1, p2);
-  queue_push(&solv->ruletojob, job);
-  if (weak)
-    queue_push(&solv->weakruleq, solv->nrules - 1);
-}
-
-static inline void
-solver_addjobrulen(Solver *solv, Id p, Id d, Id job, int weak)
-{
-  solver_addrulen(solv, p, d);
+  solver_addrule(solv, p, p2, d);
   queue_push(&solv->ruletojob, job);
   if (weak)
     queue_push(&solv->weakruleq, solv->nrules - 1);
@@ -3361,7 +3352,7 @@ add_complex_jobrules(Solver *solv, Id dep, int flags, int jobidx, int weak)
     {
       queue_free(&bq);
       if (i == 0)
-        solver_addjobrule2(solv, -SYSTEMSOLVABLE, 0, jobidx, weak);
+        solver_addjobrule(solv, -SYSTEMSOLVABLE, 0, 0, jobidx, weak);
       return 0;
     }
   for (i = 0; i < bq.count; i++)
@@ -3371,9 +3362,9 @@ add_complex_jobrules(Solver *solv, Id dep, int flags, int jobidx, int weak)
       for (j = 0; bq.elements[i + j + 1]; j++)
         ;
       if (j > 1)
-        solver_addjobrulen(solv, bq.elements[i], pool_ids2whatprovides(pool, bq.elements + i + 1, j), jobidx, weak);
+        solver_addjobrule(solv, bq.elements[i], 0, pool_ids2whatprovides(pool, bq.elements + i + 1, j), jobidx, weak);
       else
-        solver_addjobrule2(solv, bq.elements[i], bq.elements[i + 1], jobidx, weak);
+        solver_addjobrule(solv, bq.elements[i], bq.elements[i + 1], 0, jobidx, weak);
       i += j + 1;
     }
   queue_free(&bq);
@@ -3739,7 +3730,7 @@ solver_solve(Solver *solv, Queue *job)
 	{
 	  if (s->repo != installed)
 	    {
-	      solver_addrule2(solv, 0, 0);	/* create dummy rule */
+	      solver_addrule(solv, 0, 0, 0);	/* create dummy rule */
 	      continue;
 	    }
 	  solver_addupdaterule(solv, s, 1);    /* allow s to be updated */
@@ -3767,7 +3758,7 @@ solver_solve(Solver *solv, Queue *job)
 
 	  if (s->repo != installed)
 	    {
-	      solver_addrule2(solv, 0, 0);	/* create dummy rule */
+	      solver_addrule(solv, 0, 0, 0);	/* create dummy rule */
 	      continue;
 	    }
 	  solver_addupdaterule(solv, s, 0);	/* allowall = 0: downgrades not allowed */
@@ -3857,7 +3848,7 @@ solver_solve(Solver *solv, Queue *job)
 		  queue_pushunique(solv->installsuppdepq, rd->evr == 0 ? rd->name : what);
 		}
 	    }
-	  solver_addjobrulen(solv, p, d, i, weak);
+	  solver_addjobrule(solv, p, 0, d, i, weak);
           if (how & SOLVER_FORCEBEST)
 	    hasbestinstalljob = 1;
 	  break;
@@ -3870,21 +3861,21 @@ solver_solve(Solver *solv, Queue *job)
 	  if (select == SOLVER_SOLVABLE_ALL)	/* hmmm ;) */
 	    {
 	      FOR_POOL_SOLVABLES(p)
-	        solver_addjobrule2(solv, -p, 0, i, weak);
+	        solver_addjobrule(solv, -p, 0, 0, i, weak);
 	    }
 	  else if (select == SOLVER_SOLVABLE_REPO)
 	    {
 	      Repo *repo = pool_id2repo(pool, what);
 	      if (repo)
 		FOR_REPO_SOLVABLES(repo, p, s)
-		  solver_addjobrule2(solv, -p, 0, i, weak);
+		  solver_addjobrule(solv, -p, 0, 0, i, weak);
 	    }
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
 	      s = pool->solvables + p;
 	      if (installed && s->repo == installed)
 		name = !name ? s->name : -1;
-	      solver_addjobrule2(solv, -p, 0, i, weak);
+	      solver_addjobrule(solv, -p, 0, 0, i, weak);
 	    }
 	  /* special case for "erase a specific solvable": we also
 	   * erase all other solvables with that name, so that they
@@ -3912,7 +3903,7 @@ solver_solve(Solver *solv, Queue *job)
 		    if (solv->rules[j].p == -p)
 		      break;
 		  if (j == k)
-		    solver_addjobrule2(solv, -p, 0, i, weak);	/* remove by id */
+		    solver_addjobrule(solv, -p, 0, 0, i, weak);	/* remove by id */
 		}
 	    }
 	  break;
@@ -3938,17 +3929,17 @@ solver_solve(Solver *solv, Queue *job)
 	  if (select == SOLVER_SOLVABLE_ALL)
 	    {
 	      FOR_POOL_SOLVABLES(p)
-	        solver_addjobrule2(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, i, weak);
+	        solver_addjobrule(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, 0, i, weak);
 	    }
           else if (select == SOLVER_SOLVABLE_REPO)
 	    {
 	      Repo *repo = pool_id2repo(pool, what);
 	      if (repo)
 	        FOR_REPO_SOLVABLES(repo, p, s)
-	          solver_addjobrule2(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, i, weak);
+	          solver_addjobrule(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, 0, i, weak);
 	    }
 	  FOR_JOB_SELECT(p, pp, select, what)
-	    solver_addjobrule2(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, i, weak);
+	    solver_addjobrule(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, 0, i, weak);
 	  break;
 	case SOLVER_DISTUPGRADE:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: distupgrade %s\n", solver_select2str(pool, select, what));

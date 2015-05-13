@@ -99,8 +99,7 @@ solver_enablerule(struct _Solver *solv, Rule *r)
     r->d = -r->d - 1;
 }
 
-extern Rule *solver_addrule2(struct _Solver *solv, Id p1, Id p2);
-extern Rule *solver_addrulen(struct _Solver *solv, Id p, Id d);
+extern Rule *solver_addrule(struct _Solver *solv, Id p, Id p2, Id d);
 extern void solver_unifyrules(struct _Solver *solv);
 extern int solver_rulecmp(struct _Solver *solv, Rule *r1, Rule *r2);
 extern void solver_shrinkrules(struct _Solver *solv, int nrules);
