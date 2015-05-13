@@ -3869,6 +3869,14 @@ solver_solve(Solver *solv, Queue *job)
 		FOR_REPO_SOLVABLES(repo, p, s)
 		  solver_addjobrule(solv, -p, 0, 0, i, weak);
 	    }
+#ifdef ENABLE_COMPLEX_DEPS
+	  else if ((select == SOLVER_SOLVABLE_PROVIDES || select == SOLVER_SOLVABLE_NAME) && pool_is_complex_dep(pool, what))
+	    {
+	      /* no special "erase a specific solvable" handling? */
+	      add_complex_jobrules(solv, what, select == SOLVER_SOLVABLE_NAME ? (CPLXDEPS_NAME | CPLXDEPS_TODNF | CPLXDEPS_INVERT) : (CPLXDEPS_TODNF | CPLXDEPS_INVERT), i, weak);
+	      break;
+	    }
+#endif
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
 	      s = pool->solvables + p;
