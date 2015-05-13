@@ -905,9 +905,9 @@ static int
 analyze(Solver *solv, int level, Rule *c, Rule **lrp)
 {
   Pool *pool = solv->pool;
-  Queue r;
-  Rule *lr;
-  Id r_buf[4];
+  Queue q;
+  Rule *r;
+  Id q_buf[4];
   int rlevel = 1;
   Map seen;		/* global? */
   Id p = 0, d, v, vv, *dp, why;
@@ -916,7 +916,7 @@ analyze(Solver *solv, int level, Rule *c, Rule **lrp)
   int learnt_why = solv->learnt_pool.count;
   Id *decisionmap = solv->decisionmap;
 
-  queue_init_buffer(&r, r_buf, sizeof(r_buf)/sizeof(*r_buf));
+  queue_init_buffer(&q, q_buf, sizeof(q_buf)/sizeof(*q_buf));
 
   POOL_DEBUG(SOLV_DEBUG_ANALYZE, "ANALYZE at %d ----------------------\n", level);
   map_init(&seen, pool->nsolvables);
@@ -955,7 +955,7 @@ analyze(Solver *solv, int level, Rule *c, Rule **lrp)
 	    num++;			/* need to do this one as well */
 	  else
 	    {
-	      queue_push(&r, v);	/* not level1 or conflict level, add to new rule */
+	      queue_push(&q, v);	/* not level1 or conflict level, add to new rule */
 	      if (l > rlevel)
 		rlevel = l;
 	    }
@@ -983,9 +983,9 @@ l1retry:
 	    break;
 	  POOL_DEBUG(SOLV_DEBUG_ANALYZE, "got %d involved level 1 decisions\n", l1num);
 	  /* clear non-l1 bits from seen map */
-	  for (i = 0; i < r.count; i++)
+	  for (i = 0; i < q.count; i++)
 	    {
-	      v = r.elements[i];
+	      v = q.elements[i];
 	      MAPCLR(&seen, v > 0 ? v : -v);
 	    }
 	  /* only level 1 marks left in seen map */
@@ -1005,8 +1005,8 @@ l1retry:
     {
       POOL_DEBUG(SOLV_DEBUG_ANALYZE, "learned rule for level %d (am %d)\n", rlevel, level);
       solver_printruleelement(solv, SOLV_DEBUG_ANALYZE, 0, p);
-      for (i = 0; i < r.count; i++)
-        solver_printruleelement(solv, SOLV_DEBUG_ANALYZE, 0, r.elements[i]);
+      for (i = 0; i < q.count; i++)
+        solver_printruleelement(solv, SOLV_DEBUG_ANALYZE, 0, q.elements[i]);
     }
   /* push end marker on learnt reasons stack */
   queue_push(&solv->learnt_pool, 0);
@@ -1015,32 +1015,32 @@ l1retry:
   POOL_DEBUG(SOLV_DEBUG_ANALYZE, "reverting decisions (level %d -> %d)\n", level, rlevel);
   level = rlevel;
   revert(solv, level);
-  if (r.count < 2)
+  if (q.count < 2)
     {
-      d = r.count ? r.elements[0] : 0;
-      queue_free(&r);
-      lr = solver_addrule(solv, p, d, 0);
+      d = q.count ? q.elements[0] : 0;
+      queue_free(&q);
+      r = solver_addrule(solv, p, d, 0);
     }
   else
     {
-      d = pool_queuetowhatprovides(pool, &r);
-      queue_free(&r);
-      lr = solver_addrule(solv, p, 0, d);
+      d = pool_queuetowhatprovides(pool, &q);
+      queue_free(&q);
+      r = solver_addrule(solv, p, 0, d);
     }
-  assert(solv->learnt_why.count == (lr - solv->rules) - solv->learntrules);
+  assert(solv->learnt_why.count == (r - solv->rules) - solv->learntrules);
   queue_push(&solv->learnt_why, learnt_why);
-  if (lr->w2)
+  if (r->w2)
     {
       /* needs watches */
-      watch2onhighest(solv, lr);
-      addwatches_rule(solv, lr);
+      watch2onhighest(solv, r);
+      addwatches_rule(solv, r);
     }
   else
     {
       /* rule is an assertion */
-      queue_push(&solv->ruleassertions, lr - solv->rules);
+      queue_push(&solv->ruleassertions, r - solv->rules);
     }
-  *lrp = lr;
+  *lrp = r;
   return level;
 }
 
