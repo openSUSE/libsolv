@@ -542,18 +542,14 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 		if (pool->solvables[dp[j]].repo == installed)
 		  break;		/* provider was installed */
 	      if (!dp[j])
-		{
-		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "ignoring broken requires %s of installed package %s\n", pool_dep2str(pool, dep), pool_solvid2str(pool, p));
-		  continue;
-		}
+	        continue;
 	    }
-	  if (!*dp)
-	    {
-	      /* nothing provides req! */
-	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, p), p, pool_dep2str(pool, dep));
-	      addpkgrule(solv, -p, 0, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, dep);
-	      continue;
-	    }
+	  /* check if the rule contains both p and -p */
+	  for (j = 0; dp[j] != 0; j++)
+	    if (dp[j] == p)
+	      break;
+	  if (dp[j])
+	    continue;
 	  addpkgrule(solv, -p, 0, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_REQUIRES, dep);
 	  /* push all non-visited providers on the work queue */
 	  if (m)
@@ -564,14 +560,15 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	}
       if (!bq.elements[i + 1])
 	{
-	  Id p2 = bq.elements[i];
-	  /* simple rule with just two literals */
-	  if (dontfix && p2 < 0 && pool->solvables[-p2].repo == installed)
-	    continue;
-	  if (dontfix && p2 > 0 && pool->solvables[p2].repo != installed)
-	    continue;
-	  if (p == p2)
-	    continue;
+	  Id p2 = bq.elements[i++];
+	  /* simple rule with just two literals, we'll add a (-p, p2) rule */
+	  if (dontfix)
+	    {
+	      if (p2 < 0 && pool->solvables[-p2].repo == installed)
+		continue;
+	      if (p2 > 0 && pool->solvables[p2].repo != installed)
+		continue;
+	    }
 	  if (-p == p2)
 	    {
 	      if (type == SOLVER_RULE_PKG_CONFLICTS)
@@ -583,6 +580,9 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	      addpkgrule(solv, -p, 0, 0, type, dep);
 	      continue;
 	    }
+	  /* check if the rule contains both p and -p */
+	  if (p == p2)
+	    continue;
 	  addpkgrule(solv, -p, p2, 0, type, dep);
 	  if (m && p2 > 0 && !MAPTST(m, p2))
 	    queue_push(workq, p2);
@@ -627,14 +627,13 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	  for (j = 0; j < qcnt; j++)
 	    if (qele[j] == p)
 	      break;
-	  if (j == qcnt)
-	    {
-	      addpkgrule(solv, qele[0], 0, pool_ids2whatprovides(pool, qele + 1, qcnt - 1), type, dep);
-	      if (m)
-		for (j = 0; j < qcnt; j++)
-		  if (qele[j] > 0 && !MAPTST(m, qele[j]))
-		    queue_push(workq, qele[j]);
-	    }
+	  if (j < qcnt)
+	    continue;
+	  addpkgrule(solv, qele[0], 0, pool_ids2whatprovides(pool, qele + 1, qcnt - 1), type, dep);
+	  if (m)
+	    for (j = 0; j < qcnt; j++)
+	      if (qele[j] > 0 && !MAPTST(m, qele[j]))
+		queue_push(workq, qele[j]);
 	}
     }
   queue_free(&bq);
@@ -779,6 +778,12 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  addpkgrule(solv, -n, 0, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, req);
 		  continue;
 		}
+
+	      for (i = 0; dp[i] != 0; i++)
+	        if (n == dp[i])
+		  break;
+	      if (dp[i])
+		continue;		/* provided by itself, no need to add rule */
 
 	      IF_POOLDEBUG (SOLV_DEBUG_RULE_CREATION)
 	        {
