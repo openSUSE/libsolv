@@ -931,7 +931,16 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  if (p == SYSTEMSOLVABLE)
 		    p = 0;
 		  if (s->name == ps->name)
-		    addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_SAME_NAME, 0);
+		    {
+		      /* optimization: do not add the same-name conflict rule if it was
+		       * already added when we looket at the other package.
+		       * (this assumes pool_colormatch is symmetric) */
+		      if (p && m && ps->repo != installed && MAPTST(m, p) &&
+			  (ps->arch != ARCH_SRC && ps->arch != ARCH_NOSRC) &&
+			  !(solv->multiversion.size && MAPTST(&solv->multiversion, p)))
+			continue;
+		      addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_SAME_NAME, 0);
+		    }
 		  else
 		    addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_IMPLICIT_OBSOLETES, s->name);
 		}
