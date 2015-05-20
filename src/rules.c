@@ -498,13 +498,16 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
-  int i, j;
+  int i, j, flags;
   Queue bq;
 
   queue_init(&bq);
-
+  flags = dontfix ? CPLXDEPS_DONTFIX : 0;
   /* CNF expansion for requires, DNF + INVERT expansion for conflicts */
-  i = pool_normalize_complex_dep(pool, dep, &bq, type == SOLVER_RULE_PKG_REQUIRES ? 0 : (CPLXDEPS_TODNF | CPLXDEPS_EXPAND | CPLXDEPS_INVERT));
+  if (type == SOLVER_RULE_PKG_CONFLICTS)
+    flags |= CPLXDEPS_TODNF | CPLXDEPS_EXPAND | CPLXDEPS_INVERT;
+
+  i = pool_normalize_complex_dep(pool, dep, &bq, flags);
   /* handle special cases */
   if (i == 0)
     {

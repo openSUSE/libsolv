@@ -158,11 +158,11 @@ normalize_dep(Pool *pool, Id dep, Queue *bq, int flags)
 	  r = normalize_dep(pool, rd->name, bq, flags);
 	  if (r == 0)
 	    {
-	      if (rdflags == REL_AND)
+	      if (rdflags == REL_AND && (flags & CPLXDEPS_DONTFIX) == 0)
 		return 0;
 	      if (rdflags == REL_COND)
 		{
-		  r = normalize_dep(pool, rd->evr, bq, flags ^ CPLXDEPS_TODNF);
+		  r = normalize_dep(pool, rd->evr, bq, (flags ^ CPLXDEPS_TODNF) & ~CPLXDEPS_DONTFIX);
 		  if (r == 0 || r == 1)
 		    return r == 0 ? 1 : 0;
 		  invert_depblocks(pool, bq, bqcnt);	/* invert block for COND */
@@ -180,10 +180,12 @@ normalize_dep(Pool *pool, Id dep, Queue *bq, int flags)
 	  /* get blocks of second argument */
 	  bqcnt2 = bq->count;
 	  /* COND is OR with NEG on evr block, so we invert the todnf flag in that case */
-	  r = normalize_dep(pool, rd->evr, bq, rdflags == REL_COND ? (flags ^ CPLXDEPS_TODNF) : flags);
+	  r = normalize_dep(pool, rd->evr, bq, rdflags == REL_COND ? ((flags ^ CPLXDEPS_TODNF) & ~CPLXDEPS_DONTFIX) : flags);
 	  if (r == 0)
 	    {
 	      if (rdflags == REL_OR)
+		return -1;
+	      if (rdflags == REL_AND && (flags & CPLXDEPS_DONTFIX) != 0)
 		return -1;
 	      queue_truncate(bq, bqcnt);
 	      return rdflags == REL_COND ? 1 : 0;

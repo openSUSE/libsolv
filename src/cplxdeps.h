@@ -28,10 +28,11 @@ pool_is_complex_dep(Pool *pool, Id dep)
 
 extern int pool_normalize_complex_dep(Pool *pool, Id dep, Queue *bq, int flags);
 
-#define CPLXDEPS_TODNF  (1 << 0)
-#define CPLXDEPS_EXPAND (1 << 1)
-#define CPLXDEPS_INVERT (1 << 2)
-#define CPLXDEPS_NAME   (1 << 3)
+#define CPLXDEPS_TODNF   (1 << 0)
+#define CPLXDEPS_EXPAND  (1 << 1)
+#define CPLXDEPS_INVERT  (1 << 2)
+#define CPLXDEPS_NAME    (1 << 3)
+#define CPLXDEPS_DONTFIX (1 << 4)
 
 #endif
 
