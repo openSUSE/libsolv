@@ -2479,9 +2479,12 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 	    {
 #ifdef MULTI_SEMANTICS
 	      pool_setdisttype(pool, disttype2str[i].type);
-#else
-	      pool_debug(pool, SOLV_ERROR, "testcase_read: system: cannot change disttype to '%s'\n", pieces[2]);
 #endif
+	      if (pool->disttype != disttype2str[i].type)
+		{
+		  pool_debug(pool, SOLV_ERROR, "testcase_read: system: cannot change disttype to '%s'\n", pieces[2]);
+		  missing_features = 1;
+		}
 	    }
 	  if (strcmp(pieces[1], "unset") == 0)
 	    pool_setarch(pool, 0);
