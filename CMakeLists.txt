@@ -25,6 +25,8 @@ OPTION (ENABLE_CUDFREPO "Build with cudf repository support?" OFF)
 OPTION (ENABLE_HAIKU "Build with Haiku package support?" OFF)
 OPTION (ENABLE_APPDATA "Build with AppStream appdata support?" OFF)
 
+OPTION (MULTI_SEMANTICS "Build with support for multiple distribution types?" OFF)
+
 OPTION (ENABLE_LZMA_COMPRESSION "Build with lzma/xz compression support?" OFF)
 OPTION (ENABLE_BZIP2_COMPRESSION "Build with bzip2 compression support?" OFF)
 
