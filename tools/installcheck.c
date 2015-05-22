@@ -29,6 +29,9 @@
 #ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
 #endif
+#ifdef ENABLE_ARCHREPO
+#include "repo_arch.h"
+#endif
 #include "solver.h"
 #include "solv_xfopen.h"
 
@@ -147,6 +150,12 @@ main(int argc, char **argv)
 	{
 	  r = repo_add_debpackages(repo, fp, 0);
 	}
+#endif
+#ifdef ENABLE_ARCHREPO
+      else if (l >= 10 && (!strcmp(argv[i] + l - 10, ".db.tar.gz") || !strcmp(argv[i] + l - 10, ".db.tar.xz")))
+        {
+	  r = repo_add_arch_repo(repo, fp, 0);
+        }
 #endif
       else
 	r = repo_add_solv(repo, fp, 0);
