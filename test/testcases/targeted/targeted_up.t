@@ -11,7 +11,7 @@ repo available 0 testtags <inline>
 #>=Obs: A = 1-1
 #>=Pkg: D 2 1 noarch
 #>=Pkg: D 3 1 noarch
-system i686 rpm system
+system unset * system
 
 # first check untargeted
 job update name A = 1-1
