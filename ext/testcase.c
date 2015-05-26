@@ -2468,21 +2468,36 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
       else if (!strcmp(pieces[0], "system") && npieces >= 3)
 	{
 	  int i;
-	  prepared = 0;
+
 	  /* must set the disttype before the arch */
-	  for (i = 0; disttype2str[i].str != 0; i++)
-	    if (!strcmp(disttype2str[i].str, pieces[2]))
-	      break;
-	  if (!disttype2str[i].str)
-	    pool_debug(pool, SOLV_ERROR, "testcase_read: system: unknown disttype '%s'\n", pieces[2]);
-	  else if (pool->disttype != disttype2str[i].type)
+	  prepared = 0;
+	  if (strcmp(pieces[2], "*") != 0)
 	    {
-#ifdef MULTI_SEMANTICS
-	      pool_setdisttype(pool, disttype2str[i].type);
-#endif
-	      if (pool->disttype != disttype2str[i].type)
+	      char *dp = pieces[2];
+	      while (dp && *dp)
 		{
-		  pool_debug(pool, SOLV_ERROR, "testcase_read: system: cannot change disttype to '%s'\n", pieces[2]);
+		  char *dpe = strchr(dp, ',');
+		  if (dpe)
+		    *dpe = 0;
+		  for (i = 0; disttype2str[i].str != 0; i++)
+		    if (!strcmp(disttype2str[i].str, dp))
+		      break;
+		  if (dpe)
+		    *dpe++ = ',';
+		  if (disttype2str[i].str)
+		    {
+#ifdef MULTI_SEMANTICS
+		      if (pool->disttype != disttype2str[i].type)
+		        pool_setdisttype(pool, disttype2str[i].type);
+#endif
+		      if (pool->disttype == disttype2str[i].type)
+			break;
+		    }
+		  dp = dpe;
+		}
+	      if (!(dp && *dp))
+		{
+		  pool_debug(pool, SOLV_ERROR, "testcase_read: system: could not change disttype to '%s'\n", pieces[2]);
 		  missing_features = 1;
 		}
 	    }
