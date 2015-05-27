@@ -229,9 +229,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
       int njob, nfeature, nupdate, pass;
       queue_empty(&solv->problems);
       solver_reset(solv);
-
-      if (!solv->problems.count)
-        solver_run_sat(solv, 0, 0);
+      solver_run_sat(solv, 0, 0);
 
       if (!solv->problems.count)
 	{
