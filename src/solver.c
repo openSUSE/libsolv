@@ -909,10 +909,10 @@ analyze(Solver *solv, int level, Rule *c, Rule **lrp)
   Pool *pool = solv->pool;
   Queue q;
   Rule *r;
-  Id q_buf[4];
+  Id q_buf[8];
   int rlevel = 1;
   Map seen;		/* global? */
-  Id p = 0, d, v, vv, *dp, why;
+  Id p = 0, pp, v, vv, why;
   int l, i, idx;
   int num = 0, l1num = 0;
   int learnt_why = solv->learnt_pool.count;
@@ -928,29 +928,17 @@ analyze(Solver *solv, int level, Rule *c, Rule **lrp)
       IF_POOLDEBUG (SOLV_DEBUG_ANALYZE)
 	solver_printruleclass(solv, SOLV_DEBUG_ANALYZE, c);
       queue_push(&solv->learnt_pool, c - solv->rules);
-      d = c->d < 0 ? -c->d - 1 : c->d;
-      dp = d ? pool->whatprovidesdata + d : 0;
-      /* go through all literals of the rule */
-      for (i = -1; ; i++)
+      FOR_RULELITERALS(v, pp, c)
 	{
-	  if (i == -1)
-	    v = c->p;
-	  else if (d == 0)
-	    v = i ? 0 : c->w2;
-	  else
-	    v = *dp++;
-	  if (v == 0)
-	    break;
-
 	  if (DECISIONMAP_TRUE(v))	/* the one true literal */
 	    continue;
 	  vv = v > 0 ? v : -v;
 	  if (MAPTST(&seen, vv))
 	    continue;
+	  MAPSET(&seen, vv);		/* mark that we also need to look at this literal */
 	  l = solv->decisionmap[vv];
 	  if (l < 0)
 	    l = -l;
-	  MAPSET(&seen, vv);		/* mark that we also need to look at this literal */
 	  if (l == 1)
 	    l1num++;			/* need to do this one in level1 pass */
 	  else if (l == level)
@@ -964,7 +952,7 @@ analyze(Solver *solv, int level, Rule *c, Rule **lrp)
 	}
 l1retry:
       if (!num && !--l1num)
-	break;	/* all level 1 literals done */
+	break;	/* all literals done */
 
       /* find the next literal to investigate */
       /* (as num + l1num > 0, we know that we'll always find one) */
@@ -980,6 +968,7 @@ l1retry:
 
       if (num && --num == 0)
 	{
+	  /* done with normal literals, now start level 1 literal processing */
 	  p = -v;	/* so that v doesn't get lost */
 	  if (!l1num)
 	    break;
@@ -1019,13 +1008,13 @@ l1retry:
   revert(solv, level);
   if (q.count < 2)
     {
-      d = q.count ? q.elements[0] : 0;
+      Id d = q.count ? q.elements[0] : 0;
       queue_free(&q);
       r = solver_addrule(solv, p, d, 0);
     }
   else
     {
-      d = pool_queuetowhatprovides(pool, &q);
+      Id d = pool_queuetowhatprovides(pool, &q);
       queue_free(&q);
       r = solver_addrule(solv, p, 0, d);
     }
@@ -1171,10 +1160,10 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 {
   Pool *pool = solv->pool;
   Rule *r;
-  Map seen;		/* global to speed things up? */
+  Map involved;		/* global to speed things up? */
   Map rseen;
-  Id d, v, vv, *dp, why;
-  int l, i, idx;
+  Id pp, v, vv, why;
+  int i, idx;
   Id *decisionmap = solv->decisionmap;
   int oldproblemcount;
   int oldlearntpoolcount;
@@ -1192,38 +1181,25 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   queue_push(&solv->problems, 0);
 
   r = cr;
-  map_init(&seen, pool->nsolvables);
+  map_init(&involved, pool->nsolvables);
   map_init(&rseen, solv->learntrules ? solv->nrules - solv->learntrules : 0);
   if (record_proof)
     queue_push(&solv->learnt_pool, r - solv->rules);
   lastweak = 0;
   analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
-  d = r->d < 0 ? -r->d - 1 : r->d;
-  dp = d ? pool->whatprovidesdata + d : 0;
-  for (i = -1; ; i++)
+  FOR_RULELITERALS(v, pp, r)
     {
-      if (i == -1)
-	v = r->p;
-      else if (d == 0)
-	v = i ? 0 : r->w2;
-      else
-	v = *dp++;
-      if (v == 0)
-	break;
       if (DECISIONMAP_TRUE(v))	/* the one true literal */
 	  continue;
       vv = v > 0 ? v : -v;
-      l = solv->decisionmap[vv];
-      if (l < 0)
-	l = -l;
-      MAPSET(&seen, vv);
+      MAPSET(&involved, vv);
     }
   idx = solv->decisionq.count;
   while (idx > 0)
     {
       v = solv->decisionq.elements[--idx];
       vv = v > 0 ? v : -v;
-      if (!MAPTST(&seen, vv) || vv == SYSTEMSOLVABLE)
+      if (!MAPTST(&involved, vv) || vv == SYSTEMSOLVABLE)
 	continue;
       why = solv->decisionq_why.elements[idx];
       assert(why > 0);
@@ -1231,28 +1207,15 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
         queue_push(&solv->learnt_pool, why);
       r = solv->rules + why;
       analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
-      d = r->d < 0 ? -r->d - 1 : r->d;
-      dp = d ? pool->whatprovidesdata + d : 0;
-      for (i = -1; ; i++)
+      FOR_RULELITERALS(v, pp, r)
 	{
-	  if (i == -1)
-	    v = r->p;
-	  else if (d == 0)
-	    v = i ? 0 : r->w2;
-	  else
-	    v = *dp++;
-	  if (v == 0)
-	    break;
 	  if (DECISIONMAP_TRUE(v))	/* the one true literal */
 	      continue;
 	  vv = v > 0 ? v : -v;
-	  l = solv->decisionmap[vv];
-	  if (l < 0)
-	    l = -l;
-	  MAPSET(&seen, vv);
+	  MAPSET(&involved, vv);
 	}
     }
-  map_free(&seen);
+  map_free(&involved);
   map_free(&rseen);
   queue_push(&solv->problems, 0);	/* mark end of this problem */
 
