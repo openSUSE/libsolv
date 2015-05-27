@@ -576,14 +576,9 @@ makewatches(Solver *solv)
   int nsolvables = solv->pool->nsolvables;
 
   solv_free(solv->watches);
-				       /* lower half for removals, upper half for installs */
+  /* lower half for removals, upper half for installs */
   solv->watches = solv_calloc(2 * nsolvables, sizeof(Id));
-#if 1
-  /* do it reverse so pkg rules get triggered first (XXX: obsolete?) */
   for (i = 1, r = solv->rules + solv->nrules - 1; i < solv->nrules; i++, r--)
-#else
-  for (i = 1, r = solv->rules + 1; i < solv->nrules; i++, r++)
-#endif
     {
       if (!r->w2)		/* assertions do not need watches */
 	continue;
@@ -654,7 +649,6 @@ propagate(Solver *solv, int level)
   Id p, pkg, other_watch;
   Id *dp;
   Id *decisionmap = solv->decisionmap;
-
   Id *watches = solv->watches + pool->nsolvables;   /* place ptr in middle */
 
   POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "----- propagate -----\n");
@@ -662,10 +656,10 @@ propagate(Solver *solv, int level)
   /* foreach non-propagated decision */
   while (solv->propagate_index < solv->decisionq.count)
     {
-	/*
-	 * 'pkg' was just decided
-	 * negate because our watches trigger if literal goes FALSE
-	 */
+      /*
+       * 'pkg' was just decided
+       * negate because our watches trigger if literal goes FALSE
+       */
       pkg = -solv->decisionq.elements[solv->propagate_index++];
 	
       IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
@@ -694,11 +688,11 @@ propagate(Solver *solv, int level)
 	      solver_printrule(solv, SOLV_DEBUG_PROPAGATE, r);
 	    }
 
-	    /* 'pkg' was just decided (was set to FALSE)
-	     *
-	     *  now find other literal watch, check clause
-	     *   and advance on linked list
-	     */
+	  /*
+           * 'pkg' was just decided (was set to FALSE), so this rule
+	   * may now be unit.
+	   */
+	  /* find the other watch */
 	  if (pkg == r->w1)
 	    {
 	      other_watch = r->w2;
@@ -710,17 +704,16 @@ propagate(Solver *solv, int level)
 	      next_rp = &r->n2;
 	    }
 
-	    /*
-	     * This term is already true (through the other literal)
-	     * so we have nothing to do
-	     */
+	  /*
+	   * if the other watch is true we have nothing to do
+	   */
 	  if (DECISIONMAP_TRUE(other_watch))
 	    continue;
 
-	    /*
-	     * The other literal is FALSE or UNDEF
-	     *
-	     */
+	  /*
+	   * The other literal is FALSE or UNDEF
+	   *
+	   */
 
           if (r->d)
 	    {
@@ -731,6 +724,8 @@ propagate(Solver *solv, int level)
 	       *   and not FALSE
 	       *
 	       * (TRUE is also ok, in that case the rule is fulfilled)
+	       * As speed matters here we do not use the FOR_RULELITERALS
+	       * macro.
 	       */
 	      if (r->p                                /* we have a 'p' */
 		  && r->p != other_watch              /* which is not watched */
@@ -762,7 +757,7 @@ propagate(Solver *solv, int level)
 		      if (p > 0)
 			POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "    -> move w%d to %s\n", (pkg == r->w1 ? 1 : 2), pool_solvid2str(pool, p));
 		      else
-			POOL_DEBUG(SOLV_DEBUG_PROPAGATE,"    -> move w%d to !%s\n", (pkg == r->w1 ? 1 : 2), pool_solvid2str(pool, -p));
+			POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "    -> move w%d to !%s\n", (pkg == r->w1 ? 1 : 2), pool_solvid2str(pool, -p));
 		    }
 
 		  *rp = *next_rp;
@@ -1146,7 +1141,7 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
  * Otherwise we return -1 if disablerules is not set or disable
  * _all_ of the problem rules and return 0.
  *
- * return: 0 - disabled some rules, try again
+ * return:  0 - disabled some rules, try again
  *         -1 - hopeless
  */
 
@@ -1438,7 +1433,7 @@ takebranch(Solver *solv, int pos, int end, const char *msg, int disablerules)
  * install best package from the queue. We add an extra package, inst, if
  * provided. See comment in weak install section.
  *
- * returns the new solver level or 0 if unsolvable
+ * returns the new solver level or -1 if unsolvable
  *
  */
 
@@ -1584,8 +1579,6 @@ resolve_jobrules(Solver *solv, int level, int disablerules, Queue *dq)
       level = selectandinstall(solv, level, dq, disablerules, i);
       if (level <= olevel)
 	{
-	  if (level == 0)
-	    return 0;	/* unsolvable */
 	  if (level == olevel)
 	    {
 	      i--;
@@ -1811,7 +1804,7 @@ solver_set_flag(Solver *solv, int flag, int value)
 }
 
 static int
-cleandeps_check_mistakes(Solver *solv, int level)
+cleandeps_check_mistakes(Solver *solv)
 {
   Pool *pool = solv->pool;
   Rule *r;
@@ -1857,8 +1850,6 @@ cleandeps_check_mistakes(Solver *solv, int level)
       solver_reenablepolicyrules_cleandeps(solv, i);
       mademistake = 1;
     }
-  if (mademistake)
-    solver_reset(solv);
   return mademistake;
 }
 
@@ -2744,13 +2735,11 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    continue;		/* back to main loop */
 	}
 
-      if (solv->installed && solv->cleandepsmap.size)
+      if (solv->installed && solv->cleandepsmap.size && cleandeps_check_mistakes(solv))
 	{
-	  if (cleandeps_check_mistakes(solv, level))
-	    {
-	      level = 0;	/* restart from scratch */
-	      continue;
-	    }
+	  solver_reset(solv);
+	  level = 0;	/* restart from scratch */
+	  continue;
 	}
 
       if (solv->solution_callback)
