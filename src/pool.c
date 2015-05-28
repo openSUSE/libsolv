@@ -393,6 +393,34 @@ pool_shrink_whatprovides(Pool *pool)
   memset(pool->whatprovidesdata + o, 0, r * sizeof(Id));
 }
 
+/* this gets rid of all the zeros in the aux */
+static void
+pool_shrink_whatprovidesaux(Pool *pool)
+{
+  int num = pool->whatprovidesauxoff;
+  Id id;
+  Offset newoff;
+  Id *op, *wp = pool->whatprovidesauxdata + 1;
+  int i;
+
+  for (i = 0; i < num; i++)
+    {
+      Offset o = pool->whatprovidesaux[i];
+      if (o < 2)
+	continue;
+      op = pool->whatprovidesauxdata + o;
+      pool->whatprovidesaux[i] = wp - pool->whatprovidesauxdata;
+      if (op < wp)
+	abort();
+      while ((id = *op++) != 0)
+	*wp++ = id;
+    }
+  newoff = wp - pool->whatprovidesauxdata;
+  solv_realloc(pool->whatprovidesauxdata, newoff * sizeof(Id));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "shrunk whatprovidesauxdata from %d to %d\n", pool->whatprovidesauxdataoff, newoff);
+  pool->whatprovidesauxdataoff = newoff;
+}
+
 
 /*
  * pool_createwhatprovides()
@@ -409,7 +437,8 @@ pool_createwhatprovides(Pool *pool)
   Id id;
   Offset *idp, n;
   Offset *whatprovides;
-  Id *whatprovidesdata, *d;
+  Id *whatprovidesdata, *dp;
+  Offset *whatprovidesaux;
   Repo *installed = pool->installed;
   unsigned int now;
 
@@ -477,6 +506,12 @@ pool_createwhatprovides(Pool *pool)
   whatprovidesdata = solv_calloc(off + extra, sizeof(Id));
   whatprovidesdata[2] = SYSTEMSOLVABLE;
 
+  /* alloc aux vector */
+  pool->whatprovidesaux = whatprovidesaux = solv_calloc(num, sizeof(Offset));
+  pool->whatprovidesauxoff = num;
+  pool->whatprovidesauxdataoff = off;
+  pool->whatprovidesauxdata = solv_calloc(pool->whatprovidesauxdataoff, sizeof(Id));
+
   /* now fill data for all provides */
   for (i = pool->nsolvables - 1; i > 0; i--)
     {
@@ -496,19 +531,25 @@ pool_createwhatprovides(Pool *pool)
 	      Reldep *rd = GETRELDEP(pool, id);
 	      id = rd->name;
 	    }
-	  d = whatprovidesdata + whatprovides[id];   /* offset into whatprovidesdata */
-	  if (*d != i)		/* don't add same solvable twice */
+	  dp = whatprovidesdata + whatprovides[id];   /* offset into whatprovidesdata */
+	  if (*dp != i)		/* don't add same solvable twice */
 	    {
-	      d[-1] = i;
+	      dp[-1] = i;
 	      whatprovides[id]--;
+	      pool->whatprovidesauxdata[whatprovides[id]] = pp[-1];
 	    }
+	  else
+	    pool->whatprovidesauxdata[whatprovides[id]] = 1;
 	}
     }
+  memcpy(pool->whatprovidesaux, pool->whatprovides, num * sizeof(Id));
   pool->whatprovidesdata = whatprovidesdata;
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
   pool_shrink_whatprovides(pool);
+  pool_shrink_whatprovidesaux(pool);
   POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (int)(1024/sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovidesaux memory used: %d K id array, %d K data\n", pool->whatprovidesauxoff / (int)(1024/sizeof(Id)), pool->whatprovidesauxdataoff / (int)(1024/sizeof(Id)));
 
   queue_empty(&pool->lazywhatprovidesq);
   if ((!pool->addedfileprovides && pool->disttype == DISTTYPE_RPM) || pool->addedfileprovides == 1)
@@ -527,6 +568,8 @@ pool_createwhatprovides(Pool *pool)
 	  if (pool->whatprovides[i] > 1)
 	    queue_push2(&pool->lazywhatprovidesq, i, pool->whatprovides[i]);
 	  pool->whatprovides[i] = 0;
+	  if (pool->whatprovidesaux)
+	    pool->whatprovidesaux[i] = 0;	/* sorry */
 	}
       POOL_DEBUG(SOLV_DEBUG_STATS, "lazywhatprovidesq size: %d entries\n", pool->lazywhatprovidesq.count / 2);
     }
@@ -547,6 +590,10 @@ pool_freewhatprovides(Pool *pool)
   pool->whatprovidesdata = solv_free(pool->whatprovidesdata);
   pool->whatprovidesdataoff = 0;
   pool->whatprovidesdataleft = 0;
+  pool->whatprovidesaux = solv_free(pool->whatprovidesaux);
+  pool->whatprovidesauxdata = solv_free(pool->whatprovidesauxdata);
+  pool->whatprovidesauxoff = 0;
+  pool->whatprovidesauxdataoff = 0;
 }
 
 
@@ -1111,11 +1158,14 @@ pool_addrelproviders(Pool *pool, Id d)
     }
   else if (flags)
     {
+      Id *ppaux = 0;
       /* simple version comparison relation */
 #if 0
       POOL_DEBUG(SOLV_DEBUG_STATS, "addrelproviders: what provides %s?\n", pool_dep2str(pool, name));
 #endif
       pp = pool_whatprovides_ptr(pool, name);
+      if (!ISRELDEP(name) && name < pool->whatprovidesauxoff)
+	ppaux = pool->whatprovidesaux[name] ? pool->whatprovidesauxdata + pool->whatprovidesaux[name] : 0;
       while (ISRELDEP(name))
 	{
           rd = GETRELDEP(pool, name);
@@ -1124,6 +1174,34 @@ pool_addrelproviders(Pool *pool, Id d)
       while ((p = *pp++) != 0)
 	{
 	  Solvable *s = pool->solvables + p;
+	  if (ppaux)
+	    {
+	      pid = *ppaux++;
+	      if (pid && pid != 1)
+		{
+#if 0
+	          POOL_DEBUG(SOLV_DEBUG_STATS, "addrelproviders: aux hit %d %s\n", p, pool_dep2str(pool, pid));
+#endif
+		  if (!ISRELDEP(pid))
+		    {
+		      if (pid != name)
+			continue;		/* wrong provides name */
+		      if (pool->disttype == DISTTYPE_DEB)
+			continue;		/* unversioned provides can never match versioned deps */
+		    }
+		  else
+		    {
+		      prd = GETRELDEP(pool, pid);
+		      if (prd->name != name)
+			continue;		/* wrong provides name */
+		      /* right package, both deps are rels. check flags/evr */
+		      if (!pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
+			continue;
+		    }
+		  queue_push(&plist, p);
+		  continue;
+		}
+	    }
 	  if (!s->provides)
 	    {
 	      /* no provides - check nevr */
@@ -2510,6 +2588,8 @@ add_new_provider(Pool *pool, Id id, Id p)
   if (p)
     queue_push(&q, p);
   pool->whatprovides[id] = pool_queuetowhatprovides(pool, &q);
+  if (id < pool->whatprovidesauxoff)
+    pool->whatprovidesaux[id] = 0;	/* sorry */
   queue_free(&q);
 }
 

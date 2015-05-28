@@ -99,6 +99,11 @@ struct _Pool {
   Offset whatprovidesdataoff;	/* next free slot within whatprovidesdata */
   int whatprovidesdataleft;	/* number of 'free slots' within whatprovidesdata */
 
+  Offset *whatprovidesaux;
+  Offset whatprovidesauxoff;
+  Id *whatprovidesauxdata;
+  Offset whatprovidesauxdataoff;
+
   /* If nonzero, then consider only the solvables with Ids set in this
      bitmap for solving.  If zero, consider all solvables.  */
   Map *considered;
