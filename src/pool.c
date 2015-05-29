@@ -194,6 +194,8 @@ pool_get_flag(Pool *pool, int flag)
       return pool->noobsoletesmultiversion;
     case POOL_FLAG_ADDFILEPROVIDESFILTERED:
       return pool->addfileprovidesfiltered;
+    case POOL_FLAG_NOWHATPROVIDESAUX:
+      return pool->nowhatprovidesaux;
     default:
       break;
     }
@@ -235,6 +237,9 @@ pool_set_flag(Pool *pool, int flag, int value)
       break;
     case POOL_FLAG_ADDFILEPROVIDESFILTERED:
       pool->addfileprovidesfiltered = value;
+      break;
+    case POOL_FLAG_NOWHATPROVIDESAUX:
+      pool->nowhatprovidesaux = value;
       break;
     default:
       break;
@@ -508,10 +513,13 @@ pool_createwhatprovides(Pool *pool)
 
   /* alloc aux vector */
   whatprovidesauxdata = 0;
-  pool->whatprovidesaux = whatprovidesaux = solv_calloc(num, sizeof(Offset));
-  pool->whatprovidesauxoff = num;
-  pool->whatprovidesauxdataoff = off;
-  pool->whatprovidesauxdata = whatprovidesauxdata = solv_calloc(pool->whatprovidesauxdataoff, sizeof(Id));
+  if (!pool->nowhatprovidesaux)
+    {
+      pool->whatprovidesaux = whatprovidesaux = solv_calloc(num, sizeof(Offset));
+      pool->whatprovidesauxoff = num;
+      pool->whatprovidesauxdataoff = off;
+      pool->whatprovidesauxdata = whatprovidesauxdata = solv_calloc(pool->whatprovidesauxdataoff, sizeof(Id));
+    }
 
   /* now fill data for all provides */
   for (i = pool->nsolvables - 1; i > 0; i--)

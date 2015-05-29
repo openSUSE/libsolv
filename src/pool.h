@@ -160,6 +160,7 @@ struct _Pool {
   int addfileprovidesfiltered;	/* 1: only use filtered file list for addfileprovides */
   int addedfileprovides;	/* true: application called addfileprovides */
   Queue lazywhatprovidesq;	/* queue to store old whatprovides offsets */
+  int nowhatprovidesaux;	/* don't allocate and use the whatprovides aux helper */
 #endif
 };
 
@@ -195,6 +196,7 @@ struct _Pool {
 #define POOL_FLAG_NOOBSOLETESMULTIVERSION		8
 #define POOL_FLAG_ADDFILEPROVIDESFILTERED		9
 #define POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS		10
+#define POOL_FLAG_NOWHATPROVIDESAUX			11
 
 /* ----------------------------------------------- */
 
