@@ -437,7 +437,7 @@ pool_createwhatprovides(Pool *pool)
   Id id;
   Offset *idp, n;
   Offset *whatprovides;
-  Id *whatprovidesdata, *dp;
+  Id *whatprovidesdata, *dp, *whatprovidesauxdata;
   Offset *whatprovidesaux;
   Repo *installed = pool->installed;
   unsigned int now;
@@ -507,10 +507,11 @@ pool_createwhatprovides(Pool *pool)
   whatprovidesdata[2] = SYSTEMSOLVABLE;
 
   /* alloc aux vector */
+  whatprovidesauxdata = 0;
   pool->whatprovidesaux = whatprovidesaux = solv_calloc(num, sizeof(Offset));
   pool->whatprovidesauxoff = num;
   pool->whatprovidesauxdataoff = off;
-  pool->whatprovidesauxdata = solv_calloc(pool->whatprovidesauxdataoff, sizeof(Id));
+  pool->whatprovidesauxdata = whatprovidesauxdata = solv_calloc(pool->whatprovidesauxdataoff, sizeof(Id));
 
   /* now fill data for all provides */
   for (i = pool->nsolvables - 1; i > 0; i--)
@@ -526,6 +527,7 @@ pool_createwhatprovides(Pool *pool)
       pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != 0)
 	{
+	  Id auxid = id;
 	  while (ISRELDEP(id))
 	    {
 	      Reldep *rd = GETRELDEP(pool, id);
@@ -536,20 +538,24 @@ pool_createwhatprovides(Pool *pool)
 	    {
 	      dp[-1] = i;
 	      whatprovides[id]--;
-	      pool->whatprovidesauxdata[whatprovides[id]] = pp[-1];
 	    }
 	  else
-	    pool->whatprovidesauxdata[whatprovides[id]] = 1;
+	    auxid = 1;
+	  if (whatprovidesauxdata)
+	    whatprovidesauxdata[whatprovides[id]] = auxid;
 	}
     }
-  memcpy(pool->whatprovidesaux, pool->whatprovides, num * sizeof(Id));
+  if (pool->whatprovidesaux)
+    memcpy(pool->whatprovidesaux, pool->whatprovides, num * sizeof(Id));
   pool->whatprovidesdata = whatprovidesdata;
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
   pool_shrink_whatprovides(pool);
-  pool_shrink_whatprovidesaux(pool);
+  if (pool->whatprovidesaux)
+    pool_shrink_whatprovidesaux(pool);
   POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (int)(1024/sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (int)(1024/sizeof(Id)));
-  POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovidesaux memory used: %d K id array, %d K data\n", pool->whatprovidesauxoff / (int)(1024/sizeof(Id)), pool->whatprovidesauxdataoff / (int)(1024/sizeof(Id)));
+  if (pool->whatprovidesaux)
+    POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovidesaux memory used: %d K id array, %d K data\n", pool->whatprovidesauxoff / (int)(1024/sizeof(Id)), pool->whatprovidesauxdataoff / (int)(1024/sizeof(Id)));
 
   queue_empty(&pool->lazywhatprovidesq);
   if ((!pool->addedfileprovides && pool->disttype == DISTTYPE_RPM) || pool->addedfileprovides == 1)
