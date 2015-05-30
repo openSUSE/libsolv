@@ -2881,7 +2881,7 @@ rb_eval_string(
   %newobject Job;
   Job *Job() {
     Id extraflags = solver_solutionelement_extrajobflags($self->solv, $self->problemid, $self->solutionid);
-    if ($self->type == SOLVER_SOLUTION_JOB || SOLVER_SOLUTION_POOLJOB)
+    if ($self->type == SOLVER_SOLUTION_JOB || $self->type == SOLVER_SOLUTION_POOLJOB)
       return new_Job($self->solv->pool, SOLVER_NOOP, 0);
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE || $self->type == SOLVER_SOLUTION_BEST)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_NOTBYUSER|extraflags, $self->p);
