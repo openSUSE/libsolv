@@ -235,8 +235,14 @@ data_skip(unsigned char *dp, int type)
       return dp + SIZEOF_MD5;
     case REPOKEY_TYPE_SHA1:
       return dp + SIZEOF_SHA1;
+    case REPOKEY_TYPE_SHA224:
+      return dp + SIZEOF_SHA224;
     case REPOKEY_TYPE_SHA256:
       return dp + SIZEOF_SHA256;
+    case REPOKEY_TYPE_SHA384:
+      return dp + SIZEOF_SHA384;
+    case REPOKEY_TYPE_SHA512:
+      return dp + SIZEOF_SHA512;
     case REPOKEY_TYPE_IDARRAY:
     case REPOKEY_TYPE_REL_IDARRAY:
       while ((*dp & 0xc0) != 0)
