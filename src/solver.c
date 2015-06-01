@@ -182,17 +182,10 @@ autouninstall(Solver *solv, Id *problem)
     {
       if (v < 0)
 	extraflags &= solv->job.elements[-v - 1];
-      if (v >= solv->featurerules && v < solv->featurerules_end)
-	if (v > lastfeature)
-	  lastfeature = v;
       if (v >= solv->updaterules && v < solv->updaterules_end)
 	{
-	  /* check if identical to feature rule */
-	  Id p = solv->rules[v].p;
-	  Rule *r;
-	  if (p <= 0)
-	    continue;
-	  r = solv->rules + solv->featurerules + (p - solv->installed->start);
+	  /* check if identical to feature rule, we don't like that */
+	  Rule *r = solv->rules + solv->featurerules + (v - solv->updaterules);
 	  if (!r->p)
 	    {
 	      /* update rule == feature rule */
@@ -3550,7 +3543,7 @@ solver_solve(Solver *solv, Queue *job)
 	      if (how & SOLVER_FORCEBEST)
 		solv->bestupdatemap_all = 1;
 	    }
-	  if (!solv->dupmap_all)
+	  if (!solv->dupmap_all || solv->allowuninstall)
 	    hasdupjob = 1;
 	  break;
 	default:

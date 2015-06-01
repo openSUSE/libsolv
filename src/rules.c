@@ -1721,6 +1721,15 @@ solver_createdupmaps(Solver *solv)
 		  solver_addtodupmaps(solv, p, how, targeted);
 		}
 	    }
+	  else if (select == SOLVER_SOLVABLE_ALL)
+	    {
+	      FOR_POOL_SOLVABLES(p)
+		{
+		  MAPSET(&solv->dupinvolvedmap, p);
+		  if (installed && pool->solvables[p].repo != installed)
+		    MAPSET(&solv->dupmap, p);
+		}
+	    }
 	  else
 	    {
 	      targeted = how & SOLVER_TARGETED ? 1 : 0;
