@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Tue Jun  2 11:41:10 CEST 2015 - mls@suse.de
+
+- add forgotten sha-512 support to data_skip
+- speed up whatprovides lookup with a new helper array
+- fix dup with allowuninstall
+- improve alreadyinstalled handling of supplements
+- some code cleanup
+- bump version to 0.6.11
+
+-------------------------------------------------------------------
 Sat May  2 11:44:08 UTC 2015 - mrueckert@suse.de
 
 - you really want to use rbconfig there
