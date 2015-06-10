@@ -413,8 +413,7 @@ typedef PyObject *AppObjectPtr;
   $result = $1 ? $1 : Py_None;
   Py_INCREF($result);
 }
-#endif
-#if defined(SWIGPERL)
+#elif defined(SWIGPERL)
 typedef SV *AppObjectPtr;
 %typemap(in) AppObjectPtr {
   $1 = SvROK($input) ? SvRV($input) : 0;
@@ -423,8 +422,7 @@ typedef SV *AppObjectPtr;
   $result = $1 ? newRV_inc($1) : newSV(0);
   argvi++;
 }
-#endif
-#if defined(SWIGRUBY)
+#elif defined(SWIGRUBY)
 typedef VALUE AppObjectPtr;
 %typemap(in) AppObjectPtr {
   $1 = (void *)$input;
@@ -437,6 +435,8 @@ typedef TclObj *AppObjectPtr;
 %typemap(out) AppObjectPtr {
   Tcl_SetObjResult(interp, $1 ? $1 : Tcl_NewObj());
 }
+#else
+#warning AppObjectPtr not defined for this language!
 #endif
 
 
@@ -517,17 +517,16 @@ SWIG_AsValDepId(void *obj, int *val) {
 }
 
 %typemap(out) disown_helper {
-#ifdef SWIGRUBY
+#if defined(SWIGRUBY)
   SWIG_ConvertPtr(self, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
-#endif
-#ifdef SWIGPYTHON
+#elif defined(SWIGPYTHON)
   SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
-#endif
-#ifdef SWIGPERL
+#elif defined(SWIGPERL)
   SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
-#endif
-#ifdef SWIGTCL
+#elif defined(SWIGTCL)
   SWIG_ConvertPtr(objv[1], &argp1, SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN | 0);
+#else
+#warning disown_helper not implemented for this language, this is likely going to leak memory
 #endif
 
 #ifdef SWIGTCL
@@ -1285,8 +1284,7 @@ typedef struct {
     }
     pool_setloadcallback($self, callable ? loadcallback : 0, callable);
   }
-#endif
-#if defined(SWIGPERL)
+#elif defined(SWIGPERL)
 %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     int count;
@@ -1316,9 +1314,7 @@ typedef struct {
       SvREFCNT_inc(callable);
     pool_setloadcallback($self, callable ? loadcallback : 0, callable);
   }
-#endif
-
-#if defined(SWIGRUBY)
+#elif defined(SWIGRUBY)
 %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
@@ -1381,6 +1377,8 @@ typedef struct {
     }
     pool_setloadcallback($self, callable ? loadcallback : 0, callable_temp);
   }
+#else
+#warning loadcallback not implemented for this language
 #endif
 
 #if defined(SWIGTCL)
