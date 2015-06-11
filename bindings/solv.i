@@ -49,6 +49,8 @@ typedef struct {
 %typemap(out,noblock=1,fragment="SWIG_FromCharPtrAndSize") BinaryBlob {
 #if defined(SWIGPYTHON) && defined(PYTHON3)
   $result = $1.data ? Py_BuildValue("y#", $1.data, $1.len) : SWIG_Py_Void();
+#elif defined(SWIGTCL)
+  Tcl_SetObjResult(interp, SWIG_FromCharPtrAndSize($1.data, $1.len));
 #else
   $result = SWIG_FromCharPtrAndSize($1.data, $1.len);
 #if defined(SWIGPERL)
@@ -228,7 +230,80 @@ typedef struct {
 %enddef
 #endif
 
+#if defined(SWIGTCL)
+%typemap(in) Queue {
+  /* Check if is a list */
+  int retval = TCL_OK;
+  int size = 0;
+  int i = 0;
 
+  if (TCL_OK != (retval = Tcl_ListObjLength(interp, $input, &size))) {
+    Tcl_SetObjResult(interp, Tcl_NewStringObj("argument is not a list", -1));
+    return retval;
+  }
+
+  queue_init(&$1);
+
+  for (i = 0; i < size; i++) {
+    Tcl_Obj *o = NULL;
+    int v;
+
+    if (TCL_OK != (retval = Tcl_ListObjIndex(interp, $input, i, &o))) {
+      queue_free(&$1);
+      Tcl_SetObjResult(interp, Tcl_NewStringObj("failed to retrieve a list member", -1));
+      return retval;
+    }
+
+    int e = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(o, &v);
+    if (!SWIG_IsOK(e)) {
+      queue_free(&$1);
+      SWIG_exception_fail(SWIG_ArgError(e), "list must contain only integers");
+      return TCL_ERROR;
+    }
+
+    queue_push(&$1, v);
+  }
+}
+
+%typemap(out) Queue {
+  Tcl_Obj *objvx[$1.count];
+  int i;
+
+  for (i = 0; i < $1.count; i++) {
+    objvx[i] = SWIG_From_int($1.elements[i]);
+  }
+
+  Tcl_SetObjResult(interp, Tcl_NewListObj($1.count, objvx));
+
+  queue_free(&$1);
+}
+
+%define Queue2Array(type, step, con) %{
+  { /* scope is needed to make the goto of SWIG_exception_fail work */
+    int i;
+    int cnt = $1.count / step;
+    Id *idp = $1.elements;
+    Tcl_Obj *objvx[cnt];
+
+    for (i = 0; i < cnt; i++, idp += step) {
+      Id id = *idp;
+#define result resultx
+#define Tcl_SetObjResult(i, x) resultobj = x
+      type result = con;
+      Tcl_Obj *resultobj;
+      $typemap(out, type)
+      objvx[i] = resultobj;
+#undef Tcl_SetObjResult
+#undef result
+    }
+    queue_free(&$1);
+    Tcl_SetObjResult(interp, Tcl_NewListObj(cnt, objvx));
+  }
+%}
+
+%enddef
+
+#endif
 
 
 #if defined(SWIGPERL)
@@ -338,8 +413,7 @@ typedef PyObject *AppObjectPtr;
   $result = $1 ? $1 : Py_None;
   Py_INCREF($result);
 }
-#endif
-#if defined(SWIGPERL)
+#elif defined(SWIGPERL)
 typedef SV *AppObjectPtr;
 %typemap(in) AppObjectPtr {
   $1 = SvROK($input) ? SvRV($input) : 0;
@@ -348,8 +422,7 @@ typedef SV *AppObjectPtr;
   $result = $1 ? newRV_inc($1) : newSV(0);
   argvi++;
 }
-#endif
-#if defined(SWIGRUBY)
+#elif defined(SWIGRUBY)
 typedef VALUE AppObjectPtr;
 %typemap(in) AppObjectPtr {
   $1 = (void *)$input;
@@ -357,6 +430,13 @@ typedef VALUE AppObjectPtr;
 %typemap(out) AppObjectPtr {
   $result = (VALUE)$1;
 }
+#elif defined(SWIGTCL)
+typedef TclObj *AppObjectPtr;
+%typemap(out) AppObjectPtr {
+  Tcl_SetObjResult(interp, $1 ? $1 : Tcl_NewObj());
+}
+#else
+#warning AppObjectPtr not defined for this language!
 #endif
 
 
@@ -372,6 +452,8 @@ typedef VALUE AppObjectPtr;
 SWIGINTERN int
 #ifdef SWIGRUBY
 SWIG_AsValSolvFpPtr(VALUE obj, FILE **val) {
+#elif defined(SWIGTCL)
+SWIG_AsValSolvFpPtr SWIG_TCL_DECL_ARGS_2(void *obj, FILE **val) {
 #else
 SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
 #endif
@@ -393,6 +475,10 @@ SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
   return SWIG_TypeError;
 }
 
+#if defined(SWIGTCL)
+#define SWIG_AsValSolvFpPtr(x, y) SWIG_AsValSolvFpPtr SWIG_TCL_CALL_ARGS_2(x, y)
+#endif
+
 }
 
 
@@ -401,6 +487,8 @@ SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
 SWIGINTERN int
 #ifdef SWIGRUBY
 SWIG_AsValDepId(VALUE obj, int *val) {
+#elif defined(SWIGTCL)
+SWIG_AsValDepId SWIG_TCL_DECL_ARGS_2(void *obj, int *val) {
 #else
 SWIG_AsValDepId(void *obj, int *val) {
 #endif
@@ -408,7 +496,11 @@ SWIG_AsValDepId(void *obj, int *val) {
   void *vptr = 0;
   int ecode;
   if (!desc) desc = SWIG_TypeQuery("Dep *");
+#ifdef SWIGTCL
+  ecode = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(obj, val);
+#else
   ecode = SWIG_AsVal_int(obj, val);
+#endif
   if (SWIG_IsOK(ecode))
     return ecode;
   if ((SWIG_ConvertPtr(obj, &vptr, desc, 0)) == SWIG_OK) {
@@ -419,19 +511,29 @@ SWIG_AsValDepId(void *obj, int *val) {
   return SWIG_TypeError;
 }
 
+#ifdef SWIGTCL
+#define SWIG_AsValDepId(x, y) SWIG_AsValDepId SWIG_TCL_CALL_ARGS_2(x, y)
+#endif
 }
 
 %typemap(out) disown_helper {
-#ifdef SWIGRUBY
+#if defined(SWIGRUBY)
   SWIG_ConvertPtr(self, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
-#endif
-#ifdef SWIGPYTHON
+#elif defined(SWIGPYTHON)
   SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
-#endif
-#ifdef SWIGPERL
+#elif defined(SWIGPERL)
   SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
+#elif defined(SWIGTCL)
+  SWIG_ConvertPtr(objv[1], &argp1, SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN | 0);
+#else
+#warning disown_helper not implemented for this language, this is likely going to leak memory
 #endif
+
+#ifdef SWIGTCL
+  Tcl_SetObjResult(interp, SWIG_From_int((int)(0)));
+#else
   $result = SWIG_From_int((int)(0));
+#endif
 }
 
 %include "typemaps.i"
@@ -1182,8 +1284,7 @@ typedef struct {
     }
     pool_setloadcallback($self, callable ? loadcallback : 0, callable);
   }
-#endif
-#if defined(SWIGPERL)
+#elif defined(SWIGPERL)
 %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     int count;
@@ -1213,9 +1314,7 @@ typedef struct {
       SvREFCNT_inc(callable);
     pool_setloadcallback($self, callable ? loadcallback : 0, callable);
   }
-#endif
-
-#if defined(SWIGRUBY)
+#elif defined(SWIGRUBY)
 %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
@@ -1238,8 +1337,61 @@ typedef struct {
   void set_loadcallback(VALUE callable) {
     pool_setloadcallback($self, callable ? loadcallback : 0, (void *)callable);
   }
+#elif defined(SWIGTCL)
+  %{
+  typedef struct {
+    Tcl_Interp *interp;
+    Tcl_Obj *obj;
+  } tcl_callback_t;
+  SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
+    tcl_callback_t *callback_var = (tcl_callback_t *)d;
+    XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
+    Tcl_Obj *objvx[2];
+    objvx[0] = callback_var->obj;
+    objvx[1] = SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0); 
+    int result = Tcl_EvalObjv(callback_var->interp, sizeof(objvx), objvx, TCL_EVAL_GLOBAL);
+    int ecode = 0;
+    int vresult = 0;
+    Tcl_DecrRefCount(objvx[1]);
+    if (result != TCL_OK)
+      return 0; /* exception */
+    ecode = SWIG_AsVal_int(callback_var->interp, Tcl_GetObjResult(callback_var->interp), &vresult);
+    return SWIG_IsOK(ecode) ? vresult : 0;
+  }
+  %}
+  void set_loadcallback(Tcl_Obj *callable, Tcl_Interp *interp) {
+    tcl_callback_t *callable_temp;
+    if ($self->loadcallback == loadcallback) {
+      tcl_callback_t *obj = $self->loadcallbackdata;
+      Tcl_DecrRefCount(obj->obj);
+      free(obj);
+    }
+    if (callable) {
+      Tcl_IncrRefCount(callable);
+      callable_temp = malloc(sizeof(tcl_callback_t));
+      callable_temp->interp = interp;
+      callable_temp->obj = callable;
+    }
+    else {
+      callable_temp = NULL;
+    }
+    pool_setloadcallback($self, callable ? loadcallback : 0, callable_temp);
+  }
+#else
+#warning loadcallback not implemented for this language
 #endif
 
+#if defined(SWIGTCL)
+  ~Pool() {
+    Pool_set_loadcallback($self, 0, 0);
+    pool_free($self);
+  }
+  disown_helper free() {
+    Pool_set_loadcallback($self, 0, 0);
+    pool_free($self);
+    return 0;
+  }
+#else
   ~Pool() {
     Pool_set_loadcallback($self, 0);
     pool_free($self);
@@ -1249,6 +1401,7 @@ typedef struct {
     pool_free($self);
     return 0;
   }
+#endif
   disown_helper disown() {
     return 0;
   }
@@ -2728,7 +2881,7 @@ rb_eval_string(
   %newobject Job;
   Job *Job() {
     Id extraflags = solver_solutionelement_extrajobflags($self->solv, $self->problemid, $self->solutionid);
-    if ($self->type == SOLVER_SOLUTION_JOB || SOLVER_SOLUTION_POOLJOB)
+    if ($self->type == SOLVER_SOLUTION_JOB || $self->type == SOLVER_SOLUTION_POOLJOB)
       return new_Job($self->solv->pool, SOLVER_NOOP, 0);
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE || $self->type == SOLVER_SOLUTION_BEST)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_NOTBYUSER|extraflags, $self->p);
