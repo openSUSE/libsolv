@@ -158,6 +158,9 @@ toinst(Solver *solv, Repo *repo, Repo *instrepo)
       if (p < 0 || p == SYSTEMSOLVABLE)
 	continue;
 
+      Solvable *s = pool->solvables + p;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+        continue;
      /* printf(" toinstall %s\n", pool_solvid2str(pool, p));*/
       /* oh my! */
       pool->solvables[p].repo = instrepo;
