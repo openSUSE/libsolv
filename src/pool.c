@@ -421,7 +421,7 @@ pool_shrink_whatprovidesaux(Pool *pool)
 	*wp++ = id;
     }
   newoff = wp - pool->whatprovidesauxdata;
-  solv_realloc(pool->whatprovidesauxdata, newoff * sizeof(Id));
+  pool->whatprovidesauxdata = solv_realloc(pool->whatprovidesauxdata, newoff * sizeof(Id));
   POOL_DEBUG(SOLV_DEBUG_STATS, "shrunk whatprovidesauxdata from %d to %d\n", pool->whatprovidesauxdataoff, newoff);
   pool->whatprovidesauxdataoff = newoff;
 }
