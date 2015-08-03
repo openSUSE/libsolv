@@ -2006,7 +2006,7 @@ testcase_solverresult(Solver *solv, int resultflags)
 
 
 int
-testcase_write(Solver *solv, char *dir, int resultflags, const char *testcasename, const char *resultname)
+testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
 {
   Pool *pool = solv->pool;
   Repo *repo;
@@ -2332,7 +2332,7 @@ str2resultflags(Pool *pool, char *s)	/* modifies the string! */
 }
 
 Solver *
-testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, int *resultflagsp)
+testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **resultp, int *resultflagsp)
 {
   Solver *solv;
   char *buf, *bufp;
@@ -2750,7 +2750,7 @@ testcase_read(Pool *pool, FILE *fp, char *testcase, Queue *job, char **resultp, 
 }
 
 char *
-testcase_resultdiff(char *result1, char *result2)
+testcase_resultdiff(const char *result1, const char *result2)
 {
   Strqueue sq1, sq2, osq;
   char *r;
