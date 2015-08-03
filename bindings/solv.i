@@ -603,6 +603,7 @@ typedef int bool;
 #include "repo_autopattern.h"
 #endif
 #include "solv_xfopen.h"
+#include "testcase.h"
 
 /* for old ruby versions */
 #ifndef RARRAY_PTR
@@ -3067,6 +3068,10 @@ rb_eval_string(
     for (i = 1; i <= cnt; i++)
       queue_push(&q, i);
     return q;
+  }
+
+  bool write_testcase(const char *dir) {
+    return testcase_write($self, dir, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0);
   }
 }
 
