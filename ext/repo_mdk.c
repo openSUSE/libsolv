@@ -136,6 +136,8 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 	  char *arch;
 	  char *version;
 	  char *filename;
+	  char *disttag = 0;
+	  char *distepoch = 0;
 	  if ((epochstr = strchr(nvra, '@')) != 0)
 	    {
 	      char *sizestr;
@@ -146,14 +148,23 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 		  *sizestr++ = 0;
 		  if ((groupstr = strchr(sizestr, '@')) != 0)
 		    {
-		      char *n;
 		      *groupstr++ = 0;
-		      if ((n = strchr(groupstr, '@')) != 0)
-			*n = 0;
+		      if ((disttag = strchr(groupstr, '@')) != 0)
+			{
+			  *disttag++ = 0;
+			  if ((distepoch = strchr(disttag, '@')) != 0)
+			    {
+			      char *n;
+			      *distepoch++ = 0;
+			      if ((n = strchr(distepoch, '@')) != 0)
+				*n = 0;
+			    }
+			}
 		      if (*groupstr)
 			repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_GROUP, groupstr);
 		    }
-		  repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(sizestr, 0, 10));
+		  if (*sizestr)
+		    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(sizestr, 0, 10));
 		}
 	    }
           filename = pool_tmpjoin(pool, nvra, ".rpm", 0);
@@ -163,47 +174,21 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 	      *arch++ = 0;
 	      s->arch = pool_str2id(pool, arch, 1);
 	    }
-	  /* argh, do we have a distepoch or not, check self-provides */
-	  if (s->provides)
+	  if (disttag && *disttag)
 	    {
-	      Id id, lastid, *idp = s->repo->idarraydata + s->provides;
-	      lastid = 0;
-	      for (idp = s->repo->idarraydata + s->provides; (id = *idp) != 0; idp++)
-		{
-		  const char *evr, *name;
-		  int namel;
-		  Reldep *rd;
-		  if (!ISRELDEP(id))
-		    continue;
-		  rd = GETRELDEP(pool, id);
-		  if (rd->flags != REL_EQ)
-		    continue;
-		  name = pool_id2str(pool, rd->name);
-		  namel = strlen(name);
-		  if (strncmp(name, nvra, namel) != 0 || nvra[namel] != '-')
-		    continue;
-		  evr = pool_id2str(pool, rd->evr);
-		  evr = strrchr(evr, '-');
-		  if (evr && strchr(evr, ':') != 0)
-		    lastid = id;
-		}
-	      if (lastid)
-		{
-		  /* self provides found, and it contains a distepoch */
-		  /* replace with self-provides distepoch to get rid of the disttag */
-		  char *nvradistepoch = strrchr(nvra, '-');
-		  if (nvradistepoch)
-		    {
-		      Reldep *rd = GETRELDEP(pool, lastid);
-		      const char *evr = pool_id2str(pool, rd->evr);
-		      evr = strrchr(evr, '-');
-		      if (evr && (evr = strchr(evr, ':')) != 0)
-			{
-			  if (strlen(evr) < strlen(nvradistepoch))
-			    strcpy(nvradistepoch, evr);
-			}
-		    }
-		}
+	      /* strip disttag from release */
+	      char *n = strrchr(nvra, '-');
+	      if (n && !strncmp(n + 1, disttag, strlen(disttag)))
+		*n = 0;
+	    }
+	  if (distepoch && *distepoch)
+	    {
+	      /* add distepoch */
+	      int le = strlen(distepoch);
+	      int ln = strlen(nvra);
+	      nvra[ln++] = ':';
+	      memmove(nvra + ln, distepoch, le);	/* may overlap */
+	      nvra[le + ln] = 0;
 	    }
 	  version = strrchr(nvra, '-');
 	  if (version)
