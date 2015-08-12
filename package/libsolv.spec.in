@@ -240,7 +240,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_mandir}/man1/helix2solv*
 %endif
 %{_datadir}/cmake/Modules/*
-%{_libdir}/libsolv.pc
+%{_libdir}/pkgconfig/libsolv.pc
 %{_mandir}/man3/*
 
 %files demo
