@@ -4,5 +4,5 @@ includedir=@INCLUDE_INSTALL_DIR@
 Name: libsolv
 Description: Library for solving packages and reading repositories
 Version: @VERSION@
-Libs: -L${libdir} -lsolv -lsolvext
+Libs: -L${libdir} -lsolvext -lsolv
 Cflags: -I${includedir}
