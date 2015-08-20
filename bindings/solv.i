@@ -3036,6 +3036,44 @@ rb_eval_string(
     return reason;
   }
 
+  %newobject describe_weakdep_decision_raw;
+  Queue describe_weakdep_decision_raw(XSolvable *s) {
+    Queue q;
+    queue_init(&q);
+    solver_describe_weakdep_decision($self, s->id, &q);
+    return q;
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def describe_weakdep_decision(self, s):
+      d = iter(self.describe_weakdep_decision_raw(s))
+      return [ (t, XSolvable(self.pool, sid), Dep(self.pool, id)) for t, sid, id in zip(d, d, d) ]
+  }
+#endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Solver::describe_weakdep_decision {
+      my ($self, $s) = @_;
+      my $pool = $self->{'pool'};
+      my @res;
+      my @d = $self->describe_weakdep_decision_raw($s);
+      push @res, [ splice(@d, 0, 3) ] while @d;
+      return map { [ $_->[0], solv::XSolvable->new($pool, $_->[1]), solv::Dep->new($pool, $_->[2]) ] } @res;
+    }
+  }
+#endif
+#if defined(SWIGRUBY)
+%init %{
+rb_eval_string(
+    "class Solv::Solver\n"
+    "  def describe_weakdep_decision(s)\n"
+    "    self.describe_weakdep_decision_raw(s).each_slice(3).map { |t, sid, id| [ t, Solv::XSolvable.new(self.pool, sid), Solv::Dep.new(self.pool, id)] }\n"
+    "  end\n"
+    "end\n"
+  );
+%}
+#endif
+
   int alternatives_count() {
     return solver_alternatives_count($self);
   }
