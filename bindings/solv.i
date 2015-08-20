@@ -50,7 +50,7 @@ typedef struct {
 #if defined(SWIGPYTHON) && defined(PYTHON3)
   $result = $1.data ? Py_BuildValue("y#", $1.data, $1.len) : SWIG_Py_Void();
 #elif defined(SWIGTCL)
-  Tcl_SetObjResult(interp, SWIG_FromCharPtrAndSize($1.data, $1.len));
+  Tcl_SetObjResult(interp, $1.data ? Tcl_NewByteArrayObj($1.data, $1.len) : NULL);
 #else
   $result = SWIG_FromCharPtrAndSize($1.data, $1.len);
 #if defined(SWIGPERL)
