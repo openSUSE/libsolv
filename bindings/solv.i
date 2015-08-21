@@ -3517,3 +3517,25 @@ rb_eval_string(
     return solver_alternative2str($self->solv, $self->type, $self->type == SOLVER_ALTERNATIVE_TYPE_RULE ? $self->rid : $self->dep_id, $self->from_id);
   }
 }
+
+#if defined(SWIGTCL)
+%init %{
+  Tcl_Eval(interp,
+"proc solv::iter {varname iter body} {\n"\
+"  while 1 {\n"\
+"    set value [$iter __next__]\n"\
+"    if {$value eq \"NULL\"} { break }\n"\
+"    uplevel [list set $varname $value]\n"\
+"    set code [catch {uplevel $body} result]\n"\
+"    switch -exact -- $code {\n"\
+"      0 {}\n"\
+"      3 { return }\n"\
+"      4 {}\n"\
+"      default { return -code $code $result }\n"\
+"    }\n"\
+"  }\n"\
+"}\n"
+  );
+%}
+#endif
+
