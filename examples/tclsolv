@@ -1,0 +1,342 @@
+#!/usr/bin/tclsh
+
+package require solv
+package require inifile
+package require fileutil
+
+set reposdir /etc/zypp/repos.d
+
+proc fileno {file} {
+  if [regexp -- {^file(\d+)$} $file match fd] {
+    return $fd
+  }
+  error "file not open"
+}
+
+proc repo_calc_cookie_file {selfname filename} {
+  upvar $selfname self
+  set chksum [solv::new_Chksum $solv::REPOKEY_TYPE_SHA256]
+  $chksum add 1.1
+  $chksum add_stat $filename
+  return [$chksum raw]
+}
+
+proc repo_calc_cookie_fp {selfname fp} {
+  upvar $selfname self
+  set chksum [solv::new_Chksum $solv::REPOKEY_TYPE_SHA256]
+  $chksum add 1.1
+  $chksum add_fp $fp
+  return [$chksum raw]
+}
+
+proc repo_calc_cookie_ext {selfname f cookie} {
+  upvar $selfname self
+  set chksum [solv::new_Chksum $solv::REPOKEY_TYPE_SHA256]
+  $chksum add 1.1
+  $chksum add cookie
+  $chksum add_fstat [$f fileno]
+  set extcookie [$chksum raw]
+  if {[string index $extcookie 0] eq "\000"} {
+    set extcookie [string replace $extcookie 0 0 "\001"]
+  }
+  return $extcookie
+}
+
+proc repo_cachepath {selfname {ext "-"}} {
+  upvar $selfname self
+  regsub {^\.} [dict get $self name] _ path
+  if {$ext ne "-"} {
+    set path "${path}_$ext.solvx"
+  } else {
+    set path "${path}.solv"
+  }
+  regsub -all / $path _ path
+  return "/var/cache/solv/$path"
+}
+
+proc repo_generic_load {selfname pool} {
+  upvar $selfname self
+  set handle [ $pool add_repo [ dict get $self name ] ]
+  dict set self handle $handle
+  $handle configure -appdata $self -priority [expr 99 - [dict get $self priority]]
+  set dorefresh [dict get $self autorefresh]
+  set metadata_expire [dict get $self metadata_expire]
+  catch {
+    if {$metadata_expire == -1 || [clock seconds] - [file mtime [repo_cachepath self]] < $metadata_expire} {
+      set dorefresh 0
+    }
+  }
+  dict set self cookie {}
+  if { !$dorefresh && [repo_usecachedrepo self] } {
+    puts "repo [dict get $self name]: cached"
+    return 1 
+  }
+  return 0 
+}
+
+proc repo_free_handle {selfname} {
+  upvar $selfname self
+  set handle [ dict get $self handle ]
+  dict remove $self handle
+  $handle free 1
+}
+
+proc repo_usecachedrepo {selfname {ext "-"} {mark 0}} {
+  upvar $selfname self
+  return 0
+  set repopath [repo_cachepath self]
+  set code [catch {
+    set f [open $repopath "rb"]
+    seek $f -32 end
+    set fcookie [read $f 32]
+    set cookie [dict get $self [expr { $ext eq "-" ? {cookie} : {extcookie}}]]
+    if {$cookie ne {} && $cookie ne $fcookie} {
+      close $f
+      return 0
+    }
+    set fextcookie {}
+    if {$ext eq "-" && [dict get $self type] ne "system"} {
+      seek $f -64 end
+      set fextcookie [read $f 32]
+    }
+    seek $f 0 start
+    set ff [solv::xfopen_fd {} [fileno $f]]
+    close $f
+    set flags 0
+    if {$ext ne "-"} {
+      set flags [expr $solv::Repo_REPO_USE_LOADING | $solv::Repo_REPO_EXTEND_SOLVABLES]
+      if {$ext ne "DL"} {
+	set flags [expr $flags | $solv::Repo_REPO_LOCALPOOL]
+      }
+    }
+    if {! [[dict get $self handle] add_solv $ff $flags]} {
+      $ff close
+      return 0
+    }
+    $ff close
+    if {[dict get $self type] ne "system" && $ext eq "-"} {
+      dict set self cookie $fcookie
+      dict set self extcookie $fextcookie
+    }
+    if {$mark} {
+      catch {
+        ::fileutil::touch -c -m -t [clock seconds] $repopath
+      }
+    }
+    return 1
+  } res]
+  return [expr {$code == 2 ? $res : 0}]
+}
+
+proc repo_writecachedrepo {selfname {ext "-"}} {
+  upvar $selfname self
+  if [dict exists $self incomplete] {
+    return
+  }
+}
+
+proc repo_download {selfname file uncompress chksum {markincomplete 0}} {
+  upvar $selfname self
+  set url [dict get $self baseurl]
+  regsub {/$} $url {} url
+  set url "$url/$file"
+  set tempfilename [::fileutil::tempfile]
+  set f [open $tempfilename rb+]
+  file delete -- $tempfilename
+  if [catch {
+    exec -ignorestderr -- curl -f -s -L $url ">@$f"
+  }] {
+    seek $f 0 end
+    if {($chksum ne "" && $chksum ne "NULL") || [tell $f] != 0} {
+      puts "$file: download error"
+    }
+    close $f
+    return 0
+  }
+  seek $f 0 start
+  if {$chksum ne "" && $chksum ne "NULL"} {
+    set fchksum [solv::new_Chksum [$chksum cget -type]]
+    if {$fchksum eq "" || $fchksum eq "NULL"} {
+      puts "$file: unknown checksum type"
+      if {$markincomplete} {
+	dict set self incomplete 1
+      }
+      close $f
+      return 0
+    }
+    $fchksum add_fd [fileno $f]
+    if {[$fchksum hex] ne [$chksum hex]} {
+      puts "$file: checksum mismatch"
+      if {$markincomplete} {
+	dict set self incomplete 1
+      }
+      close $f
+      return 0
+    }
+  }
+  set ff [solv::xfopen_fd [expr {$uncompress ? $file : ""}] [fileno $f]]
+  close $f
+  if {$ff eq "NULL"} {
+    return 0
+  }
+  return $ff
+}
+
+###
+
+proc repo_system_load {selfname pool} {
+  upvar $selfname self
+  set handle [ $pool add_repo [ dict get $self name ] ]
+  dict set self handle $handle
+  $handle configure -appdata $self
+  $pool configure -installed $handle
+  puts -nonewline "rpm database: "
+  dict set self cookie [repo_calc_cookie_file self "/var/lib/rpm/Packages"]
+  if [repo_usecachedrepo self] {
+    puts "cached"
+    return 1
+  }
+  puts "reading"
+  set f [solv::xfopen [repo_cachepath self]]
+  $handle add_rpmdb_reffp $f $solv::Repo_REPO_REUSE_REPODATA
+  repo_writecachedrepo self
+}
+
+###
+
+proc repo_repomd_find {selfname what} {
+  upvar $selfname self
+  set handle [dict get $self handle]
+  set di [$handle Dataiterator_meta $solv::REPOSITORY_REPOMD_TYPE $what $solv::Dataiterator_SEARCH_STRING]
+  $di prepend_keyname $solv::REPOSITORY_REPOMD
+  solv::iter d $di {
+    set dp [$d parentpos]
+    set filename [$dp lookup_str $solv::REPOSITORY_REPOMD_LOCATION]
+    set checksum [$dp lookup_checksum $solv::REPOSITORY_REPOMD_CHECKSUM]
+    if {$filename ne "" && $checksum eq "NULL"} {
+      puts "no $filename file checksum"
+    } elseif {$filename ne ""} {
+      return [list $filename $checksum]
+    }
+  }
+  return {}
+}
+
+proc repo_repomd_load {selfname pool} {
+  upvar $selfname self
+  if [repo_generic_load self $pool] {
+    return 1
+  }
+  puts -nonewline "rpmmd repo '[dict get $self name]': "
+  set f [repo_download self {repodata/repomd.xml} 0 {}]
+  if {$f == 0} {
+    puts "no repomd.xml file, skipped"
+    repo_free_handle self
+    return 0
+  }
+  dict set self cookie [repo_calc_cookie_fp self $f]
+  if [repo_usecachedrepo self] {
+    puts "cached"
+    return 1
+  }
+  set handle [dict get $self handle]
+  $handle add_repomdxml $f 0
+  puts "fetching"
+  set primary [repo_repomd_find self primary]
+  if {$primary ne ""} {
+    set f [repo_download self [lindex $primary 0] 1 [lindex $primary 1] 1]
+    if {$f != 0} {
+      $handle add_rpmmd $f "NULL" 0
+      $f close
+    }
+    if [dict exists $self incomplete] {
+      return 0
+    }
+  }
+  set updateinfo [repo_repomd_find self primary]
+  if {$updateinfo ne ""} {
+    set f [repo_download self [lindex $updateinfo  0] 1 [lindex $updateinfo 1] 1]
+    if {$f != 0} {
+      $handle add_updateinfoxml $f 0
+      $f close
+    }
+  }
+  repo_writecachedrepo self
+  return 1
+}
+
+###
+
+proc repo_susetags_load {selfname pool} {
+  upvar $selfname self
+  if [repo_generic_load self $pool] {
+    return 1
+  }
+  puts -nonewline "susetags repo '[dict get $self name]': "
+  puts "skipped"
+  return 0
+}
+
+###
+
+proc repo_unknown_load {selfname pool} {
+  upvar $selfname self
+  puts "unsupported repo '[dict get $self name]': skipped"
+  return 0
+}
+
+###
+
+proc repo_load {selfname pool} {
+  upvar $selfname self
+  "repo_[dict get $self type]_load" self $pool
+}
+
+
+
+set repos {}
+foreach reponame [lsort [glob -nocomplain -directory $reposdir *.repo]] {
+  set ini [::ini::open $reponame r]
+  foreach alias [::ini::sections $ini] {
+    set repoattr [dict create enabled 0 priority 99 autorefresh 1 type rpm-md metadata_expire 900]
+    set repoattr [dict replace $repoattr {*}[::ini::get $ini $alias]]
+    dict set repoattr name $alias
+    switch -exact -- [dict get $repoattr type] {
+      rpm-md  { dict set repoattr type repomd }
+      yast2   { dict set repoattr type susetags }
+      default { dict set repoattr type unknown }
+    }
+    lappend repos $repoattr
+  }
+  ::ini::close $ini
+}
+
+set pool [solv::new_Pool]
+$pool setarch
+
+set sysrepo [dict create name {@System} type system]
+repo_load sysrepo $pool
+
+foreach repo $repos {
+  if [dict get $repo enabled] {
+    repo_load repo $pool
+  }
+}
+
+
+set cmd [lindex $::argv 0]
+
+if {$cmd == "search"} {
+  set arg [lindex $::argv 1]
+  $pool createwhatprovides
+  set sel [$pool Selection]
+  set di [$pool Dataiterator $solv::SOLVABLE_NAME $arg [ expr $solv::Dataiterator_SEARCH_SUBSTRING | $solv::Dataiterator_SEARCH_NOCASE ]]
+  solv::iter d $di {
+    $sel add_raw $solv::Job_SOLVER_SOLVABLE [$d cget -solvid]
+  }
+  foreach s [$sel solvables] {
+    puts [format { - %s [%s]: %s} [$s __str__] [[$s cget -repo] cget -name] [$s lookup_str $solv::SOLVABLE_SUMMARY]]
+  }
+  exit
+}
+
