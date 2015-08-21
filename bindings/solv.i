@@ -431,8 +431,13 @@ typedef VALUE AppObjectPtr;
   $result = (VALUE)$1;
 }
 #elif defined(SWIGTCL)
-typedef TclObj *AppObjectPtr;
+typedef Tcl_Obj *AppObjectPtr;
+%typemap(in) AppObjectPtr {
+  $1 = (void *)$input;
+}
 %typemap(out) AppObjectPtr {
+  if ($1)
+    Tcl_IncrRefCount((Tcl_Obj *)$1);
   Tcl_SetObjResult(interp, $1 ? $1 : Tcl_NewObj());
 }
 #else
