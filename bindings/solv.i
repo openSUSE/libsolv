@@ -755,6 +755,11 @@ typedef int Id;
 %constant int REL_GT;
 %constant int REL_LT;
 %constant int REL_ARCH;
+%constant int REL_AND;
+%constant int REL_OR;
+%constant int REL_WITH;
+%constant int REL_COND;
+%constant int REL_ELSE;
 
 typedef struct {
   Pool* const pool;

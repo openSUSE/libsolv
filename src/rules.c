@@ -52,7 +52,9 @@ dep_possible(Solver *solv, Id dep, Map *m)
       Reldep *rd = GETRELDEP(pool, dep);
       if (rd->flags >= 8)
 	 {
-	  if (rd->flags == REL_AND || rd->flags == REL_COND)
+	  if (rd->flags == REL_COND)
+	    return 1;
+	  if (rd->flags == REL_AND)
 	    {
 	      if (!dep_possible(solv, rd->name, m))
 		return 0;

@@ -192,6 +192,8 @@ pool_id2rel(const Pool *pool, Id id)
       return " compat >= ";
     case REL_KIND:
       return " KIND ";
+    case REL_ELSE:
+      return " ELSE ";
     default:
       break;
     }

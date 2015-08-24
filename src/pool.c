@@ -1014,10 +1014,21 @@ pool_addrelproviders(Pool *pool, Id d)
 
 	case REL_AND:
 	case REL_OR:
+	case REL_COND:
+	  if (flags == REL_COND)
+	    {
+	      if (ISRELDEP(evr))
+		{
+		  Reldep *rd2 = GETRELDEP(pool, evr);
+		  evr = rd2->flags == REL_ELSE ? rd2->evr : 0;
+		}
+	      else
+	        evr = 0;	/* assume cond is true */
+	    }
 	  wp = pool_whatprovides(pool, name);
 	  if (!pool->whatprovidesdata[wp])
-	    wp = pool_whatprovides(pool, evr);
-	  else
+	    wp = evr ? pool_whatprovides(pool, evr) : 1;
+	  else if (evr)
 	    {
 	      /* sorted merge */
 	      pp2 = pool_whatprovides_ptr(pool, evr);
@@ -1041,11 +1052,6 @@ pool_addrelproviders(Pool *pool, Id d)
 	      if (pp - (pool->whatprovidesdata + wp) != plist.count)
 		wp = 0;
 	    }
-	  break;
-
-	case REL_COND:
-	  /* assume the condition is true */
-	  wp = pool_whatprovides(pool, name);
 	  break;
 
 	case REL_NAMESPACE:

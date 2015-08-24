@@ -13,7 +13,6 @@
 #include "pool_parserpmrichdep.h"
 
 #define REL_THEN 0
-#define REL_ELSE 0
 
 static struct RichOpComp {
   const char *n;

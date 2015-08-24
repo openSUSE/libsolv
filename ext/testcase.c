@@ -378,6 +378,7 @@ struct oplist {
   { REL_COND,  "<IF>" },
   { REL_COMPAT,  "compat >=" },
   { REL_KIND,  "<KIND>" },
+  { REL_ELSE, "<ELSE>" },
   { REL_LT, "<" },
   { 0, 0 }
 };
