@@ -73,6 +73,7 @@ main(int argc, char **argv)
   int resultflags = 0;
   int debuglevel = 0;
   int writeresult = 0;
+  char *writetestcase = 0;
   int multijob = 0;
   int rescallback = 0;
   int c;
@@ -82,7 +83,7 @@ main(int argc, char **argv)
   const char *p;
 
   queue_init(&solq);
-  while ((c = getopt(argc, argv, "vmrhl:s:")) >= 0)
+  while ((c = getopt(argc, argv, "vmrhl:s:T:")) >= 0)
     {
       switch (c)
       {
@@ -106,6 +107,9 @@ main(int argc, char **argv)
 	    queue_push2(&solq, atoi(optarg), atoi(p + 1));
 	  else
 	    queue_push2(&solq, 1, atoi(optarg));
+          break;
+        case 'T':
+	  writetestcase = optarg;
           break;
         default:
 	  usage(1);
@@ -231,6 +235,8 @@ main(int argc, char **argv)
 	  else
 	    {
 	      int pcnt = solver_solve(solv, &job);
+	      if (writetestcase)
+		testcase_write(solv, writetestcase, resultflags, 0, 0);
 	      if (pcnt && solq.count)
 		{
 		  int i, taken = 0;
