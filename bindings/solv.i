@@ -37,6 +37,8 @@ typedef struct {
   }
 #else
   res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
+  if (buf && size)
+    size--;
 #endif
   if (!SWIG_IsOK(res)) {
 #if defined(SWIGPYTHON)
