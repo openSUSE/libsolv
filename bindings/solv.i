@@ -22,7 +22,22 @@ typedef struct {
 %}
 
 %typemap(in,noblock=1,fragment="SWIG_AsCharPtrAndSize") (const unsigned char *str, size_t len) (int res, char *buf = 0, size_t size = 0, int alloc = 0) {
+#if defined(SWIGTCL)
+  {
+    int bal;
+    unsigned char *ba;
+    res = SWIG_TypeError;
+    ba = Tcl_GetByteArrayFromObj($input, &bal);
+    if (ba) {
+      buf = (char *)ba;
+      size = bal;
+      res = SWIG_OK;
+      alloc = SWIG_OLDOBJ;
+    }
+  }
+#else
   res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
+#endif
   if (!SWIG_IsOK(res)) {
 #if defined(SWIGPYTHON)
     const void *pybuf = 0;
@@ -945,6 +960,9 @@ typedef struct {
   }
   int dup() {
     return $self->fp ? dup(fileno($self->fp)) : -1;
+  }
+  bool write(const unsigned char *str, size_t len) {
+    return fwrite(str, len, 1, $self->fp) == 1;
   }
   bool flush() {
     if (!$self->fp)
