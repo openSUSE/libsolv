@@ -12,8 +12,6 @@
 #include "pool.h"
 #include "pool_parserpmrichdep.h"
 
-#define REL_THEN 0
-
 static struct RichOpComp {
   const char *n;
   int l;
@@ -26,10 +24,7 @@ static struct RichOpComp {
   { "|", 1, REL_OR },
   { "OR", 2, REL_OR },
   { "IF", 2, REL_COND },
-  { "THEN", 4, REL_THEN },
-  { "?", 1, REL_THEN },
   { "ELSE", 4, REL_ELSE },
-  { ":", 1, REL_ELSE },
   { NULL, 0, 0},
 };
 
@@ -115,7 +110,7 @@ parseRichDep(Pool *pool, const char **depp, Id chainfl)
   fl = op->fl;
   if (!fl)
     return 0;
-  if (chainfl == REL_THEN && fl == REL_ELSE)
+  if (chainfl == REL_COND && fl == REL_ELSE)
     chainfl = 0;
   if (chainfl && fl != chainfl)
     return 0;
