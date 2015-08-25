@@ -417,5 +417,38 @@ pool_normalize_complex_dep(Pool *pool, Id dep, Queue *bq, int flags)
   return i;
 }
 
+void
+pool_add_pos_literals_complex_dep(Pool *pool, Id dep, Queue *q, Map *m, int neg)
+{
+  while (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags != REL_AND && rd->flags != REL_OR && rd->flags != REL_COND)
+	break;
+      pool_add_pos_literals_complex_dep(pool, rd->name, q, m, neg);
+      dep = rd->evr;
+      if (rd->flags == REL_COND)
+	{
+	  neg = !neg;
+	  if (ISRELDEP(dep))
+	    {
+	      Reldep *rd2 = GETRELDEP(pool, rd->evr);
+	      if (rd2->flags == REL_ELSE)
+		{
+	          pool_add_pos_literals_complex_dep(pool, rd2->evr, q, m, !neg);
+		  dep = rd2->name;
+		}
+	    }
+	}
+    }
+  if (!neg)
+    {
+      Id p, pp;
+      FOR_PROVIDES(p, pp, dep)
+	if (!MAPTST(m, p))
+	  queue_push(q, p);
+    }
+}
+
 #endif	/* ENABLE_COMPLEX_DEPS */
 

@@ -27,6 +27,7 @@ pool_is_complex_dep(Pool *pool, Id dep)
 }
 
 extern int pool_normalize_complex_dep(Pool *pool, Id dep, Queue *bq, int flags);
+extern void pool_add_pos_literals_complex_dep(Pool *pool, Id dep, Queue *q, Map *m, int neg);
 
 #define CPLXDEPS_TODNF   (1 << 0)
 #define CPLXDEPS_EXPAND  (1 << 1)

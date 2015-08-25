@@ -968,13 +968,20 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	}
 
       /*-----------------------------------------
-       * add recommends to the work queue
+       * add recommends/suggests to the work queue
        */
       if (s->recommends && m)
 	{
 	  recp = s->repo->idarraydata + s->recommends;
 	  while ((rec = *recp++) != 0)
 	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, rec))
+		{
+		  pool_add_pos_literals_complex_dep(pool, rec, &workq, m, 0);
+		    continue;
+		}
+#endif
 	      FOR_PROVIDES(p, pp, rec)
 		if (!MAPTST(m, p))
 		  queue_push(&workq, p);
@@ -985,6 +992,13 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  sugp = s->repo->idarraydata + s->suggests;
 	  while ((sug = *sugp++) != 0)
 	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, sug))
+		{
+		  pool_add_pos_literals_complex_dep(pool, sug, &workq, m, 0);
+		    continue;
+		}
+#endif
 	      FOR_PROVIDES(p, pp, sug)
 		if (!MAPTST(m, p))
 		  queue_push(&workq, p);
