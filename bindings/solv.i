@@ -1072,18 +1072,27 @@ typedef struct {
     return pool_isemptyupdatejob($self->pool, $self->how, $self->what);
   }
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(Job *j) {
     return $self->pool == j->pool && $self->how == j->how && $self->what == j->what;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(Job *j) {
     return !Job___eq__($self, j);
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
     return pool_job2str($self->pool, $self->how, $self->what, 0);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   const char *__repr__() {
     const char *str = pool_job2str($self->pool, $self->how, $self->what, ~0);
     return pool_tmpjoin($self->pool, "<Job ", str, ">");
@@ -1160,12 +1169,15 @@ typedef struct {
     return q;
   }
 
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
     return pool_selection2str($self->pool, &$self->q, 0);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   const char *__repr__() {
     const char *str = pool_selection2str($self->pool, &$self->q, ~0);
     return pool_tmpjoin($self->pool, "<Selection ", str, ">");
@@ -1253,6 +1265,9 @@ typedef struct {
     return solv_chksum_type2str(solv_chksum_get_type($self));
   }
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(Chksum *chk) {
     int l;
     const unsigned char *b, *bo;
@@ -1264,13 +1279,16 @@ typedef struct {
     bo = solv_chksum_get(chk, 0);
     return memcmp(b, bo, l) == 0;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(Chksum *chk) {
     return !Chksum___eq__($self, chk);
   }
 #if defined(SWIGRUBY)
   %rename("to_s") __str__;
 #endif
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   %newobject __str__;
@@ -1283,6 +1301,9 @@ typedef struct {
     solv_free((void *)h);
     return str;
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     const char *h = Chksum___str__($self);
@@ -1972,13 +1993,19 @@ rb_eval_string(
   }
 #endif
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(Repo *repo) {
     return $self == repo;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(Repo *repo) {
     return $self != repo;
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   %newobject __str__;
@@ -1989,6 +2016,9 @@ rb_eval_string(
     sprintf(buf, "Repo#%d", $self->repoid);
     return solv_strdup(buf);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -2255,6 +2285,9 @@ rb_eval_string(
     *solv::Datamatch::str = *solvc::Datamatch_stringify;
   }
 #endif
+#if defined(SWIGTCL)
+  %rename("stringify") __str__;
+#endif
   const char *__str__() {
     KeyValue kv = $self->kv;
     const char *str = repodata_stringify($self->pool, $self->data, $self->key, &kv, SEARCH_FILES | SEARCH_CHECKSUMS);
@@ -2479,18 +2512,27 @@ rb_eval_string(
   const char *str() {
     return pool_dep2str($self->pool, $self->id);
   }
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(Dep *s) {
     return $self->pool == s->pool && $self->id == s->id;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(Dep *s) {
     return !Dep___eq__($self, s);
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
     return pool_dep2str($self->pool, $self->id);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -2717,18 +2759,27 @@ rb_eval_string(
     return pool_evrcmp($self->pool, $self->pool->solvables[$self->id].evr, s2->pool->solvables[s2->id].evr, EVRCMP_COMPARE);
   }
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(XSolvable *s) {
     return $self->pool == s->pool && $self->id == s->id;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(XSolvable *s) {
     return !XSolvable___eq__($self, s);
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
     return pool_solvid2str($self->pool, $self->id);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -2789,7 +2840,7 @@ rb_eval_string(
       queue_push(&q, i);
     return q;
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
@@ -3382,12 +3433,21 @@ rb_eval_string(
     return q;
   }
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(XRule *xr) {
     return $self->solv == xr->solv && $self->id == xr->id;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(XRule *xr) {
     return !XRule___eq__($self, xr);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -3498,12 +3558,21 @@ rb_eval_string(
     Repodata *data = repo_id2repodata($self->repo, $self->id);
     repodata_extend_block(data, data->repo->start, data->repo->end - data->repo->start);
   }
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(XRepodata *xr) {
     return $self->repo == xr->repo && $self->id == xr->id;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(XRepodata *xr) {
     return !XRepodata___eq__($self, xr);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -3583,7 +3652,7 @@ rb_eval_string(
     return r;
   }
 
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
