@@ -852,7 +852,7 @@ if newpkgs:
     downloadsize = 0
     for p in newpkgs:
         downloadsize += p.lookup_num(solv.SOLVABLE_DOWNLOADSIZE)
-    print("Downloading %d packages, %d K" % (len(newpkgs), downloadsize))
+    print("Downloading %d packages, %d K" % (len(newpkgs), downloadsize / 1024))
     for p in newpkgs:
         repo = p.repo.appdata
         location, medianr = p.lookup_location()
@@ -866,7 +866,7 @@ if newpkgs:
             continue
         if not sysrepo.handle.isempty() and os.access('/usr/bin/applydeltarpm', os.X_OK):
             pname = p.name
-            di = p.repo.Dataiterator(solv.SOLVID_META, solv.DELTA_PACKAGE_NAME, pname, solv.Dataiterator.SEARCH_STRING)
+            di = p.repo.meta.Dataiterator(solv.DELTA_PACKAGE_NAME, pname, solv.Dataiterator.SEARCH_STRING)
             di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
             for d in di:
                 dp = d.parentpos()

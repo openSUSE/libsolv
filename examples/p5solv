@@ -340,6 +340,7 @@ my %langtags = (
 sub add_ext {
   my ($self, $repodata, $what, $ext) = @_;
   my ($filename, $chksum) = $self->find($what);
+  return unless $filename;
   my $handle = $repodata->new_handle();
   $repodata->set_str($handle, $solv::SUSETAGS_FILE_NAME, $filename);
   $repodata->set_checksum($handle, $solv::SUSETAGS_FILE_CHECKSUM, $chksum);
@@ -710,7 +711,7 @@ my %newpkgsfps;
 if (@newpkgs) {
   my $downloadsize = 0;
   $downloadsize += $_->lookup_num($solv::SOLVABLE_DOWNLOADSIZE) for @newpkgs;
-  printf "Downloading %d packages, %d K\n", scalar(@newpkgs), $downloadsize;
+  printf "Downloading %d packages, %d K\n", scalar(@newpkgs), $downloadsize / 1024;
   for my $p (@newpkgs) {
     my $repo = $p->{repo}->{appdata};
     my ($location) = $p->lookup_location();

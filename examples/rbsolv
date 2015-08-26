@@ -727,7 +727,7 @@ if !newpkgs.empty?
   for p in newpkgs
     downloadsize += p.lookup_num(Solv::SOLVABLE_DOWNLOADSIZE)
   end
-  puts "Downloading #{newpkgs.length} packages, #{downloadsize} K"
+  puts "Downloading #{newpkgs.length} packages, #{downloadsize / 1024} K"
   for p in newpkgs
     repo = p.repo.appdata
     location, medianr = p.lookup_location()
