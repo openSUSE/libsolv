@@ -320,6 +320,39 @@ typedef struct {
 
 %enddef
 
+%typemap(in) Queue solvejobs {
+  /* Check if is a list */
+  int retval = TCL_OK;
+  int size = 0;
+  int i = 0;
+
+  if (TCL_OK != (retval = Tcl_ListObjLength(interp, $input, &size))) {
+    Tcl_SetObjResult(interp, Tcl_NewStringObj("argument is not a list", -1));
+    return retval;
+  }
+  queue_init(&$1);
+  for (i = 0; i < size; i++) {
+    Tcl_Obj *o = NULL;
+    void *jp;
+    Job *j;
+    int res;
+
+    if (TCL_OK != (retval = Tcl_ListObjIndex(interp, $input, i, &o))) {
+      queue_free(&$1);
+      Tcl_SetObjResult(interp, Tcl_NewStringObj("failed to retrieve a list member", -1));
+      return retval;
+    }
+    res = SWIG_ConvertPtr(o, &jp ,SWIGTYPE_p_Job, 0 |  0 );
+    if (!SWIG_IsOK(res)) {
+      queue_free(&$1);
+      Tcl_SetObjResult(interp, Tcl_NewStringObj("list member is not a Job", -1));
+      return retval;
+    }
+    j = (Job *)jp;
+    queue_push2(&$1, j->how, j->what);
+  }
+}
+
 #endif
 
 
@@ -3054,6 +3087,21 @@ rb_eval_string(
       queue_push(&q, i);
     return q;
   }
+#if defined(SWIGTCL)
+  %typemap(out) Queue solve Queue2Array(Problem *, 1, new_Problem(arg1, id));
+  %newobject solve;
+  Queue solve(Queue solvejobs) {
+    Queue q;
+    int i, cnt;
+    queue_init(&q);
+    solver_solve($self, &solvejobs);
+    cnt = solver_problem_count($self);
+    for (i = 1; i <= cnt; i++)
+      queue_push(&q, i);
+    return q;
+  }
+#endif
+
   %newobject transaction;
   Transaction *transaction() {
     return solver_create_transaction($self);
