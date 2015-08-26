@@ -190,7 +190,7 @@ proc repo_download {selfName file uncompress chksum {markincomplete 0}} {
       return {NULL}
     }
     $fchksum add_fd [fileno $f]
-    if {[$fchksum hex] ne [$chksum hex]} {
+    if {[$fchksum != $chksum]} {
       puts "$file: checksum mismatch"
       if {$markincomplete} {
 	set self(incomplete) 1
@@ -267,7 +267,7 @@ proc repo_repomd_load {selfName pool} {
   if {$primary ne {}} {
     set f [repo_download self [lindex $primary 0] 1 [lindex $primary 1] 1]
     if {$f ne {NULL}} {
-      $handle add_rpmmd $f {NULL}
+      $handle add_rpmmd $f {}
       $f close
     }
     if [info exists self(incomplete)] {
@@ -284,6 +284,10 @@ proc repo_repomd_load {selfName pool} {
   }
   repo_writecachedrepo self
   return 1
+}
+
+proc repo_repomd_packagespath {selfName} {
+  return ""
 }
 
 ### susetags
@@ -352,6 +356,12 @@ proc repo_susetags_load {selfName pool} {
   return 1
 }
 
+proc repo_susetags_packagespath {selfName} {
+  upvar $selfName self
+  set datadir [[$self(handle) cget -meta] lookup_str $solv::SUSETAGS_DATADIR]
+  return [expr {$datadir ne {} ? "$datadir/" : "suse/"}]
+}
+
 ### unknown
 
 proc repo_unknown_load {selfName pool} {
@@ -365,6 +375,11 @@ proc repo_unknown_load {selfName pool} {
 proc repo_load {selfName pool} {
   upvar $selfName self
   "repo_$self(type)_load" self $pool
+}
+
+proc repo_packagespath {selfName} {
+  upvar $selfName self
+  "repo_$self(type)_packagespath" self
 }
 
 ###
@@ -404,9 +419,21 @@ foreach repoName $repoNames {
 
 
 set cmd [lindex $::argv 0]
+set ::argv [lreplace $::argv 0 0]
 
-if {$cmd == "search"} {
-  set arg [lindex $::argv 1]
+array set cmdabbrev [ list \
+  in install \
+  rm erase \
+  ls list \
+  ve verify \
+  se search \
+]
+if [info exists cmdabbrev($cmd)] {
+  set cmd $cmdabbrev($cmd)
+}
+
+if {$cmd eq "search"} {
+  set arg [lindex $::argv 0]
   $pool createwhatprovides
   set sel [$pool Selection]
   set di [$pool Dataiterator $solv::SOLVABLE_NAME $arg [ expr $solv::Dataiterator_SEARCH_SUBSTRING | $solv::Dataiterator_SEARCH_NOCASE ]]
@@ -414,8 +441,210 @@ if {$cmd == "search"} {
     $sel add_raw $solv::Job_SOLVER_SOLVABLE [$d cget -solvid]
   }
   foreach s [$sel solvables] {
-    puts [format { - %s [%s]: %s} [$s __str__] [[$s cget -repo] cget -name] [$s lookup_str $solv::SOLVABLE_SUMMARY]]
+    puts [format { - %s [%s]: %s} [$s str] [[$s cget -repo] cget -name] [$s lookup_str $solv::SOLVABLE_SUMMARY]]
   }
   exit
 }
 
+$pool addfileprovides
+$pool createwhatprovides
+
+array set cmdactionmap [ list \
+  install $solv::Job_SOLVER_INSTALL \
+  erase $solv::Job_SOLVER_ERASE \
+  up $solv::Job_SOLVER_UPDATE \
+  dup $solv::Job_SOLVER_DISTUPGRADE \
+  verify $solv::Job_SOLVER_VERIFY \
+  list 0 \
+  info 0 \
+]
+
+set jobs {}
+foreach arg $::argv {
+  set flags [expr $solv::Selection_SELECTION_NAME | $solv::Selection_SELECTION_PROVIDES | $solv::Selection_SELECTION_GLOB | \
+                  $solv::Selection_SELECTION_CANON | $solv::Selection_SELECTION_DOTARCH | $solv::Selection_SELECTION_REL ]
+  switch -glob -- $arg {
+    "/*" {
+      set flags [expr $flags | $solv::Selection_SELECTION_FILELIST ]
+      if {$cmd eq "erase"} {
+        set flags [expr $flags | $solv::Selection_SELECTION_INSTALLED_ONLY ]
+      }
+    }
+  }
+  set sel [$pool select $arg $flags]
+  if [$sel isempty] {
+    set sel [$pool select $arg [expr $flags | $solv::Selection_SELECTION_NOCASE]]
+    if {![$sel isempty]} {
+      puts "\[ignoring case for '$arg']"
+    }
+  }
+  if [$sel isempty] {
+    puts "nothing matches '$arg'"
+    exit 1
+  }
+  if {[$sel flags] & $solv::Selection_SELECTION_FILELIST} {
+    puts "\[using file list match for '$arg']"
+  }
+  if {[$sel flags] & $solv::Selection_SELECTION_PROVIDES} {
+    puts "\[using capability match for '$arg']"
+  }
+  lappend jobs {*}[$sel jobs $cmdactionmap($cmd)]
+}
+
+if {$jobs eq {} && ($cmd eq "up" || $cmd eq "dup" || $cmd eq "verify") } {
+  set sel [$pool Selection_all]
+  lappend jobs {*}[$sel jobs $cmdactionmap($cmd)]
+}
+
+if {$jobs eq {}} {
+  puts "no package matched."
+  exit 1
+}
+
+if {$cmd eq "list" || $cmd eq "info"} {
+  foreach job $jobs {
+    foreach s [$job solvables] {
+      if {$cmd eq "info"} {
+        puts [format {Name:        %s} [$s str]]
+        puts [format {Repo:        %s} [[$s cget -repo] cget -name]]
+        puts [format {Summary:     %s} [$s lookup_str $solv::SOLVABLE_SUMMARY]]
+        set str [$s lookup_str $solv::SOLVABLE_URL]
+	if {$str ne {}} {
+          puts [format {Url:         %s} $str]
+	}
+        set str [$s lookup_str $solv::SOLVABLE_LICENSE]
+	if {$str ne {}} {
+          puts [format {License      %s} $str]
+	}
+        puts [format {Description: %s} [$s lookup_str $solv::SOLVABLE_DESCRIPTION]]
+	puts {}
+      } else {
+        puts [format {  - %s [%s]} [$s str] [[$s cget -repo] cget -name]]
+        puts [format {    %s} [$s lookup_str $solv::SOLVABLE_SUMMARY]]
+      }
+    }
+  }
+  exit
+}
+
+#$pool set_debuglevel 1
+set solver [$pool Solver]
+$solver set_flag $solv::Solver_SOLVER_FLAG_SPLITPROVIDES 1
+if {$cmd eq "erase"} {
+  $solver set_flag $solv::Solver_SOLVER_FLAG_ALLOW_UNINSTALL 1
+}
+
+set problems [$solver solve $jobs]
+if {$problems ne {}} {
+  set pcnt 1
+  foreach problem $problems {
+    puts [format {Problem %d/%d:} $pcnt [llength $problems]]
+    puts [$problem str]
+    incr pcnt
+  }
+  exit 1
+}
+
+set trans [$solver transaction]
+
+if [$trans isempty] {
+  puts "Nothing to do."
+  exit
+}
+
+puts {}
+puts "Transaction summary:"
+puts {}
+foreach cl [$trans classify [expr $solv::Transaction_SOLVER_TRANSACTION_SHOW_OBSOLETES | $solv::Transaction_SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE]] {
+  switch -- [$cl cget -type] \
+    $solv::Transaction_SOLVER_TRANSACTION_ERASE {
+      puts [format {%d erased packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_INSTALL {
+      puts [format {%d installed packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_REINSTALLED {
+      puts [format {%d reinstalled packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_DOWNGRADED {
+      puts [format {%d downgraded packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_CHANGED {
+      puts [format {%d changed packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_UPGRADED {
+      puts [format {%d upgraded packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_VENDORCHANGE {
+      puts [format {%d vendor changes from '%s' to '%s':} [$cl cget -count] [$cl cget -fromstr] [$cl cget -tostr]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_ARCHCHANGE {
+      puts [format {%d archchanges from '%s' to '%s':} [$cl cget -count] [$cl cget -fromstr] [$cl cget -tostr]]
+    } \
+    default continue
+  foreach p [$cl solvables] {
+    set cltype [$cl cget -type]
+    if {$cltype == $solv::Transaction_SOLVER_TRANSACTION_UPGRADED || $cltype ==$solv::Transaction_SOLVER_TRANSACTION_DOWNGRADED} {
+      set op [$trans othersolvable $p]
+      puts [format {  - %s -> %s} [$p str] [$p str]]
+    } else {
+      puts [format {  - %s} [$p str]]
+    }
+  }
+  puts {}
+}
+puts [format {install size change: %d K} [$trans calc_installsizechange]]
+puts {}
+
+while 1 {
+  puts -nonewline "OK to continue (y/n)? "
+  flush stdout
+  set yn [gets stdin]
+  if {$yn eq "y"} {
+    break
+  }
+  if {$yn eq "n" || $yn eq "q"} {
+    exit
+  }
+}
+
+set newpkgs [$trans newsolvables]
+array set newpkgs_f {}
+if {$newpkgs ne {}} {
+  set downloadsize 0
+  foreach p $newpkgs {
+    set downloadsize [expr $downloadsize + [$p lookup_num $solv::SOLVABLE_DOWNLOADSIZE]]
+  }
+  puts [format {Downloading %d packages, %d K} [llength $newpkgs] [expr $downloadsize / 1024]]
+  foreach p $newpkgs {
+    upvar #0 "::repo_appdata_[$p cget -repo]" repo
+    set location [$p lookup_location]
+    if {$location eq {}} {
+      continue
+    }
+    set location "[repo_packagespath repo][lindex $location 0]"
+    set checksum [$p lookup_checksum $solv::SOLVABLE_CHECKSUM]
+    set f [repo_download repo $location 0 $checksum]
+    set newpkgs_f([$p cget -id]) $f
+    puts -nonewline "."
+    flush stdout
+  }
+  puts {}
+}
+
+puts "Committing transaction:"
+$trans order
+foreach p [$trans steps] {
+  set steptype [$trans steptype $p $solv::Transaction_SOLVER_TRANSACTION_RPM_ONLY]
+  if {$steptype == $solv::Transaction_SOLVER_TRANSACTION_ERASE} {
+    puts "erase [$p str]"
+    regsub {^[0-9]+:} [$p cget -evr] {} nvr
+    set nvr "[$p cget -name]-$nvr.[$p cget -arch]"
+    exec -ignorestderr -- rpm -e --nodeps --nodigest --nosignature $nvr
+  } elseif {$steptype == $solv::Transaction_SOLVER_TRANSACTION_INSTALL || $steptype == $solv::Transaction_SOLVER_TRANSACTION_MULTIINSTALL} {
+    puts "install [$p str]"
+    set f $newpkgs_f([$p cget -id])
+    set mode [expr {$steptype == $solv::Transaction_SOLVER_TRANSACTION_INSTALL ? "-U" : "-i"}]
+    exec -ignorestderr -- rpm $mode --force --nodeps --nodigest --nosignature "/dev/fd/[$f fileno]"
+  }
+}
