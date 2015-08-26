@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 09/29/2014
+.\"      Date: 08/26/2015
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "09/29/2014" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "08/26/2015" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -308,6 +308,99 @@ Note that boolean methods have an added trailing \(lq?\(rq, to be consistent wit
 .\}
 .nf
 \fBputs "empty" if\fR \fIrepo\fR\fB\&.isempty?\fR
+.fi
+.if n \{\
+.RE
+.\}
+.SH "TCL SPECIFICS"
+.sp
+Libsolv\(cqs tcl bindings can be loaded with the following statement:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBpackage require solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Objects are either created by calling class name prefixed with \(lqnew_\(rq, or they are returned by calling methods on other objects\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBset pool [solv::new_Pool]\fR
+\fBset repo [\fR\fI$pool\fR \fBadd_repo "my_first_repo"]\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Swig provides a \(lqcget\(rq method to read object attributes, and a \(lqconfigure\(rq method to write them:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fI$pool\fR \fBconfigure \-appdata 42\fR
+\fBputs "appdata is [\fR\fI$pool\fR \fBcget \-appdata]"\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The tcl bindings provide a little helper to work with iterators in a foreach style:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBset iter [\fR\fI$pool\fR \fBsolvables_iter]\fR
+\fBsolv::iter s\fR \fI$iter\fR \fB{ \&.\&.\&. }\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+libsolv\(cqs arrays are mapped to tcl\(cqs lists:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBset jobs [list\fR \fI$job1 $job2\fR\fB]\fR
+\fBset problems [\fR\fI$solver\fR \fBsolve\fR \fI$jobs\fR\fB]\fR
+\fBputs "We have [llength\fR \fI$problems\fR\fB] problems\&.\&.\&."\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Stringification is done by calling the object\(cqs \(lqstr\(rq method\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBputs [\fR\fI$dep\fR \fBstr]\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+There is one exception: you have to use \(lqstringify\(rq for Datamatch objects, as swig reports a clash with the \(lqstr\(rq attribute\&. Some objects also support a \(lq==\(rq method for equality tests, and a \(lq!=\(rq method\&.
+.sp
+Swig implements all constants as numeric variables, constants belonging to a libsolv class are prefixed with the class name:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fI$pool\fR \fBset_flag\fR \fI$solv\fR\fB::Pool_POOL_FLAG_OBSOLETEUSESCOLORS  1\fR
+\fBputs [\fR\fI$solvable\fR \fBlookup_str\fR \fI$solv\fR\fB::SOLVABLE_SUMMARY]\fR
 .fi
 .if n \{\
 .RE

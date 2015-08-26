@@ -141,6 +141,52 @@ other ruby modules:
 	puts "empty" if repo.isempty?
 
 
+Tcl Specifics
+-------------
+Libsolv's tcl bindings can be loaded with the following statement:
+
+	TCL package require solv
+
+Objects are either created by calling class name prefixed with ``new_'',
+or they are returned by calling methods on other objects.
+
+	TCL set pool [solv::new_Pool]
+	TCL set repo [$pool add_repo "my_first_repo"]
+
+Swig provides a ``cget'' method to read object attributes, and a
+``configure'' method to write them:
+
+	TCL $pool configure -appdata 42
+	TCL puts "appdata is [$pool cget -appdata]"
+
+The tcl bindings provide a little helper to work with iterators in
+a foreach style:
+
+	TCL set iter [$pool solvables_iter]
+	TCL solv::iter s $iter { ... }
+
+libsolv's arrays are mapped to tcl's lists:
+
+        TCL set jobs [list $job1 $job2]
+	TCL set problems [$solver solve $jobs]
+	TCL puts "We have [llength $problems] problems..."
+
+Stringification is done by calling the object's ``str'' method.
+
+	TCL puts [$dep str]
+
+There is one exception: you have to use ``stringify'' for Datamatch
+objects, as swig reports a clash with the ``str'' attribute.
+Some objects also support a ``=='' method for equality tests, and a
+``!='' method.
+
+Swig implements all constants as numeric variables, constants belonging
+to a libsolv class are prefixed with the class name:
+
+	TCL $pool set_flag $solv::Pool_POOL_FLAG_OBSOLETEUSESCOLORS  1
+	TCL puts [$solvable lookup_str $solv::SOLVABLE_SUMMARY]
+	
+
 The Solv Class
 --------------
 This is the main namespace of the library, you cannot create objects of this
