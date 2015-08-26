@@ -89,7 +89,7 @@ proc repo_free_handle {selfName} {
 
 proc repo_usecachedrepo {selfName {ext "-"} {mark 0}} {
   upvar $selfName self
-  set repopath [repo_cachepath self]
+  set repopath [repo_cachepath self $ext]
   set code [catch {
     set f [open $repopath "rb"]
     seek $f -32 end
@@ -133,7 +133,7 @@ proc repo_usecachedrepo {selfName {ext "-"} {mark 0}} {
   return [expr {$code == 2 ? $res : 0}]
 }
 
-proc repo_writecachedrepo {selfName {ext "-"} {info "NULL"}} {
+proc repo_writecachedrepo {selfName {ext "-"} {repodata "NULL"}} {
   upvar $selfName self
   if [info exists self(incomplete)] {
     return
@@ -144,10 +144,10 @@ proc repo_writecachedrepo {selfName {ext "-"} {info "NULL"}} {
   ::fileutil::tempdirReset
   set f [solv::xfopen $tempfilename "w+"]
   file attributes $tempfilename -permissions 0444
-  if {$info eq {NULL}} {
+  if {$repodata eq {NULL}} {
     $self(handle) write $f
   } else {
-    $info write $f
+    $repodata write $f
   }
   $f flush
   if {$self(type) ne "system" && $ext eq "-"} {
@@ -204,6 +204,17 @@ proc repo_download {selfName file uncompress chksum {markincomplete 0}} {
   return $ff
 }
 
+proc repo_generic_add_ext_key {selfName repodata h ext} {
+  upvar $selfName self
+  if {$ext eq "DL"} {
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOSITORY_DELTAINFO
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOKEY_TYPE_FLEXARRAY
+  } elseif {$ext eq "FL"} {
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::SOLVABLE_FILELIST
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOKEY_TYPE_DIRSTRARRAY
+  }
+}
+
 ### system
 
 proc repo_system_load {selfName pool} {
@@ -225,6 +236,27 @@ proc repo_system_load {selfName pool} {
 }
 
 ### repomd
+
+proc repo_repomd_add_ext {selfName repodata what ext} {
+  upvar $selfName self
+  set where [repo_repomd_find self $what]
+  if {$where eq {}} {
+    return
+  }
+  set h [$repodata new_handle]
+  $repodata set_poolstr $h $solv::REPOSITORY_REPOMD_TYPE $what
+  $repodata set_str $h $solv::REPOSITORY_REPOMD_LOCATION [lindex $where 0]
+  $repodata set_checksum $h $solv::REPOSITORY_REPOMD_CHECKSUM [lindex $where 1]
+  repo_generic_add_ext_key self $repodata $h $ext
+  $repodata add_flexarray $solv::SOLVID_META $solv::REPOSITORY_EXTERNAL $h
+}
+
+proc repo_repomd_add_exts {selfName} {
+  upvar $selfName self
+  set repodata [$self(handle) add_repodata 0]
+  repo_repomd_add_ext self $repodata "filelists" "FL"
+  $repodata internalize
+}
 
 proc repo_repomd_find {selfName what} {
   upvar $selfName self
@@ -282,7 +314,9 @@ proc repo_repomd_load {selfName pool} {
       $f close
     }
   }
+  repo_repomd_add_exts self
   repo_writecachedrepo self
+  $self(handle) create_stubs
   return 1
 }
 
@@ -290,7 +324,63 @@ proc repo_repomd_packagespath {selfName} {
   return ""
 }
 
+proc repo_repomd_load_ext {selfName repodata} {
+  upvar $selfName self
+  switch -- [$repodata lookup_str $solv::SOLVID_META $solv::REPOSITORY_REPOMD_TYPE] {
+    "deltainfo" {
+      set ext DL
+    }
+    "filelists" {
+      set ext FL
+    }
+    default {
+      return 0
+    }
+  }
+  puts -nonewline "\[$self(name):$ext: "
+  flush stdout
+  if [repo_usecachedrepo self $ext] {
+    puts "cached]"
+    return 1
+  }
+  puts "fetching]"
+  set handle $self(handle)
+  set filename [$repodata lookup_str $solv::SOLVID_META $solv::REPOSITORY_REPOMD_LOCATION]
+  set filechecksum [$repodata lookup_checksum $solv::SOLVID_META $solv::REPOSITORY_REPOMD_CHECKSUM]
+  set f [repo_download self $filename 1 $filechecksum]
+  if {$f eq {NULL}} {
+    return 0
+  }
+  if {$ext eq "FL"} {
+    $handle add_rpmmd $f "FL" [ expr $solv::Repo_REPO_USE_LOADING | $solv::Repo_REPO_EXTEND_SOLVABLES | $solv::Repo_REPO_LOCALPOOL]
+  }
+  $f close
+  repo_writecachedrepo self $ext $repodata
+  return 1
+}
+
 ### susetags
+
+proc repo_susetags_add_ext {selfName repodata what ext} {
+  upvar $selfName self
+  set where [repo_susetags_find self $what]
+  if {$where eq {}} {
+    return
+  }
+  set h [$repodata new_handle]
+  $repodata set_str $h $solv::SUSETAGS_FILE_NAME [lindex $where 0]
+  $repodata set_checksum $h $solv::SUSETAGS_FILE_CHECKSUM [lindex $where 1]
+  repo_generic_add_ext_key self $repodata $h $ext
+  $repodata add_flexarray $solv::SOLVID_META $solv::REPOSITORY_EXTERNAL $h
+}
+
+proc repo_susetags_add_exts {selfName} {
+  upvar $selfName self
+  set repodata [$self(handle) add_repodata 0]
+  repo_susetags_add_ext self $repodata "packages.FL" "FL"
+  repo_susetags_add_ext self $repodata "packages.FL.gz" "FL"
+  $repodata internalize
+}
 
 proc repo_susetags_find {selfName what} {
   upvar $selfName self
@@ -352,7 +442,9 @@ proc repo_susetags_load {selfName pool} {
       $handle internalize
     }
   }
+  repo_susetags_add_exts self
   repo_writecachedrepo self
+  $self(handle) create_stubs
   return 1
 }
 
@@ -360,6 +452,38 @@ proc repo_susetags_packagespath {selfName} {
   upvar $selfName self
   set datadir [[$self(handle) cget -meta] lookup_str $solv::SUSETAGS_DATADIR]
   return [expr {$datadir ne {} ? "$datadir/" : "suse/"}]
+}
+
+proc repo_susetags_load_ext {selfName repodata} {
+  upvar $selfName self
+  set filename [$repodata lookup_str $solv::SOLVID_META $solv::SUSETAGS_FILE_NAME]
+  set ext [string range $filename 9 10]
+  puts -nonewline "\[$self(name):$ext: "
+  flush stdout
+  if [repo_usecachedrepo self $ext] {
+    puts "cached]"
+    return 1
+  }
+  puts "fetching]"
+  set handle $self(handle)
+  set defvendorid [[$handle cget -meta] lookup_id $solv::SUSETAGS_DEFAULTVENDOR]
+  set descrdir [[$handle cget -meta] lookup_str $solv::SUSETAGS_DESCRDIR]
+  if {$descrdir eq {NULL}} {
+    set descrdir "suse/setup/descr"
+  }
+  set filechecksum [$repodata lookup_checksum $solv::SOLVID_META $solv::SUSETAGS_FILE_CHECKSUM]
+  set f [repo_download self "$descrdir/$filename" 1 $filechecksum]
+  if {$f eq {NULL}} {
+    return 0
+  }
+  set flags [expr $solv::Repo_REPO_USE_LOADING | $solv::Repo_REPO_EXTEND_SOLVABLES]
+  if {$ext ne "DL"} {
+    set flags [expr $flags | $solv::Repo_REPO_LOCALPOOL]
+  }
+  $handle add_susetags $f $defvendorid $ext $flags
+  $f close
+  repo_writecachedrepo self $ext $repodata
+  return 1
 }
 
 ### unknown
@@ -380,6 +504,28 @@ proc repo_load {selfName pool} {
 proc repo_packagespath {selfName} {
   upvar $selfName self
   "repo_$self(type)_packagespath" self
+}
+
+proc repo_load_ext {selfName repodata} {
+  upvar $selfName self
+  "repo_$self(type)_load_ext" self $repodata
+}
+
+###
+
+proc load_stub {repodata} {
+  set code [catch {
+    upvar #0 "::repo_appdata_[$repodata cget -repo]" repo
+    if [info exists repo(handle)] {
+      return [repo_load_ext repo $repodata]
+    }
+    return 0
+  } res]
+  if {$code == 2} {
+    return $res
+  }
+  puts stderr $res
+  return 0
 }
 
 ###
@@ -406,6 +552,7 @@ foreach reponame [lsort [glob -nocomplain -directory $reposdir *.repo]] {
 
 set pool [solv::new_Pool]
 $pool setarch
+$pool set_loadcallback load_stub
 
 array set sysrepo [list name {@System} type system]
 repo_load sysrepo $pool
