@@ -204,7 +204,7 @@ proc repo_download {selfName file uncompress chksum {markincomplete 0}} {
   return $ff
 }
 
-proc repo_generic_add_ext_key {selfName repodata h ext} {
+proc repo_generic_add_ext_keys {selfName ext repodata h} {
   upvar $selfName self
   if {$ext eq "DL"} {
     $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOSITORY_DELTAINFO
@@ -247,7 +247,7 @@ proc repo_repomd_add_ext {selfName repodata what ext} {
   $repodata set_poolstr $h $solv::REPOSITORY_REPOMD_TYPE $what
   $repodata set_str $h $solv::REPOSITORY_REPOMD_LOCATION [lindex $where 0]
   $repodata set_checksum $h $solv::REPOSITORY_REPOMD_CHECKSUM [lindex $where 1]
-  repo_generic_add_ext_key self $repodata $h $ext
+  repo_generic_add_ext_keys self $ext $repodata $h
   $repodata add_flexarray $solv::SOLVID_META $solv::REPOSITORY_EXTERNAL $h
 }
 
@@ -288,7 +288,7 @@ proc repo_repomd_load {selfName pool} {
     return 0
   }
   set self(cookie) [repo_calc_cookie_fp self $f]
-  if [repo_usecachedrepo self] {
+  if [repo_usecachedrepo self "-" 1] {
     puts "cached"
     return 1
   }
@@ -370,7 +370,7 @@ proc repo_susetags_add_ext {selfName repodata what ext} {
   set h [$repodata new_handle]
   $repodata set_str $h $solv::SUSETAGS_FILE_NAME [lindex $where 0]
   $repodata set_checksum $h $solv::SUSETAGS_FILE_CHECKSUM [lindex $where 1]
-  repo_generic_add_ext_key self $repodata $h $ext
+  repo_generic_add_ext_keys self $ext $repodata $h
   $repodata add_flexarray $solv::SOLVID_META $solv::REPOSITORY_EXTERNAL $h
 }
 
@@ -407,7 +407,7 @@ proc repo_susetags_load {selfName pool} {
     return 0
   }
   set self(cookie) [repo_calc_cookie_fp self $f]
-  if [repo_usecachedrepo self] {
+  if [repo_usecachedrepo self "-" 1] {
     puts "cached"
     return 1
   }

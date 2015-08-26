@@ -76,7 +76,7 @@ class repo_generic(dict):
         else:
             # compatibility to c code
             if ord(extcookie[0]) == 0:
-                extcookie[0] = chr(1)
+                extcookie = chr(1) + extcookie[1:]
         return extcookie
 
     def cachepath(self, ext = None):
@@ -237,7 +237,7 @@ class repo_generic(dict):
             return False
         return True
 
-    def writecachedrepo(self, ext, info=None):
+    def writecachedrepo(self, ext, repodata=None):
         if 'incomplete' in self:
             return
         tmpname = None
@@ -248,21 +248,21 @@ class repo_generic(dict):
             os.fchmod(fd, 0o444)
             f = os.fdopen(fd, 'wb+')
             f = solv.xfopen_fd(None, f.fileno())
-            if not info:
+            if not repodata:
                 self.handle.write(f)
             elif ext:
-                info.write(f)
-            else:       # rewrite_repos case
+                repodata.write(f)
+            else:       # rewrite_repos case, do not write stubs
                 self.handle.write_first_repodata(f)
             f.flush()
             if self.type != 'system' and not ext:
                 if 'extcookie' not in self:
                     self['extcookie'] = self.calc_cookie_ext(f, self['cookie'])
-                os.write(f.fileno(), self['extcookie'])
+                f.write(self['extcookie'])
             if not ext:
-                os.write(f.fileno(), self['cookie'])
+                f.write(self['cookie'])
             else:
-                os.write(f.fileno(), self['extcookie'])
+                f.write(self['extcookie'])
             f.close
             if self.handle.iscontiguous():
                 # switch to saved repo to activate paging and save memory
@@ -270,17 +270,20 @@ class repo_generic(dict):
                 if not ext:
                     # main repo
                     self.handle.empty()
-                    if not self.handle.add_solv(nf, solv.Repo.SOLV_ADD_NO_STUBS):
+                    flags = solv.Repo.SOLV_ADD_NO_STUBS
+                    if repodata:
+                        flags = 0       # rewrite repos case, recreate stubs
+                    if not self.handle.add_solv(nf, flags):
                         sys.exit("internal error, cannot reload solv file")
                 else:
                     # extension repodata
                     # need to extend to repo boundaries, as this is how
-                    # info.write() has written the data
-                    info.extend_to_repo()
+                    # repodata.write() has written the data
+                    repodata.extend_to_repo()
                     flags = solv.Repo.REPO_EXTEND_SOLVABLES
                     if ext != 'DL':
                         flags |= solv.Repo.REPO_LOCALPOOL
-                    info.add_solv(nf, flags)
+                    repodata.add_solv(nf, flags)
             os.rename(tmpname, self.cachepath(ext))
         except (OSError, IOError):
             if tmpname:
@@ -306,6 +309,26 @@ class repo_generic(dict):
 
     def packagespath(self):
         return ''
+
+    def add_ext_keys(self, ext, repodata, handle):
+        if ext == 'DU':
+            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_DISKUSAGE)
+            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRNUMNUMARRAY)
+        elif ext == 'FL':
+            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_FILELIST)
+            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
+        else:
+            for langtag, langtagtype in [
+                (solv.SOLVABLE_SUMMARY, solv.REPOKEY_TYPE_STR),
+                (solv.SOLVABLE_DESCRIPTION, solv.REPOKEY_TYPE_STR),
+                (solv.SOLVABLE_EULA, solv.REPOKEY_TYPE_STR),
+                (solv.SOLVABLE_MESSAGEINS, solv.REPOKEY_TYPE_STR),
+                (solv.SOLVABLE_MESSAGEDEL, solv.REPOKEY_TYPE_STR),
+                (solv.SOLVABLE_CATEGORY, solv.REPOKEY_TYPE_ID)
+            ]:
+                repodata.add_idarray(handle, solv.REPOSITORY_KEYS, self.handle.pool.id2langid(langtag, ext, 1))
+                repodata.add_idarray(handle, solv.REPOSITORY_KEYS, langtagtype)
+        
 
 class repo_repomd(repo_generic):
     def load(self, pool):
@@ -368,12 +391,7 @@ class repo_repomd(repo_generic):
         repodata.set_poolstr(handle, solv.REPOSITORY_REPOMD_TYPE, what)
         repodata.set_str(handle, solv.REPOSITORY_REPOMD_LOCATION, filename)
         repodata.set_checksum(handle, solv.REPOSITORY_REPOMD_CHECKSUM, chksum)
-        if ext == 'DL':
-            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOSITORY_DELTAINFO)
-            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_FLEXARRAY)
-        elif ext == 'FL':
-            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_FILELIST)
-            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
+        self.add_ext_keys(ext, repodata, handle)
         repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
 
     def add_exts(self):
@@ -469,23 +487,7 @@ class repo_susetags(repo_generic):
         repodata.set_str(handle, solv.SUSETAGS_FILE_NAME, filename)
         if chksum:
             repodata.set_checksum(handle, solv.SUSETAGS_FILE_CHECKSUM, chksum)
-        if ext == 'DU':
-            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_DISKUSAGE)
-            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRNUMNUMARRAY)
-        elif ext == 'FL':
-            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_FILELIST)
-            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRSTRARRAY)
-        else:
-            for langtag, langtagtype in [
-                (solv.SOLVABLE_SUMMARY, solv.REPOKEY_TYPE_STR),
-                (solv.SOLVABLE_DESCRIPTION, solv.REPOKEY_TYPE_STR),
-                (solv.SOLVABLE_EULA, solv.REPOKEY_TYPE_STR),
-                (solv.SOLVABLE_MESSAGEINS, solv.REPOKEY_TYPE_STR),
-                (solv.SOLVABLE_MESSAGEDEL, solv.REPOKEY_TYPE_STR),
-                (solv.SOLVABLE_CATEGORY, solv.REPOKEY_TYPE_ID)
-            ]:
-                repodata.add_idarray(handle, solv.REPOSITORY_KEYS, self.handle.pool.id2langid(langtag, ext, 1))
-                repodata.add_idarray(handle, solv.REPOSITORY_KEYS, langtagtype)
+        self.add_ext_keys(ext, repodata, handle)
         repodata.add_flexarray(solv.SOLVID_META, solv.REPOSITORY_EXTERNAL, handle)
         
     def add_exts(self):
