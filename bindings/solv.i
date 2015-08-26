@@ -1430,17 +1430,18 @@ typedef struct {
   } tcl_callback_t;
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     tcl_callback_t *callback_var = (tcl_callback_t *)d;
+    Tcl_Interp *interp = callback_var->interp;
     XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
+    int result, ecode = 0, vresult = 0;
     Tcl_Obj *objvx[2];
     objvx[0] = callback_var->obj;
-    objvx[1] = SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0); 
-    int result = Tcl_EvalObjv(callback_var->interp, sizeof(objvx), objvx, TCL_EVAL_GLOBAL);
-    int ecode = 0;
-    int vresult = 0;
+    objvx[1] = SWIG_NewInstanceObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, 0); 
+    Tcl_IncrRefCount(objvx[1]);
+    result = Tcl_EvalObjv(interp, sizeof(objvx)/sizeof(*objvx), objvx, TCL_EVAL_GLOBAL);
     Tcl_DecrRefCount(objvx[1]);
     if (result != TCL_OK)
       return 0; /* exception */
-    ecode = SWIG_AsVal_int(callback_var->interp, Tcl_GetObjResult(callback_var->interp), &vresult);
+    ecode = SWIG_AsVal_int(interp, Tcl_GetObjResult(interp), &vresult);
     return SWIG_IsOK(ecode) ? vresult : 0;
   }
   %}
