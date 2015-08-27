@@ -61,7 +61,7 @@ proc repo_generic_load {selfName pool} {
   set handle [ $pool add_repo $self(name) ]
   set self(handle) $handle
   $handle configure -priority [expr 99 - $self(priority)]
-  upvar self "::repo_appdata_$handle"
+  $handle appdata_link set self
   set dorefresh $self(autorefresh)
   set metadata_expire $self(metadata_expire)
   catch {
@@ -80,9 +80,7 @@ proc repo_generic_load {selfName pool} {
 proc repo_free_handle {selfName} {
   upvar $selfName self
   set handle $self(handle)
-  set ::repo_appdata_gone 1
-  upvar ::repo_appdata_gone "::repo_appdata_$handle"
-  unset "::repo_appdata_$handle"
+  $handle appdata_link del
   unset self(handle)
   $handle free 1
 }
@@ -221,7 +219,7 @@ proc repo_system_load {selfName pool} {
   upvar $selfName self
   set handle [ $pool add_repo $self(name) ]
   set self(handle) $handle
-  upvar self "::repo_appdata_$handle"
+  $handle appdata_link set self
   $pool configure -installed $handle
   puts -nonewline "rpm database: "
   set self(cookie) [repo_calc_cookie_file self "/var/lib/rpm/Packages"]
@@ -515,7 +513,7 @@ proc repo_load_ext {selfName repodata} {
 
 proc load_stub {repodata} {
   set code [catch {
-    upvar #0 "::repo_appdata_[$repodata cget -repo]" repo
+    [$repodata cget -repo] appdata_link get repo
     if [info exists repo(handle)] {
       return [repo_load_ext repo $repodata]
     }
@@ -764,7 +762,7 @@ if {$newpkgs ne {}} {
   }
   puts [format {Downloading %d packages, %d K} [llength $newpkgs] [expr $downloadsize / 1024]]
   foreach p $newpkgs {
-    upvar #0 "::repo_appdata_[$p cget -repo]" repo
+    [$p cget -repo] appdata_link get repo
     set location [$p lookup_location]
     if {$location eq {}} {
       continue
