@@ -854,22 +854,20 @@ SWIGINTERN void appdata_disown_helper(void **appdatap) {
 #elif defined(SWIGPERL)
 %{
 SWIGINTERN void appdata_clr_object_helper(struct myappdata *myappdata) {
-  if (myappdata->disowned) {
-    SvROK_off((SV *)myappdata->appdata);        /* oh my... */
-  }
-  SvREFCNT_dec((SV *)myappdata->appdata);
+  if (!myappdata->disowned)
+    SvREFCNT_dec((SV *)myappdata->appdata);
 }
 SWIGINTERN void appdata_disown_helper(void **appdatap) {
   struct myappdata *myappdata = *(struct myappdata **)appdatap;
-  SV *rsv, *sv;
+  SV *rsv;
   if (!myappdata || !myappdata->appdata || myappdata->disowned)
     return;
   rsv = myappdata->appdata;
   if (!SvROK(rsv))
     return;
-  sv = SvRV(rsv);
+  myappdata->appdata = SvRV(rsv);
   myappdata->disowned = 1;
-  SvREFCNT_dec(sv);     /* danger... */
+  SvREFCNT_dec(rsv);
 }
 %}
 #elif defined(SWIGTCL)
@@ -883,8 +881,7 @@ SWIGINTERN void appdata_disown_helper(void **appdatap) {
 #endif
 
 %{
-SWIGINTERN void appdata_clr_helper(void **appdatap)
-{
+SWIGINTERN void appdata_clr_helper(void **appdatap) {
   struct myappdata *myappdata = *(struct myappdata **)appdatap;
   if (!myappdata)
     return;
@@ -899,23 +896,37 @@ SWIGINTERN void appdata_clr_helper(void **appdatap)
   }
 }
 
-SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata)
-{
+SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
   appdata_clr_helper(appdatap);
-  if (appdata)
-    {
-      if (!*appdatap)
-        *appdatap = solv_calloc(sizeof(struct myappdata), 1);
-      (*(struct myappdata **)appdatap)->appdata = appdata;
-    }
+  if (appdata) {
+    if (!*appdatap)
+      *appdatap = solv_calloc(sizeof(struct myappdata), 1);
+    (*(struct myappdata **)appdatap)->appdata = appdata;
+  }
 }
 %}
+
+#if defined(SWIGPERL)
+%{
+SWIGINTERN void *appdata_get_helper(void *appdata) {
+  struct myappdata *myappdata = appdata;
+  if (!myappdata || !myappdata->appdata)
+    return 0;
+  return myappdata->disowned ? newRV_noinc((SV *)myappdata->appdata) : myappdata->appdata;
+}
+%}
+#else
+%{
+SWIGINTERN void *appdata_get_helper(void *appdata) {
+  return appdata ? ((struct myappdata *)appdata)->appdata : 0;
+}
+%}
+#endif
 
 
 #if defined(SWIGTCL)
 %{
-SWIGINTERN void appdata_link_clr_helper(void **appdatap)
-{
+SWIGINTERN void appdata_link_clr_helper(void **appdatap) {
   char linkname[64];
   Tcl_Interp *interp;
   struct myappdata *myappdata = *(struct myappdata **)appdatap;
@@ -932,8 +943,7 @@ SWIGINTERN void appdata_link_clr_helper(void **appdatap)
   }
 }
 
-SWIGINTERN int appdata_link_helper(void **appdatap, void *item, Tcl_Interp *interp, const char *cmd, const char *varname)
-{
+SWIGINTERN int appdata_link_helper(void **appdatap, void *item, Tcl_Interp *interp, const char *cmd, const char *varname) {
   struct myappdata *myappdata = *(struct myappdata **)appdatap;
   char linkname[64];
   int res;
@@ -1725,7 +1735,7 @@ typedef struct {
     appdata_set_helper(&pool->appdata, appdata);
   }
   AppObjectPtr Pool_appdata_get(Pool *pool) {
-    return pool->appdata ? ((struct myappdata *)pool->appdata)->appdata: 0;
+    return appdata_get_helper(pool->appdata);
   }
   %}
   void appdata_disown() {
@@ -2028,7 +2038,7 @@ rb_eval_string(
     appdata_set_helper(&repo->appdata, appdata);
   }
   AppObjectPtr Repo_appdata_get(Repo *repo) {
-    return repo->appdata ? ((struct myappdata *)repo->appdata)->appdata: 0;
+    return appdata_get_helper(repo->appdata);
   }
   %}
 #if defined(SWIGTCL)
