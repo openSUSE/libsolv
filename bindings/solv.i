@@ -10,9 +10,9 @@
 %markfunc Pool "mark_Pool";
 #endif
 
-/*
- * binaryblob handling
- */
+/**
+ ** binaryblob handling
+ **/
 
 %{
 typedef struct {
@@ -76,6 +76,17 @@ typedef struct {
 #endif
 }
 
+/**
+ ** Queue handling
+ **/
+
+%typemap(arginit) Queue {
+  queue_init(&$1);
+}
+%typemap(freearg) Queue {
+  queue_free(&$1);
+}
+
 #if defined(SWIGPYTHON)
 %typemap(in) Queue {
   /* Check if is a list */
@@ -129,7 +140,7 @@ typedef struct {
 
 %enddef
 
-#endif
+#endif  /* SWIGPYTHON */
 
 #if defined(SWIGPERL)
 %typemap(in) Queue {
@@ -164,6 +175,7 @@ typedef struct {
   queue_free(&$1);
   $result = 0;
 }
+
 %define Queue2Array(type, step, con) %{
   int i;
   int cnt = $1.count / step;
@@ -185,14 +197,8 @@ typedef struct {
 %}
 %enddef
 
-#endif
+#endif  /* SWIGPERL */
 
-%typemap(arginit) Queue {
-  queue_init(&$1);
-}
-%typemap(freearg) Queue {
-  queue_free(&$1);
-}
 
 #if defined(SWIGRUBY)
 %typemap(in) Queue {
@@ -245,7 +251,8 @@ typedef struct {
   $result = o;
 %}
 %enddef
-#endif
+
+#endif  /* SWIGRUBY */
 
 #if defined(SWIGTCL)
 %typemap(in) Queue {
@@ -258,26 +265,22 @@ typedef struct {
     Tcl_SetObjResult(interp, Tcl_NewStringObj("argument is not a list", -1));
     return retval;
   }
-
   queue_init(&$1);
-
   for (i = 0; i < size; i++) {
     Tcl_Obj *o = NULL;
-    int v;
+    int e, v;
 
     if (TCL_OK != (retval = Tcl_ListObjIndex(interp, $input, i, &o))) {
       queue_free(&$1);
       Tcl_SetObjResult(interp, Tcl_NewStringObj("failed to retrieve a list member", -1));
       return retval;
     }
-
-    int e = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(o, &v);
+    e = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(o, &v);
     if (!SWIG_IsOK(e)) {
       queue_free(&$1);
       SWIG_exception_fail(SWIG_ArgError(e), "list must contain only integers");
       return TCL_ERROR;
     }
-
     queue_push(&$1, v);
   }
 }
@@ -289,9 +292,7 @@ typedef struct {
   for (i = 0; i < $1.count; i++) {
     objvx[i] = SWIG_From_int($1.elements[i]);
   }
-
   Tcl_SetObjResult(interp, Tcl_NewListObj($1.count, objvx));
-
   queue_free(&$1);
 }
 
@@ -353,7 +354,7 @@ typedef struct {
   }
 }
 
-#endif
+#endif  /* SWIGTCL */
 
 
 #if defined(SWIGPERL)
@@ -454,11 +455,20 @@ SWIG_Perl_NewArrayObj(SWIG_MAYBE_PERL_OBJECT void *ptr, swig_type_info *t, int f
 %typemap(out) Repo_solvable_iterator * solvables_iter = Perliterator;
 %typemap(out) Dataiterator * = Perliterator;
 
-#endif
+#endif  /* SWIGPERL */
 
+
+/**
+ ** appdata handling
+ **/
 
 #if defined(SWIGPYTHON)
 typedef PyObject *AppObjectPtr;
+%typemap(in) AppObjectPtr {
+  if ($input)
+    Py_INCREF($input);
+  $1 = $input;
+}
 %typemap(out) AppObjectPtr {
   $result = $1 ? $1 : Py_None;
   Py_INCREF($result);
@@ -466,10 +476,14 @@ typedef PyObject *AppObjectPtr;
 #elif defined(SWIGPERL)
 typedef SV *AppObjectPtr;
 %typemap(in) AppObjectPtr {
-  $1 = SvROK($input) ? SvRV($input) : 0;
+  if ($input) {
+    $1 = newSV(0);
+    sv_setsv((SV *)$1, $input);
+  } else
+    $1 = (void *)0;
 }
 %typemap(out) AppObjectPtr {
-  $result = $1 ? newRV_inc($1) : newSV(0);
+  $result = $1 ? SvREFCNT_inc($1) : newSV(0);
   argvi++;
 }
 #elif defined(SWIGRUBY)
@@ -483,6 +497,8 @@ typedef VALUE AppObjectPtr;
 #elif defined(SWIGTCL)
 typedef Tcl_Obj *AppObjectPtr;
 %typemap(in) AppObjectPtr {
+  if ($input)
+    Tcl_IncrRefCount($input);
   $1 = (void *)$input;
 }
 %typemap(out) AppObjectPtr {
@@ -494,6 +510,9 @@ typedef Tcl_Obj *AppObjectPtr;
 #warning AppObjectPtr not defined for this language!
 #endif
 
+/**
+ ** FILE handling
+ **/
 
 #ifdef SWIGPYTHON
 %include "file.i"
@@ -537,6 +556,10 @@ SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
 }
 
 
+/**
+ ** DepId handling
+ **/
+
 %fragment("SWIG_AsValDepId","header") {
 
 SWIGINTERN int
@@ -571,6 +594,10 @@ SWIG_AsValDepId(void *obj, int *val) {
 #endif
 }
 
+/**
+ ** Pool disown helper
+ **/
+
 %typemap(out) disown_helper {
 #if defined(SWIGRUBY)
   SWIG_ConvertPtr(self, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
@@ -591,6 +618,11 @@ SWIG_AsValDepId(void *obj, int *val) {
 #endif
 }
 
+
+/**
+ ** misc stuff
+ **/
+
 %include "typemaps.i"
 
 %typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp) {
@@ -603,6 +635,10 @@ SWIG_AsValDepId(void *obj, int *val) {
 %typemaps_asval(%checkcode(POINTER), SWIG_AsValSolvFpPtr, "SWIG_AsValSolvFpPtr", FILE*);
 %typemaps_asval(%checkcode(INT32), SWIG_AsValDepId, "SWIG_AsValDepId", DepId);
 
+
+/**
+ ** the C declarations
+ **/
 
 %{
 #include <stdbool.h>
@@ -784,7 +820,186 @@ typedef Dataiterator Datamatch;
 
 typedef int disown_helper;
 
+struct myappdata {
+  void *appdata;
+  int disowned;
+  void *link;
+  void *linkitem;
+};
+
+
 %}
+
+#ifdef SWIGRUBY
+%{
+SWIGINTERN void appdata_clr_object_helper(struct myappdata *myappdata) {
+}
+SWIGINTERN void appdata_disown_helper(void **appdatap) {
+}
+%}
+#elif defined(SWIGPYTHON)
+%{
+SWIGINTERN void appdata_clr_object_helper(struct myappdata *myappdata) {
+  if (!myappdata->disowned)
+    Py_DECREF((PyObject *)myappdata->appdata);
+}
+SWIGINTERN void appdata_disown_helper(void **appdatap) {
+  struct myappdata *myappdata = *(struct myappdata **)appdatap;
+  if (!myappdata || !myappdata->appdata || myappdata->disowned)
+    return;
+  myappdata->disowned = 1;
+  Py_DECREF((PyObject *)myappdata->appdata);
+}
+%}
+#elif defined(SWIGPERL)
+%{
+SWIGINTERN void appdata_clr_object_helper(struct myappdata *myappdata) {
+  if (myappdata->disowned) {
+    SvROK_off((SV *)myappdata->appdata);        /* oh my... */
+  }
+  SvREFCNT_dec((SV *)myappdata->appdata);
+}
+SWIGINTERN void appdata_disown_helper(void **appdatap) {
+  struct myappdata *myappdata = *(struct myappdata **)appdatap;
+  SV *rsv, *sv;
+  if (!myappdata || !myappdata->appdata || myappdata->disowned)
+    return;
+  rsv = myappdata->appdata;
+  if (!SvROK(rsv))
+    return;
+  sv = SvRV(rsv);
+  myappdata->disowned = 1;
+  SvREFCNT_dec(sv);     /* danger... */
+}
+%}
+#elif defined(SWIGTCL)
+%{
+SWIGINTERN void appdata_clr_object_helper(struct myappdata *myappdata) {
+  Tcl_DecrRefCount((Tcl_Obj *)myappdata->appdata);
+}
+SWIGINTERN void appdata_disown_helper(void **appdatap) {
+}
+%}
+#endif
+
+%{
+SWIGINTERN void appdata_clr_helper(void **appdatap)
+{
+  struct myappdata *myappdata = *(struct myappdata **)appdatap;
+  if (!myappdata)
+    return;
+  if (myappdata->appdata) {
+    appdata_clr_object_helper(myappdata);
+    myappdata->appdata = 0;
+  }
+  myappdata->disowned = 0;
+  if (!myappdata->appdata && !myappdata->link) {
+    solv_free(myappdata);
+    *appdatap = 0;
+  }
+}
+
+SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata)
+{
+  appdata_clr_helper(appdatap);
+  if (appdata)
+    {
+      if (!*appdatap)
+        *appdatap = solv_calloc(sizeof(struct myappdata), 1);
+      (*(struct myappdata **)appdatap)->appdata = appdata;
+    }
+}
+%}
+
+
+#if defined(SWIGTCL)
+%{
+SWIGINTERN void appdata_link_clr_helper(void **appdatap)
+{
+  char linkname[64];
+  Tcl_Interp *interp;
+  struct myappdata *myappdata = *(struct myappdata **)appdatap;
+  if (!myappdata || !myappdata->link)
+    return;
+  interp = myappdata->link;
+  if (interp) {
+    SWIG_PackData(linkname + 20, &myappdata->linkitem, sizeof(void *));
+    Tcl_UpVar(interp, "#0", "::solv::appdatalink_gone", linkname, TCL_GLOBAL_ONLY);
+    myappdata->link = 0;
+    myappdata->linkitem = 0;
+    if (!myappdata->appdata && !myappdata->link)
+      *appdatap = solv_free(myappdata);
+  }
+}
+
+SWIGINTERN int appdata_link_helper(void **appdatap, void *item, Tcl_Interp *interp, const char *cmd, const char *varname)
+{
+  struct myappdata *myappdata = *(struct myappdata **)appdatap;
+  char linkname[64];
+  int res;
+  strcpy(linkname, "::solv::appdatalink_");
+  SWIG_PackData(linkname + 20, &item, sizeof(void *));
+  if (!strcmp(cmd, "set")) {
+    if (!varname) {
+      SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "appdata_link set: needs an argument");
+      return TCL_ERROR;
+    }
+    if (myappdata && myappdata->link) {
+      Tcl_UpVar(myappdata->link, "#0", "::solv::appdatalink_gone", linkname, TCL_GLOBAL_ONLY);
+      myappdata->link = 0;
+      myappdata->linkitem = 0;
+    }
+    res = Tcl_UpVar(interp, "0", varname, linkname, TCL_GLOBAL_ONLY);
+    if (res != TCL_OK)
+      return res;
+    if (!myappdata)
+      myappdata = *appdatap = solv_calloc(sizeof(struct myappdata), 1);
+    myappdata->link = interp;
+    myappdata->linkitem = item;
+    return TCL_OK;
+  } else if (!strcmp(cmd, "get")) {
+    if (!varname) {
+      SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "appdata_link get: needs an argument");
+      return TCL_ERROR;
+    }
+    if (!myappdata || !myappdata->link) {
+      SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "appdata_link get: no link is set");
+      return TCL_ERROR;
+    }
+    return Tcl_UpVar(interp, "#0", linkname, varname, 0);
+  } else if (!strcmp(cmd, "del") && !varname) {
+    if (varname) {
+      SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "appdata_link del: needs no argument");
+      return TCL_ERROR;
+    }
+    if (!myappdata || !myappdata->link)
+      return TCL_OK;
+    res = Tcl_UpVar(interp, "#0", "::solv::appdatalink_gone", linkname, TCL_GLOBAL_ONLY);
+    if (res != TCL_OK)
+      return res;
+    myappdata->link = 0;
+    myappdata->linkitem = 0;
+    if (!myappdata->appdata && !myappdata->link) {
+      myappdata = *appdatap = solv_free(myappdata);
+    }
+    return TCL_OK;
+  }
+  SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "usage: appdata_link set|get|del varName");
+  return TCL_ERROR;
+}
+%}
+#else
+
+%{
+SWIGINTERN void appdata_link_clr_helper(void **appdatap) {
+}
+
+%}
+#endif
+
+/**
+ ** the SWIG declarations defining the API
+ **/
 
 #ifdef SWIGRUBY
 %mixin Dataiterator "Enumerable";
@@ -871,7 +1086,6 @@ typedef struct {
 %nodefaultctor Pool;
 %nodefaultdtor Pool;
 typedef struct {
-  AppObjectPtr appdata;
 } Pool;
 
 %nodefaultctor Repo;
@@ -882,7 +1096,6 @@ typedef struct {
   int priority;
   int subpriority;
   int const nsolvables;
-  AppObjectPtr appdata;
 } Repo;
 
 %nodefaultctor Solver;
@@ -1359,15 +1572,19 @@ typedef struct {
     return SWIG_IsOK(ecode) ? vresult : 0;
   }
   %}
-  void set_loadcallback(PyObject *callable) {
+  void clr_loadcallback() {
     if ($self->loadcallback == loadcallback) {
       PyObject *obj = $self->loadcallbackdata;
       Py_DECREF(obj);
+      pool_setloadcallback($self, 0, 0);
     }
+  }
+  void set_loadcallback(PyObject *callable) {
+    Pool_clr_loadcallback($self);
     if (callable) {
       Py_INCREF(callable);
+      pool_setloadcallback($self, loadcallback, callable);
     }
-    pool_setloadcallback($self, callable ? loadcallback : 0, callable);
   }
 #elif defined(SWIGPERL)
 %{
@@ -1392,12 +1609,18 @@ typedef struct {
     return ret;
   }
 %}
-  void set_loadcallback(SV *callable) {
-    if ($self->loadcallback == loadcallback)
+  void clr_loadcallback() {
+    if ($self->loadcallback == loadcallback) {
       SvREFCNT_dec($self->loadcallbackdata);
-    if (callable)
+      pool_setloadcallback($self, 0, 0);
+    }
+  }
+  void set_loadcallback(SV *callable) {
+    Pool_clr_loadcallback($self);
+    if (callable) {
       SvREFCNT_inc(callable);
-    pool_setloadcallback($self, callable ? loadcallback : 0, callable);
+      pool_setloadcallback($self, loadcallback, callable);
+    }
   }
 #elif defined(SWIGRUBY)
 %{
@@ -1416,6 +1639,9 @@ typedef struct {
     }
   }
 %}
+  void clr_loadcallback() {
+    pool_setloadcallback($self, 0, 0);
+  }
   %typemap(in, numinputs=0) VALUE callable {
     $1 = rb_block_given_p() ? rb_block_proc() : 0;
   }
@@ -1445,52 +1671,73 @@ typedef struct {
     return SWIG_IsOK(ecode) ? vresult : 0;
   }
   %}
-  void set_loadcallback(Tcl_Obj *callable, Tcl_Interp *interp) {
-    tcl_callback_t *callable_temp;
+  void clr_loadcallback() {
     if ($self->loadcallback == loadcallback) {
-      tcl_callback_t *obj = $self->loadcallbackdata;
-      Tcl_DecrRefCount(obj->obj);
-      free(obj);
+      tcl_callback_t *callback_var = $self->loadcallbackdata;
+      Tcl_DecrRefCount(callback_var->obj);
+      solv_free(callback_var);
+      pool_setloadcallback($self, 0, 0);
     }
+  }
+  void set_loadcallback(Tcl_Obj *callable, Tcl_Interp *interp) {
+    Pool_clr_loadcallback($self);
     if (callable) {
+      tcl_callback_t *callback_var = solv_malloc(sizeof(tcl_callback_t));
       Tcl_IncrRefCount(callable);
-      callable_temp = malloc(sizeof(tcl_callback_t));
-      callable_temp->interp = interp;
-      callable_temp->obj = callable;
+      callback_var->interp = interp;
+      callback_var->obj = callable;
+      pool_setloadcallback($self, loadcallback, callback_var);
     }
-    else {
-      callable_temp = NULL;
-    }
-    pool_setloadcallback($self, callable ? loadcallback : 0, callable_temp);
   }
 #else
 #warning loadcallback not implemented for this language
 #endif
 
-#if defined(SWIGTCL)
   ~Pool() {
-    Pool_set_loadcallback($self, 0, 0);
-    pool_free($self);
+    Pool *pool = $self;
+    Id repoid;
+    Repo *repo;
+    FOR_REPOS(repoid, repo)
+      appdata_clr_helper(&repo->appdata);
+    Pool_clr_loadcallback(pool);
+    appdata_link_clr_helper(&pool->appdata);
+    appdata_clr_helper(&pool->appdata);
+    pool_free(pool);
   }
   disown_helper free() {
-    Pool_set_loadcallback($self, 0, 0);
-    pool_free($self);
+    Pool *pool = $self;
+    Id repoid;
+    Repo *repo;
+    FOR_REPOS(repoid, repo)
+      appdata_clr_helper(&repo->appdata);
+    Pool_clr_loadcallback(pool);
+    appdata_link_clr_helper(&pool->appdata);
+    appdata_clr_helper(&pool->appdata);
+    pool_free(pool);
     return 0;
   }
-#else
-  ~Pool() {
-    Pool_set_loadcallback($self, 0);
-    pool_free($self);
-  }
-  disown_helper free() {
-    Pool_set_loadcallback($self, 0);
-    pool_free($self);
-    return 0;
-  }
-#endif
   disown_helper disown() {
     return 0;
   }
+  AppObjectPtr appdata;
+  %{
+  void Pool_appdata_set(Pool *pool, AppObjectPtr appdata) {
+    appdata_set_helper(&pool->appdata, appdata);
+  }
+  AppObjectPtr Pool_appdata_get(Pool *pool) {
+    return pool->appdata ? ((struct myappdata *)pool->appdata)->appdata: 0;
+  }
+  %}
+  void appdata_disown() {
+    appdata_disown_helper(&$self->appdata);
+  }
+#if defined(SWIGTCL)
+  %apply int Tcl_Result { int appdata_link };
+  int appdata_link(Tcl_Interp *interp, const char *cmd, const char *varname = 0) {
+    return appdata_link_helper(&$self->appdata, $self, interp, cmd, varname);
+  }
+#endif
+
   Id str2id(const char *str, bool create=1) {
     return pool_str2id($self, str, create);
   }
@@ -1761,6 +2008,8 @@ rb_eval_string(
 #endif
 
   void free(bool reuseids = 0) {
+    appdata_link_clr_helper(&$self->appdata);
+    appdata_clr_helper(&$self->appdata);
     repo_free($self, reuseids);
   }
   void empty(bool reuseids = 0) {
@@ -1772,6 +2021,23 @@ rb_eval_string(
   bool isempty() {
     return !$self->nsolvables;
   }
+
+  AppObjectPtr appdata;
+  %{
+  void Repo_appdata_set(Repo *repo, AppObjectPtr appdata) {
+    appdata_set_helper(&repo->appdata, appdata);
+  }
+  AppObjectPtr Repo_appdata_get(Repo *repo) {
+    return repo->appdata ? ((struct myappdata *)repo->appdata)->appdata: 0;
+  }
+  %}
+#if defined(SWIGTCL)
+  %apply int Tcl_Result { int appdata_link };
+  int appdata_link(Tcl_Interp *interp, const char *cmd, const char *varname = 0) {
+    return appdata_link_helper(&$self->appdata, $self, interp, cmd, varname);
+  }
+#endif
+
   bool add_solv(const char *name, int flags = 0) {
     FILE *fp = fopen(name, "r");
     int r;
