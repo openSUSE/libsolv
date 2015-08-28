@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 08/26/2015
+.\"      Date: 08/28/2015
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "08/26/2015" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "08/28/2015" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1009,6 +1009,21 @@ Get/Set fixed jobs stored in the pool\&. Those jobs are automatically appended t
 .\}
 .sp
 Set the callback function called when repository metadata needs to be loaded on demand\&. To make use of this feature, you need to create repodata stubs that tell the library which data is available but not loaded\&. If later on the data needs to be accessed, the callback function is called with a repodata argument\&. You can then load the data (maybe fetching it first from an remote server)\&. The callback should return true if the data has been made available\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+/* bindings only */
+\fI$pool\fR\fB\->appdata_disown()\fR
+\fIpool\fR\fB\&.appdata_disown()\fR
+\fIpool\fR\fB\&.appdata_disown()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Decrement the reference count of the appdata object\&. This can be used to break circular references (e\&.g\&. if the pool\(cqs appdata value points to some meta data structure that contains a pool handle)\&. If used incorrectly, this method can lead to application crashes, so beware\&. (This method is a no\-op for ruby and tcl\&.)
 .SS "DATA RETRIEVAL METHODS"
 .sp
 In the following functions, the \fIkeyname\fR argument describes what to retrieve\&. For the standard cases you can use the available Id constants\&. For example,

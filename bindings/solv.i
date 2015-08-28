@@ -823,8 +823,6 @@ typedef int disown_helper;
 struct myappdata {
   void *appdata;
   int disowned;
-  void *link;
-  void *linkitem;
 };
 
 
@@ -890,7 +888,7 @@ SWIGINTERN void appdata_clr_helper(void **appdatap) {
     myappdata->appdata = 0;
   }
   myappdata->disowned = 0;
-  if (!myappdata->appdata && !myappdata->link) {
+  if (!myappdata->appdata) {
     solv_free(myappdata);
     *appdatap = 0;
   }
@@ -923,89 +921,6 @@ SWIGINTERN void *appdata_get_helper(void *appdata) {
 %}
 #endif
 
-
-#if defined(SWIGTCL)
-%{
-SWIGINTERN void appdata_link_clr_helper(void **appdatap) {
-  char linkname[64];
-  Tcl_Interp *interp;
-  struct myappdata *myappdata = *(struct myappdata **)appdatap;
-  if (!myappdata || !myappdata->link)
-    return;
-  interp = myappdata->link;
-  if (interp) {
-    SWIG_PackData(linkname + 20, &myappdata->linkitem, sizeof(void *));
-    Tcl_UpVar(interp, "#0", "::solv::appdatalink_gone", linkname, TCL_GLOBAL_ONLY);
-    myappdata->link = 0;
-    myappdata->linkitem = 0;
-    if (!myappdata->appdata && !myappdata->link)
-      *appdatap = solv_free(myappdata);
-  }
-}
-
-SWIGINTERN int appdata_link_helper(void **appdatap, void *item, Tcl_Interp *interp, const char *cmd, const char *varname) {
-  struct myappdata *myappdata = *(struct myappdata **)appdatap;
-  char linkname[64];
-  int res;
-  strcpy(linkname, "::solv::appdatalink_");
-  SWIG_PackData(linkname + 20, &item, sizeof(void *));
-  if (!strcmp(cmd, "set")) {
-    if (!varname) {
-      SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "appdata_link set: needs an argument");
-      return TCL_ERROR;
-    }
-    if (myappdata && myappdata->link) {
-      Tcl_UpVar(myappdata->link, "#0", "::solv::appdatalink_gone", linkname, TCL_GLOBAL_ONLY);
-      myappdata->link = 0;
-      myappdata->linkitem = 0;
-    }
-    res = Tcl_UpVar(interp, "0", varname, linkname, TCL_GLOBAL_ONLY);
-    if (res != TCL_OK)
-      return res;
-    if (!myappdata)
-      myappdata = *appdatap = solv_calloc(sizeof(struct myappdata), 1);
-    myappdata->link = interp;
-    myappdata->linkitem = item;
-    return TCL_OK;
-  } else if (!strcmp(cmd, "get")) {
-    if (!varname) {
-      SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "appdata_link get: needs an argument");
-      return TCL_ERROR;
-    }
-    if (!myappdata || !myappdata->link) {
-      SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "appdata_link get: no link is set");
-      return TCL_ERROR;
-    }
-    return Tcl_UpVar(interp, "#0", linkname, varname, 0);
-  } else if (!strcmp(cmd, "del") && !varname) {
-    if (varname) {
-      SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "appdata_link del: needs no argument");
-      return TCL_ERROR;
-    }
-    if (!myappdata || !myappdata->link)
-      return TCL_OK;
-    res = Tcl_UpVar(interp, "#0", "::solv::appdatalink_gone", linkname, TCL_GLOBAL_ONLY);
-    if (res != TCL_OK)
-      return res;
-    myappdata->link = 0;
-    myappdata->linkitem = 0;
-    if (!myappdata->appdata && !myappdata->link) {
-      myappdata = *appdatap = solv_free(myappdata);
-    }
-    return TCL_OK;
-  }
-  SWIG_Tcl_SetErrorMsg(interp, "RuntimeError", "usage: appdata_link set|get|del varName");
-  return TCL_ERROR;
-}
-%}
-#else
-
-%{
-SWIGINTERN void appdata_link_clr_helper(void **appdatap) {
-}
-
-%}
-#endif
 
 /**
  ** the SWIG declarations defining the API
@@ -1710,7 +1625,6 @@ typedef struct {
     FOR_REPOS(repoid, repo)
       appdata_clr_helper(&repo->appdata);
     Pool_clr_loadcallback(pool);
-    appdata_link_clr_helper(&pool->appdata);
     appdata_clr_helper(&pool->appdata);
     pool_free(pool);
   }
@@ -1721,7 +1635,6 @@ typedef struct {
     FOR_REPOS(repoid, repo)
       appdata_clr_helper(&repo->appdata);
     Pool_clr_loadcallback(pool);
-    appdata_link_clr_helper(&pool->appdata);
     appdata_clr_helper(&pool->appdata);
     pool_free(pool);
     return 0;
@@ -1741,12 +1654,6 @@ typedef struct {
   void appdata_disown() {
     appdata_disown_helper(&$self->appdata);
   }
-#if defined(SWIGTCL)
-  %apply int Tcl_Result { int appdata_link };
-  int appdata_link(Tcl_Interp *interp, const char *cmd, const char *varname = 0) {
-    return appdata_link_helper(&$self->appdata, $self, interp, cmd, varname);
-  }
-#endif
 
   Id str2id(const char *str, bool create=1) {
     return pool_str2id($self, str, create);
@@ -2018,7 +1925,6 @@ rb_eval_string(
 #endif
 
   void free(bool reuseids = 0) {
-    appdata_link_clr_helper(&$self->appdata);
     appdata_clr_helper(&$self->appdata);
     repo_free($self, reuseids);
   }
@@ -2041,12 +1947,6 @@ rb_eval_string(
     return appdata_get_helper(repo->appdata);
   }
   %}
-#if defined(SWIGTCL)
-  %apply int Tcl_Result { int appdata_link };
-  int appdata_link(Tcl_Interp *interp, const char *cmd, const char *varname = 0) {
-    return appdata_link_helper(&$self->appdata, $self, interp, cmd, varname);
-  }
-#endif
 
   bool add_solv(const char *name, int flags = 0) {
     FILE *fp = fopen(name, "r");

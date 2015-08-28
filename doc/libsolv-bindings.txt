@@ -578,6 +578,16 @@ needs to be accessed, the callback function is called with a repodata argument.
 You can then load the data (maybe fetching it first from an remote server).
 The callback should return true if the data has been made available.
 
+	/* bindings only */
+	$pool->appdata_disown()
+	pool.appdata_disown()
+	pool.appdata_disown()
+
+Decrement the reference count of the appdata object. This can be used to break
+circular references (e.g. if the pool's appdata value points to some meta data
+structure that contains a pool handle). If used incorrectly, this method can
+lead to application crashes, so beware. (This method is a no-op for ruby and tcl.)
+
 === DATA RETRIEVAL METHODS ===
 
 In the following functions, the _keyname_ argument describes what to retrieve.
