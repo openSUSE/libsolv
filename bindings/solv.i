@@ -1682,10 +1682,10 @@ typedef struct {
   }
   AppObjectPtr appdata;
   %{
-  void Pool_appdata_set(Pool *pool, AppObjectPtr appdata) {
+  SWIGINTERN void Pool_appdata_set(Pool *pool, AppObjectPtr appdata) {
     appdata_set_helper(&pool->appdata, appdata);
   }
-  AppObjectPtr Pool_appdata_get(Pool *pool) {
+  SWIGINTERN AppObjectPtr Pool_appdata_get(Pool *pool) {
     return appdata_get_helper(pool->appdata);
   }
   %}
@@ -1810,10 +1810,10 @@ typedef struct {
   SWIGINTERN void Pool_installed_set(Pool *pool, Repo *installed) {
     pool_set_installed(pool, installed);
   }
-  Repo *Pool_installed_get(Pool *pool) {
+  SWIGINTERN Repo *Pool_installed_get(Pool *pool) {
     return pool->installed;
   }
-  const char *Pool_errstr_get(Pool *pool) {
+  SWIGINTERN const char *Pool_errstr_get(Pool *pool) {
     return pool_errstr(pool);
   }
   %}
@@ -1978,10 +1978,10 @@ rb_eval_string(
 
   AppObjectPtr appdata;
   %{
-  void Repo_appdata_set(Repo *repo, AppObjectPtr appdata) {
+  SWIGINTERN void Repo_appdata_set(Repo *repo, AppObjectPtr appdata) {
     appdata_set_helper(&repo->appdata, appdata);
   }
-  AppObjectPtr Repo_appdata_get(Repo *repo) {
+  SWIGINTERN AppObjectPtr Repo_appdata_get(Repo *repo) {
     return appdata_get_helper(repo->appdata);
   }
   %}
