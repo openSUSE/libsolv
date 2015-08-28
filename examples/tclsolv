@@ -47,11 +47,7 @@ proc repo_calc_cookie_ext {selfName f cookie} {
   $chksum add "1.1"
   $chksum add $cookie
   $chksum add_fstat [$f fileno]
-  set extcookie [$chksum raw]
-  if {[string index $extcookie 0] eq "\000"} {
-    set extcookie [string replace $extcookie 0 0 "\001"]
-  }
-  return $extcookie
+  return [$chksum raw]
 }
 
 proc repo_cachepath {selfName {ext "-"}} {
@@ -79,6 +75,7 @@ proc repo_generic_load {selfName pool} {
     }
   }
   set self(cookie) {}
+  set self(extcookie) {}
   if { !$dorefresh && [repo_usecachedrepo self] } {
     puts "repo $self(name): cached"
     return 1 
@@ -157,7 +154,7 @@ proc repo_writecachedrepo {selfName {ext "-"} {repodata "NULL"}} {
   }
   $f flush
   if {$self(type) ne "system" && $ext eq "-"} {
-    if {![info exists self(extcookie)]} {
+    if {$self(extcookie) eq {}} {
       set self(extcookie) [repo_calc_cookie_ext self $f $self(cookie)]
     }
     $f write $self(extcookie)

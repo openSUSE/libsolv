@@ -91,6 +91,7 @@ class repo_generic(dict):
             except OSError:
                 pass
         self['cookie'] = ''
+        self['extcookie'] = ''
         if not dorefresh and self.usecachedrepo(None):
             print("repo: '%s': cached" % self.name)
             return True
@@ -247,7 +248,7 @@ class repo_generic(dict):
                 self.handle.write_first_repodata(f)
             f.flush()
             if self.type != 'system' and not ext:
-                if 'extcookie' not in self:
+                if not self['extcookie']:
                     self['extcookie'] = self.calc_cookie_ext(f, self['cookie'])
                 f.write(self['extcookie'])
             if not ext:

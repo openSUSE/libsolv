@@ -66,6 +66,7 @@ class Repo_generic
       end
     end
     @cookie = nil
+    @extcookie = nil
     if !dorefresh && usecachedrepo(nil)
       puts "repo: '#{@name}' cached"
       return true

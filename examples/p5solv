@@ -65,6 +65,7 @@ sub load {
     $dorefresh = 0 if @s && ($self->{metadata_expire} == -1 || time() - $s[9] < $self->{metadata_expire});
   }
   $self->{cookie} = '';
+  $self->{extcookie} = '';
   if (!$dorefresh && $self->usecachedrepo()) {
     print "repo: '$self->{alias}' cached\n";
     return 1;
