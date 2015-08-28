@@ -5000,7 +5000,22 @@ my \fI$chksum\fR \fB= solv::Chksum\->new(\fR\fI$type\fR\fB,\fR \fI$hex\fR\fB)\fR
 .RE
 .\}
 .sp
-Create an already finalized checksum object\&.
+Create an already finalized checksum object from a hex string\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBChksum Chksum_from_bin(Id\fR \fItype\fR\fB, char *\fR\fIbin\fR\fB)\fR
+my \fI$chksum\fR \fB= solv::Chksum\->from_bin(\fR\fI$type\fR\fB,\fR \fI$bin\fR\fB)\fR;
+\fIchksum\fR \fB= solv\&.Chksum\&.from_bin(\fR\fItype\fR\fB,\fR \fIbin\fR\fB)\fR
+\fIchksum\fR \fB= Solv::Chksum\&.from_bin(\fR\fItype\fR\fB,\fR \fIbin\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create an already finalized checksum object from a binary checksum\&.
 .SS "ATTRIBUTES"
 .sp
 .if n \{\
@@ -5032,7 +5047,7 @@ Return the type of the checksum object\&.
 .RE
 .\}
 .sp
-Add a string to the checksum\&.
+Add a (binary) string to the checksum\&.
 .sp
 .if n \{\
 .RS 4

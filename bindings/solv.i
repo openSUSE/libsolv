@@ -1335,6 +1335,19 @@ typedef struct {
       return 0;
     return solv_chksum_create_from_bin(type, buf);
   }
+  %newobject from_bin;
+  static Chksum *from_bin(Id type, const unsigned char *str, size_t len) {
+    return len == solv_chksum_len(type) ? solv_chksum_create_from_bin(type, str) : 0;
+  }
+  %perlcode {
+    # make from_bin look like a constructor
+    undef *solv::Chksum::from_bin;
+    *solv::Chksum::from_bin = sub {
+      my $pkg = shift;
+      my $self = solvc::Chksum_from_bin(@_);
+      bless $self, $pkg if defined $self;
+    };
+  }
   ~Chksum() {
     solv_chksum_free($self, 0);
   }
@@ -1407,21 +1420,13 @@ typedef struct {
   %rename("==") __eq__;
 #endif
   bool __eq__(Chksum *chk) {
-    int l;
-    const unsigned char *b, *bo;
-    if (!chk)
-      return 0;
-    if (solv_chksum_get_type($self) != solv_chksum_get_type(chk))
-      return 0;
-    b = solv_chksum_get($self, &l);
-    bo = solv_chksum_get(chk, 0);
-    return memcmp(b, bo, l) == 0;
+    return solv_chksum_cmp($self, chk);
   }
 #if defined(SWIGTCL)
   %rename("!=") __ne__;
 #endif
   bool __ne__(Chksum *chk) {
-    return !Chksum___eq__($self, chk);
+    return !solv_chksum_cmp($self, chk);
   }
 #if defined(SWIGRUBY)
   %rename("to_s") __str__;

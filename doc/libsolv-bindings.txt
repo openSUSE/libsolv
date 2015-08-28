@@ -3085,7 +3085,14 @@ These keys are constants in the *solv* class.
 	chksum = solv.Chksum(type, hex)
 	chksum = Solv::Chksum.new(type, hex)
 
-Create an already finalized checksum object.
+Create an already finalized checksum object from a hex string.
+
+	Chksum Chksum_from_bin(Id type, char *bin)
+	my $chksum = solv::Chksum->from_bin($type, $bin);
+	chksum = solv.Chksum.from_bin(type, bin)
+	chksum = Solv::Chksum.from_bin(type, bin)
+
+Create an already finalized checksum object from a binary checksum.
 
 === ATTRIBUTES ===
 
@@ -3103,7 +3110,7 @@ Return the type of the checksum object.
 	chksum.add(str)
 	chksum.add(str)
 
-Add a string to the checksum.
+Add a (binary) string to the checksum.
 
 	void add_fp(FILE *fp)
 	$chksum->add_fp($file);
