@@ -248,6 +248,7 @@ SOLV_1.0 {
 		solv_bin2hex;
 		solv_calloc;
 		solv_chksum_add;
+		solv_chksum_cmp;
 		solv_chksum_create;
 		solv_chksum_create_clone;
 		solv_chksum_create_from_bin;
