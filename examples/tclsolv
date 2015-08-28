@@ -6,11 +6,21 @@ package require fileutil
 
 set reposdir /etc/zypp/repos.d
 
+### some helpers
+
 proc fileno {file} {
   if [regexp -- {^file(\d+)$} $file match fd] {
     return $fd
   }
   error "file not open"
+}
+
+set ::globalarray_cnt 0
+
+proc globalarray {} {
+  set name "::globalarray_[incr ::globalarray_cnt]"
+  array set $name [list varName $name]
+  return $name
 }
 
 ### generic repo handling (cache reading/writing)
@@ -60,8 +70,7 @@ proc repo_generic_load {selfName pool} {
   upvar $selfName self
   set handle [ $pool add_repo $self(name) ]
   set self(handle) $handle
-  $handle configure -priority [expr 99 - $self(priority)]
-  $handle appdata_link set self
+  $handle configure -priority [expr 99 - $self(priority)] -appdata $self(varName)
   set dorefresh $self(autorefresh)
   set metadata_expire $self(metadata_expire)
   catch {
@@ -80,7 +89,6 @@ proc repo_generic_load {selfName pool} {
 proc repo_free_handle {selfName} {
   upvar $selfName self
   set handle $self(handle)
-  $handle appdata_link del
   unset self(handle)
   $handle free 1
 }
@@ -219,7 +227,7 @@ proc repo_system_load {selfName pool} {
   upvar $selfName self
   set handle [ $pool add_repo $self(name) ]
   set self(handle) $handle
-  $handle appdata_link set self
+  $handle configure -appdata $self(varName)
   $pool configure -installed $handle
   puts -nonewline "rpm database: "
   set self(cookie) [repo_calc_cookie_file self "/var/lib/rpm/Packages"]
@@ -513,7 +521,7 @@ proc repo_load_ext {selfName repodata} {
 
 proc load_stub {repodata} {
   set code [catch {
-    [$repodata cget -repo] appdata_link get repo
+    upvar #0 [[$repodata cget -repo] cget -appdata] repo
     if [info exists repo(handle)] {
       return [repo_load_ext repo $repodata]
     }
@@ -532,18 +540,16 @@ set repoNames {}
 foreach reponame [lsort [glob -nocomplain -directory $reposdir *.repo]] {
   set ini [::ini::open $reponame r]
   foreach alias [::ini::sections $ini] {
-    set num [llength $repoNames]
-    array set "repos$num" {}
-    upvar 0 "repos$num" repoattr
-    array set repoattr {enabled 0 priority 99 autorefresh 1 type rpm-md metadata_expire 900}
-    array set repoattr [::ini::get $ini $alias]
-    set repoattr(name) $alias
-    switch -exact -- $repoattr(type) {
-      rpm-md  { set repoattr(type) repomd }
-      yast2   { set repoattr(type) susetags }
-      default { set repoattr(type) unknown }
+    upvar #0 [globalarray] repo
+    array set repo {enabled 0 priority 99 autorefresh 1 type rpm-md metadata_expire 900}
+    array set repo [::ini::get $ini $alias]
+    set repo(name) $alias
+    switch -exact -- $repo(type) {
+      rpm-md  { set repo(type) repomd }
+      yast2   { set repo(type) susetags }
+      default { set repo(type) unknown }
     }
-    lappend repoNames "repos$num" 
+    lappend repoNames $repo(varName)
   }
   ::ini::close $ini
 }
@@ -552,6 +558,7 @@ set pool [solv::new_Pool]
 $pool setarch
 $pool set_loadcallback load_stub
 
+upvar #0 [globalarray] sysrepo
 array set sysrepo [list name {@System} type system]
 repo_load sysrepo $pool
 
@@ -762,7 +769,7 @@ if {$newpkgs ne {}} {
   }
   puts [format {Downloading %d packages, %d K} [llength $newpkgs] [expr $downloadsize / 1024]]
   foreach p $newpkgs {
-    [$p cget -repo] appdata_link get repo
+    upvar #0 [[$p cget -repo] cget -appdata] repo
     set location [$p lookup_location]
     if {$location eq {}} {
       continue
