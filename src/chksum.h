@@ -28,6 +28,7 @@ void *solv_chksum_free(Chksum *chk, unsigned char *cp);
 const char *solv_chksum_type2str(Id type);
 Id solv_chksum_str2type(const char *str);
 int solv_chksum_len(Id type);
+int solv_chksum_cmp(Chksum *chk, Chksum *chk2);
 
 #ifdef LIBSOLV_INTERNAL
 
