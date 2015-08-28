@@ -44,9 +44,7 @@ class Repo_generic
     chksum.add("1.1")
     chksum.add(cookie)
     chksum.add_fstat(f.fileno)
-    extcookie = chksum.raw()
-    extcookie[0] = 1 if extcookie[0] == 0
-    return extcookie
+    return chksum.raw()
   end
 
   def cachepath(ext = nil)

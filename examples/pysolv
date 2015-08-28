@@ -68,16 +68,7 @@ class repo_generic(dict):
         chksum.add("1.1");
         chksum.add(cookie)
         chksum.add_fstat(f.fileno())
-        extcookie = chksum.raw()
-        if sys.version > '3':
-            # compatibility to c code
-            if extcookie[0] == 0:
-                extcookie[0] = 1
-        else:
-            # compatibility to c code
-            if ord(extcookie[0]) == 0:
-                extcookie = chr(1) + extcookie[1:]
-        return extcookie
+        return chksum.raw()
 
     def cachepath(self, ext = None):
         path = re.sub(r'^\.', '_', self.name)

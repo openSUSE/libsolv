@@ -124,8 +124,8 @@ struct repoinfo {
   int metadata_expire;
   char **components;
   int ncomponents;
-
   unsigned char cookie[32];
+  int extcookieset;
   unsigned char extcookie[32];
   int incomplete;
 };
@@ -1133,7 +1133,7 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
       fclose(fp);
       return 0;
     }
-  if (cookie && memcmp(cookie, mycookie, sizeof(mycookie)))
+  if (cookie && memcmp(cookie, mycookie, sizeof(mycookie)) != 0)
     {
       fclose(fp);
       return 0;
@@ -1165,6 +1165,7 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
     {
       memcpy(cinfo->cookie, mycookie, sizeof(mycookie));
       memcpy(cinfo->extcookie, myextcookie, sizeof(myextcookie));
+      cinfo->extcookieset = 1;
     }
   if (mark)
     futimens(fileno(fp), 0);	/* try to set modification time */
@@ -1173,7 +1174,7 @@ usecachedrepo(Repo *repo, const char *repoext, unsigned char *cookie, int mark)
 }
 
 void
-writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *cookie)
+writecachedrepo(Repo *repo, Repodata *repodata, const char *repoext, unsigned char *cookie)
 {
   FILE *fp;
   int i, fd;
@@ -1211,22 +1212,22 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
   if (i < repo->end)
     onepiece = 0;
 
-  if (!info)
+  if (!repodata)
     repo_write(repo, fp);
   else if (repoext)
-    repodata_write(info, fp);
+    repodata_write(repodata, fp);
   else
     {
       int oldnrepodata = repo->nrepodata;
       repo->nrepodata = oldnrepodata > 2 ? 2 : oldnrepodata;	/* XXX: do this right */
       repo_write(repo, fp);
       repo->nrepodata = oldnrepodata;
-      onepiece = 0;
+      onepiece = 0;	/* don't bother for the added file provides */
     }
 
   if (!repoext && cinfo)
     {
-      if (!cinfo->extcookie[0])
+      if (!cinfo->extcookieset)
 	{
 	  /* create the ext cookie and append it */
 	  /* we just need some unique ID */
@@ -1234,8 +1235,7 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 	  if (!fstat(fileno(fp), &stb))
 	    memset(&stb, 0, sizeof(stb));
 	  calc_checksum_stat(&stb, REPOKEY_TYPE_SHA256, cookie, cinfo->extcookie);
-	  if (cinfo->extcookie[0] == 0)
-	    cinfo->extcookie[0] = 1;
+	  cinfo->extcookieset = 1;
 	}
       if (fwrite(cinfo->extcookie, 32, 1, fp) != 1)
 	{
@@ -1281,12 +1281,12 @@ writecachedrepo(Repo *repo, Repodata *info, const char *repoext, unsigned char *
 	      int flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
 	      /* make sure repodata contains complete repo */
 	      /* (this is how repodata_write saves it) */
-	      repodata_extend_block(info, repo->start, repo->end - repo->start);
-	      info->state = REPODATA_LOADING;
+	      repodata_extend_block(repodata, repo->start, repo->end - repo->start);
+	      repodata->state = REPODATA_LOADING;
 	      if (strcmp(repoext, "DL") != 0)
 		flags |= REPO_LOCALPOOL;
 	      repo_add_solv(repo, fp, flags);
-	      info->state = REPODATA_AVAILABLE;	/* in case the load failed */
+	      repodata->state = REPODATA_AVAILABLE;	/* in case the load failed */
 	    }
 	  fclose(fp);
 	}
@@ -1400,7 +1400,8 @@ repomd_load_ext(Repo *repo, Repodata *data)
       printf("%s\n", pool_errstr(repo->pool));
       return 0;
     }
-  writecachedrepo(repo, data, ext, cinfo->extcookie);
+  if (cinfo->extcookieset)
+    writecachedrepo(repo, data, ext, cinfo->extcookie);
   return 1;
 }
 
@@ -1546,7 +1547,8 @@ susetags_load_ext(Repo *repo, Repodata *data)
       return 0;
     }
   fclose(fp);
-  writecachedrepo(repo, data, ext, cinfo->extcookie);
+  if (cinfo->extcookieset)
+    writecachedrepo(repo, data, ext, cinfo->extcookie);
   return 1;
 }
 #endif

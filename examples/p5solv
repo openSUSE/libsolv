@@ -42,9 +42,7 @@ sub calc_cookie_ext {
   $chksum->add("1.1");
   $chksum->add($cookie);
   $chksum->add_fstat(fileno($f));
-  my $extcookie = $chksum->raw();
-  substr($extcookie, 0, 1) = chr(1) if ord(substr($extcookie, 0, 1)) == 0;
-  return $extcookie;
+  return $chksum->raw();
 }
 
 sub cachepath {
