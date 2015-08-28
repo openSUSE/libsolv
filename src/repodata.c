@@ -1927,19 +1927,19 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
 	  return;
 	}
       di->repoid = 0;
-      di->data = di->repo->repodata + di->pool->pos.repodataid;
-      di->repodataid = 0;
-      di->solvid = solvid;
-      di->state = di_enterrepo;
-      di->flags |= SEARCH_THISSOLVID;
-      return;
+      if (!di->pool->pos.repodataid && di->pool->pos.solvid == SOLVID_META) {
+	solvid = SOLVID_META;		/* META pos hack */
+      } else {
+        di->data = di->repo->repodata + di->pool->pos.repodataid;
+        di->repodataid = 0;
+      }
     }
-  if (solvid > 0)
+  else if (solvid > 0)
     {
       di->repo = di->pool->solvables[solvid].repo;
       di->repoid = 0;
     }
-  else if (di->repoid > 0)
+  if (di->repoid > 0)
     {
       if (!di->pool->urepos)
 	{
@@ -1949,7 +1949,8 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
       di->repoid = 1;
       di->repo = di->pool->repos[di->repoid];
     }
-  di->repodataid = 1;
+  if (solvid != SOLVID_POS)
+    di->repodataid = 1;
   di->solvid = solvid;
   if (solvid)
     di->flags |= SEARCH_THISSOLVID;
