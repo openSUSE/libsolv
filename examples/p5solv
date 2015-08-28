@@ -87,7 +87,7 @@ sub download {
   $url =~ s!/$!!;
   $url .= "/$file";
   open(my $f, '+>', undef) || die;
-  fcntl($f, Fcntl::F_SETFD, 0);		# turn of CLOEXEC
+  fcntl($f, Fcntl::F_SETFD, 0);		# turn off CLOEXEC
   my $st = system('curl', '-f', '-s', '-L', '-o', "/dev/fd/" . fileno($f), '--', $url);
   if (POSIX::lseek(fileno($f), 0, POSIX::SEEK_END) == 0 && ($st == 0 || !$chksum)) {
     return undef;
