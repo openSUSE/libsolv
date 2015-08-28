@@ -647,6 +647,7 @@ SWIG_AsValDepId(void *obj, int *val) {
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 /* argh, swig undefs bool for perl */
 #ifndef bool
@@ -1059,9 +1060,14 @@ SolvFp *solvfp_xfopen_fd(const char *fn, int fd, const char *mode = 0);
     SolvFp *sfp;
     FILE *fp;
     fd = dup(fd);
-    fp = fd == -1 ? 0 : solv_xfopen_fd(fn, fd, mode);
-    if (!fp)
+    if (fd == -1)
       return 0;
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    fp = solv_xfopen_fd(fn, fd, mode);
+    if (!fp) {
+      close(fd);
+      return 0;
+    }
     sfp = solv_calloc(1, sizeof(SolvFp));
     sfp->fp = fp;
     return sfp;
@@ -1072,6 +1078,8 @@ SolvFp *solvfp_xfopen_fd(const char *fn, int fd, const char *mode = 0);
     fp = solv_xfopen(fn, mode);
     if (!fp)
       return 0;
+    if (fileno(fp) != -1)
+      fcntl(fileno(fp), F_SETFD, FD_CLOEXEC);
     sfp = solv_calloc(1, sizeof(SolvFp));
     sfp->fp = fp;
     return sfp;
@@ -1149,6 +1157,11 @@ typedef struct {
     ret = fclose($self->fp) == 0;
     $self->fp = 0;
     return ret;
+  }
+  void cloexec(bool state) {
+    if (!$self->fp || fileno($self->fp) == -1)
+      return;
+    fcntl(fileno($self->fp), F_SETFD, state ? FD_CLOEXEC : 0);
   }
 }
 
@@ -1339,6 +1352,7 @@ typedef struct {
   static Chksum *from_bin(Id type, const unsigned char *str, size_t len) {
     return len == solv_chksum_len(type) ? solv_chksum_create_from_bin(type, str) : 0;
   }
+#if defined(SWIGPERL)
   %perlcode {
     # make from_bin look like a constructor
     undef *solv::Chksum::from_bin;
@@ -1348,6 +1362,7 @@ typedef struct {
       bless $self, $pkg if defined $self;
     };
   }
+#endif
   ~Chksum() {
     solv_chksum_free($self, 0);
   }

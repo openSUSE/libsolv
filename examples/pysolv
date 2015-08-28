@@ -303,7 +303,10 @@ class repo_generic(dict):
         return ''
 
     def add_ext_keys(self, ext, repodata, handle):
-        if ext == 'DU':
+        if ext == 'DL':
+            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOSITORY_DELTAINFO)
+            repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_FLEXARRAY)
+        elif ext == 'DU':
             repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.SOLVABLE_DISKUSAGE)
             repodata.add_idarray(handle, solv.REPOSITORY_KEYS, solv.REPOKEY_TYPE_DIRNUMNUMARRAY)
         elif ext == 'FL':
@@ -860,7 +863,7 @@ if newpkgs:
             continue
         if not sysrepo.handle.isempty() and os.access('/usr/bin/applydeltarpm', os.X_OK):
             pname = p.name
-            di = p.repo.meta.Dataiterator(solv.DELTA_PACKAGE_NAME, pname, solv.Dataiterator.SEARCH_STRING)
+            di = p.repo.Dataiterator_meta(solv.DELTA_PACKAGE_NAME, pname, solv.Dataiterator.SEARCH_STRING)
             di.prepend_keyname(solv.REPOSITORY_DELTAINFO)
             for d in di:
                 dp = d.parentpos()
@@ -887,6 +890,7 @@ if newpkgs:
                     continue
                 nf = tempfile.TemporaryFile()
                 nf = os.dup(nf.fileno())   # get rid of CLOEXEC
+                f.cloexec(0)
                 st = subprocess.call(['/usr/bin/applydeltarpm', '-a', p.arch, "/dev/fd/%d" % f.fileno(), "/dev/fd/%d" % nf])
                 if st:
                     os.close(nf)

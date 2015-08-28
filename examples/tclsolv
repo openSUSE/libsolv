@@ -212,6 +212,9 @@ proc repo_generic_add_ext_keys {selfName ext repodata h} {
   if {$ext eq "DL"} {
     $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOSITORY_DELTAINFO
     $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOKEY_TYPE_FLEXARRAY
+  } elseif {$ext eq "DU"} {
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::SOLVABLE_DISKUSAGE
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOKEY_TYPE_DIRNUMNUMARRAY
   } elseif {$ext eq "FL"} {
     $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::SOLVABLE_FILELIST
     $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOKEY_TYPE_DIRSTRARRAY
@@ -794,6 +797,7 @@ foreach p [$trans steps] {
     puts "install [$p str]"
     set f $newpkgs_f([$p cget -id])
     set mode [expr {$steptype == $solv::Transaction_SOLVER_TRANSACTION_INSTALL ? "-U" : "-i"}]
+    $f cloexec 0
     exec -ignorestderr -- rpm $mode --force --nodeps --nodigest --nosignature "/dev/fd/[$f fileno]"
   }
 }

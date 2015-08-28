@@ -3195,7 +3195,8 @@ stdio library.
 
 Create a file handle from the specified file descriptor. The path argument is
 only used to select the correct (de-)compression algorithm, use an empty path
-if you want to make sure to read/write raw data.
+if you want to make sure to read/write raw data. The file descriptor is dup()ed
+before the file handle is created.
 
 === METHODS ===
 
@@ -3206,6 +3207,16 @@ if you want to make sure to read/write raw data.
 
 Return file file descriptor of the file. If the file is not open, `-1` is
 returned.
+
+	void cloexec(bool state)
+	$file->cloexec($state)
+	file.cloexec(state)
+	file.cloexec(state)
+
+Set the close-on-exec flag of the file descriptor. The xfopen function
+returns files with close-on-exec turned on, so if you want to pass
+a file to some other process you need to call cloexec(0) before calling
+exec.
 
 	int dup()
 	my $fileno = $file->dup();
@@ -3228,7 +3239,7 @@ always returns true.
 	file.close()
 	file.close()
 
-Close the file. This is needed for languages like Ruby, that do not destruct
+Close the file. This is needed for languages like Ruby that do not destruct
 objects right after they are no longer referenced. In that case, it is good
 style to close open files so that the file descriptors are freed right away.
 Returns false if there was an error.

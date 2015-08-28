@@ -755,6 +755,7 @@ for p in trans.steps
     f = newpkgsfp.delete(p.id)
     next unless f
     mode = steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i'
+    f.cloexec(0)
     system('rpm', mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/#{f.fileno().to_s}") || abort("rpm failed: #{$? >> 8}")
     f.close
   end

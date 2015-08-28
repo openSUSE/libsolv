@@ -5200,7 +5200,7 @@ my \fI$file\fR \fB= solv::xfopen_fd(\fR\fI$path\fR\fB,\fR \fI$fileno\fR\fB)\fR;
 .RE
 .\}
 .sp
-Create a file handle from the specified file descriptor\&. The path argument is only used to select the correct (de\-)compression algorithm, use an empty path if you want to make sure to read/write raw data\&.
+Create a file handle from the specified file descriptor\&. The path argument is only used to select the correct (de\-)compression algorithm, use an empty path if you want to make sure to read/write raw data\&. The file descriptor is dup()ed before the file handle is created\&.
 .SS "METHODS"
 .sp
 .if n \{\
@@ -5217,6 +5217,21 @@ my \fI$fileno\fR \fB=\fR \fI$file\fR\fB\->fileno()\fR;
 .\}
 .sp
 Return file file descriptor of the file\&. If the file is not open, \-1 is returned\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid cloexec(bool\fR \fIstate\fR\fB)\fR
+\fI$file\fR\fB\->cloexec(\fR\fI$state\fR\fB)\fR
+\fIfile\fR\fB\&.cloexec(\fR\fIstate\fR\fB)\fR
+\fIfile\fR\fB\&.cloexec(\fR\fIstate\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Set the close\-on\-exec flag of the file descriptor\&. The xfopen function returns files with close\-on\-exec turned on, so if you want to pass a file to some other process you need to call cloexec(0) before calling exec\&.
 .sp
 .if n \{\
 .RS 4
@@ -5261,7 +5276,7 @@ Flush the file\&. Returns false if there was an error\&. Flushing a closed file 
 .RE
 .\}
 .sp
-Close the file\&. This is needed for languages like Ruby, that do not destruct objects right after they are no longer referenced\&. In that case, it is good style to close open files so that the file descriptors are freed right away\&. Returns false if there was an error\&.
+Close the file\&. This is needed for languages like Ruby that do not destruct objects right after they are no longer referenced\&. In that case, it is good style to close open files so that the file descriptors are freed right away\&. Returns false if there was an error\&.
 .SH "THE REPODATA CLASS"
 .sp
 The Repodata stores attributes for packages and the repository itself, each repository can have multiple repodata areas\&. You normally only need to directly access them if you implement lazy downloading of repository data\&. Repodata areas are created by calling the repository\(cqs add_repodata() method or by using repo_add methods without the REPO_REUSE_REPODATA or REPO_USE_LOADING flag\&.
