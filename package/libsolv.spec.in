@@ -33,21 +33,9 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 # force this version on mandriva
 BuildRequires:  libneon0.26-devel
 %endif
-%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
-BuildRequires:  db4-devel
-%endif
 %if 0%{?suse_version}
-%if 0%{?suse_version} < 1030
-BuildRequires:  expat
-%else
 BuildRequires:  libexpat-devel
-%endif
-%if 0%{?suse_version} < 1100
-BuildRequires:  graphviz
-%endif
-%if 0%{?suse_version} > 1020
 BuildRequires:  fdupes
-%endif
 %else
 BuildRequires:  expat-devel
 %endif
@@ -67,6 +55,9 @@ BuildRequires:  swig
 %global ruby_vendorarch %(ruby  -r rbconfig -e "puts RbConfig::CONFIG['vendorarchdir'].nil? ? RbConfig::CONFIG['sitearchdir'] : RbConfig::CONFIG['vendorarchdir']")
 BuildRequires:  ruby
 BuildRequires:  ruby-devel
+%if 0%{?fedora_version}
+BuildRequires:  rubypick
+%endif
 BuildRequires:  swig
 %endif
 %if %{with python_binding}
