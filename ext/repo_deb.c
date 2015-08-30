@@ -475,7 +475,9 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       return 0;
     }
   l = fread(buf, 1, sizeof(buf), fp);
-  if (l < 8 + 60 || strncmp((char *)buf, "!<arch>\ndebian-binary   ", 8 + 16) != 0)
+  if (l < 8 + 60 || strncmp((char *)buf, "!<arch>\ndebian-binary", 8 + 13) != 0 ||
+		  (strncmp((char *)buf + 21, "   ", 3) != 0 &&
+		   strncmp((char *)buf + 21, "/  ", 3) != 0))
     {
       pool_error(pool, -1, "%s: not a deb package", deb);
       fclose(fp);
@@ -495,7 +497,9 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       fclose(fp);
       return 0;
     }
-  if (strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz  ", 16) != 0)
+  if (strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz", 14) != 0 ||
+		  (strncmp((char *)buf + 8 + 60 + vlen + 14, "  ", 2) != 0 &&
+		   strncmp((char *)buf + 8 + 60 + vlen + 14, "/ ", 2) != 0))
     {
       pool_error(pool, -1, "%s: control.tar.gz is not second entry", deb);
       fclose(fp);
@@ -561,8 +565,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
 	}
     }
   if (ctgz[3] & 0x08)	/* orig filename */
-    while (*bp)
-      bp++;
+    while (*bp++);
   if (ctgz[3] & 0x10)	/* file comment */
     while (*bp)
       bp++;
