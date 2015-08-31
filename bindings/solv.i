@@ -1370,7 +1370,6 @@ typedef struct {
   }
 #if defined(SWIGPERL)
   %perlcode {
-    # make from_bin look like a constructor
     undef *solv::Chksum::from_bin;
     *solv::Chksum::from_bin = sub {
       my $pkg = shift;
