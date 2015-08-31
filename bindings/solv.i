@@ -483,7 +483,7 @@ typedef SV *AppObjectPtr;
     $1 = (void *)0;
 }
 %typemap(out) AppObjectPtr {
-  $result = $1 ? SvREFCNT_inc($1) : newSV(0);
+  $result = sv_2mortal($1 ? SvREFCNT_inc($1) : newSV(0));
   argvi++;
 }
 #elif defined(SWIGRUBY)
@@ -502,8 +502,6 @@ typedef Tcl_Obj *AppObjectPtr;
   $1 = (void *)$input;
 }
 %typemap(out) AppObjectPtr {
-  if ($1)
-    Tcl_IncrRefCount((Tcl_Obj *)$1);
   Tcl_SetObjResult(interp, $1 ? $1 : Tcl_NewObj());
 }
 #else
