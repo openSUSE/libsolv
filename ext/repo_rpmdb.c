@@ -150,7 +150,6 @@
 #define DEP_STRONG		(1 << 27)
 #define DEP_PRE_IN		((1 << 6) | (1 << 9) | (1 << 10))
 #define DEP_PRE_UN		((1 << 6) | (1 << 11) | (1 << 12))
-#define DEP_RICH		(1 << 29)
 
 #define FILEFLAG_GHOST		(1 <<  6)
 
@@ -537,7 +536,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	if (!strncmp(n[i], "rpmlib(", 7))
 	  continue;
 #ifdef ENABLE_COMPLEX_DEPS
-      if ((f[i] & (DEP_RICH|DEP_LESS| DEP_EQUAL|DEP_GREATER)) == DEP_RICH && n[i][0] == '(')
+      if ((f[i] & (DEP_LESS|DEP_EQUAL|DEP_GREATER)) == 0 && n[i][0] == '(')
 	{
 	  id = pool_parserpmrichdep(pool, n[i]);
 	  if (id)

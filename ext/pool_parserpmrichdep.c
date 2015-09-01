@@ -17,14 +17,10 @@ static struct RichOpComp {
   int l;
   Id fl;
 } RichOps[] = {
-  { "&&", 2, REL_AND },
-  { "&", 1, REL_AND },
-  { "AND", 3, REL_AND },
-  { "||", 2, REL_OR },
-  { "|", 1, REL_OR },
-  { "OR", 2, REL_OR },
-  { "IF", 2, REL_COND },
-  { "ELSE", 4, REL_ELSE },
+  { "and",  3, REL_AND },
+  { "or",   2, REL_OR },
+  { "if",   2, REL_COND },
+  { "else", 4, REL_ELSE },
   { NULL, 0, 0},
 };
 
