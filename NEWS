@@ -2,6 +2,39 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.12:
+- new features:
+  * tcl bindings
+- new functions:
+  * solv_chksum_cmp
+
+Version 0.6.11:
+- new functions:
+  * pool_ids2whatprovides
+
+Version 0.6.9:
+- new features:
+  * much improved package choosing code
+  * new testcase dependency format
+  * alternatives introspection
+- new functions:
+  * pool_deb_get_autoinstalled
+  * solver_alternative2str
+  * solver_alternatives_count
+  * solver_get_alternative
+  * solver_rule2pkgrule
+  * testcase_dep2str
+
+Version 0.6.5:
+- new features:
+  * support yum style obsolete handling
+
+Version 0.6.1:
+- API change:
+  repodata_stringify() now returns the string
+- new features:
+  * add BREAK_ORPHANS and KEEP_ORPHANS solver flags
+
 Version 0.6.0:
 - ABI change: cleaned up and reordered knownid.h
 - added support for sha224/sha384/sha512
