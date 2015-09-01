@@ -90,7 +90,6 @@ typedef struct {
 #if defined(SWIGPYTHON)
 %typemap(in) Queue {
   /* Check if is a list */
-  queue_init(&$1);
   if (PyList_Check($input)) {
     int size = PyList_Size($input);
     int i = 0;
@@ -98,16 +97,12 @@ typedef struct {
       PyObject *o = PyList_GetItem($input,i);
       int v;
       int e = SWIG_AsVal_int(o, &v);
-      if (!SWIG_IsOK(e)) {
+      if (!SWIG_IsOK(e))
         SWIG_exception_fail(SWIG_ArgError(e), "list must contain only integers");
-        queue_free(&$1);
-        return NULL;
-      }
       queue_push(&$1, v);
     }
   } else {
-    PyErr_SetString(PyExc_TypeError,"not a list");
-    return NULL;
+    SWIG_exception_fail(SWIG_TypeError, "list must contain only integers");
   }
 }
 
@@ -146,7 +141,6 @@ typedef struct {
 %typemap(in) Queue {
   AV *av;
   int i, size;
-  queue_init(&$1);
   if (!SvROK($input) || SvTYPE(SvRV($input)) != SVt_PVAV)
     SWIG_croak("Argument $argnum is not an array reference.");
   av = (AV*)SvRV($input);
@@ -203,19 +197,16 @@ typedef struct {
 #if defined(SWIGRUBY)
 %typemap(in) Queue {
   int size, i;
-  VALUE *o;
-  queue_init(&$1);
-  size = RARRAY_LEN($input);
+  VALUE *o, ary;
+  ary = rb_Array($input);
+  size = RARRAY_LEN(ary);
   i = 0;
-  o = RARRAY_PTR($input);
+  o = RARRAY_PTR(ary);
   for (i = 0; i < size; i++, o++) {
     int v;
     int e = SWIG_AsVal_int(*o, &v);
     if (!SWIG_IsOK(e))
-      {
-        SWIG_Error(SWIG_RuntimeError, "list must contain only integers");
-        SWIG_fail;
-      }
+      SWIG_exception_fail(SWIG_TypeError, "list must contain only integers");
     queue_push(&$1, v);
   }
 }
@@ -257,30 +248,20 @@ typedef struct {
 #if defined(SWIGTCL)
 %typemap(in) Queue {
   /* Check if is a list */
-  int retval = TCL_OK;
   int size = 0;
   int i = 0;
 
-  if (TCL_OK != (retval = Tcl_ListObjLength(interp, $input, &size))) {
-    Tcl_SetObjResult(interp, Tcl_NewStringObj("argument is not a list", -1));
-    return retval;
-  }
-  queue_init(&$1);
+  if (TCL_OK != Tcl_ListObjLength(interp, $input, &size))
+    SWIG_exception_fail(SWIG_TypeError, "argument is not a list");
   for (i = 0; i < size; i++) {
     Tcl_Obj *o = NULL;
     int e, v;
 
-    if (TCL_OK != (retval = Tcl_ListObjIndex(interp, $input, i, &o))) {
-      queue_free(&$1);
-      Tcl_SetObjResult(interp, Tcl_NewStringObj("failed to retrieve a list member", -1));
-      return retval;
-    }
+    if (TCL_OK != Tcl_ListObjIndex(interp, $input, i, &o))
+      SWIG_exception_fail(SWIG_IndexError, "failed to retrieve a list member");
     e = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(o, &v);
-    if (!SWIG_IsOK(e)) {
-      queue_free(&$1);
+    if (!SWIG_IsOK(e))
       SWIG_exception_fail(SWIG_ArgError(e), "list must contain only integers");
-      return TCL_ERROR;
-    }
     queue_push(&$1, v);
   }
 }
@@ -323,32 +304,22 @@ typedef struct {
 
 %typemap(in) Queue solvejobs {
   /* Check if is a list */
-  int retval = TCL_OK;
   int size = 0;
   int i = 0;
 
-  if (TCL_OK != (retval = Tcl_ListObjLength(interp, $input, &size))) {
-    Tcl_SetObjResult(interp, Tcl_NewStringObj("argument is not a list", -1));
-    return retval;
-  }
-  queue_init(&$1);
+  if (TCL_OK != Tcl_ListObjLength(interp, $input, &size))
+    SWIG_exception_fail(SWIG_TypeError, "argument is not a list");
   for (i = 0; i < size; i++) {
     Tcl_Obj *o = NULL;
     void *jp;
     Job *j;
-    int res;
+    int e;
 
-    if (TCL_OK != (retval = Tcl_ListObjIndex(interp, $input, i, &o))) {
-      queue_free(&$1);
-      Tcl_SetObjResult(interp, Tcl_NewStringObj("failed to retrieve a list member", -1));
-      return retval;
-    }
-    res = SWIG_ConvertPtr(o, &jp ,SWIGTYPE_p_Job, 0 |  0 );
-    if (!SWIG_IsOK(res)) {
-      queue_free(&$1);
-      Tcl_SetObjResult(interp, Tcl_NewStringObj("list member is not a Job", -1));
-      return retval;
-    }
+    if (TCL_OK != Tcl_ListObjIndex(interp, $input, i, &o))
+      SWIG_exception_fail(SWIG_IndexError, "failed to retrieve a list member");
+    e = SWIG_ConvertPtr(o, &jp ,SWIGTYPE_p_Job, 0 |  0 );
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_ArgError(e), "list member is not a Job");
     j = (Job *)jp;
     queue_push2(&$1, j->how, j->what);
   }
