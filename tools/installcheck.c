@@ -139,6 +139,21 @@ main(int argc, char **argv)
       else if (l >= 14 && !strcmp(argv[i] + l - 14, "primary.xml.gz"))
 	{
 	  r = repo_add_rpmmd(repo, fp, 0, 0);
+          if (!r && i + 1 < argc)
+            {
+              l = strlen(argv[i + 1]);
+              if (l >= 16 && !strcmp(argv[i + 1] + l - 16, "filelists.xml.gz"))
+                {
+                  i++;
+                  fclose(fp);
+                  if ((fp = solv_xfopen(argv[i], 0)) == 0)
+                    {
+                      perror(argv[i]);
+                      exit(1);
+                    }
+                  r = repo_add_rpmmd(repo, fp, 0, REPO_EXTEND_SOLVABLES|REPO_LOCALPOOL);
+                }
+            }
 	}
 #endif
 #ifdef ENABLE_DEBIAN
