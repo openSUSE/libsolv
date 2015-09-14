@@ -144,6 +144,41 @@ showdiskusagechanges(Transaction *trans)
 }
 #endif
 
+static Id
+find_repo(const char *name, Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
+{
+  const char *rp;
+  int i;
+
+  for (rp = name; *rp; rp++)
+    if (*rp <= '0' || *rp >= '9')
+      break;
+  if (!*rp)
+    {
+      /* repo specified by number */
+      int rnum = atoi(name);
+      for (i = 0; i < nrepoinfos; i++)
+	{
+	  struct repoinfo *cinfo = repoinfos + i;
+	  if (!cinfo->enabled || !cinfo->repo)
+	    continue;
+	  if (--rnum == 0)
+	    return cinfo->repo->repoid;
+	}
+    }
+  else
+    {
+      /* repo specified by alias */
+      Repo *repo;
+      FOR_REPOS(i, repo)
+	{
+	  if (!strcasecmp(name, repo->name))
+	    return repo->repoid;
+	}
+    }
+  return 0;
+}
+
 
 #define MODE_LIST        0
 #define MODE_INSTALL     1
@@ -172,7 +207,7 @@ usage(int r)
   fprintf(stderr, "    update:       update installed packages\n");
   fprintf(stderr, "    verify:       check dependencies of installed packages\n");
 #if defined(SUSE) || defined(FEDORA)
-  fprintf(stderr, "    patch:        install newest patches\n");
+  fprintf(stderr, "    patch:        install newest maintenance updates\n");
 #endif
   fprintf(stderr, "\n");
   exit(r);
@@ -351,37 +386,10 @@ main(int argc, char **argv)
 	}
       else if (argc > 2 && (!strcmp(argv[1], "-r") || !strcmp(argv[1], "--repo")))
 	{
-	  const char *rname = argv[2], *rp;
-	  Id repoid = 0;
-	  for (rp = rname; *rp; rp++)
-	    if (*rp <= '0' || *rp >= '9')
-	      break;
-	  if (!*rp)
-	    {
-	      /* repo specified by number */
-	      int rnum = atoi(rname);
-	      for (i = 0; i < nrepoinfos; i++)
-		{
-		  struct repoinfo *cinfo = repoinfos + i;
-		  if (!cinfo->enabled)
-		    continue;
-		  if (--rnum == 0)
-		    repoid = cinfo->repo->repoid;
-		}
-	    }
-	  else
-	    {
-	      /* repo specified by alias */
-	      Repo *repo;
-	      FOR_REPOS(i, repo)
-		{
-		  if (!strcasecmp(rname, repo->name))
-		    repoid = repo->repoid;
-		}
-	    }
+	  Id repoid = find_repo(argv[2], pool, repoinfos, nrepoinfos);
 	  if (!repoid)
 	    {
-	      fprintf(stderr, "%s: no such repo\n", rname);
+	      fprintf(stderr, "%s: no such repo\n", argv[2]);
 	      exit(1);
 	    }
 	  /* SETVENDOR is actually wrong but useful */
@@ -487,9 +495,6 @@ main(int argc, char **argv)
 	repo_internalize(commandlinerepo);
     }
 
-  // FOR_REPOS(i, repo)
-  //   printf("%s: %d solvables\n", repo->name, repo->nsolvables);
-
 #if defined(ENABLE_RPMDB)
   if (pool->disttype == DISTTYPE_RPM)
     addfileprovides(pool);
@@ -505,7 +510,7 @@ main(int argc, char **argv)
   for (i = 1; i < argc; i++)
     {
       Queue job2;
-      int j, flags, rflags;
+      int flags, rflags;
 
       if (commandlinepkgs && commandlinepkgs[i])
 	{
@@ -556,8 +561,7 @@ main(int argc, char **argv)
         printf("[using file list match for '%s']\n", argv[i]);
       if (rflags & SELECTION_PROVIDES)
 	printf("[using capability match for '%s']\n", argv[i]);
-      for (j = 0; j < job2.count; j++)
-	queue_push(&job, job2.elements[j]);
+      queue_insertn(&job, job.count, job2.count, job2.elements);
       queue_free(&job2);
     }
   keyname = solv_free(keyname);
@@ -607,11 +611,6 @@ main(int argc, char **argv)
 		  str = solvable_lookup_str(s, SOLVABLE_LICENSE);
 		  if (str)
 		    printf("License:     %s\n", str);
-#if 0
-		  str = solvable_lookup_sourcepkg(s);
-		  if (str)
-		    printf("Source:      %s\n", str);
-#endif
 		  printf("Description:\n%s\n", solvable_lookup_str(s, SOLVABLE_DESCRIPTION));
 		  printf("\n");
 		}
