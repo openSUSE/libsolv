@@ -43,9 +43,6 @@
 #include "repoinfo.h"
 #include "repoinfo_cache.h"
 #include "repoinfo_download.h"
-#if defined(SUSE) || defined(FEDORA)
-#include "repoinfo_config_yum.h"
-#endif
 
 #if defined(ENABLE_RPMDB)
 #include "fileprovides.h"
@@ -633,9 +630,6 @@ main(int argc, char **argv)
 	}
       queue_free(&q);
       queue_free(&job);
-#if defined(SUSE) || defined(FEDORA)
-      yum_substitute(pool, 0);
-#endif
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);
       solv_free(commandlinepkgs);
@@ -745,9 +739,6 @@ rerunsolver:
       transaction_free(trans);
       solver_free(solv);
       queue_free(&job);
-#if defined(SUSE) || defined(FEDORA)
-      yum_substitute(pool, 0);
-#endif
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);
       solv_free(commandlinepkgs);
@@ -770,9 +761,6 @@ rerunsolver:
       transaction_free(trans);
       solver_free(solv);
       queue_free(&job);
-#if defined(SUSE) || defined(FEDORA)
-      yum_substitute(pool, 0);
-#endif
       pool_free(pool);
       free_repoinfos(repoinfos, nrepoinfos);
       solv_free(commandlinepkgs);
@@ -916,9 +904,6 @@ rerunsolver:
   transaction_free(trans);
   solver_free(solv);
   queue_free(&job);
-#if defined(SUSE) || defined(FEDORA)
-  yum_substitute(pool, 0);
-#endif
   pool_free(pool);
   free_repoinfos(repoinfos, nrepoinfos);
   solv_free(commandlinepkgs);

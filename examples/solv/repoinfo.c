@@ -76,6 +76,9 @@ free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
       solv_free(cinfo->components);
     }
   solv_free(repoinfos);
+#if defined(SUSE) || defined(FEDORA)
+  yum_substitute((Pool *)0, 0);		/* free data */
+#endif
 }
 
 struct repoinfo *
