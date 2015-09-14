@@ -408,6 +408,8 @@ SOLV_1.0 {
 		transaction_obs_pkg;
 		transaction_order;
 		transaction_order_add_choices;
+		transaction_order_get_cycle;
+		transaction_order_get_cycleids;
 		transaction_print;
 		transaction_type;
 	local:

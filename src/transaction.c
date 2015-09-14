@@ -853,6 +853,7 @@ struct _TransactionOrderdata {
   int ntes;
   Id *invedgedata;
   int ninvedgedata;
+  Queue *cycles;
 };
 
 #define TYPE_BROKEN	(1<<0)
@@ -898,6 +899,11 @@ transaction_create_clone(Transaction *srctrans)
       trans->orderdata->ntes = od->ntes;
       trans->orderdata->invedgedata = solv_memdup2(od->invedgedata, od->ninvedgedata, sizeof(Id));
       trans->orderdata->ninvedgedata = od->ninvedgedata;
+      if (od->cycles)
+	{
+	  trans->orderdata->cycles = solv_calloc(1, sizeof(Queue));
+	  queue_init_clone(trans->orderdata->cycles, od->cycles);
+	}
     }
   return trans;
 }
@@ -922,6 +928,11 @@ transaction_free_orderdata(Transaction *trans)
       struct _TransactionOrderdata *od = trans->orderdata;
       od->tes = solv_free(od->tes);
       od->invedgedata = solv_free(od->invedgedata);
+      if (od->cycles)
+	{
+	  queue_free(od->cycles);
+	  od->cycles = solv_free(od->cycles);
+	}
       trans->orderdata = solv_free(trans->orderdata);
     }
 }
@@ -1334,7 +1345,6 @@ breakcycle(struct orderdata *od, Id *cycle)
 	    {
 	      /* prefer k, as l comes from a package with contains scriptlets */
 	      l = k;
-	      ddegmin = ddeg;
 	      continue;
 	    }
 	  /* same edge value, check for prereq */
@@ -1345,6 +1355,7 @@ breakcycle(struct orderdata *od, Id *cycle)
   queue_push(&od->cycles, od->cyclesdata.count);		/* offset into data */
   queue_push(&od->cycles, k / 2);				/* cycle elements */
   queue_push(&od->cycles, od->edgedata[cycle[l + 1] + 1]);	/* broken edge */
+  queue_push(&od->cycles, (ddegmax << 16) | ddegmin);		/* max/min values */
   od->ncycles++;
   for (k = l;;)
     {
@@ -1371,7 +1382,7 @@ breakcycle(struct orderdata *od, Id *cycle)
   POOL_DEBUG(SOLV_DEBUG_STATS, "cycle: --> ");
   for (k = 0; cycle[k + 1]; k += 2)
     {
-      te = od->tes +  cycle[k];
+      te = od->tes + cycle[k];
       if ((od->edgedata[cycle[k + 1] + 1] & TYPE_BROKEN) != 0)
         POOL_DEBUG(SOLV_DEBUG_STATS, "%s ##%x##> ", pool_solvid2str(pool, te->p), od->edgedata[cycle[k + 1] + 1]);
       else
@@ -1724,12 +1735,12 @@ transaction_order(Transaction *trans, int flags)
   now = solv_timems(0);
   /* now go through all broken cycles and create cycle edges to help
      the ordering */
-   for (i = od.cycles.count - 3; i >= 0; i -= 3)
+   for (i = od.cycles.count - 4; i >= 0; i -= 4)
      {
        if (od.cycles.elements[i + 2] >= TYPE_REQ)
          addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
      }
-   for (i = od.cycles.count - 3; i >= 0; i -= 3)
+   for (i = od.cycles.count - 4; i >= 0; i -= 4)
      {
        if (od.cycles.elements[i + 2] < TYPE_REQ)
          addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
@@ -1891,11 +1902,19 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 
   if ((flags & SOLVER_TRANSACTION_KEEP_ORDERDATA) != 0)
     {
-      trans->orderdata = solv_calloc(1, sizeof(*trans->orderdata));
-      trans->orderdata->tes = od.tes;
-      trans->orderdata->ntes = numte;
-      trans->orderdata->invedgedata = od.invedgedata;
-      trans->orderdata->ninvedgedata = od.nedgedata;
+      struct _TransactionOrderdata *tod;
+      trans->orderdata = tod = solv_calloc(1, sizeof(*trans->orderdata));
+      tod->tes = od.tes;
+      tod->ntes = numte;
+      tod->invedgedata = od.invedgedata;
+      tod->ninvedgedata = od.nedgedata;
+      if ((flags & SOLVER_TRANSACTION_KEEP_ORDERCYCLES) != 0)
+	{
+	  tod->cycles = solv_calloc(1, sizeof(Queue));
+	  queue_init_clone(tod->cycles, &od.cyclesdata);
+	  queue_insertn(tod->cycles, tod->cycles->count, od.cycles.count, od.cycles.elements);
+	  queue_push(tod->cycles, od.cycles.count / 4);
+	}
     }
   else
     {
@@ -2117,3 +2136,59 @@ transaction_check_order(Transaction *trans)
   map_free(&ins);
   POOL_DEBUG(SOLV_DEBUG_RESULT, "transaction order check done.\n");
 }
+
+void
+transaction_order_get_cycleids(Transaction *trans, Queue *q, int minseverity)
+{
+  struct _TransactionOrderdata *od = trans->orderdata;
+  Queue *cq;
+  int i, n;
+
+  queue_empty(q);
+  if (!od || !od->cycles || !od->cycles->count)
+    return;
+  cq = od->cycles;
+  n = cq->elements[cq->count - 1];
+  for (i = cq->count - 1 - 4 * n; i < cq->count - 1; i += 4)
+    {
+      if (minseverity)
+	{
+	  int cmin = cq->elements[i + 3] & 0xffff;
+	  int cmax = (cq->elements[i + 3] >> 16) & 0xffff;
+	  if (minseverity >= SOLVER_ORDERCYCLE_NORMAL && cmin < TYPE_REQ)
+	    continue;
+	  if (minseverity >= SOLVER_ORDERCYCLE_CRITICAL && (cmax & TYPE_PREREQ) == 0)
+	    continue;
+	}
+      queue_push(q, i);
+    }
+}
+
+int
+transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q)
+{
+  struct _TransactionOrderdata *od = trans->orderdata;
+  Queue *cq;
+  int cmin, cmax, severity;
+
+  queue_empty(q);
+  if (!od || !od->cycles || !od->cycles->count || cid < 0 || cid >= od->cycles->count)
+    return SOLVER_ORDERCYCLE_HARMLESS;
+  cq = od->cycles;
+  cmin = cq->elements[cid + 3] & 0xffff;
+  cmax = (cq->elements[cid + 3] >> 16) & 0xffff;
+  if (cmin < TYPE_REQ)
+    severity = SOLVER_ORDERCYCLE_HARMLESS;
+  else if ((cmax & TYPE_PREREQ) == 0)
+    severity = SOLVER_ORDERCYCLE_NORMAL;
+  else
+    severity = SOLVER_ORDERCYCLE_CRITICAL;
+  if (q)
+    {
+      int i, k = cq->elements[cid] + cq->elements[cid + 1];
+      for (i = cq->elements[cid]; i < k; i++)
+	queue_push(q, od->tes[cq->elements[i]].p);
+    }
+  return severity;
+}
+

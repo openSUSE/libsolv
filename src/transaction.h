@@ -85,6 +85,12 @@ typedef struct _Transaction {
 
 /* order flags */
 #define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
+#define SOLVER_TRANSACTION_KEEP_ORDERCYCLES	(1 << 1)
+
+/* cycle severities */
+#define SOLVER_ORDERCYCLE_HARMLESS		0
+#define SOLVER_ORDERCYCLE_NORMAL		1
+#define SOLVER_ORDERCYCLE_CRITICAL		2
 
 extern Transaction *transaction_create(struct _Pool *pool);
 extern Transaction *transaction_create_decisionq(struct _Pool *pool, Queue *decisionq, Map *multiversionmap);
@@ -127,6 +133,9 @@ extern void transaction_add_obsoleted(Transaction *trans);
 /* debug function, report problems found in the order */
 extern void transaction_check_order(Transaction *trans);
 
+/* order cycle introspection */
+extern void transaction_order_get_cycleids(Transaction *trans, Queue *q, int minseverity);
+extern int transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q);
 
 #ifdef __cplusplus
 }
