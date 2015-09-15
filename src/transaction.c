@@ -2142,14 +2142,15 @@ transaction_order_get_cycleids(Transaction *trans, Queue *q, int minseverity)
 {
   struct _TransactionOrderdata *od = trans->orderdata;
   Queue *cq;
-  int i, n;
+  int i, cid, ncycles;
 
   queue_empty(q);
   if (!od || !od->cycles || !od->cycles->count)
     return;
   cq = od->cycles;
-  n = cq->elements[cq->count - 1];
-  for (i = cq->count - 1 - 4 * n; i < cq->count - 1; i += 4)
+  ncycles = cq->elements[cq->count - 1];
+  i = cq->count - 1 - ncycles * 4;
+  for (cid = 1; cid <= ncycles; cid++, i += 4)
     {
       if (minseverity)
 	{
@@ -2160,7 +2161,7 @@ transaction_order_get_cycleids(Transaction *trans, Queue *q, int minseverity)
 	  if (minseverity >= SOLVER_ORDERCYCLE_CRITICAL && (cmax & TYPE_PREREQ) == 0)
 	    continue;
 	}
-      queue_push(q, i);
+      queue_push(q, cid);
     }
 }
 
@@ -2170,11 +2171,16 @@ transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q)
   struct _TransactionOrderdata *od = trans->orderdata;
   Queue *cq;
   int cmin, cmax, severity;
+  int ncycles;
 
   queue_empty(q);
-  if (!od || !od->cycles || !od->cycles->count || cid < 0 || cid >= od->cycles->count)
+  if (!od || !od->cycles || !od->cycles->count)
     return SOLVER_ORDERCYCLE_HARMLESS;
   cq = od->cycles;
+  ncycles = cq->elements[cq->count - 1];
+  if (cid < 1 || cid > ncycles)
+    return SOLVER_ORDERCYCLE_HARMLESS;
+  cid =  cq->count - 1 - 4 * (ncycles - cid + 1);
   cmin = cq->elements[cid + 3] & 0xffff;
   cmax = (cq->elements[cid + 3] >> 16) & 0xffff;
   if (cmin < TYPE_REQ)
