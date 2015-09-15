@@ -2190,11 +2190,7 @@ transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q)
   else
     severity = SOLVER_ORDERCYCLE_CRITICAL;
   if (q)
-    {
-      int i, k = cq->elements[cid] + cq->elements[cid + 1];
-      for (i = cq->elements[cid]; i < k; i++)
-	queue_push(q, cq->elements[i]);
-    }
+    queue_insertn(q, 0, cq->elements[cid + 1], cq->elements + cq->elements[cid]);
   return severity;
 }
 
