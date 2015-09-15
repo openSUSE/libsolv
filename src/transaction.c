@@ -1422,7 +1422,6 @@ dump_tes(struct orderdata *od)
     }
 }
 
-#if 1
 static void
 reachable(struct orderdata *od, Id i)
 {
@@ -1446,7 +1445,6 @@ reachable(struct orderdata *od, Id i)
     }
   te->mark = -1;
 }
-#endif
 
 static void
 addcycleedges(struct orderdata *od, Id *cycle, Queue *todo)
@@ -1457,9 +1455,7 @@ addcycleedges(struct orderdata *od, Id *cycle, Queue *todo)
 #endif
   struct _TransactionElement *te;
   int i, j, k, tail;
-#if 1
   int head;
-#endif
 
 #if 0
   printf("addcycleedges\n");
@@ -1521,7 +1517,6 @@ addcycleedges(struct orderdata *od, Id *cycle, Queue *todo)
 	}
     }
 
-#if 1
   /* now add all head cycle edges */
 
   /* reset marks */
@@ -1566,7 +1561,6 @@ addcycleedges(struct orderdata *od, Id *cycle, Queue *todo)
 	    }
 	}
     }
-#endif
 }
 
 void
@@ -1900,27 +1894,33 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
   POOL_DEBUG(SOLV_DEBUG_STATS, "creating new transaction took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "transaction ordering took %d ms\n", solv_timems(start));
 
-  if ((flags & SOLVER_TRANSACTION_KEEP_ORDERDATA) != 0)
+  if ((flags & (SOLVER_TRANSACTION_KEEP_ORDERDATA | SOLVER_TRANSACTION_KEEP_ORDERCYCLES)) != 0)
     {
       struct _TransactionOrderdata *tod;
       trans->orderdata = tod = solv_calloc(1, sizeof(*trans->orderdata));
-      tod->tes = od.tes;
-      tod->ntes = numte;
-      tod->invedgedata = od.invedgedata;
-      tod->ninvedgedata = od.nedgedata;
       if ((flags & SOLVER_TRANSACTION_KEEP_ORDERCYCLES) != 0)
 	{
-	  tod->cycles = solv_calloc(1, sizeof(Queue));
-	  queue_init_clone(tod->cycles, &od.cyclesdata);
-	  queue_insertn(tod->cycles, tod->cycles->count, od.cycles.count, od.cycles.elements);
-	  queue_push(tod->cycles, od.cycles.count / 4);
+	  Queue *cycles = tod->cycles = solv_calloc(1, sizeof(Queue));
+	  queue_init_clone(cycles, &od.cyclesdata);
+	  /* map from tes to packages */
+	  for (i = 0; i < cycles->count; i++)
+	    if (cycles->elements[i])
+	      cycles->elements[i] = od.tes[cycles->elements[i]].p;
+	  queue_insertn(cycles, cycles->count, od.cycles.count, od.cycles.elements);
+	  queue_push(cycles, od.cycles.count / 4);
+	}
+      if ((flags & SOLVER_TRANSACTION_KEEP_ORDERDATA) != 0)
+	{
+	  tod->tes = od.tes;
+	  tod->ntes = numte;
+	  tod->invedgedata = od.invedgedata;
+	  tod->ninvedgedata = od.nedgedata;
+	  od.tes = 0;
+	  od.invedgedata = 0;
 	}
     }
-  else
-    {
-      solv_free(od.tes);
-      solv_free(od.invedgedata);
-    }
+  solv_free(od.tes);
+  solv_free(od.invedgedata);
   queue_free(&od.cycles);
   queue_free(&od.cyclesdata);
 }
@@ -2193,7 +2193,7 @@ transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q)
     {
       int i, k = cq->elements[cid] + cq->elements[cid + 1];
       for (i = cq->elements[cid]; i < k; i++)
-	queue_push(q, od->tes[cq->elements[i]].p);
+	queue_push(q, cq->elements[i]);
     }
   return severity;
 }
