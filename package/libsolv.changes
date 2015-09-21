@@ -4,7 +4,7 @@ Tue Sep  1 13:37:11 CEST 2015 - mls@suse.de
 - added tcl bindings
 - improve debian ar archive handling
 - bindings: set the CLOEXEC flags in xfopen
-- bindings: support testcase writing
+- bindings: support testcase writing [bnc#946752]
 - support REL_ELSE as evr of REL_COND
 - bump version to 0.6.12
 
