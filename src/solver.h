@@ -195,6 +195,10 @@ struct _Solver {
   int keep_orphans;			/* how to treat orphans */
   int break_orphans;			/* how to treat orphans */
   Queue *brokenorphanrules;		/* broken rules of orphaned packages */
+
+  Map allowuninstallmap;		/* ok to uninstall those */
+  int allowuninstall_all;
+
 #endif	/* LIBSOLV_INTERNAL */
 };
 
@@ -223,7 +227,8 @@ typedef struct _Solver Solver;
 #define SOLVER_DISTUPGRADE		0x0700
 #define SOLVER_VERIFY			0x0800
 #define SOLVER_DROP_ORPHANED		0x0900
-#define SOLVER_USERINSTALLED            0x0a00
+#define SOLVER_USERINSTALLED		0x0a00
+#define SOLVER_ALLOWUNINSTALL		0x0b00
 
 #define SOLVER_JOBMASK			0xff00
 

@@ -200,15 +200,25 @@ autouninstall(Solver *solv, Id *problem)
   int lastfeature = 0, lastupdate = 0;
   Id v;
   Id extraflags = -1;
+  Map *m = 0;
 
+  if (!solv->allowuninstall && !solv->allowuninstall_all)
+    {
+      if (!solv->allowuninstallmap.size)
+	return 0;		/* why did we get called? */
+      m = &solv->allowuninstallmap;
+    }
   for (i = 0; (v = problem[i]) != 0; i++)
     {
       if (v < 0)
 	extraflags &= solv->job.elements[-v - 1];
       if (v >= solv->updaterules && v < solv->updaterules_end)
 	{
+	  Rule *r;
+	  if (m && !MAPTST(m, v - solv->updaterules))
+	    continue;
 	  /* check if identical to feature rule, we don't like that */
-	  Rule *r = solv->rules + solv->featurerules + (v - solv->updaterules);
+	  r = solv->rules + solv->featurerules + (v - solv->updaterules);
 	  if (!r->p)
 	    {
 	      /* update rule == feature rule */
@@ -427,8 +437,16 @@ makeruledecisions(Solver *solv)
 		v = ri;
 	      queue_push(&solv->problems, v);
 	      queue_push(&solv->problems, 0);
-	      if (solv->allowuninstall && v >= solv->featurerules && v < solv->updaterules_end)
-		solv->problems.count = oldproblemcount;
+	      if (v >= solv->featurerules && v < solv->updaterules_end)
+		{
+		  if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
+		    if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
+		      {
+		        solv->problems.count = oldproblemcount;
+		        havedisabled = 1;
+		        break;	/* start over */
+		      }
+		}
 	      solver_disableproblem(solv, v);
 	      havedisabled = 1;
 	      break;	/* start over */
@@ -458,8 +476,16 @@ makeruledecisions(Solver *solv)
 		v = ri;
 	      queue_push(&solv->problems, v);
 	      queue_push(&solv->problems, 0);
-	      if (solv->allowuninstall && v >= solv->featurerules && v < solv->updaterules_end)
-		solv->problems.count = oldproblemcount;
+	      if (v >= solv->featurerules && v < solv->updaterules_end)
+		{
+		  if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
+		    if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
+		      {
+		        solv->problems.count = oldproblemcount;
+		        havedisabled = 1;
+		        break;	/* start over */
+		      }
+		}
 	      solver_disableproblem(solv, v);
 	      havedisabled = 1;
 	      break;	/* start over */
@@ -507,8 +533,13 @@ makeruledecisions(Solver *solv)
 	    }
 	  queue_push(&solv->problems, 0);
 
-	  if (solv->allowuninstall && (v = autouninstall(solv, solv->problems.elements + oldproblemcount + 1)) != 0)
-	    solv->problems.count = oldproblemcount;
+	  if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
+	    if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
+	      {
+	        solv->problems.count = oldproblemcount;
+	        havedisabled = 1;
+	        break;	/* start over */
+	      }
 
 	  for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
 	    solver_disableproblem(solv, solv->problems.elements[i]);
@@ -1245,13 +1276,14 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       return 0;
     }
 
-  if (solv->allowuninstall && (v = autouninstall(solv, solv->problems.elements + oldproblemcount + 1)) != 0)
-    {
-      solv->problems.count = oldproblemcount;
-      solv->learnt_pool.count = oldlearntpoolcount;
-      solver_reset(solv);
-      return 0;
-    }
+  if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
+    if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
+      {
+	solv->problems.count = oldproblemcount;
+	solv->learnt_pool.count = oldlearntpoolcount;
+	solver_reset(solv);
+	return 0;
+      }
 
   /* finish proof */
   if (record_proof)
@@ -1672,6 +1704,7 @@ solver_free(Solver *solv)
   map_free(&solv->dupinvolvedmap);
   map_free(&solv->droporphanedmap);
   map_free(&solv->cleandepsmap);
+  map_free(&solv->allowuninstallmap);
 
   solv_free(solv->decisionmap);
   solv_free(solv->rules);
@@ -3359,6 +3392,8 @@ solver_solve(Solver *solv, Queue *job)
   map_zerosize(&solv->dupinvolvedmap);
   solv->droporphanedmap_all = 0;
   map_zerosize(&solv->droporphanedmap);
+  solv->allowuninstall_all = 0;
+  map_zerosize(&solv->allowuninstallmap);
   map_zerosize(&solv->cleandepsmap);
   map_zerosize(&solv->weakrulemap);
   queue_empty(&solv->weakruleq);
@@ -3872,6 +3907,20 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_USERINSTALLED:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: user installed %s\n", solver_select2str(pool, select, what));
+	  break;
+	case SOLVER_ALLOWUNINSTALL:
+	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: allowuninstall %s\n", solver_select2str(pool, select, what));
+	  if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
+	    solv->allowuninstall_all = 1;
+	  FOR_JOB_SELECT(p, pp, select, what)
+	    {
+	      s = pool->solvables + p;
+	      if (s->repo != installed)
+		continue;
+	      if (!solv->allowuninstallmap.size)
+		map_grow(&solv->allowuninstallmap, installed->end - installed->start);
+	      MAPSET(&solv->allowuninstallmap, p - installed->start);
+	    }
 	  break;
 	default:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: unknown job\n");
@@ -5081,6 +5130,9 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       break;
     case SOLVER_USERINSTALLED:
       strstart = "regard ", strend = " as userinstalled";
+      break;
+    case SOLVER_ALLOWUNINSTALL:
+      strstart = "allow deinstallation of ";
       break;
     default:
       strstart = "unknown job ";

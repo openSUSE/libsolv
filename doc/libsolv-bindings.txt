@@ -1873,6 +1873,11 @@ thus not installed to fulfill some dependency. This is needed input for
 the calculation of unneeded packages for jobs that have the
 SOLVER_CLEANDEPS flag set.
 
+*SOLVER_ALLOWUNINSTALL*::
+Allow the solver to deinstall the matching installed packages if they get
+into the way of resolving a dependency. This is like the
+SOLVER_FLAG_ALLOW_UNINSTALL flag, but limited to a specific set of packages.
+
 *SOLVER_JOBMASK*::
 A mask containing all the above action bits.
 

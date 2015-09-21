@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 08/28/2015
+.\"      Date: 09/21/2015
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "08/28/2015" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "09/21/2015" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3249,6 +3249,11 @@ Fix dependency problems of matching installed packages\&. The default is to igno
 \fBSOLVER_USERINSTALLED\fR
 .RS 4
 The matching installed packages are considered to be installed by a user, thus not installed to fulfill some dependency\&. This is needed input for the calculation of unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set\&.
+.RE
+.PP
+\fBSOLVER_ALLOWUNINSTALL\fR
+.RS 4
+Allow the solver to deinstall the matching installed packages if they get into the way of resolving a dependency\&. This is like the SOLVER_FLAG_ALLOW_UNINSTALL flag, but limited to a specific set of packages\&.
 .RE
 .PP
 \fBSOLVER_JOBMASK\fR

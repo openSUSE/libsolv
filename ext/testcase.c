@@ -33,18 +33,19 @@ static struct job2str {
   Id job;
   const char *str;
 } job2str[] = {
-  { SOLVER_NOOP,          "noop" },
-  { SOLVER_INSTALL,       "install" },
-  { SOLVER_ERASE,         "erase" },
-  { SOLVER_UPDATE,        "update" },
-  { SOLVER_WEAKENDEPS,    "weakendeps" },
-  { SOLVER_MULTIVERSION,  "multiversion" },
-  { SOLVER_MULTIVERSION,  "noobsoletes" },	/* old name */
-  { SOLVER_LOCK,          "lock" },
-  { SOLVER_DISTUPGRADE,   "distupgrade" },
-  { SOLVER_VERIFY,        "verify" },
-  { SOLVER_DROP_ORPHANED, "droporphaned" },
-  { SOLVER_USERINSTALLED, "userinstalled" },
+  { SOLVER_NOOP,           "noop" },
+  { SOLVER_INSTALL,        "install" },
+  { SOLVER_ERASE,          "erase" },
+  { SOLVER_UPDATE,         "update" },
+  { SOLVER_WEAKENDEPS,     "weakendeps" },
+  { SOLVER_MULTIVERSION,   "multiversion" },
+  { SOLVER_MULTIVERSION,   "noobsoletes" },	/* old name */
+  { SOLVER_LOCK,           "lock" },
+  { SOLVER_DISTUPGRADE,    "distupgrade" },
+  { SOLVER_VERIFY,         "verify" },
+  { SOLVER_DROP_ORPHANED,  "droporphaned" },
+  { SOLVER_USERINSTALLED,  "userinstalled" },
+  { SOLVER_ALLOWUNINSTALL, "allowuninstall" },
   { 0, 0 }
 };
 
