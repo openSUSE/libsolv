@@ -265,8 +265,13 @@ repo_add_autopattern(Repo *repo, int flags)
 	    repodata_set_str(data, s2 - pool->solvables, SOLVABLE_ICON, newname);
 	  else if (!strcmp(pn, "pattern-order()") && evr)
 	    repodata_set_str(data, s2 - pool->solvables, SOLVABLE_ORDER, newname);
-	  else if (!strcmp(pn, "pattern-visible()") && !evr)
-	    repodata_set_void(data, s2 - pool->solvables, SOLVABLE_ISVISIBLE);
+	  else if (!strcmp(pn, "pattern-visible()"))
+	    {
+	      if (!evr)
+	        repodata_set_void(data, s2 - pool->solvables, SOLVABLE_ISVISIBLE);
+	      else
+		repodata_set_str(data, s2 - pool->solvables, SOLVABLE_ISVISIBLE, newname);
+	    }
 	}
     }
   queue_free(&patq);
