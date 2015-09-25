@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Fri Sep 25 11:54:02 CEST 2015 - mls@suse.de
+
+- support a generic string for pattern-visible() [bnc#900769]
+- add a SOLVER_ALLOWUNINSTALL job type
+- add ordercycle introspection
+- fix mkmask handling of a zero size
+- support 'recommends' in repo_mdk.c
+- support filelist parsing in installcheck
+- bump version to 0.6.13
+
+-------------------------------------------------------------------
 Tue Sep  1 13:37:11 CEST 2015 - mls@suse.de
 
 - added tcl bindings
