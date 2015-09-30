@@ -928,7 +928,13 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  /* we still obsolete packages with same nevra, like rpm does */
 		  /* (actually, rpm mixes those packages. yuck...) */
 		  if (multi && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
-		    continue;
+		    {
+		      if (isinstalled || ps->repo != installed)
+		        continue;
+		      /* also check the installed package for multi-ness */
+		      if (MAPTST(&solv->multiversion, p))
+		        continue;
+		    }
 		  if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
 		    continue;
 		  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
@@ -938,7 +944,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  if (s->name == ps->name)
 		    {
 		      /* optimization: do not add the same-name conflict rule if it was
-		       * already added when we looket at the other package.
+		       * already added when we looked at the other package.
 		       * (this assumes pool_colormatch is symmetric) */
 		      if (p && m && ps->repo != installed && MAPTST(m, p) &&
 			  (ps->arch != ARCH_SRC && ps->arch != ARCH_NOSRC) &&
