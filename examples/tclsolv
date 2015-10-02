@@ -738,7 +738,7 @@ foreach cl [$trans classify [expr $solv::Transaction_SOLVER_TRANSACTION_SHOW_OBS
     set cltype [$cl cget -type]
     if {$cltype == $solv::Transaction_SOLVER_TRANSACTION_UPGRADED || $cltype ==$solv::Transaction_SOLVER_TRANSACTION_DOWNGRADED} {
       set op [$trans othersolvable $p]
-      puts [format {  - %s -> %s} [$p str] [$p str]]
+      puts [format {  - %s -> %s} [$p str] [$op str]]
     } else {
       puts [format {  - %s} [$p str]]
     }
