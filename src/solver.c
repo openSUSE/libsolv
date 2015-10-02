@@ -2544,13 +2544,20 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (solv->decisionmap[p] <= 0)
 		    continue;
-		  if (solv->multiversion.size && MAPTST(&solv->multiversion, p))
+		  if (!solv->keepexplicitobsoletes && solv->multiversion.size && MAPTST(&solv->multiversion, p))
 		    continue;
 		  obsp = s->repo->idarraydata + s->obsoletes;
 		  /* foreach obsoletes */
 		  while ((obs = *obsp++) != 0)
 		    FOR_PROVIDES(po, ppo, obs)
-		      MAPSET(&obsmap, po);
+		      {
+			Solvable *pos = pool->solvables + po;
+			if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pos, obs))
+			  continue;
+			if (pool->obsoleteusescolors && !pool_colormatch(pool, s, pos))
+			  continue;
+		        MAPSET(&obsmap, po);
+		      }
 		}
 	      for (i = j = 0; i < dqs.count; i++)
 		if (!MAPTST(&obsmap, dqs.elements[i]))
