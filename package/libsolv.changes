@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Mon Oct  5 13:27:25 CEST 2015 - mls@suse.de
+
+- fix bug in recommends handling [bnc#948482]
+- also check installed packages in multiversion handling
+- fix build on Mageia
+- bump version to 0.6.14
+
+-------------------------------------------------------------------
 Fri Sep 25 11:54:02 CEST 2015 - mls@suse.de
 
 - support a generic string for pattern-visible() [bnc#900769]
