@@ -24,7 +24,7 @@ ADD_CUSTOM_COMMAND (
 ADD_DEFINITIONS(-Wno-unused)
 INCLUDE_DIRECTORIES (${PYTHON_INCLUDE_PATH})
 
-ADD_LIBRARY (bindings_python SHARED solv_python.c)
+ADD_LIBRARY (bindings_python MODULE solv_python.c)
 SET_TARGET_PROPERTIES (bindings_python PROPERTIES PREFIX "" OUTPUT_NAME "_solv")
 TARGET_LINK_LIBRARIES (bindings_python libsolvext libsolv ${SYSTEM_LIBRARIES})
 
