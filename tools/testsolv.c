@@ -25,7 +25,7 @@ static struct resultflags2str {
 };
 
 static void
-usage(ex)
+usage(int ex)
 {
   fprintf(ex ? stderr : stdout, "Usage: testsolv <testcase>\n");
   exit(ex);
