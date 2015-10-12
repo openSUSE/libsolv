@@ -217,13 +217,24 @@ autouninstall(Solver *solv, Id *problem)
 	  Rule *r;
 	  if (m && !MAPTST(m, v - solv->updaterules))
 	    continue;
-	  /* check if identical to feature rule, we don't like that */
+	  /* check if identical to feature rule, we don't like that (except for orphans) */
 	  r = solv->rules + solv->featurerules + (v - solv->updaterules);
 	  if (!r->p)
 	    {
 	      /* update rule == feature rule */
 	      if (v > lastfeature)
 		lastfeature = v;
+	      /* prefer orphaned packages in dup mode */
+	      if (solv->dupmap_all && solv->keep_orphans)
+		{
+		  r = solv->rules + v;
+		  if (!r->d && r->p == (solv->installed->start + (v - solv->updaterules)))
+		    {
+		      lastfeature = v;
+		      lastupdate = 0;
+		      break;
+		    }
+		}
 	      continue;
 	    }
 	  if (v > lastupdate)
