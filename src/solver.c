@@ -3561,6 +3561,19 @@ solver_solve(Solver *solv, Queue *job)
 		  MAPSET(&solv->droporphanedmap, p - installed->start);
 		}
 	      break;
+	    case SOLVER_ALLOWUNINSTALL:
+	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
+		solv->allowuninstall_all = 1;
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  if (s->repo != installed)
+		    continue;
+		  if (!solv->allowuninstallmap.size)
+		    map_grow(&solv->allowuninstallmap, installed->end - installed->start);
+		  MAPSET(&solv->allowuninstallmap, p - installed->start);
+		}
+	      break;
 	    default:
 	      break;
 	    }
@@ -3608,7 +3621,7 @@ solver_solve(Solver *solv, Queue *job)
 	      if (how & SOLVER_FORCEBEST)
 		solv->bestupdatemap_all = 1;
 	    }
-	  if (!solv->dupmap_all || solv->allowuninstall)
+	  if (!solv->dupmap_all || solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
 	    hasdupjob = 1;
 	  break;
 	default:
@@ -3917,17 +3930,6 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_ALLOWUNINSTALL:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: allowuninstall %s\n", solver_select2str(pool, select, what));
-	  if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
-	    solv->allowuninstall_all = 1;
-	  FOR_JOB_SELECT(p, pp, select, what)
-	    {
-	      s = pool->solvables + p;
-	      if (s->repo != installed)
-		continue;
-	      if (!solv->allowuninstallmap.size)
-		map_grow(&solv->allowuninstallmap, installed->end - installed->start);
-	      MAPSET(&solv->allowuninstallmap, p - installed->start);
-	    }
 	  break;
 	default:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: unknown job\n");
