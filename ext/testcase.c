@@ -164,7 +164,7 @@ static struct selflags2str {
 };
 
 static const char *features[] = {
-#ifdef ENABLE_LINKED_PACKAGES
+#ifdef ENABLE_LINKED_PKGS
   "linked_packages",
 #endif
 #ifdef ENABLE_COMPLEX_DEPS
