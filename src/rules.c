@@ -1835,6 +1835,15 @@ solver_addduprules(Solver *solv, Map *addedmap)
 		      if (is->evr == ps->evr && solvable_identical(ps, is))
 			break;
 		    }
+		  if (!ip && solv->dupmap_all && solv->keep_orphans)
+		    {
+		      /* is this an orphan we should keep? */
+		      Rule *r = solv->rules + solv->featurerules + (p - solv->installed->start);
+		      if (!r->p)
+		        r = solv->rules + solv->updaterules + (p - solv->installed->start);
+		      if (r->p == p && !r->d)
+			ip = p;
+		    }
 		  if (!ip)
 		    solver_addrule(solv, -p, 0, 0);	/* no match, sorry */
 		  else
