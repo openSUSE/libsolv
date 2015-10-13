@@ -3361,7 +3361,7 @@ solver_solve(Solver *solv, Queue *job)
   Solvable *s;
   Rule *r;
   int now, solve_start;
-  int hasdupjob = 0;
+  int needduprules = 0;
   int hasbestinstalljob = 0;
 
   solve_start = solv_timems(0);
@@ -3633,7 +3633,7 @@ solver_solve(Solver *solv, Queue *job)
 		solv->bestupdatemap_all = 1;
 	    }
 	  if (!solv->dupmap_all || solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
-	    hasdupjob = 1;
+	    needduprules = 1;
 	  break;
 	default:
 	  break;
@@ -3688,7 +3688,7 @@ solver_solve(Solver *solv, Queue *job)
 
   /* create dup maps if needed. We need the maps early to create our
    * update rules */
-  if (hasdupjob)
+  if (needduprules)
     solver_createdupmaps(solv);
 
   /*
@@ -3979,7 +3979,7 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->infarchrules = solv->infarchrules_end = solv->nrules;
 
-  if (hasdupjob)
+  if (needduprules)
     solver_addduprules(solv, &addedmap);
   else
     solv->duprules = solv->duprules_end = solv->nrules;
@@ -3989,7 +3989,7 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->bestrules = solv->bestrules_end = solv->nrules;
 
-  if (hasdupjob)
+  if (needduprules)
     solver_freedupmaps(solv);	/* no longer needed */
 
   if (solv->do_yum_obsoletes)
