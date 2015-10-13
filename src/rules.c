@@ -1623,7 +1623,7 @@ add_cleandeps_package(Solver *solv, Id p)
   queue_pushunique(solv->cleandeps_updatepkgs, p);
 }
 
-static inline void
+static void
 solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 {
   Pool *pool = solv->pool;
