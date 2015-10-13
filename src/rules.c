@@ -1796,6 +1796,7 @@ void
 solver_addduprules(Solver *solv, Map *addedmap)
 {
   Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
   Id p, pp;
   Solvable *s, *ps;
   int first, i;
@@ -1818,11 +1819,11 @@ solver_addduprules(Solver *solv, Map *addedmap)
 	    break;
 	  if (!MAPTST(&solv->dupinvolvedmap, p))
 	    continue;
-	  if (solv->installed && ps->repo == solv->installed)
+	  if (installed && ps->repo == installed)
 	    {
 	      if (!solv->updatemap.size)
-		map_grow(&solv->updatemap, solv->installed->end - solv->installed->start);
-	      MAPSET(&solv->updatemap, p - solv->installed->start);
+		map_grow(&solv->updatemap, installed->end - installed->start);
+	      MAPSET(&solv->updatemap, p - installed->start);
 	      if (!MAPTST(&solv->dupmap, p))
 		{
 		  Id ip, ipp;
@@ -1835,12 +1836,12 @@ solver_addduprules(Solver *solv, Map *addedmap)
 		      if (is->evr == ps->evr && solvable_identical(ps, is))
 			break;
 		    }
-		  if (!ip && solv->dupmap_all && solv->keep_orphans)
+		  if (!ip && solv->keep_orphans)
 		    {
 		      /* is this an orphan we should keep? */
-		      Rule *r = solv->rules + solv->featurerules + (p - solv->installed->start);
+		      Rule *r = solv->rules + solv->featurerules + (p - installed->start);
 		      if (!r->p)
-		        r = solv->rules + solv->updaterules + (p - solv->installed->start);
+			r += solv->updaterules - solv->featurerules;
 		      if (r->p == p && !r->d)
 			ip = p;
 		    }
