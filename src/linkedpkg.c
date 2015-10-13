@@ -21,7 +21,7 @@
  *
  * product:
  *   created from product data in the repository (which is generated from files
- *   in /etc/products.d. In the future we may switch to using product()
+ *   in /etc/products.d). In the future we may switch to using product()
  *   provides of packages.
  *
  * pattern:
