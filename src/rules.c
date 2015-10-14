@@ -1302,6 +1302,8 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	      if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
 		{
 		  queue_push(&solv->orphaned, s - pool->solvables);	/* also treat as orphaned */
+		  if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, s - pool->solvables - solv->installed->start))))
+		    p = s - pool->solvables;	/* keep this orphaned package installed */
 		  j = qs.count;
 		}
 	      qs.count = j;
@@ -1844,6 +1846,12 @@ solver_addduprules(Solver *solv, Map *addedmap)
 			r += solv->updaterules - solv->featurerules;
 		      if (r->p == p && !r->d)
 			ip = p;
+		      else if (solv->dupmap_all && solv->multiversion.size)
+			{
+			  r = solv->rules + solv->updaterules + (p - solv->installed->start);
+			  if (r->p == p)
+			    ip = p;
+			}
 		    }
 		  if (!ip)
 		    solver_addrule(solv, -p, 0, 0);	/* no match, sorry */
