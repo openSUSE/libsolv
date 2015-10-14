@@ -2833,32 +2833,51 @@ solver_rule2rules(Solver *solv, Id rid, Queue *q, int recursive)
 
 /* check if the newest versions of pi still provides the dependency we're looking for */
 static int
-solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m)
+solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m, Queue *q)
 {
   Pool *pool = solv->pool;
   Rule *ur;
-  Queue q;
-  Id p, pp, qbuf[32];
+  Id p, pp;
   int i;
 
-  ur = solv->rules + solv->updaterules + (pi - pool->installed->start);
-  if (!ur->p)
-    ur = solv->rules + solv->featurerules + (pi - pool->installed->start);
-  if (!ur->p)
-    return 0;
-  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
-  FOR_RULELITERALS(p, pp, ur)
-    if (p > 0)
-      queue_push(&q, p);
-  if (q.count > 1)
-    policy_filter_unwanted(solv, &q, POLICY_MODE_CHOOSE);
-  for (i = 0; i < q.count; i++)
-    if (MAPTST(m, q.elements[i]))
-      break;
-  /* 1: none of the newest versions provide it */
-  i = i == q.count ? 1 : 0;
-  queue_free(&q);
-  return i;
+  if (!q->count || q->elements[0] != pi)
+    {
+      if (q->count)
+        queue_empty(q);
+      ur = solv->rules + solv->updaterules + (pi - pool->installed->start);
+      if (!ur->p)
+        ur = solv->rules + solv->featurerules + (pi - pool->installed->start);
+      if (!ur->p)
+	return 0;
+      queue_push2(q, pi, 0);
+      FOR_RULELITERALS(p, pp, ur)
+	if (p > 0)
+	  queue_push(q, p);
+    }
+  if (q->count == 2)
+    return 1;
+  if (q->count == 3)
+    {
+      p = q->elements[2];
+      return MAPTST(m, p) ? 0 : 1;
+    }
+  if (!q->elements[1])
+    {
+      for (i = 2; i < q->count; i++)
+	if (!MAPTST(m, q->elements[i]))
+	  break;
+      if (i == q->count)
+	return 0;	/* all provide it, no need to filter */
+      /* some don't provide it, have to filter */
+      queue_deleten(q, 0, 2);
+      policy_filter_unwanted(solv, q, POLICY_MODE_CHOOSE);
+      queue_unshift(q, 1);	/* filter mark */
+      queue_unshift(q, pi);
+    }
+  for (i = 2; i < q->count; i++)
+    if (MAPTST(m, q->elements[i]))
+      return 0;		/* at least one provides it */
+  return 1;	/* none of the new packages provided it */
 }
 
 static inline void
@@ -2883,7 +2902,7 @@ solver_addchoicerules(Solver *solv)
   Pool *pool = solv->pool;
   Map m, mneg;
   Rule *r;
-  Queue q, qi;
+  Queue q, qi, qcheck;
   int i, j, rid, havechoice;
   Id p, d, pp;
   Id p2, pp2;
@@ -2902,6 +2921,7 @@ solver_addchoicerules(Solver *solv)
   solv->choicerules_ref = solv_calloc(solv->pkgrules_end, sizeof(Id));
   queue_init(&q);
   queue_init(&qi);
+  queue_init(&qcheck);
   map_init(&m, pool->nsolvables);
   map_init(&mneg, pool->nsolvables);
   /* set up negative assertion map from infarch and dup rules */
@@ -3019,7 +3039,7 @@ solver_addchoicerules(Solver *solv)
 	  p2 = qi.elements[i];
 	  if (!p2)
 	    continue;
-	  if (solver_choicerulecheck(solv, p2, r, &m))
+	  if (solver_choicerulecheck(solv, p2, r, &m, &qcheck))
 	    {
 	      /* oops, remove element p from q */
 	      queue_removeelement(&q, qi.elements[i + 1]);
@@ -3028,6 +3048,7 @@ solver_addchoicerules(Solver *solv)
 	  qi.elements[j++] = p2;
 	}
       queue_truncate(&qi, j);
+
       if (!q.count || !qi.count)
 	{
 	  FOR_RULELITERALS(p, pp, r)
@@ -3099,6 +3120,7 @@ solver_addchoicerules(Solver *solv)
     }
   queue_free(&q);
   queue_free(&qi);
+  queue_free(&qcheck);
   map_free(&m);
   map_free(&mneg);
   solv->choicerules_end = solv->nrules;
