@@ -1302,8 +1302,6 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	      if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
 		{
 		  queue_push(&solv->orphaned, s - pool->solvables);	/* also treat as orphaned */
-		  if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, s - pool->solvables - solv->installed->start))))
-		    p = s - pool->solvables;	/* keep this orphaned package installed */
 		  j = qs.count;
 		}
 	      qs.count = j;
@@ -1794,6 +1792,29 @@ solver_freedupmaps(Solver *solv)
    * policy's priority pruning code. sigh. */
 }
 
+static int
+is_multiversion_orphan(Solver *solv, Id p)
+{
+  Pool *pool = solv->pool;
+  Solvable *s = pool->solvables + p;
+  Rule *r = solv->rules + solv->updaterules + (p - solv->installed->start);
+  Id l, pp;
+  if (!r->p)
+    return 0;
+  FOR_RULELITERALS(l, pp, r)
+    {
+      Solvable *ps = pool->solvables + l;
+      /* see multiversion code in solver_addupdaterule */
+      if (!MAPTST(&solv->multiversion, l))
+	return 0;
+      if (solv->keepexplicitobsoletes && ps->name != s->name)
+	return 0;
+      if (ps->name == s->name && ps->evr == s->evr && ps->arch == s->arch)
+	return 0;
+    }
+  return 1;
+}
+
 void
 solver_addduprules(Solver *solv, Map *addedmap)
 {
@@ -1848,8 +1869,7 @@ solver_addduprules(Solver *solv, Map *addedmap)
 			ip = p;
 		      else if (solv->dupmap_all && solv->multiversion.size)
 			{
-			  r = solv->rules + solv->updaterules + (p - solv->installed->start);
-			  if (r->p == p)
+			  if (is_multiversion_orphan(solv, p))
 			    ip = p;
 			}
 		    }
