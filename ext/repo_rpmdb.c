@@ -39,6 +39,11 @@
 # endif
 #endif
 
+#ifdef ENABLE_RPMDB_BYRPMHEADER
+#include <rpm/rpmts.h>
+#include <rpm/rpmmacro.h>
+#endif
+
 #include "pool.h"
 #include "repo.h"
 #include "hash.h"
@@ -1053,10 +1058,13 @@ struct rpmdbstate {
 
   RpmHead *rpmhead;	/* header storage space */
   int rpmheadsize;
-
+#ifdef ENABLE_RPMDB_BYRPMHEADER
+  rpmts ts;
+#else
   int dbopened;
   DB_ENV *dbenv;	/* database environment */
   DB *db;		/* packages database */
+#endif
   int byteswapped;	/* endianess of packages database */
   int is_ostree;	/* read-only db that lives in /usr/share/rpm */
 };
@@ -1131,6 +1139,117 @@ serialize_dbenv_ops(struct rpmdbstate *state)
   return -1;
 }
 #endif
+
+#ifdef ENABLE_RPMDB_BYRPMHEADER
+
+static int
+openRpmDB(struct rpmdbstate *state)
+{
+  if (!state->ts)
+    {
+      const char *rootdir = state->rootdir;
+      char dbpath[PATH_MAX+20];
+
+      snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
+      if (access(dbpath, W_OK) == -1)
+	{
+	  snprintf(dbpath, PATH_MAX, "%s/usr/share/rpm/Packages", rootdir ? rootdir : "");
+	  if (access(dbpath, R_OK) == 0)
+	    state->is_ostree = 1;
+	}
+      snprintf(dbpath, PATH_MAX+20, "_dbpath %s%s", rootdir ? rootdir : "", state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
+      rpmDefineMacro(NULL, dbpath, 0);
+      state->ts = rpmtsCreate();
+      if (rpmtsOpenDB(state->ts, O_RDONLY))
+	{
+	  fprintf(stderr, "DBERROR\n");
+	  pool_error(state->pool, 0, "dbenv->open: %s", strerror(errno)); //XXX
+	  return 0;
+	}
+      rpmtsSetVSFlags(state->ts, _RPMVSF_NODIGESTS | _RPMVSF_NOSIGNATURES | _RPMVSF_NOHEADER);
+    }
+  return 1;
+}
+
+/* get the rpmdbids of all installed packages from the Name index database.
+ * This is much faster then querying the big Packages database */
+static struct rpmdbentry *
+getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *match, int *nentriesp, char **namedatap)
+{
+  const void * key;
+  size_t keylen;
+  Id nameoff;
+
+  char *namedata = 0;
+  int namedatal = 0;
+  struct rpmdbentry *entries = 0;
+  int nentries = 0;
+
+  rpmdbIndexIterator ii;
+  int i;
+
+  if (!openRpmDB(state))
+    {
+      return NULL;
+    }
+
+  ii = rpmdbIndexIteratorInit(rpmtsGetRdb(state->ts), RPMDBI_NAME);
+
+  *nentriesp = 0;
+  if (namedatap)
+    *namedatap = 0;
+
+  while (rpmdbIndexIteratorNext(ii, &key, &keylen) == 0)
+    {
+
+      if (keylen == 10 && !memcmp(key, "gpg-pubkey", 10))
+	continue;
+      nameoff = namedatal;
+      if (namedatap)
+	{
+	  namedata = solv_extend(namedata, namedatal, keylen + 1, 1, NAMEDATA_BLOCK);
+	  memcpy(namedata + namedatal, key, keylen);
+	  namedata[namedatal + keylen] = 0;
+	  namedatal += keylen + 1;
+	}
+      for (i = 0; i<rpmdbIndexIteratorNumPkgs(ii); i++)
+	{
+	  entries = solv_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
+	  entries[nentries].rpmdbid = rpmdbIndexIteratorPkgOffset(ii, i);
+	  entries[nentries].nameoff = nameoff;
+	  nentries++;
+	}
+    }
+  /* make sure that enteries is != 0 if there was no error */
+  if (!entries)
+    entries = solv_extend(entries, 1, 1, sizeof(*entries), ENTRIES_BLOCK);
+  *nentriesp = nentries;
+  if (namedatap)
+    *namedatap = namedata;
+  return entries;
+}
+
+/* retrive header by rpmdbid */
+static int
+getrpmdbid(struct rpmdbstate *state, Id rpmdbid)
+{
+  Header h;
+  unsigned int offset = rpmdbid;
+
+  if (!openRpmDB(state))
+    {
+      return 0;
+    }
+
+  rpmdbMatchIterator mi = rpmtsInitIterator(state->ts, RPMDBI_PACKAGES, &offset, sizeof(offset));
+  h = rpmdbNextIterator(mi);
+  rpm_byrpmh(state, h);
+  mi = rpmdbFreeIterator(mi);
+  //h = headerFree(h);
+  return state->rpmhead != NULL;
+}
+
+#else
 
 /* should look in /usr/lib/rpm/macros instead, but we want speed... */
 static int
@@ -1421,16 +1540,20 @@ getrpmcursor(struct rpmdbstate *state, DBC *dbc)
   return 0;
 }
 
+#endif
+
 static void
 freestate(struct rpmdbstate *state)
 {
   /* close down */
   if (!state)
     return;
+#ifndef ENABLE_RPMDB_BYRPMHEADER
   if (state->db)
     state->db->close(state->db, 0);
   if (state->dbenv)
     closedbenv(state);
+#endif
   if (state->rootdir)
     solv_free(state->rootdir);
   solv_free(state->rpmhead);
@@ -1453,6 +1576,8 @@ rpm_state_free(void *state)
   freestate(state);
   return solv_free(state);
 }
+
+#ifndef ENABLE_RPMDB_BYRPMHEADER
 
 static int
 count_headers(struct rpmdbstate *state)
@@ -1494,6 +1619,8 @@ count_headers(struct rpmdbstate *state)
   db->close(db, 0);
   return count;
 }
+
+#endif
 
 /******************************************************************/
 
@@ -1740,6 +1867,278 @@ mkrpmdbcookie(struct stat *st, unsigned char *cookie, int flags)
     cookie[1] = 1;
   cookie[0] = f;
 }
+
+#ifdef ENABLE_RPMDB_BYRPMHEADER
+
+static int
+count_headers(struct rpmdbstate *state)
+{
+  if (!openRpmDB(state))
+    {
+      return 0;
+    }
+
+  rpmdbMatchIterator mi = rpmtsInitIterator(state->ts, RPMDBI_PACKAGES,
+					    NULL, 0);
+  return rpmdbGetIteratorCount(mi);
+}
+
+/*
+ * read rpm db as repo
+ *
+ */
+
+int
+repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
+{
+  Pool *pool = repo->pool;
+  struct stat packagesstat;
+  char * dbpath;
+  unsigned char newcookie[32];
+  const unsigned char *oldcookie = 0;
+  Id oldcookietype = 0;
+  Repodata *data;
+  int count = 0, done = 0;
+  struct rpmdbstate state;
+  int i;
+  Solvable *s;
+  unsigned int now;
+  Header h;
+
+  now = solv_timems(0);
+  memset(&state, 0, sizeof(state));
+  state.pool = pool;
+  if (flags & REPO_USE_ROOTDIR)
+    state.rootdir = solv_strdup(pool_get_rootdir(pool));
+
+  data = repo_add_repodata(repo, flags);
+
+  if (ref && !(ref->nsolvables && ref->rpmdbid && ref->pool == repo->pool))
+    {
+      if ((flags & RPMDB_EMPTY_REFREPO) != 0)
+	repo_empty(ref, 1);
+      ref = 0;
+    }
+
+  if (!openRpmDB(&state))
+    {
+      // XXX 
+      return -1;
+    }
+  dbpath = rpmExpand("%{_dbpath}/Packages", NULL);
+  if (stat(dbpath, &packagesstat))
+    {
+      pool_error(pool, -1, "%s: %s", dbpath, strerror(errno));
+      freestate(&state);
+      return -1;
+    }
+  free(dbpath);
+  mkrpmdbcookie(&packagesstat, newcookie, flags);
+  repodata_set_bin_checksum(data, SOLVID_META, REPOSITORY_RPMDBCOOKIE, REPOKEY_TYPE_SHA256, newcookie);
+
+  if (ref)
+    oldcookie = repo_lookup_bin_checksum(ref, SOLVID_META, REPOSITORY_RPMDBCOOKIE, &oldcookietype);
+  if (!ref || !oldcookie || oldcookietype != REPOKEY_TYPE_SHA256 || memcmp(oldcookie, newcookie, 32) != 0)
+    {
+      int solvstart = 0, solvend = 0;
+      Id dbid;
+      if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
+	repo_empty(ref, 1);	/* get it out of the way */
+      if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+	count = count_headers(&state);
+      i = 0;
+      s = 0;
+      rpmdbMatchIterator pkgIter = rpmtsInitIterator(state.ts, RPMDBI_PACKAGES, NULL, 0);
+
+      while ((h = rpmdbNextIterator(pkgIter)))
+	{
+	  dbid = rpmdbGetIteratorOffset(pkgIter);
+	  if (!s)
+	    {
+	      s = pool_id2solvable(pool, repo_add_solvable(repo));
+	      if (!solvstart)
+		solvstart = s - pool->solvables;
+	      solvend = s - pool->solvables + 1;
+	    }
+	  if (!repo->rpmdbid)
+	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
+	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
+	  rpm_byrpmh(&state, h);
+	  if (rpm2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS))
+	    {
+	      i++;
+	      s = 0;
+	    }
+	  else
+	    {
+	      /* We can reuse this solvable, but make sure it's still
+		 associated with this repo.  */
+	      memset(s, 0, sizeof(*s));
+	      s->repo = repo;
+	    }
+	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+	    {
+	      if (done < count)
+	        done++;
+	      if (done < count && (done - 1) * 100 / count != done * 100 / count)
+	        pool_debug(pool, SOLV_ERROR, "%%%% %d\n", done * 100 / count);
+	    }
+	  // h = headerFree(h);
+        }
+      if (s)
+	{
+	  /* oops, could not reuse. free it instead */
+          repo_free_solvable(repo, s - pool->solvables, 1);
+	  solvend--;
+	  s = 0;
+	}
+      /* now sort all solvables in the new solvstart..solvend block */
+      if (solvend - solvstart > 1)
+	{
+	  Id *pkgids = solv_malloc2(solvend - solvstart, sizeof(Id));
+	  for (i = solvstart; i < solvend; i++)
+	    pkgids[i - solvstart] = i;
+	  solv_sort(pkgids, solvend - solvstart, sizeof(Id), pkgids_sort_cmp, repo);
+	  /* adapt order */
+	  for (i = solvstart; i < solvend; i++)
+	    {
+	      int j = pkgids[i - solvstart];
+	      while (j < i)
+		j = pkgids[i - solvstart] = pkgids[j - solvstart];
+	      if (j != i)
+	        swap_solvables(repo, data, i, j);
+	    }
+	  solv_free(pkgids);
+	}
+    }
+  else
+    {
+      Id dircache[COPYDIR_DIRCACHE_SIZE];		/* see copydir */
+      struct rpmdbentry *entries = 0, *rp;
+      int nentries = 0;
+      char *namedata = 0;
+      unsigned int refmask, h;
+      Id id, *refhash;
+      int res;
+
+      memset(dircache, 0, sizeof(dircache));
+
+      /* get ids of installed rpms */
+      entries = getinstalledrpmdbids(&state, "Name", 0, &nentries, &namedata);
+      if (!entries)
+	{
+	  freestate(&state);
+	  return -1;
+	}
+
+      /* sort by name */
+      if (nentries > 1)
+        solv_sort(entries, nentries, sizeof(*entries), rpmids_sort_cmp, namedata);
+
+      /* create hash from dbid to ref */
+      refmask = mkmask(ref->nsolvables);
+      refhash = solv_calloc(refmask + 1, sizeof(Id));
+      for (i = 0; i < ref->end - ref->start; i++)
+	{
+	  if (!ref->rpmdbid[i])
+	    continue;
+	  h = ref->rpmdbid[i] & refmask;
+	  while (refhash[h])
+	    h = (h + 317) & refmask;
+	  refhash[h] = i + 1;	/* make it non-zero */
+	}
+
+      /* count the misses, they will cost us time */
+      if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+        {
+	  for (i = 0, rp = entries; i < nentries; i++, rp++)
+	    {
+	      if (refhash)
+		{
+		  Id dbid = rp->rpmdbid;
+		  h = dbid & refmask;
+		  while ((id = refhash[h]))
+		    {
+		      if (ref->rpmdbid[id - 1] == dbid)
+			break;
+		      h = (h + 317) & refmask;
+		    }
+		  if (id)
+		    continue;
+		}
+	      count++;
+	    }
+        }
+
+      if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
+        s = pool_id2solvable(pool, repo_add_solvable_block_before(repo, nentries, ref));
+      else
+        s = pool_id2solvable(pool, repo_add_solvable_block(repo, nentries));
+      if (!repo->rpmdbid)
+        repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
+
+      for (i = 0, rp = entries; i < nentries; i++, rp++, s++)
+	{
+	  Id dbid = rp->rpmdbid;
+	  repo->rpmdbid[(s - pool->solvables) - repo->start] = rp->rpmdbid;
+	  if (refhash)
+	    {
+	      h = dbid & refmask;
+	      while ((id = refhash[h]))
+		{
+		  if (ref->rpmdbid[id - 1] == dbid)
+		    break;
+		  h = (h + 317) & refmask;
+		}
+	      if (id)
+		{
+		  Solvable *r = ref->pool->solvables + ref->start + (id - 1);
+		  if (r->repo == ref)
+		    {
+		      solvable_copy(s, r, data, dircache);
+		      continue;
+		    }
+		}
+	    }
+	  res = getrpmdbid(&state, dbid);
+	  if (res <= 0)
+	    {
+	      if (!res)
+	        pool_error(pool, -1, "inconsistent rpm database, key %d not found. run 'rpm --rebuilddb' to fix.", dbid);
+	      freestate(&state);
+	      solv_free(entries);
+	      solv_free(namedata);
+	      solv_free(refhash);
+	      return -1;
+	    }
+	  rpm2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS);
+	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+	    {
+	      if (done < count)
+		done++;
+	      if (done < count && (done - 1) * 100 / count != done * 100 / count)
+		pool_debug(pool, SOLV_ERROR, "%%%% %d\n", done * 100 / count);
+	    }
+	}
+
+      solv_free(entries);
+      solv_free(namedata);
+      solv_free(refhash);
+      if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
+	repo_empty(ref, 1);
+    }
+  freestate(&state);
+  if (!(flags & REPO_NO_INTERNALIZE))
+    repodata_internalize(data);
+  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
+    pool_debug(pool, SOLV_ERROR, "%%%% 100\n");
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_rpmdb took %d ms\n", solv_timems(now));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", repodata_memused(data)/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  return 0;
+}
+
+#else
 
 /*
  * read rpm db as repo
@@ -2010,6 +2409,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", repodata_memused(data)/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
   return 0;
 }
+
+#endif
 
 int
 repo_add_rpmdb_reffp(Repo *repo, FILE *fp, int flags)
