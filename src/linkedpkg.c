@@ -63,7 +63,7 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
 	  else
 	    pkgname = req;
 	}
-      req = appdataid;
+      req = pkgname ? pkgname : appdataid;
     }
   if (!req)
     return;
@@ -77,7 +77,7 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
 	    continue;
 	  if (strncmp("application-appdata(", pool_id2str(pool, prv), 20))
 	    continue;
-	  if (!strcmp(pool_id2str(pool, prv) + 12, pool_id2str(pool, req)))
+	  if (pkgname || !strcmp(pool_id2str(pool, prv) + 12, pool_id2str(pool, req)))
 	    break;
 	}
     }
