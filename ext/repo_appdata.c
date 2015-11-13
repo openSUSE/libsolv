@@ -107,6 +107,7 @@ struct parsedata {
   int flags;
   char *desktop_file;
   int havesummary;
+  Id require;
 };
 
 
@@ -176,6 +177,7 @@ startElement(void *userData, const char *name, const char **atts)
       s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
       pd->handle = s - pool->solvables;
       pd->havesummary = 0;
+      pd->require = 0;
       break;
     case STATE_DESCRIPTION:
       pd->description = solv_free(pd->description);
@@ -351,6 +353,8 @@ endElement(void *userData, const char *name)
 	s->arch = ARCH_NOARCH;
       if (!s->evr)
 	s->evr = ID_EMPTY;
+      if (pd->require)
+	s->requires = repo_addid_dep(pd->repo, s->requires, pd->require, 0);
       if ((!s->name || !pd->havesummary) && (pd->flags & APPDATA_CHECK_DESKTOP_FILE) != 0 && pd->desktop_file)
 	add_missing_tags_from_desktop_file(pd, s, pd->desktop_file);
       if (!s->name && pd->desktop_file)
@@ -379,8 +383,8 @@ endElement(void *userData, const char *name)
 	pd->content[pd->lcontent - 4] = 0;
       else if (pd->lcontent > 3 && !strcmp(".db", pd->content + pd->lcontent - 3))
 	pd->content[pd->lcontent - 3] = 0;
-      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "appdata(", pd->content, ".appdata.xml)"), 1);
-      s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
+      if (!pd->require) /* PKGNAME superseeds ID */
+	pd->require = pool_str2id(pd->pool, pool_tmpjoin(pool, "appdata(", pd->content, ".appdata.xml)"), 1);
       id = pool_str2id(pd->pool, pool_tmpjoin(pool, "application-appdata(", pd->content, ".appdata.xml)"), 1);
       s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
       break;
@@ -434,8 +438,7 @@ endElement(void *userData, const char *name)
       pd->description = solv_dupappend(pd->description, "\n", 0);
       break;
     case STATE_PKGNAME:
-      id = pool_str2id(pd->pool, pd->content, 1);
-      s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
+      pd->require = pool_str2id(pd->pool, pd->content, 1); /* PKGNAME superseeds ID */
       break;
     case STATE_KEYWORD:
       repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_KEYWORDS, pd->content);
