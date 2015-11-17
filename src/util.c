@@ -76,6 +76,29 @@ solv_calloc(size_t num, size_t len)
   return r;
 }
 
+/* this was solv_realloc2(old, len, size), but we now overshoot
+ * for huge len sizes */
+void *
+solv_extend_realloc(void *old, size_t len, size_t size, size_t block)
+{
+  size_t xblock = (block + 1) << 5;
+  if (len >= xblock && xblock)
+    {
+      xblock <<= 1;
+      while (len >= xblock && xblock)
+	xblock <<= 1;
+      if (xblock)
+	{
+	  size_t nlen;
+          xblock = (xblock >> 5) - 1;
+	  nlen = (len + xblock) & ~xblock;
+	  if (nlen > len)
+	    len = nlen;
+	}
+    }
+  return solv_realloc2(old, len, size);
+}
+
 void *
 solv_free(void *mem)
 {

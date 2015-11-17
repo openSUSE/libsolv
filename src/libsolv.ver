@@ -262,6 +262,7 @@ SOLV_1.0 {
 		solv_depmarker;
 		solv_dupappend;
 		solv_dupjoin;
+		solv_extend_realloc;
 		solv_free;
 		solv_hex2bin;
 		solv_latin1toutf8;
