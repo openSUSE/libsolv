@@ -47,12 +47,11 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
   Id req = 0;
   Id prv = 0;
   Id p, pp;
-  Id pkgname = 0;
+  Id pkgname = 0, appdataid = 0;
 
   /* find appdata requires */
   if (s->requires)
     {
-      Id appdataid = 0;
       Id *reqp = s->repo->idarraydata + s->requires;
       while ((req = *reqp++) != 0)            /* go through all requires */
 	{
@@ -63,22 +62,34 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
 	  else
 	    pkgname = req;
 	}
-      req = appdataid;
     }
+  req = appdataid ? appdataid : pkgname;
   if (!req)
     return;
   /* find application-appdata provides */
   if (s->provides)
     {
       Id *prvp = s->repo->idarraydata + s->provides;
+      const char *reqs = pool_id2str(pool, req);
+      const char *prvs;
       while ((prv = *prvp++) != 0)            /* go through all provides */
 	{
 	  if (ISRELDEP(prv))
 	    continue;
-	  if (strncmp("application-appdata(", pool_id2str(pool, prv), 20))
+	  prvs = pool_id2str(pool, prv);
+	  if (strncmp("application-appdata(", prvs, 20))
 	    continue;
-	  if (!strcmp(pool_id2str(pool, prv) + 12, pool_id2str(pool, req)))
-	    break;
+	  if (appdataid)
+	    {
+	      if (!strcmp(prvs + 12, reqs))
+		break;
+	    }
+	  else
+	    {
+	      int reqsl = strlen(reqs);
+	      if (!strncmp(prvs + 20, reqs, reqsl) && !strcmp(prvs + 20 + reqsl, ")"))
+		break;
+	    }
 	}
     }
   if (!prv)
@@ -88,7 +99,7 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
     if (pool->solvables[p].repo == s->repo)
       if (!pkgname || pool->solvables[p].name == pkgname)
         queue_push(qr, p);
-  if (!qr->count && pkgname)
+  if (!qr->count && pkgname && appdataid)
     {
       /* huh, no matching package? try without pkgname filter */
       FOR_PROVIDES(p, pp, req)
