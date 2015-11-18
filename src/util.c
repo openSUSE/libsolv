@@ -82,6 +82,7 @@ void *
 solv_extend_realloc(void *old, size_t len, size_t size, size_t block)
 {
   size_t xblock = (block + 1) << 5;
+  len = (len + block) & ~block;
   if (len >= xblock && xblock)
     {
       xblock <<= 1;
