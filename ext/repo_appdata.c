@@ -49,6 +49,7 @@ enum state {
   STATE_GROUP,
   STATE_KEYWORDS,
   STATE_KEYWORD,
+  STATE_EXTENDS,
   NUMSTATES
 };
 
@@ -74,6 +75,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_APPLICATION, "url",           STATE_URL,           1 },
   { STATE_APPLICATION, "project_group", STATE_GROUP,         1 },
   { STATE_APPLICATION, "keywords",      STATE_KEYWORDS,      0 },
+  { STATE_APPLICATION, "extends",       STATE_EXTENDS,       1 },
   { STATE_DESCRIPTION, "p",             STATE_P,             1 },
   { STATE_DESCRIPTION, "ul",            STATE_UL,            0 },
   { STATE_DESCRIPTION, "ol",            STATE_OL,            0 },
@@ -107,6 +109,8 @@ struct parsedata {
   int flags;
   char *desktop_file;
   int havesummary;
+  const char *filename;
+  Queue *owners;
 };
 
 
@@ -127,6 +131,7 @@ startElement(void *userData, const char *name, const char **atts)
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   struct stateswitch *sw;
+  const char *type;
 
 #if 0
   fprintf(stderr, "start: [%d]%s\n", pd->state, name);
@@ -176,6 +181,10 @@ startElement(void *userData, const char *name, const char **atts)
       s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
       pd->handle = s - pool->solvables;
       pd->havesummary = 0;
+      type = find_attr("type", atts);
+      if (!type || !*type)
+        type = "desktop";
+      repodata_set_poolstr(pd->data, pd->handle, SOLVABLE_CATEGORY, type);
       break;
     case STATE_DESCRIPTION:
       pd->description = solv_free(pd->description);
@@ -311,6 +320,26 @@ add_missing_tags_from_desktop_file(struct parsedata *pd, Solvable *s, const char
   fclose(fp);
 }
 
+static char *
+guess_filename_from_id(Pool *pool, const char *id)
+{
+  int l = strlen(id);
+  char *r = pool_tmpjoin(pool, id, ".metainfo.xml", 0);
+  if (l > 8 && !strcmp(".desktop", id + l - 8))
+    strcpy(r + l - 8, ".appdata.xml");
+  else if (l > 4 && !strcmp(".ttf", id + l - 4))
+    strcpy(r + l - 4, ".metainfo.xml");
+  else if (l > 4 && !strcmp(".otf", id + l - 4))
+    strcpy(r + l - 4, ".metainfo.xml");
+  else if (l > 4 && !strcmp(".xml", id + l - 4))
+    strcpy(r + l - 4, ".metainfo.xml");
+  else if (l > 3 && !strcmp(".db", id + l - 3))
+    strcpy(r + l - 3, ".metainfo.xml");
+  else
+    return 0;
+  return r;
+}
+
 static void XMLCALL
 endElement(void *userData, const char *name)
 {
@@ -361,6 +390,31 @@ endElement(void *userData, const char *name)
 	    l -= 8;
 	  s->name = pool_strn2id(pool, name, l, 1);
 	}
+      if (!s->requires && pd->owners)
+	{
+	  int i;
+	  Id id;
+	  for (i = 0; i < pd->owners->count; i++)
+	    {
+	      Solvable *os = pd->pool->solvables + pd->owners->elements[i];
+	      s->requires = repo_addid_dep(pd->repo, s->requires, os->name, 0);
+	      id = pool_str2id(pd->pool, pool_tmpjoin(pd->pool, "application-appdata(", pool_id2str(pd->pool, os->name), ")"), 1);
+	      s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
+	    }
+	}
+      if (!s->requires && (pd->desktop_file || pd->filename))
+	{
+	  /* add appdata() link requires/provides */
+	  const char *filename = pd->filename;
+	  if (!filename)
+	    filename = guess_filename_from_id(pool, pd->desktop_file);
+	  if (filename)
+	    {
+	      filename = pool_tmpjoin(pool, "application-appdata(", filename, ")");
+	      s->requires = repo_addid_dep(pd->repo, s->requires, pool_str2id(pd->pool, filename + 12, 1), 0);
+	      s->provides = repo_addid_dep(pd->repo, s->provides, pool_str2id(pd->pool, filename, 1), 0);
+	    }
+	}
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->solvable = 0;
@@ -368,21 +422,6 @@ endElement(void *userData, const char *name)
       break;
     case STATE_ID:
       pd->desktop_file = solv_strdup(pd->content);
-      /* guess the appdata.xml file name from the id element */
-      if (pd->lcontent > 8 && !strcmp(".desktop", pd->content + pd->lcontent - 8))
-	pd->content[pd->lcontent - 8] = 0;
-      else if (pd->lcontent > 4 && !strcmp(".ttf", pd->content + pd->lcontent - 4))
-	pd->content[pd->lcontent - 4] = 0;
-      else if (pd->lcontent > 4 && !strcmp(".otf", pd->content + pd->lcontent - 4))
-	pd->content[pd->lcontent - 4] = 0;
-      else if (pd->lcontent > 4 && !strcmp(".xml", pd->content + pd->lcontent - 4))
-	pd->content[pd->lcontent - 4] = 0;
-      else if (pd->lcontent > 3 && !strcmp(".db", pd->content + pd->lcontent - 3))
-	pd->content[pd->lcontent - 3] = 0;
-      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "appdata(", pd->content, ".appdata.xml)"), 1);
-      s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
-      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "application-appdata(", pd->content, ".appdata.xml)"), 1);
-      s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
       break;
     case STATE_NAME:
       s->name = pool_str2id(pd->pool, pool_tmpjoin(pool, "application:", pd->content, 0), 1);
@@ -399,6 +438,9 @@ endElement(void *userData, const char *name)
       break;
     case STATE_GROUP:
       repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_GROUP, pd->content);
+      break;
+    case STATE_EXTENDS:
+      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, pd->content);
       break;
     case STATE_DESCRIPTION:
       if (pd->description)
@@ -436,6 +478,8 @@ endElement(void *userData, const char *name)
     case STATE_PKGNAME:
       id = pool_str2id(pd->pool, pd->content, 1);
       s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
+      id = pool_str2id(pd->pool, pool_tmpjoin(pd->pool, "application-appdata(", pd->content, ")"), 1);
+      s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
       break;
     case STATE_KEYWORD:
       repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_KEYWORDS, pd->content);
@@ -476,8 +520,8 @@ characterData(void *userData, const XML_Char *s, int len)
 
 #define BUFF_SIZE 8192
 
-int
-repo_add_appdata(Repo *repo, FILE *fp, int flags)
+static int
+repo_add_appdata_fn(Repo *repo, FILE *fp, int flags, const char *filename, Queue *owners)
 {
   Pool *pool = repo->pool;
   struct parsedata pd;
@@ -493,6 +537,8 @@ repo_add_appdata(Repo *repo, FILE *fp, int flags)
   pd.pool = repo->pool;
   pd.data = data;
   pd.flags = flags;
+  pd.filename = filename;
+  pd.owners = owners;
 
   pd.content = malloc(256);
   pd.acontent = 256;
@@ -537,6 +583,60 @@ repo_add_appdata(Repo *repo, FILE *fp, int flags)
   return ret;
 }
 
+int
+repo_add_appdata(Repo *repo, FILE *fp, int flags)
+{
+  return repo_add_appdata_fn(repo, fp, flags, 0, 0);
+}
+
+static void
+search_uninternalized_filelist(Repo *repo, const char *dir, Queue *res)
+{
+  Pool *pool = repo->pool;
+  Id rdid, p;
+  Id iter, did, idid;
+
+  for (rdid = 1; rdid < repo->nrepodata; rdid++)
+    {
+      Repodata *data = repo_id2repodata(repo, rdid);
+      if (!data)
+	continue;
+      if (data->state == REPODATA_STUB)
+	continue;
+      if (!repodata_has_keyname(data, SOLVABLE_FILELIST))
+	continue;
+      did = repodata_str2dir(data, dir, 0);
+      if (!did)
+	continue;
+      for (p = data->start; p < data->end; p++)
+	{
+	  if (p >= pool->nsolvables)
+	    continue;
+	  if (pool->solvables[p].repo != repo)
+	    continue;
+	  iter = 0;
+	  for (;;)
+	    {
+	      const char *str;
+	      int l;
+	      Id id;
+	      idid = did;
+	      str = repodata_lookup_dirstrarray_uninternalized(data, p, SOLVABLE_FILELIST, &idid, &iter);
+	      if (!iter)
+		break;
+	      l = strlen(str);
+	      if (l > 12 && strncmp(str + l - 12, ".appdata.xml", 12))
+		id = pool_str2id(pool, str, 1);
+	      else if (l > 13 && strncmp(str + l - 13, ".metainfo.xml", 13))
+		id = pool_str2id(pool, str, 1);
+	      else
+		continue;
+	      queue_push2(res, p, id);
+	    }
+	}
+    }
+}
+
 /* add all files ending in .appdata.xml */
 int
 repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
@@ -544,7 +644,13 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
   DIR *dir;
   char *dirpath;
   Repodata *data;
+  Queue flq;
+  Queue oq;
 
+  queue_init(&flq);
+  queue_init(&oq);
+  if (flags & APPDATA_SEARCH_UNINTERNALIZED_FILELIST)
+    search_uninternalized_filelist(repo, appdatadir, &flq);
   data = repo_add_repodata(repo, flags);
   if (flags & REPO_USE_ROOTDIR)
     dirpath = pool_prepend_rootdir(repo->pool, appdatadir);
@@ -569,7 +675,19 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
 	      pool_error(repo->pool, 0, "%s: %s", n, strerror(errno));
 	      continue;
 	    }
-	  repo_add_appdata(repo, fp, flags | REPO_NO_INTERNALIZE | REPO_REUSE_REPODATA | APPDATA_CHECK_DESKTOP_FILE);
+	  if (flags & APPDATA_SEARCH_UNINTERNALIZED_FILELIST)
+	    {
+	      Id id = pool_str2id(repo->pool, entry->d_name, 0);
+	      queue_empty(&oq);
+	      if (id)
+		{
+		  int i;
+		  for (i = 0; i < flq.count; i += 2)
+		    if (flq.elements[i + 1] == id)
+		      queue_push(&oq, flq.elements[i]);
+		}
+	    }
+	  repo_add_appdata_fn(repo, fp, flags | REPO_NO_INTERNALIZE | REPO_REUSE_REPODATA | APPDATA_CHECK_DESKTOP_FILE, entry->d_name, oq.count ? &oq : 0);
 	  fclose(fp);
 	}
       closedir(dir);
@@ -577,5 +695,7 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
   solv_free(dirpath);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  queue_free(&oq);
+  queue_free(&flq);
   return 0;
 }
