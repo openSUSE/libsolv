@@ -849,6 +849,37 @@ repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id void
   return 0;
 }
 
+const char *
+repodata_lookup_dirstrarray_uninternalized(Repodata *data, Id solvid, Id keyname, Id *didp, Id *iterp)
+{
+  Id *ap, did;
+  Id iter = *iterp;
+  if (iter == 0)	/* find key data */
+    {
+      if (!data->attrs)
+	return 0;
+      ap = data->attrs[solvid - data->start];
+      if (!ap)
+	return 0;
+      for (; *ap; ap += 2)
+	if (data->keys[*ap].name == keyname && data->keys[*ap].type == REPOKEY_TYPE_DIRSTRARRAY)
+	  break;
+      if (!*ap)
+	return 0;
+      iter = ap[1];
+    }
+  did = *didp;
+  for (ap = data->attriddata + iter; *ap; ap += 2)
+    {
+      if (did && ap[0] != did)
+	continue;
+      *didp = ap[0];
+      *iterp = ap - data->attriddata + 2;
+      return (const char *)data->attrdata + ap[1];
+    }
+  *iterp = 0;
+  return 0;
+}
 
 /************************************************************************
  * data search

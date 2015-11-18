@@ -301,6 +301,7 @@ void repodata_set_location(Repodata *data, Id solvid, int medianr, const char *d
 void repodata_set_deltalocation(Repodata *data, Id handle, int medianr, const char *dir, const char *file);
 void repodata_set_sourcepkg(Repodata *data, Id solvid, const char *sourcepkg);
 Id repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid);
+const char *repodata_lookup_dirstrarray_uninternalized(Repodata *data, Id solvid, Id keyname, Id *didp, Id *iterp);
 
 /* stats */
 unsigned int repodata_memused(Repodata *data);
