@@ -664,9 +664,10 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
 	  const char *n;
 	  FILE *fp;
 	  int len = strlen(entry->d_name);
-	  if (len <= 12 || strcmp(entry->d_name + len - 12, ".appdata.xml") != 0)
-	    continue;
 	  if (entry->d_name[0] == '.')
+	    continue;
+	  if (!(len > 12 && !strcmp(entry->d_name + len - 12, ".appdata.xml")) &&
+	      !(len > 13 && !strcmp(entry->d_name + len - 13, ".metainfo.xml")))
 	    continue;
           n = pool_tmpjoin(repo->pool, dirpath, "/", entry->d_name);
 	  fp = fopen(n, "r");
