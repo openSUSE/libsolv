@@ -82,7 +82,7 @@ pool_create(void)
   s->evr = ID_EMPTY;
 
   pool->debugmask = SOLV_DEBUG_RESULT;	/* FIXME */
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
   pool->implicitobsoleteusescolors = 1;
 #endif
 #ifdef RPM5

@@ -21,7 +21,7 @@
 #include "util.h"
 
 static const char *archpolicies[] = {
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
   "x86_64",	"x86_64:athlon:i686:i586:i486:i386",
 #else
   "x86_64",	"x86_64:i686:i586:i486:i386",
@@ -64,7 +64,7 @@ static const char *archpolicies[] = {
   "mips64",	"mips64",
   "mips64el",	"mips64el",
   "m68k",	"m68k",
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
   "ia32e",	"ia32e:x86_64:athlon:i686:i586:i486:i386",
   "athlon",	"athlon:i686:i586:i486:i386",
   "amd64",	"amd64:x86_64:athlon:i686:i586:i486:i386",
