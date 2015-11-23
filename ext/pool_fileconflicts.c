@@ -806,6 +806,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   Repo *installed = pool->installed;
   Id p;
   int obsoleteusescolors = pool_get_flag(pool, POOL_FLAG_OBSOLETEUSESCOLORS);
+  int hdrfetches;
 
   queue_empty(conflicts);
   if (!pkgs->count)
@@ -841,6 +842,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   /* first pass: scan dirs */
   if (!cbdata.aliases)
     {
+      hdrfetches = 0;
       cflmapn = (cutoff + 3) * 64;
       while ((cflmapn & (cflmapn - 1)) != 0)
 	cflmapn = cflmapn & (cflmapn - 1);
@@ -867,12 +869,14 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 	  handle = (*handle_cb)(pool, p, handle_cbdata);
 	  if (!handle)
 	    continue;
+	  hdrfetches++;
 	  rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_ONLYDIRS, finddirs_cb, &cbdata);
 	  if (MAPTST(&cbdata.idxmap, i))
 	    idxmapset++;
 	}
       POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap size: %d, used %d\n", cbdata.dirmapn + 1, cbdata.dirmapused);
       POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap memory usage: %d K\n", (cbdata.dirmapn + 1) * 2 * (int)sizeof(Id) / 1024);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "header fetches: %d\n", hdrfetches);
       POOL_DEBUG(SOLV_DEBUG_STATS, "dirmap creation took %d ms\n", solv_timems(now));
       POOL_DEBUG(SOLV_DEBUG_STATS, "dir conflicts found: %d, idxmap %d of %d\n", cbdata.dirconflicts, idxmapset, pkgs->count);
     }
@@ -885,6 +889,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   cbdata.cflmap = solv_calloc(cflmapn, 2 * sizeof(Id));
   cbdata.cflmapn = cflmapn - 1;	/* make it a mask */
   cbdata.create = 1;
+  hdrfetches = 0;
   for (i = 0; i < pkgs->count; i++)
     {
       if (i == cutoff)
@@ -904,12 +909,14 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
       handle = (*handle_cb)(pool, p, handle_cbdata);
       if (!handle)
 	continue;
+      hdrfetches++;
       cbdata.lastdiridx = -1;
       rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_NOGHOSTS, cbdata.aliases ? findfileconflicts_basename_cb : findfileconflicts_cb, &cbdata);
     }
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "filemap size: %d, used %d\n", cbdata.cflmapn + 1, cbdata.cflmapused);
   POOL_DEBUG(SOLV_DEBUG_STATS, "filemap memory usage: %d K\n", (cbdata.cflmapn + 1) * 2 * (int)sizeof(Id) / 1024);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "header fetches: %d\n", hdrfetches);
   POOL_DEBUG(SOLV_DEBUG_STATS, "filemap creation took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "lookat_dir size: %d\n", cbdata.lookat_dir.count);
   queue_free(&cbdata.lookat_dir);
@@ -931,6 +938,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 	  cbdata.statmapn = cflmapn - 1;	/* make it a mask */
 	}
       cbdata.create = 0;
+      hdrfetches = 0;
       for (i = 0; i < pkgs->count; i++)
 	{
 	  if (!MAPTST(&cbdata.idxmap, i))
@@ -942,11 +950,13 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 	  handle = (*handle_cb)(pool, p, handle_cbdata);
 	  if (!handle)
 	    continue;
+	  hdrfetches++;
 	  cbdata.lastdiridx = -1;
 	  rpm_iterate_filelist(handle, RPM_ITERATE_FILELIST_NOGHOSTS, findfileconflicts_alias_cb, &cbdata);
 	}
       POOL_DEBUG(SOLV_DEBUG_STATS, "normap size: %d, used %d\n", cbdata.normapn + 1, cbdata.normapused);
       POOL_DEBUG(SOLV_DEBUG_STATS, "normap memory usage: %d K\n", (cbdata.normapn + 1) * 2 * (int)sizeof(Id) / 1024);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "header fetches: %d\n", hdrfetches);
       POOL_DEBUG(SOLV_DEBUG_STATS, "stats made: %d\n", cbdata.statsmade);
       if (cbdata.usestat)
 	{
@@ -967,11 +977,10 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   cbdata.cflmapn = 0;
   cbdata.cflmapused = 0;
 
-  now = solv_timems(0);
-
   map_free(&cbdata.idxmap);
 
   /* sort and unify/prune */
+  now = solv_timems(0);
   POOL_DEBUG(SOLV_DEBUG_STATS, "raw candidates: %d, pruning\n", cbdata.lookat.count / 4);
   solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 4, sizeof(Id) * 4, &lookat_hx_cmp, pool);
   for (i = j = 0; i < cbdata.lookat.count; )
@@ -1006,10 +1015,13 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
     }
   queue_truncate(&cbdata.lookat, j);
   POOL_DEBUG(SOLV_DEBUG_STATS, "candidates now: %d\n", cbdata.lookat.count / 4);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "pruning took %d ms\n", solv_timems(now));
 
   /* third pass: collect file info for all files that match a hx */
+  now = solv_timems(0);
   solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 4, sizeof(Id) * 4, &lookat_idx_cmp, pool);
   queue_init(&cbdata.files);
+  hdrfetches = 0;
   for (i = 0; i < cbdata.lookat.count; i += 4)
     {
       Id idx = cbdata.lookat.elements[i + 1];
@@ -1018,6 +1030,8 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
       p = pkgs->elements[idx];
       handle = (*handle_cb)(pool, p, handle_cbdata);
+      if (handle)
+	hdrfetches++;
       for (;; i += 4)
 	{
 	  int fstart = cbdata.files.count;
@@ -1036,11 +1050,14 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 	    break;
 	}
     }
+  POOL_DEBUG(SOLV_DEBUG_STATS, "header fetches: %d\n", hdrfetches);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "file info fetching took %d ms\n", solv_timems(now));
 
   cbdata.normap = solv_free(cbdata.normap);
   cbdata.normapn = 0;
 
   /* forth pass: for each hx we have, compare all matching files against all other matching files */
+  now = solv_timems(0);
   solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 4, sizeof(Id) * 4, &lookat_hx_cmp, pool);
   for (i = 0; i < cbdata.lookat.count - 4; i += 4)
     {
