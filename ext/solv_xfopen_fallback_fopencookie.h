@@ -1,13 +1,13 @@
-/* 
+/*
  *	Provides a very limited fopencookie() for environments with a libc
  *	that lacks it.
- *	
- *	Author: zhasha
+ *
+ *	Authors: zhasha & nsz
  *	Modified for libsolv by Neal Gompa
- *	
+ *
  *	This program is licensed under the BSD license, read LICENSE.BSD
  *	for further information.
- *	
+ *
  */
 
 #ifndef SOLV_XFOPEN_FALLBACK_FOPENCOOKIE_H

@@ -1,10 +1,10 @@
-/* 
+/*
  *	Provides a very limited fopencookie() for environments with a libc
  *	that lacks it.
- *	
- *	Author: zhasha
+ *
+ *	Authors: zhasha & nsz
  *	Modified for libsolv by Neal Gompa
- *	
+ *
  *	This program is licensed under the BSD license, read LICENSE.BSD
  *	for further information.
  *
@@ -33,7 +33,7 @@ static void *proxy(void *arg)
 {
     struct ctx *ctx = arg;
     ssize_t r;
-    size_t n;
+    size_t n, k;
 
     pthread_detach(pthread_self());
 
@@ -47,17 +47,18 @@ static void *proxy(void *arg)
         }
         if (r == 0) { break; }
 
+        n = r, k = 0;
         while (n > 0) {
             r = ctx->io.write ?
-                (ctx->io.write)(ctx->cookie, ctx->buf + ((size_t)r - n), n) :
-                write(ctx->fd, ctx->buf + ((size_t)r - n), n);
+                (ctx->io.write)(ctx->cookie, ctx->buf + k, n) :
+                write(ctx->fd, ctx->buf + k, n);
             if (r < 0) {
                 if (errno != EINTR) { break; }
                 continue;
             }
             if (r == 0) { break; }
 
-            n -= (size_t)r;
+            n -= r, k += r;
         }
         if (n > 0) { break; }
     }
@@ -77,8 +78,8 @@ FILE *fopencookie(void *cookie, const char *mode, struct cookie_io_functions_t i
 
     switch (mode[0]) {
         case 'a':
-        case 'r': rd = 1; break;
         case 'w': wr = 1; break;
+        case 'r': rd = 1; break;
         default:
             errno = EINVAL;
             return NULL;
