@@ -203,7 +203,7 @@ the ``less than'' bit
 the ``equals to'' bit
 
 *REL_GT*::
-the ``greater then'' bit
+the ``greater than'' bit
 
 *REL_ARCH*::
 used for relations that describe an extra architecture filter, the
@@ -349,7 +349,7 @@ obsoleted packages still get removed.
 Make the addfileprovides method only add files from the standard
 locations (i.e. the ``bin'' and ``etc'' directories). This is
 useful if you have only few packages that use non-standard file
-dependencies, but you still wand the fast speed that addfileprovides()
+dependencies, but you still want the fast speed that addfileprovides()
 generates.
 
 === METHODS ===
@@ -367,7 +367,7 @@ that still references the pool.
 	pool.disown()
 	pool.disown()
 
-Break the ownership relation betwen the binding object and the pool. After
+Break the ownership relation between the binding object and the pool. After
 this call, the pool will not get freed even if the object goes out of
 scope. This also means that you must manually call the free method to free
 the pool data.
@@ -461,7 +461,7 @@ not in the pool and _create_ is false, *undef*/*None*/*nil* is returned.
 Some package managers like rpm allow dependencies on files contained in other
 packages. To allow libsolv to deal with those dependencies in an efficient way,
 you need to call the addfileprovides method after creating and reading all
-repositories. This method will scan all dependency for file names and than scan
+repositories. This method will scan all dependency for file names and then scan
 all packages for matching files. If a filename has been matched, it will be
 added to the provides list of the corresponding package. The
 addfileprovides_queue variant works the same way but returns an array
@@ -485,7 +485,7 @@ the call to addfileprovides().
 	solvables = pool.whatprovides(dep)
 
 Return all solvables that provide the specified dependency. You can use either
-a Dep object or an simple Id as argument.
+a Dep object or a simple Id as argument.
 
 	Id *matchprovidingids(const char *match, int flags)
 	my @ids = $pool->matchprovidingids($match, $flags);
@@ -575,7 +575,7 @@ Set the callback function called when repository metadata needs to be loaded on
 demand. To make use of this feature, you need to create repodata stubs that
 tell the library which data is available but not loaded. If later on the data
 needs to be accessed, the callback function is called with a repodata argument.
-You can then load the data (maybe fetching it first from an remote server).
+You can then load the data (maybe fetching it first from a remote server).
 The callback should return true if the data has been made available.
 
 	/* bindings only */
@@ -1121,7 +1121,7 @@ parameter.
 
 Add the repomd.xml meta description from the "rpm-md" format to the repository.
 This file contains information about the repository like keywords, and also a
-list of all database files with checksums. The data is added the the "meta"
+list of all database files with checksums. The data is added to the "meta"
 section of the repository, i.e. no package gets created.
 
 	bool add_updateinfoxml(FILE *fp, int flags = 0)
@@ -1203,7 +1203,7 @@ The _dir_ parameter is usually set to "/var/lib/pacman/local".
 
 Add the ``content'' meta description from the susetags format to the repository.
 This file contains information about the repository like keywords, and also
-a list of all database files with checksums. The data is added the the "meta"
+a list of all database files with checksums. The data is added to the "meta"
 section of the repository, i.e. no package gets created.
 
 	bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0)
@@ -1410,7 +1410,7 @@ Return true if the two solvables are identical.
 	$solvable.evrcmp(other)
 	$solvable.evrcmp(other)
 
-Returns -1 if the epoch/version/release of the solvable is less then the
+Returns -1 if the epoch/version/release of the solvable is less than the
 one from the other solvable, 1 if it is greater, and 0 if they are equal.
 Note that "equal" does not mean that the evr is identical.
 
@@ -2171,7 +2171,7 @@ installed package has an update rule that consists of the packages
 that may replace the installed package.
 
 *SOLVER_RULE_FEATURE*::
-Feature rules are fallback rules used when a update rule is disabled. They
+Feature rules are fallback rules used when an update rule is disabled. They
 include all packages that may replace the installed package ignoring the
 update policy, i.e. they contain downgrades, arch changes and so on.
 Without them, the solver would simply erase installed packages if their
@@ -2181,7 +2181,7 @@ update rule gets disabled.
 Job rules implement the job given to the solver.
 
 *SOLVER_RULE_DISTUPGRADE*::
-This are simple negative assertions that make sure that only packages
+These are simple negative assertions that make sure that only packages
 are kept that are also available in one of the repositories.
 
 *SOLVER_RULE_INFARCH*::
@@ -2198,7 +2198,7 @@ choice rules, so you will not see them when a problem is found.
 *SOLVER_RULE_LEARNT*::
 These rules are generated by the solver to keep it from running into
 the same problem multiple times when it has to backtrack. They are
-the main reason why a sat solver is faster then other dependency solver
+the main reason why a sat solver is faster than other dependency solver
 implementations.
 
 Special dependency rule types:
@@ -2779,7 +2779,7 @@ This element installs a package with a different version keeping the other
 versions installed.
 
 *SOLVER_TRANSACTION_MULTIREINSTALL*::
-This element reinstalls a installed package keeping the other versions
+This element reinstalls an installed package keeping the other versions
 installed.
 
 Transaction element types, active view
@@ -2795,7 +2795,7 @@ different content.
 This element installs a newer version of an installed package.
 
 *SOLVER_TRANSACTION_DOWNGRADE*::
-This element installs a older version of an installed package.
+This element installs an older version of an installed package.
 
 *SOLVER_TRANSACTION_OBSOLETES*::
 This element installs a package that obsoletes an installed package.
@@ -2897,7 +2897,7 @@ Returns true if the transaction does not do anything, i.e. has no elements.
 	newsolvables = trans.newsolvables()
 	newsolvables = trans.newsolvables()
 
-Return all packages that are to be installed by the transaction. This are
+Return all packages that are to be installed by the transaction. These are
 the packages that need to be downloaded from the repositories.
 
 	Solvable *keptsolvables();
@@ -2982,11 +2982,11 @@ transaction.
 
 === ACTIVE/PASSIVE VIEW ===
 
-Active view list what new packages get installed, while passive view shows
+Active view lists what new packages get installed, while passive view shows
 what happens to the installed packages. Most often there's not much
-difference between the two modes, but things get interesting of multiple
-package get replaced by one new package. Say you have installed package
-A-1-1 and B-1-1, and now install A-2-1 with has a new dependency that
+difference between the two modes, but things get interesting if multiple
+packages get replaced by one new package. Say you have installed packages
+A-1-1 and B-1-1, and now install A-2-1 which has a new dependency that
 obsoletes B. The transaction elements will be
 
   updated   A-1-1 (other: A-2-1)

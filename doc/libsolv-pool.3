@@ -290,22 +290,22 @@ Set a custom debug callback function\&. Instead of writing to stdout or stderr, 
 .PP
 \fBDISTTYPE_RPM\fR
 .RS 4
-Used for systems with use rpm as low level package manager\&.
+Used for systems which use rpm as low level package manager\&.
 .RE
 .PP
 \fBDISTTYPE_DEB\fR
 .RS 4
-Used for systems with use dpkg as low level package manager\&.
+Used for systems which use dpkg as low level package manager\&.
 .RE
 .PP
 \fBDISTTYPE_ARCH\fR
 .RS 4
-Used for systems with use the arch linux package manager\&.
+Used for systems which use the arch linux package manager\&.
 .RE
 .PP
 \fBDISTTYPE_HAIKU\fR
 .RS 4
-Used for systems with use haiku packages\&.
+Used for systems which use haiku packages\&.
 .RE
 .PP
 \fBPOOL_FLAG_PROMOTEEPOCH\fR
@@ -355,7 +355,7 @@ If a package is installed in multiversionmode, rpm used to ignore both the impli
 .PP
 \fBPOOL_FLAG_ADDFILEPROVIDESFILTERED\fR
 .RS 4
-Make the addfileprovides method only add files from the standard locations (i\&.e\&. the \(lqbin\(rq and \(lqetc\(rq directories)\&. This is useful if you have only few packages that use non\-standard file dependencies, but you still wand the fast speed that addfileprovides() generates\&.
+Make the addfileprovides method only add files from the standard locations (i\&.e\&. the \(lqbin\(rq and \(lqetc\(rq directories)\&. This is useful if you have only few packages that use non\-standard file dependencies, but you still want the fast speed that addfileprovides() generates\&.
 .RE
 .SS "Functions"
 .sp
@@ -585,7 +585,7 @@ A boolean OR operation, the \(lqname\(rq and \(lqevr\(rq parts of the relation c
 .PP
 \fBREL_WITH\fR
 .RS 4
-Like REL_AND, but packages mast match both dependencies simultaneously\&. See the section about boolean dependencies about more information\&.
+Like REL_AND, but packages must match both dependencies simultaneously\&. See the section about boolean dependencies about more information\&.
 .RE
 .PP
 \fBREL_NAMESPACE\fR
@@ -595,7 +595,7 @@ A special namespace relation\&. See the section about namespace dependencies for
 .PP
 \fBREL_ARCH\fR
 .RS 4
-A architecture filter dependency\&. The \(lqname\(rq part of the relation is a sub\-dependency, the \(lqevr\(rq part is the Id of an architecture that the matching packages must have (note that this is an exact match ignoring architecture policies)\&.
+An architecture filter dependency\&. The \(lqname\(rq part of the relation is a sub\-dependency, the \(lqevr\(rq part is the Id of an architecture that the matching packages must have (note that this is an exact match ignoring architecture policies)\&.
 .RE
 .PP
 \fBREL_FILECONFLICT\fR
@@ -792,7 +792,7 @@ Only compare the epoch and the version parts, ignore the release part\&.
 .RE
 .\}
 .sp
-Compare two version Ids, return \-1 if the first version is less then the second version, 0 if they are identical, and 1 if the first version is bigger than the second one\&.
+Compare two version Ids, return \-1 if the first version is less than the second version, 0 if they are identical, and 1 if the first version is bigger than the second one\&.
 .sp
 .if n \{\
 .RS 4
@@ -853,7 +853,7 @@ Like pool_match_dep, but the provider is the "self\-provides" dependency of the 
 .RE
 .\}
 .sp
-Create a index that maps dependency Ids to sets of packages that provide the dependency\&.
+Create an index that maps dependency Ids to sets of packages that provide the dependency\&.
 .sp
 .if n \{\
 .RS 4
@@ -913,7 +913,7 @@ Add the contents of the Queue \fIq\fR to the end of the whatprovidesdata array, 
 .RE
 .\}
 .sp
-Some package managers like rpm allow dependencies on files contained in other packages\&. To allow libsolv to deal with those dependencies in an efficient way, you need to call the addfileprovides method after creating and reading all repositories\&. This method will scan all dependency for file names and than scan all packages for matching files\&. If a filename has been matched, it will be added to the provides list of the corresponding package\&.
+Some package managers like rpm allow dependencies on files contained in other packages\&. To allow libsolv to deal with those dependencies in an efficient way, you need to call the addfileprovides method after creating and reading all repositories\&. This method will scan all dependency for file names and then scan all packages for matching files\&. If a filename has been matched, it will be added to the provides list of the corresponding package\&.
 .sp
 .if n \{\
 .RS 4
@@ -1010,7 +1010,7 @@ Join three strings and return the result in the pool\(cqs temporary space area\&
 .RE
 .\}
 .sp
-Like pool_tmpjoin(), but if the first argument is the last allocated space in the pool\(cqs temporary space area, it will be replaced with the result of the join and no new temporary space slot will be used\&. Thus you can join more then three strings by a combination of one pool_tmpjoin() and multiple pool_tmpappend() calls\&. Note that the \fIstr1\fR pointer is no longer usable after the call\&.
+Like pool_tmpjoin(), but if the first argument is the last allocated space in the pool\(cqs temporary space area, it will be replaced with the result of the join and no new temporary space slot will be used\&. Thus you can join more than three strings by a combination of one pool_tmpjoin() and multiple pool_tmpappend() calls\&. Note that the \fIstr1\fR pointer is no longer usable after the call\&.
 .SH "DATA LOOKUP"
 .SS "Constants"
 .PP

@@ -89,7 +89,7 @@ Stores an array of dependency Ids that describe the capabilities that also must 
 .PP
 \fBSOLVABLE_RECOMMENDS "solvable:recommends"\fR
 .RS 4
-Stores an array of dependency Ids that describe the capabilities that also should be installed when this package is installed\&. It\(cqs not an error if not all capabilites can be met\&.
+Stores an array of dependency Ids that describe the capabilities that also should be installed when this package is installed\&. It\(cqs not an error if not all capabilities can be met\&.
 .RE
 .PP
 \fBSOLVABLE_SUGGESTS "solvable:suggests"\fR
@@ -390,7 +390,7 @@ The basename of the product file in the package\&.
 .PP
 \fBPRODUCT_SHORTLABEL "product:shortlabel"\fR
 .RS 4
-A identification string of the product\&.
+An identification string of the product\&.
 .RE
 .PP
 \fBPRODUCT_DISTPRODUCT "product:distproduct"\fR
@@ -430,12 +430,12 @@ A product line string used for product registering\&.
 .PP
 \fBPRODUCT_REGISTER_TARGET "product:regtarget"\fR
 .RS 4
-A target for prouduct registering\&.
+A target for product registering\&.
 .RE
 .PP
 \fBPRODUCT_REGISTER_RELEASE "product:regrelease"\fR
 .RS 4
-A release string for proudct registering\&.
+A release string for product registering\&.
 .RE
 .PP
 \fBPUBKEY_KEYID "pubkey:keyid"\fR
@@ -548,7 +548,7 @@ The dependency is a special modalias dependency that matches installed hardware\
 .PP
 \fBNAMESPACE_SPLITPROVIDES "namespace:splitprovides"\fR
 .RS 4
-The dependency is a special splitprovides dependency used to implement updates that include a package split\&. A splitprovoide dependency contains a filename and a package name, it is matched if a package with the provided package name is installed that contains the filename\&. This namespace is implemented in libsolv, so you do not need a callback\&.
+The dependency is a special splitprovides dependency used to implement updates that include a package split\&. A splitprovides dependency contains a filename and a package name, it is matched if a package with the provided package name is installed that contains the filename\&. This namespace is implemented in libsolv, so you do not need a callback\&.
 .RE
 .PP
 \fBNAMESPACE_LANGUAGE "namespace:language"\fR
@@ -636,12 +636,12 @@ The data is an array of non\-zero Ids ordered so that it needs less space\&.
 .PP
 \fBREPOKEY_TYPE_DIRSTRARRAY "repokey:type:dirstrarray"\fR
 .RS 4
-The data is an tuple consisting of a directory Id and a basename\&. Used to store file names\&.
+The data is a tuple consisting of a directory Id and a basename\&. Used to store file names\&.
 .RE
 .PP
 \fBREPOKEY_TYPE_DIRNUMNUMARRAY "repokey:type:dirnumnumarray"\fR
 .RS 4
-The data is an triple consisting of a directory Id and two 32bit unsigned integers\&. Used to store disk usage information\&.
+The data is a triple consisting of a directory Id and two 32bit unsigned integers\&. Used to store disk usage information\&.
 .RE
 .PP
 \fBREPOKEY_TYPE_MD5 "repokey:type:md5"\fR
@@ -884,7 +884,7 @@ The checksum of the delta rpm file\&.
 .PP
 \fBDELTA_BASE_EVR "delta:baseevr"\fR
 .RS 4
-The version of the package the delta was build against\&.
+The version of the package the delta was built against\&.
 .RE
 .PP
 \fBDELTA_SEQ_NAME "delta:seqname"\fR
