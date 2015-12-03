@@ -188,16 +188,16 @@ Pool configuration
 === Constants ===
 
 *DISTTYPE_RPM*::
-Used for systems with use rpm as low level package manager.
+Used for systems which use rpm as low level package manager.
 
 *DISTTYPE_DEB*::
-Used for systems with use dpkg as low level package manager.
+Used for systems which use dpkg as low level package manager.
 
 *DISTTYPE_ARCH*::
-Used for systems with use the arch linux package manager.
+Used for systems which use the arch linux package manager.
 
 *DISTTYPE_HAIKU*::
-Used for systems with use haiku packages.
+Used for systems which use haiku packages.
 
 *POOL_FLAG_PROMOTEEPOCH*::
 Promote the epoch of the providing dependency to the requesting
@@ -257,7 +257,7 @@ obsoleted packages still get removed.
 Make the addfileprovides method only add files from the standard
 locations (i.e. the ``bin'' and ``etc'' directories). This is
 useful if you have only few packages that use non-standard file
-dependencies, but you still wand the fast speed that addfileprovides()
+dependencies, but you still want the fast speed that addfileprovides()
 generates.
 
 
@@ -383,7 +383,7 @@ A boolean OR operation, the ``name'' and ``evr'' parts of the relation can
 be two sub-dependencies. Packages can match any part of the dependency.
 
 *REL_WITH*::
-Like REL_AND, but packages mast match both dependencies simultaneously. See
+Like REL_AND, but packages must match both dependencies simultaneously. See
 the section about boolean dependencies about more information.
 
 *REL_NAMESPACE*::
@@ -391,7 +391,7 @@ A special namespace relation. See the section about namespace dependencies
 for more information.
 
 *REL_ARCH*::
-A architecture filter dependency. The ``name'' part of the relation is a
+An architecture filter dependency. The ``name'' part of the relation is a
 sub-dependency, the ``evr'' part is the Id of an architecture that the
 matching packages must have (note that this is an exact match ignoring
 architecture policies).
@@ -508,7 +508,7 @@ Only compare the epoch and the version parts, ignore the release part.
 === Functions ===
 	int pool_evrcmp(const Pool *pool, Id evr1id, Id evr2id, int mode);
 
-Compare two version Ids, return -1 if the first version is less then the
+Compare two version Ids, return -1 if the first version is less than the
 second version, 0 if they are identical, and 1 if the first version is
 bigger than the second one.
 
@@ -538,7 +538,7 @@ Whatprovides Index
 ------------------
 	void pool_createwhatprovides(Pool *pool);
 
-Create a index that maps dependency Ids to sets of packages that provide the
+Create an index that maps dependency Ids to sets of packages that provide the
 dependency.
 
 	void pool_freewhatprovides(Pool *pool);
@@ -569,7 +569,7 @@ Some package managers like rpm allow dependencies on files contained in
 other packages. To allow libsolv to deal with those dependencies in an
 efficient way, you need to call the addfileprovides method after creating
 and reading all repositories. This method will scan all dependency for file
-names and than scan all packages for matching files. If a filename has been
+names and then scan all packages for matching files. If a filename has been
 matched, it will be added to the provides list of the corresponding
 package.
 
@@ -631,7 +631,7 @@ area. You can use NULL arguments if you just want to join less strings.
 Like pool_tmpjoin(), but if the first argument is the last allocated space
 in the pool's temporary space area, it will be replaced with the result of
 the join and no new temporary space slot will be used.  Thus you can join
-more then three strings by a combination of one pool_tmpjoin() and multiple
+more than three strings by a combination of one pool_tmpjoin() and multiple
 pool_tmpappend() calls. Note that the _str1_ pointer is no longer usable
 after the call.
 

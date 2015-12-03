@@ -424,7 +424,7 @@ the \(lqequals to\(rq bit
 .PP
 \fBREL_GT\fR
 .RS 4
-the \(lqgreater then\(rq bit
+the \(lqgreater than\(rq bit
 .RE
 .PP
 \fBREL_ARCH\fR
@@ -641,7 +641,7 @@ Force a free of the pool\&. After this call, you must not access any object that
 .RE
 .\}
 .sp
-Break the ownership relation betwen the binding object and the pool\&. After this call, the pool will not get freed even if the object goes out of scope\&. This also means that you must manually call the free method to free the pool data\&.
+Break the ownership relation between the binding object and the pool\&. After this call, the pool will not get freed even if the object goes out of scope\&. This also means that you must manually call the free method to free the pool data\&.
 .sp
 .if n \{\
 .RS 4
@@ -815,7 +815,7 @@ my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->addfileprovides_queue()\fR;
 .RE
 .\}
 .sp
-Some package managers like rpm allow dependencies on files contained in other packages\&. To allow libsolv to deal with those dependencies in an efficient way, you need to call the addfileprovides method after creating and reading all repositories\&. This method will scan all dependency for file names and than scan all packages for matching files\&. If a filename has been matched, it will be added to the provides list of the corresponding package\&. The addfileprovides_queue variant works the same way but returns an array containing all file dependencies\&. This information can be stored in the meta section of the repositories to speed up the next time the repository is loaded and addfileprovides is called\&.
+Some package managers like rpm allow dependencies on files contained in other packages\&. To allow libsolv to deal with those dependencies in an efficient way, you need to call the addfileprovides method after creating and reading all repositories\&. This method will scan all dependency for file names and then scan all packages for matching files\&. If a filename has been matched, it will be added to the provides list of the corresponding package\&. The addfileprovides_queue variant works the same way but returns an array containing all file dependencies\&. This information can be stored in the meta section of the repositories to speed up the next time the repository is loaded and addfileprovides is called\&.
 .sp
 .if n \{\
 .RS 4
@@ -845,7 +845,7 @@ my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatprovides(\fR\fI$dep\fR\fB)\fR;
 .RE
 .\}
 .sp
-Return all solvables that provide the specified dependency\&. You can use either a Dep object or an simple Id as argument\&.
+Return all solvables that provide the specified dependency\&. You can use either a Dep object or a simple Id as argument\&.
 .sp
 .if n \{\
 .RS 4
@@ -1008,7 +1008,7 @@ Get/Set fixed jobs stored in the pool\&. Those jobs are automatically appended t
 .RE
 .\}
 .sp
-Set the callback function called when repository metadata needs to be loaded on demand\&. To make use of this feature, you need to create repodata stubs that tell the library which data is available but not loaded\&. If later on the data needs to be accessed, the callback function is called with a repodata argument\&. You can then load the data (maybe fetching it first from an remote server)\&. The callback should return true if the data has been made available\&.
+Set the callback function called when repository metadata needs to be loaded on demand\&. To make use of this feature, you need to create repodata stubs that tell the library which data is available but not loaded\&. If later on the data needs to be accessed, the callback function is called with a repodata argument\&. You can then load the data (maybe fetching it first from a remote server)\&. The callback should return true if the data has been made available\&.
 .sp
 .if n \{\
 .RS 4
@@ -1973,7 +1973,7 @@ Add metadata stored in the "rpm\-md" format (i\&.e\&. from files in the \(lqrepo
 .RE
 .\}
 .sp
-Add the repomd\&.xml meta description from the "rpm\-md" format to the repository\&. This file contains information about the repository like keywords, and also a list of all database files with checksums\&. The data is added the the "meta" section of the repository, i\&.e\&. no package gets created\&.
+Add the repomd\&.xml meta description from the "rpm\-md" format to the repository\&. This file contains information about the repository like keywords, and also a list of all database files with checksums\&. The data is added to the "meta" section of the repository, i\&.e\&. no package gets created\&.
 .sp
 .if n \{\
 .RS 4
@@ -2123,7 +2123,7 @@ Add the contents of the archlinux installed package database to the repository\&
 .RE
 .\}
 .sp
-Add the \(lqcontent\(rq meta description from the susetags format to the repository\&. This file contains information about the repository like keywords, and also a list of all database files with checksums\&. The data is added the the "meta" section of the repository, i\&.e\&. no package gets created\&.
+Add the \(lqcontent\(rq meta description from the susetags format to the repository\&. This file contains information about the repository like keywords, and also a list of all database files with checksums\&. The data is added to the "meta" section of the repository, i\&.e\&. no package gets created\&.
 .sp
 .if n \{\
 .RS 4
@@ -2536,7 +2536,7 @@ Return true if the two solvables are identical\&.
 .RE
 .\}
 .sp
-Returns \-1 if the epoch/version/release of the solvable is less then the one from the other solvable, 1 if it is greater, and 0 if they are equal\&. Note that "equal" does not mean that the evr is identical\&.
+Returns \-1 if the epoch/version/release of the solvable is less than the one from the other solvable, 1 if it is greater, and 0 if they are equal\&. Note that "equal" does not mean that the evr is identical\&.
 .sp
 .if n \{\
 .RS 4
@@ -3583,7 +3583,7 @@ A rule to implement the update policy of installed packages\&. Every installed p
 .PP
 \fBSOLVER_RULE_FEATURE\fR
 .RS 4
-Feature rules are fallback rules used when a update rule is disabled\&. They include all packages that may replace the installed package ignoring the update policy, i\&.e\&. they contain downgrades, arch changes and so on\&. Without them, the solver would simply erase installed packages if their update rule gets disabled\&.
+Feature rules are fallback rules used when an update rule is disabled\&. They include all packages that may replace the installed package ignoring the update policy, i\&.e\&. they contain downgrades, arch changes and so on\&. Without them, the solver would simply erase installed packages if their update rule gets disabled\&.
 .RE
 .PP
 \fBSOLVER_RULE_JOB\fR
@@ -3593,7 +3593,7 @@ Job rules implement the job given to the solver\&.
 .PP
 \fBSOLVER_RULE_DISTUPGRADE\fR
 .RS 4
-This are simple negative assertions that make sure that only packages are kept that are also available in one of the repositories\&.
+These are simple negative assertions that make sure that only packages are kept that are also available in one of the repositories\&.
 .RE
 .PP
 \fBSOLVER_RULE_INFARCH\fR
@@ -3608,7 +3608,7 @@ Choice rules are used to make sure that the solver prefers updating to installin
 .PP
 \fBSOLVER_RULE_LEARNT\fR
 .RS 4
-These rules are generated by the solver to keep it from running into the same problem multiple times when it has to backtrack\&. They are the main reason why a sat solver is faster then other dependency solver implementations\&.
+These rules are generated by the solver to keep it from running into the same problem multiple times when it has to backtrack\&. They are the main reason why a sat solver is faster than other dependency solver implementations\&.
 .RE
 .sp
 Special dependency rule types:
@@ -4511,7 +4511,7 @@ This element installs a package with a different version keeping the other versi
 .PP
 \fBSOLVER_TRANSACTION_MULTIREINSTALL\fR
 .RS 4
-This element reinstalls a installed package keeping the other versions installed\&.
+This element reinstalls an installed package keeping the other versions installed\&.
 .RE
 .sp
 Transaction element types, active view
@@ -4533,7 +4533,7 @@ This element installs a newer version of an installed package\&.
 .PP
 \fBSOLVER_TRANSACTION_DOWNGRADE\fR
 .RS 4
-This element installs a older version of an installed package\&.
+This element installs an older version of an installed package\&.
 .RE
 .PP
 \fBSOLVER_TRANSACTION_OBSOLETES\fR
@@ -4679,7 +4679,7 @@ my \fI@newsolvables\fR \fB=\fR \fI$trans\fR\fB\->newsolvables()\fR;
 .RE
 .\}
 .sp
-Return all packages that are to be installed by the transaction\&. This are the packages that need to be downloaded from the repositories\&.
+Return all packages that are to be installed by the transaction\&. These are the packages that need to be downloaded from the repositories\&.
 .sp
 .if n \{\
 .RS 4
@@ -4806,7 +4806,7 @@ Return the size change of the installed system in kilobytes (kibibytes)\&.
 Order the steps in the transactions so that dependant packages are updated before packages that depend on them\&. For rpm, you can also use rpmlib\(cqs ordering functionality, debian\(cqs dpkg does not provide a way to order a transaction\&.
 .SS "ACTIVE/PASSIVE VIEW"
 .sp
-Active view list what new packages get installed, while passive view shows what happens to the installed packages\&. Most often there\(cqs not much difference between the two modes, but things get interesting of multiple package get replaced by one new package\&. Say you have installed package A\-1\-1 and B\-1\-1, and now install A\-2\-1 with has a new dependency that obsoletes B\&. The transaction elements will be
+Active view lists what new packages get installed, while passive view shows what happens to the installed packages\&. Most often there\(cqs not much difference between the two modes, but things get interesting if multiple packages get replaced by one new package\&. Say you have installed packages A\-1\-1 and B\-1\-1, and now install A\-2\-1 which has a new dependency that obsoletes B\&. The transaction elements will be
 .sp
 .if n \{\
 .RS 4
