@@ -142,7 +142,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 
 	  if (!rel || !evr)
 	    {
-	      pool_debug(pool, SOLV_FATAL, "repo_content: bad relation '%s %s'\n", name, rel);
+	      pool_debug(pool, SOLV_ERROR, "repo_content: bad relation '%s %s'\n", name, rel);
 	      continue;
 	    }
 	  for (flags = 0; flags < 6; flags++)
@@ -150,7 +150,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
 	      break;
 	  if (flags == 6)
 	    {
-	      pool_debug(pool, SOLV_FATAL, "repo_content: unknown relation '%s'\n", rel);
+	      pool_debug(pool, SOLV_ERROR, "repo_content: unknown relation '%s'\n", rel);
 	      continue;
 	    }
 	  id = pool_rel2id(pool, id, pool_str2id(pool, evr, 1), flags + 1, 1);
@@ -518,7 +518,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 
   if (s && !s->name)
     {
-      pool_debug(pool, SOLV_FATAL, "repo_content: 'content' incomplete, no product solvable created!\n");
+      pool_debug(pool, SOLV_ERROR, "repo_content: 'content' incomplete, no product solvable created!\n");
       repo_free_solvable(repo, s - pool->solvables, 1);
       s = 0;
     }
