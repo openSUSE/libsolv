@@ -3055,6 +3055,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
     case REPOKEY_TYPE_VOID:
     case REPOKEY_TYPE_CONSTANT:
     case REPOKEY_TYPE_CONSTANTID:
+    case REPOKEY_TYPE_DELETED:
       break;
     case REPOKEY_TYPE_STR:
       data_addblob(xd, data->attrdata + val, strlen((char *)(data->attrdata + val)) + 1);
@@ -3134,7 +3135,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	      schemaid = repodata_schema2id(data, schema, 1);
 	    else if (schemaid != repodata_schema2id(data, schema, 0))
 	      {
-	 	pool_debug(data->repo->pool, SOLV_FATAL, "fixarray substructs with different schemas\n");
+	 	pool_debug(data->repo->pool, SOLV_FATAL, "repodata_serialize_key: fixarray substructs with different schemas\n");
 		exit(1);
 	      }
 	  }
@@ -3179,7 +3180,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	break;
       }
     default:
-      pool_debug(data->repo->pool, SOLV_FATAL, "don't know how to handle type %d\n", key->type);
+      pool_debug(data->repo->pool, SOLV_FATAL, "repodata_serialize_key: don't know how to handle type %d\n", key->type);
       exit(1);
     }
   if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
@@ -3260,7 +3261,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	{
 	  if (seen[*keyp])
 	    {
-	      pool_debug(data->repo->pool, SOLV_FATAL, "Inconsistent old data (key occured twice).\n");
+	      pool_debug(data->repo->pool, SOLV_FATAL, "repodata_internalize: inconsistent old data (key occured twice).\n");
 	      exit(1);
 	    }
 	  seen[*keyp] = -1;
