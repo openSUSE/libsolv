@@ -3443,7 +3443,7 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	  if (seen[keyid] == -1)
 	    {
 	      if (oldincoreoffs[keyid * 2 + 1])
-		data_addblob(&newincore, data->incoredata + oldincoreoffs[keyid], oldincoreoffs[keyid * 2 + 1]);
+		data_addblob(&newincore, data->incoredata + oldincoreoffs[keyid * 2], oldincoreoffs[keyid * 2 + 1]);
 	    }
 	  else if (seen[keyid])
 	    repodata_serialize_key(data, &newincore, &newvincore, schema, data->keys + keyid, seen[keyid] - 1);
