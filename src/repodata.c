@@ -3126,29 +3126,30 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	    sp = schema;
 	    kp = data->xattrs[-*ida];
 	    if (!kp)
-	      continue;
+	      continue;		/* ignore empty elements */
 	    num++;
-	    for (;*kp; kp += 2)
+	    for (; *kp; kp += 2)
 	      *sp++ = *kp;
 	    *sp = 0;
 	    if (!schemaid)
 	      schemaid = repodata_schema2id(data, schema, 1);
 	    else if (schemaid != repodata_schema2id(data, schema, 0))
 	      {
-	 	pool_debug(data->repo->pool, SOLV_FATAL, "repodata_serialize_key: fixarray substructs with different schemas\n");
-		exit(1);
+	 	pool_debug(data->repo->pool, SOLV_ERROR, "repodata_serialize_key: fixarray substructs with different schemas\n");
+		num = 0;
+		break;
 	      }
 	  }
+	data_addid(xd, num);
 	if (!num)
 	  break;
-	data_addid(xd, num);
 	data_addid(xd, schemaid);
 	for (ida = data->attriddata + val; *ida; ida++)
 	  {
 	    Id *kp = data->xattrs[-*ida];
 	    if (!kp)
 	      continue;
-	    for (;*kp; kp += 2)
+	    for (; *kp; kp += 2)
 	      repodata_serialize_key(data, newincore, newvincore, schema, data->keys + *kp, kp[1]);
 	  }
 	break;
