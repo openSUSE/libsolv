@@ -3192,18 +3192,57 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
     }
 }
 
+/* create a circular linked list of all keys that share
+ * the same keyname */
+static Id *
+calculate_keylink(Repodata *data)
+{
+  int i, j;
+  Id *link;
+  Id maxkeyname = 0, *keytable = 0;
+  link = solv_calloc(data->nkeys, sizeof(Id));
+  if (data->nkeys <= 2)
+    return link;
+  for (i = 1; i < data->nkeys; i++)
+    {
+      Id n = data->keys[i].name;
+      if (n >= maxkeyname)
+	{
+	  keytable = solv_realloc2(keytable, n + 128, sizeof(Id));
+	  memset(keytable + maxkeyname, 0, (n + 128 - maxkeyname) * sizeof(Id));
+	  maxkeyname = n + 128;
+	}
+      j = keytable[n];
+      if (j)
+	link[i] = link[j];
+      else
+	j = i;
+      link[j] = i;
+      keytable[n] = i;
+    }
+  /* remove links that just point to themselfs */
+  for (i = 1; i < data->nkeys; i++)
+    if (link[i] == i)
+      link[i] = 0;
+  solv_free(keytable);
+  return link;
+}
+
 void
 repodata_internalize(Repodata *data)
 {
   Repokey *key, solvkey;
   Id entry, nentry;
-  Id schemaid, keyid, *schema, *sp, oldschema, *keyp, *seen;
+  Id schemaid, keyid, *schema, *sp, oldschemaid, *keyp, *seen;
+  Offset *oldincoreoffs = 0;
   int schemaidx;
   unsigned char *dp, *ndp;
-  int newschema, oldcount;
+  int neednewschema;
   struct extdata newincore;
   struct extdata newvincore;
   Id solvkeyid;
+  Id *keylink;
+  int haveoldkl;
 
   if (!data->attrs && !data->xattrs)
     return;
@@ -3236,140 +3275,181 @@ repodata_internalize(Repodata *data)
   data->mainschema = 0;
   data->mainschemaoffsets = solv_free(data->mainschemaoffsets);
 
+  keylink = calculate_keylink(data);
   /* join entry data */
   /* we start with the meta data, entry -1 */
   for (entry = -1; entry < nentry; entry++)
     {
-      memset(seen, 0, data->nkeys * sizeof(Id));
-      oldschema = 0;
+      oldschemaid = 0;
       dp = data->incoredata;
       if (dp)
 	{
 	  dp += entry >= 0 ? data->incoreoffset[entry] : 1;
-          dp = data_read_id(dp, &oldschema);
+          dp = data_read_id(dp, &oldschemaid);
 	}
+      memset(seen, 0, data->nkeys * sizeof(Id));
 #if 0
-fprintf(stderr, "oldschema %d\n", oldschema);
-fprintf(stderr, "schemata %d\n", data->schemata[oldschema]);
+fprintf(stderr, "oldschemaid %d\n", oldschemaid);
+fprintf(stderr, "schemata %d\n", data->schemata[oldschemaid]);
 fprintf(stderr, "schemadata %p\n", data->schemadata);
 #endif
-      /* seen: -1: old data  0: skipped  >0: id + 1 */
-      newschema = 0;
-      oldcount = 0;
+
+      /* seen: -1: old data,  0: skipped,  >0: id + 1 */
+      neednewschema = 0;
       sp = schema;
-      for (keyp = data->schemadata + data->schemata[oldschema]; *keyp; keyp++)
+      haveoldkl = 0;
+      for (keyp = data->schemadata + data->schemata[oldschemaid]; *keyp; keyp++)
 	{
 	  if (seen[*keyp])
 	    {
-	      pool_debug(data->repo->pool, SOLV_FATAL, "repodata_internalize: inconsistent old data (key occured twice).\n");
-	      exit(1);
+	      /* oops, should not happen */
+	      neednewschema = 1;
+	      continue;
 	    }
-	  seen[*keyp] = -1;
+	  seen[*keyp] = -1;	/* use old marker */
 	  *sp++ = *keyp;
-	  oldcount++;
+	  if (keylink[*keyp])
+	    haveoldkl = 1;	/* potential keylink conflict */
 	}
-      if (entry >= 0)
-	keyp = data->attrs ? data->attrs[entry] : 0;
-      else
+
+      /* strip solvables key */
+      if (entry < 0 && solvkeyid && seen[solvkeyid])
 	{
-	  /* strip solvables key */
 	  *sp = 0;
 	  for (sp = keyp = schema; *sp; sp++)
 	    if (*sp != solvkeyid)
 	      *keyp++ = *sp;
-	    else
-	      oldcount--;
 	  sp = keyp;
 	  seen[solvkeyid] = 0;
-	  keyp = data->xattrs ? data->xattrs[1] : 0;
+	  neednewschema = 1;
 	}
+
+      /* add new entries */
+      if (entry >= 0)
+	keyp = data->attrs ? data->attrs[entry] : 0;
+      else
+        keyp = data->xattrs ? data->xattrs[1] : 0;
       if (keyp)
         for (; *keyp; keyp += 2)
 	  {
 	    if (!seen[*keyp])
 	      {
-	        newschema = 1;
+	        neednewschema = 1;
 	        *sp++ = *keyp;
+		if (haveoldkl && keylink[*keyp])		/* this should be pretty rare */
+		  {
+		    Id kl;
+		    for (kl = keylink[*keyp]; kl != *keyp; kl = keylink[kl])
+		      if (seen[kl] == -1)
+		        {
+			  /* replacing old key kl, remove from schema and seen */
+			  Id *osp;
+			  for (osp = schema; osp < sp; osp++)
+			    if (*osp == kl)
+			      {
+			        memmove(osp, osp + 1, (sp - osp) * sizeof(Id));
+			        sp--;
+			        seen[kl] = 0;
+				break;
+			      }
+		        }
+		  }
 	      }
 	    seen[*keyp] = keyp[1] + 1;
 	  }
+
+      /* add solvables key if needed */
       if (entry < 0 && data->end != data->start)
 	{
-	  *sp++ = solvkeyid;
-	  newschema = 1;
+	  *sp++ = solvkeyid;	/* always last in schema */
+	  neednewschema = 1;
 	}
+
+      /* commit schema */
       *sp = 0;
-      if (newschema)
+      if (neednewschema)
         /* Ideally we'd like to sort the new schema here, to ensure
-	   schema equality independend of the ordering.  We can't do that
-	   yet.  For once see below (old ids need to come before new ids).
-	   An additional difficulty is that we also need to move
-	   the values with the keys.  */
+	   schema equality independend of the ordering. */
 	schemaid = repodata_schema2id(data, schema, 1);
       else
-	schemaid = oldschema;
+	schemaid = oldschemaid;
 
+      if (entry < 0)
+	{
+	  data->mainschemaoffsets = solv_calloc(sp - schema, sizeof(Id));
+	  data->mainschema = schemaid;
+	}
+
+      /* find offsets in old incore data */
+      if (oldschemaid)
+	{
+	  Id *lastneeded = 0;
+	  for (sp = data->schemadata + data->schemata[oldschemaid]; *sp; sp++)
+	    if (seen[*sp] == -1)
+	      lastneeded = sp + 1;
+	  if (lastneeded)
+	    {
+	      if (!oldincoreoffs)
+	        oldincoreoffs = solv_malloc2(data->nkeys, 2 * sizeof(Offset));
+	      for (sp = data->schemadata + data->schemata[oldschemaid]; sp != lastneeded; sp++)
+		{
+		  /* Skip the data associated with this old key.  */
+		  key = data->keys + *sp;
+		  ndp = dp;
+		  if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
+		    {
+		      ndp = data_skip(ndp, REPOKEY_TYPE_ID);
+		      ndp = data_skip(ndp, REPOKEY_TYPE_ID);
+		    }
+		  else if (key->storage == KEY_STORAGE_INCORE)
+		    ndp = data_skip_key(data, ndp, key);
+		  oldincoreoffs[*sp * 2] = dp - data->incoredata;
+		  oldincoreoffs[*sp * 2 + 1] = ndp - dp;
+		  dp = ndp;
+		}
+	    }
+	}
 
       /* Now create data blob.  We walk through the (possibly new) schema
 	 and either copy over old data, or insert the new.  */
-      /* XXX Here we rely on the fact that the (new) schema has the form
-	 o1 o2 o3 o4 ... | n1 n2 n3 ...
-	 (oX being the old keyids (possibly overwritten), and nX being
-	  the new keyids).  This rules out sorting the keyids in order
-	 to ensure a small schema count.  */
       if (entry >= 0)
         data->incoreoffset[entry] = newincore.len;
-      data_addid(&newincore, schemaid);
-      if (entry == -1)
+
+      if (entry >= 0 && !neednewschema && oldschemaid && (!data->attrs || !data->attrs[entry]) && dp)
 	{
-	  data->mainschema = schemaid;
-	  data->mainschemaoffsets = solv_calloc(sp - schema, sizeof(Id));
+	  /* just copy over the complete old entry (including the schemaid) */
+	  ndp = data->incoredata + data->incoreoffset[entry];
+	  data_addblob(&newincore, ndp, dp - ndp);
+	  goto entrydone;
 	}
+
+      data_addid(&newincore, schemaid);
+
       /* we don't use a pointer to the schemadata here as repodata_serialize_key
        * may call repodata_schema2id() which might realloc our schemadata */
       for (schemaidx = data->schemata[schemaid]; (keyid = data->schemadata[schemaidx]) != 0; schemaidx++)
 	{
-	  if (entry == -1)
-	    data->mainschemaoffsets[schemaidx - data->schemata[schemaid]] = newincore.len;
-	  if (keyid == solvkeyid)
+	  if (entry < 0)
 	    {
-	      /* add flexarray entry count */
-	      data_addid(&newincore, data->end - data->start);
-	      break;
-	    }
-	  key = data->keys + keyid;
-#if 0
-	  fprintf(stderr, "internalize %d(%d):%s:%s\n", entry, entry + data->start, pool_id2str(data->repo->pool, key->name), pool_id2str(data->repo->pool, key->type));
-#endif
-	  ndp = dp;
-	  if (oldcount)
-	    {
-	      /* Skip the data associated with this old key.  */
-	      if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
+	      data->mainschemaoffsets[schemaidx - data->schemata[schemaid]] = newincore.len;
+	      if (keyid == solvkeyid)
 		{
-		  ndp = data_skip(dp, REPOKEY_TYPE_ID);
-		  ndp = data_skip(ndp, REPOKEY_TYPE_ID);
+		  /* add flexarray entry count */
+		  data_addid(&newincore, data->end - data->start);
+		  break;	/* always the last entry */
 		}
-	      else if (key->storage == KEY_STORAGE_INCORE)
-		ndp = data_skip_key(data, dp, key);
-	      oldcount--;
 	    }
 	  if (seen[keyid] == -1)
 	    {
-	      /* If this key was an old one _and_ was not overwritten with
-		 a different value copy over the old value (we skipped it
-		 above).  */
-	      if (dp != ndp)
-		data_addblob(&newincore, dp, ndp - dp);
-	      seen[keyid] = 0;
+	      if (oldincoreoffs[keyid * 2 + 1])
+		data_addblob(&newincore, data->incoredata + oldincoreoffs[keyid], oldincoreoffs[keyid * 2 + 1]);
 	    }
 	  else if (seen[keyid])
-	    {
-	      /* Otherwise we have a new value.  Parse it into the internal form.  */
-	      repodata_serialize_key(data, &newincore, &newvincore, schema, key, seen[keyid] - 1);
-	    }
-	  dp = ndp;
+	    repodata_serialize_key(data, &newincore, &newvincore, schema, data->keys + keyid, seen[keyid] - 1);
 	}
+
+entrydone:
+      /* free memory */
       if (entry >= 0 && data->attrs)
 	{
 	  if (data->attrs[entry])
@@ -3399,6 +3479,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
   data->lastdatalen = 0;
   solv_free(schema);
   solv_free(seen);
+  solv_free(keylink);
+  solv_free(oldincoreoffs);
   repodata_free_schemahash(data);
 
   solv_free(data->incoredata);
