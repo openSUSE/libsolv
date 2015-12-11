@@ -3411,19 +3411,19 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
 	    }
 	}
 
-      /* Now create data blob.  We walk through the (possibly new) schema
-	 and either copy over old data, or insert the new.  */
-      if (entry >= 0)
-        data->incoreoffset[entry] = newincore.len;
-
+      /* just copy over the complete old entry (including the schemaid) if there was no new data */
       if (entry >= 0 && !neednewschema && oldschemaid && (!data->attrs || !data->attrs[entry]) && dp)
 	{
-	  /* just copy over the complete old entry (including the schemaid) */
 	  ndp = data->incoredata + data->incoreoffset[entry];
+	  data->incoreoffset[entry] = newincore.len;
 	  data_addblob(&newincore, ndp, dp - ndp);
 	  goto entrydone;
 	}
 
+      /* Now create data blob.  We walk through the (possibly new) schema
+	 and either copy over old data, or insert the new.  */
+      if (entry >= 0)
+        data->incoreoffset[entry] = newincore.len;
       data_addid(&newincore, schemaid);
 
       /* we don't use a pointer to the schemadata here as repodata_serialize_key
