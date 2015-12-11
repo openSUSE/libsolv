@@ -225,7 +225,7 @@ autouninstall(Solver *solv, Id *problem)
 	      if (v > lastfeature)
 		lastfeature = v;
 	      /* prefer orphaned packages in dup mode */
-	      if (solv->dupmap_all && solv->keep_orphans)
+	      if (solv->keep_orphans)
 		{
 		  r = solv->rules + v;
 		  if (!r->d && r->p == (solv->installed->start + (v - solv->updaterules)))
@@ -2725,7 +2725,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
       if (!solv->decisioncnt_orphan)
         solv->decisioncnt_orphan = solv->decisionq.count;
-      if (solv->dupmap_all && solv->installed)
+      if (solv->installed && (solv->orphaned.count || solv->brokenorphanrules))
 	{
 	  int installedone = 0;
 
@@ -3632,7 +3632,9 @@ solver_solve(Solver *solv, Queue *job)
 	      if (how & SOLVER_FORCEBEST)
 		solv->bestupdatemap_all = 1;
 	    }
-	  if (!solv->dupmap_all || solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
+	  if ((how & SOLVER_TARGETED) != 0)
+	    needduprules = 1;
+	  if (!solv->dupmap_all || solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size || solv->keep_orphans)
 	    needduprules = 1;
 	  break;
 	default:
@@ -3747,9 +3749,13 @@ solver_solve(Solver *solv, Queue *job)
 	   * check for and remove duplicate
 	   */
 	  r = solv->rules + solv->nrules - 1;           /* r: update rule */
-          if (!r->p)
-	    continue;
 	  sr = r - (installed->end - installed->start); /* sr: feature rule */
+          if (!r->p)
+	    {
+	      if (sr->p)
+	        memset(sr, 0, sizeof(*sr));		/* no feature rules without update rules */
+	      continue;
+	    }
 	  /* it's also orphaned if the feature rule consists just of the installed package */
 	  if (!solv->dupmap_all && sr->p == i && !sr->d && !sr->w2)
 	    queue_push(&solv->orphaned, i);
