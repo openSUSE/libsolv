@@ -123,6 +123,7 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
 {
   Id p, pp, namerelid;
   char *str;
+  unsigned int sbt = 0;
 
   /* search for project requires */
   namerelid = 0;
@@ -160,6 +161,29 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
 	continue;
       queue_push(qr, p);
     }
+  if (qr->count > 1)
+    {
+      /* multiple providers. try buildtime filter */
+      sbt = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
+      if (sbt)
+	{
+	  unsigned int bt;
+	  int i, j;
+	  int filterqp = 1;
+	  for (i = j = 0; i < qr->count; i++)
+	    {
+	      bt = solvable_lookup_num(pool->solvables + qr->elements[i], SOLVABLE_BUILDTIME, 0);
+	      if (!bt)
+		filterqp = 0;	/* can't filter */
+	      if (!bt || bt == sbt)
+		qr->elements[j++] = qr->elements[i];
+	    }
+	  if (j)
+	    qr->count = j;
+	  if (!j || !filterqp)
+	    sbt = 0;	/* filter failed */
+	}
+    }
   if (!qr->count && s->repo == pool->installed)
     {
       /* oh no! Look up reference file */
@@ -184,6 +208,8 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
 	{
 	  Solvable *ps = pool->solvables + p;
 	  if (s->name != ps->name || ps->repo != s->repo || ps->arch != s->arch || s->evr != ps->evr)
+	    continue;
+	  if (sbt && solvable_lookup_num(ps, SOLVABLE_BUILDTIME, 0) != sbt)
 	    continue;
 	  queue_push(qp, p);
 	}
