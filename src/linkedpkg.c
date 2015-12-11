@@ -37,6 +37,7 @@
 
 #include "pool.h"
 #include "repo.h"
+#include "evr.h"
 #include "linkedpkg.h"
 
 #ifdef ENABLE_LINKED_PKGS
@@ -308,5 +309,71 @@ find_package_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
   else if (name[0] == 'p' && !strncmp("product:", name, 8))
     find_product_link(pool, s, reqidp, qr, prvidp, qp);
 }
+
+static int
+name_min_max(Pool *pool, Solvable *s, Id *namep, Id *minp, Id *maxp)
+{
+  Queue q;
+  Id qbuf[4];
+  Id name, min, max;
+  int i;
+
+  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  find_package_link(pool, s, 0, &q, 0, 0);
+  if (!q.count)
+    {
+      queue_free(&q);
+      return 0;
+    }
+  s = pool->solvables + q.elements[0];
+  name = s->name;
+  min = max = s->evr;
+  for (i = 1; i < q.count; i++)
+    {
+      s = pool->solvables + q.elements[i];
+      if (s->name != name)
+	{
+          queue_free(&q);
+	  return 0;
+	}
+      if (s->evr == min || s->evr == max)
+	continue;
+      if (pool_evrcmp(pool, min, s->evr, EVRCMP_COMPARE) >= 0)
+	min = s->evr;
+      else if (min == max || pool_evrcmp(pool, max, s->evr, EVRCMP_COMPARE) <= 0)
+	max = s->evr;
+    }
+  queue_free(&q);
+  *namep = name;
+  *minp = min;
+  *maxp = max;
+  return 1;
+}
+
+int
+pool_link_evrcmp(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  Id name1, evrmin1, evrmax1;
+  Id name2, evrmin2, evrmax2;
+
+  if (s1->name != s2->name)
+    return 0;	/* can't compare */
+  if (!name_min_max(pool, s1, &name1, &evrmin1, &evrmax1))
+    return 0;
+  if (!name_min_max(pool, s2, &name2, &evrmin2, &evrmax2))
+    return 0;
+  /* compare linked names */
+  if (name1 != name2)
+    return 0;
+  /* now compare evr intervals */
+  if (evrmin1 == evrmax1 && evrmin2 == evrmax2)
+    return pool_evrcmp(pool, evrmin1, evrmax2, EVRCMP_COMPARE);
+  if (evrmin1 != evrmax2 && pool_evrcmp(pool, evrmin1, evrmax2, EVRCMP_COMPARE) > 0)
+    return 1;
+  if (evrmax1 != evrmin2 && pool_evrcmp(pool, evrmax1, evrmin2, EVRCMP_COMPARE) < 0)
+    return -1;
+  return 0;
+}
+
 
 #endif

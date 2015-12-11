@@ -21,7 +21,9 @@
 #include "policy.h"
 #include "poolvendor.h"
 #include "poolarch.h"
+#include "linkedpkg.h"
 #include "cplxdeps.h"
+
 
 
 /*-----------------------------------------------------------------*/
@@ -825,7 +827,7 @@ move_installed_to_front(Pool *pool, Queue *plist)
 void
 prune_to_best_version(Pool *pool, Queue *plist)
 {
-  int i, j;
+  int i, j, r;
   Solvable *s, *best;
 
   if (plist->count < 2)		/* no need to prune for a single entry */
@@ -858,12 +860,13 @@ prune_to_best_version(Pool *pool, Queue *plist)
           best = s;		/* take current as new best */
           continue;
         }
-
-      if (best->evr != s->evr)	/* compare evr */
-        {
-          if (pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) < 0)
-            best = s;
-        }
+      r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
+#ifdef ENABLE_LINKED_PKGS
+      if (r == 0 && has_package_link(pool, s))
+        r = pool_link_evrcmp(pool, best, s);
+#endif
+      if (r < 0)
+	best = s;
     }
   plist->elements[j++] = best - pool->solvables;	/* finish last group */
   plist->count = j;
