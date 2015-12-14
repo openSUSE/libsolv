@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 09/21/2015
+.\"      Date: 12/14/2015
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "09/21/2015" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "12/14/2015" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -609,7 +609,7 @@ If a package is installed in multiversionmode, rpm used to ignore both the impli
 .PP
 \fBPOOL_FLAG_ADDFILEPROVIDESFILTERED\fR
 .RS 4
-Make the addfileprovides method only add files from the standard locations (i\&.e\&. the \(lqbin\(rq and \(lqetc\(rq directories)\&. This is useful if you have only few packages that use non\-standard file dependencies, but you still wand the fast speed that addfileprovides() generates\&.
+Make the addfileprovides method only add files from the standard locations (i\&.e\&. the \(lqbin\(rq and \(lqetc\(rq directories)\&. This is useful if you have only few packages that use non\-standard file dependencies, but you still want the fast speed that addfileprovides() generates\&.
 .RE
 .SS "METHODS"
 .sp
@@ -1589,7 +1589,7 @@ Do not create stubs for repository parts that can be downloaded on demand\&.
 .PP
 \fBSUSETAGS_RECORD_SHARES\fR
 .RS 4
-This is specific to the add_susetags() method\&. Susetags allows to refer to already read packages to save disk space\&. If this data sharing needs to work over multiple calls to add_susetags, you need to specify this flag so that the share information is made available to subsequent calls\&.
+This is specific to the add_susetags() method\&. Susetags allows one to refer to already read packages to save disk space\&. If this data sharing needs to work over multiple calls to add_susetags, you need to specify this flag so that the share information is made available to subsequent calls\&.
 .RE
 .SS "METHODS"
 .sp
@@ -4803,7 +4803,7 @@ Return the size change of the installed system in kilobytes (kibibytes)\&.
 .RE
 .\}
 .sp
-Order the steps in the transactions so that dependant packages are updated before packages that depend on them\&. For rpm, you can also use rpmlib\(cqs ordering functionality, debian\(cqs dpkg does not provide a way to order a transaction\&.
+Order the steps in the transactions so that dependent packages are updated before packages that depend on them\&. For rpm, you can also use rpmlib\(cqs ordering functionality, debian\(cqs dpkg does not provide a way to order a transaction\&.
 .SS "ACTIVE/PASSIVE VIEW"
 .sp
 Active view lists what new packages get installed, while passive view shows what happens to the installed packages\&. Most often there\(cqs not much difference between the two modes, but things get interesting if multiple packages get replaced by one new package\&. Say you have installed packages A\-1\-1 and B\-1\-1, and now install A\-2\-1 which has a new dependency that obsoletes B\&. The transaction elements will be

@@ -909,7 +909,7 @@ in your code.
 Do not create stubs for repository parts that can be downloaded on demand.
 
 *SUSETAGS_RECORD_SHARES*::
-This is specific to the add_susetags() method. Susetags allows to refer to
+This is specific to the add_susetags() method. Susetags allows one to refer to
 already read packages to save disk space. If this data sharing needs to
 work over multiple calls to add_susetags, you need to specify this flag so
 that the share information is made available to subsequent calls.
@@ -2975,7 +2975,7 @@ Return the size change of the installed system in kilobytes (kibibytes).
 	trans.order()
 	trans.order()
 
-Order the steps in the transactions so that dependant packages are updated
+Order the steps in the transactions so that dependent packages are updated
 before packages that depend on them. For rpm, you can also use rpmlib's
 ordering functionality, debian's dpkg does not provide a way to order a
 transaction.
