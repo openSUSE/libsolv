@@ -365,6 +365,8 @@ pool_link_evrcmp(Pool *pool, Solvable *s1, Solvable *s2)
   /* compare linked names */
   if (name1 != name2)
     return 0;
+  if (evrmin1 == evrmin2 && evrmax1 == evrmax2)
+    return 0;
   /* now compare evr intervals */
   if (evrmin1 == evrmax1 && evrmin2 == evrmax2)
     return pool_evrcmp(pool, evrmin1, evrmax2, EVRCMP_COMPARE);
