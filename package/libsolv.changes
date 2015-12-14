@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Mon Dec 14 15:48:01 CET 2015 - mls@suse.de
+
+- change product links to also look at timestamps [bnc#956443]
+- rework multiversion orphaned handling [bnc#957606]
+- support key type changes in repodata_internalize()
+- allow serialization of REPOKEY_TYPE_DELETED
+- improve appdata handling of installed packages
+- improve performance when run under xen
+- bump version to 0.6.15
+
+-------------------------------------------------------------------
 Mon Oct  5 13:27:25 CEST 2015 - mls@suse.de
 
 - fix bug in recommends handling [bnc#948482]
