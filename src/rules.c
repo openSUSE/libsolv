@@ -1325,7 +1325,7 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	    }
 	}
     }
-  if (!isorphaned && p == -SYSTEMSOLVABLE && solv->dupmap.size)
+  if (!isorphaned && p == -SYSTEMSOLVABLE && qs.count && solv->dupmap.size)
     p = s - pool->solvables;		/* let the dup rules sort it out */
   if (qs.count && p == -SYSTEMSOLVABLE)
     p = queue_shift(&qs);
@@ -1862,6 +1862,12 @@ solver_addduprules(Solver *solv, Map *addedmap)
 		    {
 		      /* this is a multiversion orphan, we're good if an update is installed */
 		      solver_addrule(solv, -p, 0, solv->specialupdaters[p - installed->start]);
+		      continue;
+		    }
+		  if (!r->p || (r->p == p && !r->d && !r->w2))
+		    {
+		      /* this is an orphan */
+		      MAPSET(&solv->dupmap, p);		/* for best rules processing */
 		      continue;
 		    }
 		  solver_addrule(solv, -p, 0, 0);	/* no match, sorry */
