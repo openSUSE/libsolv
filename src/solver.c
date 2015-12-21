@@ -228,7 +228,7 @@ autouninstall(Solver *solv, Id *problem)
 	      if (solv->keep_orphans)
 		{
 		  r = solv->rules + v;
-		  if (!r->d && r->p == (solv->installed->start + (v - solv->updaterules)))
+		  if (!r->d && !r->w2 && r->p == (solv->installed->start + (v - solv->updaterules)))
 		    {
 		      lastfeature = v;
 		      lastupdate = 0;
