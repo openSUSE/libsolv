@@ -89,8 +89,10 @@ job multiversion name a
 job distupgrade all packages
 # a-1-1 is treated as orphaned and stays behind
 result transaction,problems <inline>
-#>erase b-1-1.i686@system
+#>erase a-1-1.i686@system
 #>install a-2-1.i686@available
+#>upgrade b-1-1.i686@system b-2-1.i686@available
+
 
 
 nextjob
@@ -100,7 +102,8 @@ job multiversion name a
 job distupgrade repo available
 # a-1-1 is treated as orphaned and stays behind
 result transaction,problems <inline>
-#>erase b-1-1.i686@system
+#>erase a-1-1.i686@system
 #>install a-2-1.i686@available
+#>upgrade b-1-1.i686@system b-2-1.i686@available
 
 
