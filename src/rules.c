@@ -1206,6 +1206,17 @@ addduppackages(Solver *solv, Solvable *s, Queue *qs)
 }
 #endif
 
+/* stash away the original updaters for multiversion packages. We do this so that
+ * we can update the package later */
+static inline void
+set_specialupdaters(Solver *solv, Solvable *s, Id d)
+{
+  Repo *installed = solv->installed;
+  if (!solv->specialupdaters)
+    solv->specialupdaters = solv_calloc(installed->end - installed->start, sizeof(Id));
+  solv->specialupdaters[s - solv->pool->solvables - installed->start] = d;
+}
+
 /*-------------------------------------------------------------------
  *
  * add rule for update
@@ -1245,9 +1256,8 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 	    {
 	      if (p != -SYSTEMSOLVABLE)
 	        queue_unshift(&qs, p);
-	      if (!solv->specialupdaters)
-		solv->specialupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
-	      solv->specialupdaters[s - pool->solvables - solv->installed->start] = pool_queuetowhatprovides(pool, &qs);
+	      if (qs.count)
+	        set_specialupdaters(solv, s, pool_queuetowhatprovides(pool, &qs));
 	    }
 	  queue_free(&qs);
 	  return;
@@ -1300,9 +1310,7 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 		{
 		  /* this is a multiversion orphan */
 		  queue_push(&solv->orphaned, s - pool->solvables);
-		  if (!solv->specialupdaters)
-		    solv->specialupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
-		  solv->specialupdaters[s - pool->solvables - solv->installed->start] = d;
+		  set_specialupdaters(solv, s, d);
 		  if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, s - pool->solvables - solv->installed->start))))
 		    {
 		      /* we need to keep the orphan */
@@ -1313,6 +1321,11 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 		  /* we can drop it as long as we update */
 		  isorphaned = 1;
 		  j = qs.count;		/* force the update */
+		}
+	      else if (d && (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
+		{
+		  /* non-orphan multiversion package, set special updaters if we want an update */
+		  set_specialupdaters(solv, s, d);
 		}
 	      qs.count = j;
 	    }
