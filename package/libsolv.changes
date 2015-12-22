@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Dec 22 11:49:02 CET 2015 - mls@suse.de
+
+- fix update handling of multiversion packages [bnc#957606]
+- bump version to 0.6.17
+
+-------------------------------------------------------------------
 Mon Dec 21 12:59:19 CET 2015 - mls@suse.de
 
 - fix orphan handling for dup with keeporphans set [bnc#957606]
