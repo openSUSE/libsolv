@@ -417,6 +417,19 @@ addpkgrule(Solver *solv, Id p, Id p2, Id d, int type, Id dep)
 
 #ifdef ENABLE_LINKED_PKGS
 
+static int
+addlinks_cmp(const void *ap, const void *bp, void *dp)
+{
+  Pool *pool = dp;
+  Id a = *(Id *)ap;
+  Id b = *(Id *)bp;
+  Solvable *sa = pool->solvables + a;
+  Solvable *sb = pool->solvables + b;
+  if (sa->name != sb->name)
+    return sa->name - sb->name;
+  return sa - sb;
+}
+
 static void
 addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m, Queue *workq)
 {
@@ -424,6 +437,8 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
   int i;
   if (!qr->count)
     return;
+  if (qp->count > 1)
+    solv_sort(qp->elements, qp->count, sizeof(Id), addlinks_cmp, pool);
 #if 0
   printf("ADDLINKS %s\n -> %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
   for (i = 0; i < qr->count; i++)
@@ -439,9 +454,17 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
     addpkgrule(solv, -(s - pool->solvables), 0, pool_queuetowhatprovides(pool, qr), SOLVER_RULE_PKG_REQUIRES, req);
   if (qp->count > 1)
     {
-      Id d = pool_queuetowhatprovides(pool, qp);
-      for (i = 0; i < qr->count; i++)
-	addpkgrule(solv, -qr->elements[i], 0, d, SOLVER_RULE_PKG_REQUIRES, prv);
+      int j;
+      for (i = j = 0; i < qp->count; i = j)
+	{
+	  Id d = pool->solvables[qp->elements[i]].name;
+	  for (j = i + 1; j < qp->count; j++)
+	    if (d != pool->solvables[qp->elements[j]].name)
+	      break;
+	  d = pool_ids2whatprovides(pool, qp->elements + i, j - i);
+	  for (i = 0; i < qr->count; i++)
+	    addpkgrule(solv, -qr->elements[i], 0, d, SOLVER_RULE_PKG_REQUIRES, prv);
+	}
     }
   else if (qp->count)
     {
