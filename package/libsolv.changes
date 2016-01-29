@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Jan 29 14:17:26 CET 2016 - mls@suse.de
+
+- fix rule generation for linked packages [bnc#961738]
+- add hash method in bindings for some classes
+- bump version to 0.6.18
+
+-------------------------------------------------------------------
 Tue Dec 22 11:49:02 CET 2015 - mls@suse.de
 
 - fix update handling of multiversion packages [bnc#957606]
