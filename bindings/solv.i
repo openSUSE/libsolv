@@ -2189,6 +2189,11 @@ rb_eval_string(
   bool __ne__(Repo *repo) {
     return $self != repo;
   }
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->repoid;
+  }
+#endif
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
@@ -2708,6 +2713,11 @@ rb_eval_string(
   bool __ne__(Dep *s) {
     return !Dep___eq__($self, s);
   }
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->id;
+  }
+#endif
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
@@ -2955,6 +2965,11 @@ rb_eval_string(
   bool __ne__(XSolvable *s) {
     return !XSolvable___eq__($self, s);
   }
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->id;
+  }
+#endif
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
@@ -3629,6 +3644,11 @@ rb_eval_string(
   bool __ne__(XRule *xr) {
     return !XRule___eq__($self, xr);
   }
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->id;
+  }
+#endif
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("repr") __repr__;
 #endif
@@ -3754,6 +3774,11 @@ rb_eval_string(
   bool __ne__(XRepodata *xr) {
     return !XRepodata___eq__($self, xr);
   }
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->id;
+  }
+#endif
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("repr") __repr__;
 #endif
