@@ -776,10 +776,20 @@ startElement(void *userData, const char *name, const char **atts)
       str = find_attr("href", atts);
       if (str)
 	{
-	  repodata_set_location(pd->data, handle, 0, 0, str);
-	  str = find_attr("xml:base", atts);
-	  if (str)
-	    repodata_set_poolstr(pd->data, handle, SOLVABLE_MEDIABASE, str);
+	  int medianr = 0;
+	  const char *base = find_attr("xml:base", atts);
+	  if (base  && !strncmp(base, "media:", 6))
+	    {
+	      /* check for the media number in the fragment */
+	      int l = strlen(base);
+	      while (l && base[l - 1] >= '0' && base[l - 1] <= '9')
+		l--;
+	      if (l && base[l - 1] == '#' && base[l])
+		medianr = atoi(base + l);
+	    }
+	  repodata_set_location(pd->data, handle, medianr, 0, str);
+	  if (base)
+	    repodata_set_poolstr(pd->data, handle, SOLVABLE_MEDIABASE, base);
 	}
       break;
     case STATE_CHECKSUM:
