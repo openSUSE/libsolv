@@ -28,7 +28,7 @@ repomd_findfile() {
   local p=$2
   local f
   if test -n "$t" -a -s repomd.xml ; then
-    f=`repomdxml2solv -q $t:location < repomd.xml 2>/dev/null`
+    f=`repomdxml2solv -q "$t:location" < repomd.xml 2>/dev/null`
     f=${f##*/}
     if test -f "$f" ; then
       echo "$f"
@@ -42,6 +42,10 @@ repomd_findfile() {
   elif test -f "$p" ; then
     echo "$p"
   fi
+}
+
+repomd_types() {
+  test -s repomd.xml && repomdxml2solv -q type < repomd.xml
 }
 
 repomd_decompress() {
@@ -147,6 +151,17 @@ if test "$repotype" = rpmmd ; then
      if test -f "$susedataxml" ; then
 	repomd_decompress "$susedataxml"
      fi
+     # all the languages as well
+     for t in `repomd_types` ; do
+	case "$t" in
+	    susedata.*)
+		susedataxml=`repomd_findfile "$t" "$t.xml"`
+		if test -f "$susedataxml" ; then
+		    repomd_decompress "$susedataxml"
+		fi
+	    ;;
+	esac
+     done
      echo '</rpmmd>'
     ) | sed 's/<?xml[^>]*>//g' | sed '1i\<?xml version="1.0" encoding="UTF-8"?>' | rpmmd2solv $parser_options > $primfile || exit 4
   fi
@@ -244,6 +259,9 @@ elif test "$repotype" = susetags ; then
     # Now default language
     susetags_findfile_cat packages.en
 
+    # DL (delta rpms)
+    susetags_findfile_cat packages.DL
+
     # Now patterns.  Not simply those files matching *.pat{,.gz,bz2},
     # but only those mentioned in the file 'patterns'
     if test -f patterns ; then
@@ -263,7 +281,7 @@ elif test "$repotype" = susetags ; then
       esac
       case $name in
 	# ignore files we handled already
-	*.DU | *.en | *.FL | packages ) continue ;;
+	*.DU | *.en | *.FL | *.DL | packages ) continue ;;
 	*)
 	  suff=${name#packages.}
 	  echo "=Lan: $suff"
