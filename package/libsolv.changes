@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Feb 15 16:46:31 CET 2016 - mls@suse.de
+
+- parse media number from baseurl
+- support susedata.<lang>.xml language files
+- bump version to 0.6.19
+
+-------------------------------------------------------------------
 Fri Jan 29 14:17:26 CET 2016 - mls@suse.de
 
 - fix rule generation for linked packages [bnc#961738]
