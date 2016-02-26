@@ -235,7 +235,7 @@ solv_hex2bin(const char **strp, unsigned char *buf, int bufl)
         d = c - ('A' - 10);
       else
 	break;
-      c = *++str;
+      c = str[1];
       d <<= 4;
       if (c >= '0' && c <= '9')
         d |= c - '0';
@@ -246,7 +246,7 @@ solv_hex2bin(const char **strp, unsigned char *buf, int bufl)
       else
 	break;
       buf[i] = d;
-      ++str;
+      str += 2;
     }
   *strp = str;
   return i;
