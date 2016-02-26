@@ -258,12 +258,18 @@ struct parsedata {
 
   Id changelog_handle;
 
-  /** Hash to maps checksums to solv */
+  int extending;			/* are we extending an existing solvable? */
+
+  /* first solvable we added */
+  int first;
+  /* cspool ok to use */
+  int cshash_filled;
+  /* Hash to maps checksums to solv */
   Stringpool cspool;
-  /** Cache of known checksums to solvable id */
-  Id *cscache;
+  /* Cache of known checksums to solvable id */
+  Id *cshash;
   /* the current longest index in the table */
-  int ncscache;
+  int ncshash;
 };
 
 static Id
@@ -576,6 +582,83 @@ set_description_author(Repodata *data, Id handle, char *str, struct parsedata *p
 }
 
 
+
+static void
+init_cshash(struct parsedata *pd)
+{
+  /* initialize the string pool where we will store
+     the package checksums we know about, to get an Id
+     we can use in a cache */
+  stringpool_init_empty(&pd->cspool);
+}
+
+static void
+free_cshash(struct parsedata *pd)
+{
+  stringpool_free(&pd->cspool);
+  solv_free(pd->cshash);
+}
+
+/* save the checksum as key to solvable id relationship for
+   metadata extension */
+static void
+put_in_cshash(struct parsedata *pd, const char *key, Id id)
+{
+  Id index = stringpool_str2id(&pd->cspool, key, 1);
+  if (index >= pd->ncshash)
+    {
+      pd->cshash = solv_zextend(pd->cshash, pd->ncshash, index + 1 - pd->ncshash, sizeof(Id), 255);
+      pd->ncshash = index + 1;
+    }
+  /* add the checksum to the cache */
+  pd->cshash[index] = id;
+}
+
+static Id
+lookup_cshash(struct parsedata *pd, const char *key)
+{
+  Id index = stringpool_str2id(&pd->cspool, key, 0);
+  if (!index || index >= pd->ncshash || !pd->cshash[index])
+    return 0;
+  return pd->cshash[index];
+}
+
+static void
+fill_cshash_from_repo(struct parsedata *pd)
+{
+  Dataiterator di;
+  /* setup join data */
+  dataiterator_init(&di, pd->pool, pd->repo, 0, SOLVABLE_CHECKSUM, 0, 0);
+  while (dataiterator_step(&di))
+    {
+      const char *str;
+
+      if (!solv_chksum_len(di.key->type))
+	continue;
+      str = repodata_chk2str(di.data, di.key->type, (const unsigned char *)di.kv.str);
+      put_in_cshash(pd, str, di.solvid);
+    }
+  dataiterator_free(&di);
+}
+
+static void
+fill_cshash_from_new_solvables(struct parsedata *pd)
+{
+  Pool *pool = pd->pool;
+  Id cstype;
+  unsigned const char *cs;
+  int i;
+
+  for (i = pd->first; i < pool->nsolvables; i++)
+    {
+      if (pool->solvables[i].repo != pd->repo)
+	continue;
+      cs = repodata_lookup_bin_checksum_uninternalized(pd->data, i, SOLVABLE_CHECKSUM, &cstype);
+      if (cs)
+	put_in_cshash(pd, repodata_chk2str(pd->data, cstype, cs), i);
+    }
+}
+
 /*-----------------------------------------------*/
 /* XML callbacks */
 
@@ -664,26 +747,35 @@ startElement(void *userData, const char *name, const char **atts)
          a new solvable but just append the attributes to the existing
          one.
       */
+      pd->extending = 0;
       if ((pkgid = find_attr("pkgid", atts)) != NULL)
         {
+	  if (!pd->cshash_filled)
+	    {
+	      pd->cshash_filled = 1;
+	      fill_cshash_from_new_solvables(pd);
+	    }
           /* look at the checksum cache */
-          Id index = stringpool_str2id(&pd->cspool, pkgid, 0);
-          if (!index || index >= pd->ncscache || !pd->cscache[index])
+	  handle = lookup_cshash(pd, pkgid);
+	  if (!handle)
 	    {
               pool_debug(pool, SOLV_WARN, "the repository specifies extra information about package with checksum '%s', which does not exist in the repository.\n", pkgid);
-	      pd->solvable = 0;
 	      pd->handle = 0;
+	      pd->solvable = 0;
 	      break;
 	    }
-	  pd->solvable = pool_id2solvable(pool, pd->cscache[index]);
+	  pd->extending = 1;
         }
       else
         {
           /* this is a new package */
-          pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+	  handle = repo_add_solvable(pd->repo);
+	  if (!pd->first)
+	    pd->first = handle;
           pd->freshens = 0;
         }
-      pd->handle = handle = pd->solvable - pool->solvables;
+      pd->handle = handle;
+      pd->solvable = pool_id2solvable(pool, handle);
       if (pd->kind && pd->kind[1] == 'r')
 	{
 	  /* products can have a type */
@@ -697,6 +789,8 @@ startElement(void *userData, const char *name, const char **atts)
 
       break;
     case STATE_VERSION:
+      if (pd->extending && s->evr)
+	break;		/* ignore version tag repetition in extend data */
       s->evr = makeevr_atts(pool, pd, atts);
       break;
     case STATE_PROVIDES:
@@ -923,6 +1017,11 @@ endElement(void *userData, const char *name)
   switch (pd->state)
     {
     case STATE_SOLVABLE:
+      if (pd->extending)
+	{
+	  pd->solvable = 0;
+	  break;
+	}
       if (pd->kind && !s->name) /* add namespace in case of NULL name */
         s->name = pool_str2id(pool, join2(&pd->jd, pd->kind, ":", 0), 1);
       if (!s->arch)
@@ -935,7 +1034,7 @@ endElement(void *userData, const char *name)
       s->conflicts = repo_fix_conflicts(repo, s->conflicts);
       pd->freshens = 0;
       pd->kind = 0;
-      pd->solvable = s = 0;
+      pd->solvable = 0;
       break;
     case STATE_NAME:
       if (pd->kind)
@@ -957,8 +1056,6 @@ endElement(void *userData, const char *name)
       break;
     case STATE_CHECKSUM:
       {
-        Id index;
-	
 	if (!pd->chksumtype)
 	  break;
         if (strlen(pd->content) != 2 * solv_chksum_len(pd->chksumtype))
@@ -967,16 +1064,9 @@ endElement(void *userData, const char *name)
 	    break;
           }
         repodata_set_checksum(pd->data, handle, SOLVABLE_CHECKSUM, pd->chksumtype, pd->content);
-        /* we save the checksum to solvable id relationship for extended
-           metadata */
-        index = stringpool_str2id(&pd->cspool, pd->content, 1 /* create it */);
-        if (index >= pd->ncscache)
-          {
-            pd->cscache = solv_zextend(pd->cscache, pd->ncscache, index + 1 - pd->ncscache, sizeof(Id), 255);
-            pd->ncscache = index + 1;
-          }
-        /* add the checksum to the cache */
-        pd->cscache[index] = s - pool->solvables;
+	/* we save the checksum to solvable id relationship for extending metadata */
+	if (pd->cshash_filled)
+	  put_in_cshash(pd, pd->content, s - pool->solvables);
         break;
       }
     case STATE_FILE:
@@ -1165,32 +1255,12 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   pd.kind = 0;
   pd.language = language && *language && strcmp(language, "en") != 0 ? language : 0;
 
-  /* initialize the string pool where we will store
-     the package checksums we know about, to get an Id
-     we can use in a cache */
-  stringpool_init_empty(&pd.cspool);
+  init_cshash(&pd);
   if ((flags & REPO_EXTEND_SOLVABLES) != 0)
     {
       /* setup join data */
-      Dataiterator di;
-      dataiterator_init(&di, pool, repo, 0, SOLVABLE_CHECKSUM, 0, 0);
-      while (dataiterator_step(&di))
-	{
-	  const char *str;
-	  int index;
-
-	  if (!solv_chksum_len(di.key->type))
-	    continue;
-	  str = repodata_chk2str(di.data, di.key->type, (const unsigned char *)di.kv.str);
-          index = stringpool_str2id(&pd.cspool, str, 1);
-	  if (index >= pd.ncscache)
-	    {
-	      pd.cscache = solv_zextend(pd.cscache, pd.ncscache, index + 1 - pd.ncscache, sizeof(Id), 255);
-	      pd.ncscache = index + 1;
-	    }
-          pd.cscache[index] = di.solvid;
-	}
-      dataiterator_free(&di);
+      pd.cshash_filled = 1;
+      fill_cshash_from_repo(&pd);
     }
 
   parser = XML_ParserCreate(NULL);
@@ -1213,8 +1283,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   solv_free(pd.content);
   solv_free(pd.lastdirstr);
   join_freemem(&pd.jd);
-  stringpool_free(&pd.cspool);
-  solv_free(pd.cscache);
+  free_cshash(&pd);
   repodata_free_dircache(data);
 
   if (!(flags & REPO_NO_INTERNALIZE))
