@@ -300,8 +300,11 @@ const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
 void repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, const char *file);
 void repodata_set_deltalocation(Repodata *data, Id handle, int medianr, const char *dir, const char *file);
 void repodata_set_sourcepkg(Repodata *data, Id solvid, const char *sourcepkg);
+
+/* uninternalized data lookup */
 Id repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid);
 const char *repodata_lookup_dirstrarray_uninternalized(Repodata *data, Id solvid, Id keyname, Id *didp, Id *iterp);
+const unsigned char *repodata_lookup_bin_checksum_uninternalized(Repodata *data, Id solvid, Id keyname, Id *typep);
 
 /* stats */
 unsigned int repodata_memused(Repodata *data);

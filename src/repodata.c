@@ -881,6 +881,31 @@ repodata_lookup_dirstrarray_uninternalized(Repodata *data, Id solvid, Id keyname
   return 0;
 }
 
+const unsigned char *
+repodata_lookup_bin_checksum_uninternalized(Repodata *data, Id solvid, Id keyname, Id *typep)
+{
+  Id *ap;
+  if (!data->attrs)
+    return 0;
+  ap = data->attrs[solvid - data->start];
+  if (!ap)
+    return 0;
+  for (; *ap; ap += 2)
+    {
+      if (data->keys[*ap].name != keyname)
+	continue;
+      switch (data->keys[*ap].type)
+	{
+	  case_CHKSUM_TYPES:
+	    *typep = data->keys[*ap].type;
+	    return (const unsigned char *)data->attrdata + ap[1];
+	  default:
+	    break;
+	}
+    }
+  return 0;
+}
+
 /************************************************************************
  * data search
  */

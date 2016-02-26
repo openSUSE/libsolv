@@ -201,6 +201,7 @@ SOLV_1.0 {
 		repodata_key2id;
 		repodata_localize_id;
 		repodata_lookup_bin_checksum;
+		repodata_lookup_bin_checksum_uninternalized;
 		repodata_lookup_binary;
 		repodata_lookup_dirstrarray_uninternalized;
 		repodata_lookup_id;
