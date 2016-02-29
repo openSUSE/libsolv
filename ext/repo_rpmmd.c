@@ -259,11 +259,8 @@ struct parsedata {
   Id changelog_handle;
 
   int extending;			/* are we extending an existing solvable? */
-
-  /* first solvable we added */
-  int first;
-  /* cspool ok to use */
-  int cshash_filled;
+  int first;				/* first solvable we added */
+  int cshash_filled;			/* hash is filled with data */
 
   Hashtable cshash;			/* checksum hash -> offset into csdata */
   Hashval cshashm;			/* hash mask */
