@@ -264,12 +264,12 @@ struct parsedata {
   int first;
   /* cspool ok to use */
   int cshash_filled;
-  /* Hash to maps checksums to solv */
-  Stringpool cspool;
-  /* Cache of known checksums to solvable id */
-  Id *cshash;
-  /* the current longest index in the table */
-  int ncshash;
+
+  Hashtable cshash;			/* checksum hash -> offset into csdata */
+  Hashval cshashm;			/* hash mask */
+  int ncshash;				/* entries used */
+  unsigned char *csdata;		/* [len, checksum, id] */
+  int ncsdata;				/* used bytes */
 };
 
 static Id
@@ -582,45 +582,125 @@ set_description_author(Repodata *data, Id handle, char *str, struct parsedata *p
 }
 
 
+/*-----------------------------------------------*/
+/* checksum hash functions
+ *
+ * used to look up a solvable with the checksum for solvable extension purposes.
+ *
+ */
 
 static void
 init_cshash(struct parsedata *pd)
 {
-  /* initialize the string pool where we will store
-     the package checksums we know about, to get an Id
-     we can use in a cache */
-  stringpool_init_empty(&pd->cspool);
 }
 
 static void
 free_cshash(struct parsedata *pd)
 {
-  stringpool_free(&pd->cspool);
-  solv_free(pd->cshash);
+  pd->cshash = solv_free(pd->cshash);
+  pd->ncshash = 0;
+  pd->cshashm = 0;
+  pd->csdata = solv_free(pd->csdata);
+  pd->ncsdata = 0;
 }
 
-/* save the checksum as key to solvable id relationship for
-   metadata extension */
-static void
-put_in_cshash(struct parsedata *pd, const char *key, Id id)
+static inline Hashval
+hashkey(const unsigned char *key, int keyl)
 {
-  Id index = stringpool_str2id(&pd->cspool, key, 1);
-  if (index >= pd->ncshash)
+  return key[0] << 24 | key[1] << 16 | key[2] << 8 | key[3];
+}
+
+static void
+rebuild_cshash(struct parsedata *pd)
+{
+  Hashval h, hh, hm;
+  Hashtable ht;
+  unsigned char *d, *de;
+
+  hm = pd->cshashm;
+#if 0
+  fprintf(stderr, "rebuild cshash with mask 0x%x\n", hm);
+#endif
+  solv_free(pd->cshash);
+  ht = pd->cshash = (Hashtable)solv_calloc(hm + 1, sizeof(Id));
+  d = pd->csdata;
+  de = d + pd->ncsdata;
+  while (d != de)
     {
-      pd->cshash = solv_zextend(pd->cshash, pd->ncshash, index + 1 - pd->ncshash, sizeof(Id), 255);
-      pd->ncshash = index + 1;
+      h = hashkey(d + 1, d[0] + 1) & hm;
+      hh = HASHCHAIN_START;
+      while (ht[h])
+	h = HASHCHAIN_NEXT(h, hh, hm);
+      ht[h] = d + 1 - pd->csdata;
+      d += 2 + d[0] + sizeof(Id);
     }
-  /* add the checksum to the cache */
-  pd->cshash[index] = id;
+}
+
+static void
+put_in_cshash(struct parsedata *pd, const unsigned char *key, int keyl, Id id)
+{
+  Hashtable ht;
+  Hashval h, hh, hm;
+  unsigned char *d;
+
+  if (keyl < 4 || keyl > 256)
+    return;
+  ht = pd->cshash;
+  hm = pd->cshashm;
+  h = hashkey(key, keyl) & hm;
+  hh = HASHCHAIN_START;
+  if (ht)
+    {
+      while (ht[h])
+	{
+	  unsigned char *d = pd->csdata + ht[h];
+	  if (d[-1] == keyl && !memcmp(key, d, keyl))
+	    return;		/* XXX: first id wins... */
+	  h = HASHCHAIN_NEXT(h, hh, hm);
+	}
+    }
+  /* a new entry. put in csdata */
+  pd->csdata = solv_extend(pd->csdata, pd->ncsdata, 1, 1 + keyl + sizeof(Id), 4095);
+  d = pd->csdata + pd->ncsdata;
+  d[0] = keyl - 1;
+  memcpy(d + 1, key, keyl);
+  memcpy(d + 1 + keyl, &id, sizeof(Id));
+  pd->ncsdata += 1 + keyl + sizeof(Id);
+  if ((Hashval)++pd->ncshash * 2 > hm)
+    {
+      pd->cshashm = pd->cshashm ? (2 * pd->cshashm + 1) : 4095;
+      rebuild_cshash(pd);
+    }
+  else
+    ht[h] = pd->ncsdata - (keyl + sizeof(Id));
 }
 
 static Id
-lookup_cshash(struct parsedata *pd, const char *key)
+lookup_cshash(struct parsedata *pd, const unsigned char *key, int keyl)
 {
-  Id index = stringpool_str2id(&pd->cspool, key, 0);
-  if (!index || index >= pd->ncshash || !pd->cshash[index])
+  Hashtable ht;
+  Hashval h, hh, hm;
+
+  if (keyl < 4 || keyl > 256)
     return 0;
-  return pd->cshash[index];
+  ht = pd->cshash;
+  if (!ht)
+    return 0;
+  hm = pd->cshashm;
+  h = hashkey(key, keyl) & hm;
+  hh = HASHCHAIN_START;
+  while (ht[h])
+    {
+      unsigned char *d = pd->csdata + ht[h];
+      if (d[-1] == keyl - 1 && !memcmp(key, d, keyl))
+	{
+	  Id id;
+	  memcpy(&id, d + keyl, sizeof(Id));
+	  return id;
+	}
+      h = HASHCHAIN_NEXT(h, hh, hm);
+    }
+  return 0;
 }
 
 static void
@@ -630,14 +710,7 @@ fill_cshash_from_repo(struct parsedata *pd)
   /* setup join data */
   dataiterator_init(&di, pd->pool, pd->repo, 0, SOLVABLE_CHECKSUM, 0, 0);
   while (dataiterator_step(&di))
-    {
-      const char *str;
-
-      if (!solv_chksum_len(di.key->type))
-	continue;
-      str = repodata_chk2str(di.data, di.key->type, (const unsigned char *)di.kv.str);
-      put_in_cshash(pd, str, di.solvid);
-    }
+    put_in_cshash(pd, (const unsigned char *)di.kv.str, solv_chksum_len(di.key->type), di.solvid);
   dataiterator_free(&di);
 }
 
@@ -645,7 +718,7 @@ static void
 fill_cshash_from_new_solvables(struct parsedata *pd)
 {
   Pool *pool = pd->pool;
-  Id cstype;
+  Id cstype = 0;
   unsigned const char *cs;
   int i;
 
@@ -655,7 +728,7 @@ fill_cshash_from_new_solvables(struct parsedata *pd)
 	continue;
       cs = repodata_lookup_bin_checksum_uninternalized(pd->data, i, SOLVABLE_CHECKSUM, &cstype);
       if (cs)
-	put_in_cshash(pd, repodata_chk2str(pd->data, cstype, cs), i);
+	put_in_cshash(pd, cs, solv_chksum_len(cstype), i);
     }
 }
 
@@ -750,13 +823,23 @@ startElement(void *userData, const char *name, const char **atts)
       pd->extending = 0;
       if ((pkgid = find_attr("pkgid", atts)) != NULL)
         {
+	  unsigned char chk[256];
+	  int l;
+	  const char *str = pkgid;
 	  if (!pd->cshash_filled)
 	    {
 	      pd->cshash_filled = 1;
 	      fill_cshash_from_new_solvables(pd);
 	    }
+	  handle = 0;
+	  /* convert into bin checksum */
+	  l = solv_hex2bin(&str, chk, sizeof(chk));
           /* look at the checksum cache */
-	  handle = lookup_cshash(pd, pkgid);
+	  if (l >= 4 && !pkgid[2 * l])
+	    handle = lookup_cshash(pd, chk, l);
+#if 0
+	  fprintf(stderr, "Lookup %s -> %d\n", pkgid, handle);
+#endif
 	  if (!handle)
 	    {
               pool_debug(pool, SOLV_WARN, "the repository specifies extra information about package with checksum '%s', which does not exist in the repository.\n", pkgid);
@@ -1056,17 +1139,20 @@ endElement(void *userData, const char *name)
       break;
     case STATE_CHECKSUM:
       {
-	if (!pd->chksumtype)
+	unsigned char chk[256];
+	int l = solv_chksum_len(pd->chksumtype);
+	const char *str = pd->content;
+	if (!l || l > sizeof(chk))
 	  break;
-        if (strlen(pd->content) != 2 * solv_chksum_len(pd->chksumtype))
+	if (solv_hex2bin(&str, chk, l) != l || pd->content[2 * l])
           {
-	    pd->ret = pool_error(pool, -1, "line %d: invalid checksum length for %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
+	    pd->ret = pool_error(pool, -1, "line %u: invalid %s checksum", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
 	    break;
           }
-        repodata_set_checksum(pd->data, handle, SOLVABLE_CHECKSUM, pd->chksumtype, pd->content);
+        repodata_set_bin_checksum(pd->data, handle, SOLVABLE_CHECKSUM, pd->chksumtype, chk);
 	/* we save the checksum to solvable id relationship for extending metadata */
 	if (pd->cshash_filled)
-	  put_in_cshash(pd, pd->content, s - pool->solvables);
+	  put_in_cshash(pd, chk, l, s - pool->solvables);
         break;
       }
     case STATE_FILE:
