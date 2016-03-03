@@ -1014,15 +1014,24 @@ startElement(void *userData, const char *name, const char **atts)
       {
         long filesz = 0, filenum = 0;
         Id dirid;
-        if ((str = find_attr("name", atts)) != 0)
-          dirid = repodata_str2dir(pd->data, str, 1);
-        else
-          {
+        if ((str = find_attr("name", atts)) == 0)
+	  {
 	    pd->ret = pool_error(pool, -1, "<dir .../> tag without 'name' attribute");
             break;
-          }
-        if (!dirid)
-          dirid = repodata_str2dir(pd->data, "/", 1);
+	  }
+	if (*str != '/')
+	  {
+	    int l = strlen(str) + 2;
+	    if (l > pd->acontent)
+	      {
+	        pd->content = solv_realloc(pd->content, l + 256);
+	        pd->acontent = l + 256;
+	      }
+	    *pd->content = '/';
+	    strcpy(pd->content + 1, str);
+	    str = pd->content;
+	  }
+        dirid = repodata_str2dir(pd->data, str, 1);
         if ((str = find_attr("size", atts)) != 0)
           filesz = strtol(str, 0, 0);
         if ((str = find_attr("count", atts)) != 0)
