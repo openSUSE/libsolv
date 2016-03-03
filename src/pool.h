@@ -34,9 +34,6 @@ extern "C" {
 #define SYSTEMSOLVABLE		1
 
 
-/* how many strings to maintain (round robin) */
-#define POOL_TMPSPACEBUF 16
-
 /*----------------------------------------------- */
 
 struct _Repo;
@@ -52,11 +49,19 @@ typedef struct _Datapos {
   Id dp;
 } Datapos;
 
+
+#ifdef LIBSOLV_INTERNAL
+
+/* how many strings to maintain (round robin) */
+#define POOL_TMPSPACEBUF 16
+
 struct _Pool_tmpspace {
   char *buf[POOL_TMPSPACEBUF];
   int   len[POOL_TMPSPACEBUF];
   int   n;
 };
+
+#endif
 
 struct _Pool {
   void *appdata;		/* application private pointer */
