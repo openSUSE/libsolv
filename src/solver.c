@@ -3716,7 +3716,7 @@ solver_solve(Solver *solv, Queue *job)
 	      solver_addrule(solv, 0, 0, 0);	/* create dummy rule */
 	      continue;
 	    }
-	  solver_addupdaterule(solv, s, 1);    /* allow s to be updated */
+	  solver_addfeaturerule(solv, s);
 	}
       /* make sure we accounted for all rules */
       assert(solv->nrules - solv->featurerules == installed->end - installed->start);
@@ -3744,7 +3744,7 @@ solver_solve(Solver *solv, Queue *job)
 	      solver_addrule(solv, 0, 0, 0);	/* create dummy rule */
 	      continue;
 	    }
-	  solver_addupdaterule(solv, s, 0);	/* allowall = 0: downgrades not allowed */
+	  solver_addupdaterule(solv, s);
 	  /*
 	   * check for and remove duplicate
 	   */
@@ -3759,9 +3759,10 @@ solver_solve(Solver *solv, Queue *job)
 	  /* it's also orphaned if the feature rule consists just of the installed package */
 	  if (!solv->dupmap_all && sr->p == i && !sr->d && !sr->w2)
 	    queue_push(&solv->orphaned, i);
+
 	  if (!solver_rulecmp(solv, r, sr))
 	    memset(sr, 0, sizeof(*sr));		/* delete unneeded feature rule */
-	  else
+	  else if (sr->p)
 	    solver_disablerule(solv, sr);	/* disable feature rule for now */
 	}
       /* consistency check: we added a rule for _every_ installed solvable */

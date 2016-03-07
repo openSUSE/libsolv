@@ -111,7 +111,8 @@ extern void solver_addpkgrulesforlinked(struct _Solver *solv, Map *m);
 extern void solver_addpkgrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
 
 /* update/feature rules */
-extern void solver_addupdaterule(struct _Solver *solv, Solvable *s, int allow_all);
+extern void solver_addfeaturerule(struct _Solver *solv, Solvable *s);
+extern void solver_addupdaterule(struct _Solver *solv, Solvable *s);
 
 /* infarch rules */
 extern void solver_addinfarchrules(struct _Solver *solv, Map *addedmap);
