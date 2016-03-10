@@ -18,7 +18,7 @@ has_package_link(Pool *pool, Solvable *s)
   const char *name = pool_id2str(pool, s->name);
   if (name[0] == 'a' && !strncmp("application:", name, 12))
     return 1;
-  if (name[0] == 'p' && !strncmp("pattern:", name, 7))
+  if (name[0] == 'p' && !strncmp("pattern:", name, 8))
     return 1;
   if (name[0] == 'p' && !strncmp("product:", name, 8))
     return 1;
