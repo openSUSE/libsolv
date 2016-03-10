@@ -1346,18 +1346,20 @@ solver_addupdaterule(Solver *solv, Solvable *s)
   Id qsbuf[64];
   int isorphaned = 0;
   Rule *r;
-  int islinkedpseudo = 0;
 
   p = s - pool->solvables;
-#ifdef ENABLE_LINKED_PKGS
-  islinkedpseudo = is_linked_pseudo_package(solv, s);
-#endif
-
   /* Orphan detection. We cheat by looking at the feature rule, which
    * we already calculated */
   r = solv->rules + solv->featurerules + (p - solv->installed->start);
-  if (!r->p && !islinkedpseudo)
+  if (!r->p)
     {
+#ifdef ENABLE_LINKED_PKGS
+      if (is_linked_pseudo_package(solv, s))
+	{
+	  solver_addrule(solv, 0, 0, 0);
+	  return;
+	}
+#endif
       p = 0;
       queue_push(&solv->orphaned, s - pool->solvables);		/* an orphaned package */
       if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, s - pool->solvables - solv->installed->start))))
@@ -1372,24 +1374,6 @@ solver_addupdaterule(Solver *solv, Solvable *s)
     p = finddistupgradepackages(solv, s, &qs);
   else
     policy_findupdatepackages(solv, s, &qs, 0);
-
-#ifdef ENABLE_LINKED_PKGS
-  if (islinkedpseudo)
-    {
-      /* a linked pseudo package. As it is linked, we do not need an update/feature rule */
-      /* nevertheless we set specialupdaters so we can update */
-      solver_addrule(solv, 0, 0, 0);
-      if (qs.count)
-	{
-	  if (p != -SYSTEMSOLVABLE)
-	    queue_unshift(&qs, p);
-	  if (qs.count)
-	    set_specialupdaters(solv, s, pool_queuetowhatprovides(pool, &qs));
-	}
-      queue_free(&qs);
-      return;
-    }
-#endif
 
   if (qs.count && solv->multiversion.size)
     {

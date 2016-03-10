@@ -35,5 +35,6 @@ extern Id find_autoproduct_name(Pool *pool, Solvable *s);
 /* generic */
 extern void find_package_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Queue *qp);
 extern int pool_link_evrcmp(Pool *pool, Solvable *s1, Solvable *s2);
+extern void extend_updatemap_to_buddies(Solver *solv);
 
 #endif

@@ -37,7 +37,9 @@
 
 #include "pool.h"
 #include "repo.h"
+#include "solver.h"
 #include "evr.h"
+#include "bitmap.h"
 #include "linkedpkg.h"
 
 #ifdef ENABLE_LINKED_PKGS
@@ -377,5 +379,30 @@ pool_link_evrcmp(Pool *pool, Solvable *s1, Solvable *s2)
   return 0;
 }
 
+void
+extend_updatemap_to_buddies(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Solvable *s;
+  int p, ip;
+
+  if (!installed)
+    return;
+  if (!solv->updatemap.size || !solv->instbuddy)
+    return;
+  FOR_REPO_SOLVABLES(installed, p, s)
+    {
+      if (!MAPTST(&solv->updatemap, p - installed->start))
+	continue;
+      if ((ip = solv->instbuddy[p - installed->start]) <= 1)
+	continue;
+      if (!has_package_link(pool, s))	/* only look at pseudo -> real relations */
+	continue;
+      if (ip < installed->start || ip >= installed->end || pool->solvables[ip].repo != installed)
+	continue;			/* just in case... */
+      MAPSET(&solv->updatemap, ip - installed->start);
+    }
+}
 
 #endif

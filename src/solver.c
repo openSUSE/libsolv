@@ -2193,8 +2193,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    rr -= solv->installed->end - solv->installed->start;
 		  if (!rr->p)		/* identical to update rule? */
 		    rr = r;
-		  if (!rr->p && !(specialupdaters && specialupdaters[i - installed->start]))
-		    continue;		/* orpaned package */
+		  if (!rr->p)
+		    continue;		/* orpaned package or pseudo package */
 
 		  /* check if we should update this package to the latest version
 		   * noupdate is set for erase jobs, in that case we want to deinstall
@@ -2203,30 +2203,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  queue_empty(&dq);
 		  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || (rr->p && rr->p != i)))
 		    {
-		      if (!rr->p)
-			{
-			  /* specialupdater with no update/feature rule, i.e. a pseudo package */
-			  /* ignore if we also update the linked package */
-			  /* XXX: better map package in the updatemap? */
-			  if (solv->instbuddy && solv->instbuddy[s - pool->solvables - installed->start] > 1)
-			    {
-			      Id ip = solv->instbuddy[s - pool->solvables - installed->start];
-			      if (ip >= installed->start && ip < installed->end)
-			        if (MAPTST(&solv->noupdate, ip - installed->start) || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, ip - installed->start)))
-				  continue;
-			    }
-			  for (d = specialupdaters[i - installed->start]; (p = pool->whatprovidesdata[d++]) != 0; )
-			    {
-			      if (solv->decisionmap[p] > 0)
-			        {
-				  dq.count = 0;
-			          break;
-			        }
-			      if (!solv->decisionmap[p])
-				queue_push(&dq, p);
-			    }
-			}
-		      else if (specialupdaters && (d = specialupdaters[i - installed->start]) != 0)
+		      if (specialupdaters && (d = specialupdaters[i - installed->start]) != 0)
 			{
 			  /* special multiversion handling, make sure best version is chosen */
 			  if (rr->p == i && solv->decisionmap[i] >= 0)
@@ -3999,6 +3976,11 @@ solver_solve(Solver *solv, Queue *job)
     solver_addduprules(solv, &addedmap);
   else
     solv->duprules = solv->duprules_end = solv->nrules;
+
+#ifdef ENABLE_LINKED_PKGS
+  if (solv->instbuddy && solv->updatemap.size)
+    extend_updatemap_to_buddies(solv);
+#endif
 
   if (solv->bestupdatemap_all || solv->bestupdatemap.size || hasbestinstalljob)
     solver_addbestrules(solv, hasbestinstalljob);
