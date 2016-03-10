@@ -2205,7 +2205,16 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    {
 		      if (!rr->p)
 			{
-			  /* specialupdater with no update/feature rule */
+			  /* specialupdater with no update/feature rule, i.e. a pseudo package */
+			  /* ignore if we also update the linked package */
+			  /* XXX: better map package in the updatemap? */
+			  if (solv->instbuddy && solv->instbuddy[s - pool->solvables - installed->start] > 1)
+			    {
+			      Id ip = solv->instbuddy[s - pool->solvables - installed->start];
+			      if (ip >= installed->start && ip < installed->end)
+			        if (MAPTST(&solv->noupdate, ip - installed->start) || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, ip - installed->start)))
+				  continue;
+			    }
 			  for (d = specialupdaters[i - installed->start]; (p = pool->whatprovidesdata[d++]) != 0; )
 			    {
 			      if (solv->decisionmap[p] > 0)
