@@ -1548,7 +1548,9 @@ freestate(struct rpmdbstate *state)
   /* close down */
   if (!state)
     return;
-#ifndef ENABLE_RPMDB_BYRPMHEADER
+#ifdef ENABLE_RPMDB_BYRPMHEADER
+  state->ts = rpmtsFree(state->ts);
+#else
   if (state->db)
     state->db->close(state->db, 0);
   if (state->dbenv)
