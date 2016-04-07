@@ -260,6 +260,8 @@ KNOWNID(PRODUCT_REGISTER_FLAVOR,	"product:regflavor"),		/* installed and availab
 
 KNOWNID(SOLVABLE_INSTALLSTATUS,		"solvable:installstatus"),	/* debian install status */
 
+KNOWNID(SOLVABLE_PREREQ_IGNOREINST,	"solvable:prereq_ignoreinst"),	/* ignore these pre-requires for installed packages */
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

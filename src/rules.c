@@ -671,7 +671,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 
 /*-------------------------------------------------------------------
  *
- * add (install) rules for solvable
+ * add dependency rules for solvable
  *
  * s: Solvable for which to add rules
  * m: m[s] = 1 for solvables which have rules, prevent rule duplication
@@ -697,6 +697,8 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
   Queue workq;	/* list of solvables we still have to work on */
   Id workqbuf[64];
+  Queue prereqq;	/* list of pre-req ids to ignore */
+  Id prereqbuf[16];
 
   int i;
   int dontfix;		/* ignore dependency errors for installed solvables */
@@ -711,6 +713,8 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
   queue_init_buffer(&workq, workqbuf, sizeof(workqbuf)/sizeof(*workqbuf));
   queue_push(&workq, s - pool->solvables);	/* push solvable Id to work queue */
+
+  queue_init_buffer(&prereqq, prereqbuf, sizeof(prereqbuf)/sizeof(*prereqbuf));
 
   /* loop until there's no more work left */
   while (workq.count)
@@ -762,11 +766,33 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
       if (s->requires)
 	{
+	  int filterpre = 0;
 	  reqp = s->repo->idarraydata + s->requires;
 	  while ((req = *reqp++) != 0)            /* go through all requires */
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
-		continue;
+		{
+		  if (installed && s->repo == installed)
+		    {
+		      if (prereqq.count)
+			queue_empty(&prereqq);
+		      solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &prereqq);
+		      filterpre = prereqq.count;
+		    }
+		  continue;
+		}
+	      if (filterpre)
+		{
+		  /* check if this id is filtered. assumes that prereqq.count is small */
+		  for (i = 0; i < prereqq.count; i++)
+		    if (req == prereqq.elements[i])
+		      break;
+		  if (i < prereqq.count)
+		    {
+		      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s: ignoring filtered pre-req dependency %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
+		      continue;
+		    }
+		}
 
 #ifdef ENABLE_COMPLEX_DEPS
 	      if (pool_is_complex_dep(pool, req))
@@ -1034,6 +1060,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	    }
 	}
     }
+  queue_free(&prereqq);
   queue_free(&workq);
 }
 
