@@ -1014,24 +1014,11 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
 	repodata_set_sourcepkg(data, handle, sourcerpm);
       if ((flags & RPM_ADD_TRIGGERS) != 0)
 	{
-	  Id id, lastid;
 	  unsigned int ida = makedeps(pool, repo, rpmhead, TAG_TRIGGERNAME, TAG_TRIGGERVERSION, TAG_TRIGGERFLAGS, 0);
-
-	  lastid = 0;
-	  for (; (id = repo->idarraydata[ida]) != 0; ida++)
-	    {
-	      /* we currently do not support rel ids in incore data, so
-	       * strip off versioning information */
-	      while (ISRELDEP(id))
-		{
-		  Reldep *rd = GETRELDEP(pool, id);
-		  id = rd->name;
-		}
-	      if (id == lastid)
-		continue;
+	  Id id, lastid = 0;
+	  for (lastid = 0; (id = repo->idarraydata[ida]) != 0; ida++, lastid = id)
+	    if (id != lastid)
 	      repodata_add_idarray(data, handle, SOLVABLE_TRIGGERS, id);
-	      lastid = id;
-	    }
 	}
       if ((flags & RPM_ADD_NO_FILELIST) == 0)
 	addfilelist(data, handle, rpmhead, flags);
