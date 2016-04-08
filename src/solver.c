@@ -4477,6 +4477,11 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
 	return SOLVER_REASON_CLEANDEPS_ERASE;
       return SOLVER_REASON_KEEP_INSTALLED;
     }
+  if (i < solv->decisioncnt_weak)
+    {
+      if (why == 0 && pp < 0)
+	return SOLVER_REASON_CLEANDEPS_ERASE;
+    }
   if (why > 0)
     return SOLVER_REASON_RESOLVE;
   /* weak or orphaned */
