@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Fri Apr  8 15:36:21 CEST 2016 - mls@suse.de
+
+- Better support of complex deps in pool_match_dep and
+  selection_make_matchdeps
+- make SOLVER_REASON_CLEANDEPS_ERASE introspection reason work again
+- make dep2str use rpm-like output if disttype is rpm
+- implement filtering of Requires(pre,post) for installed packages
+- simplify handling of pseudo package updates [bnc#967006]
+- improve speed of rpmmd metadata parsing
+- bump version to 0.6.20
+
+-------------------------------------------------------------------
 Mon Feb 15 16:46:31 CET 2016 - mls@suse.de
 
 - parse media number from baseurl
