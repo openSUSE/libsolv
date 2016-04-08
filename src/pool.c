@@ -813,6 +813,45 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
 
   if (d1 == d2)
     return 1;
+
+  if (ISRELDEP(d1))
+    {
+      /* we use potentially matches for complex deps */
+      rd1 = GETRELDEP(pool, d1);
+      if (rd1->flags == REL_AND || rd1->flags == REL_OR || rd1->flags == REL_WITH || rd1->flags == REL_COND)
+	{
+	  if (pool_match_dep(pool, rd1->name, d2))
+	    return 1;
+	  if (rd1->flags == REL_COND && ISRELDEP(rd1->evr))
+	    {
+	      rd1 = GETRELDEP(pool, rd1->evr);
+	      if (rd1->flags != REL_ELSE)
+		return 0;
+	    }
+	  if (rd1->flags != REL_COND && pool_match_dep(pool, rd1->evr, d2))
+	    return 1;
+	  return 0;
+	}
+    }
+  if (ISRELDEP(d2))
+    {
+      /* we use potentially matches for complex deps */
+      rd2 = GETRELDEP(pool, d2);
+      if (rd2->flags == REL_AND || rd2->flags == REL_OR || rd2->flags == REL_WITH || rd2->flags == REL_COND)
+	{
+	  if (pool_match_dep(pool, d1, rd2->name))
+	    return 1;
+	  if (rd2->flags == REL_COND && ISRELDEP(rd2->evr))
+	    {
+	      rd2 = GETRELDEP(pool, rd2->evr);
+	      if (rd2->flags != REL_ELSE)
+		return 0;
+	    }
+	  if (rd2->flags != REL_COND && pool_match_dep(pool, d1, rd2->evr))
+	    return 1;
+	  return 0;
+	}
+    }
   if (!ISRELDEP(d1))
     {
       if (!ISRELDEP(d2))
