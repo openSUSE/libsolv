@@ -408,48 +408,26 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
 }
 
 static int
-add_prereq_ignoreinst_sortcmp(const void *va, const void *vb, void *dp)
+ignq_sortcmp(const void *va, const void *vb, void *dp)
 {
-  return *(Id *)va - *(Id *)vb;
+  int r = *(Id *)va - *(Id *)vb;
+  if (!r)
+    r = ((Id *)va)[1] - ((Id *)vb)[1];
+  return r;
 }
 
-static void
-add_prereq_ignoreinst(Pool *pool, Repodata *data, Id handle, Queue *ign, Queue *keep)
-{
-  int ii, ik;
-
-  /* sort both queues */
-  if (ign->count > 1)
-    solv_sort(ign->elements, ign->count, sizeof(Id), add_prereq_ignoreinst_sortcmp, 0);
-  if (keep->count > 1)
-    solv_sort(keep->elements, keep->count, sizeof(Id), add_prereq_ignoreinst_sortcmp, 0);
-  for (ii = ik = 0; ii < ign->count; )
-    {
-      if (ik == keep->count || ign->elements[ii] < keep->elements[ik])
-	{
-	  Id id = ign->elements[ii++];
-	  repodata_add_idarray(data, handle, SOLVABLE_PREREQ_IGNOREINST, id);
-	  while (ii < ign->count && ign->elements[ii] == id)
-	    ii++;
-	}
-      else if (ign->elements[ii] > keep->elements[ik])
-	ik++;
-      else
-	ii++;
-    }
-}
 /*
  * strong: 0: ignore strongness
  *         1: filter to strong
  *         2: filter to weak
  */
 static unsigned int
-makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int flags, Queue *ignq, Queue *keepq)
+makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int flags, Queue *ignq)
 {
   char **n, **v;
   unsigned int *f;
   int i, cc, nc, vc, fc;
-  int haspre, premask;
+  int haspre, premask, has_ign;
   unsigned int olddeps;
   Id *ida;
   int strong = 0;
@@ -544,6 +522,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   olddeps = repo_reserve_ids(repo, 0, cc);
   ida = repo->idarraydata + olddeps;
 
+  has_ign = 0;
   for (i = 0; ; i++)
     {
       Id id;
@@ -598,10 +577,9 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
       *ida++ = id;
       if (haspre == 2 && ignq)
 	{
-	  if ((f[i] & DEP_PRE_IN) != 0 && (f[i] & DEP_PRE_UN) == 0)
-	    queue_push(ignq, id);
-	  else
-	    queue_push(keepq, id);
+	  int is_ign = (f[i] & DEP_PRE_IN) != 0 && (f[i] & DEP_PRE_UN) == 0 ? 1 : 0;
+	  has_ign |= is_ign;
+	  queue_push2(ignq, id, is_ign);
 	}
     }
   *ida++ = 0;
@@ -609,6 +587,21 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   solv_free(n);
   solv_free(v);
   solv_free(f);
+  if (has_ign && ignq->count > 2)
+    {
+      Id id, lastid = 0;
+      int j;
+
+      solv_sort(ignq->elements, ignq->count / 2, sizeof(Id) * 2, ignq_sortcmp, 0);
+      for (i = j = 0; i < ignq->count; i += 2)
+	{
+	  id = ignq->elements[i];
+	  if (id != lastid && ignq->elements[i + 1] > 0)
+	    ignq->elements[j++] = id;
+	  lastid = id;
+	}
+      queue_truncate(ignq, j);
+    }
   return olddeps;
 }
 
@@ -949,9 +942,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   char *evr;
   char *sourcerpm;
   Queue ignq;
-  Queue keepq;
-  Id ignqbuf[16];
-  Id keepqbuf[16];
+  Id ignqbuf[64];
 
   name = headstring(rpmhead, TAG_NAME);
   if (!name)
@@ -979,28 +970,25 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   s->vendor = pool_str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   queue_init_buffer(&ignq, ignqbuf, sizeof(ignqbuf)/sizeof(*ignqbuf));
-  queue_init_buffer(&keepq, keepqbuf, sizeof(keepqbuf)/sizeof(*keepqbuf));
 
-  s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0, 0, 0);
+  s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0, 0);
   if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, flags, &ignq, &keepq);
-  s->conflicts = makedeps(pool, repo, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0, 0, 0);
-  s->obsoletes = makedeps(pool, repo, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0, 0, 0);
+  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, flags, &ignq);
+  s->conflicts = makedeps(pool, repo, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0, 0);
+  s->obsoletes = makedeps(pool, repo, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0, 0);
 
-  s->recommends = makedeps(pool, repo, rpmhead, TAG_RECOMMENDNAME, TAG_RECOMMENDVERSION, TAG_RECOMMENDFLAGS, 0, 0, 0);
-  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTNAME, TAG_SUGGESTVERSION, TAG_SUGGESTFLAGS, 0, 0, 0);
-  s->supplements = makedeps(pool, repo, rpmhead, TAG_SUPPLEMENTNAME, TAG_SUPPLEMENTVERSION, TAG_SUPPLEMENTFLAGS, 0, 0, 0);
-  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCENAME, TAG_ENHANCEVERSION, TAG_ENHANCEFLAGS, 0, 0, 0);
+  s->recommends = makedeps(pool, repo, rpmhead, TAG_RECOMMENDNAME, TAG_RECOMMENDVERSION, TAG_RECOMMENDFLAGS, 0, 0);
+  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTNAME, TAG_SUGGESTVERSION, TAG_SUGGESTFLAGS, 0, 0);
+  s->supplements = makedeps(pool, repo, rpmhead, TAG_SUPPLEMENTNAME, TAG_SUPPLEMENTVERSION, TAG_SUPPLEMENTFLAGS, 0, 0);
+  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCENAME, TAG_ENHANCEVERSION, TAG_ENHANCEFLAGS, 0, 0);
 
   s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
   s->conflicts = repo_fix_conflicts(repo, s->conflicts);
 
   if (data && ignq.count)
-    add_prereq_ignoreinst(pool, data, s - pool->solvables, &ignq, &keepq);
-
+    repodata_set_idarray(data, s - pool->solvables, SOLVABLE_PREREQ_IGNOREINST, &ignq);
   queue_free(&ignq);
-  queue_free(&keepq);
 
   if (data)
     {
@@ -1066,7 +1054,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
 	repodata_set_sourcepkg(data, handle, sourcerpm);
       if ((flags & RPM_ADD_TRIGGERS) != 0)
 	{
-	  unsigned int ida = makedeps(pool, repo, rpmhead, TAG_TRIGGERNAME, TAG_TRIGGERVERSION, TAG_TRIGGERFLAGS, 0, 0, 0);
+	  unsigned int ida = makedeps(pool, repo, rpmhead, TAG_TRIGGERNAME, TAG_TRIGGERVERSION, TAG_TRIGGERFLAGS, 0, 0);
 	  Id id, lastid = 0;
 	  for (lastid = 0; (id = repo->idarraydata[ida]) != 0; ida++, lastid = id)
 	    if (id != lastid)
