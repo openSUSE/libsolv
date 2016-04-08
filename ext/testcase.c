@@ -1190,8 +1190,10 @@ testcase_write_testtags(Repo *repo, FILE *fp)
   const char *release;
   const char *tmp;
   unsigned int ti;
+  Queue q;
 
   fprintf(fp, "=Ver: 3.0\n");
+  queue_init(&q);
   FOR_REPO_SOLVABLES(repo, p, s)
     {
       name = pool_id2str(pool, s->name);
@@ -1212,6 +1214,14 @@ testcase_write_testtags(Repo *repo, FILE *fp)
       writedeps(repo, fp, "Sup:", SOLVABLE_SUPPLEMENTS, s, s->supplements);
       writedeps(repo, fp, "Sug:", SOLVABLE_SUGGESTS, s, s->suggests);
       writedeps(repo, fp, "Enh:", SOLVABLE_ENHANCES, s, s->enhances);
+      if (solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &q))
+	{
+	  int i;
+	  fprintf(fp, "+Ipr:\n");
+	  for (i = 0; i < q.count; i++)
+	    fprintf(fp, "%s\n", testcase_dep2str(pool, q.elements[i]));
+	  fprintf(fp, "-Ipr:\n");
+	}
       if (s->vendor)
 	fprintf(fp, "=Vnd: %s\n", pool_id2str(pool, s->vendor));
       ti = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
@@ -1219,6 +1229,7 @@ testcase_write_testtags(Repo *repo, FILE *fp)
 	fprintf(fp, "=Tim: %u\n", ti);
       writefilelist(repo, fp, "Fls:", s);
     }
+  queue_free(&q);
   return 0;
 }
 
@@ -1417,6 +1428,12 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	case 'E' << 16 | 'n' << 8 | 'h':
 	  s->enhances = adddep(repo, s->enhances, line + 6, 0);
 	  break;
+	case 'I' << 16 | 'p' << 8 | 'r':
+	  {
+	    Id id = line[6] == '/' ? pool_str2id(pool, line + 6, 1) : testcase_str2dep(pool, line + 6);
+	    repodata_add_idarray(data, s - pool->solvables, SOLVABLE_PREREQ_IGNOREINST, id);
+	    break;
+	  }
         default:
 	  break;
         }
