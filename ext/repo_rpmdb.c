@@ -54,7 +54,8 @@
 /* 3: added triggers */
 /* 4: fixed triggers */
 /* 5: fixed checksum copying */
-#define RPMDB_COOKIE_VERSION 5
+/* 6: add SOLVABLE_PREREQ_IGNOREINST support */
+#define RPMDB_COOKIE_VERSION 6
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
