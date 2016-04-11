@@ -48,6 +48,8 @@ IF (ENABLE_COMPLEX_DEPS)
 IF (ENABLE_SUSEREPO OR ENABLE_RPMMD OR ENABLE_RPMDB)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	pool_parserpmrichdep.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	pool_parserpmrichdep.h)
 ENDIF (ENABLE_SUSEREPO OR ENABLE_RPMMD OR ENABLE_RPMDB)
 ENDIF (ENABLE_COMPLEX_DEPS)
 
