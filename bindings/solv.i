@@ -1468,10 +1468,17 @@ typedef struct {
   static const int POOL_FLAG_NOINSTALLEDOBSOLETES = POOL_FLAG_NOINSTALLEDOBSOLETES;
   static const int POOL_FLAG_HAVEDISTEPOCH = POOL_FLAG_HAVEDISTEPOCH;
   static const int POOL_FLAG_NOOBSOLETESMULTIVERSION = POOL_FLAG_NOOBSOLETESMULTIVERSION;
+  static const int DISTTYPE_RPM = DISTTYPE_RPM;
+  static const int DISTTYPE_DEB = DISTTYPE_DEB;
+  static const int DISTTYPE_ARCH = DISTTYPE_ARCH;
+  static const int DISTTYPE_HAIKU = DISTTYPE_HAIKU;
 
   Pool() {
     Pool *pool = pool_create();
     return pool;
+  }
+  int setdisttype(int disttype) {
+    return pool_setdisttype($self, disttype);
   }
   void set_debuglevel(int level) {
     pool_setdebuglevel($self, level);
