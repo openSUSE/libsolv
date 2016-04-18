@@ -388,12 +388,10 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
       if (!(p = strchr(p, '\n')))
 	{
 	  int l3;
-	  if (l + 1024 >= bufl)
+	  while (l + 1024 >= bufl)
 	    {
 	      buf = solv_realloc(buf, bufl + 4096);
 	      bufl += 4096;
-	      p = buf + l;
-	      continue;
 	    }
 	  p = buf + l;
 	  ll = fread(p, 1, bufl - l - 1, fp);
@@ -403,6 +401,8 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
 	  while ((l3 = strlen(p)) < ll)
 	    p[l3] = '\n';
 	  l += ll;
+	  if (p != buf)
+	    p--;
 	  continue;
 	}
       p++;
