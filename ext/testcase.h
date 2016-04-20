@@ -17,6 +17,7 @@
 #define TESTCASE_RESULT_ALTERNATIVES	(1 << 5)
 #define TESTCASE_RESULT_RULES		(1 << 6)
 #define TESTCASE_RESULT_GENID		(1 << 7)
+#define TESTCASE_RESULT_REASON		(1 << 8)
 
 extern Id testcase_str2dep(Pool *pool, const char *s);
 extern const char *testcase_dep2str(Pool *pool, Id id);

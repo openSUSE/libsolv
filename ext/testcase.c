@@ -81,6 +81,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_ALTERNATIVES,	"alternatives" },
   { TESTCASE_RESULT_RULES,		"rules" },
   { TESTCASE_RESULT_GENID,		"genid" },
+  { TESTCASE_RESULT_REASON,		"reason" },
   { 0, 0 }
 };
 
@@ -1700,6 +1701,35 @@ static struct class2str {
   { 0, 0 }
 };
 
+static struct reason2str {
+  Id reason;
+  const char *str;
+} reason2str[] = {
+  { SOLVER_REASON_UNRELATED,		"unrelated" },
+  { SOLVER_REASON_UNIT_RULE,		"unit" },
+  { SOLVER_REASON_KEEP_INSTALLED,	"keep" },
+  { SOLVER_REASON_RESOLVE_JOB,		"job" },
+  { SOLVER_REASON_UPDATE_INSTALLED,	"update" },
+  { SOLVER_REASON_CLEANDEPS_ERASE,	"cleandeps" },
+  { SOLVER_REASON_RESOLVE,		"resolve" },
+  { SOLVER_REASON_WEAKDEP,		"weakdep" },
+  { SOLVER_REASON_RESOLVE_ORPHAN,	"orphan" },
+
+  { SOLVER_REASON_RECOMMENDED,		"recommended" },
+  { SOLVER_REASON_SUPPLEMENTED,		"supplemented" },
+  { 0, 0 }
+};
+
+static const char *
+testcase_reason2str(Id reason)
+{
+  int i;
+  for (i = 0; reason2str[i].str; i++)
+    if (reason == reason2str[i].reason)
+      return reason2str[i].str;
+  return "?";
+}
+
 static int
 dump_genid(Pool *pool, Strqueue *sq, Id id, int cnt)
 {
@@ -2016,6 +2046,44 @@ testcase_solverresult(Solver *solv, int resultflags)
 	    }
 	  dump_genid(pool, &sq, id, 1);
 	}
+    }
+  if ((resultflags & TESTCASE_RESULT_REASON) != 0)
+    {
+      Queue whyq;
+      queue_init(&whyq);
+      FOR_POOL_SOLVABLES(p)
+	{
+	  Id info, p2, id;
+          int reason = solver_describe_decision(solv, p, &info);
+	  if (reason == SOLVER_REASON_UNRELATED)
+	    continue;
+	  if (reason == SOLVER_REASON_WEAKDEP)
+	    {
+	      solver_describe_weakdep_decision(solv, p, &whyq);
+	      if (whyq.count)
+		{
+		  for (i = 0; i < whyq.count; i += 3)
+		    {
+		      reason = whyq.elements[i];
+		      p2 = whyq.elements[i + 1];
+		      id = whyq.elements[i + 2];
+		      s = pool_tmpjoin(pool, "reason ", testcase_solvid2str(pool, p), 0);
+		      s = pool_tmpappend(pool, s, " ", testcase_reason2str(reason));
+		      s = pool_tmpappend(pool, s, " ", testcase_dep2str(pool, id));
+		      if (p2)
+		        s = pool_tmpappend(pool, s, " ", testcase_solvid2str(pool, p2));
+		      strqueue_push(&sq, s);
+		    }
+		  continue;
+		}
+	    }
+	  s = pool_tmpjoin(pool, "reason ", testcase_solvid2str(pool, p), 0);
+	  s = pool_tmpappend(pool, s, " ", testcase_reason2str(reason));
+	  if (info)
+	    s = pool_tmpappend(pool, s, " ", testcase_ruleid(solv, info));
+	  strqueue_push(&sq, s);
+	}
+      queue_free(&whyq);
     }
   strqueue_sort(&sq);
   result = strqueue_join(&sq);
