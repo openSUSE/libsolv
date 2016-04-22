@@ -37,7 +37,7 @@ extern "C" {
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
 extern int  selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker);
-extern int  selection_make_containsdep(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker);
+extern int  selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker);
 
 extern void selection_filter(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);

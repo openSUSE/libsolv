@@ -246,7 +246,7 @@ SOLV_1.0 {
 		selection_add;
 		selection_filter;
 		selection_make;
-		selection_make_containsdep;
+		selection_make_matchdepid;
 		selection_make_matchdeps;
 		selection_solvables;
 		solv_bin2hex;

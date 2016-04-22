@@ -988,7 +988,7 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
 }
 
 int
-selection_make_containsdep(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker)
+selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker)
 {
   Id p;
   Queue q;
@@ -1017,7 +1017,13 @@ selection_make_containsdep(Pool *pool, Queue *selection, Id dep, int flags, int 
       repo_lookup_deparray(s->repo, p, keyname, &q, marker);
       for (i = 0; i < q.count; i++)
 	{
-	  if (q.elements[i] == dep)
+	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)	/* mis-use */
+	    {
+	      if (q.elements[i] == dep)
+		break;
+	      continue;
+	    }
+	  if (pool_match_dep(pool, q.elements[i], dep))
 	    break;
 	}
       if (i < q.count)
