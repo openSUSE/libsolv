@@ -1331,8 +1331,11 @@ void
 pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
 {
   Id p;
+  Queue qq;
+  int i;
 
   queue_empty(q);
+  queue_init(&qq);
   FOR_POOL_SOLVABLES(p)
     {
       Solvable *s = pool->solvables + p;
@@ -1340,9 +1343,49 @@ pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
 	continue;
       if (s->repo != pool->installed && !pool_installable(pool, s))
 	continue;
-      if (solvable_matchesdep(s, keyname, dep, marker))
-	queue_push(q, p);
+      if (qq.count)
+	queue_empty(&qq);
+      solvable_lookup_deparray(s, keyname, &qq, marker);
+      for (i = 0; i < qq.count; i++)
+	if (pool_match_dep(pool, qq.elements[i], dep))
+	  {
+	    queue_push(q, p);
+	    break;
+	  }
     }
+  queue_free(&qq);
+}
+
+/* check if keyname contains dep, return list of matching packages */
+void
+pool_whatcontainsdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
+{
+  Id p;
+  Queue qq;
+  int i;
+
+  queue_empty(q);
+  if (!dep)
+    return;
+  queue_init(&qq);
+  FOR_POOL_SOLVABLES(p)
+    {
+      Solvable *s = pool->solvables + p;
+      if (s->repo->disabled)
+        continue;
+      if (s->repo != pool->installed && !pool_installable(pool, s))
+        continue;
+      if (qq.count)
+        queue_empty(&qq);
+      solvable_lookup_deparray(s, keyname, &qq, marker);
+      for (i = 0; i < qq.count; i++)
+        if (qq.elements[i] == dep)
+          {
+            queue_push(q, p);
+            break;
+          }
+    }
+  queue_free(&qq);
 }
 
 /*************************************************************************/

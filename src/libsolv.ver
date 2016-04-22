@@ -120,6 +120,7 @@ SOLV_1.0 {
 		pool_trivial_installable_multiversionmap;
 		pool_vendor2mask;
 		pool_whatmatchesdep;
+		pool_whatcontainsdep;
 		queue_alloc_one;
 		queue_alloc_one_head;
 		queue_delete;
@@ -245,6 +246,7 @@ SOLV_1.0 {
 		selection_add;
 		selection_filter;
 		selection_make;
+		selection_make_containsdep;
 		selection_make_matchdeps;
 		selection_solvables;
 		solv_bin2hex;

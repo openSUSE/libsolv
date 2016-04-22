@@ -33,9 +33,11 @@ extern "C" {
 #define SELECTION_SOURCE_ONLY		(1 << 12)
 #define SELECTION_WITH_SOURCE		(1 << 13)
 #define SELECTION_SKIP_KIND		(1 << 14)
+#define SELECTION_MATCH_DEPSTR		(1 << 15)
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
 extern int  selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker);
+extern int  selection_make_containsdep(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker);
 
 extern void selection_filter(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);

@@ -347,6 +347,7 @@ static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
 }
 
 void pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker);
+void pool_whatcontainsdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker);
 
 /* search the pool. the following filters are available:
  *   p     - search just this solvable
