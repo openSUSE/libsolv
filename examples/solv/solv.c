@@ -67,7 +67,7 @@ setarch(Pool *pool)
 
 
 int
-yesno(const char *str)
+yesno(const char *str, int other)
 {
   char inbuf[128], *ip;
 
@@ -88,8 +88,8 @@ yesno(const char *str)
 	  printf("Abort.\n");
 	  exit(1);
 	}
-      if (*ip == 'y' || *ip == 'n')
-	return *ip == 'y' ? 1 : 0;
+      if (*ip == 'y' || *ip == 'n' || *ip == other)
+	return *ip == 'n' ? 0 : *ip;
     }
 }
 
@@ -238,6 +238,7 @@ main(int argc, char **argv)
   char *keyname = 0;
   int keyname_depstr = 0;
   int debuglevel = 0;
+  int answer, acnt = 0;
 
   argc--;
   argv++;
@@ -765,7 +766,77 @@ rerunsolver:
   printf("install size change: %d K\n", transaction_calc_installsizechange(trans));
   printf("\n");
 
-  if (!yesno("OK to continue (y/n)? "))
+  acnt = solver_alternatives_count(solv);
+  if (acnt)
+    {
+      printf("Have %d alternatives\n\n", acnt);
+      answer = yesno("OK to continue (y/n/a)? ", 'a');
+    }
+  else
+    answer = yesno("OK to continue (y/n)? ", 0);
+  if (answer == 'a')
+    {
+      Queue choicesq;
+      Queue answerq;
+      Id id, from, chosen;
+      int j;
+      int take = 0;
+
+      queue_init(&choicesq);
+      queue_init(&answerq);
+      for (i = 1; i <= acnt; i++)
+	{
+	  int atype = solver_get_alternative(solv, i, &id, &from, &chosen, &choicesq, 0);
+	  printf("\n%s\n", solver_alternative2str(solv, atype, id, from));
+	  for (j = 0; j < choicesq.count; j++)
+	    {
+	      Id p = choicesq.elements[j];
+	      if (p < 0)
+		p = -p;
+	      queue_push(&answerq, p);
+	      printf("%6d: %s\n", answerq.count, pool_solvid2str(pool, p));
+	    }
+	}
+      queue_free(&choicesq);
+      printf("\n");
+      for (;;)
+	{
+	  char inbuf[128], *ip;
+	  printf("OK to continue (y/n), or number to change alternative: ");
+	  fflush(stdout);
+	  *inbuf = 0;
+	  if (!(ip = fgets(inbuf, sizeof(inbuf), stdin)))
+	    {
+	      printf("Abort.\n");
+	      exit(1);
+	    }
+	  while (*ip == ' ' || *ip == '\t')
+	    ip++;
+	  if (*ip >= '0' && *ip <= '9')
+	    {
+	      take = atoi(ip);
+	      if (take > 0 && take <= answerq.count)
+		break;
+	      take = 0;
+	    }
+	  if (*ip == 'n' || *ip == 'y')
+	    {
+	      answer = *ip == 'n' ? 0 : *ip;
+	      break;
+	    }
+	}
+      if (take > 0 && take <= answerq.count)
+	{
+	  Id p = answerq.elements[take - 1];
+	  queue_free(&answerq);
+	  queue_push2(&job, SOLVER_FAVOR | SOLVER_SOLVABLE_NAME, pool->solvables[p].name);
+	  solver_free(solv);
+	  solv = 0;
+	  goto rerunsolver;
+	}
+      queue_free(&answerq);
+    }
+  if (!answer)
     {
       printf("Abort.\n");
       transaction_free(trans);
@@ -854,7 +925,7 @@ rerunsolver:
       queue_init(&conflicts);
       if (checkfileconflicts(pool, &checkq, newpkgs, newpkgsfps, &conflicts))
 	{
-	  if (yesno("Re-run solver (y/n/q)? "))
+	  if (yesno("Re-run solver (y/n/q)? ", 0))
 	    {
 	      for (i = 0; i < newpkgs; i++)
 		if (newpkgsfps[i])
