@@ -453,6 +453,89 @@ prefer_suggested(Solver *solv, Queue *plist)
     }
 }
 
+static int
+sort_by_favorq_cmp(const void *ap, const void *bp, void *dp)
+{
+  const Id *a = ap, *b = bp, *d = dp;
+  return d[b[0]] - d[a[0]];
+}
+
+static void
+sort_by_favorq(Queue *favorq, Id *el, int cnt)
+{
+  int i;
+  /* map to offsets into favorq */
+  for (i = 0; i < cnt; i++)
+    {
+      Id p = el[i];
+      /* lookup p in sorted favorq */
+      int med = 0, low = 0;
+      int high = favorq->count / 2;
+      while (low != high)
+	{
+	  med = (low + high) / 2;
+	  Id pp = favorq->elements[2 * med];
+	  if (pp < p)
+	    low = med;
+	  else if (pp > p)
+	    high = med;
+	  else
+	    break;
+	}
+      while(med && favorq->elements[2 * med - 2] == p)
+	med--;
+      if (favorq->elements[2 * med] == p)
+        el[i] = 2 * med + 1;
+      else
+        el[i] = 0;	/* hmm */
+    }
+  /* sort by position */
+  solv_sort(el, cnt, sizeof(Id), sort_by_favorq_cmp, favorq->elements);
+  /* map back */
+  for (i = 0; i < cnt; i++)
+    if (el[i])
+      el[i] = favorq->elements[el[i] - 1];
+}
+
+/* bring favored packages to front and disfavored packages to back */
+static void
+prefer_favored(Solver *solv, Queue *plist)
+{
+  int i, fav, disfav, count;
+  if (!solv->favormap.size)
+    return;
+  for (i = fav = disfav = 0, count = plist->count; i < count; i++)
+    {
+      Id p = plist->elements[i];
+      if (!MAPTST(&solv->favormap, p))
+	continue;
+      if (solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, p))
+	{
+	  /* disfavored package. bring to back */
+	 if (i < plist->count - 1)
+	    {
+	      memmove(plist->elements + i, plist->elements + i + 1, (plist->count - 1 - i) * sizeof(Id));
+	      plist->elements[plist->count - 1] = p;
+	    }
+	  i--;
+	  count--;
+	  disfav++;
+	}
+      else
+	{
+	  /* favored package. bring to front */
+	  if (i > fav)
+	    memmove(plist->elements + fav + 1, plist->elements + fav, (i - fav) * sizeof(Id));
+	  plist->elements[fav++] = p;
+	}
+    }
+  /* if we have multiple favored/disfavored packages, sort by favorq index */
+  if (fav > 1)
+    sort_by_favorq(solv->favorq, plist->elements, fav);
+  if (disfav > 1)
+    sort_by_favorq(solv->favorq, plist->elements + plist->count - disfav, disfav);
+}
+
 /*
  * prune to recommended/suggested packages.
  * does not prune installed packages (they are also somewhat recommended).
@@ -1121,6 +1204,15 @@ void
 policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 {
   Pool *pool = solv->pool;
+  if (mode == POLICY_MODE_SUPPLEMENT)
+    {
+      /* reorder only */
+      dislike_old_versions(pool, plist);
+      sort_by_common_dep(pool, plist);
+      prefer_suggested(solv, plist);
+      prefer_favored(solv, plist);
+      return;
+    }
   if (plist->count > 1)
     {
       if (mode != POLICY_MODE_SUGGEST)
@@ -1144,6 +1236,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 	  dislike_old_versions(pool, plist);
 	  sort_by_common_dep(pool, plist);
 	  prefer_suggested(solv, plist);
+	  prefer_favored(solv, plist);
 	}
     }
 }

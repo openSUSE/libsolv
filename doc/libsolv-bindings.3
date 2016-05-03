@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
-.\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 12/14/2015
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 05/03/2016
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "12/14/2015" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "05/03/2016" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3254,6 +3254,16 @@ The matching installed packages are considered to be installed by a user, thus n
 \fBSOLVER_ALLOWUNINSTALL\fR
 .RS 4
 Allow the solver to deinstall the matching installed packages if they get into the way of resolving a dependency\&. This is like the SOLVER_FLAG_ALLOW_UNINSTALL flag, but limited to a specific set of packages\&.
+.RE
+.PP
+\fBSOLVER_FAVOR\fR
+.RS 4
+Prefer the specified packages if the solver encounters an alternative\&. If a job contains multiple matching favor/disfavor elements, the last one takes precedence\&.
+.RE
+.PP
+\fBSOLVER_DISFAVOR\fR
+.RS 4
+Avoid the specified packages if the solver encounters an alternative\&. This can also be used to block recommended or supplemented packages from being installed\&.
 .RE
 .PP
 \fBSOLVER_JOBMASK\fR

@@ -1701,6 +1701,7 @@ solver_free(Solver *solv)
   queuep_free(&solv->recommendscplxq);
   queuep_free(&solv->suggestscplxq);
   queuep_free(&solv->brokenorphanrules);
+  queuep_free(&solv->favorq);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -1716,6 +1717,8 @@ solver_free(Solver *solv)
   map_free(&solv->droporphanedmap);
   map_free(&solv->cleandepsmap);
   map_free(&solv->allowuninstallmap);
+  map_free(&solv->favormap);
+  map_free(&solv->isdisfavormap);
 
   solv_free(solv->decisionmap);
   solv_free(solv->rules);
@@ -2062,6 +2065,22 @@ do_complex_recommendations(Solver *solv, Id rec, Map *m, int noselected)
 }
 
 #endif
+
+static void
+prune_disfavored(Solver *solv, Queue *plist)
+{
+  int i, j;
+  if (!solv->isdisfavormap.size)
+    return;
+  for (i = j = 0; i < plist->count; i++) 
+    {    
+      Id p = plist->elements[i];
+      if (!MAPTST(&solv->isdisfavormap, p))
+        plist->elements[j++] = p; 
+    }    
+  if (i != j)
+    queue_truncate(plist, j);
+}
 
 /*-------------------------------------------------------------------
  *
@@ -2522,9 +2541,15 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  if (solv->dupmap_all && solv->installed && s->repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, i - solv->installed->start))))
 		    continue;
+		  if (solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, i))
+		    continue;	/* disfavored supplements, do not install */
 		  queue_push(&dqs, i);
 		}
 	    }
+
+	  /* filter out disfavored recommended packages */
+	  if (dq.count && solv->isdisfavormap.size)
+	    prune_disfavored(solv, &dq);
 
 	  /* filter out all packages obsoleted by installed packages */
 	  /* this is no longer needed if we have reverse obsoletes */
@@ -2636,11 +2661,22 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      for (i = 0; i < dq.count; i++)
 		MAPSET(&dqmap, dq.elements[i]);
 
-	      /* install all supplemented packages */
+	      /* prune dqs so that it only contains the best versions */
+	      for (i = j = 0; i < dqs.count; i++)
+		{
+		  p = dqs.elements[i];
+	          if (MAPTST(&dqmap, p))
+		    dqs.elements[j++] = p;
+		}
+	      dqs.count = j;
+
+	      /* install all supplemented packages, but order first */
+	      if (dqs.count > 1)
+	        policy_filter_unwanted(solv, &dqs, POLICY_MODE_SUPPLEMENT);
 	      for (i = 0; i < dqs.count; i++)
 		{
 		  p = dqs.elements[i];
-		  if (solv->decisionmap[p] || !MAPTST(&dqmap, p))
+		  if (solv->decisionmap[p])
 		    continue;
 		  POOL_DEBUG(SOLV_DEBUG_POLICY, "installing supplemented %s\n", pool_solvid2str(pool, p));
 		  olevel = level;
@@ -3327,6 +3363,42 @@ add_complex_jobrules(Solver *solv, Id dep, int flags, int jobidx, int weak)
 }
 #endif
 
+/* sort by package id, last entry wins */
+static int
+setup_favormaps_cmp(const void *ap, const void *bp, void *dp)
+{
+  const Id *a = ap, *b = bp;
+  if ((*a - *b) != 0)
+    return *a - *b;
+  return (b[1] < 0 ? -b[1] : b[1]) - (a[1] < 0 ? -a[1] : a[1]);
+}
+
+static void
+setup_favormaps(Solver *solv)
+{
+  Queue *q = solv->favorq;
+  Pool *pool = solv->pool;
+  int i;
+  Id oldp = 0;
+  if (q->count > 2)
+    solv_sort(q->elements, q->count / 2, 2 * sizeof(Id), setup_favormaps_cmp, solv);
+  map_grow(&solv->favormap, pool->nsolvables);
+  for (i = 0; i < q->count; i += 2)
+    {
+      Id p = q->elements[i];
+      if (p == oldp)
+	continue;
+      oldp = p;
+      MAPSET(&solv->favormap, p);
+      if (q->elements[i + 1] < 0)
+	{
+	  if (!solv->isdisfavormap.size)
+	    map_grow(&solv->isdisfavormap, pool->nsolvables);
+	  MAPSET(&solv->isdisfavormap, p);
+	}
+    }
+}
+
 /*
  *
  * solve job queue
@@ -3400,6 +3472,8 @@ solver_solve(Solver *solv, Queue *job)
   map_zerosize(&solv->allowuninstallmap);
   map_zerosize(&solv->cleandepsmap);
   map_zerosize(&solv->weakrulemap);
+  map_zerosize(&solv->favormap);
+  map_zerosize(&solv->isdisfavormap);
   queue_empty(&solv->weakruleq);
   solv->watches = solv_free(solv->watches);
   queue_empty(&solv->ruletojob);
@@ -3935,6 +4009,21 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_ALLOWUNINSTALL:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: allowuninstall %s\n", solver_select2str(pool, select, what));
 	  break;
+	case SOLVER_FAVOR:
+	case SOLVER_DISFAVOR:
+	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %s %s\n", (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? "favor" : "disfavor", solver_select2str(pool, select, what));
+	  FOR_JOB_SELECT(p, pp, select, what)
+	    {
+	      int j;
+	      if (!solv->favorq)
+		{
+		  solv->favorq = solv_calloc(1, sizeof(Queue));
+		  queue_init(solv->favorq);
+		}
+	      j = solv->favorq->count + 1;
+	      queue_push2(solv->favorq, p, (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? j : -j);
+	    }
+	  break;
 	default:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: unknown job\n");
 	  break;
@@ -3954,6 +4043,10 @@ solver_solve(Solver *solv, Queue *job)
     }
   assert(solv->ruletojob.count == solv->nrules - solv->jobrules);
   solv->jobrules_end = solv->nrules;
+
+  /* transform favorq into two maps */
+  if (solv->favorq)
+    setup_favormaps(solv);
 
   /* now create infarch and dup rules */
   if (!solv->noinfarchcheck)
@@ -5156,6 +5249,12 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       break;
     case SOLVER_ALLOWUNINSTALL:
       strstart = "allow deinstallation of ";
+      break;
+    case SOLVER_FAVOR:
+      strstart = "favor ";
+      break;
+    case SOLVER_DISFAVOR:
+      strstart = "disfavor ";
       break;
     default:
       strstart = "unknown job ";

@@ -1878,6 +1878,16 @@ Allow the solver to deinstall the matching installed packages if they get
 into the way of resolving a dependency. This is like the
 SOLVER_FLAG_ALLOW_UNINSTALL flag, but limited to a specific set of packages.
 
+*SOLVER_FAVOR*::
+Prefer the specified packages if the solver encounters an alternative. If
+a job contains multiple matching favor/disfavor elements, the last one takes
+precedence.
+
+*SOLVER_DISFAVOR*::
+Avoid the specified packages if the solver encounters an alternative. This
+can also be used to block recommended or supplemented packages from being
+installed.
+
 *SOLVER_JOBMASK*::
 A mask containing all the above action bits.
 

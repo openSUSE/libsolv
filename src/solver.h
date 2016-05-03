@@ -199,6 +199,9 @@ struct _Solver {
   Map allowuninstallmap;		/* ok to uninstall those */
   int allowuninstall_all;
 
+  Queue *favorq;
+  Map favormap;				/* favored / disfavored packages */
+  Map isdisfavormap;
 #endif	/* LIBSOLV_INTERNAL */
 };
 
@@ -229,6 +232,8 @@ typedef struct _Solver Solver;
 #define SOLVER_DROP_ORPHANED		0x0900
 #define SOLVER_USERINSTALLED		0x0a00
 #define SOLVER_ALLOWUNINSTALL		0x0b00
+#define SOLVER_FAVOR			0x0c00
+#define SOLVER_DISFAVOR			0x0d00
 
 #define SOLVER_JOBMASK			0xff00
 

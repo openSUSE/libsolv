@@ -46,6 +46,8 @@ static struct job2str {
   { SOLVER_DROP_ORPHANED,  "droporphaned" },
   { SOLVER_USERINSTALLED,  "userinstalled" },
   { SOLVER_ALLOWUNINSTALL, "allowuninstall" },
+  { SOLVER_FAVOR,          "favor" },
+  { SOLVER_DISFAVOR,       "disfavor" },
   { 0, 0 }
 };
 
