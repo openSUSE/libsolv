@@ -1432,6 +1432,8 @@ reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
       solv->recommends_index = -1;
       queue_truncate(&solv->decisionq, decisionqcount);
     }
+  /* but obey favored maps */
+  policy_prefer_favored(solv, dq);
 }
 
 /*-------------------------------------------------------------------

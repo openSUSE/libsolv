@@ -498,8 +498,8 @@ sort_by_favorq(Queue *favorq, Id *el, int cnt)
 }
 
 /* bring favored packages to front and disfavored packages to back */
-static void
-prefer_favored(Solver *solv, Queue *plist)
+void
+policy_prefer_favored(Solver *solv, Queue *plist)
 {
   int i, fav, disfav, count;
   if (!solv->favormap.size)
@@ -1210,7 +1210,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
       dislike_old_versions(pool, plist);
       sort_by_common_dep(pool, plist);
       prefer_suggested(solv, plist);
-      prefer_favored(solv, plist);
+      policy_prefer_favored(solv, plist);
       return;
     }
   if (plist->count > 1)
@@ -1236,7 +1236,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 	  dislike_old_versions(pool, plist);
 	  sort_by_common_dep(pool, plist);
 	  prefer_suggested(solv, plist);
-	  prefer_favored(solv, plist);
+	  policy_prefer_favored(solv, plist);
 	}
     }
 }

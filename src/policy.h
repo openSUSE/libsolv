@@ -40,6 +40,7 @@ extern void policy_create_obsolete_index(Solver *solv);
 
 /* internal, do not use */
 extern void prune_to_best_version(Pool *pool, Queue *plist);
+extern void policy_prefer_favored(Solver *solv, Queue *plist);
 
 
 #ifdef __cplusplus
