@@ -780,7 +780,6 @@ rerunsolver:
       Queue answerq;
       Id id, from, chosen;
       int j;
-      int take = 0;
 
       queue_init(&choicesq);
       queue_init(&answerq);
@@ -802,6 +801,7 @@ rerunsolver:
       for (;;)
 	{
 	  char inbuf[128], *ip;
+	  int neg = 0;
 	  printf("OK to continue (y/n), or number to change alternative: ");
 	  fflush(stdout);
 	  *inbuf = 0;
@@ -812,27 +812,30 @@ rerunsolver:
 	    }
 	  while (*ip == ' ' || *ip == '\t')
 	    ip++;
+	  if (*ip == '-' && ip[1] >= '0' && ip[1] <= '9')
+	    {
+	      neg = 1;
+	      ip++;
+	    }
 	  if (*ip >= '0' && *ip <= '9')
 	    {
-	      take = atoi(ip);
+	      int take = atoi(ip);
 	      if (take > 0 && take <= answerq.count)
-		break;
-	      take = 0;
+		{
+		  Id p = answerq.elements[take - 1];
+		  queue_free(&answerq);
+		  queue_push2(&job, (neg ? SOLVER_DISFAVOR : SOLVER_FAVOR) | SOLVER_SOLVABLE_NAME, pool->solvables[p].name);
+		  solver_free(solv);
+		  solv = 0;
+		  goto rerunsolver;
+		  break;
+		}
 	    }
 	  if (*ip == 'n' || *ip == 'y')
 	    {
 	      answer = *ip == 'n' ? 0 : *ip;
 	      break;
 	    }
-	}
-      if (take > 0 && take <= answerq.count)
-	{
-	  Id p = answerq.elements[take - 1];
-	  queue_free(&answerq);
-	  queue_push2(&job, SOLVER_FAVOR | SOLVER_SOLVABLE_NAME, pool->solvables[p].name);
-	  solver_free(solv);
-	  solv = 0;
-	  goto rerunsolver;
 	}
       queue_free(&answerq);
     }
