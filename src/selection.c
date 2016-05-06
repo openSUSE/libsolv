@@ -923,7 +923,7 @@ matchdep(Pool *pool, Id id, char *rname, int rflags, char *revr, int flags)
 int
 selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker)
 {
-  char *rname, *r;
+  char *rname, *r = 0;
   int rflags = 0;
   Id p;
   Queue q;
