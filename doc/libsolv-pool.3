@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
-.\" Generator: DocBook XSL Stylesheets v1.78.0 <http://docbook.sf.net/>
-.\"      Date: 12/14/2015
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 05/06/2016
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "12/14/2015" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "05/06/2016" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -369,7 +369,7 @@ Make the addfileprovides method only add files from the standard locations (i\&.
 .RE
 .\}
 .sp
-Set the package type of your system\&. The disttype is used for example to define package comparison semantics\&. Libsolv\(cqs default disttype should match the package manager of your system, so you only need to use this function if you want to use the library to solve packaging problems for different systems\&. The Function returns the old disttype on success, and \-1 if the new disttype is not supported\&.
+Set the package type of your system\&. The disttype is used for example to define package comparison semantics\&. Libsolv\(cqs default disttype should match the package manager of your system, so you only need to use this function if you want to use the library to solve packaging problems for different systems\&. The Function returns the old disttype on success, and \-1 if the new disttype is not supported\&. Note that any pool_setarch and pool_setarchpolicy calls need to come after the pool_setdisttype call, as they make use of the noarch/any/all architecture id\&.
 .sp
 .if n \{\
 .RS 4

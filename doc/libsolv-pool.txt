@@ -270,6 +270,9 @@ should match the package manager of your system, so you only need to
 use this function if you want to use the library to solve packaging
 problems for different systems. The Function returns the old
 disttype on success, and -1 if the new disttype is not supported.
+Note that any pool_setarch and pool_setarchpolicy calls need to
+come after the pool_setdisttype call, as they make use of the
+noarch/any/all architecture id.
 
 	int pool_set_flag(Pool *pool, int flag, int value);
 
