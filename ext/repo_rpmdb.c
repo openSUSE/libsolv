@@ -2435,7 +2435,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   if ((flags & RPM_ITERATE_FILELIST_WITHCOL) != 0)
     {
       co = headint32array(rpmhead, TAG_FILECOLORS, &cnt2);
-      if (!co || cnt != cnt2)
+      if (co && cnt != cnt2)
 	{
 	  solv_free(co);
 	  solv_free(md);
@@ -2513,8 +2513,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	      info.digest = md5;
 	    }
 	}
-      if (co)
-	info.color = co[i];
+      info.color = co ? co[i] : 0;
       (*cb)(cbdata, space, &info);
     }
   solv_free(space);
