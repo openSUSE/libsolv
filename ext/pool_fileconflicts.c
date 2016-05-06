@@ -640,7 +640,7 @@ findfileconflicts2_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
   strncpy(md5padded, info->digest, 32);
   md5padded[32] = 0;
   md5padded[33] = info->color;
-  /* printf("%d, hx %x -> %s   %d %s\n", cbdata->idx, hx, fn, info->mode, info->digest); */
+  /* printf("%d, hx %x -> %s   %d %s %d\n", cbdata->idx, hx, fn, info->mode, info->digest, info->color); */
   off = addfilesspace(cbdata, strlen(fn) + (34 + 1));
   memcpy(cbdata->filesspace + off, (unsigned char *)md5padded, 34);
   strcpy((char *)cbdata->filesspace + off + 34, fn);
@@ -805,7 +805,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   void *handle;
   Repo *installed = pool->installed;
   Id p;
-  int obsoleteusescolors = pool_get_flag(pool, POOL_FLAG_OBSOLETEUSESCOLORS);
+  int usefilecolors;
   int hdrfetches;
 
   queue_empty(conflicts);
@@ -813,8 +813,10 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
     return 0;
 
   now = start = solv_timems(0);
+  /* Hmm, should we have a different flag for this? */
+  usefilecolors = pool_get_flag(pool, POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS);
   POOL_DEBUG(SOLV_DEBUG_STATS, "searching for file conflicts\n");
-  POOL_DEBUG(SOLV_DEBUG_STATS, "packages: %d, cutoff %d\n", pkgs->count, cutoff);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "packages: %d, cutoff %d, usefilecolors %d\n", pkgs->count, cutoff, usefilecolors);
 
   memset(&cbdata, 0, sizeof(cbdata));
   cbdata.aliases = flags & FINDFILECONFLICTS_CHECK_DIRALIASING;
@@ -1026,7 +1028,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
     {
       Id idx = cbdata.lookat.elements[i + 1];
       int iterflags = RPM_ITERATE_FILELIST_WITHMD5 | RPM_ITERATE_FILELIST_NOGHOSTS;
-      if (obsoleteusescolors)
+      if (usefilecolors)
 	iterflags |= RPM_ITERATE_FILELIST_WITHCOL;
       p = pkgs->elements[idx];
       handle = (*handle_cb)(pool, p, handle_cbdata);
@@ -1098,7 +1100,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 		  }
 		if (!strcmp(fsi, fsj))
 		  continue;	/* file digests match, no conflict */
-		if (obsoleteusescolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
+		if (usefilecolors && fsi[33] && fsj[33] && (fsi[33] & fsj[33]) == 0)
 		  continue;	/* colors do not conflict */
 		queue_push(conflicts, pool_str2id(pool, fsi + 34, 1));
 		queue_push(conflicts, pkgs->elements[pidx]);
