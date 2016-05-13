@@ -1784,6 +1784,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->do_yum_obsoletes;
   case SOLVER_FLAG_NEED_UPDATEPROVIDE:
     return solv->needupdateprovide;
+  case SOLVER_FLAG_URPM_REORDER:
+    return solv->urpmreorder;
   default:
     break;
   }
@@ -1861,6 +1863,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_NEED_UPDATEPROVIDE:
     solv->needupdateprovide = value;
+    break;
+  case SOLVER_FLAG_URPM_REORDER:
+    solv->urpmreorder = value;
     break;
   default:
     break;

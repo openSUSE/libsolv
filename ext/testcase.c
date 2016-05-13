@@ -114,6 +114,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_FOCUS_INSTALLED,            "focusinstalled", 0 },
   { SOLVER_FLAG_YUM_OBSOLETES,              "yumobsoletes", 0 },
   { SOLVER_FLAG_NEED_UPDATEPROVIDE,         "needupdateprovide", 0 },
+  { SOLVER_FLAG_URPM_REORDER,               "urpmreorder", 0 },
   { 0, 0, 0 }
 };
 
@@ -1556,7 +1557,11 @@ testcase_setsolverflags(Solver *solv, const char *str)
 	  pool_debug(solv->pool, SOLV_ERROR, "setsolverflags: unknown flag '%.*s'\n", (int)(p - s), s);
 	  return 0;
 	}
-      solver_set_flag(solv, solverflags2str[i].flag, v);
+      if (solver_set_flag(solv, solverflags2str[i].flag, v) == -1)
+	{
+	  pool_debug(solv->pool, SOLV_ERROR, "setsolverflags: unsupported flag '%s'\n", solverflags2str[i].str);
+	  return 0;
+	}
     }
   return 1;
 }

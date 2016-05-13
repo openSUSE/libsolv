@@ -1195,6 +1195,63 @@ dislike_old_versions(Pool *pool, Queue *plist)
     }
 }
 
+
+/* special lang package handling for urpm */
+/* see https://bugs.mageia.org/show_bug.cgi?id=18315 */
+
+static int
+urpm_reorder_cmp(const void *ap, const void *bp, void *dp)
+{
+  return ((Id *)bp)[1] - ((Id *)ap)[1];
+}
+
+static void
+urpm_reorder(Solver *solv, Queue *plist)
+{
+  Pool *pool = solv->pool;
+  int i, count = plist->count;
+  /* add locale score to packages */
+  queue_insertn(plist, count, count, 0);
+  for (i = count - 1; i >= 0; i--)
+    {
+      Solvable *s = pool->solvables + plist->elements[i];
+      int score = 1;
+      if (s->requires)
+	{
+	  Id id, *idp, p, pp;
+	  const char *deps;
+	  for (idp = s->repo->idarraydata + s->requires; (id = *idp) != 0; idp++)
+	    {
+	      while (ISRELDEP(id))
+		{
+		  Reldep *rd = GETRELDEP(pool, id);
+		  id = rd->name;
+		}
+	      deps = strstr(pool_id2str(pool, id), "locales-");
+	      if (!deps)
+		continue;
+	      if (!strncmp(deps + 8, "en", 2))
+		score = 2;
+	      else
+		{
+		  score = 0;
+		  FOR_PROVIDES(p, pp, id)
+		    if (solv->decisionmap[p] > 0 || (pool->installed && pool->solvables[p].repo == pool->installed))
+		      score = 3;
+		  break;
+		}
+	    }
+	}
+      plist->elements[i * 2] = plist->elements[i];
+      plist->elements[i * 2 + 1] = score;
+    }
+  solv_sort(plist->elements, count, sizeof(Id) * 2, urpm_reorder_cmp, pool);
+  for (i = 0; i < count; i++)
+    plist->elements[i] = plist->elements[2 * i];
+  queue_truncate(plist, count);
+}
+
+
 /*
  *  POLICY_MODE_CHOOSE:     default, do all pruning steps
  *  POLICY_MODE_RECOMMEND:  leave out prune_to_recommended
@@ -1209,6 +1266,8 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
       /* reorder only */
       dislike_old_versions(pool, plist);
       sort_by_common_dep(pool, plist);
+      if (solv->urpmreorder)
+        urpm_reorder(solv, plist);
       prefer_suggested(solv, plist);
       policy_prefer_favored(solv, plist);
       return;
@@ -1235,6 +1294,8 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 #endif
 	  dislike_old_versions(pool, plist);
 	  sort_by_common_dep(pool, plist);
+	  if (solv->urpmreorder)
+	    urpm_reorder(solv, plist);
 	  prefer_suggested(solv, plist);
 	  policy_prefer_favored(solv, plist);
 	}
