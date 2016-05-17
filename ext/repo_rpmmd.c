@@ -657,7 +657,7 @@ put_in_cshash(struct parsedata *pd, const unsigned char *key, int keyl, Id id)
 	}
     }
   /* a new entry. put in csdata */
-  pd->csdata = solv_extend(pd->csdata, pd->ncsdata, 1, 1 + keyl + sizeof(Id), 4095);
+  pd->csdata = solv_extend(pd->csdata, pd->ncsdata, 1 + keyl + sizeof(Id), 1, 4095);
   d = pd->csdata + pd->ncsdata;
   d[0] = keyl - 1;
   memcpy(d + 1, key, keyl);
