@@ -2636,6 +2636,26 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      dqs.count = j;
 	    }
 
+	  /* implicitobsoleteusescolors doesn't mix well with supplements.
+	   * filter supplemented packages where we already decided
+	   * to install a different architecture */
+          if (dqs.count && pool->implicitobsoleteusescolors)
+	    {
+	      for (i = j = 0; i < dqs.count; i++)
+		{
+		  Id p2, pp2;
+		  p = dqs.elements[i];
+		  s = pool->solvables + p;
+		  FOR_PROVIDES(p2, pp2, s->name)
+		    if (solv->decisionmap[p2] > 0 && pool->solvables[p2].name == s->name && pool->solvables[p2].arch != s->arch)
+		      break;
+		  if (p2)
+		    continue;	/* ignore this package */
+		  dqs.elements[j++] = p;
+		}
+	      dqs.count = j;
+	    }
+
           /* make dq contain both recommended and supplemented pkgs */
 	  if (dqs.count)
 	    {
