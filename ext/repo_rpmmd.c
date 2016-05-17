@@ -651,7 +651,7 @@ put_in_cshash(struct parsedata *pd, const unsigned char *key, int keyl, Id id)
       while (ht[h])
 	{
 	  unsigned char *d = pd->csdata + ht[h];
-	  if (d[-1] == keyl && !memcmp(key, d, keyl))
+	  if (d[-1] == keyl - 1 && !memcmp(key, d, keyl))
 	    return;		/* XXX: first id wins... */
 	  h = HASHCHAIN_NEXT(h, hh, hm);
 	}
