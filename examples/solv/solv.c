@@ -673,9 +673,7 @@ main(int argc, char **argv)
   queue_push2(&job, SOLVER_ERASE|SOLVER_CLEANDEPS|SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, NAMESPACE_LANGUAGE, 0, REL_NAMESPACE, 1));
 #endif
 
-#if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA) || defined(MANDRIVA) || defined(MAGEIA))
 rerunsolver:
-#endif
   solv = solver_create(pool);
   solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
 #ifdef FEDORA
