@@ -1216,7 +1216,55 @@ urpm_reorder(Solver *solv, Queue *plist)
     {
       Solvable *s = pool->solvables + plist->elements[i];
       int score = 1;
-      if (s->requires)
+      const char *sn = pool_id2str(pool, s->name);
+
+      if (!strncmp(sn, "kernel-", 7))
+	{
+	  const char *devel = strstr(sn, "-devel-");
+	  if (devel && strlen(sn) < 256)
+	    {
+	      char kn[256];
+	      Id p, pp, knid;
+	      memcpy(kn, sn, devel - sn);
+	      strcpy(kn + (devel - sn), devel + 6);
+	      knid = pool_str2id(pool, kn, 0);
+	      if (knid)
+		{
+		  FOR_PROVIDES(p, pp, knid)
+		    if (solv->decisionmap[p] > 0 || (pool->installed && pool->solvables[p].repo == pool->installed))
+		      score = 3;
+		}
+	    }
+	}
+      else if ((sn = strstr(sn, "-kernel-")) != 0)
+	{
+	  sn += 8;
+	  if (strlen(sn) < 256 - 8 && *sn >= '0' && *sn <= '9' && sn[1] == '.')
+	    {
+	      const char *flavor = strchr(sn, '-');
+	      if (flavor)
+		{
+		  const char *release = strchr(flavor + 1, '-');
+		  if (release)
+		    {
+		      char kn[256];
+		      Id p, pp, knid;
+		      memcpy(kn, "kernel", 8);
+		      memcpy(kn + 6, flavor, release - flavor + 1);
+		      memcpy(kn + 6 + (release - flavor) + 1, sn, flavor - sn);
+		      strcpy(kn + 6 + (release + 1 - sn), release);
+		      knid = pool_str2id(pool, kn, 0);
+		      if (knid)
+			{
+			  FOR_PROVIDES(p, pp, knid)
+			    if (solv->decisionmap[p] > 0 || (pool->installed && pool->solvables[p].repo == pool->installed))
+			      score = 3;
+			}
+		    }
+		}
+	    }
+	}
+      if (score == 1 && s->requires)
 	{
 	  Id id, *idp, p, pp;
 	  const char *deps;
