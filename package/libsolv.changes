@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Wed May 18 15:09:56 CEST 2016 - mls@suse.de
+
+- add pool->setdisttype to the bindings
+- fix error in repo_deb that could lead to missing packages
+- add reason testing to testcase code
+- add pool_whatcontainsdep, selection_make_matchdepid, and
+  SELECTION_MATCH_DEPSTR
+- add SOLVER_FAVOR and SOLVER_DISFAVOR job types
+- allow unknown archs in pool_setarch
+- add the SOLVER_FLAG_URPM_REORDER solver flag
+- fix segfault in cshash dedup code
+- fix supplements handling when implicitobsoleteusescolors is set
+- bump version to 0.6.21
+
+-------------------------------------------------------------------
 Fri Apr  8 15:36:21 CEST 2016 - mls@suse.de
 
 - Better support of complex deps in pool_match_dep and
