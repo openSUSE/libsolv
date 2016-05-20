@@ -767,7 +767,17 @@ rerunsolver:
   acnt = solver_alternatives_count(solv);
   if (acnt)
     {
-      printf("Have %d alternatives\n\n", acnt);
+      if (acnt == 1)
+        printf("Have one alternative:\n");
+      else
+        printf("Have %d alternatives:\n", acnt);
+      for (i = 1; i <= acnt; i++)
+	{
+	  Id id, from;
+	  int atype = solver_get_alternative(solv, i, &id, &from, 0, 0, 0);
+	  printf("  - %s\n", solver_alternative2str(solv, atype, id, from));
+	}
+      printf("\n");
       answer = yesno("OK to continue (y/n/a)? ", 'a');
     }
   else
