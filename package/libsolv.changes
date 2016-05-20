@@ -9,7 +9,7 @@ Wed May 18 15:09:56 CEST 2016 - mls@suse.de
 - add SOLVER_FAVOR and SOLVER_DISFAVOR job types
 - allow unknown archs in pool_setarch
 - add the SOLVER_FLAG_URPM_REORDER solver flag
-- fix segfault in cshash dedup code
+- fix segfault in cshash dedup code [bnc#980901]
 - fix supplements handling when implicitobsoleteusescolors is set
 - bump version to 0.6.21
 
