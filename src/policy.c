@@ -1231,8 +1231,15 @@ urpm_reorder(Solver *solv, Queue *plist)
 	      if (knid)
 		{
 		  FOR_PROVIDES(p, pp, knid)
-		    if (solv->decisionmap[p] > 0 || (pool->installed && pool->solvables[p].repo == pool->installed))
-		      score = 3;
+		    {
+		      if (solv->decisionmap[p] > 0)
+			{
+			  score = 4;
+			  break;
+			}
+		      else if (pool->installed && pool->solvables[p].repo == pool->installed)
+			score = 3;
+		    }
 		}
 	    }
 	}
@@ -1257,8 +1264,15 @@ urpm_reorder(Solver *solv, Queue *plist)
 		      if (knid)
 			{
 			  FOR_PROVIDES(p, pp, knid)
-			    if (solv->decisionmap[p] > 0 || (pool->installed && pool->solvables[p].repo == pool->installed))
-			      score = 3;
+			    {
+			      if (solv->decisionmap[p] > 0)
+				{
+				  score = 4;
+				  break;
+				}
+			      if (pool->installed && pool->solvables[p].repo == pool->installed)
+				score = 3;
+			    }
 			}
 		    }
 		}
@@ -1284,8 +1298,15 @@ urpm_reorder(Solver *solv, Queue *plist)
 		{
 		  score = 0;
 		  FOR_PROVIDES(p, pp, id)
-		    if (solv->decisionmap[p] > 0 || (pool->installed && pool->solvables[p].repo == pool->installed))
-		      score = 3;
+		    {
+		      if (solv->decisionmap[p] > 0)
+			{
+			  score = 4;
+			  break;
+			}
+		      if (pool->installed && pool->solvables[p].repo == pool->installed)
+			score = 3;
+		    }
 		  break;
 		}
 	    }
