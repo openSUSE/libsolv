@@ -55,7 +55,8 @@
 /* 4: fixed triggers */
 /* 5: fixed checksum copying */
 /* 6: add SOLVABLE_PREREQ_IGNOREINST support */
-#define RPMDB_COOKIE_VERSION 6
+/* 7: fix bug in ignoreinst logic */
+#define RPMDB_COOKIE_VERSION 7
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
@@ -588,18 +589,23 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   solv_free(n);
   solv_free(v);
   solv_free(f);
-  if (has_ign && ignq->count > 2)
+  if (ignq && ignq->count)
     {
-      Id id, lastid = 0;
-      int j;
-
-      solv_sort(ignq->elements, ignq->count / 2, sizeof(Id) * 2, ignq_sortcmp, 0);
-      for (i = j = 0; i < ignq->count; i += 2)
+      int j = 0;
+      if (has_ign && ignq->count == 2)
+	j = 1;
+      else if (has_ign)
 	{
-	  id = ignq->elements[i];
-	  if (id != lastid && ignq->elements[i + 1] > 0)
-	    ignq->elements[j++] = id;
-	  lastid = id;
+	  Id id, lastid = 0;
+
+	  solv_sort(ignq->elements, ignq->count / 2, sizeof(Id) * 2, ignq_sortcmp, 0);
+	  for (i = j = 0; i < ignq->count; i += 2)
+	    {
+	      id = ignq->elements[i];
+	      if (id != lastid && ignq->elements[i + 1] > 0)
+		ignq->elements[j++] = id;
+	      lastid = id;
+	    }
 	}
       queue_truncate(ignq, j);
     }
