@@ -2,6 +2,26 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.21
+- new features:
+  * SOLVER_FAVOR and SOLVER_DISFAVOR job types
+- new functions:
+  * selection_make_matchdepid
+  * pool_whatcontainsdep
+  * pool_parserpmrichdep
+
+Version 0.6.20
+- new features:
+  * filter Requires(pre,post) for installed packages
+
+Version 0.6.13:
+- new features:
+  * SOLVER_ALLOWUNINSTALL job type
+  * ordercycle introspection
+- new functions:
+  * transaction_order_get_cycle
+  * transaction_order_get_cycleids
+
 Version 0.6.12:
 - new features:
   * tcl bindings
