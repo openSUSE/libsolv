@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Jun  7 11:24:47 CEST 2016 - mls@suse.de
+
+- fix bug in bug in ignoreinst logic [bnc#983141]
+
+-------------------------------------------------------------------
 Wed May 18 15:09:56 CEST 2016 - mls@suse.de
 
 - add pool->setdisttype to the bindings
