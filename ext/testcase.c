@@ -2099,8 +2099,8 @@ testcase_solverresult(Solver *solv, int resultflags)
 }
 
 
-int
-testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
+static int
+testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
 {
   Pool *pool = solv->pool;
   Repo *repo;
@@ -2132,6 +2132,9 @@ testcase_write(Solver *solv, const char *dir, int resultflags, const char *testc
       else
 	sprintf(priobuf, "%d", repo->priority);
       out = pool_tmpjoin(pool, name, ".repo", ".gz");
+      for (i = 0; out[i]; i++)
+	if (out[i] == '/')
+	  out[i] = '_';
       cmd = pool_tmpjoin(pool, "repo ", name, " ");
       cmd = pool_tmpappend(pool, cmd, priobuf, " ");
       cmd = pool_tmpappend(pool, cmd, "testtags ", out);
@@ -2318,6 +2321,52 @@ testcase_write(Solver *solv, const char *dir, int resultflags, const char *testc
   solv_free(cmd);
   strqueue_free(&sq);
   return 1;
+}
+
+int
+testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
+{
+  Pool *pool = solv->pool;
+  int i, r, repoid;
+  int mangle = 1;
+  const char **orignames;
+
+  /* mangle repo names so that there are no conflicts */
+  orignames = solv_calloc(pool->nrepos, sizeof(char *));
+  for (repoid = 1; repoid < pool->nrepos; repoid++)
+    {
+      Repo *repo = pool_id2repo(pool, repoid);
+      char *buf = solv_malloc((repo->name ? strlen(repo->name) : 0) + 40);
+      char *mp;
+      orignames[i] = repo->name;
+      if (!repo->name || !repo->name[0])
+        sprintf(buf, "#%d", repoid);
+      else
+	strcpy(buf, repo->name);
+      for (i = 0; buf[i]; i++)
+	if (buf[i] == ' ' || buf[i] == '\t' || buf[i] == '/')
+	  buf[i] = '_';
+      mp = buf + strlen(buf);
+      for (;;)
+	{
+	  for (i = 1; i < repoid; i++)
+	    if (!strcmp(buf, pool_id2repo(pool, i)->name))
+	      break;
+	  if (i == repoid)
+	    break;
+          sprintf(mp, "_%d", mangle++);
+	}
+      repo->name = buf;
+    }
+  r = testcase_write_mangled(solv, dir, resultflags, testcasename, resultname);
+  for (repoid = 1; repoid < pool->nrepos; repoid++)
+    {
+      Repo *repo = pool_id2repo(pool, repoid);
+      solv_free((void *)repo->name);
+      repo->name = orignames[i];
+    }
+  solv_free(orignames);
+  return r;
 }
 
 static char *
