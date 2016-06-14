@@ -1264,8 +1264,7 @@ finish_v2_solvable(Pool *pool, Repodata *data, Solvable *s, char *filelist, int 
 	  repodata_add_dirstr(data, s - pool->solvables, SOLVABLE_FILELIST, did, p);
 	}
     }
-  s->supplements = repo_fix_supplements(s->repo, s->provides, s->supplements, 0);
-  s->conflicts = repo_fix_conflicts(s->repo, s->conflicts);
+  repo_rewrite_suse_deps(s, 0);
 }
 
 /* stripped down version of susetags parser used for testcases */

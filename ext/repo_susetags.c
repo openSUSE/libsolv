@@ -388,12 +388,8 @@ finish_solvable(struct parsedata *pd, Solvable *s, Offset freshens)
   /* A self provide, except for source packages.  This is harmless
      to do twice (in case we see the same package twice).  */
   if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-    s->provides = repo_addid_dep(pd->repo, s->provides,
-		pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  /* XXX This uses repo_addid_dep internally, so should also be
-     harmless to do twice.  */
-  s->supplements = repo_fix_supplements(pd->repo, s->provides, s->supplements, freshens);
-  s->conflicts = repo_fix_conflicts(pd->repo, s->conflicts);
+    s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+  repo_rewrite_suse_deps(s, freshens);
   if (pd->ndirs)
     commit_diskusage(pd, handle);
 }

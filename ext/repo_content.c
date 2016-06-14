@@ -404,7 +404,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 		  if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 		    s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
 		  if (code10)
-		    s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
+		    repo_rewrite_suse_deps(s, 0);
 		}
 	      /* create new solvable */
 	      s = pool_id2solvable(pool, repo_add_solvable(repo));
@@ -538,7 +538,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (code10)
-	s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
+	repo_rewrite_suse_deps(s, 0);
 
       /* now for every other arch, clone the product except the architecture */
       for (i = 0; i < numotherarchs; ++i)

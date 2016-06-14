@@ -990,8 +990,7 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
   s->supplements = makedeps(pool, repo, rpmhead, TAG_SUPPLEMENTNAME, TAG_SUPPLEMENTVERSION, TAG_SUPPLEMENTFLAGS, 0, 0);
   s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCENAME, TAG_ENHANCEVERSION, TAG_ENHANCEFLAGS, 0, 0);
 
-  s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
-  s->conflicts = repo_fix_conflicts(repo, s->conflicts);
+  repo_rewrite_suse_deps(s, 0);
 
   if (data && ignq.count)
     repodata_set_idarray(data, s - pool->solvables, SOLVABLE_PREREQ_IGNOREINST, &ignq);
