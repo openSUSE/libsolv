@@ -167,6 +167,7 @@ SOLV_1.0 {
 		repo_lookup_void;
 		repo_matchvalue;
 		repo_reserve_ids;
+		repo_rewrite_suse_deps;
 		repo_search;
 		repo_set_deparray;
 		repo_set_id;

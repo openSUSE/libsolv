@@ -348,7 +348,6 @@ extern void solver_create_state_maps(Solver *solv, Map *installedmap, Map *confl
 
 extern void solver_calc_duchanges(Solver *solv, DUChanges *mps, int nmps);
 extern int solver_calc_installsizechange(Solver *solv);
-extern void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
 
 extern void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
 extern int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
@@ -383,6 +382,9 @@ extern const char *solver_alternative2str(Solver *solv, int type, Id id, Id from
 			pool_match_nevr(pool, pool->solvables + p, what) == 0)	\
 	continue;								\
       else
+
+/* weird suse stuff */
+extern void solver_trivial_installable(Solver *solv, Queue *pkgs, Queue *res);
 
 #ifdef __cplusplus
 }

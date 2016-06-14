@@ -33,9 +33,11 @@ extern void solver_printprobleminfo(Solver *solv, Id problem);
 extern void solver_printcompleteprobleminfo(Solver *solv, Id problem);
 extern void solver_printsolution(Solver *solv, Id problem, Id solution);
 extern void solver_printallsolutions(Solver *solv);
-extern void solver_printtrivial(Solver *solv);
 
 extern void transaction_print(Transaction *trans);
+
+/* weird suse stuff */
+extern void solver_printtrivial(Solver *solv);
 
 #ifdef __cplusplus
 }

@@ -289,13 +289,6 @@ static inline const char *pool_solvid2str(Pool *pool, Id p)
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
 Id pool_id2langid(Pool *pool, Id id, const char *lang, int create);
 
-int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap, Map *multiversionmap);
-int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed, Map *multiversionmap);
-int solvable_trivial_installable_queue(Solvable *s, Queue *installed, Map *multiversionmap);
-int solvable_is_irrelevant_patch(Solvable *s, Map *installedmap);
-
-void pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
-
 int pool_intersect_evrs(Pool *pool, int pflags, Id pevr, int flags, int evr);
 int pool_match_dep(Pool *pool, Id d1, Id d2);
 
@@ -358,6 +351,16 @@ void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*c
 
 void pool_clear_pos(Pool *pool);
 
+/* lookup functions */
+const char *pool_lookup_str(Pool *pool, Id entry, Id keyname);
+Id pool_lookup_id(Pool *pool, Id entry, Id keyname);
+unsigned long long pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned long long notfound);
+int pool_lookup_void(Pool *pool, Id entry, Id keyname);
+const unsigned char *pool_lookup_bin_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
+int pool_lookup_idarray(Pool *pool, Id entry, Id keyname, Queue *q);
+const char *pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
+const char *pool_lookup_deltalocation(Pool *pool, Id entry, unsigned int *medianrp);
+
 
 #define DUCHANGES_ONLYADD	1
 
@@ -368,19 +371,10 @@ typedef struct _DUChanges {
   int flags;
 } DUChanges;
 
-void pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps);
-int pool_calc_installsizechange(Pool *pool, Map *installedmap);
-void pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res);
-void pool_trivial_installable_multiversionmap(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res, Map *multiversionmap);
 
-const char *pool_lookup_str(Pool *pool, Id entry, Id keyname);
-Id pool_lookup_id(Pool *pool, Id entry, Id keyname);
-unsigned long long pool_lookup_num(Pool *pool, Id entry, Id keyname, unsigned long long notfound);
-int pool_lookup_void(Pool *pool, Id entry, Id keyname);
-const unsigned char *pool_lookup_bin_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
-int pool_lookup_idarray(Pool *pool, Id entry, Id keyname, Queue *q);
-const char *pool_lookup_checksum(Pool *pool, Id entry, Id keyname, Id *typep);
-const char *pool_lookup_deltalocation(Pool *pool, Id entry, unsigned int *medianrp);
+void pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
+void pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps);
+int  pool_calc_installsizechange(Pool *pool, Map *installedmap);
 
 void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
 
@@ -410,6 +404,10 @@ void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
 
 #define POOL_DEBUG(type, ...) do {if ((pool->debugmask & (type)) != 0) pool_debug(pool, (type), __VA_ARGS__);} while (0)
 #define IF_POOLDEBUG(type) if ((pool->debugmask & (type)) != 0)
+
+/* weird suse stuff */
+void pool_trivial_installable_multiversionmap(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res, Map *multiversionmap);
+void pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res);
 
 #ifdef __cplusplus
 }
