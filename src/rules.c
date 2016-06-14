@@ -3870,6 +3870,8 @@ complex_cleandeps_addback(Pool *pool, Id ip, Id req, Map *im, Map *installedm, Q
 	      if (!MAPTST(installedm, -p))
 	        break;
 	    }
+	  else if (p == ip)
+	    break;
 	}
       if (!p)
 	{
@@ -4399,6 +4401,11 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		}
 #endif
 	      FOR_PROVIDES(p, pp, req)
+		if (p == ip)
+		  break;
+	      if (p)
+		continue;
+	      FOR_PROVIDES(p, pp, req)
 		{
 		  if (MAPTST(&im, p))
 		    continue;
@@ -4429,6 +4436,11 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		  continue;
 		}
 #endif
+	      FOR_PROVIDES(p, pp, req)
+		if (p == ip)
+		  break;
+	      if (p)
+		continue;
 	      FOR_PROVIDES(p, pp, req)
 		{
 		  if (MAPTST(&im, p))
