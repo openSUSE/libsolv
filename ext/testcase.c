@@ -1736,6 +1736,33 @@ testcase_reason2str(Id reason)
   return "?";
 }
 
+static struct rclass2str {
+  Id rclass;
+  const char *str;
+} rclass2str[] = {
+  { SOLVER_RULE_PKG, "pkg" },
+  { SOLVER_RULE_UPDATE, "update" },
+  { SOLVER_RULE_FEATURE, "feature" },
+  { SOLVER_RULE_JOB, "job" },
+  { SOLVER_RULE_DISTUPGRADE, "distupgrade" },
+  { SOLVER_RULE_INFARCH, "infarch" },
+  { SOLVER_RULE_CHOICE, "choice" },
+  { SOLVER_RULE_LEARNT, "learnt" },
+  { SOLVER_RULE_BEST, "best" },
+  { SOLVER_RULE_YUMOBS, "yumobs" },
+  { 0, 0 }
+};
+
+static const char *
+testcase_rclass2str(Id rclass)
+{
+  int i;
+  for (i = 0; rclass2str[i].str; i++)
+    if (rclass == rclass2str[i].rclass)
+      return rclass2str[i].str;
+  return "unknown";
+}
+
 static int
 dump_genid(Pool *pool, Strqueue *sq, Id id, int cnt)
 {
@@ -1980,44 +2007,8 @@ testcase_solverresult(Solver *solv, int resultflags)
       queue_init(&q);
       for (rid = 1; (rclass = solver_ruleclass(solv, rid)) != SOLVER_RULE_UNKNOWN; rid++)
 	{
-	  char *prefix;
-	  switch (rclass)
-	    {
-	    case SOLVER_RULE_PKG:
-	      prefix = "pkg ";
-	      break;
-	    case SOLVER_RULE_UPDATE:
-	      prefix = "update ";
-	      break;
-	    case SOLVER_RULE_FEATURE:
-	      prefix = "feature ";
-	      break;
-	    case SOLVER_RULE_JOB:
-	      prefix = "job ";
-	      break;
-	    case SOLVER_RULE_DISTUPGRADE:
-	      prefix = "distupgrade ";
-	      break;
-	    case SOLVER_RULE_INFARCH:
-	      prefix = "infarch ";
-	      break;
-	    case SOLVER_RULE_CHOICE:
-	      prefix = "choice ";
-	      break;
-	    case SOLVER_RULE_LEARNT:
-	      prefix = "learnt ";
-	      break;
-	    case SOLVER_RULE_BEST:
-	      prefix = "best ";
-	      break;
-	    case SOLVER_RULE_YUMOBS:
-	      prefix = "yumobs ";
-	      break;
-	    default:
-	      prefix = "unknown ";
-	      break;
-	    }
-	  prefix = solv_dupjoin("rule ", prefix, testcase_ruleid(solv, rid));
+	  char *prefix = solv_dupjoin("rule ", testcase_rclass2str(rclass), " ");
+	  prefix = solv_dupappend(prefix, testcase_ruleid(solv, rid), 0);
 	  solver_ruleliterals(solv, rid, &q);
 	  if (rclass == SOLVER_RULE_FEATURE && q.count == 1 && q.elements[0] == -SYSTEMSOLVABLE)
 	    continue;
