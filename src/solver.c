@@ -2913,6 +2913,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      lastsi = -1;
 		      break;
 		    }
+		  if (solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, p))
+		    continue;
 		  if (lastsi < 0 && (MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
 		    lastsi = i;
 		}
