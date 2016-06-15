@@ -2927,6 +2927,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      p = -solv->branches.elements[i];
 		      if (p <= 0 || solv->decisionmap[p] != l + 1)
 			continue;
+		      if (solv->favormap.size && MAPTST(&solv->favormap, p))
+			if (!(solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, p)))
+			  continue;	/* current selection is favored */
 		      if (!(MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
 			{
 			  lasti = lastsi;
