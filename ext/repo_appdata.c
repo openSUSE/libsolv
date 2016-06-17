@@ -178,12 +178,18 @@ startElement(void *userData, const char *name, const char **atts)
   switch(pd->state)
     {
     case STATE_APPLICATION:
-      s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
-      pd->handle = s - pool->solvables;
-      pd->havesummary = 0;
       type = find_attr("type", atts);
       if (!type || !*type)
         type = "desktop";
+      if (strcmp(type, "desktop") != 0)
+	{
+	  /* ignore for now */
+	  pd->solvable = 0;
+	  break;
+	}
+      s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+      pd->handle = s - pool->solvables;
+      pd->havesummary = 0;
       repodata_set_poolstr(pd->data, pd->handle, SOLVABLE_CATEGORY, type);
       break;
     case STATE_DESCRIPTION:
@@ -372,6 +378,13 @@ endElement(void *userData, const char *name)
       return;
     }
   pd->skip_depth = 0;
+
+  if (!s)
+    {
+      pd->state = pd->sbtab[pd->state];
+      pd->docontent = 0;
+      return;
+    }
 
   switch (pd->state)
     {
