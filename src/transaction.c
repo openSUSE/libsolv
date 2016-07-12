@@ -56,6 +56,14 @@ obsq_sortcmp(const void *ap, const void *bp, void *dp)
   r = pool_evrcmp(pool, oas->evr, obs->evr, EVRCMP_COMPARE);
   if (r)
     return -r;	/* highest version first */
+  if (oas->arch != obs->arch)
+    {
+      /* bring same arch to front */
+      if (oas->arch == s->arch)
+        return -1;
+      if (obs->arch == s->arch)
+        return 1;
+    }
   return oa - ob;
 }
 
