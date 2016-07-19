@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Tue Jul 19 09:28:15 UTC 2016 - ngompa13@gmail.com
+
+- Enable libsolv shared library package to fix linking issues
+  with libxml2 and compression libraries
+
+-------------------------------------------------------------------
+Tue Jul 19 09:10:39 UTC 2016 - ngompa13@gmail.com
+
+- Enable bzip2 and xz/lzma compression support
+
+-------------------------------------------------------------------
 Tue Jun  7 11:24:47 CEST 2016 - mls@suse.de
 
 - fix bug in ignoreinst logic [bnc#983141]

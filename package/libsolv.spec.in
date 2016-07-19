@@ -23,10 +23,12 @@ Source:         libsolv-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %bcond_without enable_static
-%bcond_without disable_shared
+%bcond_with disable_shared
 %bcond_without perl_binding
 %bcond_without python_binding
 %bcond_without ruby_binding
+%bcond_without bz2
+%bcond_without xz
 %bcond_with zypp
 
 %if 0%{?mandriva_version}
@@ -73,6 +75,21 @@ BuildRequires:  swig
 %global python_sitearch %(python -c "from distutils.sysconfig import get_python_lib; print get_python_lib(True);")
 BuildRequires:  python-devel
 BuildRequires:  swig
+%endif
+
+%if %{with bz2}
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+BuildRequires:  bzip2-devel
+%endif
+
+%if 0%{?suse_version}
+BuildRequires:  libbz2-devel
+%endif
+
+%endif
+
+%if %{with xz}
+BuildRequires:  xz-devel
 %endif
 
 Summary:        A new approach to package dependency solving
@@ -163,7 +180,7 @@ export CXXFLAGS="$CFLAGS"
 
 CMAKE_FLAGS=
 %if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
-CMAKE_FLAGS="-DFEDORA=1"
+CMAKE_FLAGS="-DFEDORA=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
 %endif
 %if 0%{?suse_version}
 CMAKE_FLAGS="-DSUSE=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
@@ -179,6 +196,8 @@ cmake   $CMAKE_FLAGS \
 	%{?with_perl_binding:-DENABLE_PERL=1} \
 	%{?with_python_binding:-DENABLE_PYTHON=1} \
 	%{?with_ruby_binding:-DENABLE_RUBY=1} \
+	%{?with_bz2:-DENABLE_BZIP2_COMPRESSION=1} \
+	%{?with_xz:-DENABLE_LZMA_COMPRESSION=1} \
 	%{?with_zypp:-DENABLE_SUSEREPO=1 -DENABLE_HELIXREPO=1} \
 	-DUSE_VENDORDIRS=1 \
 	-DCMAKE_SKIP_RPATH=1
