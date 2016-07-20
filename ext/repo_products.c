@@ -376,12 +376,8 @@ endElement(void *userData, const char *name)
         repodata_set_str(pd->data, pd->handle, SOLVABLE_CPEID, pd->content);
       break;
     case STATE_ENDOFLIFE:
-      if (*pd->content)
-	{
-	  time_t t = datestr2timestamp(pd->content);
-	  if (t)
-	    repodata_set_num(pd->data, pd->handle, PRODUCT_ENDOFLIFE, (unsigned long long)t);
-	}
+      /* FATE#320699: Support tri-state product-endoflife (tag absent, present but nodate(0), present + date) */
+      repodata_set_num(pd->data, pd->handle, PRODUCT_ENDOFLIFE, (*pd->content ? datestr2timestamp(pd->content) : 0));
       break;
     default:
       break;
