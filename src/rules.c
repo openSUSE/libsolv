@@ -4388,6 +4388,36 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 #ifdef CLEANDEPSDEBUG
       printf("adding back %s\n", pool_solvable2str(pool, s));
 #endif
+      if (s->repo == installed && pool->implicitobsoleteusescolors)
+	{
+	  Id a, bestarch = 0;
+	  FOR_PROVIDES(p, pp, s->name)
+	    {
+	      Solvable *ps = pool->solvables + p;
+	      if (ps->name != s->name || ps->repo == installed)
+	        continue;
+	      a = ps->arch;
+	      a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
+	      if (a && a != 1 && (!bestarch || a < bestarch))
+		bestarch = a;
+	    }
+	  if (bestarch && (s->arch > pool->lastarch || pool->id2arch[s->arch] != bestarch))
+	    {
+	      FOR_PROVIDES(p, pp, s->name)
+		{
+		  Solvable *ps = pool->solvables + p;
+		  if (ps->repo == installed && ps->name == s->name && ps->evr == s->evr && ps->arch != s->arch && ps->arch < pool->lastarch && pool->id2arch[ps->arch] == bestarch)
+		    if (!MAPTST(&im, p))
+		      {
+#ifdef CLEANDEPSDEBUG
+		        printf("%s lockstep %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
+#endif
+		        MAPSET(&im, p);
+		        queue_push(&iq, p);
+		      }
+		}
+	    }
+	}
       if (s->requires)
 	{
 	  reqp = s->repo->idarraydata + s->requires;
