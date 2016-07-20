@@ -27,7 +27,8 @@
 # define PRODUCTS_PATH "/etc/products.d"
 #endif
 #ifdef ENABLE_APPDATA
-# define APPDATA_PATH "/usr/share/appdata"
+# define APPDATA_PATH "/usr/share/metainfo"
+# define APPDATA_LEGACY_PATH "/usr/share/appdata"
 #endif
 
 static void
@@ -99,6 +100,12 @@ read_installed_rpm(struct repoinfo *cinfo)
   if (repo_add_appdata_dir(repo, APPDATA_PATH, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
     {
       fprintf(stderr, "appdata reading failed: %s\n", pool_errstr(pool));
+      return 0;
+    }
+#elif defined(ENABLE_APPDATA) && defined(APPDATA_LEGACY_PATH)
+  if (repo_add_appdata_dir(repo, APPDATA_LEGACY_PATH, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | REPO_USE_ROOTDIR))
+    {
+      fprintf(stderr, "appdata reading from legacy dir failed: %s\n", pool_errstr(pool));
       return 0;
     }
 #endif
