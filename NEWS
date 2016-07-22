@@ -2,6 +2,9 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.22, 0.6.23
+- bug fix releases, no new features
+
 Version 0.6.21
 - new features:
   * SOLVER_FAVOR and SOLVER_DISFAVOR job types

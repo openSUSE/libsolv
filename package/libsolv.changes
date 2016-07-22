@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Fri Jul 22 11:37:23 CEST 2016 - mls@suse.de
+
+- also scan /usr/share/metainfo for appdata files [bnc#989830]
+- support tri-state product-endoflife [fate#320699]
+- take lockstep into account when calculating unneeded packages
+- ignore appplication extensions for now in appdata parser
+  [bnc#984332]
+- add enabled features to solvversion.h
+- take disfavors into account when auto-minimizing for recommended
+  packages
+- change cleandeps code so that it keeps all providers
+- make sure that all repos have different names in a testcase
+- bump version to 0.6.23
+
+-------------------------------------------------------------------
 Tue Jun  7 11:24:47 CEST 2016 - mls@suse.de
 
 - fix bug in ignoreinst logic [bnc#983141]
