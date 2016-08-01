@@ -2328,7 +2328,7 @@ testcase_write(Solver *solv, const char *dir, int resultflags, const char *testc
       Repo *repo = pool_id2repo(pool, repoid);
       char *buf = solv_malloc((repo->name ? strlen(repo->name) : 0) + 40);
       char *mp;
-      orignames[i] = repo->name;
+      orignames[repoid - 1] = repo->name;
       if (!repo->name || !repo->name[0])
         sprintf(buf, "#%d", repoid);
       else
@@ -2353,7 +2353,7 @@ testcase_write(Solver *solv, const char *dir, int resultflags, const char *testc
     {
       Repo *repo = pool_id2repo(pool, repoid);
       solv_free((void *)repo->name);
-      repo->name = orignames[i];
+      repo->name = orignames[repoid - 1];
     }
   solv_free(orignames);
   return r;
