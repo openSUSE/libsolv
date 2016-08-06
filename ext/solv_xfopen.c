@@ -13,6 +13,10 @@
 #include <zlib.h>
 #include <fcntl.h>
 
+#if !defined(HAVE_FUNOPEN) && !defined(HAVE_FOPENCOOKIE)
+#include "solv_xfopen_fallback_fopencookie.h"
+#endif
+
 #include "solv_xfopen.h"
 #include "util.h"
 
@@ -39,7 +43,7 @@ static FILE *cookieopen(void *cookie, const char *mode,
 	ssize_t (*cwrite)(void *, const char *, size_t),
 	int (*cclose)(void *))
 {
-#ifdef HAVE_FUNOPEN
+#if defined(HAVE_FUNOPEN) && !defined(HAVE_FOPENCOOKIE)
   if (!cookie)
     return 0;
   return funopen(cookie,
@@ -48,7 +52,7 @@ static FILE *cookieopen(void *cookie, const char *mode,
       (fpos_t (*)(void *, fpos_t, int))NULL,					/* seekfn */
       cclose
       );
-#elif defined(HAVE_FOPENCOOKIE)
+#else
   cookie_io_functions_t cio;
 
   if (!cookie)
@@ -60,8 +64,6 @@ static FILE *cookieopen(void *cookie, const char *mode,
     cio.write = cwrite;
   cio.close = cclose;
   return  fopencookie(cookie, *mode == 'w' ? "w" : "r", cio);
-#else
-# error Need to implement custom I/O
 #endif
 }
 
