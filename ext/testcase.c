@@ -767,6 +767,7 @@ testcase_str2solvid(Pool *pool, const char *str)
 	  evrid = pool_strn2id(pool, str + i + 1, repostart - (i + 1), 0);
 	  if (!evrid)
 	    continue;
+	  /* first check whatprovides */
 	  FOR_PROVIDES(p, pp, nid)
 	    {
 	      Solvable *s = pool->solvables + p;
@@ -777,6 +778,31 @@ testcase_str2solvid(Pool *pool, const char *str)
 	      if (arch && s->arch != arch)
 		continue;
 	      return p;
+	    }
+	  /* maybe it's not installable and thus not in whatprovides. do a slow search */
+	  if (repo)
+	    {
+	      Solvable *s;
+	      FOR_REPO_SOLVABLES(repo, p, s)
+		{
+		  if (s->name != nid || s->evr != evrid)
+		    continue;
+		  if (arch && s->arch != arch)
+		    continue;
+		  return p;
+		}
+	    }
+	  else
+	    {
+	      FOR_POOL_SOLVABLES(p)
+		{
+		  Solvable *s = pool->solvables + p;
+		  if (s->name != nid || s->evr != evrid)
+		    continue;
+		  if (arch && s->arch != arch)
+		    continue;
+		  return p;
+		}
 	    }
 	}
     }
