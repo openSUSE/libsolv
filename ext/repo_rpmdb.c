@@ -162,10 +162,16 @@
 # define RPM_INDEX_SIZE 8	/* rpmdbid + array index */
 #endif
 
+/* some limits to guard against corrupt rpms */
+#define MAX_SIG_CNT		0x100000
+#define MAX_SIG_DSIZE		0x100000
+
+#define MAX_HDR_CNT		0x100000
+#define MAX_HDR_DSIZE		0x2000000
 
 typedef struct rpmhead {
   int cnt;
-  int dcnt;
+  unsigned int dcnt;
   unsigned char *dp;
   int forcebinary;		/* sigh, see rh#478907 */
   unsigned char data[1];
@@ -204,7 +210,7 @@ headint32array(RpmHead *h, int tag, int *cnt)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (o + 4 * i > h->dcnt)
+  if (o > h->dcnt || i > h->dcnt || o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
   r = solv_calloc(i ? i : 1, sizeof(unsigned int));
@@ -226,7 +232,7 @@ headint32(RpmHead *h, int tag)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (i == 0 || o + 4 * i > h->dcnt)
+  if (i == 0 || o > h->dcnt || i > h->dcnt || o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
   return d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
@@ -243,7 +249,7 @@ headint64array(RpmHead *h, int tag, int *cnt)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (o + 8 * i > h->dcnt)
+  if (o > h->dcnt || i > h->dcnt || o + 8 * i > h->dcnt)
     return 0;
   d = h->dp + o;
   r = solv_calloc(i ? i : 1, sizeof(unsigned long long));
@@ -267,7 +273,7 @@ headint64(RpmHead *h, int tag)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (i == 0 || o + 8 * i > h->dcnt)
+  if (i == 0 || o > h->dcnt || i > h->dcnt || o + 8 * i > h->dcnt)
     return 0;
   d = h->dp + o;
   i = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
@@ -284,7 +290,7 @@ headint16array(RpmHead *h, int tag, int *cnt)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (o + 4 * i > h->dcnt)
+  if (o > h->dcnt || i > h->dcnt || o + 2 * i > h->dcnt)
     return 0;
   d = h->dp + o;
   r = solv_calloc(i ? i : 1, sizeof(unsigned int));
@@ -320,6 +326,8 @@ headstringarray(RpmHead *h, int tag, int *cnt)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  if (o > h->dcnt || i > h->dcnt)
+    return 0;
   r = solv_calloc(i ? i : 1, sizeof(char *));
   if (cnt)
     *cnt = i;
@@ -347,7 +355,7 @@ headbinary(RpmHead *h, int tag, unsigned int *sizep)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (o > h->dcnt || o + i < o || o + i > h->dcnt)
+  if (o > h->dcnt || i > h->dcnt || o + i > h->dcnt)
     return 0;
   if (sizep)
     *sizep = i;
@@ -2148,7 +2156,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   sigcnt = getu32(lead + 96 + 8);
   sigdsize = getu32(lead + 96 + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x100000)
+  if (sigcnt >= MAX_SIG_CNT || sigdsize >= MAX_SIG_DSIZE)
     {
       pool_error(pool, -1, "%s: bad signature header", rpm);
       fclose(fp);
@@ -2246,7 +2254,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   sigcnt = getu32(lead + 8);
   sigdsize = getu32(lead + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x2000000)
+  if (sigcnt >= MAX_HDR_CNT || sigdsize >= MAX_HDR_DSIZE)
     {
       pool_error(pool, -1, "%s: bad header", rpm);
       fclose(fp);
@@ -2656,7 +2664,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
     }
   sigcnt = getu32(lead + 96 + 8);
   sigdsize = getu32(lead + 96 + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x100000)
+  if (sigcnt >= MAX_SIG_CNT || sigdsize >= MAX_SIG_DSIZE)
     {
       pool_error(state->pool, 0, "%s: bad signature header", name);
       return 0;
@@ -2686,7 +2694,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
     }
   sigcnt = getu32(lead + 8);
   sigdsize = getu32(lead + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x2000000)
+  if (sigcnt >= MAX_HDR_CNT || sigdsize >= MAX_HDR_DSIZE)
     {
       pool_error(state->pool, 0, "%s: bad header", name);
       return 0;
@@ -2730,6 +2738,8 @@ rpm_byrpmh(void *rpmstate, Header h)
     return 0;
   sigcnt = getu32(uh);
   sigdsize = getu32(uh + 4);
+  if (sigcnt >= MAX_HDR_CNT || sigdsize >= MAX_HDR_DSIZE)
+    return 0;
   l = sigdsize + sigcnt * 16;
   if (l > state->rpmheadsize)
     {
