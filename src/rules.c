@@ -2361,8 +2361,10 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       if (!installed)
 	break;
       if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && what == installed->repoid))
-	FOR_REPO_SOLVABLES(installed, p, s)
-	  queue_push2(q, DISABLE_UPDATE, p);
+	{
+	  FOR_REPO_SOLVABLES(installed, p, s)
+	    queue_push2(q, DISABLE_UPDATE, p);
+	}
       FOR_JOB_SELECT(p, pp, select, what)
 	if (pool->solvables[p].repo == installed)
 	  {
@@ -3956,8 +3958,10 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	  what = job->elements[i + 1];
 	  select = how & SOLVER_SELECTMASK;
 	  if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && what == installed->repoid))
-	    FOR_REPO_SOLVABLES(installed, p, s)
-	      MAPSET(&userinstalled, p - installed->start);
+	    {
+	      FOR_REPO_SOLVABLES(installed, p, s)
+	        MAPSET(&userinstalled, p - installed->start);
+	    }
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    if (pool->solvables[p].repo == installed)
 	      MAPSET(&userinstalled, p - installed->start);

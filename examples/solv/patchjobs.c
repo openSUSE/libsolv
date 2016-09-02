@@ -19,8 +19,10 @@ add_patchjobs(Pool *pool, Queue *job)
   map_init(&installedmap, pool->nsolvables);
   solver_calculate_multiversionmap(pool, job, &multiversionmap);
   if (pool->installed)
-    FOR_REPO_SOLVABLES(pool->installed, p, s)
-      MAPSET(&installedmap, p);
+    {
+      FOR_REPO_SOLVABLES(pool->installed, p, s)
+        MAPSET(&installedmap, p);
+    }
 
   /* install all patches */
   for (p = 1; p < pool->nsolvables; p++)
