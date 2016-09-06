@@ -951,7 +951,7 @@ set_description_author(Repodata *data, Id handle, char *str)
 }
 
 static int
-rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, int flags)
+rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, int flags)
 {
   char *name;
   char *evr;
@@ -1110,8 +1110,14 @@ struct rpmdbentry {
 #define ENTRIES_BLOCK 255
 #define NAMEDATA_BLOCK 1023
 
+static inline unsigned int
+getu32(const unsigned char *dp)
+{
+  return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
+}
 
-static inline Id db2rpmdbid(unsigned char *db, int byteswapped)
+static inline Id
+db2rpmdbid(unsigned char *db, int byteswapped)
 {
 #ifdef RPM5
   return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
@@ -1127,7 +1133,8 @@ static inline Id db2rpmdbid(unsigned char *db, int byteswapped)
 #endif
 }
 
-static inline void rpmdbid2db(unsigned char *db, Id id, int byteswapped)
+static inline void
+rpmdbid2db(unsigned char *db, Id id, int byteswapped)
 {
 #ifdef RPM5
   db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
@@ -1372,23 +1379,50 @@ getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *ma
   return entries;
 }
 
-/* retrive header by rpmdbid */
+/* common code, return dbid on success, -1 on error */
 static int
-getrpmdbid(struct rpmdbstate *state, Id rpmdbid)
+getrpm_dbdata(struct rpmdbstate *state, DBT *dbdata, int dbid)
 {
-  unsigned char buf[16];
-  DBT dbkey;
-  DBT dbdata;
+  unsigned int dsize, cnt, l;
   RpmHead *rpmhead;
 
-  if (!rpmdbid)
+  if (dbdata->size < 8)
+    return pool_error(state->pool, -1, "corrupt rpm database (size)");
+  cnt = getu32((const unsigned char *)dbdata->data);
+  dsize = getu32((const unsigned char *)dbdata->data + 4);
+  if (cnt >= MAX_HDR_CNT || dsize >= MAX_HDR_DSIZE)
+    return pool_error(state->pool, -1, "corrupt rpm database (cnt/dcnt)");
+  l = cnt * 16 + dsize;
+  if (8 + l > dbdata->size)
+    return pool_error(state->pool, -1, "corrupt rpm database (data size)");
+  if (l + 1 > state->rpmheadsize)
     {
-      pool_error(state->pool, 0, "illegal rpmdbid");
-      return -1;
+      state->rpmheadsize = l + 128;
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
     }
+  rpmhead = state->rpmhead;
+  rpmhead->forcebinary = 1;
+  rpmhead->cnt = cnt;
+  rpmhead->dcnt = dsize;
+  memcpy(rpmhead->data, (unsigned char *)dbdata->data + 8, l);
+  rpmhead->data[l] = 0;
+  rpmhead->dp = rpmhead->data + cnt * 16;
+  return dbid;
+}
+
+/* retrive header by rpmdbid, returns 0 if not found, -1 on error */
+static int
+getrpm_dbid(struct rpmdbstate *state, Id dbid)
+{
+  unsigned char buf[4];
+  DBT dbkey;
+  DBT dbdata;
+
+  if (dbid <= 0)
+    return pool_error(state->pool, -1, "illegal rpmdbid %d", dbid);
   if (state->dbopened != 1 && !openpkgdb(state))
     return -1;
-  rpmdbid2db(buf, rpmdbid, state->byteswapped);
+  rpmdbid2db(buf, dbid, state->byteswapped);
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
   dbkey.data = buf;
@@ -1397,39 +1431,15 @@ getrpmdbid(struct rpmdbstate *state, Id rpmdbid)
   dbdata.size = 0;
   if (state->db->get(state->db, NULL, &dbkey, &dbdata, 0))
     return 0;
-  if (dbdata.size < 8)
-    {
-      pool_error(state->pool, 0, "corrupt rpm database (size)");
-      return -1;
-    }
-  if (dbdata.size > state->rpmheadsize)
-    {
-      state->rpmheadsize = dbdata.size + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
-    }
-  rpmhead = state->rpmhead;
-  memcpy(buf, dbdata.data, 8);
-  rpmhead->forcebinary = 1;
-  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
-  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
-    {
-      pool_error(state->pool, 0, "corrupt rpm database (data size)");
-      return -1;
-    }
-  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-  return 1;
+  return getrpm_dbdata(state, &dbdata, dbid);
 }
 
-/* retrive header by berkeleydb cursor */
+/* retrive header by berkeleydb cursor, returns 0 on EOF, -1 on error */
 static Id
-getrpmcursor(struct rpmdbstate *state, DBC *dbc)
+getrpm_cursor(struct rpmdbstate *state, DBC *dbc)
 {
-  unsigned char buf[16];
   DBT dbkey;
   DBT dbdata;
-  RpmHead *rpmhead;
   Id dbid;
 
   memset(&dbkey, 0, sizeof(dbkey));
@@ -1439,25 +1449,8 @@ getrpmcursor(struct rpmdbstate *state, DBC *dbc)
       if (dbkey.size != 4)
 	return pool_error(state->pool, -1, "corrupt Packages database (key size)");
       dbid = db2rpmdbid(dbkey.data, state->byteswapped);
-      if (dbid == 0)		/* the join key */
-	continue;
-      if (dbdata.size < 8)
-	return pool_error(state->pool, -1, "corrupt rpm database (size %u)\n", dbdata.size);
-      if (dbdata.size > state->rpmheadsize)
-	{
-	  state->rpmheadsize = dbdata.size + 128;
-	  state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
-	}
-      rpmhead = state->rpmhead;
-      memcpy(buf, dbdata.data, 8);
-      rpmhead->forcebinary = 1;
-      rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
-      rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-      if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
-	return pool_error(state->pool, -1, "corrupt rpm database (data size)\n");
-      memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
-      rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-      return dbid;
+      if (dbid)		/* ignore join key */
+        return getrpm_dbdata(state, &dbdata, dbid);
     }
   return 0;
 }
@@ -1859,7 +1852,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	}
       i = 0;
       s = 0;
-      while ((dbid = getrpmcursor(&state, dbc)) != 0)
+      while ((dbid = getrpm_cursor(&state, dbc)) != 0)
 	{
 	  if (dbid == -1)
 	    {
@@ -1877,7 +1870,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	  if (!repo->rpmdbid)
 	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
-	  if (rpm2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS))
+	  if (rpmhead2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS))
 	    {
 	      i++;
 	      s = 0;
@@ -2013,7 +2006,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 		    }
 		}
 	    }
-	  res = getrpmdbid(&state, dbid);
+	  res = getrpm_dbid(&state, dbid);
 	  if (res <= 0)
 	    {
 	      if (!res)
@@ -2024,7 +2017,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	      solv_free(refhash);
 	      return -1;
 	    }
-	  rpm2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS);
+	  rpmhead2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS);
 	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	    {
 	      if (done < count)
@@ -2078,13 +2071,6 @@ repo_add_rpmdb_reffp(Repo *repo, FILE *fp, int flags)
     repo_free(ref, 1);
   return res;
 }
-
-static inline unsigned int
-getu32(const unsigned char *dp)
-{
-  return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
-}
-
 
 Id
 repo_add_rpm(Repo *repo, const char *rpm, int flags)
@@ -2169,7 +2155,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   if ((flags & (RPM_ADD_WITH_PKGID | RPM_ADD_WITH_HDRID)) != 0)
     {
       /* extract pkgid or hdrid from the signature header */
-      if (sigdsize > rpmheadsize)
+      if (sigdsize + 1 > rpmheadsize)
 	{
 	  rpmheadsize = sigdsize + 128;
 	  rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
@@ -2180,6 +2166,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	  fclose(fp);
 	  return 0;
 	}
+      rpmhead->data[sigdsize] = 0;
       if (chksumh)
 	solv_chksum_add(chksumh, rpmhead->data, sigdsize);
       if (leadsigchksumh)
@@ -2262,7 +2249,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   l = sigdsize + sigcnt * 16;
   headerend = headerstart + 16 + l;
-  if (l > rpmheadsize)
+  if (l + 1 > rpmheadsize)
     {
       rpmheadsize = l + 128;
       rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
@@ -2273,6 +2260,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       fclose(fp);
       return 0;
     }
+  rpmhead->data[l] = 0;
   if (chksumh)
     solv_chksum_add(chksumh, rpmhead->data, l);
   rpmhead->forcebinary = forcebinary;
@@ -2303,7 +2291,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       solv_chksum_add(chksumh, lead, l);
   fclose(fp);
   s = pool_id2solvable(pool, repo_add_solvable(repo));
-  if (!rpm2solv(pool, repo, data, s, rpmhead, flags & ~(RPM_ADD_WITH_HDRID | RPM_ADD_WITH_PKGID)))
+  if (!rpmhead2solv(pool, repo, data, s, rpmhead, flags & ~(RPM_ADD_WITH_HDRID | RPM_ADD_WITH_PKGID)))
     {
       repo_free_solvable(repo, s - pool->solvables, 1);
       solv_chksum_free(chksumh, 0);
@@ -2355,7 +2343,7 @@ repo_add_rpm_handle(Repo *repo, void *rpmhandle, int flags)
       return 0;
     }
   s = pool_id2solvable(pool, repo_add_solvable(repo));
-  if (!rpm2solv(pool, repo, data, s, rpmhead, flags))
+  if (!rpmhead2solv(pool, repo, data, s, rpmhead, flags))
     {
       repo_free_solvable(repo, s - pool->solvables, 1);
       return 0;
@@ -2630,7 +2618,7 @@ rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
   struct rpmdbstate *state = rpmstate;
   int r;
 
-  r = getrpmdbid(state, rpmdbid);
+  r = getrpm_dbid(state, rpmdbid);
   if (!r)
     pool_error(state->pool, 0, "header #%d not in database", rpmdbid);
   return r <= 0 ? 0 : state->rpmhead;
@@ -2701,7 +2689,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
     }
   l = sigdsize + sigcnt * 16;
   /* headerend = headerstart + 16 + l; */
-  if (l > state->rpmheadsize)
+  if (l + 1 > state->rpmheadsize)
     {
       state->rpmheadsize = l + 128;
       state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
@@ -2712,6 +2700,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
       pool_error(state->pool, 0, "%s: unexpected EOF", name);
       return 0;
     }
+  rpmhead->data[l] = 0;
   rpmhead->forcebinary = forcebinary;
   rpmhead->cnt = sigcnt;
   rpmhead->dcnt = sigdsize;
@@ -2741,18 +2730,19 @@ rpm_byrpmh(void *rpmstate, Header h)
   if (sigcnt >= MAX_HDR_CNT || sigdsize >= MAX_HDR_DSIZE)
     return 0;
   l = sigdsize + sigcnt * 16;
-  if (l > state->rpmheadsize)
+  if (l + 1 > state->rpmheadsize)
     {
       state->rpmheadsize = l + 128;
       state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
     }
   rpmhead = state->rpmhead;
-  memcpy(rpmhead->data, uh + 8, l - 8);
+  memcpy(rpmhead->data, uh + 8, l);
+  rpmhead->data[l] = 0;
   free((void *)uh);
   rpmhead->forcebinary = 0;
   rpmhead->cnt = sigcnt;
   rpmhead->dcnt = sigdsize;
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+  rpmhead->dp = rpmhead->data + sigcnt * 16;
   return rpmhead;
 }
 
