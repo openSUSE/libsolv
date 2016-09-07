@@ -3949,8 +3949,10 @@ solver_solve(Solver *solv, Queue *job)
 	    {
 	      Repo *repo = pool_id2repo(pool, what);
 	      if (repo)
-		FOR_REPO_SOLVABLES(repo, p, s)
-		  solver_addjobrule(solv, -p, 0, 0, i, weak);
+		{
+		  FOR_REPO_SOLVABLES(repo, p, s)
+		    solver_addjobrule(solv, -p, 0, 0, i, weak);
+		}
 	    }
 #ifdef ENABLE_COMPLEX_DEPS
 	  else if ((select == SOLVER_SOLVABLE_PROVIDES || select == SOLVER_SOLVABLE_NAME) && pool_is_complex_dep(pool, what))
