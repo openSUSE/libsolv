@@ -835,7 +835,7 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
       Id did;
       char *b = bn[i];
 
-      if (di[i] == lastdii)
+      if (lastdid && di[i] == lastdii)
 	did = lastdid;
       else
 	{
