@@ -634,7 +634,7 @@ typedef int bool;
 #include "selection.h"
 
 #include "repo_write.h"
-#ifdef ENABLE_RPMDB
+#if defined(ENABLE_RPMDB) || defined(ENABLE_RPMPKG)
 #include "repo_rpmdb.h"
 #endif
 #ifdef ENABLE_PUBKEY
@@ -1990,6 +1990,8 @@ rb_eval_string(
   bool add_rpmdb_reffp(FILE *reffp, int flags = 0) {
     return repo_add_rpmdb_reffp($self, reffp, flags) == 0;
   }
+#endif
+#ifdef ENABLE_RPMPKG
   %newobject add_rpm;
   XSolvable *add_rpm(const char *name, int flags = 0) {
     return new_XSolvable($self->pool, repo_add_rpm($self, name, flags));

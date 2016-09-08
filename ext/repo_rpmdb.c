@@ -24,6 +24,8 @@
 #include <stdint.h>
 #include <errno.h>
 
+#ifdef ENABLE_RPMDB
+
 #include <rpm/rpmio.h>
 #include <rpm/rpmpgp.h>
 #ifndef RPM5
@@ -37,6 +39,8 @@
 # else
 #  include <db.h>
 # endif
+#endif
+
 #endif
 
 #include "pool.h"
@@ -1083,6 +1087,12 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
   return 1;
 }
 
+static inline unsigned int
+getu32(const unsigned char *dp)
+{
+  return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
+}
+
 
 /******************************************************************/
 /*  Rpm Database stuff
@@ -1095,12 +1105,16 @@ struct rpmdbstate {
   RpmHead *rpmhead;	/* header storage space */
   int rpmheadsize;
 
+#ifdef ENABLE_RPMDB
   int dbopened;
   DB_ENV *dbenv;	/* database environment */
   DB *db;		/* packages database */
   int byteswapped;	/* endianess of packages database */
   int is_ostree;	/* read-only db that lives in /usr/share/rpm */
+#endif
 };
+
+#ifdef ENABLE_RPMDB
 
 struct rpmdbentry {
   Id rpmdbid;
@@ -1110,11 +1124,6 @@ struct rpmdbentry {
 #define ENTRIES_BLOCK 255
 #define NAMEDATA_BLOCK 1023
 
-static inline unsigned int
-getu32(const unsigned char *dp)
-{
-  return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
-}
 
 static inline Id
 db2rpmdbid(unsigned char *db, int byteswapped)
@@ -1249,6 +1258,46 @@ closedbenv(struct rpmdbstate *state)
 #endif
   state->dbenv = 0;
 }
+
+#endif
+
+static void
+freestate(struct rpmdbstate *state)
+{
+  /* close down */
+  if (!state)
+    return;
+#ifdef ENABLE_RPMDB
+  if (state->db)
+    state->db->close(state->db, 0);
+  if (state->dbenv)
+    closedbenv(state);
+#endif
+  if (state->rootdir)
+    solv_free(state->rootdir);
+  solv_free(state->rpmhead);
+}
+
+void *
+rpm_state_create(Pool *pool, const char *rootdir)
+{
+  struct rpmdbstate *state;
+  state = solv_calloc(1, sizeof(*state));
+  state->pool = pool;
+  if (rootdir)
+    state->rootdir = solv_strdup(rootdir);
+  return state;
+}
+
+void *
+rpm_state_free(void *state)
+{
+  freestate(state);
+  return solv_free(state);
+}
+
+
+#ifdef ENABLE_RPMDB
 
 static int
 openpkgdb(struct rpmdbstate *state)
@@ -1453,39 +1502,6 @@ getrpm_cursor(struct rpmdbstate *state, DBC *dbc)
         return getrpm_dbdata(state, &dbdata, dbid);
     }
   return 0;
-}
-
-static void
-freestate(struct rpmdbstate *state)
-{
-  /* close down */
-  if (!state)
-    return;
-  if (state->db)
-    state->db->close(state->db, 0);
-  if (state->dbenv)
-    closedbenv(state);
-  if (state->rootdir)
-    solv_free(state->rootdir);
-  solv_free(state->rpmhead);
-}
-
-void *
-rpm_state_create(Pool *pool, const char *rootdir)
-{
-  struct rpmdbstate *state;
-  state = solv_calloc(1, sizeof(*state));
-  state->pool = pool;
-  if (rootdir)
-    state->rootdir = solv_strdup(rootdir);
-  return state;
-}
-
-void *
-rpm_state_free(void *state)
-{
-  freestate(state);
-  return solv_free(state);
 }
 
 static int
@@ -2072,6 +2088,8 @@ repo_add_rpmdb_reffp(Repo *repo, FILE *fp, int flags)
   return res;
 }
 
+#endif
+
 Id
 repo_add_rpm(Repo *repo, const char *rpm, int flags)
 {
@@ -2595,6 +2613,8 @@ rpm_query_num(void *rpmhandle, Id what, unsigned long long notfound)
   return notfound;
 }
 
+#ifdef ENABLE_RPMDB
+
 int
 rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queue *rpmdbidq)
 {
@@ -2623,6 +2643,8 @@ rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
     pool_error(state->pool, 0, "header #%d not in database", rpmdbid);
   return r <= 0 ? 0 : state->rpmhead;
 }
+
+#endif
 
 void *
 rpm_byfp(void *rpmstate, FILE *fp, const char *name)

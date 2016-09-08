@@ -4,12 +4,12 @@ SET (libsolvext_SRCS
 SET (libsolvext_HEADERS
     tools_util.h solv_xfopen.h testcase.h)
 
-IF (ENABLE_RPMDB)
+IF (ENABLE_RPMDB OR ENABLE_RPMPKG)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
         pool_fileconflicts.c repo_rpmdb.c)
     SET (libsolvext_HEADERS ${libsolvext_HEADERS}
         pool_fileconflicts.h repo_rpmdb.h)
-ENDIF (ENABLE_RPMDB)
+ENDIF (ENABLE_RPMDB OR ENABLE_RPMPKG)
 
 IF (ENABLE_PUBKEY)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
@@ -45,12 +45,12 @@ ENDIF (ENABLE_SUSEREPO)
 
 # old cmake does not support parenthetical expressions...
 IF (ENABLE_COMPLEX_DEPS)
-IF (ENABLE_SUSEREPO OR ENABLE_RPMMD OR ENABLE_RPMDB)
+IF (ENABLE_SUSEREPO OR ENABLE_RPMMD OR ENABLE_RPMDB OR ENABLE_RPMPKG)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	pool_parserpmrichdep.c)
     SET (libsolvext_HEADERS ${libsolvext_HEADERS}
 	pool_parserpmrichdep.h)
-ENDIF (ENABLE_SUSEREPO OR ENABLE_RPMMD OR ENABLE_RPMDB)
+ENDIF (ENABLE_SUSEREPO OR ENABLE_RPMMD OR ENABLE_RPMDB OR ENABLE_RPMPKG)
 ENDIF (ENABLE_COMPLEX_DEPS)
 
 IF (SUSE)
