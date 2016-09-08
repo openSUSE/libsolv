@@ -49,6 +49,7 @@ usage(char** argv)
   exit(1);
 }
 
+#if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_DEBIAN) || defined(ENABLE_ARCHREPO)
 static int
 strlen_comp(const char *str)
 {
@@ -63,6 +64,7 @@ strlen_comp(const char *str)
     return l - 5;
   return l;
 }
+#endif
 
 int
 main(int argc, char **argv)
@@ -97,7 +99,10 @@ main(int argc, char **argv)
   for (i = 2; i < argc; i++)
     {
       FILE *fp;
-      int r, l;
+      int r;
+#if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_DEBIAN) || defined(ENABLE_ARCHREPO)
+      int l;
+#endif
 
       if (!strcmp(argv[i], "--withsrc"))
 	{
@@ -126,7 +131,9 @@ main(int argc, char **argv)
           ++i;
           continue;
         }
+#if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_DEBIAN) || defined(ENABLE_ARCHREPO)
       l = strlen_comp(argv[i]);
+#endif
       if (!strcmp(argv[i], "-"))
 	fp = stdin;
       else if ((fp = solv_xfopen(argv[i], 0)) == 0)
