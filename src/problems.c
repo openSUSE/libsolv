@@ -962,8 +962,11 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 		{
 		  if (*reqrp > 0 && r->p < -1)
 		    {
+		      Pool *pool = solv->pool;
 		      Id op = -solv->rules[*reqrp].p;
-		      if (op > 1 && solv->pool->solvables[op].arch != solv->pool->solvables[-r->p].arch)
+		      if (op > 1 && pool->solvables[op].arch != pool->solvables[-r->p].arch &&
+			  pool->solvables[op].arch != pool->noarchid &&
+			  pool->solvables[-r->p].arch != pool->noarchid)
 			continue;	/* different arch, skip */
 		    }
 		  /* prefer assertions */
