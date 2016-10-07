@@ -107,18 +107,12 @@ struct _Solver {
   /* our decisions: */
   Queue decisionq;                      /* >0:install, <0:remove/conflict */
   Queue decisionq_why;			/* index of rule, Offset into rules */
+  Queue decisionq_reason;		/* reason for decision, indexed by level */
 
   Id *decisionmap;			/* map for all available solvables,
 					 * = 0: undecided
 					 * > 0: level of decision when installed,
 					 * < 0: level of decision when conflict */
-
-  int decisioncnt_jobs;
-  int decisioncnt_update;
-  int decisioncnt_keep;
-  int decisioncnt_resolve;
-  int decisioncnt_weak;
-  int decisioncnt_orphan;
 
   /* learnt rule history */
   Queue learnt_why;

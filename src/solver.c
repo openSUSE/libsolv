@@ -341,6 +341,7 @@ makeruledecisions(Solver *solv)
   assert(solv->decisionq.count == 0);
   queue_push(&solv->decisionq, SYSTEMSOLVABLE);
   queue_push(&solv->decisionq_why, 0);
+  queue_push2(&solv->decisionq_reason, 0, 0);
   solv->decisionmap[SYSTEMSOLVABLE] = 1;	/* installed at level '1' */
 
   decisionstart = solv->decisionq.count;
@@ -907,18 +908,7 @@ revert(Solver *solv, int level)
     solv->branches.count -= solv->branches.elements[solv->branches.count - 2];
   if (solv->recommends_index > solv->decisionq.count)
     solv->recommends_index = -1;	/* rebuild recommends/suggests maps */
-  if (solv->decisionq.count < solv->decisioncnt_jobs)
-    solv->decisioncnt_jobs = 0;
-  if (solv->decisionq.count < solv->decisioncnt_update)
-    solv->decisioncnt_update = 0;
-  if (solv->decisionq.count < solv->decisioncnt_keep)
-    solv->decisioncnt_keep = 0;
-  if (solv->decisionq.count < solv->decisioncnt_resolve)
-    solv->decisioncnt_resolve = 0;
-  if (solv->decisionq.count < solv->decisioncnt_weak)
-    solv->decisioncnt_weak= 0;
-  if (solv->decisionq.count < solv->decisioncnt_orphan)
-    solv->decisioncnt_orphan = 0;
+  solv->decisionq_reason.count = level + 1;
 }
 
 /*-------------------------------------------------------------------
@@ -1111,9 +1101,9 @@ solver_reset(Solver *solv)
     }
   queue_empty(&solv->decisionq_why);
   queue_empty(&solv->decisionq);
+  queue_empty(&solv->decisionq_reason);
   solv->recommends_index = -1;
   solv->propagate_index = 0;
-  solv->decisioncnt_update = solv->decisioncnt_keep = solv->decisioncnt_resolve = solv->decisioncnt_weak = solv->decisioncnt_orphan = 0;
   queue_empty(&solv->branches);
 
   /* adapt learnt rule status to new set of enabled/disabled rules */
@@ -1334,7 +1324,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
  */
 
 static int
-setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id ruleid)
+setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id ruleid, Id reason)
 {
   Pool *pool = solv->pool;
   Rule *r, *lr;
@@ -1348,6 +1338,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id rul
         solv->decisionmap[-decision] = -level;
       queue_push(&solv->decisionq, decision);
       queue_push(&solv->decisionq_why, -ruleid);	/* <= 0 -> free decision */
+      queue_push(&solv->decisionq_reason, reason);
     }
   assert(ruleid >= 0 && level > 0);
   for (;;)
@@ -1464,7 +1455,7 @@ takebranch(Solver *solv, int pos, int end, const char *msg, int disablerules)
 {
   Pool *pool = solv->pool;
   int level;
-  Id p, why;
+  Id p, why, reason;
 #if 0
   {
     int i;
@@ -1484,7 +1475,8 @@ takebranch(Solver *solv, int pos, int end, const char *msg, int disablerules)
   /* hack: revert simply sets the count, so we can still access the reverted elements */
   why = -solv->decisionq_why.elements[solv->decisionq_why.count];
   assert(why >= 0);
-  return setpropagatelearn(solv, level, p, disablerules, why);
+  reason = solv->decisionq_reason.elements[level + 1];
+  return setpropagatelearn(solv, level, p, disablerules, why, reason);
 }
 
 /*-------------------------------------------------------------------
@@ -1499,7 +1491,7 @@ takebranch(Solver *solv, int pos, int end, const char *msg, int disablerules)
  */
 
 static int
-selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid)
+selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid, Id reason)
 {
   Pool *pool = solv->pool;
   Id p;
@@ -1515,7 +1507,7 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
     createbranch(solv, level, dq, 0, ruleid);
   p = dq->elements[0];
   POOL_DEBUG(SOLV_DEBUG_POLICY, "installing %s\n", pool_solvid2str(pool, p));
-  return setpropagatelearn(solv, level, p, disablerules, ruleid);
+  return setpropagatelearn(solv, level, p, disablerules, ruleid, reason);
 }
 
 
@@ -1556,6 +1548,7 @@ solver_create(Pool *pool)
   queue_init(&solv->ruletojob);
   queue_init(&solv->decisionq);
   queue_init(&solv->decisionq_why);
+  queue_init(&solv->decisionq_reason);
   queue_init(&solv->problems);
   queue_init(&solv->orphaned);
   queue_init(&solv->learnt_why);
@@ -1590,8 +1583,6 @@ resolve_jobrules(Solver *solv, int level, int disablerules, Queue *dq)
   Rule *r;
 
   POOL_DEBUG(SOLV_DEBUG_SOLVER, "resolving job rules\n");
-  if (!solv->decisioncnt_jobs)
-    solv->decisioncnt_jobs = solv->decisionq.count;
   for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++)
     {
       Id l, pp;
@@ -1637,7 +1628,7 @@ resolve_jobrules(Solver *solv, int level, int disablerules, Queue *dq)
 	    dq->count = k;
 	}
       olevel = level;
-      level = selectandinstall(solv, level, dq, disablerules, i);
+      level = selectandinstall(solv, level, dq, disablerules, i, SOLVER_REASON_RESOLVE_JOB);
       if (level <= olevel)
 	{
 	  if (level == olevel)
@@ -1687,6 +1678,7 @@ solver_free(Solver *solv)
   queue_free(&solv->ruletojob);
   queue_free(&solv->decisionq);
   queue_free(&solv->decisionq_why);
+  queue_free(&solv->decisionq_reason);
   queue_free(&solv->learnt_why);
   queue_free(&solv->learnt_pool);
   queue_free(&solv->problems);
@@ -2181,8 +2173,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * installed packages
        */
-      if (!solv->decisioncnt_update)
-	solv->decisioncnt_update = solv->decisionq.count;
       if (level < systemlevel && solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
 	{
 	  Repo *installed = solv->installed;
@@ -2195,8 +2185,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    {
 	      int passlevel = level;
 	      Id *specialupdaters = solv->specialupdaters;
-	      if (pass == 1 && !solv->decisioncnt_keep)
-		solv->decisioncnt_keep = solv->decisionq.count;
 	      /* start with installedpos, the position that gave us problems the last time */
 	      for (i = installedpos, n = installed->start; n < installed->end; i++, n++)
 		{
@@ -2275,7 +2263,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		  if (dq.count)
 		    {
 		      olevel = level;
-		      level = selectandinstall(solv, level, &dq, disablerules, rr - solv->rules);
+		      level = selectandinstall(solv, level, &dq, disablerules, rr - solv->rules, SOLVER_REASON_UPDATE_INSTALLED);
 		      if (level <= olevel)
 			{
 			  if (level < passlevel)
@@ -2295,7 +2283,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			{
 #if 0
 			  POOL_DEBUG(SOLV_DEBUG_POLICY, "cleandeps erasing %s\n", pool_solvid2str(pool, i));
-			  level = setpropagatelearn(solv, level, -i, disablerules, 0);
+			  level = setpropagatelearn(solv, level, -i, disablerules, 0, SOLVER_REASON_CLEANDEPS_ERASE);
 #else
 			  continue;
 #endif
@@ -2303,7 +2291,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      else
 			{
 			  POOL_DEBUG(SOLV_DEBUG_POLICY, "keeping %s\n", pool_solvid2str(pool, i));
-			  level = setpropagatelearn(solv, level, i, disablerules, r - solv->rules);
+			  level = setpropagatelearn(solv, level, i, disablerules, r - solv->rules, SOLVER_REASON_KEEP_INSTALLED);
 			}
 		      if (level <= olevel)
 			{
@@ -2328,8 +2316,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  if (pass < 2)
 	    continue;		/* had trouble, retry */
 	}
-      if (!solv->decisioncnt_keep)
-	solv->decisioncnt_keep = solv->decisionq.count;
 
      if (level < systemlevel && solv->focus_installed)
 	{
@@ -2346,8 +2332,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /*
        * decide
        */
-      if (!solv->decisioncnt_resolve)
-        solv->decisioncnt_resolve = solv->decisionq.count;
       POOL_DEBUG(SOLV_DEBUG_POLICY, "deciding unresolved rules\n");
       postponed = 0;
       for (i = 1, n = 1; ; i++, n++)
@@ -2453,7 +2437,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 
 	  olevel = level;
-	  level = selectandinstall(solv, level, &dq, disablerules, r - solv->rules);
+	  level = selectandinstall(solv, level, &dq, disablerules, r - solv->rules, SOLVER_REASON_RESOLVE);
 	  if (level < systemlevel)
 	    break;		/* trouble */
 	  /* something changed, so look at all rules again */
@@ -2475,7 +2459,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		{
 		  POOL_DEBUG(SOLV_DEBUG_POLICY, "cleandeps erasing %s\n", pool_solvid2str(pool, p));
 		  olevel = level;
-		  level = setpropagatelearn(solv, level, -p, 0, 0);
+		  level = setpropagatelearn(solv, level, -p, 0, 0, SOLVER_REASON_CLEANDEPS_ERASE);
 		  if (level < olevel)
 		    break;
 		}
@@ -2486,8 +2470,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
       /* at this point we have a consistent system. now do the extras... */
 
-      if (!solv->decisioncnt_weak)
-        solv->decisioncnt_weak = solv->decisionq.count;
       if (doweak)
 	{
 	  int qcount;
@@ -2676,7 +2658,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    POOL_DEBUG(SOLV_DEBUG_POLICY, "installing supplemented %s\n", pool_solvid2str(pool, p));
 		  else
 		    POOL_DEBUG(SOLV_DEBUG_POLICY, "installing recommended %s\n", pool_solvid2str(pool, p));
-		  level = setpropagatelearn(solv, level, p, 0, 0);
+		  level = setpropagatelearn(solv, level, p, 0, 0, SOLVER_REASON_WEAKDEP);
 		  continue;	/* back to main loop */
 		}
 
@@ -2707,7 +2689,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		    continue;
 		  POOL_DEBUG(SOLV_DEBUG_POLICY, "installing supplemented %s\n", pool_solvid2str(pool, p));
 		  olevel = level;
-		  level = setpropagatelearn(solv, level, p, 0, 0);
+		  level = setpropagatelearn(solv, level, p, 0, 0, SOLVER_REASON_WEAKDEP);
 		  if (level <= olevel)
 		    break;
 		}
@@ -2760,7 +2742,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      p = dq.elements[0];
 		      POOL_DEBUG(SOLV_DEBUG_POLICY, "installing recommended %s\n", pool_solvid2str(pool, p));
 		      olevel = level;
-		      level = setpropagatelearn(solv, level, p, 0, 0);
+		      level = setpropagatelearn(solv, level, p, 0, 0, SOLVER_REASON_WEAKDEP);
 		      if (level <= olevel || solv->decisionq.count < decisioncount)
 			break;	/* we had to revert some decisions */
 		    }
@@ -2772,8 +2754,6 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    }
 	}
 
-      if (!solv->decisioncnt_orphan)
-        solv->decisioncnt_orphan = solv->decisionq.count;
       if (solv->installed && (solv->orphaned.count || solv->brokenorphanrules))
 	{
 	  int installedone = 0;
@@ -2791,7 +2771,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		continue;
 	      POOL_DEBUG(SOLV_DEBUG_SOLVER, "keeping orphaned %s\n", pool_solvid2str(pool, p));
 	      olevel = level;
-	      level = setpropagatelearn(solv, level, p, 0, 0);
+	      level = setpropagatelearn(solv, level, p, 0, 0, SOLVER_REASON_RESOLVE_ORPHAN);
 	      installedone = 1;
 	      if (level < olevel)
 		break;
@@ -2805,7 +2785,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		continue;	/* already decided */
 	      POOL_DEBUG(SOLV_DEBUG_SOLVER, "removing orphaned %s\n", pool_solvid2str(pool, p));
 	      olevel = level;
-	      level = setpropagatelearn(solv, level, -p, 0, 0);
+	      level = setpropagatelearn(solv, level, -p, 0, 0, SOLVER_REASON_RESOLVE_ORPHAN);
 	      if (level < olevel)
 		break;
 	    }
@@ -2822,7 +2802,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      p = dq.elements[i];
 		      POOL_DEBUG(SOLV_DEBUG_POLICY, "installing orphaned dep %s\n", pool_solvid2str(pool, p));
 		      olevel = level;
-		      level = setpropagatelearn(solv, level, p, 0, 0);
+		      level = setpropagatelearn(solv, level, p, 0, 0, SOLVER_REASON_RESOLVE_ORPHAN);
 		      if (level < olevel)
 			break;
 		    }
@@ -2843,7 +2823,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		continue;
 	      POOL_DEBUG(SOLV_DEBUG_SOLVER, "removing unwanted %s\n", pool_solvid2str(pool, p));
 	      olevel = level;
-	      level = setpropagatelearn(solv, level, -p, 0, 0);
+	      level = setpropagatelearn(solv, level, -p, 0, 0, SOLVER_REASON_CLEANDEPS_ERASE);
 	      if (level < olevel)
 		break;
 	    }
@@ -2950,22 +2930,13 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
       /* no minimization found, we're finally finished! */
       break;
     }
+  assert(level == -1 || level + 1 == solv->decisionq_reason.count);
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "solver statistics: %d learned rules, %d unsolvable, %d minimization steps\n", solv->stats_learned, solv->stats_unsolvable, minimizationsteps);
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "done solving.\n\n");
   queue_free(&dq);
   queue_free(&dqs);
-  if (level < 0)
-    {
-      /* unsolvable */
-      solv->decisioncnt_jobs = solv->decisionq.count;
-      solv->decisioncnt_update = solv->decisionq.count;
-      solv->decisioncnt_keep = solv->decisionq.count;
-      solv->decisioncnt_resolve = solv->decisionq.count;
-      solv->decisioncnt_weak = solv->decisionq.count;
-      solv->decisioncnt_orphan = solv->decisionq.count;
-    }
 #if 0
   solver_printdecisionq(solv, SOLV_DEBUG_RESULT);
 #endif
@@ -3515,7 +3486,7 @@ solver_solve(Solver *solv, Queue *job)
     memset(solv->decisionmap, 0, pool->nsolvables * sizeof(Id));
   queue_empty(&solv->decisionq);
   queue_empty(&solv->decisionq_why);
-  solv->decisioncnt_jobs = solv->decisioncnt_update = solv->decisioncnt_keep = solv->decisioncnt_resolve = solv->decisioncnt_weak = solv->decisioncnt_orphan = 0;
+  queue_empty(&solv->decisionq_reason);
   queue_empty(&solv->learnt_why);
   queue_empty(&solv->learnt_pool);
   queue_empty(&solv->branches);
@@ -4290,20 +4261,12 @@ void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *su
       MAPZERO(&solv->recommendsmap);
 
       /* put all packages the solver already chose in the map */
-      if (solv->decisioncnt_weak)
-	{
-	  for (i = solv->decisioncnt_weak; i < solv->decisioncnt_orphan; i++)
-	    {
-	      Id why;
-	      why = solv->decisionq_why.elements[i];
-	      if (why)
-		continue;	/* forced by unit rule or dep resolving */
-	      p = solv->decisionq.elements[i];
-	      if (p < 0)
-		continue;
+      for (i = 1; i < solv->decisionq.count; i++)
+        if ((p = solv->decisionq.elements[i]) > 0 && solv->decisionq_why.elements[i] == 0)
+	  {
+	    if (solv->decisionq_reason.elements[solv->decisionmap[p]] == SOLVER_REASON_WEAKDEP)
 	      MAPSET(&solv->recommendsmap, p);
-	    }
-	}
+	  }
 
       for (i = 0; i < solv->decisionq.count; i++)
 	{
@@ -4571,36 +4534,8 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
     *infop = why > 0 ? why : -why;
   if (why > 0)
     return SOLVER_REASON_UNIT_RULE;
-  why = -why;
-  if (i == 0)
-    return SOLVER_REASON_KEEP_INSTALLED;	/* the systemsolvable */
-  if (i < solv->decisioncnt_update)
-    return SOLVER_REASON_RESOLVE_JOB;
-  if (i < solv->decisioncnt_keep)
-    {
-      if (why == 0 && pp < 0)
-	return SOLVER_REASON_CLEANDEPS_ERASE;
-      return SOLVER_REASON_UPDATE_INSTALLED;
-    }
-  if (i < solv->decisioncnt_resolve)
-    {
-      if (solv->focus_installed && i >= solv->decisioncnt_jobs)
-	return SOLVER_REASON_RESOLVE_JOB;
-      if (why == 0 && pp < 0)
-	return SOLVER_REASON_CLEANDEPS_ERASE;
-      return SOLVER_REASON_KEEP_INSTALLED;
-    }
-  if (i < solv->decisioncnt_weak)
-    {
-      if (why == 0 && pp < 0)
-	return SOLVER_REASON_CLEANDEPS_ERASE;
-    }
-  if (why > 0)
-    return SOLVER_REASON_RESOLVE;
-  /* weak or orphaned */
-  if (i < solv->decisioncnt_orphan)
-    return SOLVER_REASON_WEAKDEP;
-  return SOLVER_REASON_RESOLVE_ORPHAN;
+  i = solv->decisionmap[p] >= 0 ? solv->decisionmap[p] : -solv->decisionmap[p];
+  return solv->decisionq_reason.elements[i];
 }
 
 
@@ -4621,7 +4556,8 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
       break;
   if (decisionno == solv->decisionq.count)
     return;	/* huh? */
-  if (decisionno < solv->decisioncnt_weak || decisionno >= solv->decisioncnt_orphan)
+  i = solv->decisionmap[p] >= 0 ? solv->decisionmap[p] : -solv->decisionmap[p];
+  if (solv->decisionq_reason.elements[i] != SOLVER_REASON_WEAKDEP)
     return;	/* huh? */
 
   /* 1) list all packages that recommend us */
