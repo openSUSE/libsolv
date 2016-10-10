@@ -197,6 +197,9 @@ struct _Solver {
   Queue *favorq;
   Map favormap;				/* favored / disfavored packages */
   Map isdisfavormap;
+
+  int installedpos;			/* for resolve_installed */
+  int do_extra_reordering;		/* reorder for future installed packages */
 #endif	/* LIBSOLV_INTERNAL */
 };
 
