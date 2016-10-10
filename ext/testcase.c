@@ -115,6 +115,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_YUM_OBSOLETES,              "yumobsoletes", 0 },
   { SOLVER_FLAG_NEED_UPDATEPROVIDE,         "needupdateprovide", 0 },
   { SOLVER_FLAG_URPM_REORDER,               "urpmreorder", 0 },
+  { SOLVER_FLAG_FOCUS_BEST,                 "focusbest", 0 },
   { 0, 0, 0 }
 };
 

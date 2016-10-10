@@ -160,6 +160,7 @@ struct _Solver {
   int bestobeypolicy;			/* true: stay in policy with the best rules */
   int noautotarget;			/* true: do not assume targeted for up/dup jobs that contain no installed solvable */
   int focus_installed;			/* true: resolve update rules first */
+  int focus_best;			/* true: resolve job dependencies first */
   int do_yum_obsoletes;			/* true: add special yumobs rules */
   int urpmreorder;			/* true: do special urpm package reordering */
 
@@ -306,6 +307,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_YUM_OBSOLETES		21
 #define SOLVER_FLAG_NEED_UPDATEPROVIDE		22
 #define SOLVER_FLAG_URPM_REORDER		23
+#define SOLVER_FLAG_FOCUS_BEST			24
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */

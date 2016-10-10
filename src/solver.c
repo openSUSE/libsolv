@@ -1367,7 +1367,7 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id rul
 }
 
 static void
-reorder_dq_for_jobrules(Solver *solv, int level, Queue *dq)
+reorder_dq_for_future_installed(Solver *solv, int level, Queue *dq)
 {
   Pool *pool = solv->pool;
   int i, j, haveone = 0, dqcount = dq->count;
@@ -1498,10 +1498,10 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
 
   if (dq->count > 1)
     policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
-  /* if we're resolving job rules and didn't resolve the installed packages yet,
+  /* if we're resolving rules and didn't resolve the installed packages yet,
    * do some special supplements ordering */
-  if (dq->count > 1 && ruleid >= solv->jobrules && ruleid < solv->jobrules_end && solv->installed && !solv->focus_installed)
-    reorder_dq_for_jobrules(solv, level, dq);
+  if (dq->count > 1 && solv->do_extra_reordering)
+    reorder_dq_for_future_installed(solv, level, dq);
   /* if we have multiple candidates we open a branch */
   if (dq->count > 1)
     createbranch(solv, level, dq, 0, ruleid);
@@ -1772,6 +1772,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->break_orphans;
   case SOLVER_FLAG_FOCUS_INSTALLED:
     return solv->focus_installed;
+  case SOLVER_FLAG_FOCUS_BEST:
+    return solv->focus_best;
   case SOLVER_FLAG_YUM_OBSOLETES:
     return solv->do_yum_obsoletes;
   case SOLVER_FLAG_NEED_UPDATEPROVIDE:
@@ -1849,6 +1851,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_FOCUS_INSTALLED:
     solv->focus_installed = value;
+    break;
+  case SOLVER_FLAG_FOCUS_BEST:
+    solv->focus_best = value;
     break;
   case SOLVER_FLAG_YUM_OBSOLETES:
     solv->do_yum_obsoletes = value;
@@ -2403,6 +2408,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
   queue_init(&dq);
   queue_init(&dqs);
   solv->installedpos = 0;
+  solv->do_extra_reordering = 0;
 
   /*
    * here's the main loop:
@@ -2447,10 +2453,25 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
        */
      if (level < systemlevel && !solv->focus_installed)
 	{
+	  if (solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
+	    solv->do_extra_reordering = 1;
 	  olevel = level;
 	  level = resolve_jobrules(solv, level, disablerules, &dq);
+	  solv->do_extra_reordering = 0;
 	  if (level < olevel)
 	    continue;
+	  systemlevel = level + 1;
+	}
+
+      /* resolve job dependencies in the focus_best case */
+      if (level < systemlevel && solv->focus_best && !solv->focus_installed && solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
+	{
+	  solv->do_extra_reordering = 1;
+	  olevel = level;
+	  level = resolve_dependencies(solv, level, disablerules, &dq);
+	  solv->do_extra_reordering = 0;
+	  if (level < olevel)
+	    continue;		/* start over */
 	  systemlevel = level + 1;
 	}
 
