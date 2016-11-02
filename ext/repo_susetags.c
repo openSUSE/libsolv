@@ -580,7 +580,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
         continue;
       pd.lineno++;
       *--linep = 0;
-      if (linep == olinep)
+      if (!cummulate && linep == olinep)
 	continue;
 
       if (intag)
@@ -600,21 +600,22 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      *linep++ = '\n';
 	      continue;
 	    }
-	  if (cummulate && is_end)
+	  else if (cummulate && is_end)
 	    {
 	      linep[-intag - keylen + 1] = 0;
 	      if (linep[-intag - keylen] == '\n')
 	        linep[-intag - keylen] = 0;
 	      linep = line;
 	      intag = 0;
+	      cummulate = 0;
 	    }
-	  if (!cummulate && is_end)
+	  else if (!cummulate && is_end)
 	    {
 	      intag = 0;
 	      linep = line;
 	      continue;
 	    }
-	  if (!cummulate && !is_end)
+	  else if (!cummulate && !is_end)
 	    linep = line + intag + keylen;
 	}
       else
