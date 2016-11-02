@@ -1800,7 +1800,7 @@ The ``what'' part is the id of a package provides.
 
 *SOLVER_SOLVABLE_ONE_OF*::
 The ``what'' part is an offset into the ``whatprovides'' data, created
-by calling the towhatprovides() pool method.
+by calling the pool_queuetowhatprovides() method from queue with package IDs.
 
 *SOLVER_SOLVABLE_REPO*::
 The ``what'' part is the id of a repository.
