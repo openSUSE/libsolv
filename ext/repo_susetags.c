@@ -330,7 +330,7 @@ commit_diskusage(struct parsedata *pd, Id handle)
  *
  */
 
-static inline unsigned
+static inline unsigned int
 tag_from_string(char *cs)
 {
   unsigned char *s = (unsigned char *)cs;
@@ -478,6 +478,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   Solvable *s;
   Offset freshens;
   int intag = 0;
+  int intag_linestart = 0;
   int cummulate = 0;
   int indesc = 0;
   int indelta = 0;
@@ -558,10 +559,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 
   for (;;)
     {
-      unsigned tag;
-      char *olinep; /* old line pointer */
+      unsigned int tag;
       char line_lang[6];
-      int keylen = 3;
+      int keylen;
 
       if (pd.ret)
 	break;
@@ -574,84 +574,86 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	}
       if (!fgets(linep, aline - (linep - line), fp)) /* read line */
 	break;
-      olinep = linep;
       linep += strlen(linep);
       if (linep == line || linep[-1] != '\n')
         continue;
       pd.lineno++;
       *--linep = 0;
-      if (linep == olinep)
-	continue;
 
       if (intag)
 	{
-	  /* check for multi-line value tags (+Key:/-Key:) */
-
-	  int is_end = (linep[-intag - keylen + 1] == '-')
-	              && (linep[-1] == ':')
-		      && (linep == line + 1 + intag + 1 + 1 + 1 + intag + 1 || linep[-intag - keylen] == '\n');
-	  if (is_end
-	      && strncmp(linep - 1 - intag, line + 1, intag))
+	  /* in multi-line value tags (+Key:/-Key:), check for end, cummulate */
+	  int is_end = line[intag_linestart] == '-' && linep[-1] == ':' && linep - line == intag_linestart + intag + 2;
+	  if (is_end && strncmp(linep - 1 - intag, line + 1, intag))
 	    {
-	      pool_debug(pool, SOLV_ERROR, "susetags: Nonmatching multi-line tags: %d: '%s' '%s' %d\n", pd.lineno, linep - 1 - intag, line + 1, intag);
+	      pool_debug(pool, SOLV_ERROR, "susetags: Nonmatching multi-line tags: %d: '%s' '%.*s'\n", pd.lineno, linep - 1 - intag, intag, line + 1);
 	    }
-	  if (cummulate && !is_end)
+	  if (!is_end)
 	    {
-	      *linep++ = '\n';
-	      continue;
+	      if (cummulate)
+		{
+		  *linep++ = '\n';
+		  intag_linestart = linep - line;
+		  continue;
+		}
+	      intag_linestart = intag + 3;
+	      linep = line + intag_linestart;
+	      if (!*linep)
+		continue;		/* ignore empty lines, bnc#381828 */
 	    }
-	  if (cummulate && is_end)
-	    {
-	      linep[-intag - keylen + 1] = 0;
-	      if (linep[-intag - keylen] == '\n')
-	        linep[-intag - keylen] = 0;
-	      linep = line;
-	      intag = 0;
-	    }
-	  if (!cummulate && is_end)
+	  else
 	    {
 	      intag = 0;
 	      linep = line;
-	      continue;
+	      if (!cummulate)
+		continue;
+	      line[intag_linestart] = 0;
+	      if (line[intag_linestart - 1] == '\n')
+	        line[intag_linestart - 1] = 0;		/* strip trailing newline */
 	    }
-	  if (!cummulate && !is_end)
-	    linep = line + intag + keylen;
 	}
       else
 	linep = line;
 
-      if (!intag && line[0] == '+' && line[1] && line[1] != ':') /* start of +Key:/-Key: tag */
+      /* ignore comments and empty lines */
+      if (!*line || *line == '#')
+	continue;
+
+      /* ignore malformed lines */
+      if (!(line[0] && line[1] && line[2] && line[3] && (line[4] == ':' || line[4] == '.')))
+        continue;
+
+      if (!intag && line[0] == '+' && line[1] != ':') /* start of +Key:/-Key: tag */
 	{
 	  char *tagend = strchr(line, ':');
-	  if (!tagend)
+	  if (!tagend || tagend - line > 100)
 	    {
 	      pd.ret = pool_error(pool, -1, "susetags: line %d: bad line '%s'\n", pd.lineno, line);
 	      break;
 	    }
-	  intag = tagend - (line + 1);
+	  intag = tagend - (line + 1);		/* set to tagsize */
 	  cummulate = 0;
-	  switch (tag_from_string(line))       /* check if accumulation is needed */
+	  switch (tag_from_string(line))	/* check if accumulation is needed */
 	    {
 	      case CTAG('+', 'D', 'e', 's'):
 	      case CTAG('+', 'E', 'u', 'l'):
 	      case CTAG('+', 'I', 'n', 's'):
 	      case CTAG('+', 'D', 'e', 'l'):
 	      case CTAG('+', 'A', 'u', 't'):
-	        if (line[4] == ':' || line[4] == '.')
-	          cummulate = 1;
+	        cummulate = 1;
 		break;
 	      default:
 		break;
 	    }
-	  line[0] = '=';                       /* handle lines between +Key:/-Key: as =Key: */
-	  line[intag + keylen - 1] = ' ';
-	  linep = line + intag + keylen;
+	  line[0] = '=';			/* handle lines between +Key:/-Key: as =Key: */
+	  line[intag + 2] = ' ';
+	  intag_linestart = intag + 3;
+	  linep = line + intag_linestart;
 	  continue;
 	}
-      if (*line == '#' || !*line)
-	continue;
-      if (! (line[0] && line[1] && line[2] && line[3] && (line[4] == ':' || line[4] == '.')))
-        continue;
+
+      /* support language suffix */
+      keylen = 3;
       line_lang[0] = 0;
       if (line[4] == '.')
         {
@@ -667,6 +669,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
               line_lang[langsize] = 0;
             }
         }
+
       tag = tag_from_string(line);
 
       if (indelta)
