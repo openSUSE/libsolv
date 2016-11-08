@@ -13,6 +13,7 @@ ENDIF (${PYTHON_VERSION_MAJOR} GREATER 2)
 
 MESSAGE (STATUS "Python executable: ${PYTHON_EXECUTABLE}")
 MESSAGE (STATUS "Python installation dir: ${PYTHON_INSTALL_DIR}")
+MESSAGE (STATUS "Python include path: ${PYTHON_INCLUDE_PATH}")
 
 ADD_CUSTOM_COMMAND (
     OUTPUT solv_python.c
