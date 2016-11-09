@@ -66,6 +66,7 @@ SOLV_1.0 {
 		testcase_str2dep;
 		testcase_str2job;
 		testcase_str2repo;
+		testcase_str2solvid;
 		testcase_read;
 		testcase_resultdiff;
 		testcase_solverresult;
