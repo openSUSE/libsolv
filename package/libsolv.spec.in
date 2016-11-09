@@ -174,7 +174,6 @@ export CFLAGS="$RPM_OPT_FLAGS"
 export CXXFLAGS="$CFLAGS"
 
 CMAKE_FLAGS=
-PYTHON_CMAKE_FLAGS=
 %if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 CMAKE_FLAGS="-DFEDORA=1"
 %endif
@@ -183,12 +182,11 @@ CMAKE_FLAGS="-DSUSE=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
 %endif
 
 %if %{with python3_binding}
-for pyversion in 3 2 ; do
-test $pyversion == 2 && perl -i -p -e 's/(python)/${1}3/i' CMakeCache.txt
-PYTHON_CMAKE_FLAGS="-DPythonLibs_FIND_VERSION=$pyversion -DPythonLibs_FIND_VERSION_MAJOR=$pyversion"
+# build both for python2 and python3
+CMAKE_FLAGS="$CMAKE_FLAGS -DPythonLibs_FIND_VERSION=2 -DPythonLibs_FIND_VERSION_MAJOR=2 -DENABLE_PYTHON3=1 -DPYTHON3_EXECUTABLE=/usr/bin/python3 -DPYTHON3_INCLUDE_DIR=$(/usr/bin/python3-config --includes | sed -e 's/ .*//' -e 's/-I//')"
 %endif
 
-cmake	$CMAKE_FLAGS $PYTHON_CMAKE_FLAGS \
+cmake	$CMAKE_FLAGS \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DLIB=%{_lib} \
 	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
@@ -201,11 +199,6 @@ cmake	$CMAKE_FLAGS $PYTHON_CMAKE_FLAGS \
 	%{?with_zypp:-DENABLE_SUSEREPO=1 -DENABLE_HELIXREPO=1} \
 	-DUSE_VENDORDIRS=1 \
 	-DCMAKE_SKIP_RPATH=1
-
-%if %{with python3_binding}
-done
-%endif
-
 make %{?jobs:-j %jobs}
 
 %install

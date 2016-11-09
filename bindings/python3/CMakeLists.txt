@@ -1,3 +1,8 @@
+# Needs the following cache variables:
+#
+# PYTHON3_EXECUTABLE
+# PYTHON3_INCLUDE_DIR
+#
 EXECUTE_PROCESS(COMMAND ${PYTHON3_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib(True))" OUTPUT_VARIABLE PYTHON3_INSTALL_DIR)
 
 MESSAGE (STATUS "Python3 executable: ${PYTHON3_EXECUTABLE}")
