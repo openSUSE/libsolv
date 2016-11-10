@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Thu Nov 10 15:09:25 CET 2016 - mls@suse.de
+
+- make testcase_str2solvid work with ignored packages
+- improve checks against corrupt rpm 
+- add SOLVER_FLAG_FOCUS_BEST solver flag
+- rework susetags multi-line handling [bnc#1007273]
+- build both for python2 and python3
+- bump version to 0.6.24
+
+-------------------------------------------------------------------
 Fri Jul 22 11:37:23 CEST 2016 - mls@suse.de
 
 - also scan /usr/share/metainfo for appdata files [bnc#989830]

@@ -2,6 +2,10 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.24
+- new features:
+  * new SOLVER_FLAG_FOCUS_BEST flag
+
 Version 0.6.22, 0.6.23
 - bug fix releases, no new features
 
