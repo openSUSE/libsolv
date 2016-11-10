@@ -181,11 +181,6 @@ CMAKE_FLAGS="-DFEDORA=1"
 CMAKE_FLAGS="-DSUSE=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
 %endif
 
-%if %{with python3_binding}
-# build both for python2 and python3
-CMAKE_FLAGS="$CMAKE_FLAGS -DPythonLibs_FIND_VERSION=2 -DPythonLibs_FIND_VERSION_MAJOR=2 -DENABLE_PYTHON3=1 -DPYTHON3_EXECUTABLE=/usr/bin/python3 -DPYTHON3_INCLUDE_DIR=$(/usr/bin/python3-config --includes | sed -e 's/ .*//' -e 's/-I//')"
-%endif
-
 cmake	$CMAKE_FLAGS \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DLIB=%{_lib} \
@@ -195,6 +190,7 @@ cmake	$CMAKE_FLAGS \
 	%{?with_disable_shared:-DDISABLE_SHARED=1} \
 	%{?with_perl_binding:-DENABLE_PERL=1} \
 	%{?with_python_binding:-DENABLE_PYTHON=1} \
+	%{?with_python3_binding:-DENABLE_PYTHON3=1} \
 	%{?with_ruby_binding:-DENABLE_RUBY=1} \
 	%{?with_zypp:-DENABLE_SUSEREPO=1 -DENABLE_HELIXREPO=1} \
 	-DUSE_VENDORDIRS=1 \

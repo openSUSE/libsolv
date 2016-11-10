@@ -1,7 +1,13 @@
-#SET (PythonLibs_FIND_VERSION 3)
+IF (ENABLE_PYTHON3 AND NOT DEFINED PythonLibs_FIND_VERSION)
+    # if we build both for python2 and python3, make this the python2 build.
+    # see comment in the python3 CMakeLists.txt file
+    SET (PythonLibs_FIND_VERSION 2)
+    SET (PythonLibs_FIND_VERSION_MAJOR 2)
+ENDIF IF (ENABLE_PYTHON3 AND NOT DEFINED PythonLibs_FIND_VERSION)
 
-FIND_PACKAGE (PythonLibs)
+FIND_PACKAGE (PythonLibs REQUIRED)
 FIND_PACKAGE (PythonInterp ${PYTHONLIBS_VERSION_STRING} REQUIRED)
+
 EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib(True))" OUTPUT_VARIABLE PYTHON_INSTALL_DIR)
 
 IF (NOT DEFINED PYTHON_VERSION_MAJOR)
