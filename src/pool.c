@@ -1335,6 +1335,14 @@ pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
   int i;
 
   queue_empty(q);
+  if (keyname == SOLVABLE_NAME)
+    {
+      Id pp;
+      FOR_PROVIDES(p, pp, dep)
+        if (pool_match_dep(pool, p, dep))
+	  queue_push(q, p);
+      return;
+    }
   queue_init(&qq);
   FOR_POOL_SOLVABLES(p)
     {

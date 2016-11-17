@@ -601,6 +601,9 @@ solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker)
   int i;
   Pool *pool = s->repo->pool;
   Queue q;
+
+  if (keyname == SOLVABLE_NAME)
+    return pool_match_nevr(pool, s, dep) ? 1 : 0;	/* nevr match hack */
   queue_init(&q);
   solvable_lookup_deparray(s, keyname, &q, marker);
   for (i = 0; i < q.count; i++)
