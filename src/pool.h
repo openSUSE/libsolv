@@ -289,7 +289,7 @@ static inline const char *pool_solvid2str(Pool *pool, Id p)
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
 Id pool_id2langid(Pool *pool, Id id, const char *lang, int create);
 
-int pool_intersect_evrs(Pool *pool, int pflags, Id pevr, int flags, int evr);
+int pool_intersect_evrs(Pool *pool, int pflags, Id pevr, int flags, Id evr);
 int pool_match_dep(Pool *pool, Id d1, Id d2);
 
 /* semi private, used in pool_match_nevr */

@@ -799,7 +799,7 @@ pool_match_flags_evr_rel_compat(Pool *pool, Reldep *range, int flags, int evr)
 
 /* public (i.e. not inlined) version of pool_match_flags_evr */
 int
-pool_intersect_evrs(Pool *pool, int pflags, Id pevr, int flags, int evr)
+pool_intersect_evrs(Pool *pool, int pflags, Id pevr, int flags, Id evr)
 {
   return pool_match_flags_evr(pool, pflags, pevr, flags, evr);
 }
