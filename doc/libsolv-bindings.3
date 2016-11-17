@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 05/03/2016
+.\"      Date: 11/17/2016
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "05/03/2016" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "11/17/2016" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -2514,8 +2514,8 @@ Return true if the solvable is installed on the system\&.
 .nf
 \fBbool identical(Solvable *\fR\fIother\fR\fB)\fR
 \fI$solvable\fR\fB\->identical(\fR\fI$other\fR\fB)\fR
-\fI$solvable\fR\fB\&.identical(\fR\fIother\fR\fB)\fR
-\fI$solvable\fR\fB\&.identical?(\fR\fIother\fR\fB)\fR
+\fIsolvable\fR\fB\&.identical(\fR\fIother\fR\fB)\fR
+\fIsolvable\fR\fB\&.identical?(\fR\fIother\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -2528,15 +2528,30 @@ Return true if the two solvables are identical\&.
 .\}
 .nf
 \fBint evrcmp(Solvable *\fR\fIother\fR\fB)\fR
-\fI$solvable\fR\fB\->evrcmp(\fR\fIother\fR\fB)\fR
-\fI$solvable\fR\fB\&.evrcmp(\fR\fIother\fR\fB)\fR
-\fI$solvable\fR\fB\&.evrcmp(\fR\fIother\fR\fB)\fR
+\fI$solvable\fR\fB\->evrcmp(\fR\fI$other\fR\fB)\fR
+\fIsolvable\fR\fB\&.evrcmp(\fR\fIother\fR\fB)\fR
+\fIsolvable\fR\fB\&.evrcmp(\fR\fIother\fR\fB)\fR
 .fi
 .if n \{\
 .RE
 .\}
 .sp
 Returns \-1 if the epoch/version/release of the solvable is less than the one from the other solvable, 1 if it is greater, and 0 if they are equal\&. Note that "equal" does not mean that the evr is identical\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint matchesdep(Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+\fI$solvable\fR\fB\->matchesdep(\fR\fI$keyname\fR\fB,\fR \fI$dep\fR\fB)\fR
+\fIsolvable\fR\fB\&.matchesdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
+\fIsolvable\fR\fB\&.matchesdep?(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return true if the dependencies stored in keyname match the specified dependeny\&.
 .sp
 .if n \{\
 .RS 4

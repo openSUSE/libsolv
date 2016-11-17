@@ -2963,6 +2963,12 @@ rb_eval_string(
   int evrcmp(XSolvable *s2) {
     return pool_evrcmp($self->pool, $self->pool->solvables[$self->id].evr, s2->pool->solvables[s2->id].evr, EVRCMP_COMPARE);
   }
+#ifdef SWIGRUBY
+  %rename("matchesdep?") matchesdep;
+#endif
+  bool matchesdep(Id keyname, DepId id, Id marker = -1) {
+    return solvable_matchesdep($self->pool->solvables + $self->id, keyname, id, marker);
+  }
 
 #if defined(SWIGTCL)
   %rename("==") __eq__;

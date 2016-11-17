@@ -1400,19 +1400,26 @@ Return true if the solvable is installed on the system.
 
 	bool identical(Solvable *other)
 	$solvable->identical($other)
-	$solvable.identical(other)
-	$solvable.identical?(other)
+	solvable.identical(other)
+	solvable.identical?(other)
 
 Return true if the two solvables are identical.
 
 	int evrcmp(Solvable *other)
-	$solvable->evrcmp(other)
-	$solvable.evrcmp(other)
-	$solvable.evrcmp(other)
+	$solvable->evrcmp($other)
+	solvable.evrcmp(other)
+	solvable.evrcmp(other)
 
 Returns -1 if the epoch/version/release of the solvable is less than the
 one from the other solvable, 1 if it is greater, and 0 if they are equal.
 Note that "equal" does not mean that the evr is identical.
+
+	int matchesdep(Id keyname, DepId id, Id marker = -1)
+	$solvable->matchesdep($keyname, $dep)
+	solvable.matchesdep(keyname, dep)
+	solvable.matchesdep?(keyname, dep)
+
+Return true if the dependencies stored in keyname match the specified dependeny.
 
 	Selection Selection(int setflags = 0)
 	my $sel = $solvable->Selection();
