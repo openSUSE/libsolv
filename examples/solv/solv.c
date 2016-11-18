@@ -116,17 +116,6 @@ nscallback(Pool *pool, void *data, Id name, Id evr)
 
 #ifdef SUSE
 static void
-add_autopackages(Pool *pool)
-{
-  int i;
-  Repo *repo;
-  FOR_REPOS(i, repo)
-    repo_add_autopattern(repo, 0);
-}
-#endif
-
-#ifdef SUSE
-static void
 showdiskusagechanges(Transaction *trans)
 {
   DUChanges duc[4];
@@ -500,15 +489,17 @@ main(int argc, char **argv)
 	  commandlinepkgs[i] = p;
 	}
       if (commandlinerepo)
-	repo_internalize(commandlinerepo);
+	{
+	  repo_internalize(commandlinerepo);
+#ifdef SUSE
+	  repo_add_autopattern(commandlinerepo, 0);
+#endif
+	}
     }
 
 #if defined(ENABLE_RPMDB)
   if (pool->disttype == DISTTYPE_RPM)
     addfileprovides(pool);
-#endif
-#ifdef SUSE
-  add_autopackages(pool);
 #endif
   pool_createwhatprovides(pool);
 

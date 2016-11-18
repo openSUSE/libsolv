@@ -10,6 +10,10 @@
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
 #include "repo_deb.h"
 #endif
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
+
 
 #include "repoinfo.h"
 #include "repoinfo_cache.h"
@@ -109,6 +113,9 @@ read_installed_repo(struct repoinfo *cinfo, Pool *pool)
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
   r = read_installed_debian(cinfo);
+#endif
+#ifdef SUSE
+  repo_add_autopattern(cinfo->repo, 0);
 #endif
   pool_set_installed(pool, cinfo->repo);
   return r;
@@ -235,6 +242,9 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 
       if ((!cinfo->autorefresh || cinfo->metadata_expire) && usecachedrepo(cinfo, 0, 0))
 	{
+#ifdef SUSE
+	  repo_add_autopattern(cinfo->repo, 0);
+#endif
 	  printf("repo '%s':", cinfo->alias);
 	  printf(" cached\n");
 	  continue;
@@ -268,6 +278,10 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 	  cinfo->repo = 0;
 	  break;
 	}
+#ifdef SUSE
+      if (cinfo->repo)
+        repo_add_autopattern(cinfo->repo, 0);
+#endif
     }
   if (sigpool)
     pool_free(sigpool);
