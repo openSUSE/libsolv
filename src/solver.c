@@ -1624,6 +1624,7 @@ solver_free(Solver *solv)
   queuep_free(&solv->suggestscplxq);
   queuep_free(&solv->brokenorphanrules);
   queuep_free(&solv->favorq);
+  queuep_free(&solv->recommendsruleq);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -1708,6 +1709,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->needupdateprovide;
   case SOLVER_FLAG_URPM_REORDER:
     return solv->urpmreorder;
+  case SOLVER_FLAG_STRONG_RECOMMENDS:
+    return solv->strongrecommends;
   default:
     break;
   }
@@ -1791,6 +1794,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_URPM_REORDER:
     solv->urpmreorder = value;
+    break;
+  case SOLVER_FLAG_STRONG_RECOMMENDS:
+    solv->strongrecommends = value;
     break;
   default:
     break;
@@ -3627,6 +3633,7 @@ solver_solve(Solver *solv, Queue *job)
   if (solv->nrules != initialnrules)
     solver_shrinkrules(solv, initialnrules);
   solv->nrules = initialnrules;
+  solv->lastpkgrule = 0;
   solv->pkgrules_end = 0;
 
   if (installed)
@@ -3840,6 +3847,7 @@ solver_solve(Solver *solv, Queue *job)
   if (solv->nrules > initialnrules)
     solver_unifyrules(solv);			/* remove duplicate pkg rules */
   solv->pkgrules_end = solv->nrules;		/* mark end of pkg rules */
+  solv->lastpkgrule = 0;
 
   if (solv->nrules > initialnrules)
     addedmap2deduceq(solv, &addedmap);		/* so that we can recreate the addedmap */
@@ -4215,13 +4223,21 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */
-  if (solv->weakruleq.count)
+  if (solv->weakruleq.count || solv->recommendsruleq)
     {
       map_grow(&solv->weakrulemap, solv->nrules);
       for (i = 0; i < solv->weakruleq.count; i++)
 	{
 	  p = solv->weakruleq.elements[i];
 	  MAPSET(&solv->weakrulemap, p);
+	}
+      if (solv->recommendsruleq)
+	{
+	  for (i = 0; i < solv->recommendsruleq->count; i++)
+	    {
+	      p = solv->recommendsruleq->elements[i];
+	      MAPSET(&solv->weakrulemap, p);
+	    }
 	}
     }
 

@@ -44,6 +44,7 @@ struct _Solver {
    */
   Rule *rules;				/* all rules */
   Id nrules;				/* [Offset] index of the last rule */
+  Id lastpkgrule;			/* last package rule we added */
 
   Queue ruleassertions;			/* Queue of all assertion rules */
 
@@ -163,6 +164,7 @@ struct _Solver {
   int focus_best;			/* true: resolve job dependencies first */
   int do_yum_obsoletes;			/* true: add special yumobs rules */
   int urpmreorder;			/* true: do special urpm package reordering */
+  int strongrecommends;			/* true: create weak rules for recommends */
 
   Map dupmap;				/* dup these packages*/
   int dupmap_all;			/* dup all packages */
@@ -201,6 +203,8 @@ struct _Solver {
 
   int installedpos;			/* for resolve_installed */
   int do_extra_reordering;		/* reorder for future installed packages */
+
+  Queue *recommendsruleq;		/* pkg rules comming from recommends */
 #endif	/* LIBSOLV_INTERNAL */
 };
 
@@ -308,6 +312,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_NEED_UPDATEPROVIDE		22
 #define SOLVER_FLAG_URPM_REORDER		23
 #define SOLVER_FLAG_FOCUS_BEST			24
+#define SOLVER_FLAG_STRONG_RECOMMENDS		25
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */
