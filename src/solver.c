@@ -1711,6 +1711,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->urpmreorder;
   case SOLVER_FLAG_STRONG_RECOMMENDS:
     return solv->strongrecommends;
+  case SOLVER_FLAG_INSTALL_ALSO_UPDATES:
+    return solv->install_also_updates;
   default:
     break;
   }
@@ -1798,6 +1800,9 @@ solver_set_flag(Solver *solv, int flag, int value)
   case SOLVER_FLAG_STRONG_RECOMMENDS:
     solv->strongrecommends = value;
     break;
+  case SOLVER_FLAG_INSTALL_ALSO_UPDATES:
+    solv->install_also_updates = value;
+    break;
   default:
     break;
   }
@@ -1838,24 +1843,26 @@ resolve_jobrules(Solver *solv, int level, int disablerules, Queue *dq)
 	continue;
       /* prune to installed if not updating */
       if (dq->count > 1 && solv->installed && !solv->updatemap_all &&
+	  !solv->install_also_updates &&
 	  !(solv->job.elements[solv->ruletojob.elements[i - solv->jobrules]] & SOLVER_ORUPDATE))
 	{
-	  int j, k;
-	  for (j = k = 0; j < dq->count; j++)
+	  int j = dq->count, k;
+	  if (solv->updatemap.size)
 	    {
-	      Solvable *s = pool->solvables + dq->elements[j];
-	      if (s->repo == solv->installed)
-		{
-		  dq->elements[k++] = dq->elements[j];
-		  if (solv->updatemap.size && MAPTST(&solv->updatemap, dq->elements[j] - solv->installed->start))
-		    {
-		      k = 0;	/* package wants to be updated, do not prune */
-		      break;
-		    }
-		}
+	      /* do not prune if an installed package wants to be updated */
+	      for (j = 0; j < dq->count; j++)
+		if (pool->solvables[dq->elements[j]].repo == solv->installed
+		    && MAPTST(&solv->updatemap, dq->elements[j] - solv->installed->start))
+		  break;
 	    }
-	  if (k)
-	    dq->count = k;
+	  if (j == dq->count)
+	    {
+	      for (j = k = 0; j < dq->count; j++)
+	        if (pool->solvables[dq->elements[j]].repo == solv->installed)
+	          dq->elements[k++] = dq->elements[j];
+	      if (k)
+		dq->count = k;
+	    }
 	}
       olevel = level;
       level = selectandinstall(solv, level, dq, disablerules, i, SOLVER_REASON_RESOLVE_JOB);

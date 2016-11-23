@@ -117,6 +117,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_URPM_REORDER,               "urpmreorder", 0 },
   { SOLVER_FLAG_FOCUS_BEST,                 "focusbest", 0 },
   { SOLVER_FLAG_STRONG_RECOMMENDS,          "strongrecommends", 0 },
+  { SOLVER_FLAG_INSTALL_ALSO_UPDATES,       "installalsoupdates", 0 },
   { 0, 0, 0 }
 };
 

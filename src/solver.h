@@ -165,6 +165,7 @@ struct _Solver {
   int do_yum_obsoletes;			/* true: add special yumobs rules */
   int urpmreorder;			/* true: do special urpm package reordering */
   int strongrecommends;			/* true: create weak rules for recommends */
+  int install_also_updates;		/* true: do not prune install job rules to installed packages */
 
   Map dupmap;				/* dup these packages*/
   int dupmap_all;			/* dup all packages */
@@ -313,6 +314,7 @@ typedef struct _Solver Solver;
 #define SOLVER_FLAG_URPM_REORDER		23
 #define SOLVER_FLAG_FOCUS_BEST			24
 #define SOLVER_FLAG_STRONG_RECOMMENDS		25
+#define SOLVER_FLAG_INSTALL_ALSO_UPDATES	26
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */
