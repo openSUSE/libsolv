@@ -66,6 +66,9 @@ ENDIF (IS_DIRECTORY "${CMAKE_INSTALL_PREFIX}/man"  AND NOT IS_DIRECTORY "${CMAKE
 ENDIF (NOT MAN_INSTALL_DIR)
 MESSAGE(STATUS "Man pages will be installed in ${MAN_INSTALL_DIR}")
 
+IF (NOT PKGCONFIG_INSTALL_DIR)
+  SET (PKGCONFIG_INSTALL_DIR ${LIB_INSTALL_DIR}/pkgconfig)
+ENDIF (NOT PKGCONFIG_INSTALL_DIR)
 ####################################################################
 # CONFIGURATION                                                    #
 ####################################################################
@@ -392,7 +395,7 @@ ENDMACRO (SPECFILE)
 MACRO (PCFILE)
   MESSAGE (STATUS "Writing pkg-config file...")
   CONFIGURE_FILE (${CMAKE_SOURCE_DIR}/libsolv.pc.in ${CMAKE_BINARY_DIR}/libsolv.pc @ONLY)
-  INSTALL( FILES ${CMAKE_BINARY_DIR}/libsolv.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig )
+  INSTALL( FILES ${CMAKE_BINARY_DIR}/libsolv.pc DESTINATION ${PKGCONFIG_INSTALL_DIR} )
 ENDMACRO (PCFILE)
 
 SPECFILE ()
