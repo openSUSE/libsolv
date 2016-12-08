@@ -981,23 +981,7 @@ sort_by_name_evr_sortcmp(const void *ap, const void *bp, void *dp)
     return 0;
   a = aa[2] < 0 ? -aa[2] : aa[2];
   b = bb[2] < 0 ? -bb[2] : bb[2];
-  if (pool->disttype != DISTTYPE_DEB && a != b)
-    {
-      /* treat release-less versions different */
-      const char *as = pool_id2str(pool, a);
-      const char *bs = pool_id2str(pool, b);
-      if (strchr(as, '-'))
-	{
-	  if (!strchr(bs, '-'))
-	    return -2;
-	}
-      else
-	{
-	  if (strchr(bs, '-'))
-	    return 2;
-	}
-    }
-  r = pool_evrcmp(pool, b, a, EVRCMP_COMPARE);
+  r = pool_evrcmp(pool, b, a, pool->disttype != DISTTYPE_DEB ? EVRCMP_MATCH_RELEASE : EVRCMP_COMPARE);
   if (!r && (aa[2] < 0 || bb[2] < 0))
     {
       if (bb[2] >= 0)
@@ -1005,9 +989,7 @@ sort_by_name_evr_sortcmp(const void *ap, const void *bp, void *dp)
       if (aa[2] >= 0)
 	return -1;
     }
-  if (r)
-    return r < 0 ? -1 : 1;
-  return 0;
+  return r;
 }
 
 /* common end of sort_by_srcversion and sort_by_common_dep */
