@@ -2188,6 +2188,35 @@ rb_eval_string(
   }
 #endif
 
+  %newobject createshadow;
+  Repo *createshadow(const char *name) {
+    Repo *repo = repo_create($self->pool, name);
+    if ($self->idarraysize) {
+      repo_reserve_ids(repo, 0, $self->idarraysize);
+      memcpy(repo->idarraydata, $self->idarraydata, sizeof(Id) * $self->idarraysize);
+      repo->idarraysize = $self->idarraysize;
+    }
+    repo->start = $self->start;
+    repo->end = $self->end;
+    repo->nsolvables = $self->nsolvables;
+    return repo;
+  }
+
+  void moveshadow(Queue q) {
+    Pool *pool = $self->pool;
+    int i;
+    for (i = 0; i < q.count; i++) {
+      Solvable *s;
+      Id p = q.elements[i];
+      if (p < $self->start || p >= $self->end)
+        continue;
+      s = pool->solvables + p;
+      if ($self->idarraysize != s->repo->idarraysize)
+        continue;
+      s->repo = $self;
+    }
+  }
+
 #if defined(SWIGTCL)
   %rename("==") __eq__;
 #endif
@@ -3458,6 +3487,13 @@ rb_eval_string(
 
   bool write_testcase(const char *dir) {
     return testcase_write($self, dir, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0);
+  }
+
+  Queue raw_decisions() {
+    Queue q;
+    queue_init(&q);
+    solver_get_decisionqueue($self, &q);
+    return q;
   }
 }
 
