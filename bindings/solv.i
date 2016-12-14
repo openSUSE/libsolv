@@ -2188,7 +2188,6 @@ rb_eval_string(
   }
 #endif
 
-  %newobject createshadow;
   Repo *createshadow(const char *name) {
     Repo *repo = repo_create($self->pool, name);
     if ($self->idarraysize) {
@@ -3489,10 +3488,18 @@ rb_eval_string(
     return testcase_write($self, dir, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0);
   }
 
-  Queue raw_decisions() {
+  Queue raw_decisions(int filter=0) {
     Queue q;
     queue_init(&q);
     solver_get_decisionqueue($self, &q);
+    if (filter) {
+      int i, j;
+      for (i = j = 0; i < q.count; i++)
+        if ((filter > 0 && q.elements[i] > 1) ||
+            (filter < 0 && q.elements[i] < 0))
+          q.elements[j++] = q.elements[i];
+      queue_truncate(&q, j);
+    }
     return q;
   }
 }
