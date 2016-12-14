@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 11/17/2016
+.\"      Date: 12/14/2016
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "11/17/2016" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "12/14/2016" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3544,6 +3544,11 @@ Like SOLVER_FLAG_ALLOW_NAMECHANGE, but used in distupgrade mode\&.
 If multiple packages obsolete an installed package, the solver checks the provides of every such package and ignores all packages that do not provide the installed package name\&. Thus, you can have an official update candidate that provides the old name, and other packages that also obsolete the package but are not considered for updating\&. If you cannot use this feature, you can turn it off by setting this flag\&.
 .RE
 .PP
+\fBSOLVER_FLAG_NEED_UPDATEPROVIDE\fR
+.RS 4
+This is somewhat the opposite of SOLVER_FLAG_NO_UPDATEPROVIDE: Only packages that provied the installed package names are considered for updating\&.
+.RE
+.PP
 \fBSOLVER_FLAG_SPLITPROVIDES\fR
 .RS 4
 Make the solver aware of special provides of the form \(lq<packagename>:<path>\(rq used in SUSE systems to support package splits\&.
@@ -3586,7 +3591,27 @@ Ignore dependencies of orphaned packages that get in the way of resolving non\-o
 .PP
 \fBSOLVER_FLAG_FOCUS_INSTALLED\fR
 .RS 4
-Resolve installed packages before resolving the given job\&. Setting this flag means that the solver will prefer picking a package version that fits the other installed packages over updating installed packages\&.
+Resolve installed packages before resolving the given jobs\&. Setting this flag means that the solver will prefer picking a package version that fits the other installed packages over updating installed packages\&.
+.RE
+.PP
+\fBSOLVER_FLAG_FOCUS_BEST\fR
+.RS 4
+First resolve the given jobs, then the dependencies of the resulting packages, then resolve all already installed packages\&. This will result in more packages being updated as when the flag is not used\&.
+.RE
+.PP
+\fBSOLVER_FLAG_INSTALL_ALSO_UPDATES\fR
+.RS 4
+Update the package if a job is already fulfilled by an installed package\&.
+.RE
+.PP
+\fBSOLVER_FLAG_YUM_OBSOLETES\fR
+.RS 4
+Turn on yum\-like package split handling\&. See the yum documentation for more details\&.
+.RE
+.PP
+\fBSOLVER_FLAG_URPM_REORDER\fR
+.RS 4
+Turn on urpm like package reordering for kernel packages\&. See the urpm documentation for more details\&.
 .RE
 .sp
 Basic rule types:

@@ -2127,6 +2127,11 @@ packages that also obsolete the package but are not considered for
 updating. If you cannot use this feature, you can turn it off
 by setting this flag.
 
+*SOLVER_FLAG_NEED_UPDATEPROVIDE*::
+This is somewhat the opposite of SOLVER_FLAG_NO_UPDATEPROVIDE: Only
+packages that provied the installed package names are considered
+for updating.
+
 *SOLVER_FLAG_SPLITPROVIDES*::
 Make the solver aware of special provides of the form
 ``<packagename>:<path>'' used in SUSE systems to support package
@@ -2169,10 +2174,30 @@ of resolving non-orphaned ones. Setting the flag might result
 in no longer working packages in case they are orphaned.
 
 *SOLVER_FLAG_FOCUS_INSTALLED*::
-Resolve installed packages before resolving the given job.
+Resolve installed packages before resolving the given jobs.
 Setting this flag means that the solver will prefer picking
 a package version that fits the other installed packages
 over updating installed packages.
+
+*SOLVER_FLAG_FOCUS_BEST*::
+First resolve the given jobs, then the dependencies of the
+resulting packages, then resolve all already installed
+packages. This will result in more packages being updated
+as when the flag is not used.
+
+*SOLVER_FLAG_INSTALL_ALSO_UPDATES*::
+Update the package if a job is already fulfilled by an installed
+package.
+
+*SOLVER_FLAG_YUM_OBSOLETES*::
+Turn on yum-like package split handling. See the yum documentation
+for more details.
+
+*SOLVER_FLAG_URPM_REORDER*::
+Turn on urpm like package reordering for kernel packages. See
+the urpm documentation for more details.
+
+
 
 Basic rule types:
 
