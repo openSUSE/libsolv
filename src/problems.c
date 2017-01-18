@@ -1089,6 +1089,7 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
 {
   Pool *pool = solv->pool;
   char *s;
+  Solvable *ss;
   switch (type)
     {
     case SOLVER_RULE_DISTUPGRADE:
@@ -1114,6 +1115,12 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
         return pool_tmpjoin(pool, "cannot install the best update candidate for package ", pool_solvid2str(pool, source), 0);
      return "cannot install the best candidate for the job";
     case SOLVER_RULE_PKG_NOT_INSTALLABLE:
+      ss = pool->solvables + source;
+      if (pool_disabled_solvable(pool, ss))
+        return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is disabled");
+      if (ss->arch && ss->arch != ARCH_SRC && ss->arch != ARCH_NOSRC &&
+          pool->id2arch && (ss->arch > pool->lastarch || !pool->id2arch[ss->arch]))
+        return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " does not have a compatible architecture");
       return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is not installable");
     case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
       s = pool_tmpjoin(pool, "nothing provides ", pool_dep2str(pool, dep), 0);
