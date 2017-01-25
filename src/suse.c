@@ -211,7 +211,7 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 Offset
 repo_fix_conflicts(Repo *repo, Offset conflicts)
 {
-  char buf[1024], *p, *dep;
+  char buf[1024], *dep;
   Pool *pool = repo->pool;
   Id id;
   int i;
@@ -224,11 +224,10 @@ repo_fix_conflicts(Repo *repo, Offset conflicts)
       if (ISRELDEP(id))
 	continue;
       dep = (char *)pool_id2str(pool, id);
-      if (!strncmp(dep, "otherproviders(", 15) && strlen(dep) < sizeof(buf) - 2)
+      if (!strncmp(dep, "otherproviders(", 15) && dep[15] && strlen(dep) < sizeof(buf) - 2)
 	{
 	  strcpy(buf, dep + 15);
-	  if ((p = strchr(buf, ')')) != 0)
-	    *p = 0;
+	  buf[strlen(buf) - 1] = 0;
 	  id = pool_str2id(pool, buf, 1);
 	  id = pool_rel2id(pool, NAMESPACE_OTHERPROVIDERS, id, REL_NAMESPACE, 1);
 	  repo->idarraydata[i] = id;
