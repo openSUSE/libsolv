@@ -955,6 +955,10 @@ traverse_dirs(Dirpool *dp, Id *dirmap, Id n, Id dir, Id *used)
       dirmap[n++] = sib;
     }
 
+  /* check if our block has some content */
+  if (parent == n)
+    return n - 1;	/* nope, drop parent id again */
+
   /* now go through all the siblings we just added and
    * do recursive calls on them */
   lastn = n;
