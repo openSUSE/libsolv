@@ -101,8 +101,6 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 {
   Id did, d, ds;
 
-  if (comp <= 0)
-    return 0;
   if (!dp->ndirs)
     {
       if (!create)
@@ -112,6 +110,8 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
       dp->dirs[0] = 0;
       dp->dirs[1] = 1;	/* "" */
     }
+  if (comp <= 0)
+    return 0;
   if (parent == 0 && comp == 1)
     return 1;
   if (!dp->dirtraverse)

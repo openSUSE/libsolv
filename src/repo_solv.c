@@ -873,11 +873,20 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	{
 	  id = read_id(&data, i + numid);
 	  if (id >= numid)
-	    data.dirpool.dirs[i] = -(id - numid);
-	  else if (idmap)
-	    data.dirpool.dirs[i] = idmap[id];
-	  else
-	    data.dirpool.dirs[i] = id;
+	    {
+	      data.dirpool.dirs[i++] = -(id - numid);
+	      if (i >= numdir)
+		{
+		  data.error = pool_error(pool, SOLV_ERROR_CORRUPT, "last dir entry is not a component");
+		  break;
+		}
+	      id = read_id(&data, numid);
+	    }
+	  if (idmap)
+	    id = idmap[id];
+	  data.dirpool.dirs[i] = id;
+	  if (id <= 0)
+            data.error = pool_error(pool, SOLV_ERROR_CORRUPT, "bad dir component");
 	}
     }
 
