@@ -268,17 +268,13 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
 #endif
   const char *dire;
 
-  parent = 0;
   if (!*dir)
-    return 0;
+    return data->dirpool.ndirs ? 0 : dirpool_add_dir(&data->dirpool, 0, 0, create);
   while (*dir == '/' && dir[1] == '/')
     dir++;
   if (*dir == '/' && !dir[1])
-    {
-      if (data->dirpool.ndirs)
-        return 1;
-      return dirpool_add_dir(&data->dirpool, 0, 1, create);
-    }
+    return data->dirpool.ndirs ? 1 : dirpool_add_dir(&data->dirpool, 0, 1, create);
+  parent = 0;
 #ifdef DIRCACHE_SIZE
   dirs = dir;
   if (data->dircache)
