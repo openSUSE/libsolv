@@ -765,16 +765,15 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
     {
       if (!fn[i])
 	continue;
-      if (!*dn[i])
+      did = repodata_str2dir(data, dn[i], 1);
+      if (!did)
 	{
-	  Solvable *s = data->repo->pool->solvables + handle;
+          Solvable *s = data->repo->pool->solvables + handle;
           if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	    did = repodata_str2dir(data, "/usr/src", 1);
 	  else
 	    continue;	/* work around rpm bug */
 	}
-      else
-        did = repodata_str2dir(data, dn[i], 1);
       repodata_add_dirnumnum(data, handle, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
     }
   solv_free(fn);
@@ -1575,7 +1574,7 @@ static Id copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did
 static inline Id
 copydir(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
 {
-  if (cache && cache[did & 255] == did)
+  if (cache && did && cache[did & 255] == did)
     return cache[(did & 255) + 256];
   return copydir_complex(pool, data, fromdata, did, cache);
 }
@@ -1583,8 +1582,16 @@ copydir(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
 static Id
 copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
 {
-  Id parent = dirpool_parent(&fromdata->dirpool, did);
-  Id compid = dirpool_compid(&fromdata->dirpool, did);
+  Id parent, compid;
+  if (!did)
+    {
+      /* make sure that the dirpool has an entry */
+      if (!data->dirpool.ndirs)
+        dirpool_add_dir(&data->dirpool, 0, 0, 1);
+      return 0;
+    }
+  parent = dirpool_parent(&fromdata->dirpool, did);
+  compid = dirpool_compid(&fromdata->dirpool, did);
   if (parent)
     parent = copydir(pool, data, fromdata, parent, cache);
   if (data->localpool || fromdata->localpool)
