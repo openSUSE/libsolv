@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Tue Feb  7 13:13:01 CET 2017 - mls@suse.de
+
+- add SOLVABLE_NAME hack for pool_whatmatchesdep and
+  solvable_matchesdep
+- add SOLVER_FLAG_STRONG_RECOMMENDS option
+- add SOLVER_FLAG_INSTALL_ALSO_UPDATES option
+- do not special case release-less provides in sort_by_common_dep
+- solver_problemruleinfo2str: return reason why a package is not
+  installable
+- guard against dirpool_add_dir being called with an illegal
+  component id
+- reject solv files with bad directories
+- bump version to 0.6.25
+
+-------------------------------------------------------------------
 Thu Nov 10 15:09:25 CET 2016 - mls@suse.de
 
 - make testcase_str2solvid work with ignored packages

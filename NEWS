@@ -2,6 +2,14 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.25
+- new features:
+  * new SOLVER_FLAG_STRONG_RECOMMENDS flag
+  * new SOLVER_FLAG_INSTALL_ALSO_UPDATES flag
+  * new matchesdep() method in bindings
+  * SOLVABLE_NAME selects nevr matching for
+    pool_whatmatchesdep and solvable_matchesdep
+ 
 Version 0.6.24
 - new features:
   * new SOLVER_FLAG_FOCUS_BEST flag
