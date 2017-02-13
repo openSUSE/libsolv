@@ -1,0 +1,9 @@
+libdir=@LIB_INSTALL_DIR@
+includedir=@INCLUDE_INSTALL_DIR@
+
+Name: libsolvext
+Description: Library for reading repositories
+Version: @VERSION@
+Requires: libsolv
+Libs: -L${libdir} -lsolvext
+Cflags: -I${includedir}

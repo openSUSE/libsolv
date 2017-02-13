@@ -2,7 +2,7 @@ libdir=@LIB_INSTALL_DIR@
 includedir=@INCLUDE_INSTALL_DIR@
 
 Name: libsolv
-Description: Library for solving packages and reading repositories
+Description: Library for solving packages
 Version: @VERSION@
-Libs: -L${libdir} -lsolvext -lsolv
+Libs: -L${libdir} -lsolv
 Cflags: -I${includedir}
