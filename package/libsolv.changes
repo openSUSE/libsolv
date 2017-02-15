@@ -2,7 +2,7 @@
 Wed Feb 15 11:34:59 CET 2017 - mls@suse.de
 
 - export solvable_matchesdep function, as we now use it in
-  the bindings
+  the bindings [bnc#1025440]
 - bump version to 0.6.26
 
 -------------------------------------------------------------------
