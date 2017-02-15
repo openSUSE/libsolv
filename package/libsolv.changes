@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Feb 15 11:34:59 CET 2017 - mls@suse.de
+
+- export solvable_matchesdep function, as we now use it in
+  the bindings
+- bump version to 0.6.26
+
+-------------------------------------------------------------------
 Tue Feb  7 13:13:01 CET 2017 - mls@suse.de
 
 - add SOLVABLE_NAME hack for pool_whatmatchesdep and
