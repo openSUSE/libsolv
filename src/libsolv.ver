@@ -310,6 +310,7 @@ SOLV_1.0 {
 		solvable_lookup_str_poollang;
 		solvable_lookup_type;
 		solvable_lookup_void;
+		solvable_matchesdep;
 		solvable_selfprovidedep;
 		solvable_set_deparray;
 		solvable_set_id;
