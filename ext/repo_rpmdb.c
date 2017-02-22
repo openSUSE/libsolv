@@ -624,6 +624,24 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   return olddeps;
 }
 
+static Id
+repodata_str2dir_rooted(Repodata *data, char *str, int create)
+{
+  char buf[256], *bp;
+  int l = strlen(str);
+  Id id;
+
+  if (l + 2 <= sizeof(buf))
+    bp = buf;
+  else
+    bp = solv_malloc(l + 2);
+  bp[0] = '/';
+  strcpy(bp + 1, str);
+  id = repodata_str2dir(data, bp, create);
+  if (bp != buf)
+    solv_free(bp);
+  return id;
+}
 
 static void
 adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dc)
@@ -765,15 +783,16 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
     {
       if (!fn[i])
 	continue;
-      did = repodata_str2dir(data, dn[i], 1);
-      if (!did)
+      if (dn[i][0] != '/')
 	{
           Solvable *s = data->repo->pool->solvables + handle;
           if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	    did = repodata_str2dir(data, "/usr/src", 1);
 	  else
-	    continue;	/* work around rpm bug */
+	    did = repodata_str2dir_rooted(data, dn[i], 1);
 	}
+      else
+        did = repodata_str2dir(data, dn[i], 1);
       repodata_add_dirnumnum(data, handle, SOLVABLE_DISKUSAGE, did, fkb[i], fn[i]);
     }
   solv_free(fn);
@@ -803,7 +822,7 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
   unsigned int *di;
   int bnc, dnc, dic;
   int i;
-  Id lastdid = 0;
+  Id did;
   unsigned int lastdii = -1;
   int lastfiltered = 0;
 
@@ -833,17 +852,16 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
 
   adddudata(data, handle, rpmhead, dn, di, bnc, dnc);
 
+  did = -1;
   for (i = 0; i < bnc; i++)
     {
-      Id did;
       char *b = bn[i];
 
-      if (lastdid && di[i] == lastdii)
-	did = lastdid;
-      else
+      if (did < 0 || di[i] != lastdii)
 	{
 	  if (di[i] >= dnc)
 	    continue;	/* corrupt entry */
+	  did = 0;
 	  lastdii = di[i];
 	  if ((flags & RPM_ADD_FILTERED_FILELIST) != 0)
 	    {
@@ -851,18 +869,17 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
 	      if (lastfiltered == 1)
 		continue;
 	    }
-	  did = repodata_str2dir(data, dn[lastdii], 1);
-	  if (!did)
-	    did = repodata_str2dir(data, "/", 1);
-	  lastdid = did;
+	  if (dn[lastdii][0] != '/')
+	    did = repodata_str2dir_rooted(data, dn[lastdii], 1);
+	  else
+	    did = repodata_str2dir(data, dn[lastdii], 1);
 	}
-      if (b && *b == '/')	/* work around rpm bug */
+      if (!b)
+	continue;
+      if (*b == '/')	/* work around rpm bug */
 	b++;
-      if (lastfiltered)
-	{
-	  if (lastfiltered != 2 || strcmp(b, "sendmail"))
-	    continue;
-	}
+      if (lastfiltered && (lastfiltered != 2 || strcmp(b, "sendmail")))
+        continue;
       repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, b);
     }
   solv_free(bn);

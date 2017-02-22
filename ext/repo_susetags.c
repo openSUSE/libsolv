@@ -1065,27 +1065,22 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 
 	  case CTAG('=', 'F', 'l', 's'):
 	    {
-	      char *p = strrchr(line + 6, '/');
+	      char *p, *file = line + 6;
 	      Id did;
-	      /* strip trailing slash */
-	      if (p && p != line + 6 && !p[1])
+
+	      if (*file != '/')
+	        *--file = '/';		/* hack: we know there is room */
+	      p  = strrchr(file, '/');
+	      /* strip trailing slashes */
+	      while (p != file && !p[1])
 		{
 		  *p = 0;
-		  p = strrchr(line + 6, '/');
+		  p = strrchr(file, '/');
 		}
-	      if (p)
-		{
-		  *p++ = 0;
-		  did = repodata_str2dir(data, line + 6, 1);
-		}
-	      else
-		{
-		  p = line + 6;
-		  did = 0;
-		}
-	      if (!did)
-	        did = repodata_str2dir(data, "/", 1);
+	      *p++ = 0;
+	      did = repodata_str2dir(data, *file ? file : "/", 1);
 	      repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, p);
+	      line[5] = ' ';
 	      break;
 	    }
 	  case CTAG('=', 'H', 'd', 'r'):

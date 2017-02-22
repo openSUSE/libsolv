@@ -1021,15 +1021,20 @@ startElement(void *userData, const char *name, const char **atts)
 	  }
 	if (*str != '/')
 	  {
-	    int l = strlen(str) + 2;
-	    if (l > pd->acontent)
+	    if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	      str = "/usr/src";
+	    else
 	      {
-	        pd->content = solv_realloc(pd->content, l + 256);
-	        pd->acontent = l + 256;
-	      }
-	    *pd->content = '/';
-	    strcpy(pd->content + 1, str);
-	    str = pd->content;
+		int l = strlen(str) + 2;
+		if (l > pd->acontent)
+		  {
+		    pd->acontent = l + 256;
+		    pd->content = solv_realloc(pd->content, pd->acontent);
+		  }
+		pd->content[0] = '/';
+		memcpy(pd->content + 1, str, l - 1);
+		str = pd->content;
+	    }
 	  }
         dirid = repodata_str2dir(pd->data, str, 1);
         if ((str = find_attr("size", atts)) != 0)
@@ -1161,10 +1166,6 @@ endElement(void *userData, const char *name)
         break;
       }
     case STATE_FILE:
-#if 0
-      id = pool_str2id(pool, pd->content, 1);
-      s->provides = repo_addid_dep(repo, s->provides, id, SOLVABLE_FILEMARKER);
-#endif
       if ((p = strrchr(pd->content, '/')) != 0)
 	{
 	  *p++ = 0;
@@ -1174,25 +1175,29 @@ endElement(void *userData, const char *name)
 	    }
 	  else
 	    {
-	      int l;
-	      id = repodata_str2dir(pd->data, pd->content, 1);
-	      l = strlen(pd->content) + 1;
-	      if (l > pd->lastdirstrl)
+	      int l = p - pd->content;
+	      if (l + 1 > pd->lastdirstrl)	/* + 1 for the possible leading / we need to insert */
 		{
 		  pd->lastdirstrl = l + 128;
 		  pd->lastdirstr = solv_realloc(pd->lastdirstr, pd->lastdirstrl);
 		}
-	      strcpy(pd->lastdirstr, pd->content);
+	      if (pd->content[0] != '/')
+		{
+		  pd->lastdirstr[0] = '/';
+		  memcpy(pd->lastdirstr + 1, pd->content, l);
+	          id = repodata_str2dir(pd->data, pd->lastdirstr, 1);
+		}
+	      else
+	        id = repodata_str2dir(pd->data, pd->content, 1);
 	      pd->lastdir = id;
+	      memcpy(pd->lastdirstr, pd->content, l);
 	    }
 	}
       else
 	{
 	  p = pd->content;
-	  id = 0;
+	  id = repodata_str2dir(pd->data, "/", 1);
 	}
-      if (!id)
-	id = repodata_str2dir(pd->data, "/", 1);
       repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, id, p);
       break;
     case STATE_SUMMARY:
