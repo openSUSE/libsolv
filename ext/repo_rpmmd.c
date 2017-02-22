@@ -22,6 +22,7 @@
 #ifdef ENABLE_COMPLEX_DEPS
 #include "pool_parserpmrichdep.h"
 #endif
+#include "repodata_diskusage.h"
 
 enum state {
   STATE_START,
@@ -247,8 +248,7 @@ struct parsedata {
   Id chksumtype;
   Id handle;
   XML_Parser *parser;
-  Id (*dirs)[3]; /* dirid, size, nfiles */
-  int ndirs;
+  Queue diskusageq;
   const char *language;			/* default language */
   Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
 
@@ -286,74 +286,6 @@ langtag(struct parsedata *pd, Id tag, const char *language)
     pd->langcache[tag] = pool_id2langid(pd->pool, tag, pd->language, 1);
   return pd->langcache[tag];
 }
-
-static int
-id3_cmp (const void *v1, const void *v2, void *dp)
-{
-  Id *i1 = (Id*)v1;
-  Id *i2 = (Id*)v2;
-  return i1[0] - i2[0];
-}
-
-static void
-commit_diskusage (struct parsedata *pd, Id handle)
-{
-  int i;
-  Dirpool *dp = &pd->data->dirpool;
-  /* Now sort in dirid order.  This ensures that parents come before
-     their children.  */
-  if (pd->ndirs > 1)
-    solv_sort(pd->dirs, pd->ndirs, sizeof (pd->dirs[0]), id3_cmp, 0);
-  /* Substract leaf numbers from all parents to make the numbers
-     non-cumulative.  This must be done post-order (i.e. all leafs
-     adjusted before parents).  We ensure this by starting at the end of
-     the array moving to the start, hence seeing leafs before parents.  */
-  for (i = pd->ndirs; i--;)
-    {
-      Id p = dirpool_parent(dp, pd->dirs[i][0]);
-      int j = i;
-      for (; p; p = dirpool_parent(dp, p))
-        {
-          for (; j--;)
-	    if (pd->dirs[j][0] == p)
-	      break;
-	  if (j >= 0)
-	    {
-	      if (pd->dirs[j][1] < pd->dirs[i][1])
-	        pd->dirs[j][1] = 0;
-	      else
-	        pd->dirs[j][1] -= pd->dirs[i][1];
-	      if (pd->dirs[j][2] < pd->dirs[i][2])
-	        pd->dirs[j][2] = 0;
-	      else
-	        pd->dirs[j][2] -= pd->dirs[i][2];
-	    }
-	  else
-	    /* Haven't found this parent in the list, look further if
-	       we maybe find the parents parent.  */
-	    j = i;
-	}
-    }
-#if 0
-  char sbuf[1024];
-  char *buf = sbuf;
-  unsigned slen = sizeof (sbuf);
-  for (i = 0; i < pd->ndirs; i++)
-    {
-      dir2str (attr, pd->dirs[i][0], &buf, &slen);
-      fprintf (stderr, "have dir %d %d %d %s\n", pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2], buf);
-    }
-  if (buf != sbuf)
-    free (buf);
-#endif
-  for (i = 0; i < pd->ndirs; i++)
-    if (pd->dirs[i][1] || pd->dirs[i][2])
-      {
-	repodata_add_dirnumnum(pd->data, handle, SOLVABLE_DISKUSAGE, pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2]);
-      }
-  pd->ndirs = 0;
-}
-
 
 /*
  * makeevr_atts
@@ -1013,7 +945,8 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_DIR:
       {
         long filesz = 0, filenum = 0;
-        Id dirid;
+        Id did;
+
         if ((str = find_attr("name", atts)) == 0)
 	  {
 	    pd->ret = pool_error(pool, -1, "<dir .../> tag without 'name' attribute");
@@ -1036,16 +969,16 @@ startElement(void *userData, const char *name, const char **atts)
 		str = pd->content;
 	    }
 	  }
-        dirid = repodata_str2dir(pd->data, str, 1);
+        did = repodata_str2dir(pd->data, str, 1);
         if ((str = find_attr("size", atts)) != 0)
           filesz = strtol(str, 0, 0);
         if ((str = find_attr("count", atts)) != 0)
           filenum = strtol(str, 0, 0);
-        pd->dirs = solv_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
-        pd->dirs[pd->ndirs][0] = dirid;
-        pd->dirs[pd->ndirs][1] = filesz;
-        pd->dirs[pd->ndirs][2] = filenum;
-        pd->ndirs++;
+        if (filesz || filenum)
+          {
+            queue_push(&pd->diskusageq, did);
+            queue_push2(&pd->diskusageq, filesz, filenum);
+          }
         break;
       }
     case STATE_CHANGELOG:
@@ -1258,8 +1191,8 @@ endElement(void *userData, const char *name)
         repodata_add_poolstr_array(pd->data, handle, SOLVABLE_KEYWORDS, pd->content);
       break;
     case STATE_DISKUSAGE:
-      if (pd->ndirs)
-        commit_diskusage(pd, handle);
+      if (pd->diskusageq.count)
+        repodata_add_diskusage(pd->data, handle, &pd->diskusageq);
       break;
     case STATE_ORDER:
       if (pd->content[0])
@@ -1350,6 +1283,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   pd.lcontent = 0;
   pd.kind = 0;
   pd.language = language && *language && strcmp(language, "en") != 0 ? language : 0;
+  queue_init(&pd.diskusageq);
 
   init_cshash(&pd);
   if ((flags & REPO_EXTEND_SOLVABLES) != 0)
@@ -1381,6 +1315,7 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   join_freemem(&pd.jd);
   free_cshash(&pd);
   repodata_free_dircache(data);
+  queue_free(&pd.diskusageq);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

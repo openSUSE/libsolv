@@ -21,6 +21,7 @@
 #ifdef ENABLE_COMPLEX_DEPS
 #include "pool_parserpmrichdep.h"
 #endif
+#include "repodata_diskusage.h"
 
 struct datashare {
   Id name;
@@ -38,8 +39,7 @@ struct parsedata {
   int last_found_source;
   struct datashare *share_with;
   int nshare;
-  Id (*dirs)[3];			/* dirid, size, nfiles */
-  int ndirs;
+  Queue diskusageq;
   struct joindata jd;
   char *language;			/* the default language */
   Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
@@ -180,39 +180,6 @@ add_source(struct parsedata *pd, char *line, Solvable *s, Id handle)
   repodata_set_constantid(pd->data, handle, SOLVABLE_SOURCEARCH, arch);
 }
 
-/*
- * add_dirline
- * add a line with directory information
- *
- */
-
-static void
-add_dirline(struct parsedata *pd, char *line)
-{
-  char *sp[6];
-  long filesz;
-  long filenum;
-  Id dirid;
-  if (split(line, sp, 6) != 5)
-    return;
-  pd->dirs = solv_extend(pd->dirs, pd->ndirs, 1, sizeof(pd->dirs[0]), 31);
-  filesz = strtol(sp[1], 0, 0);
-  filesz += strtol(sp[2], 0, 0);
-  filenum = strtol(sp[3], 0, 0);
-  filenum += strtol(sp[4], 0, 0);
-  /* hack: we know that there's room for a / */
-  if (*sp[0] != '/')
-    *--sp[0] = '/';
-  dirid = repodata_str2dir(pd->data, sp[0], 1);
-#if 0
-fprintf(stderr, "%s -> %d\n", sp[0], dirid);
-#endif
-  pd->dirs[pd->ndirs][0] = dirid;
-  pd->dirs[pd->ndirs][1] = filesz;
-  pd->dirs[pd->ndirs][2] = filenum;
-  pd->ndirs++;
-}
-
 static void
 set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *line)
 {
@@ -235,86 +202,6 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
       return;
     }
   repodata_set_checksum(data, handle, keyname, type, sp[1]);
-}
-
-
-/*
- * id3_cmp
- * compare
- *
- */
-
-static int
-id3_cmp(const void *v1, const void *v2, void *dp)
-{
-  Id *i1 = (Id*)v1;
-  Id *i2 = (Id*)v2;
-  return i1[0] - i2[0];
-}
-
-
-/*
- * commit_diskusage
- *
- */
-
-static void
-commit_diskusage(struct parsedata *pd, Id handle)
-{
-  int i;
-  Dirpool *dp = &pd->data->dirpool;
-  /* Now sort in dirid order.  This ensures that parents come before
-     their children.  */
-  if (pd->ndirs > 1)
-    solv_sort(pd->dirs, pd->ndirs, sizeof(pd->dirs[0]), id3_cmp, 0);
-  /* Substract leaf numbers from all parents to make the numbers
-     non-cumulative.  This must be done post-order (i.e. all leafs
-     adjusted before parents).  We ensure this by starting at the end of
-     the array moving to the start, hence seeing leafs before parents.  */
-  for (i = pd->ndirs; i--;)
-    {
-      Id p = dirpool_parent(dp, pd->dirs[i][0]);
-      int j = i;
-      for (; p; p = dirpool_parent(dp, p))
-        {
-          for (; j--;)
-	    if (pd->dirs[j][0] == p)
-	      break;
-	  if (j >= 0)
-	    {
-	      if (pd->dirs[j][1] < pd->dirs[i][1])
-	        pd->dirs[j][1] = 0;
-	      else
-	        pd->dirs[j][1] -= pd->dirs[i][1];
-	      if (pd->dirs[j][2] < pd->dirs[i][2])
-	        pd->dirs[j][2] = 0;
-	      else
-	        pd->dirs[j][2] -= pd->dirs[i][2];
-	    }
-	  else
-	    /* Haven't found this parent in the list, look further if
-	       we maybe find the parents parent.  */
-	    j = i;
-	}
-    }
-#if 0
-  char sbuf[1024];
-  char *buf = sbuf;
-  unsigned slen = sizeof(sbuf);
-  for (i = 0; i < pd->ndirs; i++)
-    {
-      dir2str(attr, pd->dirs[i][0], &buf, &slen);
-      fprintf(stderr, "have dir %d %d %d %s\n", pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2], buf);
-    }
-  if (buf != sbuf)
-    free (buf);
-#endif
-  for (i = 0; i < pd->ndirs; i++)
-    if (pd->dirs[i][1] || pd->dirs[i][2])
-      {
-	repodata_add_dirnumnum(pd->data, handle, SOLVABLE_DISKUSAGE, pd->dirs[i][0], pd->dirs[i][1], pd->dirs[i][2]);
-      }
-  pd->ndirs = 0;
 }
 
 
@@ -385,13 +272,13 @@ finish_solvable(struct parsedata *pd, Solvable *s, Offset freshens)
 	}
       pd->nfilelist = 0;
     }
-  /* A self provide, except for source packages.  This is harmless
+  /* Add self provide, except for source packages.  This is harmless
      to do twice (in case we see the same package twice).  */
   if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
   repo_rewrite_suse_deps(s, freshens);
-  if (pd->ndirs)
-    commit_diskusage(pd, handle);
+  if (pd->diskusageq.count)
+    repodata_add_diskusage(pd->data, handle, &pd->diskusageq);
 }
 
 static Hashtable
@@ -484,7 +371,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   int indelta = 0;
   int last_found_pack = 0;
   Id first_new_pkg = 0;
-  char *sp[5];
+  char *sp[6];
   struct parsedata pd;
   Repodata *data = 0;
   Id handle = 0;
@@ -509,6 +396,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   pd.data = data;
   pd.flags = flags;
   pd.language = language && *language ? solv_strdup(language) : 0;
+  queue_init(&pd.diskusageq);
 
   linep = line;
   s = 0;
@@ -1034,8 +922,22 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      continue;
 	    }
 	  case CTAG('=', 'D', 'i', 'r'):
-	    add_dirline(&pd, line + 6);
-	    continue;
+	    if (split(line + 6, sp, 6) == 5)
+	      {
+	        long filesz, filenum;
+		Id did;
+
+	        filesz = strtol(sp[1], 0, 0);
+	        filesz += strtol(sp[2], 0, 0);
+	        filenum = strtol(sp[3], 0, 0);
+	        filenum += strtol(sp[4], 0, 0);
+	        if (*sp[0] != '/')
+		  *--sp[0] = '/'; 	/* hack: we know that there's room for a / */
+	        did = repodata_str2dir(data, sp[0], 1);
+	        queue_push(&pd.diskusageq, did);
+	        queue_push2(&pd.diskusageq, (Id)filesz, (Id)filenum);
+	      }
+	    break;
 	  case CTAG('=', 'C', 'a', 't'):
 	    repodata_set_poolstr(data, handle, langtag(&pd, SOLVABLE_CATEGORY, line_lang), line + 3 + keylen);
 	    break;
@@ -1173,5 +1075,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   solv_free(pd.language);
   solv_free(line);
   join_freemem(&pd.jd);
+  queue_free(&pd.diskusageq);
   return pd.ret;
 }
