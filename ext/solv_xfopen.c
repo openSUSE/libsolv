@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zlib.h>
 #include <fcntl.h>
 
 #include "solv_xfopen.h"
@@ -66,7 +65,11 @@ static FILE *cookieopen(void *cookie, const char *mode,
 }
 
 
+#ifdef ENABLE_ZLIB_COMPRESSION
+
 /* gzip compression */
+
+#include <zlib.h>
 
 static ssize_t cookie_gzread(void *cookie, char *buf, size_t nbytes)
 {
@@ -95,11 +98,14 @@ static inline FILE *mygzfdopen(int fd, const char *mode)
   return cookieopen(gzf, mode, cookie_gzread, cookie_gzwrite, cookie_gzclose);
 }
 
+#endif
+
+
 #ifdef ENABLE_BZIP2_COMPRESSION
 
-#include <bzlib.h>
-
 /* bzip2 compression */
+
+#include <bzlib.h>
 
 static ssize_t cookie_bzread(void *cookie, char *buf, size_t nbytes)
 {
@@ -134,9 +140,9 @@ static inline FILE *mybzfdopen(int fd, const char *mode)
 
 #ifdef ENABLE_LZMA_COMPRESSION
 
-#include <lzma.h>
-
 /* lzma code written by me in 2008 for rpm's rpmio.c */
+
+#include <lzma.h>
 
 typedef struct lzfile {
   unsigned char buf[1 << 15];
@@ -338,8 +344,13 @@ solv_xfopen(const char *fn, const char *mode)
   if (!mode)
     mode = "r";
   suf = strrchr(fn, '.');
+#ifdef ENABLE_ZLIB_COMPRESSION
   if (suf && !strcmp(suf, ".gz"))
     return mygzfopen(fn, mode);
+#else
+  if (suf && !strcmp(suf, ".gz"))
+    return 0;
+#endif
 #ifdef ENABLE_LZMA_COMPRESSION
   if (suf && !strcmp(suf, ".xz"))
     return myxzfopen(fn, mode);
@@ -384,8 +395,13 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
       else
 	mode = simplemode = "r";
     }
+#ifdef ENABLE_ZLIB_COMPRESSION
   if (suf && !strcmp(suf, ".gz"))
     return mygzfdopen(fd, simplemode);
+#else
+    return 0;
+  if (suf && !strcmp(suf, ".gz"))
+#endif
 #ifdef ENABLE_LZMA_COMPRESSION
   if (suf && !strcmp(suf, ".xz"))
     return myxzfdopen(fd, simplemode);
@@ -413,8 +429,12 @@ solv_xfopen_iscompressed(const char *fn)
   const char *suf = fn ? strrchr(fn, '.') : 0;
   if (!suf)
     return 0;
+#ifdef ENABLE_ZLIB_COMPRESSION
   if (!strcmp(suf, ".gz"))
     return 1;
+#else
+    return -1;
+#endif
   if (!strcmp(suf, ".xz") || !strcmp(suf, ".lzma"))
 #ifdef ENABLE_LZMA_COMPRESSION
     return 1;
