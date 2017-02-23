@@ -18,9 +18,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
-#include <limits.h>
-#include <fcntl.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
