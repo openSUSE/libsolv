@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <expat.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -19,6 +18,7 @@
 #include "tools_util.h"
 #include "repo_rpmmd.h"
 #include "chksum.h"
+#include "solv_xmlparser.h"
 #ifdef ENABLE_COMPLEX_DEPS
 #include "pool_parserpmrichdep.h"
 #endif
@@ -86,8 +86,7 @@ enum state {
   STATE_OPTIONALURL,
   STATE_FLAG,
 
-  /* rpm-md dependencies inside the
-     format tag */
+  /* rpm-md dependencies inside the format tag */
   STATE_PROVIDES,
   STATE_REQUIRES,
   STATE_OBSOLETES,
@@ -118,18 +117,13 @@ enum state {
   NUMSTATES
 };
 
-struct stateswitch {
-  enum state from;
-  char *ename;
-  enum state to;
-  int docontent;
-};
-
-static struct stateswitch stateswitches[] = {
-  /** fake tag used to enclose 2 different xml files in one **/
+static struct solv_xmlparser_element stateswitches[] = {
+  /** fake tag used to enclose multiple xml files in one **/
   { STATE_START,       "rpmmd",           STATE_START,    0 },
 
-  /** tags for different package data, we just ignore the tag **/
+  /** tags for different package data, just ignore them **/
+  { STATE_START,       "patterns",        STATE_START,    0 },
+  { STATE_START,       "products",        STATE_START,    0 },
   { STATE_START,       "metadata",        STATE_START,    0 },
   { STATE_START,       "otherdata",       STATE_START,    0 },
   { STATE_START,       "filelists",       STATE_START,    0 },
@@ -140,6 +134,8 @@ static struct stateswitch stateswitches[] = {
   { STATE_START,       "pattern",         STATE_SOLVABLE, 0 },
   { STATE_START,       "patch",           STATE_SOLVABLE, 0 },
   { STATE_START,       "package",         STATE_SOLVABLE, 0 },
+
+  { STATE_SOLVABLE,    "format",          STATE_SOLVABLE, 0 },
 
   { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
   { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
@@ -231,23 +227,15 @@ struct parsedata {
   Repo *repo;
   Repodata *data;
   char *kind;
-  int depth;
-  enum state state;
-  int statedepth;
-  char *content;
-  int lcontent;
-  int acontent;
-  int docontent;
   Solvable *solvable;
   Offset freshens;
-  struct stateswitch *swtab[NUMSTATES];
-  enum state sbtab[NUMSTATES];
+
+  struct solv_xmlparser xmlp;
   struct joindata jd;
   /* temporal to store attribute tag language */
   const char *tmplang;
   Id chksumtype;
   Id handle;
-  XML_Parser *parser;
   Queue diskusageq;
   const char *language;			/* default language */
   Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
@@ -297,7 +285,7 @@ static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 {
   const char *e, *v, *r, *v2;
-  char *c;
+  char *c, *space;
   int l;
 
   e = v = r = 0;
@@ -326,12 +314,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(v);
   if (r)
     l += strlen(r) + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = solv_realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content;
+  c = space = solv_xmlparser_contentspace(&pd->xmlp, l);
   if (e)
     {
       strcpy(c, e);
@@ -350,33 +333,12 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       c += strlen(c);
     }
   *c = 0;
-  if (!*pd->content)
+  if (!*space)
     return 0;
 #if 0
-  fprintf(stderr, "evr: %s\n", pd->content);
+  fprintf(stderr, "evr: %s\n", space);
 #endif
-  return pool_str2id(pool, pd->content, 1);
-}
-
-
-/*
- * find_attr
- * find value for xml attribute
- * I: txt, name of attribute
- * I: atts, list of key/value attributes
- * O: pointer to value of matching key, or NULL
- *
- */
-
-static inline const char *
-find_attr(const char *txt, const char **atts)
-{
-  for (; *atts; atts += 2)
-    {
-      if (!strcmp(*atts, txt))
-        return atts[1];
-    }
-  return 0;
+  return pool_str2id(pool, space, 1);
 }
 
 
@@ -427,13 +389,9 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
   if (k)
     {
       int l = strlen(k) + 1 + strlen(n) + 1;
-      if (l > pd->acontent)
-	{
-	  pd->content = solv_realloc(pd->content, l + 256);
-	  pd->acontent = l + 256;
-	}
-      sprintf(pd->content, "%s:%s", k, n);
-      id = pool_str2id(pool, pd->content, 1);
+      char *space = solv_xmlparser_contentspace(&pd->xmlp, l);
+      sprintf(space, "%s:%s", k, n);
+      id = pool_str2id(pool, space, 1);
     }
 #ifdef ENABLE_COMPLEX_DEPS
   else if (!f && n[0] == '(')
@@ -666,63 +624,22 @@ fill_cshash_from_new_solvables(struct parsedata *pd)
 
 /*
  * startElement
- * XML callback
- *
  */
 
-static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
+static void
+startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
-  struct stateswitch *sw;
-  const char *str;
   Id handle = pd->handle;
+  const char *str;
   const char *pkgid;
 
-  /* fprintf(stderr, "into %s, from %d, depth %d, statedepth %d\n", name, pd->state, pd->depth, pd->statedepth); */
-
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth++;
-      return;
-    }
-
-  if (pd->state == STATE_START && !strcmp(name, "patterns"))
-    return;
-  if (pd->state == STATE_START && !strcmp(name, "products"))
-    return;
-#if 0
-  if (pd->state == STATE_START && !strcmp(name, "metadata"))
-    return;
-#endif
-  if (pd->state == STATE_SOLVABLE && !strcmp(name, "format"))
+  if (!s && state != STATE_SOLVABLE)
     return;
 
-  pd->depth++;
-  if (!pd->swtab[pd->state])
-    return;
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)
-    if (!strcmp(sw->ename, name))
-      break;
-  if (sw->from != pd->state)
-    {
-#if 0
-      fprintf(stderr, "into unknown: %s\n", name);
-#endif
-      return;
-    }
-  pd->state = sw->to;
-  pd->docontent = sw->docontent;
-  pd->statedepth = pd->depth;
-  pd->lcontent = 0;
-  *pd->content = 0;
-
-  if (!s && pd->state != STATE_SOLVABLE)
-    return;
-
-  switch(pd->state)
+  switch(state)
     {
     case STATE_SOLVABLE:
       pd->kind = 0;
@@ -750,7 +667,7 @@ startElement(void *userData, const char *name, const char **atts)
          one.
       */
       pd->extending = 0;
-      if ((pkgid = find_attr("pkgid", atts)) != NULL)
+      if ((pkgid = solv_xmlparser_find_attr("pkgid", atts)) != NULL)
         {
 	  unsigned char chk[256];
 	  int l;
@@ -791,7 +708,7 @@ startElement(void *userData, const char *name, const char **atts)
       if (pd->kind && pd->kind[1] == 'r')
 	{
 	  /* products can have a type */
-	  const char *type = find_attr("type", atts);
+	  const char *type = solv_xmlparser_find_attr("type", atts);
 	  if (type && *type)
 	    repodata_set_str(pd->data, handle, PRODUCT_TYPE, type);
 	}
@@ -863,27 +780,27 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_SUMMARY:
     case STATE_CATEGORY:
     case STATE_DESCRIPTION:
-      pd->tmplang = join_dup(&pd->jd, find_attr("lang", atts));
+      pd->tmplang = join_dup(&pd->jd, solv_xmlparser_find_attr("lang", atts));
       break;
     case STATE_USERVISIBLE:
       repodata_set_void(pd->data, handle, SOLVABLE_ISVISIBLE);
       break;
     case STATE_INCLUDESENTRY:
-      str = find_attr("pattern", atts);
+      str = solv_xmlparser_find_attr("pattern", atts);
       if (str)
 	repodata_add_poolstr_array(pd->data, handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", str));
       break;
     case STATE_EXTENDSENTRY:
-      str = find_attr("pattern", atts);
+      str = solv_xmlparser_find_attr("pattern", atts);
       if (str)
 	repodata_add_poolstr_array(pd->data, handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", str));
       break;
     case STATE_LOCATION:
-      str = find_attr("href", atts);
+      str = solv_xmlparser_find_attr("href", atts);
       if (str)
 	{
 	  int medianr = 0;
-	  const char *base = find_attr("xml:base", atts);
+	  const char *base = solv_xmlparser_find_attr("xml:base", atts);
 	  if (base  && !strncmp(base, "media:", 6))
 	    {
 	      /* check for the media number in the fragment */
@@ -899,29 +816,29 @@ startElement(void *userData, const char *name, const char **atts)
 	}
       break;
     case STATE_CHECKSUM:
-      str = find_attr("type", atts);
+      str = solv_xmlparser_find_attr("type", atts);
       pd->chksumtype = str && *str ? solv_chksum_str2type(str) : 0;
       if (!pd->chksumtype)
-	pd->ret = pool_error(pool, -1, "line %d: unknown checksum type: %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), str ? str : "NULL");
+	pd->ret = pool_error(pool, -1, "line %d: unknown checksum type: %s", solv_xmlparser_lineno(xmlp), str ? str : "NULL");
       break;
     case STATE_TIME:
       {
         unsigned int t;
-        str = find_attr("build", atts);
+        str = solv_xmlparser_find_attr("build", atts);
         if (str && (t = atoi(str)) != 0)
           repodata_set_num(pd->data, handle, SOLVABLE_BUILDTIME, t);
 	break;
       }
     case STATE_SIZE:
-      if ((str = find_attr("installed", atts)) != 0)
+      if ((str = solv_xmlparser_find_attr("installed", atts)) != 0)
 	repodata_set_num(pd->data, handle, SOLVABLE_INSTALLSIZE, strtoull(str, 0, 10));
-      if ((str = find_attr("package", atts)) != 0)
+      if ((str = solv_xmlparser_find_attr("package", atts)) != 0)
 	repodata_set_num(pd->data, handle, SOLVABLE_DOWNLOADSIZE, strtoull(str, 0, 10));
       break;
     case STATE_HEADERRANGE:
       {
         unsigned int end;
-        str = find_attr("end", atts);
+        str = solv_xmlparser_find_attr("end", atts);
 	if (str && (end = atoi(str)) != 0)
 	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
 	break;
@@ -947,7 +864,7 @@ startElement(void *userData, const char *name, const char **atts)
         long filesz = 0, filenum = 0;
         Id did;
 
-        if ((str = find_attr("name", atts)) == 0)
+        if ((str = solv_xmlparser_find_attr("name", atts)) == 0)
 	  {
 	    pd->ret = pool_error(pool, -1, "<dir .../> tag without 'name' attribute");
             break;
@@ -959,20 +876,16 @@ startElement(void *userData, const char *name, const char **atts)
 	    else
 	      {
 		int l = strlen(str) + 2;
-		if (l > pd->acontent)
-		  {
-		    pd->acontent = l + 256;
-		    pd->content = solv_realloc(pd->content, pd->acontent);
-		  }
-		pd->content[0] = '/';
-		memcpy(pd->content + 1, str, l - 1);
-		str = pd->content;
+		char *space = solv_xmlparser_contentspace(xmlp, l);
+		space[0] = '/';
+		memcpy(space + 1, str, l - 1);
+		str = space;
 	    }
 	  }
         did = repodata_str2dir(pd->data, str, 1);
-        if ((str = find_attr("size", atts)) != 0)
+        if ((str = solv_xmlparser_find_attr("size", atts)) != 0)
           filesz = strtol(str, 0, 0);
-        if ((str = find_attr("count", atts)) != 0)
+        if ((str = solv_xmlparser_find_attr("count", atts)) != 0)
           filenum = strtol(str, 0, 0);
         if (filesz || filenum)
           {
@@ -983,9 +896,9 @@ startElement(void *userData, const char *name, const char **atts)
       }
     case STATE_CHANGELOG:
       pd->changelog_handle = repodata_new_handle(pd->data);
-      if ((str = find_attr("date", atts)) != 0)
+      if ((str = solv_xmlparser_find_attr("date", atts)) != 0)
 	repodata_set_num(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_TIME, strtoull(str, 0, 10));
-      if ((str = find_attr("author", atts)) != 0)
+      if ((str = solv_xmlparser_find_attr("author", atts)) != 0)
 	repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_AUTHOR, str);
       break;
     default:
@@ -996,14 +909,12 @@ startElement(void *userData, const char *name, const char **atts)
 
 /*
  * endElement
- * XML callback
- *
  */
 
-static void XMLCALL
-endElement(void *userData, const char *name)
+static void
+endElement(struct solv_xmlparser *xmlp, int state, char *content)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   Repo *repo = pd->repo;
@@ -1011,37 +922,10 @@ endElement(void *userData, const char *name)
   Id id;
   char *p;
 
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth--;
-      /* printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth); */
-      return;
-    }
-
-  /* ignore patterns & metadata */
-  if (pd->state == STATE_START && !strcmp(name, "patterns"))
-    return;
-  if (pd->state == STATE_START && !strcmp(name, "products"))
-    return;
-#if 0
-  if (pd->state == STATE_START && !strcmp(name, "metadata"))
-    return;
-#endif
-  if (pd->state == STATE_SOLVABLE && !strcmp(name, "format"))
-    return;
-
-  pd->depth--;
-  pd->statedepth--;
-
-
   if (!s)
-    {
-      pd->state = pd->sbtab[pd->state];
-      pd->docontent = 0;
-      return;
-    }
+    return;
 
-  switch (pd->state)
+  switch (state)
     {
     case STATE_SOLVABLE:
       if (pd->extending)
@@ -1064,32 +948,32 @@ endElement(void *userData, const char *name)
       break;
     case STATE_NAME:
       if (pd->kind)
-        s->name = pool_str2id(pool, join2(&pd->jd, pd->kind, ":", pd->content), 1);
+        s->name = pool_str2id(pool, join2(&pd->jd, pd->kind, ":", content), 1);
       else
-        s->name = pool_str2id(pool, pd->content, 1);
+        s->name = pool_str2id(pool, content, 1);
       break;
     case STATE_ARCH:
-      s->arch = pool_str2id(pool, pd->content, 1);
+      s->arch = pool_str2id(pool, content, 1);
       break;
     case STATE_VENDOR:
-      s->vendor = pool_str2id(pool, pd->content, 1);
+      s->vendor = pool_str2id(pool, content, 1);
       break;
     case STATE_RPM_GROUP:
-      repodata_set_poolstr(pd->data, handle, SOLVABLE_GROUP, pd->content);
+      repodata_set_poolstr(pd->data, handle, SOLVABLE_GROUP, content);
       break;
     case STATE_RPM_LICENSE:
-      repodata_set_poolstr(pd->data, handle, SOLVABLE_LICENSE, pd->content);
+      repodata_set_poolstr(pd->data, handle, SOLVABLE_LICENSE, content);
       break;
     case STATE_CHECKSUM:
       {
 	unsigned char chk[256];
 	int l = solv_chksum_len(pd->chksumtype);
-	const char *str = pd->content;
+	const char *str = content;
 	if (!l || l > sizeof(chk))
 	  break;
-	if (solv_hex2bin(&str, chk, l) != l || pd->content[2 * l])
+	if (solv_hex2bin(&str, chk, l) != l || content[2 * l])
           {
-	    pd->ret = pool_error(pool, -1, "line %u: invalid %s checksum", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
+	    pd->ret = pool_error(pool, -1, "line %u: invalid %s checksum", solv_xmlparser_lineno(xmlp), solv_chksum_type2str(pd->chksumtype));
 	    break;
           }
         repodata_set_bin_checksum(pd->data, handle, SOLVABLE_CHECKSUM, pd->chksumtype, chk);
@@ -1099,152 +983,124 @@ endElement(void *userData, const char *name)
         break;
       }
     case STATE_FILE:
-      if ((p = strrchr(pd->content, '/')) != 0)
+      if ((p = strrchr(content, '/')) != 0)
 	{
 	  *p++ = 0;
-	  if (pd->lastdir && !strcmp(pd->lastdirstr, pd->content))
+	  if (pd->lastdir && !strcmp(pd->lastdirstr, content))
 	    {
 	      id = pd->lastdir;
 	    }
 	  else
 	    {
-	      int l = p - pd->content;
+	      int l = p - content;
 	      if (l + 1 > pd->lastdirstrl)	/* + 1 for the possible leading / we need to insert */
 		{
 		  pd->lastdirstrl = l + 128;
 		  pd->lastdirstr = solv_realloc(pd->lastdirstr, pd->lastdirstrl);
 		}
-	      if (pd->content[0] != '/')
+	      if (content[0] != '/')
 		{
 		  pd->lastdirstr[0] = '/';
-		  memcpy(pd->lastdirstr + 1, pd->content, l);
+		  memcpy(pd->lastdirstr + 1, content, l);
 	          id = repodata_str2dir(pd->data, pd->lastdirstr, 1);
 		}
 	      else
-	        id = repodata_str2dir(pd->data, pd->content, 1);
+	        id = repodata_str2dir(pd->data, content, 1);
 	      pd->lastdir = id;
-	      memcpy(pd->lastdirstr, pd->content, l);
+	      memcpy(pd->lastdirstr, content, l);
 	    }
 	}
       else
 	{
-	  p = pd->content;
+	  p = content;
 	  id = repodata_str2dir(pd->data, "/", 1);
 	}
       repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, id, p);
       break;
     case STATE_SUMMARY:
-      repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), pd->content);
+      repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_SUMMARY, pd->tmplang), content);
       break;
     case STATE_DESCRIPTION:
-      set_description_author(pd->data, handle, pd->content, pd);
+      set_description_author(pd->data, handle, content, pd);
       break;
     case STATE_CATEGORY:
-      repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_CATEGORY, pd->tmplang), pd->content);
+      repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_CATEGORY, pd->tmplang), content);
       break;
     case STATE_DISTRIBUTION:
-        repodata_set_poolstr(pd->data, handle, SOLVABLE_DISTRIBUTION, pd->content);
+        repodata_set_poolstr(pd->data, handle, SOLVABLE_DISTRIBUTION, content);
         break;
     case STATE_URL:
-      if (pd->content[0])
-	repodata_set_str(pd->data, handle, SOLVABLE_URL, pd->content);
+      if (*content)
+	repodata_set_str(pd->data, handle, SOLVABLE_URL, content);
       break;
     case STATE_PACKAGER:
-      if (pd->content[0])
-	repodata_set_poolstr(pd->data, handle, SOLVABLE_PACKAGER, pd->content);
+      if (*content)
+	repodata_set_poolstr(pd->data, handle, SOLVABLE_PACKAGER, content);
       break;
     case STATE_SOURCERPM:
-      if (pd->content[0])
-	repodata_set_sourcepkg(pd->data, handle, pd->content);
+      if (*content)
+	repodata_set_sourcepkg(pd->data, handle, content);
       break;
     case STATE_RELNOTESURL:
-      if (pd->content[0])
+      if (*content)
         {
-          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, pd->content);
+          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, content);
           repodata_add_idarray(pd->data, handle, PRODUCT_URL_TYPE, pool_str2id(pool, "releasenotes", 1));
         }
       break;
     case STATE_UPDATEURL:
-      if (pd->content[0])
+      if (*content)
         {
-          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, pd->content);
+          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, content);
           repodata_add_idarray(pd->data, handle, PRODUCT_URL_TYPE, pool_str2id(pool, "update", 1));
         }
       break;
     case STATE_OPTIONALURL:
-      if (pd->content[0])
+      if (*content)
         {
-          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, pd->content);
+          repodata_add_poolstr_array(pd->data, handle, PRODUCT_URL, content);
           repodata_add_idarray(pd->data, handle, PRODUCT_URL_TYPE, pool_str2id(pool, "optional", 1));
         }
       break;
     case STATE_FLAG:
-      if (pd->content[0])
-        repodata_add_poolstr_array(pd->data, handle, PRODUCT_FLAGS, pd->content);
+      if (*content)
+        repodata_add_poolstr_array(pd->data, handle, PRODUCT_FLAGS, content);
       break;
     case STATE_EULA:
-      if (pd->content[0])
-	repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->tmplang), pd->content);
+      if (*content)
+	repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->tmplang), content);
       break;
     case STATE_KEYWORD:
-      if (pd->content[0])
-        repodata_add_poolstr_array(pd->data, handle, SOLVABLE_KEYWORDS, pd->content);
+      if (*content)
+        repodata_add_poolstr_array(pd->data, handle, SOLVABLE_KEYWORDS, content);
       break;
     case STATE_DISKUSAGE:
       if (pd->diskusageq.count)
         repodata_add_diskusage(pd->data, handle, &pd->diskusageq);
       break;
     case STATE_ORDER:
-      if (pd->content[0])
-        repodata_set_str(pd->data, handle, SOLVABLE_ORDER, pd->content);
+      if (*content)
+        repodata_set_str(pd->data, handle, SOLVABLE_ORDER, content);
       break;
     case STATE_CHANGELOG:
-      repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_TEXT, pd->content);
+      repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_TEXT, content);
       repodata_add_flexarray(pd->data, handle, SOLVABLE_CHANGELOG, pd->changelog_handle);
       pd->changelog_handle = 0;
       break;
     default:
       break;
     }
-  pd->state = pd->sbtab[pd->state];
-  pd->docontent = 0;
-  /* fprintf(stderr, "back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth); */
 }
 
-
-/*
- * characterData
- * XML callback
- *
- */
-
-static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len)
+static void
+errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
 {
-  struct parsedata *pd = userData;
-  int l;
-  char *c;
-
-  if (!pd->docontent)
-    return;
-  l = pd->lcontent + len + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = solv_realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content + pd->lcontent;
-  pd->lcontent += len;
-  while (len-- > 0)
-    *c++ = *s++;
-  *c = 0;
+  struct parsedata *pd = xmlp->userdata;
+  pd->ret = pool_error(pd->pool, -1, "repo_rpmmd: %s at line %u:%u", errstr, line, column);
 }
 
 
 /*-----------------------------------------------*/
-/* 'main' */
-
-#define BUFF_SIZE 8192
 
 /*
  * repo_add_rpmmd
@@ -1257,30 +1113,17 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
 {
   Pool *pool = repo->pool;
   struct parsedata pd;
-  char buf[BUFF_SIZE];
-  int i, l;
-  struct stateswitch *sw;
   Repodata *data;
   unsigned int now;
-  XML_Parser parser;
 
   now = solv_timems(0);
   data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd.swtab[sw->from])
-        pd.swtab[sw->from] = sw;
-      pd.sbtab[sw->to] = sw->from;
-    }
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
 
-  pd.content = solv_malloc(256);
-  pd.acontent = 256;
-  pd.lcontent = 0;
   pd.kind = 0;
   pd.language = language && *language && strcmp(language, "en") != 0 ? language : 0;
   queue_init(&pd.diskusageq);
@@ -1293,24 +1136,10 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
       fill_cshash_from_repo(&pd);
     }
 
-  parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, &pd);
-  pd.parser = &parser;
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
-  for (;;)
-    {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	{
-	  pd.ret = pool_error(pool, -1, "repo_rpmmd: %s at line %u:%u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  break;
-	}
-      if (l == 0)
-	break;
-    }
-  XML_ParserFree(parser);
-  solv_free(pd.content);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
+  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_free(&pd.xmlp);
+
   solv_free(pd.lastdirstr);
   join_freemem(&pd.jd);
   free_cshash(&pd);
