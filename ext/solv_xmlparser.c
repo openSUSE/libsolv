@@ -14,7 +14,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef ENABLE_LIBXML2
+#include <libxml/parser.h>
+#else
 #include <expat.h>
+#endif
 
 #include "util.h"
 #include "queue.h"
@@ -31,23 +35,31 @@ add_contentspace(struct solv_xmlparser *xmlp, int l)
     }    
 }
 
+
+#ifdef ENABLE_LIBXML2
+static void
+character_data(void *userData, const xmlChar *s, int len)
+#else
 static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len) 
+character_data(void *userData, const XML_Char *s, int len) 
+#endif
 {
   struct solv_xmlparser *xmlp = userData;
-  char *c;
 
-  if (!xmlp->docontent)
+  if (!xmlp->docontent || !len)
     return;
   add_contentspace(xmlp, len);
-  c = xmlp->content + xmlp->lcontent;
+  memcpy(xmlp->content + xmlp->lcontent, s, len);
   xmlp->lcontent += len; 
-  while (len-- > 0) 
-    *c++ = *s++;
 }
 
+#ifdef ENABLE_LIBXML2
+static void
+start_element(void *userData, const xmlChar *name, const xmlChar **atts)
+#else
 static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
+start_element(void *userData, const char *name, const char **atts)
+#endif
 {
   struct solv_xmlparser *xmlp = userData;
   struct solv_xmlparser_element *elements;
@@ -64,7 +76,7 @@ startElement(void *userData, const char *name, const char **atts)
   elements = xmlp->elements;
   oldstate = xmlp->state;
   for (i = elementhelper[xmlp->nelements + oldstate]; i; i = elementhelper[i - 1])
-    if (!strcmp(elements[i - 1].element, name))
+    if (!strcmp(elements[i - 1].element, (char *)name))
       break;
   if (!i)
     {
@@ -79,12 +91,24 @@ startElement(void *userData, const char *name, const char **atts)
   xmlp->state = el->tostate;
   xmlp->docontent = el->docontent;
   xmlp->lcontent = 0;
+#ifdef ENABLE_LIBXML2
+  if (!atts)
+    {
+      static const char *nullattr;
+      atts = (const xmlChar **)&nullattr;
+    }
+#endif
   if (xmlp->state != oldstate)
-    xmlp->startelement(xmlp, xmlp->state, el->element, atts);
+    xmlp->startelement(xmlp, xmlp->state, el->element, (const char **)atts);
 }
 
+#ifdef ENABLE_LIBXML2
+static void
+end_element(void *userData, const xmlChar *name)
+#else
 static void XMLCALL
-endElement(void *userData, const char *name)
+end_element(void *userData, const char *name)
+#endif
 {
   struct solv_xmlparser *xmlp = userData;
 
@@ -148,12 +172,6 @@ solv_xmlparser_init(struct solv_xmlparser *xmlp,
   xmlp->errorhandler = errorhandler;
 }
 
-unsigned int
-solv_xmlparser_lineno(struct solv_xmlparser *xmlp)
-{
-  return (unsigned int)XML_GetCurrentLineNumber(xmlp->parser);
-}
-
 void
 solv_xmlparser_free(struct solv_xmlparser *xmlp)
 {
@@ -161,6 +179,107 @@ solv_xmlparser_free(struct solv_xmlparser *xmlp)
   queue_free(&xmlp->elementq);
   xmlp->content = solv_free(xmlp->content);
 }
+
+#ifdef ENABLE_LIBXML2
+
+static inline int
+create_parser(struct solv_xmlparser *xmlp)
+{
+  /* delayed to parse_block so that we have the first bytes */
+  return 1;
+}
+
+static inline void
+free_parser(struct solv_xmlparser *xmlp)
+{
+  if (xmlp->parser)
+    xmlFreeParserCtxt(xmlp->parser);
+  xmlp->parser = 0;
+}
+
+static xmlParserCtxtPtr create_parser_ctx(struct solv_xmlparser *xmlp, char *buf, int l)
+{
+  xmlSAXHandler sax;
+  memset(&sax, 0, sizeof(sax));
+  sax.startElement = start_element;
+  sax.endElement = end_element;
+  sax.characters = character_data;
+  return xmlCreatePushParserCtxt(&sax, xmlp, buf, l, NULL);
+}
+
+static inline int
+parse_block(struct solv_xmlparser *xmlp, char *buf, int l)
+{
+  if (!xmlp->parser)
+    {
+      int l2 = l > 4 ? 4 : 0;
+      xmlp->parser = create_parser_ctx(xmlp, buf, l2);
+      if (!xmlp->parser)
+	{
+	  xmlp->errorhandler(xmlp, "could not create parser", 0, 0);
+	  return 0;
+	}
+      buf += l2;
+      l -= l2;
+      if (l2 && !l)
+	return 1;
+    }
+  if (xmlParseChunk(xmlp->parser, buf, l, l == 0 ? 1 : 0))
+    {
+      xmlErrorPtr err = xmlCtxtGetLastError(xmlp->parser);
+      xmlp->errorhandler(xmlp, err->message, err->line, err->int2);
+      return 0;
+    }
+  return 1;
+}
+
+unsigned int
+solv_xmlparser_lineno(struct solv_xmlparser *xmlp)
+{
+  return (unsigned int)xmlSAX2GetLineNumber(xmlp->parser);
+}
+
+#else
+
+static inline int
+create_parser(struct solv_xmlparser *xmlp)
+{
+  xmlp->parser = XML_ParserCreate(NULL);
+  if (!xmlp->parser)
+    return 0;
+  XML_SetUserData(xmlp->parser, xmlp);
+  XML_SetElementHandler(xmlp->parser, start_element, end_element);
+  XML_SetCharacterDataHandler(xmlp->parser, character_data);
+  return 1;
+}
+
+static inline void
+free_parser(struct solv_xmlparser *xmlp)
+{
+  XML_ParserFree(xmlp->parser);
+  xmlp->parser = 0;
+}
+
+static inline int
+parse_block(struct solv_xmlparser *xmlp, char *buf, int l)
+{
+  if (XML_Parse(xmlp->parser, buf, l, l == 0) == XML_STATUS_ERROR)
+    {
+      unsigned int line = XML_GetCurrentLineNumber(xmlp->parser);
+      unsigned int column = XML_GetCurrentColumnNumber(xmlp->parser);
+      xmlp->errorhandler(xmlp, XML_ErrorString(XML_GetErrorCode(xmlp->parser)), line, column);
+      return 0;
+    }
+  return 1;
+}
+
+unsigned int
+solv_xmlparser_lineno(struct solv_xmlparser *xmlp)
+{
+  return (unsigned int)XML_GetCurrentLineNumber(xmlp->parser);
+}
+
+#endif
 
 void
 solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp)
@@ -173,26 +292,19 @@ solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp)
   xmlp->docontent = 0;
   xmlp->lcontent = 0;
   queue_empty(&xmlp->elementq);
-  xmlp->parser = XML_ParserCreate(NULL);
-  XML_SetUserData(xmlp->parser, xmlp);
-  XML_SetElementHandler(xmlp->parser, startElement, endElement);
-  XML_SetCharacterDataHandler(xmlp->parser, characterData);
 
+  if (!create_parser(xmlp))
+    {
+      xmlp->errorhandler(xmlp, "could not create xml parser", 0, 0);
+      return;
+    }
   for (;;)
     {
       l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(xmlp->parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	{
-	  unsigned int line = XML_GetCurrentLineNumber(xmlp->parser);
-	  unsigned int column = XML_GetCurrentColumnNumber(xmlp->parser);
-	  xmlp->errorhandler(xmlp, XML_ErrorString(XML_GetErrorCode(xmlp->parser)), line, column);
-	  break;
-	}
-      if (l == 0)
+      if (!parse_block(xmlp, buf, l) || !l)
 	break;
     }
-  XML_ParserFree(xmlp->parser);
-  xmlp->parser = 0;
+  free_parser(xmlp);
 }
 
 char *
