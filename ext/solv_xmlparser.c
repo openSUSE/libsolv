@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef ENABLE_LIBXML2
+#ifdef WITH_LIBXML2
 #include <libxml/parser.h>
 #else
 #include <expat.h>
@@ -36,7 +36,7 @@ add_contentspace(struct solv_xmlparser *xmlp, int l)
 }
 
 
-#ifdef ENABLE_LIBXML2
+#ifdef WITH_LIBXML2
 static void
 character_data(void *userData, const xmlChar *s, int len)
 #else
@@ -53,7 +53,7 @@ character_data(void *userData, const XML_Char *s, int len)
   xmlp->lcontent += len; 
 }
 
-#ifdef ENABLE_LIBXML2
+#ifdef WITH_LIBXML2
 static void
 start_element(void *userData, const xmlChar *name, const xmlChar **atts)
 #else
@@ -91,7 +91,7 @@ start_element(void *userData, const char *name, const char **atts)
   xmlp->state = el->tostate;
   xmlp->docontent = el->docontent;
   xmlp->lcontent = 0;
-#ifdef ENABLE_LIBXML2
+#ifdef WITH_LIBXML2
   if (!atts)
     {
       static const char *nullattr;
@@ -102,7 +102,7 @@ start_element(void *userData, const char *name, const char **atts)
     xmlp->startelement(xmlp, xmlp->state, el->element, (const char **)atts);
 }
 
-#ifdef ENABLE_LIBXML2
+#ifdef WITH_LIBXML2
 static void
 end_element(void *userData, const xmlChar *name)
 #else
@@ -180,7 +180,7 @@ solv_xmlparser_free(struct solv_xmlparser *xmlp)
   xmlp->content = solv_free(xmlp->content);
 }
 
-#ifdef ENABLE_LIBXML2
+#ifdef WITH_LIBXML2
 
 static inline int
 create_parser(struct solv_xmlparser *xmlp)
