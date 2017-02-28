@@ -37,20 +37,12 @@ BuildRequires:  libneon0.26-devel
 %if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 BuildRequires:  db-devel
 %endif
-%if 0%{?suse_version}
-%if 0%{?suse_version} < 1030
-BuildRequires:  expat
-%else
-BuildRequires:  libexpat-devel
-%endif
-%if 0%{?suse_version} < 1100
+BuildRequires:  libxml2-devel
+%if 0%{?suse_version} && 0%{?suse_version} < 1100
 BuildRequires:  graphviz
 %endif
 %if 0%{?suse_version} > 1020
 BuildRequires:  fdupes
-%endif
-%else
-BuildRequires:  expat-devel
 %endif
 BuildRequires:  cmake
 BuildRequires:  gcc-c++
@@ -186,6 +178,7 @@ cmake	$CMAKE_FLAGS \
 	-DLIB=%{_lib} \
 	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DWITH_LIBXML2=1 \
 	%{?with_enable_static:-DENABLE_STATIC=1} \
 	%{?with_disable_shared:-DDISABLE_SHARED=1} \
 	%{?with_perl_binding:-DENABLE_PERL=1} \
