@@ -351,6 +351,8 @@ repodata_dir2str(Repodata *data, Id did, const char *suf)
 
   if (!did)
     return suf ? suf : "";
+  if (did == 1 && !suf)
+    return "/";
   parent = did;
   while (parent)
     {
