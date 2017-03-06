@@ -6,9 +6,9 @@
 # we cannot use FIND_PACKAGE PythonLibs here, as this would
 # clash with the python variables.
 #
-IF (NOT DEFINED ${PYTHON3_EXECUTABLE})
+IF (NOT DEFINED PYTHON3_EXECUTABLE)
 SET (PYTHON3_EXECUTABLE "/usr/bin/python3")
-ENDIF (NOT DEFINED ${PYTHON3_EXECUTABLE})
+ENDIF (NOT DEFINED PYTHON3_EXECUTABLE)
 
 EXECUTE_PROCESS(COMMAND ${PYTHON3_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib(True))" OUTPUT_VARIABLE PYTHON3_INSTALL_DIR)
 EXECUTE_PROCESS(COMMAND ${PYTHON3_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_inc())" OUTPUT_VARIABLE PYTHON3_INCLUDE_DIR)
