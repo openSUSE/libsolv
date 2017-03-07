@@ -1669,12 +1669,14 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       id = kv->id;
       id = copydir(pool, data, fromdata, id, cbdata->dircache);
-      repodata_add_dirnumnum(data, handle, keyname, id, kv->num, kv->num2);
+      if (id)
+        repodata_add_dirnumnum(data, handle, keyname, id, kv->num, kv->num2);
       break;
     case REPOKEY_TYPE_DIRSTRARRAY:
       id = kv->id;
       id = copydir(pool, data, fromdata, id, cbdata->dircache);
-      repodata_add_dirstr(data, handle, keyname, id, kv->str);
+      if (id)
+        repodata_add_dirstr(data, handle, keyname, id, kv->str);
       break;
     case REPOKEY_TYPE_FLEXARRAY:
       if (kv->eof == 2)
