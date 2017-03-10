@@ -93,8 +93,6 @@ main(int argc, char **argv)
 
   arch = argv[1];
   pool = pool_create();
-  pool_setarch(pool, arch);
-  noarchid = pool->solvables[SYSTEMSOLVABLE].arch;
   for (i = 2; i < argc; i++)
     {
       FILE *fp;
@@ -148,12 +146,16 @@ main(int argc, char **argv)
 #ifdef ENABLE_SUSEREPO
       else if (l >= 8 && !strncmp(argv[i] + l - 8, "packages", 8))
 	{
+	  pool_setdisttype(pool, DISTTYPE_RPM);
+	  pool_setarch(pool, arch);
 	  r = repo_add_susetags(repo, fp, 0, 0, 0);
 	}
 #endif
 #ifdef ENABLE_RPMMD
       else if (l >= 11 && !strncmp(argv[i] + l - 11, "primary.xml", 11))
 	{
+	  pool_setdisttype(pool, DISTTYPE_RPM);
+	  pool_setarch(pool, arch);
 	  r = repo_add_rpmmd(repo, fp, 0, 0);
           if (!r && i + 1 < argc)
             {
@@ -175,16 +177,21 @@ main(int argc, char **argv)
 #ifdef ENABLE_DEBIAN
       else if (l >= 8 && !strncmp(argv[i] + l - 8, "Packages", 8))
 	{
+	  pool_setdisttype(pool, DISTTYPE_DEB);
+	  pool_setarch(pool, arch);
 	  r = repo_add_debpackages(repo, fp, 0);
 	}
 #endif
 #ifdef ENABLE_ARCHREPO
       else if (l >= 7 && (!strncmp(argv[i] + l - 7, ".db.tar", 7)))
         {
+	  pool_setdisttype(pool, DISTTYPE_ARCH);
+	  pool_setarch(pool, arch);
 	  r = repo_add_arch_repo(repo, fp, 0);
         }
 #endif
       else
+	pool_setarch(pool, arch);
 	r = repo_add_solv(repo, fp, 0);
       if (r)
 	{
@@ -197,6 +204,7 @@ main(int argc, char **argv)
   pool_addfileprovides(pool);
   pool_createwhatprovides(pool);
   archid = pool_str2id(pool, arch, 0);
+  noarchid = pool->solvables[SYSTEMSOLVABLE].arch;
 #ifndef DEBIAN
   rpmid = pool_str2id(pool, "rpm", 0);
   rpmrel = 0;
