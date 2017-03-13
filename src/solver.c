@@ -3528,7 +3528,7 @@ solver_solve(Solver *solv, Queue *job)
   Map installcandidatemap;
   Id how, what, select, name, weak, p, pp, d;
   Queue q;
-  Solvable *s;
+  Solvable *s, *name_s;
   Rule *r;
   int now, solve_start;
   int needduprules = 0;
@@ -4020,6 +4020,7 @@ solver_solve(Solver *solv, Queue *job)
 	    map_grow(&solv->cleandepsmap, installed->end - installed->start);
 	  /* specific solvable: by id or by nevra */
 	  name = (select == SOLVER_SOLVABLE || (select == SOLVER_SOLVABLE_NAME && ISRELDEP(what))) ? 0 : -1;
+	  name_s = 0;
 	  if (select == SOLVER_SOLVABLE_ALL)	/* hmmm ;) */
 	    {
 	      FOR_POOL_SOLVABLES(p)
@@ -4046,7 +4047,10 @@ solver_solve(Solver *solv, Queue *job)
 	    {
 	      s = pool->solvables + p;
 	      if (installed && s->repo == installed)
-		name = !name ? s->name : -1;
+		{
+		  name = !name ? s->name : -1;
+		  name_s = s;
+		}
 	      solver_addjobrule(solv, -p, 0, 0, i, weak);
 	    }
 	  /* special case for "erase a specific solvable": we also
@@ -4069,6 +4073,8 @@ solver_solve(Solver *solv, Queue *job)
 		    continue;
 		  /* keep installcandidates of other jobs */
 		  if (MAPTST(&installcandidatemap, p))
+		    continue;
+		  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, name_s, s))
 		    continue;
 		  /* don't add the same rule twice */
 		  for (j = oldnrules; j < k; j++)
