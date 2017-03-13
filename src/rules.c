@@ -3485,6 +3485,12 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 
   if (solv->bestupdatemap_all || solv->bestupdatemap.size)
     {
+      Map m;
+
+      if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
+	map_init(&m, pool->nsolvables);
+      else
+	map_init(&m, 0);
       FOR_REPO_SOLVABLES(installed, p, s)
 	{
 	  Id d, p2, pp2;
@@ -3543,6 +3549,25 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		    queue_pushunique(&q, q2.elements[j]);
 		}
 	    }
+	  if (solv->allowuninstall || solv->allowuninstall_all || (solv->allowuninstallmap.size && MAPTST(&solv->allowuninstallmap, p - installed->start)))
+	    {
+	      /* package is flagged both for allowuninstall and best, add negative rules */
+	      for (i = 0; i < q.count; i++)
+		MAPSET(&m, q.elements[i]);
+	      r = solv->rules + solv->featurerules + (p - installed->start);
+	      if (!r->p)	/* identical to update rule? */
+		r = solv->rules + solv->updaterules + (p - installed->start);
+	      FOR_RULELITERALS(p2, pp2, r)
+		{
+		  if (MAPTST(&m, p2))
+		    continue;
+		  solver_addrule(solv, -p2, 0, 0);
+		  queue_push(&r2pkg, p);
+		}
+	      for (i = 0; i < q.count; i++)
+		MAPCLR(&m, q.elements[i]);
+	      continue;
+	    }
 	  p2 = queue_shift(&q);
 	  if (q.count < 2)
 	    solver_addrule(solv, p2, q.count ? q.elements[0] : 0, 0);
@@ -3550,6 +3575,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	    solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
 	  queue_push(&r2pkg, p);
 	}
+      map_free(&m);
     }
   if (r2pkg.count)
     solv->bestrules_pkg = solv_memdup2(r2pkg.elements, r2pkg.count, sizeof(Id));
