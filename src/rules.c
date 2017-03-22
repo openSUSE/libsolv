@@ -3552,6 +3552,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	  if (solv->allowuninstall || solv->allowuninstall_all || (solv->allowuninstallmap.size && MAPTST(&solv->allowuninstallmap, p - installed->start)))
 	    {
 	      /* package is flagged both for allowuninstall and best, add negative rules */
+	      d = q.count == 1 ? q.elements[0] : -pool_queuetowhatprovides(pool, &q);
 	      for (i = 0; i < q.count; i++)
 		MAPSET(&m, q.elements[i]);
 	      r = solv->rules + solv->featurerules + (p - installed->start);
@@ -3561,7 +3562,10 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		{
 		  if (MAPTST(&m, p2))
 		    continue;
-		  solver_addrule(solv, -p2, 0, 0);
+		  if (d >= 0)
+		    solver_addrule(solv, -p2, d, 0);
+		  else
+		    solver_addrule(solv, -p2, 0, -d);
 		  queue_push(&r2pkg, p);
 		}
 	      for (i = 0; i < q.count; i++)
