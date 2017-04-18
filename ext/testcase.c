@@ -389,37 +389,45 @@ struct oplist {
   { 0, 0 }
 };
 
-static const char *
-testcase_dep2str_complex(Pool *pool, Id id, int addparens)
+static char *
+testcase_dep2str_complex(Pool *pool, char *s, Id id, int addparens)
 {
   Reldep *rd;
-  char *s;
   const char *s2;
   int needparens;
   struct oplist *op;
 
   if (!ISRELDEP(id))
-    return testcase_id2str(pool, id, 1);
+    {
+      s2 = testcase_id2str(pool, id, 1);
+      s = pool_tmpappend(pool, s, s2, 0);
+      pool_freetmpspace(pool, s2);
+      return s;
+    }
   rd = GETRELDEP(pool, id);
 
   /* check for special shortcuts */
   if (rd->flags == REL_NAMESPACE && !ISRELDEP(rd->name) && !strncmp(pool_id2str(pool, rd->name), "namespace:", 10))
     {
       const char *ns = pool_id2str(pool, rd->name);
-      int nslen = strlen(ns);
+      size_t nslen = strlen(ns);
+      size_t slen = s ? strlen(s) : 0;
       /* special namespace formatting */
-      const char *evrs = testcase_dep2str_complex(pool, rd->evr, 0);
-      s = pool_tmpappend(pool, evrs, ns, "()");
-      memmove(s + nslen + 1, s, strlen(s) - nslen - 2);
-      memcpy(s, ns, nslen);
-      s[nslen] = '(';
-      return s;
+      s = testcase_dep2str_complex(pool, s, rd->evr, 0);
+      s = pool_tmpappend(pool, s, ns, "()");			/* -> FOOnamespace:xxx() */
+      s += slen;
+      memmove(s + nslen + 1, s, strlen(s) - nslen - 2);		/* -> FOOnamespace:xFOO) */
+      memcpy(s, ns, nslen);					/* -> namespace:xxxxFOO) */
+      s[nslen] = '(';						/* -> namespace:xxx(FOO) */
+      return s - slen;
     }
   if (rd->flags == REL_MULTIARCH && !ISRELDEP(rd->name) && rd->evr == ARCH_ANY)
     {
       /* special :any suffix */
-      const char *ns = testcase_id2str(pool, rd->name, 1);
-      return pool_tmpappend(pool, ns, ":any", 0);
+      s2 = testcase_id2str(pool, rd->name, 1);
+      s = pool_tmpappend(pool, s, s2, ":any");
+      pool_freetmpspace(pool, s2);
+      return s;
     }
 
   needparens = 0;
@@ -430,14 +438,11 @@ testcase_dep2str_complex(Pool *pool, Id id, int addparens)
       if (rd->flags > 7 && rd->flags != REL_COMPAT && rd2->flags && rd2->flags <= 7)
 	needparens = 0;
     }
-  s = (char *)testcase_dep2str_complex(pool, rd->name, needparens);
 
   if (addparens)
-    {
-      s = pool_tmpappend(pool, s, "(", 0);
-      memmove(s + 1, s, strlen(s + 1));
-      s[0] = '(';
-    }
+    s = pool_tmpappend(pool, s, "(", 0);
+  s = testcase_dep2str_complex(pool, s, rd->name, needparens);
+
   for (op = oplist; op->flags; op++)
     if (rd->flags == op->flags)
       break;
@@ -468,21 +473,27 @@ testcase_dep2str_complex(Pool *pool, Id id, int addparens)
 	needparens = 0;	/* chain */
     }
   if (!ISRELDEP(rd->evr))
-    s2 = testcase_id2str(pool, rd->evr, 0);
+    {
+      s2 = testcase_id2str(pool, rd->evr, 0);
+      s = pool_tmpappend(pool, s, s2, 0);
+      pool_freetmpspace(pool, s2);
+    }
   else
-    s2 = testcase_dep2str_complex(pool, rd->evr, needparens);
+    s = (char *)testcase_dep2str_complex(pool, s, rd->evr, needparens);
   if (addparens)
-    s = pool_tmpappend(pool, s, s2, ")");
-  else
-    s = pool_tmpappend(pool, s, s2, 0);
-  pool_freetmpspace(pool, s2);
+    s = pool_tmpappend(pool, s, ")", 0);
   return s;
 }
 
 const char *
 testcase_dep2str(Pool *pool, Id id)
 {
-  return testcase_dep2str_complex(pool, id, 0);
+  char *s;
+  if (!ISRELDEP(id))
+    return testcase_id2str(pool, id, 1);
+  s = pool_alloctmpspace(pool, 1);
+  *s = 0;
+  return testcase_dep2str_complex(pool, s, id, 0);
 }
 
 
