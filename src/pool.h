@@ -228,6 +228,7 @@ struct _Pool {
 #define REL_KIND	24	/* for filters only */
 #define REL_MULTIARCH	25	/* debian multiarch annotation */
 #define REL_ELSE	26	/* only as evr part of REL_COND */
+#define REL_ERROR	27	/* parse errors and the like */
 
 #if !defined(__GNUC__) && !defined(__attribute__)
 # define __attribute__(x)
