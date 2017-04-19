@@ -1113,7 +1113,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
   return job;
 }
 
-int
+static int
 addselectionjob(Pool *pool, char **pieces, int npieces, Queue *jobqueue)
 {
   Id job;
