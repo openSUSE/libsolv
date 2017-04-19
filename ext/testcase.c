@@ -409,21 +409,13 @@ testcase_dep2str_complex(Pool *pool, char *s, Id id, int addparens)
   /* check for special shortcuts */
   if (rd->flags == REL_NAMESPACE && !ISRELDEP(rd->name) && !strncmp(pool_id2str(pool, rd->name), "namespace:", 10))
     {
-      const char *ns = pool_id2str(pool, rd->name);
-      size_t nslen = strlen(ns);
-      size_t slen = s ? strlen(s) : 0;
-      /* special namespace formatting */
+      s = pool_tmpappend(pool, s, pool_id2str(pool, rd->name), "(");
       s = testcase_dep2str_complex(pool, s, rd->evr, 0);
-      s = pool_tmpappend(pool, s, ns, "()");			/* -> FOOnamespace:xxx() */
-      s += slen;
-      memmove(s + nslen + 1, s, strlen(s) - nslen - 2);		/* -> FOOnamespace:xFOO) */
-      memcpy(s, ns, nslen);					/* -> namespace:xxxxFOO) */
-      s[nslen] = '(';						/* -> namespace:xxx(FOO) */
-      return s - slen;
+      return pool_tmpappend(pool, s, ")", 0);
     }
   if (rd->flags == REL_MULTIARCH && !ISRELDEP(rd->name) && rd->evr == ARCH_ANY)
     {
-      /* special :any suffix */
+      /* append special :any suffix */
       s2 = testcase_id2str(pool, rd->name, 1);
       s = pool_tmpappend(pool, s, s2, ":any");
       pool_freetmpspace(pool, s2);
