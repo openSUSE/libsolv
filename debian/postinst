@@ -1,0 +1,1 @@
+echo "/usr/local/lib64" > /etc/ld.so.conf.d/libsolv.conf
