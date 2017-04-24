@@ -998,6 +998,45 @@ pool_is_kind(Pool *pool, Id name, Id kind)
 }
 
 /*
+ * rpm eq magic:
+ *
+ * some dependencies are of the from "foo = md5sum", like the
+ * buildid provides. There's not much we can do to speed up
+ * getting the providers, because rpm's complex evr comparison
+ * rules get in the way. But we can use the first character(s)
+ * of the md5sum to do a simple pre-check.
+ */
+static inline int
+rpmeqmagic(const char *s)
+{
+  if (*s == '0')
+    {
+      while (*s == '0' && s[1] >= '0' && s[1] <= '9')
+	s++;
+      /* ignore epoch 0 */
+      if (*s == '0' && s[1] == ':')
+	{
+	  s += 2;
+	  while (*s == '0' && s[1] >= '0' && s[1] <= '9')
+	    s++;
+	}
+    }
+  if (*s >= '0' && *s <= '9')
+    {
+      if (s[1] >= '0' && s[1] <= '9')
+        return *s + (s[1] << 8);
+      return *s;
+    }
+  if ((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z'))
+    {
+      if ((s[1] >= 'a' && s[1] <= 'z') || (s[1] >= 'A' && s[1] <= 'Z'))
+        return *s + (s[1] << 8);
+      return *s;
+    }
+  return -1;
+}
+
+/*
  * addrelproviders
  *
  * add packages fulfilling the relation to whatprovides array
@@ -1218,6 +1257,7 @@ pool_addrelproviders(Pool *pool, Id d)
   else if (flags)
     {
       Id *ppaux = 0;
+      int eqmagic = 0;
       /* simple version comparison relation */
 #if 0
       POOL_DEBUG(SOLV_DEBUG_STATS, "addrelproviders: what provides %s?\n", pool_dep2str(pool, name));
@@ -1268,6 +1308,13 @@ pool_addrelproviders(Pool *pool, Id d)
 	        queue_push(&plist, p);
 	      continue;
 	    }
+	  if (!eqmagic)
+	    {
+	      if (flags != REL_EQ || pool->disttype != DISTTYPE_RPM || pool->promoteepoch || ISRELDEP(evr))
+		eqmagic = -1;
+	      else
+		eqmagic = rpmeqmagic(pool_id2str(pool, evr));
+	    }
 	  /* solvable p provides name in some rels */
 	  pidp = s->repo->idarraydata + s->provides;
 	  while ((pid = *pidp++) != 0)
@@ -1284,6 +1331,12 @@ pool_addrelproviders(Pool *pool, Id d)
 	      if (prd->name != name)
 		continue;		/* wrong provides name */
 	      /* right package, both deps are rels. check flags/evr */
+	      if (eqmagic > 0 && prd->flags == REL_EQ && !ISRELDEP(prd->evr))
+		{
+		  int peqmagic = rpmeqmagic(pool_id2str(pool, prd->evr));
+		  if (peqmagic > 0 && peqmagic != eqmagic)
+		    continue;
+		}
 	      if (pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
 		break;	/* matches */
 	    }
