@@ -1007,8 +1007,9 @@ pool_is_kind(Pool *pool, Id name, Id kind)
  * of the md5sum to do a simple pre-check.
  */
 static inline int
-rpmeqmagic(const char *s)
+rpmeqmagic(Pool *pool, Id evr)
 {
+  const char *s = pool_id2str(pool, evr);
   if (*s == '0')
     {
       while (*s == '0' && s[1] >= '0' && s[1] <= '9')
@@ -1034,6 +1035,24 @@ rpmeqmagic(const char *s)
       return *s;
     }
   return -1;
+}
+
+static inline int
+rpmeqmagic_init(Pool *pool, int flags, Id evr)
+{
+  if (flags != REL_EQ || pool->disttype != DISTTYPE_RPM || pool->promoteepoch || ISRELDEP(evr))
+    return -1;
+  else
+    return rpmeqmagic(pool, evr);
+}
+
+static inline int
+rpmeqmagic_cantmatch(Pool *pool, int flags, Id evr, int eqmagic)
+{
+  int peqmagic = rpmeqmagic(pool, evr);
+  if (peqmagic > 0 && peqmagic != eqmagic)
+    return 1;
+  return 0;
 }
 
 /*
@@ -1293,6 +1312,11 @@ pool_addrelproviders(Pool *pool, Id d)
 		      prd = GETRELDEP(pool, pid);
 		      if (prd->name != name)
 			continue;		/* wrong provides name */
+		      if (!eqmagic)
+			eqmagic = rpmeqmagic_init(pool, flags, evr);
+		      if (eqmagic > 0 && prd->flags == REL_EQ && !ISRELDEP(prd->evr) &&
+			  rpmeqmagic_cantmatch(pool, prd->flags, prd->evr, eqmagic))
+			continue;
 		      /* right package, both deps are rels. check flags/evr */
 		      if (!pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
 			continue;
@@ -1308,14 +1332,9 @@ pool_addrelproviders(Pool *pool, Id d)
 	        queue_push(&plist, p);
 	      continue;
 	    }
-	  if (!eqmagic)
-	    {
-	      if (flags != REL_EQ || pool->disttype != DISTTYPE_RPM || pool->promoteepoch || ISRELDEP(evr))
-		eqmagic = -1;
-	      else
-		eqmagic = rpmeqmagic(pool_id2str(pool, evr));
-	    }
 	  /* solvable p provides name in some rels */
+	  if (!eqmagic)
+	    eqmagic = rpmeqmagic_init(pool, flags, evr);
 	  pidp = s->repo->idarraydata + s->provides;
 	  while ((pid = *pidp++) != 0)
 	    {
@@ -1331,12 +1350,9 @@ pool_addrelproviders(Pool *pool, Id d)
 	      if (prd->name != name)
 		continue;		/* wrong provides name */
 	      /* right package, both deps are rels. check flags/evr */
-	      if (eqmagic > 0 && prd->flags == REL_EQ && !ISRELDEP(prd->evr))
-		{
-		  int peqmagic = rpmeqmagic(pool_id2str(pool, prd->evr));
-		  if (peqmagic > 0 && peqmagic != eqmagic)
-		    continue;
-		}
+	      if (eqmagic > 0 && prd->flags == REL_EQ && !ISRELDEP(prd->evr) &&
+	          rpmeqmagic_cantmatch(pool, prd->flags, prd->evr, eqmagic))
+		continue;
 	      if (pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
 		break;	/* matches */
 	    }
