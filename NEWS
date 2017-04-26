@@ -2,6 +2,12 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.27
+- new features:
+  * allow building with libxml2 instead of libexpat
+  * better handing of "forcebest with uninstall"
+  * speed improvements for "name = md5sum" dependencies
+
 Version 0.6.26
 - export solvable_matchesdep function, as we now
   use it in the bindings

@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Tue Apr 25 14:11:05 CEST 2017 - mls@suse.de
+
+- change queue resize code to use adaptive chunk sizes
+- fix potential segfault in testcase_depstr [bnc#1036002]
+- fix performance issues with name = md5sum dependencies
+  [bnc#1035946]
+- improve "forcebest with uninstall" handling
+- make dirid handling more robust
+- build with libxml2 instead of libexpat
+- bump version to 0.6.27
+
+-------------------------------------------------------------------
 Wed Feb 15 11:34:59 CET 2017 - mls@suse.de
 
 - export solvable_matchesdep function, as we now use it in
