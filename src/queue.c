@@ -16,8 +16,17 @@
 #include "queue.h"
 #include "util.h"
 
-#define EXTRA_SPACE 8
-#define EXTRA_SPACE_HEAD 8
+static inline int
+queue_extra_space(int size)
+{
+  if (size < 32)
+    return 8;
+  if (size < 64)
+    return 16;
+  if (size < 128)
+    return 32;
+  return 64;
+}
 
 void
 queue_init(Queue *q)
@@ -29,17 +38,19 @@ queue_init(Queue *q)
 void
 queue_init_clone(Queue *t, Queue *s)
 {
+  int extra_space;
   if (!s->elements)
     {
       t->alloc = t->elements = 0;
       t->count = t->left = 0;
       return;
     }
-  t->alloc = t->elements = solv_malloc2(s->count + EXTRA_SPACE, sizeof(Id));
+  extra_space = queue_extra_space(s->count);
+  t->alloc = t->elements = solv_malloc2(s->count + extra_space, sizeof(Id));
   if (s->count)
     memcpy(t->alloc, s->elements, s->count * sizeof(Id));
   t->count = s->count;
-  t->left = EXTRA_SPACE;
+  t->left = extra_space;
 }
 
 void
@@ -60,19 +71,13 @@ queue_free(Queue *q)
   q->count = q->left = 0;
 }
 
+/* make room for one element at the tail of the queue */
 void
 queue_alloc_one(Queue *q)
 {
-  if (!q->alloc)
+  if (q->alloc && q->alloc != q->elements)
     {
-      q->alloc = solv_malloc2(q->count + EXTRA_SPACE, sizeof(Id));
-      if (q->count)
-	memcpy(q->alloc, q->elements, q->count * sizeof(Id));
-      q->elements = q->alloc;
-      q->left = EXTRA_SPACE;
-    }
-  else if (q->alloc != q->elements)
-    {
+      /* there's room at the front. just move data */
       int l = q->elements - q->alloc;
       if (q->count)
         memmove(q->alloc, q->elements, q->count * sizeof(Id));
@@ -81,8 +86,17 @@ queue_alloc_one(Queue *q)
     }
   else
     {
-      q->elements = q->alloc = solv_realloc2(q->alloc, q->count + EXTRA_SPACE, sizeof(Id));
-      q->left = EXTRA_SPACE;
+      int extra_space = queue_extra_space(q->count);
+      if (!q->alloc)
+	{
+	  q->alloc = solv_malloc2(q->count + extra_space, sizeof(Id));
+	  if (q->count)
+	    memcpy(q->alloc, q->elements, q->count * sizeof(Id));
+	}
+      else
+	q->alloc = solv_realloc2(q->alloc, q->count + extra_space, sizeof(Id));
+      q->elements = q->alloc;
+      q->left = extra_space;
     }
 }
 
@@ -90,10 +104,11 @@ queue_alloc_one(Queue *q)
 void
 queue_alloc_one_head(Queue *q)
 {
-  int l;
+  int l, extra_space;
   if (!q->alloc || !q->left)
-    queue_alloc_one(q);
-  l = q->left > EXTRA_SPACE_HEAD ? EXTRA_SPACE_HEAD : q->left;
+    queue_alloc_one(q);		/* easy way to make room */
+  extra_space = queue_extra_space(q->count);
+  l = q->left > extra_space ? extra_space : q->left;
   if (q->count)
     memmove(q->elements + l, q->elements, q->count * sizeof(Id));
   q->elements += l;
@@ -160,15 +175,7 @@ queue_insertn(Queue *q, int pos, int n, Id *elements)
   if (pos > q->count)
     pos = q->count;
   if (q->left < n)
-    {
-      int off;
-      if (!q->alloc)
-	queue_alloc_one(q);
-      off = q->elements - q->alloc;
-      q->alloc = solv_realloc2(q->alloc, off + q->count + n + EXTRA_SPACE, sizeof(Id));
-      q->elements = q->alloc + off;
-      q->left = n + EXTRA_SPACE;
-    }
+    queue_prealloc(q, n);
   if (pos < q->count)
     memmove(q->elements + pos + n, q->elements + pos, (q->count - pos) * sizeof(Id));
   if (elements)
@@ -192,18 +199,19 @@ queue_deleten(Queue *q, int pos, int n)
   q->count -= n;
 }
 
-/* allocate room for n more elements */
+/* pre-allocate room for n more elements */
 void
 queue_prealloc(Queue *q, int n)
 {
-  int off;
+  int off, extra_space;
   if (n <= 0 || q->left >= n)
     return;
   if (!q->alloc)
     queue_alloc_one(q);
   off = q->elements - q->alloc;
-  q->alloc = solv_realloc2(q->alloc, off + q->count + n + EXTRA_SPACE, sizeof(Id));
+  extra_space = queue_extra_space(q->count + n);
+  q->alloc = solv_realloc2(q->alloc, off + q->count + n + extra_space, sizeof(Id));
   q->elements = q->alloc + off;
-  q->left = n + EXTRA_SPACE;
+  q->left = n + extra_space;
 }
 
