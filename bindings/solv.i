@@ -932,12 +932,18 @@ typedef int Id;
 %constant int REL_EQ;
 %constant int REL_GT;
 %constant int REL_LT;
-%constant int REL_ARCH;
 %constant int REL_AND;
 %constant int REL_OR;
 %constant int REL_WITH;
+%constant int REL_NAMESPACE;
+%constant int REL_ARCH;
+%constant int REL_FILECONFLICT;
 %constant int REL_COND;
+%constant int REL_COMPAT;
+%constant int REL_KIND;
+%constant int REL_MULTIARCH;
 %constant int REL_ELSE;
+%constant int REL_ERROR;
 
 typedef struct {
   Pool* const pool;
