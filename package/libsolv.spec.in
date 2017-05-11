@@ -28,9 +28,15 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 %bcond_without python_binding
 %bcond_without python3_binding
 %bcond_without ruby_binding
+%bcond_with zypp
+
+%if ! ((0%{?suse_version} && 0%{?suse_version} < 1330 && ! 0%{?is_opensuse}) || 0%{?suse_version} == 1110)
 %bcond_without bz2
 %bcond_without xz
-%bcond_with zypp
+%else
+%bcond_with bz2
+%bcond_with xz
+%endif
 
 %if 0%{?fedora} || 0%{?rhel} >= 8 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1330
 %bcond_without richdeps
@@ -81,6 +87,7 @@ BuildRequires:  python3-devel
 %endif
 
 %if %{with bz2}
+
 %if 0%{?fedora} || 0%{?rhel} || 0%{?mageia}
 BuildRequires:  bzip2-devel
 %endif
