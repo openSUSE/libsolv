@@ -262,7 +262,7 @@ headint64array(RpmHead *h, int tag, int *cnt)
   for (o = 0; o < i; o++, d += 8)
     {
       unsigned int x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
-      r[o] = (unsigned long long)x << 32 | (d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+      r[o] = (unsigned long long)x << 32 | (unsigned int)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
     }
   return r;
 }
@@ -281,7 +281,7 @@ headint64(RpmHead *h, int tag)
     return 0;
   d = h->dp + o;
   i = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
-  return (unsigned long long)i << 32 | (d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+  return (unsigned long long)i << 32 | (unsigned int)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
 }
 
 static unsigned int *
