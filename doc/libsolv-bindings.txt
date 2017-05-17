@@ -1357,6 +1357,13 @@ Return a tuple containing the on-media location and an optional
 media number for multi-part repositories (e.g. repositories
 spawning multiple DVDs).
 
+	const char *lookup_sourcepkg();
+	my $sourcepkg = $solvable->lookup_sourcepkg();
+	sourcepkg = solvable.lookup_sourcepkg()
+	sourcepkg = solvable.lookup_sourcepkg()
+
+Return a sourcepkg name associated with solvable.
+
 	Dataiterator Dataiterator(Id keyname, const char *match = 0, int flags = 0)
 	my $di = $solvable->Dataiterator($keyname, $match, $flags);
 	di = solvable.Dataiterator(keyname, match, flags)
@@ -3411,6 +3418,11 @@ SOLVID_META solvid that stores repodata meta information.
 	$data->set_checksum($solvid, $keyname, $chksum);
 	data.set_checksum(solvid, keyname, chksum)
 	data.set_checksum(solvid, keyname, chksum)
+
+	void set_sourcepkg(Id solvid, const char *sourcepkg);
+	$data.set_sourcepkg($solvid, $sourcepkg);
+	data.set_sourcepkg(solvid, sourcepkg)
+	data.set_sourcepkg(solvid, sourcepkg)
 
 	void add_idarray(Id solvid, Id keyname, DepId id);
 	$data->add_idarray($solvid, $keyname, $id);

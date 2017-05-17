@@ -2830,6 +2830,9 @@ rb_eval_string(
   const char *lookup_location(unsigned int *OUTPUT) {
     return solvable_lookup_location($self->pool->solvables + $self->id, OUTPUT);
   }
+  const char *lookup_sourcepkg() {
+    return solvable_lookup_sourcepkg($self->pool->solvables + $self->id);
+  }
   %newobject Dataiterator;
   Dataiterator *Dataiterator(Id key, const char *match = 0, int flags = 0) {
     return new_Dataiterator($self->pool, 0, $self->id, key, match, flags);
@@ -3791,6 +3794,9 @@ rb_eval_string(
     const unsigned char *buf = solv_chksum_get(chksum, 0);
     if (buf)
       repodata_set_bin_checksum(repo_id2repodata($self->repo, $self->id), solvid, keyname, solv_chksum_get_type(chksum), buf);
+  }
+  void set_sourcepkg(Id solvid, const char *sourcepkg) {
+    repodata_set_sourcepkg(repo_id2repodata($self->repo, $self->id), solvid, sourcepkg);
   }
   const char *lookup_str(Id solvid, Id keyname) {
     return repodata_lookup_str(repo_id2repodata($self->repo, $self->id), solvid, keyname);

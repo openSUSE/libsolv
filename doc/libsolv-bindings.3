@@ -2425,6 +2425,21 @@ Return a tuple containing the on\-media location and an optional media number fo
 .RS 4
 .\}
 .nf
+\fBconst char *lookup_sourcepkg()\fR;
+my \fR\fI$sourcepkg\fR\fB =\fR \fI$solvable\fR\fB\->lookup_sourcepkg()\fR;
+\fIsourcepkg\fR\fB \fB=\fR \fIsolvable\fR\fB\&.lookup_sourcepkg()\fR
+\fIsourcepkg\fR\fB \fB=\fR \fIsolvable\fR\fB\&.lookup_sourcepkg()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a sourcepkg name associated with solvable\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
 \fBDataiterator Dataiterator(Id\fR \fIkeyname\fR\fB, const char *\fR\fImatch\fR \fB= 0, int\fR \fIflags\fR \fB= 0)\fR
 my \fI$di\fR \fB=\fR \fI$solvable\fR\fB\->Dataiterator(\fR\fI$keyname\fR\fB,\fR \fI$match\fR\fB,\fR \fI$flags\fR\fB)\fR;
 \fIdi\fR \fB=\fR \fIsolvable\fR\fB\&.Dataiterator(\fR\fIkeyname\fR\fB,\fR \fImatch\fR\fB,\fR \fIflags\fR\fB)\fR
@@ -5548,6 +5563,19 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 \fI$data\fR\fB\->set_checksum(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$chksum\fR\fB)\fR;
 \fIdata\fR\fB\&.set_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIchksum\fR\fB)\fR
 \fIdata\fR\fB\&.set_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIchksum\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_sourcepkg(Id\fR \fIsolvid\fR\fB, const char *\fR\fIsourcepkg\fR\fB)\fR;
+\fI$data\fR\fB\->set_sourcepkg(\fR\fI$solvid\fR\fB, \fI$sourcepkg\fR\fB)\fR;
+\fIdata\fR\fB\&.set_sourcepkg(\fR\fIsolvid\fR\fB,\fR \fIsourcepkg\fR\fB)\fR
+\fIdata\fR\fB\&.set_sourcepkg(\fR\fIsolvid\fR\fB,\fR \fIsourcepkg\fR\fB)\fR
 .fi
 .if n \{\
 .RE
