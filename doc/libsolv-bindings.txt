@@ -1374,7 +1374,14 @@ information.
 	solvable.add_deparray(keyname, dep)
 	solvable.add_deparray(keyname, dep)
 
-Add a new dependency to the attributes stored in keyname.
+	void set_deparray(Id keyname, Queue *deps, Id marker = -1);
+	$solvable->set_deparray($keyname, $deps);
+	solvable.set_deparray(keyname, deps)
+	solvable.set_deparray(keyname, deps)
+
+Add a new dependency or set existing to the attributes stored in keyname.
+
+Set a dependendencies to the attributes stored in keyname.
 
 	void unset(Id keyname);
 	$solvable->unset($keyname);

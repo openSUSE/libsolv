@@ -2461,7 +2461,20 @@ Iterate over the matching data elements\&. See the Dataiterator class for more i
 .RE
 .\}
 .sp
-Add a new dependency to the attributes stored in keyname\&.
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_deparray(Id\fR \fIkeyname\fR\fB, Queue *\fR \fIdeps\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR;
+\fI$solvable\fR\fB\->set_deparray(\fR\fI$keyname\fR\fB,\fR \fI$deps\fR\fB)\fR;
+\fIsolvable\fR\fB\&.set_deparray(\fR\fIkeyname\fR\fB,\fR \fIdeps\fR\fB)\fR
+\fIsolvable\fR\fB\&.set_deparray(\fR\fIkeyname\fR\fB,\fR \fIdeps\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a new dependency or set existing to the attributes stored in keyname\&.
 .sp
 .if n \{\
 .RS 4

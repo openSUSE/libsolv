@@ -2980,6 +2980,10 @@ rb_eval_string(
     Solvable *s = $self->pool->solvables + $self->id;
     solvable_add_deparray(s, keyname, id, marker);
   }
+  void set_deparray(Id keyname, Queue *q, Id marker = -1) {
+    Solvable *s = $self->pool->solvables + $self->id;
+    solvable_set_deparray(s, keyname, q, marker);
+  }
 
   %newobject Selection;
   Selection *Selection(int setflags=0) {
