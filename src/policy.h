@@ -38,6 +38,8 @@ extern void policy_update_recommendsmap(Solver *solv);
 
 extern void policy_create_obsolete_index(Solver *solv);
 
+extern void pool_best_solvables(Pool *pool, Queue *plist, int flags);
+
 /* internal, do not use */
 extern void prune_to_best_version(Pool *pool, Queue *plist);
 extern void policy_prefer_favored(Solver *solv, Queue *plist);

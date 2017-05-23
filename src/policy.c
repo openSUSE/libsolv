@@ -1353,6 +1353,22 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
     }
 }
 
+void
+pool_best_solvables(Pool *pool, Queue *plist, int flags)
+{
+  if (plist->count > 1)
+    prune_to_highest_prio(pool, plist);
+  if (plist->count > 1)
+    prune_to_best_arch(pool, plist);
+  if (plist->count > 1)
+    prune_to_best_version(pool, plist);
+  if (plist->count > 1)
+    {
+      dislike_old_versions(pool, plist);
+      sort_by_common_dep(pool, plist);
+    }
+}
+
 
 /* check if there is an illegal architecture change if
  * installed solvable s1 is replaced by s2 */

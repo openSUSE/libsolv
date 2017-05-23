@@ -422,3 +422,7 @@ SOLV_1.0 {
 	local:
 		*;
 };
+
+SOLV_1.1 {
+		pool_best_solvables;
+} SOLV_1.0;
