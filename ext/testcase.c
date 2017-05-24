@@ -23,6 +23,9 @@
 #include "testcase.h"
 #include "selection.h"
 #include "solv_xfopen.h"
+#if ENABLE_TESTCASE_HELIXREPO
+#include "ext/repo_helix.h"
+#endif
 
 #define DISABLE_JOIN2
 #include "tools_util.h"
@@ -174,6 +177,9 @@ static const char *features[] = {
 #endif
 #ifdef ENABLE_COMPLEX_DEPS
   "complex_deps",
+#endif
+#if ENABLE_TESTCASE_HELIXREPO
+  "testcase_helixrepo",
 #endif
   0
 };
@@ -2617,10 +2623,9 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 		  repo_add_solv(repo, rfp, 0);
 		  fclose(rfp);
 		}
-#if 0
+#if ENABLE_TESTCASE_HELIXREPO
 	      else if (!strcmp(repotype, "helix"))
 		{
-		  extern int repo_add_helix(Repo *repo, FILE *fp, int flags);
 		  repo_add_helix(repo, rfp, 0);
 		  fclose(rfp);
 		}
