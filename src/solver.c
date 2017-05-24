@@ -1110,6 +1110,35 @@ solver_reset(Solver *solv)
   enabledisablelearntrules(solv);
 }
 
+static inline int
+queue_contains(Queue *q, Id id)
+{
+  int i;
+  for (i = 0; i < q->count; i++)
+    if (q->elements[i] == id)
+      return 1;
+  return 0;
+}
+
+static void
+disable_recommendsrules(Solver *solv, Queue *weakq)
+{
+  Pool *pool = solv->pool;
+  int i;
+  for (i = 0; i < weakq->count; i++)
+    {
+      Rule *r;
+      if (!queue_contains(solv->recommendsruleq, weakq->elements[i]))
+	continue;
+      r = solv->rules + weakq->elements[i];
+      if (r->d >= 0)
+	{
+	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "disabling ");
+	  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, r);
+	  solver_disablerule(solv, r);
+	}
+    }
+}
 
 /*-------------------------------------------------------------------
  *
@@ -1119,7 +1148,7 @@ solver_reset(Solver *solv)
  */
 
 static void
-analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
+analyze_unsolvable_rule(Solver *solv, Rule *r, Queue *weakq, Map *rseen)
 {
   Pool *pool = solv->pool;
   int i;
@@ -1134,12 +1163,11 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Id *lastweakp, Map *rseen)
       MAPSET(rseen, why - solv->learntrules);
       for (i = solv->learnt_why.elements[why - solv->learntrules]; solv->learnt_pool.elements[i]; i++)
 	if (solv->learnt_pool.elements[i] > 0)
-	  analyze_unsolvable_rule(solv, solv->rules + solv->learnt_pool.elements[i], lastweakp, rseen);
+	  analyze_unsolvable_rule(solv, solv->rules + solv->learnt_pool.elements[i], weakq, rseen);
       return;
     }
-  if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, why))
-    if (!*lastweakp || why > *lastweakp)
-      *lastweakp = why;
+  if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, why) && weakq)
+    queue_push(weakq, why);
   /* do not add pkg rules to problem */
   if (why < solv->pkgrules_end)
     return;
@@ -1200,12 +1228,12 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   Rule *r;
   Map involved;		/* global to speed things up? */
   Map rseen;
+  Queue weakq;
   Id pp, v, vv, why;
   int i, idx;
   Id *decisionmap = solv->decisionmap;
   int oldproblemcount;
   int oldlearntpoolcount;
-  Id lastweak;
   int record_proof = 1;
 
   POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "ANALYZE UNSOLVABLE ----------------------\n");
@@ -1221,10 +1249,10 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   r = cr;
   map_init(&involved, pool->nsolvables);
   map_init(&rseen, solv->learntrules ? solv->nrules - solv->learntrules : 0);
+  queue_init(&weakq);
   if (record_proof)
     queue_push(&solv->learnt_pool, r - solv->rules);
-  lastweak = 0;
-  analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
+  analyze_unsolvable_rule(solv, r, &weakq, &rseen);
   FOR_RULELITERALS(v, pp, r)
     {
       if (DECISIONMAP_TRUE(v))	/* the one true literal */
@@ -1244,7 +1272,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       if (record_proof)
         queue_push(&solv->learnt_pool, why);
       r = solv->rules + why;
-      analyze_unsolvable_rule(solv, r, &lastweak, &rseen);
+      analyze_unsolvable_rule(solv, r, &weakq, &rseen);
       FOR_RULELITERALS(v, pp, r)
 	{
 	  if (DECISIONMAP_TRUE(v))	/* the one true literal */
@@ -1257,11 +1285,25 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   map_free(&rseen);
   queue_push(&solv->problems, 0);	/* mark end of this problem */
 
-  if (lastweak)
+  if (weakq.count)
     {
-      /* disable last weak rule */
+      Id lastweak;
+      /* revert problems */
       solv->problems.count = oldproblemcount;
       solv->learnt_pool.count = oldlearntpoolcount;
+      /* find last weak */
+      lastweak = 0;
+      for (i = 0; i < weakq.count; i++)
+	if (weakq.elements[i] > lastweak)
+	  lastweak = weakq.elements[i];
+      if (lastweak < solv->pkgrules_end && solv->strongrecommends && solv->recommendsruleq && queue_contains(solv->recommendsruleq, lastweak))
+	{
+	  disable_recommendsrules(solv, &weakq);
+	  queue_free(&weakq);
+	  solver_reset(solv);
+	  return 0;
+	}
+      queue_free(&weakq);
       if (lastweak >= solv->jobrules && lastweak < solv->jobrules_end)
 	v = -(solv->ruletojob.elements[lastweak - solv->jobrules] + 1);
       else
@@ -1276,6 +1318,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       solver_reset(solv);
       return 0;
     }
+  queue_free(&weakq);
 
   if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
     if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
