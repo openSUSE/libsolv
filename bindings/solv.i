@@ -2624,7 +2624,7 @@ rb_eval_string(
   void each() {
     Repo *n;
     while ((n = Pool_repo_iterator___next__($self)) != 0) {
-      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p_Repo, SWIG_POINTER_OWN | 0));
+      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p_Repo, 0 | 0));
     }
   }
 #endif
