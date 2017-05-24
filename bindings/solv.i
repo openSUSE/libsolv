@@ -2609,7 +2609,6 @@ rb_eval_string(
 #ifdef SWIGPERL
   perliter(solv::Pool_repo_iterator)
 #endif
-  %newobject __next__;
   Repo *__next__() {
     Pool *pool = $self->pool;
     if ($self->id >= pool->nrepos)
