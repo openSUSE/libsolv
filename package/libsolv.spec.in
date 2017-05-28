@@ -38,7 +38,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 %bcond_with xz
 %endif
 
-%if 0%{?fedora} || 0%{?rhel} >= 8 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1330
+%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1330
 %bcond_without richdeps
 %else
 %bcond_with richdeps
