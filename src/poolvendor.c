@@ -5,15 +5,14 @@
  * for further information
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 /* we need FNM_CASEFOLD */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <fnmatch.h>
 
 #include "pool.h"
