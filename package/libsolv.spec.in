@@ -30,7 +30,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 %bcond_without ruby_binding
 %bcond_with zypp
 
-%if ! ((0%{?suse_version} && 0%{?suse_version} < 1330 && ! 0%{?is_opensuse}) || 0%{?suse_version} == 1110)
+%if 0%{?leap_version} >= 420300 || 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1330 || !0%{?suse_version}
 %bcond_without bz2
 %bcond_without xz
 %else
@@ -70,32 +70,31 @@ BuildRequires:  perl-devel
 %endif
 BuildRequires:  swig
 %endif
+
 %if %{with ruby_binding}
 %global ruby_vendorarch %(ruby  -r rbconfig -e "puts RbConfig::CONFIG['vendorarchdir'].nil? ? RbConfig::CONFIG['sitearchdir'] : RbConfig::CONFIG['vendorarchdir']")
 BuildRequires:  ruby
 BuildRequires:  ruby-devel
 BuildRequires:  swig
 %endif
+
 %if %{with python_binding}
 %global python_sitearch %(python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(True))")
 BuildRequires:  python-devel
 BuildRequires:  swig
 %endif
+
 %if %{with python3_binding}
 %global python3_sitearch %(python3 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(True))")
 BuildRequires:  python3-devel
 %endif
 
 %if %{with bz2}
-
-%if 0%{?fedora} || 0%{?rhel} || 0%{?mageia}
-BuildRequires:  bzip2-devel
-%endif
-
 %if 0%{?suse_version}
 BuildRequires:  libbz2-devel
+%else
+BuildRequires:  bzip2-devel
 %endif
-
 %endif
 
 %if %{with xz}
