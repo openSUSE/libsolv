@@ -56,6 +56,13 @@ static const char *archpolicies[] = {
   "geode",	"geode:i586:i486:i386",
   "ppc64iseries", "ppc64iseries:ppc64:ppc",
   "ppc64pseries", "ppc64pseries:ppc64:ppc",
+#elif defined(DEBIAN)
+  "amd64",  "amd64",
+  "arm64",  "arm64",
+  "armel",  "armel",
+  "armhf",  "armhf",
+  "powerpc",  "powerpc",
+  "ppc64el",  "ppc64el",
 #endif
   0
 };
