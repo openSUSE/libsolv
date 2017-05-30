@@ -1,4 +1,24 @@
 -------------------------------------------------------------------
+Sun May 28 13:32:15 UTC 2017 - ngompa13@gmail.com
+
+- Enable complex/rich dependencies for CentOS/RHEL 7, matching how
+  libsolv is configured there.
+
+-------------------------------------------------------------------
+Thu May 11 12:41:07 UTC 2017 - ngompa13@gmail.com
+
+- Disable bzip2 and xz/lzma compression support for SLE <= 12
+
+-------------------------------------------------------------------
+Mon May  8 13:15:09 UTC 2017 - ngompa13@gmail.com
+
+- Enable bzip2 and xz/lzma compression support
+- Enable complex/rich dependencies on distributions with RPM 4.13+
+- Simplified CentOS/RHEL conditionals
+- Added Mageia conditionals
+- Fixed a few spec portability issues
+
+-------------------------------------------------------------------
 Tue Apr 25 14:11:05 CEST 2017 - mls@suse.de
 
 - change queue resize code to use adaptive chunk sizes
