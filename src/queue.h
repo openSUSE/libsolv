@@ -36,7 +36,7 @@ queue_empty(Queue *q)
 {
   if (q->alloc)
     {
-      q->left += (q->elements - q->alloc) + q->count;
+      q->left += ((q->elements - q->alloc)/sizeof(Id)) + q->count;
       q->elements = q->alloc;
     }
   else
