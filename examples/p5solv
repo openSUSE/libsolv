@@ -256,6 +256,7 @@ sub add_ext {
 sub add_exts {
   my ($self) = @_;
   my $repodata = $self->{handle}->add_repodata(0);
+  $repodata->extend_to_repo();
   $self->add_ext($repodata, 'deltainfo', 'DL');
   $self->add_ext($repodata, 'filelists', 'FL');
   $repodata->internalize();

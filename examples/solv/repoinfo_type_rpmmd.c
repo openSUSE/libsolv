@@ -196,6 +196,7 @@ repomd_load(struct repoinfo *cinfo, Pool **sigpoolp)
     }
 #endif
   data = repo_add_repodata(repo, 0);
+  repodata_extend_block(data, repo->start, repo->end - repo->start);
   repomd_add_ext(repo, data, "deltainfo", "DL");
   repomd_add_ext(repo, data, "filelists", "FL");
   repodata_internalize(data);

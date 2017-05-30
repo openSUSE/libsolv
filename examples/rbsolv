@@ -317,6 +317,7 @@ class Repo_rpmmd < Repo_generic
 
   def add_exts
     repodata = @handle.add_repodata(0)
+    repodata.extend_to_repo()
     add_ext(repodata, 'deltainfo', 'DL')
     add_ext(repodata, 'filelists', 'FL')
     repodata.internalize()

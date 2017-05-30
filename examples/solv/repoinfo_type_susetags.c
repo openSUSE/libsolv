@@ -47,7 +47,7 @@ susetags_find(Repo *repo, const char *what, const unsigned char **chksump, Id *c
   return filename;
 }
 
-void
+static void
 susetags_add_ext(Repo *repo, Repodata *data)
 {
   Pool *pool = repo->pool;
@@ -264,6 +264,7 @@ susetags_load(struct repoinfo *cinfo, Pool **sigpoolp)
 #endif
   repo_internalize(repo);
   data = repo_add_repodata(repo, 0);
+  repodata_extend_block(data, repo->start, repo->end - repo->start);
   susetags_add_ext(repo, data);
   repodata_internalize(data);
   writecachedrepo(cinfo, 0, 0);

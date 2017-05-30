@@ -103,6 +103,18 @@ mdk_load_ext(Repo *repo, Repodata *data)
   return 1;
 }
 
+static void
+mdk_add_ext(Repo *repo, Repodata *data, const char *what, const char *ext, const char *filename, Id chksumtype, const unsigned char *chksum)
+{
+  Id handle = repodata_new_handle(data);
+  /* we mis-use the repomd ids here... need something generic in the future */
+  repodata_set_poolstr(data, handle, REPOSITORY_REPOMD_TYPE, what);
+  repodata_set_str(data, handle, REPOSITORY_REPOMD_LOCATION, filename);
+  repodata_set_bin_checksum(data, handle, REPOSITORY_REPOMD_CHECKSUM, chksumtype, chksum);
+  add_ext_keys(data, handle, ext);
+  repodata_add_flexarray(data, SOLVID_META, REPOSITORY_EXTERNAL, handle);
+}
+
 int
 mdk_load(struct repoinfo *cinfo, Pool **sigpoolp)
 {
@@ -195,13 +207,8 @@ mdk_load(struct repoinfo *cinfo, Pool **sigpoolp)
   /* setup on-demand loading of filelist data */
   if (mdk_find(md5sums, "files.xml.lzma", md5))
     {
-      Id handle = repodata_new_handle(data);
-      /* we mis-use the repomd ids here... need something generic in the future */
-      repodata_set_poolstr(data, handle, REPOSITORY_REPOMD_TYPE, "filelists");
-      repodata_set_str(data, handle, REPOSITORY_REPOMD_LOCATION, "media_info/files.xml.lzma");
-      repodata_set_bin_checksum(data, handle, REPOSITORY_REPOMD_CHECKSUM, REPOKEY_TYPE_MD5, md5);
-      add_ext_keys(data, handle, "FL");
-      repodata_add_flexarray(data, SOLVID_META, REPOSITORY_EXTERNAL, handle);
+      repodata_extend_block(data, repo->start, repo->end - repo->start);
+      mdk_add_ext(repo, data, "filelists", "FL", "media_info/files.xml.lzma", REPOKEY_TYPE_MD5, md5);
     }
   solv_free(md5sums);
   repodata_internalize(data);

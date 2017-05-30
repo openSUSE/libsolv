@@ -391,6 +391,7 @@ class repo_repomd(repo_generic):
 
     def add_exts(self):
         repodata = self.handle.add_repodata(0)
+        repodata.extend_to_repo()
         self.add_ext(repodata, 'deltainfo', 'DL')
         self.add_ext(repodata, 'filelists', 'FL')
         repodata.internalize()

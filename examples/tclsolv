@@ -260,6 +260,7 @@ proc repo_repomd_add_ext {selfName repodata what ext} {
 proc repo_repomd_add_exts {selfName} {
   upvar $selfName self
   set repodata [$self(handle) add_repodata 0]
+  $repodata extend_to_repo
   repo_repomd_add_ext self $repodata "filelists" "FL"
   $repodata internalize
 }
@@ -383,6 +384,7 @@ proc repo_susetags_add_ext {selfName repodata what ext} {
 proc repo_susetags_add_exts {selfName} {
   upvar $selfName self
   set repodata [$self(handle) add_repodata 0]
+  $repodata extend_to_repo
   repo_susetags_add_ext self $repodata "packages.FL" "FL"
   repo_susetags_add_ext self $repodata "packages.FL.gz" "FL"
   $repodata internalize
