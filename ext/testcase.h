@@ -19,6 +19,9 @@
 #define TESTCASE_RESULT_GENID		(1 << 7)
 #define TESTCASE_RESULT_REASON		(1 << 8)
 
+/* reuse solver hack, testsolv use only */
+#define TESTCASE_RESULT_REUSE_SOLVER	(1 << 31)
+
 extern Id testcase_str2dep(Pool *pool, const char *s);
 extern const char *testcase_dep2str(Pool *pool, Id id);
 extern const char *testcase_repoid2str(Pool *pool, Id repoid);

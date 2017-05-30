@@ -2272,7 +2272,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
       strqueue_push(&sq, cmd);
     }
 
-  if (resultflags)
+  if ((resultflags & ~TESTCASE_RESULT_REUSE_SOLVER) != 0)
     {
       char *result;
       cmd = 0;
@@ -2519,6 +2519,10 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
   int ngenid = 0;
   Queue autoinstq;
 
+  if (resultp)
+    *resultp = 0;
+  if (resultflagsp)
+    *resultflagsp = 0;
   if (!fp && !(fp = fopen(testcase, "r")))
     {
       pool_debug(pool, SOLV_ERROR, "testcase_read: could not open '%s'\n", testcase);
@@ -2799,8 +2803,10 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	  if (resultflagsp)
 	    *resultflagsp = resultflags;
 	}
-      else if (!strcmp(pieces[0], "nextjob") && npieces == 1)
+      else if (!strcmp(pieces[0], "nextjob"))
 	{
+	  if (npieces == 2 && resultflagsp && !strcmp(pieces[1], "reusesolver"))
+	    *resultflagsp |= TESTCASE_RESULT_REUSE_SOLVER;
 	  break;
 	}
       else if (!strcmp(pieces[0], "disable") && npieces == 3)

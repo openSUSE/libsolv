@@ -68,7 +68,7 @@ main(int argc, char **argv)
   Pool *pool;
   Queue job;
   Queue solq;
-  Solver *solv;
+  Solver *solv, *reusesolv = 0;
   char *result = 0;
   int resultflags = 0;
   int debuglevel = 0;
@@ -140,7 +140,12 @@ main(int argc, char **argv)
 	      pool_free(pool);
 	      exit(resultflags == 77 ? 77 : 1);
 	    }
-
+	  if (reusesolv)
+	    {
+	      solver_free(solv);
+	      solv = reusesolv;
+	      reusesolv = 0;
+	    }
 	  if (!multijob && !feof(fp))
 	    multijob = 1;
 
@@ -179,8 +184,8 @@ main(int argc, char **argv)
 	      solver_solve(solv, &job);
 	      solv->solution_callback = 0;
 	      solv->solution_callback_data = 0;
-	      if (!resultflags)
-		resultflags = TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS;
+	      if ((resultflags & ~TESTCASE_RESULT_REUSE_SOLVER) == 0)
+		resultflags |= TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS;
 	      myresult = testcase_solverresult(solv, resultflags);
 	      if (rescallback && reportsolutiondata.result)
 		{
@@ -292,8 +297,13 @@ main(int argc, char **argv)
 		}
 	    }
 	  queue_free(&job);
-	  solver_free(solv);
+	  if ((resultflags & TESTCASE_RESULT_REUSE_SOLVER) != 0 && !feof(fp))
+	    reusesolv = solv;
+	  else
+	    solver_free(solv);
 	}
+      if (reusesolv)
+	solver_free(reusesolv);
       pool_free(pool);
       fclose(fp);
     }
