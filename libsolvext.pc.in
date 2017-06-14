@@ -6,4 +6,5 @@ Description: Library for reading repositories
 Version: @VERSION@
 Requires: libsolv
 Libs: -L${libdir} -lsolvext
+Libs.private: @PRIVATE_LIBS@
 Cflags: -I${includedir}
