@@ -330,7 +330,8 @@ typedef struct {
 
 #if defined(SWIGPERL)
 
-/* work around a swig bug */
+/* work around a swig bug for swig versions < 2.0.5 */
+#if SWIG_VERSION < 0x020005
 %{
 #undef SWIG_CALLXS
 #ifdef PERL_OBJECT
@@ -343,6 +344,7 @@ typedef struct {
 #  endif
 #endif
 %}
+#endif
 
 
 %define perliter(class)
