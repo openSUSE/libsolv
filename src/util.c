@@ -139,7 +139,7 @@ solv_timems(unsigned int subtract)
 
    see also: http://sources.redhat.com/ml/libc-alpha/2008-12/msg00003.html
  */
-#if defined(__GLIBC__) && (defined(HAVE_QSORT_R) || defined(HAVE___QSORT_R))
+#if (defined(__GLIBC__) || defined(__NEWLIB__)) && (defined(HAVE_QSORT_R) || defined(HAVE___QSORT_R))
 
 void
 solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
