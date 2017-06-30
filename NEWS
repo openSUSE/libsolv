@@ -2,6 +2,10 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.28
+- new features:
+  * new pool_best_solvables() function
+
 Version 0.6.27
 - new features:
   * allow building with libxml2 instead of libexpat

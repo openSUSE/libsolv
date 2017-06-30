@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Fri Jun 30 16:37:31 CEST 2017 - mls@suse.de
+
+- make peace with newer perl versions
+- fix memory leak in bindings
+- add pool_best_solvables() function
+- fix 64bit integer parsing from RPM headers
+- bump version to 0.6.28
+
+-------------------------------------------------------------------
 Sun May 28 13:32:15 UTC 2017 - ngompa13@gmail.com
 
 - Enable complex/rich dependencies for CentOS/RHEL 7, matching how
