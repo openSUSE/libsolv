@@ -13,6 +13,7 @@
 #include "repoinfo.h"
 #include "mirror.h"
 #include "checksig.h"
+#include "repoinfo_config_yum.h"
 #include "repoinfo_download.h"
 
 static inline int
