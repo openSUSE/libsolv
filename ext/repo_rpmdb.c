@@ -177,7 +177,6 @@ typedef struct rpmhead {
   int cnt;
   unsigned int dcnt;
   unsigned char *dp;
-  int forcebinary;		/* sigh, see rh#478907 */
   unsigned char data[1];
 } RpmHead;
 
@@ -364,6 +363,18 @@ headbinary(RpmHead *h, int tag, unsigned int *sizep)
   if (sizep)
     *sizep = i;
   return h->dp + o;
+}
+
+static int
+headissourceheuristic(RpmHead *h)
+{
+  unsigned int i, o;
+  unsigned char *d = headfindtag(h, TAG_DIRNAMES);
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 8)
+    return 0;
+  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  return i == 1 && o < h->dcnt && !h->dp[o] ? 1 : 0;
 }
 
 static char *headtoevr(RpmHead *h)
@@ -989,7 +1000,7 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
     return 0;
   s->name = pool_str2id(pool, name, 1);
   sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
-  if (sourcerpm || (rpmhead->forcebinary && !headexists(rpmhead, TAG_SOURCEPACKAGE)))
+  if (sourcerpm || !(headexists(rpmhead, TAG_SOURCEPACKAGE) || headissourceheuristic(rpmhead)))
     s->arch = pool_str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
   else
     {
@@ -1466,7 +1477,6 @@ getrpm_dbdata(struct rpmdbstate *state, DBT *dbdata, int dbid)
       state->rpmhead = solv_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
     }
   rpmhead = state->rpmhead;
-  rpmhead->forcebinary = 1;
   rpmhead->cnt = cnt;
   rpmhead->dcnt = dsize;
   memcpy(rpmhead->data, (unsigned char *)dbdata->data + 8, l);
@@ -2137,7 +2147,6 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   Id chksumtype = 0;
   Chksum *chksumh = 0;
   Chksum *leadsigchksumh = 0;
-  int forcebinary = 0;
 
   data = repo_add_repodata(repo, flags);
 
@@ -2167,7 +2176,6 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       fclose(fp);
       return 0;
     }
-  forcebinary = lead[6] != 0 || lead[7] != 1;
   if (chksumh)
     solv_chksum_add(chksumh, lead, 96 + 16);
   if (leadsigchksumh)
@@ -2215,7 +2223,6 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	solv_chksum_add(chksumh, rpmhead->data, sigdsize);
       if (leadsigchksumh)
 	solv_chksum_add(leadsigchksumh, rpmhead->data, sigdsize);
-      rpmhead->forcebinary = 0;
       rpmhead->cnt = sigcnt;
       rpmhead->dcnt = sigdsize - sigcnt * 16;
       rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -2307,7 +2314,6 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   rpmhead->data[l] = 0;
   if (chksumh)
     solv_chksum_add(chksumh, rpmhead->data, l);
-  rpmhead->forcebinary = forcebinary;
   rpmhead->cnt = sigcnt;
   rpmhead->dcnt = sigdsize;
   rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -2588,7 +2594,7 @@ rpm_query(void *rpmhandle, Id what)
       if (!name)
 	name = "";
       sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
-      if (sourcerpm || (rpmhead->forcebinary && !headexists(rpmhead, TAG_SOURCEPACKAGE)))
+      if (sourcerpm || !(headexists(rpmhead, TAG_SOURCEPACKAGE) || headissourceheuristic(rpmhead)))
 	arch = headstring(rpmhead, TAG_ARCH);
       else
 	{
@@ -2680,14 +2686,12 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
   RpmHead *rpmhead;
   unsigned int sigdsize, sigcnt, l;
   unsigned char lead[4096];
-  int forcebinary = 0;
 
   if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
     {
       pool_error(state->pool, 0, "%s: not a rpm", name);
       return 0;
     }
-  forcebinary = lead[6] != 0 || lead[7] != 1;
   if (lead[78] != 0 || lead[79] != 5)
     {
       pool_error(state->pool, 0, "%s: not a V5 header", name);
@@ -2749,7 +2753,6 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
       return 0;
     }
   rpmhead->data[l] = 0;
-  rpmhead->forcebinary = forcebinary;
   rpmhead->cnt = sigcnt;
   rpmhead->dcnt = sigdsize;
   rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
@@ -2787,7 +2790,6 @@ rpm_byrpmh(void *rpmstate, Header h)
   memcpy(rpmhead->data, uh + 8, l);
   rpmhead->data[l] = 0;
   free((void *)uh);
-  rpmhead->forcebinary = 0;
   rpmhead->cnt = sigcnt;
   rpmhead->dcnt = sigdsize;
   rpmhead->dp = rpmhead->data + sigcnt * 16;
