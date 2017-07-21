@@ -3720,7 +3720,6 @@ solver_addyumobsrules(Solver *solv)
 #if 0
 printf("checking yumobs for %s\n", pool_solvable2str(pool, s));
 #endif
-      queue_empty(&qo);
       for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (op = *opp++) != 0;)
 	{
 	  Solvable *os = pool->solvables + op;
