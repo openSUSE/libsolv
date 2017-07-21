@@ -13,7 +13,9 @@
 #include "repoinfo.h"
 #include "mirror.h"
 #include "checksig.h"
+#ifdef FEDORA
 #include "repoinfo_config_yum.h"
+#endif
 #include "repoinfo_download.h"
 
 static inline int
