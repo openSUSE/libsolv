@@ -35,12 +35,5 @@ extern void pool_add_pos_literals_complex_dep(Pool *pool, Id dep, Queue *q, Map 
 #define CPLXDEPS_NAME    (1 << 3)
 #define CPLXDEPS_DONTFIX (1 << 4)
 
-#define CPLXDEPS_ELSE_AND_1 (1 << 8)
-#define CPLXDEPS_ELSE_AND_2 (1 << 9)
-#define CPLXDEPS_ELSE_OR_1  (1 << 10)
-#define CPLXDEPS_ELSE_OR_2  (1 << 11)
-#define CPLXDEPS_ELSE_OR_3  (1 << 12)
-#define CPLXDEPS_ELSE_MASK  (0x1f00)
-
 #endif
 
