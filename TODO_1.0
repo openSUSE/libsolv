@@ -1,0 +1,25 @@
+
+- make dataiterator only return the last occurance of a key
+
+- implement package priority (for things like Debian's pin feature)
+
+- merge SUSETAGS_FILE_* and  REPOSITORY_REPOMD_* keys into REPOSITORY_RESOURCE
+
+- re-order key ids
+
+- deal with DIRSTR entries having dirid 0 (for source rpms)
+
+- test rich dep rule creation
+
+- clean up rich dep rule code (see perl-BSSolv)
+
+- drop patchcheck
+
+- rename repo2solv.sh to repo2solv (maybe rewrite in C?)
+
+- obey -A option in repo2solv
+
+- make FAVOR handling deal with versions
+
+- write more manpages
+
