@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 12/14/2016
+.\"      Date: 07/25/2017
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "12/14/2016" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "07/25/2017" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -2426,9 +2426,9 @@ Return a tuple containing the on\-media location and an optional media number fo
 .\}
 .nf
 \fBconst char *lookup_sourcepkg()\fR;
-my \fR\fI$sourcepkg\fR\fB =\fR \fI$solvable\fR\fB\->lookup_sourcepkg()\fR;
-\fIsourcepkg\fR\fB \fB=\fR \fIsolvable\fR\fB\&.lookup_sourcepkg()\fR
-\fIsourcepkg\fR\fB \fB=\fR \fIsolvable\fR\fB\&.lookup_sourcepkg()\fR
+my \fI$sourcepkg\fR \fB=\fR \fI$solvable\fR\fB\->lookup_sourcepkg()\fR;
+\fIsourcepkg\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_sourcepkg()\fR
+\fIsourcepkg\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_sourcepkg()\fR
 .fi
 .if n \{\
 .RE
@@ -5573,7 +5573,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .\}
 .nf
 \fBvoid set_sourcepkg(Id\fR \fIsolvid\fR\fB, const char *\fR\fIsourcepkg\fR\fB)\fR;
-\fI$data\fR\fB\->set_sourcepkg(\fR\fI$solvid\fR\fB, \fI$sourcepkg\fR\fB)\fR;
+\fI$data\fR\fB\&.set_sourcepkg(\fR\fI$solvid\fR\fB,\fR \fI$sourcepkg\fR\fB)\fR;
 \fIdata\fR\fB\&.set_sourcepkg(\fR\fIsolvid\fR\fB,\fR \fIsourcepkg\fR\fB)\fR
 \fIdata\fR\fB\&.set_sourcepkg(\fR\fIsolvid\fR\fB,\fR \fIsourcepkg\fR\fB)\fR
 .fi

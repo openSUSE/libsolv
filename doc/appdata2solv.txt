@@ -37,3 +37,7 @@ mergesolv(1)
 Author
 ------
 Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////

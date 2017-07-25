@@ -22,3 +22,7 @@ input and writes it in solv file format to standard output.
 Author
 ------
 Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////

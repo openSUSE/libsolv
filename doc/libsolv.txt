@@ -56,3 +56,6 @@ Author
 ------
 Michael Schroeder <mls@suse.de>
 
+////
+vim: syntax=asciidoc
+////

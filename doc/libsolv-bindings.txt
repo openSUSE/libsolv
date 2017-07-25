@@ -167,7 +167,7 @@ a foreach style:
 
 libsolv's arrays are mapped to tcl's lists:
 
-        TCL set jobs [list $job1 $job2]
+	TCL set jobs [list $job1 $job2]
 	TCL set problems [$solver solve $jobs]
 	TCL puts "We have [llength $problems] problems..."
 
@@ -3541,3 +3541,6 @@ Author
 ------
 Michael Schroeder <mls@suse.de>
 
+////
+vim: syntax=asciidoc
+////
