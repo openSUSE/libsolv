@@ -42,6 +42,10 @@ IF (ENABLE_APPDATA)
 SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} appdata2solv.1)
 ENDIF (ENABLE_APPDATA)
 
+# prepend gen directory
+STRING(REGEX REPLACE "([^;]+)" "gen/\\1" libsolv_MANPAGES1 "${libsolv_MANPAGES1}")
+STRING(REGEX REPLACE "([^;]+)" "gen/\\1" libsolv_MANPAGES3 "${libsolv_MANPAGES3}")
+
 INSTALL(FILES
     ${libsolv_MANPAGES3}
     DESTINATION "${MAN_INSTALL_DIR}/man3")
