@@ -23,3 +23,7 @@
 
 - write more manpages
 
+IDEAS:
+- support REL_UNLESS aka (A & ~B)
+  useful for "Conflicts: (A unless B)"
+- support REL_WITHOUT

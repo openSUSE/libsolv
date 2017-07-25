@@ -127,12 +127,14 @@ invert_depblocks(Pool *pool, Queue *bq, int start, int r)
   return -1;
 }
 
+/* distributive property: (a1*a2 + b1*b2) * (c1*c2 + d1*d2) = 
+   a1*a2*c1*c2 + a1*a2*d1*d2 + b1*b2*c1*c2 + b1*b2*d1*d2 */
 static int
-mix_depblocks(Pool *pool, Queue *bq, int bqcnt, int bqcnt2, int flags)
+distribute_depblocks(Pool *pool, Queue *bq, int bqcnt, int bqcnt2, int flags)
 {
   int i, j, bqcnt3;
 #ifdef CPLXDEBUG
-  printf("COMPLEX MIX %d %d %d\n", bqcnt, bqcnt2, bq->count);
+  printf("COMPLEX DISTRIBUTE %d %d %d\n", bqcnt, bqcnt2, bq->count);
 #endif
   bqcnt2 = expand_simpledeps(pool, bq, bqcnt, bqcnt2);
   bqcnt3 = bq->count;
@@ -209,7 +211,7 @@ normalize_dep_or(Pool *pool, Id dep1, Id dep2, Queue *bq, int flags, int invflag
   if (r2 == 0)
     return r1;
   if ((flags & CPLXDEPS_TODNF) == 0)
-    return mix_depblocks(pool, bq, bqcnt, bqcnt2, flags);
+    return distribute_depblocks(pool, bq, bqcnt, bqcnt2, flags);
   return -1;
 }
 
@@ -234,7 +236,7 @@ normalize_dep_and(Pool *pool, Id dep1, Id dep2, Queue *bq, int flags, int invfla
   if (r2 == 1)
     return r1;
   if ((flags & CPLXDEPS_TODNF) != 0)
-    return mix_depblocks(pool, bq, bqcnt, bqcnt2, flags);
+    return distribute_depblocks(pool, bq, bqcnt, bqcnt2, flags);
   return -1;
 }
 
@@ -258,7 +260,7 @@ normalize_dep_if_else(Pool *pool, Id dep1, Id dep2, Id dep3, Queue *bq, int flag
   if (r2 == 1)
     return r1;
   if ((flags & CPLXDEPS_TODNF) != 0)
-    return mix_depblocks(pool, bq, bqcnt, bqcnt2, flags);
+    return distribute_depblocks(pool, bq, bqcnt, bqcnt2, flags);
   return -1;
 }
 
