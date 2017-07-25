@@ -3364,9 +3364,10 @@ area.
 	data.extend_to_repo()
 
 Extend the repodata so that it has the same size as the repo it belongs to.
-This method is only needed when switching to a just written repodata extension
-to make the repodata match the written extension (which is always of the
-size of the repo).
+This mthod is needed when setting up a new extension repodata so that it
+matches the repository size. It is also needed when switching to a just written
+repodata extension to make the repodata match the written extension (which is
+always of the size of the repo).
 
 	<equality>
 	if ($data1 == $data2)
