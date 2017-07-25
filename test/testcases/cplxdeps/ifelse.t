@@ -13,9 +13,9 @@ repo available 0 testtags <inline>
 #>=Pkg: C2 1 1 x86_64
 #>=Prv: C
 #>=Pkg: X 1 1 x86_64
-#>=Req: A <IF> B <ELSE> C
+#>=Req: A <IF> (B <ELSE> C)
 #>=Pkg: Y 1 1 x86_64
-#>=Con: A <IF> B <ELSE> C
+#>=Con: A <IF> (B <ELSE> C)
 job install name X
 result rules <inline>
 #>rule job 3986285ed3e7fa05cb3367ca1e7f0d3d  X-1-1.x86_64@available
