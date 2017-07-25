@@ -612,6 +612,26 @@ A conditional dependency, the \(lqname\(rq sub\-dependency is only considered if
 .RS 4
 A compat dependency used in Haiku to represent version ranges\&. The \(lqname\(rq part is the actual version, the \(lqevr\(rq part is the backwards compatibility version\&.
 .RE
+.PP
+\fBREL_KIND\fR
+.RS 4
+A pseudo dependency that limits the solvables to a specific kind\&. The kind is expected to be a prefix of the solvable name, e\&.g\&. \(lqpatch:foo\(rq would be of kind \(lqpatch\(rq\&. \(lqREL_KIND\(rq is only supported in the selection functions\&.
+.RE
+.PP
+\fBREL_MULTIARCH\fR
+.RS 4
+A debian multiarch annotation\&. The most common value for the \(lqevr\(rq part is \(lqany\(rq\&.
+.RE
+.PP
+\fBREL_ELSE\fR
+.RS 4
+The else part of a \(lqREL_COND\(rq dependency\&. See the section about boolean dependencies\&.
+.RE
+.PP
+\fBREL_ERROR\fR
+.RS 4
+An illegal dependency\&. This is useful to encode dependency parse errors\&.
+.RE
 .SS "Functions"
 .sp
 .if n \{\
@@ -1241,7 +1261,7 @@ There can be multiple equivalence classes, the set of allowed vendor changes for
 You can turn off the architecture replacement checks with the Solver\(cqs SOLVER_FLAG_ALLOW_VENDORCHANGE flag\&.
 .SH "BOOLEAN DEPENDENCIES"
 .sp
-Boolean Dependencies allow to build complex expressions from simple dependencies\&. While rpm does not support boolean expressions in dependencies and debian only allows an "OR" expression, libsolv allows arbitrary complex expressions\&. The following basic types are supported:
+Boolean Dependencies allow to build complex expressions from simple dependencies\&. Note that depending on the package manager only a subset of those may be useful\&. For example, debian currently only allows an "OR" expression\&.
 .PP
 \fBREL_OR\fR
 .RS 4
@@ -1250,17 +1270,22 @@ The expression is true if either the first dependency or the second one is true\
 .PP
 \fBREL_AND\fR
 .RS 4
-The expression is true if both dependencies are true\&. The packages fulfilling the dependencies may be different, i\&.e\&. \(lqSupplements: perl AND python\(rq is true if both a package providing perl and a package providing python are installed\&. The solver currently only supports REL_AND in Supplements/Enhances dependencies, in other types of dependencies it gets treated as REL_WITH\&.
+The expression is true if both dependencies are true\&. The packages fulfilling the dependencies may be different, i\&.e\&. \(lqSupplements: perl REL_AND python\(rq is true if both a package providing perl and a package providing python are installed\&.
 .RE
 .PP
 \fBREL_WITH\fR
 .RS 4
-The expression is true if both dependencies are true and are fulfilled by the same package\&. Thus \(lqSupplements: perl AND python\(rq would only be true if a package is installed that provides both dependencies (some kind of multi\-language interpreter)\&.
+The expression is true if both dependencies are true and are fulfilled by the same package\&. Thus \(lqSupplements: perl REL_WITH python\(rq would only be true if a package is installed that provides both dependencies (some kind of multi\-language interpreter)\&.
 .RE
 .PP
 \fBREL_COND\fR
 .RS 4
-The expression is true if the first dependency is true or the second dependency is false\&. Libsolv currently does not support this type of dependency in the solver code\&.
+The expression is true if the first dependency is true or the second dependency is false\&. \(lqA REL_COND B\(rq is equivalent to \(lqA REL_OR (NOT B)\(rq (except that libsolv does not expose \(lqNOT\(rq)\&.
+.RE
+.PP
+\fBREL_ELSE\fR
+.RS 4
+The \(lqelse\(rq part of a \(lqREL_COND\(rq dependency\&. It has to be directly in the evr part of \(lqREL_COND\(rq, e\&.g\&. \(lqfoo REL_COND (bar REL_ELSE baz)\(rq\&. This is equivalent to writing \(lq(foo REL_COND bar) REL_AND (bar REL_OR baz)\(rq\&.
 .RE
 .sp
 Each sub\-dependency of a boolean dependency can in turn be a boolean dependency, so you can chain them to create complex dependencies\&.
