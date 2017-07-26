@@ -345,6 +345,77 @@ toevr(Pool *pool, struct parsedata *pd, const char *version, const char *release
 }
 
 
+static inline void record_share(struct parsedata *pd, Id handle, Id name, Id evr, Id arch)
+{
+  Repo *repo = pd->repo;
+  int i = handle - repo->start;
+  if (i >= pd->nshare)
+    {
+      pd->share_with = solv_realloc2(pd->share_with, i + 256, sizeof(*pd->share_with));
+      memset(pd->share_with + pd->nshare, 0, (i + 256 - pd->nshare) * sizeof(*pd->share_with));
+      pd->nshare = i + 256;
+    }
+  pd->share_with[i].name = name;
+  pd->share_with[i].evr = evr;
+  pd->share_with[i].arch = arch;
+}
+
+static void process_shares(struct parsedata *pd)
+{
+  Pool *pool = pd->pool;
+  Repo *repo = pd->repo;
+  Repodata *data = pd->data;
+  int i, last_found;
+  Map keyidmap;
+
+  map_init(&keyidmap, data->nkeys);
+  for (i = 1; i < data->nkeys; i++)
+    {
+      Id keyname = data->keys[i].name;
+      if (keyname == SOLVABLE_INSTALLSIZE || keyname == SOLVABLE_DISKUSAGE || keyname == SOLVABLE_FILELIST)
+	continue;
+      if (keyname == SOLVABLE_MEDIADIR || keyname == SOLVABLE_MEDIAFILE || keyname == SOLVABLE_MEDIANR)
+	continue;
+      if (keyname == SOLVABLE_DOWNLOADSIZE || keyname == SOLVABLE_CHECKSUM)
+	continue;
+      if (keyname == SOLVABLE_SOURCENAME || keyname == SOLVABLE_SOURCEARCH || keyname == SOLVABLE_SOURCEEVR)
+	continue;
+      if (keyname == SOLVABLE_PKGID || keyname == SOLVABLE_HDRID || keyname == SOLVABLE_LEADSIGID)
+	continue;
+      if (keyname == SUSETAGS_SHARE_NAME || keyname == SUSETAGS_SHARE_EVR || keyname == SUSETAGS_SHARE_ARCH)
+	continue;
+      MAPSET(&keyidmap, i);
+    }
+  last_found = 0;
+  for (i = 0; i < pd->nshare; i++)
+    {
+      unsigned int n, nn;
+      Solvable *found = 0;
+      if (!pd->share_with[i].name)
+	continue;
+      for (n = repo->start, nn = repo->start + last_found; n < repo->end; n++, nn++)
+	{
+	  if (nn >= repo->end)
+	    nn = repo->start;
+	  found = pool->solvables + nn;
+	  if (found->repo == repo
+	      && found->name == pd->share_with[i].name
+	      && found->evr == pd->share_with[i].evr
+	      && found->arch == pd->share_with[i].arch)
+	    {
+	      last_found = nn - repo->start;
+	      break;
+	    }
+	}
+      if (n != repo->end)
+	repodata_merge_some_attrs(data, repo->start + i, repo->start + last_found, &keyidmap, 0);
+    }
+  pd->share_with = solv_free(pd->share_with);
+  pd->nshare = 0;
+  map_free(&keyidmap);
+}
+
+
 /*
  * parse susetags
  *
@@ -423,15 +494,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      arch = lookup_shared_id(sdata, p, SUSETAGS_SHARE_ARCH, pool->solvables[p].arch, sdata == data);
 	      if (!arch)
 		continue;
-	      if (p - repo->start >= pd.nshare)
-		{
-		  pd.share_with = solv_realloc2(pd.share_with, p - repo->start + 256, sizeof(*pd.share_with));
-		  memset(pd.share_with + pd.nshare, 0, (p - repo->start + 256 - pd.nshare) * sizeof(*pd.share_with));
-		  pd.nshare = p - repo->start + 256;
-		}
-	      pd.share_with[p - repo->start].name = name;
-	      pd.share_with[p - repo->start].evr = evr;
-	      pd.share_with[p - repo->start].arch = arch;
+	      record_share(&pd, p, name, evr, arch);
 	    }
 	}
     }
@@ -558,6 +621,124 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 
       tag = tag_from_string(line);
 
+      /* handle global tags and tags that start a new section */
+      switch (tag)
+        {
+        case CTAG('=', 'V', 'e', 'r'):
+	  /* start of a new file */
+	  if (s)
+	    finish_solvable(&pd, s, freshens);
+	  s = 0;
+	  handle = 0;
+          freshens = 0;
+	  indelta = 0;
+	  last_found_pack = 0;
+	  indesc++;
+	  if (createdpkgs)
+	    {
+	      solv_free(joinhash);
+	      joinhash = joinhash_init(repo, &joinhashm);
+	      createdpkgs = 0;
+	    }
+	  continue;
+
+        case CTAG('=', 'L', 'a', 'n'):
+	  /* define language of the following material */
+	  pd.language = solv_free(pd.language);
+	  memset(pd.langcache, 0, sizeof(pd.langcache));
+	  if (line[6])
+	    pd.language = solv_strdup(line + 6);
+	  continue;
+
+	case CTAG('=', 'P', 'k', 'g'):		/* start of a package */
+	case CTAG('=', 'P', 'a', 't'):		/* start of a pattern */
+	case CTAG('=', 'D', 'l', 't'):		/* start of a delta */
+	  /* =Pkg: <name> <version> <release> <architecture> */
+	  /* If we have an old solvable, complete it by filling in some default stuff.  */
+	  if (s)
+	    finish_solvable(&pd, s, freshens);
+	  s = 0;
+	  handle = 0;
+          freshens = 0;
+	  indelta = 0;
+
+	  /* define kind */
+	  pd.kind = 0;
+	  if (tag == CTAG('=', 'P', 'a', 't'))
+	    pd.kind = "pattern";
+
+	  /* parse nevra */
+          if (split(line + 5, sp, 5) != 4)
+	    {
+	      pd.ret = pool_error(pool, -1, "susetags: line %d: bad line '%s'\n", pd.lineno, line);
+	      break;
+	    }
+
+	  if (tag == CTAG('=', 'D', 'l', 't'))
+	    {
+	      /* start new delta */
+	      handle = repodata_new_handle(data);
+	      repodata_set_id(data, handle, DELTA_PACKAGE_NAME, pool_str2id(pool, sp[0], 1));
+	      repodata_set_id(data, handle, DELTA_PACKAGE_EVR, toevr(pool, &pd, sp[1], sp[2]));
+	      repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, pool_str2id(pool, sp[3], 1));
+	      repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DELTAINFO, handle);
+	      indelta = 1;
+	      continue;
+	    }
+
+	  if (joinhash)
+	    {
+	      /* data join operation. find solvable matching name/arch/evr and
+               * add data to it */
+	      Id name, arch;
+	      /* we don't use the create flag here as a simple pre-check for existance */
+	      if (pd.kind)
+		name = pool_str2id(pool, join2(&pd.jd, pd.kind, ":", sp[0]), 0);
+	      else
+		name = pool_str2id(pool, sp[0], 0);
+	      arch = pool_str2id(pool, sp[3], 0);
+	      if (name && arch)
+		{
+		  Id start = (flags & REPO_EXTEND_SOLVABLES) ? 0 : first_new_pkg;
+		  Id evr = toevr(pool, &pd, sp[1], sp[2]);
+		  if (repo->start + last_found_pack + 1 >= start && repo->start + last_found_pack + 1 < repo->end)
+		    {
+		      s = pool->solvables + repo->start + last_found_pack + 1;
+		      if (s->repo != repo || s->name != name || s->evr != evr || s->arch != arch)
+			s = 0;
+		    }
+		  if (!s)
+		    s = joinhash_lookup(repo, joinhash, joinhashm, name, evr, arch, start);
+		}
+	      /* do not create new packages in EXTEND_SOLVABLES mode */
+	      if (!s && (flags & REPO_EXTEND_SOLVABLES) != 0)
+		continue;
+	      /* fallthrough to package creation */
+	    }
+	  if (!s)
+	    {
+	      /* normal operation. create a new solvable. */
+	      s = pool_id2solvable(pool, repo_add_solvable(repo));
+	      if (pd.kind)
+		s->name = pool_str2id(pool, join2(&pd.jd, pd.kind, ":", sp[0]), 1);
+	      else
+		s->name = pool_str2id(pool, sp[0], 1);
+	      s->evr = toevr(pool, &pd, sp[1], sp[2]);
+	      s->arch = pool_str2id(pool, sp[3], 1);
+	      s->vendor = defvendor;
+	      if (!first_new_pkg)
+	        first_new_pkg = s - pool->solvables;
+	      createdpkgs = 1;
+	    }
+	  handle = s - pool->solvables;
+	  last_found_pack = (s - pool->solvables) - repo->start;
+	  continue;
+
+	default:
+	  break;
+	}
+
+      /* handle delta tags */
       if (indelta)
 	{
 	  /* Example:
@@ -600,130 +781,26 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      if (split(line + 6, sp, 3) == 2)
 		repodata_set_num(data, handle, DELTA_DOWNLOADSIZE, strtoull(sp[0], 0, 10));
 	      continue;
-	    case CTAG('=', 'P', 'k', 'g'):
-	    case CTAG('=', 'P', 'a', 't'):
-	    case CTAG('=', 'D', 'l', 't'):
-	      handle = 0;
-	      indelta = 0;
-	      break;
 	    default:
-	      pool_debug(pool, SOLV_ERROR, "susetags: unknown line: %d: %s\n", pd.lineno, line);
+	      pool_debug(pool, SOLV_WARN, "susetags: unknown line: %d: %s\n", pd.lineno, line);
 	      continue;
 	    }
 	}
 
-      /*
-       * start of (next) package or pattern or delta
-       *
-       * =Pkg: <name> <version> <release> <architecture>
-       * (=Pat: ...)
-       */
-      if (tag == CTAG('=', 'D', 'l', 't'))
+      /* we need a solvable for all other tags */
+      if (!s)
 	{
-	  if (s)
-	    finish_solvable(&pd, s, freshens);
-	  s = 0;
-	  pd.kind = 0;
-          if (split(line + 5, sp, 5) != 4)
+	  if (indesc >= 2)
 	    {
-	      pd.ret = pool_error(pool, -1, "susetags: line %d: bad line '%s'\n", pd.lineno, line);
-	      break;
+	      /* Probably invalid input data in the second set of solvables. Ignore */
+	      continue;
 	    }
-	  handle = repodata_new_handle(data);
-	  repodata_set_id(data, handle, DELTA_PACKAGE_NAME, pool_str2id(pool, sp[0], 1));
-	  repodata_set_id(data, handle, DELTA_PACKAGE_EVR, toevr(pool, &pd, sp[1], sp[2]));
-	  repodata_set_id(data, handle, DELTA_PACKAGE_ARCH, pool_str2id(pool, sp[3], 1));
-	  repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DELTAINFO, handle);
-	  indelta = 1;
-	  continue;
-	}
-      if (tag == CTAG('=', 'P', 'k', 'g')
-	   || tag == CTAG('=', 'P', 'a', 't'))
-	{
-	  /* If we have an old solvable, complete it by filling in some
-	     default stuff.  */
-	  if (s)
-	    finish_solvable(&pd, s, freshens);
-
-	  /*
-	   * define kind
-	   */
-
-	  pd.kind = 0;
-	  if (line[3] == 't')
-	    pd.kind = "pattern";
-
-	  /*
-	   * parse nevra
-	   */
-
-          if (split(line + 5, sp, 5) != 4)
-	    {
-	      pd.ret = pool_error(pool, -1, "susetags: line %d: bad line '%s'\n", pd.lineno, line);
-	      break;
-	    }
-	  s = 0;
-          freshens = 0;
-
-	  if (joinhash)
-	    {
-	      /* data join operation. find solvable matching name/arch/evr and
-               * add data to it */
-	      Id name, evr, arch;
-	      /* we don't use the create flag here as a simple pre-check for existance */
-	      if (pd.kind)
-		name = pool_str2id(pool, join2(&pd.jd, pd.kind, ":", sp[0]), 0);
-	      else
-		name = pool_str2id(pool, sp[0], 0);
-	      evr = toevr(pool, &pd, sp[1], sp[2]);
-	      arch = pool_str2id(pool, sp[3], 0);
-	      if (name && arch)
-		{
-		  Id start = (flags & REPO_EXTEND_SOLVABLES) ? 0 : first_new_pkg;
-		  if (repo->start + last_found_pack + 1 >= start && repo->start + last_found_pack + 1 < repo->end)
-		    {
-		      s = pool->solvables + repo->start + last_found_pack + 1;
-		      if (s->repo != repo || s->name != name || s->evr != evr || s->arch != arch)
-			s = 0;
-		    }
-		  if (!s)
-		    s = joinhash_lookup(repo, joinhash, joinhashm, name, evr, arch, start);
-		}
-	      /* do not create new packages in EXTEND_SOLVABLES mode */
-	      if (!s && (flags & REPO_EXTEND_SOLVABLES) != 0)
-		continue;
-	      /* fallthrough to package creation */
-	    }
-	  if (!s)
-	    {
-	      /* normal operation. create a new solvable. */
-	      s = pool_id2solvable(pool, repo_add_solvable(repo));
-	      if (pd.kind)
-		s->name = pool_str2id(pool, join2(&pd.jd, pd.kind, ":", sp[0]), 1);
-	      else
-		s->name = pool_str2id(pool, sp[0], 1);
-	      s->evr = toevr(pool, &pd, sp[1], sp[2]);
-	      s->arch = pool_str2id(pool, sp[3], 1);
-	      s->vendor = defvendor;
-	      if (!first_new_pkg)
-	        first_new_pkg = s - pool->solvables;
-	      createdpkgs = 1;
-	    }
-	  last_found_pack = (s - pool->solvables) - repo->start;
-	  if (data)
-	    handle = s - pool->solvables;
-	}
-
-      /* If we have no current solvable to add to, ignore all further lines
-         for it.  Probably invalid input data in the second set of
-	 solvables.  */
-      if (indesc >= 2 && !s)
-        {
 #if 0
-	  pool_debug(pool, SOLV_ERROR, "susetags: huh %d: %s?\n", pd.lineno, line);
+	  pool_debug(pool, SOLV_WARN, "susetags: stray line: %d: %s\n", pd.lineno, line);
 #endif
           continue;
 	}
+
       switch (tag)
         {
 	  case CTAG('=', 'P', 'r', 'v'):                                        /* provides */
@@ -754,11 +831,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    continue;
           case CTAG('=', 'P', 'r', 'q'):                                        /* pre-requires / packages required */
 	    if (pd.kind)
-	      {
-	        s->requires = adddep(pool, &pd, s->requires, line, 0, 0);           /* patterns: a required package */
-	      }
+	      s->requires = adddep(pool, &pd, s->requires, line, 0, 0);		/* pattern: package requires */
 	    else
-	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0); /* package: pre-requires */
+	      s->requires = adddep(pool, &pd, s->requires, line, SOLVABLE_PREREQMARKER, 0); /* pre-requires */
 	    continue;
 	  case CTAG('=', 'O', 'b', 's'):                                        /* obsoletes */
 	    s->obsoletes = adddep(pool, &pd, s->obsoletes, line, 0, pd.kind);
@@ -801,17 +876,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    continue;
           case CTAG('=', 'P', 'e', 'n'):                                        /* pattern: package enhances */
 	    s->enhances = adddep(pool, &pd, s->enhances, line, 0, 0);
-	    continue;
-          case CTAG('=', 'V', 'e', 'r'):                                        /* - version - */
-	    last_found_pack = 0;
-	    handle = 0;
-	    indesc++;
-	    if (createdpkgs)
-	      {
-	        solv_free(joinhash);
-	        joinhash = joinhash_init(repo, &joinhashm);
-		createdpkgs = 0;
-	      }
 	    continue;
           case CTAG('=', 'V', 'n', 'd'):                                        /* vendor */
             s->vendor = pool_str2id(pool, line + 6, 1);
@@ -880,8 +944,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      k = atoi(line + 6);
 	      if (k || !strcasecmp(line + 6, "true"))
 	        repodata_set_void(data, handle, SOLVABLE_ISVISIBLE);
+	      continue;
 	    }
-	    continue;
           case CTAG('=', 'S', 'h', 'r'):
 	    {
 	      Id name, evr, arch;
@@ -893,15 +957,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      name = pool_str2id(pool, sp[0], 1);
 	      evr = toevr(pool, &pd, sp[1], sp[2]);
 	      arch = pool_str2id(pool, sp[3], 1);
-	      if (last_found_pack >= pd.nshare)
-		{
-		  pd.share_with = solv_realloc2(pd.share_with, last_found_pack + 256, sizeof(*pd.share_with));
-		  memset(pd.share_with + pd.nshare, 0, (last_found_pack + 256 - pd.nshare) * sizeof(*pd.share_with));
-		  pd.nshare = last_found_pack + 256;
-		}
-	      pd.share_with[last_found_pack].name = name;
-	      pd.share_with[last_found_pack].evr = evr;
-	      pd.share_with[last_found_pack].arch = arch;
+	      record_share(&pd, handle, name, evr, arch);
 	      if ((flags & SUSETAGS_RECORD_SHARES) != 0)
 		{
 		  if (s->name == name)
@@ -956,12 +1012,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	  case CTAG('=', 'C', 'k', 's'):
 	    set_checksum(&pd, data, handle, SOLVABLE_CHECKSUM, line + 6);
 	    break;
-	  case CTAG('=', 'L', 'a', 'n'):
-	    pd.language = solv_free(pd.language);
-	    memset(pd.langcache, 0, sizeof(pd.langcache));
-	    if (line[6])
-	      pd.language = solv_strdup(line + 6);
-	    break;
 
 	  case CTAG('=', 'F', 'l', 's'):
 	    {
@@ -994,76 +1044,21 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	      }
 	    break;
 
-	  case CTAG('=', 'P', 'a', 't'):
-	  case CTAG('=', 'P', 'k', 'g'):
-	    break;
-
 	  default:
 #if 0
 	    pool_debug(pool, SOLV_WARN, "susetags: unknown line: %d: %s\n", pd.lineno, line);
 #endif
 	    break;
 	}
-
     }
 
   if (s)
     finish_solvable(&pd, s, freshens);
   solv_free(pd.filelist);
 
-  /* Shared attributes
-   *  (e.g. multiple binaries built from same source)
-   */
+  /* process shared attributes (e.g. multiple binaries built from same source) */
   if (pd.nshare)
-    {
-      int i, last_found;
-      Map keyidmap;
-
-      map_init(&keyidmap, data->nkeys);
-      for (i = 1; i < data->nkeys; i++)
-	{
-	  Id keyname = data->keys[i].name;
-	  if (keyname == SOLVABLE_INSTALLSIZE || keyname == SOLVABLE_DISKUSAGE || keyname == SOLVABLE_FILELIST)
-	    continue;
-	  if (keyname == SOLVABLE_MEDIADIR || keyname == SOLVABLE_MEDIAFILE || keyname == SOLVABLE_MEDIANR)
-	    continue;
-	  if (keyname == SOLVABLE_DOWNLOADSIZE || keyname == SOLVABLE_CHECKSUM)
-	    continue;
-	  if (keyname == SOLVABLE_SOURCENAME || keyname == SOLVABLE_SOURCEARCH || keyname == SOLVABLE_SOURCEEVR)
-	    continue;
-	  if (keyname == SOLVABLE_PKGID || keyname == SOLVABLE_HDRID || keyname == SOLVABLE_LEADSIGID)
-	    continue;
-	  if (keyname == SUSETAGS_SHARE_NAME || keyname == SUSETAGS_SHARE_EVR || keyname == SUSETAGS_SHARE_ARCH)
-	    continue;
-	  MAPSET(&keyidmap, i);
-	}
-      last_found = 0;
-      for (i = 0; i < pd.nshare; i++)
-	{
-	  unsigned int n, nn;
-	  Solvable *found = 0;
-          if (!pd.share_with[i].name)
-	    continue;
-	  for (n = repo->start, nn = repo->start + last_found; n < repo->end; n++, nn++)
-	    {
-	      if (nn >= repo->end)
-		nn = repo->start;
-	      found = pool->solvables + nn;
-	      if (found->repo == repo
-		  && found->name == pd.share_with[i].name
-		  && found->evr == pd.share_with[i].evr
-		  && found->arch == pd.share_with[i].arch)
-		{
-		  last_found = nn - repo->start;
-		  break;
-		}
-	    }
-	  if (n != repo->end)
-	    repodata_merge_some_attrs(data, repo->start + i, repo->start + last_found, &keyidmap, 0);
-        }
-      free(pd.share_with);
-      map_free(&keyidmap);
-    }
+    process_shares(&pd);
 
   solv_free(joinhash);
   repodata_free_dircache(data);
