@@ -2790,7 +2790,7 @@ the solver class.
 
 Create a job that implements the solution element. Add this job to the array
 of jobs for all elements of type different to SOLVER_SOLUTION_JOB and
-SOLVER_SOLUTION_POOLJOB. For the later two, a SOLVER_NOOB Job is created,
+SOLVER_SOLUTION_POOLJOB. For the latter two, a SOLVER_NOOB Job is created,
 you should replace the old job with the new one.
 
 	const char *str()
