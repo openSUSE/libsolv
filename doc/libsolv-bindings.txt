@@ -1173,9 +1173,9 @@ Add the contents of the mageia/mandriva repository metadata (the
 "synthesis.hdlist" file) to the repository.
 
 	bool add_mdk_info(FILE *fp, int flags = 0)
-	$repo->add_mdk($fp);
-	repo.add_mdk(fp)
-	repo.add_mdk(fp)
+	$repo->add_mdk_info($fp);
+	repo.add_mdk_info(fp)
+	repo.add_mdk_info(fp)
 
 Extend the packages from the synthesis file with the info.xml and files.xml
 data. Do not forget to specify *REPO_EXTEND_SOLVABLES*.
