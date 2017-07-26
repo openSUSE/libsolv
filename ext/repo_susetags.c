@@ -436,7 +436,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   int intag = 0;
   int intag_linestart = 0;
   int cummulate = 0;
-  int indesc = 0;
+  int notfound = 0;
   int indelta = 0;
   int last_found_pack = 0;
   Id first_new_pkg = 0;
@@ -451,7 +451,6 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
   if ((flags & (SUSETAGS_EXTEND|REPO_EXTEND_SOLVABLES)) != 0 && repo->nrepodata)
     {
       joinhash = joinhash_init(repo, &joinhashm);
-      indesc = 1;
     }
 
   data = repo_add_repodata(repo, flags);
@@ -630,10 +629,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    finish_solvable(&pd, s, freshens);
 	  s = 0;
 	  handle = 0;
-          freshens = 0;
+	  freshens = 0;
 	  indelta = 0;
+	  notfound = 0;
 	  last_found_pack = 0;
-	  indesc++;
 	  if (createdpkgs)
 	    {
 	      solv_free(joinhash);
@@ -659,8 +658,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    finish_solvable(&pd, s, freshens);
 	  s = 0;
 	  handle = 0;
-          freshens = 0;
+	  freshens = 0;
 	  indelta = 0;
+	  notfound = 0;
 
 	  /* define kind */
 	  pd.kind = 0;
@@ -712,7 +712,10 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 		}
 	      /* do not create new packages in EXTEND_SOLVABLES mode */
 	      if (!s && (flags & REPO_EXTEND_SOLVABLES) != 0)
-		continue;
+		{
+		  notfound = 1;
+		  continue;
+		}
 	      /* fallthrough to package creation */
 	    }
 	  if (!s)
@@ -790,11 +793,8 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
       /* we need a solvable for all other tags */
       if (!s)
 	{
-	  if (indesc >= 2)
-	    {
-	      /* Probably invalid input data in the second set of solvables. Ignore */
-	      continue;
-	    }
+	  if (notfound)
+	    continue;		/* did not find the solvable to extend */
 #if 0
 	  pool_debug(pool, SOLV_WARN, "susetags: stray line: %d: %s\n", pd.lineno, line);
 #endif
