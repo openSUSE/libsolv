@@ -383,6 +383,7 @@ struct oplist {
   { REL_AND,   "&" },
   { REL_OR ,   "|" },
   { REL_WITH , "+" },
+  { REL_WITHOUT , "-" },
   { REL_NAMESPACE , "<NAMESPACE>" },
   { REL_ARCH,       "." },
   { REL_MULTIARCH,  "<MULTIARCH>" },

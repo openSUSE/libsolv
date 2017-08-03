@@ -178,6 +178,8 @@ pool_id2rel(const Pool *pool, Id id)
       return pool->disttype == DISTTYPE_RPM ? " or " : " | ";
     case REL_WITH:
       return pool->disttype == DISTTYPE_RPM ? " with " : " + ";
+    case REL_WITHOUT:
+      return pool->disttype == DISTTYPE_RPM ? " without " : " - ";
     case REL_NAMESPACE:
       return " NAMESPACE ";	/* actually not used in dep2str */
     case REL_ARCH:
@@ -238,8 +240,8 @@ dep2strcpy(const Pool *pool, char *p, Id id, int oldrel)
     {
       Reldep *rd = GETRELDEP(pool, id);
       int rel = rd->flags;
-      if (oldrel == REL_AND || oldrel == REL_OR || oldrel == REL_WITH || oldrel == REL_COND || oldrel == REL_ELSE || oldrel == -1)
-	if (rel == REL_AND || rel == REL_OR || rel == REL_WITH || rel == REL_COND || rel == REL_ELSE)
+      if (oldrel == REL_AND || oldrel == REL_OR || oldrel == REL_WITH || oldrel == REL_WITHOUT || oldrel == REL_COND || oldrel == REL_ELSE || oldrel == -1)
+	if (rel == REL_AND || rel == REL_OR || rel == REL_WITH || rel == REL_WITHOUT || rel == REL_COND || rel == REL_ELSE)
 	  if ((oldrel != rel || rel == REL_COND || rel == REL_ELSE) && !(oldrel == REL_COND && rel == REL_ELSE))
 	    {
 	      *p++ = '(';

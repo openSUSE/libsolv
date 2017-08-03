@@ -946,6 +946,7 @@ typedef int Id;
 %constant int REL_MULTIARCH;
 %constant int REL_ELSE;
 %constant int REL_ERROR;
+%constant int REL_WITHOUT;
 
 typedef struct {
   Pool* const pool;
