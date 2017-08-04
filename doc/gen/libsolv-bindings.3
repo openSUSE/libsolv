@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
-.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 07/26/2017
+.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
+.\"      Date: 08/04/2017
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "07/26/2017" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "08/04/2017" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -2566,7 +2566,7 @@ Returns \-1 if the epoch/version/release of the solvable is less than the one fr
 .RE
 .\}
 .sp
-Return true if the dependencies stored in keyname match the specified dependeny\&.
+Return true if the dependencies stored in keyname match the specified dependency\&.
 .sp
 .if n \{\
 .RS 4
@@ -3561,7 +3561,7 @@ If multiple packages obsolete an installed package, the solver checks the provid
 .PP
 \fBSOLVER_FLAG_NEED_UPDATEPROVIDE\fR
 .RS 4
-This is somewhat the opposite of SOLVER_FLAG_NO_UPDATEPROVIDE: Only packages that provied the installed package names are considered for updating\&.
+This is somewhat the opposite of SOLVER_FLAG_NO_UPDATEPROVIDE: Only packages that provide the installed package names are considered for updating\&.
 .RE
 .PP
 \fBSOLVER_FLAG_SPLITPROVIDES\fR
@@ -5456,7 +5456,7 @@ Create stub repodatas from the information stored in the repodata meta area\&.
 .RE
 .\}
 .sp
-Extend the repodata so that it has the same size as the repo it belongs to\&. This mthod is needed when setting up a new extension repodata so that it matches the repository size\&. It is also needed when switching to a just written repodata extension to make the repodata match the written extension (which is always of the size of the repo)\&.
+Extend the repodata so that it has the same size as the repo it belongs to\&. This method is needed when setting up a new extension repodata so that it matches the repository size\&. It is also needed when switching to a just written repodata extension to make the repodata match the written extension (which is always of the size of the repo)\&.
 .sp
 .if n \{\
 .RS 4

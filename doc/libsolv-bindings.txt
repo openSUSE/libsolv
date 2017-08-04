@@ -1426,7 +1426,7 @@ Note that "equal" does not mean that the evr is identical.
 	solvable.matchesdep(keyname, dep)
 	solvable.matchesdep?(keyname, dep)
 
-Return true if the dependencies stored in keyname match the specified dependeny.
+Return true if the dependencies stored in keyname match the specified dependency.
 
 	Selection Selection(int setflags = 0)
 	my $sel = $solvable->Selection();
@@ -2136,7 +2136,7 @@ by setting this flag.
 
 *SOLVER_FLAG_NEED_UPDATEPROVIDE*::
 This is somewhat the opposite of SOLVER_FLAG_NO_UPDATEPROVIDE: Only
-packages that provied the installed package names are considered
+packages that provide the installed package names are considered
 for updating.
 
 *SOLVER_FLAG_SPLITPROVIDES*::
@@ -3364,7 +3364,7 @@ area.
 	data.extend_to_repo()
 
 Extend the repodata so that it has the same size as the repo it belongs to.
-This mthod is needed when setting up a new extension repodata so that it
+This method is needed when setting up a new extension repodata so that it
 matches the repository size. It is also needed when switching to a just written
 repodata extension to make the repodata match the written extension (which is
 always of the size of the repo).
