@@ -13,7 +13,7 @@
 #include "repoinfo.h"
 #include "mirror.h"
 #include "checksig.h"
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
 #include "repoinfo_config_yum.h"
 #endif
 #include "repoinfo_download.h"
@@ -92,7 +92,7 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
 	  fclose(fp);
 	  if (!cinfo->baseurl)
 	    return 0;
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
 	  if (strchr(cinfo->baseurl, '$'))
 	    {
 	      char *b = yum_substitute(cinfo->repo->pool, cinfo->baseurl);

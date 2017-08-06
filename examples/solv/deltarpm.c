@@ -75,7 +75,7 @@ trydeltadownload(Solvable *s, const char *loc)
 	  seq = pool_tmpappend(pool, seq, "-", pool_lookup_str(pool, SOLVID_POS, DELTA_SEQ_NUM));
 	  if (strchr(seq, '\'') != 0)
 	    continue;
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
 	  sprintf(cmd, "/usr/bin/applydeltarpm -a '%s' -c -s '", archstr);
 #else
 	  sprintf(cmd, "/usr/bin/applydeltarpm -c -s '");
@@ -101,7 +101,7 @@ trydeltadownload(Solvable *s, const char *loc)
 	    continue;
 	  /* got it, now reconstruct */
 	  newfd = opentmpfile();
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
 	  sprintf(cmd, "applydeltarpm -a '%s' /dev/fd/%d /dev/fd/%d", archstr, fileno(fp), newfd);
 #else
 	  sprintf(cmd, "applydeltarpm /dev/fd/%d /dev/fd/%d", fileno(fp), newfd);

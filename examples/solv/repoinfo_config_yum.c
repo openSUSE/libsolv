@@ -1,4 +1,4 @@
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +14,7 @@
 #include "repoinfo_config_yum.h"
 
 
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
 # define REPOINFO_PATH "/etc/yum.repos.d"
 #endif
 #ifdef SUSE
@@ -160,7 +160,7 @@ read_repoinfos_yum(Pool *pool, int *nrepoinfosp)
 	      cinfo->type = TYPE_RPMMD;
 	      cinfo->autorefresh = 1;
 	      cinfo->priority = 99;
-#ifndef FEDORA
+#if !defined(FEDORA) && !defined(MAGEIA)
 	      cinfo->repo_gpgcheck = 1;
 #endif
 	      cinfo->metadata_expire = METADATA_EXPIRE;
