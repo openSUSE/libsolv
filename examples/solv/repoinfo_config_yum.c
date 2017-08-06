@@ -48,7 +48,7 @@ yum_substitute(Pool *pool, char *line)
 	
 	      queue_init(&q);
 	      rpmstate = rpm_state_create(pool, pool_get_rootdir(pool));
-	      rpm_installedrpmdbids(rpmstate, "Providename", "redhat-release", &q);
+	      rpm_installedrpmdbids(rpmstate, "Providename", "system-release", &q);
 	      if (q.count)
 		{
 		  void *handle;
@@ -62,7 +62,7 @@ yum_substitute(Pool *pool, char *line)
 	      queue_free(&q);
 	      if (!releaseevr)
 		{
-		  fprintf(stderr, "no installed package provides 'redhat-release', cannot determine $releasever\n");
+		  fprintf(stderr, "no installed package provides 'system-release', cannot determine $releasever\n");
 		  exit(1);
 		}
 	    }
