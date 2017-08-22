@@ -210,6 +210,8 @@ solver_prune_to_highest_prio_per_name(Solver *solv, Queue *plist)
 	  queue_push(&pq, plist->elements[i]);
 	  name = pool->solvables[pq.elements[0]].name;
 	}
+      else
+	  queue_push(&pq, plist->elements[i]);
     }
   if (pq.count > 2)
     solver_prune_to_highest_prio(solv, &pq);
