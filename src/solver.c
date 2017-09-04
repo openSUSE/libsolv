@@ -140,6 +140,30 @@ solver_dep_fulfilled_alreadyinstalled(Solver *solv, Id dep)
 	    return 0;
           return r1 == 2 ? 2 : 1;
 	}
+      if (rd->flags == REL_UNLESS)
+	{
+	  int r1, r2;
+	  if (ISRELDEP(rd->evr))
+	    {
+	      Reldep *rd2 = GETRELDEP(pool, rd->evr);
+	      if (rd2->flags == REL_ELSE)
+		{
+		  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->name);
+		  if (r1)
+		    {
+		      r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->evr);
+		      return r2 && r1 == 2 ? 2 : r2;
+		    }
+		  return solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+		}
+	    }
+	  /* A AND NOT(B) */
+	  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+	  r2 = !solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
+	  if (!r1 || !r2)
+	    return 0;
+          return r1 == 2 ? 2 : 1;
+	}
       if (rd->flags == REL_AND)
         {
 	  int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);

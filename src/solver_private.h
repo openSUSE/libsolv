@@ -43,6 +43,22 @@ solver_dep_fulfilled(Solver *solv, Id dep)
 	    return 1;
 	  return !solver_dep_fulfilled(solv, rd->evr);
 	}
+      if (rd->flags == REL_UNLESS)
+	{
+	  if (ISRELDEP(rd->evr))
+	    {
+	      Reldep *rd2 = GETRELDEP(pool, rd->evr);
+	      if (rd2->flags == REL_ELSE)
+		{
+		  if (!solver_dep_fulfilled(solv, rd2->name))
+		    return solver_dep_fulfilled(solv, rd->name);
+		  return solver_dep_fulfilled(solv, rd2->evr);
+		}
+	    }
+          if (!solver_dep_fulfilled(solv, rd->name))
+	    return 0;
+	  return !solver_dep_fulfilled(solv, rd->evr);
+	}
       if (rd->flags == REL_AND)
         {
           if (!solver_dep_fulfilled(solv, rd->name))

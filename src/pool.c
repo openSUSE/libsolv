@@ -822,17 +822,17 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
     {
       /* we use potentially matches for complex deps */
       rd1 = GETRELDEP(pool, d1);
-      if (rd1->flags == REL_AND || rd1->flags == REL_OR || rd1->flags == REL_WITH || rd1->flags == REL_WITHOUT || rd1->flags == REL_COND)
+      if (rd1->flags == REL_AND || rd1->flags == REL_OR || rd1->flags == REL_WITH || rd1->flags == REL_WITHOUT || rd1->flags == REL_COND || rd1->flags == REL_UNLESS)
 	{
 	  if (pool_match_dep(pool, rd1->name, d2))
 	    return 1;
-	  if (rd1->flags == REL_COND && ISRELDEP(rd1->evr))
+	  if ((rd1->flags == REL_COND || rd1->flags == REL_UNLESS) && ISRELDEP(rd1->evr))
 	    {
 	      rd1 = GETRELDEP(pool, rd1->evr);
 	      if (rd1->flags != REL_ELSE)
 		return 0;
 	    }
-	  if (rd1->flags != REL_COND && rd1->flags != REL_WITHOUT && pool_match_dep(pool, rd1->evr, d2))
+	  if (rd1->flags != REL_COND && rd1->flags != REL_UNLESS && rd1->flags != REL_WITHOUT && pool_match_dep(pool, rd1->evr, d2))
 	    return 1;
 	  return 0;
 	}
@@ -841,17 +841,17 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
     {
       /* we use potentially matches for complex deps */
       rd2 = GETRELDEP(pool, d2);
-      if (rd2->flags == REL_AND || rd2->flags == REL_OR || rd2->flags == REL_WITH || rd2->flags == REL_WITHOUT || rd2->flags == REL_COND)
+      if (rd2->flags == REL_AND || rd2->flags == REL_OR || rd2->flags == REL_WITH || rd2->flags == REL_WITHOUT || rd2->flags == REL_COND || rd2->flags == REL_UNLESS)
 	{
 	  if (pool_match_dep(pool, d1, rd2->name))
 	    return 1;
-	  if (rd2->flags == REL_COND && ISRELDEP(rd2->evr))
+	  if ((rd2->flags == REL_COND || rd2->flags == REL_UNLESS) && ISRELDEP(rd2->evr))
 	    {
 	      rd2 = GETRELDEP(pool, rd2->evr);
 	      if (rd2->flags != REL_ELSE)
 		return 0;
 	    }
-	  if (rd2->flags != REL_COND && rd2->flags != REL_WITHOUT && pool_match_dep(pool, d1, rd2->evr))
+	  if (rd2->flags != REL_COND && rd2->flags != REL_UNLESS && rd2->flags != REL_WITHOUT && pool_match_dep(pool, d1, rd2->evr))
 	    return 1;
 	  return 0;
 	}
@@ -1130,7 +1130,8 @@ pool_addrelproviders(Pool *pool, Id d)
 	case REL_AND:
 	case REL_OR:
 	case REL_COND:
-	  if (flags == REL_COND)
+	case REL_UNLESS:
+	  if (flags == REL_COND || flags == REL_UNLESS)
 	    {
 	      if (ISRELDEP(evr))
 		{

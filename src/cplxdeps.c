@@ -29,7 +29,7 @@ pool_is_complex_dep_rd(Pool *pool, Reldep *rd)
 {
   for (;;)
     {
-      if (rd->flags == REL_AND || rd->flags == REL_COND)	/* those two are the complex ones */
+      if (rd->flags == REL_AND || rd->flags == REL_COND || rd->flags == REL_UNLESS)	/* those two are the complex ones */
 	return 1;
       if (rd->flags != REL_OR)
 	return 0;
@@ -264,6 +264,29 @@ normalize_dep_if_else(Pool *pool, Id dep1, Id dep2, Id dep3, Queue *bq, int flag
   return -1;
 }
 
+static int
+normalize_dep_unless_else(Pool *pool, Id dep1, Id dep2, Id dep3, Queue *bq, int flags)
+{
+  /* A UNLESS (B ELSE C) -> (A AND ~B) OR (C AND B) */
+  int r1, r2, bqcnt2, bqcnt = bq->count;
+  r1 = normalize_dep_and(pool, dep1, dep2, bq, flags, CPLXDEPS_TODNF);
+  if (r1 == 1)
+    return 1;		/* early exit */
+  bqcnt2 = bq->count;
+  r2 = normalize_dep_and(pool, dep2, dep3, bq, flags, 0);
+  if (r1 == 1 || r2 == 1)
+    {
+      queue_truncate(bq, bqcnt);
+      return 1;
+    }
+  if (r1 == 0)
+    return r2;
+  if (r2 == 0)
+    return r1;
+  if ((flags & CPLXDEPS_TODNF) == 0)
+    return distribute_depblocks(pool, bq, bqcnt, bqcnt2, flags);
+  return -1;
+}
 
 /*
  * returns:
@@ -280,24 +303,32 @@ normalize_dep(Pool *pool, Id dep, Queue *bq, int flags)
   if (pool_is_complex_dep(pool, dep))
     {
       Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_COND)
-        {
-          if (rd->flags == REL_COND)
-            {
-	      Id evr = rd->evr;
-              if (ISRELDEP(evr))
-                {
-                  Reldep *rd2 = GETRELDEP(pool, evr);
-                  if (rd2->flags == REL_ELSE)
-                    return normalize_dep_if_else(pool, rd->name, rd2->name, rd2->evr, bq, flags);
-                }
-              return normalize_dep_or(pool, rd->name, rd->evr, bq, flags, CPLXDEPS_TODNF);
-            }
-          if (rd->flags == REL_OR)
-            return normalize_dep_or(pool, rd->name, rd->evr, bq, flags, 0);
-          if (rd->flags == REL_AND)
-            return normalize_dep_and(pool, rd->name, rd->evr, bq, flags, 0);
-        }
+      if (rd->flags == REL_COND)
+	{
+	  Id evr = rd->evr;
+	  if (ISRELDEP(evr))
+	    {
+	      Reldep *rd2 = GETRELDEP(pool, evr);
+	      if (rd2->flags == REL_ELSE)
+		return normalize_dep_if_else(pool, rd->name, rd2->name, rd2->evr, bq, flags);
+	    }
+	  return normalize_dep_or(pool, rd->name, rd->evr, bq, flags, CPLXDEPS_TODNF);
+	}
+      if (rd->flags == REL_UNLESS)
+	{
+	  Id evr = rd->evr;
+	  if (ISRELDEP(evr))
+	    {
+	      Reldep *rd2 = GETRELDEP(pool, evr);
+	      if (rd2->flags == REL_ELSE)
+		return normalize_dep_unless_else(pool, rd->name, rd2->name, rd2->evr, bq, flags);
+	    }
+	  return normalize_dep_and(pool, rd->name, rd->evr, bq, flags, CPLXDEPS_TODNF);
+	}
+      if (rd->flags == REL_OR)
+	return normalize_dep_or(pool, rd->name, rd->evr, bq, flags, 0);
+      if (rd->flags == REL_AND)
+	return normalize_dep_and(pool, rd->name, rd->evr, bq, flags, 0);
     }
 
   /* fallback case: just use package list */
@@ -362,11 +393,11 @@ pool_add_pos_literals_complex_dep(Pool *pool, Id dep, Queue *q, Map *m, int neg)
   while (ISRELDEP(dep))
     {
       Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags != REL_AND && rd->flags != REL_OR && rd->flags != REL_COND)
+      if (rd->flags != REL_AND && rd->flags != REL_OR && rd->flags != REL_COND && rd->flags != REL_UNLESS)
 	break;
       pool_add_pos_literals_complex_dep(pool, rd->name, q, m, neg);
       dep = rd->evr;
-      if (rd->flags == REL_COND)
+      if (rd->flags == REL_COND || rd->flags == REL_UNLESS)
 	{
 	  neg = !neg;
 	  if (ISRELDEP(dep))

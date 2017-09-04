@@ -890,17 +890,17 @@ matchdep(Pool *pool, Id id, char *rname, int rflags, char *revr, int flags)
   if (ISRELDEP(id))
     {
       Reldep *rd = GETRELDEP(pool, id);
-      if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_WITH || rd->flags == REL_WITHOUT || rd->flags == REL_COND)
+      if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_WITH || rd->flags == REL_WITHOUT || rd->flags == REL_COND || rd->flags == REL_UNLESS)
 	{
 	  if (matchdep(pool, rd->name, rname, rflags, revr, flags))
 	    return 1;
-	  if (rd->flags == REL_COND && ISRELDEP(rd->evr))
+	  if ((rd->flags == REL_COND || rd->flags == REL_UNLESS) && ISRELDEP(rd->evr))
 	    {
 	      rd = GETRELDEP(pool, rd->evr);
 	      if (rd->flags != REL_ELSE)
 		return 0;
 	    }
-	  if (rd->flags != REL_COND && rd->flags != REL_WITHOUT && matchdep(pool, rd->evr, rname, rflags, revr, flags))
+	  if (rd->flags != REL_COND && rd->flags != REL_UNLESS && rd->flags != REL_WITHOUT && matchdep(pool, rd->evr, rname, rflags, revr, flags))
 	    return 1;
 	  return 0;
 	}
