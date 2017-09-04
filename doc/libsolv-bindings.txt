@@ -2500,8 +2500,8 @@ that somewhat describes the problem best to the user.
 
 	Rule *findallproblemrules(bool unfiltered = 0)
 	my @probrules = $problem->findallproblemrules();
-	probrules = problem.findallproblemrule()
-	probrules = problem.findallproblemrule()
+	probrules = problem.findallproblemrules()
+	probrules = problem.findallproblemrules()
 
 Return all rules responsible for the problem. The returned set of rules contains
 all the needed information why there was a problem, but it's hard to present
