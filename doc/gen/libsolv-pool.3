@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
-.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 08/04/2017
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 09/04/2017
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "08/04/2017" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "09/04/2017" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -608,6 +608,11 @@ An internal file conflict dependency used to represent file conflicts\&. See the
 A conditional dependency, the \(lqname\(rq sub\-dependency is only considered if the \(lqevr\(rq sub\-dependency is fulfilled\&. See the section about boolean dependencies about more information\&.
 .RE
 .PP
+\fBREL_UNLESS\fR
+.RS 4
+A conditional dependency, the \(lqname\(rq sub\-dependency is only considered if the \(lqevr\(rq sub\-dependency is not fulfilled\&. See the section about boolean dependencies about more information\&.
+.RE
+.PP
 \fBREL_COMPAT\fR
 .RS 4
 A compat dependency used in Haiku to represent version ranges\&. The \(lqname\(rq part is the actual version, the \(lqevr\(rq part is the backwards compatibility version\&.
@@ -625,7 +630,7 @@ A debian multiarch annotation\&. The most common value for the \(lqevr\(rq part 
 .PP
 \fBREL_ELSE\fR
 .RS 4
-The else part of a \(lqREL_COND\(rq dependency\&. See the section about boolean dependencies\&.
+The else part of a \(lqREL_COND\(rq or \(lqREL_UNLESS\(rq dependency\&. See the section about boolean dependencies\&.
 .RE
 .PP
 \fBREL_ERROR\fR
@@ -1283,9 +1288,14 @@ The expression is true if both dependencies are true and are fulfilled by the sa
 The expression is true if the first dependency is true or the second dependency is false\&. \(lqA REL_COND B\(rq is equivalent to \(lqA REL_OR (NOT B)\(rq (except that libsolv does not expose \(lqNOT\(rq)\&.
 .RE
 .PP
+\fBREL_UNLESS\fR
+.RS 4
+The expression is true if the first dependency is true and the second dependency is false\&. \(lqA REL_UNLESS B\(rq is equivalent to \(lqA REL_AND (NOT B)\(rq (except that libsolv does not expose \(lqNOT\(rq)\&.
+.RE
+.PP
 \fBREL_ELSE\fR
 .RS 4
-The \(lqelse\(rq part of a \(lqREL_COND\(rq dependency\&. It has to be directly in the evr part of \(lqREL_COND\(rq, e\&.g\&. \(lqfoo REL_COND (bar REL_ELSE baz)\(rq\&. This is equivalent to writing \(lq(foo REL_COND bar) REL_AND (bar REL_OR baz)\(rq\&.
+The \(lqelse\(rq part of a \(lqREL_COND\(rq or \(lqREL_UNLESS\(rq dependency\&. It has to be directly in the evr part of the condition, e\&.g\&. \(lqfoo REL_COND (bar REL_ELSE baz)\(rq\&. For \(lqREL_COND\(rq this is equivalent to writing \(lq(foo REL_COND bar) REL_AND (bar REL_OR baz)\(rq\&. For \(lqREL_UNLESS\(rq this is equivalent to writing \(lq(foo REL_UNLESS bar) REL_OR (bar REL_AND baz)\(rq\&.
 .RE
 .sp
 Each sub\-dependency of a boolean dependency can in turn be a boolean dependency, so you can chain them to create complex dependencies\&.

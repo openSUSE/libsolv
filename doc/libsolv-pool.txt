@@ -408,6 +408,11 @@ A conditional dependency, the ``name'' sub-dependency is only considered if
 the ``evr'' sub-dependency is fulfilled. See the section about boolean
 dependencies about more information.
 
+*REL_UNLESS*::
+A conditional dependency, the ``name'' sub-dependency is only considered if
+the ``evr'' sub-dependency is not fulfilled. See the section about boolean
+dependencies about more information.
+
 *REL_COMPAT*::
 A compat dependency used in Haiku to represent version ranges.  The
 ``name'' part is the actual version, the ``evr'' part is the backwards
@@ -424,8 +429,8 @@ A debian multiarch annotation. The most common value for the ``evr''
 part is ``any''.
 
 *REL_ELSE*::
-The else part of a ``REL_COND'' dependency. See the section about
-boolean dependencies.
+The else part of a ``REL_COND'' or ``REL_UNLESS'' dependency. See the
+section about boolean dependencies.
 
 *REL_ERROR*::
 An illegal dependency. This is useful to encode dependency parse errors.
@@ -859,10 +864,19 @@ The expression is true if the first dependency is true or the second
 dependency is false. ``A REL_COND B'' is equivalent to
 ``A REL_OR (NOT B)'' (except that libsolv does not expose ``NOT'').
 
+*REL_UNLESS*::
+The expression is true if the first dependency is true and the second
+dependency is false. ``A REL_UNLESS B'' is equivalent to
+``A REL_AND (NOT B)'' (except that libsolv does not expose ``NOT'').
+
 *REL_ELSE*::
-The ``else'' part of a ``REL_COND'' dependency. It has to be directly
-in the evr part of ``REL_COND'', e.g. ``foo REL_COND (bar REL_ELSE baz)''.
-This is equivalent to writing ``(foo REL_COND bar) REL_AND (bar REL_OR baz)''.
+The ``else'' part of a ``REL_COND'' or ``REL_UNLESS''  dependency.
+It has to be directly in the evr part of the condition,
+e.g. ``foo REL_COND (bar REL_ELSE baz)''.
+For ``REL_COND'' this is equivalent to writing
+``(foo REL_COND bar) REL_AND (bar REL_OR baz)''.
+For ``REL_UNLESS'' this is equivalent to writing
+``(foo REL_UNLESS bar) REL_OR (bar REL_AND baz)''.
 
 Each sub-dependency of a boolean dependency can in turn be a boolean
 dependency, so you can chain them to create complex dependencies.
