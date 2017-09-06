@@ -20,6 +20,7 @@ static struct RichOpComp {
   { "and",     3, REL_AND },
   { "or",      2, REL_OR },
   { "if",      2, REL_COND },
+  { "unless",  6, REL_UNLESS },
   { "else",    4, REL_ELSE },
   { "with",    4, REL_WITH },
   { "without", 7, REL_WITHOUT },
@@ -108,7 +109,7 @@ parseRichDep(Pool *pool, const char **depp, Id chainfl)
   fl = op->fl;
   if (!fl)
     return 0;
-  if (chainfl == REL_COND && fl == REL_ELSE)
+  if ((chainfl == REL_COND || chainfl == REL_UNLESS) && fl == REL_ELSE)
     chainfl = 0;
   if (chainfl && fl != chainfl)
     return 0;

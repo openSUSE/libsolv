@@ -393,6 +393,7 @@ struct oplist {
   { REL_KIND,  "<KIND>" },
   { REL_ELSE, "<ELSE>" },
   { REL_ERROR, "<ERROR>" },
+  { REL_UNLESS, "<UNLESS>" },
   { REL_LT, "<" },
   { 0, 0 }
 };
