@@ -1186,7 +1186,7 @@ rpmdbid2db(unsigned char *db, Id id, int byteswapped)
 #endif
 }
 
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
 int
 serialize_dbenv_ops(struct rpmdbstate *state)
 {
@@ -1227,7 +1227,7 @@ opendbenv(struct rpmdbstate *state)
 
   if (db_env_create(&dbenv, 0))
     return pool_error(state->pool, 0, "db_env_create: %s", strerror(errno));
-#if defined(FEDORA) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
+#if (defined(FEDORA) || defined(MAGEIA)) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
   dbenv->set_thread_count(dbenv, 8);
 #endif
   snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
@@ -1241,7 +1241,7 @@ opendbenv(struct rpmdbstate *state)
     }
   else
     {
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
       int serialize_fd = serialize_dbenv_ops(state);
       r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0644);
       if (serialize_fd >= 0)
@@ -1263,13 +1263,13 @@ opendbenv(struct rpmdbstate *state)
 static void
 closedbenv(struct rpmdbstate *state)
 {
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
   uint32_t eflags = 0;
 #endif
 
   if (!state->dbenv)
     return;
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
   (void)state->dbenv->get_open_flags(state->dbenv, &eflags);
   if (!(eflags & DB_PRIVATE))
     {

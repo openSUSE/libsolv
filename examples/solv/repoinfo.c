@@ -18,13 +18,13 @@
 #include "repoinfo.h"
 #include "repoinfo_cache.h"
 
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
 #include "repoinfo_config_yum.h"
 #endif
 #if defined(DEBIAN)
 #include "repoinfo_config_debian.h"
 #endif
-#if defined(MANDRIVA) || defined(MAGEIA)
+#if defined(MANDRIVA)
 #include "repoinfo_config_urpmi.h"
 #endif
 
@@ -80,7 +80,7 @@ free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
       solv_free(cinfo->components);
     }
   solv_free(repoinfos);
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
   yum_substitute((Pool *)0, 0);		/* free data */
 #endif
 }
@@ -89,10 +89,10 @@ struct repoinfo *
 read_repoinfos(Pool *pool, int *nrepoinfosp)
 {
   struct repoinfo *repoinfos = 0;
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
   repoinfos = read_repoinfos_yum(pool, nrepoinfosp);
 #endif
-#if defined(MANDRIVA) || defined(MAGEIA)
+#if defined(MANDRIVA)
   repoinfos = read_repoinfos_urpmi(pool, nrepoinfosp);
 #endif
 #if defined(DEBIAN)

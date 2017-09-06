@@ -49,7 +49,7 @@
 #include "fileconflicts.h"
 #include "deltarpm.h"
 #endif
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
 #include "patchjobs.h"
 #endif
 
@@ -195,7 +195,7 @@ usage(int r)
   fprintf(stderr, "    search:       search name/summary/description\n");
   fprintf(stderr, "    update:       update installed packages\n");
   fprintf(stderr, "    verify:       check dependencies of installed packages\n");
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
   fprintf(stderr, "    patch:        install newest maintenance updates\n");
 #endif
   fprintf(stderr, "\n");
@@ -244,7 +244,7 @@ main(int argc, char **argv)
       mainmode = MODE_INSTALL;
       mode = SOLVER_INSTALL;
     }
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
   else if (!strcmp(argv[0], "patch"))
     {
       mainmode = MODE_PATCH;
@@ -638,7 +638,7 @@ main(int argc, char **argv)
       exit(0);
     }
 
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
   if (mainmode == MODE_PATCH)
     add_patchjobs(pool, &job);
 #endif
@@ -667,7 +667,7 @@ main(int argc, char **argv)
 rerunsolver:
   solv = solver_create(pool);
   solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
   solver_set_flag(solv, SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
 #endif
   if (mainmode == MODE_ERASE)

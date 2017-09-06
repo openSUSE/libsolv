@@ -1,4 +1,4 @@
-#if defined(SUSE) || defined(FEDORA)
+#if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +14,7 @@
 #include "repoinfo_config_yum.h"
 
 
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
 # define REPOINFO_PATH "/etc/yum.repos.d"
 #endif
 #ifdef SUSE
@@ -48,7 +48,7 @@ yum_substitute(Pool *pool, char *line)
 	
 	      queue_init(&q);
 	      rpmstate = rpm_state_create(pool, pool_get_rootdir(pool));
-	      rpm_installedrpmdbids(rpmstate, "Providename", "redhat-release", &q);
+	      rpm_installedrpmdbids(rpmstate, "Providename", "system-release", &q);
 	      if (q.count)
 		{
 		  void *handle;
@@ -62,7 +62,7 @@ yum_substitute(Pool *pool, char *line)
 	      queue_free(&q);
 	      if (!releaseevr)
 		{
-		  fprintf(stderr, "no installed package provides 'redhat-release', cannot determine $releasever\n");
+		  fprintf(stderr, "no installed package provides 'system-release', cannot determine $releasever\n");
 		  exit(1);
 		}
 	    }
@@ -160,7 +160,7 @@ read_repoinfos_yum(Pool *pool, int *nrepoinfosp)
 	      cinfo->type = TYPE_RPMMD;
 	      cinfo->autorefresh = 1;
 	      cinfo->priority = 99;
-#ifndef FEDORA
+#if !defined(FEDORA) && !defined(MAGEIA)
 	      cinfo->repo_gpgcheck = 1;
 #endif
 	      cinfo->metadata_expire = METADATA_EXPIRE;
