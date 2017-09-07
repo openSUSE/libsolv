@@ -3514,6 +3514,10 @@ rb_eval_string(
     }
     return q;
   }
+
+  int get_decisionlevel(Id p) {
+    return solver_get_decisionlevel($self, p);
+  }
 }
 
 %extend Transaction {
