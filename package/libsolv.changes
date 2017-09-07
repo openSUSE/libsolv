@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Thu Sep  7 16:18:20 CEST 2017 - mls@suse.de
+
+- expose solver_get_recommendations in bindings
+- fix bug in solver_prune_to_highest_prio_per_name resulting in
+  bad solver_get_recommendations output
+- support 'without' and 'unless' dependencies
+- fix yumobs rule generation bug
+- Use same heuristic as upstream to determine src rpms
+- bump version to 0.6.29
+
+-------------------------------------------------------------------
 Fri Jun 30 16:37:31 CEST 2017 - mls@suse.de
 
 - make peace with newer perl versions
