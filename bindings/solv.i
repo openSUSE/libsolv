@@ -3514,6 +3514,23 @@ rb_eval_string(
     }
     return q;
   }
+
+  %typemap(out) Queue get_recommended Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject get_recommended;
+  Queue get_recommended(bool noselected=0) {
+    Queue q;
+    queue_init(&q);
+    solver_get_recommendations($self, &q, NULL, noselected);
+    return q;
+  }
+  %typemap(out) Queue get_suggested Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject get_suggested;
+  Queue get_suggested(bool noselected=0) {
+    Queue q;
+    queue_init(&q);
+    solver_get_recommendations($self, NULL, &q, noselected);
+    return q;
+  }
 }
 
 %extend Transaction {

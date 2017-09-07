@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
-.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 08/27/2017
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 09/07/2017
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "08/27/2017" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "09/07/2017" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3968,6 +3968,36 @@ my \fB(\fR\fI$reason\fR\fB,\fR \fI$rule\fR\fB) =\fR \fI$solver\fR\fB\->describe_
 .\}
 .sp
 Return the reason why a specific solvable was installed or erased\&. For most of the reasons the rule that triggered the decision is also returned\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *get_recommended(bool\fR \fInoselected\fR\fB=0)\fR;
+my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_recommended()\fR;
+\fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_recommended()\fR
+\fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_recommended()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all solvables that are recommended by the solver run result\&. This includes solvables included in the result, set noselected if you want to filter those\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *get_suggested(bool\fR \fInoselected\fR\fB=0)\fR;
+my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_suggested()\fR;
+\fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_suggested()\fR
+\fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_suggested()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all solvables that are suggested by the solver run result\&. This includes solvables included in the result, set noselected if you want to filter those\&.
 .SH "THE PROBLEM CLASS"
 .sp
 Problems are the way of the solver to interact with the user\&. You can simply list all problems and terminate your program, but a better way is to present solutions to the user and let him pick the ones he likes\&.

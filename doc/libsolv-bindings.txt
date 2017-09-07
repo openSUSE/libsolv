@@ -2464,6 +2464,23 @@ interfaces that show both the job result and the problems.
 Return the reason why a specific solvable was installed or erased. For most of
 the reasons the rule that triggered the decision is also returned.
 
+	Solvable *get_recommended(bool noselected=0);
+	my @solvables = $solver->get_recommended();
+	solvables = solver.get_recommended()
+	solvables = solver.get_recommended()
+
+Return all solvables that are recommended by the solver run result. This includes
+solvables included in the result, set noselected if you want to filter those.
+
+	Solvable *get_suggested(bool noselected=0);
+	my @solvables = $solver->get_suggested();
+	solvables = solver.get_suggested()
+	solvables = solver.get_suggested()
+
+Return all solvables that are suggested by the solver run result. This includes
+solvables included in the result, set noselected if you want to filter those.
+
+
 The Problem Class
 -----------------
 Problems are the way of the solver to interact with the user. You can simply list
