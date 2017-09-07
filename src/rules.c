@@ -3647,7 +3647,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
     }
   /* find names so that we can build groups */
   queue_init_clone(&qn, q);
-  prune_to_best_version(solv->pool, &qn);
+  prune_to_best_version(solv, &qn);
 #if 0
 {
   for (i = 0; i < qn.count; i++)
