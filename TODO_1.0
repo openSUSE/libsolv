@@ -23,7 +23,12 @@
 
 - write more manpages
 
+- use dup rules all the time
+
+- bindings: selections.flags() should be a attribute and not a method
+
+- rename repodata_lookup_id_uninternalized to repodata_lookup_id_voidid_uninternalized
+  and add a notfound argument
+
 IDEAS:
-- support REL_UNLESS aka (A & ~B)
-  useful for "Conflicts: (A unless B)"
-- support REL_WITHOUT
+
