@@ -4610,6 +4610,8 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
     {
       if (pool->solvables[p].repo != installed)
 	continue;
+      if (pool->considered != NULL && !MAPTST(pool->considered, p))
+          continue;
       if (!MAPTST(&im, p))
         MAPSET(cleandepsmap, p - installed->start);
     }
