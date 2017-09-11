@@ -4774,7 +4774,7 @@ solver_get_decisionblock(Solver *solv, int level, Queue *decisionq)
 int
 solver_describe_decision(Solver *solv, Id p, Id *infop)
 {
-  int i;
+  int i, in;
   Id pp, why;
 
   if (infop)
@@ -4787,6 +4787,11 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
       break;
   if (i == solv->decisionq.count)	/* just in case... */
     return SOLVER_REASON_UNRELATED;
+
+  in = solv->decisionmap[p] >= 0 ? solv->decisionmap[p] : -solv->decisionmap[p];
+  if (solv->decisionq_reason.elements[in] == SOLVER_REASON_CLEANDEPS_ERASE)
+      return SOLVER_REASON_CLEANDEPS_ERASE;
+
   why = solv->decisionq_why.elements[i];
   if (infop)
     *infop = why > 0 ? why : -why;
