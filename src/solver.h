@@ -341,6 +341,7 @@ extern void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Qu
 extern void solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered);
 extern void solver_get_userinstalled(Solver *solv, Queue *q, int flags);
 extern void pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int flags);
+extern void solver_get_cleandeps(Solver *solv, Queue *cleandepsq);
 
 extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
 extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);

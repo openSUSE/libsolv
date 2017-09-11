@@ -425,4 +425,5 @@ SOLV_1.0 {
 
 SOLV_1.1 {
 		pool_best_solvables;
+		solver_get_cleandeps;
 } SOLV_1.0;

@@ -4435,6 +4435,23 @@ void solver_get_orphaned(Solver *solv, Queue *orphanedq)
   queue_init_clone(orphanedq, &solv->orphaned);
 }
 
+void solver_get_cleandeps(Solver *solv, Queue *cleandepsq)
+{
+  Repo *installed = solv->installed;
+  Solvable *s;
+  Id p;
+
+  queue_empty(cleandepsq);
+  if (!installed || !solv->cleandepsmap.size)
+    return;
+  FOR_REPO_SOLVABLES(installed, p, s)
+    {
+      if (!MAPTST(&solv->cleandepsmap, p - installed->start) || solv->decisionmap[p] >= 0)
+	continue;
+      queue_push(cleandepsq, p);
+    }
+}
+
 void solver_get_recommendations(Solver *solv, Queue *recommendationsq, Queue *suggestionsq, int noselected)
 {
   Pool *pool = solv->pool;
