@@ -1190,14 +1190,15 @@ rpmdbid2db(unsigned char *db, Id id, int byteswapped)
 int
 serialize_dbenv_ops(struct rpmdbstate *state)
 {
-  char lpath[PATH_MAX];
+  char *lpath;
   mode_t oldmask;
   int fd;
   struct flock fl;
 
-  snprintf(lpath, PATH_MAX, "%s/var/lib/rpm/.dbenv.lock", state->rootdir ? state->rootdir : "");
+  lpath = solv_dupjoin(state->rootdir, "/var/lib/rpm/.dbenv.lock", 0);
   oldmask = umask(022);
   fd = open(lpath, (O_RDWR|O_CREAT), 0644);
+  free(lpath);
   umask(oldmask);
   if (fd < 0)
     return -1;
@@ -1221,7 +1222,7 @@ static int
 opendbenv(struct rpmdbstate *state)
 {
   const char *rootdir = state->rootdir;
-  char dbpath[PATH_MAX];
+  char *dbpath;
   DB_ENV *dbenv = 0;
   int r;
 
@@ -1230,13 +1231,15 @@ opendbenv(struct rpmdbstate *state)
 #if (defined(FEDORA) || defined(MAGEIA)) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
   dbenv->set_thread_count(dbenv, 8);
 #endif
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
+  dbpath = solv_dupjoin(rootdir, "/var/lib/rpm", 0);
   if (access(dbpath, W_OK) == -1)
     {
-      snprintf(dbpath, PATH_MAX, "%s/usr/share/rpm/Packages", rootdir ? rootdir : "");
+      free(dbpath);
+      dbpath = solv_dupjoin(rootdir, "/usr/share/rpm/Packages", 0);
       if (access(dbpath, R_OK) == 0)
 	state->is_ostree = 1;
-      snprintf(dbpath, PATH_MAX, "%s%s", rootdir ? rootdir : "", state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
+      free(dbpath);
+      dbpath = solv_dupjoin(rootdir, state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm", 0);
       r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
     }
   else
@@ -1253,9 +1256,11 @@ opendbenv(struct rpmdbstate *state)
   if (r)
     {
       pool_error(state->pool, 0, "dbenv->open: %s", strerror(errno));
+      free(dbpath);
       dbenv->close(dbenv, 0);
       return 0;
     }
+  free(dbpath);
   state->dbenv = dbenv;
   return 1;
 }
@@ -1284,6 +1289,22 @@ closedbenv(struct rpmdbstate *state)
   state->dbenv->close(state->dbenv, 0);
 #endif
   state->dbenv = 0;
+}
+
+static int
+stat_database(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
+{
+  char *dbpath;
+  dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
+  if (stat(dbpath, statbuf))
+    {
+      if (seterror)
+        pool_error(state->pool, -1, "%s: %s", dbpath, strerror(errno));
+      free(dbpath);
+      return -1;
+    }
+  free(dbpath);
+  return 0;
 }
 
 #endif
@@ -1534,7 +1555,6 @@ static int
 count_headers(struct rpmdbstate *state)
 {
   Pool *pool = state->pool;
-  char dbpath[PATH_MAX];
   struct stat statbuf;
   DB *db = 0;
   DBC *dbc = 0;
@@ -1542,8 +1562,7 @@ count_headers(struct rpmdbstate *state)
   DBT dbkey;
   DBT dbdata;
 
-  snprintf(dbpath, PATH_MAX, "%s%s/Name", state->rootdir ? state->rootdir : "", state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
-  if (stat(dbpath, &statbuf))
+  if (stat_database(state, "Name", &statbuf, 0))
     return 0;
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
@@ -1836,7 +1855,6 @@ int
 repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 {
   Pool *pool = repo->pool;
-  char dbpath[PATH_MAX];
   struct stat packagesstat;
   unsigned char newcookie[32];
   const unsigned char *oldcookie = 0;
@@ -1870,10 +1888,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     }
 
   /* XXX: should get ro lock of Packages database! */
-  snprintf(dbpath, PATH_MAX, "%s%s/Packages", state.rootdir ? state.rootdir : "", state.is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
-  if (stat(dbpath, &packagesstat))
+  if (stat_database(&state, "Packages", &packagesstat, 1))
     {
-      pool_error(pool, -1, "%s: %s", dbpath, strerror(errno));
       freestate(&state);
       return -1;
     }
