@@ -234,7 +234,7 @@ solver_dep_fulfilled_alreadyinstalled(Solver *solv, Id dep)
           return r1 == 2 || r2 == 2 ? 2 : 1;
 	}
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-        return solver_splitprovides(solv, rd->evr, 0);
+        return solver_splitprovides(solv, rd->evr, 0) ? 2 : 0;
       if (rd->flags == REL_NAMESPACE && solv->installsuppdepq)
 	{
 	  Queue *q = solv->installsuppdepq;
