@@ -4437,9 +4437,11 @@ void solver_get_orphaned(Solver *solv, Queue *orphanedq)
 
 void solver_get_cleandeps(Solver *solv, Queue *cleandepsq)
 {
+  Pool *pool = solv->pool;
   Repo *installed = solv->installed;
   Solvable *s;
-  Id p;
+  Rule *r;
+  Id p, pp, pr;
 
   queue_empty(cleandepsq);
   if (!installed || !solv->cleandepsmap.size)
@@ -4448,6 +4450,16 @@ void solver_get_cleandeps(Solver *solv, Queue *cleandepsq)
     {
       if (!MAPTST(&solv->cleandepsmap, p - installed->start) || solv->decisionmap[p] >= 0)
 	continue;
+      /* now check the update rule */
+      r = solv->rules + solv->updaterules + (p - solv->installed->start);
+      if (r->p)
+	{
+	  FOR_RULELITERALS(pr, pp, r)
+	    if (solv->decisionmap[pr] > 0)
+	      break;
+	  if (pr)
+	    continue;
+	}
       queue_push(cleandepsq, p);
     }
 }
