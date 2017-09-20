@@ -85,6 +85,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_RULES,		"rules" },
   { TESTCASE_RESULT_GENID,		"genid" },
   { TESTCASE_RESULT_REASON,		"reason" },
+  { TESTCASE_RESULT_CLEANDEPS,		"cleandeps" },
   { 0, 0 }
 };
 
@@ -2120,6 +2121,19 @@ testcase_solverresult(Solver *solv, int resultflags)
 	  strqueue_push(&sq, s);
 	}
       queue_free(&whyq);
+    }
+  if ((resultflags & TESTCASE_RESULT_CLEANDEPS) != 0)
+    {
+      Queue q;
+
+      queue_init(&q);
+      solver_get_cleandeps(solv, &q);
+      for (i = 0; i < q.count; i++)
+	{
+	  s = pool_tmpjoin(pool, "cleandeps ", testcase_solvid2str(pool, q.elements[i]), 0);
+	  strqueue_push(&sq, s);
+	}
+      queue_free(&q);
     }
   strqueue_sort(&sq);
   result = strqueue_join(&sq);
