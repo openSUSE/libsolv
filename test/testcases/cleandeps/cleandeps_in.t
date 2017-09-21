@@ -9,7 +9,8 @@ repo test 0 testtags <inline>
 #>=Pkg: B2 1 1 noarch
 system i686 rpm system
 job install name A = 2 [cleandeps]
-result transaction,problems <inline>
+result transaction,problems,cleandeps <inline>
+#>cleandeps B1-1-1.noarch@system
 #>erase B1-1-1.noarch@system
 #>install B2-1-1.noarch@test
 #>upgrade A-1-1.noarch@system A-2-1.noarch@test
