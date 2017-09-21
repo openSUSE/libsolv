@@ -79,11 +79,12 @@ main(int argc, char **argv)
   int c;
   int ex = 0;
   const char *list = 0;
+  int list_with_deps = 0;
   FILE *fp;
   const char *p;
 
   queue_init(&solq);
-  while ((c = getopt(argc, argv, "vmrhl:s:T:")) >= 0)
+  while ((c = getopt(argc, argv, "vmrhL:l:s:T:")) >= 0)
     {
       switch (c)
       {
@@ -101,6 +102,11 @@ main(int argc, char **argv)
           break;
         case 'l':
 	  list = optarg;
+	  list_with_deps = 0;
+          break;
+        case 'L':
+	  list = optarg;
+	  list_with_deps = 1;
           break;
         case 's':
 	  if ((p = strchr(optarg, ':')))
@@ -153,11 +159,17 @@ main(int argc, char **argv)
 	    printf("test %d:\n", multijob++);
 	  if (list)
 	    {
+	      Id p = 0;
 	      int selflags = SELECTION_NAME|SELECTION_PROVIDES|SELECTION_CANON|SELECTION_DOTARCH|SELECTION_REL|SELECTION_GLOB|SELECTION_FLAT;
 	      if (*list == '/')
 		selflags |= SELECTION_FILELIST;
 	      queue_empty(&job);
-	      selection_make(pool, &job, list, selflags);
+	      if (list_with_deps)
+	        p = testcase_str2solvid(pool, list);
+	      if (p)
+		queue_push2(&job, SOLVER_SOLVABLE, p);
+	      else
+	        selection_make(pool, &job, list, selflags);
 	      if (!job.elements)
 		printf("No match\n");
 	      else
@@ -167,7 +179,29 @@ main(int argc, char **argv)
 		  queue_init(&q);
 		  selection_solvables(pool, &job, &q);
 		  for (i = 0; i < q.count; i++)
-		    printf("  - %s\n", testcase_solvid2str(pool, q.elements[i]));
+		    {
+		      printf("  - %s\n", testcase_solvid2str(pool, q.elements[i]));
+		      if (list_with_deps)
+			{
+			  int j, k;
+			  static Id deps[] = {
+			    SOLVABLE_PROVIDES, SOLVABLE_REQUIRES, SOLVABLE_CONFLICTS, SOLVABLE_OBSOLETES,
+			    SOLVABLE_RECOMMENDS, SOLVABLE_SUGGESTS, SOLVABLE_SUPPLEMENTS, SOLVABLE_ENHANCES,
+			    0
+			  };
+			  for (j = 0; deps[j]; j++)
+			    {
+			      Queue dq;
+			      queue_init(&dq);
+			      pool_lookup_idarray(pool, q.elements[i], deps[j], &dq);
+			      if (dq.count)
+			        printf("    %s:\n", pool_id2str(pool, deps[j]));
+			      for (k = 0; k < dq.count; k++)
+			        printf("      %s\n", pool_dep2str(pool, dq.elements[k]));
+			      queue_free(&dq);
+			    }
+			}
+		    }
 		  queue_free(&q);
 		}
 	    }
