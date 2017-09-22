@@ -2002,43 +2002,78 @@ resolve_jobrules(Solver *solv, int level, int disablerules, Queue *dq)
   return level;
 }
 
+static inline int
+cleandeps_rule_is_true(Solver *solv, Rule *r)
+{
+  Pool *pool = solv->pool;
+  Id p, pp;
+  FOR_RULELITERALS(p, pp, r)
+    if (p > 0 && solv->decisionmap[p] > 0)
+      return 1;
+  return 0;
+}
+
 static int
 cleandeps_check_mistakes(Solver *solv)
 {
   Pool *pool = solv->pool;
-  Rule *r;
-  Id p, pp;
-  int i;
+  Rule *fr;
+  int i, j, nj;
   int mademistake = 0;
 
   if (!solv->cleandepsmap.size)
     return 0;
   /* check for mistakes */
+  policy_update_recommendsmap(solv);
   for (i = solv->installed->start; i < solv->installed->end; i++)
     {
       if (!MAPTST(&solv->cleandepsmap, i - solv->installed->start))
 	continue;
-      r = solv->rules + solv->featurerules + (i - solv->installed->start);
       /* a mistake is when the featurerule is true but the updaterule is false */
-      if (!r->p)
+      fr = solv->rules + solv->featurerules + (i - solv->installed->start);
+      if (!fr->p)
+        fr = solv->rules + solv->updaterules + (i - solv->installed->start);
+      if (!fr->p)
 	continue;
-      FOR_RULELITERALS(p, pp, r)
-	if (p > 0 && solv->decisionmap[p] > 0)
-	  break;
-      if (!p)
-	continue;	/* feature rule is not true */
-      r = solv->rules + solv->updaterules + (i - solv->installed->start);
-      if (!r->p)
-	continue;
-      FOR_RULELITERALS(p, pp, r)
-	if (p > 0 && solv->decisionmap[p] > 0)
-	  break;
-      if (p)
-	continue;	/* update rule is true */
-      POOL_DEBUG(SOLV_DEBUG_SOLVER, "cleandeps mistake: ");
-      solver_printruleclass(solv, SOLV_DEBUG_SOLVER, r);
-      POOL_DEBUG(SOLV_DEBUG_SOLVER, "feature rule: ");
-      solver_printruleclass(solv, SOLV_DEBUG_SOLVER, solv->rules + solv->featurerules + (i - solv->installed->start));
+	{
+	  /* feature rule == update rule */
+	  fr = solv->rules + solv->updaterules + (i - solv->installed->start);
+	  if (!fr->p)
+	    continue;
+	}
+      if (!cleandeps_rule_is_true(solv, fr))
+	{
+	  /* feature rule is not true, thus we cleandeps erased the package */
+	  /* check if the package is recommended/supplemented. if yes, we made a mistake. */
+	  if (!MAPTST(&solv->recommendsmap, i) && !solver_is_supplementing(solv, pool->solvables + i))
+	    continue;	/* feature rule is not true */
+	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "cleandeps recommends mistake: ");
+	  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, fr);
+	}
+      else
+	{
+	  Rule *r = solv->rules + solv->updaterules + (i - solv->installed->start);
+	  if (!r->p || r == fr || cleandeps_rule_is_true(solv, r))
+	    {
+	      /* update rule is true, check best rules */
+	      if (!solv->bestrules_pkg)
+		continue;
+	      nj = solv->bestrules_end - solv->bestrules;
+	      for (j = 0; j < nj; j++)
+		if (solv->bestrules_pkg[j] == i)
+		  {
+		    r = solv->rules + solv->bestrules + j;
+		    if (!cleandeps_rule_is_true(solv, r))
+		      break;
+		  }
+	      if (j == nj)
+		continue;
+	    }
+	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "cleandeps mistake: ");
+	  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, r);
+	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "feature rule: ");
+	  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, fr);
+	}
       if (!solv->cleandeps_mistakes)
 	{
 	  solv->cleandeps_mistakes = solv_calloc(1, sizeof(Queue));
@@ -2794,6 +2829,35 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
   return level;
 }
 
+static int
+resolve_cleandeps(Solver *solv, int level, int disablerules, int *rerunp)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  int olevel;
+  Id p;
+  Solvable *s;
+
+  if (!installed || !solv->cleandepsmap.size)
+    return level;
+  POOL_DEBUG(SOLV_DEBUG_SOLVER, "deciding cleandeps packages\n");
+  for (p = installed->start; p < installed->end; p++)
+    {
+      s = pool->solvables + p;
+      if (s->repo != installed)
+	continue;
+      if (solv->decisionmap[p] != 0 || !MAPTST(&solv->cleandepsmap, p - installed->start))
+	continue;
+      POOL_DEBUG(SOLV_DEBUG_POLICY, "cleandeps erasing %s\n", pool_solvid2str(pool, p));
+      olevel = level;
+      level = setpropagatelearn(solv, level, -p, 0, 0, SOLVER_REASON_CLEANDEPS_ERASE);
+      if (level < olevel)
+	break;
+    }
+  if (p < installed->end)
+    *rerunp = 1;
+  return level;
+}
 
 static int
 resolve_orphaned(Solver *solv, int level, int disablerules, Queue *dq, int *rerunp)
@@ -2999,24 +3063,12 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
       /* decide leftover cleandeps packages */
       if (solv->cleandepsmap.size && solv->installed)
-       {
-         for (p = solv->installed->start; p < solv->installed->end; p++)
-           {
-             s = pool->solvables + p;
-             if (s->repo != solv->installed)
-               continue;
-             if (solv->decisionmap[p] == 0 && MAPTST(&solv->cleandepsmap, p - solv->installed->start))
-               {
-                 POOL_DEBUG(SOLV_DEBUG_POLICY, "cleandeps erasing %s\n", pool_solvid2str(pool, p));
-                 olevel = level;
-                 level = setpropagatelearn(solv, level, -p, 0, 0, SOLVER_REASON_CLEANDEPS_ERASE);
-                 if (level < olevel)
-                   break;
-               }
-           }
-         if (p < solv->installed->end)
-           continue;
-       }
+	{
+	  int rerun = 0;
+	  level = resolve_cleandeps(solv, level, disablerules, &rerun);
+	  if (rerun)
+	    continue;
+	}
 
       /* at this point we have a consistent system. now do the extras... */
 
