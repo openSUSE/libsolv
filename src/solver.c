@@ -2035,12 +2035,6 @@ cleandeps_check_mistakes(Solver *solv)
         fr = solv->rules + solv->updaterules + (i - solv->installed->start);
       if (!fr->p)
 	continue;
-	{
-	  /* feature rule == update rule */
-	  fr = solv->rules + solv->updaterules + (i - solv->installed->start);
-	  if (!fr->p)
-	    continue;
-	}
       if (!cleandeps_rule_is_true(solv, fr))
 	{
 	  /* feature rule is not true, thus we cleandeps erased the package */
