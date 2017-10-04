@@ -128,6 +128,8 @@ main(int argc, char **argv)
     {
       pool = pool_create();
       pool_setdebuglevel(pool, debuglevel);
+      /* report all errors */
+      pool_setdebugmask(pool, pool->debugmask | SOLV_ERROR);
 
       fp = fopen(argv[optind], "r");
       if (!fp)
@@ -184,11 +186,16 @@ main(int argc, char **argv)
 		      if (list_with_deps)
 			{
 			  int j, k;
+			  const char *vendor;
 			  static Id deps[] = {
 			    SOLVABLE_PROVIDES, SOLVABLE_REQUIRES, SOLVABLE_CONFLICTS, SOLVABLE_OBSOLETES,
 			    SOLVABLE_RECOMMENDS, SOLVABLE_SUGGESTS, SOLVABLE_SUPPLEMENTS, SOLVABLE_ENHANCES,
+			    SOLVABLE_PREREQ_IGNOREINST,
 			    0
 			  };
+			  vendor = pool_lookup_str(pool, q.elements[i], SOLVABLE_VENDOR);
+			  if (vendor)
+			    printf("    %s: %s\n", pool_id2str(pool, SOLVABLE_VENDOR), vendor);
 			  for (j = 0; deps[j]; j++)
 			    {
 			      Queue dq;
