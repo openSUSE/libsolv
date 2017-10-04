@@ -4644,7 +4644,7 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
   for (i = 1; i < pool->nsolvables; i++)
     {
       Id *recp, rec, pp2, p2;
-      if (solv->decisionmap[i] < 0 || solv->decisionmap[i] >= level)
+      if (solv->decisionmap[i] <= 0 || solv->decisionmap[i] >= level)
 	continue;
       s = pool->solvables + i;
       if (!s->recommends)
