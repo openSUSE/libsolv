@@ -36,6 +36,7 @@
 #include "solver.h"
 #include "solverdebug.h"
 #include "transaction.h"
+#include "testcase.h"
 #ifdef SUSE
 #include "repo_autopattern.h"
 #endif
@@ -228,6 +229,7 @@ main(int argc, char **argv)
   int keyname_depstr = 0;
   int debuglevel = 0;
   int answer, acnt = 0;
+  char *testcase = 0;
 
   argc--;
   argv++;
@@ -323,6 +325,12 @@ main(int argc, char **argv)
       else if (argc > 2 && !strcmp(argv[1], "--keyname"))
 	{
 	  keyname = argv[2];
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && !strcmp(argv[1], "--testcase"))
+	{
+	  testcase = argv[2];
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -679,7 +687,15 @@ rerunsolver:
       Id problem, solution;
       int pcnt, scnt;
 
-      if (!solver_solve(solv, &job))
+      pcnt = solver_solve(solv, &job);
+      if (testcase)
+	{
+	  printf("Writing solver testcase:\n");
+	  if (!testcase_write(solv, testcase, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0))
+	    printf("%s\n", pool_errstr(pool));
+	  testcase = 0;
+	}
+      if (!pcnt)
 	break;
       pcnt = solver_problem_count(solv);
       printf("Found %d problems:\n", pcnt);
