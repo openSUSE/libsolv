@@ -22,6 +22,9 @@ extern int solver_dep_fulfilled_cplx(Solver *solv, Reldep *rd);
 extern int solver_is_supplementing_alreadyinstalled(Solver *solv, Solvable *s);
 extern void solver_intersect_obsoleted(Solver *solv, Id p, Queue *q, int qstart, Map *m);
 
+extern void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded);
+extern int solver_check_cleandeps_mistakes(Solver *solv);
+
 
 #define ISSIMPLEDEP(pool, dep) (!ISRELDEP(dep) || GETRELDEP(pool, dep)->flags < 8)
 

@@ -1766,85 +1766,6 @@ resolve_jobrules(Solver *solv, int level, int disablerules, Queue *dq)
   return level;
 }
 
-static inline int
-cleandeps_rule_is_true(Solver *solv, Rule *r)
-{
-  Pool *pool = solv->pool;
-  Id p, pp;
-  FOR_RULELITERALS(p, pp, r)
-    if (p > 0 && solv->decisionmap[p] > 0)
-      return 1;
-  return 0;
-}
-
-static int
-cleandeps_check_mistakes(Solver *solv)
-{
-  Pool *pool = solv->pool;
-  Rule *fr;
-  int i, j, nj;
-  int mademistake = 0;
-
-  if (!solv->cleandepsmap.size)
-    return 0;
-  /* check for mistakes */
-  policy_update_recommendsmap(solv);
-  for (i = solv->installed->start; i < solv->installed->end; i++)
-    {
-      if (!MAPTST(&solv->cleandepsmap, i - solv->installed->start))
-	continue;
-      /* a mistake is when the featurerule is true but the updaterule is false */
-      fr = solv->rules + solv->featurerules + (i - solv->installed->start);
-      if (!fr->p)
-        fr = solv->rules + solv->updaterules + (i - solv->installed->start);
-      if (!fr->p)
-	continue;
-      if (!cleandeps_rule_is_true(solv, fr))
-	{
-	  /* feature rule is not true, thus we cleandeps erased the package */
-	  /* check if the package is recommended/supplemented. if yes, we made a mistake. */
-	  if (!MAPTST(&solv->recommendsmap, i) && !solver_is_supplementing(solv, pool->solvables + i))
-	    continue;	/* feature rule is not true */
-	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "cleandeps recommends mistake: ");
-	  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, fr);
-	}
-      else
-	{
-	  Rule *r = solv->rules + solv->updaterules + (i - solv->installed->start);
-	  if (!r->p || r == fr || cleandeps_rule_is_true(solv, r))
-	    {
-	      /* update rule is true, check best rules */
-	      if (!solv->bestrules_pkg)
-		continue;
-	      nj = solv->bestrules_end - solv->bestrules;
-	      for (j = 0; j < nj; j++)
-		if (solv->bestrules_pkg[j] == i)
-		  {
-		    r = solv->rules + solv->bestrules + j;
-		    if (!cleandeps_rule_is_true(solv, r))
-		      break;
-		  }
-	      if (j == nj)
-		continue;
-	    }
-	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "cleandeps mistake: ");
-	  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, r);
-	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "feature rule: ");
-	  solver_printruleclass(solv, SOLV_DEBUG_SOLVER, fr);
-	}
-      if (!solv->cleandeps_mistakes)
-	{
-	  solv->cleandeps_mistakes = solv_calloc(1, sizeof(Queue));
-	  queue_init(solv->cleandeps_mistakes);
-	}
-      queue_push(solv->cleandeps_mistakes, i);
-      MAPCLR(&solv->cleandepsmap, i - solv->installed->start);
-      solver_reenablepolicyrules_cleandeps(solv, i);
-      mademistake = 1;
-    }
-  return mademistake;
-}
-
 static void
 prune_to_update_targets(Solver *solv, Id *cp, Queue *q)
 {
@@ -2866,7 +2787,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	    continue;		/* back to main loop */
 	}
 
-      if (solv->installed && solv->cleandepsmap.size && cleandeps_check_mistakes(solv))
+      if (solv->installed && solv->cleandepsmap.size && solver_check_cleandeps_mistakes(solv))
 	{
 	  solver_reset(solv);
 	  level = 0;	/* restart from scratch */
@@ -3176,7 +3097,7 @@ solver_addjobrule(Solver *solv, Id p, Id p2, Id d, Id job, int weak)
 }
 
 static inline void
-add_cleandeps_package(Solver *solv, Id p)
+add_cleandeps_updatepkg(Solver *solv, Id p)
 {
   if (!solv->cleandeps_updatepkgs)
     {
@@ -3215,7 +3136,7 @@ add_update_target(Solver *solv, Id p, Id how)
 	  MAPSET(&solv->bestupdatemap, pi - installed->start);
 	}
       if (how & SOLVER_CLEANDEPS)
-	add_cleandeps_package(solv, pi);
+	add_cleandeps_updatepkg(solv, pi);
       queue_push2(solv->update_targets, pi, p);
       /* check if it's ok to keep the installed package */
       if (s->evr == si->evr && solvable_identical(s, si))
@@ -3244,7 +3165,7 @@ add_update_target(Solver *solv, Id p, Id how)
 		  MAPSET(&solv->bestupdatemap, pi - installed->start);
 		}
 	      if (how & SOLVER_CLEANDEPS)
-		add_cleandeps_package(solv, pi);
+		add_cleandeps_updatepkg(solv, pi);
 	      queue_push2(solv->update_targets, pi, p);
 	    }
 	}
@@ -3604,7 +3525,7 @@ solver_solve(Solver *solv, Queue *job)
 		  if (how & SOLVER_CLEANDEPS)
 		    {
 		      FOR_REPO_SOLVABLES(installed, p, s)
-			add_cleandeps_package(solv, p);
+			add_cleandeps_updatepkg(solv, p);
 		    }
 		}
 	      else if (select == SOLVER_SOLVABLE_REPO)
@@ -3620,7 +3541,7 @@ solver_solve(Solver *solv, Queue *job)
 		      if (how & SOLVER_CLEANDEPS)
 			{
 			  FOR_REPO_SOLVABLES(installed, p, s)
-			    add_cleandeps_package(solv, p);
+			    add_cleandeps_updatepkg(solv, p);
 			}
 		      break;
 		    }
@@ -3650,7 +3571,7 @@ solver_solve(Solver *solv, Queue *job)
 			      MAPSET(&solv->bestupdatemap, p - installed->start);
 			    }
 			  if (how & SOLVER_CLEANDEPS)
-			    add_cleandeps_package(solv, p);
+			    add_cleandeps_updatepkg(solv, p);
 			  targeted = 0;
 			}
 		      if (!targeted || solv->noautotarget)
